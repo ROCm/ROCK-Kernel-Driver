@@ -489,28 +489,50 @@ static inline void reverse_order(u32 *l)
  * rivafb_cursor()
  */
 static void rivafb_load_cursor_image(struct riva_par *par, u8 *data, 
-				     u16 bg, u16 fg, u32 w, u32 h)
+				     u8 *mask, u16 bg, u16 fg, u32 w, u32 h)
 {
 	int i, j, k = 0;
-	u32 b, tmp;
+	u32 b, m, tmp;
 
 	for (i = 0; i < h; i++) {
 		b = *((u32 *)data)++;
+		m = *((u32 *)mask)++;
 		reverse_order(&b);
 		
 		for (j = 0; j < w/2; j++) {
 			tmp = 0;
 #if defined (__BIG_ENDIAN)
+			if (m & (1 << 31)) {
+				fg |= 1 << 15;
+				bg |= 1 << 15;
+			}
 			tmp = (b & (1 << 31)) ? fg << 16 : bg << 16;
 			b <<= 1;
+			m <<= 1;
 
+			if (m & (1 << 31)) {
+				fg |= 1 << 15;
+				bg |= 1 << 15;
+			}
 			tmp |= (b & (1 << 31)) ? fg : bg;
 			b <<= 1;
+			m <<= 1;
 #else
+			if (m & 1) {
+				fg |= 1 << 15;
+				bg |= 1 << 15;
+			}
 			tmp = (b & 1) ? fg : bg;
 			b >>= 1;
+			m >>= 1;
+			
+			if (m & 1) {
+				fg |= 1 << 15;
+				bg |= 1 << 15;
+			}
 			tmp |= (b & 1) ? fg << 16 : bg << 16;
 			b >>= 1;
+			m >>= 1;
 #endif
 			writel(tmp, par->riva.CURSOR + k++);
 		}
@@ -1449,7 +1471,8 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	struct riva_par *par = (struct riva_par *) info->par;
 	int i, j, d_idx = 0, s_idx = 0;
 	u8 data[MAX_CURS * MAX_CURS/8];
-	u16 fg, bg, size = 0;
+	u8 mask[MAX_CURS * MAX_CURS/8];
+	u16 fg, bg;
 
 	par->riva.ShowHideCursor(&par->riva, 0);
 
@@ -1480,43 +1503,40 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	if (cursor->set & (FB_CUR_SETSHAPE | FB_CUR_SETCMAP)) {
 		u32 bg_idx = info->cursor.image.bg_color;
 		u32 fg_idx = info->cursor.image.fg_color;
-		u32 width = (info->cursor.image.width+7) >> 3;
+		u32 s_pitch = (info->cursor.image.width+7) >> 3;
+		u32 d_pitch = MAX_CURS/8;
 		u8 *dat = (u8 *) cursor->image.data;
 		u8 *msk = (u8 *) info->cursor.mask;
-
+		u8 src[64];	
+		
 		switch (info->cursor.rop) {
 		case ROP_XOR:
-			for (i = 0; i < info->cursor.image.height; i++) {
-				for (j = 0; j < width; j++) {
-					d_idx = i * MAX_CURS/8  + j;
-					data[d_idx] = dat[s_idx] ^ msk[s_idx];
-					s_idx++;
-				}
-			}
+			for (i = 0; i < s_pitch * info->cursor.image.height; i++)
+					src[i] = dat[i] ^ msk[i];
 			break;
 		case ROP_COPY:
 		default:
-			for (i = 0; i < info->cursor.image.height; i++) {
-				for (j = 0; j < width; j++) {
-					d_idx = i * MAX_CURS/8 + j;
-					data[d_idx] = dat[s_idx] & msk[s_idx];
-					s_idx++;
-				}
-			}
+			for (i = 0; i < s_pitch * info->cursor.image.height; i++)
+				
+					src[i] = dat[i] & msk[i];
 			break;
 		}
+		
+		move_buf_aligned(info, data, src, d_pitch, s_pitch, info->cursor.image.height);
+
+		move_buf_aligned(info, mask, msk, d_pitch, s_pitch, info->cursor.image.height);
 
 		bg = ((info->cmap.red[bg_idx] & 0xf8) << 7) |
 		     ((info->cmap.green[bg_idx] & 0xf8) << 2) |
-		     ((info->cmap.blue[bg_idx] & 0xf8) >> 3) | 1 << 15;
+		     ((info->cmap.blue[bg_idx] & 0xf8) >> 3);
 
 		fg = ((info->cmap.red[fg_idx] & 0xf8) << 7) |
 		     ((info->cmap.green[fg_idx] & 0xf8) << 2) |
-		     ((info->cmap.blue[fg_idx] & 0xf8) >> 3) | 1 << 15;
+		     ((info->cmap.blue[fg_idx] & 0xf8) >> 3);
 
 		par->riva.LockUnlock(&par->riva, 0);
 
-		rivafb_load_cursor_image(par, data, bg, fg,
+		rivafb_load_cursor_image(par, data, mask, bg, fg,
 					 info->cursor.image.width, 
 					 info->cursor.image.height);
 	}
