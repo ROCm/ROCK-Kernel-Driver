@@ -1238,13 +1238,20 @@ probe_error:
 
 void usb_serial_disconnect(struct usb_interface *interface)
 {
+	int i;
 	struct usb_serial *serial = usb_get_intfdata (interface);
 	struct device *dev = &interface->dev;
+	struct usb_serial_port *port;
 
 	dbg ("%s", __FUNCTION__);
 
 	usb_set_intfdata (interface, NULL);
 	if (serial) {
+		for (i = 0; i < serial->num_ports; ++i) {
+			port = serial->port[i];
+			if (port && port->tty)
+				tty_hangup(port->tty);
+		}
 		/* let the last holder of this object 
 		 * cause it to be cleaned up */
 		kref_put(&serial->kref, destroy_serial);
