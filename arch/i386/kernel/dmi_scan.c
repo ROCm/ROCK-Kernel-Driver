@@ -419,18 +419,6 @@ static __init int broken_ps2_resume(struct dmi_blacklist *d)
 	return 0;
 }
 
-/*
- *	Exploding PnPBIOS. Don't yet know if its the BIOS or us for
- *	some entries
- */
-
-static __init int exploding_pnp_bios(struct dmi_blacklist *d)
-{
-	printk(KERN_WARNING "%s detected. Disabling PnPBIOS\n", d->ident);
-	dmi_broken |= BROKEN_PNP_BIOS;
-	return 0;
-}
-
 static __init int acer_cpufreq_pst(struct dmi_blacklist *d)
 {
 	printk(KERN_WARNING "%s laptop with broken PST tables in BIOS detected.\n", d->ident);
@@ -734,18 +722,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_DATE, "10/26/01"), NO_MATCH
 			} },
 			
-	{ exploding_pnp_bios, "Higraded P14H", {	/* PnPBIOS GPF on boot */
-			MATCH(DMI_BIOS_VENDOR, "American Megatrends Inc."),
-			MATCH(DMI_BIOS_VERSION, "07.00T"),
-			MATCH(DMI_SYS_VENDOR, "Higraded"),
-			MATCH(DMI_PRODUCT_NAME, "P14H")
-			} },
-	{ exploding_pnp_bios, "ASUS P4P800", {	/* PnPBIOS GPF on boot */
-			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer Inc."),
-			MATCH(DMI_BOARD_NAME, "P4P800"),
-			NO_MATCH, NO_MATCH
-			} },
-
 	/* Machines which have problems handling enabled local APICs */
 
 	{ local_apic_kills_bios, "Dell Inspiron", {
