@@ -290,8 +290,11 @@ static void destroy_async (struct dev_state *ps, struct list_head *list)
 		spin_lock_irqsave(&ps->lock, flags);
 	}
 	spin_unlock_irqrestore(&ps->lock, flags);
-	while ((as = async_getcompleted(ps)))
+	as = async_getcompleted(ps);
+	while (as) {
 		free_async(as);
+		as = async_getcompleted(ps);
+	}
 }
 
 static void destroy_async_on_interface (struct dev_state *ps, unsigned int ifnum)
@@ -968,29 +971,27 @@ static int proc_unlinkurb(struct dev_state *ps, void __user *arg)
 static int processcompl(struct async *as)
 {
 	struct urb *urb = as->urb;
+	struct usbdevfs_urb __user *userurb = as->userurb;
 	unsigned int i;
 
 	if (as->userbuffer)
 		if (copy_to_user(as->userbuffer, urb->transfer_buffer, urb->transfer_buffer_length))
 			return -EFAULT;
-	if (put_user(urb->status,
-		     &((struct usbdevfs_urb *)as->userurb)->status))
+	if (put_user(urb->status, &userurb->status))
 		return -EFAULT;
-	if (put_user(urb->actual_length,
-		     &((struct usbdevfs_urb *)as->userurb)->actual_length))
+	if (put_user(urb->actual_length, &userurb->actual_length))
 		return -EFAULT;
-	if (put_user(urb->error_count,
-		     &((struct usbdevfs_urb *)as->userurb)->error_count))
+	if (put_user(urb->error_count, &userurb->error_count))
 		return -EFAULT;
 
 	if (!(usb_pipeisoc(urb->pipe)))
 		return 0;
 	for (i = 0; i < urb->number_of_packets; i++) {
 		if (put_user(urb->iso_frame_desc[i].actual_length,
-			     &((struct usbdevfs_urb *)as->userurb)->iso_frame_desc[i].actual_length))
+			     &userurb->iso_frame_desc[i].actual_length))
 			return -EFAULT;
 		if (put_user(urb->iso_frame_desc[i].status,
-			     &((struct usbdevfs_urb *)as->userurb)->iso_frame_desc[i].status))
+			     &userurb->iso_frame_desc[i].status))
 			return -EFAULT;
 	}
 	return 0;

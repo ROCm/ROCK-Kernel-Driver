@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2002-3 Patrick Mochel
  * Copyright (c) 2002-3 Open Source Development Labs
- * 
+ *
  * This file is released under the GPLv2
  *
  */
@@ -15,8 +15,8 @@
 #include <linux/string.h>
 #include "base.h"
 
-#define to_dev(node) container_of(node,struct device,driver_list)
-#define to_drv(obj) container_of(obj,struct device_driver,kobj)
+#define to_dev(node) container_of(node, struct device, driver_list)
+#define to_drv(obj) container_of(obj, struct device_driver, kobj)
 
 /**
  *	driver_create_file - create sysfs file for driver.
@@ -28,7 +28,7 @@ int driver_create_file(struct device_driver * drv, struct driver_attribute * att
 {
 	int error;
 	if (get_driver(drv)) {
-		error = sysfs_create_file(&drv->kobj,&attr->attr);
+		error = sysfs_create_file(&drv->kobj, &attr->attr);
 		put_driver(drv);
 	} else
 		error = -EINVAL;
@@ -45,7 +45,7 @@ int driver_create_file(struct device_driver * drv, struct driver_attribute * att
 void driver_remove_file(struct device_driver * drv, struct driver_attribute * attr)
 {
 	if (get_driver(drv)) {
-		sysfs_remove_file(&drv->kobj,&attr->attr);
+		sysfs_remove_file(&drv->kobj, &attr->attr);
 		put_driver(drv);
 	}
 }
@@ -76,7 +76,7 @@ void put_driver(struct device_driver * drv)
  *	@drv:	driver to register
  *
  *	We pass off most of the work to the bus_add_driver() call,
- *	since most of the things we have to do deal with the bus 
+ *	since most of the things we have to do deal with the bus
  *	structures.
  *
  *	The one interesting aspect is that we initialize @drv->unload_sem
@@ -99,8 +99,8 @@ int driver_register(struct device_driver * drv)
  *
  *	Though, once that is done, we attempt to take @drv->unload_sem.
  *	This will block until the driver refcount reaches 0, and it is
- *	released. Only modular drivers will call this function, and we 
- *	have to guarantee that it won't complete, letting the driver 
+ *	released. Only modular drivers will call this function, and we
+ *	have to guarantee that it won't complete, letting the driver
  *	unload until all references are gone.
  */
 
