@@ -1145,7 +1145,7 @@ struct arp_iter_state {
 static struct neighbour *neigh_get_first(struct seq_file *seq)
 {
 	struct arp_iter_state* state = seq->private;
-	struct neighbour *n;
+	struct neighbour *n = NULL;
 
 	state->is_pneigh = 0;
 
