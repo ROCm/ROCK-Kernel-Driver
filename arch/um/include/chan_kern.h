@@ -12,6 +12,7 @@
 
 struct chan {
 	struct list_head list;
+	char *dev;
 	unsigned int primary:1;
 	unsigned int input:1;
 	unsigned int output:1;
@@ -38,6 +39,8 @@ extern int chan_window_size(struct list_head *chans,
 			     unsigned short *rows_out, 
 			     unsigned short *cols_out);
 extern int chan_out_fd(struct list_head *chans);
+extern int chan_config_string(struct list_head *chans, char *str, int size,
+			      char **error_out);
 
 #endif
 
