@@ -910,6 +910,12 @@ e1000_setup_copper_link(struct e1000_hw *hw)
     if(ret_val)
         return ret_val;
 
+    if(hw->mac_type == e1000_82545_rev_3) {
+        ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, &phy_data);
+        phy_data |= 0x00000008;
+        ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, phy_data);
+    }
+
     if(hw->mac_type <= e1000_82543 ||
        hw->mac_type == e1000_82541 || hw->mac_type == e1000_82547 ||
        hw->mac_type == e1000_82541_rev_2 || hw->mac_type == e1000_82547_rev_2)
