@@ -865,6 +865,24 @@ ixgb_free_tx_resources(struct ixgb_adapter *adapter)
 	adapter->tx_ring.desc = NULL;
 }
 
+static inline void
+ixgb_unmap_and_free_tx_resource(struct ixgb_adapter *adapter,
+					struct ixgb_buffer *buffer_info)
+{
+	struct pci_dev *pdev = adapter->pdev;
+	if(buffer_info->dma) {
+		pci_unmap_page(pdev,
+			   buffer_info->dma,
+			   buffer_info->length,
+			   PCI_DMA_TODEVICE);
+		buffer_info->dma = 0;
+	}
+	if(buffer_info->skb) {
+		dev_kfree_skb_any(buffer_info->skb);
+		buffer_info->skb = NULL;
+	}
+}
+
 /**
  * ixgb_clean_tx_ring - Free Tx Buffers
  * @adapter: board private structure
@@ -874,7 +892,6 @@ static void ixgb_clean_tx_ring(struct ixgb_adapter *adapter)
 {
 	struct ixgb_desc_ring *tx_ring = &adapter->tx_ring;
 	struct ixgb_buffer *buffer_info;
-	struct pci_dev *pdev = adapter->pdev;
 	unsigned long size;
 	unsigned int i;
 
@@ -882,16 +899,7 @@ static void ixgb_clean_tx_ring(struct ixgb_adapter *adapter)
 
 	for (i = 0; i < tx_ring->count; i++) {
 		buffer_info = &tx_ring->buffer_info[i];
-		if (buffer_info->skb) {
-
-			pci_unmap_page(pdev,
-				       buffer_info->dma,
-				       buffer_info->length, PCI_DMA_TODEVICE);
-
-			dev_kfree_skb(buffer_info->skb);
-
-			buffer_info->skb = NULL;
-		}
+		ixgb_unmap_and_free_tx_resource(adapter, buffer_info);
 	}
 
 	size = sizeof(struct ixgb_buffer) * tx_ring->count;
@@ -1660,7 +1668,6 @@ static boolean_t ixgb_clean_tx_irq(struct ixgb_adapter *adapter)
 {
 	struct ixgb_desc_ring *tx_ring = &adapter->tx_ring;
 	struct net_device *netdev = adapter->netdev;
-	struct pci_dev *pdev = adapter->pdev;
 	struct ixgb_tx_desc *tx_desc, *eop_desc;
 	struct ixgb_buffer *buffer_info;
 	unsigned int i, eop;
@@ -1681,24 +1688,9 @@ static boolean_t ixgb_clean_tx_irq(struct ixgb_adapter *adapter)
 			       IXGB_TX_DESC_POPTS_IXSM))
 				adapter->hw_csum_tx_good++;
 
-			if (buffer_info->dma) {
+			ixgb_unmap_and_free_tx_resource(adapter, buffer_info);
 
-				pci_unmap_page(pdev,
-					       buffer_info->dma,
-					       buffer_info->length,
-					       PCI_DMA_TODEVICE);
-
-				buffer_info->dma = 0;
-			}
-
-			if (buffer_info->skb) {
-
-				dev_kfree_skb_any(buffer_info->skb);
-
-				buffer_info->skb = NULL;
-			}
-
-			*(uint32_t *) & (tx_desc->status) = 0;
+			*(uint32_t *)&(tx_desc->status) = 0;
 
 			cleaned = (i == eop);
 			if (++i == tx_ring->count)
