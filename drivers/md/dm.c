@@ -310,7 +310,6 @@ static void __map_bio(struct dm_target *ti, struct bio *clone)
 	 * anything, the target has assumed ownership of
 	 * this io.
 	 */
-	atomic_inc(&io->md->pending);
 	atomic_inc(&io->io_count);
 	r = ti->type->map(ti, clone);
 	if (r > 0)
@@ -424,6 +423,7 @@ static void __split_bio(struct mapped_device *md, struct bio *bio)
 	ci.sector_count = bio_sectors(bio);
 	ci.idx = 0;
 
+	atomic_inc(&md->pending);
 	while (ci.sector_count)
 		__clone_and_map(&ci);
 
