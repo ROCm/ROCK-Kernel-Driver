@@ -142,6 +142,21 @@ struct scsi_request *scsi_allocate_request(struct scsi_device *sdev,
 
 void __scsi_release_request(struct scsi_request *sreq)
 {
+	struct request *req = sreq->sr_request;
+
+	/* unlikely because the tag was usually ended earlier by the
+	 * mid-layer. However, for layering reasons ULD's don't end
+	 * the tag of commands they generate. */
+	if (unlikely(blk_rq_tagged(req))) {
+		unsigned long flags;
+		struct request_queue *q = req->q;
+
+		spin_lock_irqsave(q->queue_lock, flags);
+		blk_queue_end_tag(q, req);
+		spin_unlock_irqrestore(q->queue_lock, flags);
+	}
+
+
 	if (likely(sreq->sr_command != NULL)) {
 		struct scsi_cmnd *cmd = sreq->sr_command;
 
