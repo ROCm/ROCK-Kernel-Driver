@@ -108,6 +108,10 @@
 	Note that the peak rate TBF is much more tough: with MTU 1500
 	P_crit = 150Kbytes/sec. So, if you need greater peak
 	rates, use alpha with HZ=1000 :-)
+
+	With classful TBF, limit is just kept for backwards compatibility.
+	It is passed to the default bfifo qdisc - if the inner qdisc is
+	changed the limit is not effective anymore.
 */
 
 struct tbf_sched_data
@@ -136,7 +140,7 @@ static int tbf_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
 	int ret;
 
-	if (skb->len > q->max_size || sch->stats.backlog + skb->len > q->limit) {
+	if (skb->len > q->max_size) {
 		sch->stats.drops++;
 #ifdef CONFIG_NET_CLS_POLICE
 		if (sch->reshape_fail == NULL || sch->reshape_fail(skb, sch))
@@ -152,7 +156,6 @@ static int tbf_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 	}	
 	
 	sch->q.qlen++;
-	sch->stats.backlog += skb->len;
 	sch->stats.bytes += skb->len;
 	sch->stats.packets++;
 	return 0;
@@ -163,10 +166,8 @@ static int tbf_requeue(struct sk_buff *skb, struct Qdisc* sch)
 	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
 	int ret;
 	
-	if ((ret = q->qdisc->ops->requeue(skb, q->qdisc)) == 0) {
+	if ((ret = q->qdisc->ops->requeue(skb, q->qdisc)) == 0)
 		sch->q.qlen++; 
-		sch->stats.backlog += skb->len;
-	}
 	
 	return ret;
 }
@@ -178,7 +179,6 @@ static unsigned int tbf_drop(struct Qdisc* sch)
 	
 	if ((len = q->qdisc->ops->drop(q->qdisc)) != 0) {
 		sch->q.qlen--;
-		sch->stats.backlog -= len;
 		sch->stats.drops++;
 	}
 	return len;
@@ -224,7 +224,6 @@ static struct sk_buff *tbf_dequeue(struct Qdisc* sch)
 			q->t_c = now;
 			q->tokens = toks;
 			q->ptokens = ptoks;
-			sch->stats.backlog -= len;
 			sch->q.qlen--;
 			sch->flags &= ~TCQ_F_THROTTLED;
 			return skb;
@@ -253,7 +252,6 @@ static struct sk_buff *tbf_dequeue(struct Qdisc* sch)
 		if (q->qdisc->ops->requeue(skb, q->qdisc) != NET_XMIT_SUCCESS) {
 			/* When requeue fails skb is dropped */ 
 			sch->q.qlen--;
-			sch->stats.backlog -= len;
 			sch->stats.drops++;
 		}	
 		
@@ -269,7 +267,6 @@ static void tbf_reset(struct Qdisc* sch)
 
 	qdisc_reset(q->qdisc);
 	sch->q.qlen = 0;
-	sch->stats.backlog = 0;
 	PSCHED_GET_TIME(q->t_c);
 	q->tokens = q->buffer;
 	q->ptokens = q->mtu;
@@ -456,7 +453,6 @@ static int tbf_graft(struct Qdisc *sch, unsigned long arg, struct Qdisc *new,
 	*old = xchg(&q->qdisc, new);
 	qdisc_reset(*old);
 	sch->q.qlen = 0;
-	sch->stats.backlog = 0;
 	sch_tree_unlock(sch);
 	
 	return 0;
