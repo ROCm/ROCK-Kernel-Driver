@@ -3486,7 +3486,7 @@ static int do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs *
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
-
+	bprm.security = NULL;
 	bprm.mm = mm_alloc();
 	retval = -ENOMEM;
 	if (!bprm.mm)
@@ -3503,6 +3503,10 @@ static int do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs *
 	bprm.envc = count32(envp, bprm.p / sizeof(u32));
 	if ((retval = bprm.envc) < 0)
 		goto out_mm;
+
+	retval = security_ops->bprm_alloc_security(&bprm);
+	if (retval) 
+		goto out;
 
 	retval = prepare_binprm(&bprm);
 	if (retval < 0) 
@@ -3522,9 +3526,11 @@ static int do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs *
 		goto out; 
 
 	retval = search_binary_handler(&bprm,regs);
-	if (retval >= 0)
+	if (retval >= 0) {
 		/* execve success */
+		security_ops->bprm_free_security(&bprm);
 		return retval;
+	}
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
@@ -3533,6 +3539,9 @@ out:
 		if (page)
 			__free_page(page);
 	}
+
+	if (bprm.security)
+		security_ops->bprm_free_security(&bprm);
 
 out_mm:
 	mmdrop(bprm.mm);

@@ -19,9 +19,20 @@
  */
 static inline unsigned long get_reg(struct task_struct *task, int regno)
 {
-	if (regno < (sizeof(struct pt_regs) / sizeof(unsigned long)))
-		return ((unsigned long *)task->thread.regs)[regno];
-	return 0;
+	unsigned long tmp = 0;
+
+	/*
+	 * Put the correct FP bits in, they might be wrong as a result
+	 * of our lazy FP restore.
+	 */
+	if (regno == PT_MSR) {
+		tmp = ((unsigned long *)task->thread.regs)[PT_MSR];
+		tmp |= task->thread.fpexc_mode;
+	} else if (regno < (sizeof(struct pt_regs) / sizeof(unsigned long))) {
+		tmp = ((unsigned long *)task->thread.regs)[regno];
+	}
+
+	return tmp;
 }
 
 /*

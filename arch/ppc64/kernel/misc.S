@@ -728,11 +728,16 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_futex
 	.llong .sys32_sched_setaffinity
 	.llong .sys32_sched_getaffinity
-	.llong .sys_ni_syscall		/* reserved for security */
+	.llong .sys_security
 	.llong .sys_ni_syscall		/* 225 - reserved for tux */
 	.llong .sys32_sendfile64
+	.llong .sys_ni_syscall		/* reserved for sys_io_setup */
+	.llong .sys_ni_syscall		/* reserved for sys_io_destroy */
+	.llong .sys_ni_syscall		/* reserved for sys_io_getevents */
+	.llong .sys_ni_syscall		/* 230 - reserved for sys_io_submit */
+	.llong .sys_ni_syscall		/* reserved for sys_io_cancel */
 
-	.rept NR_syscalls-226
+	.rept NR_syscalls-231
 		.llong .sys_ni_syscall
 	.endr
 #endif
@@ -963,10 +968,15 @@ _GLOBAL(sys_call_table)
 	.llong .sys_futex
 	.llong .sys_sched_setaffinity
 	.llong .sys_sched_getaffinity
-	.llong .sys_ni_syscall		/* reserved for security */
-	.llong .sys_ni_syscall		/* reserved for tux */
-	.llong .sys_ni_syscall		/* 225 - 32bit only sendfile64 */
+	.llong .sys_security
+	.llong .sys_ni_syscall		/* 225 - reserved for tux */
+	.llong .sys_ni_syscall		/* 32bit only sendfile64 */
+	.llong .sys_io_setup
+	.llong .sys_io_destroy
+	.llong .sys_io_getevents
+	.llong .sys_io_submit		/* 230 */
+	.llong .sys_io_cancel
 
-	.rept NR_syscalls-226
+	.rept NR_syscalls-231
 		.llong .sys_ni_syscall
 	.endr

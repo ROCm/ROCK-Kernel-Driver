@@ -30,6 +30,7 @@
 #include <linux/elf.h>
 #include <linux/init.h>
 #include <linux/init_task.h>
+#include <linux/prctl.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -233,9 +234,6 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 		last_task_used_math = 0;
 	current->thread.fpscr = 0;
 }
-
-/* XXX temporary */
-#define PR_FP_EXC_PRECISE	3	/* precise exception mode */
 
 int set_fpexc_mode(struct task_struct *tsk, unsigned int val)
 {
