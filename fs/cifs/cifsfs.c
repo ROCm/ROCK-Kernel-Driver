@@ -109,6 +109,8 @@ out_no_root:
 		iput(inode);
 
 out_mount_failed:
+	if(cifs_sb->local_nls)
+		unload_nls(cifs_sb->local_nls);	
 	if(cifs_sb)
 		kfree(cifs_sb);
 	return -EINVAL;
