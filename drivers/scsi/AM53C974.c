@@ -598,7 +598,7 @@ static int AM53C974_setup(char *str)
 			    (ints[1] == ints[2]) ||
 			    (ints[3] < (DEF_CLK / MAX_PERIOD)) || (ints[3] > (DEF_CLK / MIN_PERIOD)) ||
 			    (ints[4] < 0) || (ints[4] > MAX_OFFSET))
-				printk("AM53C974_setup: illegal parameter\n");
+				printk("AM53C974_setup: invalid parameter\n");
 			else {
 				overrides[commandline_current].host_scsi_id = ints[1];
 				overrides[commandline_current].target_scsi_id = ints[2];

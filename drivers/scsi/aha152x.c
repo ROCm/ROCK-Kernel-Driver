@@ -3098,7 +3098,7 @@ static void disp_ports(struct Scsi_Host *shpnt)
 		printk("MESSAGE IN");
 		break;
 	default:
-		printk("*illegal*");
+		printk("*invalid*");
 		break;
 	}
 
@@ -3467,7 +3467,7 @@ static int get_ports(struct Scsi_Host *shpnt, char *pos)
 		SPRINTF("MESSAGE IN");
 		break;
 	default:
-		SPRINTF("*illegal*");
+		SPRINTF("*invalid*");
 		break;
 	}
 

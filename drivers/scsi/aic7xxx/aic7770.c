@@ -170,7 +170,7 @@ aic7770_config(struct ahc_softc *ahc, struct aic7770_identity *entry, u_int io)
 	case 15:
 		break;
 	default:
-		printf("aic7770_config: illegal irq setting %d\n", intdef);
+		printf("aic7770_config: invalid irq setting %d\n", intdef);
 		return (ENXIO);
 	}
 
