@@ -290,6 +290,7 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 	static int current_override = 0;
 	int count, i;
 	unsigned int *ports;
+	unsigned long region_size = 16;
 	static unsigned int __initdata ncr_53c400a_ports[] = {
 		0x280, 0x290, 0x300, 0x310, 0x330, 0x340, 0x348, 0x350, 0
 	};
@@ -420,6 +421,7 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 			/* Not a 53C400A style setup - just grab */
 			if(!(request_region(overrides[current_override].NCR5380_map_name, NCR5380_region_size, "ncr5380")))
 				continue;
+			region_size = NCR5380_region_size;
 		}
 #else
 		if(!request_mem_region(overrides[current_override].NCR5380_map_name, NCR5380_region_size, "ncr5380"))
@@ -428,7 +430,7 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 		instance = scsi_register(tpnt, sizeof(struct NCR5380_hostdata));
 		if (instance == NULL) {
 #ifndef CONFIG_SCSI_G_NCR5380_MEM
-			release_region(overrides[current_override].NCR5380_map_name, NCR5380_region_size);
+			release_region(overrides[current_override].NCR5380_map_name, region_size);
 #else
 			release_mem_region(overrides[current_override].NCR5380_map_name, NCR5380_region_size);
 #endif
@@ -436,6 +438,9 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 		}
 
 		instance->NCR5380_instance_name = overrides[current_override].NCR5380_map_name;
+#ifndef CONFIG_SCSI_G_NCR5380_MEM
+		instance->n_io_port = region_size;
+#endif
 
 		NCR5380_init(instance, flags);
 
@@ -498,7 +503,7 @@ int generic_NCR5380_release_resources(struct Scsi_Host *instance)
 	NCR5380_setup(instance);
 
 #ifndef CONFIG_SCSI_G_NCR5380_MEM
-	release_region(instance->NCR5380_instance_name, NCR5380_region_size);
+	release_region(instance->NCR5380_instance_name, instance->n_io_port);
 #else
 	release_mem_region(instance->NCR5380_instance_name, NCR5380_region_size);
 #endif
