@@ -55,3 +55,4 @@ obj-$(CONFIG_MTD_EBONY)		+= ebony.o
 obj-$(CONFIG_MTD_BEECH)		+= beech-mtd.o
 obj-$(CONFIG_MTD_ARCTIC)	+= arctic-mtd.o
 obj-$(CONFIG_MTD_H720X)		+= h720x-flash.o
+obj-$(CONFIG_MTD_IXP4XX)	+= ixp4xx.o
