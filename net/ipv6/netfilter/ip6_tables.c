@@ -24,6 +24,7 @@
 #include <linux/udp.h>
 #include <linux/icmpv6.h>
 #include <net/ip.h>
+#include <net/ipv6.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <linux/proc_fs.h>
