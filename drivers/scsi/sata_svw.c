@@ -375,15 +375,8 @@ static struct pci_driver k2_sata_pci_driver = {
 
 static int __init k2_sata_init(void)
 {
-	int rc;
-
-	rc = pci_module_init(&k2_sata_pci_driver);
-	if (rc)
-		return rc;
-
-	return 0;
+	return pci_module_init(&k2_sata_pci_driver);
 }
-
 
 static void __exit k2_sata_exit(void)
 {

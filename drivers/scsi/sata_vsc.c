@@ -5,25 +5,11 @@
  *
  *  Bits from Jeff Garzik, Copyright RedHat, Inc.
  *
- *  The contents of this file are subject to the Open
- *  Software License version 1.1 that can be found at
- *  http://www.opensource.org/licenses/osl-1.1.txt and is included herein
- *  by reference.
- *
- *  Alternatively, the contents of this file may be used under the terms
- *  of the GNU General Public License version 2 (the "GPL") as distributed
- *  in the kernel source COPYING file, in which case the provisions of
- *  the GPL are applicable instead of the above.  If you wish to allow
- *  the use of your version of this file only under the terms of the
- *  GPL and not to allow others to use your version of this file under
- *  the OSL, indicate your decision by deleting the provisions above and
- *  replace them with the notice and other provisions required by the GPL.
- *  If you do not delete the provisions above, a recipient may use your
- *  version of this file under either the OSL or the GPL.
- *
+ *  This file is subject to the terms and conditions of the GNU General Public
+ *  License.  See the file "COPYING" in the main directory of this archive
+ *  for more details.
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -232,7 +218,7 @@ static struct ata_port_operations vsc_sata_ops = {
 	.port_stop		= ata_port_stop,
 };
 
-static void vsc_sata_setup_port(struct ata_ioports *port, unsigned long base)
+static void __devinit vsc_sata_setup_port(struct ata_ioports *port, unsigned long base)
 {
 	port->cmd_addr		= base + VSC_SATA_TF_CMD_OFFSET;
 	port->data_addr		= base + VSC_SATA_TF_DATA_OFFSET;
@@ -252,7 +238,7 @@ static void vsc_sata_setup_port(struct ata_ioports *port, unsigned long base)
 }
 
 
-static int vsc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
+static int __devinit vsc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	static int printed_version;
 	struct ata_probe_ent *probe_ent = NULL;
@@ -350,6 +336,11 @@ err_out:
 }
 
 
+/*
+ * 0x1725/0x7174 is the Vitesse VSC-7174
+ * 0x8086/0x3200 is the Intel 31244, which is supposed to be identical
+ * compatibility is untested as of yet
+ */
 static struct pci_device_id vsc_sata_pci_tbl[] = {
 	{ 0x1725, 0x7174, PCI_ANY_ID, PCI_ANY_ID, 0x10600, 0xFFFFFF, 0 },
 	{ 0x8086, 0x3200, PCI_ANY_ID, PCI_ANY_ID, 0x10600, 0xFFFFFF, 0 },
@@ -367,13 +358,7 @@ static struct pci_driver vsc_sata_pci_driver = {
 
 static int __init vsc_sata_init(void)
 {
-	int rc;
-
-	rc = pci_module_init(&vsc_sata_pci_driver);
-	if (rc)
-		return rc;
-
-	return 0;
+	return pci_module_init(&vsc_sata_pci_driver);
 }
 
 
