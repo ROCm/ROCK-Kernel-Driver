@@ -3373,7 +3373,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 		if (copy_from_user(&tuner, arg, sizeof(tuner)))
 			return -EFAULT;
 
-		if (tuner.tuner != 0);
+		if (tuner.tuner != 0)
 			return -EINVAL;
 
 		strcpy(tuner.name, "no_tuner");
