@@ -389,8 +389,6 @@ static const char * bpq_print_ethaddr(const unsigned char *e)
 	return buf;
 }
 
-#define BPQ_PROC_START ((void *)1)
-
 static void *bpq_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	int i = 1;
@@ -399,7 +397,7 @@ static void *bpq_seq_start(struct seq_file *seq, loff_t *pos)
 	rcu_read_lock();
 
 	if (*pos == 0)
-		return BPQ_PROC_START;
+		return SEQ_START_TOKEN;
 	
 	list_for_each_entry(bpqdev, &bpq_devices, bpq_list) {
 		if (i == *pos)
@@ -414,7 +412,7 @@ static void *bpq_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 	++*pos;
 
-	if (v == BPQ_PROC_START)
+	if (v == SEQ_START_TOKEN)
 		p = bpq_devices.next;
 	else
 		p = ((struct bpqdev *)v)->bpq_list.next;
@@ -431,7 +429,7 @@ static void bpq_seq_stop(struct seq_file *seq, void *v)
 
 static int bpq_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == BPQ_PROC_START)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, 
 			 "dev   ether      destination        accept from\n");
 	else {
