@@ -52,8 +52,6 @@
 
 #define PFX "azt2320: "
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
 MODULE_DESCRIPTION("Aztech Systems AZT2320");
 MODULE_LICENSE("GPL");

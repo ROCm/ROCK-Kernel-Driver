@@ -1195,4 +1195,3 @@ MODULE_PARM(tx_lpm, "i");
 MODULE_PARM_DESC(tx_lpm, "Enable transmitter low power (1.6us) mode");
 MODULE_PARM(max_rate, "i");
 MODULE_PARM_DESC(max_rate, "Maximum baud rate (4000000, 115200, 57600, 38400, 19200, 9600)");
-EXPORT_NO_SYMBOLS;

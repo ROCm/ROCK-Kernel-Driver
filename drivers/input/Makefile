@@ -19,11 +19,7 @@ obj-$(CONFIG_INPUT_MOUSEDEV)	+= mousedev.o
 obj-$(CONFIG_INPUT_JOYDEV)	+= joydev.o
 obj-$(CONFIG_INPUT_EVDEV)	+= evdev.o
 
-subdir-$(CONFIG_INPUT_JOYSTICK)	+= joystick
-
-ifeq ($(CONFIG_INPUT_JOYSTICK),y)
-	obj-y += joystick/joydrv.o
-endif
+obj-$(CONFIG_INPUT_JOYSTICK)	+= joystick/
 
 # The global Rules.make.
 

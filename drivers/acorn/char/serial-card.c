@@ -113,8 +113,6 @@ static void __exit serial_card_exit(void)
 			ecard_release (expcard[i]);
 }
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Russell King");
 MODULE_LICENSE("GPL");
 

@@ -386,16 +386,16 @@ pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 	pid_t __ret;
 
 	__asm__ __volatile__(
-	"orr	r0, %1, %2	@ kernel_thread sys_clone
-	mov	r1, #0
-	"__syscall(clone)"
-	movs	%0, r0		@ if we are the child
-	bne	1f
-	mov	fp, #0		@ ensure that fp is zero
-	mov	r0, %4
-	mov	lr, pc
-	mov	pc, %3
-	b	sys_exit
+	"orr	r0, %1, %2	@ kernel_thread sys_clone	\n\
+	mov	r1, #0						\n\
+	"__syscall(clone)"					\n\
+	movs	%0, r0		@ if we are the child		\n\
+	bne	1f						\n\
+	mov	fp, #0		@ ensure that fp is zero	\n\
+	mov	r0, %4						\n\
+	mov	lr, pc						\n\
+	mov	pc, %3						\n\
+	b	sys_exit					\n\
 1:	"
         : "=r" (__ret)
         : "Ir" (flags), "I" (CLONE_VM), "r" (fn), "r" (arg)

@@ -47,7 +47,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <asm/uaccess.h>
 
 
@@ -245,5 +245,3 @@ module_exit(cleanup_procfs_example);
 
 MODULE_AUTHOR("Erik Mouw");
 MODULE_DESCRIPTION("procfs examples");
-
-EXPORT_NO_SYMBOLS;

@@ -24,6 +24,7 @@
 #include <linux/sched.h>
 #include <linux/stat.h>
 #include <linux/string.h>
+#include <linux/buffer_head.h>
 #include "sysv.h"
 
 /* We don't trust the value of

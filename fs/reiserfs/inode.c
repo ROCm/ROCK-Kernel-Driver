@@ -9,6 +9,7 @@
 #include <linux/pagemap.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
+#include <linux/buffer_head.h>
 
 /* args for the create parameter of reiserfs_get_block */
 #define GET_BLOCK_NO_CREATE 0 /* don't create new blocks or convert tails */

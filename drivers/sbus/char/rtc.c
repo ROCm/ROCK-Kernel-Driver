@@ -146,8 +146,6 @@ static struct file_operations rtc_fops = {
 
 static struct miscdevice rtc_dev = { RTC_MINOR, "rtc", &rtc_fops };
 
-EXPORT_NO_SYMBOLS;
-
 static int __init rtc_sun_init(void)
 {
 	int error;

@@ -988,7 +988,6 @@ static void tuner_cleanup_module(void)
 
 module_init(tuner_init_module);
 module_exit(tuner_cleanup_module);
-EXPORT_NO_SYMBOLS;
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

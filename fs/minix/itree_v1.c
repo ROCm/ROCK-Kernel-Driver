@@ -1,3 +1,4 @@
+#include <linux/buffer_head.h>
 #include "minix.h"
 
 enum {DEPTH = 3, DIRECT = 7};	/* Only double indirect */
@@ -52,4 +53,9 @@ int V1_minix_get_block(struct inode * inode, long block,
 void V1_minix_truncate(struct inode * inode)
 {
 	truncate(inode);
+}
+
+unsigned V1_minix_blocks(loff_t size)
+{
+	return nblocks(size);
 }

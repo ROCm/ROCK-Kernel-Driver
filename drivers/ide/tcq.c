@@ -20,6 +20,7 @@
  * use tagged command queueing.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -94,15 +95,15 @@ static void tcq_invalidate_queue(struct ata_device *drive)
 
 	del_timer(&ch->timer);
 
-	if (test_bit(IDE_DMA, &ch->active))
+	if (test_bit(IDE_DMA, ch->active))
 		udma_stop(drive);
 
 	blk_queue_invalidate_tags(q);
 
 	drive->using_tcq = 0;
 	drive->queue_depth = 1;
-	clear_bit(IDE_BUSY, &ch->active);
-	clear_bit(IDE_DMA, &ch->active);
+	clear_bit(IDE_BUSY, ch->active);
+	clear_bit(IDE_DMA, ch->active);
 	ch->handler = NULL;
 
 	/*
@@ -158,7 +159,7 @@ static void ata_tcq_irq_timeout(unsigned long data)
 
 	spin_lock_irqsave(ch->lock, flags);
 
-	if (test_and_set_bit(IDE_BUSY, &ch->active))
+	if (test_and_set_bit(IDE_BUSY, ch->active))
 		printk(KERN_ERR "ATA: %s: IRQ handler not busy\n", __FUNCTION__);
 	if (!ch->handler)
 		printk(KERN_ERR "ATA: %s: missing ISR!\n", __FUNCTION__);
@@ -239,7 +240,7 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 	 * Could be called with IDE_DMA in-progress from invalidate
 	 * handler, refuse to do anything.
 	 */
-	if (test_bit(IDE_DMA, &drive->channel->active))
+	if (test_bit(IDE_DMA, drive->channel->active))
 		return ide_stopped;
 
 	/*
@@ -527,7 +528,7 @@ static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *
 	struct ata_channel *ch = drive->channel;
 
 	TCQ_PRINTK("%s: setting up queued %d\n", __FUNCTION__, rq->tag);
-	if (!test_bit(IDE_BUSY, &ch->active))
+	if (!test_bit(IDE_BUSY, ch->active))
 		printk("queued_rw: IDE_BUSY not set\n");
 
 	if (tcq_wait_dataphase(drive))
@@ -639,3 +640,6 @@ int udma_tcq_enable(struct ata_device *drive, int on)
 	drive->using_tcq = 1;
 	return 0;
 }
+
+/* FIXME: This should go away! */
+EXPORT_SYMBOL(udma_tcq_enable);

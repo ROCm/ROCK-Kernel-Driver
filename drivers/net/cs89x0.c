@@ -1703,8 +1703,6 @@ MODULE_AUTHOR("Mike Cruse, Russwll Nelson <nelson@crynwr.com>, Andrew Morton <an
 MODULE_LICENSE("GPL");
 
 
-EXPORT_NO_SYMBOLS;
-
 /*
 * media=t             - specify media type
    or media=2

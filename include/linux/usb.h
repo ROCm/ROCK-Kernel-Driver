@@ -1,9 +1,6 @@
 #ifndef __LINUX_USB_H
 #define __LINUX_USB_H
 
-#include <linux/device.h>
-#include <linux/errno.h>
-
 /* USB constants */
 
 /*
@@ -19,8 +16,8 @@
 #define USB_CLASS_MASS_STORAGE		8
 #define USB_CLASS_HUB			9
 #define USB_CLASS_CDC_DATA		0x0a
-#define USB_CLASS_CSCID		0x0b /* chip+ smart card */
-#define USB_CLASS_CONTENT_SEC		0x0d /* content security */
+#define USB_CLASS_CSCID			0x0b	/* chip+ smart card */
+#define USB_CLASS_CONTENT_SEC		0x0d	/* content security */
 #define USB_CLASS_APP_SPEC		0xfe
 #define USB_CLASS_VENDOR_SPEC		0xff
 
@@ -63,23 +60,23 @@
 /*
  * USB Packet IDs (PIDs)
  */
-#define USB_PID_UNDEF_0                        0xf0
-#define USB_PID_OUT                            0xe1
-#define USB_PID_ACK                            0xd2
-#define USB_PID_DATA0                          0xc3
-#define USB_PID_PING                           0xb4	/* USB 2.0 */
-#define USB_PID_SOF                            0xa5
-#define USB_PID_NYET                           0x96	/* USB 2.0 */
-#define USB_PID_DATA2                          0x87	/* USB 2.0 */
-#define USB_PID_SPLIT                          0x78	/* USB 2.0 */
-#define USB_PID_IN                             0x69
-#define USB_PID_NAK                            0x5a
-#define USB_PID_DATA1                          0x4b
-#define USB_PID_PREAMBLE                       0x3c	/* Token mode */
-#define USB_PID_ERR                            0x3c	/* USB 2.0: handshake mode */
-#define USB_PID_SETUP                          0x2d
-#define USB_PID_STALL                          0x1e
-#define USB_PID_MDATA                          0x0f	/* USB 2.0 */
+#define USB_PID_UNDEF_0			0xf0
+#define USB_PID_OUT			0xe1
+#define USB_PID_ACK			0xd2
+#define USB_PID_DATA0			0xc3
+#define USB_PID_PING			0xb4	/* USB 2.0 */
+#define USB_PID_SOF			0xa5
+#define USB_PID_NYET			0x96	/* USB 2.0 */
+#define USB_PID_DATA2			0x87	/* USB 2.0 */
+#define USB_PID_SPLIT			0x78	/* USB 2.0 */
+#define USB_PID_IN			0x69
+#define USB_PID_NAK			0x5a
+#define USB_PID_DATA1			0x4b
+#define USB_PID_PREAMBLE		0x3c	/* Token mode */
+#define USB_PID_ERR			0x3c	/* USB 2.0: handshake mode */
+#define USB_PID_SETUP			0x2d
+#define USB_PID_STALL			0x1e
+#define USB_PID_MDATA			0x0f	/* USB 2.0 */
 
 /*
  * Standard requests
@@ -96,19 +93,18 @@
 #define USB_REQ_SET_INTERFACE		0x0B
 #define USB_REQ_SYNCH_FRAME		0x0C
 
+#define USB_MAJOR			180
+
 
 #ifdef __KERNEL__
 
-#include <linux/types.h>
-#include <linux/ioctl.h>
-#include <linux/version.h>
-#include <linux/sched.h>
-#include <linux/delay.h>
-#include <linux/interrupt.h>	/* for in_interrupt() */
 #include <linux/config.h>
-#include <linux/list.h>
+#include <linux/errno.h>        /* for -ENODEV */
+#include <linux/delay.h>	/* for mdelay() */
+#include <linux/interrupt.h>	/* for in_interrupt() */
+#include <linux/list.h>		/* for struct list_head */
+#include <linux/device.h>	/* for struct device */
 
-#define USB_MAJOR 180
 
 static __inline__ void wait_ms(unsigned int ms)
 {
@@ -184,11 +180,11 @@ struct usb_device;
 #define USB_DT_ENDPOINT_AUDIO_SIZE	9	/* Audio extension */
 
 /* most of these maximums are arbitrary */
-#define USB_MAXCONFIG		8
-#define USB_ALTSETTINGALLOC     4
-#define USB_MAXALTSETTING	128  /* Hard limit */
-#define USB_MAXINTERFACES	32
-#define USB_MAXENDPOINTS	32   /* Hard limit */
+#define USB_MAXCONFIG			8
+#define USB_ALTSETTINGALLOC		4
+#define USB_MAXALTSETTING		128	/* Hard limit */
+#define USB_MAXINTERFACES		32
+#define USB_MAXENDPOINTS		32	/* Hard limit */
 
 /* All standard descriptors have these 2 fields in common */
 struct usb_descriptor_header {
@@ -226,7 +222,7 @@ struct usb_endpoint_descriptor {
 	__u8  bSynchAddress	__attribute__ ((packed));
 
 	/* the rest is internal to the Linux implementation */
-   	unsigned char *extra;   /* Extra descriptors */
+	unsigned char *extra;   /* Extra descriptors */
 	int extralen;
 };
 
@@ -243,9 +239,9 @@ struct usb_interface_descriptor {
 	__u8  iInterface	__attribute__ ((packed));
 
 	/* the rest is internal to the Linux implementation */
-  	struct usb_endpoint_descriptor *endpoint;
+	struct usb_endpoint_descriptor *endpoint;
 
-   	unsigned char *extra;   /* Extra descriptors */
+	unsigned char *extra;   /* Extra descriptors */
 	int extralen;
 };
 
@@ -254,7 +250,7 @@ struct usb_interface {
 
 	int act_altsetting;		/* active alternate setting */
 	int num_altsetting;		/* number of alternate settings */
-	int max_altsetting;             /* total memory allocated */
+	int max_altsetting;		/* total memory allocated */
  
 	struct usb_driver *driver;	/* driver */
 	struct device dev;		/* interface specific device info */
@@ -281,7 +277,7 @@ struct usb_config_descriptor {
 	/* the rest is internal to the Linux implementation */
 	struct usb_interface *interface;
 
-   	unsigned char *extra;   /* Extra descriptors */
+	unsigned char *extra;   /* Extra descriptors */
 	int extralen;
 };
 
@@ -334,12 +330,12 @@ struct usb_bus {
 	char *bus_name;			/* stable id (PCI slot_name etc) */
 
 #ifdef DEVNUM_ROUND_ROBIN
-	int devnum_next;                /* Next open device number in round-robin allocation */
+	int devnum_next;		/* Next open device number in round-robin allocation */
 #endif /* DEVNUM_ROUND_ROBIN */
 
-	struct usb_devmap devmap;       /* device address allocation map */
-	struct usb_operations *op;      /* Operations (specific to the HC) */
-	struct usb_device *root_hub;    /* Root hub */
+	struct usb_devmap devmap;	/* device address allocation map */
+	struct usb_operations *op;	/* Operations (specific to the HC) */
+	struct usb_device *root_hub;	/* Root hub */
 	struct list_head bus_list;	/* list of busses */
 	void *hcpriv;                   /* Host Controller private data */
 
@@ -408,7 +404,7 @@ struct usb_device {
 
 	int have_langid;		/* whether string_langid is valid yet */
 	int string_langid;		/* language ID for strings */
-  
+
 	void *hcpriv;			/* Host Controller private data */
 	
 	struct list_head filelist;
@@ -467,7 +463,7 @@ const struct usb_device_id *usb_match_id(struct usb_device *dev,
  * in host controller driver modules, does not change these path identifers;
  * neither does rebooting or re-enumerating.  These are more useful identifiers
  * than changeable ("unstable") ones like bus numbers or device addresses.
- * 
+ *
  * With a partial exception for devices connected to USB 2.0 root hubs, these
  * identifiers are also predictable:  so long as the device tree isn't changed,
  * plugging any USB device into a given hub port always gives it the same path.
@@ -492,7 +488,7 @@ static inline int usb_make_path (struct usb_device *dev, char *buf, size_t size)
  * The third probe() parameter will point to a matching entry from this
  * table.  (Null value reserved.)  Use the driver_data field for each
  * match to hold information tied to that match:  device quirks, etc.
- * 
+ *
  * Terminate the driver's table with an all-zeroes entry.
  * Use the flag values to control which fields are compared.
  */
@@ -743,12 +739,12 @@ extern void usb_deregister_dev(struct usb_driver *driver, int num_minors, int st
  *
  * FIXME should be URB_* flags
  */
-#define USB_DISABLE_SPD         0x0001
-#define USB_ISO_ASAP            0x0002
-#define USB_ASYNC_UNLINK        0x0008
-#define USB_QUEUE_BULK          0x0010
+#define USB_DISABLE_SPD		0x0001
+#define USB_ISO_ASAP		0x0002
+#define USB_ASYNC_UNLINK	0x0008
+#define USB_QUEUE_BULK		0x0010
 #define USB_NO_FSBR		0x0020
-#define USB_ZERO_PACKET         0x0040  /* Finish bulk OUTs with short packet */
+#define USB_ZERO_PACKET		0x0040	/* Finish bulk OUTs with short packet */
 #define URB_NO_INTERRUPT	0x0080	/* HINT: no non-error interrupt needed */
 					/* ... less overhead for QUEUE_BULK */
 #define USB_TIMEOUT_KILLED	0x1000	/* only set by HCD! */
@@ -767,7 +763,6 @@ typedef void (*usb_complete_t)(struct urb *);
 /**
  * struct urb - USB Request Block
  * @urb_list: For use by current owner of the URB.
- * @next: Used to link ISO requests into rings.
  * @pipe: Holds endpoint number, direction, type, and max packet size.
  *	Create these values with the eight macros available;
  *	usb_{snd,rcv}TYPEpipe(dev,endpoint), where the type is "ctrl"
@@ -827,7 +822,7 @@ typedef void (*usb_complete_t)(struct urb *);
  *
  * Initialization:
  *
- * All URBs submitted must initialize dev, pipe, next (may be null),
+ * All URBs submitted must initialize dev, pipe,
  * transfer_flags (may be zero), complete, timeout (may be zero).
  * The USB_ASYNC_UNLINK transfer flag affects later invocations of
  * the usb_unlink_urb() routine.
@@ -873,7 +868,9 @@ typedef void (*usb_complete_t)(struct urb *);
  * the quality of service is only "best effort".  Callers provide specially
  * allocated URBs, with number_of_packets worth of iso_frame_desc structures
  * at the end.  Each such packet is an individual ISO transfer.  Isochronous
- * URBs are normally submitted with urb->next fields set up as a ring, so
+ * URBs are normally queued (no flag like USB_BULK_QUEUE is needed) so that
+ * transfers are at least double buffered, and then explicitly resubmitted
+ * in completion handlers, so
  * that data (such as audio or video) streams at as constant a rate as the
  * host controller scheduler can support.
  *
@@ -891,14 +888,15 @@ typedef void (*usb_complete_t)(struct urb *);
  * When completion callback is invoked for non-isochronous URBs, the
  * actual_length field tells how many bytes were transferred.
  *
- * For interrupt and isochronous URBs, the URB provided to the callback
+ * For interrupt URBs, the URB provided to the callback
  * function is still "owned" by the USB core subsystem unless the status
  * indicates that the URB has been unlinked.  Completion handlers should
  * not modify such URBs until they have been unlinked.
  *
  * ISO transfer status is reported in the status and actual_length fields
  * of the iso_frame_desc array, and the number of errors is reported in
- * error_count.
+ * error_count.  Completion callbacks for ISO transfers will normally
+ * (re)submit URBs to ensure a constant transfer rate.
  */
 struct urb
 {
@@ -906,19 +904,18 @@ struct urb
 	atomic_t count;			/* reference count of the URB */
 	void *hcpriv;			/* private data for host controller */
 	struct list_head urb_list;	/* list pointer to all active urbs */
-	struct urb *next; 		/* (in) pointer to next URB */
 	struct usb_device *dev; 	/* (in) pointer to associated device */
 	unsigned int pipe;		/* (in) pipe information */
 	int status;			/* (return) non-ISO status */
 	unsigned int transfer_flags;	/* (in) USB_DISABLE_SPD | ...*/
 	void *transfer_buffer;		/* (in) associated data buffer */
 	int transfer_buffer_length;	/* (in) data buffer length */
-	int actual_length;              /* (return) actual transfer length */
+	int actual_length;		/* (return) actual transfer length */
 	int bandwidth;			/* bandwidth for INT/ISO request */
 	unsigned char *setup_packet;	/* (in) setup packet (control only) */
 	int start_frame;		/* (modify) start frame (INT/ISO) */
 	int number_of_packets;		/* (in) number of ISO packets */
-	int interval;                   /* (in) transfer interval (INT/ISO) */
+	int interval;			/* (in) transfer interval (INT/ISO) */
 	int error_count;		/* (return) number of ISO errors */
 	int timeout;			/* (in) timeout, in jiffies */
 	void *context;			/* (in) context for completion */
@@ -979,7 +976,6 @@ static inline void usb_fill_bulk_urb (struct urb *urb,
 				      int buffer_length,
 				      usb_complete_t complete,
 				      void *context)
-				      
 {
 	spin_lock_init(&urb->lock);
 	urb->dev = dev;
@@ -989,7 +985,7 @@ static inline void usb_fill_bulk_urb (struct urb *urb,
 	urb->complete = complete;
 	urb->context = context;
 }
-    
+
 /**
  * usb_fill_int_urb - macro to help initialize a interrupt urb
  * @urb: pointer to the urb to initialize.
@@ -1079,12 +1075,12 @@ extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
  * they typically complete within a few frames (msec) after they're issued
  */
 #ifdef CONFIG_USB_LONG_TIMEOUT
-#define USB_CTRL_GET_TIMEOUT 4
+#define USB_CTRL_GET_TIMEOUT	4
 #else
-#define USB_CTRL_GET_TIMEOUT 3
+#define USB_CTRL_GET_TIMEOUT	3
 #endif
 
-#define USB_CTRL_SET_TIMEOUT 3
+#define USB_CTRL_SET_TIMEOUT	3
 
 /* -------------------------------------------------------------------------- */
 

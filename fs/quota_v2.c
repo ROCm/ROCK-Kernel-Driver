@@ -430,7 +430,8 @@ static int v2_write_dquot(struct dquot *dquot)
 	}
 	else
 		ret = 0;
-	dqstats.writes++;
+	++dqstats_array[DQSTATS_WRITES];
+
 	return ret;
 }
 
@@ -644,7 +645,8 @@ static int v2_read_dquot(struct dquot *dquot)
 		set_fs(fs);
 		disk2memdqb(&dquot->dq_dqb, &ddquot);
 	}
-	dqstats.reads++;
+	++dqstats_array[DQSTATS_READS];
+
 	return ret;
 }
 
@@ -683,8 +685,6 @@ static void __exit exit_v2_quota_format(void)
 {
 	unregister_quota_format(&v2_quota_format);
 }
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_v2_quota_format);
 module_exit(exit_v2_quota_format);

@@ -279,9 +279,11 @@ static void __do_gscd_request(unsigned long dummy)
 	unsigned int nsect;
 
       repeat:
-	if (QUEUE_EMPTY || CURRENT->rq_status == RQ_INACTIVE)
-		goto out;
-	INIT_REQUEST;
+	if (blk_queue_empty(QUEUE)) {
+		CLEAR_INTR;
+		return;
+	}
+
 	dev = minor(CURRENT->rq_dev);
 	block = CURRENT->sector;
 	nsect = CURRENT->nr_sectors;
@@ -1070,4 +1072,3 @@ static int gscd_bcd2bin(unsigned char bcd)
 
 MODULE_AUTHOR("Oliver Raupach <raupach@nwfs1.rz.fh-hannover.de>");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

@@ -545,73 +545,8 @@ static void __init pcibios_init_hw(struct hw_pci *hw)
 	}
 }
 
-extern struct hw_pci ebsa285_pci;
-extern struct hw_pci cats_pci;
-extern struct hw_pci netwinder_pci;
-extern struct hw_pci personal_server_pci;
-extern struct hw_pci ftv_pci;
-extern struct hw_pci shark_pci;
-extern struct hw_pci integrator_pci;
-extern struct hw_pci iq80310_pci;
-
-void __init pcibios_init(void)
+void __init pci_common_init(struct hw_pci *hw)
 {
-	struct hw_pci *hw = NULL;
-
-	do {
-#ifdef CONFIG_ARCH_EBSA285
-		if (machine_is_ebsa285()) {
-			hw = &ebsa285_pci;
-			break;
-		}
-#endif
-#ifdef CONFIG_ARCH_SHARK
-		if (machine_is_shark()) {
-			hw = &shark_pci;
-			break;
-		}
-#endif
-#ifdef CONFIG_ARCH_CATS
-		if (machine_is_cats()) {
-			hw = &cats_pci;
-			break;
-		}
-#endif
-#ifdef CONFIG_ARCH_NETWINDER
-		if (machine_is_netwinder()) {
-			hw = &netwinder_pci;
-			break;
-		}
-#endif
-#ifdef CONFIG_ARCH_PERSONAL_SERVER
-		if (machine_is_personal_server()) {
-			hw = &personal_server_pci;
-			break;
-		}
-#endif
-#ifdef CONFIG_ARCH_FTVPCI
-		if (machine_is_ftvpci()) {
-			hw = &ftv_pci;
-			break;
-		}
-#endif
-#ifdef CONFIG_ARCH_INTEGRATOR
-		if (machine_is_integrator()) {
-			hw = &integrator_pci;
-			break;
-		}
-#endif
-#ifdef CONFIG_ARCH_IQ80310
-		if (machine_is_iq80310()) {
-			hw = &iq80310_pci;
-			break;
-		}
-#endif
-	} while (0);
-
-	if (hw == NULL)
-		return;
-
 	if (hw->preinit)
 		hw->preinit();
 	pcibios_init_hw(hw);

@@ -126,8 +126,6 @@ MODULE_PARM_DESC(debug,"Enable/disable extra messages");
 MODULE_PARM(quartz,"i");
 MODULE_PARM_DESC(quartz,"If present, on-board quartz frequency (Hz)");
 
-EXPORT_NO_SYMBOLS;
-
 /* Structures */
 
 struct thingie {

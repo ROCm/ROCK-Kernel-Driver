@@ -117,15 +117,14 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 	} ____cacheline_aligned ratelimits[NR_CPUS];
 	int cpu;
 
-	preempt_disable();
-	cpu = smp_processor_id();
+	cpu = get_cpu();
 	if (ratelimits[cpu].count++ >= 1000) {
 		ratelimits[cpu].count = 0;
-		preempt_enable();
+		put_cpu();
 		balance_dirty_pages(mapping);
 		return;
 	}
-	preempt_enable();
+	put_cpu();
 }
 
 /*
@@ -479,7 +478,10 @@ EXPORT_SYMBOL(write_one_page);
  *
  * For now, we treat swapper_space specially.  It doesn't use the normal
  * block a_ops.
+ *
+ * FIXME: this should move over to fs/buffer.c - buffer_heads have no business in mm/
  */
+#include <linux/buffer_head.h>
 int __set_page_dirty_buffers(struct page *page)
 {
 	struct address_space * const mapping = page->mapping;

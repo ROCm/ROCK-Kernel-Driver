@@ -471,9 +471,12 @@ static void do_ps2esdi_request(request_queue_t * q)
 	       CURRENT->current_nr_sectors, CURRENT->buffer);
 #endif
 
-	/* standard macro that ensures that requests are really on the
+	/* standard procedure to ensure that requests are really on the
 	   list + sanity checks.                     */
-	INIT_REQUEST;
+	if (blk_queue_empty(QUEUE)) {
+		CLEAR_INTR;
+		return;
+	}
 
 	if (isa_virt_to_bus(CURRENT->buffer + CURRENT->current_nr_sectors * 512) > 16 * MB) {
 		printk("%s: DMA above 16MB not supported\n", DEVICE_NAME);

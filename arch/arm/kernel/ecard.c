@@ -541,7 +541,7 @@ static expansioncard_ops_t ecard_default_ops = {
  *
  * They are not meant to be called directly, but via enable/disable_irq.
  */
-static void ecard_irq_mask(unsigned int irqnr)
+static void ecard_irq_unmask(unsigned int irqnr)
 {
 	ecard_t *ec = slot_to_ecard(irqnr - 32);
 
@@ -557,7 +557,7 @@ static void ecard_irq_mask(unsigned int irqnr)
 	}
 }
 
-static void ecard_irq_unmask(unsigned int irqnr)
+static void ecard_irq_mask(unsigned int irqnr)
 {
 	ecard_t *ec = slot_to_ecard(irqnr - 32);
 
@@ -945,20 +945,20 @@ ecard_probe(int slot, card_type_t type)
 			break;
 		}
 
-	ec->irq = 32 + slot;
-#ifdef IO_EC_MEMC8_BASE
-	if (slot == 8)
-		ec->irq = 11;
-#endif
 	/*
 	 * hook the interrupt handlers
 	 */
-	if (ec->irq != 0 && ec->irq >= 32) {
+	if (slot < 8) {
+		ec->irq = 32 + slot;
 		set_irq_chip(ec->irq, &ecard_chip);
 		set_irq_handler(ec->irq, do_level_IRQ);
 		set_irq_flags(ec->irq, IRQF_VALID);
 	}
 
+#ifdef IO_EC_MEMC8_BASE
+	if (slot == 8)
+		ec->irq = 11;
+#endif
 #ifdef CONFIG_ARCH_RPC
 	/* On RiscPC, only first two slots have DMA capability */
 	if (slot < 2)

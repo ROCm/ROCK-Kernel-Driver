@@ -3356,9 +3356,6 @@ MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("DSP audio and mixer driver for Via 82Cxxx audio devices");
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;
-
-
 
 #ifdef VIA_PROC_FS
 

@@ -120,7 +120,7 @@
 /*
  * This routine is invoked from ide.c to prepare for access to a given drive.
  */
-static void ht6560b_selectproc (ide_drive_t *drive)
+static void ht6560b_selectproc(struct ata_device *drive)
 {
 	unsigned long flags;
 	static byte current_select = 0;
@@ -195,7 +195,7 @@ static int __init try_to_init_ht6560b(void)
 	return 1;
 }
 
-static byte ht_pio2timings(ide_drive_t *drive, byte pio)
+static byte ht_pio2timings(struct ata_device *drive, byte pio)
 {
 	int active_time, recovery_time;
 	int active_cycles, recovery_cycles;
@@ -219,8 +219,8 @@ static byte ht_pio2timings(ide_drive_t *drive, byte pio)
 		/*
 		 *  Cycle times should be Vesa bus cycles
 		 */
-		active_cycles   = (active_time   * system_bus_speed + 999) / 1000;
-		recovery_cycles = (recovery_time * system_bus_speed + 999) / 1000;
+		active_cycles   = (active_time   * system_bus_speed + 999999) / 1000000;
+		recovery_cycles = (recovery_time * system_bus_speed + 999999) / 1000000;
 		/*
 		 *  Upper and lower limits
 		 */
@@ -248,7 +248,7 @@ static byte ht_pio2timings(ide_drive_t *drive, byte pio)
 /*
  *  Enable/Disable so called prefetch mode
  */
-static void ht_set_prefetch(ide_drive_t *drive, byte state)
+static void ht_set_prefetch(struct ata_device *drive, byte state)
 {
 	unsigned long flags;
 	int t = HT_PREFETCH_MODE << 8;
@@ -275,7 +275,7 @@ static void ht_set_prefetch(ide_drive_t *drive, byte state)
 #endif
 }
 
-static void tune_ht6560b (ide_drive_t *drive, byte pio)
+static void tune_ht6560b(struct ata_device *drive, byte pio)
 {
 	unsigned long flags;
 	byte timing;

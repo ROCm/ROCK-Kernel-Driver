@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/boot/compressed/head.S
  *
- *  Copyright (C) 1996-1999 Russell King
+ *  Copyright (C) 1996-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -161,7 +161,6 @@ not_relocated:	mov	r0, #0
 		cmp	r2, r3
 		blo	1b
 
-		mrc	p15, 0, r6, c0, c0	@ get processor ID
 		bl	cache_on
 
 		mov	r1, sp			@ malloc space above stack
@@ -200,7 +199,8 @@ not_relocated:	mov	r0, #0
  */
 		add	r1, r5, r0		@ end of decompressed kernel
 		adr	r2, reloc_start
-		adr	r3, reloc_end
+		ldr	r3, LC1
+		add	r3, r2, r3
 1:		ldmia	r2!, {r8 - r13}		@ copy relocation code
 		stmia	r1!, {r8 - r13}
 		ldmia	r2!, {r8 - r13}
@@ -229,8 +229,9 @@ LC0:		.word	LC0			@ r1
 		.word	_load_addr		@ r4
 		.word	_start			@ r5
 		.word	_got_start		@ r6
-		.word	_got_end		@ r7
-		.word	user_stack+4096		@ r8
+		.word	_got_end		@ ip
+		.word	user_stack+4096		@ sp
+LC1:		.word	reloc_end - reloc_start
 		.size	LC0, . - LC0
 
 /*
@@ -255,7 +256,7 @@ LC0:		.word	LC0			@ r1
 cache_on:	mov	r3, #8			@ cache_on function
 		b	call_cache_fn
 
-__cache_on:	sub	r3, r4, #16384		@ Page directory size
+__setup_mmu:	sub	r3, r4, #16384		@ Page directory size
 		bic	r3, r3, #0xff		@ Align the pointer
 		bic	r3, r3, #0x3f00
 /*
@@ -291,20 +292,35 @@ __cache_on:	sub	r3, r4, #16384		@ Page directory size
 		str	r1, [r0], #4
 		add	r1, r1, #1048576
 		str	r1, [r0]
+		mov	pc, lr
 
+__armv4_cache_on:
+		mov	r12, lr
+		bl	__setup_mmu
 		mov	r0, #0
 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
-		mcr	p15, 0, r0, c8, c7	@ flush I,D TLBs
-		mcr	p15, 0, r3, c2, c0	@ load page table pointer
-		mov	r0, #-1
-		mcr	p15, 0, r0, c3, c0	@ load domain access register
-		mrc	p15, 0, r0, c1, c0
+		mcr	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
+		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
 		orr	r0, r0, #0x1000		@ I-cache enable
+		orr	r0, r0, #0x0030
+		b	__common_cache_on
+
+__arm6_cache_on:
+		mov	r12, lr
+		bl	__setup_mmu
+		mov	r0, #0
+		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
+		mcr	p15, 0, r0, c5, c0, 0	@ invalidate whole TLB v3
+		mov	r0, #0x30
+__common_cache_on:
 #ifndef DEBUG
-		orr	r0, r0, #0x003d		@ Write buffer, mmu
+		orr	r0, r0, #0x000d		@ Write buffer, mmu
 #endif
-		mcr	p15, 0, r0, c1, c0
-		mov	pc, lr
+		mov	r1, #-1
+		mcr	p15, 0, r3, c2, c0, 0	@ load page table pointer
+		mcr	p15, 0, r1, c3, c0, 0	@ load domain access control
+		mcr	p15, 0, r0, c1, c0, 0	@ load control register
+		mov	pc, r12
 
 /*
  * All code following this line is relocatable.  It is relocated by
@@ -349,11 +365,12 @@ call_kernel:	bl	cache_clean_flush
  *  r1  = corrupted
  *  r2  = corrupted
  *  r3  = block offset
- *  r6  = CPU ID
+ *  r6  = corrupted
  *  r12 = corrupted
  */
 
 call_cache_fn:	adr	r12, proc_types
+		mrc	p15, 0, r6, c0, c0	@ get processor ID
 1:		ldr	r1, [r12, #0]		@ get value
 		ldr	r2, [r12, #4]		@ get mask
 		eor	r1, r1, r6		@ (real ^ match)
@@ -380,9 +397,12 @@ call_cache_fn:	adr	r12, proc_types
 proc_types:
 		.word	0x41560600		@ ARM6/610
 		.word	0xffffffe0
-		b	__arm6_cache_off
+		b	__arm6_cache_off	@ works, but slow
 		b	__arm6_cache_off
 		mov	pc, lr
+@		b	__arm6_cache_on		@ untested
+@		b	__arm6_cache_off
+@		b	__armv3_cache_flush
 
 		.word	0x41007000		@ ARM7/710
 		.word	0xfff8fe00
@@ -392,31 +412,31 @@ proc_types:
 
 		.word	0x41807200		@ ARM720T (writethrough)
 		.word	0xffffff00
-		b	__cache_on
+		b	__armv4_cache_on
 		b	__armv4_cache_off
 		mov	pc, lr
 
 		.word	0x41129200		@ ARM920T
 		.word	0xff00fff0
-		b	__cache_on
+		b	__armv4_cache_on
 		b	__armv4_cache_off
 		b	__armv4_cache_flush
 
 		.word	0x4401a100		@ sa110 / sa1100
 		.word	0xffffffe0
-		b	__cache_on
+		b	__armv4_cache_on
 		b	__armv4_cache_off
 		b	__armv4_cache_flush
 
 		.word	0x6901b110		@ sa1110
 		.word	0xfffffff0
-		b	__cache_on
+		b	__armv4_cache_on
 		b	__armv4_cache_off
 		b	__armv4_cache_flush
 
 		.word	0x69050000		@ xscale
 		.word	0xffff0000
-		b	__cache_on
+		b	__armv4_cache_on
 		b	__armv4_cache_off
 		b	__armv4_cache_flush
 
@@ -450,7 +470,7 @@ __armv4_cache_off:
 		mov	pc, lr
 
 __arm6_cache_off:
-		mov	r0, #0x00000060		@ ARM6 control reg.
+		mov	r0, #0x00000030		@ ARM6 control reg.
 		b	__armv3_cache_off
 
 __arm7_cache_off:
@@ -458,10 +478,10 @@ __arm7_cache_off:
 		b	__armv3_cache_off
 
 __armv3_cache_off:
-		mcr	p15, 0, r0, c1, c0	@ turn MMU and cache off
+		mcr	p15, 0, r0, c1, c0, 0	@ turn MMU and cache off
 		mov	r0, #0
-		mcr	p15, 0, r0, c7, c0	@ invalidate whole cache v3
-		mcr	p15, 0, r0, c5, c0	@ invalidate whole TLB v3
+		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
+		mcr	p15, 0, r0, c5, c0, 0	@ invalidate whole TLB v3
 		mov	pc, lr
 
 /*
@@ -488,6 +508,11 @@ __armv4_cache_flush:
 
 		mcr	p15, 0, r1, c7, c7, 0	@ flush I cache
 		mcr	p15, 0, r1, c7, c10, 4	@ drain WB
+		mov	pc, lr
+
+__armv3_cache_flush:
+		mov	r1, #0
+		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
 		mov	pc, lr
 
 /*

@@ -13,6 +13,7 @@ extern unsigned long event;
 #include <linux/types.h>
 #include <linux/times.h>
 #include <linux/timex.h>
+#include <linux/jiffies.h>
 #include <linux/rbtree.h>
 #include <linux/thread_info.h>
 
@@ -388,6 +389,11 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_FLUSHER	0x00004000	/* responsible for disk writeback */
 #define PF_RADIX_TREE	0x00008000	/* debug: performing radix tree alloc */
 
+#define PF_FREEZE	0x00010000	/* this task should be frozen for suspend */
+#define PF_IOTHREAD	0x00020000	/* this thread is needed for doing I/O to swap */
+#define PF_KERNTHREAD	0x00040000	/* this thread is a kernel thread that cannot be sent signals to */
+#define PF_FROZEN	0x00080000	/* frozen for system suspend */
+
 /*
  * Ptrace flags
  */
@@ -476,12 +482,6 @@ extern void free_uid(struct user_struct *);
 
 #include <asm/current.h>
 
-/*
- * The 64-bit value is not volatile - you MUST NOT read it
- * without holding read_lock_irq(&xtime_lock)
- */
-extern u64 jiffies_64;
-extern unsigned long volatile jiffies;
 extern unsigned long itimer_ticks;
 extern unsigned long itimer_next;
 extern void do_timer(struct pt_regs *);

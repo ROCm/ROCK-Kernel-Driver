@@ -32,6 +32,7 @@
 #include <linux/in.h>
 #define __NO_VERSION__
 #include <linux/module.h>
+#include <linux/namei.h>
 
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>

@@ -1,5 +1,5 @@
 #
-# drm device configuration
+# Drm device configuration
 #
 # This driver provides support for the
 # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
@@ -12,5 +12,6 @@ if [ "$CONFIG_DRM" != "n" ]; then
     tristate '  ATI Rage 128' CONFIG_DRM_R128
     dep_tristate '  ATI Radeon' CONFIG_DRM_RADEON $CONFIG_AGP
     dep_tristate '  Intel I810' CONFIG_DRM_I810 $CONFIG_AGP
+    dep_tristate '  Intel 830M' CONFIG_DRM_I830 $CONFIG_AGP
     dep_tristate '  Matrox g200/g400' CONFIG_DRM_MGA $CONFIG_AGP
 fi

@@ -2805,7 +2805,6 @@ void macserial_cleanup(void)
 module_init(macserial_init);
 module_exit(macserial_cleanup);
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 
 #if 0
 /*

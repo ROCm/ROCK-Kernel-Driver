@@ -1598,15 +1598,14 @@ static void do_cdu31a_request(request_queue_t * q)
 		 * The beginning here is stolen from the hard disk driver.  I hope
 		 * it's right.
 		 */
-		if (QUEUE_EMPTY || CURRENT->rq_status == RQ_INACTIVE) {
+		if (blk_queue_empty(QUEUE)) {
+			CLEAR_INTR;
 			goto end_do_cdu31a_request;
 		}
 
 		if (!sony_spun_up) {
 			scd_spinup();
 		}
-
-		INIT_REQUEST;
 
 		block = CURRENT->sector;
 		nblock = CURRENT->nr_sectors;
@@ -3503,4 +3502,3 @@ module_init(cdu31a_init);
 module_exit(cdu31a_exit);
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

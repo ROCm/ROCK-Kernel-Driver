@@ -157,6 +157,7 @@
 #include "../../scsi/constants.h"
 #include "acornscsi.h"
 #include "msgqueue.h"
+#include "scsi.h"
 
 #include <scsi/scsicam.h>
 
@@ -902,17 +903,8 @@ void acornscsi_data_updateptr(AS_Host *host, Scsi_Pointer *SCp, unsigned int len
     SCp->ptr += length;
     SCp->this_residual -= length;
 
-    if (!SCp->this_residual) {
-	if (SCp->buffers_residual) {
-	    SCp->buffer++;
-	    SCp->buffers_residual--;
-	    SCp->ptr = (char *)SCp->buffer->address;
-	    SCp->this_residual = SCp->buffer->length;
-	} else {
-	    SCp->ptr = NULL;
-	    host->dma.xfer_done = 1;
-	}
-    }
+    if (SCp->this_residual == 0 && next_SCp(SCp) == 0)
+	host->dma.xfer_done = 1;
 }
 
 /*
@@ -2558,20 +2550,8 @@ int acornscsi_queuecmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
     SCpnt->SCp.phase = (int)acornscsi_datadirection(SCpnt->cmnd[0]);
     SCpnt->SCp.sent_command = 0;
     SCpnt->SCp.scsi_xferred = 0;
-    SCpnt->SCp.Status = 0;
-    SCpnt->SCp.Message = 0;
 
-    if (SCpnt->use_sg) {
-	SCpnt->SCp.buffer = (struct scatterlist *) SCpnt->buffer;
-	SCpnt->SCp.buffers_residual = SCpnt->use_sg - 1;
-	SCpnt->SCp.ptr = (char *) SCpnt->SCp.buffer->address;
-	SCpnt->SCp.this_residual = SCpnt->SCp.buffer->length;
-    } else {
-	SCpnt->SCp.buffer = NULL;
-	SCpnt->SCp.buffers_residual = 0;
-	SCpnt->SCp.ptr = (char *) SCpnt->request_buffer;
-	SCpnt->SCp.this_residual = SCpnt->request_bufflen;
-    }
+    init_SCp(SCpnt);
 
     host->stats.queues += 1;
 
@@ -3180,4 +3160,4 @@ module_exit(acornscsi_exit);
 MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("AcornSCSI driver");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
+

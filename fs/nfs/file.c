@@ -54,8 +54,8 @@ struct file_operations nfs_file_operations = {
 
 struct inode_operations nfs_file_inode_operations = {
 	permission:	nfs_permission,
-	revalidate:	nfs_revalidate,
-	setattr:	nfs_notify_change,
+	getattr:	nfs_getattr,
+	setattr:	nfs_setattr,
 };
 
 /* Hack for future NFS swap support */

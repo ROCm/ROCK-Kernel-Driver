@@ -286,8 +286,6 @@ static struct i2c_driver i2c_driver_bt856 = {
 	bt856_command
 };
 
-EXPORT_NO_SYMBOLS;
-
 static int bt856_init(void)
 {
 	return i2c_register_driver(&i2c_driver_bt856);

@@ -184,7 +184,6 @@ void usb_show_string(struct usb_device *dev, char *id, int index)
 void usb_dump_urb (struct urb *urb)
 {
 	printk ("urb                   :%p\n", urb);
-	printk ("next                  :%p\n", urb->next);
 	printk ("dev                   :%p\n", urb->dev);
 	printk ("pipe                  :%08X\n", urb->pipe);
 	printk ("status                :%d\n", urb->status);

@@ -80,6 +80,7 @@
 #include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 #include "swab.h"
 #include "util.h"
@@ -1062,8 +1063,6 @@ static void __exit exit_ufs_fs(void)
 	unregister_filesystem(&ufs_fs_type);
 	destroy_inodecache();
 }
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_ufs_fs)
 module_exit(exit_ufs_fs)

@@ -22,7 +22,7 @@
 #include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/ioport.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/errno.h>
@@ -99,9 +99,6 @@
 /*--------------------------------------------------------------------------*/
 //                   NO serviceable parts below!
 /*--------------------------------------------------------------------------*/
-
-// How much URBs with ->next are walked
-#define MAX_NEXT_COUNT 2048
 
 static struct uhci *devs = NULL;
 
@@ -589,7 +586,6 @@ static const struct hc_driver uhci_driver = {
 
 #define DRIVER_INFO DRIVER_VERSION " " DRIVER_DESC
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_DESCRIPTION (DRIVER_INFO);
 MODULE_LICENSE ("GPL");

@@ -329,8 +329,6 @@ MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the TerraTec ActiveRadio card (0x590 or 0x591)");
 MODULE_PARM(radio_nr, "i");
 
-EXPORT_NO_SYMBOLS;
-
 static void __exit terratec_cleanup_module(void)
 {
 	video_unregister_device(&terratec_radio);

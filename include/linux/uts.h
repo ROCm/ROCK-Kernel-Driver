@@ -8,10 +8,6 @@
 #define UTS_SYSNAME "Linux"
 #endif
 
-#ifndef UTS_MACHINE
-#define UTS_MACHINE "unknown"
-#endif
-
 #ifndef UTS_NODENAME
 #define UTS_NODENAME "(none)"	/* set by sethostname() */
 #endif

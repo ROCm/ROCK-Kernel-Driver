@@ -13,9 +13,10 @@
 #include <linux/swapctl.h>
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
+#include <linux/namei.h>
 #include <linux/shm.h>
 #include <linux/blkdev.h>
-#include <linux/compiler.h>
+#include <linux/buffer_head.h>		/* for block_flushpage() */
 
 #include <asm/pgtable.h>
 

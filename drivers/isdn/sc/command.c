@@ -123,7 +123,6 @@ int command(isdn_ctrl *cmd)
 	{
 		unsigned long 	cmdptr;
 		scs_ioctl	ioc;
-		int		err;
 
 		memcpy(&cmdptr, cmd->parm.num, sizeof(unsigned long));
 		if (copy_from_user(&ioc, (scs_ioctl *)cmdptr,

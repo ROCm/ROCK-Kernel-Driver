@@ -2,10 +2,6 @@
 # Makefile for the input core drivers.
 #
 
-# The target object and module list name.
-
-O_TARGET	:= joydrv.o
-
 # I-Force may need both USB and RS-232
 
 CONFIG_JOYSTICK_IFORCE := n

@@ -42,6 +42,7 @@
 #include <linux/init.h>
 #include <linux/smp.h>
 #include <linux/module.h>
+#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/smp.h>
@@ -584,6 +585,18 @@ bad_ctc:
 	return 0;
 }
 #endif /* CONFIG_X86_TSC */
+
+static struct device device_i8253 = {
+	name:	       	"i8253",
+	bus_id:		"0040",
+};
+
+static int time_init_driverfs(void)
+{
+	return register_sys_device(&device_i8253);
+}
+
+__initcall(time_init_driverfs);
 
 void __init time_init(void)
 {

@@ -112,7 +112,7 @@ byte __init qd_read_reg (byte reg)
  * This routine is invoked from ide.c to prepare for access to a given drive.
  */
 
-static void qd_select (ide_drive_t *drive)
+static void qd_select(struct ata_device *drive)
 {
 	byte index = (( (QD_TIMREG(drive)) & 0x80 ) >> 7) |
 			(QD_TIMREG(drive) & 0x02);
@@ -133,12 +133,12 @@ static byte qd6500_compute_timing(struct ata_channel *hwif, int active_time, int
 {
 	byte active_cycle,recovery_cycle;
 
-	if (system_bus_speed <= 33) {
-		active_cycle =   9  - IDE_IN(active_time   * system_bus_speed / 1000 + 1, 2, 9);
-		recovery_cycle = 15 - IDE_IN(recovery_time * system_bus_speed / 1000 + 1, 0, 15);
+	if (system_bus_speed <= 33333) {
+		active_cycle =   9  - IDE_IN(active_time   * system_bus_speed / 1000000 + 1, 2, 9);
+		recovery_cycle = 15 - IDE_IN(recovery_time * system_bus_speed / 1000000 + 1, 0, 15);
 	} else {
-		active_cycle =   8  - IDE_IN(active_time   * system_bus_speed / 1000 + 1, 1, 8);
-		recovery_cycle = 18 - IDE_IN(recovery_time * system_bus_speed / 1000 + 1, 3, 18);
+		active_cycle =   8  - IDE_IN(active_time   * system_bus_speed / 1000000 + 1, 1, 8);
+		recovery_cycle = 18 - IDE_IN(recovery_time * system_bus_speed / 1000000 + 1, 3, 18);
 	}
 
 	return((recovery_cycle<<4) | 0x08 | active_cycle);
@@ -152,8 +152,8 @@ static byte qd6500_compute_timing(struct ata_channel *hwif, int active_time, int
 
 static byte qd6580_compute_timing (int active_time, int recovery_time)
 {
-	byte active_cycle   = 17-IDE_IN(active_time   * system_bus_speed / 1000 + 1, 2, 17);
-	byte recovery_cycle = 15-IDE_IN(recovery_time * system_bus_speed / 1000 + 1, 2, 15);
+	byte active_cycle   = 17-IDE_IN(active_time   * system_bus_speed / 1000000 + 1, 2, 17);
+	byte recovery_cycle = 15-IDE_IN(recovery_time * system_bus_speed / 1000000 + 1, 2, 15);
 
 	return((recovery_cycle<<4) | active_cycle);
 }
@@ -164,7 +164,7 @@ static byte qd6580_compute_timing (int active_time, int recovery_time)
  * tries to find timing from dos driver's table
  */
 
-static int qd_find_disk_type (ide_drive_t *drive,
+static int qd_find_disk_type(struct ata_device *drive,
 		int *active_time, int *recovery_time)
 {
 	struct qd65xx_timing_s *p;
@@ -192,7 +192,7 @@ static int qd_find_disk_type (ide_drive_t *drive,
  * check whether timings don't conflict
  */
 
-static int qd_timing_ok (ide_drive_t drives[])
+static int qd_timing_ok(struct ata_device drives[])
 {
 	return (IDE_IMPLY(drives[0].present && drives[1].present,
 			IDE_IMPLY(QD_TIMREG(drives) == QD_TIMREG(drives+1),
@@ -206,7 +206,7 @@ static int qd_timing_ok (ide_drive_t drives[])
  * records the timing, and enables selectproc as needed
  */
 
-static void qd_set_timing (ide_drive_t *drive, byte timing)
+static void qd_set_timing(struct ata_device *drive, byte timing)
 {
 	struct ata_channel *hwif = drive->channel;
 
@@ -225,7 +225,7 @@ static void qd_set_timing (ide_drive_t *drive, byte timing)
  * qd6500_tune_drive
  */
 
-static void qd6500_tune_drive (ide_drive_t *drive, byte pio)
+static void qd6500_tune_drive(struct ata_device *drive, byte pio)
 {
 	int active_time   = 175;
 	int recovery_time = 415; /* worst case values from the dos driver */
@@ -247,7 +247,7 @@ static void qd6500_tune_drive (ide_drive_t *drive, byte pio)
  * qd6580_tune_drive
  */
 
-static void qd6580_tune_drive (ide_drive_t *drive, byte pio)
+static void qd6580_tune_drive(struct ata_device *drive, byte pio)
 {
 	struct ata_timing *t;
 	int base = drive->channel->select_data;

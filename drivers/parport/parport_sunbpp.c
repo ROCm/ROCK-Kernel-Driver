@@ -364,8 +364,6 @@ static int __init init_one_port(struct sbus_dev *sdev)
 	return 1;
 }
 
-EXPORT_NO_SYMBOLS;
-
 #ifdef MODULE
 int init_module(void)
 #else

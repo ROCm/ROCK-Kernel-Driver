@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 17
+SUBLEVEL = 18
 EXTRAVERSION =
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
@@ -37,14 +37,21 @@ OBJDUMP		= $(CROSS_COMPILE)objdump
 MAKEFILES	= $(TOPDIR)/.config
 GENKSYMS	= /sbin/genksyms
 DEPMOD		= /sbin/depmod
+PERL		= perl
 MODFLAGS	= -DMODULE
+CFLAGS_MODULE   = $(MODFLAGS)
+AFLAGS_MODULE   =
 CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
-PERL		= perl
+EXPORT_FLAGS    =
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HPATH HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
-	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS MODFLAGS PERL
+	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS PERL
+
+export CPPFLAGS EXPORT_FLAGS
+export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
+export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
 all:	do-it-all
 
@@ -92,6 +99,10 @@ CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  -fomit-frame-pointer -fno-strict-aliasing -fno-common
 AFLAGS := -D__ASSEMBLY__ $(CPPFLAGS)
 
+ifdef CONFIG_MODULES
+EXPORT_FLAGS := -DEXPORT_SYMTAB
+endif
+
 INIT		=init/init.o
 CORE_FILES	=kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
 NETWORKS	=net/network.o
@@ -113,10 +124,10 @@ DRIVERS-y += drivers/base/base.o \
 	drivers/misc/misc.o \
 	drivers/net/net.o \
 	drivers/media/media.o
-DRIVERS-$(CONFIG_NUBUS) += drivers/nubus/nubus.a
+DRIVERS-$(CONFIG_NUBUS) += drivers/nubus/built-in.o
 DRIVERS-$(CONFIG_ATM) += drivers/atm/atm.o
 DRIVERS-$(CONFIG_IDE) += drivers/ide/idedriver.o
-DRIVERS-$(CONFIG_FC4) += drivers/fc4/fc4.a
+DRIVERS-$(CONFIG_FC4) += drivers/fc4/built-in.o
 DRIVERS-$(CONFIG_SCSI) += drivers/scsi/scsidrv.o
 DRIVERS-$(CONFIG_FUSION) += drivers/message/message.o
 DRIVERS-$(CONFIG_IEEE1394) += drivers/ieee1394/ieee1394drv.o
@@ -128,16 +139,16 @@ endif
 DRIVERS-$(CONFIG_SOUND) += sound/sound.o
 DRIVERS-$(CONFIG_MTD) += drivers/mtd/mtdlink.o
 DRIVERS-$(CONFIG_PCMCIA) += drivers/pcmcia/pcmcia.o
-DRIVERS-$(CONFIG_DIO) += drivers/dio/dio.a
+DRIVERS-$(CONFIG_DIO) += drivers/dio/built-in.o
 DRIVERS-$(CONFIG_SBUS) += drivers/sbus/sbus_all.o
 DRIVERS-$(CONFIG_ZORRO) += drivers/zorro/driver.o
 DRIVERS-$(CONFIG_ALL_PPC) += drivers/macintosh/macintosh.o
 DRIVERS-$(CONFIG_MAC) += drivers/macintosh/macintosh.o
 DRIVERS-$(CONFIG_PNP) += drivers/pnp/pnp.o
-DRIVERS-$(CONFIG_SGI_IP22) += drivers/sgi/sgi.a
+DRIVERS-$(CONFIG_SGI_IP22) += drivers/sgi/built-in.o
 DRIVERS-$(CONFIG_VT) += drivers/video/video.o
-DRIVERS-$(CONFIG_PARIDE) += drivers/block/paride/paride.a
-DRIVERS-$(CONFIG_TC) += drivers/tc/tc.a
+DRIVERS-$(CONFIG_PARIDE) += drivers/block/paride/built-in.o
+DRIVERS-$(CONFIG_TC) += drivers/tc/built-in.o
 DRIVERS-$(CONFIG_USB) += drivers/usb/usbdrv.o
 DRIVERS-$(CONFIG_INPUT) += drivers/input/inputdrv.o
 DRIVERS-$(CONFIG_GAMEPORT) += drivers/input/gameport/gamedrv.o
@@ -155,18 +166,27 @@ DRIVERS := $(DRIVERS-y)
 
 include arch/$(ARCH)/Makefile
 
-export	CPPFLAGS CFLAGS CFLAGS_KERNEL AFLAGS AFLAGS_KERNEL
-
 export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
 
-# Build vmlinux / boot target
+# boot target
 # ---------------------------------------------------------------------------
 
 boot: vmlinux
 	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C arch/$(ARCH)/boot
 
-vmlinux: include/linux/version.h $(CONFIGURATION) linuxsubdirs
-	$(LD) $(LINKFLAGS) $(HEAD) $(INIT) \
+# Build vmlinux
+# ---------------------------------------------------------------------------
+
+#	This is a bit tricky: If we need to relink vmlinux, we want
+#	the version number incremented, which means recompile init/version.o
+#	and relink init/init.o. However, we cannot do this during the
+#       normal descending-into-subdirs phase, since at that time
+#       we cannot yet know if we will need to relink vmlinux.
+#	So we descend into init/ inside the rule for vmlinux again.
+
+vmlinux-objs := $(HEAD) $(INIT) $(CORE_FILES) $(LIBS) $(DRIVERS) $(NETWORKS)
+
+cmd_link_vmlinux = $(LD) $(LINKFLAGS) $(HEAD) $(INIT) \
 		--start-group \
 		$(CORE_FILES) \
 		$(LIBS) \
@@ -174,10 +194,33 @@ vmlinux: include/linux/version.h $(CONFIGURATION) linuxsubdirs
 		$(NETWORKS) \
 		--end-group \
 		-o vmlinux
+
+#	set -e makes the rule exit immediately on error
+
+define rule_link_vmlinux
+	set -e
+	echo Generating build number
+	. scripts/mkversion > .tmpversion
+	mv -f .tmpversion .version
+	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C init
+	echo $(cmd_link_vmlinux)
+	$(cmd_link_vmlinux)
+	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
+endef
+
+vmlinux: $(CONFIGURATION) $(vmlinux-objs) dummy
+	$(call if_changed_rule,link_vmlinux)
+
+#	The actual objects are generated when descending, make sure
+#	no implicit rule kicks in
+
+$(sort $(vmlinux-objs)): linuxsubdirs
+	@
 
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
+.PHONY: linuxsubdirs
 linuxsubdirs: $(patsubst %, _dir_%, $(SUBDIRS))
 
 $(patsubst %, _dir_%, $(SUBDIRS)) : dummy include/linux/version.h include/config/MARKER
@@ -214,8 +257,6 @@ symlinks:
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
 	scripts/split-include include/linux/autoconf.h include/config
 	@ touch include/config/MARKER
-	. scripts/mkversion > .tmpversion
-	@mv -f .tmpversion .version
 
 # Generate some files
 
@@ -255,7 +296,7 @@ modules: $(patsubst %, _mod_%, $(SUBDIRS))
 
 .PHONY: $(patsubst %, _mod_%, $(SUBDIRS))
 $(patsubst %, _mod_%, $(SUBDIRS)) : include/linux/version.h include/config/MARKER
-	@$(MAKE) -C $(patsubst _mod_%, %, $@) CFLAGS="$(CFLAGS) $(MODFLAGS)" MAKING_MODULES=1 modules
+	@$(MAKE) -C $(patsubst _mod_%, %, $@) CFLAGS="$(CFLAGS) $(CFLAGS_MODULE)" AFLAGS="$(AFLAGS) $(AFLAGS_MODULE)" modules
 
 #	Install modules
 
@@ -330,6 +371,8 @@ CLEAN_FILES += \
 	drivers/zorro/devlist.h drivers/zorro/gen-devlist \
 	sound/oss/bin2hex sound/oss/hex2hex \
 	drivers/atm/fore200e_mkfirm drivers/atm/{pca,sba}*{.bin,.bin1,.bin2} \
+	drivers/scsi/aic7xxx/aic7xxx_seq.h \
+	drivers/scsi/aic7xxx/aic7xxx_reg.h \
 	drivers/scsi/aic7xxx/aicasm/aicasm_gram.c \
 	drivers/scsi/aic7xxx/aicasm/aicasm_scan.c \
 	drivers/scsi/aic7xxx/aicasm/y.tab.h \
@@ -468,3 +511,12 @@ backup: mrproper
 
 sums:
 	find . -type f -print | sort | xargs sum > .SUMS
+
+# FIXME Should go into a make.lib or something 
+# ---------------------------------------------------------------------------
+
+if_changed_rule = $(if $(strip $? \
+		               $(filter-out $(cmd_$(1)),$(cmd_$(@F)))\
+			       $(filter-out $(cmd_$(@F)),$(cmd_$(1)))),\
+	               @$(rule_$(1)))
+

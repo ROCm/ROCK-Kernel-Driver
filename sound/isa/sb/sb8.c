@@ -32,8 +32,6 @@
 
 #define chip_t sb_t
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Sound Blaster 1.0/2.0/Pro");
 MODULE_LICENSE("GPL");

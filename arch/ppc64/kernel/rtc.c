@@ -211,7 +211,6 @@ static void __exit rtc_exit (void)
 
 module_init(rtc_init);
 module_exit(rtc_exit);
-EXPORT_NO_SYMBOLS;
 
 /*
  *	Info exported via "/proc/driver/rtc".

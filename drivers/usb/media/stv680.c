@@ -105,7 +105,6 @@ MODULE_PARM_DESC (debug, "Debug enabled or not");
 MODULE_PARM (swapRGB_on, "i");
 MODULE_PARM_DESC (swapRGB_on, "Red/blue swap: 1=always, 0=auto, -1=never");
 MODULE_PARM (video_nr, "i");
-EXPORT_NO_SYMBOLS;
 
 /********************************************************************
  *
@@ -799,7 +798,6 @@ static int stv680_stop_stream (struct usb_stv *stv680)
 
 	for (i = 0; i < STV680_NUMSBUF; i++)
 		if (stv680->urb[i]) {
-			stv680->urb[i]->next = NULL;
 			usb_unlink_urb (stv680->urb[i]);
 			usb_free_urb (stv680->urb[i]);
 			stv680->urb[i] = NULL;
@@ -1516,7 +1514,6 @@ static inline void usb_stv680_remove_disconnected (struct usb_stv *stv680)
 
 	for (i = 0; i < STV680_NUMSBUF; i++)
 		if (stv680->urb[i]) {
-			stv680->urb[i]->next = NULL;
 			usb_unlink_urb (stv680->urb[i]);
 			usb_free_urb (stv680->urb[i]);
 			stv680->urb[i] = NULL;

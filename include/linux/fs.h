@@ -27,6 +27,7 @@
 #include <asm/atomic.h>
 
 struct poll_table_struct;
+struct nameidata;
 
 
 /*
@@ -340,6 +341,7 @@ struct block_device {
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
 	int			bd_openers;
 	const struct block_device_operations *bd_op;
+	struct request_queue	*bd_queue;
 	struct semaphore	bd_sem;	/* open/close mutex */
 	struct list_head	bd_inodes;
 	void *			bd_holder;
@@ -605,16 +607,6 @@ extern void kill_fasync(struct fasync_struct **, int, int);
 /* only for net: no internal synchronization */
 extern void __kill_fasync(struct fasync_struct *, int, int);
 
-struct nameidata {
-	struct dentry *dentry;
-	struct vfsmount *mnt;
-	struct qstr last;
-	unsigned int flags;
-	int last_type;
-	struct dentry *old_dentry;
-	struct vfsmount *old_mnt;
-};
-
 /*
  *	Umount options
  */
@@ -707,9 +699,6 @@ extern int vfs_rmdir(struct inode *, struct dentry *);
 extern int vfs_unlink(struct inode *, struct dentry *);
 extern int vfs_rename(struct inode *, struct dentry *, struct inode *, struct dentry *);
 
-extern struct dentry *lock_rename(struct dentry *, struct dentry *);
-extern void unlock_rename(struct dentry *, struct dentry *);
-
 /*
  * File types
  */
@@ -781,9 +770,8 @@ struct inode_operations {
 	int (*follow_link) (struct dentry *, struct nameidata *);
 	void (*truncate) (struct inode *);
 	int (*permission) (struct inode *, int);
-	int (*revalidate) (struct dentry *);
 	int (*setattr) (struct dentry *, struct iattr *);
-	int (*getattr) (struct dentry *, struct iattr *);
+	int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
 	int (*setxattr) (struct dentry *, const char *, void *, size_t, int);
 	ssize_t (*getxattr) (struct dentry *, const char *, void *, size_t);
 	ssize_t (*listxattr) (struct dentry *, char *, size_t);
@@ -1168,25 +1156,6 @@ extern ino_t find_inode_number(struct dentry *, struct qstr *);
 #include <linux/err.h>
 
 /*
- * The bitmask for a lookup event:
- *  - follow links at the end
- *  - require a directory
- *  - ending slashes ok even for nonexistent files
- *  - internal "there are more path compnents" flag
- *  - locked when lookup done with dcache_lock held
- */
-#define LOOKUP_FOLLOW		(1)
-#define LOOKUP_DIRECTORY	(2)
-#define LOOKUP_CONTINUE		(4)
-#define LOOKUP_PARENT		(16)
-#define LOOKUP_NOALT		(32)
-
-/*
- * Type of the last component on LOOKUP_PARENT
- */
-enum {LAST_NORM, LAST_ROOT, LAST_DOT, LAST_DOTDOT, LAST_BIND};
-
-/*
  * "descriptor" for what we're up to with a read for sendfile().
  * This allows us to use the same read code yet
  * have multiple different users of the data that
@@ -1206,19 +1175,6 @@ typedef int (*read_actor_t)(read_descriptor_t *, struct page *, unsigned long, u
 
 /* needed for stackable file system support */
 extern loff_t default_llseek(struct file *file, loff_t offset, int origin);
-
-extern int FASTCALL(__user_walk(const char *, unsigned, struct nameidata *));
-extern int FASTCALL(path_init(const char *, unsigned, struct nameidata *));
-extern int FASTCALL(path_walk(const char *, struct nameidata *));
-extern int FASTCALL(path_lookup(const char *, unsigned, struct nameidata *));
-extern int FASTCALL(link_path_walk(const char *, struct nameidata *));
-extern void path_release(struct nameidata *);
-extern int follow_down(struct vfsmount **, struct dentry **);
-extern int follow_up(struct vfsmount **, struct dentry **);
-extern struct dentry * lookup_one_len(const char *, struct dentry *, int);
-extern struct dentry * lookup_hash(struct qstr *, struct dentry *);
-#define user_path_walk(name,nd)	 __user_walk(name, LOOKUP_FOLLOW, nd)
-#define user_path_walk_link(name,nd) __user_walk(name, 0, nd)
 
 extern void inode_init_once(struct inode *);
 extern void iput(struct inode *);
@@ -1283,6 +1239,7 @@ extern int vfs_follow_link(struct nameidata *, const char *);
 extern int page_readlink(struct dentry *, char *, int);
 extern int page_follow_link(struct dentry *, struct nameidata *);
 extern struct inode_operations page_symlink_inode_operations;
+extern void generic_fillattr(struct inode *, struct kstat *);
 
 extern int vfs_readdir(struct file *, filldir_t, void *);
 
@@ -1296,6 +1253,9 @@ extern void drop_super(struct super_block *sb);
 extern kdev_t ROOT_DEV;
 extern char root_device_name[];
 
+extern int dcache_dir_open(struct inode *, struct file *);
+extern int dcache_dir_close(struct inode *, struct file *);
+extern loff_t dcache_dir_lseek(struct file *, loff_t, int);
 extern int dcache_readdir(struct file *, void *, filldir_t);
 extern int simple_statfs(struct super_block *, struct statfs *);
 extern struct dentry *simple_lookup(struct inode *, struct dentry *);
@@ -1324,8 +1284,5 @@ static inline ino_t parent_ino(struct dentry *dentry)
 	return res;
 }
 
-#include <linux/buffer_head.h>
-
 #endif /* __KERNEL__ */
-
 #endif /* _LINUX_FS_H */

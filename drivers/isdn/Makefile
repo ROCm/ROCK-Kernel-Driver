@@ -7,21 +7,20 @@ O_TARGET	:= vmlinux-obj.o
 # Object files in subdirectories
 
 mod-subdirs				:= i4l hisax capi eicon
-subdir-$(CONFIG_ISDN)			+= i4l
-subdir-$(CONFIG_ISDN_CAPI)		+= capi
-subdir-$(CONFIG_ISDN_CAPI)		+= hardware
-subdir-$(CONFIG_ISDN_DIVERSION)		+= divert
-subdir-$(CONFIG_ISDN_DRV_HISAX)		+= hisax
-subdir-$(CONFIG_ISDN_DRV_ICN)		+= icn
-subdir-$(CONFIG_ISDN_DRV_PCBIT)		+= pcbit
-subdir-$(CONFIG_ISDN_DRV_SC)		+= sc
-subdir-$(CONFIG_ISDN_DRV_LOOP)		+= isdnloop
-subdir-$(CONFIG_ISDN_DRV_ACT2000)	+= act2000
-subdir-$(CONFIG_ISDN_DRV_EICON)		+= eicon
-subdir-$(CONFIG_HYSDN)			+= hysdn
-subdir-$(CONFIG_ISDN_DRV_TPAM)		+= tpam
 
-obj-y += $(addsuffix /vmlinux-obj.o, $(subdir-y))
+obj-$(CONFIG_ISDN)			+= i4l/
+obj-$(CONFIG_ISDN_CAPI)			+= capi/
+obj-$(CONFIG_ISDN_CAPI)			+= hardware/
+obj-$(CONFIG_ISDN_DIVERSION)		+= divert/
+obj-$(CONFIG_ISDN_DRV_HISAX)		+= hisax/
+obj-$(CONFIG_ISDN_DRV_ICN)		+= icn/
+obj-$(CONFIG_ISDN_DRV_PCBIT)		+= pcbit/
+obj-$(CONFIG_ISDN_DRV_SC)		+= sc/
+obj-$(CONFIG_ISDN_DRV_LOOP)		+= isdnloop/
+obj-$(CONFIG_ISDN_DRV_ACT2000)		+= act2000/
+obj-$(CONFIG_ISDN_DRV_EICON)		+= eicon/
+obj-$(CONFIG_HYSDN)			+= hysdn/
+obj-$(CONFIG_ISDN_DRV_TPAM)		+= tpam/
 
 # The global Rules.make.
 

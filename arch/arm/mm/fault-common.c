@@ -339,8 +339,7 @@ no_context:
 int do_translation_fault(unsigned long addr, int error_code, struct pt_regs *regs)
 {
 	struct task_struct *tsk;
-	struct mm_struct *mm;
-	int offset;
+	unsigned int offset;
 	pgd_t *pgd, *pgd_k;
 	pmd_t *pmd, *pmd_k;
 
@@ -349,16 +348,17 @@ int do_translation_fault(unsigned long addr, int error_code, struct pt_regs *reg
 
 	offset = __pgd_offset(addr);
 
+	/*
+	 * FIXME: CP15 C1 is write only on ARMv3 architectures.
+	 */
 	pgd = cpu_get_pgd() + offset;
 	pgd_k = init_mm.pgd + offset;
 
 	if (pgd_none(*pgd_k))
 		goto bad_area;
 
-#if 0	/* note that we are two-level */
 	if (!pgd_present(*pgd))
 		set_pgd(pgd, *pgd_k);
-#endif
 
 	pmd_k = pmd_offset(pgd_k, addr);
 	pmd   = pmd_offset(pgd, addr);
@@ -371,8 +371,7 @@ int do_translation_fault(unsigned long addr, int error_code, struct pt_regs *reg
 
 bad_area:
 	tsk = current;
-	mm  = tsk->active_mm;
 
-	do_bad_area(tsk, mm, addr, error_code, regs);
+	do_bad_area(tsk, tsk->active_mm, addr, error_code, regs);
 	return 0;
 }

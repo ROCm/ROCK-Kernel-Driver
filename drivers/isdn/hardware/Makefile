@@ -1,15 +1,9 @@
 # Makefile for the CAPI hardware drivers
 
-# The target object and module list name.
-
-O_TARGET	:= vmlinux-obj.o
-
 # Object files in subdirectories
 
-mod-subdirs				:= avm
-subdir-$(CONFIG_CAPI_AVM)		+= avm
-
-obj-y += $(addsuffix /vmlinux-obj.o, $(subdir-y))
+mod-subdirs			:= avm
+obj-$(CONFIG_CAPI_AVM)		+= avm/
 
 # The global Rules.make.
 

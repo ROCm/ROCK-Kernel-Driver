@@ -33,18 +33,18 @@ Boston, MA 02111-1307, USA.  */
 
 #define umul_ppmm(xh, xl, a, b) \
 {register USItype __t0, __t1, __t2;                                     \
-  __asm__ ("%@ Inlined umul_ppmm
-        mov     %2, %5, lsr #16
-        mov     %0, %6, lsr #16
-        bic     %3, %5, %2, lsl #16
-        bic     %4, %6, %0, lsl #16
-        mul     %1, %3, %4
-        mul     %4, %2, %4
-        mul     %3, %0, %3
-        mul     %0, %2, %0
-        adds    %3, %4, %3
-        addcs   %0, %0, #65536
-        adds    %1, %1, %3, lsl #16
+  __asm__ ("%@ Inlined umul_ppmm					\n\
+        mov     %2, %5, lsr #16						\n\
+        mov     %0, %6, lsr #16						\n\
+        bic     %3, %5, %2, lsl #16					\n\
+        bic     %4, %6, %0, lsl #16					\n\
+        mul     %1, %3, %4						\n\
+        mul     %4, %2, %4						\n\
+        mul     %3, %0, %3						\n\
+        mul     %0, %2, %0						\n\
+        adds    %3, %4, %3						\n\
+        addcs   %0, %0, #65536						\n\
+        adds    %1, %1, %3, lsl #16					\n\
         adc     %0, %0, %3, lsr #16"                                    \
            : "=&r" ((USItype) (xh)),                                    \
              "=r" ((USItype) (xl)),                                     \

@@ -1168,7 +1168,6 @@ static int old_capi_manufacturer(unsigned int cmd, void *data)
 int capi20_manufacturer(unsigned int cmd, void *data)
 {
         struct capi_ctr *card;
-	int retval;
 
 	switch (cmd) {
 #ifdef CONFIG_AVMB1_COMPAT

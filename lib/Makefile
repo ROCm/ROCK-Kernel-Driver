@@ -23,11 +23,8 @@ endif
 
 obj-$(CONFIG_CRC32)	+= crc32.o
 
-subdir-$(CONFIG_ZLIB_INFLATE) += zlib_inflate
-subdir-$(CONFIG_ZLIB_DEFLATE) += zlib_deflate
-
-# Include the subdirs, if necessary.
-obj-y += $(join $(subdir-y),$(subdir-y:%=/%.o))
+obj-$(CONFIG_ZLIB_INFLATE) += zlib_inflate/
+obj-$(CONFIG_ZLIB_DEFLATE) += zlib_deflate/
 
 include $(TOPDIR)/drivers/net/Makefile.lib
 include $(TOPDIR)/drivers/usb/class/Makefile.lib

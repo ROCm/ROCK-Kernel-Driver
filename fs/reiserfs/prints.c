@@ -7,6 +7,7 @@
 #include <linux/fs.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/string.h>
+#include <linux/buffer_head.h>
 
 #include <stdarg.h>
 

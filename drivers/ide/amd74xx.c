@@ -87,7 +87,6 @@ static struct amd_ide_chip {
 static struct amd_ide_chip *amd_config;
 static unsigned char amd_enabled;
 static unsigned int amd_80w;
-static unsigned int amd_clock;
 
 static unsigned char amd_cyc2udma[] = { 6, 6, 5, 4, 0, 1, 1, 2, 2, 3, 3 };
 static unsigned char amd_udma2cyc[] = { 4, 6, 8, 10, 3, 2, 1, 1 };
@@ -131,7 +130,7 @@ static int amd_get_info(char *buffer, char **addr, off_t offset, int count)
 	amd_print("Highest DMA rate:                   %s", amd_dma[amd_config->flags & AMD_UDMA]);
 
 	amd_print("BM-DMA base:                        %#x", amd_base);
-	amd_print("PCI clock:                          %d.%dMHz", amd_clock / 1000, amd_clock / 100 % 10);
+	amd_print("PCI clock:                          %d.%dMHz", system_bus_speed / 1000, system_bus_speed / 100 % 10);
 	
 	amd_print("-----------------------Primary IDE-------Secondary IDE------");
 
@@ -147,7 +146,7 @@ static int amd_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	amd_print("Cable Type:            %10s%20s", (amd_80w & 1) ? "80w" : "40w", (amd_80w & 2) ? "80w" : "40w");
 
-	if (!amd_clock)
+	if (!system_bus_speed)
                 return p - buffer;
 
 	amd_print("-------------------drive0----drive1----drive2----drive3-----");
@@ -169,22 +168,22 @@ static int amd_get_info(char *buffer, char **addr, off_t offset, int count)
 		den[i]  = (c & ((i & 1) ? 0x40 : 0x20) << ((i & 2) << 2));
 
 		if (den[i] && uen[i] && udma[i] == 1) {
-			speed[i] = amd_clock * 3;
-			cycle[i] = 666666 / amd_clock;
+			speed[i] = system_bus_speed * 3;
+			cycle[i] = 666666 / system_bus_speed;
 			continue;
 		}
 
-		speed[i] = 4 * amd_clock / ((den[i] && uen[i]) ? udma[i] : (active[i] + recover[i]) * 2);
-		cycle[i] = 1000000 * ((den[i] && uen[i]) ? udma[i] : (active[i] + recover[i]) * 2) / amd_clock / 2;
+		speed[i] = 4 * system_bus_speed / ((den[i] && uen[i]) ? udma[i] : (active[i] + recover[i]) * 2);
+		cycle[i] = 1000000 * ((den[i] && uen[i]) ? udma[i] : (active[i] + recover[i]) * 2) / system_bus_speed / 2;
 	}
 
 	amd_print_drive("Transfer Mode: ", "%10s", den[i] ? (uen[i] ? "UDMA" : "DMA") : "PIO");
 
-	amd_print_drive("Address Setup: ", "%8dns", 1000000 * setup[i] / amd_clock);
-	amd_print_drive("Cmd Active:    ", "%8dns", 1000000 * active8b[i] / amd_clock);
-	amd_print_drive("Cmd Recovery:  ", "%8dns", 1000000 * recover8b[i] / amd_clock);
-	amd_print_drive("Data Active:   ", "%8dns", 1000000 * active[i] / amd_clock);
-	amd_print_drive("Data Recovery: ", "%8dns", 1000000 * recover[i] / amd_clock);
+	amd_print_drive("Address Setup: ", "%8dns", 1000000 * setup[i] / system_bus_speed);
+	amd_print_drive("Cmd Active:    ", "%8dns", 1000000 * active8b[i] / system_bus_speed);
+	amd_print_drive("Cmd Recovery:  ", "%8dns", 1000000 * recover8b[i] / system_bus_speed);
+	amd_print_drive("Data Active:   ", "%8dns", 1000000 * active[i] / system_bus_speed);
+	amd_print_drive("Data Recovery: ", "%8dns", 1000000 * recover[i] / system_bus_speed);
 	amd_print_drive("Cycle Time:    ", "%8dns", cycle[i]);
 	amd_print_drive("Transfer Rate: ", "%4d.%dMB/s", speed[i] / 1000, speed[i] / 100 % 10);
 
@@ -227,9 +226,9 @@ static void amd_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_timi
  * by upper layers.
  */
 
-static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
+static int amd_set_drive(struct ata_device *drive, unsigned char speed)
 {
-	ide_drive_t *peer = drive->channel->drives + (~drive->dn & 1);
+	struct ata_device *peer = drive->channel->drives + (~drive->dn & 1);
 	struct ata_timing t, p;
 	int T, UT;
 
@@ -238,7 +237,7 @@ static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
 			printk(KERN_WARNING "ide%d: Drive %d didn't accept speed setting. Oh, well.\n",
 				drive->dn >> 1, drive->dn & 1);
 
-	T = 1000000000 / amd_clock;
+	T = 1000000000 / system_bus_speed;
 	UT = T / min_t(int, max_t(int, amd_config->flags & AMD_UDMA, 1), 2);
 
 	ata_timing_compute(drive, speed, &t, T, UT);
@@ -248,7 +247,7 @@ static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
 		ata_timing_merge(&p, &t, &t, IDE_TIMING_8BIT);
 	}
 
-	if (speed == XFER_UDMA_5 && amd_clock <= 33333) t.udma = 1;
+	if (speed == XFER_UDMA_5 && system_bus_speed <= 33333) t.udma = 1;
 
 	amd_set_speed(drive->channel->pci_dev, drive->dn, &t);
 
@@ -264,7 +263,7 @@ static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
  * PIO-only tuning.
  */
 
-static void amd74xx_tune_drive(ide_drive_t *drive, unsigned char pio)
+static void amd74xx_tune_drive(struct ata_device *drive, u8 pio)
 {
 	if (!((amd_enabled >> drive->channel->unit) & 1))
 		return;
@@ -356,24 +355,6 @@ static unsigned int __init amd74xx_init_chipset(struct pci_dev *dev)
 	pci_read_config_byte(dev, AMD_IDE_CONFIG, &t);
 	pci_write_config_byte(dev, AMD_IDE_CONFIG,
 		(amd_config->flags & AMD_BAD_FIFO) ? (t & 0x0f) : (t | 0xf0));
-
-/*
- * Determine the system bus clock.
- */
-
-	amd_clock = system_bus_speed * 1000;
-
-	switch (amd_clock) {
-		case 33000: amd_clock = 33333; break;
-		case 37000: amd_clock = 37500; break;
-		case 41000: amd_clock = 41666; break;
-	}
-
-	if (amd_clock < 20000 || amd_clock > 50000) {
-		printk(KERN_WARNING "AMD_IDE: User given PCI clock speed impossible (%d), using 33 MHz instead.\n", amd_clock);
-		printk(KERN_WARNING "AMD_IDE: Use ide0=ata66 if you want to assume 80-wire cable\n");
-		amd_clock = 33333;
-	}
 
 /*
  * Print the boot message.

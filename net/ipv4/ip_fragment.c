@@ -24,7 +24,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/mm.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/skbuff.h>
 #include <linux/ip.h>
 #include <linux/icmp.h>

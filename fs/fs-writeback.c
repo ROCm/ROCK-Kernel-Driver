@@ -20,6 +20,7 @@
 #include <linux/mm.h>
 #include <linux/writeback.h>
 #include <linux/backing-dev.h>
+#include <linux/buffer_head.h>
 
 /**
  *	__mark_inode_dirty -	internal function

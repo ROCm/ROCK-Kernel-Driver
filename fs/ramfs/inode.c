@@ -29,6 +29,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>		/* for block_symlink() */
 
 #include <asm/uaccess.h>
 

@@ -258,7 +258,7 @@ void ide_release_dma(struct ata_channel *ch)
  * recovery" in the ATAPI drivers. This was just plain wrong before, in esp.
  * not portable, and just got uncovered now.
  */
-static void udma_pci_enable(struct ata_device *drive, int on, int verbose)
+void udma_pci_enable(struct ata_device *drive, int on, int verbose)
 {
 	struct ata_channel *ch = drive->channel;
 	int set_high = 1;
@@ -396,7 +396,7 @@ void udma_destroy_table(struct ata_channel *ch)
  * about addressing modes.
  */
 
-static int udma_pci_start(struct ata_device *drive, struct request *rq)
+int udma_pci_start(struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
 	unsigned long dma_base = ch->dma_base;
@@ -410,7 +410,7 @@ static int udma_pci_start(struct ata_device *drive, struct request *rq)
 	return 0;
 }
 
-static int udma_pci_stop(struct ata_device *drive)
+int udma_pci_stop(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
 	unsigned long dma_base = ch->dma_base;
@@ -425,12 +425,12 @@ static int udma_pci_stop(struct ata_device *drive)
 	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
 }
 
-static int udma_pci_read(struct ata_device *drive, struct request *rq)
+int udma_pci_read(struct ata_device *drive, struct request *rq)
 {
 	return ata_do_udma(1, drive, rq);
 }
 
-static int udma_pci_write(struct ata_device *drive, struct request *rq)
+int udma_pci_write(struct ata_device *drive, struct request *rq)
 {
 	return ata_do_udma(0, drive, rq);
 }
@@ -438,7 +438,7 @@ static int udma_pci_write(struct ata_device *drive, struct request *rq)
 /*
  * FIXME: This should be attached to a channel as we can see now!
  */
-static int udma_pci_irq_status(struct ata_device *drive)
+int udma_pci_irq_status(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
 	u8 dma_stat;
@@ -449,12 +449,12 @@ static int udma_pci_irq_status(struct ata_device *drive)
 	return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
 }
 
-static void udma_pci_timeout(struct ata_device *drive)
+void udma_pci_timeout(struct ata_device *drive)
 {
 	printk(KERN_ERR "ATA: UDMA timeout occured %s!\n", drive->name);
 }
 
-static void udma_pci_irq_lost(struct ata_device *drive)
+void udma_pci_irq_lost(struct ata_device *drive)
 {
 }
 
@@ -553,3 +553,11 @@ int ata_do_udma(unsigned int reading, struct ata_device *drive, struct request *
 
 EXPORT_SYMBOL(ata_do_udma);
 EXPORT_SYMBOL(ide_dma_intr);
+EXPORT_SYMBOL(udma_pci_enable);
+EXPORT_SYMBOL(udma_pci_start);
+EXPORT_SYMBOL(udma_pci_stop);
+EXPORT_SYMBOL(udma_pci_read);
+EXPORT_SYMBOL(udma_pci_write);
+EXPORT_SYMBOL(udma_pci_irq_status);
+EXPORT_SYMBOL(udma_pci_timeout);
+EXPORT_SYMBOL(udma_pci_irq_lost);

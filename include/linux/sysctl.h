@@ -544,6 +544,7 @@ enum
 	FS_LEASES=13,	/* int: leases enabled */
 	FS_DIR_NOTIFY=14,	/* int: directory notification enabled */
 	FS_LEASE_TIME=15,	/* int: maximum time to wait for a lease break */
+	FS_DQSTATS=16,	/* int: disc quota suage statistics */
 };
 
 /* CTL_DEBUG names: */

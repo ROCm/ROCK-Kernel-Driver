@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _emux.o
-
 export-objs  := emux.o
 
 snd-emux-synth-objs := emux.o emux_synth.o emux_seq.o emux_nrpn.o \

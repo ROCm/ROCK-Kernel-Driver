@@ -47,6 +47,8 @@
  */
 
 #include <linux/config.h>
+#include <linux/sched.h>
+#include <linux/errno.h>
 #include "usb.h"
 #include "scsiglue.h"
 #include "transport.h"
@@ -323,6 +325,7 @@ static int usb_stor_control_thread(void * __us)
 	/* avoid getting signals */
 	spin_lock_irq(&current->sigmask_lock);
 	flush_signals(current);
+	current->flags |= PF_IOTHREAD;
 	sigfillset(&current->blocked);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);

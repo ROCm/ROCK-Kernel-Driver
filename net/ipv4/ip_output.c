@@ -322,7 +322,8 @@ fragment:
 		/* Reject packet ONLY if TCP might fragment
 		 * it itself, if were careful enough.
 		 */
-		NETDEBUG(printk(KERN_DEBUG "sending pkt_too_big to self\n"));
+		NETDEBUG(printk(KERN_DEBUG "sending pkt_too_big (len[%u] pmtu[%u]) to self\n",
+				skb->len, rt->u.dst.pmtu));
 
 		icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED,
 			  htonl(rt->u.dst.pmtu));

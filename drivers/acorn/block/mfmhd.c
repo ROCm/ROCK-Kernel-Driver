@@ -889,17 +889,6 @@ static void mfm_request(void)
 {
 	DBG("mfm_request CURRENT=%p Busy=%d\n", CURRENT, Busy);
 
-	if (QUEUE_EMPTY) {
-		DBG("mfm_request: Exited due to NULL Current 1\n");
-		return;
-	}
-
-	if (CURRENT->rq_status == RQ_INACTIVE) {
-		/* Hmm - seems to be happening a lot on 1.3.45 */
-		/*console_printf("mfm_request: Exited due to INACTIVE Current\n"); */
-		return;
-	}
-
 	/* If we are still processing then return; we will get called again */
 	if (Busy) {
 		/* Again seems to be common in 1.3.45 */
@@ -914,16 +903,14 @@ static void mfm_request(void)
 		DBG("mfm_request: loop start\n");
 		sti();
 
-		DBG("mfm_request: before INIT_REQUEST\n");
+		DBG("mfm_request: before blk_queue_empty\n");
 
-		if (QUEUE_EMPTY) {
-			printk("mfm_request: Exiting due to !CURRENT (pre)\n");
+		if (blk_queue_empty(QUEUE)) {
+			printk("mfm_request: Exiting due to empty queue (pre)\n");
 			CLEAR_INTR;
 			Busy = 0;
 			return;
-		};
-
-		INIT_REQUEST;
+		}
 
 		DBG("mfm_request:                 before arg extraction\n");
 
@@ -1472,7 +1459,6 @@ static int mfm_reread_partitions(kdev_t dev)
 
 #ifdef MODULE
 
-EXPORT_NO_SYMBOLS;
 MODULE_LICENSE("GPL");
 
 int init_module(void)

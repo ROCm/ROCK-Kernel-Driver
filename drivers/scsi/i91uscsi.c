@@ -88,7 +88,7 @@
 #include <linux/version.h>
 #endif
 
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/delay.h>
 #include <linux/blk.h>
 #include <asm/io.h>

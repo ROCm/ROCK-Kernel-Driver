@@ -1512,8 +1512,6 @@ static int __init rose_proto_init(void)
 }
 module_init(rose_proto_init);
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_PARM(rose_ndevs, "i");
 MODULE_PARM_DESC(rose_ndevs, "number of ROSE devices");
 

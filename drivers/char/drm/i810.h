@@ -60,50 +60,10 @@
 	i810_dma_quiescent( dev );					\
 } while (0)
 
-#define __HAVE_DMA_IRQ		1
-#define __HAVE_DMA_IRQ_BH	1
-#define __HAVE_SHARED_IRQ       1
-#define DRIVER_PREINSTALL() do {					\
-	drm_i810_private_t *dev_priv =					\
-		(drm_i810_private_t *)dev->dev_private;			\
-	u16 tmp;							\
-   	tmp = I810_READ16( I810REG_HWSTAM );				\
-   	tmp = tmp & 0x6000;						\
-   	I810_WRITE16( I810REG_HWSTAM, tmp );				\
-									\
-      	tmp = I810_READ16( I810REG_INT_MASK_R );			\
-   	tmp = tmp & 0x6000;		/* Unmask interrupts */		\
-   	I810_WRITE16( I810REG_INT_MASK_R, tmp );			\
-   	tmp = I810_READ16( I810REG_INT_ENABLE_R );			\
-   	tmp = tmp & 0x6000;		/* Disable all interrupts */	\
-      	I810_WRITE16( I810REG_INT_ENABLE_R, tmp );			\
-} while (0)
-
-#define DRIVER_POSTINSTALL() do {					\
-	drm_i810_private_t *dev_priv =					\
-		(drm_i810_private_t *)dev->dev_private;			\
-	u16 tmp;							\
-   	tmp = I810_READ16( I810REG_INT_ENABLE_R );			\
-   	tmp = tmp & 0x6000;						\
-   	tmp = tmp | 0x0003;	/* Enable bp & user interrupts */	\
-   	I810_WRITE16( I810REG_INT_ENABLE_R, tmp );			\
-} while (0)
-
-#define DRIVER_UNINSTALL() do {						\
-	drm_i810_private_t *dev_priv =					\
-		(drm_i810_private_t *)dev->dev_private;			\
-	u16 tmp;							\
-	if ( dev_priv ) {						\
-		tmp = I810_READ16( I810REG_INT_IDENTITY_R );		\
-		tmp = tmp & ~(0x6000);	/* Clear all interrupts */	\
-		if ( tmp != 0 )						\
-			I810_WRITE16( I810REG_INT_IDENTITY_R, tmp );	\
-									\
-		tmp = I810_READ16( I810REG_INT_ENABLE_R );		\
-		tmp = tmp & 0x6000;	/* Disable all interrupts */	\
-		I810_WRITE16( I810REG_INT_ENABLE_R, tmp );		\
-	}								\
-} while (0)
+/* Don't need an irq any more.  The template code will make sure that
+ * a noop stub is generated for compatibility.
+ */
+#define __HAVE_DMA_IRQ		0
 
 /* Buffer customization:
  */

@@ -377,7 +377,7 @@ static int pdcraid1_make_request (request_queue_t *q, int rw, struct buffer_head
 static unsigned long calc_pdcblock_offset(struct block_device *bdev)
 {
 	unsigned long lba = 0;
-	ide_drive_t *ideinfo = get_info_ptr(to_kdev_t(bdev->bd_dev));
+	struct ata_device *ideinfo = get_info_ptr(to_kdev_t(bdev->bd_dev));
 
 	if (ideinfo==NULL)
 		return 0;

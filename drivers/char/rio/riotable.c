@@ -125,7 +125,7 @@ struct rio_info *	p;
 	rio_dprintk (RIO_DEBUG_TABLE, "RIONewTable: entering(1)\n"); 
 	if ( p->RIOSystemUp ) {		/* (1) */
 		p->RIOError.Error = HOST_HAS_ALREADY_BEEN_BOOTED;
-		return EBUSY;
+		return -EBUSY;
 	}
 
 	p->RIOError.Error = NOTHING_WRONG_AT_ALL;
@@ -147,7 +147,7 @@ struct rio_info *	p;
 				if ( *cptr<' ' || *cptr>'~' ) {
 					p->RIOError.Error = BAD_CHARACTER_IN_NAME;
 					p->RIOError.Entry = Entry;
-					return ENXIO;
+					return -ENXIO;
 				}
 				cptr++;
 			}
@@ -169,7 +169,7 @@ struct rio_info *	p;
 				rio_dprintk (RIO_DEBUG_TABLE, "%s pretending to be empty but isn't\n",MapP->Name);
 				p->RIOError.Error = TABLE_ENTRY_ISNT_PROPERLY_NULL;
 				p->RIOError.Entry = Entry;
-				return ENXIO;
+				return -ENXIO;
 			}
 			rio_dprintk (RIO_DEBUG_TABLE, "!RIO: Daemon: test (3) passes\n");
 			continue;
@@ -207,14 +207,14 @@ struct rio_info *	p;
 							MapP->Name);
 				p->RIOError.Error		 = ZERO_RTA_ID;
 				p->RIOError.Entry = Entry;
-				return ENXIO;
+				return -ENXIO;
 			}
 			if ( MapP->ID > MAX_RUP ) {
 				rio_dprintk (RIO_DEBUG_TABLE, "RIO: RTA %s has been allocated an illegal ID %d\n",
 							MapP->Name, MapP->ID);
 				p->RIOError.Error = ID_NUMBER_OUT_OF_RANGE;
 				p->RIOError.Entry = Entry;
-				return ENXIO;
+				return -ENXIO;
 			}
 			for ( SubEnt=0; SubEnt<Entry; SubEnt++ ) {
 				if ( MapP->HostUniqueNum == 
@@ -225,7 +225,7 @@ struct rio_info *	p;
 					p->RIOError.Error = DUPLICATED_RTA_ID;
 					p->RIOError.Entry = Entry;
 					p->RIOError.Other = SubEnt;
-					return ENXIO;
+					return -ENXIO;
 				}
 				/*
 				** If the RtaUniqueNum is the same, it may be looking at both
@@ -240,7 +240,7 @@ struct rio_info *	p;
 					p->RIOError.Error = DUPLICATE_UNIQUE_NUMBER;
 					p->RIOError.Entry = Entry;
 					p->RIOError.Other = SubEnt;
-					return ENXIO;
+					return -ENXIO;
 				}
 			}
 			rio_dprintk (RIO_DEBUG_TABLE, "RIONewTable: entering(7a)\n"); 
@@ -250,7 +250,7 @@ struct rio_info *	p;
 					(int)MapP->SysPort,MapP->Name, PORTS_PER_RTA);
 				p->RIOError.Error = TTY_NUMBER_OUT_OF_RANGE;
 				p->RIOError.Entry = Entry;
-				return ENXIO;
+				return -ENXIO;
 			}
 			rio_dprintk (RIO_DEBUG_TABLE, "RIONewTable: entering(7b)\n"); 
 			/* (7b) */
@@ -259,7 +259,7 @@ struct rio_info *	p;
 							(int)MapP->SysPort, MapP->Name);
 				p->RIOError.Error = TTY_NUMBER_OUT_OF_RANGE;
 				p->RIOError.Entry = Entry;
-				return ENXIO;
+				return -ENXIO;
 			}
 			for ( SubEnt=0; SubEnt<Entry; SubEnt++ ) {
 				if ( p->RIOConnectTable[SubEnt].Flags & RTA16_SECOND_SLOT )
@@ -275,7 +275,7 @@ struct rio_info *	p;
 						p->RIOError.Error = TTY_NUMBER_IN_USE;
 						p->RIOError.Entry = Entry;
 						p->RIOError.Other = SubEnt;
-						return ENXIO;
+						return -ENXIO;
 					}
 					rio_dprintk (RIO_DEBUG_TABLE, "RIONewTable: entering(9)\n"); 
 					if (RIOStrCmp(MapP->Name,
@@ -284,7 +284,7 @@ struct rio_info *	p;
 						p->RIOError.Error = NAME_USED_TWICE;
 						p->RIOError.Entry = Entry;
 						p->RIOError.Other = SubEnt;
-						return ENXIO;
+						return -ENXIO;
 					}
 				}
 			}
@@ -296,14 +296,14 @@ struct rio_info *	p;
 					MapP->Name);
 				p->RIOError.Error = HOST_ID_NOT_ZERO;
 				p->RIOError.Entry = Entry;
-				return ENXIO;
+				return -ENXIO;
 			}
 			if ( MapP->SysPort != NO_PORT ) {
 				rio_dprintk (RIO_DEBUG_TABLE, "RIO: HOST %s has been allocated port numbers!\n",
 					MapP->Name);
 				p->RIOError.Error = HOST_SYSPORT_BAD;
 				p->RIOError.Entry = Entry;
-				return ENXIO;
+				return -ENXIO;
 			}
 		}
 	}
@@ -530,7 +530,7 @@ struct Map *MapP;
 						rio_dprintk (RIO_DEBUG_TABLE, "Entry is in use and cannot be deleted!\n");
 						p->RIOError.Error = UNIT_IS_IN_USE;
 						rio_spin_unlock_irqrestore( &HostP->HostLock, lock_flags);
-						return EBUSY;
+						return -EBUSY;
 					}
 				}
 				/*
@@ -629,7 +629,7 @@ struct Map *MapP;
 
 	rio_dprintk (RIO_DEBUG_TABLE, "Couldn't find entry to be deleted\n");
 	p->RIOError.Error = COULDNT_FIND_ENTRY;
-	return ENXIO;
+	return -ENXIO;
 }
 
 int RIOAssignRta( struct rio_info *p, struct Map *MapP )
@@ -649,25 +649,25 @@ int RIOAssignRta( struct rio_info *p, struct Map *MapP )
     {
 	rio_dprintk (RIO_DEBUG_TABLE, "Bad ID in map entry!\n");
 	p->RIOError.Error = ID_NUMBER_OUT_OF_RANGE;
-	return EINVAL;
+	return -EINVAL;
     }
     if (MapP->RtaUniqueNum == 0)
     {
 	rio_dprintk (RIO_DEBUG_TABLE, "Rta Unique number zero!\n");
 	p->RIOError.Error = RTA_UNIQUE_NUMBER_ZERO;
-	return EINVAL;
+	return -EINVAL;
     }
     if ( (MapP->SysPort != NO_PORT) && (MapP->SysPort % PORTS_PER_RTA) )
     {
 	rio_dprintk (RIO_DEBUG_TABLE, "Port %d not multiple of %d!\n",(int)MapP->SysPort,PORTS_PER_RTA);
 	p->RIOError.Error = TTY_NUMBER_OUT_OF_RANGE;
-	return EINVAL;
+	return -EINVAL;
     }
     if ( (MapP->SysPort != NO_PORT) && (MapP->SysPort >= RIO_PORTS) )
     {
 	rio_dprintk (RIO_DEBUG_TABLE, "Port %d not valid!\n",(int)MapP->SysPort);
 	p->RIOError.Error = TTY_NUMBER_OUT_OF_RANGE;
-	return EINVAL;
+	return -EINVAL;
     }
 
     /*
@@ -681,7 +681,7 @@ int RIOAssignRta( struct rio_info *p, struct Map *MapP )
     {
 	rio_dprintk (RIO_DEBUG_TABLE, "Name entry contains non-printing characters!\n");
 	p->RIOError.Error = BAD_CHARACTER_IN_NAME;
-	return EINVAL;
+	return -EINVAL;
     }
     sptr++;
     }
@@ -693,7 +693,7 @@ int RIOAssignRta( struct rio_info *p, struct Map *MapP )
 	    if ( (p->RIOHosts[host].Flags & RUN_STATE) != RC_RUNNING )
 	    {
 		p->RIOError.Error = HOST_NOT_RUNNING;
-		return ENXIO;
+		return -ENXIO;
 	    }
 
 	    /*
@@ -720,7 +720,7 @@ int RIOAssignRta( struct rio_info *p, struct Map *MapP )
 		if (RIOFindFreeID(p, &p->RIOHosts[host], &nNewID, NULL) != 0)
 		{
 		    p->RIOError.Error = COULDNT_FIND_ENTRY;
-		    return EBUSY;
+		    return -EBUSY;
 		}
 		MapP->ID = (ushort)nNewID + 1;
 		rio_dprintk (RIO_DEBUG_TABLE, "Allocated ID %d for this new RTA.\n", MapP->ID);
@@ -744,7 +744,7 @@ int RIOAssignRta( struct rio_info *p, struct Map *MapP )
 		    if (unit == MAX_RUP)
 		    {
 			p->RIOError.Error = COULDNT_FIND_ENTRY;
-			return EBUSY;
+			return -EBUSY;
 		    }
 		    HostMapP->Flags |= RTA16_SECOND_SLOT;
 		    HostMapP->ID2 = MapP->ID2 = p->RIOHosts[host].Mapping[unit].ID;
@@ -761,7 +761,7 @@ int RIOAssignRta( struct rio_info *p, struct Map *MapP )
 	    {
 		rio_dprintk (RIO_DEBUG_TABLE, "Map table slot for ID %d is already in use.\n", MapP->ID);
 		p->RIOError.Error = ID_ALREADY_IN_USE;
-		return EBUSY;
+		return -EBUSY;
 	    }
 
 	    /*
@@ -802,7 +802,7 @@ int RIOAssignRta( struct rio_info *p, struct Map *MapP )
     }
     p->RIOError.Error = UNKNOWN_HOST_NUMBER;
     rio_dprintk (RIO_DEBUG_TABLE, "Unknown host %x\n", MapP->HostUniqueNum);
-    return ENXIO;
+    return -ENXIO;
 }
 
 
@@ -1017,7 +1017,7 @@ struct Map* MapP;
 	if ( MapP->ID > MAX_RUP ) {
 		rio_dprintk (RIO_DEBUG_TABLE, "Bad ID in map entry!\n");
 		p->RIOError.Error = ID_NUMBER_OUT_OF_RANGE;
-		return EINVAL;
+		return -EINVAL;
 	}
 
 	MapP->Name[MAX_NAME_LEN-1] = '\0';
@@ -1027,7 +1027,7 @@ struct Map* MapP;
 		if ( *sptr<' ' || *sptr>'~' ) {
 			rio_dprintk (RIO_DEBUG_TABLE, "Name entry contains non-printing characters!\n");
 			p->RIOError.Error = BAD_CHARACTER_IN_NAME;
-			return EINVAL;
+			return -EINVAL;
 		}
 		sptr++;
 	}
@@ -1036,7 +1036,7 @@ struct Map* MapP;
 		if ( MapP->HostUniqueNum == p->RIOHosts[host].UniqueNum ) {
 			if ( (p->RIOHosts[host].Flags & RUN_STATE) != RC_RUNNING ) {
 				p->RIOError.Error = HOST_NOT_RUNNING;
-				return ENXIO;
+				return -ENXIO;
 			}
 			if ( MapP->ID==0 ) {
 				CCOPY( MapP->Name, p->RIOHosts[host].Name, MAX_NAME_LEN );
@@ -1047,7 +1047,7 @@ struct Map* MapP;
 
 			if ( HostMapP->RtaUniqueNum != MapP->RtaUniqueNum ) {
 				p->RIOError.Error = RTA_NUMBER_WRONG;
-				return ENXIO;
+				return -ENXIO;
 			}
 			CCOPY( MapP->Name, HostMapP->Name, MAX_NAME_LEN );
 			return 0;
@@ -1055,5 +1055,5 @@ struct Map* MapP;
 	}
 	p->RIOError.Error = UNKNOWN_HOST_NUMBER;
 	rio_dprintk (RIO_DEBUG_TABLE, "Unknown host %x\n", MapP->HostUniqueNum);
-	return ENXIO;
+	return -ENXIO;
 }

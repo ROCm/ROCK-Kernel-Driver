@@ -27,6 +27,7 @@
 #include <linux/ctype.h>
 #include <linux/smp_lock.h>
 #include <linux/blkdev.h>
+#include <linux/buffer_head.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -1468,8 +1469,6 @@ static void __exit exit_iso9660_fs(void)
 #endif
 	destroy_inodecache();
 }
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_iso9660_fs)
 module_exit(exit_iso9660_fs)

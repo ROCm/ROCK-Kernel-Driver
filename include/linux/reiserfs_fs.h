@@ -20,6 +20,7 @@
 #include <asm/unaligned.h>
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
+#include <linux/buffer_head.h>
 #include <linux/reiserfs_fs_i.h>
 #include <linux/reiserfs_fs_sb.h>
 #endif
@@ -1341,6 +1342,13 @@ struct virtual_node
   const void * vn_data;
   struct virtual_item * vn_vi;	/* array of items (including a new one, excluding item to be deleted) */
 };
+
+/* used by directory items when creating virtual nodes */
+struct direntry_uarea {
+    int flags;
+    __u16 entry_count;
+    __u16 entry_sizes[1];
+} __attribute__ ((__packed__)) ;
 
 
 /***************************************************************************/

@@ -5,6 +5,7 @@
  *  AV, Sep--Dec 2000
  */
 
+#include <linux/buffer_head.h>
 #include "sysv.h"
 
 enum {DIRECT = 10, DEPTH = 4};	/* Have triple indirect */
@@ -420,6 +421,30 @@ do_indirects:
 		sysv_sync_inode (inode);
 	else
 		mark_inode_dirty(inode);
+}
+
+static unsigned sysv_nblocks(struct super_block *s, loff_t size)
+{
+	struct sysv_sb_info *sbi = SYSV_SB(s);
+	int ptrs_bits = sbi->s_ind_per_block_bits;
+	unsigned blocks, res, direct = DIRECT, i = DEPTH;
+	blocks = (size + s->s_blocksize - 1) >> s->s_blocksize_bits;
+	res = blocks;
+	while (--i && blocks > direct) {
+		blocks = ((blocks - direct - 1) >> ptrs_bits) + 1;
+		res += blocks;
+		direct = 1;
+	}
+	return blocks;
+}
+
+int sysv_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+{
+	struct super_block *s = mnt->mnt_sb;
+	generic_fillattr(dentry->d_inode, stat);
+	stat->blocks = (s->s_blocksize / 512) * sysv_nblocks(s, stat->size);
+	stat->blksize = s->s_blocksize;
+	return 0;
 }
 
 static int sysv_writepage(struct page *page)

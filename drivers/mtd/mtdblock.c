@@ -405,7 +405,11 @@ static void handle_mtdblock_request(void)
 	unsigned int res;
 
 	for (;;) {
-		INIT_REQUEST;
+		if (blk_queue_empty(QUEUE)) {
+			CLEAR_INTR;
+			return;
+		}
+
 		req = CURRENT;
 		spin_unlock_irq(QUEUE->queue_lock);
 		mtdblk = mtdblks[minor(req->rq_dev)];

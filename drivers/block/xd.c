@@ -210,12 +210,11 @@ static void __init xd_geninit (void)
 
 		printk("Detected a%s controller (type %d) at address %06x\n",
 			xd_sigs[controller].name,controller,address);
-		if (check_region(xd_iobase,4)) {
+		if (!request_region(xd_iobase,4,"xd")) {
 			printk("xd: Ports at 0x%x are not available\n",
 				xd_iobase);
 			return;
 		}
-		request_region(xd_iobase,4,"xd");
 		if (controller)
 			xd_sigs[controller].init_controller(address);
 		xd_drives = xd_initdrives(xd_sigs[controller].init_drive);
@@ -279,8 +278,13 @@ static void do_xd_request (request_queue_t * q)
 	sti();
 	if (xdc_busy)
 		return;
-	while (code = 0, !QUEUE_EMPTY) {
-		INIT_REQUEST;	/* do some checking on the request structure */
+	while (1) {
+		code = 0;
+		/* do some checking on the request structure */
+		if (blk_queue_empty(QUEUE)) {
+			CLEAR_INTR;
+			return;
+		}
 
 		if (CURRENT_DEV < xd_drives
 		    && (CURRENT->flags & REQ_CMD)

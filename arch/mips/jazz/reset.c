@@ -6,7 +6,7 @@
  *  $Id:$
  */
 
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <asm/jazz.h>
 #include <asm/io.h>
 #include <asm/system.h>

@@ -152,6 +152,8 @@ static struct pci_device_id tg3_pci_tbl[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_ALTIMA, PCI_DEVICE_ID_ALTIMA_AC1000,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_ALTIMA, PCI_DEVICE_ID_ALTIMA_AC9100,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ 0, }
 };
 
@@ -5682,7 +5684,8 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5701 &&
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5702FE &&
 	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5703 &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5703S)
+	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5703S &&
+	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_AC91002A1)
 		return -ENODEV;
 
 	/* ROFL, you should see Broadcom's driver code implementing

@@ -17,6 +17,7 @@
 #include <linux/ptrace.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/errno.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
@@ -87,4 +88,4 @@ module_exit(mouse_rpc_exit);
 MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("RiscPC mouse driver");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
+

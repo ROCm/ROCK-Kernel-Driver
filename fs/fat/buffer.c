@@ -8,6 +8,7 @@
 #include <linux/fs.h>
 #include <linux/msdos_fs.h>
 #include <linux/fat_cvf.h>
+#include <linux/buffer_head.h>
 
 struct buffer_head *fat_bread(struct super_block *sb, int block)
 {

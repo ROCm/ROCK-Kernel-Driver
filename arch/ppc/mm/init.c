@@ -140,7 +140,6 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
-	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 /* Free up now-unused memory */

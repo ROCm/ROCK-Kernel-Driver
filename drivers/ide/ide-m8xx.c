@@ -51,7 +51,7 @@ static void print_funcid (int func);
 static int check_ide_device (unsigned long base);
 
 static void ide_interrupt_ack (void *dev);
-static void m8xx_ide_tuneproc(ide_drive_t *drive, byte pio);
+static void m8xx_ide_tuneproc(struct ata_device *drive, byte pio);
 
 typedef	struct ide_ioport_desc {
 	unsigned long	base_off;		/* Offset to PCMCIA memory	*/
@@ -437,7 +437,7 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 
 /* Calculate PIO timings */
 static void
-m8xx_ide_tuneproc(ide_drive_t *drive, byte pio)
+m8xx_ide_tuneproc(struct ata_device *drive, byte pio)
 {
 #if defined(CONFIG_IDE_8xx_PCCARD) || defined(CONFIG_IDE_8xx_DIRECT)
 	volatile pcmconf8xx_t	*pcmp;

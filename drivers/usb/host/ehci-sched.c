@@ -964,15 +964,6 @@ static int itd_submit (struct ehci_hcd *ehci, struct urb *urb, int mem_flags)
 	if (urb->iso_frame_desc [0].offset != 0)
 		return -EINVAL;
 	
-	/*
-	 * NOTE doing this for now, anticipating periodic URB models
-	 * get updated to be "explicit resubmit".
-	 */
-	if (urb->next) {
-		dbg ("use explicit resubmit for ISO");
-		return -EINVAL;
-	}
-
 	/* allocate ITDs w/o locking anything */
 	status = itd_urb_transaction (ehci, urb, mem_flags);
 	if (status < 0)

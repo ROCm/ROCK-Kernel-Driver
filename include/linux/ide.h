@@ -40,9 +40,6 @@
 
 /* Right now this is only needed by a promise controlled.
  */
-#ifndef DISK_RECOVERY_TIME		/* off=0; on=access_delay_time */
-# define DISK_RECOVERY_TIME	0	/*  for hardware that needs it */
-#endif
 #ifndef OK_TO_RESET_CONTROLLER		/* 1 needed for good error recovery */
 # define OK_TO_RESET_CONTROLLER	0	/* 0 for use with AH2372A/B interface */
 #endif
@@ -202,7 +199,8 @@ typedef enum {
 	ide_cmd646,
 	ide_cy82c693,
 	ide_pmac,
-	ide_etrax100
+	ide_etrax100,
+	ide_acorn
 } hwif_chipset_t;
 
 
@@ -319,7 +317,6 @@ typedef union {
 /*
  * ATA/ATAPI device structure :
  */
-typedef
 struct ata_device {
 	struct ata_channel *	channel;
 	char			name[6];	/* device name */
@@ -411,7 +408,7 @@ struct ata_device {
 	unsigned long	immed_comp;
 	int		max_last_depth;
 	int		max_depth;
-} ide_drive_t;
+};
 
 /*
  * Status returned by various functions.
@@ -447,6 +444,7 @@ struct ata_channel {
 	 * between differen queues sharing the same irq line.
 	 */
 	spinlock_t *lock;
+	unsigned long *active;		/* active processing request */
 
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
 	struct timer_list timer;				/* failsafe timer */
@@ -454,7 +452,6 @@ struct ata_channel {
 	unsigned long poll_timeout;				/* timeout value during polled operations */
 	struct ata_device *drive;				/* last serviced drive */
 
-	unsigned long active;		/* active processing request */
 
 	ide_ioreg_t io_ports[IDE_NR_PORTS];	/* task file registers */
 	hw_regs_t hw;				/* hardware info */
@@ -547,10 +544,6 @@ struct ata_channel {
 	unsigned slow		: 1;	/* flag: slow data port */
 	unsigned io_32bit	: 1;	/* 0=16-bit, 1=32-bit */
 	unsigned char bus_state;	/* power state of the IDE bus */
-
-#if (DISK_RECOVERY_TIME > 0)
-	unsigned long last_time;	/* time when previous rq was done */
-#endif
 };
 
 /*
@@ -596,6 +589,7 @@ static inline int ata_can_queue(struct ata_device *drive)
 
 struct ata_operations {
 	struct module *owner;
+	void (*attach) (struct ata_device *);
 	int (*cleanup)(struct ata_device *);
 	int (*standby)(struct ata_device *);
 	ide_startstop_t	(*do_request)(struct ata_device *, struct request *, sector_t);
@@ -608,6 +602,9 @@ struct ata_operations {
 	void (*revalidate)(struct ata_device *);
 
 	sector_t (*capacity)(struct ata_device *);
+
+	/* linked list of rgistered device type drivers */
+	struct ata_operations *next;
 };
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
@@ -624,11 +621,20 @@ do {	\
 
 extern sector_t ata_capacity(struct ata_device *drive);
 
-/* FIXME: Actually implement and use them as soon as possible!  to make the
- * ide_scan_devices() go away! */
-
-extern int unregister_ata_driver(unsigned int type, struct ata_operations *driver);
-extern int register_ata_driver(unsigned int type, struct ata_operations *driver);
+extern void unregister_ata_driver(struct ata_operations *driver);
+extern int register_ata_driver(struct ata_operations *driver);
+static inline int ata_driver_module(struct ata_operations *driver)
+{
+#ifdef MODULE
+	if (register_ata_driver(driver) <= 0) {
+		unregister_ata_driver(driver);
+		return -ENODEV;
+	}
+#else
+	register_ata_driver(driver);
+#endif
+	return 0;
+}
 
 #define ata_ops(drive)		((drive)->driver)
 
@@ -642,7 +648,7 @@ extern int noautodma;
 #define LOCAL_END_REQUEST	/* Don't generate end_request in blk.h */
 #include <linux/blk.h>
 
-extern int __ide_end_request(struct ata_device *, struct request *, int, int);
+extern int __ide_end_request(struct ata_device *, struct request *, int, unsigned int);
 extern int ide_end_request(struct ata_device *drive, struct request *, int);
 
 /*
@@ -784,11 +790,9 @@ void ide_init_subdrivers (void);
 
 extern struct block_device_operations ide_fops[];
 
-#ifdef CONFIG_BLK_DEV_IDE
 /* Probe for devices attached to the systems host controllers.
  */
-extern int ideprobe_init (void);
-#endif
+extern int ideprobe_init(void);
 #ifdef CONFIG_BLK_DEV_IDEDISK
 extern int idedisk_init (void);
 #endif
@@ -805,9 +809,9 @@ extern int idefloppy_init (void);
 extern int idescsi_init (void);
 #endif
 
-extern struct ata_device *ide_scan_devices(byte, const char *, struct ata_operations *, int);
 extern int ide_register_subdriver(struct ata_device *, struct ata_operations *);
 extern int ide_unregister_subdriver(struct ata_device *drive);
+extern int ide_revalidate_disk(kdev_t i_rdev);
 
 #ifdef CONFIG_PCI
 # define ON_BOARD		0
@@ -863,6 +867,15 @@ static inline void udma_irq_lost(struct ata_device *drive)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 
+void udma_pci_enable(struct ata_device *drive, int on, int verbose);
+int udma_pci_start(struct ata_device *drive, struct request *rq);
+int udma_pci_stop(struct ata_device *drive);
+int udma_pci_read(struct ata_device *drive, struct request *rq);
+int udma_pci_write(struct ata_device *drive, struct request *rq);
+int udma_pci_irq_status(struct ata_device *drive);
+void udma_pci_timeout(struct ata_device *drive);
+void udma_pci_irq_lost(struct ata_device *);
+
 extern int udma_new_table(struct ata_channel *, struct request *);
 extern void udma_destroy_table(struct ata_channel *);
 extern void udma_print(struct ata_device *);
@@ -889,6 +902,5 @@ extern spinlock_t ide_lock;
 #define DRIVE_LOCK(drive)		((drive)->queue.queue_lock)
 
 extern int drive_is_ready(struct ata_device *drive);
-extern void revalidate_drives(void);
 
 #endif

@@ -33,6 +33,7 @@
  * Veritas filesystem driver - inode routines.
  */
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
 #include <linux/pagemap.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>

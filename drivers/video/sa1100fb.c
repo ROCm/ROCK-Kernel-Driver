@@ -1258,69 +1258,6 @@ sa1100fb_get_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 	return 0;
 }
 
-static struct fb_ops sa1100fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	sa1100fb_get_fix,
-	fb_get_var:	sa1100fb_get_var,
-	fb_set_var:	sa1100fb_set_var,
-	fb_get_cmap:	sa1100fb_get_cmap,
-	fb_set_cmap:	sa1100fb_set_cmap,
-	fb_setcolreg:	sa1100fb_setcolreg,
-	fb_blank:	sa1100fb_blank,
-};
-
-/*
- *  sa1100fb_switch():       
- *	Change to the specified console.  Palette and video mode
- *      are changed to the console's stored parameters.
- *
- *	Uh oh, this can be called from a tasklet (IRQ)
- */
-static int sa1100fb_switch(int con, struct fb_info *info)
-{
-	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
-	struct display *disp;
-	struct fb_cmap *cmap;
-
-	DPRINTK("con=%d info->modename=%s\n", con, fbi->fb.modename);
-
-	if (con == info->currcon)
-		return 0;
-
-	if (info->currcon >= 0) {
-		disp = fb_display + info->currcon;
-
-		/*
-		 * Save the old colormap and video mode.
-		 */
-		disp->var = fbi->fb.var;
-
-		if (disp->cmap.len)
-			fb_copy_cmap(&fbi->fb.cmap, &disp->cmap, 0);
-	}
-
-	info->currcon = con;
-	disp = fb_display + con;
-
-	/*
-	 * Make sure that our colourmap contains 256 entries.
-	 */
-	fb_alloc_cmap(&fbi->fb.cmap, 256, 0);
-
-	if (disp->cmap.len)
-		cmap = &disp->cmap;
-	else
-		cmap = fb_default_cmap(1 << disp->var.bits_per_pixel);
-
-	fb_copy_cmap(cmap, &fbi->fb.cmap, 0);
-
-	fbi->fb.var = disp->var;
-	fbi->fb.var.activate = FB_ACTIVATE_NOW;
-
-	sa1100fb_set_var(&fbi->fb.var, con, info);
-	return 0;
-}
-
 /*
  * Formal definition of the VESA spec:
  *  On
@@ -1385,6 +1322,69 @@ static int sa1100fb_blank(int blank, struct fb_info *info)
 			fb_set_cmap(&fbi->fb.cmap, 1, info);
 		sa1100fb_schedule_task(fbi, C_ENABLE);
 	}
+	return 0;
+}
+
+static struct fb_ops sa1100fb_ops = {
+	owner:		THIS_MODULE,
+	fb_get_fix:	sa1100fb_get_fix,
+	fb_get_var:	sa1100fb_get_var,
+	fb_set_var:	sa1100fb_set_var,
+	fb_get_cmap:	sa1100fb_get_cmap,
+	fb_set_cmap:	sa1100fb_set_cmap,
+	fb_setcolreg:	sa1100fb_setcolreg,
+	fb_blank:	sa1100fb_blank,
+};
+
+/*
+ *  sa1100fb_switch():       
+ *	Change to the specified console.  Palette and video mode
+ *      are changed to the console's stored parameters.
+ *
+ *	Uh oh, this can be called from a tasklet (IRQ)
+ */
+static int sa1100fb_switch(int con, struct fb_info *info)
+{
+	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
+	struct display *disp;
+	struct fb_cmap *cmap;
+
+	DPRINTK("con=%d info->modename=%s\n", con, fbi->fb.modename);
+
+	if (con == info->currcon)
+		return 0;
+
+	if (info->currcon >= 0) {
+		disp = fb_display + info->currcon;
+
+		/*
+		 * Save the old colormap and video mode.
+		 */
+		disp->var = fbi->fb.var;
+
+		if (disp->cmap.len)
+			fb_copy_cmap(&fbi->fb.cmap, &disp->cmap, 0);
+	}
+
+	info->currcon = con;
+	disp = fb_display + con;
+
+	/*
+	 * Make sure that our colourmap contains 256 entries.
+	 */
+	fb_alloc_cmap(&fbi->fb.cmap, 256, 0);
+
+	if (disp->cmap.len)
+		cmap = &disp->cmap;
+	else
+		cmap = fb_default_cmap(1 << disp->var.bits_per_pixel);
+
+	fb_copy_cmap(cmap, &fbi->fb.cmap, 0);
+
+	fbi->fb.var = disp->var;
+	fbi->fb.var.activate = FB_ACTIVATE_NOW;
+
+	sa1100fb_set_var(&fbi->fb.var, con, info);
 	return 0;
 }
 

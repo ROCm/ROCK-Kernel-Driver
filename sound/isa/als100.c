@@ -41,8 +41,6 @@
 
 #define PFX "als100: "
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
 MODULE_DESCRIPTION("Avance Logic ALS1X0");
 MODULE_LICENSE("GPL");

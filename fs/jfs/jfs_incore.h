@@ -122,8 +122,11 @@ struct jfs_sb_info {
 	short		l2nbperpage;	/* 2: log2 blocks per page	*/
 	short		l2niperblk;	/* 2: log2 inodes per page	*/
 	kdev_t		logdev;		/* 2: external log device	*/
+	uint		aggregate;	/* volume identifier in log record */
 	pxd_t		logpxd;		/* 8: pxd describing log	*/
 	pxd_t		ait2;		/* 8: pxd describing AIT copy	*/
+	char		uuid[16];	/* 16: 128-bit uuid for volume	*/
+	char		loguuid[16];	/* 16: 128-bit uuid for log	*/
 	/* Formerly in ipimap */
 	uint		gengen;		/* 4: inode generation generator*/
 	uint		inostamp;	/* 4: shows inode belongs to fileset*/

@@ -191,24 +191,8 @@ int DRM(write_string)(drm_device_t *dev, const char *s)
 		send -= count;
 	}
 
-#if LINUX_VERSION_CODE < 0x020315 && !defined(KILLFASYNCHASTHREEPARAMETERS)
-	/* The extra parameter to kill_fasync was added in 2.3.21, and is
-           _not_ present in _stock_ 2.2.14 and 2.2.15.  However, some
-           distributions patch 2.2.x kernels to add this parameter.  The
-           Makefile.linux attempts to detect this addition and defines
-           KILLFASYNCHASTHREEPARAMETERS if three parameters are found. */
-	if (dev->buf_async) kill_fasync(dev->buf_async, SIGIO);
-#else
-
-				/* Parameter added in 2.3.21. */
-#if LINUX_VERSION_CODE < 0x020400
-	if (dev->buf_async) kill_fasync(dev->buf_async, SIGIO, POLL_IN);
-#else
-				/* Type of first parameter changed in
-                                   Linux 2.4.0-test2... */
 	if (dev->buf_async) kill_fasync(&dev->buf_async, SIGIO, POLL_IN);
-#endif
-#endif
+
 	DRM_DEBUG("waking\n");
 	wake_up_interruptible(&dev->buf_readers);
 	return 0;

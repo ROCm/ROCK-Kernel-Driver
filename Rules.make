@@ -29,30 +29,88 @@ unexport subdir-y
 unexport subdir-m
 unexport subdir-n
 unexport subdir-
+unexport mod-subdirs
 
 comma	:= ,
 
-#
+# Figure out what we need to build from the various variables
+# ===========================================================================
+
 # When an object is listed to be built compiled-in and modular,
 # only build the compiled-in version
-#
+
 obj-m := $(filter-out $(obj-y),$(obj-m))
 
-#
-# Get things started.
-#
-first_rule: all_targets
+# Handle objects in subdirs
+# ---------------------------------------------------------------------------
+# o if we encounter foo/ in $(obj-y), replace it by foo/built-in.o
+#   and add the directory to the list of dirs to descend into: $(subdir-y)
+# o if we encounter foo/ in $(obj-m), remove it from $(obj-m) 
+#   and add the directory to the list of dirs to descend into: $(subdir-m)
+
+__subdir-y	:= $(patsubst %/,%,$(filter %/, $(obj-y)))
+subdir-y	+= $(__subdir-y)
+__subdir-m	:= $(patsubst %/,%,$(filter %/, $(obj-m)))
+subdir-m	+= $(__subdir-m)
+__subdir-n	:= $(patsubst %/,%,$(filter %/, $(obj-n)))
+subdir-n	+= $(__subdir-n)
+__subdir-	:= $(patsubst %/,%,$(filter %/, $(obj-)))
+subdir-		+= $(__subdir-)
+obj-y		:= $(patsubst %/, %/built-in.o, $(obj-y))
+obj-m		:= $(filter-out %/, $(obj-m))
+
+# If a dir is selected in $(subdir-y) and also mentioned in $(mod-subdirs),
+# add it to $(subdir-m)
 
 both-m          := $(filter $(mod-subdirs), $(subdir-y))
 SUB_DIRS	:= $(subdir-y)
 MOD_SUB_DIRS	:= $(sort $(subdir-m) $(both-m))
 ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 
+# export.o is never a composite object, since $(export-objs) has a
+# fixed meaning (== objects which EXPORT_SYMBOL())
+__obj-y = $(filter-out export.o,$(obj-y))
+__obj-m = $(filter-out export.o,$(obj-m))
+
+# if $(foo-objs) exists, foo.o is a composite object 
+__multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $($(m:.o=-objs)), $(m))))
+__multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $($(m:.o=-objs)), $(m))))
+
+# FIXME: Rip this out later
+# Backwards compatibility: if a composite object is listed in
+# $(list-multi), skip it here, since the Makefile will have an explicit
+# link rule for it
+
+multi-used-y := $(filter-out $(list-multi),$(__multi-used-y))
+multi-used-m := $(filter-out $(list-multi),$(__multi-used-m))
+
+# Build list of the parts of our composite objects, our composite
+# objects depend on those (obviously)
+multi-objs-y := $(foreach m, $(multi-used-y), $($(m:.o=-objs)))
+multi-objs-m := $(foreach m, $(multi-used-m), $($(m:.o=-objs)))
+
+# $(subdir-obj-y) is the list of objects in $(obj-y) which do not live
+# in the local directory
+subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)))
+
+# Replace multi-part objects by their individual parts, look at local dir only
+real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m)))
+real-objs-m := $(foreach m, $(obj-m), $(if $($(m:.o=-objs)),$($(m:.o=-objs)),$(m)))
+
+# ==========================================================================
+#
+# Get things started.
+#
+first_rule: all_targets
+
 #
 # Common rules
 #
 
-# export_flags will be set to -DEXPORT_SYMBOL for objects in $(export-objs)
+# Compile C sources (.c)
+# ---------------------------------------------------------------------------
+
+$(export-objs): export_flags := $(EXPORT_FLAGS)
 
 c_flags = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
 
@@ -71,11 +129,8 @@ cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
 %.o: %.c dummy
 	$(call if_changed,cmd_cc_o_c)
 
-# Old makefiles define their own rules for compiling .S files,
-# but these standard rules are available for any Makefile that
-# wants to use them.  Our plan is to incrementally convert all
-# the Makefiles to these standard rules.  -- rmk, mec
-ifdef USE_STANDARD_AS_RULE
+# Compile assembler sources (.S)
+# ---------------------------------------------------------------------------
 
 a_flags = $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
@@ -89,24 +144,28 @@ cmd_as_o_S = $(CC) $(a_flags) -c -o $@ $<
 %.o: %.S dummy
 	$(call if_changed,cmd_as_o_S)
 
-endif
-
-# FIXME is anybody using this rule? Why does it have EXTRA_CFLAGS?
-%.o: %.s
-	$(AS) $(AFLAGS) $(EXTRA_CFLAGS) -o $@ $<
+# FIXME
 
 %.lst: %.c
 	$(CC) $(c_flags) -g -c -o $*.o $<
 	$(TOPDIR)/scripts/makelst $* $(TOPDIR) $(OBJDUMP)
-#
-#
-#
+
+
+# If a Makefile does define neither O_TARGET nor L_TARGET,
+# use a standard O_TARGET named "built-in.o"
+
+ifndef O_TARGET
+ifndef L_TARGET
+O_TARGET := built-in.o
+endif
+endif
+
+# Build the compiled-in targets
+# ---------------------------------------------------------------------------
+
 all_targets: $(O_TARGET) $(L_TARGET) sub_dirs
 
-# $(subdir-obj-y) is the list of objects in $(obj-y) which do not live
-# in the local directory
-subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)))
-# Do build these objects, we need to descend into the directories
+# To build objects in subdirs, we need to descend into the directories
 $(subdir-obj-y): sub_dirs
 
 #
@@ -136,26 +195,6 @@ endif
 # Rule to link composite objects
 #
 
-# export.o is never a composite object, since $(export-objs) has a
-# fixed meaning (== objects which EXPORT_SYMBOL())
-__obj-y = $(filter-out export.o,$(obj-y))
-__obj-m = $(filter-out export.o,$(obj-m))
-
-# if $(foo-objs) exists, foo.o is a composite object 
-__multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $($(basename $(m))-objs), $(m))))
-__multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $($(basename $(m))-objs), $(m))))
-
-# Backwards compatibility: if a composite object is listed in
-# $(list-multi), skip it here, since the Makefile will have an explicit
-# link rule for it
-
-multi-used-y := $(filter-out $(list-multi),$(__multi-used-y))
-multi-used-m := $(filter-out $(list-multi),$(__multi-used-m))
-
-# Build list of the parts of our composite objects, our composite
-# objects depend on those (obviously)
-multi-objs-y := $(foreach m, $(multi-used-y), $($(basename $(m))-objs))
-multi-objs-m := $(foreach m, $(multi-used-m), $($(basename $(m))-objs))
 
 cmd_link_multi = $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs),$^)
 
@@ -319,7 +358,6 @@ endif # CONFIG_MODVERSIONS
 ifneq "$(strip $(export-objs))" ""
 
 $(export-objs): $(TOPDIR)/include/linux/modversions.h
-$(export-objs): export_flags := -DEXPORT_SYMTAB
 
 endif
 
@@ -378,7 +416,7 @@ endif
 # function to only execute the passed command if necessary
 
 if_changed = $(if $(strip $? \
-		          $(filter-out $($(1)),$(cmd_$@))\
-			  $(filter-out $(cmd_$@),$($(1)))),\
-	       @echo $($(1)); $($(1)); echo 'cmd_$@ := $($(1))' > .$@.cmd)
+		          $(filter-out $($(1)),$(cmd_$(@F)))\
+			  $(filter-out $(cmd_$(@F)),$($(1)))),\
+	       @echo '$($(1))' && $($(1)) && echo 'cmd_$@ := $($(1))' > $(@D)/.$(@F).cmd)
 

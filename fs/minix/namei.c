@@ -4,6 +4,7 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
+#include <linux/buffer_head.h>	/* for block_symlink() */
 #include "minix.h"
 
 static inline void inc_count(struct inode *inode)
@@ -307,4 +308,5 @@ struct inode_operations minix_dir_inode_operations = {
 	rmdir:		minix_rmdir,
 	mknod:		minix_mknod,
 	rename:		minix_rename,
+	getattr:	minix_getattr,
 };

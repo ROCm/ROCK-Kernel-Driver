@@ -4,8 +4,13 @@
  * Everything to do with buffer_heads.
  */
 
-#ifndef BUFFER_FLAGS_H
-#define BUFFER_FLAGS_H
+#ifndef _LINUX_BUFFER_HEAD_H
+#define _LINUX_BUFFER_HEAD_H
+
+#include <linux/types.h>
+#include <linux/fs.h>
+#include <linux/linkage.h>
+#include <asm/atomic.h>
 
 enum bh_state_bits {
 	BH_Uptodate,	/* Contains valid data */
@@ -138,7 +143,6 @@ BUFFER_FNS(Async_Write, async_write)
  */
 
 void FASTCALL(mark_buffer_dirty(struct buffer_head *bh));
-void buffer_init(void);
 void init_buffer(struct buffer_head *, bh_end_io_t *, void *);
 void set_bh_page(struct buffer_head *bh,
 		struct page *page, unsigned long offset);
@@ -297,4 +301,4 @@ static inline void lock_buffer(struct buffer_head * bh)
 void __buffer_error(char *file, int line);
 #define buffer_error() __buffer_error(__FILE__, __LINE__)
 
-#endif		/* BUFFER_FLAGS_H */
+#endif /* _LINUX_BUFFER_HEAD_H */

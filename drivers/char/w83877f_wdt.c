@@ -46,7 +46,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
 #include <linux/slab.h>

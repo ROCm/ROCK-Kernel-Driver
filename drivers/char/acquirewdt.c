@@ -249,4 +249,3 @@ module_init(acq_init);
 module_exit(acq_exit);
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

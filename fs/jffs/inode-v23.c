@@ -1803,8 +1803,6 @@ exit_jffs_fs(void)
 	kmem_cache_destroy(node_cache);
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(init_jffs_fs)
 module_exit(exit_jffs_fs)
 

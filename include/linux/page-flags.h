@@ -64,6 +64,7 @@
 
 #define PG_private		12	/* Has something at ->private */
 #define PG_writeback		13	/* Page is under writeback */
+#define PG_nosave		15	/* Used for system suspend/resume */
 
 /*
  * Global page accounting.  One instance per CPU.
@@ -206,6 +207,12 @@ extern void get_page_state(struct page_state *ret);
 			dec_page_state(nr_writeback);			\
 		ret;							\
 	})
+
+#define PageNosave(page)	test_bit(PG_nosave, &(page)->flags)
+#define SetPageNosave(page)	set_bit(PG_nosave, &(page)->flags)
+#define TestSetPageNosave(page)	test_and_set_bit(PG_nosave, &(page)->flags)
+#define ClearPageNosave(page)		clear_bit(PG_nosave, &(page)->flags)
+#define TestClearPageNosave(page)	test_and_clear_bit(PG_nosave, &(page)->flags)
 
 /*
  * The PageSwapCache predicate doesn't use a PG_flag at this time,

@@ -216,6 +216,4 @@ MODULE_PARM_DESC(rtctimer_freq, "timer frequency in Hz");
 
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;
-
 #endif /* CONFIG_RTC || CONFIG_RTC_MODULE */

@@ -24,6 +24,7 @@
 #include <linux/ctype.h>
 #include <linux/file.h>
 #include <linux/pagemap.h>
+#include <linux/namei.h>
 
 #include <asm/uaccess.h>
 
@@ -714,8 +715,6 @@ static void __exit exit_misc_binfmt(void)
 	unregister_binfmt(&misc_format);
 	unregister_filesystem(&bm_fs_type);
 }
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_misc_binfmt);
 module_exit(exit_misc_binfmt);

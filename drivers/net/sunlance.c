@@ -258,7 +258,7 @@ struct lance_private {
 	void (*tx)(struct net_device *);
 
 	char	       	       *name;
-	__u32			init_block_dvma;
+	dma_addr_t		init_block_dvma;
 	struct net_device      *dev;		  /* Backpointer	*/
 	struct lance_private   *next_module;
 	struct sbus_dev	       *sdev;
@@ -320,7 +320,7 @@ static void lance_init_ring_dvma(struct net_device *dev)
 {
 	struct lance_private *lp = (struct lance_private *) dev->priv;
 	volatile struct lance_init_block *ib = lp->init_block;
-	__u32 aib = lp->init_block_dvma;
+	dma_addr_t aib = lp->init_block_dvma;
 	__u32 leptr;
 	int i;
     

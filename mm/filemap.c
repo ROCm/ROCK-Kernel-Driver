@@ -20,6 +20,16 @@
 #include <linux/iobuf.h>
 #include <linux/hash.h>
 #include <linux/writeback.h>
+/*
+ * This is needed for the following functions:
+ *  - try_to_release_page
+ *  - block_flushpage
+ *  - page_has_buffers
+ *  - generic_osync_inode
+ *
+ * FIXME: remove all knowledge of the buffer layer from this file
+ */
+#include <linux/buffer_head.h>
 
 #include <asm/uaccess.h>
 #include <asm/mman.h>

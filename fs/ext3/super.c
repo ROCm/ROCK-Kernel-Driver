@@ -28,6 +28,7 @@
 #include <linux/init.h>
 #include <linux/blkdev.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_JBD_DEBUG
@@ -1808,8 +1809,6 @@ static void __exit exit_ext3_fs(void)
 	unregister_filesystem(&ext3_fs_type);
 	destroy_inodecache();
 }
-
-EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Remy Card, Stephen Tweedie, Andrew Morton, Andreas Dilger, Theodore Ts'o and others");
 MODULE_DESCRIPTION("Second Extended Filesystem with journaling extensions");

@@ -506,8 +506,6 @@ MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");
 MODULE_DESCRIPTION("SMC Ultra/EtherEZ ISA/PnP Ethernet driver");
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;
-
 /* This is set up so that only a single autoprobe takes place per call.
 ISA device autoprobes on a running machine are not recommended. */
 int

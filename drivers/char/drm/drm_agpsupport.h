@@ -35,12 +35,8 @@
 
 #if __REALLY_HAVE_AGP
 
-#if LINUX_VERSION_CODE < 0x020400
-#include "agpsupport-pre24.h"
-#else
 #define DRM_AGP_GET (drm_agp_t *)inter_module_get("drm_agp")
 #define DRM_AGP_PUT inter_module_put("drm_agp")
-#endif
 
 static const drm_agp_t *drm_agp = NULL;
 
@@ -271,24 +267,24 @@ drm_agp_head_t *DRM(agp_init)(void)
 		case INTEL_GX:		head->chipset = "Intel 440GX";   break;
 		case INTEL_I810:	head->chipset = "Intel i810";    break;
 
-#if LINUX_VERSION_CODE >= 0x020400
 		case INTEL_I815:	head->chipset = "Intel i815";	 break;
+#if LINUX_VERSION_CODE >= 0x020415
 	 	case INTEL_I820:	head->chipset = "Intel i820";	 break;
-		case INTEL_I840:	head->chipset = "Intel i840";    break;
-		case INTEL_I845:	head->chipset = "Intel i845";    break;
-		case INTEL_I850:	head->chipset = "Intel i850";	 break;
 #endif
+		case INTEL_I840:	head->chipset = "Intel i840";    break;
+#if LINUX_VERSION_CODE >= 0x020415
+		case INTEL_I845:	head->chipset = "Intel i845";    break;
+#endif
+		case INTEL_I850:	head->chipset = "Intel i850";	 break;
 
 		case VIA_GENERIC:	head->chipset = "VIA";           break;
 		case VIA_VP3:		head->chipset = "VIA VP3";       break;
 		case VIA_MVP3:		head->chipset = "VIA MVP3";      break;
-#if LINUX_VERSION_CODE >= 0x020400
 		case VIA_MVP4:		head->chipset = "VIA MVP4";      break;
 		case VIA_APOLLO_KX133:	head->chipset = "VIA Apollo KX133";
 			break;
 		case VIA_APOLLO_KT133:	head->chipset = "VIA Apollo KT133";
 			break;
-#endif
 
 		case VIA_APOLLO_PRO: 	head->chipset = "VIA Apollo Pro";
 			break;

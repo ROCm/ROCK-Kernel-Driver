@@ -422,10 +422,6 @@ static _INLINE_ void receive_chars(struct sgi_serial *info, struct pt_regs *regs
 		} else if (ch == 1) {
 			show_state();
 			return;
-		} else if (ch == 2) {
-			printk("%ld buffermem pages\n",
-					nr_buffermem_pages());
-			return;
 		}
 	}
 	/* Look for kgdb 'stop' character, consult the gdb documentation

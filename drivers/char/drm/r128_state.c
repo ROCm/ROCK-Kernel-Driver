@@ -1519,10 +1519,75 @@ int r128_cce_indirect( struct inode *inode, struct file *filp,
 {
 	drm_file_t *priv = filp->private_data;
 	drm_device_t *dev = priv->dev;
+	drm_r128_private_t *dev_priv = dev->dev_private;
+	drm_device_dma_t *dma = dev->dma;
+	drm_buf_t *buf;
+	drm_r128_buf_priv_t *buf_priv;
+	drm_r128_indirect_t indirect;
+#if 0
+	RING_LOCALS;
+#endif
 
 	LOCK_TEST_WITH_RETURN( dev );
 
-	/* Indirect buffer firing is not supported at this time.
+	if ( !dev_priv ) {
+		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
+		return -EINVAL;
+	}
+
+	if ( copy_from_user( &indirect, (drm_r128_indirect_t *)arg,
+			     sizeof(indirect) ) )
+		return -EFAULT;
+
+	DRM_DEBUG( "indirect: idx=%d s=%d e=%d d=%d\n",
+		   indirect.idx, indirect.start,
+		   indirect.end, indirect.discard );
+
+	if ( indirect.idx < 0 || indirect.idx >= dma->buf_count ) {
+		DRM_ERROR( "buffer index %d (of %d max)\n",
+			   indirect.idx, dma->buf_count - 1 );
+		return -EINVAL;
+	}
+
+	buf = dma->buflist[indirect.idx];
+	buf_priv = buf->dev_private;
+
+	if ( buf->pid != current->pid ) {
+		DRM_ERROR( "process %d using buffer owned by %d\n",
+			   current->pid, buf->pid );
+		return -EINVAL;
+	}
+	if ( buf->pending ) {
+		DRM_ERROR( "sending pending buffer %d\n", indirect.idx );
+		return -EINVAL;
+	}
+
+	if ( indirect.start < buf->used ) {
+		DRM_ERROR( "reusing indirect: start=0x%x actual=0x%x\n",
+			   indirect.start, buf->used );
+		return -EINVAL;
+	}
+
+	RING_SPACE_TEST_WITH_RETURN( dev_priv );
+	VB_AGE_TEST_WITH_RETURN( dev_priv );
+
+	buf->used = indirect.end;
+	buf_priv->discard = indirect.discard;
+
+#if 0
+	/* Wait for the 3D stream to idle before the indirect buffer
+	 * containing 2D acceleration commands is processed.
 	 */
-	return -EINVAL;
+	BEGIN_RING( 2 );
+	RADEON_WAIT_UNTIL_3D_IDLE();
+	ADVANCE_RING();
+#endif
+
+	/* Dispatch the indirect buffer full of commands from the
+	 * X server.  This is insecure and is thus only available to
+	 * privileged clients.
+	 */
+	r128_cce_dispatch_indirect( dev, buf, indirect.start, indirect.end );
+
+	return 0;
 }

@@ -73,6 +73,7 @@
 #include <linux/init.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 #include <asm/uaccess.h>
 
@@ -626,8 +627,6 @@ static void __exit exit_romfs_fs(void)
 }
 
 /* Yes, works even as a module... :) */
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_romfs_fs)
 module_exit(exit_romfs_fs)

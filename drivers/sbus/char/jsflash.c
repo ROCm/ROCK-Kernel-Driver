@@ -207,7 +207,11 @@ static void jsfd_do_request(request_queue_t *q)
 	size_t len;
 
 	for (;;) {
-		INIT_REQUEST;	/* if (QUEUE_EMPTY) return; */
+		if (blk_queue_empty(QUEUE)) {
+			CLEAR_INTR;
+			return;
+		}
+
 		req = CURRENT;
 
 		dev = MINOR(req->rq_dev);
@@ -558,8 +562,6 @@ static struct block_device_operations jsfd_fops = {
 	release:	jsfd_release,
 	ioctl:		jsfd_ioctl,
 };
-
-EXPORT_NO_SYMBOLS;
 
 int jsflash_init(void)
 {

@@ -114,12 +114,6 @@ static int __init pcwd_checkcard(void)
 {
 	int card_dat, prev_card_dat, found = 0, count = 0, done = 0;
 
-	/* As suggested by Alan Cox - this is a safety measure. */
-	if (check_region(current_readport, 4)) {
-		printk("pcwd: Port 0x%x unavailable.\n", current_readport);
-		return 0;
-	}
-
 	card_dat = 0x00;
 	prev_card_dat = 0x00;
 
@@ -628,15 +622,31 @@ static int __init pcwatchdog_init(void)
 		outb_p(0xA5, current_readport + 3);
 	}
 
-	if (revision == PCWD_REVISION_A)
-		request_region(current_readport, 2, "PCWD Rev.A (Berkshire)");
-	else
-		request_region(current_readport, 4, "PCWD Rev.C (Berkshire)");
-
-	misc_register(&pcwd_miscdev);
-
+	if (misc_register(&pcwd_miscdev))
+		return -ENODEV;
+	
 	if (supports_temp)
-		misc_register(&temp_miscdev);
+		if (misc_register(&temp_miscdev)) {
+			misc_deregister(&pcwd_miscdev);
+			return -ENODEV;		
+		}
+
+
+	if (revision == PCWD_REVISION_A) {
+		if (!request_region(current_readport, 2, "PCWD Rev.A (Berkshire)")) {
+			misc_deregister(&pcwd_miscdev);
+			if (supports_temp)
+				misc_deregister(&pcwd_miscdev);
+			return -EIO;		
+		}
+	}
+	else 
+		if (!request_region(current_readport, 4, "PCWD Rev.C (Berkshire)")) {
+			misc_deregister(&pcwd_miscdev);
+			if (supports_temp)
+				misc_deregister(&pcwd_miscdev);
+			return -EIO;
+		}
 
 	return 0;
 }
@@ -660,4 +670,3 @@ module_exit(pcwatchdog_exit);
 
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;

@@ -106,11 +106,11 @@ static void outReg (byte data, byte reg)
  * This function computes timing parameters
  * and sets controller registers accordingly.
  */
-static void ali14xx_tune_drive (ide_drive_t *drive, byte pio)
+static void ali14xx_tune_drive(struct ata_device *drive, u8 pio)
 {
 	int driveNum;
 	int time1, time2;
-	byte param1, param2, param3, param4;
+	u8 param1, param2, param3, param4;
 	unsigned long flags;
 	struct ata_timing *t;
 
@@ -124,8 +124,8 @@ static void ali14xx_tune_drive (ide_drive_t *drive, byte pio)
 	/* calculate timing, according to PIO mode */
 	time1 = t->cycle;
 	time2 = t->active;
-	param3 = param1 = (time2 * system_bus_speed + 999) / 1000;
-	param4 = param2 = (time1 * system_bus_speed + 999) / 1000 - param1;
+	param3 = param1 = (time2 * system_bus_speed + 999999) / 1000000;
+	param4 = param2 = (time1 * system_bus_speed + 999999) / 1000000 - param1;
 	if (pio < XFER_PIO_3) {
 		param3 += 8;
 		param4 += 8;

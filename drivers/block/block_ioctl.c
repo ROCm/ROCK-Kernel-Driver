@@ -56,7 +56,7 @@ int block_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 	struct request *rq;
 	int close = 0, err;
 
-	q = blk_get_queue(to_kdev_t(bdev->bd_dev));
+	q = bdev_get_queue(bdev);
 	if (!q)
 		return -ENXIO;
 

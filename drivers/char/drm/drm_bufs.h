@@ -229,11 +229,7 @@ int DRM(rmmap)(struct inode *inode, struct file *filp,
 	DRM(free)(list, sizeof(*list), DRM_MEM_MAPS);
 
 	for (pt = dev->vmalist, prev = NULL; pt; prev = pt, pt = pt->next) {
-#if LINUX_VERSION_CODE >= 0x020300
 		if (pt->vma->vm_private_data == map) found_maps++;
-#else
-		if (pt->vma->vm_pte == map) found_maps++;
-#endif
 	}
 
 	if(!found_maps) {

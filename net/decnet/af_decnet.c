@@ -2228,7 +2228,6 @@ void dn_unregister_sysctl(void);
 
 
 #ifdef MODULE
-EXPORT_NO_SYMBOLS;
 MODULE_DESCRIPTION("The Linux DECnet Network Protocol");
 MODULE_AUTHOR("Linux DECnet Project Team");
 MODULE_LICENSE("GPL");

@@ -26,7 +26,7 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #if defined(__alpha__)

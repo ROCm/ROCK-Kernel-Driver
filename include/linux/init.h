@@ -169,6 +169,9 @@ typedef void (*__cleanup_module_func_t)(void);
 
 #endif
 
+/* Data marked not to be saved by software_suspend() */
+#define __nosavedata __attribute__ ((__section__ (".data.nosave")))
+
 #ifdef CONFIG_HOTPLUG
 #define __devinit
 #define __devinitdata

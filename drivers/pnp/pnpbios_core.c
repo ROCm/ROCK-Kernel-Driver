@@ -118,7 +118,7 @@ __asm__(
 	"	pushl %ecx	\n"
 	"	pushl %ebx	\n"
 	"	pushl %eax	\n"
-	"	lcallw pnp_bios_callpoint\n"
+	"	lcallw *pnp_bios_callpoint\n"
 	"	addl $16, %esp	\n"
 	"	lret		\n"
 	".previous		\n"

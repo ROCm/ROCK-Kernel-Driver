@@ -191,6 +191,8 @@ void FASTCALL(smp_send_reschedule(int cpu))
  * The caller of this wants the passed function to run on every cpu.  If wait
  * is set, wait until all cpus have finished the function before returning.
  * The lock is here to protect the call structure.
+ * You must not call this function with disabled interrupts or from a
+ * hardware interrupt handler or from a bottom half handler.
  */
 int smp_call_function (void (*func) (void *info), void *info, int retry, 
 								int wait)
@@ -202,7 +204,7 @@ int smp_call_function (void (*func) (void *info), void *info, int retry,
 		return 0;
 	}
 
-	spin_lock_bh(&smp_fn_call.lock);
+	spin_lock(&smp_fn_call.lock);
 
 	atomic_set(&smp_fn_call.finished, 0);
 	smp_fn_call.fn = func;
@@ -219,7 +221,7 @@ int smp_call_function (void (*func) (void *info), void *info, int retry,
 		while(atomic_read(&smp_fn_call.finished) != cpus) {}
 	}
 
-	spin_unlock_bh(&smp_fn_call.lock);
+	spin_unlock(&smp_fn_call.lock);
 	return 0;
 }
 

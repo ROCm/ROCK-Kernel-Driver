@@ -28,6 +28,7 @@
 #include <linux/fs.h>
 #include <linux/ufs_fs.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 #undef UFS_NAMEI_DEBUG
 

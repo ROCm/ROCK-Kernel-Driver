@@ -171,8 +171,6 @@ void __exit cpuid_exit(void)
 module_init(cpuid_init);
 module_exit(cpuid_exit)
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("H. Peter Anvin <hpa@zytor.com>");
 MODULE_DESCRIPTION("x86 generic CPUID driver");
 MODULE_LICENSE("GPL");

@@ -5,8 +5,6 @@
 # removes any old dependencies. DON'T put your own dependencies here
 # unless it's something special (ie not a .c file).
 
-USE_STANDARD_AS_RULE := true
-
 ENTRY_OBJ = entry-$(PROCESSOR).o
 
 AFLAGS_head.o := -DTEXTADDR=$(TEXTADDR)

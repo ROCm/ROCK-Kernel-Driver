@@ -1025,4 +1025,3 @@ module_init(n_hdlc_init);
 module_exit(n_hdlc_exit);
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

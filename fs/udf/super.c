@@ -55,6 +55,7 @@
 #include <linux/cdrom.h>
 #include <linux/nls.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 #include <asm/byteorder.h>
 
 #include <linux/udf_fs.h>
@@ -207,8 +208,6 @@ static void __exit exit_udf_fs(void)
 	unregister_filesystem(&udf_fstype);
 	destroy_inodecache();
 }
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_udf_fs)
 module_exit(exit_udf_fs)

@@ -296,9 +296,6 @@ static int pi_probe_mode( PIA *pi, int max, char * scratch, int verbose)
 		range = 3;
 		if (pi->mode >= pi->proto->epp_first) range = 8;
 		if ((range == 8) && (pi->port % 8)) return 0;
-#ifndef CONFIG_PARPORT
-		if (check_region(pi->port,range)) return 0;
-#endif /* !CONFIG_PARPORT */
 		pi->reserved = range;
 		return (!pi_test_proto(pi,scratch,verbose));
 	}
@@ -307,9 +304,6 @@ static int pi_probe_mode( PIA *pi, int max, char * scratch, int verbose)
 		range = 3;
 		if (pi->mode >= pi->proto->epp_first) range = 8;
 		if ((range == 8) && (pi->port % 8)) break;
-#ifndef CONFIG_PARPORT
-		if (check_region(pi->port,range)) break;
-#endif /* !CONFIG_PARPORT */
 		pi->reserved = range;
 		if (!pi_test_proto(pi,scratch,verbose)) best = pi->mode;
 	}
@@ -330,10 +324,6 @@ static int pi_probe_unit( PIA *pi, int unit, char * scratch, int verbose)
 
 	if (!pi_register_parport(pi,verbose))
 	  return 0;
-
-#ifndef CONFIG_PARPORT
-	if (check_region(pi->port,3)) return 0;
-#endif /* !CONFIG_PARPORT */
 
 	if (pi->proto->test_port) {
 		pi_claim(pi);
@@ -424,7 +414,11 @@ int pi_init(PIA *pi, int autoprobe, int port, int mode,
 	}
 
 #ifndef CONFIG_PARPORT
-	request_region(pi->port,pi->reserved,pi->device);
+	if (!request_region(pi->port,pi->reserved,pi->device))
+		{
+		printk(KERN_WARNING"paride: Unable to request region 0x%x\n", pi->port);
+		return 0;
+		}
 #endif /* !CONFIG_PARPORT */
 
 	if (pi->parname)

@@ -236,7 +236,7 @@ static int msr_open(struct inode *inode, struct file *file)
   
   if ( !(cpu_online_map & (1UL << cpu)) )
     return -ENXIO;		/* No such CPU */
-  if ( !test_bit(X86_FEATURE_MSR, c->x86_capability) )
+  if ( !cpu_has(c, X86_FEATURE_MSR) )
     return -EIO;		/* MSR not supported */
   
   return 0;
@@ -271,8 +271,6 @@ void __exit msr_exit(void)
 
 module_init(msr_init);
 module_exit(msr_exit)
-
-EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("H. Peter Anvin <hpa@zytor.com>");
 MODULE_DESCRIPTION("x86 generic MSR driver");

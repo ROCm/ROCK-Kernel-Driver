@@ -85,12 +85,7 @@ void DRM(mem_init)(void)
 	}
 
 	si_meminfo(&si);
-#if LINUX_VERSION_CODE < 0x020317
-				/* Changed to page count in 2.3.23 */
-	DRM(ram_available) = si.totalram >> PAGE_SHIFT;
-#else
 	DRM(ram_available) = si.totalram;
-#endif
 	DRM(ram_used)	   = 0;
 }
 
@@ -257,12 +252,7 @@ unsigned long DRM(alloc_pages)(int order, int area)
 	for (addr = address, sz = bytes;
 	     sz > 0;
 	     addr += PAGE_SIZE, sz -= PAGE_SIZE) {
-#if LINUX_VERSION_CODE >= 0x020400
-				/* Argument type changed in 2.4.0-test6/pre8 */
 		mem_map_reserve(virt_to_page(addr));
-#else
-		mem_map_reserve(MAP_NR(addr));
-#endif
 	}
 
 	return address;
@@ -283,12 +273,7 @@ void DRM(free_pages)(unsigned long address, int order, int area)
 		for (addr = address, sz = bytes;
 		     sz > 0;
 		     addr += PAGE_SIZE, sz -= PAGE_SIZE) {
-#if LINUX_VERSION_CODE >= 0x020400
-				/* Argument type changed in 2.4.0-test6/pre8 */
 			mem_map_unreserve(virt_to_page(addr));
-#else
-			mem_map_unreserve(MAP_NR(addr));
-#endif
 		}
 		free_pages(address, order);
 	}
@@ -317,6 +302,29 @@ void *DRM(ioremap)(unsigned long offset, unsigned long size)
 	}
 
 	if (!(pt = ioremap(offset, size))) {
+		spin_lock(&DRM(mem_lock));
+		++DRM(mem_stats)[DRM_MEM_MAPPINGS].fail_count;
+		spin_unlock(&DRM(mem_lock));
+		return NULL;
+	}
+	spin_lock(&DRM(mem_lock));
+	++DRM(mem_stats)[DRM_MEM_MAPPINGS].succeed_count;
+	DRM(mem_stats)[DRM_MEM_MAPPINGS].bytes_allocated += size;
+	spin_unlock(&DRM(mem_lock));
+	return pt;
+}
+
+void *DRM(ioremap_nocache)(unsigned long offset, unsigned long size)
+{
+	void *pt;
+
+	if (!size) {
+		DRM_MEM_ERROR(DRM_MEM_MAPPINGS,
+			      "Mapping 0 bytes at 0x%08lx\n", offset);
+		return NULL;
+	}
+
+	if (!(pt = ioremap_nocache(offset, size))) {
 		spin_lock(&DRM(mem_lock));
 		++DRM(mem_stats)[DRM_MEM_MAPPINGS].fail_count;
 		spin_unlock(&DRM(mem_lock));

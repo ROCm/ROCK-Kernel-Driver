@@ -261,8 +261,6 @@ MODULE_AUTHOR("Ruurd Reitsma");
 MODULE_DESCRIPTION("A driver for the Miro PCM20 radio card.");
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;
-
 static void __exit pcm20_cleanup(void)
 {
 	unload_aci_rds();

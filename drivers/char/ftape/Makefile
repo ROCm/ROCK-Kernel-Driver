@@ -23,22 +23,8 @@
 #      Linux.
 #
 
-O_TARGET := ftape.o
-
-subdir-$(CONFIG_FTAPE) += lowlevel
-subdir-$(CONFIG_ZFTAPE) += zftape
-subdir-$(CONFIG_ZFT_COMPRESSOR) += compressor
-
-ifeq ($(CONFIG_FTAPE),y)
-  obj-y    += lowlevel/ftape.o
-endif
-
-ifeq ($(CONFIG_ZFTAPE),y)
-  obj-y   += zftape/zftape.o
-endif
-
-ifeq ($(CONFIG_ZFT_COMPRESSOR),y)
-  obj-y += compressor/zft-compressor.o
-endif
+obj-$(CONFIG_FTAPE)		+= lowlevel/
+obj-$(CONFIG_ZFTAPE)		+= zftape/
+obj-$(CONFIG_ZFT_COMPRESSOR)	+= compressor/
 
 include $(TOPDIR)/Rules.make

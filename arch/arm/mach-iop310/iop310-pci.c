@@ -452,20 +452,24 @@ int iop310_setup(int nr, struct pci_sys_data *sys)
 		res[0].start = IOP310_PCIPRI_LOWER_IO + 0x6e000000;
 		res[0].end   = IOP310_PCIPRI_LOWER_IO + 0x6e00ffff;
 		res[0].name  = "PCI IO Primary";
+		res[0].flags = IORESOURCE_IO;
 
 		res[1].start = IOP310_PCIPRI_LOWER_MEM;
 		res[1].end   = IOP310_PCIPRI_LOWER_MEM + IOP310_PCI_WINDOW_SIZE;
 		res[1].name  = "PCI Memory Primary";
+		res[1].flags = IORESOURCE_MEM;
 		break;
 
 	case 1:
 		res[0].start = IOP310_PCISEC_LOWER_IO + 0x6e000000;
 		res[0].end   = IOP310_PCISEC_LOWER_IO + 0x6e00ffff;
 		res[0].name  = "PCI IO Secondary";
+		res[0].flags = IORESOURCE_IO;
 
 		res[1].start = IOP310_PCISEC_LOWER_MEM;
 		res[1].end   = IOP310_PCISEC_LOWER_MEM + IOP310_PCI_WINDOW_SIZE;
 		res[1].name  = "PCI Memory Secondary";
+		res[1].flags = IORESOURCE_MEM;
 		break;
 	}
 

@@ -86,6 +86,9 @@ static inline void tlb_finish_mmu(mmu_gather_t *tlb, unsigned long start, unsign
 		freed = rss;
 	mm->rss = rss - freed;
 	tlb_flush_mmu(tlb, start, end);
+
+	/* keep the page table cache within bounds */
+	check_pgt_cache();
 }
 
 

@@ -3239,8 +3239,6 @@ static int __init synclink_cs_init(void)
 {
     servinfo_t serv;
 
-    EXPORT_NO_SYMBOLS;
-	
     if (break_on_load) {
 	    mgslpc_get_text_ptr();
 	    BREAKPOINT();

@@ -1883,8 +1883,6 @@ static int __init snd_es18xx_mixer(es18xx_t *chip)
 
 /* Card level */
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Christian Fischbach <fishbach@pool.informatik.rwth-aachen.de>, Abramo Bagnara <abramo@alsa-project.org>");  
 MODULE_DESCRIPTION("ESS ES18xx AudioDrive");
 MODULE_LICENSE("GPL");

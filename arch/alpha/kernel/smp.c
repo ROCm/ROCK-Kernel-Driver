@@ -868,6 +868,8 @@ smp_send_stop(void)
  *
  * Does not return until remote CPUs are nearly ready to execute <func>
  * or are or have executed.
+ * You must not call this function with disabled interrupts or from a
+ * hardware interrupt handler or from a bottom half handler.
  */
 
 int

@@ -3,8 +3,6 @@
 # Copyright (c) 1999,2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _core.o
-
 export-objs  := sound.o pcm.o pcm_lib.o rawmidi.o timer.o rtctimer.o hwdep.o
 
 mod-subdirs  := oss seq
@@ -29,26 +27,10 @@ ifeq ($(subst m,y,$(CONFIG_RTC)),y)
   obj-$(CONFIG_SND_RTCTIMER) += snd-rtctimer.o
 endif
 obj-$(CONFIG_SND_HWDEP) += snd-hwdep.o
-
-subdir-$(CONFIG_SND_MIXER_OSS) += oss
-subdir-$(CONFIG_SND_PCM_OSS) += oss
-ifeq ($(filter $(subdir-y),oss),oss)
-  obj-y += oss/_oss.o
-endif
-
-obj-$(CONFIG_SND_PCM_OSS) += snd-pcm.o snd-timer.o
-
-subdir-$(CONFIG_SND_SEQUENCER) += seq
-ifeq ($(CONFIG_SND_SEQUENCER),y)
-  obj-y += seq/_seq.o
-endif
-
-obj-$(CONFIG_SND_SEQUENCER) += snd-timer.o
-
-subdir-$(CONFIG_SND_BIT32_EMUL) += ioctl32
-ifeq ($(CONFIG_SND_BIT32_EMUL),y)
-  obj-y += ioctl32/_ioctl32.o
-endif
+obj-$(CONFIG_SND_MIXER_OSS) += oss/
+obj-$(CONFIG_SND_PCM_OSS) += snd-pcm.o snd-timer.o oss/
+obj-$(CONFIG_SND_SEQUENCER) += snd-timer.o seq/
+obj-$(CONFIG_SND_BIT32_EMUL) += ioctl32/
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_DUMMY) += snd-pcm.o snd-timer.o snd.o
@@ -111,7 +93,5 @@ ifeq ($(CONFIG_SND_SB16_CSP),y)
   obj-$(CONFIG_SND_SB16) += snd-hwdep.o
   obj-$(CONFIG_SND_SBAWE) += snd-hwdep.o
 endif
-
-obj-m := $(sort $(obj-m))
 
 include $(TOPDIR)/Rules.make

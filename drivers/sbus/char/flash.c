@@ -158,8 +158,6 @@ static struct file_operations flash_fops = {
 
 static struct miscdevice flash_dev = { FLASH_MINOR, "flash", &flash_fops };
 
-EXPORT_NO_SYMBOLS;
-
 static int __init flash_init(void)
 {
 	struct sbus_bus *sbus;

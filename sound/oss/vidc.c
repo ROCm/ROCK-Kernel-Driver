@@ -546,4 +546,3 @@ module_exit(cleanup_vidc);
 MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("VIDC20 audio driver");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

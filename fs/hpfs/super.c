@@ -6,6 +6,7 @@
  *  mounting, unmounting, error handling
  */
 
+#include <linux/buffer_head.h>
 #include <linux/string.h>
 #include "hpfs_fn.h"
 #include <linux/module.h>
@@ -645,8 +646,6 @@ static void __exit exit_hpfs_fs(void)
 	unregister_filesystem(&hpfs_fs_type);
 	destroy_inodecache();
 }
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_hpfs_fs)
 module_exit(exit_hpfs_fs)

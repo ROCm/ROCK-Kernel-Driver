@@ -1535,9 +1535,6 @@ isdnloop_init(void)
 	char *p;
 	char rev[10];
 
-	/* No symbols to export, hide all symbols */
-	EXPORT_NO_SYMBOLS;
-
 	if ((p = strchr(revision, ':'))) {
 		strcpy(rev, p + 1);
 		p = strchr(rev, '$');

@@ -18,16 +18,6 @@ unsigned int nr_free_highpages(void);
 extern void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig);
 extern void check_highmem_ptes(void);
 
-static inline char *bh_kmap(struct buffer_head *bh)
-{
-	return kmap(bh->b_page) + bh_offset(bh);
-}
-
-static inline void bh_kunmap(struct buffer_head *bh)
-{
-	kunmap(bh->b_page);
-}
-
 /*
  * remember to add offset! and never ever reenable interrupts between a
  * bio_kmap_irq and bio_kunmap_irq!!

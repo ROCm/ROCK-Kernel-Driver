@@ -121,7 +121,7 @@ static int calc_clk (int time, int bus_speed)
 {
 	int clocks;
 
-	clocks = (time*bus_speed+999)/1000 -1;
+	clocks = (time*bus_speed+999999)/1000000 -1;
 
 	if (clocks < 0)
 		clocks = 0;
@@ -183,7 +183,7 @@ static void compute_clocks (byte pio, pio_clocks_t *p_pclk)
 /*
  * set DMA mode a specific channel for CY82C693
  */
-static void cy82c693_dma_enable (ide_drive_t *drive, int mode, int single)
+static void cy82c693_dma_enable(struct ata_device *drive, int mode, int single)
 {
         byte index;
 	byte data;
@@ -270,7 +270,7 @@ static int cy82c693_dmaproc(struct ata_device *drive)
 /*
  * tune ide drive - set PIO mode
  */
-static void cy82c693_tune_drive (ide_drive_t *drive, byte pio)
+static void cy82c693_tune_drive(struct ata_device *drive, byte pio)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;

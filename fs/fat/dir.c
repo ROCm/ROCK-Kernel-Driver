@@ -18,6 +18,7 @@
 #include <linux/msdos_fs.h>
 #include <linux/dirent.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 #include <asm/uaccess.h>
 

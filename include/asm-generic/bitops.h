@@ -51,6 +51,12 @@ extern __inline__ int test_bit(int nr, long * addr)
 	return ((mask & *addr) != 0);
 }
 
+/*
+ * fls: find last bit set.
+ */
+
+#define fls(x) generic_fls(x)
+
 #ifdef __KERNEL__
 
 /*

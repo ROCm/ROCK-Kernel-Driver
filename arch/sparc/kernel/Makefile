@@ -7,8 +7,6 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-USE_STANDARD_AS_RULE := true
-
 SH = $(CONFIG_SHELL)
 
 all: kernel.o head.o init_task.o

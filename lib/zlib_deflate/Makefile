@@ -6,13 +6,10 @@
 # decompression code.
 #
 
-O_TARGET    := zlib_deflate.o
-
 export-objs := deflate_syms.o
 
-obj-y := deflate.o deftree.o deflate_syms.o
-obj-m := $(O_TARGET)
+obj-$(CONFIG_ZLIB_DEFLATE) += zlib_deflate.o
 
-EXTRA_CFLAGS += -I $(TOPDIR)/lib/zlib_deflate
+zlib_deflate-objs := deflate.o deftree.o deflate_syms.o
 
 include $(TOPDIR)/Rules.make

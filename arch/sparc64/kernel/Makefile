@@ -4,7 +4,6 @@
 
 SH = $(CONFIG_SHELL)
 
-USE_STANDARD_AS_RULE := true
 EXTRA_AFLAGS := -ansi
 
 all: kernel.o head.o init_task.o

@@ -112,13 +112,13 @@ extern void sbus_free_consistent(struct sbus_dev *, long, void *, u32);
 #define	SBUS_DMA_NONE		3
 
 /* All the rest use streaming mode mappings. */
-extern u32 sbus_map_single(struct sbus_dev *, void *, long, int);
-extern void sbus_unmap_single(struct sbus_dev *, u32, long, int);
+extern dma_addr_t sbus_map_single(struct sbus_dev *, void *, size_t, int);
+extern void sbus_unmap_single(struct sbus_dev *, dma_addr_t, size_t, int);
 extern int sbus_map_sg(struct sbus_dev *, struct scatterlist *, int, int);
 extern void sbus_unmap_sg(struct sbus_dev *, struct scatterlist *, int, int);
 
 /* Finally, allow explicit synchronization of streamable mappings. */
-extern void sbus_dma_sync_single(struct sbus_dev *, u32, long, int);
+extern void sbus_dma_sync_single(struct sbus_dev *, dma_addr_t, size_t, int);
 extern void sbus_dma_sync_sg(struct sbus_dev *, struct scatterlist *, int, int);
 
 #endif /* !(_SPARC_SBUS_H) */

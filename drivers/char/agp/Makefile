@@ -3,8 +3,6 @@
 # space ioctl interface to use agp memory.  It also adds a kernel interface
 # that other drivers could use to manipulate agp memory.
 
-O_TARGET	:= agp.o
-
 export-objs := agpgart_be.o
 
 agpgart-objs := agpgart_fe.o agpgart_be.o

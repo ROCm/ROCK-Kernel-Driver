@@ -2,11 +2,10 @@
 # Makefile for the Solaris binary emulation.
 #
 
-USE_STANDARD_AS_RULE := true
 EXTRA_AFLAGS := -ansi
 
 ifeq ($(CONFIG_SOLARIS_EMUL),m)
-  EXTRA_AFLAGS += $(MODFLAGS)
+  EXTRA_AFLAGS += $(CFLAGS_MODULE) # FIXME
 endif
 
 solaris-objs := entry64.o fs.o misc.o signal.o systbl.o socket.o \

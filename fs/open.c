@@ -15,6 +15,7 @@
 #include <linux/slab.h>
 #include <linux/tty.h>
 #include <linux/iobuf.h>
+#include <linux/namei.h>
 #include <linux/backing-dev.h>
 
 #include <asm/uaccess.h>

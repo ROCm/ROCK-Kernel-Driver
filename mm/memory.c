@@ -127,9 +127,6 @@ void clear_page_tables(mmu_gather_t *tlb, unsigned long first, int nr)
 		free_one_pgd(tlb, page_dir);
 		page_dir++;
 	} while (--nr);
-
-	/* keep the page table cache within bounds */
-	check_pgt_cache();
 }
 
 pte_t * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
@@ -346,8 +343,7 @@ static void zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address,
 		if (pte_present(pte)) {
 			unsigned long pfn = pte_pfn(pte);
 
-			pte_clear(ptep);
-			pfn = pte_pfn(pte);
+			pte = ptep_get_and_clear(ptep);
 			tlb_remove_tlb_entry(tlb, pte, address+offset);
 			if (pfn_valid(pfn)) {
 				struct page *page = pfn_to_page(pfn);

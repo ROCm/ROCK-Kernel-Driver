@@ -65,8 +65,6 @@
 
 #define chip_t es1938_t
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Jaromir Koutek <miri@punknet.cz>");
 MODULE_DESCRIPTION("ESS Solo-1");
 MODULE_LICENSE("GPL");

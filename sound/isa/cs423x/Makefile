@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _cs423x.o
-
 export-objs  := cs4231_lib.o cs4236_lib.o
 
 snd-cs4231-lib-objs := cs4231_lib.o
@@ -24,7 +22,5 @@ obj-$(CONFIG_SND_INTERWAVE) += snd-cs4231-lib.o
 obj-$(CONFIG_SND_INTERWAVE_STB) += snd-cs4231-lib.o
 obj-$(CONFIG_SND_OPTI92X_CS4231) += snd-cs4231-lib.o
 obj-$(CONFIG_SND_WAVEFRONT) += snd-cs4231-lib.o
-
-obj-m := $(sort $(obj-m))
 
 include $(TOPDIR)/Rules.make

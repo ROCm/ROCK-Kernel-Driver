@@ -19,6 +19,7 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/blkdev.h>
+#include <linux/buffer_head.h>
 
 #define REISERFS_OLD_BLOCKSIZE 4096
 #define REISERFS_SUPER_MAGIC_STRING_OFFSET_NJ 20
@@ -1247,7 +1248,6 @@ out1:
 MODULE_DESCRIPTION("ReiserFS journaled filesystem");
 MODULE_AUTHOR("Hans Reiser <reiser@namesys.com>");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 
 //
 // this is exactly what 2.3.99-pre9's init_ext2_fs is

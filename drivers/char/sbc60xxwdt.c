@@ -61,7 +61,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
 #include <linux/slab.h>
@@ -352,4 +352,3 @@ module_init(sbc60xxwdt_init);
 module_exit(sbc60xxwdt_unload);
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

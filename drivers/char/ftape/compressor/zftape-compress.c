@@ -1285,7 +1285,6 @@ int init_module(void)
 	if (!mod_member_present(&__this_module, can_unload))
 		return -EBUSY;
 	__this_module.can_unload = can_unload;
-	EXPORT_NO_SYMBOLS;
 #endif
 	result = zft_compressor_init();
 	keep_module_locked = 0;

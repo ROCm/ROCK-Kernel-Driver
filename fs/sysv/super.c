@@ -23,6 +23,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/buffer_head.h>
 #include "sysv.h"
 
 /*
@@ -555,8 +556,6 @@ static void __exit exit_sysv_fs(void)
 	unregister_filesystem(&v7_fs_type);
 	sysv_destroy_icache();
 }
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_sysv_fs)
 module_exit(exit_sysv_fs)

@@ -42,8 +42,6 @@
 #define CHIP1370
 #endif
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Thomas Sailer <sailer@ife.ee.ethz.ch>");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");

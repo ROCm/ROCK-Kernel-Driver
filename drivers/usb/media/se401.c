@@ -71,8 +71,6 @@ MODULE_LICENSE("GPL");
 MODULE_PARM(flickerless, "i");
 MODULE_PARM_DESC(flickerless, "Net frequency to adjust exposure time to (0/50/60)");
 MODULE_PARM(video_nr, "i");
-EXPORT_NO_SYMBOLS;
-
 
 static struct usb_driver se401_driver;
 
@@ -632,7 +630,6 @@ static int se401_stop_stream(struct usb_se401 *se401)
 	se401_sndctrl(1, se401, SE401_REQ_CAMERA_POWER, 0, NULL, 0);
 
 	for (i=0; i<SE401_NUMSBUF; i++) if (se401->urb[i]) {
-		se401->urb[i]->next=NULL;
 		usb_unlink_urb(se401->urb[i]);
 		usb_free_urb(se401->urb[i]);
 		se401->urb[i]=NULL;
@@ -1506,7 +1503,6 @@ static inline void usb_se401_remove_disconnected (struct usb_se401 *se401)
 	wake_up_interruptible(&se401->wq);
 
 	for (i=0; i<SE401_NUMSBUF; i++) if (se401->urb[i]) {
-		se401->urb[i]->next = NULL;
 		usb_unlink_urb(se401->urb[i]);
 		usb_free_urb(se401->urb[i]);
 		se401->urb[i] = NULL;

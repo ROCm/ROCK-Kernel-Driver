@@ -6,8 +6,6 @@
 # unless it's something special (ie not a .c file).
 #
 
-USE_STANDARD_AS_RULE := true
-
 # EXTRA_AFLAGS = -mips3 -mcpu=r4000 # not used?
 
 all:	kernel.o head.o init_task.o

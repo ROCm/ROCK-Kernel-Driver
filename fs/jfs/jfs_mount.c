@@ -405,8 +405,11 @@ static int chkSuper(struct super_block *sb)
 	sbi->l2niperblk = sbi->l2bsize - L2DISIZE;
 	if (sbi->mntflag & JFS_INLINELOG)
 		sbi->logpxd = j_sb->s_logpxd;
-	else
+	else {
 		sbi->logdev = to_kdev_t(le32_to_cpu(j_sb->s_logdev));
+		memcpy(sbi->uuid, j_sb->s_uuid, sizeof(sbi->uuid));
+		memcpy(sbi->loguuid, j_sb->s_loguuid, sizeof(sbi->uuid));
+	}
 	sbi->ait2 = j_sb->s_ait2;
 
       out:
@@ -446,10 +449,6 @@ int updateSuper(struct super_block *sb, uint state)
 		j_sb->s_logdev =
 			cpu_to_le32(JFS_SBI(sb)->log->bdev->bd_dev);
 		j_sb->s_logserial = cpu_to_le32(JFS_SBI(sb)->log->serial);
-		/* record our own device number in case the location
-		 * changes after a reboot
-		 */
-		j_sb->s_device = cpu_to_le32(kdev_t_to_nr(sb->s_dev));
 	} else if (state == FM_CLEAN) {
 		/*
 		 * If this volume is shared with OS/2, OS/2 will need to

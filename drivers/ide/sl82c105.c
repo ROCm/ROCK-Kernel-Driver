@@ -5,8 +5,12 @@
  *
  * Maintainer unknown.
  *
- * Drive tuning added from Rebel.com's kernel sources
- *  -- Russell King (15/11/98) linux@arm.linux.org.uk
+ * Changelog:
+ *
+ * 15/11/1998	RMK	Drive tuning added from Rebel.com's kernel
+ *			sources
+ * 30/03/2002	RMK	Add fixes specified in W83C553F errata.
+ *			(with special thanks to Todd Inglett)
  */
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -26,6 +30,17 @@
 #include "pcihost.h"
 
 extern char *ide_xfer_verbose (byte xfer_rate);
+
+/*
+ * SL82C105 PCI config register 0x40 bits.
+ */
+#define CTRL_IDE_IRQB	(1 << 30)
+#define CTRL_IDE_IRQA	(1 << 28)
+#define CTRL_LEGIRQ	(1 << 11)
+#define CTRL_P1F16	(1 << 5)
+#define CTRL_P1EN	(1 << 4)
+#define CTRL_P0F16	(1 << 1)
+#define	CTRL_P0EN	(1 << 0)
 
 /*
  * Convert a PIO mode and cycle time to the required on/off
@@ -56,7 +71,7 @@ static unsigned int get_timing_sl82c105(struct ata_timing *t)
 /*
  * Configure the drive and chipset for PIO
  */
-static void config_for_pio(ide_drive_t *drive, int pio, int report)
+static void config_for_pio(struct ata_device *drive, int pio, int report)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
@@ -94,7 +109,7 @@ static void config_for_pio(ide_drive_t *drive, int pio, int report)
 /*
  * Configure the drive and the chipset for DMA
  */
-static int config_for_dma(ide_drive_t *drive)
+static int config_for_dma(struct ata_device *drive)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
@@ -111,11 +126,12 @@ static int config_for_dma(ide_drive_t *drive)
 	return 0;
 }
 
+
 /*
  * Check to see if the drive and
  * chipset is capable of DMA mode
  */
-static int sl82c105_check_drive(ide_drive_t *drive)
+static int sl82c105_check_drive(struct ata_device *drive)
 {
 	int on = 0;
 
@@ -146,6 +162,7 @@ static int sl82c105_check_drive(ide_drive_t *drive)
 			break;
 		}
 	} while (0);
+
 	if (on)
 		config_for_dma(drive);
 	else
@@ -153,12 +170,12 @@ static int sl82c105_check_drive(ide_drive_t *drive)
 
 	udma_enable(drive, on, 0);
 
-
 	return 0;
 }
 
 /*
- * Our own dmaproc, only to intercept ide_dma_check
+ * Our very own dmaproc.  We need to intercept various calls
+ * to fix up the SL82C105 specific behaviour.
  */
 static int sl82c105_dmaproc(struct ata_device *drive)
 {
@@ -166,10 +183,97 @@ static int sl82c105_dmaproc(struct ata_device *drive)
 }
 
 /*
+ * The SL82C105 holds off all IDE interrupts while in DMA mode until
+ * all DMA activity is completed.  Sometimes this causes problems (eg,
+ * when the drive wants to report an error condition).
+ *
+ * 0x7e is a "chip testing" register.  Bit 2 resets the DMA controller
+ * state machine.  We need to kick this to work around various bugs.
+ */
+static inline void sl82c105_reset_host(struct pci_dev *dev)
+{
+	u16 val;
+
+	pci_read_config_word(dev, 0x7e, &val);
+	pci_write_config_word(dev, 0x7e, val | (1 << 2));
+	pci_write_config_word(dev, 0x7e, val & ~(1 << 2));
+}
+
+static void sl82c105_dma_enable(struct ata_device *drive, int on, int verbose)
+{
+	if (!on || config_for_dma(drive)) {
+		config_for_pio(drive, 4, 0);
+		on = 0;
+	}
+	udma_pci_enable(drive, on, verbose);
+}
+
+/*
+ * ATAPI devices can cause the SL82C105 DMA state machine to go gaga.
+ * Winbond recommend that the DMA state machine is reset prior to
+ * setting the bus master DMA enable bit.
+ *
+ * The generic IDE core will have disabled the BMEN bit before this
+ * function is called.
+ */
+static int sl82c105_dma_read(struct ata_device *drive, struct request *rq)
+{
+	sl82c105_reset_host(drive->channel->pci_dev);
+	return udma_pci_read(drive, rq);
+}
+
+static int sl82c105_dma_write(struct ata_device *drive, struct request *rq)
+{
+	sl82c105_reset_host(drive->channel->pci_dev);
+	return udma_pci_write(drive, rq);
+}
+
+static void sl82c105_timeout(struct ata_device *drive)
+{
+	sl82c105_reset_host(drive->channel->pci_dev);
+}
+
+/*
+ * If we get an IRQ timeout, it might be that the DMA state machine
+ * got confused.  Fix from Todd Inglett.  Details from Winbond.
+ *
+ * This function is called when the IDE timer expires, the drive
+ * indicates that it is READY, and we were waiting for DMA to complete.
+ */
+static void sl82c105_lostirq(struct ata_device *drive)
+{
+	struct ata_channel *ch = drive->channel;
+	struct pci_dev *dev = ch->pci_dev;
+	u32 val, mask = ch->unit ? CTRL_IDE_IRQB : CTRL_IDE_IRQA;
+	unsigned long dma_base = ch->dma_base;
+
+	printk("sl82c105: lost IRQ: resetting host\n");
+
+	/*
+	 * Check the raw interrupt from the drive.
+	 */
+	pci_read_config_dword(dev, 0x40, &val);
+	if (val & mask)
+		printk("sl82c105: drive was requesting IRQ, but host lost it\n");
+
+	/*
+	 * Was DMA enabled?  If so, disable it - we're resetting the
+	 * host.  The IDE layer will be handling the drive for us.
+	 */
+	val = inb(dma_base);
+	if (val & 1) {
+		outb(val & ~1, dma_base);
+		printk("sl82c105: DMA was enabled\n");
+	}
+
+	sl82c105_reset_host(dev);
+}
+
+/*
  * We only deal with PIO mode here - DMA mode 'using_dma' is not
  * initialised at the point that this function is called.
  */
-static void tune_sl82c105(ide_drive_t *drive, byte pio)
+static void tune_sl82c105(struct ata_device *drive, byte pio)
 {
 	config_for_pio(drive, pio, 1);
 
@@ -185,21 +289,25 @@ static void tune_sl82c105(ide_drive_t *drive, byte pio)
  * Return the revision of the Winbond bridge
  * which this function is part of.
  */
-static unsigned int sl82c105_bridge_revision(struct pci_dev *dev)
+static __init unsigned int sl82c105_bridge_revision(struct pci_dev *dev)
 {
 	struct pci_dev *bridge;
 	unsigned char rev;
 
-	bridge = pci_find_device(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_83C553, NULL);
-
 	/*
-	 * If we are part of a Winbond 553
+	 * The bridge should be part of the same device, but function 0.
 	 */
-	if (!bridge || bridge->class >> 8 != PCI_CLASS_BRIDGE_ISA)
+	bridge = pci_find_slot(dev->bus->number,
+			       PCI_DEVFN(PCI_SLOT(dev->devfn), 0));
+	if (!bridge)
 		return -1;
 
-	if (bridge->bus != dev->bus ||
-	    PCI_SLOT(bridge->devfn) != PCI_SLOT(dev->devfn))
+	/*
+	 * Make sure it is a Winbond 553 and is an ISA bridge.
+	 */
+	if (bridge->vendor != PCI_VENDOR_ID_WINBOND ||
+	    bridge->device != PCI_DEVICE_ID_WINBOND_83C553 ||
+	    bridge->class >> 8 != PCI_CLASS_BRIDGE_ISA)
 		return -1;
 
 	/*
@@ -215,49 +323,55 @@ static unsigned int sl82c105_bridge_revision(struct pci_dev *dev)
  */
 static unsigned int __init sl82c105_init_chipset(struct pci_dev *dev)
 {
-	unsigned char ctrl_stat;
+	u32 val;
 
-	/*
-	 * Enable the ports
-	 */
-	pci_read_config_byte(dev, 0x40, &ctrl_stat);
-	pci_write_config_byte(dev, 0x40, ctrl_stat | 0x33);
+	pci_read_config_dword(dev, 0x40, &val);
+	val |= CTRL_P0EN | CTRL_P0F16 | CTRL_P1EN | CTRL_P1F16;
+	pci_write_config_dword(dev, 0x40, val);
 
 	return dev->irq;
 }
 
-static void __init sl82c105_init_dma(struct ata_channel *hwif, unsigned long dma_base)
+static void __init sl82c105_init_dma(struct ata_channel *ch, unsigned long dma_base)
 {
-	unsigned int rev;
+	unsigned int bridge_rev;
 	byte dma_state;
 
 	dma_state = inb(dma_base + 2);
-	rev = sl82c105_bridge_revision(hwif->pci_dev);
-	if (rev <= 5) {
-		hwif->autodma = 0;
-		hwif->drives[0].autotune = 1;
-		hwif->drives[1].autotune = 1;
+	bridge_rev = sl82c105_bridge_revision(ch->pci_dev);
+	if (bridge_rev <= 5) {
+		ch->autodma = 0;
+		ch->drives[0].autotune = 1;
+		ch->drives[1].autotune = 1;
 		printk("    %s: Winbond 553 bridge revision %d, BM-DMA disabled\n",
-		       hwif->name, rev);
+		       ch->name, bridge_rev);
 		dma_state &= ~0x60;
 	} else {
 		dma_state |= 0x60;
-		hwif->autodma = 1;
+		ch->autodma = 1;
 	}
 	outb(dma_state, dma_base + 2);
 
-	hwif->XXX_udma = NULL;
-	ata_init_dma(hwif, dma_base);
-	if (hwif->XXX_udma)
-		hwif->XXX_udma = sl82c105_dmaproc;
+	ata_init_dma(ch, dma_base);
+
+	if (bridge_rev <= 5)
+		ch->XXX_udma = NULL;
+	else {
+		ch->XXX_udma      = sl82c105_dmaproc;
+		ch->udma_enable   = sl82c105_dma_enable;
+		ch->udma_read     = sl82c105_dma_read;
+		ch->udma_write    = sl82c105_dma_write;
+		ch->udma_timeout  = sl82c105_timeout;
+		ch->udma_irq_lost = sl82c105_lostirq;
+	}
 }
 
 /*
  * Initialise the chip
  */
-static void __init sl82c105_init_channel(struct ata_channel *hwif)
+static void __init sl82c105_init_channel(struct ata_channel *ch)
 {
-	hwif->tuneproc = tune_sl82c105;
+	ch->tuneproc = tune_sl82c105;
 }
 
 

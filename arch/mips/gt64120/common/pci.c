@@ -41,6 +41,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/version.h>
+#include <linux/cache.h>
 #include <asm/pci.h>
 #include <asm/io.h>
 #include <asm/gt64120/gt64120.h>
@@ -1014,9 +1015,6 @@ static u32 __init scan_pci_bus(struct pci_device *pci_devices)
 	return arrayCounter;
 }
 
-#define ALIGN(val,align)        (((val) + ((align) - 1)) & ~((align) - 1))
-#define MAX(val1, val2) ((val1) > (val2) ? (val1) : (val2))
-
 /*
  * This function goes through the list of devices and allocates the BARs in
  * either IO or MEM space.  It does it in order of size, which will limit the
@@ -1071,14 +1069,14 @@ static void __init allocate_pci_space(struct pci_device *pci_devices)
 			device.devfn =
 			    PCI_DEVFN(pci_devices[maxDevice].slot, 0);
 			if (pci_devices[maxDevice].BARtype[maxBAR] == 1) {
-				alignto = MAX(0x1000, maxSize);
+				alignto = max(0x1000U, maxSize);
 				base = ALIGN(pci0_io_base, alignto);
 				pci0WriteConfigReg(PCI_BASE_ADDRESS_0 +
 						   (maxBAR * 4), &device,
 						   base | 0x1);
 				pci0_io_base = base + alignto;
 			} else {
-				alignto = MAX(0x1000, maxSize);
+				alignto = max(0x1000U, maxSize);
 				base = ALIGN(pci0_mem_base, alignto);
 				pci0WriteConfigReg(PCI_BASE_ADDRESS_0 +
 						   (maxBAR * 4), &device,

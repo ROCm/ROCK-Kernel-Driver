@@ -408,7 +408,5 @@ static void __exit exit_aout32_binfmt(void)
 	unregister_binfmt(&aout32_format);
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(init_aout32_binfmt);
 module_exit(exit_aout32_binfmt);

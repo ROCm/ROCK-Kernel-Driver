@@ -4,6 +4,7 @@
 /*
  * The MS-DOS filesystem constants/structures
  */
+#include <linux/buffer_head.h>
 #include <asm/byteorder.h>
 
 #define SECTOR_SIZE	512		/* sector size (bytes) */

@@ -48,6 +48,7 @@
 #include <linux/blk.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
+#include <linux/version.h>
 #include "scsi.h"
 #include "hosts.h"
 

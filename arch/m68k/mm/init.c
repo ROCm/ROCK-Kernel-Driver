@@ -35,20 +35,6 @@
 
 mmu_gather_t mmu_gathers[NR_CPUS];
 
-int do_check_pgt_cache(int low, int high)
-{
-	int freed = 0;
-	if(pgtable_cache_size > high) {
-		do {
-			if(pmd_quicklist)
-				freed += free_pmd_slow(get_pmd_fast());
-			if(pte_quicklist)
-				free_pte_slow(get_pte_fast()), freed++;
-		} while(pgtable_cache_size > low);
-	}
-	return freed;
-}
-
 /*
  * BAD_PAGE is the page that is used for page faults when linux
  * is out-of-memory. Older versions of linux just did a
@@ -56,27 +42,9 @@ int do_check_pgt_cache(int low, int high)
  * for a process dying in kernel mode, possibly leaving an inode
  * unused etc..
  *
- * BAD_PAGETABLE is the accompanying page-table: it is initialized
- * to point to BAD_PAGE entries.
- *
  * ZERO_PAGE is a special page that is used for zero-initialized
  * data and COW.
  */
-unsigned long empty_bad_page_table;
-
-pte_t *__bad_pagetable(void)
-{
-    memset((void *)empty_bad_page_table, 0, PAGE_SIZE);
-    return (pte_t *)empty_bad_page_table;
-}
-
-unsigned long empty_bad_page;
-
-pte_t __bad_page(void)
-{
-    memset ((void *)empty_bad_page, 0, PAGE_SIZE);
-    return pte_mkdirty(__mk_pte(empty_bad_page, PAGE_SHARED));
-}
 
 unsigned long empty_zero_page;
 
@@ -106,8 +74,6 @@ void show_mem(void)
     printk("%d reserved pages\n",reserved);
     printk("%d pages shared\n",shared);
     printk("%d pages swap cached\n",cached);
-    printk("%ld pages in page table cache\n",pgtable_cache_size);
-	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 extern void init_pointer_table(unsigned long ptable);
@@ -127,7 +93,7 @@ void __init mem_init(void)
 	unsigned long tmp;
 	int i;
 
-	max_mapnr = num_physpages = MAP_NR(high_memory);
+	max_mapnr = num_physpages = (((unsigned long)high_memory - PAGE_OFFSET) >> PAGE_SHIFT);
 
 #ifdef CONFIG_ATARI
 	if (MACH_IS_ATARI)
@@ -138,12 +104,6 @@ void __init mem_init(void)
 	totalram_pages = free_all_bootmem();
 
 	for (tmp = PAGE_OFFSET ; tmp < (unsigned long)high_memory; tmp += PAGE_SIZE) {
-#if 0
-#ifndef CONFIG_SUN3
-		if (virt_to_phys ((void *)tmp) >= mach_max_dma_address)
-			clear_bit(PG_DMA, &virt_to_page(tmp)->flags);
-#endif
-#endif
 		if (PageReserved(virt_to_page(tmp))) {
 			if (tmp >= (unsigned long)&_text
 			    && tmp < (unsigned long)&_etext)
@@ -155,14 +115,6 @@ void __init mem_init(void)
 				datapages++;
 			continue;
 		}
-#if 0
-		set_page_count(virt_to_page(tmp), 1);
-#ifdef CONFIG_BLK_DEV_INITRD
-		if (!initrd_start ||
-		    (tmp < (initrd_start & PAGE_MASK) || tmp >= initrd_end))
-#endif
-			free_page(tmp);
-#endif
 	}
 	
 #ifndef CONFIG_SUN3

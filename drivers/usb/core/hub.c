@@ -17,6 +17,7 @@
 #include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
+#include <linux/ioctl.h>
 #ifdef CONFIG_USB_DEBUG
 	#define DEBUG
 #else

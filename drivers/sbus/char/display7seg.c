@@ -29,7 +29,6 @@
 static int sol_compat = 0;		/* Solaris compatibility mode	*/
 
 #ifdef MODULE
-EXPORT_NO_SYMBOLS;
 
 /* Solaris compatibility flag -
  * The Solaris implementation omits support for several

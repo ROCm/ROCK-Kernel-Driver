@@ -12,6 +12,7 @@
 #include <linux/efs_vh.h>
 #include <linux/efs_fs_sb.h>
 #include <linux/slab.h>
+#include <linux/buffer_head.h>
 
 static struct super_block *efs_get_sb(struct file_system_type *fs_type,
 	int flags, char *dev_name, void *data)
@@ -103,8 +104,6 @@ static void __exit exit_efs_fs(void) {
 	unregister_filesystem(&efs_fs_type);
 	destroy_inodecache();
 }
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_efs_fs)
 module_exit(exit_efs_fs)

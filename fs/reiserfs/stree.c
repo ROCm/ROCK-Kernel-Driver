@@ -59,6 +59,7 @@
 #include <linux/pagemap.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 /* Does the buffer contain a disk block which is in the tree. */
 inline int B_IS_IN_TREE (const struct buffer_head * p_s_bh)

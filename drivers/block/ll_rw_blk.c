@@ -25,6 +25,7 @@
 #include <linux/bootmem.h>
 #include <linux/completion.h>
 #include <linux/compiler.h>
+#include <linux/buffer_head.h>
 #include <scsi/scsi.h>
 #include <linux/backing-dev.h>
 
@@ -79,8 +80,8 @@ unsigned long blk_max_low_pfn, blk_max_pfn;
 int blk_nohighio = 0;
 
 /**
- * blk_get_queue: - return the queue that matches the given device
- * @dev:    device
+ * bdev_get_queue: - return the queue that matches the given device
+ * @bdev:    device
  *
  * Description:
  *     Given a specific device, return the queue that will hold I/O
@@ -89,14 +90,9 @@ int blk_nohighio = 0;
  *     stored in the same location.
  *
  **/
-inline request_queue_t *blk_get_queue(kdev_t dev)
+inline request_queue_t *bdev_get_queue(struct block_device *bdev)
 {
-	struct blk_dev_struct *bdev = blk_dev + major(dev);
-
-	if (bdev->queue)
-		return bdev->queue(dev);
-	else
-		return &blk_dev[major(dev)].request_queue;
+	return bdev->bd_queue;
 }
 
 /**
@@ -111,7 +107,7 @@ inline request_queue_t *blk_get_queue(kdev_t dev)
 struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev)
 {
 	struct backing_dev_info *ret = NULL;
-	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
+	request_queue_t *q = bdev_get_queue(bdev);
 
 	if (q)
 		ret = &q->backing_dev_info;
@@ -521,42 +517,6 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
 						       rq->current_nr_sectors);
 
 	printk("\n");
-}
-
-/*
- * standard prep_rq_fn that builds 10 byte cmds
- */
-int ll_10byte_cmd_build(request_queue_t *q, struct request *rq)
-{
-	int hard_sect = queue_hardsect_size(q);
-	sector_t block = rq->hard_sector / (hard_sect >> 9);
-	unsigned long blocks = rq->hard_nr_sectors / (hard_sect >> 9);
-
-	if (!(rq->flags & REQ_CMD))
-		return 0;
-
-	memset(rq->cmd, 0, sizeof(rq->cmd));
-
-	if (rq_data_dir(rq) == READ)
-		rq->cmd[0] = READ_10;
-	else 
-		rq->cmd[0] = WRITE_10;
-
-	/*
-	 * fill in lba
-	 */
-	rq->cmd[2] = (block >> 24) & 0xff;
-	rq->cmd[3] = (block >> 16) & 0xff;
-	rq->cmd[4] = (block >>  8) & 0xff;
-	rq->cmd[5] = block & 0xff;
-
-	/*
-	 * and transfer length
-	 */
-	rq->cmd[7] = (blocks >> 8) & 0xff;
-	rq->cmd[8] = blocks & 0xff;
-
-	return 0;
 }
 
 void blk_recount_segments(request_queue_t *q, struct bio *bio)
@@ -1418,7 +1378,9 @@ get_rq:
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
 	req->bio = req->biotail = bio;
-	req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
+	if (bio->bi_bdev)
+		req->rq_dev = to_kdev_t(bio->bi_bdev->bd_dev);
+	else	req->rq_dev = NODEV;
 	add_request(q, req, insert_here);
 out:
 	if (freereq)
@@ -1515,7 +1477,7 @@ void generic_make_request(struct bio *bio)
 	 * Stacking drivers are expected to know what they are doing.
 	 */
 	do {
-		q = blk_get_queue(to_kdev_t(bio->bi_bdev->bd_dev));
+		q = bdev_get_queue(bio->bi_bdev);
 		if (!q) {
 			printk(KERN_ERR
 			       "generic_make_request: Trying to access nonexistent block-device %s (%Lu)\n",
@@ -1763,9 +1725,8 @@ inline void blk_recalc_rq_sectors(struct request *rq, int nsect)
 {
 	if (rq->flags & REQ_CMD) {
 		rq->hard_sector += nsect;
-		rq->hard_nr_sectors -= nsect;
+		rq->nr_sectors = rq->hard_nr_sectors -= nsect;
 		rq->sector = rq->hard_sector;
-		rq->nr_sectors = rq->hard_nr_sectors;
 
 		rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
 		rq->hard_cur_sectors = rq->current_nr_sectors;
@@ -1919,7 +1880,7 @@ int __init blk_dev_init(void)
 EXPORT_SYMBOL(end_that_request_first);
 EXPORT_SYMBOL(end_that_request_last);
 EXPORT_SYMBOL(blk_init_queue);
-EXPORT_SYMBOL(blk_get_queue);
+EXPORT_SYMBOL(bdev_get_queue);
 EXPORT_SYMBOL(blk_cleanup_queue);
 EXPORT_SYMBOL(blk_queue_make_request);
 EXPORT_SYMBOL(blk_queue_bounce_limit);
@@ -1942,7 +1903,6 @@ EXPORT_SYMBOL(blk_queue_assign_lock);
 EXPORT_SYMBOL(blk_phys_contig_segment);
 EXPORT_SYMBOL(blk_hw_contig_segment);
 
-EXPORT_SYMBOL(ll_10byte_cmd_build);
 EXPORT_SYMBOL(blk_queue_prep_rq);
 
 EXPORT_SYMBOL(blk_queue_init_tags);

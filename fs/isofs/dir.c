@@ -21,6 +21,7 @@
 #include <linux/time.h>
 #include <linux/config.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>
 
 #include <asm/uaccess.h>
 

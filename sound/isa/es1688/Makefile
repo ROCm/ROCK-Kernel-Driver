@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _es1688.o
-
 export-objs  := es1688_lib.o
 
 snd-es1688-lib-objs := es1688_lib.o

@@ -611,6 +611,14 @@ smb_statfs(struct super_block *sb, struct statfs *buf)
 	return result;
 }
 
+int smb_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+{
+	int err = smb_revalidate_inode(dentry);
+	if (!err)
+		generic_fillattr(dentry->d_inode, stat);
+	return err;
+}
+
 int
 smb_notify_change(struct dentry *dentry, struct iattr *attr)
 {
@@ -774,8 +782,6 @@ static void __exit exit_smb_fs(void)
 	printk(KERN_DEBUG "smb_current_vmalloced: %d\n",smb_current_vmalloced);
 #endif
 }
-
-EXPORT_NO_SYMBOLS;
 
 module_init(init_smb_fs)
 module_exit(exit_smb_fs)

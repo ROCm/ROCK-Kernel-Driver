@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _sb.o
-
 export-objs  := emu8000.o emu8000_synth.o sb_common.o sb8_main.o sb16_main.o sb16_csp.o
 
 snd-sb-common-objs := sb_common.o sb_mixer.o
@@ -33,7 +31,5 @@ endif
 ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_SBAWE) += snd-emu8000-synth.o
 endif
-
-obj-m := $(sort $(obj-m))
 
 include $(TOPDIR)/Rules.make

@@ -406,8 +406,6 @@ static void __exit sh_wdt_exit(void)
 	misc_deregister(&sh_wdt_miscdev);
 }
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Paul Mundt <lethal@chaoticdreams.org>");
 MODULE_DESCRIPTION("SH 3/4 watchdog driver");
 MODULE_LICENSE("GPL");

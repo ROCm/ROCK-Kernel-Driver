@@ -2,15 +2,6 @@
 # Makefile for drivers/acorn/scsi
 #
 
-USE_STANDARD_AS_RULE := true
-
-O_TARGET	:= acorn-scsi.o
-
-obj-y		:=
-obj-m		:=
-obj-n		:=
-obj-		:=
-
 export-objs		:= fas216.o queue.o msgqueue.o
 acornscsi_mod-objs	:= acornscsi.o acornscsi-io.o
 

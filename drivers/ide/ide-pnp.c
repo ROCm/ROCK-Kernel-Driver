@@ -75,7 +75,7 @@ static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
 
 	if (index != -1) {
 		hwif->pci_dev = dev;
-		printk("ide%d: %s IDE interface\n", index, DEV_NAME(dev));
+		printk(KERN_INFO "ide%d: %s IDE interface\n", index, DEV_NAME(dev));
 		return 0;
 	}
 
@@ -133,12 +133,12 @@ void __init pnpide_init(int enable)
 				continue;
 
        			if (PREPARE_FUNC(dev) && (PREPARE_FUNC(dev))(dev) < 0) {
-				printk("ide: %s prepare failed\n", DEV_NAME(dev));
+				printk(KERN_ERR "ide: %s prepare failed\n", DEV_NAME(dev));
 				continue;
 			}
 
 			if (ACTIVATE_FUNC(dev) && (ACTIVATE_FUNC(dev))(dev) < 0) {
-				printk("ide: %s activate failed\n", DEV_NAME(dev));
+				printk(KERN_ERR "ide: %s activate failed\n", DEV_NAME(dev));
 				continue;
 			}
 

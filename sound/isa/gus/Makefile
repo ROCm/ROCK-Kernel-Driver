@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _gus.o
-
 export-objs  := gus_main.o gus_volume.o
 
 snd-gus-lib-objs := gus_main.o \
@@ -34,7 +32,5 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_INTERWAVE) += snd-gus-synth.o
   obj-$(CONFIG_SND_INTERWAVE_STB) += snd-gus-synth.o
 endif
-
-obj-m := $(sort $(obj-m))
 
 include $(TOPDIR)/Rules.make

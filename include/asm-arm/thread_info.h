@@ -28,7 +28,7 @@ typedef unsigned long mm_segment_t;		/* domain register	*/
  * low level task data that entry.S needs immediate access to.
  */
 struct thread_info {
-	__u32			flags;		/* low level flags */
+	unsigned long		flags;		/* low level flags */
 	__s32			preempt_count;	/* 0 => preemptable, <0 => bug */
 	mm_segment_t		addr_limit;	/* address limit */
 	__u32			cpu;		/* cpu */

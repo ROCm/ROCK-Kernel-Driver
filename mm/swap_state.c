@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
+#include <linux/buffer_head.h>	/* for block_sync_page()/block_flushpage() */
 
 #include <asm/pgtable.h>
 

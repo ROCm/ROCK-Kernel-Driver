@@ -8,7 +8,6 @@
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
 EXTRA_AFLAGS	:= -traditional
-USE_STANDARD_AS_RULE	:= true
 
 all: kernel.o head.o init_task.o
 

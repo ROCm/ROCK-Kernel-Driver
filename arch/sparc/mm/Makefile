@@ -7,7 +7,6 @@
 #
 # Note 2! The CFLAGS definition is now in the main makefile...
 
-USE_STANDARD_AS_RULE := true
 EXTRA_AFLAGS := -ansi
 
 O_TARGET := mm.o

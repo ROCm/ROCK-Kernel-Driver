@@ -234,12 +234,12 @@ extern int nfs_inode_is_stale(struct inode *, struct nfs_fh *,
 extern struct inode *nfs_fhget(struct dentry *, struct nfs_fh *,
 				struct nfs_fattr *);
 extern int __nfs_refresh_inode(struct inode *, struct nfs_fattr *);
-extern int nfs_revalidate(struct dentry *);
+extern int nfs_getattr(struct vfsmount *, struct dentry *, struct kstat *);
 extern int nfs_permission(struct inode *, int);
 extern int nfs_open(struct inode *, struct file *);
 extern int nfs_release(struct inode *, struct file *);
 extern int __nfs_revalidate_inode(struct nfs_server *, struct inode *);
-extern int nfs_notify_change(struct dentry *, struct iattr *);
+extern int nfs_setattr(struct dentry *, struct iattr *);
 
 /*
  * linux/fs/nfs/file.c

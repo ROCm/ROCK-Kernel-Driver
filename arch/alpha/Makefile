@@ -96,7 +96,7 @@ SUBDIRS := $(SUBDIRS) arch/alpha/kernel arch/alpha/mm arch/alpha/lib \
 CORE_FILES := arch/alpha/kernel/kernel.o arch/alpha/mm/mm.o $(CORE_FILES)
 
 ifeq ($(CONFIG_MATHEMU),y)
-  CORE_FILES := $(CORE_FILES) arch/alpha/math-emu/math-emu.o
+  CORE_FILES := $(CORE_FILES) arch/alpha/math-emu/built-in.o
 endif
 
 LIBS := $(TOPDIR)/arch/alpha/lib/lib.a $(LIBS) $(TOPDIR)/arch/alpha/lib/lib.a

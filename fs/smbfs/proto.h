@@ -49,6 +49,7 @@ extern void smb_get_inode_attr(struct inode *inode, struct smb_fattr *fattr);
 extern void smb_set_inode_attr(struct inode *inode, struct smb_fattr *fattr);
 extern void smb_invalidate_inodes(struct smb_sb_info *server);
 extern int smb_revalidate_inode(struct dentry *dentry);
+extern int smb_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat);
 extern int smb_notify_change(struct dentry *dentry, struct iattr *attr);
 /* file.c */
 extern struct address_space_operations smb_file_aops;

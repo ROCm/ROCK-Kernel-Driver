@@ -26,6 +26,7 @@
 #include <linux/spinlock.h>
 #include <linux/blkdev.h>	/* For bdev_hardsect_size(). */
 #include <linux/backing-dev.h>
+#include <linux/buffer_head.h>
 
 #include "ntfs.h"
 #include "sysctl.h"
@@ -1934,7 +1935,6 @@ static void __exit exit_ntfs_fs(void)
 	ntfs_sysctl(0);
 }
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Anton Altaparmakov <aia21@cantab.net>");
 MODULE_DESCRIPTION("NTFS 1.2/3.x driver");
 MODULE_LICENSE("GPL");

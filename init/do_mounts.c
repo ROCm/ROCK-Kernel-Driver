@@ -10,6 +10,7 @@
 #include <linux/fd.h>
 #include <linux/tty.h>
 #include <linux/init.h>
+#include <linux/suspend.h>
 
 #include <linux/nfs_fs.h>
 #include <linux/nfs_fs_sb.h>
@@ -825,6 +826,11 @@ void prepare_namespace(void)
 #endif
 
 	create_dev("/dev/root", ROOT_DEV, NULL);
+
+	/* This has to be before mounting root, because even readonly mount of reiserfs would replay
+	   log corrupting stuff */
+	software_resume();
+
 	if (mount_initrd) {
 		if (initrd_load() && !kdev_same(ROOT_DEV, mk_kdev(RAMDISK_MAJOR, 0))) {
 			handle_initrd();
