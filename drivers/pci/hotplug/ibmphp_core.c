@@ -898,7 +898,7 @@ static int set_bus (struct slot * slot_cur)
 	int rc;
 	u8 speed;
 	u8 cmd = 0x0;
-	struct pci_dev * dev;
+	struct pci_dev *dev = NULL;
 	int retval;
 
 	debug ("%s - entry slot # %d \n", __FUNCTION__, slot_cur->number);
@@ -946,11 +946,9 @@ static int set_bus (struct slot * slot_cur)
 				break;
 			case BUS_SPEED_133:
 				/* This is to take care of the bug in CIOBX chip */
-				pci_for_each_dev(dev) {
-					if ((dev->vendor == PCI_VENDOR_ID_SERVERWORKS) &&
-					    (dev->device == 0x0101))
-						ibmphp_hpc_writeslot (slot_cur, HPC_BUS_100PCIXMODE);
-				}
+				while ((dev = pci_find_device(PCI_VENDOR_ID_SERVERWORKS,
+							      0x0101, dev)) != NULL)
+					ibmphp_hpc_writeslot (slot_cur, HPC_BUS_100PCIXMODE);
 				cmd = HPC_BUS_133PCIXMODE;
 				break;
 			default:
