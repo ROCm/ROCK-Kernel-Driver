@@ -605,7 +605,7 @@ nfs_find_actor(struct inode *inode, void *opaque)
 		return 0;
 	if (nfs_compare_fh(NFS_FH(inode), fh))
 		return 0;
-	if (is_bad_inode(inode))
+	if (is_bad_inode(inode) || NFS_STALE(inode))
 		return 0;
 	return 1;
 }
@@ -949,7 +949,7 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 	lock_kernel();
 	if (!inode || is_bad_inode(inode))
  		goto out_nowait;
-	if (NFS_STALE(inode) && inode != inode->i_sb->s_root->d_inode)
+	if (NFS_STALE(inode))
  		goto out_nowait;
 
 	while (NFS_REVALIDATING(inode)) {
@@ -973,9 +973,9 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 			 inode->i_sb->s_id,
 			 (long long)NFS_FILEID(inode), status);
 		if (status == -ESTALE) {
-			NFS_FLAGS(inode) |= NFS_INO_STALE;
-			if (inode != inode->i_sb->s_root->d_inode)
-				remove_inode_hash(inode);
+			nfs_zap_caches(inode);
+			if (!S_ISDIR(inode->i_mode))
+				NFS_FLAGS(inode) |= NFS_INO_STALE;
 		}
 		goto out;
 	}
@@ -1014,7 +1014,6 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 		inode->i_sb->s_id,
 		(long long)NFS_FILEID(inode));
 
-	NFS_FLAGS(inode) &= ~NFS_INO_STALE;
 out:
 	NFS_FLAGS(inode) &= ~NFS_INO_REVALIDATING;
 	wake_up(&nfsi->nfs_i_wait);
@@ -1335,7 +1334,8 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr, unsign
 	 */
 	nfs_invalidate_inode(inode);
  out_err:
-	return -EIO;
+	NFS_FLAGS(inode) |= NFS_INO_STALE;
+	return -ESTALE;
 }
 
 /*
