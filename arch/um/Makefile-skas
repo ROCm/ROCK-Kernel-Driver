@@ -9,12 +9,9 @@ CFLAGS-$(CONFIG_GCOV) += -fprofile-arcs -ftest-coverage
 CFLAGS-$(CONFIG_GPROF) += $(PROFILE)
 LINK-$(CONFIG_GPROF) += $(PROFILE)
 
-MODE_INCLUDE += -I$(TOPDIR)/$(ARCH_DIR)/kernel/skas/include
+MODE_INCLUDE += -I$(srctree)/$(ARCH_DIR)/kernel/skas/include
 
 LINK_SKAS = -Wl,-rpath,/lib 
-LD_SCRIPT_SKAS = dyn.lds
+LD_SCRIPT_SKAS = dyn.lds.S
 
-GEN_HEADERS += $(TOPDIR)/$(ARCH_DIR)/include/skas_ptregs.h
-
-$(TOPDIR)/$(ARCH_DIR)/include/skas_ptregs.h :
-	$(Q)$(MAKE) $(build)=$(ARCH_DIR)/kernel/skas $@
+GEN_HEADERS += $(ARCH_DIR)/include/skas_ptregs.h

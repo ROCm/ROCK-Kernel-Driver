@@ -4,6 +4,7 @@
 #
 
 extra-y := vmlinux.lds uml.lds dyn.lds
+clean-files := vmlinux.lds.S
 
 obj-y = checksum.o config.o exec_kern.o exitcode.o frame_kern.o frame.o \
 	helper.o init_task.o irq.o irq_user.o ksyms.o main.o mem.o mem_user.o \
@@ -24,23 +25,15 @@ obj-$(CONFIG_MODE_SKAS) += skas/
 user-objs-$(CONFIG_TTY_LOG) += tty_log.o
 
 USER_OBJS := $(filter %_user.o,$(obj-y))  $(user-objs-y) config.o helper.o \
-	main.o process.o tempfile.o time.o tty_log.o umid.o user_util.o
+	main.o process.o tempfile.o time.o tty_log.o umid.o user_util.o frame.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
-CFLAGS_frame.o := $(patsubst -fomit-frame-pointer,,$(USER_CFLAGS))
-
-# This has to be separate because it needs be compiled with frame pointers
-# regardless of how the rest of the kernel is built.
-
-$(obj)/frame.o: $(src)/frame.c
-	$(CC) $(CFLAGS_$(notdir $@)) -c -o $@ $<
+CFLAGS_frame.o := -fno-omit-frame-pointer
 
 $(USER_OBJS) : %.o: %.c
-	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
+	$(CC) $(USER_CFLAGS) $(CFLAGS_$(notdir $@)) -c -o $@ $<
 
 QUOTE = 'my $$config=`cat $(TOPDIR)/.config`; $$config =~ s/"/\\"/g ; $$config =~ s/\n/\\n"\n"/g ; while(<STDIN>) { $$_ =~ s/CONFIG/$$config/; print $$_ }'
-
-$(obj)/config.o : $(obj)/config.c
 
 quiet_cmd_quote = QUOTE $@
 cmd_quote = $(PERL) -e $(QUOTE) < $< > $@
