@@ -142,7 +142,7 @@
 #define UART_MSR_ANY_DELTA 0x0F	/* Any of the delta bits! */
 
 /*
- * The Intel PXA2xx chip defines those bits
+ * The Intel XScale on-chip UARTs define these bits
  */
 #define UART_IER_DMAE	0x80	/* DMA Requests Enable */
 #define UART_IER_UUE	0x40	/* UART Unit Enable */

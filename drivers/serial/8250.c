@@ -170,7 +170,8 @@ static const struct serial_uart_config uart_config[PORT_MAX_8250+1] = {
 	{ "ST16654",	64,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
 	{ "XR16850",	128,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
 	{ "RSA",	2048,	UART_CLEAR_FIFO | UART_USE_FIFO },
-	{ "NS16550A",	16,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_NATSEMI }
+	{ "NS16550A",	16,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_NATSEMI },
+	{ "XScale",	32,	UART_CLEAR_FIFO | UART_USE_FIFO  },
 };
 
 static _INLINE_ unsigned int serial_in(struct uart_8250_port *up, int offset)
@@ -1512,6 +1513,8 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	up->ier &= ~UART_IER_MSI;
 	if (UART_ENABLE_MS(&up->port, termios->c_cflag))
 		up->ier |= UART_IER_MSI;
+	if (up->port.type == PORT_XSCALE)
+		up->ier |= UART_IER_UUE | UART_IER_RTOIE;
 
 	serial_out(up, UART_IER, up->ier);
 
@@ -1953,7 +1956,11 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 	 *	First save the UER then disable the interrupts
 	 */
 	ier = serial_in(up, UART_IER);
-	serial_out(up, UART_IER, 0);
+
+	if (up->port.type == PORT_XSCALE)
+		serial_out(up, UART_IER, UART_IER_UUE);
+	else
+		serial_out(up, UART_IER, 0);
 
 	/*
 	 *	Now, do each character
