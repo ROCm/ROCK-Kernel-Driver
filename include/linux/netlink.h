@@ -133,10 +133,9 @@ int netlink_sendskb(struct sock *sk, struct sk_buff *skb, int protocol);
 
 /*
  *	skb should fit one page. This choice is good for headerless malloc.
- *
- *      FIXME: What is the best size for SLAB???? --ANK
  */
-#define NLMSG_GOODSIZE (PAGE_SIZE - ((sizeof(struct sk_buff)+0xF)&~0xF))
+#define NLMSG_GOODORDER 0
+#define NLMSG_GOODSIZE (SKB_MAX_ORDER(0, NLMSG_GOODORDER))
 
 
 struct netlink_callback

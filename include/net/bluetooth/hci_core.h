@@ -119,6 +119,8 @@ struct hci_dev {
 
 	struct hci_dev_stats	stat;
 
+	struct sk_buff_head	driver_init;
+
 	void			*driver_data;
 	void			*core_data;
 

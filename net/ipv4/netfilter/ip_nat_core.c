@@ -543,6 +543,7 @@ int __init ip_nat_init(void)
 static int clean_nat(struct ip_conntrack *i, void *data)
 {
 	memset(&i->nat, 0, sizeof(i->nat));
+	i->status &= ~(IPS_NAT_MASK | IPS_NAT_DONE_MASK | IPS_SEQ_ADJUST);
 	return 0;
 }
 

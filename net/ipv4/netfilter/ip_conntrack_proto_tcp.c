@@ -665,11 +665,13 @@ static int tcp_in_window(struct ip_ct_tcp *state,
 		if (*index == TCP_ACK_SET) {
 			if (state->last_dir == dir
 			    && state->last_seq == seq
+			    && state->last_ack == ack
 			    && state->last_end == end)
 				state->retrans++;
 			else {
 				state->last_dir = dir;
 				state->last_seq = seq;
+				state->last_ack = ack;
 				state->last_end = end;
 				state->retrans = 0;
 			}

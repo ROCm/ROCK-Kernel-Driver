@@ -4,8 +4,8 @@
 			  David S. Miller	 
 
 	This document is intended to serve as a guide to Linux port
-maintainers on how to implement atomic counter and bitops interfaces
-properly.
+maintainers on how to implement atomic counter, bitops, and spinlock
+interfaces properly.
 
 	The atomic_t type should be defined as a signed integer.
 Also, it should be made opaque such that any kind of cast to a normal
@@ -242,6 +242,19 @@ happen.  Specifically, in the above case the atomic_dec_and_test()
 counter decrement would not become globally visible until the
 obj->active update does.
 
+As a historical note, 32-bit Sparc used to only allow usage of
+24-bits of it's atomic_t type.  This was because it used 8 bits
+as a spinlock for SMP safety.  Sparc32 lacked a "compare and swap"
+type instruction.  However, 32-bit Sparc has since been moved over
+to a "hash table of spinlocks" scheme, that allows the full 32-bit
+counter to be realized.  Essentially, an array of spinlocks are
+indexed into based upon the address of the atomic_t being operated
+on, and that lock protects the atomic operation.  Parisc uses the
+same scheme.
+
+Another note is that the atomic_t operations returning values are
+extremely slow on an old 386.
+
 We will now cover the atomic bitmask operations.  You will find that
 their SMP and memory barrier semantics are similar in shape and scope
 to the atomic_t ops above.
@@ -345,3 +358,99 @@ except that two underscores are prefixed to the interface name.
 
 These non-atomic variants also do not require any special memory
 barrier semantics.
+
+The routines xchg() and cmpxchg() need the same exact memory barriers
+as the atomic and bit operations returning values.
+
+Spinlocks and rwlocks have memory barrier expectations as well.
+The rule to follow is simple:
+
+1) When acquiring a lock, the implementation must make it globally
+   visible before any subsequent memory operation.
+
+2) When releasing a lock, the implementation must make it such that
+   all previous memory operations are globally visible before the
+   lock release.
+
+Which finally brings us to _atomic_dec_and_lock().  There is an
+architecture-neutral version implemented in lib/dec_and_lock.c,
+but most platforms will wish to optimize this in assembler.
+
+	int _atomic_dec_and_lock(atomic_t *atomic, spinlock_t *lock);
+
+Atomically decrement the given counter, and if will drop to zero
+atomically acquire the given spinlock and perform the decrement
+of the counter to zero.  If it does not drop to zero, do nothing
+with the spinlock.
+
+It is actually pretty simple to get the memory barrier correct.
+Simply satisfy the spinlock grab requirements, which is make
+sure the spinlock operation is globally visible before any
+subsequent memory operation.
+
+We can demonstrate this operation more clearly if we define
+an abstract atomic operation:
+
+	long cas(long *mem, long old, long new);
+
+"cas" stands for "compare and swap".  It atomically:
+
+1) Compares "old" with the value currently at "mem".
+2) If they are equal, "new" is written to "mem".
+3) Regardless, the current value at "mem" is returned.
+
+As an example usage, here is what an atomic counter update
+might look like:
+
+void example_atomic_inc(long *counter)
+{
+	long old, new, ret;
+
+	while (1) {
+		old = *counter;
+		new = old + 1;
+
+		ret = cas(counter, old, new);
+		if (ret == old)
+			break;
+	}
+}
+
+Let's use cas() in order to build a pseudo-C atomic_dec_and_lock():
+
+int _atomic_dec_and_lock(atomic_t *atomic, spinlock_t *lock)
+{
+	long old, new, ret;
+	int went_to_zero;
+
+	went_to_zero = 0;
+	while (1) {
+		old = atomic_read(atomic);
+		new = old - 1;
+		if (new == 0) {
+			went_to_zero = 1;
+			spin_lock(lock);
+		}
+		ret = cas(atomic, old, new);
+		if (ret == old)
+			break;
+		if (went_to_zero) {
+			spin_unlock(lock);
+			went_to_zero = 0;
+		}
+	}
+
+	return went_to_zero;
+}
+
+Now, as far as memory barriers go, as long as spin_lock()
+strictly orders all subsequent memory operations (including
+the cas()) with respect to itself, things will be fine.
+
+Said another way, _atomic_dec_and_lock() must guarentee that
+a counter dropping to zero is never made visible before the
+spinlock being acquired.
+
+Note that this also means that for the case where the counter
+is not dropping to zero, there are no memory ordering
+requirements.

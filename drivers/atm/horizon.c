@@ -39,6 +39,7 @@
 #include <linux/uio.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
+#include <linux/wait.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -1089,13 +1090,11 @@ static inline void rx_bus_master_complete_handler (hrz_dev * dev) {
 /********** (queue to) become the next TX thread **********/
 
 static inline int tx_hold (hrz_dev * dev) {
-  while (test_and_set_bit (tx_busy, &dev->flags)) {
-    PRINTD (DBG_TX, "sleeping at tx lock %p %lu", dev, dev->flags);
-    interruptible_sleep_on (&dev->tx_queue);
-    PRINTD (DBG_TX, "woken at tx lock %p %lu", dev, dev->flags);
-    if (signal_pending (current))
-      return -1;
-  }
+  PRINTD (DBG_TX, "sleeping at tx lock %p %lu", dev, dev->flags);
+  wait_event_interruptible(dev->tx_queue, (!test_and_set_bit(tx_busy, &dev->flags)));
+  PRINTD (DBG_TX, "woken at tx lock %p %lu", dev, dev->flags);
+  if (signal_pending (current))
+    return -1;
   PRINTD (DBG_TX, "set tx_busy for dev %p", dev);
   return 0;
 }
