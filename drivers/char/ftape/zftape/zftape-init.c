@@ -118,7 +118,7 @@ static int zft_open(struct inode *ino, struct file *filep)
 	     > 
 	    FTAPE_SEL_D) {
 		clear_bit(0,&busy_flag);
-		TRACE_ABORT(-ENXIO, ft_t_err, "failed: illegal unit nr");
+		TRACE_ABORT(-ENXIO, ft_t_err, "failed: invalid unit nr");
 	}
 	orig_sigmask = current->blocked;
 	sigfillset(&current->blocked);
