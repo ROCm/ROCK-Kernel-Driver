@@ -136,6 +136,8 @@ ToDo/Notes:
 	- Add helpers fs/ntfs/layout.h::MK_MREF() and MK_LE_MREF().
 	- Modify fs/ntfs/mft.c::map_extent_mft_record() to only verify the mft
 	  record sequence number if it is specified (i.e. not zero).
+	- Add fs/ntfs/mft.[hc]::ntfs_mft_record_alloc() and various helper
+	  functions used by it.
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 
