@@ -1091,7 +1091,7 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 
 	sock->type  = type;
 
-	i = -EBUSY;
+	i = -EAFNOSUPPORT;
 	if (!net_family_get(family))
 		goto out_release;
 
@@ -1288,7 +1288,7 @@ asmlinkage long sys_accept(int fd, struct sockaddr *upeer_sockaddr, int *upeer_a
 	if (err)
 		goto out_release;
 
-	err = -EBUSY;
+	err = -EAFNOSUPPORT;
 	if (!net_family_get(sock->ops->family))
 		goto out_release;
 
