@@ -616,16 +616,16 @@ asmlinkage long sys_rt_sigaction(int sig,
 
 #endif /* __KERNEL_SYSCALLS__ */
 
-/*
- * "Conditional" syscalls
- *
- * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
- * but it doesn't work on all toolchains, so we just do it by hand.
- *
- * Note that we do *not* provide a parameter list to avoid 
- * conflicting with one of the syscall declarations in some
- * of the relevant header files (including this one).
- */
-#define cond_syscall(x) asmlinkage long x() __attribute__((weak,alias("sys_ni_syscall")));
+/* "Conditional" syscalls.  What we want is
+
+	__attribute__((weak,alias("sys_ni_syscall")))
+
+   but that raises the problem of what type to give the symbol.  If we use
+   a prototype, it'll conflict with the definition given in this file and
+   others.  If we use __typeof, we discover that not all symbols actually
+   have declarations.  If we use no prototype, then we get warnings from
+   -Wstrict-prototypes.  Ho hum.  */
+
+#define cond_syscall(x)  asm(".weak\t" #x "\n" #x " = sys_ni_syscall");
 
 #endif /* _ALPHA_UNISTD_H */
