@@ -397,7 +397,7 @@ EXPORT_SYMBOL(bitreverse);
  * the same way on decoding, it doesn't make a difference.
  */
 
-#if UNITTEST
+#ifdef UNITTEST
 
 #include <stdlib.h>
 #include <stdio.h>

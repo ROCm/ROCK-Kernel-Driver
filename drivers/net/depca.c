@@ -2086,7 +2086,7 @@ static int __init depca_module_init (void)
 {
         int err = 0;
 
-#if CONFIG_MCA
+#ifdef CONFIG_MCA
         err = mca_register_driver (&depca_mca_driver);
 #endif
 #ifdef CONFIG_EISA
@@ -2101,7 +2101,7 @@ static int __init depca_module_init (void)
 static void __exit depca_module_exit (void)
 {
 	int i;
-#if CONFIG_MCA
+#ifdef CONFIG_MCA
         mca_unregister_driver (&depca_mca_driver);
 #endif
 #ifdef CONFIG_EISA
