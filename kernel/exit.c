@@ -465,7 +465,8 @@ static inline void forget_original_parent(struct task_struct * father)
 	 */
 	list_for_each(_p, &father->children) {
 		p = list_entry(_p,struct task_struct,sibling);
-		reparent_thread(p, reaper, child_reaper);
+		if (father == p->real_parent)
+			reparent_thread(p, reaper, child_reaper);
 	}
 	list_for_each(_p, &father->ptrace_children) {
 		p = list_entry(_p,struct task_struct,ptrace_list);
@@ -485,9 +486,16 @@ static inline void zap_thread(task_t *p, task_t *father, int traced)
 		p->ptrace = ptrace_flag;
 		__ptrace_link(p, trace_task);
 	} else {
-		/* Otherwise, if we were tracing this thread, untrace it.  */
+		/*
+		 * Otherwise, if we were tracing this thread, untrace it.
+		 * If we were only tracing the thread (i.e. not its real
+		 * parent), stop here.
+		 */
 		ptrace_unlink (p);
-
+		if (p->parent != father) {
+			BUG_ON(p->parent != p->real_parent);
+			return;
+		}
 		list_del_init(&p->sibling);
 		p->parent = p->real_parent;
 		list_add_tail(&p->sibling, &p->parent->children);

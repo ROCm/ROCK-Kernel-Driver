@@ -790,6 +790,12 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	if (clone_flags & CLONE_CLEARTID)
 		p->user_tid = user_tid;
 
+	/*
+	 * Syscall tracing should be turned off in the child regardless
+	 * of CLONE_PTRACE.
+	 */
+	clear_tsk_thread_flag(p, TIF_SYSCALL_TRACE);
+
 	/* Our parent execution domain becomes current domain
 	   These must match for thread signalling to apply */
 	   
