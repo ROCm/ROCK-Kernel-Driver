@@ -70,8 +70,17 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
  */
 static inline void pgd_clear (pgd_t * pgd) { }
 
+#define pmd_page(pmd) (pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT))
+
+#define pmd_page_kernel(pmd) \
+((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+
 #define pgd_page(pgd) \
+((struct page *) __va(pgd_val(pgd) & PAGE_MASK))
+
+#define pgd_page_kernel(pgd) \
 ((unsigned long) __va(pgd_val(pgd) & PAGE_MASK))
+
 
 /* Find an entry in the second-level page table.. */
 #define pmd_offset(dir, address) ((pmd_t *) pgd_page(*(dir)) + \
@@ -141,5 +150,7 @@ static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 #define __swp_entry(type, offset)	((swp_entry_t){(type) | (offset) << 5})
 #define __pte_to_swp_entry(pte)		((swp_entry_t){ (pte).pte_high })
 #define __swp_entry_to_pte(x)		((pte_t){ 0, (x).val })
+
+#define __pmd_free_tlb(tlb, x)		do { } while (0)
 
 #endif /* _I386_PGTABLE_3LEVEL_H */
