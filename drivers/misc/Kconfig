@@ -6,6 +6,7 @@ menu "Misc devices"
 
 config IBM_ASM
 	tristate "Device driver for IBM RSA service processor"
+	depends on X86
 	default n
 	---help---
 	  This option enables device driver support for in-band access to the
