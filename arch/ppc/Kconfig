@@ -569,7 +569,15 @@ config TQM8260
 	  End of Life: not yet :-)
 	  URL: <http://www.denx.de/PDF/TQM82xx_SPEC_Rev005.pdf>
 
+config ADS8272
+	bool "ADS8272"
+
 endchoice
+
+config PQ2ADS
+	bool
+	depends on ADS8272
+	default y
 
 config TQM8xxL
 	bool
@@ -589,6 +597,15 @@ config 8260
 	  The MPC8260 is a typical embedded CPU made by Motorola.  Selecting
 	  this option means that you wish to build a kernel for a machine with
 	  an 8260 class CPU.
+
+config 8272
+	bool
+	depends on 6xx
+	default y if ADS8272
+	select 8260
+	help
+	  The MPC8272 CPM has a different internal dpram setup than other CPM2
+	  devices
 
 config CPM2
 	bool
