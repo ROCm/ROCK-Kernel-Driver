@@ -808,6 +808,25 @@ xfs_bdstrat_cb(struct xfs_buf *bp)
 	}
 }
 
+
+int
+xfs_bmap(bhv_desc_t	*bdp,
+	xfs_off_t	offset,
+	ssize_t		count,
+	int		flags,
+	page_buf_bmap_t	*pbmapp,
+	int		*npbmaps)
+{
+	xfs_inode_t	*ip = XFS_BHVTOI(bdp);
+	xfs_iocore_t	*io = &ip->i_iocore;
+
+	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
+	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
+	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
+
+	return xfs_iomap(io, offset, count, flags, pbmapp, npbmaps);
+}
+
 /*
  * Wrapper around bdstrat so that we can stop data
  * from going to disk in case we are shutting down the filesystem.

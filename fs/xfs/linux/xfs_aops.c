@@ -48,6 +48,9 @@ map_blocks(
 	vnode_t			*vp = LINVFS_GET_VP(inode);
 	int			error, nmaps = 1;
 
+	if (((flags & (PBF_DIRECT|PBF_SYNC)) == PBF_DIRECT) &&
+	    (offset >= inode->i_size))
+		count = max(count, XFS_WRITE_IO_LOG);
 retry:
 	VOP_BMAP(vp, offset, count, flags, pbmapp, &nmaps, error);
 	if (flags & PBF_WRITE) {
@@ -145,9 +148,8 @@ probe_unmapped_page(
 			struct buffer_head	*bh, *head;
 			bh = head = page_buffers(page);
 			do {
-				if (buffer_mapped(bh) || !buffer_uptodate(bh)) {
+				if (buffer_mapped(bh) || !buffer_uptodate(bh))
 					break;
-				}
 				ret += bh->b_size;
 				if (ret >= pg_offset)
 					break;
@@ -289,7 +291,7 @@ convert_page(
 	bh = head = page_buffers(page);
 	do {
 		offset = i << bbits;
-		if (!buffer_uptodate(bh))
+		if (!(PageUptodate(page) || buffer_uptodate(bh)))
 			continue;
 		if (buffer_mapped(bh) && !buffer_delay(bh) && all_bh) {
 			if (startio && (offset < end)) {
@@ -372,7 +374,7 @@ delalloc_convert(
 	page_buf_bmap_t		*mp, map;
 	unsigned long		p_offset = 0, end_index;
 	loff_t			offset, end_offset;
-	int			len, err, i, cnt = 0;
+	int			len, err, i, cnt = 0, uptodate = 1;
 
 	/* Are we off the end of the file ? */
 	end_index = inode->i_size >> PAGE_CACHE_SHIFT;
@@ -396,7 +398,7 @@ delalloc_convert(
 
 	len = bh->b_size;
 	do {
-		if (!buffer_uptodate(bh) && !startio) {
+		if (!(PageUptodate(page) || buffer_uptodate(bh)) && !startio) {
 			goto next_bh;
 		}
 
@@ -423,47 +425,56 @@ delalloc_convert(
 					unlock_buffer(bh);
 				}
 			}
-		} else if (!buffer_mapped(bh) && 
-			   (buffer_uptodate(bh) || PageUptodate(page))
-			   && (allocate_space || startio)) {
-			int	size;
-
-			/* Getting here implies an unmapped buffer was found,
-			 * and we are in a path where we need to write the
-			 * whole page out.
-			 */
-			if (!mp) {
-				size = probe_unmapped_cluster(inode, page,
-								bh, head);
-				err = map_blocks(inode, offset, size, &map,
-						PBF_WRITE|PBF_DIRECT);
-				if (err) {
-					goto error;
+		} else if ((buffer_uptodate(bh) || PageUptodate(page)) &&
+			   (allocate_space || startio)) {
+			if (!buffer_mapped(bh)) {
+				int	size;
+				
+				/*
+				 * Getting here implies an unmapped buffer
+				 * was found, and we are in a path where we
+				 * need to write the whole page out.
+				 */
+				if (!mp) {
+					size = probe_unmapped_cluster(
+							inode, page, bh, head);
+					err = map_blocks(inode, offset,
+							size, &map,
+							PBF_WRITE | PBF_DIRECT);
+					if (err) {
+						goto error;
+					}
+					mp = match_offset_to_mapping(page, &map,
+								     p_offset);
 				}
-				mp = match_offset_to_mapping(page, &map,
-								p_offset);
-			}
-			if (mp) {
-				map_buffer_at_offset(page, bh, p_offset,
-					inode->i_blkbits, mp);
-				if (startio) {
+				if (mp) {
+					map_buffer_at_offset(page,
+							bh, p_offset,
+							inode->i_blkbits, mp);
+					if (startio) {
+						bh_arr[cnt++] = bh;
+					} else {
+						unlock_buffer(bh);
+					}
+				}
+			} else if (startio && buffer_mapped(bh)) {
+				if (buffer_uptodate(bh) && allocate_space) {
+					lock_buffer(bh);
 					bh_arr[cnt++] = bh;
-				} else {
-					unlock_buffer(bh);
 				}
-			}
-		} else if (startio && buffer_mapped(bh)) {
-			if(buffer_uptodate(bh) && allocate_space) {
-				lock_buffer(bh);
-				bh_arr[cnt++] = bh;
 			}
 		}
 
 next_bh:
+		if (!buffer_uptodate(bh))
+			uptodate = 0;
 		offset += len;
 		p_offset += len;
 		bh = bh->b_this_page;
 	} while (offset < end_offset);
+
+	if (uptodate)
+		SetPageUptodate(page);
 
 	if (startio) {
 		submit_page(page, bh_arr, cnt);
@@ -509,17 +520,15 @@ linvfs_get_block_core(
 	ssize_t			size;
 	loff_t			offset = (loff_t)iblock << inode->i_blkbits;
 
-	if (blocks) {
+	/* If we are doing writes at the end of the file,
+	 * allocate in chunks
+	 */
+	if (blocks)
 		size = blocks << inode->i_blkbits;
-	} else {
-		/* If we are doing writes at the end of the file,
-		 * allocate in chunks
-		 */
-		if (create && (offset >= inode->i_size) && !(flags & PBF_SYNC))
-			size = 1 << XFS_WRITE_IO_LOG;
-		else
-			size = 1 << inode->i_blkbits;
-	}
+	else if (create && (offset >= inode->i_size))
+		size = 1 << XFS_WRITE_IO_LOG;
+	else
+		size = 1 << inode->i_blkbits;
 
 	VOP_BMAP(vp, offset, size,
 		create ? flags : PBF_READ,
@@ -534,15 +543,20 @@ linvfs_get_block_core(
 		page_buf_daddr_t	bn;
 		loff_t			delta;
 
-		delta = offset - pbmap.pbm_offset;
-		delta >>= inode->i_blkbits;
+		/* For unwritten extents do not report a disk address on
+		 * the read case.
+		 */
+		if (create || ((pbmap.pbm_flags & PBMF_UNWRITTEN) == 0)) {
+			delta = offset - pbmap.pbm_offset;
+			delta >>= inode->i_blkbits;
 
-		bn = pbmap.pbm_bn >> (inode->i_blkbits - 9);
-		bn += delta;
+			bn = pbmap.pbm_bn >> (inode->i_blkbits - 9);
+			bn += delta;
 
-		bh_result->b_blocknr = bn;
-		bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
-		set_buffer_mapped(bh_result);
+			bh_result->b_blocknr = bn;
+			bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
+			set_buffer_mapped(bh_result);
+		}
 	}
 
 	/* If we previously allocated a block out beyond eof and

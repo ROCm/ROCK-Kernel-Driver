@@ -575,7 +575,7 @@ STATIC int
 linvfs_setxattr(
 	struct dentry	*dentry,
 	const char	*name,
-	void		*data,
+	const void	*data,
 	size_t		size,
 	int		flags)
 {
@@ -593,13 +593,15 @@ linvfs_setxattr(
 		error = -ENOATTR;
 		p += xfs_namespaces[SYSTEM_NAMES].namelen;
 		if (strcmp(p, POSIXACL_ACCESS) == 0) {
-			error = xfs_acl_vset(vp, data, size, _ACL_TYPE_ACCESS);
+			error = xfs_acl_vset(vp, (void *) data, size,
+						_ACL_TYPE_ACCESS);
 		}
 		else if (strcmp(p, POSIXACL_DEFAULT) == 0) {
-			error = xfs_acl_vset(vp, data, size, _ACL_TYPE_DEFAULT);
+			error = xfs_acl_vset(vp, (void *) data, size,
+						_ACL_TYPE_DEFAULT);
 		}
 		else if (strcmp(p, POSIXCAP) == 0) {
-			error = xfs_cap_vset(vp, data, size);
+			error = xfs_cap_vset(vp, (void *) data, size);
 		}
 		if (!error) {
 			error = vn_revalidate(vp);
@@ -619,7 +621,7 @@ linvfs_setxattr(
 			return -EPERM;
 		xflags |= ATTR_ROOT;
 		p += xfs_namespaces[ROOT_NAMES].namelen;
-		VOP_ATTR_SET(vp, p, data, size, xflags, NULL, error);
+		VOP_ATTR_SET(vp, p, (void *) data, size, xflags, NULL, error);
 		return -error;
 	}
 	if (strncmp(name, xfs_namespaces[USER_NAMES].name,
@@ -627,7 +629,7 @@ linvfs_setxattr(
 		if (!capable_user_xattr(inode))
 			return -EPERM;
 		p += xfs_namespaces[USER_NAMES].namelen;
-		VOP_ATTR_SET(vp, p, data, size, xflags, NULL, error);
+		VOP_ATTR_SET(vp, p, (void *) data, size, xflags, NULL, error);
 		return -error;
 	}
 	return -ENOATTR;

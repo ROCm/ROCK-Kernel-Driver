@@ -142,7 +142,7 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 		}
 		if (INT_ISZERO(dip->di_next_unlinked, ARCH_CONVERT))  {
 			cmn_err(CE_WARN,
-"Bad next_unlinked field (0) in XFS inode buffer 0x%x, starting blockno %Ld, offset 0x%x",
+"Bad next_unlinked field (0) in XFS inode buffer 0x%p, starting blockno %Ld, offset 0x%x",
 				(__uint64_t)(__psunsigned_t) bp,
 				(__int64_t) XFS_BUF_ADDR(bp),
 				xfs_buf_offset(bp, i * mp->m_sb.sb_inodesize));

@@ -22,6 +22,7 @@ enum bh_state_bits {
 	BH_New,		/* Disk mapping was newly created by get_block */
 	BH_Async_Read,	/* Is under end_buffer_async_read I/O */
 	BH_Async_Write,	/* Is under end_buffer_async_write I/O */
+	BH_Delay,	/* Buffer is not yet allocated on disk */
 
 	BH_Boundary,	/* Block is followed by a discontiguity */
 	BH_PrivateStart,/* not a state bit, but the first bit available
@@ -105,6 +106,7 @@ BUFFER_FNS(Mapped, mapped)
 BUFFER_FNS(New, new)
 BUFFER_FNS(Async_Read, async_read)
 BUFFER_FNS(Async_Write, async_write)
+BUFFER_FNS(Delay, delay);
 BUFFER_FNS(Boundary, boundary)
 
 #define bh_offset(bh)		((unsigned long)(bh)->b_data & ~PAGE_MASK)

@@ -87,40 +87,59 @@ struct xfs_bmap_free;
 #define AIL_LOCK(mp,s)		s=mutex_spinlock(&(mp)->m_ail_lock)
 #define AIL_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_ail_lock, s)
 
-
-/* Prototypes and functions for I/O core modularization, a vector
- * of functions is used to indirect from xfs/cxfs independent code
- * to the xfs/cxfs dependent code.
- * The vector is placed in the mount structure so that we can
- * minimize the number of memory indirections involved.
+/*
+ * Prototypes and functions for I/O core modularization.
  */
+ 
+struct flid;
+struct buf;
 
+typedef int		(*xfs_ioinit_t)(struct vfs *,
+				struct xfs_mount_args *, int *);
 typedef int		(*xfs_bmapi_t)(struct xfs_trans *, void *,
 				xfs_fileoff_t, xfs_filblks_t, int,
 				xfs_fsblock_t *, xfs_extlen_t,
 				struct xfs_bmbt_irec *, int *,
 				struct xfs_bmap_free *);
 typedef int		(*xfs_bmap_eof_t)(void *, xfs_fileoff_t, int, int *);
+typedef int		(*xfs_iomap_write_direct_t)(
+				void *, loff_t, size_t, int,
+				struct xfs_bmbt_irec *, int *, int);
+typedef int		(*xfs_iomap_write_delay_t)(
+				void *, loff_t, size_t, int,
+				struct xfs_bmbt_irec *, int *);
+typedef int		(*xfs_iomap_write_allocate_t)(
+				void *, struct xfs_bmbt_irec *, int *);
+typedef int		(*xfs_iomap_write_unwritten_t)(
+				void *, loff_t, size_t);
+typedef uint		(*xfs_lck_map_shared_t)(void *);
 typedef void		(*xfs_lock_t)(void *, uint);
 typedef void		(*xfs_lock_demote_t)(void *, uint);
 typedef int		(*xfs_lock_nowait_t)(void *, uint);
 typedef void		(*xfs_unlk_t)(void *, unsigned int);
-typedef void		(*xfs_chgtime_t)(void *, int);
 typedef xfs_fsize_t	(*xfs_size_t)(void *);
-typedef xfs_fsize_t	(*xfs_lastbyte_t)(void *);
+typedef xfs_fsize_t	(*xfs_iodone_t)(struct vfs *);
 
 typedef struct xfs_ioops {
-	xfs_bmapi_t		xfs_bmapi_func;
-	xfs_bmap_eof_t		xfs_bmap_eof_func;
-	xfs_lock_t		xfs_ilock;
-	xfs_lock_demote_t	xfs_ilock_demote;
-	xfs_lock_nowait_t	xfs_ilock_nowait;
-	xfs_unlk_t		xfs_unlock;
-	xfs_chgtime_t		xfs_chgtime;
-	xfs_size_t		xfs_size_func;
-	xfs_lastbyte_t		xfs_lastbyte;
+	xfs_ioinit_t			xfs_ioinit;
+	xfs_bmapi_t			xfs_bmapi_func;
+	xfs_bmap_eof_t			xfs_bmap_eof_func;
+	xfs_iomap_write_direct_t	xfs_iomap_write_direct;
+	xfs_iomap_write_delay_t		xfs_iomap_write_delay;
+	xfs_iomap_write_allocate_t	xfs_iomap_write_allocate;
+	xfs_iomap_write_unwritten_t	xfs_iomap_write_unwritten;
+	xfs_lock_t			xfs_ilock;
+	xfs_lck_map_shared_t		xfs_lck_map_shared;
+	xfs_lock_demote_t		xfs_ilock_demote;
+	xfs_lock_nowait_t		xfs_ilock_nowait;
+	xfs_unlk_t			xfs_unlock;
+	xfs_size_t			xfs_size_func;
+	xfs_iodone_t			xfs_iodone;
 } xfs_ioops_t;
 
+
+#define XFS_IOINIT(vfsp, args, flags) \
+	(*(mp)->m_io_ops.xfs_ioinit)(vfsp, args, flags)
 
 #define XFS_BMAPI(mp, trans,io,bno,len,f,first,tot,mval,nmap,flist)	\
 	(*(mp)->m_io_ops.xfs_bmapi_func) \
@@ -130,8 +149,30 @@ typedef struct xfs_ioops {
 	(*(mp)->m_io_ops.xfs_bmap_eof_func) \
 		((io)->io_obj, endoff, whichfork, eof)
 
+#define XFS_IOMAP_WRITE_DIRECT(mp, io, offset, count, flags, mval, nmap, found)\
+	(*(mp)->m_io_ops.xfs_iomap_write_direct) \
+		((io)->io_obj, offset, count, flags, mval, nmap, found)
+
+#define XFS_IOMAP_WRITE_DELAY(mp, io, offset, count, flags, mval, nmap) \
+	(*(mp)->m_io_ops.xfs_iomap_write_delay) \
+		((io)->io_obj, offset, count, flags, mval, nmap)
+
+#define XFS_IOMAP_WRITE_ALLOCATE(mp, io, mval, nmap) \
+	(*(mp)->m_io_ops.xfs_iomap_write_allocate) \
+		((io)->io_obj, mval, nmap)
+
+#define XFS_IOMAP_WRITE_UNWRITTEN(mp, io, offset, count) \
+	(*(mp)->m_io_ops.xfs_iomap_write_unwritten) \
+		((io)->io_obj, offset, count)
+
+#define XFS_LCK_MAP_SHARED(mp, io) \
+	(*(mp)->m_io_ops.xfs_lck_map_shared)((io)->io_obj)
+
 #define XFS_ILOCK(mp, io, mode) \
 	(*(mp)->m_io_ops.xfs_ilock)((io)->io_obj, mode)
+
+#define XFS_ILOCK_NOWAIT(mp, io, mode) \
+	(*(mp)->m_io_ops.xfs_ilock_nowait)((io)->io_obj, mode)
 
 #define XFS_IUNLOCK(mp, io, mode) \
 	(*(mp)->m_io_ops.xfs_unlock)((io)->io_obj, mode)
@@ -142,8 +183,13 @@ typedef struct xfs_ioops {
 #define XFS_SIZE(mp, io) \
 	(*(mp)->m_io_ops.xfs_size_func)((io)->io_obj)
 
-#define XFS_LASTBYTE(mp, io) \
-	(*(mp)->m_io_ops.xfs_lastbyte)((io)->io_obj)
+#define XFS_IODONE(vfsp) \
+	(*(mp)->m_io_ops.xfs_iodone)(vfsp)
+
+
+/*
+ * Prototypes and functions for the XFS realtime subsystem.
+ */
 
 
 typedef struct xfs_mount {
@@ -303,8 +349,8 @@ typedef struct xfs_mount {
 /*
  * Default minimum read and write sizes.
  */
-#define XFS_READIO_LOG_LARGE	12
-#define XFS_WRITEIO_LOG_LARGE	12
+#define XFS_READIO_LOG_LARGE	16
+#define XFS_WRITEIO_LOG_LARGE	16
 /*
  * Default allocation size
  */

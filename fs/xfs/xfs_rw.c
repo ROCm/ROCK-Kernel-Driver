@@ -97,7 +97,7 @@ xfs_do_force_shutdown(
 
 	if (!(flags & XFS_FORCE_UMOUNT)) {
 		cmn_err(CE_NOTE,
-		"xfs_force_shutdown(%s,0x%x) called from line %d of file %s.  Return address = 0x%x",
+		"xfs_force_shutdown(%s,0x%x) called from line %d of file %s.  Return address = 0x%p",
 			mp->m_fsname,flags,lnnum,fname,__return_address);
 	}
 	/*
