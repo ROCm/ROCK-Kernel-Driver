@@ -3504,7 +3504,9 @@ kdb_init(void)
 		KDB_MAJOR_VERSION, KDB_MINOR_VERSION, KDB_TEST_VERSION);
 
 	kdb_cmd_init();		/* Preset commands from kdb_cmds */
+	kdb_initial_cpu = -1;	/* Avoid recursion problems */
 	kdb(KDB_REASON_SILENT, 0, 0);	/* Activate any preset breakpoints on boot cpu */
+	kdb_initial_cpu = smp_processor_id();
 	notifier_chain_register(&panic_notifier_list, &kdb_block);
 
 #ifdef KDB_HAVE_LONGJMP
