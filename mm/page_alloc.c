@@ -756,7 +756,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	}
 
 	/* This allocation should allow future memory freeing. */
-	if (((p->flags & PF_MEMALLOC) || p->memdie) && !in_interrupt()) {
+	if (((p->flags & PF_MEMALLOC) || unlikely(test_thread_flag(TIF_MEMDIE))) && !in_interrupt()) {
 		/* go through the zonelist yet again, ignoring mins */
 		for (i = 0; (z = zones[i]) != NULL; i++) {
 			page = buffered_rmqueue(z, order, gfp_mask);

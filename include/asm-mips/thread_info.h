@@ -116,6 +116,7 @@ register struct thread_info *__current_thread_info __asm__("$28");
 #define TIF_SYSCALL_AUDIT	4	/* syscall auditing active */
 #define TIF_USEDFPU		16	/* FPU was used by this task this quantum (SMP) */
 #define TIF_POLLING_NRFLAG	17	/* true if poll_idle() is polling TIF_NEED_RESCHED */
+#define TIF_MEMDIE		18
 #define TIF_SYSCALL_TRACE	31	/* syscall trace active */
 
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)

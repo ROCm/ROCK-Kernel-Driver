@@ -615,11 +615,6 @@ struct task_struct {
 	struct key *thread_keyring;	/* keyring private to this thread */
 #endif
 /*
- * All archs should support atomic ops with
- * 1 byte granularity.
- */
-	unsigned char memdie;
-/*
  * Must be changed atomically so it shouldn't be
  * be a shareable bitflag.
  */
