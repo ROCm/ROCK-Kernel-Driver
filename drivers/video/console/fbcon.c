@@ -1663,7 +1663,8 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 	var.yres = height * fh;
 	x_diff = info->var.xres - var.xres;
 	y_diff = info->var.yres - var.yres;
-	if (x_diff < 0 || x_diff > fw || (y_diff < 0 || y_diff > fh)) {
+	if (x_diff < 0 || x_diff > fw || (y_diff < 0 || y_diff > fh) ||
+	    (info->flags & FBINFO_MISC_MODESWITCH)) {
 		char mode[40];
 
 		DPRINTK("attempting resize %ix%i\n", var.xres, var.yres);
@@ -1678,9 +1679,12 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 			return -EINVAL;
 		DPRINTK("resize now %ix%i\n", var.xres, var.yres);
 		if (CON_IS_VISIBLE(vc)) {
-			var.activate = FB_ACTIVATE_NOW;
+			var.activate = FB_ACTIVATE_NOW |
+				(info->flags & FBINFO_MISC_MODESWITCH) ?
+				FB_ACTIVATE_FORCE : 0;
 			fb_set_var(info, &var);
 		}
+		info->flags &= ~FBINFO_MISC_MODESWITCH;
 	}
 	p->vrows = var.yres_virtual/fh;
 	if (var.yres > (fh * (height + 1)))
@@ -1788,17 +1792,8 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
 
-	if (mode_switch) {
-		struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
-		struct fb_var_screeninfo var = info->var;
-
-		if (blank) {
-			fbcon_cursor(vc, CM_ERASE);
-			return 0;
-		}
-		var.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_FORCE;
-		fb_set_var(info, &var);
-	}
+	if (mode_switch)
+		info->flags |= FBINFO_MISC_MODESWITCH;
 
 	fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
 
