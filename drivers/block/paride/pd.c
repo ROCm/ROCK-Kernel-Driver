@@ -742,21 +742,16 @@ static int pd_ready(void)
 	return !(status_reg(pd_current) & STAT_BUSY);
 }
 
-static void do_pd_request1(request_queue_t * q)
+static void do_pd_request(request_queue_t * q)
 {
+	if (pd_req)
+		return;
 	pd_req = elv_next_request(q);
 	if (!pd_req)
 		return;
 
 	ps_continuation = do_pd_io;
 	ps_set_intr();
-}
-
-static void do_pd_request(request_queue_t * q)
-{
-	if (pd_req)
-		return;
-	do_pd_request1(q);
 }
 
 static int pd_next_buf(void)
@@ -785,8 +780,15 @@ static inline void next_request(int success)
 
 	spin_lock_irqsave(&pd_lock, saved_flags);
 	end_request(pd_req, success);
-	do_pd_request1(pd_queue);
+	pd_req = elv_next_request(pd_queue);
+	if (!pd_req) {
+		spin_unlock_irqrestore(&pd_lock, saved_flags);
+		return;
+	}
 	spin_unlock_irqrestore(&pd_lock, saved_flags);
+
+	ps_continuation = do_pd_io;
+	ps_set_intr();
 }
 
 static void do_pd_io(void)
