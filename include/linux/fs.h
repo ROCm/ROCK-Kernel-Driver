@@ -555,8 +555,8 @@ struct file_ra_state {
 	unsigned long prev_page;	/* Cache last read() position */
 	unsigned long ahead_start;	/* Ahead window */
 	unsigned long ahead_size;
-	unsigned long serial_cnt;	/* measure of sequentiality */
-	unsigned long average;		/* another measure of sequentiality */
+	unsigned long currnt_wnd_hit;	/* locality in the current window */
+	unsigned long average;		/* size of next current window */
 	unsigned long ra_pages;		/* Maximum readahead window */
 	unsigned long mmap_hit;		/* Cache hit stat for mmap accesses */
 	unsigned long mmap_miss;	/* Cache miss stat for mmap accesses */
