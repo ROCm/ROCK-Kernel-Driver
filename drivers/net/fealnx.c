@@ -1404,11 +1404,10 @@ static void free_one_rx_descriptor(struct netdev_private *np)
 }
 
 
+/* Stop rx before calling this */
 static void reset_rx_descriptors(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
-
-	stop_nic_rx(dev->base_addr, np->crvalue);
 
 	while (!(np->cur_rx->status & RXOWN))
 		free_one_rx_descriptor(np);
@@ -1417,7 +1416,6 @@ static void reset_rx_descriptors(struct net_device *dev)
 
 	writel(np->rx_ring_dma + ((char*)np->cur_rx - (char*)np->rx_ring),
 		dev->base_addr + RXLBA);
-	writel(np->crvalue, dev->base_addr + TCRRCR);
 }
 
 
@@ -1475,8 +1473,11 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 		if (intr_status & (RI | RBU)) {
 			if (intr_status & RI)
 				netdev_rx(dev);
-			else
+			else {
+				stop_nic_rx(ioaddr, np->crvalue);
 				reset_rx_descriptors(dev);
+				writel(np->crvalue, ioaddr + TCRRCR);
+			}				
 		}
 
 		while (np->really_tx_count) {
@@ -1584,6 +1585,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 static int netdev_rx(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
+	long ioaddr = dev->base_addr;
 
 	/* If EOP is set on the next entry, it's a new packet. Send it up. */
 	while (!(np->cur_rx->status & RXOWN)) {
@@ -1642,7 +1644,9 @@ static int netdev_rx(struct net_device *dev)
 						free_one_rx_descriptor(np);
 					continue;
 				} else {	/* something error, need to reset this chip */
+					stop_nic_rx(ioaddr, np->crvalue);
 					reset_rx_descriptors(dev);
+					writel(np->crvalue, ioaddr + TCRRCR);
 				}
 				break;	/* exit the while loop */
 			}
