@@ -36,10 +36,10 @@ static void map_absent_destroy (struct mtd_info *);
 
 
 static struct mtd_chip_driver map_absent_chipdrv = {
-	probe: 		map_absent_probe,
-	destroy:	map_absent_destroy,
-	name: 		"map_absent",
-	module: 	THIS_MODULE
+	.probe 		= map_absent_probe,
+	.destroy	= map_absent_destroy,
+	.name 		= "map_absent",
+	.module 	= THIS_MODULE
 };
 
 static struct mtd_info *map_absent_probe(struct map_info *map)

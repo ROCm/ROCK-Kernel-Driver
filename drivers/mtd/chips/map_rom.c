@@ -21,9 +21,9 @@ static void maprom_nop (struct mtd_info *);
 struct mtd_info *map_rom_probe(struct map_info *map);
 
 static struct mtd_chip_driver maprom_chipdrv = {
-	probe: map_rom_probe,
-	name: "map_rom",
-	module: THIS_MODULE
+	.probe	= map_rom_probe,
+	.name	= "map_rom",
+	.module	= THIS_MODULE
 };
 
 struct mtd_info *map_rom_probe(struct map_info *map)

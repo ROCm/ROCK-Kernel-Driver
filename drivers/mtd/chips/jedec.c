@@ -33,14 +33,51 @@ static unsigned long my_bank_size;
 
 /* Listing of parts and sizes. We need this table to learn the sector
    size of the chip and the total length */
-static const struct JEDECTable JEDEC_table[] = 
-  {{0x013D,"AMD Am29F017D",2*1024*1024,64*1024,MTD_CAP_NORFLASH},
-   {0x01AD,"AMD Am29F016",2*1024*1024,64*1024,MTD_CAP_NORFLASH},
-   {0x01D5,"AMD Am29F080",1*1024*1024,64*1024,MTD_CAP_NORFLASH},
-   {0x01A4,"AMD Am29F040",512*1024,64*1024,MTD_CAP_NORFLASH},
-   {0x20E3,"AMD Am29W040B",512*1024,64*1024,MTD_CAP_NORFLASH},
-   {0xC2AD,"Macronix MX29F016",2*1024*1024,64*1024,MTD_CAP_NORFLASH},
-   {}};
+static const struct JEDECTable JEDEC_table[] = {
+	{
+		.jedec		= 0x013D,
+		.name		= "AMD Am29F017D",
+		.size		= 2*1024*1024,
+		.sectorsize	= 64*1024,
+		.capabilities	= MTD_CAP_NORFLASH
+	},
+	{
+		.jedec		= 0x01AD,
+		.name		= "AMD Am29F016",
+		.size		= 2*1024*1024,
+		.sectorsize	= 64*1024,
+		.capabilities	= MTD_CAP_NORFLASH
+	},
+	{
+		.jedec		= 0x01D5,
+		.name		= "AMD Am29F080",
+		.size		= 1*1024*1024,
+		.sectorsize	= 64*1024,
+		.capabilities	= MTD_CAP_NORFLASH
+	},
+	{
+		.jedec		= 0x01A4,
+		.name		= "AMD Am29F040",
+		.size		= 512*1024,
+		.sectorsize	= 64*1024,
+		.capabilities	= MTD_CAP_NORFLASH
+	},
+	{
+		.jedec		= 0x20E3,
+		.name		= "AMD Am29W040B",
+		.size		= 512*1024,
+		.sectorsize	= 64*1024,
+		.capabilities	= MTD_CAP_NORFLASH
+	},
+	{
+		.jedec		= 0xC2AD,
+		.name		= "Macronix MX29F016",
+		.size		= 2*1024*1024,
+		.sectorsize	= 64*1024,
+		.capabilities	= MTD_CAP_NORFLASH
+	},
+	{ .jedec = 0x0 }
+};
 
 static const struct JEDECTable *jedec_idtoinf(__u8 mfr,__u8 id);
 static void jedec_sync(struct mtd_info *mtd) {};
@@ -54,9 +91,9 @@ static struct mtd_info *jedec_probe(struct map_info *map);
 
 
 static struct mtd_chip_driver jedec_chipdrv = {
-	probe: jedec_probe,
-	name: "jedec",
-	module: THIS_MODULE
+	.probe	= jedec_probe,
+	.name	= "jedec",
+	.module	= THIS_MODULE
 };
 
 /* Probe entry point */

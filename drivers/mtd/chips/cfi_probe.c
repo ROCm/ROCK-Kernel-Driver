@@ -294,8 +294,8 @@ static void print_cfi_ident(struct cfi_ident *cfip)
 #endif /* DEBUG_CFI */
 
 static struct chip_probe cfi_chip_probe = {
-	name: "CFI",
-	probe_chip: cfi_probe_chip
+	.name		= "CFI",
+	.probe_chip	= cfi_probe_chip
 };
 
 struct mtd_info *cfi_probe(struct map_info *map)
@@ -308,9 +308,9 @@ struct mtd_info *cfi_probe(struct map_info *map)
 }
 
 static struct mtd_chip_driver cfi_chipdrv = {
-	probe: cfi_probe,
-	name: "cfi_probe",
-	module: THIS_MODULE
+	.probe		= cfi_probe,
+	.name		= "cfi_probe",
+	.module		= THIS_MODULE
 };
 
 int __init cfi_probe_init(void)
