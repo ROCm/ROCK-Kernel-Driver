@@ -326,12 +326,12 @@ extern int daca_leave_sleep(void);
 #undef IOCTL_OUT
 
 #define IOCTL_IN(arg, ret)	\
-	rc = get_user(ret, (int *)(arg)); \
+	rc = get_user(ret, (int __user *)(arg)); \
 	if (rc) break;
 #define IOCTL_OUT(arg, ret)	\
-	ioctl_return2((int *)(arg), ret)
+	ioctl_return2((int __user *)(arg), ret)
 
-static inline int ioctl_return2(int *addr, int value)
+static inline int ioctl_return2(int __user *addr, int value)
 {
 	return value < 0 ? value : put_user(value, addr);
 }
@@ -514,6 +514,7 @@ tas_set_frame_rate(void)
 static int
 tas_mixer_ioctl(u_int cmd, u_long arg)
 {
+	int __user *argp = (int __user *)arg;
 	int data;
 	int rc;
 
@@ -524,16 +525,16 @@ tas_mixer_ioctl(u_int cmd, u_long arg)
 
         if ((cmd & ~0xff) == MIXER_WRITE(0) &&
             tas_supported_mixers() & (1<<(cmd & 0xff))) {
-		rc = get_user(data, (int *)(arg));
+		rc = get_user(data, argp);
                 if (rc<0) return rc;
 		tas_set_mixer_level(cmd & 0xff, data);
 		tas_get_mixer_level(cmd & 0xff, &data);
-		return ioctl_return2((int *)(arg), data);
+		return ioctl_return2(argp, data);
         }
         if ((cmd & ~0xff) == MIXER_READ(0) &&
             tas_supported_mixers() & (1<<(cmd & 0xff))) {
 		tas_get_mixer_level(cmd & 0xff, &data);
-		return ioctl_return2((int *)(arg), data);
+		return ioctl_return2(argp, data);
         }
 
 	switch(cmd) {
