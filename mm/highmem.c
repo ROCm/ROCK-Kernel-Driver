@@ -88,7 +88,7 @@ static void flush_all_zero_pkmaps(void)
 
 		page->virtual = NULL;
 	}
-	flush_tlb_all();
+	flush_tlb_kernel_range(PKMAP_ADDR(0), PKMAP_ADDR(LAST_PKMAP));
 }
 
 static inline unsigned long map_new_virtual(struct page *page)

@@ -81,6 +81,7 @@ static inline void free_area_pmd(pgd_t * dir, unsigned long address, unsigned lo
 void vmfree_area_pages(unsigned long address, unsigned long size)
 {
 	pgd_t * dir;
+	unsigned long start = address;
 	unsigned long end = address + size;
 
 	dir = pgd_offset_k(address);
@@ -90,7 +91,7 @@ void vmfree_area_pages(unsigned long address, unsigned long size)
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
-	flush_tlb_all();
+	flush_tlb_kernel_range(start, end);
 }
 
 static inline int alloc_area_pte (pte_t * pte, unsigned long address,

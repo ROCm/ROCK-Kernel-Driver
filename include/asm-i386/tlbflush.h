@@ -67,6 +67,7 @@ __asm__ __volatile__("invlpg %0": :"m" (*(char *) addr))
  *  - flush_tlb_mm(mm) flushes the specified mm context TLB's
  *  - flush_tlb_page(vma, vmaddr) flushes one page
  *  - flush_tlb_range(vma, start, end) flushes a range of pages
+ *  - flush_tlb_kernel_range(start, end) flushes a range of kernel pages
  *  - flush_tlb_pgtables(mm, start, end) flushes a range of page tables
  *
  * ..but the i386 has somewhat limited tlb flushing capabilities,
@@ -131,6 +132,8 @@ extern struct tlb_state cpu_tlbstate[NR_CPUS];
 
 
 #endif
+
+#define flush_tlb_kernel_range(start, end) flush_tlb_all()
 
 static inline void flush_tlb_pgtables(struct mm_struct *mm,
 				      unsigned long start, unsigned long end)

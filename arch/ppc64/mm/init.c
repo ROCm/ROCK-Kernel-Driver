@@ -262,15 +262,6 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 }
 
 void
-flush_tlb_all(void)
-{
-	/* Implemented to just flush the vmalloc area.
-	 * vmalloc is the only user of flush_tlb_all.
-	 */
-	__flush_tlb_range(NULL, VMALLOC_START, VMALLOC_END);
-}
-
-void
 flush_tlb_mm(struct mm_struct *mm)
 {
 	if (mm->map_count) {
