@@ -880,7 +880,7 @@ void __init ide_scan_pcibus (int scan_direction)
 			ide_scan_pcidev(dev);
 		}
 	} else {
-		pci_for_each_dev_reverse(dev) {
+		while ((dev = pci_find_device_reverse(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 			ide_scan_pcidev(dev);
 		}
 	}
