@@ -770,7 +770,7 @@ static unsigned long agp_generic_alloc_page(void)
 		return 0;
 
 	get_page(page);
-	LockPage(page);
+	SetPageLocked(page);
 	atomic_inc(&agp_bridge.current_memory_agp);
 	return (unsigned long)page_address(page);
 }
@@ -785,7 +785,7 @@ static void agp_generic_destroy_page(unsigned long addr)
 
 	page = virt_to_page(pt);
 	put_page(page);
-	UnlockPage(page);
+	unlock_page(page);
 	free_page((unsigned long) pt);
 	atomic_dec(&agp_bridge.current_memory_agp);
 }
@@ -2744,7 +2744,7 @@ static unsigned long ali_alloc_page(void)
 		return 0;
 
 	get_page(page);
-	LockPage(page);
+	SetPageLocked(page);
 	atomic_inc(&agp_bridge.current_memory_agp);
 
 	global_cache_flush();
@@ -2780,7 +2780,7 @@ static void ali_destroy_page(unsigned long addr)
 
 	page = virt_to_page(pt);
 	put_page(page);
-	UnlockPage(page);
+	unlock_page(page);
 	free_page((unsigned long) pt);
 	atomic_dec(&agp_bridge.current_memory_agp);
 }
@@ -3476,6 +3476,12 @@ static struct {
 		"Ali",
 		"M1641",
 		ali_generic_setup },
+	{ PCI_DEVICE_ID_AL_M1644_0,
+		PCI_VENDOR_ID_AL,
+		ALI_M1644,
+		"Ali",
+		"M1644",
+		ali_generic_setup },
 	{ PCI_DEVICE_ID_AL_M1647_0,
 		PCI_VENDOR_ID_AL,
 		ALI_M1647,
@@ -3513,7 +3519,7 @@ static struct {
 		PCI_VENDOR_ID_AMD,
 		AMD_762,
 		"AMD",
-		"AMD 760MP",
+		"760MP",
 		amd_irongate_setup },
 	{ 0,
 		PCI_VENDOR_ID_AMD,
@@ -3579,11 +3585,11 @@ static struct {
 		"i845",
 		intel_845_setup },
 	{ PCI_DEVICE_ID_INTEL_850_0,
-	        PCI_VENDOR_ID_INTEL,
-	        INTEL_I850,
-	        "Intel",
-	        "i850",
-	        intel_850_setup },
+		PCI_VENDOR_ID_INTEL,
+		INTEL_I850,
+		"Intel",
+		"i850",
+intel_850_setup },
 	{ PCI_DEVICE_ID_INTEL_860_0,
 		PCI_VENDOR_ID_INTEL,
 		INTEL_I860,

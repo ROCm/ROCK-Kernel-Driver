@@ -26,7 +26,7 @@
  *
  *    05/07/2000 - implemented persistent snapshot support
  *    23/11/2000 - used cpu_to_le64 rather than my own macro
- *    25/01/2001 - Put LockPage back in
+ *    25/01/2001 - Put SetPageLocked back in
  *    01/02/2001 - A dropped snapshot is now set as inactive
  *    12/03/2001 - lvm_pv_get_number changes:
  *                 o made it static
@@ -34,6 +34,7 @@
  *                 o pv number is returned in new uint * arg
  *                 o -1 returned on error
  *                 lvm_snapshot_fill_COW_table has a return value too.
+ *    25/02/2002 - s/LockPage/SetPageLocked/ - akpm@zip.com.au
  *
  */
 
@@ -451,7 +452,7 @@ int lvm_snapshot_alloc_iobuf_pages(struct kiobuf * iobuf, int sectors)
 			goto out;
 
 		iobuf->maplist[i] = page;
-		LockPage(page);
+		SetPageLocked(page);
 		iobuf->nr_pages++;
 	}
 	iobuf->offset = 0;

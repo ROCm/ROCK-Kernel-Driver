@@ -85,12 +85,14 @@ struct TceTableManagerCB {
 	u64	index;			/* Index of this tce table (token?) */
 	u16	maxTceTableIndex;	/* Max num of tables for partition */
 	u8	virtualBusFlag;		/* Flag to indicate virtual bus */
-	u8	rsvd[5];
+ 	u8	logicalSlot;		/* IOA Tce Slot Index */
+ 	u8	rsvd[4];
 };
 
 extern struct TceTable virtBusTceTable;	/* Tce table for virtual bus */
 
 extern void create_tce_tables(void);
+extern void create_pci_bus_tce_table(unsigned long);
 
 void tce_init_pSeries(void);
 void tce_init_iSeries(void);

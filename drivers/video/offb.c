@@ -42,9 +42,6 @@
 #include <video/fbcon-cfb32.h>
 #include <video/macmodes.h>
 
-
-static int currcon = 0;
-
 /* Supported palette hacks */
 enum {
 	cmap_unknown,
@@ -52,7 +49,8 @@ enum {
 	cmap_r128,	/* ATI Rage128 */
 	cmap_M3A,	/* ATI Rage Mobility M3 Head A */
 	cmap_M3B,	/* ATI Rage Mobility M3 Head B */
-	cmap_radeon	/* ATI Radeon */
+	cmap_radeon,	/* ATI Radeon */
+	cmap_gxt2000,	/* IBM GXT2000 */
 };
 
 struct fb_info_offb {
@@ -64,6 +62,7 @@ struct fb_info_offb {
     volatile unsigned char *cmap_adr;
     volatile unsigned char *cmap_data;
     int cmap_type;
+    int blanked;
     union {
 #ifdef FBCON_HAS_CFB16
 	u16 cfb16[16];
@@ -97,6 +96,10 @@ static int offb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info);
 static int offb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info);
+static int offb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			 u_int transp, struct fb_info *info);
+static int offb_blank(int blank, struct fb_info *info);
+
 #ifdef CONFIG_BOOTX_TEXT
 extern boot_infos_t *boot_infos;
 #endif
@@ -112,8 +115,6 @@ static void offb_init_fb(const char *name, const char *full_name, int width,
 
 static int offbcon_switch(int con, struct fb_info *info);
 static int offbcon_updatevar(int con, struct fb_info *info);
-static void offbcon_blank(int blank, struct fb_info *info);
-
 
     /*
      *  Internal routines
@@ -121,10 +122,6 @@ static void offbcon_blank(int blank, struct fb_info *info);
 
 static int offb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			 u_int *transp, struct fb_info *info);
-static int offb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			 u_int transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
-
 
 static struct fb_ops offb_ops = {
 	owner:		THIS_MODULE,
@@ -133,6 +130,8 @@ static struct fb_ops offb_ops = {
 	fb_set_var:	offb_set_var,
 	fb_get_cmap:	offb_get_cmap,
 	fb_set_cmap:	offb_set_cmap,
+	fb_setcolreg:	offb_setcolreg,
+	fb_blank:	offb_blank,
 };
 
     /*
@@ -210,9 +209,11 @@ static int offb_set_var(struct fb_var_screeninfo *var, int con,
 static int offb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			 struct fb_info *info)
 {
-    if (con == currcon) /* current console? */
+    struct fb_info_offb *info2 = (struct fb_info_offb *)info;
+
+    if (con == info->currcon && !info2->blanked) /* current console? */		
 	return fb_get_cmap(cmap, kspc, offb_getcolreg, info);
-    else if (fb_display[con].cmap.len) /* non default colormap? */
+    if (fb_display[con].cmap.len) /* non default colormap? */
 	fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
     else
     {
@@ -240,13 +241,76 @@ static int offb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	if ((err = fb_alloc_cmap(&fb_display[con].cmap, size, 0)))
 	    return err;
     }
-    if (con == currcon)			/* current console? */
-	return fb_set_cmap(cmap, kspc, offb_setcolreg, info);
+    if (con == info->currcon && !info2->blanked)	/* current console? */
+	return fb_set_cmap(cmap, kspc, info);
     else
 	fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
     return 0;
 }
 
+    /*
+     *  Blank the display.
+     */
+
+static int offb_blank(int blank, struct fb_info *info)
+{
+    struct fb_info_offb *info2 = (struct fb_info_offb *)info;
+    int i, j;
+
+    if (!info2->cmap_adr)
+	return 0;
+
+    if (!info2->blanked) {
+       if (!blank)
+	   return 0;
+       if (fb_display[info->currcon].cmap.len)
+   	   fb_get_cmap(&fb_display[info->currcon].cmap, 1, offb_getcolreg,info);
+    }
+
+    info2->blanked = blank;
+	
+
+    if (blank)
+	for (i = 0; i < 256; i++) {
+	    switch(info2->cmap_type) {
+	    case cmap_m64:
+	        *info2->cmap_adr = i;
+	  	mach_eieio();
+	  	for (j = 0; j < 3; j++) {
+		    *info2->cmap_data = 0;
+		    mach_eieio();
+	    	}
+	    	break;
+	    case cmap_M3A:
+	        /* Clear PALETTE_ACCESS_CNTL in DAC_CNTL */
+	    	out_le32((unsigned *)(info2->cmap_adr + 0x58),
+	    		in_le32((unsigned *)(info2->cmap_adr + 0x58)) & ~0x20);
+	    case cmap_r128:
+	    	/* Set palette index & data */
+    	        out_8(info2->cmap_adr + 0xb0, i);
+	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
+	    	break;
+	    case cmap_M3B:
+	        /* Set PALETTE_ACCESS_CNTL in DAC_CNTL */
+	    	out_le32((unsigned *)(info2->cmap_adr + 0x58),
+	    		in_le32((unsigned *)(info2->cmap_adr + 0x58)) | 0x20);
+	    	/* Set palette index & data */
+	    	out_8(info2->cmap_adr + 0xb0, i);
+	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
+	    	break;
+	    case cmap_radeon:
+    	        out_8(info2->cmap_adr + 0xb0, i);
+	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
+	    	break;
+	    case cmap_gxt2000:
+		out_le32((unsigned *)info2->cmap_adr + i, 0);
+		break;
+	    }
+	}
+    else
+	do_install_cmap(info->currcon, info);
+    return 0;	
+}
 
     /*
      *  Initialisation
@@ -449,6 +513,10 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 		info->cmap_adr = ioremap(base + 0x7ff000, 0x1000) + 0xcc0;
 		info->cmap_data = info->cmap_adr + 1;
 		info->cmap_type = cmap_m64;
+	} else if (device_is_compatible(dp, "pci1014,b7")) {
+		unsigned long regbase = dp->addrs[0].address;
+		info->cmap_adr = ioremap(regbase + 0x6000, 0x1000);
+		info->cmap_type = cmap_gxt2000;
 	}
         fix->visual = info->cmap_adr ? FB_VISUAL_PSEUDOCOLOR
 				     : FB_VISUAL_STATIC_PSEUDOCOLOR;
@@ -513,7 +581,6 @@ static void __init offb_init_fb(const char *name, const char *full_name,
     disp->cmap.green = NULL;
     disp->cmap.blue = NULL;
     disp->cmap.transp = NULL;
-    disp->screen_base = ioremap(address, fix->smem_len);
     disp->visual = fix->visual;
     disp->type = fix->type;
     disp->type_aux = fix->type_aux;
@@ -568,12 +635,13 @@ static void __init offb_init_fb(const char *name, const char *full_name,
     strncat(info->info.modename, full_name, sizeof(info->info.modename));
     info->info.node = NODEV;
     info->info.fbops = &offb_ops;
+    info->info.screen_base = ioremap(address, fix->smem_len);
     info->info.disp = disp;
+    info->info.currcon = -1;	
     info->info.fontname[0] = '\0';
     info->info.changevar = NULL;
     info->info.switch_con = &offbcon_switch;
     info->info.updatevar = &offbcon_updatevar;
-    info->info.blank = &offbcon_blank;
     info->info.flags = FBINFO_FLAG_DEFAULT;
 
     for (i = 0; i < 16; i++) {
@@ -617,14 +685,15 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 #endif /* CONFIG_FB_COMPAT_XPMAC) */
 }
 
-
 static int offbcon_switch(int con, struct fb_info *info)
 {
-    /* Do we have to save the colormap? */
-    if (fb_display[currcon].cmap.len)
-	fb_get_cmap(&fb_display[currcon].cmap, 1, offb_getcolreg, info);
+    struct fb_info_offb *info2 = (struct fb_info_offb *)info;	
 
-    currcon = con;
+    /* Do we have to save the colormap? */
+    if (fb_display[info->currcon].cmap.len && !info2->blanked)
+	fb_get_cmap(&fb_display[info->currcon].cmap, 1, offb_getcolreg, info);
+
+    info->currcon = con;
     /* Install new colormap */
     do_install_cmap(con, info);
     return 0;
@@ -638,56 +707,6 @@ static int offbcon_updatevar(int con, struct fb_info *info)
 {
     /* Nothing */
     return 0;
-}
-
-    /*
-     *  Blank the display.
-     */
-
-static void offbcon_blank(int blank, struct fb_info *info)
-{
-    struct fb_info_offb *info2 = (struct fb_info_offb *)info;
-    int i, j;
-
-    if (!info2->cmap_adr)
-	return;
-
-    if (blank)
-	for (i = 0; i < 256; i++) {
-	    switch(info2->cmap_type) {
-	    case cmap_m64:
-	        *info2->cmap_adr = i;
-	  	mach_eieio();
-	  	for (j = 0; j < 3; j++) {
-		    *info2->cmap_data = 0;
-		    mach_eieio();
-	    	}
-	    	break;
-	    case cmap_M3A:
-	        /* Clear PALETTE_ACCESS_CNTL in DAC_CNTL */
-	    	out_le32((unsigned *)(info2->cmap_adr + 0x58),
-	    		in_le32((unsigned *)(info2->cmap_adr + 0x58)) & ~0x20);
-	    case cmap_r128:
-	    	/* Set palette index & data */
-    	        out_8(info2->cmap_adr + 0xb0, i);
-	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
-	    	break;
-	    case cmap_M3B:
-	        /* Set PALETTE_ACCESS_CNTL in DAC_CNTL */
-	    	out_le32((unsigned *)(info2->cmap_adr + 0x58),
-	    		in_le32((unsigned *)(info2->cmap_adr + 0x58)) | 0x20);
-	    	/* Set palette index & data */
-	    	out_8(info2->cmap_adr + 0xb0, i);
-	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
-	    	break;
-	    case cmap_radeon:
-    	        out_8(info2->cmap_adr + 0xb0, i);
-	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
-	    	break;
-	    }
-	}
-    else
-	do_install_cmap(currcon, info);
 }
 
     /*
@@ -769,6 +788,10 @@ static int offb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
   	out_le32((unsigned *)(info2->cmap_adr + 0xb4),
     		(red << 16 | green << 8 | blue));
 	break;
+    case cmap_gxt2000:
+	out_le32((unsigned *)info2->cmap_adr + regno,
+		(red << 16 | green << 8 | blue));
+	break;
     }
 
     if (regno < 16)
@@ -789,20 +812,6 @@ static int offb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
        }
 
     return 0;
-}
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-    if (con != currcon)
-	return;
-    if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, offb_setcolreg, info);
-    else
-    {
-	int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-	fb_set_cmap(fb_default_cmap(size), 1, offb_setcolreg, info);
-    }
 }
 
 MODULE_LICENSE("GPL");

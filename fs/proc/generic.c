@@ -304,16 +304,21 @@ int proc_readdir(struct file * filp,
 	unsigned int ino;
 	int i;
 	struct inode *inode = filp->f_dentry->d_inode;
+	int ret = 0;
+
+	lock_kernel();
 
 	ino = inode->i_ino;
 	de = PDE(inode);
-	if (!de)
-		return -EINVAL;
+	if (!de) {
+		ret = -EINVAL;
+		goto out;
+	}
 	i = filp->f_pos;
 	switch (i) {
 		case 0:
 			if (filldir(dirent, ".", 1, i, ino, DT_DIR) < 0)
-				return 0;
+				goto out;
 			i++;
 			filp->f_pos++;
 			/* fall through */
@@ -321,7 +326,7 @@ int proc_readdir(struct file * filp,
 			if (filldir(dirent, "..", 2, i,
 				    parent_ino(filp->f_dentry),
 				    DT_DIR) < 0)
-				return 0;
+				goto out;
 			i++;
 			filp->f_pos++;
 			/* fall through */
@@ -329,8 +334,10 @@ int proc_readdir(struct file * filp,
 			de = de->subdir;
 			i -= 2;
 			for (;;) {
-				if (!de)
-					return 1;
+				if (!de) {
+					ret = 1;
+					goto out;
+				}
 				if (!i)
 					break;
 				de = de->next;
@@ -340,12 +347,14 @@ int proc_readdir(struct file * filp,
 			do {
 				if (filldir(dirent, de->name, de->namelen, filp->f_pos,
 					    de->low_ino, de->mode >> 12) < 0)
-					return 0;
+					goto out;
 				filp->f_pos++;
 				de = de->next;
 			} while (de);
 	}
-	return 1;
+	ret = 1;
+out:	unlock_kernel();
+	return ret;	
 }
 
 /*

@@ -96,7 +96,10 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 				| RH_PS_OCIC | RH_PS_PRSC;
 		if (status) {
 			changed = 1;
-			set_bit (i + 1, buf);
+			if (i < 7)
+			    buf [0] |= 1 << (i + 1);
+			else
+			    buf [1] |= 1 << (i - 7);
 		}
 	}
 	return changed ? length : 0;
@@ -151,12 +154,10 @@ static int ohci_hub_control (
 	u16		wLength
 ) {
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
-	int		ports;
+	int		ports = hcd->self.root_hub->maxchild;
 	u32		temp;
 	int		retval = 0;
 
-	// if (port request)
-		ports = roothub_a (ohci) & RH_A_NDP; 
 	switch (typeReq) {
 	case ClearHubFeature:
 		switch (wValue) {

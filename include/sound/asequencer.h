@@ -24,7 +24,6 @@
 
 #ifndef __KERNEL__
 #include <linux/ioctl.h>
-#include <sys/ipc.h>
 #endif
 
 #include <sound/asound.h>
@@ -110,7 +109,7 @@
  * event data type = sndrv_seq_connect_t
  */
 #define SNDRV_SEQ_EVENT_PORT_SUBSCRIBED	66	/* ports connected */
-#define SNDRV_SEQ_EVENT_PORT_UNSUBSCRIBED	67	/* ports disconnected */
+#define SNDRV_SEQ_EVENT_PORT_UNSUBSCRIBED 67	/* ports disconnected */
 
 /** synthesizer events
  * event data type = sndrv_seq_eve_sample_control_t
@@ -153,13 +152,13 @@
 #define SNDRV_SEQ_EVENT_INSTR_STATUS_RESULT 108	/* result */
 #define SNDRV_SEQ_EVENT_INSTR_PUT	109	/* put instrument to port */
 #define SNDRV_SEQ_EVENT_INSTR_GET	110	/* get instrument from port */
-#define SNDRV_SEQ_EVENT_INSTR_GET_RESULT	111	/* result */
+#define SNDRV_SEQ_EVENT_INSTR_GET_RESULT 111	/* result */
 #define SNDRV_SEQ_EVENT_INSTR_FREE	112	/* free instrument(s) */
 #define SNDRV_SEQ_EVENT_INSTR_LIST	113	/* instrument list */
 #define SNDRV_SEQ_EVENT_INSTR_LIST_RESULT 114	/* result */
 #define SNDRV_SEQ_EVENT_INSTR_CLUSTER	115	/* cluster parameters */
-#define SNDRV_SEQ_EVENT_INSTR_CLUSTER_GET	116	/* get cluster parameters */
-#define SNDRV_SEQ_EVENT_INSTR_CLUSTER_RESULT 117	/* result */
+#define SNDRV_SEQ_EVENT_INSTR_CLUSTER_GET 116	/* get cluster parameters */
+#define SNDRV_SEQ_EVENT_INSTR_CLUSTER_RESULT 117 /* result */
 #define SNDRV_SEQ_EVENT_INSTR_CHANGE	118	/* instrument change */
 /* 119-129: reserved */
 
@@ -175,18 +174,6 @@
 #define SNDRV_SEQ_EVENT_USR_VAR2	137
 #define SNDRV_SEQ_EVENT_USR_VAR3	138
 #define SNDRV_SEQ_EVENT_USR_VAR4	139
-
-/* 140-149: IPC shared memory events (*NOT SUPPORTED YET*)
- * event data type = sndrv_seq_ev_ipcshm
- * (SNDRV_SEQ_EVENT_LENGTH_VARIPC must be set)
- */
-#define SNDRV_SEQ_EVENT_IPCSHM		140
-/* 141-144: reserved */
-#define SNDRV_SEQ_EVENT_USR_VARIPC0	145
-#define SNDRV_SEQ_EVENT_USR_VARIPC1	146
-#define SNDRV_SEQ_EVENT_USR_VARIPC2	147
-#define SNDRV_SEQ_EVENT_USR_VARIPC3	148
-#define SNDRV_SEQ_EVENT_USR_VARIPC4	149
 
 /* 150-151: kernel events with quote - DO NOT use in user clients */
 #define SNDRV_SEQ_EVENT_KERNEL_ERROR	150
@@ -232,7 +219,6 @@ struct sndrv_seq_connect {
 #define SNDRV_SEQ_EVENT_LENGTH_FIXED	(0<<2)	/* fixed event size */
 #define SNDRV_SEQ_EVENT_LENGTH_VARIABLE	(1<<2)	/* variable event size */
 #define SNDRV_SEQ_EVENT_LENGTH_VARUSR	(2<<2)	/* variable event size - user memory space */
-#define SNDRV_SEQ_EVENT_LENGTH_VARIPC	(3<<2)	/* variable event size - IPC */
 #define SNDRV_SEQ_EVENT_LENGTH_MASK	(3<<2)
 
 #define SNDRV_SEQ_PRIORITY_NORMAL	(0<<4)	/* normal priority */
@@ -269,14 +255,8 @@ struct sndrv_seq_ev_raw32 {
 
 	/* external stored data */
 struct sndrv_seq_ev_ext {
-	size_t len;		/* length of data */
+	unsigned int len;	/* length of data */
 	void *ptr;		/* pointer to data (note: maybe 64-bit) */
-};
-
-	/* external stored data - IPC shared memory */
-struct sndrv_seq_ev_ipcshm {
-	size_t len;		/* length of data */
-	key_t ipc;		/* IPC key */
 };
 
 /* Instrument cluster type */
@@ -358,7 +338,7 @@ struct sndrv_seq_result {
 
 
 struct sndrv_seq_real_time {
-	unsigned int tv_sec;		/* seconds */
+	unsigned int tv_sec;	/* seconds */
 	unsigned int tv_nsec;	/* nanoseconds */
 };
 
@@ -406,8 +386,8 @@ struct sndrv_seq_event {
 	union sndrv_seq_timestamp time;	/* schedule time */
 
 
-	struct sndrv_seq_addr source;		/* source address */
-	struct sndrv_seq_addr dest;		/* destination address */
+	struct sndrv_seq_addr source;	/* source address */
+	struct sndrv_seq_addr dest;	/* destination address */
 
 	union {				/* event data... */
 		struct sndrv_seq_ev_note note;
@@ -415,7 +395,6 @@ struct sndrv_seq_event {
 		struct sndrv_seq_ev_raw8 raw8;
 		struct sndrv_seq_ev_raw32 raw32;
 		struct sndrv_seq_ev_ext ext;
-		struct sndrv_seq_ev_ipcshm ipcshm;
 		struct sndrv_seq_ev_queue_control queue;
 		union sndrv_seq_timestamp time;
 		struct sndrv_seq_addr addr;
@@ -464,8 +443,6 @@ struct sndrv_seq_event_bounce {
 #define sndrv_seq_ev_is_instr_type(ev)	((ev)->type >= 100 && (ev)->type < 130)
 /* variable length events: 130-139 */
 #define sndrv_seq_ev_is_variable_type(ev)	((ev)->type >= 130 && (ev)->type < 140)
-/* ipc shmem events: 140-149 */
-#define sndrv_seq_ev_is_varipc_type(ev)	((ev)->type >= 140 && (ev)->type < 150)
 /* reserved for kernel */
 #define sndrv_seq_ev_is_reserved(ev)	((ev)->type >= 150)
 
@@ -483,7 +460,6 @@ struct sndrv_seq_event_bounce {
 #define sndrv_seq_ev_is_fixed(ev)		(sndrv_seq_ev_length_type(ev) == SNDRV_SEQ_EVENT_LENGTH_FIXED)
 #define sndrv_seq_ev_is_variable(ev)	(sndrv_seq_ev_length_type(ev) == SNDRV_SEQ_EVENT_LENGTH_VARIABLE)
 #define sndrv_seq_ev_is_varusr(ev)	(sndrv_seq_ev_length_type(ev) == SNDRV_SEQ_EVENT_LENGTH_VARUSR)
-#define sndrv_seq_ev_is_varipc(ev)	(sndrv_seq_ev_length_type(ev) == SNDRV_SEQ_EVENT_LENGTH_VARIPC)
 
 /* time-stamp type */
 #define sndrv_seq_ev_timestamp_type(ev)	((ev)->flags & SNDRV_SEQ_TIME_STAMP_MASK)
@@ -798,9 +774,9 @@ struct sndrv_seq_instr_info {
 	int result;			/* operation result */
 	unsigned int formats[8];	/* bitmap of supported formats */
 	int ram_count;			/* count of RAM banks */
-	sndrv_seq_instr_size_t ram_sizes[16];	/* size of RAM banks */
+	sndrv_seq_instr_size_t ram_sizes[16]; /* size of RAM banks */
 	int rom_count;			/* count of ROM banks */
-	sndrv_seq_instr_size_t rom_sizes[8];	/* size of ROM banks */
+	sndrv_seq_instr_size_t rom_sizes[8]; /* size of ROM banks */
 	char reserved[128];
 };
 
@@ -808,7 +784,7 @@ struct sndrv_seq_instr_info {
 
 struct sndrv_seq_instr_status {
 	int result;			/* operation result */
-	sndrv_seq_instr_size_t free_ram[16];	/* free RAM in banks */
+	sndrv_seq_instr_size_t free_ram[16]; /* free RAM in banks */
 	int instrument_count;		/* count of downloaded instruments */
 	char reserved[128];
 };
@@ -837,7 +813,7 @@ struct sndrv_seq_instr_data {
 	} data;
 };
 
-/* INSTR_PUT/GET, data are stored in one block (extended or IPC), header + data */
+/* INSTR_PUT/GET, data are stored in one block (extended), header + data */
 
 struct sndrv_seq_instr_header {
 	union {
@@ -849,7 +825,7 @@ struct sndrv_seq_instr_header {
 	unsigned int len;		/* real instrument data length (without header) */
 	int result;			/* operation result */
 	char reserved[16];		/* for the future */
-	struct sndrv_seq_instr_data data;	/* instrument data (for put/get result) */
+	struct sndrv_seq_instr_data data; /* instrument data (for put/get result) */
 };
 
 /* INSTR_CLUSTER_SET */
@@ -887,14 +863,14 @@ struct sndrv_seq_instr_cluster_get {
 #define SNDRV_SEQ_IOCTL_SET_PORT_INFO	_IOW ('S', 0x23, struct sndrv_seq_port_info)
 
 #define SNDRV_SEQ_IOCTL_SUBSCRIBE_PORT	_IOW ('S', 0x30, struct sndrv_seq_port_subscribe)
-#define SNDRV_SEQ_IOCTL_UNSUBSCRIBE_PORT	_IOW ('S', 0x31, struct sndrv_seq_port_subscribe)
+#define SNDRV_SEQ_IOCTL_UNSUBSCRIBE_PORT _IOW ('S', 0x31, struct sndrv_seq_port_subscribe)
 
 #define SNDRV_SEQ_IOCTL_CREATE_QUEUE	_IOWR('S', 0x32, struct sndrv_seq_queue_info)
 #define SNDRV_SEQ_IOCTL_DELETE_QUEUE	_IOW ('S', 0x33, struct sndrv_seq_queue_info)
 #define SNDRV_SEQ_IOCTL_GET_QUEUE_INFO	_IOWR('S', 0x34, struct sndrv_seq_queue_info)
 #define SNDRV_SEQ_IOCTL_SET_QUEUE_INFO	_IOWR('S', 0x35, struct sndrv_seq_queue_info)
 #define SNDRV_SEQ_IOCTL_GET_NAMED_QUEUE	_IOWR('S', 0x36, struct sndrv_seq_queue_info)
-#define SNDRV_SEQ_IOCTL_GET_QUEUE_STATUS	_IOWR('S', 0x40, struct sndrv_seq_queue_status)
+#define SNDRV_SEQ_IOCTL_GET_QUEUE_STATUS _IOWR('S', 0x40, struct sndrv_seq_queue_status)
 #define SNDRV_SEQ_IOCTL_GET_QUEUE_TEMPO	_IOWR('S', 0x41, struct sndrv_seq_queue_tempo)
 #define SNDRV_SEQ_IOCTL_SET_QUEUE_TEMPO	_IOW ('S', 0x42, struct sndrv_seq_queue_tempo)
 #define SNDRV_SEQ_IOCTL_GET_QUEUE_OWNER	_IOWR('S', 0x43, struct sndrv_seq_queue_owner)

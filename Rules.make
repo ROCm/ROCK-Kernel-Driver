@@ -19,7 +19,6 @@ unexport SUB_DIRS
 unexport ALL_SUB_DIRS
 unexport MOD_SUB_DIRS
 unexport O_TARGET
-unexport ALL_MOBJS
 
 unexport obj-y
 unexport obj-m
@@ -32,6 +31,12 @@ unexport subdir-n
 unexport subdir-
 
 comma	:= ,
+
+#
+# When an object is listed to be built compiled-in and modular,
+# only build the compiled-in version
+#
+obj-m := $(filter-out $(obj-y),$(obj-m))
 
 #
 # Get things started.
@@ -182,37 +187,34 @@ endif
 #
 # A rule to make modules
 #
-ALL_MOBJS = $(filter-out $(obj-y), $(obj-m))
-ifneq "$(strip $(ALL_MOBJS))" ""
+ifneq "$(strip $(obj-m))" ""
 MOD_DESTDIR := $(shell $(CONFIG_SHELL) $(TOPDIR)/scripts/pathdown.sh)
 endif
 
-unexport MOD_DIRS
-MOD_DIRS := $(MOD_SUB_DIRS) $(MOD_IN_SUB_DIRS)
-ifneq "$(strip $(MOD_DIRS))" ""
-.PHONY: $(patsubst %,_modsubdir_%,$(MOD_DIRS))
-$(patsubst %,_modsubdir_%,$(MOD_DIRS)) : dummy
+ifneq "$(strip $(MOD_SUB_DIRS))" ""
+.PHONY: $(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS))
+$(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS)) : dummy
 	$(MAKE) -C $(patsubst _modsubdir_%,%,$@) modules
 
-.PHONY: $(patsubst %,_modinst_%,$(MOD_DIRS))
-$(patsubst %,_modinst_%,$(MOD_DIRS)) : dummy
+.PHONY: $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
+$(patsubst %,_modinst_%,$(MOD_SUB_DIRS)) : dummy
 	$(MAKE) -C $(patsubst _modinst_%,%,$@) modules_install
 endif
 
 .PHONY: modules
-modules: $(ALL_MOBJS) dummy \
-	 $(patsubst %,_modsubdir_%,$(MOD_DIRS))
+modules: $(obj-m) dummy \
+	 $(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS))
 
 .PHONY: _modinst__
 _modinst__: dummy
-ifneq "$(strip $(ALL_MOBJS))" ""
+ifneq "$(strip $(obj-m))" ""
 	mkdir -p $(MODLIB)/kernel/$(MOD_DESTDIR)
-	cp $(ALL_MOBJS) $(MODLIB)/kernel/$(MOD_DESTDIR)$(MOD_TARGET)
+	cp $(obj-m) $(MODLIB)/kernel/$(MOD_DESTDIR)
 endif
 
 .PHONY: modules_install
 modules_install: _modinst__ \
-	 $(patsubst %,_modinst_%,$(MOD_DIRS))
+	 $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
 
 #
 # A rule to do nothing
@@ -304,7 +306,8 @@ $(TOPDIR)/include/linux/modversions.h:
 endif # CONFIG_MODVERSIONS
 
 ifneq "$(strip $(export-objs))" ""
-$(export-objs): $(export-objs:.o=.c) $(TOPDIR)/include/linux/modversions.h
+$(export-objs): $(TOPDIR)/include/linux/modversions.h
+$(export-objs): %.o: %.c
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(CFLAGS_$@) -DEXPORT_SYMTAB -c $(@:.o=.c)
 	@ ( \
 	    echo 'ifeq ($(strip $(subst $(comma),:,$(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -DEXPORT_SYMTAB)),$$(strip $$(subst $$(comma),:,$$(CFLAGS) $$(EXTRA_CFLAGS) $$(CFLAGS_$@) -DEXPORT_SYMTAB)))' ; \

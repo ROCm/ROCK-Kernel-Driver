@@ -1464,7 +1464,7 @@ static int gdth_update_timeout(int hanum, Scsi_Cmnd *scp, int timeout)
             timer_table[SCSI_TIMER].expires = jiffies + timeout;
             timer_active |= 1 << SCSI_TIMER;
         } else {
-            if (jiffies + timeout < timer_table[SCSI_TIMER].expires)
+            if (time_before(jiffies + timeout, timer_table[SCSI_TIMER].expires))
                 timer_table[SCSI_TIMER].expires = jiffies + timeout;
         }
     }

@@ -30,12 +30,10 @@
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <asm/ppcdebug.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/pci_dma.h>
 #include <asm/machdep.h>
-#ifdef CONFIG_PPC_EEH
 #include <asm/eeh.h>
-#endif
 
 #include "pci.h"
 
@@ -61,13 +59,11 @@ void        fixup_resources(struct pci_dev* dev);
 void   iSeries_pcibios_init(void);
 void   pSeries_pcibios_init(void);
 
-
-extern struct Naca *naca;
-
-int pci_assign_all_busses = 0;
-
+int    pci_assign_all_busses = 0;
 struct pci_controller* hose_head;
 struct pci_controller** hose_tail = &hose_head;
+
+LIST_HEAD(iSeries_Global_Device_List);
 
 /*******************************************************************
  * Counters and control flags. 
@@ -517,7 +513,6 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 {
 	struct pci_controller *phb = PCI_GET_PHB_PTR(bus);
 	struct resource *res;
-	unsigned long io_offset;
 	int i;
 
 #ifndef CONFIG_PPC_ISERIES
@@ -549,23 +544,23 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 				/* Transparent resource -- don't try to "fix" it. */
 				continue;
 			}
-#ifdef CONFIG_PPC_EEH
-			if (res->flags & (IORESOURCE_IO|IORESOURCE_MEM)) {
-				res->start = eeh_token(phb->global_number, bus->number, 0, 0);
-				res->end = eeh_token(phb->global_number, bus->number, 0xff, 0xffffffff);
-			}
-#else
-			if (res->flags & IORESOURCE_IO) {
-				res->start += (unsigned long)phb->io_base_virt;
-				res->end += (unsigned long)phb->io_base_virt;
-			} else if (phb->pci_mem_offset
-				   && (res->flags & IORESOURCE_MEM)) {
-				if (res->start < phb->pci_mem_offset) {
-					res->start += phb->pci_mem_offset;
-					res->end += phb->pci_mem_offset;
+			if (is_eeh_implemented()) {
+				if (res->flags & (IORESOURCE_IO|IORESOURCE_MEM)) {
+					res->start = eeh_token(phb->global_number, bus->number, 0, 0);
+					res->end = eeh_token(phb->global_number, bus->number, 0xff, 0xffffffff);
+				}
+			} else {
+				if (res->flags & IORESOURCE_IO) {
+					res->start += (unsigned long)phb->io_base_virt;
+					res->end += (unsigned long)phb->io_base_virt;
+				} else if (phb->pci_mem_offset
+					   && (res->flags & IORESOURCE_MEM)) {
+					if (res->start < phb->pci_mem_offset) {
+						res->start += phb->pci_mem_offset;
+						res->end += phb->pci_mem_offset;
+					}
 				}
 			}
-#endif
 		}
 	}
 #endif	
@@ -584,7 +579,7 @@ int pcibios_enable_device(struct pci_dev *dev)
 	int idx;
 	struct resource *r;
 
-	PPCDBG(PPCDBG_BUSWALK,"PCI: "__FUNCTION__" for device %s \n",dev->slot_name);
+	PPCDBG(PPCDBG_BUSWALK,"PCI: %s for device %s \n",__FUNCTION__,dev->slot_name);
 	if (ppc_md.pcibios_enable_device_hook)
 		if (ppc_md.pcibios_enable_device_hook(dev, 0))
 			return -EINVAL;

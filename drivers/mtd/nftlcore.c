@@ -40,7 +40,6 @@
 
 /* NFTL block device stuff */
 #define MAJOR_NR NFTL_MAJOR
-#define DEVICE_REQUEST nftl_request
 #define DEVICE_OFF(device)
 
 
@@ -54,7 +53,6 @@
  */
 
 static int nftl_sizes[256];
-static int nftl_blocksizes[256];
 
 /* .. for the Linux partition table handling. */
 struct hd_struct part_table[256];
@@ -147,7 +145,6 @@ static void NFTL_setup(struct mtd_info *mtd)
 	NFTLs[firstfree] = nftl;
 	/* Finally, set up the block device sizes */
 	nftl_sizes[firstfree * 16] = nftl->nr_sects;
-	//nftl_blocksizes[firstfree*16] = 512;
 	part_table[firstfree * 16].nr_sects = nftl->nr_sects;
 
 	nftl_gendisk.nr_real++;
@@ -1028,13 +1025,6 @@ int __init init_nftl(void)
 		return -EBUSY;
 	} else {
 		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &nftl_request);
-
-		/* set block size to 1kB each */
-		for (i = 0; i < 256; i++) {
-			nftl_blocksizes[i] = 1024;
-		}
-		blksize_size[MAJOR_NR] = nftl_blocksizes;
-
 		add_gendisk(&nftl_gendisk);
 	}
 	

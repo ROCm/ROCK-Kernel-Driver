@@ -716,20 +716,6 @@ dasd_register_major (major_info_t * major_info)
 		goto out_blk_size;
 	memset (blk_size[major], 0, (1 << MINORBITS) * sizeof (int));
 
-        /* init blksize_size */
-	blksize_size[major] =
-	    (int *) kmalloc ((1 << MINORBITS) * sizeof (int), GFP_ATOMIC);
-	if (!blksize_size[major])
-		goto out_blksize_size;
-	memset (blksize_size[major], 0, (1 << MINORBITS) * sizeof (int));
-
-        /* init_hardsect_size */
-	hardsect_size[major] =
-	    (int *) kmalloc ((1 << MINORBITS) * sizeof (int), GFP_ATOMIC);
-	if (!hardsect_size[major])
-		goto out_hardsect_size;
-	memset (hardsect_size[major], 0, (1 << MINORBITS) * sizeof (int));
-
 	/* finally do the gendisk stuff */
 	major_info->gendisk.part = kmalloc ((1 << MINORBITS) *
 					    sizeof (struct hd_struct),
@@ -748,14 +734,6 @@ dasd_register_major (major_info_t * major_info)
 
         /* error handling - free the prior allocated memory */  
       out_gendisk:
-	kfree (hardsect_size[major]);
-	hardsect_size[major] = NULL;
-
-      out_hardsect_size:
-	kfree (blksize_size[major]);
-	blksize_size[major] = NULL;
-
-      out_blksize_size:
 	kfree (blk_size[major]);
 	blk_size[major] = NULL;
 
@@ -812,8 +790,6 @@ dasd_unregister_major (major_info_t * major_info)
 	kfree (major_info->gendisk.part);
 
 	kfree (blk_size[major]);
-	kfree (blksize_size[major]);
-	kfree (hardsect_size[major]);
 
 	blk_clear(major);
 
@@ -3341,6 +3317,7 @@ dasd_setup_blkdev (dasd_device_t *device )
         device->request_queue = kmalloc(sizeof(request_queue_t),GFP_KERNEL);
         device->request_queue->queuedata = device;
         blk_init_queue (device->request_queue, do_dasd_request);
+	blk_queue_hardsect_size(device->request_queue, device->sizes.bp_block);
         elevator_init (&(device->request_queue->elevator),ELEVATOR_NOOP);
 
         for (i = 0; i < (1 << DASD_PARTN_BITS); i++) {
@@ -3350,8 +3327,6 @@ dasd_setup_blkdev (dasd_device_t *device )
                                  sizes.s2b_shift) >> 1;
                 else
                         device->major_info->gendisk.sizes[minor + i] = 0;
-                hardsect_size[major][minor + i] = device->sizes.bp_block;
-                blksize_size[major][minor + i] = device->sizes.bp_block;
 		blk_queue_max_sectors(device->request_queue,
 		 device->discipline->max_blocks << device->sizes.s2b_shift);
 		device->major_info->gendisk.part[minor+i].start_sect = 0;
@@ -3381,8 +3356,6 @@ dasd_disable_blkdev (dasd_device_t *device )
         for (i = 0; i < (1 << DASD_PARTN_BITS); i++) {
                 destroy_buffers(MKDEV(major,minor+i));
                 device->major_info->gendisk.sizes[minor + i] = 0;
-                hardsect_size[major][minor + i] = 0;
-                blksize_size[major][minor + i] = 0;
         }
         if (device->request_queue) {
             blk_cleanup_queue (device->request_queue);

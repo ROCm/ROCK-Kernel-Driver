@@ -10,32 +10,6 @@
 #include <asm/spitfire.h>
 #include <asm/pgtable.h>
 
-static __inline__ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long start,
-					  unsigned long end)
-{
-	/* Note the signed type.  */
-	long s = start, e = end, vpte_base;
-	if (s > e)
-		/* Nobody should call us with start below VM hole and end above.
-		   See if it is really true.  */
-		BUG();
-#if 0
-	/* Currently free_pgtables guarantees this.  */
-	s &= PMD_MASK;
-	e = (e + PMD_SIZE - 1) & PMD_MASK;
-#endif
-	vpte_base = (tlb_type == spitfire ?
-		     VPTE_BASE_SPITFIRE :
-		     VPTE_BASE_CHEETAH);
-	{
-		struct vm_area_struct vma;
-		vma.vm_mm = mm;
-		flush_tlb_range(&vma,
-				vpte_base + (s >> (PAGE_SHIFT - 3)),
-				vpte_base + (e >> (PAGE_SHIFT - 3)));
-	}
-}
-
 /* Page table allocation/freeing. */
 #ifdef CONFIG_SMP
 /* Sliiiicck */

@@ -144,7 +144,6 @@ static void *fm2fb_mem;
 static unsigned long fm2fb_reg_phys;
 static volatile unsigned char *fm2fb_reg;
 
-static int currcon = 0;
 static struct display disp;
 static struct fb_info fb_info;
 static struct { u_char red, green, blue, pad; } palette[16];
@@ -189,9 +188,9 @@ static int fm2fb_set_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *info);
 static int fm2fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
-static int fm2fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info);
-
+static int fm2fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			   u_int transp, struct fb_info *info);
+static int fm2fb_blank(int blank, struct fb_info *info);
 
     /*
      *  Interface to the low level console driver
@@ -200,8 +199,6 @@ static int fm2fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 int fm2fb_init(void);
 static int fm2fbcon_switch(int con, struct fb_info *info);
 static int fm2fbcon_updatevar(int con, struct fb_info *info);
-static void fm2fbcon_blank(int blank, struct fb_info *info);
-
 
     /*
      *  Internal routines
@@ -209,10 +206,6 @@ static void fm2fbcon_blank(int blank, struct fb_info *info);
 
 static int fm2fb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			   u_int *transp, struct fb_info *info);
-static int fm2fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			   u_int transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
-
 
 static struct fb_ops fm2fb_ops = {
 	owner:		THIS_MODULE,
@@ -220,7 +213,9 @@ static struct fb_ops fm2fb_ops = {
 	fb_get_var:	fm2fb_get_var,
 	fb_set_var:	fm2fb_set_var,
 	fb_get_cmap:	fm2fb_get_cmap,
-	fb_set_cmap:	fm2fb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	fm2fb_setcolreg,
+	fb_blank:	fm2fb_blank,
 };
 
     /*
@@ -291,7 +286,7 @@ static int fm2fb_set_var(struct fb_var_screeninfo *var, int con,
 static int fm2fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info)
 {
-    if (con == currcon) /* current console? */
+    if (con == info->currcon) /* current console? */
 	return fb_get_cmap(cmap, kspc, fm2fb_getcolreg, info);
     else if (fb_display[con].cmap.len) /* non default colormap? */
 	fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -299,28 +294,6 @@ static int fm2fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 	fb_copy_cmap(fb_default_cmap(256), cmap, kspc ? 0 : 2);
     return 0;
 }
-
-    /*
-     *  Set the Colormap
-     */
-
-static int fm2fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info)
-{
-    int err;
-
-    if (!fb_display[con].cmap.len) {	/* no colormap allocated? */
-	if ((err = fb_alloc_cmap(&fb_display[con].cmap, 256, 0)))
-	    return err;
-    }
-    if (con == currcon) {		/* current console? */
-	err = fb_set_cmap(cmap, kspc, fm2fb_setcolreg, info);
-	return err;
-    } else
-	fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-    return 0;
-}
-
 
     /*
      *  Initialisation
@@ -361,7 +334,7 @@ int __init fm2fb_init(void)
 	    for (x = 0; x < 96; x++) *ptr++ = 0x0000ff;	/* blue */
 	    for (x = 0; x < 96; x++) *ptr++ = 0x000000;	/* black */
 	}
-	fm2fbcon_blank(0, NULL);
+	fm2fb_blank(0, NULL);
 
 	if (fm2fb_mode == -1)
 	    fm2fb_mode = FM2FB_MODE_PAL;
@@ -383,7 +356,6 @@ int __init fm2fb_init(void)
 	disp.cmap.start = 0;
 	disp.cmap.len = 0;
 	disp.cmap.red = disp.cmap.green = disp.cmap.blue = disp.cmap.transp = NULL;
-	disp.screen_base = (char *)fm2fb_mem;
 	disp.visual = fb_fix.visual;
 	disp.type = fb_fix.type;
 	disp.type_aux = fb_fix.type_aux;
@@ -403,12 +375,13 @@ int __init fm2fb_init(void)
 	strcpy(fb_info.modename, fb_fix.id);
 	fb_info.node = NODEV;
 	fb_info.fbops = &fm2fb_ops;
+	fb_info.screen_base = (char *)fm2fb_mem;
+	fb_info.currcon = -1;
 	fb_info.disp = &disp;
 	fb_info.fontname[0] = '\0';
 	fb_info.changevar = NULL;
 	fb_info.switch_con = &fm2fbcon_switch;
 	fb_info.updatevar = &fm2fbcon_updatevar;
-	fb_info.blank = &fm2fbcon_blank;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	fm2fb_set_var(&fb_var, -1, &fb_info);
@@ -443,10 +416,10 @@ int __init fm2fb_setup(char *options)
 static int fm2fbcon_switch(int con, struct fb_info *info)
 {
     /* Do we have to save the colormap? */
-    if (fb_display[currcon].cmap.len)
-	fb_get_cmap(&fb_display[currcon].cmap, 1, fm2fb_getcolreg, info);
+    if (fb_display[info->currcon].cmap.len)
+	fb_get_cmap(&fb_display[info->currcon].cmap, 1, fm2fb_getcolreg, info);
 
-    currcon = con;
+    info->currcon = con;
     /* Install new colormap */
     do_install_cmap(con, info);
     return 0;
@@ -466,13 +439,14 @@ static int fm2fbcon_updatevar(int con, struct fb_info *info)
      *  Blank the display.
      */
 
-static void fm2fbcon_blank(int blank, struct fb_info *info)
+static int fm2fb_blank(int blank, struct fb_info *info)
 {
     unsigned char t = FRAMEMASTER_ROM;
 
     if (!blank)
 	t |= FRAMEMASTER_ENABLE | FRAMEMASTER_NOLACE;
     fm2fb_reg[0] = t;
+    return 0;	
 }
 
     /*
@@ -515,17 +489,6 @@ static int fm2fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
     fbcon_cfb32_cmap[regno] = (red << 16) | (green << 8) | blue;
 #endif
     return 0;
-}
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-    if (con != currcon)
-	return;
-    if (fb_display[con].cmap.len)
-	fb_set_cmap(&fb_display[con].cmap, 1, fm2fb_setcolreg, info);
-    else
-	fb_set_cmap(fb_default_cmap(256), 1, fm2fb_setcolreg, info);
 }
 
 MODULE_LICENSE("GPL");

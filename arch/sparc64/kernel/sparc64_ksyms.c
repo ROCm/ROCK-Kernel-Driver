@@ -42,6 +42,7 @@
 #include <asm/checksum.h>
 #include <asm/fpumacro.h>
 #include <asm/pgalloc.h>
+#include <asm/cacheflush.h>
 #ifdef CONFIG_SBUS
 #include <asm/sbus.h>
 #include <asm/dma.h>

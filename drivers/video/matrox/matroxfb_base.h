@@ -479,7 +479,6 @@ struct matrox_fb_info {
 	unsigned int	max_pixel_clock;
 
 	struct matrox_switch*	hw_switch;
-	int		currcon;
 	struct display*	currcon_display;
 
 	struct {

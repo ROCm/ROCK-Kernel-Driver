@@ -28,8 +28,13 @@
  * priority range is allocated to RT tasks, the 100-139
  * range is for SCHED_OTHER tasks. Priority values are
  * inverted: lower p->prio value means higher priority.
+ * 
+ * MAX_USER_RT_PRIO allows the actual maximum RT priority
+ * to be separate from the value exported to user-space.
+ * NOTE: MAX_RT_PRIO must not be smaller than MAX_USER_RT_PRIO.
  */
 #define MAX_RT_PRIO		100
+#define MAX_USER_RT_PRIO	100
 #define MAX_PRIO		(MAX_RT_PRIO + 40)
 
 /*
@@ -1071,7 +1076,7 @@ asmlinkage long sys_nice(int increment)
  */
 int task_prio(task_t *p)
 {
-	return p->prio - 100;
+	return p->prio - MAX_USER_RT_PRIO;
 }
 
 int task_nice(task_t *p)
@@ -1137,7 +1142,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 	 * priority for SCHED_OTHER is 0.
 	 */
 	retval = -EINVAL;
-	if (lp.sched_priority < 0 || lp.sched_priority > 99)
+	if (lp.sched_priority < 0 || lp.sched_priority > MAX_USER_RT_PRIO-1)
 		goto out_unlock;
 	if ((policy == SCHED_OTHER) != (lp.sched_priority == 0))
 		goto out_unlock;
@@ -1157,7 +1162,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 	p->policy = policy;
 	p->rt_priority = lp.sched_priority;
 	if (policy != SCHED_OTHER)
-		p->prio = 99 - p->rt_priority;
+		p->prio = MAX_USER_RT_PRIO-1 - p->rt_priority;
 	else
 		p->prio = p->static_prio;
 	if (array)
@@ -1237,7 +1242,7 @@ out_unlock:
 /**
  * sys_sched_setaffinity - set the cpu affinity of a process
  * @pid: pid of the process
- * @len: length of the bitmask pointed to by user_mask_ptr
+ * @len: length in bytes of the bitmask pointed to by user_mask_ptr
  * @user_mask_ptr: user-space pointer to the new cpu mask
  */
 asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
@@ -1289,7 +1294,7 @@ out_unlock:
 /**
  * sys_sched_getaffinity - get the cpu affinity of a process
  * @pid: pid of the process
- * @len: length of the bitmask pointed to by user_mask_ptr
+ * @len: length in bytes of the bitmask pointed to by user_mask_ptr
  * @user_mask_ptr: user-space pointer to hold the current cpu mask
  */
 asmlinkage int sys_sched_getaffinity(pid_t pid, unsigned int len,
@@ -1371,7 +1376,7 @@ asmlinkage long sys_sched_get_priority_max(int policy)
 	switch (policy) {
 	case SCHED_FIFO:
 	case SCHED_RR:
-		ret = 99;
+		ret = MAX_USER_RT_PRIO-1;
 		break;
 	case SCHED_OTHER:
 		ret = 0;
@@ -1511,6 +1516,12 @@ void show_state(void)
 	read_unlock(&tasklist_lock);
 }
 
+/*
+ * double_rq_lock - safely lock two runqueues
+ *
+ * Note this does not disable interrupts like task_rq_lock,
+ * you need to do so manually before calling.
+ */
 static inline void double_rq_lock(runqueue_t *rq1, runqueue_t *rq2)
 {
 	if (rq1 == rq2)
@@ -1526,6 +1537,12 @@ static inline void double_rq_lock(runqueue_t *rq1, runqueue_t *rq2)
 	}
 }
 
+/*
+ * double_rq_unlock - safely unlock two runqueues
+ *
+ * Note this does not restore interrupts like task_rq_unlock,
+ * you need to do so manually after calling.
+ */
 static inline void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
 {
 	spin_unlock(&rq1->lock);
@@ -1675,7 +1692,7 @@ out:
 static int migration_thread(void * bind_cpu)
 {
 	int cpu = cpu_logical_map((int) (long) bind_cpu);
-	struct sched_param param = { sched_priority: 99 };
+	struct sched_param param = { sched_priority: MAX_RT_PRIO-1 };
 	runqueue_t *rq;
 	int ret;
 
@@ -1760,7 +1777,7 @@ void __init migration_init(void)
 	current->cpus_allowed = -1L;
 
 	for (cpu = 0; cpu < smp_num_cpus; cpu++)
-		while (!cpu_rq(cpu)->migration_thread)
+		while (!cpu_rq(cpu_logical_map(cpu))->migration_thread)
 			schedule_timeout(2);
 }
 #endif

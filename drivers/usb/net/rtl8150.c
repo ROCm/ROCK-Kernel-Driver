@@ -309,7 +309,7 @@ static void read_bulk_callback(struct urb *urb)
 	case 0:
 		break;
 	case -ENOENT:
-		return;	/* urb's in unlink state */
+		return;	/* the urb is in unlink state */
 	case -ETIMEDOUT:
 		warn("reset needed may be?..");
 		goto goon;
@@ -318,12 +318,8 @@ static void read_bulk_callback(struct urb *urb)
 		goto goon;
 	}
 
-	tasklet_schedule(&dev->tl);
-
-	if (!dev->rx_skb) {
-		/* lost packets++ */
-		return;
-	}
+	if (!dev->rx_skb)
+		goto resched;
 
 	res = urb->actual_length;
 	rx_stat = le16_to_cpu(*(short *)(urb->transfer_buffer + res - 4));
@@ -336,10 +332,8 @@ static void read_bulk_callback(struct urb *urb)
 	dev->stats.rx_bytes += pkt_len;
 	
 	skb = pull_skb(dev);
-	if (!skb) {
-		dev->rx_skb = NULL;
-		return;
-	}
+	if (!skb)
+		goto resched;
 
 	skb->dev = netdev;
 	skb_reserve(skb, 2);
@@ -347,10 +341,16 @@ static void read_bulk_callback(struct urb *urb)
 goon:
 	FILL_BULK_URB(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
 		      dev->rx_skb->data, RTL8150_MTU, read_bulk_callback, dev);
-	if (usb_submit_urb(dev->rx_urb, GFP_ATOMIC))
+	if (usb_submit_urb(dev->rx_urb, GFP_ATOMIC)) {
 		set_bit(RX_URB_FAIL, &dev->flags);
-	else
+		goto resched;
+	} else {
 		clear_bit(RX_URB_FAIL, &dev->flags);
+	}
+
+	return;
+resched:
+	tasklet_schedule(&dev->tl);
 }
 
 static void rx_fixup(unsigned long data)
@@ -362,22 +362,24 @@ static void rx_fixup(unsigned long data)
 
 	fill_skb_pool(dev);
 	if (test_bit(RX_URB_FAIL, &dev->flags))
-		goto try_again;
-	if (dev->rx_skb)
-		return;
-	if (!(skb = pull_skb(dev))) {
-		tasklet_schedule(&dev->tl);
-		return;
-	}
+		if (dev->rx_skb)
+			goto try_again;
+	if (!(skb = pull_skb(dev)))
+		goto tlsched;
 	dev->rx_skb = skb;
 	FILL_BULK_URB(dev->rx_urb, dev->udev, usb_rcvbulkpipe(dev->udev, 1),
 		      dev->rx_skb->data, RTL8150_MTU, read_bulk_callback, dev);
 try_again:
 	if (usb_submit_urb(dev->rx_urb, GFP_ATOMIC)) {
 		set_bit(RX_URB_FAIL, &dev->flags);
-		tasklet_schedule(&dev->tl);
-	 } else
+		goto tlsched;
+	 } else {
 		clear_bit(RX_URB_FAIL, &dev->flags);
+	}
+
+	return;
+tlsched:
+	tasklet_schedule(&dev->tl);
 }
 
 static void write_bulk_callback(struct urb *urb)

@@ -17,6 +17,7 @@
 #include <linux/fs.h>
 #include <linux/qnx4_fs.h>
 #include <linux/stat.h>
+#include <linux/smp_lock.h>
 
 
 static int qnx4_readdir(struct file *filp, void *dirent, filldir_t filldir)
@@ -32,6 +33,8 @@ static int qnx4_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 	QNX4DEBUG(("qnx4_readdir:i_size = %ld\n", (long) inode->i_size));
 	QNX4DEBUG(("filp->f_pos         = %ld\n", (long) filp->f_pos));
+
+	lock_kernel();
 
 	while (filp->f_pos < inode->i_size) {
 		blknum = qnx4_block_map( inode, filp->f_pos >> QNX4_BLOCK_SIZE_BITS );
@@ -63,7 +66,7 @@ static int qnx4_readdir(struct file *filp, void *dirent, filldir_t filldir)
 					}
 					if (filldir(dirent, de->di_fname, size, filp->f_pos, ino, DT_UNKNOWN) < 0) {
 						brelse(bh);
-						return 0;
+						goto out;
 					}
 				}
 			}
@@ -74,6 +77,8 @@ static int qnx4_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	}
 	UPDATE_ATIME(inode);
 
+out:
+	unlock_kernel();
 	return 0;
 }
 

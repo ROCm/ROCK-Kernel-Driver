@@ -24,7 +24,6 @@
 #include <video/fbcon-cfb16.h>
 
 static u16 colreg[16];
-static int currcon = 0;
 static struct fb_info fb_info;
 static struct display display;
 
@@ -118,7 +117,7 @@ static int
 anakinfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info)
 {
-	if (con == currcon)
+	if (con == info->currcon)
 		return fb_get_cmap(cmap, kspc, anakinfb_getcolreg, info);
 	else if (fb_display[con].cmap.len)
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -128,26 +127,9 @@ anakinfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 }
 
 static int
-anakinfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			struct fb_info *info)
-{
-	int err;
-
-	if (!fb_display[con].cmap.len) {
-		if ((err = fb_alloc_cmap(&fb_display[con].cmap, 16, 0)))
-			return err;
-	}
-	if (con == currcon)
-		return fb_set_cmap(cmap, kspc, anakinfb_setcolreg, info);
-	else
-		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-	return 0;
-}
-
-static int
 anakinfb_switch_con(int con, struct fb_info *info)
 { 
-	currcon = con;
+	info->currcon = con;
 	return 0;
 
 }
@@ -172,7 +154,9 @@ static struct fb_ops anakinfb_ops = {
 	fb_get_var:	anakinfb_get_var,
 	fb_set_var:	anakinfb_set_var,
 	fb_get_cmap:	anakinfb_get_cmap,
-	fb_set_cmap:	anakinfb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	anakinfb_setcolreg,
+	fb_blank:	anakinfb_blank,
 };
 
 int __init
@@ -180,19 +164,24 @@ anakinfb_init(void)
 {
 	memset(&fb_info, 0, sizeof(struct fb_info));
 	strcpy(fb_info.modename, "AnakinFB");
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	fb_info.fbops = &anakinfb_ops;
+	fb_info.currcon = -1;
 	fb_info.disp = &display;
 	strcpy(fb_info.fontname, "VGA8x16");
 	fb_info.changevar = NULL;
 	fb_info.switch_con = &anakinfb_switch_con;
 	fb_info.updatevar = &anakinfb_updatevar;
-	fb_info.blank = &anakinfb_blank;
 
 	memset(&display, 0, sizeof(struct display));
 	anakinfb_get_var(&display.var, 0, &fb_info);
-	display.screen_base = ioremap(VGA_START, VGA_SIZE);
+	if (!(request_mem_region(VGA_START, VGA_SIZE, "vga")))
+		return -ENOMEM;
+	if (!(fb_info.screen_base = ioremap(VGA_START, VGA_SIZE))) {
+		release_mem_region(VGA_START, VGA_SIZE);
+		return -EIO;
+	}
 	display.visual = FB_VISUAL_TRUECOLOR;
 	display.type = FB_TYPE_PACKED_PIXELS;
 	display.type_aux = 0;
@@ -209,8 +198,11 @@ anakinfb_init(void)
 	display.dispsw = &fbcon_dummy;
 #endif
 
-	if (register_framebuffer(&fb_info) < 0)
+	if (register_framebuffer(&fb_info) < 0) {
+		iounmap(fb_info.screen_base);
+		release_mem_region(VGA_START, VGA_SIZE);
 		return -EINVAL;
+	}
 
 	MOD_INC_USE_COUNT;
 	return 0;

@@ -45,24 +45,24 @@ void fbcon_ilbm_bmove(struct display *p, int sy, int sx, int dy, int dx,
 		      int height, int width)
 {
     if (sx == 0 && dx == 0 && width == p->next_plane)
-	fb_memmove(p->screen_base+dy*fontheight(p)*p->next_line,
-		  p->screen_base+sy*fontheight(p)*p->next_line,
+	fb_memmove(p->fb_info->screen_base+dy*fontheight(p)*p->next_line,
+		  p->fb_info->screen_base+sy*fontheight(p)*p->next_line,
 		  height*fontheight(p)*p->next_line);
     else {
 	u8 *src, *dest;
 	u_int i;
 
 	if (dy <= sy) {
-	    src = p->screen_base+sy*fontheight(p)*p->next_line+sx;
-	    dest = p->screen_base+dy*fontheight(p)*p->next_line+dx;
+	    src = p->fb_info->screen_base+sy*fontheight(p)*p->next_line+sx;
+	    dest = p->fb_info->screen_base+dy*fontheight(p)*p->next_line+dx;
 	    for (i = p->var.bits_per_pixel*height*fontheight(p); i--;) {
 		fb_memmove(dest, src, width);
 		src += p->next_plane;
 		dest += p->next_plane;
 	    }
 	} else {
-	    src = p->screen_base+(sy+height)*fontheight(p)*p->next_line+sx;
-	    dest = p->screen_base+(dy+height)*fontheight(p)*p->next_line+dx;
+	    src = p->fb_info->screen_base+(sy+height)*fontheight(p)*p->next_line+sx;
+	    dest = p->fb_info->screen_base+(dy+height)*fontheight(p)*p->next_line+dx;
 	    for (i = p->var.bits_per_pixel*height*fontheight(p); i--;) {
 		src -= p->next_plane;
 		dest -= p->next_plane;
@@ -79,7 +79,7 @@ void fbcon_ilbm_clear(struct vc_data *conp, struct display *p, int sy, int sx,
     u_int i, rows;
     int bg, bg0;
 
-    dest = p->screen_base+sy*fontheight(p)*p->next_line+sx;
+    dest = p->fb_info->screen_base+sy*fontheight(p)*p->next_line+sx;
 
     bg0 = attr_bgcol_ec(p,conp);
     for (rows = height*fontheight(p); rows--;) {
@@ -102,7 +102,7 @@ void fbcon_ilbm_putc(struct vc_data *conp, struct display *p, int c, int yy,
     u8 d;
     int fg0, bg0, fg, bg;
 
-    dest = p->screen_base+yy*fontheight(p)*p->next_line+xx;
+    dest = p->fb_info->screen_base+yy*fontheight(p)*p->next_line+xx;
     cdat = p->fontdata+(c&p->charmask)*fontheight(p);
     fg0 = attr_fgcol(p,c);
     bg0 = attr_bgcol(p,c);
@@ -153,7 +153,7 @@ void fbcon_ilbm_putcs(struct vc_data *conp, struct display *p,
     u32 d;
     int fg0, bg0, fg, bg;
 
-    dest0 = p->screen_base+yy*fontheight(p)*p->next_line+xx;
+    dest0 = p->fb_info->screen_base+yy*fontheight(p)*p->next_line+xx;
     c1 = scr_readw(s);
     fg0 = attr_fgcol(p, c1);
     bg0 = attr_bgcol(p, c1);
@@ -235,7 +235,7 @@ void fbcon_ilbm_revc(struct display *p, int xx, int yy)
     u_int rows, i;
     int mask;
 
-    dest0 = p->screen_base+yy*fontheight(p)*p->next_line+xx;
+    dest0 = p->fb_info->screen_base+yy*fontheight(p)*p->next_line+xx;
     mask = p->fgcol ^ p->bgcol;
 
     /*

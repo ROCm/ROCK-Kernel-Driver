@@ -130,14 +130,14 @@ UNUSUAL_DEV(  0x04e6, 0x0003, 0x0000, 0x9999,
 		"ImageMate SDDR09",
 		US_SC_SCSI, US_PR_EUSB_SDDR09, NULL,
 		US_FL_SINGLE_LUN | US_FL_START_STOP ),
-#endif
 
 /* This entry is from Andries.Brouwer@cwi.nl */
 UNUSUAL_DEV(  0x04e6, 0x0005, 0x0100, 0x0208,
 		"SCM Microsystems",
 		"eUSB SmartMedia / CompactFlash Adapter",
-		US_SC_SCSI, US_PR_DPCM_USB, NULL, 
+		US_SC_SCSI, US_PR_DPCM_USB, sddr09_init, 
 		US_FL_START_STOP), 
+#endif
 
 UNUSUAL_DEV(  0x04e6, 0x0006, 0x0100, 0x0205, 
 		"Shuttle",

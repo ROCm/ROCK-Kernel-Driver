@@ -181,9 +181,7 @@ MODULE_PARM(drive3,"1-6i");
 
 #define MAJOR_NR	major
 #define DEVICE_NAME "PCD"
-#define DEVICE_REQUEST do_pcd_request
 #define DEVICE_NR(device) (minor(device))
-#define DEVICE_ON(device)
 #define DEVICE_OFF(device)
 
 #include <linux/blk.h>
@@ -224,8 +222,6 @@ static void 	pcd_probe_capabilities(void);
 static void     do_pcd_read_drq(void);
 static void 	do_pcd_request(request_queue_t * q);
 static void 	do_pcd_read(void);
-
-static int pcd_blocksizes[PCD_UNITS];
 
 struct pcd_unit {
 	struct pi_adapter pia;		/* interface to paride layer */
@@ -357,10 +353,7 @@ int pcd_init (void)	/* preliminary initialisation */
 		}
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &pcd_lock);
-
-	for (i=0;i<PCD_UNITS;i++) pcd_blocksizes[i] = 1024;
-        blksize_size[MAJOR_NR] = pcd_blocksizes;
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_pcd_request, &pcd_lock);
 
 	return 0;
 }

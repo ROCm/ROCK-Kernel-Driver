@@ -3,8 +3,6 @@
 
 #include <linux/threads.h>
 #include <asm/processor.h>
-#include <asm/Naca.h>
-#include <asm/Paca.h>
 
 /*
  * This program is free software; you can redistribute it and/or

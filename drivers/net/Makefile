@@ -18,7 +18,6 @@ O_TARGET := net.o
 export-objs     :=	8390.o arlan.o aironet4500_core.o aironet4500_card.o \
 			ppp_async.o ppp_generic.o slhc.o pppox.o auto_irq.o \
 			net_init.o mii.o
-list-multi	:=	rcpci.o
 rcpci-objs	:=	rcpci45.o rclanmtl.o
 
 ifeq ($(CONFIG_E100),y)
@@ -42,7 +41,7 @@ subdir-$(CONFIG_TR) += tokenring
 subdir-$(CONFIG_WAN) += wan
 subdir-$(CONFIG_NET_FC) += fc
 subdir-$(CONFIG_ARCNET) += arcnet
-subdir-$(CONFIG_APPLETALK) += appletalk
+subdir-$(CONFIG_DEV_APPLETALK) += appletalk
 subdir-$(CONFIG_SK98LIN) += sk98lin
 subdir-$(CONFIG_SKFP) += skfp
 
@@ -222,21 +221,7 @@ subdir-y	+= ../acorn/net
 obj-y		+= ../acorn/net/acorn-net.o
 endif
 
-#
-# HIPPI adapters
-#
-
-ifneq ($(ARCH),s390)
-ifneq ($(ARCH),s390x)
-obj-y += auto_irq.o
-endif
-endif
-
 include $(TOPDIR)/Rules.make
 
 clean:
 	rm -f core *.o *.a *.s
-
-rcpci.o: $(rcpci-objs)
-	$(LD) -r -o $@ $(rcpci-objs)
-

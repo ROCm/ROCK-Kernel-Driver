@@ -556,9 +556,9 @@ L:	ext3-users@redhat.com
 S:	Maintained
 
 FARSYNC SYNCHRONOUS DRIVER
-P:	Bob Dunlop
-M:	rjd@xyzzy.clara.co.uk
-M:	bob.dunlop@farsite.co.uk
+P:	Kevin Curtis
+M:	kevin.curtis@farsite.co.uk
+M:	kevin.curtis@farsite.co.uk
 W:	http://www.farsite.co.uk/
 S:	Supported
 
@@ -737,15 +737,11 @@ L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
 IEEE 1394 SUBSYSTEM
-P:	Andreas Bombe
-M:	andreas.bombe@munich.netsurf.de
+P:	Ben Collins
+M:	bcollins@debian.org
 L:	linux1394-devel@lists.sourceforge.net
 W:	http://linux1394.sourceforge.net/
 S:	Maintained
-
-IEEE 1394 AIC5800 DRIVER
-L:	linux1394-devel@lists.sourceforge.net
-S:	Orphan
 
 IEEE 1394 OHCI DRIVER
 P:	Ben Collins
@@ -799,6 +795,12 @@ P:	Peter J. Braam
 M:	braam@clusterfs.com
 W:	http://www.inter-mezzo.org/
 L:	intermezzo-discuss@lists.sourceforge.net
+S:	Maintained
+
+IOC3 DRIVER
+P:	Ralf Baechle
+M:	ralf@oss.sgi.com
+L:	linux-mips@oss.sgi.com
 S:	Maintained
 
 IP MASQUERADING:
@@ -934,6 +936,13 @@ M:	benh@kernel.crashing.org
 W:	http://www.linuxppc.org/
 L:	linuxppc-dev@lists.linuxppc.org
 S:	Maintained
+
+LINUX FOR 64BIT POWERPC
+P:	David Engebretsen
+M:	engebret@us.ibm.com
+W:	http://linuxppc64.org
+L:	linuxppc64-dev@lists.linuxppc.org
+S:	Supported
 
 LOGICAL DISK MANAGER SUPPORT (LDM, Windows 2000/XP Dynamic Disks)
 P:	Richard Russon (FlatCap)
@@ -1137,9 +1146,10 @@ S:	Maintained
 
 NTFS FILESYSTEM
 P:	Anton Altaparmakov
-M:	aia21@cus.cam.ac.uk
+M:	aia21@cantab.net
 L:	linux-ntfs-dev@lists.sourceforge.net
 L:	linux-kernel@vger.kernel.org
+W:	http://linux-ntfs.sf.net/
 S:	Maintained
 
 NVIDIA (RIVA) FRAMEBUFFER DRIVER
@@ -1171,6 +1181,12 @@ M:	zwane@commfireservices.com
 L:	linux-sound@vger.kernel.org
 S:	Maintained
 
+ORINOCO DRIVER
+P:	David Gibson
+M:	hermes@gibson.dropbear.id.au
+W:	http://www.ozlabs.org/people/dgibson/dldwd
+S:	Maintained
+
 PARALLEL PORT SUPPORT
 P:	Phil Blundell
 M:	Philip.Blundell@pobox.com
@@ -1198,8 +1214,10 @@ L:	linux-abi-devel@lists.sourceforge.net
 S:	Maintained
 
 PCI ID DATABASE
-P:	Jens Maurer
-M:	jmaurer@cck.uni-kl.de
+P:	Martin Mares
+M:	mj@ucw.cz
+L:	pciids-devel@lists.sourceforge.net
+W:	http://pciids.sourceforge.net/
 S:	Maintained
 
 PCI SOUND DRIVERS (ES1370, ES1371 and SONICVIBES)
@@ -1387,11 +1405,11 @@ M:	mingo@redhat.com
 S:	Maintained
 
 SIS 5513 IDE CONTROLLER DRIVER
-P:      Lionel Bouton
-M:      Lionel.Bouton@inet6.fr
-W:      http://inet6.dyn.dhs.org/sponsoring/sis5513/index.html
-W:      http://gyver.homeip.net/sis5513/index.html
-S:      Maintained
+P:	Lionel Bouton
+M:	Lionel.Bouton@inet6.fr
+W:	http://inet6.dyn.dhs.org/sponsoring/sis5513/index.html
+W:	http://gyver.homeip.net/sis5513/index.html
+S:	Maintained
 
 SIS 900/7016 FAST ETHERNET DRIVER
 P:	Ollie Lho
@@ -1508,19 +1526,24 @@ M:	hch@infradead.org
 S:	Maintained
 
 TI GRAPH LINK USB (SilverLink) CABLE DRIVER
-P:     Romain Lievin
-M:     roms@lpg.ticalc.org
-P:     Julien Blache
-M:     jb@technologeek.org
-S:     Maintained
+P:	Romain Lievin
+M:	roms@lpg.ticalc.org
+P:	Julien Blache
+M:	jb@technologeek.org
+S:	Maintained
+
+TIEMAN VOYAGER USB BRAILLE DISPLAY DRIVER
+P:	Stephane Dalton
+M:	sdalton@videotron.ca
+P:	Stéphane Doyon
+M:	s.doyon@videotron.ca
+S:	Maintained
 
 TLAN NETWORK DRIVER
-P:	Torben Mathiasen
-M:	torben.mathiasen@compaq.com
-M:	torben@kernel.dk
-L:	tlan@vuser.vu.union.edu
-L:	linux-net@vger.kernel.org
-W:	http://tlan.kernel.dk
+P:	Samuel Chessman
+M:	chessman@tux.org
+L:	tlan-devel@lists.sourceforge.net
+W:	http://sourceforge.net/projects/tlan/
 S:	Maintained
 
 TOKEN-RING NETWORK DRIVER
@@ -1613,6 +1636,12 @@ USB CDC ETHERNET DRIVER
 P:	Brad Hards
 M:	bradh@frogmouth.net
 L:	linux-usb-users@lists.sourceforge.net
+L:	linux-usb-devel@lists.sourceforge.net
+S:	Maintained
+
+USB EHCI DRIVER
+P:	David Brownell
+M:	dbrownell@users.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
 
@@ -1724,7 +1753,7 @@ S:	Maintained
 USB SERIAL CYBERJACK PINPAD/E-COM DRIVER
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
-S:	Supported
+S:	Maintained
 
 USB AUERSWALD DRIVER
 P:	Wolfgang Muees

@@ -120,8 +120,8 @@ void fbcon_vga_planes_bmove(struct display *p, int sy, int sx, int dy, int dx,
 
 	if (dy < sy || (dy == sy && dx < sx)) {
 		line_ofs = p->line_length - width;
-		dest = p->screen_base + dx + dy * p->line_length;
-		src = p->screen_base + sx + sy * p->line_length;
+		dest = p->fb_info->screen_base + dx + dy * p->line_length;
+		src = p->fb_info->screen_base + sx + sy * p->line_length;
 		while (height--) {
 			for (x = 0; x < width; x++) {
 				readb(src);
@@ -134,8 +134,8 @@ void fbcon_vga_planes_bmove(struct display *p, int sy, int sx, int dy, int dx,
 		}
 	} else {
 		line_ofs = p->line_length - width;
-		dest = p->screen_base + dx + width + (dy + height - 1) * p->line_length;
-		src = p->screen_base + sx + width + (sy + height - 1) * p->line_length;
+		dest = p->fb_info->screen_base + dx + width + (dy + height - 1) * p->line_length;
+		src = p->fb_info->screen_base + sx + width + (sy + height - 1) * p->line_length;
 		while (height--) {
 			for (x = 0; x < width; x++) {
 				dest--;
@@ -167,7 +167,7 @@ void fbcon_vga_planes_clear(struct vc_data *conp, struct display *p, int sy, int
 	sy *= fontheight(p);
 	height *= fontheight(p);
 
-	where = p->screen_base + sx + sy * p->line_length;
+	where = p->fb_info->screen_base + sx + sy * p->line_length;
 	while (height--) {
 		for (x = 0; x < width; x++) {
 			writeb(0, where);
@@ -184,7 +184,7 @@ void fbcon_ega_planes_putc(struct vc_data *conp, struct display *p, int c, int y
 
 	int y;
 	u8 *cdat = p->fontdata + (c & p->charmask) * fontheight(p);
-	char *where = p->screen_base + xx + yy * p->line_length * fontheight(p);
+	char *where = p->fb_info->screen_base + xx + yy * p->line_length * fontheight(p);
 
 	setmode(0);
 	setop(0);
@@ -213,7 +213,7 @@ void fbcon_vga_planes_putc(struct vc_data *conp, struct display *p, int c, int y
 
 	int y;
 	u8 *cdat = p->fontdata + (c & p->charmask) * fontheight(p);
-	char *where = p->screen_base + xx + yy * p->line_length * fontheight(p);
+	char *where = p->fb_info->screen_base + xx + yy * p->line_length * fontheight(p);
 
 	setmode(2);
 	setop(0);
@@ -248,7 +248,7 @@ void fbcon_ega_planes_putcs(struct vc_data *conp, struct display *p, const unsig
 	selectmask();
 
 	setmask(0xff);
-	where = p->screen_base + xx + yy * p->line_length * fontheight(p);
+	where = p->fb_info->screen_base + xx + yy * p->line_length * fontheight(p);
 	writeb(bg, where);
 	rmb();
 	readb(where); /* fill latches */
@@ -289,7 +289,7 @@ void fbcon_vga_planes_putcs(struct vc_data *conp, struct display *p, const unsig
 	selectmask();
 
 	setmask(0xff);
-	where = p->screen_base + xx + yy * p->line_length * fontheight(p);
+	where = p->fb_info->screen_base + xx + yy * p->line_length * fontheight(p);
 	writeb(bg, where);
 	rmb();
 	readb(where); /* fill latches */
@@ -312,7 +312,7 @@ void fbcon_vga_planes_putcs(struct vc_data *conp, struct display *p, const unsig
 
 void fbcon_vga_planes_revc(struct display *p, int xx, int yy)
 {
-	char *where = p->screen_base + xx + yy * p->line_length * fontheight(p);
+	char *where = p->fb_info->screen_base + xx + yy * p->line_length * fontheight(p);
 	int y;
 	
 	setmode(0);

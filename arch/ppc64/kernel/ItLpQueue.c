@@ -12,7 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <asm/system.h>
-#include <asm/Paca.h>
+#include <asm/paca.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/HvLpEvent.h>
 #include <asm/iSeries/HvCallEvent.h>

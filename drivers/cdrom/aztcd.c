@@ -191,8 +191,6 @@
 #include <asm/io.h>
 
 #include <asm/uaccess.h>
-static int aztcd_blocksizes[1] = { 2048 };
-
 
 /*###########################################################################
   Defines
@@ -1925,8 +1923,8 @@ int __init aztcd_init(void)
 		       MAJOR_NR);
 		return -EIO;
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &aztSpin);
-	blksize_size[MAJOR_NR] = aztcd_blocksizes;
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_aztcd_request, &aztSpin);
+	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
 	register_disk(NULL, mk_kdev(MAJOR_NR, 0), 1, &azt_fops, 0);
 
 	if ((azt_port == 0x1f0) || (azt_port == 0x170))

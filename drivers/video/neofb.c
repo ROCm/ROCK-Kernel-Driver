@@ -423,8 +423,8 @@ static struct display_switch fbcon_neo2200_accel = {
 /*
  *    Set a single color register. Return != 0 for invalid regno.
  */
-static int neo_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			 u_int transp, struct fb_info *fb)
+static int neofb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			   u_int transp, struct fb_info *fb)
 {
   struct neofb_info *info = (struct neofb_info *)fb;
 
@@ -828,46 +828,6 @@ static void neofb_update_start (struct neofb_info *info, struct fb_var_screeninf
   VGAwGR(0x0E,(((Base >> 16) & 0x0f) | (oldExtCRTDispAddr & 0xf0)));
 
   neoLock();
-}
-
-/*
- * Set the Colormap
- */
-static int neofb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *fb)
-{
-  struct neofb_info *info = (struct neofb_info *)fb;
-  struct display* disp = (con < 0) ? fb->disp : (fb_display + con);
-  struct fb_cmap *dcmap = &disp->cmap;
-  int err = 0;
-
-  /* no colormap allocated? */
-  if (!dcmap->len)
-    {
-      int size;
-
-      if (fb->var.bits_per_pixel == 8)
-	size = NR_PALETTE;
-      else
-	size = 32;
-
-      err = fb_alloc_cmap (dcmap, size, 0);
-    }
-
-  /*
-   * we should be able to remove this test once fbcon has been
-   * "improved" --rmk
-   */
-  if (!err && con == info->currcon)
-    {
-      err = fb_set_cmap (cmap, kspc, neo_setcolreg, fb);
-      dcmap = &fb->cmap;
-    }
-
-  if (!err)
-    fb_copy_cmap (cmap, dcmap, kspc ? 0 : 1);
-
-  return err;
 }
 
 /*
@@ -1535,7 +1495,6 @@ static int neofb_set_var (struct fb_var_screeninfo *var, int con,
 
   fb->fix.line_length = display->next_line;
 
-  display->screen_base    = fb->screen_base;
   display->line_length    = fb->fix.line_length;
   display->visual         = fb->fix.visual;
   display->type	          = fb->fix.type;
@@ -1565,13 +1524,13 @@ static int neofb_set_var (struct fb_var_screeninfo *var, int con,
   if (chgvar && fb && fb->changevar)
     fb->changevar (con);
 
-  if (con == info->currcon)
+  if (con == info->fb.currcon)
     {
       if (chgvar || con < 0)
         neofb_set_par (info, &par);
 
       neofb_update_start (info, var);
-      fb_set_cmap (&fb->cmap, 1, neo_setcolreg, fb);
+      fb_set_cmap (&fb->cmap, 1, fb);
 
       if (var->accel_flags & FB_ACCELF_TEXT)
 	neo2200_accel_init (info, var);
@@ -1634,9 +1593,9 @@ static int neofb_switch (int con, struct fb_info *fb)
   struct display *disp;
   struct fb_cmap *cmap;
 
-  if (info->currcon >= 0)
+  if (info->fb.currcon >= 0)
     {
-      disp = fb_display + info->currcon;
+      disp = fb_display + info->fb.currcon;
 
       /*
        * Save the old colormap and video mode.
@@ -1646,7 +1605,7 @@ static int neofb_switch (int con, struct fb_info *fb)
 	fb_copy_cmap(&fb->cmap, &disp->cmap, 0);
     }
 
-  info->currcon = con;
+  info->fb.currcon = con;
   disp = fb_display + con;
 
   /*
@@ -1674,7 +1633,7 @@ static int neofb_switch (int con, struct fb_info *fb)
 /*
  *    (Un)Blank the display.
  */
-static void neofb_blank (int blank, struct fb_info *fb)
+static int neofb_blank (int blank, struct fb_info *fb)
 {
   //  struct neofb_info *info = (struct neofb_info *)fb;
 
@@ -1707,40 +1666,16 @@ static void neofb_blank (int blank, struct fb_info *fb)
     default: /* case 0, or anything else: unblank */
       break;
     }
-}
-
-/*
- * Get the currently displayed virtual consoles colormap.
- */
-static int gen_get_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_info *fb)
-{
-  fb_copy_cmap (&fb->cmap, cmap, kspc ? 0 : 2);
-  return 0;
-}
-
-/*
- * Get the currently displayed virtual consoles fixed part of the display.
- */
-static int gen_get_fix (struct fb_fix_screeninfo *fix, int con, struct fb_info *fb)
-{
-  *fix = fb->fix;
-  return 0;
-}
-
-/*
- * Get the current user defined part of the display.
- */
-static int gen_get_var (struct fb_var_screeninfo *var, int con, struct fb_info *fb)
-{
-  *var = fb->var;
-  return 0;
+   return 0; 	
 }
 
 static struct fb_ops neofb_ops = {
   owner:          THIS_MODULE,
   fb_set_var:     neofb_set_var,
-  fb_set_cmap:    neofb_set_cmap,
+  fb_set_cmap:    gen_set_cmap,
+  fb_setcolreg:	  neofb_setcolreg,	
   fb_pan_display: neofb_pan_display,
+  fb_blank:	  neofb_blank,	
   fb_get_fix:     gen_get_fix,
   fb_get_var:     gen_get_var,
   fb_get_cmap:    gen_get_cmap,
@@ -2099,7 +2034,7 @@ static struct neofb_info * __devinit neo_alloc_fb_info (struct pci_dev *dev,
 
   memset (info, 0, sizeof(struct neofb_info) + sizeof(struct display));
 
-  info->currcon = -1;
+  info->fb.currcon = -1;
   info->pcidev  = dev;
   info->accel   = id->driver_data;
 
@@ -2167,7 +2102,6 @@ static struct neofb_info * __devinit neo_alloc_fb_info (struct pci_dev *dev,
   info->fb.changevar      = NULL;
   info->fb.switch_con     = neofb_switch;
   info->fb.updatevar      = neofb_updatevar;
-  info->fb.blank          = neofb_blank;
   info->fb.flags          = FBINFO_FLAG_DEFAULT;
   info->fb.disp           = (struct display *)(info + 1);
   info->fb.pseudo_palette = (void *)(info->fb.disp + 1);

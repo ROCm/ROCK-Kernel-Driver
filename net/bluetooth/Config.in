@@ -9,6 +9,7 @@ if [ "$CONFIG_NET" != "n" ]; then
 
    if [ "$CONFIG_BLUEZ" != "n" ]; then
       dep_tristate 'L2CAP protocol support' CONFIG_BLUEZ_L2CAP $CONFIG_BLUEZ
+      dep_tristate 'SCO links support' CONFIG_BLUEZ_SCO $CONFIG_BLUEZ
       source drivers/bluetooth/Config.in
    fi
    endmenu

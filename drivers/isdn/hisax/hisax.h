@@ -493,7 +493,7 @@ struct BCState {
 	u_char *conmsg;
 	struct timer_list transbusy;
 	struct tq_struct tqueue;
-	int event;
+	unsigned long event;
 	int  (*BC_SetStack) (struct PStack *, struct BCState *);
 	void (*BC_Close) (struct BCState *);
 #ifdef ERROR_STATISTIC

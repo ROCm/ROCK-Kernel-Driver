@@ -41,14 +41,10 @@
 
 	4th revision: USA49W version
 
-	See usa26msg.h for description of message formats
-
-	Third revision: USA28X version (aka USA26)
-
 	Buffer formats for RX/TX data messages are not defined by
 	a structure, but are described here:
 
-	USB OUT (host -> USA26, transmit) messages contain a 
+	USB OUT (host -> USAxx, transmit) messages contain a 
 	REQUEST_ACK indicator (set to 0xff to request an ACK at the 
 	completion of transmit; 0x00 otherwise), followed by data:
 
@@ -56,17 +52,28 @@
 
 	with a total data length of 63.
 
-	USB IN (USA26 -> host, receive) messages contain either a zero
-	flag (indicating no error in any data bytes):
+	USB IN (USAxx -> host, receive) messages begin with a status
+	byte in which the 0x80 bit is either:
+				   	
+		(a)	0x80 bit clear
+			indicates that the bytes following it are all data
+			bytes:
 
-		00 DAT DAT DAT ...
+				STAT DATA DATA DATA DATA DATA ...
 
-	for a total of 63 data bytes, or a non-zero status flag (indicating 
-	that all data bytes will be preceded by status flag):
+			for a total of up to 63 DATA bytes,
 
-		STAT DAT STAT DAT STAT DAT ...
+	or:
 
-	for a total of 32 data bytes.  The valid bits in the STAT bytes are:
+		(b)	0x80 bit set
+			indiates that the bytes following alternate data and
+			status bytes:
+
+				STAT DATA STAT DATA STAT DATA STAT DATA ...
+
+			for a total of up to 32 DATA bytes.
+
+	The valid bits in the STAT bytes are:
 
 		OVERRUN	0x02
 		PARITY	0x04
@@ -75,9 +82,19 @@
 
 	Notes:
 	
-	1.	a "no status" RX data message (first byte zero) can serve as
-		a "break off" indicator.
-	2.	a control message specifying disablePort will be answered
+	(1) The OVERRUN bit can appear in either (a) or (b) format
+		messages, but the but the PARITY/FRAMING/BREAK bits
+		only appear in (b) format messages.
+	(2) For the host to determine the exact point at which the
+		overrun occurred (to identify the point in the data
+		stream at which the data was lost), it needs to count
+		128 characters, starting at the first character of the
+		message in which OVERRUN was reported; the lost character(s)
+		would have been received between the 128th and 129th
+		characters.
+	(3)	An RX data message in which the first byte has 0x80 clear
+		serves as a "break off" indicator.
+	(4)	a control message specifying disablePort will be answered
 		with a status message, but no further status will be sent
 		until a control messages with enablePort is sent
 
@@ -92,6 +109,7 @@
 	2000mar09	change to support 4 ports
 	2000may03	change external clocking to match USA-49W hardware
 	2000jun01	add extended BSD-style copyright text
+	2001jul05	change message format to improve OVERRUN case
 */
 
 #ifndef	__USA49MSG__

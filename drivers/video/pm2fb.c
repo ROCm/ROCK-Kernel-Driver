@@ -129,7 +129,7 @@ static struct {
 
 static char curblink __initdata = 1;
 
-static const struct {
+static struct {
 	char name[16];
 	struct pm2fb_par par;
 } user_mode[] __initdata = {
@@ -375,7 +375,7 @@ static void pm2fb_set_disp(const void* par, struct display* disp,
 static struct fbgen_hwswitch pm2fb_hwswitch={
 	pm2fb_detect, pm2fb_encode_fix, pm2fb_decode_var,
 	pm2fb_encode_var, pm2fb_get_par, pm2fb_set_par,
-	pm2fb_getcolreg, pm2fb_setcolreg, pm2fb_pan_display,
+	pm2fb_getcolreg, pm2fb_pan_display,
 	pm2fb_blank, pm2fb_set_disp
 };
 
@@ -385,8 +385,10 @@ static struct fb_ops pm2fb_ops={
 	fb_get_var:	fbgen_get_var,
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
-	fb_set_cmap:	fbgen_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	pm2fb_setcolreg,
 	fb_pan_display:	fbgen_pan_display,
+	fb_blank:	fbgen_blank,
 };
 
 /***************************************************************************
@@ -1809,7 +1811,7 @@ static void pm2fb_set_disp(const void* par, struct display* disp,
 
 	save_flags(flags);
 	cli();
-	disp->screen_base = i->regions.v_fb;
+	i->gen.info.screen_base = i->regions.v_fb;
 	switch (depth=((struct pm2fb_par* )par)->depth) {
 #ifdef FBCON_HAS_CFB8
 		case 8:
@@ -2087,11 +2089,10 @@ int __init pm2fb_init(void){
 	strcpy(fb_info.gen.info.fontname, pm2fb_options.font);
 	fb_info.gen.info.switch_con=&fbgen_switch;
 	fb_info.gen.info.updatevar=&fbgen_update_var;
-	fb_info.gen.info.blank=&fbgen_blank;
 	fbgen_get_var(&fb_info.disp.var, -1, &fb_info.gen.info);
 	fbgen_do_set_var(&fb_info.disp.var, 1, &fb_info.gen);
 	fbgen_set_disp(-1, &fb_info.gen);
-	fbgen_install_cmap(0, &fb_info.gen);
+	do_install_cmap(0, &fb_info.gen.info);
 	if (register_framebuffer(&fb_info.gen.info)<0) {
 		printk(KERN_ERR "pm2fb: unable to register.\n");
 		MOD_DEC_USE_COUNT;

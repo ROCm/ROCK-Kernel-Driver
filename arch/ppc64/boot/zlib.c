@@ -671,11 +671,6 @@ struct inflate_blocks_state {
 /*   load local pointers */
 #define LOAD {LOADIN LOADOUT}
 
-/*
- * The IBM 150 firmware munges the data right after _etext[].  This
- * protects it. -- Cort
- */
-local uInt protect_mask[] = {0, 0, 0, 0, 0, 0, 0, 0, 0 ,0 ,0 ,0};
 /* And'ing with mask[n] masks the lower n bits */
 local uInt inflate_mask[] = {
     0x0000,

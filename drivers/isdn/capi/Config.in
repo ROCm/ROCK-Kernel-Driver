@@ -1,0 +1,16 @@
+#
+# Config.in for the CAPI subsystem
+#
+
+bool            '  Verbose reason code reporting (kernel size +=7K)' CONFIG_ISDN_DRV_AVMB1_VERBOSE_REASON
+dep_bool        '  CAPI2.0 Middleware support (EXPERIMENTAL)' CONFIG_ISDN_CAPI_MIDDLEWARE $CONFIG_EXPERIMENTAL
+dep_tristate    '  CAPI2.0 /dev/capi support' CONFIG_ISDN_CAPI_CAPI20 $CONFIG_ISDN_CAPI
+if [ "$CONFIG_ISDN_CAPI_MIDDLEWARE" = "y" ]; then
+   dep_mbool    '    CAPI2.0 filesystem support' CONFIG_ISDN_CAPI_CAPIFS_BOOL $CONFIG_ISDN_CAPI_CAPI20
+   if [ "$CONFIG_ISDN_CAPI_CAPIFS_BOOL" = "y" ]; then
+      define_tristate CONFIG_ISDN_CAPI_CAPIFS $CONFIG_ISDN_CAPI_CAPI20
+   else
+      define_tristate CONFIG_ISDN_CAPI_CAPIFS n
+   fi
+fi
+dep_tristate    '  CAPI2.0 capidrv interface support' CONFIG_ISDN_CAPI_CAPIDRV $CONFIG_ISDN_CAPI $CONFIG_ISDN

@@ -119,8 +119,12 @@
 #define TO_READ_FROM_IRQ 		TO_DEFAULT_COMMAND
 #define TO_GET_READY			TO_DEFAULT_COMMAND
 
+#ifdef CONFIG_USB_DYNAMIC_MINORS
+#define MDC800_DEVICE_MINOR_BASE 0
+#else
 /* Minor Number of the device (create with mknod /dev/mustek c 180 32) */
 #define MDC800_DEVICE_MINOR_BASE 32
+#endif
 
 
 /**************************************************************************
@@ -176,6 +180,7 @@ struct mdc800_data
 
 	int			pic_index;	// Cache for the Imagesize (-1 for nothing cached )
 	int			pic_len;
+	int			minor;
 };
 
 
@@ -406,6 +411,7 @@ static void* mdc800_usb_probe (struct usb_device *dev ,unsigned int ifnum,
 	int i,j;
 	struct usb_interface_descriptor	*intf_desc;
 	int irq_interval=0;
+	int retval;
 
 	dbg ("(mdc800_usb_probe) called.");
 
@@ -470,6 +476,12 @@ static void* mdc800_usb_probe (struct usb_device *dev ,unsigned int ifnum,
 
 	down (&mdc800->io_lock);
 
+	retval = usb_register_dev (&mdc800_usb_driver, 1, &mdc800->minor);
+	if (retval && (retval != -ENODEV)) {
+		err ("Not able to get a minor for this device.");
+		return 0;
+	}
+
 	mdc800->dev=dev;
 	mdc800->open=0;
 
@@ -525,6 +537,8 @@ static void mdc800_usb_disconnect (struct usb_device *dev,void* ptr)
 	if (mdc800->state == NOT_CONNECTED)
 		return;
 	
+	usb_deregister_dev (&mdc800_usb_driver, 1, mdc800->minor);
+
 	mdc800->state=NOT_CONNECTED;
 
 	usb_unlink_urb (mdc800->irq_urb);
@@ -933,6 +947,7 @@ static struct usb_driver mdc800_usb_driver =
 	disconnect:	mdc800_usb_disconnect,
 	fops:		&mdc800_device_ops,
 	minor:		MDC800_DEVICE_MINOR_BASE,
+	num_minors:	1,
 	id_table:	mdc800_table
 };
 

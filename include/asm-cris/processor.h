@@ -102,7 +102,7 @@ unsigned long get_wchan(struct task_struct *p);
         unsigned long eip = 0;   \
         unsigned long regs = (unsigned long)user_regs(tsk); \
         if (regs > PAGE_SIZE && \
-            VALID_PAGE(virt_to_page(regs))) \
+            virt_addr_valid(regs)) \
               eip = ((struct pt_regs *)regs)->irp; \
         eip; })
 

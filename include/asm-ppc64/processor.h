@@ -490,18 +490,10 @@
 #define	PV_630        	0x0040
 #define	PV_630p	        0x0041
 
-/* Platforms supported by PPC64.  _machine is actually a set of flags */
-#define _MACH_pSeriesHW 0x00010000
-#define _MACH_iSeriesHW 0x00020000
-#define _MACH_LPAR	0x00000001
-
-#define _MACH_unknown	0x00000000
-#define _MACH_pSeries	(_MACH_pSeriesHW)
-#define _MACH_pSeriesLP	(_MACH_pSeriesHW | _MACH_LPAR)
-#define _MACH_iSeries	(_MACH_iSeriesHW | _MACH_LPAR)
-
-/* Compat defines for drivers */
-#define _MACH_Pmac	0xf0000000	/* bogus value */
+/* Platforms supported by PPC64 */
+#define PLATFORM_PSERIES      0x0100
+#define PLATFORM_PSERIES_LPAR 0x0101
+#define PLATFORM_ISERIES_LPAR 0x0201
 	
 /*
  * List of interrupt controllers.
@@ -597,11 +589,6 @@ GLUE(GLUE(.LT,NAME),_procname_end):
 #define CTRLF		0x088
 #define RUNLATCH	0x0001
 
-/* Macros for adjusting thread priority (hardware multi-threading) */
-#define HMT_low()	asm volatile("or 1,1,1")
-#define HMT_medium()	asm volatile("or 2,2,2")
-#define HMT_high()	asm volatile("or 3,3,3")
-
 /* Size of an exception stack frame contained in the paca. */
 #define EXC_FRAME_SIZE 64
 
@@ -609,7 +596,6 @@ GLUE(GLUE(.LT,NAME),_procname_end):
 			asm volatile("mfasr %0" : "=r" (rval)); rval;})
 
 #ifndef __ASSEMBLY__
-extern int _machine;
 extern int have_of;
 
 struct task_struct;
@@ -715,12 +701,12 @@ unsigned long get_wchan(struct task_struct *p);
 #define ARCH_HAS_PREFETCHW
 #define ARCH_HAS_SPINLOCK_PREFETCH
 
-extern inline void prefetch(const void *x)
+static inline void prefetch(const void *x)
 {
 	__asm__ __volatile__ ("dcbt 0,%0" : : "r" (x));
 }
 
-extern inline void prefetchw(const void *x)
+static inline void prefetchw(const void *x)
 {
 	__asm__ __volatile__ ("dcbtst 0,%0" : : "r" (x));
 }

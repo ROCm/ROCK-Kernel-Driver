@@ -47,7 +47,6 @@ static int broken_ipi_registers;
 OpenPIC_SourcePtr ISU[OPENPIC_MAX_ISU];
 
 static void openpic_end_irq(unsigned int irq_nr);
-static void openpic_ack_irq(unsigned int irq_nr);
 static void openpic_set_affinity(unsigned int irq_nr, unsigned long cpumask);
 
 struct hw_interrupt_type open_pic = {
@@ -56,14 +55,13 @@ struct hw_interrupt_type open_pic = {
 	NULL,
 	openpic_enable_irq,
 	openpic_disable_irq,
-	openpic_ack_irq,
+	NULL,
 	openpic_end_irq,
 	openpic_set_affinity
 };
 
 #ifdef CONFIG_SMP
 static void openpic_end_ipi(unsigned int irq_nr);
-static void openpic_ack_ipi(unsigned int irq_nr);
 static void openpic_enable_ipi(unsigned int irq_nr);
 static void openpic_disable_ipi(unsigned int irq_nr);
 
@@ -73,9 +71,9 @@ struct hw_interrupt_type open_pic_ipi = {
 	NULL,
 	openpic_enable_ipi,
 	openpic_disable_ipi,
-	openpic_ack_ipi,
+	NULL,
 	openpic_end_ipi,
-	0
+	NULL
 };
 #endif /* CONFIG_SMP */
 
@@ -756,13 +754,6 @@ static inline void openpic_set_sense(u_int irq, int sense)
 				(sense ? OPENPIC_SENSE_LEVEL : 0));
 }
 
-/* No spinlocks, should not be necessary with the OpenPIC
- * (1 register = 1 interrupt and we have the desc lock).
- */
-static void openpic_ack_irq(unsigned int irq_nr)
-{
-}
-
 static void openpic_end_irq(unsigned int irq_nr)
 {
 	if ((irq_desc[irq_nr].status & IRQ_LEVEL) != 0)
@@ -775,10 +766,6 @@ static void openpic_set_affinity(unsigned int irq_nr, unsigned long cpumask)
 }
 
 #ifdef CONFIG_SMP
-static void openpic_ack_ipi(unsigned int irq_nr)
-{
-}
-
 static void openpic_end_ipi(unsigned int irq_nr)
 {
 	/* IPIs are marked IRQ_PER_CPU. This has the side effect of

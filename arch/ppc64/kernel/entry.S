@@ -1,5 +1,5 @@
 /*
- *  arch/ppc/kernel/entry.S
+ *  arch/ppc64/kernel/entry.S
  *
  *  PowerPC version 
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
@@ -290,7 +290,7 @@ _GLOBAL(_switch)
 	std	r23,_CCR(r1)
 	std	r1,KSP(r3)	/* Set old stack pointer */
 
-	mfspr	r5,SPRG3	/* Get Paca */
+	mfspr	r5,SPRG3	/* Get paca */
 	addi	r13,r4,-THREAD	/* Convert THREAD to 'current' */
 	std	r13,PACACURRENT(r5)	/* Set new 'current' */
 

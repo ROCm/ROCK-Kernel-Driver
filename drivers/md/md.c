@@ -105,7 +105,6 @@ static ctl_table raid_root_table[] = {
  * subsystems want to have a pre-defined structure
  */
 struct hd_struct md_hd_struct[MAX_MD_DEVS];
-static int md_blocksizes[MAX_MD_DEVS];
 static int md_maxreadahead[MAX_MD_DEVS];
 static mdk_thread_t *md_recovery_thread;
 
@@ -172,7 +171,7 @@ void del_mddev_mapping(mddev_t * mddev, kdev_t dev)
 
 static int md_make_request (request_queue_t *q, struct bio *bio)
 {
-	mddev_t *mddev = kdev_to_mddev(bio->bi_dev);
+	mddev_t *mddev = kdev_to_mddev(to_kdev_t(bio->bi_bdev->bd_dev));
 
 	if (mddev && mddev->pers)
 		return mddev->pers->make_request(mddev, bio_rw(bio), bio);
@@ -488,8 +487,8 @@ static int read_disk_sb(mdk_rdev_t * rdev)
 			(filler_t *)mapping->a_ops->readpage, NULL);
 	if (IS_ERR(page))
 		goto out;
-	wait_on_page(page);
-	if (!Page_Uptodate(page))
+	wait_on_page_locked(page);
+	if (!PageUptodate(page))
 		goto fail;
 	if (PageError(page))
 		goto fail;
@@ -948,14 +947,14 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 						offs + MD_SB_BYTES);
 	if (error)
 		goto unlock;
-	UnlockPage(page);
-	wait_on_page(page);
+	unlock_page(page);
+	wait_on_page_locked(page);
 	page_cache_release(page);
 	fsync_bdev(bdev);
 skip:
 	return 0;
 unlock:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 fail:
 	printk("md: write_disk_sb failed for device %s\n", partition_name(dev));
@@ -1577,7 +1576,7 @@ static int device_size_calculation(mddev_t * mddev)
 	if (!md_size[mdidx(mddev)])
 		md_size[mdidx(mddev)] = sb->size * data_disks;
 
-	readahead = (blk_get_readahead(rdev->dev) * 512) / PAGE_SIZE;
+	readahead = (VM_MAX_READAHEAD * 1024) / PAGE_SIZE;
 	if (!sb->level || (sb->level == 4) || (sb->level == 5)) {
 		readahead = (mddev->sb->chunk_size>>PAGE_SHIFT) * 4 * data_disks;
 		if (readahead < data_disks * (MAX_SECTORS>>(PAGE_SHIFT-9))*2)
@@ -1710,9 +1709,18 @@ static int do_md_run(mddev_t * mddev)
 		if (rdev->faulty)
 			continue;
 		invalidate_device(rdev->dev, 1);
+#if 0
+	/*
+	 * Aside of obvious breakage (code below results in block size set
+	 * according to the sector size of last component instead of the
+	 * maximal sector size), we have more interesting problem here.
+	 * Namely, we actually ought to set _sector_ size for the array
+	 * and that requires per-array request queues.  Disabled for now.
+	 */
 		md_blocksizes[mdidx(mddev)] = 1024;
-		if (get_hardsect_size(rdev->dev) > md_blocksizes[mdidx(mddev)])
-			md_blocksizes[mdidx(mddev)] = get_hardsect_size(rdev->dev);
+		if (bdev_hardsect_size(rdev->bdev) > md_blocksizes[mdidx(mddev)])
+			md_blocksizes[mdidx(mddev)] = bdev_hardsect_size(rdev->bdev);
+#endif
 	}
 	mddev->pers = pers[pnum];
 
@@ -2556,9 +2564,14 @@ static int unprotect_array(mddev_t * mddev)
 
 static int set_disk_faulty(mddev_t *mddev, kdev_t dev)
 {
+	mdk_rdev_t *rdev;
 	int ret;
 
-	ret = md_error(mddev, dev);
+	rdev = find_rdev(mddev, dev);
+	if (!rdev)
+		return 0;
+
+	ret = md_error(mddev, rdev->bdev);
 	return ret;
 }
 
@@ -3035,9 +3048,10 @@ void md_recover_arrays(void)
 }
 
 
-int md_error(mddev_t *mddev, kdev_t rdev)
+int md_error(mddev_t *mddev, struct block_device *bdev)
 {
 	mdk_rdev_t * rrdev;
+	kdev_t rdev = to_kdev_t(bdev->bd_dev);
 
 	dprintk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",
 		major(dev),minor(dev),major(rdev),minor(rdev),
@@ -3603,11 +3617,9 @@ static void md_geninit(void)
 	int i;
 
 	for(i = 0; i < MAX_MD_DEVS; i++) {
-		md_blocksizes[i] = 1024;
 		md_size[i] = 0;
 		md_maxreadahead[i] = 32;
 	}
-	blksize_size[MAJOR_NR] = md_blocksizes;
 	blk_size[MAJOR_NR] = md_size;
 
 	dprintk("md: sizeof(mdp_super_t) = %d\n", (int)sizeof(mdp_super_t));

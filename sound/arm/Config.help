@@ -1,0 +1,3 @@
+CONFIG_SND_SA11XX_UDA1341
+  Say Y or M if you have a Compaq iPaq H3x00 handheld computer and want
+  to use its Philips UDA 1341 audio chip.

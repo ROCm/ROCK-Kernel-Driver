@@ -107,7 +107,11 @@ MFG:HEWLETT-PACKARD;MDL:DESKJET 970C;CMD:MLC,PCL,PML;CLASS:PRINTER;DESCRIPTION:H
 #define USBLP_REQ_RESET				0x02
 #define USBLP_REQ_HP_CHANNEL_CHANGE_REQUEST	0x00	/* HP Vendor-specific */
 
+#ifdef CONFIG_USB_DYNAMIC_MINORS
+#define USBLP_MINORS		256
+#else
 #define USBLP_MINORS		16
+#endif
 #define USBLP_MINOR_BASE	0
 
 #define USBLP_WRITE_TIMEOUT	(5*HZ)			/* 5 seconds */
@@ -208,6 +212,8 @@ static int usblp_select_alts(struct usblp *usblp);
 static int usblp_set_protocol(struct usblp *usblp, int protocol);
 static int usblp_cache_device_id_string(struct usblp *usblp);
 
+/* forward reference to make our lives easier */
+extern struct usb_driver usblp_driver;
 
 /*
  * Functions for usblp control messages.
@@ -366,6 +372,7 @@ static void usblp_cleanup (struct usblp *usblp)
 {
 	devfs_unregister (usblp->devfs);
 	usblp_table [usblp->minor] = NULL;
+	usb_deregister_dev (&usblp_driver, 1, usblp->minor);
 	info("usblp%d: removed", usblp->minor);
 
 	kfree (usblp->writeurb->transfer_buffer);
@@ -787,6 +794,7 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 {
 	struct usblp *usblp = 0;
 	int protocol;
+	int retval;
 	char name[6];
 
 	/* Malloc and start initializing usblp structure so we can use it
@@ -801,12 +809,19 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	init_waitqueue_head(&usblp->wait);
 	usblp->ifnum = ifnum;
 
-	/* Look for a free usblp_table entry. */
-	while (usblp_table[usblp->minor]) {
-		usblp->minor++;
-		if (usblp->minor >= USBLP_MINORS) {
-			err("no more free usblp devices");
+	retval = usb_register_dev(&usblp_driver, 1, &usblp->minor);
+	if (retval) {
+		if (retval != -ENODEV) {
+			err("Not able to get a minor for this device.");
 			goto abort;
+		}
+		/* Look for a free usblp_table entry on our own. */
+		while (usblp_table[usblp->minor]) {
+			usblp->minor++;
+			if (usblp->minor >= USBLP_MINORS) {
+				err("no more free usblp devices");
+				goto abort;
+			}
 		}
 	}
 
@@ -862,6 +877,9 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	usblp_check_status(usblp, 0);
 #endif
 
+	/* add a table entry so the device works when advertised */
+	usblp_table[usblp->minor] = usblp;
+
 	/* If we have devfs, create with perms=660. */
 	sprintf(name, "lp%d", usblp->minor);
 	usblp->devfs = devfs_register(usb_devfs_handle, name,
@@ -877,7 +895,7 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 		usblp->current_protocol, usblp->dev->descriptor.idVendor,
 		usblp->dev->descriptor.idProduct);
 
-	return usblp_table[usblp->minor] = usblp;
+	return usblp;
 
 abort:
 	if (usblp) {
@@ -1090,6 +1108,7 @@ static struct usb_driver usblp_driver = {
 	disconnect:	usblp_disconnect,
 	fops:		&usblp_fops,
 	minor:		USBLP_MINOR_BASE,
+	num_minors:	USBLP_MINORS,
 	id_table:	usblp_ids,
 };
 

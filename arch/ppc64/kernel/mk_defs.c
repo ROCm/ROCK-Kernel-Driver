@@ -30,8 +30,8 @@
 #include <asm/processor.h>
 #include <asm/hardirq.h>
 
-#include <asm/Naca.h>
-#include <asm/Paca.h>
+#include <asm/naca.h>
+#include <asm/paca.h>
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/HvLpEvent.h>
@@ -60,44 +60,44 @@ main(void)
 
 	DEFINE(MM, offsetof(struct task_struct, mm));
 
-	/* Naca */
-	DEFINE(DCACHEL1LINESIZE, offsetof(struct Naca, dCacheL1LineSize));
-        DEFINE(DCACHEL1LOGLINESIZE, offsetof(struct Naca, dCacheL1LogLineSize));
-        DEFINE(DCACHEL1LINESPERPAGE, offsetof(struct Naca, dCacheL1LinesPerPage));
-        DEFINE(ICACHEL1LINESIZE, offsetof(struct Naca, iCacheL1LineSize));
-        DEFINE(ICACHEL1LOGLINESIZE, offsetof(struct Naca, iCacheL1LogLineSize));
-        DEFINE(ICACHEL1LINESPERPAGE, offsetof(struct Naca, iCacheL1LinesPerPage));
-	DEFINE(SLBSIZE, offsetof(struct Naca, slb_size));
+	/* naca */
+        DEFINE(PACA, offsetof(struct naca_struct, paca));
+	DEFINE(DCACHEL1LINESIZE, offsetof(struct naca_struct, dCacheL1LineSize));
+        DEFINE(DCACHEL1LOGLINESIZE, offsetof(struct naca_struct, dCacheL1LogLineSize));
+        DEFINE(DCACHEL1LINESPERPAGE, offsetof(struct naca_struct, dCacheL1LinesPerPage));
+        DEFINE(ICACHEL1LINESIZE, offsetof(struct naca_struct, iCacheL1LineSize));
+        DEFINE(ICACHEL1LOGLINESIZE, offsetof(struct naca_struct, iCacheL1LogLineSize));
+        DEFINE(ICACHEL1LINESPERPAGE, offsetof(struct naca_struct, iCacheL1LinesPerPage));
+	DEFINE(SLBSIZE, offsetof(struct naca_struct, slb_size));
 
-	/* Paca */
-        DEFINE(PACA, offsetof(struct Naca, paca));
-        DEFINE(PACA_SIZE, sizeof(struct Paca));
-        DEFINE(PACAPACAINDEX, offsetof(struct Paca, xPacaIndex));
-        DEFINE(PACAPROCSTART, offsetof(struct Paca, xProcStart));
-        DEFINE(PACAKSAVE, offsetof(struct Paca, xKsave));
-	DEFINE(PACACURRENT, offsetof(struct Paca, xCurrent));
-        DEFINE(PACASAVEDMSR, offsetof(struct Paca, xSavedMsr));
-        DEFINE(PACASTABREAL, offsetof(struct Paca, xStab_data.real));
-        DEFINE(PACASTABVIRT, offsetof(struct Paca, xStab_data.virt));
-	DEFINE(PACASTABRR, offsetof(struct Paca, xStab_data.next_round_robin));
-        DEFINE(PACAR1, offsetof(struct Paca, xR1));
-        DEFINE(PACALPQUEUE, offsetof(struct Paca, lpQueuePtr));
-	DEFINE(PACATOC, offsetof(struct Paca, xTOC));
-	DEFINE(PACAEXCSP, offsetof(struct Paca, exception_sp));
-	DEFINE(PACAHRDWINTSTACK, offsetof(struct Paca, xHrdIntStack));
-	DEFINE(PACAPROCENABLED, offsetof(struct Paca, xProcEnabled));
-	DEFINE(PACAHRDWINTCOUNT, offsetof(struct Paca, xHrdIntCount));
-	DEFINE(PACADEFAULTDECR, offsetof(struct Paca, default_decr));
-	DEFINE(PACAPROFENABLED, offsetof(struct Paca, prof_enabled));
-	DEFINE(PACAPROFLEN, offsetof(struct Paca, prof_len));
-	DEFINE(PACAPROFSHIFT, offsetof(struct Paca, prof_shift));
-	DEFINE(PACAPROFBUFFER, offsetof(struct Paca, prof_buffer));
-	DEFINE(PACAPROFSTEXT, offsetof(struct Paca, prof_stext));
-	DEFINE(PACALPPACA, offsetof(struct Paca, xLpPaca));
-        DEFINE(LPPACA, offsetof(struct Paca, xLpPaca));
-        DEFINE(PACAREGSAV, offsetof(struct Paca, xRegSav));
-        DEFINE(PACAEXC, offsetof(struct Paca, exception_stack));
-        DEFINE(PACAGUARD, offsetof(struct Paca, guard));
+	/* paca */
+        DEFINE(PACA_SIZE, sizeof(struct paca_struct));
+        DEFINE(PACAPACAINDEX, offsetof(struct paca_struct, xPacaIndex));
+        DEFINE(PACAPROCSTART, offsetof(struct paca_struct, xProcStart));
+        DEFINE(PACAKSAVE, offsetof(struct paca_struct, xKsave));
+	DEFINE(PACACURRENT, offsetof(struct paca_struct, xCurrent));
+        DEFINE(PACASAVEDMSR, offsetof(struct paca_struct, xSavedMsr));
+        DEFINE(PACASTABREAL, offsetof(struct paca_struct, xStab_data.real));
+        DEFINE(PACASTABVIRT, offsetof(struct paca_struct, xStab_data.virt));
+	DEFINE(PACASTABRR, offsetof(struct paca_struct, xStab_data.next_round_robin));
+        DEFINE(PACAR1, offsetof(struct paca_struct, xR1));
+        DEFINE(PACALPQUEUE, offsetof(struct paca_struct, lpQueuePtr));
+	DEFINE(PACATOC, offsetof(struct paca_struct, xTOC));
+	DEFINE(PACAEXCSP, offsetof(struct paca_struct, exception_sp));
+	DEFINE(PACAHRDWINTSTACK, offsetof(struct paca_struct, xHrdIntStack));
+	DEFINE(PACAPROCENABLED, offsetof(struct paca_struct, xProcEnabled));
+	DEFINE(PACAHRDWINTCOUNT, offsetof(struct paca_struct, xHrdIntCount));
+	DEFINE(PACADEFAULTDECR, offsetof(struct paca_struct, default_decr));
+	DEFINE(PACAPROFENABLED, offsetof(struct paca_struct, prof_enabled));
+	DEFINE(PACAPROFLEN, offsetof(struct paca_struct, prof_len));
+	DEFINE(PACAPROFSHIFT, offsetof(struct paca_struct, prof_shift));
+	DEFINE(PACAPROFBUFFER, offsetof(struct paca_struct, prof_buffer));
+	DEFINE(PACAPROFSTEXT, offsetof(struct paca_struct, prof_stext));
+	DEFINE(PACALPPACA, offsetof(struct paca_struct, xLpPaca));
+        DEFINE(LPPACA, offsetof(struct paca_struct, xLpPaca));
+        DEFINE(PACAREGSAV, offsetof(struct paca_struct, xRegSav));
+        DEFINE(PACAEXC, offsetof(struct paca_struct, exception_stack));
+        DEFINE(PACAGUARD, offsetof(struct paca_struct, guard));
         DEFINE(LPPACASRR0, offsetof(struct ItLpPaca, xSavedSrr0));
         DEFINE(LPPACASRR1, offsetof(struct ItLpPaca, xSavedSrr1));
 	DEFINE(LPPACAANYINT, offsetof(struct ItLpPaca, xIntDword.xAnyInt));

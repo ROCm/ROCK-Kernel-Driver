@@ -398,7 +398,7 @@ void clear_user_page(void *to, unsigned long address)
 		pte_t entry;
 		unsigned long flags;
 
-		entry = mk_pte_phys(phys_addr, pgprot);
+		entry = pfn_pte(phys_addr >> PAGE_SHIFT, pgprot);
 		down(&p3map_sem[(address & CACHE_ALIAS)>>12]);
 		set_pte(pte, entry);
 		save_and_cli(flags);
@@ -437,7 +437,7 @@ void copy_user_page(void *to, void *from, unsigned long address)
 		pte_t entry;
 		unsigned long flags;
 
-		entry = mk_pte_phys(phys_addr, pgprot);
+		entry = pfn_pte(phys_addr >> PAGE_SHIFT, pgprot);
 		down(&p3map_sem[(address & CACHE_ALIAS)>>12]);
 		set_pte(pte, entry);
 		save_and_cli(flags);

@@ -294,7 +294,6 @@ static void hitfb_set_disp(const void *fb_par, struct display *disp,
 {
     const struct hitfb_par *par = fb_par;
 
-    disp->screen_base = (void *)fb_info.hit_videobase;
     disp->scrollmode = SCROLL_YREDRAW;
 
     switch(((struct hitfb_par *)par)->bpp) {
@@ -323,7 +322,6 @@ struct fbgen_hwswitch hitfb_switch = {
     hitfb_get_par,
     hitfb_set_par,
     hitfb_getcolreg,
-    hitfb_setcolreg,
     hitfb_pan_display,
     hitfb_blank,
     hitfb_set_disp
@@ -337,7 +335,9 @@ static struct fb_ops hitfb_ops = {
     fb_set_var:		fbgen_set_var,
     fb_get_cmap:	fbgen_get_cmap,
     fb_set_cmap:	fbgen_set_cmap,
+    fb_setcolreg:	hitfb_setcolreg,	
     fb_pan_display:	fbgen_pan_display,
+    fb_blank:		fbgen_blank,	
 };
 
 
@@ -348,19 +348,20 @@ int __init hitfb_init(void)
     fb_info.gen.info.flags = FBINFO_FLAG_DEFAULT;
     fb_info.gen.info.fbops = &hitfb_ops;
     fb_info.gen.info.disp = &fb_info.disp;
+    fb_info.gen.info.currcon = 1;	
     fb_info.gen.info.changevar = NULL;
     fb_info.gen.info.switch_con = &fbgen_switch;
     fb_info.gen.info.updatevar = &fbgen_update_var;
-    fb_info.gen.info.blank = &fbgen_blank;
     fb_info.gen.parsize = sizeof(struct hitfb_par);
     fb_info.gen.fbhw = &hitfb_switch;
     fb_info.gen.fbhw->detect();
+    fb_info.screen_base = (void *)fb_info.hit_videobase;
     
     fbgen_get_var(&fb_info.disp.var, -1, &fb_info.gen.info);
     fb_info.disp.var.activate = FB_ACTIVATE_NOW;
     fbgen_do_set_var(&fb_info.disp.var, 1, &fb_info.gen);
     fbgen_set_disp(-1, &fb_info.gen);
-    fbgen_install_cmap(0, &fb_info.gen);
+    do_install_cmap(0, &fb_info.gen);
     
     if(register_framebuffer(&fb_info.gen.info)<0) return -EINVAL;
     

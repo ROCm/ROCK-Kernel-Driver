@@ -42,40 +42,6 @@ void __init fpu_init(void)
 
 	write_cr0(oldcr0 & ~((1UL<<3)|(1UL<<2))); /* clear TS and EM */
 
-	asm("fninit"); 
-	load_mxcsr(0x1f80); 
-	/* initialize MMX state. normally this will be covered by fninit, but the 
-	   architecture doesn't guarantee it so do it explicitely. */ 
-	asm volatile("movq %0,%%mm0\n\t"
-	    "movq %%mm0,%%mm1\n\t"
-	    "movq %%mm0,%%mm2\n\t"
-	    "movq %%mm0,%%mm3\n\t"
-	    "movq %%mm0,%%mm4\n\t"
-	    "movq %%mm0,%%mm5\n\t"
-	    "movq %%mm0,%%mm6\n\t"
-	    "movq %%mm0,%%mm7\n\t" :: "m" (0ULL));
-	asm("emms");
-
-	/* initialize XMM state */ 
-	asm("xorpd %xmm0,%xmm0");
-	asm("xorpd %xmm1,%xmm1");
-	asm("xorpd %xmm2,%xmm2");
-	asm("xorpd %xmm3,%xmm3");
-	asm("xorpd %xmm4,%xmm4");
-	asm("xorpd %xmm5,%xmm5");
-	asm("xorpd %xmm6,%xmm6");
-	asm("xorpd %xmm7,%xmm7");
-	asm("xorpd %xmm8,%xmm8");
-	asm("xorpd %xmm9,%xmm9");
-	asm("xorpd %xmm10,%xmm10");
-	asm("xorpd %xmm11,%xmm11");
-	asm("xorpd %xmm12,%xmm12");
-	asm("xorpd %xmm13,%xmm13");
-	asm("xorpd %xmm14,%xmm14");
-	asm("xorpd %xmm15,%xmm15");
-	load_mxcsr(0x1f80);
-	asm volatile("fxsave %0" : "=m" (init_fpu_env));
-
 	/* clean state in init */
 	stts();
 	clear_thread_flag(TIF_USEDFPU);
@@ -89,13 +55,11 @@ void __init fpu_init(void)
  */
 void init_fpu(void)
 {
-#if 0
-	asm("fninit"); 
-	load_mxcsr(0x1f80);
-#else
-	asm volatile("fxrstor %0" :: "m" (init_fpu_env)); 
-#endif
-	current->used_math = 1;
+	struct task_struct *me = current;
+	memset(&me->thread.i387.fxsave, 0, sizeof(struct i387_fxsave_struct));
+	me->thread.i387.fxsave.cwd = 0x37f;
+	me->thread.i387.fxsave.mxcsr = 0x1f80;
+	me->used_math = 1;
 }
 
 /*

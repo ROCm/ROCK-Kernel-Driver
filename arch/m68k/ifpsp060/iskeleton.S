@@ -76,8 +76,8 @@ _060_isp_done:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 	tstl	%curptr@(TASK_NEEDRESCHED)
-	jne	SYMBOL_NAME(ret_from_exception)	| deliver signals,
-						| reschedule etc..
+	jne	ret_from_exception	| deliver signals,
+					| reschedule etc..
 	RESTORE_ALL
 
 |
@@ -113,7 +113,7 @@ _060_real_chk:
 |	bral		_060_real_trace
 
 real_chk_end:
-	bral		SYMBOL_NAME(trap)	| jump to trap handler
+	bral		trap			| jump to trap handler
 
 |
 | _060_real_divbyzero:
@@ -153,7 +153,7 @@ _060_real_divbyzero:
 |	bral		_060_real_trace
 
 real_divbyzero_end:
-	bral		SYMBOL_NAME(trap)	| jump to trap handler
+	bral		trap			| jump to trap handler
 
 |##########################
 

@@ -22,7 +22,7 @@ typedef unsigned long mm_context_t;
  * Define the size of the cache used for segment table entries.  The first
  * entry is used as a cache pointer, therefore the actual number of entries
  * stored is one less than defined here.  Do not change this value without
- * considering the impact it will have on the layout of the paca in Paca.h.
+ * considering the impact it will have on the layout of the paca in paca.h.
  */
 #define STAB_CACHE_SIZE 16
 
@@ -90,7 +90,7 @@ typedef struct {
 } SLBE;
 
 /*
- * This structure is used in Paca.h where the layout depends on the 
+ * This structure is used in paca.h where the layout depends on the 
  * size being 24B.
  */
 typedef struct {

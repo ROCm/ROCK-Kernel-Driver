@@ -265,7 +265,6 @@ void __init mem_init(void)
 {
 	extern char _stext, _etext, _fdata, _edata;
 	extern char __init_begin, __init_end;
-	extern unsigned long totalram_pages;
 	extern unsigned long setup_zero_pages(void);
 	cnodeid_t nid;
 	unsigned long tmp;

@@ -13,14 +13,19 @@
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
+#include <asm/tlbflush.h>
 
 static inline void forget_pte(pte_t page)
 {
 	if (pte_none(page))
 		return;
 	if (pte_present(page)) {
-		struct page *ptpage = pte_page(page);
-		if ((!VALID_PAGE(ptpage)) || PageReserved(ptpage))
+		unsigned long pfn = pte_pfn(page);
+		struct page *ptpage;
+		if (!pfn_valid(pfn))
+			return;
+		ptpage = pfn_to_page(page);
+		if (PageReserved(ptpage))
 			return;
 		page_cache_release(ptpage);
 		return;

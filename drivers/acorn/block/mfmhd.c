@@ -195,8 +195,6 @@ struct mfm_info {
 
 static struct hd_struct mfm[MFM_MAXDRIVES << 6];
 static int mfm_sizes[MFM_MAXDRIVES << 6];
-static int mfm_blocksizes[MFM_MAXDRIVES << 6];
-static int mfm_sectsizes[MFM_MAXDRIVES << 6];
 static DECLARE_WAIT_QUEUE_HEAD(mfm_wait_open);
 
 /* Stuff from the assembly routines */
@@ -1316,14 +1314,6 @@ static void mfm_geninit (void)
 {
 	int i;
 
-	for (i = 0; i < (MFM_MAXDRIVES << 6); i++) {
-		/* Can't increase this - if you do all hell breaks loose */
-		mfm_blocksizes[i] = 1024;
-		mfm_sectsizes[i] = 512;
-	}
-	blksize_size[MAJOR_NR] = mfm_blocksizes;
-	hardsect_size[MAJOR_NR] = mfm_sectsizes;
-
 	mfm_drives = mfm_initdrives();
 
 	printk("mfm: detected %d hard drive%s\n", mfm_drives,
@@ -1430,7 +1420,7 @@ int mfm_init (void)
 	hdc63463_irqpolladdress	= mfm_IRQPollLoc;
 	hdc63463_irqpollmask	= irqmask;
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_mfm_request);
 
 	add_gendisk(&mfm_gendisk);
 

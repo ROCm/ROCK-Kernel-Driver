@@ -34,14 +34,6 @@ struct ide_ops {
 	ide_ioreg_t (*ide_default_io_base)(int index);
 	void (*ide_init_hwif_ports)(hw_regs_t *hw, ide_ioreg_t data_port,
 	                            ide_ioreg_t ctrl_port, int *irq);
-	int (*ide_request_irq)(unsigned int irq, void (*handler)(int, void *,
-	                       struct pt_regs *), unsigned long flags,
-	                       const char *device, void *dev_id);
-	void (*ide_free_irq)(unsigned int irq, void *dev_id);
-	int (*ide_check_region) (ide_ioreg_t from, unsigned int extent);
-	void (*ide_request_region)(ide_ioreg_t from, unsigned int extent,
-	                        const char *name);
-	void (*ide_release_region)(ide_ioreg_t from, unsigned int extent);
 };
 
 extern struct ide_ops *ide_ops;
@@ -98,35 +90,6 @@ typedef union {
 		unsigned HOB		: 1;	/* 48-bit address ordering */
 	} b;
 } control_t;
-
-static __inline__ int ide_request_irq(unsigned int irq, void (*handler)(int,void *, struct pt_regs *),
-			unsigned long flags, const char *device, void *dev_id)
-{
-	return ide_ops->ide_request_irq(irq, handler, flags, device, dev_id);
-}
-
-static __inline__ void ide_free_irq(unsigned int irq, void *dev_id)
-{
-	ide_ops->ide_free_irq(irq, dev_id);
-}
-
-static __inline__ int ide_check_region (ide_ioreg_t from, unsigned int extent)
-{
-	return ide_ops->ide_check_region(from, extent);
-}
-
-static __inline__ void ide_request_region(ide_ioreg_t from,
-                                          unsigned int extent, const char *name)
-{
-	ide_ops->ide_request_region(from, extent, name);
-}
-
-static __inline__ void ide_release_region(ide_ioreg_t from,
-                                          unsigned int extent)
-{
-	ide_ops->ide_release_region(from, extent);
-}
-
 
 #if defined(CONFIG_SWAP_IO_SPACE) && defined(__MIPSEB__)
 

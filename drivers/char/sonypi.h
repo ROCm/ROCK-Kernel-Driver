@@ -35,7 +35,7 @@
 #ifdef __KERNEL__
 
 #define SONYPI_DRIVER_MAJORVERSION	 1
-#define SONYPI_DRIVER_MINORVERSION	10
+#define SONYPI_DRIVER_MINORVERSION	11
 
 #include <linux/types.h>
 #include <linux/pci.h>
@@ -141,6 +141,7 @@ static struct sonypi_irq_list sonypi_type2_irq_list[] = {
 #define SONYPI_TYPE1_BLUETOOTH_EV	0x30
 #define SONYPI_TYPE2_BLUETOOTH_EV	0x08
 #define SONYPI_TYPE1_PKEY_EV		0x40
+#define SONYPI_TYPE2_PKEY_EV		0x08
 #define SONYPI_BACK_EV			0x08
 #define SONYPI_LID_EV			0x38
 

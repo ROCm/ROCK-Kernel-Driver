@@ -1348,8 +1348,10 @@ int sdla_set_config(struct net_device *dev, struct ifmap *map)
 		return(-EINVAL);
 
 	dev->base_addr = map->base_addr;
-	request_region(dev->base_addr, SDLA_IO_EXTENTS, dev->name);
-
+	if (!request_region(dev->base_addr, SDLA_IO_EXTENTS, dev->name)){
+		printk(KERN_WARNING "SDLA: io-port 0x%04lx in use \n", dev->base_addr);
+		return(-EINVAL);
+	}
 	/* test for card types, S502A, S502E, S507, S508                 */
 	/* these tests shut down the card completely, so clear the state */
 	flp->type = SDLA_UNKNOWN;

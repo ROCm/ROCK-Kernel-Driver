@@ -83,7 +83,6 @@ struct fb_info_iga {
     struct pci_mmap_map *mmap_map;
     struct { u_short blue, green, red, pad; } palette[256];
     int video_cmap_len;
-    int currcon;
     struct display disp;
     struct display_switch dispsw; 
     union {
@@ -331,9 +330,9 @@ static int iga_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 	return 0;
 }
 
-static int iga_setcolreg(unsigned regno, unsigned red, unsigned green,
-                          unsigned blue, unsigned transp,
-                          struct fb_info *fb_info)
+static int igafb_setcolreg(unsigned regno, unsigned red, unsigned green,
+                           unsigned blue, unsigned transp,
+                           struct fb_info *fb_info)
 {
         /*
          *  Set a single color register. The values supplied are
@@ -383,51 +382,18 @@ static int iga_setcolreg(unsigned regno, unsigned red, unsigned green,
 	return 0;
 }
 
-static void do_install_cmap(int con, struct fb_info *fb_info)
-{
-	struct fb_info_iga *info = (struct fb_info_iga*) fb_info;
-
-        if (con != info->currcon)
-                return;
-        if (fb_display[con].cmap.len)
-                fb_set_cmap(&fb_display[con].cmap, 1,
-                            iga_setcolreg, &info->fb_info);
-        else
-                fb_set_cmap(fb_default_cmap(info->video_cmap_len), 1, 
-			    iga_setcolreg, &info->fb_info);
-}
-
 static int igafb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
                            struct fb_info *fb_info)
 {
 	struct fb_info_iga *info = (struct fb_info_iga*) fb_info;
 	
-        if (con == info->currcon) /* current console? */
+        if (con == fb_info->currcon) /* current console? */
                 return fb_get_cmap(cmap, kspc, iga_getcolreg, &info->fb_info);
         else if (fb_display[con].cmap.len) /* non default colormap? */
                 fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
         else
                 fb_copy_cmap(fb_default_cmap(info->video_cmap_len),
                      cmap, kspc ? 0 : 2);
-        return 0;
-}
-
-static int igafb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-	                  struct fb_info *info)
-{
-        int err;
-	struct fb_info_iga *fb = (struct fb_info_iga*) info;
-
-        if (!fb_display[con].cmap.len) {        /* no colormap allocated? */
-                err = fb_alloc_cmap(&fb_display[con].cmap,
-				    fb->video_cmap_len,0);
-                if (err)
-                        return err;
-        }
-        if (con == fb->currcon)                     /* current console? */
-                return fb_set_cmap(cmap, kspc, iga_setcolreg, info);
-        else
-                fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
         return 0;
 }
 
@@ -440,7 +406,8 @@ static struct fb_ops igafb_ops = {
 	fb_get_var:	igafb_get_var,
 	fb_set_var:	igafb_set_var,
 	fb_get_cmap:	igafb_get_cmap,
-	fb_set_cmap:	igafb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	igafb_setcolreg,
 #ifdef __sparc__
 	fb_mmap:	igafb_mmap,
 #endif
@@ -460,7 +427,6 @@ static void igafb_set_disp(int con, struct fb_info_iga *info)
         igafb_get_fix(&fix, con, &info->fb_info);
 
         memset(display, 0, sizeof(struct display));
-        display->screen_base = info->frame_buffer;
         display->visual = fix.visual;
         display->type = fix.type;
         display->type_aux = fix.type_aux;
@@ -514,26 +480,16 @@ static int igafb_switch(int con, struct fb_info *fb_info)
 	struct fb_info_iga *info = (struct fb_info_iga*) fb_info;
 
         /* Do we have to save the colormap? */
-        if (fb_display[info->currcon].cmap.len)
-                fb_get_cmap(&fb_display[info->currcon].cmap, 1,
+        if (fb_display[fb_info->currcon].cmap.len)
+                fb_get_cmap(&fb_display[fb_info->currcon].cmap, 1,
                             iga_getcolreg, fb_info);
 
-	info->currcon = con;
+	fb_info->currcon = con;
 	/* Install new colormap */
 	do_install_cmap(con, fb_info);
 	igafb_update_var(con, fb_info);
         return 1;
 }
-
-
-
-/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
-
-static void igafb_blank(int blank, struct fb_info *info)
-{
-        /* Not supported */
-}
-
 
 static int __init iga_init(struct fb_info_iga *info)
 {
@@ -571,11 +527,12 @@ static int __init iga_init(struct fb_info_iga *info)
 	info->fb_info.node = NODEV;
 	info->fb_info.fbops = &igafb_ops;
 	info->fb_info.disp = &info->disp;
+        info->fb_info.screen_base = info->frame_buffer;
+	info->fb_info.currcon = -1;
 	strcpy(info->fb_info.fontname, fontname);
 	info->fb_info.changevar = NULL;
 	info->fb_info.switch_con = &igafb_switch;
 	info->fb_info.updatevar = &igafb_update_var;
-	info->fb_info.blank = &igafb_blank;
 	info->fb_info.flags=FBINFO_FLAG_DEFAULT;
 
 	igafb_set_disp(-1, info);

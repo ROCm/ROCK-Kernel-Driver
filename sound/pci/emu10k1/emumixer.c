@@ -353,7 +353,10 @@ static int snd_emu10k1_shared_spdif_get(snd_kcontrol_t * kcontrol,
 {
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 
-	ucontrol->value.integer.value[0] = inl(emu->port + HCFG) & HCFG_GPOUT0 ? 0 : 1;
+	if (emu->audigy)
+		ucontrol->value.integer.value[0] = inl(emu->port + A_IOCFG) & A_IOCFG_GPOUT0 ? 1 : 0;
+	else
+		ucontrol->value.integer.value[0] = inl(emu->port + HCFG) & HCFG_GPOUT0 ? 1 : 0;
         return 0;
 }
 
@@ -363,20 +366,32 @@ static int snd_emu10k1_shared_spdif_put(snd_kcontrol_t * kcontrol,
 	unsigned long flags;
 	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
 	unsigned int reg, val;
-	int change;
+	int change = 0;
 
 	spin_lock_irqsave(&emu->reg_lock, flags);
+	if (emu->audigy) {
+		reg = inl(emu->port + A_IOCFG);
+		val = ucontrol->value.integer.value[0] ? A_IOCFG_GPOUT0 : 0;
+		change = (reg & A_IOCFG_GPOUT0) != val;
+		if (change) {
+			reg &= ~A_IOCFG_GPOUT0;
+			reg |= val;
+			outl(reg | val, emu->port + A_IOCFG);
+		}
+	}
 	reg = inl(emu->port + HCFG);
-	val = ucontrol->value.integer.value[0] & 1 ? 0 : HCFG_GPOUT0;
-	change = (reg & HCFG_GPOUT0) != val;
-	reg &= ~HCFG_GPOUT0;
-	reg |= val;
-	outl(reg | val, emu->port + HCFG);
+	val = ucontrol->value.integer.value[0] ? HCFG_GPOUT0 : 0;
+	change |= (reg & HCFG_GPOUT0) != val;
+	if (change) {
+		reg &= ~HCFG_GPOUT0;
+		reg |= val;
+		outl(reg | val, emu->port + HCFG);
+	}
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
         return change;
 }
 
-static snd_kcontrol_new_t snd_emu10k1_shared_spdif =
+static snd_kcontrol_new_t snd_emu10k1_shared_spdif __devinitdata =
 {
 	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
 	name:		"SB Live Analog/Digital Output Jack",
@@ -385,68 +400,14 @@ static snd_kcontrol_new_t snd_emu10k1_shared_spdif =
 	put:		snd_emu10k1_shared_spdif_put
 };
 
-#if 0 // XXX: not working yet..
-/*
- * Audigy analog / digital switches
- */
-static int audigy_output_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
-	uinfo->count = 1;
-	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 1;
-	return 0;
-}
-
-static int audigy_output_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
-{
-	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
-	unsigned int mask = (unsigned int)kcontrol->private_value;
-
-	ucontrol->value.integer.value[0] = inl(emu->port + A_IOCFG) & mask ? 0 : 1;
-        return 0;
-}
-
-static int audigy_output_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
-{
-	unsigned long flags;
-	emu10k1_t *emu = snd_kcontrol_chip(kcontrol);
-	unsigned int mask = (unsigned int)kcontrol->private_value;
-	unsigned int reg, oreg;
-	int change;
-
-	spin_lock_irqsave(&emu->reg_lock, flags);
-	reg = oreg = inl(emu->port + A_IOCFG);
-	reg &= ~mask;
-	reg |= ucontrol->value.integer.value[0] & 1 ? 0 : mask;
-	change = (reg != oreg);
-	if (change)
-		outl(reg, emu->port + A_IOCFG);
-	spin_unlock_irqrestore(&emu->reg_lock, flags);
-        return change;
-}
-
-static snd_kcontrol_new_t audigy_output_analog =
+static snd_kcontrol_new_t snd_audigy_shared_spdif __devinitdata =
 {
 	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:		"Audigy Analog Output Switch",
-	info:		audigy_output_info,
-	get:		audigy_output_get,
-	put:		audigy_output_put,
-	private_value:	0x40,
+	name:		"Audigy Analog/Digital Output Jack",
+	info:		snd_emu10k1_shared_spdif_info,
+	get:		snd_emu10k1_shared_spdif_get,
+	put:		snd_emu10k1_shared_spdif_put
 };
-
-static snd_kcontrol_new_t audigy_output_digital =
-{
-	iface:		SNDRV_CTL_ELEM_IFACE_MIXER,
-	name:		"Audigy Digital Output Switch",
-	info:		audigy_output_info,
-	get:		audigy_output_get,
-	put:		audigy_output_put,
-	private_value:	0x04,
-};
-#endif // XXX
-
 
 /*
  */
@@ -528,16 +489,10 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 	}
 
 	if (emu->audigy) {
-#if 0 // XXX
-		if ((kctl = snd_ctl_new1(&audigy_output_analog, emu)) == NULL)
+		if ((kctl = snd_ctl_new1(&snd_audigy_shared_spdif, emu)) == NULL)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))
 			return err;
-		if ((kctl = snd_ctl_new1(&audigy_output_digital, emu)) == NULL)
-			return -ENOMEM;
-		if ((err = snd_ctl_add(card, kctl)))
-			return err;
-#endif // XXX
 	} else {
 		if ((kctl = snd_ctl_new1(&snd_emu10k1_shared_spdif, emu)) == NULL)
 			return -ENOMEM;

@@ -70,8 +70,6 @@ unsigned long ppc_memoffset = PAGE_OFFSET;
 int mem_init_done;
 int init_bootmem_done;
 int boot_mapsize;
-unsigned long totalram_pages;
-unsigned long totalhigh_pages;
 #ifdef CONFIG_ALL_PPC
 unsigned long agp_special_page;
 #endif
@@ -142,18 +140,7 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
-	show_buffers();
-}
-
-void si_meminfo(struct sysinfo *val)
-{
-	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = totalhigh_pages;
-	val->freehigh = nr_free_highpages();
-	val->mem_unit = PAGE_SIZE;
+	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 /* Free up now-unused memory */

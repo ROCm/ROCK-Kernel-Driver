@@ -17,13 +17,11 @@
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/smp.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/rtas.h>
 #include "i8259.h"
 #include "xics.h"
 #include <asm/ppcdebug.h>
-
-extern struct Naca *naca;
 
 void xics_enable_irq(u_int irq);
 void xics_disable_irq(u_int irq);
@@ -233,9 +231,9 @@ xics_get_irq(struct pt_regs *regs)
 		}
 	} else if( vec == XICS_IRQ_SPURIOUS ) {
 		irq = -1;
-		printk("spurious PPC interrupt!\n");
-	} else
+	} else {
 		irq = real_irq_to_virt(vec) + XICS_IRQ_OFFSET;
+	}
 	return irq;
 }
 
@@ -371,7 +369,7 @@ nextnode:
 		xics_irq_8259_cascade = virt_irq_create_mapping(xics_irq_8259_cascade_real);
 	}
 
-	if (_machine == _MACH_pSeries) {
+	if (naca->platform == PLATFORM_PSERIES) {
 #ifdef CONFIG_SMP
 		for (i = 0; i < naca->processorCount; ++i) {
 			xics_info.per_cpu[i] =
@@ -385,7 +383,7 @@ nextnode:
 	/* actually iSeries does not use any of xics...but it has link dependencies
 	 * for now, except this new one...
 	 */
-	} else if (_machine == _MACH_pSeriesLP) {
+	} else if (naca->platform == PLATFORM_PSERIES_LPAR) {
 		ops = &pSeriesLP_ops;
 #endif
 	}

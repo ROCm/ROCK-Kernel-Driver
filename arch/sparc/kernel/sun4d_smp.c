@@ -63,8 +63,6 @@ extern volatile int smp_process_available;
 extern volatile int smp_commenced;
 extern int __smp4d_processor_id(void);
 
-extern unsigned long totalram_pages;
-
 /* #define SMP_DEBUG */
 
 #ifdef SMP_DEBUG

@@ -205,9 +205,7 @@ MODULE_PARM(drive3,"1-8i");
 
 #define MAJOR_NR   major
 #define DEVICE_NAME "PD"
-#define DEVICE_REQUEST do_pd_request
 #define DEVICE_NR(device) (minor(device)>>PD_BITS)
-#define DEVICE_ON(device)
 #define DEVICE_OFF(device)
 
 #include <linux/blk.h>
@@ -288,7 +286,6 @@ static void pd_eject( int unit);
 
 static struct hd_struct pd_hd[PD_DEVS];
 static int pd_sizes[PD_DEVS];
-static int pd_blocksizes[PD_DEVS];
 
 #define PD_NAMELEN	8
 
@@ -395,15 +392,12 @@ int pd_init (void)
                 return -1;
         }
 	q = BLK_DEFAULT_QUEUE(MAJOR_NR);
-	blk_init_queue(q, DEVICE_REQUEST, &pd_lock);
+	blk_init_queue(q, do_pd_request, &pd_lock);
 	blk_queue_max_sectors(q, cluster);
-        
+
 	pd_gendisk.major = major;
 	pd_gendisk.major_name = name;
 	add_gendisk(&pd_gendisk);
-
-	for(i=0;i<PD_DEVS;i++) pd_blocksizes[i] = 1024;
-	blksize_size[MAJOR_NR] = pd_blocksizes;
 
 	printk("%s: %s version %s, major %d, cluster %d, nice %d\n",
 		name,name,PD_VERSION,major,cluster,nice);

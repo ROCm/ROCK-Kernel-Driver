@@ -36,7 +36,7 @@ wakeup_code:
 	orl     $0x80000001, %eax
 	movl	%eax, %cr0
 
-	ljmpl	$__KERNEL_CS,$SYMBOL_NAME(wakeup_pmode_return)
+	ljmpl	$__KERNEL_CS,$wakeup_pmode_return
 
 	.code32
 	ALIGN

@@ -180,7 +180,7 @@ void *hpfs_get_sector(struct super_block *s, unsigned secno, struct buffer_head 
 
 	if ((*bhp = bh = sb_getblk(s, secno)) != NULL) {
 		if (!buffer_uptodate(bh)) wait_on_buffer(bh);
-		mark_buffer_uptodate(bh, 1);
+		set_buffer_uptodate(bh);
 		return bh->b_data;
 	} else {
 		printk("HPFS: hpfs_get_sector: getblk failed\n");

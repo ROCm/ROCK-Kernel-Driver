@@ -220,7 +220,6 @@ static struct atari_disk_type user_params[FD_MAX_UNITS];
 static struct atari_disk_type default_params[FD_MAX_UNITS];
 
 static int floppy_sizes[256];
-static int floppy_blocksizes[256];
 
 /* current info on each unit */
 static struct atari_floppy_struct {
@@ -2012,8 +2011,7 @@ int __init atari_floppy_init (void)
 			floppy_sizes[i] = MAX_DISK_SIZE;
 
 	blk_size[MAJOR_NR] = floppy_sizes;
-	blksize_size[MAJOR_NR] = floppy_blocksizes;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &ataflop_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &ataflop_lock);
 
 	printk(KERN_INFO "Atari floppy driver: max. %cD, %strack buffering\n",
 	       DriveType == 0 ? 'D' : DriveType == 1 ? 'H' : 'E',

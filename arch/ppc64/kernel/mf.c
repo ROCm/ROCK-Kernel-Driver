@@ -1003,7 +1003,7 @@ int mf_getVmlinuxChunk(char *buffer, int *size, int offset, u64 side)
 		}
 	}
 
-	pci_unmap_single(iSeries_vio_dev, dma_addr, *size, PCI_DMA_FROMDEVICE);
+	pci_unmap_single(iSeries_vio_dev, dma_addr, len, PCI_DMA_FROMDEVICE);
 
 	return rc;
 }

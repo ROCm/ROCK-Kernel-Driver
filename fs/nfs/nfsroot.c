@@ -78,7 +78,6 @@
 #include <linux/nfs_fs.h>
 #include <linux/nfs_mount.h>
 #include <linux/in.h>
-#include <linux/inet.h>
 #include <linux/major.h>
 #include <linux/utsname.h>
 #include <net/ipconfig.h>
@@ -281,7 +280,8 @@ static int __init root_nfs_addr(void)
 		return -1;
 	}
 
-	strncpy(nfs_data.hostname, in_ntoa(servaddr), sizeof(nfs_data.hostname)-1);
+	snprintf(nfs_data.hostname, sizeof(nfs_data.hostname),
+		 "%u.%u.%u.%u", NIPQUAD(servaddr));
 	return 0;
 }
 
@@ -374,8 +374,8 @@ static int __init root_nfs_getport(int program, int version, int proto)
 {
 	struct sockaddr_in sin;
 
-	printk(KERN_NOTICE "Looking up port of RPC %d/%d on %s\n",
-		program, version, in_ntoa(servaddr));
+	printk(KERN_NOTICE "Looking up port of RPC %d/%d on %u.%u.%u.%u\n",
+		program, version, NIPQUAD(servaddr));
 	set_sockaddr(&sin, servaddr, 0);
 	return rpc_getport_external(&sin, program, version, proto);
 }

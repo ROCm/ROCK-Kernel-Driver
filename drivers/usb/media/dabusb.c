@@ -52,12 +52,17 @@
 
 /* --------------------------------------------------------------------- */
 
+#ifdef CONFIG_USB_DYNAMIC_MINORS
+#define NRDABUSB 256
+#else
 #define NRDABUSB 4
+#endif
 
 /*-------------------------------------------------------------------*/
 
 static dabusb_t dabusb[NRDABUSB];
 static int buffers = 256;
+extern struct usb_driver dabusb_driver;
 
 /*-------------------------------------------------------------------*/
 
@@ -722,6 +727,7 @@ static void *dabusb_probe (struct usb_device *usbdev, unsigned int ifnum,
 			   const struct usb_device_id *id)
 {
 	int devnum;
+	int retval;
 	pdabusb_t s;
 
 	dbg("dabusb: probe: vendor id 0x%x, device id 0x%x ifnum:%d",
@@ -734,15 +740,21 @@ static void *dabusb_probe (struct usb_device *usbdev, unsigned int ifnum,
 	if (ifnum != _DABUSB_IF && usbdev->descriptor.idProduct == 0x9999)
 		return NULL;
 
-	devnum = dabusb_find_struct ();
-	if (devnum == -1)
-		return NULL;
+	retval = usb_register_dev (&dabusb_driver, 1, &devnum);
+	if (retval) {
+		if (retval != -ENODEV)
+			return NULL;
+		devnum = dabusb_find_struct ();
+		if (devnum == -1)
+			return NULL;
+	}
 
 	s = &dabusb[devnum];
 
 	down (&s->mutex);
 	s->remove_pending = 0;
 	s->usbdev = usbdev;
+	s->devnum = devnum;
 
 	if (usb_set_configuration (usbdev, usbdev->config[0].bConfigurationValue) < 0) {
 		err("set_configuration failed");
@@ -777,6 +789,7 @@ static void dabusb_disconnect (struct usb_device *usbdev, void *ptr)
 
 	dbg("dabusb_disconnect");
 
+	usb_deregister_dev (&dabusb_driver, 1, s->devnum);
 	s->remove_pending = 1;
 	wake_up (&s->wait);
 	if (s->state == _started)
@@ -801,6 +814,7 @@ static struct usb_driver dabusb_driver =
 	disconnect:	dabusb_disconnect,
 	fops:		&dabusb_fops,
 	minor:		DABUSB_MINOR,
+	num_minors:	NRDABUSB,
 	id_table:	dabusb_ids,
 };
 

@@ -81,8 +81,9 @@ static inline int copy_one_pte(struct mm_struct *mm, pte_t * src, pte_t * dst)
 	return error;
 }
 
-static int move_one_page(struct mm_struct *mm, unsigned long old_addr, unsigned long new_addr)
+static int move_one_page(struct vm_area_struct *vma, unsigned long old_addr, unsigned long new_addr)
 {
+	struct mm_struct *mm = vma->vm_mm;
 	int error = 0;
 	pte_t *src, *dst;
 
@@ -94,6 +95,7 @@ static int move_one_page(struct mm_struct *mm, unsigned long old_addr, unsigned 
 		pte_unmap_nested(src);
 		pte_unmap(dst);
 	}
+	flush_tlb_page(vma, old_addr);
 	spin_unlock(&mm->page_table_lock);
 	return error;
 }
@@ -101,7 +103,6 @@ static int move_one_page(struct mm_struct *mm, unsigned long old_addr, unsigned 
 static int move_page_tables(struct vm_area_struct *vma,
 	unsigned long new_addr, unsigned long old_addr, unsigned long len)
 {
-	struct mm_struct *mm = vma->vm_mm;
 	unsigned long offset = len;
 
 	flush_cache_range(vma, old_addr, old_addr + len);
@@ -113,10 +114,9 @@ static int move_page_tables(struct vm_area_struct *vma,
 	 */
 	while (offset) {
 		offset -= PAGE_SIZE;
-		if (move_one_page(mm, old_addr + offset, new_addr + offset))
+		if (move_one_page(vma, old_addr + offset, new_addr + offset))
 			goto oops_we_failed;
 	}
-	flush_tlb_range(vma, old_addr, old_addr + len);
 	return 0;
 
 	/*
@@ -129,7 +129,7 @@ static int move_page_tables(struct vm_area_struct *vma,
 oops_we_failed:
 	flush_cache_range(vma, new_addr, new_addr + len);
 	while ((offset += PAGE_SIZE) < len)
-		move_one_page(mm, new_addr + offset, old_addr + offset);
+		move_one_page(vma, new_addr + offset, old_addr + offset);
 	zap_page_range(vma, new_addr, len);
 	return -1;
 }

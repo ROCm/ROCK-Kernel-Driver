@@ -17,6 +17,7 @@
 #include <linux/umsdos_fs.h>
 #include <linux/slab.h>
 #include <linux/pagemap.h>
+#include <linux/smp_lock.h>
 
 #define UMSDOS_SPECIAL_DIRFPOS	3
 extern struct dentry *saved_root;
@@ -302,6 +303,8 @@ static int UMSDOS_readdir (struct file *filp, void *dirbuf, filldir_t filldir)
 	int ret = 0, count = 0;
 	struct UMSDOS_DIR_ONCE bufk;
 
+	lock_kernel();
+
 	bufk.dirbuf = dirbuf;
 	bufk.filldir = filldir;
 	bufk.stop = 0;
@@ -317,6 +320,7 @@ static int UMSDOS_readdir (struct file *filp, void *dirbuf, filldir_t filldir)
 			break;
 		count += bufk.count;
 	}
+	unlock_kernel();
 	Printk (("UMSDOS_readdir out %d count %d pos %Ld\n", 
 		ret, count, filp->f_pos));
 	return count ? : ret;
@@ -692,8 +696,8 @@ struct dentry *umsdos_solve_hlink (struct dentry *hlink)
 	dentry_dst=(struct dentry *)page;
 	if (IS_ERR(page))
 		goto out;
-	wait_on_page(page);
-	if (!Page_Uptodate(page))
+	wait_on_page_locked(page);
+	if (!PageUptodate(page))
 		goto async_fail;
 
 	dentry_dst = ERR_PTR(-ENOMEM);

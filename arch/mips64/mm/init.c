@@ -40,8 +40,6 @@
 
 mmu_gather_t mmu_gathers[NR_CPUS];
 
-unsigned long totalram_pages;
-
 void pgd_init(unsigned long page)
 {
 	unsigned long *p, *end;
@@ -341,7 +339,7 @@ void show_mem(void)
 	printk("%d pages swap cached\n",cached);
 	printk("%ld pages in page table cache\n", pgtable_cache_size);
 	printk("%d free pages\n", free);
-	show_buffers();
+	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 #ifndef CONFIG_DISCONTIGMEM
@@ -457,18 +455,4 @@ free_initmem(void)
 	}
 	printk("Freeing unused kernel memory: %ldk freed\n",
 	       (&__init_end - &__init_begin) >> 10);
-}
-
-void
-si_meminfo(struct sysinfo *val)
-{
-	val->totalram = totalram_pages;
-	val->sharedram = atomic_read(&shmem_nrpages);
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = 0;
-	val->freehigh = nr_free_highpages();
-	val->mem_unit = PAGE_SIZE;
-
-	return;
 }

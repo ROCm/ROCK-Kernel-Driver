@@ -272,9 +272,7 @@ static void __init smp_init(void)
 #define smp_init()	do { } while (0)
 #endif
 
-static inline void setup_per_cpu_areas(void)
-{
-}
+static inline void setup_per_cpu_areas(void) { }
 
 #else
 
@@ -391,8 +389,8 @@ asmlinkage void __init start_kernel(void)
 
 	fork_init(mempages);
 	proc_caches_init();
+	buffer_init();
 	vfs_caches_init(mempages);
-	buffer_init(mempages);
 	radix_tree_init();
 #if defined(CONFIG_ARCH_S390)
 	ccwcache_init();

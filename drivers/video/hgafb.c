@@ -156,7 +156,6 @@ static struct fb_info fb_info;
 static struct display disp;
 
 /* Don't assume that tty1 will be the initial current console. */
-static int currcon = -1; 
 static int release_io_port = 0;
 static int release_io_ports = 0;
 
@@ -511,7 +510,7 @@ int hga_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 }
 	
 /**
- *	hga_setcolreg - set color registers
+ *	hgafb_setcolreg - set color registers
  *	@regno:register index to set
  *	@red:red value, unused
  *	@green:green value, unused
@@ -524,31 +523,12 @@ int hga_get_cmap(struct fb_cmap *cmap, int kspc, int con,
  *	A zero is returned on success and 1 for failure.
  */
 
-static int hga_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			 u_int transp, struct fb_info *info)
+static int hgafb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			   u_int transp, struct fb_info *info)
 {
 	if (regno > 1)
 		return 1;
 	return 0;
-}
-
-/**
- *	hga_set_cmap - set the colormap
- *	@cmap:struct fb_cmap to set
- *	@kspc:called from kernel space?
- *	@con:unused
- *	@info:pointer to fb_info object containing info for current hga board
- *
- *	This wrapper function passes it's input parameters to fb_set_cmap().
- *	Callback function hga_setcolreg() is used to set the color registers.
- */
-
-int hga_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-                 struct fb_info *info)
-{
-	CHKINFO(-EINVAL);
-	DPRINTK("hga_set_cmap: con:%d\n", con);
-	return fb_set_cmap(cmap, kspc, hga_setcolreg, info);
 }
 
 /**
@@ -592,15 +572,38 @@ int hga_pan_display(struct fb_var_screeninfo *var, int con,
 	return 0;
 }
 
-    
+/**
+ *	hgafb_blank - (un)blank the screen
+ *	@blank_mode:blanking method to use
+ *	@info:unused
+ *	
+ *	Blank the screen if blank_mode != 0, else unblank. 
+ *	Implements VESA suspend and powerdown modes on hardware that supports 
+ *	disabling hsync/vsync:
+ *		@blank_mode == 2 means suspend vsync,
+ *		@blank_mode == 3 means suspend hsync,
+ *		@blank_mode == 4 means powerdown.
+ */
+
+static int hgafb_blank(int blank_mode, struct fb_info *info)
+{
+	CHKINFO( );
+	DPRINTK("hgafb_blank: blank_mode:%d, info:%x, fb_info:%x\n", blank_mode, (unsigned)info, (unsigned)&fb_info);
+
+	hga_blank(blank_mode);
+	return 0;
+}
+
 static struct fb_ops hgafb_ops = {
 	owner:		THIS_MODULE,
 	fb_get_fix:	hga_get_fix,
 	fb_get_var:	hga_get_var,
 	fb_set_var:	hga_set_var,
 	fb_get_cmap:	hga_get_cmap,
-	fb_set_cmap:	hga_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	hgafb_setcolreg,
 	fb_pan_display:	hga_pan_display,
+	fb_blank:	hgafb_blank,
 };
 		
 
@@ -625,15 +628,15 @@ static struct fb_ops hgafb_ops = {
 static int hgafbcon_switch(int con, struct fb_info *info)
 {
 	CHKINFO(-EINVAL);
-	DPRINTK("hgafbcon_switch: currcon:%d, con:%d, info:%x, fb_info:%x\n", currcon, con, (unsigned)info, (unsigned)&fb_info);
+	DPRINTK("hgafbcon_switch: currcon:%d, con:%d, info:%x, fb_info:%x\n", info->currcon, con, (unsigned)info, (unsigned)&fb_info);
 
 	/* Save the colormap and video mode */
 #if 0	/* Not necessary in hgafb, we use fixed colormap */
-	fb_copy_cmap(&info->cmap, &fb_display[currcon].cmap, 0);
+	fb_copy_cmap(&info->cmap, &fb_display[info->currcon].cmap, 0);
 #endif
 
-	if (currcon != -1) /* this check is absolute necessary! */
-		memcpy(&fb_display[currcon].var, &info->var,
+	if (info->currcon != -1) /* this check is absolute necessary! */
+		memcpy(&fb_display[info->currcon].var, &info->var,
 				sizeof(struct fb_var_screeninfo));
 
 	/* Install a new colormap and change the video mode. By default fbcon
@@ -642,13 +645,13 @@ static int hgafbcon_switch(int con, struct fb_info *info)
 	 */
 #if 0
 	fb_copy_cmap(&fb_display[con].cmap, &info->cmap, 0);
-	fb_set_cmap(&info->cmap, 1, hga_setcolreg, info);
+	fb_set_cmap(&info->cmap, 1, info);
 #endif
 
 	memcpy(&info->var, &fb_display[con].var,
 			sizeof(struct fb_var_screeninfo));
 	/* hga_set_var(&info->var, con, &fb_info); is it necessary? */
-	currcon = con;
+	info->currcon = con;
 
 	/* Hack to work correctly with XF86_Mono */
 	hga_gfx_mode();
@@ -672,28 +675,6 @@ static int hgafbcon_updatevar(int con, struct fb_info *info)
 	DPRINTK("hga_update_var: con:%d, info:%x, fb_info:%x\n", con, (unsigned)info, (unsigned)&fb_info);
 	return (con < 0) ? -EINVAL : hga_pan_display(&fb_display[con].var, con, info);
 }
-
-/**
- *	hgafbcon_blank - (un)blank the screen
- *	@blank_mode:blanking method to use
- *	@info:unused
- *	
- *	Blank the screen if blank_mode != 0, else unblank. 
- *	Implements VESA suspend and powerdown modes on hardware that supports 
- *	disabling hsync/vsync:
- *		@blank_mode == 2 means suspend vsync,
- *		@blank_mode == 3 means suspend hsync,
- *		@blank_mode == 4 means powerdown.
- */
-
-static void hgafbcon_blank(int blank_mode, struct fb_info *info)
-{
-	CHKINFO( );
-	DPRINTK("hga_blank: blank_mode:%d, info:%x, fb_info:%x\n", blank_mode, (unsigned)info, (unsigned)&fb_info);
-
-	hga_blank(blank_mode);
-}
-
 
 /* ------------------------------------------------------------------------- */
     
@@ -721,8 +702,6 @@ int __init hgafb_init(void)
 	hga_fix.smem_len = hga_vram_len;
 
 	disp.var = hga_default_var;
-/*	disp.cmap = ???; */
-	disp.screen_base = (char*)hga_fix.smem_start;
 	disp.visual = hga_fix.visual;
 	disp.type = hga_fix.type;
 	disp.type_aux = hga_fix.type_aux;
@@ -744,7 +723,6 @@ int __init hgafb_init(void)
 	strcpy (fb_info.modename, hga_fix.id);
 	fb_info.node = NODEV;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
-/*	fb_info.open = ??? */
 	fb_info.var = hga_default_var;
 	fb_info.fix = hga_fix;
 	fb_info.monspecs.hfmin = 0;
@@ -755,12 +733,10 @@ int __init hgafb_init(void)
 	fb_info.fbops = &hgafb_ops;
 	fb_info.screen_base = (char *)hga_fix.smem_start;
 	fb_info.disp = &disp;
-/*	fb_info.display_fg = ??? */
-/*	fb_info.fontname initialized later */
+	fb_info.currcon = 1;
 	fb_info.changevar = NULL;
 	fb_info.switch_con = hgafbcon_switch;
 	fb_info.updatevar = hgafbcon_updatevar;
-	fb_info.blank = hgafbcon_blank;
 	fb_info.pseudo_palette = NULL; /* ??? */
 	fb_info.par = NULL;
 

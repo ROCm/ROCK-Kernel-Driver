@@ -120,7 +120,6 @@ static unsigned int xd_bases[] __initdata =
 
 static struct hd_struct xd_struct[XD_MAXDRIVES << 6];
 static int xd_sizes[XD_MAXDRIVES << 6], xd_access[XD_MAXDRIVES];
-static int xd_blocksizes[XD_MAXDRIVES << 6];
 
 static spinlock_t xd_lock = SPIN_LOCK_UNLOCKED;
 
@@ -170,7 +169,7 @@ int __init xd_init (void)
 		return -1;
 	}
 	devfs_handle = devfs_mk_dir (NULL, xd_gendisk.major_name, NULL);
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &xd_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_xd_request, &xd_lock);
 	add_gendisk(&xd_gendisk);
 	xd_geninit();
 
@@ -206,9 +205,6 @@ static void __init xd_geninit (void)
 {
 	u_char i,controller;
 	unsigned int address;
-
-	for(i=0;i<(XD_MAXDRIVES << 6);i++) xd_blocksizes[i] = 1024;
-	blksize_size[MAJOR_NR] = xd_blocksizes;
 
 	if (xd_detect(&controller,&address)) {
 

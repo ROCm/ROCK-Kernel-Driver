@@ -38,7 +38,7 @@
  * give any ordering guarantees about loads, we have to use the
  * stronger but slower sync instruction for mb and rmb.
  */
-#define mb()  __asm__ __volatile__ ("sync" : : : "memory")
+#define mb()   __asm__ __volatile__ ("sync" : : : "memory")
 #define rmb()  __asm__ __volatile__ ("lwsync" : : : "memory")
 #define wmb()  __asm__ __volatile__ ("eieio" : : : "memory")
 

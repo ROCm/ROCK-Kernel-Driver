@@ -30,13 +30,12 @@ obj-y               :=	ppc_ksyms.o setup.o entry.o traps.o irq.o idle.o \
 			rtc.o init_task.o pSeries_htab.o
 
 obj-$(CONFIG_PCI) +=  pci.o pci_dn.o pci_dma.o
-obj-$(CONFIG_PPC_EEH) += eeh.o
 
 ifeq ($(CONFIG_PPC_ISERIES),y)
 obj-$(CONFIG_PCI) += iSeries_pci.o iSeries_pci_reset.o iSeries_IoMmTable.o iSeries_irq.o iSeries_VpdInfo.o XmPciLpEvent.o 
 endif
 ifeq ($(CONFIG_PPC_PSERIES),y)
-obj-$(CONFIG_PCI) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o
+obj-$(CONFIG_PCI) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o eeh.o
 
 obj-y += rtasd.o nvram.o
 endif

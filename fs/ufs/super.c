@@ -80,6 +80,7 @@
 #include <linux/locks.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 
 #include "swab.h"
 #include "util.h"
@@ -650,16 +651,34 @@ magic_found:
 	uspi->s_fmask = fs32_to_cpu(sb, usb1->fs_fmask);
 	uspi->s_fshift = fs32_to_cpu(sb, usb1->fs_fshift);
 
-	/* block size must be a power-of-two between 4k and 32k */
-	if ((uspi->s_bsize & (uspi->s_bsize-1)) ||
-	    (uspi->s_bsize < 4096 || uspi->s_bsize > 32768)) {
-		printk("ufs_read_super: fs_bsize %u != {4096, 8192, 16384, 32768}\n", uspi->s_bsize);
+	if (uspi->s_fsize & (uspi->s_fsize - 1)) {
+		printk("ufs_read_super: fragment size %u is not a power of 2\n",
+			uspi->s_fsize);
+			goto failed;
+	}
+	if (uspi->s_fsize < 512) {
+		printk("ufs_read_super: fragment size %u is too small\n",
+			uspi->s_fsize);
 		goto failed;
 	}
-	/* fragment size must be a power-of-two between 512 and 4096 bytes */
-	if ((uspi->s_fsize & (uspi->s_fsize-1)) ||
-	    (uspi->s_fsize < 512 || uspi->s_fsize > 4096)) {
-		printk("ufs_read_super: fs_fsize %u != {512, 1024, 2048. 4096}\n", uspi->s_fsize);
+	if (uspi->s_fsize > 4096) {
+		printk("ufs_read_super: fragment size %u is too large\n",
+			uspi->s_fsize);
+		goto failed;
+	}
+	if (uspi->s_bsize & (uspi->s_bsize - 1)) {
+		printk("ufs_read_super: block size %u is not a power of 2\n",
+			uspi->s_bsize);
+		goto failed;
+	}
+	if (uspi->s_bsize < 4096) {
+		printk("ufs_read_super: block size %u is too small\n",
+			uspi->s_fsize);
+		goto failed;
+	}
+	if (uspi->s_bsize / uspi->s_fsize > 8) {
+		printk("ufs_read_super: too many fragments per block (%u)\n",
+			uspi->s_bsize / uspi->s_fsize);
 		goto failed;
 	}
 	if (uspi->s_fsize != block_size || uspi->s_sbsize != super_block_size) {
@@ -822,6 +841,8 @@ void ufs_write_super (struct super_block * sb) {
 	struct ufs_super_block_third * usb3;
 	unsigned flags;
 
+	lock_kernel();
+
 	UFSD(("ENTER\n"))
 	flags = sb->u.ufs_sb.s_flags;
 	uspi = sb->u.ufs_sb.s_uspi;
@@ -838,6 +859,7 @@ void ufs_write_super (struct super_block * sb) {
 	}
 	sb->s_dirt = 0;
 	UFSD(("EXIT\n"))
+	unlock_kernel();
 }
 
 void ufs_put_super (struct super_block * sb)

@@ -361,7 +361,7 @@ affs_get_block(struct inode *inode, sector_t block, struct buffer_head *bh_resul
 		u32 blocknr = affs_alloc_block(inode, ext_bh->b_blocknr);
 		if (!blocknr)
 			goto err_alloc;
-		bh_result->b_state |= (1UL << BH_New);
+		set_buffer_new(bh_result);
 		AFFS_I(inode)->mmu_private += AFFS_SB(sb)->s_data_blksize;
 		AFFS_I(inode)->i_blkcnt++;
 
@@ -400,7 +400,7 @@ err_ext:
 	return PTR_ERR(ext_bh);
 err_alloc:
 	brelse(ext_bh);
-	bh_result->b_state &= ~(1UL << BH_Mapped);
+	clear_buffer_mapped(bh_result);
 	bh_result->b_bdev = NULL;
 	// unlock cache
 	affs_unlock_ext(inode);
@@ -618,7 +618,7 @@ affs_readpage_ofs(struct file *file, struct page *page)
 	err = affs_do_readpage_ofs(file, page, 0, to);
 	if (!err)
 		SetPageUptodate(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return err;
 }
 
@@ -630,7 +630,7 @@ static int affs_prepare_write_ofs(struct file *file, struct page *page, unsigned
 	int err = 0;
 
 	pr_debug("AFFS: prepare_write(%u, %ld, %d, %d)\n", (u32)inode->i_ino, page->index, from, to);
-	if (Page_Uptodate(page))
+	if (PageUptodate(page))
 		return 0;
 
 	size = inode->i_size;
@@ -701,7 +701,7 @@ static int affs_commit_write_ofs(struct file *file, struct page *page, unsigned 
 		if (IS_ERR(bh))
 			goto out;
 		memcpy(AFFS_DATA(bh), data + from, bsize);
-		if (bh->b_state & (1UL << BH_New)) {
+		if (buffer_new(bh)) {
 			AFFS_DATA_HEAD(bh)->ptype = cpu_to_be32(T_DATA);
 			AFFS_DATA_HEAD(bh)->key = cpu_to_be32(inode->i_ino);
 			AFFS_DATA_HEAD(bh)->sequence = cpu_to_be32(bidx);
@@ -730,7 +730,7 @@ static int affs_commit_write_ofs(struct file *file, struct page *page, unsigned 
 			goto out;
 		tmp = min(bsize, to - from);
 		memcpy(AFFS_DATA(bh), data + from, tmp);
-		if (bh->b_state & (1UL << BH_New)) {
+		if (buffer_new(bh)) {
 			AFFS_DATA_HEAD(bh)->ptype = cpu_to_be32(T_DATA);
 			AFFS_DATA_HEAD(bh)->key = cpu_to_be32(inode->i_ino);
 			AFFS_DATA_HEAD(bh)->sequence = cpu_to_be32(bidx);
@@ -830,7 +830,7 @@ affs_truncate(struct inode *inode)
 		res = mapping->a_ops->prepare_write(NULL, page, size, size);
 		if (!res)
 			res = mapping->a_ops->commit_write(NULL, page, size, size);
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 		mark_inode_dirty(inode);
 		unlock_kernel();

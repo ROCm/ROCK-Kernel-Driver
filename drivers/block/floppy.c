@@ -230,6 +230,7 @@ static int allowed_drive_mask = 0x33;
 
 static int irqdma_allocated;
 
+#define LOCAL_END_REQUEST
 #define MAJOR_NR FLOPPY_MAJOR
 
 #include <linux/blk.h>
@@ -477,7 +478,6 @@ static struct floppy_struct *current_type[N_DRIVE];
 static struct floppy_struct user_params[N_DRIVE];
 
 static int floppy_sizes[256];
-static int floppy_blocksizes[256];
 
 /*
  * The driver is trying to determine the correct media format
@@ -2274,17 +2274,32 @@ static int do_format(kdev_t device, struct format_descr *tmp_format_req)
  * =============================
  */
 
+static inline void end_request(struct request *req, int uptodate)
+{
+	kdev_t dev = req->rq_dev;
+
+	if (end_that_request_first(req, uptodate, req->hard_cur_sectors))
+		return;
+	add_blkdev_randomness(major(dev));
+	floppy_off(DEVICE_NR(dev));
+	blkdev_dequeue_request(req);
+	end_that_request_last(req);
+}
+
+
 /* new request_done. Can handle physical sectors which are smaller than a
  * logical buffer */
 static void request_done(int uptodate)
 {
+	struct request_queue *q = QUEUE;
+	struct request *req = elv_next_request(q);
 	unsigned long flags;
 	int block;
 
 	probing = 0;
 	reschedule_timeout(MAXTIMEOUT, "request done %d", uptodate);
 
-	if (QUEUE_EMPTY){
+	if (blk_queue_empty(q)) {
 		DPRINT("request list destroyed in floppy request done\n");
 		return;
 	}
@@ -2292,48 +2307,48 @@ static void request_done(int uptodate)
 	if (uptodate){
 		/* maintain values for invalidation on geometry
 		 * change */
-		block = current_count_sectors + CURRENT->sector;
+		block = current_count_sectors + req->sector;
 		INFBOUND(DRS->maxblock, block);
 		if (block > _floppy->sect)
 			DRS->maxtrack = 1;
 
 		/* unlock chained buffers */
-		spin_lock_irqsave(QUEUE->queue_lock, flags);
-		while (current_count_sectors && !QUEUE_EMPTY &&
-		       current_count_sectors >= CURRENT->current_nr_sectors){
-			current_count_sectors -= CURRENT->current_nr_sectors;
-			CURRENT->nr_sectors -= CURRENT->current_nr_sectors;
-			CURRENT->sector += CURRENT->current_nr_sectors;
-			end_request(1);
+		spin_lock_irqsave(q->queue_lock, flags);
+		while (current_count_sectors && !blk_queue_empty(q) &&
+		       current_count_sectors >= req->current_nr_sectors){
+			current_count_sectors -= req->current_nr_sectors;
+			req->nr_sectors -= req->current_nr_sectors;
+			req->sector += req->current_nr_sectors;
+			end_request(req, 1);
 		}
-		spin_unlock_irqrestore(QUEUE->queue_lock, flags);
+		spin_unlock_irqrestore(q->queue_lock, flags);
 
-		if (current_count_sectors && !QUEUE_EMPTY){
+		if (current_count_sectors && !blk_queue_empty(q)) {
 			/* "unlock" last subsector */
-			CURRENT->buffer += current_count_sectors <<9;
-			CURRENT->current_nr_sectors -= current_count_sectors;
-			CURRENT->nr_sectors -= current_count_sectors;
-			CURRENT->sector += current_count_sectors;
+			req->buffer += current_count_sectors <<9;
+			req->current_nr_sectors -= current_count_sectors;
+			req->nr_sectors -= current_count_sectors;
+			req->sector += current_count_sectors;
 			return;
 		}
 
-		if (current_count_sectors && QUEUE_EMPTY)
+		if (current_count_sectors && blk_queue_empty(q))
 			DPRINT("request list destroyed in floppy request done\n");
 
 	} else {
-		if (rq_data_dir(CURRENT) == WRITE) {
+		if (rq_data_dir(req) == WRITE) {
 			/* record write error information */
 			DRWE->write_errors++;
 			if (DRWE->write_errors == 1) {
-				DRWE->first_error_sector = CURRENT->sector;
+				DRWE->first_error_sector = req->sector;
 				DRWE->first_error_generation = DRS->generation;
 			}
-			DRWE->last_error_sector = CURRENT->sector;
+			DRWE->last_error_sector = req->sector;
 			DRWE->last_error_generation = DRS->generation;
 		}
-		spin_lock_irqsave(QUEUE->queue_lock, flags);
-		end_request(0);
-		spin_unlock_irqrestore(QUEUE->queue_lock, flags);
+		spin_lock_irqsave(q->queue_lock, flags);
+		end_request(req, 0);
+		spin_unlock_irqrestore(q->queue_lock, flags);
 	}
 }
 
@@ -3865,6 +3880,12 @@ static int floppy_revalidate(kdev_t dev)
 		if (cf)
 			UDRS->generation++;
 		if (NO_GEOM){
+#if 0
+	/*
+	 * What the devil is going on here?  We are not guaranteed to do
+	 * any IO and ENXIO case is nothing but ENOMEM in disguise - it
+	 * happens if and only if buffer cache is out of memory.  WTF?
+	 */
 			/* auto-sensing */
 			int size = floppy_blocksizes[minor(dev)];
 			if (!size)
@@ -3878,6 +3899,9 @@ static int floppy_revalidate(kdev_t dev)
 			process_fd_request();
 			wait_on_buffer(bh);
 			brelse(bh);
+			return 0;
+#endif
+			process_fd_request();
 			return 0;
 		}
 		if (cf)
@@ -4167,8 +4191,7 @@ int __init floppy_init(void)
 			floppy_sizes[i] = MAX_DISK_SIZE;
 
 	blk_size[MAJOR_NR] = floppy_sizes;
-	blksize_size[MAJOR_NR] = floppy_blocksizes;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &floppy_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &floppy_lock);
 	reschedule_timeout(MAXTIMEOUT, "floppy init", MAXTIMEOUT);
 	config_types();
 

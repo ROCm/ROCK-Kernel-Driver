@@ -1,0 +1,471 @@
+ToDo:
+	- Find and fix bugs.
+	- W.r.t. s_maxbytes still need to be careful on reading/truncating as
+	  there are dragons lurking in the details, e.g. read_inode() currently
+	  does no checks for file size wrt s_maxbytes. So what happens when a
+	  user open()s a file with i_size > s_maxbytes? Should read_inode()
+	  truncate the visible i_size? Will the user just get -E2BIG (or
+	  whatever) on open()? Or will (s)he be able to open() but lseek() and
+	  read() will fail when s_maxbytes is reached? -> Investigate this!
+	- Implement/allow non-resident index bitmaps in dir.c::ntfs_readdir()
+	  and then also consider initialized_size w.r.t. the bitmaps, etc.
+	- vcn_to_lcn() should somehow return the correct pointer within the
+	  ->run_list so we can get at the lcns for the following vcns, this is
+	  strictly a speed optimization. Obviously need to keep the ->run_list
+	  locked or RACE. load_attribute_list() already performs such an
+	  optimization so use the same optimization where desired.
+	- Consider if ntfs_file_read_compressed_block() shouldn't be coping
+	  with initialized_size < data_size. I don't think it can happen but
+	  it requires more careful consideration.
+	- CLEANUP: Modularise and reuse code in aops.c. At the moment we have
+	  several copies of almost identicall functions and the functions are
+	  quite big. Modularising them a bit, e.g. a-la get_block(), will make
+	  them cleaner and make code reuse easier.
+	- Want to use dummy inodes for address space i/o. We need some VFS
+	  changes first, which are currently under discussion.
+
+2.0.6 - Major bugfix to make compatible with other kernel changes.
+
+	- Initialize the mftbmp address space properly now that there are more
+	  fields in the struct address_space. This was leading to hangs and
+	  oopses on umount since 2.5.12 because of changes to other parts of
+	  the kernel. We probably want a kernel generic init_address_space()
+	  function...
+	- Drop BKL from ntfs_readdir() after consultation with Al Viro. The
+	  only caller of ->readdir() is vfs_readdir() which holds i_sem during
+	  the call, and i_sem is sufficient protection against changes in the
+	  directory inode (including ->i_size).
+	- Use generic_file_llseek() for directories (as opposed to
+	  default_llseek()) as this downs i_sem instead of the BKL which is
+	  what we now need for exclusion against ->f_pos changes considering we
+	  no longer take the BKL in ntfs_readdir().
+
+2.0.5 - Major bugfix. Buffer overflow in extent inode handling.
+
+	- No need to set old blocksize in super.c::ntfs_fill_super() as the
+	  VFS does so via invocation of deactivate_super() calling
+	  fs->fill_super() calling block_kill_super() which does it.
+	- BKL moved from VFS into dir.c::ntfs_readdir(). (Linus Torvalds)
+	  -> Do we really need it? I don't think so as we have exclusion on
+	  the directory ntfs_inode rw_semaphore mrec_lock. We mmight have to
+	  move the ->f_pos accesses under the mrec_lock though. Check this...
+	- Fix really, really, really stupid buffer overflow in extent inode
+	  handling in mft.c::map_extent_mft_record().
+
+2.0.4 - Cleanups and updates for kernel 2.5.11.
+
+	- Add documentation on how to use the MD driver to be able to use NTFS
+	  stripe and volume sets in Linux and generally cleanup documentation
+	  a bit.
+	Remove all uses of kdev_t in favour of struct block_device *:
+	- Change compress.c::ntfs_file_read_compressed_block() to use
+	  sb_getblk() instead of getblk().
+	- Change super.c::ntfs_fill_super() to use bdev_hardsect_size() instead
+	  of get_hardsect_size().
+	- No need to get old blocksize in super.c::ntfs_fill_super() as
+	  fs/super.c::get_sb_bdev() already does this.
+	- Set bh->b_bdev instead of bh->b_dev throughout aops.c.
+
+2.0.3 - Small bug fixes, cleanups, and performance improvements.
+
+	- Remove some dead code from mft.c.
+	- Optimize readpage and read_block functions throughout aops.c so that
+	  only initialized blocks are read. Non-initialized ones have their
+	  buffer head mapped, zeroed, and set up to date, without scheduling
+	  any i/o. Thanks to Al Viro for advice on how to avoid the device i/o.
+	Thanks go to Andrew Morton for spotting the below:
+	- Fix buglet in allocate_compression_buffers() error code path.
+	- Call flush_dcache_page() after modifying page cache page contents in
+	  ntfs_file_readpage().
+	- Check for existence of page buffers throughout aops.c before calling
+	  create_empty_buffers(). This happens when an I/O error occurs and the
+	  read is retried. (It also happens once writing is implemented so that
+	  needed doing anyway but I had left it for later...)
+	- Don't BUG_ON() uptodate and/or mapped buffers throughout aops.c in
+	  readpage and read_block functions. Reasoning same as above (i.e. I/O
+	  error retries and future write code paths.)
+
+2.0.2 - Minor updates and cleanups.
+
+	- Cleanup: rename mst.c::__post_read_mst_fixup to post_write_mst_fixup
+	  and cleanup the code a bit, removing the unused size parameter.
+	- Change default fmask to 0177 and update documentation.
+	- Change attrib.c::get_attr_search_ctx() to return the search context
+	  directly instead of taking the address of a pointer. A return value
+	  of NULL means the allocation failed. Updated all callers
+	  appropriately.
+	- Update to 2.5.9 kernel (preserving backwards compatibility) by
+	  replacing all occurences of page->buffers with page_buffers(page).
+	- Fix minor bugs in run list merging, also minor cleanup.
+	- Updates to bootsector layout and mft mirror contents descriptions.
+	- Small bug fix in error detection in unistr.c and some cleanups.
+	- Grow name buffer allocations in unistr.c in aligned mutlipled of 64
+	  bytes.
+
+2.0.1 - Minor updates.
+
+	- Make default umask correspond to documentation.
+	- Improve documentation.
+	- Set default mode to include execute bit. The {u,f,d}mask can be used
+	  to take it away if desired. This allows binaries to be executed from
+	  a mounted ntfs partition.
+
+2.0.0 - New version number. Remove TNG from the name. Now in the kernel.
+
+	- Add kill_super, just keeping up with the vfs changes in the kernel.
+	- Repeat some changes from tng-0.0.8 that somehow got lost on the way
+	  from the CVS import into BitKeeper.
+	- Begin to implement proper handling of allocated_size vs
+	  initialized_size vs data_size (i.e. i_size). Done are
+	  mft.c::ntfs_mft_readpage(), aops.c::end_buffer_read_index_async(),
+	  and attrib.c::load_attribute_list().
+	- Lock the run list in attrib.c::load_attribute_list() while using it.
+	- Fix memory leak in ntfs_file_read_compressed_block() and generally
+	  clean up compress.c a little, removing some uncommented/unused debug
+	  code.
+	- Tidy up dir.c a little bit.
+	- Don't bother getting the run list in inode.c::ntfs_read_inode().
+	- Merge mft.c::ntfs_mft_readpage() and aops.c::ntfs_index_readpage()
+	  creating aops.c::ntfs_mst_readpage(), improving the handling of
+	  holes and overflow in the process and implementing the correct
+	  equivalent of ntfs_file_get_block() in ntfs_mst_readpage() itself.
+	  I am aiming for correctness at the moment. Modularisation can come
+	  later.
+	- Rename aops.c::end_buffer_read_index_async() to
+	  end_buffer_read_mst_async() and optimize the overflow checking and
+	  handling.
+	- Use the host of the mftbmp address space mapping to hold the ntfs
+	  volume. This is needed so the async i/o completion handler can
+	  retrieve a pointer to the volume. Hopefully this will not cause
+	  problems elsewhere in the kernel... Otherwise will need to use a
+	  fake inode.
+	- Complete implementation of proper handling of allocated_size vs
+	  initialized_size vs data_size (i.e. i_size) in whole driver.
+	  Basically aops.c is now completely rewritten.
+	- Change NTFS driver name to just NTFS and set version number to 2.0.0
+	  to make a clear distinction from the old driver which is still on
+	  version 1.1.22.
+
+tng-0.0.8 - 08/03/2002 - Now using BitKeeper, http://linux-ntfs.bkbits.net/
+
+	- Replace bdevname(sb->s_dev) with sb->s_id.
+	- Remove now superfluous new-line characters in all callers of
+	  ntfs_debug().
+	- Apply kludge in ntfs_read_inode(), setting i_nlink to 1 for
+	  directories. Without this the "find" utility gets very upset which is
+	  fair enough as Linux/Unix do not support directory hard links.
+	- Further run list merging work. (Richard Russon)
+	- Backwards compatibility for gcc-2.95. (Richard Russon)
+	- Update to kernel 2.5.5-pre1 and rediff the now tiny patch.
+	- Convert to new file system declaration using ->ntfs_get_sb() and
+	  replacing ntfs_read_super() with ntfs_fill_super().
+	- Set s_maxbytes to MAX_LFS_FILESIZE to avoid page cache page index
+	  overflow on 32-bit architectures.
+	- Cleanup upcase loading code to use ntfs_(un)map_page().
+	- Disable/reenable preemtion in critical sections of compession engine.
+	- Replace device size determination in ntfs_fill_super() with
+	  sb->s_bdev->bd_inode->i_size (in bytes) and remove now superfluous
+	  function super.c::get_nr_blocks().
+	- Implement a mount time option (show_inodes) allowing choice of which
+	  types of inode names readdir() returns and modify ntfs_filldir()
+	  accordingly. There are several parameters to show_inodes:
+		system:	system files
+	  	win32:	long file names (including POSIX file names) [DEFAULT]
+		long:	same as win32
+	  	dos:	short file names only (excluding POSIX file names)
+		short:	same as dos
+		posix:	same as both win32 and dos
+	  	all:	all file names
+	  Note that the options are additive, i.e. specifying:
+		-o show_inodes=system,show_inodes=win32,show_inodes=dos
+	  is the same as specifying:
+		-o show_inodes=all
+	  Note that the "posix" and "all" options will show all directory
+	  names, BUT the link count on each directory inode entry is set to 1,
+	  due to Linux not supporting directory hard links. This may well
+	  confuse some userspace applications, since the directory names will
+	  have the same inode numbers. Thus it is NOT advisable to use the
+	  "posix" or "all" options. We provide them only for completeness sake.
+	- Add copies of allocated_size, initialized_size, and compressed_size to
+	  the ntfs inode structure and set them up in
+	  inode.c::ntfs_read_inode(). These reflect the unnamed data attribute
+	  for files and the index allocation attribute for directories.
+	- Add copies of allocated_size and initialized_size to ntfs inode for
+	  $BITMAP attribute of large directories and set them up in
+	  inode.c::ntfs_read_inode().
+	- Add copies of allocated_size and initialized_size to ntfs volume for
+	  $BITMAP attribute of $MFT and set them up in
+	  super.c::load_system_files().
+	- Parse deprecated ntfs driver options (iocharset, show_sys_files,
+	  posix, and utf8) and tell user what the new options to use are. Note
+	  we still do support them but they will be removed with kernel 2.7.x.
+	- Change all occurences of integer long long printf formatting to hex
+	  as printk() will not support long long integer format if/when the
+	  div64 patch goes into the kernel.
+	- Make slab caches have stable names and change the names to what they
+	  were intended to be. These changes are required/made possible by the
+	  new slab cache name handling which removes the length limitation by
+	  requiring the caller of kmem_cache_create() to supply a stable name
+	  which is then referenced but not copied.
+	- Rename run_list structure to run_list_element and create a new
+	  run_list structure containing a pointer to a run_list_element
+	  structure and a read/write semaphore. Adapt all users of run lists
+	  to new scheme and take and release the lock as needed. This fixes a
+	  nasty race as the run_list changes even when inodes are locked for
+	  reading and even when the inode isn't locked at all, so we really
+	  needed the serialization. We use a semaphore rather than a spinlock
+	  as memory allocations can sleep and doing everything GFP_ATOMIC
+	  would be silly.
+	- Cleanup read_inode() removing all code checking for lowest_vcn != 0.
+	  This can never happen due to the nature of lookup_attr() and how we
+	  support attribute lists. If it did happen it would imply the inode
+	  being corrupt.
+	- Check for lowest_vcn != 0 in ntfs_read_inode() and mark the inode as
+	  bad if found.
+	- Update to 2.5.6-pre2 changes in struct address_space.
+	- Use parent_ino() when accessing d_parent inode number in dir.c.
+	- Import Sourceforge CVS repository into BitKeeper repository:
+		http://linux-ntfs.bkbits.net/ntfs-tng-2.5
+	- Update fs/Makefile, fs/Config.help, fs/Config.in, and
+	  Documentation/filesystems/ntfs.txt for NTFS TNG.
+	- Create kernel configuration option controlling whether debugging
+	  is enabled or not.
+	- Add the required export of end_buffer_io_sync() from the patches
+	  directory to the kernel code.
+	- Update inode.c::ntfs_show_options() with show_inodes mount option.
+	- Update errors mount option.
+
+tng-0.0.7 - 13/02/2002 - The driver is now feature complete for read-only!
+
+	- Cleanup mft.c and it's debug/error output in particular. Fix a minor
+	  bug in mapping of extent inodes. Update all the comments to fit all
+	  the recent code changes.
+	- Modify vcn_to_lcn() to cope with entirely unmapped run lists.
+	- Cleanups in compress.c, mostly comments and folding help.
+	- Implement attrib.c::map_run_list() as a generic helper.
+	- Make compress.c::ntfs_file_read_compressed_block() use map_run_list()
+	  thus making code shorter and enabling attribute list support.
+	- Cleanup incorrect use of [su]64 with %L printf format specifier in
+	  all source files. Type casts to [unsigned] long long added to correct
+	  the mismatches (important for architectures which have long long not
+	  being 64 bits).
+	- Merge async io completion handlers for directory indexes and $MFT
+	  data into one by setting the index_block_size{_bits} of the ntfs
+	  inode for $MFT to the mft_record_size{_bits} of the ntfs_volume.
+	- Cleanup aops.c, update comments.
+	- Make ntfs_file_get_block() use map_run_list() so all files now
+	  support attribute lists.
+	- Make ntfs_dir_readpage() almost verbatim copy of
+	  block_read_full_page() by using ntfs_file_get_block() with only real
+	  difference being the use of our own async io completion handler
+	  rather than the default one, thus reducing the amount of code and
+	  automatically enabling attribute list support for directory indices.
+	- Fix bug in load_attribute_list() - forgot to call brelse in error
+	  code path.
+	- Change parameters to find_attr() and lookup_attr(). We no longer
+	  pass in the upcase table and its length. These can be gotten from
+	  ctx->ntfs_ino->vol->upcase{_len}. Update all callers.
+	- Cleanups in attrib.c. 
+	- Implement merging of run lists, attrib.c::merge_run_lists() and its
+	  helpers. (Richard Russon)
+	- Attribute lists part 2, attribute extents and multi part run lists:
+	  enable proper support for LCN_RL_NOT_MAPPED and automatic mapping of
+	  further run list parts via attrib.c::map_run_list().
+	- Tiny endianness bug fix in decompress_mapping_pairs().
+
+tng-0.0.6 - Encrypted directories, bug fixes, cleanups, debugging enhancements.
+
+	- Enable encrypted directories. (Their index root is marked encrypted
+	  to indicate that new files in that directory should be created
+	  encrypted.)
+	- Fix bug in NInoBmpNonResident() macro. (Cut and paste error.)
+	- Enable $Extend system directory. Most (if not all) extended system
+	  files do not have unnamed data attributes so ntfs_read_inode() had to
+	  special case them but that is ok, as the special casing recovery
+	  happens inside an error code path so there is zero slow down in the
+	  normal fast path. The special casing is done by introducing a new
+	  function inode.c::ntfs_is_extended_system_file() which checks if any
+	  of the hard links in the inode point to $Extend as being their parent
+	  directory and if they do we assume this is an extended system file.
+	- Create a sysctl/proc interface to allow {dis,en}abling of debug output
+	  when compiled with -DDEBUG. Default is debug messages to be disabled.
+	  To enable them, one writes a non-zero value to /proc/sys/fs/ntfs-debug
+	  (if /proc is enabled) or uses sysctl(2) to effect the same (if sysctl
+	  interface is enabled). Inspired by old ntfs driver.
+	- Add debug_msgs insmod/kernel boot parameter to set whether debug
+	  messages are {dis,en}abled. This is useful to enable debug messages
+	  during ntfs initialization and is the only way to activate debugging
+	  when the sysctl interface is not enabled.
+	- Cleanup debug output in various places.
+	- Remove all dollar signs ($) from the source (except comments) to
+	  enable compilation on architectures whose gcc compiler does not
+	  support dollar signs in the names of variables/constants. Attribute
+	  types now start with AT_ instead of $ and $I30 is now just I30.
+	- Cleanup ntfs_lookup() and add consistency check of sequence numbers.
+	- Load complete run list for $MFT/$BITMAP during mount and cleanup
+	  access functions. This means we now cope with $MFT/$BITMAP being
+	  spread accross several mft records.
+	- Disable modification of mft_zone_multiplier on remount. We can always
+	  reenable this later on if we really want to, but we will need to make
+	  sure we readjust the mft_zone size / layout accordingly.
+
+tng-0.0.5 - Modernize for 2.5.x and further in line-ing with Al Viro's comments.
+
+	- Use sb_set_blocksize() instead of set_blocksize() and verify the
+	  return value.
+	- Use sb_bread() instead of bread() throughout.
+	- Add index_vcn_size{_bits} to ntfs_inode structure to store the size
+	  of a directory index block vcn. Apply resulting simplifications in
+	  dir.c everywhere.
+	- Fix a small bug somewhere (but forgot what it was).
+	- Change ntfs_{debug,error,warning} to enable gcc to do type checking
+	  on the printf-format parameter list and fix bugs reported by gcc
+	  as a result. (Richard Russon)
+	- Move inode allocation strategy to Al's new stuff but maintain the
+	  divorce of ntfs_inode from struct inode. To achieve this we have two
+	  separate slab caches, one for big ntfs inodes containing a struct
+	  inode and pure ntfs inodes and at the same time fix some faulty
+	  error code paths in ntfs_read_inode().
+	- Show mount options in proc (inode.c::ntfs_show_options()).
+
+tng-0.0.4 - Big changes, getting in line with Al Viro's comments.
+
+	- Modified (un)map_mft_record functions to be common for read and write
+	  case. To specify which is which, added extra parameter at front of
+	  parameter list. Pass either READ or WRITE to this, each has the
+	  obvious meaning.
+	- General cleanups to allow for easier folding in vi.
+	- attrib.c::decompress_mapping_pairs() now accepts the old run list
+	  argument, and invokes attrib.c::merge_run_lists() to merge the old
+	  and the new run lists.
+	- Removed attrib.c::find_first_attr().
+	- Implemented loading of attribute list and complete run list for $MFT.
+	  This means we now cope with $MFT being spread across several mft
+	  records.
+	- Adapt to 2.5.2-pre9 and the changed create_empty_buffers() syntax.
+	- Adapt major/minor/kdev_t/[bk]devname stuff to new 2.5.x kernels.
+	- Make ntfs_volume be allocated via kmalloc() instead of using a slab
+	  cache. There are too little ntfs_volume structures at any one time
+	  to justify a private slab cache.
+	- Fix bogus kmap() use in async io completion. Now use kmap_atomic().
+	  Use KM_BIO_IRQ on advice from IRC/kernel...
+	- Use ntfs_map_page() in map_mft_record() and create ->readpage method
+	  for reading $MFT (ntfs_mft_readpage). In the process create dedicated
+	  address space operations (ntfs_mft_aops) for $MFT inode mapping. Also
+	  removed the now superfluous exports from the kernel core patch.
+	- Fix a bug where kfree() was used insted of ntfs_free().
+	- Change map_mft_record() to take ntfs_inode as argument instead of
+	  vfs inode. Dito for unmap_mft_record(). Adapt all callers.
+	- Add pointer to ntfs_volume to ntfs_inode.
+	- Add mft record number and sequence number to ntfs_inode. Stop using
+	  i_ino and i_generation for in-driver purposes.
+	- Implement attrib.c::merge_run_lists(). (Richard Russon)
+	- Remove use of proper inodes by extent inodes. Move i_ino and
+	  i_generation to ntfs_inode to do this. Apply simplifications that
+	  result and remove iget_no_wait(), etc.
+	- Pass ntfs_inode everywhere in the driver (used to be struct inode).
+	- Add reference counting in ntfs_inode for the ntfs inode itself and
+	  for the mapped mft record.
+	- Extend mft record mapping so we can (un)map extent mft records (new
+	  functions (un)map_extent_mft_record), and so mappings are reference
+	  counted and don't have to happen twice if already mapped - just ref
+	  count increases.
+	- Add -o iocharset as alias to -o nls for backwards compatibility.
+	- The latest core patch is now tiny. In fact just a single additional
+	  export is necessary over the base kernel.
+
+tng-0.0.3 - Cleanups, enhancements, bug fixes.
+
+	- Work on attrib.c::decompress_mapping_pairs() to detect base extents
+	  and setup the run list appropriately using knowledge provided by the
+	  sizes in the base attribute record.
+	- Balance the get_/put_attr_search_ctx() calls so we don't leak memory
+	  any more.
+	- Introduce ntfs_malloc_nofs() and ntfs_free() to allocate/free a single
+	  page or use vmalloc depending on the amount of memory requested.
+	- Cleanup error output. The __FUNCTION__ "(): " is now added
+	  automatically. Introduced a new header file debug.h to support this
+	  and also moved ntfs_debug() function into it.
+	- Make reading of compressed files more intelligent and especially get
+	  rid of the vmalloc_nofs() from readpage(). This now uses per CPU
+	  buffers (allocated at first mount with cluster size <= 4kiB and
+	  deallocated on last umount with cluster size <= 4kiB), and
+	  asynchronous io for the compressed data using a list of buffer heads.
+	  Er, we use synchronous io as async io only works on whole pages
+	  covered by buffers and not on individual buffer heads...
+	- Bug fix for reading compressed files with sparse compression blocks.
+
+tng-0.0.2 - Now handles larger/fragmented/compressed volumes/files/dirs.
+
+	- Fixed handling of directories when cluster size exceeds index block
+	  size.
+	- Hide DOS only name space directory entries from readdir() but allow
+	  them in lookup(). This should fix the problem that Linux doesn't
+	  support directory hard links, while still allowing access to entries
+	  via their short file name. This also has the benefit of mimicking
+	  what Windows users are used to, so it is the ideal solution.
+	- Implemented sync_page everywhere so no more hangs in D state when
+	  waiting for a page.
+	- Stop using bforget() in favour of brelse().
+	- Stop locking buffers unnecessarily.
+	- Implemented compressed files (inode->mapping contains uncompressed
+	  data, raw compressed data is currently bread() into a vmalloc()ed
+	  memory buffer).
+	- Enable compressed directories. (Their index root is marked compressed
+	  to indicate that new files in that directory should be created
+	  compressed.)
+	- Use vsnprintf rather than vsprintf in the ntfs_error and ntfs_warning
+	  functions. (Thanks to Will Dyson for pointing this out.)
+	- Moved the ntfs_inode and ntfs_volume (the former ntfs_inode_info and
+	  ntfs_sb_info) out of the common inode and super_block structures and
+	  started using the generic_ip and generic_sbp pointers instead. This
+	  makes ntfs entirely private with respect to the kernel tree.
+	- Detect compiler version and abort with error message if gcc less than
+	  2.96 is used.
+	- Fix bug in name comparison function in unistr.c.
+	- Implement attribute lists part 1, the infrastructure: search contexts
+	  and operations, find_external_attr(), lookup_attr()) and make the
+	  code use the infrastructure.
+	- Fix stupid buffer overflow bug that became apparent on larger run
+	  list containing attributes.
+	- Fix bugs in readdir() that became apparent on larger directories.
+
+	The driver is now really useful and survives the test
+		find . -type f -exec md5sum "{}" \;
+	without any error messages on a over 1GiB sized partition with >16k
+	files on it, including compressed files and directories and many files
+	and directories with attribute lists.
+
+tng-0.0.1 - The first useful version.
+
+	- Added ntfs_lookup().
+	- Added default upcase generation and handling.
+	- Added compile options to be shown on module init.
+	- Many bug fixes that were "hidden" before.
+	- Update to latest kernel.
+	- Added ntfs_readdir().
+	- Added file operations for mmap(), read(), open() and llseek(). We just
+	  use the generic ones. The whole point of going through implementing
+	  readpage() methods and where possible get_block() call backs is that
+	  this allows us to make use of the generic high level methods provided
+	  by the kernel.
+
+	The driver is now actually useful! Yey. (-: It undoubtedly has got bugs
+	though and it doesn't implement accesssing compressed files yet. Also,
+	accessing files with attribute list attributes is not implemented yet
+	either. But for small or simple file systems it should work and allow
+	you to list directories, use stat on directory entries and the file
+	system, open, read, mmap and llseek around in files. A big mile stone
+	has been reached!
+
+tng-0.0.0 - Initial version tag.
+
+	Initial driver implementation. The driver can mount and umount simple
+	NTFS file systems (i.e. ones without attribute lists in the system
+	files). If the mount fails there might be problems in the error handling
+	code paths, so be warned. Otherwise it seems to be loading the system
+	files nicely and the mft record read mapping/unmapping seems to be
+	working nicely, too. Proof of inode metadata in the page cache and non-
+	resident file unnamed stream data in the page cache concepts is thus
+	complete.
+

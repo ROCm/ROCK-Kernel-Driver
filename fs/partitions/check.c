@@ -251,8 +251,18 @@ static void check_partition(struct gendisk *hd, kdev_t dev, int first_part_minor
 	else
 		printk(KERN_INFO " %s:", disk_name(hd, minor(dev), buf));
 	bdev = bdget(kdev_t_to_nr(dev));
+	bdev->bd_contains = bdev;
 	bdev->bd_inode->i_size = (loff_t)hd->part[minor(dev)].nr_sects << 9;
-	bdev->bd_inode->i_blkbits = blksize_bits(block_size(dev));
+	if (!bdev->bd_openers) {
+		unsigned bsize = bdev_hardsect_size(bdev);
+		while (bsize < PAGE_CACHE_SIZE) {
+			if (bdev->bd_inode->i_size & bsize)
+				break;
+			bsize <<= 1;
+		}
+		bdev->bd_block_size = bsize;
+		bdev->bd_inode->i_blkbits = blksize_bits(bsize);
+	}
 	for (i = 0; check_part[i]; i++) {
 		int res;
 		res = check_part[i](hd, bdev, first_sector, first_part_minor);
@@ -431,8 +441,8 @@ unsigned char *read_dev_sector(struct block_device *bdev, unsigned long n, Secto
 	page = read_cache_page(mapping, n/sect,
 			(filler_t *)mapping->a_ops->readpage, NULL);
 	if (!IS_ERR(page)) {
-		wait_on_page(page);
-		if (!Page_Uptodate(page))
+		wait_on_page_locked(page);
+		if (!PageUptodate(page))
 			goto fail;
 		if (PageError(page))
 			goto fail;
@@ -476,12 +486,6 @@ int wipe_partitions(kdev_t dev)
 		g->part[minor].start_sect = 0;
 		g->part[minor].nr_sects = 0;
 	}
-
-	/* some places do blksize_size[major][minor] = 1024,
-	   as preparation for reading partition table - superfluous */
-	/* sd.c used to set blksize_size to 2048 in case
-	   rscsi_disks[target].device->sector_size == 2048 */
-
 	return 0;
 }
 

@@ -250,8 +250,8 @@ int timer_interrupt(struct pt_regs * regs)
 {
 	int next_dec;
 	unsigned long cur_tb;
-	struct Paca * paca = (struct Paca *)mfspr(SPRG3);
-	unsigned long cpu = paca->xPacaIndex;
+	struct paca_struct *lpaca = get_paca();
+	unsigned long cpu = lpaca->xPacaIndex;
 	struct ItLpQueue * lpq;
 
 	irq_enter(cpu);
@@ -261,16 +261,16 @@ int timer_interrupt(struct pt_regs * regs)
 		ppc_do_profile(instruction_pointer(regs));
 #endif
 
-	paca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
+	lpaca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
 
-	while (paca->next_jiffy_update_tb <= (cur_tb = get_tb())) {
+	while (lpaca->next_jiffy_update_tb <= (cur_tb = get_tb())) {
 
 #ifdef CONFIG_SMP
 		smp_local_timer_interrupt(regs);
 #endif
 		if (cpu == 0) {
 			write_lock(&xtime_lock);
-			tb_last_stamp = paca->next_jiffy_update_tb;
+			tb_last_stamp = lpaca->next_jiffy_update_tb;
 			do_timer(regs);
 			timer_sync_xtime( cur_tb );
 			timer_check_rtc();
@@ -278,15 +278,15 @@ int timer_interrupt(struct pt_regs * regs)
 			if ( adjusting_time && (time_adjust == 0) )
 				ppc_adjtimex();
 		}
-		paca->next_jiffy_update_tb += tb_ticks_per_jiffy;
+		lpaca->next_jiffy_update_tb += tb_ticks_per_jiffy;
 	}
 	
-	next_dec = paca->next_jiffy_update_tb - cur_tb;
-	if (next_dec > paca->default_decr)
-        	next_dec = paca->default_decr;
+	next_dec = lpaca->next_jiffy_update_tb - cur_tb;
+	if (next_dec > lpaca->default_decr)
+        	next_dec = lpaca->default_decr;
 	set_dec(next_dec);
 
-	lpq = paca->lpQueuePtr;
+	lpq = lpaca->lpQueuePtr;
 	if (lpq && ItLpQueue_isLpIntPending(lpq))
 		lpEvent_count += ItLpQueue_process(lpq, regs); 
 

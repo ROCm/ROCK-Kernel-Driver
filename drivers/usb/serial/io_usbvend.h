@@ -92,6 +92,20 @@
 #define ION_DEVICE_ID_EDGEPORT_8I		0x014	// Edgeport/8 RS422 (single-CPU)
 #define ION_DEVICE_ID_MT4X56USB			0x1403	// OEM device
 
+// BlackBox OEM devices
+#define ION_DEVICE_ID_BB_EDGEPORT_4		0x001	// Edgeport/4 RS232
+#define ION_DEVICE_ID_BB_EDGEPORT_4T		0x004	// Edgeport/4 RS232 for Telxon (aka "Fleetport")
+#define ION_DEVICE_ID_BB_EDGEPORT_2		0x005	// Edgeport/2 RS232
+#define ION_DEVICE_ID_BB_EDGEPORT_4I		0x006	// Edgeport/4 RS422
+#define ION_DEVICE_ID_BB_EDGEPORT_2I		0x007	// Edgeport/2 RS422/RS485
+#define	ION_DEVICE_ID_BB_EDGEPORT_421		0x00C	// Edgeport/421 Hub+RS232+Parallel
+#define	ION_DEVICE_ID_BB_EDGEPORT_21		0x00D	// Edgeport/21  RS232+Parallel
+#define ION_DEVICE_ID_BB_EDGEPORT_8_DUAL_CPU	0x00E	// Half of an Edgeport/8 (the kind with 2 EP/4s on 1 PCB)
+#define ION_DEVICE_ID_BB_EDGEPORT_8		0x00F	// Edgeport/8 (single-CPU)
+#define ION_DEVICE_ID_BB_EDGEPORT_2_DIN		0x010	// Edgeport/2 RS232 with Apple DIN connector
+#define ION_DEVICE_ID_BB_EDGEPORT_4_DIN		0x011	// Edgeport/4 RS232 with Apple DIN connector
+#define ION_DEVICE_ID_BB_EDGEPORT_16_DUAL_CPU	0x012	// Half of an Edgeport/16 (the kind with 2 EP/8s)
+#define ION_DEVICE_ID_BB_EDGEPORT_8I		0x014	// Edgeport/8 RS422 (single-CPU)
 // These IDs are used by the Edgeport.exe program for uninstalling.
 // 
 #define EDGEPORT_DEVICE_IDS	{0x001, 0x003, 0x004, 0x005, 0x006, 0x007, 0x00B, \

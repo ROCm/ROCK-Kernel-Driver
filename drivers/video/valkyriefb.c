@@ -75,7 +75,6 @@ static int default_vmode = VMODE_NVRAM;
 static int default_cmode = CMODE_NVRAM;
 static char fontname[40] __initdata = { 0 };
 
-static int currcon = 0;
 static int switching = 0;
 
 struct fb_par_valkyrie {
@@ -126,8 +125,9 @@ static int valkyrie_set_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *info);
 static int valkyrie_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
-static int valkyrie_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info);
+static int valkyriefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			     u_int transp, struct fb_info *info);
+static int valkyriefb_blank(int blank_mode, struct fb_info *info);
 
 static int read_valkyrie_sense(struct fb_info_valkyrie *p);
 static inline int valkyrie_vram_reqd(int video_mode, int color_mode);
@@ -151,14 +151,13 @@ static struct fb_ops valkyriefb_ops = {
 	fb_get_var:	valkyrie_get_var,
 	fb_set_var:	valkyrie_set_var,
 	fb_get_cmap:	valkyrie_get_cmap,
-	fb_set_cmap:	valkyrie_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	valkyriefb_setcolreg,
+	fb_blank:	valkyriefb_blank,
 };
 
 static int valkyriefb_getcolreg(u_int regno, u_int *red, u_int *green,
 			     u_int *blue, u_int *transp, struct fb_info *info);
-static int valkyriefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			     u_int transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
 
 static int valkyrie_get_fix(struct fb_fix_screeninfo *fix, int con,
 			 struct fb_info *info)
@@ -224,7 +223,7 @@ static int valkyrie_set_var(struct fb_var_screeninfo *var, int con,
 		/* Don't want to do this if just switching consoles. */
 		(*info->changevar)(con);
 	}
-	if (con == currcon)
+	if (con == info->currcon)
 		valkyrie_set_par(&par, p);
 	if (depthchange)
 		if ((err = fb_alloc_cmap(&disp->cmap, 0, 0)))
@@ -237,7 +236,7 @@ static int valkyrie_set_var(struct fb_var_screeninfo *var, int con,
 static int valkyrie_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info)
 {
-	if (con == currcon)	{
+	if (con == info->currcon)	{
 		/* current console? */
 		return fb_get_cmap(cmap, kspc, valkyriefb_getcolreg, info);
 	}
@@ -251,38 +250,17 @@ static int valkyrie_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 	return 0;
 }
 
-static int valkyrie_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			 struct fb_info *info)
-{
-	struct display *disp = &fb_display[con];
-	int err;
-
-	if (disp->cmap.len == 0) {
-		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		err = fb_alloc_cmap(&disp->cmap, size, 0);
-		if (err) {
-			return err;
-		}
-	}
-
-	if (con == currcon) {
-		return fb_set_cmap(cmap, kspc, valkyriefb_setcolreg, info);
-	}
-	fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
-	return 0;
-}
-
 static int valkyriefb_switch(int con, struct fb_info *fb)
 {
 	struct fb_info_valkyrie *info = (struct fb_info_valkyrie *) fb;
 	struct fb_par_valkyrie par;
 
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, valkyriefb_getcolreg,
+	if (fb_display[fb->currcon].cmap.len)
+		fb_get_cmap(&fb_display[fb->currcon].cmap, 1, valkyriefb_getcolreg,
 			    fb);
-	currcon = con;
+	fb->currcon = con;
 #if 1
-	valkyrie_var_to_par(&fb_display[currcon].var, &par, fb);
+	valkyrie_var_to_par(&fb_display[fb->currcon].var, &par, fb);
 	valkyrie_set_par(&par, info);
 	do_install_cmap(con, fb);
 #else
@@ -302,7 +280,7 @@ static int valkyriefb_updatevar(int con, struct fb_info *info)
 	return 0;
 }
 
-static void valkyriefb_blank(int blank_mode, struct fb_info *info)
+static int valkyriefb_blank(int blank_mode, struct fb_info *info)
 {
 /*
  *  Blank the screen if blank_mode != 0, else unblank. If blank_mode == NULL
@@ -342,6 +320,7 @@ static void valkyriefb_blank(int blank_mode, struct fb_info *info)
 			break;
 		}
 	}
+	return 0;
 }
 
 static int valkyriefb_getcolreg(u_int regno, u_int *red, u_int *green,
@@ -389,21 +368,6 @@ static int valkyriefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	}
 
 	return 0;
-}
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != currcon)
-		return;
-	if (fb_display[con].cmap.len) {
-		fb_set_cmap(&fb_display[con].cmap, 1, valkyriefb_setcolreg,
-			    info);
-	}
-	else {
-		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		fb_set_cmap(fb_default_cmap(size), 1, valkyriefb_setcolreg,
-			    info);
-	}
 }
 
 #ifdef CONFIG_FB_COMPAT_XPMAC
@@ -750,7 +714,6 @@ static void valkyrie_par_to_display(struct fb_par_valkyrie *par,
   struct display *disp, struct fb_fix_screeninfo *fix, struct fb_info_valkyrie *p)
 {
 	disp->var = p->var;
-	disp->screen_base = (char *) p->frame_buffer + 0x1000;
 	disp->visual = fix->visual;
 	disp->line_length = fix->line_length;
 
@@ -781,12 +744,13 @@ static void __init valkyrie_init_info(struct fb_info *info, struct fb_info_valky
 	strcpy(info->modename, p->fix.id);
 	info->node = NODEV;
 	info->fbops = &valkyriefb_ops;
+	info->screen_base = (char *) p->frame_buffer + 0x1000;
 	info->disp = &p->disp;
+	info->currcon = -1;
 	strcpy(info->fontname, fontname);
 	info->changevar = NULL;
 	info->switch_con = &valkyriefb_switch;
 	info->updatevar = &valkyriefb_updatevar;
-	info->blank = &valkyriefb_blank;
 	info->flags = FBINFO_FLAG_DEFAULT;
 }
 

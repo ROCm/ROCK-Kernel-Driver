@@ -579,7 +579,7 @@ cleanup_module(void)
 /* SA_RANDOM   - can be source for cert. random number generators */
 #define IP2_SA_FLAGS	0
 
-int __init
+int
 ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize) 
 {
 #ifdef	CONFIG_DEVFS_FS
@@ -973,6 +973,8 @@ retry:
 
 	return 0;
 }
+
+EXPORT_SYMBOL(ip2_loadmain);
 
 /******************************************************************************/
 /* Function:   ip2_init_board()                                               */

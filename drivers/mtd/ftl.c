@@ -95,8 +95,6 @@ MODULE_PARM(shuffle_freq, "i");
 /* Funky stuff for setting up a block device */
 #define MAJOR_NR		FTL_MAJOR
 #define DEVICE_NAME		"ftl"
-#define DEVICE_REQUEST		do_ftl_request
-#define DEVICE_ON(device)
 #define DEVICE_OFF(device)
 
 #define DEVICE_NR(minor)	((minor)>>5)
@@ -179,7 +177,6 @@ static struct mtd_notifier ftl_notifier = {
 
 static struct hd_struct ftl_hd[MINOR_NR(MAX_DEV, 0, 0)];
 static int ftl_sizes[MINOR_NR(MAX_DEV, 0, 0)];
-static int ftl_blocksizes[MINOR_NR(MAX_DEV, 0, 0)];
 
 static struct gendisk ftl_gendisk = {
     major:		FTL_MAJOR,
@@ -1347,13 +1344,10 @@ int init_ftl(void)
 	return -EAGAIN;
     }
     
-    for (i = 0; i < MINOR_NR(MAX_DEV, 0, 0); i++)
-	ftl_blocksizes[i] = 1024;
     for (i = 0; i < MAX_DEV*MAX_PART; i++) {
 	ftl_hd[i].nr_sects = 0;
 	ftl_hd[i].start_sect = 0;
     }
-    blksize_size[FTL_MAJOR] = ftl_blocksizes;
     ftl_gendisk.major = FTL_MAJOR;
     blk_init_queue(BLK_DEFAULT_QUEUE(FTL_MAJOR), &do_ftl_request);
     add_gendisk(&ftl_gendisk);

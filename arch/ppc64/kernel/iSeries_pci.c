@@ -35,7 +35,7 @@
 #include <asm/machdep.h>
 #include <asm/pci-bridge.h>
 #include <asm/ppcdebug.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/flight_recorder.h>
 #include <asm/pci_dma.h>
 
@@ -55,7 +55,6 @@ extern struct pci_controller** hose_tail;
 extern int    global_phb_number;
 extern int    panic_timeout;
 
-extern struct Naca *naca;
 extern struct device_node *allnodes;
 extern unsigned long phb_tce_table_init(struct pci_controller *phb);
 extern unsigned long iSeries_Base_Io_Memory;    
@@ -449,7 +448,7 @@ int iSeries_Scan_Bridge_Slot(HvBusNumber Bus, struct HvCallPci_BridgeInfo* Bridg
 	HvSubBusNumber SubBus = BridgeInfo->subBusNumber;
 	u16       VendorId    = 0;
 	int       HvRc        = 0;
-	int       Irq         = 0;
+	u8        Irq         = 0;
 	int       IdSel       = ISERIES_GET_DEVICE_FROM_SUBBUS(SubBus);
 	int       Function    = ISERIES_GET_FUNCTION_FROM_SUBBUS(SubBus);
 	HvAgentId AgentId     = ISERIES_PCI_AGENTID(IdSel, Function);
@@ -476,9 +475,14 @@ int iSeries_Scan_Bridge_Slot(HvBusNumber Bus, struct HvCallPci_BridgeInfo* Bridg
 					/**********************************************************/
 					/* FoundDevice: 0x18.28.10 = 0x12AE                       */
 					/**********************************************************/
-					HvCallPci_configStore8(Bus, SubBus, AgentId, PCI_INTERRUPT_LINE, Irq);  
 					PPCDBG(PPCDBG_BUSWALK,"PCI:- FoundDevice: 0x%02X.%02X.%02X = 0x%04X\n",
 					                                       Bus, SubBus, AgentId, VendorId);
+
+					HvRc = HvCallPci_configStore8(Bus, SubBus, AgentId, PCI_INTERRUPT_LINE, Irq);  
+					if( HvRc != 0) {
+						pci_Log_Error("PciCfgStore Irq Failed!",Bus,SubBus,AgentId,HvRc);
+					}
+
 					++DeviceCount;
 					DeviceNode = build_device_node(Bus, SubBus, EADsIdSel, Function);
 					DeviceNode->Vendor      = VendorId;

@@ -47,20 +47,20 @@ static struct inode_operations ramfs_dir_inode_operations;
  */
 static int ramfs_readpage(struct file *file, struct page * page)
 {
-	if (!Page_Uptodate(page)) {
+	if (!PageUptodate(page)) {
 		memset(kmap(page), 0, PAGE_CACHE_SIZE);
 		kunmap(page);
 		flush_dcache_page(page);
 		SetPageUptodate(page);
 	}
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
 }
 
 static int ramfs_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
 	void *addr = kmap(page);
-	if (!Page_Uptodate(page)) {
+	if (!PageUptodate(page)) {
 		memset(addr, 0, PAGE_CACHE_SIZE);
 		flush_dcache_page(page);
 		SetPageUptodate(page);

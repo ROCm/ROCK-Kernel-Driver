@@ -674,7 +674,6 @@ static int n_retries=6;
 
 static int ndrives;
 static u_char drv_pattern[NR_SBPCD]={speed_auto,speed_auto,speed_auto,speed_auto};
-static int sbpcd_blocksizes[NR_SBPCD];
 
 /*==========================================================================*/
 /*
@@ -5858,7 +5857,7 @@ int __init SBPCD_INIT(void)
 		goto init_done;
 #endif /* MODULE */
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DO_SBPCD_REQUEST, &sbpcd_lock);
 #ifdef DONT_MERGE_REQUESTS
 	(BLK_DEFAULT_QUEUE(MAJOR_NR))->back_merge_fn = dont_bh_merge_fn;
 	(BLK_DEFAULT_QUEUE(MAJOR_NR))->front_merge_fn = dont_bh_merge_fn;
@@ -5928,12 +5927,8 @@ int __init SBPCD_INIT(void)
 		{
                 	printk(" sbpcd: Unable to register with Uniform CD-ROm driver\n");
 		}
-		/*
-		 * set the block size
-		 */
-		sbpcd_blocksizes[j]=CD_FRAMESIZE;
 	}
-	blksize_size[MAJOR_NR]=sbpcd_blocksizes;
+	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), CD_FRAMESIZE);
 
 #ifndef MODULE
  init_done:

@@ -1,13 +1,12 @@
-/*
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
  *  Copyright (c) 1999-2000  Andre Hedrick <andre@linux-ide.org>
  *  Copyright (c) 1995-1998  Mark Lord
  *
  *  May be copied or modified under the terms of the GNU General Public License
  *
  *  Special Thanks to Mark for his Six years of work.
- */
-
-/*
+ *
  * This module provides support for the bus-master IDE DMA functions
  * of various PCI chipsets, including the Intel PIIX (i82371FB for
  * the 430 FX chipset), the PIIX3 (i82371SB for the 430 HX/VX and
@@ -65,12 +64,12 @@
  *
  * And, yes, Intel Zappa boards really *do* use both PIIX IDE ports.
  *
- * check_drive_lists(ide_drive_t *drive, int good_bad)
- *
  * ATA-66/100 and recovery functions, I forgot the rest......
  */
 
 #include <linux/config.h>
+#define __NO_VERSION__
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>
@@ -194,190 +193,81 @@ const char *bad_dma_drives[] = {"WDC AC11000H",
 #endif
 
 /*
- * dma_intr() is the handler for disk read/write DMA interrupts
+ * This is the handler for disk read/write DMA interrupts.
  */
-ide_startstop_t ide_dma_intr (ide_drive_t *drive)
+ide_startstop_t ide_dma_intr(struct ata_device *drive, struct request *rq)
 {
-	byte stat, dma_stat;
+	u8 stat, dma_stat;
 
-	dma_stat = drive->channel->dmaproc(ide_dma_end, drive);
-	stat = GET_STAT();			/* get drive status */
-	if (OK_STAT(stat,DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
+	dma_stat = udma_stop(drive);
+	if (OK_STAT(stat = GET_STAT(),DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
 		if (!dma_stat) {
-			struct request *rq = HWGROUP(drive)->rq;
-
-			__ide_end_request(drive, 1, rq->nr_sectors);
+			__ide_end_request(drive, rq, 1, rq->nr_sectors);
 			return ide_stopped;
 		}
-		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n",
+		printk(KERN_ERR "%s: dma_intr: bad DMA status (dma_stat=%x)\n",
 		       drive->name, dma_stat);
 	}
 	return ide_error(drive, "dma_intr", stat);
-}
-
-int ide_build_sglist(struct ata_channel *hwif, struct request *rq)
-{
-	request_queue_t *q = &hwif->drives[DEVICE_NR(rq->rq_dev) & 1].queue;
-	struct ata_request *ar = rq->special;
-
-	if (!(ar->ar_flags & ATA_AR_SETUP)) {
-		ar->ar_flags |= ATA_AR_SETUP;
-		ar->ar_sg_nents = blk_rq_map_sg(q, rq, ar->ar_sg_table);
-	}
-
-	if (rq->q && ar->ar_sg_nents > rq->nr_phys_segments) {
-		printk("%s: received %d phys segments, build %d\n", __FILE__, rq->nr_phys_segments, ar->ar_sg_nents);
-		return 0;
-	} else if (!ar->ar_sg_nents) {
-		printk("%s: zero segments in request\n", __FILE__);
-		return 0;
-	}
-
-	if (rq_data_dir(rq) == READ)
-		ar->ar_sg_ddir = PCI_DMA_FROMDEVICE;
-	else
-		ar->ar_sg_ddir = PCI_DMA_TODEVICE;
-
-	return pci_map_sg(hwif->pci_dev, ar->ar_sg_table, ar->ar_sg_nents, ar->ar_sg_ddir);
 }
 
 /*
  * FIXME: taskfiles should be a map of pages, not a long virt address... /jens
  * FIXME: I agree with Jens --mdcki!
  */
-static int raw_build_sglist(struct ata_channel *ch, struct request *rq)
+static int build_sglist(struct ata_channel *ch, struct request *rq)
 {
-	struct ata_request *ar = rq->special;
-	struct scatterlist *sg = ar->ar_sg_table;
-	struct ata_taskfile *args = &ar->ar_task;
-	unsigned char *virt_addr = rq->buffer;
-	int sector_count = rq->nr_sectors;
+	struct scatterlist *sg = ch->sg_table;
 	int nents = 0;
 
-	if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
-		ar->ar_sg_ddir = PCI_DMA_TODEVICE;
-	else
-		ar->ar_sg_ddir = PCI_DMA_FROMDEVICE;
-
-	if (sector_count > 128) {
-		memset(&sg[nents], 0, sizeof(*sg));
-
-		sg[nents].page = virt_to_page(virt_addr);
-		sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
-		sg[nents].length = 128  * SECTOR_SIZE;
-		nents++;
-		virt_addr = virt_addr + (128 * SECTOR_SIZE);
-		sector_count -= 128;
-	}
-	memset(&sg[nents], 0, sizeof(*sg));
-	sg[nents].page = virt_to_page(virt_addr);
-	sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
-	sg[nents].length =  sector_count  * SECTOR_SIZE;
-	nents++;
-
-	return pci_map_sg(ch->pci_dev, sg, nents, ar->ar_sg_ddir);
-}
-
-/*
- * Prepare a dma request.
- * Returns 0 if all went okay, returns 1 otherwise.
- * This may also be invoked from trm290.c
- */
-int ide_build_dmatable(ide_drive_t *drive, struct request *rq,
-		       ide_dma_action_t func)
-{
-	struct ata_channel *hwif = drive->channel;
-#ifdef CONFIG_BLK_DEV_TRM290
-	unsigned int is_trm290_chipset = (hwif->chipset == ide_trm290);
+	if (rq->flags & REQ_DRIVE_ACB) {
+		struct ata_taskfile *args = rq->special;
+#if 1
+		unsigned char *virt_addr = rq->buffer;
+		int sector_count = rq->nr_sectors;
 #else
-	const int is_trm290_chipset = 0;
+		nents = blk_rq_map_sg(rq->q, rq, ch->sg_table);
+
+		if (nents > rq->nr_segments)
+			printk("ide-dma: received %d segments, build %d\n", rq->nr_segments, nents);
 #endif
-	unsigned int count = 0;
-	int i;
-	struct scatterlist *sg;
-	struct ata_request *ar = rq->special;
-	unsigned int *table = ar->ar_dmatable_cpu;
 
-	if (rq->flags & REQ_DRIVE_TASKFILE)
-		ar->ar_sg_nents = raw_build_sglist(hwif, rq);
-	else
-		ar->ar_sg_nents = ide_build_sglist(hwif, rq);
-
-	if (!ar->ar_sg_nents)
-		return 0;
-
-	sg = ar->ar_sg_table;
-	i = ar->ar_sg_nents;
-	while (i) {
-		u32 cur_addr;
-		u32 cur_len;
-
-		cur_addr = sg_dma_address(sg);
-		cur_len = sg_dma_len(sg);
+		if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
+			ch->sg_dma_direction = PCI_DMA_TODEVICE;
+		else
+			ch->sg_dma_direction = PCI_DMA_FROMDEVICE;
 
 		/*
-		 * Fill in the dma table, without crossing any 64kB boundaries.
-		 * Most hardware requires 16-bit alignment of all blocks,
-		 * but the trm290 requires 32-bit alignment.
+		 * FIXME: This depends upon a hard coded page size!
 		 */
+		if (sector_count > 128) {
+			memset(&sg[nents], 0, sizeof(*sg));
 
-		while (cur_len) {
-			u32 xcount, bcount = 0x10000 - (cur_addr & 0xffff);
-
-			if (count++ >= PRD_ENTRIES) {
-				printk("ide-dma: req %p\n", HWGROUP(drive)->rq);
-				printk("count %d, sg_nents %d, cur_len %d, cur_addr %u\n", count, ar->ar_sg_nents, cur_len, cur_addr);
-				BUG();
-			}
-
-			if (bcount > cur_len)
-				bcount = cur_len;
-			*table++ = cpu_to_le32(cur_addr);
-			xcount = bcount & 0xffff;
-			if (is_trm290_chipset)
-				xcount = ((xcount >> 2) - 1) << 16;
-			if (xcount == 0x0000) {
-		        /*
-			 * Most chipsets correctly interpret a length of
-			 * 0x0000 as 64KB, but at least one (e.g. CS5530)
-			 * misinterprets it as zero (!). So here we break
-			 * the 64KB entry into two 32KB entries instead.
-			 */
-				if (count++ >= PRD_ENTRIES) {
-					pci_unmap_sg(hwif->pci_dev, sg,
-						     ar->ar_sg_nents,
-						     ar->ar_sg_ddir);
-					return 0;
-				}
-
-				*table++ = cpu_to_le32(0x8000);
-				*table++ = cpu_to_le32(cur_addr + 0x8000);
-				xcount = 0x8000;
-			}
-			*table++ = cpu_to_le32(xcount);
-			cur_addr += bcount;
-			cur_len -= bcount;
+			sg[nents].page = virt_to_page(virt_addr);
+			sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
+			sg[nents].length = 128  * SECTOR_SIZE;
+			++nents;
+			virt_addr = virt_addr + (128 * SECTOR_SIZE);
+			sector_count -= 128;
 		}
+		memset(&sg[nents], 0, sizeof(*sg));
+		sg[nents].page = virt_to_page(virt_addr);
+		sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
+		sg[nents].length =  sector_count  * SECTOR_SIZE;
+		++nents;
+	} else {
+		nents = blk_rq_map_sg(rq->q, rq, ch->sg_table);
 
-		sg++;
-		i--;
+		if (rq->q && nents > rq->nr_phys_segments)
+			printk("ide-dma: received %d phys segments, build %d\n", rq->nr_phys_segments, nents);
+
+		if (rq_data_dir(rq) == READ)
+			ch->sg_dma_direction = PCI_DMA_FROMDEVICE;
+		else
+			ch->sg_dma_direction = PCI_DMA_TODEVICE;
+
 	}
-
-	if (!count)
-		printk("%s: empty DMA table?\n", drive->name);
-	else if (!is_trm290_chipset)
-		*--table |= cpu_to_le32(0x80000000);
-
-	return count;
-}
-
-/* Teardown mappings after DMA has completed.  */
-void ide_destroy_dmatable(struct ata_device *d)
-{
-	struct pci_dev *dev = d->channel->pci_dev;
-	struct ata_request *ar = IDE_CUR_AR(d);
-
-	pci_unmap_sg(dev, ar->ar_sg_table, ar->ar_sg_nents, ar->ar_sg_ddir);
+	return pci_map_sg(ch->pci_dev, sg, nents, ch->sg_dma_direction);
 }
 
 /*
@@ -385,7 +275,7 @@ void ide_destroy_dmatable(struct ata_device *d)
  *  This is setup to be called as an extern for future support
  *  to other special driver code.
  */
-int check_drive_lists (ide_drive_t *drive, int good_bad)
+int check_drive_lists(struct ata_device *drive, int good_bad)
 {
 	struct hd_driveid *id = drive->id;
 
@@ -398,7 +288,7 @@ int check_drive_lists (ide_drive_t *drive, int good_bad)
 			printk("%s: Disabling (U)DMA for %s\n", drive->name, id->model);
 		return(blacklist);
 	}
-#else /* !CONFIG_IDEDMA_NEW_DRIVE_LISTINGS */
+#else
 	const char **list;
 
 	if (good_bad) {
@@ -419,92 +309,76 @@ int check_drive_lists (ide_drive_t *drive, int good_bad)
 			}
 		}
 	}
-#endif /* CONFIG_IDEDMA_NEW_DRIVE_LISTINGS */
+#endif
 	return 0;
 }
 
-int report_drive_dmaing (ide_drive_t *drive)
-{
-	struct hd_driveid *id = drive->id;
-
-	if ((id->field_valid & 4) && (eighty_ninty_three(drive)) &&
-	    (id->dma_ultra & (id->dma_ultra >> 14) & 3)) {
-		if ((id->dma_ultra >> 15) & 1) {
-			printk(", UDMA(mode 7)");	/* UDMA BIOS-enabled! */
-		} else {
-			printk(", UDMA(133)");	/* UDMA BIOS-enabled! */
-		}
-	} else if ((id->field_valid & 4) && (eighty_ninty_three(drive)) &&
-		  (id->dma_ultra & (id->dma_ultra >> 11) & 7)) {
-		if ((id->dma_ultra >> 13) & 1) {
-			printk(", UDMA(100)");	/* UDMA BIOS-enabled! */
-		} else if ((id->dma_ultra >> 12) & 1) {
-			printk(", UDMA(66)");	/* UDMA BIOS-enabled! */
-		} else {
-			printk(", UDMA(44)");	/* UDMA BIOS-enabled! */
-		}
-	} else if ((id->field_valid & 4) &&
-		   (id->dma_ultra & (id->dma_ultra >> 8) & 7)) {
-		if ((id->dma_ultra >> 10) & 1) {
-			printk(", UDMA(33)");	/* UDMA BIOS-enabled! */
-		} else if ((id->dma_ultra >> 9) & 1) {
-			printk(", UDMA(25)");	/* UDMA BIOS-enabled! */
-		} else {
-			printk(", UDMA(16)");	/* UDMA BIOS-enabled! */
-		}
-	} else if (id->field_valid & 4) {
-		printk(", (U)DMA");	/* Can be BIOS-enabled! */
-	} else {
-		printk(", DMA");
-	}
-	return 1;
-}
-
-static int config_drive_for_dma (ide_drive_t *drive)
+static int config_drive_for_dma(struct ata_device *drive)
 {
 	int config_allows_dma = 1;
 	struct hd_driveid *id = drive->id;
-	struct ata_channel *hwif = drive->channel;
+	struct ata_channel *ch = drive->channel;
 
 #ifdef CONFIG_IDEDMA_ONLYDISK
 	if (drive->type != ATA_DISK)
 		config_allows_dma = 0;
 #endif
 
-	if (id && (id->capability & 1) && hwif->autodma && config_allows_dma) {
+	if (id && (id->capability & 1) && ch->autodma && config_allows_dma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive))
-			return hwif->dmaproc(ide_dma_off, drive);
+		if (udma_black_list(drive)) {
+			udma_enable(drive, 0, 1);
+
+			return 0;
+		}
 
 		/* Enable DMA on any drive that has UltraDMA (mode 6/7/?) enabled */
 		if ((id->field_valid & 4) && (eighty_ninty_three(drive)))
-			if ((id->dma_ultra & (id->dma_ultra >> 14) & 2))
-				return hwif->dmaproc(ide_dma_on, drive);
+			if ((id->dma_ultra & (id->dma_ultra >> 14) & 2)) {
+				udma_enable(drive, 1, 1);
+
+				return 0;
+			}
 		/* Enable DMA on any drive that has UltraDMA (mode 3/4/5) enabled */
 		if ((id->field_valid & 4) && (eighty_ninty_three(drive)))
-			if ((id->dma_ultra & (id->dma_ultra >> 11) & 7))
-				return hwif->dmaproc(ide_dma_on, drive);
+			if ((id->dma_ultra & (id->dma_ultra >> 11) & 7)) {
+				udma_enable(drive, 1, 1);
+
+				return 0;
+			}
 		/* Enable DMA on any drive that has UltraDMA (mode 0/1/2) enabled */
 		if (id->field_valid & 4)	/* UltraDMA */
-			if ((id->dma_ultra & (id->dma_ultra >> 8) & 7))
-				return hwif->dmaproc(ide_dma_on, drive);
+			if ((id->dma_ultra & (id->dma_ultra >> 8) & 7)) {
+				udma_enable(drive, 1, 1);
+
+				return 0;
+			}
 		/* Enable DMA on any drive that has mode2 DMA (multi or single) enabled */
 		if (id->field_valid & 2)	/* regular DMA */
-			if ((id->dma_mword & 0x404) == 0x404 || (id->dma_1word & 0x404) == 0x404)
-				return hwif->dmaproc(ide_dma_on, drive);
+			if ((id->dma_mword & 0x404) == 0x404 || (id->dma_1word & 0x404) == 0x404) {
+				udma_enable(drive, 1, 1);
+
+				return 0;
+			}
 		/* Consult the list of known "good" drives */
-		if (ide_dmaproc(ide_dma_good_drive, drive))
-			return hwif->dmaproc(ide_dma_on, drive);
+		if (udma_white_list(drive)) {
+			udma_enable(drive, 1, 1);
+
+			return 0;
+		}
 	}
-	return hwif->dmaproc(ide_dma_off_quietly, drive);
+	udma_enable(drive, 0, 0);
+
+	return 0;
 }
 
 /*
  * 1 dma-ing, 2 error, 4 intr
  */
-static int dma_timer_expiry(ide_drive_t *drive)
+static int dma_timer_expiry(struct ata_device *drive, struct request *__rq)
 {
-	byte dma_stat = inb(drive->channel->dma_base+2);
+	/* FIXME: What's that? */
+	u8 dma_stat = inb(drive->channel->dma_base+2);
 
 #ifdef DEBUG
 	printk("%s: dma_timer_expiry: dma status == 0x%02x\n", drive->name, dma_stat);
@@ -515,7 +389,7 @@ static int dma_timer_expiry(ide_drive_t *drive)
 #endif
 
 	if (dma_stat & 2) {	/* ERROR */
-		byte stat = GET_STAT();
+		u8 stat = GET_STAT();
 		return ide_error(drive, "dma_timer_expiry", stat);
 	}
 	if (dma_stat & 1)	/* DMAing */
@@ -523,9 +397,155 @@ static int dma_timer_expiry(ide_drive_t *drive)
 	return 0;
 }
 
-static void ide_toggle_bounce(ide_drive_t *drive, int on)
+int ata_start_dma(struct ata_device *drive, struct request *rq)
 {
+	struct ata_channel *ch = drive->channel;
+	unsigned long dma_base = ch->dma_base;
+	unsigned int reading = 0;
+
+	if (rq_data_dir(rq) == READ)
+		reading = 1 << 3;
+
+	/* try PIO instead of DMA */
+	if (!udma_new_table(ch, rq))
+		return 1;
+
+	outl(ch->dmatable_dma, dma_base + 4); /* PRD table */
+	outb(reading, dma_base);		/* specify r/w */
+	outb(inb(dma_base+2)|6, dma_base+2);	/* clear INTR & ERROR flags */
+	drive->waiting_for_dma = 1;
+	return 0;
+}
+
+/*
+ * This initiates/aborts DMA read/write operations on a drive.
+ *
+ * The caller is assumed to have selected the drive and programmed the drive's
+ * sector address using CHS or LBA.  All that remains is to prepare for DMA
+ * and then issue the actual read/write DMA/PIO command to the drive.
+ *
+ * For ATAPI devices, we just prepare for DMA and return. The caller should
+ * then issue the packet command to the drive and call us again with
+ * udma_start afterwards.
+ *
+ * Returns 0 if all went well.
+ * Returns 1 if DMA read/write could not be started, in which case
+ * the caller should revert to PIO for the current request.
+ * May also be invoked from trm290.c
+ */
+int XXX_ide_dmaproc(struct ata_device *drive)
+{
+	return config_drive_for_dma(drive);
+}
+
+/*
+ * Needed for allowing full modular support of ide-driver
+ */
+void ide_release_dma(struct ata_channel *ch)
+{
+	if (!ch->dma_base)
+		return;
+
+	if (ch->dmatable_cpu) {
+		pci_free_consistent(ch->pci_dev,
+				    PRD_ENTRIES * PRD_BYTES,
+				    ch->dmatable_cpu,
+				    ch->dmatable_dma);
+		ch->dmatable_cpu = NULL;
+	}
+	if (ch->sg_table) {
+		kfree(ch->sg_table);
+		ch->sg_table = NULL;
+	}
+	if ((ch->dma_extra) && (ch->unit == 0))
+		release_region((ch->dma_base + 16), ch->dma_extra);
+	release_region(ch->dma_base, 8);
+	ch->dma_base = 0;
+}
+
+/*
+ * This can be called for a dynamically installed interface. Don't __init it
+ */
+void ide_setup_dma(struct ata_channel *ch, unsigned long dma_base, unsigned int num_ports)
+{
+	printk("    %s: BM-DMA at 0x%04lx-0x%04lx", ch->name, dma_base, dma_base + num_ports - 1);
+	if (check_region(dma_base, num_ports)) {
+		printk(" -- ERROR, PORT ADDRESSES ALREADY IN USE\n");
+		return;
+	}
+	request_region(dma_base, num_ports, ch->name);
+	ch->dma_base = dma_base;
+	ch->dmatable_cpu = pci_alloc_consistent(ch->pci_dev,
+						  PRD_ENTRIES * PRD_BYTES,
+						  &ch->dmatable_dma);
+	if (ch->dmatable_cpu == NULL)
+		goto dma_alloc_failure;
+
+	ch->sg_table = kmalloc(sizeof(struct scatterlist) * PRD_ENTRIES,
+				 GFP_KERNEL);
+	if (ch->sg_table == NULL) {
+		pci_free_consistent(ch->pci_dev, PRD_ENTRIES * PRD_BYTES,
+				    ch->dmatable_cpu, ch->dmatable_dma);
+		goto dma_alloc_failure;
+	}
+
+	ch->XXX_udma = XXX_ide_dmaproc;
+
+	if (ch->chipset != ide_trm290) {
+		u8 dma_stat = inb(dma_base+2);
+		printk(", BIOS settings: %s:%s, %s:%s",
+		       ch->drives[0].name, (dma_stat & 0x20) ? "DMA" : "pio",
+		       ch->drives[1].name, (dma_stat & 0x40) ? "DMA" : "pio");
+	}
+	printk("\n");
+	return;
+
+dma_alloc_failure:
+	printk(" -- ERROR, UNABLE TO ALLOCATE DMA TABLES\n");
+}
+
+/****************************************************************************
+ * UDMA function which should have architecture specific counterparts where
+ * neccessary.
+ *
+ * The intention is that at some point in time we will move this whole to
+ * architecture specific kernel sections. For now I would love the architecture
+ * maintainers to just #ifdef #endif this stuff directly here. I have for now
+ * tryed to update as much as I could in the architecture specific code.  But
+ * of course I may have done mistakes, so please bear with me and update it
+ * here the proper way.
+ *
+ * Thank you a lot in advance!
+ *
+ * Sat May  4 20:29:46 CEST 2002 Marcin Dalecki.
+ */
+
+/*
+ * This is the generic part of the DMA setup used by the host chipset drivers
+ * in the corresponding DMA setup method.
+ *
+ * FIXME: there are some places where this gets used driectly for "error
+ * recovery" in the ATAPI drivers. This was just plain wrong before, in esp.
+ * not portable, and just got uncovered now.
+ */
+void udma_enable(struct ata_device *drive, int on, int verbose)
+{
+	struct ata_channel *ch = drive->channel;
+	int set_high = 1;
+	u8 unit = (drive->select.b.unit & 0x01);
 	u64 addr = BLK_BOUNCE_HIGH;
+
+	if (!on) {
+		if (verbose)
+			printk("%s: DMA disabled\n", drive->name);
+		set_high = 0;
+		outb(inb(ch->dma_base + 2) & ~(1 << (5 + unit)), ch->dma_base + 2);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+		udma_tcq_enable(drive, 0);
+#endif
+	}
+
+	/* toggle bounce buffers */
 
 	if (on && drive->type == ATA_DISK && drive->channel->highmem) {
 		if (!PCI_DMA_BUS_IS_PHYS)
@@ -535,197 +555,299 @@ static void ide_toggle_bounce(ide_drive_t *drive, int on)
 	}
 
 	blk_queue_bounce_limit(&drive->queue, addr);
+
+	drive->using_dma = on;
+
+	if (on) {
+		outb(inb(ch->dma_base + 2) | (1 << (5 + unit)), ch->dma_base + 2);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
+		udma_tcq_enable(drive, 1);
+#endif
+	}
 }
 
 /*
- * Start DMA engine.
+ * This prepares a dma request.  Returns 0 if all went okay, returns 1
+ * otherwise.  May also be invoked from trm290.c
  */
-int ide_start_dma(struct ata_channel *hwif, ide_drive_t *drive, ide_dma_action_t func)
+int udma_new_table(struct ata_channel *ch, struct request *rq)
 {
-	unsigned int reading = 0, count;
-	unsigned long dma_base = hwif->dma_base;
-	struct ata_request *ar = IDE_CUR_AR(drive);
+	unsigned int *table = ch->dmatable_cpu;
+#ifdef CONFIG_BLK_DEV_TRM290
+	unsigned int is_trm290_chipset = (ch->chipset == ide_trm290);
+#else
+	const int is_trm290_chipset = 0;
+#endif
+	unsigned int count = 0;
+	int i;
+	struct scatterlist *sg;
 
-	/* This can happen with drivers abusing the special request field.
+	ch->sg_nents = i = build_sglist(ch, rq);
+	if (!i)
+		return 0;
+
+	sg = ch->sg_table;
+	while (i) {
+		u32 cur_addr;
+		u32 cur_len;
+
+		cur_addr = sg_dma_address(sg);
+		cur_len = sg_dma_len(sg);
+
+		/*
+		 * Fill in the dma table, without crossing any 64kB boundaries.
+		 * Most hardware requires 16-bit alignment of all blocks,
+		 * but the trm290 requires 32-bit alignment.
+		 */
+
+		while (cur_len) {
+			u32 xcount, bcount = 0x10000 - (cur_addr & 0xffff);
+
+			if (count++ >= PRD_ENTRIES) {
+				printk("ide-dma: count %d, sg_nents %d, cur_len %d, cur_addr %u\n",
+						count, ch->sg_nents, cur_len, cur_addr);
+				BUG();
+			}
+
+			if (bcount > cur_len)
+				bcount = cur_len;
+			*table++ = cpu_to_le32(cur_addr);
+			xcount = bcount & 0xffff;
+			if (is_trm290_chipset)
+				xcount = ((xcount >> 2) - 1) << 16;
+			if (xcount == 0x0000) {
+		        /*
+			 * Most chipsets correctly interpret a length of
+			 * 0x0000 as 64KB, but at least one (e.g. CS5530)
+			 * misinterprets it as zero (!). So here we break
+			 * the 64KB entry into two 32KB entries instead.
+			 */
+				if (count++ >= PRD_ENTRIES) {
+					pci_unmap_sg(ch->pci_dev, sg,
+						     ch->sg_nents,
+						     ch->sg_dma_direction);
+					return 0;
+				}
+
+				*table++ = cpu_to_le32(0x8000);
+				*table++ = cpu_to_le32(cur_addr + 0x8000);
+				xcount = 0x8000;
+			}
+			*table++ = cpu_to_le32(xcount);
+			cur_addr += bcount;
+			cur_len -= bcount;
+		}
+
+		sg++;
+		i--;
+	}
+
+	if (!count)
+		printk(KERN_ERR "%s: empty DMA table?\n", ch->name);
+	else if (!is_trm290_chipset)
+		*--table |= cpu_to_le32(0x80000000);
+
+	return count;
+}
+
+/* Teardown mappings after DMA has completed.  */
+void udma_destroy_table(struct ata_channel *ch)
+{
+	pci_unmap_sg(ch->pci_dev, ch->sg_table, ch->sg_nents, ch->sg_dma_direction);
+}
+
+void udma_print(struct ata_device *drive)
+{
+#ifdef CONFIG_ARCH_ACORN
+	printk(", DMA");
+#else
+	struct hd_driveid *id = drive->id;
+	char *str = NULL;
+
+	if ((id->field_valid & 4) && (eighty_ninty_three(drive)) &&
+	    (id->dma_ultra & (id->dma_ultra >> 14) & 3)) {
+		if ((id->dma_ultra >> 15) & 1)
+			str = ", UDMA(mode 7)";	/* UDMA BIOS-enabled! */
+		else
+			str = ", UDMA(133)";	/* UDMA BIOS-enabled! */
+	} else if ((id->field_valid & 4) && (eighty_ninty_three(drive)) &&
+		  (id->dma_ultra & (id->dma_ultra >> 11) & 7)) {
+		if ((id->dma_ultra >> 13) & 1) {
+			str = ", UDMA(100)";	/* UDMA BIOS-enabled! */
+		} else if ((id->dma_ultra >> 12) & 1) {
+			str = ", UDMA(66)";	/* UDMA BIOS-enabled! */
+		} else {
+			str = ", UDMA(44)";	/* UDMA BIOS-enabled! */
+		}
+	} else if ((id->field_valid & 4) &&
+		   (id->dma_ultra & (id->dma_ultra >> 8) & 7)) {
+		if ((id->dma_ultra >> 10) & 1) {
+			str = ", UDMA(33)";	/* UDMA BIOS-enabled! */
+		} else if ((id->dma_ultra >> 9) & 1) {
+			str = ", UDMA(25)";	/* UDMA BIOS-enabled! */
+		} else {
+			str = ", UDMA(16)";	/* UDMA BIOS-enabled! */
+		}
+	} else if (id->field_valid & 4)
+		str = ", (U)DMA";	/* Can be BIOS-enabled! */
+	else
+		str = ", DMA";
+
+	printk(str);
+#endif
+}
+
+/*
+ * Drive back/white list handling for UDMA capability:
+ */
+
+int udma_black_list(struct ata_device *drive)
+{
+	return check_drive_lists(drive, 0);
+}
+
+int udma_white_list(struct ata_device *drive)
+{
+	return check_drive_lists(drive, 1);
+}
+
+/*
+ * Generic entry points for functions provided possibly by the host chip set
+ * drivers.
+ */
+
+/*
+ * Prepare the channel for a DMA startfer. Please note that only the broken
+ * Pacific Digital host chip needs the reques to be passed there to decide
+ * about addressing modes.
+ */
+
+int udma_start(struct ata_device *drive, struct request *rq)
+{
+	struct ata_channel *ch = drive->channel;
+	unsigned long dma_base = ch->dma_base;
+
+	if (ch->udma_start)
+		return ch->udma_start(drive, rq);
+
+	/* Note that this is done *after* the cmd has
+	 * been issued to the drive, as per the BM-IDE spec.
+	 * The Promise Ultra33 doesn't work correctly when
+	 * we do this part before issuing the drive cmd.
 	 */
-
-	if (!ar)
-		return 1;
-
-	if (rq_data_dir(ar->ar_rq) == READ)
-		reading = 1 << 3;
-
-	if (hwif->rwproc)
-		hwif->rwproc(drive, func);
-
-	if (!(count = ide_build_dmatable(drive, ar->ar_rq, func)))
-		return 1;	/* try PIO instead of DMA */
-
-	ar->ar_flags |= ATA_AR_SETUP;
-	outl(ar->ar_dmatable, dma_base + 4);	/* PRD table */
-	outb(reading, dma_base);		/* specify r/w */
-	outb(inb(dma_base + 2) | 6, dma_base+2);/* clear INTR & ERROR flags */
-	drive->waiting_for_dma = 1;
+	outb(inb(dma_base)|1, dma_base);		/* start DMA */
 	return 0;
 }
 
-/*
- * ide_dmaproc() initiates/aborts DMA read/write operations on a drive.
- *
- * The caller is assumed to have selected the drive and programmed the drive's
- * sector address using CHS or LBA.  All that remains is to prepare for DMA
- * and then issue the actual read/write DMA/PIO command to the drive.
- *
- * For ATAPI devices, we just prepare for DMA and return. The caller should
- * then issue the packet command to the drive and call us again with
- * ide_dma_begin afterwards.
- *
- * Returns 0 if all went well.
- * Returns 1 if DMA read/write could not be started, in which case
- * the caller should revert to PIO for the current request.
- * May also be invoked from trm290.c
- */
-int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+int udma_stop(struct ata_device *drive)
 {
-	struct ata_channel *hwif = drive->channel;
-	unsigned long dma_base = hwif->dma_base;
-	u8 unit = (drive->select.b.unit & 0x01);
-	unsigned int reading = 0, set_high = 1;
-	struct ata_request *ar;
+	struct ata_channel *ch = drive->channel;
+	unsigned long dma_base = ch->dma_base;
 	u8 dma_stat;
 
-	switch (func) {
-		case ide_dma_off:
-			printk("%s: DMA disabled\n", drive->name);
-		case ide_dma_off_quietly:
-			set_high = 0;
-			outb(inb(dma_base+2) & ~(1<<(5+unit)), dma_base+2);
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-			hwif->dmaproc(ide_dma_queued_off, drive);
-#endif
-		case ide_dma_on:
-			ide_toggle_bounce(drive, set_high);
-			drive->using_dma = (func == ide_dma_on);
-			if (drive->using_dma) {
-				outb(inb(dma_base+2)|(1<<(5+unit)), dma_base+2);
-#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
-				hwif->dmaproc(ide_dma_queued_on, drive);
-#endif
-			}
-			return 0;
-		case ide_dma_check:
-			return config_drive_for_dma (drive);
-		case ide_dma_begin:
-			if (test_and_set_bit(IDE_DMA, &HWGROUP(drive)->flags))
-				BUG();
-			/* Note that this is done *after* the cmd has
-			 * been issued to the drive, as per the BM-IDE spec.
-			 * The Promise Ultra33 doesn't work correctly when
-			 * we do this part before issuing the drive cmd.
-			 */
-			outb(inb(dma_base)|1, dma_base);		/* start DMA */
-			return 0;
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-		case ide_dma_queued_on:
-		case ide_dma_queued_off:
-		case ide_dma_read_queued:
-		case ide_dma_write_queued:
-		case ide_dma_queued_start:
-			return ide_tcq_dmaproc(func, drive);
-#endif
+	if (ch->udma_stop)
+		return ch->udma_stop(drive);
 
-		case ide_dma_read:
-			reading = 1 << 3;
-		case ide_dma_write:
-			ar = IDE_CUR_AR(drive);
+	drive->waiting_for_dma = 0;
+	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
+	dma_stat = inb(dma_base+2);		/* get DMA status */
+	outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
+	udma_destroy_table(ch);			/* purge DMA mappings */
 
-			if (ide_start_dma(hwif, drive, func))
-				return 1;
-
-			if (drive->type != ATA_DISK)
-				return 0;
-			BUG_ON(HWGROUP(drive)->handler);
-			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
-			if ((ar->ar_rq->flags & REQ_DRIVE_TASKFILE) &&
-			    (drive->addressing == 1)) {
-				struct ata_taskfile *args = &ar->ar_task;
-				OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
-			} else if (drive->addressing) {
-				OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
-			} else {
-				OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
-			}
-			return hwif->dmaproc(ide_dma_begin, drive);
-		case ide_dma_end: /* returns 1 on error, 0 otherwise */
-			if (!test_and_clear_bit(IDE_DMA, &HWGROUP(drive)->flags))
-				BUG();
-			drive->waiting_for_dma = 0;
-			outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
-			dma_stat = inb(dma_base+2);	/* get DMA status */
-			outb(dma_stat|6, dma_base+2);	/* clear the INTR & ERROR bits */
-			ide_destroy_dmatable(drive);	/* purge DMA mappings */
-			return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
-		case ide_dma_test_irq: /* returns 1 if dma irq issued, 0 otherwise */
-			dma_stat = inb(dma_base+2);
-#if 0  /* do not set unless you know what you are doing */
-			if (dma_stat & 4) {
-				byte stat = GET_STAT();
-				outb(dma_base+2, dma_stat & 0xE4);
-			}
-#endif
-			return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
-		case ide_dma_bad_drive:
-		case ide_dma_good_drive:
-			return check_drive_lists(drive, (func == ide_dma_good_drive));
-		case ide_dma_verbose:
-			return report_drive_dmaing(drive);
-		case ide_dma_timeout:
-			printk(KERN_ERR "%s: DMA timeout occured!\n", __FUNCTION__);
-			return 1;
-		case ide_dma_retune:
-		case ide_dma_lostirq:
-			printk(KERN_ERR "%s: chipset supported func only: %d\n", __FUNCTION__, func);
-			return 1;
-		default:
-			printk(KERN_ERR "%s: unsupported func: %d\n", __FUNCTION__, func);
-			return 1;
-	}
+	return (dma_stat & 7) != 4 ? (0x10 | dma_stat) : 0;	/* verify good DMA status */
 }
 
 /*
- * Needed for allowing full modular support of ide-driver
+ * This is the default read write function.
+ *
+ * It's exported only for host chips which use it for fallback or (too) late
+ * capability checking.
  */
-void ide_release_dma(struct ata_channel *hwif)
-{
-	if (!hwif->dma_base)
-		return;
 
-	if ((hwif->dma_extra) && (hwif->unit == 0))
-		release_region((hwif->dma_base + 16), hwif->dma_extra);
-	release_region(hwif->dma_base, 8);
-	hwif->dma_base = 0;
+int ata_do_udma(unsigned int reading, struct ata_device *drive, struct request *rq)
+{
+	if (ata_start_dma(drive, rq))
+		return 1;
+
+	if (drive->type != ATA_DISK)
+		return 0;
+
+	reading <<= 3;
+
+	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
+	if ((rq->flags & REQ_DRIVE_ACB) && (drive->addressing == 1)) {
+		struct ata_taskfile *args = rq->special;
+
+		OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
+	} else if (drive->addressing) {
+		OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
+	} else {
+		OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
+	}
+
+	return udma_start(drive, rq);
+}
+
+int udma_read(struct ata_device *drive, struct request *rq)
+{
+	struct ata_channel *ch = drive->channel;
+
+	if (ch->udma_read)
+		return ch->udma_read(drive, rq);
+
+	return ata_do_udma(1, drive, rq);
+}
+
+int udma_write(struct ata_device *drive, struct request *rq)
+{
+	struct ata_channel *ch = drive->channel;
+
+	if (ch->udma_write)
+		return ch->udma_write(drive, rq);
+
+	return ata_do_udma(0, drive, rq);
 }
 
 /*
- * This can be called for a dynamically installed interface. Don't __init it
+ * FIXME: This should be attached to a channel as we can see now!
  */
-void ide_setup_dma(struct ata_channel *hwif, unsigned long dma_base, unsigned int num_ports)
+int udma_irq_status(struct ata_device *drive)
 {
-	printk("    %s: BM-DMA at 0x%04lx-0x%04lx", hwif->name, dma_base, dma_base + num_ports - 1);
-	if (check_region(dma_base, num_ports)) {
-		printk(" -- ERROR, PORT ADDRESSES ALREADY IN USE\n");
-		return;
-	}
-	request_region(dma_base, num_ports, hwif->name);
-	hwif->dma_base = dma_base;
-	hwif->dmaproc = &ide_dmaproc;
+	struct ata_channel *ch = drive->channel;
+	u8 dma_stat;
 
-	if (hwif->chipset != ide_trm290) {
-		byte dma_stat = inb(dma_base+2);
-		printk(", BIOS settings: %s:%s, %s:%s",
-		       hwif->drives[0].name, (dma_stat & 0x20) ? "DMA" : "pio",
-		       hwif->drives[1].name, (dma_stat & 0x40) ? "DMA" : "pio");
-	}
-	printk("\n");
-	return;
+	if (ch->udma_irq_status)
+		return ch->udma_irq_status(drive);
+
+	/* default action */
+	dma_stat = inb(ch->dma_base + 2);
+
+	return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
 }
+
+void udma_timeout(struct ata_device *drive)
+{
+	printk(KERN_ERR "ATA: UDMA timeout occured %s!\n", drive->name);
+
+	/* Invoke the chipset specific handler now. */
+	if (drive->channel->udma_timeout)
+		drive->channel->udma_timeout(drive);
+
+}
+
+void udma_irq_lost(struct ata_device *drive)
+{
+	if (drive->channel->udma_irq_lost)
+		drive->channel->udma_irq_lost(drive);
+}
+
+EXPORT_SYMBOL(udma_enable);
+EXPORT_SYMBOL(udma_start);
+EXPORT_SYMBOL(udma_stop);
+EXPORT_SYMBOL(udma_read);
+EXPORT_SYMBOL(udma_write);
+EXPORT_SYMBOL(ata_do_udma);
+EXPORT_SYMBOL(udma_irq_status);
+EXPORT_SYMBOL(udma_print);
+EXPORT_SYMBOL(udma_black_list);
+EXPORT_SYMBOL(udma_white_list);

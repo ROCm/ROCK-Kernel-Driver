@@ -767,7 +767,8 @@ static int __init konicawc_init(void)
 		sizeof(struct konicawc),
 		"konicawc",
 		&cbTbl,
-		THIS_MODULE);
+		THIS_MODULE,
+		id_table);
 }
 
 

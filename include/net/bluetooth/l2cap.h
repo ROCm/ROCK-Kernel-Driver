@@ -23,22 +23,17 @@
 */
 
 /*
- *  $Id: l2cap.h,v 1.5 2001/06/14 21:28:26 maxk Exp $
+ *  $Id: l2cap.h,v 1.1.1.1 2002/03/08 21:03:15 maxk Exp $
  */
 
 #ifndef __L2CAP_H
 #define __L2CAP_H
-
-#include <asm/types.h>
-#include <asm/byteorder.h>
 
 /* L2CAP defaults */
 #define L2CAP_DEFAULT_MTU 	672
 #define L2CAP_DEFAULT_FLUSH_TO	0xFFFF
 
 #define L2CAP_CONN_TIMEOUT 	(HZ * 40)
-#define L2CAP_DISCONN_TIMEOUT 	(HZ * 2)
-#define L2CAP_CONN_IDLE_TIMEOUT	(HZ * 60)
 
 /* L2CAP socket address */
 struct sockaddr_l2 {
@@ -47,23 +42,38 @@ struct sockaddr_l2 {
 	bdaddr_t	l2_bdaddr;
 };
 
-/* set/get sockopt defines */
-#define L2CAP_OPTIONS  0x01
+/* Socket options */
+#define L2CAP_OPTIONS	0x01
 struct l2cap_options {
 	__u16 omtu;
 	__u16 imtu;
 	__u16 flush_to;
-	__u32 token_rate;
-	__u32 bucket_size;
-	__u32 pick_band;
-	__u32 latency;
-	__u32 delay_var;
 };
 
 #define L2CAP_CONNINFO  0x02
 struct l2cap_conninfo {
 	__u16 hci_handle;
 };
+
+#define L2CAP_LM	0x03
+#define L2CAP_LM_MASTER		0x0001
+#define L2CAP_LM_AUTH		0x0002
+#define L2CAP_LM_ENCRYPT	0x0004
+#define L2CAP_LM_TRUSTED	0x0008
+
+#define L2CAP_QOS	0x04
+struct l2cap_qos {
+	__u16 service_type;
+	__u32 token_rate;
+	__u32 token_bucket_size;
+	__u32 peak_bandwidth;
+	__u32 latency;
+	__u32 delay_variation;
+};
+
+#define L2CAP_SERV_NO_TRAFFIC	0x00
+#define L2CAP_SERV_BEST_EFFORT	0x01
+#define L2CAP_SERV_GUARANTEED	0x02
 
 /* L2CAP command codes */
 #define L2CAP_COMMAND_REJ 0x01
@@ -79,7 +89,6 @@ struct l2cap_conninfo {
 #define L2CAP_INFO_RSP    0x0b
 
 /* L2CAP structures */
-
 typedef struct {
 	__u16      len;
 	__u16      cid;
@@ -112,11 +121,17 @@ typedef struct {
 } __attribute__ ((packed))	l2cap_conn_rsp;
 #define L2CAP_CONN_RSP_SIZE	8
 
-#define L2CAP_CONN_SUCCESS    0x0000
-#define L2CAP_CONN_PEND       0x0001
-#define L2CAP_CONN_BAD_PSM    0x0002
-#define L2CAP_CONN_SEC_BLOCK  0x0003
-#define L2CAP_CONN_NO_MEM     0x0004
+/* connect result */
+#define L2CAP_CR_SUCCESS    0x0000
+#define L2CAP_CR_PEND       0x0001
+#define L2CAP_CR_BAD_PSM    0x0002
+#define L2CAP_CR_SEC_BLOCK  0x0003
+#define L2CAP_CR_NO_MEM     0x0004
+
+/* connect status */
+#define L2CAP_CS_NO_INFO      0x0000
+#define L2CAP_CS_AUTHEN_PEND  0x0001
+#define L2CAP_CS_AUTHOR_PEND  0x0002
 
 typedef struct {
 	__u16      dcid;
@@ -147,6 +162,8 @@ typedef struct {
 #define L2CAP_CONF_FLUSH_TO	0x02
 #define L2CAP_CONF_QOS		0x03
 
+#define L2CAP_CONF_MAX_SIZE	22
+
 typedef struct {
 	__u16      dcid;
 	__u16      scid;
@@ -158,5 +175,71 @@ typedef struct {
 	__u16      scid;
 } __attribute__ ((packed)) 	l2cap_disconn_rsp;
 #define L2CAP_DISCONN_RSP_SIZE	4
+
+typedef struct {
+	__u16       type;
+	__u8        data[0];
+} __attribute__ ((packed))	l2cap_info_req;
+#define L2CAP_INFO_REQ_SIZE	2
+
+typedef struct {
+	__u16       type;
+	__u16       result;
+	__u8        data[0];
+} __attribute__ ((packed))	l2cap_info_rsp;
+#define L2CAP_INFO_RSP_SIZE	4
+
+/* ----- L2CAP connections ----- */
+struct l2cap_chan_list {
+	struct sock	*head;
+	rwlock_t	lock;
+	long		num;
+};
+
+struct l2cap_conn {
+	struct hci_conn	*hcon;
+
+	bdaddr_t 	*dst;
+	bdaddr_t 	*src;
+	
+	unsigned int    mtu;
+
+	spinlock_t	lock;
+	
+	struct sk_buff *rx_skb;
+	__u32		rx_len;
+	__u8		rx_ident;
+	__u8		tx_ident;
+
+	struct l2cap_chan_list chan_list;
+};
+
+/* ----- L2CAP channel and socket info ----- */
+#define l2cap_pi(sk)   ((struct l2cap_pinfo *) sk->protinfo)
+
+struct l2cap_pinfo {
+	__u16		psm;
+	__u16		dcid;
+	__u16		scid;
+
+	__u16		imtu;
+	__u16		omtu;
+	__u16		flush_to;
+	
+	__u32		link_mode;
+
+	__u8		conf_state;
+	__u16		conf_mtu;
+
+	__u8		ident;
+
+	struct l2cap_conn 	*conn;
+	struct sock 		*next_c;
+	struct sock 		*prev_c;
+};
+
+#define CONF_REQ_SENT    0x01
+#define CONF_INPUT_DONE  0x02
+#define CONF_OUTPUT_DONE 0x04
 
 #endif /* __L2CAP_H */

@@ -453,6 +453,17 @@ CONFIG_SYNCLINK
   The module will be called synclink.o.  If you want to do that, say M
   here.
 
+CONFIG_SYNCLINKMP
+  Enable support for the SyncLink Multiport (2 or 4 ports)
+  serial adapter, running asynchronous and HDLC communications up
+  to 2.048Mbps. Each ports is independently selectable for
+  RS-232, V.35, RS-449, RS-530, and X.21
+
+  This driver may be built as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called synclinkmp.o.  If you want to do that, say M
+  here.
+
 CONFIG_N_HDLC
   Allows synchronous HDLC communications with tty device drivers that
   support synchronous HDLC such as the Microgate SyncLink adapter.

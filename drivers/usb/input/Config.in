@@ -15,13 +15,4 @@ if [ "$CONFIG_USB_HID" != "y" ]; then
 fi
 
 dep_tristate '  Wacom Intuos/Graphire tablet support' CONFIG_USB_WACOM $CONFIG_USB $CONFIG_INPUT
-
-# Turn on CONFIG_USB_INPUT if any of the drivers are compiled into the kernel
-# to make our Makefile logic a bit simpler.
-if [ "$CONFIG_USB_HID" = "y" -o "$CONFIG_USB_KBD" = "y" -o "$CONFIG_USB_MOUSE" = "y" ]; then
-   define_bool CONFIG_USB_INPUT y
-fi
-if [ "$CONFIG_USB_WACOM" = "y" ]; then
-   define_bool CONFIG_USB_INPUT y
-fi
    

@@ -3,6 +3,7 @@
 # 18 Apr 1998, Michael Elizabeth Chastain, <mailto:mec@shout.net>
 # Rewritten to use lists instead of if-statements.
 
+O_TARGET	:= _oss.o
 
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
@@ -81,24 +82,21 @@ subdir-$(CONFIG_SOUND_EMU10K1) += emu10k1
 subdir-$(CONFIG_SOUND_CS4281) += cs4281
 
 ifeq ($(CONFIG_SOUND_EMU10K1),y)
-  obj-y += emu10k1/emu10k1.o
+  obj-y += emu10k1/_emu10k1.o
 endif
 
 ifeq ($(CONFIG_SOUND_CS4281),y)
-  obj-y += cs4281/cs4281.o
+  obj-y += cs4281/_cs4281.o
 endif
 
 subdir-$(CONFIG_DMASOUND) += dmasound
 
 ifeq ($(CONFIG_DMASOUND),y)
-  obj-y += dmasound/dmasound.o
+  obj-y += dmasound/_dmasound.o
 endif
 
 
 # Declare multi-part drivers.
-
-list-multi	:= sound.o gus.o pas2.o sb.o sb_lib.o vidc_mod.o \
-    wavefront.o
 
 sound-objs	:= 							\
     dev_table.o soundcard.o sound_syms.o		\
@@ -114,34 +112,7 @@ vidc_mod-objs	:= vidc.o vidc_fill.o
 wavefront-objs  := wavfront.o wf_midi.o yss225.o
 
 
-O_TARGET	:= sounddrivers.o
-
 include $(TOPDIR)/Rules.make
-
-
-
-# Link rules for multi-part drivers.
-
-sound.o: $(sound-objs)
-	$(LD) -r -o $@ $(sound-objs)
-
-gus.o: $(gus-objs)
-	$(LD) -r -o $@ $(gus-objs)
-
-pas2.o: $(pas2-objs)
-	$(LD) -r -o $@ $(pas2-objs)
-
-sb.o: $(sb-objs)
-	$(LD) -r -o $@ $(sb-objs)
-
-sb_lib.o: $(sb_lib-objs)
-	$(LD) -r -o $@ $(sb_lib-objs)
-
-vidc_mod.o: $(vidc_mod-objs)
-	$(LD) -r -o $@ $(vidc_mod-objs)
-
-wavefront.o: $(wavefront-objs)
-	$(LD) -r -o $@ $(wavefront-objs)
 
 # Firmware files that need translation
 #

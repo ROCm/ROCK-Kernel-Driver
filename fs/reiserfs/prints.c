@@ -138,8 +138,9 @@ static void sprintf_block_head (char * buf, struct buffer_head * bh)
 
 static void sprintf_buffer_head (char * buf, struct buffer_head * bh) 
 {
-  sprintf (buf, "dev %s, size %d, blocknr %ld, count %d, list %d, state 0x%lx, page %p, (%s, %s, %s)",
-	   kdevname (bh->b_dev), bh->b_size, bh->b_blocknr, atomic_read (&(bh->b_count)), bh->b_list,
+  sprintf (buf, "dev %s, size %d, blocknr %ld, count %d, state 0x%lx, page %p, (%s, %s, %s)",
+	   bdevname (bh->b_bdev), bh->b_size, bh->b_blocknr,
+	   atomic_read (&(bh->b_count)),
 	   bh->b_state, bh->b_page,
 	   buffer_uptodate (bh) ? "UPTODATE" : "!UPTODATE",
 	   buffer_dirty (bh) ? "DIRTY" : "CLEAN",
@@ -508,7 +509,7 @@ static int print_super_block (struct buffer_head * bh)
     }
 
     printk ("%s\'s super block in block %ld\n======================\n",
-            kdevname (bh->b_dev), bh->b_blocknr);
+            bdevname (bh->b_bdev), bh->b_blocknr);
     printk ("Reiserfs version %s\n", version );
     printk ("Block count %u\n", sb_block_count(rs));
     printk ("Blocksize %d\n", sb_blocksize(rs));

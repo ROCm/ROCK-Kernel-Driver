@@ -806,8 +806,7 @@ static inline void sa1100fb_schedule_task(struct sa1100fb_info *fbi, u_int state
  */
 static inline struct fb_var_screeninfo *get_con_var(struct fb_info *info, int con)
 {
-	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
-	return (con == fbi->currcon || con == -1) ? &fbi->fb.var : &fb_display[con].var;
+	return (con == info->currcon || con == -1) ? &info->var : &fb_display[con].var;
 }
 
 /*
@@ -824,8 +823,7 @@ static inline struct display *get_con_display(struct fb_info *info, int con)
  */
 static inline struct fb_cmap *get_con_cmap(struct fb_info *info, int con)
 {
-	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
-	return (con == fbi->currcon || con == -1) ? &fbi->fb.cmap : &fb_display[con].cmap;
+	return (con == info->currcon || con == -1) ? &info->cmap : &fb_display[con].cmap;
 }
 
 static inline u_int
@@ -883,7 +881,7 @@ sa1100fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		   u_int trans, struct fb_info *info)
 {
 	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
-	struct display *disp = get_con_display(info, fbi->currcon);
+	struct display *disp = get_con_display(info, info->currcon);
 	u_int val;
 	int ret = 1;
 
@@ -1042,7 +1040,7 @@ sa1100fb_hw_set_var(struct fb_var_screeninfo *var, struct sa1100fb_info *fbi)
 	fbi->palette_cpu = (u16 *)(fbi->map_cpu + PAGE_SIZE - palette_mem_size);
 	fbi->palette_dma = fbi->map_dma + PAGE_SIZE - palette_mem_size;
 
-	fb_set_cmap(&fbi->fb.cmap, 1, sa1100fb_setcolreg, &fbi->fb);
+	fb_set_cmap(&fbi->fb.cmap, 1, &fbi->fb);
 
 	/* Set board control register to handle new color depth */
 	sa1100fb_set_truecolor(var->bits_per_pixel >= 16);
@@ -1139,7 +1137,6 @@ sa1100fb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 		break;
 	}
 
-	display->screen_base	= fbi->screen_cpu;
 	display->next_line	= display->line_length;
 	display->type		= fbi->fb.fix.type;
 	display->type_aux	= fbi->fb.fix.type_aux;
@@ -1189,7 +1186,7 @@ sa1100fb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 		fbi->fb.changevar(con);
 
 	/* If the current console is selected, activate the new var. */
-	if (con != fbi->currcon)
+	if (con != fbi->fb.currcon)
 		return 0;
 
 	sa1100fb_hw_set_var(dvar, fbi);
@@ -1206,14 +1203,14 @@ __do_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	int err = 0;
 
 	if (con == -1)
-		con = fbi->currcon;
+		con = info->currcon;
 
 	/* no colormap allocated? (we always have "this" colour map allocated) */
 	if (con >= 0)
 		err = fb_alloc_cmap(&fb_display[con].cmap, fbi->palette_size, 0);
 
-	if (!err && con == fbi->currcon)
-		err = fb_set_cmap(cmap, kspc, sa1100fb_setcolreg, info);
+	if (!err && con == info->currcon)
+		err = fb_set_cmap(cmap, kspc, info);
 
 	if (!err)
 		fb_copy_cmap(cmap, dcmap, kspc ? 0 : 1);
@@ -1268,6 +1265,8 @@ static struct fb_ops sa1100fb_ops = {
 	fb_set_var:	sa1100fb_set_var,
 	fb_get_cmap:	sa1100fb_get_cmap,
 	fb_set_cmap:	sa1100fb_set_cmap,
+	fb_setcolreg:	sa1100fb_setcolreg,
+	fb_blank:	sa1100fb_blank,
 };
 
 /*
@@ -1285,11 +1284,11 @@ static int sa1100fb_switch(int con, struct fb_info *info)
 
 	DPRINTK("con=%d info->modename=%s\n", con, fbi->fb.modename);
 
-	if (con == fbi->currcon)
+	if (con == info->currcon)
 		return 0;
 
-	if (fbi->currcon >= 0) {
-		disp = fb_display + fbi->currcon;
+	if (info->currcon >= 0) {
+		disp = fb_display + info->currcon;
 
 		/*
 		 * Save the old colormap and video mode.
@@ -1300,7 +1299,7 @@ static int sa1100fb_switch(int con, struct fb_info *info)
 			fb_copy_cmap(&fbi->fb.cmap, &disp->cmap, 0);
 	}
 
-	fbi->currcon = con;
+	info->currcon = con;
 	disp = fb_display + con;
 
 	/*
@@ -1357,7 +1356,7 @@ static int sa1100fb_switch(int con, struct fb_info *info)
  * 	12 and 16 bpp modes don't really use the palette, so this will not
  *      blank the display in all modes.  
  */
-static void sa1100fb_blank(int blank, struct fb_info *info)
+static int sa1100fb_blank(int blank, struct fb_info *info)
 {
 	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
 	int i;
@@ -1383,9 +1382,10 @@ static void sa1100fb_blank(int blank, struct fb_info *info)
 			sa1100fb_blank_helper(blank);
 		if (fbi->fb.disp->visual == FB_VISUAL_PSEUDOCOLOR ||
 		    fbi->fb.disp->visual == FB_VISUAL_STATIC_PSEUDOCOLOR)
-			fb_set_cmap(&fbi->fb.cmap, 1, sa1100fb_setcolreg, info);
+			fb_set_cmap(&fbi->fb.cmap, 1, info);
 		sa1100fb_schedule_task(fbi, C_ENABLE);
 	}
+	return 0;
 }
 
 static int sa1100fb_updatevar(int con, struct fb_info *info)
@@ -1986,7 +1986,7 @@ static int __init sa1100fb_map_video_memory(struct sa1100fb_info *fbi)
 					&fbi->map_dma);
 
 	if (fbi->map_cpu) {
-		fbi->screen_cpu = fbi->map_cpu + PAGE_SIZE;
+		fbi->fb.screen_base = fbi->map_cpu + PAGE_SIZE;
 		fbi->screen_dma = fbi->map_dma + PAGE_SIZE;
 		fbi->fb.fix.smem_start = fbi->screen_dma;
 	}
@@ -2012,7 +2012,7 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 
 	memset(fbi, 0, sizeof(struct sa1100fb_info) + sizeof(struct display));
 
-	fbi->currcon		= -1;
+	fbi->fb.currcon		= -1;
 
 	strcpy(fbi->fb.fix.id, SA1100_NAME);
 
@@ -2037,10 +2037,10 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 	fbi->fb.changevar	= NULL;
 	fbi->fb.switch_con	= sa1100fb_switch;
 	fbi->fb.updatevar	= sa1100fb_updatevar;
-	fbi->fb.blank		= sa1100fb_blank;
 	fbi->fb.flags		= FBINFO_FLAG_DEFAULT;
 	fbi->fb.node		= NODEV;
 	fbi->fb.monspecs	= monspecs;
+	fbi->fb.currcon		= -1;
 	fbi->fb.disp		= (struct display *)(fbi + 1);
 	fbi->fb.pseudo_palette	= (void *)(fbi->fb.disp + 1);
 

@@ -132,10 +132,28 @@ not_angel:
 		 */
 
 		.text
-1:		adr	r2, LC0
-		ldmia	r2, {r2, r3, r4, r5, sp}
+		adr	r0, LC0
+		ldmia	r0, {r1, r2, r3, r4, r5, r6, ip, sp}
+		subs	r0, r0, r1		@ calculate the delta offset
 
-		mov	r0, #0
+		teq	r0, #0			@ if delta is zero, we're
+		beq	not_relocated		@ running at the address we
+						@ were linked at.
+
+		add	r2, r2, r0		@ different address, so we
+		add	r3, r3, r0		@ need to fix up various
+		add	r5, r5, r0		@ pointers.
+		add	r6, r6, r0
+		add	ip, ip, r0
+		add	sp, sp, r0
+
+1:		ldr	r1, [r6, #0]		@ relocate entries in the GOT
+		add	r1, r1, r0		@ table.  This fixes up the
+		str	r1, [r6], #4		@ C references.
+		cmp	r6, ip
+		blt	1b
+
+not_relocated:	mov	r0, #0
 1:		str	r0, [r2], #4		@ clear bss
 		str	r0, [r2], #4
 		str	r0, [r2], #4
@@ -149,16 +167,25 @@ not_angel:
 		mov	r1, sp			@ malloc space above stack
 		add	r2, sp, #0x10000	@ 64k max
 
-		teq	r4, r5			@ will we overwrite ourselves?
-		moveq	r5, r2			@ decompress after image
-		movne	r5, r4			@ decompress to final location
+/*
+ * Check to see if we will overwrite ourselves.
+ *   r4 = final kernel address
+ *   r5 = start of this image
+ *   r2 = end of malloc space (and therefore this image)
+ * We basically want:
+ *   r4 >= r2 -> OK
+ *   r4 + image length <= r5 -> OK
+ */
+		cmp	r4, r2
+		bhs	wont_overwrite
+		add	r0, r4, #4096*1024	@ 4MB largest kernel size
+		cmp	r0, r5
+		bls	wont_overwrite
 
+		mov	r5, r2			@ decompress after malloc space
 		mov	r0, r5
 		mov	r3, r7
-		bl	SYMBOL_NAME(decompress_kernel)
-
-		teq	r4, r5			@ do we need to relocate
-		beq	call_kernel		@ the kernel?
+		bl	decompress_kernel
 
 		add	r0, r0, #127
 		bic	r0, r0, #127		@ align the kernel length
@@ -184,12 +211,26 @@ not_angel:
 		bl	cache_clean_flush
 		add	pc, r5, r0		@ call relocation code
 
+/*
+ * We're not in danger of overwriting ourselves.  Do this the simple way.
+ *
+ * r4     = kernel execution address
+ * r7     = architecture ID
+ */
+wont_overwrite:	mov	r0, r4
+		mov	r3, r7
+		bl	decompress_kernel
+		b	call_kernel
+
 		.type	LC0, #object
-LC0:		.word	__bss_start
-		.word	_end
-		.word	_load_addr
-		.word	_start
-		.word	user_stack+4096
+LC0:		.word	LC0			@ r1
+		.word	__bss_start		@ r2
+		.word	_end			@ r3
+		.word	_load_addr		@ r4
+		.word	_start			@ r5
+		.word	_got_start		@ r6
+		.word	_got_end		@ r7
+		.word	user_stack+4096		@ r8
 		.size	LC0, . - LC0
 
 /*
@@ -518,5 +559,5 @@ memdump:	mov	r12, r0
 reloc_end:
 
 		.align
-		.section	".stack"
+		.section ".stack", "aw"
 user_stack:	.space	4096

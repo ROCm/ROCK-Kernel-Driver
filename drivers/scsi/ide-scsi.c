@@ -59,7 +59,6 @@ typedef struct idescsi_pc_s {
 	int request_transfer;			/* Bytes to transfer */
 	int actually_transferred;		/* Bytes actually transferred */
 	int buffer_size;			/* Size of our data buffer */
-	struct request *rq;			/* The corresponding request */
 	byte *buffer;				/* Data buffer */
 	byte *current_position;			/* Pointer into the above buffer */
 	struct scatterlist *sg;			/* Scatter gather table */
@@ -259,10 +258,9 @@ static void hexdump(u8 *x, int len)
 	printk("]\n");
 }
 
-static int idescsi_end_request(ide_drive_t *drive, int uptodate)
+static int idescsi_end_request(struct ata_device *drive, struct request *rq, int uptodate)
 {
 	idescsi_scsi_t *scsi = drive->driver_data;
-	struct request *rq = HWGROUP(drive)->rq;
 	idescsi_pc_t *pc = (idescsi_pc_t *) rq->special;
 	int log = test_bit(IDESCSI_LOG_CMD, &scsi->log);
 	struct Scsi_Host *host;
@@ -270,7 +268,7 @@ static int idescsi_end_request(ide_drive_t *drive, int uptodate)
 	unsigned long flags;
 
 	if (!(rq->flags & REQ_SPECIAL)) {
-		ide_end_request(drive, uptodate);
+		ide_end_request(drive, rq, uptodate);
 		return 0;
 	}
 	ide_end_drive_cmd (drive, 0, 0);
@@ -313,13 +311,12 @@ static inline unsigned long get_timeout(idescsi_pc_t *pc)
 /*
  *	Our interrupt handler.
  */
-static ide_startstop_t idescsi_pc_intr (ide_drive_t *drive)
+static ide_startstop_t idescsi_pc_intr(struct ata_device *drive, struct request *rq)
 {
 	idescsi_scsi_t *scsi = drive->driver_data;
 	byte status, ireason;
 	int bcount;
 	idescsi_pc_t *pc=scsi->pc;
-	struct request *rq = pc->rq;
 	unsigned int temp;
 
 #if IDESCSI_DEBUG_LOG
@@ -331,7 +328,7 @@ static ide_startstop_t idescsi_pc_intr (ide_drive_t *drive)
 		printk ("ide-scsi: %s: DMA complete\n", drive->name);
 #endif /* IDESCSI_DEBUG_LOG */
 		pc->actually_transferred=pc->request_transfer;
-		(void) drive->channel->dmaproc(ide_dma_end, drive);
+		udma_stop(drive);
 	}
 
 	status = GET_STAT();						/* Clear the interrupt */
@@ -342,7 +339,7 @@ static ide_startstop_t idescsi_pc_intr (ide_drive_t *drive)
 		ide__sti();
 		if (status & ERR_STAT)
 			rq->errors++;
-		idescsi_end_request(drive, 1);
+		idescsi_end_request(drive, rq, 1);
 		return ide_stopped;
 	}
 	bcount = IN_BYTE (IDE_BCOUNTH_REG) << 8 | IN_BYTE (IDE_BCOUNTL_REG);
@@ -369,7 +366,7 @@ static ide_startstop_t idescsi_pc_intr (ide_drive_t *drive)
 				pc->actually_transferred += temp;
 				pc->current_position += temp;
 				idescsi_discard_data (drive,bcount - temp);
-				ide_set_handler(drive, &idescsi_pc_intr, get_timeout(pc), NULL);
+				ide_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);
 				return ide_started;
 			}
 #if IDESCSI_DEBUG_LOG
@@ -393,11 +390,11 @@ static ide_startstop_t idescsi_pc_intr (ide_drive_t *drive)
 	pc->actually_transferred+=bcount;				/* Update the current position */
 	pc->current_position+=bcount;
 
-	ide_set_handler(drive, &idescsi_pc_intr, get_timeout(pc), NULL);	/* And set the interrupt handler again */
+	ide_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);	/* And set the interrupt handler again */
 	return ide_started;
 }
 
-static ide_startstop_t idescsi_transfer_pc (ide_drive_t *drive)
+static ide_startstop_t idescsi_transfer_pc(struct ata_device *drive, struct request *rq)
 {
 	idescsi_scsi_t *scsi = drive->driver_data;
 	idescsi_pc_t *pc = scsi->pc;
@@ -413,7 +410,7 @@ static ide_startstop_t idescsi_transfer_pc (ide_drive_t *drive)
 		printk (KERN_ERR "ide-scsi: (IO,CoD) != (0,1) while issuing a packet command\n");
 		return ide_stopped;
 	}
-	ide_set_handler(drive, &idescsi_pc_intr, get_timeout(pc), NULL);	/* Set the interrupt routine */
+	ide_set_handler(drive, idescsi_pc_intr, get_timeout(pc), NULL);	/* Set the interrupt routine */
 	atapi_write(drive, scsi->pc->c, 12);			/* Send the actual packet */
 	return ide_started;
 }
@@ -421,11 +418,10 @@ static ide_startstop_t idescsi_transfer_pc (ide_drive_t *drive)
 /*
  *	Issue a packet command
  */
-static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
+static ide_startstop_t idescsi_issue_pc(struct ata_device *drive, struct request *rq, idescsi_pc_t *pc)
 {
 	idescsi_scsi_t *scsi = drive->driver_data;
 	int bcount;
-	struct request *rq = pc->rq;
 	int dma_ok = 0;
 
 	scsi->pc=pc;							/* Set the current packet command */
@@ -433,8 +429,12 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 	pc->current_position=pc->buffer;
 	bcount = min(pc->request_transfer, 63 * 1024);		/* Request to transfer the entire buffer at once */
 
-	if (drive->using_dma && rq->bio)
-		dma_ok = !drive->channel->dmaproc(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive);
+	if (drive->using_dma && rq->bio) {
+		if (test_bit (PC_WRITING, &pc->flags))
+			dma_ok = !udma_write(drive, rq);
+		else
+			dma_ok = !udma_read(drive, rq);
+	}
 
 	SELECT_DRIVE(drive->channel, drive);
 	if (IDE_CONTROL_REG)
@@ -445,22 +445,22 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 
 	if (dma_ok) {
 		set_bit(PC_DMA_IN_PROGRESS, &pc->flags);
-		(void) drive->channel->dmaproc(ide_dma_begin, drive);
+		udma_start(drive, rq);
 	}
 	if (test_bit (IDESCSI_DRQ_INTERRUPT, &scsi->flags)) {
-		ide_set_handler (drive, &idescsi_transfer_pc, get_timeout(pc), NULL);
+		ide_set_handler(drive, idescsi_transfer_pc, get_timeout(pc), NULL);
 		OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG);		/* Issue the packet command */
 		return ide_started;
 	} else {
 		OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG);
-		return idescsi_transfer_pc (drive);
+		return idescsi_transfer_pc(drive, rq);
 	}
 }
 
 /*
- *	idescsi_do_request is our request handling function.
+ * This is our request handling function.
  */
-static ide_startstop_t idescsi_do_request (ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t idescsi_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
 #if IDESCSI_DEBUG_LOG
 	printk (KERN_INFO "rq_status: %d, rq_dev: %u, cmd: %d, errors: %d\n",rq->rq_status,(unsigned int) rq->rq_dev,rq->cmd,rq->errors);
@@ -468,20 +468,20 @@ static ide_startstop_t idescsi_do_request (ide_drive_t *drive, struct request *r
 #endif /* IDESCSI_DEBUG_LOG */
 
 	if (rq->flags & REQ_SPECIAL) {
-		return idescsi_issue_pc (drive, (idescsi_pc_t *) rq->special);
+		return idescsi_issue_pc(drive, rq, (idescsi_pc_t *) rq->special);
 	}
 	blk_dump_rq_flags(rq, "ide-scsi: unsup command");
-	idescsi_end_request(drive, 0);
+	idescsi_end_request(drive, rq, 0);
 	return ide_stopped;
 }
 
-static int idescsi_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
+static int idescsi_open(struct inode *inode, struct file *filp, struct ata_device *drive)
 {
 	MOD_INC_USE_COUNT;
 	return 0;
 }
 
-static void idescsi_ide_release (struct inode *inode, struct file *filp, ide_drive_t *drive)
+static void idescsi_ide_release(struct inode *inode, struct file *filp, struct ata_device *drive)
 {
 	MOD_DEC_USE_COUNT;
 }
@@ -556,9 +556,7 @@ static struct ata_operations idescsi_driver = {
 	release:		idescsi_ide_release,
 	check_media_change:	NULL,
 	revalidate:		idescsi_revalidate,
-	pre_reset:		NULL,
 	capacity:		NULL,
-	special:		NULL,
 	proc:			NULL
 };
 
@@ -762,7 +760,6 @@ int idescsi_queue (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 
 	memset (pc->c, 0, 12);
 	pc->flags = 0;
-	pc->rq = rq;
 	memcpy (pc->c, cmd->cmnd, cmd->cmd_len);
 	if (cmd->use_sg) {
 		pc->buffer = NULL;

@@ -81,7 +81,6 @@
 static int max_loop = 8;
 static struct loop_device *loop_dev;
 static int *loop_sizes;
-static int *loop_blksizes;
 static devfs_handle_t devfs_handle;      /*  For the directory */
 
 /*
@@ -155,20 +154,17 @@ struct loop_func_table *xfer_funcs[MAX_LO_CRYPT] = {
 #define MAX_DISK_SIZE 1024*1024*1024
 
 static unsigned long
-compute_loop_size(struct loop_device *lo,
-		  struct dentry * lo_dentry, kdev_t lodev)
+compute_loop_size(struct loop_device *lo, struct dentry * lo_dentry)
 {
-	loff_t size = 0;
-
-	size = lo_dentry->d_inode->i_mapping->host->i_size;
+	loff_t size = lo_dentry->d_inode->i_mapping->host->i_size;
 	return (size - lo->lo_offset) >> BLOCK_SIZE_BITS;
 }
 
 static void figure_loop_size(struct loop_device *lo)
 {
 	loop_sizes[lo->lo_number] = compute_loop_size(lo,
-					lo->lo_backing_file->f_dentry,
-					lo->lo_device);
+					lo->lo_backing_file->f_dentry);
+					
 }
 
 static int lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
@@ -220,14 +216,14 @@ static int lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t po
 		offset = 0;
 		index++;
 		pos += size;
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 	}
 	up(&mapping->host->i_sem);
 	return 0;
 
 unlock:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 fail:
 	up(&mapping->host->i_sem);
@@ -383,7 +379,7 @@ static struct bio *loop_get_bio(struct loop_device *lo)
 static void loop_end_io_transfer(struct bio *bio)
 {
 	struct bio *rbh = bio->bi_private;
-	struct loop_device *lo = &loop_dev[minor(rbh->bi_dev)];
+	struct loop_device *lo = &loop_dev[minor(to_kdev_t(rbh->bi_bdev->bd_dev))];
 	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 
 	if (!uptodate || bio_rw(bio) == WRITE) {
@@ -416,7 +412,7 @@ out_bh:
 	bio->bi_sector = rbh->bi_sector + (lo->lo_offset >> 9);
 	bio->bi_rw = rbh->bi_rw;
 	spin_lock_irq(&lo->lo_lock);
-	bio->bi_dev = lo->lo_device;
+	bio->bi_bdev = lo->lo_device;
 	spin_unlock_irq(&lo->lo_lock);
 
 	return bio;
@@ -428,11 +424,12 @@ static int loop_make_request(request_queue_t *q, struct bio *rbh)
 	struct loop_device *lo;
 	unsigned long IV;
 	int rw = bio_rw(rbh);
+	int unit = minor(to_kdev_t(rbh->bi_bdev->bd_dev));
 
-	if (minor(rbh->bi_dev) >= max_loop)
+	if (unit >= max_loop)
 		goto out;
 
-	lo = &loop_dev[minor(rbh->bi_dev)];
+	lo = &loop_dev[unit];
 	spin_lock_irq(&lo->lo_lock);
 	if (lo->lo_state != Lo_bound)
 		goto inactive;
@@ -550,8 +547,6 @@ static int loop_thread(void *data)
 	atomic_inc(&lo->lo_pending);
 	spin_unlock_irq(&lo->lo_lock);
 
-	current->flags |= PF_NOIO;
-
 	/*
 	 * up sem, we are running
 	 */
@@ -585,12 +580,13 @@ static int loop_thread(void *data)
 	return 0;
 }
 
-static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
-		       unsigned int arg)
+static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
+		       struct block_device *bdev, unsigned int arg)
 {
 	struct file	*file;
 	struct inode	*inode;
-	kdev_t		lo_device;
+	kdev_t		dev = to_kdev_t(bdev->bd_dev);
+	struct block_device *lo_device;
 	int		lo_flags = 0;
 	int		error;
 
@@ -612,8 +608,8 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
 	if (S_ISBLK(inode->i_mode)) {
-		lo_device = inode->i_rdev;
-		if (kdev_same(lo_device, dev)) {
+		lo_device = inode->i_bdev;
+		if (lo_device == bdev) {
 			error = -EBUSY;
 			goto out;
 		}
@@ -629,7 +625,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 		if (!aops->prepare_write || !aops->commit_write)
 			lo_flags |= LO_FLAGS_READ_ONLY;
 
-		lo_device = inode->i_dev;
+		lo_device = inode->i_sb->s_bdev;
 		lo_flags |= LO_FLAGS_DO_BMAP;
 		error = 0;
 	} else
@@ -637,7 +633,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 
 	get_file(file);
 
-	if (IS_RDONLY (inode) || is_read_only(lo_device)
+	if (IS_RDONLY (inode) || is_read_only(to_kdev_t(lo_device->bd_dev))
 	    || !(lo_file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
@@ -652,7 +648,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 	lo->old_gfp_mask = inode->i_mapping->gfp_mask;
 	inode->i_mapping->gfp_mask = GFP_NOIO;
 
-	set_blocksize(dev, block_size(lo_device));
+	set_blocksize(bdev, block_size(lo_device));
 
 	lo->lo_bio = lo->lo_biotail = NULL;
 	kernel_thread(loop_thread, lo, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
@@ -723,7 +719,7 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	loop_release_xfer(lo);
 	lo->transfer = NULL;
 	lo->ioctl = NULL;
-	lo->lo_device = NODEV;
+	lo->lo_device = NULL;
 	lo->lo_encrypt_type = 0;
 	lo->lo_offset = 0;
 	lo->lo_encrypt_key_size = 0;
@@ -795,7 +791,7 @@ static int loop_get_status(struct loop_device *lo, struct loop_info *arg)
 	info.lo_number = lo->lo_number;
 	info.lo_device = kdev_t_to_nr(file->f_dentry->d_inode->i_dev);
 	info.lo_inode = file->f_dentry->d_inode->i_ino;
-	info.lo_rdevice = kdev_t_to_nr(lo->lo_device);
+	info.lo_rdevice = lo->lo_device->bd_dev;
 	info.lo_offset = lo->lo_offset;
 	info.lo_flags = lo->lo_flags;
 	strncpy(info.lo_name, lo->lo_name, LO_NAME_SIZE);
@@ -828,7 +824,7 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 	down(&lo->lo_ctl_mutex);
 	switch (cmd) {
 	case LOOP_SET_FD:
-		err = loop_set_fd(lo, file, inode->i_rdev, arg);
+		err = loop_set_fd(lo, file, inode->i_bdev, arg);
 		break;
 	case LOOP_CLR_FD:
 		err = loop_clr_fd(lo, inode->i_bdev);
@@ -992,10 +988,6 @@ int __init loop_init(void)
 	if (!loop_sizes)
 		goto out_mem;
 
-	loop_blksizes = kmalloc(max_loop * sizeof(int), GFP_KERNEL);
-	if (!loop_blksizes)
-		goto out_mem;
-
 	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), loop_make_request);
 	blk_queue_bounce_limit(BLK_DEFAULT_QUEUE(MAJOR_NR), BLK_BOUNCE_HIGH);
 
@@ -1010,9 +1002,7 @@ int __init loop_init(void)
 	}
 
 	memset(loop_sizes, 0, max_loop * sizeof(int));
-	memset(loop_blksizes, 0, max_loop * sizeof(int));
 	blk_size[MAJOR_NR] = loop_sizes;
-	blksize_size[MAJOR_NR] = loop_blksizes;
 	for (i = 0; i < max_loop; i++)
 		register_disk(NULL, mk_kdev(MAJOR_NR, i), 1, &lo_fops, 0);
 
@@ -1034,7 +1024,6 @@ void loop_exit(void)
 
 	kfree(loop_dev);
 	kfree(loop_sizes);
-	kfree(loop_blksizes);
 }
 
 module_init(loop_init);

@@ -43,10 +43,12 @@
 #include <linux/personality.h>
 #include <linux/stat.h>
 #include <linux/filter.h>
+#include <linux/tty.h>
+#include <linux/binfmts.h>
+#include <linux/elf.h>
 #include <asm/types.h>
 #include <asm/ipc.h>
 #include <asm/uaccess.h>
-#include <linux/elf.h>
 #include <asm/ppc32.h>
 #include <asm/ppcdebug.h>
 #include <asm/unistd.h>
@@ -1245,18 +1247,19 @@ handle_signal32(unsigned long sig, struct k_sigaction *ka,
 		    || __put_user((unsigned int)frame, &sc->regs)
 		    || __put_user(sig, &sc->signal))
 			goto badframe;
-
-		if (ka->sa.sa_flags & SA_ONESHOT)
-			ka->sa.sa_handler = SIG_DFL;
-
-		if (!(ka->sa.sa_flags & SA_NODEFER)) {
-			spin_lock_irq(&current->sigmask_lock);
-			sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
-			sigaddset(&current->blocked,sig);
-			recalc_sigpending();
-			spin_unlock_irq(&current->sigmask_lock);
-		}
 	}
+
+	if (ka->sa.sa_flags & SA_ONESHOT)
+		ka->sa.sa_handler = SIG_DFL;
+
+	if (!(ka->sa.sa_flags & SA_NODEFER)) {
+		spin_lock_irq(&current->sigmask_lock);
+		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
+		sigaddset(&current->blocked,sig);
+		recalc_sigpending();
+		spin_unlock_irq(&current->sigmask_lock);
+	}
+	
 	return;
 
 badframe:

@@ -68,7 +68,7 @@ typedef struct zone_struct {
 	 * table, they should be so rare as to be outweighed by the
 	 * benefits from the saved space.
 	 *
-	 * __wait_on_page() and unlock_page() in mm/filemap.c, are the
+	 * __wait_on_page_locked() and unlock_page() in mm/filemap.c, are the
 	 * primary users of these fields, and in mm/page_alloc.c
 	 * free_area_init_core() performs the initialization of them.
 	 */

@@ -83,7 +83,7 @@ int reiserfs_unpack (struct inode * inode, struct file * filp)
     kunmap(page) ; /* mapped by prepare_write */
 
 out_unlock:
-    UnlockPage(page) ;
+    unlock_page(page) ;
     page_cache_release(page) ;
 
 out:

@@ -3899,6 +3899,17 @@ static void *ibmcam_probe(struct usb_device *dev, unsigned int ifnum, const stru
 	return uvd;
 }
 
+
+static struct usb_device_id id_table[] = {
+	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, IBMCAM_PRODUCT_ID, 0x0002, 0x0002) },	/* Model 1 */
+	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, IBMCAM_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 2 */
+	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, IBMCAM_PRODUCT_ID, 0x0301, 0x0301) },	/* Model 3 */
+	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, NETCAM_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 4 */
+	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, VEO_800C_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 2 */
+	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, VEO_800D_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 4 */
+	{ }  /* Terminating entry */
+};
+
 /*
  * ibmcam_init()
  *
@@ -3926,7 +3937,8 @@ static int __init ibmcam_init(void)
 		sizeof(ibmcam_t),
 		"ibmcam",
 		&cbTbl,
-		THIS_MODULE);
+		THIS_MODULE,
+		id_table);
 }
 
 static void __exit ibmcam_cleanup(void)
@@ -3934,15 +3946,6 @@ static void __exit ibmcam_cleanup(void)
 	usbvideo_Deregister(&cams);
 }
 
-static __devinitdata struct usb_device_id id_table[] = {
-	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, IBMCAM_PRODUCT_ID, 0x0002, 0x0002) },	/* Model 1 */
-	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, IBMCAM_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 2 */
-	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, IBMCAM_PRODUCT_ID, 0x0301, 0x0301) },	/* Model 3 */
-	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, NETCAM_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 4 */
-	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, VEO_800C_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 2 */
-	{ USB_DEVICE_VER(IBMCAM_VENDOR_ID, VEO_800D_PRODUCT_ID, 0x030a, 0x030a) },	/* Model 4 */
-	{ }  /* Terminating entry */
-};
 MODULE_DEVICE_TABLE(usb, id_table);
 
 module_init(ibmcam_init);

@@ -526,6 +526,7 @@
 #include "sd.h"
 #include "scsi.h"
 #include "hosts.h"
+#include <scsi/scsicam.h>
 
 #include "megaraid.h"
 
@@ -1107,10 +1108,11 @@ static void mega_cmd_done (mega_host_config * megaCfg, mega_scb * pScb, int stat
 		status = 0xF0;
 	}
 #endif
+	
 	if (SCpnt->cmnd[0] == INQUIRY && !islogical) {
 		if ( SCpnt->use_sg ) {
 			sgList = (struct scatterlist *)SCpnt->request_buffer;
-			memcpy(&c, sgList[0].address, 0x1);
+			memcpy(&c, cpu_to_le32(sg_dma_address(&sgList[0])), 0x1);
 		} else {
 			memcpy(&c, SCpnt->request_buffer, 0x1);
 		}
@@ -3007,11 +3009,10 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 
 		if (!(flag & BOARD_QUARTZ)) {
 			/* Request our IO Range */
-			if (check_region (megaBase, 16)) {
+			if (!request_region(megaBase, 16, "megaraid")) {
 				printk(KERN_WARNING "megaraid: Couldn't register I/O range!\n");
 				goto err_unregister;
 			}
-			request_region(megaBase, 16, "megaraid");
 		}
 
 		/* Request our IRQ */
@@ -4557,8 +4558,10 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 #endif
 	IO_LOCK_T;
 
-	if (!inode || !(dev = inode->i_rdev))
+	if (!inode)
 		return -EINVAL;
+
+	dev = inode->i_rdev;
 
 	if (_IOC_TYPE (cmd) != MEGAIOC_MAGIC)
 		return (-EINVAL);
@@ -5104,16 +5107,16 @@ mega_del_logdrv(mega_host_config *this_hba, int logdrv)
 	 * Stop sending commands to the controller, queue them internally.
 	 * When deletion is complete, ISR will flush the queue.
 	 */
-	IO_LOCK;
+	IO_LOCK(this_hba->host);
 	this_hba->quiescent = 1;
-	IO_UNLOCK;
+	IO_UNLOCK(this_hba->host);
 
 	while( this_hba->qPcnt ) {
 			sleep_on_timeout( &wq, 1*HZ );	/* sleep for 1s */
 	}
 	rval = mega_do_del_logdrv(this_hba, logdrv);
 
-	IO_LOCK;
+	IO_LOCK(this_hba->host);
 	/*
 	 * Attach the internal queue to the pending queue
 	 */
@@ -5158,7 +5161,7 @@ mega_del_logdrv(mega_host_config *this_hba, int logdrv)
 	}
 	this_hba->quiescent = 0;
 
-	IO_UNLOCK;
+	IO_UNLOCK(this_hba->host);
 
 	return rval;
 }

@@ -3,20 +3,21 @@
 #
 
 O_TARGET := aic7xxx_drv.o
-MOD_TARGET = aic7xxx.o
+
+obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx.o
 
 # Core files
-obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx.o aic7xxx_93cx6.o aic7770.o
+aic7xxx-objs	+= aic7xxx_core.o aic7xxx_93cx6.o aic7770.o
 
 # Platform Specific Files
-obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx_linux.o aic7xxx_proc.o aic7770_linux.o
+aic7xxx-objs	+= aic7xxx_linux.o aic7xxx_proc.o aic7770_linux.o
 
 # PCI Specific Files
 ifeq ($(CONFIG_PCI),y)
   # Core PCI files
-  obj-$(CONFIG_SCSI_AIC7XXX) += aic7xxx_pci.o
+  aic7xxx-objs	+= aic7xxx_pci.o
   # Platform Specific PCI Files
-  obj-$(CONFIG_SCSI_AIC7XXX) += aic7xxx_linux_pci.o
+  aic7xxx-objs	+= aic7xxx_linux_pci.o
 endif
 
 #EXTRA_CFLAGS += -g

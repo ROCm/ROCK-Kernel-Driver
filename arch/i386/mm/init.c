@@ -41,8 +41,6 @@
 
 mmu_gather_t mmu_gathers[NR_CPUS];
 unsigned long highstart_pfn, highend_pfn;
-static unsigned long totalram_pages;
-static unsigned long totalhigh_pages;
 
 /*
  * NOTE: pagetable_init alloc all the fixmap pagetables contiguous on the
@@ -95,7 +93,7 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
-	show_buffers();
+	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 /* References to section boundaries */
@@ -122,7 +120,7 @@ static inline void set_pte_phys (unsigned long vaddr,
 	}
 	pte = pte_offset_kernel(pmd, vaddr);
 	/* <phys,flags> stored as-is, to permit clearing entries */
-	set_pte(pte, mk_pte_phys(phys, flags));
+	set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -239,7 +237,7 @@ static void __init pagetable_init (void)
 				vaddr = i*PGDIR_SIZE + j*PMD_SIZE + k*PAGE_SIZE;
 				if (end && (vaddr >= end))
 					break;
-				*pte = mk_pte_phys(__pa(vaddr), PAGE_KERNEL);
+				*pte = pfn_pte(__pa(vaddr) >> PAGE_SHIFT, PAGE_KERNEL);
 			}
 			set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte_base)));
 			if (pte_base != pte_offset_kernel(pmd, 0))
@@ -375,7 +373,7 @@ void __init test_wp_bit(void)
 	pmd = pmd_offset(pgd, vaddr);
 	pte = pte_offset_kernel(pmd, vaddr);
 	old_pte = *pte;
-	*pte = mk_pte_phys(0, PAGE_READONLY);
+	*pte = pfn_pte(0, PAGE_READONLY);
 	local_flush_tlb();
 
 	boot_cpu_data.wp_works_ok = do_test_wp_bit(vaddr);
@@ -560,18 +558,6 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 	}
 }
 #endif
-
-void si_meminfo(struct sysinfo *val)
-{
-	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = totalhigh_pages;
-	val->freehigh = nr_free_highpages();
-	val->mem_unit = PAGE_SIZE;
-	return;
-}
 
 #if defined(CONFIG_X86_PAE)
 static struct kmem_cache_s *pae_pgd_cachep;

@@ -518,7 +518,6 @@ static int __init nbd_init(void)
 #ifdef MODULE
 	printk("nbd: registered device at major %d\n", MAJOR_NR);
 #endif
-	blksize_size[MAJOR_NR] = nbd_blksizes;
 	blk_size[MAJOR_NR] = nbd_sizes;
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_nbd_request, &nbd_lock);
 	for (i = 0; i < MAX_NBD; i++) {

@@ -191,7 +191,7 @@ unsigned char IN_BYTE(ide_ioreg_t reg) {
 #define ATA_PIO0_STROBE 19
 #define ATA_PIO0_HOLD    4
 
-static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive);
+static int e100_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq);
 static void e100_ideproc (ide_ide_action_t func, ide_drive_t *drive,
 			  void *buffer, unsigned int length);
 
@@ -278,7 +278,7 @@ init_e100_ide (void)
 
 		hwif->chipset = ide_etrax100;
 		hwif->tuneproc = &tune_e100_ide;
-		hwif->dmaproc = &e100_dmaproc;
+		hwif->udma = &e100_dmaproc;
 		hwif->ata_read = e100_ide_input_data;
 		hwif->ata_write = e100_ide_output_data;
 		hwif->atapi_read = e100_atapi_read;
@@ -564,13 +564,14 @@ e100_ide_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 static etrax_dma_descr ata_descrs[MAX_DMA_DESCRS];
 static unsigned int ata_tot_size;
 
+
 /*
- * e100_ide_build_dmatable() prepares a dma request.
- * Returns 0 if all went okay, returns 1 otherwise.
+ * This prepares a dma request.  Returns 0 if all went okay, returns 1
+ * otherwise.
  */
-static int e100_ide_build_dmatable (ide_drive_t *drive)
+
+static int e100_udma_new_table(struct ata_channel *ch, struct request *rq)
 {
-	struct request *rq = HWGROUP(drive)->rq;
 	struct buffer_head *bh = rq->bh;
 	unsigned long size, addr;
 	unsigned int count = 0;
@@ -602,7 +603,7 @@ static int e100_ide_build_dmatable (ide_drive_t *drive)
 		/* did we run out of descriptors? */
 
 		if(count >= MAX_DMA_DESCRS) {
-			printk("%s: too few DMA descriptors\n", drive->name);
+			printk("%s: too few DMA descriptors\n", ch->name);
 			return 1;
 		}
 
@@ -623,7 +624,7 @@ static int e100_ide_build_dmatable (ide_drive_t *drive)
                    size > 131072 only one split is necessary */
 
 		if(size > 65536) {
- 		        /* ok we want to do IO at addr, size bytes. set up a new descriptor entry */
+		        /* ok we want to do IO at addr, size bytes. set up a new descriptor entry */
                         ata_descrs[count].sw_len = 0;  /* 0 means 65536, this is a 16-bit field */
                         ata_descrs[count].ctrl = 0;
                         ata_descrs[count].buf = addr;
@@ -656,7 +657,7 @@ static int e100_ide_build_dmatable (ide_drive_t *drive)
 		return 0;
 	}
 
-	printk("%s: empty DMA table?\n", drive->name);
+	printk("%s: empty DMA table?\n", ch->name);
 	return 1;	/* let the PIO routines handle this weirdness */
 }
 
@@ -687,7 +688,7 @@ static int config_drive_for_dma (ide_drive_t *drive)
 /*
  * etrax_dma_intr() is the handler for disk read/write DMA interrupts
  */
-static ide_startstop_t etrax_dma_intr (ide_drive_t *drive)
+static ide_startstop_t etrax_dma_intr (struct ata_device *drive, struct request *rq)
 {
 	int i, dma_stat;
 	byte stat;
@@ -695,15 +696,13 @@ static ide_startstop_t etrax_dma_intr (ide_drive_t *drive)
 	LED_DISK_READ(0);
 	LED_DISK_WRITE(0);
 
-	dma_stat = drive->channel->dmaproc(ide_dma_end, drive);
+	dma_stat = drive->channel->udma(ide_dma_end, drive, rq);
 	stat = GET_STAT();			/* get drive status */
 	if (OK_STAT(stat,DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
 		if (!dma_stat) {
-			struct request *rq;
-			rq = HWGROUP(drive)->rq;
 			for (i = rq->nr_sectors; i > 0;) {
 				i -= rq->current_nr_sectors;
-				ide_end_request(drive, 1);
+				ide_end_request(drive, rq, 1);
 			}
 			return ide_stopped;
 		}
@@ -728,7 +727,7 @@ static ide_startstop_t etrax_dma_intr (ide_drive_t *drive)
  * the caller should revert to PIO for the current request.
  */
 
-static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+static int e100_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
         static unsigned int reading; /* static to support ide_dma_begin semantics */
 	int atapi = 0;
@@ -788,24 +787,21 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 
 		/* set up the Etrax DMA descriptors */
 
-		if(e100_ide_build_dmatable (drive))
+		if(e100_udma_new_table(drive->channel, rq))
 			return 1;
 
 		if(!atapi) {
 			/* set the irq handler which will finish the request when DMA is done */
-		
 			ide_set_handler(drive, &etrax_dma_intr, WAIT_CMD, NULL);
-			
+
 			/* issue cmd to drive */
-			
 			OUT_BYTE(WIN_READDMA, IDE_COMMAND_REG);
 		}
 
 		/* begin DMA */
-	      
 		*R_DMA_CH3_FIRST = virt_to_phys(ata_descrs);
 		*R_DMA_CH3_CMD   = IO_STATE(R_DMA_CH3_CMD, cmd, start);
-		
+
 		/* initiate a multi word dma read using DMA handshaking */
 		
 		*R_ATA_TRANSFER_CNT =
@@ -822,7 +818,7 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		LED_DISK_READ(1);
 
 		D(printk("dma read of %d bytes.\n", ata_tot_size));
- 
+
 	} else {
 		/* writing */
 
@@ -831,29 +827,25 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 
 		/* set up the Etrax DMA descriptors */
 
-		if(e100_ide_build_dmatable (drive))
+		if(e100_udma_new_table(drive->channel, rq))
 			return 1;
 
 		if(!atapi) {
 			/* set the irq handler which will finish the request when DMA is done */
-				
 			ide_set_handler(drive, &etrax_dma_intr, WAIT_CMD, NULL);
-			
+
 			/* issue cmd to drive */
-			
 			OUT_BYTE(WIN_WRITEDMA, IDE_COMMAND_REG);
 		}
 
 		/* begin DMA */
-		
 		*R_DMA_CH2_FIRST = virt_to_phys(ata_descrs);
 		*R_DMA_CH2_CMD   = IO_STATE(R_DMA_CH2_CMD, cmd, start);
-		
+
 		/* initiate a multi word dma write using DMA handshaking */
-		
 		*R_ATA_TRANSFER_CNT =
 			IO_FIELD(R_ATA_TRANSFER_CNT, count, ata_tot_size >> 1);
-		
+
 		*R_ATA_CTRL_DATA =
 			IO_FIELD(R_ATA_CTRL_DATA, data,     IDE_DATA_REG) |
 			IO_STATE(R_ATA_CTRL_DATA, rw,       write) |
@@ -880,7 +872,7 @@ static int e100_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
  * --- Marcin Dalecki
  */
 
-void ide_release_dma(struct ata_channel *hwif)
+void ide_release_dma(struct ata_channel *ch)
 {
 	/* empty */
 }

@@ -12,37 +12,137 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/vmalloc.h>
+#include <linux/slab.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/ldt.h>
 #include <asm/desc.h>
 
+#ifdef CONFIG_SMP /* avoids "defined but not used" warnig */
+static void flush_ldt(void *mm)
+{
+	if (current->mm)
+		load_LDT(&current->mm->context);
+}
+#endif
+
+static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
+{
+	void *oldldt;
+	void *newldt;
+	int oldsize;
+
+	if (mincount <= pc->size)
+		return 0;
+	oldsize = pc->size;
+	mincount = (mincount+511)&(~511);
+	if (mincount*LDT_ENTRY_SIZE > PAGE_SIZE)
+		newldt = vmalloc(mincount*LDT_ENTRY_SIZE);
+	else
+		newldt = kmalloc(mincount*LDT_ENTRY_SIZE, GFP_KERNEL);
+
+	if (!newldt)
+		return -ENOMEM;
+
+	if (oldsize)
+		memcpy(newldt, pc->ldt, oldsize*LDT_ENTRY_SIZE);
+	oldldt = pc->ldt;
+	memset(newldt+oldsize*LDT_ENTRY_SIZE, 0, (mincount-oldsize)*LDT_ENTRY_SIZE);
+	wmb();
+	pc->ldt = newldt;
+	pc->size = mincount;
+	if (reload) {
+		load_LDT(pc);
+#ifdef CONFIG_SMP
+		if (current->mm->cpu_vm_mask != (1<<smp_processor_id()))
+			smp_call_function(flush_ldt, 0, 1, 1);
+#endif
+	}
+	wmb();
+	if (oldsize) {
+		if (oldsize*LDT_ENTRY_SIZE > PAGE_SIZE)
+			vfree(oldldt);
+		else
+			kfree(oldldt);
+	}
+	return 0;
+}
+
+static inline int copy_ldt(mm_context_t *new, mm_context_t *old)
+{
+	int err = alloc_ldt(new, old->size, 0);
+	if (err < 0) {
+		printk(KERN_WARNING "ldt allocation failed\n");
+		new->size = 0;
+		return err;
+	}
+	memcpy(new->ldt, old->ldt, old->size*LDT_ENTRY_SIZE);
+	return 0;
+}
+
 /*
- * read_ldt() is not really atomic - this is not a problem since
- * synchronization of reads and writes done to the LDT has to be
- * assured by user-space anyway. Writes are atomic, to protect
- * the security checks done on new descriptors.
+ * we do not have to muck with descriptors here, that is
+ * done in switch_mm() as needed.
  */
+int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
+{
+	struct mm_struct * old_mm;
+	int retval = 0;
+
+	init_MUTEX(&mm->context.sem);
+	mm->context.size = 0;
+	old_mm = current->mm;
+	if (old_mm && old_mm->context.size > 0) {
+		down(&old_mm->context.sem);
+		retval = copy_ldt(&mm->context, &old_mm->context);
+		up(&old_mm->context.sem);
+	}
+	return retval;
+}
+
+/*
+ * No need to lock the MM as we are the last user
+ */
+void release_segments(struct mm_struct *mm)
+{
+	if (mm->context.size) {
+		clear_LDT();
+		if (mm->context.size*LDT_ENTRY_SIZE > PAGE_SIZE)
+			vfree(mm->context.ldt);
+		else
+			kfree(mm->context.ldt);
+		mm->context.size = 0;
+	}
+}
+
 static int read_ldt(void * ptr, unsigned long bytecount)
 {
 	int err;
 	unsigned long size;
 	struct mm_struct * mm = current->mm;
 
-	err = 0;
-	if (!mm->context.segments)
-		goto out;
+	if (!mm->context.size)
+		return 0;
+	if (bytecount > LDT_ENTRY_SIZE*LDT_ENTRIES)
+		bytecount = LDT_ENTRY_SIZE*LDT_ENTRIES;
 
-	size = LDT_ENTRIES*LDT_ENTRY_SIZE;
+	down(&mm->context.sem);
+	size = mm->context.size*LDT_ENTRY_SIZE;
 	if (size > bytecount)
 		size = bytecount;
 
-	err = size;
-	if (copy_to_user(ptr, mm->context.segments, size))
+	err = 0;
+	if (copy_to_user(ptr, mm->context.ldt, size))
 		err = -EFAULT;
-out:
-	return err;
+	up(&mm->context.sem);
+	if (err < 0)
+		return err;
+	if (size != bytecount) {
+		/* zero-fill the rest */
+		clear_user(ptr+size, bytecount-size);
+	}
+	return bytecount;
 }
 
 static int read_default_ldt(void * ptr, unsigned long bytecount)
@@ -53,7 +153,7 @@ static int read_default_ldt(void * ptr, unsigned long bytecount)
 
 	err = 0;
 	address = &default_ldt[0];
-	size = sizeof(struct desc_struct);
+	size = 5*sizeof(struct desc_struct);
 	if (size > bytecount)
 		size = bytecount;
 
@@ -88,24 +188,14 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 			goto out;
 	}
 
-	/*
-	 * the GDT index of the LDT is allocated dynamically, and is
-	 * limited by MAX_LDT_DESCRIPTORS.
-	 */
-	down_write(&mm->mmap_sem);
-	if (!mm->context.segments) {
-		void * segments = vmalloc(LDT_ENTRIES*LDT_ENTRY_SIZE);
-		error = -ENOMEM;
-		if (!segments)
+	down(&mm->context.sem);
+	if (ldt_info.entry_number >= mm->context.size) {
+		error = alloc_ldt(&current->mm->context, ldt_info.entry_number+1, 1);
+		if (error < 0)
 			goto out_unlock;
-		memset(segments, 0, LDT_ENTRIES*LDT_ENTRY_SIZE);
-		wmb();
-		mm->context.segments = segments;
-		mm->context.cpuvalid = 1UL << smp_processor_id();
-		load_LDT(mm);
 	}
 
-	lp = (__u32 *) ((ldt_info.entry_number << 3) + (char *) mm->context.segments);
+	lp = (__u32 *) ((ldt_info.entry_number << 3) + (char *) mm->context.ldt);
 
    	/* Allow LDTs to be cleared by the user. */
    	if (ldt_info.base_addr == 0 && ldt_info.limit == 0) {
@@ -143,7 +233,7 @@ install:
 	error = 0;
 
 out_unlock:
-	up_write(&mm->mmap_sem);
+	up(&mm->context.sem);
 out:
 	return error;
 }

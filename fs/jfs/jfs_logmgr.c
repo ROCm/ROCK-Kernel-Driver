@@ -966,9 +966,15 @@ int lmLogSync(log_t * log, int nosyncwait)
 		 * We need to make sure all of the "written" metapages
 		 * actually make it to disk
 		 */
-		fsync_inode_data_buffers(sbi->ipbmap);
-		fsync_inode_data_buffers(sbi->ipimap);
-		fsync_inode_data_buffers(sbi->direct_inode);
+		filemap_fdatawait(sbi->ipbmap->i_mapping);
+		filemap_fdatawait(sbi->ipimap->i_mapping);
+		filemap_fdatawait(sbi->direct_inode->i_mapping);
+		filemap_fdatawrite(sbi->ipbmap->i_mapping);
+		filemap_fdatawrite(sbi->ipimap->i_mapping);
+		filemap_fdatawrite(sbi->direct_inode->i_mapping);
+		filemap_fdatawait(sbi->ipbmap->i_mapping);
+		filemap_fdatawait(sbi->ipimap->i_mapping);
+		filemap_fdatawait(sbi->direct_inode->i_mapping);
 
 		lrd.logtid = 0;
 		lrd.backchain = 0;
@@ -1072,8 +1078,8 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	 */
 
 	log->sb = sb;		/* This should be a list */
+	log->bdev = sb->s_bdev;
 	log->flag = JFS_INLINELOG;
-	log->dev = sb->s_dev;
 	log->base = addressPXD(&JFS_SBI(sb)->logpxd);
 	log->size = lengthPXD(&JFS_SBI(sb)->logpxd) >>
 	    (L2LOGPSIZE - sb->s_blocksize_bits);
@@ -1104,7 +1110,6 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
 	}
 
 	log->sb = sb;		/* This should be a list */
-	log->dev = JFS_SBI(sb)->logdev;
 	log->bdev = bdev;
 	
 	/*
@@ -1313,7 +1318,7 @@ static int lmLogInit(log_t * log)
 	logsuper->state = cpu_to_le32(LOGMOUNT);
 	log->serial = le32_to_cpu(logsuper->serial) + 1;
 	logsuper->serial = cpu_to_le32(log->serial);
-	logsuper->device = cpu_to_le32(kdev_t_to_nr(log->dev));
+	logsuper->device = cpu_to_le32(log->bdev->bd_dev);
 	lbmDirectWrite(log, bpsuper, lbmWRITE | lbmRELEASE | lbmSYNC);
 	if ((rc = lbmIOWait(bpsuper, lbmFREE)))
 		goto errout30;
@@ -1428,7 +1433,7 @@ static int lmLogShutdown(log_t * log)
 	 * We need to make sure all of the "written" metapages
 	 * actually make it to disk
 	 */
-	fsync_no_super(log->sb->s_bdev);
+	sync_blockdev(log->sb->s_bdev);
 
 	/*
 	 * write the last SYNCPT record with syncpoint = 0
@@ -1775,7 +1780,7 @@ static int lbmRead(log_t * log, int pn, lbuf_t ** bpp)
 	bio = bio_alloc(GFP_NOFS, 1);
 
 	bio->bi_sector = bp->l_blkno << (log->l2bsize - 9);
-	bio->bi_dev = log->dev;
+	bio->bi_bdev = log->bdev;
 	bio->bi_io_vec[0].bv_page = virt_to_page(bp->l_ldata);
 	bio->bi_io_vec[0].bv_len = LOGPSIZE;
 	bio->bi_io_vec[0].bv_offset = 0;
@@ -1917,7 +1922,7 @@ void lbmStartIO(lbuf_t * bp)
 
 	bio = bio_alloc(GFP_NOFS, 1);
 	bio->bi_sector = bp->l_blkno << (log->l2bsize - 9);
-	bio->bi_dev = log->dev;
+	bio->bi_bdev = log->bdev;
 	bio->bi_io_vec[0].bv_page = virt_to_page(bp->l_ldata);
 	bio->bi_io_vec[0].bv_len = LOGPSIZE;
 	bio->bi_io_vec[0].bv_offset = 0;

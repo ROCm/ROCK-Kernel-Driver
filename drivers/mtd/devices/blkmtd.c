@@ -165,21 +165,19 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
   int err;
   int sectornr, sectors, i;
   struct kiobuf *iobuf;
-  kdev_t dev;
   unsigned long *blocks;
 
   if(!rawdevice) {
     printk("blkmtd: readpage: PANIC file->private_data == NULL\n");
     return -EIO;
   }
-  dev = to_kdev_t(rawdevice->binding->bd_dev);
 
   DEBUG(2, "blkmtd: readpage called, dev = `%s' page = %p index = %ld\n",
-	bdevname(dev), page, page->index);
+	bdevname(rawdevice->binding), page, page->index);
 
-  if(Page_Uptodate(page)) {
+  if(PageUptodate(page)) {
     DEBUG(2, "blkmtd: readpage page %ld is already upto date\n", page->index);
-    UnlockPage(page);
+    unlock_page(page);
     return 0;
   }
 
@@ -205,7 +203,7 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
 	}
 	SetPageUptodate(page);
 	flush_dcache_page(page);
-	UnlockPage(page);
+	unlock_page(page);
 	spin_unlock(&mbd_writeq_lock);
 	return 0;
       }
@@ -283,7 +281,7 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
     err = 0;
   }
   flush_dcache_page(page);
-  UnlockPage(page);
+  unlock_page(page);
   DEBUG(2, "blkmtd: readpage: finished, err = %d\n", err);
   return 0;
 }
@@ -356,7 +354,6 @@ static int write_queue_task(void *data)
       int sectornr = item->pagenr << (PAGE_SHIFT - item->rawdevice->sector_bits);
       int sectorcnt = item->pagecnt << (PAGE_SHIFT - item->rawdevice->sector_bits);
       int max_sectors = KIO_MAX_SECTORS >> (item->rawdevice->sector_bits - 9);
-      kdev_t dev = to_kdev_t(item->rawdevice->binding->bd_dev);
 
       /* If we are writing to the last page on the device and it doesnt end
        * on a page boundary, subtract the number of sectors that dont exist.
@@ -419,7 +416,7 @@ static int write_queue_task(void *data)
       write_queue_tail %= write_queue_sz;
       if(!item->iserase) {
 	for(i = 0 ; i < item->pagecnt; i++) {
-	  UnlockPage(item->pages[i]);
+	  unlock_page(item->pages[i]);
 	  __free_pages(item->pages[i], 0);
 	}
 	kfree(item->pages);
@@ -473,7 +470,7 @@ static int queue_page_write(mtd_raw_dev_data_t *rawdevice, struct page **pages,
       outpage = alloc_pages(GFP_KERNEL, 0);
       if(!outpage) {
 	while(i--) {
-	  UnlockPage(new_pages[i]);
+	  unlock_page(new_pages[i]);
 	  __free_pages(new_pages[i], 0);
 	}
 	kfree(new_pages);
@@ -546,7 +543,7 @@ static int blkmtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 
   /* check erase region has valid start and length */
   DEBUG(2, "blkmtd: erase: dev = `%s' from = 0x%x len = 0x%lx\n",
-	bdevname(rawdevice->binding->bd_dev), from, len);
+	bdevname(rawdevice->binding), from, len);
   while(numregions) {
     DEBUG(3, "blkmtd: checking erase region = 0x%08X size = 0x%X num = 0x%x\n",
 	  einfo->offset, einfo->erasesize, einfo->numblocks);
@@ -610,7 +607,7 @@ static int blkmtd_erase(struct mtd_info *mtd, struct erase_info *instr)
     if(!err) {
       while(pagecnt--) {
 	SetPageUptodate(pages[pagecnt]);
-	UnlockPage(pages[pagecnt]);
+	unlock_page(pages[pagecnt]);
 	page_cache_release(pages[pagecnt]);
 	flush_dcache_page(pages[pagecnt]);
       }
@@ -648,7 +645,7 @@ static int blkmtd_read(struct mtd_info *mtd, loff_t from, size_t len,
   *retlen = 0;
 
   DEBUG(2, "blkmtd: read: dev = `%s' from = %ld len = %d buf = %p\n",
-	bdevname(rawdevice->binding->bd_dev), (long int)from, len, buf);
+	bdevname(rawdevice->binding), (long int)from, len, buf);
 
   pagenr = from >> PAGE_SHIFT;
   offset = from - (pagenr << PAGE_SHIFT);
@@ -665,8 +662,8 @@ static int blkmtd_read(struct mtd_info *mtd, loff_t from, size_t len,
     if(IS_ERR(page)) {
       return PTR_ERR(page);
     }
-    wait_on_page(page);
-    if(!Page_Uptodate(page)) {
+    wait_on_page_locked(page);
+    if(!PageUptodate(page)) {
       /* error reading page */
       printk("blkmtd: read: page not uptodate\n");
       page_cache_release(page);
@@ -718,7 +715,7 @@ static int blkmtd_write(struct mtd_info *mtd, loff_t to, size_t len,
 
   *retlen = 0;
   DEBUG(2, "blkmtd: write: dev = `%s' to = %ld len = %d buf = %p\n",
-	bdevname(rawdevice->binding->bd_dev), (long int)to, len, buf);
+	bdevname(rawdevice->binding), (long int)to, len, buf);
 
   /* handle readonly and out of range numbers */
 
@@ -809,7 +806,7 @@ static int blkmtd_write(struct mtd_info *mtd, loff_t to, size_t len,
       }
       memcpy(page_address(page), buf, PAGE_SIZE);
       pages[pagecnt++] = page;
-      UnlockPage(page);
+      unlock_page(page);
       SetPageUptodate(page);
       pagenr++;
       pagesc--;
@@ -965,7 +962,7 @@ static void __exit cleanup_blkmtd(void)
     kfree(write_queue);
 
   if(erase_page) {
-    UnlockPage(erase_page);
+    unlock_page(erase_page);
     __free_pages(erase_page, 0);
   }
   printk("blkmtd: unloaded for %s\n", device);
@@ -1065,6 +1062,7 @@ static int __init init_blkmtd(void)
   int readonly = 0;
   int erase_size = CONFIG_MTD_BLKDEV_ERASESIZE;
   kdev_t rdev;
+  struct block_device *bdev;
   int err;
   int mode;
   int regions;
@@ -1130,11 +1128,16 @@ static int __init init_blkmtd(void)
     printk("blkmtd: attempting to use an MTD device as a block device\n");
     return 1;
   }
+  /* get the block device */
+  bdev = bdget(kdev_t_to_nr(mk_kdev(maj, min)));
+  err = blkdev_get(bdev, mode, 0, BDEV_RAW);
+  if (err)
+    return 1;
 
-  DEBUG(1, "blkmtd: devname = %s\n", bdevname(rdev));
+  DEBUG(1, "blkmtd: devname = %s\n", bdevname(bdev));
   blocksize = BLOCK_SIZE;
 
-  blocksize = bs ? bs : block_size(rdev);
+  blocksize = bs ? bs : block_size(bdev);
   i = blocksize;
   blocksize_bits = 0;
   while(i != 1) {
@@ -1142,27 +1145,24 @@ static int __init init_blkmtd(void)
     i >>= 1;
   }
 
-  size = (count ? count*blocksize : blkdev_size_in_bytes(rdev));
+  size = count ? count*blocksize : bdev->bd_inode->i_size;
 
   DEBUG(1, "blkmtd: size = %ld\n", (long int)size);
 
   if(size == 0) {
     printk("blkmtd: cant determine size\n");
+    blkdev_put(bdev, BDEV_RAW);
     return 1;
   }
 
   mtd_rawdevice = (mtd_raw_dev_data_t *)kmalloc(sizeof(mtd_raw_dev_data_t), GFP_KERNEL);
   if(mtd_rawdevice == NULL) {
+    blkdev_put(bdev, BDEV_RAW);
     err = -ENOMEM;
     goto init_err;
   }
   memset(mtd_rawdevice, 0, sizeof(mtd_raw_dev_data_t));
-  /* get the block device */
-  mtd_rawdevice->binding = bdget(kdev_t_to_nr(mk_kdev(maj, min)));
-  err = blkdev_get(mtd_rawdevice->binding, mode, 0, BDEV_RAW);
-  if (err) {
-    goto init_err;
-  }
+  mtd_rawdevice->binding = bdev;
   mtd_rawdevice->totalsize = size;
   mtd_rawdevice->sector_size = blocksize;
   mtd_rawdevice->sector_bits = blocksize_bits;

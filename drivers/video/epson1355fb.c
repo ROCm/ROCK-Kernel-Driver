@@ -361,9 +361,9 @@ static int e1355_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 	return 0;
 }
 
-static int e1355_setcolreg(unsigned regno, unsigned red, unsigned green,
-			   unsigned blue, unsigned transp,
-			   struct fb_info *info)
+static int e1355fb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			     unsigned blue, unsigned transp,
+			     struct fb_info *info)
 {
 	u8 r = (red >> 8) & 0xf0;
 	u8 g = (green>>8) & 0xf0;
@@ -432,7 +432,6 @@ static void e1355_set_disp(const void *unused, struct display *disp,
 {
 	struct display_switch *d;
 
-	disp->screen_base = (void *)E1355_FB_BASE;
 	disp->dispsw = &e1355_dispsw;
 	
 	switch(disp->var.bits_per_pixel) {
@@ -467,7 +466,6 @@ struct fbgen_hwswitch e1355_switch = {
 	get_par:	e1355_get_par,
 	set_par:	e1355_set_par,
 	getcolreg:	e1355_getcolreg,
-	setcolreg:	e1355_setcolreg,
 	pan_display:	e1355_pan_display,
 	blank:		e1355_blank,
 	set_disp:	e1355_set_disp,
@@ -483,8 +481,10 @@ static struct fb_ops e1355fb_ops = {
 	fb_get_var:	fbgen_get_var,
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
-	fb_set_cmap:	fbgen_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	e1355fb_setcolreg,
 	fb_pan_display:	fbgen_pan_display,
+	fb_blank:	fbgen_blank,
 };
 
 static struct e1355fb_info fb_info;
@@ -502,18 +502,19 @@ int __init e1355fb_init(void)
 	fb_info.gen.info.changevar = NULL;
 	fb_info.gen.info.node = NODEV;
 	fb_info.gen.info.fbops = &e1355fb_ops;
+	fb_info.gen.info.screen_base = (void *)E1355_FB_BASE;
+	fb_info.gen.currcon = -1;
 	fb_info.gen.info.disp = &disp;
 	fb_info.gen.parsize = sizeof(struct e1355_par);
 	fb_info.gen.info.switch_con = &fbgen_switch;
 	fb_info.gen.info.updatevar = &fbgen_update_var;
-	fb_info.gen.info.blank = &fbgen_blank;
 	fb_info.gen.info.flags = FBINFO_FLAG_DEFAULT;
 	/* This should give a reasonable default video mode */
 	fbgen_get_var(&disp.var, -1, &fb_info.gen.info);
 	fbgen_do_set_var(&disp.var, 1, &fb_info.gen);
 	fbgen_set_disp(-1, &fb_info.gen);
 	if (disp.var.bits_per_pixel > 1) 
-		fbgen_install_cmap(0, &fb_info.gen);
+		do_install_cmap(0, &fb_info.gen);
 	if (register_framebuffer(&fb_info.gen.info) < 0)
 		return -EINVAL;
 	printk(KERN_INFO "fb%d: %s frame buffer device\n", GET_FB_IDX(fb_info.gen.info.node),

@@ -1564,8 +1564,8 @@ static int fbcon_blank(struct vc_data *conp, int blank)
     if (!p->can_soft_blank) {
 	if (blank) {
 	    if (p->visual == FB_VISUAL_MONO01) {
-		if (p->screen_base)
-		    fb_memset255(p->screen_base,
+		if (p->fb_info->screen_base)
+		    fb_memset255(p->fb_info->screen_base,
 				 p->var.xres_virtual*p->var.yres_virtual*
 				 p->var.bits_per_pixel>>3);
 	    } else {
@@ -1590,7 +1590,8 @@ static int fbcon_blank(struct vc_data *conp, int blank)
 	    return 1;
 	}
     }
-    (*info->blank)(blank, info);
+    if (info->fbops->fb_blank)	
+    	(*info->fbops->fb_blank)(blank, info);
     return 0;
 }
 
@@ -2123,7 +2124,7 @@ static int __init fbcon_show_logo( void )
     struct display *p = &fb_display[fg_console]; /* draw to vt in foreground */
     int depth = p->var.bits_per_pixel;
     int line = p->next_line;
-    unsigned char *fb = p->screen_base;
+    unsigned char *fb = p->fb_info->screen_base;
     unsigned char *logo;
     unsigned char *dst, *src;
     int i, j, n, x1, y1, x;

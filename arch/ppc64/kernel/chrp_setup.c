@@ -57,7 +57,7 @@
 #include <asm/irq.h>
 #include <asm/keyboard.h>
 #include <asm/init.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/time.h>
 
 #include "local_irq.h"
@@ -67,7 +67,6 @@
 #include <asm/ppcdebug.h>
 
 extern volatile unsigned char *chrp_int_ack_special;
-extern struct Naca *naca;
 
 void chrp_setup_pci_ptrs(void);
 void chrp_progress(char *, unsigned short);
@@ -91,6 +90,9 @@ extern void iSeries_pcibios_fixup(void);
 extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
 extern int  pSeries_set_rtc_time(struct rtc_time *rtc_time);
 void pSeries_calibrate_decr(void);
+static void fwnmi_init(void);
+extern void SystemReset_FWNMI(void), MachineCheck_FWNMI(void);	/* from head.S */
+int fwnmi_active;  /* TRUE if an FWNMI handler is present */
 
 kdev_t boot_dev;
 unsigned long  virtPython0Facilities = 0;  // python0 facility area (memory mapped io) (64-bit format) VIRTUAL address.
@@ -153,6 +155,8 @@ chrp_setup_arch(void)
 
 	printk("Boot arguments: %s\n", cmd_line);
 
+	fwnmi_init();
+
 	/* Find and initialize PCI host bridges */
 	/* iSeries needs to be done much later. */
  	#ifndef CONFIG_PPC_ISERIES
@@ -188,6 +192,23 @@ chrp_init2(void)
 	 */
 	chrp_request_regions();
 	ppc_md.progress(UTS_RELEASE, 0x7777);
+}
+
+/* Initialize firmware assisted non-maskable interrupts if
+ * the firmware supports this feature.
+ *
+ */
+static void __init fwnmi_init(void)
+{
+	long ret;
+	int ibm_nmi_register = rtas_token("ibm,nmi-register");
+	if (ibm_nmi_register == RTAS_UNKNOWN_SERVICE)
+		return;
+	ret = rtas_call(ibm_nmi_register, 2, 1, NULL,
+			__pa((unsigned long)SystemReset_FWNMI),
+			__pa((unsigned long)MachineCheck_FWNMI));
+	if (ret == 0)
+		fwnmi_active = 1;
 }
 
 
@@ -230,7 +251,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif /* CONFIG_BLK_DEV_INITRD */
 #endif
 
-	ppc_md.ppc_machine = _machine;
+	ppc_md.ppc_machine = naca->platform;
 
 	ppc_md.setup_arch     = chrp_setup_arch;
 	ppc_md.setup_residual = NULL;
@@ -238,11 +259,9 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	if(naca->interrupt_controller == IC_OPEN_PIC) {
 		ppc_md.init_IRQ       = openpic_init_IRQ; 
 		ppc_md.get_irq        = openpic_get_irq;
-		ppc_md.post_irq	      = NULL;
 	} else {
 		ppc_md.init_IRQ       = xics_init_IRQ;
 		ppc_md.get_irq        = xics_get_irq;
-		ppc_md.post_irq	      = NULL;
 	}
 	ppc_md.init_ras_IRQ = init_ras_IRQ;
 
@@ -296,7 +315,7 @@ chrp_progress(char *s, unsigned short hex)
 	if (hex)
 		udbg_printf("<chrp_progress> %s\n", s);
 
-	if (!rtas.base || (_machine != _MACH_pSeries))
+	if (!rtas.base || (naca->platform != PLATFORM_PSERIES))
 		return;
 
 	if (max_width == 0) {

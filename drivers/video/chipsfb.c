@@ -48,8 +48,6 @@
 #include <video/fbcon-cfb16.h>
 #include <video/macmodes.h>
 
-static int currcon = 0;
-
 struct fb_info_chips {
 	struct fb_info info;
 	struct fb_fix_screeninfo fix;
@@ -76,7 +74,7 @@ struct fb_info_chips {
 
 #define write_ind(num, val, ap, dp)	do { \
 	outb((num), (ap)); outb((val), (dp)); \
-} while (0)
+} while (0);
 #define read_ind(num, var, ap, dp)	do { \
 	outb((num), (ap)); var = inb((dp)); \
 } while (0);
@@ -127,8 +125,9 @@ static int chips_set_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *info);
 static int chips_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
-static int chips_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info);
+static int chipsfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			     u_int transp, struct fb_info *info);
+static int chipsfb_blank(int blank, struct fb_info *info);
 
 static struct fb_ops chipsfb_ops = {
 	owner:		THIS_MODULE,
@@ -136,14 +135,13 @@ static struct fb_ops chipsfb_ops = {
 	fb_get_var:	chips_get_var,
 	fb_set_var:	chips_set_var,
 	fb_get_cmap:	chips_get_cmap,
-	fb_set_cmap:	chips_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	chipsfb_setcolreg,
+	fb_blank:	chipsfb_blank,
 };
 
 static int chipsfb_getcolreg(u_int regno, u_int *red, u_int *green,
 			     u_int *blue, u_int *transp, struct fb_info *info);
-static int chipsfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			     u_int transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
 static void chips_set_bitdepth(struct fb_info_chips *p, struct display* disp, int con, int bpp);
 
 static int chips_get_fix(struct fb_fix_screeninfo *fix, int con,
@@ -188,7 +186,7 @@ static int chips_set_var(struct fb_var_screeninfo *var, int con,
 static int chips_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info)
 {
-	if (con == currcon)		/* current console? */
+	if (con == info->currcon)		/* current console? */
 		return fb_get_cmap(cmap, kspc, chipsfb_getcolreg, info);
 	if (fb_display[con].cmap.len)	/* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -199,35 +197,18 @@ static int chips_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 	return 0;
 }
 
-static int chips_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			 struct fb_info *info)
-{
-	int err;
-
-	if (!fb_display[con].cmap.len) {	/* no colormap allocated? */
-		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		if ((err = fb_alloc_cmap(&fb_display[con].cmap, size, 0)))
-			return err;
-	}
-	if (con == currcon)			/* current console? */
-		return fb_set_cmap(cmap, kspc, chipsfb_setcolreg, info);
-	else
-		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-	return 0;
-}
-
 static int chipsfbcon_switch(int con, struct fb_info *info)
 {
 	struct fb_info_chips *p = (struct fb_info_chips *) info;
 	int new_bpp, old_bpp;
 
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, chipsfb_getcolreg, info);
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, chipsfb_getcolreg, info);
 
 	new_bpp = fb_display[con].var.bits_per_pixel;
-	old_bpp = fb_display[currcon].var.bits_per_pixel;
-	currcon = con;
+	old_bpp = fb_display[info->currcon].var.bits_per_pixel;
+	info->currcon = con;
 
 	if (new_bpp != old_bpp)
 		chips_set_bitdepth(p, &fb_display[con], con, new_bpp);
@@ -241,7 +222,7 @@ static int chipsfb_updatevar(int con, struct fb_info *info)
 	return 0;
 }
 
-static void chipsfb_blank(int blank, struct fb_info *info)
+static int chipsfb_blank(int blank, struct fb_info *info)
 {
 	struct fb_info_chips *p = (struct fb_info_chips *) info;
 	int i;
@@ -279,6 +260,7 @@ static void chipsfb_blank(int blank, struct fb_info *info)
 			outb(p->palette[i].blue, 0x3c9);
 		}
 	}
+	return 0;
 }
 
 static int chipsfb_getcolreg(u_int regno, u_int *red, u_int *green,
@@ -323,18 +305,6 @@ static int chipsfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	return 0;
 }
 
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, chipsfb_setcolreg, info);
-	else {
-		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		fb_set_cmap(fb_default_cmap(size), 1, chipsfb_setcolreg, info);
-	}
-}
-
 static void chips_set_bitdepth(struct fb_info_chips *p, struct display* disp, int con, int bpp)
 {
 	int err;
@@ -342,7 +312,7 @@ static void chips_set_bitdepth(struct fb_info_chips *p, struct display* disp, in
 	struct fb_var_screeninfo* var = &p->var;
 	
 	if (bpp == 16) {
-		if (con == currcon) {
+		if (con == p->info.currcon) {
 			write_cr(0x13, 200);		// Set line length (doublewords)
 			write_xr(0x81, 0x14);		// 15 bit (555) color mode
 			write_xr(0x82, 0x00);		// Disable palettes
@@ -364,7 +334,7 @@ static void chips_set_bitdepth(struct fb_info_chips *p, struct display* disp, in
 		disp->dispsw = &fbcon_dummy;
 #endif
 	} else if (bpp == 8) {
-		if (con == currcon) {
+		if (con == p->info.currcon) {
 			write_cr(0x13, 100);		// Set line length (doublewords)
 			write_xr(0x81, 0x12);		// 8 bit color mode
 			write_xr(0x82, 0x08);		// Graphics gamma enable
@@ -568,7 +538,6 @@ static void __init init_chips(struct fb_info_chips *p)
 	p->disp.cmap.green = NULL;
 	p->disp.cmap.blue = NULL;
 	p->disp.cmap.transp = NULL;
-	p->disp.screen_base = p->frame_buffer;
 	p->disp.visual = p->fix.visual;
 	p->disp.type = p->fix.type;
 	p->disp.type_aux = p->fix.type_aux;
@@ -580,12 +549,13 @@ static void __init init_chips(struct fb_info_chips *p)
 	strcpy(p->info.modename, p->fix.id);
 	p->info.node = NODEV;
 	p->info.fbops = &chipsfb_ops;
+	p->info.screen_base = p->frame_buffer;
 	p->info.disp = &p->disp;
+	p->info.currcon = -1;
 	p->info.fontname[0] = 0;
 	p->info.changevar = NULL;
 	p->info.switch_con = &chipsfbcon_switch;
 	p->info.updatevar = &chipsfb_updatevar;
-	p->info.blank = &chipsfb_blank;
 	p->info.flags = FBINFO_FLAG_DEFAULT;
 
 	for (i = 0; i < 16; ++i) {

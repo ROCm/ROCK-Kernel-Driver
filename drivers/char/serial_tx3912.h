@@ -24,7 +24,7 @@
 #define UART_TXOVERRUN_INT  3  /* transmit overrun error          (25, 15) */
 #define UART_EMPTY_INT      2  /* both trans/recv regs empty      (24, 14) */
 #define UART_DMAFULL_INT    1  /* DMA at end of buffer            (23, 13) */
-#define UART_DMAHALF_INT    0  /* DMA halfway through buffer */   (22, 12) */
+#define UART_DMAHALF_INT    0  /* DMA halfway through buffer      (22, 12) */
 
 #define UARTA_SHIFT        22
 #define UARTB_SHIFT        12

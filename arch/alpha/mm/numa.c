@@ -358,7 +358,6 @@ void __init mem_init(void)
 	extern int page_is_ram(unsigned long) __init;
 	extern char _text, _etext, _data, _edata;
 	extern char __init_begin, __init_end;
-	extern unsigned long totalram_pages;
 	unsigned long nid, i;
 	mem_map_t * lmem_map;
 
@@ -426,5 +425,5 @@ show_mem(void)
 	printk("%ld pages shared\n",shared);
 	printk("%ld pages swap cached\n",cached);
 	printk("%ld pages in page table cache\n",pgtable_cache_size);
-	show_buffers();
+	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }

@@ -83,7 +83,7 @@ fi
 define_bool CONFIG_KCORE_ELF y	# On IA-64, we always want an ELF /proc/kcore.
 
 bool 'SMP support' CONFIG_SMP
-tristate 'Support running of Linux/x86 binaries' CONFIG_IA32_SUPPORT
+bool 'Support running of Linux/x86 binaries' CONFIG_IA32_SUPPORT
 bool 'Performance monitor support' CONFIG_PERFMON
 tristate '/proc/pal support' CONFIG_IA64_PALINFO
 tristate '/proc/efi/vars support' CONFIG_EFI_VARS
@@ -123,6 +123,7 @@ source drivers/block/Config.in
 source drivers/ieee1394/Config.in
 source drivers/message/i2o/Config.in
 source drivers/md/Config.in
+source drivers/message/fusion/Config.in
 
 mainmenu_option next_comment
 comment 'ATA/IDE/MFM/RLL support'
@@ -174,14 +175,7 @@ fi
 
 source net/ax25/Config.in
 
-mainmenu_option next_comment
-comment 'ISDN subsystem'
-
-tristate 'ISDN support' CONFIG_ISDN
-if [ "$CONFIG_ISDN" != "n" ]; then
-  source drivers/isdn/Config.in
-fi
-endmenu
+source drivers/isdn/Config.in
 
 mainmenu_option next_comment
 comment 'CD-ROM drivers (not for SCSI or IDE/ATAPI drives)'
@@ -232,9 +226,7 @@ source drivers/usb/Config.in
 
 source lib/Config.in
 
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   source net/bluetooth/Config.in
-fi
+source net/bluetooth/Config.in
 
 fi # !HP_SIM
 

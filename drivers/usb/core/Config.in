@@ -4,11 +4,8 @@
 bool '  USB verbose debug messages' CONFIG_USB_DEBUG
 
 comment 'Miscellaneous USB options'
-bool '  USB device filesystem' CONFIG_USB_DEVICEFS
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   bool '  Enforce USB bandwidth allocation (EXPERIMENTAL)' CONFIG_USB_BANDWIDTH
-else
-   define_bool CONFIG_USB_BANDWIDTH n
-fi
-bool '  Long timeout for slow-responding devices (some MGE Ellipse UPSes)' CONFIG_USB_LONG_TIMEOUT
+    bool '  USB device filesystem' CONFIG_USB_DEVICEFS
+    bool '  Long timeout for slow-responding devices (some MGE Ellipse UPSes)' CONFIG_USB_LONG_TIMEOUT
+dep_bool '  Enforce USB bandwidth allocation (EXPERIMENTAL)' CONFIG_USB_BANDWIDTH $CONFIG_EXPERIMENTAL
+dep_bool '  Dynamic USB minor allocation (EXPERIMENTAL)' CONFIG_USB_DYNAMIC_MINORS $CONFIG_EXPERIMENTAL
 

@@ -3,12 +3,9 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := synth.o
+O_TARGET     := _synth.o
 
-subdir-y     := emux
-subdir-m     := $(subdir-y)
-
-list-multi   := snd-util-mem.o
+mod-subdirs  := emux
 
 export-objs  := util_mem.o
 
@@ -21,7 +18,9 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_SBAWE) += snd-util-mem.o
 endif
 
-include $(TOPDIR)/Rules.make
+subdir-$(CONFIG_SND) += emux
+ifeq ($(CONFIG_SND),y)
+  obj-y += emux/_emux.o
+endif
 
-snd-util-mem.o: $(snd-util-mem-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-util-mem-objs)
+include $(TOPDIR)/Rules.make

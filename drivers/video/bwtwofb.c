@@ -83,7 +83,7 @@ static struct sbus_mmap_map bw2_mmap_map[] = {
 	{ 0,			0,			0		    }
 };
 
-static void bw2_blank (struct fb_info_sbusfb *fb)
+static int bw2_blank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u8 tmp;
@@ -93,9 +93,10 @@ static void bw2_blank (struct fb_info_sbusfb *fb)
 	tmp &= ~BWTWO_CTL_ENABLE_VIDEO;
 	sbus_writeb(tmp, &fb->s.bw2.regs->control);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
-static void bw2_unblank (struct fb_info_sbusfb *fb)
+static int bw2_unblank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u8 tmp;
@@ -105,12 +106,13 @@ static void bw2_unblank (struct fb_info_sbusfb *fb)
 	tmp |= BWTWO_CTL_ENABLE_VIDEO;
 	sbus_writeb(tmp, &fb->s.bw2.regs->control);
 	spin_unlock_irqrestore(&fb->lock, flags);
+ 	return 0;
 }
 
 static void bw2_margins (struct fb_info_sbusfb *fb, struct display *p,
 			 int x_margin, int y_margin)
 {
-	p->screen_base += (y_margin - fb->y_margin) *
+	fb->info.screen_base += (y_margin - fb->y_margin) *
 		p->line_length + ((x_margin - fb->x_margin) >> 3);
 }
 
@@ -235,11 +237,11 @@ char __init *bwtwofb_init(struct fb_info_sbusfb *fb)
 	
 	disp->scrollmode = SCROLL_YREDRAW;
 	disp->inverse = 1;
-	if (!disp->screen_base) {
-		disp->screen_base = (char *)
+	if (!fb->info.screen_base) {
+		fb->info.screen_base = (char *)
 			sbus_ioremap(resp, 0, type->fb_size, "bw2 ram");
 	}
-	disp->screen_base += fix->line_length * fb->y_margin + (fb->x_margin >> 3);
+	fb->info.screen_base += fix->line_length * fb->y_margin + (fb->x_margin >> 3);
 	fb->dispsw = fbcon_mfb;
 	fix->visual = FB_VISUAL_MONO01;
 

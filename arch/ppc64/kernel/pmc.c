@@ -23,7 +23,7 @@
  */
 
 #include <asm/proc_fs.h>
-#include <asm/Paca.h>
+#include <asm/paca.h>
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/processor.h>
@@ -32,9 +32,7 @@
 #include <linux/spinlock.h>
 #include <asm/pmc.h>
 #include <asm/uaccess.h>
-#include <asm/Naca.h>
-
-extern struct Naca *naca;
+#include <asm/naca.h>
 
 struct _pmc_sw pmc_sw_system = {
 	0  

@@ -47,28 +47,24 @@ static int pdcadma_get_info (char *buffer, char **addr, off_t offset, int count)
 
 	return p-buffer;	/* => must be less than 4k! */
 }
-#endif  /* defined(DISPLAY_PDCADMA_TIMINGS) && defined(CONFIG_PROC_FS) */
+#endif
 
 byte pdcadma_proc = 0;
 
 extern char *ide_xfer_verbose (byte xfer_rate);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-/*
- * pdcadma_dmaproc() initiates/aborts (U)DMA read/write operations on a drive.
- */
 
-int pdcadma_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+/*
+ * This initiates/aborts (U)DMA read/write operations on a drive.
+ */
+static int pdcadma_dmaproc(struct ata_device *drive)
 {
-	switch (func) {
-		case ide_dma_check:
-			func = ide_dma_off_quietly;
-		default:
-			break;
-	}
-	return ide_dmaproc(func, drive);	/* use standard DMA stuff */
+	udma_enable(drive, 0, 0);
+
+	return 0;
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
+#endif
 
 unsigned int __init pci_init_pdcadma(struct pci_dev *dev)
 {
@@ -76,9 +72,9 @@ unsigned int __init pci_init_pdcadma(struct pci_dev *dev)
 	if (!pdcadma_proc) {
 		pdcadma_proc = 1;
 		bmide_dev = dev;
-		pdcadma_display_info = &pdcadma_get_info;
+		pdcadma_display_info = pdcadma_get_info;
 	}
-#endif /* DISPLAY_PDCADMA_TIMINGS && CONFIG_PROC_FS */
+#endif
 	return 0;
 }
 
@@ -96,7 +92,7 @@ void __init ide_init_pdcadma(struct ata_channel *hwif)
 //	hwif->speedproc = &pdcadma_tune_chipset;
 
 //	if (hwif->dma_base) {
-//		hwif->dmaproc = &pdcadma_dmaproc;
+//		hwif->XXX_dmaproc = &pdcadma_dmaproc;
 //		hwif->autodma = 1;
 //	}
 }

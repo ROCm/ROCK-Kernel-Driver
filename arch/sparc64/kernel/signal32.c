@@ -1383,15 +1383,28 @@ int do_signal32(sigset_t *oldset, struct pt_regs * regs,
 		signr = dequeue_signal(&current->blocked, &info);
 		spin_unlock_irq(&current->sigmask_lock);
 		
-		if (!signr) break;
+		if (!signr)
+			break;
 
 		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
+			/* Do the syscall restart before we let the debugger
+			 * look at the child registers.
+			 */
+			if (restart_syscall &&
+			    (regs->u_regs[UREG_I0] == ERESTARTNOHAND ||
+			     regs->u_regs[UREG_I0] == ERESTARTSYS ||
+			     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) {
+				/* replay the system call when we are done */
+				regs->u_regs[UREG_I0] = orig_i0;
+				regs->tpc -= 4;
+				regs->tnpc -= 4;
+				restart_syscall = 0;
+			}
+
 			current->exit_code = signr;
-			preempt_disable();
 			current->state = TASK_STOPPED;
 			notify_parent(current, SIGCHLD);
 			schedule();
-			preempt_enable();
 			if (!(signr = current->exit_code))
 				continue;
 			current->exit_code = 0;
@@ -1445,15 +1458,13 @@ int do_signal32(sigset_t *oldset, struct pt_regs * regs,
 			case SIGSTOP: {
 				struct signal_struct *sig;
 
+				current->state = TASK_STOPPED;
 				current->exit_code = signr;
 				sig = current->parent->sig;
-				preempt_disable();
-				current->state = TASK_STOPPED;
 				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags &
 				      SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
-				preempt_enable();
 				continue;
 			}
 			case SIGQUIT: case SIGILL: case SIGTRAP:

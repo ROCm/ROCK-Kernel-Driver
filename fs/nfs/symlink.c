@@ -44,13 +44,13 @@ static int nfs_symlink_filler(struct inode *inode, struct page *page)
 		goto error;
 	SetPageUptodate(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
 
 error:
 	SetPageError(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return -EIO;
 }
 
@@ -64,7 +64,7 @@ static char *nfs_getlink(struct inode *inode, struct page **ppage)
 				(filler_t *)nfs_symlink_filler, inode);
 	if (IS_ERR(page))
 		goto read_failed;
-	if (!Page_Uptodate(page))
+	if (!PageUptodate(page))
 		goto getlink_read_error;
 	*ppage = page;
 	p = kmap(page);

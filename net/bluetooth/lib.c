@@ -25,7 +25,7 @@
 /*
  * BlueZ kernel library.
  *
- * $Id: lib.c,v 1.3 2001/06/22 23:14:23 maxk Exp $
+ * $Id: lib.c,v 1.1 2002/03/08 21:06:59 maxk Exp $
  */
 
 #include <linux/kernel.h>

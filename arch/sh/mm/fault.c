@@ -290,6 +290,7 @@ void update_mmu_cache(struct vm_area_struct * vma,
 	unsigned long vpn;
 #if defined(__SH4__)
 	struct page *page;
+	unsigned long pfn;
 	unsigned long ptea;
 #endif
 
@@ -298,11 +299,14 @@ void update_mmu_cache(struct vm_area_struct * vma,
 		return;
 
 #if defined(__SH4__)
-	page = pte_page(pte);
-	if (VALID_PAGE(page) && !test_bit(PG_mapped, &page->flags)) {
-		unsigned long phys = pte_val(pte) & PTE_PHYS_MASK;
-		__flush_wback_region((void *)P1SEGADDR(phys), PAGE_SIZE);
-		__set_bit(PG_mapped, &page->flags);
+	pfn = pte_pfn(pte);
+	if (pfn_valid(pfn)) {
+		page = pfn_to_page(pfn);
+		if (!test_bit(PG_mapped, &page->flags)) {
+			unsigned long phys = pte_val(pte) & PTE_PHYS_MASK;
+			__flush_wback_region((void *)P1SEGADDR(phys), PAGE_SIZE);
+			__set_bit(PG_mapped, &page->flags);
+		}
 	}
 #endif
 

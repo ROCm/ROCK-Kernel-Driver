@@ -17,7 +17,6 @@
 #include <linux/smp_lock.h>
 #include <linux/msdos_fs.h>
 #include <linux/fat_cvf.h>
-#include <linux/bitops.h>
 
 //#include <asm/uaccess.h>
 #include <asm/unaligned.h>
@@ -121,7 +120,7 @@ struct inode *fat_iget(struct super_block *sb, int i_pos)
 	return inode;
 }
 
-static void fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de);
+static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de);
 
 struct inode *fat_build_inode(struct super_block *sb,
 				struct msdos_dir_entry *de, int ino, int *res)
@@ -135,10 +134,14 @@ struct inode *fat_build_inode(struct super_block *sb,
 	*res = -ENOMEM;
 	if (!inode)
 		goto out;
-	*res = 0;
 	inode->i_ino = iunique(sb, MSDOS_ROOT_INO);
 	inode->i_version = 0;
-	fat_fill_inode(inode, de);
+	*res = fat_fill_inode(inode, de);
+	if (*res < 0) {
+		iput(inode);
+		inode = NULL;
+		goto out;
+	}
 	fat_attach(inode, ino);
 	insert_inode_hash(inode);
 out:
@@ -174,9 +177,7 @@ void fat_put_super(struct super_block *sb)
 		dec_cvf_format_use_count_by_version(sbi->cvf_format->cvf_version);
 		sbi->cvf_format->unmount_cvf(sb);
 	}
-	if (sbi->fat_bits == 32) {
-		fat_clusters_flush(sb);
-	}
+	fat_clusters_flush(sb);
 	fat_cache_inval_dev(sb);
 	if (sbi->nls_disk) {
 		unload_nls(sbi->nls_disk);
@@ -358,37 +359,43 @@ out:
 	return ret;
 }
 
-static void fat_calc_dir_size(struct inode *inode)
+static int fat_calc_dir_size(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;
 	int nr;
 
 	inode->i_size = 0;
 	if (MSDOS_I(inode)->i_start == 0)
-		return;
+		return 0;
 
 	nr = MSDOS_I(inode)->i_start;
 	do {
 		inode->i_size += 1 << MSDOS_SB(sb)->cluster_bits;
-		if (!(nr = fat_access(sb, nr, -1))) {
-			printk("FAT: Directory %ld: bad FAT\n",
-			       inode->i_ino);
-			break;
+		nr = fat_access(sb, nr, -1);
+		if (nr < 0)
+			return nr;
+		else if (nr == FAT_ENT_FREE) {
+			fat_fs_panic(sb, "Directory %lu: invalid cluster chain",
+				     inode->i_ino);
+			return -EIO;
 		}
 		if (inode->i_size > FAT_MAX_DIR_SIZE) {
-			fat_fs_panic(sb, "Directory %ld: "
+			fat_fs_panic(sb, "Directory %lu: "
 				     "exceeded the maximum size of directory",
 				     inode->i_ino);
 			inode->i_size = FAT_MAX_DIR_SIZE;
 			break;
 		}
-	} while (nr != -1);
+	} while (nr != FAT_ENT_EOF);
+
+	return 0;
 }
 
-static void fat_read_root(struct inode *inode)
+static int fat_read_root(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	int error;
 
 	MSDOS_I(inode)->i_location = 0;
 	inode->i_uid = sbi->options.fs_uid;
@@ -400,7 +407,9 @@ static void fat_read_root(struct inode *inode)
 	inode->i_fop = &fat_dir_operations;
 	if (sbi->fat_bits == 32) {
 		MSDOS_I(inode)->i_start = sbi->root_cluster;
-		fat_calc_dir_size(inode);
+		error = fat_calc_dir_size(inode);
+		if (error < 0)
+			return error;
 	} else {
 		MSDOS_I(inode)->i_start = 0;
 		inode->i_size = sbi->dir_entries * sizeof(struct msdos_dir_entry);
@@ -415,6 +424,8 @@ static void fat_read_root(struct inode *inode)
 	inode->i_mtime = inode->i_atime = inode->i_ctime = 0;
 	MSDOS_I(inode)->i_ctime_ms = 0;
 	inode->i_nlink = fat_subdirs(inode)+2;
+
+	return 0;
 }
 
 /*
@@ -573,12 +584,13 @@ static struct super_operations fat_sops = {
 int fat_fill_super(struct super_block *sb, void *data, int silent,
 		   struct inode_operations *fs_dir_inode_ops, int isvfat)
 {
-	struct inode *root_inode;
+	struct inode *root_inode = NULL;
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
 	struct msdos_sb_info *sbi;
-	int logical_sector_size, fat_clusters, debug, cp;
+	int logical_sector_size, fat_clusters, debug, cp, first;
 	unsigned int total_sectors, rootdir_sectors;
+	unsigned char media;
 	long error = -EIO;
 	char buf[50];
 	int i;
@@ -638,6 +650,13 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	if (!b->heads) {
 		if (!silent)
 			printk("FAT: bogus number-of-heads value\n");
+		brelse(bh);
+		goto out_invalid;
+	}
+	media = b->media;
+	if (!FAT_VALID_MEDIA(media)) {
+		if (!silent)
+			printk("FAT: invalid media value (0x%02x)\n", media);
 		brelse(bh);
 		goto out_invalid;
 	}
@@ -763,6 +782,21 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 
 	brelse(bh);
 
+	/* validity check of FAT */
+	first = __fat_access(sb, 0, -1);
+	if (first < 0) {
+		error = first;
+		goto out_fail;
+	}
+	if (FAT_FIRST_ENT(sb, media) != first) {
+		if (!silent) {
+			printk("FAT: invalid first entry of FAT "
+			       "(0x%x != 0x%x)\n",
+			       FAT_FIRST_ENT(sb, media), first);
+		}
+		goto out_invalid;
+	}
+
 	if (!strcmp(cvf_format, "none"))
 		i = -1;
 	else
@@ -802,18 +836,20 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 			       sbi->nls_io->charset);
 	}
 
+	error = -ENOMEM;
 	root_inode = new_inode(sb);
 	if (!root_inode)
 		goto out_fail;
-
 	root_inode->i_ino = MSDOS_ROOT_INO;
 	root_inode->i_version = 0;
-	fat_read_root(root_inode);
+	error = fat_read_root(root_inode);
+	if (error < 0)
+		goto out_fail;
+	error = -ENOMEM;
 	insert_inode_hash(root_inode);
 	sb->s_root = d_alloc_root(root_inode);
 	if (!sb->s_root) {
 		printk("FAT: get root inode failed\n");
-		iput(root_inode);
 		goto out_fail;
 	}
 	if(i >= 0) {
@@ -826,6 +862,8 @@ out_invalid:
 	error = -EINVAL;
 
 out_fail:
+	if (root_inode)
+		iput(root_inode);
 	if (sbi->nls_io)
 		unload_nls(sbi->nls_io);
 	if (sbi->nls_disk)
@@ -855,17 +893,20 @@ int fat_statfs(struct super_block *sb,struct statfs *buf)
 		free = MSDOS_SB(sb)->free_clusters;
 	else {
 		free = 0;
-		for (nr = 2; nr < MSDOS_SB(sb)->clusters+2; nr++)
-			if (!fat_access(sb,nr,-1)) free++;
+		for (nr = 2; nr < MSDOS_SB(sb)->clusters + 2; nr++)
+			if (fat_access(sb, nr, -1) == FAT_ENT_FREE)
+				free++;
 		MSDOS_SB(sb)->free_clusters = free;
 	}
 	unlock_fat(sb);
+
 	buf->f_type = sb->s_magic;
 	buf->f_bsize = 1 << MSDOS_SB(sb)->cluster_bits;
 	buf->f_blocks = MSDOS_SB(sb)->clusters;
 	buf->f_bfree = free;
 	buf->f_bavail = free;
 	buf->f_namelen = MSDOS_SB(sb)->options.isvfat ? 260 : 12;
+
 	return 0;
 }
 
@@ -906,10 +947,11 @@ static struct address_space_operations fat_aops = {
 };
 
 /* doesn't deal with root inode */
-static void fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
+static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 {
 	struct super_block *sb = inode->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	int error;
 
 	MSDOS_I(inode)->i_location = 0;
 	inode->i_uid = sbi->options.fs_uid;
@@ -930,16 +972,19 @@ static void fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 				(CF_LE_W(de->starthi) << 16);
 		}
 		MSDOS_I(inode)->i_logstart = MSDOS_I(inode)->i_start;
+		error = fat_calc_dir_size(inode);
+		if (error < 0)
+			return error;
+		MSDOS_I(inode)->mmu_private = inode->i_size;
+
 		inode->i_nlink = fat_subdirs(inode);
 		    /* includes .., compensating for "self" */
 #ifdef DEBUG
 		if (!inode->i_nlink) {
-			printk("directory %d: i_nlink == 0\n",inode->i_ino);
+			printk("directory %lu: i_nlink == 0\n",inode->i_ino);
 			inode->i_nlink = 1;
 		}
 #endif
-		fat_calc_dir_size(inode);
-		MSDOS_I(inode)->mmu_private = inode->i_size;
 	} else { /* not a directory */
 		inode->i_generation |= 1;
 		inode->i_mode = MSDOS_MKMODE(de->attr,
@@ -974,6 +1019,8 @@ static void fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		? date_dos2unix(CF_LE_W(de->ctime),CF_LE_W(de->cdate))
 		: inode->i_mtime;
 	MSDOS_I(inode)->i_ctime_ms = de->ctime_ms;
+
+	return 0;
 }
 
 void fat_write_inode(struct inode *inode, int wait)

@@ -1273,7 +1273,7 @@ out:
 #endif /* __sparc__ */
 #endif
 
-#if !defined(__alpha__) && !defined(__ia64__)
+#if !defined(__alpha__) && !defined(__ia64__) && !defined(__arm__)
 /*
  * For backwards compatibility.  Functionality superseded by sigprocmask.
  */
@@ -1301,7 +1301,8 @@ sys_ssetmask(int newmask)
 }
 #endif /* !defined(__alpha__) */
 
-#if !defined(__alpha__) && !defined(__ia64__) && !defined(__mips__)
+#if !defined(__alpha__) && !defined(__ia64__) && !defined(__mips__) && \
+    !defined(__arm__)
 /*
  * For backwards compatibility.  Functionality superseded by sigaction.
  */
@@ -1318,4 +1319,4 @@ sys_signal(int sig, __sighandler_t handler)
 
 	return ret ? ret : (unsigned long)old_sa.sa.sa_handler;
 }
-#endif /* !alpha && !__ia64__ && !defined(__mips__) */
+#endif /* !alpha && !__ia64__ && !defined(__mips__) && !defined(__arm__) */

@@ -26,8 +26,8 @@ struct consolefontdesc {
 #define KDGETLED	0x4B31	/* return current led state */
 #define KDSETLED	0x4B32	/* set led state [lights, not flags] */
 #define 	LED_SCR		0x01	/* scroll lock led */
-#define 	LED_CAP		0x04	/* caps lock led */
 #define 	LED_NUM		0x02	/* num lock led */
+#define 	LED_CAP		0x04	/* caps lock led */
 
 #define KDGKBTYPE	0x4B33	/* get keyboard type */
 #define 	KB_84		0x01
@@ -89,10 +89,10 @@ struct unimapinit {
 #define KDSKBMETA	0x4B63	/* sets meta key handling mode */
 
 #define		K_SCROLLLOCK	0x01
-#define		K_CAPSLOCK	0x02
-#define		K_NUMLOCK	0x04
+#define		K_NUMLOCK	0x02
+#define		K_CAPSLOCK	0x04
 #define	KDGKBLED	0x4B64	/* get led flags (not lights) */
-#define KDSKBLED	0x4B65	/* set led flags (not lights) */
+#define	KDSKBLED	0x4B65	/* set led flags (not lights) */
 
 struct kbentry {
 	unsigned char kb_table;

@@ -21,8 +21,38 @@
 
 typedef unsigned long elf_greg_t;
 
-#define ELF_NGREG (sizeof (struct pt_regs) / sizeof(elf_greg_t))
+#define ELF_NGREG 36
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+/* Format of 64-bit elf_gregset_t is:
+ * 	G0 --> G7
+ * 	O0 --> O7
+ * 	L0 --> L7
+ * 	I0 --> I7
+ *	TSTATE
+ *	TPC
+ *	TNPC
+ *	Y
+ */
+#define ELF_CORE_COPY_REGS(__elf_regs, __pt_regs)	\
+do {	unsigned long *dest = &(__elf_regs[0]);		\
+	struct pt_regs *src = (__pt_regs);		\
+	unsigned long *sp;				\
+	int i;						\
+	for(i = 0; i < 16; i++)				\
+		dest[i] = src->u_regs[i];		\
+	/* Don't try this at home kids... */		\
+	set_fs(USER_DS);				\
+	sp = (unsigned long *)				\
+	 ((src->u_regs[14] + STACK_BIAS)		\
+	  & 0xfffffffffffffff8UL);			\
+	for(i = 0; i < 16; i++)				\
+		__get_user(dest[i+16], &sp[i]);		\
+	set_fs(KERNEL_DS);				\
+	dest[32] = src->tstate;				\
+	dest[33] = src->tpc;				\
+	dest[34] = src->tnpc;				\
+	dest[35] = src->y;				\
+} while (0);
 
 typedef struct {
 	unsigned long	pr_regs[32];
@@ -69,10 +99,15 @@ typedef struct {
 
 #ifdef __KERNEL__
 #define SET_PERSONALITY(ex, ibcs2)			\
-do {	if ((ex).e_ident[EI_CLASS] == ELFCLASS32)	\
-		set_thread_flag(TIF_32BIT);		\
+do {	unsigned long new_flags = current_thread_info()->flags; \
+	new_flags &= _TIF_32BIT;			\
+	if ((ex).e_ident[EI_CLASS] == ELFCLASS32)	\
+		new_flags |= _TIF_32BIT;		\
 	else						\
-		clear_thread_flag(TIF_32BIT);		\
+		new_flags &= ~_TIF_32BIT;		\
+	if ((current_thread_info()->flags & _TIF_32BIT) \
+	    != new_flags)				\
+		set_thread_flag(TIF_ABI_PENDING);	\
 	/* flush_thread will update pgd cache */	\
 	if (ibcs2)					\
 		set_personality(PER_SVR4);		\

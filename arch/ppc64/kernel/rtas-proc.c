@@ -200,7 +200,7 @@ void proc_rtas_init(void)
 	struct proc_dir_entry *entry;
 
 	rtas_node = find_devices("rtas");
-	if ((rtas_node == 0) || (_machine == _MACH_iSeries)) {
+	if ((rtas_node == 0) || (naca->platform == PLATFORM_ISERIES_LPAR)) {
 		return;
 	}
 	

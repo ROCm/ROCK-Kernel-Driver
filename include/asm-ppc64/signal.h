@@ -58,12 +58,6 @@ typedef struct {
 #define SIGRTMIN	32
 #define SIGRTMAX	(_NSIG-1)
 
-
-
-
-
-
-
 /*
  * SA_FLAGS values:
  *

@@ -22,7 +22,6 @@ int sgi_partition(struct gendisk *hd, struct block_device *bdev, unsigned long f
 	int i, csum, magic;
 	unsigned int *ui, start, blocks, cs;
 	Sector sect;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct sgi_disklabel {
 		int magic_mushroom;         /* Big fat spliff... */
 		short root_part_num;        /* Root partition number */
@@ -51,7 +50,7 @@ int sgi_partition(struct gendisk *hd, struct block_device *bdev, unsigned long f
 	magic = label->magic_mushroom;
 	if(be32_to_cpu(magic) != SGI_LABEL_MAGIC) {
 		/*printk("Dev %s SGI disklabel: bad magic %08x\n",
-		       bdevname(dev), magic);*/
+		       bdevname(bdev), magic);*/
 		put_dev_sector(sect);
 		return 0;
 	}
@@ -62,7 +61,7 @@ int sgi_partition(struct gendisk *hd, struct block_device *bdev, unsigned long f
 	}
 	if(csum) {
 		printk(KERN_WARNING "Dev %s SGI disklabel: csum bad, label corrupted\n",
-		       bdevname(dev));
+		       bdevname(bdev));
 		put_dev_sector(sect);
 		return 0;
 	}

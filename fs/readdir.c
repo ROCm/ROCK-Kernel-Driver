@@ -23,9 +23,7 @@ int vfs_readdir(struct file *file, filldir_t filler, void *buf)
 	down(&inode->i_sem);
 	res = -ENOENT;
 	if (!IS_DEADDIR(inode)) {
-		lock_kernel();
 		res = file->f_op->readdir(file, buf, filler);
-		unlock_kernel();
 	}
 	up(&inode->i_sem);
 out:

@@ -12,13 +12,3 @@ else
    dep_tristate '  USB RTL8150 based ethernet device support (EXPERIMENTAL)' CONFIG_USB_RTL8150 $CONFIG_USB $CONFIG_NET $CONFIG_EXPERIMENTAL
    dep_tristate '  USB-to-USB Networking cable device support' CONFIG_USB_USBNET $CONFIG_USB $CONFIG_NET
 fi
-
-# Turn on CONFIG_USB_NET if any of the drivers are compiled into the kernel to
-# make our Makefile logic a bit simpler
-if [ "$CONFIG_USB_PEGASUS" = "y" -o "$CONFIG_USB_RTL8150" = "y" -o "$CONFIG_USB_KAWETH" = "y" ]; then
-   define_bool CONFIG_USB_NET y
-fi
-if [ "$CONFIG_USB_CATC" = "y" -o "$CONFIG_USB_USBNET" = "y" -o "$CONFIG_USB_CDCETHER" = "y" ]; then
-   define_bool CONFIG_USB_NET y
-fi
-   

@@ -37,8 +37,8 @@
 
 #include <asm/time.h>
 #include "iSeries_setup.h"
-#include <asm/Naca.h>
-#include <asm/Paca.h>
+#include <asm/naca.h>
+#include <asm/paca.h>
 #include <asm/iSeries/LparData.h>
 #include <asm/iSeries/HvCallHpt.h>
 #include <asm/iSeries/HvLpConfig.h>
@@ -85,7 +85,6 @@ int piranha_simulator = 0;
 
 extern char _end[];
 
-extern struct Naca *naca;
 extern int rd_size;		/* Defined in drivers/block/rd.c */
 extern unsigned long klimit;
 extern unsigned long embedded_sysmap_start;
@@ -296,7 +295,7 @@ iSeries_init_early(void)
 		initrd_start = (unsigned long)__va(naca->xRamDisk);
 		initrd_end   = initrd_start + naca->xRamDiskSize * PAGE_SIZE;
 		initrd_below_start_ok = 1;	// ramdisk in kernel space
-		ROOT_DEV = MKDEV( RAMDISK_MAJOR, 0 );
+		ROOT_DEV = mk_kdev( RAMDISK_MAJOR, 0 );
 
 		if ( ((rd_size*1024)/PAGE_SIZE) < naca->xRamDiskSize )
 			rd_size = (naca->xRamDiskSize*PAGE_SIZE)/1024;
@@ -305,7 +304,7 @@ iSeries_init_early(void)
 #endif /* CONFIG_BLK_DEV_INITRD */
 	  {
                 
-	    /*		ROOT_DEV = MKDEV( VIODASD_MAJOR, 1 ); */
+	    /*		ROOT_DEV = mk_kdev( VIODASD_MAJOR, 1 ); */
 	  }
 
 	iSeries_recal_tb = get_tb();
@@ -889,13 +888,13 @@ static void iSeries_setup_dprofile(void)
 {
 	if ( dprof_buffer ) {
 		unsigned i;
-		for (i=0; i<maxPacas; ++i) {
-			xPaca[i].prof_shift = dprof_shift;
-			xPaca[i].prof_len = dprof_len-1;
-			xPaca[i].prof_buffer = dprof_buffer;
-			xPaca[i].prof_stext = (unsigned *)&_stext;
+		for (i=0; i<MAX_PACAS; ++i) {
+			paca[i].prof_shift = dprof_shift;
+			paca[i].prof_len = dprof_len-1;
+			paca[i].prof_buffer = dprof_buffer;
+			paca[i].prof_stext = (unsigned *)&_stext;
 			mb();
-			xPaca[i].prof_enabled = 1;
+			paca[i].prof_enabled = 1;
 		}
 	}
 }

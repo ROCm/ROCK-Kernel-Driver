@@ -56,6 +56,7 @@ struct request {
 
 	unsigned int current_nr_sectors;
 	unsigned int hard_cur_sectors;
+	int tag;
 	void *special;
 	char *buffer;
 	struct completion *waiting;
@@ -75,18 +76,18 @@ enum rq_flag_bits {
 	__REQ_NOMERGE,	/* don't touch this for merging */
 	__REQ_STARTED,	/* drive already may have started this one */
 	__REQ_DONTPREP,	/* don't call prep for this one */
+	__REQ_QUEUED,	/* uses queueing */
 	/*
-	 * for IDE
- 	*/
+	 * for ATA/ATAPI devices
+	 */
 	__REQ_DRIVE_CMD,
-	__REQ_DRIVE_TASK,
 	__REQ_DRIVE_ACB,
 
 	__REQ_PC,	/* packet command (special) */
 	__REQ_BLOCK_PC,	/* queued down pc from block layer */
 	__REQ_SENSE,	/* sense retrival */
 
-	__REQ_SPECIAL,	/* driver special command */
+	__REQ_SPECIAL,	/* driver special command (currently reset) */
 
 	__REQ_NR_BITS,	/* stops here */
 };
@@ -98,15 +99,13 @@ enum rq_flag_bits {
 #define REQ_NOMERGE	(1 << __REQ_NOMERGE)
 #define REQ_STARTED	(1 << __REQ_STARTED)
 #define REQ_DONTPREP	(1 << __REQ_DONTPREP)
+#define REQ_QUEUED	(1 << __REQ_QUEUED)
 #define REQ_DRIVE_CMD	(1 << __REQ_DRIVE_CMD)
-#define REQ_DRIVE_TASK	(1 << __REQ_DRIVE_TASK)
 #define REQ_DRIVE_ACB	(1 << __REQ_DRIVE_ACB)
 #define REQ_PC		(1 << __REQ_PC)
-#define REQ_SENSE	(1 << __REQ_SENSE)
 #define REQ_BLOCK_PC	(1 << __REQ_BLOCK_PC)
+#define REQ_SENSE	(1 << __REQ_SENSE)
 #define REQ_SPECIAL	(1 << __REQ_SPECIAL)
-
-#define REQ_DRIVE_TASKFILE	REQ_DRIVE_ACB
 
 #include <linux/elevator.h>
 
@@ -123,6 +122,17 @@ typedef void (unplug_device_fn) (void *q);
 enum blk_queue_state {
 	Queue_down,
 	Queue_up,
+};
+
+#define BLK_TAGS_PER_LONG	(sizeof(unsigned long) * 8)
+#define BLK_TAGS_MASK		(BLK_TAGS_PER_LONG - 1)
+
+struct blk_queue_tag {
+	struct request **tag_index;	/* map of busy tags */
+	unsigned long *tag_map;		/* bit map of free/busy tags */
+	struct list_head busy_list;	/* fifo list of busy tags */
+	int busy;			/* current depth */
+	int max_depth;
 };
 
 /*
@@ -154,9 +164,9 @@ struct request_queue
 
 	/*
 	 * The VM-level readahead tunable for this device.  In
-	 * units of 512-byte sectors.
+	 * units of PAGE_CACHE_SIZE pages.
 	 */
-	unsigned ra_sectors;
+	unsigned long ra_pages;
 
 	/*
 	 * The queue owner gets to use this for whatever they like.
@@ -197,6 +207,8 @@ struct request_queue
 	unsigned long		seg_boundary_mask;
 
 	wait_queue_head_t	queue_wait;
+
+	struct blk_queue_tag	*queue_tags;
 };
 
 #define RQ_INACTIVE		(-1)
@@ -207,9 +219,11 @@ struct request_queue
 
 #define QUEUE_FLAG_PLUGGED	0	/* queue is plugged */
 #define QUEUE_FLAG_CLUSTER	1	/* cluster several segments into 1 */
+#define QUEUE_FLAG_QUEUED	2	/* uses generic tag queueing */
 
 #define blk_queue_plugged(q)	test_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
 #define blk_mark_plugged(q)	set_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
+#define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
 #define blk_queue_empty(q)	elv_queue_empty(q)
 #define list_entry_rq(ptr)	list_entry((ptr), struct request, queuelist)
 
@@ -291,7 +305,7 @@ extern void blk_plug_device(request_queue_t *);
 extern void blk_recount_segments(request_queue_t *, struct bio *);
 extern inline int blk_phys_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 extern inline int blk_hw_contig_segment(request_queue_t *q, struct bio *, struct bio *);
-extern int block_ioctl(kdev_t, unsigned int, unsigned long);
+extern int block_ioctl(struct block_device *, unsigned int, unsigned long);
 extern int ll_10byte_cmd_build(request_queue_t *, struct request *);
 
 /*
@@ -314,15 +328,26 @@ extern void blk_queue_hardsect_size(request_queue_t *q, unsigned short);
 extern void blk_queue_segment_boundary(request_queue_t *q, unsigned long);
 extern void blk_queue_assign_lock(request_queue_t *q, spinlock_t *);
 extern void blk_queue_prep_rq(request_queue_t *q, prep_rq_fn *pfn);
-extern int blk_set_readahead(kdev_t dev, unsigned sectors);
-extern unsigned blk_get_readahead(kdev_t dev);
+extern unsigned long *blk_get_ra_pages(struct block_device *bdev);
 
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(void *);
 
+/*
+ * tag stuff
+ */
+#define blk_queue_tag_request(q, tag)	((q)->queue_tags->tag_index[(tag)])
+#define blk_queue_tag_depth(q)		((q)->queue_tags->busy)
+#define blk_queue_tag_queue(q)		((q)->queue_tags->busy < (q)->queue_tags->max_depth)
+#define blk_rq_tagged(rq)		((rq)->flags & REQ_QUEUED)
+extern int blk_queue_start_tag(request_queue_t *, struct request *);
+extern void blk_queue_end_tag(request_queue_t *, struct request *);
+extern int blk_queue_init_tags(request_queue_t *, int);
+extern void blk_queue_free_tags(request_queue_t *);
+extern void blk_queue_invalidate_tags(request_queue_t *);
+
 extern int * blk_size[MAX_BLKDEV];	/* in units of 1024 bytes */
-extern int * blksize_size[MAX_BLKDEV];
 
 #define MAX_PHYS_SEGMENTS 128
 #define MAX_HW_SEGMENTS 128
@@ -340,18 +365,26 @@ extern inline void blk_clear(int major)
 #if 0
 	blk_size_in_bytes[major] = NULL;
 #endif
-	blksize_size[major] = NULL;
 }
 
-extern inline int get_hardsect_size(kdev_t dev)
+extern inline int queue_hardsect_size(request_queue_t *q)
 {
-	request_queue_t *q = blk_get_queue(dev);
 	int retval = 512;
 
 	if (q && q->hardsect_size)
 		retval = q->hardsect_size;
 
 	return retval;
+}
+
+extern inline int get_hardsect_size(kdev_t dev)
+{
+	return queue_hardsect_size(blk_get_queue(dev));
+}
+
+extern inline int bdev_hardsect_size(struct block_device *bdev)
+{
+	return queue_hardsect_size(blk_get_queue(to_kdev_t(bdev->bd_dev)));
 }
 
 #define blk_finished_io(nsects)	do { } while (0)
@@ -368,17 +401,9 @@ extern inline unsigned int blksize_bits(unsigned int size)
 	return bits;
 }
 
-extern inline unsigned int block_size(kdev_t dev)
+extern inline unsigned int block_size(struct block_device *bdev)
 {
-	int retval = BLOCK_SIZE;
-	int major = major(dev);
-
-	if (blksize_size[major]) {
-		int minor = minor(dev);
-		if (blksize_size[major][minor])
-			retval = blksize_size[major][minor];
-	}
-	return retval;
+	return bdev->bd_block_size;
 }
 
 static inline loff_t blkdev_size_in_bytes(kdev_t dev)

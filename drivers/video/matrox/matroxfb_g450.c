@@ -79,7 +79,7 @@ static int matroxfb_g450_connect(struct matroxfb_g450_info* m2info) {
 	ACCESS_FBINFO(altout.output) = &matroxfb_g450_altout;
 	up_write(&ACCESS_FBINFO(altout.lock));
 	ACCESS_FBINFO(output.all) |= MATROXFB_OUTPUT_CONN_SECONDARY;
-	matroxfb_switch(ACCESS_FBINFO(currcon), (struct fb_info*)MINFO);	
+	matroxfb_switch(ACCESS_FBINFO(fbcon.currcon), (struct fb_info*)MINFO);	
 	return 0;
 }
 

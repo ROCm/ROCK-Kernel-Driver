@@ -116,7 +116,7 @@ int reiserfs_resize (struct super_block * s, unsigned long block_count_new)
 		reiserfs_test_and_set_le_bit(0, bitmap[i]->b_data);
 
 		mark_buffer_dirty(bitmap[i]) ;
-		mark_buffer_uptodate(bitmap[i], 1);
+		set_buffer_uptodate(bitmap[i]);
 		ll_rw_block(WRITE, 1, bitmap + i);
 		wait_on_buffer(bitmap[i]);
 	    }	

@@ -280,6 +280,8 @@ qh_completions (
 
 		/* if these qtds were queued to the HC, some may be active.
 		 * else we're cleaning up after a failed URB submission.
+		 *
+		 * FIXME can simplify: cleanup case is gone now.
 		 */
 		if (likely (qh != 0)) {
 			int		qh_halted;
@@ -404,6 +406,49 @@ qh_completions (
 }
 
 /*-------------------------------------------------------------------------*/
+
+/*
+ * reverse of qh_urb_transaction:  free a list of TDs.
+ * used for cleanup after errors, before HC sees an URB's TDs.
+ */
+static void qtd_list_free (
+	struct ehci_hcd		*ehci,
+	struct urb		*urb,
+	struct list_head	*qtd_list
+) {
+	struct list_head	*entry, *temp;
+	int			unmapped = 0;
+
+	list_for_each_safe (entry, temp, qtd_list) {
+		struct ehci_qtd	*qtd;
+
+		qtd = list_entry (entry, struct ehci_qtd, qtd_list);
+		list_del (&qtd->qtd_list);
+		if (unmapped != 2) {
+			int	direction;
+			size_t	size;
+
+			/* for ctrl unmap twice: SETUP and DATA;
+			 * else (bulk, intr) just once: DATA
+			 */
+			if (!unmapped++ && usb_pipecontrol (urb->pipe)) {
+				direction = PCI_DMA_TODEVICE;
+				size = sizeof (struct usb_ctrlrequest);
+			} else {
+				direction = usb_pipein (urb->pipe)
+					? PCI_DMA_FROMDEVICE
+					: PCI_DMA_TODEVICE;
+				size = qtd->urb->transfer_buffer_length;
+				unmapped++;
+			}
+			if (qtd->buf_dma)
+				pci_unmap_single (ehci->hcd.pdev,
+					qtd->buf_dma,
+					size, direction);
+		}
+		ehci_qtd_free (ehci, qtd);
+	}
+}
 
 /*
  * create a list of filled qtds for this URB; won't link into qh.
@@ -547,8 +592,7 @@ qh_urb_transaction (
 	return head;
 
 cleanup:
-	urb->status = -ENOMEM;
-	qh_completions (ehci, head, 1);
+	qtd_list_free (ehci, urb, head);
 	return 0;
 }
 
@@ -713,7 +757,7 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 
 /*-------------------------------------------------------------------------*/
 
-static void
+static int
 submit_async (
 	struct ehci_hcd		*ehci,
 	struct urb		*urb,
@@ -807,8 +851,7 @@ submit_async (
 		if (likely (qh != 0)) {
 			// dbg_qh ("new qh", ehci, qh);
 			dev->ep [epnum] = qh;
-		} else
-			urb->status = -ENOMEM;
+		}
 	}
 
 	/* Control/bulk operations through TTs don't need scheduling,
@@ -820,8 +863,11 @@ submit_async (
 			qh_link_async (ehci, qh_get (qh));
 	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
-	if (unlikely (!qh))
-		qh_completions (ehci, qtd_list, 1);
+	if (unlikely (qh == 0)) {
+		qtd_list_free (ehci, urb, qtd_list);
+		return -ENOMEM;
+	}
+	return 0;
 }
 
 /*-------------------------------------------------------------------------*/

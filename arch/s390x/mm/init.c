@@ -39,8 +39,6 @@
 
 mmu_gather_t mmu_gathers[NR_CPUS];
 
-static unsigned long totalram_pages;
-
 pgd_t swapper_pg_dir[PTRS_PER_PGD] __attribute__((__aligned__(PAGE_SIZE)));
 char  empty_zero_page[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 
@@ -89,7 +87,7 @@ void show_mem(void)
         printk("%d pages shared\n",shared);
         printk("%d pages swap cached\n",cached);
         printk("%ld pages in page table cache\n",pgtable_cache_size);
-        show_buffers();
+        printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 /* References to section boundaries */
@@ -116,10 +114,9 @@ void __init paging_init(void)
         pte_t * pt_dir;
         pte_t   pte;
 	int     i,j,k;
-        unsigned long address=0;
+        unsigned long pfn = 0;
         unsigned long pgdir_k = (__pa(swapper_pg_dir) & PAGE_MASK) |
           _KERN_REGION_TABLE;
-	unsigned long end_mem = (unsigned long) __va(max_low_pfn*PAGE_SIZE);
 	static const int ssm_mask = 0x04000000L;
 
 	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
@@ -147,7 +144,7 @@ void __init paging_init(void)
 	
         for (i = 0 ; i < PTRS_PER_PGD ; i++,pg_dir++) {
 
-                if (address >= end_mem) {
+                if (pfn >= max_low_pfn) {
                         pgd_clear(pg_dir);
                         continue;
                 }          
@@ -156,7 +153,7 @@ void __init paging_init(void)
                 pgd_populate(&init_mm, pg_dir, pm_dir);
 
                 for (j = 0 ; j < PTRS_PER_PMD ; j++,pm_dir++) {
-                        if (address >= end_mem) {
+                        if (pfn >= max_low_pfn) {
                                 pmd_clear(pm_dir);
                                 continue; 
                         }          
@@ -165,13 +162,13 @@ void __init paging_init(void)
                         pmd_populate(&init_mm, pm_dir, pt_dir);
 	
                         for (k = 0 ; k < PTRS_PER_PTE ; k++,pt_dir++) {
-                                pte = mk_pte_phys(address, PAGE_KERNEL);
-                                if (address >= end_mem) {
+                                pte = mk_pte_phys(pfn, PAGE_KERNEL);
+                                if (pfn >= max_low_pfn) {
                                         pte_clear(&pte); 
                                         continue;
                                 }
                                 set_pte(pt_dir, pte);
-                                address += PAGE_SIZE;
+                                pfn++;
                         }
                 }
         }
@@ -243,17 +240,6 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 	}
 }
 #endif
-
-void si_meminfo(struct sysinfo *val)
-{
-        val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = 0;
-	val->freehigh = 0;
-	val->mem_unit = PAGE_SIZE;
-}
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

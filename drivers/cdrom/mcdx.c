@@ -285,7 +285,6 @@ static int mcdx_setattentuator(struct s_drive_stuff *,
 
 /* static variables ************************************************/
 
-static int mcdx_blocksizes[MCDX_NDRIVES];
 static int mcdx_drive_map[][2] = MCDX_DRIVEMAP;
 static struct s_drive_stuff *mcdx_stuffp[MCDX_NDRIVES];
 static struct s_drive_stuff *mcdx_irq_map[16] = { 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1086,8 +1085,6 @@ int __init mcdx_init_drive(int drive)
 	int size = sizeof(*stuffp);
 	char msg[80];
 
-	mcdx_blocksizes[drive] = 0;
-
 	xtrace(INIT, "init() try drive %d\n", drive);
 
 	xtrace(INIT, "kmalloc space for stuffpt's\n");
@@ -1182,9 +1179,8 @@ int __init mcdx_init_drive(int drive)
 		return 1;
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_mcdx_request,
 		       &mcdx_lock);
-	blksize_size[MAJOR_NR] = mcdx_blocksizes;
 
 	xtrace(INIT, "init() subscribe irq and i/o\n");
 	mcdx_irq_map[stuffp->irq] = stuffp;

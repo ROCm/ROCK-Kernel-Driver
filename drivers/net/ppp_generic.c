@@ -381,6 +381,8 @@ static ssize_t ppp_read(struct file *file, char *buf,
 	ssize_t ret;
 	struct sk_buff *skb = 0;
 
+	ret = count;
+
 	if (pf == 0)
 		return -ENXIO;
 	add_wait_queue(&pf->rwait, &wait);

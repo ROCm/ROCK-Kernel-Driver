@@ -44,7 +44,7 @@ static inline void  net_profile_accumulate(struct timeval *entered,
 			      "sbbl %3,%1\n\t" 
 			      "addl %4,%0\n\t" 
 			      "adcl %5,%1\n\t" 
-			      "subl " SYMBOL_NAME_STR(net_profile_adjust) "+4,%0\n\t" 
+			      "subl net_profile_adjust+4,%0\n\t" 
 			      "sbbl $0,%1\n\t" 
 			      : "=r" (acc->tv_usec), "=r" (acc->tv_sec)
 			      : "g" (entered->tv_usec), "g" (entered->tv_sec),

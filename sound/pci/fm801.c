@@ -23,6 +23,7 @@
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/pci.h>
 #include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -471,7 +472,7 @@ static void snd_fm801_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	status = inw(FM801_REG(chip, IRQ_STATUS));
 	if ((status & (FM801_IRQ_PLAYBACK|FM801_IRQ_CAPTURE|FM801_IRQ_MPU|FM801_IRQ_VOLUME)) == 0)
 		return;
-	if (chip->pcm && (status & FM801_IRQ_PLAYBACK)) {
+	if (chip->pcm && (status & FM801_IRQ_PLAYBACK) && chip->playback_substream) {
 		spin_lock(&chip->reg_lock);
 		chip->ply_buf++;
 		chip->ply_pos += chip->ply_count;
@@ -486,7 +487,7 @@ static void snd_fm801_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		spin_unlock(&chip->reg_lock);
 		snd_pcm_period_elapsed(chip->playback_substream);
 	}
-	if (chip->pcm && (status & FM801_IRQ_CAPTURE)) {
+	if (chip->pcm && (status & FM801_IRQ_CAPTURE) && chip->capture_substream) {
 		spin_lock(&chip->reg_lock);
 		chip->cap_buf++;
 		chip->cap_pos += chip->cap_count;

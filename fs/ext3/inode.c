@@ -414,6 +414,7 @@ static Indirect *ext3_get_branch(struct inode *inode, int depth, int *offsets,
 	return NULL;
 
 changed:
+	brelse(bh);
 	*err = -EAGAIN;
 	goto no_block;
 failure:
@@ -574,7 +575,7 @@ static int ext3_alloc_branch(handle_t *handle, struct inode *inode,
 			branch[n].p = (u32*) bh->b_data + offsets[n];
 			*branch[n].p = branch[n].key;
 			BUFFER_TRACE(bh, "marking uptodate");
-			mark_buffer_uptodate(bh, 1);
+			set_buffer_uptodate(bh);
 			unlock_buffer(bh);
 
 			BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");
@@ -745,7 +746,7 @@ reread:
 
 	/* Simplest case - block found, no allocation needed */
 	if (!partial) {
-		bh_result->b_state &= ~(1UL << BH_New);
+		clear_buffer_new(bh_result);
 got_it:
 		map_bh(bh_result, inode->i_sb, le32_to_cpu(chain[depth-1].key));
 		/* Clean up and exit */
@@ -811,7 +812,7 @@ out:
 	if (new_size > ei->i_disksize)
 		ei->i_disksize = new_size;
 
-	bh_result->b_state |= (1UL << BH_New);
+	set_buffer_new(bh_result);
 	goto got_it;
 
 changed:
@@ -873,7 +874,7 @@ struct buffer_head *ext3_getblk(handle_t *handle, struct inode * inode,
 			if (!fatal) {
 				memset(bh->b_data, 0,
 				       inode->i_sb->s_blocksize);
-				mark_buffer_uptodate(bh, 1);
+				set_buffer_uptodate(bh);
 			}
 			unlock_buffer(bh);
 			BUFFER_TRACE(bh, "call ext3_journal_dirty_metadata");
@@ -1013,8 +1014,8 @@ static int ext3_prepare_write(struct file *file, struct page *page,
 			      unsigned from, unsigned to)
 {
 	struct inode *inode = page->mapping->host;
-	handle_t *handle = ext3_journal_current_handle();
 	int ret, needed_blocks = ext3_writepage_trans_blocks(inode);
+	handle_t *handle;
 
 	lock_kernel();
 	handle = ext3_journal_start(inode, needed_blocks);
@@ -1069,7 +1070,7 @@ static int journal_dirty_async_data(handle_t *handle, struct buffer_head *bh)
 /* For commit_write() in data=journal mode */
 static int commit_write_fn(handle_t *handle, struct buffer_head *bh)
 {
-	set_bit(BH_Uptodate, &bh->b_state);
+	set_buffer_uptodate(bh);
 	return ext3_journal_dirty_metadata(handle, bh);
 }
 
@@ -1289,8 +1290,13 @@ static int ext3_writepage(struct page *page)
 
 	/* bget() all the buffers */
 	if (order_data) {
-		if (!page_has_buffers(page))
-			create_empty_buffers(page, inode->i_sb->s_blocksize);
+		if (!page_has_buffers(page)) {
+			if (!PageUptodate(page))
+				buffer_error();
+			create_empty_buffers(page,
+				inode->i_sb->s_blocksize,
+				(1 << BH_Dirty)|(1 << BH_Uptodate));
+		}
 		page_bufs = page_buffers(page);
 		walk_page_buffers(handle, page_bufs, 0,
 				PAGE_CACHE_SIZE, NULL, bget_one);
@@ -1326,7 +1332,7 @@ out_fail:
 	
 	unlock_kernel();
 	SetPageDirty(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return ret;
 }
 
@@ -1393,7 +1399,7 @@ static int ext3_block_truncate_page(handle_t *handle,
 		goto out;
 
 	if (!page_has_buffers(page))
-		create_empty_buffers(page, blocksize);
+		create_empty_buffers(page, blocksize, 0);
 
 	/* Find the buffer that contains "offset" */
 	bh = page_buffers(page);
@@ -1416,8 +1422,8 @@ static int ext3_block_truncate_page(handle_t *handle,
 	}
 
 	/* Ok, it's mapped. Make sure it's up-to-date */
-	if (Page_Uptodate(page))
-		set_bit(BH_Uptodate, &bh->b_state);
+	if (PageUptodate(page))
+		set_buffer_uptodate(bh);
 
 	if (!buffer_uptodate(bh)) {
 		err = -EIO;
@@ -1447,11 +1453,11 @@ static int ext3_block_truncate_page(handle_t *handle,
 	} else {
 		if (ext3_should_order_data(inode))
 			err = ext3_journal_dirty_data(handle, bh, 0);
-		__mark_buffer_dirty(bh);
+		mark_buffer_dirty(bh);
 	}
 
 unlock:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 out:
 	return err;

@@ -181,7 +181,9 @@ int snd_cs8427_create(snd_i2c_bus_t *bus,
 	static unsigned char initvals2[] = {
 	  CS8427_REG_RECVERRMASK | CS8427_REG_AUTOINC,
 	  /* CS8427_REG_RECVERRMASK: unmask the input PLL clock, V, confidence, biphase, parity status bits */
-	  CS8427_UNLOCK | CS8427_V | CS8427_CONF | CS8427_BIP | CS8427_PAR,
+	  /* CS8427_UNLOCK | CS8427_V | CS8427_CONF | CS8427_BIP | CS8427_PAR,
+	  Why setting CS8427_V causes clicks and glitches? */
+	  CS8427_UNLOCK | CS8427_CONF | CS8427_BIP | CS8427_PAR,
 	  /* CS8427_REG_CSDATABUF:
 	     Registers 32-55 window to CS buffer
 	     Inhibit D->E transfers from overwriting first 5 bytes of CS data.
@@ -228,10 +230,10 @@ int snd_cs8427_create(snd_i2c_bus_t *bus,
 		goto __fail;
 	}
 	/* Turn off CS8427 interrupt stuff that is not used in hardware */
-	memset(buf, 0, 8);
-	/* from address 9 to 16 */
+	memset(buf, 0, 7);
+	/* from address 9 to 15 */
 	buf[0] = 9;	/* register */
-	if ((err = snd_i2c_sendbytes(device, buf, 8)) != 8)
+	if ((err = snd_i2c_sendbytes(device, buf, 7)) != 7)
 		goto __fail;
 	/* send transfer initialization sequence */
 	memcpy(chip->regmap + (initvals2[0] & 0x7f), initvals2 + 1, 3);

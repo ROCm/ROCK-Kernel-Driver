@@ -36,8 +36,6 @@ extern void ia64_tlb_init (void);
 
 unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
 
-static unsigned long totalram_pages;
-
 static int pgt_cache_water[2] = { 25, 50 };
 
 void
@@ -109,6 +107,7 @@ free_initmem (void)
 void
 free_initrd_mem (unsigned long start, unsigned long end)
 {
+	struct page *page;
 	/*
 	 * EFI uses 4KB pages while the kernel can use 4KB  or bigger.
 	 * Thus EFI and the kernel may have different page sizes. It is
@@ -147,26 +146,14 @@ free_initrd_mem (unsigned long start, unsigned long end)
 		printk(KERN_INFO "Freeing initrd memory: %ldkB freed\n", (end - start) >> 10);
 
 	for (; start < end; start += PAGE_SIZE) {
-		if (!VALID_PAGE(virt_to_page(start)))
+		if (!virt_addr_valid(start))
 			continue;
-		clear_bit(PG_reserved, &virt_to_page(start)->flags);
-		set_page_count(virt_to_page(start), 1);
-		free_page(start);
+		page = virt_to_page(start);
+		clear_bit(PG_reserved, &page->flags);
+		set_page_count(page, 1);
+		__free_page(page);
 		++totalram_pages;
 	}
-}
-
-void
-si_meminfo (struct sysinfo *val)
-{
-	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = 0;
-	val->freehigh = 0;
-	val->mem_unit = PAGE_SIZE;
-	return;
 }
 
 void
@@ -200,7 +187,7 @@ show_mem(void)
 			pgdat = pgdat->node_next;
 		} while (pgdat);
 		printk("Total of %ld pages in page table cache\n", pgtable_cache_size);
-		show_buffers();
+		printk("%ld buffermem pages\n", nr_buffermem_pages());
 		printk("%d free buffer pages\n", nr_free_buffer_pages());
 	}
 #else /* !CONFIG_DISCONTIGMEM */
@@ -220,7 +207,7 @@ show_mem(void)
 	printk("%d pages shared\n", shared);
 	printk("%d pages swap cached\n", cached);
 	printk("%ld pages in page table cache\n", pgtable_cache_size);
-	show_buffers();
+	printk("%ld buffermem pages\n", nr_buffermem_pages());
 #endif /* !CONFIG_DISCONTIGMEM */
 }
 
@@ -289,7 +276,7 @@ ia64_mmu_init (void *my_cpu_data)
 	ia64_srlz_d();
 
 	ia64_itr(0x2, IA64_TR_PERCPU_DATA, PERCPU_ADDR,
-		 pte_val(mk_pte_phys(__pa(my_cpu_data), PAGE_KERNEL)), PAGE_SHIFT);
+		 pte_val(pfn_pte(__pa(my_cpu_data) >> PAGE_SHIFT, PAGE_KERNEL)), PAGE_SHIFT);
 
 	__restore_flags(flags);
 	ia64_srlz_i();

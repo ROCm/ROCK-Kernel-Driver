@@ -20,7 +20,7 @@
    of the stack frame of math_emulate() */
 #define SETUP_DATA_AREA(arg)	FPU_info = (struct info *) &arg
 
-#define LDT_DESCRIPTOR(s)	(((struct desc_struct *)current->mm->context.segments)[(s) >> 3])
+#define LDT_DESCRIPTOR(s)	(((struct desc_struct *)current->mm->context.ldt)[(s) >> 3])
 #define SEG_D_SIZE(x)		((x).b & (3 << 21))
 #define SEG_G_BIT(x)		((x).b & (1 << 23))
 #define SEG_GRANULARITY(x)	(((x).b & (1 << 23)) ? 4096 : 1)

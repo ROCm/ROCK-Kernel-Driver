@@ -38,7 +38,7 @@
 #include <asm/init.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/system.h>
 #include <asm/pmc.h>
 #include <asm/machdep.h>
@@ -83,7 +83,7 @@ create_pte_mapping(unsigned long start, unsigned long end,
 	for (addr = start; addr < end; addr += step) {
 		unsigned long vsid = get_kernel_vsid(addr);
 		unsigned long va = (vsid << 28) | (addr & 0xfffffff);
-		if (_machine == _MACH_pSeriesLP)
+		if (naca->platform == PLATFORM_PSERIES_LPAR)
 			pSeries_lpar_make_pte(htab, va,
 				(unsigned long)__v2a(addr), mode, mask, large);
 		else
@@ -99,7 +99,7 @@ htab_initialize(void)
 	unsigned long pteg_count;
 	unsigned long mode_rw, mask;
 	unsigned long offset = reloc_offset();
-	struct Naca *_naca = RELOC(naca);
+	struct naca_struct *_naca = RELOC(naca);
 	HTAB *_htab_data = PTRRELOC(&htab_data);
 
 	/*
@@ -118,7 +118,7 @@ htab_initialize(void)
 	_htab_data->htab_num_ptegs = pteg_count;
 	_htab_data->htab_hash_mask = pteg_count - 1;
 
-	if (_machine == _MACH_pSeries) {
+	if (naca->platform == PLATFORM_PSERIES) {
 		/* Find storage for the HPT.  Must be contiguous in
 		 * the absolute address space.
 		 */

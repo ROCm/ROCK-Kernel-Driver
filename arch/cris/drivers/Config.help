@@ -572,3 +572,39 @@ CONFIG_ETRAX_PARALLEL_PORT0
 CONFIG_ETRAX_PARALLEL_PORT1
   Say Y here to enable parallel port 1.
 
+CONFIG_ETRAX_ETHERNET_LPSLAVE
+  This option enables a slave ETRAX 100 or ETRAX 100LX, connected to a
+  master ETRAX 100 or ETRAX 100LX through par0 and par1, to act as an
+  Ethernet controller.
+
+CONFIG_ETRAX_ETHERNET_LPSLAVE_HAS_LEDS
+  Enable if the slave has it's own LEDs.
+
+CONFIG_ETRAX_IDE
+  Enable this to get support for ATA/IDE.  You can't use parallel
+  ports or SCSI ports at the same time.
+
+CONFIG_ETRAX_NETWORK_LED_ON_WHEN_ACTIVITY
+  Selecting LED_on_when_link will light the LED when there is a
+  connection and will flash off when there is activity.
+
+  Selecting LED_on_when_activity will light the LED only when
+  there is activity.
+
+  This setting will also affect the behaviour of other activity LEDs
+  e.g. Bluetooth.
+
+CONFIG_ETRAX_NETWORK_LED_ON_WHEN_LINK
+  Selecting LED_on_when_link will light the LED when there is a
+  connection and will flash off when there is activity.
+
+  Selecting LED_on_when_activity will light the LED only when
+  there is activity.
+
+  This setting will also affect the behaviour of other activity LEDs
+  e.g. Bluetooth.
+
+CONFIG_ETRAX_SERIAL_PORT0
+  Enables the ETRAX 100 serial driver for ser0 (ttyS0)
+  Normally you want this on, unless you use external DMA 1 that uses
+  the same DMA channels.

@@ -254,11 +254,15 @@ static int __init ni5010_probe1(struct net_device *dev, int ioaddr)
 	if (dev->irq == 0xff)
 		;
 	else if (dev->irq < 2) {
+		unsigned long irq_mask, delay;
+
 		PRINTK2((KERN_DEBUG "%s: I/O #5 passed!\n", dev->name));
 
-		autoirq_setup(0);
+		irq_mask = probe_irq_on();
 		trigger_irq(ioaddr);
-		dev->irq = autoirq_report(2);
+		delay = jiffies + HZ/50;
+		while (time_before(jiffies, delay)) ;
+		dev->irq = probe_irq_off(irq_mask);
 
 		PRINTK2((KERN_DEBUG "%s: I/O #6 passed!\n", dev->name));
 

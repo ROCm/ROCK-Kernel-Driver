@@ -2474,7 +2474,6 @@ typedef struct DAC960_Controller
   } FW;
   DiskPartition_T DiskPartitions[DAC960_MinorCount];
   int PartitionSizes[DAC960_MinorCount];
-  int BlockSizes[DAC960_MinorCount];
   unsigned char ProgressBuffer[DAC960_ProgressBufferSize];
   unsigned char UserStatusBuffer[DAC960_UserMessageSize];
 }

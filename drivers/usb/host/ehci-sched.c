@@ -220,6 +220,8 @@ static void intr_deschedule (
 ) {
 	unsigned long	flags;
 
+	period >>= 3;		// FIXME microframe periods not handled yet
+
 	spin_lock_irqsave (&ehci->lock, flags);
 
 	do {
@@ -256,6 +258,38 @@ static void intr_deschedule (
 		atomic_read (&qh->refcount), ehci->periodic_urbs);
 }
 
+static int check_period (
+	struct ehci_hcd *ehci, 
+	unsigned	frame,
+	int		uframe,
+	unsigned	period,
+	unsigned	usecs
+) {
+	/*
+	 * 80% periodic == 100 usec/uframe available
+	 * convert "usecs we need" to "max already claimed" 
+	 */
+	usecs = 100 - usecs;
+
+	do {
+		int	claimed;
+
+// FIXME delete when intr_submit handles non-empty queues
+// this gives us a one intr/frame limit (vs N/uframe)
+		if (ehci->pshadow [frame].ptr)
+			return 0;
+
+		claimed = periodic_usecs (ehci, frame, uframe);
+		if (claimed > usecs)
+			return 0;
+
+// FIXME update to handle sub-frame periods
+	} while ((frame += period) < ehci->periodic_size);
+
+	// success!
+	return 1;
+}
+
 static int intr_submit (
 	struct ehci_hcd		*ehci,
 	struct urb		*urb,
@@ -263,7 +297,6 @@ static int intr_submit (
 	int			mem_flags
 ) {
 	unsigned		epnum, period;
-	unsigned		temp;
 	unsigned short		usecs;
 	unsigned long		flags;
 	struct ehci_qh		*qh;
@@ -272,11 +305,8 @@ static int intr_submit (
 
 	/* get endpoint and transfer data */
 	epnum = usb_pipeendpoint (urb->pipe);
-	if (usb_pipein (urb->pipe)) {
-		temp = urb->dev->epmaxpacketin [epnum];
+	if (usb_pipein (urb->pipe))
 		epnum |= 0x10;
-	} else
-		temp = urb->dev->epmaxpacketout [epnum];
 	if (urb->dev->speed != USB_SPEED_HIGH) {
 		dbg ("no intr/tt scheduling yet"); 
 		status = -ENOSYS;
@@ -287,6 +317,13 @@ static int intr_submit (
 	 * NOTE: current completion/restart logic doesn't handle more than
 	 * one qtd in a periodic qh ... 16-20 KB/urb is pretty big for this.
 	 * such big requests need many periods to transfer.
+	 *
+	 * FIXME want to change hcd core submit model to expect queuing
+	 * for all transfer types ... not just ISO and (with flag) BULK.
+	 * that means: getting rid of this check; handling the "interrupt
+	 * urb already queued" case below like bulk queuing is handled (no
+	 * errors possible!); and completly getting rid of that annoying
+	 * qh restart logic.  simpler/smaller overall, and more flexible.
 	 */
 	if (unlikely (qtd_list->next != qtd_list->prev)) {
 		dbg ("only one intr qtd per urb allowed"); 
@@ -297,11 +334,13 @@ static int intr_submit (
 	usecs = HS_USECS (urb->transfer_buffer_length);
 
 	/* FIXME handle HS periods of less than 1 frame. */
-	if (urb->interval < 8)
-		period = 1;
-	else
-		period = urb->interval >> 8;
-		
+	period = urb->interval >> 3;
+	if (period < 1) {
+		dbg ("intr period %d uframes, NYET!", urb->interval);
+		status = -EINVAL;
+		goto done;
+	}
+
 	spin_lock_irqsave (&ehci->lock, flags);
 
 	/* get the qh (must be empty and idle) */
@@ -326,21 +365,22 @@ static int intr_submit (
 			list_splice (qtd_list, &qh->qtd_list);
 			qh_update (qh, list_entry (qtd_list->next,
 						struct ehci_qtd, qtd_list));
+			qtd_list = &qh->qtd_list;
 		}
 	} else {
 		/* can't sleep here, we have ehci->lock... */
 		qh = ehci_qh_make (ehci, urb, qtd_list, SLAB_ATOMIC);
-		qtd_list = &qh->qtd_list;
 		if (likely (qh != 0)) {
 			// dbg ("new INTR qh %p", qh);
 			dev->ep [epnum] = qh;
+			qtd_list = &qh->qtd_list;
 		} else
 			status = -ENOMEM;
 	}
 
 	/* Schedule this periodic QH. */
 	if (likely (status == 0)) {
-		unsigned	frame = urb->interval;
+		unsigned	frame = period;
 
 		qh->hw_next = EHCI_LIST_END;
 		qh->usecs = usecs;
@@ -352,27 +392,19 @@ static int intr_submit (
 		do {
 			int	uframe;
 
-			/* Select some frame 0..(urb->interval - 1) with a
-			 * microframe that can hold this transaction.
+			/* pick a set of slots such that all uframes have
+			 * enough periodic bandwidth available.
 			 *
 			 * FIXME for TT splits, need uframes for start and end.
 			 * FSTNs can put end into next frame (uframes 0 or 1).
 			 */
 			frame--;
 			for (uframe = 0; uframe < 8; uframe++) {
-				int	claimed;
-				claimed = periodic_usecs (ehci, frame, uframe);
-				/* 80% periodic == 100 usec max committed */
-				if ((claimed + usecs) <= 100) {
-					vdbg ("frame %d.%d: %d usecs, plus %d",
-						frame, uframe, claimed, usecs);
+				if (check_period (ehci, frame, uframe,
+						period, usecs) != 0)
 					break;
-				}
 			}
 			if (uframe == 8)
-				continue;
-// FIXME delete when code below handles non-empty queues
-			if (ehci->pshadow [frame].ptr)
 				continue;
 
 			/* QH will run once each period, starting there  */
@@ -389,8 +421,9 @@ static int intr_submit (
 				qh, qh->usecs, period, frame, uframe);
 			do {
 				if (unlikely (ehci->pshadow [frame].ptr != 0)) {
-// FIXME -- just link to the end, before any qh with a shorter period,
+// FIXME -- just link toward the end, before any qh with a shorter period,
 // AND handle it already being (implicitly) linked into this frame
+// AS WELL AS updating the check_period() logic
 					BUG ();
 				} else {
 					ehci->pshadow [frame].qh = qh_get (qh);
@@ -401,7 +434,7 @@ static int intr_submit (
 			} while (frame < ehci->periodic_size);
 
 			/* update bandwidth utilization records (for usbfs) */
-			usb_claim_bandwidth (urb->dev, urb, usecs, 0);
+			usb_claim_bandwidth (urb->dev, urb, usecs/period, 0);
 
 			/* maybe enable periodic schedule processing */
 			if (!ehci->periodic_urbs++)
@@ -412,14 +445,9 @@ static int intr_submit (
 	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
 done:
-	if (status) {
-		usb_complete_t	complete = urb->complete;
+	if (status)
+		qtd_list_free (ehci, urb, qtd_list);
 
-		urb->complete = 0;
-		urb->status = status;
-		qh_completions (ehci, qtd_list, 1);
-		urb->complete = complete;
-	}
 	return status;
 }
 
@@ -438,6 +466,10 @@ intr_complete (
 	if (likely ((qh->hw_token & __constant_cpu_to_le32 (QTD_STS_ACTIVE))
 			!= 0))
 		return flags;
+	if (unlikely (list_empty (&qh->qtd_list))) {
+		dbg ("intr qh %p no TDs?", qh);
+		return flags;
+	}
 	
 	qtd = list_entry (qh->qtd_list.next, struct ehci_qtd, qtd_list);
 	urb = qtd->urb;

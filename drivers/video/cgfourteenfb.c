@@ -202,7 +202,7 @@ static void cg14_loadcmap (struct fb_info_sbusfb *fb, struct display *p,
 static void cg14_margins (struct fb_info_sbusfb *fb, struct display *p,
 			  int x_margin, int y_margin)
 {
-	p->screen_base += (y_margin - fb->y_margin) *
+	fb->info.screen_base += (y_margin - fb->y_margin) *
 		p->line_length + (x_margin - fb->x_margin);
 }
 
@@ -387,7 +387,7 @@ char __init *cgfourteenfb_init(struct fb_info_sbusfb *fb)
 	fb->s.cg14.regs = (struct cg14_regs *)(unsigned long)bases[0];
 	fb->s.cg14.clut = (void *)((unsigned long)bases[0]+CG14_CLUT1);
 	fb->s.cg14.cursor = (void *)((unsigned long)bases[0]+CG14_CURSORREGS);
-	disp->screen_base = (char *)bases[1];
+	fb->info.screen_base = (char *)bases[1];
 	
 	/* CG14_VCA_8MB_MASK is not correctly set on the 501-2482
 	 * VSIMM, so we read the memory size from the PROM
@@ -418,7 +418,7 @@ char __init *cgfourteenfb_init(struct fb_info_sbusfb *fb)
 	fix->accel = FB_ACCEL_SUN_CG14;
 	
 	disp->scrollmode = SCROLL_YREDRAW;
-	disp->screen_base += fix->line_length * fb->y_margin + fb->x_margin;
+	fb->info.screen_base += fix->line_length * fb->y_margin + fb->x_margin;
 	fb->dispsw = fbcon_cfb8;
 	
 	type->fb_depth = 24;

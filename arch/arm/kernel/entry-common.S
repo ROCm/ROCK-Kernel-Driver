@@ -49,7 +49,7 @@ ret_fast_work:
 	b	work_pending
 
 work_resched:
-	bl	SYMBOL_NAME(schedule)
+	bl	schedule
 /*
  * "slow" syscall return path.  "why" tells us if this was a real syscall.
  */
@@ -70,12 +70,15 @@ no_work_pending:
 __do_notify_resume:
 	mov	r0, sp				@ 'regs'
 	mov	r2, why				@ 'syscall'
-	b	SYMBOL_NAME(do_notify_resume)	@ note the bl above sets lr
+	b	do_notify_resume		@ note the bl above sets lr
 
 /*
  * This is how we return from a fork.
  */
 ENTRY(ret_from_fork)
+#ifdef CONFIG_PREEMPT
+	bl	schedule_tail
+#endif
 	get_thread_info tsk
 	ldr	ip, [tsk, #TI_FLAGS]		@ check for syscall tracing
 	mov	why, #1
@@ -83,7 +86,7 @@ ENTRY(ret_from_fork)
 	beq	ret_slow_syscall
 	mov	r1, sp
 	mov	r0, #1				@ trace exit [IP = 1]
-	bl	SYMBOL_NAME(syscall_trace)
+	bl	syscall_trace
 	b	ret_slow_syscall
 	
 
@@ -151,8 +154,8 @@ ENTRY(vector_swi)
 2:	mov	why, #0				@ no longer a real syscall
 	cmp	scno, #ARMSWI_OFFSET
 	eor	r0, scno, #OS_NUMBER << 20	@ put OS number back
-	bcs	SYMBOL_NAME(arm_syscall)	
-	b	SYMBOL_NAME(sys_ni_syscall)	@ not private func
+	bcs	arm_syscall	
+	b	sys_ni_syscall			@ not private func
 
 	/*
 	 * This is the really slow path.  We're going to be doing
@@ -161,7 +164,7 @@ ENTRY(vector_swi)
 __sys_trace:
 	add	r1, sp, #S_OFF
 	mov	r0, #0				@ trace entry [IP = 0]
-	bl	SYMBOL_NAME(syscall_trace)
+	bl	syscall_trace
 
 	adrsvc	al, lr, __sys_trace_return	@ return address
 	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
@@ -174,14 +177,14 @@ __sys_trace_return:
 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
 	mov	r1, sp
 	mov	r0, #1				@ trace exit [IP = 1]
-	bl	SYMBOL_NAME(syscall_trace)
+	bl	syscall_trace
 	b	ret_slow_syscall
 
 	.align	5
 #ifdef CONFIG_ALIGNMENT_TRAP
 	.type	__cr_alignment, #object
 __cr_alignment:
-	.word	SYMBOL_NAME(cr_alignment)
+	.word	cr_alignment
 #endif
 
 	.type	sys_call_table, #object
@@ -194,7 +197,7 @@ ENTRY(sys_call_table)
 @ r0 = syscall number
 @ r5 = syscall table
 		.type	sys_syscall, #function
-SYMBOL_NAME(sys_syscall):
+sys_syscall:
 		eor	scno, r0, #OS_NUMBER << 20
 		cmp	scno, #NR_syscalls	@ check range
 		stmleia	sp, {r5, r6}		@ shuffle args
@@ -207,35 +210,35 @@ SYMBOL_NAME(sys_syscall):
 
 sys_fork_wrapper:
 		add	r0, sp, #S_OFF
-		b	SYMBOL_NAME(sys_fork)
+		b	sys_fork
 
 sys_vfork_wrapper:
 		add	r0, sp, #S_OFF
-		b	SYMBOL_NAME(sys_vfork)
+		b	sys_vfork
 
 sys_execve_wrapper:
 		add	r3, sp, #S_OFF
-		b	SYMBOL_NAME(sys_execve)
+		b	sys_execve
 
 sys_clone_wapper:
 		add	r2, sp, #S_OFF
-		b	SYMBOL_NAME(sys_clone)
+		b	sys_clone
 
 sys_sigsuspend_wrapper:
 		add	r3, sp, #S_OFF
-		b	SYMBOL_NAME(sys_sigsuspend)
+		b	sys_sigsuspend
 
 sys_rt_sigsuspend_wrapper:
 		add	r2, sp, #S_OFF
-		b	SYMBOL_NAME(sys_rt_sigsuspend)
+		b	sys_rt_sigsuspend
 
 sys_sigreturn_wrapper:
 		add	r0, sp, #S_OFF
-		b	SYMBOL_NAME(sys_sigreturn)
+		b	sys_sigreturn
 
 sys_rt_sigreturn_wrapper:
 		add	r0, sp, #S_OFF
-		b	SYMBOL_NAME(sys_rt_sigreturn)
+		b	sys_rt_sigreturn
 
 sys_sigaltstack_wrapper:
 		ldr	r2, [sp, #S_OFF + S_SP]

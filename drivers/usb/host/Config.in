@@ -14,12 +14,3 @@ else
    define_bool CONFIG_USB_UHCI_ALT n
 fi
 dep_tristate '  OHCI (Compaq, iMacs, OPTi, SiS, ALi, ...) support' CONFIG_USB_OHCI $CONFIG_USB
-
-# Turn on CONFIG_USB_HOST if any of the Host controller drivers are compiled
-# into the kernel to make our Makefile logic a bit simpler
-if [ "$CONFIG_USB_EHCI_HCD" = "y" -o "$CONFIG_USB_OHCI_HCD" = "y" -o "$CONFIG_USB_UHCI_HCD" = "y" ]; then
-   define_bool CONFIG_USB_HOST y
-fi
-if [ "$CONFIG_USB_UHCI" = "y" -o "$CONFIG_USB_UHCI_ALT" = "y" -o "$CONFIG_USB_OHCI" = "y" ]; then
-   define_bool CONFIG_USB_HOST y
-fi

@@ -47,6 +47,8 @@ static int autofs_root_readdir(struct file *filp, void *dirent, filldir_t filldi
 	struct inode * inode = filp->f_dentry->d_inode;
 	off_t onr, nr;
 
+	lock_kernel();
+
 	sbi = autofs_sbi(inode->i_sb);
 	dirhash = &sbi->dirhash;
 	nr = filp->f_pos;
@@ -55,25 +57,27 @@ static int autofs_root_readdir(struct file *filp, void *dirent, filldir_t filldi
 	{
 	case 0:
 		if (filldir(dirent, ".", 1, nr, inode->i_ino, DT_DIR) < 0)
-			return 0;
+			goto out;
 		filp->f_pos = ++nr;
 		/* fall through */
 	case 1:
 		if (filldir(dirent, "..", 2, nr, inode->i_ino, DT_DIR) < 0)
-			return 0;
+			goto out;
 		filp->f_pos = ++nr;
 		/* fall through */
 	default:
 		while ( onr = nr, ent = autofs_hash_enum(dirhash,&nr,ent) ) {
 			if ( !ent->dentry || d_mountpoint(ent->dentry) ) {
 				if (filldir(dirent,ent->name,ent->len,onr,ent->ino,DT_UNKNOWN) < 0)
-					return 0;
+					goto out;
 				filp->f_pos = nr;
 			}
 		}
 		break;
 	}
 
+out:
+	unlock_kernel();
 	return 0;
 }
 

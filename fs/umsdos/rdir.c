@@ -15,6 +15,7 @@
 #include <linux/limits.h>
 #include <linux/umsdos_fs.h>
 #include <linux/slab.h>
+#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 
@@ -63,11 +64,15 @@ static int UMSDOS_rreaddir (struct file *filp, void *dirbuf, filldir_t filldir)
 {
 	struct inode *dir = filp->f_dentry->d_inode;
 	struct RDIR_FILLDIR bufk;
+	int ret;
 
+	lock_kernel();
 	bufk.filldir = filldir;
 	bufk.dirbuf = dirbuf;
 	bufk.real_root = pseudo_root && (dir == saved_root->d_inode);
-	return fat_readdir (filp, &bufk, rdir_filldir);
+	ret = fat_readdir (filp, &bufk, rdir_filldir);
+	unlock_kernel();
+	return ret;
 }
 
 

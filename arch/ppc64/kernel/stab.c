@@ -14,8 +14,8 @@
 #include <asm/pgtable.h>
 #include <asm/mmu.h>
 #include <asm/mmu_context.h>
-#include <asm/Paca.h>
-#include <asm/Naca.h>
+#include <asm/paca.h>
+#include <asm/naca.h>
 #include <asm/pmc.h>
 
 int make_ste(unsigned long stab, 

@@ -211,7 +211,6 @@ int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 /*
  * Common ioctl's for block devices
  */
-extern int block_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg);
 int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 {
 	request_queue_t *q;
@@ -220,8 +219,9 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 	unsigned short usval;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	int holder;
+	unsigned long *ra_pages;
 
-	intval = block_ioctl(dev, cmd, arg);
+	intval = block_ioctl(bdev, cmd, arg);
 	if (intval != -ENOTTY)
 		return intval;
 
@@ -241,13 +241,21 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 		case BLKFRASET:
 			if(!capable(CAP_SYS_ADMIN))
 				return -EACCES;
-			return blk_set_readahead(dev, arg);
+			ra_pages = blk_get_ra_pages(bdev);
+			if (ra_pages == NULL)
+				return -ENOTTY;
+			*ra_pages = (arg * 512) / PAGE_CACHE_SIZE;
+			return 0;
 
 		case BLKRAGET:
 		case BLKFRAGET:
 			if (!arg)
 				return -EINVAL;
-			return put_user(blk_get_readahead(dev), (long *)arg);
+			ra_pages = blk_get_ra_pages(bdev);
+			if (ra_pages == NULL)
+				return -ENOTTY;
+			return put_user((*ra_pages * PAGE_CACHE_SIZE) / 512,
+						(long *)arg);
 
 		case BLKSECTGET:
 			if ((q = blk_get_queue(dev)) == NULL)
@@ -266,7 +274,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 
 		case BLKSSZGET:
 			/* get block device hardware sector size */
-			intval = get_hardsect_size(dev);
+			intval = bdev_hardsect_size(bdev);
 			return put_user(intval, (int *) arg);
 
 		case BLKGETSIZE:
@@ -296,7 +304,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 
 		case BLKBSZGET:
 			/* get the logical block size (cf. BLKSSZGET) */
-			intval = block_size(dev);
+			intval = block_size(bdev);
 			return put_user(intval, (int *) arg);
 
 		case BLKBSZSET:
@@ -312,7 +320,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 				return -EINVAL;
 			if (bd_claim(bdev, &holder) < 0)
 				return -EBUSY;
-			set_blocksize(dev, intval);
+			set_blocksize(bdev, intval);
 			bd_release(bdev);
 			return 0;
 

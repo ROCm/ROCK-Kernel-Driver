@@ -398,6 +398,37 @@ CONFIG_HDLC
 
   If unsure, say N here.
 
+CONFIG_COMX_HW_MUNICH
+  Hardware driver for the 'SliceCOM' (channelized E1) and 'PciCOM'
+  boards (X21) from the MultiGate family.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called comx-hw-munich.o. If you want to compile it
+  as a module, say M here and read Documentation/modules.txt.
+
+  Read linux/Documentation/networking/slicecom.txt for help on
+  configuring and using SliceCOM interfaces. Further info on these cards
+  can be found at http://www.itc.hu or <info@itc.hu>.
+
+CONFIG_HDLC_RAW
+  Say Y to this option if you want generic HDLC driver to support
+  raw HDLC over WAN (Wide Area Network) connections.
+
+  If unsure, say N here.
+
+CONFIG_HDLC_CISCO
+  Say Y to this option if you want generic HDLC driver to support
+  Cisco HDLC over WAN (Wide Area Network) connections.
+
+  If unsure, say N here.
+
+CONFIG_HDLC_FR
+  Say Y to this option if you want generic HDLC driver to support
+  Frame-Relay protocol over WAN (Wide Area Network) connections.
+
+  If unsure, say N here.
+
 CONFIG_HDLC_PPP
   Say Y to this option if you want generic HDLC driver to support
   PPP over WAN (Wide Area Network) connections.
@@ -425,4 +456,26 @@ CONFIG_C101
   say Y here and see <http://hq.pm.waw.pl/pub/hdlc/>
 
   If unsure, say N here.
+
+Cyclades-PC300 support
+CONFIG_PC300
+  This is a driver for the Cyclades-PC300 synchronous communication
+  boards. These boards provide synchronous serial interfaces to your
+  Linux box (interfaces currently available are RS-232/V.35, X.21 and
+  T1/E1). If you wish to support Multilink PPP, please select the
+  option below this one and read the file README.mlppp provided by PC300
+  package.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read Documentation/modules.txt. The module will be
+  called pc300.o.
+
+  If you haven't heard about it, it's safe to say N.
+
+Cyclades-PC300 Sync TTY (to MLPPP) support
+CONFIG_PC300_MLPPP
+  Say 'Y' to this option if you are planning to use Multilink PPP over the
+  PC300 synchronous communication boards.
+
 

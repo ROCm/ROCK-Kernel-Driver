@@ -69,7 +69,6 @@ int raw_open(struct inode *inode, struct file *filp)
 {
 	int minor;
 	struct block_device * bdev;
-	kdev_t rdev;	/* it should eventually go away */
 	int err;
 	int sector_size;
 	int sector_bits;
@@ -104,7 +103,6 @@ int raw_open(struct inode *inode, struct file *filp)
 		goto out;
 
 	atomic_inc(&bdev->bd_count);
-	rdev = to_kdev_t(bdev->bd_dev);
 	err = blkdev_get(bdev, filp->f_mode, 0, BDEV_RAW);
 	if (err)
 		goto out;
@@ -117,7 +115,7 @@ int raw_open(struct inode *inode, struct file *filp)
 	if (raw_devices[minor].inuse++)
 		goto out;
 
-	sector_size = get_hardsect_size(rdev);
+	sector_size = bdev_hardsect_size(bdev);
 	raw_devices[minor].sector_size = sector_size;
 	for (sector_bits = 0; !(sector_size & 1); )
 		sector_size>>=1, sector_bits++;

@@ -22,8 +22,8 @@
 #include <asm/pgtable.h>
 #include <asm/mmu.h>
 #include <asm/mmu_context.h>
-#include <asm/Naca.h>
-#include <asm/Paca.h>
+#include <asm/naca.h>
+#include <asm/paca.h>
 #include <asm/ppcdebug.h>
 #include "nonstdio.h"
 #include "privinst.h"
@@ -123,12 +123,10 @@ static void mem_translate(void);
 static void mem_check(void);
 static void mem_find_real(void);
 static void mem_find_vsid(void);
-static void mem_check_full_group(void);
 static void mem_check_pagetable_vsids (void);
 
 static void mem_map_check_slab(void);
 static void mem_map_lock_pages(void);
-static void mem_map_check_hash(void);
 static void mem_check_dup_rpn (void);
 static void debug_trace(void);
 
@@ -141,7 +139,6 @@ extern int xmon_read_poll(void);
 extern int setjmp(u_int *);
 extern void longjmp(u_int *, int);
 extern unsigned long _ASR;
-extern struct Naca *naca;
 
 pte_t *find_linux_pte(pgd_t *pgdir, unsigned long va);	/* from htab.c */
 
@@ -540,7 +537,7 @@ insert_bpts()
 	int i;
 	struct bpt *bp;
 
-	if (_machine != _MACH_pSeries)
+	if (naca->platform != PLATFORM_PSERIES)
 		return;
 	bp = bpts;
 	for (i = 0; i < NBPTS; ++i, ++bp) {
@@ -571,7 +568,7 @@ remove_bpts()
 	struct bpt *bp;
 	unsigned instr;
 
-	if (_machine != _MACH_pSeries)
+	if (naca->platform != PLATFORM_PSERIES)
 		return;
 	if (!__is_processor(PV_POWER4)) {
 		set_dabr(0);
@@ -646,14 +643,8 @@ cmds(struct pt_regs *excp)
 			case 'c':
 				mem_check();
 				break;
-			case 'g':
-				mem_check_full_group();
-				break;
 			case 'j':
 				mem_map_check_slab();
-				break;
-			case 'h':
-				mem_map_check_hash();
 				break;
 			case 'f':
 				mem_find_real();
@@ -1261,7 +1252,7 @@ super_regs()
 {
 	int i, cmd;
 	unsigned long val;
-	struct Paca*  ptrPaca = NULL;
+	struct paca_struct*  ptrPaca = NULL;
 	struct ItLpPaca*  ptrLpPaca = NULL;
 	struct ItLpRegSave*  ptrLpRegSave = NULL;
 
@@ -1283,7 +1274,7 @@ super_regs()
 
 		// Dump out relevant Paca data areas.
 		printf("Paca: \n");
-		ptrPaca = (struct Paca*)get_sprg3();
+		ptrPaca = get_paca();
     
 		printf("  Local Processor Control Area (LpPaca): \n");
 		ptrLpPaca = ptrPaca->xLpPacaPtr;
@@ -2502,34 +2493,6 @@ void mem_map_lock_pages()
 	printf(" count of locked pages = %d \n", lock_count); 
 }
 
-
-
-void mem_map_check_hash()
-{
-	int i = max_mapnr;
-	
-	while (i-- > 0)  {
-		/* skip the reserved */
-		if (!PageReserved(mem_map+i)) {
-			if (((mem_map+i)->next_hash) != NULL) {
-				if ( REGION_ID((mem_map+i)->next_hash) != KERNEL_REGION_ID ) {
-					printf(" mem_map check hash - non c0 entry - "
-					       "address/value = %p %lx\n", mem_map+i,(mem_map+i)->next_hash);
-				} 
-				if ((unsigned long)((mem_map+i)->next_hash) ==  KERNELBASE){
-					printf(" mem_map check hash - 0x%lx  entry = %p \n",
-					       KERNELBASE, mem_map+i);
-				} 
-			}
-		} else {
-			if (page_count(mem_map+i) < 0) {
-				printf(" reserved page with negative count- entry = %lx \n", mem_map+i);
-			}
-		}
-	}
-	printf(" mem_map check hash completed \n");
-}
-
 void mem_check_dup_rpn ()
 {
 	unsigned long htab_size_bytes;
@@ -2737,70 +2700,6 @@ void mem_check_pagetable_vsids ()
 
 	printf("\nDone -------------------\n");
 
-}
-
-
-void mem_check_full_group()
-{
-	unsigned long htab_size_bytes;
-	unsigned count;
-	unsigned count_array[] = {0,0,0,0,0,0,0,0,0}; 
-	unsigned i;
-	unsigned long htab_end;
-	HPTE *hpte1, *hpte2, *hpte3;
-	u64  rpn = 0;
-
-	htab_size_bytes = htab_data.htab_num_ptegs * 128; // 128B / PTEG
-	htab_end = (unsigned long)htab_data.htab + htab_size_bytes;
-
-	printf("\nHardware Page Find full groups \n-------------------\n");
-	printf("htab base      : %.16lx\n", htab_data.htab);
-	printf("htab size      : %.16lx\n", htab_size_bytes);
-
-	for (hpte1 = htab_data.htab; (unsigned long)hpte1 < htab_end; hpte1= hpte1 + 8)
-	{
-		count = 0;
-		hpte2 = hpte1;
-		for (i=0; i<8; ++i)
-		{
-			if ( hpte2->dw0.dw0.v != 0 )
-			{
-				count++;
-			}
-			hpte2++;
-		}
-		if (count == 8 )
-		{
-			printf("  full group starting with entry %lx \n", hpte1);
-			hpte3 = hpte1;
-			for (i=0; i<8; ++i)
-			{
-				if ( hpte3->dw0.dw0.v != 0 )
-				{
-					printf(" entry number %d   \n",i);
-					printf("          vsid: %.13lx   api: %.2lx  hash: %.1lx\n", 
-					       (hpte3->dw0.dw0.avpn)>>5, 
-					       (hpte3->dw0.dw0.avpn) & 0x1f,
-					       (hpte3->dw0.dw0.h));
-					printf("          rpn: %.13lx \n", (hpte3->dw1.dw1.rpn)); 
-					// Dump out the memmap array entry address, corresponding virtual address, and reference count.
-					rpn = hpte3->dw1.dw1.rpn;
-					printf("          mem_map+rpn=%p, virtual@=%p, count=%lx \n", mem_map+rpn, (mem_map+rpn)->virtual, (mem_map+rpn)->count);
-				}
-				hpte3++;
-			}
-			if (xmon_interrupted())
-				return;
-		}
-
-		count_array[count]++;
-	}
-	for (i=1; i<9; ++i)
-	{
-		printf("  group count for size  %i = %lx \n", i, count_array[i]);
-	}
-
-	printf("\nDone -------------------\n");
 }
 
 static void debug_trace(void) {

@@ -52,6 +52,7 @@ MODULE_DESCRIPTION("Driver for Compaq Smart2 Array Controllers");
 MODULE_LICENSE("GPL");
 
 #define MAJOR_NR COMPAQ_SMART2_MAJOR
+#define LOCAL_END_REQUEST
 #include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/genhd.h>
@@ -101,7 +102,6 @@ static struct board_type products[] = {
 
 static struct hd_struct * ida;
 static int * ida_sizes;
-static int * ida_blocksizes;
 static struct gendisk ida_gendisk[MAX_CTLR];
 
 static struct proc_dir_entry *proc_array;
@@ -176,10 +176,6 @@ static void ida_geninit(int ctlr)
 		ida[(ctlr<<CTLR_SHIFT) + (i<<NWD_SHIFT)].nr_sects =
 		ida_sizes[(ctlr<<CTLR_SHIFT) + (i<<NWD_SHIFT)] =
 				drv->nr_blks;
-
-		for(j=0; j<16; j++)
-			ida_blocksizes[(ctlr<<CTLR_SHIFT) + (i<<NWD_SHIFT)+j] =
-				1024;
 
 		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->blk_size;
 		ida_gendisk[ctlr].nr_real++;
@@ -342,7 +338,6 @@ void cleanup_module(void)
 	remove_proc_entry("cpqarray", proc_root_driver);
 	kfree(ida);
 	kfree(ida_sizes);
-	kfree(ida_blocksizes);
 }
 #endif /* MODULE */
 
@@ -383,18 +378,8 @@ int __init cpqarray_init(void)
 		return(num_cntlrs_reg);
 	}
 
-	ida_blocksizes = kmalloc(sizeof(int)*nr_ctlr*NWD*16, GFP_KERNEL);
-	if(ida_blocksizes==NULL)
-	{
-		kfree(ida);
-		kfree(ida_sizes); 
-		printk( KERN_ERR "cpqarray: out of memory");
-		return(num_cntlrs_reg);
-	}
-
 	memset(ida, 0, sizeof(struct hd_struct)*nr_ctlr*NWD*16);
 	memset(ida_sizes, 0, sizeof(int)*nr_ctlr*NWD*16);
-	memset(ida_blocksizes, 0, sizeof(int)*nr_ctlr*NWD*16);
 	memset(ida_gendisk, 0, sizeof(struct gendisk)*MAX_CTLR);
 
 		/* 
@@ -452,7 +437,6 @@ int __init cpqarray_init(void)
 			{
 				kfree(ida);
 				kfree(ida_sizes);
-				kfree(ida_blocksizes);
 			}
                 	return(num_cntlrs_reg);
 	
@@ -479,8 +463,6 @@ int __init cpqarray_init(void)
 
 		/* This is a driver limit and could be eliminated. */
 		blk_queue_max_phys_segments(q, SG_MAX);
-
-		blksize_size[MAJOR_NR+i] = ida_blocksizes + (i*256);
 
 		ida_gendisk[i].major = MAJOR_NR + i;
 		ida_gendisk[i].major_name = "ida";
@@ -1511,7 +1493,6 @@ static int revalidate_allvol(kdev_t dev)
 	 */
 	memset(ida+(ctlr*256),            0, sizeof(struct hd_struct)*NWD*16);
 	memset(ida_sizes+(ctlr*256),      0, sizeof(int)*NWD*16);
-	memset(ida_blocksizes+(ctlr*256), 0, sizeof(int)*NWD*16);
 	memset(hba[ctlr]->drv,            0, sizeof(drv_info_t)*NWD);
 	ida_gendisk[ctlr].nr_real = 0;
 

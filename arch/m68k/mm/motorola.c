@@ -286,7 +286,6 @@ void __init paging_init(void)
 }
 
 extern char __init_begin, __init_end;
-extern unsigned long totalram_pages;
 
 void free_initmem(void)
 {

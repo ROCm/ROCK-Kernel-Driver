@@ -16,7 +16,7 @@
 
 #include <asm/assembler.h>
 	
-		.section	".start", #alloc, #execinstr
+		.section	".start", "ax"
 
 		b	__beginning
 	
@@ -38,7 +38,7 @@ __beginning:	mov	r4, r0				@ save the entry to the firmware
 		adr	r1, __ofw_data
 		add	r2, r1, #4
 		mov	lr, pc
-		b	SYMBOL_NAME(ofw_init)
+		b	ofw_init
 		mov	r1, #0
 
 		adr	r2, __mmu_off			@ calculate physical address
@@ -109,7 +109,7 @@ __go_on:
 		add	sp, sp, #128
 		adr	r0, __ofw_data
 		mov	lr, pc
-		b	SYMBOL_NAME(create_params)
+		b	create_params
 	
 		mov	r8, #0
 		mov	r7, #15

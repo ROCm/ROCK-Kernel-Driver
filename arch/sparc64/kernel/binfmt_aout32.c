@@ -201,6 +201,7 @@ static int load_aout32_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	unsigned long error;
 	unsigned long fd_offset;
 	unsigned long rlim;
+	unsigned long orig_thr_flags;
 	int retval;
 
 	ex = *((struct exec *) bprm->buf);		/* exec-header */
@@ -305,8 +306,14 @@ beyond_if:
 
 	set_brk(current->mm->start_brk, current->mm->brk);
 
+	/* Make sure STACK_TOP returns the right thing.  */
+	orig_thr_flags = current_thread_info()->flags;
+	current_thread_info()->flags |= _TIF_32BIT;
+
 	retval = setup_arg_pages(bprm);
 	if (retval < 0) { 
+		current_thread_info()->flags = orig_thr_flags;
+
 		/* Someone check-me: is this error path enough? */ 
 		send_sig(SIGKILL, current, 0); 
 		return retval;
@@ -314,7 +321,7 @@ beyond_if:
 
 	current->mm->start_stack =
 		(unsigned long) create_aout32_tables((char *)bprm->p, bprm);
-	if (!(test_thread_flag(TIF_32BIT))) {
+	if (!(orig_thr_flags & _TIF_32BIT)) {
 		unsigned long pgd_cache;
 
 		pgd_cache = ((unsigned long)current->mm->pgd[0])<<11UL;
@@ -323,7 +330,6 @@ beyond_if:
 				     : /* no outputs */
 				     : "r" (pgd_cache),
 				       "r" (TSB_REG), "i" (ASI_DMMU));
-		set_thread_flag(TIF_32BIT);
 	}
 	start_thread32(regs, ex.a_entry, current->mm->start_stack);
 	if (current->ptrace & PT_PTRACED)

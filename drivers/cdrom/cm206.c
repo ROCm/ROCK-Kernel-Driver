@@ -261,8 +261,6 @@ struct toc_struct {		/* private copy of Table of Contents */
 	uch track, fsm[3], q0;
 };
 
-static int cm206_blocksizes[1] = { 2048 };
-
 struct cm206_struct {
 	volatile ush intr_ds;	/* data status read on last interrupt */
 	volatile ush intr_ls;	/* uart line status read on last interrupt */
@@ -1500,9 +1498,9 @@ int __init cm206_init(void)
 		return -EIO;
 	}
 	devfs_plain_cdrom(&cm206_info, &cm206_bdops);
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_cm206_request,
 		       &cm206_lock);
-	blksize_size[MAJOR_NR] = cm206_blocksizes;
+	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
 	init_bh(CM206_BH, cm206_bh);
 
 	memset(cd, 0, sizeof(*cd));	/* give'm some reasonable value */

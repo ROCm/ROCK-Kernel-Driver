@@ -169,7 +169,7 @@ static int nfs_commit_write(struct file *file, struct page *page, unsigned offse
 }
 
 /*
- * The following is used by wait_on_page(), generic_file_readahead()
+ * The following is used by wait_on_page_locked(), generic_file_readahead()
  * to initiate the completion of any page readahead operations.
  */
 static int nfs_sync_page(struct page *page)
@@ -279,14 +279,17 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	 * Flush all pending writes before doing anything
 	 * with locks..
 	 */
-	status = filemap_fdatasync(inode->i_mapping);
+	status = filemap_fdatawait(inode->i_mapping);
+	status2 = filemap_fdatawrite(inode->i_mapping);
+	if (!status)
+		status = status2;
 	down(&inode->i_sem);
 	status2 = nfs_wb_all(inode);
-	if (status2 && !status)
+	if (!status)
 		status = status2;
 	up(&inode->i_sem);
 	status2 = filemap_fdatawait(inode->i_mapping);
-	if (status2 && !status)
+	if (!status)
 		status = status2;
 	if (status < 0)
 		return status;
@@ -305,7 +308,8 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	 */
  out_ok:
 	if ((IS_SETLK(cmd) || IS_SETLKW(cmd)) && fl->fl_type != F_UNLCK) {
-		filemap_fdatasync(inode->i_mapping);
+		filemap_fdatawait(inode->i_mapping);
+		filemap_fdatawrite(inode->i_mapping);
 		down(&inode->i_sem);
 		nfs_wb_all(inode);      /* we may have slept */
 		up(&inode->i_sem);

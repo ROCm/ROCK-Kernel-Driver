@@ -366,7 +366,6 @@ typedef struct jfs_log {
 				 *    need to be a list if we share
 				 *    the log between fs's
 				 */
-	kdev_t dev;		/* 4: log lv number */
 	struct block_device *bdev; /* 4: log lv pointer */
 	s32 serial;		/* 4: log mount serial number */
 

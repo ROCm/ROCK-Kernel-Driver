@@ -517,6 +517,7 @@ static struct usb_driver rio_driver = {
 	disconnect:	disconnect_rio,
 	fops:		&usb_rio_fops,
 	minor:		RIO_MINOR,
+	num_minors:	1,
 	id_table:	rio_table,
 };
 

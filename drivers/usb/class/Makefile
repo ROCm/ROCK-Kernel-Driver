@@ -3,7 +3,7 @@
 # (one step up from the misc category)
 #
 
-O_TARGET	:= usb-class.o
+O_TARGET	:= class.o
 
 obj-$(CONFIG_USB_ACM)		+= cdc-acm.o
 obj-$(CONFIG_USB_AUDIO)		+= audio.o

@@ -229,7 +229,7 @@ static int jfs_get_block(struct inode *ip, sector_t lblock,
 			rc = extRecord(ip, &xad);
 			if (rc)
 				goto unlock;
-			bh_result->b_state |= (1UL << BH_New);
+			set_buffer_new(bh_result);
 		}
 
 		map_bh(bh_result, ip->i_sb, xaddr);
@@ -249,7 +249,7 @@ static int jfs_get_block(struct inode *ip, sector_t lblock,
 	if (rc)
 		goto unlock;
 
-	bh_result->b_state |= (1UL << BH_New);
+	set_buffer_new(bh_result);
 	map_bh(bh_result, ip->i_sb, addressXAD(&xad));
 
 #else				/* _JFS_4K */

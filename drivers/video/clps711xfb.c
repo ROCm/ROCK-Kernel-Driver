@@ -36,10 +36,7 @@
 #include <asm/hardware/clps7111.h>
 #include <asm/arch/syspld.h>
 
-static struct clps7111fb_info {
-	struct fb_info		fb;
-	int			currcon;
-} *cfb;
+struct fb_info	*cfb;
 
 #define CMAP_SIZE	16
 
@@ -92,32 +89,6 @@ clps7111fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 }
 		    
 /*
- * Set the colormap
- */
-static int
-clps7111fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-		    struct fb_info *info)
-{
-	struct clps7111fb_info *cfb = (struct clps7111fb_info *)info;
-	struct fb_cmap *dcmap = &fb_display[con].cmap;
-	int err = 0;
-
-	/* no colormap allocated? */
-	if (!dcmap->len)
-		err = fb_alloc_cmap(dcmap, CMAP_SIZE, 0);
-
-	if (!err && con == cfb->currcon) {
-		err = fb_set_cmap(cmap, kspc, clps7111fb_setcolreg, &cfb->fb);
-		dcmap = &cfb->fb.cmap;
-	}
-
-	if (!err)
-		fb_copy_cmap(cmap, dcmap, kspc ? 0 : 1);
-
-	return err;
-}
-
-/*
  *    Set the User Defined Part of the Display
  */
 static int
@@ -134,19 +105,19 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 	if ((var->activate & FB_ACTIVATE_MASK) != FB_ACTIVATE_NOW)
 		return -EINVAL;
 
-	if (cfb->fb.var.xres != var->xres)
+	if (info->var.xres != var->xres)
 		chgvar = 1;
-	if (cfb->fb.var.yres != var->yres)
+	if (info->var.yres != var->yres)
 		chgvar = 1;
-	if (cfb->fb.var.xres_virtual != var->xres_virtual)
+	if (info->var.xres_virtual != var->xres_virtual)
 		chgvar = 1;
-	if (cfb->fb.var.yres_virtual != var->yres_virtual)
+	if (info->var.yres_virtual != var->yres_virtual)
 		chgvar = 1;
-	if (cfb->fb.var.bits_per_pixel != var->bits_per_pixel)
+	if (info->var.bits_per_pixel != var->bits_per_pixel)
 		chgvar = 1;
 
 	if (con < 0) {
-		display = cfb->fb.disp;
+		display = info->disp;
 		chgvar = 0;
 	} else {
 		display = fb_display + con;
@@ -164,21 +135,21 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 	switch (var->bits_per_pixel) {
 #ifdef FBCON_HAS_MFB
 	case 1:
-		cfb->fb.fix.visual	= FB_VISUAL_MONO01;
+		info->fix.visual	= FB_VISUAL_MONO01;
 		display->dispsw		= &fbcon_mfb;
 		display->dispsw_data	= NULL;
 		break;
 #endif
 #ifdef FBCON_HAS_CFB2
 	case 2:
-		cfb->fb.fix.visual	= FB_VISUAL_PSEUDOCOLOR;
+		info->fix.visual	= FB_VISUAL_PSEUDOCOLOR;
 		display->dispsw		= &fbcon_cfb2;
 		display->dispsw_data	= NULL;
 		break;
 #endif
 #ifdef FBCON_HAS_CFB4
 	case 4:
-		cfb->fb.fix.visual	= FB_VISUAL_PSEUDOCOLOR;
+		info->fix.visual	= FB_VISUAL_PSEUDOCOLOR;
 		display->dispsw		= &fbcon_cfb4;
 		display->dispsw_data	= NULL;
 		break;
@@ -189,37 +160,36 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 
 	display->next_line	= var->xres_virtual * var->bits_per_pixel / 8;
 
-	cfb->fb.fix.line_length = display->next_line;
+	info->fix.line_length = display->next_line;
 
-	display->screen_base	= cfb->fb.screen_base;
-	display->line_length	= cfb->fb.fix.line_length;
-	display->visual		= cfb->fb.fix.visual;
-	display->type		= cfb->fb.fix.type;
-	display->type_aux	= cfb->fb.fix.type_aux;
-	display->ypanstep	= cfb->fb.fix.ypanstep;
-	display->ywrapstep	= cfb->fb.fix.ywrapstep;
+	display->line_length	= info->fix.line_length;
+	display->visual		= info->fix.visual;
+	display->type		= info->fix.type;
+	display->type_aux	= info->fix.type_aux;
+	display->ypanstep	= info->fix.ypanstep;
+	display->ywrapstep	= info->fix.ywrapstep;
 	display->can_soft_blank = 1;
 	display->inverse	= 0;
 
-	cfb->fb.var		= *var;
-	cfb->fb.var.activate	&= ~FB_ACTIVATE_ALL;
+	info->var		= *var;
+	info->var.activate	&= ~FB_ACTIVATE_ALL;
 
 	/*
 	 * Update the old var.  The fbcon drivers still use this.
-	 * Once they are using cfb->fb.var, this can be dropped.
+	 * Once they are using cfb->var, this can be dropped.
 	 *                                      --rmk
 	 */
-	display->var		= cfb->fb.var;
+	display->var		= info->var;
 
 	/*
 	 * If we are setting all the virtual consoles, also set the
 	 * defaults used to create new consoles.
 	 */
 	if (var->activate & FB_ACTIVATE_ALL)
-		cfb->fb.disp->var = cfb->fb.var;
+		info->disp->var = info->var;
 
-	if (chgvar && info && cfb->fb.changevar)
-		cfb->fb.changevar(con);
+	if (chgvar && info && info->changevar)
+		info->changevar(con);
 
 	/*
 	 * LCDCON must only be changed while the LCD is disabled
@@ -236,68 +206,39 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 	clps_writel(lcdcon, LCDCON);
 	clps_writel(syscon | SYSCON1_LCDEN, SYSCON1);
 
-	fb_set_cmap(&cfb->fb.cmap, 1, clps7111fb_setcolreg, &cfb->fb);
+	fb_set_cmap(&info->cmap, 1, info);
 
-	return 0;
-}
-
-/*
- * Get the currently displayed virtual consoles colormap.
- */
-static int
-gen_get_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
-{
-	fb_copy_cmap(&info->cmap, cmap, kspc ? 0 : 2);
-	return 0;
-}
-
-/*
- * Get the currently displayed virtual consoles fixed part of the display.
- */
-static int
-gen_get_fix(struct fb_fix_screeninfo *fix, int con, struct fb_info *info)
-{
-	*fix = info->fix;
-	return 0;
-}
-
-/*
- * Get the current user defined part of the display.
- */
-static int
-gen_get_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
-{
-	*var = info->var;
 	return 0;
 }
 
 static struct fb_ops clps7111fb_ops = {
 	owner:		THIS_MODULE,
 	fb_set_var:	clps7111fb_set_var,
-	fb_set_cmap:	clps7111fb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_get_fix:	gen_get_fix,
 	fb_get_var:	gen_get_var,
 	fb_get_cmap:	gen_get_cmap,
+	fb_setcolreg:	clps7111fb_setcolreg,
+	fb_blank:	clps7111fb_blank,
 };
 
 static int clps7111fb_switch(int con, struct fb_info *info)
 {
-	struct clps7111fb_info *cfb = (struct clps7111fb_info *)info;
 	struct display *disp;
 	struct fb_cmap *cmap;
 
-	if (cfb->currcon >= 0) {
-		disp = fb_display + cfb->currcon;
+	if (info->currcon >= 0) {
+		disp = fb_display + info->currcon;
 
 		/*
 		 * Save the old colormap and video mode.
 		 */
-		disp->var = cfb->fb.var;
+		disp->var = info->var;
 		if (disp->cmap.len)
-			fb_copy_cmap(&cfb->fb.cmap, &disp->cmap, 0);
+			fb_copy_cmap(&info->cmap, &disp->cmap, 0);
 	}
 
-	cfb->currcon = con;
+	info->currcon = con;
 	disp = fb_display + con;
 
 	/*
@@ -310,12 +251,12 @@ static int clps7111fb_switch(int con, struct fb_info *info)
 	else
 		cmap = fb_default_cmap(CMAP_SIZE);
 
-	fb_copy_cmap(cmap, &cfb->fb.cmap, 0);
+	fb_copy_cmap(cmap, &info->cmap, 0);
 
-	cfb->fb.var = disp->var;
-	cfb->fb.var.activate = FB_ACTIVATE_NOW;
+	info->var = disp->var;
+	info->var.activate = FB_ACTIVATE_NOW;
 
-	clps7111fb_set_var(&cfb->fb.var, con, &cfb->fb);
+	clps7111fb_set_var(&info->var, con, info);
 
 	return 0;
 }
@@ -325,7 +266,7 @@ static int clps7111fb_updatevar(int con, struct fb_info *info)
 	return -EINVAL;
 }
 
-static void clps7111fb_blank(int blank, struct fb_info *info)
+static int clps7111fb_blank(int blank, struct fb_info *info)
 {
     	if (blank) {
 		if (machine_is_edb7211()) {
@@ -369,6 +310,7 @@ static void clps7111fb_blank(int blank, struct fb_info *info)
 				clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
 		}
 	}
+	return 0;
 }
 
 static int 
@@ -435,31 +377,30 @@ int __init clps711xfb_init(void)
 
 	cfb->currcon		= -1;
 
-	strcpy(cfb->fb.fix.id, "clps7111");
-	cfb->fb.screen_base	= (void *)PAGE_OFFSET;
-	cfb->fb.fix.smem_start	= PAGE_OFFSET;
-	cfb->fb.fix.smem_len	= 0x14000;
-	cfb->fb.fix.type	= FB_TYPE_PACKED_PIXELS;
+	strcpy(cfb->fix.id, "clps7111");
+	cfb->screen_base	= (void *)PAGE_OFFSET;
+	cfb->fix.smem_start	= PAGE_OFFSET;
+	cfb->fix.smem_len	= 0x14000;
+	cfb->fix.type	= FB_TYPE_PACKED_PIXELS;
 
-	cfb->fb.var.xres	 = 640;
-	cfb->fb.var.xres_virtual = 640;
-	cfb->fb.var.yres	 = 240;
-	cfb->fb.var.yres_virtual = 240;
-	cfb->fb.var.bits_per_pixel = 4;
-	cfb->fb.var.grayscale   = 1;
-	cfb->fb.var.activate	= FB_ACTIVATE_NOW;
-	cfb->fb.var.height	= -1;
-	cfb->fb.var.width	= -1;
+	cfb->var.xres	 = 640;
+	cfb->var.xres_virtual = 640;
+	cfb->var.yres	 = 240;
+	cfb->var.yres_virtual = 240;
+	cfb->var.bits_per_pixel = 4;
+	cfb->var.grayscale   = 1;
+	cfb->var.activate	= FB_ACTIVATE_NOW;
+	cfb->var.height	= -1;
+	cfb->var.width	= -1;
 
-	cfb->fb.fbops		= &clps7111fb_ops;
-	cfb->fb.changevar	= NULL;
-	cfb->fb.switch_con	= clps7111fb_switch;
-	cfb->fb.updatevar	= clps7111fb_updatevar;
-	cfb->fb.blank		= clps7111fb_blank;
-	cfb->fb.flags		= FBINFO_FLAG_DEFAULT;
-	cfb->fb.disp		= (struct display *)(cfb + 1);
+	cfb->fbops		= &clps7111fb_ops;
+	cfb->changevar	= NULL;
+	cfb->switch_con	= clps7111fb_switch;
+	cfb->updatevar	= clps7111fb_updatevar;
+	cfb->flags		= FBINFO_FLAG_DEFAULT;
+	cfb->disp		= (struct display *)(cfb + 1);
 
-	fb_alloc_cmap(&cfb->fb.cmap, CMAP_SIZE, 0);
+	fb_alloc_cmap(&cfb->cmap, CMAP_SIZE, 0);
 
 	/* Register the /proc entries. */
 	clps7111fb_backlight_proc_entry = create_proc_entry("backlight", 0444,
@@ -498,15 +439,15 @@ int __init clps711xfb_init(void)
 		clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
 	}
 
-	clps7111fb_set_var(&cfb->fb.var, -1, &cfb->fb);
-	err = register_framebuffer(&cfb->fb);
+	clps7111fb_set_var(&cfb->var, -1, cfb);
+	err = register_framebuffer(cfb);
 
 out:	return err;
 }
 
 static void __exit clps711xfb_exit(void)
 {
-	unregister_framebuffer(&cfb->fb);
+	unregister_framebuffer(cfb);
 	kfree(cfb);
 
 	/*

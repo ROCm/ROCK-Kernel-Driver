@@ -36,8 +36,6 @@
 
 mmu_gather_t mmu_gathers[NR_CPUS];
 
-unsigned long totalram_pages;
-
 extern void die_if_kernel(char *,struct pt_regs *,long);
 
 static struct pcb_struct original_pcb;
@@ -139,7 +137,7 @@ show_mem(void)
 	printk("%ld reserved pages\n",reserved);
 	printk("%ld pages shared\n",shared);
 	printk("%ld pages swap cached\n",cached);
-	show_buffers();
+	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 #endif
 
@@ -250,12 +248,12 @@ callback_init(void * kernel_end)
 		/* Set up the third level PTEs and update the virtual
 		   addresses of the CRB entries.  */
 		for (i = 0; i < crb->map_entries; ++i) {
-			unsigned long paddr = crb->map[i].pa;
+			unsigned long pfn = crb->map[i].pa >> PAGE_SHIFT;
 			crb->map[i].va = vaddr;
 			for (j = 0; j < crb->map[i].count; ++j) {
 				set_pte(pte_offset_kernel(pmd, vaddr),
-					mk_pte_phys(paddr, PAGE_KERNEL));
-				paddr += PAGE_SIZE;
+					pfn_pte(pfn, PAGE_KERNEL));
+				pfn++;
 				vaddr += PAGE_SIZE;
 			}
 		}
@@ -283,7 +281,7 @@ paging_init(void)
 	unsigned long dma_pfn, high_pfn;
 
 	dma_pfn = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
-	high_pfn = max_low_pfn;
+	high_pfn = max_pfn = max_low_pfn;
 
 	if (dma_pfn >= high_pfn)
 		zones_size[ZONE_DMA] = high_pfn;
@@ -390,15 +388,3 @@ free_initrd_mem(unsigned long start, unsigned long end)
 	printk ("Freeing initrd memory: %ldk freed\n", (end - __start) >> 10);
 }
 #endif
-
-void
-si_meminfo(struct sysinfo *val)
-{
-	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = 0;
-	val->freehigh = 0;
-	val->mem_unit = PAGE_SIZE;
-}

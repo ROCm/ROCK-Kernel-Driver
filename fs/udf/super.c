@@ -55,6 +55,7 @@
 #include <linux/stat.h>
 #include <linux/cdrom.h>
 #include <linux/nls.h>
+#include <linux/smp_lock.h>
 #include <asm/byteorder.h>
 
 #include <linux/udf_fs.h>
@@ -359,9 +360,11 @@ udf_parse_options(char *options, struct udf_options *uopt)
 void
 udf_write_super(struct super_block *sb)
 {
+	lock_kernel();
 	if (!(sb->s_flags & MS_RDONLY))
 		udf_open_lvid(sb);
 	sb->s_dirt = 0;
+	unlock_kernel();
 }
 
 static int

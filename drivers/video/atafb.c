@@ -173,8 +173,6 @@ static int screen_len;
 
 static int current_par_valid=0; 
 
-static int currcon=0;
-
 static int mono_moni=0;
 
 static struct display disp;
@@ -285,13 +283,6 @@ extern unsigned char fontdata_8x16[];
  * void (*set_par)( struct atafb_par *par )
  *   Set the hardware according to 'par'.
  *   
- * int (*setcolreg)( unsigned regno, unsigned red,
- *                   unsigned green, unsigned blue,
- *                   unsigned transp, struct fb_info *info )
- *   Set a single color register. The values supplied are already
- *   rounded down to the hardware's capabilities (according to the
- *   entries in the var structure). Return != 0 for invalid regno.
- *
  * int (*getcolreg)( unsigned regno, unsigned *red,
  *                   unsigned *green, unsigned *blue,
  *                   unsigned *transp, struct fb_info *info )
@@ -324,9 +315,6 @@ static struct fb_hwswitch {
 	int  (*getcolreg)( unsigned regno, unsigned *red,
 					   unsigned *green, unsigned *blue,
 					   unsigned *transp, struct fb_info *info );
-	int  (*setcolreg)( unsigned regno, unsigned red,
-					   unsigned green, unsigned blue,
-					   unsigned transp, struct fb_info *info );
 	void (*set_screen_base)(void *s_base);
 	int  (*blank)( int blank_mode );
 	int  (*pan_display)( struct fb_var_screeninfo *var,
@@ -1597,7 +1585,7 @@ static int falcon_pan_display( struct fb_var_screeninfo *var,
 							   struct atafb_par *par )
 {
 	int xoffset;
-	int bpp = fb_display[currcon].var.bits_per_pixel;
+	int bpp = fb_display[fb_info.currcon].var.bits_per_pixel;
 
 	if (bpp == 1)
 		var->xoffset = up(var->xoffset, 32);
@@ -1608,13 +1596,13 @@ static int falcon_pan_display( struct fb_var_screeninfo *var,
 		var->xoffset = up(var->xoffset, 2);
 	}
 	par->hw.falcon.line_offset = bpp *
-	       	(fb_display[currcon].var.xres_virtual - fb_display[currcon].var.xres) / 16;
+	       	(fb_display[fb_info.currcon].var.xres_virtual - fb_display[fb_info.currcon].var.xres) / 16;
 	if (par->hw.falcon.xoffset)
 		par->hw.falcon.line_offset -= bpp;
 	xoffset = var->xoffset - par->hw.falcon.xoffset;
 
 	par->screen_base = screen_base +
-	        (var->yoffset * fb_display[currcon].var.xres_virtual + xoffset) * bpp / 8;
+	        (var->yoffset * fb_display[fb_info.currcon].var.xres_virtual + xoffset) * bpp / 8;
 	if (fbhw->set_screen_base)
 		fbhw->set_screen_base (par->screen_base);
 	else
@@ -2313,8 +2301,8 @@ static int pan_display( struct fb_var_screeninfo *var,
 		return -EINVAL;
 	var->xoffset = up(var->xoffset, 16);
 	par->screen_base = screen_base +
-	        (var->yoffset * fb_display[currcon].var.xres_virtual + var->xoffset)
-	        * fb_display[currcon].var.bits_per_pixel / 8;
+	        (var->yoffset * fb_display[fb_info.currcon].var.xres_virtual + var->xoffset)
+	        * fb_display[fb_info.currcon].var.bits_per_pixel / 8;
 	fbhw->set_screen_base (par->screen_base);
 	return 0;
 }
@@ -2326,7 +2314,7 @@ static int pan_display( struct fb_var_screeninfo *var,
 #ifdef ATAFB_TT
 static struct fb_hwswitch tt_switch = {
 	tt_detect, tt_encode_fix, tt_decode_var, tt_encode_var,
-	tt_get_par, tt_set_par, tt_getcolreg, tt_setcolreg,
+	tt_get_par, tt_set_par, tt_getcolreg, 
 	set_screen_base, NULL, pan_display
 };
 #endif
@@ -2335,14 +2323,14 @@ static struct fb_hwswitch tt_switch = {
 static struct fb_hwswitch falcon_switch = {
 	falcon_detect, falcon_encode_fix, falcon_decode_var, falcon_encode_var,
 	falcon_get_par, falcon_set_par, falcon_getcolreg,
-	falcon_setcolreg, set_screen_base, falcon_blank, falcon_pan_display
+	set_screen_base, falcon_blank, falcon_pan_display
 };
 #endif
 
 #ifdef ATAFB_STE
 static struct fb_hwswitch st_switch = {
 	stste_detect, stste_encode_fix, stste_decode_var, stste_encode_var,
-	stste_get_par, stste_set_par, stste_getcolreg, stste_setcolreg,
+	stste_get_par, stste_set_par, stste_getcolreg,
 	stste_set_screen_base, NULL, pan_display
 };
 #endif
@@ -2350,7 +2338,7 @@ static struct fb_hwswitch st_switch = {
 #ifdef ATAFB_EXT
 static struct fb_hwswitch ext_switch = {
 	ext_detect, ext_encode_fix, ext_decode_var, ext_encode_var,
-	ext_get_par, ext_set_par, ext_getcolreg, ext_setcolreg, NULL, NULL, NULL
+	ext_get_par, ext_set_par, ext_getcolreg, NULL, NULL, NULL
 };
 #endif
 
@@ -2410,20 +2398,6 @@ do_fb_set_var(struct fb_var_screeninfo *var, int isactive)
 	return 0;
 }
 
-/* Functions for handling colormap */
-
-static void
-do_install_cmap(int con, struct fb_info *info)
-{
-	if (con != currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, fbhw->setcolreg, info);
-	else
-		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-					    1, fbhw->setcolreg, info);		
-}
-
 static int
 atafb_get_fix(struct fb_fix_screeninfo *fix, int con, struct fb_info *info)
 {
@@ -2468,7 +2442,7 @@ atafb_set_disp(int con, struct fb_info *info)
 	atafb_get_var(&var, con, info);
 	if (con == -1)
 		con=0;
-	display->screen_base = (void *)fix.smem_start;
+	info->screen_base = (void *)fix.smem_start;
 	display->visual = fix.visual;
 	display->type = fix.type;
 	display->type_aux = fix.type_aux;
@@ -2530,7 +2504,7 @@ atafb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 {
 	int err,oldxres,oldyres,oldbpp,oldxres_virtual,
 	    oldyres_virtual,oldyoffset;
-	if ((err=do_fb_set_var(var, con==currcon)))
+	if ((err=do_fb_set_var(var, con==info->currcon)))
 		return err;
 	if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
 		oldxres=fb_display[con].var.xres;
@@ -2560,7 +2534,7 @@ atafb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 static int
 atafb_get_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 {
-	if (con == currcon) /* current console ? */
+	if (con == info->currcon) /* current console ? */
 		return fb_get_cmap(cmap, kspc, fbhw->getcolreg, info);
 	else
 		if (fb_display[con].cmap.len) /* non default colormap ? */
@@ -2568,23 +2542,6 @@ atafb_get_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 		else
 			fb_copy_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
 				     cmap, kspc ? 0 : 2);
-	return 0;
-}
-
-static int
-atafb_set_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
-{
-	int err;
-	if (! fb_display[con].cmap.len) { /* no colormap allocated ? */
-		if ((err = fb_alloc_cmap(&fb_display[con].cmap,
-					 1 << fb_display[con].var.bits_per_pixel,
-					 0)))
-		return err;
-	}
-	if (con == currcon) /* current console ? */
-		return fb_set_cmap(cmap, kspc, fbhw->setcolreg, info);
-	else
-		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
 	return 0;
 }
 
@@ -2599,7 +2556,7 @@ atafb_pan_display(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 	    || yoffset < 0 || yoffset + fb_display[con].var.yres > fb_display[con].var.yres_virtual)
 		return -EINVAL;
 
-	if (con == currcon) {
+	if (con == info->currcon) {
 		if (fbhw->pan_display) {
 			if ((err = fbhw->pan_display(var, &current_par)))
 				return err;
@@ -2642,8 +2599,9 @@ static struct fb_ops atafb_ops = {
 	fb_get_var:	atafb_get_var,
 	fb_set_var:	atafb_set_var,
 	fb_get_cmap:	atafb_get_cmap,
-	fb_set_cmap:	atafb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_pan_display:	atafb_pan_display,
+	fb_blank:	atafb_blank,
 	fb_ioctl:	atafb_ioctl,
 };
 
@@ -2692,11 +2650,11 @@ static int
 atafb_switch(int con, struct fb_info *info)
 {
 	/* Do we have to save the colormap ? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, fbhw->getcolreg,
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, fbhw->getcolreg,
 			    info);
 	do_fb_set_var(&fb_display[con].var,1);
-	currcon=con;
+	info->currcon=con;
 	/* Install new colormap */
 	do_install_cmap(con, info);
 	return 0;
@@ -2709,13 +2667,13 @@ atafb_switch(int con, struct fb_info *info)
  * 3 = suspend hsync
  * 4 = off
  */
-static void
+static int 
 atafb_blank(int blank, struct fb_info *info)
 {
 	unsigned short black[16];
 	struct fb_cmap cmap;
 	if (fbhw->blank && !fbhw->blank(blank))
-		return;
+		return 1;
 	if (blank) {
 		memset(black, 0, 16*sizeof(unsigned short));
 		cmap.red=black;
@@ -2724,10 +2682,11 @@ atafb_blank(int blank, struct fb_info *info)
 		cmap.transp=NULL;
 		cmap.start=0;
 		cmap.len=16;
-		fb_set_cmap(&cmap, 1, fbhw->setcolreg, info);
+		fb_set_cmap(&cmap, 1, info);
 	}
 	else
-		do_install_cmap(currcon, info);
+		do_install_cmap(info->currcon, info);
+	return 0;
 }
 
 int __init atafb_init(void)
@@ -2743,18 +2702,21 @@ int __init atafb_init(void)
 #ifdef ATAFB_EXT
 		if (external_addr) {
 			fbhw = &ext_switch;
+			fb_info.fb_setcolreg = &ext_setcolreg;
 			break;
 		}
 #endif
 #ifdef ATAFB_TT
 		if (ATARIHW_PRESENT(TT_SHIFTER)) {
 			fbhw = &tt_switch;
+			fb_info.fb_setcolreg = &tt_setcolreg;
 			break;
 		}
 #endif
 #ifdef ATAFB_FALCON
 		if (ATARIHW_PRESENT(VIDEL_SHIFTER)) {
 			fbhw = &falcon_switch;
+			fb_info.fb_setcolreg = &falcon_setcolreg;
 			request_irq(IRQ_AUTO_4, falcon_vbl_switcher, IRQ_TYPE_PRIO,
 			            "framebuffer/modeswitch", falcon_vbl_switcher);
 			break;
@@ -2764,9 +2726,11 @@ int __init atafb_init(void)
 		if (ATARIHW_PRESENT(STND_SHIFTER) ||
 		    ATARIHW_PRESENT(EXTD_SHIFTER)) {
 			fbhw = &st_switch;
+			fb_info.fb_setcolreg = &stste_setcolreg;
 			break;
 		}
 		fbhw = &st_switch;
+		fb_info.fb_setcolreg = &stste_setcolreg;
 		printk("Cannot determine video hardware; defaulting to ST(e)\n");
 #else /* ATAFB_STE */
 		/* no default driver included */
@@ -2831,9 +2795,9 @@ int __init atafb_init(void)
 	fb_info.node = NODEV;
 	fb_info.fbops = &atafb_ops;
 	fb_info.disp = &disp;
+	fb_info.currcon = -1;
 	fb_info.switch_con = &atafb_switch;
 	fb_info.updatevar = &fb_update_var;
-	fb_info.blank = &atafb_blank;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	do_fb_set_var(&atafb_predefined[default_par-1], 1);
 	strcat(fb_info.modename, fb_var_names[default_par-1][0]);
@@ -2876,8 +2840,8 @@ int __init atafb_setup( char *options )
 
     if (!options || !*options)
 		return 0;
-     
-    for(this_opt=strtok(options,","); this_opt; this_opt=strtok(NULL,",")) {
+    
+    while ((this_opt = strsep(options, ",")) != NULL) {	 
 	if (!*this_opt) continue;
 	if ((temp=get_video_mode(this_opt)))
 		default_par=temp;

@@ -299,13 +299,6 @@ CONFIG_IDEDMA_IVB
 
   It is normally safe to answer Y; however, the default is N.
 
-CONFIG_IDEDMA_PCI_WIP
-  If you enable this you will be able to use and test highly
-  developmental projects. If you say N, the configurator will
-  simply skip those options.
-
-  It is SAFEST to say N to this question.
-
 CONFIG_BLK_DEV_PDC_ADMA
   Please read the comments at the top of <file:drivers/ide/ide-pci.c>.
 
@@ -430,6 +423,15 @@ CONFIG_BLK_DEV_PIIX
   and also for the Efar Victory66 (slc90e66) chip.  This allows
   the kernel to change PIO, DMA and UDMA speeds and to configure
   the chip to optimum performance.
+
+CONFIG_BLK_DEV_PIIX_TRY133
+  The ICH2, ICH2-M, ICH3, ICH3-M, ICH3-S and CICH chips can support
+  UDMA133 in hardware, even though the specifications of the chips
+  say otherwise. By enabling this option, you allow the driver to
+  enable the UDMA133 mode on these chips.
+
+  If you want to stay on the safe side, say N here.
+  If you prefer maximum performance, say Y here.
 
 CONFIG_BLK_DEV_PDC202XX
   Promise Ultra33 or PDC20246
@@ -755,7 +757,8 @@ CONFIG_BLK_DEV_IDE_TCQ
   supports it. For now this includes the IBM Deskstar series drives,
   such as the 22GXP, 75GXP, 40GV, 60GXP, and 120GXP (ie any Deskstar made
   in the last couple of years), and at least some of the Western
-  Digital drives in the Expert series.
+  Digital drives in the Expert series (by nature of really being IBM
+  drives).
 
   If you have such a drive, say Y here.
 
@@ -774,7 +777,8 @@ CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
   echo "using_tcq:32" > /proc/ide/hdX/settings
 
   where any value between 1-32 selects chosen queue depth and enables
-  TCQ, and 0 disables it.
+  TCQ, and 0 disables it. hdparm version 4.7 an above also support
+  TCQ manipulations.
 
   Generally say Y here.
 

@@ -25,13 +25,13 @@
 
 #define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
 
-static unsigned long max_block(kdev_t dev)
+static unsigned long max_block(struct block_device *bdev)
 {
 	unsigned int retval = ~0U;
-	loff_t sz = blkdev_size_in_bytes(dev);
+	loff_t sz = bdev->bd_inode->i_size;
 
 	if (sz) {
-		unsigned int size = block_size(dev);
+		unsigned int size = block_size(bdev);
 		unsigned int sizebits = blksize_bits(size);
 		retval = (sz >> sizebits);
 	}
@@ -53,10 +53,10 @@ static void kill_bdev(struct block_device *bdev)
 	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
 }	
 
-int set_blocksize(kdev_t dev, int size)
+int set_blocksize(struct block_device *bdev, int size)
 {
 	int oldsize;
-	struct block_device *bdev;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	/* Size must be a power of two, and between 512 and PAGE_SIZE */
 	if (size > PAGE_SIZE || size < 512 || (size & (size-1)))
@@ -66,36 +66,22 @@ int set_blocksize(kdev_t dev, int size)
 	if (size < get_hardsect_size(dev))
 		return -EINVAL;
 
-	/* No blocksize array? Implies hardcoded BLOCK_SIZE */
-	if (!blksize_size[major(dev)]) {
-		if (size == BLOCK_SIZE)
-			return 0;
-		return -EINVAL;
-	}
-
-	oldsize = blksize_size[major(dev)][minor(dev)];
+	oldsize = bdev->bd_block_size;
 	if (oldsize == size)
 		return 0;
 
-	if (!oldsize && size == BLOCK_SIZE) {
-		blksize_size[major(dev)][minor(dev)] = size;
-		return 0;
-	}
-
 	/* Ok, we're actually changing the blocksize.. */
-	bdev = bdget(kdev_t_to_nr(dev));
-	sync_buffers(bdev, 2);
-	blksize_size[major(dev)][minor(dev)] = size;
+	sync_blockdev(bdev);
+	bdev->bd_block_size = size;
 	bdev->bd_inode->i_blkbits = blksize_bits(size);
 	kill_bdev(bdev);
-	bdput(bdev);
 	return 0;
 }
 
 int sb_set_blocksize(struct super_block *sb, int size)
 {
 	int bits;
-	if (set_blocksize(sb->s_dev, size) < 0)
+	if (set_blocksize(sb->s_bdev, size) < 0)
 		return 0;
 	sb->s_blocksize = size;
 	for (bits = 9, size >>= 9; size >>= 1; bits++)
@@ -106,7 +92,7 @@ int sb_set_blocksize(struct super_block *sb, int size)
 
 int sb_min_blocksize(struct super_block *sb, int size)
 {
-	int minsize = get_hardsect_size(sb->s_dev);
+	int minsize = bdev_hardsect_size(sb->s_bdev);
 	if (size < minsize)
 		size = minsize;
 	return sb_set_blocksize(sb, size);
@@ -114,13 +100,12 @@ int sb_min_blocksize(struct super_block *sb, int size)
 
 static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer_head * bh, int create)
 {
-	if (iblock >= max_block(inode->i_rdev))
+	if (iblock >= max_block(inode->i_bdev))
 		return -EIO;
 
-	bh->b_dev = inode->i_rdev;
 	bh->b_bdev = inode->i_bdev;
 	bh->b_blocknr = iblock;
-	bh->b_state |= 1UL << BH_Mapped;
+	set_buffer_mapped(bh);
 	return 0;
 }
 
@@ -181,22 +166,6 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 	return retval;
 }
 	
-
-static int __block_fsync(struct inode * inode)
-{
-	int ret, err;
-
-	ret = filemap_fdatasync(inode->i_mapping);
-	err = sync_buffers(inode->i_bdev, 1);
-	if (err && !ret)
-		ret = err;
-	err = filemap_fdatawait(inode->i_mapping);
-	if (err && !ret)
-		ret = err;
-
-	return ret;
-}
-
 /*
  *	Filp may be NULL when we are called by an msync of a vma
  *	since the vma has no handle.
@@ -206,7 +175,7 @@ static int block_fsync(struct file *filp, struct dentry *dentry, int datasync)
 {
 	struct inode * inode = dentry->d_inode;
 
-	return __block_fsync(inode);
+	return sync_blockdev(inode->i_bdev);
 }
 
 /*
@@ -350,9 +319,11 @@ struct block_device *bdget(dev_t dev)
 		struct inode *inode = new_inode(bd_mnt->mnt_sb);
 		if (inode) {
 			kdev_t kdev = to_kdev_t(dev);
+
 			atomic_set(&new_bdev->bd_count,1);
 			new_bdev->bd_dev = dev;
 			new_bdev->bd_op = NULL;
+			new_bdev->bd_contains = NULL;
 			new_bdev->bd_inode = inode;
 			inode->i_mode = S_IFBLK;
 			inode->i_rdev = kdev;
@@ -360,6 +331,7 @@ struct block_device *bdget(dev_t dev)
 			inode->i_bdev = new_bdev;
 			inode->i_data.a_ops = &def_blk_aops;
 			inode->i_data.gfp_mask = GFP_USER;
+			inode->i_data.ra_pages = &default_ra_pages;
 			spin_lock(&bdev_lock);
 			bdev = bdfind(dev, head);
 			if (!bdev) {
@@ -563,7 +535,7 @@ int check_disk_change(kdev_t dev)
 		return 0;
 
 	printk(KERN_DEBUG "VFS: Disk change detected on device %s\n",
-		bdevname(dev));
+		__bdevname(dev));
 
 	if (invalidate_device(dev, 0))
 		printk("VFS: busy inodes on changed media.\n");
@@ -590,28 +562,78 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 {
 	int ret = -ENXIO;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
+	struct module *owner = NULL;
 
 	down(&bdev->bd_sem);
 	lock_kernel();
-	if (!bdev->bd_op)
+	if (!bdev->bd_op) {
 		bdev->bd_op = get_blkfops(major(dev));
-	if (bdev->bd_op) {
-		ret = 0;
-		if (bdev->bd_op->owner)
-			__MOD_INC_USE_COUNT(bdev->bd_op->owner);
-		if (bdev->bd_op->open)
-			ret = bdev->bd_op->open(inode, file);
-		if (!ret) {
-			bdev->bd_openers++;
-			bdev->bd_inode->i_size = blkdev_size(dev);
-			bdev->bd_inode->i_blkbits = blksize_bits(block_size(dev));
-		} else {
-			if (bdev->bd_op->owner)
-				__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
-			if (!bdev->bd_openers)
-				bdev->bd_op = NULL;
+		if (!bdev->bd_op)
+			goto out;
+		owner = bdev->bd_op->owner;
+		if (owner)
+			__MOD_INC_USE_COUNT(owner);
+	}
+	if (!bdev->bd_contains) {
+		unsigned minor = minor(dev);
+		struct gendisk *g = get_gendisk(dev);
+		bdev->bd_contains = bdev;
+		if (g) {
+			int shift = g->minor_shift;
+			unsigned minor0 = (minor >> shift) << shift;
+			if (minor != minor0) {
+				struct block_device *disk;
+				disk = bdget(MKDEV(major(dev), minor0));
+				ret = -ENOMEM;
+				if (!disk)
+					goto out1;
+				ret = blkdev_get(disk, file->f_mode, file->f_flags, BDEV_RAW);
+				if (ret)
+					goto out1;
+				bdev->bd_contains = disk;
+			}
 		}
 	}
+	if (bdev->bd_inode->i_data.ra_pages == &default_ra_pages) {
+		unsigned long *ra_pages = blk_get_ra_pages(bdev);
+		if (ra_pages == NULL)
+			ra_pages = &default_ra_pages;
+		inode->i_data.ra_pages = ra_pages;
+	}
+	if (bdev->bd_op->open) {
+		ret = bdev->bd_op->open(inode, file);
+		if (ret)
+			goto out2;
+	}
+	bdev->bd_inode->i_size = blkdev_size(dev);
+	if (!bdev->bd_openers) {
+		unsigned bsize = bdev_hardsect_size(bdev);
+		while (bsize < PAGE_CACHE_SIZE) {
+			if (bdev->bd_inode->i_size & bsize)
+				break;
+			bsize <<= 1;
+		}
+		bdev->bd_block_size = bsize;
+		bdev->bd_inode->i_blkbits = blksize_bits(bsize);
+	}
+	bdev->bd_openers++;
+	unlock_kernel();
+	up(&bdev->bd_sem);
+	return 0;
+
+out2:
+	if (!bdev->bd_openers) {
+		bdev->bd_op = NULL;
+		bdev->bd_inode->i_data.ra_pages = &default_ra_pages;
+		if (bdev != bdev->bd_contains) {
+			blkdev_put(bdev->bd_contains, BDEV_RAW);
+			bdev->bd_contains = NULL;
+		}
+	}
+out1:
+	if (owner)
+		__MOD_DEC_USE_COUNT(owner);
+out:
 	unlock_kernel();
 	up(&bdev->bd_sem);
 	if (ret)
@@ -664,10 +686,8 @@ int blkdev_put(struct block_device *bdev, int kind)
 	lock_kernel();
 	switch (kind) {
 	case BDEV_FILE:
-		__block_fsync(bd_inode);
-		break;
 	case BDEV_FS:
-		fsync_no_super(bdev);
+		sync_blockdev(bd_inode->i_bdev);
 		break;
 	}
 	if (!--bdev->bd_openers)
@@ -676,8 +696,14 @@ int blkdev_put(struct block_device *bdev, int kind)
 		ret = bdev->bd_op->release(bd_inode, NULL);
 	if (bdev->bd_op->owner)
 		__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
-	if (!bdev->bd_openers)
+	if (!bdev->bd_openers) {
 		bdev->bd_op = NULL;
+		bdev->bd_inode->i_data.ra_pages = &default_ra_pages;
+		if (bdev != bdev->bd_contains) {
+			blkdev_put(bdev->bd_contains, BDEV_RAW);
+			bdev->bd_contains = NULL;
+		}
+	}
 	unlock_kernel();
 	up(&bdev->bd_sem);
 	bdput(bdev);
@@ -714,6 +740,8 @@ struct address_space_operations def_blk_aops = {
 	sync_page: block_sync_page,
 	prepare_write: blkdev_prepare_write,
 	commit_write: blkdev_commit_write,
+	writeback_mapping: generic_writeback_mapping,
+	vm_writeback: generic_vm_writeback,
 	direct_IO: blkdev_direct_IO,
 };
 
@@ -728,7 +756,7 @@ struct file_operations def_blk_fops = {
 	ioctl:		blkdev_ioctl,
 };
 
-const char * bdevname(kdev_t dev)
+const char *__bdevname(kdev_t dev)
 {
 	static char buffer[32];
 	const char * name = blkdevs[major(dev)].name;

@@ -1180,6 +1180,9 @@ static int __init sa1100_pcmcia_init(void)
 #ifdef CONFIG_SA1100_STORK
 	pcmcia_stork_init();
 #endif
+#ifdef CONFIG_SA1100_TRIZEPS
+	pcmcia_trizeps_init();
+#endif
 #ifdef CONFIG_SA1100_XP860
 	pcmcia_xp860_init();
 #endif

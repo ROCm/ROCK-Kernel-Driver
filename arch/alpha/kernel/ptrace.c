@@ -106,7 +106,7 @@ get_reg_addr(struct task_struct * task, unsigned long regno)
 		zero = 0;
 		addr = &zero;
 	} else {
-		addr = (long *)((long)task + regoff[regno]);
+		addr = (long *)((long)task->thread_info + regoff[regno]);
 	}
 	return addr;
 }
@@ -292,7 +292,7 @@ sys_ptrace(long request, long pid, long addr, long data,
 		if (request != PTRACE_KILL)
 			goto out;
 	}
-	if (child->p_pptr != current) {
+	if (child->parent != current) {
 		DBG(DBG_MEM, ("child not parent of this process\n"));
 		goto out;
 	}
@@ -340,9 +340,9 @@ sys_ptrace(long request, long pid, long addr, long data,
 		if ((unsigned long) data > _NSIG)
 			goto out;
 		if (request == PTRACE_SYSCALL)
-			set_thread_flag(TIF_SYSCALL_TRACE);
+			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		else
-			clear_thread_flag(TIF_SYSCALL_TRACE);
+			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		child->exit_code = data;
 		wake_up_process(child);
 		/* make sure single-step breakpoint is gone. */
@@ -371,7 +371,7 @@ sys_ptrace(long request, long pid, long addr, long data,
 			goto out;
 		/* Mark single stepping.  */
 		child->thread_info->bpt_nsaved = -1;
-		clear_thread_flag(TIF_SYSCALL_TRACE);
+		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		wake_up_process(child);
 		child->exit_code = data;
 		/* give it a chance to run. */

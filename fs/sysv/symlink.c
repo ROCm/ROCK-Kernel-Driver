@@ -5,8 +5,7 @@
  *  Aug 2001, Christoph Hellwig (hch@infradead.org)
  */
 
-#include <linux/fs.h>
-#include <linux/sysv_fs.h>
+#include "sysv.h"
 
 static int sysv_readlink(struct dentry *dentry, char *buffer, int buflen)
 {

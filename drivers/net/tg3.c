@@ -52,8 +52,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"0.96"
-#define DRV_MODULE_RELDATE	"Mar 6, 2002"
+#define DRV_MODULE_VERSION	"0.98"
+#define DRV_MODULE_RELDATE	"Mar 28, 2002"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -3206,12 +3206,19 @@ static int tg3_load_5701_a0_firmware_fix(struct tg3 *tp)
 	/* Now startup only the RX cpu. */
 	tw32(RX_CPU_BASE + CPU_STATE, 0xffffffff);
 	tw32(RX_CPU_BASE + CPU_PC,    TG3_FW_TEXT_ADDR);
+
+	/* Flush posted writes. */
+	tr32(RX_CPU_BASE + CPU_PC);
 	for (i = 0; i < 5; i++) {
 		if (tr32(RX_CPU_BASE + CPU_PC) == TG3_FW_TEXT_ADDR)
 			break;
 		tw32(RX_CPU_BASE + CPU_STATE, 0xffffffff);
 		tw32(RX_CPU_BASE + CPU_MODE,  CPU_MODE_HALT);
 		tw32(RX_CPU_BASE + CPU_PC,    TG3_FW_TEXT_ADDR);
+
+		/* Flush posted writes. */
+		tr32(RX_CPU_BASE + CPU_PC);
+
 		udelay(1000);
 	}
 	if (i >= 5) {
@@ -3223,6 +3230,9 @@ static int tg3_load_5701_a0_firmware_fix(struct tg3 *tp)
 	}
 	tw32(RX_CPU_BASE + CPU_STATE, 0xffffffff);
 	tw32(RX_CPU_BASE + CPU_MODE,  0x00000000);
+
+	/* Flush posted writes. */
+	tr32(RX_CPU_BASE + CPU_MODE);
 
 	return 0;
 }

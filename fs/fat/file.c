@@ -46,8 +46,10 @@ int fat_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_r
 	unsigned long phys;
 
 	phys = fat_bmap(inode, iblock);
+	if (phys < 0)
+		return phys;
 	if (phys) {
-		map_bh(bh_result, inode->i_sb, phys);
+		map_bh(bh_result, sb, phys);
 		return 0;
 	}
 	if (!create)
@@ -56,7 +58,7 @@ int fat_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_r
 		BUG();
 		return -EIO;
 	}
-	if (!(iblock % MSDOS_SB(inode->i_sb)->cluster_size)) {
+	if (!(iblock % MSDOS_SB(sb)->cluster_size)) {
 		int error;
 
 		error = fat_add_cluster(inode);
@@ -65,10 +67,12 @@ int fat_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_r
 	}
 	MSDOS_I(inode)->mmu_private += sb->s_blocksize;
 	phys = fat_bmap(inode, iblock);
+	if (phys < 0)
+		return phys;
 	if (!phys)
 		BUG();
-	bh_result->b_state |= (1UL << BH_New);
-	map_bh(bh_result, inode->i_sb, phys);
+	set_buffer_new(bh_result);
+	map_bh(bh_result, sb, phys);
 	return 0;
 }
 

@@ -26,10 +26,14 @@ static int filemap_sync_pte(pte_t *ptep, struct vm_area_struct *vma,
 	pte_t pte = *ptep;
 
 	if (pte_present(pte) && pte_dirty(pte)) {
-		struct page *page = pte_page(pte);
-		if (VALID_PAGE(page) && !PageReserved(page) && ptep_test_and_clear_dirty(ptep)) {
-			flush_tlb_page(vma, address);
-			set_page_dirty(page);
+		struct page *page;
+		unsigned long pfn = pte_pfn(pte);
+		if (pfn_valid(pfn)) {
+			page = pfn_to_page(pfn);
+			if (!PageReserved(page) && ptep_test_and_clear_dirty(ptep)) {
+				flush_tlb_page(vma, address);
+				set_page_dirty(page);
+			}
 		}
 	}
 	return 0;
@@ -138,19 +142,21 @@ static int msync_interval(struct vm_area_struct * vma,
 
 		if (!ret && (flags & (MS_SYNC|MS_ASYNC))) {
 			struct inode * inode = file->f_dentry->d_inode;
+			int err;
 
 			down(&inode->i_sem);
-			ret = filemap_fdatasync(inode->i_mapping);
+			ret = filemap_fdatawait(inode->i_mapping);
+			err = filemap_fdatawrite(inode->i_mapping);
+			if (!ret)
+				ret = err;
 			if (flags & MS_SYNC) {
-				int err;
-
 				if (file->f_op && file->f_op->fsync) {
 					err = file->f_op->fsync(file, file->f_dentry, 1);
 					if (err && !ret)
 						ret = err;
 				}
 				err = filemap_fdatawait(inode->i_mapping);
-				if (err && !ret)
+				if (!ret)
 					ret = err;
 			}
 			up(&inode->i_sem);

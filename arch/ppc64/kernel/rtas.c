@@ -20,7 +20,7 @@
 #include <asm/prom.h>
 #include <asm/rtas.h>
 #include <asm/machdep.h>
-#include <asm/Paca.h>
+#include <asm/paca.h>
 #include <asm/page.h>
 #include <asm/system.h>
 #include <asm/udbg.h>

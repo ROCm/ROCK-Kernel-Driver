@@ -144,7 +144,9 @@ char *snd_pcm_state_names[] = {
 	STATE(PREPARED),
 	STATE(RUNNING),
 	STATE(XRUN),
+	STATE(DRAINING),
 	STATE(PAUSED),
+	STATE(SUSPENDED),
 };
 
 char *snd_pcm_access_names[] = {

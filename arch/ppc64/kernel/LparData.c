@@ -14,13 +14,13 @@
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/init.h>
-#include <asm/Naca.h>
+#include <asm/naca.h>
 #include <asm/abs_addr.h>
 #include <asm/bitops.h>
 #include <asm/iSeries/ItLpNaca.h>
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/iSeries/ItLpRegSave.h>
-#include <asm/Paca.h>
+#include <asm/paca.h>
 #include <asm/iSeries/HvReleaseData.h>
 #include <asm/iSeries/LparMap.h>
 #include <asm/iSeries/ItVpdAreas.h>
@@ -61,8 +61,8 @@ struct ItLpQueue xItLpQueue = {};
 struct HvReleaseData hvReleaseData = {
 	0xc8a5d9c4,	/* desc = "HvRD" ebcdic */
 	sizeof(struct HvReleaseData),
-	offsetof(struct Naca, xItVpdAreas),
-	(struct Naca *)(KERNELBASE+0x4000),	/* 64-bit Naca address */
+	offsetof(struct naca_struct, xItVpdAreas),
+	(struct naca_struct *)(KERNELBASE+0x4000), /* 64-bit Naca address */
 	0x6000,		/* offset of LparMap within loadarea (see head.S) */
 	0,
 	1,		/* tags inactive       */
@@ -174,7 +174,7 @@ struct ItVpdAreas itVpdAreas = {
 	0, 0,
 	26,		/* # VPD array entries */
 	10,		/* # DMA array entries */
-	maxProcessors*2, maxPhysicalProcessors,	/* Max logical, physical procs */
+	MAX_PROCESSORS*2, maxPhysicalProcessors,	/* Max logical, physical procs */
 	offsetof(struct ItVpdAreas,xPlicDmaToks),/* offset to DMA toks */
 	offsetof(struct ItVpdAreas,xSlicVpdAdrs),/* offset to VPD addrs */
 	offsetof(struct ItVpdAreas,xPlicDmaLens),/* offset to DMA lens */
@@ -186,7 +186,7 @@ struct ItVpdAreas itVpdAreas = {
 	{0},		/* DMA tokens */
 	{		/* VPD lengths */
 		0,0,0,0,		/*  0 -  3 */
-		sizeof(struct Paca),	/*       4 length of Paca  */
+		sizeof(struct paca_struct),	/*       4 length of Paca  */
 		0,			/*       5 */
 		sizeof(struct ItIplParmsReal),/* 6 length of IPL parms */
 		26992,			/*	 7 length of MS VPD */
@@ -203,7 +203,7 @@ struct ItVpdAreas itVpdAreas = {
 		},
 	{			/* VPD addresses */
 		0,0,0,0,		/*	 0 -  3 */
-		&xPaca[0],		/*       4 first Paca */
+		&paca[0],		/*       4 first Paca */
 		0,			/*       5 */
 		&xItIplParmsReal,	/*	 6 IPL parms */
 		&xMsVpd,		/*	 7 MS Vpd */
@@ -219,10 +219,6 @@ struct ItVpdAreas itVpdAreas = {
 		0,0
 	}
 };
-
-
-/* Data area used in flush_hash_page  */
-long long flush_hash_page_hpte[2];
 
 struct msChunks msChunks = {0, 0, 0, 0, NULL};
 

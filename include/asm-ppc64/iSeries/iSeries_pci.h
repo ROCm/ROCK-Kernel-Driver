@@ -39,7 +39,8 @@ struct iSeries_Device_Node;
 #define ISERIES_SUBBUS(DevPtr) DevPtr->DsaAddr.subBusNumber
 #define ISERIES_DEVICE(DevPtr) DevPtr->DsaAddr.deviceId
 #define ISERIES_DEVFUN(DevPtr) DevPtr->DevFn
-#define ISERIES_DSA(DevPtr)   (*(u64*)&DevPtr->DsaAddr)  
+#define ISERIES_DSA(DevPtr)   (*(u64*)&DevPtr->DsaAddr)
+#define ISERIES_DEVNODE(PciDev) ((struct iSeries_Device_Node*)PciDev->sysdata)
 
 #define EADsMaxAgents 7
 /************************************************************************************/
@@ -87,6 +88,7 @@ struct iSeries_Device_Node {
 	int              IoRetry;        /* Current Retry Count         */
 	int              Flags;          /* Possible flags(disable/bist)*/
 	u16              Vendor;         /* Vendor ID                   */
+	u8               LogicalSlot;    /* Hv Slot Index for Tces      */
 	struct TceTable* DevTceTable;    /* Device TCE Table            */ 
 	u8               PhbId;          /* Phb Card is on.             */
 	u16              Board;          /* Board Number                */

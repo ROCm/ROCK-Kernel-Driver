@@ -492,6 +492,10 @@ int clgenfb_setup (char *options);
 static int clgenfb_open (struct fb_info *info, int user);
 static int clgenfb_release (struct fb_info *info, int user);
 
+static int clgenfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+			      unsigned blue, unsigned transp,
+			      struct fb_info *info);
+
 /* function table of the above functions */
 static struct fb_ops clgenfb_ops = {
 	owner:		THIS_MODULE,
@@ -501,8 +505,10 @@ static struct fb_ops clgenfb_ops = {
 	fb_get_var:	fbgen_get_var,
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
-	fb_set_cmap:	fbgen_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	clgenfb_setcolreg,
 	fb_pan_display:	fbgen_pan_display,
+	fb_blank:	fbgen_blank,
 };
 
 /*--- Hardware Specific Routines -------------------------------------------*/
@@ -517,9 +523,6 @@ static void clgen_get_par (void *par, struct fb_info_gen *info);
 static void clgen_set_par (const void *par, struct fb_info_gen *info);
 static int clgen_getcolreg (unsigned regno, unsigned *red, unsigned *green,
 			    unsigned *blue, unsigned *transp,
-			    struct fb_info *info);
-static int clgen_setcolreg (unsigned regno, unsigned red, unsigned green,
-			    unsigned blue, unsigned transp,
 			    struct fb_info *info);
 static int clgen_pan_display (const struct fb_var_screeninfo *var,
 			      struct fb_info_gen *info);
@@ -538,7 +541,6 @@ static struct fbgen_hwswitch clgen_hwswitch =
 	clgen_get_par,
 	clgen_set_par,
 	clgen_getcolreg,
-	clgen_setcolreg,
 	clgen_pan_display,
 	clgen_blank,
 	clgen_set_disp
@@ -1674,9 +1676,9 @@ static int clgen_getcolreg (unsigned regno, unsigned *red, unsigned *green,
 }
 
 
-static int clgen_setcolreg (unsigned regno, unsigned red, unsigned green,
-			    unsigned blue, unsigned transp,
-			    struct fb_info *info)
+static int clgenfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+			      unsigned blue, unsigned transp,
+			      struct fb_info *info)
 {
 	struct clgenfb_info *fb_info = (struct clgenfb_info *) info;
 
@@ -2179,13 +2181,13 @@ static void clgen_set_disp (const void *par, struct display *disp,
 	accel_text = _par->var.accel_flags & FB_ACCELF_TEXT;
 
 	printk ("Cirrus Logic video mode: ");
-	disp->screen_base = (char *) fb_info->fbmem;
+	info->info.screen_base = (char *) fb_info->fbmem;
 	switch (_par->var.bits_per_pixel) {
 #ifdef FBCON_HAS_MFB
 	case 1:
 		printk ("monochrome\n");
 		if (fb_info->btype == BT_GD5480)
-			disp->screen_base = (char *) fb_info->fbmem;
+			info->info.screen_base = (char *) fb_info->fbmem;
 		disp->dispsw = &fbcon_mfb;
 		break;
 #endif
@@ -2193,7 +2195,7 @@ static void clgen_set_disp (const void *par, struct display *disp,
 	case 8:
 		printk ("8 bit color depth\n");
 		if (fb_info->btype == BT_GD5480)
-			disp->screen_base = (char *) fb_info->fbmem;
+			info->info.screen_base = (char *) fb_info->fbmem;
 		if (accel_text)
 			disp->dispsw = &fbcon_clgen_8;
 		else
@@ -2208,7 +2210,7 @@ static void clgen_set_disp (const void *par, struct display *disp,
 		else
 			disp->dispsw = &fbcon_cfb16;
 		if (fb_info->btype == BT_GD5480)
-			disp->screen_base = (char *) fb_info->fbmem + 1 * MB_;
+			info->info.screen_base = (char *) fb_info->fbmem + 1 * MB_;
 		disp->dispsw_data = fb_info->fbcon_cmap.cfb16;
 		break;
 #endif
@@ -2217,7 +2219,7 @@ static void clgen_set_disp (const void *par, struct display *disp,
 		printk ("24 bit color depth\n");
 		disp->dispsw = &fbcon_cfb24;
 		if (fb_info->btype == BT_GD5480)
-			disp->screen_base = (char *) fb_info->fbmem + 2 * MB_;
+			info->info.screen_base = (char *) fb_info->fbmem + 2 * MB_;
 		disp->dispsw_data = fb_info->fbcon_cmap.cfb24;
 		break;
 #endif
@@ -2229,7 +2231,7 @@ static void clgen_set_disp (const void *par, struct display *disp,
 		else
 			disp->dispsw = &fbcon_cfb32;
 		if (fb_info->btype == BT_GD5480)
-			disp->screen_base = (char *) fb_info->fbmem + 2 * MB_;
+			info->info.screen_base = (char *) fb_info->fbmem + 2 * MB_;
 		disp->dispsw_data = fb_info->fbcon_cmap.cfb32;
 		break;
 #endif
@@ -2781,10 +2783,10 @@ int __init clgenfb_init(void)
 	fb_info->gen.info.node = NODEV;
 	fb_info->gen.info.fbops = &clgenfb_ops;
 	fb_info->gen.info.disp = &disp;
+	fb_info->gen.info.currcon = -1;
 	fb_info->gen.info.changevar = NULL;
 	fb_info->gen.info.switch_con = &fbgen_switch;
 	fb_info->gen.info.updatevar = &fbgen_update_var;
-	fb_info->gen.info.blank = &fbgen_blank;
 	fb_info->gen.info.flags = FBINFO_FLAG_DEFAULT;
 
 	for (j = 0; j < 256; j++) {
@@ -2814,7 +2816,7 @@ int __init clgenfb_init(void)
 
 	disp.var = clgenfb_default;
 	fbgen_set_disp (-1, &fb_info->gen);
-	fbgen_install_cmap (0, &fb_info->gen);
+	do_install_cmap (0, &fb_info->gen.info);
 
 	err = register_framebuffer (&fb_info->gen.info);
 	if (err) {
@@ -2860,8 +2862,7 @@ int __init clgenfb_setup(char *options) {
 	if (!options || !*options)
 		return 0;
 
-	for (this_opt = strtok (options, ","); this_opt != NULL;
-	     this_opt = strtok (NULL, ",")) {
+	while ((this_opt = strsep (&options, ",")) != NULL) {	
 		if (!*this_opt) continue;
 
 		DPRINTK("clgenfb_setup: option '%s'\n", this_opt);

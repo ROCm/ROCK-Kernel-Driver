@@ -34,6 +34,11 @@ typedef struct sndrv_xferi snd_xferi_t;
 typedef struct sndrv_xfern snd_xfern_t;
 typedef struct sndrv_xferv snd_xferv_t;
 
+/* forward declarations */
+#ifdef CONFIG_PCI
+struct pci_dev;
+#endif
+
 /* device allocation stuff */
 
 #define SNDRV_DEV_TYPE_RANGE_SIZE		0x1000
@@ -252,7 +257,6 @@ void *snd_malloc_isa_pages_fallback(unsigned long size, dma_addr_t *dma_addr, un
 #define snd_free_isa_pages(size, ptr, dma_addr) snd_free_pages(ptr, size)
 #endif
 #ifdef CONFIG_PCI
-struct pci_dev;
 void *snd_malloc_pci_pages(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr);
 void *snd_malloc_pci_pages_fallback(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
 void snd_free_pci_pages(struct pci_dev *pci, unsigned long size, void *ptr, dma_addr_t dma_addr);
@@ -298,26 +302,33 @@ unsigned int snd_dma_residue(unsigned long dma);
 
 int snd_task_name(struct task_struct *task, char *name, size_t size);
 #ifdef CONFIG_SND_VERBOSE_PRINTK
-int snd_verbose_printk(const char *file, int line, const char *format);
+void snd_verbose_printk(const char *file, int line, const char *format, ...);
+#endif
+#if defined(CONFIG_SND_DEBUG) && defined(CONFIG_SND_VERBOSE_PRINTK)
+void snd_verbose_printd(const char *file, int line, const char *format, ...);
+#endif
+#if defined(CONFIG_SND_DEBUG) && !defined(CONFIG_SND_VERBOSE_PRINTK)
+void snd_printd(const char *format, ...);
 #endif
 
 /* --- */
 
 #ifdef CONFIG_SND_VERBOSE_PRINTK
-#define snd_printk(format, args...) do { \
-	printk(snd_verbose_printk(__FILE__, __LINE__, format) ? format + 3 : format, ##args); \
-} while (0)
+#define snd_printk(fmt, args...) \
+	snd_verbose_printk(__FILE__, __LINE__, fmt ,##args)
 #else
-#define snd_printk(format, args...) do { \
-	printk(format, ##args); \
-} while (0)
+#define snd_printk(fmt, args...) \
+	printk(fmt ,##args)
 #endif
 
 #ifdef CONFIG_SND_DEBUG
 
 #define __ASTRING__(x) #x
 
-#define snd_printd(format, args...) snd_printk(format, ##args)
+#ifdef CONFIG_SND_VERBOSE_PRINTK
+#define snd_printd(fmt, args...) \
+	snd_verbose_printd(__FILE__, __LINE__, fmt ,##args)
+#endif
 #define snd_assert(expr, args...) do {\
 	if (!(expr)) {\
 		snd_printk("BUG? (%s) (called from %p)\n", __ASTRING__(expr), __builtin_return_address(0));\
@@ -333,7 +344,7 @@ int snd_verbose_printk(const char *file, int line, const char *format);
 
 #else /* !CONFIG_SND_DEBUG */
 
-#define snd_printd(format, args...)	/* nothing */
+#define snd_printd(fmt, args...)	/* nothing */
 #define snd_assert(expr, args...)	/* nothing */
 #define snd_runtime_check(expr, args...) do { if (!(expr)) { args; } } while (0)
 

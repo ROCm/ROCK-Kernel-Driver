@@ -508,7 +508,7 @@ static inline int udpv6_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 {
 #if defined(CONFIG_FILTER)
 	if (sk->filter && skb->ip_summed != CHECKSUM_UNNECESSARY) {
-		if ((unsigned short)csum_fold(csum_partial(skb->h.raw, skb->len, skb->csum))) {
+		if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
 			UDP6_INC_STATS_BH(UdpInErrors);
 			IP6_INC_STATS_BH(Ip6InDiscards);
 			kfree_skb(skb);

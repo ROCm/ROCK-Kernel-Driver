@@ -43,6 +43,9 @@
 #define PRIV(sch) ((struct ingress_qdisc_data *) (sch)->data)
 
 
+/* Thanks to Doron Oz for this hack
+*/
+static int nf_registered = 0; 
 
 struct ingress_qdisc_data {
 	struct Qdisc		*q;
@@ -147,15 +150,21 @@ static int ingress_enqueue(struct sk_buff *skb,struct Qdisc *sch)
 #ifdef CONFIG_NET_CLS_POLICE
 		case TC_POLICE_SHOT:
 			result = NF_DROP;
+			sch->stats.drops++;
 			break;
 		case TC_POLICE_RECLASSIFY: /* DSCP remarking here ? */
 		case TC_POLICE_OK:
 		case TC_POLICE_UNSPEC:
 		default:
+			sch->stats.packets++;
+			sch->stats.bytes += skb->len;
 			result = NF_ACCEPT;
 			break;
+	}
+#else
+	sch->stats.packets++;
+	sch->stats.bytes += skb->len;
 #endif
-	};
 
 	skb->tc_index = TC_H_MIN(res.classid);
 	return result;
@@ -236,22 +245,21 @@ int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 {
 	struct ingress_qdisc_data *p = PRIV(sch);
 
+	if (!nf_registered) {
+		if (nf_register_hook(&ing_ops) < 0) {
+			printk("ingress qdisc registration error \n");
+			goto error;
+			}
+		nf_registered++;
+	}
+
 	DPRINTK("ingress_init(sch %p,[qdisc %p],opt %p)\n",sch,p,opt);
 	memset(p, 0, sizeof(*p));
 	p->filter_list = NULL;
 	p->q = &noop_qdisc;
-#ifndef MODULE
-	if (nf_register_hook(&ing_ops) < 0) {
-		printk("Unable to register ingress \n");
-		goto error;
-	}
-#endif
-	DPRINTK("ingress_init: qdisc %p\n", sch);
 	MOD_INC_USE_COUNT;
 	return 0;
-#ifndef MODULE
 error:
-#endif
 	return -EINVAL;
 }
 
@@ -295,12 +303,9 @@ static void ingress_destroy(struct Qdisc *sch)
 /* for future use */
 	qdisc_destroy(p->q);
 #endif
-
-#ifndef MODULE
-	nf_unregister_hook(&ing_ops);
-#endif
-
+ 
 	MOD_DEC_USE_COUNT;
+
 }
 
 
@@ -356,6 +361,7 @@ struct Qdisc_ops ingress_qdisc_ops =
 	ingress_dump,			/* dump */
 };
 
+
 #ifdef MODULE
 int init_module(void)
 {
@@ -366,20 +372,15 @@ int init_module(void)
 		return ret;
 	}
 
-        if (nf_register_hook(&ing_ops) < 0) {
-		printk("Unable to register ingress on hook \n");
-		unregister_qdisc(&ingress_qdisc_ops);
-		return 0;
-	}
-
 	return ret;
 }
 
 
 void cleanup_module(void) 
 {
-	nf_unregister_hook(&ing_ops);
 	unregister_qdisc(&ingress_qdisc_ops);
+	if (nf_registered)
+		nf_unregister_hook(&ing_ops);
 }
 #endif
 MODULE_LICENSE("GPL");

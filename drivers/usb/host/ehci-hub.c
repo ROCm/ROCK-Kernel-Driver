@@ -91,7 +91,10 @@ ehci_hub_status_data (struct usb_hcd *hcd, char *buf)
 		if (!(temp & PORT_CONNECT))
 			ehci->reset_done [i] = 0;
 		if ((temp & (PORT_CSC | PORT_PEC | PORT_OCC)) != 0) {
-			set_bit (i, buf);
+			if (i < 7)
+			    buf [0] |= 1 << (i + 1);
+			else
+			    buf [1] |= 1 << (i - 7);
 			status = STS_PCD;
 		}
 	}
@@ -141,7 +144,7 @@ static int ehci_hub_control (
 ) {
 	struct ehci_hcd	*ehci = hcd_to_ehci (hcd);
 	int		ports = HCS_N_PORTS (ehci->hcs_params);
-	u32		temp;
+	u32		temp, status;
 	unsigned long	flags;
 	int		retval = 0;
 
@@ -219,22 +222,22 @@ static int ehci_hub_control (
 		if (!wIndex || wIndex > ports)
 			goto error;
 		wIndex--;
-		memset (buf, 0, 4);
+		status = 0;
 		temp = readl (&ehci->regs->port_status [wIndex]);
 
 		// wPortChange bits
 		if (temp & PORT_CSC)
-			set_bit (USB_PORT_FEAT_C_CONNECTION, buf);
+			status |= 1 << USB_PORT_FEAT_C_CONNECTION;
 		if (temp & PORT_PEC)
-			set_bit (USB_PORT_FEAT_C_ENABLE, buf);
+			status |= 1 << USB_PORT_FEAT_C_ENABLE;
 		// USB_PORT_FEAT_C_SUSPEND
 		if (temp & PORT_OCC)
-			set_bit (USB_PORT_FEAT_C_OVER_CURRENT, buf);
+			status |= 1 << USB_PORT_FEAT_C_OVER_CURRENT;
 
 		/* whoever resets must GetPortStatus to complete it!! */
 		if ((temp & PORT_RESET)
 				&& jiffies > ehci->reset_done [wIndex]) {
-			set_bit (USB_PORT_FEAT_C_RESET, buf);
+			status |= 1 << USB_PORT_FEAT_C_RESET;
 
 			/* force reset to complete */
 			writel (temp & ~PORT_RESET,
@@ -252,26 +255,27 @@ static int ehci_hub_control (
 		// don't show wPortStatus if it's owned by a companion hc
 		if (!(temp & PORT_OWNER)) {
 			if (temp & PORT_CONNECT) {
-				set_bit (USB_PORT_FEAT_CONNECTION, buf);
-				set_bit (USB_PORT_FEAT_HIGHSPEED, buf);
+				status |= 1 << USB_PORT_FEAT_CONNECTION;
+				status |= 1 << USB_PORT_FEAT_HIGHSPEED;
 			}
 			if (temp & PORT_PE)
-				set_bit (USB_PORT_FEAT_ENABLE, buf);
+				status |= 1 << USB_PORT_FEAT_ENABLE;
 			if (temp & PORT_SUSPEND)
-				set_bit (USB_PORT_FEAT_SUSPEND, buf);
+				status |= 1 << USB_PORT_FEAT_SUSPEND;
 			if (temp & PORT_OC)
-				set_bit (USB_PORT_FEAT_OVER_CURRENT, buf);
+				status |= 1 << USB_PORT_FEAT_OVER_CURRENT;
 			if (temp & PORT_RESET)
-				set_bit (USB_PORT_FEAT_RESET, buf);
+				status |= 1 << USB_PORT_FEAT_RESET;
 			if (temp & PORT_POWER)
-				set_bit (USB_PORT_FEAT_POWER, buf);
+				status |= 1 << USB_PORT_FEAT_POWER;
 		}
 
 #ifndef	EHCI_VERBOSE_DEBUG
-	if (*(u16*)(buf+2))	/* only if wPortChange is interesting */
+	if (status & ~0xffff)	/* only if wPortChange is interesting */
 #endif
 		dbg_port (hcd, "GetStatus", wIndex + 1, temp);
-		cpu_to_le32s ((u32 *) buf);
+		// we "know" this alignment is good, caller used kmalloc()...
+		*((u32 *) buf) = cpu_to_le32 (status);
 		break;
 	case SetHubFeature:
 		switch (wValue) {

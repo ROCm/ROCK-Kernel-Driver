@@ -3,7 +3,7 @@
 
 /*
  * This file contains some defines for the AT-hd-controller.
- * Various sources.  
+ * Various sources.
  */
 
 #define HD_IRQ 14			/* the standard disk interrupt */
@@ -51,19 +51,17 @@
 #define ICRC_ERR		0x80	/* new meaning:  CRC error during transfer */
 
 /*
- * bits of NSECTOR reg
+ * sector count bits
  */
-#define NSEC_CD			0x1
-#define NSEC_IO			0x2
-#define NSEC_REL		0x4
+#define NSEC_CD			0x01
+#define NSEC_IO			0x02
+#define NSEC_REL		0x04
 
 /*
  * Command Header sizes for IOCTL commands
- *	HDIO_DRIVE_CMD and HDIO_DRIVE_TASK
  */
 
 #define HDIO_DRIVE_CMD_HDR_SIZE		(4 * sizeof(u8))
-#define HDIO_DRIVE_TASK_HDR_SIZE	(8 * sizeof(u8))
 #define HDIO_DRIVE_HOB_HDR_SIZE		(8 * sizeof(u8))
 
 #define IDE_DRIVE_TASK_INVALID		-1
@@ -295,7 +293,6 @@ struct hd_big_geometry {
 #define HDIO_GET_UNMASKINTR	0x0302	/* get current unmask setting */
 #define HDIO_GET_MULTCOUNT	0x0304	/* get current IDE blockmode setting */
 #define HDIO_GET_QDMA		0x0305	/* get use-qdma flag */
-#define HDIO_OBSOLETE_IDENTITY	0x0307	/* OBSOLETE, DO NOT USE: returns 142 bytes */
 #define HDIO_GET_32BIT		0x0309	/* get current io_32bit setting */
 #define HDIO_GET_NOWERR		0x030a	/* get ignore-write-error flag */
 #define HDIO_GET_DMA		0x030b	/* get use-dma flag */
@@ -306,11 +303,7 @@ struct hd_big_geometry {
 #define	HDIO_GET_ADDRESS	0x0310	/* */
 
 #define HDIO_GET_BUSSTATE	0x031a	/* get the bus state of the hwif */
-#define HDIO_TRISTATE_HWIF	0x031b	/* execute a channel tristate */
-#define HDIO_DRIVE_TASK		0x031e	/* execute task and special drive command */
 #define HDIO_DRIVE_CMD		0x031f	/* execute a special drive command */
-
-#define HDIO_DRIVE_CMD_AEB	HDIO_DRIVE_TASK
 
 /* hd/ide ctl's that pass (arg) non-ptr values are numbered 0x032n/0x033n */
 #define HDIO_SET_MULTCOUNT	0x0321	/* change IDE blockmode */
@@ -529,11 +522,7 @@ struct hd_driveid {
 					 *  7:0	current value
 					 */
 	unsigned short	words95_99[5];	/* reserved words 95-99 */
-#if 0
-	unsigned short	words100_103[4]	;/* reserved words 100-103 */
-#else
 	unsigned long long lba_capacity_2;/* 48-bit total number of sectors */
-#endif
 	unsigned short	words104_125[22];/* reserved words 104-125 */
 	unsigned short	last_lun;	/* (word 126) */
 	unsigned short	word127;	/* (word 127) Feature Set
@@ -581,7 +570,7 @@ struct hd_driveid {
 					 * 15:8 Checksum
 					 *  7:0 Signature
 					 */
-};
+} __attribute__((packed));
 
 /*
  * IDE "nice" flags. These are used on a per drive basis to determine

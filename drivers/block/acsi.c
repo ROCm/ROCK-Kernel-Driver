@@ -243,7 +243,6 @@ unsigned long 	phys_acsi_buffer;
 
 static int				NDevices = 0;
 static int				acsi_sizes[MAX_DEV<<4] = { 0, };
-static int				acsi_blocksizes[MAX_DEV<<4] = { 0, };
 static struct hd_struct	acsi_part[MAX_DEV<<4] = { {0,0}, };
 static int 				access_count[MAX_DEV] = { 0, };
 static char 			busy[MAX_DEV] = { 0, };
@@ -1738,9 +1737,6 @@ static void acsi_geninit(void)
 			NDevices, n_slm );
 #endif
 					 
-	for( i = 0; i < (MAX_DEV << 4); i++ )
-		acsi_blocksizes[i] = 1024;
-	blksize_size[MAJOR_NR] = acsi_blocksizes;
 	for( i = 0; i < NDevices; ++i )
 		register_disk(&acsi_gendisk, mk_kdev(MAJOR_NR,i<<4),
 				(acsi_info[i].type==HARDDISK)?1<<4:1,
@@ -1784,7 +1780,7 @@ int acsi_init( void )
 	phys_acsi_buffer = virt_to_phys( acsi_buffer );
 	STramMask = ATARIHW_PRESENT(EXTD_DMA) ? 0x00000000 : 0xff000000;
 	
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &acsi_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_acsi_request, &acsi_lock);
 	add_gendisk(&acsi_gendisk);
 
 #ifdef CONFIG_ATARI_SLM

@@ -7,7 +7,6 @@
  */
 
 #ifndef __ASSEMBLY__
-#include <linux/threads.h>
 #include <asm/processor.h>		/* For TASK_SIZE */
 #include <asm/mmu.h>
 #include <asm/page.h>
@@ -247,35 +246,35 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
-extern inline int pte_read(pte_t pte)  { return pte_val(pte) & _PAGE_USER;}
-extern inline int pte_write(pte_t pte) { return pte_val(pte) & _PAGE_RW;}
-extern inline int pte_exec(pte_t pte)  { return pte_val(pte) & _PAGE_EXEC;}
-extern inline int pte_dirty(pte_t pte) { return pte_val(pte) & _PAGE_DIRTY;}
-extern inline int pte_young(pte_t pte) { return pte_val(pte) & _PAGE_ACCESSED;}
+static inline int pte_read(pte_t pte)  { return pte_val(pte) & _PAGE_USER;}
+static inline int pte_write(pte_t pte) { return pte_val(pte) & _PAGE_RW;}
+static inline int pte_exec(pte_t pte)  { return pte_val(pte) & _PAGE_EXEC;}
+static inline int pte_dirty(pte_t pte) { return pte_val(pte) & _PAGE_DIRTY;}
+static inline int pte_young(pte_t pte) { return pte_val(pte) & _PAGE_ACCESSED;}
 
-extern inline void pte_uncache(pte_t pte) { pte_val(pte) |= _PAGE_NO_CACHE; }
-extern inline void pte_cache(pte_t pte)   { pte_val(pte) &= ~_PAGE_NO_CACHE; }
+static inline void pte_uncache(pte_t pte) { pte_val(pte) |= _PAGE_NO_CACHE; }
+static inline void pte_cache(pte_t pte)   { pte_val(pte) &= ~_PAGE_NO_CACHE; }
 
-extern inline pte_t pte_rdprotect(pte_t pte) {
+static inline pte_t pte_rdprotect(pte_t pte) {
 	pte_val(pte) &= ~_PAGE_USER; return pte; }
-extern inline pte_t pte_exprotect(pte_t pte) {
+static inline pte_t pte_exprotect(pte_t pte) {
 	pte_val(pte) &= ~_PAGE_EXEC; return pte; }
-extern inline pte_t pte_wrprotect(pte_t pte) {
+static inline pte_t pte_wrprotect(pte_t pte) {
 	pte_val(pte) &= ~(_PAGE_RW); return pte; }
-extern inline pte_t pte_mkclean(pte_t pte) {
+static inline pte_t pte_mkclean(pte_t pte) {
 	pte_val(pte) &= ~(_PAGE_DIRTY); return pte; }
-extern inline pte_t pte_mkold(pte_t pte) {
+static inline pte_t pte_mkold(pte_t pte) {
 	pte_val(pte) &= ~_PAGE_ACCESSED; return pte; }
 
-extern inline pte_t pte_mkread(pte_t pte) {
+static inline pte_t pte_mkread(pte_t pte) {
 	pte_val(pte) |= _PAGE_USER; return pte; }
-extern inline pte_t pte_mkexec(pte_t pte) {
+static inline pte_t pte_mkexec(pte_t pte) {
 	pte_val(pte) |= _PAGE_USER | _PAGE_EXEC; return pte; }
-extern inline pte_t pte_mkwrite(pte_t pte) {
+static inline pte_t pte_mkwrite(pte_t pte) {
 	pte_val(pte) |= _PAGE_RW; return pte; }
-extern inline pte_t pte_mkdirty(pte_t pte) {
+static inline pte_t pte_mkdirty(pte_t pte) {
 	pte_val(pte) |= _PAGE_DIRTY; return pte; }
-extern inline pte_t pte_mkyoung(pte_t pte) {
+static inline pte_t pte_mkyoung(pte_t pte) {
 	pte_val(pte) |= _PAGE_ACCESSED; return pte; }
 
 /* Atomic PTE updates */
@@ -359,20 +358,6 @@ extern pgd_t ioremap_dir[1024];
 extern void paging_init(void);
 
 /*
- * Page tables may have changed.  We don't need to do anything here
- * as entries are faulted into the hash table by the low-level
- * data/instruction access exception handlers.
- */
-#if 0
-/*
- * We won't be able to use update_mmu_cache to update the 
- * hardware page table because we need to update the pte
- * as well, but we don't get the address of the pte, only
- * its value.
- */
-#define update_mmu_cache(vma, addr, pte)	do { } while (0)
-#else
-/*
  * This gets called at the end of handling a page fault, when
  * the kernel has put a new PTE into the page table for the process.
  * We use it to put a corresponding HPTE into the hash table
@@ -380,7 +365,6 @@ extern void paging_init(void);
  * hash-table miss exception.
  */
 extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
-#endif
 
 /* Encode and de-code a swap entry */
 #define SWP_TYPE(entry)			(((entry).val >> 1) & 0x3f)

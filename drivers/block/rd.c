@@ -73,8 +73,6 @@ int initrd_below_start_ok;
  */
 
 static unsigned long rd_length[NUM_RAMDISKS];	/* Size of RAM disks in bytes   */
-static int rd_hardsec[NUM_RAMDISKS];		/* Size of real blocks in bytes */
-static int rd_blocksizes[NUM_RAMDISKS];		/* Size of 1024 byte blocks :)  */
 static int rd_kbsize[NUM_RAMDISKS];	/* Size in blocks of 1024 bytes */
 static devfs_handle_t devfs_handle;
 static struct block_device *rd_bdev[NUM_RAMDISKS];/* Protected device data */
@@ -106,19 +104,19 @@ int rd_blocksize = BLOCK_SIZE;			/* blocksize of the RAM disks */
  */
 static int ramdisk_readpage(struct file *file, struct page * page)
 {
-	if (!Page_Uptodate(page)) {
+	if (!PageUptodate(page)) {
 		memset(kmap(page), 0, PAGE_CACHE_SIZE);
 		kunmap(page);
 		flush_dcache_page(page);
 		SetPageUptodate(page);
 	}
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
 }
 
 static int ramdisk_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
-	if (!Page_Uptodate(page)) {
+	if (!PageUptodate(page)) {
 		void *addr = page_address(page);
 		memset(addr, 0, PAGE_CACHE_SIZE);
 		flush_dcache_page(page);
@@ -173,7 +171,7 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 				goto out;
 			err = 0;
 
-			if (!Page_Uptodate(page)) {
+			if (!PageUptodate(page)) {
 				memset(kmap(page), 0, PAGE_CACHE_SIZE);
 				kunmap(page);
 				SetPageUptodate(page);
@@ -206,7 +204,7 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 			SetPageDirty(page);
 		}
 		if (unlock)
-			UnlockPage(page);
+			unlock_page(page);
 		__free_page(page);
 	} while (size);
 
@@ -244,7 +242,7 @@ static int rd_make_request(request_queue_t * q, struct bio *sbh)
 	unsigned long offset, len;
 	int rw = sbh->bi_rw;
 
-	minor = minor(sbh->bi_dev);
+	minor = minor(to_kdev_t(sbh->bi_bdev->bd_dev));
 
 	if (minor >= NUM_RAMDISKS)
 		goto fail;
@@ -430,8 +428,6 @@ static int __init rd_init (void)
 	for (i = 0; i < NUM_RAMDISKS; i++) {
 		/* rd_size is given in kB */
 		rd_length[i] = rd_size << 10;
-		rd_hardsec[i] = rd_blocksize;
-		rd_blocksizes[i] = rd_blocksize;
 		rd_kbsize[i] = rd_size;
 	}
 	devfs_handle = devfs_mk_dir (NULL, "rd", NULL);
@@ -451,7 +447,6 @@ static int __init rd_init (void)
 			INITRD_MINOR, S_IFBLK | S_IRUSR, &rd_bd_op, NULL);
 #endif
 
-	blksize_size[MAJOR_NR] = rd_blocksizes;	/* Avoid set_blocksize() check */
 	blk_size[MAJOR_NR] = rd_kbsize;		/* Size of the RAM disk in kB  */
 
 	/* rd_size is given in kB */

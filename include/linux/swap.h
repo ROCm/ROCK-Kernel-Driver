@@ -79,6 +79,7 @@ struct swap_info_struct {
 	unsigned int flags;
 	spinlock_t sdev_lock;
 	struct file *swap_file;
+	unsigned old_block_size;
 	unsigned short * swap_map;
 	unsigned int lowest_bit;
 	unsigned int highest_bit;
@@ -95,12 +96,15 @@ extern int nr_swap_pages;
 /* Swap 50% full? Release swapcache more aggressively.. */
 #define vm_swap_full() (nr_swap_pages*2 < total_swap_pages)
 
+extern unsigned long totalram_pages;
+extern unsigned long totalhigh_pages;
 extern unsigned int nr_free_pages(void);
 extern unsigned int nr_free_buffer_pages(void);
+extern unsigned int nr_free_pagecache_pages(void);
+extern unsigned long nr_buffermem_pages(void);
 extern int nr_active_pages;
 extern int nr_inactive_pages;
 extern atomic_t nr_async_pages;
-extern atomic_t page_cache_size;
 extern atomic_t buffermem_pages;
 extern spinlock_t pagecache_lock;
 extern void __remove_inode_page(struct page *);

@@ -37,7 +37,7 @@ smb_invalid_dir_cache(struct inode * dir)
 	if (!page)
 		goto out;
 
-	if (!Page_Uptodate(page))
+	if (!PageUptodate(page))
 		goto out_unlock;
 
 	cache = kmap(page);
@@ -46,7 +46,7 @@ smb_invalid_dir_cache(struct inode * dir)
 	kunmap(page);
 	SetPageUptodate(page);
 out_unlock:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 out:
 	return;
@@ -172,7 +172,7 @@ smb_fill_cache(struct file *filp, void *dirent, filldir_t filldir,
 		if (ctl.page) {
 			kunmap(ctl.page);
 			SetPageUptodate(ctl.page);
-			UnlockPage(ctl.page);
+			unlock_page(ctl.page);
 			page_cache_release(ctl.page);
 		}
 		ctl.cache = NULL;

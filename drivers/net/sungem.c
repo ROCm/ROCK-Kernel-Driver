@@ -2126,9 +2126,9 @@ static void gem_init_hw(struct gem *gp, int restart_link)
 	 */
 	if (restart_link)
 		gem_init_phy(gp);
+	gem_init_pause_thresholds(gp);
 	gem_init_dma(gp);
 	gem_init_mac(gp);
-	gem_init_pause_thresholds(gp);
 
 	if (restart_link) {
 		/* Default aneg parameters */
@@ -2823,7 +2823,7 @@ use_random:
 	dev_addr[0] = 0x08;
 	dev_addr[1] = 0x00;
 	dev_addr[2] = 0x20;
-	get_random_bytes(dev_addr, 3);
+	get_random_bytes(dev_addr + 3, 3);
 	return;
 }
 #endif /* not Sparc and not PPC */

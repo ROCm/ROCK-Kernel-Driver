@@ -146,7 +146,7 @@ int  iSeries_Device_Information(struct pci_dev* PciDev,char* Buffer, int BufferS
 int   device_Location(struct pci_dev* PciDev,char* BufPtr)
 {
 	struct iSeries_Device_Node* DevNode = (struct iSeries_Device_Node*)PciDev->sysdata;
-	return sprintf(BufPtr,"PCI: Bus%3d, Device%3d, Vendor %04X, Location %s",
+	return sprintf(BufPtr,"PCI: Bus%3d, AgentId%3d, Vendor %04X, Location %s",
 		       DevNode->DsaAddr.busNumber,
 		       DevNode->AgentId,
 		       DevNode->Vendor,

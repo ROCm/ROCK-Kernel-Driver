@@ -56,7 +56,6 @@
 int sbusfb_init(void);
 int sbusfb_setup(char*);
 
-static int currcon;
 static int defx_margin = -1, defy_margin = -1;
 static char fontname[40] __initdata = { 0 };
 static int curblink __initdata = 1;
@@ -89,6 +88,9 @@ static int sbusfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info);
 static int sbusfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info);
+static int sbusfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			    u_int transp, struct fb_info *info);
+static int sbusfb_blank(int blank, struct fb_info *info);
 static int sbusfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 			    u_long arg, int con, struct fb_info *info);
 static void sbusfb_cursor(struct display *p, int mode, int x, int y);
@@ -101,8 +103,6 @@ static void sbusfb_clear_margin(struct display *p, int s);
 
 static int sbusfbcon_switch(int con, struct fb_info *info);
 static int sbusfbcon_updatevar(int con, struct fb_info *info);
-static void sbusfbcon_blank(int blank, struct fb_info *info);
-
 
     /*
      *  Internal routines
@@ -110,9 +110,6 @@ static void sbusfbcon_blank(int blank, struct fb_info *info);
 
 static int sbusfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			    u_int *transp, struct fb_info *info);
-static int sbusfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			    u_int transp, struct fb_info *info);
-static void do_install_cmap(int con, struct fb_info *info);
 
 static struct fb_ops sbusfb_ops = {
 	owner:		THIS_MODULE,
@@ -123,6 +120,8 @@ static struct fb_ops sbusfb_ops = {
 	fb_set_var:	sbusfb_set_var,
 	fb_get_cmap:	sbusfb_get_cmap,
 	fb_set_cmap:	sbusfb_set_cmap,
+	fb_setcolreg:	sbusfb_setcolreg,
+	fb_blank:	sbusfb_blank,
 	fb_ioctl:	sbusfb_ioctl,
 	fb_mmap:	sbusfb_mmap,
 };
@@ -265,7 +264,7 @@ static void sbusfb_clear_margin(struct display *p, int s)
 		rects [15] = fb->var.yres_virtual;
 		(*fb->fill)(fb, p, s, 4, rects);
 	} else {
-		unsigned char *fb_base = p->screen_base, *q;
+		unsigned char *fb_base = fb->info.screen_base, *q;
 		int skip_bytes = fb->y_margin * fb->var.xres_virtual;
 		int scr_size = fb->var.xres_virtual * fb->var.yres_virtual;
 		int h, he, incr, size;
@@ -523,8 +522,8 @@ static int sbusfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 		if ((err = fb_alloc_cmap(&disp->cmap, 1<<disp->var.bits_per_pixel, 0)))
 			return err;
 	}
-	if (con == currcon) {			/* current console? */
-		err = fb_set_cmap(cmap, kspc, sbusfb_setcolreg, info);
+	if (con == info->currcon) {			/* current console? */
+		err = fb_set_cmap(cmap, kspc, info);
 		if (!err) {
 			struct fb_info_sbusfb *fb = sbusfbinfo(info);
 			
@@ -762,8 +761,8 @@ static int sbusfbcon_switch(int con, struct fb_info *info)
 	int lastconsole;
     
 	/* Do we have to save the colormap? */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1, sbusfb_getcolreg, info);
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1, sbusfb_getcolreg, info);
 
 	if (info->display_fg) {
 		lastconsole = info->display_fg->vc_num;
@@ -780,7 +779,7 @@ static int sbusfbcon_switch(int con, struct fb_info *info)
 		fb->x_margin = x_margin; fb->y_margin = y_margin;
 		sbusfb_clear_margin(&fb_display[con], 0);
 	}
-	currcon = con;
+	info->currcon = con;
 	/* Install new colormap */
 	do_install_cmap(con, info);
 	return 0;
@@ -800,14 +799,15 @@ static int sbusfbcon_updatevar(int con, struct fb_info *info)
      *  Blank the display.
      */
 
-static void sbusfbcon_blank(int blank, struct fb_info *info)
+static int sbusfb_blank(int blank, struct fb_info *info)
 {
     struct fb_info_sbusfb *fb = sbusfbinfo(info);
     
     if (blank && fb->blank)
-    	return fb->blank(fb);
+	    return fb->blank(fb);
     else if (!blank && fb->unblank)
-    	return fb->unblank(fb);
+	    return fb->unblank(fb);
+    return 0;
 }
 
     /*
@@ -850,22 +850,6 @@ static int sbusfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	fb->color_map CM(regno, 1) = green;
 	fb->color_map CM(regno, 2) = blue;
 	return 0;
-}
-
-
-static void do_install_cmap(int con, struct fb_info *info)
-{
-	struct fb_info_sbusfb *fb = sbusfbinfo(info);
-	
-	if (con != currcon)
-		return;
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, sbusfb_setcolreg, info);
-	else
-		fb_set_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel),
-			    1, sbusfb_setcolreg, info);
-	if (fb->loadcmap)
-		(*fb->loadcmap)(fb, &fb_display[con], 0, 256);
 }
 
 static int sbusfb_set_font(struct display *p, int width, int height)
@@ -977,7 +961,7 @@ static void __init sbusfb_init_fb(int node, int parent, int fbtype,
 	fb->emulations[0] = fbtype;
 	
 #ifndef __sparc_v9__
-	disp->screen_base = (unsigned char *)prom_getintdefault(node, "address", 0);
+	fb->info.screen_base = (unsigned char *)prom_getintdefault(node, "address", 0);
 #endif
 	
 	type->fb_height = h = prom_getintdefault(node, "height", 900);
@@ -1022,11 +1006,11 @@ sizechange:
 	fb->info.node = NODEV;
 	fb->info.fbops = &sbusfb_ops;
 	fb->info.disp = disp;
+	fb->info.currcon = -1;
 	strcpy(fb->info.fontname, fontname);
 	fb->info.changevar = NULL;
 	fb->info.switch_con = &sbusfbcon_switch;
 	fb->info.updatevar = &sbusfbcon_updatevar;
-	fb->info.blank = &sbusfbcon_blank;
 	fb->info.flags = FBINFO_FLAG_DEFAULT;
 	
 	fb->cursor.hwsize.fbx = 32;

@@ -3,12 +3,9 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := drivers.o
+O_TARGET     := _drivers.o
 
-subdir-y     := opl3 mpu401
-subdir-m     := $(subdir-y)
-
-list-multi   := snd-dummy.o snd-mtpav.o snd-serial-u16550.o snd-virmidi.o
+mod-subdirs  := opl3 mpu401
 
 snd-dummy-objs := dummy.o
 snd-mtpav-objs := mtpav.o
@@ -21,16 +18,9 @@ obj-$(CONFIG_SND_VIRMIDI) += snd-virmidi.o
 obj-$(CONFIG_SND_SERIAL_U16550) += snd-serial-u16550.o
 obj-$(CONFIG_SND_MTPAV) += snd-mtpav.o
 
+subdir-$(CONFIG_SND) += opl3 mpu401
+ifeq ($(CONFIG_SND),y)
+  obj-y += mpu401/_mpu401.o opl3/_opl3.o
+endif
+
 include $(TOPDIR)/Rules.make
-
-snd-dummy.o: $(snd-dummy-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-dummy-objs)
-
-snd-mtpav.o: $(snd-mtpav-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-mtpav-objs)
-
-snd-serial-u16550.o: $(snd-serial-u16550-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-serial-u16550-objs)
-
-snd-virmidi.o: $(snd-virmidi-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-virmidi-objs)

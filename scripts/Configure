@@ -537,9 +537,15 @@ if [ "$1" != "" ] ; then
 	CONFIG_IN=$1
 fi
 
-DEFAULTS=arch/$ARCH/defconfig
-if [ -f .config ]; then
-  DEFAULTS=.config
+DEFAULTS=.config
+if [ ! -f .config ]; then
+  DEFAULTS=/etc/kernel-config
+  if [ ! -f $DEFAULTS ]; then
+    DEFAULTS=/boot/config-`uname -r`
+    if [ ! -f $DEFAULTS ]; then
+      DEFAULTS=arch/$ARCH/defconfig
+    fi
+  fi
 fi
 
 if [ -f $DEFAULTS ]; then

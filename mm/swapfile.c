@@ -14,6 +14,7 @@
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
 #include <linux/shm.h>
+#include <linux/blkdev.h>
 #include <linux/compiler.h>
 
 #include <asm/pgtable.h>
@@ -307,13 +308,13 @@ int remove_exclusive_swap_page(struct page *page)
 	retval = 0;
 	if (p->swap_map[SWP_OFFSET(entry)] == 1) {
 		/* Recheck the page count with the pagecache lock held.. */
-		read_lock(&swapper_space.page_lock);
+		write_lock(&swapper_space.page_lock);
 		if (page_count(page) - !!PagePrivate(page) == 2) {
 			__delete_from_swap_cache(page);
 			SetPageDirty(page);
 			retval = 1;
 		}
-		read_unlock(&swapper_space.page_lock);
+		write_unlock(&swapper_space.page_lock);
 	}
 	swap_info_put(p);
 
@@ -348,7 +349,7 @@ void free_swap_and_cache(swp_entry_t entry)
 			delete_from_swap_cache(page);
 			SetPageDirty(page);
 		}
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 	}
 }
@@ -589,11 +590,12 @@ static int try_to_unuse(unsigned int type)
 		 * Wait for and lock page.  When do_swap_page races with
 		 * try_to_unuse, do_swap_page can handle the fault much
 		 * faster than try_to_unuse can locate the entry.  This
-		 * apparently redundant "wait_on_page" lets try_to_unuse
+		 * apparently redundant "wait_on_page_locked" lets try_to_unuse
 		 * defer to do_swap_page in such a case - in some tests,
 		 * do_swap_page and try_to_unuse repeatedly compete.
 		 */
-		wait_on_page(page);
+		wait_on_page_locked(page);
+		wait_on_page_writeback(page);
 		lock_page(page);
 
 		/*
@@ -689,7 +691,7 @@ static int try_to_unuse(unsigned int type)
 		 * mark page dirty so try_to_swap_out will preserve it.
 		 */
 		SetPageDirty(page);
-		UnlockPage(page);
+		unlock_page(page);
 		page_cache_release(page);
 
 		/*
@@ -786,8 +788,12 @@ asmlinkage long sys_swapoff(const char * specialfile)
 	swap_device_unlock(p);
 	swap_list_unlock();
 	vfree(swap_map);
-	if (S_ISBLK(swap_file->f_dentry->d_inode->i_mode))
-		bd_release(swap_file->f_dentry->d_inode->i_bdev);
+	if (S_ISBLK(swap_file->f_dentry->d_inode->i_mode)) {
+		struct block_device *bdev;
+		bdev = swap_file->f_dentry->d_inode->i_bdev;
+		set_blocksize(bdev, p->old_block_size);
+		bd_release(bdev);
+	}
 	filp_close(swap_file, NULL);
 	err = 0;
 
@@ -878,6 +884,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 		nr_swapfiles = type+1;
 	p->flags = SWP_USED;
 	p->swap_file = NULL;
+	p->old_block_size = 0;
 	p->swap_map = NULL;
 	p->lowest_bit = 0;
 	p->highest_bit = 0;
@@ -913,7 +920,8 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 			bdev = NULL;
 			goto bad_swap;
 		}
-		error = set_blocksize(swap_file->f_dentry->d_inode->i_rdev,
+		p->old_block_size = block_size(bdev);
+		error = set_blocksize(swap_file->f_dentry->d_inode->i_bdev,
 				      PAGE_SIZE);
 		if (error < 0)
 			goto bad_swap;
@@ -1065,8 +1073,10 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	error = 0;
 	goto out;
 bad_swap:
-	if (bdev)
+	if (bdev) {
+		set_blocksize(bdev, p->old_block_size);
 		bd_release(bdev);
+	}
 bad_swap_2:
 	swap_list_lock();
 	swap_map = p->swap_map;

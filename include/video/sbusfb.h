@@ -123,8 +123,8 @@ struct fb_info_sbusfb {
 	void (*setcurshape)(struct fb_info_sbusfb *);
 	void (*setcursormap)(struct fb_info_sbusfb *, unsigned char *, unsigned char *, unsigned char *);
 	void (*loadcmap)(struct fb_info_sbusfb *, struct display *, int, int);
-	void (*blank)(struct fb_info_sbusfb *);
-	void (*unblank)(struct fb_info_sbusfb *);
+	int (*blank)(struct fb_info_sbusfb *);
+	int (*unblank)(struct fb_info_sbusfb *);
 	void (*margins)(struct fb_info_sbusfb *, struct display *, int, int);
 	void (*reset)(struct fb_info_sbusfb *);
 	void (*fill)(struct fb_info_sbusfb *, struct display *, int, int, unsigned short *);

@@ -6,9 +6,10 @@
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
 
-unsigned long find_next_zero_bit(void *addr, unsigned long size, unsigned long offset)
+unsigned long find_next_zero_bit(unsigned long *addr, unsigned long size,
+				 unsigned long offset)
 {
-	unsigned long *p = ((unsigned long *) addr) + (offset >> 6);
+	unsigned long *p = addr + (offset >> 6);
 	unsigned long result = offset & ~63UL;
 	unsigned long tmp;
 
@@ -55,9 +56,9 @@ static __inline__ unsigned long ___ffs(unsigned long word)
         return result;
 }
 
-unsigned long find_next_bit(void *addr, unsigned long size, unsigned long offset)
+unsigned long find_next_bit(unsigned long *addr, unsigned long size, unsigned long offset)
 {
-	unsigned long *p = ((unsigned long *) addr) + (offset >> 6);
+	unsigned long *p = addr + (offset >> 6);
 	unsigned long result = offset & ~63UL;
 	unsigned long tmp;
 
@@ -110,7 +111,7 @@ static __inline__ unsigned int ext2_ffz(unsigned int x)
 	return tempRC;
 }
 
-unsigned long find_next_zero_le_bit(void *addr, unsigned long size, unsigned long offset)
+unsigned long find_next_zero_le_bit(unsigned long *addr, unsigned long size, unsigned long offset)
 {
         unsigned int *p = ((unsigned int *) addr) + (offset >> 5);
         unsigned int result = offset & ~31;

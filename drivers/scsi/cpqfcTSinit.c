@@ -41,9 +41,9 @@
 #include <linux/timer.h>
 #include <linux/ioport.h>  // request_region() prototype
 #include <linux/vmalloc.h> // ioremap()
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,7)
+//#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,7)
 #include <linux/completion.h>
-#endif
+//#endif
 #ifdef __alpha__
 #define __KERNEL_SYSCALLS__
 #endif
@@ -532,7 +532,7 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
 
 	// must be super user to send stuff directly to the
 	// controller and/or physical drives...
-	if( !suser() )
+	if( !capable(CAP_SYS_ADMIN) )
 	  return -EPERM;
 
 	// copy the caller's struct to our space.

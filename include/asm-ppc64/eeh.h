@@ -37,11 +37,13 @@ struct pci_dev;
 #define EEH_STATE_OVERRIDE 1   /* IOA does not require eeh traps */
 #define EEH_STATE_FAILURE  16  /* */
 
-/* This is for profiling only and should be removed */
-extern unsigned long eeh_total_mmio_reads;
+/* This is for profiling only */
 extern unsigned long eeh_total_mmio_ffs;
 
+extern int eeh_implemented;
+
 void eeh_init(void);
+static inline int is_eeh_implemented(void) { return eeh_implemented; }
 int eeh_get_state(unsigned long ea);
 unsigned long eeh_check_failure(void *token, unsigned long val);
 
@@ -83,7 +85,7 @@ extern void *memset(void *,int, unsigned long);
  */
 /* #define EEH_POSSIBLE_ERROR(addr, vaddr, val) ((vaddr) != (addr) && ~(val) == 0 && !IS_EEH_TOKEN_DISABLED(addr)) */
 /* This version is rearranged to collect some profiling data */
-#define EEH_POSSIBLE_ERROR(addr, vaddr, val) (++eeh_total_mmio_reads, (~(val) == 0 && (++eeh_total_mmio_ffs, (vaddr) != (addr) && !IS_EEH_TOKEN_DISABLED(addr))))
+#define EEH_POSSIBLE_ERROR(addr, vaddr, val) (~(val) == 0 && (++eeh_total_mmio_ffs, (vaddr) != (addr) && !IS_EEH_TOKEN_DISABLED(addr)))
 
 /* 
  * MMIO read/write operations with EEH support.

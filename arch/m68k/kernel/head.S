@@ -302,15 +302,15 @@
 /* #define FONT_8x16 */	/* 2nd choice */
 /* #define FONT_6x11 */	/* 3rd choice */
 
-.globl SYMBOL_NAME(kernel_pg_dir)
-.globl SYMBOL_NAME(availmem)
-.globl SYMBOL_NAME(m68k_pgtable_cachemode)
-.globl SYMBOL_NAME(m68k_supervisor_cachemode)
+.globl kernel_pg_dir
+.globl availmem
+.globl m68k_pgtable_cachemode
+.globl m68k_supervisor_cachemode
 #ifdef CONFIG_MVME16x
-.globl SYMBOL_NAME(mvme_bdid)
+.globl mvme_bdid
 #endif
 #ifdef CONFIG_Q40
-.globl SYMBOL_NAME(q40_mem_cptr)	
+.globl q40_mem_cptr	
 #endif		
 
 CPUTYPE_040	= 1	/* indicates an 040 */
@@ -585,40 +585,40 @@ ENTRY(_stext)
 	.long	MACH_MAC, MAC_BOOTI_VERSION
 	.long	MACH_Q40, Q40_BOOTI_VERSION	
 	.long	0
-1:	jra	SYMBOL_NAME(__start)
+1:	jra	__start
 
-.equ	SYMBOL_NAME(kernel_pg_dir),SYMBOL_NAME(_stext)
+.equ	kernel_pg_dir,_stext
 
-.equ	.,SYMBOL_NAME(_stext)+PAGESIZE
+.equ	.,_stext+PAGESIZE
 
 ENTRY(_start)
-	jra	SYMBOL_NAME(__start)
+	jra	__start
 __INIT
 ENTRY(__start)
 
 /*
  * Setup initial stack pointer
  */
-	lea	%pc@(SYMBOL_NAME(_stext)),%sp
+	lea	%pc@(_stext),%sp
 
 /*
  * Record the CPU and machine type.
  */
 
 	get_bi_record	BI_MACHTYPE
-	lea	%pc@(SYMBOL_NAME(m68k_machtype)),%a1
+	lea	%pc@(m68k_machtype),%a1
 	movel	%a0@,%a1@
 
 	get_bi_record	BI_FPUTYPE
-	lea	%pc@(SYMBOL_NAME(m68k_fputype)),%a1
+	lea	%pc@(m68k_fputype),%a1
 	movel	%a0@,%a1@
 
 	get_bi_record	BI_MMUTYPE
-	lea	%pc@(SYMBOL_NAME(m68k_mmutype)),%a1
+	lea	%pc@(m68k_mmutype),%a1
 	movel	%a0@,%a1@
 
 	get_bi_record	BI_CPUTYPE
-	lea	%pc@(SYMBOL_NAME(m68k_cputype)),%a1
+	lea	%pc@(m68k_cputype),%a1
 	movel	%a0@,%a1@
 
 #ifdef CONFIG_MAC
@@ -682,7 +682,7 @@ L(test_notmac):
  * and is converted here from a booter type definition to a separate bit
  * number which allows for the standard is_0x0 macro tests.
  */
-	movel	%pc@(SYMBOL_NAME(m68k_cputype)),%d0
+	movel	%pc@(m68k_cputype),%d0
 	/*
 	 * Assume it's an 030
 	 */
@@ -766,9 +766,9 @@ L(test_notmac):
 L(save_cachetype):
 	/* Save cache mode for supervisor mode and page tables
 	 */
-	lea	%pc@(SYMBOL_NAME(m68k_supervisor_cachemode)),%a0
+	lea	%pc@(m68k_supervisor_cachemode),%a0
 	movel	%d0,%a0@
-	lea	%pc@(SYMBOL_NAME(m68k_pgtable_cachemode)),%a0
+	lea	%pc@(m68k_pgtable_cachemode),%a0
 	movel	%d1,%a0@
 
 /*
@@ -804,7 +804,7 @@ L(save_cachetype):
 	tstl	%d0
 	jbmi	1f
 	movel	%a0@,%d3
-	lea	%pc@(SYMBOL_NAME(atari_mch_type)),%a0
+	lea	%pc@(atari_mch_type),%a0
 	movel	%d3,%a0@
 1:
 	/* On the Hades, the iobase must be set up before opening the
@@ -834,7 +834,7 @@ L(getvmetype):
 	tstl	%d0
 	jbmi	1f
 	movel	%a0@,%d3
-	lea	%pc@(SYMBOL_NAME(vme_brdtype)),%a0
+	lea	%pc@(vme_brdtype),%a0
 	movel	%d3,%a0@
 1:
 #ifdef CONFIG_MVME16x
@@ -854,7 +854,7 @@ L(getvmetype):
 	.word	0x70		/* trap 0x70 - .BRD_ID */
 	movel	%sp@+,%a0
 1:
-	lea	%pc@(SYMBOL_NAME(mvme_bdid)),%a1
+	lea	%pc@(mvme_bdid),%a1
 	/* Structure is 32 bytes long */
 	movel	%a0@+,%a1@+
 	movel	%a0@+,%a1@+
@@ -894,16 +894,16 @@ L(nocon):
 	putc	'\n'
 	putc	'A'
 	dputn	%pc@(L(cputype))
-	dputn	%pc@(SYMBOL_NAME(m68k_supervisor_cachemode))
-	dputn	%pc@(SYMBOL_NAME(m68k_pgtable_cachemode))
+	dputn	%pc@(m68k_supervisor_cachemode)
+	dputn	%pc@(m68k_pgtable_cachemode)
 	dputc	'\n'
 
 /*
  * Save physical start address of kernel
  */
 	lea	%pc@(L(phys_kernel_start)),%a0
-	lea	%pc@(SYMBOL_NAME(_stext)),%a1
-	subl	#SYMBOL_NAME(_stext),%a1
+	lea	%pc@(_stext),%a1
+	subl	#_stext,%a1
 	addl	#PAGE_OFFSET,%a1
 	movel	%a1,%a0@
 
@@ -920,7 +920,7 @@ L(nocon):
  */
 
 	mmu_map	#PAGE_OFFSET,%pc@(L(phys_kernel_start)),#4*1024*1024,\
-		%pc@(SYMBOL_NAME(m68k_supervisor_cachemode))
+		%pc@(m68k_supervisor_cachemode)
 
 	putc	'C'
 
@@ -984,7 +984,7 @@ L(mmu_init_atari):
 
 	/* I/O base addr for non-Medusa, non-Hades: 0x00000000 */
 	moveq	#0,%d0
-	movel	%pc@(SYMBOL_NAME(atari_mch_type)),%d3
+	movel	%pc@(atari_mch_type),%d3
 	cmpl	#ATARI_MACH_MEDUSA,%d3
 	jbeq	2f
 	cmpl	#ATARI_MACH_HADES,%d3
@@ -1263,7 +1263,7 @@ L(mmu_fixup):
 	 */
 	movel	%pc@(L(phys_kernel_start)),%d0
 	subl	#PAGE_OFFSET,%d0
-	lea	%pc@(SYMBOL_NAME(_stext)),%a0
+	lea	%pc@(_stext),%a0
 	subl	%d0,%a0
 	mmu_fixup_page_mmu_cache	%a0
 
@@ -1461,7 +1461,7 @@ L(cache_done):
 /*
  * Setup initial stack pointer
  */
-	lea	SYMBOL_NAME(init_task_union),%curptr
+	lea	init_task_union,%curptr
 	lea	0x2000(%curptr),%sp
 
 	putc	'K'
@@ -1471,14 +1471,14 @@ L(cache_done):
 /*
  * The new 64bit printf support requires an early exception initialization.
  */
-	jbsr	SYMBOL_NAME(base_trap_init)
+	jbsr	base_trap_init
 
 /* jump to the kernel start */
 
 	putc	'\n'
 	leds	0x55
 
-	jbsr	SYMBOL_NAME(start_kernel)
+	jbsr	start_kernel
 
 /*
  * Find a tag record in the bootinfo structure
@@ -1489,7 +1489,7 @@ L(cache_done):
 func_start	get_bi_record,%d1
 
 	movel	ARG1,%d0
-	lea	%pc@(SYMBOL_NAME(_end)),%a0
+	lea	%pc@(_end),%a0
 1:	tstw	%a0@(BIR_TAG)
 	jeq	3f
 	cmpw	%a0@(BIR_TAG),%d0
@@ -1669,7 +1669,7 @@ mmu_040_print:
 	jbra	1b
 #endif /* MMU 040 Dumping code that's gory and detailed */
 
-	lea	%pc@(SYMBOL_NAME(kernel_pg_dir)),%a5
+	lea	%pc@(kernel_pg_dir),%a5
 	movel	%a5,%a0			/* a0 has the address of the root table ptr */
 	movel	#0x00000000,%a4		/* logical address */
 	moveql	#0,%d0
@@ -2286,7 +2286,7 @@ func_start	mmu_fixup_page_mmu_cache,%d0/%a0
 
 	movel	%a0@,%d0
 	andil	#_CACHEMASK040,%d0
-	orl	%pc@(SYMBOL_NAME(m68k_pgtable_cachemode)),%d0
+	orl	%pc@(m68k_pgtable_cachemode),%d0
 	movel	%d0,%a0@
 
 	dputc	'\n'
@@ -2516,7 +2516,7 @@ func_start	mmu_get_root_table_entry,%d0/%a1
 	 * in mm/init.c simply expects kernel_pg_dir there, the rest of
 	 * page is used for further ptr tables in get_ptr_table.
 	 */
-	lea	%pc@(SYMBOL_NAME(_stext)),%a0
+	lea	%pc@(_stext),%a0
 	lea	%pc@(L(mmu_cached_pointer_tables)),%a1
 	movel	%a0,%a1@
 	addl	#ROOT_TABLE_SIZE*4,%a1@
@@ -2907,7 +2907,7 @@ L(serial_init_not_mac):
 	is_not_q40(2f)
 /* debug output goes into SRAM, so we don't do it unless requested
    - check for '%LX$' signature in SRAM   */
-	lea	%pc@(SYMBOL_NAME(q40_mem_cptr)),%a1
+	lea	%pc@(q40_mem_cptr),%a1
 	move.l	#0xff020010,%a1@  /* must be inited - also used by debug=mem */
 	move.l	#0xff020000,%a1   
 	cmp.b	#'%',%a1@
@@ -3040,7 +3040,7 @@ func_start	serial_putc,%d0/%d1/%a0/%a1
 	 * the SRAM, which is non-standard.
 	 */
 	moveml	%d0-%d7/%a2-%a6,%sp@-
-	movel	SYMBOL_NAME(vme_brdtype),%d1
+	movel	vme_brdtype,%d1
 	jeq	1f			| No tag - use the Bug
 	cmpi	#VME_TYPE_MVME162,%d1
 	jeq	6f
@@ -3112,7 +3112,7 @@ func_start	serial_putc,%d0/%d1/%a0/%a1
 	is_not_q40(2f)
 	tst.l	%pc@(L(q40_do_debug))	/* only debug if requested */
 	beq	2f
-	lea	%pc@(SYMBOL_NAME(q40_mem_cptr)),%a1
+	lea	%pc@(q40_mem_cptr),%a1
 	move.l	%a1@,%a0
 	move.b	%d0,%a0@
 	addq.l	#4,%a0
@@ -3287,13 +3287,13 @@ console_clear_loop:
 	/* Calculate font size */
 
 #if   defined(FONT_8x8)
-	lea	%pc@(SYMBOL_NAME(font_vga_8x8)), %a0
+	lea	%pc@(font_vga_8x8), %a0
 #elif defined(FONT_8x16)
-	lea	%pc@(SYMBOL_NAME(font_vga_8x16)),%a0
+	lea	%pc@(font_vga_8x16),%a0
 #elif defined(FONT_6x11)
-	lea	%pc@(SYMBOL_NAME(font_vga_6x11)),%a0
+	lea	%pc@(font_vga_6x11),%a0
 #else	/*   (FONT_8x8) default */
-	lea	%pc@(SYMBOL_NAME(font_vga_8x8)), %a0
+	lea	%pc@(font_vga_8x8), %a0
 #endif
 
 	/*
@@ -3347,11 +3347,11 @@ L(console_put_stats):
 	putn	%pc@(L(mac_videobase))		/* video addr. */
 
 	puts	"\n  _stext:"
-	lea	%pc@(SYMBOL_NAME(_stext)),%a0
+	lea	%pc@(_stext),%a0
 	putn	%a0
 
 	puts	"\nbootinfo:"
-	lea	%pc@(SYMBOL_NAME(_end)),%a0
+	lea	%pc@(_end),%a0
 	putn	%a0
 
 	puts	"\ncpuid:"
@@ -3380,7 +3380,7 @@ L(console_put_penguin):
 	subil	#64,%d0		/* snug up against the right edge */
 	clrl	%d1		/* start at the top */
 	movel	#73,%d7
-	lea	%pc@(SYMBOL_NAME(that_penguin)),%a1
+	lea	%pc@(that_penguin),%a1
 console_penguin_row:
 	movel	#31,%d6
 console_penguin_pixel_pair:
@@ -3846,18 +3846,18 @@ __FINIT
 	.data
 	.align	4
 
-SYMBOL_NAME_LABEL(availmem)
+availmem:
 	.long	0
-SYMBOL_NAME_LABEL(m68k_pgtable_cachemode)
+m68k_pgtable_cachemode:
 	.long	0
-SYMBOL_NAME_LABEL(m68k_supervisor_cachemode)
+m68k_supervisor_cachemode:
 	.long	0
 #if defined(CONFIG_MVME16x)
-SYMBOL_NAME_LABEL(mvme_bdid)
+mvme_bdid:
 	.long	0,0,0,0,0,0,0,0
 #endif
 #if defined(CONFIG_Q40)
-SYMBOL_NAME_LABEL(q40_mem_cptr)
+q40_mem_cptr:
 	.long 0
 L(q40_do_debug):	
 	.long 0	

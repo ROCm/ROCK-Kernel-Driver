@@ -30,6 +30,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/pci.h>
 #include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -49,6 +50,7 @@ MODULE_DEVICES("{{Intel,82801AA},"
 		"{Intel,82901AB},"
 		"{Intel,82801BA},"
 		"{Intel,ICH3},"
+		"{Intel,ICH4},"
 		"{Intel,MX440},"
 		"{SiS,SI7012},"
 		"{NVidia,NForce Audio},"
@@ -115,6 +117,9 @@ MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},di
 #endif
 #ifndef PCI_DEVICE_ID_INTEL_ICH3
 #define PCI_DEVICE_ID_INTEL_ICH3	0x2485
+#endif
+#ifndef PCI_DEVICE_ID_INTEL_ICH4
+#define PCI_DEVICE_ID_INTEL_ICH4	0x24c5
 #endif
 #ifndef PCI_DEVICE_ID_SI_7012
 #define PCI_DEVICE_ID_SI_7012		0x7012
@@ -205,7 +210,7 @@ MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},di
 
 typedef struct {
 	unsigned long reg_offset;
-	u32 *bdbar;			/* CPU address (32bit) */
+	u32 *bdbar;				/* CPU address (32bit) */
 	unsigned int bdbar_addr;		/* PCI bus address (32bit) */
 	snd_pcm_substream_t *substream;
 	unsigned int physbuf;			/* physical address (32bit) */
@@ -230,6 +235,8 @@ typedef struct _snd_intel8x0 intel8x0_t;
 
 struct _snd_intel8x0 {
 	unsigned int device_type;
+	char ac97_name[32];
+	char ctrl_name[32];
 
 	unsigned long dma_playback_size;
 	unsigned long dma_capture_size;
@@ -284,6 +291,7 @@ static struct pci_device_id snd_intel8x0_ids[] __devinitdata = {
 	{ 0x8086, 0x2425, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 82901AB */
 	{ 0x8086, 0x2445, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 82801BA */
 	{ 0x8086, 0x2485, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* ICH3 */
+	{ 0x8086, 0x24c5, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* ICH4 */
 	{ 0x8086, 0x7195, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 440MX */
 	{ 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_SIS },	/* SI7012 */
 	{ 0x10de, 0x01b1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* NFORCE */
@@ -470,9 +478,16 @@ static void snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	intel8x0_t *chip = snd_magic_cast(intel8x0_t, dev_id, return);
 	unsigned int status;
 
+	spin_lock(&chip->reg_lock);
 	status = inl(ICHREG(chip, GLOB_STA));
-	if ((status & (ICH_MCINT | ICH_POINT | ICH_PIINT)) == 0)
+	if ((status & (ICH_MCINT | ICH_POINT | ICH_PIINT)) == 0) {
+		spin_unlock(&chip->reg_lock);
 		return;
+	}
+	/* ack first */
+	outl(status & (ICH_MCINT | ICH_POINT | ICH_PIINT), ICHREG(chip, GLOB_STA));
+	spin_unlock(&chip->reg_lock);
+
 	if (status & ICH_POINT)
 		snd_intel8x0_update(chip, &chip->playback);
 	if (status & ICH_PIINT)
@@ -1218,11 +1233,11 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	chip->playback.size = chip->playback.fragsize = INTEL8X0_TESTBUF_SIZE;
 	chip->playback.substream = NULL; /* don't process interrupts */
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
 	/* set rate */
 	snd_ac97_set_rate(chip->ac97, AC97_PCM_FRONT_DAC_RATE, 48000);
 	snd_intel8x0_setup_periods(chip, &chip->playback);
 	port = chip->bmport + chip->playback.reg_offset;
+	spin_lock_irqsave(&chip->reg_lock, flags);
 	outb(ICH_IOCE | ICH_STARTBM, port + ICH_REG_PI_CR); /* trigger */
 	do_gettimeofday(&start_time);
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
@@ -1256,16 +1271,18 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	else
 		t += stop_time.tv_usec - start_time.tv_usec;
 	if (t == 0) {
-		snd_printk("?? calculation error..\n");
+		snd_printk(KERN_ERR "?? calculation error..\n");
 		return;
 	}
 	pos = (pos / 4) * 1000;
 	pos = (pos / t) * 1000 + ((pos % t) * 1000) / t;
-	if ((pos > 40000 && pos < 47500) ||
-	    (pos > 48500 && pos < 50000)) {
+	if (pos < 40000 || pos >= 60000) 
+		/* abnormal value. hw problem? */
+		printk(KERN_INFO "intel8x0: measured clock %ld rejected\n", pos);
+	else if (pos < 47500 || pos > 48500)
+		/* not 48000Hz, tuning the clock.. */
 		chip->ac97->clock = (chip->ac97->clock * 48000) / pos;
-		printk(KERN_INFO "intel8x0: clocking to %d\n", chip->ac97->clock);
-	}
+	printk(KERN_INFO "intel8x0: clocking to %d\n", chip->ac97->clock);
 }
 
 static int snd_intel8x0_dev_free(snd_device_t *device)
@@ -1275,16 +1292,15 @@ static int snd_intel8x0_dev_free(snd_device_t *device)
 }
 
 static int __devinit snd_intel8x0_create(snd_card_t * card,
-				      struct pci_dev *pci,
-				      unsigned long device_type,
-				      intel8x0_t ** r_intel8x0)
+					 struct pci_dev *pci,
+					 unsigned long device_type,
+					 intel8x0_t ** r_intel8x0)
 {
 	intel8x0_t *chip;
 	int err;
 	static snd_device_ops_t ops = {
 		dev_free:	snd_intel8x0_dev_free,
 	};
-	char name[32];
 
 	*r_intel8x0 = NULL;
 
@@ -1301,15 +1317,15 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	chip->pci = pci;
 	chip->irq = -1;
 	chip->port = pci_resource_start(pci, 0);
-	sprintf(name, "%s - AC'97", card->shortname);
-	if ((chip->res_port = request_region(chip->port, 256, name)) == NULL) {
+	sprintf(chip->ac97_name, "%s - AC'97", card->shortname);
+	if ((chip->res_port = request_region(chip->port, 256, chip->ac97_name)) == NULL) {
 		snd_intel8x0_free(chip);
 		snd_printk("unable to grab ports 0x%lx-0x%lx\n", chip->port, chip->port + 256 - 1);
 		return -EBUSY;
 	}
-	sprintf(name, "%s - Controller", card->shortname);
+	sprintf(chip->ctrl_name, "%s - Controller", card->shortname);
 	chip->bmport = pci_resource_start(pci, 1);
-	if ((chip->res_bmport = request_region(chip->bmport, 64, name)) == NULL) {
+	if ((chip->res_bmport = request_region(chip->bmport, 64, chip->ctrl_name)) == NULL) {
 		snd_intel8x0_free(chip);
 		snd_printk("unable to grab ports 0x%lx-0x%lx\n", chip->bmport, chip->bmport + 64 - 1);
 		return -EBUSY;
@@ -1393,6 +1409,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_INTEL_82901, "Intel ICH 82901AB" },
 	{ PCI_DEVICE_ID_INTEL_440MX, "Intel 440MX" },
 	{ PCI_DEVICE_ID_INTEL_ICH3, "Intel ICH3" },
+	{ PCI_DEVICE_ID_INTEL_ICH4, "Intel ICH4" },
 	{ PCI_DEVICE_ID_SI_7012, "SiS SI7012" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia NForce" },
 	{ 0x764d, "AMD AMD8111" },

@@ -236,6 +236,16 @@ void irlmp_close_lsap(struct lsap_cb *self)
 	lap = self->lap;
 	if (lap) {
 		ASSERT(lap->magic == LMP_LAP_MAGIC, return;);
+		/* We might close a LSAP before it has completed the
+		 * connection setup. In those case, higher layers won't
+		 * send a proper disconnect request. Harmless, except
+		 * that we will forget to close LAP... - Jean II */
+		if(self->lsap_state != LSAP_DISCONNECTED) {
+			self->lsap_state = LSAP_DISCONNECTED;
+			irlmp_do_lap_event(self->lap,
+					   LM_LAP_DISCONNECT_REQUEST, NULL);
+		}
+		/* Now, remove from the link */
 		lsap = hashbin_remove(lap->lsaps, (int) self, NULL);
 	}
 	self->lap = NULL;
@@ -1209,6 +1219,72 @@ void irlmp_status_indication(struct lap_cb *self,
 						       link, lock);
 		else
 			IRDA_DEBUG(2, __FUNCTION__ "(), no handler\n");
+	}
+}
+
+/*
+ * Receive flow control indication from LAP.
+ * LAP want us to send it one more frame. We implement a simple round
+ * robin scheduler between the active sockets so that we get a bit of
+ * fairness. Note that the round robin is far from perfect, but it's
+ * better than nothing.
+ * We then poll the selected socket so that we can do synchronous
+ * refilling of IrLAP (which allow to minimise the number of buffers).
+ * Jean II
+ */
+void irlmp_flow_indication(struct lap_cb *self, LOCAL_FLOW flow)
+{
+	struct lsap_cb *next;
+	struct lsap_cb *curr;
+	int	lsap_todo;
+
+	ASSERT(self->magic == LMP_LAP_MAGIC, return;);
+	ASSERT(flow == FLOW_START, return;);
+
+	/* Get the number of lsap. That's the only safe way to know
+	 * that we have looped around... - Jean II */
+	lsap_todo = HASHBIN_GET_SIZE(self->lsaps);
+	IRDA_DEBUG(4, __FUNCTION__ "() : %d lsaps to scan\n", lsap_todo);
+
+	/* Poll lsap in order until the queue is full or until we
+	 * tried them all.
+	 * Most often, the current LSAP will have something to send,
+	 * so we will go through this loop only once. - Jean II */
+	while((lsap_todo--) &&
+	      (IRLAP_GET_TX_QUEUE_LEN(self->irlap) < LAP_HIGH_THRESHOLD)) {
+		/* Try to find the next lsap we should poll. */
+		next = self->flow_next;
+		if(next != NULL) {
+			/* Note that if there is only one LSAP on the LAP
+			 * (most common case), self->flow_next is always NULL,
+			 * so we always avoid this loop. - Jean II */
+			IRDA_DEBUG(4, __FUNCTION__ "() : searching my LSAP\n");
+
+			/* We look again in hashbins, because the lsap
+			 * might have gone away... - Jean II */
+			curr = (struct lsap_cb *) hashbin_get_first(self->lsaps);
+			while((curr != NULL ) && (curr != next))
+				curr = (struct lsap_cb *) hashbin_get_next(self->lsaps);
+		} else
+			curr = NULL;
+
+		/* If we have no lsap, restart from first one */
+		if(curr == NULL)
+			curr = (struct lsap_cb *) hashbin_get_first(self->lsaps);
+		/* Uh-oh... Paranoia */
+		if(curr == NULL)
+			break;
+
+		/* Next time, we will get the next one (or the first one) */
+		self->flow_next = (struct lsap_cb *) hashbin_get_next(self->lsaps);
+		IRDA_DEBUG(4, __FUNCTION__ "() : curr is %p, next was %p and is now %p, still %d to go - queue len = %d\n", curr, next, self->flow_next, lsap_todo, IRLAP_GET_TX_QUEUE_LEN(self->irlap));
+
+		/* Inform lsap user that it can send one more packet. */
+		if (curr->notify.flow_indication != NULL)
+			curr->notify.flow_indication(curr->notify.instance, 
+						     curr, flow);
+		else
+			IRDA_DEBUG(1, __FUNCTION__ "(), no handler\n");
 	}
 }
 

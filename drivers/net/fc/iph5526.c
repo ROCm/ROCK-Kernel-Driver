@@ -3870,8 +3870,11 @@ struct pci_dev *pdev = NULL;
 		/* Wait for the Link to come up and the login process 
 		 * to complete. 
 		 */
-		for(timeout = jiffies + 10*HZ; (timeout > jiffies) && ((fi->g.link_up == FALSE) || (fi->g.port_discovery == TRUE) || (fi->g.explore_fabric == TRUE) || (fi->g.perform_adisc == TRUE));)
+		for(timeout = jiffies + 10*HZ; time_before(jiffies, timeout) && ((fi->g.link_up == FALSE) || (fi->g.port_discovery == TRUE) || (fi->g.explore_fabric == TRUE) || (fi->g.perform_adisc == TRUE));)
+		{
+			cpu_relax();
 			barrier();
+		}
 		
 		count++;
 		no_of_hosts++;

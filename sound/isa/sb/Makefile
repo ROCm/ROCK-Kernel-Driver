@@ -5,9 +5,6 @@
 
 O_TARGET     := _sb.o
 
-list-multi   := snd-sb-common.o snd-sb8-dsp.o snd-sb16-dsp.o snd-sb16-csp.o \
-	        snd-sb8.o snd-sb16.o snd-sbawe.o snd-emu8000-synth.o snd-es968.o
-
 export-objs  := emu8000.o emu8000_synth.o sb_common.o sb8_main.o sb16_main.o sb16_csp.o
 
 snd-sb-common-objs := sb_common.o sb_mixer.o
@@ -37,31 +34,6 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_SBAWE) += snd-emu8000-synth.o
 endif
 
+obj-m := $(sort $(obj-m))
+
 include $(TOPDIR)/Rules.make
-
-snd-sb-common.o: $(snd-sb-common-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-sb-common-objs)
-
-snd-sb8-dsp.o: $(snd-sb8-dsp-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-sb8-dsp-objs)
-
-snd-sb16-dsp.o: $(snd-sb16-dsp-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-sb16-dsp-objs)
-
-snd-sb16-csp.o: $(snd-sb16-csp-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-sb16-csp-objs)
-
-snd-sb8.o: $(snd-sb8-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-sb8-objs)
-
-snd-sb16.o: $(snd-sb16-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-sb16-objs)
-
-snd-sbawe.o: $(snd-sbawe-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-sbawe-objs)
-
-snd-emu8000-synth.o: $(snd-emu8000-synth-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-emu8000-synth-objs)
-
-snd-es968.o: $(snd-es968-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-es968-objs)

@@ -105,9 +105,9 @@ inline void make_le_item_head (struct item_head * ih, const struct cpu_key * key
 }
 
 static void add_to_flushlist(struct inode *inode, struct buffer_head *bh) {
-    struct list_head *list = &(SB_JOURNAL(inode->i_sb)->j_dirty_buffers) ;
+    struct reiserfs_journal *j = SB_JOURNAL(inode->i_sb) ;
 
-    buffer_insert_list(bh, list) ;
+    buffer_insert_list(&j->j_dirty_buffers_lock, bh, &j->j_dirty_buffers) ;
 }
 
 //
@@ -273,7 +273,7 @@ research:
             kunmap(bh_result->b_page) ;
 	// We do not return -ENOENT if there is a hole but page is uptodate, because it means
 	// That there is some MMAPED data associated with it that is yet to be written to disk.
-	if ((args & GET_BLOCK_NO_HOLE) && !Page_Uptodate(bh_result->b_page) ) {
+	if ((args & GET_BLOCK_NO_HOLE) && !PageUptodate(bh_result->b_page) ) {
 	    return -ENOENT ;
 	}
         return 0 ;
@@ -295,7 +295,7 @@ research:
 	} else 
 	    // We do not return -ENOENT if there is a hole but page is uptodate, because it means
 	    // That there is some MMAPED data associated with it that is yet to  be written to disk.
-	    if ((args & GET_BLOCK_NO_HOLE) && !Page_Uptodate(bh_result->b_page) ) {
+	    if ((args & GET_BLOCK_NO_HOLE) && !PageUptodate(bh_result->b_page) ) {
 	    ret = -ENOENT ;
 	    }
 
@@ -328,8 +328,8 @@ research:
 	** read old data off disk.  Set the up to date bit on the buffer instead
 	** and jump to the end
 	*/
-	    if (Page_Uptodate(bh_result->b_page)) {
-		mark_buffer_uptodate(bh_result, 1);
+	    if (PageUptodate(bh_result->b_page)) {
+		set_buffer_uptodate(bh_result);
 		goto finished ;
     }
 
@@ -398,7 +398,7 @@ finished:
     pathrelse (&path);
     /* I _really_ doubt that you want it.  Chris? */
     map_bh(bh_result, inode->i_sb, 0);
-    mark_buffer_uptodate (bh_result, 1);
+    set_buffer_uptodate (bh_result);
     return 0;
 }
 
@@ -500,7 +500,7 @@ static int convert_tail_for_hole(struct inode *inode,
 
 unlock:
     if (tail_page != hole_page) {
-        UnlockPage(tail_page) ;
+        unlock_page(tail_page) ;
 	page_cache_release(tail_page) ;
     }
 out:
@@ -653,7 +653,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 		reiserfs_restore_prepared_buffer(inode->i_sb, bh) ;
 		goto research;
 	    }
-	    bh_result->b_state |= (1UL << BH_New);
+	    set_buffer_new(bh_result);
 	    put_block_num(item, pos_in_item, allocated_block_nr) ;
             unfm_ptr = allocated_block_nr;
 	    journal_mark_dirty (&th, inode->i_sb, bh);
@@ -705,7 +705,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 		   allocated block for that */
 		unp = cpu_to_le32 (allocated_block_nr);
 		set_block_dev_mapped (bh_result, allocated_block_nr, inode);
-		bh_result->b_state |= (1UL << BH_New);
+		set_buffer_new(bh_result);
 		done = 1;
 	    }
 	    tmp_key = key; // ;)
@@ -761,7 +761,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 		reiserfs_free_block (&th, allocated_block_nr);
 		goto failure;
 	    }
-	    /* it is important the mark_buffer_uptodate is done after
+	    /* it is important the set_buffer_uptodate is done after
 	    ** the direct2indirect.  The buffer might contain valid
 	    ** data newer than the data on disk (read by readpage, changed,
 	    ** and then sent here by writepage).  direct2indirect needs
@@ -769,7 +769,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	    ** if the data in unbh needs to be replaced with data from
 	    ** the disk
 	    */
-	    mark_buffer_uptodate (unbh, 1);
+	    set_buffer_uptodate (unbh);
 
 	    /* we've converted the tail, so we must 
 	    ** flush unbh before the transaction commits
@@ -779,7 +779,13 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	    /* mark it dirty now to prevent commit_write from adding
 	    ** this buffer to the inode's dirty buffer list
 	    */
-	    __mark_buffer_dirty(unbh) ;
+		/*
+		 * AKPM: changed __mark_buffer_dirty to mark_buffer_dirty().
+		 * It's still atomic, but it sets the page dirty too,
+		 * which makes it eligible for writeback at any time by the
+		 * VM (which was also the case with __mark_buffer_dirty())
+		 */
+	    mark_buffer_dirty(unbh) ;
 		  
 	    //inode->i_blocks += inode->i_sb->s_blocksize / 512;
 	    //mark_tail_converted (inode);
@@ -803,7 +809,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 		   block for that */
 		un.unfm_nodenum = cpu_to_le32 (allocated_block_nr);
 		set_block_dev_mapped (bh_result, allocated_block_nr, inode);
-		bh_result->b_state |= (1UL << BH_New);
+		set_buffer_new(bh_result);
 		done = 1;
 	    } else {
 		/* paste hole to the indirect item */
@@ -1716,7 +1722,7 @@ out:
     return error ;
 
 unlock:
-    UnlockPage(page) ;
+    unlock_page(page) ;
     page_cache_release(page) ;
     return error ;
 }
@@ -1788,7 +1794,7 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
 	        mark_buffer_dirty(bh) ;
 	    }
 	}
-	UnlockPage(page) ;
+	unlock_page(page) ;
 	page_cache_release(page) ;
     }
 
@@ -1845,7 +1851,7 @@ research:
 	    goto out ;
 	}
 	set_block_dev_mapped(bh_result, get_block_num(item,pos_in_item),inode);
-        mark_buffer_uptodate(bh_result, 1);
+        set_buffer_uptodate(bh_result);
     } else if (is_direct_le_ih(ih)) {
         char *p ; 
         p = page_address(bh_result->b_page) ;
@@ -1865,7 +1871,7 @@ research:
 	journal_mark_dirty(&th, inode->i_sb, bh) ;
 	bytes_copied += copy_size ;
 	set_block_dev_mapped(bh_result, 0, inode);
-        mark_buffer_uptodate(bh_result, 1);
+        set_buffer_uptodate(bh_result);
 
 	/* are there still bytes left? */
         if (bytes_copied < bh_result->b_size && 
@@ -1910,13 +1916,13 @@ static inline void submit_bh_for_writepage(struct buffer_head **bhp, int nr) {
     for(i = 0 ; i < nr ; i++) {
         bh = bhp[i] ;
 	lock_buffer(bh) ;
-	set_buffer_async_io(bh) ;
+	mark_buffer_async_write(bh) ;
 	/* submit_bh doesn't care if the buffer is dirty, but nobody
 	** later on in the call chain will be cleaning it.  So, we
 	** clean the buffer here, it still gets written either way.
 	*/
-	clear_bit(BH_Dirty, &bh->b_state) ;
-	set_bit(BH_Uptodate, &bh->b_state) ;
+	clear_buffer_dirty(bh) ;
+	set_buffer_uptodate(bh) ;
 	submit_bh(WRITE, bh) ;
     }
 }
@@ -1984,24 +1990,30 @@ static int reiserfs_write_full_page(struct page *page) {
 	block++ ;
     } while(bh != head) ;
 
+    if (!partial)
+        SetPageUptodate(page) ;
+    BUG_ON(PageWriteback(page));
+    SetPageWriteback(page);
+    unlock_page(page);
+
     /* if this page only had a direct item, it is very possible for
     ** nr == 0 without there being any kind of error.
     */
     if (nr) {
         submit_bh_for_writepage(arr, nr) ;
     } else {
-        UnlockPage(page) ;
+        end_page_writeback(page) ;
     }
-    if (!partial)
-        SetPageUptodate(page) ;
 
     return 0 ;
 
 fail:
     if (nr) {
+        SetPageWriteback(page);
+        unlock_page(page);
         submit_bh_for_writepage(arr, nr) ;
     } else {
-        UnlockPage(page) ;
+        unlock_page(page) ;
     }
     ClearPageUptodate(page) ;
     return error ;

@@ -1,4 +1,4 @@
-18-Dec-2001
+26-Apr-2002
 
 The EHCI driver is used to talk to high speed USB 2.0 devices using
 USB 2.0-capable host controller hardware.  The USB 2.0 standard is
@@ -19,6 +19,9 @@ interact with the EHCI controller through a "Transaction Translator"
 (TT) in the hub, which turns low or full speed transactions into
 high speed "split transactions" that don't waste transfer bandwidth.
 
+At this writing, this driver has been seen to work with implementations
+of EHCI from (in alphabetical order):  Intel, NEC, Philips, and VIA.
+
 At this writing, high speed devices are finally beginning to appear.
 While usb-storage devices have been available for some time (working
 quite speedily on the 2.4 version of this driver), hubs have only
@@ -36,7 +39,7 @@ APIs exposed to USB device drivers.
 FUNCTIONALITY
 
 This driver is regularly tested on x86 hardware, and has also been
-used on PPC hardware so big/little endianneess issues should be gone.
+used on PPC hardware so big/little endianness issues should be gone.
 It's believed to do all the right PCI magic so that I/O works even on
 systems with interesting DMA mapping issues.
 
@@ -51,11 +54,13 @@ scheduling for interrupt transfers, which means among other things that
 connecting USB 1.1 hubs, keyboards, and mice to USB 2.0 hubs won't work.
 Connect them to USB 1.1 hubs, or to a root hub.
 
-Isochronous (ISO) transfer support is not yet working.  No production
+Isochronous (ISO) transfer support is also newly functional.  No production
 high speed devices are available which would need it (though high quality
 webcams are in the works!).  Note that split transaction support for ISO
 transfers can't share much code with the code for high speed ISO transfers,
-since EHCI represents these with a different data structure.
+since EHCI represents these with a different data structure.  So for now,
+most USB audio and video devices have the same restrictions as hubs, mice,
+and keyboards:  don't connect them using high speed USB hubs.
 
 The EHCI root hub code should hand off USB 1.1 devices to its companion
 controller.  This driver doesn't need to know anything about those
@@ -99,6 +104,8 @@ Device drivers shouldn't care whether they're running over EHCI or not,
 but they may want to check for "usb_device->speed == USB_SPEED_HIGH".
 High speed devices can do things that full speed (or low speed) ones
 can't, such as "high bandwidth" periodic (interrupt or ISO) transfers.
+Also, some values in device descriptors (such as polling intervals for
+periodic transfers) use different encodings when operating at high speed.
 
 
 PERFORMANCE

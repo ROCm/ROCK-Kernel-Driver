@@ -150,8 +150,8 @@ static void __free_small_page(unsigned long spage, struct order *order)
 	unsigned long flags;
 	struct page *page;
 
-	page = virt_to_page(spage);
-	if (VALID_PAGE(page)) {
+	if (virt_addr_valid(spage)) {
+		page = virt_to_page(spage);
 
 		/*
 		 * The container-page must be marked Reserved

@@ -116,12 +116,10 @@ static int dn_fb_set_var(struct fb_var_screeninfo *var, int isactive,
 			 struct fb_info *info);
 static int dn_fb_get_cmap(struct fb_cmap *cmap,int kspc,int con,
 			  struct fb_info *info);
-static int dn_fb_set_cmap(struct fb_cmap *cmap,int kspc,int con,
-			  struct fb_info *info);
+static int dn_fb_blank(int blank,struct fb_info *info);
 
 static int dnfbcon_switch(int con,struct fb_info *info);
 static int dnfbcon_updatevar(int con,struct fb_info *info);
-static void dnfbcon_blank(int blank,struct fb_info *info);
 
 static void dn_fb_set_disp(int con,struct fb_info *info);
 
@@ -133,10 +131,9 @@ static struct fb_ops dn_fb_ops = {
 	fb_get_var:	dn_fb_get_var,
 	fb_set_var:	dn_fb_set_var,
 	fb_get_cmap:	dn_fb_get_cmap,
-	fb_set_cmap:	dn_fb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_blank:	dn_fb_blank,
 };
-
-static int currcon=0;
 
 #define NUM_TOTAL_MODES 1
 struct fb_var_screeninfo dn_fb_predefined[] = {
@@ -248,15 +245,6 @@ static int dn_fb_get_cmap(struct fb_cmap *cmap,int kspc,int con,
 	return -EINVAL;
 }
 
-static int dn_fb_set_cmap(struct fb_cmap *cmap,int kspc,int con,
-			  struct fb_info *info) {
-
-	printk("set cmap not supported\n");
-
-	return -EINVAL;
-
-}
-
 static void dn_fb_set_disp(int con, struct fb_info *info) {
 
   struct fb_fix_screeninfo fix;
@@ -273,8 +261,6 @@ static void dn_fb_set_disp(int con, struct fb_info *info) {
   if(con==-1) 
     con=0;
 
-   display->screen_base = (u_char *)fix.smem_start;
-printk("screenbase: %lx\n",fix.smem_start);
    display->visual = fix.visual;
    display->type = fix.type;
    display->type_aux = fix.type_aux;
@@ -304,9 +290,11 @@ printk("dn_fb_init\n");
 	fb_info.disp=disp;
 	fb_info.switch_con=&dnfbcon_switch;
 	fb_info.updatevar=&dnfbcon_updatevar;
-	fb_info.blank=&dnfbcon_blank;	
 	fb_info.node = NODEV;
 	fb_info.fbops = &dn_fb_ops;
+   	fb_info.screen_base = (u_char *)fix.smem_start;
+	printk("screenbase: %lx\n",fix.smem_start);
+	fb_info.currcon = -1;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;	
 
         dn_fb_get_var(&disp[0].var,0, &fb_info);
@@ -336,7 +324,7 @@ printk("dn_fb_init: register\n");
 	
 static int dnfbcon_switch(int con,  struct fb_info *info) { 
 
-	currcon=con;
+	info->currcon = con;
 	
 	return 0;
 
@@ -348,17 +336,13 @@ static int dnfbcon_updatevar(int con,  struct fb_info *info) {
 
 }
 
-static void dnfbcon_blank(int blank,  struct fb_info *info) {
-
-	if(blank)  {
+static int dn_fb_blank(int blank,  struct fb_info *info)
+{
+	if (blank)
         	outb(0x0,  AP_CONTROL_3A);
-	}
-	else {
+	else 
 	        outb(0x1,  AP_CONTROL_3A);
-	}
-
-	return ;
-
+	return 0;
 }
 
 void dn_bitblt(struct display *p,int x_src,int y_src, int x_dest, int y_dest,
@@ -371,7 +355,7 @@ void dn_bitblt(struct display *p,int x_src,int y_src, int x_dest, int y_dest,
 
 	incr=(y_dest<=y_src) ? 1 : -1 ;
 
-	src=(ushort *)(p->screen_base+ y_src*p->next_line+(x_src >> 4));
+	src=(ushort *)(p->fb_info.screen_base+ y_src*p->next_line+(x_src >> 4));
 	dest=y_dest*(p->next_line >> 1)+(x_dest >> 4);
 	
 	if(incr>0) {
@@ -449,20 +433,20 @@ static void bmove_apollofb(struct display *p, int sy, int sx, int dy, int dx,
     u_int rows;
 
     if (sx == 0 && dx == 0 && width == p->next_line) {
-	src = p->screen_base+sy*fontheight*width;
-	dest = p->screen_base+dy*fontheight*width;
+	src = p->fb_info.screen_base+sy*fontheight*width;
+	dest = p->fb_info.screen_base+dy*fontheight*width;
 	mymemmove(dest, src, height*fontheight*width);
     } else if (dy <= sy) {
-	src = p->screen_base+sy*fontheight*p->next_line+sx;
-	dest = p->screen_base+dy*fontheight*p->next_line+dx;
+	src = p->fb_info.screen_base+sy*fontheight*p->next_line+sx;
+	dest = p->fb_info.screen_base+dy*fontheight*p->next_line+dx;
 	for (rows = height*fontheight; rows--;) {
 	    mymemmove(dest, src, width);
 	    src += p->next_line;
 	    dest += p->next_line;
 	}
     } else {
-	src = p->screen_base+((sy+height)*fontheight-1)*p->next_line+sx;
-	dest = p->screen_base+((dy+height)*fontheight-1)*p->next_line+dx;
+	src = p->fb_info.screen_base+((sy+height)*fontheight-1)*p->next_line+sx;
+	dest = p->fb_info.screen_base+((dy+height)*fontheight-1)*p->next_line+dx;
 	for (rows = height*fontheight; rows--;) {
 	    mymemmove(dest, src, width);
 	    src -= p->next_line;

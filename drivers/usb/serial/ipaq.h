@@ -23,6 +23,9 @@
 #define HP_JORNADA_548_ID	0x1016
 #define HP_JORNADA_568_ID	0x1116
 
+#define CASIO_VENDOR_ID		0x07cf
+#define CASIO_EM500_ID		0x2002
+
 /*
  * Since we can't queue our bulk write urbs (don't know why - it just
  * doesn't work), we can send down only one write urb at a time. The simplistic

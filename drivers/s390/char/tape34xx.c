@@ -1343,13 +1343,17 @@ ccw_req_t * tape34xx_bread (struct request *req,tape_info_t* ti,int tapeblock_ma
 	ccw_req_t *cqr;
 	ccw1_t *ccw;
 	__u8 *data;
-	int s2b = blksize_size[tapeblock_major][ti->blk_minor]/hardsect_size[tapeblock_major][ti->blk_minor];
+	kdev_t dev = mk_kdev(tapeblock_major, ti->blk_minor);
+	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
+	unsigned bsize = block_size(bdev);
+	int s2b = bsize/queue_hardsect_size(&ti->request_queue);
 	int realcount;
 	int size,bhct = 0;
 	struct buffer_head* bh;
+	bdput(bdev);
 	for (bh = req->bh; bh; bh = bh->b_reqnext) {
-		if (bh->b_size > blksize_size[tapeblock_major][ti->blk_minor])
-			for (size = 0; size < bh->b_size; size += blksize_size[tapeblock_major][ti->blk_minor])
+		if (bh->b_size > bsize)
+			for (size = 0; size < bh->b_size; size += bsize)
 				bhct++;
 		else
 			bhct++;
@@ -1396,17 +1400,17 @@ ccw_req_t * tape34xx_bread (struct request *req,tape_info_t* ti,int tapeblock_ma
 	ti->position=realcount+req->nr_sectors/s2b;
 	for (bh=req->bh;bh!=NULL;) {
 	        ccw->flags = CCW_FLAG_CC;
-		if (bh->b_size >= blksize_size[tapeblock_major][ti->blk_minor]) {
-			for (size = 0; size < bh->b_size; size += blksize_size[tapeblock_major][ti->blk_minor]) {
+		if (bh->b_size >= bsize) {
+			for (size = 0; size < bh->b_size; size += bsize) {
 			        ccw++;
 				ccw->flags = CCW_FLAG_CC;
 				ccw->cmd_code = READ_FORWARD;
-				ccw->count = blksize_size[tapeblock_major][ti->blk_minor];
+				ccw->count = bsize;
 				set_normalized_cda (ccw, __pa (bh->b_data + size));
 			}
 			bh = bh->b_reqnext;
 		} else {	/* group N bhs to fit into byt_per_blk */
-			for (size = 0; bh != NULL && size < blksize_size[tapeblock_major][ti->blk_minor];) {
+			for (size = 0; bh != NULL && size < bsize;) {
 				ccw++;
 				ccw->flags = CCW_FLAG_DC;
 				ccw->cmd_code = READ_FORWARD;
@@ -1415,10 +1419,10 @@ ccw_req_t * tape34xx_bread (struct request *req,tape_info_t* ti,int tapeblock_ma
 				size += bh->b_size;
 				bh = bh->b_reqnext;
 			}
-			if (size != blksize_size[tapeblock_major][ti->blk_minor]) {
+			if (size != bsize) {
 				PRINT_WARN ("Cannot fulfill small request %d vs. %d (%ld sects)\n",
 					    size,
-					    blksize_size[tapeblock_major][ti->blk_minor],
+					    bsize,
 					    req->nr_sectors);
 				kfree(data);
 				tape_free_request (cqr);

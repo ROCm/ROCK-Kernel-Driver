@@ -35,7 +35,7 @@
 /*
  * core module and version information
  */
-#define RNG_VERSION "0.9.7"
+#define RNG_VERSION "0.9.8"
 #define RNG_MODULE_NAME "i810_rng"
 #define RNG_DRIVER_NAME   RNG_MODULE_NAME " hardware driver " RNG_VERSION
 #define PFX RNG_MODULE_NAME ": "
@@ -336,6 +336,7 @@ static struct pci_device_id rng_pci_tbl[] __initdata = {
 	{ 0x8086, 0x2428, PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0x8086, 0x2448, PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0x8086, 0x244e, PCI_ANY_ID, PCI_ANY_ID, },
+	{ 0x8086, 0x245e, PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0, },
 };
 MODULE_DEVICE_TABLE (pci, rng_pci_tbl);

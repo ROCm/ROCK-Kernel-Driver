@@ -43,21 +43,6 @@
 
 
 /*
- *	Display an IP address in readable format. 
- */
- 
-char *in_ntoa(__u32 in)
-{
-	static char buff[18];
-	char *p;
-
-	p = (char *) &in;
-	sprintf(buff, "%d.%d.%d.%d",
-		(p[0] & 255), (p[1] & 255), (p[2] & 255), (p[3] & 255));
-	return(buff);
-}
-
-/*
  *	Convert an ASCII string to binary IP. 
  */
  

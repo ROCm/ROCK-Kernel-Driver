@@ -142,6 +142,7 @@ static struct usb_serial_device_type pl2303_device = {
 
 struct pl2303_private { 
 	u8 line_control;
+	u8 termios_initialized;
 };
 
 
@@ -214,13 +215,19 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 	int baud;
 	int i;
 
-	dbg (__FUNCTION__ " -  port %d", port->number);
+	dbg (__FUNCTION__ " -  port %d, initialized = %d", port->number, 
+	     ((struct pl2303_private *) port->private)->termios_initialized);
 
 	if ((!port->tty) || (!port->tty->termios)) {
 		dbg(__FUNCTION__" - no tty structures");
 		return;
 	}
 
+	if (!(((struct pl2303_private *) port->private)->termios_initialized)) {
+		*(port->tty->termios) = tty_std_termios;
+		port->tty->termios->c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+		((struct pl2303_private *) port->private)->termios_initialized = 1;
+	}
 	cflag = port->tty->termios->c_cflag;
 	/* check that they really want us to change something */
 	if (old_termios) {
@@ -390,9 +397,6 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 
 	/* Setup termios */
 	if (port->tty) {
-		*(port->tty->termios) = tty_std_termios;
-		port->tty->termios->c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-
 		pl2303_set_termios (port, &tmp_termios);
 	}
 

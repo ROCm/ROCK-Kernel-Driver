@@ -9,7 +9,7 @@
 #include <linux/linkage.h>
 #include <asm/mach-types.h>
 
-		.section        ".start", #alloc, #execinstr
+		.section        ".start", "ax"
 
 __XScale_start:
 

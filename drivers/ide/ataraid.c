@@ -34,10 +34,6 @@
 
 #include "ataraid.h"
 
-                                        
-static int ataraid_hardsect_size[256];
-static int ataraid_blksize_size[256];
-
 static struct raid_device_operations* ataraid_ops[16];
 
 static int ataraid_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
@@ -238,17 +234,7 @@ static __init int ataraid_init(void)
 {
 	int i;
         for(i=0;i<256;i++)
-	{
-        	ataraid_hardsect_size[i] = 512;
-		ataraid_blksize_size[i] = 1024;  
 		ataraid_readahead[i] = 1023;
-	}
-	
-	if (blksize_size[ATAMAJOR]==NULL)
-		blksize_size[ATAMAJOR] = ataraid_blksize_size;
-	if (hardsect_size[ATAMAJOR]==NULL)
-		hardsect_size[ATAMAJOR] = ataraid_hardsect_size;
-	
 	
 	/* setup the gendisk structure */	
 	ataraid_gendisk.part = kmalloc(256 * sizeof(struct hd_struct),GFP_KERNEL);
@@ -286,9 +272,7 @@ static __init int ataraid_init(void)
 static void __exit ataraid_exit(void)
 {
 	unregister_blkdev(ATAMAJOR, "ataraid");
-	hardsect_size[ATAMAJOR] = NULL;
 	blk_size[ATAMAJOR] = NULL;
-	blksize_size[ATAMAJOR] = NULL;                       
 
 	del_gendisk(&ataraid_gendisk);
         

@@ -48,6 +48,7 @@
 #include <linux/stat.h>
 #include <linux/blkdev.h>
 #include <linux/quotaops.h>
+#include <linux/smp_lock.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
@@ -568,6 +569,7 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	struct jffs_control *c = (struct jffs_control *)inode->i_sb->u.generic_sbp;
 	int j;
 	int ddino;
+	lock_kernel();
 	D3(printk (KERN_NOTICE "readdir(): down biglock\n"));
 	down(&c->fmc->biglock);
 
@@ -577,6 +579,7 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		if (filldir(dirent, ".", 1, filp->f_pos, inode->i_ino, DT_DIR) < 0) {
 			D3(printk (KERN_NOTICE "readdir(): up biglock\n"));
 			up(&c->fmc->biglock);
+			unlock_kernel();
 			return 0;
 		}
 		filp->f_pos = 1;
@@ -593,6 +596,7 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		if (filldir(dirent, "..", 2, filp->f_pos, ddino, DT_DIR) < 0) {
 			D3(printk (KERN_NOTICE "readdir(): up biglock\n"));
 			up(&c->fmc->biglock);
+			unlock_kernel();
 			return 0;
 		}
 		filp->f_pos++;
@@ -611,6 +615,7 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			    filp->f_pos , f->ino, DT_UNKNOWN) < 0) {
 		        D3(printk (KERN_NOTICE "readdir(): up biglock\n"));
 			up(&c->fmc->biglock);
+			unlock_kernel();
 			return 0;
 		}
 		filp->f_pos++;
@@ -620,6 +625,7 @@ jffs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	}
 	D3(printk (KERN_NOTICE "readdir(): up biglock\n"));
 	up(&c->fmc->biglock);
+	unlock_kernel();
 	return filp->f_pos;
 } /* jffs_readdir()  */
 
@@ -739,7 +745,7 @@ jffs_do_readpage_nolock(struct file *file, struct page *page)
 		  (f->name ? f->name : ""), (long)page->index));
 
 	get_page(page);
-	/* Don't LockPage(page), should be locked already */
+	/* Don't SetPageLocked(page), should be locked already */
 	buf = page_address(page);
 	ClearPageUptodate(page);
 	ClearPageError(page);
@@ -789,7 +795,7 @@ jffs_do_readpage_nolock(struct file *file, struct page *page)
 static int jffs_readpage(struct file *file, struct page *page)
 {
 	int ret = jffs_do_readpage_nolock(file, page);
-	UnlockPage(page);
+	unlock_page(page);
 	return ret;
 }
 
@@ -1519,7 +1525,7 @@ jffs_prepare_write(struct file *filp, struct page *page,
 	/* FIXME: we should detect some error conditions here */
 
 	/* Bugger that. We should make sure the page is uptodate */
-	if (!Page_Uptodate(page) && (from || to < PAGE_CACHE_SIZE))
+	if (!PageUptodate(page) && (from || to < PAGE_CACHE_SIZE))
 		return jffs_do_readpage_nolock(filp, page);
 
 	return 0;
@@ -1746,8 +1752,9 @@ void
 jffs_write_super(struct super_block *sb)
 {
 	struct jffs_control *c = (struct jffs_control *)sb->u.generic_sbp;
-
+	lock_kernel();
 	jffs_garbage_collect_trigger(c);
+	unlock_kernel();
 }
 
 static struct super_operations jffs_ops =

@@ -1658,8 +1658,6 @@ static struct block_device_operations sjcd_fops = {
 	check_media_change:sjcd_disk_change,
 };
 
-static int blksize = 2048;
-
 /*
  * Following stuff is intended for initialization of the cdrom. It
  * first looks for presence of device. If the device is present, it
@@ -1686,15 +1684,14 @@ int __init sjcd_init(void)
 	printk("SJCD: sjcd=0x%x: ", sjcd_base);
 #endif
 
-	blksize_size[MAJOR_NR] = &blksize;
-
 	if (devfs_register_blkdev(MAJOR_NR, "sjcd", &sjcd_fops) != 0) {
 		printk("SJCD: Unable to get major %d for Sanyo CD-ROM\n",
 		       MAJOR_NR);
 		return (-EIO);
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,&sjcd_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_sjcd_request, &sjcd_lock);
+	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
 	register_disk(NULL, mk_kdev(MAJOR_NR, 0), 1, &sjcd_fops, 0);
 
 	if (check_region(sjcd_base, 4)) {

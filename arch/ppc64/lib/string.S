@@ -8,7 +8,7 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
-#include "../kernel/ppc_asm.tmpl"
+#include <asm/ppc_asm.tmpl>
 #include <asm/processor.h>
 #include <asm/errno.h>
 

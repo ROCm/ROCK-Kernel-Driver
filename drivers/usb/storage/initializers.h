@@ -37,8 +37,13 @@
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <linux/config.h>
 #include "usb.h"
 
 /* This places the Shuttle/SCM USB<->SCSI bridge devices in multi-target
  * mode */
 int usb_stor_euscsi_init(struct us_data *us);
+
+#ifdef CONFIG_USB_STORAGE_SDDR09
+int sddr09_init(struct us_data *us);
+#endif

@@ -4,7 +4,7 @@
  * ldm - Part of the Linux-NTFS project.
  *
  * Copyright (C) 2001 Richard Russon <ldm@flatcap.org>
- * Copyright (C) 2001 Anton Altaparmakov <antona@users.sf.net>
+ * Copyright (C) 2001 Anton Altaparmakov
  *
  * Documentation is available at http://linux-ntfs.sf.net/ldm
  *

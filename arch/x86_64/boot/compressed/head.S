@@ -41,7 +41,7 @@ startup_32:
 	movl %eax,%fs
 	movl %eax,%gs
 
-	lss SYMBOL_NAME(stack_start),%esp
+	lss stack_start,%esp
 	xorl %eax,%eax
 1:	incl %eax		# check that A20 really IS enabled
 	movl %eax,0x000000	# loop forever if it isn't
@@ -59,8 +59,8 @@ startup_32:
  * Clear BSS
  */
 	xorl %eax,%eax
-	movl $ SYMBOL_NAME(_edata),%edi
-	movl $ SYMBOL_NAME(_end),%ecx
+	movl $_edata,%edi
+	movl $_end,%ecx
 	subl %edi,%ecx
 	cld
 	rep
@@ -72,7 +72,7 @@ startup_32:
 	movl %esp,%eax
 	pushl %esi	# real mode pointer as second arg
 	pushl %eax	# address of structure as first arg
-	call SYMBOL_NAME(decompress_kernel)
+	call decompress_kernel
 	orl  %eax,%eax 
 	jnz  3f
 	addl $8,%esp

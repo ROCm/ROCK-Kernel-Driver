@@ -5,9 +5,6 @@
 
 O_TARGET     := _gus.o
 
-list-multi   := snd-gus-lib.o snd-gusclassic.o snd-gusextreme.o \
-		snd-gusmax.o snd-interwave.o snd-interwave-stb.o
-
 export-objs  := gus_main.o gus_volume.o
 
 snd-gus-lib-objs := gus_main.o \
@@ -38,25 +35,6 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_INTERWAVE_STB) += snd-gus-synth.o
 endif
 
+obj-m := $(sort $(obj-m))
+
 include $(TOPDIR)/Rules.make
-
-snd-gus-lib.o: $(snd-gus-lib-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-gus-lib-objs)
-
-snd-gus-synth.o: $(snd-gus-synth-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-gus-synth-objs)
-
-snd-gusclassic.o: $(snd-gusclassic-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-gusclassic-objs)
-
-snd-gusextreme.o: $(snd-gusextreme-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-gusextreme-objs)
-
-snd-gusmax.o: $(snd-gusmax-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-gusmax-objs)
-
-snd-interwave.o: $(snd-interwave-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-interwave-objs)
-
-snd-interwave-stb.o: $(snd-interwave-stb-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-interwave-stb-objs)

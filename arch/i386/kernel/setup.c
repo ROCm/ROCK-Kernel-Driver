@@ -2153,6 +2153,11 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		strcpy(c->x86_model_id, p);
 	
 #ifdef CONFIG_SMP
+	/* PGE CPUID bug: Pentium4 supports PGE, but seems to have SMP bugs.. */
+	if ( c->x86 == 15 )
+		clear_bit(X86_FEATURE_PGE, c->x86_capability);
+
+
 	if (test_bit(X86_FEATURE_HT, c->x86_capability)) {
 		extern	int phys_proc_id[NR_CPUS];
 		
@@ -2870,7 +2875,7 @@ void __init cpu_init (void)
 	set_tss_desc(nr,t);
 	gdt_table[__TSS(nr)].b &= 0xfffffdff;
 	load_TR(nr);
-	load_LDT(&init_mm);
+	load_LDT(&init_mm.context);
 
 	/* Clear %fs and %gs. */
 	asm volatile ("xorl %eax, %eax; movl %eax, %fs; movl %eax, %gs");

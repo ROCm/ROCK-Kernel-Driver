@@ -48,7 +48,6 @@
 
 #define TABLE_SIZE	((TABLE_OFFSET + PTRS_PER_PTE) * sizeof(pte_t))
 
-static unsigned long totalram_pages;
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern char _stext, _text, _etext, _end, __init_begin, __init_end;
 
@@ -64,18 +63,6 @@ static struct meminfo meminfo __initdata = { 0, };
  */
 struct page *empty_zero_page;
 
-/* This is currently broken
- * PG_skip is used on sparc/sparc64 architectures to "skip" certain
- * parts of the address space.
- *
- * #define PG_skip	10
- * #define PageSkip(page) (machine_is_riscpc() && test_bit(PG_skip, &(page)->flags))
- *			if (PageSkip(page)) {
- *				page = page->next_hash;
- *				if (page == NULL)
- *					break;
- *			}
- */
 void show_mem(void)
 {
 	int free = 0, total = 0, reserved = 0;
@@ -113,7 +100,7 @@ void show_mem(void)
 	printk("%d slab pages\n", slab);
 	printk("%d pages shared\n", shared);
 	printk("%d pages swap cached\n", cached);
-	show_buffers();
+	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 struct node_info {
@@ -643,14 +630,3 @@ static int __init keepinitrd_setup(char *__unused)
 
 __setup("keepinitrd", keepinitrd_setup);
 #endif
-
-void si_meminfo(struct sysinfo *val)
-{
-	val->totalram  = totalram_pages;
-	val->sharedram = 0;
-	val->freeram   = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = 0;
-	val->freehigh  = 0;
-	val->mem_unit  = PAGE_SIZE;
-}

@@ -575,7 +575,11 @@ struct scsi_device {
 	devfs_handle_t de;      /* directory for the device      */
 	char type;
 	char scsi_level;
-	char vendor[8], model[16], rev[4];
+	unsigned char inquiry_len;	/* valid bytes in 'inquiry' */
+	unsigned char * inquiry;	/* INQUIRY response data */
+	char * vendor;		/* [back_compat] point into 'inquiry' ... */
+	char * model;		/* ... after scan; point to static string */
+	char * rev;		/* ... "nullnullnullnull" before scan */
 	unsigned char current_tag;	/* current tag */
 	unsigned char sync_min_period;	/* Not less than this period */
 	unsigned char sync_max_offset;	/* Not greater than this offset */
@@ -666,6 +670,8 @@ struct scsi_request {
 	unsigned short sr_sglist_len;	/* size of malloc'd scatter-gather list */
 	unsigned sr_underflow;	/* Return error if less than
 				   this amount is transferred */
+ 	void * upper_private_data;	/* reserved for owner (usually upper
+ 					   level driver) of this request */
 };
 
 /*

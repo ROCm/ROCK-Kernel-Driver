@@ -444,7 +444,7 @@ struct ov511_frame {
 	int snapshot;		/* True if frame was a snapshot */
 };
 
-#define DECOMP_INTERFACE_VER 3
+#define DECOMP_INTERFACE_VER 4
 
 /* Compression module operations */
 struct ov51x_decomp_ops {
@@ -454,8 +454,7 @@ struct ov51x_decomp_ops {
 			  int, int, int);
 	int (*decomp_422)(unsigned char *, unsigned char *, unsigned char *,
 			  int, int, int);
-	void (*decomp_lock)(void);
-	void (*decomp_unlock)(void);
+	struct module *owner;
 };
 
 struct usb_ov511 {
@@ -484,6 +483,7 @@ struct usb_ov511 {
 	int auto_gain;		/* Auto gain control enabled flag */
 	int auto_exp;		/* Auto exposure enabled flag */
 	int backlight;		/* Backlight exposure algorithm flag */
+	int mirror;		/* Image is reversed horizontally */
 
 	int led_policy;		/* LED: off|on|auto; OV511+ only */
 
@@ -522,9 +522,9 @@ struct usb_ov511 {
 	int bclass;		/* Class of bridge (BCL_*) */
 	int sensor;		/* Type of image sensor chip (SEN_*) */
 	int sclass;		/* Type of image sensor chip (SCL_*) */
-	int tuner;		/* Type of TV tuner */
 
 	int packet_size;	/* Frame size per isoc desc */
+	int packet_numbering;	/* Is ISO frame numbering enabled? */
 
 	struct semaphore param_lock;	/* params lock for this camera */
 
@@ -555,10 +555,13 @@ struct usb_ov511 {
 	int has_audio_proc;	/* Device has an audio processor */
 	int freq;		/* Current tuner frequency */
 	int tuner_type;		/* Specific tuner model */
+	int pal;		/* Device is designed for PAL resolution */
 
 	/* I2C interface to kernel */
 	struct semaphore i2c_lock;	  /* Protect I2C controller regs */
 	unsigned char primary_i2c_slave;  /* I2C write id of sensor */
+	unsigned char tuner_i2c_slave;	  /* I2C write id of tuner */
+	unsigned char audio_i2c_slave;	  /* I2C write id of audio processor */
 
 	/* Control transaction stuff */
 	unsigned char *cbuf;		/* Buffer for payload */
@@ -587,18 +590,6 @@ symbolic(struct symbolic_list list[], int num)
 
 	return (NOT_DEFINED_STR);
 }
-
-struct mode_list_518 {
-	int width;
-	int height;
-	u8 reg28;
-	u8 reg29;
-	u8 reg2a;
-	u8 reg2c;
-	u8 reg2e;
-	u8 reg24;
-	u8 reg25;
-};
 
 /* Compression stuff */
 

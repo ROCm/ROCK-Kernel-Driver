@@ -192,7 +192,7 @@ static int jumpshot_raw_bulk(int direction,
 		return US_BULK_TRANSFER_SHORT;
 	}
 
-	US_DEBUGP("jumpshot_raw_bulk:  Transfered %d of %d bytes\n", act_len, len);
+	US_DEBUGP("jumpshot_raw_bulk:  Transferred %d of %d bytes\n", act_len, len);
 	return US_BULK_TRANSFER_GOOD;
 }
 

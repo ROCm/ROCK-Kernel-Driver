@@ -569,6 +569,9 @@ td_fill (struct ohci_hcd *ohci, unsigned int info,
 	td->hwNextTD = cpu_to_le32 (td_pt->td_dma);
 	td->hwPSW [0] = cpu_to_le16 ((data & 0x0FFF) | 0xE000);
 
+	/* HC might read the TD right after we link it ... */
+	wmb ();
+
 	/* append to queue */
 	td->ed->hwTailP = td->hwNextTD;
 }
@@ -641,8 +644,10 @@ static void td_submit_urb (struct urb *urb)
 				cnt++;
 			}
 			/* start bulk list */
-			if (!ohci->sleeping)
+			if (!ohci->sleeping) {
+				wmb ();
 				writel (OHCI_BLF, &ohci->regs->cmdstatus);
+			}
 			break;
 
 		case PIPE_INTERRUPT:
@@ -654,6 +659,7 @@ static void td_submit_urb (struct urb *urb)
 			break;
 
 		case PIPE_CONTROL:
+			/* control requests don't use toggle state  */
 			info = TD_CC | TD_DP_SETUP | TD_T_DATA0;
 			td_fill (ohci, info,
 #ifdef CONFIG_PCI
@@ -678,8 +684,10 @@ static void td_submit_urb (struct urb *urb)
 				: TD_CC | TD_DP_OUT | TD_T_DATA1;
 			td_fill (ohci, info, data, 0, urb, cnt++);
 			/* start control list */
-			if (!ohci->sleeping)
+			if (!ohci->sleeping) {
+				wmb ();
 				writel (OHCI_CLF, &ohci->regs->cmdstatus);
+			}
 			break;
 
 		case PIPE_ISOCHRONOUS:

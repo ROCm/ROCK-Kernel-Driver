@@ -105,10 +105,13 @@ static inline pte_t ptep_get_and_clear(pte_t *ptep)
 
 	pte_clear(ptep);
 	if (!pte_not_present(pte)) {
-		struct page *page = pte_page(pte);
-		if (VALID_PAGE(page)&&
-		    (!page->mapping || !(page->mapping->i_mmap_shared)))
-			__clear_bit(PG_mapped, &page->flags);
+		struct page *page;
+		unsigned long pfn = pte_pfn(pte);
+		if (pfn_valid(pfn)) {
+			page = pfn_to_page(page);
+			if (!page->mapping || !page->mapping->i_mmap_shared)
+				__clear_bit(PG_mapped, &page->flags);
+		}
 	}
 	return pte;
 }

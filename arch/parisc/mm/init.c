@@ -20,7 +20,6 @@
 
 #include <asm/pgalloc.h>
 
-static unsigned long totalram_pages;
 extern unsigned long max_pfn, mem_max;
 
 void free_initmem(void)  {
@@ -155,7 +154,7 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
-	show_buffers();
+	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 void set_pte_phys (unsigned long vaddr, unsigned long phys)
@@ -451,29 +450,3 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 #endif
 }
 #endif
-
-void si_meminfo(struct sysinfo *val)
-{
-	int i;
-
-	i = max_mapnr;
-	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-#if 0
-	while (i-- > 0)  {
-		if (PageReserved(mem_map+i))
-			continue;
-		val->totalram++;
-		if (!atomic_read(&mem_map[i].count))
-			continue;
-		val->sharedram += atomic_read(&mem_map[i].count) - 1;
-	}
-	val->totalram <<= PAGE_SHIFT;
-	val->sharedram <<= PAGE_SHIFT;
-#endif
-	val->totalhigh = 0;
-	val->freehigh = 0;
-	return;
-}

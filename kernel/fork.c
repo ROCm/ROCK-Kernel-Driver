@@ -34,6 +34,9 @@
 
 static kmem_cache_t *task_struct_cachep;
 
+extern int copy_semundo(unsigned long clone_flags, struct task_struct *tsk);
+extern void exit_semundo(struct task_struct *tsk);
+
 /* The idle threads do not count.. */
 int nr_threads;
 
@@ -364,6 +367,13 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 	if (clone_flags & CLONE_VM) {
 		atomic_inc(&oldmm->mm_users);
 		mm = oldmm;
+		/*
+		 * There are cases where the PTL is held to ensure no
+		 * new threads start up in user mode using an mm, which
+		 * allows optimizing out ipis; the tlb_gather_mmu code
+		 * is an example.
+		 */
+		spin_unlock_wait(&oldmm->page_table_lock);
 		goto good_mm;
 	}
 
@@ -383,11 +393,6 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 
 	if (retval)
 		goto free_pt;
-
-	/*
-	 * child gets a private LDT (if there was an LDT in the parent)
-	 */
-	copy_segments(tsk, mm);
 
 	if (init_new_context(tsk,mm))
 		goto free_pt;
@@ -665,6 +670,7 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 
 	copy_flags(clone_flags, p);
 	p->pid = get_pid(clone_flags);
+	p->proc_dentry = NULL;
 
 	INIT_LIST_HEAD(&p->run_list);
 
@@ -709,8 +715,10 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 
 	retval = -ENOMEM;
 	/* copy all the process information */
-	if (copy_files(clone_flags, p))
+	if (copy_semundo(clone_flags, p))
 		goto bad_fork_cleanup;
+	if (copy_files(clone_flags, p))
+		goto bad_fork_cleanup_semundo;
 	if (copy_fs(clone_flags, p))
 		goto bad_fork_cleanup_files;
 	if (copy_sighand(clone_flags, p))
@@ -722,7 +730,6 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	retval = copy_thread(0, clone_flags, stack_start, stack_size, p, regs);
 	if (retval)
 		goto bad_fork_cleanup_namespace;
-	p->semundo = NULL;
 	
 	/* Our parent execution domain becomes current domain
 	   These must match for thread signalling to apply */
@@ -814,6 +821,8 @@ bad_fork_cleanup_fs:
 	exit_fs(p); /* blocking */
 bad_fork_cleanup_files:
 	exit_files(p); /* blocking */
+bad_fork_cleanup_semundo:
+	exit_semundo(p);
 bad_fork_cleanup:
 	put_exec_domain(p->thread_info->exec_domain);
 	if (p->binfmt && p->binfmt->module)

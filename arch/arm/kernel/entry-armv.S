@@ -653,7 +653,7 @@ __und_invalid:	sub	sp, sp, #S_FRAME_SIZE
 		stmia	r4, {r5 - r7}			@ Save XXX pc, cpsr, old_r0
 		mov	r0, sp
 		and	r2, r6, #31			@ int mode
-		b	SYMBOL_NAME(bad_mode)
+		b	bad_mode
 
 #if defined CONFIG_FPE_NWFPE || defined CONFIG_FPE_FASTFPE
 		/* The FPE is always present */
@@ -725,7 +725,7 @@ __dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 #endif
 		msr	cpsr_c, r9
 		mov	r2, sp
-		bl	SYMBOL_NAME(do_DataAbort)
+		bl	do_DataAbort
 		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC
 		ldr	r0, [sp, #S_PSR]
 		msr	spsr, r0
@@ -756,7 +756,6 @@ __irq_svc:	sub	sp, sp, #S_FRAME_SIZE
 #ifdef CONFIG_PREEMPT
 		ldr	r0, [r8, #TI_FLAGS]		@ get flags
 		tst	r0, #_TIF_NEED_RESCHED
-		ldrne	r6, .LCirq_stat
 		blne	svc_preempt
 preempt_return:
 		ldr	r0, [r8, #TI_PREEMPT]		@ read preempt value
@@ -770,20 +769,20 @@ preempt_return:
 
 #ifdef CONFIG_PREEMPT
 svc_preempt:	teq	r9, #0				@ was preempt count = 0
+		ldreq	r6, .LCirq_stat
 		movne	pc, lr				@ no
 		ldr	r0, [r6, #4]			@ local_irq_count
 		ldr	r1, [r6, #8]			@ local_bh_count
 		adds	r0, r0, r1
 		movne	pc, lr
-		ldr	r1, [r8, #TI_TASK]
-		set_cpsr_c r2, #MODE_SVC		@ enable IRQs
-		str	r0, [r1, #0]			@ current->state = TASK_RUNNING
-1:		bl	SYMBOL_NAME(schedule)
+		mov	r7, #PREEMPT_ACTIVE
+		str	r7, [r8, #TI_PREEMPT]		@ set PREEMPT_ACTIVE
+1:		set_cpsr_c r2, #MODE_SVC		@ enable IRQs
+		bl	schedule
 		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC	@ disable IRQs
-		ldr	r0, [r8, #TI_FLAGS]
+		ldr	r0, [r8, #TI_FLAGS]		@ get new tasks TI_FLAGS
 		tst	r0, #_TIF_NEED_RESCHED
-		beq	preempt_return
-		set_cpsr_c r0, #MODE_SVC		@ enable IRQs
+		beq	preempt_return			@ go again
 		b	1b
 #endif
 
@@ -802,7 +801,7 @@ __und_svc:	sub	sp, sp, #S_FRAME_SIZE
 
 		mov	r0, r5				@ unsigned long pc
 		mov	r1, sp				@ struct pt_regs *regs
-		bl	SYMBOL_NAME(do_undefinstr)
+		bl	do_undefinstr
 
 1:		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC
 		ldr	lr, [sp, #S_PSR]		@ Get SVC cpsr
@@ -824,7 +823,7 @@ __pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		msr	cpsr_c, r9
 		mov	r0, r2				@ address (pc)
 		mov	r1, sp				@ regs
-		bl	SYMBOL_NAME(do_PrefetchAbort)	@ call abort handler
+		bl	do_PrefetchAbort		@ call abort handler
 		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC
 		ldr	r0, [sp, #S_PSR]
 		msr	spsr, r0
@@ -835,11 +834,11 @@ __pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 .LCund:		.word	__temp_und
 .LCabt:		.word	__temp_abt
 #ifdef MULTI_ABORT
-.LCprocfns:	.word	SYMBOL_NAME(processor)
+.LCprocfns:	.word	processor
 #endif
-.LCfp:		.word	SYMBOL_NAME(fp_enter)
+.LCfp:		.word	fp_enter
 #ifdef CONFIG_PREEMPT
-.LCirq_stat:	.word	SYMBOL_NAME(irq_stat)
+.LCirq_stat:	.word	irq_stat
 #endif
 
 		irq_prio_table
@@ -868,7 +867,7 @@ __dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		set_cpsr_c r2, #MODE_SVC		@ Enable interrupts
 		mov	r2, sp
 		adrsvc	al, lr, ret_from_exception
-		b	SYMBOL_NAME(do_DataAbort)
+		b	do_DataAbort
 
 		.align	5
 __irq_usr:	sub	sp, sp, #S_FRAME_SIZE
@@ -930,7 +929,7 @@ fpundefinstr:	set_cpsr_c r0, #MODE_SVC		@ Enable interrupts
 		mov	r0, lr
 		mov	r1, sp
 		adrsvc	al, lr, ret_from_exception
-		b	SYMBOL_NAME(do_undefinstr)
+		b	do_undefinstr
 
 		.align	5
 __pabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
@@ -945,7 +944,7 @@ __pabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		set_cpsr_c r0, #MODE_SVC		@ Enable interrupts
 		mov	r0, r5				@ address (pc)
 		mov	r1, sp				@ regs
-		bl	SYMBOL_NAME(do_PrefetchAbort)	@ call abort handler
+		bl	do_PrefetchAbort		@ call abort handler
 		/* fall through */
 /*
  * This is the return code to user mode for abort handlers
@@ -1231,9 +1230,9 @@ __temp_abt:	.word	0				@ Saved lr_abt
 		.word	0				@ Saved spsr_abt
 		.word	-1				@ old_r0
 
-		.globl	SYMBOL_NAME(cr_alignment)
-		.globl	SYMBOL_NAME(cr_no_alignment)
-SYMBOL_NAME(cr_alignment):
+		.globl	cr_alignment
+		.globl	cr_no_alignment
+cr_alignment:
 		.space	4
-SYMBOL_NAME(cr_no_alignment):
+cr_no_alignment:
 		.space	4

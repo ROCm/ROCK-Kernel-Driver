@@ -45,6 +45,7 @@ struct exec_domain;
 #define CLONE_PARENT	0x00008000	/* set if we want to have the same parent as the cloner */
 #define CLONE_THREAD	0x00010000	/* Same thread group? */
 #define CLONE_NEWNS	0x00020000	/* New namespace group? */
+#define CLONE_SYSVSEM	0x00040000	/* share system V SEM_UNDO semantics */
 
 #define CLONE_SIGNAL	(CLONE_SIGHAND | CLONE_THREAD)
 
@@ -315,8 +316,7 @@ struct task_struct {
 	struct tty_struct *tty; /* NULL if no tty */
 	unsigned int locks; /* How many file locks are being held */
 /* ipc stuff */
-	struct sem_undo *semundo;
-	struct sem_queue *semsleeping;
+	struct sysv_sem sysvsem;
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /* filesystem information */
@@ -346,6 +346,7 @@ struct task_struct {
 
 /* journalling filesystem info */
 	void *journal_info;
+	struct dentry *proc_dentry;
 };
 
 extern void __put_task_struct(struct task_struct *tsk);
@@ -367,8 +368,8 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_MEMALLOC	0x00000800	/* Allocating memory */
 #define PF_MEMDIE	0x00001000	/* Killed for out-of-memory */
 #define PF_FREE_PAGES	0x00002000	/* per process page freeing */
-#define PF_NOIO		0x00004000	/* avoid generating further I/O */
-#define PF_FLUSHER	0x00008000	/* responsible for disk writeback */
+#define PF_FLUSHER	0x00004000	/* responsible for disk writeback */
+#define PF_RADIX_TREE	0x00008000	/* debug: performing radix tree alloc */
 
 /*
  * Ptrace flags
@@ -769,15 +770,7 @@ static inline struct task_struct *younger_sibling(struct task_struct *p)
 
 #define thread_group_leader(p)	(p->pid == p->tgid)
 
-static inline void unhash_process(struct task_struct *p)
-{
-	write_lock_irq(&tasklist_lock);
-	nr_threads--;
-	unhash_pid(p);
-	REMOVE_LINKS(p);
-	list_del(&p->thread_group);
-	write_unlock_irq(&tasklist_lock);
-}
+extern void unhash_process(struct task_struct *p);
 
 /* Protects ->fs, ->files, ->mm, and synchronises with wait4().  Nests inside tasklist_lock */
 static inline void task_lock(struct task_struct *p)

@@ -258,7 +258,7 @@ static void leo_putc(struct vc_data *conp, struct display *p, int c, int yy, int
 	sbus_writel(attr_bgcol(p,c) << 24, &ss->bg);
 	sbus_writel(0xFFFFFFFF<<(32-fontwidth(p)),
 		    &us->fontmsk);
-	u = ((u32 *)p->screen_base) + y + x;
+	u = ((u32 *)p->fb_info.screen_base) + y + x;
 	if (fontwidth(p) <= 8) {
 		for (i = 0; i < fontheight(p); i++, u += 2048) {
 			u32 val = *fd++ << 24;
@@ -304,7 +304,7 @@ static void leo_putcs(struct vc_data *conp, struct display *p, const unsigned sh
 		y = yy << (fontheightlog(p) + 11);
 	else
 		y = (yy * fontheight(p)) << 11;
-	u = ((u32 *)p->screen_base) + y + x;
+	u = ((u32 *)p->fb_info.screen_base) + y + x;
 	if (fontwidth(p) <= 8) {
 		sbus_writel(0xFFFFFFFF<<(32-4*fontwidth(p)), &us->fontmsk);
 		x = 4*fontwidth(p) - fontheight(p)*2048;
@@ -535,7 +535,7 @@ static void leo_setcursor (struct fb_info_sbusfb *fb)
 	spin_unlock_irqrestore(&fb->lock, flags);
 }
 
-static void leo_blank (struct fb_info_sbusfb *fb)
+static int leo_blank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u32 tmp;
@@ -547,9 +547,10 @@ static void leo_blank (struct fb_info_sbusfb *fb)
 	tmp &= ~LEO_KRN_CSR_ENABLE;
 	sbus_writel(tmp, &fb->s.leo.lx_krn->krn_csr);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
-static void leo_unblank (struct fb_info_sbusfb *fb)
+static int leo_unblank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u32 tmp;
@@ -563,6 +564,7 @@ static void leo_unblank (struct fb_info_sbusfb *fb)
 		sbus_writel(tmp, &fb->s.leo.lx_krn->krn_csr);
 	}
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
 static int __init
@@ -592,7 +594,7 @@ leo_wid_put (struct fb_info_sbusfb *fb, struct fb_wid_list *wl)
 
 static void leo_margins (struct fb_info_sbusfb *fb, struct display *p, int x_margin, int y_margin)
 {
-	p->screen_base += 8192 * (y_margin - fb->y_margin) + 4 * (x_margin - fb->x_margin);
+	fb->fb_info.screen_base += 8192 * (y_margin - fb->y_margin) + 4 * (x_margin - fb->x_margin);
 }
 
 static void leo_switch_from_graph (struct fb_info_sbusfb *fb)
@@ -673,12 +675,12 @@ char * __init leofb_init(struct fb_info_sbusfb *fb)
 	fb->info.fbops = fbops;
 	
 	disp->scrollmode = SCROLL_YREDRAW;
-	if (!disp->screen_base) {
-		disp->screen_base = (char *)
+	if (!fb->info.screen_base) {
+		fb->info.screen_base = (char *)
 			sbus_ioremap(&sdev->resource[0], LEO_OFF_SS0,
 				     0x800000, "leo ram");
 	}
-	disp->screen_base += 8192 * fb->y_margin + 4 * fb->x_margin;
+	fb->info.screen_base += 8192 * fb->y_margin + 4 * fb->x_margin;
 	us = fb->s.leo.lc_ss0_usr = (struct leo_lc_ss0_usr *)
 		sbus_ioremap(&sdev->resource[0], LEO_OFF_LC_SS0_USR,
 			     0x1000, "leolc ss0usr");

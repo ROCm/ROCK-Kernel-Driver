@@ -596,7 +596,7 @@ static int se401_start_stream(struct usb_se401 *se401)
 	for (i=0; i<SE401_NUMSBUF; i++) {
 		urb=usb_alloc_urb(0, GFP_KERNEL);
 		if(!urb)
-			return ENOMEM;
+			return -ENOMEM;
 
 		FILL_BULK_URB(urb, se401->dev,
 			usb_rcvbulkpipe(se401->dev, SE401_VIDEO_ENDPOINT),

@@ -55,6 +55,14 @@ CONFIG_PLX_HERMES
   Support for these adaptors is so far still incomplete and buggy.
   You have been warned.
 
+Prism 2.5 PCI 802.11b adaptor support
+CONFIG_PCI_HERMES
+  Enable support for PCI and mini-PCI 802.11b wireless NICs based on
+  the Prism 2.5 chipset.  These are true PCI cards, not the 802.11b
+  PCMCIA cards bundled with PCI<->PCMCIA adaptors which are also
+  common.  Some of the built-in wireless adaptors in laptops are of
+  this variety.
+
 CONFIG_PCMCIA_HERMES
   A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
   as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/

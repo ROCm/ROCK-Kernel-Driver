@@ -81,7 +81,6 @@ static int floppy_count;
 
 static struct floppy_state floppy_states[MAX_FLOPPIES];
 
-static int floppy_blocksizes[2] = {512,512};
 static int floppy_sizes[2] = {2880,2880};
 
 static spinlock_t swim_iop_lock = SPIN_LOCK_UNLOCKED;
@@ -149,8 +148,8 @@ int swimiop_init(void)
 		       MAJOR_NR);
 		return -EBUSY;
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &swim_iop_lock);
-	blksize_size[MAJOR_NR] = floppy_blocksizes;
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request,
+			&swim_iop_lock);
 	blk_size[MAJOR_NR] = floppy_sizes;
 
 	printk("SWIM-IOP: %s by Joshua M. Thompson (funaho@jurai.org)\n",

@@ -3,19 +3,19 @@
 # Copyright (c) 1999 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := sq.o
+O_TARGET     := _seq.o
 
-subdir-y     := instr
-subdir-m     := $(subdir-y)
-obj-y        += instr/instr.o
-subdir-$(CONFIG_SND_SEQUENCER_OSS) += oss
-ifeq ($(CONFIG_SND_SEQUENCER_OSS),y)
-  obj-y	     += oss/oss.o
+mod-subdirs  := instr
+
+subdir-$(CONFIG_SND) += instr
+ifeq ($(CONFIG_SND),y)
+  obj-y        += instr/_instr.o
 endif
 
-list-multi   := snd-seq-device.o snd-seq.o snd-seq-midi.o snd-seq-midi-emul.o \
-		snd-seq-midi-event.o snd-seq-instr.o snd-seq-dummy.o \
-		snd-seq-virmidi.o
+subdir-$(CONFIG_SND_SEQUENCER_OSS) += oss
+ifeq ($(CONFIG_SND_SEQUENCER_OSS),y)
+  obj-y	     += oss/_oss.o
+endif
 
 export-objs  := seq_device.o seq.o seq_ports.o seq_instr.o seq_midi_emul.o \
 		seq_midi_event.o seq_virmidi.o
@@ -81,28 +81,6 @@ obj-$(CONFIG_SND_EMU10K1) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-m
 obj-$(CONFIG_SND_TRIDENT) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o snd-seq-midi-emul.o snd-seq-instr.o
 obj-$(CONFIG_SND_YMFPCI) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-midi-event.o snd-seq-midi-emul.o snd-seq-instr.o
 
+obj-m := $(sort $(obj-m))
+
 include $(TOPDIR)/Rules.make
-
-snd-seq-device.o: $(snd-seq-device-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-seq-device-objs)
-
-snd-seq.o: $(snd-seq-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-seq-objs)
-
-snd-seq-midi.o: $(snd-seq-midi-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-seq-midi-objs)
-
-snd-seq-midi-emul.o: $(snd-seq-midi-emul-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-seq-midi-emul-objs)
-
-snd-seq-midi-event.o: $(snd-seq-midi-event-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-seq-midi-event-objs)
-
-snd-seq-instr.o: $(snd-seq-instr-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-seq-instr-objs)
-
-snd-seq-dummy.o: $(snd-seq-dummy-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-seq-dummy-objs)
-
-snd-seq-virmidi.o: $(snd-seq-virmidi-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-seq-virmidi-objs)

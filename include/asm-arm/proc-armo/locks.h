@@ -28,7 +28,7 @@
 "	orrmi	ip, ip, #0x80000000	@ set N\n" \
 "	teqp	ip, #0\n"			\
 "	movmi	ip, %0\n"			\
-"	blmi	" SYMBOL_NAME_STR(fail)		\
+"	blmi	" #fail				\
 	:					\
 	: "r" (ptr)				\
 	: "ip", "lr", "cc");			\
@@ -50,7 +50,7 @@
 "	teqp	ip, #0\n"			\
 "	movmi	ip, %1\n"			\
 "	movpl	ip, #0\n"			\
-"	blmi	" SYMBOL_NAME_STR(fail) "\n"	\
+"	blmi	" #fail "\n"			\
 "	mov	%0, ip"				\
 	: "=&r" (result)			\
 	: "r" (ptr)				\
@@ -72,7 +72,7 @@
 "	orrle	ip, ip, #0x80000000	@ set N - should this be mi ??? DAG ! \n" \
 "	teqp	ip, #0\n"			\
 "	movmi	ip, %0\n"			\
-"	blmi	" SYMBOL_NAME_STR(wake)		\
+"	blmi	" #wake				\
 	:					\
 	: "r" (ptr)				\
 	: "ip", "lr", "cc");			\
@@ -104,7 +104,7 @@
 " orreq ip, ip, #0x40000000 @ set Z \n"\
 "	teqp	ip, #0\n"			\
 "	movne	ip, %0\n"			\
-"	blne	" SYMBOL_NAME_STR(fail)		\
+"	blne	" #fail				\
 	:					\
 	: "r" (ptr), "I" (RW_LOCK_BIAS)		\
 	: "ip", "lr", "cc");			\
@@ -127,7 +127,7 @@
 " orrcs ip, ip, #0x20000000 @ set C\n" \
 "	teqp	ip, #0\n"			\
 "	movcs	ip, %0\n"			\
-"	blcs	" SYMBOL_NAME_STR(wake)		\
+"	blcs	" #wake				\
 	:					\
 	: "r" (ptr), "I" (RW_LOCK_BIAS)		\
 	: "ip", "lr", "cc");			\
@@ -152,7 +152,7 @@
 " orreq ip, ip, #0x40000000 @ Set Z \n" \
 "	teqp	ip, #0\n"			\
 "	moveq	ip, %0\n"			\
-"	bleq	" SYMBOL_NAME_STR(wake)		\
+"	bleq	" #wake				\
 	:					\
 	: "r" (ptr), "I" (1)			\
 	: "ip", "lr", "cc");			\

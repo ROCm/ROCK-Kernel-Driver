@@ -46,6 +46,7 @@ if [ "$CONFIG_SERIAL_NONSTANDARD" = "y" ]; then
       dep_tristate '  Multi-Tech multiport card support (EXPERIMENTAL)' CONFIG_ISI m
    fi
    tristate '  Microgate SyncLink card support' CONFIG_SYNCLINK
+   tristate '  SyncLink Multiport support' CONFIG_SYNCLINKMP
    tristate '  HDLC line discipline support' CONFIG_N_HDLC
    tristate '  SDL RISCom/8 card support' CONFIG_RISCOM8
    tristate '  Specialix IO8+ card support' CONFIG_SPECIALIX

@@ -81,7 +81,7 @@ static int ncp_symlink_readpage(struct file *file, struct page *page)
 		goto fail;
 	SetPageUptodate(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
 
 failEIO:
@@ -90,7 +90,7 @@ failEIO:
 fail:
 	SetPageError(page);
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return error;
 }
 

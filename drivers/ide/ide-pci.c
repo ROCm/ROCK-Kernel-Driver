@@ -1,6 +1,8 @@
-/*
- *  Copyright (c) 1998-2000  Andre Hedrick <andre@linux-ide.org>
- *  Copyright (c) 1995-1998  Mark Lord
+/**** vi:set ts=8 sts=8 sw=8:************************************************
+ *
+ *  Copyright (C) 2002	     Marcin Dalecki <martin@dalecki.de>
+ *  Copyright (C) 1998-2000  Andre Hedrick <andre@linux-ide.org>
+ *  Copyright (C) 1995-1998  Mark Lord
  *
  *  May be copied or modified under the terms of the GNU General Public License
  */
@@ -81,17 +83,10 @@ extern void ide_init_hpt34x(struct ata_channel *);
 #endif
 
 #ifdef CONFIG_BLK_DEV_HPT366
-extern byte hpt363_shared_irq;
-extern byte hpt363_shared_pin;
-
 extern unsigned int pci_init_hpt366(struct pci_dev *);
 extern unsigned int ata66_hpt366(struct ata_channel *);
 extern void ide_init_hpt366(struct ata_channel *);
 extern void ide_dmacapable_hpt366(struct ata_channel *, unsigned long);
-#else
-/* FIXME: those have to be killed */
-static byte hpt363_shared_irq;
-static byte hpt363_shared_pin;
 #endif
 
 #ifdef CONFIG_BLK_DEV_NS87415
@@ -177,7 +172,7 @@ typedef struct ide_pci_enablebit_s {
 #define ATA_F_PHACK	0x40	/* apply PROMISE hacks */
 #define ATA_F_HPTHACK	0x80	/* apply HPT366 hacks */
 
-typedef struct ide_pci_device_s {
+struct ata_pci_device {
 	unsigned short		vendor;
 	unsigned short		device;
 	unsigned int		(*init_chipset)(struct pci_dev *dev);
@@ -188,9 +183,9 @@ typedef struct ide_pci_device_s {
 	unsigned int		bootable;
 	unsigned int		extra;
 	unsigned int		flags;
-} ide_pci_device_t;
+};
 
-static ide_pci_device_t pci_chipsets[] __initdata = {
+static struct ata_pci_device pci_chipsets[] __initdata = {
 #ifdef CONFIG_BLK_DEV_PIIX
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371FB_1, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371SB_1, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
@@ -201,8 +196,10 @@ static ide_pci_device_t pci_chipsets[] __initdata = {
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AB_1, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_9, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_8, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801E_9, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_10, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_11, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
+	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801DB_9, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_EFAR, PCI_DEVICE_ID_EFAR_SLC90E66_1, pci_init_piix, ata66_piix, ide_init_piix, ide_dmacapable_piix, {{0x41,0x80,0x80}, {0x43,0x80,0x80}}, ON_BOARD, 0, 0 },
 #endif
 #ifdef CONFIG_BLK_DEV_VIA82CXXX
@@ -317,7 +314,7 @@ static ide_pci_device_t pci_chipsets[] __initdata = {
  * settings of split-mirror pci-config space, place chipset into init-mode,
  * and/or preserve an interrupt if the card is not native ide support.
  */
-static unsigned int __init trust_pci_irq(ide_pci_device_t *d, struct pci_dev *dev)
+static unsigned int __init trust_pci_irq(struct ata_pci_device *d, struct pci_dev *dev)
 {
 	if (d->flags & ATA_F_IRQ)
 		return dev->irq;
@@ -482,7 +479,7 @@ static unsigned long __init get_dma_base(struct ata_channel *hwif, int extra, co
  * Setup DMA transfers on a channel.
  */
 static void __init setup_channel_dma(struct ata_channel *hwif, struct pci_dev *dev,
-		ide_pci_device_t *d,
+		struct ata_pci_device *d,
 		int port,
 		u8 class_rev,
 		int pciirq,
@@ -532,7 +529,7 @@ static void __init setup_channel_dma(struct ata_channel *hwif, struct pci_dev *d
  * This gets called once for the master and for the slave interface.
  */
 static int __init setup_host_channel(struct pci_dev *dev,
-		ide_pci_device_t *d,
+		struct ata_pci_device *d,
 		int port,
 		u8 class_rev,
 		int pciirq,
@@ -646,17 +643,16 @@ no_dma:
 }
 
 /*
- * Looks at the primary/secondary channels on a PCI IDE device and, if they
- * are enabled, prepares the IDE driver for use with them.  This generic code
- * works for most PCI chipsets.
+ * Looks at the primary/secondary channels on a PCI IDE device and, if they are
+ * enabled, prepares the IDE driver for use with them.  This generic code works
+ * for most PCI chipsets.
  *
  * One thing that is not standardized is the location of the primary/secondary
  * interface "enable/disable" bits.  For chipsets that we "know" about, this
- * information is in the ide_pci_device_t struct; for all other chipsets, we
- * just assume both interfaces are enabled.
+ * information is in the struct ata_pci_device struct; for all other chipsets,
+ * we just assume both interfaces are enabled.
  */
-
-static void __init setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d)
+static void __init setup_pci_device(struct pci_dev *dev, struct ata_pci_device *d)
 {
 	int autodma = 0;
 	int pciirq = 0;
@@ -713,7 +709,7 @@ check_if_enabled:
 		d->bootable = (pcicmd & PCI_COMMAND_MEMORY) ? OFF_BOARD : NEVER_BOARD;
 	}
 
-	printk("%s: chipset revision %d\n", dev->name, class_rev);
+	printk(KERN_INFO "ATA: chipset rev.: %d\n", class_rev);
 
 	/*
 	 * Can we trust the reported IRQ?
@@ -726,11 +722,11 @@ check_if_enabled:
 		   to act otherwise on those. The Supertrak however we need
 		   to skip */
 		if (d->vendor == PCI_VENDOR_ID_PROMISE && d->device == PCI_DEVICE_ID_PROMISE_20265) {
-			printk(KERN_INFO "ide: Found promise 20265 in RAID mode.\n");
+			printk(KERN_INFO "ATA: Found promise 20265 in RAID mode.\n");
 			if(dev->bus->self && dev->bus->self->vendor == PCI_VENDOR_ID_INTEL &&
 				dev->bus->self->device == PCI_DEVICE_ID_INTEL_I960)
 			{
-				printk(KERN_INFO "ide: Skipping Promise PDC20265 attached to I2O RAID controller.\n");
+				printk(KERN_INFO "ATA: Skipping Promise PDC20265 attached to I2O RAID controller.\n");
 				return;
 			}
 		}
@@ -738,9 +734,10 @@ check_if_enabled:
 		   Suspect a fastrak and fall through */
 	}
 	if ((dev->class & ~(0xfa)) != ((PCI_CLASS_STORAGE_IDE << 8) | 5)) {
-		printk("%s: not 100%% native mode: will probe irqs later\n", dev->name);
+		printk(KERN_INFO "ATA: non-legacy mode: IRQ probe delayed\n");
+
 		/*
-		 * This allows off board ide-pci cards the enable a BIOS,
+		 * This allows off board ide-pci cards to enable a BIOS,
 		 * verify interrupt settings of split-mirror pci-config
 		 * space, place chipset into init-mode, and/or preserve
 		 * an interrupt if the card is not native ide support.
@@ -750,19 +747,18 @@ check_if_enabled:
 		else
 			pciirq = trust_pci_irq(d, dev);
 	} else if (tried_config) {
-		printk("%s: will probe IRQs later\n", dev->name);
+		printk(KERN_INFO "ATA: will probe IRQs later\n");
 		pciirq = 0;
 	} else if (!pciirq) {
-		printk("%s: bad IRQ (%d): will probe later\n", dev->name, pciirq);
+		printk(KERN_INFO "ATA: invalid IRQ (%d): will probe later\n", pciirq);
 		pciirq = 0;
 	} else {
 		if (d->init_chipset)
 			d->init_chipset(dev);
 #ifdef __sparc__
-		printk("%s: 100%% native mode on irq %s\n",
-		       dev->name, __irq_itoa(pciirq));
+		printk(KERN_INFO "ATA: 100%% native mode on irq\n", __irq_itoa(pciirq));
 #else
-		printk("%s: 100%% native mode on irq %d\n", dev->name, pciirq);
+		printk(KERN_INFO "ATA: 100%% native mode on irq %d\n", pciirq);
 #endif
 	}
 
@@ -773,10 +769,11 @@ check_if_enabled:
 	setup_host_channel(dev, d, ATA_SECONDARY, class_rev, pciirq, autodma, &pcicmd);
 }
 
-static void __init pdc20270_device_order_fixup (struct pci_dev *dev, ide_pci_device_t *d)
+static void __init pdc20270_device_order_fixup (struct pci_dev *dev, struct ata_pci_device *d)
 {
-	struct pci_dev *dev2 = NULL, *findev;
-	ide_pci_device_t *d2;
+	struct pci_dev *dev2 = NULL;
+	struct pci_dev *findev;
+	struct ata_pci_device *d2;
 
 	if (dev->bus->self &&
 	    dev->bus->self->vendor == PCI_VENDOR_ID_DEC &&
@@ -812,10 +809,10 @@ static void __init pdc20270_device_order_fixup (struct pci_dev *dev, ide_pci_dev
 	setup_pci_device(dev2, d2);
 }
 
-static void __init hpt366_device_order_fixup (struct pci_dev *dev, ide_pci_device_t *d)
+static void __init hpt366_device_order_fixup (struct pci_dev *dev, struct ata_pci_device *d)
 {
 	struct pci_dev *dev2 = NULL, *findev;
-	ide_pci_device_t *d2;
+	struct ata_pci_device *d2;
 	unsigned char pin1 = 0, pin2 = 0;
 	unsigned int class_rev;
 
@@ -841,9 +838,7 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, ide_pci_devic
 		    (PCI_FUNC(findev->devfn) & 1)) {
 			dev2 = findev;
 			pci_read_config_byte(dev2, PCI_INTERRUPT_PIN, &pin2);
-			hpt363_shared_pin = (pin1 != pin2) ? 1 : 0;
-			hpt363_shared_irq = (dev->irq == dev2->irq) ? 1 : 0;
-			if (hpt363_shared_pin && hpt363_shared_irq) {
+			if ((pin1 != pin2) && (dev->irq == dev2->irq)) {
 				d->bootable = ON_BOARD;
 				printk("%s: onboard version of chipset, pin1=%d pin2=%d\n", dev->name, pin1, pin2);
 			}
@@ -867,7 +862,7 @@ static void __init scan_pcidev(struct pci_dev *dev)
 {
 	unsigned short vendor;
 	unsigned short device;
-	ide_pci_device_t *d;
+	struct ata_pci_device *d;
 
 	vendor = dev->vendor;
 	device = dev->device;
@@ -879,7 +874,7 @@ static void __init scan_pcidev(struct pci_dev *dev)
 		++d;
 
 	if (d->init_channel == ATA_PCI_IGNORE)
-		printk("%s: has been ignored by PCI bus scan\n", dev->name);
+		printk(KERN_INFO "ATA: %s: ignored by PCI bus scan\n", dev->name);
 	else if ((d->vendor == PCI_VENDOR_ID_OPTI && d->device == PCI_DEVICE_ID_OPTI_82C558) && !(PCI_FUNC(dev->devfn) & 1))
 		return;
 	else if ((d->vendor == PCI_VENDOR_ID_CONTAQ && d->device == PCI_DEVICE_ID_CONTAQ_82C693) && (!(PCI_FUNC(dev->devfn) & 1) || !((dev->class >> 8) == PCI_CLASS_STORAGE_IDE)))
@@ -894,10 +889,10 @@ static void __init scan_pcidev(struct pci_dev *dev)
 		pdc20270_device_order_fixup(dev, d);
 	else if (!(d->vendor == 0 && d->device == 0) || (dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
 		if (d->vendor == 0 && d->device == 0)
-			printk("%s: unknown IDE controller on PCI slot %s, vendor=%04x, device=%04x\n",
-			       dev->name, dev->slot_name, vendor, device);
+			printk(KERN_INFO "ATA: unknown interface: %s (%04x:%04x) on PCI slot %s\n",
+			       dev->name, vendor, device, dev->slot_name);
 		else
-			printk("%s: IDE controller on PCI slot %s\n", dev->name, dev->slot_name);
+			printk(KERN_INFO "ATA: interface: %s, on PCI slot %s\n", dev->name, dev->slot_name);
 		setup_pci_device(dev, d);
 	}
 }

@@ -121,9 +121,6 @@ struct neofb_info {
   struct display_switch	*dispsw;
 
   struct pci_dev *pcidev;
-
-  int   currcon;
-
   int   accel;
   char *name;
 

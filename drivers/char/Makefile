@@ -16,7 +16,8 @@ obj-y	 += mem.o tty_io.o n_tty.o tty_ioctl.o raw.o pty.o misc.o random.o
 
 export-objs     :=	busmouse.o console.o keyboard.o sysrq.o \
 			misc.o pty.o random.o selection.o serial.o \
-			sonypi.o tty_io.o tty_ioctl.o generic_serial.o rtc.o
+			sonypi.o tty_io.o tty_ioctl.o generic_serial.o rtc.o \
+			ip2main.o
 
 mod-subdirs	:=	ftape drm pcmcia
 
@@ -143,6 +144,7 @@ obj-$(CONFIG_RISCOM8) += riscom8.o
 obj-$(CONFIG_ISI) += isicom.o
 obj-$(CONFIG_ESPSERIAL) += esp.o
 obj-$(CONFIG_SYNCLINK) += synclink.o
+obj-$(CONFIG_SYNCLINKMP) += synclinkmp.o
 obj-$(CONFIG_N_HDLC) += n_hdlc.o
 obj-$(CONFIG_SPECIALIX) += specialix.o
 obj-$(CONFIG_AMIGA_BUILTIN_SERIAL) += amiserial.o

@@ -12,13 +12,13 @@
    Copyright 1992 - 2002 Kai Makisara
    email Kai.Makisara@metla.fi
 
-   Last modified: Wed Jan 23 20:22:42 2002 by makisara
+   Last modified: Tue Feb  5 21:25:55 2002 by makisara
    Some small formal changes - aeb, 950809
 
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20020123";
+static char *verstr = "20020205";
 
 #include <linux/module.h>
 
@@ -2112,7 +2112,8 @@ static int st_set_options(Scsi_Tape *STp, long options)
 #define MODE_SELECT_PAGE_FORMAT 0x10
 
 /* Read a mode page into the tape buffer. The block descriptors are included
-   if incl_block_descs is true. */
+   if incl_block_descs is true. The page control is ored to the page number
+   parameter, if necessary. */
 static int read_mode_page(Scsi_Tape *STp, int page, int omit_block_descs)
 {
 	unsigned char cmd[MAX_COMMAND_SIZE];

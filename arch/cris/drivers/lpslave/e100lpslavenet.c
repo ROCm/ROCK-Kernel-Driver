@@ -313,7 +313,7 @@ e100_open(struct net_device *dev)
 		IO_STATE(R_PAR0_CONFIG, iautofd, noninv)    |
           /* Not used in reverse direction, don't care */
 		IO_STATE(R_PAR0_CONFIG, istrb,   noninv)    |
-          /* Not connected, don't care /
+          /* Not connected, don't care */
 		IO_STATE(R_PAR0_CONFIG, iinit,   noninv)    |
           /* perror is GND and reverse wants 0, noninv */
 		IO_STATE(R_PAR0_CONFIG, iperr,   noninv)    |

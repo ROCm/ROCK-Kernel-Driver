@@ -115,7 +115,6 @@ static int no_int_yet;
 static int access_count[MAX_HD];
 static char ps2esdi_valid[MAX_HD];
 static int ps2esdi_sizes[MAX_HD << 6];
-static int ps2esdi_blocksizes[MAX_HD << 6];
 static int ps2esdi_drives;
 static struct hd_struct ps2esdi[MAX_HD << 6];
 static u_short io_base;
@@ -176,7 +175,8 @@ int __init ps2esdi_init(void)
 		return -1;
 	}
 	/* set up some global information - indicating device specific info */
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &ps2esdi_lock);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_ps2esdi_request,
+			&ps2esdi_lock);
 
 	/* some minor housekeeping - setup the global gendisk structure */
 	add_gendisk(&ps2esdi_gendisk);
@@ -412,12 +412,8 @@ static void __init ps2esdi_geninit(void)
 
 	ps2esdi_gendisk.nr_real = ps2esdi_drives;
 
-	for (i = 0; i < (MAX_HD << 6); i++)
-		ps2esdi_blocksizes[i] = 1024;
-
 	request_dma(dma_arb_level, "ed");
 	request_region(io_base, 4, "ed");
-	blksize_size[MAJOR_NR] = ps2esdi_blocksizes;
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 128);
 
 	for (i = 0; i < ps2esdi_drives; i++) {

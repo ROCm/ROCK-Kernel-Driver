@@ -3,9 +3,7 @@
 # Copyright (c) 1999 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := oss.o
-
-list-multi   := snd-seq-oss.o
+O_TARGET     := _oss.o
 
 snd-seq-oss-objs  := seq_oss.o seq_oss_init.o seq_oss_timer.o seq_oss_ioctl.o \
 		     seq_oss_event.o seq_oss_rw.o seq_oss_synth.o \
@@ -14,6 +12,3 @@ snd-seq-oss-objs  := seq_oss.o seq_oss_init.o seq_oss_timer.o seq_oss_ioctl.o \
 obj-$(CONFIG_SND_SEQUENCER_OSS) += snd-seq-oss.o
 
 include $(TOPDIR)/Rules.make
-
-snd-seq-oss.o: $(snd-seq-oss-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-seq-oss-objs)

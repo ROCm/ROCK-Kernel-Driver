@@ -35,7 +35,6 @@
 static struct fb_info fb_info;
 static struct { u_char red, green, blue, pad; } palette[256];
 static struct display global_disp;
-static int currcon = 0;
 
 /*
  * Interface used by the world
@@ -48,10 +47,8 @@ static int tx3912fb_set_var(struct fb_var_screeninfo *var, int con,
 				struct fb_info *info);
 static int tx3912fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 				struct fb_info *info);
-static int tx3912fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-				struct fb_info *info);
-static int tx3912fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
-				u_long arg, int con, struct fb_info *info);
+static int tx3912fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			u_int transp, struct fb_info *info);
 
 /*
  * Interface used by console driver
@@ -59,7 +56,6 @@ static int tx3912fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 int tx3912fb_init(void);
 static int tx3912fbcon_switch(int con, struct fb_info *info);
 static int tx3912fbcon_updatevar(int con, struct fb_info *info);
-static void tx3912fbcon_blank(int blank, struct fb_info *info);
 
 /*
  * Macros
@@ -72,10 +68,6 @@ static void tx3912fbcon_blank(int blank, struct fb_info *info);
  */
 static int tx3912fb_getcolreg(u_int regno, u_int *red, u_int *green,
 			u_int *blue, u_int *transp, struct fb_info *info);
-static int tx3912fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			u_int transp, struct fb_info *info);
-static void tx3912fb_install_cmap(int con, struct fb_info *info);
-
 
 /*
  * Frame buffer operations structure used by console driver
@@ -86,8 +78,8 @@ static struct fb_ops tx3912fb_ops = {
 	fb_get_var: tx3912fb_get_var,
 	fb_set_var: tx3912fb_set_var,
 	fb_get_cmap: tx3912fb_get_cmap,
-	fb_set_cmap: tx3912fb_set_cmap,
-	fb_ioctl: tx3912fb_ioctl,
+	fb_set_cmap: gen_set_cmap,
+	fb_setcolreg:	tx3912fb_setcolreg,
 };
 
 
@@ -226,7 +218,6 @@ static int tx3912fb_set_var(struct fb_var_screeninfo *var, int con,
 		    oldvyres != var->yres_virtual ||
 		    oldbpp != var->bits_per_pixel) {
 
-			display->screen_base = (u_char *) tx3912fb_vaddr;
 
 			switch (var->bits_per_pixel) {
 			case 1:
@@ -285,7 +276,7 @@ static int tx3912fb_set_var(struct fb_var_screeninfo *var, int con,
 		if (oldbpp != var->bits_per_pixel) {
 			if ((err = fb_alloc_cmap(&display->cmap, 0, 0)))
 				return err;
-			tx3912fb_install_cmap(con, info);
+			do_install_cmap(con, info);
 		}
 	}
 
@@ -298,7 +289,7 @@ static int tx3912fb_set_var(struct fb_var_screeninfo *var, int con,
 static int tx3912fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info)
 {
-	if (con == currcon)
+	if (con == info->currcon)
 		return fb_get_cmap(cmap, kspc, tx3912fb_getcolreg, info);
 	else if (fb_display[con].cmap.len) /* non default colormap? */
 		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
@@ -306,36 +297,6 @@ static int tx3912fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 		fb_copy_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel), cmap, kspc ? 0 : 2);
 
 	return 0;
-}
-
-/*
- *  Set the Colormap
- */
-static int tx3912fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			struct fb_info *info)
-{
-	int err;
-
-	if (!fb_display[con].cmap.len)
-		if ((err = fb_alloc_cmap(&fb_display[con].cmap,
-				1<<fb_display[con].var.bits_per_pixel, 0)))
-			return err;
-
-	if (con == currcon)
-		return fb_set_cmap(cmap, kspc, tx3912fb_setcolreg, info);
-	else
-		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-
-	return 0;
-}
-
-/*
- *  Framebuffer ioctl
- */
-static int tx3912fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
-				u_long arg, int con, struct fb_info *info)
-{
-	return -EINVAL;
 }
 
 /*
@@ -399,10 +360,11 @@ int __init tx3912fb_init(void)
 	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fbops = &tx3912fb_ops;
+	fb_info.screen_base = (u_char *) tx3912fb_vaddr;
 	fb_info.disp = &global_disp;
+	fb_info.currcon = -1;
 	fb_info.switch_con = &tx3912fbcon_switch;
 	fb_info.updatevar = &tx3912fbcon_updatevar;
-	fb_info.blank = &tx3912fbcon_blank;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	tx3912fb_set_var(&tx3912fb_info, -1, &fb_info);
@@ -422,16 +384,15 @@ int __init tx3912fb_init(void)
 static int tx3912fbcon_switch(int con, struct fb_info *info)
 {
 	/* Save off the color map if needed */
-	if (fb_display[currcon].cmap.len)
-		fb_get_cmap(&fb_display[currcon].cmap, 1,
+	if (fb_display[info->currcon].cmap.len)
+		fb_get_cmap(&fb_display[info->currcon].cmap, 1,
 			tx3912fb_getcolreg, info);
 
 	/* Make the switch */
-	currcon = con;
+	info->currcon = con;
 
 	/* Install new colormap */
-	tx3912fb_install_cmap(con, info);
-
+	do_install_cmap(con, info);
 	return 0;
 }
 
@@ -442,15 +403,6 @@ static int tx3912fbcon_updatevar(int con, struct fb_info *info)
 {
 	/* Nothing */
 	return 0;
-}
-
-/*
- * Blank the display
- */
-static void tx3912fbcon_blank(int blank, struct fb_info *info)
-{
-	/* FIXME */
-	printk("tx3912fbcon_blank\n");
 }
 
 /*
@@ -510,20 +462,6 @@ static int tx3912fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	palette[regno].blue = blue;
 
 	return 0;
-}
-
-/*
- * Install the color map
- */
-static void tx3912fb_install_cmap(int con, struct fb_info *info)
-{
-	if (con != currcon)
-		return;
-
-	if (fb_display[con].cmap.len)
-		fb_set_cmap(&fb_display[con].cmap, 1, tx3912fb_setcolreg, info);
-	else
-		fb_set_cmap(fb_default_cmap(1 << fb_display[con].var.bits_per_pixel), 1, tx3912fb_setcolreg, info);
 }
 
 MODULE_LICENSE("GPL");

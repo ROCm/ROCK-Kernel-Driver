@@ -1681,7 +1681,7 @@ int reiserfs_allocate_list_bitmaps(struct super_block *s, struct reiserfs_list_b
 
 				/* why is this kerplunked right here? */
 static inline int reiserfs_buffer_prepared(const struct buffer_head *bh) {
-  if (bh && test_bit(BH_JPrepared, ( struct buffer_head * ) &bh->b_state))
+  if (bh && test_bit(BH_JPrepared, &bh->b_state))
     return 1 ;
   else
     return 0 ;
@@ -1690,7 +1690,7 @@ static inline int reiserfs_buffer_prepared(const struct buffer_head *bh) {
 /* buffer was journaled, waiting to get to disk */
 static inline int buffer_journal_dirty(const struct buffer_head *bh) {
   if (bh)
-    return test_bit(BH_JDirty_wait, ( struct buffer_head * ) &bh->b_state) ;
+    return test_bit(BH_JDirty_wait, &bh->b_state) ;
   else
     return 0 ;
 }

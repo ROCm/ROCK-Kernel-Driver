@@ -53,6 +53,7 @@ ENTRY(v3_flush_user_tlb_range)
 	act_mm	r3				@ get current->active_mm
 	teq	r2, r3				@ == mm ?
 	movne	pc, lr				@ no, we dont do anything
+ENTRY(v3_flush_kern_tlb_range)
 	bic	r0, r0, #0x0ff
 	bic	r0, r0, #0xf00
 1:	mcr	p15, 0, r0, c6, c0, 0		@ invalidate TLB entry
@@ -87,5 +88,6 @@ ENTRY(v3_tlb_fns)
 	.long	v3_flush_user_tlb_mm
 	.long	v3_flush_user_tlb_range
 	.long	v3_flush_user_tlb_page
+	.long	v3_flush_kern_tlb_range
 	.long	v3_flush_kern_tlb_page
 	.size	v3_tlb_fns, . - v3_tlb_fns

@@ -51,7 +51,6 @@ extern int have_print;
 #define outl(data,addr)		writel(data,((unsigned long)(addr)))
 #else
 #define IS_MAPPED_VADDR(port)	((unsigned long)(port) >> 60UL)
-#ifdef CONFIG_PPC_EEH
 #define readb(addr)		eeh_readb((void*)(addr))  
 #define readw(addr)		eeh_readw((void*)(addr))  
 #define readl(addr)		eeh_readl((void*)(addr))
@@ -61,17 +60,6 @@ extern int have_print;
 #define memset_io(a,b,c)	eeh_memset((void *)(a),(b),(c))
 #define memcpy_fromio(a,b,c)	eeh_memcpy_fromio((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	eeh_memcpy_toio((void *)(a),(b),(c))
-#else
-#define readb(addr)		in_8((volatile u8 *)(addr))
-#define writeb(b,addr)		out_8((volatile u8 *)(addr), (b))
-#define readw(addr)		in_le16((volatile u16 *)(addr))
-#define readl(addr)		in_le32((volatile u32 *)(addr))
-#define writew(b,addr)		out_le16((volatile u16 *)(addr),(b))
-#define writel(b,addr)		out_le32((volatile u32 *)(addr),(b))
-#define memset_io(a,b,c)	memset((void *)(a),(b),(c))
-#define memcpy_fromio(a,b,c)	memcpy((a),(void *)(b),(c))
-#define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
-#endif
 #define inb(port)		_inb((unsigned long)port)
 #define outb(val, port)		_outb(val, (unsigned long)port)
 #define inw(port)		_inw((unsigned long)port)
@@ -146,7 +134,7 @@ extern void iounmap(void *addr);
  * Change virtual addresses to physical addresses and vv, for
  * addresses in the area where the kernel has the RAM mapped.
  */
-extern inline unsigned long virt_to_phys(volatile void * address)
+static inline unsigned long virt_to_phys(volatile void * address)
 {
 #ifdef __IO_DEBUG
 	printk("virt_to_phys: 0x%08lx -> 0x%08lx\n", 
@@ -156,7 +144,7 @@ extern inline unsigned long virt_to_phys(volatile void * address)
 	return __pa((unsigned long)address);
 }
 
-extern inline void * phys_to_virt(unsigned long address)
+static inline void * phys_to_virt(unsigned long address)
 {
 #ifdef __IO_DEBUG
 	printk("phys_to_virt: 0x%08lx -> 0x%08lx\n", address, __va(address));
@@ -175,7 +163,7 @@ extern inline void * phys_to_virt(unsigned long address)
 
 #endif /* __KERNEL__ */
 
-extern inline void iosync(void)
+static inline void iosync(void)
 {
         __asm__ __volatile__ ("sync" : : : "memory");
 }
@@ -190,7 +178,7 @@ extern inline void iosync(void)
 /*
  * 8, 16 and 32 bit, big and little endian I/O operations, with barrier.
  */
-extern inline int in_8(volatile unsigned char *addr)
+static inline int in_8(volatile unsigned char *addr)
 {
 	int ret;
 
@@ -198,12 +186,12 @@ extern inline int in_8(volatile unsigned char *addr)
 	return ret;
 }
 
-extern inline void out_8(volatile unsigned char *addr, int val)
+static inline void out_8(volatile unsigned char *addr, int val)
 {
 	__asm__ __volatile__("stb%U0%X0 %1,%0" : "=m" (*addr) : "r" (val));
 }
 
-extern inline int in_le16(volatile unsigned short *addr)
+static inline int in_le16(volatile unsigned short *addr)
 {
 	int ret;
 
@@ -212,7 +200,7 @@ extern inline int in_le16(volatile unsigned short *addr)
 	return ret;
 }
 
-extern inline int in_be16(volatile unsigned short *addr)
+static inline int in_be16(volatile unsigned short *addr)
 {
 	int ret;
 
@@ -220,18 +208,18 @@ extern inline int in_be16(volatile unsigned short *addr)
 	return ret;
 }
 
-extern inline void out_le16(volatile unsigned short *addr, int val)
+static inline void out_le16(volatile unsigned short *addr, int val)
 {
 	__asm__ __volatile__("sthbrx %1,0,%2" : "=m" (*addr) :
 			      "r" (val), "r" (addr));
 }
 
-extern inline void out_be16(volatile unsigned short *addr, int val)
+static inline void out_be16(volatile unsigned short *addr, int val)
 {
 	__asm__ __volatile__("sth%U0%X0 %1,%0" : "=m" (*addr) : "r" (val));
 }
 
-extern inline unsigned in_le32(volatile unsigned *addr)
+static inline unsigned in_le32(volatile unsigned *addr)
 {
 	unsigned ret;
 
@@ -240,7 +228,7 @@ extern inline unsigned in_le32(volatile unsigned *addr)
 	return ret;
 }
 
-extern inline unsigned in_be32(volatile unsigned *addr)
+static inline unsigned in_be32(volatile unsigned *addr)
 {
 	unsigned ret;
 
@@ -248,22 +236,20 @@ extern inline unsigned in_be32(volatile unsigned *addr)
 	return ret;
 }
 
-extern inline void out_le32(volatile unsigned *addr, int val)
+static inline void out_le32(volatile unsigned *addr, int val)
 {
 	__asm__ __volatile__("stwbrx %1,0,%2" : "=m" (*addr) :
 			     "r" (val), "r" (addr));
 }
 
-extern inline void out_be32(volatile unsigned *addr, int val)
+static inline void out_be32(volatile unsigned *addr, int val)
 {
 	__asm__ __volatile__("stw%U0%X0 %1,%0" : "=m" (*addr) : "r" (val));
 }
 
-#ifdef CONFIG_PPC_EEH
-#include <asm/eeh.h>
-#endif
-
 #ifndef CONFIG_PPC_ISERIES 
+#include <asm/eeh.h>
+
 static inline u8 _inb(unsigned long port) {
 	if (IS_MAPPED_VADDR(port))
 		return readb((void *)port);

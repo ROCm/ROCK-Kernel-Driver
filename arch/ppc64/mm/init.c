@@ -57,10 +57,8 @@
 #include <asm/smp.h>
 #include <asm/machdep.h>
 #include <asm/tlb.h>
-#include <asm/Naca.h>
-#ifdef CONFIG_PPC_EEH
+#include <asm/naca.h>
 #include <asm/eeh.h>
-#endif
 
 #include <asm/ppcdebug.h>
 
@@ -75,7 +73,6 @@ int mem_init_done;
 unsigned long ioremap_bot = IMALLOC_BASE;
 
 static int boot_mapsize;
-static unsigned long totalram_pages;
 
 extern pgd_t swapper_pg_dir[];
 extern char __init_begin, __init_end;
@@ -85,7 +82,6 @@ extern struct _of_tce_table of_tce_table[];
 extern char _start[], _end[];
 extern char _stext[], etext[];
 extern struct task_struct *current_set[NR_CPUS];
-extern struct Naca *naca;
 
 void mm_init_ppc64(void);
 
@@ -138,18 +134,7 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
-	show_buffers();
-}
-
-void si_meminfo(struct sysinfo *val)
-{
- 	val->totalram = totalram_pages;
-	val->sharedram = 0;
-	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
-	val->totalhigh = 0;
-	val->freehigh = 0;
-	val->mem_unit = PAGE_SIZE;
+	printk("%ld buffermem pages\n", nr_buffermem_pages());
 }
 
 void *
@@ -158,13 +143,11 @@ ioremap(unsigned long addr, unsigned long size)
 #ifdef CONFIG_PPC_ISERIES
 	return (void*)addr;
 #else
-#ifdef CONFIG_PPC_EEH
 	if(mem_init_done && (addr >> 60UL)) {
 		if (IS_EEH_TOKEN_DISABLED(addr))
-			return IO_TOKEN_TO_ADDR(addr);
+			return (void *)IO_TOKEN_TO_ADDR(addr);
 		return (void*)addr; /* already mapped address or EEH token. */
 	}
-#endif
 	return __ioremap(addr, size, _PAGE_NO_CACHE);
 #endif
 }
@@ -245,7 +228,7 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 		ptep = pte_alloc_kernel(&ioremap_mm, pmdp, ea);
 
 		pa = absolute_to_phys(pa);
-		set_pte(ptep, mk_pte_phys(pa & PAGE_MASK, __pgprot(flags)));
+		set_pte(ptep, pfn_pte(pa >> PAGE_SHIFT, __pgprot(flags)));
 		spin_unlock(&ioremap_mm.page_table_lock);
 	} else {
 		/* If the mm subsystem is not fully up, we cannot create a
@@ -458,7 +441,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
  * Do very early mm setup.
  */
 void __init mm_init_ppc64(void) {
-	struct Paca *paca;
+	struct paca_struct *lpaca;
 	unsigned long guard_page, index;
 
 	ppc_md.progress("MM:init", 0);
@@ -477,8 +460,8 @@ void __init mm_init_ppc64(void) {
 
 	/* Setup guard pages for the Paca's */
 	for (index = 0; index < NR_CPUS; index++) {
-		paca = &xPaca[index];
-		guard_page = ((unsigned long)paca) + 0x1000;
+		lpaca = &paca[index];
+		guard_page = ((unsigned long)lpaca) + 0x1000;
 		ppc_md.hpte_updateboltedpp(PP_RXRX, guard_page);
 	}
 

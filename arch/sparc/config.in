@@ -38,6 +38,7 @@ define_bool CONFIG_SUN_AUXIO y
 define_bool CONFIG_SUN_IO y
 define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
+define_bool CONFIG_SUN_PM y
 
 bool 'Support for SUN4 machines (disables SUN4[CDM] support)' CONFIG_SUN4
 if [ "$CONFIG_SUN4" != "y" ]; then
@@ -118,14 +119,7 @@ else
   define_bool CONFIG_BLK_DEV_HD n
 fi
 
-mainmenu_option next_comment
-comment 'ISDN subsystem'
-
-tristate 'ISDN support' CONFIG_ISDN
-if [ "$CONFIG_ISDN" != "n" ]; then
-   source drivers/isdn/Config.in
-fi
-endmenu
+source drivers/isdn/Config.in
 
 mainmenu_option next_comment
 comment 'SCSI support'

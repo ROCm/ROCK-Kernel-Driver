@@ -14,7 +14,6 @@
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
-#include <linux/nvram.h>
 #include <linux/spinlock.h>
 #include <linux/console.h>
 #include <linux/irq.h>
@@ -47,6 +46,9 @@
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/iSeries_pci.h>
 #include <asm/iSeries/iSeries_proc.h>
+#include <asm/iSeries/mf.h>
+#include <asm/iSeries/HvLpEvent.h>
+#include <asm/iSeries/HvLpConfig.h>
 #endif
 
 /* Tell string.h we don't want memcpy etc. as cpp defines */
@@ -150,6 +152,11 @@ EXPORT_SYMBOL(HvCall4);
 EXPORT_SYMBOL(HvCall5);
 EXPORT_SYMBOL(HvCall6);
 EXPORT_SYMBOL(HvCall7);
+EXPORT_SYMBOL(HvLpEvent_unregisterHandler);
+EXPORT_SYMBOL(HvLpEvent_registerHandler);
+EXPORT_SYMBOL(mf_allocateLpEvents);
+EXPORT_SYMBOL(mf_deallocateLpEvents);
+EXPORT_SYMBOL(HvLpConfig_getLpIndex_outline);
 #endif
 
 EXPORT_SYMBOL(_insb);
@@ -183,13 +190,11 @@ EXPORT_SYMBOL(iSeries_memcpy_fromio);
 EXPORT_SYMBOL(iSeries_Read_Word);
 EXPORT_SYMBOL(iSeries_Read_Byte);
 EXPORT_SYMBOL(iSeries_Write_Byte);
-
 #endif /* CONFIG_PPC_ISERIES */
-#ifdef CONFIG_PPC_EEH
+#ifndef CONFIG_PPC_ISERIES
 EXPORT_SYMBOL(eeh_check_failure);
 EXPORT_SYMBOL(eeh_total_mmio_ffs);
-EXPORT_SYMBOL(eeh_total_mmio_reads);
-#endif /* CONFIG_PPC_EEH */
+#endif /* CONFIG_PPC_ISERIES */
 #endif /* CONFIG_PCI */
 
 EXPORT_SYMBOL(iSeries_veth_dev);
@@ -219,9 +224,6 @@ EXPORT_SYMBOL(__no_use_cli);
 #endif
 #endif
 
-#ifndef CONFIG_MACH_SPECIFIC
-EXPORT_SYMBOL(_machine);
-#endif
 EXPORT_SYMBOL(ppc_md);
 
 EXPORT_SYMBOL(find_devices);
@@ -233,10 +235,6 @@ EXPORT_SYMBOL(machine_is_compatible);
 EXPORT_SYMBOL(find_all_nodes);
 EXPORT_SYMBOL(get_property);
 
-#ifdef CONFIG_NVRAM
-EXPORT_SYMBOL(nvram_read_byte);
-EXPORT_SYMBOL(nvram_write_byte);
-#endif /* CONFIG_NVRAM */
 
 EXPORT_SYMBOL_NOVERS(__ashrdi3);
 EXPORT_SYMBOL_NOVERS(__ashldi3);

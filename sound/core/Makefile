@@ -3,11 +3,11 @@
 # Copyright (c) 1999,2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := core.o
+O_TARGET     := _core.o
 
 export-objs  := sound.o pcm.o pcm_lib.o rawmidi.o timer.o rtctimer.o hwdep.o
 
-list-multi   := snd.o snd-pcm.o snd-rawmidi.o snd-timer.o snd-rtctimer.o snd-hwdep.o
+mod-subdirs  := oss seq
 
 snd-objs     := sound.o init.o isadma.o memory.o info.o control.o misc.o \
                 device.o wrappers.o
@@ -24,7 +24,7 @@ snd-rtctimer-objs := rtctimer.o
 snd-hwdep-objs    := hwdep.o
 
 obj-$(CONFIG_SND) += snd.o
-ifeq ($(CONFIG_RTC),y)
+ifeq ($(subst m,y,$(CONFIG_RTC)),y)
   obj-$(CONFIG_SND_RTCTIMER) += snd-timer.o
   obj-$(CONFIG_SND_RTCTIMER) += snd-rtctimer.o
 endif
@@ -33,16 +33,14 @@ obj-$(CONFIG_SND_HWDEP) += snd-hwdep.o
 subdir-$(CONFIG_SND_MIXER_OSS) += oss
 subdir-$(CONFIG_SND_PCM_OSS) += oss
 ifeq ($(filter $(subdir-y),oss),oss)
-  subdir-m += oss
-  obj-y += oss/oss.o
+  obj-y += oss/_oss.o
 endif
 
-obj-$(CONFIG_SND_PCM_OSS) += snd-pcm.o
+obj-$(CONFIG_SND_PCM_OSS) += snd-pcm.o snd-timer.o
 
 subdir-$(CONFIG_SND_SEQUENCER) += seq
 ifeq ($(CONFIG_SND_SEQUENCER),y)
-  subdir-m += seq
-  obj-y += seq/sq.o
+  obj-y += seq/_seq.o
 endif
 
 obj-$(CONFIG_SND_SEQUENCER) += snd-timer.o
@@ -95,6 +93,7 @@ obj-$(CONFIG_SND_FM801) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_ICE1712) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_INTEL8X0) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 obj-$(CONFIG_SND_MAESTRO3) += snd-pcm.o snd-timer.o snd.o
+obj-$(CONFIG_SND_RME32) += snd-pcm.o snd-timer.o snd.o
 obj-$(CONFIG_SND_RME96) += snd-pcm.o snd-timer.o snd.o
 obj-$(CONFIG_SND_SONICVIBES) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_VIA686) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
@@ -113,22 +112,6 @@ ifeq ($(CONFIG_SND_SB16_CSP),y)
   obj-$(CONFIG_SND_SBAWE) += snd-hwdep.o
 endif
 
+obj-m := $(sort $(obj-m))
+
 include $(TOPDIR)/Rules.make
-
-snd.o: $(snd-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-objs)
-
-snd-pcm.o: $(snd-pcm-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-pcm-objs)
-
-snd-rawmidi.o: $(snd-rawmidi-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-rawmidi-objs)
-
-snd-timer.o: $(snd-timer-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-timer-objs)
-
-snd-rtctimer.o: $(snd-rtctimer-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-rtctimer-objs)
-
-snd-hwdep.o: $(snd-hwdep-objs)
-	$(LD) $(LD_RFLAG) -r -o $@ $(snd-hwdep-objs)

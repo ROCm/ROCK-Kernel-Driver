@@ -682,7 +682,9 @@ depca_hw_init(struct net_device *dev, u_long ioaddr, int mca_slot)
 	if (dev->irq < 2) {
 #ifndef MODULE
 		unsigned char irqnum;
-		autoirq_setup(0);
+		unsigned long irq_mask, delay;
+
+		irq_mask = probe_irq_on();
 
 		/* Assign the correct irq list */
 		switch (lp->adapter) {
@@ -706,7 +708,10 @@ depca_hw_init(struct net_device *dev, u_long ioaddr, int mca_slot)
 		/* Trigger an initialization just for the interrupt. */
 		outw(INEA | INIT, DEPCA_DATA);
 	  
-		irqnum = autoirq_report(1);
+		delay = jiffies + HZ/50;
+		while (time_before(jiffies, delay)) ;
+		irqnum = probe_irq_off(irq_mask);
+
 		status = -ENXIO;
 		if (!irqnum) {
 			printk(" and failed to detect IRQ line.\n");
