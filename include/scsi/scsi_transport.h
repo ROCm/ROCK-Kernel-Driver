@@ -33,6 +33,7 @@ struct scsi_transport_template {
 	struct class *device_class;
 	struct class *target_class;
 	struct class *host_class;
+	struct attribute_group *host_statistics;
 
 	/* Constructor functions */
 	int (*device_setup)(struct scsi_device *);

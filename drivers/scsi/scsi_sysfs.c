@@ -716,6 +716,14 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost)
  			if (error)
 				return error;
  		}
+
+		if (shost->transportt->host_statistics) {
+			error = sysfs_create_group(
+					&shost->transport_classdev.kobj,
+					shost->transportt->host_statistics);
+			if (error)
+				return error;
+		}
  	}
 
 	return 0;

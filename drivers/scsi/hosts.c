@@ -82,8 +82,12 @@ void scsi_remove_host(struct Scsi_Host *shost)
 	if (shost->transportt->host_destroy)
 		shost->transportt->host_destroy(shost);
 	class_device_unregister(&shost->shost_classdev);
-	if (shost->transport_classdev.class)
-		class_device_unregister(&shost->transport_classdev);
+	if (shost->transport_classdev.class) {
+		if (shost->transportt->host_statistics)
+			sysfs_remove_group(&shost->transport_classdev.kobj,
+				shost->transportt->host_statistics);
+ 		class_device_unregister(&shost->transport_classdev);
+	}
 	device_del(&shost->shost_gendev);
 }
 EXPORT_SYMBOL(scsi_remove_host);
