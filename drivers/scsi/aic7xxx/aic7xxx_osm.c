@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#159 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#160 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -576,12 +576,12 @@ static void ahc_linux_run_device_queue(struct ahc_softc*,
 static void ahc_linux_setup_tag_info(char *p, char *end, char *s);
 static void ahc_linux_setup_tag_info_global(char *p);
 static void ahc_linux_setup_dv(char *p, char *end, char *s);
-static int ahc_linux_next_unit(void);
+static int  ahc_linux_next_unit(void);
 static void ahc_runq_tasklet(unsigned long data);
-static int ahc_linux_halt(struct notifier_block *nb, u_long event, void *buf);
+static int  ahc_linux_halt(struct notifier_block *nb, u_long event, void *buf);
+static void ahc_schedule_completeq(struct ahc_softc *ahc, struct ahc_cmd *acmd);
 
-static void	     ahc_schedule_completeq(struct ahc_softc *ahc,
-					    struct ahc_cmd *acmd);
+/********************************* Inlines ************************************/
 static __inline void ahc_schedule_runq(struct ahc_softc *ahc);
 static __inline struct ahc_linux_device*
 		     ahc_linux_get_device(struct ahc_softc *ahc, u_int channel,
@@ -805,6 +805,510 @@ ahc_linux_map_seg(struct ahc_softc *ahc, struct scb *scb,
 	sg->len = ahc_htole32(len);
 	return (consumed);
 }
+
+/************************  Host template entry points *************************/
+static int	   ahc_linux_detect(Scsi_Host_Template *);
+static int	   ahc_linux_release(struct Scsi_Host *);
+static int	   ahc_linux_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
+static const char *ahc_linux_info(struct Scsi_Host *);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+static int	   ahc_linux_slave_alloc(Scsi_Device *);
+static int	   ahc_linux_slave_configure(Scsi_Device *);
+static void	   ahc_linux_slave_destroy(Scsi_Device *);
+static int	   ahd_linux_biosparam(struct scsi_device*,
+				       struct block_device*,
+				       sector_t, int[]);
+#else
+static void	   ahc_linux_select_queue_depth(struct Scsi_Host *host,
+						Scsi_Device *scsi_devs);
+static int	   ahc_linux_biosparam(Disk *, kdev_t, int[]);
+#endif
+static int	   ahc_linux_bus_reset(Scsi_Cmnd *);
+static int	   ahc_linux_dev_reset(Scsi_Cmnd *);
+static int	   ahc_linux_abort(Scsi_Cmnd *);
+
+/*
+ * Try to detect an Adaptec 7XXX controller.
+ */
+static int
+ahc_linux_detect(Scsi_Host_Template *template)
+{
+	struct	ahc_softc *ahc;
+	int     found;
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	/*
+	 * It is a bug that the upper layer takes
+	 * this lock just prior to calling us.
+	 */
+	spin_unlock_irq(&io_request_lock);
+#endif
+
+	/*
+	 * Sanity checking of Linux SCSI data structures so
+	 * that some of our hacks^H^H^H^H^Hassumptions aren't
+	 * violated.
+	 */
+	if (offsetof(struct ahc_cmd_internal, end)
+	  > offsetof(struct scsi_cmnd, host_scribble)) {
+		printf("ahc_linux_detect: SCSI data structures changed.\n");
+		printf("ahc_linux_detect: Unable to attach\n");
+		return (0);
+	}
+#ifdef MODULE
+	/*
+	 * If we've been passed any parameters, process them now.
+	 */
+	if (aic7xxx)
+		aic7xxx_setup(aic7xxx);
+	if (dummy_buffer[0] != 'P')
+		printk(KERN_WARNING
+"aic7xxx: Please read the file /usr/src/linux/drivers/scsi/README.aic7xxx\n"
+"aic7xxx: to see the proper way to specify options to the aic7xxx module\n"
+"aic7xxx: Specifically, don't use any commas when passing arguments to\n"
+"aic7xxx: insmod or else it might trash certain memory areas.\n");
+#endif
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,0)
+	template->proc_name = "aic7xxx";
+#else
+	template->proc_dir = &proc_scsi_aic7xxx;
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
+	/*
+	 * We can only map 16MB per-SG
+	 * so create a sector limit of
+	 * "16MB" in 2K sectors.
+	 */
+	template->max_sectors = 8192;
+#endif
+
+	/*
+	 * Initialize our softc list lock prior to
+	 * probing for any adapters.
+	 */
+	ahc_list_lockinit();
+
+#ifdef CONFIG_PCI
+	ahc_linux_pci_probe(template);
+#endif
+
+	if (aic7xxx_no_probe == 0)
+		aic7770_linux_probe(template);
+
+	/*
+	 * Register with the SCSI layer all
+	 * controllers we've found.
+	 */
+	found = 0;
+	TAILQ_FOREACH(ahc, &ahc_tailq, links) {
+
+		if (ahc_linux_register_host(ahc, template) == 0)
+			found++;
+	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	spin_lock_irq(&io_request_lock);
+#endif
+	aic7xxx_detect_complete++;
+	return (found);
+}
+
+/*
+ * Free the passed in Scsi_Host memory structures prior to unloading the
+ * module.
+ */
+int
+ahc_linux_release(struct Scsi_Host * host)
+{
+	struct ahc_softc *ahc;
+	u_long l;
+
+	ahc_list_lock(&l);
+	if (host != NULL) {
+
+		/*
+		 * We should be able to just perform
+		 * the free directly, but check our
+		 * list for extra sanity.
+		 */
+		ahc = ahc_find_softc(*(struct ahc_softc **)host->hostdata);
+		if (ahc != NULL) {
+			u_long s;
+
+			ahc_lock(ahc, &s);
+			ahc_intr_enable(ahc, FALSE);
+			ahc_unlock(ahc, &s);
+			ahc_free(ahc);
+		}
+	}
+	ahc_list_unlock(&l);
+	return (0);
+}
+
+/*
+ * Return a string describing the driver.
+ */
+static const char *
+ahc_linux_info(struct Scsi_Host *host)
+{
+	static char buffer[512];
+	char	ahc_info[256];
+	char   *bp;
+	struct ahc_softc *ahc;
+
+	bp = &buffer[0];
+	ahc = *(struct ahc_softc **)host->hostdata;
+	memset(bp, 0, sizeof(buffer));
+	strcpy(bp, "Adaptec AIC7XXX EISA/VLB/PCI SCSI HBA DRIVER, Rev ");
+	strcat(bp, AIC7XXX_DRIVER_VERSION);
+	strcat(bp, "\n");
+	strcat(bp, "        <");
+	strcat(bp, ahc->description);
+	strcat(bp, ">\n");
+	strcat(bp, "        ");
+	ahc_controller_info(ahc, ahc_info);
+	strcat(bp, ahc_info);
+	strcat(bp, "\n");
+
+	return (bp);
+}
+
+/*
+ * Queue an SCB to the controller.
+ */
+static int
+ahc_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
+{
+	struct	 ahc_softc *ahc;
+	struct	 ahc_linux_device *dev;
+	u_long	 flags;
+
+	ahc = *(struct ahc_softc **)cmd->host->hostdata;
+
+	/*
+	 * Save the callback on completion function.
+	 */
+	cmd->scsi_done = scsi_done;
+
+	ahc_midlayer_entrypoint_lock(ahc, &flags);
+
+	/*
+	 * Close the race of a command that was in the process of
+	 * being queued to us just as our simq was frozen.  Let
+	 * DV commands through so long as we are only frozen to
+	 * perform DV.
+	 */
+	if (ahc->platform_data->qfrozen != 0
+	 && AHC_DV_CMD(cmd) == 0) {
+
+		ahc_cmd_set_transaction_status(cmd, CAM_REQUEUE_REQ);
+		ahc_linux_queue_cmd_complete(ahc, cmd);
+		ahc_schedule_completeq(ahc, NULL);
+		ahc_midlayer_entrypoint_unlock(ahc, &flags);
+		return (0);
+	}
+	dev = ahc_linux_get_device(ahc, cmd->channel, cmd->target,
+				   cmd->lun, /*alloc*/TRUE);
+	if (dev == NULL) {
+		ahc_midlayer_entrypoint_unlock(ahc, &flags);
+		printf("aic7xxx_linux_queue: Unable to allocate device!\n");
+		return (-ENOMEM);
+	}
+	cmd->result = CAM_REQ_INPROG << 16;
+	TAILQ_INSERT_TAIL(&dev->busyq, (struct ahc_cmd *)cmd, acmd_links.tqe);
+	if ((dev->flags & AHC_DEV_ON_RUN_LIST) == 0) {
+		TAILQ_INSERT_TAIL(&ahc->platform_data->device_runq, dev, links);
+		dev->flags |= AHC_DEV_ON_RUN_LIST;
+		ahc_linux_run_device_queues(ahc);
+	}
+	ahc_midlayer_entrypoint_unlock(ahc, &flags);
+	return (0);
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+static int
+ahc_linux_slave_alloc(Scsi_Device *device)
+{
+	/*
+	 * Nothing to be done for now.
+	 */
+	return (0);
+}
+
+static int
+ahc_linux_slave_configure(Scsi_Device *device)
+{
+	struct	ahc_softc *ahc;
+	struct	ahc_linux_device *dev;
+	u_long	flags;
+
+	ahc = *((struct ahc_softc **)device->host->hostdata);
+	ahc_midlayer_entrypoint_lock(ahc, &flags);
+	/*
+	 * Since Linux has attached to the device, configure
+	 * it so we don't free and allocate the device
+	 * structure on every command.
+	 */
+	dev = ahc_linux_get_device(ahc, device->channel,
+				   device->id, device->lun,
+					   /*alloc*/TRUE);
+	if (dev != NULL) {
+		dev->flags &= ~AHC_DEV_UNCONFIGURED;
+		dev->scsi_device = device;
+	}
+	ahc_linux_device_queue_depth(ahc, dev);
+	ahc_midlayer_entrypoint_unlock(ahc, &flags);
+	return (0);
+}
+
+static void
+ahc_linux_slave_destroy(Scsi_Device *device)
+{
+	struct	ahc_softc *ahc;
+	struct	ahc_linux_device *dev;
+	u_long	flags;
+
+	ahc = *((struct ahc_softc **)device->host->hostdata);
+	ahc_midlayer_entrypoint_lock(ahc, &flags);
+	dev = ahc_linux_get_device(ahc, device->channel,
+				   device->id, device->lun,
+					   /*alloc*/FALSE);
+	if (dev != NULL)
+		dev->flags |= AHC_DEV_UNCONFIGURED;
+	ahc_midlayer_entrypoint_unlock(ahc, &flags);
+}
+#else
+/*
+ * Sets the queue depth for each SCSI device hanging
+ * off the input host adapter.
+ */
+static void
+ahc_linux_select_queue_depth(struct Scsi_Host * host,
+			     Scsi_Device * scsi_devs)
+{
+	Scsi_Device *device;
+	struct	ahc_softc *ahc;
+	u_long	flags;
+
+	ahc = *((struct ahc_softc **)host->hostdata);
+	ahc_midlayer_entrypoint_lock(ahc, &flags);
+	for (device = scsi_devs; device != NULL; device = device->next) {
+		if (device->host == host) {
+			struct	 ahc_linux_device *dev;
+
+			/*
+			 * Since Linux has attached to the device, configure
+			 * it so we don't free and allocate the device
+			 * structure on every command.
+			 */
+			dev = ahc_linux_get_device(ahc, device->channel,
+						   device->id, device->lun,
+						   /*alloc*/TRUE);
+			if (dev != NULL) {
+				dev->flags &= ~AHC_DEV_UNCONFIGURED;
+				dev->scsi_device = device;
+				ahc_linux_device_queue_depth(ahc, dev);
+				device->queue_depth = dev->openings
+						    + dev->active;
+				if ((dev->flags & (AHC_DEV_Q_BASIC
+						| AHC_DEV_Q_TAGGED)) == 0) {
+					/*
+					 * We allow the OS to queue 2 untagged
+					 * transactions to us at any time even
+					 * though we can only execute them
+					 * serially on the controller/device.
+					 * This should remove some latency.
+					 */
+					device->queue_depth = 2;
+				}
+			}
+		}
+	}
+	ahc_midlayer_entrypoint_unlock(ahc, &flags);
+}
+#endif
+
+/*
+ * Return the disk geometry for the given SCSI device.
+ */
+static int
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+ahc_linux_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		    sector_t capacity, int geom[])
+#else
+ahc_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
+#endif
+{
+	int	 heads;
+	int	 sectors;
+	int	 cylinders;
+	int	 ret;
+	int	 extended;
+	struct	 ahc_softc *ahc;
+	u_int	 channel;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+	uint8_t	*bh;
+
+	channel = sdev->channel;
+#else
+	u_long	capacity;
+	struct	buffer_head *bh;
+
+	capacity = disk->capacity;
+	channel = disk->device->channel;
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+	ahc = *((struct ahc_softc **)sdev->host->hostdata);
+#else
+	ahc = *((struct ahc_softc **)disk->device->host->hostdata);
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+	bh = scsi_bios_ptable(bdev);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,17)
+	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, block_size(dev));
+#else
+	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, 1024);
+#endif
+
+	if (bh) {
+		ret = scsi_partsize(bh, capacity,
+				    &geom[2], &geom[0], &geom[1]);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+		kfree(bh);
+#else
+		brelse(bh);
+#endif
+		if (ret != -1)
+			return (ret);
+	}
+	heads = 64;
+	sectors = 32;
+	cylinders = capacity / (heads * sectors);
+
+	if (aic7xxx_extended != 0)
+		extended = 1;
+	else if (channel == 0)
+		extended = (ahc->flags & AHC_EXTENDED_TRANS_A) != 0;
+	else
+		extended = (ahc->flags & AHC_EXTENDED_TRANS_B) != 0;
+	if (extended && cylinders >= 1024) {
+		heads = 255;
+		sectors = 63;
+		cylinders = capacity / (heads * sectors);
+	}
+	geom[0] = heads;
+	geom[1] = sectors;
+	geom[2] = cylinders;
+	return (0);
+}
+
+/*
+ * Abort the current SCSI command(s).
+ */
+static int
+ahc_linux_abort(Scsi_Cmnd *cmd)
+{
+	int error;
+
+	error = ahc_linux_queue_recovery_cmd(cmd, SCB_ABORT);
+	if (error != 0)
+		printf("aic7xxx_abort returns 0x%x\n", error);
+	return (error);
+}
+
+/*
+ * Attempt to send a target reset message to the device that timed out.
+ */
+static int
+ahc_linux_dev_reset(Scsi_Cmnd *cmd)
+{
+	int error;
+
+	error = ahc_linux_queue_recovery_cmd(cmd, SCB_DEVICE_RESET);
+	if (error != 0)
+		printf("aic7xxx_dev_reset returns 0x%x\n", error);
+	return (error);
+}
+
+/*
+ * Reset the SCSI bus.
+ */
+static int
+ahc_linux_bus_reset(Scsi_Cmnd *cmd)
+{
+	struct ahc_softc *ahc;
+	struct ahc_cmd *acmd;
+	u_long s;
+	int    found;
+
+	ahc = *(struct ahc_softc **)cmd->host->hostdata;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	spin_unlock_irq(&io_request_lock);
+#endif
+	ahc_midlayer_entrypoint_lock(ahc, &s);
+	found = ahc_reset_channel(ahc, cmd->channel + 'A',
+				  /*initiate reset*/TRUE);
+	acmd = TAILQ_FIRST(&ahc->platform_data->completeq);
+	TAILQ_INIT(&ahc->platform_data->completeq);
+	ahc_midlayer_entrypoint_unlock(ahc, &s);
+	if (bootverbose)
+		printf("%s: SCSI bus reset delivered. "
+		       "%d SCBs aborted.\n", ahc_name(ahc), found);
+
+	if (acmd != NULL) {
+		acmd = ahc_linux_run_complete_queue(ahc, acmd);
+		if (acmd != NULL) {
+			ahc_midlayer_entrypoint_lock(ahc, &s);
+			ahc_schedule_completeq(ahc, acmd);
+			ahc_midlayer_entrypoint_unlock(ahc, &s);
+		}
+	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	spin_lock_irq(&io_request_lock);
+#endif
+	return SUCCESS;
+}
+
+Scsi_Host_Template aic7xxx_driver_template = {
+	.proc_info		= ahc_linux_proc_info,
+	.detect			= ahc_linux_detect,
+	.release		= ahc_linux_release,
+	.info			= ahc_linux_info,
+	.queuecommand		= ahc_linux_queue,
+	.eh_abort_handler	= ahc_linux_abort,
+	.eh_device_reset_handler = ahc_linux_dev_reset,
+	.eh_bus_reset_handler	= ahc_linux_bus_reset,
+#if defined(__i386__)
+	.bios_param		= ahc_linux_biosparam,
+#endif
+	.can_queue		= AHC_MAX_QUEUE,
+	.this_id		= -1,
+	.sg_tablesize		= AHC_NSEG,
+	.cmd_per_lun		= 2,
+	.use_clustering		= ENABLE_CLUSTERING,
+#if defined CONFIG_HIGHIO
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
+/* Assume RedHat Distribution with its different HIGHIO conventions. */
+	.can_dma_32		= 1,
+	.single_sg_okay		= 1,
+#else
+	.highmem_io		= 1,
+#endif
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+	.slave_configure	= ahc_linux_slave_configure,
+	.slave_destroy		= ahc_linux_slave_destroy,
+#else
+	.select_queue_depths	= ahc_linux_select_queue_depth,
+	.use_new_eh_code	= 1,
+#endif
+};
+
+#define driver_template aic7xxx_driver_template
+#include "scsi_module.c"
 
 /**************************** Tasklet Handler *********************************/
 
@@ -1316,93 +1820,6 @@ __setup("aic7xxx=", aic7xxx_setup);
 #endif
 
 int aic7xxx_verbose;
-
-/*
- * Try to detect an Adaptec 7XXX controller.
- */
-int
-ahc_linux_detect(Scsi_Host_Template *template)
-{
-	struct	ahc_softc *ahc;
-	int     found;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	/*
-	 * It is a bug that the upper layer takes
-	 * this lock just prior to calling us.
-	 */
-	spin_unlock_irq(&io_request_lock);
-#endif
-
-	/*
-	 * Sanity checking of Linux SCSI data structures so
-	 * that some of our hacks^H^H^H^H^Hassumptions aren't
-	 * violated.
-	 */
-	if (offsetof(struct ahc_cmd_internal, end)
-	  > offsetof(struct scsi_cmnd, host_scribble)) {
-		printf("ahc_linux_detect: SCSI data structures changed.\n");
-		printf("ahc_linux_detect: Unable to attach\n");
-		return (0);
-	}
-#ifdef MODULE
-	/*
-	 * If we've been passed any parameters, process them now.
-	 */
-	if (aic7xxx)
-		aic7xxx_setup(aic7xxx);
-	if (dummy_buffer[0] != 'P')
-		printk(KERN_WARNING
-"aic7xxx: Please read the file /usr/src/linux/drivers/scsi/README.aic7xxx\n"
-"aic7xxx: to see the proper way to specify options to the aic7xxx module\n"
-"aic7xxx: Specifically, don't use any commas when passing arguments to\n"
-"aic7xxx: insmod or else it might trash certain memory areas.\n");
-#endif
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,0)
-	template->proc_name = "aic7xxx";
-#else
-	template->proc_dir = &proc_scsi_aic7xxx;
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
-	/*
-	 * We can only map 16MB per-SG
-	 * so create a sector limit of
-	 * "16MB" in 2K sectors.
-	 */
-	template->max_sectors = 8192;
-#endif
-
-	/*
-	 * Initialize our softc list lock prior to
-	 * probing for any adapters.
-	 */
-	ahc_list_lockinit();
-
-#ifdef CONFIG_PCI
-	ahc_linux_pci_probe(template);
-#endif
-
-	if (aic7xxx_no_probe == 0)
-		aic7770_linux_probe(template);
-
-	/*
-	 * Register with the SCSI layer all
-	 * controllers we've found.
-	 */
-	found = 0;
-	TAILQ_FOREACH(ahc, &ahc_tailq, links) {
-
-		if (ahc_linux_register_host(ahc, template) == 0)
-			found++;
-	}
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	spin_lock_irq(&io_request_lock);
-#endif
-	aic7xxx_detect_complete++;
-	return (found);
-}
 
 int
 ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
@@ -3194,109 +3611,6 @@ ahc_linux_generate_dv_pattern(struct ahc_linux_target *targ)
 	}
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-int
-ahc_linux_slave_alloc(Scsi_Device *device)
-{
-	/*
-	 * Nothing to be done for now.
-	 */
-	return (0);
-}
-
-int
-ahc_linux_slave_configure(Scsi_Device *device)
-{
-	struct	ahc_softc *ahc;
-	struct	ahc_linux_device *dev;
-	u_long	flags;
-
-	ahc = *((struct ahc_softc **)device->host->hostdata);
-	ahc_midlayer_entrypoint_lock(ahc, &flags);
-	/*
-	 * Since Linux has attached to the device, configure
-	 * it so we don't free and allocate the device
-	 * structure on every command.
-	 */
-	dev = ahc_linux_get_device(ahc, device->channel,
-				   device->id, device->lun,
-					   /*alloc*/TRUE);
-	if (dev != NULL) {
-		dev->flags &= ~AHC_DEV_UNCONFIGURED;
-		dev->scsi_device = device;
-	}
-	ahc_linux_device_queue_depth(ahc, dev);
-	ahc_midlayer_entrypoint_unlock(ahc, &flags);
-	return (0);
-}
-
-void
-ahc_linux_slave_destroy(Scsi_Device *device)
-{
-	struct	ahc_softc *ahc;
-	struct	ahc_linux_device *dev;
-	u_long	flags;
-
-	ahc = *((struct ahc_softc **)device->host->hostdata);
-	ahc_midlayer_entrypoint_lock(ahc, &flags);
-	dev = ahc_linux_get_device(ahc, device->channel,
-				   device->id, device->lun,
-					   /*alloc*/FALSE);
-	if (dev != NULL)
-		dev->flags |= AHC_DEV_UNCONFIGURED;
-	ahc_midlayer_entrypoint_unlock(ahc, &flags);
-}
-#else
-/*
- * Sets the queue depth for each SCSI device hanging
- * off the input host adapter.
- */
-void
-ahc_linux_select_queue_depth(struct Scsi_Host * host,
-			     Scsi_Device * scsi_devs)
-{
-	Scsi_Device *device;
-	struct	ahc_softc *ahc;
-	u_long	flags;
-
-	ahc = *((struct ahc_softc **)host->hostdata);
-	ahc_midlayer_entrypoint_lock(ahc, &flags);
-	for (device = scsi_devs; device != NULL; device = device->next) {
-		if (device->host == host) {
-			struct	 ahc_linux_device *dev;
-
-			/*
-			 * Since Linux has attached to the device, configure
-			 * it so we don't free and allocate the device
-			 * structure on every command.
-			 */
-			dev = ahc_linux_get_device(ahc, device->channel,
-						   device->id, device->lun,
-						   /*alloc*/TRUE);
-			if (dev != NULL) {
-				dev->flags &= ~AHC_DEV_UNCONFIGURED;
-				dev->scsi_device = device;
-				ahc_linux_device_queue_depth(ahc, dev);
-				device->queue_depth = dev->openings
-						    + dev->active;
-				if ((dev->flags & (AHC_DEV_Q_BASIC
-						| AHC_DEV_Q_TAGGED)) == 0) {
-					/*
-					 * We allow the OS to queue 2 untagged
-					 * transactions to us at any time even
-					 * though we can only execute them
-					 * serially on the controller/device.
-					 * This should remove some latency.
-					 */
-					device->queue_depth = 2;
-				}
-			}
-		}
-	}
-	ahc_midlayer_entrypoint_unlock(ahc, &flags);
-}
-#endif
-
 static u_int
 ahc_linux_user_tagdepth(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 {
@@ -3398,58 +3712,6 @@ ahc_linux_device_queue_depth(struct ahc_softc *ahc,
 	} else {
 		ahc_set_tags(ahc, &devinfo, AHC_QUEUE_NONE);
 	}
-}
-
-/*
- * Queue an SCB to the controller.
- */
-int
-ahc_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
-{
-	struct	 ahc_softc *ahc;
-	struct	 ahc_linux_device *dev;
-	u_long	 flags;
-
-	ahc = *(struct ahc_softc **)cmd->host->hostdata;
-
-	/*
-	 * Save the callback on completion function.
-	 */
-	cmd->scsi_done = scsi_done;
-
-	ahc_midlayer_entrypoint_lock(ahc, &flags);
-
-	/*
-	 * Close the race of a command that was in the process of
-	 * being queued to us just as our simq was frozen.  Let
-	 * DV commands through so long as we are only frozen to
-	 * perform DV.
-	 */
-	if (ahc->platform_data->qfrozen != 0
-	 && AHC_DV_CMD(cmd) == 0) {
-
-		ahc_cmd_set_transaction_status(cmd, CAM_REQUEUE_REQ);
-		ahc_linux_queue_cmd_complete(ahc, cmd);
-		ahc_schedule_completeq(ahc, NULL);
-		ahc_midlayer_entrypoint_unlock(ahc, &flags);
-		return (0);
-	}
-	dev = ahc_linux_get_device(ahc, cmd->channel, cmd->target,
-				   cmd->lun, /*alloc*/TRUE);
-	if (dev == NULL) {
-		ahc_midlayer_entrypoint_unlock(ahc, &flags);
-		printf("aic7xxx_linux_queue: Unable to allocate device!\n");
-		return (-ENOMEM);
-	}
-	cmd->result = CAM_REQ_INPROG << 16;
-	TAILQ_INSERT_TAIL(&dev->busyq, (struct ahc_cmd *)cmd, acmd_links.tqe);
-	if ((dev->flags & AHC_DEV_ON_RUN_LIST) == 0) {
-		TAILQ_INSERT_TAIL(&ahc->platform_data->device_runq, dev, links);
-		dev->flags |= AHC_DEV_ON_RUN_LIST;
-		ahc_linux_run_device_queues(ahc);
-	}
-	ahc_midlayer_entrypoint_unlock(ahc, &flags);
-	return (0);
 }
 
 static void
@@ -3841,34 +4103,6 @@ ahc_linux_free_device(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 	if (targ->refcount == 0
 	 && (targ->flags & AHC_DV_REQUIRED) == 0)
 		ahc_linux_free_target(ahc, targ);
-}
-
-/*
- * Return a string describing the driver.
- */
-const char *
-ahc_linux_info(struct Scsi_Host *host)
-{
-	static char buffer[512];
-	char	ahc_info[256];
-	char   *bp;
-	struct ahc_softc *ahc;
-
-	bp = &buffer[0];
-	ahc = *(struct ahc_softc **)host->hostdata;
-	memset(bp, 0, sizeof(buffer));
-	strcpy(bp, "Adaptec AIC7XXX EISA/VLB/PCI SCSI HBA DRIVER, Rev ");
-	strcat(bp, AIC7XXX_DRIVER_VERSION);
-	strcat(bp, "\n");
-	strcat(bp, "        <");
-	strcat(bp, ahc->description);
-	strcat(bp, ">\n");
-	strcat(bp, "        ");
-	ahc_controller_info(ahc, ahc_info);
-	strcat(bp, ahc_info);
-	strcat(bp, "\n");
-
-	return (bp);
 }
 
 void
@@ -4852,181 +5086,6 @@ done:
 	return (retval);
 }
 
-/*
- * Abort the current SCSI command(s).
- */
-int
-ahc_linux_abort(Scsi_Cmnd *cmd)
-{
-	int error;
-
-	error = ahc_linux_queue_recovery_cmd(cmd, SCB_ABORT);
-	if (error != 0)
-		printf("aic7xxx_abort returns 0x%x\n", error);
-	return (error);
-}
-
-/*
- * Attempt to send a target reset message to the device that timed out.
- */
-int
-ahc_linux_dev_reset(Scsi_Cmnd *cmd)
-{
-	int error;
-
-	error = ahc_linux_queue_recovery_cmd(cmd, SCB_DEVICE_RESET);
-	if (error != 0)
-		printf("aic7xxx_dev_reset returns 0x%x\n", error);
-	return (error);
-}
-
-/*
- * Reset the SCSI bus.
- */
-int
-ahc_linux_bus_reset(Scsi_Cmnd *cmd)
-{
-	struct ahc_softc *ahc;
-	struct ahc_cmd *acmd;
-	u_long s;
-	int    found;
-
-	ahc = *(struct ahc_softc **)cmd->host->hostdata;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	spin_unlock_irq(&io_request_lock);
-#endif
-	ahc_midlayer_entrypoint_lock(ahc, &s);
-	found = ahc_reset_channel(ahc, cmd->channel + 'A',
-				  /*initiate reset*/TRUE);
-	acmd = TAILQ_FIRST(&ahc->platform_data->completeq);
-	TAILQ_INIT(&ahc->platform_data->completeq);
-	ahc_midlayer_entrypoint_unlock(ahc, &s);
-	if (bootverbose)
-		printf("%s: SCSI bus reset delivered. "
-		       "%d SCBs aborted.\n", ahc_name(ahc), found);
-
-	if (acmd != NULL) {
-		acmd = ahc_linux_run_complete_queue(ahc, acmd);
-		if (acmd != NULL) {
-			ahc_midlayer_entrypoint_lock(ahc, &s);
-			ahc_schedule_completeq(ahc, acmd);
-			ahc_midlayer_entrypoint_unlock(ahc, &s);
-		}
-	}
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	spin_lock_irq(&io_request_lock);
-#endif
-	return SUCCESS;
-}
-
-/*
- * Return the disk geometry for the given SCSI device.
- */
-int
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-ahc_linux_biosparam(struct scsi_device *sdev, struct block_device *bdev,
-		    sector_t capacity, int geom[])
-#else
-ahc_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
-#endif
-{
-	int	 heads;
-	int	 sectors;
-	int	 cylinders;
-	int	 ret;
-	int	 extended;
-	struct	 ahc_softc *ahc;
-	u_int	 channel;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	uint8_t	*bh;
-
-	channel = sdev->channel;
-#else
-	u_long	capacity;
-	struct	buffer_head *bh;
-
-	capacity = disk->capacity;
-	channel = disk->device->channel;
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	ahc = *((struct ahc_softc **)sdev->host->hostdata);
-#else
-	ahc = *((struct ahc_softc **)disk->device->host->hostdata);
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	bh = scsi_bios_ptable(bdev);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,17)
-	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, block_size(dev));
-#else
-	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, 1024);
-#endif
-
-	if (bh) {
-		ret = scsi_partsize(bh, capacity,
-				    &geom[2], &geom[0], &geom[1]);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-		kfree(bh);
-#else
-		brelse(bh);
-#endif
-		if (ret != -1)
-			return (ret);
-	}
-	heads = 64;
-	sectors = 32;
-	cylinders = capacity / (heads * sectors);
-
-	if (aic7xxx_extended != 0)
-		extended = 1;
-	else if (channel == 0)
-		extended = (ahc->flags & AHC_EXTENDED_TRANS_A) != 0;
-	else
-		extended = (ahc->flags & AHC_EXTENDED_TRANS_B) != 0;
-	if (extended && cylinders >= 1024) {
-		heads = 255;
-		sectors = 63;
-		cylinders = capacity / (heads * sectors);
-	}
-	geom[0] = heads;
-	geom[1] = sectors;
-	geom[2] = cylinders;
-	return (0);
-}
-
-/*
- * Free the passed in Scsi_Host memory structures prior to unloading the
- * module.
- */
-int
-ahc_linux_release(struct Scsi_Host * host)
-{
-	struct ahc_softc *ahc;
-	u_long l;
-
-	ahc_list_lock(&l);
-	if (host != NULL) {
-
-		/*
-		 * We should be able to just perform
-		 * the free directly, but check our
-		 * list for extra sanity.
-		 */
-		ahc = ahc_find_softc(*(struct ahc_softc **)host->hostdata);
-		if (ahc != NULL) {
-			u_long s;
-
-			ahc_lock(ahc, &s);
-			ahc_intr_enable(ahc, FALSE);
-			ahc_unlock(ahc, &s);
-			ahc_free(ahc);
-		}
-	}
-	ahc_list_unlock(&l);
-	return (0);
-}
-
 void
 ahc_platform_dump_card_state(struct ahc_softc *ahc)
 {
@@ -5065,9 +5124,3 @@ ahc_platform_dump_card_state(struct ahc_softc *ahc)
 		}
 	}
 }
-
-#if defined(MODULE) || LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-static Scsi_Host_Template driver_template = AIC7XXX;
-Scsi_Host_Template *aic7xxx_driver_template = &driver_template;
-#include "scsi_module.c"
-#endif

@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#91 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#92 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -549,6 +549,7 @@ static int ahd_linux_next_unit(void);
 static void ahd_runq_tasklet(unsigned long data);
 static int ahd_linux_halt(struct notifier_block *nb, u_long event, void *buf);
 
+/****************************** Inlines ***************************************/
 static __inline void ahd_schedule_completeq(struct ahd_softc *ahd,
 					    struct ahd_cmd *acmd);
 static __inline void ahd_schedule_runq(struct ahd_softc *ahd);
@@ -794,6 +795,531 @@ ahd_linux_map_seg(struct ahd_softc *ahd, struct scb *scb,
 	return (consumed);
 }
 
+/************************  Host template entry points *************************/
+static int	   ahd_linux_detect(Scsi_Host_Template *);
+static int	   ahd_linux_release(struct Scsi_Host *);
+static const char *ahd_linux_info(struct Scsi_Host *);
+static int	   ahd_linux_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+static int	   ahd_linux_slave_alloc(Scsi_Device *);
+static int	   ahd_linux_slave_configure(Scsi_Device *);
+static void	   ahd_linux_slave_destroy(Scsi_Device *);
+static int	   ahd_linux_biosparam(struct scsi_device*,
+				       struct block_device*, sector_t, int[]);
+#else
+static void	   ahd_linux_select_queue_depth(struct Scsi_Host *host,
+						Scsi_Device *scsi_devs);
+static int	   ahd_linux_biosparam(Disk *, kdev_t, int[]);
+#endif
+static int	   ahd_linux_bus_reset(Scsi_Cmnd *);
+static int	   ahd_linux_dev_reset(Scsi_Cmnd *);
+static int	   ahd_linux_abort(Scsi_Cmnd *);
+
+/*
+ * Try to detect an Adaptec 79XX controller.
+ */
+static int
+ahd_linux_detect(Scsi_Host_Template *template)
+{
+	struct	ahd_softc *ahd;
+	int     found;
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	/*
+	 * It is a bug that the upper layer takes
+	 * this lock just prior to calling us.
+	 */
+	spin_unlock_irq(&io_request_lock);
+#endif
+
+	/*
+	 * Sanity checking of Linux SCSI data structures so
+	 * that some of our hacks^H^H^H^H^Hassumptions aren't
+	 * violated.
+	 */
+	if (offsetof(struct ahd_cmd_internal, end)
+	  > offsetof(struct scsi_cmnd, host_scribble)) {
+		printf("ahd_linux_detect: SCSI data structures changed.\n");
+		printf("ahd_linux_detect: Unable to attach\n");
+		return (0);
+	}
+#ifdef MODULE
+	/*
+	 * If we've been passed any parameters, process them now.
+	 */
+	if (aic79xx)
+		aic79xx_setup(aic79xx);
+	if (dummy_buffer[0] != 'P')
+		printk(KERN_WARNING
+"aic79xx: Please read the file /usr/src/linux/drivers/scsi/README.aic79xx\n"
+"aic79xx: to see the proper way to specify options to the aic79xx module\n"
+"aic79xx: Specifically, don't use any commas when passing arguments to\n"
+"aic79xx: insmod or else it might trash certain memory areas.\n");
+#endif
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,0)
+	template->proc_name = "aic79xx";
+#else
+	template->proc_dir = &proc_scsi_aic79xx;
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
+	/*
+	 * We can only map 16MB per-SG
+	 * so create a sector limit of
+	 * "16MB" in 2K sectors.
+	 */
+	template->max_sectors = 8192;
+#endif
+
+	/*
+	 * Initialize our softc list lock prior to
+	 * probing for any adapters.
+	 */
+	ahd_list_lockinit();
+
+#ifdef CONFIG_PCI
+	ahd_linux_pci_probe(template);
+#endif
+
+	/*
+	 * Register with the SCSI layer all
+	 * controllers we've found.
+	 */
+	found = 0;
+	TAILQ_FOREACH(ahd, &ahd_tailq, links) {
+
+		if (ahd_linux_register_host(ahd, template) == 0)
+			found++;
+	}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	spin_lock_irq(&io_request_lock);
+#endif
+	aic79xx_detect_complete++;
+	return (found);
+}
+
+/*
+ * Free the passed in Scsi_Host memory structures prior to unloading the
+ * module.
+ */
+static int
+ahd_linux_release(struct Scsi_Host * host)
+{
+	struct ahd_softc *ahd;
+	u_long l;
+
+	ahd_list_lock(&l);
+	if (host != NULL) {
+
+		/*
+		 * We should be able to just perform
+		 * the free directly, but check our
+		 * list for extra sanity.
+		 */
+		ahd = ahd_find_softc(*(struct ahd_softc **)host->hostdata);
+		if (ahd != NULL) {
+			u_long s;
+
+			ahd_lock(ahd, &s);
+			ahd_intr_enable(ahd, FALSE);
+			ahd_unlock(ahd, &s);
+			ahd_free(ahd);
+		}
+	}
+	ahd_list_unlock(&l);
+	return (0);
+}
+
+/*
+ * Return a string describing the driver.
+ */
+static const char *
+ahd_linux_info(struct Scsi_Host *host)
+{
+	static char buffer[512];
+	char	ahd_info[256];
+	char   *bp;
+	struct ahd_softc *ahd;
+
+	bp = &buffer[0];
+	ahd = *(struct ahd_softc **)host->hostdata;
+	memset(bp, 0, sizeof(buffer));
+	strcpy(bp, "Adaptec AIC79XX PCI-X SCSI HBA DRIVER, Rev ");
+	strcat(bp, AIC79XX_DRIVER_VERSION);
+	strcat(bp, "\n");
+	strcat(bp, "        <");
+	strcat(bp, ahd->description);
+	strcat(bp, ">\n");
+	strcat(bp, "        ");
+	ahd_controller_info(ahd, ahd_info);
+	strcat(bp, ahd_info);
+	strcat(bp, "\n");
+
+	return (bp);
+}
+
+/*
+ * Queue an SCB to the controller.
+ */
+static int
+ahd_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
+{
+	struct	 ahd_softc *ahd;
+	struct	 ahd_linux_device *dev;
+	u_long	 flags;
+
+	ahd = *(struct ahd_softc **)cmd->host->hostdata;
+
+	/*
+	 * Save the callback on completion function.
+	 */
+	cmd->scsi_done = scsi_done;
+
+	ahd_midlayer_entrypoint_lock(ahd, &flags);
+
+	/*
+	 * Close the race of a command that was in the process of
+	 * being queued to us just as our simq was frozen.  Let
+	 * DV commands through so long as we are only frozen to
+	 * perform DV.
+	 */
+	if (ahd->platform_data->qfrozen != 0
+	 && AHD_DV_CMD(cmd) == 0) {
+
+		ahd_cmd_set_transaction_status(cmd, CAM_REQUEUE_REQ);
+		ahd_linux_queue_cmd_complete(ahd, cmd);
+		ahd_schedule_completeq(ahd, NULL);
+		ahd_midlayer_entrypoint_unlock(ahd, &flags);
+		return (0);
+	}
+	dev = ahd_linux_get_device(ahd, cmd->channel, cmd->target,
+				   cmd->lun, /*alloc*/TRUE);
+	if (dev == NULL) {
+		ahd_midlayer_entrypoint_unlock(ahd, &flags);
+		printf("aic79xx_linux_queue: Unable to allocate device!\n");
+		return (-ENOMEM);
+	}
+	if (cmd->cmd_len > MAX_CDB_LEN)
+		return (-EINVAL);
+	cmd->result = CAM_REQ_INPROG << 16;
+	TAILQ_INSERT_TAIL(&dev->busyq, (struct ahd_cmd *)cmd, acmd_links.tqe);
+	if ((dev->flags & AHD_DEV_ON_RUN_LIST) == 0) {
+		TAILQ_INSERT_TAIL(&ahd->platform_data->device_runq, dev, links);
+		dev->flags |= AHD_DEV_ON_RUN_LIST;
+		ahd_linux_run_device_queues(ahd);
+	}
+	ahd_midlayer_entrypoint_unlock(ahd, &flags);
+	return (0);
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+static int
+ahd_linux_slave_configure(Scsi_Device *device)
+{
+	struct	ahd_softc *ahd;
+	struct	ahd_linux_device *dev;
+	u_long	flags;
+
+	ahd = *((struct ahd_softc **)device->host->hostdata);
+	ahd_midlayer_entrypoint_lock(ahd, &flags);
+	/*
+	 * Since Linux has attached to the device, configure
+	 * it so we don't free and allocate the device
+	 * structure on every command.
+	 */
+	dev = ahd_linux_get_device(ahd, device->channel,
+				   device->id, device->lun,
+					   /*alloc*/TRUE);
+	if (dev != NULL) {
+		dev->flags &= ~AHD_DEV_UNCONFIGURED;
+		dev->scsi_device = device;
+	}
+	ahd_linux_device_queue_depth(ahd, dev);
+	ahd_midlayer_entrypoint_unlock(ahd, &flags);
+	return (0);
+}
+
+static void
+ahd_linux_slave_destroy(Scsi_Device *device)
+{
+	struct	ahd_softc *ahd;
+	struct	ahd_linux_device *dev;
+	u_long	flags;
+
+	ahd = *((struct ahd_softc **)device->host->hostdata);
+	ahd_midlayer_entrypoint_lock(ahd, &flags);
+	dev = ahd_linux_get_device(ahd, device->channel,
+				   device->id, device->lun,
+					   /*alloc*/FALSE);
+	if (dev != NULL)
+		dev->flags |= AHD_DEV_UNCONFIGURED;
+	ahd_midlayer_entrypoint_unlock(ahd, &flags);
+}
+#else
+/*
+ * Sets the queue depth for each SCSI device hanging
+ * off the input host adapter.
+ */
+static void
+ahd_linux_select_queue_depth(struct Scsi_Host * host,
+			     Scsi_Device * scsi_devs)
+{
+	Scsi_Device *device;
+	struct	ahd_softc *ahd;
+	u_long	flags;
+	int	scbnum;
+
+	ahd = *((struct ahd_softc **)host->hostdata);
+	ahd_midlayer_entrypoint_lock(ahd, &flags);
+	scbnum = 0;
+	for (device = scsi_devs; device != NULL; device = device->next) {
+
+		if (device->host == host) {
+			struct	 ahd_linux_device *dev;
+
+			/*
+			 * Since Linux has attached to the device, configure
+			 * it so we don't free and allocate the device
+			 * structure on every command.
+			 */
+			dev = ahd_linux_get_device(ahd, device->channel,
+						   device->id, device->lun,
+						   /*alloc*/TRUE);
+			if (dev != NULL) {
+				dev->flags &= ~AHD_DEV_UNCONFIGURED;
+				dev->scsi_device = device;
+				ahd_linux_device_queue_depth(ahd, dev);
+				device->queue_depth = dev->openings
+						    + dev->active;
+				if ((dev->flags & (AHD_DEV_Q_BASIC
+						| AHD_DEV_Q_TAGGED)) == 0) {
+					/*
+					 * We allow the OS to queue 2 untagged
+					 * transactions to us at any time even
+					 * though we can only execute them
+					 * serially on the controller/device.
+					 * This should remove some latency.
+					 */
+					device->queue_depth = 2;
+				}
+			}
+		}
+	}
+	ahd_midlayer_entrypoint_unlock(ahd, &flags);
+}
+#endif
+
+/*
+ * Return the disk geometry for the given SCSI device.
+ */
+static int
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+ahd_linux_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		    sector_t capacity, int geom[])
+{
+	uint8_t *bh;
+#else
+ahd_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
+{
+	struct	scsi_device *sdev = disk->device;
+	u_long	capacity = disk->capacity;
+	struct	buffer_head *bh;
+#endif
+	int	 heads;
+	int	 sectors;
+	int	 cylinders;
+	int	 ret;
+	int	 extended;
+	struct	 ahd_softc *ahd;
+
+	ahd = *((struct ahd_softc **)sdev->host->hostdata);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+	bh = scsi_bios_ptable(bdev);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,17)
+	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, block_size(dev));
+#else
+	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, 1024);
+#endif
+
+	if (bh) {
+		ret = scsi_partsize(bh, capacity,
+				    &geom[2], &geom[0], &geom[1]);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+		kfree(bh);
+#else
+		brelse(bh);
+#endif
+		if (ret != -1)
+			return (ret);
+	}
+	heads = 64;
+	sectors = 32;
+	cylinders = aic_sector_div(capacity, heads, sectors);
+
+	if (aic79xx_extended != 0)
+		extended = 1;
+	else
+		extended = (ahd->flags & AHD_EXTENDED_TRANS_A) != 0;
+	if (extended && cylinders >= 1024) {
+		heads = 255;
+		sectors = 63;
+		cylinders = aic_sector_div(capacity, heads, sectors);
+	}
+	geom[0] = heads;
+	geom[1] = sectors;
+	geom[2] = cylinders;
+	return (0);
+}
+
+/*
+ * Abort the current SCSI command(s).
+ */
+static int
+ahd_linux_abort(Scsi_Cmnd *cmd)
+{
+	struct ahd_softc *ahd;
+	u_long s;
+#if NOTYET
+	struct ahd_cmd *acmd;
+	int    found;
+#endif
+
+	ahd = *(struct ahd_softc **)cmd->host->hostdata;
+#if NOTYET
+	int error;
+
+	error = ahd_linux_queue_recovery_cmd(cmd, SCB_ABORT);
+	if (error != 0)
+		printf("aic79xx_abort returns 0x%x\n", error);
+	return (error);
+#else
+	ahd_midlayer_entrypoint_lock(ahd, &s);
+#ifdef AHD_DEBUG
+	if ((ahd_debug & AHD_SHOW_RECOVERY) != 0) {
+		printf("%s: Abort called for cmd %p\n", ahd_name(ahd), cmd);
+		ahd_dump_card_state(ahd);
+	}
+#endif
+	ahd_midlayer_entrypoint_unlock(ahd, &s);
+	return (FAILED);
+#endif
+}
+
+/*
+ * Attempt to send a target reset message to the device that timed out.
+ */
+static int
+ahd_linux_dev_reset(Scsi_Cmnd *cmd)
+{
+	struct ahd_softc *ahd;
+#if NOTYET
+	struct ahd_cmd *acmd;
+	u_long s;
+	int    found;
+#endif
+
+	ahd = *(struct ahd_softc **)cmd->host->hostdata;
+#ifdef AHD_DEBUG
+	if ((ahd_debug & AHD_SHOW_RECOVERY) != 0)
+		printf("%s: Dev reset called for cmd %p\n",
+		       ahd_name(ahd), cmd);
+#endif
+#if NOTYET
+	int error;
+
+	error = ahd_linux_queue_recovery_cmd(cmd, SCB_DEVICE_RESET);
+	if (error != 0)
+		printf("aic79xx_dev_reset returns 0x%x\n", error);
+	return (error);
+#else
+	return (FAILED);
+#endif
+}
+
+/*
+ * Reset the SCSI bus.
+ */
+static int
+ahd_linux_bus_reset(Scsi_Cmnd *cmd)
+{
+	struct ahd_softc *ahd;
+	struct ahd_cmd *acmd;
+	u_long s;
+	int    found;
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	spin_unlock_irq(&io_request_lock);
+#endif
+	ahd = *(struct ahd_softc **)cmd->host->hostdata;
+#ifdef AHD_DEBUG
+	if ((ahd_debug & AHD_SHOW_RECOVERY) != 0);
+		printf("%s: Bus reset called for cmd %p\n",
+		       ahd_name(ahd), cmd);
+#endif
+	ahd_midlayer_entrypoint_lock(ahd, &s);
+	found = ahd_reset_channel(ahd, cmd->channel + 'A',
+				  /*initiate reset*/TRUE);
+	acmd = TAILQ_FIRST(&ahd->platform_data->completeq);
+	TAILQ_INIT(&ahd->platform_data->completeq);
+	ahd_midlayer_entrypoint_unlock(ahd, &s);
+	if (bootverbose)
+		printf("%s: SCSI bus reset delivered. "
+		       "%d SCBs aborted.\n", ahd_name(ahd), found);
+
+	if (acmd != NULL) {
+		acmd = ahd_linux_run_complete_queue(ahd, acmd);
+		if (acmd != NULL) {
+			ahd_midlayer_entrypoint_lock(ahd, &s);
+			ahd_schedule_completeq(ahd, acmd);
+			ahd_midlayer_entrypoint_unlock(ahd, &s);
+		}
+	}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	spin_lock_irq(&io_request_lock);
+#endif
+	return (SUCCESS);
+}
+
+Scsi_Host_Template aic79xx_driver_template = {
+	.proc_info		= ahd_linux_proc_info,
+	.detect			= ahd_linux_detect,
+	.release		= ahd_linux_release,
+	.info			= ahd_linux_info,
+	.queuecommand		= ahd_linux_queue,
+	.eh_abort_handler	= ahd_linux_abort,
+	.eh_device_reset_handler = ahd_linux_dev_reset,
+	.eh_bus_reset_handler	= ahd_linux_bus_reset,
+#if defined(__i386__)
+	.bios_param		= ahd_linux_biosparam,
+#endif
+	.can_queue		= AHD_MAX_QUEUE,
+	.this_id		= -1,
+	.sg_tablesize		= AHD_NSEG,
+	.cmd_per_lun		= 2,
+	.use_clustering		= ENABLE_CLUSTERING,
+#if defined CONFIG_HIGHIO
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
+/* Assume RedHat Distribution with its different HIGHIO conventions. */
+	.can_dma_32		= 1,
+	.single_sg_okay		= 1,
+#else
+	.highmem_io		= 1,
+#endif
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+	.slave_configure	= ahd_linux_slave_configure,
+	.slave_destroy		= ahd_linux_slave_destroy,
+#else
+	.select_queue_depths	= ahd_linux_select_queue_depth,
+	.use_new_eh_code	= 1,
+#endif
+};
+
+#define driver_template aic79xx_driver_template
+#include "scsi_module.c"
 /**************************** Tasklet Handler *********************************/
 
 static void
@@ -1432,90 +1958,6 @@ __setup("aic79xx=", aic79xx_setup);
 #endif
 
 int aic79xx_verbose;
-
-/*
- * Try to detect an Adaptec 79XX controller.
- */
-int
-ahd_linux_detect(Scsi_Host_Template *template)
-{
-	struct	ahd_softc *ahd;
-	int     found;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	/*
-	 * It is a bug that the upper layer takes
-	 * this lock just prior to calling us.
-	 */
-	spin_unlock_irq(&io_request_lock);
-#endif
-
-	/*
-	 * Sanity checking of Linux SCSI data structures so
-	 * that some of our hacks^H^H^H^H^Hassumptions aren't
-	 * violated.
-	 */
-	if (offsetof(struct ahd_cmd_internal, end)
-	  > offsetof(struct scsi_cmnd, host_scribble)) {
-		printf("ahd_linux_detect: SCSI data structures changed.\n");
-		printf("ahd_linux_detect: Unable to attach\n");
-		return (0);
-	}
-#ifdef MODULE
-	/*
-	 * If we've been passed any parameters, process them now.
-	 */
-	if (aic79xx)
-		aic79xx_setup(aic79xx);
-	if (dummy_buffer[0] != 'P')
-		printk(KERN_WARNING
-"aic79xx: Please read the file /usr/src/linux/drivers/scsi/README.aic79xx\n"
-"aic79xx: to see the proper way to specify options to the aic79xx module\n"
-"aic79xx: Specifically, don't use any commas when passing arguments to\n"
-"aic79xx: insmod or else it might trash certain memory areas.\n");
-#endif
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,0)
-	template->proc_name = "aic79xx";
-#else
-	template->proc_dir = &proc_scsi_aic79xx;
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
-	/*
-	 * We can only map 16MB per-SG
-	 * so create a sector limit of
-	 * "16MB" in 2K sectors.
-	 */
-	template->max_sectors = 8192;
-#endif
-
-	/*
-	 * Initialize our softc list lock prior to
-	 * probing for any adapters.
-	 */
-	ahd_list_lockinit();
-
-#ifdef CONFIG_PCI
-	ahd_linux_pci_probe(template);
-#endif
-
-	/*
-	 * Register with the SCSI layer all
-	 * controllers we've found.
-	 */
-	found = 0;
-	TAILQ_FOREACH(ahd, &ahd_tailq, links) {
-
-		if (ahd_linux_register_host(ahd, template) == 0)
-			found++;
-	}
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	spin_lock_irq(&io_request_lock);
-#endif
-	aic79xx_detect_complete++;
-	return (found);
-}
 
 int
 ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
@@ -3285,112 +3727,6 @@ ahd_linux_generate_dv_pattern(struct ahd_linux_target *targ)
 	}
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-int
-ahd_linux_slave_alloc(Scsi_Device *device)
-{
-	/*
-	 * Nothing to be done for now.
-	 */
-	return (0);
-}
-
-int
-ahd_linux_slave_configure(Scsi_Device *device)
-{
-	struct	ahd_softc *ahd;
-	struct	ahd_linux_device *dev;
-	u_long	flags;
-
-	ahd = *((struct ahd_softc **)device->host->hostdata);
-	ahd_midlayer_entrypoint_lock(ahd, &flags);
-	/*
-	 * Since Linux has attached to the device, configure
-	 * it so we don't free and allocate the device
-	 * structure on every command.
-	 */
-	dev = ahd_linux_get_device(ahd, device->channel,
-				   device->id, device->lun,
-					   /*alloc*/TRUE);
-	if (dev != NULL) {
-		dev->flags &= ~AHD_DEV_UNCONFIGURED;
-		dev->scsi_device = device;
-	}
-	ahd_linux_device_queue_depth(ahd, dev);
-	ahd_midlayer_entrypoint_unlock(ahd, &flags);
-	return (0);
-}
-
-void
-ahd_linux_slave_destroy(Scsi_Device *device)
-{
-	struct	ahd_softc *ahd;
-	struct	ahd_linux_device *dev;
-	u_long	flags;
-
-	ahd = *((struct ahd_softc **)device->host->hostdata);
-	ahd_midlayer_entrypoint_lock(ahd, &flags);
-	dev = ahd_linux_get_device(ahd, device->channel,
-				   device->id, device->lun,
-					   /*alloc*/FALSE);
-	if (dev != NULL)
-		dev->flags |= AHD_DEV_UNCONFIGURED;
-	ahd_midlayer_entrypoint_unlock(ahd, &flags);
-}
-#else
-/*
- * Sets the queue depth for each SCSI device hanging
- * off the input host adapter.
- */
-void
-ahd_linux_select_queue_depth(struct Scsi_Host * host,
-			     Scsi_Device * scsi_devs)
-{
-	Scsi_Device *device;
-	struct	ahd_softc *ahd;
-	u_long	flags;
-	int	scbnum;
-
-	ahd = *((struct ahd_softc **)host->hostdata);
-	ahd_midlayer_entrypoint_lock(ahd, &flags);
-	scbnum = 0;
-	for (device = scsi_devs; device != NULL; device = device->next) {
-
-		if (device->host == host) {
-			struct	 ahd_linux_device *dev;
-
-			/*
-			 * Since Linux has attached to the device, configure
-			 * it so we don't free and allocate the device
-			 * structure on every command.
-			 */
-			dev = ahd_linux_get_device(ahd, device->channel,
-						   device->id, device->lun,
-						   /*alloc*/TRUE);
-			if (dev != NULL) {
-				dev->flags &= ~AHD_DEV_UNCONFIGURED;
-				dev->scsi_device = device;
-				ahd_linux_device_queue_depth(ahd, dev);
-				device->queue_depth = dev->openings
-						    + dev->active;
-				if ((dev->flags & (AHD_DEV_Q_BASIC
-						| AHD_DEV_Q_TAGGED)) == 0) {
-					/*
-					 * We allow the OS to queue 2 untagged
-					 * transactions to us at any time even
-					 * though we can only execute them
-					 * serially on the controller/device.
-					 * This should remove some latency.
-					 */
-					device->queue_depth = 2;
-				}
-			}
-		}
-	}
-	ahd_midlayer_entrypoint_unlock(ahd, &flags);
-}
-#endif
-
 static u_int
 ahd_linux_user_tagdepth(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 {
@@ -3482,60 +3818,6 @@ ahd_linux_device_queue_depth(struct ahd_softc *ahd,
 	} else {
 		ahd_set_tags(ahd, &devinfo, AHD_QUEUE_NONE);
 	}
-}
-
-/*
- * Queue an SCB to the controller.
- */
-int
-ahd_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
-{
-	struct	 ahd_softc *ahd;
-	struct	 ahd_linux_device *dev;
-	u_long	 flags;
-
-	ahd = *(struct ahd_softc **)cmd->host->hostdata;
-
-	/*
-	 * Save the callback on completion function.
-	 */
-	cmd->scsi_done = scsi_done;
-
-	ahd_midlayer_entrypoint_lock(ahd, &flags);
-
-	/*
-	 * Close the race of a command that was in the process of
-	 * being queued to us just as our simq was frozen.  Let
-	 * DV commands through so long as we are only frozen to
-	 * perform DV.
-	 */
-	if (ahd->platform_data->qfrozen != 0
-	 && AHD_DV_CMD(cmd) == 0) {
-
-		ahd_cmd_set_transaction_status(cmd, CAM_REQUEUE_REQ);
-		ahd_linux_queue_cmd_complete(ahd, cmd);
-		ahd_schedule_completeq(ahd, NULL);
-		ahd_midlayer_entrypoint_unlock(ahd, &flags);
-		return (0);
-	}
-	dev = ahd_linux_get_device(ahd, cmd->channel, cmd->target,
-				   cmd->lun, /*alloc*/TRUE);
-	if (dev == NULL) {
-		ahd_midlayer_entrypoint_unlock(ahd, &flags);
-		printf("aic79xx_linux_queue: Unable to allocate device!\n");
-		return (-ENOMEM);
-	}
-	if (cmd->cmd_len > MAX_CDB_LEN)
-		return (-EINVAL);
-	cmd->result = CAM_REQ_INPROG << 16;
-	TAILQ_INSERT_TAIL(&dev->busyq, (struct ahd_cmd *)cmd, acmd_links.tqe);
-	if ((dev->flags & AHD_DEV_ON_RUN_LIST) == 0) {
-		TAILQ_INSERT_TAIL(&ahd->platform_data->device_runq, dev, links);
-		dev->flags |= AHD_DEV_ON_RUN_LIST;
-		ahd_linux_run_device_queues(ahd);
-	}
-	ahd_midlayer_entrypoint_unlock(ahd, &flags);
-	return (0);
 }
 
 static void
@@ -3861,34 +4143,6 @@ ahd_linux_free_device(struct ahd_softc *ahd, struct ahd_linux_device *dev)
 	if (targ->refcount == 0
 	 && (targ->flags & AHD_DV_REQUIRED) == 0)
 		ahd_linux_free_target(ahd, targ);
-}
-
-/*
- * Return a string describing the driver.
- */
-const char *
-ahd_linux_info(struct Scsi_Host *host)
-{
-	static char buffer[512];
-	char	ahd_info[256];
-	char   *bp;
-	struct ahd_softc *ahd;
-
-	bp = &buffer[0];
-	ahd = *(struct ahd_softc **)host->hostdata;
-	memset(bp, 0, sizeof(buffer));
-	strcpy(bp, "Adaptec AIC79XX PCI-X SCSI HBA DRIVER, Rev ");
-	strcat(bp, AIC79XX_DRIVER_VERSION);
-	strcat(bp, "\n");
-	strcat(bp, "        <");
-	strcat(bp, ahd->description);
-	strcat(bp, ">\n");
-	strcat(bp, "        ");
-	ahd_controller_info(ahd, ahd_info);
-	strcat(bp, ahd_info);
-	strcat(bp, "\n");
-
-	return (bp);
 }
 
 void
@@ -4861,218 +5115,6 @@ ahd_linux_dev_timed_unfreeze(u_long arg)
 	ahd_unlock(ahd, &s);
 }
 
-/*
- * Abort the current SCSI command(s).
- */
-int
-ahd_linux_abort(Scsi_Cmnd *cmd)
-{
-	struct ahd_softc *ahd;
-	u_long s;
-#if NOTYET
-	struct ahd_cmd *acmd;
-	int    found;
-#endif
-
-	ahd = *(struct ahd_softc **)cmd->host->hostdata;
-#if NOTYET
-	int error;
-
-	error = ahd_linux_queue_recovery_cmd(cmd, SCB_ABORT);
-	if (error != 0)
-		printf("aic79xx_abort returns 0x%x\n", error);
-	return (error);
-#else
-	ahd_midlayer_entrypoint_lock(ahd, &s);
-#ifdef AHD_DEBUG
-	if ((ahd_debug & AHD_SHOW_RECOVERY) != 0) {
-		printf("%s: Abort called for cmd %p\n", ahd_name(ahd), cmd);
-		ahd_dump_card_state(ahd);
-	}
-#endif
-	ahd_midlayer_entrypoint_unlock(ahd, &s);
-	return (FAILED);
-#endif
-}
-
-/*
- * Attempt to send a target reset message to the device that timed out.
- */
-int
-ahd_linux_dev_reset(Scsi_Cmnd *cmd)
-{
-	struct ahd_softc *ahd;
-#if NOTYET
-	struct ahd_cmd *acmd;
-	u_long s;
-	int    found;
-#endif
-
-	ahd = *(struct ahd_softc **)cmd->host->hostdata;
-#ifdef AHD_DEBUG
-	if ((ahd_debug & AHD_SHOW_RECOVERY) != 0)
-		printf("%s: Dev reset called for cmd %p\n",
-		       ahd_name(ahd), cmd);
-#endif
-#if NOTYET
-	int error;
-
-	error = ahd_linux_queue_recovery_cmd(cmd, SCB_DEVICE_RESET);
-	if (error != 0)
-		printf("aic79xx_dev_reset returns 0x%x\n", error);
-	return (error);
-#else
-	return (FAILED);
-#endif
-}
-
-/*
- * Reset the SCSI bus.
- */
-int
-ahd_linux_bus_reset(Scsi_Cmnd *cmd)
-{
-	struct ahd_softc *ahd;
-	struct ahd_cmd *acmd;
-	u_long s;
-	int    found;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	spin_unlock_irq(&io_request_lock);
-#endif
-	ahd = *(struct ahd_softc **)cmd->host->hostdata;
-#ifdef AHD_DEBUG
-	if ((ahd_debug & AHD_SHOW_RECOVERY) != 0);
-		printf("%s: Bus reset called for cmd %p\n",
-		       ahd_name(ahd), cmd);
-#endif
-	ahd_midlayer_entrypoint_lock(ahd, &s);
-	found = ahd_reset_channel(ahd, cmd->channel + 'A',
-				  /*initiate reset*/TRUE);
-	acmd = TAILQ_FIRST(&ahd->platform_data->completeq);
-	TAILQ_INIT(&ahd->platform_data->completeq);
-	ahd_midlayer_entrypoint_unlock(ahd, &s);
-	if (bootverbose)
-		printf("%s: SCSI bus reset delivered. "
-		       "%d SCBs aborted.\n", ahd_name(ahd), found);
-
-	if (acmd != NULL) {
-		acmd = ahd_linux_run_complete_queue(ahd, acmd);
-		if (acmd != NULL) {
-			ahd_midlayer_entrypoint_lock(ahd, &s);
-			ahd_schedule_completeq(ahd, acmd);
-			ahd_midlayer_entrypoint_unlock(ahd, &s);
-		}
-	}
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	spin_lock_irq(&io_request_lock);
-#endif
-	return (SUCCESS);
-}
-
-/*
- * Return the disk geometry for the given SCSI device.
- */
-int
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-ahd_linux_biosparam(struct scsi_device *sdev, struct block_device *bdev,
-		    sector_t capacity, int geom[])
-#else
-ahd_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
-#endif
-{
-	int	 heads;
-	int	 sectors;
-	int	 cylinders;
-	int	 ret;
-	int	 extended;
-	struct	 ahd_softc *ahd;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	uint8_t	*bh;
-#else
-	u_long	 capacity;
-	struct	 buffer_head *bh;
-
-	capacity = disk->capacity;
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	ahd = *((struct ahd_softc **)sdev->host->hostdata);
-#else
-	ahd = *((struct ahd_softc **)disk->device->host->hostdata);
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	bh = scsi_bios_ptable(bdev);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,17)
-	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, block_size(dev));
-#else
-	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, 1024);
-#endif
-
-	if (bh) {
-		ret = scsi_partsize(bh, capacity,
-				    &geom[2], &geom[0], &geom[1]);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-		kfree(bh);
-#else
-		brelse(bh);
-#endif
-		if (ret != -1)
-			return (ret);
-	}
-	heads = 64;
-	sectors = 32;
-	cylinders = capacity / (heads * sectors);
-
-	if (aic79xx_extended != 0)
-		extended = 1;
-	else
-		extended = (ahd->flags & AHD_EXTENDED_TRANS_A) != 0;
-	if (extended && cylinders >= 1024) {
-		heads = 255;
-		sectors = 63;
-		cylinders = capacity / (heads * sectors);
-	}
-	geom[0] = heads;
-	geom[1] = sectors;
-	geom[2] = cylinders;
-	return (0);
-}
-
-/*
- * Free the passed in Scsi_Host memory structures prior to unloading the
- * module.
- */
-int
-ahd_linux_release(struct Scsi_Host * host)
-{
-	struct ahd_softc *ahd;
-	u_long l;
-
-	ahd_list_lock(&l);
-	if (host != NULL) {
-
-		/*
-		 * We should be able to just perform
-		 * the free directly, but check our
-		 * list for extra sanity.
-		 */
-		ahd = ahd_find_softc(*(struct ahd_softc **)host->hostdata);
-		if (ahd != NULL) {
-			u_long s;
-
-			ahd_lock(ahd, &s);
-			ahd_intr_enable(ahd, FALSE);
-			ahd_unlock(ahd, &s);
-			ahd_free(ahd);
-		}
-	}
-	ahd_list_unlock(&l);
-	return (0);
-}
-
 void
 ahd_platform_dump_card_state(struct ahd_softc *ahd)
 {
@@ -5103,9 +5145,3 @@ ahd_platform_dump_card_state(struct ahd_softc *ahd)
 		}
 	}
 }
-
-#if defined(MODULE) || LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-static Scsi_Host_Template driver_template = AIC79XX;
-Scsi_Host_Template *aic79xx_driver_template = &driver_template;
-#include "scsi_module.c"
-#endif

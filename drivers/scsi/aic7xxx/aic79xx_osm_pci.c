@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm_pci.c#17 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm_pci.c#18 $
  */
 
 #include "aic79xx_osm.h"
@@ -181,7 +181,7 @@ ahd_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	pci_set_drvdata(pdev, ahd);
 	if (aic79xx_detect_complete)
-		ahd_linux_register_host(ahd, aic79xx_driver_template);
+		ahd_linux_register_host(ahd, &aic79xx_driver_template);
 #endif
 	return (0);
 }
