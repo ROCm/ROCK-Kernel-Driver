@@ -12,8 +12,9 @@ img := $(subst $(src)//,/,$(src)/$(img))
 
 quiet_cmd_ramdisk = LD      $@
 define cmd_ramdisk
-	$(LD) -T $(src)/ld.script -b binary --oformat $(O_FORMAT) -o $@ $(img)
+	$(LD) -T $(srctree)/$(src)/ld.script -b binary --oformat $(O_FORMAT) \
+		-o $@ $(img)
 endef
 
-$(obj)/ramdisk.o: $(img) $(src)/ld.script
+$(obj)/ramdisk.o: $(img) $(srctree)/$(src)/ld.script
 	$(call cmd,ramdisk)
