@@ -63,41 +63,6 @@ error_out:
 	return bh;
 }
 
-/*
- * Speculatively reserve an inode in a blockgroup which used to have some
- * spare ones.  Later, when we come to actually claim the inode in the bitmap
- * it may be that it was taken.  In that case the allocator will undo this
- * reservation and try again.
- *
- * The inode allocator does not physically alter the superblock.  But we still
- * set sb->s_dirt, because the superblock was "logically" altered - we need to
- * go and add up the free inodes counts again and flush out the superblock.
- */
-static void ext2_reserve_inode(struct super_block *sb, int group, int dir)
-{
-	struct ext2_group_desc * desc;
-	struct buffer_head *bh;
-
-	desc = ext2_get_group_desc(sb, group, &bh);
-	if (!desc) {
-		ext2_error(sb, "ext2_reserve_inode",
-			"can't get descriptor for group %d", group);
-		return;
-	}
-
-	spin_lock(sb_bgl_lock(EXT2_SB(sb), group));
-	desc->bg_free_inodes_count =
-		cpu_to_le16(le16_to_cpu(desc->bg_free_inodes_count) - 1);
-	if (dir)
-		desc->bg_used_dirs_count =
-			cpu_to_le16(le16_to_cpu(desc->bg_used_dirs_count) + 1);
-	spin_unlock(sb_bgl_lock(EXT2_SB(sb), group));
-	if (dir)
-		percpu_counter_inc(&EXT2_SB(sb)->s_dirs_counter);
-	sb->s_dirt = 1;
-	mark_buffer_dirty(bh);
-}
-
 static void ext2_release_inode(struct super_block *sb, int group, int dir)
 {
 	struct ext2_group_desc * desc;
