@@ -159,6 +159,8 @@ static inline int dev_is_ethdev(struct net_device *dev)
 	);
 }
 
+static spinlock_t bpq_lock = SPIN_LOCK_UNLOCKED;
+
 /*
  *	Sanity check: remove all devices that ceased to exists and
  *	return '1' if the given BPQ device was affected.
@@ -169,8 +171,7 @@ static int bpq_check_devices(struct net_device *dev)
 	int result = 0;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&bpq_lock, flags);
 
 	bpq_prev = NULL;
 
@@ -196,7 +197,7 @@ static int bpq_check_devices(struct net_device *dev)
 			bpq_prev = bpq;
 	}
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&bpq_lock, flags);
 
 	return result;
 }
@@ -446,8 +447,9 @@ static int bpq_get_info(char *buffer, char **start, off_t offset, int length)
 	int len     = 0;
 	off_t pos   = 0;
 	off_t begin = 0;
+	unsigned long flags;
 
-	cli();
+	spin_lock_irqsave(&bpq_lock, flags);
 
 	len += sprintf(buffer, "dev   ether      destination        accept from\n");
 
@@ -470,7 +472,7 @@ static int bpq_get_info(char *buffer, char **start, off_t offset, int length)
 			break;
 	}
 
-	sti();
+	spin_unlock_irqrestore(&bpq_lock, flags);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);
@@ -491,6 +493,7 @@ static int bpq_new_device(struct net_device *dev)
 {
 	int k;
 	struct bpqdev *bpq, *bpq2;
+	unsigned long flags;
 
 	if ((bpq = kmalloc(sizeof(struct bpqdev), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
@@ -553,7 +556,7 @@ static int bpq_new_device(struct net_device *dev)
 	dev->mtu             = AX25_DEF_PACLEN;
 	dev->addr_len        = AX25_ADDR_LEN;
 
-	cli();
+	spin_lock_irqsave(&bpq_lock, flags);
 
 	if (bpq_devices == NULL) {
 		bpq_devices = bpq;
@@ -562,7 +565,7 @@ static int bpq_new_device(struct net_device *dev)
 		bpq2->next = bpq;
 	}
 
-	sti();
+	spin_unlock_irqrestore(&bpq_lock, flags);
 
 	return 0;
 }
@@ -615,7 +618,13 @@ static int __init bpq_init_driver(void)
 
 	printk(banner);
 
-	proc_net_create("bpqether", 0, bpq_get_info);
+	if (!proc_net_create("bpqether", 0, bpq_get_info)) {
+		printk(KERN_ERR
+			"bpq: cannot create /proc/net/bpqether entry.\n");
+		unregister_netdevice_notifier(&bpq_dev_notifier);
+		dev_remove_pack(&bpq_packet_type);
+		return -ENOENT;
+	}
 
 	read_lock_bh(&dev_base_lock);
 	for (dev = dev_base; dev != NULL; dev = dev->next) {
