@@ -11,18 +11,18 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
+ *
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
@@ -176,19 +176,19 @@ static int sw_read_packet(struct gameport *gameport, unsigned char *buf, int len
 				buf[i] = v >> 5;		/* Store it */
 			i++;					/* Advance index */
 			bitout = strobe;			/* Extend timeout for next bit */
-		} 
+		}
 
 		if (kick && (~v & u & 0x01)) {			/* Falling edge on axis 0 */
 			sched = kick;				/* Schedule second trigger */
 			kick = 0;				/* Don't schedule next time on falling edge */
 			pending = 1;				/* Mark schedule */
-		} 
+		}
 
 		if (pending && sched < 0 && (i > -SW_END)) {	/* Second trigger time */
 			gameport_trigger(gameport);		/* Trigger */
 			bitout = start;				/* Long bit timeout */
 			pending = 0;				/* Unmark schedule */
-			timeout = 0;				/* Switch from global to bit timeouts */ 
+			timeout = 0;				/* Switch from global to bit timeouts */
 		}
 	}
 
@@ -482,14 +482,14 @@ static int sw_read(struct sw *sw)
 	sw_read_packet(sw->gameport, buf, SW_LENGTH, i);			/* Read ID packet, this initializes the stick */
 
 	sw->fail = SW_FAIL;
-	
+
 	return -1;
 }
 
 static void sw_timer(unsigned long private)
 {
 	struct sw *sw = (void *) private;
-	
+
 	sw->reads++;
 	if (sw_read(sw)) sw->bads++;
 	mod_timer(&sw->timer, jiffies + SW_REFRESH);
@@ -653,7 +653,7 @@ static void sw_connect(struct gameport *gameport, struct gameport_dev *dev)
 				case 60:
 					sw->number++;
 				case 45:				/* Ambiguous packet length */
-					if (j <= 40) {			/* ID length less or eq 40 -> FSP */	
+					if (j <= 40) {			/* ID length less or eq 40 -> FSP */
 				case 43:
 						sw->type = SW_ID_FSP;
 						break;
