@@ -188,11 +188,17 @@ EXPORT_SYMBOL(dev_base_lock);
 
 #define NETDEV_HASHBITS	8
 static struct hlist_head dev_name_head[1<<NETDEV_HASHBITS];
+static struct hlist_head dev_index_head[1<<NETDEV_HASHBITS];
 
 static inline struct hlist_head *dev_name_hash(const char *name)
 {
 	unsigned hash = full_name_hash(name, strnlen(name, IFNAMSIZ));
 	return &dev_name_head[hash & ((1<<NETDEV_HASHBITS)-1)];
+}
+
+static inline struct hlist_head *dev_index_hash(int ifindex)
+{
+	return &dev_index_head[ifindex & ((1<<NETDEV_HASHBITS)-1)];
 }
 
 /*
@@ -554,12 +560,15 @@ int __dev_get(const char *name)
 
 struct net_device *__dev_get_by_index(int ifindex)
 {
-	struct net_device *dev;
+	struct hlist_node *p;
 
-	for (dev = dev_base; dev; dev = dev->next)
+	hlist_for_each(p, dev_index_hash(ifindex)) {
+		struct net_device *dev
+			= hlist_entry(p, struct net_device, index_hlist);
 		if (dev->ifindex == ifindex)
-			break;
-	return dev;
+			return dev;
+	}
+	return NULL;
 }
 
 
@@ -2842,6 +2851,7 @@ int register_netdevice(struct net_device *dev)
 	*dev_tail = dev;
 	dev_tail = &dev->next;
 	hlist_add_head(&dev->name_hlist, head);
+	hlist_add_head(&dev->index_hlist, dev_index_hash(dev->ifindex));
 	dev_hold(dev);
 	dev->reg_state = NETREG_REGISTERING;
 	write_unlock_bh(&dev_base_lock);
@@ -3064,6 +3074,7 @@ int unregister_netdevice(struct net_device *dev)
 		if (d == dev) {
 			write_lock_bh(&dev_base_lock);
 			hlist_del(&dev->name_hlist);
+			hlist_del(&dev->index_hlist);
 			if (dev_tail == &dev->next)
 				dev_tail = dp;
 			*dp = d->next;
@@ -3144,6 +3155,9 @@ static int __init net_dev_init(void)
 
 	for (i = 0; i < ARRAY_SIZE(dev_name_head); i++)
 		INIT_HLIST_HEAD(&dev_name_head[i]);
+
+	for (i = 0; i < ARRAY_SIZE(dev_index_head); i++)
+		INIT_HLIST_HEAD(&dev_index_head[i]);
 
 	/*
 	 *	Initialise the packet receive queues.

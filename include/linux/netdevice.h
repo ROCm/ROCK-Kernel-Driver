@@ -377,6 +377,8 @@ struct net_device
 	struct list_head	todo_list;
 	/* device name hash chain */
 	struct hlist_node	name_hlist;
+	/* device index hash chain */
+	struct hlist_node	index_hlist;
 
 	/* register/unregister state machine */
 	enum { NETREG_UNINITIALIZED=0,
