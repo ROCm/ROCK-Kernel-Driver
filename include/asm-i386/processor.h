@@ -400,7 +400,7 @@ struct thread_struct {
 /* floating point info */
 	union i387_union	i387;
 /* virtual 86 mode info */
-	struct vm86_struct	* vm86_info;
+	struct vm86_struct __user * vm86_info;
 	unsigned long		screen_bitmap;
 	unsigned long		v86flags, v86mask, saved_esp0;
 	unsigned int		saved_fs, saved_gs;
