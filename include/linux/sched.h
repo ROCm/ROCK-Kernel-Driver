@@ -45,6 +45,7 @@ struct exec_domain;
 #define CLONE_PARENT	0x00008000	/* set if we want to have the same parent as the cloner */
 #define CLONE_THREAD	0x00010000	/* Same thread group? */
 #define CLONE_NEWNS	0x00020000	/* New namespace group? */
+#define CLONE_SYSVSEM	0x00040000	/* share system V SEM_UNDO semantics */
 
 #define CLONE_SIGNAL	(CLONE_SIGHAND | CLONE_THREAD)
 
@@ -315,8 +316,7 @@ struct task_struct {
 	struct tty_struct *tty; /* NULL if no tty */
 	unsigned int locks; /* How many file locks are being held */
 /* ipc stuff */
-	struct sem_undo *semundo;
-	struct sem_queue *semsleeping;
+	struct sysv_sem sysvsem;
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /* filesystem information */
