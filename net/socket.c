@@ -729,9 +729,9 @@ static ssize_t sock_writev(struct file *file, const struct iovec *vector,
  */
 
 static DECLARE_MUTEX(br_ioctl_mutex);
-static int (*br_ioctl_hook)(unsigned int cmd, unsigned long arg) = NULL;
+static int (*br_ioctl_hook)(unsigned int cmd, void __user *arg) = NULL;
 
-void brioctl_set(int (*hook)(unsigned int, unsigned long))
+void brioctl_set(int (*hook)(unsigned int, void __user *))
 {
 	down(&br_ioctl_mutex);
 	br_ioctl_hook = hook;
@@ -770,6 +770,7 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		      unsigned long arg)
 {
 	struct socket *sock;
+	void __user *argp = (void __user *)arg;
 	int pid, err;
 
 	unlock_kernel();
@@ -804,7 +805,7 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 			down(&br_ioctl_mutex);
 			if (br_ioctl_hook) 
-				err = br_ioctl_hook(cmd, arg);
+				err = br_ioctl_hook(cmd, argp);
 			up(&br_ioctl_mutex);
 			break;
 		case SIOCGIFVLAN:

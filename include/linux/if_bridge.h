@@ -104,7 +104,7 @@ struct __fdb_entry
 
 #include <linux/netdevice.h>
 
-extern void brioctl_set(int (*ioctl_hook)(unsigned int, unsigned long));
+extern void brioctl_set(int (*ioctl_hook)(unsigned int, void __user *));
 extern int (*br_handle_frame_hook)(struct sk_buff *skb);
 extern int (*br_should_route_hook)(struct sk_buff **pskb);
 
