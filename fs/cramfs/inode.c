@@ -20,15 +20,11 @@
 #include <linux/blkdev.h>
 #include <linux/cramfs_fs.h>
 #include <linux/smp_lock.h>
+#include <linux/slab.h>
+#include <linux/cramfs_fs_sb.h>
 #include <asm/semaphore.h>
 
 #include <asm/uaccess.h>
-
-#define CRAMFS_SB_MAGIC u.cramfs_sb.magic
-#define CRAMFS_SB_SIZE u.cramfs_sb.size
-#define CRAMFS_SB_BLOCKS u.cramfs_sb.blocks
-#define CRAMFS_SB_FILES u.cramfs_sb.files
-#define CRAMFS_SB_FLAGS u.cramfs_sb.flags
 
 static struct super_operations cramfs_ops;
 static struct inode_operations cramfs_dir_inode_operations;
@@ -188,12 +184,23 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 	return read_buffers[buffer] + offset;
 }
 
+static void cramfs_put_super(struct super_block *sb)
+{
+	kfree(sb->u.generic_sbp);
+	sb->u.generic_sbp = NULL;
+}
 
 static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	int i;
 	struct cramfs_super super;
 	unsigned long root_offset;
+	struct cramfs_sb_info *sbi;
+
+	sbi = kmalloc(sizeof(struct cramfs_sb_info), GFP_KERNEL);
+	if (!sbi)
+		return -ENOMEM;
+	sb->u.generic_sbp = sbi;
 
 	sb_set_blocksize(sb, PAGE_CACHE_SIZE);
 
@@ -229,16 +236,16 @@ static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	root_offset = super.root.offset << 2;
 	if (super.flags & CRAMFS_FLAG_FSID_VERSION_2) {
-		sb->CRAMFS_SB_SIZE=super.size;
-		sb->CRAMFS_SB_BLOCKS=super.fsid.blocks;
-		sb->CRAMFS_SB_FILES=super.fsid.files;
+		sbi->size=super.size;
+		sbi->blocks=super.fsid.blocks;
+		sbi->files=super.fsid.files;
 	} else {
-		sb->CRAMFS_SB_SIZE=1<<28;
-		sb->CRAMFS_SB_BLOCKS=0;
-		sb->CRAMFS_SB_FILES=0;
+		sbi->size=1<<28;
+		sbi->blocks=0;
+		sbi->files=0;
 	}
-	sb->CRAMFS_SB_MAGIC=super.magic;
-	sb->CRAMFS_SB_FLAGS=super.flags;
+	sbi->magic=super.magic;
+	sbi->flags=super.flags;
 	if (root_offset == 0)
 		printk(KERN_INFO "cramfs: empty filesystem");
 	else if (!(super.flags & CRAMFS_FLAG_SHIFTED_ROOT_OFFSET) &&
@@ -254,6 +261,8 @@ static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_root = d_alloc_root(get_cramfs_inode(sb, &super.root));
 	return 0;
 out:
+	kfree(sbi);
+	sb->u.generic_sbp = NULL;
 	return -EINVAL;
 }
 
@@ -261,10 +270,10 @@ static int cramfs_statfs(struct super_block *sb, struct statfs *buf)
 {
 	buf->f_type = CRAMFS_MAGIC;
 	buf->f_bsize = PAGE_CACHE_SIZE;
-	buf->f_blocks = sb->CRAMFS_SB_BLOCKS;
+	buf->f_blocks = CRAMFS_SB(sb)->blocks;
 	buf->f_bfree = 0;
 	buf->f_bavail = 0;
-	buf->f_files = sb->CRAMFS_SB_FILES;
+	buf->f_files = CRAMFS_SB(sb)->files;
 	buf->f_ffree = 0;
 	buf->f_namelen = CRAMFS_MAXPATHLEN;
 	return 0;
@@ -334,7 +343,7 @@ static struct dentry * cramfs_lookup(struct inode *dir, struct dentry *dentry)
 	int sorted;
 
 	lock_kernel();
-	sorted = dir->i_sb->CRAMFS_SB_FLAGS & CRAMFS_FLAG_SORTED_DIRS;
+	sorted = CRAMFS_SB(dir->i_sb)->flags & CRAMFS_FLAG_SORTED_DIRS;
 	while (offset < dir->i_size) {
 		struct cramfs_inode *de;
 		char *name;
@@ -445,6 +454,7 @@ static struct inode_operations cramfs_dir_inode_operations = {
 };
 
 static struct super_operations cramfs_ops = {
+	put_super:	cramfs_put_super,
 	statfs:		cramfs_statfs,
 };
 

@@ -290,7 +290,6 @@ extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long
 #include <linux/pipe_fs_i.h>
 /* #include <linux/umsdos_fs_i.h> */
 #include <linux/romfs_fs_i.h>
-#include <linux/cramfs_fs_sb.h>
 
 /*
  * Attribute flags.  These should be or-ed together to figure out what
@@ -669,7 +668,6 @@ struct quota_mount_options
 #include <linux/bfs_fs_sb.h>
 #include <linux/udf_fs_sb.h>
 #include <linux/ncp_fs_sb.h>
-#include <linux/cramfs_fs_sb.h>
 #include <linux/jffs2_fs_sb.h>
 
 extern struct list_head super_blocks;
@@ -728,7 +726,6 @@ struct super_block {
 		struct udf_sb_info	udf_sb;
 		struct ncp_sb_info	ncpfs_sb;
 		struct jffs2_sb_info	jffs2_sb;
-		struct cramfs_sb_info	cramfs_sb;
 		void			*generic_sbp;
 	} u;
 	/*
