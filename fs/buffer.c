@@ -458,19 +458,17 @@ void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
 }
 
 /*
- * FIXME: What is this function actually trying to do?  Why "zones[0]"?
- * Is it still correct/needed if/when blockdev mappings use GFP_HIGHUSER?
+ * Kick pdflush then try to free up some ZONE_NORMAL memory.
  */
 static void free_more_memory(void)
 {
 	struct zone *zone;
 
-	zone = contig_page_data.node_zonelists[GFP_NOFS & GFP_ZONEMASK].zones[0];
-
-	wakeup_bdflush();
-	try_to_free_pages(zone, GFP_NOFS, 0);
+	zone = contig_page_data.node_zonelists[GFP_NOFS&GFP_ZONEMASK].zones[0];
+	wakeup_bdflush(1024);
 	blk_run_queues();
 	yield();
+	try_to_free_pages(zone, GFP_NOFS, 0);
 }
 
 /*

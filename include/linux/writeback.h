@@ -43,6 +43,8 @@ struct writeback_control {
 					   older than this */
 	long nr_to_write;		/* Write this many pages, and decrement
 					   this for each page written */
+	int nonblocking;		/* Don't get stuck on request queues */
+	int encountered_congestion;	/* An output: a queue is full */
 };
 	
 void writeback_inodes(struct writeback_control *wbc);
@@ -61,6 +63,8 @@ static inline void wait_on_inode(struct inode *inode)
 /*
  * mm/page-writeback.c
  */
+int wakeup_bdflush(long nr_pages);
+
 /* These 5 are exported to sysctl. */
 extern int dirty_background_ratio;
 extern int dirty_async_ratio;

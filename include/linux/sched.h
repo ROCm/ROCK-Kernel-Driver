@@ -273,6 +273,7 @@ extern struct user_struct root_user;
 #define INIT_USER (&root_user)
 
 typedef struct prio_array prio_array_t;
+struct backing_dev_info;
 
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
@@ -398,6 +399,7 @@ struct task_struct {
 /* journalling filesystem info */
 	void *journal_info;
 	struct dentry *proc_dentry;
+	struct backing_dev_info *backing_dev_info;
 };
 
 extern void __put_task_struct(struct task_struct *tsk);
