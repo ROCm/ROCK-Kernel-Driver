@@ -99,9 +99,8 @@ typedef enum _SIS_CHIP_TYPE {
     SIS_315,
     SIS_315PRO, /* SiS 325 */
     SIS_550,
-    SIS_640,
-    SIS_740,
     SIS_650,
+    SIS_740,
     SIS_330, 
     MAX_SIS_CHIP
 } SIS_CHIP_TYPE;
@@ -119,7 +118,6 @@ typedef enum _SIS_VB_CHIP_TYPE {
     VB_CHIP_302,
     VB_CHIP_302B,
     VB_CHIP_302LV,
-    VB_CHIP_303,
     VB_CHIP_UNKNOWN, /* other video bridge or no video bridge */
     MAX_VB_CHIP
 } SIS_VB_CHIP_TYPE;
@@ -174,6 +172,7 @@ struct _SIS_HW_DEVICE_INFO
                                  /* if NULL, then read from pjROMImage; */
                                  /* Note:ROM image file is the file of VBIOS ROM */
 
+    BOOLEAN UseROM;		 /* TW: Use the ROM image if provided */
  
     UCHAR  *pjCustomizedROMImage;/* base virtual address of ROM image file. */
                                  /* wincE:ROM image file is the file for OEM */
@@ -208,6 +207,7 @@ struct _SIS_HW_DEVICE_INFO
                                  /*             011:Trumpion LVDS Scaling Chip */
                                  /*             100:LVDS(LCD-out)+Chrontel 7005 */
                                  /*             101:Single Chrontel 7005 */
+				 /* TW: This has changed on 310/325 series! */
 
     ULONG  ulCRT2LCDType;        /* defined in the data structure type */
                                  /* "SIS_LCD_TYPE" */
@@ -234,13 +234,17 @@ struct _SIS_HW_DEVICE_INFO
     UCHAR  szVBIOSVer[VBIOS_VER_MAX_LENGTH];
 
     UCHAR  pdc;			/* TW: PanelDelayCompensation */
+    
+#ifdef LINUX_KERNEL
+    BOOLEAN Is301BDH;
+#endif        
 
 #ifdef LINUX_XF86
     PCITAG PciTag;		/* PCI Tag for Linux XF86 */
 #endif
 };
 #endif
-#endif /*~ mark by Paul ,Move definition to sisv.h  */
+#endif 
 
 
 /* TW: Addtional IOCTL for communication sisfb <> X driver        */
@@ -268,7 +272,19 @@ struct _SISFB_INFO {
 	unsigned char sisfb_revision;
 	unsigned char sisfb_patchlevel;
 
-	char reserved[253]; 		/* for future use */
+	unsigned char sisfb_caps;	/* sisfb's capabilities */
+
+	int    sisfb_tqlen;		/* turbo queue length (in KB) */
+
+	unsigned int sisfb_pcibus;      /* The card's PCI ID */
+	unsigned int sisfb_pcislot;
+	unsigned int sisfb_pcifunc;
+
+	unsigned char sisfb_lcdpdc;
+	
+	unsigned char sisfb_lcda;
+
+	char reserved[235]; 		/* for future use */
 };
 #endif
 

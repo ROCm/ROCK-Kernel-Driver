@@ -107,14 +107,12 @@ static int hitfb_setcolreg(unsigned regno, unsigned red, unsigned green,
     
 	if (regno < 16) {
 		switch(info->var.bits_per_pixel) {
-#ifdef FBCON_HAS_CFB16
 		case 16:
 			((u16 *)(info->pseudo_palette))[regno] =
 					((red   & 0xf800)      ) |
 					((green & 0xfc00) >>  5) |
 					((blue  & 0xf800) >> 11);
 			break;
-#endif
 		}
 	}
 	return 0;
