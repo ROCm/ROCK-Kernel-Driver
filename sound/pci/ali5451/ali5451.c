@@ -1971,6 +1971,7 @@ static int ali_resume(snd_card_t *card, unsigned int state)
 	spin_unlock_irq(&chip->reg_lock);
 
 	snd_ac97_resume(chip->ac97);
+	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	
 	return 0;
 }
