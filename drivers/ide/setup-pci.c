@@ -444,13 +444,12 @@ static ide_hwif_t *ide_hwif_configure(struct pci_dev *dev, ide_pci_device_t *d, 
 	}
 	if ((hwif = ide_match_hwif(base, d->bootable, d->name)) == NULL)
 		return NULL;	/* no room in ide_hwifs[] */
-	if (hwif->io_ports[IDE_DATA_OFFSET] != base) {
-fixup_address:
+	if (hwif->io_ports[IDE_DATA_OFFSET] != base ||
+	    hwif->io_ports[IDE_CONTROL_OFFSET] != (ctl | 2)) {
+		memset(&hwif->hw, 0, sizeof(hwif->hw));
 		ide_init_hwif_ports(&hwif->hw, base, (ctl | 2), NULL);
 		memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->io_ports));
 		hwif->noprobe = !hwif->io_ports[IDE_DATA_OFFSET];
-	} else if (hwif->io_ports[IDE_CONTROL_OFFSET] != (ctl | 2)) {
-		goto fixup_address;
 	}
 	hwif->chipset = ide_pci;
 	hwif->pci_dev = dev;

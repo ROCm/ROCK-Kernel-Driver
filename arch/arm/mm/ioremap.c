@@ -20,6 +20,7 @@
  * We use MMU protection domains to trap any attempt to access the bank
  * that is not currently mapped.  (This isn't fully implemented yet.)
  */
+#include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
 #include <linux/vmalloc.h>

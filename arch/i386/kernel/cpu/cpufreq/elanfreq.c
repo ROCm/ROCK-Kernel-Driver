@@ -77,7 +77,7 @@ static struct cpufreq_frequency_table elanfreq_table[] = {
  *	and have the rest of the chip running with 33 MHz. 
  */
 
-static unsigned int elanfreq_get_cpu_frequency(void)
+static unsigned int elanfreq_get_cpu_frequency(unsigned int cpu)
 {
         u8 clockspeed_reg;    /* Clock Speed Register */
 	
@@ -121,7 +121,7 @@ static void elanfreq_set_cpu_state (unsigned int state) {
 
 	struct cpufreq_freqs    freqs;
 
-	freqs.old = elanfreq_get_cpu_frequency();
+	freqs.old = elanfreq_get_cpu_frequency(0);
 	freqs.new = elan_multiplier[state].clock;
 	freqs.cpu = 0; /* elanfreq.c is UP only driver */
 	
@@ -209,7 +209,7 @@ static int elanfreq_cpu_init(struct cpufreq_policy *policy)
 
 	/* max freq */
 	if (!max_freq)
-		max_freq = elanfreq_get_cpu_frequency();
+		max_freq = elanfreq_get_cpu_frequency(0);
 
 	/* table init */
  	for (i=0; (elanfreq_table[i].frequency != CPUFREQ_TABLE_END); i++) {
@@ -220,7 +220,7 @@ static int elanfreq_cpu_init(struct cpufreq_policy *policy)
 	/* cpuinfo and default policy values */
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-	policy->cur = elanfreq_get_cpu_frequency();
+	policy->cur = elanfreq_get_cpu_frequency(0);
 
 	result = cpufreq_frequency_table_cpuinfo(policy, elanfreq_table);
 	if (result)
@@ -267,6 +267,7 @@ static struct freq_attr* elanfreq_attr[] = {
 
 
 static struct cpufreq_driver elanfreq_driver = {
+	.get	 	= elanfreq_get_cpu_frequency,
 	.verify 	= elanfreq_verify,
 	.target 	= elanfreq_target,
 	.init		= elanfreq_cpu_init,

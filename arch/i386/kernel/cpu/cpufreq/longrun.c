@@ -46,11 +46,16 @@ static void __init longrun_get_policy(struct cpufreq_policy *policy)
 	rdmsr(MSR_TMTA_LONGRUN_CTRL, msr_lo, msr_hi);
 	msr_lo &= 0x0000007F;
 	msr_hi &= 0x0000007F;
-
-	policy->min = longrun_low_freq + msr_lo * 
-		((longrun_high_freq - longrun_low_freq) / 100);
-	policy->max = longrun_low_freq + msr_hi * 
-		((longrun_high_freq - longrun_low_freq) / 100);
+	
+	if ( longrun_high_freq <= longrun_low_freq ) {
+		/* Assume degenerate Longrun table */
+		policy->min = policy->max = longrun_high_freq;
+	} else {
+		policy->min = longrun_low_freq + msr_lo * 
+			((longrun_high_freq - longrun_low_freq) / 100);
+		policy->max = longrun_low_freq + msr_hi * 
+			((longrun_high_freq - longrun_low_freq) / 100);
+	}
 	policy->cpu = 0;
 }
 
@@ -70,10 +75,15 @@ static int longrun_set_policy(struct cpufreq_policy *policy)
 	if (!policy)
 		return -EINVAL;
 
-	pctg_lo = (policy->min - longrun_low_freq) / 
-		((longrun_high_freq - longrun_low_freq) / 100);
-	pctg_hi = (policy->max - longrun_low_freq) / 
-		((longrun_high_freq - longrun_low_freq) / 100);
+	if ( longrun_high_freq <= longrun_low_freq ) {
+		/* Assume degenerate Longrun table */
+		pctg_lo = pctg_hi = 100;
+	} else {
+		pctg_lo = (policy->min - longrun_low_freq) / 
+			((longrun_high_freq - longrun_low_freq) / 100);
+		pctg_hi = (policy->max - longrun_low_freq) / 
+			((longrun_high_freq - longrun_low_freq) / 100);
+	}
 
 	if (pctg_hi > 100)
 		pctg_hi = 100;
@@ -128,6 +138,17 @@ static int longrun_verify_policy(struct cpufreq_policy *policy)
 	return 0;
 }
 
+static unsigned int longrun_get(unsigned int cpu)
+{
+	u32 eax, ebx, ecx, edx;
+
+	if (cpu)
+		return 0;
+
+	cpuid(0x80860007, &eax, &ebx, &ecx, &edx);
+
+	return (eax * 1000);
+}
 
 /**
  * longrun_determine_freqs - determines the lowest and highest possible core frequency
@@ -250,8 +271,10 @@ static int __init longrun_cpu_init(struct cpufreq_policy *policy)
 
 
 static struct cpufreq_driver longrun_driver = {
+	.flags		= CPUFREQ_CONST_LOOPS,
 	.verify 	= longrun_verify_policy,
 	.setpolicy 	= longrun_set_policy,
+	.get		= longrun_get,
 	.init		= longrun_cpu_init,
 	.name		= "longrun",
 	.owner		= THIS_MODULE,

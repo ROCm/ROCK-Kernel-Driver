@@ -105,7 +105,7 @@ static int sort_by_size(struct pci_resource **head)
 	return 0;
 }
 
-
+#if 0
 /*
  * sort_by_max_size - sort nodes by their length, largest first
  */
@@ -151,6 +151,7 @@ static int sort_by_max_size(struct pci_resource **head)
 
 	return 0;
 }
+#endif
 
 /**
  * get_io_resource - get resource for I/O ports
@@ -247,6 +248,7 @@ struct pci_resource *acpiphp_get_io_resource (struct pci_resource **head, u32 si
 }
 
 
+#if 0
 /**
  * get_max_resource - get the largest resource
  *
@@ -254,7 +256,7 @@ struct pci_resource *acpiphp_get_io_resource (struct pci_resource **head, u32 si
  * list pointed to by head.  It aligns the node on top and bottom
  * to "size" alignment before returning it.
  */
-struct pci_resource *acpiphp_get_max_resource (struct pci_resource **head, u32 size)
+static struct pci_resource *acpiphp_get_max_resource (struct pci_resource **head, u32 size)
 {
 	struct pci_resource *max;
 	struct pci_resource *temp;
@@ -340,7 +342,7 @@ struct pci_resource *acpiphp_get_max_resource (struct pci_resource **head, u32 s
 	/* If we get here, we couldn't find one */
 	return NULL;
 }
-
+#endif
 
 /**
  * get_resource - get resource (mem, pfmem)

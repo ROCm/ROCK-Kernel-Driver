@@ -30,7 +30,7 @@
 
 struct pci_dev *rpaphp_find_pci_dev(struct device_node *dn)
 {
-	struct pci_dev *retval_dev = NULL, *dev = NULL;
+	struct pci_dev *retval_dev = NULL, *dev;
 	char bus_id[BUS_ID_SIZE];
 
 	sprintf(bus_id, "%04x:%02x:%02x.%d",dn->phb->global_number,
@@ -57,9 +57,8 @@ int rpaphp_claim_resource(struct pci_dev *dev, int resource)
 	struct resource *res = &dev->resource[resource];
 	struct resource *root = pci_find_parent_resource(dev, res);
 	char *dtype = resource < PCI_BRIDGE_RESOURCES ? "device" : "bridge";
-	int err;
+	int err = -EINVAL;
 
-	err = -EINVAL;
 	if (root != NULL) {
 		err = request_resource(root, res);
 	}
@@ -117,8 +116,8 @@ static int rpaphp_get_sensor_state(struct slot *slot, int *state)
 	return rc;
 }
 
-/*
- * get_pci_adapter_status - get  the status of a slot
+/**
+ * get_pci_adapter_status - get the status of a slot
  * 
  * 0-- slot is empty
  * 1-- adapter is configured
@@ -136,7 +135,7 @@ int rpaphp_get_pci_adapter_status(struct slot *slot, int is_init, u8 * value)
 	if (state == PRESENT) {
 		if (!is_init)
 			/* at run-time slot->state can be changed by */
-			/* config/unconfig adapter                        */
+			/* config/unconfig adapter */
 			*value = slot->state;
 		else {
 			if (!slot->dn->child)
@@ -154,7 +153,7 @@ int rpaphp_get_pci_adapter_status(struct slot *slot, int is_init, u8 * value)
 		*value = state;
 	}
 
-      exit:
+exit:
 	return rc;
 }
 
@@ -175,6 +174,7 @@ static void rpaphp_fixup_new_pci_devices(struct pci_bus *bus)
 			pci_read_irq_line(dev);
 			for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 				struct resource *r = &dev->resource[i];
+
 				if (r->parent || !r->start || !r->flags)
 					continue;
 				rpaphp_claim_resource(dev, i);
@@ -183,7 +183,8 @@ static void rpaphp_fixup_new_pci_devices(struct pci_bus *bus)
 	}
 }
 
-static void rpaphp_pci_config_device(struct pci_bus *pci_bus, struct device_node *dn)
+static void
+rpaphp_pci_config_device(struct pci_bus *pci_bus, struct device_node *dn)
 {
 	int num;
 
@@ -192,7 +193,6 @@ static void rpaphp_pci_config_device(struct pci_bus *pci_bus, struct device_node
 		rpaphp_fixup_new_pci_devices(pci_bus);
 		pci_bus_add_devices(pci_bus);
 	}
-	return;
 }
 
 static int rpaphp_pci_config_bridge(struct pci_dev *dev, struct device_node *dn);
@@ -201,7 +201,8 @@ static int rpaphp_pci_config_bridge(struct pci_dev *dev, struct device_node *dn)
  rpaphp_pci_config_dn() will recursively configure all devices under the 
  given slot->dn and return the dn's pci_dev.
  *****************************************************************************/
-static struct pci_dev *rpaphp_pci_config_dn(struct device_node *dn, struct pci_bus *bus)
+static struct pci_dev *
+rpaphp_pci_config_dn(struct device_node *dn, struct pci_bus *bus)
 {
 	struct device_node *local;
 	struct pci_dev *dev;
@@ -256,16 +257,16 @@ static struct pci_dev *rpaphp_config_pci_adapter(struct slot *slot)
 			goto exit;
 		}
 
+		eeh_add_device_early(slot->dn->child);
 		dev = rpaphp_pci_config_dn(slot->dn, pci_bus);
-		eeh_add_device(dev);
+		eeh_add_device_late(dev);
 	} else {
 		/* slot is not enabled */
 		err("slot doesn't have pci_dev structure\n");
 		dev = NULL;
-		goto exit;
 	}
 
-      exit:
+exit:
 	dbg("Exit %s: pci_dev %s\n", __FUNCTION__, dev ? "found" : "not found");
 	return dev;
 }
@@ -304,9 +305,9 @@ static int setup_pci_hotplug_slot_info(struct slot *slot)
 	if (slot->hotplug_slot->info->adapter_status == NOT_VALID) {
 		dbg("%s: NOT_VALID: skip dn->full_name=%s\n",
 		    __FUNCTION__, slot->dn->full_name);
-		return (-1);
+		return -1;
 	}
-	return (0);
+	return 0;
 }
 
 static int setup_pci_slot(struct slot *slot)
@@ -317,7 +318,8 @@ static int setup_pci_slot(struct slot *slot)
 		dealloc_slot_struct(slot);
 		return 1;
 	}
-
+	
+	strcpy(slot->name, pci_name(slot->bridge));
 	/* find slot's pci_dev if it's not empty */
 	if (slot->hotplug_slot->info->adapter_status == EMPTY) {
 		slot->state = EMPTY;	/* slot is empty */
@@ -353,7 +355,7 @@ int register_pci_slot(struct slot *slot)
 	if (setup_pci_slot(slot))
 		goto exit_rc;
 	rc = register_slot(slot);
-      exit_rc:
+exit_rc:
 	if (rc)
 		dealloc_slot_struct(slot);
 	return rc;
@@ -389,7 +391,7 @@ int rpaphp_enable_pci_slot(struct slot *slot)
 		slot->state = NOT_VALID;
 		retval = -EINVAL;
 	}
-      exit:
+exit:
 	if (slot->state != NOT_VALID)
 		rpaphp_set_attention_status(slot, LED_ON);
 	else

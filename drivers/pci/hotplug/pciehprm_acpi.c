@@ -1301,6 +1301,7 @@ static struct acpi_php_slot * get_acpi_slot (
 
 }
 
+#if 0
 void * pciehprm_get_slot(struct slot *slot)
 {
 	struct acpi_bridge	*ab = acpi_bridges_head;
@@ -1312,6 +1313,7 @@ void * pciehprm_get_slot(struct slot *slot)
 
 	return (void *)aps;
 }
+#endif
 
 static void pciehprm_dump_func_res( struct pci_func *fun)
 {

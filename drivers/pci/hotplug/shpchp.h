@@ -205,7 +205,6 @@ struct resource_lists {
 extern void shpchp_create_ctrl_files	(struct controller *ctrl);
 
 /* controller functions */
-extern void	shpchp_pushbutton_thread(unsigned long event_pointer);
 extern int	shpchprm_find_available_resources(struct controller *ctrl);
 extern int	shpchp_event_start_thread(void);
 extern void	shpchp_event_stop_thread(void);

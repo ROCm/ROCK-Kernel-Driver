@@ -855,6 +855,9 @@ config BLK_DEV_IDE_SWARM
 	bool "SWARM onboard IDE support"
 	depends on SIBYTE_SWARM
 
+config IDE_ARM
+	def_bool ARM && (ARCH_A5K || ARCH_CLPS7500 || ARCH_RPC || ARCH_SHARK)
+
 config BLK_DEV_IDE_ICSIDE
 	tristate "ICS IDE interface support"
 	depends on ARM && ARCH_ACORN

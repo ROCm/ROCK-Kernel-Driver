@@ -297,7 +297,7 @@ static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 
 		/* and wait a while for it to happen */
 		do {
-			wait_ms (10);
+			msleep(10);
 			msec -= 10;
 			pci_read_config_dword (to_pci_dev(ehci->hcd.self.controller), where, &cap);
 		} while ((cap & (1 << 16)) && msec);
@@ -632,7 +632,7 @@ static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 
 	while (time_before (jiffies, ehci->next_statechange))
-		msec_delay (100);
+		msleep (100);
 
 #ifdef	CONFIG_USB_SUSPEND
 	(void) usb_suspend_device (hcd->self.root_hub);
@@ -654,7 +654,7 @@ static int ehci_resume (struct usb_hcd *hcd)
 	// maybe restore (PCI) FLADJ
 
 	while (time_before (jiffies, ehci->next_statechange))
-		msec_delay (100);
+		msleep (100);
 
 #ifdef	CONFIG_USB_SUSPEND
 	retval = usb_resume_device (hcd->self.root_hub);
@@ -769,7 +769,7 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs)
 			 * and make khubd collect PORT_STAT_C_SUSPEND to
 			 * stop that signaling.
 			 */
-			ehci->reset_done [i] = jiffies + MSEC_TO_JIFFIES (20);
+			ehci->reset_done [i] = jiffies + msecs_to_jiffies (20);
 			mod_timer (&ehci->hcd.rh_timer,
 					ehci->reset_done [i] + 1);
 			ehci_dbg (ehci, "port %d remote wakeup\n", i + 1);

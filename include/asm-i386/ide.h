@@ -85,6 +85,9 @@ static __inline__ void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_por
 }
 #endif
 
+#define IDE_ARCH_OBSOLETE_INIT
+#define ide_default_io_ctl(base)	((base) + 0x206) /* obsolete */
+
 #ifdef CONFIG_BLK_DEV_IDEPCI
 #define ide_init_default_irq(base)	(0)
 #else

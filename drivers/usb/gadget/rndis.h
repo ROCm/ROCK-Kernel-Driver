@@ -277,6 +277,7 @@ typedef struct rndis_params
 	u8			confignr;
 	int			used;
 	enum rndis_state	state;
+	u32			filter;
 	u32			medium;
 	u32			speed;
 	u32			media_state;

@@ -251,12 +251,10 @@ u8 pciehp_handle_power_fault(u8 hp_slot, void *inst_id)
 }
 
 
-/*
- * sort_by_size
+/**
+ * sort_by_size: sort nodes by their length, smallest first.
  *
- * Sorts nodes on the list by their length.
- * Smallest first.
- *
+ * @head: list to sort
  */
 static int sort_by_size(struct pci_resource **head)
 {
@@ -265,10 +263,10 @@ static int sort_by_size(struct pci_resource **head)
 	int out_of_order = 1;
 
 	if (!(*head))
-		return(1);
+		return 1;
 
 	if (!((*head)->next))
-		return(0);
+		return 0;
 
 	while (out_of_order) {
 		out_of_order = 0;
@@ -298,7 +296,7 @@ static int sort_by_size(struct pci_resource **head)
 		}
 	}  /* End of out_of_order loop */
 
-	return(0);
+	return 0;
 }
 
 
@@ -316,10 +314,10 @@ static int sort_by_max_size(struct pci_resource **head)
 	int out_of_order = 1;
 
 	if (!(*head))
-		return(1);
+		return 1;
 
 	if (!((*head)->next))
-		return(0);
+		return 0;
 
 	while (out_of_order) {
 		out_of_order = 0;
@@ -349,17 +347,18 @@ static int sort_by_max_size(struct pci_resource **head)
 		}
 	}  /* End of out_of_order loop */
 
-	return(0);
+	return 0;
 }
 
 
-/*
- * do_pre_bridge_resource_split
- *
- *	Returns zero or one node of resources that aren't in use
+/**
+ * do_pre_bridge_resource_split: return one unused resource node
+ * @head: list to scan
  *
  */
-static struct pci_resource *do_pre_bridge_resource_split (struct pci_resource **head, struct pci_resource **orig_head, u32 alignment)
+static struct pci_resource *
+do_pre_bridge_resource_split(struct pci_resource **head,
+				struct pci_resource **orig_head, u32 alignment)
 {
 	struct pci_resource *prevnode = NULL;
 	struct pci_resource *node;
@@ -369,18 +368,18 @@ static struct pci_resource *do_pre_bridge_resource_split (struct pci_resource **
 	dbg("do_pre_bridge_resource_split\n");
 
 	if (!(*head) || !(*orig_head))
-		return(NULL);
+		return NULL;
 
 	rc = pciehp_resource_sort_and_combine(head);
 
 	if (rc)
-		return(NULL);
+		return NULL;
 
 	if ((*head)->base != (*orig_head)->base)
-		return(NULL);
+		return NULL;
 
 	if ((*head)->length == (*orig_head)->length)
-		return(NULL);
+		return NULL;
 
 
 	/* If we got here, there the bridge requires some of the resource, but
@@ -392,10 +391,10 @@ static struct pci_resource *do_pre_bridge_resource_split (struct pci_resource **
 		/* this one isn't an aligned length, so we'll make a new entry
 		 * and split it up.
 		 */
-		split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+		split_node = kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
 
 		if (!split_node)
-			return(NULL);
+			return NULL;
 
 		temp_dword = (node->length | (alignment-1)) + 1 - alignment;
 
@@ -410,34 +409,32 @@ static struct pci_resource *do_pre_bridge_resource_split (struct pci_resource **
 		split_node->next = node;
 	}
 
-	if (node->length < alignment) {
-		return(NULL);
-	}
+	if (node->length < alignment)
+		return NULL;
 
 	/* Now unlink it */
 	if (*head == node) {
 		*head = node->next;
-		node->next = NULL;
 	} else {
 		prevnode = *head;
 		while (prevnode->next != node)
 			prevnode = prevnode->next;
 
 		prevnode->next = node->next;
-		node->next = NULL;
 	}
+	node->next = NULL;
 
-	return(node);
+	return node;
 }
 
 
-/*
- * do_bridge_resource_split
- *
- *	Returns zero or one node of resources that aren't in use
+/**
+ * do_bridge_resource_split: return one unused resource node
+ * @head: list to scan
  *
  */
-static struct pci_resource *do_bridge_resource_split (struct pci_resource **head, u32 alignment)
+static struct pci_resource *
+do_bridge_resource_split(struct pci_resource **head, u32 alignment)
 {
 	struct pci_resource *prevnode = NULL;
 	struct pci_resource *node;
@@ -445,12 +442,12 @@ static struct pci_resource *do_bridge_resource_split (struct pci_resource **head
 	u32 temp_dword;
 
 	if (!(*head))
-		return(NULL);
+		return NULL;
 
 	rc = pciehp_resource_sort_and_combine(head);
 
 	if (rc)
-		return(NULL);
+		return NULL;
 
 	node = *head;
 
@@ -462,7 +459,7 @@ static struct pci_resource *do_bridge_resource_split (struct pci_resource **head
 
 	if (node->length < alignment) {
 		kfree(node);
-		return(NULL);
+		return NULL;
 	}
 
 	if (node->base & (alignment - 1)) {
@@ -470,7 +467,7 @@ static struct pci_resource *do_bridge_resource_split (struct pci_resource **head
 		temp_dword = (node->base | (alignment-1)) + 1;
 		if ((node->length - (temp_dword - node->base)) < alignment) {
 			kfree(node);
-			return(NULL);
+			return NULL;
 		}
 
 		node->length -= (temp_dword - node->base);
@@ -480,10 +477,10 @@ static struct pci_resource *do_bridge_resource_split (struct pci_resource **head
 	if (node->length & (alignment - 1)) {
 		/* There's stuff in use after this node */
 		kfree(node);
-		return(NULL);
+		return NULL;
 	}
 
-	return(node);
+	return node;
 }
 
 
@@ -497,7 +494,7 @@ static struct pci_resource *do_bridge_resource_split (struct pci_resource **head
  *
  * size must be a power of two.
  */
-static struct pci_resource *get_io_resource (struct pci_resource **head, u32 size)
+static struct pci_resource *get_io_resource(struct pci_resource **head, u32 size)
 {
 	struct pci_resource *prevnode;
 	struct pci_resource *node;
@@ -505,13 +502,13 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
 	u32 temp_dword;
 
 	if (!(*head))
-		return(NULL);
+		return NULL;
 
 	if ( pciehp_resource_sort_and_combine(head) )
-		return(NULL);
+		return NULL;
 
 	if ( sort_by_size(head) )
-		return(NULL);
+		return NULL;
 
 	for (node = *head; node; node = node->next) {
 		if (node->length < size)
@@ -526,10 +523,11 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
 			if ((node->length - (temp_dword - node->base)) < size)
 				continue;
 
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(struct pci_resource),
+						GFP_KERNEL);
 
 			if (!split_node)
-				return(NULL);
+				return NULL;
 
 			split_node->base = node->base;
 			split_node->length = temp_dword - node->base;
@@ -545,10 +543,11 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
 		if (node->length > size) {
 			/* this one is longer than we need
 			   so we'll make a new entry and split it up */
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(struct pci_resource),
+						GFP_KERNEL);
 
 			if (!split_node)
-				return(NULL);
+				return NULL;
 
 			split_node->base = node->base + size;
 			split_node->length = node->length - size;
@@ -579,7 +578,7 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
 		break;
 	}
 
-	return(node);
+	return node;
 }
 
 
@@ -592,7 +591,7 @@ static struct pci_resource *get_io_resource (struct pci_resource **head, u32 siz
  * J.I. modified to put max size limits of; 64M->32M->16M->8M->4M->1M
  *  This is needed to avoid allocating entire ACPI _CRS res to one child bridge/slot.
  */
-static struct pci_resource *get_max_resource (struct pci_resource **head, u32 size)
+static struct pci_resource *get_max_resource(struct pci_resource **head, u32 size)
 {
 	struct pci_resource *max;
 	struct pci_resource *temp;
@@ -602,13 +601,13 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 	int i;
 
 	if (!(*head))
-		return(NULL);
+		return NULL;
 
 	if (pciehp_resource_sort_and_combine(head))
-		return(NULL);
+		return NULL;
 
 	if (sort_by_max_size(head))
-		return(NULL);
+		return NULL;
 
 	for (max = *head;max; max = max->next) {
 
@@ -626,10 +625,11 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 			if ((max->length - (temp_dword - max->base)) < size)
 				continue;
 
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(struct pci_resource),
+						GFP_KERNEL);
 
 			if (!split_node)
-				return(NULL);
+				return NULL;
 
 			split_node->base = max->base;
 			split_node->length = temp_dword - max->base;
@@ -644,10 +644,11 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 		if ((max->base + max->length) & (size - 1)) {
 			/* this one isn't end aligned properly at the top
 			   so we'll make a new entry and split it up */
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(struct pci_resource),
+						GFP_KERNEL);
 
 			if (!split_node)
-				return(NULL);
+				return NULL;
 			temp_dword = ((max->base + max->length) & ~(size - 1));
 			split_node->base = temp_dword;
 			split_node->length = max->length + max->base
@@ -665,9 +666,10 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 
 		for ( i = 0; max_size[i] > size; i++) {
 			if (max->length > max_size[i]) {
-				split_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+				split_node = kmalloc(sizeof(struct pci_resource),
+							GFP_KERNEL);
 				if (!split_node)
-					break;	/* return (NULL); */
+					break;	/* return NULL; */
 				split_node->base = max->base + max_size[i];
 				split_node->length = max->length - max_size[i];
 				max->length = max_size[i];
@@ -691,11 +693,11 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
 		}
 
 		max->next = NULL;
-		return(max);
+		return max;
 	}
 
 	/* If we get here, we couldn't find one */
-	return(NULL);
+	return NULL;
 }
 
 
@@ -708,7 +710,7 @@ static struct pci_resource *get_max_resource (struct pci_resource **head, u32 si
  *
  * size must be a power of two.
  */
-static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
+static struct pci_resource *get_resource(struct pci_resource **head, u32 size)
 {
 	struct pci_resource *prevnode;
 	struct pci_resource *node;
@@ -716,13 +718,13 @@ static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
 	u32 temp_dword;
 
 	if (!(*head))
-		return(NULL);
+		return NULL;
 
 	if ( pciehp_resource_sort_and_combine(head) )
-		return(NULL);
+		return NULL;
 
 	if ( sort_by_size(head) )
-		return(NULL);
+		return NULL;
 
 	for (node = *head; node; node = node->next) {
 		dbg("%s: req_size =0x%x node=%p, base=0x%x, length=0x%x\n",
@@ -740,10 +742,11 @@ static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
 			if ((node->length - (temp_dword - node->base)) < size)
 				continue;
 
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(struct pci_resource),
+						GFP_KERNEL);
 
 			if (!split_node)
-				return(NULL);
+				return NULL;
 
 			split_node->base = node->base;
 			split_node->length = temp_dword - node->base;
@@ -760,10 +763,11 @@ static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
 			dbg("%s: too big\n", __FUNCTION__);
 			/* this one is longer than we need
 			   so we'll make a new entry and split it up */
-			split_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+			split_node = kmalloc(sizeof(struct pci_resource),
+						GFP_KERNEL);
 
 			if (!split_node)
-				return(NULL);
+				return NULL;
 
 			split_node->base = node->base + size;
 			split_node->length = node->length - size;
@@ -790,7 +794,7 @@ static struct pci_resource *get_resource (struct pci_resource **head, u32 size)
 		/* Stop looping */
 		break;
 	}
-	return(node);
+	return node;
 }
 
 
@@ -812,12 +816,12 @@ int pciehp_resource_sort_and_combine(struct pci_resource **head)
 	dbg("%s: head = %p, *head = %p\n", __FUNCTION__, head, *head);
 
 	if (!(*head))
-		return(1);
+		return 1;
 
 	dbg("*head->next = %p\n",(*head)->next);
 
 	if (!(*head)->next)
-		return(0);	/* only one item on the list, already sorted! */
+		return 0;	/* only one item on the list, already sorted! */
 
 	dbg("*head->base = 0x%x\n",(*head)->base);
 	dbg("*head->next->base = 0x%x\n",(*head)->next->base);
@@ -863,7 +867,7 @@ int pciehp_resource_sort_and_combine(struct pci_resource **head)
 			node1 = node1->next;
 	}
 
-	return(0);
+	return 0;
 }
 
 
@@ -878,11 +882,10 @@ struct pci_func *pciehp_slot_create(u8 busnumber)
 	struct pci_func *new_slot;
 	struct pci_func *next;
 	dbg("%s: busnumber %x\n", __FUNCTION__, busnumber);
-	new_slot = (struct pci_func *) kmalloc(sizeof(struct pci_func), GFP_KERNEL);
+	new_slot = kmalloc(sizeof(struct pci_func), GFP_KERNEL);
 
-	if (new_slot == NULL) {
-		return(new_slot);
-	}
+	if (new_slot == NULL)
+		return new_slot;
 
 	memset(new_slot, 0, sizeof(struct pci_func));
 
@@ -897,11 +900,11 @@ struct pci_func *pciehp_slot_create(u8 busnumber)
 			next = next->next;
 		next->next = new_slot;
 	}
-	return(new_slot);
+	return new_slot;
 }
 
 
-/*
+/**
  * slot_remove - Removes a node from the linked list of slots.
  * @old_slot: slot to remove
  *
@@ -912,19 +915,18 @@ static int slot_remove(struct pci_func * old_slot)
 	struct pci_func *next;
 
 	if (old_slot == NULL)
-		return(1);
+		return 1;
 
 	next = pciehp_slot_list[old_slot->bus];
 
-	if (next == NULL) {
-		return(1);
-	}
+	if (next == NULL)
+		return 1;
 
 	if (next == old_slot) {
 		pciehp_slot_list[old_slot->bus] = old_slot->next;
 		pciehp_destroy_board_resources(old_slot);
 		kfree(old_slot);
-		return(0);
+		return 0;
 	}
 
 	while ((next->next != old_slot) && (next->next != NULL)) {
@@ -935,9 +937,9 @@ static int slot_remove(struct pci_func * old_slot)
 		next->next = old_slot->next;
 		pciehp_destroy_board_resources(old_slot);
 		kfree(old_slot);
-		return(0);
+		return 0;
 	} else
-		return(2);
+		return 2;
 }
 
 
@@ -954,7 +956,7 @@ static int bridge_slot_remove(struct pci_func *bridge)
 	struct pci_func *next;
 
 	if (bridge == NULL)
-		return(1);
+		return 1;
 
 	secondaryBus = (bridge->config_space[0x06] >> 8) & 0xFF;
 	subordinateBus = (bridge->config_space[0x06] >> 16) & 0xFF;
@@ -970,13 +972,13 @@ static int bridge_slot_remove(struct pci_func *bridge)
 	next = pciehp_slot_list[bridge->bus];
 
 	if (next == NULL) {
-		return(1);
+		return 1;
 	}
 
 	if (next == bridge) {
 		pciehp_slot_list[bridge->bus] = bridge->next;
 		kfree(bridge);
-		return(0);
+		return 0;
 	}
 
 	while ((next->next != bridge) && (next->next != NULL)) {
@@ -986,9 +988,9 @@ static int bridge_slot_remove(struct pci_func *bridge)
 	if (next->next == bridge) {
 		next->next = bridge->next;
 		kfree(bridge);
-		return(0);
+		return 0;
 	} else
-		return(2);
+		return 2;
 }
 
 
@@ -1016,7 +1018,7 @@ struct pci_func *pciehp_slot_find(u8 bus, u8 device, u8 index)
 		dbg("%s: func == NULL\n", __FUNCTION__);
 
 	if ((func == NULL) || ((func->device == device) && (index == 0)))
-		return(func);
+		return func;
 
 	if (func->device == device)
 		found++;
@@ -1035,11 +1037,11 @@ struct pci_func *pciehp_slot_find(u8 bus, u8 device, u8 index)
 		if ((found == index) || (func->function == index)) {
 			dbg("%s: Found bus %x dev %x func %x\n", __FUNCTION__,
 					func->bus, func->device, func->function);
-			return(func);
+			return func;
 		}
 	}
 
-	return(NULL);
+	return NULL;
 }
 
 static int is_bridge(struct pci_func * func)
@@ -1187,7 +1189,7 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 			/* Done with exclusive hardware access */
 			up(&ctrl->crit_sect);
 
-			return(rc);
+			return rc;
 		}
 		pciehp_save_slot_config(ctrl, func);
 
@@ -1251,7 +1253,7 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 		/* Done with exclusive hardware access */
 		up(&ctrl->crit_sect);
 
-		return(rc);
+		return rc;
 	}
 	return 0;
 }
@@ -1273,10 +1275,10 @@ static u32 remove_board(struct pci_func *func, struct controller *ctrl)
 	struct slot *p_slot;
 
 	if (func == NULL)
-		return(1);
+		return 1;
 
 	if (pciehp_unconfigure_device(func))
-		return(1);
+		return 1;
 
 	device = func->device;
 
@@ -1370,7 +1372,7 @@ static u32 remove_board(struct pci_func *func, struct controller *ctrl)
 		func = pciehp_slot_create(ctrl->slot_bus);
 
 		if (func == NULL) {
-			return(1);
+			return 1;
 		}
 
 		func->bus = ctrl->slot_bus;
@@ -1385,11 +1387,86 @@ static u32 remove_board(struct pci_func *func, struct controller *ctrl)
 }
 
 
-static void pushbutton_helper_thread (unsigned long data)
+static void pushbutton_helper_thread(unsigned long data)
 {
 	pushbutton_pending = data;
 
 	up(&event_semaphore);
+}
+
+
+/**
+ * pciehp_pushbutton_thread
+ *
+ * Scheduled procedure to handle blocking stuff for the pushbuttons
+ * Handles all pending events and exits.
+ *
+ */
+static void pciehp_pushbutton_thread(unsigned long slot)
+{
+	struct slot *p_slot = (struct slot *) slot;
+	u8 getstatus;
+	int rc;
+	
+	pushbutton_pending = 0;
+
+	if (!p_slot) {
+		dbg("%s: Error! slot NULL\n", __FUNCTION__);
+		return;
+	}
+
+	p_slot->hpc_ops->get_power_status(p_slot, &getstatus);
+	if (getstatus) {
+		p_slot->state = POWEROFF_STATE;
+		dbg("In power_down_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
+
+		if (pciehp_disable_slot(p_slot)) {
+			/* Wait for exclusive access to hardware */
+			down(&p_slot->ctrl->crit_sect);
+
+			/* Turn on the Attention LED */
+			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
+			if (rc) {
+				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
+				return;
+			}
+	
+			/* Wait for the command to complete */
+			wait_for_ctrl_irq (p_slot->ctrl);
+
+			/* Done with exclusive hardware access */
+			up(&p_slot->ctrl->crit_sect);
+		}
+		p_slot->state = STATIC_STATE;
+	} else {
+		p_slot->state = POWERON_STATE;
+		dbg("In add_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
+
+		if (pciehp_enable_slot(p_slot)) {
+			/* Wait for exclusive access to hardware */
+			down(&p_slot->ctrl->crit_sect);
+
+			/* Turn off the green LED */
+			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
+			if (rc) {
+				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
+				return;
+			}
+			/* Wait for the command to complete */
+			wait_for_ctrl_irq (p_slot->ctrl);
+			
+			p_slot->hpc_ops->green_led_off(p_slot);
+
+			/* Wait for the command to complete */
+			wait_for_ctrl_irq (p_slot->ctrl);
+
+			/* Done with exclusive hardware access */
+			up(&p_slot->ctrl->crit_sect);
+		}
+		p_slot->state = STATIC_STATE;
+	}
+
+	return;
 }
 
 
@@ -1420,7 +1497,7 @@ static int event_thread(void* data)
 	return 0;
 }
 
-int pciehp_event_start_thread (void)
+int pciehp_event_start_thread(void)
 {
 	int pid;
 
@@ -1440,7 +1517,7 @@ int pciehp_event_start_thread (void)
 }
 
 
-void pciehp_event_stop_thread (void)
+void pciehp_event_stop_thread(void)
 {
 	event_finished = 1;
 	dbg("event_thread finish command given\n");
@@ -1450,13 +1527,13 @@ void pciehp_event_stop_thread (void)
 }
 
 
-static int update_slot_info (struct slot *slot)
+static int update_slot_info(struct slot *slot)
 {
 	struct hotplug_slot_info *info;
 	/* char buffer[SLOT_NAME_SIZE]; */
 	int result;
 
-	info = kmalloc (sizeof (struct hotplug_slot_info), GFP_KERNEL);
+	info = kmalloc(sizeof(struct hotplug_slot_info), GFP_KERNEL);
 	if (!info)
 		return -ENOMEM;
 
@@ -1603,87 +1680,10 @@ static void interrupt_event_handler(struct controller *ctrl)
 			}
 		}		/* End of FOR loop */
 	}
-
-	return;
 }
 
 
-/**
- * pciehp_pushbutton_thread
- *
- * Scheduled procedure to handle blocking stuff for the pushbuttons
- * Handles all pending events and exits.
- *
- */
-void pciehp_pushbutton_thread (unsigned long slot)
-{
-	struct slot *p_slot = (struct slot *) slot;
-	u8 getstatus;
-	int rc;
-	
-	pushbutton_pending = 0;
-
-	if (!p_slot) {
-		dbg("%s: Error! slot NULL\n", __FUNCTION__);
-		return;
-	}
-
-	p_slot->hpc_ops->get_power_status(p_slot, &getstatus);
-	if (getstatus) {
-		p_slot->state = POWEROFF_STATE;
-		dbg("In power_down_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
-
-		if (pciehp_disable_slot(p_slot)) {
-			/* Wait for exclusive access to hardware */
-			down(&p_slot->ctrl->crit_sect);
-
-			/* Turn on the Attention LED */
-			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
-			if (rc) {
-				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
-				return;
-			}
-	
-			/* Wait for the command to complete */
-			wait_for_ctrl_irq (p_slot->ctrl);
-
-			/* Done with exclusive hardware access */
-			up(&p_slot->ctrl->crit_sect);
-		}
-		p_slot->state = STATIC_STATE;
-	} else {
-		p_slot->state = POWERON_STATE;
-		dbg("In add_board, b:d(%x:%x)\n", p_slot->bus, p_slot->device);
-
-		if (pciehp_enable_slot(p_slot)) {
-			/* Wait for exclusive access to hardware */
-			down(&p_slot->ctrl->crit_sect);
-
-			/* Turn off the green LED */
-			rc = p_slot->hpc_ops->set_attention_status(p_slot, 1);
-			if (rc) {
-				err("%s: Issue of Set Atten Indicator On command failed\n", __FUNCTION__);
-				return;
-			}
-			/* Wait for the command to complete */
-			wait_for_ctrl_irq (p_slot->ctrl);
-			
-			p_slot->hpc_ops->green_led_off(p_slot);
-
-			/* Wait for the command to complete */
-			wait_for_ctrl_irq (p_slot->ctrl);
-
-			/* Done with exclusive hardware access */
-			up(&p_slot->ctrl->crit_sect);
-		}
-		p_slot->state = STATIC_STATE;
-	}
-
-	return;
-}
-
-
-int pciehp_enable_slot (struct slot *p_slot)
+int pciehp_enable_slot(struct slot *p_slot)
 {
 	u8 getstatus = 0;
 	int rc;
@@ -1692,7 +1692,7 @@ int pciehp_enable_slot (struct slot *p_slot)
 	func = pciehp_slot_find(p_slot->bus, p_slot->device, 0);
 	if (!func) {
 		dbg("%s: Error! slot NULL\n", __FUNCTION__);
-		return (1);
+		return 1;
 	}
 
 	/* Check to see if (latch closed, card present, power off) */
@@ -1701,21 +1701,21 @@ int pciehp_enable_slot (struct slot *p_slot)
 	if (rc || !getstatus) {
 		info("%s: no adapter on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
-		return (0);
+		return 0;
 	}
 	
 	rc = p_slot->hpc_ops->get_latch_status(p_slot, &getstatus);
 	if (rc || getstatus) {
 		info("%s: latch open on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
-		return (0);
+		return 0;
 	}
 	
 	rc = p_slot->hpc_ops->get_power_status(p_slot, &getstatus);
 	if (rc || getstatus) {
 		info("%s: already enabled on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
-		return (0);
+		return 0;
 	}
 	up(&p_slot->ctrl->crit_sect);
 
@@ -1723,7 +1723,7 @@ int pciehp_enable_slot (struct slot *p_slot)
 
 	func = pciehp_slot_create(p_slot->bus);
 	if (func == NULL)
-		return (1);
+		return 1;
 
 	func->bus = p_slot->bus;
 	func->device = p_slot->device;
@@ -1746,7 +1746,7 @@ int pciehp_enable_slot (struct slot *p_slot)
 		/* Setup slot structure with entry for empty slot */
 		func = pciehp_slot_create(p_slot->bus);
 		if (func == NULL)
-			return (1);	/* Out of memory */
+			return 1;	/* Out of memory */
 
 		func->bus = p_slot->bus;
 		func->device = p_slot->device;
@@ -1767,7 +1767,7 @@ int pciehp_enable_slot (struct slot *p_slot)
 }
 
 
-int pciehp_disable_slot (struct slot *p_slot)
+int pciehp_disable_slot(struct slot *p_slot)
 {
 	u8 class_code, header_type, BCR;
 	u8 index = 0;
@@ -1779,7 +1779,7 @@ int pciehp_disable_slot (struct slot *p_slot)
 	struct pci_func *func;
 
 	if (!p_slot->ctrl)
-		return (1);
+		return 1;
 
 	/* Check to see if (latch closed, card present, power on) */
 	down(&p_slot->ctrl->crit_sect);
@@ -1788,21 +1788,21 @@ int pciehp_disable_slot (struct slot *p_slot)
 	if (ret || !getstatus) {
 		info("%s: no adapter on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
-		return (0);
+		return 0;
 	}
 
 	ret = p_slot->hpc_ops->get_latch_status(p_slot, &getstatus);
 	if (ret || getstatus) {
 		info("%s: latch open on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
-		return (0);
+		return 0;
 	}
 
 	ret = p_slot->hpc_ops->get_power_status(p_slot, &getstatus);
 	if (ret || !getstatus) {
 		info("%s: already disabled slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
-		return (0);
+		return 0;
 	}
 	up(&p_slot->ctrl->crit_sect);
 
@@ -1854,7 +1854,7 @@ int pciehp_disable_slot (struct slot *p_slot)
 	if (p_slot)
 		update_slot_info(p_slot);
 
-	return(rc);
+	return rc;
 }
 
 
@@ -1869,7 +1869,7 @@ int pciehp_disable_slot (struct slot *p_slot)
  * Returns 0 if success
  *
  */
-static u32 configure_new_device (struct controller * ctrl, struct pci_func * func,
+static u32 configure_new_device(struct controller * ctrl, struct pci_func * func,
 	u8 behind_bridge, struct resource_lists * resources, u8 bridge_bus, u8 bridge_dev)
 {
 	u8 temp_byte, function, max_functions, stop_it;
@@ -1901,20 +1901,23 @@ static u32 configure_new_device (struct controller * ctrl, struct pci_func * fun
 	function = 0;
 
 	do {
-		rc = configure_new_function(ctrl, new_slot, behind_bridge, resources, bridge_bus, bridge_dev);
+		rc = configure_new_function(ctrl, new_slot, behind_bridge,
+					resources, bridge_bus, bridge_dev);
 
 		if (rc) {
-			dbg("configure_new_function failed %d\n",rc);
+			dbg("configure_new_function failed: %d\n", rc);
 			index = 0;
 
 			while (new_slot) {
-				new_slot = pciehp_slot_find(new_slot->bus, new_slot->device, index++);
+				new_slot = pciehp_slot_find(new_slot->bus,
+						new_slot->device, index++);
 
 				if (new_slot)
-					pciehp_return_board_resources(new_slot, resources);
+					pciehp_return_board_resources(new_slot,
+						resources);
 			}
 
-			return(rc);
+			return rc;
 		}
 
 		function++;
@@ -1936,7 +1939,7 @@ static u32 configure_new_device (struct controller * ctrl, struct pci_func * fun
 
 				if (new_slot == NULL) {
 					/* Out of memory */
-					return(1);
+					return 1;
 				}
 
 				new_slot->bus = func->bus;
@@ -1950,17 +1953,497 @@ static u32 configure_new_device (struct controller * ctrl, struct pci_func * fun
 		}
 
 	} while (function < max_functions);
-	dbg("returning from configure_new_device\n");
+	dbg("returning from %s\n", __FUNCTION__);
 
 	return 0;
 }
-
 
 /*
  * Configuration logic that involves the hotplug data structures and 
  * their bookkeeping
  */
 
+/**
+ * configure_bridge: fill bridge's registers, either configure or disable it.
+ */
+static int
+configure_bridge(struct pci_bus *pci_bus, unsigned int devfn,
+			struct pci_resource *mem_node,
+			struct pci_resource **hold_mem_node,
+			int base_addr, int limit_addr)
+{
+	u16 temp_word;
+	u32 rc;
+
+	if (mem_node) {
+		memcpy(*hold_mem_node, mem_node, sizeof(struct pci_resource));
+		mem_node->next = NULL;
+
+		/* set Mem base and Limit registers */
+		RES_CHECK(mem_node->base, 16);
+		temp_word = (u16)(mem_node->base >> 16);
+		rc = pci_bus_write_config_word(pci_bus, devfn, base_addr, temp_word);
+
+		RES_CHECK(mem_node->base + mem_node->length - 1, 16);
+		temp_word = (u16)((mem_node->base + mem_node->length - 1) >> 16);
+		rc = pci_bus_write_config_word(pci_bus, devfn, limit_addr, temp_word);
+	} else {
+		temp_word = 0xFFFF;
+		rc = pci_bus_write_config_word(pci_bus, devfn, base_addr, temp_word);
+
+		temp_word = 0x0000;
+		rc = pci_bus_write_config_word(pci_bus, devfn, limit_addr, temp_word);
+
+		kfree(*hold_mem_node);
+		*hold_mem_node = NULL;
+	}
+	return rc;
+}
+
+static int
+configure_new_bridge(struct controller *ctrl, struct pci_func *func,
+		u8 behind_bridge, struct resource_lists *resources,
+		struct pci_bus *pci_bus)
+{
+	int cloop;
+	u8 temp_byte;
+	u8 device;
+	u16 temp_word;
+	u32 rc;
+	u32 ID;
+	unsigned int devfn;
+	struct pci_resource *mem_node;
+	struct pci_resource *p_mem_node;
+	struct pci_resource *io_node;
+	struct pci_resource *bus_node;
+	struct pci_resource *hold_mem_node;
+	struct pci_resource *hold_p_mem_node;
+	struct pci_resource *hold_IO_node;
+	struct pci_resource *hold_bus_node;
+	struct irq_mapping irqs;
+	struct pci_func *new_slot;
+	struct resource_lists temp_resources;
+
+	devfn = PCI_DEVFN(func->device, func->function);
+
+	/* set Primary bus */
+	dbg("set Primary bus = 0x%x\n", func->bus);
+	rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_PRIMARY_BUS, func->bus);
+	if (rc)
+		return rc;
+
+	/* find range of busses to use */
+	bus_node = get_max_resource(&resources->bus_head, 1L);
+
+	/* If we don't have any busses to allocate, we can't continue */
+	if (!bus_node) {
+		err("Got NO bus resource to use\n");
+		return -ENOMEM;
+	}
+	dbg("Got ranges of buses to use: base:len=0x%x:%x\n", bus_node->base, bus_node->length);
+
+	/* set Secondary bus */
+	temp_byte = (u8)bus_node->base;
+	dbg("set Secondary bus = 0x%x\n", temp_byte);
+	rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_SECONDARY_BUS, temp_byte);
+	if (rc)
+		return rc;
+
+	/* set subordinate bus */
+	temp_byte = (u8)(bus_node->base + bus_node->length - 1);
+	dbg("set subordinate bus = 0x%x\n", temp_byte);
+	rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_SUBORDINATE_BUS, temp_byte);
+	if (rc)
+		return rc;
+
+	/* Set HP parameters (Cache Line Size, Latency Timer) */
+	rc = pciehprm_set_hpp(ctrl, func, PCI_HEADER_TYPE_BRIDGE);
+	if (rc)
+		return rc;
+
+	/* Setup the IO, memory, and prefetchable windows */
+
+	io_node = get_max_resource(&(resources->io_head), 0x1000L);
+	if (io_node) {
+		dbg("io_node(base, len, next) (%x, %x, %p)\n", io_node->base,
+				io_node->length, io_node->next);
+	}
+
+	mem_node = get_max_resource(&(resources->mem_head), 0x100000L);
+	if (mem_node) {
+		dbg("mem_node(base, len, next) (%x, %x, %p)\n", mem_node->base,
+				mem_node->length, mem_node->next);
+	}
+
+	if (resources->p_mem_head)
+		p_mem_node = get_max_resource(&(resources->p_mem_head), 0x100000L);
+	else {
+		/*
+		 * In some platform implementation, MEM and PMEM are not
+		 *  distinguished, and hence ACPI _CRS has only MEM entries
+		 *  for both MEM and PMEM.
+		 */
+		dbg("using MEM for PMEM\n");
+		p_mem_node = get_max_resource(&(resources->mem_head), 0x100000L);
+	}
+	if (p_mem_node) {
+		dbg("p_mem_node(base, len, next) (%x, %x, %p)\n", p_mem_node->base,
+				p_mem_node->length, p_mem_node->next);
+	}
+
+	/* set up the IRQ info */
+	if (!resources->irqs) {
+		irqs.barber_pole = 0;
+		irqs.interrupt[0] = 0;
+		irqs.interrupt[1] = 0;
+		irqs.interrupt[2] = 0;
+		irqs.interrupt[3] = 0;
+		irqs.valid_INT = 0;
+	} else {
+		irqs.barber_pole = resources->irqs->barber_pole;
+		irqs.interrupt[0] = resources->irqs->interrupt[0];
+		irqs.interrupt[1] = resources->irqs->interrupt[1];
+		irqs.interrupt[2] = resources->irqs->interrupt[2];
+		irqs.interrupt[3] = resources->irqs->interrupt[3];
+		irqs.valid_INT = resources->irqs->valid_INT;
+	}
+
+	/* set up resource lists that are now aligned on top and bottom
+	 * for anything behind the bridge.
+	 */
+	temp_resources.bus_head = bus_node;
+	temp_resources.io_head = io_node;
+	temp_resources.mem_head = mem_node;
+	temp_resources.p_mem_head = p_mem_node;
+	temp_resources.irqs = &irqs;
+
+	/* Make copies of the nodes we are going to pass down so that
+	 * if there is a problem,we can just use these to free resources
+	 */
+	hold_bus_node = kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+	hold_IO_node = kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+	hold_mem_node = kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+	hold_p_mem_node = kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
+
+	if (!hold_bus_node || !hold_IO_node || !hold_mem_node || !hold_p_mem_node) {
+		kfree(hold_bus_node);
+		kfree(hold_IO_node);
+		kfree(hold_mem_node);
+		kfree(hold_p_mem_node);
+
+		return 1;
+	}
+
+	memcpy(hold_bus_node, bus_node, sizeof(struct pci_resource));
+
+	bus_node->base += 1;
+	bus_node->length -= 1;
+	bus_node->next = NULL;
+
+	/* If we have IO resources copy them and fill in the bridge's
+	 * IO range registers
+	 */
+	if (io_node) {
+		memcpy(hold_IO_node, io_node, sizeof(struct pci_resource));
+		io_node->next = NULL;
+
+		/* set IO base and Limit registers */
+		RES_CHECK(io_node->base, 8);
+		temp_byte = (u8)(io_node->base >> 8);
+		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_BASE, temp_byte);
+
+		RES_CHECK(io_node->base + io_node->length - 1, 8);
+		temp_byte = (u8)((io_node->base + io_node->length - 1) >> 8);
+		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
+	} else {
+		kfree(hold_IO_node);
+		hold_IO_node = NULL;
+	}
+
+	/* If we have memory resources copy them and fill in the bridge's
+	 * memory range registers.  Otherwise, fill in the range
+	 * registers with values that disable them.
+	 */
+	rc = configure_bridge(pci_bus, devfn, mem_node, &hold_mem_node,
+				PCI_MEMORY_BASE, PCI_MEMORY_LIMIT);
+
+	/* If we have prefetchable memory resources copy them and 
+	 * fill in the bridge's memory range registers.  Otherwise,
+	 * fill in the range registers with values that disable them.
+	 */
+	rc = configure_bridge(pci_bus, devfn, p_mem_node, &hold_p_mem_node,
+				PCI_PREF_MEMORY_BASE, PCI_PREF_MEMORY_LIMIT);
+
+	/* Adjust this to compensate for extra adjustment in first loop */
+	irqs.barber_pole--;
+
+	rc = 0;
+
+	/* Here we actually find the devices and configure them */
+	for (device = 0; (device <= 0x1F) && !rc; device++) {
+		irqs.barber_pole = (irqs.barber_pole + 1) & 0x03;
+
+		ID = 0xFFFFFFFF;
+		pci_bus->number = hold_bus_node->base;
+		pci_bus_read_config_dword (pci_bus, PCI_DEVFN(device, 0), PCI_VENDOR_ID, &ID);
+		pci_bus->number = func->bus;
+
+		if (ID != 0xFFFFFFFF) {	  /*  device Present */
+			/* Setup slot structure. */
+			new_slot = pciehp_slot_create(hold_bus_node->base);
+
+			if (new_slot == NULL) {
+				/* Out of memory */
+				rc = -ENOMEM;
+				continue;
+			}
+
+			new_slot->bus = hold_bus_node->base;
+			new_slot->device = device;
+			new_slot->function = 0;
+			new_slot->is_a_board = 1;
+			new_slot->status = 0;
+
+			rc = configure_new_device(ctrl, new_slot, 1,
+					&temp_resources, func->bus,
+					func->device);
+			dbg("configure_new_device rc=0x%x\n",rc);
+		}	/* End of IF (device in slot?) */
+	}		/* End of FOR loop */
+
+	if (rc) {
+		pciehp_destroy_resource_list(&temp_resources);
+
+		return_resource(&(resources->bus_head), hold_bus_node);
+		return_resource(&(resources->io_head), hold_IO_node);
+		return_resource(&(resources->mem_head), hold_mem_node);
+		return_resource(&(resources->p_mem_head), hold_p_mem_node);
+		return(rc);
+	}
+
+	/* save the interrupt routing information */
+	if (resources->irqs) {
+		resources->irqs->interrupt[0] = irqs.interrupt[0];
+		resources->irqs->interrupt[1] = irqs.interrupt[1];
+		resources->irqs->interrupt[2] = irqs.interrupt[2];
+		resources->irqs->interrupt[3] = irqs.interrupt[3];
+		resources->irqs->valid_INT = irqs.valid_INT;
+	} else if (!behind_bridge) {
+		/* We need to hook up the interrupts here */
+		for (cloop = 0; cloop < 4; cloop++) {
+			if (irqs.valid_INT & (0x01 << cloop)) {
+				rc = pciehp_set_irq(func->bus, func->device,
+							0x0A + cloop, irqs.interrupt[cloop]);
+				if (rc) {
+					pciehp_destroy_resource_list (&temp_resources);
+					return_resource(&(resources->bus_head), hold_bus_node);
+					return_resource(&(resources->io_head), hold_IO_node);
+					return_resource(&(resources->mem_head), hold_mem_node);
+					return_resource(&(resources->p_mem_head), hold_p_mem_node);
+					return rc;
+				}
+			}
+		}	/* end of for loop */
+	}
+
+	/* Return unused bus resources
+	 * First use the temporary node to store information for the board
+	 */
+	if (hold_bus_node && bus_node && temp_resources.bus_head) {
+		hold_bus_node->length = bus_node->base - hold_bus_node->base;
+
+		hold_bus_node->next = func->bus_head;
+		func->bus_head = hold_bus_node;
+
+		temp_byte = (u8)(temp_resources.bus_head->base - 1);
+
+		/* set subordinate bus */
+		dbg("re-set subordinate bus = 0x%x\n", temp_byte);
+		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_SUBORDINATE_BUS, temp_byte);
+
+		if (temp_resources.bus_head->length == 0) {
+			kfree(temp_resources.bus_head);
+			temp_resources.bus_head = NULL;
+		} else {
+			dbg("return bus res of b:d(0x%x:%x) base:len(0x%x:%x)\n",
+				func->bus, func->device, temp_resources.bus_head->base, temp_resources.bus_head->length);
+			return_resource(&(resources->bus_head), temp_resources.bus_head);
+		}
+	}
+
+	/* If we have IO space available and there is some left,
+	 * return the unused portion
+	 */
+	if (hold_IO_node && temp_resources.io_head) {
+		io_node = do_pre_bridge_resource_split(&(temp_resources.io_head),
+							&hold_IO_node, 0x1000);
+
+		/* Check if we were able to split something off */
+		if (io_node) {
+			hold_IO_node->base = io_node->base + io_node->length;
+
+			RES_CHECK(hold_IO_node->base, 8);
+			temp_byte = (u8)((hold_IO_node->base) >> 8);
+			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_BASE, temp_byte);
+
+			return_resource(&(resources->io_head), io_node);
+		}
+
+		io_node = do_bridge_resource_split(&(temp_resources.io_head), 0x1000);
+
+		/*  Check if we were able to split something off */
+		if (io_node) {
+			/* First use the temporary node to store information for the board */
+			hold_IO_node->length = io_node->base - hold_IO_node->base;
+
+			/* If we used any, add it to the board's list */
+			if (hold_IO_node->length) {
+				hold_IO_node->next = func->io_head;
+				func->io_head = hold_IO_node;
+
+				RES_CHECK(io_node->base - 1, 8);
+				temp_byte = (u8)((io_node->base - 1) >> 8);
+				rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
+
+				return_resource(&(resources->io_head), io_node);
+			} else {
+				/* it doesn't need any IO */
+				temp_byte = 0x00;
+				rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
+
+				return_resource(&(resources->io_head), io_node);
+				kfree(hold_IO_node);
+			}
+		} else {
+			/* it used most of the range */
+			hold_IO_node->next = func->io_head;
+			func->io_head = hold_IO_node;
+		}
+	} else if (hold_IO_node) {
+		/* it used the whole range */
+		hold_IO_node->next = func->io_head;
+		func->io_head = hold_IO_node;
+	}
+
+	/* If we have memory space available and there is some left,
+	 * return the unused portion
+	 */
+	if (hold_mem_node && temp_resources.mem_head) {
+		mem_node = do_pre_bridge_resource_split(&(temp_resources.mem_head), &hold_mem_node, 0x100000L);
+
+		/* Check if we were able to split something off */
+		if (mem_node) {
+			hold_mem_node->base = mem_node->base + mem_node->length;
+
+			RES_CHECK(hold_mem_node->base, 16);
+			temp_word = (u16)((hold_mem_node->base) >> 16);
+			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
+
+			return_resource(&(resources->mem_head), mem_node);
+		}
+
+		mem_node = do_bridge_resource_split(&(temp_resources.mem_head), 0x100000L);
+
+		/* Check if we were able to split something off */
+		if (mem_node) {
+			/* First use the temporary node to store information for the board */
+			hold_mem_node->length = mem_node->base - hold_mem_node->base;
+
+			if (hold_mem_node->length) {
+				hold_mem_node->next = func->mem_head;
+				func->mem_head = hold_mem_node;
+
+				/* configure end address */
+				RES_CHECK(mem_node->base - 1, 16);
+				temp_word = (u16)((mem_node->base - 1) >> 16);
+				rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
+
+				/* Return unused resources to the pool */
+				return_resource(&(resources->mem_head), mem_node);
+			} else {
+				/* it doesn't need any Mem */
+				temp_word = 0x0000;
+				rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
+
+				return_resource(&(resources->mem_head), mem_node);
+				kfree(hold_mem_node);
+			}
+		} else {
+			/* it used most of the range */
+			hold_mem_node->next = func->mem_head;
+			func->mem_head = hold_mem_node;
+		}
+	} else if (hold_mem_node) {
+		/* it used the whole range */
+		hold_mem_node->next = func->mem_head;
+		func->mem_head = hold_mem_node;
+	}
+
+	/* If we have prefetchable memory space available and there is some 
+	 * left at the end, return the unused portion
+	 */
+	if (hold_p_mem_node && temp_resources.p_mem_head) {
+		p_mem_node = do_pre_bridge_resource_split(&(temp_resources.p_mem_head),
+								&hold_p_mem_node, 0x100000L);
+
+		/* Check if we were able to split something off */
+		if (p_mem_node) {
+			hold_p_mem_node->base = p_mem_node->base + p_mem_node->length;
+
+			RES_CHECK(hold_p_mem_node->base, 16);
+			temp_word = (u16)((hold_p_mem_node->base) >> 16);
+			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
+
+			return_resource(&(resources->p_mem_head), p_mem_node);
+		}
+
+		p_mem_node = do_bridge_resource_split(&(temp_resources.p_mem_head), 0x100000L);
+
+		/* Check if we were able to split something off */
+		if (p_mem_node) {
+			/* First use the temporary node to store information for the board */
+			hold_p_mem_node->length = p_mem_node->base - hold_p_mem_node->base;
+
+			/* If we used any, add it to the board's list */
+			if (hold_p_mem_node->length) {
+				hold_p_mem_node->next = func->p_mem_head;
+				func->p_mem_head = hold_p_mem_node;
+
+				RES_CHECK(p_mem_node->base - 1, 16);
+				temp_word = (u16)((p_mem_node->base - 1) >> 16);
+				rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
+
+				return_resource(&(resources->p_mem_head), p_mem_node);
+			} else {
+				/* it doesn't need any PMem */
+				temp_word = 0x0000;
+				rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
+
+				return_resource(&(resources->p_mem_head), p_mem_node);
+				kfree(hold_p_mem_node);
+			}
+		} else {
+			/* it used the most of the range */
+			hold_p_mem_node->next = func->p_mem_head;
+			func->p_mem_head = hold_p_mem_node;
+		}
+	} else if (hold_p_mem_node) {
+		/* it used the whole range */
+		hold_p_mem_node->next = func->p_mem_head;
+		func->p_mem_head = hold_p_mem_node;
+	}
+
+	/* We should be configuring an IRQ and the bridge's base address
+	 * registers if it needs them.  Although we have never seen such
+	 * a device
+	 */
+
+	pciehprm_enable_card(ctrl, func, PCI_HEADER_TYPE_BRIDGE);
+
+	dbg("PCI Bridge Hot-Added s:b:d:f(%02x:%02x:%02x:%02x)\n", ctrl->seg, func->bus, func->device, func->function);
+
+	return rc;
+}
 
 /**
  * configure_new_function - Configures the PCI header information of one device
@@ -1974,31 +2457,22 @@ static u32 configure_new_device (struct controller * ctrl, struct pci_func * fun
  * Returns 0 if success
  *
  */
-static int configure_new_function (struct controller * ctrl, struct pci_func * func,
-	u8 behind_bridge, struct resource_lists *resources, u8 bridge_bus, u8 bridge_dev)
+static int
+configure_new_function(struct controller *ctrl, struct pci_func *func,
+		u8 behind_bridge, struct resource_lists *resources,
+		u8 bridge_bus, u8 bridge_dev)
 {
 	int cloop;
 	u8 temp_byte;
-	u8 device;
 	u8 class_code;
 	u16 temp_word;
 	u32 rc;
 	u32 temp_register;
 	u32 base;
-	u32 ID;
 	unsigned int devfn;
 	struct pci_resource *mem_node;
-	struct pci_resource *p_mem_node;
 	struct pci_resource *io_node;
-	struct pci_resource *bus_node;
-	struct pci_resource *hold_mem_node;
-	struct pci_resource *hold_p_mem_node;
-	struct pci_resource *hold_IO_node;
-	struct pci_resource *hold_bus_node;
-	struct irq_mapping irqs;
-	struct pci_func *new_slot;
 	struct pci_bus lpci_bus, *pci_bus;
-	struct resource_lists temp_resources;
 
 	memcpy(&lpci_bus, ctrl->pci_dev->subordinate, sizeof(lpci_bus));
 	pci_bus = &lpci_bus;
@@ -2006,477 +2480,25 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 	devfn = PCI_DEVFN(func->device, func->function);
 
 	/* Check for Bridge */
-	rc = pci_bus_read_config_byte (pci_bus, devfn, PCI_HEADER_TYPE, &temp_byte);
+	rc = pci_bus_read_config_byte(pci_bus, devfn, PCI_HEADER_TYPE, &temp_byte);
 	if (rc)
 		return rc;
 	dbg("%s: bus %x dev %x func %x temp_byte = %x\n", __FUNCTION__,
 		func->bus, func->device, func->function, temp_byte);
 
 	if ((temp_byte & 0x7F) == PCI_HEADER_TYPE_BRIDGE) { /* PCI-PCI Bridge */
-		/* set Primary bus */
-		dbg("set Primary bus = 0x%x\n", func->bus);
-		rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_PRIMARY_BUS, func->bus);
+		rc = configure_new_bridge(ctrl, func, behind_bridge, resources,
+						pci_bus);
+
 		if (rc)
 			return rc;
-
-		/* find range of busses to use */
-		bus_node = get_max_resource(&resources->bus_head, 1L);
-
-		/* If we don't have any busses to allocate, we can't continue */
-		if (!bus_node) {
-			err("Got NO bus resource to use\n");
-			return -ENOMEM;
-		}
-		dbg("Got ranges of buses to use: base:len=0x%x:%x\n", bus_node->base, bus_node->length);
-
-		/* set Secondary bus */
-		dbg("set Secondary bus = 0x%x\n", temp_byte);
-		dbg("func->bus %x\n", func->bus);
-
-		temp_byte = (u8)bus_node->base;
-		dbg("set Secondary bus = 0x%x\n", temp_byte);
-		rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_SECONDARY_BUS, temp_byte);
-		if (rc)
-			return rc;
-
-		/* set subordinate bus */
-		temp_byte = (u8)(bus_node->base + bus_node->length - 1);
-		dbg("set subordinate bus = 0x%x\n", temp_byte);
-		rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_SUBORDINATE_BUS, temp_byte);
-		if (rc)
-			return rc;
-
-		/* Set HP parameters (Cache Line Size, Latency Timer) */
-		rc = pciehprm_set_hpp(ctrl, func, PCI_HEADER_TYPE_BRIDGE);
-		if (rc)
-			return rc;
-
-		/* Setup the IO, memory, and prefetchable windows */
-
-		io_node = get_max_resource(&(resources->io_head), 0x1000L);
-		if (io_node) {
-			dbg("io_node(base, len, next) (%x, %x, %p)\n", io_node->base, io_node->length, io_node->next);
-		}
-
-		mem_node = get_max_resource(&(resources->mem_head), 0x100000L);
-		if (mem_node) {
-			dbg("mem_node(base, len, next) (%x, %x, %p)\n", mem_node->base, mem_node->length, mem_node->next);
-		}
-
-		if (resources->p_mem_head)
-			p_mem_node = get_max_resource(&(resources->p_mem_head), 0x100000L);
-		else {
-			/*
-			 * In some platform implementation, MEM and PMEM are not
-			 *  distinguished, and hence ACPI _CRS has only MEM entries
-			 *  for both MEM and PMEM.
-			 */
-			dbg("using MEM for PMEM\n");
-			p_mem_node = get_max_resource(&(resources->mem_head), 0x100000L);
-		}
-		if (p_mem_node) {
-			dbg("p_mem_node(base, len, next) (%x, %x, %p)\n", p_mem_node->base, p_mem_node->length, p_mem_node->next);
-		}
-
-		/* set up the IRQ info */
-		if (!resources->irqs) {
-			irqs.barber_pole = 0;
-			irqs.interrupt[0] = 0;
-			irqs.interrupt[1] = 0;
-			irqs.interrupt[2] = 0;
-			irqs.interrupt[3] = 0;
-			irqs.valid_INT = 0;
-		} else {
-			irqs.barber_pole = resources->irqs->barber_pole;
-			irqs.interrupt[0] = resources->irqs->interrupt[0];
-			irqs.interrupt[1] = resources->irqs->interrupt[1];
-			irqs.interrupt[2] = resources->irqs->interrupt[2];
-			irqs.interrupt[3] = resources->irqs->interrupt[3];
-			irqs.valid_INT = resources->irqs->valid_INT;
-		}
-
-		/* set up resource lists that are now aligned on top and bottom
-		 * for anything behind the bridge.
-		 */
-		temp_resources.bus_head = bus_node;
-		temp_resources.io_head = io_node;
-		temp_resources.mem_head = mem_node;
-		temp_resources.p_mem_head = p_mem_node;
-		temp_resources.irqs = &irqs;
-
-		/* Make copies of the nodes we are going to pass down so that
-		 * if there is a problem,we can just use these to free resources
-		 */
-		hold_bus_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
-		hold_IO_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
-		hold_mem_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
-		hold_p_mem_node = (struct pci_resource *) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
-
-		if (!hold_bus_node || !hold_IO_node || !hold_mem_node || !hold_p_mem_node) {
-			if (hold_bus_node)
-				kfree(hold_bus_node);
-			if (hold_IO_node)
-				kfree(hold_IO_node);
-			if (hold_mem_node)
-				kfree(hold_mem_node);
-			if (hold_p_mem_node)
-				kfree(hold_p_mem_node);
-
-			return(1);
-		}
-
-		memcpy(hold_bus_node, bus_node, sizeof(struct pci_resource));
-
-		bus_node->base += 1;
-		bus_node->length -= 1;
-		bus_node->next = NULL;
-
-		/* If we have IO resources copy them and fill in the bridge's
-		 * IO range registers
-		 */
-		if (io_node) {
-			memcpy(hold_IO_node, io_node, sizeof(struct pci_resource));
-			io_node->next = NULL;
-
-			/* set IO base and Limit registers */
-			RES_CHECK(io_node->base, 8);
-			temp_byte = (u8)(io_node->base >> 8);
-			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_BASE, temp_byte);
-
-			RES_CHECK(io_node->base + io_node->length - 1, 8);
-			temp_byte = (u8)((io_node->base + io_node->length - 1) >> 8);
-			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
-		} else {
-			kfree(hold_IO_node);
-			hold_IO_node = NULL;
-		}
-
-		/* If we have memory resources copy them and fill in the bridge's
-		 * memory range registers.  Otherwise, fill in the range
-		 * registers with values that disable them.
-		 */
-		if (mem_node) {
-			memcpy(hold_mem_node, mem_node, sizeof(struct pci_resource));
-			mem_node->next = NULL;
-
-			/* set Mem base and Limit registers */
-			RES_CHECK(mem_node->base, 16);
-			temp_word = (u32)(mem_node->base >> 16);
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
-
-			RES_CHECK(mem_node->base + mem_node->length - 1, 16);
-			temp_word = (u32)((mem_node->base + mem_node->length - 1) >> 16);
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
-		} else {
-			temp_word = 0xFFFF;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
-
-			temp_word = 0x0000;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
-
-			kfree(hold_mem_node);
-			hold_mem_node = NULL;
-		}
-
-		/* If we have prefetchable memory resources copy them and 
-		 * fill in the bridge's memory range registers.  Otherwise,
-		 * fill in the range registers with values that disable them.
-		 */
-		if (p_mem_node) {
-			memcpy(hold_p_mem_node, p_mem_node, sizeof(struct pci_resource));
-			p_mem_node->next = NULL;
-
-			/* set Pre Mem base and Limit registers */
-			RES_CHECK(p_mem_node->base, 16);
-			temp_word = (u32)(p_mem_node->base >> 16);
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
-
-			RES_CHECK(p_mem_node->base + p_mem_node->length - 1, 16);
-			temp_word = (u32)((p_mem_node->base + p_mem_node->length - 1) >> 16);
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
-		} else {
-			temp_word = 0xFFFF;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
-
-			temp_word = 0x0000;
-			rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
-
-			kfree(hold_p_mem_node);
-			hold_p_mem_node = NULL;
-		}
-
-		/* Adjust this to compensate for extra adjustment in first loop */
-		irqs.barber_pole--;
-
-		rc = 0;
-
-		/* Here we actually find the devices and configure them */
-		for (device = 0; (device <= 0x1F) && !rc; device++) {
-			irqs.barber_pole = (irqs.barber_pole + 1) & 0x03;
-
-			ID = 0xFFFFFFFF;
-			pci_bus->number = hold_bus_node->base;
-			pci_bus_read_config_dword (pci_bus, PCI_DEVFN(device, 0), PCI_VENDOR_ID, &ID);
-			pci_bus->number = func->bus;
-
-			if (ID != 0xFFFFFFFF) {	  /*  device Present */
-				/* Setup slot structure. */
-				new_slot = pciehp_slot_create(hold_bus_node->base);
-
-				if (new_slot == NULL) {
-					/* Out of memory */
-					rc = -ENOMEM;
-					continue;
-				}
-
-				new_slot->bus = hold_bus_node->base;
-				new_slot->device = device;
-				new_slot->function = 0;
-				new_slot->is_a_board = 1;
-				new_slot->status = 0;
-
-				rc = configure_new_device(ctrl, new_slot, 1, &temp_resources, func->bus, func->device);
-				dbg("configure_new_device rc=0x%x\n",rc);
-			}	/* End of IF (device in slot?) */
-		}		/* End of FOR loop */
-
-		if (rc) {
-			pciehp_destroy_resource_list(&temp_resources);
-
-			return_resource(&(resources->bus_head), hold_bus_node);
-			return_resource(&(resources->io_head), hold_IO_node);
-			return_resource(&(resources->mem_head), hold_mem_node);
-			return_resource(&(resources->p_mem_head), hold_p_mem_node);
-			return(rc);
-		}
-
-		/* save the interrupt routing information */
-		if (resources->irqs) {
-			resources->irqs->interrupt[0] = irqs.interrupt[0];
-			resources->irqs->interrupt[1] = irqs.interrupt[1];
-			resources->irqs->interrupt[2] = irqs.interrupt[2];
-			resources->irqs->interrupt[3] = irqs.interrupt[3];
-			resources->irqs->valid_INT = irqs.valid_INT;
-		} else if (!behind_bridge) {
-			/* We need to hook up the interrupts here */
-			for (cloop = 0; cloop < 4; cloop++) {
-				if (irqs.valid_INT & (0x01 << cloop)) {
-					rc = pciehp_set_irq(func->bus, func->device,
-							   0x0A + cloop, irqs.interrupt[cloop]);
-					if (rc) {
-						pciehp_destroy_resource_list (&temp_resources);
-						return_resource(&(resources->bus_head), hold_bus_node);
-						return_resource(&(resources->io_head), hold_IO_node);
-						return_resource(&(resources->mem_head), hold_mem_node);
-						return_resource(&(resources->p_mem_head), hold_p_mem_node);
-						return rc;
-					}
-				}
-			}	/* end of for loop */
-		}
-
-		/* Return unused bus resources
-		 * First use the temporary node to store information for the board
-		 */
-		if (hold_bus_node && bus_node && temp_resources.bus_head) {
-			hold_bus_node->length = bus_node->base - hold_bus_node->base;
-
-			hold_bus_node->next = func->bus_head;
-			func->bus_head = hold_bus_node;
-
-			temp_byte = (u8)(temp_resources.bus_head->base - 1);
-
-			/* set subordinate bus */
-			dbg("re-set subordinate bus = 0x%x\n", temp_byte);
-			rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_SUBORDINATE_BUS, temp_byte);
-
-			if (temp_resources.bus_head->length == 0) {
-				kfree(temp_resources.bus_head);
-				temp_resources.bus_head = NULL;
-			} else {
-				dbg("return bus res of b:d(0x%x:%x) base:len(0x%x:%x)\n",
-					func->bus, func->device, temp_resources.bus_head->base, temp_resources.bus_head->length);
-				return_resource(&(resources->bus_head), temp_resources.bus_head);
-			}
-		}
-
-		/* If we have IO space available and there is some left,
-		 * return the unused portion
-		 */
-		if (hold_IO_node && temp_resources.io_head) {
-			io_node = do_pre_bridge_resource_split(&(temp_resources.io_head),
-							       &hold_IO_node, 0x1000);
-
-			/* Check if we were able to split something off */
-			if (io_node) {
-				hold_IO_node->base = io_node->base + io_node->length;
-
-				RES_CHECK(hold_IO_node->base, 8);
-				temp_byte = (u8)((hold_IO_node->base) >> 8);
-				rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_BASE, temp_byte);
-
-				return_resource(&(resources->io_head), io_node);
-			}
-
-			io_node = do_bridge_resource_split(&(temp_resources.io_head), 0x1000);
-
-			/*  Check if we were able to split something off */
-			if (io_node) {
-				/* First use the temporary node to store information for the board */
-				hold_IO_node->length = io_node->base - hold_IO_node->base;
-
-				/* If we used any, add it to the board's list */
-				if (hold_IO_node->length) {
-					hold_IO_node->next = func->io_head;
-					func->io_head = hold_IO_node;
-
-					RES_CHECK(io_node->base - 1, 8);
-					temp_byte = (u8)((io_node->base - 1) >> 8);
-					rc = pci_bus_write_config_byte (pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
-
-					return_resource(&(resources->io_head), io_node);
-				} else {
-					/* it doesn't need any IO */
-					temp_byte = 0x00;
-					rc = pci_bus_write_config_byte(pci_bus, devfn, PCI_IO_LIMIT, temp_byte);
-
-					return_resource(&(resources->io_head), io_node);
-					kfree(hold_IO_node);
-				}
-			} else {
-				/* it used most of the range */
-				hold_IO_node->next = func->io_head;
-				func->io_head = hold_IO_node;
-			}
-		} else if (hold_IO_node) {
-			/* it used the whole range */
-			hold_IO_node->next = func->io_head;
-			func->io_head = hold_IO_node;
-		}
-
-		/* If we have memory space available and there is some left,
-		 * return the unused portion
-		 */
-		if (hold_mem_node && temp_resources.mem_head) {
-			mem_node = do_pre_bridge_resource_split(&(temp_resources.mem_head), &hold_mem_node, 0x100000L);
-
-			/* Check if we were able to split something off */
-			if (mem_node) {
-				hold_mem_node->base = mem_node->base + mem_node->length;
-
-				RES_CHECK(hold_mem_node->base, 16);
-				temp_word = (u32)((hold_mem_node->base) >> 16);
-				rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_BASE, temp_word);
-
-				return_resource(&(resources->mem_head), mem_node);
-			}
-
-			mem_node = do_bridge_resource_split(&(temp_resources.mem_head), 0x100000L);
-
-			/* Check if we were able to split something off */
-			if (mem_node) {
-				/* First use the temporary node to store information for the board */
-				hold_mem_node->length = mem_node->base - hold_mem_node->base;
-
-				if (hold_mem_node->length) {
-					hold_mem_node->next = func->mem_head;
-					func->mem_head = hold_mem_node;
-
-					/* configure end address */
-					RES_CHECK(mem_node->base - 1, 16);
-					temp_word = (u32)((mem_node->base - 1) >> 16);
-					rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
-
-					/* Return unused resources to the pool */
-					return_resource(&(resources->mem_head), mem_node);
-				} else {
-					/* it doesn't need any Mem */
-					temp_word = 0x0000;
-					rc = pci_bus_write_config_word (pci_bus, devfn, PCI_MEMORY_LIMIT, temp_word);
-
-					return_resource(&(resources->mem_head), mem_node);
-					kfree(hold_mem_node);
-				}
-			} else {
-				/* it used most of the range */
-				hold_mem_node->next = func->mem_head;
-				func->mem_head = hold_mem_node;
-			}
-		} else if (hold_mem_node) {
-			/* it used the whole range */
-			hold_mem_node->next = func->mem_head;
-			func->mem_head = hold_mem_node;
-		}
-
-		/* If we have prefetchable memory space available and there is some 
-		 * left at the end, return the unused portion
-		 */
-		if (hold_p_mem_node && temp_resources.p_mem_head) {
-			p_mem_node = do_pre_bridge_resource_split(&(temp_resources.p_mem_head),
-								  &hold_p_mem_node, 0x100000L);
-
-			/* Check if we were able to split something off */
-			if (p_mem_node) {
-				hold_p_mem_node->base = p_mem_node->base + p_mem_node->length;
-
-				RES_CHECK(hold_p_mem_node->base, 16);
-				temp_word = (u32)((hold_p_mem_node->base) >> 16);
-				rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_BASE, temp_word);
-
-				return_resource(&(resources->p_mem_head), p_mem_node);
-			}
-
-			p_mem_node = do_bridge_resource_split(&(temp_resources.p_mem_head), 0x100000L);
-
-			/* Check if we were able to split something off */
-			if (p_mem_node) {
-				/* First use the temporary node to store information for the board */
-				hold_p_mem_node->length = p_mem_node->base - hold_p_mem_node->base;
-
-				/* If we used any, add it to the board's list */
-				if (hold_p_mem_node->length) {
-					hold_p_mem_node->next = func->p_mem_head;
-					func->p_mem_head = hold_p_mem_node;
-
-					RES_CHECK(p_mem_node->base - 1, 16);
-					temp_word = (u32)((p_mem_node->base - 1) >> 16);
-					rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
-
-					return_resource(&(resources->p_mem_head), p_mem_node);
-				} else {
-					/* it doesn't need any PMem */
-					temp_word = 0x0000;
-					rc = pci_bus_write_config_word (pci_bus, devfn, PCI_PREF_MEMORY_LIMIT, temp_word);
-
-					return_resource(&(resources->p_mem_head), p_mem_node);
-					kfree(hold_p_mem_node);
-				}
-			} else {
-				/* it used the most of the range */
-				hold_p_mem_node->next = func->p_mem_head;
-				func->p_mem_head = hold_p_mem_node;
-			}
-		} else if (hold_p_mem_node) {
-			/* it used the whole range */
-			hold_p_mem_node->next = func->p_mem_head;
-			func->p_mem_head = hold_p_mem_node;
-		}
-
-		/* We should be configuring an IRQ and the bridge's base address
-		 * registers if it needs them.  Although we have never seen such
-		 * a device
-		 */
-
-		pciehprm_enable_card(ctrl, func, PCI_HEADER_TYPE_BRIDGE);
-
-		dbg("PCI Bridge Hot-Added s:b:d:f(%02x:%02x:%02x:%02x)\n", ctrl->seg, func->bus, func->device, func->function);
 	} else if ((temp_byte & 0x7F) == PCI_HEADER_TYPE_NORMAL) {
 		/* Standard device */
 		u64	base64;
-		rc = pci_bus_read_config_byte (pci_bus, devfn, 0x0B, &class_code);
+		rc = pci_bus_read_config_byte(pci_bus, devfn, 0x0B, &class_code);
 
 		if (class_code == PCI_BASE_CLASS_DISPLAY)
-			return (DEVICE_TYPE_NOT_SUPPORTED);
+			return DEVICE_TYPE_NOT_SUPPORTED;
 
 		/* Figure out IO and memory needs */
 		for (cloop = PCI_BASE_ADDRESS_0; cloop <= PCI_BASE_ADDRESS_5; cloop += 4) {
@@ -2535,7 +2557,7 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 					else {
 						if (prefetchable)
 							dbg("using MEM for PMEM\n");
-						mem_node=get_resource(&(resources->mem_head), (ulong)base);
+						mem_node = get_resource(&(resources->mem_head), (ulong)base);
 					}
 
 					/* allocate the resource to the board */
@@ -2614,11 +2636,10 @@ static int configure_new_function (struct controller * ctrl, struct pci_func * f
 	}  /* End of Not-A-Bridge else */
 	else {
 		/* It's some strange type of PCI adapter (Cardbus?) */
-		return(DEVICE_TYPE_NOT_SUPPORTED);
+		return DEVICE_TYPE_NOT_SUPPORTED;
 	}
 
 	func->configured = 1;
 
 	return 0;
 }
-

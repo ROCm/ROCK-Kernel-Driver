@@ -40,9 +40,7 @@
 #define HS_CSR_EIM	0x0002
 #define HS_CSR_DHA	0x0001
 
-#define SLOT_MAGIC	0x67267322
 struct slot {
-	u32 magic;
 	u8 number;
 	unsigned int devfn;
 	struct pci_bus *bus;
@@ -86,7 +84,6 @@ extern u8 cpci_get_attention_status(struct slot *slot);
 extern u8 cpci_get_latch_status(struct slot *slot);
 extern u8 cpci_get_adapter_status(struct slot *slot);
 extern u16 cpci_get_hs_csr(struct slot * slot);
-extern u16 cpci_set_hs_csr(struct slot * slot, u16 hs_csr);
 extern int cpci_set_attention_status(struct slot *slot, int status);
 extern int cpci_check_and_clear_ins(struct slot * slot);
 extern int cpci_check_ext(struct slot * slot);

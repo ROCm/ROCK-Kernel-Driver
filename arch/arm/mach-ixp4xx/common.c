@@ -168,7 +168,7 @@ static void ixp4xx_irq_unmask(unsigned int irq)
 	 * manual. If edge-triggered, need to move it to the mask_ack.
 	 * Nobody seems to be using the edge-triggered mode on the GPIOs. 
 	 */
-	if (line > 0)
+	if (line >= 0)
 		gpio_line_isr_clear(line);
 
 	*IXP4XX_ICMR |= (1 << irq);

@@ -75,7 +75,7 @@ static int ehci_hub_suspend (struct usb_hcd *hcd)
 	(void) handshake (&ehci->regs->status, STS_HALT, STS_HALT, 2000);
 
 	root->dev.power.power_state = 3;
-	ehci->next_statechange = jiffies + MSEC_TO_JIFFIES(10);
+	ehci->next_statechange = jiffies + msecs_to_jiffies(10);
 	spin_unlock_irq (&ehci->lock);
 	return status;
 }
@@ -112,13 +112,13 @@ static int ehci_hub_resume (struct usb_hcd *hcd)
 		temp = readl (&ehci->regs->port_status [i]);
 		temp &= ~(PORT_WKOC_E|PORT_WKDISC_E|PORT_WKCONN_E);
 		if (temp & PORT_SUSPEND) {
-			ehci->reset_done [i] = jiffies + MSEC_TO_JIFFIES (20);
+			ehci->reset_done [i] = jiffies + msecs_to_jiffies (20);
 			temp |= PORT_RESUME;
 		}
 		writel (temp, &ehci->regs->port_status [i]);
 	}
 	i = HCS_N_PORTS (ehci->hcs_params);
-	wait_ms (20);
+	msleep (20);
 	while (i--) {
 		temp = readl (&ehci->regs->port_status [i]);
 		if ((temp & PORT_SUSPEND) == 0)
@@ -139,7 +139,7 @@ static int ehci_hub_resume (struct usb_hcd *hcd)
 		writel (ehci->command | temp, &ehci->regs->command);
 
 	root->dev.power.power_state = 0;
-	ehci->next_statechange = jiffies + MSEC_TO_JIFFIES(5);
+	ehci->next_statechange = jiffies + msecs_to_jiffies(5);
 	ehci->hcd.state = USB_STATE_RUNNING;
 	return 0;
 }
@@ -334,7 +334,7 @@ static int ehci_hub_control (
 				writel ((temp & ~PORT_WAKE_BITS) | PORT_RESUME,
 					&ehci->regs->port_status [wIndex]);
 				ehci->reset_done [wIndex] = jiffies
-						+ MSEC_TO_JIFFIES (20);
+						+ msecs_to_jiffies (20);
 			}
 			break;
 		case USB_PORT_FEAT_C_SUSPEND:
@@ -514,7 +514,7 @@ static int ehci_hub_control (
 				 * usb 2.0 spec says 50 ms resets on root
 				 */
 				ehci->reset_done [wIndex] = jiffies
-						+ MSEC_TO_JIFFIES (50);
+						+ msecs_to_jiffies (50);
 			}
 			writel (temp, &ehci->regs->port_status [wIndex]);
 			break;

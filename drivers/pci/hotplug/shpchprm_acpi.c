@@ -1299,7 +1299,8 @@ static struct acpi_php_slot * get_acpi_slot (
 
 }
 
-void * shpchprm_get_slot(struct slot *slot)
+#if 0
+static void * shpchprm_get_slot(struct slot *slot)
 {
 	struct acpi_bridge	*ab = acpi_bridges_head;
 	struct acpi_php_slot	*aps = get_acpi_slot (ab, slot->number);
@@ -1310,6 +1311,7 @@ void * shpchprm_get_slot(struct slot *slot)
 
 	return (void *)aps;
 }
+#endif
 
 static void shpchprm_dump_func_res( struct pci_func *fun)
 {

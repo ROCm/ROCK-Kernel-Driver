@@ -540,6 +540,20 @@ static int __init fixup_sgtc(void)
 	return sgtc;
 }
 
+static unsigned int powernow_get(unsigned int cpu)
+{
+	union msr_fidvidstatus fidvidstatus;
+	unsigned int cfid;
+
+	if (cpu)
+		return 0;
+	rdmsrl (MSR_K7_FID_VID_STATUS, fidvidstatus.val);
+	cfid = fidvidstatus.bits.CFID;
+
+	return (fsb * fid_codes[cfid] / 10);
+}
+
+
 static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 {
 	union msr_fidvidstatus fidvidstatus;
@@ -590,7 +604,7 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 
 	policy->cpuinfo.transition_latency = 20 * latency / fsb;
 
-	policy->cur = maximum_speed;
+	policy->cur = powernow_get(0);
 
 	cpufreq_frequency_table_get_attr(powernow_table, policy->cpu);
 
@@ -610,6 +624,7 @@ static struct freq_attr* powernow_table_attr[] = {
 static struct cpufreq_driver powernow_driver = {
 	.verify 	= powernow_verify,
 	.target 	= powernow_target,
+	.get		= powernow_get,	
 	.init		= powernow_cpu_init,
 	.exit		= powernow_cpu_exit,
 	.name		= "powernow-k7",

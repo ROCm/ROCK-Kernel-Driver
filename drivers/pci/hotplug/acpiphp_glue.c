@@ -66,7 +66,7 @@ static void handle_hotplug_event_func (acpi_handle, u32, void *);
  *  4. ..
  *
  */
-static int is_ejectable (acpi_handle handle)
+static int is_ejectable(acpi_handle handle)
 {
 	acpi_status status;
 	acpi_handle tmp;
@@ -326,10 +326,10 @@ static void decode_hpp(struct acpiphp_bridge *bridge)
 	bridge->hpp.enable_PERR = package->package.elements[3].integer.value;
 
 	dbg("_HPP parameter = (%02x, %02x, %02x, %02x)\n",
-	    bridge->hpp.cache_line_size,
-	    bridge->hpp.latency_timer,
-	    bridge->hpp.enable_SERR,
-	    bridge->hpp.enable_PERR);
+		bridge->hpp.cache_line_size,
+		bridge->hpp.latency_timer,
+		bridge->hpp.enable_SERR,
+		bridge->hpp.enable_PERR);
 
 	bridge->flags |= BRIDGE_HAS_HPP;
 
@@ -919,6 +919,48 @@ static unsigned int get_slot_status(struct acpiphp_slot *slot)
 	return (unsigned int)sta;
 }
 
+/**
+ * acpiphp_check_bridge - re-enumerate devices
+ *
+ * Iterate over all slots under this bridge and make sure that if a
+ * card is present they are enabled, and if not they are disabled.
+ */
+static int acpiphp_check_bridge(struct acpiphp_bridge *bridge)
+{
+	struct acpiphp_slot *slot;
+	int retval = 0;
+	int enabled, disabled;
+
+	enabled = disabled = 0;
+
+	for (slot = bridge->slots; slot; slot = slot->next) {
+		unsigned int status = get_slot_status(slot);
+		if (slot->flags & SLOT_ENABLED) {
+			if (status == ACPI_STA_ALL)
+				continue;
+			retval = acpiphp_disable_slot(slot);
+			if (retval) {
+				err("Error occurred in disabling\n");
+				goto err_exit;
+			}
+			disabled++;
+		} else {
+			if (status != ACPI_STA_ALL)
+				continue;
+			retval = acpiphp_enable_slot(slot);
+			if (retval) {
+				err("Error occurred in enabling\n");
+				goto err_exit;
+			}
+			enabled++;
+		}
+	}
+
+	dbg("%s: %d enabled, %d disabled\n", __FUNCTION__, enabled, disabled);
+
+ err_exit:
+	return retval;
+}
 
 /*
  * ACPI event handlers
@@ -1113,6 +1155,8 @@ void __exit acpiphp_glue_exit(void)
 
 		kfree(bridge);
 	}
+
+	acpi_pci_unregister_driver(&acpi_pci_hp_driver);
 }
 
 
@@ -1138,13 +1182,14 @@ int __init acpiphp_get_num_slots(void)
 }
 
 
+#if 0
 /**
  * acpiphp_for_each_slot - call function for each slot
  * @fn: callback function
  * @data: context to be passed to callback function
  *
  */
-int acpiphp_for_each_slot(acpiphp_callback fn, void *data)
+static int acpiphp_for_each_slot(acpiphp_callback fn, void *data)
 {
 	struct list_head *node;
 	struct acpiphp_bridge *bridge;
@@ -1163,7 +1208,7 @@ int acpiphp_for_each_slot(acpiphp_callback fn, void *data)
  err_exit:
 	return retval;
 }
-
+#endif
 
 /* search matching slot from id  */
 struct acpiphp_slot *get_slot_from_id(int id)
@@ -1180,7 +1225,8 @@ struct acpiphp_slot *get_slot_from_id(int id)
 	}
 
 	/* should never happen! */
-	err("%s: no object for id %d\n",__FUNCTION__, id);
+	err("%s: no object for id %d\n", __FUNCTION__, id);
+	WARN_ON(1);
 	return 0;
 }
 
@@ -1237,50 +1283,6 @@ int acpiphp_disable_slot(struct acpiphp_slot *slot)
 
  err_exit:
 	up(&slot->crit_sect);
-	return retval;
-}
-
-
-/**
- * acpiphp_check_bridge - re-enumerate devices
- *
- * Iterate over all slots under this bridge and make sure that if a
- * card is present they are enabled, and if not they are disabled.
- */
-int acpiphp_check_bridge(struct acpiphp_bridge *bridge)
-{
-	struct acpiphp_slot *slot;
-	int retval = 0;
-	int enabled, disabled;
-
-	enabled = disabled = 0;
-
-	for (slot = bridge->slots; slot; slot = slot->next) {
-		unsigned int status = get_slot_status(slot);
-		if (slot->flags & SLOT_ENABLED) {
-			if (status == ACPI_STA_ALL)
-				continue;
-			retval = acpiphp_disable_slot(slot);
-			if (retval) {
-				err("Error occurred in disabling\n");
-				goto err_exit;
-			}
-			disabled++;
-		} else {
-			if (status != ACPI_STA_ALL)
-				continue;
-			retval = acpiphp_enable_slot(slot);
-			if (retval) {
-				err("Error occurred in enabling\n");
-				goto err_exit;
-			}
-			enabled++;
-		}
-	}
-
-	dbg("%s: %d enabled, %d disabled\n", __FUNCTION__, enabled, disabled);
-
- err_exit:
 	return retval;
 }
 

@@ -592,9 +592,7 @@ static _INLINE_ void check_modem_status(struct async_struct *info)
 #ifdef SERIAL_DEBUG_OPEN
 			printk("scheduling hangup...");
 #endif
-			MOD_INC_USE_COUNT;
-			if (schedule_work(&info->tqueue_hangup) == 0)
-				MOD_DEC_USE_COUNT;
+			schedule_work(&info->tqueue_hangup);
 		}
 	}
 	if (info->flags & ASYNC_CTS_FLOW) {
@@ -723,7 +721,6 @@ static void do_serial_hangup(void *private_)
 	tty = info->tty;
 	if (tty)
 		tty_hangup(tty);
-	MOD_DEC_USE_COUNT;
 }
 
 /*static void rs_8xx_timer(void)
@@ -1689,7 +1686,6 @@ static void rs_8xx_close(struct tty_struct *tty, struct file * filp)
 
 	if (tty_hung_up_p(filp)) {
 		DBG_CNT("before DEC-hung");
-		MOD_DEC_USE_COUNT;
 		restore_flags(flags);
 		return;
 	}
@@ -1716,7 +1712,6 @@ static void rs_8xx_close(struct tty_struct *tty, struct file * filp)
 	}
 	if (state->count) {
 		DBG_CNT("before DEC-2");
-		MOD_DEC_USE_COUNT;
 		restore_flags(flags);
 		return;
 	}
@@ -1770,7 +1765,6 @@ static void rs_8xx_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
-	MOD_DEC_USE_COUNT;
 	restore_flags(flags);
 }
 
@@ -2021,7 +2015,6 @@ static int rs_8xx_open(struct tty_struct *tty, struct file * filp)
 	if (retval)
 		return retval;
 
-	MOD_INC_USE_COUNT;
 	retval = block_til_ready(tty, filp, info);
 	if (retval) {
 #ifdef SERIAL_DEBUG_OPEN
@@ -2530,6 +2523,7 @@ static int __init rs_8xx_init(void)
 
 	/* Initialize the tty_driver structure */
 
+	serial_driver->owner = THIS_MODULE;
 	serial_driver->driver_name = "serial";
 	serial_driver->devfs_name = "tts/";
 	serial_driver->name = "ttyS";

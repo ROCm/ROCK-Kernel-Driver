@@ -40,6 +40,7 @@
 #include <linux/version.h>
 #include <linux/device.h>
 #include <linux/moduleparam.h>
+#include <linux/ctype.h>
 
 #include <asm/byteorder.h>
 #include <asm/io.h>
@@ -117,6 +118,7 @@ struct eth_dev {
 	unsigned		zlp:1;
 	unsigned		cdc:1;
 	unsigned		rndis:1;
+	u16			cdc_filter;
 	unsigned long		todo;
 #define	WORK_RX_MEMORY		0
 	int			rndis_config;
@@ -191,6 +193,16 @@ MODULE_PARM_DESC(iManufacturer, "USB Manufacturer string");
 static char *__initdata iProduct;
 module_param(iProduct, charp, S_IRUGO);
 MODULE_PARM_DESC(iProduct, "USB Product string");
+
+/* initial value, changed by "ifconfig usb0 hw ether xx:xx:xx:xx:xx:xx" */
+static char *__initdata dev_addr;
+module_param(dev_addr, charp, S_IRUGO);
+MODULE_PARM_DESC(iProduct, "Device Ethernet Address");
+
+/* this address is invisible to ifconfig */
+static char *__initdata host_addr;
+module_param(host_addr, charp, S_IRUGO);
+MODULE_PARM_DESC(host_addr, "Host Ethernet Address");
 
 
 /*-------------------------------------------------------------------------*/
@@ -1139,6 +1151,9 @@ eth_set_config (struct eth_dev *dev, unsigned number, int gfp_flags)
 	}
 	eth_reset_config (dev);
 
+	/* default:  pass all packets, no multicast filtering */
+	dev->cdc_filter = 0x000f;
+
 	switch (number) {
 	case DEV_CONFIG_VALUE:
 		dev->rndis = 0;
@@ -1311,9 +1326,20 @@ static void eth_setup_complete (struct usb_ep *ep, struct usb_request *req)
  * section 3.6.2.1 table 4 has ACM requests; RNDIS requires the
  * encapsulated command mechanism.
  */
-#define CDC_SEND_ENCAPSULATED_COMMAND	0x00	/* optional */
-#define CDC_GET_ENCAPSULATED_RESPONSE	0x01	/* optional */
-#define CDC_SET_ETHERNET_PACKET_FILTER	0x43	/* required */
+#define CDC_SEND_ENCAPSULATED_COMMAND		0x00	/* optional */
+#define CDC_GET_ENCAPSULATED_RESPONSE		0x01	/* optional */
+#define CDC_SET_ETHERNET_MULTICAST_FILTERS	0x40	/* optional */
+#define CDC_SET_ETHERNET_PM_PATTERN_FILTER	0x41	/* optional */
+#define CDC_GET_ETHERNET_PM_PATTERN_FILTER	0x42	/* optional */
+#define CDC_SET_ETHERNET_PACKET_FILTER		0x43	/* required */
+#define CDC_GET_ETHERNET_STATISTIC		0x44	/* optional */
+
+/* table 62; bits in cdc_filter */
+#define	CDC_PACKET_TYPE_PROMISCUOUS		(1 << 0)
+#define	CDC_PACKET_TYPE_ALL_MULTICAST		(1 << 1) /* no filter */
+#define	CDC_PACKET_TYPE_DIRECTED		(1 << 2)
+#define	CDC_PACKET_TYPE_BROADCAST		(1 << 3)
+#define	CDC_PACKET_TYPE_MULTICAST		(1 << 4) /* filtered */
 
 #ifdef CONFIG_USB_ETH_RNDIS
 
@@ -1513,8 +1539,9 @@ done_set_intf:
 		DEBUG (dev, "NOP packet filter %04x\n", ctrl->wValue);
 		/* NOTE: table 62 has 5 filter bits to reduce traffic,
 		 * and we "must" support multicast and promiscuous.
-		 * this NOP implements a bad filter...
+		 * this NOP implements a bad filter (always promisc)
 		 */
+		dev->cdc_filter = ctrl->wValue;
 		value = 0;
 		break;
 #endif /* DEV_CONFIG_CDC */
@@ -1942,6 +1969,11 @@ static int eth_start_xmit (struct sk_buff *skb, struct net_device *net)
 	struct usb_request	*req = 0;
 	unsigned long		flags;
 
+	/* FIXME check dev->cdc_filter to decide whether to send this,
+	 * instead of acting as if CDC_PACKET_TYPE_PROMISCUOUS were
+	 * always set.  RNDIS has the same kind of outgoing filter.
+	 */
+
 	spin_lock_irqsave (&dev->lock, flags);
 	req = container_of (dev->tx_reqs.next, struct usb_request, list);
 	list_del (&req->list);
@@ -2178,6 +2210,36 @@ eth_unbind (struct usb_gadget *gadget)
 	set_gadget_data (gadget, 0);
 }
 
+static u8 __init nibble (unsigned char c)
+{
+	if (likely (isdigit (c)))
+		return c - '0';
+	c = toupper (c);
+	if (likely (isxdigit (c)))
+		return 10 + c - 'A';
+	return 0;
+}
+
+static void __init get_ether_addr (const char *str, u8 *dev_addr)
+{
+	if (str) {
+		unsigned	i;
+
+		for (i = 0; i < 6; i++) {
+			unsigned char num;
+
+			if((*str == '.') || (*str == ':'))
+				str++;
+			num = nibble(*str++) << 4;
+			num |= (nibble(*str++));
+			dev_addr [i] = num;
+		}
+		if (is_valid_ether_addr (dev_addr))
+			return;
+	}
+	random_ether_addr(dev_addr);
+}
+
 static int __init
 eth_bind (struct usb_gadget *gadget)
 {
@@ -2372,21 +2434,13 @@ autoconf_fail:
 	dev->cdc = cdc;
 	dev->zlp = zlp;
 
-	/* FIXME make these addresses configurable with module params.
-	 * also the manufacturer and product strings.
+	/* Module params for these addresses should come from ID proms.
+	 * The host side address is used with CDC and RNDIS, and commonly
+	 * end ups in a persistent config database.
 	 */
-
-	/* one random address for the gadget device ... both of these could
-	 * reasonably come from an id prom or a module parameter.
-	 */
-	random_ether_addr(net->dev_addr);
-
-	/* ... another address for the host, on the other end of the
-	 * link, gets exported through CDC (see CDC spec table 41)
-	 * and RNDIS.
-	 */
+	get_ether_addr(dev_addr, net->dev_addr);
 	if (cdc || rndis) {
-		random_ether_addr(dev->host_mac);
+		get_ether_addr(host_addr, dev->host_mac);
 #ifdef	DEV_CONFIG_CDC
 		snprintf (ethaddr, sizeof ethaddr, "%02X%02X%02X%02X%02X%02X",
 			dev->host_mac [0], dev->host_mac [1],

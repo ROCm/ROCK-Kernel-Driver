@@ -33,7 +33,7 @@
  * Fix: mdc800 used sleep_on and slept with io_lock held.
  * Converted sleep_on to waitqueues with schedule_timeout and made io_lock
  * a semaphore from a spinlock.
- * by Oliver Neukum <520047054719-0001@t-online.de>
+ * by Oliver Neukum <oliver@neukum.name>
  * (02/12/2001)
  * 
  * Identify version on module load.
@@ -41,7 +41,7 @@
  *
  * version 0.7.5
  * Fixed potential SMP races with Spinlocks.
- * Thanks to Oliver Neukum <oliver.neukum@lrz.uni-muenchen.de> who 
+ * Thanks to Oliver Neukum <oliver@neukum.name> who 
  * noticed the race conditions.
  * (30/10/2000)
  *
@@ -312,16 +312,17 @@ static void mdc800_usb_irq (struct urb *urb, struct pt_regs *res)
 static int mdc800_usb_waitForIRQ (int mode, int msec)
 {
         DECLARE_WAITQUEUE(wait, current);
+	long timeout;
 
 	mdc800->camera_request_ready=1+mode;
 
 	add_wait_queue(&mdc800->irq_wait, &wait);
 	set_current_state(TASK_INTERRUPTIBLE);
-	if (!mdc800->irq_woken)
+	timeout = msec*HZ/1000;
+	while (!mdc800->irq_woken && timeout)
 	{
-		long timeout = msec*HZ/1000;
-		while(timeout)
-			timeout = schedule_timeout (timeout);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		timeout = schedule_timeout (timeout);
 	}
         remove_wait_queue(&mdc800->irq_wait, &wait);
 	set_current_state(TASK_RUNNING);
@@ -670,6 +671,7 @@ static ssize_t mdc800_device_read (struct file *file, char *buf, size_t len, lof
 {
 	size_t left=len, sts=len; /* single transfer size */
 	char* ptr=buf;
+	long timeout;
 	DECLARE_WAITQUEUE(wait, current);
 
 	down (&mdc800->io_lock);
@@ -717,12 +719,11 @@ static ssize_t mdc800_device_read (struct file *file, char *buf, size_t len, lof
 					return len-left;
 				}
 				add_wait_queue(&mdc800->download_wait, &wait);
-				set_current_state(TASK_INTERRUPTIBLE);
-				if (!mdc800->downloaded)
+				timeout = TO_DOWNLOAD_GET_READY*HZ/1000;
+				while (!mdc800->downloaded && timeout)
 				{
-					long timeout = TO_DOWNLOAD_GET_READY*HZ/1000;
-					while(timeout)
-						timeout = schedule_timeout (timeout);
+					set_current_state(TASK_UNINTERRUPTIBLE);
+					timeout = schedule_timeout (timeout);
 				}
 				set_current_state(TASK_RUNNING);
 				remove_wait_queue(&mdc800->download_wait, &wait);
@@ -823,6 +824,7 @@ static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t l
 		if (mdc800->in_count == 8)
 		{
 			int answersize;
+			long timeout;
 
 			if (mdc800_usb_waitForIRQ (0,TO_GET_READY))
 			{
@@ -843,12 +845,11 @@ static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t l
 				return -EIO;
 			}
 			add_wait_queue(&mdc800->write_wait, &wait);
-			set_current_state(TASK_INTERRUPTIBLE);
-			if (!mdc800->written)
+			timeout = TO_WRITE_GET_READY*HZ/1000;
+			while (!mdc800->written && timeout)
 			{
-				long timeout = TO_WRITE_GET_READY*HZ/1000;
-				while(timeout)
-					timeout = schedule_timeout (timeout);
+				set_current_state(TASK_UNINTERRUPTIBLE);
+				timeout = schedule_timeout (timeout);
 			}
                         set_current_state(TASK_RUNNING);
 			remove_wait_queue(&mdc800->write_wait, &wait);

@@ -381,7 +381,7 @@ static void hub_power_on(struct usb_hub *hub)
 	}
 
 	/* Wait for power to be enabled */
-	wait_ms(hub->descriptor->bPwrOn2PwrGood * 2);
+	msleep(hub->descriptor->bPwrOn2PwrGood * 2);
 }
 
 static int hub_hub_status(struct usb_hub *hub,
@@ -887,7 +887,7 @@ static int hub_port_wait_reset(struct usb_device *hub, int port,
 			delay_time < HUB_RESET_TIMEOUT;
 			delay_time += delay) {
 		/* wait to give the device a chance to reset */
-		wait_ms(delay);
+		msleep(delay);
 
 		/* read and decode port status */
 		ret = hub_port_status(hub, port, &portstatus, &portchange);
@@ -1002,7 +1002,7 @@ static int hub_port_debounce(struct usb_device *hub, int port)
 	connection = 0;
 	stable_count = 0;
 	for (delay_time = 0; delay_time < HUB_DEBOUNCE_TIMEOUT; delay_time += HUB_DEBOUNCE_STEP) {
-		wait_ms(HUB_DEBOUNCE_STEP);
+		msleep(HUB_DEBOUNCE_STEP);
 
 		ret = hub_port_status(hub, port, &portstatus, &portchange);
 		if (ret < 0)
@@ -1146,7 +1146,7 @@ hub_port_init (struct usb_device *hub, struct usb_device *dev, int port)
 			retval = usb_set_address(dev);
 			if (retval >= 0)
 				break;
-			wait_ms(200);
+			msleep(200);
 		}
 		if (retval < 0) {
 			dev_err(&dev->dev,
@@ -1165,11 +1165,11 @@ hub_port_init (struct usb_device *hub, struct usb_device *dev, int port)
 		 *  - let SET_ADDRESS settle, some device hardware wants it
 		 *  - read ep0 maxpacket even for high and low speed,
   		 */
-		wait_ms(10);
+		msleep(10);
 		retval = usb_get_device_descriptor(dev, 8);
 		if (retval >= 8)
 			break;
-		wait_ms(100);
+		msleep(100);
 	}
 	if (retval != 8) {
 		dev_err(&dev->dev, "device descriptor read/%s, error %d\n",
@@ -1515,7 +1515,7 @@ static void hub_events(void)
 			}
 			if (hubchange & HUB_CHANGE_OVERCURRENT) {
 				dev_dbg (&hub->intf->dev, "overcurrent change\n");
-				wait_ms(500);	/* Cool down */
+				msleep(500);	/* Cool down */
 				clear_hub_feature(dev, C_HUB_OVER_CURRENT);
                         	hub_power_on(hub);
 			}

@@ -127,6 +127,7 @@ u16 cpci_get_hs_csr(struct slot* slot)
 	return hs_csr;
 }
 
+#if 0
 u16 cpci_set_hs_csr(struct slot* slot, u16 hs_csr)
 {
 	int hs_cap;
@@ -156,6 +157,7 @@ u16 cpci_set_hs_csr(struct slot* slot, u16 hs_csr)
 	}
 	return new_hs_csr;
 }
+#endif
 
 int cpci_check_and_clear_ins(struct slot* slot)
 {

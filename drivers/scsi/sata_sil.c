@@ -276,8 +276,14 @@ static void sil_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val)
 static void sil_dev_config(struct ata_port *ap, struct ata_device *dev)
 {
 	unsigned int n, quirks = 0;
-	const char *s = &dev->product[0];
-	unsigned int len = strnlen(s, sizeof(dev->product));
+	unsigned char model_num[40];
+	const char *s;
+	unsigned int len;
+
+	ata_dev_id_string(dev, model_num, ATA_ID_PROD_OFS,
+			  sizeof(model_num));
+	s = &model_num[0];
+	len = strnlen(s, sizeof(model_num));
 
 	/* ATAPI specifies that empty space is blank-filled; remove blanks */
 	while ((len > 0) && (s[len - 1] == ' '))

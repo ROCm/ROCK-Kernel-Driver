@@ -215,7 +215,7 @@ static __init struct pci_dev *gx_detect_chipset(void)
  *
  * Finds out at which efficient frequency the Cyrix MediaGX/NatSemi Geode CPU runs.
  */
-static int gx_get_cpuspeed(void)
+static unsigned int gx_get_cpuspeed(unsigned int cpu)
 {
 	if ((gx_params->pci_suscfg & SUSMOD) == 0) 
 		return stock_freq;
@@ -271,7 +271,7 @@ static void gx_set_cpuspeed(unsigned int khz)
 
 
 	freqs.cpu = 0;
-	freqs.old = gx_get_cpuspeed();
+	freqs.old = gx_get_cpuspeed(0);
 
 	new_khz = gx_validate_speed(khz, &gx_params->on_duration, &gx_params->off_duration);
 
@@ -405,7 +405,7 @@ static int cpufreq_gx_target(struct cpufreq_policy *policy,
 
 static int cpufreq_gx_cpu_init(struct cpufreq_policy *policy)
 {
-	int maxfreq, curfreq;
+	unsigned int maxfreq, curfreq;
 
 	if (!policy || policy->cpu != 0)
 		return -ENODEV;
@@ -419,7 +419,7 @@ static int cpufreq_gx_cpu_init(struct cpufreq_policy *policy)
 		maxfreq = 30000 * gx_freq_mult[getCx86(CX86_DIR1) & 0x0f];
 	}
 	stock_freq = maxfreq;
-	curfreq = gx_get_cpuspeed();
+	curfreq = gx_get_cpuspeed(0);
 
 	dprintk("cpu max frequency is %d.\n", maxfreq);
 	dprintk("cpu current frequency is %dkHz.\n",curfreq);
@@ -446,6 +446,7 @@ static int cpufreq_gx_cpu_init(struct cpufreq_policy *policy)
  *   MediaGX/Geode GX initialize cpufreq driver
  */
 static struct cpufreq_driver gx_suspmod_driver = {
+	.get		= gx_get_cpuspeed,
 	.verify		= cpufreq_gx_verify,
 	.target		= cpufreq_gx_target,
 	.init		= cpufreq_gx_cpu_init,

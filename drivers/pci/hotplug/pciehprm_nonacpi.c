@@ -52,11 +52,6 @@ int pciehprm_print_pirt(void)
 	return 0;
 }
 
-void * pciehprm_get_slot(struct slot *slot)
-{
-	return NULL;
-}
-
 int pciehprm_get_physical_slot_number(struct controller *ctrl, u32 *sun, u8 busnum, u8 devnum)
 {
 

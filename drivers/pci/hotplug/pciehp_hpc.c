@@ -291,14 +291,14 @@ static void start_int_poll_timer(struct php_ctlr_state_s *php_ctlr, int seconds)
 
 static int pcie_write_cmd(struct slot *slot, u16 cmd)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	int retval = 0;
 	u16 slot_status;
 
 	DBG_ENTER_ROUTINE 
 	
 	dbg("%s : Enter\n", __FUNCTION__);
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -331,13 +331,13 @@ static int pcie_write_cmd(struct slot *slot, u16 cmd)
 
 static int hpc_check_lnk_status(struct controller *ctrl)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = ctrl->hpc_ctlr_handle;
 	u16 lnk_status;
 	int retval = 0;
 
 	DBG_ENTER_ROUTINE 
 
-	if (!ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -362,14 +362,14 @@ static int hpc_check_lnk_status(struct controller *ctrl)
 
 static int hpc_get_attention_status(struct slot *slot, u8 *status)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	u16 slot_ctrl;
 	u8 atten_led_state;
 	int retval = 0;
 	
 	DBG_ENTER_ROUTINE 
 
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -409,14 +409,14 @@ static int hpc_get_attention_status(struct slot *slot, u8 *status)
 
 static int hpc_get_power_status(struct slot * slot, u8 *status)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	u16 slot_ctrl;
 	u8 pwr_state;
 	int	retval = 0;
 	
 	DBG_ENTER_ROUTINE 
 
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -450,13 +450,13 @@ static int hpc_get_power_status(struct slot * slot, u8 *status)
 
 static int hpc_get_latch_status(struct slot *slot, u8 *status)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	u16 slot_status;
 	int retval = 0;
 
 	DBG_ENTER_ROUTINE 
 
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -476,14 +476,14 @@ static int hpc_get_latch_status(struct slot *slot, u8 *status)
 
 static int hpc_get_adapter_status(struct slot *slot, u8 *status)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	u16 slot_status;
 	u8 card_state;
 	int retval = 0;
 
 	DBG_ENTER_ROUTINE 
 
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -503,7 +503,7 @@ static int hpc_get_adapter_status(struct slot *slot, u8 *status)
 
 static int hpc_query_power_fault(struct slot * slot)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	u16 slot_status;
 	u8 pwr_fault;
 	int retval = 0;
@@ -511,7 +511,7 @@ static int hpc_query_power_fault(struct slot * slot)
 
 	DBG_ENTER_ROUTINE 
 
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -532,13 +532,13 @@ static int hpc_query_power_fault(struct slot * slot)
 
 static int hpc_set_attention_status(struct slot *slot, u8 value)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	u16 slot_cmd = 0;
 	u16 slot_ctrl;
 	int rc = 0;
 
 	dbg("%s: \n", __FUNCTION__);
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -580,13 +580,13 @@ static int hpc_set_attention_status(struct slot *slot, u8 value)
 
 static void hpc_set_green_led_on(struct slot *slot)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	u16 slot_cmd;
 	u16 slot_ctrl;
 	int rc = 0;
        	
 	dbg("%s: \n", __FUNCTION__);	
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return ;
 	}
@@ -615,13 +615,13 @@ static void hpc_set_green_led_on(struct slot *slot)
 
 static void hpc_set_green_led_off(struct slot *slot)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	u16 slot_cmd;
 	u16 slot_ctrl;
 	int rc = 0;
 
 	dbg("%s: \n", __FUNCTION__);	
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return ;
 	}
@@ -651,13 +651,13 @@ static void hpc_set_green_led_off(struct slot *slot)
 
 static void hpc_set_green_led_blink(struct slot *slot)
 {
-	struct php_ctlr_state_s *php_ctlr =(struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	u16 slot_cmd;
 	u16 slot_ctrl;
 	int rc = 0; 
 	
 	dbg("%s: \n", __FUNCTION__);	
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return ;
 	}
@@ -692,13 +692,13 @@ int pcie_get_ctlr_slot_config(struct controller *ctrl,
 	int *updown,		/* physical_slot_num increament: 1 or -1	*/
 	int *flags)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = ctrl->hpc_ctlr_handle;
 	u32 slot_cap;
 	int rc = 0;
 	
 	DBG_ENTER_ROUTINE 
 
-	if (!ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -723,12 +723,12 @@ int pcie_get_ctlr_slot_config(struct controller *ctrl,
 
 static void hpc_release_ctlr(struct controller *ctrl)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = ctrl->hpc_ctlr_handle;
 	struct php_ctlr_state_s *p, *p_prev;
 
 	DBG_ENTER_ROUTINE 
 
-	if (!ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return ;
 	}
@@ -769,7 +769,7 @@ static void hpc_release_ctlr(struct controller *ctrl)
 
 static int hpc_power_on_slot(struct slot * slot)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	u16 slot_cmd;
 	u16 slot_ctrl;
 
@@ -778,7 +778,7 @@ static int hpc_power_on_slot(struct slot * slot)
 	DBG_ENTER_ROUTINE 
 	dbg("%s: \n", __FUNCTION__);	
 
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -818,7 +818,7 @@ static int hpc_power_on_slot(struct slot * slot)
 
 static int hpc_power_off_slot(struct slot * slot)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	u16 slot_cmd;
 	u16 slot_ctrl;
 
@@ -827,7 +827,7 @@ static int hpc_power_off_slot(struct slot * slot)
 	DBG_ENTER_ROUTINE 
 	dbg("%s: \n", __FUNCTION__);	
 
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -879,10 +879,10 @@ static irqreturn_t pcie_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 		return IRQ_NONE;
 
 	if (!pciehp_poll_mode) { 
-		ctrl = (struct controller *)dev_id;
+		ctrl = dev_id;
 		php_ctlr = ctrl->hpc_ctlr_handle;
 	} else {
-		php_ctlr = (struct php_ctlr_state_s *) dev_id;
+		php_ctlr = dev_id;
 		ctrl = (struct controller *)php_ctlr->callback_instance_id;
 	}
 
@@ -1017,14 +1017,14 @@ static irqreturn_t pcie_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 
 static int hpc_get_max_lnk_speed (struct slot *slot, enum pcie_link_speed *value)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	enum pcie_link_speed lnk_speed;
 	u32	lnk_cap;
 	int retval = 0;
 
 	DBG_ENTER_ROUTINE 
 
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -1058,14 +1058,14 @@ static int hpc_get_max_lnk_speed (struct slot *slot, enum pcie_link_speed *value
 
 static int hpc_get_max_lnk_width (struct slot *slot, enum pcie_link_width *value)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	enum pcie_link_width lnk_wdth;
 	u32	lnk_cap;
 	int retval = 0;
 
 	DBG_ENTER_ROUTINE 
 
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -1120,14 +1120,14 @@ static int hpc_get_max_lnk_width (struct slot *slot, enum pcie_link_width *value
 
 static int hpc_get_cur_lnk_speed (struct slot *slot, enum pcie_link_speed *value)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	enum pcie_link_speed lnk_speed = PCI_SPEED_UNKNOWN;
 	int retval = 0;
 	u16 lnk_status;
 
 	DBG_ENTER_ROUTINE 
 
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -1161,14 +1161,14 @@ static int hpc_get_cur_lnk_speed (struct slot *slot, enum pcie_link_speed *value
 
 static int hpc_get_cur_lnk_width (struct slot *slot, enum pcie_link_width *value)
 {
-	struct php_ctlr_state_s *php_ctlr = (struct php_ctlr_state_s *) slot->ctrl->hpc_ctlr_handle;
+	struct php_ctlr_state_s *php_ctlr = slot->ctrl->hpc_ctlr_handle;
 	enum pcie_link_width lnk_wdth = PCIE_LNK_WIDTH_UNKNOWN;
 	int retval = 0;
 	u16 lnk_status;
 
 	DBG_ENTER_ROUTINE 
 
-	if (!slot->ctrl->hpc_ctlr_handle) {
+	if (!php_ctlr) {
 		err("%s: Invalid HPC controller handle!\n", __FUNCTION__);
 		return -1;
 	}
@@ -1245,7 +1245,7 @@ static struct hpc_ops pciehp_hpc_ops = {
 };
 
 int pcie_init(struct controller * ctrl,
-	struct pci_dev * pdev,
+	struct pci_dev *pdev,
 	php_intr_callback_t attention_button_callback,
 	php_intr_callback_t switch_change_callback,
 	php_intr_callback_t presence_change_callback,

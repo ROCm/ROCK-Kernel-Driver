@@ -45,9 +45,8 @@
 
 struct i2o_cmd_passthru
 {
+	unsigned int iop;	/* IOP unit number */
 	void *msg;		/* message */
-	int iop;		/* number of the I2O controller, to which the
-				   message should go to */
 };
 
 struct i2o_cmd_hrtlct

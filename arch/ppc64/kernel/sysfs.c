@@ -114,6 +114,7 @@ void ppc64_enable_pmcs(void)
 	unsigned long hid0;
 	unsigned long set, reset;
 	int ret;
+	unsigned int ctrl;
 
 	/* Only need to enable them once */
 	if (__get_cpu_var(pmcs_enabled))
@@ -157,6 +158,16 @@ void ppc64_enable_pmcs(void)
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		char *ptr = (char *)&paca[smp_processor_id()].xLpPaca;
 		ptr[0xBB] = 1;
+	}
+
+	/*
+	 * On SMT machines we have to set the run latch in the ctrl register
+	 * in order to make PMC6 spin.
+	 */
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SMT) {
+		ctrl = mfspr(CTRLF);
+		ctrl |= RUNLATCH;
+		mtspr(CTRLT, ctrl);
 	}
 }
 #endif

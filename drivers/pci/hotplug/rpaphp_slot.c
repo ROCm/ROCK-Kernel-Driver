@@ -58,13 +58,10 @@ void rpaphp_sysfs_remove_attr_location (struct hotplug_slot *slot)
 	sysfs_remove_file(&slot->kobj, &hotplug_slot_attr_location.attr);
 }
 
-/* free up the memory user by a slot */
+/* free up the memory used by a slot */
 static void rpaphp_release_slot(struct hotplug_slot *hotplug_slot)
 {
-	struct slot *slot = hotplug_slot? (struct slot *) hotplug_slot->private:NULL;
-
-	if (slot == NULL)
-		return;
+	struct slot *slot = (struct slot *) hotplug_slot->private;
 
 	dealloc_slot_struct(slot);
 }
@@ -83,54 +80,47 @@ struct slot *alloc_slot_struct(struct device_node *dn, int drc_index, char *drc_
 {
 	struct slot *slot;
 	
-	dbg("Enter alloc_slot_struct(): dn->full_name=%s drc_index=0x%x drc_name=%s\n",
-		dn->full_name, drc_index, drc_name);
-
 	slot = kmalloc(sizeof (struct slot), GFP_KERNEL);
 	if (!slot)
-		return (NULL);
+		goto error_nomem;
 	memset(slot, 0, sizeof (struct slot));
 	slot->hotplug_slot = kmalloc(sizeof (struct hotplug_slot), GFP_KERNEL);
-	if (!slot->hotplug_slot) {
-		kfree(slot);
-		return (NULL);
-	}
+	if (!slot->hotplug_slot)
+		goto error_slot;
 	memset(slot->hotplug_slot, 0, sizeof (struct hotplug_slot));
 	slot->hotplug_slot->info = kmalloc(sizeof (struct hotplug_slot_info),
 					   GFP_KERNEL);
-	if (!slot->hotplug_slot->info) {
-		kfree(slot->hotplug_slot);
-		kfree(slot);
-		return (NULL);
-	}
+	if (!slot->hotplug_slot->info)
+		goto error_hpslot;
 	memset(slot->hotplug_slot->info, 0, sizeof (struct hotplug_slot_info));
 	slot->hotplug_slot->name = kmalloc(BUS_ID_SIZE + 1, GFP_KERNEL);
-	if (!slot->hotplug_slot->name) {
-		kfree(slot->hotplug_slot->info);
-		kfree(slot->hotplug_slot);
-		kfree(slot);
-		return (NULL);
-	}
+	if (!slot->hotplug_slot->name)
+		goto error_info;
 	slot->location = kmalloc(strlen(drc_name) + 1, GFP_KERNEL);
-	if (!slot->location) {
-		kfree(slot->hotplug_slot->info);
-		kfree(slot->hotplug_slot->name);
-		kfree(slot->hotplug_slot);
-		kfree(slot);
-		return (NULL);
-	}
+	if (!slot->location)
+		goto error_name;
 	slot->name = slot->hotplug_slot->name;
 	slot->dn = dn;
 	slot->index = drc_index;
 	strcpy(slot->location, drc_name);
 	slot->power_domain = power_domain;
-	slot->magic = SLOT_MAGIC;
 	slot->hotplug_slot->private = slot;
 	slot->hotplug_slot->ops = &rpaphp_hotplug_slot_ops;
 	slot->hotplug_slot->release = &rpaphp_release_slot;
-	dbg("Exit alloc_slot_struct(): slot->dn->full_name=%s drc_index=0x%x drc_name=%s\n",
-		slot->dn->full_name, slot->index, slot->name);
-	return (slot);
+	slot->hotplug_slot->info->cur_bus_speed = PCI_SPEED_UNKNOWN;
+
+	return slot;
+
+error_name:
+	kfree(slot->hotplug_slot->name);
+error_info:
+	kfree(slot->hotplug_slot->info);
+error_hpslot:
+	kfree(slot->hotplug_slot);
+error_slot:
+	kfree(slot);
+error_nomem:
+	return NULL;
 }
 
 int register_slot(struct slot *slot)
@@ -138,13 +128,15 @@ int register_slot(struct slot *slot)
 	int retval;
 	char *vio_uni_addr = NULL;
 
-	dbg("%s registering slot:path[%s] index[%x], name[%s] pdomain[%x] type[%d]\n", __FUNCTION__, slot->dn->full_name, slot->index, slot->name, slot->power_domain, slot->type);
+	dbg("%s registering slot:path[%s] index[%x], name[%s] pdomain[%x] type[%d]\n",
+		__FUNCTION__, slot->dn->full_name, slot->index, slot->name,
+		slot->power_domain, slot->type);
 
 	retval = pci_hp_register(slot->hotplug_slot);
 	if (retval) {
 		err("pci_hp_register failed with error %d\n", retval);
 		rpaphp_release_slot(slot->hotplug_slot);
-		return (retval);
+		return retval;
 	}
 	
 	/* create "phy_locatoin" file */
@@ -163,7 +155,7 @@ int register_slot(struct slot *slot)
 		info("Slot [%s](bus_id=%s) registered\n",
 		     slot->name, pci_name(slot->bridge));
 	num_slots++;
-	return (0);
+	return 0;
 }
 
 int rpaphp_get_power_status(struct slot *slot, u8 * value)
