@@ -1556,8 +1556,17 @@ void unmap_mapping_range(struct address_space *mapping,
 
 	spin_lock(&mapping->i_mmap_lock);
 
+	/* serialize i_size write against truncate_count write */
+	smp_wmb();
 	/* Protect against page faults, and endless unmapping loops */
 	mapping->truncate_count++;
+	/*
+	 * For archs where spin_lock has inclusive semantics like ia64
+	 * this smp_mb() will prevent to read pagetable contents
+	 * before the truncate_count increment is visible to
+	 * other cpus.
+	 */
+	smp_mb();
 	if (unlikely(is_restart_addr(mapping->truncate_count))) {
 		if (mapping->truncate_count == 0)
 			reset_vma_truncate_counts(mapping);
@@ -1865,10 +1874,18 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (vma->vm_file) {
 		mapping = vma->vm_file->f_mapping;
 		sequence = mapping->truncate_count;
+		smp_rmb(); /* serializes i_size against truncate_count */
 	}
 retry:
 	cond_resched();
 	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, &ret);
+	/*
+	 * No smp_rmb is needed here as long as there's a full
+	 * spin_lock/unlock sequence inside the ->nopage callback
+	 * (for the pagecache lookup) that acts as an implicit
+	 * smp_mb() and prevents the i_size read to happen
+	 * after the next truncate_count read.
+	 */
 
 	/* no page was available -- either SIGBUS or OOM */
 	if (new_page == NOPAGE_SIGBUS)
