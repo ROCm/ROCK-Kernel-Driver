@@ -35,10 +35,9 @@ create_dir(struct kobject * k, struct dentry * p, const char * n)
 		if (!error) {
 			dentry->d_fsdata = k;
 			p->d_inode->i_nlink++;
-		} else {
-			dput(dentry);
+		} else
 			dentry = ERR_PTR(error);
-		}
+		dput(dentry);
 	}
 	up(&p->d_inode->i_sem);
 	return dentry;
@@ -136,6 +135,7 @@ void sysfs_remove_dir(struct kobject * kobj)
 			 * Unlink and unhash.
 			 */
 			spin_unlock(&dcache_lock);
+			d_delete(d);
 			simple_unlink(dentry->d_inode,d);
 			dput(d);
 			spin_lock(&dcache_lock);
@@ -143,6 +143,7 @@ void sysfs_remove_dir(struct kobject * kobj)
 		pr_debug(" done\n");
 		node = dentry->d_subdirs.next;
 	}
+	list_del_init(&dentry->d_child);
 	spin_unlock(&dcache_lock);
 	up(&dentry->d_inode->i_sem);
 
