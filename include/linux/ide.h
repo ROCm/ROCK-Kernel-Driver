@@ -283,16 +283,10 @@ struct ata_device {
 	 */
 	request_queue_t	queue;	/* per device request queue */
 
-	struct ata_device	*next;	/* circular list of hwgroup drives */
-
 	/* Those are directly injected jiffie values. They should go away and
 	 * we should use generic timers instead!!!
 	 */
-
-	unsigned long PADAM_sleep;		/* sleep until this time */
-	unsigned long PADAM_service_start;	/* time we started last request */
-	unsigned long PADAM_service_time;	/* service time of last request */
-	unsigned long PADAM_timeout;		/* max time to wait for irq */
+	unsigned long PADAM_sleep;	/* sleep until this time */
 
 	/* Flags requesting/indicating one of the following special commands
 	 * executed on the request queue.
@@ -512,7 +506,7 @@ struct ata_taskfile;
 typedef struct hwgroup_s {
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
 	unsigned long flags;		/* BUSY, SLEEPING */
-	struct ata_device *drive;	/* current drive */
+	struct ata_device *XXX_drive;	/* current drive */
 	struct request *rq;		/* current request */
 	struct timer_list timer;	/* failsafe timer */
 	unsigned long poll_timeout;	/* timeout value during long polls */

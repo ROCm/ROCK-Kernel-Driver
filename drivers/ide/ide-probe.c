@@ -438,10 +438,11 @@ static inline void probe_for_drive (ide_drive_t *drive)
  * This routine only knows how to look for drive units 0 and 1
  * on an interface, so any setting of MAX_DRIVES > 2 won't work here.
  */
-static void probe_hwif(struct ata_channel *ch)
+static void channel_probe(struct ata_channel *ch)
 {
 	unsigned int unit;
 	unsigned long flags;
+	int error;
 
 	if (ch->noprobe)
 		return;
@@ -454,96 +455,97 @@ static void probe_hwif(struct ata_channel *ch)
 	/*
 	 * Check for the presence of a channel by probing for drives on it.
 	 */
-
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		struct ata_device *drive = &ch->drives[unit];
 
 		probe_for_drive(drive);
 
-		if (drive->present && !ch->present) {
+		/* drive found, there is a channel it is attached too. */
+		if (drive->present)
 			ch->present = 1;
-		}
 	}
 
-	if (ch->present) {
-		int error = 0;
+	if (!ch->present)
+		goto not_found;
 
-		if (((unsigned long)ch->io_ports[IDE_DATA_OFFSET] | 7) ==
-				((unsigned long)ch->io_ports[IDE_STATUS_OFFSET])) {
-			error += !request_region(ch->io_ports[IDE_DATA_OFFSET], 8, ch->name);
-			ch->straight8 = 1;
-		} else {
-			if (ch->io_ports[IDE_DATA_OFFSET])
-				error += !request_region(ch->io_ports[IDE_DATA_OFFSET], 1, ch->name);
-			if (ch->io_ports[IDE_ERROR_OFFSET])
-				error += !request_region(ch->io_ports[IDE_ERROR_OFFSET], 1, ch->name);
-			if (ch->io_ports[IDE_NSECTOR_OFFSET])
-				error += !request_region(ch->io_ports[IDE_NSECTOR_OFFSET], 1, ch->name);
-			if (ch->io_ports[IDE_SECTOR_OFFSET])
-				error += !request_region(ch->io_ports[IDE_SECTOR_OFFSET], 1, ch->name);
-			if (ch->io_ports[IDE_LCYL_OFFSET])
-				error += !request_region(ch->io_ports[IDE_LCYL_OFFSET], 1, ch->name);
-			if (ch->io_ports[IDE_HCYL_OFFSET])
-				error += !request_region(ch->io_ports[IDE_HCYL_OFFSET], 1, ch->name);
-			if (ch->io_ports[IDE_SELECT_OFFSET])
-				error += !request_region(ch->io_ports[IDE_SELECT_OFFSET], 1, ch->name);
-			if (ch->io_ports[IDE_STATUS_OFFSET])
-				error += !request_region(ch->io_ports[IDE_STATUS_OFFSET], 1, ch->name);
+	error = 0;
 
-		}
-		if (ch->io_ports[IDE_CONTROL_OFFSET])
-			error += !request_region(ch->io_ports[IDE_CONTROL_OFFSET], 1, ch->name);
+	if (((unsigned long)ch->io_ports[IDE_DATA_OFFSET] | 7) ==
+			((unsigned long)ch->io_ports[IDE_STATUS_OFFSET])) {
+		error += !request_region(ch->io_ports[IDE_DATA_OFFSET], 8, ch->name);
+		ch->straight8 = 1;
+	} else {
+		if (ch->io_ports[IDE_DATA_OFFSET])
+			error += !request_region(ch->io_ports[IDE_DATA_OFFSET], 1, ch->name);
+		if (ch->io_ports[IDE_ERROR_OFFSET])
+			error += !request_region(ch->io_ports[IDE_ERROR_OFFSET], 1, ch->name);
+		if (ch->io_ports[IDE_NSECTOR_OFFSET])
+			error += !request_region(ch->io_ports[IDE_NSECTOR_OFFSET], 1, ch->name);
+		if (ch->io_ports[IDE_SECTOR_OFFSET])
+			error += !request_region(ch->io_ports[IDE_SECTOR_OFFSET], 1, ch->name);
+		if (ch->io_ports[IDE_LCYL_OFFSET])
+			error += !request_region(ch->io_ports[IDE_LCYL_OFFSET], 1, ch->name);
+		if (ch->io_ports[IDE_HCYL_OFFSET])
+			error += !request_region(ch->io_ports[IDE_HCYL_OFFSET], 1, ch->name);
+		if (ch->io_ports[IDE_SELECT_OFFSET])
+			error += !request_region(ch->io_ports[IDE_SELECT_OFFSET], 1, ch->name);
+		if (ch->io_ports[IDE_STATUS_OFFSET])
+			error += !request_region(ch->io_ports[IDE_STATUS_OFFSET], 1, ch->name);
+
+	}
+	if (ch->io_ports[IDE_CONTROL_OFFSET])
+		error += !request_region(ch->io_ports[IDE_CONTROL_OFFSET], 1, ch->name);
 #if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
-		if (ch->io_ports[IDE_IRQ_OFFSET])
-			error += !request_region(ch->io_ports[IDE_IRQ_OFFSET], 1, ch->name);
+	if (ch->io_ports[IDE_IRQ_OFFSET])
+		error += !request_region(ch->io_ports[IDE_IRQ_OFFSET], 1, ch->name);
 #endif
 
-		/* Some neccessary register area was already used. Skip this
-		 * device.
-		 */
-		if (
+	/* Some neccessary register area was already used. Skip this device.
+	 */
+
+	if (
 #if CONFIG_BLK_DEV_PDC4030
-				(ch->chipset != ide_pdc4030 || ch->unit == 0) &&
+			(ch->chipset != ide_pdc4030 || ch->unit == 0) &&
 #endif
-				error) {
-			/* FIXME: We should be dealing properly with partial IO
-			 * region allocations here.
-			 */
-			ch->present = 0;
-			printk("%s: error: ports already in use!\n", ch->name);
+			error) {
 
-		}
+		/* FIXME: We should be dealing properly with partial IO region
+		 * allocations here.
+		 */
+
+		ch->present = 0;
+		printk("%s: error: ports already in use!\n", ch->name);
 	}
 
-	if (ch->present) {
-		/* Register this hardware interface within the global device tree.
-		 */
-		sprintf(ch->dev.bus_id, "%04x", ch->io_ports[IDE_DATA_OFFSET]);
-		sprintf(ch->dev.name, "ide");
-		ch->dev.driver_data = ch;
+	if (!ch->present)
+		goto not_found;
+
+	/* Register this hardware interface within the global device tree.
+	 */
+	sprintf(ch->dev.bus_id, "%04x", ch->io_ports[IDE_DATA_OFFSET]);
+	sprintf(ch->dev.name, "ide");
+	ch->dev.driver_data = ch;
 #ifdef CONFIG_BLK_DEV_IDEPCI
-		if (ch->pci_dev)
-			ch->dev.parent = &ch->pci_dev->dev;
-		else
+	if (ch->pci_dev)
+		ch->dev.parent = &ch->pci_dev->dev;
+	else
 #endif
-			ch->dev.parent = NULL; /* Would like to do = &device_legacy */
+		ch->dev.parent = NULL; /* Would like to do = &device_legacy */
 
-		device_register(&ch->dev);
+	device_register(&ch->dev);
 
-		if (ch->io_ports[IDE_CONTROL_OFFSET] && ch->reset) {
-			unsigned long timeout = jiffies + WAIT_WORSTCASE;
-			byte stat;
+	if (ch->io_ports[IDE_CONTROL_OFFSET] && ch->reset) {
+		unsigned long timeout = jiffies + WAIT_WORSTCASE;
+		byte stat;
 
-			printk("%s: reset\n", ch->name);
-			OUT_BYTE(12, ch->io_ports[IDE_CONTROL_OFFSET]);
-			udelay(10);
-			OUT_BYTE(8, ch->io_ports[IDE_CONTROL_OFFSET]);
-			do {
-				ide_delay_50ms();
-				stat = IN_BYTE(ch->io_ports[IDE_STATUS_OFFSET]);
-			} while ((stat & BUSY_STAT) && 0 < (signed long)(timeout - jiffies));
-
-		}
+		printk("%s: reset\n", ch->name);
+		OUT_BYTE(12, ch->io_ports[IDE_CONTROL_OFFSET]);
+		udelay(10);
+		OUT_BYTE(8, ch->io_ports[IDE_CONTROL_OFFSET]);
+		do {
+			ide_delay_50ms();
+			stat = IN_BYTE(ch->io_ports[IDE_STATUS_OFFSET]);
+		} while ((stat & BUSY_STAT) && 0 < (signed long)(timeout - jiffies));
 	}
 
 	__restore_flags(flags);	/* local CPU only */
@@ -551,16 +553,19 @@ static void probe_hwif(struct ata_channel *ch)
 	/*
 	 * Now setup the PIO transfer modes of the drives on this channel.
 	 */
-	if (ch->present) {
-		for (unit = 0; unit < MAX_DRIVES; ++unit) {
-			struct ata_device *drive = &ch->drives[unit];
+	for (unit = 0; unit < MAX_DRIVES; ++unit) {
+		struct ata_device *drive = &ch->drives[unit];
 
-			if (drive->present && (drive->autotune == 1)) {
-				if (drive->channel->tuneproc)
-					drive->channel->tuneproc(drive, 255);	/* auto-tune PIO mode */
-			}
+		if (drive->present && (drive->autotune == 1)) {
+			if (drive->channel->tuneproc)
+				drive->channel->tuneproc(drive, 255);	/* auto-tune PIO mode */
 		}
 	}
+
+	return;
+
+not_found:
+	__restore_flags(flags);
 }
 
 /*
@@ -682,12 +687,7 @@ static int init_irq(struct ata_channel *ch)
 			spin_unlock_irqrestore(&ide_lock, flags);
 			return 1;
 		}
-		memset(hwgroup, 0, sizeof(ide_hwgroup_t));
-		hwgroup->rq       = NULL;
-		hwgroup->handler  = NULL;
-		hwgroup->drive    = NULL;
-		hwgroup->flags	  = 0;
-
+		memset(hwgroup, 0, sizeof(*hwgroup));
 		init_timer(&hwgroup->timer);
 		hwgroup->timer.function = &ide_timer_expiry;
 		hwgroup->timer.data = (unsigned long) hwgroup;
@@ -716,21 +716,17 @@ static int init_irq(struct ata_channel *ch)
 	}
 
 	/*
-	 * Everything is okay.
+	 * Everything is okay. Tag us as member of this hardware group.
 	 */
 	ch->hwgroup = hwgroup;
-
 	for (i = 0; i < MAX_DRIVES; ++i) {
 		struct ata_device *drive = &ch->drives[i];
 
 		if (!drive->present)
 			continue;
 
-		if (!hwgroup->drive)
-			hwgroup->drive = drive;
-
-		drive->next = hwgroup->drive->next;
-		hwgroup->drive->next = drive;
+		if (!hwgroup->XXX_drive)
+			hwgroup->XXX_drive = drive;
 
 		init_device_queue(drive);
 	}
@@ -833,58 +829,65 @@ err_kmalloc_gd:
 	return;
 }
 
-static int hwif_init(struct ata_channel *hwif)
+static void channel_init(struct ata_channel *ch)
 {
-	if (!hwif->present)
-		return 0;
-	if (!hwif->irq) {
-		if (!(hwif->irq = ide_default_irq(hwif->io_ports[IDE_DATA_OFFSET])))
-		{
-			printk("%s: DISABLED, NO IRQ\n", hwif->name);
-			return (hwif->present = 0);
+	if (!ch->present)
+		return;
+
+	/* we set it back to 1 if all is ok below */
+	ch->present = 0;
+
+	if (!ch->irq) {
+		if (!(ch->irq = ide_default_irq(ch->io_ports[IDE_DATA_OFFSET]))) {
+			printk("%s: DISABLED, NO IRQ\n", ch->name);
+
+			return;
 		}
 	}
 #ifdef CONFIG_BLK_DEV_HD
-	if (hwif->irq == HD_IRQ && hwif->io_ports[IDE_DATA_OFFSET] != HD_DATA) {
-		printk("%s: CANNOT SHARE IRQ WITH OLD HARDDISK DRIVER (hd.c)\n", hwif->name);
-		return (hwif->present = 0);
+	if (ch->irq == HD_IRQ && ch->io_ports[IDE_DATA_OFFSET] != HD_DATA) {
+		printk("%s: CANNOT SHARE IRQ WITH OLD HARDDISK DRIVER (hd.c)\n", ch->name);
+
+		return;
 	}
 #endif
 
-	hwif->present = 0; /* we set it back to 1 if all is ok below */
+	if (devfs_register_blkdev (ch->major, ch->name, ide_fops)) {
+		printk("%s: UNABLE TO GET MAJOR NUMBER %d\n", ch->name, ch->major);
 
-	if (devfs_register_blkdev (hwif->major, hwif->name, ide_fops)) {
-		printk("%s: UNABLE TO GET MAJOR NUMBER %d\n", hwif->name, hwif->major);
-		return (hwif->present = 0);
+		return;
 	}
 
-	if (init_irq(hwif)) {
-		int i = hwif->irq;
+	if (init_irq(ch)) {
+		int irq = ch->irq;
 		/*
-		 *	It failed to initialise. Find the default IRQ for 
-		 *	this port and try that.
+		 * It failed to initialise. Find the default IRQ for
+		 * this port and try that.
 		 */
-		if (!(hwif->irq = ide_default_irq(hwif->io_ports[IDE_DATA_OFFSET]))) {
-			printk("%s: Disabled unable to get IRQ %d.\n", hwif->name, i);
-			(void) unregister_blkdev (hwif->major, hwif->name);
-			return (hwif->present = 0);
+		if (!(ch->irq = ide_default_irq(ch->io_ports[IDE_DATA_OFFSET]))) {
+			printk(KERN_INFO "%s: disabled; unable to get IRQ %d.\n", ch->name, irq);
+			(void) unregister_blkdev (ch->major, ch->name);
+
+			return;
 		}
-		if (init_irq(hwif)) {
-			printk("%s: probed IRQ %d and default IRQ %d failed.\n",
-				hwif->name, i, hwif->irq);
-			(void) unregister_blkdev (hwif->major, hwif->name);
-			return (hwif->present = 0);
+		if (init_irq(ch)) {
+			printk(KERN_INFO "%s: probed IRQ %d and default IRQ %d failed.\n",
+				ch->name, irq, ch->irq);
+			(void) unregister_blkdev(ch->major, ch->name);
+
+			return;
 		}
-		printk("%s: probed IRQ %d failed, using default.\n",
-			hwif->name, hwif->irq);
+		printk(KERN_INFO "%s: probed IRQ %d failed, using default.\n", ch->name, ch->irq);
 	}
 
-	init_gendisk(hwif);
-	blk_dev[hwif->major].data = hwif;
-	blk_dev[hwif->major].queue = ide_get_queue;
-	hwif->present = 1;	/* success */
+	init_gendisk(ch);
+	blk_dev[ch->major].data = ch;
+	blk_dev[ch->major].queue = ide_get_queue;
 
-	return hwif->present;
+	/* all went well, flag this channel entry as valid */
+	ch->present = 1;
+
+	return;
 }
 
 int ideprobe_init (void)
@@ -901,9 +904,9 @@ int ideprobe_init (void)
 	 */
 	for (index = 0; index < MAX_HWIFS; ++index)
 		if (probe[index])
-			probe_hwif(&ide_hwifs[index]);
+			channel_probe(&ide_hwifs[index]);
 	for (index = 0; index < MAX_HWIFS; ++index)
 		if (probe[index])
-			hwif_init(&ide_hwifs[index]);
+			channel_init(&ide_hwifs[index]);
 	return 0;
 }
