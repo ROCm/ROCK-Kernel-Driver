@@ -333,7 +333,6 @@
 #define MMCR0_PMC2_CYCLES	0x1
 #define MMCR0_PMC2_ITLB		0x7
 #define MMCR0_PMC2_LOADMISSTIME	0x5
-#define MMCR0_PMXE		(1 << 26)
 
 /* Short-hand versions for a number of the above SPRNs */
 #define CTR	SPRN_CTR	/* Counter Register */
