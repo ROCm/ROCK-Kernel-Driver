@@ -8,6 +8,7 @@
  * work is done in the northbridge(s).
  */
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/init.h>
