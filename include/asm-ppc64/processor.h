@@ -595,6 +595,8 @@ GLUE(GLUE(.LT,NAME),_procname_end):
 			asm volatile("mfasr %0" : "=r" (rval)); rval;})
 
 #ifndef __ASSEMBLY__
+extern unsigned long *_get_SP(void);
+
 extern int have_of;
 
 struct task_struct;

@@ -50,6 +50,7 @@
 #include <linux/cdrom.h>
 #include <linux/loop.h>
 #include <linux/auto_fs.h>
+#include <linux/auto_fs4.h>
 #include <linux/devfs_fs.h>
 #include <linux/tty.h>
 #include <linux/vt_kern.h>
@@ -4159,6 +4160,7 @@ COMPATIBLE_IOCTL(AUTOFS_IOC_FAIL),
 COMPATIBLE_IOCTL(AUTOFS_IOC_CATATONIC),
 COMPATIBLE_IOCTL(AUTOFS_IOC_PROTOVER),
 COMPATIBLE_IOCTL(AUTOFS_IOC_EXPIRE),
+COMPATIBLE_IOCTL(AUTOFS_IOC_EXPIRE_MULTI),
 /* DEVFS */
 COMPATIBLE_IOCTL(DEVFSDIOC_GET_PROTO_REV),
 COMPATIBLE_IOCTL(DEVFSDIOC_SET_EVENT_MASK),
