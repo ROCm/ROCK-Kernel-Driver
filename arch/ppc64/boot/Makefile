@@ -29,9 +29,22 @@ BOOTLD = $(CROSS32_COMPILE)ld
 BOOTAS = $(CROSS32_COMPILE)as
 BOOTAFLAGS = -D__ASSEMBLY__ $(HOSTCFLAGS)
 
-.c.o:
+$(obj)/start.o:	$(obj)/start.c
 	$(BOOTCC) $(BOOTCFLAGS) -c -o $*.o $<
-.S.o:
+
+$(obj)/main.o:	$(obj)/main.c
+	$(BOOTCC) $(BOOTCFLAGS) -c -o $*.o $<
+
+$(obj)/zlib.o:	$(obj)/zlib.c
+	$(BOOTCC) $(BOOTCFLAGS) -c -o $*.o $<
+
+$(obj)/imagesize.o:	$(obj)/imagesize.c
+	$(BOOTCC) $(BOOTCFLAGS) -c -o $*.o $<
+
+$(obj)/no_initrd.o:	$(obj)/no_initrd.c
+	$(BOOTCC) $(BOOTCFLAGS) -c -o $*.o $<
+
+$(obj)/crt0.o:	$(obj)/crt0.S
 	$(BOOTCC) $(BOOTAFLAGS) -traditional -c -o $*.o $<
 
 CFLAGS	= $(CPPFLAGS) -O -fno-builtin -DSTDC_HEADERS
