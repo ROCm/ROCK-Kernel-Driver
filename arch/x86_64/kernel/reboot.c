@@ -9,7 +9,9 @@
 #include <asm/kdebug.h>
 #include <asm/delay.h>
 #include <asm/hw_irq.h>
-
+#include <asm/system.h>
+#include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 
 /*
  * Power off function, if any
@@ -17,35 +19,37 @@
 void (*pm_power_off)(void);
 
 static long no_idt[3];
-static int reboot_mode;
+static enum { 
+	BOOT_BIOS = 'b',
+	BOOT_TRIPLE = 't',
+	BOOT_KBD = 'k'
+} reboot_type = BOOT_KBD;
+static int reboot_mode = 0;
 
-#ifdef CONFIG_SMP
-int reboot_smp = 0;
-static int reboot_cpu = -1;
-#endif
-
+/* reboot=b[ios] | t[riple] | k[bd] [, [w]arm | [c]old]
+   bios	  Use the CPU reboto vector for warm reset
+   warm   Don't set the cold reboot flag
+   cold   Set the cold reboto flag
+   triple Force a triple fault (init)
+   kbd    Use the keyboard controller. cold reset (default)
+ */ 
 static int __init reboot_setup(char *str)
 {
-	while(1) {
+	for (;;) {
 		switch (*str) {
-		case 'w': /* "warm" reboot (no memory testing etc) */
+		case 'w': 
 			reboot_mode = 0x1234;
 			break;
-		case 'c': /* "cold" reboot (with memory testing etc) */
-			reboot_mode = 0x0;
+
+		case 'c':
+			reboot_mode = 0;
 			break;
-#ifdef CONFIG_SMP
-		case 's': /* "smp" reboot by executing reset on BSP or other CPU*/
-			reboot_smp = 1;
-			if (isdigit(str[1]))
-				sscanf(str+1, "%d", &reboot_cpu);		
-			else if (!strncmp(str,"smp",3))
-				sscanf(str+3, "%d", &reboot_cpu); 
-				/* we will leave sorting out the final value 
-				when we are ready to reboot, since we might not
- 				have set up boot_cpu_id or smp_num_cpu */
+
+		case 't':
+		case 'b':
+		case 'k':
+			reboot_type = *str;
 			break;
-#endif
 		}
 		if((str = strchr(str,',')) != NULL)
 			str++;
@@ -56,6 +60,56 @@ static int __init reboot_setup(char *str)
 }
 
 __setup("reboot=", reboot_setup);
+
+/* overwrites random kernel memory. Should not be kernel .text */
+#define WARMBOOT_TRAMP 0x1000UL
+
+static void reboot_warm(void)
+{
+	extern unsigned char warm_reboot[], warm_reboot_end[];
+	printk("warm reboot\n");
+
+	local_irq_disable(); 
+		
+	/* restore identity mapping */
+	init_level4_pgt[0] = __pml4(__pa(level3_ident_pgt) | 7); 
+	__flush_tlb_all(); 
+
+	/* Move the trampoline to low memory */
+	memcpy(__va(WARMBOOT_TRAMP), warm_reboot, warm_reboot_end - warm_reboot); 
+
+	/* Start it in compatibility mode. */
+	asm volatile( "   pushq $0\n" 		/* ss */
+		     "   pushq $0x2000\n" 	/* rsp */
+	             "   pushfq\n"		/* eflags */
+		     "   pushq %[cs]\n"
+		     "   pushq %[target]\n"
+		     "   iretq" :: 
+		      [cs] "i" (__KERNEL_COMPAT32_CS), 
+		      [target] "b" (WARMBOOT_TRAMP));
+}
+
+#ifdef CONFIG_SMP
+static void smp_halt(void)
+{
+	int cpuid = safe_smp_processor_id(); 
+
+	/* Only run this on the boot processor */
+	if (cpuid != boot_cpu_id) { 
+		static int first_entry = 1;
+		if (first_entry) { 
+			first_entry = 0;
+			smp_call_function((void *)machine_restart, NULL, 1, 0);
+		} else {
+			/* AP reentering. just halt */
+			for(;;) 
+				asm volatile("hlt");
+		} 
+			
+	}
+	smp_send_stop();
+}
+#endif
 
 static inline void kb_wait(void)
 {
@@ -68,48 +122,24 @@ static inline void kb_wait(void)
 
 void machine_restart(char * __unused)
 {
-#ifdef CONFIG_SMP
-	int cpuid;
-	
-	cpuid = GET_APIC_ID(apic_read(APIC_ID));
+	int i;
 
-	if (reboot_smp) {
-
-		/* check to see if reboot_cpu is valid 
-		   if its not, default to the BSP */
-		if ((reboot_cpu == -1) ||  
-		      (reboot_cpu > (NR_CPUS -1))  || 
-		      !(phys_cpu_present_map & (1<<cpuid))) 
-			reboot_cpu = boot_cpu_id;
-
-		reboot_smp = 0;  /* use this as a flag to only go through this once*/
-		/* re-run this function on the other CPUs
-		   it will fall though this section since we have 
-		   cleared reboot_smp, and do the reboot if it is the
-		   correct CPU, otherwise it halts. */
-		if (reboot_cpu != cpuid)
-			smp_call_function((void *)machine_restart , NULL, 1, 0);
-	}
-
-	/* if reboot_cpu is still -1, then we want a tradional reboot, 
-	   and if we are not running on the reboot_cpu,, halt */
-	if ((reboot_cpu != -1) && (cpuid != reboot_cpu)) {
-		for (;;)
-		__asm__ __volatile__ ("hlt");
-	}
-	/*
-	 * Stop all CPUs and turn off local APICs and the IO-APIC, so
-	 * other OSs see a clean IRQ state.
-	 */
-	smp_send_stop();
-	disable_IO_APIC();
+#if CONFIG_SMP
+	smp_halt(); 
 #endif
+
+	disable_IO_APIC();
 	
-	/* rebooting needs to touch the page at absolute addr 0 */
+	/* Tell the BIOS if we want cold or warm reboot */
 	*((unsigned short *)__va(0x472)) = reboot_mode;
+       
 	for (;;) {
-		int i;
-		/* First fondle with the keyboard controller. */ 
+		/* Could also try the reset bit in the Hammer NB */
+		switch (reboot_type) { 
+		case BOOT_BIOS:
+			reboot_warm();
+
+		case BOOT_KBD:
 		for (i=0; i<100; i++) {
 			kb_wait();
 			udelay(50);
@@ -117,11 +147,13 @@ void machine_restart(char * __unused)
 			udelay(50);
 		}
 
-		/* Could do reset through the northbridge of Hammer here. */
-
-		/* That didn't work - force a triple fault.. */
+		case BOOT_TRIPLE: 
 		__asm__ __volatile__("lidt %0": :"m" (no_idt));
 		__asm__ __volatile__("int3");
+
+			reboot_type = BOOT_KBD;
+			break;
+		}      
 	}      
 }
 

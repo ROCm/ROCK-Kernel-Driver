@@ -16,9 +16,14 @@
 #define __STR(x) #x
 #define STR(x) __STR(x)
 
-#define __PUSH(x) "pushq %%" __STR(x) "\n\t"
-#define __POP(x)  "popq  %%" __STR(x) "\n\t"
+#define __SAVE(reg,offset) "movq %%" #reg ",(14-" #offset ")*8(%%rsp)\n\t"
+#define __RESTORE(reg,offset) "movq (14-" #offset ")*8(%%rsp),%%" #reg "\n\t"
 
+#ifdef CONFIG_X86_REMOTE_DEBUG
+
+/* full frame for the debug stub */
+/* Should be replaced with a dwarf2 cie/fde description, then gdb could
+   figure it out all by itself. */
 struct save_context_frame { 
 	unsigned long rbp; 
 	unsigned long rbx;
@@ -34,46 +39,64 @@ struct save_context_frame {
 	unsigned long r12;
 	unsigned long rdi;
 	unsigned long rsi;
+	unsigned long flags;
 }; 
 
-/* frame pointer must be last for get_wchan */
-/* It would be more efficient to let the compiler clobber most of these registers.
-   Clobbering all is not possible because that lets reload freak out. Even just 
-   clobbering six generates wrong code with gcc 3.1 for me so do it this way for now.
-   rbp needs to be always explicitly saved because gcc cannot clobber the
-   frame pointer and the scheduler is compiled with frame pointers. -AK */
 #define SAVE_CONTEXT \
-	__PUSH(rsi) __PUSH(rdi) \
-    __PUSH(r12) __PUSH(r13) __PUSH(r14) __PUSH(r15)  \
-	__PUSH(rdx) __PUSH(rcx) __PUSH(r8) __PUSH(r9) __PUSH(r10) __PUSH(r11)  \
-	__PUSH(rbx) __PUSH(rbp) 
-#define RESTORE_CONTEXT \
-	__POP(rbp) __POP(rbx) \
-	__POP(r11) __POP(r10) __POP(r9) __POP(r8) __POP(rcx) __POP(rdx) \
-	__POP(r15) __POP(r14) __POP(r13) __POP(r12) \
-	__POP(rdi) __POP(rsi)
+	"pushfq\n\t"							\
+	"subq $14*8,%%rsp\n\t" 						\
+	__SAVE(rbx, 12) __SAVE(rdi,  1)					\
+	__SAVE(rdx,  6) __SAVE(rcx,  7)					\
+	__SAVE(r8,   8) __SAVE(r9,   9)					\
+	__SAVE(r12,  2) __SAVE(r13,  3)					\
+	__SAVE(r14,  4) __SAVE(r15,  5)					\
+	__SAVE(r10, 10) __SAVE(r11, 11)					\
+	__SAVE(rsi, 0)  __SAVE(rbp, 13) 				\
 
-/* RED-PEN: pipeline stall on ret because it is not predicted */
-/* RED-PEN: the register saving could be optimized */
+
+#define RESTORE_CONTEXT \
+	__RESTORE(rbx, 12) __RESTORE(rdi,  1) 					\
+	__RESTORE(rdx,  6) __RESTORE(rcx,  7)					\
+	__RESTORE(r12,  2) __RESTORE(r13,  3)					\
+	__RESTORE(r14,  4) __RESTORE(r15,  5)					\
+	__RESTORE(r10, 10) __RESTORE(r11, 11)					\
+	__RESTORE(r8,   8) __RESTORE(r9,   9)					\
+	__RESTORE(rbp, 13) __RESTORE(rsi, 0) 		   		        \
+	"addq $14*8,%%rsp\n\t" 							\
+	"popfq\n\t"
+
+#define __EXTRA_CLOBBER 
+
+#else
 /* frame pointer must be last for get_wchan */
+#define SAVE_CONTEXT    "pushfq ; pushq %%rbp ; movq %%rsi,%%rbp\n\t"
+#define RESTORE_CONTEXT "movq %%rbp,%%rsi ; popq %%rbp ; popfq\n\t" 
+
+#define __EXTRA_CLOBBER  \
+	,"rcx","rbx","rdx","r8","r9","r10","r11","r12","r13","r14","r15"
+#endif
 
 #define switch_to(prev,next,last) \
 	asm volatile(SAVE_CONTEXT						    \
-		     "movq %%rsp,%[prevrsp]\n\t"				    \
-		     "movq %[nextrsp],%%rsp\n\t"				    \
-		     "movq $thread_return,%[prevrip]\n\t"			   \
-		     "pushq %[nextrip]\n\t"					    \
-		     "jmp __switch_to\n\t"		\
+		     "movq %%rsp,%P[threadrsp](%[prev])\n\t" /* save RSP */	  \
+		     "movq %P[threadrsp](%[next]),%%rsp\n\t" /* restore RSP */	  \
+		     "call __switch_to\n\t"					  \
 		     ".globl thread_return\n"					\
 		     "thread_return:\n\t"					    \
+		     "movq %%gs:%P[pda_pcurrent],%%rsi\n\t"			  \
+		     "movq %P[thread_info](%%rsi),%%r8\n\t"			  \
+		     "btr  %[tif_fork],%P[ti_flags](%%r8)\n\t"			  \
+		     "movq %%rax,%%rdi\n\t" 					  \
+		     "jc   ret_from_fork\n\t"					  \
 		     RESTORE_CONTEXT						    \
-		     :[prevrsp] "=m" (prev->thread.rsp), 			    \
-		      [prevrip] "=m" (prev->thread.rip),		    	    \
-		      "=a" (last)						    \
-		     :[nextrsp] "m" (next->thread.rsp), 			    \
-		      [nextrip] "m" (next->thread.rip),				    \
-		      [next] "S" (next), [prev] "D" (prev)  			    \
-	             :"memory")
+		     : "=a" (last)					  	  \
+		     : [next] "S" (next), [prev] "D" (prev),			  \
+		       [threadrsp] "i" (offsetof(struct task_struct, thread.rsp)), \
+		       [ti_flags] "i" (offsetof(struct thread_info, flags)),\
+		       [tif_fork] "i" (TIF_FORK),			  \
+		       [thread_info] "i" (offsetof(struct task_struct, thread_info)), \
+		       [pda_pcurrent] "i" (offsetof(struct x8664_pda, pcurrent))   \
+		     : "memory", "cc" __EXTRA_CLOBBER)
     
 extern void load_gs_index(unsigned); 
 
@@ -88,14 +111,14 @@ extern void load_gs_index(unsigned);
 		"2:\n"				\
 		".section .fixup,\"ax\"\n"	\
 		"3:\t"				\
-		"pushq $0 ; popq %% " #seg "\n\t"	\
+		"movl %1,%%" #seg "\n\t" 	\
 		"jmp 2b\n"			\
 		".previous\n"			\
 		".section __ex_table,\"a\"\n\t"	\
 		".align 8\n\t"			\
 		".quad 1b,3b\n"			\
 		".previous"			\
-		: :"r" (value))
+		: :"r" (value), "r" (0))
 
 #define set_debug(value,register) \
                 __asm__("movq %0,%%db" #register  \
@@ -297,5 +320,8 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define HAVE_DISABLE_HLT
 void disable_hlt(void);
 void enable_hlt(void);
+
+#define HAVE_EAT_KEY
+void eat_key(void);
 
 #endif

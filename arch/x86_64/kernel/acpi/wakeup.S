@@ -94,12 +94,6 @@ wakeup_32:
 	movw	%ax, %ss
 
 	mov	$(wakeup_stack - __START_KERNEL_map), %esp
-
-	call	1f
-1:	popl	%eax
-	movl	$0xb8040, %ebx
-	call	early_print
-	
 	movl	saved_magic - __START_KERNEL_map, %eax
 	cmpl	$0x9abcdef0, %eax
 	jne	bogus_32_magic
@@ -115,11 +109,7 @@ wakeup_32:
 	movl	%eax, %cr4
 
 	/* Setup early boot stage 4 level pagetables */
-#if 1
 	movl	$(wakeup_level4_pgt - __START_KERNEL_map), %eax
-#else
-	movl    saved_cr3 - __START_KERNEL_map, %eax
-#endif	
 	movl	%eax, %cr3
 
 	/* Setup EFER (Extended Feature Enable Register) */
@@ -222,19 +212,6 @@ wakeup_long64:
 	jmp	%rax
 
 .code32
-
-early_print:
-	movl	$16, %edx
-1:	
-	movl	%eax, %ecx
-	andl	$0xf, %ecx
-	shrl	$4, %eax
-	addw	$0x0e00 + '0', %ecx
-	movw	%ecx, %ds:(%edx, %ebx)
-	decl	%edx
-	decl	%edx
-	jnz	1b
-	ret
 
 	.align	64	
 gdta:

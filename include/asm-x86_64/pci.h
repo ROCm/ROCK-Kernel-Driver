@@ -76,8 +76,8 @@ extern void pci_free_consistent(struct pci_dev *hwdev, size_t size,
  * Once the device is given the dma address, the device owns this memory
  * until either pci_unmap_single or pci_dma_sync_single is performed.
  */
-extern dma_addr_t __pci_map_single(struct pci_dev *hwdev, void *ptr,
-			  size_t size, int direction, int flush);
+extern dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, 
+				 int direction);
 
 
 void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t addr,
@@ -126,8 +126,8 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 
 
 #else
-static inline dma_addr_t __pci_map_single(struct pci_dev *hwdev, void *ptr,
-					size_t size, int direction, int flush)
+static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
+					size_t size, int direction)
 {
 	dma_addr_t addr; 
 
@@ -213,12 +213,6 @@ extern int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 		      int nents, int direction);
 extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 			 int nents, int direction);
-
-static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
-			  size_t size, int direction)
-{
-	return __pci_map_single(hwdev,ptr,size,direction,1); 
-}
 
 #define pci_unmap_page pci_unmap_single
 

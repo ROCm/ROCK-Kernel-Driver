@@ -385,10 +385,10 @@ void __init setup_local_APIC (void)
 	value = apic_read(APIC_LVT0) & APIC_LVT_MASKED;
 	if (!smp_processor_id() && (pic_mode || !value)) {
 		value = APIC_DM_EXTINT;
-		printk("enabled ExtINT on CPU#%d\n", smp_processor_id());
+		Dprintk(KERN_INFO "enabled ExtINT on CPU#%d\n", smp_processor_id());
 	} else {
 		value = APIC_DM_EXTINT | APIC_LVT_MASKED;
-		printk("masked ExtINT on CPU#%d\n", smp_processor_id());
+		Dprintk(KERN_INFO "masked ExtINT on CPU#%d\n", smp_processor_id());
 	}
 	apic_write_around(APIC_LVT0, value);
 

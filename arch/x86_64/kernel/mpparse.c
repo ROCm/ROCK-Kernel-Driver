@@ -892,11 +892,15 @@ void __init mp_parse_prt (void)
 	list_for_each(node, &acpi_prt.entries) {
 		entry = list_entry(node, struct acpi_prt_entry, node);
 
-		/* We're only interested in static (non-link) entries. */
-		if (entry->link.handle)
+		/* Need to get irq for dynamic entry */
+		if (entry->link.handle) {
+			irq = acpi_pci_link_get_irq(entry->link.handle, entry->link.index);
+			if (!irq)
 			continue;
-
+		}
+		else
 		irq = entry->link.index;
+
 		ioapic = mp_find_ioapic(irq);
 		if (ioapic < 0)
 			continue;
