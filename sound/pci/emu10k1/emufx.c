@@ -1012,7 +1012,6 @@ static void snd_emu10k1_del_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icod
 		ctl = snd_emu10k1_look_for_ctl(emu, &id);
 		snd_runtime_check(ctl == NULL, continue);
 		snd_ctl_remove(emu->card, ctl->kcontrol);
-		list_del(&ctl->list);
 	}
 }
 
