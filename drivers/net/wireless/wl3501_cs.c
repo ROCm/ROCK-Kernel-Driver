@@ -120,47 +120,55 @@ static int wl3501_chan2freq[] = {
 
 static const struct {
 	int reg_domain;
-	int min, max;
+	int min, max, deflt;
 } iw_channel_table[] = {
 	{
 		.reg_domain = IW_REG_DOMAIN_FCC,
 		.min	    = 1,
 		.max	    = 11,
+		.deflt	    = 1,
 	},
 	{
 		.reg_domain = IW_REG_DOMAIN_DOC,
 		.min	    = 1,
 		.max	    = 11,
+		.deflt	    = 1,
 	},
 	{
 		.reg_domain = IW_REG_DOMAIN_ETSI,
 		.min	    = 1,
 		.max	    = 13,
+		.deflt	    = 1,
 	},
 	{
 		.reg_domain = IW_REG_DOMAIN_SPAIN,
 		.min	    = 10,
 		.max	    = 11,
+		.deflt	    = 10,
 	},
 	{
 		.reg_domain = IW_REG_DOMAIN_FRANCE,
 		.min	    = 10,
 		.max	    = 13,
+		.deflt	    = 10,
 	},
 	{
 		.reg_domain = IW_REG_DOMAIN_MKK,
 		.min	    = 14,
 		.max	    = 14,
+		.deflt	    = 14,
 	},
 	{
 		.reg_domain = IW_REG_DOMAIN_MKK1,
 		.min	    = 1,
 		.max	    = 14,
+		.deflt	    = 1,
 	},
 	{
 		.reg_domain = IW_REG_DOMAIN_ISRAEL,
 		.min	    = 3,
 		.max	    = 9,
+		.deflt	    = 9,
 	},
 };
 
@@ -179,6 +187,24 @@ static int iw_valid_channel(int reg_domain, int channel)
 		if (reg_domain == iw_channel_table[i].reg_domain) {
 			rc = channel >= iw_channel_table[i].min &&
 			     channel <= iw_channel_table[i].max;
+			break;
+		}
+	return rc;
+}
+
+/**
+ * iw_default_channel - get default channel for a regulatory domain
+ * @reg_comain - regulatory domain
+ *
+ * Returns the default channel for a regulatory domain
+ */
+static int iw_default_channel(int reg_domain)
+{
+	int i, rc = 1;
+
+	for (i = 0; i < ARRAY_SIZE(iw_channel_table); i++)
+		if (reg_domain == iw_channel_table[i].reg_domain) {
+			rc = iw_channel_table[i].deflt;
 			break;
 		}
 	return rc;
@@ -2050,22 +2076,10 @@ static void wl3501_config(dev_link_t *link)
 	this->card_name[0]	= '\0';
 	this->firmware_date[0]	= '\0';
 	this->rssi		= 255;
+	this->chan		= iw_default_channel(this->reg_domain);
 	strlcpy(this->nick, "Planet WL3501", sizeof(this->nick));
 	spin_lock_init(&this->lock);
 	init_waitqueue_head(&this->wait);
-
-	switch (this->reg_domain) {
-	case IW_REG_DOMAIN_SPAIN:
-	case IW_REG_DOMAIN_FRANCE:
-		this->chan = 10;
-		break;
-	case IW_REG_DOMAIN_MKK:
-		this->chan = 14;
-		break;
-	default:
-		this->chan = 1;
-		break;
-	}
 	netif_start_queue(dev);
 	goto out;
 cs_failed:
