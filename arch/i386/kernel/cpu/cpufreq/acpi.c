@@ -32,6 +32,7 @@
 #include <linux/seq_file.h>
 #include <asm/io.h>
 #include <asm/delay.h>
+#include <asm/uaccess.h>
 
 #include <linux/acpi.h>
 #include <acpi/processor.h>
