@@ -619,20 +619,20 @@ typedef struct smb_com_open_req {	/* also handles create */
 	struct smb_hdr hdr;	/* wct = 24 */
 	__u8 AndXCommand;
 	__u8 AndXReserved;
-	__u16 AndXOffset;
+	__le16 AndXOffset;
 	__u8 Reserved;		/* Must Be Zero */
-	__u16 NameLength;
-	__u32 OpenFlags;
-	__u32 RootDirectoryFid;
-	__u32 DesiredAccess;
-	__u64 AllocationSize;
-	__u32 FileAttributes;
-	__u32 ShareAccess;
-	__u32 CreateDisposition;
-	__u32 CreateOptions;
-	__u32 ImpersonationLevel;
+	__le16 NameLength;
+	__le32 OpenFlags;
+	__le32 RootDirectoryFid;
+	__le32 DesiredAccess;
+	__le64 AllocationSize;
+	__le32 FileAttributes;
+	__le32 ShareAccess;
+	__le32 CreateDisposition;
+	__le32 CreateOptions;
+	__le32 ImpersonationLevel;
 	__u8 SecurityFlags;
-	__u16 ByteCount;
+	__le16 ByteCount;
 	char fileName[1];
 } OPEN_REQ;
 
@@ -649,19 +649,19 @@ typedef struct smb_com_open_rsp {
 	struct smb_hdr hdr;	/* wct = 34 BB */
 	__u8 AndXCommand;
 	__u8 AndXReserved;
-	__u16 AndXOffset;
+	__le16 AndXOffset;
 	__u8 OplockLevel;
 	__u16 Fid;
-	__u32 CreateAction;
-	__u64 CreationTime;
-	__u64 LastAccessTime;
-	__u64 LastWriteTime;
-	__u64 ChangeTime;
-	__u32 FileAttributes;
-	__u64 AllocationSize;
-	__u64 EndOfFile;
-	__u16 FileType;
-	__u16 DeviceState;
+	__le32 CreateAction;
+	__le64 CreationTime;
+	__le64 LastAccessTime;
+	__le64 LastWriteTime;
+	__le64 ChangeTime;
+	__le32 FileAttributes;
+	__le64 AllocationSize;
+	__le64 EndOfFile;
+	__le16 FileType;
+	__le16 DeviceState;
 	__u8 DirectoryFlag;
 	__u16 ByteCount;	/* bct = 0 */
 } OPEN_RSP;

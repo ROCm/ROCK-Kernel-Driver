@@ -569,6 +569,7 @@ CIFSSMBOpen(const int xid, struct cifsTconInfo *tcon,
 	OPEN_RSP *pSMBr = NULL;
 	int bytes_returned;
 	int name_len;
+	__u16 count;
 
 openRetry:
 	rc = smb_init(SMB_COM_NT_CREATE_ANDX, 24, tcon, (void **) &pSMB,
@@ -579,7 +580,7 @@ openRetry:
 	pSMB->AndXCommand = 0xFF;	/* none */
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
-		pSMB->ByteCount = 1;	/* account for one byte pad to word boundary */
+		count = 1;	/* account for one byte pad to word boundary */
 		name_len =
 		    cifs_strtoUCS((wchar_t *) (pSMB->fileName + 1),
 				  fileName, 530
@@ -589,7 +590,7 @@ openRetry:
 		name_len *= 2;
 		pSMB->NameLength = cpu_to_le16(name_len);
 	} else {		/* BB improve the check for buffer overruns BB */
-		pSMB->ByteCount = 0;	/* no pad */
+		count = 0;	/* no pad */
 		name_len = strnlen(fileName, 530);
 		name_len++;	/* trailing null */
 		pSMB->NameLength = cpu_to_le16(name_len);
@@ -602,30 +603,29 @@ openRetry:
 	}
 	pSMB->DesiredAccess = cpu_to_le32(access_flags);
 	pSMB->AllocationSize = 0;
-	pSMB->FileAttributes = ATTR_NORMAL;
+	pSMB->FileAttributes = cpu_to_le32(ATTR_NORMAL);
 	/* XP does not handle ATTR_POSIX_SEMANTICS */
 	/* but it helps speed up case sensitive checks for other
 	servers such as Samba */
 	if (tcon->ses->capabilities & CAP_UNIX)
-		pSMB->FileAttributes |= ATTR_POSIX_SEMANTICS;
+		pSMB->FileAttributes |= cpu_to_le32(ATTR_POSIX_SEMANTICS);
 
 	/* if ((omode & S_IWUGO) == 0)
-		pSMB->FileAttributes |= ATTR_READONLY;*/
+		pSMB->FileAttributes |= cpu_to_le32(ATTR_READONLY);*/
 	/*  Above line causes problems due to vfs splitting create into two
 		pieces - need to set mode after file created not while it is
 		being created */
-	pSMB->FileAttributes = cpu_to_le32(pSMB->FileAttributes);
 	pSMB->ShareAccess = cpu_to_le32(FILE_SHARE_ALL);
 	pSMB->CreateDisposition = cpu_to_le32(openDisposition);
 	pSMB->CreateOptions = cpu_to_le32(create_options);
 	pSMB->ImpersonationLevel = cpu_to_le32(SECURITY_IMPERSONATION);	/* BB ??*/
 	pSMB->SecurityFlags =
-	    cpu_to_le32(SECURITY_CONTEXT_TRACKING | SECURITY_EFFECTIVE_ONLY);
+	    SECURITY_CONTEXT_TRACKING | SECURITY_EFFECTIVE_ONLY;
 
-	pSMB->ByteCount += name_len;
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
+	count += name_len;
+	pSMB->hdr.smb_buf_length += count;
 
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->ByteCount = cpu_to_le16(count);
 	/* long_op set to 1 to allow for oplock break timeouts */
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 1);
