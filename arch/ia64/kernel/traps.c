@@ -447,30 +447,14 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		"Unknown fault 13", "Unknown fault 14", "Unknown fault 15"
 	};
 
-#if 0
-	/* this is for minimal trust debugging; yeah this kind of stuff is useful at times... */
-
-	if (vector != 25) {
-		static unsigned long last_time;
-		static char count;
-		unsigned long n = vector;
-		char buf[32], *cp;
-
-		if (jiffies - last_time > 5*HZ)
-			count = 0;
-
-		if (count++ < 5) {
-			last_time = jiffies;
-			cp = buf + sizeof(buf);
-			*--cp = '\0';
-			while (n) {
-				*--cp = "0123456789abcdef"[n & 0xf];
-				n >>= 4;
-			}
-			printk("<0x%s>", cp);
-		}
+	if ((isr & IA64_ISR_NA) && ((isr & IA64_ISR_CODE_MASK) == IA64_ISR_CODE_LFETCH)) {
+		/*
+		 * This fault was due to lfetch.fault, set "ed" bit in the psr to cancel
+		 * the lfetch.
+		 */
+		ia64_psr(regs)->ed = 1;
+		return;
 	}
-#endif
 
 	switch (vector) {
 	      case 24: /* General Exception */
