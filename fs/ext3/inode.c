@@ -2616,6 +2616,7 @@ void ext3_write_inode(struct inode *inode, int wait)
 
 	if (ext3_journal_current_handle()) {
 		jbd_debug(0, "called recursively, non-PF_MEMALLOC!\n");
+		dump_stack();
 		return;
 	}
 
