@@ -775,7 +775,7 @@ static int read_old_bitmaps (struct super_block * s)
   memset (SB_AP_BITMAP (s), 0, sizeof (struct buffer_head *) * sb_bmap_nr(rs));
 
   for (i = 0; i < sb_bmap_nr(rs); i ++) {
-    SB_AP_BITMAP (s)[i] = reiserfs_bread (s, bmp1 + i);
+    SB_AP_BITMAP (s)[i] = sb_bread (s, bmp1 + i);
     if (!SB_AP_BITMAP (s)[i])
       return 1;
   }
@@ -827,7 +827,7 @@ static int read_super_block (struct super_block * s, int offset)
     sb_set_blocksize (s, sb_blocksize(rs));
     brelse (bh);
     
-    bh = reiserfs_bread (s, offset / s->s_blocksize);
+    bh = sb_bread (s, offset / s->s_blocksize);
     if (!bh) {
 	printk("sh-2007: read_super_block: "
                 "bread failed (dev %s, block %lu, size %lu)\n",
