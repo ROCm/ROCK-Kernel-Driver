@@ -28,15 +28,12 @@
 #include <sound/initval.h>
 #include "vx222.h"
 
-#define chip_t vx_core_t
-
 #define CARD_NAME "VX222"
 
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("Digigram VX222 V2/Mic");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Digigram," CARD_NAME "}}");
+MODULE_SUPPORTED_DEVICE("{{Digigram," CARD_NAME "}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
@@ -47,19 +44,14 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Digigram " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Digigram " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Digigram " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(mic, bool, boot_devs, 0444);
 MODULE_PARM_DESC(mic, "Enable Microphone.");
-MODULE_PARM_SYNTAX(mic, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 module_param_array(ibl, int, boot_devs, 0444);
 MODULE_PARM_DESC(ibl, "Capture IBL size.");
-MODULE_PARM_SYNTAX(ibl, SNDRV_ENABLED);
 
 /*
  */
@@ -130,13 +122,13 @@ static int snd_vx222_free(vx_core_t *chip)
 			kfree_nocheck(vx->port_res[i]);
 		}
 	}
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_vx222_dev_free(snd_device_t *device)
 {
-	vx_core_t *chip = snd_magic_cast(vx_core_t, device->device_data, return -ENXIO);
+	vx_core_t *chip = device->device_data;
 	return snd_vx222_free(chip);
 }
 

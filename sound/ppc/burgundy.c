@@ -28,8 +28,6 @@
 #include "pmac.h"
 #include "burgundy.h"
 
-#define chip_t pmac_t
-
 
 /* Waits for busy flag to clear */
 inline static void

@@ -28,8 +28,6 @@
 #include <sound/core.h>
 #include "pmac.h"
 
-#define chip_t pmac_t
-
 /* i2c address */
 #define DACA_I2C_ADDR	0x4d
 

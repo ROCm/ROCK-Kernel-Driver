@@ -45,7 +45,7 @@
 /* send SDA and SCL */
 static void ewx_i2c_setlines(snd_i2c_bus_t *bus, int clk, int data)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, bus->private_data, return);
+	ice1712_t *ice = bus->private_data;
 	unsigned char tmp = 0;
 	if (clk)
 		tmp |= ICE1712_EWX2496_SERIAL_CLOCK;
@@ -57,13 +57,13 @@ static void ewx_i2c_setlines(snd_i2c_bus_t *bus, int clk, int data)
 
 static int ewx_i2c_getclock(snd_i2c_bus_t *bus)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, bus->private_data, return -EIO);
+	ice1712_t *ice = bus->private_data;
 	return snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA) & ICE1712_EWX2496_SERIAL_CLOCK ? 1 : 0;
 }
 
 static int ewx_i2c_getdata(snd_i2c_bus_t *bus, int ack)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, bus->private_data, return -EIO);
+	ice1712_t *ice = bus->private_data;
 	int bit;
 	/* set RW pin to low */
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_WRITE_MASK, ~ICE1712_EWX2496_RW);
@@ -80,7 +80,7 @@ static int ewx_i2c_getdata(snd_i2c_bus_t *bus, int ack)
 
 static void ewx_i2c_start(snd_i2c_bus_t *bus)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, bus->private_data, return);
+	ice1712_t *ice = bus->private_data;
 	unsigned char mask;
 
 	snd_ice1712_save_gpio_status(ice);
@@ -99,13 +99,13 @@ static void ewx_i2c_start(snd_i2c_bus_t *bus)
 
 static void ewx_i2c_stop(snd_i2c_bus_t *bus)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, bus->private_data, return);
+	ice1712_t *ice = bus->private_data;
 	snd_ice1712_restore_gpio_status(ice);
 }
 
 static void ewx_i2c_direction(snd_i2c_bus_t *bus, int clock, int data)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, bus->private_data, return);
+	ice1712_t *ice = bus->private_data;
 	unsigned char mask = 0;
 
 	if (clock)

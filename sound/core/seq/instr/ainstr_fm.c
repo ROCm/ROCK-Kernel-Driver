@@ -29,8 +29,6 @@
 MODULE_AUTHOR("Uros Bizjak <uros@kss-loka.si>");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture FM Instrument support.");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_SUPPORTED_DEVICE("sound");
 
 char *snd_seq_fm_id = SNDRV_SEQ_INSTR_ID_OPL2_3;
 

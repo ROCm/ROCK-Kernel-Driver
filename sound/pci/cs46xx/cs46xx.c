@@ -37,8 +37,7 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Cirrus Logic Sound Fusion CS46XX");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Cirrus Logic,Sound Fusion (CS4280)},"
+MODULE_SUPPORTED_DEVICE("{{Cirrus Logic,Sound Fusion (CS4280)},"
 		"{Cirrus Logic,Sound Fusion (CS4610)},"
 		"{Cirrus Logic,Sound Fusion (CS4612)},"
 		"{Cirrus Logic,Sound Fusion (CS4615)},"
@@ -56,22 +55,16 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for the CS46xx soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for the CS46xx soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable CS46xx soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(external_amp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(external_amp, "Force to enable external amplifer.");
-MODULE_PARM_SYNTAX(external_amp, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 module_param_array(thinkpad, bool, boot_devs, 0444);
 MODULE_PARM_DESC(thinkpad, "Force to enable Thinkpad's CLKRUN control.");
-MODULE_PARM_SYNTAX(thinkpad, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 module_param_array(mmap_valid, bool, boot_devs, 0444);
 MODULE_PARM_DESC(mmap_valid, "Support OSS mmap.");
-MODULE_PARM_SYNTAX(mmap_valid, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 
 static struct pci_device_id snd_cs46xx_ids[] = {
         { 0x1013, 0x6001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* CS4280 */

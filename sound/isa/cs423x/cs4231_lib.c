@@ -43,8 +43,6 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Routines for control of CS4231(A)/CS4232/InterWave & compatible chips");
 MODULE_LICENSE("GPL");
 
-#define chip_t cs4231_t
-
 #if 0
 #define SNDRV_DEBUG_MCE
 #endif
@@ -969,7 +967,7 @@ static void snd_cs4231_overrange(cs4231_t *chip)
 
 irqreturn_t snd_cs4231_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, dev_id, return IRQ_NONE);
+	cs4231_t *chip = dev_id;
 	unsigned char status;
 
 	status = snd_cs4231_in(chip, CS4231_IRQ_STATUS);
@@ -1407,7 +1405,7 @@ static void snd_cs4231_resume(cs4231_t *chip)
 
 static int snd_cs4231_pm_suspend(snd_card_t *card, unsigned int state)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, card->pm_private_data, return -EINVAL);
+	cs4231_t *chip = card->pm_private_data;
 	if (chip->suspend) {
 		chip->suspend(chip);
 		snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
@@ -1417,7 +1415,7 @@ static int snd_cs4231_pm_suspend(snd_card_t *card, unsigned int state)
 
 static int snd_cs4231_pm_resume(snd_card_t *card, unsigned int state)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, card->pm_private_data, return -EINVAL);
+	cs4231_t *chip = card->pm_private_data;
 	if (chip->resume) {
 		chip->resume(chip);
 		snd_power_change_state(card, SNDRV_CTL_POWER_D0);
@@ -1453,13 +1451,13 @@ static int snd_cs4231_free(cs4231_t *chip)
 	}
 	if (chip->timer)
 		snd_device_free(chip->card, chip->timer);
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_cs4231_dev_free(snd_device_t *device)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, device->device_data, return -ENXIO);
+	cs4231_t *chip = device->device_data;
 	return snd_cs4231_free(chip);	
 }
 
@@ -1493,7 +1491,7 @@ static int snd_cs4231_new(snd_card_t * card,
 	cs4231_t *chip;
 
 	*rchip = NULL;
-	chip = snd_magic_kcalloc(cs4231_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	chip->hardware = hardware;
@@ -1626,7 +1624,7 @@ static snd_pcm_ops_t snd_cs4231_capture_ops = {
 
 static void snd_cs4231_pcm_free(snd_pcm_t *pcm)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, pcm->private_data, return);
+	cs4231_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1686,7 +1684,7 @@ int snd_cs4231_pcm(cs4231_t *chip, int device, snd_pcm_t **rpcm)
 
 static void snd_cs4231_timer_free(snd_timer_t *timer)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, timer->private_data, return);
+	cs4231_t *chip = timer->private_data;
 	chip->timer = NULL;
 }
 

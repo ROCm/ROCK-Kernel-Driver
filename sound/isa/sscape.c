@@ -36,8 +36,6 @@
 
 #include <sound/sscape_ioctl.h>
 
-#define chip_t cs4231_t
-
 
 MODULE_AUTHOR("Chris Rankin");
 MODULE_DESCRIPTION("ENSONIQ SoundScape PnP driver");
@@ -53,27 +51,21 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index number for SoundScape soundcard");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "Description for SoundScape card");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for SoundScape driver.");
-MODULE_PARM_SYNTAX(port, SNDRV_ENABLED);
 
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for SoundScape driver.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 
 module_param_array(mpu_irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_irq, "MPU401 IRQ # for SoundScape driver.");
-MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
 
 module_param_array(dma, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma, "DMA # for SoundScape driver.");
-MODULE_PARM_SYNTAX(dma, SNDRV_DMA8_DESC);
   
 #ifdef CONFIG_PNP
 static struct pnp_card_device_id sscape_pnpids[] = {

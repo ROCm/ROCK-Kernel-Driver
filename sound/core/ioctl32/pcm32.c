@@ -234,7 +234,7 @@ static int _snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long a
 
 	/* FIXME: need to check whether fop->ioctl is sane */
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL && substream->runtime, return -ENXIO);
 
@@ -349,8 +349,8 @@ static int _snd_ioctl32_pcm_hw_params_old(unsigned int fd, unsigned int cmd, uns
 	mm_segment_t oldseg;
 	int err;
 
-	data32 = snd_kcalloc(sizeof(*data32), GFP_KERNEL);
-	data = snd_kcalloc(sizeof(*data), GFP_KERNEL);
+	data32 = kcalloc(1, sizeof(*data32), GFP_KERNEL);
+	data = kcalloc(1, sizeof(*data), GFP_KERNEL);
 	if (data32 == NULL || data == NULL) {
 		err = -ENOMEM;
 		goto __end;

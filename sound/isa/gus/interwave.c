@@ -41,18 +41,17 @@
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
-MODULE_CLASSES("{sound}");
 MODULE_LICENSE("GPL");
 #ifndef SNDRV_STB
 MODULE_DESCRIPTION("AMD InterWave");
-MODULE_DEVICES("{{Gravis,UltraSound Plug & Play},"
+MODULE_SUPPORTED_DEVICE("{{Gravis,UltraSound Plug & Play},"
 		"{STB,SoundRage32},"
 		"{MED,MED3210},"
 		"{Dynasonix,Dynasonix Pro},"
 		"{Panasonic,PCA761AW}}");
 #else
 MODULE_DESCRIPTION("AMD InterWave STB with TEA6330T");
-MODULE_DEVICES("{{AMD,InterWave STB with TEA6330T}}");
+MODULE_SUPPORTED_DEVICE("{{AMD,InterWave STB with TEA6330T}}");
 #endif
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
@@ -77,47 +76,32 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for InterWave soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for InterWave soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable InterWave soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-#ifdef CONFIG_PNP
 module_param_array(isapnp, bool, boot_devs, 0444);
 MODULE_PARM_DESC(isapnp, "ISA PnP detection for specified soundcard.");
-MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
-#endif
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for InterWave driver.");
-MODULE_PARM_SYNTAX(port, SNDRV_ENABLED ",allows:{{0x210,0x260,0x10}},dialog:list");
 #ifdef SNDRV_STB
 module_param_array(port_tc, long, boot_devs, 0444);
 MODULE_PARM_DESC(port_tc, "Tone control (TEA6330T - i2c bus) port # for InterWave driver.");
-MODULE_PARM_SYNTAX(port_tc, SNDRV_ENABLED ",allows:{{0x350,0x380,0x10}},dialog:list");
 #endif
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for InterWave driver.");
-MODULE_PARM_SYNTAX(irq, SNDRV_ENABLED ",allows:{{3},{5},{9},{11},{12},{15}},dialog:list");
 module_param_array(dma1, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma1, "DMA1 # for InterWave driver.");
-MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
 module_param_array(dma2, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma2, "DMA2 # for InterWave driver.");
-MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
 module_param_array(joystick_dac, int, boot_devs, 0444);
 MODULE_PARM_DESC(joystick_dac, "Joystick DAC level 0.59V-4.52V or 0.389V-2.98V for InterWave driver.");
-MODULE_PARM_SYNTAX(joystick_dac, SNDRV_ENABLED ",allows:{{0,31}}");
 module_param_array(midi, int, boot_devs, 0444);
 MODULE_PARM_DESC(midi, "MIDI UART enable for InterWave driver.");
-MODULE_PARM_SYNTAX(midi, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 module_param_array(pcm_channels, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcm_channels, "Reserved PCM channels for InterWave driver.");
-MODULE_PARM_SYNTAX(pcm_channels, SNDRV_ENABLED ",allows:{{2,16}}");
 module_param_array(effect, int, boot_devs, 0444);
 MODULE_PARM_DESC(effect, "Effects enable for InterWave driver.");
-MODULE_PARM_SYNTAX(effect, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 
 struct snd_interwave {
 	int irq;

@@ -29,8 +29,6 @@
 #include <sound/core.h>
 #include "pmac.h"
 
-#define chip_t pmac_t
-
 
 #ifdef CONFIG_ADB_CUDA
 #define PMAC_AMP_AVAIL

@@ -52,19 +52,18 @@
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
-MODULE_CLASSES("{sound}");
 MODULE_LICENSE("GPL");
 #ifdef OPTi93X
 MODULE_DESCRIPTION("OPTi93X");
-MODULE_DEVICES("{{OPTi,82C931/3}}");
+MODULE_SUPPORTED_DEVICE("{{OPTi,82C931/3}}");
 #else	/* OPTi93X */
 #ifdef CS4231
 MODULE_DESCRIPTION("OPTi92X - CS4231");
-MODULE_DEVICES("{{OPTi,82C924 (CS4231)},"
+MODULE_SUPPORTED_DEVICE("{{OPTi,82C924 (CS4231)},"
 		"{OPTi,82C925 (CS4231)}}");
 #else	/* CS4231 */
 MODULE_DESCRIPTION("OPTi92X - AD1848");
-MODULE_DEVICES("{{OPTi,82C924 (AD1848)},"
+MODULE_SUPPORTED_DEVICE("{{OPTi,82C924 (AD1848)},"
 		"{OPTi,82C925 (AD1848)},"
 	        "{OAK,Mozart}}");
 #endif	/* CS4231 */
@@ -86,38 +85,27 @@ static int dma2 = SNDRV_DEFAULT_DMA1;		/* 0,1,3 */
 
 module_param(index, int, 0444);
 MODULE_PARM_DESC(index, "Index value for opti9xx based soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param(id, charp, 0444);
 MODULE_PARM_DESC(id, "ID string for opti9xx based soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 //module_param(enable, bool, 0444);
 //MODULE_PARM_DESC(enable, "Enable opti9xx soundcard.");
-//MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param(isapnp, bool, 0444);
 MODULE_PARM_DESC(isapnp, "Enable ISA PnP detection for specified soundcard.");
-MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
 module_param(port, long, 0444);
 MODULE_PARM_DESC(port, "WSS port # for opti9xx driver.");
-MODULE_PARM_SYNTAX(port, SNDRV_PORT_DESC);
 module_param(mpu_port, long, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port # for opti9xx driver.");
-MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT_DESC);
 module_param(fm_port, long, 0444);
 MODULE_PARM_DESC(fm_port, "FM port # for opti9xx driver.");
-MODULE_PARM_SYNTAX(fm_port, SNDRV_PORT_DESC);
 module_param(irq, int, 0444);
 MODULE_PARM_DESC(irq, "WSS irq # for opti9xx driver.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 module_param(mpu_irq, int, 0444);
 MODULE_PARM_DESC(mpu_irq, "MPU-401 irq # for opti9xx driver.");
-MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
 module_param(dma1, int, 0444);
 MODULE_PARM_DESC(dma1, "1st dma # for opti9xx driver.");
-MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
 #if defined(CS4231) || defined(OPTi93X)
 module_param(dma2, int, 0444);
 MODULE_PARM_DESC(dma2, "2nd dma # for opti9xx driver.");
-MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
 #endif	/* CS4231 || OPTi93X */
 
 #define OPTi9XX_HW_DETECT	0
@@ -474,7 +462,6 @@ static int __devinit snd_opti9xx_configure(opti9xx_t *chip)
 	unsigned char dma_bits;
 	unsigned char mpu_port_bits = 0;
 	unsigned char mpu_irq_bits;
-	unsigned long flags;
 
 	switch (chip->hardware) {
 #ifndef OPTi93X
@@ -601,13 +588,11 @@ __skip_base:
 	dma_bits |= 0x04;
 #endif	/* CS4231 || OPTi93X */
 
-	spin_lock_irqsave(&chip->lock, flags);
 #ifndef OPTi93X
 	 outb(irq_bits << 3 | dma_bits, chip->wss_base);
 #else /* OPTi93X */
 	snd_opti9xx_write(chip, OPTi9XX_MC_REG(3), (irq_bits << 3 | dma_bits));
 #endif /* OPTi93X */
-	spin_unlock_irqrestore(&chip->lock, flags);
 
 __skip_resources:
 	if (chip->hardware > OPTi9XX_HW_82C928) {
@@ -663,8 +648,6 @@ __skip_mpu:
 }
 
 #ifdef OPTi93X
-
-#define chip_t opti93x_t
 
 static unsigned char snd_opti93x_default_image[32] =
 {
@@ -767,15 +750,10 @@ static void snd_opti93x_mce_down(opti93x_t *chip)
 
 static void snd_opti93x_mute(opti93x_t *chip, int mute)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->lock, flags);
-
 	mute = mute ? 1 : 0;
-	if (chip->mute == mute) {
-		spin_unlock_irqrestore(&chip->lock, flags);
+	if (chip->mute == mute)
 		return;
-	}
+
 	chip->mute = mute;
 
 	snd_opti93x_mute_reg(chip, OPTi93X_CD_LEFT_INPUT, mute);
@@ -800,8 +778,6 @@ static void snd_opti93x_mute(opti93x_t *chip, int mute)
 	snd_opti93x_mute_reg(chip, OPTi93X_MIC_RIGHT_INPUT, mute);
 	snd_opti93x_mute_reg(chip, OPTi93X_OUT_LEFT, mute);
 	snd_opti93x_mute_reg(chip, OPTi93X_OUT_RIGHT, mute);
-
-	spin_unlock_irqrestore(&chip->lock, flags);
 }
 
 
@@ -873,10 +849,8 @@ static unsigned char snd_opti93x_get_format(opti93x_t *chip,
 
 static void snd_opti93x_playback_format(opti93x_t *chip, unsigned char fmt)
 {
-	unsigned long flags;
 	unsigned char mask;
 
-	spin_lock_irqsave(&chip->lock, flags);
 	snd_opti93x_mute(chip, 1);
 
 	snd_opti93x_mce_up(chip);
@@ -885,14 +859,10 @@ static void snd_opti93x_playback_format(opti93x_t *chip, unsigned char fmt)
 	snd_opti93x_mce_down(chip);
 
 	snd_opti93x_mute(chip, 0);
-	spin_unlock_irqrestore(&chip->lock, flags);
 }
 
 static void snd_opti93x_capture_format(opti93x_t *chip, unsigned char fmt)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->lock, flags);
 	snd_opti93x_mute(chip, 1);
 
 	snd_opti93x_mce_up(chip);
@@ -904,7 +874,6 @@ static void snd_opti93x_capture_format(opti93x_t *chip, unsigned char fmt)
 	snd_opti93x_mce_down(chip);
 
 	snd_opti93x_mute(chip, 0);
-	spin_unlock_irqrestore(&chip->lock, flags);
 }
 
 
@@ -1128,7 +1097,7 @@ static void snd_opti93x_overrange(opti93x_t *chip)
 
 irqreturn_t snd_opti93x_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	opti93x_t *codec = snd_magic_cast(opti93x_t, dev_id, return IRQ_NONE);
+	opti93x_t *codec = dev_id;
 	unsigned char status;
 
 	status = snd_opti9xx_read(codec->chip, OPTi9XX_MC_REG(11));
@@ -1274,13 +1243,13 @@ static int snd_opti93x_free(opti93x_t *chip)
 	if (chip->irq >= 0) {
 	  free_irq(chip->irq, chip);
 	}
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_opti93x_dev_free(snd_device_t *device)
 {
-	opti93x_t *chip = snd_magic_cast(opti93x_t, device->device_data, return -ENXIO);
+	opti93x_t *chip = device->device_data;
 	return snd_opti93x_free(chip);
 }
 
@@ -1305,7 +1274,7 @@ int snd_opti93x_create(snd_card_t *card, opti9xx_t *chip,
 	opti93x_t *codec;
 
 	*rcodec = NULL;
-	codec = snd_magic_kcalloc(opti93x_t, 0, GFP_KERNEL);
+	codec = kcalloc(1, sizeof(*codec), GFP_KERNEL);
 	if (codec == NULL)
 		return -ENOMEM;
 	codec->irq = -1;
@@ -1385,7 +1354,7 @@ static snd_pcm_ops_t snd_opti93x_capture_ops = {
 
 static void snd_opti93x_pcm_free(snd_pcm_t *pcm)
 {
-	opti93x_t *codec = snd_magic_cast(opti93x_t, pcm->private_data, return);
+	opti93x_t *codec = pcm->private_data;
 	codec->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }

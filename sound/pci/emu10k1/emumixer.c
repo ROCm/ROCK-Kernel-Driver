@@ -32,8 +32,6 @@
 #include <sound/core.h>
 #include <sound/emu10k1.h>
 
-#define chip_t emu10k1_t
-
 #define AC97_ID_STAC9758	0x83847658
 
 static int snd_emu10k1_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
@@ -421,7 +419,7 @@ static snd_kcontrol_new_t snd_audigy_shared_spdif __devinitdata =
  */
 static void snd_emu10k1_mixer_free_ac97(ac97_t *ac97)
 {
-	emu10k1_t *emu = snd_magic_cast(emu10k1_t, ac97->private_data, return);
+	emu10k1_t *emu = ac97->private_data;
 	emu->ac97 = NULL;
 }
 

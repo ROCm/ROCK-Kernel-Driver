@@ -18,8 +18,8 @@
       </affiliation>
      </author>
 
-     <date>Mar. 6, 2004</date>
-     <edition>0.3.1</edition>
+     <date>June 29, 2004</date>
+     <edition>0.3.2</edition>
 
     <abstract>
       <para>
@@ -411,10 +411,6 @@
           // "PCI Resource Managements"
   };
 
-  // this should be go into <sound/sndmagic.h>
-  // (see "Management of Cards and Components")
-  #define mychip_t_magic        0xa15a4501
-
   // chip-specific destructor
   // (see "PCI Resource Managements")
   static int snd_mychip_free(mychip_t *chip)
@@ -426,8 +422,7 @@
   // (see "Management of Cards and Components")
   static int snd_mychip_dev_free(snd_device_t *device)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t,
-                  device->device_data, return -ENXIO);
+          mychip_t *chip = device->device_data;
           return snd_mychip_free(chip);
   }
 
@@ -448,8 +443,8 @@
           // check PCI availability here
           // (see "PCI Resource Managements")
 
-          // allocate a chip-specific data with magic-alloc
-          chip = snd_magic_kcalloc(mychip_t, 0, GFP_KERNEL);
+          // allocate a chip-specific data with zero filled
+          chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
           if (chip == NULL)
                   return -ENOMEM;
 
@@ -906,13 +901,6 @@
       </para>
 
       <para>
-        You might have objections against such a typedef, but this
-      typedef is necessary if you use a <quote>magic-cast</quote>
-      (explained <link
-      linkend="card-management-chip-what-advantage"><citetitle>later</citetitle></link>). 
-      </para>
-
-      <para>
         In general, there are two ways to allocate the chip record.
       </para>
 
@@ -943,9 +931,8 @@
             </programlisting>
           </informalexample>
 
-          With this method, you don't have to allocate twice. But you
-        cannot use <quote>magic-cast</quote> for this record pointer,
-        instead. 
+          With this method, you don't have to allocate twice.
+          The record is released together with the card instance.
         </para>
       </section>
 
@@ -956,7 +943,7 @@
           After allocating a card instance via
           <function>snd_card_new()</function> (with
           <constant>NULL</constant> on the 4th arg), call
-          <function>snd_magic_kcalloc()</function>. 
+          <function>kcalloc()</function>. 
 
           <informalexample>
             <programlisting>
@@ -965,13 +952,10 @@
   mychip_t *chip;
   card = snd_card_new(index[dev], id[dev], THIS_MODULE, NULL);
   .....
-  chip = snd_magic_kcalloc(mychip_t, 0, GFP_KERNEL);
+  chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 ]]>
             </programlisting>
           </informalexample>
-
-          Once when the record is allocated via snd_magic stuff, you
-        can use <quote>magic-cast</quote> for the void pointer. 
         </para>
 
         <para>
@@ -1003,21 +987,6 @@
         </para>
 
         <para>
-          Also, you need to define a magic-value for <type>mychip_t</type>.
-
-          <informalexample>
-            <programlisting>
-<![CDATA[
-  #define mychip_t_magic        0xa15a4501
-]]>
-            </programlisting>
-          </informalexample>
-	(the detail will be described in the
-	<link linkend="card-management-chip-what-advantage"><citetitle>
-	next</citetitle></link> subsection).
-	</para>
-
-        <para>
           Next, initialize the fields, and register this chip
           record as a low-level device with a specified
           <parameter>ops</parameter>, 
@@ -1045,8 +1014,7 @@
 <![CDATA[
   static int snd_mychip_dev_free(snd_device_t *device)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t, device->device_data,
-                                          return -ENXIO);
+          mychip_t *chip = device->device_data;
           return snd_mychip_free(chip);
   }
 ]]>
@@ -1056,127 +1024,6 @@
           where <function>snd_mychip_free()</function> is the real destructor.
         </para>
       </section>
-
-      <section id="card-management-chip-what-advantage">
-        <title>Not a magic but a logic</title>
-
-        <para>Now, you might have a question: What is the advantage of the
-        second method?  Obviously, it looks far more complicated.</para> 
-        <para>
-          As I wrote many times, the second method allows a
-        <quote>magic-cast</quote> for <type>mychip_t</type>. If you
-        have a void pointer (such as
-        pcm-&gt;private_data), the pointer type
-        is unknown at the compile time, and you cannot know even if a
-        wrong pointer type is passed. The compiler would accept
-        it. The magic-cast checks the pointer type at the runtime (and
-        whether it's a null pointer, too). Hence, the cast will be
-        much safer and good for debugging. 
-        </para>
-
-	<para>
-	As you have already seen, allocation with a magic-header can
-	be done via <function>snd_magic_kmalloc()</function> or
-	<function>snd_magic_kcalloc()</function>.
-
-          <informalexample>
-            <programlisting>
-<![CDATA[
-  mychip_t *chip;
-  chip = snd_magic_kmalloc(mychip_t, 0, GFP_KERNEL);
-  chip = snd_magic_kcalloc(mychip_t, 0, GFP_KERNEL);
-]]>
-            </programlisting>
-          </informalexample>
-
-        The difference of these two functions is whether the area is
-	zero-cleared (<function>kcalloc</function>) or not
-	(<function>kmalloc</function>).
-	</para>
-
-	<para>
-	The first argument of the allocator is the type of the
-	record.  The magic-constant has to be defined for this type
-	beforehand.  In this case, we'll need to define
-	<constant>mychip_t_magic</constant>, for example, as already
-	seen,
-
-          <informalexample>
-            <programlisting>
-<![CDATA[
-  #define mychip_t_magic        0xa15a4501
-]]>
-            </programlisting>
-          </informalexample>
-
-        The value is arbitrary but should be unique.
-        This is usually defined in
-        <filename>&lt;include/sndmagic.h&gt;</filename> or
-        <filename>&lt;include/amagic.h&gt;</filename> for alsa-driver tree,
-        but you may define it locally in the code at the early
-        development stage, since changing
-        <filename>sndmagic.h</filename> will lead to the recompilation
-        of the whole driver codes.
-        </para>
-
-	<para>
-	The second argument is the extra-data length.  It is usually
-        zero.  The third argument is the flags to be passed to kernel
-        memory allocator, <constant>GFP_XXX</constant>.  Normally,
-        <constant>GFP_KERNEL</constant> is passed.
-	</para>
-
-        <para>
-          For casting a pointer, use
-          <function>snd_magic_cast()</function> macro:
-
-          <informalexample>
-            <programlisting>
-<![CDATA[
-  mychip_t *chip = snd_magic_cast(mychip_t, source_pointer, action);
-]]>
-            </programlisting>
-          </informalexample>
-
-        where <parameter>source_pointer</parameter> is the pointer to
-        be casted (e.g. pcm-&gt;private_data), and
-        <parameter>action</parameter> is the action to do if the cast
-        fails (e.g. return <constant>-EINVAL</constant>). 
-        </para>
-
-	<para>
-	For releasing the magic-allocated data, you need to call
-        <function>snd_magic_kfree()</function> function instead of
-        <function>kfree()</function>.
-
-          <informalexample>
-            <programlisting>
-<![CDATA[
-  snd_magic_kfree(chip);
-]]>
-            </programlisting>
-          </informalexample>
-	</para>
-
-	<para>
-	If you call <function>kfree()</function> for the
-	magic-allocated value, it will lead to memory leaks.
-	When the ALSA drivers are compiled with
-	<constant>CONFIG_SND_DEBUG_MEMORY</constant> kernel config (or
-	configured with <option>--with-debug=full</option>), the
-	non-matching free will be checked and you'll see warning
-	messages.
-	</para>
-
-        <para>
-          If you are 100% sure that your code is bug-free, you can
-          compile the driver without
-          <constant>CONFIG_SND_DEBUG_MEMORY</constant> kernel config,
-          so that the magic-allocator and the magic-cast will be
-          replaced to the normal kmalloc and cast.
-        </para>
-      </section>
-    </section>
 
     <section id="card-management-registration">
       <title>Registration and Release</title>
@@ -1257,7 +1104,7 @@
           if (chip->irq >= 0)
                   free_irq(chip->irq, (void *)chip);
           // release the data
-          snd_magic_kfree(chip);
+          kfree(chip);
           return 0;
   }
 
@@ -1283,7 +1130,7 @@
                   return -ENXIO;
           }
 
-          chip = snd_magic_kcalloc(mychip_t, 0, GFP_KERNEL);
+          chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
           if (chip == NULL)
                   return -ENOMEM;
 
@@ -1436,7 +1283,7 @@
       need to initialize this number as -1 before actual allocation,
       since irq 0 is valid. The port address and its resource pointer
       can be initialized as null by
-      <function>snd_magic_kcalloc()</function> automatically, so you
+      <function>kcalloc()</function> automatically, so you
       don't have to take care of resetting them. 
       </para>
 
@@ -1517,16 +1364,13 @@
   static irqreturn_t snd_mychip_interrupt(int irq, void *dev_id,
                                           struct pt_regs *regs)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t, dev_id, return);
+          mychip_t *chip = dev_id;
           ....
           return IRQ_HANDLED;
   }
 ]]>
           </programlisting>
         </informalexample>
-
-        Again the magic-cast is used here to get the correct pointer
-      from the second argument. 
       </para>
 
       <para>
@@ -1583,19 +1427,14 @@
         <informalexample>
           <programlisting>
 <![CDATA[
-  snd_magic_kfree(chip);
+  kfree(chip);
 ]]>
           </programlisting>
         </informalexample>
       </para>
 
       <para>
-        The chip instance is freed via
-      <function>snd_magic_kfree()</function>. Please use this function
-      for the object allocated by
-      <function>snd_magic_kmalloc()</function>. If you free it with
-      <function>kfree()</function>, it won't work properly and will
-      result in the memory leak. Also, again, remember that you cannot
+      Again, remember that you cannot
       set <parameter>__devexit</parameter> prefix for this destructor. 
       </para>
 
@@ -1855,9 +1694,6 @@
           <programlisting>
 <![CDATA[
   #include <sound/pcm.h>
-  ....
-
-  #define chip_t mychip_t
   ....
 
   /* hardware definition */
@@ -2224,8 +2060,7 @@
 <![CDATA[
   static void mychip_pcm_free(snd_pcm_t *pcm)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t,
-                                    pcm->private_data, return);
+          mychip_t *chip = snd_pcm_chip(pcm);
           // free your own data
           kfree(chip->my_private_pcm_data);
           // do what you like else...
@@ -2653,8 +2488,11 @@ struct _snd_pcm_runtime {
 	done in
 	<link linkend="pcm-interface-operators-open-callback"><citetitle>
 	the open callback</citetitle></link>.
-        Since it's a void pointer, you should use magic-kmalloc and
-	magic-cast for such an object. 
+	Don't mix this with <constant>pcm-&gt;private_data</constant>.
+	The <constant>pcm-&gt;private_data</constant> usually points the
+	chip instance assigned statically at the creation of PCM, while the 
+	<constant>runtime-&gt;private_data</constant> points a dynamic
+	data created at the PCM open callback.
 
           <informalexample>
             <programlisting>
@@ -2663,7 +2501,7 @@ struct _snd_pcm_runtime {
   {
           my_pcm_data_t *data;
           ....
-          data = snd_magic_kmalloc(my_pcm_data_t, 0, GFP_KERNEL);
+          data = kmalloc(sizeof(*data), GFP_KERNEL);
           substream->runtime->private_data = data;
           ....
   }
@@ -2710,8 +2548,6 @@ struct _snd_pcm_runtime {
         <informalexample>
           <programlisting>
 <![CDATA[
-  #define chip_t mychip_t
-
   int xxx() {
           mychip_t *chip = snd_pcm_substream_chip(substream);
           ....
@@ -2719,13 +2555,14 @@ struct _snd_pcm_runtime {
 ]]>
           </programlisting>
         </informalexample>
-      </para>
 
-      <para>
-        It's expanded with a magic-cast, so the cast-error is
-      automatically checked. You should define <type>chip_t</type> at
-      the beginning of the code, since this will be referred in many
-      places of pcm and control interfaces. 
+	The macro reads <constant>substream-&gt;private_data</constant>,
+	which is a copy of <constant>pcm-&gt;private_data</constant>.
+	You can override the former if you need to assign different data
+	records per PCM substream.  For example, cmi8330 driver assigns
+	different private_data for playback and capture directions,
+	because it uses two different codecs (SB- and AD-compatible) for
+	different directions.
       </para>
 
       <section id="pcm-interface-operators-open-callback">
@@ -2803,7 +2640,7 @@ struct _snd_pcm_runtime {
   static int snd_xxx_close(snd_pcm_substream_t *substream)
   {
           ....
-          snd_magic_kfree(substream->runtime->private_data);
+          kfree(substream->runtime->private_data);
           ....
   }
 ]]>
@@ -3176,7 +3013,7 @@ struct _snd_pcm_runtime {
   static irqreturn_t snd_mychip_interrupt(int irq, void *dev_id,
                                           struct pt_regs *regs)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t, dev_id, return);
+          mychip_t *chip = dev_id;
           spin_lock(&chip->lock);
           ....
           if (pcm_irq_invoked(chip)) {
@@ -3220,7 +3057,7 @@ struct _snd_pcm_runtime {
   static irqreturn_t snd_mychip_interrupt(int irq, void *dev_id,
                                           struct pt_regs *regs)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t, dev_id, return);
+          mychip_t *chip = dev_id;
           spin_lock(&chip->lock);
           ....
           if (pcm_irq_invoked(chip)) {
@@ -3988,8 +3825,7 @@ struct _snd_pcm_runtime {
   static unsigned short snd_mychip_ac97_read(ac97_t *ac97,
                                              unsigned short reg)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t,
-                                   ac97->private_data, return 0);
+          mychip_t *chip = ac97->private_data;
           ....
           // read a register value here from the codec
           return the_register_value;
@@ -3998,8 +3834,7 @@ struct _snd_pcm_runtime {
   static void snd_mychip_ac97_write(ac97_t *ac97,
                                    unsigned short reg, unsigned short val)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t,
-                                   ac97->private_data, return 0);
+          mychip_t *chip = ac97->private_data;
           ....
           // write the given register value to the codec
   }
@@ -4096,8 +3931,7 @@ struct _snd_pcm_runtime {
   static unsigned short snd_mychip_ac97_read(ac97_t *ac97,
                                              unsigned short reg)
   {
-          mychip_t *chip = snd_magic_cast(mychip_t,
-                                   ac97->private_data, return 0);
+          mychip_t *chip = ac97->private_data;
           ....
           return the_register_value;
   }
@@ -4375,7 +4209,7 @@ struct _snd_pcm_runtime {
           <programlisting>
 <![CDATA[
   mpu401_t *mpu;
-  mpu = snd_magic_cast(mpu401_t, rmidi->private_data, );
+  mpu = rmidi->private_data;
 ]]>
           </programlisting>
         </informalexample>
@@ -4546,16 +4380,15 @@ struct _snd_pcm_runtime {
 
       <para>
         You can then pass any pointer value to the
-        <parameter>private_data</parameter>. Again, it should be a
-        magic-allocated record, so that the cast can be checked more
-        safely. If you assign a private data, you should define the
+        <parameter>private_data</parameter>.
+        If you assign a private data, you should define the
         destructor, too. The destructor function is set to
         <structfield>private_free</structfield> field.  
 
         <informalexample>
           <programlisting>
 <![CDATA[
-  mydata_t *p = snd_magic_kmalloc(mydata_t, 0, GFP_KERNEL);
+  mydata_t *p = kmalloc(sizeof(*p), GFP_KERNEL);
   hw->private_data = p;
   hw->private_free = mydata_free;
 ]]>
@@ -4569,9 +4402,8 @@ struct _snd_pcm_runtime {
 <![CDATA[
   static void mydata_free(snd_hwdep_t *hw)
   {
-          mydata_t *p = snd_magic_cast(mydata_csp_t,
-                                       hw->private_data, return);
-          snd_magic_kfree(p);
+          mydata_t *p = hw->private_data;
+          kfree(p);
   }
 ]]>
           </programlisting>
@@ -5097,8 +4929,7 @@ struct _snd_pcm_runtime {
   static void my_proc_read(snd_info_entry_t *entry,
                            snd_info_buffer_t *buffer)
   {
-          chip_t *cm = snd_magic_cast(mychip_t,
-                                  entry->private_data, return);
+          chip_t *chip = entry->private_data;
 
           snd_iprintf(buffer, "This is my chip!\n");
           snd_iprintf(buffer, "Port = %ld\n", chip->port);
@@ -5266,8 +5097,7 @@ struct _snd_pcm_runtime {
   static int mychip_suspend(snd_card_t *card, unsigned int state)
   {
           // (1)
-          mychip_t *chip = snd_magic_cast(mychip_t, card->pm_private_data,
-                                          return -ENXIO);
+          mychip_t *chip = card->pm_private_data;
           // (2)
           snd_pcm_suspend_all(chip->pcm);
           // (3)
@@ -5309,8 +5139,7 @@ struct _snd_pcm_runtime {
   static void mychip_resume(mychip_t *chip)
   {
           // (1)
-          mychip_t *chip = snd_magic_cast(mychip_t, card->pm_private_data,
-                                          return -ENXIO);
+          mychip_t *chip = card->pm_private_data;
           // (2)
           pci_enable_device(chip->pci);
           // (3)
@@ -5427,19 +5256,7 @@ struct _snd_pcm_runtime {
       The module parameters must be declared with the standard
     <function>module_param()()</function>,
     <function>module_param_array()()</function> and
-    <function>MODULE_PARM_DESC()</function> macros. The ALSA provides
-    an additional macro, <function>MODULE_PARM_SYNTAX()</function>,
-    for describing its syntax. The strings will be written to
-    <filename>/lib/modules/XXX/modules.generic_string</filename>
-    file. 
-    </para>
-
-    <para>
-      For convenience, the typical string arguments given to
-    <function>MODULE_PARM_SYNTAX()</function> are defined in
-    <filename>&lt;sound/initval.h&gt;</filename>, such as
-    <constant>SNDRV_ID_DESC</constant> or
-    <constant>SNDRV_ENABLED</constant>.
+    <function>MODULE_PARM_DESC()</function> macros.
     </para>
 
     <para>
@@ -5453,13 +5270,10 @@ struct _snd_pcm_runtime {
   static int boot_devs;
   module_param_array(index, int, boot_devs, 0444);
   MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
-  MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
   module_param_array(id, charp, boot_devs, 0444);
   MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
-  MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
   module_param_array(enable, bool, boot_devs, 0444);
   MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
-  MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 ]]>
         </programlisting>
       </informalexample>
@@ -5478,9 +5292,8 @@ struct _snd_pcm_runtime {
         <programlisting>
 <![CDATA[
   MODULE_DESCRIPTION("My Chip");
-  MODULE_CLASSES("{sound}");
   MODULE_LICENSE("GPL");
-  MODULE_DEVICES("{{Vendor,My Chip Name}}");
+  MODULE_SUPPORTED_DEVICE("{{Vendor,My Chip Name}}");
 ]]>
         </programlisting>
       </informalexample>

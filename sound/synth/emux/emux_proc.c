@@ -36,7 +36,7 @@ snd_emux_proc_info_read(snd_info_entry_t *entry,
 	snd_emux_t *emu;
 	int i;
 
-	emu = snd_magic_cast(snd_emux_t, entry->private_data, return);
+	emu = entry->private_data;
 	down(&emu->register_mutex);
 	if (emu->name)
 		snd_iprintf(buf, "Device: %s\n", emu->name);

@@ -48,8 +48,7 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Intel 82801AA,82901AB,i810,i820,i830,i840,i845,MX440; SiS 7012; Ali 5455");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Intel,82801AA-ICH},"
+MODULE_SUPPORTED_DEVICE("{{Intel,82801AA-ICH},"
 		"{Intel,82901AB-ICH0},"
 		"{Intel,82801BA-ICH2},"
 		"{Intel,82801CA-ICH3},"
@@ -85,28 +84,21 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Intel i8x0 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Intel i8x0 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable Intel i8x0 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(ac97_clock, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
-MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:0");
 module_param_array(ac97_quirk, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
-MODULE_PARM_SYNTAX(ac97_quirk, SNDRV_ENABLED ",allows:{{-1,4}},dialog:list,default:-1");
 #ifdef SUPPORT_JOYSTICK
 module_param_array(joystick, bool, boot_devs, 0444);
 MODULE_PARM_DESC(joystick, "Enable joystick for Intel i8x0 soundcard.");
-MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 #endif
 #ifdef SUPPORT_MIDI
 module_param_array(mpu_port, int, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU401 port # for Intel i8x0 driver.");
-MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog:list");
 #endif
 
 /*
@@ -148,6 +140,9 @@ MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog
 #endif
 #ifndef PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO
 #define PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO	0x006a
+#endif
+#ifndef PCI_DEVICE_ID_NVIDIA_CK8_AUDIO
+#define PCI_DEVICE_ID_NVIDIA_CK8_AUDIO	0x008a
 #endif
 #ifndef PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO
 #define PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO	0x00da
@@ -397,7 +392,6 @@ typedef struct {
 } ichdev_t;
 
 typedef struct _snd_intel8x0 intel8x0_t;
-#define chip_t intel8x0_t
 
 struct _snd_intel8x0 {
 	unsigned int device_type;
@@ -463,6 +457,7 @@ static struct pci_device_id snd_intel8x0_ids[] = {
 	{ 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_SIS },	/* SI7012 */
 	{ 0x10de, 0x01b1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE */
 	{ 0x10de, 0x006a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE2 */
+	{ 0x10de, 0x008a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* CK8 */
 	{ 0x10de, 0x00da, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE3 */
 	{ 0x10de, 0x00ea, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* CK8S */
 	{ 0x1022, 0x746d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD8111 */
@@ -605,7 +600,7 @@ static void snd_intel8x0_codec_write(ac97_t *ac97,
 				     unsigned short reg,
 				     unsigned short val)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, ac97->private_data, return);
+	intel8x0_t *chip = ac97->private_data;
 	
 	spin_lock(&chip->ac97_lock);
 	if (snd_intel8x0_codec_semaphore(chip, ac97->num) < 0) {
@@ -619,7 +614,7 @@ static void snd_intel8x0_codec_write(ac97_t *ac97,
 static unsigned short snd_intel8x0_codec_read(ac97_t *ac97,
 					      unsigned short reg)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, ac97->private_data, return ~0);
+	intel8x0_t *chip = ac97->private_data;
 	unsigned short res;
 	unsigned int tmp;
 
@@ -669,7 +664,7 @@ static int snd_intel8x0_ali_codec_semaphore(intel8x0_t *chip)
 
 static unsigned short snd_intel8x0_ali_codec_read(ac97_t *ac97, unsigned short reg)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, ac97->private_data, return ~0);
+	intel8x0_t *chip = ac97->private_data;
 	unsigned short data = 0xffff;
 
 	spin_lock(&chip->ac97_lock);
@@ -689,7 +684,7 @@ static unsigned short snd_intel8x0_ali_codec_read(ac97_t *ac97, unsigned short r
 
 static void snd_intel8x0_ali_codec_write(ac97_t *ac97, unsigned short reg, unsigned short val)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, ac97->private_data, return);
+	intel8x0_t *chip = ac97->private_data;
 
 	spin_lock(&chip->ac97_lock);
 	if (snd_intel8x0_ali_codec_semaphore(chip)) {
@@ -822,7 +817,7 @@ static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 
 static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, dev_id, return IRQ_NONE);
+	intel8x0_t *chip = dev_id;
 	ichdev_t *ichdev;
 	unsigned int status;
 	unsigned int i;
@@ -1058,17 +1053,23 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 {
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	ichdev_t *ichdev = get_ichdev(substream);
-	unsigned long flags;
 	size_t ptr1, ptr;
+	int civ, timeout = 10;
+	unsigned int position;
 
-	ptr1 = igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << ichdev->pos_shift;
-	if (ptr1 != 0)
-		ptr = ichdev->fragsize1 - ptr1;
-	else
-		ptr = 0;
-	spin_lock_irqsave(&chip->reg_lock, flags);
-	ptr += ichdev->position;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	do {
+		civ = igetbyte(chip, ichdev->reg_offset + ICH_REG_OFF_CIV);
+		ptr1 = igetword(chip, ichdev->reg_offset + ichdev->roff_picb);
+		position = ichdev->position;
+		if (ptr1 == 0)
+			udelay(1);
+		if (civ == igetbyte(chip, ichdev->reg_offset + ICH_REG_OFF_CIV) &&
+		    ptr1 == igetword(chip, ichdev->reg_offset + ichdev->roff_picb))
+			break;
+	} while (timeout--);
+	ptr1 <<= ichdev->pos_shift;
+	ptr = ichdev->fragsize1 - ptr1;
+	ptr += position;
 	if (ptr >= ichdev->size)
 		return 0;
 	return bytes_to_frames(substream->runtime, ptr);
@@ -1627,13 +1628,13 @@ static int __devinit snd_intel8x0_pcm(intel8x0_t *chip)
 
 static void snd_intel8x0_mixer_free_ac97_bus(ac97_bus_t *bus)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, bus->private_data, return);
+	intel8x0_t *chip = bus->private_data;
 	chip->ac97_bus = NULL;
 }
 
 static void snd_intel8x0_mixer_free_ac97(ac97_t *ac97)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, ac97->private_data, return);
+	intel8x0_t *chip = ac97->private_data;
 	chip->ac97[ac97->num] = NULL;
 }
 
@@ -2198,7 +2199,7 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
@@ -2208,7 +2209,7 @@ static int snd_intel8x0_free(intel8x0_t *chip)
  */
 static int intel8x0_suspend(snd_card_t *card, unsigned int state)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, card->pm_private_data, return -EINVAL);
+	intel8x0_t *chip = card->pm_private_data;
 	int i;
 
 	for (i = 0; i < chip->pcm_devs; i++)
@@ -2223,7 +2224,7 @@ static int intel8x0_suspend(snd_card_t *card, unsigned int state)
 
 static int intel8x0_resume(snd_card_t *card, unsigned int state)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, card->pm_private_data, return -EINVAL);
+	intel8x0_t *chip = card->pm_private_data;
 	int i;
 
 	pci_restore_state(chip->pci, chip->pci_state);
@@ -2346,7 +2347,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 static void snd_intel8x0_proc_read(snd_info_entry_t * entry,
 				   snd_info_buffer_t * buffer)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, entry->private_data, return);
+	intel8x0_t *chip = entry->private_data;
 	unsigned int tmp;
 
 	snd_iprintf(buffer, "Intel8x0\n\n");
@@ -2379,7 +2380,7 @@ static void __devinit snd_intel8x0_proc_init(intel8x0_t * chip)
 
 static int snd_intel8x0_dev_free(snd_device_t *device)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, device->device_data, return -ENXIO);
+	intel8x0_t *chip = device->device_data;
 	return snd_intel8x0_free(chip);
 }
 
@@ -2438,7 +2439,7 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	chip = snd_magic_kcalloc(intel8x0_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	spin_lock_init(&chip->reg_lock);
@@ -2614,6 +2615,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO, "NVidia nForce2" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO, "NVidia nForce3" },
 	{ PCI_DEVICE_ID_NVIDIA_CK8S_AUDIO, "NVidia CK8S" },
+	{ PCI_DEVICE_ID_NVIDIA_CK8_AUDIO, "NVidia CK8" },
 	{ 0x746d, "AMD AMD8111" },
 	{ 0x7445, "AMD AMD768" },
 	{ 0x5455, "ALi M5455" },

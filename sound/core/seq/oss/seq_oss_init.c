@@ -183,7 +183,7 @@ snd_seq_oss_open(struct file *file, int level)
 	int i, rc;
 	seq_oss_devinfo_t *dp;
 
-	if ((dp = snd_kcalloc(sizeof(*dp), GFP_KERNEL)) == NULL) {
+	if ((dp = kcalloc(1, sizeof(*dp), GFP_KERNEL)) == NULL) {
 		snd_printk(KERN_ERR "can't malloc device info\n");
 		return -ENOMEM;
 	}
@@ -211,7 +211,7 @@ snd_seq_oss_open(struct file *file, int level)
 	snd_seq_oss_midi_setup(dp);
 
 	if (dp->synth_opened == 0 && dp->max_mididev == 0) {
-		snd_printk(KERN_ERR "no device found\n");
+		/* snd_printk(KERN_ERR "no device found\n"); */
 		rc = -ENODEV;
 		goto _error;
 	}

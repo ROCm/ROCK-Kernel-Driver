@@ -46,8 +46,7 @@
 
 MODULE_DESCRIPTION("MIDI serial u16550");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ALSA, MIDI serial u16550}}");
+MODULE_SUPPORTED_DEVICE("{{ALSA, MIDI serial u16550}}");
 
 #define SNDRV_SERIAL_SOUNDCANVAS 0 /* Roland Soundcanvas; F5 NN selects part */
 #define SNDRV_SERIAL_MS124T 1      /* Midiator MS-124T */
@@ -81,38 +80,27 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for Serial MIDI.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for Serial MIDI.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable UART16550A chip.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for UART16550A chip.");
-MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for UART16550A chip.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 module_param_array(speed, int, boot_devs, 0444);
 MODULE_PARM_DESC(speed, "Speed in bauds.");
-MODULE_PARM_SYNTAX(speed, SNDRV_ENABLED ",allows:{9600,19200,38400,57600,115200},dialog:list");
 module_param_array(base, int, boot_devs, 0444);
 MODULE_PARM_DESC(base, "Base for divisor in bauds.");
-MODULE_PARM_SYNTAX(base, SNDRV_ENABLED ",allows:{57600,115200,230400,460800},dialog:list");
 module_param_array(outs, int, boot_devs, 0444);
 MODULE_PARM_DESC(outs, "Number of MIDI outputs.");
 module_param_array(ins, int, boot_devs, 0444);
 MODULE_PARM_DESC(ins, "Number of MIDI inputs.");
 module_param_array(droponfull, bool, boot_devs, 0444);
 MODULE_PARM_DESC(droponfull, "Flag to enable drop-on-full buffer mode");
-MODULE_PARM_SYNTAX(droponfull, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
-MODULE_PARM_SYNTAX(outs, SNDRV_ENABLED ",allows:{{1,16}},dialog:list");
-MODULE_PARM_SYNTAX(ins, SNDRV_ENABLED ",allows:{{1,16}},dialog:list");
 module_param_array(adaptor, int, boot_devs, 0444);
 MODULE_PARM_DESC(adaptor, "Type of adaptor.");
-MODULE_PARM_SYNTAX(adaptor, SNDRV_ENABLED ",allows:{{0=Soundcanvas,1=MS-124T,2=MS-124W S/A,3=MS-124W M/B,4=Generic}},dialog:list");
 
 /*#define SNDRV_SERIAL_MS124W_MB_NOCOMBO 1*/  /* Address outs as 0-3 instead of bitmap */
 
@@ -524,7 +512,7 @@ static void snd_uart16550_do_close(snd_uart16550_t * uart)
 static int snd_uart16550_input_open(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return -ENXIO);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&uart->open_lock, flags);
 	if (uart->filemode == SERIAL_MODE_NOT_OPENED)
@@ -538,7 +526,7 @@ static int snd_uart16550_input_open(snd_rawmidi_substream_t * substream)
 static int snd_uart16550_input_close(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return -ENXIO);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&uart->open_lock, flags);
 	uart->filemode &= ~SERIAL_MODE_INPUT_OPEN;
@@ -552,7 +540,7 @@ static int snd_uart16550_input_close(snd_rawmidi_substream_t * substream)
 static void snd_uart16550_input_trigger(snd_rawmidi_substream_t * substream, int up)
 {
 	unsigned long flags;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&uart->open_lock, flags);
 	if (up) {
@@ -566,7 +554,7 @@ static void snd_uart16550_input_trigger(snd_rawmidi_substream_t * substream, int
 static int snd_uart16550_output_open(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return -ENXIO);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&uart->open_lock, flags);
 	if (uart->filemode == SERIAL_MODE_NOT_OPENED)
@@ -580,7 +568,7 @@ static int snd_uart16550_output_open(snd_rawmidi_substream_t * substream)
 static int snd_uart16550_output_close(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return -ENXIO);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&uart->open_lock, flags);
 	uart->filemode &= ~SERIAL_MODE_OUTPUT_OPEN;
@@ -652,7 +640,7 @@ static void snd_uart16550_output_write(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
 	unsigned char midi_byte, addr_byte;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 	char first;
 	static unsigned long lasttime=0;
 	
@@ -730,7 +718,7 @@ static void snd_uart16550_output_write(snd_rawmidi_substream_t * substream)
 static void snd_uart16550_output_trigger(snd_rawmidi_substream_t * substream, int up)
 {
 	unsigned long flags;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&uart->open_lock, flags);
 	if (up) {
@@ -765,13 +753,13 @@ static int snd_uart16550_free(snd_uart16550_t *uart)
 		release_resource(uart->res_base);
 		kfree_nocheck(uart->res_base);
 	}
-	snd_magic_kfree(uart);
+	kfree(uart);
 	return 0;
 };
 
 static int snd_uart16550_dev_free(snd_device_t *device)
 {
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, device->device_data, return -ENXIO);
+	snd_uart16550_t *uart = device->device_data;
 	return snd_uart16550_free(uart);
 }
 
@@ -791,7 +779,7 @@ static int __init snd_uart16550_create(snd_card_t * card,
 	int err;
 
 
-	if ((uart = snd_magic_kcalloc(snd_uart16550_t, 0, GFP_KERNEL)) == NULL)
+	if ((uart = kcalloc(1, sizeof(*uart), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
 	uart->adaptor = adaptor;
 	uart->card = card;

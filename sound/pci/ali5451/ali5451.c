@@ -43,8 +43,7 @@
 MODULE_AUTHOR("Matt Wu <Matt_Wu@acersoftech.com.cn>");
 MODULE_DESCRIPTION("ALI M5451");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ALI,M5451,pci},{ALI,M5451}}");
+MODULE_SUPPORTED_DEVICE("{{ALI,M5451,pci},{ALI,M5451}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
@@ -55,19 +54,14 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ALI M5451 PCI Audio.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ALI M5451 PCI Audio.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ALI 5451 PCI Audio.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(pcm_channels, int, boot_devs, 0444);
 MODULE_PARM_DESC(pcm_channels, "PCM Channels");
-MODULE_PARM_SYNTAX(pcm_channels, SNDRV_ENABLED ",default:32,allows:{{1,32}}");
 module_param_array(spdif, bool, boot_devs, 0444);
 MODULE_PARM_DESC(spdif, "Support SPDIF I/O");
-MODULE_PARM_SYNTAX(spdif, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 /*
  *  Debug part definitions
@@ -171,7 +165,6 @@ MODULE_PARM_SYNTAX(spdif, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 typedef struct snd_stru_ali ali_t;
 typedef struct snd_ali_stru_voice snd_ali_voice_t;
-#define chip_t ali_t
 
 typedef struct snd_ali_channel_control {
 	// register data
@@ -495,7 +488,7 @@ static void snd_ali_codec_write(ac97_t *ac97,
 				unsigned short reg,
 				unsigned short val )
 {
-	ali_t *codec = snd_magic_cast(ali_t, ac97->private_data, return);
+	ali_t *codec = ac97->private_data;
 
 	snd_ali_printk("codec_write: reg=%xh data=%xh.\n", reg, val);
 	snd_ali_codec_poke(codec, 0, reg, val);
@@ -505,7 +498,7 @@ static void snd_ali_codec_write(ac97_t *ac97,
 
 static unsigned short snd_ali_codec_read(ac97_t *ac97, unsigned short reg)
 {
-	ali_t *codec = snd_magic_cast(ali_t, ac97->private_data, return -ENXIO);
+	ali_t *codec = ac97->private_data;
 
 	snd_ali_printk("codec_read reg=%xh.\n", reg);
 	return (snd_ali_codec_peek(codec, 0, reg));
@@ -1051,7 +1044,7 @@ static irqreturn_t snd_ali_card_interrupt(int irq,
 				   void *dev_id,
 				   struct pt_regs *regs)
 {
-	ali_t 	*codec = snd_magic_cast(ali_t, dev_id, return IRQ_NONE);
+	ali_t 	*codec = dev_id;
 
 	if (codec == NULL)
 		return IRQ_NONE;
@@ -1247,7 +1240,7 @@ static int snd_ali_trigger(snd_pcm_substream_t *substream,
 	what = whati = capture_flag = 0;
 	snd_pcm_group_for_each(pos, substream) {
 		s = snd_pcm_group_substream_entry(pos);
-		if ((ali_t *) _snd_pcm_chip(s->pcm) == codec) {
+		if ((ali_t *) snd_pcm_substream_chip(s) == codec) {
 			pvoice = (snd_ali_voice_t *) s->runtime->private_data;
 			evoice = pvoice->extra;
 			what |= 1 << (pvoice->number & 0x1f);
@@ -1720,7 +1713,7 @@ static snd_pcm_ops_t snd_ali_capture_ops = {
 
 static void snd_ali_pcm_free(snd_pcm_t *pcm)
 {
-	ali_t *codec = snd_magic_cast(ali_t, pcm->private_data, return);
+	ali_t *codec = pcm->private_data;
 	codec->pcm = NULL;
 }
 
@@ -1769,7 +1762,7 @@ static int snd_ali5451_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t 
 static int snd_ali5451_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	unsigned long flags;
-	ali_t *codec = snd_magic_cast(ali_t, kcontrol->private_data, -ENXIO);
+	ali_t *codec = kcontrol->private_data;
 	unsigned int enable;
 
 	enable = ucontrol->value.integer.value[0] ? 1 : 0;
@@ -1796,7 +1789,7 @@ static int snd_ali5451_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 static int snd_ali5451_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	unsigned long flags;
-	ali_t *codec = snd_magic_cast(ali_t, kcontrol->private_data, -ENXIO);
+	ali_t *codec = kcontrol->private_data;
 	unsigned int change = 0, enable = 0;
 
 	enable = ucontrol->value.integer.value[0] ? 1 : 0;
@@ -1863,13 +1856,13 @@ static snd_kcontrol_new_t snd_ali5451_mixer_spdif[] __devinitdata = {
 
 static void snd_ali_mixer_free_ac97_bus(ac97_bus_t *bus)
 {
-	ali_t *codec = snd_magic_cast(ali_t, bus->private_data, return);
+	ali_t *codec = bus->private_data;
 	codec->ac97_bus = NULL;
 }
 
 static void snd_ali_mixer_free_ac97(ac97_t *ac97)
 {
-	ali_t *codec = snd_magic_cast(ali_t, ac97->private_data, return);
+	ali_t *codec = ac97->private_data;
 	codec->ac97 = NULL;
 }
 
@@ -1907,7 +1900,7 @@ static int __devinit snd_ali_mixer(ali_t * codec)
 #ifdef CONFIG_PM
 static int ali_suspend(snd_card_t *card, unsigned int state)
 {
-	ali_t *chip = snd_magic_cast(ali_t, card->pm_private_data, return -EINVAL);
+	ali_t *chip = card->pm_private_data;
 	ali_image_t *im;
 	int i, j;
 
@@ -1948,7 +1941,7 @@ static int ali_suspend(snd_card_t *card, unsigned int state)
 
 static int ali_resume(snd_card_t *card, unsigned int state)
 {
-	ali_t *chip = snd_magic_cast(ali_t, card->pm_private_data, return -EINVAL);
+	ali_t *chip = card->pm_private_data;
 	ali_image_t *im;
 	int i, j;
 
@@ -2001,7 +1994,7 @@ static int snd_ali_free(ali_t * codec)
 	if (codec->image)
 		kfree(codec->image);
 #endif
-	snd_magic_kfree(codec);
+	kfree(codec);
 	return 0;
 }
 
@@ -2071,7 +2064,7 @@ static int __devinit snd_ali_resources(ali_t *codec)
 }
 static int snd_ali_dev_free(snd_device_t *device) 
 {
-	ali_t *codec=snd_magic_cast(ali_t, device->device_data, return -ENXIO);
+	ali_t *codec=device->device_data;
 	snd_ali_free(codec);
 	return 0;
 }
@@ -2106,7 +2099,7 @@ static int __devinit snd_ali_create(snd_card_t * card,
 		return -ENXIO;
 	}
 
-	if ((codec = snd_magic_kcalloc(ali_t, 0, GFP_KERNEL)) == NULL)
+	if ((codec = kcalloc(1, sizeof(*codec), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
 
 	spin_lock_init(&codec->reg_lock);

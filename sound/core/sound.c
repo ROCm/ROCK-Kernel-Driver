@@ -44,19 +44,14 @@ static int device_mode = S_IFCHR | S_IRUGO | S_IWUGO;
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture driver for soundcards.");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_SUPPORTED_DEVICE("sound");
 module_param(major, int, 0444);
 MODULE_PARM_DESC(major, "Major # for sound driver.");
-MODULE_PARM_SYNTAX(major, "default:116,skill:devel");
 module_param(cards_limit, int, 0444);
 MODULE_PARM_DESC(cards_limit, "Count of auto-loadable soundcards.");
-MODULE_PARM_SYNTAX(cards_limit, "default:8,skill:advanced");
 MODULE_ALIAS_CHARDEV_MAJOR(CONFIG_SND_MAJOR);
 #ifdef CONFIG_DEVFS_FS
 module_param(device_mode, int, 0444);
 MODULE_PARM_DESC(device_mode, "Device file permission mask for devfs.");
-MODULE_PARM_SYNTAX(device_mode, "default:0666,base:8");
 #endif
 MODULE_ALIAS_CHARDEV_MAJOR(CONFIG_SND_MAJOR);
 
@@ -439,14 +434,11 @@ EXPORT_SYMBOL(snd_unregister_oss_device);
   /* memory.c */
 #ifdef CONFIG_SND_DEBUG_MEMORY
 EXPORT_SYMBOL(snd_hidden_kmalloc);
+EXPORT_SYMBOL(snd_hidden_kcalloc);
 EXPORT_SYMBOL(snd_hidden_kfree);
 EXPORT_SYMBOL(snd_hidden_vmalloc);
 EXPORT_SYMBOL(snd_hidden_vfree);
-EXPORT_SYMBOL(_snd_magic_kmalloc);
-EXPORT_SYMBOL(_snd_magic_kcalloc);
-EXPORT_SYMBOL(snd_magic_kfree);
 #endif
-EXPORT_SYMBOL(snd_kcalloc);
 EXPORT_SYMBOL(snd_kmalloc_strdup);
 EXPORT_SYMBOL(copy_to_user_fromio);
 EXPORT_SYMBOL(copy_from_user_toio);

@@ -462,7 +462,7 @@ symbol_entry_t * cs46xx_dsp_lookup_symbol_addr (cs46xx_t * chip, u32 address, in
 
 static void cs46xx_dsp_proc_symbol_table_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
+	cs46xx_t *chip = entry->private_data;
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	int i;
 
@@ -489,7 +489,7 @@ static void cs46xx_dsp_proc_symbol_table_read (snd_info_entry_t *entry, snd_info
 
 static void cs46xx_dsp_proc_modules_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
+	cs46xx_t *chip = entry->private_data;
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	int i,j;
 
@@ -511,7 +511,7 @@ static void cs46xx_dsp_proc_modules_read (snd_info_entry_t *entry, snd_info_buff
 
 static void cs46xx_dsp_proc_task_tree_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
+	cs46xx_t *chip = entry->private_data;
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	int i,j,col;
 	unsigned long dst = chip->region.idx[1].remap_addr + DSP_PARAMETER_BYTE_OFFSET;
@@ -538,7 +538,7 @@ static void cs46xx_dsp_proc_task_tree_read (snd_info_entry_t *entry, snd_info_bu
 
 static void cs46xx_dsp_proc_scb_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
+	cs46xx_t *chip = entry->private_data;
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	int i;
 
@@ -570,7 +570,7 @@ static void cs46xx_dsp_proc_scb_read (snd_info_entry_t *entry, snd_info_buffer_t
 
 static void cs46xx_dsp_proc_parameter_dump_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
+	cs46xx_t *chip = entry->private_data;
 	/*dsp_spos_instance_t * ins = chip->dsp_spos_instance; */
 	unsigned int i,col = 0;
 	unsigned long dst = chip->region.idx[1].remap_addr + DSP_PARAMETER_BYTE_OFFSET;
@@ -597,7 +597,7 @@ static void cs46xx_dsp_proc_parameter_dump_read (snd_info_entry_t *entry, snd_in
 
 static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
+	cs46xx_t *chip = entry->private_data;
 	int i,col = 0;
 	unsigned long dst = chip->region.idx[2].remap_addr;
 
@@ -1057,7 +1057,7 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 	
 	int fifo_addr,fifo_span,valid_slots;
 
-	spos_control_block_t sposcb = {
+	static spos_control_block_t sposcb = {
 		/* 0 */ HFG_TREE_SCB,HFG_STACK,
 		/* 1 */ SPOSCB_ADDR,BG_TREE_SCB_ADDR,
 		/* 2 */ DSP_SPOS_DC,0,
@@ -1110,18 +1110,18 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
   
 	{
 		/* create the null SCB */
-		generic_scb_t null_scb = {
+		static generic_scb_t null_scb = {
 			{ 0, 0, 0, 0 },
 			{ 0, 0, 0, 0, 0 },
 			NULL_SCB_ADDR, NULL_SCB_ADDR,
-			null_algorithm->address, 0,
-			0,0,0,
+			0, 0, 0, 0, 0,
 			{
 				0,0,
 				0,0,
 			}
 		};
 
+		null_scb.entry_point = null_algorithm->address;
 		ins->the_null_scb = cs46xx_dsp_create_scb(chip, "nullSCB", (u32 *)&null_scb, NULL_SCB_ADDR);
 		ins->the_null_scb->task_entry = null_algorithm;
 		ins->the_null_scb->sub_list_ptr = ins->the_null_scb;
@@ -1132,7 +1132,7 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 
 	{
 		/* setup foreground task tree */
-		task_tree_control_block_t fg_task_tree_hdr =  {
+		static task_tree_control_block_t fg_task_tree_hdr =  {
 			{ FG_TASK_HEADER_ADDR | (DSP_SPOS_DC << 0x10),
 			  DSP_SPOS_DC_DC,
 			  DSP_SPOS_DC_DC,
@@ -1145,7 +1145,7 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
     
 			{
 				BG_TREE_SCB_ADDR,TIMINGMASTER_SCB_ADDR, 
-				fg_task_tree_header_code->address,
+				0,
 				FG_TASK_HEADER_ADDR + TCBData,                  
 			},
 
@@ -1158,7 +1158,7 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 			},
 
 			{
-				DSP_SPOS_DC,task_tree_thread->address,
+				DSP_SPOS_DC,0,
 				DSP_SPOS_DC,DSP_SPOS_DC,
 				DSP_SPOS_DC,DSP_SPOS_DC,
 				DSP_SPOS_DC,DSP_SPOS_DC,
@@ -1200,13 +1200,15 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 			}
 		};
 
+		fg_task_tree_hdr.links.entry_point = fg_task_tree_header_code->address;
+		fg_task_tree_hdr.context_blk.stack0 = task_tree_thread->address;
 		cs46xx_dsp_create_task_tree(chip,"FGtaskTreeHdr",(u32 *)&fg_task_tree_hdr,FG_TASK_HEADER_ADDR,0x35);
 	}
 
 
 	{
 		/* setup foreground task tree */
-		task_tree_control_block_t bg_task_tree_hdr =  {
+		static task_tree_control_block_t bg_task_tree_hdr =  {
 			{ DSP_SPOS_DC_DC,
 			  DSP_SPOS_DC_DC,
 			  DSP_SPOS_DC_DC,
@@ -1219,7 +1221,7 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
     
 			{
 				NULL_SCB_ADDR,NULL_SCB_ADDR,  /* Set up the background to do nothing */
-				task_tree_header_code->address,
+				0,
 				BG_TREE_SCB_ADDR + TCBData,
 			},
 
@@ -1232,7 +1234,7 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 			},
 
 			{
-				DSP_SPOS_DC,task_tree_thread->address,
+				DSP_SPOS_DC,0,
 				DSP_SPOS_DC,DSP_SPOS_DC,
 				DSP_SPOS_DC,DSP_SPOS_DC,
 				DSP_SPOS_DC,DSP_SPOS_DC,
@@ -1273,6 +1275,9 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 				0,0
 			}
 		};
+
+		bg_task_tree_hdr.links.entry_point = task_tree_header_code->address;
+		bg_task_tree_hdr.context_blk.stack0 = task_tree_thread->address;
 		cs46xx_dsp_create_task_tree(chip,"BGtaskTreeHdr",(u32 *)&bg_task_tree_hdr,BG_TREE_SCB_ADDR,0x35);
 	}
 
@@ -1312,7 +1317,7 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 	if (!write_back_scb) goto _fail_end;
 
 	{
-		mix2_ostream_spb_t mix2_ostream_spb = {
+		static mix2_ostream_spb_t mix2_ostream_spb = {
 			0x00020000,
 			0x0000ffff
 		};

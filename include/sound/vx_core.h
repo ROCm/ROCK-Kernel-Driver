@@ -182,6 +182,7 @@ struct snd_vx_core {
 	/* clock and audio sources */
 	unsigned int audio_source;	/* current audio input source */
 	unsigned int audio_source_target;
+	unsigned int clock_mode;	/* clock mode (VX_CLOCK_MODE_XXX) */
 	unsigned int clock_source;	/* current clock source (INTERNAL_QUARTZ or UER_SYNC) */
 	unsigned int freq;		/* current frequency */
 	unsigned int freq_detected;	/* detected frequency from digital in */
@@ -362,6 +363,13 @@ enum {
 enum {
 	INTERNAL_QUARTZ,
 	UER_SYNC
+};
+
+/* clock mode */
+enum {
+	VX_CLOCK_MODE_AUTO,	/* depending on the current audio source */
+	VX_CLOCK_MODE_INTERNAL,	/* fixed to internal quartz */
+	VX_CLOCK_MODE_EXTERNAL	/* fixed to UER sync */
 };
 
 /* SPDIF/UER type */

@@ -458,7 +458,7 @@ static int route_load_ttable(snd_pcm_plugin_t *plugin,
 			dptr->func = route_to_channel;
 		if (nsrcs > 0) {
                         int srcidx;
-			dptr->srcs = snd_kcalloc(nsrcs * sizeof(*srcs), GFP_KERNEL);
+			dptr->srcs = kcalloc(nsrcs, sizeof(*srcs), GFP_KERNEL);
                         for(srcidx = 0; srcidx < nsrcs; srcidx++)
 				dptr->srcs[srcidx] = srcs[srcidx];
 		} else

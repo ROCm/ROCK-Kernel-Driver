@@ -368,8 +368,6 @@ struct _snd_ice1712 {
 	struct semaphore gpio_mutex;
 };
 
-#define chip_t ice1712_t
-
 
 /*
  * gpio access functions

@@ -821,8 +821,6 @@ snd_emu8000_update_reverb_mode(emu8000_t *emu)
  * mixer interface
  *----------------------------------------------------------------*/
 
-#define chip_t	emu8000_t
-
 /*
  * bass/treble
  */
@@ -1070,7 +1068,7 @@ static int snd_emu8000_free(emu8000_t *hw)
 		release_resource(hw->res_port3);
 		kfree_nocheck(hw->res_port3);
 	}
-	snd_magic_kfree(hw);
+	kfree(hw);
 	return 0;
 }
 
@@ -1078,7 +1076,7 @@ static int snd_emu8000_free(emu8000_t *hw)
  */
 static int snd_emu8000_dev_free(snd_device_t *device)
 {
-	emu8000_t *hw = snd_magic_cast(emu8000_t, device->device_data, return -ENXIO);
+	emu8000_t *hw = device->device_data;
 	return snd_emu8000_free(hw);
 }
 
@@ -1101,7 +1099,7 @@ snd_emu8000_new(snd_card_t *card, int index, long port, int seq_ports, snd_seq_d
 	if (seq_ports <= 0)
 		return 0;
 
-	hw = snd_magic_kcalloc(emu8000_t, 0, GFP_KERNEL);
+	hw = kcalloc(1, sizeof(*hw), GFP_KERNEL);
 	if (hw == NULL)
 		return -ENOMEM;
 	spin_lock_init(&hw->reg_lock);
