@@ -23,6 +23,7 @@
 #include <asm/io.h>
 
 #include <linux/timex.h>
+#include <linux/profile.h>
 
 u64 jiffies_64;
 
