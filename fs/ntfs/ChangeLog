@@ -83,6 +83,7 @@ ToDo/Notes:
 	  the bug report.)
 	- Fix error handling in fs/ntfs/quota.c::ntfs_mark_quotas_out_of_date()
 	  where we failed to release i_sem on the $Quota/$Q attribute inode.
+	- Fix bug in handling of bad inodes in fs/ntfs/namei.c::ntfs_lookup().
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 

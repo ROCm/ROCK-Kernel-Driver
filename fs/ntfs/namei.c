@@ -127,15 +127,16 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent,
 		dent_inode = ntfs_iget(vol->sb, dent_ino);
 		if (likely(!IS_ERR(dent_inode))) {
 			/* Consistency check. */
-			if (MSEQNO(mref) == NTFS_I(dent_inode)->seq_no ||
+			if (is_bad_inode(dent_inode) || MSEQNO(mref) ==
+					NTFS_I(dent_inode)->seq_no ||
 					dent_ino == FILE_MFT) {
 				/* Perfect WIN32/POSIX match. -- Case 1. */
 				if (!name) {
-					ntfs_debug("Done.");
+					ntfs_debug("Done.  (Case 1.)");
 					return d_splice_alias(dent_inode, dent);
 				}
 				/*
-				 * We are too indented. Handle imperfect
+				 * We are too indented.  Handle imperfect
 				 * matches and short file names further below.
 				 */
 				goto handle_name;
@@ -181,6 +182,7 @@ handle_name:
 
 	nls_name.name = NULL;
 	if (name->type != FILE_NAME_DOS) {			/* Case 2. */
+		ntfs_debug("Case 2.");
 		nls_name.len = (unsigned)ntfs_ucstonls(vol,
 				(ntfschar*)&name->name, name->len,
 				(unsigned char**)&nls_name.name, 0);
@@ -188,6 +190,7 @@ handle_name:
 	} else /* if (name->type == FILE_NAME_DOS) */ {		/* Case 3. */
 		FILE_NAME_ATTR *fn;
 
+		ntfs_debug("Case 3.");
 		kfree(name);
 
 		/* Find the WIN32 name corresponding to the matched DOS name. */
@@ -271,12 +274,17 @@ handle_name:
 			dput(real_dent);
 		else
 			new_dent = real_dent;
+		ntfs_debug("Done.  (Created new dentry.)");
 		return new_dent;
 	}
 	kfree(nls_name.name);
 	/* Matching dentry exists, check if it is negative. */
 	if (real_dent->d_inode) {
-		BUG_ON(real_dent->d_inode != dent_inode);
+		if (unlikely(real_dent->d_inode != dent_inode)) {
+			/* This can happen because bad inodes are unhashed. */
+			BUG_ON(!is_bad_inode(dent_inode));
+			BUG_ON(!is_bad_inode(real_dent->d_inode));
+		}
 		/*
 		 * Already have the inode and the dentry attached, decrement
 		 * the reference count to balance the ntfs_iget() we did
@@ -285,6 +293,7 @@ handle_name:
 		 * about any NFS/disconnectedness issues here.
 		 */
 		iput(dent_inode);
+		ntfs_debug("Done.  (Already had inode and dentry.)");
 		return real_dent;
 	}
 	/*
@@ -295,6 +304,7 @@ handle_name:
 	if (!S_ISDIR(dent_inode->i_mode)) {
 		/* Not a directory; everything is easy. */
 		d_instantiate(real_dent, dent_inode);
+		ntfs_debug("Done.  (Already had negative file dentry.)");
 		return real_dent;
 	}
 	spin_lock(&dcache_lock);
@@ -308,6 +318,7 @@ handle_name:
 		real_dent->d_inode = dent_inode;
 		spin_unlock(&dcache_lock);
 		security_d_instantiate(real_dent, dent_inode);
+		ntfs_debug("Done.  (Already had negative directory dentry.)");
 		return real_dent;
 	}
 	/*
@@ -327,6 +338,8 @@ handle_name:
 	/* Throw away real_dent. */
 	dput(real_dent);
 	/* Use new_dent as the actual dentry. */
+	ntfs_debug("Done.  (Already had negative, disconnected directory "
+			"dentry.)");
 	return new_dent;
 
 eio_err_out:
@@ -338,6 +351,7 @@ err_out:
 	if (m)
 		unmap_mft_record(ni);
 	iput(dent_inode);
+	ntfs_error(vol->sb, "Failed, returning error code %i.", err);
 	return ERR_PTR(err);
    }
 }
