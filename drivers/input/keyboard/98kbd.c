@@ -189,6 +189,13 @@ void kbd98_interrupt(struct serio *serio, unsigned char data,
 			input_sync(&kbd98->dev);
 			return;
 
+		case KEY_CAPSLOCK:
+			input_report_key(&kbd98->dev, keycode, 1);
+			input_sync(&kbd98->dev);
+			input_report_key(&kbd98->dev, keycode, 0);
+			input_sync(&kbd98->dev);
+			return;
+
 		case KBD98_KEY_NULL:
 			return;
 
