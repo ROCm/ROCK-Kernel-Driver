@@ -728,14 +728,14 @@ static int netlink_sendmsg(struct kiocb *kiocb, struct socket *sock,
 	   to corresponding kernel module.   --ANK (980802)
 	 */
 
-	err = security_netlink_send(skb);
-	if (err) {
+	err = -EFAULT;
+	if (memcpy_fromiovec(skb_put(skb,len), msg->msg_iov, len)) {
 		kfree_skb(skb);
 		goto out;
 	}
 
-	err = -EFAULT;
-	if (memcpy_fromiovec(skb_put(skb,len), msg->msg_iov, len)) {
+	err = security_netlink_send(skb);
+	if (err) {
 		kfree_skb(skb);
 		goto out;
 	}
