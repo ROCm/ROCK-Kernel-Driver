@@ -1128,6 +1128,7 @@ CIFSUnixCreateSymLink(const int xid, struct cifsTconInfo *tcon,
 	int name_len_target;
 	int rc = 0;
 	int bytes_returned = 0;
+	__u16 params, param_offset, offset, byte_count;
 
 	cFYI(1, ("In Symlink Unix style"));
 createSymLinkRetry:
@@ -1149,17 +1150,17 @@ createSymLinkRetry:
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, fromName, name_len);
 	}
-	pSMB->ParameterCount = 6 + name_len;
+	params = 6 + name_len;
 	pSMB->MaxSetupCount = 0;
 	pSMB->Reserved = 0;
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+	param_offset = offsetof(struct smb_com_transaction2_spi_req,
                                      InformationLevel) - 4;
-	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
+	offset = param_offset + params;
 
-	data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;
+	data_offset = (char *) (&pSMB->hdr.Protocol) + offset;
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len_target =
 		    cifs_strtoUCS((wchar_t *) data_offset, toName, 530
@@ -1173,24 +1174,23 @@ createSymLinkRetry:
 		strncpy(data_offset, toName, name_len_target);
 	}
 
-	pSMB->DataCount = name_len_target;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	/* BB find exact max on data count below from sess */
 	pSMB->MaxDataCount = cpu_to_le16(1000);
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
-	pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount + pSMB->DataCount;
-	pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
-	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+	byte_count = 3 /* pad */  + params + name_len_target;
+	pSMB->DataCount = cpu_to_le16(name_len_target);
+	pSMB->ParameterCount = cpu_to_le16(params);
 	pSMB->TotalDataCount = pSMB->DataCount;
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
-	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
-	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
+	pSMB->ParameterOffset = cpu_to_le16(param_offset);
+	pSMB->DataOffset = cpu_to_le16(offset);
 	pSMB->InformationLevel = cpu_to_le16(SMB_SET_FILE_UNIX_LINK);
 	pSMB->Reserved4 = 0;
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
@@ -1220,6 +1220,7 @@ CIFSUnixCreateHardLink(const int xid, struct cifsTconInfo *tcon,
 	int name_len_target;
 	int rc = 0;
 	int bytes_returned = 0;
+	__u16 params, param_offset, offset, byte_count;
 
 	cFYI(1, ("In Create Hard link Unix style"));
 createHardLinkRetry:
@@ -1240,17 +1241,17 @@ createHardLinkRetry:
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, toName, name_len);
 	}
-	pSMB->ParameterCount = 6 + name_len;
+	params = 6 + name_len;
 	pSMB->MaxSetupCount = 0;
 	pSMB->Reserved = 0;
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+	param_offset = offsetof(struct smb_com_transaction2_spi_req,
                                      InformationLevel) - 4;
-	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
+	offset = param_offset + params;
 
-	data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;
+	data_offset = (char *) (&pSMB->hdr.Protocol) + offset;
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len_target =
 		    cifs_strtoUCS((wchar_t *) data_offset, fromName, 530
@@ -1264,24 +1265,23 @@ createHardLinkRetry:
 		strncpy(data_offset, fromName, name_len_target);
 	}
 
-	pSMB->DataCount = name_len_target;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	/* BB find exact max on data count below from sess*/
 	pSMB->MaxDataCount = cpu_to_le16(1000);
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
-	pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount + pSMB->DataCount;
-	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+	byte_count = 3 /* pad */  + params + name_len_target;
+	pSMB->ParameterCount = cpu_to_le16(params);
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
-	pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
+	pSMB->DataCount = cpu_to_le16(name_len_target);
 	pSMB->TotalDataCount = pSMB->DataCount;
-	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
-	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
+	pSMB->ParameterOffset = cpu_to_le16(param_offset);
+	pSMB->DataOffset = cpu_to_le16(offset);
 	pSMB->InformationLevel = cpu_to_le16(SMB_SET_FILE_UNIX_HLINK);
 	pSMB->Reserved4 = 0;
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
@@ -2528,6 +2528,7 @@ CIFSSMBSetEOF(const int xid, struct cifsTconInfo *tcon, const char *fileName,
 	int name_len;
 	int rc = 0;
 	int bytes_returned = 0;
+	__u16 params, byte_count, data_count, param_offset, offset;
 
 	cFYI(1, ("In SetEOF"));
 SetEOFRetry:
@@ -2548,8 +2549,8 @@ SetEOFRetry:
 		name_len++;	/* trailing null */
 		strncpy(pSMB->FileName, fileName, name_len);
 	}
-	pSMB->ParameterCount = 6 + name_len;
-	pSMB->DataCount = sizeof (struct file_end_of_file_info);
+	params = 6 + name_len;
+	data_count = sizeof (struct file_end_of_file_info);
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find max SMB size from sess */
 	pSMB->MaxSetupCount = 0;
@@ -2557,9 +2558,9 @@ SetEOFRetry:
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+	param_offset = offsetof(struct smb_com_transaction2_spi_req,
                                      InformationLevel) - 4;
-	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
+	offset = param_offset + params;
 	if(SetAllocation) {
         	if (tcon->ses->capabilities & CAP_INFOLEVEL_PASSTHRU)
 	            pSMB->InformationLevel =
@@ -2578,21 +2579,21 @@ SetEOFRetry:
 
 	parm_data =
 	    (struct file_end_of_file_info *) (((char *) &pSMB->hdr.Protocol) +
-				       pSMB->DataOffset);
-	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
-	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
+				       offset);
+	pSMB->ParameterOffset = cpu_to_le16(param_offset);
+	pSMB->DataOffset = cpu_to_le16(offset);
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
-	pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount + pSMB->DataCount;
-	pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
+	byte_count = 3 /* pad */  + params + data_count;
+	pSMB->DataCount = cpu_to_le16(data_count);
 	pSMB->TotalDataCount = pSMB->DataCount;
-	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+	pSMB->ParameterCount = cpu_to_le16(params);
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
 	pSMB->Reserved4 = 0;
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
+	pSMB->hdr.smb_buf_length += byte_count;
 	parm_data->FileSize = cpu_to_le64(size);
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
@@ -2709,6 +2710,7 @@ CIFSSMBSetTimes(const int xid, struct cifsTconInfo *tcon, const char *fileName,
 	int rc = 0;
 	int bytes_returned = 0;
 	char *data_offset;
+	__u16 params, param_offset, offset, byte_count, count;
 
 	cFYI(1, ("In SetTimes"));
 
@@ -2731,8 +2733,8 @@ SetTimesRetry:
 		strncpy(pSMB->FileName, fileName, name_len);
 	}
 
-	pSMB->ParameterCount = 6 + name_len;
-	pSMB->DataCount = sizeof (FILE_BASIC_INFO);
+	params = 6 + name_len;
+	count = sizeof (FILE_BASIC_INFO);
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find exact max SMB PDU from sess structure BB */
 	pSMB->MaxSetupCount = 0;
@@ -2740,19 +2742,19 @@ SetTimesRetry:
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+	param_offset = offsetof(struct smb_com_transaction2_spi_req,
                                      InformationLevel) - 4;
-	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
-	data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;
-	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
-	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
+	offset = param_offset + params;
+	data_offset = (char *) (&pSMB->hdr.Protocol) + offset;
+	pSMB->ParameterOffset = cpu_to_le16(param_offset);
+	pSMB->DataOffset = cpu_to_le16(offset);
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
-	pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount + pSMB->DataCount;
+	byte_count = 3 /* pad */  + params + count;
 
-	pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
-	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+	pSMB->DataCount = cpu_to_le16(count);
+	pSMB->ParameterCount = cpu_to_le16(params);
 	pSMB->TotalDataCount = pSMB->DataCount;
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
 	if (tcon->ses->capabilities & CAP_INFOLEVEL_PASSTHRU)
@@ -2760,9 +2762,9 @@ SetTimesRetry:
 	else
 		pSMB->InformationLevel = cpu_to_le16(SMB_SET_FILE_BASIC_INFO);
 	pSMB->Reserved4 = 0;
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
+	pSMB->hdr.smb_buf_length += byte_count;
 	memcpy(data_offset, data, sizeof (FILE_BASIC_INFO));
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
@@ -2778,7 +2780,6 @@ SetTimesRetry:
 	return rc;
 }
 
-
 int
 CIFSSMBSetTimesLegacy(int xid, struct cifsTconInfo *tcon, char *fileName,
 		FILE_INFO_STANDARD * data, const struct nls_table *nls_codepage)
@@ -2789,6 +2790,7 @@ CIFSSMBSetTimesLegacy(int xid, struct cifsTconInfo *tcon, char *fileName,
 	int rc = 0;
 	int bytes_returned = 0;
 	char *data_offset;
+	__u16 params, param_offset, count, offset, byte_count;
 
 	cFYI(1, ("In SetTimesLegacy"));
 
@@ -2812,8 +2814,8 @@ SetTimesRetryLegacy:
 	}
 /* BB fixme - we have to map to FILE_STANDARD_INFO (level 1 info
 	in parent function, from the better and ususal FILE_BASIC_INFO */
-	pSMB->ParameterCount = 6 + name_len;
-	pSMB->DataCount = sizeof (FILE_INFO_STANDARD);
+	params = 6 + name_len;
+	count = sizeof (FILE_INFO_STANDARD);
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find exact max SMB PDU from sess structure BB */
 	pSMB->MaxSetupCount = 0;
@@ -2821,19 +2823,19 @@ SetTimesRetryLegacy:
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+	param_offset = offsetof(struct smb_com_transaction2_spi_req,
                                      InformationLevel) - 4;
-	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
-	data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;
-	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
-	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
+	offset = param_offset + params;
+	data_offset = (char *) (&pSMB->hdr.Protocol) + offset;
+	pSMB->ParameterOffset = cpu_to_le16(param_offset);
+	pSMB->DataOffset = cpu_to_le16(offset);
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
-	pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount + pSMB->DataCount;
+	byte_count = 3 /* pad */  + params + count;
 
-	pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
-	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+	pSMB->DataCount = cpu_to_le16(count);
+	pSMB->ParameterCount = cpu_to_le16(params);
 	pSMB->TotalDataCount = pSMB->DataCount;
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
 	/* I doubt that passthrough levels apply to this old
@@ -2843,9 +2845,9 @@ SetTimesRetryLegacy:
 	else*/
 		pSMB->InformationLevel = cpu_to_le16(SMB_INFO_STANDARD);
 	pSMB->Reserved4 = 0;
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
+	pSMB->hdr.smb_buf_length += byte_count;
 	memcpy(data_offset, data, sizeof (FILE_INFO_STANDARD));
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
@@ -2872,6 +2874,7 @@ CIFSSMBUnixSetPerms(const int xid, struct cifsTconInfo *tcon,
 	int rc = 0;
 	int bytes_returned = 0;
 	FILE_UNIX_BASIC_INFO *data_offset;
+	__u16 params, param_offset, offset, count, byte_count;
 
 	cFYI(1, ("In SetUID/GID/Mode"));
 setPermsRetry:
@@ -2893,8 +2896,8 @@ setPermsRetry:
 		strncpy(pSMB->FileName, fileName, name_len);
 	}
 
-	pSMB->ParameterCount = 6 + name_len;
-	pSMB->DataCount = sizeof (FILE_UNIX_BASIC_INFO);
+	params = 6 + name_len;
+	count = sizeof (FILE_UNIX_BASIC_INFO);
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find exact max SMB PDU from sess structure BB */
 	pSMB->MaxSetupCount = 0;
@@ -2902,25 +2905,25 @@ setPermsRetry:
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+	param_offset = offsetof(struct smb_com_transaction2_spi_req,
                                      InformationLevel) - 4;
-	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
+	offset = param_offset + params;
 	data_offset =
 	    (FILE_UNIX_BASIC_INFO *) ((char *) &pSMB->hdr.Protocol +
-				      pSMB->DataOffset);
-	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
-	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
+				      offset);
+	pSMB->DataOffset = cpu_to_le16(offset);
+	pSMB->ParameterOffset = cpu_to_le16(param_offset);
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
-	pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount + pSMB->DataCount;
-	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
-	pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
+	byte_count = 3 /* pad */  + params + count;
+	pSMB->ParameterCount = cpu_to_le16(params);
+	pSMB->DataCount = cpu_to_le16(count);
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
 	pSMB->TotalDataCount = pSMB->DataCount;
 	pSMB->InformationLevel = cpu_to_le16(SMB_SET_FILE_UNIX_BASIC);
 	pSMB->Reserved4 = 0;
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
+	pSMB->hdr.smb_buf_length += byte_count;
 	data_offset->Uid = cpu_to_le64(uid);
 	data_offset->Gid = cpu_to_le64(gid);
 	/* better to leave device as zero when it is  */
@@ -2944,7 +2947,7 @@ setPermsRetry:
 		data_offset->Type = cpu_to_le32(UNIX_SOCKET);
 
 
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
@@ -3309,6 +3312,7 @@ CIFSSMBSetEA(const int xid, struct cifsTconInfo *tcon, const char *fileName,
 	int name_len;
 	int rc = 0;
 	int bytes_returned = 0;
+	__u16 params, param_offset, byte_count, offset, count;
 
 	cFYI(1, ("In SetEA"));
 SetEARetry:
@@ -3330,7 +3334,7 @@ SetEARetry:
 		strncpy(pSMB->FileName, fileName, name_len);
 	}
 
-	pSMB->ParameterCount = 6 + name_len;
+	params = 6 + name_len;
 
 	/* done calculating parms using name_len of file name,
 	now use name_len to calculate length of ea name
@@ -3340,7 +3344,7 @@ SetEARetry:
 	else
 		name_len = strnlen(ea_name,255);
 
-	pSMB->DataCount = sizeof(*parm_data) + ea_value_len + name_len + 1;
+	count = sizeof(*parm_data) + ea_value_len + name_len + 1;
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	pSMB->MaxDataCount = cpu_to_le16(1000);	/* BB find max SMB size from sess */
 	pSMB->MaxSetupCount = 0;
@@ -3348,22 +3352,22 @@ SetEARetry:
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_spi_req,
+	param_offset = offsetof(struct smb_com_transaction2_spi_req,
                                      InformationLevel) - 4;
-	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
+	offset = param_offset + params;
 	pSMB->InformationLevel =
 		cpu_to_le16(SMB_SET_FILE_EA);
 
 	parm_data =
 		(struct fealist *) (((char *) &pSMB->hdr.Protocol) +
-				       pSMB->DataOffset);
-	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
-	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
+				       offset);
+	pSMB->ParameterOffset = cpu_to_le16(param_offset);
+	pSMB->DataOffset = cpu_to_le16(offset);
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_PATH_INFORMATION);
-	pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount + pSMB->DataCount;
-	pSMB->DataCount = cpu_to_le16(pSMB->DataCount);
+	byte_count = 3 /* pad */  + params + count;
+	pSMB->DataCount = cpu_to_le16(count);
 	parm_data->list_len = (__u32)(pSMB->DataCount);
 	parm_data->list[0].EA_flags = 0;
 	/* we checked above that name len is less than 255 */
@@ -3381,11 +3385,11 @@ SetEARetry:
 		memcpy(parm_data->list[0].name+name_len+1,ea_value,ea_value_len);
 
 	pSMB->TotalDataCount = pSMB->DataCount;
-	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+	pSMB->ParameterCount = cpu_to_le16(params);
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
 	pSMB->Reserved4 = 0;
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
