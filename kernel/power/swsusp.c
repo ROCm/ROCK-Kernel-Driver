@@ -364,7 +364,7 @@ static int write_suspend_image(void)
 }
 
 struct highmem_page {
-	char *data;
+	long data;
 	struct page *page;
 	struct highmem_page *next;
 };
@@ -406,7 +406,7 @@ static int save_highmem(void)
 		if (!save->data)
 			panic("Not enough memory");
 		kaddr = kmap_atomic(page, KM_USER0);
-		memcpy(save->data, kaddr, PAGE_SIZE);
+		memcpy((void *)save->data, kaddr, PAGE_SIZE);
 		kunmap_atomic(kaddr, KM_USER0);
 		highmem_copy = save;
 	}
@@ -422,7 +422,7 @@ static int restore_highmem(void)
 		highmem_copy = save->next;
 		
 		kaddr = kmap_atomic(save->page, KM_USER0);
-		memcpy(kaddr, save->data, PAGE_SIZE);
+		memcpy(kaddr, (void *)save->data, PAGE_SIZE);
 		kunmap_atomic(kaddr, KM_USER0);
 		free_page(save->data);
 		kfree(save);
