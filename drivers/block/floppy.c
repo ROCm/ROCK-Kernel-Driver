@@ -220,7 +220,6 @@ static unsigned short virtual_dma_port=0x3f0;
 void floppy_interrupt(int irq, void *dev_id, struct pt_regs * regs);
 static int set_dor(int fdc, char mask, char data);
 static void register_devfs_entries (int drive) __init;
-static devfs_handle_t devfs_handle;
 
 #define K_64	0x10000		/* 64KB */
 
@@ -3946,22 +3945,22 @@ static struct block_device_operations floppy_fops = {
 	.media_changed	= check_floppy_change,
 	.revalidate_disk= floppy_revalidate,
 };
+static char *table[] =
+{"", "d360", "h1200", "u360", "u720", "h360", "h720",
+"u1440", "u2880", "CompaQ", "h1440", "u1680", "h410",
+"u820", "h1476", "u1722", "h420", "u830", "h1494", "u1743",
+"h880", "u1040", "u1120", "h1600", "u1760", "u1920",
+"u3200", "u3520", "u3840", "u1840", "u800", "u1600",
+NULL
+};
+static int t360[] = {1,0}, t1200[] = {2,5,6,10,12,14,16,18,20,23,0},
+t3in[] = {8,9,26,27,28, 7,11,15,19,24,25,29,31, 3,4,13,17,21,22,30,0};
+static int *table_sup[] = 
+{NULL, t360, t1200, t3in+5+8, t3in+5, t3in, t3in};
 
 static void __init register_devfs_entries (int drive)
 {
     int base_minor, i;
-    static char *table[] =
-    {"", "d360", "h1200", "u360", "u720", "h360", "h720",
-     "u1440", "u2880", "CompaQ", "h1440", "u1680", "h410",
-     "u820", "h1476", "u1722", "h420", "u830", "h1494", "u1743",
-     "h880", "u1040", "u1120", "h1600", "u1760", "u1920",
-     "u3200", "u3520", "u3840", "u1840", "u800", "u1600",
-     NULL
-    };
-    static int t360[] = {1,0}, t1200[] = {2,5,6,10,12,14,16,18,20,23,0},
-      t3in[] = {8,9,26,27,28, 7,11,15,19,24,25,29,31, 3,4,13,17,21,22,30,0};
-    static int *table_sup[] = 
-    {NULL, t360, t1200, t3in+5+8, t3in+5, t3in, t3in};
 
     base_minor = (drive < 4) ? drive : (124 + drive);
     if (UDP->cmos < NUMBER(default_drive_params)) {
@@ -3969,11 +3968,23 @@ static void __init register_devfs_entries (int drive)
 	do {
 	    char name[16];
 
-	    sprintf (name, "%d%s", drive, table[table_sup[UDP->cmos][i]]);
-	    devfs_register (devfs_handle, name, DEVFS_FL_DEFAULT, MAJOR_NR,
+	    sprintf(name, "floppy/%d%s", drive, table[table_sup[UDP->cmos][i]]);
+	    devfs_register(NULL, name, DEVFS_FL_DEFAULT, MAJOR_NR,
 			    base_minor + (table_sup[UDP->cmos][i] << 2),
 			    S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP,
 			    &floppy_fops, NULL);
+	} while (table_sup[UDP->cmos][i++]);
+    }
+}
+
+static void unregister_devfs_entries (int drive)
+{
+    int i;
+
+    if (UDP->cmos < NUMBER(default_drive_params)) {
+	i = 0;
+	do {
+	    devfs_remove("floppy/%d%s", drive, table[table_sup[UDP->cmos][i]]);
 	} while (table_sup[UDP->cmos][i++]);
     }
 }
@@ -4229,7 +4240,7 @@ int __init floppy_init(void)
 			goto Enomem;
 	}
 
-	devfs_handle = devfs_mk_dir (NULL, "floppy", NULL);
+	devfs_mk_dir (NULL, "floppy", NULL);
 	if (register_blkdev(MAJOR_NR,"fd",&floppy_fops)) {
 		printk("Unable to get major %d for floppy\n",MAJOR_NR);
 		err = -EBUSY;
@@ -4561,15 +4572,17 @@ void cleanup_module(void)
 	int drive;
 		
 	platform_device_unregister(&floppy_device);
-	devfs_unregister (devfs_handle);
 	blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
 	unregister_blkdev(MAJOR_NR, "fd");
 	for (drive = 0; drive < N_DRIVE; drive++) {
 		if ((allowed_drive_mask & (1 << drive)) &&
-		    fdc_state[FDC(drive)].version != FDC_NONE)
+		    fdc_state[FDC(drive)].version != FDC_NONE) {
 			del_gendisk(disks[drive]);
+			unregister_devfs_entries(drive);
+		}
 		put_disk(disks[drive]);
 	}
+	devfs_remove("floppy");
 
 	blk_cleanup_queue(&floppy_queue);
 	/* eject disk, if any */
