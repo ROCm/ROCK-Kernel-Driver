@@ -1166,9 +1166,10 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
 /*
  * Request address space for all standard resources
  */
-static void __init register_memory(unsigned long max_low_pfn)
+static void __init register_memory(void)
 {
-	unsigned long low_mem_size;
+	long long gapsize;
+	unsigned long long last;
 	int	      i;
 
 	if (efi_enabled)
@@ -1184,9 +1185,21 @@ static void __init register_memory(unsigned long max_low_pfn)
 		request_resource(&ioport_resource, &standard_io_resources[i]);
 
 	/* Tell the PCI layer not to allocate too close to the RAM area.. */
-	low_mem_size = ((max_low_pfn << PAGE_SHIFT) + 0xfffff) & ~0xfffff;
-	if (low_mem_size > pci_mem_start)
-		pci_mem_start = low_mem_size;
+	last = 0x100000000ull;
+	gapsize = 0x400000;
+	i = e820.nr_map;
+	while (--i >= 0) {
+		unsigned long long start = e820.map[i].addr;
+		unsigned long long end = start + e820.map[i].size;
+		long long gap = last - end;
+
+		if (gap > gapsize) {
+			gapsize = gap;
+			pci_mem_start = ((unsigned long) end + 0xfffff) & ~0xfffff;
+		}
+		last = start;
+	}
+	printk("Allocating PCI resources starting at %08lx\n", pci_mem_start);
 }
 
 /* Use inline assembly to define this because the nops are defined 
@@ -1432,7 +1445,7 @@ void __init setup_arch(char **cmdline_p)
 		get_smp_config();
 #endif
 
-	register_memory(max_low_pfn);
+	register_memory();
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
