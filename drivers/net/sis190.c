@@ -41,7 +41,7 @@
 
 #ifdef SiS190_DEBUG
 #define assert(expr) \
-        if(!(expr)) {					\
+        if(unlikely(!(expr))) {					\
 	        printk( "Assertion failed! %s,%s,%s,line=%d\n",	\
         	#expr,__FILE__,__FUNCTION__,__LINE__);		\
         }
@@ -93,38 +93,38 @@ static int multicast_filter_limit = 32;
 //-------------------------------------------------------------------------
 // Bit Mask definitions
 //-------------------------------------------------------------------------
-#define BIT_0       0x0001
-#define BIT_1       0x0002
-#define BIT_2       0x0004
-#define BIT_3       0x0008
-#define BIT_4       0x0010
-#define BIT_5       0x0020
-#define BIT_6       0x0040
-#define BIT_7       0x0080
-#define BIT_8       0x0100
-#define BIT_9       0x0200
-#define BIT_10      0x0400
-#define BIT_11      0x0800
-#define BIT_12      0x1000
-#define BIT_13      0x2000
-#define BIT_14      0x4000
-#define BIT_15      0x8000
-#define BIT_16       0x10000
-#define BIT_17       0x20000
-#define BIT_18       0x40000
-#define BIT_19       0x80000
-#define BIT_20      0x100000
-#define BIT_21       0x200000
-#define BIT_22       0x400000
-#define BIT_23       0x800000
-#define BIT_24       0x1000000
-#define BIT_25       0x2000000
-#define BIT_26      0x04000000
-#define BIT_27      0x08000000
-#define BIT_28      0x10000000
-#define BIT_29      0x20000000
-#define BIT_30      0x40000000
-#define BIT_31      0x80000000
+#define BIT_0	0x0001
+#define BIT_1	0x0002
+#define BIT_2	0x0004
+#define BIT_3	0x0008
+#define BIT_4	0x0010
+#define BIT_5	0x0020
+#define BIT_6	0x0040
+#define BIT_7	0x0080
+#define BIT_8	0x0100
+#define BIT_9	0x0200
+#define BIT_10	0x0400
+#define BIT_11	0x0800
+#define BIT_12	0x1000
+#define BIT_13	0x2000
+#define BIT_14	0x4000
+#define BIT_15	0x8000
+#define BIT_16	0x10000
+#define BIT_17	0x20000
+#define BIT_18	0x40000
+#define BIT_19	0x80000
+#define BIT_20	0x100000
+#define BIT_21	0x200000
+#define BIT_22	0x400000
+#define BIT_23	0x800000
+#define BIT_24	0x1000000
+#define BIT_25	0x2000000
+#define BIT_26	0x04000000
+#define BIT_27	0x08000000
+#define BIT_28	0x10000000
+#define BIT_29	0x20000000
+#define BIT_30	0x40000000
+#define BIT_31	0x80000000
 
 /* write/read MMIO register */
 #define SiS_W8(reg, val8)	writeb ((val8), ioaddr + (reg))
@@ -137,139 +137,138 @@ static int multicast_filter_limit = 32;
 static struct {
 	const char *name;
 } board_info[] __devinitdata = {
-	{
-"SiS190 Gigabit Ethernet"},};
+	{ "SiS190 Gigabit Ethernet" },
+};
 
 static struct pci_device_id sis190_pci_tbl[] __devinitdata = {
-	{0x1039, 0x0190, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{0,},
+	{ 0x1039, 0x0190, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ 0,},
 };
 
 MODULE_DEVICE_TABLE(pci, sis190_pci_tbl);
 
 enum SiS190_registers {
-
-	TxControl = 0x0,
-	TxDescStartAddr = 0x4,
-	TxNextDescAddr = 0x0c,
-	RxControl = 0x10,
-	RxDescStartAddr = 0x14,
-	RxNextDescAddr = 0x1c,
-	IntrStatus = 0x20,
-	IntrMask = 0x24,
-	IntrControl = 0x28,
-	IntrTimer = 0x2c,
-	PMControl = 0x30,
-	ROMControl = 0x38,
-	ROMInterface = 0x3c,
-	StationControl = 0x40,
-	GMIIControl = 0x44,
-	TxMacControl = 0x50,
-	RxMacControl = 0x60,
-	RxMacAddr = 0x62,
-	RxHashTable = 0x68,
-	RxWakeOnLan = 0x70,
-	RxMPSControl = 0x78,
+	TxControl		= 0x0,
+	TxDescStartAddr		= 0x4,
+	TxNextDescAddr		= 0x0c,
+	RxControl		= 0x10,
+	RxDescStartAddr		= 0x14,
+	RxNextDescAddr		= 0x1c,
+	IntrStatus		= 0x20,
+	IntrMask		= 0x24,
+	IntrControl		= 0x28,
+	IntrTimer		= 0x2c,
+	PMControl		= 0x30,
+	ROMControl		= 0x38,
+	ROMInterface		= 0x3c,
+	StationControl		= 0x40,
+	GMIIControl		= 0x44,
+	TxMacControl		= 0x50,
+	RxMacControl		= 0x60,
+	RxMacAddr		= 0x62,
+	RxHashTable		= 0x68,
+	RxWakeOnLan		= 0x70,
+	RxMPSControl		= 0x78,
 };
 
 enum sis190_register_content {
 	/*InterruptStatusBits */
 
-	SoftInt = 0x40000000,
-	Timeup = 0x20000000,
-	PauseFrame = 0x80000,
-	MagicPacket = 0x40000,
-	WakeupFrame = 0x20000,
-	LinkChange = 0x10000,
-	RxQEmpty = 0x80,
-	RxQInt = 0x40,
-	TxQ1Empty = 0x20,
-	TxQ1Int = 0x10,
-	TxQ0Empty = 0x08,
-	TxQ0Int = 0x04,
-	RxHalt = 0x02,
-	TxHalt = 0x01,
+	SoftInt			= 0x40000000,
+	Timeup			= 0x20000000,
+	PauseFrame		= 0x80000,
+	MagicPacket		= 0x40000,
+	WakeupFrame		= 0x20000,
+	LinkChange		= 0x10000,
+	RxQEmpty		= 0x80,
+	RxQInt			= 0x40,
+	TxQ1Empty		= 0x20,
+	TxQ1Int			= 0x10,
+	TxQ0Empty		= 0x08,
+	TxQ0Int			= 0x04,
+	RxHalt			= 0x02,
+	TxHalt			= 0x01,
 
 	/*RxStatusDesc */
-	RxRES = 0x00200000,
-	RxCRC = 0x00080000,
-	RxRUNT = 0x00100000,
-	RxRWT = 0x00400000,
+	RxRES			= 0x00200000,
+	RxCRC			= 0x00080000,
+	RxRUNT			= 0x00100000,
+	RxRWT			= 0x00400000,
 
 	/*ChipCmdBits */
-	CmdReset = 0x10,
-	CmdRxEnb = 0x08,
-	CmdTxEnb = 0x01,
-	RxBufEmpty = 0x01,
+	CmdReset		= 0x10,
+	CmdRxEnb		= 0x08,
+	CmdTxEnb		= 0x01,
+	RxBufEmpty		= 0x01,
 
 	/*Cfg9346Bits */
-	Cfg9346_Lock = 0x00,
-	Cfg9346_Unlock = 0xC0,
+	Cfg9346_Lock		= 0x00,
+	Cfg9346_Unlock		= 0xC0,
 
 	/*rx_mode_bits */
-	AcceptErr = 0x20,
-	AcceptRunt = 0x10,
-	AcceptBroadcast = 0x0800,
-	AcceptMulticast = 0x0400,
-	AcceptMyPhys = 0x0200,
-	AcceptAllPhys = 0x0100,
+	AcceptErr		= 0x20,
+	AcceptRunt		= 0x10,
+	AcceptBroadcast		= 0x0800,
+	AcceptMulticast		= 0x0400,
+	AcceptMyPhys		= 0x0200,
+	AcceptAllPhys		= 0x0100,
 
 	/*RxConfigBits */
-	RxCfgFIFOShift = 13,
-	RxCfgDMAShift = 8,
+	RxCfgFIFOShift		= 13,
+	RxCfgDMAShift		= 8,
 
 	/*TxConfigBits */
-	TxInterFrameGapShift = 24,
-	TxDMAShift = 8,		/* DMA burst value (0-7) is shift this many bits */
+	TxInterFrameGapShift	= 24,
+	TxDMAShift		= 8, /* DMA burst value (0-7) is shift this many bits */
 
 	/*_PHYstatus */
-	TBI_Enable = 0x80,
-	TxFlowCtrl = 0x40,
-	RxFlowCtrl = 0x20,
+	TBI_Enable		= 0x80,
+	TxFlowCtrl		= 0x40,
+	RxFlowCtrl		= 0x20,
 
-	_1000bpsF = 0x1c,
-	_1000bpsH = 0x0c,
-	_100bpsF = 0x18,
-	_100bpsH = 0x08,
-	_10bpsF = 0x14,
-	_10bpsH = 0x04,
+	_1000bpsF		= 0x1c,
+	_1000bpsH		= 0x0c,
+	_100bpsF		= 0x18,
+	_100bpsH		= 0x08,
+	_10bpsF			= 0x14,
+	_10bpsH			= 0x04,
 
-	LinkStatus = 0x02,
-	FullDup = 0x01,
+	LinkStatus		= 0x02,
+	FullDup			= 0x01,
 
 	/*GIGABIT_PHY_registers */
-	PHY_CTRL_REG = 0,
-	PHY_STAT_REG = 1,
-	PHY_AUTO_NEGO_REG = 4,
-	PHY_1000_CTRL_REG = 9,
+	PHY_CTRL_REG		= 0,
+	PHY_STAT_REG		= 1,
+	PHY_AUTO_NEGO_REG	= 4,
+	PHY_1000_CTRL_REG	= 9,
 
 	/*GIGABIT_PHY_REG_BIT */
-	PHY_Restart_Auto_Nego = 0x0200,
-	PHY_Enable_Auto_Nego = 0x1000,
+	PHY_Restart_Auto_Nego	= 0x0200,
+	PHY_Enable_Auto_Nego	= 0x1000,
 
 	//PHY_STAT_REG = 1;
-	PHY_Auto_Neco_Comp = 0x0020,
+	PHY_Auto_Neco_Comp	= 0x0020,
 
 	//PHY_AUTO_NEGO_REG = 4;
-	PHY_Cap_10_Half = 0x0020,
-	PHY_Cap_10_Full = 0x0040,
-	PHY_Cap_100_Half = 0x0080,
-	PHY_Cap_100_Full = 0x0100,
+	PHY_Cap_10_Half		= 0x0020,
+	PHY_Cap_10_Full		= 0x0040,
+	PHY_Cap_100_Half	= 0x0080,
+	PHY_Cap_100_Full	= 0x0100,
 
 	//PHY_1000_CTRL_REG = 9;
-	PHY_Cap_1000_Full = 0x0200,
+	PHY_Cap_1000_Full	= 0x0200,
 
-	PHY_Cap_Null = 0x0,
+	PHY_Cap_Null		= 0x0,
 
 	/*_MediaType*/
-	_10_Half = 0x01,
-	_10_Full = 0x02,
-	_100_Half = 0x04,
-	_100_Full = 0x08,
-	_1000_Full = 0x10,
+	_10_Half		= 0x01,
+	_10_Full		= 0x02,
+	_100_Half		= 0x04,
+	_100_Full		= 0x08,
+	_1000_Full		= 0x10,
 
 	/*_TBICSRBit*/
-	TBILinkOK = 0x02000000,
+	TBILinkOK		= 0x02000000,
 };
 
 const static struct {
@@ -277,16 +276,16 @@ const static struct {
 	u8 version;		/* depend on docs */
 	u32 RxConfigMask;	/* should clear the bits supported by this chip */
 } sis_chip_info[] = {
-	{
-"SiS-0190", 0x00, 0xff7e1880,},};
+	{ "SiS-0190", 0x00, 0xff7e1880,},
+};
 
 enum _DescStatusBit {
-	OWNbit = 0x80000000,
-	INTbit = 0x40000000,
-	DEFbit = 0x200000,
-	CRCbit = 0x20000,
-	PADbit = 0x10000,
-	ENDbit = 0x80000000,
+	OWNbit			= 0x80000000,
+	INTbit			= 0x40000000,
+	DEFbit			= 0x200000,
+	CRCbit			= 0x20000,
+	PADbit			= 0x10000,
+	ENDbit			= 0x80000000,
 };
 
 struct TxDesc {
@@ -321,7 +320,7 @@ struct sis190_private {
 	struct sk_buff *Tx_skbuff[NUM_TX_DESC];	/* Index of Transmit data buffer */
 };
 
-MODULE_AUTHOR("K.M. Liu<kmliu@sis.com");
+MODULE_AUTHOR("K.M. Liu <kmliu@sis.com>");
 MODULE_DESCRIPTION("SiS SiS190 Gigabit Ethernet driver");
 MODULE_LICENSE("GPL");
 MODULE_PARM(media, "1-" __MODULE_STRING(MAX_UNITS) "i");
@@ -513,10 +512,10 @@ SiS190_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	*dev_out = dev;
 	return 0;
 
-      err_out_free_res:
+err_out_free_res:
 	pci_release_regions(pdev);
 
-      err_out:
+err_out:
 	pci_disable_device(pdev);
 	unregister_netdev(dev);
 	kfree(dev);
@@ -1173,12 +1172,10 @@ SiS190_get_stats(struct net_device *dev)
 }
 
 static struct pci_driver sis190_pci_driver = {
-	.name = MODULENAME,
-	.id_table = sis190_pci_tbl,
-	.probe = SiS190_init_one,
-	.remove = SiS190_remove_one,
-	.suspend = NULL,
-	.resume = NULL,
+	.name		= MODULENAME,
+	.id_table	= sis190_pci_tbl,
+	.probe		= SiS190_init_one,
+	.remove		= SiS190_remove_one,
 };
 
 static int __init
