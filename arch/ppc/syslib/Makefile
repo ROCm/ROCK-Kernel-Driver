@@ -17,7 +17,11 @@ ifeq ($(CONFIG_4xx),y)
 ifeq ($(CONFIG_VIRTEX_II_PRO),y)
 obj-$(CONFIG_40x)		+= xilinx_pic.o
 else
+ifeq ($(CONFIG_403),y)
+obj-$(CONFIG_40x)		+= ppc403_pic.o
+else
 obj-$(CONFIG_40x)		+= ppc4xx_pic.o
+endif
 endif
 obj-$(CONFIG_44x)		+= ppc4xx_pic.o
 obj-$(CONFIG_40x)		+= ppc4xx_setup.o

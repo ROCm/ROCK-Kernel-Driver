@@ -162,8 +162,7 @@
 #define DCRN_UIC_VR(base)       (base + 0x7)
 #define DCRN_UIC_VCR(base)      (base + 0x8)
 
-#define UIC0_UIC1NC		30	/* UIC1 non-critical interrupt */
-#define UIC0_UIC1CR      	31	/* UIC1 critical interrupt */
+#define UIC0_UIC1NC      	0x00000002
 
 #define UICB_UIC0NC		0x40000000
 #define UICB_UIC1NC		0x10000000
@@ -518,7 +517,6 @@
 #else
 #define NR_UICS 2
 #endif
-#define UIC_CASCADE_MASK	0x0003		/* bits 30 & 31 */
 
 #define BD_EMAC_ADDR(e,i) bi_enetaddr[e][i]
 

@@ -101,8 +101,8 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.setup_arch	 	= oak_setup_arch;
 	ppc_md.show_percpuinfo	 	= oak_show_percpuinfo;
 	ppc_md.irq_canonicalize 	= NULL;
-	ppc_md.init_IRQ		 	= oak_init_IRQ;
-	ppc_md.get_irq		 	= oak_get_irq;
+	ppc_md.init_IRQ		 	= ppc4xx_pic_init;
+	ppc_md.get_irq		 	= NULL;  /* Set in ppc4xx_pic_init() */
 	ppc_md.init		 	= NULL;
 
 	ppc_md.restart		 	= oak_restart;
@@ -153,32 +153,6 @@ oak_show_percpuinfo(struct seq_file *m, int i)
 		   bp->bi_busfreq / 1000000);
 
 	return 0;
-}
-
-/*
- * Document me.
- */
-void __init
-oak_init_IRQ(void)
-{
-	int i;
-
-	ppc4xx_pic_init();
-
-	for (i = 0; i < NR_IRQS; i++) {
-		irq_desc[i].handler = ppc4xx_pic;
-	}
-
-	return;
-}
-
-/*
- * Document me.
- */
-int
-oak_get_irq(struct pt_regs *regs)
-{
-	return (ppc4xx_pic_get_irq(regs));
 }
 
 /*
