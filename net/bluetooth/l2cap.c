@@ -1940,19 +1940,25 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 fl
 		}
 
 		if (skb->len < 2) {
-			BT_ERR("Frame is too small (len %d)", skb->len);
+			BT_ERR("Frame is too short (len %d)", skb->len);
 			goto drop;
 		}
 
 		hdr = (struct l2cap_hdr *) skb->data;
 		len = __le16_to_cpu(hdr->len) + L2CAP_HDR_SIZE;
 
-		BT_DBG("Start: total len %d, frag len %d", len, skb->len);
-
 		if (len == skb->len) {
 			/* Complete frame received */
 			l2cap_recv_frame(conn, skb);
 			return 0;
+		}
+
+		BT_DBG("Start: total len %d, frag len %d", len, skb->len);
+
+		if (skb->len > len) {
+			BT_ERR("Frame is too long (len %d, expected len %d)",
+				skb->len, len);
+			goto drop;
 		}
 
 		/* Allocate skb for the complete frame (with header) */
@@ -1970,7 +1976,7 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 fl
 		}
 
 		if (skb->len > conn->rx_len) {
-			BT_ERR("Fragment is too large (len %d, expect %d)",
+			BT_ERR("Fragment is too long (len %d, expected %d)",
 					skb->len, conn->rx_len);
 			kfree_skb(conn->rx_skb);
 			conn->rx_skb = NULL;
