@@ -277,15 +277,10 @@ config SCSI_AACRAID
 	tristate "Adaptec AACRAID support (EXPERIMENTAL)"
 	depends on EXPERIMENTAL && SCSI && PCI
 
-choice
-	prompt "Adaptec AIC7xxx support"
-	optional
-	depends on SCSI
-
-source "drivers/scsi/aic7xxx/Kconfig"
+source "drivers/scsi/aic7xxx/Kconfig.aic7xxx"
 
 config SCSI_AIC7XXX_OLD
-	tristate "Old driver"
+	tristate "Adaptec AIC7xxx support (old driver)"
 	help
 	  WARNING This driver is an older aic7xxx driver and is no longer
 	  under active development.  Adaptec, Inc. is writing a new driver to
@@ -325,8 +320,7 @@ config SCSI_AIC7XXX_OLD
 	  say M here and read <file:Documentation/modules.txt>.  The module
 	  will be called aic7xxx_old.o.
 
-endchoice
-
+source "drivers/scsi/aic7xxx/Kconfig.aic79xx"
 
 # All the I2O code and drivers do not seem to be 64bit safe.
 config SCSI_DPT_I2O

@@ -38,9 +38,9 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_93cx6.h#7 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_93cx6.h#12 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_93cx6.h,v 1.8 2000/11/10 20:13:41 gibbs Exp $
+ * $FreeBSD$
  */
 #ifndef _AIC7XXX_93CX6_H_
 #define _AIC7XXX_93CX6_H_
@@ -93,8 +93,10 @@ do {								\
 #define	SEEPROM_DATA_INB(sd) \
 	ahc_inb(sd->sd_ahc, sd->sd_dataout_offset)
 
-int read_seeprom(struct seeprom_descriptor *sd, uint16_t *buf,
-		 u_int start_addr, u_int count);
-int verify_cksum(struct seeprom_config *sc);
+int ahc_read_seeprom(struct seeprom_descriptor *sd, uint16_t *buf,
+		     u_int start_addr, u_int count);
+int ahc_write_seeprom(struct seeprom_descriptor *sd, uint16_t *buf,
+		      u_int start_addr, u_int count);
+int ahc_verify_cksum(struct seeprom_config *sc);
 
 #endif /* _AIC7XXX_93CX6_H_ */
