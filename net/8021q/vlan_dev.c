@@ -74,7 +74,11 @@ int vlan_dev_rebuild_header(struct sk_buff *skb)
 static inline struct sk_buff *vlan_check_reorder_header(struct sk_buff *skb)
 {
 	if (VLAN_DEV_INFO(skb->dev)->flags & 1) {
-		skb = skb_share_check(skb, GFP_ATOMIC);
+		if (skb_shared(skb) || skb_cloned(skb)) {
+			struct sk_buff *nskb = skb_copy(skb, GFP_ATOMIC);
+			kfree(skb);
+			skb = nskb;
+		}
 		if (skb) {
 			/* Lifted from Gleb's VLAN code... */
 			memmove(skb->data - ETH_HLEN,
