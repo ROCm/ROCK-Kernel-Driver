@@ -22,6 +22,7 @@
 #include <linux/spinlock.h>
 #include <linux/device.h>
 #include <linux/slab.h>
+#include <linux/cpu.h>
 
 /**
  * The "cpufreq driver" - the arch- or hardware-dependend low
@@ -115,6 +116,7 @@ static void cpufreq_remove_dev (struct class_device * dev);
 extern struct device_class cpu_devclass;
 
 static struct class_interface cpufreq_interface = {
+        .class =	&cpu_class,
         .add =		&cpufreq_add_dev,
         .remove =	&cpufreq_remove_dev,
 };
