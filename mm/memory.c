@@ -408,10 +408,7 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned 
 {
 	struct mm_struct *mm = vma->vm_mm;
 	mmu_gather_t *tlb;
-	pgd_t * dir;
 	unsigned long start = address, end = address + size;
-
-	dir = pgd_offset(mm, address);
 
 	/*
 	 * This is a long-lived spinlock. That's fine.
