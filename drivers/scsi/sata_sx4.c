@@ -826,14 +826,14 @@ out:
 
 static void pdc_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
-	if (tf->protocol == ATA_PROT_PIO)
+	if (tf->protocol != ATA_PROT_DMA)
 		ata_tf_load_mmio(ap, tf);
 }
 
 
 static void pdc_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
-	if (tf->protocol == ATA_PROT_PIO)
+	if (tf->protocol != ATA_PROT_DMA)
 		ata_exec_command_mmio(ap, tf);
 }
 
