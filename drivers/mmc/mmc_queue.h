@@ -15,6 +15,7 @@ struct mmc_queue {
 	int			(*issue_fn)(struct mmc_queue *, struct request *);
 	void			*data;
 	struct request_queue	*queue;
+	struct scatterlist	*sg;
 };
 
 struct mmc_io_request {
