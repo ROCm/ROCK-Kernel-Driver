@@ -2099,7 +2099,7 @@ static void start_hc(struct uhci_hcd *uhci)
 	uhci->state_end = jiffies + HZ;
 	outw(USBCMD_RS | USBCMD_CF | USBCMD_MAXP, io_addr + USBCMD);
 
-        uhci->hcd.state = USB_STATE_READY;
+        uhci->hcd.state = USB_STATE_RUNNING;
 }
 
 /*
@@ -2452,7 +2452,7 @@ static int uhci_resume(struct usb_hcd *hcd)
 		reset_hc(uhci);
 		start_hc(uhci);
 	}
-	uhci->hcd.state = USB_STATE_READY;
+	uhci->hcd.state = USB_STATE_RUNNING;
 	return 0;
 }
 #endif

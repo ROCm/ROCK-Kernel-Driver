@@ -231,7 +231,6 @@ static void ehci_ready (struct ehci_hcd *ehci)
 		ehci->hcd.state = USB_STATE_HALT;
 		return;
 	}
-	ehci->hcd.state = USB_STATE_READY;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -481,7 +480,7 @@ done2:
 	ehci->reboot_notifier.notifier_call = ehci_reboot;
 	register_reboot_notifier (&ehci->reboot_notifier);
 
-	ehci->hcd.state = USB_STATE_READY;
+	ehci->hcd.state = USB_STATE_RUNNING;
 	writel (FLAG_CF, &ehci->regs->configured_flag);
 	readl (&ehci->regs->command);	/* unblock posted write */
 
@@ -625,7 +624,7 @@ static int ehci_resume (struct usb_hcd *hcd)
 	/* resume HC and each port */
 // restore pci FLADJ value
 	// khubd and drivers will set HC running, if needed;
-	hcd->state = USB_STATE_READY;
+	hcd->state = USB_STATE_RUNNING;
 	// FIXME Philips/Intel/... etc don't really have a "READY"
 	// state ... turn on CMD_RUN too
 	for (i = 0; i < ports; i++) {

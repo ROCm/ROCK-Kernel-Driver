@@ -267,7 +267,7 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 			if (ohci->ed_bulktail)
 				ohci->hc_control |= OHCI_CTRL_BLE;
 		}
-		hcd->state = USB_STATE_READY;
+		hcd->state = USB_STATE_RUNNING;
 		writel (ohci->hc_control, &ohci->regs->control);
 
 		/* trigger a start-frame interrupt (why?) */
