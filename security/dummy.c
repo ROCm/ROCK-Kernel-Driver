@@ -12,12 +12,15 @@
  *	(at your option) any later version.
  */
 
+#undef DEBUG
+
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/security.h>
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
+
 
 static int dummy_ptrace (struct task_struct *parent, struct task_struct *child)
 {
@@ -122,55 +125,55 @@ static int dummy_sb_statfs (struct super_block *sb)
 	return 0;
 }
 
-static int dummy_mount (char *dev_name, struct nameidata *nd, char *type,
-			unsigned long flags, void *data)
+static int dummy_sb_mount (char *dev_name, struct nameidata *nd, char *type,
+			   unsigned long flags, void *data)
 {
 	return 0;
 }
 
-static int dummy_check_sb (struct vfsmount *mnt, struct nameidata *nd)
+static int dummy_sb_check_sb (struct vfsmount *mnt, struct nameidata *nd)
 {
 	return 0;
 }
 
-static int dummy_umount (struct vfsmount *mnt, int flags)
+static int dummy_sb_umount (struct vfsmount *mnt, int flags)
 {
 	return 0;
 }
 
-static void dummy_umount_close (struct vfsmount *mnt)
+static void dummy_sb_umount_close (struct vfsmount *mnt)
 {
 	return;
 }
 
-static void dummy_umount_busy (struct vfsmount *mnt)
+static void dummy_sb_umount_busy (struct vfsmount *mnt)
 {
 	return;
 }
 
-static void dummy_post_remount (struct vfsmount *mnt, unsigned long flags,
-				void *data)
+static void dummy_sb_post_remount (struct vfsmount *mnt, unsigned long flags,
+				   void *data)
 {
 	return;
 }
 
 
-static void dummy_post_mountroot (void)
+static void dummy_sb_post_mountroot (void)
 {
 	return;
 }
 
-static void dummy_post_addmount (struct vfsmount *mnt, struct nameidata *nd)
+static void dummy_sb_post_addmount (struct vfsmount *mnt, struct nameidata *nd)
 {
 	return;
 }
 
-static int dummy_pivotroot (struct nameidata *old_nd, struct nameidata *new_nd)
+static int dummy_sb_pivotroot (struct nameidata *old_nd, struct nameidata *new_nd)
 {
 	return 0;
 }
 
-static void dummy_post_pivotroot (struct nameidata *old_nd, struct nameidata *new_nd)
+static void dummy_sb_post_pivotroot (struct nameidata *old_nd, struct nameidata *new_nd)
 {
 	return;
 }
@@ -303,12 +306,12 @@ static int dummy_inode_getattr (struct vfsmount *mnt, struct dentry *dentry)
 	return 0;
 }
 
-static void dummy_post_lookup (struct inode *ino, struct dentry *d)
+static void dummy_inode_post_lookup (struct inode *ino, struct dentry *d)
 {
 	return;
 }
 
-static void dummy_delete (struct inode *ino)
+static void dummy_inode_delete (struct inode *ino)
 {
 	return;
 }
@@ -529,12 +532,12 @@ static void dummy_sem_free_security (struct sem_array *sma)
 	return;
 }
 
-static int dummy_register (const char *name, struct security_operations *ops)
+static int dummy_register_security (const char *name, struct security_operations *ops)
 {
 	return -EINVAL;
 }
 
-static int dummy_unregister (const char *name, struct security_operations *ops)
+static int dummy_unregister_security (const char *name, struct security_operations *ops)
 {
 	return -EINVAL;
 }
@@ -558,16 +561,16 @@ struct security_operations dummy_security_ops = {
 	.sb_alloc_security =		dummy_sb_alloc_security,
 	.sb_free_security =		dummy_sb_free_security,
 	.sb_statfs =			dummy_sb_statfs,
-	.sb_mount =			dummy_mount,
-	.sb_check_sb =			dummy_check_sb,
-	.sb_umount =			dummy_umount,
-	.sb_umount_close =		dummy_umount_close,
-	.sb_umount_busy =		dummy_umount_busy,
-	.sb_post_remount =		dummy_post_remount,
-	.sb_post_mountroot =		dummy_post_mountroot,
-	.sb_post_addmount =		dummy_post_addmount,
-	.sb_pivotroot =			dummy_pivotroot,
-	.sb_post_pivotroot =		dummy_post_pivotroot,
+	.sb_mount =			dummy_sb_mount,
+	.sb_check_sb =			dummy_sb_check_sb,
+	.sb_umount =			dummy_sb_umount,
+	.sb_umount_close =		dummy_sb_umount_close,
+	.sb_umount_busy =		dummy_sb_umount_busy,
+	.sb_post_remount =		dummy_sb_post_remount,
+	.sb_post_mountroot =		dummy_sb_post_mountroot,
+	.sb_post_addmount =		dummy_sb_post_addmount,
+	.sb_pivotroot =			dummy_sb_pivotroot,
+	.sb_post_pivotroot =		dummy_sb_post_pivotroot,
 	
 	.inode_alloc_security =		dummy_inode_alloc_security,
 	.inode_free_security =		dummy_inode_free_security,
@@ -591,8 +594,8 @@ struct security_operations dummy_security_ops = {
 	.inode_permission_lite =	dummy_inode_permission_lite,
 	.inode_setattr =		dummy_inode_setattr,
 	.inode_getattr =		dummy_inode_getattr,
-	.inode_post_lookup =		dummy_post_lookup,
-	.inode_delete =			dummy_delete,
+	.inode_post_lookup =		dummy_inode_post_lookup,
+	.inode_delete =			dummy_inode_delete,
 	.inode_setxattr =		dummy_inode_setxattr,
 	.inode_getxattr =		dummy_inode_getxattr,
 	.inode_listxattr =		dummy_inode_listxattr,
@@ -641,7 +644,113 @@ struct security_operations dummy_security_ops = {
 	.sem_alloc_security =		dummy_sem_alloc_security,
 	.sem_free_security =		dummy_sem_free_security,
 
-	.register_security =		dummy_register,
-	.unregister_security =		dummy_unregister,
+	.register_security =		dummy_register_security,
+	.unregister_security =		dummy_unregister_security,
 };
+
+#define set_to_dummy_if_null(ops, function)				\
+	do {								\
+		if (!ops->function) {					\
+			ops->function = dummy_##function;		\
+			pr_debug("Had to override the " #function	\
+				 " security operation with the dummy one.\n");\
+			}						\
+	} while (0)
+
+void security_fixup_ops (struct security_operations *ops)
+{
+	set_to_dummy_if_null(ops, ptrace);
+	set_to_dummy_if_null(ops, capget);
+	set_to_dummy_if_null(ops, capset_check);
+	set_to_dummy_if_null(ops, capset_set);
+	set_to_dummy_if_null(ops, acct);
+	set_to_dummy_if_null(ops, capable);
+	set_to_dummy_if_null(ops, quotactl);
+	set_to_dummy_if_null(ops, quota_on);
+	set_to_dummy_if_null(ops, bprm_alloc_security);
+	set_to_dummy_if_null(ops, bprm_free_security);
+	set_to_dummy_if_null(ops, bprm_compute_creds);
+	set_to_dummy_if_null(ops, bprm_set_security);
+	set_to_dummy_if_null(ops, bprm_check_security);
+	set_to_dummy_if_null(ops, sb_alloc_security);
+	set_to_dummy_if_null(ops, sb_free_security);
+	set_to_dummy_if_null(ops, sb_statfs);
+	set_to_dummy_if_null(ops, sb_mount);
+	set_to_dummy_if_null(ops, sb_check_sb);
+	set_to_dummy_if_null(ops, sb_umount);
+	set_to_dummy_if_null(ops, sb_umount_close);
+	set_to_dummy_if_null(ops, sb_umount_busy);
+	set_to_dummy_if_null(ops, sb_post_remount);
+	set_to_dummy_if_null(ops, sb_post_mountroot);
+	set_to_dummy_if_null(ops, sb_post_addmount);
+	set_to_dummy_if_null(ops, sb_pivotroot);
+	set_to_dummy_if_null(ops, sb_post_pivotroot);
+	set_to_dummy_if_null(ops, inode_alloc_security);
+	set_to_dummy_if_null(ops, inode_free_security);
+	set_to_dummy_if_null(ops, inode_create);
+	set_to_dummy_if_null(ops, inode_post_create);
+	set_to_dummy_if_null(ops, inode_link);
+	set_to_dummy_if_null(ops, inode_post_link);
+	set_to_dummy_if_null(ops, inode_unlink);
+	set_to_dummy_if_null(ops, inode_symlink);
+	set_to_dummy_if_null(ops, inode_post_symlink);
+	set_to_dummy_if_null(ops, inode_mkdir);
+	set_to_dummy_if_null(ops, inode_post_mkdir);
+	set_to_dummy_if_null(ops, inode_rmdir);
+	set_to_dummy_if_null(ops, inode_mknod);
+	set_to_dummy_if_null(ops, inode_post_mknod);
+	set_to_dummy_if_null(ops, inode_rename);
+	set_to_dummy_if_null(ops, inode_post_rename);
+	set_to_dummy_if_null(ops, inode_readlink);
+	set_to_dummy_if_null(ops, inode_follow_link);
+	set_to_dummy_if_null(ops, inode_permission);
+	set_to_dummy_if_null(ops, inode_permission_lite);
+	set_to_dummy_if_null(ops, inode_setattr);
+	set_to_dummy_if_null(ops, inode_getattr);
+	set_to_dummy_if_null(ops, inode_post_lookup);
+	set_to_dummy_if_null(ops, inode_delete);
+	set_to_dummy_if_null(ops, inode_setxattr);
+	set_to_dummy_if_null(ops, inode_getxattr);
+	set_to_dummy_if_null(ops, inode_listxattr);
+	set_to_dummy_if_null(ops, inode_removexattr);
+	set_to_dummy_if_null(ops, file_permission);
+	set_to_dummy_if_null(ops, file_alloc_security);
+	set_to_dummy_if_null(ops, file_free_security);
+	set_to_dummy_if_null(ops, file_ioctl);
+	set_to_dummy_if_null(ops, file_mmap);
+	set_to_dummy_if_null(ops, file_mprotect);
+	set_to_dummy_if_null(ops, file_lock);
+	set_to_dummy_if_null(ops, file_fcntl);
+	set_to_dummy_if_null(ops, file_set_fowner);
+	set_to_dummy_if_null(ops, file_send_sigiotask);
+	set_to_dummy_if_null(ops, file_receive);
+	set_to_dummy_if_null(ops, task_create);
+	set_to_dummy_if_null(ops, task_alloc_security);
+	set_to_dummy_if_null(ops, task_free_security);
+	set_to_dummy_if_null(ops, task_setuid);
+	set_to_dummy_if_null(ops, task_post_setuid);
+	set_to_dummy_if_null(ops, task_setgid);
+	set_to_dummy_if_null(ops, task_setpgid);
+	set_to_dummy_if_null(ops, task_getpgid);
+	set_to_dummy_if_null(ops, task_getsid);
+	set_to_dummy_if_null(ops, task_setgroups);
+	set_to_dummy_if_null(ops, task_setnice);
+	set_to_dummy_if_null(ops, task_setrlimit);
+	set_to_dummy_if_null(ops, task_setscheduler);
+	set_to_dummy_if_null(ops, task_getscheduler);
+	set_to_dummy_if_null(ops, task_wait);
+	set_to_dummy_if_null(ops, task_kill);
+	set_to_dummy_if_null(ops, task_prctl);
+	set_to_dummy_if_null(ops, task_kmod_set_label);
+	set_to_dummy_if_null(ops, task_reparent_to_init);
+	set_to_dummy_if_null(ops, ipc_permission);
+	set_to_dummy_if_null(ops, msg_queue_alloc_security);
+	set_to_dummy_if_null(ops, msg_queue_free_security);
+	set_to_dummy_if_null(ops, shm_alloc_security);
+	set_to_dummy_if_null(ops, shm_free_security);
+	set_to_dummy_if_null(ops, sem_alloc_security);
+	set_to_dummy_if_null(ops, sem_free_security);
+	set_to_dummy_if_null(ops, register_security);
+	set_to_dummy_if_null(ops, unregister_security);
+}
 
