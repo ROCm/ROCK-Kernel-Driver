@@ -21,9 +21,6 @@
 #include <asm/sigcontext.h>
 #include <asm/unistd.h>
 #include <asm/page.h>
-#ifdef PROFILING
-#include <sys/gmon.h>
-#endif
 #include "user_util.h"
 #include "kern_util.h"
 #include "user.h"
@@ -33,13 +30,18 @@
 #include "sysdep/ptrace.h"
 #include "sysdep/sigcontext.h"
 #include "irq_user.h"
-#include "syscall_user.h"
 #include "ptrace_user.h"
 #include "time_user.h"
 #include "init.h"
 #include "os.h"
+#include "uml-config.h"
+#include "choose-mode.h"
+#include "mode.h"
+#ifdef CONFIG_MODE_SKAS
+#include "skas_ptrace.h"
+#endif
 
-void init_new_thread(void *sig_stack, void (*usr1_handler)(int))
+void init_new_thread_stack(void *sig_stack, void (*usr1_handler)(int))
 {
 	int flags = 0;
 
@@ -47,6 +49,13 @@ void init_new_thread(void *sig_stack, void (*usr1_handler)(int))
 		set_sigstack(sig_stack, 2 * page_size());
 		flags = SA_ONSTACK;
 	}
+	if(usr1_handler) set_handler(SIGUSR1, usr1_handler, flags, -1);
+}
+
+void init_new_thread_signals(int altstack)
+{
+	int flags = altstack ? SA_ONSTACK : 0;
+
 	set_handler(SIGSEGV, (__sighandler_t) sig_handler, flags,
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGTRAP, (__sighandler_t) sig_handler, flags, 
@@ -61,11 +70,10 @@ void init_new_thread(void *sig_stack, void (*usr1_handler)(int))
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGUSR2, (__sighandler_t) sig_handler, 
 		    SA_NOMASK | flags, -1);
-	if(usr1_handler) set_handler(SIGUSR1, usr1_handler, flags, -1);
-	signal(SIGCHLD, SIG_IGN);
+	(void) CHOOSE_MODE(signal(SIGCHLD, SIG_IGN), (void *) 0);
 	signal(SIGHUP, SIG_IGN);
 
-	init_irq_signals(sig_stack != NULL);
+	init_irq_signals(altstack);
 }
 
 struct tramp {
@@ -126,26 +134,6 @@ void trace_myself(void)
 {
 	if(ptrace(PTRACE_TRACEME, 0, 0, 0) < 0)
 		panic("ptrace failed in trace_myself");
-}
-
-void attach_process(int pid)
-{
-	if((ptrace(PTRACE_ATTACH, pid, 0, 0) < 0) ||
-	   (ptrace(PTRACE_CONT, pid, 0, 0) < 0))
-		tracer_panic("OP_FORK failed to attach pid");
-	wait_for_stop(pid, SIGSTOP, PTRACE_CONT, NULL);
-	if(ptrace(PTRACE_CONT, pid, 0, 0) < 0)
-		tracer_panic("OP_FORK failed to continue process");
-}
-
-void tracer_panic(char *format, ...)
-{
-	va_list ap;
-
-	va_start(ap, format);
-	vprintf(format, ap);
-	printf("\n");
-	while(1) sleep(10);
 }
 
 void suspend_new_thread(int fd)

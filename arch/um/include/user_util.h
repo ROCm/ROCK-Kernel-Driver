@@ -23,6 +23,13 @@ struct cpu_task {
 
 extern struct cpu_task cpu_tasks[];
 
+struct signal_info {
+	void (*handler)(int, struct uml_pt_regs *);
+	int is_irq;
+};
+
+extern struct signal_info sig_info[];
+
 extern unsigned long low_physmem;
 extern unsigned long high_physmem;
 extern unsigned long uml_physmem;
@@ -31,15 +38,10 @@ extern unsigned long end_vm;
 extern unsigned long start_vm;
 extern unsigned long highmem;
 
-extern int tracing_pid;
-extern int honeypot;
-
 extern char host_info[];
 
 extern char saved_command_line[];
 extern char command_line[];
-
-extern int gdb_pid;
 
 extern char *tempdir;
 
@@ -53,12 +55,10 @@ extern int pty_close_sigio;
 extern void stop(void);
 extern void stack_protections(unsigned long address);
 extern void task_protections(unsigned long address);
-extern int signals(int (*init_proc)(void *), void *sp);
 extern int wait_for_stop(int pid, int sig, int cont_type, void *relay);
 extern void *add_signal_handler(int sig, void (*handler)(int));
 extern int start_fork_tramp(void *arg, unsigned long temp_stack, 
 			    int clone_flags, int (*tramp)(void *));
-extern void trace_myself(void);
 extern int clone_and_wait(int (*fn)(void *), void *arg, void *sp, int flags);
 extern int linux_main(int argc, char **argv);
 extern void remap_data(void *segment_start, void *segment_end, int w);
@@ -71,13 +71,13 @@ extern int switcheroo(int fd, int prot, void *from, void *to, int size);
 extern void setup_machinename(char *machine_out);
 extern void setup_hostinfo(void);
 extern void add_arg(char *cmd_line, char *arg);
-extern void init_new_thread(void *sig_stack, void (*usr1_handler)(int));
+extern void init_new_thread_stack(void *sig_stack, void (*usr1_handler)(int));
+extern void init_new_thread_signals(int altstack);
 extern void attach_process(int pid);
-extern int fork_tramp(void *sig_stack);
 extern void do_exec(int old_pid, int new_pid);
 extern void tracer_panic(char *msg, ...);
 extern char *get_umid(int only_if_set);
-extern void do_longjmp(void *p);
+extern void do_longjmp(void *p, int val);
 extern void suspend_new_thread(int fd);
 extern int detach(int pid, int sig);
 extern int attach(int pid);
@@ -91,7 +91,8 @@ extern void arch_check_bugs(void);
 extern int arch_handle_signal(int sig, struct uml_pt_regs *regs);
 extern int arch_fixup(unsigned long address, void *sc_ptr);
 extern void forward_pending_sigio(int target);
-
+extern int can_do_skas(void);
+ 
 #endif
 
 /*

@@ -1,3 +1,8 @@
+# 
+# Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
+# Licensed under the GPL
+#
+
 ARCH_DIR = arch/um
 OS := $(shell uname -s)
 
@@ -11,27 +16,20 @@ include/linux/version.h: arch/$(ARCH)/Makefile
 # EXTRAVERSION...
 MODLIB := $(INSTALL_MOD_PATH)/lib/modules/$(KERNELRELEASE)
 
-MAKEBOOT = $(MAKE) -C $(ARCH_DIR)/boot
-
 ifeq ($(CONFIG_DEBUGSYM),y)
-DEBUG = -g
 CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS))
 endif
 
-ifeq ($(CONFIG_GCOV),y)
-CFLAGS += -fprofile-arcs -ftest-coverage
-endif
-
-ifeq ($(CONFIG_GPROF), y)
-PROFILE += -pg -DPROFILING
-LINK_PROFILE = $(PROFILE) -Wl,--wrap,__monstartup
-endif
+CFLAGS-$(CONFIG_DEBUGSYM) += -g
+CFLAGS-$(CONFIG_GCOV) += -fprofile-arcs -ftest-coverage
+CFLAGS-$(CONFIG_GPROF) += $(PROFILE)
+LINK-$(CONFIG_GPROF) += $(PROFILE) -Wl,--wrap,__monstartup
 
 core-y			+= $(ARCH_DIR)/kernel/		 \
 			   $(ARCH_DIR)/drivers/          \
 			   $(ARCH_DIR)/sys-$(SUBARCH)/
 
-ARCH_INCLUDE = $(ARCH_DIR)/include
+ARCH_INCLUDE = -I$(ARCH_DIR)/include
 MODE_INCLUDE = -I$(ARCH_DIR)/kernel/tt/include \
 	-I$(ARCH_DIR)/kernel/skas/include
 
@@ -40,8 +38,8 @@ MODE_INCLUDE = -I$(ARCH_DIR)/kernel/tt/include \
 # in CFLAGS.  Otherwise, it would cause ld to complain about the two different
 # errnos.
 
-CFLAGS += $(DEBUG) $(PROFILE) -D__arch_um__ -DSUBARCH=\"$(SUBARCH)\" \
-	-D_LARGEFILE64_SOURCE -I$(ARCH_INCLUDE) -Derrno=kernel_errno \
+CFLAGS += $(CFLAGS-y) -D__arch_um__ -DSUBARCH=\"$(SUBARCH)\" \
+	-D_LARGEFILE64_SOURCE $(ARCH_INCLUDE) -Derrno=kernel_errno \
 	$(MODE_INCLUDE)
 
 LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
@@ -55,7 +53,13 @@ SYMLINK_HEADERS = include/asm-um/archparam.h include/asm-um/system.h \
 ARCH_SYMLINKS = include/asm-um/arch $(ARCH_DIR)/include/sysdep $(ARCH_DIR)/os \
 	$(SYMLINK_HEADERS) $(ARCH_DIR)/include/uml-config.h
 
-GEN_HEADERS = $(ARCH_DIR)/include/task.h
+ifeq ($(CONFIG_MODE_SKAS), y)
+GEN_HEADERS = $(ARCH_DIR)/kernel/skas/include/skas_ptregs.h
+
+$(SYS_HEADERS) : $(ARCH_DIR)/kernel/skas/include/skas_ptregs.h
+endif
+
+GEN_HEADERS += $(ARCH_DIR)/include/task.h $(ARCH_DIR)/include/kern_constants.h
 
 include $(ARCH_DIR)/Makefile-$(SUBARCH)
 include $(ARCH_DIR)/Makefile-os-$(OS)
@@ -63,9 +67,9 @@ include $(ARCH_DIR)/Makefile-os-$(OS)
 $(ARCH_DIR)/vmlinux.lds.S :
 	touch $@
 
-prepare: $(ARCH_SYMLINKS) $(GEN_HEADERS)
+prepare: $(ARCH_SYMLINKS) $(SYS_HEADERS) $(GEN_HEADERS)
 
-LDFLAGS_vmlinux = -r $(ARCH_DIR)/main.o
+LDFLAGS_vmlinux = -r
 
 vmlinux: $(ARCH_DIR)/main.o 
 
@@ -76,17 +80,19 @@ AFLAGS_uml.lds.o = -U$(SUBARCH) -DSTART=$$(($(TOP_ADDR) - $(SIZE))) \
 	-DELF_ARCH=$(ELF_ARCH) -DELF_FORMAT=\"$(ELF_FORMAT)\" -P -C -Uum
 
 linux: $(ARCH_DIR)/uml.lds.s vmlinux
-	$(CC) -Wl,-T,$(ARCH_DIR)/uml.lds.s -o $@ $(LINK_PROFILE) \
-	$(LINK_WRAPS) -static vmlinux -L/usr/lib -lutil
+	$(CC) -Wl,-T,$(ARCH_DIR)/uml.lds.s -static $(LINK-y) $(LINK_WRAPS) \
+		-o linux $(ARCH_DIR)/main.o vmlinux -L/usr/lib -lutil
 
 
 USER_CFLAGS := $(patsubst -I%,,$(CFLAGS))
 USER_CFLAGS := $(patsubst -Derrno=kernel_errno,,$(USER_CFLAGS))
-USER_CFLAGS := $(patsubst -D__KERNEL__,,$(USER_CFLAGS)) -I$(ARCH_INCLUDE) \
+USER_CFLAGS := $(patsubst -D__KERNEL__,,$(USER_CFLAGS)) $(ARCH_INCLUDE) \
 	$(MODE_INCLUDE)
 
 # To get a definition of F_SETSIG
 USER_CFLAGS += -D_GNU_SOURCE
+
+CLEAN_FILES += linux x.i gmon.out $(ARCH_DIR)/link.ld $(GEN_HEADERS)
 
 $(ARCH_DIR)/main.o: $(ARCH_DIR)/main.c
 	$(CC) $(USER_CFLAGS) $(EXTRA_CFLAGS) -c -o $@ $<
@@ -108,7 +114,6 @@ archclean: sysclean
 	find . \( -name '*.bb' -o -name '*.bbg' -o -name '*.da' \
 		-o -name '*.gcov' \) -type f -print | xargs rm -f
 	rm -f linux x.i gmon.out $(ARCH_DIR)/link.ld $(GEN_HEADERS)
-	@$(MAKEBOOT) clean
 
 archdep: 
 	for d in $(ARCH_SUBDIRS); do $(MAKE) -C $$d fastdep; done
@@ -133,9 +138,16 @@ $(ARCH_DIR)/include/uml-config.h :
 $(ARCH_DIR)/include/task.h : $(ARCH_DIR)/util/mk_task
 	$< > $@
 
-$(ARCH_DIR)/util/mk_task : $(ARCH_DIR)/util FORCE ;
+$(ARCH_DIR)/include/kern_constants.h : $(ARCH_DIR)/util/mk_constants
+	$< > $@
+
+$(ARCH_DIR)/util/mk_task : $(ARCH_DIR)/kernel/skas/include/skas_ptregs.h \
+	$(ARCH_DIR)/util FORCE ;
 
 $(ARCH_DIR)/util: FORCE
 	@$(call descend,$@,)
+
+$(ARCH_DIR)/kernel/skas/include/skas_ptregs.h :
+	$(MAKE) -C $(ARCH_DIR)/kernel/skas include/skas_ptregs.h
 
 export SUBARCH USER_CFLAGS OS

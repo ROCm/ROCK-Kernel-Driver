@@ -8,6 +8,8 @@
 #include "kern_util.h"
 #include "kern.h"
 #include "os.h"
+#include "mode.h"
+#include "choose-mode.h"
 
 #ifdef CONFIG_SMP
 static void kill_idlers(int me)
@@ -17,26 +19,17 @@ static void kill_idlers(int me)
 
 	for(i = 0; i < sizeof(idle_threads)/sizeof(idle_threads[0]); i++){
 		p = idle_threads[i];
-		if((p != NULL) && (p->thread.extern_pid != me))
-			os_kill_process(p->thread.extern_pid, 0);
+		if((p != NULL) && (p->thread.mode.tt.extern_pid != me))
+			os_kill_process(p->thread.mode.tt.extern_pid, 0);
 	}
 }
 #endif
 
 static void kill_off_processes(void)
 {
-	struct task_struct *p;
-	int me;
-
-	me = os_getpid();
-	for_each_process(p){
-		if(p->thread.extern_pid != me) 
-			os_kill_process(p->thread.extern_pid, 0);
-	}
-	if(init_task.thread.extern_pid != me) 
-		os_kill_process(init_task.thread.extern_pid, 0);
+	CHOOSE_MODE(kill_off_processes_tt(), kill_off_processes_skas());
 #ifdef CONFIG_SMP
-	kill_idlers(me);
+	kill_idlers(os_getpid());
 #endif
 }
 
@@ -50,16 +43,14 @@ void machine_restart(char * __unused)
 {
 	do_uml_exitcalls();
 	kill_off_processes();
-	tracing_reboot();
-	os_kill_process(os_getpid(), 0);
+	CHOOSE_MODE(reboot_tt(), reboot_skas());
 }
 
 void machine_power_off(void)
 {
 	do_uml_exitcalls();
 	kill_off_processes();
-	tracing_halt();
-	os_kill_process(os_getpid(), 0);
+	CHOOSE_MODE(halt_tt(), halt_skas());
 }
 
 void machine_halt(void)

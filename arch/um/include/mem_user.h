@@ -54,11 +54,6 @@ extern int create_mem_file(unsigned long len);
 extern void setup_range(int fd, char *driver, unsigned long start,
 			unsigned long pfn, unsigned long total, int need_vm, 
 			struct mem_region *region, void *reserved);
-extern void map(unsigned long virt, unsigned long p, unsigned long len, 
-		int r, int w, int x);
-extern int unmap(void *addr, int len);
-extern int protect(unsigned long addr, unsigned long len, int r, int w, 
-		   int x, int must_succeed);
 extern void setup_memory(void *entry);
 extern unsigned long find_iomem(char *driver, unsigned long *len_out);
 extern int init_maps(struct mem_region *region);
@@ -68,10 +63,15 @@ extern unsigned long get_vm(unsigned long len);
 extern void setup_physmem(unsigned long start, unsigned long usable,
 			  unsigned long len);
 extern int setup_region(struct mem_region *region, void *entry);
-extern void add_iomem(char *name, int fd, int size);
+extern void add_iomem(char *name, int fd, unsigned long size);
 extern struct mem_region *phys_region(unsigned long phys);
 extern unsigned long phys_offset(unsigned long phys);
 extern void unmap_physmem(void);
+extern int map_memory(unsigned long virt, unsigned long phys, 
+		      unsigned long len, int r, int w, int x);
+extern int protect_memory(unsigned long addr, unsigned long len, 
+			  int r, int w, int x, int must_succeed);
+extern unsigned long get_kmem_end(void);
 
 #endif
 

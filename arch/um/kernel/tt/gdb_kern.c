@@ -3,10 +3,28 @@
  * Licensed under the GPL
  */
 
-#ifndef __MMU_H
-#define __MMU_H
+#include "linux/init.h"
+#include "linux/config.h"
+#include "mconsole_kern.h"
 
-#include "um_mmu.h"
+#ifdef CONFIG_MCONSOLE
+
+extern int gdb_config(char *str);
+extern int gdb_remove(char *unused);
+
+static struct mc_device gdb_mc = {
+	name:		"gdb",
+	config:		gdb_config,
+	remove:		gdb_remove,
+};
+
+int gdb_mc_init(void)
+{
+	mconsole_register_dev(&gdb_mc);
+	return(0);
+}
+
+__initcall(gdb_mc_init);
 
 #endif
 

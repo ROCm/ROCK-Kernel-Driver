@@ -171,7 +171,7 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
 	 */
 	if((current->ptrace & PT_DTRACE) && 
 	   is_syscall(PT_REGS_IP(&current->thread.regs)))
-		current->thread.singlestep_syscall = 1;
+		current->thread.mode.tt.singlestep_syscall = 1;
 	return(0);
 }
 
@@ -241,7 +241,7 @@ int sys_sigreturn(struct pt_regs regs)
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sig->siglock);
-	copy_sc_from_user(current->thread.regs.regs.sc, sc,
+	copy_sc_from_user(current->thread.regs.regs.mode.tt, sc,
 			  &signal_frame_sc.arch);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 }
@@ -257,7 +257,7 @@ int sys_rt_sigreturn(struct pt_regs regs)
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sig->siglock);
-	copy_sc_from_user(current->thread.regs.regs.sc, sc,
+	copy_sc_from_user(current->thread.regs.regs.mode.tt, sc,
 			  &signal_frame_sc.arch);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 }

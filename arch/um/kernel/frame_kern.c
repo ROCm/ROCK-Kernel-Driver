@@ -43,7 +43,7 @@ int setup_signal_stack_si(unsigned long stack_top, int sig,
 	if(restorer == NULL)
 		panic("setup_signal_stack_si - no restorer");
 
-	if(copy_sc_to_user((void *) sc, regs->regs.sc, 
+	if(copy_sc_to_user((void *) sc, regs->regs.mode.tt, 
 			   &signal_frame_sc.arch) ||
 	   copy_to_user((void *) start, signal_frame_si.common.data,
 			signal_frame_si.common.len) ||
@@ -86,7 +86,8 @@ int setup_signal_stack_sc(unsigned long stack_top, int sig,
 	if(copy_to_user((void *) start, frame->data, frame->len) ||
 	   copy_to_user((void *) (start + frame->sig_index), &sig, 
 			sizeof(sig)) ||
-	   copy_sc_to_user(user_sc, regs->regs.sc, &signal_frame_sc.arch) ||
+	   copy_sc_to_user(user_sc, regs->regs.mode.tt, 
+			   &signal_frame_sc.arch) ||
 	   copy_to_user(sc_sigmask(user_sc), mask, sizeof(mask->sig[0])) ||
 	   copy_to_user((void *) sigs, &mask->sig[1], sig_size) ||
 	   copy_restorer(restorer, start, frame->sr_index, frame->sr_relative))

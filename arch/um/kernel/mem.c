@@ -25,6 +25,8 @@
 #include "mem.h"
 #include "kern.h"
 #include "init.h"
+#include "os.h"
+#include "mode_kern.h"
 
 /* Changed during early boot */
 pgd_t swapper_pg_dir[1024];
@@ -56,12 +58,12 @@ static unsigned long brk_end;
 
 static void map_cb(void *unused)
 {
-	map(brk_end, __pa(brk_end), uml_reserved - brk_end, 1, 1, 0);
+	map_memory(brk_end, __pa(brk_end), uml_reserved - brk_end, 1, 1, 0);
 }
 
 void unmap_physmem(void)
 {
-	unmap((void *) brk_end, uml_reserved - brk_end);
+	os_unmap_memory((void *) brk_end, uml_reserved - brk_end);
 }
 
 extern char __binary_start;
@@ -81,17 +83,17 @@ void mem_init(void)
 	/* Map in the area just after the brk now that kmalloc is about
 	 * to be turned on.
 	 */
-	brk_end = (unsigned long) ROUND_UP(sbrk(0));
+	brk_end = (unsigned long) UML_ROUND_UP(sbrk(0));
 	map_cb(NULL);
-	tracing_cb(map_cb, NULL);
+	initial_thread_cb(map_cb, NULL);
 	free_bootmem(__pa(brk_end), uml_reserved - brk_end);
 	uml_reserved = brk_end;
 
 	/* Fill in any hole at the start of the binary */
 	start = (unsigned long) &__binary_start;
 	if(uml_physmem != start){
-		map(uml_physmem, __pa(uml_physmem), start - uml_physmem,
-		    1, 1, 0);
+		map_memory(uml_physmem, __pa(uml_physmem), start - uml_physmem,
+			   1, 1, 0);
 	}
 
 	/* this will put all low memory onto the freelists */
@@ -104,6 +106,21 @@ void mem_init(void)
 	printk(KERN_INFO "Memory: %luk available\n", 
 	       (unsigned long) nr_free_pages() << (PAGE_SHIFT-10));
 	kmalloc_ok = 1;
+}
+
+/* Changed during early boot */
+static unsigned long kmem_top = 0;
+
+unsigned long get_kmem_end(void)
+{
+	if(kmem_top == 0)
+		kmem_top = CHOOSE_MODE(kmem_end_tt, kmem_end_skas);
+	return(kmem_top);
+}
+
+void set_kmem_end(unsigned long new)
+{
+	kmem_top = new;
 }
 
 #if CONFIG_HIGHMEM
@@ -379,20 +396,6 @@ void show_mem(void)
         printk("%d pages swap cached\n", cached);
 }
 
-/* Changed during early boot */
-static unsigned long kmem_top = 0;
-
-unsigned long get_kmem_end(void)
-{
-	if(kmem_top == 0) kmem_top = host_task_size - ABOVE_KMEM;
-	return(kmem_top);
-}
-
-void set_kmem_end(unsigned long new)
-{
-	kmem_top = new;
-}
-
 static int __init uml_mem_setup(char *line, int *add)
 {
 	char *retptr;
@@ -513,7 +516,7 @@ unsigned long get_vm(unsigned long len)
 	return(0);
  found:
 	up(&vm_reserved_sem);
-	start = (unsigned long) ROUND_UP(this->end) + PAGE_SIZE;
+	start = (unsigned long) UML_ROUND_UP(this->end) + PAGE_SIZE;
 	err = reserve_vm(start, start + len, NULL);
 	if(err) return(0);
 	return(start);
@@ -562,7 +565,7 @@ struct iomem iomem_regions[NREGIONS] = { [ 0 ... NREGIONS - 1 ] =
 
 int num_iomem_regions = 0;
 
-void add_iomem(char *name, int fd, int size)
+void add_iomem(char *name, int fd, unsigned long size)
 {
 	if(num_iomem_regions == sizeof(iomem_regions)/sizeof(iomem_regions[0]))
 		return;
