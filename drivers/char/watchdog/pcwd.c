@@ -53,6 +53,7 @@
 #include <linux/moduleparam.h>
 #include <linux/types.h>
 #include <linux/timer.h>
+#include <linux/jiffies.h>
 #include <linux/config.h>
 #include <linux/wait.h>
 #include <linux/slab.h>
@@ -69,7 +70,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-#define WD_VER                  "1.15 (03/27/2004)"
+#define WD_VER                  "1.16 (03/27/2004)"
 #define PFX			"pcwd: "
 
 /*
@@ -115,20 +116,36 @@
 #define CMD_ISA_DELAY_TIME_4SECS        0x0B
 #define CMD_ISA_DELAY_TIME_8SECS        0x0C
 
+/*
+ * We are using an kernel timer to do the pinging of the watchdog
+ * every ~500ms. We try to set the internal heartbeat of the
+ * watchdog to 2 ms.
+ */
+
+#define WDT_INTERVAL (HZ/2+1)
+
 /* We can only use 1 card due to the /dev/watchdog restriction */
 static int cards_found;
 
 /* internal variables */
-static int current_readport, revision, temp_panic;
 static atomic_t open_allowed = ATOMIC_INIT(1);
 static char expect_close;
+static struct timer_list timer;
+static unsigned long next_heartbeat;
+static int temp_panic;
+static int revision;			/* The card's revision */
 static int supports_temp;		/* Wether or not the card has a temperature device */
 static int command_mode;		/* Wether or not the card is in command mode */
 static int initial_status;		/* The card's boot status */
+static int current_readport;		/* The cards I/O address */
 static spinlock_t io_lock;
-static int heartbeat;
 
 /* module parameters */
+#define WATCHDOG_HEARTBEAT 60		/* 60 sec default heartbeat */
+static int heartbeat = WATCHDOG_HEARTBEAT;
+module_param(heartbeat, int, 0);
+MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds. (2<=heartbeat<=7200, default=" __MODULE_STRING(WATCHDOG_HEARTBEAT) ")");
+
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
 #else
@@ -204,18 +221,53 @@ static void unset_command_mode(void)
 	command_mode = 0;
 }
 
+static void pcwd_timer_ping(unsigned long data)
+{
+	int wdrst_stat;
+
+	/* If we got a heartbeat pulse within the WDT_INTERVAL
+	 * we agree to ping the WDT */
+	if(time_before(jiffies, next_heartbeat)) {
+		/* Ping the watchdog */
+		spin_lock(&io_lock);
+		if (revision == PCWD_REVISION_A) {
+			/*  Rev A cards are reset by setting the WD_WDRST bit in register 1 */
+			wdrst_stat = inb_p(current_readport);
+			wdrst_stat &= 0x0F;
+			wdrst_stat |= WD_WDRST;
+
+			outb_p(wdrst_stat, current_readport + 1);
+		} else {
+			/* Re-trigger watchdog by writing to port 0 */
+			outb_p(0x00, current_readport);
+		}
+
+		/* Re-set the timer interval */
+		mod_timer(&timer, jiffies + WDT_INTERVAL);
+
+		spin_unlock(&io_lock);
+	} else {
+		printk(KERN_WARNING PFX "Heartbeat lost! Will not ping the watchdog\n");
+	}
+}
+
 static int pcwd_start(void)
 {
 	int stat_reg;
 
-	/*  Enable the port  */
+	next_heartbeat = jiffies + (heartbeat * HZ);
+
+	/* Start the timer */
+	mod_timer(&timer, jiffies + WDT_INTERVAL);
+
+	/* Enable the port */
 	if (revision == PCWD_REVISION_C) {
 		spin_lock(&io_lock);
 		outb_p(0x00, current_readport + 3);
+		udelay(ISA_COMMAND_TIMEOUT);
 		stat_reg = inb_p(current_readport + 2);
 		spin_unlock(&io_lock);
-		if (stat_reg & 0x10)
-		{
+		if (stat_reg & 0x10) {
 			printk(KERN_INFO PFX "Could not start watchdog\n");
 			return -EIO;
 		}
@@ -227,15 +279,19 @@ static int pcwd_stop(void)
 {
 	int stat_reg;
 
+	/* Stop the timer */
+	del_timer(&timer);
+
 	/*  Disable the board  */
 	if (revision == PCWD_REVISION_C) {
 		spin_lock(&io_lock);
 		outb_p(0xA5, current_readport + 3);
+		udelay(ISA_COMMAND_TIMEOUT);
 		outb_p(0xA5, current_readport + 3);
+		udelay(ISA_COMMAND_TIMEOUT);
 		stat_reg = inb_p(current_readport + 2);
 		spin_unlock(&io_lock);
-		if ((stat_reg & 0x10) == 0)
-		{
+		if ((stat_reg & 0x10) == 0) {
 			printk(KERN_INFO PFX "Could not stop watchdog\n");
 			return -EIO;
 		}
@@ -243,19 +299,19 @@ static int pcwd_stop(void)
 	return 0;
 }
 
-static void pcwd_send_heartbeat(void)
+static void pcwd_keepalive(void)
 {
-	int wdrst_stat;
+	/* user land ping */
+	next_heartbeat = jiffies + (heartbeat * HZ);
+}
 
-	wdrst_stat = inb_p(current_readport);
-	wdrst_stat &= 0x0F;
+static int pcwd_set_heartbeat(int t)
+{
+	if ((t < 2) || (t > 7200)) /* arbitrary upper limit */
+		return -EINVAL;
 
-	wdrst_stat |= WD_WDRST;
-
-	if (revision == PCWD_REVISION_A)
-		outb_p(wdrst_stat, current_readport + 1);
-	else
-		outb_p(wdrst_stat, current_readport);
+	heartbeat = t;
+	return 0;
 }
 
 static int pcwd_get_status(int *status)
@@ -347,11 +403,12 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 	int rv;
 	int status;
 	int temperature;
-	static struct watchdog_info ident=
-	{
+	int new_heartbeat;
+	static struct watchdog_info ident = {
 		.options =		WDIOF_OVERHEAT |
 					WDIOF_CARDRESET |
 					WDIOF_KEEPALIVEPING |
+					WDIOF_SETTIMEOUT |
 					WDIOF_MAGICCLOSE,
 		.firmware_version =	1,
 		.identity =		"PCWD",
@@ -403,8 +460,18 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 		return -EINVAL;
 
 	case WDIOC_KEEPALIVE:
-		pcwd_send_heartbeat();
+		pcwd_keepalive();
 		return 0;
+
+	case WDIOC_SETTIMEOUT:
+		if (get_user(new_heartbeat, (int *) arg))
+			return -EFAULT;
+
+		if (pcwd_set_heartbeat(new_heartbeat))
+			return -EINVAL;
+
+		pcwd_keepalive();
+		/* Fall */
 
 	case WDIOC_GETTIMEOUT:
 		return put_user(heartbeat, (int *)arg);
@@ -436,7 +503,7 @@ static ssize_t pcwd_write(struct file *file, const char *buf, size_t len,
 					expect_close = 42;
 			}
 		}
-		pcwd_send_heartbeat();
+		pcwd_keepalive();
 	}
 	return len;
 }
@@ -453,6 +520,7 @@ static int pcwd_open(struct inode *inode, struct file *file)
 
 	/* Activate */
 	pcwd_start();
+	pcwd_keepalive();
 	return(0);
 }
 
@@ -463,7 +531,7 @@ static int pcwd_close(struct inode *inode, struct file *file)
 		atomic_inc( &open_allowed );
 	} else {
 		printk(KERN_CRIT PFX "Unexpected close, not stopping watchdog!\n");
-		pcwd_send_heartbeat();
+		pcwd_keepalive();
 	}
 	expect_close = 0;
 	return 0;
@@ -651,13 +719,16 @@ static int __devinit pcwatchdog_init(int base_addr)
 	supports_temp = 0;
 	temp_panic = 0;
 	initial_status = 0x0000;
-	heartbeat = 0;
 
 	/* get the boot_status */
 	pcwd_get_status(&initial_status);
 
 	/* clear the "card caused reboot" flag */
 	pcwd_clear_status();
+
+	init_timer(&timer);
+	timer.function = pcwd_timer_ping;
+	timer.data = 0;
 
 	/*  Disable the board  */
 	pcwd_stop();
@@ -674,20 +745,16 @@ static int __devinit pcwatchdog_init(int base_addr)
 			current_readport, firmware);
 		kfree(firmware);
 		option_switches = get_option_switches();
-		switch (option_switches & 0x07) {
-			case 0: heartbeat = 20; break;
-			case 1: heartbeat = 40; break;
-			case 2: heartbeat = 60; break;
-			case 3: heartbeat = 300; break;
-			case 4: heartbeat = 600; break;
-			case 5: heartbeat = 1800; break;
-			case 6: heartbeat = 3600; break;
-			case 7: heartbeat = 7200; break;
-		}
 		printk(KERN_INFO PFX "Option switches (0x%02x): Temperature Reset Enable=%s, Power On Delay=%s\n",
 			option_switches,
 			((option_switches & 0x10) ? "ON" : "OFF"),
 			((option_switches & 0x08) ? "ON" : "OFF"));
+
+		/* Reprogram internal heartbeat to 2 seconds */
+		if (set_command_mode()) {
+			send_isa_command(CMD_ISA_DELAY_TIME_2SECS);
+			unset_command_mode();
+		}
 	} else {
 		/* Should NEVER happen, unless get_revision() fails. */
 		printk(KERN_INFO PFX "Unable to get revision\n");
@@ -709,6 +776,13 @@ static int __devinit pcwatchdog_init(int base_addr)
 
 	if (initial_status == 0)
 		printk(KERN_INFO PFX "No previous trip detected - Cold boot or reset\n");
+
+	/* Check that the heartbeat value is within it's range ; if not reset to the default */
+        if (pcwd_set_heartbeat(heartbeat)) {
+                pcwd_set_heartbeat(WATCHDOG_HEARTBEAT);
+                printk(KERN_INFO PFX "heartbeat value must be 2<=heartbeat<=7200, using %d\n",
+                        WATCHDOG_HEARTBEAT);
+	}
 
 	ret = register_reboot_notifier(&pcwd_notifier);
 	if (ret) {
