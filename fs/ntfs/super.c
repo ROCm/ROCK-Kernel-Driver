@@ -142,7 +142,7 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 	if (!opt || !*opt)
 		goto no_mount_options;
 	ntfs_debug("Entering with mount options string: %s", opt);
-	while ((p = strsep(&opt, ","))) {
+	while ( (p = strsep(&opt, ",")) && (*p != '\0') ) {
 		if ((v = strchr(p, '=')))
 			*v++ = '\0';
 		NTFS_GETOPT("uid", uid)
