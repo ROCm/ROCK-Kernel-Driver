@@ -678,6 +678,7 @@ e1000_sw_init(struct e1000_adapter *adapter)
 
 	atomic_set(&adapter->irq_sem, 1);
 	spin_lock_init(&adapter->stats_lock);
+	spin_lock_init(&adapter->tx_lock);
 
 	return 0;
 }
@@ -1765,6 +1766,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	struct e1000_adapter *adapter = netdev->priv;
 	unsigned int first;
 	unsigned int tx_flags = 0;
+	unsigned long flags;
 	int count;
 
 	if(skb->len <= 0) {
@@ -1772,10 +1774,13 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		return 0;
 	}
 
+	spin_lock_irqsave(&adapter->tx_lock, flags);
+
 	if(adapter->hw.mac_type == e1000_82547) {
 		if(e1000_82547_fifo_workaround(adapter, skb)) {
 			netif_stop_queue(netdev);
 			mod_timer(&adapter->tx_fifo_stall_timer, jiffies);
+			spin_unlock_irqrestore(&adapter->tx_lock, flags);
 			return 1;
 		}
 	}
@@ -1796,11 +1801,14 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		e1000_tx_queue(adapter, count, tx_flags);
 	else {
 		netif_stop_queue(netdev);
+		spin_unlock_irqrestore(&adapter->tx_lock, flags);
 		return 1;
 	}
 
 	netdev->trans_start = jiffies;
 
+	spin_unlock_irqrestore(&adapter->tx_lock, flags);
+	
 	return 0;
 }
 
@@ -2154,6 +2162,8 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	unsigned int i, eop;
 	boolean_t cleaned = FALSE;
 
+	spin_lock(&adapter->tx_lock);
+
 	i = tx_ring->next_to_clean;
 	eop = tx_ring->buffer_info[i].next_to_watch;
 	eop_desc = E1000_TX_DESC(*tx_ring, eop);
@@ -2197,6 +2207,8 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 
 	if(cleaned && netif_queue_stopped(netdev) && netif_carrier_ok(netdev))
 		netif_wake_queue(netdev);
+
+	spin_unlock(&adapter->tx_lock);
 
 	return cleaned;
 }
