@@ -25,6 +25,7 @@
 
 #if defined(__SMP__) || defined(CONFIG_SND_DEBUG)
 
+#if 0 /* NOT USED */
 /* (interruptible) sleep_on during the specified spinlock */
 void snd_seq_sleep_in_lock(wait_queue_head_t *p, spinlock_t *lock)
 {
@@ -60,6 +61,7 @@ long snd_seq_sleep_timeout_in_lock(wait_queue_head_t *p, spinlock_t *lock, long 
 
 	return timeout;
 }
+#endif /* NOT USED */
 
 /* wait until all locks are released */
 void snd_use_lock_sync_helper(snd_use_lock_t *lockp, const char *file, int line)

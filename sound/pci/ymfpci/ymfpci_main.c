@@ -1538,6 +1538,7 @@ YMFPCI_DOUBLE("ADC Playback Volume", 0, YDSXGR_PRIADCOUTVOL),
 YMFPCI_DOUBLE("ADC Capture Volume", 0, YDSXGR_PRIADCLOOPVOL),
 YMFPCI_DOUBLE("ADC Playback Volume", 1, YDSXGR_SECADCOUTVOL),
 YMFPCI_DOUBLE("ADC Capture Volume", 1, YDSXGR_SECADCLOOPVOL),
+YMFPCI_DOUBLE("FM Legacy Volume", 0, YDSXGR_LEGACYOUTVOL),
 YMFPCI_DOUBLE(SNDRV_CTL_NAME_IEC958("AC97 ", PLAYBACK,VOLUME), 0, YDSXGR_ZVOUTVOL),
 YMFPCI_DOUBLE(SNDRV_CTL_NAME_IEC958("", CAPTURE,VOLUME), 0, YDSXGR_ZVLOOPVOL),
 YMFPCI_DOUBLE(SNDRV_CTL_NAME_IEC958("AC97 ",PLAYBACK,VOLUME), 1, YDSXGR_SPDIFOUTVOL),
@@ -2022,6 +2023,7 @@ static int __devinit snd_ymfpci_memalloc(ymfpci_t *chip)
 	snd_ymfpci_writel(chip, YDSXGR_NATIVEADCINVOL, 0x3fff3fff);
 	snd_ymfpci_writel(chip, YDSXGR_NATIVEDACINVOL, 0x3fff3fff);
 	snd_ymfpci_writel(chip, YDSXGR_PRIADCLOOPVOL, 0x3fff3fff);
+	snd_ymfpci_writel(chip, YDSXGR_LEGACYOUTVOL, 0x3fff3fff);
 	
 	return 0;
 }
@@ -2036,6 +2038,7 @@ static int snd_ymfpci_free(ymfpci_t *chip)
 	if (chip->res_reg_area) {	/* don't touch busy hardware */
 		snd_ymfpci_writel(chip, YDSXGR_NATIVEDACOUTVOL, 0);
 		snd_ymfpci_writel(chip, YDSXGR_BUF441OUTVOL, 0);
+		snd_ymfpci_writel(chip, YDSXGR_LEGACYOUTVOL, 0);
 		snd_ymfpci_writel(chip, YDSXGR_STATUS, ~0);
 		snd_ymfpci_disable_dsp(chip);
 		snd_ymfpci_writel(chip, YDSXGR_PLAYCTRLBASE, 0);
@@ -2100,6 +2103,7 @@ static int saved_regs_index[] = {
 	YDSXGR_SPDIFLOOPVOL,
 	YDSXGR_SPDIFOUTVOL,
 	YDSXGR_ZVOUTVOL,
+	YDSXGR_LEGACYOUTVOL,
 	/* address bases */
 	YDSXGR_PLAYCTRLBASE,
 	YDSXGR_RECCTRLBASE,
@@ -2112,7 +2116,7 @@ static int saved_regs_index[] = {
 	YDSXGR_ADCFORMAT,
 	YDSXGR_ADCSLOTSR,
 };
-#define YDSXGR_NUM_SAVED_REGS	(sizeof(saved_regs_index)/sizeof(saved_regs_index[0]))
+#define YDSXGR_NUM_SAVED_REGS	ARRAY_SIZE(saved_regs_index)
 
 void snd_ymfpci_suspend(ymfpci_t *chip)
 {
