@@ -132,7 +132,11 @@ struct node_entry {
 	u32 capabilities;	
 	struct list_head unit_directories;
 
+	struct hpsb_tlabel_pool *tpool;
+
 	const char *vendor_name;
+	char *oui_name;
+
 	quadlet_t quadlets[0];
 };
 
@@ -151,6 +155,10 @@ struct node_entry *hpsb_guid_get_entry(u64 guid);
 /* Same as above, but use the nodeid to get an node entry. This is not
  * fool-proof by itself, since the nodeid can change.  */
 struct node_entry *hpsb_nodeid_get_entry(nodeid_t nodeid);
+
+/* Same as above except that it will not block waiting for the nodemgr
+ * serialize semaphore.  */
+struct node_entry *hpsb_check_nodeid(nodeid_t nodeid);
 
 /*
  * If the entry refers to a local host, this function will return the pointer

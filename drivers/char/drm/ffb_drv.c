@@ -28,16 +28,16 @@
 
 #define DRIVER_FOPS						\
 static struct file_operations	DRM(fops) = {			\
-	owner:   		THIS_MODULE,			\
-	open:	 		DRM(open),			\
-	flush:	 		DRM(flush),			\
-	release: 		DRM(release),			\
-	ioctl:	 		DRM(ioctl),			\
-	mmap:	 		DRM(mmap),			\
-	read:	 		DRM(read),			\
-	fasync:	 		DRM(fasync),			\
-	poll:	 		DRM(poll),			\
-	get_unmapped_area:	ffb_get_unmapped_area,		\
+	.owner   		= THIS_MODULE,			\
+	.open	 		= DRM(open),			\
+	.flush	 		= DRM(flush),			\
+	.release 		= DRM(release),			\
+	.ioctl	 		= DRM(ioctl),			\
+	.mmap	 		= DRM(mmap),			\
+	.read	 		= DRM(read),			\
+	.fasync	 		= DRM(fasync),			\
+	.poll	 		= DRM(poll),			\
+	.get_unmapped_area	= ffb_get_unmapped_area,		\
 }
 
 #define DRIVER_COUNT_CARDS()	ffb_count_card_instances()

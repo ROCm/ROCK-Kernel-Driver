@@ -96,13 +96,13 @@ static ssize_t zft_write(struct file *fp, const char *buff,
 
 static struct file_operations zft_cdev =
 {
-	owner:		THIS_MODULE,
-	read:		zft_read,
-	write:		zft_write,
-	ioctl:		zft_ioctl,
-	mmap:		zft_mmap,
-	open:		zft_open,
-	release:	zft_close,
+	.owner		= THIS_MODULE,
+	.read		= zft_read,
+	.write		= zft_write,
+	.ioctl		= zft_ioctl,
+	.mmap		= zft_mmap,
+	.open		= zft_open,
+	.release	= zft_close,
 };
 
 /*      Open floppy tape device

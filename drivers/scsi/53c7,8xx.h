@@ -59,16 +59,16 @@ extern int NCR53c7xx_release(struct Scsi_Host *);
 #endif
 
 #define NCR53c7xx {					\
-          name:           "NCR53c{7,8}xx (rel 17)",	\
-	  detect:         NCR53c7xx_detect,		\
-	  queuecommand:   NCR53c7xx_queue_command,	\
-	  abort:          NCR53c7xx_abort,		\
-	  reset:          NCR53c7xx_reset,		\
-	  can_queue:      24,				\
-	  this_id:        7,				\
-	  sg_tablesize:   127,				\
-	  cmd_per_lun:    3,				\
-	  use_clustering: DISABLE_CLUSTERING} 
+          .name           = "NCR53c{7,8}xx (rel 17)",	\
+	  .detect         = NCR53c7xx_detect,		\
+	  .queuecommand   = NCR53c7xx_queue_command,	\
+	  .abort          = NCR53c7xx_abort,		\
+	  .reset          = NCR53c7xx_reset,		\
+	  .can_queue      = 24,				\
+	  .this_id        = 7,				\
+	  .sg_tablesize   = 127,				\
+	  .cmd_per_lun    = 3,				\
+	  .use_clustering = DISABLE_CLUSTERING} 
 
 #ifndef HOSTS_C
 

@@ -34,6 +34,7 @@
 #include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/wait.h>
+#include <linux/interrupt.h>
 
 #include "hosts.h"
 #include "highlevel.h"
@@ -158,7 +159,7 @@ static void cmp_add_host(struct hpsb_host *host)
 {
 	struct cmp_host *ch;
 
-	ch = kmalloc(sizeof *ch, SLAB_KERNEL);
+	ch = kmalloc(sizeof *ch, in_interrupt() ? SLAB_ATOMIC : SLAB_KERNEL);
 	if (ch == NULL) {
 		HPSB_ERR("Failed to allocate cmp_host");
 		return;

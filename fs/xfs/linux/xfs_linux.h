@@ -42,7 +42,6 @@
 #include <linux/sched.h>
 #include <linux/bitops.h>
 #include <linux/major.h>
-#include <linux/root_dev.h>
 
 #include <asm/page.h>
 #include <asm/div64.h>

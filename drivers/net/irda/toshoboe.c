@@ -938,12 +938,12 @@ toshoboe_resume (struct pci_dev *pci_dev)
 }
 
 static struct pci_driver toshoboe_pci_driver = {
-  name		: "toshoboe",
-  id_table	: toshoboe_pci_tbl,
-  probe		: toshoboe_probe,
-  remove	: toshoboe_remove,
-  suspend	: toshoboe_suspend,
-  resume	: toshoboe_resume 
+	.name		= "toshoboe",
+	.id_table	= toshoboe_pci_tbl,
+	.probe		= toshoboe_probe,
+	.remove		= toshoboe_remove,
+	.suspend	= toshoboe_suspend,
+	.resume		= toshoboe_resume 
 };
 
 int __init
