@@ -814,19 +814,23 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 }
 
 static struct cifsSesInfo *
-cifs_find_tcp_session(__u32 new_target_ip_addr,
+cifs_find_tcp_session(struct in_addr * target_ip_addr, 
+		struct in6_addr *target_ip6_addr,
 		 char *userName, struct TCP_Server_Info **psrvTcp)
 {
 	struct list_head *tmp;
 	struct cifsSesInfo *ses;
-
 	*psrvTcp = NULL;
 	read_lock(&GlobalSMBSeslock);
+
 	list_for_each(tmp, &GlobalSMBSessionList) {
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
 		if (ses->server) {
-			if (ses->server->addr.sockAddr.sin_addr.s_addr ==
-			    new_target_ip_addr) {
+			if((target_ip_addr && 
+				(ses->server->addr.sockAddr.sin_addr.s_addr
+				  == target_ip_addr->s_addr)) || (target_ip6_addr
+				&& memcmp(&ses->server->addr.sockAddr6.sin6_addr,
+					target_ip6_addr,sizeof(*target_ip6_addr)))){
 				/* BB lock server and tcp session and increment use count here?? */
 				*psrvTcp = ses->server;	/* found a match on the TCP session */
 				/* BB check if reconnection needed */
@@ -1235,8 +1239,9 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	}
 
 	existingCifsSes =
-	    cifs_find_tcp_session(sin_server.sin_addr.s_addr,
-			     volume_info.username, &srvTcp);
+	    cifs_find_tcp_session(&sin_server.sin_addr,
+			NULL /* no ipv6 addr */,
+			volume_info.username, &srvTcp);
 	if (srvTcp) {
 		cFYI(1, ("Existing tcp session with server found "));                
 	} else {	/* create socket */
