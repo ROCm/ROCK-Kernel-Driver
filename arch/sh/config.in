@@ -322,7 +322,7 @@ comment 'Watchdog Cards'
 bool 'Watchdog Timer Support' CONFIG_WATCHDOG
 if [ "$CONFIG_WATCHDOG" != "n" ]; then
    bool '  Disable watchdog shutdown on close' CONFIG_WATCHDOG_NOWAYOUT
-   dep_tristate '  SH 3/4 Watchdog' CONFIG_SH_WDT $CONFIG_SUPERH
+   tristate '  SH 3/4 Watchdog' CONFIG_SH_WDT
 fi
 endmenu
 
