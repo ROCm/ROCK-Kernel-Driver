@@ -442,9 +442,13 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		if (copy_to_user((void *) arg, &dinfo, sizeof(dinfo)))
 			return -EFAULT;
 
+		return 0;
+
 	case HIDIOCGFLAG:
 		if (put_user(list->flags, (int *) arg))
 			return -EFAULT;
+
+		return 0;
 
 	case HIDIOCSFLAG:
 		{
@@ -533,6 +537,8 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		if (copy_to_user((void *) arg, &rinfo, sizeof(rinfo)))
 			return -EFAULT;
 
+		return 0;
+
 	case HIDIOCGFIELDINFO:
 		if (copy_from_user(&finfo, (void *) arg, sizeof(finfo)))
 			return -EFAULT;
@@ -564,6 +570,8 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		if (copy_to_user((void *) arg, &finfo, sizeof(finfo)))
 			return -EFAULT;
 
+		return 0;
+
 	case HIDIOCGUCODE:
 		if (copy_from_user(&uref, (void *) arg, sizeof(uref)))
 			return -EFAULT;
@@ -584,6 +592,8 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 
 		if (copy_to_user((void *) arg, &uref, sizeof(uref)))
 			return -EFAULT;
+
+		return 0;
 
 	case HIDIOCGUSAGE:
 	case HIDIOCSUSAGE:

@@ -33,6 +33,8 @@ EXPORT_SYMBOL(input_register_device);
 EXPORT_SYMBOL(input_unregister_device);
 EXPORT_SYMBOL(input_register_handler);
 EXPORT_SYMBOL(input_unregister_handler);
+EXPORT_SYMBOL(input_grab_device);
+EXPORT_SYMBOL(input_release_device);
 EXPORT_SYMBOL(input_open_device);
 EXPORT_SYMBOL(input_close_device);
 EXPORT_SYMBOL(input_accept_process);
@@ -175,9 +177,12 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 	if (type != EV_SYN) 
 		dev->sync = 0;
 
-	list_for_each_entry(handle, &dev->h_list, d_node)
-		if (handle->open)
-			handle->handler->event(handle, type, code, value);
+	if (dev->grab)
+		dev->grab->handler->event(dev->grab, type, code, value);
+	else
+		list_for_each_entry(handle, &dev->h_list, d_node)
+			if (handle->open)
+				handle->handler->event(handle, type, code, value);
 }
 
 static void input_repeat_key(unsigned long data)
@@ -201,6 +206,21 @@ int input_accept_process(struct input_handle *handle, struct file *file)
 	return 0;
 }
 
+int input_grab_device(struct input_handle *handle)
+{
+	if (handle->dev->grab)
+		return -EBUSY;
+
+	handle->dev->grab = handle;
+	return 0;
+}
+
+void input_release_device(struct input_handle *handle)
+{
+	if (handle->dev->grab == handle)
+		handle->dev->grab = NULL;
+}
+
 int input_open_device(struct input_handle *handle)
 {
 	if (handle->dev->pm_dev)
@@ -221,6 +241,7 @@ int input_flush_device(struct input_handle* handle, struct file* file)
 
 void input_close_device(struct input_handle *handle)
 {
+	input_release_device(handle);
 	if (handle->dev->pm_dev)
 		pm_dev_idle(handle->dev->pm_dev);
 	if (handle->dev->close)
