@@ -201,6 +201,7 @@ static int cramfs_fill_super(struct super_block *sb, void *data, int silent)
 	if (!sbi)
 		return -ENOMEM;
 	sb->u.generic_sbp = sbi;
+	memset(sbi, 0, sizeof(struct cramfs_sb_info));
 
 	sb_set_blocksize(sb, PAGE_CACHE_SIZE);
 
