@@ -414,9 +414,6 @@ static inline int usb_make_path (struct usb_device *dev, char *buf, size_t size)
  *	Export this with MODULE_DEVICE_TABLE(usb,...).  This must be set
  *	or your driver's probe function will never get called.
  * @driver: the driver model core driver structure.
- * @serialize: a semaphore used to serialize access to this driver.  Used
- * 	in the probe and disconnect functions.  Only the USB core should use
- * 	this lock.
  *
  * USB drivers must provide a name, probe() and disconnect() methods,
  * and an id_table.  Other driver fields are optional.
@@ -451,8 +448,6 @@ struct usb_driver {
 	const struct usb_device_id *id_table;
 
 	struct device_driver driver;
-
-	struct semaphore serialize;
 };
 #define	to_usb_driver(d) container_of(d, struct usb_driver, driver)
 

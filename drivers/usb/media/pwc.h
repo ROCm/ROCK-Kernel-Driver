@@ -18,16 +18,20 @@
 #ifndef PWC_H
 #define PWC_H
 
+#include <linux/version.h>
+
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/usb.h>
+#include <linux/smp_lock.h>
 #include <linux/spinlock.h>
+#include <linux/usb.h>
 #include <linux/videodev.h>
 #include <linux/wait.h>
-#include <linux/smp_lock.h>
 
 #include <asm/semaphore.h>
 #include <asm/errno.h>
+
+#include "pwc-ioctl.h"
 
 /* Defines and structures for the Philips webcam */
 /* Used for checking memory corruption/pointer validation */
@@ -58,10 +62,12 @@
 #define TOUCAM_HEADER_SIZE		8
 #define TOUCAM_TRAILER_SIZE		4
 
+#define FEATURE_MOTOR_PANTILT		0x0001
+
 /* Version block */
 #define PWC_MAJOR	8
-#define PWC_MINOR	11
-#define PWC_VERSION 	"8.11"
+#define PWC_MINOR	12
+#define PWC_VERSION 	"8.12"
 #define PWC_NAME 	"pwc"
 
 /* Turn certain features on/off */
@@ -119,8 +125,9 @@ struct pwc_device
    /* Pointer to our usb_device */
    struct usb_device *udev;
    
-   int type;                    /* type of cam (645, 646, 675, 680, 690) */
+   int type;                    /* type of cam (645, 646, 675, 680, 690, 720, 730, 740, 750) */
    int release;			/* release number */
+   int features;		/* feature bits */
    int error_status;		/* set when something goes wrong with the cam (unplugged, USB errors) */
    int usb_init;		/* set when the cam has been initialized over USB */
 
@@ -193,6 +200,11 @@ struct pwc_device
 
    struct semaphore modlock;		/* to prevent races in video_open(), etc */
    spinlock_t ptrlock;			/* for manipulating the buffer pointers */
+
+   /*** motorized pan/tilt feature */
+   struct pwc_mpt_range angle_range;
+   int pan_angle;			/* in degrees * 100 */
+   int tilt_angle;			/* absolute angle; 0,0 is home position */
 
    /*** Misc. data ***/
    wait_queue_head_t frameq;		/* When waiting for a frame to finish... */

@@ -52,7 +52,7 @@ int pwc_decode_size(struct pwc_device *pdev, int width, int height)
 	return find;
 }
 
-/* initialize variables depending on type */
+/* initialize variables depending on type and decompressor*/
 void pwc_construct(struct pwc_device *pdev)
 {
 	switch(pdev->type) {
@@ -73,9 +73,17 @@ void pwc_construct(struct pwc_device *pdev)
 	case 690:
 		pdev->view_min.x = 128;
 		pdev->view_min.y =  96;
-		pdev->view_max.x = 640;
-		pdev->view_max.y = 480;
-		pdev->image_mask = 1 << PSZ_SQCIF | 1 << PSZ_QSIF | 1 << PSZ_QCIF | 1 << PSZ_SIF | 1 << PSZ_CIF | 1 << PSZ_VGA;
+		/* Anthill bug #38: PWC always reports max size, even without PWCX */
+		if (pdev->decompressor != NULL) {
+			pdev->view_max.x = 640;
+			pdev->view_max.y = 480;
+			pdev->image_mask = 1 << PSZ_SQCIF | 1 << PSZ_QSIF | 1 << PSZ_QCIF | 1 << PSZ_SIF | 1 << PSZ_CIF | 1 << PSZ_VGA;
+		}
+		else {
+			pdev->view_max.x = 352;
+			pdev->view_max.y = 288;
+			pdev->image_mask = 1 << PSZ_SQCIF | 1 << PSZ_QSIF | 1 << PSZ_QCIF | 1 << PSZ_SIF | 1 << PSZ_CIF;
+		}
 		pdev->vcinterface = 3;
 		pdev->vendpoint = 4;
 		pdev->frame_header_size = 0;
@@ -87,9 +95,18 @@ void pwc_construct(struct pwc_device *pdev)
 	case 750:
 		pdev->view_min.x = 160;
 		pdev->view_min.y = 120;
-		pdev->view_max.x = 640;
-		pdev->view_max.y = 480;
-		pdev->image_mask = 1 << PSZ_QSIF | 1 << PSZ_SIF | 1 << PSZ_VGA;
+		/* Anthill bug #38: PWC always reports max size, even without PWCX */
+		if (pdev->decompressor != NULL) {
+			pdev->view_max.x = 640;
+			pdev->view_max.y = 480;
+			pdev->image_mask = 1 << PSZ_QSIF | 1 << PSZ_SIF | 1 << PSZ_VGA;
+		}
+		else {
+			/* Tell CIF, even though SIF really is the maximum, but some tools really need CIF */
+			pdev->view_max.x = 352;
+			pdev->view_max.y = 288;
+			pdev->image_mask = 1 << PSZ_QSIF | 1 << PSZ_SIF;
+		}
 		pdev->vcinterface = 3;
 		pdev->vendpoint = 5;
 		pdev->frame_header_size = TOUCAM_HEADER_SIZE;

@@ -1488,16 +1488,20 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 		       usb_sndbulkpipe(edge_serial->serial->dev, edge_serial->bulk_out_endpoint),
 		       buffer, count+2, edge_bulk_out_data_callback, edge_port);
 
+	/* decrement the number of credits we have by the number we just sent */
+	edge_port->txCredits -= count;
+	edge_port->icount.tx += count;
+
 	urb->dev = edge_serial->serial->dev;
 	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status) {
 		/* something went wrong */
 		dbg("%s - usb_submit_urb(write bulk) failed", __FUNCTION__);
 		edge_port->write_in_progress = FALSE;
-	} else {
-		/* decrement the number of credits we have by the number we just sent */
-		edge_port->txCredits -= count;
-		edge_port->icount.tx += count;
+
+		/* revert the credits as something bad happened. */
+		edge_port->txCredits += count;
+		edge_port->icount.tx -= count;
 	}
 	dbg("%s wrote %d byte(s) TxCredit %d, Fifo %d", __FUNCTION__, count, edge_port->txCredits, fifo->count);
 }
