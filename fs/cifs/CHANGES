@@ -1,7 +1,9 @@
 Version 1.09
 ------------
 Fix /proc/fs module unload warning message (that could be logged
-to the kernel log)
+to the kernel log). Fix intermittent failure in connectathon
+test7 (hardlink count not immediately refreshed in case in which
+inode metadata can be incorrectly kept cached when time near zero)
 
 Version 1.08
 ------------
