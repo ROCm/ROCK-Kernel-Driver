@@ -236,8 +236,8 @@
 	ENTRY_SAME(flock)
 	ENTRY_SAME(msync)
 	/* struct iovec contains pointers */
-	ENTRY_DIFF(readv)		/* 145 */
-	ENTRY_DIFF(writev)
+	ENTRY_COMP(readv)		/* 145 */
+	ENTRY_COMP(writev)
 	ENTRY_SAME(getsid)
 	ENTRY_SAME(fdatasync)
 	/* struct __sysctl_args is a mess */

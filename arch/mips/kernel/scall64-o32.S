@@ -403,8 +403,8 @@ out:	jr	ra
 	sys	sys32_select	5
 	sys	sys_flock	2
 	sys	sys_msync	3
-	sys	sys32_readv	3			/* 4145 */
-	sys	sys32_writev	3
+	sys	compat_sys_readv	3		/* 4145 */
+	sys	compat_sys_writev	3
 	sys	sys_cacheflush	3
 	sys	sys_cachectl	3
 	sys	sys_sysmips	4

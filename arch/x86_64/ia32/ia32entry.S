@@ -450,8 +450,8 @@ ia32_sys_call_table:
 	.quad sys32_select
 	.quad sys_flock
 	.quad sys_msync
-	.quad sys32_readv		/* 145 */
-	.quad sys32_writev
+	.quad compat_sys_readv		/* 145 */
+	.quad compat_sys_writev
 	.quad sys_getsid
 	.quad sys_fdatasync
 	.quad sys32_sysctl	/* sysctl */

@@ -117,5 +117,11 @@ long compat_sys_shmat(int first, int second, compat_uptr_t third, int version,
 long compat_sys_shmctl(int first, int second, void __user *uptr);
 long compat_sys_semtimedop(int semid, struct sembuf __user *tsems,
 		unsigned nsems, const struct compat_timespec __user *timeout);
+
+asmlinkage ssize_t compat_sys_readv(unsigned long fd,
+		const struct compat_iovec __user *vec, unsigned long vlen);
+asmlinkage ssize_t compat_sys_writev(unsigned long fd,
+		const struct compat_iovec __user *vec, unsigned long vlen);
+
 #endif /* CONFIG_COMPAT */
 #endif /* _LINUX_COMPAT_H */

@@ -1203,9 +1203,6 @@ static inline int check_nonblock(int ret, int fd)
 	return ret;
 }
 
-extern asmlinkage int sys32_readv(u32 fd, u32 vector, s32 count);
-extern asmlinkage int sys32_writev(u32 fd, u32 vector, s32 count);
-
 asmlinkage int sunos_read(unsigned int fd, u32 buf, u32 count)
 {
 	int ret;
@@ -1218,7 +1215,7 @@ asmlinkage int sunos_readv(u32 fd, u32 vector, s32 count)
 {
 	int ret;
 
-	ret = check_nonblock(sys32_readv(fd, vector, count), fd);
+	ret = check_nonblock(compat_sys_readv(fd, (void*)A(vector), count), fd);
 	return ret;
 }
 
@@ -1234,7 +1231,7 @@ asmlinkage int sunos_writev(u32 fd, u32 vector, s32 count)
 {
 	int ret;
 
-	ret = check_nonblock(sys32_writev(fd, vector, count), fd);
+	ret = check_nonblock(compat_sys_writev(fd, (void*)A(vector), count), fd);
 	return ret;
 }
 

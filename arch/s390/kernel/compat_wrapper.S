@@ -663,19 +663,19 @@ sys32_msync_wrapper:
 	lgfr	%r4,%r4			# int
 	jg	sys_msync		# branch to system call
 
-	.globl  sys32_readv_wrapper 
-sys32_readv_wrapper:
+	.globl  compat_sys_readv_wrapper
+compat_sys_readv_wrapper:
 	lgfr	%r2,%r2			# int
-	llgtr	%r3,%r3			# const struct iovec_emu31 *
+	llgtr	%r3,%r3			# const struct compat_iovec *
 	llgfr	%r4,%r4			# unsigned long
-	jg	sys32_readv		# branch to system call
+	jg	compat_sys_readv	# branch to system call
 
-	.globl  sys32_writev_wrapper 
-sys32_writev_wrapper:
+	.globl  compat_sys_writev_wrapper
+compat_sys_writev_wrapper:
 	lgfr	%r2,%r2			# int
-	llgtr	%r3,%r3			# const struct iovec_emu31 *
+	llgtr	%r3,%r3			# const struct compat_iovec *
 	llgfr	%r4,%r4			# unsigned long
-	jg	sys32_writev		# branch to system call
+	jg	compat_sys_writev	# branch to system call
 
 	.globl  sys32_getsid_wrapper 
 sys32_getsid_wrapper:

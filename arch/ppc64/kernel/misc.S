@@ -717,8 +717,8 @@ _GLOBAL(sys_call_table32)
 	.llong .ppc32_select
 	.llong .sys_flock
 	.llong .sys_msync
-	.llong .sys32_readv		/* 145 */
-	.llong .sys32_writev
+	.llong .compat_sys_readv	/* 145 */
+	.llong .compat_sys_writev
 	.llong .sys32_getsid
 	.llong .sys_fdatasync
 	.llong .sys32_sysctl

@@ -34,9 +34,17 @@
 #include <linux/syscalls.h>
 #include <linux/ctype.h>
 #include <linux/module.h>
+#include <linux/dnotify.h>
+#include <linux/highuid.h>
+#include <linux/sunrpc/svc.h>
+#include <linux/nfsd/nfsd.h>
+#include <linux/nfsd/syscall.h>
+#include <linux/personality.h>
+
 #include <net/sock.h>		/* siocdevprivate_ioctl */
 
 #include <asm/uaccess.h>
+#include <asm/mmu_context.h>
 
 /*
  * Not all architectures have sys_utime, so implement this in terms
@@ -788,3 +796,181 @@ asmlinkage int compat_sys_mount(char __user * dev_name, char __user * dir_name,
 	return retval;
 }
 
+static ssize_t compat_do_readv_writev(int type, struct file *file,
+			       const struct compat_iovec __user *uvector,
+			       unsigned long nr_segs, loff_t *pos)
+{
+	typedef ssize_t (*io_fn_t)(struct file *, char __user *, size_t, loff_t *);
+	typedef ssize_t (*iov_fn_t)(struct file *, const struct iovec *, unsigned long, loff_t *);
+
+	compat_ssize_t tot_len;
+	struct iovec iovstack[UIO_FASTIOV];
+	struct iovec *iov=iovstack, *vector;
+	ssize_t ret;
+	int seg;
+	io_fn_t fn;
+	iov_fn_t fnv;
+	struct inode *inode;
+
+	/*
+	 * SuS says "The readv() function *may* fail if the iovcnt argument
+	 * was less than or equal to 0, or greater than {IOV_MAX}.  Linux has
+	 * traditionally returned zero for zero segments, so...
+	 */
+	ret = 0;
+	if (nr_segs == 0)
+		goto out;
+
+	/*
+	 * First get the "struct iovec" from user memory and
+	 * verify all the pointers
+	 */
+	ret = -EINVAL;
+	if ((nr_segs > UIO_MAXIOV) || (nr_segs <= 0))
+		goto out;
+	if (!file->f_op)
+		goto out;
+	if (nr_segs > UIO_FASTIOV) {
+		ret = -ENOMEM;
+		iov = kmalloc(nr_segs*sizeof(struct iovec), GFP_KERNEL);
+		if (!iov)
+			goto out;
+	}
+	ret = -EFAULT;
+	if (verify_area(VERIFY_READ, uvector, nr_segs*sizeof(*uvector)))
+		goto out;
+
+	/*
+	 * Single unix specification:
+	 * We should -EINVAL if an element length is not >= 0 and fitting an
+	 * ssize_t.  The total length is fitting an ssize_t
+	 *
+	 * Be careful here because iov_len is a size_t not an ssize_t
+	 */
+	tot_len = 0;
+	vector = iov;
+	ret = -EINVAL;
+	for (seg = 0 ; seg < nr_segs; seg++) {
+		compat_ssize_t tmp = tot_len;
+		compat_ssize_t len;
+		compat_uptr_t buf;
+
+		if (__get_user(len, &uvector->iov_len) ||
+		    __get_user(buf, &uvector->iov_base)) {
+			ret = -EFAULT;
+			goto out;
+		}
+		if (len < 0)	/* size_t not fitting an compat_ssize_t .. */
+			goto out;
+		tot_len += len;
+		if (tot_len < tmp) /* maths overflow on the compat_ssize_t */
+			goto out;
+		vector->iov_base = compat_ptr(buf);
+		vector->iov_len = (compat_size_t) len;
+		uvector++;
+		vector++;
+	}
+	if (tot_len == 0) {
+		ret = 0;
+		goto out;
+	}
+
+	inode = file->f_dentry->d_inode;
+	/* VERIFY_WRITE actually means a read, as we write to user space */
+	ret = locks_verify_area((type == READ
+				 ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE),
+				inode, file, *pos, tot_len);
+	if (ret)
+		goto out;
+
+	fnv = NULL;
+	if (type == READ) {
+		fn = file->f_op->read;
+		fnv = file->f_op->readv;
+	} else {
+		fn = (io_fn_t)file->f_op->write;
+		fnv = file->f_op->writev;
+	}
+	if (fnv) {
+		ret = fnv(file, iov, nr_segs, pos);
+		goto out;
+	}
+
+	/* Do it by hand, with file-ops */
+	ret = 0;
+	vector = iov;
+	while (nr_segs > 0) {
+		void __user * base;
+		size_t len;
+		ssize_t nr;
+
+		base = vector->iov_base;
+		len = vector->iov_len;
+		vector++;
+		nr_segs--;
+
+		nr = fn(file, base, len, pos);
+
+		if (nr < 0) {
+			if (!ret) ret = nr;
+			break;
+		}
+		ret += nr;
+		if (nr != len)
+			break;
+	}
+out:
+	if (iov != iovstack)
+		kfree(iov);
+	if ((ret + (type == READ)) > 0)
+		dnotify_parent(file->f_dentry,
+				(type == READ) ? DN_ACCESS : DN_MODIFY);
+	return ret;
+}
+
+asmlinkage ssize_t
+compat_sys_readv(unsigned long fd, const struct compat_iovec __user *vec, unsigned long vlen)
+{
+	struct file *file;
+	ssize_t ret = -EBADF;
+
+	file = fget(fd);
+	if (!file)
+		return -EBADF;
+
+	if (!(file->f_mode & FMODE_READ))
+		goto out;
+
+	ret = -EINVAL;
+	if (!file->f_op || (!file->f_op->readv && !file->f_op->read))
+		goto out;
+
+	ret = compat_do_readv_writev(READ, file, vec, vlen, &file->f_pos);
+
+out:
+	fput(file);
+	return ret;
+}
+
+asmlinkage ssize_t
+compat_sys_writev(unsigned long fd, const struct compat_iovec __user *vec, unsigned long vlen)
+{
+	struct file *file;
+	ssize_t ret = -EBADF;
+
+	file = fget(fd);
+	if (!file)
+		return -EBADF;
+	if (!(file->f_mode & FMODE_WRITE))
+		goto out;
+
+	ret = -EINVAL;
+	if (!file->f_op || (!file->f_op->writev && !file->f_op->write))
+		goto out;
+
+	ret = compat_do_readv_writev(WRITE, file, vec, vlen, &file->f_pos);
+
+out:
+	fput(file);
+	return ret;
+}

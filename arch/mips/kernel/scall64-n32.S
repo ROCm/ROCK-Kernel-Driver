@@ -135,8 +135,8 @@ EXPORT(sysn32_call_table)
 	PTR	compat_sys_ioctl		/* 6015 */
 	PTR	sys_pread64
 	PTR	sys_pwrite64
-	PTR	sys32_readv
-	PTR	sys32_writev
+	PTR	compat_sys_readv
+	PTR	compat_sys_writev
 	PTR	sys_access			/* 6020 */
 	PTR	sys_pipe
 	PTR	sys32_select
