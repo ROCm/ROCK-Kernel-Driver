@@ -447,7 +447,7 @@ static void __devexit tlan_remove_one( struct pci_dev *pdev)
 
 	pci_release_regions(pdev);
 	
-	kfree( dev );
+	free_netdev( dev );
 		
 	pci_set_drvdata( pdev, NULL );
 } 

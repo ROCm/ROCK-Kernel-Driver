@@ -826,7 +826,7 @@ gt96100_probe1(int port_num)
  free_region:
 	release_region(gtif->iobase, GT96100_ETH_IO_SIZE);
 	unregister_netdev(dev);
-	kfree (dev);
+	free_netdev (dev);
 	err("%s failed.  Returns %d\n", __FUNCTION__, retval);
 	return retval;
 }
@@ -1575,7 +1575,7 @@ static void gt96100_cleanup_module(void)
 				(struct gt96100_private *)gtif->dev->priv;
 			release_region(gtif->iobase, gp->io_size);
 			unregister_netdev(gtif->dev);
-			kfree (gtif->dev);
+			free_netdev (gtif->dev);
 		}
 	}
 }

@@ -3376,7 +3376,7 @@ static void __devexit dfx_remove_one_pci_or_eisa(struct pci_dev *pdev, struct ne
 	if (bp->kmalloced)
 		pci_free_consistent(pdev, alloc_size, bp->kmalloced,
 				    bp->kmalloced_dma);
-	kfree(dev);
+	free_netdev(dev);
 }
 
 static void __devexit dfx_remove_one (struct pci_dev *pdev)

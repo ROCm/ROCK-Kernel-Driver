@@ -69,10 +69,6 @@ struct pt_regs;
 extern void timer_tick_interrupt(struct pt_regs *);
 #endif
 
-#ifndef CONFIG_SMP
-extern unsigned long up_clock_tick;
-#endif
-
 extern unsigned long sparc64_get_clock_tick(unsigned int cpu);
 
 #endif /* _SPARC64_TIMER_H */

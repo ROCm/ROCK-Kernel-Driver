@@ -138,7 +138,6 @@ static char *version = "$Id: he.c,v 1.18 2003/05/06 22:57:15 chas Exp $";
 static int he_open(struct atm_vcc *vcc, short vpi, int vci);
 static void he_close(struct atm_vcc *vcc);
 static int he_send(struct atm_vcc *vcc, struct sk_buff *skb);
-static int he_sg_send(struct atm_vcc *vcc, unsigned long start, unsigned long size);
 static int he_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg);
 static irqreturn_t he_irq_handler(int irq, void *dev_id, struct pt_regs *regs);
 static void he_tasklet(unsigned long data);
@@ -166,7 +165,6 @@ static struct atmdev_ops he_ops =
 	.close =	he_close,	
 	.ioctl =	he_ioctl,	
 	.send =		he_send,
-	.sg_send =	he_sg_send,	
 	.phy_put =	he_phy_put,
 	.phy_get =	he_phy_get,
 	.proc_read =	he_proc_read,
@@ -2724,16 +2722,6 @@ close_tx_incomplete:
 	kfree(he_vcc);
 
 	clear_bit(ATM_VF_ADDR, &vcc->flags);
-}
-
-static int
-he_sg_send(struct atm_vcc *vcc, unsigned long start, unsigned long size)
-{
-#ifdef USE_SCATTERGATHER
-	return 1;
-#else
-	return 0;
-#endif
 }
 
 static int

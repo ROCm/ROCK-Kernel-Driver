@@ -542,7 +542,14 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			acpi_ht = 1;
 			if (!acpi_force) acpi_disabled = 1;
 		}
-#endif
+
+#ifdef CONFIG_X86_LOCAL_APIC
+		/* disable IO-APIC */
+		else if (!memcmp(from, "noapic", 6)) {
+			skip_ioapic_setup = 1;
+		}
+#endif /* CONFIG_X86_LOCAL_APIC */
+#endif /* CONFIG_ACPI_BOOT */
 
 		/*
 		 * highmem=size forces highmem to be exactly 'size' bytes.

@@ -415,16 +415,19 @@ static __init int swab_apm_power_in_minutes(struct dmi_blacklist *d)
  * The MP1.4 table is right however and so SMP kernels tend to work. 
  */
  
-extern int skip_ioapic_setup;
 static __init int broken_pirq(struct dmi_blacklist *d)
 {
+
 	printk(KERN_INFO " *** Possibly defective BIOS detected (irqtable)\n");
 	printk(KERN_INFO " *** Many BIOSes matching this signature have incorrect IRQ routing tables.\n");
 	printk(KERN_INFO " *** If you see IRQ problems, in particular SCSI resets and hangs at boot\n");
 	printk(KERN_INFO " *** contact your hardware vendor and ask about updates.\n");
 	printk(KERN_INFO " *** Building an SMP kernel may evade the bug some of the time.\n");
 #ifdef CONFIG_X86_IO_APIC
-	skip_ioapic_setup = 0;
+	{
+		extern int skip_ioapic_setup;
+		skip_ioapic_setup = 0;
+	}
 #endif
 	return 0;
 }
@@ -516,7 +519,6 @@ static __init int print_if_true(struct dmi_blacklist *d)
 
 
 extern int acpi_disabled, acpi_force;
-extern int skip_ioapic_setup; 
 
 static __init __attribute__((unused)) int acpi_disable(struct dmi_blacklist *d) 
 { 
@@ -1002,13 +1004,15 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
  *	returns 1 or we hit the end.
  */
  
-#define	ACPI_BLACKLIST_CUTOFF_YEAR	2001
 
 static __init void dmi_check_blacklist(void)
 {
 	struct dmi_blacklist *d;
 	int i;
 		
+#ifdef	CONFIG_ACPI_BOOT
+#define	ACPI_BLACKLIST_CUTOFF_YEAR	2001
+
 	if (dmi_ident[DMI_BIOS_DATE]) { 
 		char *s = strrchr(dmi_ident[DMI_BIOS_DATE], '/'); 
 		if (s) { 
@@ -1026,6 +1030,7 @@ static __init void dmi_check_blacklist(void)
 			} 
 		}
 	}
+#endif
 
 	d=&dmi_blacklist[0];
 	while(d->callback)

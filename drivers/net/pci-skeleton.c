@@ -871,7 +871,7 @@ static void __devexit netdrv_remove_one (struct pci_dev *pdev)
 		sizeof (struct netdrv_private));
 #endif /* NETDRV_NDEBUG */
 
-	kfree (dev);
+	free_netdev (dev);
 
 	pci_set_drvdata (pdev, NULL);
 

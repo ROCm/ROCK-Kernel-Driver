@@ -411,7 +411,7 @@ void cleanup_module(void)
 	free_irq(dev->irq, dev);
 	release_region(dev->base_addr, ARCNET_TOTAL_SIZE);
 	kfree(dev->priv);
-	kfree(dev);
+	free_netdev(dev);
 }
 
 #else

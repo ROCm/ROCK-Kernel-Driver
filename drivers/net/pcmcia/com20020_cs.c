@@ -329,7 +329,7 @@ static void com20020_detach(dev_link_t *link)
 	    
 	    DEBUG(1,"kfree...\n");
 	    kfree(dev->priv);
-	    kfree(dev);
+	    free_netdev(dev);
 	}
 	DEBUG(1,"kfree2...\n");
 	kfree(info);

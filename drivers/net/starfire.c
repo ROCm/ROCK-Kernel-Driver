@@ -2196,7 +2196,7 @@ static void __devexit starfire_remove_one (struct pci_dev *pdev)
 	pci_release_regions(pdev);
 
 	pci_set_drvdata(pdev, NULL);
-	kfree(dev);			/* Will also free np!! */
+	free_netdev(dev);			/* Will also free np!! */
 }
 
 

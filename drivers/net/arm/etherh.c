@@ -721,7 +721,7 @@ static void __devexit etherh_remove(struct expansion_card *ec)
 	if (ec->cid.product == PROD_ANT_ETHERM)
 		size <<= 3;
 	release_region(dev->base_addr, size);
-	kfree(dev);
+	free_netdev(dev);
 
 	ec->ops = NULL;
 	kfree(ec->irq_data);

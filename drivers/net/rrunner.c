@@ -253,7 +253,7 @@ static void __devexit rr_remove_one (struct pci_dev *pdev)
 				    rr->tx_ring_dma);
 		unregister_netdev(dev);
 		iounmap(rr->regs);
-		kfree(dev);
+		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);
 		pci_set_drvdata(pdev, NULL);

@@ -254,7 +254,7 @@ err_out:
 		release_OF_resource(mp->of_node, 1);
 		release_OF_resource(mp->of_node, 2);
 	}
-	kfree(dev);
+	free_netdev(dev);
 }
 
 static void dbdma_reset(volatile struct dbdma_regs *dma)

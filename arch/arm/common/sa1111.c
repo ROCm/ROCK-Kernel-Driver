@@ -55,9 +55,6 @@ struct sa1111 {
 static struct sa1111 *g_sa1111;
 
 static struct sa1111_dev usb_dev = {
-	.dev = {
-		.name	= "Intel Corporation SA1111 [USB Controller]",
-	},
 	.skpcr_mask	= SKPCR_UCLKEN,
 	.devid		= SA1111_DEVID_USB,
 	.irq = {
@@ -71,9 +68,6 @@ static struct sa1111_dev usb_dev = {
 };
 
 static struct sa1111_dev sac_dev = {
-	.dev = {
-		.name	= "Intel Corporation SA1111 [Audio Controller]",
-	},
 	.skpcr_mask	= SKPCR_I2SCLKEN | SKPCR_L3CLKEN,
 	.devid		= SA1111_DEVID_SAC,
 	.irq = {
@@ -85,17 +79,11 @@ static struct sa1111_dev sac_dev = {
 };
 
 static struct sa1111_dev ssp_dev = {
-	.dev = {
-		.name	= "Intel Corporation SA1111 [SSP Controller]",
-	},
 	.skpcr_mask	= SKPCR_SCLKEN,
 	.devid		= SA1111_DEVID_SSP,
 };
 
 static struct sa1111_dev kbd_dev = {
-	.dev = {
-		.name	= "Intel Corporation SA1111 [PS2]",
-	},
 	.skpcr_mask	= SKPCR_PTCLKEN,
 	.devid		= SA1111_DEVID_PS2,
 	.irq = {
@@ -105,9 +93,6 @@ static struct sa1111_dev kbd_dev = {
 };
 
 static struct sa1111_dev mse_dev = {
-	.dev = {
-		.name	= "Intel Corporation SA1111 [PS2]",
-	},
 	.skpcr_mask	= SKPCR_PMCLKEN,
 	.devid		= SA1111_DEVID_PS2,
 	.irq = {
@@ -117,17 +102,11 @@ static struct sa1111_dev mse_dev = {
 };
 
 static struct sa1111_dev int_dev = {
-	.dev = {
-		.name	= "Intel Corporation SA1111 [Interrupt Controller]",
-	},
 	.skpcr_mask	= 0,
 	.devid		= SA1111_DEVID_INT,
 };
 
 static struct sa1111_dev pcmcia_dev = {
-	.dev = {
-		.name	= "Intel Corporation SA1111 [PCMCIA Controller]",
-	},
 	.skpcr_mask	= 0,
 	.devid		= SA1111_DEVID_PCMCIA,
 	.irq = {
@@ -570,7 +549,7 @@ sa1111_init_one_child(struct sa1111 *sachip, struct resource *parent,
 	sadev->dev.bus    = &sa1111_bus_type;
 	sadev->res.start  = sachip->phys + offset;
 	sadev->res.end    = sadev->res.start + 511;
-	sadev->res.name   = sadev->dev.name;
+	sadev->res.name   = sadev->dev.bus_id;
 	sadev->res.flags  = IORESOURCE_MEM;
 	sadev->mapbase    = sachip->base + offset;
 

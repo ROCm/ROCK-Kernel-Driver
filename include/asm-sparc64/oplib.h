@@ -327,6 +327,10 @@ extern int prom_setprop(int node, char *prop_name, char *prop_value,
 extern int prom_pathtoinode(char *path);
 extern int prom_inst2pkg(int);
 
+/* CPU probing helpers.  */
+int cpu_find_by_instance(int instance, int *prom_node, int *mid);
+int cpu_find_by_mid(int mid, int *prom_node);
+
 /* Client interface level routines. */
 extern void prom_set_trap_table(unsigned long tba);
 

@@ -7,7 +7,7 @@
 
   */
 
-/* $Id: nsp_io.h,v 1.2 2002/09/20 04:06:58 gotom Exp $ */
+/* $Id: nsp_io.h,v 1.3 2003/08/04 21:15:26 elca Exp $ */
 
 #ifndef __NSP_IO_H__
 #define __NSP_IO_H__
@@ -76,7 +76,7 @@ static inline void nsp_fifo8_read(unsigned int   base,
 				  void          *buf,
 				  unsigned long  count)
 {
-	/*DEBUG(0, __FUNCTION__ "() buf=0x%p, count=0x%lx\n", buf, count);*/
+	/*nsp_dbg(NSP_DEBUG_DATA_IO, "buf=0x%p, count=0x%lx", buf, count);*/
 	nsp_multi_read_1(base, FIFODATA, buf, count);
 }
 
@@ -95,7 +95,7 @@ static inline void nsp_fifo16_read(unsigned int   base,
 				   void          *buf,
 				   unsigned long  count)
 {
-	//DEBUG(0, __FUNCTION__ "() buf=0x%p, count=0x%lx*2\n", buf, count);
+	//nsp_dbg(NSP_DEBUG_DATA_IO, "buf=0x%p, count=0x%lx*2", buf, count);
 	nsp_multi_read_2(base, FIFODATA, buf, count);
 }
 
@@ -114,7 +114,7 @@ static inline void nsp_fifo32_read(unsigned int   base,
 				   void          *buf,
 				   unsigned long  count)
 {
-	//DEBUG(0, __FUNCTION__ "() buf=0x%p, count=0x%lx*4\n", buf, count);
+	//nsp_dbg(NSP_DEBUG_DATA_IO, "buf=0x%p, count=0x%lx*4", buf, count);
 	nsp_multi_read_4(base, FIFODATA, buf, count);
 }
 
@@ -225,11 +225,11 @@ static inline void nsp_mmio_multi_read_4(unsigned long  base,
 	unsigned long *tmp = (unsigned long *)buf;
 	int i;
 
-	//printk("base 0x%0lx ptr 0x%p\n",base,ptr);
+	//nsp_dbg(NSP_DEBUG_DATA_IO, "base 0x%0lx ptr 0x%p",base,ptr);
 
 	for (i = 0; i < count; i++) {
 		*tmp = readl(ptr);
-		//printk("<%d,%p,%p,%lx>", i, ptr, tmp, *tmp);
+		//nsp_dbg(NSP_DEBUG_DATA_IO, "<%d,%p,%p,%lx>", i, ptr, tmp, *tmp);
 		tmp++;
 	}
 }
@@ -238,7 +238,7 @@ static inline void nsp_mmio_fifo32_read(unsigned int   base,
 					void          *buf,
 					unsigned long  count)
 {
-	//DEBUG(0, __FUNCTION__ "() buf=0x%p, count=0x%lx*4\n", buf, count);
+	//nsp_dbg(NSP_DEBUG_DATA_IO, "buf=0x%p, count=0x%lx*4", buf, count);
 	nsp_mmio_multi_read_4(base, FIFODATA, buf, count);
 }
 
@@ -251,11 +251,11 @@ static inline void nsp_mmio_multi_write_4(unsigned long  base,
 	unsigned long *tmp = (unsigned long *)buf;
 	int i;
 
-	//printk("base 0x%0lx ptr 0x%p\n",base,ptr);
+	//nsp_dbg(NSP_DEBUG_DATA_IO, "base 0x%0lx ptr 0x%p",base,ptr);
 
 	for (i = 0; i < count; i++) {
 		writel(*tmp, ptr);
-		//printk("<%d,%p,%p,%lx>", i, ptr, tmp, *tmp);
+		//nsp_dbg(NSP_DEBUG_DATA_IO, "<%d,%p,%p,%lx>", i, ptr, tmp, *tmp);
 		tmp++;
 	}
 }
@@ -264,7 +264,7 @@ static inline void nsp_mmio_fifo32_write(unsigned int   base,
 					 void          *buf,
 					 unsigned long  count)
 {
-	//DEBUG(0, __FUNCTION__ "() buf=0x%p, count=0x%lx*4\n", buf, count);
+	//nsp_dbg(NSP_DEBUG_DATA_IO, "buf=0x%p, count=0x%lx*4", buf, count);
 	nsp_mmio_multi_write_4(base, FIFODATA, buf, count);
 }
 

@@ -20,7 +20,6 @@
 #include <asm/ptrace.h>
 #include <asm/segment.h>
 #include <asm/page.h>
-#include <asm/delay.h>
 
 /* Bus types */
 #define EISA_bus 0

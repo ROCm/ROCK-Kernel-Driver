@@ -574,9 +574,9 @@ static void netwave_detach(dev_link_t *link)
 
     /* Unlink device structure, free pieces */
     *linkp = link->next;
-    if (link->dev)
+    if (link->dev) 
 	unregister_netdev(dev);
-    kfree(dev);
+    free_netdev(dev);
     
 } /* netwave_detach */
 

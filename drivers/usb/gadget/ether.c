@@ -1635,6 +1635,7 @@ eth_unbind (struct usb_gadget *gadget)
 	}
 
 	unregister_netdev (dev->net);
+	free_netdev(dev->net);
 
 	/* assuming we used keventd, it must quiesce too */
 	flush_scheduled_work ();

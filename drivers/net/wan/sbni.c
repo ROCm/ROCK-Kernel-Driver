@@ -277,7 +277,7 @@ sbni_pci_probe( struct net_device  *dev )
 		pci_irq_line = pdev->irq;
 
 		/* Avoid already found cards from previous calls */
-		if( !pci_request_region( pci_ioaddr, SBNI_IO_EXTENT, dev->name ) ) {
+		if( !request_region( pci_ioaddr, SBNI_IO_EXTENT, dev->name ) ) {
 			pci_read_config_word( pdev, PCI_SUBSYSTEM_ID, &subsys );
 			if( subsys != 2  ||	/* Dual adapter is present */
 			    check_region( pci_ioaddr += 4, SBNI_IO_EXTENT ) )
@@ -1507,7 +1507,7 @@ cleanup_module( void )
 			unregister_netdev( dev );
 			release_region( dev->base_addr, SBNI_IO_EXTENT );
 			kfree( dev->priv );
-			kfree( dev );
+			free_netdev( dev );
 		}
 }
 

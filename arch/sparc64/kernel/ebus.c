@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 
 #include <asm/system.h>
 #include <asm/page.h>

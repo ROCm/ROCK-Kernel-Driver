@@ -1012,7 +1012,7 @@ static int vortex_eisa_remove (struct device *device)
 	outw (TotalReset|0x14, ioaddr + EL3_CMD);
 	release_region (ioaddr, VORTEX_TOTAL_SIZE);
 
-	kfree (dev);
+	free_netdev (dev);
 	return 0;
 }
 #endif
@@ -3057,7 +3057,7 @@ static void __devexit vortex_remove_one (struct pci_dev *pdev)
 						vp->rx_ring_dma);
 	if (vp->must_free_region)
 		release_region(dev->base_addr, vp->io_size);
-	kfree(dev);
+	free_netdev(dev);
 }
 
 
@@ -3111,7 +3111,7 @@ static void __exit vortex_eisa_cleanup (void)
 		outw (TotalReset, ioaddr + EL3_CMD);
 		release_region (ioaddr, VORTEX_TOTAL_SIZE);
 
-		kfree (compaq_net_device);
+		free_netdev (compaq_net_device);
 	}
 }
 

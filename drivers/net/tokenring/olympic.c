@@ -1779,7 +1779,7 @@ static void __devexit olympic_remove_one(struct pci_dev *pdev)
 	iounmap(olympic_priv->olympic_lap) ; 
 	pci_release_regions(pdev) ;
 	pci_set_drvdata(pdev,NULL) ;  	
-	kfree(dev) ; 
+	free_netdev(dev) ; 
 }
 
 static struct pci_driver olympic_driver = { 
