@@ -215,7 +215,8 @@ static struct tunertype tuners[] = {
           16*158.00, 16*453.00, 0xa0,0x90,0x30,0x8e,732},
         { "LG PAL (newer TAPC series)", LGINNOTEK, PAL,
           16*170.00, 16*450.00, 0x01,0x02,0x08,0x8e,623},
-	
+	{ "Philips PAL/SECAM multi (FM1216ME)", Philips, PAL,
+	  16*160.00,16*442.00,0x01,0x02,0x04,0x8e,623 },
 };
 #define TUNERS (sizeof(tuners)/sizeof(struct tunertype))
 
@@ -253,7 +254,7 @@ static int tuner_stereo(struct i2c_client *c)
 	return (tuner_getstatus (c) & TUNER_STEREO);
 }
 
-
+#if 0 /* unused */
 static int tuner_islocked (struct i2c_client *c)
 {
         return (tuner_getstatus (c) & TUNER_FL);
@@ -264,12 +265,12 @@ static int tuner_afcstatus (struct i2c_client *c)
         return (tuner_getstatus (c) & TUNER_AFC) - 2;
 }
 
-#if 0 /* unused */
 static int tuner_mode (struct i2c_client *c)
 {
         return (tuner_getstatus (c) & TUNER_MODE) >> 3;
 }
 #endif
+
 // Initalization as described in "MT203x Programming Procedures", Rev 1.2, Feb.2001
 static int mt2032_init(struct i2c_client *c)
 {
@@ -651,8 +652,9 @@ static void set_tv_freq(struct i2c_client *c, int freq)
 		default:
 			config |= TEMIC_SET_PAL_BG;
 			break;
-		break;
 		}
+		break;
+
 	case TUNER_PHILIPS_FQ1216ME:
 		config &= ~0x0f;
 		switch (pal[0]) {
@@ -672,8 +674,8 @@ static void set_tv_freq(struct i2c_client *c, int freq)
 		case 'G':
 			config |= PHILIPS_SET_PAL_BGDK;
 			break;
-		break;
 		}
+		break;
 	}
 
 	
@@ -703,6 +705,8 @@ static void set_tv_freq(struct i2c_client *c, int freq)
 		buffer[2] = tun->config;
 		buffer[3] = config;
 	}
+	dprintk("tuner: tv 0x%02x 0x%02x 0x%02x 0x%02x\n",
+		buffer[0],buffer[1],buffer[2],buffer[3]);
 
         if (4 != (rc = i2c_master_send(c,buffer,4)))
                 printk("tuner: i2c i/o error: rc == %d (should be 4)\n",rc);
@@ -720,12 +724,10 @@ static void mt2032_set_radio_freq(struct i2c_client *c,int freq)
 
 static void set_radio_freq(struct i2c_client *c, int freq)
 {
-	u8 config;
-	u16 div;
 	struct tunertype *tun;
 	struct tuner *t = (struct tuner*)c->data;
         unsigned char buffer[4];
-	int rc;
+	int rc,div;
 
 	if (freq < radio_range[0]*16 || freq > radio_range[1]*16) {
 		printk("tuner: radio freq (%d.%02d) out of range (%d-%d)\n",
@@ -744,35 +746,27 @@ static void set_radio_freq(struct i2c_client *c, int freq)
 	}
 
 	tun=&tuners[t->type];
-	config = 0xa4 /* 0xa5 */; /* bit 0 is AFC (set) vs. RF-Signal (clear) */
-	div=freq + (int)(16*10.7);
-  	div&=0x7fff;
-
+	div = freq + (int)(16*10.7);
         buffer[0] = (div>>8) & 0x7f;
         buffer[1] = div      & 0xff;
-        buffer[2] = tun->config;
-        buffer[3] = config;
+	buffer[2] = tun->config;
+	switch (t->type) {
+	case TUNER_PHILIPS_FM1216ME:
+		buffer[3] = 0x19;
+		break;
+	default:
+		buffer[3] = 0xa4;
+		break;
+	}
+
+	dprintk("tuner: radio 0x%02x 0x%02x 0x%02x 0x%02x\n",
+		buffer[0],buffer[1],buffer[2],buffer[3]);
+
         if (4 != (rc = i2c_master_send(c,buffer,4)))
                 printk("tuner: i2c i/o error: rc == %d (should be 4)\n",rc);
-
-	if (debug) {
-		current->state   = TASK_INTERRUPTIBLE;
-		schedule_timeout(HZ/10);
-		
-		if (tuner_islocked (c))
-			printk ("tuner: PLL locked\n");
-		else
-			printk ("tuner: PLL not locked\n");
-
-		if (config & 1) {
-			printk ("tuner: AFC: %d\n", tuner_afcstatus(c));
-		} else {
-			printk ("tuner: Signal: %d\n", tuner_signal(c));
-		}
-	}
 }
-/* ---------------------------------------------------------------------- */
 
+/* ---------------------------------------------------------------------- */
 
 static int tuner_attach(struct i2c_adapter *adap, int addr,
 			unsigned short flags, int kind)
@@ -824,6 +818,7 @@ static int tuner_probe(struct i2c_adapter *adap)
 	this_adap = 0;
 	switch (adap->id) {
 	case I2C_ALGO_BIT | I2C_HW_B_BT848:
+	case I2C_ALGO_BIT | I2C_HW_B_RIVA:
 	case I2C_ALGO_SAA7134:
 		printk("tuner: probing %s i2c adapter [id=0x%x]\n",
 		       adap->name,adap->id);
