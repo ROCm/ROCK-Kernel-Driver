@@ -775,19 +775,16 @@ restart:
 
 		if (unlikely(nx<0)) {
 			err = nx;
-			if (err == -EAGAIN) {
-				struct task_struct *tsk = current;
-				DECLARE_WAITQUEUE(wait, tsk);
-				if (!flags)
-					goto error;
+			if (err == -EAGAIN && !flags) {
+				DECLARE_WAITQUEUE(wait, current);
 
-				__set_task_state(tsk, TASK_INTERRUPTIBLE);
 				add_wait_queue(&km_waitq, &wait);
-				nx = xfrm_tmpl_resolve(policy, fl, xfrm, family);
-				if (nx == -EAGAIN)
-					schedule();
-				__set_task_state(tsk, TASK_RUNNING);
+				set_current_state(TASK_INTERRUPTIBLE);
+				schedule();
+				set_current_state(TASK_RUNNING);
 				remove_wait_queue(&km_waitq, &wait);
+
+				nx = xfrm_tmpl_resolve(policy, fl, xfrm, family);
 
 				if (nx == -EAGAIN && signal_pending(current)) {
 					err = -ERESTART;
