@@ -925,7 +925,7 @@ static void pdc20621_put_to_dimm(struct ata_probe_ent *pe, void *psource,
 	readl(mmio + PDC_DIMM_WINDOW_CTLR);
 	offset -= (idx * window_size); 
 	idx++;
-	dist = ((long) (window_size - (offset + size))) >= 0 ? size : 
+	dist = ((long)(s32)(window_size - (offset + size))) >= 0 ? size :
 		(long) (window_size - offset);
 	memcpy_toio((char *) (dimm_mmio + offset / 4), (char *) psource, dist);
 	writel(0x01, mmio + PDC_GENERAL_CTLR);
