@@ -75,6 +75,7 @@
 
 #define XPRT_MAX_BACKOFF	(8)
 #define XPRT_IDLE_TIMEOUT	(5*60*HZ)
+#define XPRT_MAX_RESVPORT	(800)
 
 /*
  * Local functions
@@ -85,7 +86,7 @@ static void	xprt_disconnect(struct rpc_xprt *);
 static void	xprt_connect_status(struct rpc_task *task);
 static struct rpc_xprt * xprt_setup(int proto, struct sockaddr_in *ap,
 						struct rpc_timeout *to);
-static struct socket *xprt_create_socket(int, struct rpc_timeout *, int);
+static struct socket *xprt_create_socket(struct rpc_xprt *, int, int);
 static void	xprt_bind_socket(struct rpc_xprt *, struct socket *);
 static int      __xprt_get_cong(struct rpc_xprt *, struct rpc_task *);
 
@@ -453,17 +454,74 @@ out_abort:
 	spin_unlock(&xprt->sock_lock);
 }
 
+static void xprt_socket_connect(void *args)
+{
+	struct rpc_xprt *xprt = (struct rpc_xprt *)args;
+	struct socket *sock = xprt->sock;
+	int status = -EIO;
+
+	if (xprt->shutdown) {
+		rpc_wake_up_status(&xprt->pending, -EIO);
+		return;
+	}
+	if (!xprt->addr.sin_port)
+		goto out_err;
+
+	/*
+	 * Start by resetting any existing state
+	 */
+	xprt_close(xprt);
+	sock = xprt_create_socket(xprt, xprt->prot, xprt->resvport);
+	if (sock == NULL) {
+		/* couldn't create socket or bind to reserved port;
+		 * this is likely a permanent error, so cause an abort */
+		goto out_err;
+		return;
+	}
+	xprt_bind_socket(xprt, sock);
+	xprt_sock_setbufsize(xprt);
+
+	if (!xprt->stream)
+		goto out;
+
+	/*
+	 * Tell the socket layer to start connecting...
+	 */
+	status = sock->ops->connect(sock, (struct sockaddr *) &xprt->addr,
+			sizeof(xprt->addr), O_NONBLOCK);
+	dprintk("RPC: %p  connect status %d connected %d sock state %d\n",
+			xprt, -status, xprt_connected(xprt), sock->sk->sk_state);
+	if (status >= 0)
+		goto out;
+	switch (status) {
+		case -EINPROGRESS:
+		case -EALREADY:
+			return;
+		default:
+			goto out_err;
+	}
+out:
+	spin_lock_bh(&xprt->sock_lock);
+	if (xprt->snd_task)
+		rpc_wake_up_task(xprt->snd_task);
+	spin_unlock_bh(&xprt->sock_lock);
+	return;
+out_err:
+	spin_lock_bh(&xprt->sock_lock);
+	if (xprt->snd_task) {
+		xprt->snd_task->tk_status = status;
+		rpc_wake_up_task(xprt->snd_task);
+	}
+	spin_unlock_bh(&xprt->sock_lock);
+}
+
 /*
  * Attempt to connect a TCP socket.
  *
  */
-void
-xprt_connect(struct rpc_task *task)
+void xprt_connect(struct rpc_task *task)
 {
 	struct rpc_xprt	*xprt = task->tk_xprt;
-	struct socket	*sock = xprt->sock;
-	struct sock	*inet;
-	int		status;
 
 	dprintk("RPC: %4d xprt_connect xprt %p %s connected\n", task->tk_pid,
 			xprt, (xprt_connected(xprt) ? "is" : "is not"));
@@ -484,79 +542,9 @@ xprt_connect(struct rpc_task *task)
 	if (task->tk_rqstp)
 		task->tk_rqstp->rq_bytes_sent = 0;
 
-	/*
-	 * We're here because the xprt was marked disconnected.
-	 * Start by resetting any existing state.
-	 */
-	xprt_close(xprt);
-	if (!(sock = xprt_create_socket(xprt->prot, &xprt->timeout, xprt->resvport))) {
-		/* couldn't create socket or bind to reserved port;
-		 * this is likely a permanent error, so cause an abort */
-		task->tk_status = -EIO;
-		goto out_write;
-	}
-	xprt_bind_socket(xprt, sock);
-	xprt_sock_setbufsize(xprt);
-
-	if (!xprt->stream)
-		goto out_write;
-
-	inet = sock->sk;
-
-	/*
-	 * Tell the socket layer to start connecting...
-	 */
-	status = sock->ops->connect(sock, (struct sockaddr *) &xprt->addr,
-				sizeof(xprt->addr), O_NONBLOCK);
-	dprintk("RPC: %4d  connect status %d connected %d sock state %d\n",
-		task->tk_pid, -status, xprt_connected(xprt), inet->sk_state);
-
-	if (status >= 0)
-		return;
-
-	switch (status) {
-	case -EINPROGRESS:
-	case -EALREADY:
-		/* Protect against TCP socket state changes */
-		lock_sock(inet);
-		if (inet->sk_state != TCP_ESTABLISHED) {
-			dprintk("RPC: %4d  waiting for connection\n",
-					task->tk_pid);
-			task->tk_timeout = RPC_CONNECT_TIMEOUT;
-			/* if the socket is already closing, delay briefly */
-			if ((1 << inet->sk_state) &
-			    ~(TCPF_SYN_SENT | TCPF_SYN_RECV))
-				task->tk_timeout = RPC_REESTABLISH_TIMEOUT;
-			rpc_sleep_on(&xprt->pending, task, xprt_connect_status,
-									NULL);
-		}
-		release_sock(inet);
-		break;
-	case -ECONNREFUSED:
-	case -ECONNRESET:
-	case -ENOTCONN:
-		if (!RPC_IS_SOFT(task)) {
-			rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
-			task->tk_status = -ENOTCONN;
-			break;
-		}
-	default:
-		/* Report myriad other possible returns.  If this file
-		 * system is soft mounted, just error out, like Solaris.  */
-		if (RPC_IS_SOFT(task)) {
-			printk(KERN_WARNING
-			"RPC: error %d connecting to server %s, exiting\n",
-					-status, task->tk_client->cl_server);
-			task->tk_status = -EIO;
-			goto out_write;
-		}
-		printk(KERN_WARNING "RPC: error %d connecting to server %s\n",
-				-status, task->tk_client->cl_server);
-		/* This will prevent anybody else from reconnecting */
-		rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
-		task->tk_status = status;
-		break;
-	}
+	task->tk_timeout = RPC_CONNECT_TIMEOUT;
+	rpc_sleep_on(&xprt->pending, task, xprt_connect_status, NULL);
+	schedule_work(&xprt->sock_connect);
 	return;
  out_write:
 	xprt_release_write(xprt, task);
@@ -581,6 +569,8 @@ xprt_connect_status(struct rpc_task *task)
 		task->tk_status = -EIO;
 
 	switch (task->tk_status) {
+	case -ECONNREFUSED:
+	case -ECONNRESET:
 	case -ENOTCONN:
 		rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
 		return;
@@ -1447,11 +1437,13 @@ xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 	init_waitqueue_head(&xprt->cong_wait);
 
 	INIT_LIST_HEAD(&xprt->recv);
+	INIT_WORK(&xprt->sock_connect, xprt_socket_connect, xprt);
 	INIT_WORK(&xprt->task_cleanup, xprt_socket_autoclose, xprt);
 	init_timer(&xprt->timer);
 	xprt->timer.function = xprt_init_autodisconnect;
 	xprt->timer.data = (unsigned long) xprt;
 	xprt->last_used = jiffies;
+	xprt->port = XPRT_MAX_RESVPORT;
 
 	/* Set timeout parameters */
 	if (to) {
@@ -1484,31 +1476,28 @@ xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 /*
  * Bind to a reserved port
  */
-static inline int
-xprt_bindresvport(struct socket *sock)
+static inline int xprt_bindresvport(struct rpc_xprt *xprt, struct socket *sock)
 {
-	struct sockaddr_in myaddr;
+	struct sockaddr_in myaddr = {
+		.sin_family = AF_INET,
+	};
 	int		err, port;
-	kernel_cap_t saved_cap = current->cap_effective;
 
-	/* Override capabilities.
-	 * They were checked in xprt_create_proto i.e. at mount time
-	 */
-	cap_raise(current->cap_effective, CAP_NET_BIND_SERVICE);
-
-	memset(&myaddr, 0, sizeof(myaddr));
-	myaddr.sin_family = AF_INET;
-	port = 800;
+	/* Were we already bound to a given port? Try to reuse it */
+	port = xprt->port;
 	do {
 		myaddr.sin_port = htons(port);
 		err = sock->ops->bind(sock, (struct sockaddr *) &myaddr,
 						sizeof(myaddr));
-	} while (err == -EADDRINUSE && --port > 0);
-	current->cap_effective = saved_cap;
+		if (err == 0) {
+			xprt->port = port;
+			return 0;
+		}
+		if (--port == 0)
+			port = XPRT_MAX_RESVPORT;
+	} while (err == -EADDRINUSE && port != xprt->port);
 
-	if (err < 0)
-		printk("RPC: Can't bind to reserved port (%d).\n", -err);
-
+	printk("RPC: Can't bind to reserved port (%d).\n", -err);
 	return err;
 }
 
@@ -1571,8 +1560,7 @@ xprt_sock_setbufsize(struct rpc_xprt *xprt)
  * Datastream sockets are created here, but xprt_connect will create
  * and connect stream sockets.
  */
-static struct socket *
-xprt_create_socket(int proto, struct rpc_timeout *to, int resvport)
+static struct socket * xprt_create_socket(struct rpc_xprt *xprt, int proto, int resvport)
 {
 	struct socket	*sock;
 	int		type, err;
@@ -1588,7 +1576,7 @@ xprt_create_socket(int proto, struct rpc_timeout *to, int resvport)
 	}
 
 	/* If the caller has the capability, bind to a reserved port */
-	if (resvport && xprt_bindresvport(sock) < 0) {
+	if (resvport && xprt_bindresvport(xprt, sock) < 0) {
 		printk("RPC: can't bind to reserved port.\n");
 		goto failed;
 	}

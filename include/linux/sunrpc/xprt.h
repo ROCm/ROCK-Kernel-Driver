@@ -168,6 +168,11 @@ struct rpc_xprt {
 	unsigned long		tcp_copied,	/* copied to request */
 				tcp_flags;
 	/*
+	 * Connection of sockets
+	 */
+	struct work_struct	sock_connect;
+	unsigned short		port;
+	/*
 	 * Disconnection of idle sockets
 	 */
 	struct work_struct	task_cleanup;
