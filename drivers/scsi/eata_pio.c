@@ -593,7 +593,7 @@ static int get_pio_conf_PIO(u32 base, struct get_conf *buf)
 	int z;
 	unsigned short *p;
 
-	if (!request_region(base, 8, "eata_pio"))
+	if (!request_region(base, 9, "eata_pio"))
 		return 0;
 
 	memset(buf, 0, sizeof(struct get_conf));
@@ -641,7 +641,7 @@ static int get_pio_conf_PIO(u32 base, struct get_conf *buf)
 	return 1;
 
  fail:
-	release_region(base, 8);
+	release_region(base, 9);
 	return 0;
 }
 
@@ -784,7 +784,7 @@ static int register_pio_HBA(long base, struct get_conf *gc, Scsi_Host_Template *
 	sh->unique_id = base;
 	sh->base = base;
 	sh->io_port = base;
-	sh->n_io_port = 8;
+	sh->n_io_port = 9;
 	sh->irq = gc->IRQ;
 	sh->dma_channel = PIO;
 	sh->this_id = gc->scsi_id[3];
@@ -825,7 +825,7 @@ static void find_pio_ISA(struct get_conf *buf, Scsi_Host_Template * tpnt)
 		if (!get_pio_conf_PIO(ISAbases[i], buf))
 			continue;
 		if (!register_pio_HBA(ISAbases[i], buf, tpnt))
-			release_region(ISAbases[i], 8);
+			release_region(ISAbases[i], 9);
 		else
 			ISAbases[i] = 0;
 	}
@@ -857,10 +857,10 @@ static void find_pio_EISA(struct get_conf *buf, Scsi_Host_Template * tpnt)
 					DBG(DBG_PROBE && DBG_EISA, print_pio_config(buf));
 					if (buf->IRQ) {
 						if (!register_pio_HBA(base, buf, tpnt))
-							release_region(base, 8);
+							release_region(base, 9);
 					} else {
 						printk(KERN_NOTICE "eata_dma: No valid IRQ. HBA " "removed from list\n");
-						release_region(base, 8);
+						release_region(base, 9);
 					}
 				}
 				/* Nothing found here so we take it from the list */
@@ -900,7 +900,7 @@ static void find_pio_PCI(struct get_conf *buf, Scsi_Host_Template * tpnt)
 			/* We didn't find it in the primary search */
 			if (get_pio_conf_PIO(base, buf)) {
 				if (buf->FORCADR) {	/* If the address is forced */
-					release_region(base, 8);
+					release_region(base, 9);
 					continue;	/* we'll find it later      */
 				}
 
@@ -910,7 +910,7 @@ static void find_pio_PCI(struct get_conf *buf, Scsi_Host_Template * tpnt)
 				 */
 
 				if (!register_pio_HBA(base, buf, tpnt)) {
-					release_region(base, 8);
+					release_region(base, 9);
 					continue;
 				}
 
