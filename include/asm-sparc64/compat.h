@@ -64,6 +64,19 @@ struct compat_flock {
 	short		__unused;
 };
 
+#define F_GETLK64	12
+#define F_SETLK64	13
+#define F_SETLKW64	14
+
+struct compat_flock64 {
+	short		l_type;
+	short		l_whence;
+	compat_loff_t	l_start;
+	compat_loff_t	l_len;
+	compat_pid_t	l_pid;
+	short		__unused;
+};
+
 struct compat_statfs {
 	int		f_type;
 	int		f_bsize;
@@ -83,5 +96,8 @@ typedef u32		compat_old_sigset_t;
 #define _COMPAT_NSIG_BPW	32
 
 typedef u32		compat_sigset_word;
+
+#define COMPAT_OFF_T_MAX	0x7fffffff
+#define COMPAT_LOFF_T_MAX	0x7fffffffffffffffL
 
 #endif /* _ASM_SPARC64_COMPAT_H */
