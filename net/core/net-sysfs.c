@@ -126,8 +126,18 @@ static ssize_t show_broadcast(struct class_device *dev, char *buf)
 	return -EINVAL;
 }
 
+static ssize_t show_carrier(struct class_device *dev, char *buf)
+{
+	struct net_device *netdev = to_net_dev(dev);
+	if (netif_running(netdev)) {
+		return sprintf(buf, fmt_dec, !!netif_carrier_ok(netdev));
+	}
+	return -EINVAL;
+}
+
 static CLASS_DEVICE_ATTR(address, S_IRUGO, show_address, NULL);
 static CLASS_DEVICE_ATTR(broadcast, S_IRUGO, show_broadcast, NULL);
+static CLASS_DEVICE_ATTR(carrier, S_IRUGO, show_carrier, NULL);
 
 /* read-write attributes */
 NETDEVICE_SHOW(mtu, fmt_dec);
@@ -186,6 +196,7 @@ static struct class_device_attribute *net_class_attributes[] = {
 	&class_device_attr_type,
 	&class_device_attr_address,
 	&class_device_attr_broadcast,
+	&class_device_attr_carrier,
 	NULL
 };
 
