@@ -375,6 +375,7 @@ void unmap_hugepage_range(struct vm_area_struct *vma,
 	unsigned long addr;
 	hugepte_t *ptep;
 	struct page *page;
+	int cpu;
 	int local = 0;
 	cpumask_t tmp;
 
@@ -383,7 +384,8 @@ void unmap_hugepage_range(struct vm_area_struct *vma,
 	BUG_ON((end % HPAGE_SIZE) != 0);
 
 	/* XXX are there races with checking cpu_vm_mask? - Anton */
-	tmp = cpumask_of_cpu(smp_processor_id());
+	cpu = get_cpu();
+	tmp = cpumask_of_cpu(cpu);
 	if (cpus_equal(vma->vm_mm->cpu_vm_mask, tmp))
 		local = 1;
 
@@ -406,6 +408,7 @@ void unmap_hugepage_range(struct vm_area_struct *vma,
 
 		put_page(page);
 	}
+	put_cpu();
 
 	mm->rss -= (end - start) >> PAGE_SHIFT;
 }

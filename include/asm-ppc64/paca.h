@@ -136,23 +136,21 @@ struct paca_struct {
 	u8  rsvd6[0x500 - 0x8];
 
 /*=====================================================================================
- * CACHE_LINE_31 0x0F00 - 0x0F7F Exception stack
+ * CACHE_LINE_31-32 0x0F00 - 0x0FFF Exception register save areas
  *=====================================================================================
  */
-	u8 exception_stack[N_EXC_STACK*EXC_FRAME_SIZE];
+	u64 exgen[8];		/* used for most interrupts/exceptions */
+	u64 exmc[8];		/* used for machine checks */
+	u64 exslb[8];		/* used for SLB/segment table misses
+				 * on the linear mapping */
+	u64 exdsi[8];		/* used for linear mapping hash table misses */
 
 /*=====================================================================================
- * CACHE_LINE_32 0x0F80 - 0x0FFF Reserved
+ * Page 2 used as a stack when we detect a bad kernel stack pointer,
+ * and early in SMP boots before relocation is enabled.
  *=====================================================================================
  */
-	u8 rsvd7[0x80];                  /* Give the stack some rope ... */
-
-/*=====================================================================================
- * Page 2 Reserved for guard page.  Also used as a stack early in SMP boots before
- *        relocation is enabled.
- *=====================================================================================
- */
-	u8 guard[0x1000];               /* ... and then hang 'em         */ 
+	u8 guard[0x1000];
 };
 
 #endif /* _PPC64_PACA_H */

@@ -13,6 +13,7 @@
 #ifndef __ASSEMBLY__
 #include <linux/config.h>
 #include <asm/processor.h>
+#include <asm/page.h>
 #include <linux/stringify.h>
 
 /*
@@ -23,8 +24,10 @@ struct thread_info {
 	struct exec_domain *exec_domain;	/* execution domain */
 	unsigned long	flags;			/* low level flags */
 	int		cpu;			/* cpu we're on */
-	int		preempt_count;		/* not used at present */
+	int		preempt_count;
 	struct restart_block restart_block;
+	/* set by force_successful_syscall_return */
+	unsigned char	syscall_noerror;
 };
 
 /*
@@ -73,7 +76,7 @@ struct thread_info {
 static inline struct thread_info *current_thread_info(void)
 {
 	struct thread_info *ti;
-	__asm__("clrrdi %0,1,14" : "=r"(ti));
+	__asm__("clrrdi %0,1,%1" : "=r"(ti) : "i" (THREAD_SHIFT));
 	return ti;
 }
 

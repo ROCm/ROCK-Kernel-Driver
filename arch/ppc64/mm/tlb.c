@@ -91,12 +91,15 @@ void hpte_update(pte_t *ptep, unsigned long pte, int wrprot)
 void __flush_tlb_pending(struct ppc64_tlb_batch *batch)
 {
 	int i;
-	cpumask_t tmp = cpumask_of_cpu(smp_processor_id());
+	int cpu;
+	cpumask_t tmp;
 	int local = 0;
 
 	BUG_ON(in_interrupt());
 
+	cpu = get_cpu();
 	i = batch->index;
+	tmp = cpumask_of_cpu(cpu);
 	if (cpus_equal(batch->mm->cpu_vm_mask, tmp))
 		local = 1;
 
@@ -106,6 +109,7 @@ void __flush_tlb_pending(struct ppc64_tlb_batch *batch)
 	else
 		flush_hash_range(batch->context, i, local);
 	batch->index = 0;
+	put_cpu();
 }
 
 #ifdef CONFIG_SMP

@@ -65,8 +65,43 @@ struct mm_struct ioremap_mm = {
 	.page_table_lock = SPIN_LOCK_UNLOCKED,
 };
 
+/*
+ * Make sure the floating-point register state in the
+ * the thread_struct is up to date for task tsk.
+ */
+void flush_fp_to_thread(struct task_struct *tsk)
+{
+	if (tsk->thread.regs) {
+		/*
+		 * We need to disable preemption here because if we didn't,
+		 * another process could get scheduled after the regs->msr
+		 * test but before we have finished saving the FP registers
+		 * to the thread_struct.  That process could take over the
+		 * FPU, and then when we get scheduled again we would store
+		 * bogus values for the remaining FP registers.
+		 */
+		preempt_disable();
+		if (tsk->thread.regs->msr & MSR_FP) {
+#ifdef CONFIG_SMP
+			/*
+			 * This should only ever be called for current or
+			 * for a stopped child process.  Since we save away
+			 * the FP register state on context switch on SMP,
+			 * there is something wrong if a stopped child appears
+			 * to still have its FP state in the CPU registers.
+			 */
+			BUG_ON(tsk != current);
+#endif
+			giveup_fpu(current);
+		}
+		preempt_enable();
+	}
+}
+
 void enable_kernel_fp(void)
 {
+	WARN_ON(preemptible());
+
 #ifdef CONFIG_SMP
 	if (current->thread.regs && (current->thread.regs->msr & MSR_FP))
 		giveup_fpu(current);
@@ -80,12 +115,9 @@ EXPORT_SYMBOL(enable_kernel_fp);
 
 int dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
 {
-	struct pt_regs *regs = tsk->thread.regs;
-
-	if (!regs)
+	if (!tsk->thread.regs)
 		return 0;
-	if (tsk == current && (regs->msr & MSR_FP))
-		giveup_fpu(current);
+	flush_fp_to_thread(current);
 
 	memcpy(fpregs, &tsk->thread.fpr[0], sizeof(*fpregs));
 
@@ -96,6 +128,8 @@ int dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
 
 void enable_kernel_altivec(void)
 {
+	WARN_ON(preemptible());
+
 #ifdef CONFIG_SMP
 	if (current->thread.regs && (current->thread.regs->msr & MSR_VEC))
 		giveup_altivec(current);
@@ -107,10 +141,29 @@ void enable_kernel_altivec(void)
 }
 EXPORT_SYMBOL(enable_kernel_altivec);
 
+/*
+ * Make sure the VMX/Altivec register state in the
+ * the thread_struct is up to date for task tsk.
+ */
+void flush_altivec_to_thread(struct task_struct *tsk)
+{
+#ifdef CONFIG_ALTIVEC
+	if (tsk->thread.regs) {
+		preempt_disable();
+		if (tsk->thread.regs->msr & MSR_VEC) {
+#ifdef CONFIG_SMP
+			BUG_ON(tsk != current);
+#endif
+			giveup_altivec(current);
+		}
+		preempt_enable();
+	}
+#endif
+}
+
 int dump_task_altivec(struct pt_regs *regs, elf_vrregset_t *vrregs)
 {
-	if (regs->msr & MSR_VEC)
-		giveup_altivec(current);
+	flush_altivec_to_thread(current);
 	memcpy(vrregs, &current->thread.vr[0], sizeof(*vrregs));
 	return 1;
 }
@@ -166,6 +219,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 void show_regs(struct pt_regs * regs)
 {
 	int i;
+	unsigned long trap;
 
 	printk("NIP: %016lX XER: %016lX LR: %016lX\n",
 	       regs->nip, regs->xer, regs->link);
@@ -176,7 +230,8 @@ void show_regs(struct pt_regs * regs)
 	       regs->msr & MSR_FP ? 1 : 0,regs->msr&MSR_ME ? 1 : 0,
 	       regs->msr&MSR_IR ? 1 : 0,
 	       regs->msr&MSR_DR ? 1 : 0);
-	if (regs->trap == 0x300 || regs->trap == 0x380 || regs->trap == 0x600)
+	trap = TRAP(regs);
+	if (trap == 0x300 || trap == 0x380 || trap == 0x600)
 		printk("DAR: %016lx, DSISR: %016lx\n", regs->dar, regs->dsisr);
 	printk("TASK: %p[%d] '%s' THREAD: %p",
 	       current, current->pid, current->comm, current->thread_info);
@@ -191,6 +246,8 @@ void show_regs(struct pt_regs * regs)
 		}
 
 		printk("%016lX ", regs->gpr[i]);
+		if (i == 13 && !FULL_REGS(regs))
+			break;
 	}
 	printk("\n");
 	/*
@@ -245,16 +302,8 @@ release_thread(struct task_struct *t)
  */
 void prepare_to_copy(struct task_struct *tsk)
 {
-	struct pt_regs *regs = tsk->thread.regs;
-
-	if (regs == NULL)
-		return;
-	if (regs->msr & MSR_FP)
-		giveup_fpu(current);
-#ifdef CONFIG_ALTIVEC
-	if (regs->msr & MSR_VEC)
-		giveup_altivec(current);
-#endif /* CONFIG_ALTIVEC */
+	flush_fp_to_thread(current);
+	flush_altivec_to_thread(current);
 }
 
 /*
@@ -439,12 +488,8 @@ int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
 		goto out;
-	if (regs->msr & MSR_FP)
-		giveup_fpu(current);
-#ifdef CONFIG_ALTIVEC
-	if (regs->msr & MSR_VEC)
-		giveup_altivec(current);
-#endif /* CONFIG_ALTIVEC */
+	flush_fp_to_thread(current);
+	flush_altivec_to_thread(current);
 	error = do_execve(filename, (char __user * __user *) a1,
 				    (char __user * __user *) a2, regs);
   

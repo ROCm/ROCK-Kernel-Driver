@@ -44,9 +44,6 @@ static int xmon_owner;
 static int xmon_gate;
 #endif /* CONFIG_SMP */
 
-#define TRAP(regs)	((regs)->trap)
-#define FULL_REGS(regs)	1
-
 static unsigned long in_xmon = 0;
 
 static unsigned long adrs;

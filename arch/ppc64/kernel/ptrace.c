@@ -119,8 +119,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		if (index < PT_FPR0) {
 			tmp = get_reg(child, (int)index);
 		} else {
-			if (child->thread.regs->msr & MSR_FP)
-				giveup_fpu(child);
+			flush_fp_to_thread(child);
 			tmp = ((unsigned long *)child->thread.fpr)[index - PT_FPR0];
 		}
 		ret = put_user(tmp,(unsigned long __user *) data);
@@ -152,8 +151,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		if (index < PT_FPR0) {
 			ret = put_reg(child, index, data);
 		} else {
-			if (child->thread.regs->msr & MSR_FP)
-				giveup_fpu(child);
+			flush_fp_to_thread(child);
 			((unsigned long *)child->thread.fpr)[index - PT_FPR0] = data;
 			ret = 0;
 		}
@@ -245,8 +243,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		unsigned long *reg = &((unsigned long *)child->thread.fpr)[0];
 		unsigned long __user *tmp = (unsigned long __user *)addr;
 
-		if (child->thread.regs->msr & MSR_FP)
-			giveup_fpu(child);
+		flush_fp_to_thread(child);
 
 		for (i = 0; i < 32; i++) {
 			ret = put_user(*reg, tmp);
@@ -263,8 +260,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		unsigned long *reg = &((unsigned long *)child->thread.fpr)[0];
 		unsigned long __user *tmp = (unsigned long __user *)addr;
 
-		if (child->thread.regs->msr & MSR_FP)
-			giveup_fpu(child);
+		flush_fp_to_thread(child);
 
 		for (i = 0; i < 32; i++) {
 			ret = get_user(*reg, tmp);

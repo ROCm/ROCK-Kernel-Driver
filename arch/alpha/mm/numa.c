@@ -279,8 +279,8 @@ setup_memory(void *kernel_end)
 				       initrd_end,
 				       phys_to_virt(PFN_PHYS(max_low_pfn)));
 		} else {
-			nid = NODE_DATA(kvaddr_to_nid(initrd_start));
-			reserve_bootmem_node(nid,
+			nid = kvaddr_to_nid(initrd_start);
+			reserve_bootmem_node(NODE_DATA(nid),
 					     virt_to_phys((void *)initrd_start),
 					     INITRD_SIZE);
 		}

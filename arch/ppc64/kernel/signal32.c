@@ -130,11 +130,10 @@ static int save_user_regs(struct pt_regs *regs, struct mcontext32 __user *frame,
 {
 	elf_greg_t64 *gregs = (elf_greg_t64 *)regs;
 	int i, err = 0;
-	
-	/* Make sure floating point registers are stored in regs */ 
-	if (regs->msr & MSR_FP)
-		giveup_fpu(current);
-	
+
+	/* Make sure floating point registers are stored in regs */
+	flush_fp_to_thread(current);
+
 	/* save general and floating-point registers */
 	for (i = 0; i <= PT_RESULT; i ++)
 		err |= __put_user((unsigned int)gregs[i], &frame->mc_gregs[i]);
@@ -148,8 +147,7 @@ static int save_user_regs(struct pt_regs *regs, struct mcontext32 __user *frame,
 #ifdef CONFIG_ALTIVEC
 	/* save altivec registers */
 	if (current->thread.used_vr) {
-		if (regs->msr & MSR_VEC)
-			giveup_altivec(current);
+		flush_altivec_to_thread(current);
 		if (__copy_to_user(&frame->mc_vregs, current->thread.vr,
 				   ELF_NVRREG32 * sizeof(vector128)))
 			return 1;
@@ -934,7 +932,7 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 
 	ka = (signr == 0)? NULL: &current->sighand->action[signr-1];
 
-	if (regs->trap == 0x0C00		/* System Call! */
+	if (TRAP(regs) == 0x0C00		/* System Call! */
 	    && regs->ccr & 0x10000000		/* error signalled */
 	    && ((ret = regs->gpr[3]) == ERESTARTSYS
 		|| ret == ERESTARTNOHAND || ret == ERESTARTNOINTR

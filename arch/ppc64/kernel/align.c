@@ -22,8 +22,6 @@
 #include <asm/cache.h>
 #include <asm/cputable.h>
 
-void disable_kernel_fp(void); /* asm function from head.S */
-
 struct aligninfo {
 	unsigned char len;
 	unsigned char flags;
@@ -280,8 +278,11 @@ fix_alignment(struct pt_regs *regs)
 	}
 
 	/* Force the fprs into the save area so we can reference them */
-	if ((flags & F) && (regs->msr & MSR_FP))
-		giveup_fpu(current);
+	if (flags & F) {
+		if (!user_mode(regs))
+			return 0;
+		flush_fp_to_thread(current);
+	}
 	
 	/* If we are loading, get the data from user space */
 	if (flags & LD) {
@@ -310,9 +311,11 @@ fix_alignment(struct pt_regs *regs)
 		if (flags & F) {
 			if (nb == 4) {
 				/* Doing stfs, have to convert to single */
+				preempt_disable();
 				enable_kernel_fp();
 				cvt_df(&current->thread.fpr[reg], (float *)&data.v[4], &current->thread.fpscr);
 				disable_kernel_fp();
+				preempt_enable();
 			}
 			else
 				data.dd = current->thread.fpr[reg];
@@ -344,9 +347,11 @@ fix_alignment(struct pt_regs *regs)
 		if (flags & F) {
 			if (nb == 4) {
 				/* Doing lfs, have to convert to double */
+				preempt_disable();
 				enable_kernel_fp();
 				cvt_fd((float *)&data.v[4], &current->thread.fpr[reg], &current->thread.fpscr);
 				disable_kernel_fp();
+				preempt_enable();
 			}
 			else
 				current->thread.fpr[reg] = data.dd;

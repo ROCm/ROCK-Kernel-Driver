@@ -764,6 +764,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	void *pgdir;
 	pte_t *ptep;
 	int local = 0;
+	int cpu;
 	cpumask_t tmp;
 
 	/* handle i-cache coherency */
@@ -794,12 +795,14 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 
 	vsid = get_vsid(vma->vm_mm->context.id, ea);
 
-	tmp = cpumask_of_cpu(smp_processor_id());
+	cpu = get_cpu();
+	tmp = cpumask_of_cpu(cpu);
 	if (cpus_equal(vma->vm_mm->cpu_vm_mask, tmp))
 		local = 1;
 
 	__hash_page(ea, pte_val(pte) & (_PAGE_USER|_PAGE_RW), vsid, ptep,
 		    0x300, local);
+	put_cpu();
 }
 
 void * reserve_phb_iospace(unsigned long size)
