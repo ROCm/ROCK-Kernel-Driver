@@ -55,7 +55,7 @@ int jfs_umount(struct super_block *sb)
 	struct inode *ipimap = sbi->ipimap;
 	struct inode *ipaimap = sbi->ipaimap;
 	struct inode *ipaimap2 = sbi->ipaimap2;
-	log_t *log;
+	struct jfs_log *log;
 	int rc = 0;
 
 	jFYI(1, ("\n	UnMount JFS: sb:0x%p\n", sb));
@@ -143,7 +143,7 @@ int jfs_umount_rw(struct super_block *sb)
 {
 	struct address_space *bdev_mapping = sb->s_bdev->bd_inode->i_mapping;
 	struct jfs_sb_info *sbi = JFS_SBI(sb);
-	log_t *log = sbi->log;
+	struct jfs_log *log = sbi->log;
 
 	if (!log)
 		return 0;

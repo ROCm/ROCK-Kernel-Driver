@@ -84,15 +84,15 @@
 #define XT_GETSEARCH(IP, LEAF, BN, MP,  P, INDEX) \
 	BT_GETSEARCH(IP, LEAF, BN, MP, xtpage_t, P, INDEX, i_xtroot)
 /* xtree entry parameter descriptor */
-typedef struct {
-	metapage_t *mp;
+struct xtsplit {
+	struct metapage *mp;
 	s16 index;
 	u8 flag;
 	s64 off;
 	s64 addr;
 	int len;
-	pxdlist_t *pxdlist;
-} xtsplit_t;
+	struct pxdlist *pxdlist;
+};
 
 
 /*
@@ -111,29 +111,25 @@ static struct {
  * forward references
  */
 static int xtSearch(struct inode *ip,
-		    s64 xoff, int *cmpp, btstack_t * btstack, int flag);
+		    s64 xoff, int *cmpp, struct btstack * btstack, int flag);
 
 static int xtSplitUp(tid_t tid,
 		     struct inode *ip,
-		     xtsplit_t * split, btstack_t * btstack);
+		     struct xtsplit * split, struct btstack * btstack);
 
-static int xtSplitPage(tid_t tid,
-		       struct inode *ip,
-		       xtsplit_t * split, metapage_t ** rmpp, s64 * rbnp);
+static int xtSplitPage(tid_t tid, struct inode *ip, struct xtsplit * split,
+		       struct metapage ** rmpp, s64 * rbnp);
 
-static int xtSplitRoot(tid_t tid,
-		       struct inode *ip,
-		       xtsplit_t * split, metapage_t ** rmpp);
+static int xtSplitRoot(tid_t tid, struct inode *ip,
+		       struct xtsplit * split, struct metapage ** rmpp);
 
 #ifdef _STILL_TO_PORT
-static int xtDeleteUp(tid_t tid,
-		      struct inode *ip,
-		      metapage_t * fmp,
-		      xtpage_t * fp, btstack_t * btstack);
+static int xtDeleteUp(tid_t tid, struct inode *ip, struct metapage * fmp,
+		      xtpage_t * fp, struct btstack * btstack);
 
 static int xtSearchNode(struct inode *ip,
 			xad_t * xad,
-			int *cmpp, btstack_t * btstack, int flag);
+			int *cmpp, struct btstack * btstack, int flag);
 
 static int xtRelink(tid_t tid, struct inode *ip, xtpage_t * fp);
 #endif				/*  _STILL_TO_PORT */
@@ -155,10 +151,10 @@ int xtLookup(struct inode *ip, s64 lstart,
 	     s64 llen, int *pflag, s64 * paddr, s32 * plen, int no_check)
 {
 	int rc = 0;
-	btstack_t btstack;
+	struct btstack btstack;
 	int cmp;
 	s64 bn;
-	metapage_t *mp;
+	struct metapage *mp;
 	xtpage_t *p;
 	int index;
 	xad_t *xad;
@@ -240,8 +236,8 @@ int xtLookup(struct inode *ip, s64 lstart,
  *
  * parameter:
  *      struct inode    *ip,
- *      lxdlist_t       *lxdlist,       lxd list (in)
- *      xadlist_t       *xadlist,       xad list (in/out)
+ *      struct lxdlist  *lxdlist,       lxd list (in)
+ *      struct xadlist  *xadlist,       xad list (in/out)
  *      int		flag)
  *
  * coverage of lxd by xad under assumption of
@@ -256,15 +252,14 @@ int xtLookup(struct inode *ip, s64 lstart,
  *      required to cover the last byte;
  *      the extent backing a page is fully contained within an xad;
  */
-int xtLookupList(struct inode *ip, lxdlist_t * lxdlist,	/* lxd list (in) */
-		 xadlist_t * xadlist,	/* xad list (in/out) */
-		 int flag)
+int xtLookupList(struct inode *ip, struct lxdlist * lxdlist,
+		 struct xadlist * xadlist, int flag)
 {
 	int rc = 0;
-	btstack_t btstack;
+	struct btstack btstack;
 	int cmp;
 	s64 bn;
-	metapage_t *mp;
+	struct metapage *mp;
 	xtpage_t *p;
 	int index;
 	lxd_t *lxd;
@@ -509,17 +504,17 @@ int xtLookupList(struct inode *ip, lxdlist_t * lxdlist,	/* lxd list (in) */
  *      the page containing the entry is pinned at exit.
  */
 static int xtSearch(struct inode *ip, s64 xoff,	/* offset of extent */
-		    int *cmpp, btstack_t * btstack, int flag)
+		    int *cmpp, struct btstack * btstack, int flag)
 {
 	struct jfs_inode_info *jfs_ip = JFS_IP(ip);
 	int rc = 0;
 	int cmp = 1;		/* init for empty page */
 	s64 bn;			/* block number */
-	metapage_t *mp;		/* page buffer */
+	struct metapage *mp;	/* page buffer */
 	xtpage_t *p;		/* page */
 	xad_t *xad;
 	int base, index, lim, btindex;
-	btframe_t *btsp;
+	struct btframe *btsp;
 	int nsplit = 0;		/* number of pages to split */
 	s64 t64;
 
@@ -796,16 +791,16 @@ int xtInsert(tid_t tid,		/* transaction id */
 {
 	int rc = 0;
 	s64 xaddr, hint;
-	metapage_t *mp;		/* meta-page buffer */
+	struct metapage *mp;	/* meta-page buffer */
 	xtpage_t *p;		/* base B+-tree index page */
 	s64 bn;
 	int index, nextindex;
-	btstack_t btstack;	/* traverse stack */
-	xtsplit_t split;	/* split information */
+	struct btstack btstack;	/* traverse stack */
+	struct xtsplit split;	/* split information */
 	xad_t *xad;
 	int cmp;
-	tlock_t *tlck;
-	xtlock_t *xtlck;
+	struct tlock *tlck;
+	struct xtlock *xtlck;
 
 	jFYI(1,
 	     ("xtInsert: nxoff:0x%lx nxlen:0x%x\n", (ulong) xoff, xlen));
@@ -903,7 +898,7 @@ int xtInsert(tid_t tid,		/* transaction id */
 	/* Don't log it if there are no links to the file */
 	if (!test_cflag(COMMIT_Nolink, ip)) {
 		tlck = txLock(tid, ip, mp, tlckXTREE | tlckGROW);
-		xtlck = (xtlock_t *) & tlck->lock;
+		xtlck = (struct xtlock *) & tlck->lock;
 		xtlck->lwm.offset =
 		    (xtlck->lwm.offset) ? min(index,
 					      (int)xtlck->lwm.offset) : index;
@@ -937,27 +932,27 @@ int xtInsert(tid_t tid,		/* transaction id */
  */
 static int
 xtSplitUp(tid_t tid,
-	  struct inode *ip, xtsplit_t * split, btstack_t * btstack)
+	  struct inode *ip, struct xtsplit * split, struct btstack * btstack)
 {
 	int rc = 0;
-	metapage_t *smp;
+	struct metapage *smp;
 	xtpage_t *sp;		/* split page */
-	metapage_t *rmp;
+	struct metapage *rmp;
 	s64 rbn;		/* new right page block number */
-	metapage_t *rcmp;
+	struct metapage *rcmp;
 	xtpage_t *rcp;		/* right child page */
 	s64 rcbn;		/* right child page block number */
 	int skip;		/* index of entry of insertion */
 	int nextindex;		/* next available entry index of p */
-	btframe_t *parent;	/* parent page entry on traverse stack */
+	struct btframe *parent;	/* parent page entry on traverse stack */
 	xad_t *xad;
 	s64 xaddr;
 	int xlen;
 	int nsplit;		/* number of pages split */
-	pxdlist_t pxdlist;
+	struct pxdlist pxdlist;
 	pxd_t *pxd;
-	tlock_t *tlck;
-	xtlock_t *xtlck;
+	struct tlock *tlck;
+	struct xtlock *xtlck;
 
 	smp = split->mp;
 	sp = XT_PAGE(ip, smp);
@@ -995,7 +990,7 @@ xtSplitUp(tid_t tid,
 		/* Don't log it if there are no links to the file */
 		if (!test_cflag(COMMIT_Nolink, ip)) {
 			tlck = txLock(tid, ip, smp, tlckXTREE | tlckGROW);
-			xtlck = (xtlock_t *) & tlck->lock;
+			xtlck = (struct xtlock *) & tlck->lock;
 			xtlck->lwm.offset = (xtlck->lwm.offset) ?
 			    min(skip, (int)xtlck->lwm.offset) : skip;
 			xtlck->lwm.length =
@@ -1163,7 +1158,7 @@ xtSplitUp(tid_t tid,
 			if (!test_cflag(COMMIT_Nolink, ip)) {
 				tlck = txLock(tid, ip, smp,
 					      tlckXTREE | tlckGROW);
-				xtlck = (xtlock_t *) & tlck->lock;
+				xtlck = (struct xtlock *) & tlck->lock;
 				xtlck->lwm.offset = (xtlck->lwm.offset) ?
 				    min(skip, (int)xtlck->lwm.offset) : skip;
 				xtlck->lwm.length =
@@ -1210,8 +1205,8 @@ xtSplitUp(tid_t tid,
  * parameter:
  *      int		tid,
  *      struct inode    *ip,
- *      xtsplit_t       *split,
- *      metapage_t	**rmpp,
+ *      struct xtsplit  *split,
+ *      struct metapage	**rmpp,
  *      u64		*rbnp,
  *
  * return:
@@ -1219,23 +1214,23 @@ xtSplitUp(tid_t tid,
  */
 static int
 xtSplitPage(tid_t tid, struct inode *ip,
-	    xtsplit_t * split, metapage_t ** rmpp, s64 * rbnp)
+	    struct xtsplit * split, struct metapage ** rmpp, s64 * rbnp)
 {
 	int rc = 0;
-	metapage_t *smp;
+	struct metapage *smp;
 	xtpage_t *sp;
-	metapage_t *rmp;
+	struct metapage *rmp;
 	xtpage_t *rp;		/* new right page allocated */
 	s64 rbn;		/* new right page block number */
-	metapage_t *mp;
+	struct metapage *mp;
 	xtpage_t *p;
 	s64 nextbn;
 	int skip, maxentry, middle, righthalf, n;
 	xad_t *xad;
-	pxdlist_t *pxdlist;
+	struct pxdlist *pxdlist;
 	pxd_t *pxd;
-	tlock_t *tlck;
-	xtlock_t *sxtlck = 0, *rxtlck = 0;
+	struct tlock *tlck;
+	struct xtlock *sxtlck = 0, *rxtlck = 0;
 
 	smp = split->mp;
 	sp = XT_PAGE(ip, smp);
@@ -1274,13 +1269,13 @@ xtSplitPage(tid_t tid, struct inode *ip,
 		 * acquire a transaction lock on the new right page;
 		 */
 		tlck = txLock(tid, ip, rmp, tlckXTREE | tlckNEW);
-		rxtlck = (xtlock_t *) & tlck->lock;
+		rxtlck = (struct xtlock *) & tlck->lock;
 		rxtlck->lwm.offset = XTENTRYSTART;
 		/*
 		 * acquire a transaction lock on the split page
 		 */
 		tlck = txLock(tid, ip, smp, tlckXTREE | tlckGROW);
-		sxtlck = (xtlock_t *) & tlck->lock;
+		sxtlck = (struct xtlock *) & tlck->lock;
 	}
 
 	/*
@@ -1465,26 +1460,26 @@ xtSplitPage(tid_t tid, struct inode *ip,
  * parameter:
  *      int		tid,
  *      struct inode    *ip,
- *      xtsplit_t       *split,
- *      metapage_t	**rmpp)
+ *      struct xtsplit  *split,
+ *      struct metapage	**rmpp)
  *
  * return:
  *      Pointer to page in which to insert or NULL on error.
  */
 static int
 xtSplitRoot(tid_t tid,
-	    struct inode *ip, xtsplit_t * split, metapage_t ** rmpp)
+	    struct inode *ip, struct xtsplit * split, struct metapage ** rmpp)
 {
 	xtpage_t *sp;
-	metapage_t *rmp;
+	struct metapage *rmp;
 	xtpage_t *rp;
 	s64 rbn;
 	int skip, nextindex;
 	xad_t *xad;
 	pxd_t *pxd;
-	pxdlist_t *pxdlist;
-	tlock_t *tlck;
-	xtlock_t *xtlck;
+	struct pxdlist *pxdlist;
+	struct tlock *tlck;
+	struct xtlock *xtlck;
 
 	sp = &JFS_IP(ip)->i_xtroot;
 
@@ -1546,7 +1541,7 @@ xtSplitRoot(tid_t tid,
 
 	if (!test_cflag(COMMIT_Nolink, ip)) {
 		tlck = txLock(tid, ip, rmp, tlckXTREE | tlckNEW);
-		xtlck = (xtlock_t *) & tlck->lock;
+		xtlck = (struct xtlock *) & tlck->lock;
 		xtlck->lwm.offset = XTENTRYSTART;
 		xtlck->lwm.length = le16_to_cpu(rp->header.nextindex) -
 		    XTENTRYSTART;
@@ -1577,7 +1572,7 @@ xtSplitRoot(tid_t tid,
 
 	if (!test_cflag(COMMIT_Nolink, ip)) {
 		tlck = txLock(tid, ip, split->mp, tlckXTREE | tlckGROW);
-		xtlck = (xtlock_t *) & tlck->lock;
+		xtlck = (struct xtlock *) & tlck->lock;
 		xtlck->lwm.offset = XTENTRYSTART;
 		xtlck->lwm.length = 1;
 	}
@@ -1608,16 +1603,16 @@ int xtExtend(tid_t tid,		/* transaction id */
 {
 	int rc = 0;
 	int cmp;
-	metapage_t *mp;		/* meta-page buffer */
+	struct metapage *mp;	/* meta-page buffer */
 	xtpage_t *p;		/* base B+-tree index page */
 	s64 bn;
 	int index, nextindex, len;
-	btstack_t btstack;	/* traverse stack */
-	xtsplit_t split;	/* split information */
+	struct btstack btstack;	/* traverse stack */
+	struct xtsplit split;	/* split information */
 	xad_t *xad;
 	s64 xaddr;
-	tlock_t *tlck;
-	xtlock_t *xtlck = 0;
+	struct tlock *tlck;
+	struct xtlock *xtlck = 0;
 	int rootsplit = 0;
 
 	jFYI(1,
@@ -1646,7 +1641,7 @@ int xtExtend(tid_t tid,		/* transaction id */
 	BT_MARK_DIRTY(mp, ip);
 	if (!test_cflag(COMMIT_Nolink, ip)) {
 		tlck = txLock(tid, ip, mp, tlckXTREE | tlckGROW);
-		xtlck = (xtlock_t *) & tlck->lock;
+		xtlck = (struct xtlock *) & tlck->lock;
 	}
 
 	/* extend will overflow extent ? */
@@ -1701,7 +1696,7 @@ int xtExtend(tid_t tid,		/* transaction id */
 					tlck = txLock(tid, ip, mp,
 						      tlckXTREE |
 						      tlckGROW);
-					xtlck = (xtlock_t *) & tlck->lock;
+					xtlck = (struct xtlock *) & tlck->lock;
 				}
 			}
 		} else
@@ -1768,17 +1763,17 @@ int xtTailgate(tid_t tid,		/* transaction id */
 {
 	int rc = 0;
 	int cmp;
-	metapage_t *mp;		/* meta-page buffer */
+	struct metapage *mp;	/* meta-page buffer */
 	xtpage_t *p;		/* base B+-tree index page */
 	s64 bn;
 	int index, nextindex, llen, rlen;
-	btstack_t btstack;	/* traverse stack */
-	xtsplit_t split;	/* split information */
+	struct btstack btstack;	/* traverse stack */
+	struct xtsplit split;	/* split information */
 	xad_t *xad;
-	tlock_t *tlck;
-	xtlock_t *xtlck = 0;
-	tlock_t *mtlck;
-	maplock_t *pxdlock;
+	struct tlock *tlck;
+	struct xtlock *xtlck = 0;
+	struct tlock *mtlck;
+	struct maplock *pxdlock;
 	int rootsplit = 0;
 
 /*
@@ -1804,7 +1799,7 @@ printf("xtTailgate: nxoff:0x%lx nxlen:0x%x nxaddr:0x%lx\n",
 	 */
 	if (!test_cflag(COMMIT_Nolink, ip)) {
 		tlck = txLock(tid, ip, mp, tlckXTREE | tlckGROW);
-		xtlck = (xtlock_t *) & tlck->lock;
+		xtlck = (struct xtlock *) & tlck->lock;
 	}
 
 	/* completely replace extent ? */
@@ -1859,7 +1854,7 @@ printf("xtTailgate: xoff:0x%lx xlen:0x%x xaddr:0x%lx\n",
 					tlck = txLock(tid, ip, mp,
 						      tlckXTREE |
 						      tlckGROW);
-					xtlck = (xtlock_t *) & tlck->lock;
+					xtlck = (struct xtlock *) & tlck->lock;
 				}
 			}
 		} else
@@ -1892,7 +1887,7 @@ printf("xtTailgate: xoff:0x%lx xlen:0x%x xaddr:0x%lx\n",
 		/* free from PWMAP at commit */
 		if (!test_cflag(COMMIT_Nolink, ip)) {
 			mtlck = txMaplock(tid, ip, tlckMAP);
-			pxdlock = (maplock_t *) & mtlck->lock;
+			pxdlock = (struct maplock *) & mtlck->lock;
 			pxdlock->flag = mlckFREEPXD;
 			PXDaddress(&pxdlock->pxd, addressXAD(xad) + llen);
 			PXDlength(&pxdlock->pxd, rlen);
@@ -1944,19 +1939,19 @@ int xtUpdate(tid_t tid, struct inode *ip, xad_t * nxad)
 {				/* new XAD */
 	int rc = 0;
 	int cmp;
-	metapage_t *mp;		/* meta-page buffer */
+	struct metapage *mp;	/* meta-page buffer */
 	xtpage_t *p;		/* base B+-tree index page */
 	s64 bn;
 	int index0, index, newindex, nextindex;
-	btstack_t btstack;	/* traverse stack */
-	xtsplit_t split;	/* split information */
+	struct btstack btstack;	/* traverse stack */
+	struct xtsplit split;	/* split information */
 	xad_t *xad, *lxad, *rxad;
 	int xflag;
 	s64 nxoff, xoff;
 	int nxlen, xlen, lxlen, rxlen;
 	s64 nxaddr, xaddr;
-	tlock_t *tlck;
-	xtlock_t *xtlck = 0;
+	struct tlock *tlck;
+	struct xtlock *xtlck = 0;
 	int rootsplit = 0, newpage = 0;
 
 	/* there must exist extent to be tailgated */
@@ -1980,7 +1975,7 @@ printf("xtUpdate: nxflag:0x%x nxoff:0x%lx nxlen:0x%x nxaddr:0x%lx\n",
 	 */
 	if (!test_cflag(COMMIT_Nolink, ip)) {
 		tlck = txLock(tid, ip, mp, tlckXTREE | tlckGROW);
-		xtlck = (xtlock_t *) & tlck->lock;
+		xtlck = (struct xtlock *) & tlck->lock;
 	}
 
 	xad = &p->xad[index0];
@@ -2192,7 +2187,7 @@ printf("xtUpdate.updateRight.split p:0x%p\n", p);
 					tlck = txLock(tid, ip, mp,
 						      tlckXTREE |
 						      tlckGROW);
-					xtlck = (xtlock_t *) & tlck->lock;
+					xtlck = (struct xtlock *) & tlck->lock;
 				}
 			}
 		} else {
@@ -2255,7 +2250,7 @@ printf("xtUpdate.updateRight.split p:0x%p\n", p);
 		BT_MARK_DIRTY(mp, ip);
 		if (!test_cflag(COMMIT_Nolink, ip)) {
 			tlck = txLock(tid, ip, mp, tlckXTREE | tlckGROW);
-			xtlck = (xtlock_t *) & tlck->lock;
+			xtlck = (struct xtlock *) & tlck->lock;
 		}
 
 		index0 = index = newindex;
@@ -2337,7 +2332,7 @@ printf("xtUpdate.updateLeft.split p:0x%p\n", p);
 					tlck = txLock(tid, ip, mp,
 						      tlckXTREE |
 						      tlckGROW);
-					xtlck = (xtlock_t *) & tlck->lock;
+					xtlck = (struct xtlock *) & tlck->lock;
 				}
 			}
 		} else
@@ -2397,18 +2392,18 @@ int xtAppend(tid_t tid,		/* transaction id */
 	     int flag)
 {
 	int rc = 0;
-	metapage_t *mp;		/* meta-page buffer */
+	struct metapage *mp;	/* meta-page buffer */
 	xtpage_t *p;		/* base B+-tree index page */
 	s64 bn, xaddr;
 	int index, nextindex;
-	btstack_t btstack;	/* traverse stack */
-	xtsplit_t split;	/* split information */
+	struct btstack btstack;	/* traverse stack */
+	struct xtsplit split;	/* split information */
 	xad_t *xad;
 	int cmp;
-	tlock_t *tlck;
-	xtlock_t *xtlck;
+	struct tlock *tlck;
+	struct xtlock *xtlck;
 	int nsplit, nblocks, xlen;
-	pxdlist_t pxdlist;
+	struct pxdlist pxdlist;
 	pxd_t *pxd;
 
 	xaddr = *xaddrp;
@@ -2516,7 +2511,7 @@ int xtAppend(tid_t tid,		/* transaction id */
 	 * action: xad insertion/extension;
 	 */
 	tlck = txLock(tid, ip, mp, tlckXTREE | tlckGROW);
-	xtlck = (xtlock_t *) & tlck->lock;
+	xtlck = (struct xtlock *) & tlck->lock;
 
 	/* insert the new entry: mark the entry NEW */
 	xad = &p->xad[index];
@@ -2561,14 +2556,14 @@ int xtAppend(tid_t tid,		/* transaction id */
 int xtDelete(tid_t tid, struct inode *ip, s64 xoff, s32 xlen, int flag)
 {
 	int rc = 0;
-	btstack_t btstack;
+	struct btstack btstack;
 	int cmp;
 	s64 bn;
-	metapage_t *mp;
+	struct metapage *mp;
 	xtpage_t *p;
 	int index, nextindex;
-	tlock_t *tlck;
-	xtlock_t *xtlck;
+	struct tlock *tlck;
+	struct xtlock *xtlck;
 
 	/*
 	 * find the matching entry; xtSearch() pins the page
@@ -2603,7 +2598,7 @@ int xtDelete(tid_t tid, struct inode *ip, s64 xoff, s32 xlen, int flag)
 	 * action:xad deletion;
 	 */
 	tlck = txLock(tid, ip, mp, tlckXTREE);
-	xtlck = (xtlock_t *) & tlck->lock;
+	xtlck = (struct xtlock *) & tlck->lock;
 	xtlck->lwm.offset =
 	    (xtlck->lwm.offset) ? min(index, xtlck->lwm.offset) : index;
 
@@ -2630,19 +2625,18 @@ int xtDelete(tid_t tid, struct inode *ip, s64 xoff, s32 xlen, int flag)
  * return:
  */
 static int
-xtDeleteUp(tid_t tid,
-	   struct inode *ip,
-	   metapage_t * fmp, xtpage_t * fp, btstack_t * btstack)
+xtDeleteUp(tid_t tid, struct inode *ip,
+	   struct metapage * fmp, xtpage_t * fp, struct btstack * btstack)
 {
 	int rc = 0;
-	metapage_t *mp;
+	struct metapage *mp;
 	xtpage_t *p;
 	int index, nextindex;
 	s64 xaddr;
 	int xlen;
-	btframe_t *parent;
-	tlock_t *tlck;
-	xtlock_t *xtlck;
+	struct btframe *parent;
+	struct tlock *tlck;
+	struct xtlock *xtlck;
 
 	/*
 	 * keep root leaf page which has become empty
@@ -2736,7 +2730,7 @@ xtDeleteUp(tid_t tid,
 			 * action:xad deletion;
 			 */
 			tlck = txLock(tid, ip, mp, tlckXTREE);
-			xtlck = (xtlock_t *) & tlck->lock;
+			xtlck = (struct xtlock *) & tlck->lock;
 			xtlck->lwm.offset =
 			    (xtlck->lwm.offset) ? min(index,
 						      xtlck->lwm.
@@ -2785,10 +2779,10 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 	   int xtype)
 {				/* extent type: XTPAGE or DATAEXT */
 	int rc = 0;
-	tblock_t *tblk;
-	tlock_t *tlck;
-	xtlock_t *xtlck;
-	metapage_t *mp, *pmp, *lmp, *rmp;	/* meta-page buffer */
+	struct tblock *tblk;
+	struct tlock *tlck;
+	struct xtlock *xtlck;
+	struct metapage *mp, *pmp, *lmp, *rmp;	/* meta-page buffer */
 	xtpage_t *p, *pp, *rp, *lp;	/* base B+-tree index page */
 	xad_t *xad;
 	pxd_t *pxd;
@@ -2801,8 +2795,8 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 	s64 bn;
 	int cmp;
 	int index;
-	pxdlock_t *pxdlock;
-	btstack_t btstack;	/* traverse stack */
+	struct pxd_lock *pxdlock;
+	struct btstack btstack;	/* traverse stack */
 
 	xtype = xtype & EXTENT_TYPE;
 
@@ -3016,7 +3010,7 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 		BT_MARK_DIRTY(mp, ip);
 		/* tlckNEW init  xtlck->lwm.offset = XTENTRYSTART; */
 		tlck = txLock(tid, ip, mp, tlckXTREE | tlckNEW);
-		xtlck = (xtlock_t *) & tlck->lock;
+		xtlck = (struct xtlock *) & tlck->lock;
 
 		/* update the self address in the xtpage header */
 		pxd = &p->header.self;
@@ -3060,7 +3054,7 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 	else			/* (xtype  == XTPAGE) */
 		tlck = txMaplock(tid, ip, tlckMAP | tlckRELOCATE);
 
-	pxdlock = (pxdlock_t *) & tlck->lock;
+	pxdlock = (struct pxd_lock *) & tlck->lock;
 	pxdlock->flag = mlckFREEPXD;
 	PXDaddress(&pxdlock->pxd, oxaddr);
 	PXDlength(&pxdlock->pxd, xlen);
@@ -3076,7 +3070,7 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 	jEVENT(0, ("xtRelocate: update parent xad entry.\n"));
 	BT_MARK_DIRTY(pmp, ip);
 	tlck = txLock(tid, ip, pmp, tlckXTREE | tlckGROW);
-	xtlck = (xtlock_t *) & tlck->lock;
+	xtlck = (struct xtlock *) & tlck->lock;
 
 	/* update the XAD with the new destination extent; */
 	xad = &pp->xad[index];
@@ -3113,17 +3107,17 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
  *      the page containing the entry is pinned at exit.
  */
 static int xtSearchNode(struct inode *ip, xad_t * xad,	/* required XAD entry */
-			int *cmpp, btstack_t * btstack, int flag)
+			int *cmpp, struct btstack * btstack, int flag)
 {
 	int rc = 0;
 	s64 xoff, xaddr;
 	int xlen;
 	int cmp = 1;		/* init for empty page */
 	s64 bn;			/* block number */
-	metapage_t *mp;		/* meta-page buffer */
+	struct metapage *mp;	/* meta-page buffer */
 	xtpage_t *p;		/* page */
 	int base, index, lim;
-	btframe_t *btsp;
+	struct btframe *btsp;
 	s64 t64;
 
 	BT_CLR(btstack);
@@ -3233,9 +3227,9 @@ static int xtSearchNode(struct inode *ip, xad_t * xad,	/* required XAD entry */
 static int xtRelink(tid_t tid, struct inode *ip, xtpage_t * p)
 {
 	int rc = 0;
-	metapage_t *mp;
+	struct metapage *mp;
 	s64 nextbn, prevbn;
-	tlock_t *tlck;
+	struct tlock *tlck;
 
 	nextbn = le64_to_cpu(p->header.next);
 	prevbn = le64_to_cpu(p->header.prev);
@@ -3295,14 +3289,14 @@ static int xtRelink(tid_t tid, struct inode *ip, xtpage_t * p)
 void xtInitRoot(tid_t tid, struct inode *ip)
 {
 	xtpage_t *p;
-	tlock_t *tlck;
+	struct tlock *tlck;
 
 	/*
 	 * acquire a transaction lock on the root
 	 *
 	 * action:
 	 */
-	tlck = txLock(tid, ip, (metapage_t *) &JFS_IP(ip)->bxflag,
+	tlck = txLock(tid, ip, (struct metapage *) &JFS_IP(ip)->bxflag,
 		      tlckXTREE | tlckNEW);
 	p = &JFS_IP(ip)->i_xtroot;
 
@@ -3386,20 +3380,20 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 {
 	int rc = 0;
 	s64 teof;
-	metapage_t *mp;
+	struct metapage *mp;
 	xtpage_t *p;
 	s64 bn;
 	int index, nextindex;
 	xad_t *xad;
 	s64 xoff, xaddr;
 	int xlen, len, freexlen;
-	btstack_t btstack;
-	btframe_t *parent;
-	tblock_t *tblk = 0;
-	tlock_t *tlck = 0;
-	xtlock_t *xtlck = 0;
-	xdlistlock_t xadlock;	/* maplock for COMMIT_WMAP */
-	pxdlock_t *pxdlock;	/* maplock for COMMIT_WMAP */
+	struct btstack btstack;
+	struct btframe *parent;
+	struct tblock *tblk = 0;
+	struct tlock *tlck = 0;
+	struct xtlock *xtlck = 0;
+	struct xdlistlock xadlock;	/* maplock for COMMIT_WMAP */
+	struct pxd_lock *pxdlock;		/* maplock for COMMIT_WMAP */
 	s64 nfreed;
 	int freed, log;
 	int locked_leaves = 0;
@@ -3509,7 +3503,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 		}
 		tlck = txLock(tid, ip, mp, tlckXTREE);
 		tlck->type = tlckXTREE | tlckTRUNCATE;
-		xtlck = (xtlock_t *) & tlck->lock;
+		xtlck = (struct xtlock *) & tlck->lock;
 		xtlck->hwm.offset = le16_to_cpu(p->header.nextindex) - 1;
 	}
 	BT_MARK_DIRTY(mp, ip);
@@ -3574,7 +3568,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 				xtlck->lwm.length = index + 1 -
 				    xtlck->lwm.offset;
 				xtlck->twm.offset = index;
-				pxdlock = (pxdlock_t *) & xtlck->pxdlock;
+				pxdlock = (struct pxd_lock *) & xtlck->pxdlock;
 				pxdlock->flag = mlckFREEPXD;
 				PXDaddress(&pxdlock->pxd, xaddr);
 				PXDlength(&pxdlock->pxd, freexlen);
@@ -3582,7 +3576,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 			/* free truncated extent */
 			else {	/* COMMIT_WMAP */
 
-				pxdlock = (pxdlock_t *) & xadlock;
+				pxdlock = (struct pxd_lock *) & xadlock;
 				pxdlock->flag = mlckFREEPXD;
 				PXDaddress(&pxdlock->pxd, xaddr);
 				PXDlength(&pxdlock->pxd, freexlen);
@@ -3614,7 +3608,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 				xadlock.count =
 				    le16_to_cpu(p->header.nextindex) -
 				    nextindex;
-				txFreeMap(ip, (maplock_t *) & xadlock, 0,
+				txFreeMap(ip, (struct maplock *) & xadlock, 0,
 					  COMMIT_WMAP);
 			}
 			p->header.nextindex = cpu_to_le16(nextindex);
@@ -3644,7 +3638,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 		xadlock.xdlist = &p->xad[XTENTRYSTART];
 		xadlock.count =
 		    le16_to_cpu(p->header.nextindex) - XTENTRYSTART;
-		txFreeMap(ip, (maplock_t *) & xadlock, 0, COMMIT_WMAP);
+		txFreeMap(ip, (struct maplock *) & xadlock, 0, COMMIT_WMAP);
 	}
 
 	if (p->header.flag & BT_ROOT) {
@@ -3704,7 +3698,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 				 * free child extents covered by parent [);
 				 */
 				tlck = txLock(tid, ip, mp, tlckXTREE);
-				xtlck = (xtlock_t *) & tlck->lock;
+				xtlck = (struct xtlock *) & tlck->lock;
 				if (!(tlck->type & tlckTRUNCATE)) {
 					xtlck->hwm.offset =
 					    le16_to_cpu(p->header.
@@ -3719,7 +3713,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 				xadlock.count =
 				    le16_to_cpu(p->header.nextindex) -
 				    index - 1;
-				txFreeMap(ip, (maplock_t *) & xadlock, 0,
+				txFreeMap(ip, (struct maplock *) & xadlock, 0,
 					  COMMIT_WMAP);
 			}
 			BT_MARK_DIRTY(mp, ip);
@@ -3751,7 +3745,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 	if (log && mp->lid && (tblk->last != mp->lid) &&
 	    lid_to_tlock(mp->lid)->tid) {
 		lid_t lid = mp->lid;
-		tlock_t *prev;
+		struct tlock *prev;
 
 		tlck = lid_to_tlock(lid);
 
@@ -3780,7 +3774,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 			 * invalidate parent if COMMIT_PWMAP;
 			 */
 			tlck = txLock(tid, ip, mp, tlckXTREE);
-			xtlck = (xtlock_t *) & tlck->lock;
+			xtlck = (struct xtlock *) & tlck->lock;
 			xtlck->hwm.offset =
 			    le16_to_cpu(p->header.nextindex) - 1;
 			tlck->type = tlckXTREE | tlckFREE;
@@ -3791,7 +3785,7 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 			xadlock.count =
 			    le16_to_cpu(p->header.nextindex) -
 			    XTENTRYSTART;
-			txFreeMap(ip, (maplock_t *) & xadlock, 0,
+			txFreeMap(ip, (struct maplock *) & xadlock, 0,
 				  COMMIT_WMAP);
 		}
 		BT_MARK_DIRTY(mp, ip);
@@ -3919,20 +3913,20 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 s64 xtTruncate_pmap(tid_t tid, struct inode *ip, s64 committed_size)
 {
 	s64 bn;
-	btstack_t btstack;
+	struct btstack btstack;
 	int cmp;
 	int index;
 	int locked_leaves = 0;
-	metapage_t *mp;
+	struct metapage *mp;
 	xtpage_t *p;
-	btframe_t *parent;
+	struct btframe *parent;
 	int rc;
-	tblock_t *tblk;
-	tlock_t *tlck = 0;
+	struct tblock *tblk;
+	struct tlock *tlck = 0;
 	xad_t *xad;
 	int xlen;
 	s64 xoff;
-	xtlock_t *xtlck = 0;
+	struct xtlock *xtlck = 0;
 
 	/* save object truncation type */
 	tblk = tid_to_tblock(tid);
@@ -3988,7 +3982,7 @@ s64 xtTruncate_pmap(tid_t tid, struct inode *ip, s64 committed_size)
 	}
 	tlck = txLock(tid, ip, mp, tlckXTREE);
 	tlck->type = tlckXTREE | tlckFREE;
-	xtlck = (xtlock_t *) & tlck->lock;
+	xtlck = (struct xtlock *) & tlck->lock;
 	xtlck->hwm.offset = index;
 
 
@@ -4020,7 +4014,7 @@ s64 xtTruncate_pmap(tid_t tid, struct inode *ip, s64 committed_size)
 		 * invalidate parent if COMMIT_PWMAP;
 		 */
 		tlck = txLock(tid, ip, mp, tlckXTREE);
-		xtlck = (xtlock_t *) & tlck->lock;
+		xtlck = (struct xtlock *) & tlck->lock;
 		xtlck->hwm.offset =
 		    le16_to_cpu(p->header.nextindex) - 1;
 		tlck->type = tlckXTREE | tlckFREE;
@@ -4074,14 +4068,14 @@ s64 xtTruncate_pmap(tid_t tid, struct inode *ip, s64 committed_size)
 int xtDisplayTree(struct inode *ip)
 {
 	int rc = 0;
-	metapage_t *mp;
+	struct metapage *mp;
 	xtpage_t *p;
 	s64 bn, pbn;
 	int index, lastindex, v, h;
 	xad_t *xad;
-	btstack_t btstack;
-	btframe_t *btsp;
-	btframe_t *parent;
+	struct btstack btstack;
+	struct btframe *btsp;
+	struct btframe *parent;
 
 	printk("display B+-tree.\n");
 
@@ -4195,7 +4189,7 @@ int xtDisplayTree(struct inode *ip)
 int xtDisplayPage(struct inode *ip, s64 bn, xtpage_t * p)
 {
 	int rc = 0;
-	metapage_t *mp;
+	struct metapage *mp;
 	xad_t *xad;
 	s64 xaddr, xoff;
 	int xlen, i, j;
@@ -4254,7 +4248,7 @@ btree_t *t;
 	u64 bn;
 	int index;
 	btentry_t *e;
-	btstack_t btstack;
+	struct btstack btstack;
 	struct btsf *parent;
 
 	/* clear stack */

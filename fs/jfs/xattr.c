@@ -174,7 +174,7 @@ static int ea_write(struct inode *ip, struct jfs_ea_list *ealist, int size,
 	char *cp;
 	s32 nbytes, nb;
 	s32 bytes_to_write;
-	metapage_t *mp;
+	struct metapage *mp;
 
 	/*
 	 * Quick check to see if this is an in-linable EA.  Short EAs
@@ -311,7 +311,7 @@ static int ea_read(struct inode *ip, struct jfs_ea_list *ealist)
 	int i;
 	int nbytes, nb;
 	s32 bytes_to_read;
-	metapage_t *mp;
+	struct metapage *mp;
 
 	/* quick check for in-line EA */
 	if (ji->ea.flag & DXD_INLINE)

@@ -76,7 +76,7 @@
 /*
  * lbuf's ready to be redriven.  Protected by log_redrive_lock (jfsIO thread)
  */
-static lbuf_t *log_redrive_list;
+static struct lbuf *log_redrive_list;
 static spinlock_t log_redrive_lock = SPIN_LOCK_UNLOCKED;
 DECLARE_WAIT_QUEUE_HEAD(jfs_IO_thread_wait);
 
@@ -160,32 +160,32 @@ do {						\
 /*
  * external references
  */
-extern void txLazyUnlock(tblock_t * tblk);
+extern void txLazyUnlock(struct tblock * tblk);
 extern int jfs_stop_threads;
 extern struct completion jfsIOwait;
 
 /*
  * forward references
  */
-static int lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd,
-			 tlock_t * tlck);
+static int lmWriteRecord(struct jfs_log * log, struct tblock * tblk,
+			 struct lrd * lrd, struct tlock * tlck);
 
-static int lmNextPage(log_t * log);
-static int lmLogFileSystem(log_t * log, char *uuid, int activate);
+static int lmNextPage(struct jfs_log * log);
+static int lmLogFileSystem(struct jfs_log * log, char *uuid, int activate);
 
-static int lbmLogInit(log_t * log);
-static void lbmLogShutdown(log_t * log);
-static lbuf_t *lbmAllocate(log_t * log, int);
-static void lbmFree(lbuf_t * bp);
-static void lbmfree(lbuf_t * bp);
-static int lbmRead(log_t * log, int pn, lbuf_t ** bpp);
-static void lbmWrite(log_t * log, lbuf_t * bp, int flag, int cant_block);
-static void lbmDirectWrite(log_t * log, lbuf_t * bp, int flag);
-static int lbmIOWait(lbuf_t * bp, int flag);
+static int lbmLogInit(struct jfs_log * log);
+static void lbmLogShutdown(struct jfs_log * log);
+static struct lbuf *lbmAllocate(struct jfs_log * log, int);
+static void lbmFree(struct lbuf * bp);
+static void lbmfree(struct lbuf * bp);
+static int lbmRead(struct jfs_log * log, int pn, struct lbuf ** bpp);
+static void lbmWrite(struct jfs_log * log, struct lbuf * bp, int flag, int cant_block);
+static void lbmDirectWrite(struct jfs_log * log, struct lbuf * bp, int flag);
+static int lbmIOWait(struct lbuf * bp, int flag);
 static bio_end_io_t lbmIODone;
 
-void lbmStartIO(lbuf_t * bp);
-void lmGCwrite(log_t * log, int cant_block);
+void lbmStartIO(struct lbuf * bp);
+void lmGCwrite(struct jfs_log * log, int cant_block);
 
 
 /*
@@ -212,11 +212,12 @@ struct lmStat {
  *
  * note: todo: log error handler
  */
-int lmLog(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
+int lmLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
+	  struct tlock * tlck)
 {
 	int lsn;
 	int diffp, difft;
-	metapage_t *mp = NULL;
+	struct metapage *mp = NULL;
 
 	jFYI(1, ("lmLog: log:0x%p tblk:0x%p, lrd:0x%p tlck:0x%p\n",
 		 log, tblk, lrd, tlck));
@@ -330,11 +331,12 @@ int lmLog(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
  * serialization: LOG_LOCK() held on entry/exit
  */
 static int
-lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
+lmWriteRecord(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
+	      struct tlock * tlck)
 {
 	int lsn = 0;		/* end-of-log address */
-	lbuf_t *bp;		/* dst log page buffer */
-	logpage_t *lp;		/* dst log page */
+	struct lbuf *bp;	/* dst log page buffer */
+	struct logpage *lp;	/* dst log page */
 	caddr_t dst;		/* destination address in log page */
 	int dstoffset;		/* end-of-log offset in log page */
 	int freespace;		/* free space in log page */
@@ -344,16 +346,16 @@ lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 	int nbytes;		/* number of bytes to move */
 	int i;
 	int len;
-	linelock_t *linelock;
-	lv_t *lv;
-	lvd_t *lvd;
+	struct linelock *linelock;
+	struct lv *lv;
+	struct lvd *lvd;
 	int l2linesize;
 
 	len = 0;
 
 	/* retrieve destination log page to write */
-	bp = (lbuf_t *) log->bp;
-	lp = (logpage_t *) bp->l_ldata;
+	bp = (struct lbuf *) log->bp;
+	lp = (struct logpage *) bp->l_ldata;
 	dstoffset = log->eor;
 
 	/* any log data to write ? */
@@ -366,7 +368,7 @@ lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 	/* retrieve source meta-data page to log */
 	if (tlck->flag & tlckPAGELOCK) {
 		p = (caddr_t) (tlck->mp->data);
-		linelock = (linelock_t *) & tlck->lock;
+		linelock = (struct linelock *) & tlck->lock;
 	}
 	/* retrieve source in-memory inode to log */
 	else if (tlck->flag & tlckINODELOCK) {
@@ -374,14 +376,14 @@ lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 			p = (caddr_t) &JFS_IP(tlck->ip)->i_dtroot;
 		else
 			p = (caddr_t) &JFS_IP(tlck->ip)->i_xtroot;
-		linelock = (linelock_t *) & tlck->lock;
+		linelock = (struct linelock *) & tlck->lock;
 	}
 #ifdef	_JFS_WIP
 	else if (tlck->flag & tlckINLINELOCK) {
 
-		inlinelock = (inlinelock_t *) & tlck;
+		inlinelock = (struct inlinelock *) & tlck;
 		p = (caddr_t) & inlinelock->pxd;
-		linelock = (linelock_t *) & tlck;
+		linelock = (struct linelock *) & tlck;
 	}
 #endif				/* _JFS_WIP */
 	else {
@@ -393,7 +395,7 @@ lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
       moveData:
 	ASSERT(linelock->index <= linelock->maxcnt);
 
-	lv = (lv_t *) & linelock->lv;
+	lv = linelock->lv;
 	for (i = 0; i < linelock->index; i++, lv++) {
 		if (lv->length == 0)
 			continue;
@@ -404,7 +406,7 @@ lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 			lmNextPage(log);
 
 			bp = log->bp;
-			lp = (logpage_t *) bp->l_ldata;
+			lp = (struct logpage *) bp->l_ldata;
 			dstoffset = LOGPHDRSIZE;
 		}
 
@@ -428,8 +430,8 @@ lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 			/* page become full: move on to next page */
 			lmNextPage(log);
 
-			bp = (lbuf_t *) log->bp;
-			lp = (logpage_t *) bp->l_ldata;
+			bp = (struct lbuf *) log->bp;
+			lp = (struct logpage *) bp->l_ldata;
 			dstoffset = LOGPHDRSIZE;
 
 			srclen -= nbytes;
@@ -440,7 +442,7 @@ lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 		 * move log vector descriptor
 		 */
 		len += 4;
-		lvd = (lvd_t *) ((caddr_t) lp + dstoffset);
+		lvd = (struct lvd *) ((caddr_t) lp + dstoffset);
 		lvd->offset = cpu_to_le16(lv->offset);
 		lvd->length = cpu_to_le16(lv->length);
 		dstoffset += 4;
@@ -450,7 +452,7 @@ lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 	}
 
 	if ((i = linelock->next)) {
-		linelock = (linelock_t *) lid_to_tlock(i);
+		linelock = (struct linelock *) lid_to_tlock(i);
 		goto moveData;
 	}
 
@@ -534,8 +536,8 @@ lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 		/* page become full: move on to next page */
 		lmNextPage(log);
 
-		bp = (lbuf_t *) log->bp;
-		lp = (logpage_t *) bp->l_ldata;
+		bp = (struct lbuf *) log->bp;
+		lp = (struct logpage *) bp->l_ldata;
 		dstoffset = LOGPHDRSIZE;
 		src += nbytes;
 	}
@@ -555,21 +557,21 @@ lmWriteRecord(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
  *			
  * serialization: LOG_LOCK() held on entry/exit
  */
-static int lmNextPage(log_t * log)
+static int lmNextPage(struct jfs_log * log)
 {
-	logpage_t *lp;
+	struct logpage *lp;
 	int lspn;		/* log sequence page number */
 	int pn;			/* current page number */
-	lbuf_t *bp;
-	lbuf_t *nextbp;
-	tblock_t *tblk;
+	struct lbuf *bp;
+	struct lbuf *nextbp;
+	struct tblock *tblk;
 
 	jFYI(1, ("lmNextPage\n"));
 
 	/* get current log page number and log sequence page number */
 	pn = log->page;
 	bp = log->bp;
-	lp = (logpage_t *) bp->l_ldata;
+	lp = (struct logpage *) bp->l_ldata;
 	lspn = le32_to_cpu(lp->h.page);
 
 	LOGGC_LOCK(log);
@@ -637,7 +639,7 @@ static int lmNextPage(log_t * log)
 	log->bp = nextbp;
 
 	/* initialize next log page */
-	lp = (logpage_t *) nextbp->l_ldata;
+	lp = (struct logpage *) nextbp->l_ldata;
 	lp->h.page = lp->t.page = cpu_to_le32(lspn + 1);
 	lp->h.eor = lp->t.eor = cpu_to_le16(LOGPHDRSIZE);
 
@@ -661,7 +663,7 @@ static int lmNextPage(log_t * log)
  *	transaction blocks on the commit queue.
  *	N.B. LOG_LOCK is NOT held during lmGroupCommit().
  */
-int lmGroupCommit(log_t * log, tblock_t * tblk)
+int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
 {
 	int rc = 0;
 
@@ -738,13 +740,13 @@ int lmGroupCommit(log_t * log, tblock_t * tblk)
  *	LOGGC_LOCK must be held by caller.
  *	N.B. LOG_LOCK is NOT held during lmGroupCommit().
  */
-void lmGCwrite(log_t * log, int cant_write)
+void lmGCwrite(struct jfs_log * log, int cant_write)
 {
-	lbuf_t *bp;
-	logpage_t *lp;
+	struct lbuf *bp;
+	struct logpage *lp;
 	int gcpn;		/* group commit page number */
-	tblock_t *tblk;
-	tblock_t *xtblk;
+	struct tblock *tblk;
+	struct tblock *xtblk;
 
 	/*
 	 * build the commit group of a log page
@@ -768,8 +770,8 @@ void lmGCwrite(log_t * log, int cant_write)
 	/*
 	 * pageout to commit transactions on the log page.
 	 */
-	bp = (lbuf_t *) tblk->bp;
-	lp = (logpage_t *) bp->l_ldata;
+	bp = (struct lbuf *) tblk->bp;
+	lp = (struct logpage *) bp->l_ldata;
 	/* is page already full ? */
 	if (tblk->flag & tblkGC_EOP) {
 		/* mark page to free at end of group commit of the page */
@@ -806,12 +808,12 @@ void lmGCwrite(log_t * log, int cant_write)
  * NOTE:
  *	This routine is called a interrupt time by lbmIODone
  */
-void lmPostGC(lbuf_t * bp)
+void lmPostGC(struct lbuf * bp)
 {
 	unsigned long flags;
-	log_t *log = bp->l_log;
-	logpage_t *lp;
-	tblock_t *tblk;
+	struct jfs_log *log = bp->l_log;
+	struct logpage *lp;
+	struct tblock *tblk;
 
 	//LOGGC_LOCK(log);
 	spin_lock_irqsave(&log->gclock, flags);
@@ -866,7 +868,7 @@ void lmPostGC(lbuf_t * bp)
 		 */
 		else if (tblk->flag & tblkGC_EOP) {
 			/* finalize the page */
-			lp = (logpage_t *) bp->l_ldata;
+			lp = (struct logpage *) bp->l_ldata;
 			bp->l_ceor = bp->l_eor;
 			lp->h.eor = lp->t.eor = cpu_to_le16(bp->l_eor);
 			jEVENT(0, ("lmPostGC: calling lbmWrite\n"));
@@ -921,14 +923,14 @@ void lmPostGC(lbuf_t * bp)
  *			
  * serialization: LOG_LOCK() held on entry/exit
  */
-int lmLogSync(log_t * log, int nosyncwait)
+int lmLogSync(struct jfs_log * log, int nosyncwait)
 {
 	int logsize;
 	int written;		/* written since last syncpt */
 	int free;		/* free space left available */
 	int delta;		/* additional delta to write normally */
 	int more;		/* additional write granted */
-	lrd_t lrd;
+	struct lrd lrd;
 	int lsn;
 	struct logsyncblk *lp;
 
@@ -1056,15 +1058,15 @@ int lmLogSync(log_t * log, int nosyncwait)
  *
  * serialization:
  */
-int lmLogOpen(struct super_block *sb, log_t ** logptr)
+int lmLogOpen(struct super_block *sb, struct jfs_log ** logptr)
 {
 	int rc;
 	struct block_device *bdev;
-	log_t *log;
+	struct jfs_log *log;
 
-	if (!(log = kmalloc(sizeof(log_t), GFP_KERNEL)))
+	if (!(log = kmalloc(sizeof(struct jfs_log), GFP_KERNEL)))
 		return ENOMEM;
-	memset(log, 0, sizeof(log_t));
+	memset(log, 0, sizeof(struct jfs_log));
 	init_waitqueue_head(&log->syncwait);
 
 	log->sb = sb;		/* This should be a list */
@@ -1173,14 +1175,14 @@ int lmLogOpen(struct super_block *sb, log_t ** logptr)
  *			
  * serialization: single first open thread
  */
-int lmLogInit(log_t * log)
+int lmLogInit(struct jfs_log * log)
 {
 	int rc = 0;
-	lrd_t lrd;
-	logsuper_t *logsuper;
-	lbuf_t *bpsuper;
-	lbuf_t *bp;
-	logpage_t *lp;
+	struct lrd lrd;
+	struct logsuper *logsuper;
+	struct lbuf *bpsuper;
+	struct lbuf *bp;
+	struct logpage *lp;
 	int lsn;
 
 	jFYI(1, ("lmLogInit: log:0x%p\n", log));
@@ -1206,7 +1208,7 @@ int lmLogInit(log_t * log)
 	if ((rc = lbmRead(log, 1, &bpsuper)))
 		goto errout10;
 
-	logsuper = (logsuper_t *) bpsuper->l_ldata;
+	logsuper = (struct logsuper *) bpsuper->l_ldata;
 
 	if (logsuper->magic != cpu_to_le32(LOGMAGIC)) {
 		jERROR(1, ("*** Log Format Error ! ***\n"));
@@ -1252,7 +1254,7 @@ int lmLogInit(log_t * log)
 	if ((rc = lbmRead(log, log->page, &bp)))
 		goto errout20;
 
-	lp = (logpage_t *) bp->l_ldata;
+	lp = (struct logpage *) bp->l_ldata;
 
 	jFYI(1, ("lmLogInit: lsn:0x%x page:%d eor:%d:%d\n",
 		 le32_to_cpu(logsuper->end), log->page, log->eor,
@@ -1291,7 +1293,7 @@ int lmLogInit(log_t * log)
 	lsn = lmWriteRecord(log, NULL, &lrd, NULL);
 	bp = log->bp;
 	bp->l_ceor = bp->l_eor;
-	lp = (logpage_t *) bp->l_ldata;
+	lp = (struct logpage *) bp->l_ldata;
 	lp->h.eor = lp->t.eor = cpu_to_le16(bp->l_eor);
 	lbmWrite(log, bp, lbmWRITE | lbmSYNC, 0);
 	if ((rc = lbmIOWait(bp, 0)))
@@ -1363,7 +1365,7 @@ int lmLogInit(log_t * log)
  *
  * serialization:
  */
-int lmLogClose(struct super_block *sb, log_t * log)
+int lmLogClose(struct super_block *sb, struct jfs_log * log)
 {
 	struct block_device *bdev = log->bdev;
 	int rc;
@@ -1400,7 +1402,7 @@ int lmLogClose(struct super_block *sb, log_t * log)
  *
  * FUNCTION:	wait for all outstanding log records to be written to disk
  */
-void lmLogWait(log_t *log)
+void lmLogWait(struct jfs_log *log)
 {
 	int i;
 
@@ -1438,15 +1440,15 @@ void lmLogWait(log_t *log)
  *			
  * serialization: single last close thread
  */
-int lmLogShutdown(log_t * log)
+int lmLogShutdown(struct jfs_log * log)
 {
 	int rc;
-	lrd_t lrd;
+	struct lrd lrd;
 	int lsn;
-	logsuper_t *logsuper;
-	lbuf_t *bpsuper;
-	lbuf_t *bp;
-	logpage_t *lp;
+	struct logsuper *logsuper;
+	struct lbuf *bpsuper;
+	struct lbuf *bp;
+	struct logpage *lp;
 
 	jFYI(1, ("lmLogShutdown: log:0x%p\n", log));
 
@@ -1469,7 +1471,7 @@ int lmLogShutdown(log_t * log)
 	lrd.log.syncpt.sync = 0;
 	lsn = lmWriteRecord(log, NULL, &lrd, NULL);
 	bp = log->bp;
-	lp = (logpage_t *) bp->l_ldata;
+	lp = (struct logpage *) bp->l_ldata;
 	lp->h.eor = lp->t.eor = cpu_to_le16(bp->l_eor);
 	lbmWrite(log, log->bp, lbmWRITE | lbmRELEASE | lbmSYNC, 0);
 	lbmIOWait(log->bp, lbmFREE);
@@ -1482,7 +1484,7 @@ int lmLogShutdown(log_t * log)
 	if ((rc = lbmRead(log, 1, &bpsuper)))
 		goto out;
 
-	logsuper = (logsuper_t *) bpsuper->l_ldata;
+	logsuper = (struct logsuper *) bpsuper->l_ldata;
 	logsuper->state = cpu_to_le32(LOGREDONE);
 	logsuper->end = cpu_to_le32(lsn);
 	lbmDirectWrite(log, bpsuper, lbmWRITE | lbmRELEASE | lbmSYNC);
@@ -1518,12 +1520,12 @@ int lmLogShutdown(log_t * log)
  * RETURN:	0	- success
  *		errors returned by vms_iowait().
  */
-static int lmLogFileSystem(log_t * log, char *uuid, int activate)
+static int lmLogFileSystem(struct jfs_log * log, char *uuid, int activate)
 {
 	int rc = 0;
 	int i;
-	logsuper_t *logsuper;
-	lbuf_t *bpsuper;
+	struct logsuper *logsuper;
+	struct lbuf *bpsuper;
 
 	/*
 	 * insert/remove file system device to log active file system list.
@@ -1531,7 +1533,7 @@ static int lmLogFileSystem(log_t * log, char *uuid, int activate)
 	if ((rc = lbmRead(log, 1, &bpsuper)))
 		return rc;
 
-	logsuper = (logsuper_t *) bpsuper->l_ldata;
+	logsuper = (struct logsuper *) bpsuper->l_ldata;
 	if (activate) {
 		for (i = 0; i < MAX_ACTIVE; i++)
 			if (!memcmp(logsuper->active[i].uuid, NULL_UUID, 16)) {
@@ -1589,10 +1591,10 @@ static int lmLogFileSystem(log_t * log, char *uuid, int activate)
  *
  * initialize per log I/O setup at lmLogInit()
  */
-static int lbmLogInit(log_t * log)
+static int lbmLogInit(struct jfs_log * log)
 {				/* log inode */
 	int i;
-	lbuf_t *lbuf;
+	struct lbuf *lbuf;
 
 	jFYI(1, ("lbmLogInit: log:0x%p\n", log));
 
@@ -1616,7 +1618,7 @@ static int lbmLogInit(log_t * log)
 	log->lbuf_free = NULL;
 
 	for (i = 0; i < LOGPAGES; i++) {
-		lbuf = kmalloc(sizeof(lbuf_t), GFP_KERNEL);
+		lbuf = kmalloc(sizeof(struct lbuf), GFP_KERNEL);
 		if (lbuf == 0)
 			goto error;
 		lbuf->l_ldata = (char *) __get_free_page(GFP_KERNEL);
@@ -1644,15 +1646,15 @@ static int lbmLogInit(log_t * log)
  *
  * finalize per log I/O setup at lmLogShutdown()
  */
-static void lbmLogShutdown(log_t * log)
+static void lbmLogShutdown(struct jfs_log * log)
 {
-	lbuf_t *lbuf;
+	struct lbuf *lbuf;
 
 	jFYI(1, ("lbmLogShutdown: log:0x%p\n", log));
 
 	lbuf = log->lbuf_free;
 	while (lbuf) {
-		lbuf_t *next = lbuf->l_freelist;
+		struct lbuf *next = lbuf->l_freelist;
 		free_page((unsigned long) lbuf->l_ldata);
 		kfree(lbuf);
 		lbuf = next;
@@ -1667,9 +1669,9 @@ static void lbmLogShutdown(log_t * log)
  *
  * allocate an empty log buffer
  */
-static lbuf_t *lbmAllocate(log_t * log, int pn)
+static struct lbuf *lbmAllocate(struct jfs_log * log, int pn)
 {
-	lbuf_t *bp;
+	struct lbuf *bp;
 	unsigned long flags;
 
 	/*
@@ -1698,7 +1700,7 @@ static lbuf_t *lbmAllocate(log_t * log, int pn)
  *
  * release a log buffer to freelist
  */
-static void lbmFree(lbuf_t * bp)
+static void lbmFree(struct lbuf * bp)
 {
 	unsigned long flags;
 
@@ -1709,9 +1711,9 @@ static void lbmFree(lbuf_t * bp)
 	LCACHE_UNLOCK(flags);
 }
 
-static void lbmfree(lbuf_t * bp)
+static void lbmfree(struct lbuf * bp)
 {
-	log_t *log = bp->l_log;
+	struct jfs_log *log = bp->l_log;
 
 	assert(bp->l_wqnext == NULL);
 
@@ -1737,7 +1739,7 @@ static void lbmfree(lbuf_t * bp)
  * NOTES:
  *	Takes log_redrive_lock.
  */
-static inline void lbmRedrive(lbuf_t *bp)
+static inline void lbmRedrive(struct lbuf *bp)
 {
 	unsigned long flags;
 
@@ -1753,10 +1755,10 @@ static inline void lbmRedrive(lbuf_t *bp)
 /*
  *	lbmRead()
  */
-static int lbmRead(log_t * log, int pn, lbuf_t ** bpp)
+static int lbmRead(struct jfs_log * log, int pn, struct lbuf ** bpp)
 {
 	struct bio *bio;
-	lbuf_t *bp;
+	struct lbuf *bp;
 
 	/*
 	 * allocate a log buffer
@@ -1804,9 +1806,10 @@ static int lbmRead(log_t * log, int pn, lbuf_t ** bpp)
  * LOGGC_LOCK() serializes lbmWrite() by lmNextPage() and lmGroupCommit().
  * LCACHE_LOCK() serializes xflag between lbmWrite() and lbmIODone()
  */
-static void lbmWrite(log_t * log, lbuf_t * bp, int flag, int cant_block)
+static void lbmWrite(struct jfs_log * log, struct lbuf * bp, int flag,
+		     int cant_block)
 {
-	lbuf_t *tail;
+	struct lbuf *tail;
 	unsigned long flags;
 
 	jFYI(1, ("lbmWrite: bp:0x%p flag:0x%x pn:0x%x\n",
@@ -1872,7 +1875,7 @@ static void lbmWrite(log_t * log, lbuf_t * bp, int flag, int cant_block)
  * initiate pageout bypassing write queue for sidestream
  * (e.g., log superblock) write;
  */
-static void lbmDirectWrite(log_t * log, lbuf_t * bp, int flag)
+static void lbmDirectWrite(struct jfs_log * log, struct lbuf * bp, int flag)
 {
 	jEVENT(0, ("lbmDirectWrite: bp:0x%p flag:0x%x pn:0x%x\n",
 		   bp, flag, bp->l_pn));
@@ -1902,10 +1905,10 @@ static void lbmDirectWrite(log_t * log, lbuf_t * bp, int flag)
  *
  * serialization: LCACHE_LOCK() is NOT held during log i/o;
  */
-void lbmStartIO(lbuf_t * bp)
+void lbmStartIO(struct lbuf * bp)
 {
 	struct bio *bio;
-	log_t *log = bp->l_log;
+	struct jfs_log *log = bp->l_log;
 
 	jFYI(1, ("lbmStartIO\n"));
 
@@ -1935,7 +1938,7 @@ void lbmStartIO(lbuf_t * bp)
 /*
  *	lbmIOWait()
  */
-static int lbmIOWait(lbuf_t * bp, int flag)
+static int lbmIOWait(struct lbuf * bp, int flag)
 {
 	unsigned long flags;
 	int rc = 0;
@@ -1968,9 +1971,9 @@ static int lbmIOWait(lbuf_t * bp, int flag)
  */
 static void lbmIODone(struct bio *bio)
 {
-	lbuf_t *bp = bio->bi_private;
-	lbuf_t *nextbp, *tail;
-	log_t *log;
+	struct lbuf *bp = bio->bi_private;
+	struct lbuf *nextbp, *tail;
+	struct jfs_log *log;
 	unsigned long flags;
 
 	/*
@@ -2109,7 +2112,7 @@ static void lbmIODone(struct bio *bio)
 
 int jfsIOWait(void *arg)
 {
-	lbuf_t *bp;
+	struct lbuf *bp;
 
 	jFYI(1, ("jfsIOWait is here!\n"));
 
@@ -2167,16 +2170,16 @@ int jfsIOWait(void *arg)
  * XXX: We're synchronously writing one page at a time.  This needs to
  *	be improved by writing multiple pages at once.
  */
-int lmLogFormat(log_t *log, s64 logAddress, int logSize)
+int lmLogFormat(struct jfs_log *log, s64 logAddress, int logSize)
 {
 	int rc = -EIO;
 	struct jfs_sb_info *sbi = JFS_SBI(log->sb);
-	logsuper_t *logsuper;
-	logpage_t *lp;
+	struct logsuper *logsuper;
+	struct logpage *lp;
 	int lspn;		/* log sequence page number */
 	struct lrd *lrd_ptr;
 	int npages = 0;
-	lbuf_t *bp;
+	struct lbuf *bp;
 
 	jFYI(0, ("lmLogFormat: logAddress:%Ld logSize:%d\n",
 		 (long long)logAddress, logSize));
@@ -2198,7 +2201,7 @@ int lmLogFormat(log_t *log, s64 logAddress, int logSize)
 	/*
 	 *      init log superblock: log page 1
 	 */
-	logsuper = (logsuper_t *) bp->l_ldata;
+	logsuper = (struct logsuper *) bp->l_ldata;
 
 	logsuper->magic = cpu_to_le32(LOGMAGIC);
 	logsuper->version = cpu_to_le32(LOGVERSION);
@@ -2237,7 +2240,7 @@ int lmLogFormat(log_t *log, s64 logAddress, int logSize)
 	 * the succeeding log pages will have ascending order of
 	 * the lspn starting from 0, ... (N-2)
 	 */
-	lp = (logpage_t *) bp->l_ldata;
+	lp = (struct logpage *) bp->l_ldata;
 	/*
 	 * initialize 1st log page to be written: lpsn = N - 1,
 	 * write a SYNCPT log record is written to this page

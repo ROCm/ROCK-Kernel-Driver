@@ -358,8 +358,8 @@ exit:
 int extHint(struct inode *ip, s64 offset, xad_t * xp)
 {
 	struct super_block *sb = ip->i_sb;
-	xadlist_t xadl;
-	lxdlist_t lxdl;
+	struct xadlist xadl;
+	struct lxdlist lxdl;
 	lxd_t lxd;
 	s64 prev;
 	int rc, nbperpage = JFS_SBI(sb)->nbperpage;
@@ -516,7 +516,7 @@ extBalloc(struct inode *ip, s64 hint, s64 * nblocks, s64 * blkno)
 {
 	s64 nb, nblks, daddr, max;
 	int rc, nbperpage = JFS_SBI(ip->i_sb)->nbperpage;
-	bmap_t *mp = JFS_SBI(ip->i_sb)->bmap;
+	struct bmap *mp = JFS_SBI(ip->i_sb)->bmap;
 
 	/* get the number of blocks to initially attempt to allocate.
 	 * we'll first try the number of blocks requested unless this

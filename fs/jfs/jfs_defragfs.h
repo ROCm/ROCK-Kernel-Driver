@@ -21,7 +21,7 @@
 /*
  *	defragfs parameter list
  */
-typedef struct {
+struct defragfs {
 	uint flag;		/* 4: */
 	u8 dev;			/* 1: */
 	u8 pad[3];		/* 3: */
@@ -33,7 +33,7 @@ typedef struct {
 	s64 old_xaddr;		/* 8: */
 	s64 new_xaddr;		/* 8: */
 	s32 xlen;		/* 4: */
-} defragfs_t;			/* (52) */
+};
 
 /* plist flag */
 #define DEFRAGFS_SYNC		0x80000000

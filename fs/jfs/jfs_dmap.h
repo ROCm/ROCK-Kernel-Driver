@@ -142,9 +142,9 @@ static __inline signed char TREEMAX(signed char *cp)
 /*
  *	dmap summary tree
  *
- * dmaptree_t must be consistent with dmapctl_t.
+ * dmaptree must be consistent with dmapctl.
  */
-typedef struct {
+struct dmaptree {
 	s32 nleafs;		/* 4: number of tree leafs      */
 	s32 l2nleafs;		/* 4: l2 number of tree leafs   */
 	s32 leafidx;		/* 4: index of first tree leaf  */
@@ -152,27 +152,27 @@ typedef struct {
 	s8 budmin;		/* 1: min l2 tree leaf value to combine */
 	s8 stree[TREESIZE];	/* TREESIZE: tree               */
 	u8 pad[2];		/* 2: pad to word boundary      */
-} dmaptree_t;			/* - 360 -                      */
+};				/* - 360 -                      */
 
 /*
  *	dmap page per 8K blocks bitmap
  */
-typedef struct {
+struct dmap {
 	s32 nblocks;		/* 4: num blks covered by this dmap     */
 	s32 nfree;		/* 4: num of free blks in this dmap     */
 	s64 start;		/* 8: starting blkno for this dmap      */
-	dmaptree_t tree;	/* 360: dmap tree                       */
+	struct dmaptree tree;	/* 360: dmap tree                       */
 	u8 pad[1672];		/* 1672: pad to 2048 bytes              */
 	u32 wmap[LPERDMAP];	/* 1024: bits of the working map        */
 	u32 pmap[LPERDMAP];	/* 1024: bits of the persistent map     */
-} dmap_t;			/* - 4096 -                             */
+};				/* - 4096 -                             */
 
 /*
  *	disk map control page per level.
  *
- * dmapctl_t must be consistent with dmaptree_t.
+ * dmapctl must be consistent with dmaptree.
  */
-typedef struct {
+struct dmapctl {
 	s32 nleafs;		/* 4: number of tree leafs      */
 	s32 l2nleafs;		/* 4: l2 number of tree leafs   */
 	s32 leafidx;		/* 4: index of the first tree leaf      */
@@ -180,17 +180,17 @@ typedef struct {
 	s8 budmin;		/* 1: minimum l2 tree leaf value        */
 	s8 stree[CTLTREESIZE];	/* CTLTREESIZE: dmapctl tree    */
 	u8 pad[2714];		/* 2714: pad to 4096            */
-} dmapctl_t;			/* - 4096 -                     */
+};				/* - 4096 -                     */
 
 /*
- *	common definition for dmaptree_t within dmap and dmapctl
+ *	common definition for dmaptree within dmap and dmapctl
  */
-typedef union {
-	dmaptree_t t1;
-	dmapctl_t t2;
+typedef union dmtree {
+	struct dmaptree t1;
+	struct dmapctl t2;
 } dmtree_t;
 
-/* macros for accessing fields within dmtree_t */
+/* macros for accessing fields within dmtree */
 #define	dmt_nleafs	t1.nleafs
 #define	dmt_l2nleafs 	t1.l2nleafs
 #define	dmt_leafidx 	t1.leafidx
@@ -201,7 +201,7 @@ typedef union {
 /* 
  *	on-disk aggregate disk allocation map descriptor.
  */
-typedef struct {
+struct dbmap {
 	s64 dn_mapsize;		/* 8: number of blocks in aggregate     */
 	s64 dn_nfree;		/* 8: num free blks in aggregate map    */
 	s32 dn_l2nbperpage;	/* 4: number of blks per page           */
@@ -218,17 +218,17 @@ typedef struct {
 	s64 dn_agsize;		/* 8: num of blks per alloc group       */
 	s8 dn_maxfreebud;	/* 1: max free buddy system             */
 	u8 pad[3007];		/* 3007: pad to 4096                    */
-} dbmap_t;			/* - 4096 -                             */
+};				/* - 4096 -                             */
 
 /* 
  *	in-memory aggregate disk allocation map descriptor.
  */
-typedef struct bmap {
-	dbmap_t db_bmap;	/* on-disk aggregate map descriptor */
+struct bmap {
+	struct dbmap db_bmap;	/* on-disk aggregate map descriptor */
 	struct inode *db_ipbmap;	/* ptr to aggregate map incore inode */
 	struct semaphore db_bmaplock;	/* aggregate map lock */
 	u32 *db_DBmap;
-} bmap_t;
+};
 
 /* macros for accessing fields within in-memory aggregate map descriptor */
 #define	db_mapsize	db_bmap.dn_mapsize
@@ -279,7 +279,7 @@ extern int dbUnmount(struct inode *ipbmap, int mounterror);
 extern int dbFree(struct inode *ipbmap, s64 blkno, s64 nblocks);
 
 extern int dbUpdatePMap(struct inode *ipbmap,
-			int free, s64 blkno, s64 nblocks, tblock_t * tblk);
+			int free, s64 blkno, s64 nblocks, struct tblock * tblk);
 
 extern int dbNextAG(struct inode *ipbmap);
 
