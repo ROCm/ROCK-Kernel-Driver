@@ -546,6 +546,12 @@ int ide_start_dma(struct ata_channel *hwif, ide_drive_t *drive, ide_dma_action_t
 	unsigned long dma_base = hwif->dma_base;
 	struct ata_request *ar = IDE_CUR_AR(drive);
 
+	/* This can happen with drivers abusing the special request field.
+	 */
+
+	if (!ar)
+		return 1;
+
 	if (rq_data_dir(ar->ar_rq) == READ)
 		reading = 1 << 3;
 

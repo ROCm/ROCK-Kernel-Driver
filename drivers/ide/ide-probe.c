@@ -195,6 +195,9 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 #ifndef CONFIG_BLK_DEV_IDE_TCQ
 	drive->queue_depth = 1;
 #else
+# ifndef CONFIG_BLK_DEV_IDE_TCQ_DEPTH
+#  define CONFIG_BLK_DEV_IDE_TCQ_DEPTH 1
+# endif
 	drive->queue_depth = drive->id->queue_depth + 1;
 	if (drive->queue_depth > CONFIG_BLK_DEV_IDE_TCQ_DEPTH)
 		drive->queue_depth = CONFIG_BLK_DEV_IDE_TCQ_DEPTH;

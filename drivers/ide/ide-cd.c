@@ -512,7 +512,7 @@ void cdrom_analyze_sense_data(ide_drive_t *drive,
 #endif /* not VERBOSE_IDE_CD_ERRORS */
 }
 
-static void cdrom_queue_request_sense(ide_drive_t *drive, 
+static void cdrom_queue_request_sense(ide_drive_t *drive,
 				      struct completion *wait,
 				      struct request_sense *sense,
 				      struct packet_command *failed_command)
@@ -536,7 +536,7 @@ static void cdrom_queue_request_sense(ide_drive_t *drive,
 	rq->flags = REQ_SENSE;
 	rq->special = (char *) pc;
 	rq->waiting = wait;
-	(void) ide_do_drive_cmd(drive, rq, ide_preempt);
+	ide_do_drive_cmd(drive, rq, ide_preempt);
 }
 
 
@@ -554,6 +554,7 @@ static void cdrom_end_request(ide_drive_t *drive, int uptodate)
 	if ((rq->flags & REQ_CMD) && !rq->current_nr_sectors)
 		uptodate = 1;
 
+	HWGROUP(drive)->rq->special = NULL;
 	ide_end_request(drive, uptodate);
 }
 

@@ -311,6 +311,7 @@ static ide_startstop_t pre_task_mulout_intr(ide_drive_t *drive, struct request *
 static ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 {
 	byte stat		= GET_STAT();
+	/* FIXME: this should go possible as well */
 	byte io_32bit		= drive->io_32bit;
 	struct request *rq	= &HWGROUP(drive)->wrq;
 	ide_hwgroup_t *hwgroup	= HWGROUP(drive);
@@ -612,6 +613,7 @@ static ide_startstop_t pre_task_out_intr(ide_drive_t *drive, struct request *rq)
 static ide_startstop_t task_out_intr(ide_drive_t *drive)
 {
 	byte stat		= GET_STAT();
+	/* FIXME: this should go possible as well */
 	byte io_32bit		= drive->io_32bit;
 	struct request *rq	= HWGROUP(drive)->rq;
 	char *pBuf		= NULL;
@@ -628,7 +630,7 @@ static ide_startstop_t task_out_intr(ide_drive_t *drive)
 		rq = HWGROUP(drive)->rq;
 		pBuf = ide_map_rq(rq, &flags);
 		DTF("write: %p, rq->current_nr_sectors: %d\n", pBuf, (int) rq->current_nr_sectors);
-		drive->io_32bit = 0;
+
 		taskfile_output_data(drive, pBuf, SECTOR_WORDS);
 		ide_unmap_rq(rq, pBuf, &flags);
 		drive->io_32bit = io_32bit;
@@ -647,6 +649,7 @@ static ide_startstop_t task_mulin_intr(ide_drive_t *drive)
 {
 	unsigned int		msect, nsect;
 	byte stat		= GET_STAT();
+	/* FIXME: this should go possible as well */
 	byte io_32bit		= drive->io_32bit;
 	struct request *rq	= HWGROUP(drive)->rq;
 	char *pBuf		= NULL;
@@ -913,68 +916,76 @@ int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
 }
 
 /*
- * Issue ATA command and wait for completion. Use for implementing commands in
- * kernel.
+ * Implement generic ioctls invoked from userspace to imlpement specific
+ * functionality.
  *
- * The caller has to make sure buf is never NULL!
+ * FIXME:
+ *
+ * 1. Rewrite hdparm to use the ide_task_ioctl function.
+ *
+ * 2. Publish it.
+ *
+ * 3. Kill this and HDIO_DRIVE_CMD alltogether.
  */
-static int ide_wait_cmd(ide_drive_t *drive, u8 cmd, u8 nsect, u8 feature, u8 sectors, u8 *argbuf)
-{
-	struct request rq;
 
-	/* FIXME: Do we really have to zero out the buffer?
-	 */
-	memset(argbuf, 0, 4 + SECTOR_WORDS * 4 * sectors);
-	ide_init_drive_cmd(&rq);
-	rq.buffer = argbuf;
-	argbuf[0] = cmd;
-	argbuf[1] = nsect;
-	argbuf[2] = feature;
-	argbuf[3] = sectors;
-
-	return ide_do_drive_cmd(drive, &rq, ide_wait);
-}
-
-int ide_cmd_ioctl(ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+int ide_cmd_ioctl(ide_drive_t *drive, unsigned long arg)
 {
 	int err = 0;
-	u8 args[4];
-	u8 *argbuf = args;
+	u8 vals[4];
+	u8 *argbuf = vals;
 	byte xfer_rate = 0;
 	int argsize = 4;
-	/* FIXME: this should not reside on the stack */
-	struct ata_taskfile tfargs;
+	struct ata_taskfile args;
+	struct request rq;
 
+	/*
+	 * First phase.
+	 */
 	if (NULL == (void *) arg) {
 		struct request rq;
 		ide_init_drive_cmd(&rq);
 		return ide_do_drive_cmd(drive, &rq, ide_wait);
 	}
-	if (copy_from_user(args, (void *)arg, 4))
+
+	/*
+	 * Second phase.
+	 */
+	if (copy_from_user(vals, (void *)arg, 4))
 		return -EFAULT;
 
-	tfargs.taskfile.feature = args[2];
-	tfargs.taskfile.sector_count = args[3];
-	tfargs.taskfile.sector_number = args[1];
-	tfargs.taskfile.low_cylinder = 0x00;
-	tfargs.taskfile.high_cylinder = 0x00;
-	tfargs.taskfile.device_head = 0x00;
-	tfargs.taskfile.command = args[0];
+	args.taskfile.feature = vals[2];
+	args.taskfile.sector_count = vals[3];
+	args.taskfile.sector_number = vals[1];
+	args.taskfile.low_cylinder = 0x00;
+	args.taskfile.high_cylinder = 0x00;
+	args.taskfile.device_head = 0x00;
+	args.taskfile.command = vals[0];
 
-	if (args[3]) {
-		argsize = 4 + (SECTOR_WORDS * 4 * args[3]);
+	if (vals[3]) {
+		argsize = 4 + (SECTOR_WORDS * 4 * vals[3]);
 		argbuf = kmalloc(argsize, GFP_KERNEL);
 		if (argbuf == NULL)
 			return -ENOMEM;
-		memcpy(argbuf, args, 4);
+		memcpy(argbuf, vals, 4);
 	}
-	if (set_transfer(drive, &tfargs)) {
-		xfer_rate = args[1];
-		if (ide_ata66_check(drive, &tfargs))
+
+	if (set_transfer(drive, &args)) {
+		xfer_rate = vals[1];
+		if (ide_ata66_check(drive, &args))
 			goto abort;
 	}
 
-	err = ide_wait_cmd(drive, args[0], args[1], args[2], args[3], argbuf);
+	/* Issue ATA command and wait for completion.
+	 */
+
+	/* FIXME: Do we really have to zero out the buffer?
+	 */
+	memset(argbuf, 0, 4 + SECTOR_WORDS * 4 * vals[3]);
+	ide_init_drive_cmd(&rq);
+	rq.buffer = argbuf;
+	memcpy(argbuf, vals, 4);
+
+	err = ide_do_drive_cmd(drive, &rq, ide_wait);
 
 	if (!err && xfer_rate) {
 		/* active-retuning-calls future */
@@ -987,10 +998,11 @@ abort:
 		err = -EFAULT;
 	if (argsize > 4)
 		kfree(argbuf);
+
 	return err;
 }
 
-int ide_task_ioctl(ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+int ide_task_ioctl(ide_drive_t *drive, unsigned long arg)
 {
 	int err = 0;
 	u8 args[7];

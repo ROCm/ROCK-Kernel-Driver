@@ -864,10 +864,10 @@ extern ide_startstop_t task_no_data_intr(ide_drive_t *drive);
 extern void ide_cmd_type_parser(struct ata_taskfile *args);
 extern int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *cmd, byte *buf);
 
-extern int ide_cmd_ioctl(ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
-extern int ide_task_ioctl(ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
+extern int ide_cmd_ioctl(ide_drive_t *drive, unsigned long arg);
+extern int ide_task_ioctl(ide_drive_t *drive, unsigned long arg);
 
-void ide_delay_50ms (void);
+void ide_delay_50ms(void);
 
 byte ide_auto_reduce_xfer (ide_drive_t *drive);
 int ide_driveid_update (ide_drive_t *drive);
