@@ -509,10 +509,12 @@ static void put_mount(void)
 	DBG("driverfs: mount_count = %d\n",mount_count);
 }
 
-int __init init_driverfs_fs(void)
+static int __init driverfs_init(void)
 {
 	return register_filesystem(&driverfs_fs_type);
 }
+
+core_initcall(driverfs_init);
 
 static struct dentry * get_dentry(struct dentry * parent, const char * name)
 {

@@ -65,6 +65,4 @@ driverfs_create_symlink(struct driver_dir_entry * parent,
 extern void
 driverfs_remove_file(struct driver_dir_entry *, const char * name);
 
-extern int init_driverfs_fs(void);
-
 #endif /* _DDFS_H_ */

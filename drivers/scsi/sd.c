@@ -1525,7 +1525,7 @@ static void __exit exit_sd(void)
 		vfree(sd_dsk_arr);
 	}
 	sd_template.dev_max = 0;
-	remove_driver(&sd_template.scsi_driverfs_driver);
+	driver_unregister(&sd_template.scsi_driverfs_driver);
 
 	unregister_reboot_notifier(&sd_notifier_block);
 }

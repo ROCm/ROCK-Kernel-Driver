@@ -19,7 +19,7 @@ static DEVICE_ATTR(name,S_IRUGO,device_read_name,NULL);
 static ssize_t
 device_read_power(struct device * dev, char * page, size_t count, loff_t off)
 {
-	return off ? 0 : sprintf(page,"%d\n",dev->current_state);
+	return off ? 0 : sprintf(page,"%d\n",dev->power_state);
 }
 
 static ssize_t

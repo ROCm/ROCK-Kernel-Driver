@@ -354,7 +354,7 @@ static int __init ps2_init(void)
 
 static void __exit ps2_exit(void)
 {
-	remove_driver(&ps2_driver.drv);
+	driver_unregister(&ps2_driver.drv);
 }
 
 module_init(ps2_init);

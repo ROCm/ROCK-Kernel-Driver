@@ -1114,7 +1114,7 @@ int ecard_register_driver(struct ecard_driver *drv)
 
 void ecard_remove_driver(struct ecard_driver *drv)
 {
-	remove_driver(&drv->drv);
+	driver_unregister(&drv->drv);
 }
 
 static int ecard_match(struct device *_dev, struct device_driver *_drv)
