@@ -172,7 +172,7 @@ struct aiptek_features aiptek_features[] = {
 };
 
 struct usb_device_id aiptek_ids[] = {
-	{USB_DEVICE(USB_VENDOR_ID_AIPTEK, 0x20), driver_info:0},
+	{USB_DEVICE(USB_VENDOR_ID_AIPTEK, 0x20), .driver_info = 0},
 	{}
 };
 
