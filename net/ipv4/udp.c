@@ -766,6 +766,64 @@ static __inline__ int udp_checksum_complete(struct sk_buff *skb)
 }
 
 /*
+ * Packets queued on the UDP socket may have a bad checksum,
+ * and need to be discarded. On the other hand, we are not
+ * allowed to return EAGAIN on a blocking socket, or
+ * after select() has signalled that data is available.
+ *
+ * To solve this, udp_poll makes sure that the next packet in
+ * the queue has a valid checksum. This fixes the select/recvmsg
+ * case.
+ * The general case of recvmsg on a blocking socket is solved by
+ * simply looping over in udp_recvmsg when the checksum is bad.
+ */
+unsigned int
+udp_poll(struct file *file, struct socket *sock, struct poll_table_struct *wait)
+{
+	struct sock *sk = sock->sk;
+  	struct sk_buff *skb;
+	int error;
+
+	do {
+		spin_lock_irq(&sk->sk_receive_queue.lock);
+		skb = skb_peek(&sk->sk_receive_queue);
+		if (skb != NULL)
+			atomic_inc(&skb->users);
+		spin_unlock_irq(&sk->sk_receive_queue.lock);
+
+		if (skb == NULL)
+			break;
+
+		error = 0;
+		if (skb->ip_summed == CHECKSUM_UNNECESSARY) {
+			/* All is well */
+		} else if (!(error = __udp_checksum_complete(skb))) {
+			skb->ip_summed = CHECKSUM_UNNECESSARY;
+		} else {
+			/* Bad checksum. Pluck it from there queue */
+			UDP_INC_STATS_BH(UdpInErrors);
+
+			spin_lock_irq(&sk->sk_receive_queue.lock);
+			if (skb == skb_peek(&sk->sk_receive_queue)) {
+				__skb_unlink(skb, &sk->sk_receive_queue);
+				spin_unlock_irq(&sk->sk_receive_queue.lock);
+				kfree_skb(skb);
+			} else {
+				spin_unlock_irq(&sk->sk_receive_queue.lock);
+			}
+		}
+
+		skb_free_datagram(sk, skb);
+	} while (error);
+
+	/* We have made sure there's at least one valid
+	 * UDP packet in the queue, so do the normal datagram
+	 * poll now */
+	return datagram_poll(file, sock, wait);
+}
+
+
+/*
  * 	This should be easy, if there is something there we
  * 	return it, otherwise we block.
  */
@@ -787,6 +845,7 @@ int udp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	if (flags & MSG_ERRQUEUE)
 		return ip_recv_error(sk, msg, len);
 
+try_again:
 	skb = skb_recv_datagram(sk, flags, noblock, &err);
 	if (!skb)
 		goto out;
@@ -852,7 +911,7 @@ csum_copy_err:
 
 	skb_free_datagram(sk, skb);
 
-	return -EAGAIN;	
+	goto try_again;
 }
 
 int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
