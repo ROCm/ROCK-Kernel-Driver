@@ -417,7 +417,12 @@ retry:
 
 	if (!data->saved_num)
 		call_on_cpu(cpu, salinfo_log_read_cpu, data);
-	data->state = data->log_size ? STATE_LOG_RECORD : STATE_NO_DATA;
+	if (!data->log_size) {
+	        data->state = STATE_NO_DATA;
+	        clear_bit(cpu, &data->cpu_event);
+	} else {
+	        data->state = STATE_LOG_RECORD;
+	}
 }
 
 static ssize_t
