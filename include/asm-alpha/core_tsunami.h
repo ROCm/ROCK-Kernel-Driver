@@ -299,69 +299,19 @@ struct el_TSUNAMI_sysdata_mcheck {
  * can only use linear accesses to get at PCI memory and I/O spaces.
  */
 
-#define vucp	volatile unsigned char *
-#define vusp	volatile unsigned short *
-#define vuip	volatile unsigned int *
-#define vulp	volatile unsigned long *
-
-__EXTERN_INLINE u8 tsunami_inb(unsigned long addr)
-{
-	/* ??? I wish I could get rid of this.  But there's no ioremap
-	   equivalent for I/O space.  PCI I/O can be forced into the
-	   correct hose's I/O region, but that doesn't take care of
-	   legacy ISA crap.  */
-
-	addr += TSUNAMI_IO_BIAS;
-	return __kernel_ldbu(*(vucp)addr);
-}
-
-__EXTERN_INLINE void tsunami_outb(u8 b, unsigned long addr)
-{
-	addr += TSUNAMI_IO_BIAS;
-	__kernel_stb(b, *(vucp)addr);
-	mb();
-}
-
-__EXTERN_INLINE u16 tsunami_inw(unsigned long addr)
-{
-	addr += TSUNAMI_IO_BIAS;
-	return __kernel_ldwu(*(vusp)addr);
-}
-
-__EXTERN_INLINE void tsunami_outw(u16 b, unsigned long addr)
-{
-	addr += TSUNAMI_IO_BIAS;
-	__kernel_stw(b, *(vusp)addr);
-	mb();
-}
-
-__EXTERN_INLINE u32 tsunami_inl(unsigned long addr)
-{
-	addr += TSUNAMI_IO_BIAS;
-	return *(vuip)addr;
-}
-
-__EXTERN_INLINE void tsunami_outl(u32 b, unsigned long addr)
-{
-	addr += TSUNAMI_IO_BIAS;
-	*(vuip)addr = b;
-	mb();
-}
-
 /*
  * Memory functions.  all accesses are done through linear space.
  */
 
-__EXTERN_INLINE unsigned long tsunami_ioremap(unsigned long addr, 
-					      unsigned long size
-					      __attribute__((unused)))
+__EXTERN_INLINE void __iomem *tsunami_ioportmap(unsigned long addr)
 {
-	return addr + TSUNAMI_MEM_BIAS;
+	return (void __iomem *)(addr + TSUNAMI_IO_BIAS);
 }
 
-__EXTERN_INLINE void tsunami_iounmap(unsigned long addr)
+__EXTERN_INLINE void __iomem *tsunami_ioremap(unsigned long addr, 
+					      unsigned long size)
 {
-	return;
+	return (void __iomem *)(addr + TSUNAMI_MEM_BIAS);
 }
 
 __EXTERN_INLINE int tsunami_is_ioaddr(unsigned long addr)
@@ -369,87 +319,20 @@ __EXTERN_INLINE int tsunami_is_ioaddr(unsigned long addr)
 	return addr >= TSUNAMI_BASE;
 }
 
-__EXTERN_INLINE u8 tsunami_readb(unsigned long addr)
+__EXTERN_INLINE int tsunami_is_mmio(const volatile void __iomem *xaddr)
 {
-	return __kernel_ldbu(*(vucp)addr);
+	unsigned long addr = (unsigned long) xaddr;
+	return (addr & 0x100000000UL) == 0;
 }
 
-__EXTERN_INLINE u16 tsunami_readw(unsigned long addr)
-{
-	return __kernel_ldwu(*(vusp)addr);
-}
-
-__EXTERN_INLINE u32 tsunami_readl(unsigned long addr)
-{
-	return *(vuip)addr;
-}
-
-__EXTERN_INLINE u64 tsunami_readq(unsigned long addr)
-{
-	return *(vulp)addr;
-}
-
-__EXTERN_INLINE void tsunami_writeb(u8 b, unsigned long addr)
-{
-	__kernel_stb(b, *(vucp)addr);
-}
-
-__EXTERN_INLINE void tsunami_writew(u16 b, unsigned long addr)
-{
-	__kernel_stw(b, *(vusp)addr);
-}
-
-__EXTERN_INLINE void tsunami_writel(u32 b, unsigned long addr)
-{
-	*(vuip)addr = b;
-}
-
-__EXTERN_INLINE void tsunami_writeq(u64 b, unsigned long addr)
-{
-	*(vulp)addr = b;
-}
-
-#undef vucp
-#undef vusp
-#undef vuip
-#undef vulp
-
-#ifdef __WANT_IO_DEF
-
-#define __inb(p)		tsunami_inb((unsigned long)(p))
-#define __inw(p)		tsunami_inw((unsigned long)(p))
-#define __inl(p)		tsunami_inl((unsigned long)(p))
-#define __outb(x,p)		tsunami_outb((x),(unsigned long)(p))
-#define __outw(x,p)		tsunami_outw((x),(unsigned long)(p))
-#define __outl(x,p)		tsunami_outl((x),(unsigned long)(p))
-#define __readb(a)		tsunami_readb((unsigned long)(a))
-#define __readw(a)		tsunami_readw((unsigned long)(a))
-#define __readl(a)		tsunami_readl((unsigned long)(a))
-#define __readq(a)		tsunami_readq((unsigned long)(a))
-#define __writeb(x,a)		tsunami_writeb((x),(unsigned long)(a))
-#define __writew(x,a)		tsunami_writew((x),(unsigned long)(a))
-#define __writel(x,a)		tsunami_writel((x),(unsigned long)(a))
-#define __writeq(x,a)		tsunami_writeq((x),(unsigned long)(a))
-#define __ioremap(a,s)		tsunami_ioremap((unsigned long)(a),(s))
-#define __iounmap(a)		tsunami_iounmap((unsigned long)(a))
-#define __is_ioaddr(a)		tsunami_is_ioaddr((unsigned long)(a))
-
-#define inb(p)			__inb(p)
-#define inw(p)			__inw(p)
-#define inl(p)			__inl(p)
-#define outb(x,p)		__outb((x),(p))
-#define outw(x,p)		__outw((x),(p))
-#define outl(x,p)		__outl((x),(p))
-#define __raw_readb(a)		__readb(a)
-#define __raw_readw(a)		__readw(a)
-#define __raw_readl(a)		__readl(a)
-#define __raw_readq(a)		__readq(a)
-#define __raw_writeb(v,a)	__writeb((v),(a))
-#define __raw_writew(v,a)	__writew((v),(a))
-#define __raw_writel(v,a)	__writel((v),(a))
-#define __raw_writeq(v,a)	__writeq((v),(a))
-
-#endif /* __WANT_IO_DEF */
+#undef __IO_PREFIX
+#define __IO_PREFIX		tsunami
+#define tsunami_trivial_rw_bw	1
+#define tsunami_trivial_rw_lq	1
+#define tsunami_trivial_io_bw	1
+#define tsunami_trivial_io_lq	1
+#define tsunami_trivial_iounmap	1
+#include <asm/io_trivial.h>
 
 #ifdef __IO_EXTERN_INLINE
 #undef __EXTERN_INLINE

@@ -68,36 +68,6 @@ EXPORT_SYMBOL(alpha_using_srm);
 #endif /* CONFIG_ALPHA_GENERIC */
 
 /* platform dependent support */
-EXPORT_SYMBOL(_inb);
-EXPORT_SYMBOL(_inw);
-EXPORT_SYMBOL(_inl);
-EXPORT_SYMBOL(_outb);
-EXPORT_SYMBOL(_outw);
-EXPORT_SYMBOL(_outl);
-EXPORT_SYMBOL(_readb);
-EXPORT_SYMBOL(_readw);
-EXPORT_SYMBOL(_readl);
-EXPORT_SYMBOL(_writeb);
-EXPORT_SYMBOL(_writew);
-EXPORT_SYMBOL(_writel);
-EXPORT_SYMBOL(___raw_readb); 
-EXPORT_SYMBOL(___raw_readw); 
-EXPORT_SYMBOL(___raw_readl); 
-EXPORT_SYMBOL(___raw_readq); 
-EXPORT_SYMBOL(___raw_writeb); 
-EXPORT_SYMBOL(___raw_writew); 
-EXPORT_SYMBOL(___raw_writel); 
-EXPORT_SYMBOL(___raw_writeq); 
-EXPORT_SYMBOL(_memcpy_fromio);
-EXPORT_SYMBOL(_memcpy_toio);
-EXPORT_SYMBOL(_memset_c_io);
-EXPORT_SYMBOL(scr_memcpyw);
-EXPORT_SYMBOL(insb);
-EXPORT_SYMBOL(insw);
-EXPORT_SYMBOL(insl);
-EXPORT_SYMBOL(outsb);
-EXPORT_SYMBOL(outsw);
-EXPORT_SYMBOL(outsl);
 EXPORT_SYMBOL(strcat);
 EXPORT_SYMBOL(strcmp);
 EXPORT_SYMBOL(strcpy);
