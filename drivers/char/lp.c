@@ -126,6 +126,7 @@
 #include <linux/delay.h>
 #include <linux/poll.h>
 #include <linux/console.h>
+#include <linux/device.h>
 
 #include <linux/parport.h>
 #undef LP_STATS
