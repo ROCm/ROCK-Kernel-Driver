@@ -94,10 +94,11 @@ HandSpring Visor, Palm USB, and Clié USB driver
 Compaq iPAQ, HP Jornada and Casio EM500 driver
 
   This driver can be used to connect to Compaq iPAQ, HP Jornada and Casio EM500
-  PDAs running Windows CE 3.0 or PocketPC 2002 using a USB cable/cradle. It
-  has been tested only on the Compaq H3135, but is rumoured to work on
-  with the H3600 and later models as well as the Jornada 548 and 568.
-  With minor modifications, it may work for other CE based handhelds too.
+  PDAs running Windows CE 3.0 or PocketPC 2002 using a USB cable/cradle.
+  It's very likely that every device supported by ActiveSync USB works with this
+  driver. The driver supports the Compaq iPAQ, Jornada 548/568 and the Casio
+  EM500 out of the box. For others, please use module parameters to specify
+  the product and vendor id. e.g. modprobe ipaq vendor=0x3f0 product=0x1125
 
   The driver presents a serial interface (usually on /dev/ttyUSB0) over
   which one may run ppp and establish a TCP/IP link to the iPAQ. Once this
@@ -105,36 +106,12 @@ Compaq iPAQ, HP Jornada and Casio EM500 driver
   significant advantage of using USB is speed - you can get 73 to 113
   kbytes/sec for download/upload to the iPAQ.
 
-  The driver works intermittently with the usb-uhci driver but quite
-  reliably with the uhci driver. However, performance is much better
-  with usb-uhci. It does not seem to work with ohci at all.
+  This driver is only one of a set of components required to utilize
+  the USB connection. Please visit http://synce.sourceforge.net which
+  contains the necessary packages and a simple step-by-step howto.
 
-  You must setup hotplug to invoke pppd as soon as the iPAQ is connected.
-  A ppp script like the one below should be kept in the file
-  /etc/hotplug/usb/ipaq Remember to chmod +x. Make sure there are no
-  options in /etc/ppp/options or ~/.ppprc which conflict with the ones
-  given below.
-
-	#!/bin/bash
-
-	MYIP=linux.box.ip
-	REMOTEIP=ipaq.ip
-	MYDNS=my.dns.server
-	killall -9 pppd
-	/usr/sbin/pppd /dev/ttyUSB0 \
-	connect "/usr/sbin/chat -v TIMEOUT 60 CLIENT 'CLIENTSERVER\c'" \
-	nocrtscts local debug passive $MYIP:$REMOTEIP ms-dns $MYDNS noauth \
-	proxyarp
-
-  You must also download and install asyncd from http://synce.sourceforge.net
-  This is required to emulate keep-alive packets which are exchanged by
-  ActiveSync and the iPAQ.
-
-  On connecting the cable, you should see the usual "Device Connected",
-  "User Authenticated" messages flash by on your iPAQ. Once connected,
-  you can use Win CE programs like ftpView, Pocket Outlook from the iPAQ
-  and xcerdisp, synce utilities from the Linux side. Remember to enable IP
-  forwarding. 
+  Once connected, you can use Win CE programs like ftpView, Pocket Outlook
+  from the iPAQ and xcerdisp, synce utilities from the Linux side.
 
   To use Pocket IE, follow the instructions given at
   http://www.tekguru.co.uk/EM500/usbtonet.htm to achieve the same thing
