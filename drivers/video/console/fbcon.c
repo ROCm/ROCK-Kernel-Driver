@@ -1996,8 +1996,10 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 	   font length must be multiple of 256, at least. And 256 is multiple
 	   of 4 */
 	k = 0;
-	while (p > new_data)
-		k += *--(u32 *) p;
+	while (p > new_data) {
+		p = (u8 *)((u32 *)p - 1);
+		k += *(u32 *) p;
+	}
 	FNTSUM(new_data) = k;
 	/* Check if the same font is on some other console already */
 	for (i = 0; i < MAX_NR_CONSOLES; i++) {
