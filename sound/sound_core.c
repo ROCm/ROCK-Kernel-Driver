@@ -122,7 +122,7 @@ static int __sound_insert_unit(struct sound_unit * s, struct sound_unit **list, 
  *	Remove a node from the chain. Called with the lock asserted
  */
  
-static void __sound_remove_unit(struct sound_unit **list, int unit)
+static struct sound_unit *__sound_remove_unit(struct sound_unit **list, int unit)
 {
 	while(*list)
 	{
@@ -130,13 +130,12 @@ static void __sound_remove_unit(struct sound_unit **list, int unit)
 		if(p->unit_minor==unit)
 		{
 			*list=p->next;
-			devfs_unregister (p->de);
-			kfree(p);
-			return;
+			return p;
 		}
 		list=&(p->next);
 	}
 	printk(KERN_ERR "Sound device %d went missing!\n", unit);
+	return NULL;
 }
 
 /*
@@ -189,9 +188,15 @@ static int sound_insert_unit(struct sound_unit **list, struct file_operations *f
  	
 static void sound_remove_unit(struct sound_unit **list, int unit)
 {
+	struct sound_unit *p;
+
 	spin_lock(&sound_loader_lock);
-	__sound_remove_unit(list, unit);
+	p = __sound_remove_unit(list, unit);
 	spin_unlock(&sound_loader_lock);
+	if (p) {
+		devfs_unregister (p->de);
+		kfree(p);
+	}
 }
 
 /*

@@ -1577,7 +1577,6 @@ int  cs46xx_dsp_disable_spdif_out (cs46xx_t *chip)
 int cs46xx_dsp_enable_spdif_in (cs46xx_t *chip)
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
-	unsigned int flags;
 
 	/* turn on amplifier */
 	chip->active_ctrl(chip, 1);

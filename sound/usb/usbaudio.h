@@ -58,6 +58,8 @@
 #define EP_GENERAL			0x01
 
 #define MS_GENERAL			0x01
+#define MIDI_IN_JACK			0x02
+#define MIDI_OUT_JACK			0x03
 
 /* endpoint attributes */
 #define EP_ATTR_MASK			0x0c
@@ -146,21 +148,33 @@ struct snd_usb_audio {
 /*
  * Information about devices with broken descriptors
  */
+#define QUIRK_ANY_INTERFACE -1
+
+#define QUIRK_MIDI_FIXED_ENDPOINT	0
+#define QUIRK_MIDI_YAMAHA		1
+#define QUIRK_MIDI_MIDIMAN		2
+
 typedef struct snd_usb_audio_quirk snd_usb_audio_quirk_t;
 typedef struct snd_usb_midi_endpoint_info snd_usb_midi_endpoint_info_t;
 
 struct snd_usb_audio_quirk {
 	const char *vendor_name;
 	const char *product_name;
-	int ifnum;
-
-	/* MIDI specific */
-	struct snd_usb_midi_endpoint_info {
-		int16_t epnum;		/* ep number, -1 autodetect */
-		uint16_t out_cables;	/* bitmask */
-		uint16_t in_cables;	/* bitmask */
-	} endpoints[MIDI_MAX_ENDPOINTS];
+	int16_t ifnum;
+	int16_t type;
+	const void *data;
 };
+
+/* data for QUIRK_MIDI_FIXED_ENDPOINT */
+struct snd_usb_midi_endpoint_info {
+	int16_t epnum;		/* ep number, -1 autodetect */
+	uint16_t out_cables;	/* bitmask */
+	uint16_t in_cables;	/* bitmask */
+};
+
+/* for QUIRK_MIDI_YAMAHA, data is NULL */
+
+/* for QUIRK_MIDI_MIDIMAN, data is the number of ports */
 
 /*
  * USB MIDI sequencer device data
@@ -173,6 +187,7 @@ typedef struct snd_usb_midi_in_endpoint snd_usb_midi_in_endpoint_t;
 struct snd_usb_midi {
 	/* filled by usbaudio.c */
 	snd_usb_audio_t *chip;
+	struct usb_interface *iface;
 	int ifnum;
 	const snd_usb_audio_quirk_t *quirk;
 
