@@ -1174,7 +1174,7 @@ static int serial8250_startup(struct uart_port *port)
 
 	/*
 	 * Clear the FIFO buffers and disable them.
-	 * (they will be reeanbled in change_speed())
+	 * (they will be reeanbled in settermios())
 	 */
 	if (uart_config[up->port.type].flags & UART_CLEAR_FIFO) {
 		serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO);
@@ -1241,7 +1241,7 @@ static int serial8250_startup(struct uart_port *port)
 
 	/*
 	 * Finally, enable interrupts.  Note: Modem status interrupts
-	 * are set via change_speed(), which will be occuring imminently
+	 * are set via settermios(), which will be occuring imminently
 	 * anyway, so we don't enable them here.
 	 */
 	up->ier = UART_IER_RLSI | UART_IER_RDI;
@@ -1319,14 +1319,15 @@ static void serial8250_shutdown(struct uart_port *port)
 }
 
 static void
-serial8250_change_speed(struct uart_port *port, unsigned int cflag,
-			unsigned int iflag, unsigned int quot)
+serial8250_settermios(struct uart_port *port, struct termios *termios,
+		      struct termios *old)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
 	unsigned char cval, fcr = 0;
 	unsigned long flags;
+	unsigned int quot;
 
-	switch (cflag & CSIZE) {
+	switch (termios->c_cflag & CSIZE) {
 	case CS5:
 		cval = 0x00;
 		break;
@@ -1342,16 +1343,21 @@ serial8250_change_speed(struct uart_port *port, unsigned int cflag,
 		break;
 	}
 
-	if (cflag & CSTOPB)
+	if (termios->c_cflag & CSTOPB)
 		cval |= 0x04;
-	if (cflag & PARENB)
+	if (termios->c_cflag & PARENB)
 		cval |= UART_LCR_PARITY;
-	if (!(cflag & PARODD))
+	if (!(termios->c_cflag & PARODD))
 		cval |= UART_LCR_EPAR;
 #ifdef CMSPAR
-	if (cflag & CMSPAR)
+	if (termios->c_cflag & CMSPAR)
 		cval |= UART_LCR_SPAR;
 #endif
+
+	/*
+	 * Ask the core to calculate the divisor for us.
+	 */
+	quot = uart_get_divisor(port, termios, old);
 
 	/*
 	 * Work around a bug in the Oxford Semiconductor 952 rev B
@@ -1375,34 +1381,6 @@ serial8250_change_speed(struct uart_port *port, unsigned int cflag,
 	if (up->port.type == PORT_16750)
 		fcr |= UART_FCR7_64BYTE;
 
-	up->port.read_status_mask = UART_LSR_OE | UART_LSR_THRE | UART_LSR_DR;
-	if (iflag & INPCK)
-		up->port.read_status_mask |= UART_LSR_FE | UART_LSR_PE;
-	if (iflag & (BRKINT | PARMRK))
-		up->port.read_status_mask |= UART_LSR_BI;
-
-	/*
-	 * Characteres to ignore
-	 */
-	up->port.ignore_status_mask = 0;
-	if (iflag & IGNPAR)
-		up->port.ignore_status_mask |= UART_LSR_PE | UART_LSR_FE;
-	if (iflag & IGNBRK) {
-		up->port.ignore_status_mask |= UART_LSR_BI;
-		/*
-		 * If we're ignoring parity and break indicators,
-		 * ignore overruns too (for real raw support).
-		 */
-		if (iflag & IGNPAR)
-			up->port.ignore_status_mask |= UART_LSR_OE;
-	}
-
-	/*
-	 * ignore all characters if CREAD is not set
-	 */
-	if ((cflag & CREAD) == 0)
-		up->port.ignore_status_mask |= UART_LSR_DR;
-
 	/*
 	 * Ok, we're now changing the port state.  Do it with
 	 * interrupts disabled.
@@ -1410,17 +1388,51 @@ serial8250_change_speed(struct uart_port *port, unsigned int cflag,
 	spin_lock_irqsave(&up->port.lock, flags);
 
 	/*
+	 * Update the per-port timeout.
+	 */
+	uart_update_timeout(port, termios->c_cflag, quot);
+
+	up->port.read_status_mask = UART_LSR_OE | UART_LSR_THRE | UART_LSR_DR;
+	if (termios->c_iflag & INPCK)
+		up->port.read_status_mask |= UART_LSR_FE | UART_LSR_PE;
+	if (termios->c_iflag & (BRKINT | PARMRK))
+		up->port.read_status_mask |= UART_LSR_BI;
+
+	/*
+	 * Characteres to ignore
+	 */
+	up->port.ignore_status_mask = 0;
+	if (termios->c_iflag & IGNPAR)
+		up->port.ignore_status_mask |= UART_LSR_PE | UART_LSR_FE;
+	if (termios->c_iflag & IGNBRK) {
+		up->port.ignore_status_mask |= UART_LSR_BI;
+		/*
+		 * If we're ignoring parity and break indicators,
+		 * ignore overruns too (for real raw support).
+		 */
+		if (termios->c_iflag & IGNPAR)
+			up->port.ignore_status_mask |= UART_LSR_OE;
+	}
+
+	/*
+	 * ignore all characters if CREAD is not set
+	 */
+	if ((termios->c_cflag & CREAD) == 0)
+		up->port.ignore_status_mask |= UART_LSR_DR;
+
+	/*
 	 * CTS flow control flag and modem status interrupts
 	 */
 	up->ier &= ~UART_IER_MSI;
-	if (UART_ENABLE_MS(&up->port, cflag))
+	if (UART_ENABLE_MS(&up->port, termios->c_cflag))
 		up->ier |= UART_IER_MSI;
 
 	serial_out(up, UART_IER, up->ier);
 
 	if (uart_config[up->port.type].flags & UART_STARTECH) {
 		serial_outp(up, UART_LCR, 0xBF);
-		serial_outp(up, UART_EFR, cflag & CRTSCTS ? UART_EFR_CTS :0);
+		serial_outp(up, UART_EFR,
+			    termios->c_cflag & CRTSCTS ? UART_EFR_CTS :0);
 	}
 	serial_outp(up, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
 	serial_outp(up, UART_DLL, quot & 0xff);		/* LS of divisor */
@@ -1728,7 +1740,7 @@ static struct uart_ops serial8250_pops = {
 	.break_ctl	= serial8250_break_ctl,
 	.startup	= serial8250_startup,
 	.shutdown	= serial8250_shutdown,
-	.change_speed	= serial8250_change_speed,
+	.settermios	= serial8250_settermios,
 	.pm		= serial8250_pm,
 	.type		= serial8250_type,
 	.release_port	= serial8250_release_port,

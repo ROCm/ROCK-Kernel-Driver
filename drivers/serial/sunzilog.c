@@ -917,26 +917,27 @@ sunzilog_convert_to_zs(struct uart_sunzilog_port *up, unsigned int cflag,
 
 /* The port lock is not held.  */
 static void
-sunzilog_change_speed(struct uart_port *port, unsigned int cflag,
-		      unsigned int iflag, unsigned int quot)
+sunzilog_settermios(struct uart_port *port, struct termios *termios,
+		    struct termios *old)
 {
 	struct uart_sunzilog_port *up = (struct uart_sunzilog_port *) port;
 	unsigned long flags;
 	int baud, brg;
 
+	baud = uart_get_baud_rate(port, termios);
+
 	spin_lock_irqsave(&up->port.lock, flags);
 
-	baud = (ZS_CLOCK / (quot * 16));
 	brg = BPS_TO_BRG(baud, ZS_CLOCK / ZS_CLOCK_DIVISOR);
 
-	sunzilog_convert_to_zs(up, cflag, iflag, brg);
+	sunzilog_convert_to_zs(up, termios->c_cflag, termios->c_iflag, brg);
 
-	if (UART_ENABLE_MS(&up->port, cflag))
+	if (UART_ENABLE_MS(&up->port, termios->c_cflag))
 		up->flags |= SUNZILOG_FLAG_MODEM_STATUS;
 	else
 		up->flags &= ~SUNZILOG_FLAG_MODEM_STATUS;
 
-	up->cflag = cflag;
+	up->cflag = termios->c_cflag;
 
 	sunzilog_maybe_update_regs(up, ZILOG_CHANNEL_FROM_PORT(port));
 
@@ -982,7 +983,7 @@ static struct uart_ops sunzilog_pops = {
 	.break_ctl	=	sunzilog_break_ctl,
 	.startup	=	sunzilog_startup,
 	.shutdown	=	sunzilog_shutdown,
-	.change_speed	=	sunzilog_change_speed,
+	.settermios	=	sunzilog_settermios,
 	.type		=	sunzilog_type,
 	.release_port	=	sunzilog_release_port,
 	.request_port	=	sunzilog_request_port,

@@ -440,15 +440,13 @@ static void nb85e_uart_shutdown (struct uart_port *port)
 }
 
 static void
-nb85e_uart_change_speed (struct uart_port *port, unsigned cflags,
-			 unsigned iflag, unsigned quot)
+nb85e_uart_settermios (struct uart_port *port, struct termios *termios,
+		       struct termios *old)
 {
-	/* The serial framework doesn't give us the baud rate directly, but
-	   insists on calculating a `quotient' from it, and giving us that
-	   instead.  Get the real baud rate from the tty code instead.  */
-	int baud = tty_get_baud_rate (port->info->tty);
+	/* FIXME: Which termios flags does this driver support? --rmk */
 
-	nb85e_uart_configure (port->line, cflags, baud);
+	nb85e_uart_configure (port->line, termios->c_cflags,
+			uart_get_baud_rate(port, termios));
 }
 
 static const char *nb85e_uart_type (struct uart_port *port)
@@ -483,7 +481,7 @@ static struct uart_ops nb85e_uart_ops = {
 	.break_ctl	= nb85e_uart_break_ctl,
 	.startup	= nb85e_uart_startup,
 	.shutdown	= nb85e_uart_shutdown,
-	.change_speed	= nb85e_uart_change_speed,
+	.settermios	= nb85e_uart_settermios,
 	.type		= nb85e_uart_type,
 	.release_port	= nb85e_uart_nop,
 	.request_port	= nb85e_uart_success,

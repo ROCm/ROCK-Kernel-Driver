@@ -451,10 +451,7 @@ uart_change_speed(struct uart_info *info, struct termios *old_termios)
 	else
 		info->flags |= UIF_CHECK_CD;
 
-	quot = uart_get_divisor(port, termios, old_termios);
-	uart_update_timeout(port, termios->c_cflag, quot);
-
-	port->ops->change_speed(port, termios->c_cflag, termios->c_iflag, quot);
+	port->ops->settermios(port, termios, old_termios);
 }
 
 static inline void
@@ -1857,9 +1854,12 @@ int __init
 uart_set_options(struct uart_port *port, struct console *co,
 		 int baud, int parity, int bits, int flow)
 {
-	unsigned int cflag = CREAD | HUPCL | CLOCAL;
-	unsigned int quot;
+	struct termios termios;
 	int i;
+
+	memset(&termios, 0, sizeof(struct termios));
+
+	termios.c_cflag = CREAD | HUPCL | CLOCAL;
 
 	/*
 	 * Construct a cflag setting.
@@ -1868,28 +1868,27 @@ uart_set_options(struct uart_port *port, struct console *co,
 		if (baud_rates[i].rate <= baud)
 			break;
 
-	cflag |= baud_rates[i].cflag;
+	termios.c_cflag |= baud_rates[i].cflag;
 
 	if (bits == 7)
-		cflag |= CS7;
+		termios.c_cflag |= CS7;
 	else
-		cflag |= CS8;
+		termios.c_cflag |= CS8;
 
 	switch (parity) {
 	case 'o': case 'O':
-		cflag |= PARODD;
+		termios.c_cflag |= PARODD;
 		/*fall through*/
 	case 'e': case 'E':
-		cflag |= PARENB;
+		termios.c_cflag |= PARENB;
 		break;
 	}
 
 	if (flow == 'r')
-		cflag |= CRTSCTS;
+		termios.c_cflag |= CRTSCTS;
 
-	co->cflag = cflag;
-	quot = (port->uartclk / (16 * baud));
-	port->ops->change_speed(port, cflag, 0, quot);
+	port->ops->settermios(port, &termios, NULL);
+	co->cflag = termios.c_cflag;
 
 	return 0;
 }

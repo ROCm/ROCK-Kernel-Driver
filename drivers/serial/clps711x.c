@@ -317,14 +317,23 @@ static void clps711xuart_shutdown(struct uart_port *port)
 }
 
 static void
-clps711xuart_change_speed(struct uart_port *port, unsigned int cflag,
-			  unsigned int iflag, unsigned int quot)
+clps711xuart_settermios(struct uart_port *port, struct termios *termios,
+			struct termios *old)
 {
-	unsigned int ubrlcr;
+	unsigned int ubrlcr, quot;
 	unsigned long flags;
 
-	/* byte size and parity */
-	switch (cflag & CSIZE) {
+	/*
+	 * We don't implement CREAD.
+	 */
+	termios->c_cflag |= CREAD;
+
+	/*
+	 * Ask the core to calculate the divisor for us.
+	 */
+	quot = uart_get_divisor(port, termios, old);
+
+	switch (termios->c_cflag & CSIZE) {
 	case CS5:
 		ubrlcr = UBRLCR_WRDLEN5;
 		break;
@@ -338,39 +347,43 @@ clps711xuart_change_speed(struct uart_port *port, unsigned int cflag,
 		ubrlcr = UBRLCR_WRDLEN8;
 		break;
 	}
-	if (cflag & CSTOPB)
+	if (termios->c_cflag & CSTOPB)
 		ubrlcr |= UBRLCR_XSTOP;
-	if (cflag & PARENB) {
+	if (termios->c_cflag & PARENB) {
 		ubrlcr |= UBRLCR_PRTEN;
-		if (!(cflag & PARODD))
+		if (!(termios->c_cflag & PARODD))
 			ubrlcr |= UBRLCR_EVENPRT;
 	}
 	if (port->fifosize > 1)
 		ubrlcr |= UBRLCR_FIFOEN;
 
+	spin_lock_irqsave(&port->lock, flags);
+
+	/*
+	 * Update the per-port timeout.
+	 */
+	uart_update_timeout(port, termios->c_cflag, quot);
+
 	port->read_status_mask = UARTDR_OVERR;
-	if (iflag & INPCK)
+	if (termios->c_iflag & INPCK)
 		port->read_status_mask |= UARTDR_PARERR | UARTDR_FRMERR;
 
 	/*
 	 * Characters to ignore
 	 */
 	port->ignore_status_mask = 0;
-	if (iflag & IGNPAR)
+	if (termios->c_iflag & IGNPAR)
 		port->ignore_status_mask |= UARTDR_FRMERR | UARTDR_PARERR;
-	if (iflag & IGNBRK) {
+	if (termios->c_iflag & IGNBRK) {
 		/*
 		 * If we're ignoring parity and break indicators,
 		 * ignore overruns to (for real raw support).
 		 */
-		if (iflag & IGNPAR)
+		if (termios->c_iflag & IGNPAR)
 			port->ignore_status_mask |= UARTDR_OVERR;
 	}
 
 	quot -= 1;
-
-	/* first, disable everything */
-	spin_lock_irqsave(&port->lock, flags);
 
 	clps_writel(ubrlcr | quot, UBRLCR(port));
 
@@ -411,7 +424,7 @@ static struct uart_ops clps711x_pops = {
 	.break_ctl	= clps711xuart_break_ctl,
 	.startup	= clps711xuart_startup,
 	.shutdown	= clps711xuart_shutdown,
-	.change_speed	= clps711xuart_change_speed,
+	.settermios	= clps711xuart_settermios,
 	.type		= clps711xuart_type,
 	.config_port	= clps711xuart_config_port,
 	.release_port	= clps711xuart_release_port,

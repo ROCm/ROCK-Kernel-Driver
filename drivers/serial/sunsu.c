@@ -660,7 +660,7 @@ static int sunsu_startup(struct uart_port *port)
 
 	/*
 	 * Clear the FIFO buffers and disable them.
-	 * (they will be reeanbled in change_speed())
+	 * (they will be reeanbled in settermios())
 	 */
 	if (uart_config[up->port.type].flags & UART_CLEAR_FIFO) {
 		serial_outp(up, UART_FCR, UART_FCR_ENABLE_FIFO);
@@ -714,7 +714,7 @@ static int sunsu_startup(struct uart_port *port)
 
 	/*
 	 * Finally, enable interrupts.  Note: Modem status interrupts
-	 * are set via change_speed(), which will be occuring imminently
+	 * are set via settermios(), which will be occuring imminently
 	 * anyway, so we don't enable them here.
 	 */
 	up->ier = UART_IER_RLSI | UART_IER_RDI;
@@ -844,6 +844,17 @@ sunsu_change_speed(struct uart_port *port, unsigned int cflag,
 	if (up->port.type == PORT_16750)
 		fcr |= UART_FCR7_64BYTE;
 
+	/*
+	 * Ok, we're now changing the port state.  Do it with
+	 * interrupts disabled.
+	 */
+	spin_lock_irqsave(&up->port.lock, flags);
+
+	/*
+	 * Update the per-port timeout.
+	 */
+	uart_update_timeout(port, cflag, quot);
+
 	up->port.read_status_mask = UART_LSR_OE | UART_LSR_THRE | UART_LSR_DR;
 	if (iflag & INPCK)
 		up->port.read_status_mask |= UART_LSR_FE | UART_LSR_PE;
@@ -879,11 +890,6 @@ sunsu_change_speed(struct uart_port *port, unsigned int cflag,
 	if (UART_ENABLE_MS(&up->port, cflag))
 		up->ier |= UART_IER_MSI;
 
-	/*
-	 * Ok, we're now changing the port state.  Do it with
-	 * interrupts disabled.
-	 */
-	spin_lock_irqsave(&up->port.lock, flags);
 	serial_out(up, UART_IER, up->ier);
 
 	if (uart_config[up->port.type].flags & UART_STARTECH) {
@@ -908,6 +914,20 @@ sunsu_change_speed(struct uart_port *port, unsigned int cflag,
 	up->cflag = cflag;
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
+}
+
+static void
+sunsu_settermios(struct uart_port *port, struct termios *termios,
+		 struct termios *old)
+{
+	unsigned int quot;
+
+	/*
+	 * Ask the core to calculate the divisor for us.
+	 */
+	quot = uart_get_divisor(port, termios, old);
+
+	sunsu_change_speed(port, termios->c_cflag, termios->c_iflag, quot);
 }
 
 static void sunsu_release_port(struct uart_port *port)
@@ -960,7 +980,7 @@ static struct uart_ops sunsu_pops = {
 	.break_ctl	= sunsu_break_ctl,
 	.startup	= sunsu_startup,
 	.shutdown	= sunsu_shutdown,
-	.change_speed	= sunsu_change_speed,
+	.settermios	= sunsu_settermios,
 	.type		= sunsu_type,
 	.release_port	= sunsu_release_port,
 	.request_port	= sunsu_request_port,

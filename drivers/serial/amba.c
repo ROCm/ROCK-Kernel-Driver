@@ -403,14 +403,19 @@ static void ambauart_shutdown(struct uart_port *port)
 }
 
 static void
-ambauart_change_speed(struct uart_port *port, unsigned int cflag,
-		      unsigned int iflag, unsigned int quot)
+ambauart_settermios(struct uart_port *port, struct termios *termios,
+		    struct termios *old)
 {
 	unsigned int lcr_h, old_cr;
 	unsigned long flags;
+	unsigned int quot;
 
-	/* byte size and parity */
-	switch (cflag & CSIZE) {
+	/*
+	 * Ask the core to calculate the divisor for us.
+	 */
+	quot = uart_get_divisor(port, termios, old);
+
+	switch (termios->c_cflag & CSIZE) {
 	case CS5:
 		lcr_h = AMBA_UARTLCR_H_WLEN_5;
 		break;
@@ -424,49 +429,55 @@ ambauart_change_speed(struct uart_port *port, unsigned int cflag,
 		lcr_h = AMBA_UARTLCR_H_WLEN_8;
 		break;
 	}
-	if (cflag & CSTOPB)
+	if (termios->c_cflag & CSTOPB)
 		lcr_h |= AMBA_UARTLCR_H_STP2;
-	if (cflag & PARENB) {
+	if (termios->c_cflag & PARENB) {
 		lcr_h |= AMBA_UARTLCR_H_PEN;
-		if (!(cflag & PARODD))
+		if (!(termios->c_cflag & PARODD))
 			lcr_h |= AMBA_UARTLCR_H_EPS;
 	}
 	if (port->fifosize > 1)
 		lcr_h |= AMBA_UARTLCR_H_FEN;
 
+	spin_lock_irqsave(&port->lock, flags);
+
+	/*
+	 * Update the per-port timeout.
+	 */
+	uart_update_timeout(port, termios->c_cflag, quot);
+
 	port->read_status_mask = AMBA_UARTRSR_OE;
-	if (iflag & INPCK)
+	if (termios->c_iflag & INPCK)
 		port->read_status_mask |= AMBA_UARTRSR_FE | AMBA_UARTRSR_PE;
-	if (iflag & (BRKINT | PARMRK))
+	if (termios->c_iflag & (BRKINT | PARMRK))
 		port->read_status_mask |= AMBA_UARTRSR_BE;
 
 	/*
 	 * Characters to ignore
 	 */
 	port->ignore_status_mask = 0;
-	if (iflag & IGNPAR)
+	if (termios->c_iflag & IGNPAR)
 		port->ignore_status_mask |= AMBA_UARTRSR_FE | AMBA_UARTRSR_PE;
-	if (iflag & IGNBRK) {
+	if (termios->c_iflag & IGNBRK) {
 		port->ignore_status_mask |= AMBA_UARTRSR_BE;
 		/*
 		 * If we're ignoring parity and break indicators,
 		 * ignore overruns too (for real raw support).
 		 */
-		if (iflag & IGNPAR)
+		if (termios->c_iflag & IGNPAR)
 			port->ignore_status_mask |= AMBA_UARTRSR_OE;
 	}
 
 	/*
 	 * Ignore all characters if CREAD is not set.
 	 */
-	if ((cflag & CREAD) == 0)
+	if ((termios->c_cflag & CREAD) == 0)
 		port->ignore_status_mask |= UART_DUMMY_RSR_RX;
 
 	/* first, disable everything */
-	spin_lock_irqsave(&port->lock, flags);
 	old_cr = UART_GET_CR(port) & ~AMBA_UARTCR_MSIE;
 
-	if (UART_ENABLE_MS(port, cflag))
+	if (UART_ENABLE_MS(port, termios->c_cflag))
 		old_cr |= AMBA_UARTCR_MSIE;
 
 	UART_PUT_CR(port, 0);
@@ -546,7 +557,7 @@ static struct uart_ops amba_pops = {
 	.break_ctl	= ambauart_break_ctl,
 	.startup	= ambauart_startup,
 	.shutdown	= ambauart_shutdown,
-	.change_speed	= ambauart_change_speed,
+	.settermios	= ambauart_settermios,
 	.type		= ambauart_type,
 	.release_port	= ambauart_release_port,
 	.request_port	= ambauart_request_port,

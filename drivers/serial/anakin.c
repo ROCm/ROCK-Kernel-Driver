@@ -283,13 +283,36 @@ static void anakin_shutdown(struct uart_port *port)
 }
 
 static void
-anakin_change_speed(struct uart_port *port, unsigned int cflag,
-		    unsigned int iflag, unsigned int quot)
+anakin_settermios(struct uart_port *port, struct termios *termios,
+		  struct termios *old)
 {
-	unsigned int flags;
+	unsigned long flags;
+	unsigned int quot;
+
+	/*
+	 * We don't support parity, stop bits, or anything other
+	 * than 8 bits, so clear these termios flags.
+	 */
+	termios->c_cflag &= ~(CSIZE | CSTOPB | PARENB | PARODD | CREAD);
+	termios->c_cflag |= CS8;
+
+	/*
+	 * We don't appear to support any error conditions either.
+	 */
+	termios->c_iflag &= ~(INPCK | IGNPAR | IGNBRK | BRKINT);
+
+	/*
+	 * Ask the core to calculate the divisor for us.
+	 */
+	quot = uart_get_divisor(port, termios, old);
 
 	spin_lock_irqsave(&port->lock, flags);
-	while (!(anakin_in(port, 0x10) & TXEMPTY));
+
+	uart_update_timeout(port, termios->c_cflag, quot);
+
+	while (!(anakin_in(port, 0x10) & TXEMPTY))
+		barrier();
+
 	anakin_out(port, 0x10, (anakin_in(port, 0x10) & ~PRESCALER)
 			| (quot << 3));
 
@@ -314,7 +337,7 @@ static struct uart_ops anakin_pops = {
 	.break_ctl	= anakin_break_ctl,
 	.startup	= anakin_startup,
 	.shutdown	= anakin_shutdown,
-	.change_speed	= anakin_change_speed,
+	.settermios	= anakin_settermios,
 	.type		= anakin_type,
 };
 

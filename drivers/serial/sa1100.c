@@ -436,36 +436,50 @@ static void sa1100_shutdown(struct uart_port *port)
 }
 
 static void
-sa1100_change_speed(struct uart_port *port, unsigned int cflag,
-		    unsigned int iflag, unsigned int quot)
+sa1100_settermios(struct uart_port *port, struct termios *termios,
+		  struct termios *old)
 {
 	struct sa1100_port *sport = (struct sa1100_port *)port;
 	unsigned long flags;
-	unsigned int utcr0, old_utcr3;
+	unsigned int utcr0, old_utcr3, quot;
+	unsigned int old_csize = old ? old->c_cflag & CSIZE : CS8;
 
-	/* byte size and parity */
-	switch (cflag & CSIZE) {
-	case CS7:
-		utcr0 = 0;
-		break;
-	default:
-		utcr0 = UTCR0_DSS;
-		break;
+	/*
+	 * We only support CS7 and CS8.
+	 */
+	while ((termios->c_cflag & CSIZE) != CS7 ||
+	       (termios->c_cflag & CSIZE) != CS8) {
+		termios->c_cflag &= ~CSIZE;
+		termios->c_cflag |= old_csize;
+		old_csize = CS8;
 	}
-	if (cflag & CSTOPB)
+
+	if ((termios->c_cflag & CSIZE) == CS8)
+		utcr0 = UTCR0_DSS;
+	else
+		utcr0 = 0;
+
+	if (termios->c_cflag & CSTOPB)
 		utcr0 |= UTCR0_SBS;
-	if (cflag & PARENB) {
+	if (termios->c_cflag & PARENB) {
 		utcr0 |= UTCR0_PE;
-		if (!(cflag & PARODD))
+		if (!(termios->c_cflag & PARODD))
 			utcr0 |= UTCR0_OES;
 	}
 
+	/*
+	 * Ask the core to calculate the divisor for us.
+	 */
+	quot = uart_get_divisor(port, termios, old);
+
+	spin_lock_irqsave(&sport->port.lock, flags);
+
 	sport->port.read_status_mask &= UTSR0_TO_SM(UTSR0_TFS);
 	sport->port.read_status_mask |= UTSR1_TO_SM(UTSR1_ROR);
-	if (iflag & INPCK)
+	if (termios->c_iflag & INPCK)
 		sport->port.read_status_mask |=
 				UTSR1_TO_SM(UTSR1_FRE | UTSR1_PRE);
-	if (iflag & (BRKINT | PARMRK))
+	if (termios->c_iflag & (BRKINT | PARMRK))
 		sport->port.read_status_mask |=
 				UTSR0_TO_SM(UTSR0_RBB | UTSR0_REB);
 
@@ -473,29 +487,36 @@ sa1100_change_speed(struct uart_port *port, unsigned int cflag,
 	 * Characters to ignore
 	 */
 	sport->port.ignore_status_mask = 0;
-	if (iflag & IGNPAR)
+	if (termios->c_iflag & IGNPAR)
 		sport->port.ignore_status_mask |=
 				UTSR1_TO_SM(UTSR1_FRE | UTSR1_PRE);
-	if (iflag & IGNBRK) {
+	if (termios->c_iflag & IGNBRK) {
 		sport->port.ignore_status_mask |=
 				UTSR0_TO_SM(UTSR0_RBB | UTSR0_REB);
 		/*
 		 * If we're ignoring parity and break indicators,
 		 * ignore overruns too (for real raw support).
 		 */
-		if (iflag & IGNPAR)
+		if (termios->c_iflag & IGNPAR)
 			sport->port.ignore_status_mask |=
 				UTSR1_TO_SM(UTSR1_ROR);
 	}
 
 	del_timer_sync(&sport->timer);
 
-	/* first, disable interrupts and drain transmitter */
-	spin_lock_irqsave(&sport->port.lock, flags);
+	/*
+	 * Update the per-port timeout.
+	 */
+	uart_update_timeout(port, termios->c_cflag, quot);
+
+	/*
+	 * disable interrupts and drain transmitter
+	 */
 	old_utcr3 = UART_GET_UTCR3(sport);
 	UART_PUT_UTCR3(sport, old_utcr3 & ~(UTCR3_RIE | UTCR3_TIE));
 
-	while (UART_GET_UTSR1(sport) & UTSR1_TBY);
+	while (UART_GET_UTSR1(sport) & UTSR1_TBY)
+		barrier();
 
 	/* then, disable everything */
 	UART_PUT_UTCR3(sport, 0);
@@ -512,7 +533,7 @@ sa1100_change_speed(struct uart_port *port, unsigned int cflag,
 
 	UART_PUT_UTCR3(sport, old_utcr3);
 
-	if (UART_ENABLE_MS(&sport->port, cflag))
+	if (UART_ENABLE_MS(&sport->port, termios->c_cflag))
 		sa1100_enable_ms(&sport->port);
 
 	spin_unlock_irqrestore(&sport->port.lock, flags);
@@ -597,7 +618,7 @@ static struct uart_ops sa1100_pops = {
 	.break_ctl	= sa1100_break_ctl,
 	.startup	= sa1100_startup,
 	.shutdown	= sa1100_shutdown,
-	.change_speed	= sa1100_change_speed,
+	.settermios	= sa1100_settermios,
 	.type		= sa1100_type,
 	.release_port	= sa1100_release_port,
 	.request_port	= sa1100_request_port,
