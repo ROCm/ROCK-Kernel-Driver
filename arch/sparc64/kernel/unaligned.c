@@ -484,7 +484,9 @@ int handle_popc(u32 insn, struct pt_regs *regs)
 
 extern void do_fpother(struct pt_regs *regs);
 extern void do_privact(struct pt_regs *regs);
-extern void data_access_exception(struct pt_regs *regs);
+extern void data_access_exception(struct pt_regs *regs,
+				  unsigned long sfsr,
+				  unsigned long sfar);
 
 int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 {
@@ -527,14 +529,14 @@ int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 				break;
 			}
 		default:
-			data_access_exception(regs);
+			data_access_exception(regs, 0, addr);
 			return 1;
 		}
 		if (put_user (first >> 32, (u32 *)addr) ||
 		    __put_user ((u32)first, (u32 *)(addr + 4)) ||
 		    __put_user (second >> 32, (u32 *)(addr + 8)) ||
 		    __put_user ((u32)second, (u32 *)(addr + 12))) {
-		    	data_access_exception(regs);
+		    	data_access_exception(regs, 0, addr);
 		    	return 1;
 		}
 	} else {
@@ -547,7 +549,7 @@ int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 			do_privact(regs);
 			return 1;
 		} else if (asi > ASI_SNFL) {
-			data_access_exception(regs);
+			data_access_exception(regs, 0, addr);
 			return 1;
 		}
 		switch (insn & 0x180000) {
@@ -564,7 +566,7 @@ int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 				err |= __get_user (data[i], (u32 *)(addr + 4*i));
 		}
 		if (err && !(asi & 0x2 /* NF */)) {
-			data_access_exception(regs);
+			data_access_exception(regs, 0, addr);
 			return 1;
 		}
 		if (asi & 0x8) /* Little */ {
@@ -667,7 +669,7 @@ void handle_lddfmna(struct pt_regs *regs, unsigned long sfar, unsigned long sfsr
 		*(u64 *)(f->regs + freg) = value;
 		current_thread_info()->fpsaved[0] |= flag;
 	} else {
-daex:		data_access_exception(regs);
+daex:		data_access_exception(regs, sfsr, sfar);
 		return;
 	}
 	advance(regs);
@@ -711,7 +713,7 @@ void handle_stdfmna(struct pt_regs *regs, unsigned long sfar, unsigned long sfsr
 		    __put_user ((u32)value, (u32 *)(sfar + 4)))
 			goto daex;
 	} else {
-daex:		data_access_exception(regs);
+daex:		data_access_exception(regs, sfsr, sfar);
 		return;
 	}
 	advance(regs);
