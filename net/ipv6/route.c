@@ -602,6 +602,8 @@ static int ipv6_get_mtu(struct net_device *dev)
 
 static inline unsigned int ipv6_advmss(unsigned int mtu)
 {
+	mtu -= sizeof(struct ipv6hdr) + sizeof(struct tcphdr);
+
 	if (mtu < ip6_rt_min_advmss)
 		mtu = ip6_rt_min_advmss;
 
