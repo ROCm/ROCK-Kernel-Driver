@@ -1044,6 +1044,9 @@ sctp_association_t *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
 sctp_endpoint_t *sctp_endpoint_is_match(sctp_endpoint_t *,
 					const sockaddr_storage_t *);
 
+int sctp_has_association(const sockaddr_storage_t *laddr,
+			 const sockaddr_storage_t *paddr);
+
 int sctp_verify_init(const sctp_association_t *asoc,
 		     sctp_cid_t cid,
 		     sctp_init_chunk_t *peer_init,

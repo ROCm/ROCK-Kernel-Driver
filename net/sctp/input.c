@@ -522,9 +522,9 @@ void __sctp_unhash_established(sctp_association_t *asoc)
 }
 
 /* Look up an association. */
-sctp_association_t *__sctp_rcv_lookup_association(const sockaddr_storage_t *laddr,
-						  const sockaddr_storage_t *paddr,
-						  sctp_transport_t **transportp)
+sctp_association_t *__sctp_lookup_association(const sockaddr_storage_t *laddr,
+					      const sockaddr_storage_t *paddr,
+					      sctp_transport_t **transportp)
 {
 	sctp_hashbucket_t *head;
 	sctp_endpoint_common_t *epb;
@@ -555,6 +555,36 @@ hit:
 	sock_hold(epb->sk);
 	read_unlock(&head->lock);
 	return asoc;
+}
+
+/* Look up an association. BH-safe. */
+sctp_association_t *sctp_lookup_association(const sockaddr_storage_t *laddr,
+					    const sockaddr_storage_t *paddr,
+					    sctp_transport_t **transportp)
+{
+	sctp_association_t *asoc;
+
+	sctp_local_bh_disable();
+	asoc = __sctp_lookup_association(laddr, paddr, transportp);
+	sctp_local_bh_enable();
+	
+	return asoc;
+}
+
+/* Is there an association matching the given local and peer addresses? */
+int sctp_has_association(const sockaddr_storage_t *laddr,
+			 const sockaddr_storage_t *paddr)
+{
+	sctp_association_t *asoc;
+	sctp_transport_t *transport;
+
+	if (asoc = sctp_lookup_association(laddr, paddr, &transport)) {
+		sock_put(asoc->base.sk);
+		sctp_association_put(asoc);
+		return 1;
+	}
+
+	return 0;
 }
 
 /*
@@ -633,7 +663,7 @@ static sctp_association_t *__sctp_rcv_initack_lookup(struct sk_buff *skb,
 
 		sctp_param2sockaddr(paddr, (sctp_addr_param_t *)parm, 
 				    ntohs(sh->source));
-		asoc = __sctp_rcv_lookup_association(laddr, paddr, transportp);
+		asoc = __sctp_lookup_association(laddr, paddr, transportp);
 		if (asoc)
 			return asoc;
 	}
@@ -649,7 +679,7 @@ sctp_association_t *__sctp_rcv_lookup(struct sk_buff *skb,
 {
 	sctp_association_t *asoc;
 
-	asoc = __sctp_rcv_lookup_association(laddr, paddr, transportp);
+	asoc = __sctp_lookup_association(laddr, paddr, transportp);
 
 	/* Further lookup for INIT-ACK packet.
 	 * SCTP Implementors Guide, 2.18 Handling of address
