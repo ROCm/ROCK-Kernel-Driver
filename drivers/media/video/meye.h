@@ -292,7 +292,7 @@ struct meye {
 	u8 mchip_irq;			/* irq */
 	u8 mchip_mode;			/* actual mchip mode: HIC_MODE... */
 	u8 mchip_fnum;			/* current mchip frame number */
-	unsigned char *mchip_mmregs;	/* mchip: memory mapped registers */
+	unsigned char __iomem *mchip_mmregs;/* mchip: memory mapped registers */
 	u8 *mchip_ptable[MCHIP_NB_PAGES];/* mchip: ptable */
 	dma_addr_t *mchip_ptable_toc;	/* mchip: ptable toc */
 	dma_addr_t mchip_dmahandle;	/* mchip: dma handle to ptable toc */

@@ -102,7 +102,7 @@ struct bt878 {
 	unsigned char revision;
 	unsigned int irq;
 	unsigned long bt878_adr;
-	unsigned char *bt878_mem; /* function 1 */
+	volatile void __iomem *bt878_mem; /* function 1 */
 
 	volatile u32 finished_block;
 	volatile u32 last_block;
@@ -129,17 +129,17 @@ void bt878_start(struct bt878 *bt, u32 controlreg, u32 op_sync_orin,
 void bt878_stop(struct bt878 *bt);	     
 
 #if defined(__powerpc__)	/* big-endian */
-extern __inline__ void io_st_le32(volatile unsigned *addr, unsigned val)
+extern __inline__ void io_st_le32(volatile unsigned __iomem *addr, unsigned val)
 {
 	__asm__ __volatile__("stwbrx %1,0,%2":"=m"(*addr):"r"(val),
 			     "r"(addr));
 	__asm__ __volatile__("eieio":::"memory");
 }
 
-#define bmtwrite(dat,adr)  io_st_le32((unsigned *)(adr),(dat))
-#define bmtread(adr)       ld_le32((unsigned *)(adr))
+#define bmtwrite(dat,adr)  io_st_le32((adr),(dat))
+#define bmtread(adr)       ld_le32((adr))
 #else
-#define bmtwrite(dat,adr)  writel((dat), (char *) (adr))
+#define bmtwrite(dat,adr)  writel((dat), (adr))
 #define bmtread(adr)       readl(adr)
 #endif
 

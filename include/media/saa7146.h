@@ -123,7 +123,7 @@ struct saa7146_dev
        	spinlock_t                 	slock;
         struct semaphore           	lock;
 
-	unsigned char			*mem;		/* pointer to mapped IO memory */
+	unsigned char			__iomem *mem;	/* pointer to mapped IO memory */
 	int				revision;	/* chip revision; needed for bug-workarounds*/
 
 	/* pci-device & irq stuff*/

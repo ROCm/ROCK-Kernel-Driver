@@ -265,7 +265,7 @@ get_high_mem (unsigned long size)
  * if more than one driver at a time has the idea to use this memory!!!!
  */
 
-	volatile unsigned char *mem;
+	volatile unsigned char __iomem *mem;
 	unsigned char c;
 	unsigned long hi_mem_ph;
 	unsigned long i;
@@ -299,7 +299,7 @@ get_high_mem (unsigned long size)
 			schedule();
 	}
 
-	iounmap((void *) mem);
+	iounmap(mem);
 
 	if (i != size) {
 		dprintk(1,
