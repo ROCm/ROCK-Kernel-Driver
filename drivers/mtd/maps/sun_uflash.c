@@ -95,8 +95,8 @@ int uflash_devinit(struct linux_ebus_device* edev)
 	if(0 != pdev->name && 0 < strlen(pdev->name)) {
 		pdev->map.name = pdev->name;
 	}
-	pdev->phys = edev->resource[0].start;
-	pdev->virt = 
+	pdev->map.phys = edev->resource[0].start;
+	pdev->map.virt = 
 		(unsigned long)ioremap_nocache(edev->resource[0].start, pdev->map.size);
 	if(0 == pdev->map.virt) {
 		printk("%s: failed to map device\n", __FUNCTION__);

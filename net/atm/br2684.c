@@ -437,6 +437,10 @@ static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 			dev_kfree_skb(skb);
 			return;
 		}
+
+		/* Strip FCS if present */
+		if (skb->len > 7 && skb->data[7] == 0x01)
+			__skb_trim(skb, skb->len - 4);
 	} else {
 		plen = PADLEN + ETH_HLEN;	/* pad, dstmac,srcmac, ethtype */
 		/* first 2 chars should be 0 */

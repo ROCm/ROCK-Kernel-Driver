@@ -159,7 +159,10 @@ struct inet_sock {
 	struct inet_opt   inet;
 };
 
-#define inet_sk(__sk) (&((struct inet_sock *)__sk)->inet)
+static inline struct inet_opt * inet_sk(const struct sock *__sk)
+{
+	return &((struct inet_sock *)__sk)->inet;
+}
 
 #endif
 

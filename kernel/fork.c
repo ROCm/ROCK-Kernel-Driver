@@ -918,7 +918,14 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->thread_info->preempt_count = 1;
 #endif
 	p->did_exec = 0;
-	p->state = TASK_UNINTERRUPTIBLE;
+
+	/*
+	 * We mark the process as running here, but have not actually
+	 * inserted it onto the runqueue yet. This guarantees that
+	 * nobody will actually run it, and a signal or other external
+	 * event cannot wake it up and insert it on the runqueue either.
+	 */
+	p->state = TASK_RUNNING;
 
 	copy_flags(clone_flags, p);
 	if (clone_flags & CLONE_IDLETASK)
@@ -1209,9 +1216,10 @@ long do_fork(unsigned long clone_flags,
 			set_tsk_thread_flag(p, TIF_SIGPENDING);
 		}
 
-		p->state = TASK_STOPPED;
 		if (!(clone_flags & CLONE_STOPPED))
 			wake_up_forked_process(p);	/* do this last */
+		else
+			p->state = TASK_STOPPED;
 		++total_forks;
 
 		if (unlikely (trace)) {

@@ -316,7 +316,7 @@ unsigned long do_mremap(unsigned long addr,
 	new_len = PAGE_ALIGN(new_len);
 
 	/* Don't allow the degenerate cases */
-	if (!(old_len | new_len))
+	if (!old_len || !new_len)
 		goto out;
 
 	/* new_addr is only valid if MREMAP_FIXED is specified */

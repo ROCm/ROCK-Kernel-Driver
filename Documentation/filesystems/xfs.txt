@@ -29,10 +29,11 @@ When mounting an XFS filesystem, the following options are accepted.
 	The preferred buffered I/O size can also be altered on an
 	individual file basis using the ioctl(2) system call.
 
-  ikeep
+  ikeep/noikeep
 	When inode clusters are emptied of inodes, keep them around
-	on the disk, this is the old XFS behavior. Default is now to
-	return the inode cluster to the free space pool.
+	on the disk (ikeep) - this is the traditional XFS behaviour
+	and is still the default for now.  Using the noikeep option,
+	inode clusters are returned to the free space pool.
 
   logbufs=value
 	Set the number of in-memory log buffers.  Valid numbers range
@@ -75,6 +76,10 @@ When mounting an XFS filesystem, the following options are accepted.
 	Filesystems mounted "norecovery" must be mounted read-only or
 	the mount will fail.
 
+  nouuid
+	Don't check for double mounted file systems using the file system uuid.
+	This is useful to mount LVM snapshot volumes.
+
   osyncisosync
 	Make O_SYNC writes implement true O_SYNC.  WITHOUT this option,
 	Linux XFS behaves as if an "osyncisdsync" option is used,
@@ -108,10 +113,6 @@ When mounting an XFS filesystem, the following options are accepted.
 	The "swidth" option is required if the "sunit" option has been
 	specified, and must be a multiple of the "sunit" value.
 
-  nouuid
-        Don't check for double mounted file systems using the file system uuid.
-        This is useful to mount LVM snapshot volumes.
-
 sysctls
 =======
 
@@ -139,14 +140,14 @@ The following sysctls are available for the XFS filesystem:
 	Causes certain error conditions to call BUG(). Value is a bitmask; 
 	AND together the tags which represent errors which should cause panics:
 	
-		XFS_NO_PTAG                     0LL
-		XFS_PTAG_IFLUSH                 0x0000000000000001LL
-		XFS_PTAG_LOGRES                 0x0000000000000002LL
-		XFS_PTAG_AILDELETE              0x0000000000000004LL
-		XFS_PTAG_ERROR_REPORT           0x0000000000000008LL
-		XFS_PTAG_SHUTDOWN_CORRUPT       0x0000000000000010LL
-		XFS_PTAG_SHUTDOWN_IOERROR       0x0000000000000020LL
-		XFS_PTAG_SHUTDOWN_LOGERROR      0x0000000000000040LL
+		XFS_NO_PTAG                     0
+		XFS_PTAG_IFLUSH                 0x00000001
+		XFS_PTAG_LOGRES                 0x00000002
+		XFS_PTAG_AILDELETE              0x00000004
+		XFS_PTAG_ERROR_REPORT           0x00000008
+		XFS_PTAG_SHUTDOWN_CORRUPT       0x00000010
+		XFS_PTAG_SHUTDOWN_IOERROR       0x00000020
+		XFS_PTAG_SHUTDOWN_LOGERROR      0x00000040
 
 	This option is intended for debugging only.		
 
@@ -164,6 +165,21 @@ The following sysctls are available for the XFS filesystem:
   fs.xfs.restrict_chown		(Min: 0  Default: 1  Max: 1)
   	Controls whether unprivileged users can use chown to "give away"
 	a file to another user.
+
+  fs.xfs.inherit_sync		(Min: 0  Default: 1  Max 1)
+	Setting this to "1" will cause the "sync" flag set 
+	by the chattr(1) command on a directory to be
+	inherited by files in that directory.
+
+  fs.xfs.inherit_nodump		(Min: 0  Default: 1  Max 1)
+	Setting this to "1" will cause the "nodump" flag set 
+	by the chattr(1) command on a directory to be
+	inherited by files in that directory.
+
+  fs.xfs.inherit_noatime	(Min: 0  Default: 1  Max 1)
+	Setting this to "1" will cause the "noatime" flag set 
+	by the chattr(1) command on a directory to be
+	inherited by files in that directory.
 
   vm.pagebuf.stats_clear	(Min: 0  Default: 0  Max: 1)
 	Setting this to "1" clears accumulated pagebuf statistics 

@@ -345,13 +345,15 @@ int rawv6_rcv(struct sock *sk, struct sk_buff *skb)
  *	we return it, otherwise we block.
  */
 
-static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, int len,
+static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk,
+		  struct msghdr *msg, size_t len,
 		  int noblock, int flags, int *addr_len)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)msg->msg_name;
 	struct sk_buff *skb;
-	int copied, err;
+	size_t copied;
+	int err;
 
 	if (flags & MSG_OOB)
 		return -EOPNOTSUPP;
@@ -527,7 +529,8 @@ error:
 	IP6_INC_STATS(Ip6OutDiscards);
 	return err; 
 }
-static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg, int len)
+static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
+		   struct msghdr *msg, size_t len)
 {
 	struct ipv6_txoptions opt_space;
 	struct sockaddr_in6 * sin6 = (struct sockaddr_in6 *) msg->msg_name;

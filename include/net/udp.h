@@ -68,7 +68,7 @@ extern int	udp_connect(struct sock *sk,
 			    struct sockaddr *usin, int addr_len);
 
 extern int	udp_sendmsg(struct kiocb *iocb, struct sock *sk,
-			    struct msghdr *msg, int len);
+			    struct msghdr *msg, size_t len);
 
 extern int	udp_rcv(struct sk_buff *skb);
 extern int	udp_ioctl(struct sock *sk, int cmd, unsigned long arg);

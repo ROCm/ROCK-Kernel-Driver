@@ -49,6 +49,9 @@
 #include <asm/pcic.h>
 #include <asm/cacheflush.h>
 
+/* Used to protect the IRQ action lists */
+spinlock_t irq_action_lock = SPIN_LOCK_UNLOCKED;
+
 /*
  * Dave Redman (djhr@tadpole.co.uk)
  *
@@ -492,7 +495,7 @@ int request_fast_irq(unsigned int irq,
 		return -EBUSY;
 	}
 
-	save_and_cli(flags);
+	spin_lock_irqsave(&irq_action_lock, flags);
 
 	/* If this is flagged as statically allocated then we use our
 	 * private struct which is never freed.
@@ -507,10 +510,10 @@ int request_fast_irq(unsigned int irq,
 	
 	if (action == NULL)
 	    action = (struct irqaction *)kmalloc(sizeof(struct irqaction),
-						 GFP_KERNEL);
+						 GFP_ATOMIC);
 	
 	if (!action) { 
-		restore_flags(flags);
+		spin_unlock_irqrestore(&irq_action_lock, flags);
 		return -ENOMEM;
 	}
 
@@ -547,7 +550,7 @@ int request_fast_irq(unsigned int irq,
 	*(cpu_irq + irq_action) = action;
 
 	enable_irq(irq);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irq_action_lock, flags);
 	return 0;
 }
 
@@ -586,7 +589,7 @@ int request_irq(unsigned int irq,
 		action = NULL;		/* Or else! */
 	}
 
-	save_and_cli(flags);
+	spin_lock_irqsave(&irq_action_lock, flags);
 
 	/* If this is flagged as statically allocated then we use our
 	 * private struct which is never freed.
@@ -600,10 +603,10 @@ int request_irq(unsigned int irq,
 	
 	if (action == NULL)
 	    action = (struct irqaction *)kmalloc(sizeof(struct irqaction),
-						 GFP_KERNEL);
+						 GFP_ATOMIC);
 	
 	if (!action) { 
-		restore_flags(flags);
+		spin_unlock_irqrestore(&irq_action_lock, flags);
 		return -ENOMEM;
 	}
 
@@ -620,7 +623,7 @@ int request_irq(unsigned int irq,
 		*(cpu_irq + irq_action) = action;
 
 	enable_irq(irq);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irq_action_lock, flags);
 	return 0;
 }
 

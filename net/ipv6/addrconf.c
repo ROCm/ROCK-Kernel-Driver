@@ -1809,6 +1809,54 @@ static void addrconf_sit_config(struct net_device *dev)
 		sit_route_add(dev);
 }
 
+static inline int
+ipv6_inherit_linklocal(struct inet6_dev *idev, struct net_device *link_dev)
+{
+	struct in6_addr lladdr;
+
+	if (!ipv6_get_lladdr(link_dev, &lladdr)) {
+		addrconf_add_linklocal(idev, &lladdr);
+		return 0;
+	}
+	return -1;
+}
+
+static void ip6_tnl_add_linklocal(struct inet6_dev *idev)
+{
+	struct net_device *link_dev;
+
+	/* first try to inherit the link-local address from the link device */
+	if (idev->dev->iflink &&
+	    (link_dev = __dev_get_by_index(idev->dev->iflink))) {
+		if (!ipv6_inherit_linklocal(idev, link_dev))
+			return;
+	}
+	/* then try to inherit it from any device */
+	for (link_dev = dev_base; link_dev; link_dev = link_dev->next) {
+		if (!ipv6_inherit_linklocal(idev, link_dev))
+			return;
+	}
+	printk(KERN_DEBUG "init ip6-ip6: add_linklocal failed\n");
+}
+
+/*
+ * Autoconfigure tunnel with a link-local address so routing protocols,
+ * DHCPv6, MLD etc. can be run over the virtual link
+ */
+
+static void addrconf_ip6_tnl_config(struct net_device *dev)
+{
+	struct inet6_dev *idev;
+
+	ASSERT_RTNL();
+
+	if ((idev = addrconf_add_dev(dev)) == NULL) {
+		printk(KERN_DEBUG "init ip6-ip6: add_dev failed\n");
+		return;
+	}
+	ip6_tnl_add_linklocal(idev);
+	addrconf_add_mroute(dev);
+}
 
 int addrconf_notify(struct notifier_block *this, unsigned long event, 
 		    void * data)
@@ -1822,7 +1870,9 @@ int addrconf_notify(struct notifier_block *this, unsigned long event,
 		case ARPHRD_SIT:
 			addrconf_sit_config(dev);
 			break;
-
+		case ARPHRD_TUNNEL6:
+			addrconf_ip6_tnl_config(dev);
+			break;
 		case ARPHRD_LOOPBACK:
 			init_loopback(dev);
 			break;
@@ -2121,6 +2171,7 @@ static void addrconf_dad_completed(struct inet6_ifaddr *ifp)
 	 */
 
 	if (ifp->idev->cnf.forwarding == 0 &&
+	    ifp->idev->cnf.rtr_solicits > 0 &&
 	    (dev->flags&IFF_LOOPBACK) == 0 &&
 	    (ipv6_addr_type(&ifp->addr) & IPV6_ADDR_LINKLOCAL)) {
 		struct in6_addr all_routers;

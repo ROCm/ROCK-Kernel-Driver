@@ -54,7 +54,7 @@ struct sparc_phys_banks {
 
 #define SPARC_PHYS_BANKS 32
 
-extern struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS];
+extern struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS+1];
 
 /* Cache alias structure.  Entry is valid if context != -1. */
 struct cache_palias {

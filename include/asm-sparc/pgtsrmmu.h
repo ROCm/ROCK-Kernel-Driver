@@ -109,6 +109,13 @@
 
 #ifndef __ASSEMBLY__
 
+/* This makes sense. Honest it does - Anton */
+/* XXX Yes but it's ugly as sin.  FIXME. -KMW */
+extern void *srmmu_nocache_pool;
+#define __nocache_pa(VADDR) (((unsigned long)VADDR) - SRMMU_NOCACHE_VADDR + __pa((unsigned long)srmmu_nocache_pool))
+#define __nocache_va(PADDR) (__va((unsigned long)PADDR) - (unsigned long)srmmu_nocache_pool + SRMMU_NOCACHE_VADDR)
+#define __nocache_fix(VADDR) __va(__nocache_pa(VADDR))
+
 /* Accessing the MMU control register. */
 extern __inline__ unsigned int srmmu_get_mmureg(void)
 {

@@ -775,8 +775,8 @@ static int pppoe_ioctl(struct socket *sock, unsigned int cmd,
 }
 
 
-static int pppoe_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
-		  int total_len)
+static int pppoe_sendmsg(struct kiocb *iocb, struct socket *sock, 
+		  struct msghdr *m, size_t total_len)
 {
 	struct sk_buff *skb = NULL;
 	struct sock *sk = sock->sk;
@@ -939,7 +939,7 @@ static struct ppp_channel_ops pppoe_chan_ops = {
 };
 
 static int pppoe_recvmsg(struct kiocb *iocb, struct socket *sock,
-		  struct msghdr *m, int total_len, int flags)
+		  struct msghdr *m, size_t total_len, int flags)
 {
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb = NULL;
