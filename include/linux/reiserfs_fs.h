@@ -1820,6 +1820,8 @@ void padd_item (char * item, int total_length, int length);
 
 void reiserfs_read_inode (struct inode * inode) ;
 void reiserfs_read_inode2(struct inode * inode, void *p) ;
+int reiserfs_find_actor(struct inode * inode, void *p) ;
+int reiserfs_init_locked_inode(struct inode * inode, void *p) ;
 void reiserfs_delete_inode (struct inode * inode);
 void reiserfs_write_inode (struct inode * inode, int) ;
 struct dentry *reiserfs_get_dentry(struct super_block *, void *) ;

@@ -1070,7 +1070,7 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 	s->s_flags |= MS_RDONLY ;
     }
     args.objectid = REISERFS_ROOT_PARENT_OBJECTID ;
-    root_inode = iget4 (s, REISERFS_ROOT_OBJECTID, 0, (void *)(&args));
+    root_inode = iget4 (s, REISERFS_ROOT_OBJECTID, reiserfs_find_actor, reiserfs_init_locked_inode, (void *)(&args));
     if (!root_inode) {
 	printk ("reiserfs_fill_super: get root inode failed\n");
 	goto error;

@@ -1138,6 +1138,13 @@ void reiserfs_read_inode(struct inode *inode) {
 // evolved as the prototype did
 //
 
+int reiserfs_init_locked_inode (struct inode * inode, void *p)
+{
+    struct reiserfs_iget4_args *args = (struct reiserfs_iget4_args *)p ;
+    INODE_PKEY(inode)->k_dir_id = cpu_to_le32(args->objectid);
+    return 0;
+}
+
 /* looks for stat data in the tree, and fills up the fields of in-core
    inode stat data fields */
 void reiserfs_read_inode2 (struct inode * inode, void *p)
@@ -1213,7 +1220,6 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
  * reiserfs_find_actor() - "find actor" reiserfs supplies to iget4().
  *
  * @inode:    inode from hash table to check
- * @inode_no: inode number we are looking for
  * @opaque:   "cookie" passed to iget4(). This is &reiserfs_iget4_args.
  *
  * This function is called by iget4() to distinguish reiserfs inodes
@@ -1222,8 +1228,7 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
  * inode numbers (objectids) are distinguished by parent directory ids.
  *
  */
-static int reiserfs_find_actor( struct inode *inode, 
-				unsigned long inode_no, void *opaque )
+int reiserfs_find_actor( struct inode *inode, void *opaque )
 {
     struct reiserfs_iget4_args *args;
 
@@ -1239,7 +1244,7 @@ struct inode * reiserfs_iget (struct super_block * s, const struct cpu_key * key
 
     args.objectid = key->on_disk_key.k_dir_id ;
     inode = iget4 (s, key->on_disk_key.k_objectid, 
-		   reiserfs_find_actor, (void *)(&args));
+		   reiserfs_find_actor, reiserfs_init_locked_inode, (void *)(&args));
     if (!inode) 
 	return ERR_PTR(-ENOMEM) ;
 

@@ -592,7 +592,7 @@ struct nfs_find_desc {
  * i_ino.
  */
 static int
-nfs_find_actor(struct inode *inode, unsigned long ino, void *opaque)
+nfs_find_actor(struct inode *inode, void *opaque)
 {
 	struct nfs_find_desc	*desc = (struct nfs_find_desc *)opaque;
 	struct nfs_fh		*fh = desc->fh;
@@ -608,6 +608,18 @@ nfs_find_actor(struct inode *inode, unsigned long ino, void *opaque)
 	if (!atomic_read(&inode->i_count))
 		NFS_CACHEINV(inode);
 	return 1;
+}
+
+static int
+nfs_init_locked(struct inode *inode, void *opaque)
+{
+	struct nfs_find_desc	*desc = (struct nfs_find_desc *)opaque;
+	struct nfs_fh		*fh = desc->fh;
+	struct nfs_fattr	*fattr = desc->fattr;
+
+	NFS_FILEID(inode) = fattr->fileid;
+	memcpy(NFS_FH(inode), fh, sizeof(struct nfs_fh));
+	return 0;
 }
 
 /*
@@ -652,7 +664,7 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 
 	ino = nfs_fattr_to_ino_t(fattr);
 
-	if (!(inode = iget4(sb, ino, nfs_find_actor, &desc)))
+	if (!(inode = iget4(sb, ino, nfs_find_actor, nfs_init_locked, &desc)))
 		goto out_no_inode;
 
 	if (NFS_NEW(inode)) {
@@ -662,8 +674,6 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 
 		/* We can't support UPDATE_ATIME(), since the server will reset it */
 		NFS_FLAGS(inode) &= ~NFS_INO_NEW;
-		NFS_FILEID(inode) = fattr->fileid;
-		memcpy(NFS_FH(inode), fh, sizeof(struct nfs_fh));
 		inode->i_flags |= S_NOATIME;
 		inode->i_mode = fattr->mode;
 		/* Why so? Because we want revalidate for devices/FIFOs, and
