@@ -2037,15 +2037,20 @@ static irqreturn_t snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *r
 static int __devinit
 snd_es1968_mixer(es1968_t *chip)
 {
+	ac97_bus_t bus, *pbus;
 	ac97_t ac97;
 	snd_ctl_elem_id_t id;
 	int err;
 
+	memset(&bus, 0, sizeof(bus));
+	bus.write = snd_es1968_ac97_write;
+	bus.read = snd_es1968_ac97_read;
+	if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+		return err;
+
 	memset(&ac97, 0, sizeof(ac97));
-	ac97.write = snd_es1968_ac97_write;
-	ac97.read = snd_es1968_ac97_read;
 	ac97.private_data = chip;
-	if ((err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97)) < 0)
+	if ((err = snd_ac97_mixer(pbus, &ac97, &chip->ac97)) < 0)
 		return err;
 
 	/* attach master switch / volumes for h/w volume control */

@@ -2097,8 +2097,8 @@ void snd_ac97_resume(ac97_t *ac97)
 	}
 __reset_ready:
 
-	if (bus->init)
-		bus->init(ac97);
+	if (ac97->bus->init)
+		ac97->bus->init(ac97);
 
 	is_ad18xx = (ac97->flags & AC97_AD_MULTI);
 	if (is_ad18xx) {
@@ -2107,11 +2107,11 @@ __reset_ready:
 			if (! ac97->spec.ad18xx.id[codec])
 				continue;
 			/* select single codec */
-			ac97->write(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
-			ac97->write(ac97, AC97_AD_CODEC_CFG, ac97->spec.ad18xx.codec_cfg[codec]);
+			ac97->bus->write(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
+			ac97->bus->write(ac97, AC97_AD_CODEC_CFG, ac97->spec.ad18xx.codec_cfg[codec]);
 		}
 		/* select all codecs */
-		ac97->write(ac97, AC97_AD_SERIAL_CFG, 0x7000);
+		ac97->bus->write(ac97, AC97_AD_SERIAL_CFG, 0x7000);
 	}
 
 	/* restore ac97 status */
@@ -2130,12 +2130,12 @@ __reset_ready:
 						if (! ac97->spec.ad18xx.id[codec])
 							continue;
 						/* select single codec */
-						ac97->write(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
+						ac97->bus->write(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
 						/* update PCM bits */
-						ac97->write(ac97, AC97_PCM, ac97->spec.ad18xx.pcmreg[codec]);
+						ac97->bus->write(ac97, AC97_PCM, ac97->spec.ad18xx.pcmreg[codec]);
 					}
 					/* select all codecs */
-					ac97->write(ac97, AC97_AD_SERIAL_CFG, 0x7000);
+					ac97->bus->write(ac97, AC97_AD_SERIAL_CFG, 0x7000);
 					continue;
 				} else if (i == AC97_AD_TEST ||
 					   i == AC97_AD_CODEC_CFG ||
