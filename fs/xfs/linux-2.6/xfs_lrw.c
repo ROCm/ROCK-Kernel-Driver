@@ -74,6 +74,7 @@
 #include "xfs_iomap.h"
 
 #include <linux/capability.h>
+#include <linux/writeback.h>
 
 
 #if defined(XFS_RW_TRACE)
@@ -225,40 +226,11 @@ xfs_inval_cached_pages(
 	int		write,
 	int		relock)
 {
-	xfs_mount_t	*mp;
-
-	if (!VN_CACHED(vp)) {
-		return;
+	if (VN_CACHED(vp)) {
+		xfs_inval_cached_trace(io, offset, -1, ctooff(offtoct(offset)), -1);
+		VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(offset)), -1, FI_REMAPF_LOCKED);
 	}
 
-	mp = io->io_mount;
-
-	/*
-	 * We need to get the I/O lock exclusively in order
-	 * to safely invalidate pages and mappings.
-	 */
-	if (relock) {
-		XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
-		XFS_ILOCK(mp, io, XFS_IOLOCK_EXCL);
-	}
-
-	/* Writing beyond EOF creates a hole that must be zeroed */
-	if (write && (offset > XFS_SIZE(mp, io))) {
-		xfs_fsize_t	isize;
-
-		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
-		isize = XFS_SIZE(mp, io);
-		if (offset > isize) {
-			xfs_zero_eof(vp, io, offset, isize, offset);
-		}
-		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
-	}
-
-	xfs_inval_cached_trace(io, offset, -1, ctooff(offtoct(offset)), -1);
-	VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(offset)), -1, FI_REMAPF_LOCKED);
-	if (relock) {
-		XFS_ILOCK_DEMOTE(mp, io, XFS_IOLOCK_EXCL);
-	}
 }
 
 ssize_t			/* bytes read, or (-)  error */
@@ -637,32 +609,34 @@ xfs_write(
 	bhv_desc_t		*bdp,
 	struct kiocb		*iocb,
 	const struct iovec	*iovp,
-	unsigned int		segs,
+	unsigned int		nsegs,
 	loff_t			*offset,
 	int			ioflags,
 	cred_t			*credp)
 {
 	struct file		*file = iocb->ki_filp;
-	size_t			size = 0;
+	struct address_space	*mapping = file->f_mapping;
+	struct inode		*inode = mapping->host;
+	unsigned long		segs = nsegs;
 	xfs_inode_t		*xip;
 	xfs_mount_t		*mp;
-	ssize_t			ret;
-	int			error = 0;
+	ssize_t			ret = 0, error = 0;
 	xfs_fsize_t		isize, new_size;
-	xfs_fsize_t		n, limit;
 	xfs_iocore_t		*io;
 	vnode_t			*vp;
 	unsigned long		seg;
 	int			iolock;
 	int			eventsent = 0;
 	vrwlock_t		locktype;
+	size_t			ocount = 0, count;
+	loff_t			pos;
+	int			need_isem = 1, need_flush = 0;
 
 	XFS_STATS_INC(xs_write_calls);
 
 	vp = BHV_TO_VNODE(bdp);
 	xip = XFS_BHVTOI(bdp);
 
-	/* START copy & waste from filemap.c */
 	for (seg = 0; seg < segs; seg++) {
 		const struct iovec *iv = &iovp[seg];
 
@@ -670,73 +644,90 @@ xfs_write(
 		 * If any segment has a negative length, or the cumulative
 		 * length ever wraps negative then return -EINVAL.
 		 */
-		size += iv->iov_len;
-		if (unlikely((ssize_t)(size|iv->iov_len) < 0))
-			return XFS_ERROR(-EINVAL);
+		ocount += iv->iov_len;
+		if (unlikely((ssize_t)(ocount|iv->iov_len) < 0))
+			return -EINVAL;
+		if (access_ok(VERIFY_READ, iv->iov_base, iv->iov_len))
+			continue;
+		if (seg == 0)
+			return -EFAULT;
+		segs = seg;
+		ocount -= iv->iov_len;  /* This segment is no good */
+		break;
 	}
-	/* END copy & waste from filemap.c */
 
-	if (size == 0)
+	count = ocount;
+	pos = *offset;
+
+	if (count == 0)
 		return 0;
 
 	io = &xip->i_iocore;
 	mp = io->io_mount;
 
-	if (XFS_FORCED_SHUTDOWN(mp)) {
+	if (XFS_FORCED_SHUTDOWN(mp))
 		return -EIO;
-	}
 
 	if (ioflags & IO_ISDIRECT) {
 		xfs_buftarg_t	*target =
 			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
 				mp->m_rtdev_targp : mp->m_ddev_targp;
 
-		if ((*offset & target->pbr_smask) ||
-		    (size & target->pbr_smask)) {
+		if ((pos & target->pbr_smask) || (count & target->pbr_smask))
 			return XFS_ERROR(-EINVAL);
-		}
-		iolock = XFS_IOLOCK_SHARED;
-		locktype = VRWLOCK_WRITE_DIRECT;
-	} else {
+
+		if (!VN_CACHED(vp) && pos < i_size_read(inode))
+			need_isem = 0;
+
+		if (VN_CACHED(vp))
+			need_flush = 1;
+	}
+
+relock:
+	if (need_isem) {
 		iolock = XFS_IOLOCK_EXCL;
 		locktype = VRWLOCK_WRITE;
+
+		down(&inode->i_sem);
+	} else {
+		iolock = XFS_IOLOCK_SHARED;
+		locktype = VRWLOCK_WRITE_DIRECT;
 	}
 
 	xfs_ilock(xip, XFS_ILOCK_EXCL|iolock);
 
-	isize = xip->i_d.di_size;
-	limit = XFS_MAXIOFFSET(mp);
+	isize = i_size_read(inode);
 
 	if (file->f_flags & O_APPEND)
 		*offset = isize;
 
 start:
-	n = limit - *offset;
-	if (n <= 0) {
+	error = -generic_write_checks(file, &pos, &count,
+					S_ISBLK(inode->i_mode));
+	if (error) {
 		xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
-		return -EFBIG;
+		goto out_unlock_isem;
 	}
 
-	if (n < size)
-		size = n;
-
-	new_size = *offset + size;
-	if (new_size > isize) {
+	new_size = pos + count;
+	if (new_size > isize)
 		io->io_new_size = new_size;
-	}
 
 	if ((DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_WRITE) &&
 	    !(ioflags & IO_INVIS) && !eventsent)) {
-		loff_t		savedsize = *offset;
-		int dmflags = FILP_DELAY_FLAG(file) | DM_SEM_FLAG_RD(ioflags);
+		loff_t		savedsize = pos;
+		int		dmflags = FILP_DELAY_FLAG(file);
+
+		if (need_isem)
+			dmflags |= DM_FLAGS_ISEM;
 
 		xfs_iunlock(xip, XFS_ILOCK_EXCL);
 		error = XFS_SEND_DATA(xip->i_mount, DM_EVENT_WRITE, vp,
-				      *offset, size,
+				      pos, count,
 				      dmflags, &locktype);
 		if (error) {
 			xfs_iunlock(xip, iolock);
-			return -error;
+			goto out_unlock_isem;
 		}
 		xfs_ilock(xip, XFS_ILOCK_EXCL);
 		eventsent = 1;
@@ -748,9 +739,8 @@ start:
 		 * event prevents another call to XFS_SEND_DATA, which is
 		 * what allows the size to change in the first place.
 		 */
-		if ((file->f_flags & O_APPEND) &&
-		    savedsize != xip->i_d.di_size) {
-			*offset = isize = xip->i_d.di_size;
+		if ((file->f_flags & O_APPEND) && savedsize != isize) {
+			pos = isize = xip->i_d.di_size;
 			goto start;
 		}
 	}
@@ -761,8 +751,10 @@ start:
 	 *
 	 * We must update xfs' times since revalidate will overcopy xfs.
 	 */
-	if (size && !(ioflags & IO_INVIS))
+	if (!(ioflags & IO_INVIS)) {
 		xfs_ichgtime(xip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
+		inode_update_time(inode, 1);
+	}
 
 	/*
 	 * If the offset is beyond the size of the file, we have a couple
@@ -773,12 +765,12 @@ start:
 	 * to zero it out up to the new size.
 	 */
 
-	if (!(ioflags & IO_ISDIRECT) && (*offset > isize && isize)) {
-		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offset,
-			isize, *offset + size);
+	if (pos > isize) {
+		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, pos,
+					isize, pos + count);
 		if (error) {
 			xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
-			return(-error);
+			goto out_unlock_isem;
 		}
 	}
 	xfs_iunlock(xip, XFS_ILOCK_EXCL);
@@ -795,22 +787,64 @@ start:
 		(S_ISGID | S_IXGRP))) &&
 	     !capable(CAP_FSETID)) {
 		error = xfs_write_clear_setuid(xip);
-		if (error) {
+		if (likely(!error))
+			error = -remove_suid(file->f_dentry);
+		if (unlikely(error)) {
 			xfs_iunlock(xip, iolock);
-			return -error;
+			goto out_unlock_isem;
 		}
 	}
 
 retry:
-	if (ioflags & IO_ISDIRECT) {
-		xfs_inval_cached_pages(vp, io, *offset, 1, 1);
-		xfs_rw_enter_trace(XFS_DIOWR_ENTER,
-				io, (void *)iovp, segs, *offset, ioflags);
+	/* We can write back this queue in page reclaim */
+	current->backing_dev_info = mapping->backing_dev_info;
+
+	if ((ioflags & IO_ISDIRECT)) {
+		if (need_flush) {
+			xfs_inval_cached_trace(io, pos, -1,
+					ctooff(offtoct(pos)), -1);
+			VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(pos)),
+					-1, FI_REMAPF_LOCKED);
+		}
+
+		if (need_isem) {
+			/* demote the lock now the cached pages are gone */
+			XFS_ILOCK_DEMOTE(mp, io, XFS_IOLOCK_EXCL);
+			up(&inode->i_sem);
+
+			iolock = XFS_IOLOCK_SHARED;
+			locktype = VRWLOCK_WRITE_DIRECT;
+			need_isem = 0;
+		}
+
+ 		xfs_rw_enter_trace(XFS_DIOWR_ENTER, io, (void *)iovp, segs,
+				*offset, ioflags);
+		ret = generic_file_direct_write(iocb, iovp,
+				&segs, pos, offset, count, ocount);
+
+		/*
+		 * direct-io write to a hole: fall through to buffered I/O
+		 * for completing the rest of the request.
+		 */
+		if (ret >= 0 && ret != count) {
+			XFS_STATS_ADD(xs_write_bytes, ret);
+
+			pos += ret;
+			count -= ret;
+
+			need_isem = 1;
+			ioflags &= ~IO_ISDIRECT;
+			xfs_iunlock(xip, iolock);
+			goto relock;
+		}
 	} else {
-		xfs_rw_enter_trace(XFS_WRITE_ENTER,
-				io, (void *)iovp, segs, *offset, ioflags);
+		xfs_rw_enter_trace(XFS_WRITE_ENTER, io, (void *)iovp, segs,
+				*offset, ioflags);
+		ret = generic_file_buffered_write(iocb, iovp, segs,
+				pos, offset, count, ret);
 	}
-	ret = generic_file_aio_write_nolock(iocb, iovp, segs, offset);
+
+	current->backing_dev_info = NULL;
 
 	if ((ret == -ENOSPC) &&
 	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) &&
@@ -821,17 +855,15 @@ retry:
 				DM_RIGHT_NULL, vp, DM_RIGHT_NULL, NULL, NULL,
 				0, 0, 0); /* Delay flag intentionally  unused */
 		if (error)
-			return -error;
+			goto out_unlock_isem;
 		xfs_rwlock(bdp, locktype);
-		*offset = xip->i_d.di_size;
+		pos = xip->i_d.di_size;
 		goto retry;
 	}
 
 	if (*offset > xip->i_d.di_size) {
 		xfs_ilock(xip, XFS_ILOCK_EXCL);
 		if (*offset > xip->i_d.di_size) {
-			struct inode	*inode = LINVFS_GET_IP(vp);
-
 			xip->i_d.di_size = *offset;
 			i_size_write(inode, *offset);
 			xip->i_update_core = 1;
@@ -840,23 +872,22 @@ retry:
 		xfs_iunlock(xip, XFS_ILOCK_EXCL);
 	}
 
-	if (ret <= 0) {
-		xfs_rwunlock(bdp, locktype);
-		return ret;
-	}
+	error = -ret;
+	if (ret <= 0)
+		goto out_unlock_internal;
 
 	XFS_STATS_ADD(xs_write_bytes, ret);
 
 	/* Handle various SYNC-type writes */
-	if ((file->f_flags & O_SYNC) || IS_SYNC(file->f_dentry->d_inode)) {
-
+	if ((file->f_flags & O_SYNC) || IS_SYNC(inode)) {
 		/*
 		 * If we're treating this as O_DSYNC and we have not updated the
 		 * size, force the log.
 		 */
+		if (!(mp->m_flags & XFS_MOUNT_OSYNCISOSYNC) &&
+		    !(xip->i_update_size)) {
+			xfs_inode_log_item_t	*iip = xip->i_itemp;
 
-		if (!(mp->m_flags & XFS_MOUNT_OSYNCISOSYNC)
-			&& !(xip->i_update_size)) {
 			/*
 			 * If an allocation transaction occurred
 			 * without extending the size, then we have to force
@@ -876,14 +907,8 @@ retry:
 			 * all changes affecting the inode are permanent
 			 * when we return.
 			 */
-
-			xfs_inode_log_item_t *iip;
-			xfs_lsn_t lsn;
-
-			iip = xip->i_itemp;
 			if (iip && iip->ili_last_lsn) {
-				lsn = iip->ili_last_lsn;
-				xfs_log_force(mp, lsn,
+				xfs_log_force(mp, iip->ili_last_lsn,
 						XFS_LOG_FORCE | XFS_LOG_SYNC);
 			} else if (xfs_ipincount(xip) > 0) {
 				xfs_log_force(mp, (xfs_lsn_t)0,
@@ -924,12 +949,25 @@ retry:
 				xfs_trans_set_sync(tp);
 				error = xfs_trans_commit(tp, 0, NULL);
 				xfs_iunlock(xip, XFS_ILOCK_EXCL);
+				if (error)
+					goto out_unlock_internal;
 			}
 		}
-	} /* (ioflags & O_SYNC) */
 
+		xfs_rwunlock(bdp, locktype);
+
+		error = sync_page_range(inode, mapping, pos, ret);
+		if (!error)
+			error = -ret;
+		goto out_unlock_isem;
+	}
+
+ out_unlock_internal:
 	xfs_rwunlock(bdp, locktype);
-	return(ret);
+ out_unlock_isem:
+	if (need_isem)
+		up(&inode->i_sem);
+	return -error;
 }
 
 /*
