@@ -245,7 +245,7 @@ ip6_tnl_create(struct ip6_tnl_parm *p, struct ip6_tnl **pt)
 	t->parms = *p;
 
 	if ((err = register_netdevice(dev)) < 0) {
-		kfree(dev);
+		free_netdev(dev);
 		return err;
 	}
 	dev_hold(dev);
@@ -1118,7 +1118,7 @@ int __init ip6_tunnel_init(void)
 	ip6ip6_fb_tnl_dev->init = ip6ip6_fb_tnl_dev_init;
 
 	if ((err = register_netdev(ip6ip6_fb_tnl_dev))) {
-		kfree(ip6ip6_fb_tnl_dev);
+		free_netdev(ip6ip6_fb_tnl_dev);
 		goto fail;
 	}
 	return 0;

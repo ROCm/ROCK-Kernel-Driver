@@ -731,12 +731,6 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 			break;
 		}
 
-		if (register_netdev(dev)) {
-			printk(KERN_ERR "acenic: device registration failed\n");
-			free_netdev(dev);
-			continue;
-		}
-
 		switch(pdev->vendor) {
 		case PCI_VENDOR_ID_ALTEON:
 			if (pdev->device == PCI_DEVICE_ID_FARALLON_PN9100T) {
@@ -824,6 +818,13 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 			continue;
 		}
 
+		if (register_netdev(dev)) {
+			printk(KERN_ERR "acenic: device registration failed\n");
+			ace_init_cleanup(dev);
+			free_netdev(dev);
+			continue;
+		}
+
 		if (ap->pci_using_dac)
 			dev->features |= NETIF_F_HIGHDMA;
 
@@ -874,6 +875,7 @@ static void __exit ace_module_cleanup(void)
 	while (root_dev) {
 		ap = root_dev->priv;
 		next = ap->next;
+		unregister_netdev(root_dev);
 
 		regs = ap->regs;
 
@@ -1133,7 +1135,6 @@ static void ace_init_cleanup(struct net_device *dev)
 	if (dev->irq)
 		free_irq(dev->irq, dev);
 
-	unregister_netdev(dev);
 	iounmap(ap->regs);
 }
 

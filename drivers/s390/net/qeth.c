@@ -6707,15 +6707,6 @@ qeth_remove_card(struct qeth_card *card, int method)
 }
 
 static void
-qeth_destructor(struct net_device *dev)
-{
-	struct qeth_card *card;
-
-	card = (struct qeth_card *) (dev->priv);
-	QETH_DBF_CARD2(0, trace, "dstr", card);
-}
-
-static void
 qeth_set_multicast_list(struct net_device *dev)
 {
 	struct qeth_card *card = dev->priv;
@@ -7655,28 +7646,11 @@ qeth_init_dev(struct net_device *dev)
 
 	QETH_DBF_CARD3(0, trace, "inid", card);
 
-	dev->tx_timeout = &qeth_tx_timeout;
-	dev->watchdog_timeo = QETH_TX_TIMEOUT;
-	dev->open = qeth_open;
-	dev->stop = qeth_stop;
-	dev->set_config = qeth_set_config;
-	dev->hard_start_xmit = qeth_hard_start_xmit;
-	dev->do_ioctl = qeth_do_ioctl;
-	dev->get_stats = qeth_get_stats;
-	dev->change_mtu = qeth_change_mtu;
-#ifdef QETH_VLAN
-	dev->vlan_rx_register = qeth_vlan_rx_register;
-	dev->vlan_rx_kill_vid = qeth_vlan_rx_kill_vid;
-#endif
 	dev->rebuild_header = __qeth_rebuild_header_func(card);
 	dev->hard_header = __qeth_hard_header_func(card);
 	dev->header_cache_update = __qeth_header_cache_update_func(card);
 	dev->hard_header_cache = __qeth_hard_header_cache_func(card);
 	dev->hard_header_parse = NULL;
-	dev->destructor = qeth_destructor;
-	dev->set_multicast_list = qeth_set_multicast_list;
-	dev->set_mac_address = qeth_set_mac_address;
-	dev->neigh_setup = qeth_neigh_setup;
 
 	dev->flags |= qeth_get_additional_dev_flags(card->type);
 
@@ -7694,8 +7668,6 @@ qeth_init_dev(struct net_device *dev)
 	dev->tx_queue_len = qeth_get_device_tx_q_len(card->type);
 	dev->hard_header_len =
 		qeth_get_hlen(card->link_type) + card->options.add_hhlen;
-	dev->addr_len = OSA_ADDR_LEN;	/* is ok for eth, tr, atm lane */
-	SET_MODULE_OWNER(dev);
 	netif_start_queue(dev);
 
 	dev->mtu = card->initial_mtu;
@@ -8358,6 +8330,28 @@ qeth_fill_qeth_card_options(struct qeth_card *card)
 	card->options.fake_ll = DONT_FAKE_LL;
 }
 
+static void qeth_setup(struct net_device *dev)
+{
+	dev->tx_timeout = &qeth_tx_timeout;
+	dev->watchdog_timeo = QETH_TX_TIMEOUT;
+	dev->open = qeth_open;
+	dev->stop = qeth_stop;
+	dev->set_config = qeth_set_config;
+	dev->hard_start_xmit = qeth_hard_start_xmit;
+	dev->do_ioctl = qeth_do_ioctl;
+	dev->get_stats = qeth_get_stats;
+	dev->change_mtu = qeth_change_mtu;
+#ifdef QETH_VLAN
+	dev->vlan_rx_register = qeth_vlan_rx_register;
+	dev->vlan_rx_kill_vid = qeth_vlan_rx_kill_vid;
+#endif
+	dev->set_multicast_list = qeth_set_multicast_list;
+	dev->set_mac_address = qeth_set_mac_address;
+	dev->neigh_setup = qeth_neigh_setup;
+	dev->addr_len = OSA_ADDR_LEN;	/* is ok for eth, tr, atm lane */
+	SET_MODULE_OWNER(dev);
+}
+
 static int
 qeth_alloc_card_stuff(struct qeth_card *card)
 {
@@ -8385,11 +8379,9 @@ qeth_alloc_card_stuff(struct qeth_card *card)
 		goto exit_dma2;
 	memset(card->dma_stuff->sendbuf, 0, QETH_BUFSIZE);
 
-	card->dev = (struct net_device *) kmalloc(sizeof (struct net_device),
-						  GFP_KERNEL);
+	card->dev = alloc_netdev(0, "", qeth_setup);
 	if (!card->dev)
 		goto exit_dev;
-	memset(card->dev, 0, sizeof (struct net_device));
 
 	card->stats =
 	    (struct net_device_stats *)

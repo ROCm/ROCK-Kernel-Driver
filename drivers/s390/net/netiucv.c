@@ -1473,6 +1473,14 @@ netiucv_remove_files(struct device *dev)
 	sysfs_remove_group(&dev->kobj, &netiucv_attr_group);
 }
 
+/*
+ * XXX: Don't use sysfs unless you know WTF you are doing.
+ * This particular turd registers sysfs objects embedded into netiucv_priv
+ * which is kfreed without any regard to possible sysfs references.
+ * As the result, the wanker who'd decided that sysfs exports were too hip and
+ * cute to resist had generated a set of user-exploitable holes in this driver.
+ */
+
 static int
 netiucv_register_device(struct net_device *ndev, int ifno)
 {
@@ -1592,46 +1600,8 @@ netiucv_remove_connection(struct iucv_connection *conn)
 	}
 }
 
-/**
- * Allocate and initialize everything of a net device.
- */
-static struct net_device *
-netiucv_init_netdevice(int ifno, char *username)
+static void setup_netiucv(struct net_device *dev)
 {
-	struct netiucv_priv *privptr;
-	int          priv_size;
-
-	struct net_device *dev = kmalloc(sizeof(struct net_device), GFP_KERNEL);
-	if (!dev)
-		return NULL;
-	memset(dev, 0, sizeof(struct net_device));
-	sprintf(dev->name, "iucv%d", ifno);
-
-	priv_size = sizeof(struct netiucv_priv);
-	dev->priv = kmalloc(priv_size, GFP_KERNEL);
-	if (dev->priv == NULL) {
-		kfree(dev);
-		return NULL;
-	}
-        memset(dev->priv, 0, priv_size);
-        privptr = (struct netiucv_priv *)dev->priv;
-	privptr->fsm = init_fsm("netiucvdev", dev_state_names,
-				dev_event_names, NR_DEV_STATES, NR_DEV_EVENTS,
-				dev_fsm, DEV_FSM_LEN, GFP_KERNEL);
-	if (privptr->fsm == NULL) {
-		kfree(privptr);
-		kfree(dev);
-		return NULL;
-	}
-	privptr->conn = netiucv_new_connection(dev, username);
-	if (!privptr->conn) {
-		kfree_fsm(privptr->fsm);
-		kfree(privptr);
-		kfree(dev);
-		return NULL;
-	}
-
-	fsm_newstate(privptr->fsm, DEV_STATE_STOPPED);
 	dev->mtu	         = NETIUCV_MTU_DEFAULT;
 	dev->hard_start_xmit     = netiucv_tx;
 	dev->open	         = netiucv_open;
@@ -1644,6 +1614,47 @@ netiucv_init_netdevice(int ifno, char *username)
 	dev->tx_queue_len        = NETIUCV_QUEUELEN_DEFAULT;
 	dev->flags	         = IFF_POINTOPOINT | IFF_NOARP;
 	SET_MODULE_OWNER(dev);
+}
+
+/**
+ * Allocate and initialize everything of a net device.
+ */
+static struct net_device *
+netiucv_init_netdevice(int ifno, char *username)
+{
+	struct netiucv_priv *privptr;
+	int          priv_size;
+
+	struct net_device *dev = alloc_netdev(0, "", setup_netiucv);
+	if (!dev)
+		return NULL;
+	sprintf(dev->name, "iucv%d", ifno);
+
+	priv_size = sizeof(struct netiucv_priv);
+	dev->priv = kmalloc(priv_size, GFP_KERNEL);
+	if (dev->priv == NULL) {
+		free_netdev(dev);
+		return NULL;
+	}
+        memset(dev->priv, 0, priv_size);
+        privptr = (struct netiucv_priv *)dev->priv;
+	privptr->fsm = init_fsm("netiucvdev", dev_state_names,
+				dev_event_names, NR_DEV_STATES, NR_DEV_EVENTS,
+				dev_fsm, DEV_FSM_LEN, GFP_KERNEL);
+	if (privptr->fsm == NULL) {
+		kfree(privptr);
+		free_netdev(dev);
+		return NULL;
+	}
+	privptr->conn = netiucv_new_connection(dev, username);
+	if (!privptr->conn) {
+		kfree_fsm(privptr->fsm);
+		kfree(privptr);
+		free_netdev(dev);
+		return NULL;
+	}
+
+	fsm_newstate(privptr->fsm, DEV_STATE_STOPPED);
 	return dev;
 }
 

@@ -341,8 +341,9 @@ static struct sv11_device *sv11_init(int iobase, int irq)
 		{
 			printk(KERN_ERR "%s: unable to register device.\n",
 				d->name);
-			goto fail;
-		}				
+			sppp_detach(d);
+			goto dmafail2;
+		}
 
 		z8530_describe(dev, "I/O", iobase);
 		dev->active=1;

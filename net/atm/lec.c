@@ -798,7 +798,7 @@ lecd_attach(struct atm_vcc *vcc, int arg)
                         return -ENOMEM;
                 snprintf(dev_lec[i]->name, IFNAMSIZ, "lec%d", i);
                 if (register_netdev(dev_lec[i])) {
-                        kfree(dev_lec[i]);
+                        free_netdev(dev_lec[i]);
                         return -EINVAL;
                 }
 

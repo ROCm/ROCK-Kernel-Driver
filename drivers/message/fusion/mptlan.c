@@ -1437,7 +1437,7 @@ mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 	SET_MODULE_OWNER(dev);
 
 	if (register_netdev(dev) != 0) {
-		kfree(dev);
+		free_netdev(dev);
 		dev = NULL;
 	}
 	return dev;
