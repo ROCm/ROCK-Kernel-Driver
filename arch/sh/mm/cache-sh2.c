@@ -62,7 +62,7 @@ int __init detect_cpu_and_cache_system(void)
 	cpu_data->dcache.flags		= 0;
 
 	/*
-	 * SH-2 doesn't have seperate caches
+	 * SH-2 doesn't have separate caches
 	 */
 	cpu_data->dcache.flags |= SH_CACHE_COMBINED;
 	cpu_data->icache = cpu_data->dcache;
