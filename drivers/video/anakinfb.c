@@ -21,7 +21,6 @@
 #include <asm/io.h>
 
 #include <video/fbcon.h>
-#include <video/fbcon-cfb16.h>
 
 static u32 colreg[16];
 static struct fb_info fb_info;

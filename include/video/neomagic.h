@@ -1,5 +1,5 @@
 /*
- * linux/drivers/video/neofb.h -- NeoMagic Framebuffer Driver
+ * linux/include/video/neo_reg.h -- NeoMagic Framebuffer Driver
  *
  * Copyright (c) 2001  Denis Oliver Kropp <dok@convergence.de>
  *
@@ -8,13 +8,60 @@
  * archive for more details.
  */
 
+#define NEO_BS0_BLT_BUSY        0x00000001
+#define NEO_BS0_FIFO_AVAIL      0x00000002
+#define NEO_BS0_FIFO_PEND       0x00000004
+
+#define NEO_BC0_DST_Y_DEC       0x00000001
+#define NEO_BC0_X_DEC           0x00000002
+#define NEO_BC0_SRC_TRANS       0x00000004
+#define NEO_BC0_SRC_IS_FG       0x00000008
+#define NEO_BC0_SRC_Y_DEC       0x00000010
+#define NEO_BC0_FILL_PAT        0x00000020
+#define NEO_BC0_SRC_MONO        0x00000040
+#define NEO_BC0_SYS_TO_VID      0x00000080
+
+#define NEO_BC1_DEPTH8          0x00000100
+#define NEO_BC1_DEPTH16         0x00000200
+#define NEO_BC1_X_320           0x00000400
+#define NEO_BC1_X_640           0x00000800
+#define NEO_BC1_X_800           0x00000c00
+#define NEO_BC1_X_1024          0x00001000
+#define NEO_BC1_X_1152          0x00001400
+#define NEO_BC1_X_1280          0x00001800
+#define NEO_BC1_X_1600          0x00001c00
+#define NEO_BC1_DST_TRANS       0x00002000
+#define NEO_BC1_MSTR_BLT        0x00004000
+#define NEO_BC1_FILTER_Z        0x00008000
+
+#define NEO_BC2_WR_TR_DST       0x00800000
+
+#define NEO_BC3_SRC_XY_ADDR     0x01000000
+#define NEO_BC3_DST_XY_ADDR     0x02000000
+#define NEO_BC3_CLIP_ON         0x04000000
+#define NEO_BC3_FIFO_EN         0x08000000
+#define NEO_BC3_BLT_ON_ADDR     0x10000000
+#define NEO_BC3_SKIP_MAPPING    0x80000000
+
+#define NEO_MODE1_DEPTH8        0x0100
+#define NEO_MODE1_DEPTH16       0x0200
+#define NEO_MODE1_DEPTH24       0x0300
+#define NEO_MODE1_X_320         0x0400
+#define NEO_MODE1_X_640         0x0800
+#define NEO_MODE1_X_800         0x0c00
+#define NEO_MODE1_X_1024        0x1000
+#define NEO_MODE1_X_1152        0x1400
+#define NEO_MODE1_X_1280        0x1800
+#define NEO_MODE1_X_1600        0x1c00
+#define NEO_MODE1_BLT_ON_ADDR   0x2000
+
+#ifdef __KERNEL__
 
 #ifdef NEOFB_DEBUG
 # define DBG(x)		printk (KERN_DEBUG "neofb: %s\n", (x));
 #else
 # define DBG(x)
 #endif
-
 
 #define PCI_CHIP_NM2070 0x0001
 #define PCI_CHIP_NM2090 0x0002
@@ -77,9 +124,7 @@ typedef volatile struct {
 #define NEO_EXT_GR_MAX 0xC7
 
 struct neofb_par {
-
-  int depth;
-
+  
   unsigned char MiscOutReg;     /* Misc */
   unsigned char CRTC[25];       /* Crtc Controller */
   unsigned char Sequencer[5];   /* Video Sequencer */
@@ -113,31 +158,11 @@ struct neofb_par {
   unsigned char VCLK3NumeratorHigh;
   unsigned char VCLK3Denominator;
   unsigned char VerticalExt;
-};
 
-struct neofb_info {
-
-  struct fb_info  fb;
-  struct display_switch	*dispsw;
-
-  struct pci_dev *pcidev;
-  int   accel;
-  char *name;
-
-  struct {
-    u8    *vbase;
-    u32    pbase;
-    u32    len;
 #ifdef CONFIG_MTRR
-    int    mtrr;
+  int    mtrr;
 #endif
-  } video;
-
-  struct {
-    u8    *vbase;
-    u32    pbase;
-    u32    len;
-  } mmio;
+  u8    *mmio_vbase;
 
   Neo2200 *neo2200;
 
@@ -151,19 +176,13 @@ struct neofb_info {
   int lcd_stretch;
   int internal_display;
   int external_display;
-
-  struct {
-    u16 red, green, blue, transp;
-  } palette[NR_PALETTE];
 };
-
 
 typedef struct {
     int x_res;
     int y_res;
     int mode;
 } biosMode;
-
 
 /* vga IO functions */
 static inline u8 VGArCR (u8 index)
@@ -241,51 +260,5 @@ static inline void VGAwMISC (u8 value)
 {
   outb (value, 0x3c2);
 }
+#endif
 
-
-#define NEO_BS0_BLT_BUSY        0x00000001
-#define NEO_BS0_FIFO_AVAIL      0x00000002
-#define NEO_BS0_FIFO_PEND       0x00000004
-
-#define NEO_BC0_DST_Y_DEC       0x00000001
-#define NEO_BC0_X_DEC           0x00000002
-#define NEO_BC0_SRC_TRANS       0x00000004
-#define NEO_BC0_SRC_IS_FG       0x00000008
-#define NEO_BC0_SRC_Y_DEC       0x00000010
-#define NEO_BC0_FILL_PAT        0x00000020
-#define NEO_BC0_SRC_MONO        0x00000040
-#define NEO_BC0_SYS_TO_VID      0x00000080
-
-#define NEO_BC1_DEPTH8          0x00000100
-#define NEO_BC1_DEPTH16         0x00000200
-#define NEO_BC1_X_320           0x00000400
-#define NEO_BC1_X_640           0x00000800
-#define NEO_BC1_X_800           0x00000c00
-#define NEO_BC1_X_1024          0x00001000
-#define NEO_BC1_X_1152          0x00001400
-#define NEO_BC1_X_1280          0x00001800
-#define NEO_BC1_X_1600          0x00001c00
-#define NEO_BC1_DST_TRANS       0x00002000
-#define NEO_BC1_MSTR_BLT        0x00004000
-#define NEO_BC1_FILTER_Z        0x00008000
-
-#define NEO_BC2_WR_TR_DST       0x00800000
-
-#define NEO_BC3_SRC_XY_ADDR     0x01000000
-#define NEO_BC3_DST_XY_ADDR     0x02000000
-#define NEO_BC3_CLIP_ON         0x04000000
-#define NEO_BC3_FIFO_EN         0x08000000
-#define NEO_BC3_BLT_ON_ADDR     0x10000000
-#define NEO_BC3_SKIP_MAPPING    0x80000000
-
-#define NEO_MODE1_DEPTH8        0x0100
-#define NEO_MODE1_DEPTH16       0x0200
-#define NEO_MODE1_DEPTH24       0x0300
-#define NEO_MODE1_X_320         0x0400
-#define NEO_MODE1_X_640         0x0800
-#define NEO_MODE1_X_800         0x0c00
-#define NEO_MODE1_X_1024        0x1000
-#define NEO_MODE1_X_1152        0x1400
-#define NEO_MODE1_X_1280        0x1800
-#define NEO_MODE1_X_1600        0x1c00
-#define NEO_MODE1_BLT_ON_ADDR   0x2000
