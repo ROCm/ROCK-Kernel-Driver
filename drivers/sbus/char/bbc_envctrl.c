@@ -7,6 +7,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <asm/oplib.h>
 #include <asm/ebus.h>
 #define __KERNEL_SYSCALLS__
