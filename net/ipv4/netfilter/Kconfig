@@ -324,16 +324,6 @@ config IP_NF_TARGET_REJECT
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
-config IP_NF_TARGET_MIRROR
-	tristate "MIRROR target support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && IP_NF_FILTER
-	help
-	  The MIRROR target allows a filtering rule to specify that an
-	  incoming packet should be bounced back to the sender.
-
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
-
 config IP_NF_NAT
 	tristate "Full NAT"
 	depends on IP_NF_IPTABLES && IP_NF_CONNTRACK
