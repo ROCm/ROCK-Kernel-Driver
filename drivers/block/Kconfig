@@ -44,7 +44,7 @@ config BLK_DEV_SWIM_IOP
 
 config BLK_DEV_PS2
 	tristate "PS/2 ESDI hard disk support"
-	depends on MCA
+	depends on MCA && MCA_LEGACY
 	help
 	  Say Y here if you have a PS/2 machine with a MCA bus and an ESDI
 	  hard disk.
