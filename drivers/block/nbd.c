@@ -33,6 +33,8 @@
  *   from sending/receiving disk data. <ldl@aros.net>
  * 03-06-23 Cosmetic changes. <ldl@aros.net>
  * 03-06-23 Enhance diagnostics support. <ldl@aros.net>
+ * 03-06-24 Remove unneeded blksize_bits field from nbd_device struct.
+ *   <ldl@aros.net>
  *
  * possible FIXME: make set_sock / set_blksize / set_size / do_it one syscall
  * why not: would need verify_area and friends, would share yet another 
@@ -535,7 +537,7 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
 	struct nbd_device *lo = inode->i_bdev->bd_disk->private_data;
-	int error, temp;
+	int error;
 	struct request sreq ;
 
 	/* Anyone capable of this syscall can do *real bad* things */
@@ -600,12 +602,6 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 		if ((arg & (arg-1)) || (arg < 512) || (arg > PAGE_SIZE))
 			return -EINVAL;
 		lo->blksize = arg;
-		temp = arg >> 9;
-		lo->blksize_bits = 9;
-		while (temp > 1) {
-			lo->blksize_bits++;
-			temp >>= 1;
-		}
 		lo->bytesize &= ~(lo->blksize-1); 
 		set_capacity(lo->disk, lo->bytesize >> 9);
 		return 0;
@@ -614,7 +610,7 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 		set_capacity(lo->disk, lo->bytesize >> 9);
 		return 0;
 	case NBD_SET_SIZE_BLOCKS:
-		lo->bytesize = ((u64) arg) << lo->blksize_bits;
+		lo->bytesize = ((u64) arg) * lo->blksize;
 		set_capacity(lo->disk, lo->bytesize >> 9);
 		return 0;
 	case NBD_DO_IT:
@@ -717,7 +713,6 @@ static int __init nbd_init(void)
 		INIT_LIST_HEAD(&nbd_dev[i].queue_head);
 		init_MUTEX(&nbd_dev[i].tx_lock);
 		nbd_dev[i].blksize = 1024;
-		nbd_dev[i].blksize_bits = 10;
 		nbd_dev[i].bytesize = ((u64)0x7ffffc00) << 10; /* 2TB */
 		disk->major = NBD_MAJOR;
 		disk->first_minor = i;

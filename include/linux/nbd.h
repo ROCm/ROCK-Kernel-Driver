@@ -5,6 +5,8 @@
  * 2001 Copyright (C) Steven Whitehouse
  *            New nbd_end_request() for compatibility with new linux block
  *            layer code.
+ * 2003/06/24 Louis D. Langholtz <ldl@aros.net>
+ *            Removed unneeded blksize_bits field from nbd_device struct.
  */
 
 #ifndef LINUX_NBD_H
@@ -50,7 +52,6 @@ struct nbd_device {
 	struct semaphore tx_lock;
 	struct gendisk *disk;
 	int blksize;
-	int blksize_bits;
 	u64 bytesize;
 };
 
