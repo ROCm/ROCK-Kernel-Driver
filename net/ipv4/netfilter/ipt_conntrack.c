@@ -1,7 +1,13 @@
 /* Kernel module to match connection tracking information.
  * Superset of Rusty's minimalistic state match.
- * GPL (C) 2001  Marc Boucher (marc@mbsi.ca).
+ *
+ * (C) 2001  Marc Boucher (marc@mbsi.ca).
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
+
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/netfilter_ipv4/ip_conntrack.h>

@@ -4,8 +4,13 @@
    These are not required by the compatibility layer.
 */
 
-/* (c) 1999 Paul `Rusty' Russell.  Licenced under the GNU General
-   Public Licence. */
+/* (C) 1999-2001 Paul `Rusty' Russell
+ * (C) 2002-2004 Netfilter Core Team <coreteam@netfilter.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
 
 #include <linux/config.h>
 #include <linux/types.h>

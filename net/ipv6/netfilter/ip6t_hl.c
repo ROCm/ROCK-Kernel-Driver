@@ -1,9 +1,11 @@
-/*
- * Hop Limit matching module
- * Maciej Soltysiak <solt@dns.toxicfilms.tv>
+/* Hop Limit matching module */
+
+/* (C) 2001-2002 Maciej Soltysiak <solt@dns.toxicfilms.tv>
  * Based on HW's ttl module
  *
- * This software is distributed under the terms  GNU GPL
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 
 #include <linux/module.h>

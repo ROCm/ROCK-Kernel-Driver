@@ -1,5 +1,9 @@
-/*
- * Licensed under GNU GPL version 2 Copyright Magnus Boden <mb@ozaba.mine.nu>
+/* (C) 2001-2002 Magnus Boden <mb@ozaba.mine.nu>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
  * Version: 0.0.7
  *
  * Thu 21 Mar 2002 Harald Welte <laforge@gnumonks.org>
