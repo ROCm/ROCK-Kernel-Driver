@@ -384,9 +384,11 @@ static void tc574_detach(dev_link_t *link)
 
 	/* Unlink device structure, free bits */
 	*linkp = link->next;
-	if (link->dev)
+	if (link->dev) {
 		unregister_netdev(dev);
-	kfree(dev);
+		free_netdev(dev);
+	} else 
+		kfree(dev);
 
 } /* tc574_detach */
 

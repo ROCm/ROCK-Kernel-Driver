@@ -1954,7 +1954,7 @@ idt77252_phy_get(struct atm_dev *dev, unsigned long addr)
 	return read_utility(dev->dev_data, 0x100 + (addr & 0x1ff));
 }
 
-static int
+static inline int
 idt77252_send_skb(struct atm_vcc *vcc, struct sk_buff *skb, int oam)
 {
 	struct atm_dev *dev = vcc->dev;

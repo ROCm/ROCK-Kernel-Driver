@@ -154,7 +154,6 @@ void irlan_client_discovery_indication(discinfo_t *discovery,
 	
 	IRDA_DEBUG(1, "%s()\n", __FUNCTION__ );
 
-	ASSERT(irlan != NULL, return;);
 	ASSERT(discovery != NULL, return;);
 
 	/*
@@ -170,7 +169,8 @@ void irlan_client_discovery_indication(discinfo_t *discovery,
 	daddr = discovery->daddr;
 
 	/* Find instance */
-	self = (struct irlan_cb *) hashbin_get_first(irlan);
+	rcu_read_lock();
+	self = irlan_get_any();
 	if (self) {
 		ASSERT(self->magic == IRLAN_MAGIC, return;);
 
@@ -179,6 +179,7 @@ void irlan_client_discovery_indication(discinfo_t *discovery,
 		
 		irlan_client_wakeup(self, saddr, daddr);
 	}
+	rcu_read_unlock();
 }
 	
 /*
@@ -511,7 +512,7 @@ static void irlan_check_response_param(struct irlan_cb *self, char *param,
 		      bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], 
 		      bytes[5]);
 		for (i = 0; i < 6; i++) 
-			self->dev.dev_addr[i] = bytes[i];
+			self->dev->dev_addr[i] = bytes[i];
 	}
 }
 

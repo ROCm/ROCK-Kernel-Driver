@@ -983,7 +983,7 @@ static int ether00_remove_devices(void)
 			unregister_netdev(dev_list[i]);
 			iounmap((void*)dev_list[i]->base_addr);
 			release_mem_region(dev_list[i]->base_addr, MAC_REG_SIZE);
-			kfree(dev_list[i]);
+			free_netdev(dev_list[i]);
 			dev_list[i]=0;
 		}
 	}

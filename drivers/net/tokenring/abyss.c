@@ -443,7 +443,7 @@ static void __devexit abyss_detach (struct pci_dev *pdev)
 	release_region(dev->base_addr-0x10, ABYSS_IO_EXTENT);
 	free_irq(dev->irq, dev);
 	tmsdev_term(dev);
-	kfree(dev);
+	free_netdev(dev);
 	pci_set_drvdata(pdev, NULL);
 }
 

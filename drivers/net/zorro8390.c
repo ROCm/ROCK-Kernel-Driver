@@ -413,7 +413,7 @@ static void __exit zorro8390_cleanup(void)
 	unregister_netdev(dev);
 	free_irq(IRQ_AMIGA_PORTS, dev);
 	release_mem_region(ZTWO_PADDR(dev->base_addr), NE_IO_EXTENT*2);
-	kfree(dev);
+	free_netdev(dev);
 	root_zorro8390_dev = next;
     }
 #endif

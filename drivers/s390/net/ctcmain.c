@@ -2708,7 +2708,7 @@ ctc_free_netdevice(struct net_device * dev, int free_dev)
 	}
 #ifdef MODULE
 	if (free_dev)
-		kfree(dev);
+		free_netdev(dev);
 #endif
 }
 

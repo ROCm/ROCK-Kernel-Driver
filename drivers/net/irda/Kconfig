@@ -68,20 +68,6 @@ config TEKRAM_DONGLE
 
 comment "Old SIR device drivers"
 
-config IRTTY_OLD
-	tristate "Old IrTTY (broken)"
-	depends on IRDA && EXPERIMENTAL
-	help
-	  Say Y here if you want to build support for the IrTTY line
-	  discipline.  If you want to compile it as a module (irtty), say M
-	  here and read <file:Documentation/modules.txt>.  IrTTY makes it
-	  possible to use Linux's own serial driver for all IrDA ports that
-	  are 16550 compatible.  Most IrDA chips are 16550 compatible so you
-	  should probably say Y to this option.  Using IrTTY will however
-	  limit the speed of the connection to 115200 bps (IrDA SIR mode).
-
-	  If unsure, say N.
-
 config IRPORT_SIR
 	tristate "IrPORT (IrDA serial driver)"
 	depends on IRDA

@@ -1275,7 +1275,7 @@ static void __exit bigmac_cleanup(void)
 				     bp->bblock_dvma);
 
 		unregister_netdev(bp->dev);
-		kfree(bp->dev);
+		free_netdev(bp->dev);
 		root_bigmac_dev = bp_nxt;
 	}
 }

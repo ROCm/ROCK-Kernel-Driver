@@ -6882,7 +6882,7 @@ static void __devexit tg3_remove_one(struct pci_dev *pdev)
 	if (dev) {
 		unregister_netdev(dev);
 		iounmap((void *) ((struct tg3 *)(dev->priv))->regs);
-		kfree(dev);
+		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);
 		pci_set_drvdata(pdev, NULL);

@@ -235,7 +235,7 @@ sb1000_remove_one(struct pnp_dev *pdev)
 	unregister_netdev(dev);
 	release_region(dev->base_addr, 16);
 	release_region(dev->mem_start, 16);
-	kfree(dev);
+	free_netdev(dev);
 }
 
 static struct pnp_driver sb1000_driver = {

@@ -2965,7 +2965,7 @@ static void release_dev(int i)
 		iounmap(p->mem_ptr_virt);
 	kfree(d->priv);
 	d->priv = NULL;
-	kfree(d);
+	free_netdev(d);
 	hp100_devlist[i] = NULL;
 }
 

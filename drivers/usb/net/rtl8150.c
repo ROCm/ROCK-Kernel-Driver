@@ -870,7 +870,7 @@ static void rtl8150_disconnect(struct usb_interface *intf)
 		free_skb_pool(dev);
 		if (dev->rx_skb)
 			dev_kfree_skb(dev->rx_skb);
-		kfree(dev->netdev);
+		free_netdev(dev->netdev);
 		kfree(dev->intr_buff);
 		kfree(dev);
 	}

@@ -646,7 +646,7 @@ rtl8169_remove_one(struct pci_dev *pdev)
 	       sizeof (struct net_device) + sizeof (struct rtl8169_private));
 
 	pci_disable_device(pdev);
-	kfree(dev);
+	free_netdev(dev);
 	pci_set_drvdata(pdev, NULL);
 }
 

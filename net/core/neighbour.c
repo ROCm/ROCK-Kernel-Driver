@@ -50,6 +50,7 @@ static void neigh_timer_handler(unsigned long arg);
 static void neigh_app_notify(struct neighbour *n);
 #endif
 static int pneigh_ifdown(struct neigh_table *tbl, struct net_device *dev);
+void neigh_changeaddr(struct neigh_table *tbl, struct net_device *dev);
 
 static int neigh_glbl_allocs;
 static struct neigh_table *neigh_tables;
@@ -166,6 +167,33 @@ static void pneigh_queue_purge(struct sk_buff_head *list)
 		dev_put(skb->dev);
 		kfree_skb(skb);
 	}
+}
+
+void neigh_changeaddr(struct neigh_table *tbl, struct net_device *dev)
+{
+	int i;
+
+	write_lock_bh(&tbl->lock);
+
+	for (i=0; i <= NEIGH_HASHMASK; i++) {
+		struct neighbour *n, **np;
+
+		np = &tbl->hash_buckets[i];
+		while ((n = *np) != NULL) {
+			if (dev && n->dev != dev) {
+				np = &n->next;
+				continue;
+			}
+			*np = n->next;
+			write_lock_bh(&n->lock);
+			n->dead = 1;
+			neigh_del_timer(n);
+			write_unlock_bh(&n->lock);
+			neigh_release(n);
+		}
+	}
+
+        write_unlock_bh(&tbl->lock);
 }
 
 int neigh_ifdown(struct neigh_table *tbl, struct net_device *dev)

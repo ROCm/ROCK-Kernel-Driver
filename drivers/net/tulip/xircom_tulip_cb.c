@@ -1702,7 +1702,7 @@ static void __devexit xircom_remove_one(struct pci_dev *pdev)
 	printk(KERN_INFO "xircom_remove_one(%s)\n", dev->name);
 	unregister_netdev(dev);
 	pci_release_regions(pdev);
-	kfree(dev);
+	free_netdev(dev);
 	pci_set_drvdata(pdev, NULL);
 }
 
