@@ -2564,7 +2564,7 @@ static void strip_free(struct strip *strip_info)
 
 	strip_info->magic = 0;
 
-	kfree(strip_info->dev);
+	free_netdev(strip_info->dev);
 }
 
 

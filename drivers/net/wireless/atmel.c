@@ -1443,7 +1443,7 @@ struct net_device *init_atmel_card( unsigned short irq, int port, char *firmware
  err_out_irq:
 	free_irq(dev->irq, dev);
  err_out_free:
-	kfree(dev);
+	free_netdev(dev);
 	return NULL;
 }
 

@@ -1401,7 +1401,7 @@ static int __init init_baycomepp(void)
 
 		if (register_netdev(dev)) {
 			printk(KERN_WARNING "%s: cannot register net device %s\n", bc_drvname, dev->name);
-			kfree(dev);
+			free_netdev(dev);
 			break;
 		}
 		if (set_hw && baycom_setmode(dev->priv, mode[i]))

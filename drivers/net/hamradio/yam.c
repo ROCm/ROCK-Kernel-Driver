@@ -1192,7 +1192,7 @@ static void __exit yam_cleanup_driver(void)
 		struct net_device *dev = yam_devs[i];
 		if (dev) {
 			unregister_netdev(dev);
-			kfree(dev);
+			free_netdev(dev);
 		}
 	}
 

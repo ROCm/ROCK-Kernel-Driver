@@ -1068,7 +1068,7 @@ ether1_probe(struct expansion_card *ec, const struct ecard_id *id)
 release:
 	release_region(dev->base_addr, 16);
 	release_region(dev->base_addr + 0x800, 4096);
-	kfree(dev);
+	free_netdev(dev);
 out:
 	return ret;
 }

@@ -1213,7 +1213,7 @@ out3:
 out2:
 	release_region(io, 8);
 out1:
-	kfree(dev);
+	free_netdev(dev);
 out:
 	return ERR_PTR(err);
 }

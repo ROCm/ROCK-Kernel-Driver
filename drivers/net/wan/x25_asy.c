@@ -94,7 +94,7 @@ static struct x25_asy *x25_asy_alloc(void)
 			return sl;
 		} else {
 			printk("x25_asy_alloc() - register_netdev() failure.\n");
-			kfree(dev);
+			free_netdev(dev);
 		}
 	}
 	return NULL;

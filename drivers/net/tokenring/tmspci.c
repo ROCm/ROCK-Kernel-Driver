@@ -179,7 +179,7 @@ err_out_irq:
 err_out_region:
 	release_region(pci_ioaddr, TMS_PCI_IO_EXTENT);
 err_out_trdev:
-	kfree(dev);
+	free_netdev(dev);
 	return ret;
 }
 
