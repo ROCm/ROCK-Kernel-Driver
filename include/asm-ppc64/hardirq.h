@@ -82,7 +82,7 @@ typedef struct {
 #define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
 
 #if CONFIG_PREEMPT
-# define in_atomic()	(preempt_count() != kernel_locked())
+# define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
 #else
 # define in_atomic()	(preempt_count() != 0)
@@ -111,7 +111,5 @@ do {						\
 	else					\
 		print_backtrace(_get_SP());	\
 } while (0)
-
-#define dump_stack()	show_stack()
 
 #endif /* __ASM_HARDIRQ_H */

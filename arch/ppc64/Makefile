@@ -29,10 +29,10 @@ HEAD := arch/ppc64/kernel/head.o
 core-y			+= arch/ppc64/kernel/ arch/ppc64/mm/ arch/ppc64/lib/
 core-$(CONFIG_XMON)	+= arch/ppc64/xmon/
 
-MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
+makeboot = $(call descend,arch/ppc64/boot,$(1))
 
 ifdef CONFIG_PPC_PSERIES
-BOOT_TARGETS = zImage znetboot.initrd zImage.initrd
+BOOT_TARGETS = zImage zImage.initrd
 endif
 
 ifdef CONFIG_PPC_ISERIES
@@ -40,22 +40,14 @@ BOOT_TARGETS = vmlinux.sminitrd vmlinux.initrd vmlinux.sm
 endif
 
 $(BOOT_TARGETS): vmlinux
-	@$(MAKEBOOT) $@
-
-znetboot: vmlinux
-ifdef CONFIG_SMP
-	cp -f vmlinux /tftpboot/vmlinux.smp
-else
-	cp -f vmlinux /tftpboot/vmlinux
-endif
-	@$(MAKEBOOT) $@
+	@$(call makeboot,arch/ppc64/boot/$@)
 
 %_config: arch/ppc64/configs/%_defconfig
 	rm -f .config arch/ppc64/defconfig
 	cp -f arch/ppc64/configs/$(@:config=defconfig) arch/ppc64/defconfig
 
 archclean:
-	@$(MAKEBOOT) clean
+	@$(call makeboot,clean)
 
 archmrproper:
 
@@ -74,3 +66,4 @@ include/asm-$(ARCH)/offsets.h: include/asm-$(ARCH)/offsets.h.tmp
 
 CLEAN_FILES += include/asm-$(ARCH)/offsets.h.tmp \
 	       include/asm-$(ARCH)/offsets.h
+
