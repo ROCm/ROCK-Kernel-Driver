@@ -804,7 +804,6 @@ struct vortex_private {
 										 * bale from the ISR */
 	u16 io_size;						/* Size of PCI region (for release_region) */
 	spinlock_t lock;					/* Serialise access to device & its vortex_private */
-	spinlock_t mdio_lock;				/* Serialise access to mdio hardware */
 	struct mii_if_info mii;				/* MII lib hooks/info */
 };
 
@@ -851,6 +850,22 @@ static struct media_table {
   { "MII-External",	 0,		0x41, XCVR_10baseT, 3*HZ },
   { "Default",	 0,			0xFF, XCVR_10baseT, 10000},
 };
+
+static struct {
+	const char str[ETH_GSTRING_LEN];
+} ethtool_stats_keys[] = {
+	{ "rx_packets" },
+	{ "tx_packets" },
+	{ "rx_bytes" },
+	{ "tx_bytes" },
+	{ "collisions" },
+	{ "tx_carrier_errors" },
+	{ "tx_heartbeat_errors" },
+	{ "tx_window_errors" },
+};
+
+/* number of ETHTOOL_GSTATS u64's */
+#define VORTEX_NUM_STATS      8
 
 static int vortex_probe1(struct device *gendev, long ioaddr, int irq,
 				   int chip_idx, int card_idx);
@@ -1219,7 +1234,6 @@ static int __devinit vortex_probe1(struct device *gendev,
 	}
 
 	spin_lock_init(&vp->lock);
-	spin_lock_init(&vp->mdio_lock);
 	vp->gendev = gendev;
 	vp->mii.dev = dev;
 	vp->mii.mdio_read = mdio_read;
@@ -1854,6 +1868,7 @@ vortex_timer(unsigned long data)
 		break;
 	case XCVR_MII: case XCVR_NWAY:
 		{
+			spin_lock_bh(&vp->lock);
 			mii_status = mdio_read(dev, vp->phys[0], 1);
 			ok = 1;
 			if (vortex_debug > 2)
@@ -1887,6 +1902,7 @@ vortex_timer(unsigned long data)
 			} else {
 				netif_carrier_off(dev);
 			}
+			spin_unlock_bh(&vp->lock);
 		}
 		break;
 	  default:					/* Other media types handled by Tx timeouts. */
@@ -2883,6 +2899,109 @@ static void update_stats(long ioaddr, struct net_device *dev)
 	return;
 }
 
+static int vortex_nway_reset(struct net_device *dev)
+{
+	struct vortex_private *vp = netdev_priv(dev);
+	long ioaddr = dev->base_addr;
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&vp->lock, flags);
+	EL3WINDOW(4);
+	rc = mii_nway_restart(&vp->mii);
+	spin_unlock_irqrestore(&vp->lock, flags);
+	return rc;
+}
+
+static u32 vortex_get_link(struct net_device *dev)
+{
+	struct vortex_private *vp = netdev_priv(dev);
+	long ioaddr = dev->base_addr;
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&vp->lock, flags);
+	EL3WINDOW(4);
+	rc = mii_link_ok(&vp->mii);
+	spin_unlock_irqrestore(&vp->lock, flags);
+	return rc;
+}
+
+static int vortex_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct vortex_private *vp = netdev_priv(dev);
+	long ioaddr = dev->base_addr;
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&vp->lock, flags);
+	EL3WINDOW(4);
+	rc = mii_ethtool_gset(&vp->mii, cmd);
+	spin_unlock_irqrestore(&vp->lock, flags);
+	return rc;
+}
+
+static int vortex_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct vortex_private *vp = netdev_priv(dev);
+	long ioaddr = dev->base_addr;
+	unsigned long flags;
+	int rc;
+
+	spin_lock_irqsave(&vp->lock, flags);
+	EL3WINDOW(4);
+	rc = mii_ethtool_sset(&vp->mii, cmd);
+	spin_unlock_irqrestore(&vp->lock, flags);
+	return rc;
+}
+
+static u32 vortex_get_msglevel(struct net_device *dev)
+{
+	return vortex_debug;
+}
+
+static void vortex_set_msglevel(struct net_device *dev, u32 dbg)
+{
+	vortex_debug = dbg;
+}
+
+static int vortex_get_stats_count(struct net_device *dev)
+{
+	return VORTEX_NUM_STATS;
+}
+
+static void vortex_get_ethtool_stats(struct net_device *dev,
+	struct ethtool_stats *stats, u64 *data)
+{
+	struct vortex_private *vp = netdev_priv(dev);
+	unsigned long flags;
+
+	spin_lock_irqsave(&vp->lock, flags);
+	update_stats(dev->base_addr, dev);
+	spin_unlock_irqrestore(&vp->lock, flags);
+
+	data[0] = vp->stats.rx_packets;
+	data[1] = vp->stats.tx_packets;
+	data[2] = vp->stats.rx_bytes;
+	data[3] = vp->stats.tx_bytes;
+	data[4] = vp->stats.collisions;
+	data[5] = vp->stats.tx_carrier_errors;
+	data[6] = vp->stats.tx_heartbeat_errors;
+	data[7] = vp->stats.tx_window_errors;
+}
+
+
+static void vortex_get_strings(struct net_device *dev, u32 stringset, u8 *data)
+{
+	switch (stringset) {
+	case ETH_SS_STATS:
+		memcpy(data, &ethtool_stats_keys, sizeof(ethtool_stats_keys));
+		break;
+	default:
+		WARN_ON(1);
+		break;
+	}
+}
 
 static void vortex_get_drvinfo(struct net_device *dev,
 					struct ethtool_drvinfo *info)
@@ -2904,6 +3023,15 @@ static void vortex_get_drvinfo(struct net_device *dev,
 
 static struct ethtool_ops vortex_ethtool_ops = {
 	.get_drvinfo		= vortex_get_drvinfo,
+	.get_strings            = vortex_get_strings,
+	.get_msglevel           = vortex_get_msglevel,
+	.set_msglevel           = vortex_set_msglevel,
+	.get_ethtool_stats      = vortex_get_ethtool_stats,
+	.get_stats_count        = vortex_get_stats_count,
+	.get_settings           = vortex_get_settings,
+	.set_settings           = vortex_set_settings,
+	.get_link               = vortex_get_link,
+	.nway_reset             = vortex_nway_reset,
 };
 
 #ifdef CONFIG_PCI
@@ -2915,6 +3043,7 @@ static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	int err;
 	struct vortex_private *vp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
+	unsigned long flags;
 	int state = 0;
 
 	if(VORTEX_PCI(vp))
@@ -2924,8 +3053,10 @@ static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	if(state != 0)
 		pci_set_power_state(VORTEX_PCI(vp), PCI_D0);
+	spin_lock_irqsave(&vp->lock, flags);
 	EL3WINDOW(4);
 	err = generic_mii_ioctl(&vp->mii, if_mii(rq), cmd, NULL);
+	spin_unlock_irqrestore(&vp->lock, flags);
 	if(state != 0)
 		pci_set_power_state(VORTEX_PCI(vp), state);
 
@@ -3043,14 +3174,11 @@ static void mdio_sync(long ioaddr, int bits)
 
 static int mdio_read(struct net_device *dev, int phy_id, int location)
 {
-	struct vortex_private *vp = netdev_priv(dev);
 	int i;
 	long ioaddr = dev->base_addr;
 	int read_cmd = (0xf6 << 10) | (phy_id << 5) | location;
 	unsigned int retval = 0;
 	long mdio_addr = ioaddr + Wn4_PhysicalMgmt;
-
-	spin_lock_bh(&vp->mdio_lock);
 
 	if (mii_preamble_required)
 		mdio_sync(ioaddr, 32);
@@ -3071,19 +3199,15 @@ static int mdio_read(struct net_device *dev, int phy_id, int location)
 		outw(MDIO_ENB_IN | MDIO_SHIFT_CLK, mdio_addr);
 		mdio_delay();
 	}
-	spin_unlock_bh(&vp->mdio_lock);
 	return retval & 0x20000 ? 0xffff : retval>>1 & 0xffff;
 }
 
 static void mdio_write(struct net_device *dev, int phy_id, int location, int value)
 {
-	struct vortex_private *vp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int write_cmd = 0x50020000 | (phy_id << 23) | (location << 18) | value;
 	long mdio_addr = ioaddr + Wn4_PhysicalMgmt;
 	int i;
-
-	spin_lock_bh(&vp->mdio_lock);
 
 	if (mii_preamble_required)
 		mdio_sync(ioaddr, 32);
@@ -3103,7 +3227,6 @@ static void mdio_write(struct net_device *dev, int phy_id, int location, int val
 		outw(MDIO_ENB_IN | MDIO_SHIFT_CLK, mdio_addr);
 		mdio_delay();
 	}
-	spin_unlock_bh(&vp->mdio_lock);
 	return;
 }
 
