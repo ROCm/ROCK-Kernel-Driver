@@ -1567,6 +1567,9 @@ static int sd_synchronize_cache(int index, int verbose)
 	Scsi_Device *SDpnt = sdkp->device;
 	int retries, the_result;
 
+	if (!SDpnt->online)
+		return 0;
+
 	if(verbose) {
 		char buf[16];
 
