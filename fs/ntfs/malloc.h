@@ -37,13 +37,10 @@
 static inline void *ntfs_malloc_nofs(unsigned long size)
 {
 	if (likely(size <= PAGE_SIZE)) {
-		if (likely(size)) {
-			/* kmalloc() has per-CPU caches so is faster for now. */
-			return kmalloc(PAGE_SIZE, GFP_NOFS);
-			/* return (void *)__get_free_page(GFP_NOFS |
-					__GFP_HIGHMEM); */
-		}
-		BUG();
+		BUG_ON(!size);
+		/* kmalloc() has per-CPU caches so is faster for now. */
+		return kmalloc(PAGE_SIZE, GFP_NOFS);
+		/* return (void *)__get_free_page(GFP_NOFS | __GFP_HIGHMEM); */
 	}
 	if (likely(size >> PAGE_SHIFT < num_physpages))
 		return __vmalloc(size, GFP_NOFS | __GFP_HIGHMEM, PAGE_KERNEL);
@@ -54,8 +51,9 @@ static inline void ntfs_free(void *addr)
 {
 	if (likely(((unsigned long)addr < VMALLOC_START) ||
 			((unsigned long)addr >= VMALLOC_END ))) {
-		return kfree(addr);
-		/* return free_page((unsigned long)addr); */
+		kfree(addr);
+		/* free_page((unsigned long)addr); */
+		return;
 	}
 	vfree(addr);
 }
