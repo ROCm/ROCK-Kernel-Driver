@@ -160,6 +160,7 @@ struct snd_usb_audio {
 #define QUIRK_IGNORE_INTERFACE		9
 #define QUIRK_MIDI_NOVATION		10
 #define QUIRK_MIDI_MOTU			11
+#define QUIRK_MIDI_EMAGIC		12
 
 typedef struct snd_usb_audio_quirk snd_usb_audio_quirk_t;
 typedef struct snd_usb_midi_endpoint_info snd_usb_midi_endpoint_info_t;
@@ -199,6 +200,9 @@ struct snd_usb_midi_endpoint_info {
 /* for QUIRK_IGNORE_INTERFACE, data is NULL */
 
 /* for QUIRK_MIDI_NOVATION and _MOTU, data is NULL */
+
+/* for QUIRK_MIDI_EMAGIC, data points to a snd_usb_midi_endpoint_info
+ * structure (out_cables and in_cables only) */
 
 /*
  */

@@ -335,11 +335,15 @@ static int cmi9880_build_controls(struct hda_codec *codec)
 			return err;
 	}
 	if (spec->multiout.dig_out_nid) {
-		err = snd_hda_create_spdif_out_ctls(codec, CMI_DIG_OUT_NID);
+		err = snd_hda_create_spdif_out_ctls(codec, spec->multiout.dig_out_nid);
 		if (err < 0)
 			return err;
 	}
-	/* TODO: digital-in */
+	if (spec->dig_in_nid) {
+		err = snd_hda_create_spdif_in_ctls(codec, spec->dig_in_nid);
+		if (err < 0)
+			return err;
+	}
 	return 0;
 }
 
@@ -367,6 +371,8 @@ static int cmi9880_resume(struct hda_codec *codec)
 		snd_hda_resume_ctls(codec, cmi9880_ch_mode_mixer);
 	if (spec->multiout.dig_out_nid)
 		snd_hda_resume_spdif_out(codec);
+	if (spec->dig_in_nid)
+		snd_hda_resume_spdif_in(codec);
 
 	return 0;
 }

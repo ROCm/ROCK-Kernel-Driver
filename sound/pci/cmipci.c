@@ -2554,13 +2554,6 @@ static void __devinit query_chip(cmipci_t *cm)
 			printk(KERN_ERR "chip %x version not supported\n", detect);
 		}
 	}
-
-	/* added -MCx suffix for chip supporting multi-channels */
-	if (cm->can_multi_ch)
-		sprintf(cm->card->driver + strlen(cm->card->driver),
-			"-MC%d", cm->max_channels);
-	else if (cm->can_ac3_sw)
-		strcpy(cm->card->driver + strlen(cm->card->driver), "-SWIEC");
 }
 
 
@@ -2664,7 +2657,15 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 	cm->max_channels = 2;
 	cm->do_soft_ac3 = soft_ac3[dev];
 
-	query_chip(cm);
+	if (pci->device != PCI_DEVICE_ID_CMEDIA_CM8338A &&
+	    pci->device != PCI_DEVICE_ID_CMEDIA_CM8338B)
+		query_chip(cm);
+	/* added -MCx suffix for chip supporting multi-channels */
+	if (cm->can_multi_ch)
+		sprintf(cm->card->driver + strlen(cm->card->driver),
+			"-MC%d", cm->max_channels);
+	else if (cm->can_ac3_sw)
+		strcpy(cm->card->driver + strlen(cm->card->driver), "-SWIEC");
 
 	cm->dig_status = SNDRV_PCM_DEFAULT_CON_SPDIF;
 	cm->dig_pcm_status = SNDRV_PCM_DEFAULT_CON_SPDIF;

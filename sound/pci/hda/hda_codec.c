@@ -992,7 +992,7 @@ static snd_kcontrol_new_t dig_mixes[] = {
 };
 
 /**
- * snd_hda_create_spdif_out_ctls - create SPDIF-related controls
+ * snd_hda_create_spdif_out_ctls - create Output SPDIF-related controls
  * @codec: the HDA codec
  * @nid: audio out widget NID
  *
@@ -1017,6 +1017,98 @@ int snd_hda_create_spdif_out_ctls(struct hda_codec *codec, hda_nid_t nid)
 	codec->spdif_status = convert_to_spdif_status(codec->spdif_ctls);
 	return 0;
 }
+
+/*
+ * SPDIF input
+ */
+
+#define snd_hda_spdif_in_switch_info	snd_hda_spdif_out_switch_info
+
+static int snd_hda_spdif_in_switch_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
+
+	ucontrol->value.integer.value[0] = codec->spdif_in_enable;
+	return 0;
+}
+
+static int snd_hda_spdif_in_switch_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
+	hda_nid_t nid = kcontrol->private_value;
+	unsigned int val = !!ucontrol->value.integer.value[0];
+	int change;
+
+	down(&codec->spdif_mutex);
+	change = codec->spdif_in_enable != val;
+	if (change || codec->in_resume) {
+		codec->spdif_in_enable = val;
+		snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_DIGI_CONVERT_1, val);
+	}
+	up(&codec->spdif_mutex);
+	return change;
+}
+
+static int snd_hda_spdif_in_status_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	struct hda_codec *codec = snd_kcontrol_chip(kcontrol);
+	hda_nid_t nid = kcontrol->private_value;
+	unsigned short val;
+	unsigned int sbits;
+
+	val = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_DIGI_CONVERT, 0);
+	sbits = convert_to_spdif_status(val);
+	ucontrol->value.iec958.status[0] = sbits;
+	ucontrol->value.iec958.status[1] = sbits >> 8;
+	ucontrol->value.iec958.status[2] = sbits >> 16;
+	ucontrol->value.iec958.status[3] = sbits >> 24;
+	return 0;
+}
+
+static snd_kcontrol_new_t dig_in_ctls[] = {
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = SNDRV_CTL_NAME_IEC958("",CAPTURE,SWITCH),
+		.info = snd_hda_spdif_in_switch_info,
+		.get = snd_hda_spdif_in_switch_get,
+		.put = snd_hda_spdif_in_switch_put,
+	},
+	{
+		.access = SNDRV_CTL_ELEM_ACCESS_READ,
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = SNDRV_CTL_NAME_IEC958("",CAPTURE,DEFAULT),
+		.info = snd_hda_spdif_mask_info,
+		.get = snd_hda_spdif_in_status_get,
+	},
+	{ } /* end */
+};
+
+/**
+ * snd_hda_create_spdif_in_ctls - create Input SPDIF-related controls
+ * @codec: the HDA codec
+ * @nid: audio in widget NID
+ *
+ * Creates controls related with the SPDIF input.
+ * Called from each patch supporting the SPDIF in.
+ *
+ * Returns 0 if successful, or a negative error code.
+ */
+int snd_hda_create_spdif_in_ctls(struct hda_codec *codec, hda_nid_t nid)
+{
+	int err;
+	snd_kcontrol_t *kctl;
+	snd_kcontrol_new_t *dig_mix;
+
+	for (dig_mix = dig_in_ctls; dig_mix->name; dig_mix++) {
+		kctl = snd_ctl_new1(dig_mix, codec);
+		kctl->private_value = nid;
+		if ((err = snd_ctl_add(codec->bus->card, kctl)) < 0)
+			return err;
+	}
+	codec->spdif_in_enable = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_DIGI_CONVERT, 0) & 1;
+	return 0;
+}
+
 
 /**
  * snd_hda_build_controls - build mixer controls
@@ -1704,12 +1796,21 @@ int snd_hda_resume_ctls(struct hda_codec *codec, snd_kcontrol_new_t *knew)
 }
 
 /**
- * snd_hda_resume_spdi_out - resume the digital I/O
+ * snd_hda_resume_spdif_out - resume the digital out
  * @codec: the HDA codec
  */
 int snd_hda_resume_spdif_out(struct hda_codec *codec)
 {
 	return snd_hda_resume_ctls(codec, dig_mixes);
+}
+
+/**
+ * snd_hda_resume_spdif_in - resume the digital in
+ * @codec: the HDA codec
+ */
+int snd_hda_resume_spdif_in(struct hda_codec *codec)
+{
+	return snd_hda_resume_ctls(codec, dig_in_ctls);
 }
 #endif
 

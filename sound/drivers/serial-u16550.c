@@ -232,7 +232,7 @@ static void snd_uart16550_io_loop(snd_uart16550_t * uart)
 			}
 			else if ((uart->filemode & SERIAL_MODE_INPUT_OPEN) && (uart->midi_input[substream] != NULL)) {
 				snd_rawmidi_receive(uart->midi_input[substream], &c, 1);
-		}
+			}
 		} else if ((uart->filemode & SERIAL_MODE_INPUT_OPEN) && (uart->midi_input[substream] != NULL)) {
 			snd_rawmidi_receive(uart->midi_input[substream], &c, 1);
 		}

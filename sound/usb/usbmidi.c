@@ -88,6 +88,8 @@ struct usb_protocol_ops {
 	void (*input)(snd_usb_midi_in_endpoint_t*, uint8_t*, int);
 	void (*output)(snd_usb_midi_out_endpoint_t*);
 	void (*output_packet)(struct urb*, uint8_t, uint8_t, uint8_t, uint8_t);
+	void (*init_out_endpoint)(snd_usb_midi_out_endpoint_t*);
+	void (*finish_out_endpoint)(snd_usb_midi_out_endpoint_t*);
 };
 
 struct snd_usb_midi {
@@ -127,6 +129,7 @@ struct snd_usb_midi_out_endpoint {
 #define STATE_SYSEX_2	6
 		uint8_t data[2];
 	} ports[0x10];
+	int current_port;
 };
 
 struct snd_usb_midi_in_endpoint {
@@ -135,6 +138,8 @@ struct snd_usb_midi_in_endpoint {
 	struct usbmidi_in_port {
 		snd_rawmidi_substream_t* substream;
 	} ports[0x10];
+	int seen_f5;
+	int current_port;
 };
 
 static void snd_usbmidi_do_output(snd_usb_midi_out_endpoint_t* ep);
@@ -264,6 +269,22 @@ static void snd_usbmidi_out_tasklet(unsigned long data)
 	snd_usb_midi_out_endpoint_t* ep = (snd_usb_midi_out_endpoint_t *) data;
 
 	snd_usbmidi_do_output(ep);
+}
+
+/* helper function to send static data that may not DMA-able */
+static int send_bulk_static_data(snd_usb_midi_out_endpoint_t* ep,
+				 const void *data, int len)
+{
+	int err;
+	void *buf = kmalloc(len, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+	memcpy(buf, data, len);
+	dump_urb("sending", buf, len);
+	err = usb_bulk_msg(ep->umidi->chip->dev, ep->urb->pipe, buf, len,
+			   NULL, HZ / 4);
+	kfree(buf);
+	return err;
 }
 
 /*
@@ -528,6 +549,134 @@ static struct usb_protocol_ops snd_usbmidi_motu_ops = {
 	.output = snd_usbmidi_motu_output,
 };
 
+/*
+ * Emagic USB MIDI protocol: raw MIDI with "F5 xx" port switching.
+ */
+
+static void snd_usbmidi_emagic_init_out(snd_usb_midi_out_endpoint_t* ep)
+{
+	static const u8 init_data[] = {
+		/* initialization magic: "get version" */
+		0xf0,
+		0x00, 0x20, 0x31,	/* Emagic */
+		0x64,			/* Unitor8 */
+		0x0b,			/* version number request */
+		0x00,			/* command version */
+		0x00,			/* EEPROM, box 0 */
+		0xf7
+	};
+	send_bulk_static_data(ep, init_data, sizeof(init_data));
+	/* while we're at it, pour on more magic */
+	send_bulk_static_data(ep, init_data, sizeof(init_data));
+}
+
+static void snd_usbmidi_emagic_finish_out(snd_usb_midi_out_endpoint_t* ep)
+{
+	static const u8 finish_data[] = {
+		/* switch to patch mode with last preset */
+		0xf0,
+		0x00, 0x20, 0x31,	/* Emagic */
+		0x64,			/* Unitor8 */
+		0x10,			/* patch switch command */
+		0x00,			/* command version */
+		0x7f,			/* to all boxes */
+		0x40,			/* last preset in EEPROM */
+		0xf7
+	};
+	send_bulk_static_data(ep, finish_data, sizeof(finish_data));
+}
+
+static void snd_usbmidi_emagic_input(snd_usb_midi_in_endpoint_t* ep,
+				     uint8_t* buffer, int buffer_length)
+{
+	/* ignore padding bytes at end of buffer */
+	while (buffer_length > 0 && buffer[buffer_length - 1] == 0xff)
+		--buffer_length;
+
+	/* handle F5 at end of last buffer */
+	if (ep->seen_f5)
+		goto switch_port;
+
+	while (buffer_length > 0) {
+		int i;
+
+		/* determine size of data until next F5 */
+		for (i = 0; i < buffer_length; ++i)
+			if (buffer[i] == 0xf5)
+				break;
+		snd_usbmidi_input_data(ep, ep->current_port, buffer, i);
+		buffer += i;
+		buffer_length -= i;
+
+		if (buffer_length <= 0)
+			break;
+		/* assert(buffer[0] == 0xf5); */
+		ep->seen_f5 = 1;
+		++buffer;
+		--buffer_length;
+
+	switch_port:
+		if (buffer_length <= 0)
+			break;
+		if (buffer[0] < 0x80) {
+			ep->current_port = (buffer[0] - 1) & 15;
+			++buffer;
+			--buffer_length;
+		}
+		ep->seen_f5 = 0;
+	}
+}
+
+static void snd_usbmidi_emagic_output(snd_usb_midi_out_endpoint_t* ep)
+{
+	int port0 = ep->current_port;
+	uint8_t* buf = ep->urb->transfer_buffer;
+	int buf_free = ep->max_transfer;
+	int length, i;
+
+	for (i = 0; i < 0x10; ++i) {
+		/* round-robin, starting at the last current port */
+		int portnum = (port0 + i) & 15;
+		usbmidi_out_port_t* port = &ep->ports[portnum];
+
+		if (!port->active)
+			continue;
+		if (snd_rawmidi_transmit_peek(port->substream, buf, 1) != 1) {
+			port->active = 0;
+			continue;
+		}
+
+		if (portnum != ep->current_port) {
+			if (buf_free < 2)
+				break;
+			ep->current_port = portnum;
+			buf[0] = 0xf5;
+			buf[1] = (portnum + 1) & 15;
+			buf += 2;
+			buf_free -= 2;
+		}
+
+		if (buf_free < 1)
+			break;
+		length = snd_rawmidi_transmit(port->substream, buf, buf_free);
+		if (length > 0) {
+			buf += length;
+			buf_free -= length;
+			if (buf_free < 1)
+				break;
+		}
+	}
+	ep->urb->transfer_buffer_length = ep->max_transfer - buf_free;
+}
+
+static struct usb_protocol_ops snd_usbmidi_emagic_ops = {
+	.input = snd_usbmidi_emagic_input,
+	.output = snd_usbmidi_emagic_output,
+	.init_out_endpoint = snd_usbmidi_emagic_init_out,
+	.finish_out_endpoint = snd_usbmidi_emagic_finish_out,
+};
+
+
 static int snd_usbmidi_output_open(snd_rawmidi_substream_t* substream)
 {
 	snd_usb_midi_t* umidi = substream->rmidi->private_data;
@@ -725,6 +874,9 @@ static int snd_usbmidi_out_endpoint_create(snd_usb_midi_t* umidi,
 			ep->ports[i].cable = i << 4;
 		}
 
+	if (umidi->usb_protocol_ops->init_out_endpoint)
+		umidi->usb_protocol_ops->init_out_endpoint(ep);
+
 	rep->out = ep;
 	return 0;
 }
@@ -757,8 +909,11 @@ void snd_usbmidi_disconnect(struct list_head* p, struct usb_driver *driver)
 	umidi = list_entry(p, snd_usb_midi_t, list);
 	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i) {
 		snd_usb_midi_endpoint_t* ep = &umidi->endpoints[i];
-		if (ep->out && ep->out->urb)
+		if (ep->out && ep->out->urb) {
 			usb_kill_urb(ep->out->urb);
+			if (umidi->usb_protocol_ops->finish_out_endpoint)
+				umidi->usb_protocol_ops->finish_out_endpoint(ep->out);
+		}
 		if (ep->in && ep->in->urb)
 			usb_kill_urb(ep->in->urb);
 	}
@@ -867,6 +1022,10 @@ static struct {
 	/* MOTU Fastlane */
 	{0x07fd, 0x0001, 0, "%s MIDI A"},
 	{0x07fd, 0x0001, 1, "%s MIDI B"},
+	/* Emagic Unitor8/AMT8/MT4 */
+	{0x086a, 0x0001, 8, "%s Broadcast"},
+	{0x086a, 0x0002, 8, "%s Broadcast"},
+	{0x086a, 0x0003, 4, "%s Broadcast"},
 };
 
 static void snd_usbmidi_init_substream(snd_usb_midi_t* umidi,
@@ -1340,6 +1499,12 @@ int snd_usb_create_midi_interface(snd_usb_audio_t* chip,
 		case QUIRK_MIDI_MOTU:
 			umidi->usb_protocol_ops = &snd_usbmidi_motu_ops;
 			err = snd_usbmidi_detect_per_port_endpoints(umidi, endpoints);
+			break;
+		case QUIRK_MIDI_EMAGIC:
+			umidi->usb_protocol_ops = &snd_usbmidi_emagic_ops;
+			memcpy(&endpoints[0], quirk->data,
+			       sizeof(snd_usb_midi_endpoint_info_t));
+			err = snd_usbmidi_detect_endpoints(umidi, &endpoints[0], 1);
 			break;
 		default:
 			snd_printd(KERN_ERR "invalid quirk type %d\n", quirk->type);

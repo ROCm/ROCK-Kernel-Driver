@@ -60,6 +60,7 @@ int snd_hda_mixer_amp_switch_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 int snd_hda_mixer_amp_switch_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol);
 
 int snd_hda_create_spdif_out_ctls(struct hda_codec *codec, hda_nid_t nid);
+int snd_hda_create_spdif_in_ctls(struct hda_codec *codec, hda_nid_t nid);
 
 /*
  * input MUX helper
@@ -138,6 +139,7 @@ int snd_hda_add_new_ctls(struct hda_codec *codec, snd_kcontrol_new_t *knew);
 #ifdef CONFIG_PM
 int snd_hda_resume_ctls(struct hda_codec *codec, snd_kcontrol_new_t *knew);
 int snd_hda_resume_spdif_out(struct hda_codec *codec);
+int snd_hda_resume_spdif_in(struct hda_codec *codec);
 #endif
 
 /*

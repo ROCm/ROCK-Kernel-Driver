@@ -2036,8 +2036,11 @@ int patch_cm9761(ac97_t *ac97)
 {
 	unsigned short val;
 
-	/* CM9761 has no Master and PCM volume although the register reacts */
-	ac97->flags |= AC97_HAS_NO_MASTER_VOL | AC97_HAS_NO_PCM_VOL;
+	/* CM9761 has no PCM volume although the register reacts */
+	/* Master volume seems to have _some_ influence on the analog
+	 * input sounds
+	 */
+	ac97->flags |= /*AC97_HAS_NO_MASTER_VOL |*/ AC97_HAS_NO_PCM_VOL;
 	snd_ac97_write_cache(ac97, AC97_MASTER, 0x8808);
 	snd_ac97_write_cache(ac97, AC97_PCM, 0x8808);
 
@@ -2059,7 +2062,8 @@ int patch_cm9761(ac97_t *ac97)
         ac97->ext_id |= AC97_EI_SPDIF;
 	/* to be sure: we overwrite the ext status bits */
 	snd_ac97_write_cache(ac97, AC97_EXTENDED_STATUS, 0x05c0);
-	snd_ac97_write_cache(ac97, AC97_CM9761_SPDIF_CTRL, 0x0209);
+	/* Don't set 0x0200 here.  This results in the silent analog output */
+	snd_ac97_write_cache(ac97, AC97_CM9761_SPDIF_CTRL, 0x0009);
 	ac97->rates[AC97_RATES_SPDIF] = SNDRV_PCM_RATE_48000; /* 48k only */
 
 	/* set-up multi channel */
@@ -2086,7 +2090,7 @@ int patch_cm9761(ac97_t *ac97)
 		val = 0x321c;
 #endif
 	val = snd_ac97_read(ac97, AC97_CM9761_MULTI_CHAN);
-	val |= (1 << 4);
+	val |= (1 << 4); /* front on */
 	snd_ac97_write_cache(ac97, AC97_CM9761_MULTI_CHAN, val);
 
 	/* FIXME: set up GPIO */

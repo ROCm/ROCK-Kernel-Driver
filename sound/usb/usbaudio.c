@@ -2970,6 +2970,7 @@ static int snd_usb_create_quirk(snd_usb_audio_t *chip,
 	case QUIRK_MIDI_MIDIMAN:
 	case QUIRK_MIDI_NOVATION:
 	case QUIRK_MIDI_MOTU:
+	case QUIRK_MIDI_EMAGIC:
 		return snd_usb_create_midi_interface(chip, iface, quirk);
 	case QUIRK_COMPOSITE:
 		return create_composite_quirk(chip, iface, quirk);

@@ -525,3 +525,15 @@ EXPORT_SYMBOL(snd_midi_event_no_status);
 EXPORT_SYMBOL(snd_midi_event_encode);
 EXPORT_SYMBOL(snd_midi_event_encode_byte);
 EXPORT_SYMBOL(snd_midi_event_decode);
+
+static int __init alsa_seq_midi_event_init(void)
+{
+	return 0;
+}
+
+static void __exit alsa_seq_midi_event_exit(void)
+{
+}
+
+module_init(alsa_seq_midi_event_init)
+module_exit(alsa_seq_midi_event_exit)

@@ -35,6 +35,7 @@
 #include <sound/pcm.h>
 #include <sound/ac97_codec.h>
 #include <sound/info.h>
+#include <sound/control.h>
 #include <sound/initval.h>
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
@@ -281,9 +282,60 @@ static struct pci_device_id snd_intel8x0m_ids[] = {
 #endif
 	{ 0, }
 };
+static int snd_intel8x0m_switch_default_get(snd_kcontrol_t *kcontrol,
+					    snd_ctl_elem_value_t *ucontrol);
+static int snd_intel8x0m_switch_default_put(snd_kcontrol_t *kcontrol,
+					    snd_ctl_elem_value_t *ucontrol);
+static int snd_intel8x0m_switch_default_info(snd_kcontrol_t *kcontrol,
+					     snd_ctl_elem_info_t *uinfo);
+
+#define PRIVATE_VALUE_INITIALIZER(r,m) (((r) & 0xffff) << 16 | ((m) & 0xffff))
+#define PRIVATE_VALUE_MASK(control) ((control)->private_value & 0xffff)
+#define PRIVATE_VALUE_REG(control) (((control)->private_value >> 16) & 0xffff)
+
+static snd_kcontrol_new_t snd_intel8x0m_mixer_switches[] __devinitdata = {
+  { .name  = "Off-hook Switch",
+    .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+    .info  = snd_intel8x0m_switch_default_info,
+    .get   = snd_intel8x0m_switch_default_get,
+    .put   = snd_intel8x0m_switch_default_put,
+    .private_value = PRIVATE_VALUE_INITIALIZER(AC97_GPIO_STATUS,AC97_GPIO_LINE1_OH)
+  }
+};
 
 MODULE_DEVICE_TABLE(pci, snd_intel8x0m_ids);
 
+static int snd_intel8x0m_switch_default_info(snd_kcontrol_t *kcontrol,
+					     snd_ctl_elem_info_t *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int snd_intel8x0m_switch_default_get(snd_kcontrol_t *kcontrol,
+					    snd_ctl_elem_value_t *ucontrol)
+{
+	unsigned short mask = PRIVATE_VALUE_MASK(kcontrol);
+	unsigned short reg = PRIVATE_VALUE_REG(kcontrol);
+	intel8x0_t *chip = snd_kcontrol_chip(kcontrol);
+	unsigned int status;
+	status = snd_ac97_read(chip->ac97, reg) & mask ? 1 : 0;
+	ucontrol->value.integer.value[0] = status;
+	return 0;
+}
+static int snd_intel8x0m_switch_default_put(snd_kcontrol_t *kcontrol,
+					    snd_ctl_elem_value_t *ucontrol)
+{
+	unsigned short mask = PRIVATE_VALUE_MASK(kcontrol);
+	unsigned short reg = PRIVATE_VALUE_REG(kcontrol);
+	intel8x0_t *chip = snd_kcontrol_chip(kcontrol);
+	unsigned short new_status = ucontrol->value.integer.value[0] ? mask : ~mask;
+	return snd_ac97_update_bits(chip->ac97, reg,
+				    mask, new_status);
+}
 /*
  *  Lowlevel I/O - busmaster
  */
@@ -638,17 +690,12 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 
 static int snd_intel8x0m_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 {
-	ichdev_t *ichdev = get_ichdev(substream);
 	/* hook off/on on start/stop */
-	/* TODO: move it to ac97 controls */
+	/* Moved this to mixer control */
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		snd_ac97_update_bits(ichdev->ac97, AC97_GPIO_STATUS,
-				     AC97_GPIO_LINE1_OH, AC97_GPIO_LINE1_OH);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		snd_ac97_update_bits(ichdev->ac97, AC97_GPIO_STATUS,
-				     AC97_GPIO_LINE1_OH, ~AC97_GPIO_LINE1_OH);
 		break;
 	default:
 		return -EINVAL;
@@ -890,6 +937,7 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 	ac97_t *x97;
 	int err;
 	unsigned int glob_sta = 0;
+	unsigned int idx;
 	static ac97_bus_ops_t ops = {
 		.write = snd_intel8x0_codec_write,
 		.read = snd_intel8x0_codec_read,
@@ -921,9 +969,13 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		return err;
 	}
 	chip->ac97 = x97;
-	if(ac97_is_modem(x97) && !chip->ichd[ICHD_MDMIN].ac97 ) {
+	if(ac97_is_modem(x97) && !chip->ichd[ICHD_MDMIN].ac97) {
 		chip->ichd[ICHD_MDMIN].ac97 = x97;
 		chip->ichd[ICHD_MDMOUT].ac97 = x97;
+	}
+	for (idx = 0; idx < ARRAY_SIZE(snd_intel8x0m_mixer_switches); idx++) {
+		if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&snd_intel8x0m_mixer_switches[idx], chip))) < 0)
+			goto __err;
 	}
 
 	chip->in_ac97_init = 0;

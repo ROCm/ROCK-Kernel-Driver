@@ -493,6 +493,11 @@ static int alc_build_controls(struct hda_codec *codec)
 		if (err < 0)
 			return err;
 	}
+	if (spec->dig_in_nid) {
+		err = snd_hda_create_spdif_in_ctls(codec, spec->dig_in_nid);
+		if (err < 0)
+			return err;
+	}
 	return 0;
 }
 
@@ -735,6 +740,8 @@ static int alc_resume(struct hda_codec *codec)
 	}
 	if (spec->multiout.dig_out_nid)
 		snd_hda_resume_spdif_out(codec);
+	if (spec->dig_in_nid)
+		snd_hda_resume_spdif_in(codec);
 
 	return 0;
 }
@@ -1432,6 +1439,7 @@ static int patch_alc882(struct hda_codec *codec)
 	spec->num_mixers++;
 
 	spec->multiout.dig_out_nid = ALC880_DIGOUT_NID;
+	spec->dig_in_nid = ALC880_DIGIN_NID;
 	spec->front_panel = 1;
 	spec->init_verbs = alc882_init_verbs;
 	spec->channel_mode = alc882_ch_modes;

@@ -1763,6 +1763,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	},
 	{
 		.vendor = 0x1028,
+		.device = 0x012c,
+		.name = "Dell Precision 650",	/* AD1981A */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x1028,
 		.device = 0x012d,
 		.name = "Dell Precision 450",	/* AD1981B*/
 		.type = AC97_TUNE_HP_ONLY

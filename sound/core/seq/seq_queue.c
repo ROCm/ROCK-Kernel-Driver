@@ -650,7 +650,7 @@ void snd_seq_queue_remove_cells(int client, snd_seq_remove_events_t *info)
 /*
  * send events to all subscribed ports
  */
-static void queue_broadcast_event(queue_t *q, snd_seq_event_t *ev, int from_timer_port, int atomic, int hop)
+static void queue_broadcast_event(queue_t *q, snd_seq_event_t *ev, int atomic, int hop)
 {
 	snd_seq_event_t sev;
 
@@ -661,60 +661,58 @@ static void queue_broadcast_event(queue_t *q, snd_seq_event_t *ev, int from_time
 	sev.queue = q->queue;
 	sev.data.queue.queue = q->queue;
 
-	if (from_timer_port) {
-		/* broadcast events from Timer port */
-		sev.source.client = SNDRV_SEQ_CLIENT_SYSTEM;
-		sev.source.port = SNDRV_SEQ_PORT_SYSTEM_TIMER;
-		sev.dest.client = SNDRV_SEQ_ADDRESS_SUBSCRIBERS;
-		snd_seq_kernel_client_dispatch(SNDRV_SEQ_CLIENT_SYSTEM, &sev, atomic, hop);
-	}
+	/* broadcast events from Timer port */
+	sev.source.client = SNDRV_SEQ_CLIENT_SYSTEM;
+	sev.source.port = SNDRV_SEQ_PORT_SYSTEM_TIMER;
+	sev.dest.client = SNDRV_SEQ_ADDRESS_SUBSCRIBERS;
+	snd_seq_kernel_client_dispatch(SNDRV_SEQ_CLIENT_SYSTEM, &sev, atomic, hop);
 }
 
 /*
  * process a received queue-control event.
  * this function is exported for seq_sync.c.
  */
-void snd_seq_queue_process_event(queue_t *q, snd_seq_event_t *ev, int from_timer_port, int atomic, int hop)
+void snd_seq_queue_process_event(queue_t *q, snd_seq_event_t *ev, int atomic, int hop)
 {
 	switch (ev->type) {
 	case SNDRV_SEQ_EVENT_START:
 		snd_seq_prioq_leave(q->tickq, ev->source.client, 1);
 		snd_seq_prioq_leave(q->timeq, ev->source.client, 1);
 		if (! snd_seq_timer_start(q->timer))
-			queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
+			queue_broadcast_event(q, ev, atomic, hop);
 		break;
 
 	case SNDRV_SEQ_EVENT_CONTINUE:
 		if (! snd_seq_timer_continue(q->timer))
-			queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
+			queue_broadcast_event(q, ev, atomic, hop);
 		break;
 
 	case SNDRV_SEQ_EVENT_STOP:
 		snd_seq_timer_stop(q->timer);
-		queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
+		queue_broadcast_event(q, ev, atomic, hop);
 		break;
 
 	case SNDRV_SEQ_EVENT_TEMPO:
 		snd_seq_timer_set_tempo(q->timer, ev->data.queue.param.value);
-		queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
+		queue_broadcast_event(q, ev, atomic, hop);
 		break;
 
 	case SNDRV_SEQ_EVENT_SETPOS_TICK:
 		if (snd_seq_timer_set_position_tick(q->timer, ev->data.queue.param.time.tick) == 0) {
-			queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
+			queue_broadcast_event(q, ev, atomic, hop);
 		}
 		break;
 
 	case SNDRV_SEQ_EVENT_SETPOS_TIME:
 		if (snd_seq_timer_set_position_time(q->timer, ev->data.queue.param.time.time) == 0) {
-			queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
+			queue_broadcast_event(q, ev, atomic, hop);
 		}
 		break;
 	case SNDRV_SEQ_EVENT_QUEUE_SKEW:
 		if (snd_seq_timer_set_skew(q->timer,
 					   ev->data.queue.param.skew.value,
 					   ev->data.queue.param.skew.base) == 0) {
-			queue_broadcast_event(q, ev, from_timer_port, atomic, hop);
+			queue_broadcast_event(q, ev, atomic, hop);
 		}
 		break;
 	}
@@ -740,7 +738,7 @@ int snd_seq_control_queue(snd_seq_event_t *ev, int atomic, int hop)
 		return -EPERM;
 	}
 
-	snd_seq_queue_process_event(q, ev, 1, atomic, hop);
+	snd_seq_queue_process_event(q, ev, atomic, hop);
 
 	queue_access_unlock(q);
 	queuefree(q);

@@ -2480,7 +2480,8 @@ static void vortex_codec_init(vortex_t * vortex)
 	int i;
 
 	for (i = 0; i < 32; i++) {
-		hwwrite(vortex->mmio, (VORTEX_CODEC_CHN + (i << 2)), 0);
+		/* the windows driver writes -i, so we write -i */
+		hwwrite(vortex->mmio, (VORTEX_CODEC_CHN + (i << 2)), -i);
 		msleep(2);
 	}
 	if (0) {
@@ -2502,7 +2503,7 @@ static void vortex_codec_init(vortex_t * vortex)
 		hwwrite(vortex->mmio, VORTEX_CODEC_CTRL, 0x00e8);
 	}
 	for (i = 0; i < 32; i++) {
-		hwwrite(vortex->mmio, (VORTEX_CODEC_CHN + (i << 2)), 0);
+		hwwrite(vortex->mmio, (VORTEX_CODEC_CHN + (i << 2)), -i);
 		msleep(5);
 	}
 	hwwrite(vortex->mmio, VORTEX_CODEC_CTRL, 0xe8);
