@@ -223,9 +223,8 @@ static struct sysfs_ops part_sysfs_ops = {
 static ssize_t part_dev_read(struct hd_struct * p, char *page)
 {
 	struct gendisk *disk = container_of(p->kobj.parent,struct gendisk,kobj);
-	int part = p->partno;
-	dev_t base = MKDEV(disk->major, disk->first_minor); 
-	return sprintf(page, "%04x\n", (unsigned)(base + part));
+	dev_t dev = MKDEV(disk->major, disk->first_minor + p->partno); 
+	return print_dev_t(page, dev);
 }
 static ssize_t part_start_read(struct hd_struct * p, char *page)
 {
