@@ -100,6 +100,7 @@ struct cpufreq_policy {
 
 #define CPUFREQ_PRECHANGE	(0)
 #define CPUFREQ_POSTCHANGE	(1)
+#define CPUFREQ_RESUMECHANGE	(8)
 
 struct cpufreq_freqs {
 	unsigned int cpu;	/* cpu nr */
@@ -210,6 +211,10 @@ struct cpufreq_driver {
 #define CPUFREQ_PANIC_OUTOFSYNC	0x04	/* panic if cpufreq's opinion of
 					 * current frequency differs from
 					 * actual frequency */
+#define CPUFREQ_PANIC_RESUME_OUTOFSYNC 0x08 /* panic if cpufreq's opinion of
+					 * current frequency differs from
+					 * actual frequency on resume
+					 * from sleep. */
 
 
 int cpufreq_register_driver(struct cpufreq_driver *driver_data);
