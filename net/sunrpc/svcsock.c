@@ -414,7 +414,6 @@ svc_sendto(struct svc_rqst *rqstp, struct xdr_buf *xdr)
 	}
 	/* send tail */
 	if (xdr->tail[0].iov_len) {
-		/* The tail *will* be in respages[0]; */
 		result = sock->ops->sendpage(sock, rqstp->rq_respages[rqstp->rq_restailpage], 
 					     ((unsigned long)xdr->tail[0].iov_base)& (PAGE_SIZE-1),
 					     xdr->tail[0].iov_len, 0);
