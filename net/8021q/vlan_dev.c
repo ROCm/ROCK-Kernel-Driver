@@ -757,6 +757,34 @@ int vlan_dev_stop(struct net_device *dev)
 	vlan_flush_mc_list(dev);
 	return 0;
 }
+
+int vlan_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+{
+	struct net_device *real_dev = VLAN_DEV_INFO(dev)->real_dev;
+	struct ifreq ifrr;
+	int err = -EOPNOTSUPP;
+
+	strncpy(ifrr.ifr_name, real_dev->name, IFNAMSIZ);
+	ifrr.ifr_ifru = ifr->ifr_ifru;
+
+	switch(cmd) {
+	case SIOCGMIIPHY:
+	case SIOCGMIIREG:
+	case SIOCSMIIREG:
+		if (real_dev->do_ioctl && netif_device_present(real_dev)) 
+			err = real_dev->do_ioctl(dev, &ifrr, cmd);
+		break;
+
+	case SIOCETHTOOL:
+		err = dev_ethtool(&ifrr);
+	}
+
+	if (!err) 
+		ifr->ifr_ifru = ifrr.ifr_ifru;
+
+	return err;
+}
+
 /** Taken from Gleb + Lennert's VLAN code, and modified... */
 void vlan_dev_set_multicast_list(struct net_device *vlan_dev)
 {

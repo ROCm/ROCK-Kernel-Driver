@@ -358,6 +358,7 @@ static void vlan_setup(struct net_device *new_dev)
 	new_dev->set_mac_address = vlan_dev_set_mac_address;
 	new_dev->set_multicast_list = vlan_dev_set_multicast_list;
 	new_dev->destructor = free_netdev;
+	new_dev->do_ioctl = vlan_dev_ioctl;
 }
 
 /*  Attach a VLAN device to a mac address (ie Ethernet Card).
