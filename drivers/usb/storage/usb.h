@@ -100,13 +100,12 @@ struct us_unusual_dev {
 						    Win/MacOS compatibility */
 #define US_FL_START_STOP      0x00000004 /* ignore START_STOP commands	    */
 #define US_FL_IGNORE_SER      0x00000010 /* Ignore the serial number given  */
-#define US_FL_SCM_MULT_TARG   0x00000020 /* supports multiple targets */
-#define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs fixing */
+#define US_FL_SCM_MULT_TARG   0x00000020 /* supports multiple targets	    */
+#define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs fixing   */
 
+#define US_FL_DEV_ATTACHED    0x00010000 /* is the device attached?	    */
+#define US_FLIDX_IP_WANTED   17  /* 0x00020000	is an IRQ expected?	    */
 
-/* kernel thread actions */
-#define US_ACT_COMMAND		1
-#define US_ACT_EXIT		5
 
 /* processing state machine states */
 #define US_STATE_IDLE		1
@@ -128,12 +127,11 @@ struct us_data {
 	/* The device we're working with
 	 * It's important to note:
 	 *    (o) you must hold dev_semaphore to change pusb_dev
-	 *    (o) DEV_ATTACHED in bitflags should change whenever pusb_dev does
+	 *    (o) DEV_ATTACHED in flags should change whenever pusb_dev does
 	 */
 	struct semaphore	dev_semaphore;	 /* protect pusb_dev */
 	struct usb_device	*pusb_dev;	 /* this usb_device */
-
-	unsigned int		flags;		 /* from filter initially */
+	unsigned long		flags;		 /* from filter initially */
 
 	/* information about the device -- always good */
 	char			vendor[USB_STOR_STRING_LEN];
@@ -165,16 +163,11 @@ struct us_data {
 	Scsi_Cmnd		*srb;		 /* current srb		*/
 
 	/* thread information */
-	Scsi_Cmnd		*queue_srb;	 /* the single queue slot */
-	int			action;		 /* what to do		  */
-	int			pid;		 /* control thread	  */
-	atomic_t		sm_state;
+	int			pid;		 /* control thread	 */
+	atomic_t		sm_state;	 /* what we are doing	 */
 
 	/* interrupt info for CBI devices -- only good if attached */
 	struct semaphore	ip_waitq;	 /* for CBI interrupts	 */
-	unsigned long		bitflags;	 /* single-bit flags:	 */
-#define IP_WANTED	1			 /* is an IRQ expected?	 */
-#define DEV_ATTACHED	2			 /* is the dev. attached?*/
 
 	/* interrupt communications data */
 	struct semaphore	irq_urb_sem;	 /* to protect irq_urb	 */
@@ -183,7 +176,7 @@ struct us_data {
 	unsigned char		irqdata[2];	 /* data from USB IRQ	 */
 
 	/* control and bulk communications data */
-	struct semaphore	current_urb_sem; /* to protect irq_urb	 */
+	struct semaphore	current_urb_sem; /* protect current_urb  */
 	struct urb		*current_urb;	 /* non-int USB requests */
 	struct usb_ctrlrequest	*dr;		 /* control requests	 */
 
@@ -192,7 +185,6 @@ struct us_data {
 
 	/* mutual exclusion structures */
 	struct completion	notify;		 /* thread begin/end	    */
-	spinlock_t		queue_exclusion; /* to protect data structs */
 	struct us_unusual_dev   *unusual_dev;	 /* If unusual device       */
 	void			*extra;		 /* Any extra data          */
 	extra_data_destructor	extra_destructor;/* extra data destructor   */
@@ -209,6 +201,8 @@ extern struct usb_driver usb_storage_driver;
 extern void fill_inquiry_response(struct us_data *us,
 	unsigned char *data, unsigned int data_len);
 
+/* The scsi_lock() and scsi_unlock() macros protect the sm_state and the
+ * single queue element srb for write access */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,3)
 #define scsi_unlock(host)	spin_unlock_irq(host->host_lock)
 #define scsi_lock(host)		spin_lock_irq(host->host_lock)

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg2 - AML execution - opcodes with 2 arguments
- *              $Revision: 108 $
+ *              $Revision: 109 $
  *
  *****************************************************************************/
 
@@ -359,7 +359,8 @@ acpi_ex_opcode_2A_1T_1R (
 			/* Object to be indexed is a Package */
 
 			if (index >= operand[0]->package.count) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Index value beyond package end\n"));
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Index value (%X) beyond package end (%X)\n",
+					index, operand[0]->package.count));
 				status = AE_AML_PACKAGE_LIMIT;
 				goto cleanup;
 			}
@@ -401,7 +402,8 @@ acpi_ex_opcode_2A_1T_1R (
 			/* Object to be indexed is a Buffer */
 
 			if (index >= operand[0]->buffer.length) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Index value beyond end of buffer\n"));
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Index value (%X) beyond end of buffer (%X)\n",
+					index, operand[0]->buffer.length));
 				status = AE_AML_BUFFER_LIMIT;
 				goto cleanup;
 			}
@@ -522,7 +524,8 @@ acpi_ex_opcode_2A_0T_1R (
 
 	default:
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_2A_0T_1R: Unknown opcode %X\n", walk_state->opcode));
+		ACPI_REPORT_ERROR (("Acpi_ex_opcode_2A_0T_1R: Unknown opcode %X\n",
+			walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
 	}

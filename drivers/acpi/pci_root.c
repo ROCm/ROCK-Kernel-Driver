@@ -1,5 +1,5 @@
 /*
- *  pci_root.c - ACPI PCI Root Bridge Driver ($Revision: 38 $)
+ *  pci_root.c - ACPI PCI Root Bridge Driver ($Revision: 39 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -154,7 +154,7 @@ acpi_pci_evaluate_crs (
 	root->mem_tra = acpi_pci_root_bus_tra ((acpi_resource *)
 			buffer.pointer, ACPI_MEMORY_RANGE);
 
-	kfree(buffer.pointer);
+	acpi_os_free(buffer.pointer);
 	return_VALUE(0);
 }
 

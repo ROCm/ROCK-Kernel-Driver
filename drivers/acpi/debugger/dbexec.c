@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbexec - debugger control method execution
- *              $Revision: 41 $
+ *              $Revision: 42 $
  *
  ******************************************************************************/
 
@@ -223,6 +223,9 @@ acpi_db_execute (
 	acpi_gbl_db_method_info.args = args;
 	acpi_gbl_db_method_info.flags = flags;
 
+	return_obj.pointer = NULL;
+	return_obj.length = ACPI_ALLOCATE_BUFFER;
+
 	acpi_db_execute_setup (&acpi_gbl_db_method_info);
 	status = acpi_db_execute_method (&acpi_gbl_db_method_info, &return_obj);
 
@@ -259,6 +262,10 @@ acpi_db_execute (
 			acpi_os_printf ("Execution of %s returned object %p Buflen %X\n",
 				acpi_gbl_db_method_info.pathname, return_obj.pointer, return_obj.length);
 			acpi_db_dump_object (return_obj.pointer, 1);
+		}
+		else {
+			acpi_os_printf ("No return object from execution of %s\n",
+				acpi_gbl_db_method_info.pathname);
 		}
 	}
 

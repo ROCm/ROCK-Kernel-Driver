@@ -1,5 +1,5 @@
 /*
- * acpi_processor.c - ACPI Processor Driver ($Revision: 66 $)
+ * acpi_processor.c - ACPI Processor Driver ($Revision: 69 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -616,8 +616,15 @@ acpi_processor_set_power_policy (
 	 * Set the default C1 promotion and C2 demotion policies, where we
 	 * promote from C1 to C2 after several (10) successive C1 transitions,
 	 * as we cannot (currently) measure the time spent in C1. Demote from
-	 * C2 to C1 after experiencing several (4) 'shorts' (time spent in C2
-	 * is less than the C2 transtion latency).
+	 * C2 to C1 anytime we experience a 'short' (time spent in C2 is less
+	 * than the C2 transtion latency).  Note the simplifying assumption 
+	 * that the 'cost' of a transition is amortized when we sleep for at
+	 * least as long as the transition's latency (thus the total transition
+	 * time is two times the latency).
+	 *
+	 * TBD: Measure C1 sleep times by instrumenting the core IRQ handler.
+	 * TBD: Demote to default C-State after long periods of activity.
+	 * TBD: Investigate policy's use of CPU utilization -vs- sleep duration.
 	 */
 	if (pr->power.states[ACPI_STATE_C2].valid) {
 		pr->power.states[ACPI_STATE_C1].promotion.threshold.count = 10;
@@ -625,7 +632,7 @@ acpi_processor_set_power_policy (
 			pr->power.states[ACPI_STATE_C2].latency_ticks;
 		pr->power.states[ACPI_STATE_C1].promotion.state = ACPI_STATE_C2;
 
-		pr->power.states[ACPI_STATE_C2].demotion.threshold.count = 4;
+		pr->power.states[ACPI_STATE_C2].demotion.threshold.count = 1;
 		pr->power.states[ACPI_STATE_C2].demotion.threshold.ticks =
 			pr->power.states[ACPI_STATE_C2].latency_ticks;
 		pr->power.states[ACPI_STATE_C2].demotion.state = ACPI_STATE_C1;
@@ -929,7 +936,7 @@ acpi_processor_get_performance_control (
 		pr->performance.status_register));
 
 end:
-	kfree(buffer.pointer);
+	acpi_os_free(buffer.pointer);
 
 	return_VALUE(result);
 }
@@ -1006,7 +1013,7 @@ acpi_processor_get_performance_states (
 	}
 
 end:
-	kfree(buffer.pointer);
+	acpi_os_free(buffer.pointer);
 
 	return_VALUE(result);
 }
@@ -2059,11 +2066,8 @@ acpi_processor_get_info (
 	if (!pr)
 		return_VALUE(-EINVAL);
 
-#ifdef CONFIG_SMP
-	/* FIXME: What should this be? -- RR */
 	if (num_online_cpus() > 1)
-		errata.smp = num_online_cpus();
-#endif
+		errata.smp = TRUE;
 
 	acpi_processor_errata(pr);
 

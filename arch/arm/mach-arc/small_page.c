@@ -50,7 +50,7 @@
  */
 
 struct order {
-	struct page *queue;
+	struct list_head queue;
 	unsigned int mask;		/* (1 << shift) - 1		*/
 	unsigned int shift;		/* (1 << shift) size of page	*/
 	unsigned int block_mask;	/* nr_blocks - 1		*/
@@ -60,10 +60,10 @@ struct order {
 
 static struct order orders[] = {
 #if PAGE_SIZE == 4096
-	{ NULL, 2047, 11,  1, 0x00000003 }
+	{ LIST_HEAD_INIT(orders[0].queue), 2047, 11,  1, 0x00000003 }
 #elif PAGE_SIZE == 32768
-	{ NULL, 2047, 11, 15, 0x0000ffff },
-	{ NULL, 8191, 13,  3, 0x0000000f }
+	{ LIST_HEAD_INIT(orders[0].queue), 2047, 11, 15, 0x0000ffff },
+	{ LIST_HEAD_INIT(orders[1].queue), 8191, 13,  3, 0x0000000f }
 #else
 #error unsupported page size
 #endif
@@ -75,70 +75,49 @@ static struct order orders[] = {
 
 static spinlock_t small_page_lock = SPIN_LOCK_UNLOCKED;
 
-static void add_page_to_queue(struct page *page, struct page **p)
-{
-#ifdef PEDANTIC
-	if (page->pprev_hash)
-		PAGE_BUG(page);
-#endif
-	page->next_hash = *p;
-	if (*p)
-		(*p)->pprev_hash = &page->next_hash;
-	*p = page;
-	page->pprev_hash = p;
-}
-
-static void remove_page_from_queue(struct page *page)
-{
-	if (page->pprev_hash) {
-		if (page->next_hash)
-			page->next_hash->pprev_hash = page->pprev_hash;
-		*page->pprev_hash = page->next_hash;
-		page->pprev_hash = NULL;
-	}
-}
-
 static unsigned long __get_small_page(int priority, struct order *order)
 {
 	unsigned long flags;
 	struct page *page;
 	int offset;
 
-	if (!order->queue)
-		goto need_new_page;
+	do {
+		spin_lock_irqsave(&small_page_lock, flags);
 
-	spin_lock_irqsave(&small_page_lock, flags);
-	page = order->queue;
+		if (list_empty(&order->queue))
+			goto need_new_page;
+
+		page = list_entry(order->queue.next, struct page, list);
 again:
 #ifdef PEDANTIC
-	if (USED_MAP(page) & ~order->all_used)
-		PAGE_BUG(page);
+		if (USED_MAP(page) & ~order->all_used)
+			PAGE_BUG(page);
 #endif
-	offset = ffz(USED_MAP(page));
-	SET_USED(page, offset);
-	if (USED_MAP(page) == order->all_used)
-		remove_page_from_queue(page);
-	spin_unlock_irqrestore(&small_page_lock, flags);
+		offset = ffz(USED_MAP(page));
+		SET_USED(page, offset);
+		if (USED_MAP(page) == order->all_used)
+			list_del_init(&page->list);
+		spin_unlock_irqrestore(&small_page_lock, flags);
 
-	return (unsigned long) page_address(page) + (offset << order->shift);
+		return (unsigned long) page_address(page) + (offset << order->shift);
 
 need_new_page:
-	page = alloc_page(priority);
+		spin_unlock_irqrestore(&small_page_lock, flags);
+		page = alloc_page(priority);
+		spin_lock_irqsave(&small_page_lock, flags);
 
-	spin_lock_irqsave(&small_page_lock, flags);
-	if (!order->queue) {
-		if (!page)
-			goto no_page;
-		SetPageReserved(page);
-		USED_MAP(page) = 0;
-		cli();
-		add_page_to_queue(page, &order->queue);
-	} else {
+		if (list_empty(&order->queue)) {
+			if (!page)
+				goto no_page;
+			SetPageReserved(page);
+			USED_MAP(page) = 0;
+			list_add(&page->list, &order->queue);
+			goto again;
+		}
+
+		spin_unlock_irqrestore(&small_page_lock, flags);
 		__free_page(page);
-		cli();
-		page = order->queue;
-	}
-	goto again;
+	} while (1);
 
 no_page:
 	spin_unlock_irqrestore(&small_page_lock, flags);
@@ -173,7 +152,7 @@ static void __free_small_page(unsigned long spage, struct order *order)
 		spin_lock_irqsave(&small_page_lock, flags);
 
 		if (USED_MAP(page) == order->all_used)
-			add_page_to_queue(page, &order->queue);
+			list_add(&page->list, &order->queue);
 
 		if (!TEST_AND_CLEAR_USED(page, spage))
 			goto already_free;
@@ -189,7 +168,7 @@ free_page:
 	/*
 	 * unlink the page from the small page queue and free it
 	 */
-	remove_page_from_queue(page);
+	list_del_init(&page->list);
 	spin_unlock_irqrestore(&small_page_lock, flags);
 	ClearPageReserved(page);
 	__free_page(page);

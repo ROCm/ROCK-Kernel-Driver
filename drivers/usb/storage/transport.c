@@ -344,6 +344,12 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
 			   len = srb->request_bufflen;
 	   }
 
+	/* According to the linux-scsi people, any command sent which
+	 * violates this invariant is a bug.  In the hopes of removing
+	 * all the complex logic above, let's find them and eliminate them.
+	 */
+	BUG_ON(len != srb->request_bufflen);
+
 	return len;
 }
 
@@ -354,24 +360,35 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
 /*
  * This is subtle, so pay attention:
  * ---------------------------------
- * We're very concered about races with a command abort.  Hanging this code is
- * a sure fire way to hang the kernel.
+ * We're very concerned about races with a command abort.  Hanging this code
+ * is a sure fire way to hang the kernel.  (Note that this discussion applies
+ * only to transactions resulting from a scsi queued-command, since only
+ * these transactions are subject to a scsi abort.  Other transactions, such
+ * as those occurring during device-specific initialization, must be handled
+ * by a separate code path.)
  *
- * The abort function first sets the machine state, then tries to acquire the
- * lock on the current_urb to abort it.
+ * The abort function first sets the machine state, then acquires the lock
+ * on the current_urb before checking if it needs to be aborted.
  *
- * Once a function grabs the current_urb_sem, then it -MUST- test the state to
- * see if we just got aborted before the lock was grabbed.  If so, it's
- * essential to release the lock and return.
+ * When a function submits the current_urb, it must first grab the
+ * current_urb_sem to prevent the abort function from trying to cancel the
+ * URB while the submit call is underway.  After a function submits the
+ * current_urb, it -MUST- test the state to see if we got aborted just before
+ * the submission.  If so, it's essential to abort the URB if it's still in
+ * progress.  Either way, the function must then release the lock and wait
+ * for the URB to finish.
  *
- * The idea is that, once the current_urb_sem is held, the state can't really
- * change anymore without also engaging the usb_unlink_urb() call _after_ the
- * URB is actually submitted.
+ * (It's also permissible, but not necessary, to test the state -before-
+ * submitting the URB.  Doing so would prevent an unnecessary submission if
+ * the transaction had already been aborted, but this is very unlikely to
+ * happen, because the abort would have to have been requested during actual
+ * kernel processing rather than during an I/O delay.)
  *
- * So, we've guaranteed that (after the sm_state test), if we do submit the
- * URB it will get aborted when we release the current_urb_sem.  And we've
- * also guaranteed that if the abort code was called before we held the
- * current_urb_sem, we can safely get out before the URB is submitted.
+ * The idea is that (1) once the state is changed to ABORTING, either the
+ * aborting function or the submitting function is guaranteed to call
+ * usb_unlink_urb() for an active URB, and (2) current_urb_sem prevents
+ * usb_unlink_urb() from being called more than once or from being called
+ * during usb_submit_urb().
  */
 
 /* This is the completion handler which will wake us up when an URB
@@ -385,10 +402,10 @@ static void usb_stor_blocking_completion(struct urb *urb)
 }
 
 /* This is the common part of the URB message submission code
- * This function expects the current_urb_sem to be held upon entry.
  *
- * All URBs from the usb-storage driver _must_ pass through this function
- * (or something like it) for the abort mechanisms to work properly.
+ * All URBs from the usb-storage driver involved in handling a queued scsi
+ * command _must_ pass through this function (or something like it) for the
+ * abort mechanisms to work properly.
  */
 static int usb_stor_msg_common(struct us_data *us)
 {
@@ -404,17 +421,28 @@ static int usb_stor_msg_common(struct us_data *us)
 	us->current_urb->error_count = 0;
 	us->current_urb->transfer_flags = USB_ASYNC_UNLINK;
 
-	/* submit the URB */
+	/* lock and submit the URB */
+	down(&(us->current_urb_sem));
 	status = usb_submit_urb(us->current_urb, GFP_NOIO);
 	if (status) {
 		/* something went wrong */
+		up(&(us->current_urb_sem));
 		return status;
 	}
 
-	/* wait for the completion of the URB */
+	/* has the current command been aborted? */
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+
+		/* cancel the URB, if it hasn't been cancelled already */
+		if (us->current_urb->status == -EINPROGRESS) {
+			US_DEBUGP("-- cancelling URB\n");
+			usb_unlink_urb(us->current_urb);
+		}
+	}
 	up(&(us->current_urb_sem));
+
+	/* wait for the completion of the URB */
 	wait_for_completion(&urb_done);
-	down(&(us->current_urb_sem));
 
 	/* return the URB status */
 	return us->current_urb->status;
@@ -436,29 +464,15 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 	us->dr->wIndex = cpu_to_le16(index);
 	us->dr->wLength = cpu_to_le16(size);
 
-	/* lock the URB */
-	down(&(us->current_urb_sem));
-
-	/* has the current command been aborted? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		up(&(us->current_urb_sem));
-		return 0;
-	}
-
-	/* fill the URB */
+	/* fill and submit the URB */
 	FILL_CONTROL_URB(us->current_urb, us->pusb_dev, pipe, 
 			 (unsigned char*) us->dr, data, size, 
 			 usb_stor_blocking_completion, NULL);
-
-	/* submit the URB */
 	status = usb_stor_msg_common(us);
 
 	/* return the actual length of the data transferred if no error*/
 	if (status >= 0)
 		status = us->current_urb->actual_length;
-
-	/* release the lock and return status */
-	up(&(us->current_urb_sem));
 	return status;
 }
 
@@ -470,27 +484,13 @@ int usb_stor_bulk_msg(struct us_data *us, void *data, int pipe,
 {
 	int status;
 
-	/* lock the URB */
-	down(&(us->current_urb_sem));
-
-	/* has the current command been aborted? */
-	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		up(&(us->current_urb_sem));
-		return 0;
-	}
-
-	/* fill the URB */
+	/* fill and submit the URB */
 	FILL_BULK_URB(us->current_urb, us->pusb_dev, pipe, data, len,
 		      usb_stor_blocking_completion, NULL);
-
-	/* submit the URB */
 	status = usb_stor_msg_common(us);
 
-	/* return the actual length of the data transferred */
+	/* store the actual length of the data transferred */
 	*act_len = us->current_urb->actual_length;
-
-	/* release the lock and return status */
-	up(&(us->current_urb_sem));
 	return status;
 }
 
@@ -845,31 +845,28 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 }
 
 /* Abort the currently running scsi command or device reset.
- */
+ * This must be called with scsi_lock(us->srb->host) held */
 void usb_stor_abort_transport(struct us_data *us)
 {
 	int state = atomic_read(&us->sm_state);
 
 	US_DEBUGP("usb_stor_abort_transport called\n");
 
-	/* If the current state is wrong or if there's
-	 *  no srb, then there's nothing to do */
-	BUG_ON((state != US_STATE_RUNNING && state != US_STATE_RESETTING));
-	BUG_ON(!(us->srb));
+	/* Normally the current state is RUNNING.  If the control thread
+	 * hasn't even started processing this command, the state will be
+	 * IDLE.  Anything else is a bug. */
+	BUG_ON((state != US_STATE_RUNNING && state != US_STATE_IDLE));
 
-	/* set state to abort */
+	/* set state to abort and release the lock */
 	atomic_set(&us->sm_state, US_STATE_ABORTING);
+	scsi_unlock(us->srb->host);
 
 	/* If the state machine is blocked waiting for an URB or an IRQ,
 	 * let's wake it up */
 
 	/* If we have an URB pending, cancel it.  Note that we guarantee with
-	 * the current_urb_sem that either (a) an URB has just been submitted,
-	 * or (b) the URB will never get submitted.  But, because of the use
-	 * of us->sm_state and current_urb_sem, we can't get an URB sumbitted
-	 * _after_ we set the state to US_STATE_ABORTING and this section of
-	 * code runs.  Thus we avoid deadlocks.
-	 */
+	 * the current_urb_sem that if a URB has just been submitted, it
+	 * won't be cancelled more than once. */
 	down(&(us->current_urb_sem));
 	if (us->current_urb->status == -EINPROGRESS) {
 		US_DEBUGP("-- cancelling URB\n");
@@ -878,10 +875,13 @@ void usb_stor_abort_transport(struct us_data *us)
 	up(&(us->current_urb_sem));
 
 	/* If we are waiting for an IRQ, simulate it */
-	if (test_bit(IP_WANTED, &us->bitflags)) {
+	if (test_bit(US_FLIDX_IP_WANTED, &us->flags)) {
 		US_DEBUGP("-- simulating missing IRQ\n");
 		usb_stor_CBI_irq(us->irq_urb);
 	}
+
+	/* Reacquire the lock */
+	scsi_lock(us->srb->host);
 }
 
 /*
@@ -903,7 +903,7 @@ void usb_stor_CBI_irq(struct urb *urb)
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 
 		/* was this a wanted interrupt? */
-		if (!test_and_clear_bit(IP_WANTED, &us->bitflags)) {
+		if (!test_and_clear_bit(US_FLIDX_IP_WANTED, &us->flags)) {
 			US_DEBUGP("ERROR: Unwanted interrupt received!\n");
 			return;
 		}
@@ -919,7 +919,7 @@ void usb_stor_CBI_irq(struct urb *urb)
 		US_DEBUGP("-- device has been removed\n");
 
 		/* was this a wanted interrupt? */
-		if (!test_and_clear_bit(IP_WANTED, &us->bitflags))
+		if (!test_and_clear_bit(US_FLIDX_IP_WANTED, &us->flags))
 			return;
 
 		/* indicate a transport error -- this is the best we can do */
@@ -943,7 +943,7 @@ void usb_stor_CBI_irq(struct urb *urb)
 	}
 
 	/* was this a wanted interrupt? */
-	if (!test_and_clear_bit(IP_WANTED, &us->bitflags)) {
+	if (!test_and_clear_bit(US_FLIDX_IP_WANTED, &us->flags)) {
 		US_DEBUGP("ERROR: Unwanted interrupt received!\n");
 		return;
 	}
@@ -965,7 +965,7 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	init_MUTEX_LOCKED(&(us->ip_waitq));
 
 	/* Set up for status notification */
-	set_bit(IP_WANTED, &us->bitflags);
+	set_bit(US_FLIDX_IP_WANTED, &us->flags);
 
 	/* COMMAND STAGE */
 	/* let's send the command via the control pipe */
@@ -978,7 +978,7 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 	US_DEBUGP("Call to usb_stor_control_msg() returned %d\n", result);
 	if (result < 0) {
 		/* Reset flag for status notification */
-		clear_bit(IP_WANTED, &us->bitflags);
+		clear_bit(US_FLIDX_IP_WANTED, &us->flags);
 	}
 
 	/* did we abort this command? */
@@ -1016,11 +1016,11 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		/* report any errors */
 		if (result == US_BULK_TRANSFER_ABORTED) {
-			clear_bit(IP_WANTED, &us->bitflags);
+			clear_bit(US_FLIDX_IP_WANTED, &us->flags);
 			return USB_STOR_TRANSPORT_ABORTED;
 		}
 		if (result == US_BULK_TRANSFER_FAILED) {
-			clear_bit(IP_WANTED, &us->bitflags);
+			clear_bit(US_FLIDX_IP_WANTED, &us->flags);
 			return USB_STOR_TRANSPORT_FAILED;
 		}
 	}
@@ -1397,11 +1397,9 @@ static int usb_stor_reset_common(struct us_data *us,
 	/* return a result code based on the result of the control message */
 	if (result < 0) {
 		US_DEBUGP("Soft reset failed: %d\n", result);
-		us->srb->result = DID_ERROR << 16;
 		result = FAILED;
 	} else {
 		US_DEBUGP("Soft reset done\n");
-		us->srb->result = GOOD << 1;
 		result = SUCCESS;
 	}
 	return result;

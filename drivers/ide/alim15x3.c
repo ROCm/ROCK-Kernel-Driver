@@ -99,43 +99,6 @@ static void ali15x3_tune_drive(struct ata_device *drive, byte pio)
 	__restore_flags(flags);
 }
 
-static byte ali15x3_can_ultra(struct ata_device *drive)
-{
-	if (m5229_revision <= 0x20) {
-		return 0;
-	} else if ((m5229_revision < 0xC2) &&
-#ifndef CONFIG_WDC_ALI15X3
-		((chip_is_1543c_e && strstr(drive->id->model, "WDC ")) ||
-		 (drive->type != ATA_DISK))) {
-#else
-		(drive->type != ATA_DISK)) {
-#endif
-		return 0;
-	} else {
-		return 1;
-	}
-}
-
-static int ali15x3_ratemask(struct ata_device *drive)
-{
-	int map = 0;
-
-	if (!ali15x3_can_ultra(drive))
-		return 0;
-
-	map |= XFER_UDMA;
-
-	if (!eighty_ninty_three(drive))
-		return map;
-
-	if (m5229_revision >= 0xC4)
-		map |= XFER_UDMA_100;
-	if (m5229_revision >= 0xC2)
-		map |= XFER_UDMA_66;
-
-	return map;
-}
-
 static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
 {
 	struct pci_dev *dev = drive->channel->pci_dev;
@@ -156,6 +119,7 @@ static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
 	if (speed < XFER_SW_DMA_0)
 		ali15x3_tune_drive(drive, speed);
 #ifdef CONFIG_BLK_DEV_IDEDMA
+	/* FIXME: no support for MWDMA and SWDMA modes  --bkz */
 	else if (speed >= XFER_UDMA_0) {
 		pci_read_config_byte(dev, m5229_udma, &tmpbyte);
 		tmpbyte &= (0x0f << ((1-unit) << 2));
@@ -176,91 +140,40 @@ static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
+static int ali15x3_udma_setup(struct ata_device *drive, int map)
 {
-	int map;
-	u8 mode;
-
-	if (udma)
-		map = ali15x3_ratemask(drive);
-	else
-		map = XFER_SWDMA | XFER_MWDMA;
-
-	mode = ata_timing_mode(drive, map);
-	if (mode < XFER_SW_DMA_0)
-		return 0;
-
-	return !ali15x3_tune_chipset(drive, mode);
-}
-
-static int ali15x3_udma_setup(struct ata_device *drive)
-{
-	struct hd_driveid *id = drive->id;
-	struct ata_channel *hwif = drive->channel;
-	int on = 1;
-	int verbose = 1;
-	byte can_ultra_dma = ali15x3_can_ultra(drive);
-
-	if ((m5229_revision<=0x20) && (drive->type != ATA_DISK)) {
-		udma_enable(drive, 0, 0);
-		return 0;
-	}
-
-	if ((id != NULL) && ((id->capability & 1) != 0) && hwif->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (udma_black_list(drive)) {
-			on = 0;
-			goto fast_ata_pio;
-		}
-		on = 0;
-		verbose = 0;
-		if ((id->field_valid & 4) && (m5229_revision >= 0xC2)) {
-			if (id->dma_ultra & 0x003F) {
-				/* Force if Capable UltraDMA */
-				on = config_chipset_for_dma(drive, can_ultra_dma);
-				if ((id->field_valid & 2) &&
-				    (!on))
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if ((id->dma_mword & 0x0007) ||
-			    (id->dma_1word & 0x0007)) {
-				/* Force if Capable regular DMA modes */
-				on = config_chipset_for_dma(drive, can_ultra_dma);
-				if (!on)
-					goto no_dma_set;
-			}
-		} else if (udma_white_list(drive)) {
-			if (id->eide_dma_time > 150) {
-				goto no_dma_set;
-			}
-			/* Consult the list of known "good" drives */
-			on = config_chipset_for_dma(drive, can_ultra_dma);
-			if (!on)
-				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
-		}
-	} else if ((id->capability & 8) || (id->field_valid & 2)) {
-fast_ata_pio:
-		on = 0;
-		verbose = 0;
-no_dma_set:
-		ali15x3_tune_drive(drive, 255);
-	}
-
-	udma_enable(drive, on, verbose);
-
-	return 0;
+#ifndef CONFIG_WDC_ALI15X3
+	if ((m5229_revision < 0xC2) && chip_is_1543c_e &&
+	    strstr(drive->id->model, "WDC "))
+		map &= ~XFER_UDMA_ALL;
+#endif
+	return udma_generic_setup(drive, map);
 }
 
 static int ali15x3_udma_init(struct ata_device *drive, struct request *rq)
 {
 	if ((m5229_revision < 0xC2) && (drive->type != ATA_DISK))
-		return ide_stopped;	/* try PIO instead of DMA */
+		return ATA_OP_FINISHED;	/* try PIO instead of DMA */
 
 	return udma_pci_init(drive, rq);
+}
+
+static int __init ali15x3_modes_map(struct ata_channel *ch)
+{
+	int map = XFER_EPIO | XFER_SWDMA | XFER_MWDMA;
+
+	if (m5229_revision <= 0x20)
+		return map;
+
+	map |= XFER_UDMA;
+
+	if (m5229_revision >= 0xC2) {
+		map |= XFER_UDMA_66;
+		if (m5229_revision >= 0xC4)
+			map |= XFER_UDMA_100;
+	}
+
+	return map;
 }
 #endif
 
@@ -426,6 +339,8 @@ static void __init ali15x3_init_channel(struct ata_channel *hwif)
 	}
 #endif /* CONFIG_SPARC64 */
 
+	hwif->udma_four = ali15x3_ata66_check(hwif);
+
 	hwif->tuneproc = &ali15x3_tune_drive;
 	hwif->drives[0].autotune = 1;
 	hwif->drives[1].autotune = 1;
@@ -436,22 +351,21 @@ static void __init ali15x3_init_channel(struct ata_channel *hwif)
 		/*
 		 * M1543C or newer for DMAing
 		 */
-		hwif->udma_init = ali15x3_udma_init;
+		hwif->modes_map = ali15x3_modes_map(hwif);
+		if (m5229_revision < 0xC2)
+			hwif->no_atapi_autodma = 1;
 		hwif->udma_setup = ali15x3_udma_setup;
-		hwif->autodma = 1;
+		hwif->udma_init = ali15x3_udma_init;
 	}
-
-	if (noautodma)
-		hwif->autodma = 0;
-#else
-	hwif->autodma = 0;
 #endif
 }
 
 static void __init ali15x3_init_dma(struct ata_channel *ch, unsigned long dmabase)
 {
-	if ((dmabase) && (m5229_revision < 0x20))
+	if (dmabase && (m5229_revision < 0x20)) {
+		ch->autodma = 0;
 		return;
+	}
 
 	ata_init_dma(ch, dmabase);
 }
@@ -472,7 +386,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_AL,
 	        device: PCI_DEVICE_ID_AL_M5229,
 		init_chipset: ali15x3_init_chipset,
-		ata66_check: ali15x3_ata66_check,
 		init_channel: ali15x3_init_channel,
 		init_dma: ali15x3_init_dma,
 		enablebits: { {0x00,0x00,0x00}, {0x00,0x00,0x00} },

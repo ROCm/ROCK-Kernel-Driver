@@ -182,6 +182,7 @@ void hpsb_packet_received(struct hpsb_host *host, quadlet_t *data, size_t size,
 #define IEEE1394_MINOR_BLOCK_RAW1394       0
 #define IEEE1394_MINOR_BLOCK_VIDEO1394     1
 #define IEEE1394_MINOR_BLOCK_DV1394        2
+#define IEEE1394_MINOR_BLOCK_AMDTP         3
 #define IEEE1394_MINOR_BLOCK_EXPERIMENTAL 15
 
 /* return the index (within a minor number block) of a file */

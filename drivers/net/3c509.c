@@ -1259,9 +1259,9 @@ MODULE_PARM_DESC(max_interrupt_work, "maximum events handled per interrupt");
 #ifdef __ISAPNP__
 MODULE_PARM(nopnp, "i");
 MODULE_PARM_DESC(nopnp, "disable ISA PnP support (0-1)");
+MODULE_DEVICE_TABLE(isapnp, el3_isapnp_adapters);
 #endif	/* __ISAPNP__ */
 MODULE_DESCRIPTION("3Com Etherlink III (3c509, 3c509B) ISA/PnP ethernet driver");
-MODULE_DEVICE_TABLE(isapnp, el3_isapnp_adapters);
 MODULE_LICENSE("GPL");
 
 int

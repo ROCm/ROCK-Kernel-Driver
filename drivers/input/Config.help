@@ -98,3 +98,12 @@ CONFIG_INPUT_EVBUG
   inserted in and removed from the running kernel whenever you want).
   The module will be called joydev.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_INPUT_UINPUT
+  Say Y here if you want to support user level drivers for input
+  subsystem accessible under char device 10:223 - /dev/input/uinput.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called uinput.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.	    

@@ -53,7 +53,7 @@ extern inline void sema_init (struct semaphore *sem, int val)
  *	*sem = (struct semaphore)__SEMAPHORE_INITIALIZER((*sem),val);
  *
  * i'd rather use the more flexible initialization above, but sadly
- * GCC 2.7.2.3 emits a bogus warning. EGCS doesnt. Oh well.
+ * GCC 2.7.2.3 emits a bogus warning. EGCS doesn't. Oh well.
  */
 	atomic_set(&sem->count, val);
 	sem->waking = 0;

@@ -83,7 +83,7 @@ extern void chrp_init(unsigned long r3, unsigned long r4,
 #endif /* CONFIG_ALL_PPC */
 
 #ifdef CONFIG_MAGIC_SYSRQ
-unsigned long SYSRQ_KEY;
+unsigned long SYSRQ_KEY = 0x54;
 #endif /* CONFIG_MAGIC_SYSRQ */
 
 #ifdef CONFIG_VGA_CONSOLE

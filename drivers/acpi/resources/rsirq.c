@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsirq - IRQ resource descriptors
- *              $Revision: 28 $
+ *              $Revision: 29 $
  *
  ******************************************************************************/
 
@@ -99,6 +99,7 @@ acpi_rs_irq_resource (
 	if (i == 0) {
 		/* Zero interrupts is invalid! */
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Found Zero interrupt levels in resource list\n"));
 		return_ACPI_STATUS (AE_BAD_DATA);
 	}
 	output_struct->data.irq.number_of_interrupts = i;
@@ -133,6 +134,7 @@ acpi_rs_irq_resource (
 				 * are allowed (ACPI spec v1.0b ection 6.4.2.1),
 				 * so an error will occur if we reach this point
 				 */
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid interrupt polarity/trigger in resource list\n"));
 				return_ACPI_STATUS (AE_BAD_DATA);
 			}
 		}

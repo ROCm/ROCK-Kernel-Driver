@@ -242,11 +242,11 @@ void xdr_kunmap(struct xdr_buf *xdr, size_t base)
 		return;
 	if (base || xdr->page_base) {
 		pglen -= base;
+		base  += xdr->page_base;
 		ppage += base >> PAGE_CACHE_SHIFT;
 	}
 	for (;;) {
 		flush_dcache_page(*ppage);
-		flush_page_to_ram(*ppage);
 		kunmap(*ppage);
 		if (pglen <= PAGE_CACHE_SIZE)
 			break;

@@ -12,13 +12,14 @@
  
 #ifdef DEBUG
 
-#define pipestring(pipe) ({ char *temp; \
-	switch (usb_pipetype (pipe)) { \
+#define edstring(ed_type) ({ char *temp; \
+	switch (ed_type) { \
 	case PIPE_CONTROL:	temp = "CTRL"; break; \
 	case PIPE_BULK:		temp = "BULK"; break; \
 	case PIPE_INTERRUPT:	temp = "INTR"; break; \
 	default: 		temp = "ISOC"; break; \
 	}; temp;})
+#define pipestring(pipe) edstring(usb_pipetype(pipe))
 
 /* debug| print the main components of an URB     
  * small: 0) header + data packets 1) just header
@@ -35,9 +36,9 @@ static void urb_print (struct urb * urb, char * str, int small)
 #ifndef	OHCI_VERBOSE_DEBUG
 	if (urb->status != 0)
 #endif
-	dbg("%s:[%4x] dev:%d,ep=%d-%c,%s,flags:%4x,len:%d/%d,stat:%d", 
+	dbg("%s %p dev:%d,ep=%d-%c,%s,flags:%x,len:%d/%d,stat:%d", 
 		    str,
-		    usb_get_current_frame_number (urb->dev), 
+		    urb,
 		    usb_pipedevice (pipe),
 		    usb_pipeendpoint (pipe), 
 		    usb_pipeout (pipe)? 'O': 'I',
@@ -242,21 +243,25 @@ static void ohci_dump (struct ohci_hcd *controller, int verbose)
 	ohci_dump_roothub (controller, 1);
 }
 
+static const char data0 [] = "DATA0";
+static const char data1 [] = "DATA1";
+
 static void ohci_dump_td (char *label, struct td *td)
 {
 	u32	tmp = le32_to_cpup (&td->hwINFO);
 
-	dbg ("%s td %p; urb %p index %d; hw next td %08x",
+	dbg ("%s td %p%s; urb %p index %d; hw next td %08x",
 		label, td,
+		(tmp & TD_DONE) ? " (DONE)" : "",
 		td->urb, td->index,
 		le32_to_cpup (&td->hwNextTD));
 	if ((tmp & TD_ISO) == 0) {
-		char	*toggle, *pid;
+		const char	*toggle, *pid;
 		u32	cbp, be;
 
 		switch (tmp & TD_T) {
-		case TD_T_DATA0: toggle = "DATA0"; break;
-		case TD_T_DATA1: toggle = "DATA1"; break;
+		case TD_T_DATA0: toggle = data0; break;
+		case TD_T_DATA1: toggle = data1; break;
 		case TD_T_TOGGLE: toggle = "(CARRY)"; break;
 		default: toggle = "(?)"; break;
 		}
@@ -297,9 +302,9 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 	u32	tmp = ed->hwINFO;
 	char	*type = "";
 
-	dbg ("%s: %s, ed %p state 0x%x type %d; next ed %08x",
+	dbg ("%s: %s, ed %p state 0x%x type %s; next ed %08x",
 		ohci->hcd.self.bus_name, label,
-		ed, ed->state, ed->type,
+		ed, ed->state, edstring (ed->type),
 		le32_to_cpup (&ed->hwNextED));
 	switch (tmp & (ED_IN|ED_OUT)) {
 	case ED_OUT: type = "-OUT"; break;
@@ -314,10 +319,10 @@ ohci_dump_ed (struct ohci_hcd *ohci, char *label, struct ed *ed, int verbose)
 		0x000f & (le32_to_cpu (tmp) >> 7),
 		type,
 		0x007f & le32_to_cpu (tmp));
-	dbg ("  tds: head %08x%s%s tail %08x%s",
+	dbg ("  tds: head %08x %s%s tail %08x%s",
 		tmp = le32_to_cpup (&ed->hwHeadP),
+		(ed->hwHeadP & ED_C) ? data1 : data0,
 		(ed->hwHeadP & ED_H) ? " HALT" : "",
-		(ed->hwHeadP & ED_C) ? " CARRY" : "",
 		le32_to_cpup (&ed->hwTailP),
 		verbose ? "" : " (not listing)");
 	if (verbose) {

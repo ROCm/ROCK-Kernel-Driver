@@ -202,8 +202,7 @@ __do_irq(unsigned int irq, struct irqaction *action, struct pt_regs *regs)
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
 
-	__cli();
-	spin_lock(&irq_controller_lock);
+	spin_lock_irq(&irq_controller_lock);
 }
 
 /*
@@ -634,6 +633,8 @@ unsigned long probe_irq_on(void)
 
 		irq_desc[i].probing = 1;
 		irq_desc[i].triggered = 0;
+		if (irq_desc[i].chip->type)
+			irq_desc[i].chip->type(i, IRQT_PROBE);
 		irq_desc[i].chip->unmask(i);
 		irqs += 1;
 	}

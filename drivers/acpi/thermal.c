@@ -1,5 +1,5 @@
 /*
- *  acpi_thermal.c - ACPI Thermal Zone Driver ($Revision: 39 $)
+ *  acpi_thermal.c - ACPI Thermal Zone Driver ($Revision: 40 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -231,7 +231,7 @@ acpi_thermal_set_cooling_mode (
 
 	arg0.integer.value = mode;
 
-	status = acpi_evaluate(handle, NULL, &arg_list, NULL);
+	status = acpi_evaluate_object(handle, NULL, &arg_list, NULL);
 	if (ACPI_FAILURE(status))
 		return_VALUE(-ENODEV);
 

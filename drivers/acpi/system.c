@@ -1,5 +1,5 @@
 /*
- *  acpi_system.c - ACPI System Driver ($Revision: 57 $)
+ *  acpi_system.c - ACPI System Driver ($Revision: 60 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -24,7 +24,6 @@
  */
 
 #define ACPI_C
-#define HAVE_NEW_DEVICE_MODEL
 
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -126,7 +125,7 @@ acpi_system_restore_state (
 
 	/* wait for power to come back */
 	mdelay(10);
-#ifdef HAVE_NEW_DEVICE_MODEL
+
 	/* turn all the devices back on */
 	device_resume(RESUME_POWER_ON);
 
@@ -135,11 +134,8 @@ acpi_system_restore_state (
 
 	/* restore device context */
 	device_resume(RESUME_RESTORE_STATE);
-#else
-#error Resume cant work without driver model
-#endif
 
-	if ((state == ACPI_STATE_S1) && (dmi_broken & BROKEN_INIT_AFTER_S1)) {
+	if (dmi_broken & BROKEN_INIT_AFTER_S1) {
 		printk("Broken toshiba laptop -> kicking interrupts\n");
 		init_8259A(0);
 	}
@@ -166,7 +162,6 @@ acpi_system_save_state(
 {
 	int			error = 0;
 
-#ifdef HAVE_NEW_DEVICE_MODEL
 	/* Send notification to devices that they will be suspended.
 	 * If any device or driver cannot make the transition, either up
 	 * or down, we'll get an error back.
@@ -174,10 +169,9 @@ acpi_system_save_state(
 	error = device_suspend(state, SUSPEND_NOTIFY);
 	if (error)
 		return AE_ERROR;
-#endif
+
 	if (state < ACPI_STATE_S5) {
 
-#ifdef HAVE_NEW_DEVICE_MODEL
 		/* Tell devices to stop I/O and actually save their state.
 		 * It is theoretically possible that something could fail,
 		 * so handle that gracefully..
@@ -190,7 +184,6 @@ acpi_system_save_state(
 			device_resume(RESUME_RESTORE_STATE);
 			return error;
 		}
-#endif
 
 		/* flush caches */
 		ACPI_FLUSH_CPU_CACHE();
@@ -202,15 +195,13 @@ acpi_system_save_state(
 			if (!error && (state == ACPI_STATE_S4))
 				error = acpi_save_state_disk();
 
-#ifdef HAVE_NEW_DEVICE_MODEL
 			if (error) {
 				device_resume(RESUME_RESTORE_STATE);
 				return error;
 			}
-#endif
 		}
 	}
-#ifdef HAVE_NEW_DEVICE_MODEL
+
 	/* disable interrupts
 	 * Note that acpi_suspend -- our caller -- will do this once we return.
 	 * But, we want it done early, so we don't get any suprises during
@@ -233,7 +224,7 @@ acpi_system_save_state(
 	 */
 	if (error && state != ACPI_STATE_S5)
 		acpi_system_restore_state(state);
-#endif
+
 	return error ? AE_ERROR : AE_OK;
 }
 
@@ -515,12 +506,12 @@ acpi_system_read_dsdt (
 		if (size > count)
 			size = count;
 		if (copy_to_user(buffer, data, size)) {
-			kfree(dsdt.pointer);
+			acpi_os_free(dsdt.pointer);
 			return_VALUE(-EFAULT);
 		}
 	}
 
-	kfree(dsdt.pointer);
+	acpi_os_free(dsdt.pointer);
 
 	*ppos += size;
 
@@ -558,12 +549,12 @@ acpi_system_read_fadt (
 		if (size > count)
 			size = count;
 		if (copy_to_user(buffer, data, size)) {
-			kfree(fadt.pointer);
+			acpi_os_free(fadt.pointer);
 			return_VALUE(-EFAULT);
 		}
 	}
 
-	kfree(fadt.pointer);
+	acpi_os_free(fadt.pointer);
 
 	*ppos += size;
 
@@ -1174,7 +1165,7 @@ acpi_system_remove_fs (
 
 /* Simple wrapper calling power down function. */
 static void acpi_sysrq_power_off(int key, struct pt_regs *pt_regs,
-	struct kbd_struct *kbd, struct tty_struct *tty)
+				 struct tty_struct *tty)
 {
 	acpi_power_off();
 }

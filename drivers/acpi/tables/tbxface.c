@@ -2,7 +2,7 @@
  *
  * Module Name: tbxface - Public interfaces to the ACPI subsystem
  *                         ACPI table oriented interfaces
- *              $Revision: 57 $
+ *              $Revision: 58 $
  *
  *****************************************************************************/
 
@@ -52,7 +52,6 @@ acpi_load_tables (void)
 {
 	ACPI_POINTER            rsdp_address;
 	acpi_status             status;
-	u32                     number_of_tables = 0;
 
 
 	ACPI_FUNCTION_TRACE ("Acpi_load_tables");
@@ -81,16 +80,16 @@ acpi_load_tables (void)
 
 	/* Get the RSDT via the RSDP */
 
-	status = acpi_tb_get_table_rsdt (&number_of_tables);
+	status = acpi_tb_get_table_rsdt ();
 	if (ACPI_FAILURE (status)) {
 		ACPI_REPORT_ERROR (("Acpi_load_tables: Could not load RSDT: %s\n",
 				  acpi_format_exception (status)));
 		goto error_exit;
 	}
 
-	/* Now get the rest of the tables */
+	/* Now get the tables needed by this subsystem (FADT, DSDT, etc.) */
 
-	status = acpi_tb_get_all_tables (number_of_tables);
+	status = acpi_tb_get_required_tables ();
 	if (ACPI_FAILURE (status)) {
 		ACPI_REPORT_ERROR (("Acpi_load_tables: Error getting required tables (DSDT/FADT/FACS): %s\n",
 				  acpi_format_exception (status)));
@@ -154,10 +153,10 @@ acpi_load_table (
 
 	/* Copy the table to a local buffer */
 
-	address.pointer_type    = ACPI_LOGICAL_POINTER;
+	address.pointer_type    = ACPI_LOGICAL_POINTER | ACPI_LOGICAL_ADDRESSING;
 	address.pointer.logical = table_ptr;
 
-	status = acpi_tb_get_table (&address, &table_info);
+	status = acpi_tb_get_table_body (&address, table_ptr, &table_info);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -166,7 +165,7 @@ acpi_load_table (
 
 	status = acpi_tb_install_table (&table_info);
 	if (ACPI_FAILURE (status)) {
-		/* Free table allocated by Acpi_tb_get_table */
+		/* Free table allocated by Acpi_tb_get_table_body */
 
 		acpi_tb_delete_single_table (&table_info);
 		return_ACPI_STATUS (status);

@@ -10,10 +10,12 @@
 LDFLAGS_vmlinux	:=-p -X -T arch/arm/vmlinux.lds
 OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S
 GZFLAGS		:=-9
-CFLAGS		+=-pipe
+#CFLAGS		+=-pipe
+
+CFLAGS		:=$(CFLAGS:-O2=-Os)
 
 ifneq ($(CONFIG_NO_FRAME_POINTER),y)
-CFLAGS		:=$(CFLAGS:-fomit-frame-pointer=)
+CFLAGS		:=$(CFLAGS: -fomit-frame-pointer=)
 endif
 
 ifeq ($(CONFIG_DEBUG_INFO),y)
@@ -24,7 +26,7 @@ endif
 # the options further down the list override previous items.
 #
 apcs-$(CONFIG_CPU_32)		:=-mapcs-32
-apcs-$(CONFIG_CPU_26)		:=-mapcs-26 -mcpu=arm3 -Os
+apcs-$(CONFIG_CPU_26)		:=-mapcs-26 -mcpu=arm3
 
 # This selects which instruction set is used.
 # Note that GCC is lame - it doesn't numerically define an
@@ -212,8 +214,11 @@ include/asm-arm/.proc: $(wildcard include/config/cpu/32.h) $(wildcard include/co
 	@ln -sf proc-$(PROCESSOR) include/asm-arm/proc
 	@touch $@
 
-prepare: include/asm-arm/.arch include/asm-arm/.proc \
-	 include/asm-arm/constants.h
+prepare: maketools
+
+.PHONY: maketools
+maketools: include/asm-arm/.arch include/asm-arm/.proc \
+	 include/asm-arm/constants.h include/linux/version.h FORCE
 	@$(MAKETOOLS)
 
 vmlinux: arch/arm/vmlinux.lds
@@ -222,6 +227,7 @@ arch/arm/vmlinux.lds: arch/arm/Makefile $(LDSCRIPT) \
 	$(wildcard include/config/cpu/32.h) \
 	$(wildcard include/config/cpu/26.h) \
 	$(wildcard include/config/arch/*.h)
+	@echo '  Generating $@'
 	@sed 's/TEXTADDR/$(TEXTADDR)/;s/DATAADDR/$(DATAADDR)/' $(LDSCRIPT) >$@
 
 bzImage zImage zinstall Image bootpImage install: vmlinux
@@ -242,10 +248,6 @@ archmrproper: FORCE
 
 archclean: FORCE
 	@$(MAKEBOOT) clean
-
-# we need version.h
-maketools: include/linux/version.h FORCE
-	@$(MAKETOOLS)
 
 # My testing targets (that short circuit a few dependencies)
 zImg:;	@$(MAKEBOOT) zImage

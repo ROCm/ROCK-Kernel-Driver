@@ -1,5 +1,5 @@
 /*
- * $Id: iforce-packets.c,v 1.15 2002/06/09 11:08:04 jdeneux Exp $
+ * $Id: iforce-packets.c,v 1.16 2002/07/07 10:22:50 jdeneux Exp $
  *
  *  Copyright (c) 2000-2002 Vojtech Pavlik <vojtech@ucw.cz>
  *  Copyright (c) 2001-2002 Johann Deneux <deneux@ifrance.com>
@@ -101,13 +101,13 @@ int iforce_send_packet(struct iforce *iforce, u16 cmd, unsigned char* data)
  */
 	switch (iforce->bus) {
 
-#ifdef IFORCE_232
+#ifdef CONFIG_JOYSTICK_IFORCE_232
 		case IFORCE_232:
 		if (empty)
 			iforce_serial_xmit(iforce);
 		break;
 #endif
-#ifdef IFORCE_USB
+#ifdef CONFIG_JOYSTICK_IFORCE_USB
 		case IFORCE_USB: 
 
 		if (iforce->usbdev && empty &&
@@ -161,7 +161,7 @@ void iforce_process_packet(struct iforce *iforce, u16 cmd, unsigned char *data)
 		printk(KERN_WARNING "iforce-packets.c: re-entrant call to iforce_process %d\n", being_used);
 	being_used++;
 
-#ifdef IFORCE_232
+#ifdef CONFIG_JOYSTICK_IFORCE_232
 	if (HI(iforce->expect_packet) == HI(cmd)) {
 		iforce->expect_packet = 0;
 		iforce->ecmd = cmd;
@@ -251,7 +251,7 @@ int iforce_get_id_packet(struct iforce *iforce, char *packet)
 
 	case IFORCE_USB:
 
-#ifdef IFORCE_USB
+#ifdef CONFIG_JOYSTICK_IFORCE_USB
 		iforce->cr.bRequest = packet[0];
 		iforce->ctrl->dev = iforce->usbdev;
 
@@ -281,7 +281,7 @@ int iforce_get_id_packet(struct iforce *iforce, char *packet)
 
 	case IFORCE_232:
 
-#ifdef IFORCE_232
+#ifdef CONFIG_JOYSTICK_IFORCE_232
 		iforce->expect_packet = FF_CMD_QUERY;
 		iforce_send_packet(iforce, FF_CMD_QUERY, packet);
 

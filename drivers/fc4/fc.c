@@ -994,7 +994,7 @@ int fcp_scsi_dev_reset(Scsi_Cmnd *SCpnt)
 	 */
 
 	fc->rst_pkt->host->eh_action = &sem;
-	fc->rst_pkt->request.rq_status = RQ_SCSI_BUSY;
+	fc->rst_pkt->request->rq_status = RQ_SCSI_BUSY;
 
 	fc->rst_pkt->done = fcp_scsi_reset_done;
 	fcp_scsi_queue_it(fc, fc->rst_pkt, fcmd, 0);

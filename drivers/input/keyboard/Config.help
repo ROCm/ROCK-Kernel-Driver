@@ -46,6 +46,14 @@ CONFIG_KEYBOARD_XTKBD
   The module will be called xtkbd.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_KEYBOARD_NEWTON
+  Say Y here if you have a Newton keyboard on a serial port.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called maple_keyb.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
 CONFIG_KEYBOARD_MAPLE  
   Say Y here if you have a DreamCast console running Linux and have
   a keyboard attached to its Maple bus.

@@ -465,6 +465,25 @@ static struct ed *ed_get (
 		 * we know it's already a power of 2
 		 */
 		ed->interval = interval;
+#ifdef DEBUG
+	/*
+	 * There are two other cases we ought to change hwINFO, both during
+	 * enumeration.  There, the control request completes, unlinks, and
+	 * the next request gets queued before the unlink completes, so it
+	 * uses old/wrong hwINFO.  How much of a problem is this?  khubd is
+	 * already retrying after such failures...
+	 */
+	} else if (type == PIPE_CONTROL) {
+		u32	info = le32_to_cpup (&ed->hwINFO);
+
+		if (!(info & 0x7f))
+			dbg ("RETRY ctrl: address != 0");
+		info >>= 16;
+		if (info != udev->epmaxpacketin [0])
+			dbg ("RETRY ctrl: maxpacket %d != 8",
+				udev->epmaxpacketin [0]);
+
+#endif /* DEBUG */
 	}
 
 done:
@@ -539,12 +558,15 @@ td_fill (struct ohci_hcd *ohci, unsigned int info,
 
 	/* aim for only one interrupt per urb.  mostly applies to control
 	 * and iso; other urbs rarely need more than one TD per urb.
+	 * this way, only final tds (or ones with an error) cause IRQs.
 	 *
 	 * NOTE: could delay interrupts even for the last TD, and get fewer
 	 * interrupts ... increasing per-urb latency by sharing interrupts.
+	 * Drivers that queue bulk urbs may request that behavior.
 	 */
-	if (index != (urb_priv->length - 1))
-		info |= is_iso ? TD_DI_SET (7) : TD_DI_SET (1);
+	if (index != (urb_priv->length - 1)
+			|| (urb->transfer_flags & URB_NO_INTERRUPT))
+		info |= TD_DI_SET (7);
 
 	/* use this td as the next dummy */
 	td_pt = urb_priv->td [index];
@@ -565,6 +587,7 @@ td_fill (struct ohci_hcd *ohci, unsigned int info,
 	td->hwINFO = cpu_to_le32 (info);
 	if (is_iso) {
 		td->hwCBP = cpu_to_le32 (data & 0xFFFFF000);
+		td->hwPSW [0] = cpu_to_le16 ((data & 0x0FFF) | 0xE000);
 		td->ed->intriso.last_iso = info & 0xffff;
 	} else {
 		td->hwCBP = cpu_to_le32 (data); 
@@ -574,7 +597,6 @@ td_fill (struct ohci_hcd *ohci, unsigned int info,
 	else
 		td->hwBE = 0;
 	td->hwNextTD = cpu_to_le32 (td_pt->td_dma);
-	td->hwPSW [0] = cpu_to_le16 ((data & 0x0FFF) | 0xE000);
 
 	/* HC might read the TD right after we link it ... */
 	wmb ();
@@ -596,17 +618,17 @@ static void td_submit_urb (struct urb *urb)
 	int		cnt = 0; 
 	__u32		info = 0;
   	unsigned int	toggle = 0;
+	int		is_out = usb_pipeout (urb->pipe);
 
 	/* OHCI handles the DATA-toggles itself, we just use the
 	 * USB-toggle bits for resetting
 	 */
-  	if (usb_gettoggle (urb->dev, usb_pipeendpoint (urb->pipe),
-			usb_pipeout (urb->pipe))) {
+  	if (usb_gettoggle (urb->dev, usb_pipeendpoint (urb->pipe), is_out)) {
   		toggle = TD_T_TOGGLE;
 	} else {
   		toggle = TD_T_DATA0;
 		usb_settoggle (urb->dev, usb_pipeendpoint (urb->pipe),
-			usb_pipeout (urb->pipe), 1);
+			is_out, 1);
 	}
 
 	urb_priv->td_cnt = 0;
@@ -614,9 +636,9 @@ static void td_submit_urb (struct urb *urb)
 	if (data_len) {
 		data = pci_map_single (ohci->hcd.pdev,
 				       urb->transfer_buffer, data_len,
-				       usb_pipeout (urb->pipe)
-				       ? PCI_DMA_TODEVICE
-				       : PCI_DMA_FROMDEVICE);
+				       is_out
+					       ? PCI_DMA_TODEVICE
+					       : PCI_DMA_FROMDEVICE);
 	} else
 		data = 0;
 
@@ -625,18 +647,20 @@ static void td_submit_urb (struct urb *urb)
 	 */
 	switch (usb_pipetype (urb->pipe)) {
 		case PIPE_BULK:
-			info = usb_pipeout (urb->pipe)
+			info = is_out
 				? TD_CC | TD_DP_OUT
 				: TD_CC | TD_DP_IN ;
+			/* TDs _could_ transfer up to 8K each */
 			while (data_len > 4096) {		
 				td_fill (ohci,
 					info | (cnt? TD_T_TOGGLE:toggle),
 					data, 4096, urb, cnt);
 				data += 4096; data_len -= 4096; cnt++;
 			}
-			info = usb_pipeout (urb->pipe)?
-				TD_CC | TD_DP_OUT : TD_CC | TD_R | TD_DP_IN ;
-			td_fill (ohci, info | (cnt? TD_T_TOGGLE:toggle),
+			/* maybe avoid ED halt on final TD short read */
+			if (!(urb->transfer_flags & URB_SHORT_NOT_OK))
+				info |= TD_R;
+			td_fill (ohci, info | (cnt ? TD_T_TOGGLE : toggle),
 				data, data_len, urb, cnt);
 			cnt++;
 			if ((urb->transfer_flags & USB_ZERO_PACKET)
@@ -653,8 +677,11 @@ static void td_submit_urb (struct urb *urb)
 			break;
 
 		case PIPE_INTERRUPT:
+			/* current policy:  only one TD per request.
+			 * otherwise identical to bulk, except for BLF
+			 */
 			info = TD_CC | toggle;
-			info |= usb_pipeout (urb->pipe) 
+			info |= is_out
 				?  TD_DP_OUT
 				:  TD_R | TD_DP_IN;
 			td_fill (ohci, info, data, data_len, urb, cnt++);
@@ -670,14 +697,12 @@ static void td_submit_urb (struct urb *urb)
 				 8, urb, cnt++); 
 			if (data_len > 0) {  
 				info = TD_CC | TD_R | TD_T_DATA1;
-				info |= usb_pipeout (urb->pipe)
-				    ? TD_DP_OUT
-				    : TD_DP_IN;
+				info |= is_out ? TD_DP_OUT : TD_DP_IN;
 				/* NOTE:  mishandles transfers >8K, some >4K */
 				td_fill (ohci, info, data, data_len,
 						urb, cnt++);  
 			} 
-			info = usb_pipeout (urb->pipe)
+			info = is_out
 				? TD_CC | TD_DP_IN | TD_T_DATA1
 				: TD_CC | TD_DP_OUT | TD_T_DATA1;
 			td_fill (ohci, info, data, 0, urb, cnt++);
@@ -726,10 +751,6 @@ static void td_done (struct urb *urb, struct td *td)
 		int	dlen = 0;
 
  		cc = (tdPSW >> 12) & 0xF;
-		if (! ((urb->transfer_flags & USB_DISABLE_SPD)
-				&& (cc == TD_DATAUNDERRUN)))
-			cc = TD_CC_NOERROR;
-
 		if (usb_pipeout (urb->pipe))
 			dlen = urb->iso_frame_desc [td->index].length;
 		else
@@ -758,9 +779,9 @@ static void td_done (struct urb *urb, struct td *td)
 				usb_pipeendpoint (urb->pipe),
 				usb_pipeout (urb->pipe));
 
-		/* update packet status if needed (short may be ok) */
-		if (((urb->transfer_flags & USB_DISABLE_SPD) != 0
-				&& cc == TD_DATAUNDERRUN))
+		/* update packet status if needed (short is normally ok) */
+		if (cc == TD_DATAUNDERRUN
+				&& !(urb->transfer_flags & URB_SHORT_NOT_OK))
 			cc = TD_CC_NOERROR;
 		if (cc != TD_CC_NOERROR) {
 			spin_lock (&urb->lock);
@@ -810,10 +831,13 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 	while (td_list_hc) {		
 		td_list = dma_to_td (ohci, td_list_hc);
 
+		td_list->hwINFO |= cpu_to_le32 (TD_DONE);
+
 		if (TD_CC_GET (le32_to_cpup (&td_list->hwINFO))) {
 			urb_priv = (urb_priv_t *) td_list->urb->hcpriv;
-			/* typically the endpoint halts on error; un-halt,
-			 * and maybe dequeue other TDs from this urb
+			/* Non-iso endpoints can halt on error; un-halt,
+			 * and dequeue any other TDs from this urb.
+			 * No other TD could have caused the halt.
 			 */
 			if (td_list->ed->hwHeadP & ED_H) {
 				if (urb_priv && ((td_list->index + 1)

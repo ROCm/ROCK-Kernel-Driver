@@ -1,5 +1,5 @@
 /*
- *  acpi_power.c - ACPI Bus Power Management ($Revision: 37 $)
+ *  acpi_power.c - ACPI Bus Power Management ($Revision: 38 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -186,7 +186,7 @@ acpi_power_on (
 		return_VALUE(0);
 	}
 
-	status = acpi_evaluate(resource->handle, "_ON", NULL, NULL);
+	status = acpi_evaluate_object(resource->handle, "_ON", NULL, NULL);
 	if (ACPI_FAILURE(status))
 		return_VALUE(-ENODEV);
 
@@ -240,7 +240,7 @@ acpi_power_off (
 		return_VALUE(0);
 	}
 
-	status = acpi_evaluate(resource->handle, "_OFF", NULL, NULL);
+	status = acpi_evaluate_object(resource->handle, "_OFF", NULL, NULL);
 	if (ACPI_FAILURE(status))
 		return_VALUE(-ENODEV);
 

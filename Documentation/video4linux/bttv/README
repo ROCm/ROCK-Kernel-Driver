@@ -58,6 +58,9 @@ Insmod-options:	list of all insmod options available for bttv and
 		the helper modules.
 MAKEDEV:	a script to create the special files for v4l
 CARDLIST:	List of all supported cards
+Cards:		more detailed descriptions of known TV cards:
+		OEM name variants, used i2c chips, ...
+		also includes non-bttv cards.
 
 Loading just the bttv modules isn't enouth for most cards.  The
 drivers for the i2c tuner/sound chips must also be loaded.  bttv tries

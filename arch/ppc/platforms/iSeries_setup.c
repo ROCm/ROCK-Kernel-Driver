@@ -216,12 +216,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.progress			= iSeries_progress;
 	ppc_md.find_end_of_memory	= iSeries_find_end_of_memory;
 
-	ppc_md.kbd_setkeycode    	= NULL;
-	ppc_md.kbd_getkeycode    	= NULL;
-	ppc_md.kbd_translate     	= NULL;
-	ppc_md.kbd_unexpected_up 	= NULL;
-	ppc_md.kbd_leds          	= NULL;
-	ppc_md.kbd_init_hw       	= NULL;
 #ifdef CONFIG_PCI
 	ppc_md.pcibios_fixup_bus        = iSeries_fixup_bus;
 	ppc_md.pcibios_fixup            = iSeries_fixup;
@@ -229,10 +223,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.pcibios_fixup_bus        = NULL;
 	ppc_md.pcibios_fixup            = NULL;
 #endif /* CONFIG_PCI         */
-
-#if defined(CONFIG_MAGIC_SYSRQ)
-	ppc_md.ppc_kbd_sysrq_xlate	= NULL;
-#endif
 
 #ifdef CONFIG_SMP
 	ppc_md.smp_ops			= &iSeries_smp_ops;

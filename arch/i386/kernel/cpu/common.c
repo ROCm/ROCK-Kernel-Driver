@@ -15,9 +15,6 @@ static int disable_x86_fxsr __initdata = 0;
 
 struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
-static struct cpu_dev default_cpu;
-static struct cpu_dev * this_cpu = &default_cpu;
-
 extern void mcheck_init(struct cpuinfo_x86 *c);
 
 static void default_init(struct cpuinfo_x86 * c)
@@ -36,6 +33,7 @@ static void default_init(struct cpuinfo_x86 * c)
 static struct cpu_dev default_cpu = {
 	c_init:	default_init,
 };
+static struct cpu_dev * this_cpu = &default_cpu;
 
 static int __init cachesize_setup(char *str)
 {

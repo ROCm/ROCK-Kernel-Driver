@@ -136,6 +136,16 @@ struct elf_prpsinfo32
 #define NEW_TO_OLD_UID(uid) ((uid) > 65535) ? (u16)overflowuid : (u16)(uid)
 #define NEW_TO_OLD_GID(gid) ((gid) > 65535) ? (u16)overflowgid : (u16)(gid)
 
+#include <linux/time.h>
+
+#define jiffies_to_timeval jiffies_to_timeval32
+static __inline__ void
+jiffies_to_timeval32(unsigned long jiffies, struct timeval32 *value)
+{
+	value->tv_usec = (jiffies % HZ) * (1000000L / HZ);
+	value->tv_sec = jiffies / HZ;
+}
+
 #define elf_addr_t	u32
 #define elf_caddr_t	u32
 #undef start_thread

@@ -41,7 +41,13 @@ smb_ioctl(struct inode *inode, struct file *filp,
 	case SMB_IOC_NEWCONN:
 		/* arg is smb_conn_opt, or NULL if no connection was made */
 		if (!arg) {
-			result = smb_wakeup(server);
+			result = 0;
+			smb_lock_server(server);
+			server->state = CONN_RETRIED;
+			printk(KERN_ERR "Connection attempt failed!  [%d]\n",
+			       server->conn_error);
+			smbiod_flush(server);
+			smb_unlock_server(server);
 			break;
 		}
 

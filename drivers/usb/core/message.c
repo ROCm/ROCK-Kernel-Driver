@@ -62,7 +62,7 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 			    urb->pipe, urb->status, timeout);
 			status = urb->status;
 		} else {
-			printk("usb_control/bulk_msg: timeout\n");
+			warn("usb_control/bulk_msg: timeout");
 			usb_unlink_urb(urb);  // remove urb safely
 			status = -ETIMEDOUT;
 		}

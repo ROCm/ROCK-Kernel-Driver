@@ -189,6 +189,8 @@ static void remove_host(struct hpsb_host *host)
         }
 
         kfree(hi);
+
+        atomic_inc(&internal_generation);
 }
 
 static void host_reset(struct hpsb_host *host)
@@ -223,8 +225,6 @@ static void host_reset(struct hpsb_host *host)
                 }
         }
         spin_unlock_irqrestore(&host_info_lock, flags);
-
-        atomic_inc(&internal_generation);
 }
 
 static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,

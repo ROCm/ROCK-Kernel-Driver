@@ -52,8 +52,14 @@ void dump_mem(char *label, void *data, int length)
 		printk("%s\n", line);
 	}
 }
+#endif
 
-#ifdef CONFIG_PROC_FS
+#ifdef PROC_FS_JFS /* see jfs_debug.h */
+
+static struct proc_dir_entry *base;
+#ifdef CONFIG_JFS_DEBUG
+extern read_proc_t jfs_txanchor_read;
+
 static int loglevel_read(char *page, char **start, off_t off,
 			 int count, int *eof, void *data)
 {
@@ -89,28 +95,29 @@ static int loglevel_write(struct file *file, const char *buffer,
 	jfsloglevel = c - '0';
 	return count;
 }
+#endif
 
 
-extern read_proc_t jfs_txanchor_read;
 #ifdef CONFIG_JFS_STATISTICS
 extern read_proc_t jfs_lmstats_read;
 extern read_proc_t jfs_xtstat_read;
 extern read_proc_t jfs_mpstat_read;
 #endif
-static struct proc_dir_entry *base;
 
 static struct {
 	const char	*name;
 	read_proc_t	*read_fn;
 	write_proc_t	*write_fn;
 } Entries[] = {
-	{ "TxAnchor",	jfs_txanchor_read, },
 #ifdef CONFIG_JFS_STATISTICS
 	{ "lmstats",	jfs_lmstats_read, },
 	{ "xtstat",	jfs_xtstat_read, },
 	{ "mpstat",	jfs_mpstat_read, },
 #endif
+#ifdef CONFIG_JFS_DEBUG
+	{ "TxAnchor",	jfs_txanchor_read, },
 	{ "loglevel",	loglevel_read, loglevel_write }
+#endif
 };
 #define NPROCENT	(sizeof(Entries)/sizeof(Entries[0]))
 
@@ -142,5 +149,4 @@ void jfs_proc_clean(void)
 	}
 }
 
-#endif /* CONFIG_PROC_FS */
-#endif /* CONFIG_JFS_DEBUG */
+#endif /* PROC_FS_JFS */

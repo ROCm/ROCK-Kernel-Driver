@@ -68,7 +68,7 @@ extern void jfs_write_inode(struct inode *inode, int wait);
 
 extern struct dentry *jfs_get_parent(struct dentry *dentry);
 
-#if defined(CONFIG_JFS_DEBUG) && defined(CONFIG_PROC_FS)
+#ifdef PROC_FS_JFS /* see jfs_debug.h */
 extern void jfs_proc_init(void);
 extern void jfs_proc_clean(void);
 #endif
@@ -318,9 +318,14 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	if (!sbi->nls_tab)
 		sbi->nls_tab = load_nls_default();
 
+	/* logical blocks are represented by 40 bits in pxd_t, etc. */
 	sb->s_maxbytes = ((u64) sb->s_blocksize) << 40;
 #if BITS_PER_LONG == 32
-	sb->s_maxbytes = min((u64)PAGE_CACHE_SIZE << 32, sb->s_maxbytes);
+	/*
+	 * Page cache is indexed by long.
+	 * I would use MAX_LFS_FILESIZE, but it's only half as big
+	 */
+	sb->s_maxbytes = min(((u64)PAGE_CACHE_SIZE << 32) - 1, sb->s_maxbytes);
 #endif
 
 	return 0;
@@ -448,7 +453,7 @@ static int __init init_jfs_fs(void)
 	}
 	wait_for_completion(&jfsIOwait);	/* Wait until IO thread starts */
 
-#if defined(CONFIG_JFS_DEBUG) && defined(CONFIG_PROC_FS)
+#ifdef PROC_FS_JFS
 	jfs_proc_init();
 #endif
 
@@ -485,7 +490,7 @@ static void __exit exit_jfs_fs(void)
 	wait_for_completion(&jfsIOwait);	/* Wait until Commit thread exits */
 	wake_up(&jfs_sync_thread_wait);
 	wait_for_completion(&jfsIOwait);	/* Wait until Sync thread exits */
-#if defined(CONFIG_JFS_DEBUG) && defined(CONFIG_PROC_FS)
+#ifdef PROC_FS_JFS
 	jfs_proc_clean();
 #endif
 	unregister_filesystem(&jfs_fs_type);

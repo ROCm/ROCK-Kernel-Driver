@@ -394,8 +394,6 @@ ENTRY(cpu_arm1020_set_pmd)
  */
 	.align	5
 ENTRY(cpu_arm1020_set_pte)
-	tst	r0, #2048
-	streq	r0, [r0, -r0]			@ BUG_ON
 	str	r1, [r0], #-2048		@ linux version
 
 	eor	r1, r1, #LPTE_PRESENT | LPTE_YOUNG | LPTE_WRITE | LPTE_DIRTY
@@ -553,7 +551,7 @@ __arm1020_proc_info:
 	b	__arm1020_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name
-	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT
+	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB
 	.long	cpu_arm1020_info
 	.long	arm1020_processor_functions
 	.long	v4wbi_tlb_fns

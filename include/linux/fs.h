@@ -303,8 +303,8 @@ struct address_space_operations {
 	int (*bmap)(struct address_space *, long);
 	int (*invalidatepage) (struct page *, unsigned long);
 	int (*releasepage) (struct page *, int);
-#define KERNEL_HAS_O_DIRECT /* this is for modules out of the kernel */
-	int (*direct_IO)(int, struct inode *, struct kiobuf *, unsigned long, int);
+	int (*direct_IO)(int, struct inode *, char *buf,
+				loff_t offset, size_t count);
 };
 
 struct backing_dev_info;
@@ -988,7 +988,6 @@ extern int unregister_filesystem(struct file_system_type *);
 extern struct vfsmount *kern_mount(struct file_system_type *);
 extern int may_umount(struct vfsmount *);
 extern long do_mount(char *, char *, char *, unsigned long, void *);
-extern void umount_tree(struct vfsmount *);
 
 #define kern_umount mntput
 
@@ -1128,7 +1127,7 @@ extern int check_disk_change(kdev_t);
 extern int invalidate_inodes(struct super_block *);
 extern int invalidate_device(kdev_t, int);
 extern void invalidate_inode_pages(struct inode *);
-extern void invalidate_inode_pages2(struct address_space *);
+extern void invalidate_inode_pages2(struct address_space *mapping);
 extern void write_inode_now(struct inode *, int);
 extern int filemap_fdatawrite(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
@@ -1233,6 +1232,11 @@ extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned
 extern ssize_t generic_file_read(struct file *, char *, size_t, loff_t *);
 extern ssize_t generic_file_write(struct file *, const char *, size_t, loff_t *);
 extern void do_generic_file_read(struct file *, loff_t *, read_descriptor_t *, read_actor_t);
+ssize_t generic_file_direct_IO(int rw, struct inode *inode, char *buf,
+				loff_t offset, size_t count);
+int generic_direct_IO(int rw, struct inode *inode, char *buf,
+			loff_t offset, size_t count, get_block_t *get_block);
+
 extern loff_t no_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t remote_llseek(struct file *file, loff_t offset, int origin);

@@ -24,7 +24,7 @@
 #ifndef _BTTVP_H_
 #define _BTTVP_H_
 
-#define BTTV_VERSION_CODE KERNEL_VERSION(0,8,38)
+#define BTTV_VERSION_CODE KERNEL_VERSION(0,8,42)
 
 #include <linux/types.h>
 #include <linux/wait.h>
@@ -127,40 +127,20 @@ struct bttv_overlay {
 };
 
 struct bttv_vbi {
-        struct semaphore           lock;
-	int                        users;
-	int                        lines;
-
-	/* mmap */
-	int                        streaming;
-	struct bttv_buffer         *bufs[VIDEO_MAX_FRAME];
-	struct list_head           stream;
-
-	/* read */
-	int                        reading;
-	int                        read_off;
-	struct bttv_buffer         *read_buf;
+	int                      users;
+	int                      lines;
+	struct videobuf_queue    q;
 };
 
 struct bttv_fh {
 	struct bttv              *btv;
-
-	/* locking */
+	struct videobuf_queue    q;
 	int resources;
-	struct semaphore lock;
-
-	/* keep current driver settings */
+	
+	/* current settings */
 	const struct bttv_format *ovfmt;
 	struct bttv_overlay      ov;
 	struct bttv_buffer       buf;
-
-	/* for read() capture */
-	struct bttv_buffer       read_buf;
-	int                      read_off;
-
-	/* mmap()'ed buffers */
-	struct bttv_buffer       *bufs[VIDEO_MAX_FRAME];
-	struct list_head stream; /* v4l2 QBUF/DQBUF */
 };
 
 /* ---------------------------------------------------------- */
@@ -221,6 +201,8 @@ int bttv_overlay_risc(struct bttv *btv, struct bttv_overlay *ov,
 /* bttv-vbi.c                                                 */
 
 extern struct video_device bttv_vbi_template;
+extern struct videobuf_queue_ops vbi_qops;
+
 
 /* ---------------------------------------------------------- */
 /* bttv-driver.c                                              */
@@ -277,7 +259,8 @@ struct bttv {
 	/* gpio interface */
 	wait_queue_head_t gpioq;
 	int shutdown;
-
+	void (*audio_hook)(struct bttv *btv, struct video_audio *v, int set);
+	
 	/* i2c layer */
 	struct i2c_adapter         i2c_adap;
 	struct i2c_algo_bit_data   i2c_algo;

@@ -105,21 +105,21 @@ static int ns87415_udma_init(struct ata_device *drive, struct request *rq)
 	ns87415_prepare_drive(drive, 1);	/* select DMA xfer */
 
 	if (udma_pci_init(drive, rq))		/* use standard DMA stuff */
-		return ide_started;
+		return ATA_OP_CONTINUES;
 
 	ns87415_prepare_drive(drive, 0);	/* DMA failed: select PIO xfer */
 
-	return ide_stopped;
+	return ATA_OP_FINISHED;
 }
 
-static int ns87415_udma_setup(struct ata_device *drive)
+static int ns87415_udma_setup(struct ata_device *drive, int map)
 {
 	if (drive->type != ATA_DISK) {
 		udma_enable(drive, 0, 0);
 
 		return 0;
 	}
-	return udma_pci_setup(drive);
+	return udma_pci_setup(drive, map);
 }
 #endif
 

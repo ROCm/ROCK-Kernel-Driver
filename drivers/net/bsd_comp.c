@@ -65,6 +65,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/string.h>
 
 #include <linux/ppp_defs.h>
 

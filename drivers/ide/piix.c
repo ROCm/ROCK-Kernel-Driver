@@ -244,26 +244,18 @@ static void piix_tune_drive(struct ata_device *drive, unsigned char pio)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-
-static int piix_udma_setup(struct ata_device *drive)
+static int __init piix_modes_map(struct ata_channel *ch)
 {
-	short w80 = drive->channel->udma_four;
+	short w80 = ch->udma_four;
+	int map = XFER_EPIO |
+		  (piix_config->flags & PIIX_NODMA ? 0 : (XFER_SWDMA | XFER_MWDMA |
+		  (piix_config->flags & PIIX_UDMA ? XFER_UDMA : 0) |
+		  (w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_66 ? XFER_UDMA_66 : 0) |
+		  (w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_100 ? XFER_UDMA_100 : 0) |
+		  (w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_133 ? XFER_UDMA_133 : 0)));
 
-	short speed = ata_timing_mode(drive,
-			XFER_PIO | XFER_EPIO |
-			(piix_config->flags & PIIX_NODMA ? 0 : (XFER_SWDMA | XFER_MWDMA |
-			(piix_config->flags & PIIX_UDMA ? XFER_UDMA : 0) |
-			(w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_66 ? XFER_UDMA_66 : 0) |
-			(w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_100 ? XFER_UDMA_100 : 0) |
-			(w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_133 ? XFER_UDMA_133 : 0))));
-
-	piix_set_drive(drive, speed);
-
-	udma_enable(drive, drive->channel->autodma && (speed & XFER_MODE) != XFER_PIO, 0);
-
-	return 0;
+	return map;
 }
-
 #endif
 
 /*
@@ -360,9 +352,10 @@ static void __init piix_init_channel(struct ata_channel *ch)
 {
 	int i;
 
+	ch->udma_four = piix_ata66_check(ch);
+
 	ch->tuneproc = &piix_tune_drive;
 	ch->speedproc = &piix_set_drive;
-	ch->autodma = 0;
 	ch->io_32bit = 1;
 	ch->unmask = 1;
 	for (i = 0; i < 2; i++) {
@@ -373,11 +366,8 @@ static void __init piix_init_channel(struct ata_channel *ch)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (ch->dma_base) {
 		ch->highmem = 1;
-		ch->udma_setup = piix_udma_setup;
-# ifdef CONFIG_IDEDMA_AUTO
-		if (!noautodma)
-			ch->autodma = 1;
-# endif
+		ch->modes_map = piix_modes_map(ch);
+		ch->udma_setup = udma_generic_setup;
 	}
 #endif
 }
@@ -401,7 +391,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82371FB_1,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -411,7 +400,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82371SB_1,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -421,7 +409,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82371AB,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -431,7 +418,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82443MX_1,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -441,7 +427,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82372FB_1,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -451,7 +436,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82801AA_1,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -461,7 +445,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82801AB_1,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -471,7 +454,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82801BA_9,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -481,7 +463,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82801BA_8,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -491,7 +472,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82801E_9,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -501,7 +481,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82801CA_10,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -511,7 +490,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82801CA_11,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -521,7 +499,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_INTEL,
 		device: PCI_DEVICE_ID_INTEL_82801DB_9,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},
@@ -531,7 +508,6 @@ static struct ata_pci_device chipsets[] __initdata = {
 		vendor: PCI_VENDOR_ID_EFAR,
 		device: PCI_DEVICE_ID_EFAR_SLC90E66_1,
 		init_chipset: piix_init_chipset,
-		ata66_check: piix_ata66_check,
 		init_channel: piix_init_channel,
 		init_dma: piix_init_dma,
 		enablebits: {{0x41,0x80,0x80}, {0x43,0x80,0x80}},

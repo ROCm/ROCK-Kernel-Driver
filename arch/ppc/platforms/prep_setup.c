@@ -79,15 +79,6 @@ extern void rs_nvram_write_val(int addr,
 				 unsigned char val);
 extern void ibm_prep_init(void);
 
-extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
-extern int pckbd_getkeycode(unsigned int scancode);
-extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
-		char raw_mode);
-extern char pckbd_unexpected_up(unsigned char keycode);
-extern void pckbd_leds(unsigned char leds);
-extern void pckbd_init_hw(void);
-extern unsigned char pckbd_sysrq_xlate[];
-
 extern void prep_find_bridges(void);
 extern char saved_command_line[];
 
@@ -893,19 +884,6 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 	ppc_ide_md.default_irq = prep_ide_default_irq;
 	ppc_ide_md.default_io_base = prep_ide_default_io_base;
-#endif
-
-#ifdef CONFIG_VT
-	ppc_md.kbd_setkeycode    = pckbd_setkeycode;
-	ppc_md.kbd_getkeycode    = pckbd_getkeycode;
-	ppc_md.kbd_translate     = pckbd_translate;
-	ppc_md.kbd_unexpected_up = pckbd_unexpected_up;
-	ppc_md.kbd_leds          = pckbd_leds;
-	ppc_md.kbd_init_hw       = pckbd_init_hw;
-#ifdef CONFIG_MAGIC_SYSRQ
-	ppc_md.ppc_kbd_sysrq_xlate	 = pckbd_sysrq_xlate;
-	SYSRQ_KEY = 0x54;
-#endif
 #endif
 
 #ifdef CONFIG_SMP

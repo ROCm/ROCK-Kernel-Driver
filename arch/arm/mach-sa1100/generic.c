@@ -76,13 +76,10 @@ unsigned int sa11x0_validatespeed(unsigned int khz)
 	return cclk_frequency_100khz[sa11x0_freq_to_ppcr(khz)] * 100;
 }
 
-static int __init sa11x0_init_clock(void)
+unsigned int sa11x0_getspeed(void)
 {
-	cpufreq_init(cclk_frequency_100khz[PPCR & 0xf] * 100, 59000, 287000);
-	return 0;
+	return cclk_frequency_100khz[PPCR & 0xf] * 100;
 }
-
-__initcall(sa11x0_init_clock);
 #else
 /*
  * We still need to provide this so building without cpufreq works.
@@ -100,7 +97,7 @@ EXPORT_SYMBOL(cpufreq_get);
 static void sa1100_power_off(void)
 {
 	mdelay(100);
-	cli();
+	local_irq_disable();
 	/* disable internal oscillator, float CS lines */
 	PCFR = (PCFR_OPDE | PCFR_FP | PCFR_FS);
 	/* enable wake-up on GPIO0 (Assabet...) */

@@ -97,6 +97,14 @@ static inline void save_processor_context (void)
 	asm volatile ("pushfl ; popl (%0)" : "=m" (saved_context.eflags));
 }
 
+static void
+do_fpu_end(void)
+{
+        /* restore FPU regs if necessary */
+	/* Do it out of line so that gcc does not move cr0 load to some stupid place */
+        kernel_fpu_end();
+}
+
 /*
  * restore_processor_context
  * 
@@ -220,13 +228,6 @@ void fix_processor_context(void)
 
 }
 
-static void
-do_fpu_end(void)
-{
-        /* restore FPU regs if necessary */
-	/* Do it out of line so that gcc does not move cr0 load to some stupid place */
-        kernel_fpu_end();
-}
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
 /* Local variables for do_magic */

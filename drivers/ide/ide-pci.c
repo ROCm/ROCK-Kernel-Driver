@@ -257,24 +257,13 @@ controller_ok:
 	if (d->flags & ATA_F_NODMA)
 		goto no_dma;
 
-	/* Check whatever this interface is UDMA4 mode capable. */
-	if (ch->udma_four) {
+	if (ch->udma_four)
 		printk("%s: warning: ATA-66/100 forced bit set!\n", dev->name);
-	} else {
-		if (d->ata66_check)
-			ch->udma_four = d->ata66_check(ch);
-	}
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	/*
 	 * Setup DMA transfers on the channel.
 	 */
-	if (d->flags & ATA_F_NOADMA)
-		autodma = 0;
-
-	if (autodma)
-		ch->autodma = 1;
-
 	if (!((d->flags & ATA_F_DMA) || ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE && (dev->class & 0x80))))
 		goto no_dma;
 	/*
@@ -324,6 +313,10 @@ controller_ok:
 	 * already enabled by the primary channel run.
 	 */
 	pci_set_master(dev);
+
+	if (autodma)
+		ch->autodma = 1;
+
 	if (d->init_dma)
 		d->init_dma(ch, dma_base);
 	else
@@ -334,6 +327,11 @@ no_dma:
 	/* Call chipset-specific routine for each enabled channel. */
 	if (d->init_channel)
 		d->init_channel(ch);
+
+#ifdef CONFIG_BLK_DEV_IDEDMA
+	if ((d->flags & ATA_F_NOADMA) || noautodma)
+		ch->autodma = 0;
+#endif
 
 	return 0;
 }

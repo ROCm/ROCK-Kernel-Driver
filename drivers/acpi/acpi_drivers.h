@@ -1,5 +1,5 @@
 /*
- *  acpi_drivers.h  ($Revision: 30 $)
+ *  acpi_drivers.h  ($Revision: 31 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -124,6 +124,7 @@
 
 #ifdef CONFIG_ACPI_EC
 
+int acpi_ec_ecdt_probe (void);
 int acpi_ec_init (void);
 void acpi_ec_exit (void);
 

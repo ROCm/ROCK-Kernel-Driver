@@ -434,17 +434,17 @@ smb_put_super(struct super_block *sb)
 {
 	struct smb_sb_info *server = SMB_SB(sb);
 
-	if (server->sock_file) {
-		smb_dont_catch_keepalive(server);
-		fput(server->sock_file);
-	}
+	smbiod_unregister_server(server);
+
+	smb_lock_server(server);
+	server->state = CONN_INVALID;
+
+	smb_close_socket(server);
 
 	if (server->conn_pid)
-	       kill_proc(server->conn_pid, SIGTERM, 1);
+		kill_proc(server->conn_pid, SIGTERM, 1);
 
 	smb_kfree(server->ops);
-	if (server->packet)
-		smb_vfree(server->packet);
 
 	if (server->remote_nls) {
 		unload_nls(server->remote_nls);
@@ -455,6 +455,7 @@ smb_put_super(struct super_block *sb)
 		server->local_nls = NULL;
 	}
 	sb->u.generic_sbp = NULL;
+	smb_unlock_server(server);
 	smb_kfree(server);
 }
 
@@ -491,32 +492,25 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 	server->mnt = NULL;
 	server->sock_file = NULL;
 	init_MUTEX(&server->sem);
-	init_waitqueue_head(&server->wait);
+	INIT_LIST_HEAD(&server->entry);
+	INIT_LIST_HEAD(&server->xmitq);
+	INIT_LIST_HEAD(&server->recvq);
+	server->conn_error = 0;
 	server->conn_pid = 0;
 	server->state = CONN_INVALID; /* no connection yet */
 	server->generation = 0;
-	server->packet_size = smb_round_length(SMB_INITIAL_PACKET_SIZE);
-	server->packet = smb_vmalloc(server->packet_size);
-	if (!server->packet)
-		goto out_no_mem;
 
 	/* Allocate the global temp buffer and some superblock helper structs */
+	/* FIXME: move these to the smb_sb_info struct */
 	VERBOSE("alloc chunk = %d\n", sizeof(struct smb_ops) +
-		sizeof(struct smb_mount_data_kernel) +
-		2*SMB_MAXPATHLEN + 20);
+		sizeof(struct smb_mount_data_kernel));
 	mem = smb_kmalloc(sizeof(struct smb_ops) +
-			  sizeof(struct smb_mount_data_kernel) +
-			  2*SMB_MAXPATHLEN + 20, GFP_KERNEL);
+			  sizeof(struct smb_mount_data_kernel), GFP_KERNEL);
 	if (!mem)
-		goto out_no_temp;
+		goto out_no_mem;
 
 	server->ops = mem;
 	server->mnt = mem + sizeof(struct smb_ops);
-	server->name_buf = mem + sizeof(struct smb_ops) +
-		sizeof(struct smb_mount_data_kernel);
-	server->temp_buf = mem + sizeof(struct smb_ops) +
-		sizeof(struct smb_mount_data_kernel) +
-		SMB_MAXPATHLEN + 1;
 
 	/* Setup NLS stuff */
 	server->remote_nls = NULL;
@@ -573,14 +567,14 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 		goto out_no_root;
 	smb_new_dentry(sb->s_root);
 
+	smbiod_register_server(server);
+
 	return 0;
 
 out_no_root:
 	iput(root_inode);
 out_bad_option:
 	smb_kfree(mem);
-out_no_temp:
-	smb_vfree(server->packet);
 out_no_mem:
 	if (!server->mnt)
 		printk(KERN_ERR "smb_fill_super: allocation failure\n");
@@ -764,14 +758,19 @@ static int __init init_smb_fs(void)
 
 	err = init_inodecache();
 	if (err)
-		goto out1;
+		goto out_inode;
+	err = smb_init_request_cache();
+	if (err)
+		goto out_request;
 	err = register_filesystem(&smb_fs_type);
 	if (err)
 		goto out;
 	return 0;
 out:
+	smb_destroy_request_cache();
+out_request:
 	destroy_inodecache();
-out1:
+out_inode:
 	return err;
 }
 
@@ -779,6 +778,7 @@ static void __exit exit_smb_fs(void)
 {
 	DEBUG1("unregistering ...\n");
 	unregister_filesystem(&smb_fs_type);
+	smb_destroy_request_cache();
 	destroy_inodecache();
 #ifdef DEBUG_SMB_MALLOC
 	printk(KERN_DEBUG "smb_malloced: %d\n", smb_malloced);

@@ -91,10 +91,10 @@ if [ "$CONFIG_FB" = "y" ]; then
    if [ "$CONFIG_HP300" = "y" ]; then
       define_bool CONFIG_FB_HP300 y
    fi
-   if [ "$ARCH" = "alpha" ]; then
+   if [ "$CONFIG_ALPHA" = "y" ]; then
       tristate '  TGA framebuffer support' CONFIG_FB_TGA
    fi
-   if [ "$ARCH" = "i386" ]; then
+   if [ "$CONFIG_X86" = "y" ]; then
       bool '  VESA VGA graphics console' CONFIG_FB_VESA
       tristate '  VGA 16-color graphics console' CONFIG_FB_VGA16
       tristate '  Hercules mono graphics console (EXPERIMENTAL)' CONFIG_FB_HGA
@@ -158,16 +158,16 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 tristate '  Permedia3 support (EXPERIMENTAL)' CONFIG_FB_PM3
       fi
    fi
-   if [ "$ARCH" = "sparc" -o "$ARCH" = "sparc64" ]; then
+   if [ "$CONFIG_SPARC32" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
       bool '  SBUS and UPA framebuffers' CONFIG_FB_SBUS
       if [ "$CONFIG_FB_SBUS" != "n" ]; then
-	 if [ "$ARCH" = "sparc64" ]; then
+	 if [ "$CONFIG_SPARC64" = "y" ]; then
 	    bool '    Creator/Creator3D support' CONFIG_FB_CREATOR
 	 fi
 	 bool '    CGsix (GX,TurboGX) support' CONFIG_FB_CGSIX
 	 bool '    BWtwo support' CONFIG_FB_BWTWO
 	 bool '    CGthree support' CONFIG_FB_CGTHREE
-	 if [ "$ARCH" = "sparc" ]; then
+	 if [ "$CONFIG_SPARC32" = "y" ]; then
 	    bool '    TCX (SS4/SS5 only) support' CONFIG_FB_TCX
 	    bool '    CGfourteen (SX) support' CONFIG_FB_CGFOURTEEN
 	    bool '    P9100 (Sparcbook 3 only) support' CONFIG_FB_P9100
@@ -175,7 +175,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 bool '    Leo (ZX) support' CONFIG_FB_LEO
       fi
    fi
-   if [ "$ARCH" = "sparc" ]; then
+   if [ "$CONFIG_SPARC32" = "y" ]; then
       if [ "$CONFIG_PCI" != "n" ]; then
 	 bool '  PCI framebuffers' CONFIG_FB_PCI
 	 if [ "$CONFIG_FB_PCI" != "n" ]; then
@@ -183,7 +183,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 fi
       fi
    fi
-   if [ "$ARCH" = "sparc64" ]; then
+   if [ "$CONFIG_SPARC64" = "y" ]; then
       if [ "$CONFIG_PCI" != "n" ]; then
 	 bool '  PCI framebuffers' CONFIG_FB_PCI
 	 if [ "$CONFIG_FB_PCI" != "n" ]; then
@@ -208,7 +208,7 @@ if [ "$CONFIG_FB" = "y" ]; then
       bool '  TMPTX3912/PR31700 frame buffer support' CONFIG_FB_TX3912
    fi
    if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-      tristate '  Virtual Frame Buffer support (ONLY FOR TESTING!)' CONFIG_FB_VIRTUAL
+      tristate '  Virtual Frame Buffer support (ONLY FOR TESTING!) (EXPERIMENTAL)' CONFIG_FB_VIRTUAL
    fi
 
    bool '  Advanced low level driver options' CONFIG_FBCON_ADVANCED
@@ -427,7 +427,7 @@ if [ "$CONFIG_FB" = "y" ]; then
       fi
    fi
    bool '  Support only 8 pixels wide fonts' CONFIG_FBCON_FONTWIDTH8_ONLY
-   if [ "$ARCH" = "sparc" -o "$ARCH" = "sparc64" ]; then
+   if [ "$CONFIG_SPARC32" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
       bool '  Sparc console 8x16 font' CONFIG_FONT_SUN8x16
       if [ "$CONFIG_FBCON_FONTWIDTH8_ONLY" = "n" ]; then
 	 bool '  Sparc console 12x22 font (not supported by all drivers)' CONFIG_FONT_SUN12x22
