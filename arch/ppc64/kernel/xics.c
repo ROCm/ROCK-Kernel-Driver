@@ -357,6 +357,7 @@ nextnode:
 	np = find_type_devices("interrupt-controller");
 	if (!np) {
 		printk(KERN_WARNING "xics:  no ISA Interrupt Controller\n");
+		xics_irq_8259_cascade_real = -1;
 		xics_irq_8259_cascade = -1;
 	} else {
 		ireg = (uint *) get_property(np, "interrupts", 0);
