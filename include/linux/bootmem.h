@@ -32,6 +32,8 @@ typedef struct bootmem_data {
 	void *node_bootmem_map;
 	unsigned long last_offset;
 	unsigned long last_pos;
+	unsigned long last_success;	/* Previous allocation point.  To speed
+					 * up searching */
 } bootmem_data_t;
 
 extern unsigned long __init bootmem_bootmap_pages (unsigned long);
