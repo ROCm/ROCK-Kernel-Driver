@@ -35,5 +35,6 @@ struct cache_desc {
 #endif
 
 #define SMP_CACHE_BYTES		L1_CACHE_BYTES
+#define L1_CACHE_SHIFT_MAX 5	/* largest L1 which this arch supports */
 
 #endif /* _ASM_CACHE_H */

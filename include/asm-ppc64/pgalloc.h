@@ -53,7 +53,7 @@ pmd_free(pmd_t *pmd)
 	free_page((unsigned long)pmd);
 }
 
-#define pmd_free_tlb(tlb, pmd)	pmd_free(pmd)
+#define __pmd_free_tlb(tlb, pmd)	pmd_free(pmd)
 
 #define pmd_populate_kernel(mm, pmd, pte) pmd_set(pmd, pte)
 #define pmd_populate(mm, pmd, pte_page) \
@@ -88,7 +88,7 @@ pte_free_kernel(pte_t *pte)
 }
 
 #define pte_free(pte_page)	pte_free_kernel(page_address(pte_page))
-#define pte_free_tlb(tlb, pte)	pte_free(pte)
+#define __pte_free_tlb(tlb, pte)	pte_free(pte)
 
 #define check_pgt_cache()	do { } while (0)
 

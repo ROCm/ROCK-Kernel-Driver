@@ -227,23 +227,16 @@ asmlinkage long sys_dup(unsigned int fildes)
 static int setfl(int fd, struct file * filp, unsigned long arg)
 {
 	struct inode * inode = filp->f_dentry->d_inode;
-	int error;
+	int error = 0;
 
-	/*
-	 * In the case of an append-only file, O_APPEND
-	 * cannot be cleared
-	 */
+	/* O_APPEND cannot be cleared if the file is marked as append-only */
 	if (!(arg & O_APPEND) && IS_APPEND(inode))
 		return -EPERM;
 
-	/* Did FASYNC state change? */
-	if ((arg ^ filp->f_flags) & FASYNC) {
-		if (filp->f_op && filp->f_op->fasync) {
-			error = filp->f_op->fasync(fd, filp, (arg & FASYNC) != 0);
-			if (error < 0)
-				return error;
-		}
-	}
+	/* required for strict SunOS emulation */
+	if (O_NONBLOCK != O_NDELAY)
+	       if (arg & O_NDELAY)
+		   arg |= O_NONBLOCK;
 
 	if (arg & O_DIRECT) {
 		if (!inode->i_mapping || !inode->i_mapping->a_ops ||
@@ -251,13 +244,19 @@ static int setfl(int fd, struct file * filp, unsigned long arg)
 				return -EINVAL;
 	}
 
-	/* required for strict SunOS emulation */
-	if (O_NONBLOCK != O_NDELAY)
-	       if (arg & O_NDELAY)
-		   arg |= O_NONBLOCK;
+	lock_kernel();
+	if ((arg ^ filp->f_flags) & FASYNC) {
+		if (filp->f_op && filp->f_op->fasync) {
+			error = filp->f_op->fasync(fd, filp, (arg & FASYNC) != 0);
+			if (error < 0)
+				goto out;
+		}
+	}
 
 	filp->f_flags = (arg & SETFL_MASK) | (filp->f_flags & ~SETFL_MASK);
-	return 0;
+ out:
+	unlock_kernel();
+	return error;
 }
 
 static long do_fcntl(unsigned int fd, unsigned int cmd,
@@ -283,9 +282,7 @@ static long do_fcntl(unsigned int fd, unsigned int cmd,
 			err = filp->f_flags;
 			break;
 		case F_SETFL:
-			lock_kernel();
 			err = setfl(fd, filp, arg);
-			unlock_kernel();
 			break;
 		case F_GETLK:
 			err = fcntl_getlk(filp, (struct flock *) arg);

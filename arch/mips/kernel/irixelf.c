@@ -54,7 +54,6 @@ static struct linux_binfmt irix_format = {
 
 #ifndef elf_addr_t
 #define elf_addr_t unsigned long
-#define elf_caddr_t char *
 #endif
 
 #ifdef DEBUG_ELF
@@ -155,8 +154,8 @@ unsigned long * create_irix_tables(char * p, int argc, int envc,
 				   unsigned int interp_load_addr,
 				   struct pt_regs *regs, struct elf_phdr *ephdr)
 {
-	elf_caddr_t *argv;
-	elf_caddr_t *envp;
+	elf_addr_t *argv;
+	elf_addr_t *envp;
 	elf_addr_t *sp, *csp;
 	
 #ifdef DEBUG_ELF
@@ -202,20 +201,20 @@ unsigned long * create_irix_tables(char * p, int argc, int envc,
 #undef NEW_AUX_ENT
 
 	sp -= envc+1;
-	envp = (elf_caddr_t *) sp;
+	envp = sp;
 	sp -= argc+1;
-	argv = (elf_caddr_t *) sp;
+	argv = sp;
 
 	__put_user((elf_addr_t)argc,--sp);
 	current->mm->arg_start = (unsigned long) p;
 	while (argc-->0) {
-		__put_user((elf_caddr_t)(unsigned long)p,argv++);
+		__put_user((unsigned long)p,argv++);
 		p += strlen_user(p);
 	}
 	__put_user(NULL, argv);
 	current->mm->arg_end = current->mm->env_start = (unsigned long) p;
 	while (envc-->0) {
-		__put_user((elf_caddr_t)(unsigned long)p,envp++);
+		__put_user((unsigned long)p,envp++);
 		p += strlen_user(p);
 	}
 	__put_user(NULL, envp);

@@ -696,7 +696,7 @@ int mga_dma_flush( DRM_IOCTL_ARGS )
 #if MGA_DMA_DEBUG
 		int ret = mga_do_wait_for_idle( dev_priv );
 		if ( ret < 0 )
-			DRM_INFO( "%s: -EBUSY\n", __func__ );
+			DRM_INFO( "%s: -EBUSY\n", __FUNCTION__ );
 		return ret;
 #else
 		return mga_do_wait_for_idle( dev_priv );

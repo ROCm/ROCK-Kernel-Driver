@@ -47,7 +47,7 @@ BTFIXUPDEF_CALL(void, free_pmd_fast, pmd_t *)
 #define free_pmd_fast(pmd)	BTFIXUP_CALL(free_pmd_fast)(pmd)
 
 #define pmd_free(pmd)           free_pmd_fast(pmd)
-#define pmd_free_tlb(tlb, pmd)	pmd_free(pmd)
+#define __pmd_free_tlb(tlb, pmd) pmd_free(pmd)
 
 BTFIXUPDEF_CALL(void, pmd_populate, pmd_t *, struct page *)
 #define pmd_populate(MM, PMD, PTE)        BTFIXUP_CALL(pmd_populate)(PMD, PTE)
@@ -64,6 +64,6 @@ BTFIXUPDEF_CALL(void, free_pte_fast, pte_t *)
 
 BTFIXUPDEF_CALL(void, pte_free, struct page *)
 #define pte_free(pte)		BTFIXUP_CALL(pte_free)(pte)
-#define pte_free_tlb(tlb, pte)	pte_free(pte)
+#define __pte_free_tlb(tlb, pte)	pte_free(pte)
 
 #endif /* _SPARC_PGALLOC_H */
