@@ -773,7 +773,8 @@ siginfo64to32(siginfo_t32 *d, siginfo_t *s)
 	memset (d, 0, sizeof(siginfo_t32));
 	d->si_signo = s->si_signo;
 	d->si_errno = s->si_errno;
-	d->si_code = s->si_code;
+	/* XXX why dont we just implement copy_siginfo_to_user32? - Anton */
+	d->si_code = s->si_code & 0xffff;
 	if (s->si_signo >= SIGRTMIN) {
 		d->si_pid = s->si_pid;
 		d->si_uid = s->si_uid;

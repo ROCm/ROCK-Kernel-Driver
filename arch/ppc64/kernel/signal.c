@@ -455,7 +455,7 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 		    || __put_user(&rt_sf->info, &rt_sf->pinfo)
 		    || __put_user(&rt_sf->uc, &rt_sf->puc)
 		    /* Put the siginfo */
-		    || __copy_to_user(&rt_sf->info, info, sizeof(*info))
+		    || copy_siginfo_to_user(&rt_sf->info, info)
 		    /* Create the ucontext */
 		    || __put_user(0, &rt_sf->uc.uc_flags)
 		    || __put_user(0, &rt_sf->uc.uc_link)
