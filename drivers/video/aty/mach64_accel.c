@@ -216,8 +216,9 @@ void atyfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 	draw_rect(area->dx, area->dy, area->width, area->height, par);
 }
 
-void atyfb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+void atyfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
+	u32 color = rect->color, dx = rect->dx, width = rect->width;
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 
 	if (!rect->width || !rect->height)
@@ -229,25 +230,25 @@ void atyfb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 		return;
 	}
 
-	rect->color |= (rect->color << 8);
-	rect->color |= (rect->color << 16);
+	color |= (color << 8);
+	color |= (color << 16);
 
 	if (info->var.bits_per_pixel == 24) {
 		/* In 24 bpp, the engine is in 8 bpp - this requires that all */
 		/* horizontal coordinates and widths must be adjusted */
-		rect->dx *= 3;
-		rect->width *= 3;
+		dx *= 3;
+		width *= 3;
 	}
 
 	wait_for_fifo(3, par);
-	aty_st_le32(DP_FRGD_CLR, rect->color, par);
+	aty_st_le32(DP_FRGD_CLR, color, par);
 	aty_st_le32(DP_SRC,
 		    BKGD_SRC_BKGD_CLR | FRGD_SRC_FRGD_CLR | MONO_SRC_ONE,
 		    par);
 	aty_st_le32(DST_CNTL,
 		    DST_LAST_PEL | DST_Y_TOP_TO_BOTTOM |
 		    DST_X_LEFT_TO_RIGHT, par);
-	draw_rect(rect->dx, rect->dy, rect->width, rect->height, par);
+	draw_rect(dx, rect->dy, width, rect->height, par);
 }
 
 void atyfb_imageblit(struct fb_info *info, struct fb_image *image)

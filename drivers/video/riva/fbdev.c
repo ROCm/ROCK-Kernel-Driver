@@ -150,7 +150,7 @@ enum riva_chips {
 static struct riva_chip_info {
 	const char *name;
 	unsigned arch_rev;
-} riva_chip_info[] __devinitdata = {
+} riva_chip_info[] __initdata = {
 	{ "RIVA-128", NV_ARCH_03 },
 	{ "RIVA-TNT", NV_ARCH_04 },
 	{ "RIVA-TNT2", NV_ARCH_04 },
@@ -193,7 +193,7 @@ static struct riva_chip_info {
 	{ "Quadro4-700-XGL", NV_ARCH_20 }
 };
 
-static struct pci_device_id rivafb_pci_tbl[] __devinitdata = {
+static struct pci_device_id rivafb_pci_tbl[] __initdata = {
 	{ PCI_VENDOR_ID_NVIDIA_SGS, PCI_DEVICE_ID_NVIDIA_SGS_RIVA128,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_RIVA_128 },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_TNT,
@@ -458,7 +458,7 @@ static void rivafb_load_cursor_image(u8 *data, u8 *mask, struct riva_par *par,
 		m = *((u32 *)mask)++;
 		for (j = 0; j < w/2; j++) {
 			tmp = 0;
-#if defined (__BIG_ENDIAN__)
+#if defined (__BIG_ENDIAN)
 			if (m & (1 << 31))
 				tmp = (b & (1 << 31)) ? fg << 16 : bg << 16;
 			b <<= 1;
@@ -623,7 +623,7 @@ static void riva_load_video_mode(struct fb_info *info)
 	width = info->var.xres_virtual;
 	hDisplaySize = info->var.xres;
 	hDisplay = (hDisplaySize / 8) - 1;
-	hStart = (hDisplaySize + info->var.right_margin) / 8 + 2;
+	hStart = (hDisplaySize + info->var.right_margin) / 8 - 1;
 	hEnd = (hDisplaySize + info->var.right_margin +
 		info->var.hsync_len) / 8 - 1;
 	hTotal = (hDisplaySize + info->var.right_margin +
@@ -697,6 +697,15 @@ static void riva_load_video_mode(struct fb_info *info)
 
 	if (par->riva.Architecture >= NV_ARCH_10)
 		par->riva.CURSOR = (U032 *)(info->screen_base + par->riva.CursorStart);
+
+	if (info->var.sync & FB_SYNC_HOR_HIGH_ACT)
+		newmode.misc_output &= ~0x40;
+	else
+		newmode.misc_output |= 0x40;
+	if (info->var.sync & FB_SYNC_VERT_HIGH_ACT)
+		newmode.misc_output &= ~0x80;
+	else
+		newmode.misc_output |= 0x80;	
 
 	par->riva.CalcStateExt(&par->riva, &newmode.ext, bpp, width,
 				  hDisplaySize, height, dotClock);
@@ -932,7 +941,7 @@ static int rivafb_release(struct fb_info *info, int user)
 	if (cnt == 1) {
 		par->riva.LockUnlock(&par->riva, 0);
 		par->riva.LoadStateExt(&par->riva, &par->initial_state.ext);
-
+		riva_load_state(par, &par->initial_state);
 		restore_vga(&par->state);
 		par->riva.LockUnlock(&par->riva, 1);
 	}
@@ -1156,13 +1165,13 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	case 16:
 		if (info->var.green.length == 5) {
 			/* 0rrrrrgg gggbbbbb */
-			((u16 *)(info->pseudo_palette))[regno] =
+			((u32 *)(info->pseudo_palette))[regno] =
 					((red & 0xf800) >> 1) |
 					((green & 0xf800) >> 6) |
 					((blue & 0xf800) >> 11);
 		} else {
 			/* rrrrrggg gggbbbbb */
-			((u16 *)(info->pseudo_palette))[regno] =
+			((u32 *)(info->pseudo_palette))[regno] =
 					((red & 0xf800) >> 0) |
 					((green & 0xf800) >> 5) |
 					((blue & 0xf800) >> 11);
@@ -1192,7 +1201,7 @@ static int rivafb_setcolreg(unsigned regno, unsigned red, unsigned green,
  * CALLED FROM:
  * framebuffer hook
  */
-static void rivafb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+static void rivafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
 	u_int color, rop = 0;
@@ -1238,7 +1247,7 @@ static void rivafb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
  * CALLED FROM:
  * framebuffer hook
  */
-static void rivafb_copyarea(struct fb_info *info, struct fb_copyarea *region)
+static void rivafb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
 
@@ -1288,6 +1297,8 @@ static inline void reverse_order(u32 *l)
 {
 	u8 *a = (u8 *)l;
 	*a = byte_rev[*a], a++;
+	*a = byte_rev[*a], a++;
+	*a = byte_rev[*a], a++;
 	*a = byte_rev[*a];
 }
 
@@ -1315,13 +1326,13 @@ static inline void convert_bgcolor_16(u32 *col)
  * CALLED FROM:
  * framebuffer hook
  */
-static void rivafb_imageblit(struct fb_info *info, struct fb_image *image)
+static void rivafb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
-	u32 fgx = 0, bgx = 0, width, mod;
-	u8 *cdat = image->data, *dat;
+	u32 fgx = 0, bgx = 0, width, mod, tmp;
+	u8 *cdat = image->data;
 	volatile u32 *d;
-	int i, j, size;
+	int i, j, k, size;
 
 	if (image->depth != 1) {
 		wait_for_idle(par);
@@ -1330,84 +1341,80 @@ static void rivafb_imageblit(struct fb_info *info, struct fb_image *image)
 	}
 
 	width = (image->width + 7)/8;
-
-	size = image->width * image->height;
-	dat = cdat;
-/*
-	for (i = 0; i < size; i++) {
-		*dat = byte_rev[*dat];
-		dat++;
-	}
-*/
 	switch (info->var.bits_per_pixel) {
 	case 8:
 		fgx = image->fg_color;
 		bgx = image->bg_color;
 		break;
 	case 16:
-		fgx |= ((u16 *) (info->pseudo_palette))[image->fg_color];
-		bgx |= ((u16 *) (info->pseudo_palette))[image->bg_color];
+		fgx = ((u32 *) (info->pseudo_palette))[image->fg_color];
+		bgx = ((u32 *) (info->pseudo_palette))[image->bg_color];
 		if (info->var.green.length == 6)
 			convert_bgcolor_16(&bgx);	
 		break;
 	case 32:
-		fgx |= ((u32 *) (info->pseudo_palette))[image->fg_color];
-		bgx |= ((u32 *) (info->pseudo_palette))[image->bg_color];
+		fgx = ((u32 *) (info->pseudo_palette))[image->fg_color];
+		bgx = ((u32 *) (info->pseudo_palette))[image->bg_color];
 		break;
 	}
 
 	RIVA_FIFO_FREE(par->riva, Bitmap, 7);
-	par->riva.Bitmap->ClipE.TopLeft     = (image->dy << 16) | (image->dx & 0xFFFF);
-	par->riva.Bitmap->ClipE.BottomRight = (((image->dy + image->height) << 16) |
-                                       		((image->dx + image->width) & 0xffff));
+	par->riva.Bitmap->ClipE.TopLeft     = 
+		(image->dy << 16) | (image->dx & 0xFFFF);
+	par->riva.Bitmap->ClipE.BottomRight = 
+		(((image->dy + image->height) << 16) |
+		 ((image->dx + image->width) & 0xffff));
 	par->riva.Bitmap->Color0E           = bgx;
 	par->riva.Bitmap->Color1E           = fgx;
-	par->riva.Bitmap->WidthHeightInE    = (image->height << 16) | ((image->width + 31) & ~31);
-	par->riva.Bitmap->WidthHeightOutE   = (image->height << 16) | ((image->width + 31) & ~31);
-	par->riva.Bitmap->PointE            = (image->dy << 16) | (image->dx & 0xFFFF);
+	par->riva.Bitmap->WidthHeightInE    = 
+		(image->height << 16) | ((image->width + 31) & ~31);
+	par->riva.Bitmap->WidthHeightOutE   = 
+		(image->height << 16) | ((image->width + 31) & ~31);
+	par->riva.Bitmap->PointE            = 
+		(image->dy << 16) | (image->dx & 0xFFFF);
 
 	d = &par->riva.Bitmap->MonochromeData01E;
 
 	mod = width % 4;
 
 	if (width >= 4) {
-		while (image->height--) {
+		k = image->height;
+		while (k--) {
 			size = width / 4;
 			while (size >= 16) {
 				RIVA_FIFO_FREE(par->riva, Bitmap, 16);
-				for (i = 0; i < 16; i++)
-					d[i] = *((u32 *)cdat)++;
+				for (i = 0; i < 16; i++) {
+					tmp = *((u32 *)cdat)++;
+					reverse_order(&tmp);
+					d[i] = tmp;
+				}
 				size -= 16;
 			}
 
 			if (size) {
 				RIVA_FIFO_FREE(par->riva, Bitmap, size);
-				for (i = 0; i < size; i++)
-					d[i] = *((u32 *) cdat)++;
+				for (i = 0; i < size; i++) {
+					tmp = *((u32 *) cdat)++;
+					reverse_order(&tmp);
+					d[i] = tmp;
+				}
 			}
 
 			if (mod) {
-				u32 tmp;
 				RIVA_FIFO_FREE(par->riva, Bitmap, 1);
 				for (i = 0; i < mod; i++)
 					((u8 *)&tmp)[i] = *cdat++;
+				reverse_order(&tmp);
 				d[i] = tmp;
 			}
 		}
 	} else {
-		u32 tmp;
-
 		for (i = image->height; i > 0; i-=16) {
-			if (i >= 16)
-				size = 16;
-			else
-				size = i;
+			size = (i >= 16) ? 16 : i;
 			RIVA_FIFO_FREE(par->riva, Bitmap, size);
 			for (j = 0; j < size; j++) {
-				if (image->width <= 8)
-					tmp = *cdat++;
-				else
-					tmp = *((u16 *)cdat)++;
+				for (k = 0; k < width; k++) 
+					((u8 *) &tmp)[k] = *cdat++;
 				reverse_order(&tmp);
 				d[j] = tmp;
 			}
@@ -1470,14 +1477,19 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	if (flags & (FB_CUR_SETSHAPE | FB_CUR_SETCMAP | FB_CUR_SETDEST)) {
 		int bg_idx = cursor->image.bg_color;
 		int fg_idx = cursor->image.fg_color;
+		int width = (cursor->image.width+7)/8;
+		u8 *dat = (u8 *) cursor->image.data;
+		u8 *dst = (u8 *) cursor->dest;
+		u8 *msk = (u8 *) cursor->mask;
 
 		switch (cursor->rop) {
 		case ROP_XOR:
 			for (i = 0; i < cursor->image.height; i++) {
-				for (j = 0; j < (cursor->image.width + 7)/8; j++) {
+				for (j = 0; j < width; j++) {
 					d_idx = i * MAX_CURS/8  + j;
-					data[d_idx] =  byte_rev[((u8 *)cursor->image.data)[s_idx] ^ ((u8 *)cursor->dest)[s_idx]]; 	
-					mask[d_idx] = byte_rev[((u8 *)cursor->mask)[s_idx]];
+					data[d_idx] =  byte_rev[dat[s_idx] ^ 
+								dst[s_idx]];
+					mask[d_idx] = byte_rev[msk[s_idx]];
 					s_idx++;
 				}
 			}
@@ -1485,24 +1497,24 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		case ROP_COPY:
 		default:
 			for (i = 0; i < cursor->image.height; i++) {
-				for (j = 0; j < (cursor->image.width + 7)/8; j++) {
+				for (j = 0; j < width; j++) {
 					d_idx = i * MAX_CURS/8 + j;
-					data[d_idx] = byte_rev[((u8 *)cursor->image.data)[s_idx]];
-					mask[d_idx] = byte_rev[((u8 *)cursor->mask)[s_idx]];
+					data[d_idx] = byte_rev[dat[s_idx]];
+					mask[d_idx] = byte_rev[msk[s_idx]];
 					s_idx++;
 				}
 			}
 			break;
 		}
-/*
-		bg = ((par->cmap[bg_idx].red & 0xf8) << 7) |
-		     ((par->cmap[bg_idx].green & 0xf8) << 2) |
-		     ((par->cmap[bg_idx].blue & 0xf8) >> 3) | 1 << 15;
 
-		fg = ((par->cmap[fg_idx].red & 0xf8) << 7) |
-		     ((par->cmap[fg_idx].green & 0xf8) << 2) |
-		     ((par->cmap[fg_idx].blue & 0xf8) >> 3) | 1 << 15;
-*/
+		bg = ((info->cmap.red[bg_idx] & 0xf8) << 7) |
+		     ((info->cmap.green[bg_idx] & 0xf8) << 2) |
+		     ((info->cmap.blue[bg_idx] & 0xf8) >> 3) | 1 << 15;
+
+		fg = ((info->cmap.red[fg_idx] & 0xf8) << 7) |
+		     ((info->cmap.green[fg_idx] & 0xf8) << 2) |
+		     ((info->cmap.blue[fg_idx] & 0xf8) >> 3) | 1 << 15;
+
 		par->riva.LockUnlock(&par->riva, 0);
 		rivafb_load_cursor_image(data, mask, par, cursor->image.width,
 		cursor->image.height, bg, fg);
@@ -1538,12 +1550,12 @@ static struct fb_ops riva_fb_ops = {
 	.fb_blank 	= rivafb_blank,
 	.fb_fillrect 	= rivafb_fillrect,
 	.fb_copyarea 	= rivafb_copyarea,
-	.fb_imageblit 	= cfb_imageblit,
-	.fb_cursor	= soft_cursor,	
+	.fb_imageblit 	= rivafb_imageblit,
+	.fb_cursor	= rivafb_cursor,	
 	.fb_sync 	= rivafb_sync,
 };
 
-static int __devinit riva_set_fbinfo(struct fb_info *info)
+static int __init riva_set_fbinfo(struct fb_info *info)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
 	unsigned int cmap_len;
@@ -1689,8 +1701,8 @@ static void riva_get_dfpinfo(struct fb_info *info)
  *
  * ------------------------------------------------------------------------- */
 
-static int __devinit rivafb_probe(struct pci_dev *pd,
-				     const struct pci_device_id *ent)
+static int __init rivafb_probe(struct pci_dev *pd,
+			     	const struct pci_device_id *ent)
 {
 	struct riva_chip_info *rci = &riva_chip_info[ent->driver_data];
 	struct riva_par *default_par;
@@ -1819,21 +1831,15 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	}
 #endif /* CONFIG_MTRR */
 
-	/* unlock io */
-	CRTCout(default_par, 0x11, 0xFF);/* vgaHWunlock() + riva unlock (0x7F) */
-	default_par->riva.LockUnlock(&default_par->riva, 0);
-
-	riva_save_state(default_par, &default_par->initial_state);
-
 	if (riva_set_fbinfo(info) < 0) {
 		printk(KERN_ERR PFX "error setting initial video mode\n");
-		goto err_out_load_state;
+		goto err_out_iounmap_fb;
 	}
 
 	if (register_framebuffer(info) < 0) {
 		printk(KERN_ERR PFX
 			"error registering riva framebuffer\n");
-		goto err_out_load_state;
+		goto err_out_iounmap_fb;
 	}
 
 	pci_set_drvdata(pd, info);
@@ -1847,9 +1853,7 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 		info->fix.smem_start);
 	return 0;
 
-err_out_load_state:
-	riva_load_state(default_par, &default_par->initial_state);
-/* err_out_iounmap_fb: */
+err_out_iounmap_fb:
 	iounmap(info->screen_base);
 err_out_free_base1:
 	release_mem_region(rivafb_fix.smem_start, rivafb_fix.smem_len);
@@ -1869,7 +1873,7 @@ err_out:
 	return -ENODEV;
 }
 
-static void __devexit rivafb_remove(struct pci_dev *pd)
+static void __exit rivafb_remove(struct pci_dev *pd)
 {
 	struct fb_info *info = pci_get_drvdata(pd);
 	struct riva_par *par = (struct riva_par *) info->par;
@@ -1877,10 +1881,7 @@ static void __devexit rivafb_remove(struct pci_dev *pd)
 	if (!info)
 		return;
 
-	riva_load_state(par, &par->initial_state);
-
 	unregister_framebuffer(info);
-
 #ifdef CONFIG_MTRR
 	if (par->mtrr.vram_valid)
 		mtrr_del(par->mtrr.vram, info->fix.smem_start,
@@ -1948,7 +1949,7 @@ static struct pci_driver rivafb_driver = {
 	name:		"rivafb",
 	id_table:	rivafb_pci_tbl,
 	probe:		rivafb_probe,
-	remove:		__devexit_p(rivafb_remove),
+	remove:		__exit_p(rivafb_remove),
 };
 
 
@@ -1961,12 +1962,7 @@ static struct pci_driver rivafb_driver = {
 
 int __init rivafb_init(void)
 {
-	int err;
-	err = pci_module_init(&rivafb_driver);
-	if (err)
-		return err;
-	pci_register_driver(&rivafb_driver);
-	return 0;
+	return pci_module_init(&rivafb_driver);
 }
 
 

@@ -75,8 +75,6 @@ static inline int wait_for_space(struct i810fb_par *par, u32 space)
 	return 1;
 }
 
-
-
 /** 
  * wait_for_engine_idle - waits for all hardware engines to finish
  * @par: pointer to i810fb_par structure
@@ -154,12 +152,14 @@ static inline void source_copy_blit(int dwidth, int dheight, int dpitch,
 				    int blit_bpp, struct i810fb_par *par)
 {
 	if (begin_iring(par, 24 + IRING_PAD)) return;
+
 	PUT_RING(BLIT | SOURCE_COPY_BLIT | 4);
 	PUT_RING(xdir | rop << 16 | dpitch | DYN_COLOR_EN | blit_bpp);
 	PUT_RING(dheight << 16 | dwidth);
 	PUT_RING(dest);
 	PUT_RING(dpitch);
 	PUT_RING(src);
+
 	end_iring(par);
 }	
 
@@ -184,12 +184,14 @@ static inline void color_blit(int width, int height, int pitch,  int dest,
 			      struct i810fb_par *par)
 {
 	if (begin_iring(par, 24 + IRING_PAD)) return;
+
 	PUT_RING(BLIT | COLOR_BLT | 3);
 	PUT_RING(rop << 16 | pitch | SOLIDPATTERN | DYN_COLOR_EN | blit_bpp);
 	PUT_RING(height << 16 | width);
 	PUT_RING(dest);
 	PUT_RING(what);
 	PUT_RING(NOP);
+
 	end_iring(par);
 }
  
@@ -220,17 +222,16 @@ static inline void mono_src_copy_imm_blit(int dwidth, int dheight, int dpitch,
 					  int dest, const u32 *src, int bg,
 					  int fg, struct i810fb_par *par)
 {
-	u32 i, *s = (u32 *) src;
-
 	if (begin_iring(par, 24 + (dsize << 2) + IRING_PAD)) return;
+
 	PUT_RING(BLIT | MONO_SOURCE_COPY_IMMEDIATE | (4 + dsize));
 	PUT_RING(DYN_COLOR_EN | blit_bpp | rop << 16 | dpitch);
 	PUT_RING(dheight << 16 | dwidth);
 	PUT_RING(dest);
 	PUT_RING(bg);
 	PUT_RING(fg);
-	for (i = dsize; i--; ) 
-		PUT_RING(*s++);
+	while (dsize--) 
+		PUT_RING(*src++);
 
 	end_iring(par);
 }
@@ -314,22 +315,15 @@ static inline void i810fb_iring_enable(struct i810fb_par *par, u32 mode)
 	i810_writel(IRING + 12, mmio, tmp);
 }       
 
-void i810fb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
+void i810fb_fillrect(struct fb_info *p, const struct fb_fillrect *rect)
 {
 	struct i810fb_par *par = (struct i810fb_par *) p->par;
 	u32 dx, dy, width, height, dest, rop = 0, color = 0;
 
-	if (!p->var.accel_flags || par->dev_flags & LOCKUP) {
-		cfb_fillrect(p, rect);
-		return;
-	}
+	if (!p->var.accel_flags || par->dev_flags & LOCKUP ||
+	    par->depth == 4) 
+		return cfb_fillrect(p, rect);
 
-	if (par->depth == 4) {
-		wait_for_engine_idle(par);
-		cfb_fillrect(p, rect);
-		return;
-	}
-			
 	if (par->depth == 1) 
 		color = rect->color;
 	else 
@@ -352,16 +346,9 @@ void i810fb_copyarea(struct fb_info *p, struct fb_copyarea *region)
 	struct i810fb_par *par = (struct i810fb_par *) p->par;
 	u32 sx, sy, dx, dy, pitch, width, height, src, dest, xdir;
 
-	if (!p->var.accel_flags || par->dev_flags & LOCKUP) {
-		cfb_copyarea(p, region);
-		return;
-	}
-
-	if (par->depth == 4) {
-		wait_for_engine_idle(par);
-		cfb_copyarea(p, region);
-		return;
-	}
+	if (!p->var.accel_flags || par->dev_flags & LOCKUP ||
+	    par->depth == 4)
+		return cfb_copyarea(p, region);
 
 	dx = region->dx * par->depth;
 	sx = region->sx * par->depth;
@@ -399,16 +386,9 @@ void i810fb_imageblit(struct fb_info *p, struct fb_image *image)
 	u32 fg = 0, bg = 0, s_pitch, d_pitch, size, offset, dst, i, j;
 	u8 *s_addr, *d_addr;
 	
-	if (!p->var.accel_flags || par->dev_flags & LOCKUP) {
-		cfb_imageblit(p, image);
-		return;
-	}
-
-	if (par->depth == 4 || image->depth != 1) {
-		wait_for_engine_idle(par);
-		cfb_imageblit(p, image);
-		return;
-	}
+	if (!p->var.accel_flags || par->dev_flags & LOCKUP ||
+	    par->depth == 4 || image->depth != 1) 
+		return cfb_imageblit(p, image);
 
 	switch (p->var.bits_per_pixel) {
 	case 8:
@@ -425,14 +405,14 @@ void i810fb_imageblit(struct fb_info *p, struct fb_image *image)
 	dst = p->fix.smem_start + (image->dy * p->fix.line_length) + 
 		(image->dx * par->depth);
 
-	s_pitch = image->width/8;
+	s_pitch = (image->width+7)/8;
 	d_pitch = (s_pitch + 1) & ~1;
 	
-	size = d_pitch * image->height;
+	size = (d_pitch * image->height) + 7;
+	size &= ~7;
 
 	if (image->width & 15) {
-		offset = get_buffer_offset(size, par);
-		
+		offset = get_buffer_offset(size, par);		
 		d_addr = par->pixmap.virtual + offset;
 		s_addr = image->data;
 		
@@ -465,7 +445,7 @@ int i810fb_sync(struct fb_info *p)
 {
 	struct i810fb_par *par = (struct i810fb_par *) p->par;
 	
-	if (!p->var.accel_flags)
+	if (!p->var.accel_flags || par->dev_flags & LOCKUP)
 		return 0;
 
 	return wait_for_engine_idle(par);

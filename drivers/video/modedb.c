@@ -129,6 +129,14 @@ static const struct fb_videomode modedb[] __initdata = {
 	NULL, 68, 1400, 1050, 9259, 136, 40, 13, 1, 112, 3,
 	0, FB_VMODE_NONINTERLACED   	
     }, {
+	/* 1400x1050 @ 75,107 Hz, 82,392 kHz +hsync +vsync*/
+	"LCD_XGA_75", 75, 1400, 1050, 9271, 120, 56, 13, 0, 112, 3,
+	FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
+    }, {
+	/* 1400x1050 @ 60 Hz, ? kHz +hsync +vsync*/
+	"LCD_XGA_60", 60, 1400, 1050, 9259, 128, 40, 12, 0, 112, 3,
+	FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
+    }, {
 	/* 1024x768 @ 85 Hz, 70.24 kHz hsync */
 	NULL, 85, 1024, 768, 10111, 192, 32, 34, 14, 160, 6,
 	0, FB_VMODE_NONINTERLACED

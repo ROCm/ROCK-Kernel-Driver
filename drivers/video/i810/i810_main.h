@@ -121,7 +121,7 @@ extern void i810fb_encode_registers(const struct fb_var_screeninfo *var,
 extern void i810fb_fill_var_timings(struct fb_var_screeninfo *var);
 				    
 /* Accelerated Functions */
-extern void i810fb_fillrect (struct fb_info *p, struct fb_fillrect *rect);
+extern void i810fb_fillrect (struct fb_info *p, const struct fb_fillrect *rect);
 extern void i810fb_copyarea (struct fb_info *p, struct fb_copyarea *region);
 extern void i810fb_imageblit(struct fb_info *p, struct fb_image *image);
 extern int  i810fb_sync     (struct fb_info *p);

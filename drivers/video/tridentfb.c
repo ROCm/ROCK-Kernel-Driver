@@ -451,7 +451,7 @@ static struct accel_switch accel_image = {
  * Accel functions called by the upper layers
  */
 
-static void tridentfb_fillrect(struct fb_info * info, struct fb_fillrect *fr)
+static void tridentfb_fillrect(struct fb_info * info, const struct fb_fillrect *fr)
 {
 	int bpp = info->var.bits_per_pixel;
 	int dx,dy,w,h,col;

@@ -73,28 +73,39 @@ static u32 cfb_tab32[] = {
 	0x00000000, 0xffffffff
 };
 
-#if BITS_PER_LONG == 32
-#define FB_WRITEL fb_writel
-#define FB_READL  fb_readl
-#else
-#define FB_WRITEL fb_writeq
-#define FB_READL  fb_readq
-#endif 
-
 #if defined (__BIG_ENDIAN)
 #define LEFT_POS(bpp)          (BITS_PER_LONG - bpp)
-#define NEXT_POS(pos, bpp)     ((pos) -= (bpp))
 #define SHIFT_HIGH(val, bits)  ((val) >> (bits))
 #define SHIFT_LOW(val, bits)   ((val) << (bits))
 #else
 #define LEFT_POS(bpp)          (0)
-#define NEXT_POS(pos, bpp)     ((pos) += (bpp))
 #define SHIFT_HIGH(val, bits)  ((val) << (bits))
 #define SHIFT_LOW(val, bits)   ((val) >> (bits))
 #endif
 
-static inline void color_imageblit(struct fb_image *image, struct fb_info *p, 
-				   u8 *dst1, unsigned long start_index,
+#if BITS_PER_LONG == 32
+#define FB_WRITEL	fb_writel
+#define FB_READL	fb_readl
+#define INIT_FASTPATH	{}
+#define FASTPATH	fb_writel((end_mask & eorx)^bgx, dst++)
+#else
+#define FB_WRITEL	fb_writeq
+#define FB_READL	fb_readq
+#define INIT_FASTPATH	unsigned long val = 0, bpl = 0
+#define FASTPATH {					\
+	val |= SHIFT_HIGH((end_mask & eorx)^bgx, bpl);	\
+	bpl += 32;					\
+	bpl &= BITS_PER_LONG - 1;			\
+	if (!bpl) {					\
+		FB_WRITEL(val, dst++);			\
+		val = 0;				\
+	}						\
+}
+#endif
+
+static inline void color_imageblit(const struct fb_image *image, 
+				   struct fb_info *p, u8 *dst1, 
+				   unsigned long start_index,
 				   unsigned long pitch_index)
 {
 	/* Draw the penguin */
@@ -106,10 +117,9 @@ static inline void color_imageblit(struct fb_image *image, struct fb_info *p,
 
 	dst2 = (unsigned long *) dst1;
 	for (i = image->height; i--; ) {
-		n = image->width;
 		dst = (unsigned long *) dst1;
-		shift = 0;
-		val = 0;
+		n = image->width;
+		shift = val = 0;
 		
 		if (start_index) {
 			unsigned long start_mask = ~(SHIFT_HIGH(~0UL,
@@ -152,8 +162,9 @@ static inline void color_imageblit(struct fb_image *image, struct fb_info *p,
 	}
 }
 
-static inline void slow_imageblit(struct fb_image *image, struct fb_info *p, 
-				  u8 *dst1, unsigned long fgcolor,
+static inline void slow_imageblit(const struct fb_image *image, 
+				  struct fb_info *p, u8 *dst1, 
+				  unsigned long fgcolor,
 				  unsigned long bgcolor, 
 				  unsigned long start_index,
 				  unsigned long pitch_index)
@@ -168,11 +179,11 @@ static inline void slow_imageblit(struct fb_image *image, struct fb_info *p,
 	dst2 = (unsigned long *) dst1;
 
 	for (i = image->height; i--; ) {
-		shift = val = 0;
-		l = 8;
-		j = image->width;
 		dst = (unsigned long *) dst1;
+		j = image->width;
+		shift = val = 0;
 		s = src;
+		l = 8;
 
 		/* write leading bits */
 		if (start_index) {
@@ -228,13 +239,13 @@ static inline void slow_imageblit(struct fb_image *image, struct fb_info *p,
  *           fix->line_legth is divisible by 4;
  *           beginning and end of a scanline is dword aligned
  */
-static inline void fast_imageblit(struct fb_image *image, struct fb_info *p, 
-				  u8 *dst1, unsigned long fgcolor, 
-				  unsigned long bgcolor) 
+static inline void fast_imageblit(const struct fb_image *image, 
+				  struct fb_info *p, u8 *dst1, 
+				  u32 fgcolor, u32 bgcolor) 
 {
-	unsigned long fgx = fgcolor, bgx = bgcolor, bpp = p->var.bits_per_pixel;
-	unsigned long ppw = BITS_PER_LONG/bpp, spitch = (image->width + 7)/8;
-	unsigned long bit_mask, end_mask, eorx, shift;
+	u32 fgx = fgcolor, bgx = bgcolor, bpp = p->var.bits_per_pixel;
+	u32 ppw = BITS_PER_LONG/bpp, spitch = (image->width + 7)/8;
+	u32 bit_mask, end_mask, eorx, shift;
 	char *s = image->data, *src;
 	unsigned long *dst;
 	u32 *tab = NULL;
@@ -265,11 +276,12 @@ static inline void fast_imageblit(struct fb_image *image, struct fb_info *p,
 
 	for (i = image->height; i--; ) {
 		dst = (unsigned long *) dst1, shift = 8; src = s;
-		
+		INIT_FASTPATH;
+	
 		for (j = k; j--; ) {
 			shift -= ppw;
 			end_mask = tab[(*src >> shift) & bit_mask];
-			FB_WRITEL((end_mask & eorx)^bgx, dst++);
+			FASTPATH;
 			if (!shift) { shift = 8; src++; }		
 		}
 		dst1 += p->fix.line_length;
@@ -277,10 +289,12 @@ static inline void fast_imageblit(struct fb_image *image, struct fb_info *p,
 	}
 }	
 	
-void cfb_imageblit(struct fb_info *p, struct fb_image *image)
+void cfb_imageblit(struct fb_info *p, const struct fb_image *image)
 {
 	unsigned long fgcolor, bgcolor, start_index, bitstart, pitch_index = 0;
 	unsigned long bpl = sizeof(unsigned long), bpp = p->var.bits_per_pixel;
+	u32 width = image->width, height = image->height; 
+	u32 dx = image->dx, dy = image->dy;
 	int x2, y2, vxres, vyres;
 	u8 *dst1;
 
@@ -296,14 +310,14 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 
 	x2 = image->dx + image->width;
 	y2 = image->dy + image->height;
-	image->dx = image->dx > 0 ? image->dx : 0;
-	image->dy = image->dy > 0 ? image->dy : 0;
+	dx = image->dx > 0 ? image->dx : 0;
+	dy = image->dy > 0 ? image->dy : 0;
 	x2 = x2 < vxres ? x2 : vxres;
 	y2 = y2 < vyres ? y2 : vyres;
-	image->width  = x2 - image->dx;
-	image->height = y2 - image->dy;
+	width  = x2 - dx;
+	height = y2 - dy;
 
-	bitstart = (image->dy * p->fix.line_length * 8) + (image->dx * bpp);
+	bitstart = (dy * p->fix.line_length * 8) + (dx * bpp);
 	start_index = bitstart & (BITS_PER_LONG - 1);
 	pitch_index = (p->fix.line_length & (bpl - 1)) * 8;
 
@@ -325,13 +339,13 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 		}	
 		
 		if (BITS_PER_LONG % bpp == 0 && !start_index && !pitch_index && 
-		    ((image->width & (BITS_PER_LONG/bpp-1)) == 0) &&
+		    ((width & (BITS_PER_LONG/bpp-1)) == 0) &&
 		    bpp >= 8 && bpp <= 32) 			
 			fast_imageblit(image, p, dst1, fgcolor, bgcolor);
 		else 
-			slow_imageblit(image, p, dst1, fgcolor, bgcolor, start_index, pitch_index);
-	}
-	else if (image->depth == bpp) 
+			slow_imageblit(image, p, dst1, fgcolor, bgcolor,
+					start_index, pitch_index);
+	} else if (image->depth == bpp) 
 		color_imageblit(image, p, dst1, start_index, pitch_index);
 }
 

@@ -732,6 +732,10 @@ int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 	if (new_cols == video_num_columns && new_rows == video_num_lines)
 		return 0;
 
+	err = resize_screen(currcons, new_cols, new_rows);
+	if (err)
+		return err;
+
 	newscreen = (unsigned short *) kmalloc(new_screen_size, GFP_USER);
 	if (!newscreen)
 		return -ENOMEM;
@@ -745,10 +749,6 @@ int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 	video_num_columns = new_cols;
 	video_size_row = new_row_size;
 	screenbuf_size = new_screen_size;
-
-	err = resize_screen(currcons, new_cols, new_rows);
-	if (err)
-		return err;
 
 	rlth = min(old_row_size, new_row_size);
 	rrem = new_row_size - rlth;

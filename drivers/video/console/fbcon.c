@@ -399,7 +399,7 @@ void accel_putcs(struct vc_data *vc, struct display *p,
 
 	if (!(vc->vc_font.width & 7)) {
 		unsigned int pitch, cnt, i, j, k;
-		unsigned int maxcnt = FB_PIXMAPSIZE/(vc->vc_font.height * width);
+		unsigned int maxcnt = FB_PIXMAPSIZE/cellsize;
 		char *src, *dst, *dst0;
 
 		image.data = pixmap;
@@ -437,8 +437,6 @@ void accel_putcs(struct vc_data *vc, struct display *p,
 			image.dx += vc->vc_font.width;
 		}	
 	}
-	if (info->fbops->fb_sync)
-		info->fbops->fb_sync(info);
 }
 
 void accel_clear_margins(struct vc_data *vc, struct display *p,
@@ -1883,10 +1881,11 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 	var.activate = FB_ACTIVATE_NOW;
 
 	err = fb_set_var(&var, info);
-	return  (err || var.xres != info->var.xres ||
-		 var.yres != info->var.yres) ?
-		-EINVAL : 0;
-	  
+	if (err || var.xres != info->var.xres ||
+		 var.yres != info->var.yres) 
+		return -EINVAL;
+	p->vrows = info->var.yres_virtual/vc->vc_font.height;
+	return 0;
 }
 
 static int fbcon_switch(struct vc_data *vc)

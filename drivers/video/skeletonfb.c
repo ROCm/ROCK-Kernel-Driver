@@ -384,7 +384,7 @@ static int xxxfb_blank(int blank_mode, const struct fb_info *info)
  *	depending on the rastering operation with the value of color which
  *	is in the current color depth format.
  */
-void xxfb_fillrect(struct fb_info *p, struct fb_fillrect *region)
+void xxfb_fillrect(struct fb_info *p, const struct fb_fillrect *region)
 {
 /*	Meaning of struct fb_fillrect
  *
@@ -410,7 +410,7 @@ void xxfb_fillrect(struct fb_info *p, struct fb_fillrect *region)
  *      This drawing operation copies a rectangular area from one area of the
  *	screen to another area.
  */
-void xxxfb_copyarea(struct fb_info *p, struct fb_copyarea *area) 
+void xxxfb_copyarea(struct fb_info *p, const struct fb_copyarea *area) 
 {
 /*
  *      @dx: The x and y coordinates of the upper left hand corner of the
@@ -435,7 +435,7 @@ void xxxfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
  *	mono image (needed for font handling) or a color image (needed for
  *	tux). 
  */
-void xxxfb_imageblit(struct fb_info *p, struct fb_image *image) 
+void xxxfb_imageblit(struct fb_info *p, const struct fb_image *image) 
 {
 /*
  *      @dx: The x and y coordinates of the upper left hand corner of the

@@ -359,13 +359,13 @@ void bitfill_rev(unsigned long *dst, int dst_idx, unsigned long pat, int left,
 	}
 }
 
-void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
+void cfb_fillrect(struct fb_info *p, const struct fb_fillrect *rect)
 {
-	unsigned long height, fg;
+	u32 bpp = p->var.bits_per_pixel;
 	unsigned long x2, y2, vxres, vyres;
+	unsigned long height, width, fg;
 	unsigned long *dst;
 	int dst_idx, left;
-	u32 bpp = p->var.bits_per_pixel;
 
 	/* We want rotation but lack hardware to do it for us. */
 	if (!p->fbops->fb_rotate && p->var.rotate) {
@@ -385,7 +385,7 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 	y2 = rect->dy + rect->height;
 	x2 = x2 < vxres ? x2 : vxres;
 	y2 = y2 < vyres ? y2 : vyres;
-	rect->width = x2 - rect->dx;
+	width = x2 - rect->dx;
 	height = y2 - rect->dy;
 	
 	if (p->fix.visual == FB_VISUAL_TRUECOLOR ||
@@ -419,7 +419,7 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 		while (height--) {
 			dst += dst_idx >> SHIFT_PER_LONG;
 			dst_idx &= (BITS_PER_LONG-1);
-			fill_op32(dst, dst_idx, pat, rect->width*bpp);
+			fill_op32(dst, dst_idx, pat, width*bpp);
 			dst_idx += p->fix.line_length*8;
 		}
 	} else {
@@ -443,7 +443,7 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 			dst += dst_idx >> SHIFT_PER_LONG;
 			dst_idx &= (BITS_PER_LONG-1);
 			fill_op(dst, dst_idx, pat, left, right, 
-				rect->width*bpp);
+				width*bpp);
 			r = (p->fix.line_length*8) % bpp;
 			pat = pat << (bpp-r) | pat >> r;
 			dst_idx += p->fix.line_length*8;

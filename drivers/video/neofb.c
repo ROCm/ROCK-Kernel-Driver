@@ -1318,7 +1318,7 @@ static int neofb_blank(int blank, struct fb_info *info)
 }
 
 static void
-neo2200_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+neo2200_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
 	u_long dst, rop;
@@ -1429,7 +1429,7 @@ neo2200_imageblit(struct fb_info *info, struct fb_image *image)
 }
 
 static void
-neofb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+neofb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	if (info->var.accel_flags == FB_ACCELF_TEXT)
 		neo2200_fillrect(info, rect);	
