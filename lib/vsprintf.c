@@ -143,9 +143,9 @@ static char * number(char * buf, char * end, unsigned long long num, int base, i
 	c = (type & ZEROPAD) ? '0' : ' ';
 	sign = 0;
 	if (type & SIGN) {
-		if (num < 0) {
+		if ((signed long long) num < 0) {
 			sign = '-';
-			num = -num;
+			num = - (signed long long) num;
 			size--;
 		} else if (type & PLUS) {
 			sign = '+';

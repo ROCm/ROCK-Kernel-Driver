@@ -236,16 +236,23 @@ static ad1889_dev_t *ad1889_alloc_dev(struct pci_dev *pci)
 
 	for (i = 0; i < AD_MAX_STATES; i++) {
 		dmabuf = &dev->state[i].dmabuf;
-		if ((dmabuf->rawbuf = kmalloc(DMA_SIZE, GFP_KERNEL|GFP_DMA)) == NULL)
-			return NULL;
+		dmabuf->rawbuf = kmalloc(DMA_SIZE, GFP_KERNEL|GFP_DMA);
+		if (!dmabuf->rawbuf)
+			goto err_free_dmabuf;
 		dmabuf->rawbuf_size = DMA_SIZE;
 		dmabuf->dma_handle = 0;
 		dmabuf->rd_ptr = dmabuf->wr_ptr = dmabuf->dma_len = 0UL;
 		dmabuf->ready = 0;
 		dmabuf->rate = 44100;
 	}
-
+out:
 	return dev;
+
+err_free_dmabuf:
+	while (--i >= 0)
+		kfree(dev->state[i].dmabuf.rawbuf);
+	kfree(dev);
+	return NULL;
 }
 
 static void ad1889_free_dev(ad1889_dev_t *dev)
