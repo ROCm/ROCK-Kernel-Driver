@@ -55,7 +55,7 @@
 #include <asm/pgtable.h>
 #endif
 
-#if 0 /* defer interrupt work to a tasklet */
+#if defined(CONFIG_ATM_FORE200E_USE_TASKLET) /* defer interrupt work to a tasklet */
 #define FORE200E_USE_TASKLET
 #endif
 
@@ -1354,6 +1354,7 @@ fore200e_rx_irq(struct fore200e* fore200e)
 }
 
 
+#ifndef FORE200E_USE_TASKLET
 static void
 fore200e_irq(struct fore200e* fore200e)
 {
@@ -1367,6 +1368,7 @@ fore200e_irq(struct fore200e* fore200e)
     fore200e_tx_irq(fore200e);
     spin_unlock_irqrestore(&fore200e->q_lock, flags);
 }
+#endif
 
 
 static irqreturn_t
