@@ -2148,11 +2148,11 @@ static int tiocsetd(struct tty_struct *tty, int __user *p)
 
 static int send_break(struct tty_struct *tty, int duration)
 {
-	set_current_state(TASK_INTERRUPTIBLE);
-
 	tty->driver->break_ctl(tty, -1);
-	if (!signal_pending(current))
+	if (!signal_pending(current)) {
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(duration);
+	}
 	tty->driver->break_ctl(tty, 0);
 	if (signal_pending(current))
 		return -EINTR;
