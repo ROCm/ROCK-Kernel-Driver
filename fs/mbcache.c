@@ -72,6 +72,20 @@ EXPORT_SYMBOL(mb_cache_entry_find_first);
 EXPORT_SYMBOL(mb_cache_entry_find_next);
 #endif
 
+struct mb_cache {
+	struct list_head		c_cache_list;
+	const char			*c_name;
+	struct mb_cache_op		c_op;
+	atomic_t			c_entry_count;
+	int				c_bucket_bits;
+#ifndef MB_CACHE_INDEXES_COUNT
+	int				c_indexes_count;
+#endif
+	kmem_cache_t			*c_entry_cache;
+	struct list_head		*c_block_hash;
+	struct list_head		*c_indexes_hash[0];
+};
+
 
 /*
  * Global data: list of all mbcache's, lru list, and a spinlock for
@@ -229,7 +243,7 @@ mb_cache_create(const char *name, struct mb_cache_op *cache_op,
 	struct mb_cache *cache = NULL;
 
 	if(entry_size < sizeof(struct mb_cache_entry) +
-	   indexes_count * sizeof(struct mb_cache_entry_index))
+	   indexes_count * sizeof(((struct mb_cache_entry *) 0)->e_indexes[0]))
 		return NULL;
 
 	cache = kmalloc(sizeof(struct mb_cache) +
