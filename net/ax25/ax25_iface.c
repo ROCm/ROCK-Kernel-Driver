@@ -56,7 +56,8 @@ static struct listen_struct {
 } *listen_list;
 static spinlock_t listen_lock = SPIN_LOCK_UNLOCKED;
 
-int ax25_protocol_register(unsigned int pid, int (*func)(struct sk_buff *, ax25_cb *))
+int ax25_protocol_register(unsigned int pid,
+	int (*func)(struct sk_buff *, ax25_cb *))
 {
 	struct protocol_struct *protocol;
 

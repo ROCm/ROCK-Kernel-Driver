@@ -59,7 +59,8 @@ static void ax25_ds_add_timer(ax25_dev *ax25_dev)
 
 void ax25_ds_del_timer(ax25_dev *ax25_dev)
 {
-	if (ax25_dev) del_timer(&ax25_dev->dama.slave_timer);
+	if (ax25_dev)
+		del_timer(&ax25_dev->dama.slave_timer);
 }
 
 void ax25_ds_set_timer(ax25_dev *ax25_dev)

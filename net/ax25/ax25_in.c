@@ -217,7 +217,8 @@ static int ax25_process_rx_frame(ax25_cb *ax25, struct sk_buff *skb, int type, i
 	return queued;
 }
 
-static int ax25_rcv(struct sk_buff *skb, struct net_device *dev, ax25_address *dev_addr, struct packet_type *ptype)
+static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
+	ax25_address *dev_addr, struct packet_type *ptype)
 {
 	struct sock *make;
 	struct sock *sk;
@@ -486,4 +487,3 @@ int ax25_kiss_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	return ax25_rcv(skb, dev, (ax25_address *)dev->dev_addr, ptype);
 }
-

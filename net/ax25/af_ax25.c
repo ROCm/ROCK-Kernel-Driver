@@ -222,7 +222,8 @@ static void ax25_kill_by_device(struct net_device *dev)
 /*
  *	Handle device status changes.
  */
-static int ax25_device_event(struct notifier_block *this,unsigned long event, void *ptr)
+static int ax25_device_event(struct notifier_block *this,unsigned long event,
+	void *ptr)
 {
 	struct net_device *dev = (struct net_device *)ptr;
 
@@ -263,7 +264,8 @@ void ax25_insert_socket(ax25_cb *ax25)
  *	Find a socket that wants to accept the SABM we have just
  *	received.
  */
-struct sock *ax25_find_listener(ax25_address *addr, int digi, struct net_device *dev, int type)
+struct sock *ax25_find_listener(ax25_address *addr, int digi,
+	struct net_device *dev, int type)
 {
 	unsigned long flags;
 	ax25_cb *s;
@@ -289,7 +291,8 @@ struct sock *ax25_find_listener(ax25_address *addr, int digi, struct net_device 
 /*
  *	Find an AX.25 socket given both ends.
  */
-struct sock *ax25_find_socket(ax25_address *my_addr, ax25_address *dest_addr, int type)
+struct sock *ax25_find_socket(ax25_address *my_addr, ax25_address *dest_addr,
+	int type)
 {
 	ax25_cb *s;
 	unsigned long flags;
@@ -311,7 +314,8 @@ struct sock *ax25_find_socket(ax25_address *my_addr, ax25_address *dest_addr, in
  *	Find an AX.25 control block given both ends. It will only pick up
  *	floating AX.25 control blocks or non Raw socket bound control blocks.
  */
-ax25_cb *ax25_find_cb(ax25_address *src_addr, ax25_address *dest_addr, ax25_digi *digi, struct net_device *dev)
+ax25_cb *ax25_find_cb(ax25_address *src_addr, ax25_address *dest_addr,
+	ax25_digi *digi, struct net_device *dev)
 {
 	ax25_cb *s;
 	unsigned long flags;
@@ -395,12 +399,12 @@ static void ax25_destroy_timer(unsigned long data)
 }
 
 /*
- *	This is called from user mode and the timers. Thus it protects itself against
- *	interrupt users but doesn't worry about being called during work.
- *	Once it is removed from the queue no interrupt or bottom half will
- *	touch it and we are (fairly 8-) ) safe.
+ *	This is called from user mode and the timers. Thus it protects itself
+ *	against interrupt users but doesn't worry about being called during
+ *	work. Once it is removed from the queue no interrupt or bottom half
+ *	will touch it and we are (fairly 8-) ) safe.
  */
-void ax25_destroy_socket(ax25_cb *ax25)	/* Not static as it's used by the timer */
+void ax25_destroy_socket(ax25_cb *ax25)
 {
 	struct sk_buff *skb;
 	unsigned long flags;
@@ -626,7 +630,8 @@ ax25_cb *ax25_create_cb(void)
  *	AX25 socket object
  */
 
-static int ax25_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen)
+static int ax25_setsockopt(struct socket *sock, int level, int optname,
+	char *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	ax25_cb *ax25;
@@ -763,7 +768,8 @@ static int ax25_setsockopt(struct socket *sock, int level, int optname, char *op
 	return res;
 }
 
-static int ax25_getsockopt(struct socket *sock, int level, int optname, char *optval, int *optlen)
+static int ax25_getsockopt(struct socket *sock, int level, int optname,
+	char *optval, int *optlen)
 {
 	struct sock *sk = sock->sk;
 	ax25_cb *ax25;
@@ -1177,7 +1183,8 @@ done:
 /*
  *	FIXME: nonblock behaviour looks like it may have a bug.
  */
-static int ax25_connect(struct socket *sock, struct sockaddr *uaddr, int addr_len, int flags)
+static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
+	int addr_len, int flags)
 {
 	struct sock *sk = sock->sk;
 	ax25_cb *ax25 = ax25_sk(sk);
@@ -1440,7 +1447,8 @@ static int ax25_accept(struct socket *sock, struct socket *newsock, int flags)
 	return 0;
 }
 
-static int ax25_getname(struct socket *sock, struct sockaddr *uaddr, int *uaddr_len, int peer)
+static int ax25_getname(struct socket *sock, struct sockaddr *uaddr,
+	int *uaddr_len, int peer)
 {
 	struct sock *sk;
 	ax25_cb *ax25;
@@ -1485,7 +1493,8 @@ static int ax25_getname(struct socket *sock, struct sockaddr *uaddr, int *uaddr_
 	return 0;
 }
 
-static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, int len, struct scm_cookie *scm)
+static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, int len,
+	struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	ax25_cb *ax25;
@@ -1661,7 +1670,8 @@ static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, int len, struct
 	}
 }
 
-static int ax25_recvmsg(struct socket *sock, struct msghdr *msg, int size, int flags, struct scm_cookie *scm)
+static int ax25_recvmsg(struct socket *sock, struct msghdr *msg, int size,
+	int flags, struct scm_cookie *scm)
 {
 	struct sock *sk;
 	int copied;
