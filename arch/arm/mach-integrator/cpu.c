@@ -73,7 +73,7 @@ static struct vco freq_to_vco(unsigned int freq_khz, int factor)
  * Validate the speed in khz.  If it is outside our
  * range, then return the lowest.
  */
-static void integrator_verify_speed(struct cpufreq_policy *policy)
+static int integrator_verify_speed(struct cpufreq_policy *policy)
 {
 	struct vco vco;
 
@@ -93,6 +93,8 @@ static void integrator_verify_speed(struct cpufreq_policy *policy)
 		vco.vdw = 152;
 
 	policy->min = policy->max = vco_to_freq(vco, 1);
+
+	return 0;
 }
 
 static void do_set_policy(int cpu, struct cpufreq_policy *policy)
@@ -116,7 +118,7 @@ static void do_set_policy(int cpu, struct cpufreq_policy *policy)
 	__raw_writel(0, CM_LOCK);
 }
 
-static void integrator_set_policy(struct cpufreq_policy *policy)
+static int integrator_set_policy(struct cpufreq_policy *policy)
 {
 	unsigned long cpus_allowed;
 	int cpu;
@@ -139,6 +141,8 @@ static void integrator_set_policy(struct cpufreq_policy *policy)
 	 * Restore the CPUs allowed mask.
 	 */
 	set_cpus_allowed(current, cpus_allowed);
+
+	return 0;
 }
 
 static struct cpufreq_policy integrator_policy = {
@@ -151,7 +155,6 @@ static struct cpufreq_driver integrator_driver = {
 	.verify		= integrator_verify_speed,
 	.setpolicy	= integrator_set_policy,
 	.policy		= &integrator_policy,
-	.cpu_min_freq	= 12000,
 };
 #endif
 
@@ -202,6 +205,8 @@ static int __init integrator_cpu_init(void)
 	set_cpus_allowed(current, cpus_allowed);
 
 #ifdef CONFIG_CPU_FREQ
+	for (cpu=0; cpu<NR_CPUS; cpu++)
+		integrator_driver.cpu_min_freq[cpu] = 12000;
 	integrator_driver.policy = policies;
 	cpufreq_register(&integrator_driver);
 #else

@@ -176,7 +176,7 @@ static void sa1100_update_dram_timings(int current_speed, int new_speed)
 	}
 }
 
-static void sa1100_setspeed(struct cpufreq_policy *policy)
+static int sa1100_setspeed(struct cpufreq_policy *policy)
 {
 	unsigned int cur = sa11x0_getspeed();
 	struct cpufreq_freqs freqs;
@@ -196,6 +196,8 @@ static void sa1100_setspeed(struct cpufreq_policy *policy)
 		sa1100_update_dram_timings(cur, policy->max);
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+
+	return 0;
 }
 
 static struct cpufreq_policy sa1100_policy = {
@@ -208,7 +210,7 @@ static struct cpufreq_driver sa1100_driver = {
 	.verify		= sa11x0_verify_speed,
 	.setpolicy	= sa1100_setspeed,
 	.policy		= &sa1100_policy,
-	.cpu_min_freq	= 59000,
+	.cpu_min_freq[0]= 59000,
 };
 
 static int __init sa1100_dram_init(void)
@@ -216,7 +218,7 @@ static int __init sa1100_dram_init(void)
 	int ret = -ENODEV;
 
 	if ((processor_id & CPU_SA1100_MASK) == CPU_SA1100_ID) {
-		sa1100_driver.cpu_curr_freq[0] =
+		sa1100_driver.cpu_cur_freq[0] =
 		sa1100_policy.min =
 		sa1100_policy.max = sa11x0_getspeed();
 
