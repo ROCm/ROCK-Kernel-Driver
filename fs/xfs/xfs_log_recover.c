@@ -2049,7 +2049,6 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		return error;
 	}
 	error = 0;
-	xfs_inobp_check(mp, bp);
 	ASSERT(in_f->ilf_fields & XFS_ILOG_CORE);
 	dip = (xfs_dinode_t *)xfs_buf_offset(bp, imap.im_boffset);
 
@@ -2207,14 +2206,6 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 
 
 write_inode_buffer:
-#if 0
-	/*
-	 * Can't do this if the transaction didn't log the current
-	 * contents, e.g. rmdir.
-	 */
-	XFS_DIR_SHORTFORM_VALIDATE_ONDISK(mp, dip);
-#endif
-	xfs_inobp_check(mp, bp);
 	if (ITEM_TYPE(item) == XFS_LI_INODE) {
 		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) == NULL ||
 		       XFS_BUF_FSPRIVATE(bp, xfs_mount_t *) == mp);
