@@ -633,25 +633,6 @@ pciio_info_get(vertex_hdl_t pciio)
     return pciio_info;
 }
 
-/*
- * Given a vertex_hdl_t, return the pciio_info_t from the host device - that
- * is, the device plugged into the slot on the host bus.
- */
-
-pciio_info_t
-pciio_hostinfo_get(vertex_hdl_t pciio)
-{
-	pciio_info_t	pciio_info;
-
-	pciio_info = pciio_info_get(pciio);
-	if (pciio_info && (pciio_info->c_vertex != pciio_info->c_hostvertex)) {
-		pciio_info = pciio_info_get(pciio_info->c_hostvertex);
-	}
-
-	return pciio_info;
-}
-
-
 void
 pciio_info_set(vertex_hdl_t pciio, pciio_info_t pciio_info)
 {
@@ -673,12 +654,6 @@ pciio_info_dev_get(pciio_info_t pciio_info)
     return (pciio_info->c_vertex);
 }
 
-vertex_hdl_t
-pciio_info_hostdev_get(pciio_info_t pciio_info)
-{
-    return (pciio_info->c_hostvertex);
-}
-
 /*ARGSUSED*/
 pciio_bus_t
 pciio_info_bus_get(pciio_info_t pciio_info)
@@ -690,15 +665,6 @@ pciio_slot_t
 pciio_info_slot_get(pciio_info_t pciio_info)
 {
     return (pciio_info->c_slot);
-}
-
-pciio_slot_t
-pciio_info_hostslot_get(pciio_info_t pciio_info)
-{
-    vertex_hdl_t	host_vhdl = pciio_info_hostdev_get(pciio_info);
-    pciio_info_t	host_info = pciio_info_get(host_vhdl);
-
-    return (pciio_info_slot_get(host_info));
 }
 
 pciio_function_t
