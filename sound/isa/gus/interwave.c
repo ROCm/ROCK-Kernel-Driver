@@ -151,6 +151,8 @@ static struct pnp_card_device_id snd_interwave_pnpids[] = {
 	{ .id = "CDC1111", .devs = { { .id = "CDC1112" } } },
 	/* Panasonic PCA761AW Audio Card */
 	{ .id = "ADV55ff", .devs = { { .id = "ADV0010" } } },
+	/* InterWave STB without TEA6330T */
+	{ .id = "ADV550a", .devs = { { .id = "ADV0010" } } },
 #else
 	/* InterWave STB with TEA6330T */
 	{ .id = "ADV550a", .devs = { { .id = "ADV0010" }, { .id = "ADV0015" } } },
