@@ -1798,7 +1798,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 		 * of course not the data as we did direct DMA for the IO.
 		 */
 		if (written >= 0 && file->f_flags & O_SYNC)
-			status = generic_osync_inode(inode, OSYNC_METADATA);
+			status = generic_osync_inode(inode, mapping, OSYNC_METADATA);
 		if (written >= 0 && !is_sync_kiocb(iocb))
 			written = -EIOCBQUEUED;
 		goto out_status;
@@ -1886,7 +1886,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 	 */
 	if (status >= 0) {
 		if ((file->f_flags & O_SYNC) || IS_SYNC(inode))
-			status = generic_osync_inode(inode,
+			status = generic_osync_inode(inode, mapping,
 					OSYNC_METADATA|OSYNC_DATA);
 	}
 	
