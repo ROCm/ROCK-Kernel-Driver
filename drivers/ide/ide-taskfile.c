@@ -542,6 +542,12 @@ int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_
 					drive->name);
 			return -EFAULT;
 		}
+		switch (args->tfRegister[IDE_COMMAND_OFFSET]) {
+			case WIN_IDENTIFY:
+			case WIN_SMART:
+				args->tfRegister[IDE_NSECTOR_OFFSET] = 0;
+				break;
+		}
 
 		rq.hard_nr_sectors = rq.nr_sectors;
 		rq.hard_cur_sectors = rq.current_nr_sectors = rq.nr_sectors;
