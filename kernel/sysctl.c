@@ -904,9 +904,6 @@ asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
 	if (copy_from_user(&tmp, args, sizeof(tmp)))
 		return -EFAULT;
 
-	if (tmp.nlen < 0 || tmp.nlen > CTL_MAXNAME)
-		return -EINVAL;
-
 	lock_kernel();
 	error = do_sysctl(tmp.name, tmp.nlen, tmp.oldval, tmp.oldlenp,
 			  tmp.newval, tmp.newlen);
