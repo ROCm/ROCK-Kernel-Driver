@@ -560,35 +560,57 @@ static void put_mount (struct vfsmount **mount)
 static int create_special_files (void)
 {
 	struct dentry *parent;
-	int retval;
+	int retval = 0;
 
 	/* create the devices special file */
 	retval = get_mount (&usbdevice_fs_type, &usbdevfs_mount);
-	if (retval)
-		return retval;
+	if (retval) {
+		err ("Unable to get usbdevfs mount");
+		goto exit;
+	}
+
 	retval = get_mount (&usb_fs_type, &usbfs_mount);
 	if (retval) {
-		put_mount (&usbfs_mount);
-		return retval;
+		err ("Unable to get usbfs mount");
+		goto error_clean_usbdevfs_mount;
 	}
+
 	parent = usbfs_mount->mnt_sb->s_root;
-	devices_usbfs_dentry = fs_create_file ("devices", listmode | S_IFREG, parent,
+	devices_usbfs_dentry = fs_create_file ("devices",
+					       listmode | S_IFREG, parent,
 					       NULL, &usbdevfs_devices_fops,
 					       listuid, listgid);
 	if (devices_usbfs_dentry == NULL) {
 		err ("Unable to create devices usbfs file");
-		return -ENODEV;
+		retval = -ENODEV;
+		goto error_clean_mounts;
 	}
+
 	parent = usbdevfs_mount->mnt_sb->s_root;
-	devices_usbdevfs_dentry = fs_create_file ("devices", listmode | S_IFREG, parent,
+	devices_usbdevfs_dentry = fs_create_file ("devices",
+						  listmode | S_IFREG, parent,
 						  NULL, &usbdevfs_devices_fops,
 						  listuid, listgid);
 	if (devices_usbdevfs_dentry == NULL) {
 		err ("Unable to create devices usbfs file");
-		return -ENODEV;
+		retval = -ENODEV;
+		goto error_remove_file;
 	}
 
-	return 0;
+	goto exit;
+	
+error_remove_file:
+	fs_remove_file (devices_usbfs_dentry);
+	devices_usbfs_dentry = NULL;
+
+error_clean_mounts:
+	put_mount (&usbfs_mount);
+
+error_clean_usbdevfs_mount:
+	put_mount (&usbdevfs_mount);	
+
+exit:
+	return retval;
 }
 
 static void remove_special_files (void)
