@@ -1295,7 +1295,7 @@ static struct module *load_module(void *umod,
 
 #ifdef CONFIG_MODVERSIONS
 	if ((mod->symbols.num_syms && !crcindex)
-	    || (mod->gpl_symbols.num_syms && !gplcrcindex))
+	    || (mod->gpl_symbols.num_syms && !gplcrcindex)) {
 		printk(KERN_WARNING "%s: No versions for exported symbols."
 		       " Tainting kernel.\n", mod->name);
 		tainted |= TAINT_FORCED_MODULE;

@@ -54,7 +54,7 @@ CROSS_COMPILE 	=
 
 # 	That's our default target when none is given on the command line
 
-all:	vmlinux
+all:	vmlinux modules
 
 # 	Decide whether to build built-in, modular, or both.
 #	Normally, just do built-in.
@@ -707,7 +707,7 @@ MRPROPER_DIRS += \
 
 # clean - Delete all intermediate files
 #
-clean-dirs += $(addprefix, _clean_,$(ALL_SUBDIRS) Documentation/DocBook scripts)
+clean-dirs += $(addprefix _clean_,$(ALL_SUBDIRS) Documentation/DocBook scripts)
 .PHONY: $(clean-dirs) clean archclean mrproper archmrproper distclean
 $(clean-dirs):
 	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
