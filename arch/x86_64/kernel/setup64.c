@@ -52,10 +52,10 @@ off	Disable
 */ 
 void __init nonx_setup(const char *str)
 {
-	if (!strcmp(str, "on")) {
+	if (!strncmp(str, "on", 2)) {
                 __supported_pte_mask |= _PAGE_NX; 
  		do_not_nx = 0; 
-	} else if (!strcmp(str, "off")) {
+	} else if (!strncmp(str, "off", 3)) {
 		do_not_nx = 1;
 		__supported_pte_mask &= ~_PAGE_NX;
         } 
