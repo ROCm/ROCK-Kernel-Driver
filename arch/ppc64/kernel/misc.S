@@ -398,46 +398,6 @@ _GLOBAL(_outsl_ns)
 	bdnz	00b
 	blr	
 
-/*
- * Extended precision shifts
- *
- * R3/R4 has 64 bit value
- * R5    has shift count
- * result in R3/R4
- *
- *  ashrdi3:     XXXYYY/ZZZAAA -> SSSXXX/YYYZZZ
- *  ashldi3:     XXXYYY/ZZZAAA -> YYYZZZ/AAA000
- *  lshrdi3:     XXXYYY/ZZZAAA -> 000XXX/YYYZZZ
- */
-/* MIKEC: These may no longer be needed...what does gcc expect ? */
-	
-_GLOBAL(__ashrdi3)
-	li	r6,32
-	sub	r6,r6,r5
-	slw	r7,r3,r6	/* isolate YYY */
-	srw	r4,r4,r5	/* isolate ZZZ */
-	or	r4,r4,r7	/* YYYZZZ */
-	sraw	r3,r3,r5	/* SSSXXX */
-	blr
-
-_GLOBAL(__ashldi3)
-	li	r6,32
-	sub	r6,r6,r5
-	srw	r7,r4,r6	/* isolate ZZZ */
-	slw	r4,r4,r5	/* AAA000 */
-	slw	r3,r3,r5	/* YYY--- */
-	or	r3,r3,r7	/* YYYZZZ */
-	blr
-
-_GLOBAL(__lshrdi3)
-	li	r6,32
-	sub	r6,r6,r5
-	slw	r7,r3,r6        /* isolate YYY */
-	srw	r4,r4,r5        /* isolate ZZZ */
-	or	r4,r4,r7        /* YYYZZZ */
-	srw	r3,r3,r5        /* 000XXX */
-	blr
-
 _GLOBAL(abs)
 	cmpi	0,r3,0
 	bge	10f
