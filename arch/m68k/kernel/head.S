@@ -130,7 +130,7 @@
  *
  * mmu_engage
  * ----------
- *	Thanks to a small helping routine enabling the mmu got quiet simple
+ *	Thanks to a small helping routine enabling the mmu got quite simple
  * and there is only one way left. mmu_engage makes a complete a new mapping
  * that only includes the absolute necessary to be able to jump to the final
  * postion and to restore the original mapping.
@@ -1202,7 +1202,7 @@ L(not6000):
  *
  * Map the kernel (that's already done),
  * Map the I/O (on most machines that's the
- * 0x5000.0000 ... 0x5200.0000 range,
+ * 0x5000.0000 ... 0x5300.0000 range,
  * Map the video frame buffer using as few pages
  * as absolutely (this requirement mostly stems from
  * the fact that when the frame buffer is at
@@ -1246,10 +1246,11 @@ L(mmu_init_mac):
 	andl	L(mac_videobase),%d0
 
 	mmu_map		#VIDEOMEMBASE,%d0,#VIDEOMEMSIZE,%d3
-	mmu_map_eq	#0x40800000,#0x02000000,%d3	/* rom ? */
-	mmu_map_eq	#0x50000000,#0x02000000,%d3
-	mmu_map_eq	#0x60000000,#0x00400000,%d3
-	mmu_map_eq	#0x9c000000,#0x00400000,%d3
+	/* The ROM starts at 4000 0000		    	*/
+	mmu_map_eq	#0x40000000,#0x02000000,%d3
+	/* IO devices                               	*/
+	mmu_map_eq	#0x50000000,#0x03000000,%d3
+	/* NuBus slot space				*/
 	mmu_map_tt	#1,#0xf8000000,#0x08000000,%d3
 
 	jbra	L(mmu_init_done)
@@ -1461,6 +1462,9 @@ L(mmu_fixup_done):
 	andl	L(mac_videobase),%d0
 	addl	#VIDEOMEMBASE,%d0
 	movel	%d0,L(mac_videobase)
+#ifdef MAC_SERIAL_DEBUG
+	orl	#0x50000000,L(mac_sccbase)
+#endif		
 1:
 #endif
 
@@ -3032,10 +3036,6 @@ func_start	serial_putc,%d0/%d1/%a0/%a1
 #ifdef CONFIG_MAC
 	is_not_mac(5f)
 
-#ifdef CONSOLE
-	console_putc	%d0
-#endif /* CONSOLE */
-
 #ifdef MAC_SERIAL_DEBUG
 
 #ifdef MAC_USE_SCC_A
@@ -3430,6 +3430,10 @@ L(console_put_stats):
 	putn	%pc@(L(cputype))
 	putc	'\n'
 
+#ifdef MAC_SERIAL_DEBUG
+	putn	%pc@(L(mac_sccbase))
+	putc	'\n'
+#endif	
 #  if defined(MMU_PRINT)
 	jbsr	mmu_print_machine_cpu_types
 #  endif /* MMU_PRINT */
@@ -3606,7 +3610,7 @@ console_not_home:
 	movel	%a0@(Lconsole_struct_num_columns),%d1
 	cmpl	%d1,%d0
 	jcs	1f
-	putc	'\n'	/* recursion is OK! */
+	console_putc	#'\n'	/* recursion is OK! */
 1:
 	movel	%a0@(Lconsole_struct_cur_row),%d1
 
