@@ -991,8 +991,10 @@ static int st_open(struct inode *inode, struct file *filp)
 		return (-EBUSY);
 	}
 
-	if(!scsi_device_get(STp->device))
+	if(scsi_device_get(STp->device)) {
+		write_unlock(&st_dev_arr_lock);
 		return (-ENXIO);
+	}
 	STp->in_use = 1;
 	write_unlock(&st_dev_arr_lock);
 	STp->rew_at_close = STp->autorew_dev = (minor(inode->i_rdev) & 0x80) == 0;
