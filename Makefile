@@ -109,8 +109,12 @@ MAKEFLAGS += --no-print-directory
 #	If the user wants quiet mode, echo short versions of the commands 
 #	only
 
-ifneq ($(KBUILD_VERBOSE),1)
+ifeq ($(KBUILD_VERBOSE),1)
+  quiet =
+  Q =
+else
   quiet=quiet_
+  Q = @
 endif
 
 #	If the user is running make -s (silent mode), suppress echoing of
@@ -120,7 +124,7 @@ ifneq ($(findstring s,$(MAKEFLAGS)),)
   quiet=silent_
 endif
 
-export quiet KBUILD_VERBOSE
+export quiet Q KBUILD_VERBOSE
 
 #	Paths to obj / src tree
 
@@ -698,7 +702,7 @@ MRPROPER_DIRS += \
 clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook scripts
 
 $(addprefix _clean_,$(clean-dirs)):
-	$(MAKE) MAKEFILES= -rR -f scripts/Makefile.clean obj=$(patsubst _clean_%,%,$@)
+	$(Q)$(MAKE) MAKEFILES= -rR -f scripts/Makefile.clean obj=$(patsubst _clean_%,%,$@)
 
 quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
 cmd_rmclean	  = rm -f $(CLEAN_FILES)

@@ -38,5 +38,5 @@ endif
 .PHONY: $(subdir-ymn)
 
 $(subdir-ymn):
-	$(MAKE) -rR -f scripts/Makefile.clean obj=$@
+	$(Q)$(MAKE) -rR -f scripts/Makefile.clean obj=$@
 
