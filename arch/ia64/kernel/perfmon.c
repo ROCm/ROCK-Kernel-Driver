@@ -4729,6 +4729,11 @@ recheck:
 	if (task == current || ctx->ctx_fl_system) return 0;
 
 	/*
+	 * if context is UNLOADED we are safe to go
+	 */
+	if (state == PFM_CTX_UNLOADED) return 0;
+
+	/*
 	 * no command can operate on a zombie context
 	 */
 	if (state == PFM_CTX_ZOMBIE) {
@@ -4737,12 +4742,9 @@ recheck:
 	}
 
 	/*
-	 * if context is UNLOADED, MASKED we are safe to go
-	 */
-	if (state != PFM_CTX_LOADED) return 0;
-
-	/*
-	 * context is LOADED, we must make sure the task is stopped
+	 * context is LOADED or MASKED. Some commands may need to have 
+	 * the task stopped.
+	 *
 	 * We could lift this restriction for UP but it would mean that
 	 * the user has no guarantee the task would not run between
 	 * two successive calls to perfmonctl(). That's probably OK.
