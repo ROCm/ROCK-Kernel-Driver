@@ -125,6 +125,23 @@ int ata_scsi_slave_config(struct scsi_device *sdev)
 	sdev->use_10_for_ms = 1;
 	blk_queue_max_phys_segments(sdev->request_queue, LIBATA_MAX_PRD);
 
+	if (sdev->id < ATA_MAX_DEVICES) {
+		struct ata_port *ap;
+		struct ata_device *dev;
+
+		ap = (struct ata_port *) &sdev->host->hostdata[0];
+		dev = &ap->device[sdev->id];
+
+		if (dev->flags & ATA_DFLAG_LBA48) {
+			sdev->host->max_sectors = 1024;
+			blk_queue_max_sectors(sdev->request_queue, 1024);
+			printk(KERN_INFO "ata%u: dev %u max request 512KB (lba48)\n",
+			       ap->id, sdev->id);
+		} else
+			printk(KERN_INFO "ata%u: dev %u max request 120KB\n",
+			       ap->id, sdev->id);
+	}
+
 	return 0;	/* scsi layer doesn't check return value, sigh */
 }
 
