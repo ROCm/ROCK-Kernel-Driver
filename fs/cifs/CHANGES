@@ -1,7 +1,7 @@
 Version 0.91
 ------------
-Fix oops in reopen_files when invalid dentry. drop dentry on server rename. 
-Fix cases where pid is now tgid 
+Fix oops in reopen_files when invalid dentry. drop dentry on server rename 
+and on revalidate errors. Fix cases where pid is now tgid 
 
 Version 0.90
 ------------

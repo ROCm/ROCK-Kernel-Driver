@@ -587,12 +587,24 @@ cifs_revalidate(struct dentry *direntry)
 		}            
 	}
 
-	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
-		cifs_get_inode_info_unix(&direntry->d_inode, full_path,
+	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX) {
+		rc = cifs_get_inode_info_unix(&direntry->d_inode, full_path,
 					 direntry->d_sb);
-	else
-		cifs_get_inode_info(&direntry->d_inode, full_path, NULL,
+		if(rc) {
+			cFYI(1,("error on getting revalidate info %d",rc));
+/*			if(rc != -ENOENT)
+				rc = 0; */ /* BB should we cache info on certain errors? */
+		}
+	} else {
+		rc = cifs_get_inode_info(&direntry->d_inode, full_path, NULL,
 				    direntry->d_sb);
+		if(rc) {
+			cFYI(1,("error on getting revalidate info %d",rc));
+/*			if(rc != -ENOENT)
+				rc = 0; */  /* BB should we cache info on certain errors? */
+		}
+	}
+	/* should we remap certain errors, access denied?, to zero */
 
 	/* BB if not oplocked, invalidate inode pages if mtime has changed */
 
