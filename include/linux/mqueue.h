@@ -30,8 +30,24 @@ struct mq_attr {
 	long	__reserved[4];	/* ignored for input, zeroed for output */
 };
 
+/*
+ * SIGEV_THREAD implementation:
+ * SIGEV_THREAD must be implemented in user space. If SIGEV_THREAD is passed
+ * to mq_notify, then
+ * - sigev_signo must be the file descriptor of an AF_NETLINK socket. It's not
+ *   necessary that the socket is bound.
+ * - sigev_value.sival_ptr must point to a cookie that is NOTIFY_COOKIE_LEN
+ *   bytes long.
+ * If the notification is triggered, then the cookie is sent to the netlink
+ * socket. The last byte of the cookie is replaced with the NOTIFY_?? codes:
+ * NOTIFY_WOKENUP if the notification got triggered, NOTIFY_REMOVED if it was
+ * removed, either due to a close() on the message queue fd or due to a
+ * mq_notify() that removed the notification.
+ */
 #define NOTIFY_NONE	0
 #define NOTIFY_WOKENUP	1
 #define NOTIFY_REMOVED	2
+
+#define NOTIFY_COOKIE_LEN	32
 
 #endif
