@@ -279,6 +279,7 @@ int drive_is_ready(struct ata_device *drive)
 
 	if (stat & BUSY_STAT)
 		return 0;	/* drive busy:  definitely not interrupting */
+
 	return 1;		/* drive ready: *might* be interrupting */
 }
 

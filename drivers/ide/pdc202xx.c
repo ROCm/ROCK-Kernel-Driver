@@ -1450,7 +1450,7 @@ static struct ata_pci_device chipsets[] __initdata = {
 		init_chipset: pdc202xx_init_chipset,
 		ata66_check: ata66_pdc202xx,
 		init_channel: ide_init_pdc202xx,
-		exnablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
+		enablebits: {{0x50,0x02,0x02}, {0x50,0x04,0x04}},
 		bootable: OFF_BOARD,
 		extra: 48,
 		flags: ATA_F_IRQ  | ATA_F_DMA

@@ -1058,6 +1058,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 
 			if (put_user(val, (unsigned long *) arg))
 				return -EFAULT;
+
 			return 0;
 		}
 
@@ -1081,6 +1082,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 
 			if (put_user(val, (unsigned long *) arg))
 				return -EFAULT;
+
 			return 0;
 		}
 
@@ -1100,7 +1102,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 		}
 
 		case HDIO_GET_ACOUSTIC: {
-			u8 val = drive->acoustic;
+			unsigned long val = drive->acoustic;
 
 			if (put_user(val, (u8 *) arg))
 				return -EFAULT;
@@ -1128,6 +1130,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 
 			if (put_user(val, (u8 *) arg))
 				return -EFAULT;
+
 			return 0;
 		}
 
@@ -1153,7 +1156,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 
 
 /*
- *      IDE subdriver functions, registered with ide.c
+ * Subdriver functions.
  */
 static struct ata_operations idedisk_driver = {
 	owner:			THIS_MODULE,
@@ -1178,11 +1181,9 @@ static void __exit idedisk_exit (void)
 
 	while ((drive = ide_scan_devices(ATA_DISK, "ide-disk", &idedisk_driver, failed)) != NULL) {
 		if (idedisk_cleanup (drive)) {
-			printk (KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
-			failed++;
+			printk(KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
+			++failed;
 		}
-		/* We must remove proc entries defined in this module.
-		   Otherwise we oops while accessing these entries */
 	}
 }
 
@@ -1203,10 +1204,11 @@ int idedisk_init(void)
 			idedisk_cleanup(drive);
 			continue;
 		}
-		failed--;
+		--failed;
 	}
 	revalidate_drives();
 	MOD_DEC_USE_COUNT;
+
 	return 0;
 }
 

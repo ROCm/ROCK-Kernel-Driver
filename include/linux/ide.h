@@ -239,6 +239,19 @@ void ide_setup_ports(hw_regs_t *hw,
 
 #include <asm/ide.h>
 
+/* Currently only m68k, apus and m8xx need it */
+#ifdef ATA_ARCH_ACK_INTR
+# define ide_ack_intr(hwif) (hwif->hw.ack_intr ? hwif->hw.ack_intr(hwif) : 1)
+#else
+# define ide_ack_intr(hwif) (1)
+#endif
+
+/* Currently only Atari needs it */
+#ifndef ATA_ARCH_LOCK
+# define ide_release_lock(lock)		do {} while (0)
+# define ide_get_lock(lock, hdlr, data)	do {} while (0)
+#endif
+
 /*
  * If the arch-dependant ide.h did not declare/define any OUT_BYTE or IN_BYTE
  * functions, we make some defaults here. The only architecture currently
@@ -324,14 +337,16 @@ struct ata_device {
 	 * magically just go away.
 	 */
 	request_queue_t	queue;	/* per device request queue */
+	struct request *rq;		/* current request */
 
 	unsigned long sleep;	/* sleep until this time */
 
-	byte     using_dma;		/* disk is using dma for read/write */
-	byte	 using_tcq;		/* disk is using queueing */
 	byte	 retry_pio;		/* retrying dma capable host in pio */
 	byte	 state;			/* retry state */
-	byte     dsc_overlap;		/* flag: DSC overlap */
+
+	unsigned using_dma	: 1;	/* disk is using dma for read/write */
+	unsigned using_tcq	: 1;	/* disk is using queueing */
+	unsigned dsc_overlap	: 1;	/* flag: DSC overlap */
 
 	unsigned waiting_for_dma: 1;	/* dma currently in progress */
 	unsigned busy		: 1;	/* currently doing revalidate_disk() */
@@ -403,10 +418,38 @@ struct ata_device {
 	int		max_depth;
 } ide_drive_t;
 
+/*
+ * Status returned by various functions.
+ */
+typedef enum {
+	ide_stopped,	/* no drive operation was started */
+	ide_started,	/* a drive operation was started, and a handler was set */
+	ide_released	/* started and released bus */
+} ide_startstop_t;
+
+/*
+ *  Interrupt and timeout handler type.
+ */
+typedef ide_startstop_t (ata_handler_t)(struct ata_device *, struct request *);
+typedef int (ata_expiry_t)(struct ata_device *, struct request *);
+
 enum {
 	ATA_PRIMARY	= 0,
 	ATA_SECONDARY	= 1
 };
+
+enum {
+	IDE_BUSY,	/* awaiting an interrupt */
+	IDE_SLEEP,
+	IDE_DMA		/* DMA in progress */
+};
+
+typedef struct hwgroup_s {
+	/* FIXME: We should look for busy request queues instead of looking at
+	 * the !NULL state of this field.
+	 */
+	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
+} ide_hwgroup_t;
 
 struct ata_channel {
 	struct device	dev;		/* device handle */
@@ -415,7 +458,9 @@ struct ata_channel {
 	struct hwgroup_s *hwgroup;	/* actually (ide_hwgroup_t *) */
 	struct timer_list timer;	/* failsafe timer */
 	int (*expiry)(struct ata_device *, struct request *);	/* irq handler, if active */
+	unsigned long poll_timeout;	/* timeout value during polled operations */
 	struct ata_device *drive;	/* last serviced drive */
+	unsigned long active;		/* active processing request */
 
 	ide_ioreg_t	io_ports[IDE_NR_PORTS];	/* task file registers */
 	hw_regs_t	hw;		/* Hardware info */
@@ -506,9 +551,8 @@ struct ata_channel {
 #endif
 	/* driver soft-power interface */
 	int (*busproc)(struct ata_device *, int);
-	byte		bus_state;	/* power state of the IDE bus */
 
-	unsigned long poll_timeout; /* timeout value during polled operations */
+	byte		bus_state;	/* power state of the IDE bus */
 };
 
 /*
@@ -517,26 +561,7 @@ struct ata_channel {
 extern int ide_register_hw(hw_regs_t *hw, struct ata_channel **hwifp);
 extern void ide_unregister(struct ata_channel *hwif);
 
-/*
- * Status returned by various functions.
- */
-typedef enum {
-	ide_stopped,	/* no drive operation was started */
-	ide_started,	/* a drive operation was started, and a handler was set */
-	ide_released	/* started and released bus */
-} ide_startstop_t;
-
-/*
- *  Interrupt and timeout handler type.
- */
-typedef ide_startstop_t (ata_handler_t)(struct ata_device *, struct request *);
-typedef int (ata_expiry_t)(struct ata_device *, struct request *);
-
 struct ata_taskfile;
-
-#define IDE_BUSY	0	/* awaiting an interrupt */
-#define IDE_SLEEP	1
-#define IDE_DMA		2	/* DMA in progress */
 
 #define IDE_MAX_TAG	32
 
@@ -560,15 +585,6 @@ static inline int ata_can_queue(struct ata_device *drive)
 # define ata_pending_commands(drive)	(0)
 # define ata_can_queue(drive)		(1)
 #endif
-
-typedef struct hwgroup_s {
-	/* FIXME: We should look for busy request queues instead of looking at
-	 * the !NULL state of this field.
-	 */
-	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
-	unsigned long flags;		/* BUSY, SLEEPING */
-	struct request *rq;		/* current request */
-} ide_hwgroup_t;
 
 /* FIXME: kill this as soon as possible */
 #define PROC_IDE_READ_RETURN(page,start,off,count,eof,len) return 0;

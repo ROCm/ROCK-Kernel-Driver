@@ -122,7 +122,7 @@ static struct ata_channel __init *lookup_channel(unsigned long io_base, int boot
 	 * Unless there is a bootable card that does not use the standard
 	 * ports 1f0/170 (the ide0/ide1 defaults). The (bootable) flag.
 	 */
-	if (bootable) {
+	if (bootable == ON_BOARD) {
 		for (h = 0; h < MAX_HWIFS; ++h) {
 			hwif = &ide_hwifs[h];
 			if (hwif->chipset == ide_unknown)
@@ -703,7 +703,7 @@ static void __init scan_pcidev(struct pci_dev *dev)
 			hpt374_device_order_fixup(dev, d);
 	} else if (d->vendor == PCI_VENDOR_ID_PROMISE && d->device == PCI_DEVICE_ID_PROMISE_20268R)
 		pdc20270_device_order_fixup(dev, d);
-	else if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
+	else {
 		printk(KERN_INFO "ATA: %s (%04x:%04x) on PCI slot %s\n",
 				dev->name, vendor, device, dev->slot_name);
 		setup_pci_device(dev, d);

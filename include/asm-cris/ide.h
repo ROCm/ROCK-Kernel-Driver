@@ -96,10 +96,6 @@ static __inline__ void ide_init_default_hwifs(void)
 #undef SUPPORT_SLOW_DATA_PORTS
 #define SUPPORT_SLOW_DATA_PORTS	0
 
-#define ide_ack_intr(hwif)		(1)
-#define ide_release_lock(lock)		do {} while (0)
-#define ide_get_lock(lock, hdlr, data)	do {} while (0)
-
 /* the drive addressing is done through a controller register on the Etrax CPU */
 void OUT_BYTE(unsigned char data, ide_ioreg_t reg);
 unsigned char IN_BYTE(ide_ioreg_t reg);

@@ -382,10 +382,10 @@ static int dma_timer_expiry(struct ata_device *drive, struct request *rq)
 
 #ifdef DEBUG
 	printk("%s: dma_timer_expiry: dma status == 0x%02x\n", drive->name, dma_stat);
-#endif /* DEBUG */
+#endif
 
 #if 0
-	HWGROUP(drive)->expiry = NULL;	/* one free ride for now */
+	drive->expiry = NULL;	/* one free ride for now */
 #endif
 
 	if (dma_stat & 2) {	/* ERROR */

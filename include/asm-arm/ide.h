@@ -21,10 +21,6 @@
 
 #include <asm/arch/ide.h>
 
-#define ide_ack_intr(hwif)		(1)
-#define ide_release_lock(lock)		do {} while (0)
-#define ide_get_lock(lock, hdlr, data)	do {} while (0)
-
 /*
  * We always use the new IDE port registering,
  * so these are fixed here.

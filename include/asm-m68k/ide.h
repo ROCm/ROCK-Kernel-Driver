@@ -145,10 +145,13 @@ static __inline__ void ide_init_default_hwifs(void)
 
 #endif /* CONFIG_ATARI || CONFIG_Q40 */
 
+#define ATA_ARCH_ACK_INTR
+
+#ifdef CONFIG_ATARI
+#define ATA_ARCH_LOCK
 
 static __inline__ void ide_release_lock (int *ide_lock)
 {
-#ifdef CONFIG_ATARI
 	if (MACH_IS_ATARI) {
 		if (*ide_lock == 0) {
 			printk("ide_release_lock: bug\n");
@@ -157,12 +160,10 @@ static __inline__ void ide_release_lock (int *ide_lock)
 		*ide_lock = 0;
 		stdma_release();
 	}
-#endif /* CONFIG_ATARI */
 }
 
 static __inline__ void ide_get_lock (int *ide_lock, void (*handler)(int, void *, struct pt_regs *), void *data)
 {
-#ifdef CONFIG_ATARI
 	if (MACH_IS_ATARI) {
 		if (*ide_lock == 0) {
 			if (in_interrupt() > 0)
@@ -171,10 +172,8 @@ static __inline__ void ide_get_lock (int *ide_lock, void (*handler)(int, void *,
 			*ide_lock = 1;
 		}
 	}
-#endif /* CONFIG_ATARI */
 }
-
-#define ide_ack_intr(hwif)	((hwif)->hw.ack_intr ? (hwif)->hw.ack_intr(hwif) : 1)
+#endif /* CONFIG_ATARI */
 
 /*
  * On the Atari, we sometimes can't enable interrupts:
