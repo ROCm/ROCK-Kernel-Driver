@@ -84,6 +84,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 	struct list_head *tmp;
 	struct cifsSesInfo *ses;
 	struct cifsTconInfo *tcon;
+	struct mid_q_entry * mid_entry;
 	
 	if(server->tcpStatus == CifsExiting)
 		return rc;
@@ -122,6 +123,23 @@ cifs_reconnect(struct TCP_Server_Info *server)
 		sock_release(server->ssocket);
 		server->ssocket = NULL;
 	}
+
+	spin_lock(&GlobalMid_Lock);
+	list_for_each(tmp, &server->pending_mid_q) {
+		mid_entry = list_entry(tmp, struct
+					mid_q_entry,
+					qhead);
+		if(mid_entry) {
+			if(mid_entry->midState == MID_REQUEST_SUBMITTED) {
+				/* Mark other intransit requests as needing retry so 
+				  we do not immediately mark the session bad again 
+				  (ie after we reconnect below) as they timeout too */
+				mid_entry->midState = MID_RETRY_NEEDED;
+			}
+		}
+	}
+	spin_unlock(&GlobalMid_Lock);
+
 
 	while ((server->tcpStatus != CifsExiting) && (server->tcpStatus != CifsGood))
 	{
@@ -193,6 +211,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		} else if (server->tcpStatus == CifsNeedReconnect) {
 			cFYI(1,("Reconnecting after server stopped responding"));
 			cifs_reconnect(server);
+			cFYI(1,("call to reconnect done"));
 			csocket = server->ssocket;
 			continue;
 		} else if ((length == -ERESTARTSYS) || (length == -EAGAIN)) {

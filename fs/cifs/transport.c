@@ -190,6 +190,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	long timeout;
 	struct mid_q_entry *midQ;
 
+cifs_dead_ses_retry:
 	midQ = AllocMidQEntry(in_buf, ses);
 	if (midQ == NULL)
 		return -EIO;
@@ -201,10 +202,10 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		return -EIO;
 	}
 
-        if (in_buf->smb_buf_length > 12)
-                in_buf->Flags2 = cpu_to_le16(in_buf->Flags2);
+	if (in_buf->smb_buf_length > 12)
+		in_buf->Flags2 = cpu_to_le16(in_buf->Flags2);
 	
-        rc = cifs_sign_smb(in_buf, ses, &midQ->sequence_number);
+	rc = cifs_sign_smb(in_buf, ses, &midQ->sequence_number);
 
 	midQ->midState = MID_REQUEST_SUBMITTED;
 	rc = smb_send(ses->server->ssocket, in_buf, in_buf->smb_buf_length,
@@ -236,8 +237,12 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 			    be32_to_cpu(midQ->resp_buf->smb_buf_length);
 		else {
 			cFYI(1,("No response buffer"));
+			if(midQ->midState != MID_RETRY_NEEDED) {
+				ses->server->tcpStatus = CifsNeedReconnect;
+				DeleteMidQEntry(midQ);
+				goto cifs_dead_ses_retry;
+			}
 			DeleteMidQEntry(midQ);
-			ses->server->tcpStatus = CifsNeedReconnect;
 			return -EIO;
 		}
 	}
