@@ -2619,6 +2619,24 @@ void ll_rw_block(int rw, int nr, struct buffer_head *bhs[])
 }
 
 /*
+ * For a data-integrity writeout, we need to wait upon any in-progress I/O
+ * and then start new I/O and then wait upon it.
+ */
+void sync_dirty_buffer(struct buffer_head *bh)
+{
+	WARN_ON(atomic_read(&bh->b_count) < 1);
+	lock_buffer(bh);
+	if (test_clear_buffer_dirty(bh)) {
+		get_bh(bh);
+		bh->b_end_io = end_buffer_io_sync;
+		submit_bh(WRITE, bh);
+		wait_on_buffer(bh);
+	} else {
+		unlock_buffer(bh);
+	}
+}
+
+/*
  * Sanity checks for try_to_free_buffers.
  */
 static void check_ttfb_buffer(struct page *page, struct buffer_head *bh)

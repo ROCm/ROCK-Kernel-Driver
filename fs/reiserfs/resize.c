@@ -120,8 +120,7 @@ int reiserfs_resize (struct super_block * s, unsigned long block_count_new)
 
 		mark_buffer_dirty(bitmap[i].bh) ;
 		set_buffer_uptodate(bitmap[i].bh);
-		ll_rw_block(WRITE, 1, &bitmap[i].bh);
-		wait_on_buffer(bitmap[i].bh);
+		sync_dirty_buffer(bitmap[i].bh);
 		// update bitmap_info stuff
 		bitmap[i].first_zero_hint=1;
 		bitmap[i].free_count = sb_blocksize(sb) * 8 - 1;

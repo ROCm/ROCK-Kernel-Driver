@@ -243,8 +243,7 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 
 		/* synchronously update superblock */
 		mark_buffer_dirty(bh);
-		ll_rw_block(WRITE, 1, &bh);
-		wait_on_buffer(bh);
+		sync_dirty_buffer(bh);
 		brelse(bh);
 
 		/*
@@ -512,15 +511,13 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 		memcpy(j_sb2, j_sb, sizeof (struct jfs_superblock));
 
 		mark_buffer_dirty(bh);
-		ll_rw_block(WRITE, 1, &bh2);
-		wait_on_buffer(bh2);
+		sync_dirty_buffer(bh2);
 		brelse(bh2);
 	}
 
 	/* write primary superblock */
 	mark_buffer_dirty(bh);
-	ll_rw_block(WRITE, 1, &bh);
-	wait_on_buffer(bh);
+	sync_dirty_buffer(bh);
 	brelse(bh);
 
 	goto resume;
