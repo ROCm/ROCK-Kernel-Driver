@@ -24,6 +24,10 @@
 #undef  ISDN_DEBUG_NET_DIAL
 #undef  ISDN_DEBUG_NET_ICALL
 
+#define isdn_BUG() \
+do { printk(KERN_WARNING "ISDN Bug at %s:%d", __FILE__, __LINE__); \
+} while(0)
+
 /* Prototypes */
 extern void isdn_MOD_INC_USE_COUNT(void);
 extern void isdn_MOD_DEC_USE_COUNT(void);

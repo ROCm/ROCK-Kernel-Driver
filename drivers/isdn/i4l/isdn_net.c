@@ -54,6 +54,11 @@ enum {
 	ST_12,
 };
 
+/* keep clear of ISDN_CMD_* and ISDN_STAT_* */
+enum {
+	EV_NET_DIAL = 0x200,
+};
+
 /*
  * Outline of new tbusy handling: 
  *
@@ -625,6 +630,7 @@ isdn_net_stat_callback(int idx, isdn_ctrl *c)
 		}
 		break;
 	}
+	return 0;
 }
 
 /* Initiate dialout. Set phone-number-pointer to first number
@@ -745,6 +751,160 @@ do_dialout(isdn_net_local *lp)
 	return 1;
 }
 
+/* returns 1 if timer callback is needed */
+static int
+isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
+{
+	isdn_net_dev *p = lp->netdev;
+	isdn_ctrl cmd;
+
+#ifdef ISDN_DEBUG_NET_DIAL
+	printk(KERN_DEBUG "%s: dialstate=%d\n", lp->name, lp->dialstate);
+#endif
+
+	switch (lp->dialstate) {
+	case ST_0:
+		break;
+	case ST_1:
+		switch (pr) {
+		case EV_NET_DIAL:
+			if (init_dialout(lp) == 0)
+				return 0;
+			lp->dialstate = ST_2;
+			goto st_2_net_dial;
+		}
+		break;
+	case ST_2:
+		switch (pr) {
+		case EV_NET_DIAL:
+		st_2_net_dial:
+			lp->dialretry = 0;
+			lp->dialstate = ST_3;
+			goto st_3_net_dial;
+		}
+		break;
+	case ST_3:
+		switch (pr) {
+		case EV_NET_DIAL:
+		st_3_net_dial:
+			return do_dialout(lp);
+		}
+		break;
+	case ST_4:
+		switch (pr) {
+		case EV_NET_DIAL:
+			/* Wait for D-Channel-connect.
+			 * If timeout, switch back to state 3.
+			 * Dialmax-handling moved to state 3.
+			 */
+			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
+				lp->dialstate = ST_3;
+			return 1;
+		}
+		break;
+	case ST_5:
+		switch (pr) {
+		case EV_NET_DIAL:
+			/* Got D-Channel-Connect, send B-Channel-request */
+			lp->dtimer = 0;
+			lp->dialstate = ST_6;
+			isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
+			return 1;
+		}
+		break;
+	case ST_6:
+		switch (pr) {
+		case EV_NET_DIAL:
+			/* Wait for B- or D-Channel-connect. If timeout,
+			 * switch back to state 3.
+			 */
+#ifdef ISDN_DEBUG_NET_DIAL
+			printk(KERN_DEBUG "dialtimer2: %d\n", lp->dtimer);
+#endif
+			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
+				lp->dialstate = ST_3;
+			return 1;
+		}
+		break;
+	case ST_7:
+		switch (pr) {
+		case EV_NET_DIAL:
+			/* Got incoming Call, setup L2 and L3 protocols,
+			 * then wait for D-Channel-connect
+			 */
+#ifdef ISDN_DEBUG_NET_DIAL
+			printk(KERN_DEBUG "dialtimer4: %d\n", lp->dtimer);
+#endif
+			cmd.arg = lp->l2_proto << 8;
+			isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
+			cmd.arg = lp->l3_proto << 8;
+			isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL3, &cmd);
+			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT15) {
+				isdn_net_hangup(&p->dev);
+			} else {
+				lp->dialstate = ST_8;
+				return 1;
+			}
+			break;
+		}
+		break;
+	case ST_9:
+		switch (pr) {
+		case EV_NET_DIAL:
+			/* Got incoming D-Channel-Connect, send B-Channel-request */
+			isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
+			lp->dtimer = 0;
+			lp->dialstate = ST_10;
+			return 1;
+		}
+		break;
+	case ST_8:
+	case ST_10:
+		switch (pr) {
+		case EV_NET_DIAL:
+		/*  Wait for B- or D-channel-connect */
+#ifdef ISDN_DEBUG_NET_DIAL
+			printk(KERN_DEBUG "dialtimer4: %d\n", lp->dtimer);
+#endif
+			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
+				isdn_net_hangup(&p->dev);
+			else
+				return 1;
+			break;
+		}
+		break;
+	case ST_11:
+		switch (pr) {
+		case EV_NET_DIAL:
+			/* Callback Delay */
+			if (lp->dtimer++ > lp->cbdelay)
+				lp->dialstate = ST_1;
+			return 1;
+		}
+		break;
+	case ST_12:
+		switch (pr) {
+		case EV_NET_DIAL:
+			/* Remote does callback. Hangup after cbdelay, then wait for incoming
+			 * call (in state 4).
+			 */
+			if (lp->dtimer++ > lp->cbdelay) {
+				printk(KERN_INFO "%s: hangup waiting for callback ...\n", lp->name);
+				lp->dtimer = 0;
+				lp->dialstate = ST_4;
+				isdn_slot_command(lp->isdn_slot, ISDN_CMD_HANGUP, &cmd);
+				isdn_slot_all_eaz(lp->isdn_slot);
+			}
+			return 1;
+		}
+		break;
+	default:
+		isdn_BUG();
+		break;
+	}
+	return 0;
+}
+
 /*
  * Perform dialout for net-interfaces and timeout-handling for
  * D-Channel-up and B-Channel-up Messages.
@@ -758,118 +918,17 @@ do_dialout(isdn_net_local *lp)
 void
 isdn_net_dial(void)
 {
-	isdn_net_dev *p = dev->netdev;
 	int anymore = 0;
-	isdn_ctrl cmd;
+	isdn_net_dev *p = dev->netdev;
 
 	for (p = dev->netdev; p; p = p->next) {
 		isdn_net_local *lp = p->local;
+		
+		if (lp->dialstate == ST_0)
+			continue;
 
-#ifdef ISDN_DEBUG_NET_DIAL
-		if (lp->dialstate)
-			printk(KERN_DEBUG "%s: dialstate=%d\n", lp->name, lp->dialstate);
-#endif
-		switch (lp->dialstate) {
-		case ST_0:
-			/* Nothing to do for this interface */
-			break;
-		case ST_1:
-			anymore = init_dialout(lp);
-			/* Fall through */
-		case ST_2:
-			lp->dialretry = 0;
+		if (isdn_net_handle_event(lp, EV_NET_DIAL, NULL))
 			anymore = 1;
-			lp->dialstate = ST_3;
-			/* Fall through */
-		case ST_3:
-			anymore = do_dialout(lp);
-			break;
-		case ST_4:
-			/* Wait for D-Channel-connect.
-			 * If timeout, switch back to state 3.
-			 * Dialmax-handling moved to state 3.
-			 */
-			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
-					lp->dialstate = ST_3;
-			anymore = 1;
-			break;
-		case ST_5:
-			/* Got D-Channel-Connect, send B-Channel-request */
-			anymore = 1;
-			lp->dtimer = 0;
-			lp->dialstate = ST_6;
-			isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
-			break;
-		case ST_6:
-			/* Wait for B- or D-Channel-connect. If timeout,
-			 * switch back to state 3.
-			 */
-#ifdef ISDN_DEBUG_NET_DIAL
-			printk(KERN_DEBUG "dialtimer2: %d\n", lp->dtimer);
-#endif
-			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
-				lp->dialstate = ST_3;
-			anymore = 1;
-			break;
-		case ST_7:
-			/* Got incoming Call, setup L2 and L3 protocols,
-			 * then wait for D-Channel-connect
-			 */
-#ifdef ISDN_DEBUG_NET_DIAL
-			printk(KERN_DEBUG "dialtimer4: %d\n", lp->dtimer);
-#endif
-			cmd.arg = lp->l2_proto << 8;
-			isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
-			cmd.arg = lp->l3_proto << 8;
-			isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL3, &cmd);
-			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT15)
-				isdn_net_hangup(&p->dev);
-			else {
-				anymore = 1;
-				lp->dialstate = ST_8;
-			}
-			break;
-		case ST_9:
-			/* Got incoming D-Channel-Connect, send B-Channel-request */
-			isdn_slot_command(lp->isdn_slot, ISDN_CMD_ACCEPTB, &cmd);
-			anymore = 1;
-			lp->dtimer = 0;
-			lp->dialstate = ST_10;
-			break;
-		case ST_8:
-		case ST_10:
-			/*  Wait for B- or D-channel-connect */
-#ifdef ISDN_DEBUG_NET_DIAL
-			printk(KERN_DEBUG "dialtimer4: %d\n", lp->dtimer);
-#endif
-			if (lp->dtimer++ > ISDN_TIMER_DTIMEOUT10)
-				isdn_net_hangup(&p->dev);
-			else
-				anymore = 1;
-			break;
-		case ST_11:
-			/* Callback Delay */
-			if (lp->dtimer++ > lp->cbdelay)
-				lp->dialstate = ST_1;
-			anymore = 1;
-			break;
-		case ST_12:
-			/* Remote does callback. Hangup after cbdelay, then wait for incoming
-			 * call (in state 4).
-			 */
-			if (lp->dtimer++ > lp->cbdelay) {
-				printk(KERN_INFO "%s: hangup waiting for callback ...\n", lp->name);
-				lp->dtimer = 0;
-				lp->dialstate = ST_4;
-				isdn_slot_command(lp->isdn_slot, ISDN_CMD_HANGUP, &cmd);
-				isdn_slot_all_eaz(lp->isdn_slot);
-			}
-			anymore = 1;
-			break;
-		default:
-			printk(KERN_WARNING "isdn_net: Illegal dialstate %d for device %s\n",
-			       lp->dialstate, lp->name);
-		}
 	}
 	isdn_timer_ctrl(ISDN_TIMER_NETDIAL, anymore);
 }
