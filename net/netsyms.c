@@ -58,21 +58,6 @@
 #if defined(CONFIG_INET_ESP) || defined(CONFIG_INET_ESP_MODULE) || defined(CONFIG_INET6_ESP) || defined(CONFIG_INET6_ESP_MODULE)
 #include <net/esp.h>
 #endif
-
-#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE) \
-   || defined (CONFIG_IP_SCTP_MODULE)
-#include <linux/in6.h>
-#include <linux/icmpv6.h>
-#include <net/ipv6.h>
-#include <net/ndisc.h>
-#include <net/transp_v6.h>
-#include <net/addrconf.h>
-
-extern int sysctl_local_port_range[2];
-extern int tcp_port_rover;
-extern int udp_port_rover;
-#endif
-
 #endif
 
 #include <linux/rtnetlink.h>
@@ -176,12 +161,6 @@ EXPORT_SYMBOL(devinet_ioctl);
 EXPORT_SYMBOL(register_inetaddr_notifier);
 EXPORT_SYMBOL(unregister_inetaddr_notifier);
 
-/* proc */
-#ifdef CONFIG_PROC_FS
-EXPORT_SYMBOL(udp_proc_register);
-EXPORT_SYMBOL(udp_proc_unregister);
-#endif
-
 /* needed for ip_gre -cw */
 EXPORT_SYMBOL(ip_statistics);
 #if defined(CONFIG_INET_ESP) || defined(CONFIG_INET_ESP_MODULE) || defined(CONFIG_INET6_ESP) || defined(CONFIG_INET6_ESP_MODULE)
@@ -197,17 +176,11 @@ EXPORT_SYMBOL(flow_cache_genid);
 /* inet functions common to v4 and v6 */
 
 /* Socket demultiplexing. */
-EXPORT_SYMBOL(udp_hash);
-EXPORT_SYMBOL(udp_hash_lock);
 
 EXPORT_SYMBOL(ip_queue_xmit);
 EXPORT_SYMBOL(memcpy_fromiovecend);
 EXPORT_SYMBOL(csum_partial_copy_fromiovecend);
 /* UDP/TCP exported functions for TCPv6 */
-EXPORT_SYMBOL(udp_ioctl);
-EXPORT_SYMBOL(udp_connect);
-EXPORT_SYMBOL(udp_disconnect);
-EXPORT_SYMBOL(udp_sendmsg);
 EXPORT_SYMBOL(tcp_write_wakeup);
 EXPORT_SYMBOL(tcp_send_synack);
 EXPORT_SYMBOL(tcp_check_req);
@@ -220,7 +193,6 @@ EXPORT_SYMBOL(tcp_statistics);
 EXPORT_SYMBOL(tcp_rcv_state_process);
 EXPORT_SYMBOL(tcp_timewait_state_process);
 EXPORT_SYMBOL(tcp_create_openreq_child);
-EXPORT_SYMBOL(udp_prot);
 EXPORT_SYMBOL(tcp_simple_retransmit);
 EXPORT_SYMBOL(tcp_transmit_skb);
 EXPORT_SYMBOL(tcp_connect);
@@ -228,7 +200,6 @@ EXPORT_SYMBOL(tcp_make_synack);
 EXPORT_SYMBOL(tcp_tw_deschedule);
 EXPORT_SYMBOL(tcp_delete_keepalive_timer);
 EXPORT_SYMBOL(tcp_reset_keepalive_timer);
-EXPORT_SYMBOL(udp_port_rover);
 EXPORT_SYMBOL(tcp_sync_mss);
 EXPORT_SYMBOL(net_statistics); 
 EXPORT_SYMBOL(sysctl_tcp_reordering);
