@@ -1900,8 +1900,6 @@ __xfs_bmbt_get_all(
 
 		b = (((xfs_dfsbno_t)l0 & XFS_MASK64LO(9)) << 43) |
 		    (((xfs_dfsbno_t)l1) >> 21);
-		if (!((b >> 32) == 0 || ISNULLDSTARTBLOCK(b)))
-			printk("b == 0x%llx NULL %d\n", b, ISNULLDSTARTBLOCK(b));
 		ASSERT((b >> 32) == 0 || ISNULLDSTARTBLOCK(b));
 		s->br_startblock = (xfs_fsblock_t)b;
 	}
@@ -2803,8 +2801,6 @@ xfs_check_nostate_extents(
 	for (; num > 0; num--, ep++) {
 		if ((ep->l0 >>
 		     (64 - BMBT_EXNTFLAG_BITLEN)) != 0) {
-			printk("Extent at 0x%p value 0x%llx\n", ep,
-				(ep->l0 >> (64 - BMBT_EXNTFLAG_BITLEN)));
 			ASSERT(0);
 			return 1;
 		}
