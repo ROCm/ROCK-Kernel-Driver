@@ -870,7 +870,10 @@ static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 
 
 #define UHCI_USBLEGSUP		0xc0		/* legacy support */
+#define UHCI_USBCMD		0		/* command register */
+#define UHCI_USBINTR		4		/* interrupt register */
 #define UHCI_USBLEGSUP_DEFAULT	0x2000		/* only PIRQ enable set */
+#define UHCI_USBCMD_GRESET	0x0004		/* Global reset */
 
 #define OHCI_CONTROL		0x04
 #define OHCI_CMDSTATUS		0x08
@@ -883,6 +886,26 @@ static void __init quirk_usb_disable_smm_bios(struct pci_dev *pdev)
 {
 
 	if (pdev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x00)) { /* UHCI */
+		int i;
+		unsigned long base = 0;;
+
+		for (i = 0; i < PCI_ROM_RESOURCE; i++) 
+			if ((pci_resource_flags(pdev, i) & IORESOURCE_IO)) {
+				base = pci_resource_start(pdev, i);
+				break;
+			}
+
+		if (!base)
+			return;
+
+		outw(0, base + UHCI_USBINTR);
+		outw(UHCI_USBCMD_GRESET, base + UHCI_USBCMD);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+       		schedule_timeout((HZ*50+999) / 1000);
+		outw(0, base + UHCI_USBCMD);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout((HZ*10+999) / 1000);
+
 		pci_write_config_word(pdev, UHCI_USBLEGSUP, UHCI_USBLEGSUP_DEFAULT);
 	}
 
@@ -898,7 +921,7 @@ static void __init quirk_usb_disable_smm_bios(struct pci_dev *pdev)
 			while (temp && readl(base + OHCI_CONTROL) & OHCI_CTRL_IR) {
 				temp--;
 				set_current_state(TASK_UNINTERRUPTIBLE);
-			        schedule_timeout( HZ / 100);
+				schedule_timeout( HZ / 100);
 			}
 		}
 		iounmap(base);
