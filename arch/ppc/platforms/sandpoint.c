@@ -103,11 +103,9 @@
 #include <asm/bootinfo.h>
 #include <asm/mpc10x.h>
 #include <asm/pci-bridge.h>
+#include <asm/kgdb.h>
 
 #include "sandpoint.h"
-
-extern void gen550_progress(char *, unsigned short);
-extern void gen550_init(int, struct uart_port *);
 
 unsigned char __res[sizeof(bd_t)];
 
@@ -706,6 +704,9 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #if defined(CONFIG_SERIAL_8250) && \
 	(defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG))
 	sandpoint_early_serial_map();
+#ifdef CONFIG_KGDB
+	ppc_md.kgdb_map_scc = gen550_kgdb_map_scc;
+#endif
 #ifdef CONFIG_SERIAL_TEXT_DEBUG
 	ppc_md.progress = gen550_progress;
 #endif
