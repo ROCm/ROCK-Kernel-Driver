@@ -186,43 +186,36 @@ extern volatile int pci_poke_faulted;
 #endif
 
 /* When access exceptions happen, we must do this. */
-static void clean_and_reenable_l1_caches(void)
+static void spitfire_clean_and_reenable_l1_caches(void)
 {
 	unsigned long va;
 
-	if (tlb_type == spitfire) {
-		/* Clean 'em. */
-		for (va =  0; va < (PAGE_SIZE << 1); va += 32) {
-			spitfire_put_icache_tag(va, 0x0);
-			spitfire_put_dcache_tag(va, 0x0);
-		}
+	if (tlb_type != spitfire)
+		BUG();
 
-		/* Re-enable in LSU. */
-		__asm__ __volatile__("flush %%g6\n\t"
-				     "membar #Sync\n\t"
-				     "stxa %0, [%%g0] %1\n\t"
-				     "membar #Sync"
-				     : /* no outputs */
-				     : "r" (LSU_CONTROL_IC | LSU_CONTROL_DC |
-					    LSU_CONTROL_IM | LSU_CONTROL_DM),
-				     "i" (ASI_LSU_CONTROL)
-				     : "memory");
-	} else if (tlb_type == cheetah || tlb_type == cheetah_plus) {
-		/* Flush D-cache */
-		for (va = 0; va < (1 << 16); va += (1 << 5)) {
-			__asm__ __volatile__("stxa %%g0, [%0] %1\n\t"
-					     "membar #Sync"
-					     : /* no outputs */
-					     : "r" (va), "i" (ASI_DCACHE_TAG));
-		}
+	/* Clean 'em. */
+	for (va =  0; va < (PAGE_SIZE << 1); va += 32) {
+		spitfire_put_icache_tag(va, 0x0);
+		spitfire_put_dcache_tag(va, 0x0);
 	}
+
+	/* Re-enable in LSU. */
+	__asm__ __volatile__("flush %%g6\n\t"
+			     "membar #Sync\n\t"
+			     "stxa %0, [%%g0] %1\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "r" (LSU_CONTROL_IC | LSU_CONTROL_DC |
+				    LSU_CONTROL_IM | LSU_CONTROL_DM),
+			     "i" (ASI_LSU_CONTROL)
+			     : "memory");
 }
 
 void do_iae(struct pt_regs *regs)
 {
 	siginfo_t info;
 
-	clean_and_reenable_l1_caches();
+	spitfire_clean_and_reenable_l1_caches();
 
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
@@ -236,7 +229,7 @@ void do_dae(struct pt_regs *regs)
 {
 #ifdef CONFIG_PCI
 	if (pci_poke_in_progress && pci_poke_cpu == smp_processor_id()) {
-		clean_and_reenable_l1_caches();
+		spitfire_clean_and_reenable_l1_caches();
 
 		pci_poke_faulted = 1;
 
