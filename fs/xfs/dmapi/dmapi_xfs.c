@@ -228,7 +228,9 @@ prohibited_mr_events(
 	struct address_space *mapping = LINVFS_GET_IP(vp)->i_mapping;
 	int prohibited = (1 << DM_EVENT_READ);
 	struct vm_area_struct *vma;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	struct prio_tree_iter iter;
+#endif
 
 	if (!VN_MAPPED(vp))
 		return 0;

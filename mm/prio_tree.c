@@ -421,6 +421,7 @@ struct prio_tree_node *prio_tree_first(struct prio_tree_root *root,
 	}
 	return NULL;
 }
+EXPORT_SYMBOL(prio_tree_first);
 
 /* Get the next prio_tree_node that overlaps with the input interval in iter */
 struct prio_tree_node *prio_tree_next(struct prio_tree_root *root,
@@ -452,6 +453,7 @@ repeat:
 
 	goto repeat;
 }
+EXPORT_SYMBOL(prio_tree_next);
 
 /*
  * Radix priority search tree for address_space->i_mmap_{_shared}
