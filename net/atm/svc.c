@@ -66,7 +66,7 @@ static void svc_disconnect(struct atm_vcc *vcc)
 	}
 	/* beware - socket is still in use by atmsigd until the last
 	   as_indicate has been answered */
-	while ((skb = skb_dequeue(&vcc->sk->sk_receive_queue))) {
+	while ((skb = skb_dequeue(&vcc->sk->sk_receive_queue)) != NULL) {
 		DPRINTK("LISTEN REL\n");
 		sigd_enq2(NULL,as_reject,vcc,NULL,NULL,&vcc->qos,0);
 		dev_kfree_skb(skb);
