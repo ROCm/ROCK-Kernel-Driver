@@ -153,13 +153,13 @@
 #define NODE_MAX_MEM_SHIFT	24
 #define NODE_MAX_MEM_SIZE	(1<<NODE_MAX_MEM_SHIFT)
 
-#else
-
-#define PFN_TO_NID(pfn)		(0)
-
 #endif /* CONFIG_DISCONTIGMEM */
 
 #endif	/* CONFIG_ARCH_EDB7211 */
+
+#ifndef PFN_TO_NID
+#define PFN_TO_NID(pfn)		(0)
+#endif
 
 #endif
 

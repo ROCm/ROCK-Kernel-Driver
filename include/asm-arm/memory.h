@@ -69,7 +69,7 @@ static inline void *phys_to_virt(unsigned long x)
 
 #define page_to_pfn(page)	(((page) - mem_map) + PHYS_PFN_OFFSET)
 #define pfn_to_page(pfn)	((mem_map + (pfn)) - PHYS_PFN_OFFSET)
-#define pfn_valid(pfn)		((pfn) >= PHYS_PFN_OFFSET && (pfn) < max_mapnr)
+#define pfn_valid(pfn)		((pfn) >= PHYS_PFN_OFFSET && (pfn) < (PHYS_PFN_OFFSET + max_mapnr))
 
 #define virt_to_page(kaddr)	(pfn_to_page(__pa(kaddr) >> PAGE_SHIFT))
 #define virt_addr_valid(kaddr)	((kaddr) >= PAGE_OFFSET && (kaddr) < (unsigned long)high_memory)
