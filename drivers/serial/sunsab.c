@@ -768,7 +768,7 @@ static void sunsab_set_termios(struct uart_port *port, struct termios *termios,
 {
 	struct uart_sunsab_port *up = (struct uart_sunsab_port *) port;
 	unsigned long flags;
-	int baud = uart_get_baud_rate(port, termios);
+	int baud = uart_get_baud_rate(port, termios, old, 0, 4000000);
 
 	spin_lock_irqsave(&up->port.lock, flags);
 	sunsab_convert_to_sab(up, termios->c_cflag, termios->c_iflag, baud);
