@@ -546,15 +546,21 @@ static __init int ignore_timer_override(struct dmi_blacklist *d)
 
 #ifdef	CONFIG_ACPI_PCI
 static __init int disable_acpi_irq(struct dmi_blacklist *d) 
-{ 
-	printk(KERN_NOTICE "%s detected: force use of acpi=noirq\n", d->ident); 	
-	acpi_noirq_set();
+{
+	if (!acpi_force) {
+		printk(KERN_NOTICE "%s detected: force use of acpi=noirq\n",
+		       d->ident); 	
+		acpi_noirq_set();
+	}
 	return 0;
 }
 static __init int disable_acpi_pci(struct dmi_blacklist *d) 
-{ 
-	printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n", d->ident); 	
-	acpi_disable_pci();
+{
+	if (!acpi_force) {
+		printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n",
+		       d->ident); 	
+		acpi_disable_pci();
+	}
 	return 0;
 }  
 #endif
