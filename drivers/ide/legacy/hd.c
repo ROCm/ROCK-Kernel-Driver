@@ -846,7 +846,7 @@ static void __init hd_geninit(void)
 	}
 }
 
-int __init hd_init(void)
+static int __init hd_init(void)
 {
 	if (register_blkdev(MAJOR_NR,"hd",&hd_fops)) {
 		printk("hd: unable to get major %d for hard disk\n",MAJOR_NR);

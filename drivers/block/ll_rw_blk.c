@@ -53,7 +53,7 @@ static kmem_cache_t *request_cachep;
 /*
  * plug management
  */
-static struct list_head blk_plug_list;
+static LIST_HEAD(blk_plug_list);
 static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 /* blk_dev_struct is:
@@ -2041,26 +2041,15 @@ void end_that_request_last(struct request *req)
 	blk_put_request(req);
 }
 
-#define MB(kb)	((kb) << 10)
-
 int __init blk_dev_init(void)
 {
-	struct blk_dev_struct *dev;
-	int total_ram;
+	int total_ram = nr_free_pages() << (PAGE_SHIFT - 10);
 
 	request_cachep = kmem_cache_create("blkdev_requests",
-					   sizeof(struct request),
-					   0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-
+			sizeof(struct request), 0,
+			SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (!request_cachep)
 		panic("Can't create request pool slab cache\n");
-
-	for (dev = blk_dev + MAX_BLKDEV; dev-- != blk_dev;)
-		dev->queue = NULL;
-
-	memset(ro_bits,0,sizeof(ro_bits));
-
-	total_ram = nr_free_pages() << (PAGE_SHIFT - 10);
 
 	/*
 	 * Free request slots per queue.
@@ -2077,16 +2066,11 @@ int __init blk_dev_init(void)
 	 */
 	if ((batch_requests = queue_nr_requests / 4) > 32)
 		batch_requests = 32;
-	printk("block: %d slots per queue, batch=%d\n", queue_nr_requests, batch_requests);
+	printk("block: %d slots per queue, batch=%d\n",
+			queue_nr_requests, batch_requests);
 
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
-
-	INIT_LIST_HEAD(&blk_plug_list);
-
-#if defined(CONFIG_IDE) && defined(CONFIG_BLK_DEV_HD)
-	hd_init();
-#endif
 
 	return 0;
 };
