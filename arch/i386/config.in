@@ -156,6 +156,10 @@ if [ "$CONFIG_MWINCHIP3D" = "y" ]; then
    define_bool CONFIG_X86_USE_PPRO_CHECKSUM y
    define_bool CONFIG_X86_OOSTORE y
 fi
+
+bool 'Machine Check Exception' CONFIG_X86_MCE
+dep_bool 'Check for non-fatal errors' CONFIG_X86_MCE_NONFATAL $CONFIG_X86_MCE
+
 tristate 'Toshiba Laptop support' CONFIG_TOSHIBA
 tristate 'Dell laptop support' CONFIG_I8K
 

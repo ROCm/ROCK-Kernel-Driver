@@ -803,6 +803,30 @@ CONFIG_APM_REAL_MODE_POWER_OFF
   a work-around for a number of buggy BIOSes. Switch this option on if
   your computer crashes instead of powering off properly.
 
+CONFIG_X86_MCE
+  Machine Check Exception support allows the processor to notify the
+  kernel if it detects a problem (e.g. overheating, component failure).
+  The action the kernel takes depends on the severity of the problem,
+  ranging from a warning message on the console, to halting the machine.
+  Your processor must be a Pentium or newer to support this - check the
+  flags in /proc/cpuinfo for mce.  Note that some older Pentium systems
+  have a design flaw which leads to false MCE events - hence MCE is
+  disabled on all P5 processors, unless explicitly enabled with "mce"
+  as a boot argument.  Similarly, if MCE is built in and creates a
+  problem on some new non-standard machine, you can boot with "nomce"
+  to disable it.  MCE support simply ignores non-MCE processors like
+  the 386 and 486, so nearly everyone can say Y here.
+
+CONFIG_X86_MCE_NONFATAL
+  Enabling this feature starts a timer that triggers every 5 seconds which
+  will look at the machine check registers to see if anything happened.
+  Non-fatal problems automatically get corrected (but still logged).
+  Disable this if you don't want to see these messages.
+  Seeing the messages this option prints out may be indicative of dying hardware,
+  or out-of-spec (ie, overclocked) hardware.
+  This option only does something on hardware with Intel P6 style MCE.
+  (Pentium Pro and above, AMD Athlon/Duron)
+				 
 CONFIG_TOSHIBA
   This adds a driver to safely access the System Management Mode of
   the CPU on Toshiba portables with a genuine Toshiba BIOS. It does
@@ -909,3 +933,6 @@ CONFIG_DEBUG_BUGVERBOSE
   of the BUG call as well as the EIP and oops trace.  This aids
   debugging but costs about 70-100K of memory.
 
+CONFIG_DEBUG_OBSOLETE
+  Say Y here if you want to reduce the chances of the tree compiling,
+  and are prepared to dig into driver internals to fix compile errors.
