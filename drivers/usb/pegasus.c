@@ -71,7 +71,6 @@
 static int loopback = 0;
 static int mii_mode = 0;
 static int multicast_filter_limit = 32;
-static DECLARE_MUTEX(gsem);
 
 static struct usb_eth_dev usb_dev_id[] = {
 #define	PEGASUS_DEV(pn, vid, pid, flags)	\
@@ -488,10 +487,10 @@ static int enable_net_traffic( struct net_device *dev, struct usb_device *usb )
 	pegasus_t *pegasus = dev->priv;
 
 
-	if ( read_mii_word(pegasus, pegasus->phy, MII_BMSR, &bmsr) ) 
-		return 1;
-	if ( !(bmsr & 0x20) && !loopback ) 
-		warn( "%s: link NOT established (0x%x) - check the cable.",
+	read_mii_word(pegasus, pegasus->phy, MII_BMSR, &bmsr);
+	read_mii_word(pegasus, pegasus->phy, MII_BMSR, &bmsr);
+	if ( !(bmsr & 4) && !loopback )
+		warn( "%s: link NOT established (%04x) - check the cable.",
 			dev->name, bmsr );
 	if ( read_mii_word(pegasus, pegasus->phy, MII_LPA, &linkpart) )
 		return 2;
@@ -970,10 +969,9 @@ static void * pegasus_probe( struct usb_device *dev, unsigned int ifnum,
 		err("usb_set_configuration() failed");
 		return NULL;
 	}
-	down(&gsem);
 	if(!(pegasus = kmalloc(sizeof(struct pegasus), GFP_KERNEL))) {
 		err("out of memory allocating device structure");
-		goto exit;
+		return NULL;
 	}
 
 	usb_inc_dev_use( dev );
@@ -984,23 +982,20 @@ static void * pegasus_probe( struct usb_device *dev, unsigned int ifnum,
 	pegasus->ctrl_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!pegasus->ctrl_urb) {
 		kfree (pegasus);
-		pegasus = NULL;
-		goto exit;
+		return NULL;
 	}
 	pegasus->rx_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!pegasus->rx_urb) {
 		usb_free_urb (pegasus->ctrl_urb);
 		kfree (pegasus);
-		pegasus = NULL;
-		goto exit;
+		return NULL;
 	}
 	pegasus->tx_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!pegasus->tx_urb) {
 		usb_free_urb (pegasus->rx_urb);
 		usb_free_urb (pegasus->ctrl_urb);
 		kfree (pegasus);
-		pegasus = NULL;
-		goto exit;
+		return NULL;
 	}
 	pegasus->intr_urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!pegasus->intr_urb) {
@@ -1008,8 +1003,7 @@ static void * pegasus_probe( struct usb_device *dev, unsigned int ifnum,
 		usb_free_urb (pegasus->rx_urb);
 		usb_free_urb (pegasus->ctrl_urb);
 		kfree (pegasus);
-		pegasus = NULL;
-		goto exit;
+		return NULL;
 	}
 
 	net = init_etherdev( NULL, 0 );
@@ -1018,11 +1012,11 @@ static void * pegasus_probe( struct usb_device *dev, unsigned int ifnum,
 		usb_free_urb (pegasus->rx_urb);
 		usb_free_urb (pegasus->ctrl_urb);
 		kfree( pegasus );
-		pegasus = NULL;
-		goto exit;
+		return NULL;
 	}
 
 	init_MUTEX(&pegasus->sem);
+	down(&pegasus->sem);
 	pegasus->usb = dev;
 	pegasus->net = net;
 	SET_MODULE_OWNER(net);
@@ -1068,7 +1062,7 @@ static void * pegasus_probe( struct usb_device *dev, unsigned int ifnum,
 		pegasus->phy = 1;
 	}
 exit:
-	up(&gsem);
+	up(&pegasus->sem);
 	return pegasus;
 }
 
