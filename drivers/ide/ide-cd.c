@@ -666,8 +666,10 @@ static void cdrom_end_request (ide_drive_t *drive, int uptodate)
 		struct cdrom_info *info = drive->driver_data;
 		void *sense = &info->sense_data;
 		
-		if (failed && failed->sense)
+		if (failed && failed->sense) {
 			sense = failed->sense;
+			failed->sense_len = rq->sense_len;
+		}
 
 		cdrom_analyze_sense_data(drive, failed, sense);
 	}
@@ -723,7 +725,7 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 		 * scsi status byte
 		 */
 		if ((rq->flags & REQ_BLOCK_PC) && !rq->errors)
-			rq->errors = CHECK_CONDITION;
+			rq->errors = SAM_STAT_CHECK_CONDITION;
 
 		/* Check for tray open. */
 		if (sense_key == NOT_READY) {
@@ -1609,10 +1611,12 @@ static inline int cdrom_write_check_ireason(ide_drive_t *drive, int len, int ire
 
 static void post_transform_command(struct request *req)
 {
-	char *ibuf = req->buffer;
+	char *ibuf = req->data;
 	u8 *c = req->cmd;
 
 	if (!blk_pc_request(req))
+		return;
+	if (!ibuf)
 		return;
 
 	/*
