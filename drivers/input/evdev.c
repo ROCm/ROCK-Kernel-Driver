@@ -233,7 +233,6 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct evdev_list *list = file->private_data;
 	struct evdev *evdev = list->evdev;
 	struct input_dev *dev = evdev->handle.dev;
-	struct input_devinfo id;
 	int retval, t, u;
 
 	if (!evdev->exist) return -ENODEV;
@@ -244,12 +243,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			return put_user(EV_VERSION, (int *) arg);
 
 		case EVIOCGID:
-			id.bustype = dev->id.bustype;
-			id.vendor = dev->id.vendor;
-			id.product = dev->id.product;
-			id.version = dev->id.version;
-			return copy_to_user((void *) arg, &id, sizeof(struct input_devinfo));
-
+			return copy_to_user((void *) arg, &dev->id, sizeof(struct input_devinfo));
 		
 		case EVIOCGREP:
 			if ((retval = put_user(dev->rep[0], ((int *) arg) + 0))) return retval;
