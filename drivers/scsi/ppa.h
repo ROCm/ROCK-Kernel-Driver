@@ -152,10 +152,10 @@ int ppa_sg = SG_ALL;		/* enable/disable scatter-gather. */
 #endif
 
 static int ppa_engine(ppa_struct *, Scsi_Cmnd *);
-static int ppa_in(int, char *, int);
-static int ppa_init(int);
+static int ppa_in(ppa_struct *, char *, int);
+static int ppa_init(ppa_struct *);
 static void ppa_interrupt(void *);
-static int ppa_out(int, char *, int);
+static int ppa_out(ppa_struct *, char *, int);
 
 #else
 #define ppa_release 0
