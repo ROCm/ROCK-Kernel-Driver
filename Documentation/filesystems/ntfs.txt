@@ -73,7 +73,7 @@ show_inodes=opt		Allows choice of which types of inode names readdir()
 			directory names, BUT the link count on each directory
 			inode entry is set to 1, due to Linux not supporting
 			directory hard links. This may well confuse some
-			userspace applications, since the directory names will
+			user space applications, since the directory names will
 			have the same inode numbers. Thus it is NOT advisable
 			to use the "posix" and "all" options. We provide them
 			only for completeness sake.
@@ -134,7 +134,7 @@ Features
 ========
 
 - This is a complete rewrite of the NTFS driver that used to be in the kernel.
-  This new driver implementats NTFS read support and is functionally equivalent
+  This new driver implements NTFS read support and is functionally equivalent
   to the old ntfs driver. And in addition the new driver has full support for
   sparse files on NTFS 3.x volumes which the old driver isn't happy with.
 - A comparison of the two drivers using:
