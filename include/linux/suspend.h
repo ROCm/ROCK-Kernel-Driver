@@ -55,6 +55,10 @@ extern int register_suspend_notifier(struct notifier_block *);
 extern int unregister_suspend_notifier(struct notifier_block *);
 extern void refrigerator(unsigned long);
 
+extern unsigned int nr_copy_pages __nosavedata;
+extern suspend_pagedir_t *pagedir_nosave __nosavedata;
+
+
 #else
 #define software_suspend()		do { } while(0)
 #define software_resume()		do { } while(0)

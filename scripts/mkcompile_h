@@ -48,9 +48,10 @@ if [ -r $TARGET ] && \
       grep -v 'UTS_VERSION\|LINUX_COMPILE_TIME' $TARGET > .tmpver.1 && \
       grep -v 'UTS_VERSION\|LINUX_COMPILE_TIME' .tmpcompile > .tmpver.2 && \
       cmp -s .tmpver.1 .tmpver.2; then
-   echo $TARGET is unchanged;
+   echo $TARGET was not updated;
    rm -f .tmpcompile
 else
+   echo $TARGET was updated
    mv -f .tmpcompile $TARGET
 fi
 rm -f .tmpver.1 .tmpver.2

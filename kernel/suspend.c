@@ -106,7 +106,7 @@ static int resume_status = 0;
 static char resume_file[256] = "";			/* For resume= kernel option */
 static kdev_t resume_device;
 /* Local variables that should not be affected by save */
-static unsigned int nr_copy_pages __nosavedata = 0;
+unsigned int nr_copy_pages __nosavedata = 0;
 
 static int pm_suspend_state = 0;
 
@@ -119,7 +119,7 @@ static int pm_suspend_state = 0;
    allocated at time of resume, that travels through memory not to
    collide with anything.
  */
-static suspend_pagedir_t *pagedir_nosave __nosavedata = NULL;
+suspend_pagedir_t *pagedir_nosave __nosavedata = NULL;
 static suspend_pagedir_t *pagedir_save;
 static int pagedir_order __nosavedata = 0;
 
@@ -783,7 +783,7 @@ void suspend_power_down(void)
  * Magic happens here
  */
 
-static void do_magic_resume_1(void)
+void do_magic_resume_1(void)
 {
 	barrier();
 	mb();
@@ -795,7 +795,7 @@ static void do_magic_resume_1(void)
 			   driver scheduled DMA, we have good chance for DMA to finish ;-). */
 }
 
-static void do_magic_resume_2(void)
+void do_magic_resume_2(void)
 {
 	if (nr_copy_pages_check != nr_copy_pages)
 		panic("nr_copy_pages changed?!");
@@ -817,14 +817,14 @@ static void do_magic_resume_2(void)
 #endif
 }
 
-static void do_magic_suspend_1(void)
+void do_magic_suspend_1(void)
 {
 	mb();
 	barrier();
 	spin_lock_irq(&suspend_pagedir_lock);
 }
 
-static void do_magic_suspend_2(void)
+void do_magic_suspend_2(void)
 {
 	read_swapfiles();
 	if (!suspend_save_image())
