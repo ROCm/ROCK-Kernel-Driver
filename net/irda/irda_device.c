@@ -111,7 +111,7 @@ int __init irda_device_init( void)
 
 void __exit irda_device_cleanup(void)
 {
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	hashbin_delete(tasks, (FREE_FUNC) __irda_task_delete);
 	hashbin_delete(dongles, NULL);
@@ -127,7 +127,7 @@ void irda_device_set_media_busy(struct net_device *dev, int status)
 {
 	struct irlap_cb *self;
 
-	IRDA_DEBUG(4, __FUNCTION__ "(%s)\n", status ? "TRUE" : "FALSE");
+	IRDA_DEBUG(4, "%s(%s)\n", __FUNCTION__, status ? "TRUE" : "FALSE");
 
 	self = (struct irlap_cb *) dev->atalk_ptr;
 
@@ -152,7 +152,7 @@ int irda_device_set_dtr_rts(struct net_device *dev, int dtr, int rts)
 	struct if_irda_req req;
 	int ret;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	if (!dev->do_ioctl) {
 		ERROR("%s: do_ioctl not impl. by device driver\n",
@@ -173,7 +173,7 @@ int irda_device_change_speed(struct net_device *dev, __u32 speed)
 	struct if_irda_req req;
 	int ret;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	if (!dev->do_ioctl) {
 		ERROR("%s: do_ioctl not impl. by device driver\n",
@@ -199,7 +199,7 @@ int irda_device_is_receiving(struct net_device *dev)
 	struct if_irda_req req;
 	int ret;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	if (!dev->do_ioctl) {
 		ERROR("%s: do_ioctl not impl. by device driver\n",
@@ -216,7 +216,7 @@ int irda_device_is_receiving(struct net_device *dev)
 
 void irda_task_next_state(struct irda_task *task, IRDA_TASK_STATE state)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "(), state = %s\n", task_state[state]);
+	IRDA_DEBUG(2, "%s(), state = %s\n", __FUNCTION__, task_state[state]);
 
 	task->state = state;
 }
@@ -250,7 +250,7 @@ int irda_task_kick(struct irda_task *task)
 	int count = 0;
 	int timeout;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	ASSERT(task != NULL, return -1;);
 	ASSERT(task->magic == IRDA_TASK_MAGIC, return -1;);
@@ -298,8 +298,8 @@ int irda_task_kick(struct irda_task *task)
 				 irda_task_timer_expired);
 		finished = FALSE;
 	} else {
-		IRDA_DEBUG(0, __FUNCTION__
-			   "(), not finished, and no timeout!\n");
+		IRDA_DEBUG(0, "%s(), not finished, and no timeout!\n",
+			   __FUNCTION__);
 		finished = FALSE;
 	}
 
@@ -328,7 +328,7 @@ struct irda_task *irda_task_execute(void *instance,
 	struct irda_task *task;
 	int ret;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	task = kmalloc(sizeof(struct irda_task), GFP_ATOMIC);
 	if (!task)
@@ -365,7 +365,7 @@ static void irda_task_timer_expired(void *data)
 {
 	struct irda_task *task;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	task = (struct irda_task *) data;
 
@@ -517,7 +517,7 @@ int irda_device_set_mode(struct net_device* dev, int mode)
 	struct if_irda_req req;
 	int ret;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__);
 
 	if (!dev->do_ioctl) {
 		ERROR("%s: set_raw_mode not impl. by device driver\n",

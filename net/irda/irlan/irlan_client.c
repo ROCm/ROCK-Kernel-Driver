@@ -71,7 +71,7 @@ static void irlan_client_kick_timer_expired(void *data)
 {
 	struct irlan_cb *self = (struct irlan_cb *) data;
 	
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -90,7 +90,7 @@ static void irlan_client_kick_timer_expired(void *data)
 
 void irlan_client_start_kick_timer(struct irlan_cb *self, int timeout)
 {
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
 	irda_start_timer(&self->client.kick_timer, timeout, (void *) self, 
 			 irlan_client_kick_timer_expired);
@@ -104,7 +104,7 @@ void irlan_client_start_kick_timer(struct irlan_cb *self, int timeout)
  */
 void irlan_client_wakeup(struct irlan_cb *self, __u32 saddr, __u32 daddr)
 {
-	IRDA_DEBUG(1, __FUNCTION__ "()\n");
+	IRDA_DEBUG(1, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -116,7 +116,7 @@ void irlan_client_wakeup(struct irlan_cb *self, __u32 saddr, __u32 daddr)
 	if ((self->client.state != IRLAN_IDLE) || 
 	    (self->provider.access_type == ACCESS_DIRECT))
 	{
-			IRDA_DEBUG(0, __FUNCTION__ "(), already awake!\n");
+			IRDA_DEBUG(0, "%s(), already awake!\n", __FUNCTION__ );
 			return;
 	}
 
@@ -125,7 +125,7 @@ void irlan_client_wakeup(struct irlan_cb *self, __u32 saddr, __u32 daddr)
 	self->daddr = daddr;
 
 	if (self->disconnect_reason == LM_USER_REQUEST) {
-			IRDA_DEBUG(0, __FUNCTION__ "(), still stopped by user\n");
+			IRDA_DEBUG(0, "%s(), still stopped by user\n", __FUNCTION__ );
 			return;
 	}
 
@@ -152,7 +152,7 @@ void irlan_client_discovery_indication(discovery_t *discovery,
 	struct irlan_cb *self;
 	__u32 saddr, daddr;
 	
-	IRDA_DEBUG(1, __FUNCTION__"()\n");
+	IRDA_DEBUG(1, "%s()\n", __FUNCTION__ );
 
 	ASSERT(irlan != NULL, return;);
 	ASSERT(discovery != NULL, return;);
@@ -174,7 +174,7 @@ void irlan_client_discovery_indication(discovery_t *discovery,
 	if (self) {
 		ASSERT(self->magic == IRLAN_MAGIC, return;);
 
-		IRDA_DEBUG(1, __FUNCTION__ "(), Found instance (%08x)!\n",
+		IRDA_DEBUG(1, "%s(), Found instance (%08x)!\n", __FUNCTION__ ,
 		      daddr);
 		
 		irlan_client_wakeup(self, saddr, daddr);
@@ -192,7 +192,7 @@ static int irlan_client_ctrl_data_indication(void *instance, void *sap,
 {
 	struct irlan_cb *self;
 	
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 	
 	self = (struct irlan_cb *) instance;
 	
@@ -203,7 +203,7 @@ static int irlan_client_ctrl_data_indication(void *instance, void *sap,
 	irlan_do_client_event(self, IRLAN_DATA_INDICATION, skb); 
 
 	/* Ready for a new command */	
-	IRDA_DEBUG(2, __FUNCTION__ "(), clearing tx_busy\n");
+	IRDA_DEBUG(2, "%s(), clearing tx_busy\n", __FUNCTION__ );
 	self->client.tx_busy = FALSE;
 
 	/* Check if we have some queued commands waiting to be sent */
@@ -220,7 +220,7 @@ static void irlan_client_ctrl_disconnect_indication(void *instance, void *sap,
 	struct tsap_cb *tsap;
 	struct sk_buff *skb;
 
-	IRDA_DEBUG(4, __FUNCTION__ "(), reason=%d\n", reason);
+	IRDA_DEBUG(4, "%s(), reason=%d\n", __FUNCTION__ , reason);
 	
 	self = (struct irlan_cb *) instance;
 	tsap = (struct tsap_cb *) sap;
@@ -252,7 +252,7 @@ void irlan_client_open_ctrl_tsap(struct irlan_cb *self)
 	struct tsap_cb *tsap;
 	notify_t notify;
 
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -272,7 +272,7 @@ void irlan_client_open_ctrl_tsap(struct irlan_cb *self)
 	
 	tsap = irttp_open_tsap(LSAP_ANY, DEFAULT_INITIAL_CREDIT, &notify);
 	if (!tsap) {
-		IRDA_DEBUG(2, __FUNCTION__ "(), Got no tsap!\n");
+		IRDA_DEBUG(2, "%s(), Got no tsap!\n", __FUNCTION__ );
 		return;
 	}
 	self->client.tsap_ctrl = tsap;
@@ -292,7 +292,7 @@ static void irlan_client_ctrl_connect_confirm(void *instance, void *sap,
 {
 	struct irlan_cb *self;
 
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	self = (struct irlan_cb *) instance;
 
@@ -318,7 +318,7 @@ void irlan_client_reconnect_data_channel(struct irlan_cb *self)
 	struct sk_buff *skb;
 	__u8 *frame;
 		
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -361,7 +361,7 @@ void irlan_client_parse_response(struct irlan_cb *self, struct sk_buff *skb)
 
 	ASSERT(skb != NULL, return;);	
 	
-	IRDA_DEBUG(4, __FUNCTION__ "() skb->len=%d\n", (int) skb->len);
+	IRDA_DEBUG(4, "%s() skb->len=%d\n", __FUNCTION__ , (int) skb->len);
 	
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -392,7 +392,7 @@ void irlan_client_parse_response(struct irlan_cb *self, struct sk_buff *skb)
 	/* How many parameters? */
 	count = frame[1];
 
-	IRDA_DEBUG(4, __FUNCTION__ "(), got %d parameters\n", count);
+	IRDA_DEBUG(4, "%s(), got %d parameters\n", __FUNCTION__ , count);
 	
 	ptr = frame+2;
 
@@ -400,7 +400,7 @@ void irlan_client_parse_response(struct irlan_cb *self, struct sk_buff *skb)
  	for (i=0; i<count;i++) {
 		ret = irlan_extract_param(ptr, name, value, &val_len);
 		if (ret < 0) {
-			IRDA_DEBUG(2, __FUNCTION__ "(), IrLAN, Error!\n");
+			IRDA_DEBUG(2, "%s(), IrLAN, Error!\n", __FUNCTION__ );
 			break;
 		}
 		ptr += ret;
@@ -424,7 +424,7 @@ static void irlan_check_response_param(struct irlan_cb *self, char *param,
 	__u8 *bytes;
 	int i;
 
-	IRDA_DEBUG(4, __FUNCTION__ "(), parm=%s\n", param);
+	IRDA_DEBUG(4, "%s(), parm=%s\n", __FUNCTION__ , param);
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
@@ -462,7 +462,7 @@ static void irlan_check_response_param(struct irlan_cb *self, char *param,
 		else if (strcmp(value, "HOSTED") == 0)
 			self->client.access_type = ACCESS_HOSTED;
 		else {
-			IRDA_DEBUG(2, __FUNCTION__ "(), unknown access type!\n");
+			IRDA_DEBUG(2, "%s(), unknown access type!\n", __FUNCTION__ );
 		}
 	}
 	/* IRLAN version */
@@ -484,14 +484,14 @@ static void irlan_check_response_param(struct irlan_cb *self, char *param,
 		memcpy(&tmp_cpu, value, 2); /* Align value */
 		le16_to_cpus(&tmp_cpu);     /* Convert to host order */
 		self->client.recv_arb_val = tmp_cpu;
-		IRDA_DEBUG(2, __FUNCTION__ "(), receive arb val=%d\n", 
+		IRDA_DEBUG(2, "%s(), receive arb val=%d\n", __FUNCTION__ , 
 			   self->client.recv_arb_val);
 	}
 	if (strcmp(param, "MAX_FRAME") == 0) {
 		memcpy(&tmp_cpu, value, 2); /* Align value */
 		le16_to_cpus(&tmp_cpu);     /* Convert to host order */
 		self->client.max_frame = tmp_cpu;
-		IRDA_DEBUG(4, __FUNCTION__ "(), max frame=%d\n", 
+		IRDA_DEBUG(4, "%s(), max frame=%d\n", __FUNCTION__ , 
 			   self->client.max_frame);
 	}
 	 
@@ -526,7 +526,7 @@ void irlan_client_get_value_confirm(int result, __u16 obj_id,
 {
 	struct irlan_cb *self;
 	
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
 	ASSERT(priv != NULL, return;);
 
@@ -539,7 +539,7 @@ void irlan_client_get_value_confirm(int result, __u16 obj_id,
 
 	/* Check if request succeeded */
 	if (result != IAS_SUCCESS) {
-		IRDA_DEBUG(2, __FUNCTION__ "(), got NULL value!\n");
+		IRDA_DEBUG(2, "%s(), got NULL value!\n", __FUNCTION__ );
 		irlan_do_client_event(self, IRLAN_IAS_PROVIDER_NOT_AVAIL, 
 				      NULL);
 		return;
@@ -557,7 +557,7 @@ void irlan_client_get_value_confirm(int result, __u16 obj_id,
 		irias_delete_value(value);
 		break;
 	default:
-		IRDA_DEBUG(2, __FUNCTION__ "(), unknown type!\n");
+		IRDA_DEBUG(2, "%s(), unknown type!\n", __FUNCTION__ );
 		break;
 	}
 	irlan_do_client_event(self, IRLAN_IAS_PROVIDER_NOT_AVAIL, NULL);

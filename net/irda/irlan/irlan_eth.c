@@ -50,7 +50,7 @@ int irlan_eth_init(struct net_device *dev)
 {
 	struct irlan_cb *self;
 
-	IRDA_DEBUG(2, __FUNCTION__"()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(dev != NULL, return -1;);
        
@@ -107,7 +107,7 @@ int irlan_eth_open(struct net_device *dev)
 {
 	struct irlan_cb *self;
 	
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(dev != NULL, return -1;);
 
@@ -143,7 +143,7 @@ int irlan_eth_close(struct net_device *dev)
 	struct irlan_cb *self = (struct irlan_cb *) dev->priv;
 	struct sk_buff *skb;
 	
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 	
 	/* Stop device */
 	netif_stop_queue(dev);
@@ -356,14 +356,14 @@ void irlan_eth_set_multicast_list(struct net_device *dev)
 
  	self = dev->priv; 
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
  	ASSERT(self != NULL, return;); 
  	ASSERT(self->magic == IRLAN_MAGIC, return;);
 
 	/* Check if data channel has been connected yet */
 	if (self->client.state != IRLAN_DATA) {
-		IRDA_DEBUG(1, __FUNCTION__ "(), delaying!\n");
+		IRDA_DEBUG(1, "%s(), delaying!\n", __FUNCTION__ );
 		return;
 	}
 
@@ -373,20 +373,20 @@ void irlan_eth_set_multicast_list(struct net_device *dev)
 	} 
 	else if ((dev->flags & IFF_ALLMULTI) || dev->mc_count > HW_MAX_ADDRS) {
 		/* Disable promiscuous mode, use normal mode. */
-		IRDA_DEBUG(4, __FUNCTION__ "(), Setting multicast filter\n");
+		IRDA_DEBUG(4, "%s(), Setting multicast filter\n", __FUNCTION__ );
 		/* hardware_set_filter(NULL); */
 
 		irlan_set_multicast_filter(self, TRUE);
 	}
 	else if (dev->mc_count) {
-		IRDA_DEBUG(4, __FUNCTION__ "(), Setting multicast filter\n");
+		IRDA_DEBUG(4, "%s(), Setting multicast filter\n", __FUNCTION__ );
 		/* Walk the address list, and load the filter */
 		/* hardware_set_filter(dev->mc_list); */
 
 		irlan_set_multicast_filter(self, TRUE);
 	}
 	else {
-		IRDA_DEBUG(4, __FUNCTION__ "(), Clearing multicast filter\n");
+		IRDA_DEBUG(4, "%s(), Clearing multicast filter\n", __FUNCTION__ );
 		irlan_set_multicast_filter(self, FALSE);
 	}
 

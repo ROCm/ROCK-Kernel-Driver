@@ -108,7 +108,7 @@ void irlmp_add_discovery_log(hashbin_t *cachelog, hashbin_t *log)
 {
 	discovery_t *discovery;
 
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	/*
 	 *  If log is missing this means that IrLAP was unable to perform the
@@ -150,7 +150,7 @@ void irlmp_expire_discoveries(hashbin_t *log, __u32 saddr, int force)
 	discovery_t *discovery, *curr;
 	unsigned long flags;
 
-	IRDA_DEBUG(4, __FUNCTION__ "()\n");
+	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	spin_lock_irqsave(&log->hb_spinlock, flags);
 

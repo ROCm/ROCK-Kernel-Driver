@@ -326,29 +326,29 @@
  * compiler will optimise away the if() in all cases.
  */
 /* All error messages (will show up in the normal logs) */
-#define DERROR(dbg, args...) \
+#define DERROR(dbg, format, args...) \
 	{if(DEBUG_##dbg) \
-		printk(KERN_INFO "irnet: " __FUNCTION__ "(): " args);}
+		printk(KERN_INFO "irnet: %s(): " format, __FUNCTION__ , ##args);}
 
 /* Normal debug message (will show up in /var/log/debug) */
-#define DEBUG(dbg, args...) \
+#define DEBUG(dbg, format, args...) \
 	{if(DEBUG_##dbg) \
-		printk(KERN_DEBUG "irnet: " __FUNCTION__ "(): " args);}
+		printk(KERN_DEBUG "irnet: %s(): " format, __FUNCTION__ , ##args);}
 
 /* Entering a function (trace) */
-#define DENTER(dbg, args...) \
+#define DENTER(dbg, format, args...) \
 	{if(DEBUG_##dbg) \
-		printk(KERN_DEBUG "irnet: ->" __FUNCTION__ args);}
+		printk(KERN_DEBUG "irnet: -> %s" format, __FUNCTION__ , ##args);}
 
 /* Entering and exiting a function in one go (trace) */
-#define DPASS(dbg, args...) \
+#define DPASS(dbg, format, args...) \
 	{if(DEBUG_##dbg) \
-		printk(KERN_DEBUG "irnet: <>" __FUNCTION__ args);}
+		printk(KERN_DEBUG "irnet: <>%s" format, __FUNCTION__ , ##args);}
 
 /* Exiting a function (trace) */
-#define DEXIT(dbg, args...) \
+#define DEXIT(dbg, format, args...) \
 	{if(DEBUG_##dbg) \
-		printk(KERN_DEBUG "irnet: <-" __FUNCTION__ "()" args);}
+		printk(KERN_DEBUG "irnet: <-%s()" format, __FUNCTION__ , ##args);}
 
 /* Exit a function with debug */
 #define DRETURN(ret, dbg, args...) \
@@ -434,7 +434,7 @@ typedef struct irnet_socket
 
   /* ------------------- IrLMP and IrIAS part ------------------- */
   /* Used for IrDA Discovery and socket name resolution */
-  __u32			ckey;		/* IrLMP client handle */
+  void *		ckey;		/* IrLMP client handle */
   __u16			mask;		/* Hint bits mask (filter discov.)*/
   int			nslots;		/* Number of slots for discovery */
 
