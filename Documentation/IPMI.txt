@@ -5,6 +5,18 @@
 			  <minyard@mvista.com>
 			    <minyard@acm.org>
 
+The Intelligent Platform Management Interface, or IPMI, is a
+standard for controlling intelligent devices that monitor a system.
+It provides for dynamic discovery of sensors in the system and the
+ability to monitor the sensors and be informed when the sensor's
+values change or go outside certain boundaries.  It also has a
+standardized database for field-replacable units (FRUs) and a watchdog
+timer.
+
+To use this, you need an interface to an IPMI controller in your
+system (called a Baseboard Management Controller, or BMC) and
+management software that can use the IPMI system.
+
 This document describes how to use the IPMI driver for Linux.  If you
 are not familiar with IPMI itself, see the web site at
 http://www.intel.com/design/servers/ipmi/index.htm.  IPMI is a big
