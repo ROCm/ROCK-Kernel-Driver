@@ -589,7 +589,7 @@ done:
  */
 static void
 refill_inactive_zone(struct zone *zone, const int nr_pages_in,
-			struct page_state *ps, int priority)
+			struct page_state *ps)
 {
 	int pgmoved;
 	int pgdeactivate = 0;
@@ -749,7 +749,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
  */
 static int
 shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
-	const int nr_pages, int *nr_mapped, struct page_state *ps, int priority)
+	const int nr_pages, int *nr_mapped, struct page_state *ps)
 {
 	unsigned long ratio;
 
@@ -779,7 +779,7 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
 		if (count > SWAP_CLUSTER_MAX * 4)
 			count = SWAP_CLUSTER_MAX * 4;
 		atomic_set(&zone->refill_counter, 0);
-		refill_inactive_zone(zone, count, ps, priority);
+		refill_inactive_zone(zone, count, ps);
 	}
 	return shrink_cache(nr_pages, zone, gfp_mask,
 				max_scan, nr_mapped);
@@ -828,7 +828,7 @@ shrink_caches(struct zone **zones, int priority, int *total_scanned,
 		if (max_scan < to_reclaim * 2)
 			max_scan = to_reclaim * 2;
 		ret += shrink_zone(zone, max_scan, gfp_mask,
-				to_reclaim, &nr_mapped, ps, priority);
+				to_reclaim, &nr_mapped, ps);
 		*total_scanned += max_scan + nr_mapped;
 		if (ret >= nr_pages)
 			break;
@@ -966,7 +966,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 			if (max_scan < SWAP_CLUSTER_MAX)
 				max_scan = SWAP_CLUSTER_MAX;
 			to_free -= shrink_zone(zone, max_scan, GFP_KERNEL,
-					to_reclaim, &nr_mapped, ps, priority);
+					to_reclaim, &nr_mapped, ps);
 			if (i < ZONE_HIGHMEM) {
 				reclaim_state->reclaimed_slab = 0;
 				shrink_slab(max_scan + nr_mapped, GFP_KERNEL);
