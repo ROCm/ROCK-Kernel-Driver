@@ -31,7 +31,7 @@ asmlinkage long compat_sys_keyctl(u32 option,
 		return keyctl_get_keyring_ID(arg2, arg3);
 
 	case KEYCTL_JOIN_SESSION_KEYRING:
-		return keyctl_join_session_keyring(compat_ptr(arg3));
+		return keyctl_join_session_keyring(compat_ptr(arg2));
 
 	case KEYCTL_UPDATE:
 		return keyctl_update_key(arg2, compat_ptr(arg3), arg4);
