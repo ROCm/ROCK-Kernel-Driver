@@ -533,15 +533,6 @@ int __init pnpbios_init(void)
 {
 	int ret;
 
-	/* Don't use pnpbios if ACPI is enabled */
-#ifdef CONFIG_ACPI
-	if (!acpi_disabled) {
-		pnpbios_disabled = 1;
-		printk(KERN_INFO "PnPBIOS: Disabled by ACPI\n");
-		return -ENODEV;
-	}
-#endif
-
 	if (pnpbios_disabled || dmi_check_system(pnpbios_dmi_table)) {
 		printk(KERN_INFO "PnPBIOS: Disabled\n");
 		return -ENODEV;
