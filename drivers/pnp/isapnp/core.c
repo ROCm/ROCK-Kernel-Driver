@@ -99,6 +99,7 @@ MODULE_LICENSE("GPL");
 static unsigned char isapnp_checksum_value;
 static DECLARE_MUTEX(isapnp_cfg_mutex);
 static int isapnp_detected;
+static int isapnp_csn_count;
 
 /* some prototypes */
 
@@ -371,11 +372,14 @@ static int __init isapnp_isolate(void)
 			break;
 		}
 	      __next:
+		if (csn == 255)
+			break;
 		checksum = 0x6a;
 		chksum = 0x00;
 		bit = 0x00;
 	}
 	isapnp_wait();
+	isapnp_csn_count = csn;
 	return csn;
 }
 
@@ -880,7 +884,7 @@ static int __init isapnp_build_device_list(void)
 
 	isapnp_wait();
 	isapnp_key();
-	for (csn = 1; csn <= 10; csn++) {
+	for (csn = 1; csn <= isapnp_csn_count; csn++) {
 		isapnp_wake(csn);
 		isapnp_peek(header, 9);
 		checksum = isapnp_checksum(header);
@@ -890,12 +894,6 @@ static int __init isapnp_build_device_list(void)
 			header[4], header[5], header[6], header[7], header[8]);
 		printk(KERN_DEBUG "checksum = 0x%x\n", checksum);
 #endif
-		/* Don't be strict on the checksum, here !
-                   e.g. 'SCM SwapBox Plug and Play' has header[8]==0 (should be: b7)*/
-		if (header[8] == 0)
-			;
-		else if (checksum == 0x00 || checksum != header[8])	/* not valid CSN */
-			continue;
 		if ((card = isapnp_alloc(sizeof(struct pnp_card))) == NULL)
 			continue;
 
@@ -932,7 +930,7 @@ int isapnp_present(void)
 
 int isapnp_cfg_begin(int csn, int logdev)
 {
-	if (csn < 1 || csn > 10 || logdev > 10)
+	if (csn < 1 || csn > isapnp_csn_count || logdev > 10)
 		return -EINVAL;
 	MOD_INC_USE_COUNT;
 	down(&isapnp_cfg_mutex);
