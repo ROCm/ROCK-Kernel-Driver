@@ -1,8 +1,8 @@
 /**
  * attrib.c - NTFS attribute operations. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (C) 2002 Richard Russon.
+ * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1180,12 +1180,15 @@ BOOL find_attr(const ATTR_TYPES type, const uchar_t *name, const u32 name_len,
 			return TRUE;
 		/* @val is present; compare values. */
 		else {
+			u32 vl;
 			register int rc;
-			
+
+			vl = le32_to_cpu(a->_ARA(value_length));
+			if (vl > val_len)
+				vl = val_len;
+
 			rc = memcmp(val, (u8*)a + le16_to_cpu(
-					a->_ARA(value_offset)), 
-				    	min_t(const u32, val_len,
-					le32_to_cpu(a->_ARA(value_length))));
+					a->_ARA(value_offset)), vl);
 			/*
 			 * If @val collates before the current attribute's
 			 * value, there is no matching attribute.
