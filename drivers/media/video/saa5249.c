@@ -579,7 +579,7 @@ static int do_saa5249_ioctl(struct inode *inode, struct file *file,
 		case VTXIOCSETVIRT: 
 		{
 			/* The SAA5249 has virtual-row reception turned on always */
-			t->virtual_mode = (int)arg;
+			t->virtual_mode = (int)(long)arg;
 			return 0;
 		}
 	}

@@ -2948,16 +2948,16 @@ static void bttv_print_irqbits(u32 print, u32 mark)
 static void bttv_print_riscaddr(struct bttv *btv)
 {
 	printk("  main: %08Lx\n",
-	       (u64)btv->main.dma);
+	       (unsigned long long)btv->main.dma);
 	printk("  vbi : o=%08Lx e=%08Lx\n",
-	       btv->vcurr ? (u64)btv->vcurr->top.dma : 0,
-	       btv->vcurr ? (u64)btv->vcurr->bottom.dma : 0);
+	       btv->vcurr ? (unsigned long long)btv->vcurr->top.dma : 0,
+	       btv->vcurr ? (unsigned long long)btv->vcurr->bottom.dma : 0);
 	printk("  cap : o=%08Lx e=%08Lx\n",
-	       btv->top    ? (u64)btv->top->top.dma : 0,
-	       btv->bottom ? (u64)btv->bottom->bottom.dma : 0);
+	       btv->top    ? (unsigned long long)btv->top->top.dma : 0,
+	       btv->bottom ? (unsigned long long)btv->bottom->bottom.dma : 0);
 	printk("  scr : o=%08Lx e=%08Lx\n",
-	       btv->screen ? (u64)btv->screen->top.dma  : 0,
-	       btv->screen ? (u64)btv->screen->bottom.dma : 0);
+	       btv->screen ? (unsigned long long)btv->screen->top.dma  : 0,
+	       btv->screen ? (unsigned long long)btv->screen->bottom.dma : 0);
 }
 
 static void bttv_irq_timeout(unsigned long data)

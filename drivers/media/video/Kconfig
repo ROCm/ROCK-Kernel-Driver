@@ -35,7 +35,7 @@ config VIDEO_BT848
 
 config VIDEO_PMS
 	tristate "Mediavision Pro Movie Studio Video For Linux"
-	depends on VIDEO_DEV
+	depends on VIDEO_DEV && ISA
 	help
 	  Say Y if you have such a thing.  This driver is also available as a
 	  module called pms ( = code which can be inserted in and removed

@@ -7,7 +7,6 @@
 #include <linux/config.h>
 #include <asm/thread_info.h>
 
-#ifndef CONFIG_DEBUG_SPINLOCK
 	.text
 	.align	64
 
@@ -76,5 +75,3 @@ spin_on_lock:
 	ba,pt	%xcc, to_zero
 	 nop
 	nop
-
-#endif /* !(CONFIG_DEBUG_SPINLOCK) */
