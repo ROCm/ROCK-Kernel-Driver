@@ -74,7 +74,12 @@ static
 int i2c_writebytes (struct dvb_frontend *fe, u8 addr, u8 *buf, u8 len)
 {
 	struct dvb_i2c_bus *i2c = fe->i2c;
-	struct i2c_msg msg = { addr: addr, flags: 0, buf: buf, len: len };
+	struct i2c_msg msg = {
+		.addr	= addr,
+		.flags	= 0,
+		.buf	= buf,
+		.len	= len
+	};
 	int err;
 
 	LOG("i2c_writebytes", msg.addr, msg.buf, msg.len);
@@ -645,7 +650,12 @@ int sp887x_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 static
 int sp887x_attach (struct dvb_i2c_bus *i2c, void **data)
 {
-	struct i2c_msg msg = { addr: 0x70, flags: 0, buf: NULL, len: 0 };
+	struct i2c_msg msg = {
+		.addr	= 0x70,
+		.flags	= 0,
+		.buf	= NULL,
+		.len	= 0
+	};
 
 	dprintk ("%s\n", __FUNCTION__);
 
