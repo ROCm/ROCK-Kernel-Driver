@@ -23,10 +23,10 @@
 
 #define NTLMSSP_SIGNATURE "NTLMSSP"
 /* Message Types */
-#define NtLmNegotiate     1
-#define NtLmChallenge     2
-#define NtLmAuthenticate  3
-#define UnknownMessage    8
+#define NtLmNegotiate     cpu_to_le32(1)
+#define NtLmChallenge     cpu_to_le32(2)
+#define NtLmAuthenticate  cpu_to_le32(3)
+#define UnknownMessage    cpu_to_le32(8)
 
 /* Negotiate Flags */
 #define NTLMSSP_NEGOTIATE_UNICODE       0x01	// Text strings are in unicode

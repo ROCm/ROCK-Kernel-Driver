@@ -1634,6 +1634,7 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	} else if ((smb_buffer_response->WordCount == 3)
 		   || (smb_buffer_response->WordCount == 4)) {
 		__u16 action = le16_to_cpu(pSMBr->resp.Action);
+		__u16 blob_len = le16_to_cpu(pSMBr->resp.SecurityBlobLength);
 		if (action & GUEST_LOGIN)
 			cFYI(1, (" Guest login"));	/* do we want to mark SesInfo struct ? */
 		ses->Suid = smb_buffer_response->Uid;	/* UID left in wire format (le) */
@@ -1642,11 +1643,9 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 		bcc_ptr = pByteArea(smb_buffer_response);	
 		if ((pSMBr->resp.hdr.WordCount == 3)
 		    || ((pSMBr->resp.hdr.WordCount == 4)
-			&& (pSMBr->resp.SecurityBlobLength <
-			    pSMBr->resp.ByteCount))) {
+			&& (blob_len < pSMBr->resp.ByteCount))) {
 			if (pSMBr->resp.hdr.WordCount == 4)
-				bcc_ptr +=
-				    pSMBr->resp.SecurityBlobLength;
+				bcc_ptr += blob_len;
 
 			if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
 				if ((long) (bcc_ptr) % 2) {
@@ -2201,16 +2200,16 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 				memcpy(ses->server->cryptKey,
 				       SecurityBlob2->Challenge,
 				       CIFS_CRYPTO_KEY_SIZE);
-				if(SecurityBlob2->NegotiateFlags & NTLMSSP_NEGOTIATE_NTLMV2)
+				if(SecurityBlob2->NegotiateFlags & cpu_to_le32(NTLMSSP_NEGOTIATE_NTLMV2))
 					*pNTLMv2_flag = TRUE;
 
 				if((SecurityBlob2->NegotiateFlags & 
-					NTLMSSP_NEGOTIATE_ALWAYS_SIGN) 
+					cpu_to_le32(NTLMSSP_NEGOTIATE_ALWAYS_SIGN)) 
 					|| (sign_CIFS_PDUs > 1))
 						ses->server->secMode |= 
 							SECMODE_SIGN_REQUIRED;	
 				if ((SecurityBlob2->NegotiateFlags & 
-					NTLMSSP_NEGOTIATE_SIGN) && (sign_CIFS_PDUs))
+					cpu_to_le32(NTLMSSP_NEGOTIATE_SIGN)) && (sign_CIFS_PDUs))
 						ses->server->secMode |= 
 							SECMODE_SIGN_ENABLED;
 

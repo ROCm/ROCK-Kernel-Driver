@@ -137,15 +137,15 @@
 /*
  * SMB flag2 definitions 
  */
-#define SMBFLG2_KNOWS_LONG_NAMES 0x0001	/* can send long (non-8.3) path names in response */
-#define SMBFLG2_KNOWS_EAS 0x0002
-#define SMBFLG2_SECURITY_SIGNATURE 0x0004
-#define SMBFLG2_IS_LONG_NAME 0x0040
-#define SMBFLG2_EXT_SEC 0x0800
-#define SMBFLG2_DFS 0x1000
-#define SMBFLG2_PAGING_IO 0x2000
-#define SMBFLG2_ERR_STATUS 0x4000
-#define SMBFLG2_UNICODE 0x8000
+#define SMBFLG2_KNOWS_LONG_NAMES cpu_to_le16(1)	/* can send long (non-8.3) path names in response */
+#define SMBFLG2_KNOWS_EAS cpu_to_le16(2)
+#define SMBFLG2_SECURITY_SIGNATURE cpu_to_le16(4)
+#define SMBFLG2_IS_LONG_NAME cpu_to_le16(0x40)
+#define SMBFLG2_EXT_SEC cpu_to_le16(0x80)
+#define SMBFLG2_DFS cpu_to_le16(0x1000)
+#define SMBFLG2_PAGING_IO cpu_to_le16(0x2000)
+#define SMBFLG2_ERR_STATUS cpu_to_le16(0x4000)
+#define SMBFLG2_UNICODE cpu_to_le16(0x8000)
 
 /*
  * These are the file access permission bits defined in CIFS for the
@@ -308,7 +308,7 @@ struct smb_hdr {
 		__le32 CifsError;
 	} Status;
 	__u8 Flags;
-	__u16 Flags2;		/* note: le */
+	__le16 Flags2;		/* note: le */
 	__le16 PidHigh;
 	union {
 		struct {

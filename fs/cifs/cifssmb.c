@@ -811,7 +811,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 		pSMB->Timeout = 0;
 	} else if (waitFlag == TRUE) {
 		timeout = 3;  /* blocking operation, no timeout */
-		pSMB->Timeout = -1; /* blocking - do not time out */
+		pSMB->Timeout = cpu_to_le32(-1);/* blocking - do not time out */
 	} else {
 		pSMB->Timeout = 0;
 	}
@@ -2485,12 +2485,6 @@ QFSUnixRetry:
 			    (FILE_SYSTEM_UNIX_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
 				 data_offset);
-			response_data->MajorVersionNumber =
-				le16_to_cpu(response_data->MajorVersionNumber);
-			response_data->MinorVersionNumber =
-				le16_to_cpu(response_data->MinorVersionNumber);
-			response_data->Capability =
-				le64_to_cpu(response_data->Capability);
 			memcpy(&tcon->fsUnixInfo, response_data,
 			       sizeof (FILE_SYSTEM_UNIX_INFO));
 		}

@@ -61,7 +61,7 @@ int cifs_sign_smb(struct smb_hdr * cifs_pdu, struct cifsSesInfo * ses,
 	if((cifs_pdu == NULL) || (ses == NULL))
 		return -EINVAL;
 
-	if((le32_to_cpu(cifs_pdu->Flags2) & SMBFLG2_SECURITY_SIGNATURE) == 0) 
+	if((cifs_pdu->Flags2 & SMBFLG2_SECURITY_SIGNATURE) == 0) 
 		return rc;
 
 	spin_lock(&GlobalMid_Lock);

@@ -123,11 +123,12 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 	int i = 0;
 	struct msghdr smb_msg;
 	struct kvec iov;
+	unsigned len = smb_buf_length + 4;
 
 	if(ssocket == NULL)
 		return -ENOTSOCK; /* BB eventually add reconnect code here */
 	iov.iov_base = smb_buffer;
-	iov.iov_len = smb_buf_length + 4;
+	iov.iov_len = len;
 
 	smb_msg.msg_name = sin;
 	smb_msg.msg_namelen = sizeof (struct sockaddr);
@@ -142,10 +143,10 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 
 	smb_buffer->smb_buf_length = cpu_to_be32(smb_buffer->smb_buf_length);
 	cFYI(1, ("Sending smb of length %d ", smb_buf_length));
-	dump_smb(smb_buffer, smb_buf_length + 4);
+	dump_smb(smb_buffer, len);
 
-	while(iov.iov_len > 0) {
-		rc = kernel_sendmsg(ssocket, &smb_msg, &iov, 1, smb_buf_length + 4);
+	while (len > 0) {
+		rc = kernel_sendmsg(ssocket, &smb_msg, &iov, 1, len);
 		if ((rc == -ENOSPC) || (rc == -EAGAIN)) {
 			i++;
 			if(i > 60) {
@@ -163,6 +164,7 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 			break;
 		iov.iov_base += rc;
 		iov.iov_len -= rc;
+		len -= rc;
 	}
 
 	if (rc < 0) {
@@ -272,9 +274,6 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		return -EIO;
 	}
 
-	if (in_buf->smb_buf_length > 12)
-		in_buf->Flags2 = cpu_to_le16(in_buf->Flags2);
-	
 	rc = cifs_sign_smb(in_buf, ses, &midQ->sequence_number);
 
 	midQ->midState = MID_REQUEST_SUBMITTED;
@@ -329,7 +328,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	spin_lock(&GlobalMid_Lock);
 	if (midQ->resp_buf) {
 		spin_unlock(&GlobalMid_Lock);
-		receive_len = be32_to_cpu(midQ->resp_buf->smb_buf_length);
+		receive_len = be32_to_cpu(*(__be32 *)midQ->resp_buf);
 	} else {
 		cERROR(1,("No response buffer"));
 		if(midQ->midState == MID_REQUEST_SUBMITTED) {
@@ -368,23 +367,19 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 
 		if (midQ->resp_buf && out_buf
 		    && (midQ->midState == MID_RESPONSE_RECEIVED)) {
-			memcpy(out_buf, midQ->resp_buf,
-			       receive_len +
-			       4 /* include 4 byte RFC1001 header */ );
+			out_buf->smb_buf_length = receive_len;
+			memcpy((char *)out_buf + 4,
+			       (char *)midQ->resp_buf + 4,
+			       receive_len);
 
 			dump_smb(out_buf, 92);
 			/* convert the length into a more usable form */
-			out_buf->smb_buf_length =
-			    be32_to_cpu(out_buf->smb_buf_length);
-			if((out_buf->smb_buf_length > 24) &&
+			if((receive_len > 24) &&
 			   (ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))) {
 				rc = cifs_verify_signature(out_buf, ses->mac_signing_key,midQ->sequence_number); /* BB fix BB */
 				if(rc)
 					cFYI(1,("Unexpected signature received from server"));
 			}
-
-			if (out_buf->smb_buf_length > 12)
-				out_buf->Flags2 = le16_to_cpu(out_buf->Flags2);
 
 			*pbytes_returned = out_buf->smb_buf_length;
 

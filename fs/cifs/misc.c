@@ -289,7 +289,7 @@ checkSMBhdr(struct smb_hdr *smb, __u16 mid)
 {
 	/* Make sure that this really is an SMB, that it is a response, 
 	   and that the message ids match */
-	if ((*(unsigned int *) smb->Protocol == cpu_to_le32(0x424d53ff)) && 
+	if ((*(__le32 *) smb->Protocol == cpu_to_le32(0x424d53ff)) && 
 		(mid == smb->Mid)) {    
 		if(smb->Flags & SMBFLG_RESPONSE)
 			return 0;                    
@@ -301,7 +301,7 @@ checkSMBhdr(struct smb_hdr *smb, __u16 mid)
 				cERROR(1, ("Rcvd Request not response "));         
 		}
 	} else { /* bad signature or mid */
-		if (*(unsigned int *) smb->Protocol != cpu_to_le32(0x424d53ff))
+		if (*(__le32 *) smb->Protocol != cpu_to_le32(0x424d53ff))
 			cERROR(1,
 			       ("Bad protocol string signature header %x ",
 				*(unsigned int *) smb->Protocol));
