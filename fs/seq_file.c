@@ -10,6 +10,7 @@
 #include <linux/slab.h>
 
 #include <asm/uaccess.h>
+#include <asm/page.h>
 
 /**
  *	seq_open -	initialize sequential file
