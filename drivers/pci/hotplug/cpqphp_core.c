@@ -61,7 +61,7 @@ static void *cpqhp_rom_start;
 static int power_mode;
 static int debug;
 
-#define DRIVER_VERSION	"0.9.7"
+#define DRIVER_VERSION	"0.9.8"
 #define DRIVER_AUTHOR	"Dan Zink <dan.zink@compaq.com>, Greg Kroah-Hartman <greg@kroah.com>"
 #define DRIVER_DESC	"Compaq Hot Plug PCI Controller Driver"
 
@@ -627,9 +627,8 @@ static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
 	dbg("bus, dev, fn = %d, %d, %d\n", bus, device, function);
 
 	slot_func = cpqhp_slot_find(bus, device, function);
-	if (!slot_func) {
+	if (!slot_func)
 		return -ENODEV;
-	}
 
 	return cpqhp_set_attention_status(ctrl, slot_func, status);
 }
@@ -702,7 +701,7 @@ static int hardware_test(struct hotplug_slot *hotplug_slot, u32 value)
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
-	return cpqhp_hardware_test (ctrl, value);	
+	return cpqhp_hardware_test(ctrl, value);	
 }
 
 
@@ -1311,7 +1310,7 @@ static int one_time_init(void)
 	if (!smbios_table) {
 		err ("Could not find the SMBIOS pointer in memory\n");
 		retval = -EIO;
-		goto error;
+		goto error_rom_start;
 	}
 
 	smbios_start = ioremap(readl(smbios_table + ST_ADDRESS),
@@ -1319,24 +1318,23 @@ static int one_time_init(void)
 	if (!smbios_start) {
 		err ("Could not ioremap memory region taken from SMBIOS values\n");
 		retval = -EIO;
-		goto error;
+		goto error_smbios_start;
 	}
 
 	initialized = 1;
 
 	return retval;
 
+error_smbios_start:
+	iounmap(smbios_start);
+error_rom_start:
+	iounmap(cpqhp_rom_start);
 error:
-	if (cpqhp_rom_start)
-		iounmap(cpqhp_rom_start);
-	if (smbios_start)
-		iounmap(smbios_start);
-	
 	return retval;
 }
 
 
-static void unload_cpqphpd(void)
+static void __exit unload_cpqphpd(void)
 {
 	struct pci_func *next;
 	struct pci_func *TempSlot;
@@ -1470,7 +1468,7 @@ MODULE_DEVICE_TABLE(pci, hpcd_pci_tbl);
 
 
 static struct pci_driver cpqhpc_driver = {
-	.name =		"pci_hotplug",
+	.name =		"compaq_pci_hotplug",
 	.id_table =	hpcd_pci_tbl,
 	.probe =	cpqhpc_probe,
 	/* remove:	cpqhpc_remove_one, */
