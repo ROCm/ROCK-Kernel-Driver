@@ -236,10 +236,10 @@ static void xfrm6_update_pmtu(struct dst_entry *dst, u32 mtu)
 {
 	struct dst_entry *path = dst->path;
 
-	if (mtu >= 1280 && mtu < dst_pmtu(dst))
-		return;
-
-	path->ops->update_pmtu(path, mtu);
+	if (mtu >= IPV6_MIN_MTU && mtu < dst_pmtu(dst))
+		path->ops->update_pmtu(path, mtu);
+	
+	return;
 }
 
 struct dst_ops xfrm6_dst_ops = {
