@@ -6,6 +6,7 @@
 #ifndef __UM_PTRACE_I386_H
 #define __UM_PTRACE_I386_H
 
+#include "sysdep/ptrace.h"
 #include "asm/ptrace-generic.h"
 
 #define PT_REGS_EAX(r) UPT_EAX(&(r)->regs)
@@ -29,7 +30,7 @@
 #define PT_REGS_SYSCALL_RET(r) PT_REGS_EAX(r)
 #define PT_FIX_EXEC_STACK(sp) do ; while(0)
 
-#define user_mode(r) ((r)->regs.is_user)
+#define user_mode(r) UPT_IS_USER(&(r)->regs)
 
 #endif
 

@@ -48,11 +48,11 @@ struct {
 	int is_user;
 } segfault_record[1024];
 
-void segv_handler(int sig, struct uml_pt_regs *regs)
+void segv_handler(int sig, union uml_pt_regs *regs)
 {
 	int index, max;
 
-	if(regs->is_user && !UPT_SEGV_IS_FIXABLE(regs)){
+	if(UPT_IS_USER(regs) && !UPT_SEGV_IS_FIXABLE(regs)){
 		bad_segv(UPT_FAULT_ADDR(regs), UPT_IP(regs), 
 			 UPT_FAULT_WRITE(regs));
 		return;
@@ -65,35 +65,35 @@ void segv_handler(int sig, struct uml_pt_regs *regs)
 	segfault_record[index].pid = os_getpid();
 	segfault_record[index].is_write = UPT_FAULT_WRITE(regs);
 	segfault_record[index].sp = UPT_SP(regs);
-	segfault_record[index].is_user = regs->is_user;
+	segfault_record[index].is_user = UPT_IS_USER(regs);
 	segv(UPT_FAULT_ADDR(regs), UPT_IP(regs), UPT_FAULT_WRITE(regs),
-	     regs->is_user, regs);
+	     UPT_IS_USER(regs), regs);
 }
 
-void usr2_handler(int sig, struct uml_pt_regs *regs)
+void usr2_handler(int sig, union uml_pt_regs *regs)
 {
 	CHOOSE_MODE(syscall_handler_tt(sig, regs), (void) 0);
 }
 
 struct signal_info sig_info[] = {
-	[ SIGTRAP ] { handler :		relay_signal,
-		      is_irq :		0 },
-	[ SIGFPE ] { handler :		relay_signal,
-		     is_irq :		0 },
-	[ SIGILL ] { handler :		relay_signal,
-		     is_irq :		0 },
-	[ SIGBUS ] { handler :		bus_handler,
-		     is_irq :		0 },
-	[ SIGSEGV] { handler :		segv_handler,
-		     is_irq :		0 },
-	[ SIGIO ] { handler :		sigio_handler,
-		    is_irq :		1 },
-	[ SIGVTALRM ] { handler :	timer_handler,
-			is_irq :	1 },
-        [ SIGALRM ] { handler :         timer_handler,
-                      is_irq :          1 },
-	[ SIGUSR2 ] { handler :		usr2_handler,
-		      is_irq :		0 },
+	[ SIGTRAP ] { .handler 		= relay_signal,
+		      .is_irq 		= 0 },
+	[ SIGFPE ] { .handler 		= relay_signal,
+		     .is_irq 		= 0 },
+	[ SIGILL ] { .handler 		= relay_signal,
+		     .is_irq 		= 0 },
+	[ SIGBUS ] { .handler 		= bus_handler,
+		     .is_irq 		= 0 },
+	[ SIGSEGV] { .handler 		= segv_handler,
+		     .is_irq 		= 0 },
+	[ SIGIO ] { .handler 		= sigio_handler,
+		    .is_irq 		= 1 },
+	[ SIGVTALRM ] { .handler 	= timer_handler,
+			.is_irq 	= 1 },
+        [ SIGALRM ] { .handler          = timer_handler,
+                      .is_irq           = 1 },
+	[ SIGUSR2 ] { .handler 		= usr2_handler,
+		      .is_irq 		= 0 },
 };
 
 void sig_handler(int sig, struct sigcontext sc)
