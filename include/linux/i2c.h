@@ -34,6 +34,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/i2c-id.h>
+#include <linux/device.h>	/* for struct device */
 #include <asm/semaphore.h>
 
 /* --- General options ------------------------------------------------	*/
@@ -144,6 +145,8 @@ struct i2c_driver {
 	int (*command)(struct i2c_client *client,unsigned int cmd, void *arg);
 };
 
+extern struct bus_type i2c_bus_type;
+
 /*
  * i2c_client identifies a single device (i.e. chip) that is connected to an 
  * i2c bus. The behaviour is defined by the routines of the driver. This
@@ -228,12 +231,14 @@ struct i2c_adapter {
 
 	int timeout;
 	int retries;
+	struct device dev;	/* the adapter device */
 
 #ifdef CONFIG_PROC_FS 
 	/* No need to set this when you initialize the adapter          */
 	int inode;
 #endif /* def CONFIG_PROC_FS */
 };
+#define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
 
 /*flags for the driver struct: */
 #define I2C_DF_NOTIFY	0x01		/* notify on bus (de/a)ttaches 	*/

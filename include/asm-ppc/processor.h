@@ -469,8 +469,8 @@
 #define	ICMP	SPRN_ICMP	/* Instruction TLB Compare Register */
 #define	IMISS	SPRN_IMISS	/* Instruction TLB Miss Register */
 #define	IMMR	SPRN_IMMR      	/* PPC 860/821 Internal Memory Map Register */
-#define	L2CR	SPRN_L2CR    	/* PPC 750 L2 control register */
-#define	L3CR	SPRN_L3CR    	/* PPC 7450 L3 Cache control register */
+#define	L2CR	SPRN_L2CR    	/* Classic PPC L2 cache control register */
+#define	L3CR	SPRN_L3CR	/* PPC 745x L3 cache control register */
 #define	LR	SPRN_LR
 #define	PVR	SPRN_PVR	/* Processor Version */
 #define	RPA	SPRN_RPA	/* Required Physical Address Register */
@@ -609,7 +609,7 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp);
 void release_thread(struct task_struct *);
 
 /* Prepare to copy thread state - unlazy all lazy status */
-#define prepare_to_copy(tsk)	do { } while (0)
+extern void prepare_to_copy(struct task_struct *tsk);
 
 /*
  * Create a new kernel thread.

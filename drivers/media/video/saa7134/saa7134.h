@@ -22,7 +22,11 @@
 #include <linux/i2c.h>
 #include <linux/videodev.h>
 #include <linux/kdev_t.h>
-#include "video-buf.h"
+
+#include <media/video-buf.h>
+#include <media/tuner.h>
+#include <media/audiochip.h>
+#include <media/id.h>
 
 #define SAA7134_VERSION_CODE KERNEL_VERSION(0,2,2)
 

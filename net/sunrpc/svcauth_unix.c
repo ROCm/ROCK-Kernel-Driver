@@ -441,9 +441,6 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 		return SVC_DENIED;
 	}
 
-	/* Put NULL verifier */
-	svc_putu32(resv, RPC_AUTH_NULL);
-	svc_putu32(resv, 0);
 
 	key.m_class = rqstp->rq_server->sv_program->pg_class;
 	key.m_addr = rqstp->rq_addr.sin_addr;
@@ -470,8 +467,13 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 		}
 	else rv = SVC_DROP;
 
-	if (rqstp->rq_client == NULL && rqstp->rq_proc != 0)
+	if (rv  == SVC_OK && rqstp->rq_client == NULL && rqstp->rq_proc != 0)
 		goto badcred;
+
+	/* Put NULL verifier */
+	svc_putu32(resv, RPC_AUTH_NULL);
+	svc_putu32(resv, 0);
+
 	return rv;
 
 badcred:

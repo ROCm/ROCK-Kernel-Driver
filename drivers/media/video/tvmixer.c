@@ -16,8 +16,6 @@
 #include <linux/soundcard.h>
 #include <asm/uaccess.h>
 
-#include "audiochip.h"
-#include "id.h"
 
 #define DEV_MAX  4
 
@@ -136,16 +134,16 @@ static int tvmixer_ioctl(struct inode *inode, struct file *file, unsigned int cm
 	case MIXER_WRITE(SOUND_MIXER_VOLUME):
 		left  = mix_to_v4l(val);
 		right = mix_to_v4l(val >> 8);
-		va.volume  = MAX(left,right);
-		va.balance = (32768*MIN(left,right)) / (va.volume ? va.volume : 1);
+		va.volume  = max(left,right);
+		va.balance = (32768*min(left,right)) / (va.volume ? va.volume : 1);
 		va.balance = (left<right) ? (65535-va.balance) : va.balance;
 		client->driver->command(client,VIDIOCSAUDIO,&va);
 		client->driver->command(client,VIDIOCGAUDIO,&va);
 		/* fall throuth */
 	case MIXER_READ(SOUND_MIXER_VOLUME):
-		left  = (MIN(65536 - va.balance,32768) *
+		left  = (min(65536 - va.balance,32768) *
 			 va.volume) / 32768;
-		right = (MIN(va.balance,32768) *
+		right = (min(va.balance,32768) *
 			 va.volume) / 32768;
 		ret = v4l_to_mix2(left,right);
 		break;

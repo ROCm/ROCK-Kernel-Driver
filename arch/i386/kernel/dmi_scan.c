@@ -3,6 +3,7 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/apm_bios.h>
 #include <linux/slab.h>
 #include <asm/io.h>
@@ -893,3 +894,5 @@ void __init dmi_scan_machine(void)
 	if(err == 0)
 		dmi_check_blacklist();
 }
+
+EXPORT_SYMBOL(is_unsafe_smbus);
