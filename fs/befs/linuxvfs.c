@@ -13,6 +13,7 @@
 #include <linux/nls.h>
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
+#include <linux/parser.h>
 
 #include "befs.h"
 #include "btree.h"
@@ -667,12 +668,27 @@ befs_nls2utf(struct super_block *sb, const char *in,
 	return -EILSEQ;
 }
 
+/**
+ * Use the
+ *
+ */
+enum {
+	Opt_uid, Opt_gid, Opt_charset, Opt_debug,
+};
+
+static match_table_t befs_tokens = {
+	{Opt_uid, "uid=%d"},
+	{Opt_gid, "gid=%d"},
+	{Opt_charset, "iocharset=%s"},
+	{Opt_debug, "debug"}
+};
+
 static int
 parse_options(char *options, befs_mount_options * opts)
 {
-	char *this_char;
-	char *value;
-	int ret = 1;
+	char *p;
+	substring_t args[MAX_OPT_ARGS];
+	int option;
 
 	/* Initialize options */
 	opts->uid = 0;
@@ -683,64 +699,56 @@ parse_options(char *options, befs_mount_options * opts)
 	opts->debug = 0;
 
 	if (!options)
-		return ret;
+		return 1;
 
-	while ((this_char = strsep(&options, ",")) != NULL) {
+	while ((p = strsep(&options, ",")) != NULL) {
+		int token;
+		if (!*p)
+			continue;
 
-		if ((value = strchr(this_char, '=')) != NULL)
-			*value++ = 0;
-
-		if (!strcmp(this_char, "uid")) {
-			if (!value || !*value) {
-				ret = 0;
-			} else {
-				opts->uid = simple_strtoul(value, &value, 0);
-				opts->use_uid = 1;
-				if (*value) {
-					printk(KERN_ERR "BEFS: Invalid uid "
-					       "option: %s\n", value);
-					ret = 0;
-				}
+		token = match_token(p, befs_tokens, args);
+		switch (token) {
+		case Opt_uid:
+			if (match_int(&args[0], &option))
+				return 0;
+			if (option < 0) {
+				printk(KERN_ERR "BeFS: Invalid uid %d, "
+						"using default\n", option);
+				break;
 			}
-		} else if (!strcmp(this_char, "gid")) {
-			if (!value || !*value)
-				ret = 0;
-			else {
-				opts->gid = simple_strtoul(value, &value, 0);
-				opts->use_gid = 1;
-				if (*value) {
-					printk(KERN_ERR
-					       "BEFS: Invalid gid option: "
-					       "%s\n", value);
-					ret = 0;
-				}
+			opts->uid = option;
+			opts->use_uid = 1;
+			break;
+		case Opt_gid:
+			if (match_int(&args[0], &option))
+				return 0;
+			if (option < 0) {
+				printk(KERN_ERR "BeFS: Invalid gid %d, "
+						"using default\n", option);
+				break;
 			}
-		} else if (!strcmp(this_char, "iocharset") && value) {
-			char *p = value;
-			int len;
-
-			while (*value && *value != ',')
-				value++;
-			len = value - p;
-			if (len) {
-				char *buffer = kmalloc(len + 1, GFP_NOFS);
-				if (buffer) {
-					opts->iocharset = buffer;
-					memcpy(buffer, p, len);
-					buffer[len] = 0;
-
-				} else {
-					printk(KERN_ERR "BEFS: "
-					       "cannot allocate memory\n");
-					ret = 0;
-				}
+			opts->gid = option;
+			opts->use_gid = 1;
+			break;
+		case Opt_charset:
+			kfree(opts->iocharset);
+			opts->iocharset = match_strdup(&args[0]);
+			if (!opts->iocharset) {
+				printk(KERN_ERR "BeFS: allocation failure for "
+						"iocharset string\n");
+				return 0;
 			}
-		} else if (!strcmp(this_char, "debug")) {
+			break;
+		case Opt_debug:
 			opts->debug = 1;
+			break;
+		default:
+			printk(KERN_ERR "BeFS: Unrecognized mount option \"%s\" "
+					"or missing value\n", p);
+			return 0;
 		}
 	}
-
-	return ret;
+	return 1;
 }
 
 /* This function has the responsibiltiy of getting the

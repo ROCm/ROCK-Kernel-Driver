@@ -50,6 +50,7 @@
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/parser.h>
 #include <linux/stat.h>
 #include <linux/cdrom.h>
 #include <linux/nls.h>
@@ -225,7 +226,7 @@ module_exit(exit_udf_fs)
  *	gid=		Set the default group.
  *	umask=		Set the default umask.
  *	uid=		Set the default user.
- *	bs=			Set the block size.
+ *	bs=		Set the block size.
  *	unhide		Show otherwise hidden files.
  *	undelete	Show deleted files in lists.
  *	adinicb		Embed data in the inode (default)
@@ -259,18 +260,53 @@ module_exit(exit_udf_fs)
  *	uopts		Pointer to mount options variable.
  *
  * POST-CONDITIONS
- *	<return>	0	Mount options parsed okay.
- *	<return>	-1	Error parsing mount options.
+ *	<return>	1	Mount options parsed okay.
+ *	<return>	0	Error parsing mount options.
  *
  * HISTORY
  *	July 1, 1997 - Andrew E. Mileski
  *	Written, tested, and released.
  */
 
+enum {
+	Opt_novrs, Opt_nostrict, Opt_bs, Opt_unhide, Opt_undelete,
+	Opt_noadinicb, Opt_adinicb, Opt_shortad, Opt_longad,
+	Opt_gid, Opt_uid, Opt_umask, Opt_session, Opt_lastblock,
+	Opt_anchor, Opt_volume, Opt_partition, Opt_fileset,
+	Opt_rootdir, Opt_utf8, Opt_iocharset,
+	Opt_err
+};
+
+static match_table_t tokens = {
+	{Opt_novrs, "novrs"},
+	{Opt_nostrict, "nostrict"},
+	{Opt_bs, "bs=%u"},
+	{Opt_unhide, "unhide"},
+	{Opt_undelete, "undelete"},
+	{Opt_noadinicb, "noadinicb"},
+	{Opt_adinicb, "adinicb"},
+	{Opt_shortad, "shortad"},
+	{Opt_longad, "longad"},
+	{Opt_gid, "gid=%u"},
+	{Opt_uid, "uid=%u"},
+	{Opt_umask, "umask=%o"},
+	{Opt_session, "session=%u"},
+	{Opt_lastblock, "lastblock=%u"},
+	{Opt_anchor, "anchor=%u"},
+	{Opt_volume, "volume=%u"},
+	{Opt_partition, "partition=%u"},
+	{Opt_fileset, "fileset=%u"},
+	{Opt_rootdir, "rootdir=%u"},
+	{Opt_utf8, "utf8"},
+	{Opt_iocharset, "iocharset=%s"},
+	{Opt_err, NULL}
+};
+
 static int
 udf_parse_options(char *options, struct udf_options *uopt)
 {
-	char *opt, *val;
+	char *p;
+	int option;
 
 	uopt->novrs = 0;
 	uopt->blocksize = 2048;
@@ -286,71 +322,106 @@ udf_parse_options(char *options, struct udf_options *uopt)
 	if (!options)
 		return 1;
 
-	while ((opt = strsep(&options, ",")) != NULL)
-	{
-		if (!*opt)
+	while ((p = strsep(&options, ",")) != NULL) {
+		substring_t args[MAX_OPT_ARGS];
+		int token;
+		if (!*p)
 			continue;
-		/* Make "opt=val" into two strings */
-		val = strchr(opt, '=');
-		if (val)
-			*(val++) = 0;
-		if (!strcmp(opt, "novrs") && !val)
+
+		token = match_token(p, tokens, args);
+		switch (token) {
+		case Opt_novrs:
 			uopt->novrs = 1;
-		else if (!strcmp(opt, "bs") && val)
-			uopt->blocksize = simple_strtoul(val, NULL, 0);
-		else if (!strcmp(opt, "unhide") && !val)
+			break;
+		case Opt_bs:
+			if (match_int(&args[0], &option))
+				return 0;
+			uopt->blocksize = option;
+			break;
+		case Opt_unhide:
 			uopt->flags |= (1 << UDF_FLAG_UNHIDE);
-		else if (!strcmp(opt, "undelete") && !val)
+			break;
+		case Opt_undelete:
 			uopt->flags |= (1 << UDF_FLAG_UNDELETE);
-		else if (!strcmp(opt, "noadinicb") && !val)
+			break;
+		case Opt_noadinicb:
 			uopt->flags &= ~(1 << UDF_FLAG_USE_AD_IN_ICB);
-		else if (!strcmp(opt, "adinicb") && !val)
+			break;
+		case Opt_adinicb:
 			uopt->flags |= (1 << UDF_FLAG_USE_AD_IN_ICB);
-		else if (!strcmp(opt, "shortad") && !val)
+			break;
+		case Opt_shortad:
 			uopt->flags |= (1 << UDF_FLAG_USE_SHORT_AD);
-		else if (!strcmp(opt, "longad") && !val)
+			break;
+		case Opt_longad:
 			uopt->flags &= ~(1 << UDF_FLAG_USE_SHORT_AD);
-		else if (!strcmp(opt, "gid") && val)
-			uopt->gid = simple_strtoul(val, NULL, 0);
-		else if (!strcmp(opt, "umask") && val)
-			uopt->umask = simple_strtoul(val, NULL, 0);
-		else if (!strcmp(opt, "nostrict") && !val)
+			break;
+		case Opt_gid:
+			if (match_int(args, &option))
+				return 0;
+			uopt->gid = option;
+			break;
+		case Opt_uid:
+			if (match_int(args, &option))
+				return 0;
+			uopt->uid = option;
+			break;
+		case Opt_umask:
+			if (match_octal(args, &option))
+				return 0;
+			uopt->umask = option;
+			break;
+		case Opt_nostrict:
 			uopt->flags &= ~(1 << UDF_FLAG_STRICT);
-		else if (!strcmp(opt, "uid") && val)
-			uopt->uid = simple_strtoul(val, NULL, 0);
-		else if (!strcmp(opt, "session") && val)
-			uopt->session = simple_strtoul(val, NULL, 0);
-		else if (!strcmp(opt, "lastblock") && val)
-			uopt->lastblock = simple_strtoul(val, NULL, 0);
-		else if (!strcmp(opt, "anchor") && val)
-			uopt->anchor = simple_strtoul(val, NULL, 0);
-		else if (!strcmp(opt, "volume") && val)
-			uopt->volume = simple_strtoul(val, NULL, 0);
-		else if (!strcmp(opt, "partition") && val)
-			uopt->partition = simple_strtoul(val, NULL, 0);
-		else if (!strcmp(opt, "fileset") && val)
-			uopt->fileset = simple_strtoul(val, NULL, 0);
-		else if (!strcmp(opt, "rootdir") && val)
-			uopt->rootdir = simple_strtoul(val, NULL, 0);
-#ifdef CONFIG_NLS
-		else if (!strcmp(opt, "iocharset") && val)
-		{
-			uopt->nls_map = load_nls(val);
-			uopt->flags |= (1 << UDF_FLAG_NLS_MAP);
-		}
-#endif
-		else if (!strcmp(opt, "utf8") && !val)
+			break;
+		case Opt_session:
+			if (match_int(args, &option))
+				return 0;
+			uopt->session = option;
+			break;
+		case Opt_lastblock:
+			if (match_int(args, &option))
+				return 0;
+			uopt->lastblock = option;
+			break;
+		case Opt_anchor:
+			if (match_int(args, &option))
+				return 0;
+			uopt->anchor = option;
+			break;
+		case Opt_volume:
+			if (match_int(args, &option))
+				return 0;
+			uopt->volume = option;
+			break;
+		case Opt_partition:
+			if (match_int(args, &option))
+				return 0;
+			uopt->partition = option;
+			break;
+		case Opt_fileset:
+			if (match_int(args, &option))
+				return 0;
+			uopt->fileset = option;
+			break;
+		case Opt_rootdir:
+			if (match_int(args, &option))
+				return 0;
+			uopt->rootdir = option;
+			break;
+		case Opt_utf8:
 			uopt->flags |= (1 << UDF_FLAG_UTF8);
-		else if (val)
-		{
-			printk(KERN_ERR "udf: bad mount option \"%s=%s\"\n",
-				opt, val);
-			return 0;
-		}
-		else
-		{
-			printk(KERN_ERR "udf: bad mount option \"%s\"\n",
-				opt);
+			break;
+#ifdef CONFIG_NLS
+		case Opt_iocharset:
+			uopt->nls_map = load_nls(args[0].from);
+			uopt->flags |= (1 << UDF_FLAG_NLS_MAP);
+			break;
+#endif
+		default:
+			printk(KERN_ERR "udf: bad mount option \"%s\" "
+					"or missing value\n",
+				p);
 			return 0;
 		}
 	}

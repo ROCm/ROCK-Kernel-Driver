@@ -18,6 +18,7 @@
 #include <linux/init.h>
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
+#include <linux/parser.h>
 
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
@@ -133,50 +134,56 @@ static void adfs_put_super(struct super_block *sb)
 	sb->s_fs_info = NULL;
 }
 
+enum {Opt_uid, Opt_gid, Opt_ownmask, Opt_othmask, Opt_err};
+
+static match_table_t tokens = {
+	{Opt_uid, "uid=%u"},
+	{Opt_gid, "gid=%u"},
+	{Opt_ownmask, "ownmask=%o"},
+	{Opt_othmask, "othmask=%o"},
+	{Opt_err, NULL}
+};
+
 static int parse_options(struct super_block *sb, char *options)
 {
-	char *value, *opt;
+	char *p;
 	struct adfs_sb_info *asb = ADFS_SB(sb);
+	int option;
 
 	if (!options)
 		return 0;
 
-	while ((opt = strsep(&options, ",")) != NULL) {
-		if (!*opt)
+	while ((p = strsep(&options, ",")) != NULL) {
+		substring_t args[MAX_OPT_ARGS];
+		int token;
+		if (!*p)
 			continue;
-		value = strchr(opt, '=');
-		if (value)
-			*value++ = '\0';
 
-		if (!strcmp(opt, "uid")) {	/* owner of all files */
-			if (!value || !*value)
+		token = match_token(p, tokens, args);
+		switch (token) {
+		case Opt_uid:
+			if (match_int(args, &option))
 				return -EINVAL;
-			asb->s_uid = simple_strtoul(value, &value, 0);
-			if (*value)
+			asb->s_uid = option;
+			break;
+		case Opt_gid:
+			if (match_int(args, &option))
 				return -EINVAL;
-		} else
-		if (!strcmp(opt, "gid")) {	/* group owner of all files */
-			if (!value || !*value)
+			asb->s_gid = option;
+			break;
+		case Opt_ownmask:
+			if (match_octal(args, &option))
 				return -EINVAL;
-			asb->s_gid = simple_strtoul(value, &value, 0);
-			if (*value)
+			asb->s_owner_mask = option;
+			break;
+		case Opt_othmask:
+			if (match_octal(args, &option))
 				return -EINVAL;
-		} else
-		if (!strcmp(opt, "ownmask")) {	/* owner permission mask */
-			if (!value || !*value)
-				return -EINVAL;
-			asb->s_owner_mask = simple_strtoul(value, &value, 8);
-			if (*value)
-				return -EINVAL;
-		} else
-		if (!strcmp(opt, "othmask")) {	/* others permission mask */
-			if (!value || !*value)
-				return -EINVAL;
-			asb->s_other_mask = simple_strtoul(value, &value, 8);
-			if (*value)
-				return -EINVAL;
-		} else {			/* eh? say again. */
-			printk("ADFS-fs: unrecognised mount option %s\n", opt);
+			asb->s_other_mask = option;
+			break;
+		default:
+			printk("ADFS-fs: unrecognised mount option \"%s\" "
+					"or missing value\n", p);
 			return -EINVAL;
 		}
 	}
