@@ -20,6 +20,8 @@
 #include <linux/proc_fs.h>
 #include <linux/mm.h>
 
+#include <asm/sections.h>
+
 #ifdef CONFIG_KALLSYMS_ALL
 #define all_var 1
 #else
@@ -28,16 +30,13 @@
 
 /* These will be re-linked against their real values during the second link stage */
 extern unsigned long kallsyms_addresses[] __attribute__((weak));
-extern unsigned long kallsyms_num_syms __attribute__((weak));
+extern unsigned long kallsyms_num_syms __attribute__((weak,section("data")));
 extern u8 kallsyms_names[] __attribute__((weak));
 
 extern u8 kallsyms_token_table[] __attribute__((weak));
 extern u16 kallsyms_token_index[] __attribute__((weak));
 
 extern unsigned long kallsyms_markers[] __attribute__((weak));
-
-/* Defined by the linker script. */
-extern char _stext[], _etext[], _sinittext[], _einittext[], _end[];
 
 static inline int is_kernel_inittext(unsigned long addr)
 {

@@ -256,7 +256,6 @@ static struct file_operations fragmentation_file_operations = {
 static int version_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
-	extern char *linux_banner;
 	int len;
 
 	strcpy(page, linux_banner);

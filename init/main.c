@@ -75,8 +75,6 @@
 #error Sorry, your GCC is too old. It builds incorrect kernels.
 #endif
 
-extern char *linux_banner;
-
 static int init(void *);
 
 extern void init_IRQ(void);
@@ -157,12 +155,13 @@ static char * argv_init[MAX_INIT_ARGS+2] = { "init", NULL, };
 char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 static const char *panic_later, *panic_param;
 
+extern struct obs_kernel_param __setup_start[], __setup_end[];
+
 static int __init obsolete_checksetup(char *line)
 {
 	struct obs_kernel_param *p;
-	extern struct obs_kernel_param __setup_start, __setup_end;
 
-	p = &__setup_start;
+	p = __setup_start;
 	do {
 		int n = strlen(p->str);
 		if (!strncmp(line, p->str, n)) {
@@ -179,7 +178,7 @@ static int __init obsolete_checksetup(char *line)
 				return 1;
 		}
 		p++;
-	} while (p < &__setup_end);
+	} while (p < __setup_end);
 	return 0;
 }
 
@@ -453,9 +452,8 @@ static void noinline rest_init(void)
 static int __init do_early_param(char *param, char *val)
 {
 	struct obs_kernel_param *p;
-	extern struct obs_kernel_param __setup_start, __setup_end;
 
-	for (p = &__setup_start; p < &__setup_end; p++) {
+	for (p = __setup_start; p < __setup_end; p++) {
 		if (p->early && strcmp(param, p->str) == 0) {
 			if (p->setup_func(val) != 0)
 				printk(KERN_WARNING
@@ -592,14 +590,14 @@ __setup("initcall_debug", initcall_debug_setup);
 
 struct task_struct *child_reaper = &init_task;
 
-extern initcall_t __initcall_start, __initcall_end;
+extern initcall_t __initcall_start[], __initcall_end[];
 
 static void __init do_initcalls(void)
 {
 	initcall_t *call;
 	int count = preempt_count();
 
-	for (call = &__initcall_start; call < &__initcall_end; call++) {
+	for (call = __initcall_start; call < __initcall_end; call++) {
 		char *msg;
 
 		if (initcall_debug) {

@@ -72,7 +72,7 @@
 #include "power.h"
 
 /* References to section boundaries */
-extern char __nosave_begin, __nosave_end;
+extern const void __nosave_begin, __nosave_end;
 
 /* Variables to be preserved over suspend */
 static int pagedir_order_check;
