@@ -1,7 +1,7 @@
 /*
  * CompactPCI Hot Plug Driver PCI functions
  *
- * Copyright (c) 2002 by SOMA Networks, Inc.
+ * Copyright (C) 2002 by SOMA Networks, Inc.
  *
  * All rights reserved.
  *
