@@ -238,6 +238,34 @@ acpi_cpufreq_verify (
 }
 
 
+static unsigned long
+acpi_cpufreq_guess_freq (
+	struct cpufreq_acpi_io	*data,
+	unsigned int		cpu)
+{
+	if (cpu_khz) {
+		/* search the closest match to cpu_khz */
+		unsigned int i;
+		unsigned long freq;
+		unsigned long freqn = data->acpi_data.states[0].core_frequency * 1000;
+
+		for (i=0; i < (data->acpi_data.state_count - 1); i++) {
+			freq = freqn;
+			freqn = data->acpi_data.states[i+1].core_frequency * 1000;
+			if ((2 * cpu_khz) > (freqn + freq)) {
+				data->acpi_data.state = i;
+				return (freq);
+			}
+		}
+		data->acpi_data.state = data->acpi_data.state_count - 1;
+		return (freqn);
+	} else
+		/* assume CPU is at P0... */
+		data->acpi_data.state = 0;
+		return data->acpi_data.states[0].core_frequency * 1000;
+	
+}
+
 static int
 acpi_cpufreq_cpu_init (
 	struct cpufreq_policy   *policy)
@@ -290,11 +318,8 @@ acpi_cpufreq_cpu_init (
 	}
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 
-	/* 
-	 * The current speed is unknown and not detectable by ACPI... argh! Assume 
-	 * it's P0, it will be set to this value later during initialization.
-	 */
-	policy->cur = data->acpi_data.states[0].core_frequency * 1000;
+	/* The current speed is unknown and not detectable by ACPI...  */
+	policy->cur = acpi_cpufreq_guess_freq(data, policy->cpu);
 
 	/* table init */
 	for (i=0; i<=data->acpi_data.state_count; i++)
