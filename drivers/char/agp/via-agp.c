@@ -310,7 +310,7 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 
 	/* VT8361 */
 	{
-		.device_id	= PCI_DEVICE_ID_VIA_8361,	// 0x3112
+		.device_id	= PCI_DEVICE_ID_VIA_8361,
 		.chipset_name	= "Apollo KLE133",
 	},
 
