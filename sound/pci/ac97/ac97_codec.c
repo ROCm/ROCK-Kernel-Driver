@@ -2115,6 +2115,8 @@ static int swap_headphone(ac97_t *ac97, int remove_master)
 {
 	/* FIXME: error checks.. */
 	if (remove_master) {
+		if (ctl_find(ac97, "Headphone Playback Switch") == NULL)
+			return 0;
 		snd_ac97_remove_ctl(ac97, "Master Playback Switch");
 		snd_ac97_remove_ctl(ac97, "Master Playback Volume");
 	} else {
