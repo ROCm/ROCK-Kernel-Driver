@@ -262,7 +262,7 @@ static void ctrl_start_transfer(hfcusb_data * hfc)
 		hfc->ctrl_urb->transfer_buffer_length = 0;
 		hfc->ctrl_write.wIndex = hfc->ctrl_buff[hfc->ctrl_out_idx].hfc_reg;
 		hfc->ctrl_write.wValue = hfc->ctrl_buff[hfc->ctrl_out_idx].reg_val;
-		err = usb_submit_urb(hfc->ctrl_urb, GFP_KERNEL);	/* start transfer */
+		err = usb_submit_urb(hfc->ctrl_urb, GFP_ATOMIC);	/* start transfer */
 		printk(KERN_DEBUG "ctrl_start_transfer: submit %d\n", err);
 	}
 }				/* ctrl_start_transfer */
@@ -754,7 +754,7 @@ static void tx_iso_complete(struct urb *urb, struct pt_regs *regs)
 			}
         }
 
-		errcode = usb_submit_urb(urb, GFP_KERNEL);
+		errcode = usb_submit_urb(urb, GFP_ATOMIC);
 		if(errcode < 0)
 		{
 			printk(KERN_INFO "HFC-USB: error submitting ISO URB: %i \n",  errcode);
@@ -821,7 +821,7 @@ static void rx_iso_complete(struct urb *urb, struct pt_regs *regs)
 		fill_isoc_urb(urb, fifo->hfc->dev, fifo->pipe,context_iso_urb->buffer, num_isoc_packets,
 			fifo->usb_packet_maxlen, fifo->intervall, rx_iso_complete, urb->context);
 
-		errcode = usb_submit_urb(urb, GFP_KERNEL);
+		errcode = usb_submit_urb(urb, GFP_ATOMIC);
 		if(errcode < 0)
 		{
 			printk(KERN_INFO "HFC-USB: error submitting ISO URB: %i \n",  errcode);
@@ -1345,7 +1345,7 @@ char *conf_str[]=
 /*************************************************/
 /* function called to probe a new plugged device */
 /*************************************************/
-static int __devinit hfc_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
+static int hfc_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *dev= interface_to_usbdev(intf);
 	hfcusb_data *context;
