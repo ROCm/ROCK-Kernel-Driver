@@ -3270,14 +3270,16 @@ console_clear_loop:
 
 	/* Calculate font size */
 
-#if   defined(FONT_8x8)
-	lea	%pc@(font_vga_8x8), %a0
-#elif defined(FONT_8x16)
+#if   defined(FONT_8x8) && defined(CONFIG_FONT_8x8)
+	lea	%pc@(font_vga_8x8),%a0
+#elif defined(FONT_8x16) && defined(CONFIG_FONT_8x16)
 	lea	%pc@(font_vga_8x16),%a0
-#elif defined(FONT_6x11)
+#elif defined(FONT_6x11) && defined(CONFIG_FONT_6x11)
 	lea	%pc@(font_vga_6x11),%a0
-#else	/*   (FONT_8x8) default */
-	lea	%pc@(font_vga_8x8), %a0
+#elif defined(CONFIG_FONT_8x8) /* default */
+	lea	%pc@(font_vga_8x8),%a0
+#else /* no compiled-in font */
+	lea	0,%a0
 #endif
 
 	/*
@@ -3286,6 +3288,8 @@ console_clear_loop:
 	 */
 	lea	%pc@(L(console_font)),%a1
 	movel	%a0,%a1@	/* store pointer to struct fbcon_font_desc in Lconsole_font */
+	tstl	%a0
+	jeq	1f
 
 	/*
 	 *	Calculate global maxs
@@ -3313,7 +3317,7 @@ console_clear_loop:
 	/*
 	 * Initialization is complete
 	 */
-	moveml	%sp@+,%a0-%a4/%d0-%d7
+1:	moveml	%sp@+,%a0-%a4/%d0-%d7
 	rts
 
 L(console_put_stats):
@@ -3399,6 +3403,8 @@ console_scroll:
 	lea	%pc@(L(mac_rowbytes)),%a0
 	movel	%a0@,%d5
 	movel	%pc@(L(console_font)),%a0
+	tstl	%a0
+	jeq	1f
 	mulul	%a0@(FBCON_FONT_DESC_HEIGHT),%d5	/* account for # scan lines per character */
 	addal	%d5,%a2
 
@@ -3453,13 +3459,15 @@ console_scroll_clear_loop:
 	movel	%d0,%a1@+
 	dbra	%d6,console_scroll_clear_loop
 
-	moveml	%sp@+,%a0-%a4/%d0-%d7
+1:	moveml	%sp@+,%a0-%a4/%d0-%d7
 	rts
 
 
 func_start	console_putc,%a0/%a1/%d0-%d7
 
 	is_not_mac(console_exit)
+	tstl	%pc@(L(console_font))
+	jeq	console_exit
 
 	/* Output character in d7 on console.
 	 */
