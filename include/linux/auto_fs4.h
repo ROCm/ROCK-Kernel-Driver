@@ -47,9 +47,11 @@ union autofs_packet_union {
 	struct autofs_packet_expire_multi expire_multi;
 };
 
-#define AUTOFS_IOC_EXPIRE_MULTI _IOW(0x93,0x66,int)
-#define AUTOFS_IOC_PROTOSUBVER  _IOR(0x93,0x67,int)
-#define AUTOFS_IOC_ASKUMOUNT	_IOR(0x93,0x70,int)
+#define AUTOFS_IOC_EXPIRE_MULTI		_IOW(0x93,0x66,int)
+#define AUTOFS_IOC_PROTOSUBVER		_IOR(0x93,0x67,int)
+#define AUTOFS_IOC_ASKREGHOST           _IOR(0x93,0x68,int)
+#define AUTOFS_IOC_TOGGLEREGHOST        _IOR(0x93,0x69,int)
+#define AUTOFS_IOC_ASKUMOUNT		_IOR(0x93,0x70,int)
 
 
 #endif /* _LINUX_AUTO_FS4_H */

@@ -28,13 +28,15 @@ static int autofs4_root_ioctl(struct inode *, struct file *,unsigned int,unsigne
 static int autofs4_dir_open(struct inode *inode, struct file *file);
 static int autofs4_dir_close(struct inode *inode, struct file *file);
 static int autofs4_dir_readdir(struct file * filp, void * dirent, filldir_t filldir);
+static int autofs4_root_readdir(struct file * filp, void * dirent, filldir_t filldir);
 static struct dentry *autofs4_root_lookup(struct inode *,struct dentry *, struct nameidata *);
+static int autofs4_dcache_readdir(struct file *, void *, filldir_t);
 
 struct file_operations autofs4_root_operations = {
 	.open		= dcache_dir_open,
 	.release	= dcache_dir_close,
 	.read		= generic_read_dir,
-	.readdir	= dcache_readdir,
+	.readdir	= autofs4_root_readdir,
 	.ioctl		= autofs4_root_ioctl,
 };
 
@@ -61,12 +63,37 @@ struct inode_operations autofs4_dir_inode_operations = {
 	.rmdir		= autofs4_dir_rmdir,
 };
 
+static int autofs4_root_readdir(struct file *file, void *dirent,
+				filldir_t filldir)
+{
+	struct autofs_sb_info *sbi = autofs4_sbi(file->f_dentry->d_sb);
+	int oz_mode = autofs4_oz_mode(sbi);
+
+	DPRINTK(("autofs4_root_readdir called, filp->f_pos = %lld\n",
+			file->f_pos));
+
+	/*
+	 * Don't set reghost flag if:
+	 * 1) f_pos is larger than zero -- we've already been here.
+	 * 2) we haven't even enabled reghosting in the 1st place.
+	 * 3) this is the daemon doing a readdir
+	 */
+	if (oz_mode && file->f_pos == 0 && sbi->reghost_enabled)
+		sbi->needs_reghost = 1;
+
+	DPRINTK(("autofs4_root_readdir: needs_reghost = %d\n",
+			sbi->needs_reghost));
+
+	return autofs4_dcache_readdir(file, dirent, filldir);
+}
+
 /* Update usage from here to top of tree, so that scan of
    top-level directories will give a useful result */
 static void autofs4_update_usage(struct dentry *dentry)
 {
 	struct dentry *top = dentry->d_sb->s_root;
 
+	spin_lock(&dcache_lock);
 	for(; dentry != top; dentry = dentry->d_parent) {
 		struct autofs_info *ino = autofs4_dentry_ino(dentry);
 
@@ -75,6 +102,7 @@ static void autofs4_update_usage(struct dentry *dentry)
 			ino->last_used = jiffies;
 		}
 	}
+	spin_unlock(&dcache_lock);
 }
 
 /*
@@ -674,6 +702,44 @@ static inline int autofs4_get_protosubver(struct autofs_sb_info *sbi, int *p)
 }
 
 /*
+ * Tells the daemon whether we need to reghost or not. Also, clears
+ * the reghost_needed flag.
+ */
+static inline int autofs4_ask_reghost(struct autofs_sb_info *sbi, int *p)
+{
+	int status;
+
+	DPRINTK(("autofs_ask_reghost: returning %d\n", sbi->needs_reghost));
+
+	status = put_user(sbi->needs_reghost, p);
+	if ( status )
+		return status;
+
+	sbi->needs_reghost = 0;
+	return 0;
+}
+
+/*
+ * Enable / Disable reghosting ioctl() operation
+ */
+static inline int autofs4_toggle_reghost(struct autofs_sb_info *sbi, int *p)
+{
+	int status;
+	int val;
+
+	status = get_user(val, p);
+
+	DPRINTK(("autofs4_toggle_reghost: reghost = %d\n", val));
+
+	if (status)
+		return status;
+
+	/* turn on/off reghosting, with the val */
+	sbi->reghost_enabled = val;
+	return 0;
+}
+
+/*
 * Tells the daemon whether it can umount the autofs mount.
 */
 static inline int autofs4_ask_umount(struct vfsmount *mnt, int *p)
@@ -735,6 +801,11 @@ static int autofs4_root_ioctl(struct inode *inode, struct file *filp,
 		return autofs4_get_protosubver(sbi, (int *)arg);
 	case AUTOFS_IOC_SETTIMEOUT:
 		return autofs4_get_set_timeout(sbi,(unsigned long *)arg);
+
+	case AUTOFS_IOC_TOGGLEREGHOST:
+		return autofs4_toggle_reghost(sbi, (int *) arg);
+	case AUTOFS_IOC_ASKREGHOST:
+		return autofs4_ask_reghost(sbi, (int *) arg);
 
 	case AUTOFS_IOC_ASKUMOUNT:
 		return autofs4_ask_umount(filp->f_vfsmnt, (int *) arg);

@@ -97,6 +97,8 @@ struct autofs_sb_info {
 	int version;
 	int sub_version;
 	unsigned long exp_timeout;
+	int reghost_enabled;
+	int needs_reghost;
 	struct super_block *sb;
 	struct autofs_wait_queue *queues; /* Wait queue pointer */
 };
