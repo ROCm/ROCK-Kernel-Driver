@@ -170,6 +170,7 @@ ixp4xx_wdt_release(struct inode *inode, struct file *file)
 static struct file_operations ixp4xx_wdt_fops =
 {
 	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
 	.write		= ixp4xx_wdt_write,
 	.ioctl		= ixp4xx_wdt_ioctl,
 	.open		= ixp4xx_wdt_open,
