@@ -34,6 +34,7 @@ struct esp_data
 	struct {
 		u8			*key;		/* Key */
 		int			key_len;	/* Length of the key */
+		u8			*work_digest;
 		/* authlen is length of trailer containing auth token.
 		 * If it is not zero it is assumed to be
 		 * >= crypto_tfm_alg_digestsize(atfm) */
@@ -187,7 +188,7 @@ esp_hmac_digest(struct esp_data *esp, struct sk_buff *skb, int offset,
 		int len, u8 *auth_data)
 {
 	struct crypto_tfm *tfm = esp->auth.tfm;
-	char digest[crypto_tfm_alg_digestsize(tfm)];
+	char *digest = esp->auth.work_digest;
 
 	memset(auth_data, 0, esp->auth.authlen);
  	crypto_hmac_init(tfm, esp->auth.key, &esp->auth.key_len);
@@ -579,6 +580,10 @@ void esp_destroy(struct xfrm_state *x)
 		crypto_free_tfm(esp->auth.tfm);
 		esp->auth.tfm = NULL;
 	}
+	if (esp->auth.work_digest) {
+		kfree(esp->auth.work_digest);
+		esp->auth.work_digest = NULL;
+	}
 }
 
 int esp_init_state(struct xfrm_state *x, void *args)
@@ -596,6 +601,8 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	if (esp == NULL)
 		return -ENOMEM;
 
+	memset(esp, 0, sizeof(*esp));
+
 	if (x->aalg) {
 		esp->auth.key = x->aalg->alg_key;
 		esp->auth.key_len = (x->aalg->alg_key_len+7)/8;
@@ -604,6 +611,9 @@ int esp_init_state(struct xfrm_state *x, void *args)
 			goto error;
 		esp->auth.digest = esp_hmac_digest;
 		esp->auth.authlen = crypto_tfm_alg_digestsize(esp->auth.tfm);
+		esp->auth.work_digest = kmalloc(esp->auth.authlen, GFP_KERNEL);
+		if (!esp->auth.work_digest)
+			goto error;
 	}
 	esp->conf.key = x->ealg->alg_key;
 	esp->conf.key_len = (x->ealg->alg_key_len+7)/8;
@@ -628,6 +638,8 @@ error:
 	if (esp) {
 		if (esp->auth.tfm)
 			crypto_free_tfm(esp->auth.tfm);
+		if (esp->auth.work_digest)
+			kfree(esp->auth.work_digest);
 		if (esp->conf.tfm)
 			crypto_free_tfm(esp->conf.tfm);
 		kfree(esp);

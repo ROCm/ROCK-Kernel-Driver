@@ -35,14 +35,14 @@ void crypto_hmac_init(struct crypto_tfm *tfm, u8 *key, unsigned int *keylen)
 {
 	unsigned int i;
 	struct scatterlist tmp;
-	char ipad[crypto_tfm_alg_blocksize(tfm) + 1];
+	char *ipad = tfm->crt_work_block;
 
 	if (*keylen > crypto_tfm_alg_blocksize(tfm)) {
 		hash_key(tfm, key, *keylen);
 		*keylen = crypto_tfm_alg_digestsize(tfm);
 	}
 
-	memset(ipad, 0, sizeof(ipad));
+	memset(ipad, 0, crypto_tfm_alg_blocksize(tfm) + 1);
 	memcpy(ipad, key, *keylen);
 
 	for (i = 0; i < crypto_tfm_alg_blocksize(tfm); i++)
@@ -67,7 +67,7 @@ void crypto_hmac_final(struct crypto_tfm *tfm, u8 *key,
 {
 	unsigned int i;
 	struct scatterlist tmp;
-	char opad[crypto_tfm_alg_blocksize(tfm) + 1];
+	char *opad = tfm->crt_work_block;
 
 	if (*keylen > crypto_tfm_alg_blocksize(tfm)) {
 		hash_key(tfm, key, *keylen);
@@ -76,7 +76,7 @@ void crypto_hmac_final(struct crypto_tfm *tfm, u8 *key,
 
 	crypto_digest_final(tfm, out);
 
-	memset(opad, 0, sizeof(opad));
+	memset(opad, 0, crypto_tfm_alg_blocksize(tfm) + 1);
 	memcpy(opad, key, *keylen);
 		
 	for (i = 0; i < crypto_tfm_alg_blocksize(tfm); i++)

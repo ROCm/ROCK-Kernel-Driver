@@ -108,6 +108,8 @@ struct crypto_tfm *crypto_alloc_tfm(const char *name, u32 flags)
 	if (tfm == NULL)
 		goto out_put;
 
+	memset(tfm, 0, sizeof(*tfm));
+
 	if (alg->cra_ctxsize) {
 		tfm->crt_ctx = kmalloc(alg->cra_ctxsize, GFP_KERNEL);
 		if (tfm->crt_ctx == NULL)
@@ -116,12 +118,23 @@ struct crypto_tfm *crypto_alloc_tfm(const char *name, u32 flags)
 
 	tfm->__crt_alg = alg;
 	
+	if (alg->cra_blocksize) {
+		tfm->crt_work_block = kmalloc(alg->cra_blocksize + 1,
+					      GFP_KERNEL);
+		if (tfm->crt_work_block == NULL)
+			goto out_free_ctx;
+	}
+
 	if (crypto_init_flags(tfm, flags))
-		goto out_free_ctx;
+		goto out_free_work_block;
 		
 	crypto_init_ops(tfm);
 	
 	goto out;
+
+out_free_work_block:
+	if (tfm->__crt_alg->cra_blocksize)
+		kfree(tfm->crt_work_block);
 
 out_free_ctx:
 	if (tfm->__crt_alg->cra_ctxsize)
@@ -139,6 +152,9 @@ void crypto_free_tfm(struct crypto_tfm *tfm)
 {
 	if (tfm->__crt_alg->cra_ctxsize)
 		kfree(tfm->crt_ctx);
+		
+	if (tfm->__crt_alg->cra_blocksize)
+		kfree(tfm->crt_work_block);
 		
 	if (crypto_tfm_alg_type(tfm) == CRYPTO_ALG_TYPE_CIPHER)
 		if (tfm->crt_cipher.cit_iv)

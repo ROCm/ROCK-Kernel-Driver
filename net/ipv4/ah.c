@@ -11,6 +11,7 @@ struct ah_data
 {
 	u8			*key;
 	int			key_len;
+	u8			*work_digest;
 	int			digest_len;
 
 	void			(*digest)(struct ah_data*,
@@ -142,13 +143,12 @@ static void
 ah_hmac_digest(struct ah_data *ahp, struct sk_buff *skb, u8 *auth_data)
 {
 	struct crypto_tfm *tfm = ahp->tfm;
-	char digest[crypto_tfm_alg_digestsize(tfm)];
 
 	memset(auth_data, 0, ahp->digest_len);
  	crypto_hmac_init(tfm, ahp->key, &ahp->key_len);
   	skb_ah_walk(skb, tfm);
-	crypto_hmac_final(tfm, ahp->key, &ahp->key_len, digest);
-	memcpy(auth_data, digest, ahp->digest_len);
+	crypto_hmac_final(tfm, ahp->key, &ahp->key_len, ahp->work_digest);
+	memcpy(auth_data, ahp->work_digest, ahp->digest_len);
 }
 
 int ah_output(struct sk_buff *skb)
@@ -335,11 +335,19 @@ int ah_init_state(struct xfrm_state *x, void *args)
 	if (ahp == NULL)
 		return -ENOMEM;
 
+	memset(ahp, 0, sizeof(*ahp));
+
 	ahp->key = x->aalg->alg_key;
 	ahp->key_len = (x->aalg->alg_key_len+7)/8;
 	ahp->tfm = crypto_alloc_tfm(x->aalg->alg_name, 0);
+	if (!ahp->tfm)
+		goto error;
 	ahp->digest = ah_hmac_digest;
 	ahp->digest_len = 12;
+	ahp->work_digest = kmalloc(crypto_tfm_alg_digestsize(ahp->tfm),
+				   GFP_KERNEL);
+	if (!ahp->work_digest)
+		goto error;
 	x->props.header_len = (12 + ahp->digest_len + 7)&~7;
 	if (x->props.mode)
 		x->props.header_len += 20;
@@ -349,6 +357,8 @@ int ah_init_state(struct xfrm_state *x, void *args)
 
 error:
 	if (ahp) {
+		if (ahp->work_digest)
+			kfree(ahp->work_digest);
 		if (ahp->tfm)
 			crypto_free_tfm(ahp->tfm);
 		kfree(ahp);
@@ -360,6 +370,10 @@ void ah_destroy(struct xfrm_state *x)
 {
 	struct ah_data *ahp = x->data;
 
+	if (ahp->work_digest) {
+		kfree(ahp->work_digest);
+		ahp->work_digest = NULL;
+	}
 	if (ahp->tfm) {
 		crypto_free_tfm(ahp->tfm);
 		ahp->tfm = NULL;
