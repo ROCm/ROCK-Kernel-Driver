@@ -23,7 +23,7 @@
 #include <asm/open_pic.h>
 
 /* LongTrail */
-unsigned long gg2_pci_config_base;
+void __iomem *gg2_pci_config_base;
 
 /*
  * The VLSI Golden Gate II has only 512K of PCI configuration space, so we
@@ -253,9 +253,10 @@ chrp_find_bridges(void)
 			   || strncmp(model, "Motorola, Grackle", 17) == 0) {
 			setup_grackle(hose);
 		} else if (is_longtrail) {
+			void __iomem *p = ioremap(GG2_PCI_CONFIG_BASE, 0x80000);
 			hose->ops = &gg2_pci_ops;
-			hose->cfg_data = ioremap(GG2_PCI_CONFIG_BASE, 0x80000);
-			gg2_pci_config_base = (unsigned long) hose->cfg_data;
+			hose->cfg_data = p;
+			gg2_pci_config_base = p;
 		} else {
 			printk("No methods for %s (model %s), using RTAS\n",
 			       dev->full_name, model);
