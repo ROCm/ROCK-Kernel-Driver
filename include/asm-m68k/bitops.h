@@ -175,51 +175,96 @@ static inline int test_bit(int nr, const volatile unsigned long *vaddr)
 static inline int find_first_zero_bit(const unsigned long *vaddr,
 				      unsigned size)
 {
-	const unsigned long *p = vaddr, *addr = vaddr;
-	unsigned long allones = ~0UL;
-	int res;
+	const unsigned long *p = vaddr;
+	int res = 32;
 	unsigned long num;
 
 	if (!size)
 		return 0;
 
-	size = (size >> 5) + ((size & 31) > 0);
-	while (*p++ == allones)
-	{
-		if (--size == 0)
-			return (p - addr) << 5;
+	size = (size + 31) >> 5;
+	while (!(num = ~*p++)) {
+		if (!--size)
+			goto out;
 	}
 
-	num = ~*--p;
 	__asm__ __volatile__ ("bfffo %1{#0,#0},%0"
 			      : "=d" (res) : "d" (num & -num));
-	return ((p - addr) << 5) + (res ^ 31);
+	res ^= 31;
+out:
+	return ((long)p - (long)vaddr - 4) * 8 + res;
 }
 
 static inline int find_next_zero_bit(const unsigned long *vaddr, int size,
 				     int offset)
 {
-	const unsigned long *addr = vaddr;
-	const unsigned long *p = addr + (offset >> 5);
-	int set = 0, bit = offset & 31UL, res;
+	const unsigned long *p = vaddr + (offset >> 5);
+	int bit = offset & 31UL, res;
 
 	if (offset >= size)
 		return size;
 
 	if (bit) {
-		unsigned long num = ~*p & (~0UL << bit);
+		unsigned long num = ~*p++ & (~0UL << bit);
+		offset -= bit;
 
 		/* Look for zero in first longword */
 		__asm__ __volatile__ ("bfffo %1{#0,#0},%0"
 				      : "=d" (res) : "d" (num & -num));
 		if (res < 32)
-			return (offset & ~31UL) + (res ^ 31);
-                set = 32 - bit;
-		p++;
+			return offset + (res ^ 31);
+		offset += 32;
 	}
 	/* No zero yet, search remaining full bytes for a zero */
-	res = find_first_zero_bit (p, size - 32 * (p - addr));
-	return (offset + set + res);
+	res = find_first_zero_bit(p, size - ((long)p - (long)vaddr) * 8);
+	return offset + res;
+}
+
+static inline int find_first_bit(const unsigned long *vaddr, unsigned size)
+{
+	const unsigned long *p = vaddr;
+	int res = 32;
+	unsigned long num;
+
+	if (!size)
+		return 0;
+
+	size = (size + 31) >> 5;
+	while (!(num = *p++)) {
+		if (!--size)
+			goto out;
+	}
+
+	__asm__ __volatile__ ("bfffo %1{#0,#0},%0"
+			      : "=d" (res) : "d" (num & -num));
+	res ^= 31;
+out:
+	return ((long)p - (long)vaddr - 4) * 8 + res;
+}
+
+static inline int find_next_bit(const unsigned long *vaddr, int size,
+				int offset)
+{
+	const unsigned long *p = vaddr + (offset >> 5);
+	int bit = offset & 31UL, res;
+
+	if (offset >= size)
+		return size;
+
+	if (bit) {
+		unsigned long num = *p++ & (~0UL << bit);
+		offset -= bit;
+
+		/* Look for one in first longword */
+		__asm__ __volatile__ ("bfffo %1{#0,#0},%0"
+				      : "=d" (res) : "d" (num & -num));
+		if (res < 32)
+			return offset + (res ^ 31);
+		offset += 32;
+	}
+	/* No one yet, search remaining full bytes for a one */
+	res = find_first_bit(p, size - ((long)p - (long)vaddr) * 8);
+	return offset + res;
 }
 
 /*
