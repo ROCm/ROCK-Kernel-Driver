@@ -72,6 +72,7 @@ static void set_global_features(void);
 static void isdn_register_devfs(int);
 static void isdn_unregister_devfs(int);
 static int isdn_wildmat(char *s, char *p);
+static int isdn_command(isdn_ctrl *cmd);
 
 void
 isdn_lock_drivers(void)
@@ -353,7 +354,7 @@ isdn_receive_skb_callback(int di, int channel, struct sk_buff *skb)
  * lowlevel-driver, use driver's transparent mode and handle V.110 in
  * linklevel instead.
  */
-int
+static int
 isdn_command(isdn_ctrl *cmd)
 {
 	if (cmd->driver == -1) {
@@ -385,20 +386,6 @@ isdn_command(isdn_ctrl *cmd)
 		}
 	}
 	return dev->drv[cmd->driver]->interface->command(cmd);
-}
-
-void
-isdn_all_eaz(int di, int ch)
-{
-	isdn_ctrl cmd;
-
-	if (di < 0)
-		return;
-	cmd.driver = di;
-	cmd.arg = ch;
-	cmd.command = ISDN_CMD_SETEAZ;
-	cmd.parm.num[0] = '\0';
-	isdn_command(&cmd);
 }
 
 /*
@@ -462,7 +449,7 @@ isdn_status_callback(isdn_ctrl * c)
 			dev->drv[di]->flags |= DRV_FLAG_RUNNING;
 			for (i = 0; i < ISDN_MAX_CHANNELS; i++)
 				if (drvmap[i] == di)
-					isdn_all_eaz(di, chanmap[i]);
+					isdn_slot_all_eaz(i);
 			set_global_features();
 			break;
 		case ISDN_STAT_STOP:
@@ -769,50 +756,40 @@ isdn_getnum(char **p)
 #define DLE 0x10
 
 /*
- * isdn_readbchan() tries to get data from the read-queue.
+ * isdn_slot_readbchan() tries to get data from the read-queue.
  * It MUST be called with interrupts off.
- *
- * Be aware that this is not an atomic operation when sleep != 0, even though 
- * interrupts are turned off! Well, like that we are currently only called
- * on behalf of a read system call on raw device files (which are documented
- * to be dangerous and for for debugging purpose only). The inode semaphore
- * takes care that this is not called for the same minor device number while
- * we are sleeping, but access is not serialized against simultaneous read()
- * from the corresponding ttyI device. Can other ugly events, like changes
- * of the mapping (di,ch)<->minor, happen during the sleep? --he 
  */
 int
-isdn_readbchan(int di, int channel, u_char * buf, u_char * fp, int len, wait_queue_head_t *sleep)
+isdn_slot_readbchan(int slot, u_char * buf, u_char * fp, int len)
 {
 	int count;
 	int count_pull;
 	int count_put;
 	int dflag;
+	int di = isdn_slot_driver(slot);
+	int ch = isdn_slot_channel(slot);
 	struct sk_buff *skb;
 	u_char *cp;
 
 	if (!dev->drv[di])
 		return 0;
-	if (skb_queue_empty(&dev->drv[di]->rpqueue[channel])) {
-		if (sleep)
-			interruptible_sleep_on(sleep);
-		else
-			return 0;
-	}
-	if (len > dev->drv[di]->rcvcount[channel])
-		len = dev->drv[di]->rcvcount[channel];
+	if (skb_queue_empty(&dev->drv[di]->rpqueue[ch]))
+		return 0;
+
+	if (len > dev->drv[di]->rcvcount[ch])
+		len = dev->drv[di]->rcvcount[ch];
 	cp = buf;
 	count = 0;
 	while (len) {
-		if (!(skb = skb_peek(&dev->drv[di]->rpqueue[channel])))
+		if (!(skb = skb_peek(&dev->drv[di]->rpqueue[ch])))
 			break;
 #ifdef CONFIG_ISDN_AUDIO
 		if (ISDN_AUDIO_SKB_LOCK(skb))
 			break;
 		ISDN_AUDIO_SKB_LOCK(skb) = 1;
-		if ((ISDN_AUDIO_SKB_DLECOUNT(skb)) || (dev->drv[di]->DLEflag & (1 << channel))) {
+		if ((ISDN_AUDIO_SKB_DLECOUNT(skb)) || (dev->drv[di]->DLEflag & (1 << ch))) {
 			char *p = skb->data;
-			unsigned long DLEmask = (1 << channel);
+			unsigned long DLEmask = (1 << ch);
 
 			dflag = 0;
 			count_pull = count_put = 0;
@@ -863,7 +840,7 @@ isdn_readbchan(int di, int channel, u_char * buf, u_char * fp, int len, wait_que
 #ifdef CONFIG_ISDN_AUDIO
 			ISDN_AUDIO_SKB_LOCK(skb) = 0;
 #endif
-			skb = skb_dequeue(&dev->drv[di]->rpqueue[channel]);
+			skb = skb_dequeue(&dev->drv[di]->rpqueue[ch]);
 			dev_kfree_skb(skb);
 		} else {
 			/* Not yet emptied this buff, so it
@@ -875,7 +852,7 @@ isdn_readbchan(int di, int channel, u_char * buf, u_char * fp, int len, wait_que
 			ISDN_AUDIO_SKB_LOCK(skb) = 0;
 #endif
 		}
-		dev->drv[di]->rcvcount[channel] -= count_put;
+		dev->drv[di]->rcvcount[ch] -= count_put;
 	}
 	return count;
 }
@@ -1741,8 +1718,8 @@ isdn_map_eaz2msn(char *msn, int di)
 #define L2V (~(ISDN_FEATURE_L2_V11096|ISDN_FEATURE_L2_V11019|ISDN_FEATURE_L2_V11038))
 
 int
-isdn_get_free_channel(int usage, int l2_proto, int l3_proto, int pre_dev
-		      ,int pre_chan, char *msn)
+isdn_get_free_slot(int usage, int l2_proto, int l3_proto,
+		   int pre_dev,int pre_chan, char *msn)
 {
 	int i;
 	ulong flags;
@@ -1857,17 +1834,20 @@ isdn_unexclusive_channel(int di, int ch)
  * Return: length of data on success, -ERRcode on failure.
  */
 int
-isdn_writebuf_skb_stub(int drvidx, int chan, int ack, struct sk_buff *skb)
+isdn_slot_write(int slot, struct sk_buff *skb)
 {
 	int ret;
 	struct sk_buff *nskb = NULL;
 	int v110_ret = skb->len;
-	int idx = isdn_dc2minor(drvidx, chan);
+	int di = isdn_slot_driver(slot);
+	int ch = isdn_slot_channel(slot);
 
-	if (dev->v110[idx]) {
-		atomic_inc(&dev->v110use[idx]);
-		nskb = isdn_v110_encode(dev->v110[idx], skb);
-		atomic_dec(&dev->v110use[idx]);
+	BUG_ON(slot < 0);
+
+	if (dev->v110[slot]) {
+		atomic_inc(&dev->v110use[slot]);
+		nskb = isdn_v110_encode(dev->v110[slot], skb);
+		atomic_dec(&dev->v110use[slot]);
 		if (!nskb)
 			return 0;
 		v110_ret = *((int *)nskb->data);
@@ -1877,10 +1857,9 @@ isdn_writebuf_skb_stub(int drvidx, int chan, int ack, struct sk_buff *skb)
 			return v110_ret;
 		}
 		/* V.110 must always be acknowledged */
-		ack = 1;
-		ret = dev->drv[drvidx]->interface->writebuf_skb(drvidx, chan, ack, nskb);
+		ret = dev->drv[di]->interface->writebuf_skb(di, ch, 1, nskb);
 	} else {
-		int hl = dev->drv[drvidx]->interface->hl_hdrlen;
+		int hl = isdn_slot_hdrlen(slot);
 
 		if( skb_headroom(skb) < hl ){
 			/* 
@@ -1896,22 +1875,22 @@ isdn_writebuf_skb_stub(int drvidx, int chan, int ack, struct sk_buff *skb)
 			skb_tmp = skb_realloc_headroom(skb, hl);
 			printk(KERN_DEBUG "isdn_writebuf_skb_stub: reallocating headroom%s\n", skb_tmp ? "" : " failed");
 			if (!skb_tmp) return -ENOMEM; /* 0 better? */
-			ret = dev->drv[drvidx]->interface->writebuf_skb(drvidx, chan, ack, skb_tmp);
+			ret = dev->drv[di]->interface->writebuf_skb(di, ch, 1, skb_tmp);
 			if( ret > 0 ){
 				dev_kfree_skb(skb);
 			} else {
 				dev_kfree_skb(skb_tmp);
 			}
 		} else {
-			ret = dev->drv[drvidx]->interface->writebuf_skb(drvidx, chan, ack, skb);
+			ret = dev->drv[di]->interface->writebuf_skb(di, ch, 1, skb);
 		}
 	}
 	if (ret > 0) {
-		dev->obytes[idx] += ret;
-		if (dev->v110[idx]) {
-			atomic_inc(&dev->v110use[idx]);
-			dev->v110[idx]->skbuser++;
-			atomic_dec(&dev->v110use[idx]);
+		dev->obytes[di] += ret;
+		if (dev->v110[slot]) {
+			atomic_inc(&dev->v110use[slot]);
+			dev->v110[slot]->skbuser++;
+			atomic_dec(&dev->v110use[slot]);
 			/* For V.110 return unencoded data length */
 			ret = v110_ret;
 			/* if the complete frame was send we free the skb;
@@ -1920,7 +1899,7 @@ isdn_writebuf_skb_stub(int drvidx, int chan, int ack, struct sk_buff *skb)
 				dev_kfree_skb(skb);
 		}
 	} else
-		if (dev->v110[idx])
+		if (dev->v110[slot])
 			dev_kfree_skb(nskb);
 	return ret;
 }
@@ -2193,24 +2172,6 @@ isdn_slot_all_eaz(int slot)
 
 	cmd.parm.num[0] = '\0';
 	isdn_slot_command(slot, ISDN_CMD_SETEAZ, &cmd);
-}
-
-int
-isdn_slot_readbchan(int slot, u_char *buf, u_char *fp, int len, wait_queue_head_t *sleep)
-{
-	int di = isdn_slot_driver(slot);
-	int ch = isdn_slot_channel(slot);
-
-	return isdn_readbchan(di, ch, buf, fp, len, sleep);
-}
-
-int
-isdn_slot_writebuf_skb_stub(int slot, int ack, struct sk_buff *skb)
-{
-	int di = isdn_slot_driver(slot);
-	int ch = isdn_slot_channel(slot);
-
-	return isdn_writebuf_skb_stub(di, ch, ack, skb);
 }
 
 /*

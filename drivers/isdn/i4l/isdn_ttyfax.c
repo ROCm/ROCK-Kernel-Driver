@@ -373,8 +373,8 @@ isdn_tty_cmd_FCLASS1(char **p, modem_info * info)
 			PARSE_ERROR1;
 		}
 		/* get a temporary connection to the first free fax driver */
-		i = isdn_get_free_channel(ISDN_USAGE_FAX, ISDN_PROTO_L2_FAX,
-					  ISDN_PROTO_L3_FCLASS1, -1, -1, "00");
+		i = isdn_get_free_slot(ISDN_USAGE_FAX, ISDN_PROTO_L2_FAX,
+				       ISDN_PROTO_L3_FCLASS1, -1, -1, "00");
 		if (i < 0) {
 			restore_flags(flags);
 			PARSE_ERROR1;

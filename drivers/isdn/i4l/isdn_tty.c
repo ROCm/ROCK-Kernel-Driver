@@ -145,7 +145,7 @@ isdn_tty_readmodem(void)
 							cli();
 							r = isdn_slot_readbchan(info->isdn_slot,
 									   tty->flip.char_buf_ptr,
-									   tty->flip.flag_buf_ptr, c, 0);
+									   tty->flip.flag_buf_ptr, c);
 							/* CISCO AsyncPPP Hack */
 							if (!(info->emu.mdmreg[REG_CPPP] & BIT_CPPP))
 								memset(tty->flip.flag_buf_ptr, 0, r);
@@ -315,7 +315,7 @@ isdn_tty_tint(modem_info * info)
 	if (!skb)
 		return;
 	len = skb->len;
-	if ((slen = isdn_slot_writebuf_skb_stub(info->isdn_slot, 1, skb)) == len) {
+	if ((slen = isdn_slot_write(info->isdn_slot, skb)) == len) {
 		struct tty_struct *tty = info->tty;
 		info->send_outstanding++;
 		info->msr &= ~UART_MSR_CTS;
@@ -651,7 +651,7 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 	m->mdmreg[REG_SI1I] = si2bit[si];
 	save_flags(flags);
 	cli();
-	i = isdn_get_free_channel(usg, l2, m->mdmreg[REG_L3PROT], -1, -1, m->msn);
+	i = isdn_get_free_slot(usg, l2, m->mdmreg[REG_L3PROT], -1, -1, m->msn);
 	if (i < 0) {
 		restore_flags(flags);
 		isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
@@ -842,7 +842,7 @@ isdn_tty_resume(char *id, modem_info * info, atemu * m)
 	m->mdmreg[REG_SI1I] = si2bit[si];
 	save_flags(flags);
 	cli();
-	i = isdn_get_free_channel(usg, l2, m->mdmreg[REG_L3PROT], -1, -1, m->msn);
+	i = isdn_get_free_slot(usg, l2, m->mdmreg[REG_L3PROT], -1, -1, m->msn);
 	if (i < 0) {
 		restore_flags(flags);
 		isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
@@ -922,7 +922,7 @@ isdn_tty_send_msg(modem_info * info, atemu * m, char *msg)
 	m->mdmreg[REG_SI1I] = si2bit[si];
 	save_flags(flags);
 	cli();
-	i = isdn_get_free_channel(usg, l2, m->mdmreg[REG_L3PROT], -1, -1, m->msn);
+	i = isdn_get_free_slot(usg, l2, m->mdmreg[REG_L3PROT], -1, -1, m->msn);
 	if (i < 0) {
 		restore_flags(flags);
 		isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
@@ -3253,10 +3253,9 @@ isdn_tty_cmd_ATA(modem_info * info)
 		}
 #endif
 		isdn_slot_command(info->isdn_slot, ISDN_CMD_SETL3, &cmd);
-		isdn_slot_command(info->isdn_slot, ISDN_CMD_ACCEPTD, &cmd);
 		info->dialing = 16;
 		info->emu.carrierwait = 0;
-		isdn_command(&cmd);
+		isdn_slot_command(info->isdn_slot, ISDN_CMD_ACCEPTD, &cmd);
 		isdn_timer_ctrl(ISDN_TIMER_CARRIER, 1);
 	} else
 		isdn_tty_modem_result(RESULT_NO_ANSWER, info);

@@ -614,7 +614,7 @@ isdn_net_dial(void)
 			case 2:
 				/* Prepare dialing. Clear EAZ, then set EAZ. */
 				isdn_slot_command(lp->isdn_slot, ISDN_CMD_CLREAZ, &cmd);
-				sprintf(cmd.parm.num, "%s", isdn_map_eaz2msn(lp->msn, cmd.driver));
+				sprintf(cmd.parm.num, "%s", isdn_slot_map_eaz2msn(lp->isdn_slot, lp->msn));
 				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETEAZ, &cmd);
 				lp->dialretry = 0;
 				anymore = 1;
@@ -1017,7 +1017,7 @@ void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb)
 		printk("isdn BUG at %s:%d!\n", __FILE__, __LINE__);
 		goto error;
 	}
-	ret = isdn_slot_writebuf_skb_stub(lp->isdn_slot, 1, skb);
+	ret = isdn_slot_write(lp->isdn_slot, skb);
 	if (ret != len) {
 		/* we should never get here */
 		printk(KERN_WARNING "%s: HL driver queue full\n", lp->name);
@@ -1225,7 +1225,7 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 				}
 				/* Grab a free ISDN-Channel */
 				if (((chi =
-				     isdn_get_free_channel(
+				     isdn_get_free_slot(
 					 		ISDN_USAGE_NET,
 							lp->l2_proto,
 							lp->l3_proto,
@@ -1234,7 +1234,7 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 							lp->msn)
 							) < 0) &&
 					((chi =
-				     isdn_get_free_channel(
+				     isdn_get_free_slot(
 					 		ISDN_USAGE_NET,
 							lp->l2_proto,
 							lp->l3_proto,
@@ -2361,7 +2361,7 @@ p = dev->netdev;
 					if (lp->phone[1]) {
 						/* Grab a free ISDN-Channel */
 						if ((chi = 
-							isdn_get_free_channel(
+							isdn_get_free_slot(
 								ISDN_USAGE_NET,
 								lp->l2_proto,
 								lp->l3_proto,
@@ -2477,7 +2477,7 @@ isdn_net_force_dial_lp(isdn_net_local * lp)
 
 			/* Grab a free ISDN-Channel */
 			if ((chi = 
-						isdn_get_free_channel(
+						isdn_get_free_slot(
 							ISDN_USAGE_NET,
 							lp->l2_proto,
 							lp->l3_proto,
@@ -2797,7 +2797,7 @@ isdn_net_setcfg(isdn_net_ioctl_cfg * cfg)
 
 			/* If binding is exclusive, try to grab the channel */
 			save_flags(flags);
-			if ((i = isdn_get_free_channel(ISDN_USAGE_NET,
+			if ((i = isdn_get_free_slot(ISDN_USAGE_NET,
 				lp->l2_proto, lp->l3_proto, drvidx,
 				chidx, lp->msn)) < 0) {
 				/* Grab failed, because desired channel is in use */
