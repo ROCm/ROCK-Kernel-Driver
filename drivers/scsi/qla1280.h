@@ -1306,7 +1306,6 @@ struct scsi_qla_host {
 /*
  *  Linux - SCSI Driver Interface Function Prototypes.
  */
-int qla1280_proc_info(char *, char **, off_t, int, int, int);
 const char *qla1280_info(struct Scsi_Host *host);
 int qla1280_detect(Scsi_Host_Template *);
 int qla1280_release(struct Scsi_Host *);

@@ -6062,12 +6062,11 @@ void DC395x_inquiry(struct AdapterCtlBlk *pACB, struct DeviceCtlBlk *pDCB)
  else SPRINTF(" No  ")
 
 static int
-DC395x_proc_info(char *buffer, char **start, off_t offset, int length,
-		 int hostno, int inout)
+DC395x_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start, off_t offset, int length,
+		 int inout)
 {
 	int dev, spd, spd1;
 	char *pos = buffer;
-	struct Scsi_Host *shpnt = NULL;
 	struct AdapterCtlBlk *pACB;
 	struct DeviceCtlBlk *pDCB;
 	unsigned long flags;
@@ -6078,15 +6077,11 @@ DC395x_proc_info(char *buffer, char **start, off_t offset, int length,
 	pACB = DC395x_pACB_start;
 
 	while (pACB) {
-		shpnt = pACB->pScsiHost;
-		if (shpnt->host_no == hostno)
+		if (pACB->pScsiHost == shpnt)
 			break;
 		pACB = pACB->pNextACB;
 	}
 	if (!pACB)
-		return -ESRCH;
-
-	if (!shpnt)
 		return -ESRCH;
 
 	if (inout)		/* Has data been written to the file ? */

@@ -209,17 +209,12 @@ int fcal_release(struct Scsi_Host *host)
 #undef SPRINTF
 #define SPRINTF(args...) { if (pos < (buffer + length)) pos += sprintf (pos, ## args); }
 
-int fcal_proc_info (char *buffer, char **start, off_t offset, int length, int hostno, int inout)
+int fcal_proc_info (struct Scsi_Host *host, char *buffer, char **start, off_t offset, int length, int inout)
 {
-	struct Scsi_Host *host = NULL;
 	struct fcal *fcal;
 	fc_channel *fc;
 	char *pos = buffer;
 	int i, j;
-
-	host = scsi_host_hn_get(hostno);
-
-	if (!host) return -ESRCH;
 
 	if (inout) return length;
     

@@ -623,11 +623,10 @@ qla1280_set_info(char *buffer, int length, struct Scsi_Host *HBAptr)
 #define	PROC_BUF	&qla1280_buffer[len]
 
 int
-qla1280_proc_info(char *buffer, char **start, off_t offset, int length,
-		  int hostno, int inout)
+qla1280_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset, int length,
+		  int inout)
 {
 #if QLA1280_PROFILE
-	struct Scsi_Host *host;
 	struct scsi_qla_host *ha;
 	int size = 0;
 	scsi_lu_t *up;
@@ -637,21 +636,8 @@ qla1280_proc_info(char *buffer, char **start, off_t offset, int length,
 	host = NULL;
 
 	/* Find the host that was specified */
-	for (ha = qla1280_hostlist; (ha != NULL) && ha->host->host_no != hostno;
+	for (ha = qla1280_hostlist; (ha != NULL) && ha->host != host;
 	     ha = ha->next) ;
-
-	/* if host wasn't found then exit */
-	if (!ha) {
-		size =  sprintf(buffer, "Can't find adapter for host "
-				"number %d\n", hostno);
-		if (size > length) {
-			return size;
-		} else {
-			return 0;
-		}
-	}
-
-	host = ha->host;
 
 	if (inout == TRUE) {	/* Has data been written to the file? */
 		printk(KERN_INFO

@@ -746,11 +746,10 @@ char *lprint_Scsi_Cmnd (Scsi_Cmnd *cmd, char *pos, char *buffer, int length);
 #ifndef NCR5380_proc_info
 static
 #endif
-int NCR5380_proc_info (char *buffer, char **start, off_t offset,
-		       int length, int hostno, int inout)
+int NCR5380_proc_info (struct Scsi_Host *instance, char *buffer, char **start, off_t offset,
+		       int length, int inout)
 {
     char *pos = buffer;
-    struct Scsi_Host *instance;
     struct NCR5380_hostdata *hostdata;
     Scsi_Cmnd *ptr;
     unsigned long flags;
@@ -763,9 +762,6 @@ int NCR5380_proc_info (char *buffer, char **start, off_t offset,
 	}					\
     } while (0)
 
-    instance = scsi_host_hn_get(hostno);
-    if (!instance)
-	return(-ESRCH);
     hostdata = (struct NCR5380_hostdata *)instance->hostdata;
 
     if (inout) { /* Has data been written to the file ? */

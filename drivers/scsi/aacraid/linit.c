@@ -137,7 +137,6 @@ static int aac_release(struct Scsi_Host *);
 static int aac_queuecommand(Scsi_Cmnd *, void (*CompletionRoutine)(Scsi_Cmnd *));
 static int aac_biosparm(struct scsi_device *, struct block_device *,
 			sector_t, int *);
-static int aac_procinfo(char *, char **, off_t, int, int, int);
 static int aac_ioctl(Scsi_Device *, int, void *);
 static int aac_eh_abort(Scsi_Cmnd * cmd);
 static int aac_eh_device_reset(Scsi_Cmnd* cmd);
@@ -616,7 +615,6 @@ static int aac_cfg_ioctl(struct inode * inode,  struct file * file, unsigned int
 static Scsi_Host_Template driver_template = {
 	.module				= THIS_MODULE,
 	.name           		= "AAC",
-	.proc_info      		= aac_procinfo,
 	.detect         		= aac_detect,
 	.release        		= aac_release,
 	.info           		= aac_driverinfo,
@@ -682,35 +680,3 @@ static int aac_eh_reset(Scsi_Cmnd* cmd)
 
 
 #include "scsi_module.c"
-
-/**
- *	aac_procinfo	-	Implement /proc/scsi/<drivername>/<n>
- *	@proc_buffer: memory buffer for I/O
- *	@start_ptr: pointer to first valid data
- *	@offset: offset into file
- *	@bytes_available: space left
- *	@host_no: scsi host ident
- *	@write: direction of I/O
- *
- *	Used to export driver statistics and other infos to the world outside 
- *	the kernel using the proc file system. Also provides an interface to
- *	feed the driver with information.
- *
- *		For reads
- *			- if offset > 0 return 0
- *			- if offset == 0 write data to proc_buffer and set the start_ptr to
- *			beginning of proc_buffer, return the number of characters written.
- *		For writes
- *			- writes currently not supported, return 0
- *
- *	Bugs:	Only offset zero is handled
- */
-
-static int aac_procinfo(char *proc_buffer, char **start_ptr,off_t offset,
-			int bytes_available, int host_no, int write)
-{
-	if(write || offset > 0)
-		return 0;
-	*start_ptr = proc_buffer;
-	return sprintf(proc_buffer, "%s  %d\n", "Raid Controller, scsi hba number", host_no);
-}

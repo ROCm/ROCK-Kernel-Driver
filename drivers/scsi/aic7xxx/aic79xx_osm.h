@@ -1006,7 +1006,7 @@ ahd_flush_device_writes(struct ahd_softc *ahd)
 	(((dev_softc)->dma_mask = mask) && 0)
 #endif
 /**************************** Proc FS Support *********************************/
-int	ahd_linux_proc_info(char *, char **, off_t, int, int, int);
+int	ahd_linux_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
 
 /*************************** Domain Validation ********************************/
 #define AHD_DV_CMD(cmd) ((cmd)->scsi_done == ahd_linux_dv_complete)

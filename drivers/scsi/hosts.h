@@ -68,7 +68,7 @@ typedef struct	SHT
      * outside the kernel ie. userspace and it also provides an interface
      * to feed the driver with information. Check eata_dma_proc.c for reference
      */
-    int (*proc_info)(char *, char **, off_t, int, int, int);
+    int (*proc_info)(struct Scsi_Host *, char *, char **, off_t, int, int);
 
     /*
      * The name pointer is a pointer to the name of the SCSI
@@ -569,9 +569,6 @@ extern int scsi_remove_host(struct Scsi_Host *);
  */
 extern int scsi_register_host(Scsi_Host_Template *);
 extern int scsi_unregister_host(Scsi_Host_Template *);
-
-extern struct Scsi_Host *scsi_host_hn_get(unsigned short);
-extern void scsi_host_put(struct Scsi_Host *);
 
 /**
  * scsi_find_device - find a device given the host

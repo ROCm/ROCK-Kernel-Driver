@@ -51,11 +51,8 @@ static int generic_NCR5380_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *))
 static int generic_NCR5380_bus_reset(Scsi_Cmnd *);
 static int generic_NCR5380_host_reset(Scsi_Cmnd *);
 static int generic_NCR5380_device_reset(Scsi_Cmnd *);
-static int notyet_generic_proc_info (char *buffer ,char **start, off_t offset,
-                     int length, int hostno, int inout);
 static const char* generic_NCR5380_info(struct Scsi_Host *);
 static int generic_NCR5380_biosparam(struct scsi_device *, struct block_device *, sector_t, int *);
-static int generic_NCR5380_proc_info(char* buffer, char** start, off_t offset, int length, int hostno, int inout);
 
 #ifndef CMD_PER_LUN
 #define CMD_PER_LUN 2
