@@ -124,6 +124,11 @@ static int ati_create_gatt_pages(int nr_tables)
 	for (i = 0; i < nr_tables; i++) {
 		entry = kmalloc(sizeof(ati_page_map), GFP_KERNEL);
 		if (entry == NULL) {
+			while (i>0) {
+				kfree (tables[i-1]);
+				i--;
+			}
+			kfree (tables);
 			retval = -ENOMEM;
 			break;
 		}
