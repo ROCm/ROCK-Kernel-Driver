@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -39,8 +39,6 @@ STATIC int	xfs_uuid_mount(xfs_mount_t *);
 mutex_t		xfs_uuidtabmon;		/* monitor for uuidtab */
 STATIC int	xfs_uuidtab_size;
 STATIC uuid_t	*xfs_uuidtab;
-
-STATIC void	xfs_uuid_unmount(xfs_mount_t *);
 
 void xfs_xlatesb(void *, xfs_sb_t *, int, xfs_arch_t, __int64_t);
 
@@ -120,10 +118,9 @@ xfs_mount_init(void)
 	spinlock_init(&mp->m_freeze_lock, "xfs_freeze");
 	init_sv(&mp->m_wait_unfreeze, SV_DEFAULT, "xfs_freeze", 0);
 	atomic_set(&mp->m_active_trans, 0);
-	mp->m_cxfstype = XFS_CXFS_NOT;
 
 	return mp;
-}	/* xfs_mount_init */
+}
 
 /*
  * Free up the resources associated with a mount structure.  Assume that
@@ -146,19 +143,12 @@ xfs_mount_free(
 		for (agno = 0; agno < mp->m_maxagi; agno++)
 			if (mp->m_perag[agno].pagb_list)
 				kmem_free(mp->m_perag[agno].pagb_list,
-				  sizeof(xfs_perag_busy_t) * XFS_PAGB_NUM_SLOTS);
+						sizeof(xfs_perag_busy_t) *
+							XFS_PAGB_NUM_SLOTS);
 		kmem_free(mp->m_perag,
 			  sizeof(xfs_perag_t) * mp->m_sb.sb_agcount);
 	}
 
-#if 0
-	/*
-	 * XXXdpd - Doesn't work now for shutdown case.
-	 * Should at least free the memory.
-	 */
-	ASSERT(mp->m_ail.ail_back == (xfs_log_item_t*)&(mp->m_ail));
-	ASSERT(mp->m_ail.ail_forw == (xfs_log_item_t*)&(mp->m_ail));
-#endif
 	AIL_LOCK_DESTROY(&mp->m_ail_lock);
 	spinlock_destroy(&mp->m_sb_lock);
 	mutex_destroy(&mp->m_ilock);
@@ -172,8 +162,12 @@ xfs_mount_free(
 	}
 
 	if (remove_bhv) {
-		VFS_REMOVEBHV(XFS_MTOVFS(mp), &mp->m_bhv);
+		struct vfs	*vfsp = XFS_MTOVFS(mp);
+
+		bhv_remove_all_vfsops(vfsp, 0);
+		VFS_REMOVEBHV(vfsp, &mp->m_bhv);
 	}
+
 	spinlock_destroy(&mp->m_freeze_lock);
 	sv_destroy(&mp->m_wait_unfreeze);
 	kmem_free(mp, sizeof(xfs_mount_t));
@@ -605,14 +599,11 @@ xfs_mountfs(
 {
 	xfs_buf_t	*bp;
 	xfs_sb_t	*sbp = &(mp->m_sb);
-	int		error = 0;
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
-	int		readio_log;
-	int		writeio_log;
+	int		readio_log, writeio_log;
 	vmap_t		vmap;
 	xfs_daddr_t	d;
-	extern xfs_ioops_t xfs_iocore_xfs;	/* from xfs_iocore.c */
 	__uint64_t	ret64;
 	uint		quotaflags, quotaondisk;
 	uint		uquotaondisk = 0, gquotaondisk = 0;
@@ -620,6 +611,7 @@ xfs_mountfs(
 	__int64_t	update_flags;
 	int		agno, noio;
 	int		uuid_mounted = 0;
+	int		error = 0;
 
 	noio = dev == 0 && mp->m_sb_bp != NULL;
 	if (mp->m_sb_bp == NULL) {
@@ -644,7 +636,8 @@ xfs_mountfs(
 		if ((BBTOB(mp->m_dalign) & mp->m_blockmask) ||
 		    (BBTOB(mp->m_swidth) & mp->m_blockmask)) {
 			if (mp->m_flags & XFS_MOUNT_RETERR) {
-				cmn_err(CE_WARN, "XFS: alignment check 1 failed");
+				cmn_err(CE_WARN,
+					"XFS: alignment check 1 failed");
 				error = XFS_ERROR(EINVAL);
 				goto error1;
 			}
@@ -664,7 +657,8 @@ xfs_mountfs(
 				mp->m_swidth = XFS_BB_TO_FSBT(mp, mp->m_swidth);
 			} else {
 				if (mp->m_flags & XFS_MOUNT_RETERR) {
-					cmn_err(CE_WARN, "XFS: alignment check 3 failed");
+					cmn_err(CE_WARN,
+					"XFS: alignment check 3 failed");
 					error = XFS_ERROR(EINVAL);
 					goto error1;
 				}
@@ -718,7 +712,8 @@ xfs_mountfs(
 	 * since a single partition filesystem is identical to a single
 	 * partition volume/filesystem.
 	 */
-	if ((mfsi_flags & XFS_MFSI_SECOND) == 0 && (mp->m_flags & XFS_MOUNT_NOUUID) == 0) {
+	if ((mfsi_flags & XFS_MFSI_SECOND) == 0 &&
+	    (mp->m_flags & XFS_MOUNT_NOUUID) == 0) {
 		if (xfs_uuid_mount(mp)) {
 			error = XFS_ERROR(EINVAL);
 			goto error1;
@@ -858,9 +853,6 @@ xfs_mountfs(
 	if (mfsi_flags & XFS_MFSI_CLIENT) {
 		return(0);
 	}
-
-	/* Initialize the I/O function vector with XFS functions */
-	mp->m_io_ops = xfs_iocore_xfs;
 
 	/*
 	 *  Copies the low order bits of the timestamp and the randomly
@@ -1118,6 +1110,7 @@ xfs_mountfs(
 int
 xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 {
+	struct vfs	*vfsp = XFS_MTOVFS(mp);
 	int		ndquots;
 #if defined(DEBUG) || defined(INDUCE_IO_ERROR)
 	int64_t		fsid;
@@ -1178,14 +1171,14 @@ xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 	/*
 	 * clear all error tags on this filesystem
 	 */
-	memcpy(&fsid, &(XFS_MTOVFS(mp)->vfs_fsid), sizeof(int64_t));
-	(void) xfs_errortag_clearall_umount(fsid, mp->m_fsname, 0);
+	memcpy(&fsid, &vfsp->vfs_fsid, sizeof(int64_t));
+	xfs_errortag_clearall_umount(fsid, mp->m_fsname, 0);
 #endif
-
+	XFS_IODONE(vfsp);
 	xfs_mount_free(mp, 1);
 	return 0;
 }
-
+ 
 void
 xfs_unmountfs_close(xfs_mount_t *mp, struct cred *cr)
 {

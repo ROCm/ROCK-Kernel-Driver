@@ -1,7 +1,7 @@
 /*
  * XFS filesystem operations.
  *
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -248,9 +248,6 @@ xfs_start_flags(
 	if (ap->flags & XFSMNT_NOATIME)
 		mp->m_flags |= XFS_MOUNT_NOATIME;
 
-	if (ap->flags & (XFSMNT_UQUOTA | XFSMNT_GQUOTA))
-		xfs_qm_mount_quotainit(mp, ap->flags);
-
 	if (ap->flags & XFSMNT_RETERR)
 		mp->m_flags |= XFS_MOUNT_RETERR;
 
@@ -387,11 +384,12 @@ xfs_finish_flags(
  */
 STATIC int
 xfs_mount(
-	vfs_t			*vfsp,
+	struct bhv_desc		*bhvp,
 	struct xfs_mount_args	*args,
 	cred_t			*credp)
 {
-	xfs_mount_t		*mp;
+	struct vfs		*vfsp = bhvtovfs(bhvp);
+	struct xfs_mount	*mp = XFS_BHVTOM(bhvp);
 	struct block_device	*ddev, *logdev, *rtdev;
 	int			ronly = (vfsp->vfs_flag & VFS_RDONLY);
 	int			flags = 0, error;
@@ -400,23 +398,18 @@ xfs_mount(
 	logdev = rtdev = NULL;
 
 	/*
-	 * Allocate VFS private data (xfs mount structure).
-	 */
-	mp = xfs_mount_init();
-
-	/*
 	 * Open real time and log devices - order is important.
 	 */
 	if (args->logname[0]) {
 		error = xfs_blkdev_get(mp, args->logname, &logdev);
 		if (error)
-			goto free_mp;
+			return error;
 	}
 	if (args->rtname[0]) {
 		error = xfs_blkdev_get(mp, args->rtname, &rtdev);
 		if (error) {
 			xfs_blkdev_put(logdev);
-			goto free_mp;
+			return error;
 		}
 
 		if (rtdev == ddev || rtdev == logdev) {
@@ -424,12 +417,11 @@ xfs_mount(
 	"XFS: Cannot mount filesystem with identical rtdev and ddev/logdev.");
 			xfs_blkdev_put(logdev);
 			xfs_blkdev_put(rtdev);
-			error = EINVAL;
-			goto free_mp;
+			return EINVAL;
 		}
 	}
 
-	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
+	mp->m_io_ops = xfs_iocore_xfs;
 
 	mp->m_ddev_targp = xfs_alloc_buftarg(ddev);
 	if (rtdev)
@@ -465,10 +457,8 @@ xfs_mount(
 		xfs_setsize_buftarg(mp->m_rtdev_targp, mp->m_sb.sb_blocksize,
 				    mp->m_sb.sb_blocksize);
 
-	error = xfs_mountfs(vfsp, mp, ddev->bd_dev, flags);
-	if (error)
-		goto error;
-	return 0;
+	if (!(error = XFS_IOINIT(vfsp, args, flags)))
+		return 0;
 
  error:
 	xfs_binval(mp->m_ddev_targp);
@@ -479,9 +469,6 @@ xfs_mount(
 		xfs_binval(mp->m_rtdev_targp);
 	}
 	xfs_unmountfs_close(mp, NULL);
-
- free_mp:
-	xfs_mount_free(mp, 1);
 	return error;
 }
 
@@ -523,8 +510,9 @@ xfs_ibusy(
 				continue;
 			}
 #ifdef DEBUG
-			printk("busy vp=0x%p ip=0x%p inum %Ld count=%d\n",
-				vp, ip, ip->i_ino, vn_count(vp));
+			cmn_err(CE_WARN, "%s: busy vp=0x%p ip=0x%p "
+					 "inum %Ld count=%d",
+				__FUNCTION__, vp, ip, ip->i_ino, vn_count(vp));
 #endif
 			busy++;
 		}
@@ -577,7 +565,8 @@ xfs_unmount(
 	 */
 	if (xfs_ibusy(mp)) {
 		error = XFS_ERROR(EBUSY);
-		printk("xfs_unmount: xfs_ibusy says error/%d\n", error);
+		cmn_err(CE_ALERT, "%s: xfs_ibusy failed -- error code %d",
+			__FUNCTION__, error);
 		goto out;
 	}
 
@@ -598,7 +587,7 @@ xfs_unmount(
 	 * we want to make sure we invalidate dirty pages that belong to
 	 * referenced vnodes as well.
 	 */
-	if (XFS_FORCED_SHUTDOWN(mp))  {
+	if (XFS_FORCED_SHUTDOWN(mp)) {
 		error = xfs_sync(&mp->m_bhv,
 			 (SYNC_WAIT | SYNC_CLOSE), credp);
 		ASSERT(error != EFSCORRUPTED);
@@ -641,7 +630,7 @@ xfs_unmount_flush(
 {
 	xfs_inode_t	*rip = mp->m_rootip;
 	xfs_inode_t	*rbmip;
-	xfs_inode_t	*rsumip=NULL;
+	xfs_inode_t	*rsumip = NULL;
 	vnode_t		*rvp = XFS_ITOV(rip);
 	int		error;
 
@@ -675,18 +664,17 @@ xfs_unmount_flush(
 	}
 
 	/*
-	 * synchronously flush root inode to disk
+	 * Synchronously flush root inode to disk
 	 */
 	error = xfs_iflush(rip, XFS_IFLUSH_SYNC);
-
 	if (error == EFSCORRUPTED)
 		goto fscorrupt_out2;
 
 	if (vn_count(rvp) != 1 && !relocation) {
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
-		error = XFS_ERROR(EBUSY);
-		return (error);
+		return XFS_ERROR(EBUSY);
 	}
+
 	/*
 	 * Release dquot that rootinode, rbmino and rsumino might be holding,
 	 * flush and purge the quota inodes.
@@ -701,7 +689,7 @@ xfs_unmount_flush(
 	}
 
 	xfs_iunlock(rip, XFS_ILOCK_EXCL);
-	return (0);
+	return 0;
 
 fscorrupt_out:
 	xfs_ifunlock(rip);
@@ -709,8 +697,7 @@ fscorrupt_out:
 fscorrupt_out2:
 	xfs_iunlock(rip, XFS_ILOCK_EXCL);
 
-	error = XFS_ERROR(EFSCORRUPTED);
-	return (error);
+	return XFS_ERROR(EFSCORRUPTED);
 }
 
 /*
@@ -725,12 +712,11 @@ xfs_root(
 	bhv_desc_t	*bdp,
 	vnode_t		**vpp)
 {
-	vnode_t *vp;
+	vnode_t		*vp;
 
 	vp = XFS_ITOV((XFS_BHVTOM(bdp))->m_rootip);
 	VN_HOLD(vp);
 	*vpp = vp;
-
 	return 0;
 }
 
@@ -1411,23 +1397,6 @@ xfs_syncsub(
 	ASSERT(ipointer_in == B_FALSE);
 
 	/*
-	 * Get the Quota Manager to flush the dquots in a similar manner.
-	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if ((error = xfs_qm_sync(mp, flags))) {
-			/*
-			 * If we got an IO error, we will be shutting down.
-			 * So, there's nothing more for us to do here.
-			 */
-			ASSERT(error != EIO || XFS_FORCED_SHUTDOWN(mp));
-			if (XFS_FORCED_SHUTDOWN(mp)) {
-				kmem_free(ipointer, sizeof(xfs_iptr_t));
-				return XFS_ERROR(error);
-			}
-		}
-	}
-
-	/*
 	 * Flushing out dirty data above probably generated more
 	 * log activity, so if this isn't vfs_sync() then flush
 	 * the log again.  If SYNC_WAIT is set then do it synchronously.
@@ -1581,16 +1550,17 @@ xfs_vget(
 
 
 vfsops_t xfs_vfsops = {
+	BHV_IDENTITY_INIT(VFS_BHV_XFS,VFS_POSITION_XFS),
+	.vfs_parseargs		= xfs_parseargs,
+	.vfs_showargs		= xfs_showargs,
 	.vfs_mount		= xfs_mount,
 	.vfs_unmount		= xfs_unmount,
 	.vfs_root		= xfs_root,
 	.vfs_statvfs		= xfs_statvfs,
 	.vfs_sync		= xfs_sync,
 	.vfs_vget		= xfs_vget,
+	.vfs_dmapiops		= (vfs_dmapiops_t)fs_nosys,
+	.vfs_quotactl		= (vfs_quotactl_t)fs_nosys,
 	.vfs_init_vnode		= xfs_initialize_vnode,
 	.vfs_force_shutdown	= xfs_do_force_shutdown,
-#ifdef CONFIG_XFS_DMAPI
-	.vfs_dmapi_mount	= xfs_dm_mount,
-	.vfs_dmapi_fsys_vector	= xfs_dm_get_fsys_vector,
-#endif
 };

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -199,10 +199,7 @@ extern int		xfs_qm_mplist_nowait(xfs_mount_t *);
 extern int		xfs_qm_dqhashlock_nowait(xfs_dquot_t *);
 
 /* system call interface */
-extern int linvfs_getxstate(struct super_block *, struct fs_quota_stat *);
-extern int linvfs_setxstate(struct super_block *, unsigned int, int);
-extern int linvfs_getxquota(struct super_block *, int, qid_t, struct fs_disk_quota *);
-extern int linvfs_setxquota(struct super_block *, int, qid_t, struct fs_disk_quota *);
+extern int		xfs_qm_quotactl(bhv_desc_t *, int, int, xfs_caddr_t);
 
 #ifdef DEBUG
 extern int		xfs_qm_internalqcheck(xfs_mount_t *);

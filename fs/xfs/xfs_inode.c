@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -1189,25 +1189,6 @@ xfs_ialloc(
 	 */
 	ip->i_d.di_aformat = XFS_DINODE_FMT_EXTENTS;
 	ip->i_d.di_anextents = 0;
-
-#if DEBUG
-	{
-		uint	badflags = VNOSWAP |
-			       VISSWAP |
-			       VREPLICABLE |
-			   /*  VNONREPLICABLE | XXX uncomment this */
-			       VDOCMP |
-			       VFRLOCKS;
-
-		/*
-		 * For shared mounts, VNOSWAP is set in xfs_iget
-		 */
-		if (tp->t_mountp->m_cxfstype != XFS_CXFS_NOT)
-			badflags &= ~VNOSWAP;
-
-		ASSERT(!(vp->v_flag & badflags));
-	}
-#endif /* DEBUG */
 
 	/*
 	 * Log the new values stuffed into the inode.

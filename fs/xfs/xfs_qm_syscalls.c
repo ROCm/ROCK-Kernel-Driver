@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -34,9 +34,9 @@
 #include <xfs_quota_priv.h>
 
 #ifdef DEBUG
-# define qdprintk(s, args...)		printk(s, ## args)
+# define qdprintk(s, args...)	cmn_err(CE_DEBUG, s, ## args)
 #else
-# define qdprintk(s, args...)		do { } while (0)
+# define qdprintk(s, args...)	do { } while (0)
 #endif
 
 STATIC int	xfs_qm_scall_trunc_qfiles(xfs_mount_t *, uint);
@@ -58,95 +58,123 @@ STATIC void	xfs_qm_export_dquot(xfs_mount_t *, xfs_disk_dquot_t *,
 					fs_disk_quota_t *);
 
 
+/*
+ * The main distribution switch of all XFS quotactl system calls.
+ */
 int
-linvfs_getxstate(
-	struct super_block	*sb,
-	struct fs_quota_stat	*fqs)
+xfs_qm_quotactl(
+	struct bhv_desc *bdp,
+	int		cmd,
+	int		id,
+	xfs_caddr_t	addr)
 {
-	xfs_mount_t		*mp;
-	vfs_t			*vfsp;
+	xfs_mount_t	*mp;
+	int 		error;
+	struct vfs	*vfsp;
 
-	vfsp = LINVFS_GET_VFS(sb);
-	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
-	return -xfs_qm_scall_getqstat(mp, fqs);
-}
+	vfsp = bhvtovfs(bdp);
+        mp = XFS_VFSTOM(vfsp);
 
-int
-linvfs_setxstate(
-	struct super_block	*sb,
-	unsigned int		flags,
-	int			op)
-{
-	xfs_mount_t		*mp;
-	vfs_t			*vfsp;
-	uint			qflags;
+	if (addr == NULL && cmd != Q_SYNC)
+		return XFS_ERROR(EINVAL);
+	if (id < 0 && cmd != Q_SYNC)
+		return XFS_ERROR(EINVAL);
 
-	vfsp = LINVFS_GET_VFS(sb);
-	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
-	if (vfsp->vfs_flag & VFS_RDONLY)
-		return -EROFS;
+	/*
+	 * The following commands are valid even when quotaoff.
+	 */
+	switch (cmd) {
+	      	/* 
+		 * truncate quota files. quota must be off.
+		 */
+	      case Q_XQUOTARM:
+		if (XFS_IS_QUOTA_ON(mp) || addr == NULL)
+			return XFS_ERROR(EINVAL);
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			return XFS_ERROR(EROFS);
+		return (xfs_qm_scall_trunc_qfiles(mp, 
+			       xfs_qm_import_qtype_flags(*(uint *)addr)));
+		/*
+		 * Get quota status information.
+		 */
+	      case Q_XGETQSTAT:
+		return (xfs_qm_scall_getqstat(mp, (fs_quota_stat_t *)addr));
 
-	switch (op) {
-	case Q_XQUOTARM:
-		if (XFS_IS_QUOTA_ON(mp)) {
-			qdprintk("cannot remove, quota on: flags=%x\n", flags);
-			return -EINVAL;
-		}
-		qflags = xfs_qm_import_qtype_flags(flags);
-		return -xfs_qm_scall_trunc_qfiles(mp, qflags);
-	case Q_XQUOTAON:
-		qflags = xfs_qm_import_flags(flags);
-		return -xfs_qm_scall_quotaon(mp, qflags);
-	case Q_XQUOTAOFF:
-		qflags = xfs_qm_import_flags(flags);
-		if (!XFS_IS_QUOTA_ON(mp))
-			return -ESRCH;
-		return -xfs_qm_scall_quotaoff(mp, qflags, B_FALSE);
+		/*
+		 * QUOTAON for root f/s and quota enforcement on others..
+		 * Quota accounting for non-root f/s's must be turned on
+		 * at mount time.
+		 */
+	      case Q_XQUOTAON:
+		if (addr == NULL)
+			return XFS_ERROR(EINVAL);
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			return XFS_ERROR(EROFS);
+		return (xfs_qm_scall_quotaon(mp,
+					  xfs_qm_import_flags(*(uint *)addr)));
+	      case Q_XQUOTAOFF:
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			return XFS_ERROR(EROFS);
+		break;
+		
+	      default:
+		break;
 	}
-	qdprintk("cannot set state, invalid op: op=%x flags=%x\n", op, flags);
-	return -EINVAL;
+
+	if (! XFS_IS_QUOTA_ON(mp))
+		return XFS_ERROR(ESRCH);
+
+	switch (cmd) {
+	      case Q_XQUOTAOFF:
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			return XFS_ERROR(EROFS);
+		error = xfs_qm_scall_quotaoff(mp,
+					    xfs_qm_import_flags(*(uint *)addr),
+					    B_FALSE);
+		break;
+
+		/* 
+		 * Defaults to XFS_GETUQUOTA. 
+		 */
+	      case Q_XGETQUOTA:
+		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_USER, 
+					(fs_disk_quota_t *)addr);
+		break;
+		/*
+		 * Set limits, both hard and soft. Defaults to Q_SETUQLIM.
+		 */
+	      case Q_XSETQLIM:
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			return XFS_ERROR(EROFS);
+		error = xfs_qm_scall_setqlim(mp, (xfs_dqid_t)id, XFS_DQ_USER,
+					     (fs_disk_quota_t *)addr);
+		break;
+
+	       case Q_XSETGQLIM:
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			return XFS_ERROR(EROFS);
+		error = xfs_qm_scall_setqlim(mp, (xfs_dqid_t)id, XFS_DQ_GROUP,
+					     (fs_disk_quota_t *)addr);
+		break;
+
+	      		
+	      case Q_XGETGQUOTA:
+		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_GROUP, 
+					(fs_disk_quota_t *)addr);
+		break;
+
+		/*
+		 * Quotas are entirely undefined after quotaoff in XFS quotas.
+		 * For instance, there's no way to set limits when quotaoff.
+		 */
+
+	      default:
+		error = XFS_ERROR(EINVAL);
+		break;
+	}
+
+	return (error);
 }
-
-int
-linvfs_getxquota(
-	struct super_block	*sb,
-	int			type,
-	qid_t			id,
-	struct fs_disk_quota	*fdq)
-{
-	xfs_mount_t		*mp;
-	vfs_t			*vfsp;
-	int			qtype;
-
-	vfsp = LINVFS_GET_VFS(sb);
-	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
-	if (!XFS_IS_QUOTA_ON(mp))
-		return -ESRCH;
-	qtype = (type == GRPQUOTA)? XFS_DQ_GROUP : XFS_DQ_USER;
-	return -xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, qtype, fdq);
-}
-
-int
-linvfs_setxquota(
-	struct super_block	*sb,
-	int			type,
-	qid_t			id,
-	struct fs_disk_quota	*fdq)
-{
-	xfs_mount_t		*mp;
-	vfs_t			*vfsp;
-	int			qtype;
-
-	vfsp = LINVFS_GET_VFS(sb);
-	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
-	if (!XFS_IS_QUOTA_ON(mp))
-		return -ESRCH;
-	if (vfsp->vfs_flag & VFS_RDONLY)
-		return -EROFS;
-	qtype = (type == GRPQUOTA)? XFS_DQ_GROUP : XFS_DQ_USER;
-	return xfs_qm_scall_setqlim(mp, (xfs_dqid_t)id, qtype, fdq);
-}
-
 
 /*
  * Turn off quota accounting and/or enforcement for all udquots and/or
@@ -487,6 +515,7 @@ xfs_qm_scall_getqstat(
 	out->qs_pad = 0;
 	out->qs_uquota.qfs_ino = mp->m_sb.sb_uquotino;
 	out->qs_gquota.qfs_ino = mp->m_sb.sb_gquotino;
+
 	if (mp->m_quotainfo) {
 		uip = mp->m_quotainfo->qi_uquotaip;
 		gip = mp->m_quotainfo->qi_gquotaip;
@@ -1048,10 +1077,10 @@ mutex_t	      qcheck_lock;
 #define DQTEST_LIST_PRINT(l, NXT, title) \
 { \
 	  xfs_dqtest_t	*dqp; int i = 0;\
-	  printk("%s (#%d)\n", title, (int) (l)->qh_nelems); \
+	  cmn_err(CE_DEBUG, "%s (#%d)", title, (int) (l)->qh_nelems); \
 	  for (dqp = (xfs_dqtest_t *)(l)->qh_next; dqp != NULL; \
 	       dqp = (xfs_dqtest_t *)dqp->NXT) { \
-	    printk("\t%d\.\t\"%d (%s)\"\t bcnt = %d, icnt = %d\n", \
+		cmn_err(CE_DEBUG, "  %d\. \"%d (%s)\"  bcnt = %d, icnt = %d", \
 			 ++i, dqp->d_id, DQFLAGTO_TYPESTR(dqp),	     \
 			 dqp->d_bcount, dqp->d_icount); } \
 }
@@ -1081,13 +1110,15 @@ STATIC void
 xfs_qm_dqtest_print(
 	xfs_dqtest_t	*d)
 {
-	printk("-----------DQTEST DQUOT----------------\n");
-	printk("---- dquot ID =	 %d\n", d->d_id);
-	printk("---- type     =	 %s\n", XFS_QM_ISUDQ(d) ? "USR" : "GRP");
-	printk("---- fs	      =	 0x%p\n", d->q_mount);
-	printk("---- bcount   =	 %Lu (0x%x)\n", d->d_bcount, (int)d->d_bcount);
-	printk("---- icount   =	 %Lu (0x%x)\n", d->d_icount, (int)d->d_icount);
-	printk("---------------------------\n");
+	cmn_err(CE_DEBUG, "-----------DQTEST DQUOT----------------");
+	cmn_err(CE_DEBUG, "---- dquot ID = %d", d->d_id);
+	cmn_err(CE_DEBUG, "---- type     = %s", XFS_QM_ISUDQ(d)? "USR" : "GRP");
+	cmn_err(CE_DEBUG, "---- fs       = 0x%p", d->q_mount);
+	cmn_err(CE_DEBUG, "---- bcount   = %Lu (0x%x)",
+		d->d_bcount, (int)d->d_bcount);
+	cmn_err(CE_DEBUG, "---- icount   = %Lu (0x%x)",
+		d->d_icount, (int)d->d_icount);
+	cmn_err(CE_DEBUG, "---------------------------");
 }
 
 STATIC void
@@ -1101,10 +1132,10 @@ xfs_qm_dqtest_failed(
 {
 	qmtest_nfails++;
 	if (error)
-		printk("quotacheck failed for %d, error = %d\nreason = %s\n",
+		cmn_err(CE_DEBUG, "quotacheck failed id=%d, err=%d\nreason: %s",
 		       INT_GET(d->d_id, ARCH_CONVERT), error, reason);
 	else
-		printk("quotacheck failed for %d (%s) [%d != %d]\n",
+		cmn_err(CE_DEBUG, "quotacheck failed id=%d (%s) [%d != %d]",
 		       INT_GET(d->d_id, ARCH_CONVERT), reason, (int)a, (int)b);
 	xfs_qm_dqtest_print(d);
 	if (dqp)
@@ -1119,36 +1150,42 @@ xfs_dqtest_cmp2(
 	int err = 0;
 	if (INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) != d->d_icount) {
 		xfs_qm_dqtest_failed(d, dqp, "icount mismatch",
-				     INT_GET(dqp->q_core.d_icount, ARCH_CONVERT), d->d_icount, 0);
+			INT_GET(dqp->q_core.d_icount, ARCH_CONVERT),
+			d->d_icount, 0);
 		err++;
 	}
 	if (INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT) != d->d_bcount) {
 		xfs_qm_dqtest_failed(d, dqp, "bcount mismatch",
-				     INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT), d->d_bcount, 0);
+			INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT),
+			d->d_bcount, 0);
 		err++;
 	}
 	if (INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT) &&
-	    INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT) >= INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT)) {
+	    INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT) >=
+	    INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT)) {
 		if (INT_ISZERO(dqp->q_core.d_btimer, ARCH_CONVERT) &&
 		    !INT_ISZERO(dqp->q_core.d_id, ARCH_CONVERT)) {
-			printk("%d [%s] [0x%p] BLK TIMER NOT STARTED\n",
-			       d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);
+			cmn_err(CE_DEBUG,
+				"%d [%s] [0x%p] BLK TIMER NOT STARTED",
+				d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);
 			err++;
 		}
 	}
 	if (INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT) &&
-	    INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) >= INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT)) {
+	    INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) >=
+	    INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT)) {
 		if (INT_ISZERO(dqp->q_core.d_itimer, ARCH_CONVERT) &&
 		    !INT_ISZERO(dqp->q_core.d_id, ARCH_CONVERT)) {
-			printk("%d [%s] [0x%p] INO TIMER NOT STARTED\n",
-			       d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);
+			cmn_err(CE_DEBUG,
+				"%d [%s] [0x%p] INO TIMER NOT STARTED",
+				d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);
 			err++;
 		}
 	}
-#if 0
+#ifdef QUOTADEBUG
 	if (!err) {
-		printk("%d [%s] [0x%p] qchecked\n",
-		       d->d_id, XFS_QM_ISUDQ(d) ? "USR" : "GRP", d->q_mount);
+		cmn_err(CE_DEBUG, "%d [%s] [0x%p] qchecked",
+			d->d_id, XFS_QM_ISUDQ(d) ? "USR" : "GRP", d->q_mount);
 	}
 #endif
 	return (err);
@@ -1338,10 +1375,9 @@ xfs_qm_internalqcheck(
 		}
 	} while (! done);
 	if (error) {
-		printk("Bulkstat returned error 0x%x\n",
-		       error);
+		cmn_err(CE_DEBUG, "Bulkstat returned error 0x%x", error);
 	}
-	printk("Checking results against system dquots\n");
+	cmn_err(CE_DEBUG, "Checking results against system dquots");
 	for (i = 0; i < qmtest_hashmask; i++) {
 		h1 = &qmtest_udqtab[i];
 		for (d = (xfs_dqtest_t *) h1->qh_next; d != NULL; ) {
@@ -1360,10 +1396,10 @@ xfs_qm_internalqcheck(
 	}
 
 	if (qmtest_nfails) {
-		printk("**************	quotacheck failed  **************\n");
-		printk("failures = %d\n", qmtest_nfails);
+		cmn_err(CE_DEBUG, "******** quotacheck failed  ********");
+		cmn_err(CE_DEBUG, "failures = %d", qmtest_nfails);
 	} else {
-		printk("**************	quotacheck successful! **************\n");
+		cmn_err(CE_DEBUG, "******** quotacheck successful! ********");
 	}
 	kmem_free(qmtest_udqtab, qmtest_hashmask * sizeof(xfs_dqhash_t));
 	kmem_free(qmtest_gdqtab, qmtest_hashmask * sizeof(xfs_dqhash_t));

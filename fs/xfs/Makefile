@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+# Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of version 2 of the GNU General Public License as
@@ -32,10 +32,6 @@
 # Makefile for XFS on Linux.
 #
 
-
-# This needs -I. because everything does #include <xfs.h> instead of "xfs.h".
-# The code is wrong, local files should be included using "xfs.h", not <xfs.h>
-# but I am not going to change every file at the moment.
 EXTRA_CFLAGS +=	 -Ifs/xfs -funsigned-char
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
@@ -54,6 +50,7 @@ xfs-$(CONFIG_XFS_QUOTA)		+= xfs_dquot.o \
 				   xfs_dquot_item.o \
 				   xfs_trans_dquot.o \
 				   xfs_qm_syscalls.o \
+				   xfs_qmops.o \
 				   xfs_qm.o
 
 xfs-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
@@ -127,6 +124,7 @@ xfs-y				+= $(addprefix linux/, \
 				   xfs_iops.o \
 				   xfs_lrw.o \
 				   xfs_super.o \
+				   xfs_vfs.o \
 				   xfs_vnode.o)
 
 # Objects in support/

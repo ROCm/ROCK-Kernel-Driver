@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -355,6 +355,14 @@ xfs_mount_t *
 xfs_bhvtom(bhv_desc_t *bdp)
 {
 	return XFS_BHVTOM(bdp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_VFSTOM)
+xfs_mount_t *
+xfs_vfstom(vfs_t *vfs)
+{
+	return XFS_VFSTOM(vfs);
 }
 #endif
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -145,15 +145,9 @@
 
 
 extern int
-xfs_dm_mount(
-	vfs_t		*vfsp,
-	char		*dir_name,
-	char		*fsname);
-
-extern int
 xfs_dm_get_fsys_vector(
 	bhv_desc_t	*bdp,
-	dm_fcntl_vector_t *vecrq);
+	caddr_t		vecrq);
 
 extern int
 xfs_dm_send_data_event(

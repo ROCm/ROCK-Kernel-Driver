@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -34,20 +34,34 @@
 
 #ifdef CONFIG_XFS_POSIX_ACL
 # define XFS_ACL_STRING		"ACLs, "
+# define set_posix_acl_flag(sb)	((sb)->s_flags |= MS_POSIXACL)
 #else
 # define XFS_ACL_STRING
+# define set_posix_acl_flag(sb)	do { } while (0)
 #endif
 
 #ifdef CONFIG_XFS_DMAPI
 # define XFS_DMAPI_STRING	"DMAPI, "
+# define vfs_insertdmapi(vfs)	vfs_insertops(vfsp, &xfs_dmops_xfs)
+# define vfs_initdmapi()	(0)			/* temporarily */
+# define vfs_exitdmapi()	do { } while (0)	/* temporarily */
 #else
 # define XFS_DMAPI_STRING
+# define vfs_insertdmapi(vfs)	do { } while (0)
+# define vfs_initdmapi()	(0)
+# define vfs_exitdmapi()	do { } while (0)
 #endif
 
 #ifdef CONFIG_XFS_QUOTA
 # define XFS_QUOTA_STRING	"quota, "
+# define vfs_insertquota(vfs)	vfs_insertops(vfsp, &xfs_qmops_xfs)
+# define vfs_initquota()	(0)			/* temporarily */
+# define vfs_exitquota()	do { } while (0)	/* temporarily */
 #else
 # define XFS_QUOTA_STRING
+# define vfs_insertquota(vfs)	do { } while (0)
+# define vfs_initquota()	(0)
+# define vfs_exitquota()	do { } while (0)
 #endif
 
 #ifdef CONFIG_XFS_RT
@@ -82,6 +96,8 @@ struct xfs_mount;
 struct pb_target;
 struct block_device;
 
+extern int  xfs_parseargs(bhv_desc_t *, char *, struct xfs_mount_args *, int);
+extern int  xfs_showargs(bhv_desc_t *, struct seq_file *);
 extern void xfs_initialize_vnode(bhv_desc_t *, vnode_t *, bhv_desc_t *, int);
 
 extern int  xfs_blkdev_get(struct xfs_mount *, const char *,
@@ -94,5 +110,9 @@ extern void xfs_free_buftarg(struct pb_target *);
 
 extern void xfs_setsize_buftarg(struct pb_target *, unsigned int, unsigned int);
 extern unsigned int xfs_getsize_buftarg(struct pb_target *);
+
+extern void bhv_insert_all_vfsops(struct vfs *);
+extern void bhv_remove_all_vfsops(struct vfs *, int);
+extern void bhv_remove_vfsops(struct vfs *, int);
 
 #endif	/* __XFS_SUPER_H__ */
