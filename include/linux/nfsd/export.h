@@ -45,14 +45,9 @@
 
 #ifdef __KERNEL__
 
-struct svc_client {
-	struct svc_client *	cl_next;
-	char			cl_ident[NFSCLNT_IDMAX];
-};
-
 struct svc_export {
 	struct list_head	ex_hash;
-	struct svc_client *	ex_client;
+	struct auth_domain *	ex_client;
 	int			ex_flags;
 	struct vfsmount *	ex_mnt;
 	struct dentry *		ex_dentry;
@@ -68,11 +63,11 @@ struct svc_export {
 struct svc_expkey {
 	struct list_head	ek_hash;
 
-	struct svc_client	*ek_client;
+	struct auth_domain *	ek_client;
 	int			ek_fsidtype;
 	u32			ek_fsid[2];
 
-	struct svc_export	*ek_export;
+	struct svc_export *	ek_export;
 };
 
 #define EX_SECURE(exp)		(!((exp)->ex_flags & NFSEXP_INSECURE_PORT))
@@ -90,21 +85,22 @@ void			nfsd_export_init(void);
 void			nfsd_export_shutdown(void);
 void			exp_readlock(void);
 void			exp_readunlock(void);
-struct svc_client *	exp_getclient(struct sockaddr_in *sin);
-void			exp_putclient(struct svc_client *clp);
-struct svc_expkey *	exp_find_key(struct svc_client *clp, int fsid_type, u32 *fsidv);
-struct svc_export *	exp_get_by_name(struct svc_client *clp,
+struct auth_domain *	exp_getclient(struct sockaddr_in *sin);
+struct svc_expkey *	exp_find_key(struct auth_domain *clp, 
+				     int fsid_type, u32 *fsidv);
+struct svc_export *	exp_get_by_name(struct auth_domain *clp,
 					struct vfsmount *mnt,
 					struct dentry *dentry);
-struct svc_export *	exp_parent(struct svc_client *clp, struct vfsmount *mnt,
+struct svc_export *	exp_parent(struct auth_domain *clp,
+				   struct vfsmount *mnt,
 				   struct dentry *dentry);
-int			exp_rootfh(struct svc_client *, 
+int			exp_rootfh(struct auth_domain *, 
 					char *path, struct knfsd_fh *, int maxsize);
-int			exp_pseudoroot(struct svc_client *, struct svc_fh *fhp);
+int			exp_pseudoroot(struct auth_domain *, struct svc_fh *fhp);
 int			nfserrno(int errno);
 
 static inline struct svc_export *
-exp_find(struct svc_client *clp, int fsid_type, u32 *fsidv)
+exp_find(struct auth_domain *clp, int fsid_type, u32 *fsidv)
 {
 	struct svc_expkey *ek = exp_find_key(clp, fsid_type, fsidv);
 	if (ek)

@@ -32,28 +32,19 @@
 #define NFSDDBG_FACILITY	NFSDDBG_EXPORT
 #define NFSD_PARANOIA 1
 
-typedef struct svc_client	svc_client;
+typedef struct auth_domain	svc_client;
 typedef struct svc_export	svc_export;
 
 static void		exp_unexport_all(svc_client *clp);
 static void		exp_do_unexport(svc_export *unexp);
-static svc_client *	exp_getclientbyname(char *name);
-static void		exp_freeclient(svc_client *clp);
-static void		exp_unhashclient(svc_client *clp);
 static int		exp_verify_string(char *cp, int max);
-
-#define CLIENT_HASHBITS		6
-#define CLIENT_HASHMAX		(1 << CLIENT_HASHBITS)
-#define CLIENT_HASHMASK		(CLIENT_HASHMAX - 1)
-#define CLIENT_HASH(a) \
-		((((a)>>24) ^ ((a)>>16) ^ ((a)>>8) ^(a)) & CLIENT_HASHMASK)
 
 #define	EXPKEY_HASHBITS		8
 #define	EXPKEY_HASHMAX		(1 << EXPKEY_HASHBITS)
 #define	EXPKEY_HASHMASK		(EXPKEY_HASHMAX -1)
 static struct list_head expkey_table[EXPKEY_HASHMAX];
 
-static inline int expkey_hash(struct svc_client *clp, int type, u32 *fsidv)
+static inline int expkey_hash(struct auth_domain *clp, int type, u32 *fsidv)
 {
 	int hash = type;
 	char * cp = (char*)fsidv;
@@ -66,14 +57,6 @@ static inline int expkey_hash(struct svc_client *clp, int type, u32 *fsidv)
 		hash += *cp++;
 	return hash & EXPKEY_HASHMASK;
 }
-
-struct svc_clnthash {
-	struct svc_clnthash *	h_next;
-	struct in_addr		h_addr;
-	struct svc_client *	h_client;
-};
-static struct svc_clnthash *	clnt_hash[CLIENT_HASHMAX];
-static svc_client *		clients;
 
 /* hash table of exports indexed by dentry+client */
 #define	EXPORT_HASHBITS		8
@@ -249,7 +232,7 @@ static void exp_fsid_unhash(struct svc_export *exp)
 	}
 }
 
-static int exp_fsid_hash(struct svc_client *clp, struct svc_export *exp)
+static int exp_fsid_hash(svc_client *clp, struct svc_export *exp)
 {
 	struct list_head *head;
 	struct svc_expkey *ek;
@@ -272,7 +255,7 @@ static int exp_fsid_hash(struct svc_client *clp, struct svc_export *exp)
 	return 0;
 }
 
-static int exp_hash(struct svc_client *clp, struct svc_export *exp)
+static int exp_hash(struct auth_domain *clp, struct svc_export *exp)
 {
 	struct list_head *head;
 	struct svc_expkey *ek;
@@ -337,7 +320,7 @@ exp_export(struct nfsctl_export *nxp)
 	exp_writelock();
 
 	/* Look up client info */
-	if (!(clp = exp_getclientbyname(nxp->ex_client)))
+	if (!(clp = auth_domain_find(nxp->ex_client)))
 		goto out_unlock;
 
 
@@ -406,6 +389,7 @@ exp_export(struct nfsctl_export *nxp)
 	dprintk("nfsd: created export entry %p for client %p\n", exp, clp);
 
 	exp->ex_client = clp;
+	cache_get(&clp->h);
 	exp->ex_mnt = mntget(nd.mnt);
 	exp->ex_dentry = dget(nd.dentry);
 	exp->ex_flags = nxp->ex_flags;
@@ -425,6 +409,8 @@ exp_export(struct nfsctl_export *nxp)
 	}
 
 finish:
+	if (clp)
+		auth_domain_put(clp);
 	path_release(&nd);
 out_unlock:
 	exp_writeunlock();
@@ -441,14 +427,12 @@ exp_do_unexport(svc_export *unexp)
 {
 	struct dentry	*dentry;
 	struct vfsmount *mnt;
-	struct inode	*inode;
 
 	list_del(&unexp->ex_hash);
 	exp_unhash(unexp);
 	exp_fsid_unhash(unexp);
 	dentry = unexp->ex_dentry;
 	mnt = unexp->ex_mnt;
-	inode = dentry->d_inode;
 	dput(dentry);
 	mntput(mnt);
 
@@ -480,7 +464,7 @@ exp_unexport_all(svc_client *clp)
 int
 exp_unexport(struct nfsctl_export *nxp)
 {
-	svc_client	*clp;
+	struct auth_domain *dom;
 	int		err;
 
 	/* Consistency check */
@@ -490,14 +474,19 @@ exp_unexport(struct nfsctl_export *nxp)
 	exp_writelock();
 
 	err = -EINVAL;
-	clp = exp_getclientbyname(nxp->ex_client);
-	if (clp) {
-		svc_export *exp = exp_get(clp, nxp->ex_dev, nxp->ex_ino);
+	dom = auth_domain_find(nxp->ex_client);
+
+	if (dom) {
+		svc_export *exp = exp_get(dom, nxp->ex_dev, nxp->ex_ino);
 		if (exp) {
 			exp_do_unexport(exp);
 			err = 0;
-		}
-	}
+		} else
+			dprintk("nfsd: no export %x/%lx for %s\n",
+				nxp->ex_dev, nxp->ex_ino, nxp->ex_client);
+		auth_domain_put(dom);
+	} else
+		dprintk("nfsd: unexport couldn't find %s\n", nxp->ex_client);
 
 	exp_writeunlock();
 	return err;
@@ -509,7 +498,7 @@ exp_unexport(struct nfsctl_export *nxp)
  * since its harder to fool a kernel module than a user space program.
  */
 int
-exp_rootfh(struct svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
+exp_rootfh(svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 {
 	struct svc_export	*exp;
 	struct nameidata	nd;
@@ -526,7 +515,7 @@ exp_rootfh(struct svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 	inode = nd.dentry->d_inode;
 
 	dprintk("nfsd: exp_rootfh(%s [%p] %s:%s/%ld)\n",
-		 path, nd.dentry, clp->cl_ident,
+		 path, nd.dentry, clp->name,
 		 inode->i_sb->s_id, inode->i_ino);
 	exp = exp_parent(clp, nd.mnt, nd.dentry);
 	if (!exp) {
@@ -556,7 +545,7 @@ out:
  * export point with fsid==0
  */
 int
-exp_pseudoroot(struct svc_client *clp, struct svc_fh *fhp)
+exp_pseudoroot(struct auth_domain *clp, struct svc_fh *fhp)
 {
 	struct svc_export *exp;
 
@@ -574,50 +563,12 @@ exp_pseudoroot(struct svc_client *clp, struct svc_fh *fhp)
  * future lookups.
  * Locking against other processes is the responsibility of the caller.
  */
-struct svc_client *
+svc_client *
 exp_getclient(struct sockaddr_in *sin)
 {
-	struct svc_clnthash	**hp, **head, *tmp;
-	unsigned long		addr = sin->sin_addr.s_addr;
-
-	head = &clnt_hash[CLIENT_HASH(addr)];
-
-	for (hp = head; (tmp = *hp) != NULL; hp = &(tmp->h_next)) {
-		if (tmp->h_addr.s_addr == addr) {
-#if 0
-/* If we really want to do this, we need a spin
-lock to protect against multiple access (as we only
-have an exp_readlock) and need to protect
-the code in e_show() that walks this list too.
-*/
-			/* Move client to the front */
-			if (head != hp) {
-				*hp = tmp->h_next;
-				tmp->h_next = *head;
-				*head = tmp;
-			}
-#endif
-			return tmp->h_client;
-		}
-	}
-
-	return NULL;
+	return auth_unix_lookup(sin->sin_addr);
 }
 
-/*
- * Find a client given its identifier.
- */
-static svc_client *
-exp_getclientbyname(char *ident)
-{
-	svc_client *	clp;
-
-	for (clp = clients; clp; clp = clp->cl_next) {
-		if (!strcmp(clp->cl_ident, ident))
-			return clp;
-	}
-	return NULL;
-}
 
 /* Iterator */
 
@@ -725,7 +676,7 @@ static inline void mangle(struct seq_file *m, const char *s)
 static int e_show(struct seq_file *m, void *p)
 {
 	struct svc_export *exp = p;
-	struct svc_client *clp;
+	svc_client *clp;
 	char *pbuf;
 
 	if (p == (void *)1) {
@@ -741,7 +692,7 @@ static int e_show(struct seq_file *m, void *p)
 			 pbuf, PAGE_SIZE));
 
 	seq_putc(m, '\t');
-	mangle(m, clp->cl_ident);
+	mangle(m, clp->name);
 	seq_putc(m, '(');
 	exp_flags(m, exp->ex_flags, exp->ex_fsid, 
 		  exp->ex_anon_uid, exp->ex_anon_gid);
@@ -764,13 +715,12 @@ struct seq_operations nfs_exports_op = {
 int
 exp_addclient(struct nfsctl_client *ncp)
 {
-	struct svc_clnthash *	ch[NFSCLNT_ADDRMAX];
-	svc_client *		clp;
-	int			i, err, change = 0, ilen;
+	struct auth_domain	*dom;
+	int			i, err;
 
 	/* First, consistency check. */
 	err = -EINVAL;
-	if (!(ilen = exp_verify_string(ncp->cl_ident, NFSCLNT_IDMAX)))
+	if (! exp_verify_string(ncp->cl_ident, NFSCLNT_IDMAX))
 		goto out;
 	if (ncp->cl_naddr > NFSCLNT_ADDRMAX)
 		goto out;
@@ -778,56 +728,19 @@ exp_addclient(struct nfsctl_client *ncp)
 	/* Lock the hashtable */
 	exp_writelock();
 
-	/* First check if this is a change request for a client. */
-	for (clp = clients; clp; clp = clp->cl_next)
-		if (!strcmp(clp->cl_ident, ncp->cl_ident))
-			break;
+	dom = unix_domain_find(ncp->cl_ident);
 
 	err = -ENOMEM;
-	if (clp) {
-		change = 1;
-	} else {
-		if (!(clp = kmalloc(sizeof(*clp), GFP_KERNEL)))
-			goto out_unlock;
-		memset(clp, 0, sizeof(*clp));
-
-		dprintk("created client %s (%p)\n", ncp->cl_ident, clp);
-
-		strcpy(clp->cl_ident, ncp->cl_ident);
-	}
-
-	/* Allocate hash buckets */
-	for (i = 0; i < ncp->cl_naddr; i++) {
-		ch[i] = kmalloc(sizeof(struct svc_clnthash), GFP_KERNEL);
-		if (!ch[i]) {
-			while (i--)
-				kfree(ch[i]);
-			if (!change)
-				kfree(clp);
-			goto out_unlock;
-		}
-	}
-
-	/* Remove old client hash entries. */
-	if (change)
-		exp_unhashclient(clp);
+	if (!dom)
+		goto out_unlock;
 
 	/* Insert client into hashtable. */
-	for (i = 0; i < ncp->cl_naddr; i++) {
-		struct in_addr	addr = ncp->cl_addrlist[i];
-		int		hash;
+	for (i = 0; i < ncp->cl_naddr; i++)
+		auth_unix_add_addr(ncp->cl_addrlist[i], dom);
 
-		hash = CLIENT_HASH(addr.s_addr);
-		ch[i]->h_client = clp;
-		ch[i]->h_addr = addr;
-		ch[i]->h_next = clnt_hash[hash];
-		clnt_hash[hash] = ch[i];
-	}
+	auth_unix_forget_old(dom);
+	auth_domain_put(dom);
 
-	if (!change) {
-		clp->cl_next = clients;
-		clients = clp;
-	}
 	err = 0;
 
 out_unlock:
@@ -842,8 +755,8 @@ out:
 int
 exp_delclient(struct nfsctl_client *ncp)
 {
-	svc_client	**clpp, *clp;
 	int		err;
+	struct auth_domain *dom;
 
 	err = -EINVAL;
 	if (!exp_verify_string(ncp->cl_ident, NFSCLNT_IDMAX))
@@ -852,62 +765,19 @@ exp_delclient(struct nfsctl_client *ncp)
 	/* Lock the hashtable */
 	exp_writelock();
 
-	for (clpp = &clients; (clp = *clpp); clpp = &(clp->cl_next))
-		if (!strcmp(ncp->cl_ident, clp->cl_ident))
-			break;
-
-	if (clp) {
-		*clpp = clp->cl_next;
-		exp_freeclient(clp);
-		err = 0;
+	dom = auth_domain_find(ncp->cl_ident);
+	/* just make sure that no addresses work 
+	 * and that it will expire soon 
+	 */
+	if (dom) {
+		err = auth_unix_forget_old(dom);
+		dom->h.expiry_time = CURRENT_TIME;
+		auth_domain_put(dom);
 	}
 
 	exp_writeunlock();
 out:
 	return err;
-}
-
-/*
- * Free a client. The caller has already removed it from the client list.
- */
-static void
-exp_freeclient(svc_client *clp)
-{
-	exp_unhashclient(clp);
-
-	exp_unexport_all(clp);
-	kfree (clp);
-}
-
-/*
- * Remove client from hashtable. We first collect all hashtable
- * entries and free them in one go.
- * The hash table must be writelocked by the caller.
- */
-static void
-exp_unhashclient(svc_client *clp)
-{
-	struct svc_clnthash	**hpp, *hp, *ch[NFSCLNT_ADDRMAX];
-	int			i, count, err;
-
-again:
-	err = 0;
-	for (i = 0, count = 0; i < CLIENT_HASHMAX && !err; i++) {
-		hpp = clnt_hash + i;
-		while ((hp = *hpp) && !err) {
-			if (hp->h_client == clp) {
-				*hpp = hp->h_next;
-				ch[count++] = hp;
-				err = (count >= NFSCLNT_ADDRMAX);
-			} else {
-				hpp = &(hp->h_next);
-			}
-		}
-	}
-	if (err)
-		goto again;
-	for (i = 0; i < count; i++)
-		kfree (ch[i]);
 }
 
 /*
@@ -936,10 +806,6 @@ nfsd_export_init(void)
 
 	dprintk("nfsd: initializing export module.\n");
 
-	for (i = 0; i < CLIENT_HASHMAX; i++)
-		clnt_hash[i] = NULL;
-	clients = NULL;
-
 	for (i = 0; i < EXPORT_HASHMAX ; i++)
 		INIT_LIST_HEAD(&export_table[i]);
 
@@ -954,18 +820,14 @@ nfsd_export_init(void)
 void
 nfsd_export_shutdown(void)
 {
-	int	i;
 
 	dprintk("nfsd: shutting down export module.\n");
 
 	exp_writelock();
 
-	for (i = 0; i < CLIENT_HASHMAX; i++) {
-		while (clnt_hash[i])
-			exp_freeclient(clnt_hash[i]->h_client);
-	}
-	clients = NULL; /* we may be restarted before the module unloads */
-	
+	exp_unexport_all(NULL);
+	svcauth_unix_purge();
+
 	exp_writeunlock();
 	dprintk("nfsd: export shutdown complete.\n");
 }

@@ -12,6 +12,7 @@
 #ifdef __KERNEL__
 
 #include <linux/sunrpc/msg_prot.h>
+#include <linux/sunrpc/cache.h>
 
 struct svc_cred {
 	uid_t			cr_uid;
@@ -20,6 +21,30 @@ struct svc_cred {
 };
 
 struct svc_rqst;		/* forward decl */
+
+/* Authentication is done in the context of a domain.
+ * For a server, a domain represents a group of clients using
+ * a common mechanism for authentication and having a common mapping
+ * between local identity (uid) and network identity.  All clients
+ * in a domain have similar general access rights.  Each domain can
+ * contain multiple principals which will have different specific right
+ * based on normal Discretionary Access Control.
+ *
+ * For a client, a domain represents a number of servers which all
+ * use a common authentication mechanism and network identity name space.
+ *
+ * A domain is created by an authentication flavour module based on name
+ * only.  Userspace then fills in detail on demand.
+ *
+ * The creation of a domain typically implies creation of one or
+ * more caches for storing domain specific information.
+ */
+struct auth_domain {
+	struct	cache_head	h;
+	char			*name;
+	int			flavour;
+};
+
 /*
  * Each authentication flavour registers an auth_ops
  * structure.
@@ -49,12 +74,16 @@ struct svc_rqst;		/* forward decl */
  *    DROP - the reply should be quitely dropped
  *    DENIED - authp holds a reason for MSG_DENIED
  *    SYSERR - rpc system_err
+ *
+ * domain_release()
+ *   This call releases a domain.
  */
 struct auth_ops {
 	char *	name;
 	int	flavour;
 	int	(*accept)(struct svc_rqst *rq, u32 *authp, int proc);
 	int	(*release)(struct svc_rqst *rq);
+	void	(*domain_release)(struct auth_domain *);
 };
 extern struct auth_ops	*authtab[RPC_AUTH_MAXFLAVOR];
 
@@ -73,6 +102,18 @@ extern int	svc_authorise(struct svc_rqst *rqstp);
 extern int	svc_auth_register(rpc_authflavor_t flavor, struct auth_ops *aops);
 extern void	svc_auth_unregister(rpc_authflavor_t flavor);
 
+extern struct auth_domain *unix_domain_find(char *name);
+extern void auth_domain_put(struct auth_domain *item);
+extern int auth_unix_add_addr(struct in_addr addr, struct auth_domain *dom);
+extern struct auth_domain *auth_domain_lookup(struct auth_domain *item, int set);
+extern struct auth_domain *auth_domain_find(char *name);
+extern struct auth_domain *auth_unix_lookup(struct in_addr addr);
+extern int auth_unix_forget_old(struct auth_domain *dom);
+extern void svcauth_unix_purge(void);
+
+extern int name_hash(char *name, int size);
+
+extern struct cache_detail auth_domain_cache, ip_map_cache;
 
 #endif /* __KERNEL__ */
 

@@ -15,12 +15,14 @@
 #include <linux/sched.h>
 #include <linux/uio.h>
 #include <linux/unistd.h>
+#include <linux/init.h>
 
 #include <linux/sunrpc/sched.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/svcsock.h>
 #include <linux/sunrpc/auth.h>
+
 
 /* RPC scheduler */
 EXPORT_SYMBOL(rpc_allocate);
@@ -108,3 +110,33 @@ EXPORT_SYMBOL(nfs_debug);
 EXPORT_SYMBOL(nfsd_debug);
 EXPORT_SYMBOL(nlm_debug);
 #endif
+
+static int __init
+init_sunrpc(void)
+{
+#ifdef RPC_DEBUG
+	rpc_register_sysctl();
+#endif
+#ifdef CONFIG_PROC_FS
+	rpc_proc_init();
+#endif
+	cache_register(&auth_domain_cache);
+	cache_register(&ip_map_cache);
+	return 0;
+}
+
+static void __exit
+cleanup_sunrpc(void)
+{
+	cache_unregister(&auth_domain_cache);
+	cache_unregister(&ip_map_cache);
+#ifdef RPC_DEBUG
+	rpc_unregister_sysctl();
+#endif
+#ifdef CONFIG_PROCFS
+	rpc_proc_exit();
+#endif
+}
+MODULE_LICENSE("GPL");
+module_init(init_sunrpc);
+module_exit(cleanup_sunrpc);

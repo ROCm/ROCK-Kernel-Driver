@@ -13,7 +13,6 @@
 
 /* Dummy declarations */
 struct svc_rqst;
-struct svc_client;		/* opaque type */
 
 /*
  * This is the set of functions for lockd->nfsd communication

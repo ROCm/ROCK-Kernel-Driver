@@ -27,6 +27,7 @@
 #include <linux/sunrpc/stats.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/svcsock.h>
+#include <linux/sunrpc/cache.h>
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/stats.h>
 #include <linux/nfsd/cache.h>
@@ -196,7 +197,7 @@ nfsd(struct svc_rqst *rqstp)
 		 */
 		while ((err = svc_recv(serv, rqstp,
 				       5*60*HZ)) == -EAGAIN)
-		    ;
+			cache_clean();
 		if (err < 0)
 			break;
 		update_thread_usage(atomic_read(&nfsd_busy));
@@ -218,6 +219,10 @@ nfsd(struct svc_rqst *rqstp)
 		svc_process(serv, rqstp);
 
 		/* Unlock export hash tables */
+		if (rqstp->rq_client) {
+			auth_domain_put(rqstp->rq_client);
+			rqstp->rq_client = NULL;
+		}
 		exp_readunlock();
 		update_thread_usage(atomic_read(&nfsd_busy));
 		atomic_dec(&nfsd_busy);

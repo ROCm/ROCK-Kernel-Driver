@@ -139,7 +139,6 @@ int		nfsd_permission(struct svc_export *, struct dentry *, int);
  */
 void		nfsd_lockd_init(void);
 void		nfsd_lockd_shutdown(void);
-void		nfsd_lockd_unexport(struct svc_client *);
 
 
 /*

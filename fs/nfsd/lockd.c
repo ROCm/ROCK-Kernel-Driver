@@ -42,6 +42,8 @@ nlm_fopen(struct svc_rqst *rqstp, struct nfs_fh *f, struct file *filp)
 		mntget(filp->f_vfsmnt);
 	}
 	fh_put(&fh);
+	if (rqstp->rq_client)
+		auth_domain_put(rqstp->rq_client);
 	rqstp->rq_client = NULL;
 	exp_readunlock();
  	/* nlm and nfsd don't share error codes.
