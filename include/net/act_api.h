@@ -8,36 +8,6 @@
 #include <net/sch_generic.h>
 #include <net/pkt_sched.h>
 
-struct tcf_police
-{
-	struct tcf_police *next;
-	int		refcnt;
-#ifdef CONFIG_NET_CLS_ACT
-	int		bindcnt;
-#endif
-	u32		index;
-	int		action;
-	int		result;
-	u32		ewma_rate;
-	u32		burst;
-	u32		mtu;
-	u32		toks;
-	u32		ptoks;
-	psched_time_t	t_c;
-	spinlock_t	lock;
-	struct qdisc_rate_table *R_tab;
-	struct qdisc_rate_table *P_tab;
-
-	struct gnet_stats_basic bstats;
-	struct gnet_stats_queue qstats;
-	struct gnet_stats_rate_est rate_est;
-	spinlock_t	*stats_lock;
-};
-
-#ifdef CONFIG_NET_CLS_ACT
-
-#define ACT_P_CREATED 1
-#define ACT_P_DELETED 1
 #define tca_gen(name) \
 struct tcf_##name *next; \
 	u32 index; \
@@ -51,6 +21,25 @@ struct tcf_##name *next; \
 	struct gnet_stats_rate_est rate_est; \
 	spinlock_t *stats_lock; \
 	spinlock_t lock
+
+struct tcf_police
+{
+	tca_gen(police);
+	int		result;
+	u32		ewma_rate;
+	u32		burst;
+	u32		mtu;
+	u32		toks;
+	u32		ptoks;
+	psched_time_t	t_c;
+	struct qdisc_rate_table *R_tab;
+	struct qdisc_rate_table *P_tab;
+};
+
+#ifdef CONFIG_NET_CLS_ACT
+
+#define ACT_P_CREATED 1
+#define ACT_P_DELETED 1
 
 struct tcf_act_hdr
 {
