@@ -109,10 +109,13 @@ pxafb_setpalettereg(u_int regno, u_int red, u_int green, u_int blue,
 	u_int val, ret = 1;
 
 	if (regno < fbi->palette_size) {
-		val  = ((red   >>  0) & 0xf800);
-		val |= ((green >>  5) & 0x07e0);
-		val |= ((blue  >> 11) & 0x001f);
-
+		if (fbi->fb.var.grayscale) {
+			val = ((blue >> 8) & 0x00ff);
+		} else {
+			val  = ((red   >>  0) & 0xf800);
+			val |= ((green >>  5) & 0x07e0);
+			val |= ((blue  >> 11) & 0x001f);
+		}
 		fbi->palette_cpu[regno] = val;
 		ret = 0;
 	}
@@ -150,7 +153,7 @@ pxafb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	switch (fbi->fb.fix.visual) {
 	case FB_VISUAL_TRUECOLOR:
 		/*
-		 * 12 or 16-bit True Colour.  We encode the RGB value
+		 * 16-bit True Colour.  We encode the RGB value
 		 * according to the RGB bitfield information.
 		 */
 		if (regno < 16) {
@@ -242,7 +245,7 @@ static int pxafb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	 * The pixel packing format is described on page 7-11 of the
 	 * PXA2XX Developer's Manual.
          */
-	if ( var->bits_per_pixel == 16 ) {
+	if (var->bits_per_pixel == 16) {
 		var->red.offset   = 11; var->red.length   = 5;
 		var->green.offset = 5;  var->green.length = 6;
 		var->blue.offset  = 0;  var->blue.length  = 5;
@@ -297,7 +300,10 @@ static int pxafb_set_par(struct fb_info *info)
 
 	fbi->fb.fix.line_length = var->xres_virtual *
 				  var->bits_per_pixel / 8;
-	fbi->palette_size = var->bits_per_pixel == 8 ? 256 : 16;
+	if (var->bits_per_pixel == 16)
+		fbi->palette_size = 0;
+	else
+		fbi->palette_size = var->bits_per_pixel == 1 ? 4 : 1 << var->bits_per_pixel;
 
 	palette_mem_size = fbi->palette_size * sizeof(u16);
 
@@ -310,6 +316,11 @@ static int pxafb_set_par(struct fb_info *info)
 	 * Set (any) board control register to handle new color depth
 	 */
 	pxafb_set_truecolor(fbi->fb.fix.visual == FB_VISUAL_TRUECOLOR);
+
+	if (fbi->fb.var.bits_per_pixel == 16)
+		fb_dealloc_cmap(&fbi->fb.cmap);
+	else
+		fb_alloc_cmap(&fbi->fb.cmap, 1<<fbi->fb.var.bits_per_pixel, 0);
 
 	pxafb_activate_var(var, fbi);
 
@@ -349,7 +360,7 @@ static int pxafb_set_par(struct fb_info *info)
 /*
  * pxafb_blank():
  *	Blank the display by setting all palette values to zero.  Note, the
- * 	12 and 16 bpp modes don't really use the palette, so this will not
+ * 	16 bpp mode does not really use the palette, so this will not
  *      blank the display in all modes.
  */
 static int pxafb_blank(int blank, struct fb_info *info)
@@ -514,7 +525,7 @@ static int pxafb_activate_var(struct fb_var_screeninfo *var, struct pxafb_info *
 	 * the YRES parameter.
 	 */
 	lines_per_panel = var->yres;
-	if (fbi->lccr0 & LCCR0_SDS)
+	if ((fbi->lccr0 & LCCR0_SDS) == LCCR0_Dual)
 		lines_per_panel /= 2;
 
 	new_regs.lccr2 =
@@ -566,20 +577,16 @@ static int pxafb_activate_var(struct fb_var_screeninfo *var, struct pxafb_info *
 	fbi->dmadesc_palette_cpu->fidr  = 0;
 	fbi->dmadesc_palette_cpu->ldcmd = (fbi->palette_size * 2) | LDCMD_PAL;
 
-	if( var->bits_per_pixel < 12)
-	{
-		/* assume any mode with <12 bpp is palette driven */
-		fbi->dmadesc_palette_cpu->fdadr = fbi->dmadesc_fbhigh_dma;
-		fbi->dmadesc_fbhigh_cpu->fdadr = fbi->dmadesc_palette_dma;
-		fbi->fdadr0 = fbi->dmadesc_palette_dma; /* flips back and forth between pal and fbhigh */
-	}
-	else
-	{
+	if (var->bits_per_pixel == 16) {
 		/* palette shouldn't be loaded in true-color mode */
 		fbi->dmadesc_fbhigh_cpu->fdadr = fbi->dmadesc_fbhigh_dma;
 		fbi->fdadr0 = fbi->dmadesc_fbhigh_dma; /* no pal just fbhigh */
 		/* init it to something, even though we won't be using it */
 		fbi->dmadesc_palette_cpu->fdadr = fbi->dmadesc_palette_dma;
+	} else {
+		fbi->dmadesc_palette_cpu->fdadr = fbi->dmadesc_fbhigh_dma;
+		fbi->dmadesc_fbhigh_cpu->fdadr = fbi->dmadesc_palette_dma;
+		fbi->fdadr0 = fbi->dmadesc_palette_dma; /* flips back and forth between pal and fbhigh */
 	}
 
 #if 0
@@ -696,7 +703,7 @@ static void pxafb_setup_gpio(struct pxafb_info *fbi)
 	}
 
 	else {
-	        printk( KERN_ERR "pxafb_setup_gpio: unable to determine bits per pixel\n");
+	        printk(KERN_ERR "pxafb_setup_gpio: unable to determine bits per pixel\n");
         }
 }
 
@@ -1123,11 +1130,11 @@ static int __init pxafb_parse_options(struct device *dev, char *options)
 				res_specified = 1;
 			}
 		done:
-			if ( res_specified ) {
-				dev_info(dev, "overriding resolution: %dx%x\n", xres, yres);
+			if (res_specified) {
+				dev_info(dev, "overriding resolution: %dx%d\n", xres, yres);
 				inf->xres = xres; inf->yres = yres;
 			}
-			if ( bpp_specified )
+			if (bpp_specified)
 				switch (bpp) {
 				case 1:
 				case 2:
@@ -1142,7 +1149,7 @@ static int __init pxafb_parse_options(struct device *dev, char *options)
 				}
                 } else if (!strncmp(this_opt, "pixclock:", 9)) {
                         inf->pixclock = simple_strtoul(this_opt+9, NULL, 0);
-			dev_info(dev, "override pixclock: %u\n", inf->pixclock);
+			dev_info(dev, "override pixclock: %ld\n", inf->pixclock);
                 } else if (!strncmp(this_opt, "left:", 5)) {
                         inf->left_margin = simple_strtoul(this_opt+5, NULL, 0);
 			dev_info(dev, "override left: %u\n", inf->left_margin);
@@ -1162,7 +1169,7 @@ static int __init pxafb_parse_options(struct device *dev, char *options)
                         inf->vsync_len = simple_strtoul(this_opt+9, NULL, 0);
 			dev_info(dev, "override vsynclen: %u\n", inf->vsync_len);
                 } else if (!strncmp(this_opt, "hsync:", 6)) {
-                        if ( simple_strtoul(this_opt+6, NULL, 0) == 0 ) {
+                        if (simple_strtoul(this_opt+6, NULL, 0) == 0) {
 				dev_info(dev, "override hsync: Active Low\n");
 				inf->sync &= ~FB_SYNC_HOR_HIGH_ACT;
 			} else {
@@ -1170,7 +1177,7 @@ static int __init pxafb_parse_options(struct device *dev, char *options)
 				inf->sync |= FB_SYNC_HOR_HIGH_ACT;
 			}
                 } else if (!strncmp(this_opt, "vsync:", 6)) {
-                        if ( simple_strtoul(this_opt+6, NULL, 0) == 0 ) {
+                        if (simple_strtoul(this_opt+6, NULL, 0) == 0) {
 				dev_info(dev, "override vsync: Active Low\n");
 				inf->sync &= ~FB_SYNC_VERT_HIGH_ACT;
 			} else {
@@ -1178,7 +1185,7 @@ static int __init pxafb_parse_options(struct device *dev, char *options)
 				inf->sync |= FB_SYNC_VERT_HIGH_ACT;
 			}
                 } else if (!strncmp(this_opt, "dpc:", 4)) {
-                        if ( simple_strtoul(this_opt+4, NULL, 0) == 0 ) {
+                        if (simple_strtoul(this_opt+4, NULL, 0) == 0) {
 				dev_info(dev, "override double pixel clock: false\n");
 				inf->lccr3 &= ~LCCR3_DPC;
 			} else {
@@ -1186,20 +1193,20 @@ static int __init pxafb_parse_options(struct device *dev, char *options)
 				inf->lccr3 |= LCCR3_DPC;
 			}
                 } else if (!strncmp(this_opt, "outputen:", 9)) {
-                        if ( simple_strtoul(this_opt+9, NULL, 0) == 0 ) {
+                        if (simple_strtoul(this_opt+9, NULL, 0) == 0) {
 				dev_info(dev, "override output enable: active low\n");
-				inf->lccr3 = ( inf->lccr3 & ~LCCR3_OEP ) | LCCR3_OutEnL;
+				inf->lccr3 = (inf->lccr3 & ~LCCR3_OEP) | LCCR3_OutEnL;
 			} else {
 				dev_info(dev, "override output enable: active high\n");
-				inf->lccr3 = ( inf->lccr3 & ~LCCR3_OEP ) | LCCR3_OutEnH;
+				inf->lccr3 = (inf->lccr3 & ~LCCR3_OEP) | LCCR3_OutEnH;
 			}
                 } else if (!strncmp(this_opt, "pixclockpol:", 12)) {
-                        if ( simple_strtoul(this_opt+12, NULL, 0) == 0 ) {
+                        if (simple_strtoul(this_opt+12, NULL, 0) == 0) {
 				dev_info(dev, "override pixel clock polarity: falling edge\n");
-				inf->lccr3 = ( inf->lccr3 & ~LCCR3_PCP ) | LCCR3_PixFlEdg;
+				inf->lccr3 = (inf->lccr3 & ~LCCR3_PCP) | LCCR3_PixFlEdg;
 			} else {
 				dev_info(dev, "override pixel clock polarity: rising edge\n");
-				inf->lccr3 = ( inf->lccr3 & ~LCCR3_PCP ) | LCCR3_PixRsEdg;
+				inf->lccr3 = (inf->lccr3 & ~LCCR3_PCP) | LCCR3_PixRsEdg;
 			}
                 } else if (!strncmp(this_opt, "color", 5)) {
 			inf->lccr0 = (inf->lccr0 & ~LCCR0_CMS) | LCCR0_Color;
@@ -1244,7 +1251,7 @@ int __init pxafb_probe(struct device *dev)
 
 #ifdef CONFIG_FB_PXA_PARAMETERS
 	ret = pxafb_parse_options(dev, g_options);
-	if ( ret < 0 )
+	if (ret < 0)
 		goto failed;
 #endif
 
@@ -1252,23 +1259,23 @@ int __init pxafb_probe(struct device *dev)
         /* Check for various illegal bit-combinations. Currently only
 	 * a warning is given. */
 
-        if ( inf->lccr0 & LCCR0_INVALID_CONFIG_MASK )
+        if (inf->lccr0 & LCCR0_INVALID_CONFIG_MASK)
                 dev_warn(dev, "machine LCCR0 setting contains illegal bits: %08x\n",
                         inf->lccr0 & LCCR0_INVALID_CONFIG_MASK);
-        if ( inf->lccr3 & LCCR3_INVALID_CONFIG_MASK )
+        if (inf->lccr3 & LCCR3_INVALID_CONFIG_MASK)
                 dev_warn(dev, "machine LCCR3 setting contains illegal bits: %08x\n",
                         inf->lccr3 & LCCR3_INVALID_CONFIG_MASK);
-        if ( inf->lccr0 & LCCR0_DPD &&
-             ( ( inf->lccr0 & LCCR0_PAS ) != LCCR0_Pas ||
-               ( inf->lccr0 & LCCR0_SDS ) != LCCR0_Sngl ||
-               ( inf->lccr0 & LCCR0_CMS ) != LCCR0_Mono ) )
+        if (inf->lccr0 & LCCR0_DPD &&
+	    ((inf->lccr0 & LCCR0_PAS) != LCCR0_Pas ||
+	     (inf->lccr0 & LCCR0_SDS) != LCCR0_Sngl ||
+	     (inf->lccr0 & LCCR0_CMS) != LCCR0_Mono))
                 dev_warn(dev, "Double Pixel Data (DPD) mode is only valid in passive mono"
 			 " single panel mode\n");
-        if ( (inf->lccr0 & LCCR0_PAS) == LCCR0_Act &&
-             ( inf->lccr0 & LCCR0_SDS ) == LCCR0_Dual )
+        if ((inf->lccr0 & LCCR0_PAS) == LCCR0_Act &&
+	    (inf->lccr0 & LCCR0_SDS) == LCCR0_Dual)
                 dev_warn(dev, "Dual panel only valid in passive mode\n");
-        if ( (inf->lccr0 & LCCR0_PAS ) == LCCR0_Pas &&
-             (inf->upper_margin || inf->lower_margin) )
+        if ((inf->lccr0 & LCCR0_PAS) == LCCR0_Pas &&
+             (inf->upper_margin || inf->lower_margin))
                 dev_warn(dev, "Upper and lower margins must be 0 in passive mode\n");
 #endif
 
