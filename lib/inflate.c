@@ -271,14 +271,15 @@ STATIC const int dbits = 6;          /* bits in base distance lookup table */
 STATIC unsigned hufts;         /* track memory usage */
 
 
-STATIC int huft_build(b, n, s, d, e, t, m)
-unsigned *b;            /* code lengths in bits (all assumed <= BMAX) */
-unsigned n;             /* number of codes (assumed <= N_MAX) */
-unsigned s;             /* number of simple-valued codes (0..s-1) */
-const ush *d;                 /* list of base values for non-simple codes */
-const ush *e;                 /* list of extra bits for non-simple codes */
-struct huft **t;        /* result: starting table */
-int *m;                 /* maximum lookup bits, returns actual */
+STATIC int huft_build(
+	unsigned *b,            /* code lengths in bits (all assumed <= BMAX) */
+	unsigned n,             /* number of codes (assumed <= N_MAX) */
+	unsigned s,             /* number of simple-valued codes (0..s-1) */
+	const ush *d,           /* list of base values for non-simple codes */
+	const ush *e,           /* list of extra bits for non-simple codes */
+	struct huft **t,        /* result: starting table */
+	int *m                  /* maximum lookup bits, returns actual */
+	)
 /* Given a list of code lengths and a maximum table size, make a set of
    tables to decode that set of codes.  Return zero on success, one if
    the given code set is incomplete (the tables are still built in this
@@ -489,8 +490,9 @@ DEBG("huft7 ");
 
 
 
-STATIC int huft_free(t)
-struct huft *t;         /* table to free */
+STATIC int huft_free(
+	struct huft *t         /* table to free */
+	)
 /* Free the malloc'ed tables built by huft_build(), which makes a linked
    list of the tables it made, with the links in a dummy first entry of
    each table. */
@@ -510,9 +512,12 @@ struct huft *t;         /* table to free */
 }
 
 
-STATIC int inflate_codes(tl, td, bl, bd)
-struct huft *tl, *td;   /* literal/length and distance decoder tables */
-int bl, bd;             /* number of bits decoded by tl[] and td[] */
+STATIC int inflate_codes(
+	struct huft *tl,    /* literal/length decoder tables */
+	struct huft *td,    /* distance decoder tables */
+	int bl,             /* number of bits decoded by tl[] */
+	int bd              /* number of bits decoded by td[] */
+	)
 /* inflate (decompress) the codes in a deflated (compressed) block.
    Return an error code or zero if it all goes ok. */
 {
@@ -619,7 +624,7 @@ int bl, bd;             /* number of bits decoded by tl[] and td[] */
 
 
 
-STATIC int inflate_stored()
+STATIC int inflate_stored(void)
 /* "decompress" an inflated type 0 (stored) block. */
 {
   unsigned n;           /* number of bytes in block */
@@ -675,7 +680,7 @@ DEBG("<stor");
 
 
 
-STATIC int inflate_fixed()
+STATIC int inflate_fixed(void)
 /* decompress an inflated type 1 (fixed Huffman codes) block.  We should
    either replace this with a custom decoder, or at least precompute the
    Huffman tables. */
@@ -729,7 +734,7 @@ DEBG("<fix");
 
 
 
-STATIC int inflate_dynamic()
+STATIC int inflate_dynamic(void)
 /* decompress an inflated type 2 (dynamic Huffman codes) block. */
 {
   int i;                /* temporary variables */
@@ -907,8 +912,9 @@ DEBG("dyn7 ");
 
 
 
-STATIC int inflate_block(e)
-int *e;                 /* last block flag */
+STATIC int inflate_block(
+	int *e                  /* last block flag */
+	)
 /* decompress an inflated block */
 {
   unsigned t;           /* block type */
@@ -954,7 +960,7 @@ int *e;                 /* last block flag */
 
 
 
-STATIC int inflate()
+STATIC int inflate(void)
 /* decompress an inflated entry */
 {
   int e;                /* last block flag */
