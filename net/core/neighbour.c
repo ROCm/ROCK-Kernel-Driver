@@ -406,12 +406,6 @@ struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 		goto out;
 	}
 
-	if (tbl->entries > (tbl->hash_mask + 1)) {
-		write_lock_bh(&tbl->lock);
-		neigh_hash_grow(tbl, (tbl->hash_mask + 1) << 1);
-		write_unlock_bh(&tbl->lock);
-	}
-
 	memcpy(n->primary_key, pkey, key_len);
 	n->dev = dev;
 	dev_hold(dev);
@@ -432,6 +426,9 @@ struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 	n->confirmed = jiffies - (n->parms->base_reachable_time << 1);
 
 	write_lock_bh(&tbl->lock);
+
+	if (tbl->entries > (tbl->hash_mask + 1)) {
+		neigh_hash_grow(tbl, (tbl->hash_mask + 1) << 1);
 
 	hash_val = tbl->hash(pkey, dev) & tbl->hash_mask;
 
