@@ -1979,6 +1979,15 @@ config R8169_NAPI
 
 	  If in doubt, say N.
 
+config R8169_VLAN
+	bool "VLAN support"
+	depends on R8169 && VLAN_8021Q
+	---help---
+	  Say Y here for the r8169 driver to support the functions required
+	  by the kernel 802.1Q code.
+	  
+	  If in doubt, say Y.
+
 config SK98LIN
 	tristate "Marvell Yukon Chipset / SysKonnect SK-98xx Support"
 	depends on PCI
@@ -2190,6 +2199,17 @@ config S2IO_NAPI
 	  information.
 
 	  If in doubt, say N.
+
+config 2BUFF_MODE
+	bool "Use 2 Buffer Mode on Rx side."
+	depends on S2IO
+	---help---
+	On enabling the 2 buffer mode, the received frame will be
+	split into 2 parts before being DMA'ed to the hosts memory.
+	The parts are the ethernet header and ethernet payload. 
+	This is useful on systems where DMA'ing to to unaligned 
+	physical memory loactions comes with a heavy price.
+	If not sure please say N.
 
 endmenu
 
