@@ -102,7 +102,6 @@ struct svc_export *	exp_get_by_name(struct svc_client *clp,
 int			exp_rootfh(struct svc_client *, 
 					char *path, struct knfsd_fh *, int maxsize);
 int			nfserrno(int errno);
-void			exp_nlmdetach(void);
 
 
 #endif /* __KERNEL__ */

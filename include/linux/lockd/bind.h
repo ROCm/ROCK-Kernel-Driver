@@ -26,7 +26,6 @@ struct nlmsvc_binding {
 						struct nfs_fh *,
 						struct file *);
 	void			(*fclose)(struct file *);
-	void			(*detach)(void);
 };
 
 extern struct nlmsvc_binding *	nlmsvc_ops;

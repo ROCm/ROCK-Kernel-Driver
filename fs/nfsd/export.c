@@ -878,18 +878,6 @@ again:
 }
 
 /*
- * Lockd is shutting down and tells us to unregister all clients
- */
-void
-exp_nlmdetach(void)
-{
-	struct svc_client	*clp;
-
-	for (clp = clients; clp; clp = clp->cl_next)
-		nfsd_lockd_unexport(clp);
-}
-
-/*
  * Verify that string is non-empty and does not exceed max length.
  */
 static int

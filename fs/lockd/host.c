@@ -159,6 +159,30 @@ nohost:
 	return host;
 }
 
+struct nlm_host *
+nlm_find_client(void)
+{
+	/* find a nlm_host for a client for which h_killed == 0.
+	 * and return it
+	 */
+	int hash;
+	down(&nlm_host_sema);
+	for (hash = 0 ; hash < NLM_HOST_NRHASH; hash++) {
+		struct nlm_host *host, **hp;
+		for (hp = &nlm_hosts[hash]; (host = *hp) ; hp = &host->h_next) {
+			if (host->h_exportent != NULL &&
+			    host->h_killed == 0) {
+				nlm_get_host(host);
+				up(&nlm_host_sema);
+				return host;
+			}
+		}
+	}
+	up(&nlm_host_sema);
+	return NULL;
+}
+
+				
 /*
  * Create the NLM RPC client for an NLM peer
  */

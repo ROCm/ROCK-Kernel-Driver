@@ -130,7 +130,7 @@ lockd(struct svc_rqst *rqstp)
 			flush_signals(current);
 			spin_unlock_irq(&current->sigmask_lock);
 			if (nlmsvc_ops) {
-				nlmsvc_ops->detach();
+				nlmsvc_invalidate_all();
 				grace_period_expire = set_grace_period();
 			}
 		}
@@ -187,7 +187,7 @@ lockd(struct svc_rqst *rqstp)
 	 */
 	if (!nlmsvc_pid || current->pid == nlmsvc_pid) {
 		if (nlmsvc_ops)
-			nlmsvc_ops->detach();
+			nlmsvc_invalidate_all();
 		nlm_shutdown_hosts();
 		nlmsvc_pid = 0;
 	} else

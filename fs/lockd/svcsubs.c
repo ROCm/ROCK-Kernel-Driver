@@ -309,3 +309,18 @@ nlmsvc_invalidate_client(struct svc_client *clnt)
 		nlm_release_host(host);
 	}
 }
+
+/*
+ * delete all hosts structs for clients
+ */
+void
+nlmsvc_invalidate_all(void)
+{
+	struct nlm_host *host;
+	while ((host = nlm_find_client()) != NULL) {
+		nlmsvc_free_host_resources(host);
+		host->h_expires = 0;
+		host->h_killed = 1;
+		nlm_release_host(host);
+	}
+}

@@ -150,6 +150,8 @@ void		  nlm_rebind_host(struct nlm_host *);
 struct nlm_host * nlm_get_host(struct nlm_host *);
 void		  nlm_release_host(struct nlm_host *);
 void		  nlm_shutdown_hosts(void);
+extern struct nlm_host *nlm_find_client(void);
+
 
 /*
  * Server-side lock handling
@@ -173,6 +175,7 @@ u32		  nlm_lookup_file(struct svc_rqst *, struct nlm_file **,
 void		  nlm_release_file(struct nlm_file *);
 void		  nlmsvc_mark_resources(void);
 void		  nlmsvc_free_host_resources(struct nlm_host *);
+void		  nlmsvc_invalidate_all(void);
 
 static __inline__ struct inode *
 nlmsvc_file_inode(struct nlm_file *file)
