@@ -20,6 +20,7 @@
 #include <linux/threads.h>
 #include <linux/smp_lock.h>
 #include <linux/seq_file.h>
+#include <linux/init.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -34,9 +35,6 @@
 static int ppc_htab_show(struct seq_file *m, void *v);
 static ssize_t ppc_htab_write(struct file * file, const char __user * buffer,
 			      size_t count, loff_t *ppos);
-int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
-		  void __user *buffer, size_t *lenp, loff_t *ppos);
-
 extern PTE *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;
 extern unsigned long _SDR1;
@@ -438,3 +436,32 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 	*ppos += *lenp;
 	return 0;
 }
+
+#ifdef CONFIG_SYSCTL
+/*
+ * Register our sysctl.
+ */
+static ctl_table htab_ctl_table[]={
+	{
+		.ctl_name	= KERN_PPC_L2CR,
+		.procname	= "l2cr",
+		.mode		= 0644,
+		.proc_handler	= &proc_dol2crvec,
+	},
+	{ 0, },
+};
+static ctl_table htab_sysctl_root[] = {
+	{ 1, "kernel", NULL, 0, 0755, htab_ctl_table, },
+ 	{ 0,},
+};
+
+static int __init
+register_ppc_htab_sysctl(void)
+{
+	register_sysctl_table(htab_sysctl_root, 0);
+
+	return 0;
+}
+
+__initcall(register_ppc_htab_sysctl);
+#endif

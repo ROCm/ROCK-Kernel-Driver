@@ -110,12 +110,6 @@ extern int sysctl_userprocess_debug;
 
 extern int sysctl_hz_timer;
 
-#if defined(CONFIG_PPC32) && defined(CONFIG_6xx)
-extern unsigned long powersave_nap;
-int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
-		  void __user *buffer, size_t *lenp, loff_t *ppos);
-#endif
-
 #ifdef CONFIG_BSD_PROCESS_ACCT
 extern int acct_parm[];
 #endif
@@ -353,22 +347,6 @@ static ctl_table kern_table[] = {
 		.maxlen		= sizeof (int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
-	},
-#endif
-#if defined(CONFIG_PPC32) && defined(CONFIG_6xx)
-	{
-		.ctl_name	= KERN_PPC_POWERSAVE_NAP,
-		.procname	= "powersave-nap",
-		.data		= &powersave_nap,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_PPC_L2CR,
-		.procname	= "l2cr",
-		.mode		= 0644,
-		.proc_handler	= &proc_dol2crvec,
 	},
 #endif
 	{
