@@ -195,7 +195,11 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
 		++q->counter;
 		ret = q->qdisc->enqueue(skb, q->qdisc);
-		if (ret)
+		if (likely(ret == NET_XMIT_SUCCESS)) {
+			sch->q.qlen++;
+			sch->bstats.bytes += skb->len;
+			sch->bstats.packets++;
+		} else
 			sch->qstats.drops++;
 		return ret;
 	}
@@ -487,7 +491,7 @@ static int netem_graft(struct Qdisc *sch, unsigned long arg, struct Qdisc *new,
 	sch_tree_lock(sch);
 	*old = xchg(&q->qdisc, new);
 	qdisc_reset(*old);
-	sch->q.qlen = 0;
+	sch->q.qlen = q->delayed.qlen;
 	sch_tree_unlock(sch);
 
 	return 0;
