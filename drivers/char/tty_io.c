@@ -2246,6 +2246,7 @@ void __init tty_init(void)
 	 */
 	memset(&dev_tty_driver, 0, sizeof(struct tty_driver));
 	dev_tty_driver.magic = TTY_DRIVER_MAGIC;
+	dev_tty_driver.owner = THIS_MODULE;
 	dev_tty_driver.driver_name = "/dev/tty";
 	dev_tty_driver.name = dev_tty_driver.driver_name + 5;
 	dev_tty_driver.name_base = 0;
@@ -2259,6 +2260,7 @@ void __init tty_init(void)
 		panic("Couldn't register /dev/tty driver\n");
 
 	dev_syscons_driver = dev_tty_driver;
+	dev_syscons_driver.owner = THIS_MODULE;
 	dev_syscons_driver.driver_name = "/dev/console";
 	dev_syscons_driver.name = dev_syscons_driver.driver_name + 5;
 	dev_syscons_driver.major = TTYAUX_MAJOR;
@@ -2271,6 +2273,7 @@ void __init tty_init(void)
 
 #ifdef CONFIG_UNIX98_PTYS
 	dev_ptmx_driver = dev_tty_driver;
+	dev_ptmx_driver.owner = THIS_MODULE;
 	dev_ptmx_driver.driver_name = "/dev/ptmx";
 	dev_ptmx_driver.name = dev_ptmx_driver.driver_name + 5;
 	dev_ptmx_driver.major= TTYAUX_MAJOR;
@@ -2284,6 +2287,7 @@ void __init tty_init(void)
 	
 #ifdef CONFIG_VT
 	dev_console_driver = dev_tty_driver;
+	dev_console_driver.owner = THIS_MODULE;
 	dev_console_driver.driver_name = "/dev/vc/0";
 	dev_console_driver.name = dev_console_driver.driver_name + 5;
 	dev_console_driver.major = TTY_MAJOR;
