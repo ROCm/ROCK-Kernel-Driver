@@ -581,45 +581,51 @@ static int acm_probe (struct usb_interface *intf,
 
 	dev = interface_to_usbdev (intf);
 
-		cfacm = dev->actconfig;
-
-		for (j = 0; j < cfacm->desc.bNumInterfaces - 1; j++) {
-		    
-			if (usb_interface_claimed(cfacm->interface[j]) ||
-			    usb_interface_claimed(cfacm->interface[j + 1]))
-			continue;
-
-			/* We know we're probe()d with the control interface.
-			 * FIXME ACM doesn't guarantee the data interface is
-			 * adjacent to the control interface, or that if one
-			 * is there it's not for call management ... so use
-			 * the cdc union descriptor whenever there is one.
-			 */
+			cfacm = dev->actconfig;
+	
+			/* We know we're probe()d with the control interface. */
 			ifcom = intf->cur_altsetting;
-			if (intf == cfacm->interface[j]) {
-				ifdata = cfacm->interface[j + 1]->cur_altsetting;
-				data = cfacm->interface[j + 1];
-			} else if (intf == cfacm->interface[j + 1]) {
+
+			/* ACM doesn't guarantee the data interface is
+			 * adjacent to the control interface, or that if one
+			 * is there it's not for call management ... so find
+			 * it
+			 */
+			for (j = 0; j < cfacm->desc.bNumInterfaces; j++) {
 				ifdata = cfacm->interface[j]->cur_altsetting;
 				data = cfacm->interface[j];
-			} else
-				continue;
 
-			if (ifdata->desc.bInterfaceClass != 10 || ifdata->desc.bNumEndpoints < 2)
-				continue;
+				if (ifdata->desc.bInterfaceClass == 10 &&
+				    ifdata->desc.bNumEndpoints == 2) {
+					epctrl = &ifcom->endpoint[0].desc;
+					epread = &ifdata->endpoint[0].desc;
+					epwrite = &ifdata->endpoint[1].desc;
 
-			epctrl = &ifcom->endpoint[0].desc;
-			epread = &ifdata->endpoint[0].desc;
-			epwrite = &ifdata->endpoint[1].desc;
+					if ((epctrl->bEndpointAddress & 0x80) != 0x80 ||
+					    (epctrl->bmAttributes & 3) != 3 ||
+					    (epread->bmAttributes & 3) != 2 || 
+					    (epwrite->bmAttributes & 3) != 2 ||
+					    ((epread->bEndpointAddress & 0x80) ^ (epwrite->bEndpointAddress & 0x80)) != 0x80) 
+						goto next_interface;
 
-			if ((epctrl->bEndpointAddress & 0x80) != 0x80 || (epctrl->bmAttributes & 3) != 3 ||
-			   (epread->bmAttributes & 3) != 2 || (epwrite->bmAttributes & 3) != 2 ||
-			   ((epread->bEndpointAddress & 0x80) ^ (epwrite->bEndpointAddress & 0x80)) != 0x80)
-				continue;
+					if ((epread->bEndpointAddress & 0x80) != 0x80) {
+						epread = &ifdata->endpoint[1].desc;
+						epwrite = &ifdata->endpoint[0].desc;
+					}
+					dbg("found data interface at %d\n", j);
+					break;
+				} else {
+next_interface:
+					ifdata = NULL;
+					data = NULL;
+				}
+			}
 
-			if ((epread->bEndpointAddress & 0x80) != 0x80) {
-				epread = &ifdata->endpoint[1].desc;
-				epwrite = &ifdata->endpoint[0].desc;
+			/* there's been a problem */
+			if (!ifdata) {
+				dbg("interface not found (%p)\n", ifdata);
+				return -ENODEV;
+
 			}
 
 			for (minor = 0; minor < ACM_TTY_MINORS && acm_table[minor]; minor++);
@@ -696,16 +702,21 @@ static int acm_probe (struct usb_interface *intf,
 			acm->line.databits = 8;
 			acm_set_line(acm, &acm->line);
 
-			usb_driver_claim_interface(&acm_driver, data, acm);
+			if ( (j = usb_driver_claim_interface(&acm_driver, data, acm)) != 0) {
+				err("claim failed");
+				usb_free_urb(acm->ctrlurb);
+				usb_free_urb(acm->readurb);
+				usb_free_urb(acm->writeurb);
+				kfree(acm);
+				kfree(buf);
+				return j;
+			} 
 
 			tty_register_device(acm_tty_driver, minor, &intf->dev);
 
 			acm_table[minor] = acm;
 			usb_set_intfdata (intf, acm);
 			return 0;
-		}
-
-	return -EIO;
 }
 
 static void acm_disconnect(struct usb_interface *intf)
