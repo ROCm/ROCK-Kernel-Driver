@@ -242,14 +242,14 @@ again:
 	mp = search_hash(hash_ptr, mapping, lblock);
 	if (mp) {
 	      page_found:
+		if (test_bit(META_stale, &mp->flag)) {
+			spin_unlock(&meta_lock);
+			yield();
+			goto again;
+		}
 		mp->count++;
 		lock_metapage(mp);
 		spin_unlock(&meta_lock);
-		if (test_bit(META_stale, &mp->flag)) {
-			release_metapage(mp);
-			yield();	/* Let other waiters release it, too */
-			goto again;
-		}
 		if (test_bit(META_discard, &mp->flag)) {
 			if (!new) {
 				jfs_error(inode->i_sb,
@@ -461,7 +461,6 @@ void release_metapage(struct metapage * mp)
 	}
 
 	if (mp->page) {
-		/* Releasing spinlock, we have to check mp->count later */
 		set_bit(META_stale, &mp->flag);
 		spin_unlock(&meta_lock);
 		kunmap(mp->page);
@@ -498,12 +497,6 @@ void release_metapage(struct metapage * mp)
 		list_del(&mp->synclist);
 		LOGSYNC_UNLOCK(log);
 	}
-	if (mp->count) {
-		/* Someone else is trying to get this metpage */
-		unlock_metapage(mp);
-		spin_unlock(&meta_lock);
-		return;
-	}
 	remove_from_hash(mp, meta_hash(mp->mapping, mp->index));
 	spin_unlock(&meta_lock);
 
@@ -532,12 +525,8 @@ again:
 		mp = search_hash(hash_ptr, mapping, lblock);
 		if (mp) {
 			if (test_bit(META_stale, &mp->flag)) {
-				/* Racing with release_metapage */
-				mp->count++;
-				lock_metapage(mp);
 				spin_unlock(&meta_lock);
-				/* racing release_metapage should be done now */
-				release_metapage(mp);
+				yield();
 				goto again;
 			}
 
