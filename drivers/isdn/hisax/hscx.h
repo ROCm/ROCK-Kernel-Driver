@@ -37,6 +37,4 @@
 extern int HscxVersion(struct IsdnCardState *cs, char *s);
 extern void hscx_sched_event(struct BCState *bcs, int event);
 extern void modehscx(struct BCState *bcs, int mode, int bc);
-extern void clear_pending_hscx_ints(struct IsdnCardState *cs);
-extern void inithscx(struct IsdnCardState *cs);
-extern void inithscxisac(struct IsdnCardState *cs, int part);
+extern void inithscxisac(struct IsdnCardState *cs);

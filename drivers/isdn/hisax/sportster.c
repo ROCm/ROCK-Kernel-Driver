@@ -168,10 +168,9 @@ Sportster_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_sportster(cs);
 			return(0);
 		case CARD_INIT:
-			inithscxisac(cs, 1);
+			inithscxisac(cs);
 			cs->hw.spt.res_irq |= SPORTSTER_INTE; /* IRQ On */
 			byteout(cs->hw.spt.cfg_reg + SPORTSTER_RES_IRQ, cs->hw.spt.res_irq);
-			inithscxisac(cs, 2);
 			return(0);
 		case CARD_TEST:
 			return(0);

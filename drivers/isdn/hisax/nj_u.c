@@ -131,7 +131,6 @@ NETjet_U_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			return(0);
 		case CARD_INIT:
 			inittiger(cs);
-			clear_pending_icc_ints(cs);
 			initicc(cs);
 			/* Reenable all IRQ */
 			cs->writeisac(cs, ICC_MASK, 0);

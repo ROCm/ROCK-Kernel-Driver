@@ -623,6 +623,8 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 void __init
 initicc(struct IsdnCardState *cs)
 {
+	int val, eval;
+
 	INIT_WORK(&cs->work, icc_bh, cs);
 	cs->setstack_d = setstack_icc;
 	cs->DC_Close = DC_Close_icc;
@@ -631,7 +633,26 @@ initicc(struct IsdnCardState *cs)
 	cs->dbusytimer.function = (void *) dbusy_timer_handler;
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);
-  	cs->writeisac(cs, ICC_MASK, 0xff);
+
+	val = cs->readisac(cs, ICC_STAR);
+	debugl1(cs, "ICC STAR %x", val);
+	val = cs->readisac(cs, ICC_MODE);
+	debugl1(cs, "ICC MODE %x", val);
+	val = cs->readisac(cs, ICC_ADF2);
+	debugl1(cs, "ICC ADF2 %x", val);
+	val = cs->readisac(cs, ICC_ISTA);
+	debugl1(cs, "ICC ISTA %x", val);
+	if (val & 0x01) {
+		eval = cs->readisac(cs, ICC_EXIR);
+		debugl1(cs, "ICC EXIR %x", eval);
+	}
+	val = cs->readisac(cs, ICC_CIR0);
+	debugl1(cs, "ICC CIR0 %x", val);
+	cs->dc.icc.ph_state = (val >> 2) & 0xf;
+	icc_sched_event(cs, D_L1STATECHANGE);
+	/* Disable all IRQ */
+	cs->writeisac(cs, ICC_MASK, 0xFF);
+
   	cs->dc.icc.mocr = 0xaa;
 	if (test_bit(HW_IOM1, &cs->HW_Flags)) {
 		/* IOM 1 Mode */
@@ -655,29 +676,4 @@ initicc(struct IsdnCardState *cs)
 	ph_command(cs, ICC_CMD_RES);
 	cs->writeisac(cs, ICC_MASK, 0x0);
 	ph_command(cs, ICC_CMD_DI);
-}
-
-void __init
-clear_pending_icc_ints(struct IsdnCardState *cs)
-{
-	int val, eval;
-
-	val = cs->readisac(cs, ICC_STAR);
-	debugl1(cs, "ICC STAR %x", val);
-	val = cs->readisac(cs, ICC_MODE);
-	debugl1(cs, "ICC MODE %x", val);
-	val = cs->readisac(cs, ICC_ADF2);
-	debugl1(cs, "ICC ADF2 %x", val);
-	val = cs->readisac(cs, ICC_ISTA);
-	debugl1(cs, "ICC ISTA %x", val);
-	if (val & 0x01) {
-		eval = cs->readisac(cs, ICC_EXIR);
-		debugl1(cs, "ICC EXIR %x", eval);
-	}
-	val = cs->readisac(cs, ICC_CIR0);
-	debugl1(cs, "ICC CIR0 %x", val);
-	cs->dc.icc.ph_state = (val >> 2) & 0xf;
-	icc_sched_event(cs, D_L1STATECHANGE);
-	/* Disable all IRQ */
-	cs->writeisac(cs, ICC_MASK, 0xFF);
 }

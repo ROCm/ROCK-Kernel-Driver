@@ -479,17 +479,12 @@ Sedl_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			return(0);
 		case CARD_INIT:
 			if (cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) {
-				clear_pending_isac_ints(cs);
 				writereg(cs->hw.sedl.adr, cs->hw.sedl.hscx,
 					ISAR_IRQBIT, 0);
 				initisac(cs);
 				initisar(cs);
-				/* Reenable all IRQ */
-				cs->writeisac(cs, ISAC_MASK, 0);
-				/* RESET Receiver and Transmitter */
-				cs->writeisac(cs, ISAC_CMDR, 0x41);
 			} else {
-				inithscxisac(cs, 3);
+				inithscxisac(cs);
 			}
 			return(0);
 		case CARD_TEST:

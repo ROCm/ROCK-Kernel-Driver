@@ -860,7 +860,7 @@ Diva_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 				ireg = (unsigned int *)cs->hw.diva.pci_cfg;
 				*ireg = PITA_INT0_ENABLE;
 			}
-			inithscxisac(cs, 3);
+			inithscxisac(cs);
 			return(0);
 		case CARD_TEST:
 			return(0);

@@ -243,8 +243,6 @@ BKM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_bkm(cs);
 			return (0);
 		case CARD_INIT:
-			clear_pending_isac_ints(cs);
-			clear_pending_jade_ints(cs);
 			initisac(cs);
 			initjade(cs);
 			/* Enable ints */

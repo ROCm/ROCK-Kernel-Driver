@@ -66,4 +66,3 @@
 extern void ISACVersion(struct IsdnCardState *cs, char *s);
 extern void initisac(struct IsdnCardState *cs);
 extern void isac_interrupt(struct IsdnCardState *cs, u_char val);
-extern void clear_pending_isac_ints(struct IsdnCardState *cs);

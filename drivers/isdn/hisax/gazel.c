@@ -421,7 +421,7 @@ Gazel_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			release_io_gazel(cs);
 			return (0);
 		case CARD_INIT:
-			inithscxisac(cs, 1);
+			inithscxisac(cs);
 			if ((cs->subtyp==R647)||(cs->subtyp==R685)) {
 				int i;
 				for (i=0;i<(2+MAX_WAITING_CALLS);i++) {
