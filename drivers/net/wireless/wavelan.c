@@ -2172,6 +2172,11 @@ static int wavelan_get_range(struct net_device *dev,
 	range->num_bitrates = 1;
 	range->bitrate[0] = 2000000;	/* 2 Mb/s */
 
+	/* Event capability (kernel + driver) */
+	range->event_capa[0] = (IW_EVENT_CAPA_MASK(0x8B02) |
+				IW_EVENT_CAPA_MASK(0x8B04));
+	range->event_capa[1] = IW_EVENT_CAPA_K_1;
+
 	/* Disable interrupts and save flags. */
 	spin_lock_irqsave(&lp->spinlock, flags);
 	
@@ -2403,11 +2408,10 @@ static const struct iw_handler_def	wavelan_handler_def =
 	.num_standard	= sizeof(wavelan_handler)/sizeof(iw_handler),
 	.num_private	= sizeof(wavelan_private_handler)/sizeof(iw_handler),
 	.num_private_args = sizeof(wavelan_private_args)/sizeof(struct iw_priv_args),
-	.standard	= (iw_handler *) wavelan_handler,
-	.private	= (iw_handler *) wavelan_private_handler,
-	.private_args	= (struct iw_priv_args *) wavelan_private_args,
-	.spy_offset	= ((void *) (&((net_local *) NULL)->spy_data) -
-			   (void *) NULL),
+	.standard	= wavelan_handler,
+	.private	= wavelan_private_handler,
+	.private_args	= wavelan_private_args,
+	.get_wireless_stats = wavelan_get_wireless_stats,
 };
 
 /*------------------------------------------------------------------*/
@@ -4190,8 +4194,9 @@ static int __init wavelan_config(struct net_device *dev, unsigned short ioaddr)
 #endif				/* SET_MAC_ADDRESS */
 
 #ifdef WIRELESS_EXT		/* if wireless extension exists in the kernel */
-	dev->get_wireless_stats = wavelan_get_wireless_stats;
-	dev->wireless_handlers = (struct iw_handler_def *)&wavelan_handler_def;
+	dev->wireless_handlers = &wavelan_handler_def;
+	lp->wireless_data.spy_data = &lp->spy_data;
+	dev->wireless_data = &lp->wireless_data;
 #endif
 
 	dev->mtu = WAVELAN_MTU;

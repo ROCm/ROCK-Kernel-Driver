@@ -1188,6 +1188,7 @@ struct airo_info {
 	struct iw_statistics	wstats;		// wireless stats
 	unsigned long		scan_timestamp;	/* Time started to scan */
 	struct iw_spy_data	spy_data;
+	struct iw_public_data	wireless_data;
 #endif /* WIRELESS_EXT */
 #ifdef MICSUPPORT
 	/* MIC stuff */
@@ -2626,8 +2627,7 @@ static void wifi_setup(struct net_device *dev)
 	dev->set_mac_address = &airo_set_mac_address;
 	dev->do_ioctl = &airo_ioctl;
 #ifdef WIRELESS_EXT
-	dev->get_wireless_stats = airo_get_wireless_stats;
-	dev->wireless_handlers = (struct iw_handler_def *)&airo_handler_def;
+	dev->wireless_handlers = &airo_handler_def;
 #endif /* WIRELESS_EXT */
 	dev->change_mtu = &airo_change_mtu;
 	dev->open = &airo_open;
@@ -2654,6 +2654,9 @@ static struct net_device *init_wifidev(struct airo_info *ai,
 	dev->priv = ethdev->priv;
 	dev->irq = ethdev->irq;
 	dev->base_addr = ethdev->base_addr;
+#ifdef WIRELESS_EXT
+	dev->wireless_data = ethdev->wireless_data;
+#endif /* WIRELESS_EXT */
 	memcpy(dev->dev_addr, ethdev->dev_addr, dev->addr_len);
 	err = register_netdev(dev);
 	if (err<0) {
@@ -2733,8 +2736,9 @@ struct net_device *_init_airo_card( unsigned short irq, int port,
 	dev->set_mac_address = &airo_set_mac_address;
 	dev->do_ioctl = &airo_ioctl;
 #ifdef WIRELESS_EXT
-	dev->get_wireless_stats = airo_get_wireless_stats;
-	dev->wireless_handlers = (struct iw_handler_def *)&airo_handler_def;
+	dev->wireless_handlers = &airo_handler_def;
+	ai->wireless_data.spy_data = &ai->spy_data;
+	dev->wireless_data = &ai->wireless_data;
 #endif /* WIRELESS_EXT */
 	dev->change_mtu = &airo_change_mtu;
 	dev->open = &airo_open;
@@ -3217,7 +3221,7 @@ badrx:
 					goto exitrx;
 				}
 			}
-#ifdef IW_WIRELESS_SPY		/* defined in iw_handler.h */
+#ifdef WIRELESS_SPY
 			if (apriv->spy_data.spy_number > 0) {
 				char *sa;
 				struct iw_quality wstats;
@@ -3237,7 +3241,7 @@ badrx:
 				/* Update spy records */
 				wireless_spy_update(dev, sa, &wstats);
 			}
-#endif /* IW_WIRELESS_SPY */
+#endif /* WIRELESS_SPY */
 			OUT4500( apriv, EVACK, EV_RX);
 
 			if (test_bit(FLAG_802_11, &apriv->flags)) {
@@ -3467,7 +3471,7 @@ badmic:
 #else
 		memcpy(buffer, ai->rxfids[0].virtual_host_addr, len);
 #endif
-#ifdef IW_WIRELESS_SPY		/* defined in iw_handler.h */
+#ifdef WIRELESS_SPY
 		if (ai->spy_data.spy_number > 0) {
 			char *sa;
 			struct iw_quality wstats;
@@ -3479,7 +3483,7 @@ badmic:
 			/* Update spy records */
 			wireless_spy_update(ai->dev, sa, &wstats);
 		}
-#endif /* IW_WIRELESS_SPY */
+#endif /* WIRELESS_SPY */
 
 		skb->dev = ai->dev;
 		skb->ip_summed = CHECKSUM_NONE;
@@ -6505,6 +6509,13 @@ static int airo_get_range(struct net_device *dev,
 		range->avg_qual.level = 176;	/* -80 dBm */
 	range->avg_qual.noise = 0;
 
+	/* Event capability (kernel + driver) */
+	range->event_capa[0] = (IW_EVENT_CAPA_K_0 |
+				IW_EVENT_CAPA_MASK(SIOCGIWTHRSPY) |
+				IW_EVENT_CAPA_MASK(SIOCGIWAP) |
+				IW_EVENT_CAPA_MASK(SIOCGIWSCAN));
+	range->event_capa[1] = IW_EVENT_CAPA_K_1;
+	range->event_capa[4] = IW_EVENT_CAPA_MASK(IWEVTXDROP);
 	return 0;
 }
 
@@ -6872,8 +6883,14 @@ static int airo_get_scan(struct net_device *dev,
 	while((!rc) && (BSSList.index != 0xffff)) {
 		/* Translate to WE format this entry */
 		current_ev = airo_translate_scan(dev, current_ev,
-						 extra + IW_SCAN_MAX_DATA,
+						 extra + dwrq->length,
 						 &BSSList);
+
+		/* Check if there is space for one more entry */
+		if((extra + dwrq->length - current_ev) <= IW_EV_ADDR_LEN) {
+			/* Ask user space to try again with a bigger buffer */
+			return -E2BIG;
+		}
 
 		/* Read next entry */
 		rc = PC4500_readrid(ai, RID_BSSLISTNEXT,
@@ -7010,12 +7027,10 @@ static const struct iw_handler_def	airo_handler_def =
 	.num_standard	= sizeof(airo_handler)/sizeof(iw_handler),
 	.num_private	= sizeof(airo_private_handler)/sizeof(iw_handler),
 	.num_private_args = sizeof(airo_private_args)/sizeof(struct iw_priv_args),
-	.standard	= (iw_handler *) airo_handler,
-	.private	= (iw_handler *) airo_private_handler,
-	.private_args	= (struct iw_priv_args *) airo_private_args,
-	.spy_offset	= ((void *) (&((struct airo_info *) NULL)->spy_data) -
-			   (void *) NULL),
-
+	.standard	= airo_handler,
+	.private	= airo_private_handler,
+	.private_args	= airo_private_args,
+	.get_wireless_stats = airo_get_wireless_stats,
 };
 
 #endif /* WIRELESS_EXT */
