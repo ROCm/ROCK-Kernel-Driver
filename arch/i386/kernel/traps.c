@@ -704,27 +704,24 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 	/* Save debug status register where ptrace can see it */
 	tsk->thread.debugreg[6] = condition;
 
-	/* Mask out spurious TF errors due to lazy TF clearing */
+	/*
+	 * Single-stepping through TF: make sure we ignore any events in
+	 * kernel space (but re-enable TF when returning to user mode).
+	 * And if the event was due to a debugger (PT_DTRACE), clear the
+	 * TF flag so that register information is correct.
+	 */
 	if (condition & DR_STEP) {
 		/*
-		 * The TF error should be masked out only if the current
-		 * process is not traced and if the TRAP flag has been set
-		 * previously by a tracing process (condition detected by
-		 * the PT_DTRACE flag); remember that the i386 TRAP flag
-		 * can be modified by the process itself in user mode,
-		 * allowing programs to debug themselves without the ptrace()
-		 * interface.
+		 * We already checked v86 mode above, so we can
+		 * check for kernel mode by just checking the CPL
+		 * of CS.
 		 */
 		if ((regs->xcs & 3) == 0)
 			goto clear_TF_reenable;
 
-		/*
-		 * Was the TF flag set by a debugger? If so, clear it now,
-		 * so that register information is correct.
-		 */
-		if (tsk->ptrace & PT_DTRACE) {
-			regs->eflags &= ~TF_MASK;
+		if (likely(tsk->ptrace & PT_DTRACE)) {
 			tsk->ptrace &= ~PT_DTRACE;
+			regs->eflags &= ~TF_MASK;
 		}
 	}
 
@@ -746,7 +743,6 @@ debug_vm86:
 
 clear_TF_reenable:
 	set_tsk_thread_flag(tsk, TIF_SINGLESTEP);
-clear_TF:
 	regs->eflags &= ~TF_MASK;
 	return;
 }
