@@ -30,7 +30,8 @@
 
 /* Change Log
  *
- * 5.2.26	11/13/03
+ * 5.2.27	12/14/03
+ *   o Added netpoll support.
  *   o Fixed endianess bug causing ethtool loopback diags to fail on ppc.
  *   o Use pdev->irq rather than netdev->irq in preparation for MSI support.
  *   o Report driver message on user override of InterruptThrottleRate
@@ -62,7 +63,7 @@
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.2.26-k1";
+char e1000_driver_version[] = "5.2.27-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -177,6 +178,11 @@ static int e1000_notify_reboot(struct notifier_block *, unsigned long event, voi
 static int e1000_suspend(struct pci_dev *pdev, uint32_t state);
 #ifdef CONFIG_PM
 static int e1000_resume(struct pci_dev *pdev);
+#endif
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/* for netdump / net console */
+static void e1000_netpoll (struct net_device *dev);
 #endif
 
 struct notifier_block e1000_notifier_reboot = {
@@ -431,6 +437,9 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->vlan_rx_register = e1000_vlan_rx_register;
 	netdev->vlan_rx_add_vid = e1000_vlan_rx_add_vid;
 	netdev->vlan_rx_kill_vid = e1000_vlan_rx_kill_vid;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	netdev->poll_controller = e1000_netpoll;
+#endif
 
 	netdev->mem_start = mmio_start;
 	netdev->mem_end = mmio_start + mmio_len;
@@ -2883,6 +2892,22 @@ e1000_resume(struct pci_dev *pdev)
 	}
 
 	return 0;
+}
+#endif
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/*
+ * Polling 'interrupt' - used by things like netconsole to send skbs
+ * without having to re-enable interrupts. It's not called while
+ * the interrupt routine is executing.
+ */
+
+static void e1000_netpoll (struct net_device *dev)
+{
+	struct e1000_adapter *adapter = dev->priv;
+	disable_irq(adapter->pdev->irq);
+	e1000_intr (adapter->pdev->irq, dev, NULL);
+	enable_irq(adapter->pdev->irq);
 }
 #endif
 
