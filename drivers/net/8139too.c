@@ -123,6 +123,11 @@
 #define USE_IO_OPS 1
 #endif
 
+/* use a 16K rx ring buffer instead of the default 32K */
+#ifdef CONFIG_SH_DREAMCAST
+#define USE_BUF16K 1
+#endif
+
 /* define to 1 to enable copious debugging info */
 #undef RTL8139_DEBUG
 
@@ -165,7 +170,11 @@ static int multicast_filter_limit = 32;
 static int debug = -1;
 
 /* Size of the in-memory receive ring. */
+#ifdef USE_BUF16K
+#define RX_BUF_LEN_IDX	1	/* 0==8K, 1==16K, 2==32K, 3==64K */
+#else
 #define RX_BUF_LEN_IDX	2	/* 0==8K, 1==16K, 2==32K, 3==64K */
+#endif
 #define RX_BUF_LEN	(8192 << RX_BUF_LEN_IDX)
 #define RX_BUF_PAD	16
 #define RX_BUF_WRAP_PAD 2048 /* spare padding to handle lack of packet wrap */
@@ -261,7 +270,12 @@ static struct pci_device_id rtl8139_pci_tbl[] = {
 	{0x1259, 0xa117, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ALLIED8139 },
 	{0x14ea, 0xab06, PCI_ANY_ID, PCI_ANY_ID, 0, 0, FNW3603TX },
 	{0x14ea, 0xab07, PCI_ANY_ID, PCI_ANY_ID, 0, 0, FNW3800TX },
+	{0x11db, 0x1234, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
 
+#ifdef CONFIG_SH_SECUREEDGE5410
+	/* Bogus 8139 silicon reports 8129 without external PROM :-( */
+	{0x10ec, 0x8129, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139 },
+#endif
 #ifdef CONFIG_8139TOO_8129
 	{0x10ec, 0x8129, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8129 },
 #endif
@@ -707,10 +721,17 @@ static const u16 rtl8139_intr_mask =
 	PCIErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOOver |
 	TxErr | TxOK | RxErr | RxOK;
 
+#ifdef USE_BUF16K 
+static const unsigned int rtl8139_rx_config =
+	RxCfgRcv16K | RxNoWrap |
+	(RX_FIFO_THRESH << RxCfgFIFOShift) |
+	(RX_DMA_BURST << RxCfgDMAShift);
+#else
 static const unsigned int rtl8139_rx_config =
 	RxCfgRcv32K | RxNoWrap |
 	(RX_FIFO_THRESH << RxCfgFIFOShift) |
 	(RX_DMA_BURST << RxCfgDMAShift);
+#endif
 
 static const unsigned int rtl8139_tx_config =
 	(TX_DMA_BURST << TxDMAShift) | (TX_RETRY << TxRetryShift);
