@@ -102,8 +102,6 @@ static char *serial_version = "4.30";
 
 static char *serial_name = "Amiga-builtin serial driver";
 
-static DECLARE_TASK_QUEUE(tq_serial);
-
 static struct tty_driver serial_driver, callout_driver;
 static int serial_refcount;
 
@@ -276,8 +274,7 @@ static _INLINE_ void rs_sched_event(struct async_struct *info,
 				  int event)
 {
 	info->event |= 1 << event;
-	queue_task(&info->tqueue, &tq_serial);
-	mark_bh(SERIAL_BH);
+	tasklet_schedule(&info->tlet);
 }
 
 static _INLINE_ void receive_chars(struct async_struct *info)
@@ -560,12 +557,8 @@ static void ser_tx_int(int irq, void *dev_id, struct pt_regs * regs)
  * interrupt driver proper are done; the interrupt driver schedules
  * them using rs_sched_event(), and they get done here.
  */
-static void do_serial_bh(void)
-{
-	run_task_queue(&tq_serial);
-}
 
-static void do_softint(void *private_)
+static void do_softint(unsigned long private_)
 {
 	struct async_struct	*info = (struct async_struct *) private_;
 	struct tty_struct	*tty;
@@ -1878,8 +1871,7 @@ static int get_async_struct(int line, struct async_struct **ret_info)
 	info->flags = sstate->flags;
 	info->xmit_fifo_size = sstate->xmit_fifo_size;
 	info->line = line;
-	info->tqueue.routine = do_softint;
-	info->tqueue.data = info;
+	tasklet_init(&info->tlet, do_softint, (unsigned long)info);
 	info->state = sstate;
 	if (sstate->info) {
 		kfree(info);
@@ -2117,8 +2109,6 @@ static int __init rs_init(void)
 	if (!request_mem_region(CUSTOM_PHYSADDR+0x30, 4, "amiserial [Paula]"))
 		return -EBUSY;
 
-	init_bh(SERIAL_BH, do_serial_bh);
-
 	IRQ_ports = NULL;
 
 	show_serial_version();
@@ -2234,23 +2224,18 @@ static int __init rs_init(void)
 
 static __exit void rs_exit(void) 
 {
-	unsigned long flags;
 	int e1, e2;
-	struct async_struct *info;
+	struct async_struct *info = rs_table[0].info;
 
 	/* printk("Unloading %s: version %s\n", serial_name, serial_version); */
-	save_flags(flags);
-	cli();
-        remove_bh(SERIAL_BH);
+	tasklet_kill(&info->tlet);
 	if ((e1 = tty_unregister_driver(&serial_driver)))
 		printk("SERIAL: failed to unregister serial driver (%d)\n",
 		       e1);
 	if ((e2 = tty_unregister_driver(&callout_driver)))
 		printk("SERIAL: failed to unregister callout driver (%d)\n", 
 		       e2);
-	restore_flags(flags);
 
-	info = rs_table[0].info;
 	if (info) {
 	  rs_table[0].info = NULL;
 	  kfree(info);
