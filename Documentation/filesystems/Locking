@@ -69,10 +69,10 @@ setattr:	no	yes
 permission:	yes	no
 getattr:				(see below)
 revalidate:	no			(see below)
-setxattr:	yes	no
-getxattr:	yes	no
-listxattr:	yes	no
-removexattr:	yes	no
+setxattr:	no	yes
+getxattr:	no	yes
+listxattr:	no	yes
+removexattr:	no	yes
 	Additionally, ->rmdir(), ->unlink() and ->rename() have ->i_sem on
 victim.
 	cross-directory ->rename() has (per-superblock) ->s_vfs_rename_sem.
