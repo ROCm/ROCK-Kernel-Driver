@@ -859,7 +859,7 @@ static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *
 		instance->atm_dev->signal = ATM_PHY_SIG_FOUND;
 		down (&instance->serialize); /* vs self */
 		if (!instance->firmware_loaded) {
-			usb_set_interface (instance->usb_dev, 1, 2);
+			usb_set_interface (instance->usb_dev, 1, 1);
 			instance->firmware_loaded = 1;
 		}
 		up (&instance->serialize);
