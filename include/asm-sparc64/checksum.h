@@ -66,8 +66,9 @@ csum_partial_copy_from_user(const char *src, char *dst, int len,
  */
 #define HAVE_CSUM_COPY_USER
 extern unsigned int csum_partial_copy_user_sparc64(const char *src, char *dst, int len, unsigned int sum);
+
 static __inline__ unsigned int 
-csum_and_copy_to_user(const char *src, char *dst, int len, 
+csum_and_copy_to_user(const char *src, char __user *dst, int len, 
 		      unsigned int sum, int *err)
 {
 	__asm__ __volatile__ ("stx	%0, [%%sp + 0x7ff + 128]"

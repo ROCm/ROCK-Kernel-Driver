@@ -191,8 +191,10 @@ static __inline__ unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
  *	Copy and checksum to user
  */
 #define HAVE_CSUM_COPY_USER
-static __inline__ unsigned int csum_and_copy_to_user (const char *src, char *dst,
-				    int len, int sum, int *err_ptr)
+static __inline__ unsigned int csum_and_copy_to_user (const char *src, 
+						      char __user *dst,
+						      int len, int sum, 
+						      int *err_ptr)
 {
 	/* code stolen from include/asm-mips64 */
 	sum = csum_partial(src, len, sum);
