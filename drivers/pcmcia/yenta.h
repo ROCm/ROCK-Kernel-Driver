@@ -101,7 +101,6 @@ struct yenta_socket {
 	void *base;
 	void (*handler)(void *, unsigned int);
 	void *info;
-	socket_cap_t cap;
 	spinlock_t event_lock;
 	unsigned int events;
 	struct work_struct tq_task;

@@ -68,13 +68,11 @@ static struct pccard_operations i82092aa_operations = {
 	.init 		 	= i82092aa_init,
 	.suspend	   	= i82092aa_suspend,
 	.register_callback 	= i82092aa_register_callback,
-	.inquire_socket		= i82092aa_inquire_socket,   
 	.get_status		= i82092aa_get_status,
 	.get_socket		= i82092aa_get_socket,
 	.set_socket		= i82092aa_set_socket,
 	.set_io_map		= i82092aa_set_io_map,
 	.set_mem_map		= i82092aa_set_mem_map,
-	.proc_setup		= i82092aa_proc_setup,
 };
 
 /* The card can do upto 4 sockets, allocate a structure for each of them */
@@ -86,7 +84,6 @@ struct socket_info {
 				    2 = card but not initialized,
 				    3 = operational card */
 	int 	io_base; 	/* base io address of the socket */
-	socket_cap_t cap;
 	
 	unsigned int pending_events; /* Pending events on this interface */
 	
@@ -141,10 +138,10 @@ static int __init i82092aa_pci_probe(struct pci_dev *dev, const struct pci_devic
 	for (i = 0;i<socket_count;i++) {
 		sockets[i].card_state = 1; /* 1 = present but empty */
 		sockets[i].io_base = pci_resource_start(dev, 0);
-		sockets[i].cap.features |= SS_CAP_PCCARD;
-		sockets[i].cap.map_size = 0x1000;
-		sockets[i].cap.irq_mask = 0;
-		sockets[i].cap.pci_irq  = dev->irq;
+		sockets[i].socket.features |= SS_CAP_PCCARD;
+		sockets[i].socket.map_size = 0x1000;
+		sockets[i].socket.irq_mask = 0;
+		sockets[i].socket.pci_irq  = dev->irq;
 
 		sockets[i].number = i;
 		
@@ -488,16 +485,6 @@ static int i82092aa_register_callback(struct pcmcia_socket *socket, void (*handl
 	return 0;
 } /* i82092aa_register_callback */
                                         
-static int i82092aa_inquire_socket(struct pcmcia_socket *socket, socket_cap_t *cap)
-{
-	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
-	enter("i82092aa_inquire_socket");
-	*cap = sockets[sock].cap;
-	leave("i82092aa_inquire_socket");
-	return 0;
-} /* i82092aa_inquire_socket */
-
-
 static int i82092aa_get_status(struct pcmcia_socket *socket, u_int *value)
 {
 	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
@@ -831,12 +818,6 @@ static int i82092aa_set_mem_map(struct pcmcia_socket *socket, struct pccard_mem_
 	leave("i82092aa_set_mem_map");
 	return 0;
 }
-
-static void i82092aa_proc_setup(struct pcmcia_socket *socket, struct proc_dir_entry *base)
-{
-	
-}
-/* Module stuff */
 
 static int i82092aa_module_init(void)
 {
