@@ -68,16 +68,10 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 	int error = 0;
 
 	if (ia_valid & ATTR_SIZE) {
-		if (attr->ia_size == inode->i_size) {
-			if (ia_valid == ATTR_SIZE)
-				goto out;	/* we can skip lock_kernel() */
-		} else {
-			lock_kernel();
+		if (attr->ia_size != inode->i_size)
 			error = vmtruncate(inode, attr->ia_size);
-			unlock_kernel();
-			if (error)
-				goto out;
-		}
+		if (error || (ia_valid == ATTR_SIZE))
+			goto out;
 	}
 
 	lock_kernel();
