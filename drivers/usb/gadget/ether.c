@@ -234,7 +234,7 @@ MODULE_PARM_DESC(host_addr, "Host Ethernet Address");
 /* For CDC-incapable hardware, choose the simple cdc subset.
  * Anything that talks bulk (without notable bugs) can do this.
  */
-#ifdef CONFIG_USB_GADGET_PXA
+#ifdef CONFIG_USB_GADGET_PXA2XX
 #define	DEV_CONFIG_SUBSET
 #endif
 
@@ -2373,6 +2373,7 @@ autoconf_fail:
 	EP_OUT_NAME = ep->name;
 	ep->driver_data = ep;	/* claim */
 
+#if defined(DEV_CONFIG_CDC) || defined(CONFIG_USB_ETH_RNDIS)
 	/* CDC Ethernet control interface doesn't require a status endpoint.
 	 * Since some hosts expect one, try to allocate one anyway.
 	 */
@@ -2386,13 +2387,12 @@ autoconf_fail:
 				"can't run RNDIS on %s\n",
 				gadget->name);
 			return -ENODEV;
-#ifdef	DEV_CONFIG_CDC
 		} else if (cdc) {
 			control_intf.bNumEndpoints = 0;
 			/* FIXME remove endpoint from descriptor list */
-#endif
 		}
 	}
+#endif
 
 	/* one config:  cdc, else minimal subset */
 	if (!cdc) {
@@ -2446,7 +2446,7 @@ autoconf_fail:
 
 	/* Module params for these addresses should come from ID proms.
 	 * The host side address is used with CDC and RNDIS, and commonly
-	 * end ups in a persistent config database.
+	 * ends up in a persistent config database.
 	 */
 	get_ether_addr(dev_addr, net->dev_addr);
 	if (cdc || rndis) {
