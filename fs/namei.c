@@ -598,9 +598,9 @@ static int revalidate_special(struct nameidata *nd)
 	struct dentry *dentry = nd->dentry;
 	int err, counter = 0;
 
+ revalidate_again:
 	if (!dentry->d_op || !dentry->d_op->d_revalidate)
 		return 0;
- revalidate_again:
 	if (!dentry->d_op->d_revalidate(dentry, nd)) {
 		struct dentry *new;
 		if ((err = permission(dentry->d_parent->d_inode, MAY_EXEC,nd)))
