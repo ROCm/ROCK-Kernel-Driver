@@ -196,12 +196,7 @@ struct ip_conntrack
 	/* Helper, if any. */
 	struct ip_conntrack_helper *helper;
 
-	/* Our various nf_ct_info structs specify *what* relation this
-           packet has to the conntrack */
-	struct nf_ct_info infos[IP_CT_NUMBER];
-
 	/* Storage reserved for other modules: */
-
 	union ip_conntrack_proto proto;
 
 	union ip_conntrack_help help;
@@ -238,8 +233,12 @@ ip_conntrack_tuple_taken(const struct ip_conntrack_tuple *tuple,
 			 const struct ip_conntrack *ignored_conntrack);
 
 /* Return conntrack_info and tuple hash for given skb. */
-extern struct ip_conntrack *
-ip_conntrack_get(struct sk_buff *skb, enum ip_conntrack_info *ctinfo);
+static inline struct ip_conntrack *
+ip_conntrack_get(const struct sk_buff *skb, enum ip_conntrack_info *ctinfo)
+{
+	*ctinfo = skb->nfctinfo;
+	return (struct ip_conntrack *)skb->nfct;
+}
 
 /* decrement reference count on a conntrack */
 extern inline void ip_conntrack_put(struct ip_conntrack *ct);

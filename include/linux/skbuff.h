@@ -97,10 +97,6 @@ struct nf_conntrack {
 	void (*destroy)(struct nf_conntrack *);
 };
 
-struct nf_ct_info {
-	struct nf_conntrack *master;
-};
-
 #ifdef CONFIG_BRIDGE_NETFILTER
 struct nf_bridge_info {
 	atomic_t use;
@@ -186,6 +182,7 @@ struct skb_shared_info {
  *	@nfmark: Can be used for communication between hooks
  *	@nfcache: Cache info
  *	@nfct: Associated connection, if any
+ *	@nfctinfo: Relationship of this skb to the connection
  *	@nf_debug: Netfilter debugging
  *	@nf_bridge: Saved data about a bridged frame - see br_netfilter.c
  *      @private: Data which is private to the HIPPI implementation
@@ -253,7 +250,8 @@ struct sk_buff {
 #ifdef CONFIG_NETFILTER
         unsigned long		nfmark;
 	__u32			nfcache;
-	struct nf_ct_info	*nfct;
+	struct nf_conntrack	*nfct;
+	__u32			nfctinfo;
 #ifdef CONFIG_NETFILTER_DEBUG
         unsigned int		nf_debug;
 #endif
@@ -1141,15 +1139,15 @@ extern int skb_iter_next(const struct sk_buff *skb, struct skb_iter *i);
 extern void skb_iter_abort(const struct sk_buff *skb, struct skb_iter *i);
 
 #ifdef CONFIG_NETFILTER
-static inline void nf_conntrack_put(struct nf_ct_info *nfct)
+static inline void nf_conntrack_put(struct nf_conntrack *nfct)
 {
-	if (nfct && atomic_dec_and_test(&nfct->master->use))
-		nfct->master->destroy(nfct->master);
+	if (nfct && atomic_dec_and_test(&nfct->use))
+		nfct->destroy(nfct);
 }
-static inline void nf_conntrack_get(struct nf_ct_info *nfct)
+static inline void nf_conntrack_get(struct nf_conntrack *nfct)
 {
 	if (nfct)
-		atomic_inc(&nfct->master->use);
+		atomic_inc(&nfct->use);
 }
 static inline void nf_reset(struct sk_buff *skb)
 {

@@ -146,7 +146,7 @@ check_for_demasq(struct sk_buff **pskb)
 	case IPPROTO_ICMP:
 		/* ICMP errors. */
 		protocol->error(*pskb, &ctinfo, NF_IP_PRE_ROUTING);
-		ct = (struct ip_conntrack *)(*pskb)->nfct->master;
+		ct = (struct ip_conntrack *)(*pskb)->nfct;
 		if (ct) {
 			/* We only do SNAT in the compatibility layer.
 			   So we can manipulate ICMP errors from
@@ -187,7 +187,7 @@ check_for_demasq(struct sk_buff **pskb)
 				      NULL, NULL, NULL);
 
 		/* Put back the reference gained from find_get */
-		nf_conntrack_put(&h->ctrack->infos[0]);
+		nf_conntrack_put(&h->ctrack->ct_general);
 		if (ret == NF_ACCEPT) {
 			struct ip_conntrack *ct;
 			ct = ip_conntrack_get(*pskb, &ctinfo);
@@ -206,7 +206,7 @@ check_for_demasq(struct sk_buff **pskb)
 	} else {
 		if (h)
 			/* Put back the reference gained from find_get */
-			nf_conntrack_put(&h->ctrack->infos[0]);
+			nf_conntrack_put(&h->ctrack->ct_general);
 		ret = NF_ACCEPT;
 	}
 

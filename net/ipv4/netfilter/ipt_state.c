@@ -30,9 +30,9 @@ match(const struct sk_buff *skb,
 	enum ip_conntrack_info ctinfo;
 	unsigned int statebit;
 
-	if (skb->nfct == &ip_conntrack_untracked.infos[IP_CT_NEW])
+	if (skb->nfct == &ip_conntrack_untracked.ct_general)
 		statebit = IPT_STATE_UNTRACKED;
-	else if (!ip_conntrack_get((struct sk_buff *)skb, &ctinfo))
+	else if (!ip_conntrack_get(skb, &ctinfo))
 		statebit = IPT_STATE_INVALID;
 	else
 		statebit = IPT_STATE_BIT(ctinfo);

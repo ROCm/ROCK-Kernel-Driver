@@ -112,10 +112,7 @@ inline void
 ip_conntrack_put(struct ip_conntrack *ct)
 {
 	IP_NF_ASSERT(ct);
-	IP_NF_ASSERT(ct->infos[0].master);
-	/* nf_conntrack_put wants to go via an info struct, so feed it
-           one at random. */
-	nf_conntrack_put(&ct->infos[0]);
+	nf_conntrack_put(&ct->ct_general);
 }
 
 static int ip_conntrack_hash_rnd_initted;
@@ -416,36 +413,15 @@ ip_conntrack_find_get(const struct ip_conntrack_tuple *tuple,
 	return h;
 }
 
-static inline struct ip_conntrack *
-__ip_conntrack_get(struct nf_ct_info *nfct, enum ip_conntrack_info *ctinfo)
-{
-	struct ip_conntrack *ct
-		= (struct ip_conntrack *)nfct->master;
-
-	/* ctinfo is the index of the nfct inside the conntrack */
-	*ctinfo = nfct - ct->infos;
-	IP_NF_ASSERT(*ctinfo >= 0 && *ctinfo < IP_CT_NUMBER);
-	return ct;
-}
-
-/* Return conntrack and conntrack_info given skb->nfct->master */
-struct ip_conntrack *
-ip_conntrack_get(struct sk_buff *skb, enum ip_conntrack_info *ctinfo)
-{
-	if (skb->nfct) 
-		return __ip_conntrack_get(skb->nfct, ctinfo);
-	return NULL;
-}
-
-/* Confirm a connection given skb->nfct; places it in hash table */
+/* Confirm a connection given skb; places it in hash table */
 int
-__ip_conntrack_confirm(struct nf_ct_info *nfct)
+__ip_conntrack_confirm(struct sk_buff *skb)
 {
 	unsigned int hash, repl_hash;
 	struct ip_conntrack *ct;
 	enum ip_conntrack_info ctinfo;
 
-	ct = __ip_conntrack_get(nfct, &ctinfo);
+	ct = ip_conntrack_get(skb, &ctinfo);
 
 	/* ipt_REJECT uses ip_conntrack_attach to attach related
 	   ICMP/TCP RST packets in other direction.  Actual packet
@@ -570,7 +546,6 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 	struct ip_conntrack_tuple repl_tuple;
 	size_t hash;
 	struct ip_conntrack_expect *expected;
-	int i;
 
 	if (!ip_conntrack_hash_rnd_initted) {
 		get_random_bytes(&ip_conntrack_hash_rnd, 4);
@@ -609,9 +584,6 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 	conntrack->tuplehash[IP_CT_DIR_ORIGINAL].ctrack = conntrack;
 	conntrack->tuplehash[IP_CT_DIR_REPLY].tuple = repl_tuple;
 	conntrack->tuplehash[IP_CT_DIR_REPLY].ctrack = conntrack;
-	for (i=0; i < IP_CT_NUMBER; i++)
-		conntrack->infos[i].master = &conntrack->ct_general;
-
 	if (!protocol->new(conntrack, skb)) {
 		kmem_cache_free(ip_conntrack_cachep, conntrack);
 		return NULL;
@@ -655,7 +627,7 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 		expected->sibling = conntrack;
 		LIST_DELETE(&ip_conntrack_expect_list, expected);
 		expected->expectant->expecting--;
-		nf_conntrack_get(&master_ct(conntrack)->infos[0]);
+		nf_conntrack_get(&master_ct(conntrack)->ct_general);
 
 		/* this is a braindead... --pablo */
 		atomic_inc(&ip_conntrack_count);
@@ -728,7 +700,8 @@ resolve_normal_ct(struct sk_buff *skb,
 		}
 		*set_reply = 0;
 	}
-	skb->nfct = &h->ctrack->infos[*ctinfo];
+	skb->nfct = &h->ctrack->ct_general;
+	skb->nfctinfo = *ctinfo;
 	return h->ctrack;
 }
 
@@ -1213,23 +1186,23 @@ ip_ct_gather_frags(struct sk_buff *skb)
 }
 
 /* Used by ipt_REJECT. */
-static void ip_conntrack_attach(struct sk_buff *nskb, struct nf_ct_info *nfct)
+static void ip_conntrack_attach(struct sk_buff *nskb, struct sk_buff *skb)
 {
 	struct ip_conntrack *ct;
 	enum ip_conntrack_info ctinfo;
 
-	ct = __ip_conntrack_get(nfct, &ctinfo);
-
-	/* This ICMP is in reverse direction to the packet which
-           caused it */
+	/* This ICMP is in reverse direction to the packet which caused it */
+	ct = ip_conntrack_get(skb, &ctinfo);
+	
 	if (CTINFO2DIR(ctinfo) == IP_CT_DIR_ORIGINAL)
 		ctinfo = IP_CT_RELATED + IP_CT_IS_REPLY;
 	else
 		ctinfo = IP_CT_RELATED;
 
-	/* Attach new skbuff, and increment count */
-	nskb->nfct = &ct->infos[ctinfo];
-	atomic_inc(&ct->ct_general.use);
+	/* Attach to new skbuff, and increment count */
+	nskb->nfct = &ct->ct_general;
+	nskb->nfctinfo = ctinfo;
+	nf_conntrack_get(nskb->nfct);
 }
 
 static inline int
@@ -1441,11 +1414,6 @@ int __init ip_conntrack_init(void)
 	atomic_set(&ip_conntrack_untracked.ct_general.use, 1);
 	/*  - and look it like as a confirmed connection */
 	set_bit(IPS_CONFIRMED_BIT, &ip_conntrack_untracked.status);
-	/*  - and prepare the ctinfo field for REJECT & NAT. */
-	ip_conntrack_untracked.infos[IP_CT_NEW].master =
-	ip_conntrack_untracked.infos[IP_CT_RELATED].master =
-	ip_conntrack_untracked.infos[IP_CT_RELATED + IP_CT_IS_REPLY].master = 
-			&ip_conntrack_untracked.ct_general;
 
 	return ret;
 

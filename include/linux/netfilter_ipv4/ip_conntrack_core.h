@@ -38,14 +38,14 @@ struct ip_conntrack_tuple_hash *
 ip_conntrack_find_get(const struct ip_conntrack_tuple *tuple,
 		      const struct ip_conntrack *ignored_conntrack);
 
-extern int __ip_conntrack_confirm(struct nf_ct_info *nfct);
+extern int __ip_conntrack_confirm(struct sk_buff *skb);
 
 /* Confirm a connection: returns NF_DROP if packet must be dropped. */
 static inline int ip_conntrack_confirm(struct sk_buff *skb)
 {
 	if (skb->nfct
-	    && !is_confirmed((struct ip_conntrack *)skb->nfct->master))
-		return __ip_conntrack_confirm(skb->nfct);
+	    && !is_confirmed((struct ip_conntrack *)skb->nfct))
+		return __ip_conntrack_confirm(skb);
 	return NF_ACCEPT;
 }
 
