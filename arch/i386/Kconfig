@@ -1047,6 +1047,18 @@ config X86_LONGRUN
 
 	  If in doubt, say N.
 
+config X86_GX_SUSPMOD
+	tristate "Cyrix MediaGX/NatSemi Geode Suspend Modulation"
+	depends on CPU_FREQ
+	help
+	 This add the CPUFreq driver for NatSemi Geode processors which
+	 support suspend modulation.
+
+	 For details, take a look at linux/Documentation/cpufreq.
+
+	 If in doubt, say N.
+
+
 endmenu
 
 
