@@ -1172,13 +1172,16 @@ static void pdc_sata_setup_port(struct ata_ioports *port, unsigned long base)
 {
 	port->cmd_addr		= base;
 	port->data_addr		= base;
+	port->feature_addr	=
 	port->error_addr	= base + 0x4;
 	port->nsect_addr	= base + 0x8;
 	port->lbal_addr		= base + 0xc;
 	port->lbam_addr		= base + 0x10;
 	port->lbah_addr		= base + 0x14;
 	port->device_addr	= base + 0x18;
-	port->cmdstat_addr	= base + 0x1c;
+	port->command_addr	=
+	port->status_addr	= base + 0x1c;
+	port->altstatus_addr	=
 	port->ctl_addr		= base + 0x38;
 }
 
@@ -1262,7 +1265,7 @@ static void pdc20621_put_to_dimm(struct ata_probe_ent *pe, void *psource,
 	readl(mmio + PDC_DIMM_WINDOW_CTLR);
 	offset -= (idx * window_size); 
 	idx++;
-	dist = ((long) (window_size - (offset + size))) >= 0 ? size : 
+	dist = (((long) window_size - (offset + size))) >= 0 ? size : 
 		(long) (window_size - offset);
 	memcpy_toio((char *) (dimm_mmio + offset / 4), (char *) psource, dist);
 	writel(0x01, mmio + PDC_GENERAL_CTLR);
