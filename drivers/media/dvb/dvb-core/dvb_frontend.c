@@ -22,8 +22,12 @@
  * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
  */
 
+#include <asm/processor.h>
+#include <asm/semaphore.h>
+#include <linux/string.h>
+#include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/smp_lock.h>
+#include <linux/wait.h>
 #include <linux/slab.h>
 #include <linux/poll.h>
 #include <linux/module.h>
@@ -31,6 +35,7 @@
 
 #include "dvb_frontend.h"
 #include "dvbdev.h"
+#include "dvb_functions.h"
 
 
 static int dvb_frontend_debug = 0;
@@ -59,7 +64,7 @@ struct dvb_frontend_data {
 	struct semaphore sem;
 	struct list_head list_head;
 	wait_queue_head_t wait_queue;
-	struct task_struct *thread;
+	pid_t thread_pid;
 	unsigned long release_jiffies;
 	unsigned long lost_sync_jiffies;
 	int bending;
@@ -98,14 +103,6 @@ static DECLARE_MUTEX(frontend_mutex);
 
 
 static
-inline void ddelay (int ms)
-{
-	current->state=TASK_INTERRUPTIBLE;
-	schedule_timeout((HZ*ms)/1000);
-}
-
-
-static
 int dvb_frontend_internal_ioctl (struct dvb_frontend *frontend, 
 				 unsigned int cmd, void *arg)
 {
@@ -116,10 +113,10 @@ int dvb_frontend_internal_ioctl (struct dvb_frontend *frontend,
 	if (frontend->before_ioctl)
 		err = frontend->before_ioctl (frontend, cmd, arg);
 
-	if (err) {
+	if (err == -EOPNOTSUPP) {
 		err = frontend->ioctl (frontend, cmd, arg);
 
-		if (err && frontend->after_ioctl)
+		if ((err == -EOPNOTSUPP) && frontend->after_ioctl)
 			err = frontend->after_ioctl (frontend, cmd, arg);
 	}
 
@@ -198,7 +195,7 @@ void dvb_call_frontend_notifiers (struct dvb_frontend_data *fe,
 		fe->lost_sync_jiffies = jiffies;
 
 	if (((s ^ fe->status) & FE_HAS_LOCK) && (s & FE_HAS_LOCK))
-		ddelay (fe->info->notifier_delay);
+		dvb_delay (fe->info->notifier_delay);
 
 	fe->status = s;
 
@@ -313,7 +310,7 @@ int dvb_frontend_set_parameters (struct dvb_frontend_data *fe,
 	dvb_bend_frequency (fe, 0);
 
 	dprintk ("%s: f == %i, drift == %i\n",
-		 __FUNCTION__, param->frequency, fe->lnb_drift);
+		 __FUNCTION__, (int) param->frequency, (int) fe->lnb_drift);
 
 	param->frequency += fe->lnb_drift + fe->bending;
 	err = dvb_frontend_internal_ioctl (frontend, FE_SET_FRONTEND, param);
@@ -391,6 +388,8 @@ void dvb_frontend_recover (struct dvb_frontend_data *fe)
 		
 		if (fe->info->type == FE_QPSK)
 			stepsize = fe->parameters.u.qpsk.symbol_rate / 16000;
+		else if (fe->info->type == FE_QAM)
+			stepsize = 0;
 		else
 			stepsize = fe->info->frequency_stepsize * 2;
 
@@ -428,42 +427,31 @@ static
 int dvb_frontend_thread (void *data)
 {
 	struct dvb_frontend_data *fe = (struct dvb_frontend_data *) data;
+	char name [15];
 	int quality = 0, delay = 3*HZ;
 	fe_status_t s;
 
 	dprintk ("%s\n", __FUNCTION__);
 
-	lock_kernel ();
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,61))
-	daemonize ();
-#else
-	daemonize ("dvb fe");
-#endif
-/*	not needed anymore in 2.5.x, done in daemonize() */
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-	reparent_to_init ();
-#endif
-
-	sigfillset (&current->blocked);
-	fe->thread = current;
-	snprintf (current->comm, sizeof (current->comm), "kdvb-fe-%i:%i",
+	snprintf (name, sizeof(name), "kdvb-fe-%i:%i",
 		  fe->frontend.i2c->adapter->num, fe->frontend.i2c->id);
-	unlock_kernel ();
+
+	dvb_kernel_thread_setup (name);
+
+	fe->lost_sync_count = -1;
 
 	dvb_call_frontend_notifiers (fe, 0);
 	dvb_frontend_init (fe);
-
-	fe->lost_sync_count = -1;
 
 	while (!dvb_frontend_is_exiting (fe)) {
 		up (&fe->sem);      /* is locked when we enter the thread... */
 
 		interruptible_sleep_on_timeout (&fe->wait_queue, delay);
+		if (signal_pending(current))
+			break;
 
-		if (down_interruptible (&fe->sem)) {
-			fe->thread = NULL;
-			return -ERESTARTSYS;
-		}
+		if (down_interruptible (&fe->sem))
+			break;
 
 		if (fe->lost_sync_count == -1)
 			continue;
@@ -505,7 +493,11 @@ int dvb_frontend_thread (void *data)
 		dvb_frontend_internal_ioctl (&fe->frontend, FE_SLEEP, NULL); 
 
 	up (&fe->sem);
-	fe->thread = NULL;
+
+	fe->thread_pid = 0;
+	mb();
+
+	wake_up_interruptible (&fe->wait_queue);
 	return 0;
 }
 
@@ -515,32 +507,63 @@ void dvb_frontend_stop (struct dvb_frontend_data *fe)
 {
 	dprintk ("%s\n", __FUNCTION__);
 
-	while (fe->thread) {
 		fe->exit = 1;
+	mb();
+
+	if (!fe->thread_pid)
+		return;
+
+	/* check if the thread is really alive */
+	if (kill_proc(fe->thread_pid, 0, 1) == -ESRCH) {
+		printk("dvb_frontend_stop: thread PID %d already died\n",
+				fe->thread_pid);
+		/* make sure the mutex was not held by the thread */
+		init_MUTEX (&fe->sem);
+		return;
+	}
+
 		wake_up_interruptible (&fe->wait_queue);
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout (5);
-		if (signal_pending(current))
-			break;
-	};
+	interruptible_sleep_on(&fe->wait_queue);
+
+	/* paranoia check */
+	if (fe->thread_pid)
+		printk("dvb_frontend_stop: warning: thread PID %d won't exit\n",
+				fe->thread_pid);
 }
 
 
 static
-void dvb_frontend_start (struct dvb_frontend_data *fe)
+int dvb_frontend_start (struct dvb_frontend_data *fe)
 {
+	int ret;
+
 	dprintk ("%s\n", __FUNCTION__);
 
-	if (fe->thread)
+	if (fe->thread_pid) {
+		if (!fe->exit)
+			return 0;
+		else
 		dvb_frontend_stop (fe);
+	}
 
+	if (signal_pending(current))
+		return -EINTR;
 	if (down_interruptible (&fe->sem))
-		return;
+		return -EINTR;
 
 	fe->exit = 0;
-	fe->thread = (void*) ~0;
+	fe->thread_pid = 0;
+	mb();
 
-	kernel_thread (dvb_frontend_thread, fe, 0);
+	ret = kernel_thread (dvb_frontend_thread, fe, 0);
+	if (ret < 0) {
+		printk("dvb_frontend_start: failed to start kernel_thread (%d)\n", ret);
+		up(&fe->sem);
+		return ret;
+	}
+	fe->thread_pid = ret;
+
+	return 0;
 }
 
 
@@ -618,10 +641,12 @@ int dvb_frontend_open (struct inode *inode, struct file *file)
 		return ret;
 
 	if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
-		dvb_frontend_start (fe);
+		ret = dvb_frontend_start (fe);
+		if (ret)
+			dvb_generic_release (inode, file);
 
 		/*  empty event queue */
-		fe->events.eventr = fe->events.eventw;
+		fe->events.eventr = fe->events.eventw = 0;
 	}
 	
 	return ret;

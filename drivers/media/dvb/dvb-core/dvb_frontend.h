@@ -30,10 +30,7 @@
 #include <linux/ioctl.h>
 #include <linux/i2c.h>
 #include <linux/module.h>
-
-#ifndef MODULE_LICENSE
-#define MODULE_LICENSE(x)
-#endif
+#include <linux/errno.h>
 
 #include <linux/dvb/frontend.h>
 

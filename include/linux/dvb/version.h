@@ -1,9 +1,8 @@
-/* 
- * net.h
+/*
+ * version.h
  *
- * Copyright (C) 2000 Marcus Metzler <marcus@convergence.de>
- *                  & Ralph  Metzler <ralph@convergence.de>
-                      for convergence integrated media GmbH
+ * Copyright (C) 2000 Holger Waechtler <holger@convergence.de>
+ *                    for convergence integrated media GmbH
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
@@ -21,21 +20,10 @@
  *
  */
 
-#ifndef _DVBNET_H_
-#define _DVBNET_H_
+#ifndef _DVBVERSION_H_
+#define _DVBVERSION_H_
 
-#include <asm/types.h>
+#define DVB_API_VERSION 3
 
-
-struct dvb_net_if {
-	__u16 pid;
-	__u16 if_num;
-};
-
-
-#define NET_ADD_IF                 _IOWR('o', 52, struct dvb_net_if)
-#define NET_REMOVE_IF              _IO('o', 53)
-#define NET_GET_IF                 _IOWR('o', 54, struct dvb_net_if)
-
-#endif /*_DVBNET_H_*/
+#endif /*_DVBVERSION_H_*/
 

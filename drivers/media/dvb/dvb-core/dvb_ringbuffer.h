@@ -32,8 +32,10 @@
 #ifndef _DVB_RINGBUFFER_H_
 #define _DVB_RINGBUFFER_H_
 
+#include <linux/spinlock.h>
+#include <linux/wait.h>
 
-typedef struct dvb_ringbuffer {
+struct dvb_ringbuffer {
         u8               *data;
         ssize_t           size;
         ssize_t           pread;
@@ -41,7 +43,7 @@ typedef struct dvb_ringbuffer {
 
         wait_queue_head_t queue;
         spinlock_t        lock;
-} dvb_ringbuffer_t;
+};
 
 
 /*
@@ -73,25 +75,25 @@ typedef struct dvb_ringbuffer {
 */
 
 /* initialize ring buffer, lock and queue */
-extern void dvb_ringbuffer_init(dvb_ringbuffer_t *rbuf, void *data, size_t len);
+extern void dvb_ringbuffer_init(struct dvb_ringbuffer *rbuf, void *data, size_t len);
 
 /* test whether buffer is empty */
-extern int dvb_ringbuffer_empty(dvb_ringbuffer_t *rbuf);
+extern int dvb_ringbuffer_empty(struct dvb_ringbuffer *rbuf);
 
 /* return the number of free bytes in the buffer */
-extern ssize_t dvb_ringbuffer_free(dvb_ringbuffer_t *rbuf);
+extern ssize_t dvb_ringbuffer_free(struct dvb_ringbuffer *rbuf);
 
 /* return the number of bytes waiting in the buffer */
-extern ssize_t dvb_ringbuffer_avail(dvb_ringbuffer_t *rbuf);
+extern ssize_t dvb_ringbuffer_avail(struct dvb_ringbuffer *rbuf);
 
 
 /* read routines & macros */
 /* ---------------------- */
 /* flush buffer */
-extern void dvb_ringbuffer_flush(dvb_ringbuffer_t *rbuf);
+extern void dvb_ringbuffer_flush(struct dvb_ringbuffer *rbuf);
 
 /* flush buffer protected by spinlock and wake-up waiting task(s) */
-extern void dvb_ringbuffer_flush_spinlock_wakeup(dvb_ringbuffer_t *rbuf);
+extern void dvb_ringbuffer_flush_spinlock_wakeup(struct dvb_ringbuffer *rbuf);
 
 /* peek at byte <offs> in the buffer */
 #define DVB_RINGBUFFER_PEEK(rbuf,offs)	\
@@ -106,7 +108,7 @@ extern void dvb_ringbuffer_flush_spinlock_wakeup(dvb_ringbuffer_t *rbuf);
 ** <usermem> specifies whether <buf> resides in user space
 ** returns number of bytes transferred or -EFAULT
 */
-extern ssize_t dvb_ringbuffer_read(dvb_ringbuffer_t *rbuf, u8 *buf, 
+extern ssize_t dvb_ringbuffer_read(struct dvb_ringbuffer *rbuf, u8 *buf, 
                                    size_t len, int usermem);
 
 
@@ -121,7 +123,7 @@ extern ssize_t dvb_ringbuffer_read(dvb_ringbuffer_t *rbuf, u8 *buf,
 ** <usermem> specifies whether <buf> resides in user space
 ** returns number of bytes transferred or -EFAULT
 */
-extern ssize_t dvb_ringbuffer_write(dvb_ringbuffer_t *rbuf, const u8 *buf,
+extern ssize_t dvb_ringbuffer_write(struct dvb_ringbuffer *rbuf, const u8 *buf,
                                     size_t len, int usermem);
 
 #endif /* _DVB_RINGBUFFER_H_ */

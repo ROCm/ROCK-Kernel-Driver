@@ -24,9 +24,9 @@
 #ifndef _DVBDEV_H_
 #define _DVBDEV_H_
 
-#include <linux/types.h>
-#include <linux/version.h>
+#include <asm/types.h>
 #include <linux/poll.h>
+#include <linux/fs.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/list.h>
 
@@ -84,9 +84,5 @@ extern int dvb_generic_open (struct inode *inode, struct file *file);
 extern int dvb_generic_release (struct inode *inode, struct file *file);
 extern int dvb_generic_ioctl (struct inode *inode, struct file *file,
 			      unsigned int cmd, unsigned long arg);
-int dvb_usercopy(struct inode *inode, struct file *file,
-                     unsigned int cmd, unsigned long arg,
-                     int (*func)(struct inode *inode, struct file *file,
-                     unsigned int cmd, void *arg));
 #endif /* #ifndef _DVBDEV_H_ */
 

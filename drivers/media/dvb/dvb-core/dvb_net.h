@@ -33,18 +33,18 @@
 
 #define DVB_NET_DEVICES_MAX 10
 
-typedef struct dvb_net {
+struct dvb_net {
 	struct dvb_device *dvbdev;
 	int card_num;
 	int dev_num;
 	struct net_device device[DVB_NET_DEVICES_MAX];
 	int state[DVB_NET_DEVICES_MAX];
-	dmx_demux_t *demux;
-} dvb_net_t;
+	struct dmx_demux *demux;
+};
 
 
 void dvb_net_release(struct dvb_net *);
-int  dvb_net_init(struct dvb_adapter *, struct dvb_net *, dmx_demux_t *);
+int  dvb_net_init(struct dvb_adapter *, struct dvb_net *, struct dmx_demux *);
 
 #endif
 

@@ -21,26 +21,19 @@
  *
  */
 
-#include <linux/config.h>
-#include <linux/version.h>
+#include <asm/types.h>
+#include <asm/semaphore.h>
+#include <linux/errno.h>
+#include <linux/string.h>
 #include <linux/module.h>
-#include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/mm.h>
-#include <linux/string.h>
-#include <linux/errno.h>
 #include <linux/init.h>
-#include <asm/uaccess.h>
-#include <asm/system.h>
-#include <linux/kmod.h>
 #include <linux/slab.h>
+#include <linux/version.h>
 
 #include "dvbdev.h"
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#include "compat.h"
-#endif
+#include "dvb_functions.h"
 
 static int dvbdev_debug = 0;
 #define dprintk if (dvbdev_debug) printk
@@ -188,8 +181,8 @@ skip:
 int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev, 
 			const struct dvb_device *template, void *priv, int type)
 {
-	u32 id;
 	struct dvb_device *dvbdev;
+	int id;
 
 	if (down_interruptible (&dvbdev_register_lock))
 		return -ERESTARTSYS;
@@ -284,10 +277,6 @@ int dvb_register_adapter(struct dvb_adapter **padap, const char *name)
 	memset (adap, 0, sizeof(struct dvb_adapter));
 	INIT_LIST_HEAD (&adap->device_list);
 
- 	/* fixme: is this correct? */
-	/* No */
-	try_module_get(THIS_MODULE);
-
 	printk ("DVB: registering new adapter (%s).\n", name);
 	
 	devfs_mk_dir("dvb/adapter%d", num);
@@ -310,9 +299,6 @@ int dvb_unregister_adapter(struct dvb_adapter *adap)
 	list_del (&adap->list_head);
 	up (&dvbdev_register_lock);
 	kfree (adap);
-	/* fixme: is this correct? */
-	/* No. */
-	module_put(THIS_MODULE);
 	return 0;
 }
 

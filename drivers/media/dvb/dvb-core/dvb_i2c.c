@@ -19,16 +19,15 @@
  * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
  */
 
+#include <asm/semaphore.h>
+#include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/module.h>
-#include <linux/version.h>
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#include "compat.h"
-#endif
 
 #include "dvb_i2c.h"
+#include "dvb_functions.h"
+
 
 struct dvb_i2c_device {
 	struct list_head list_head;

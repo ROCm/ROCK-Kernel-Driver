@@ -34,7 +34,8 @@
 
 typedef enum {
 	VIDEO_FORMAT_4_3,     /* Select 4:3 format */ 
-        VIDEO_FORMAT_16_9     /* Select 16:9 format. */ 
+        VIDEO_FORMAT_16_9,    /* Select 16:9 format. */
+	VIDEO_FORMAT_221_1    /* 2.21:1 */
 } video_format_t;
 
 
@@ -56,6 +57,11 @@ typedef enum {
 	VIDEO_CENTER_CUT_OUT  /* use center cut out format */
 } video_displayformat_t;
 
+typedef struct {
+	int w;
+	int h;
+	video_format_t aspect_ratio;
+} video_size_t;
 
 typedef enum {
         VIDEO_SOURCE_DEMUX, /* Select the demux as the main source */ 
@@ -74,9 +80,10 @@ typedef enum {
 
 struct video_event { 
         int32_t type; 
+#define VIDEO_EVENT_SIZE_CHANGED 1
         time_t timestamp;
 	union { 
-	        video_format_t video_format;
+	        video_size_t size;
 	} u; 
 };
 
@@ -186,6 +193,7 @@ typedef uint16_t video_attributes_t;
 #define VIDEO_SET_SPU_PALETTE      _IOW('o', 51, video_spu_palette_t)
 #define VIDEO_GET_NAVI             _IOR('o', 52, video_navi_pack_t)
 #define VIDEO_SET_ATTRIBUTES       _IO('o', 53)
+#define VIDEO_GET_SIZE             _IOR('o', 55, video_size_t)
 
 #endif /*_DVBVIDEO_H_*/
 

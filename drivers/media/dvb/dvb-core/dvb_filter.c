@@ -1,4 +1,6 @@
+#include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/string.h>
 #include "dvb_filter.h"
 
 unsigned int bitrates[3][16] =
@@ -6,14 +8,14 @@ unsigned int bitrates[3][16] =
  {0,32,48,56,64,80,96,112,128,160,192,224,256,320,384,0},
  {0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0}};
 
-uint32_t freq[4] = {441, 480, 320, 0};
+u32 freq[4] = {441, 480, 320, 0};
 
 unsigned int ac3_bitrates[32] =
     {32,40,48,56,64,80,96,112,128,160,192,224,256,320,384,448,512,576,640,
      0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-uint32_t ac3_freq[4] = {480, 441, 320, 0};
-uint32_t ac3_frames[3][32] =
+u32 ac3_freq[4] = {480, 441, 320, 0};
+u32 ac3_frames[3][32] =
     {{64,80,96,112,128,160,192,224,256,320,384,448,512,640,768,896,1024,
       1152,1280,0,0,0,0,0,0,0,0,0,0,0,0,0},
      {69,87,104,121,139,174,208,243,278,348,417,487,557,696,835,975,1114,
@@ -67,9 +69,9 @@ void ts_to_pes(ipack *p, u8 *buf) // don't need count (=188)
 #if 0
 /* needs 5 byte input, returns picture coding type*/
 static
-int read_picture_header(uint8_t *headr, mpg_picture *pic, int field, int pr)
+int read_picture_header(u8 *headr, struct mpg_picture *pic, int field, int pr)
 {
-	uint8_t pct;
+	u8 pct;
 
 	if (pr) printk( "Pic header: ");
         pic->temporal_reference[field] = (( headr[0] << 2 ) | 
@@ -114,7 +116,7 @@ int read_picture_header(uint8_t *headr, mpg_picture *pic, int field, int pr)
 #if 0
 /* needs 4 byte input */
 static
-int read_gop_header(uint8_t *headr, mpg_picture *pic, int pr)
+int read_gop_header(u8 *headr, struct mpg_picture *pic, int pr)
 {
 	if (pr) printk("GOP header: "); 
 
@@ -146,7 +148,7 @@ int read_gop_header(uint8_t *headr, mpg_picture *pic, int pr)
 #if 0
 /* needs 8 byte input */
 static
-int read_sequence_header(uint8_t *headr, VideoInfo *vi, int pr)
+int read_sequence_header(u8 *headr, struct dvb_video_info *vi, int pr)
 {
         int sw;
 	int form = -1;
@@ -261,14 +263,14 @@ int read_sequence_header(uint8_t *headr, VideoInfo *vi, int pr)
 
 #if 0
 static
-int get_vinfo(uint8_t *mbuf, int count, VideoInfo *vi, int pr)
+int get_vinfo(u8 *mbuf, int count, struct dvb_video_info *vi, int pr)
 {
-	uint8_t *headr;
+	u8 *headr;
 	int found = 0;
 	int c = 0;
 
 	while (found < 4 && c+4 < count){
-		uint8_t *b;
+		u8 *b;
 
 		b = mbuf+c;
 		if ( b[0] == 0x00 && b[1] == 0x00 && b[2] == 0x01
@@ -291,15 +293,15 @@ int get_vinfo(uint8_t *mbuf, int count, VideoInfo *vi, int pr)
 
 #if 0
 static
-int get_ainfo(uint8_t *mbuf, int count, AudioInfo *ai, int pr)
+int get_ainfo(u8 *mbuf, int count, struct dvb_audio_info *ai, int pr)
 {
-	uint8_t *headr;
+	u8 *headr;
 	int found = 0;
 	int c = 0;
 	int fr = 0;
 
 	while (found < 2 && c < count){
-		uint8_t b[2];
+		u8 b[2];
 		memcpy( b, mbuf+c, 2);
 
 		if ( b[0] == 0xff && (b[1] & 0xf8) == 0xf8)
@@ -346,16 +348,16 @@ int get_ainfo(uint8_t *mbuf, int count, AudioInfo *ai, int pr)
 #endif
 
 
-int dvb_filter_get_ac3info(uint8_t *mbuf, int count, AudioInfo *ai, int pr)
+int dvb_filter_get_ac3info(u8 *mbuf, int count, struct dvb_audio_info *ai, int pr)
 {
-	uint8_t *headr;
+	u8 *headr;
 	int found = 0;
 	int c = 0;
-	uint8_t frame = 0;
+	u8 frame = 0;
 	int fr = 0;
 	
 	while ( !found  && c < count){
-		uint8_t *b = mbuf+c;
+		u8 *b = mbuf+c;
 
 		if ( b[0] == 0x0b &&  b[1] == 0x77 )
 			found = 1;
@@ -378,18 +380,18 @@ int dvb_filter_get_ac3info(uint8_t *mbuf, int count, AudioInfo *ai, int pr)
 	ai->bit_rate = ac3_bitrates[frame >> 1]*1000;
 
 	if (pr)
-		printk("  BRate: %d kb/s", ai->bit_rate/1000);
+		printk("  BRate: %d kb/s", (int) ai->bit_rate/1000);
 
 	ai->frequency = (headr[2] & 0xc0 ) >> 6;
 	fr = (headr[2] & 0xc0 ) >> 6;
 	ai->frequency = freq[fr]*100;
-	if (pr) printk ("  Freq: %d Hz\n", ai->frequency);
+	if (pr) printk ("  Freq: %d Hz\n", (int) ai->frequency);
 
 
 	ai->framesize = ac3_frames[fr][frame >> 1];
 	if ((frame & 1) &&  (fr == 1)) ai->framesize++;
 	ai->framesize = ai->framesize << 1;
-	if (pr) printk ("  Framesize %d\n", ai->framesize);
+	if (pr) printk ("  Framesize %d\n",(int) ai->framesize);
 
 
 	return 0;
@@ -398,11 +400,11 @@ int dvb_filter_get_ac3info(uint8_t *mbuf, int count, AudioInfo *ai, int pr)
 
 #if 0
 static
-uint8_t *skip_pes_header(uint8_t **bufp)
+u8 *skip_pes_header(u8 **bufp)
 {
-        uint8_t *inbuf = *bufp;
-        uint8_t *buf = inbuf;
-        uint8_t *pts = NULL;
+        u8 *inbuf = *bufp;
+        u8 *buf = inbuf;
+        u8 *pts = NULL;
         int skip = 0;
 
 	static const int mpeg1_skip_table[16] = {
@@ -437,7 +439,7 @@ uint8_t *skip_pes_header(uint8_t **bufp)
 
 #if 0
 static
-void initialize_quant_matrix( uint32_t *matrix )
+void initialize_quant_matrix( u32 *matrix )
 {
         int i;
 
@@ -465,7 +467,7 @@ void initialize_quant_matrix( uint32_t *matrix )
 
 #if 0
 static
-void initialize_mpg_picture(mpg_picture *pic)
+void initialize_mpg_picture(struct mpg_picture *pic)
 {
         int i;
 
@@ -493,7 +495,7 @@ void initialize_mpg_picture(mpg_picture *pic)
 
 #if 0
 static
-void mpg_set_picture_parameter( int32_t field_type, mpg_picture *pic )
+void mpg_set_picture_parameter( int32_t field_type, struct mpg_picture *pic )
 {
         int16_t last_h_offset;
         int16_t last_v_offset;
@@ -532,7 +534,7 @@ void mpg_set_picture_parameter( int32_t field_type, mpg_picture *pic )
 
 #if 0
 static
-void init_mpg_picture( mpg_picture *pic, int chan, int32_t field_type)
+void init_mpg_picture( struct mpg_picture *pic, int chan, int32_t field_type)
 {
         pic->picture_header = 0;
         pic->sequence_header_data
@@ -561,7 +563,7 @@ void init_mpg_picture( mpg_picture *pic, int chan, int32_t field_type)
 }
 #endif
 
-void dvb_filter_pes2ts_init(dvb_filter_pes2ts_t *p2ts, unsigned short pid, 
+void dvb_filter_pes2ts_init(struct dvb_filter_pes2ts *p2ts, unsigned short pid, 
 			    dvb_filter_pes2ts_cb_t *cb, void *priv)
 {
 	unsigned char *buf=p2ts->buf;
@@ -574,7 +576,7 @@ void dvb_filter_pes2ts_init(dvb_filter_pes2ts_t *p2ts, unsigned short pid,
 	p2ts->priv=priv;
 }
 
-int dvb_filter_pes2ts(dvb_filter_pes2ts_t *p2ts, unsigned char *pes, int len)
+int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes, int len)
 {
 	unsigned char *buf=p2ts->buf;
 	int ret=0, rest;

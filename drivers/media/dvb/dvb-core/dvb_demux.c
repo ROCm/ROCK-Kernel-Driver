@@ -21,46 +21,31 @@
  *
  */
 
+#include <asm/uaccess.h>
+#include <linux/spinlock.h>
+#include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/module.h>
 #include <linux/poll.h>
-#include <linux/version.h>
-#include <asm/uaccess.h>
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#include "compat.h"
-#else
+#include <linux/string.h>
 	#include <linux/crc32.h>
-#endif
 
 #include "dvb_demux.h"
+#include "dvb_functions.h"
 
 #define NOBUFS  
 
 LIST_HEAD(dmx_muxs);
 
 
-int dmx_register_demux(dmx_demux_t *demux) 
+int dmx_register_demux(struct dmx_demux *demux) 
 {
-	struct list_head *pos;
-	
-	if (!(demux->id && demux->vendor && demux->model)) 
-		return -EINVAL;
-
-	list_for_each(pos, &dmx_muxs) {
-		if (!strcmp(DMX_DIR_ENTRY(pos)->id, demux->id))
-			return -EEXIST;
-	}
-
 	demux->users = 0;
 	list_add(&demux->reg_list, &dmx_muxs);
-	/* fixme: is this correct? */
-	try_module_get(THIS_MODULE);
-
 	return 0;
 }
 
-int dmx_unregister_demux(dmx_demux_t* demux)
+int dmx_unregister_demux(struct dmx_demux* demux)
 {
 	struct list_head *pos, *n, *head=&dmx_muxs;
 
@@ -69,8 +54,6 @@ int dmx_unregister_demux(dmx_demux_t* demux)
 			if (demux->users>0)
 				return -EINVAL;
 			list_del(pos);
-			/* fixme: is this correct? */
-			module_put(THIS_MODULE);
 			return 0;
 		}
 	}
@@ -211,7 +194,7 @@ int dvb_dmx_swfilter_section_feed (struct dvb_demux_feed *feed)
 {
 	struct dvb_demux *demux = feed->demux;
 	struct dvb_demux_filter *f = feed->filter;
-	dmx_section_feed_t *sec = &feed->feed.sec;
+	struct dmx_section_feed *sec = &feed->feed.sec;
 	u8 *buf = sec->secbuf;
 
 	if (sec->secbufp != sec->seclen)
@@ -243,7 +226,7 @@ static
 int dvb_dmx_swfilter_section_packet(struct dvb_demux_feed *feed, const u8 *buf) 
 {
 	struct dvb_demux *demux = feed->demux;
-	dmx_section_feed_t *sec = &feed->feed.sec;
+	struct dmx_section_feed *sec = &feed->feed.sec;
 	int p, count;
 	int ccok, rest;
 	u8 cc;
@@ -506,12 +489,14 @@ int dmx_pid_set (u16 pid, struct dvb_demux_feed *feed)
 	if (pid == feed->pid)
 		return 0;
 
-	if (feed->pid <= DMX_MAX_PID)
-		list_for_each_safe(pos, n, head)
+	if (feed->pid <= DMX_MAX_PID) {
+		list_for_each_safe(pos, n, head) {
 			if (DMX_FEED_ENTRY(pos)->pid == feed->pid) {
 				list_del(pos);
 				break;
 			}
+		}
+	}
 
 	list_add(&feed->list_head, head);
 	feed->pid = pid;
@@ -521,8 +506,8 @@ int dmx_pid_set (u16 pid, struct dvb_demux_feed *feed)
 
 
 static
-int dmx_ts_feed_set (struct dmx_ts_feed_s* ts_feed, u16 pid, int ts_type, 
-		     dmx_ts_pes_t pes_type, size_t callback_length, 
+int dmx_ts_feed_set (struct dmx_ts_feed* ts_feed, u16 pid, int ts_type, 
+		     enum dmx_ts_pes pes_type, size_t callback_length, 
 		     size_t circular_buffer_size, int descramble, 
 		     struct timespec timeout)
 {
@@ -597,7 +582,7 @@ int dmx_ts_feed_set (struct dmx_ts_feed_s* ts_feed, u16 pid, int ts_type,
 
 
 static
-int dmx_ts_feed_start_filtering(struct dmx_ts_feed_s* ts_feed)
+int dmx_ts_feed_start_filtering(struct dmx_ts_feed* ts_feed)
 {
 	struct dvb_demux_feed *feed = (struct dvb_demux_feed *) ts_feed;
 	struct dvb_demux *demux = feed->demux;
@@ -631,7 +616,7 @@ int dmx_ts_feed_start_filtering(struct dmx_ts_feed_s* ts_feed)
 }
  
 static
-int dmx_ts_feed_stop_filtering(struct dmx_ts_feed_s* ts_feed)
+int dmx_ts_feed_stop_filtering(struct dmx_ts_feed* ts_feed)
 {
 	struct dvb_demux_feed *feed = (struct dvb_demux_feed *) ts_feed;
 	struct dvb_demux *demux = feed->demux;
@@ -662,7 +647,7 @@ int dmx_ts_feed_stop_filtering(struct dmx_ts_feed_s* ts_feed)
 }
 
 static
-int dvbdmx_allocate_ts_feed (dmx_demux_t *dmx, dmx_ts_feed_t **ts_feed, 
+int dvbdmx_allocate_ts_feed (struct dmx_demux *dmx, struct dmx_ts_feed **ts_feed, 
 			     dmx_ts_cb callback)
 {
 	struct dvb_demux *demux = (struct dvb_demux *) dmx;
@@ -684,12 +669,12 @@ int dvbdmx_allocate_ts_feed (dmx_demux_t *dmx, dmx_ts_feed_t **ts_feed,
 	feed->buffer = 0;
 
 	(*ts_feed) = &feed->feed.ts;
-	(*ts_feed)->is_filtering = 0;
 	(*ts_feed)->parent = dmx;
 	(*ts_feed)->priv = 0;
-	(*ts_feed)->set = dmx_ts_feed_set;
+	(*ts_feed)->is_filtering = 0;
 	(*ts_feed)->start_filtering = dmx_ts_feed_start_filtering;
 	(*ts_feed)->stop_filtering = dmx_ts_feed_stop_filtering;
+	(*ts_feed)->set = dmx_ts_feed_set;
 
 
 	if (!(feed->filter = dvb_dmx_filter_alloc(demux))) {
@@ -708,7 +693,7 @@ int dvbdmx_allocate_ts_feed (dmx_demux_t *dmx, dmx_ts_feed_t **ts_feed,
 }
 
 static
-int dvbdmx_release_ts_feed(dmx_demux_t *dmx, dmx_ts_feed_t *ts_feed)
+int dvbdmx_release_ts_feed(struct dmx_demux *dmx, struct dmx_ts_feed *ts_feed)
 {
 	struct dvb_demux *demux = (struct dvb_demux *) dmx;
 	struct dvb_demux_feed *feed = (struct dvb_demux_feed *) ts_feed;
@@ -754,8 +739,8 @@ int dvbdmx_release_ts_feed(dmx_demux_t *dmx, dmx_ts_feed_t *ts_feed)
  ******************************************************************************/
 
 static int 
-dmx_section_feed_allocate_filter(struct dmx_section_feed_s* feed, 
-				 dmx_section_filter_t** filter) 
+dmx_section_feed_allocate_filter(struct dmx_section_feed* feed, 
+				     struct dmx_section_filter** filter) 
 {
 	struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) feed;
 	struct dvb_demux *dvbdemux=dvbdmxfeed->demux;
@@ -767,8 +752,9 @@ dmx_section_feed_allocate_filter(struct dmx_section_feed_s* feed,
 	dvbdmxfilter=dvb_dmx_filter_alloc(dvbdemux);
 	if (!dvbdmxfilter) {
 		up(&dvbdemux->mutex);
-		return -ENOSPC;
+		return -EBUSY;
 	}
+
 	spin_lock_irq(&dvbdemux->lock);
 	*filter=&dvbdmxfilter->filter;
 	(*filter)->parent=feed;
@@ -784,8 +770,9 @@ dmx_section_feed_allocate_filter(struct dmx_section_feed_s* feed,
 	return 0;
 }
 
+
 static int 
-dmx_section_feed_set(struct dmx_section_feed_s* feed, 
+dmx_section_feed_set(struct dmx_section_feed* feed, 
 		     u16 pid, size_t circular_buffer_size, 
 		     int descramble, int check_crc) 
 {
@@ -799,16 +786,18 @@ dmx_section_feed_set(struct dmx_section_feed_s* feed,
 	if (down_interruptible (&dvbdmx->mutex))
 		return -ERESTARTSYS;
 	
-	if (dvbdmxfeed->pid <= DMX_MAX_PID)
-		list_for_each_safe(pos, n, head)
+	if (dvbdmxfeed->pid <= DMX_MAX_PID) {
+		list_for_each_safe(pos, n, head) {
 			if (DMX_FEED_ENTRY(pos)->pid == dvbdmxfeed->pid) {
 				list_del(pos);
 				break;
 			}
+		}
+	}
 
 	list_add(&dvbdmxfeed->list_head, head);
-	dvbdmxfeed->pid=pid;
 
+	dvbdmxfeed->pid = pid;
 	dvbdmxfeed->buffer_size=circular_buffer_size;
 	dvbdmxfeed->descramble=descramble;
 	if (dvbdmxfeed->descramble) {
@@ -834,8 +823,8 @@ dmx_section_feed_set(struct dmx_section_feed_s* feed,
 static void prepare_secfilters(struct dvb_demux_feed *dvbdmxfeed)
 {
 	int i;
-	dmx_section_filter_t *sf;
 	struct dvb_demux_filter *f;
+	struct dmx_section_filter *sf;
 	u8 mask, mode, doneq;
 		
 	if (!(f=dvbdmxfeed->filter))
@@ -855,7 +844,7 @@ static void prepare_secfilters(struct dvb_demux_feed *dvbdmxfeed)
 
 
 static int 
-dmx_section_feed_start_filtering(dmx_section_feed_t *feed)
+dmx_section_feed_start_filtering(struct dmx_section_feed *feed)
 {
 	struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) feed;
 	struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
@@ -895,8 +884,9 @@ dmx_section_feed_start_filtering(dmx_section_feed_t *feed)
 	return 0;
 }
 
+
 static int 
-dmx_section_feed_stop_filtering(struct dmx_section_feed_s* feed)
+dmx_section_feed_stop_filtering(struct dmx_section_feed* feed)
 {
 	struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) feed;
 	struct dvb_demux *dvbdmx=dvbdmxfeed->demux;
@@ -918,9 +908,10 @@ dmx_section_feed_stop_filtering(struct dmx_section_feed_s* feed)
 	return ret;
 }
 
+
 static int 
-dmx_section_feed_release_filter(dmx_section_feed_t *feed, 
-				dmx_section_filter_t* filter)
+dmx_section_feed_release_filter(struct dmx_section_feed *feed, 
+				struct dmx_section_filter* filter)
 {
 	struct dvb_demux_filter *dvbdmxfilter=(struct dvb_demux_filter *) filter, *f;
 	struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) feed;
@@ -938,9 +929,10 @@ dmx_section_feed_release_filter(dmx_section_feed_t *feed,
 	
 	spin_lock_irq(&dvbdmx->lock);
 	f=dvbdmxfeed->filter;
-	if (f==dvbdmxfilter)
+
+	if (f == dvbdmxfilter) {
 		dvbdmxfeed->filter=dvbdmxfilter->next;
-	else {
+	} else {
 		while(f->next!=dvbdmxfilter)
 			f=f->next;
 		f->next=f->next->next;
@@ -951,8 +943,8 @@ dmx_section_feed_release_filter(dmx_section_feed_t *feed,
 	return 0;
 }
 
-static int dvbdmx_allocate_section_feed(dmx_demux_t *demux, 
-					dmx_section_feed_t **feed,
+static int dvbdmx_allocate_section_feed(struct dmx_demux *demux, 
+					struct dmx_section_feed **feed,
 					dmx_section_cb callback)
 {
 	struct dvb_demux *dvbdmx=(struct dvb_demux *) demux;
@@ -977,18 +969,19 @@ static int dvbdmx_allocate_section_feed(dmx_demux_t *demux,
 	(*feed)->is_filtering=0;
 	(*feed)->parent=demux;
 	(*feed)->priv=0;
+
 	(*feed)->set=dmx_section_feed_set;
 	(*feed)->allocate_filter=dmx_section_feed_allocate_filter;
-	(*feed)->release_filter=dmx_section_feed_release_filter;
 	(*feed)->start_filtering=dmx_section_feed_start_filtering;
 	(*feed)->stop_filtering=dmx_section_feed_stop_filtering;
+	(*feed)->release_filter = dmx_section_feed_release_filter;
 
 	up(&dvbdmx->mutex);
 	return 0;
 }
 
-static int dvbdmx_release_section_feed(dmx_demux_t *demux, 
-				       dmx_section_feed_t *feed)
+static int dvbdmx_release_section_feed(struct dmx_demux *demux, 
+				       struct dmx_section_feed *feed)
 {
 	struct dvb_demux_feed *dvbdmxfeed=(struct dvb_demux_feed *) feed;
 	struct dvb_demux *dvbdmx=(struct dvb_demux *) demux;
@@ -1010,11 +1003,12 @@ static int dvbdmx_release_section_feed(dmx_demux_t *demux,
 	dvbdmxfeed->state=DMX_STATE_FREE;
 
 	if (dvbdmxfeed->pid <= DMX_MAX_PID) {
-		list_for_each_safe(pos, n, head)
+		list_for_each_safe(pos, n, head) {
 			if (DMX_FEED_ENTRY(pos)->pid == dvbdmxfeed->pid) {
 				list_del(pos);
 				break;
 			}
+		}
 		dvbdmxfeed->pid = 0xffff;
 	}
 
@@ -1027,7 +1021,7 @@ static int dvbdmx_release_section_feed(dmx_demux_t *demux,
  * dvb_demux kernel data API calls
  ******************************************************************************/
 
-static int dvbdmx_open(dmx_demux_t *demux)
+static int dvbdmx_open(struct dmx_demux *demux)
 {
 	struct dvb_demux *dvbdemux=(struct dvb_demux *) demux;
 
@@ -1037,7 +1031,8 @@ static int dvbdmx_open(dmx_demux_t *demux)
 	return 0;
 }
 
-static int dvbdmx_close(struct dmx_demux_s *demux)
+
+static int dvbdmx_close(struct dmx_demux *demux)
 {
 	struct dvb_demux *dvbdemux=(struct dvb_demux *) demux;
 
@@ -1048,12 +1043,12 @@ static int dvbdmx_close(struct dmx_demux_s *demux)
 	return 0;
 }
 
-static int dvbdmx_write(dmx_demux_t *demux, const char *buf, size_t count)
+
+static int dvbdmx_write(struct dmx_demux *demux, const char *buf, size_t count)
 {
 	struct dvb_demux *dvbdemux=(struct dvb_demux *) demux;
 
-	if ((!demux->frontend) ||
-	    (demux->frontend->source!=DMX_MEMORY_FE))
+	if ((!demux->frontend) || (demux->frontend->source != DMX_MEMORY_FE))
 		return -EINVAL;
 
 	if (down_interruptible (&dvbdemux->mutex))
@@ -1065,35 +1060,25 @@ static int dvbdmx_write(dmx_demux_t *demux, const char *buf, size_t count)
 }
 
 
-static int dvbdmx_add_frontend(dmx_demux_t *demux, 
-			       dmx_frontend_t *frontend)
+static int dvbdmx_add_frontend(struct dmx_demux *demux, struct dmx_frontend *frontend)
 {
 	struct dvb_demux *dvbdemux=(struct dvb_demux *) demux;
-	struct list_head *pos, *head=&dvbdemux->frontend_list;
-	
-	if (!(frontend->id && frontend->vendor && frontend->model)) 
-		return -EINVAL;
-	list_for_each(pos, head) 
-	{
-		if (!strcmp(DMX_FE_ENTRY(pos)->id, frontend->id))
-			return -EEXIST;
-	}
+	struct list_head *head = &dvbdemux->frontend_list;
 
 	list_add(&(frontend->connectivity_list), head);
+
 	return 0;
 }
 
+
 static int 
-dvbdmx_remove_frontend(dmx_demux_t *demux, 
-		       dmx_frontend_t *frontend)
+dvbdmx_remove_frontend(struct dmx_demux *demux, struct dmx_frontend *frontend)
 {
 	struct dvb_demux *dvbdemux=(struct dvb_demux *) demux;
 	struct list_head *pos, *n, *head=&dvbdemux->frontend_list;
 
-	list_for_each_safe (pos, n, head) 
-	{
-		if (DMX_FE_ENTRY(pos)==frontend) 
-		{
+	list_for_each_safe (pos, n, head) {
+		if (DMX_FE_ENTRY(pos) == frontend) {
 			list_del(pos);
 			return 0;
 		}
@@ -1101,8 +1086,9 @@ dvbdmx_remove_frontend(dmx_demux_t *demux,
 	return -ENODEV;
 }
 
+
 static struct list_head *
-dvbdmx_get_frontends(dmx_demux_t *demux)
+dvbdmx_get_frontends(struct dmx_demux *demux)
 {
 	struct dvb_demux *dvbdemux=(struct dvb_demux *) demux;
 
@@ -1111,8 +1097,8 @@ dvbdmx_get_frontends(dmx_demux_t *demux)
 	return &dvbdemux->frontend_list;
 }
 
-static int dvbdmx_connect_frontend(dmx_demux_t *demux, 
-				   dmx_frontend_t *frontend)
+
+int dvbdmx_connect_frontend(struct dmx_demux *demux, struct dmx_frontend *frontend)
 {
 	struct dvb_demux *dvbdemux=(struct dvb_demux *) demux;
 
@@ -1127,7 +1113,8 @@ static int dvbdmx_connect_frontend(dmx_demux_t *demux,
 	return 0;
 }
 
-static int dvbdmx_disconnect_frontend(dmx_demux_t *demux)
+
+int dvbdmx_disconnect_frontend(struct dmx_demux *demux)
 {
 	struct dvb_demux *dvbdemux=(struct dvb_demux *) demux;
 
@@ -1139,7 +1126,8 @@ static int dvbdmx_disconnect_frontend(dmx_demux_t *demux)
 	return 0;
 }
 
-static int dvbdmx_get_pes_pids(dmx_demux_t *demux, u16 *pids)
+
+static int dvbdmx_get_pes_pids(struct dmx_demux *demux, u16 *pids)
 {
 	struct dvb_demux *dvbdemux=(struct dvb_demux *) demux;
 
@@ -1150,8 +1138,8 @@ static int dvbdmx_get_pes_pids(dmx_demux_t *demux, u16 *pids)
 int 
 dvb_dmx_init(struct dvb_demux *dvbdemux)
 {
-	int i;
-	dmx_demux_t *dmx=&dvbdemux->dmx;
+	int i, err;
+	struct dmx_demux *dmx = &dvbdemux->dmx;
 
 	dvbdemux->users=0;
 	dvbdemux->filter=vmalloc(dvbdemux->filternum*sizeof(struct dvb_demux_filter));
@@ -1176,8 +1164,11 @@ dvb_dmx_init(struct dvb_demux *dvbdemux)
 		dvbdemux->pesfilter[i]=NULL;
 		dvbdemux->pids[i]=0xffff;
 	}
-	dvbdemux->playing=dvbdemux->recording=0;
+
 	INIT_LIST_HEAD(&dvbdemux->feed_list);
+
+	dvbdemux->playing = 0;
+	dvbdemux->recording = 0;
 	dvbdemux->tsbufp=0;
 
 	if (!dvbdemux->check_crc32)
@@ -1187,9 +1178,8 @@ dvb_dmx_init(struct dvb_demux *dvbdemux)
 		 dvbdemux->memcopy = dvb_dmx_memcopy;
 
 	dmx->frontend=0;
-	dmx->reg_list.next=dmx->reg_list.prev=&dmx->reg_list;
+	dmx->reg_list.prev = dmx->reg_list.next = &dmx->reg_list;
 	dmx->priv=(void *) dvbdemux;
-	//dmx->users=0;		  // reset in dmx_register_demux() 
 	dmx->open=dvbdmx_open;
 	dmx->close=dvbdmx_close;
 	dmx->write=dvbdmx_write;
@@ -1210,8 +1200,8 @@ dvb_dmx_init(struct dvb_demux *dvbdemux)
 	sema_init(&dvbdemux->mutex, 1);
 	spin_lock_init(&dvbdemux->lock);
 
-	if (dmx_register_demux(dmx)<0) 
-		return -1;
+	if ((err = dmx_register_demux(dmx)) < 0) 
+		return err;
 
 	return 0;
 }
@@ -1219,7 +1209,7 @@ dvb_dmx_init(struct dvb_demux *dvbdemux)
 int 
 dvb_dmx_release(struct dvb_demux *dvbdemux)
 {
-	dmx_demux_t *dmx=&dvbdemux->dmx;
+	struct dmx_demux *dmx = &dvbdemux->dmx;
 
 	dmx_unregister_demux(dmx);
 	if (dvbdemux->filter)
@@ -1228,10 +1218,3 @@ dvb_dmx_release(struct dvb_demux *dvbdemux)
 		vfree(dvbdemux->feed);
 	return 0;
 }
-
-#if 0
-MODULE_DESCRIPTION("Software MPEG Demultiplexer");
-MODULE_AUTHOR("Ralph Metzler, Markus Metzler");
-MODULE_LICENSE("GPL");
-#endif
-

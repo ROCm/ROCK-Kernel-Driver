@@ -25,14 +25,17 @@
  */
 
 #include <asm/uaccess.h>
+#include <linux/errno.h>
+#include <linux/kernel.h>
+#include <linux/string.h>
+#include <linux/ioctl.h>
+#include <linux/slab.h>
 
 #include <linux/dvb/net.h>
+
 #include "dvb_demux.h"
 #include "dvb_net.h"
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#include "compat.h"
-#endif
+#include "dvb_functions.h"
 
 #define DVB_NET_MULTICAST_MAX 10
 
@@ -40,11 +43,11 @@ struct dvb_net_priv {
         struct net_device_stats stats;
         char name[6];
 	u16 pid;
-        struct dmx_demux_s *demux;
-	dmx_section_feed_t *secfeed;
-	dmx_section_filter_t *secfilter;
+        struct dmx_demux *demux;
+	struct dmx_section_feed *secfeed;
+	struct dmx_section_filter *secfilter;
 	int multi_num;
-	dmx_section_filter_t *multi_secfilter[DVB_NET_MULTICAST_MAX];
+	struct dmx_section_filter *multi_secfilter[DVB_NET_MULTICAST_MAX];
 	unsigned char multi_macs[DVB_NET_MULTICAST_MAX][6];
 	int mode;
 };
@@ -135,8 +138,8 @@ dvb_net_sec(struct net_device *dev, const u8 *pkt, int pkt_len)
 static int 
 dvb_net_callback(const u8 *buffer1, size_t buffer1_len,
 		 const u8 *buffer2, size_t buffer2_len,
-		 dmx_section_filter_t *filter,
-		 dmx_success_t success)
+		 struct dmx_section_filter *filter,
+		 enum dmx_success success)
 {
         struct net_device *dev=(struct net_device *) filter->priv;
 
@@ -159,7 +162,7 @@ static u8 mask_promisc[6]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 static int 
 dvb_net_filter_set(struct net_device *dev, 
-		   dmx_section_filter_t **secfilter,
+		   struct dmx_section_filter **secfilter,
 		   u8 *mac, u8 *mac_mask)
 {
 	struct dvb_net_priv *priv = (struct dvb_net_priv*) dev->priv;
@@ -205,7 +208,7 @@ dvb_net_feed_start(struct net_device *dev)
 {
 	int ret, i;
 	struct dvb_net_priv *priv = (struct dvb_net_priv*) dev->priv;
-        dmx_demux_t *demux = priv->demux;
+        struct dmx_demux *demux = priv->demux;
         unsigned char *mac = (unsigned char *) dev->dev_addr;
 		
 	priv->secfeed=0;
@@ -430,7 +433,7 @@ int
 dvb_net_add_if(struct dvb_net *dvbnet, u16 pid)
 {
         struct net_device *net;
-	dmx_demux_t *demux;
+	struct dmx_demux *demux;
 	struct dvb_net_priv *priv;
 	int result;
 	int if_num;
@@ -524,7 +527,7 @@ int dvb_net_do_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 	case NET_REMOVE_IF:
-		return dvb_net_remove_if(dvbnet, (int) parg);
+		return dvb_net_remove_if(dvbnet, (long) parg);
 	default:
 		return -EINVAL;
 	}
@@ -569,7 +572,7 @@ dvb_net_release(struct dvb_net *dvbnet)
 }
 
 int
-dvb_net_init(struct dvb_adapter *adap, struct dvb_net *dvbnet, dmx_demux_t *dmx)
+dvb_net_init(struct dvb_adapter *adap, struct dvb_net *dvbnet, struct dmx_demux *dmx)
 {
 	int i;
 		

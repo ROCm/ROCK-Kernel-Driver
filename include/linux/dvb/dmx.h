@@ -24,10 +24,10 @@
 #ifndef _DVBDMX_H_
 #define _DVBDMX_H_
 
+#include <asm/types.h>
 #ifdef __KERNEL__
-#include <linux/types.h>
+#include <linux/time.h>
 #else
-#include <stdint.h>
 #include <time.h>
 #endif
 
@@ -103,18 +103,18 @@ typedef enum
 
 typedef struct dmx_filter
 {
-	uint8_t         filter[DMX_FILTER_SIZE];
-	uint8_t         mask[DMX_FILTER_SIZE];
-	uint8_t         mode[DMX_FILTER_SIZE];
+	__u8  filter[DMX_FILTER_SIZE];
+	__u8  mask[DMX_FILTER_SIZE];
+	__u8  mode[DMX_FILTER_SIZE];
 } dmx_filter_t;
 
 
 struct dmx_sct_filter_params
 {
-	uint16_t            pid;
+	__u16            pid;
 	dmx_filter_t        filter;
-	uint32_t            timeout;
-	uint32_t            flags;
+	__u32            timeout;
+	__u32            flags;
 #define DMX_CHECK_CRC       1
 #define DMX_ONESHOT         2
 #define DMX_IMMEDIATE_START 4
@@ -124,11 +124,11 @@ struct dmx_sct_filter_params
 
 struct dmx_pes_filter_params
 {
-	uint16_t            pid;
+	__u16            pid;
 	dmx_input_t         input;
 	dmx_output_t        output;
 	dmx_pes_type_t      pes_type;
-	uint32_t            flags;
+	__u32            flags;
 };
 
 
@@ -143,7 +143,7 @@ struct dmx_event
 };
 
 typedef struct dmx_caps {
-	uint32_t caps;
+	__u32 caps;
 	int num_decoders; 
 } dmx_caps_t;
 
@@ -161,7 +161,7 @@ typedef enum {
 struct dmx_stc {
 	unsigned int num;	/* input : which STC? 0..N */
 	unsigned int base;	/* output: divisor for stc to get 90 kHz clock */
-	uint64_t stc;		/* output: stc in 'base'*90 kHz units */
+	__u64 stc;		/* output: stc in 'base'*90 kHz units */
 };
 
 
@@ -171,7 +171,7 @@ struct dmx_stc {
 #define DMX_SET_PES_FILTER       _IOW('o',44,struct dmx_pes_filter_params)
 #define DMX_SET_BUFFER_SIZE      _IO('o',45)
 #define DMX_GET_EVENT            _IOR('o',46,struct dmx_event)
-#define DMX_GET_PES_PIDS         _IOR('o',47,uint16_t[5])
+#define DMX_GET_PES_PIDS         _IOR('o', 47, __u16[5])
 #define DMX_GET_CAPS             _IOR('o',48,dmx_caps_t)
 #define DMX_SET_SOURCE           _IOW('o',49,dmx_source_t)
 #define DMX_GET_STC              _IOWR('o',50,struct dmx_stc)
