@@ -415,11 +415,12 @@ int vx_send_rih_nolock(vx_core_t *chip, int cmd)
  */
 int vx_send_rih(vx_core_t *chip, int cmd)
 {
+	unsigned long flags;
 	int err;
 
-	spin_lock_bh(&chip->lock);
+	spin_lock_irqsave(&chip->lock, flags);
 	err = vx_send_rih_nolock(chip, cmd);
-	spin_unlock_bh(&chip->lock);
+	spin_unlock_irqrestore(&chip->lock, flags);
 	return err;
 }
 
