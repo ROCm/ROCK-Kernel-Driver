@@ -6,6 +6,7 @@ obj-$(CONFIG_HOTPLUG_PCI)		+= pci_hotplug.o
 obj-$(CONFIG_HOTPLUG_PCI_FAKE)		+= fakephp.o 
 obj-$(CONFIG_HOTPLUG_PCI_COMPAQ)	+= cpqphp.o
 obj-$(CONFIG_HOTPLUG_PCI_IBM)		+= ibmphp.o
+obj-$(CONFIG_HOTPLUG_PCI_AMD)		+= amdshpc.o
 obj-$(CONFIG_HOTPLUG_PCI_ACPI)		+= acpiphp.o
 obj-$(CONFIG_HOTPLUG_PCI_CPCI_ZT5550)	+= cpcihp_zt5550.o
 obj-$(CONFIG_HOTPLUG_PCI_CPCI_GENERIC)	+= cpcihp_generic.o
@@ -33,6 +34,16 @@ ibmphp-objs		:=	ibmphp_core.o	\
 				ibmphp_pci.o	\
 				ibmphp_res.o	\
 				ibmphp_hpc.o
+
+amdshpc-objs		:=	amdshpc_core.o	\
+				amdshpc_ctrl.o	\
+				amdshpc_pci.o	\
+				amdshpc_pcix.o	\
+				amdshpc_ddi.o	\
+				amdshpc_dsb.o	\
+				amdshpc_enb.o	\
+				amdshpc_int.o	\
+				amdshpc_led.o
 
 acpiphp-objs		:=	acpiphp_core.o	\
 				acpiphp_glue.o	\
