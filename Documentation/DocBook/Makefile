@@ -47,7 +47,7 @@ installmandocs: mandocs
 ###
 #External programs used
 KERNELDOC = scripts/kernel-doc
-DOCPROC   = scripts/docproc
+DOCPROC   = scripts/basic/docproc
 SPLITMAN  = $(PERL) $(srctree)/scripts/split-man
 MAKEMAN   = $(PERL) $(srctree)/scripts/makeman
 

@@ -28,7 +28,7 @@
  *		!Ifilename
  *		!Dfilename
  *		!Ffilename
- *		
+ *
  */
 
 #include <stdio.h>
@@ -125,7 +125,7 @@ void add_new_symbol(struct symfile *sym, char * symname)
 struct symfile * add_new_file(char * filename)
 {
 	symfilelist[symfilecnt++].filename = strdup(filename);
-	return &symfilelist[symfilecnt - 1];					
+	return &symfilelist[symfilecnt - 1];
 }
 /* Check if file already are present in the list */
 struct symfile * filename_exist(char * filename)
@@ -149,8 +149,8 @@ void noaction2(char * file, char * line)   { file = file; line = line; }
 /* Echo the line without further action */
 void printline(char * line)               { printf("%s", line); }
 
-/* 
- * Find all symbols exported with EXPORT_SYMBOL and EXPORT_SYMBOL_GPL 
+/*
+ * Find all symbols exported with EXPORT_SYMBOL and EXPORT_SYMBOL_GPL
  * in filename.
  * All symbols located are stored in symfilelist.
  */
@@ -210,7 +210,7 @@ void docfunctions(char * filename, char * type)
 	int symcnt = 0;
 	int idx = 0;
 	char **vec;
-	
+
 	for (i=0; i <= symfilecnt; i++)
 		symcnt += symfilelist[i].symbolcnt;
 	vec = malloc((2 + 2 * symcnt + 2) * sizeof(char*));
@@ -250,7 +250,7 @@ void singfunc(char * filename, char * line)
 	vec[idx++] = KERNELDOC;
 	vec[idx++] = DOCBOOK;
 
-        /* Split line up in individual parameters preceeded by FUNCTION */        
+        /* Split line up in individual parameters preceeded by FUNCTION */
         for (i=0; line[i]; i++) {
                 if (isspace(line[i])) {
                         line[i] = '\0';
@@ -318,7 +318,7 @@ void parse_file(FILE *infile)
 	}
 	fflush(stdout);
 }
-		
+
 
 int main(int argc, char *argv[])
 {
@@ -359,7 +359,7 @@ int main(int argc, char *argv[])
 		externalfunctions = extfunc;
 		symbolsonly       = printline;
 		singlefunctions   = singfunc;
-		
+
 		parse_file(infile);
 	}
 	else if (strcmp("depend", argv[1]) == 0)
