@@ -84,6 +84,8 @@ struct zone {
 	atomic_t		refill_counter;
 	unsigned long		nr_active;
 	unsigned long		nr_inactive;
+	int			all_unreclaimable; /* All pages pinned */
+	unsigned long		pages_scanned;	   /* since last reclaim */
 
 	ZONE_PADDING(_pad2_)
 
@@ -203,6 +205,7 @@ memclass(struct zone *pgzone, struct zone *classzone)
 
 void get_zone_counts(unsigned long *active, unsigned long *inactive);
 void build_all_zonelists(void);
+void wakeup_kswapd(struct zone *zone);
 
 /**
  * for_each_pgdat - helper macro to iterate over all nodes

@@ -167,6 +167,12 @@ static inline void free_pages_check(const char *function, struct page *page)
  * Frees a list of pages. 
  * Assumes all pages on list are in same zone, and of same order.
  * count is the number of pages to free, or 0 for all on the list.
+ *
+ * If the zone was previously in an "all pages pinned" state then look to
+ * see if this freeing clears that state.
+ *
+ * And clear the zone's pages_scanned counter, to hold off the "all pages are
+ * pinned" detection logic.
  */
 static int
 free_pages_bulk(struct zone *zone, int count,
@@ -181,6 +187,8 @@ free_pages_bulk(struct zone *zone, int count,
 	base = zone->zone_mem_map;
 	area = zone->free_area + order;
 	spin_lock_irqsave(&zone->lock, flags);
+	zone->all_unreclaimable = 0;
+	zone->pages_scanned = 0;
 	while (!list_empty(list) && count--) {
 		page = list_entry(list->prev, struct page, list);
 		/* have to delete it as __free_pages_bulk list manipulates */
@@ -464,12 +472,8 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	}
 
 	/* we're somewhat low on memory, failed to find what we needed */
-	for (i = 0; zones[i] != NULL; i++) {
-		struct zone *z = zones[i];
-		if (z->free_pages <= z->pages_low &&
-		    waitqueue_active(&z->zone_pgdat->kswapd_wait))
-			wake_up_interruptible(&z->zone_pgdat->kswapd_wait);
-	}
+	for (i = 0; zones[i] != NULL; i++)
+		wakeup_kswapd(zones[i]);
 
 	/* Go through the zonelist again, taking __GFP_HIGH into account */
 	min = 1UL << order;
