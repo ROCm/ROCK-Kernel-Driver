@@ -154,11 +154,8 @@ hiddev_lookup_usage(struct hid_device *hid, struct hiddev_usage_ref *uref)
 	return NULL;
 }
 
-/*
- * This is where hid.c calls into hiddev to pass an event that occurred over
- * the interrupt pipe
- */
-void hiddev_hid_event(struct hid_device *hid, struct hiddev_usage_ref *uref)
+static void hiddev_send_event(struct hid_device *hid,
+			      struct hiddev_usage_ref *uref)
 {
 	struct hiddev *hiddev = hid->hiddev;
 	struct hiddev_list *list = hiddev->list;
@@ -178,6 +175,44 @@ void hiddev_hid_event(struct hid_device *hid, struct hiddev_usage_ref *uref)
 	wake_up_interruptible(&hiddev->wait);
 }
 
+/*
+ * This is where hid.c calls into hiddev to pass an event that occurred over
+ * the interrupt pipe
+ */
+void hiddev_hid_event(struct hid_device *hid, struct hid_field *field,
+		      struct hid_usage *usage, __s32 value)
+{
+	unsigned type = field->report_type;
+	struct hiddev_usage_ref uref;
+
+	uref.report_type = 
+	  (type == HID_INPUT_REPORT) ? HID_REPORT_TYPE_INPUT :
+	  ((type == HID_OUTPUT_REPORT) ? HID_REPORT_TYPE_OUTPUT : 
+	   ((type == HID_FEATURE_REPORT) ? HID_REPORT_TYPE_FEATURE:0));
+	uref.report_id = field->report->id;
+	uref.field_index = field->index;
+	uref.usage_index = (usage - field->usage);
+	uref.usage_code = usage->hid;
+	uref.value = value;
+
+	hiddev_send_event(hid, &uref);
+}
+
+
+void hiddev_report_event(struct hid_device *hid, struct hid_report *report)
+{
+	unsigned type = report->type;
+	struct hiddev_usage_ref uref;
+
+	memset(&uref, 0, sizeof(uref));
+	uref.report_type = 
+	  (type == HID_INPUT_REPORT) ? HID_REPORT_TYPE_INPUT :
+	  ((type == HID_OUTPUT_REPORT) ? HID_REPORT_TYPE_OUTPUT : 
+	   ((type == HID_FEATURE_REPORT) ? HID_REPORT_TYPE_FEATURE:0));
+	uref.report_id = report->id;
+
+	hiddev_send_event(hid, &uref);
+}
 /*
  * fasync file op
  */

@@ -793,22 +793,8 @@ static void hid_process_event(struct hid_device *hid, struct hid_field *field, s
 	hid_dump_input(usage, value);
 	if (hid->claimed & HID_CLAIMED_INPUT)
 		hidinput_hid_event(hid, field, usage, value);
-#ifdef CONFIG_USB_HIDDEV
-	if (hid->claimed & HID_CLAIMED_HIDDEV) {
-		struct hiddev_usage_ref uref;
-		unsigned type = field->report_type;
-		uref.report_type = 
-		  (type == HID_INPUT_REPORT) ? HID_REPORT_TYPE_INPUT :
-		  ((type == HID_OUTPUT_REPORT) ? HID_REPORT_TYPE_OUTPUT : 
-		   ((type == HID_FEATURE_REPORT) ? HID_REPORT_TYPE_FEATURE:0));
-		uref.report_id = field->report->id;
-		uref.field_index = field->index;
-		uref.usage_index = (usage - field->usage);
-		uref.usage_code = usage->hid;
-		uref.value = value;
-		hiddev_hid_event(hid, &uref);
-	}
-#endif
+	if (hid->claimed & HID_CLAIMED_HIDDEV)
+		hiddev_hid_event(hid, field, usage, value);
 }
 
 /*
@@ -904,27 +890,15 @@ static int hid_input_report(int type, struct urb *urb)
 		return -1;
 	}
 
-#ifdef CONFIG_USB_HIDDEV
-	/* Notify listeners that a report has been received */
-	if (hid->claimed & HID_CLAIMED_HIDDEV) {
-		struct hiddev_usage_ref uref;
-		memset(&uref, 0, sizeof(uref));
-		uref.report_type = 
-		  (type == HID_INPUT_REPORT) ? HID_REPORT_TYPE_INPUT :
-		  ((type == HID_OUTPUT_REPORT) ? HID_REPORT_TYPE_OUTPUT : 
-		   ((type == HID_FEATURE_REPORT) ? HID_REPORT_TYPE_FEATURE:0));
-		uref.report_id = report->id;
-		uref.field_index = HID_FIELD_INDEX_NONE;
-		hiddev_hid_event(hid, &uref);
-	}
-#endif
-
 	size = ((report->size - 1) >> 3) + 1;
 
 	if (len < size) {
 		dbg("report %d is too short, (%d < %d)", report->id, len, size);
 		return -1;
 	}
+
+	if (hid->claimed & HID_CLAIMED_HIDDEV)
+		hiddev_report_event(hid, report);
 
 	for (n = 0; n < report->maxfield; n++)
 		hid_input_field(hid, report->field[n], data);
