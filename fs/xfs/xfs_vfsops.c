@@ -132,14 +132,6 @@ xfs_init(void)
 					    "xfs_chashlist");
 	_ACL_ZONE_INIT(xfs_acl_zone, "xfs_acl");
 
-#ifdef CONFIG_XFS_VNODE_TRACING
-	ktrace_init(VNODE_TRACE_SIZE);
-#else
-#ifdef DEBUG
-	ktrace_init(64);
-#endif
-#endif
-
 	/*
 	 * Allocate global trace buffers.
 	 */
@@ -203,9 +195,6 @@ xfs_cleanup(void)
 	kmem_cache_destroy(xfs_ili_zone);
 	kmem_cache_destroy(xfs_chashlist_zone);
 	_ACL_ZONE_DESTROY(xfs_acl_zone);
-#if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
-	ktrace_uninit();
-#endif
 }
 
 /*

@@ -131,11 +131,12 @@ xfs-y				+= $(addprefix linux/, \
 # Objects in support/
 xfs-y				+= $(addprefix support/, \
 				   debug.o \
-				   ktrace.o \
 				   move.o \
 				   mrlock.o \
 				   qsort.o \
 				   uuid.o)
+
+xfs-$(CONFIG_XFS_TRACE)		+= support/ktrace.o
 
 # Quota and DMAPI stubs
 xfs-y				+= xfs_dmops.o \

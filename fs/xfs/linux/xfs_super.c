@@ -869,6 +869,8 @@ init_xfs_fs( void )
 	si_meminfo(&si);
 	xfs_physmem = si.totalram;
 
+	ktrace_init(64);
+
 	error = init_inodecache();
 	if (error < 0)
 		goto undo_inodecache;
@@ -907,6 +909,7 @@ exit_xfs_fs( void )
 	vfs_exitdmapi();
 	pagebuf_terminate();
 	destroy_inodecache();
+	ktrace_uninit();
 }
 
 module_init(init_xfs_fs);
