@@ -319,18 +319,39 @@ static int rd_open(struct inode *inode, struct file *filp)
 {
 	unsigned unit = iminor(inode);
 
-	/*
-	 * Immunize device against invalidate_buffers() and prune_icache().
-	 */
 	if (rd_bdev[unit] == NULL) {
 		struct block_device *bdev = inode->i_bdev;
+		struct address_space *mapping;
+		int gfp_mask;
+
 		inode = igrab(bdev->bd_inode);
 		rd_bdev[unit] = bdev;
 		bdev->bd_openers++;
 		bdev->bd_block_size = rd_blocksize;
 		inode->i_size = get_capacity(rd_disks[unit])<<9;
-		inode->i_mapping->a_ops = &ramdisk_aops;
-		inode->i_mapping->backing_dev_info = &rd_backing_dev_info;
+		mapping = inode->i_mapping;
+		mapping->a_ops = &ramdisk_aops;
+		mapping->backing_dev_info = &rd_backing_dev_info;
+
+		/*
+		 * Deep badness.  rd_blkdev_pagecache_IO() needs to allocate
+		 * pagecache pages within a request_fn.  We cannot recur back
+		 * into the filesytem which is mounted atop the ramdisk, because
+		 * that would deadlock on fs locks.  And we really don't want
+		 * to reenter rd_blkdev_pagecache_IO when we're already within
+		 * that function.
+		 *
+		 * So we turn off __GFP_FS and __GFP_IO.
+		 *
+		 * And to give this thing a hope of working, turn on __GFP_HIGH.
+		 * Hopefully, there's enough regular memory allocation going on
+		 * for the page allocator emergency pools to keep the ramdisk
+		 * driver happy.
+		 */
+		gfp_mask = mapping_gfp_mask(mapping);
+		gfp_mask &= ~(__GFP_FS|__GFP_IO);
+		gfp_mask |= __GFP_HIGH;
+		mapping_set_gfp_mask(mapping, gfp_mask);
 	}
 
 	return 0;
