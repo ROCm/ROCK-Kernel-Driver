@@ -2,8 +2,26 @@
  * linux/kernel/posix_timers.c
  *
  *
- * 2002-10-15  Posix Clocks & timers by George Anzinger
- *			     Copyright (C) 2002 by MontaVista Software.
+ * 2002-10-15  Posix Clocks & timers
+ *                           by George Anzinger george@mvista.com
+ *
+ *			     Copyright (C) 2002 2003 by MontaVista Software.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or (at
+ * your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ * MontaVista Software | 1237 East Arques Avenue | Sunnyvale | CA 94085 | USA
  */
 
 /* These are all the functions necessary to implement
@@ -33,7 +51,7 @@
 		       result; })
 
 #endif
-#define CLOCK_REALTIME_RES TICK_NSEC  // In nano seconds.
+#define CLOCK_REALTIME_RES TICK_NSEC  /* In nano seconds. */
 
 static inline u64  mpy_l_X_l_ll(unsigned long mpy1,unsigned long mpy2)
 {
@@ -82,17 +100,15 @@ static spinlock_t idr_lock = SPIN_LOCK_UNLOCKED;
 # define timer_active(tmr) BARFY	// error to use outside of SMP
 # define set_timer_inactive(tmr) do { } while (0)
 #endif
-
 /*
- * For some reason mips/mips64 define the SIGEV constants plus 128.
- * Here we define a mask to get rid of the common bits.	 The
- * optimizer should make this costless to all but mips.
- * Note that no common bits (the non-mips case) will give 0xffffffff.
+ * we assume that the new SIGEV_THREAD_ID shares no bits with the other
+ * SIGEV values.  Here we put out an error if this assumption fails.
  */
-#define MIPS_SIGEV ~(SIGEV_NONE & \
-		      SIGEV_SIGNAL & \
-		      SIGEV_THREAD &  \
-		      SIGEV_THREAD_ID)
+#if SIGEV_THREAD_ID != (SIGEV_THREAD_ID & \
+                       ~(SIGEV_SIGNAL | SIGEV_NONE | SIGEV_THREAD))
+#error "SIGEV_THREAD_ID must not share bit with other SIGEV values!"
+#endif
+
 
 #define REQUEUE_PENDING 1
 /*
@@ -301,7 +317,7 @@ static void timer_notify_task(struct k_itimer *timr)
 	if (timr->it_incr)
 		timr->sigq->info.si_sys_private = ++timr->it_requeue_pending;
 
-	if (timr->it_sigev_notify & SIGEV_THREAD_ID & MIPS_SIGEV)
+	if (timr->it_sigev_notify & SIGEV_THREAD_ID )
 		ret = send_sigqueue(timr->it_sigev_signo, timr->sigq,
 			timr->it_process);
 	else
@@ -338,14 +354,14 @@ static inline struct task_struct * good_sigevent(sigevent_t * event)
 {
 	struct task_struct *rtn = current;
 
-	if ((event->sigev_notify & SIGEV_THREAD_ID & MIPS_SIGEV) &&
+	if ((event->sigev_notify & SIGEV_THREAD_ID ) &&
 		(!(rtn = find_task_by_pid(event->sigev_notify_thread_id)) ||
-			rtn->tgid != current->tgid))
+		 rtn->tgid != current->tgid ||
+		 (event->sigev_notify & ~SIGEV_THREAD_ID) != SIGEV_SIGNAL))
 		return NULL;
 
-	if ((event->sigev_notify & ~SIGEV_NONE & MIPS_SIGEV) &&
-			event->sigev_signo &&
-			((unsigned) (event->sigev_signo > SIGRTMAX)))
+	if (((event->sigev_notify & ~SIGEV_THREAD_ID) != SIGEV_NONE) &&
+	    ((event->sigev_signo <= 0) || (event->sigev_signo > SIGRTMAX)))
 		return NULL;
 
 	return rtn;
@@ -365,6 +381,8 @@ static struct k_itimer * alloc_posix_timer(void)
 {
 	struct k_itimer *tmr;
 	tmr = kmem_cache_alloc(posix_timers_cache, GFP_KERNEL);
+	if (!tmr)
+		return tmr;
 	memset(tmr, 0, sizeof (struct k_itimer));
 	tmr->it_id = (timer_t)-1;
 	if (unlikely(!(tmr->sigq = sigqueue_alloc()))) {
@@ -586,14 +604,18 @@ do_timer_gettime(struct k_itimer *timr, struct itimerspec *cur_setting)
 
 	posix_get_now(&now);
 
-	if (expires && (timr->it_sigev_notify & SIGEV_NONE) && !timr->it_incr &&
-			posix_time_before(&timr->it_timer, &now))
+	if (expires &&
+	    ((timr->it_sigev_notify & ~SIGEV_THREAD_ID) == SIGEV_NONE) &&
+	    !timr->it_incr &&
+	    posix_time_before(&timr->it_timer, &now))
 		timr->it_timer.expires = expires = 0;
 	if (expires) {
 		if (timr->it_requeue_pending & REQUEUE_PENDING ||
-		    (timr->it_sigev_notify & SIGEV_NONE))
+		    (timr->it_sigev_notify & ~SIGEV_THREAD_ID) == SIGEV_NONE) {
 			while (posix_time_before(&timr->it_timer, &now))
 				posix_bump_timer(timr);
+			expires = timr->it_timer.expires;
+		}
 		else
 			if (!timer_pending(&timr->it_timer))
 				expires = 0;
@@ -804,7 +826,7 @@ do_timer_settime(struct k_itimer *timr, int flags,
 	 * equal to jiffies, so the timer notify function is called directly.
 	 * We do not even queue SIGEV_NONE timers!
 	 */
-	if (!(timr->it_sigev_notify & SIGEV_NONE)) {
+	if (((timr->it_sigev_notify & ~SIGEV_THREAD_ID) != SIGEV_NONE)) {
 		if (timr->it_timer.expires == jiffies)
 			timer_notify_task(timr);
 		else
@@ -967,9 +989,6 @@ static int do_posix_gettime(struct k_clock *clock, struct timespec *tp)
  * if we are interrupted since we don't take lock that will stall us or
  * any other cpu. Voila, no irq lock is needed.
  *
- * Note also that the while loop assures that the sub_jiff_offset
- * will be less than a jiffie, thus no need to normalize the result.
- * Well, not really, if called with ints off :(
  */
 
 static u64 do_posix_clock_monotonic_gettime_parts(
