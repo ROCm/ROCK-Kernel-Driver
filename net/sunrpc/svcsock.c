@@ -592,7 +592,13 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 		/* possibly an icmp error */
 		dprintk("svc: recvfrom returned error %d\n", -err);
 	}
+	svsk->sk_sk->sk_stamp = skb->stamp;
 	set_bit(SK_DATA, &svsk->sk_flags); /* there may be more data... */
+
+	/*
+	 * Maybe more packets - kick another thread ASAP.
+	 */
+	svc_sock_received(svsk);
 
 	len  = skb->len - sizeof(struct udphdr);
 	rqstp->rq_arg.len = len;
@@ -605,8 +611,6 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 	rqstp->rq_addr.sin_addr.s_addr = skb->nh.iph->saddr;
 	rqstp->rq_daddr = skb->nh.iph->daddr;
 
-	svsk->sk_sk->sk_stamp = skb->stamp;
-
 	if (skb_is_nonlinear(skb)) {
 		/* we have to copy */
 		local_bh_disable();
@@ -614,7 +618,6 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 			local_bh_enable();
 			/* checksum error */
 			skb_free_datagram(svsk->sk_sk, skb);
-			svc_sock_received(svsk);
 			return 0;
 		}
 		local_bh_enable();
@@ -626,7 +629,6 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 		if (skb->ip_summed != CHECKSUM_UNNECESSARY) {
 			if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
 				skb_free_datagram(svsk->sk_sk, skb);
-				svc_sock_received(svsk);
 				return 0;
 			}
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
@@ -645,9 +647,6 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 
 	if (serv->sv_stats)
 		serv->sv_stats->netudpcnt++;
-
-	/* One down, maybe more to go... */
-	svc_sock_received(svsk);
 
 	return len;
 }
