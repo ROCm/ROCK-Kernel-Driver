@@ -49,6 +49,7 @@ fi
 dep_bool '  Initial RAM disk (initrd) support' CONFIG_BLK_DEV_INITRD $CONFIG_BLK_DEV_RAM
 
 if [ "$CONFIG_X86" = "y" -o "$CONFIG_PPC32" = "y" ]; then
-   bool 'Support for Large Block Devices' CONFIG_LBD
+#   bool 'Support for Large Block Devices' CONFIG_LBD
+   define_bool CONFIG_LBD y
 fi
 endmenu
