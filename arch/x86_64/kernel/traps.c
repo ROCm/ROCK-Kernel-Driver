@@ -74,7 +74,7 @@ asmlinkage void spurious_interrupt_bug(void);
 asmlinkage void call_debug(void);
 
 struct notifier_block *die_chain;
-static spinlock_t die_notifier_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(die_notifier_lock);
 
 int register_die_notifier(struct notifier_block *nb)
 {
@@ -324,7 +324,7 @@ void out_of_line_bug(void)
 	BUG(); 
 } 
 
-static spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(die_lock);
 static int die_owner = -1;
 
 void oops_begin(void)
