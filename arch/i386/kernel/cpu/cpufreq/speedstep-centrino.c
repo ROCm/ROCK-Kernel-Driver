@@ -431,7 +431,7 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 	freq = get_cur_freq(0);
 
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
-	policy->cpuinfo.transition_latency = 10; /* 10uS transition latency */
+	policy->cpuinfo.transition_latency = 10000; /* 10uS transition latency */
 	policy->cur = freq;
 
 	dprintk(KERN_INFO PFX "centrino_cpu_init: policy=%d cur=%dkHz\n",
