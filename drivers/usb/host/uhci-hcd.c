@@ -2329,6 +2329,7 @@ err_alloc_skelqh:
 
 err_alloc_skeltd:
 	usb_free_dev(udev);
+	hcd->self.root_hub = NULL;
 
 err_alloc_root_hub:
 	pci_pool_destroy(uhci->qh_pool);

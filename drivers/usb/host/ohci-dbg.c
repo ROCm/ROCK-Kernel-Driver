@@ -208,7 +208,8 @@ static void ohci_dump (struct ohci_hcd *controller, int verbose)
 	if (verbose)
 		ohci_dump_periodic (controller, "hcca");
 #endif
-	dbg ("hcca frame #%04x", controller->hcca->frame_no);
+	if (controller->hcca)
+		dbg ("hcca frame #%04x", controller->hcca->frame_no);
 	ohci_dump_roothub (controller, 1);
 }
 
