@@ -44,8 +44,6 @@
 #include <asm/machdep.h>
 #include <asm/iSeries/HvCallHpt.h>
 
-int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs);
-
 struct task_struct *last_task_used_math = NULL;
 
 struct mm_struct ioremap_mm = { pgd             : ioremap_dir  
@@ -77,7 +75,7 @@ dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs)
 }
 
 void
-_switch_to(struct task_struct *prev, struct task_struct *new)
+__switch_to(struct task_struct *prev, struct task_struct *new)
 {
 	struct thread_struct *new_thread, *old_thread;
 	unsigned long flags;
@@ -99,9 +97,9 @@ _switch_to(struct task_struct *prev, struct task_struct *new)
 	new_thread = &new->thread;
 	old_thread = &current->thread;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	_switch(old_thread, new_thread);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 void show_regs(struct pt_regs * regs)
@@ -177,9 +175,8 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	childregs = (struct pt_regs *) sp;
 	*childregs = *regs;
 	if ((childregs->msr & MSR_PR) == 0) {
-		/* for kernel thread, set `current' and stackptr in new task */
+		/* for kernel thread, set stackptr in new task */
 		childregs->gpr[1] = sp + sizeof(struct pt_regs);
-		childregs->gpr[13] = (unsigned long) p;
 		p->thread.regs = NULL;	/* no user register state */
 		clear_ti_thread_flag(p->thread_info, TIF_32BIT);
 #ifdef CONFIG_PPC_ISERIES
@@ -300,13 +297,13 @@ out:
 
 void initialize_paca_hardware_interrupt_stack(void)
 {
-	extern struct naca_struct *naca;
-
 	int i;
 	unsigned long stack;
 	unsigned long end_of_stack =0;
 
-	for (i=1; i < naca->processorCount; i++) {
+	for (i=1; i < NR_CPUS; i++) {
+		if (!cpu_possible(i))
+			continue;
 		/* Carve out storage for the hardware interrupt stack */
 		stack = __get_free_pages(GFP_KERNEL, get_order(8*PAGE_SIZE));
 
@@ -326,10 +323,12 @@ void initialize_paca_hardware_interrupt_stack(void)
 	 * __get_free_pages() might give us a page > KERNBASE+256M which
 	 * is mapped with large ptes so we can't set up the guard page.
 	 */
-	if (__is_processor(PV_POWER4))
+	if (cpu_has_largepage())
 		return;
 
-	for (i=0; i < naca->processorCount; i++) {
+	for (i=0; i < NR_CPUS; i++) {
+		if (!cpu_possible(i))
+			continue;
 		/* set page at the top of stack to be protected - prevent overflow */
 		end_of_stack = paca[i].xHrdIntStack - (8*PAGE_SIZE - STACK_FRAME_OVERHEAD);
 		ppc_md.hpte_updateboltedpp(PP_RXRX,end_of_stack);

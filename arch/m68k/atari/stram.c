@@ -1044,8 +1044,8 @@ static int stram_release( struct inode *inode, struct file *filp )
 
 
 static struct block_device_operations stram_fops = {
-	open:		stram_open,
-	release:	stram_release,
+	.open =		stram_open,
+	.release =	stram_release,
 };
 
 int __init stram_device_init(void)

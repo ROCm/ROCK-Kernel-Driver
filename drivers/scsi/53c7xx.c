@@ -1144,8 +1144,8 @@ ncr53c7xx_init (Scsi_Host_Template *tpnt, int board, int chip,
     	return -1;
     }
 
-    printk("scsi-ncr53c7xx : %s at memory 0x%x, io 0x%x, irq %d",
-    	chip_str, (unsigned) base, io_port, irq);
+    printk("scsi-ncr53c7xx : %s at memory 0x%lx, io 0x%x, irq %d",
+    	chip_str, base, io_port, irq);
     if (dma == DMA_NONE)
     	printk("\n");
     else 
@@ -3459,9 +3459,10 @@ create_cmd (Scsi_Cmnd *cmd) {
 
     for (i = 0; cmd->use_sg ? (i < cmd->use_sg) : !i; cmd_datain += 4, 
 	cmd_dataout += 4, ++i) {
-	u32 vbuf = cmd->use_sg ? 
-	    (u32)(((struct scatterlist *)cmd->buffer)[i].address) :
-	    (u32)(cmd->request_buffer);
+	u32 vbuf = cmd->use_sg
+	    ? (u32)page_address(((struct scatterlist *)cmd->buffer)[i].page)+
+	      ((struct scatterlist *)cmd->buffer)[i].offset
+	    : (u32)(cmd->request_buffer);
 	u32 bbuf = virt_to_bus((void *)vbuf);
 	u32 count = cmd->use_sg ?
 	    ((struct scatterlist *)cmd->buffer)[i].length :
@@ -5428,16 +5429,16 @@ insn_to_offset (Scsi_Cmnd *cmd, u32 *insn) {
 	    if ((buffers = cmd->use_sg)) {
     	    	for (offset = 0, 
 		     	segment = (struct scatterlist *) cmd->buffer;
-    	    	     buffers && !((found = ((ptr >= segment->address) && 
-    	    	    	    (ptr < (segment->address + segment->length)))));
+    	    	     buffers && !((found = ((ptr >= (char *)page_address(segment->page)+segment->offset) && 
+    	    	    	    (ptr < ((char *)page_address(segment->page)+segment->offset+segment->length)))));
     	    	     --buffers, offset += segment->length, ++segment)
 #if 0
 		    printk("scsi%d: comparing 0x%p to 0x%p\n", 
-			cmd->host->host_no, saved, segment->address);
+			cmd->host->host_no, saved, page_address(segment->page+segment->offset);
 #else
 		    ;
 #endif
-    	    	    offset += ptr - segment->address;
+    	    	    offset += ptr - ((char *)page_address(segment->page)+segment->offset);
     	    } else {
 		found = 1;
     	    	offset = ptr - (char *) (cmd->request_buffer);

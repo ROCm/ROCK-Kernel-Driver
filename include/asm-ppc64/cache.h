@@ -8,6 +8,9 @@
 #define __ARCH_PPC64_CACHE_H
 
 /* bytes per L1 cache line */
-#define L1_CACHE_BYTES	128
+#define L1_CACHE_SHIFT	7
+#define L1_CACHE_BYTES	(1 << L1_CACHE_SHIFT)
+
+#define SMP_CACHE_BYTES L1_CACHE_BYTES
 
 #endif

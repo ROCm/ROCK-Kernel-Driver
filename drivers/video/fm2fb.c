@@ -198,8 +198,9 @@ static int fm2fb_blank(int blank, struct fb_info *info)
 	if (!blank)
 		t |= FRAMEMASTER_ENABLE | FRAMEMASTER_NOLACE;
 	fm2fb_reg[0] = t;
+	return 0;
 }
-    
+
     /*
      *  Set a single color register. The values supplied are already
      *  rounded down to the hardware's capabilities (according to the

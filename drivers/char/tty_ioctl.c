@@ -97,7 +97,7 @@ static void change_termios(struct tty_struct * tty, struct termios * new_termios
 	int canon_change;
 	struct termios old_termios = *tty->termios;
 
-	__cli(); // FIXME: is this safe?
+	local_irq_disable(); // FIXME: is this safe?
 	*tty->termios = *new_termios;
 	unset_locked_termios(tty->termios, &old_termios, tty->termios_locked);
 	canon_change = (old_termios.c_lflag ^ tty->termios->c_lflag) & ICANON;
@@ -107,7 +107,7 @@ static void change_termios(struct tty_struct * tty, struct termios * new_termios
 		tty->canon_data = 0;
 		tty->erasing = 0;
 	}
-	__sti(); // FIXME: is this safe?
+	local_irq_enable(); // FIXME: is this safe?
 	if (canon_change && !L_ICANON(tty) && tty->read_cnt)
 		/* Get characters left over from canonical mode. */
 		wake_up_interruptible(&tty->read_wait);

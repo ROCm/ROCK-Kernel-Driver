@@ -381,9 +381,9 @@ fpsp_done:
 .Lnotkern:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
-	tstl	%curptr@(TASK_NEEDRESCHED)
+	tstb	%curptr@(TASK_NEEDRESCHED)
 	jne	ret_from_exception	| deliver signals,
-						| reschedule etc..
+					| reschedule etc..
 	RESTORE_ALL
 
 |

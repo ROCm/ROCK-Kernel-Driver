@@ -111,6 +111,7 @@ PT_DTRACE_BIT = 2
 	movel	%sp,\reg
 	andw	#-THREAD_SIZE,\reg
 	movel	\reg,%curptr
+	movel	%curptr@,%curptr
 .endm
 
 #else /* C source */

@@ -77,14 +77,14 @@ pmd_t *get_pointer_table (void)
 	 * virtual address space to be noncacheable.
 	 */
 	if (mask == 0) {
-		unsigned long page;
+		void *page;
 		ptable_desc *new;
 
-		if (!(page = get_free_page (GFP_KERNEL)))
+		if (!(page = (void *)get_free_page(GFP_KERNEL)))
 			return 0;
 
 		flush_tlb_kernel_page(page);
-		nocache_page (page);
+		nocache_page(page);
 
 		new = PD_PTABLE(page);
 		PD_MARKBITS(new) = 0xfe;
@@ -119,7 +119,7 @@ int free_pointer_table (pmd_t *ptable)
 	if (PD_MARKBITS(dp) == 0xff) {
 		/* all tables in page are free, free page */
 		list_del(dp);
-		cache_page (page);
+		cache_page((void *)page);
 		free_page (page);
 		return 1;
 	} else if (ptable_list.next != dp) {
@@ -185,10 +185,6 @@ unsigned long mm_vtop(unsigned long vaddr)
 		}
 		voff -= m68k_memory[i].size;
 	} while (++i < m68k_num_memory);
-
-	/* As a special case allow `__pa(high_memory)'.  */
-	if (voff == 0)
-		return m68k_memory[i-1].addr + m68k_memory[i-1].size;
 
 	/* As a special case allow `__pa(high_memory)'.  */
 	if (voff == 0)

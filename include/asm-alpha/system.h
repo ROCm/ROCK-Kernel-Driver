@@ -303,16 +303,11 @@ extern int __min_ipl;
 #define getipl()		(rdps() & 7)
 #define setipl(ipl)		((void) swpipl(ipl))
 
-#define __cli()			do { setipl(IPL_MAX); barrier(); } while(0)
-#define __sti()			do { barrier(); setipl(IPL_MIN); } while(0)
-#define __save_flags(flags)	((flags) = rdps())
-#define __save_and_cli(flags)	do { (flags) = swpipl(IPL_MAX); barrier(); } while(0)
-#define __restore_flags(flags)	do { barrier(); setipl(flags); barrier(); } while(0)
-
-#define local_irq_save(flags)		__save_and_cli(flags)
-#define local_irq_restore(flags)	__restore_flags(flags)
-#define local_irq_disable()		__cli()
-#define local_irq_enable()		__sti()
+#define local_irq_disable()			do { setipl(IPL_MAX); barrier(); } while(0)
+#define local_irq_enable()			do { barrier(); setipl(IPL_MIN); } while(0)
+#define local_save_flags(flags)	((flags) = rdps())
+#define local_irq_save(flags)	do { (flags) = swpipl(IPL_MAX); barrier(); } while(0)
+#define local_irq_restore(flags)	do { barrier(); setipl(flags); barrier(); } while(0)
 
 #ifdef CONFIG_SMP
 
@@ -332,11 +327,11 @@ extern void __global_restore_flags(unsigned long flags);
 
 #else /* CONFIG_SMP */
 
-#define cli()			__cli()
-#define sti()			__sti()
-#define save_flags(flags)	__save_flags(flags)
-#define save_and_cli(flags)	__save_and_cli(flags)
-#define restore_flags(flags)	__restore_flags(flags)
+#define cli()			local_irq_disable()
+#define sti()			local_irq_enable()
+#define save_flags(flags)	local_save_flags(flags)
+#define save_and_cli(flags)	local_irq_save(flags)
+#define restore_flags(flags)	local_irq_restore(flags)
 
 #endif /* CONFIG_SMP */
 

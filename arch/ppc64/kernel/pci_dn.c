@@ -33,7 +33,6 @@
 #include <asm/irq.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
-#include <asm/init.h>
 #include <asm/pci-bridge.h>
 #include <asm/ppcdebug.h>
 #include <asm/naca.h>

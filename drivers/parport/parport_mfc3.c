@@ -332,7 +332,7 @@ static struct parport_operations pp_mfc3_ops = {
 int __init parport_mfc3_init(void)
 {
 	struct parport *p;
-	int pias;
+	int pias = 0;
 	struct pia *pp;
 	struct zorro_dev *z = NULL;
 

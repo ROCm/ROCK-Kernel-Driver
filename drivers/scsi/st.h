@@ -21,12 +21,20 @@ typedef struct {
 	int syscall_result;
 	Scsi_Request *last_SRpnt;
 	unsigned char *b_data;
-	unsigned short use_sg;	/* zero or number of segments for this adapter */
-	unsigned short sg_segs;	/* total number of allocated segments */
-	unsigned short orig_sg_segs;	/* number of segments allocated at first try */
+	unsigned short use_sg;	/* zero or maximum number of s/g segments for this adapter */
+	unsigned short sg_segs;		/* number of segments in s/g list */
+	unsigned short orig_frp_segs;	/* number of segments allocated at first try */
+	unsigned short frp_segs;	/* number of buffer segments */
+	unsigned int frp_sg_current;	/* driver buffer length currently in s/g list */
+	struct st_buf_fragment *frp;	/* the allocated buffer fragment list */
 	struct scatterlist sg[1];	/* MUST BE last item */
 } ST_buffer;
 
+/* The tape buffer fragment descriptor */
+struct st_buf_fragment {
+	struct page *page;
+	unsigned int length;
+};
 
 /* The tape mode definition */
 typedef struct {
@@ -147,6 +155,9 @@ typedef struct {
 #define ST_EOD		7
 /* EOD hit while reading => ST_EOD_1 => return zero => ST_EOD_2 =>
    return zero => ST_EOD, return ENOSPC */
+/* When writing: ST_EOM_OK == early warning found, write OK
+		 ST_EOD_1  == allow trying new write after early warning
+		 ST_EOM_ERROR == early warning found, not able to write all */
 
 /* Values of rw */
 #define	ST_IDLE		0

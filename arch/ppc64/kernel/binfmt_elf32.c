@@ -62,6 +62,16 @@ struct elf_prpsinfo32
 	char	pr_psargs[ELF_PRARGSZ];	/* initial part of arg list */
 };
 
+#include <linux/time.h>
+
+#define jiffies_to_timeval jiffies_to_timeval32
+static __inline__ void
+jiffies_to_timeval32(unsigned long jiffies, struct timeval32 *value)
+{
+	value->tv_usec = (jiffies % HZ) * (1000000L / HZ);
+	value->tv_sec = jiffies / HZ;
+}
+
 extern void start_thread32(struct pt_regs *, unsigned long, unsigned long);
 #undef start_thread
 #define start_thread start_thread32

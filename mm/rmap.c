@@ -163,7 +163,7 @@ void page_add_rmap(struct page * page, pte_t * ptep)
 void page_remove_rmap(struct page * page, pte_t * ptep)
 {
 	struct pte_chain * pc, * prev_pc = NULL;
-	unsigned long pfn = pte_pfn(*ptep);
+	unsigned long pfn = page_to_pfn(page);
 
 	if (!page || !ptep)
 		BUG();

@@ -62,6 +62,7 @@
 #include <linux/major.h>
 #include <linux/mm.h>
 #include <linux/console.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -236,8 +237,8 @@ void my_udelay (long us)
 }
 
 static inline int
-serial_paranoia_check(struct cyclades_port *info,
-			dev_t device, const char *routine)
+serial_paranoia_check(struct cyclades_port *info, kdev_t device,
+		      const char *routine)
 {
 #ifdef SERIAL_PARANOIA_CHECK
     static const char *badmagic =
@@ -1261,7 +1262,7 @@ cy_write(struct tty_struct * tty, int from_user,
 			    break;
 		    }
 
-		    cli();
+		    save_flags(flags); cli();		
 		    c = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 				   SERIAL_XMIT_SIZE - info->xmit_head));
 		    memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
@@ -1276,7 +1277,7 @@ cy_write(struct tty_struct * tty, int from_user,
 	    up(&tmp_buf_sem);
     } else {
 	    while (1) {
-		    cli();
+		    save_flags(flags); cli();		
 		    c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 				       SERIAL_XMIT_SIZE - info->xmit_head));
 		    if (c <= 0) {
@@ -1376,7 +1377,7 @@ cy_throttle(struct tty_struct * tty)
 #ifdef SERIAL_DEBUG_THROTTLE
   char buf[64];
 	
-    printk("throttle %s: %d....\n", _tty_name(tty, buf),
+    printk("throttle %s: %d....\n", tty_name(tty, buf),
 	   tty->ldisc.chars_in_buffer(tty));
     printk("cy_throttle ttyS%d\n", info->line);
 #endif
@@ -1412,7 +1413,7 @@ cy_unthrottle(struct tty_struct * tty)
 #ifdef SERIAL_DEBUG_THROTTLE
   char buf[64];
 	
-    printk("throttle %s: %d....\n", _tty_name(tty, buf),
+    printk("throttle %s: %d....\n", tty_name(tty, buf),
 	   tty->ldisc.chars_in_buffer(tty));
     printk("cy_unthrottle ttyS%d\n", info->line);
 #endif
@@ -2394,7 +2395,11 @@ scrn[1] = '\0';
     
     memset(&cy_serial_driver, 0, sizeof(struct tty_driver));
     cy_serial_driver.magic = TTY_DRIVER_MAGIC;
+#ifdef CONFIG_DEVFS_FS
+    cy_serial_driver.name = "tts/%d";
+#else
     cy_serial_driver.name = "ttyS";
+#endif
     cy_serial_driver.major = TTY_MAJOR;
     cy_serial_driver.minor_start = 64;
     cy_serial_driver.num = NR_PORTS;
@@ -2429,7 +2434,11 @@ scrn[1] = '\0';
      * major number and the subtype code.
      */
     cy_callout_driver = cy_serial_driver;
+#ifdef CONFIG_DEVFS_FS
+    cy_callout_driver.name = "cua/%d";
+#else
     cy_callout_driver.name = "cua";
+#endif
     cy_callout_driver.major = TTYAUX_MAJOR;
     cy_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
 

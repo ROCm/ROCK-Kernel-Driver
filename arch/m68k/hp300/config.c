@@ -29,10 +29,9 @@ extern int show_hp300_interrupts(struct seq_file *, void *);
 
 #ifdef CONFIG_VT
 extern int hp300_keyb_init(void);
-#else
-/* Dummy function for when there is no keyboard. */
-int __init hp300_keyb_init(void)
+static int hp300_kbdrate(struct kbd_repeat *k)
 {
+  return 0;
 }
 #endif
 
@@ -46,15 +45,6 @@ static void hp300_pulse(int x)
 }
 #endif
 
-static int hp300_kbdrate(struct kbd_repeat *k)
-{
-  return 0;
-}
-
-static void hp300_kbd_leds(unsigned int leds)
-{
-}
-
 static void hp300_get_model(char *model)
 {
   strcpy(model, "HP9000/300");
@@ -63,9 +53,10 @@ static void hp300_get_model(char *model)
 void __init config_hp300(void)
 {
   mach_sched_init      = hp300_sched_init;
+#ifdef CONFIG_VT
   mach_keyb_init       = hp300_keyb_init;
   mach_kbdrate         = hp300_kbdrate;
-  mach_kbd_leds        = hp300_kbd_leds;
+#endif
   mach_init_IRQ        = hp300_init_IRQ;
   mach_request_irq     = hp300_request_irq;
   mach_free_irq        = hp300_free_irq;

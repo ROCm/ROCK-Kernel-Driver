@@ -93,21 +93,7 @@ extern unsigned long mm_cachebits;
  * Conversion functions: convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.
  */
-#define __mk_pte(page, pgprot) \
-({									\
-	pte_t __pte;							\
-									\
-	pte_val(__pte) = __pa(page) + pgprot_val(pgprot);	        \
-	__pte;								\
-})
-#define mk_pte(page, pgprot) __mk_pte(page_address(page), (pgprot))
-#define mk_pte_phys(physpage, pgprot) \
-({									\
-	pte_t __pte;							\
-									\
-	pte_val(__pte) = (physpage) + pgprot_val(pgprot);		\
-	__pte;								\
-})
+#define mk_pte(page, pgprot) pfn_pte(page_to_pfn(page), (pgprot))
 
 extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 { pte_val(pte) = (pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot); return pte; }
@@ -134,7 +120,10 @@ extern inline void pgd_set(pgd_t * pgdp, pmd_t * pmdp)
 #define pte_none(pte)		(!pte_val(pte))
 #define pte_present(pte)	(pte_val(pte) & (_PAGE_PRESENT | _PAGE_FAKE_SUPER))
 #define pte_clear(ptep)		({ pte_val(*(ptep)) = 0; })
-#define pte_pagenr(pte)		((__pte_page(pte) - PAGE_OFFSET) >> PAGE_SHIFT)
+
+#define pte_page(pte)		(mem_map + ((unsigned long)(__va(pte_val(pte)) - PAGE_OFFSET) >> PAGE_SHIFT))
+#define pte_pfn(pte)		(pte_val(pte) >> PAGE_SHIFT)
+#define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 
 #define pmd_none(pmd)		(!pmd_val(pmd))
 #define pmd_bad(pmd)		((pmd_val(pmd) & _DESCTYPE_MASK) != _PAGE_TABLE)
@@ -145,16 +134,13 @@ extern inline void pgd_set(pgd_t * pgdp, pmd_t * pmdp)
 	while (--__i >= 0)			\
 		*__ptr++ = 0;			\
 })
+#define pmd_page(pmd)		(mem_map + ((unsigned long)(__va(pmd_val(pmd)) - PAGE_OFFSET) >> PAGE_SHIFT))
 
 
 #define pgd_none(pgd)		(!pgd_val(pgd))
 #define pgd_bad(pgd)		((pgd_val(pgd) & _DESCTYPE_MASK) != _PAGE_TABLE)
 #define pgd_present(pgd)	(pgd_val(pgd) & _PAGE_TABLE)
 #define pgd_clear(pgdp)		({ pgd_val(*pgdp) = 0; })
-/* Permanent address of a page. */
-#define page_address(page)	({ if (!(page)->virtual) BUG(); (page)->virtual; })
-#define __page_address(page)	(PAGE_OFFSET + (((page) - mem_map) << PAGE_SHIFT))
-#define pte_page(pte)		(mem_map+pte_pagenr(pte))
 
 #define pte_ERROR(e) \
 	printk("%s:%d: bad pte %08lx.\n", __FILE__, __LINE__, pte_val(e))
@@ -217,11 +203,15 @@ extern inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 }
 
 /* Find an entry in the third-level page table.. */ 
-extern inline pte_t * pte_offset(pmd_t * pmdp, unsigned long address)
+extern inline pte_t * pte_offset_kernel(pmd_t * pmdp, unsigned long address)
 {
 	return (pte_t *)__pmd_page(*pmdp) + ((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1));
 }
 
+#define pte_offset_map(pmdp,address) ((pte_t *)kmap(pmd_page(*pmdp)) + ((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
+#define pte_offset_map_nested(pmdp, address) pte_offset_map(pmdp, address)
+#define pte_unmap(pte) kunmap(pte)
+#define pte_unmap_nested(pte) kunmap(pte)
 
 /*
  * Allocate and free page tables. The xxx_kernel() versions are
@@ -233,30 +223,34 @@ extern inline pte_t * pte_offset(pmd_t * pmdp, unsigned long address)
  * from both the cache and ATC, or the CPU might not notice that the
  * cache setting for the page has been changed. -jskov
  */
-static inline void nocache_page (unsigned long vaddr)
+static inline void nocache_page(void *vaddr)
 {
+	unsigned long addr = (unsigned long)vaddr;
+
 	if (CPU_IS_040_OR_060) {
 		pgd_t *dir;
 		pmd_t *pmdp;
 		pte_t *ptep;
 
-		dir = pgd_offset_k(vaddr);
-		pmdp = pmd_offset(dir,vaddr);
-		ptep = pte_offset(pmdp,vaddr);
+		dir = pgd_offset_k(addr);
+		pmdp = pmd_offset(dir, addr);
+		ptep = pte_offset_kernel(pmdp, addr);
 		*ptep = pte_mknocache(*ptep);
 	}
 }
 
-static inline void cache_page (unsigned long vaddr)
+static inline void cache_page(void *vaddr)
 {
+	unsigned long addr = (unsigned long)vaddr;
+
 	if (CPU_IS_040_OR_060) {
 		pgd_t *dir;
 		pmd_t *pmdp;
 		pte_t *ptep;
 
-		dir = pgd_offset_k(vaddr);
-		pmdp = pmd_offset(dir,vaddr);
-		ptep = pte_offset(pmdp,vaddr);
+		dir = pgd_offset_k(addr);
+		pmdp = pmd_offset(dir, addr);
+		ptep = pte_offset_kernel(pmdp, addr);
 		*ptep = pte_mkcache(*ptep);
 	}
 }

@@ -8,6 +8,8 @@
 #ifndef WRITEBACK_H
 #define WRITEBACK_H
 
+struct backing_dev_info;
+
 extern spinlock_t inode_lock;
 extern struct list_head inode_in_use;
 extern struct list_head inode_unused;
@@ -38,6 +40,9 @@ void wake_up_inode(struct inode *inode);
 void __wait_on_inode(struct inode * inode);
 void sync_inodes_sb(struct super_block *, int wait);
 void sync_inodes(int wait);
+void writeback_backing_dev(struct backing_dev_info *bdi, int *nr_to_write,
+			enum writeback_sync_modes sync_mode,
+			unsigned long *older_than_this);
 
 /* writeback.h requires fs.h; it, too, is not included from here. */
 static inline void wait_on_inode(struct inode *inode)

@@ -240,7 +240,7 @@ static inline void isa_delay(void)
 #define readb   isa_readb
 #define readw   isa_readw
 #define writeb  isa_writeb
-#define writew  isa_writeb
+#define writew  isa_writew
 #endif /* CONFIG_ISA */
 
 #if defined(CONFIG_PCI)

@@ -44,6 +44,16 @@ enum {
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
 
+/*
+ * Temporary defines for UP kernels, until all code gets fixed.
+ */
+#if !CONFIG_SMP
+# define cli()			local_irq_disable()
+# define sti()			local_irq_enable()
+# define save_flags(x)		local_irq_save(x)
+# define restore_flags(x)	local_irq_restore(x)
+# define save_and_cli(x)	local_irq_save_off(x)
+#endif
 
 
 /* PLEASE, avoid to allocate new softirqs, if you need not _really_ high

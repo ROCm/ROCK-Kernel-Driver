@@ -306,7 +306,7 @@ static struct pci_ops * __devinit pci_check_direct(void)
 	unsigned int tmp;
 	unsigned long flags;
 
-	__save_flags(flags); __cli();
+	local_save_flags(flags); local_irq_disable();
 
 	/*
 	 * Check if configuration type 1 works.
@@ -318,7 +318,7 @@ static struct pci_ops * __devinit pci_check_direct(void)
 		if (inl (0xCF8) == 0x80000000 &&
 		    pci_sanity_check(&pci_direct_conf1)) {
 			outl (tmp, 0xCF8);
-			__restore_flags(flags);
+			local_irq_restore(flags);
 			printk(KERN_INFO "PCI: Using configuration type 1\n");
 			if (!request_region(0xCF8, 8, "PCI conf1"))
 				return NULL;
@@ -336,7 +336,7 @@ static struct pci_ops * __devinit pci_check_direct(void)
 		outb (0x00, 0xCFA);
 		if (inb (0xCF8) == 0x00 && inb (0xCFA) == 0x00 &&
 		    pci_sanity_check(&pci_direct_conf2)) {
-			__restore_flags(flags);
+			local_irq_restore(flags);
 			printk(KERN_INFO "PCI: Using configuration type 2\n");
 			if (!request_region(0xCF8, 4, "PCI conf2"))
 				return NULL;
@@ -344,7 +344,7 @@ static struct pci_ops * __devinit pci_check_direct(void)
 		}
 	}
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	return NULL;
 }
 

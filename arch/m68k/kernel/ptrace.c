@@ -98,12 +98,13 @@ void ptrace_disable(struct task_struct *child)
 	/* make sure the single step bit is not set. */
 	tmp = get_reg(child, PT_SR) & ~(TRACE_BITS << 16);
 	put_reg(child, PT_SR, tmp);
+	child->thread.work.delayed_trace = 0;
+	child->thread.work.syscall_trace = 0;
 }
 
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 {
 	struct task_struct *child;
-	unsigned long flags;
 	int ret;
 
 	lock_kernel();
@@ -243,14 +244,16 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			ret = -EIO;
 			if ((unsigned long) data > _NSIG)
 				break;
-			if (request == PTRACE_SYSCALL)
-				child->ptrace |= PT_TRACESYS;
-			else
-				child->ptrace &= ~PT_TRACESYS;
+			if (request == PTRACE_SYSCALL) {
+					child->thread.work.syscall_trace = ~0;
+			} else {
+					child->thread.work.syscall_trace = 0;
+			}
 			child->exit_code = data;
 			/* make sure the single step bit is not set. */
 			tmp = get_reg(child, PT_SR) & ~(TRACE_BITS << 16);
 			put_reg(child, PT_SR, tmp);
+			child->thread.work.delayed_trace = 0;
 			wake_up_process(child);
 			ret = 0;
 			break;
@@ -271,6 +274,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	/* make sure the single step bit is not set. */
 			tmp = get_reg(child, PT_SR) & ~(TRACE_BITS << 16);
 			put_reg(child, PT_SR, tmp);
+			child->thread.work.delayed_trace = 0;
 			wake_up_process(child);
 			break;
 		}
@@ -281,9 +285,10 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			ret = -EIO;
 			if ((unsigned long) data > _NSIG)
 				break;
-			child->ptrace &= ~PT_TRACESYS;
+			child->thread.work.syscall_trace = 0;
 			tmp = get_reg(child, PT_SR) | (TRACE_BITS << 16);
 			put_reg(child, PT_SR, tmp);
+			child->thread.work.delayed_trace = 1;
 
 			child->exit_code = data;
 	/* give it a chance to run. */
@@ -354,7 +359,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			break;
 	}
 out_tsk:
-	free_task_struct(child);
+	put_task_struct(child);
 out:
 	unlock_kernel();
 	return ret;
@@ -362,8 +367,8 @@ out:
 
 asmlinkage void syscall_trace(void)
 {
-	if ((current->ptrace & (PT_PTRACED|PT_TRACESYS))
-			!= (PT_PTRACED|PT_TRACESYS))
+	if (!current->thread.work.delayed_trace &&
+	    !current->thread.work.syscall_trace)
 		return;
 	current->exit_code = SIGTRAP;
 	current->state = TASK_STOPPED;

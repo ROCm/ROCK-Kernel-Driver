@@ -175,7 +175,7 @@ smp_callin(void)
 	current->active_mm = &init_mm;
 
 	/* Must have completely accurate bogos.  */
-	__sti();
+	local_irq_enable();
 
 	/* Wait boot CPU to stop with irq enabled before running
 	   calibrate_delay. */

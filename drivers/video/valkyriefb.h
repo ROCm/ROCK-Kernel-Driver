@@ -9,6 +9,8 @@
  * 
  * vmode 10 changed by Steven Borley <sjb@salix.demon.co.uk>, 14 mai 2000
  *
+ * Ported to 68k Macintosh by David Huggins-Daines <dhd@debian.org>
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version
@@ -37,12 +39,19 @@
  *  Copyright (C) 1998 Jon Howell
  */
 
+#ifdef CONFIG_MAC
+/* Valkyrie registers are word-aligned on m68k */
+#define VALKYRIE_REG_PADSIZE	3
+#else
+#define VALKYRIE_REG_PADSIZE	7
+#endif
+
 /*
  * Structure of the registers for the Valkyrie colormap registers.
  */
 struct cmap_regs {
 	unsigned char addr;
-	char pad1[7];
+	char pad1[VALKYRIE_REG_PADSIZE];
 	unsigned char lut;
 };
 
@@ -52,7 +61,7 @@ struct cmap_regs {
 
 struct vpreg {			/* padded register */
 	unsigned char r;
-	char pad[7];
+	char pad[VALKYRIE_REG_PADSIZE];
 };
 
 
@@ -81,6 +90,7 @@ struct valkyrie_regvals {
 	int	vres;
 };
 
+#ifndef CONFIG_MAC
 /* Register values for 1024x768, 75Hz mode (17) */
 /* I'm not sure which mode this is (16 or 17), so I'm defining it as 17,
  * since the equivalent mode in controlfb (which I adapted this from) is
@@ -125,20 +135,21 @@ static struct valkyrie_regvals valkyrie_reg_init_14 = {
 	1024, 768
 };
 
-/* Register values for 832x624, 75Hz mode (13) */
-static struct valkyrie_regvals valkyrie_reg_init_13 = {
-    9,
-    { 23, 42, 3 },  /* pixel clock = 57.07MHz for V=74.27Hz */
-    { 832, 0 },
-	832, 624
-};
-
 /* Register values for 800x600, 72Hz mode (11) */
 static struct valkyrie_regvals valkyrie_reg_init_11 = {
     13,
     { 17, 27, 3 },  /* pixel clock = 49.63MHz for V=71.66Hz */
     { 800, 0 },
 	800, 600
+};
+#endif /* CONFIG_MAC */
+
+/* Register values for 832x624, 75Hz mode (13) */
+static struct valkyrie_regvals valkyrie_reg_init_13 = {
+    9,
+    { 23, 42, 3 },  /* pixel clock = 57.07MHz for V=74.27Hz */
+    { 832, 0 },
+	832, 624
 };
 
 /* Register values for 800x600, 60Hz mode (10) */
@@ -177,6 +188,15 @@ static struct valkyrie_regvals *valkyrie_reg_init[VMODE_MAX] = {
 	NULL,
 	NULL,
 	&valkyrie_reg_init_10,
+#ifdef CONFIG_MAC
+	NULL,
+	NULL,
+	&valkyrie_reg_init_13,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+#else
 	&valkyrie_reg_init_11,
 	NULL,
 	&valkyrie_reg_init_13,
@@ -184,6 +204,7 @@ static struct valkyrie_regvals *valkyrie_reg_init[VMODE_MAX] = {
 	&valkyrie_reg_init_15,
 	NULL,
 	&valkyrie_reg_init_17,
+#endif
 	NULL,
 	NULL,
 	NULL

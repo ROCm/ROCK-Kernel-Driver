@@ -9,7 +9,7 @@
 #define _ASM_APOLLO_DMA_H
 
 #include <asm/apollohw.h>		/* need byte IO */
-#include <asm/spinlock.h>	/* And spinlocks */
+#include <linux/spinlock.h>		/* And spinlocks */
 #include <linux/delay.h>
 
 

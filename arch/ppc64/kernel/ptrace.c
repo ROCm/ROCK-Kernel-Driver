@@ -1,5 +1,5 @@
 /*
- *  linux/arch/ppc/kernel/ptrace.c
+ *  linux/arch/ppc64/kernel/ptrace.c
  *
  *  PowerPC version
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
@@ -30,58 +30,12 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
-
-/*
- * Set of msr bits that gdb can change on behalf of a process.
- */
-#define MSR_DEBUGCHANGE	(MSR_FE0 | MSR_SE | MSR_BE | MSR_FE1)
+#include <asm/ptrace-common.h>
 
 /*
  * does not yet catch signals sent when the child dies.
  * in exit.c or in signal.c.
  */
-
-/*
- * Get contents of register REGNO in task TASK.
- */
-static inline unsigned long get_reg(struct task_struct *task, int regno)
-{
-	if (regno < sizeof(struct pt_regs) / sizeof(unsigned long))
-		return ((unsigned long *)task->thread.regs)[regno];
-	return (0);
-}
-
-/*
- * Write contents of register REGNO in task TASK.
- */
-static inline int put_reg(struct task_struct *task, int regno,
-			  unsigned long data)
-{
-	if (regno < PT_SOFTE) {
-		if (regno == PT_MSR)
-			data = (data & MSR_DEBUGCHANGE)
-				| (task->thread.regs->msr & ~MSR_DEBUGCHANGE);
-		((unsigned long *)task->thread.regs)[regno] = data;
-		return 0;
-	}
-	return -EIO;
-}
-
-static inline void
-set_single_step(struct task_struct *task)
-{
-	struct pt_regs *regs = task->thread.regs;
-	if (regs != NULL)
-		regs->msr |= MSR_SE;
-}
-
-static inline void
-clear_single_step(struct task_struct *task)
-{
-	struct pt_regs *regs = task->thread.regs;
-	if (regs != NULL)
-		regs->msr &= ~MSR_SE;
-}
 
 /*
  * Called by kernel/ptrace.c when detaching..
@@ -148,16 +102,17 @@ int sys_ptrace(long request, long pid, long addr, long data)
 
 	/* read the word at location addr in the USER area. */
 	case PTRACE_PEEKUSR: {
-		unsigned long index, tmp;
+		unsigned long index;
+		unsigned long tmp;
 
 		ret = -EIO;
 		/* convert to index and check */
 		index = (unsigned long) addr >> 3;
-		if ((addr & 7) || index > PT_FPSCR)
+		if ((addr & 7) || (index > PT_FPSCR))
 			break;
 
 		if (index < PT_FPR0) {
-			tmp = get_reg(child, (int) index);
+			tmp = get_reg(child, (int)index);
 		} else {
 			if (child->thread.regs->msr & MSR_FP)
 				giveup_fpu(child);
@@ -171,7 +126,8 @@ int sys_ptrace(long request, long pid, long addr, long data)
 	case PTRACE_POKETEXT: /* write the word at location addr. */
 	case PTRACE_POKEDATA:
 		ret = 0;
-		if (access_process_vm(child, addr, &data, sizeof(data), 1) == sizeof(data))
+		if (access_process_vm(child, addr, &data, sizeof(data), 1)
+				== sizeof(data))
 			break;
 		ret = -EIO;
 		break;
@@ -183,7 +139,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		/* convert to index and check */
 		index = (unsigned long) addr >> 3;
-		if ((addr & 7) || index > PT_FPSCR)
+		if ((addr & 7) || (index > PT_FPSCR))
 			break;
 
 		if (index == PT_ORIG_R3)
@@ -216,11 +172,11 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		break;
 	}
 
-/*
- * make the child exit.  Best I can do is send it a sigkill. 
- * perhaps it should be put in the status that it wants to 
- * exit.
- */
+	/*
+	 * make the child exit.  Best I can do is send it a sigkill.
+	 * perhaps it should be put in the status that it wants to
+	 * exit.
+	 */
 	case PTRACE_KILL: {
 		ret = 0;
 		if (child->state == TASK_ZOMBIE)	/* already dead */
@@ -249,56 +205,50 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		ret = ptrace_detach(child, data);
 		break;
 
-	case PPC_PTRACE_GETREGS:
-	{ /* Get GPRs 0 - 31. */
+	case PPC_PTRACE_GETREGS: { /* Get GPRs 0 - 31. */
 		u64 tmp;
 		u64 cntr;
+
 		ret = 0; 
-		for (cntr=0; cntr<32 && ret==0; ++cntr)
-		{
+		for (cntr=0; cntr<32 && ret==0; ++cntr) {
 			tmp = ((u64*)child->thread.regs)[cntr];
 			ret = put_user(tmp, (u64*)(data+cntr));
 		}
 		break;
 	}
 
-	case PPC_PTRACE_SETREGS:
-	{ /* Set GPRs 0 - 31. */
+	case PPC_PTRACE_SETREGS: { /* Set GPRs 0 - 31. */
 		u64 cntr;
+
 		ret = 0; 
 		for (cntr=0; cntr<32 && ret==0; ++cntr)
-		{
 			ret = put_reg(child, cntr, *(u64*)(data+cntr));
-		}
 		break;
 	}
 
-	case PPC_PTRACE_GETFPREGS:
-	{ /* Get FPRs 0 - 31. */
+	case PPC_PTRACE_GETFPREGS: { /* Get FPRs 0 - 31. */
 		u64 tmp;
 		u64 cntr;
+
 		ret = -EIO;
 		if (child->thread.regs->msr & MSR_FP)
 			giveup_fpu(child);
 		ret = 0; 
-		for (cntr=0; cntr<32 && ret==0; ++cntr)
-		{
+		for (cntr=0; cntr<32 && ret==0; ++cntr) {
 			tmp = ((u64*)child->thread.fpr)[cntr];
 			ret = put_user(tmp, (u64*)(data+cntr));
 		}
 		break;
 	}
 
-	case PPC_PTRACE_SETFPREGS:
-	{ /* Get FPRs 0 - 31. */
+	case PPC_PTRACE_SETFPREGS: { /* Get FPRs 0 - 31. */
 		u64 cntr;
+
 		ret = -EIO;
 		if (child->thread.regs->msr & MSR_FP)
 			giveup_fpu(child);
 		for (cntr=0; cntr<32; ++cntr)
-		{
 			((u64*)child->thread.fpr)[cntr] = *(u64*)(data+cntr);
-		}
 		ret = 0; 
 		break;
 	}
@@ -334,4 +284,3 @@ void do_syscall_trace(void)
 		current->exit_code = 0;
 	}
 }
-

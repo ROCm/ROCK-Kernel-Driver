@@ -20,6 +20,7 @@
 #include <linux/console.h>
 #include <linux/rtc.h>
 #include <linux/init.h>
+#include <linux/vt_kern.h>
 #ifdef CONFIG_ZORRO
 #include <linux/zorro.h>
 #endif
@@ -110,9 +111,9 @@ static void amiga_heartbeat(int on);
 #endif
 
 static struct console amiga_console_driver = {
-	name:		"debug",
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"debug",
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 #ifdef CONFIG_MAGIC_SYSRQ
@@ -127,8 +128,6 @@ static char amiga_sysrq_xlate[128] =
 	"\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000";	/* 0x70 - 0x7f */
 #endif
 
-extern void (*kd_mksound)(unsigned int, unsigned int);
-
 
     /*
      *  Motherboard Resources present in all Amiga models
@@ -137,10 +136,10 @@ extern void (*kd_mksound)(unsigned int, unsigned int);
 static struct {
     struct resource _ciab, _ciaa, _custom, _kickstart;
 } mb_resources = {
-    _ciab:	{ "CIA B", 0x00bfd000, 0x00bfdfff },
-    _ciaa:	{ "CIA A", 0x00bfe000, 0x00bfefff },
-    _custom:	{ "Custom I/O", 0x00dff000, 0x00dfffff },
-    _kickstart:	{ "Kickstart ROM", 0x00f80000, 0x00ffffff }
+    ._ciab =		{ "CIA B", 0x00bfd000, 0x00bfdfff },
+    ._ciaa =		{ "CIA A", 0x00bfe000, 0x00bfefff },
+    ._custom =		{ "Custom I/O", 0x00dff000, 0x00dfffff },
+    ._kickstart =	{ "Kickstart ROM", 0x00f80000, 0x00ffffff }
 };
 
 static struct resource rtc_resource = {
@@ -389,10 +388,11 @@ void __init config_amiga(void)
     request_resource(&iomem_resource, &((struct resource *)&mb_resources)[i]);
 
   mach_sched_init      = amiga_sched_init;
+#ifdef CONFIG_VT
   mach_keyb_init       = amiga_keyb_init;
   mach_kbdrate         = amiga_kbdrate;
   mach_kbd_translate   = amiga_kbd_translate;
-  SYSRQ_KEY            = 0xff;
+#endif
   mach_init_IRQ        = amiga_init_IRQ;
   mach_default_handler = &amiga_default_handler;
   mach_request_irq     = amiga_request_irq;
@@ -432,8 +432,11 @@ void __init config_amiga(void)
 #ifdef CONFIG_DUMMY_CONSOLE
   conswitchp           = &dummy_con;
 #endif
+#ifdef CONFIG_VT
   kd_mksound           = amiga_mksound;
+#endif
 #ifdef CONFIG_MAGIC_SYSRQ
+  SYSRQ_KEY            = 0xff;
   mach_sysrq_key = 0x5f;	     /* HELP */
   mach_sysrq_shift_state = 0x03; /* SHIFT+ALTGR */
   mach_sysrq_shift_mask = 0xff;  /* all modifiers except CapsLock */

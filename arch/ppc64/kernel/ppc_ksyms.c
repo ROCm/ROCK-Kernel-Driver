@@ -86,8 +86,6 @@ EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(disable_irq_nosync);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(kernel_flag);
-EXPORT_SYMBOL(synchronize_irq);
-EXPORT_SYMBOL(smp_num_cpus);
 #endif /* CONFIG_SMP */
 
 EXPORT_SYMBOL(register_ioctl32_conversion);
@@ -212,10 +210,6 @@ EXPORT_SYMBOL(flush_icache_user_range);
 EXPORT_SYMBOL(flush_icache_page);
 EXPORT_SYMBOL(flush_dcache_page);
 #ifdef CONFIG_SMP
-EXPORT_SYMBOL(__global_cli);
-EXPORT_SYMBOL(__global_sti);
-EXPORT_SYMBOL(__global_save_flags);
-EXPORT_SYMBOL(__global_restore_flags);
 #ifdef CONFIG_PPC_ISERIES
 EXPORT_SYMBOL(__no_use_restore_flags);
 EXPORT_SYMBOL(__no_use_save_flags);

@@ -5,6 +5,7 @@
 #include <linux/tty.h>
 #include <linux/console.h>
 #include <linux/rtc.h>
+#include <linux/vt_kern.h>
 
 #include <asm/setup.h>
 #include <asm/bootinfo.h>
@@ -41,7 +42,6 @@ extern void dn_dummy_reset(void);
 extern void dn_dummy_waitbut(void);
 extern struct fb_info *dn_fb_init(long *);
 extern void dn_dummy_debug_init(void);
-extern void (*kd_mksound)(unsigned int, unsigned int);
 extern void dn_dummy_video_setup(char *,int *);
 extern void dn_process_int(int irq, struct pt_regs *fp);
 #ifdef CONFIG_HEARTBEAT
@@ -165,8 +165,10 @@ void config_apollo(void) {
 	dn_setup_model();	
 
 	mach_sched_init=dn_sched_init; /* */
+#ifdef CONFIG_VT
 	mach_keyb_init=dn_keyb_init;
 	mach_kbdrate=dn_dummy_kbdrate;
+#endif
 	mach_init_IRQ=dn_init_IRQ;
 	mach_default_handler=NULL;
 	mach_request_irq     = dn_request_irq;
@@ -187,7 +189,9 @@ void config_apollo(void) {
 #ifdef CONFIG_DUMMY_CONSOLE
         conswitchp           = &dummy_con;
 #endif
+#ifdef CONFIG_VT
 	kd_mksound	     = dn_mksound;
+#endif
 #ifdef CONFIG_HEARTBEAT
   	mach_heartbeat = dn_heartbeat;
 #endif

@@ -99,7 +99,7 @@ extern int bagetlance_probe(struct net_device *);
 extern int mvme147lance_probe(struct net_device *dev);
 extern int tc515_probe(struct net_device *dev);
 extern int lance_probe(struct net_device *dev);
-extern int mace68k_probe(struct net_device *dev);
+extern int mace_probe(struct net_device *dev);
 extern int macsonic_probe(struct net_device *dev);
 extern int mac8390_probe(struct net_device *dev);
 extern int mac89x0_probe(struct net_device *dev);
@@ -354,7 +354,7 @@ static struct devprobe m68k_probes[] __initdata = {
 	{mvme147lance_probe, 0},
 #endif
 #ifdef CONFIG_MACMACE		/* Mac 68k Quadra AV builtin Ethernet */
-	{mace68k_probe, 0},
+	{mace_probe, 0},
 #endif
 #ifdef CONFIG_MACSONIC		/* Mac SONIC-based Ethernet of all sorts */ 
 	{macsonic_probe, 0},

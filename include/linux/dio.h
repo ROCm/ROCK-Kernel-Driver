@@ -72,16 +72,16 @@
 #define DIO_SCINHOLE(scode) (((scode) >= 32) && ((scode) < DIOII_SCBASE))
 
 /* macros to read device IDs, given base address */
-#define DIO_ID(baseaddr) readb((baseaddr) + DIO_IDOFF)
-#define DIO_SECID(baseaddr) readb((baseaddr) + DIO_SECIDOFF)
+#define DIO_ID(baseaddr) in_8((baseaddr) + DIO_IDOFF)
+#define DIO_SECID(baseaddr) in_8((baseaddr) + DIO_SECIDOFF)
 
 /* extract the interrupt level */
-#define DIO_IPL(baseaddr) (((readb((baseaddr) + DIO_IPLOFF) >> 4) & 0x03) + 3)
+#define DIO_IPL(baseaddr) (((in_8((baseaddr) + DIO_IPLOFF) >> 4) & 0x03) + 3)
 
 /* find the size of a DIO-II board's address space.
  * DIO boards are all fixed length.
  */
-#define DIOII_SIZE(baseaddr) ((readb((baseaddr) + DIOII_SIZEOFF) + 1) * 0x100000)
+#define DIOII_SIZE(baseaddr) ((in_8((baseaddr) + DIOII_SIZEOFF) + 1) * 0x100000)
 
 /* general purpose macro for both DIO and DIO-II */
 #define DIO_SIZE(scode, base) (DIO_ISDIOII((scode)) ? DIOII_SIZE((base)) : DIO_DEVSIZE)
@@ -109,7 +109,7 @@
 #define DIO_ID_DCMREM   0x85 /* 98642A serial MUX */
 #define DIO_DESC_DCMREM "98642A DCMREM serial MUX"
 #define DIO_ID_LAN      0x15 /* 98643A LAN */
-#define DIO_DESC_LAN "98643A LAN"
+#define DIO_DESC_LAN "98643A LANCE ethernet"
 #define DIO_ID_FHPIB    0x08 /* 98625A/98625B fast HP-IB */
 #define DIO_DESC_FHPIB "98625A/98625B fast HPIB"
 #define DIO_ID_NHPIB    0x80 /* 98624A HP-IB (normal ie slow) */
@@ -192,10 +192,10 @@
  * identify them...
  */
 
-extern void dio_init(void);
 extern int dio_find(int deviceid);
 extern void *dio_scodetoviraddr(int scode);
 extern int dio_scodetoipl(int scode);
+extern const char *dio_scodetoname(int scode);
 extern void dio_config_board(int scode);
 extern void dio_unconfig_board(int scode);
 

@@ -31,36 +31,36 @@ struct naca_struct *naca;
  * processors.  The processor VPD array needs one entry per physical
  * processor (not thread).
  */
-#define PACAINITDATA(number,start,lpq,asrr,asrv) \
-{                                                                          \
-        xLpPacaPtr: &paca[number].xLpPaca,                                 \
-        xLpRegSavePtr: &paca[number].xRegSav,                              \
-        xPacaIndex: (number),           /* Paca Index        */             \
-        default_decr: 0x00ff0000,       /* Initial Decr      */             \
-        xStab_data: {                                                       \
-                real: (asrr),           /* Real pointer to segment table */ \
-                virt: (asrv),           /* Virt pointer to segment table */ \
-                next_round_robin: 1     /* Round robin index */             \
-        },                                                                  \
-        lpQueuePtr: (lpq),              /* &xItLpQueue,                  */ \
-        /* xRtas: {                                                            \
-                lock: SPIN_LOCK_UNLOCKED                                    \
-        }, */                                                                  \
-        xProcStart: (start),            /* Processor start */               \
-        xLpPaca: {                                                          \
-                xDesc: 0xd397d781,      /* "LpPa"          */               \
-                xSize: sizeof(struct ItLpPaca),                             \
-                xFPRegsInUse: 1,                                            \
-                xDynProcStatus: 2,                                          \
-		xDecrVal: 0x00ff0000,					    \
-                xEndOfQuantum: 0xffffffffffffffff                           \
-        },                                                                  \
-        xRegSav: {                                                          \
-                xDesc: 0xd397d9e2,      /* "LpRS"          */               \
-                xSize: sizeof(struct ItLpRegSave)                           \
-        },                                                                  \
-        exception_sp:                                                       \
-                (&paca[number].exception_stack[0]) - EXC_FRAME_SIZE,       \
+#define PACAINITDATA(number,start,lpq,asrr,asrv)			    \
+{									    \
+	.xLpPacaPtr = &paca[number].xLpPaca,				    \
+	.xLpRegSavePtr = &paca[number].xRegSav,				    \
+	.xPacaIndex = (number),		/* Paca Index */		    \
+	.default_decr = 0x00ff0000,	/* Initial Decr */		    \
+	.xStab_data = {							    \
+		.real = (asrr),		/* Real pointer to segment table */ \
+		.virt = (asrv),		/* Virt pointer to segment table */ \
+		.next_round_robin = 1	/* Round robin index */		    \
+	},								    \
+	.lpQueuePtr = (lpq),		/* &xItLpQueue, */		    \
+	/* .xRtas = {							    \
+		.lock = SPIN_LOCK_UNLOCKED				    \
+	}, */								    \
+	.xProcStart = (start),		/* Processor start */		    \
+	.xLpPaca = {							    \
+		.xDesc = 0xd397d781,	/* "LpPa" */			    \
+		.xSize = sizeof(struct ItLpPaca),			    \
+		.xFPRegsInUse = 1,					    \
+		.xDynProcStatus = 2,					    \
+		.xDecrVal = 0x00ff0000,					    \
+		.xEndOfQuantum = 0xffffffffffffffff			    \
+	},								    \
+	.xRegSav = {							    \
+		.xDesc = 0xd397d9e2,	/* "LpRS" */			    \
+		.xSize = sizeof(struct ItLpRegSave)			    \
+	},								    \
+	.exception_sp =							    \
+		(&paca[number].exception_stack[0]) - EXC_FRAME_SIZE,	    \
 }
 
 struct paca_struct paca[MAX_PACAS] __page_aligned = {

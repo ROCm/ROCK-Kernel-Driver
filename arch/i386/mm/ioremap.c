@@ -215,7 +215,7 @@ void iounmap(void *addr)
 	struct vm_struct *p;
 	if (addr <= high_memory) 
 		return; 
-	p = remove_kernel_area(PAGE_MASK & (unsigned long) addr); 
+	p = remove_kernel_area((void *) (PAGE_MASK & (unsigned long) addr));
 	if (!p) { 
 		printk("__iounmap: bad address %p\n", addr);
 		return;

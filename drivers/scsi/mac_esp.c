@@ -360,14 +360,14 @@ int mac_esp_detect(Scsi_Host_Template * tpnt)
 			} else {
 				/* q950, 900, 700 */
 				quick = 1;
-				writel(0x1d1, 0xf9800024);
+				out_be32(0xf9800024, 0x1d1);
 				esp->dregs = (void *) 0xf9800024;
 			}
 
 		} else { /* chipnum */
 
 			quick = 1;
-			writel(0x1d1, 0xf9800028);
+			out_be32(0xf9800028, 0x1d1);
 			esp->dregs = (void *) 0xf9800028;
 
 		} /* chipnum == 0 */
@@ -377,7 +377,7 @@ int mac_esp_detect(Scsi_Host_Template * tpnt)
 
 		/* Set the command buffer */
 		esp->esp_command = (volatile unsigned char*) cmd_buffer;
-		esp->esp_command_dvma = (volatile unsigned char*) cmd_buffer;
+		esp->esp_command_dvma = (__u32) cmd_buffer;
 
 		/* various functions */
 		esp->dma_bytes_sent = &dma_bytes_sent;

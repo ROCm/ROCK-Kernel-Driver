@@ -565,7 +565,7 @@ static unsigned long __init lance_probe1( struct net_device *dev,
 		}
 		if (request_irq(irq, lance_interrupt, IRQ_TYPE_PRIO,
 		            "Riebl-VME Ethernet", dev)) {
-			printk( "Lance: request for irq %d failed\n", irq );
+			printk( "Lance: request for irq %ld failed\n", irq );
 			return( 0 );
 		}
 		dev->irq = irq;
@@ -926,7 +926,7 @@ static void lance_interrupt( int irq, void *dev_id, struct pt_regs *fp)
 #ifndef final_version
 			if (lp->cur_tx - dirty_tx >= TX_RING_SIZE) {
 				DPRINTK( 0, ( "out-of-sync dirty pointer,"
-							  " %d vs. %d, full=%d.\n",
+							  " %d vs. %d, full=%ld.\n",
 							  dirty_tx, lp->cur_tx, lp->tx_full ));
 				dirty_tx += TX_RING_SIZE;
 			}

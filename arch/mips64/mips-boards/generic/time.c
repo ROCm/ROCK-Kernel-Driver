@@ -188,7 +188,7 @@ static unsigned long __init cal_r4koff(void)
 	unsigned long count;
 	unsigned int flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 
 	/* Start counter exactly on falling edge of update flag */
 	while (CMOS_READ(RTC_REG_A) & RTC_UIP);
@@ -204,7 +204,7 @@ static unsigned long __init cal_r4koff(void)
 	count = read_32bit_cp0_register(CP0_COUNT);
 
 	/* restore interrupts */
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	return (count / HZ);
 }

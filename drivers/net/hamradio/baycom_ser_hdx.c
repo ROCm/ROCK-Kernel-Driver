@@ -416,13 +416,13 @@ static void ser12_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	} while (!(iir & 1));
 	if (bc->modem.arb_divider <= 0) {
 		bc->modem.arb_divider = SER12_ARB_DIVIDER(bc);
-		__sti();
+		local_irq_enable();
 		hdlcdrv_arbitrate(dev, &bc->hdrv);
 	}
-	__sti();
+	local_irq_enable();
 	hdlcdrv_transmitter(dev, &bc->hdrv);
 	hdlcdrv_receiver(dev, &bc->hdrv);
-	__cli();
+	local_irq_disable();
 }
 
 /* --------------------------------------------------------------------- */

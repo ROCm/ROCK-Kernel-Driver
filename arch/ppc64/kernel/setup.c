@@ -23,7 +23,6 @@
 #include <linux/ioport.h>
 #include <linux/tty.h>
 #include <linux/root_dev.h>
-#include <asm/init.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/processor.h>
@@ -43,9 +42,6 @@ extern unsigned long klimit;
 extern HTAB htab_data;
 extern unsigned long loops_per_jiffy;
 
-extern unsigned long embedded_sysmap_start;
-extern unsigned long embedded_sysmap_end;
-
 int have_of = 1;
 
 extern void  chrp_init(unsigned long r3,
@@ -54,7 +50,6 @@ extern void  chrp_init(unsigned long r3,
 		       unsigned long r6,
 		       unsigned long r7);
 
-extern void chrp_init_map_io_space( void );
 extern void iSeries_init( void );
 extern void iSeries_init_early( void );
 extern void pSeries_init_early( void );
@@ -171,10 +166,6 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	udbg_puts("Naca Info...\n\n");
 	udbg_puts("naca                       = 0x");
 	udbg_puthex((unsigned long)naca);
-	udbg_putc('\n');
-
-	udbg_puts("naca->processorCount       = 0x");
-	udbg_puthex(naca->processorCount);
 	udbg_putc('\n');
 
 	udbg_puts("naca->physicalMemorySize   = 0x");
@@ -294,6 +285,9 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	pvr = paca[cpu_id].pvr;
 
 	switch (PVR_VER(pvr)) {
+	case PV_NORTHSTAR:
+		seq_printf(m, "RS64-II (northstar)\n");
+		break;
 	case PV_PULSAR:
 		seq_printf(m, "RS64-III (pulsar)\n");
 		break;
@@ -305,6 +299,9 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		break;
 	case PV_SSTAR:
 		seq_printf(m, "RS64-IV (sstar)\n");
+		break;
+	case PV_POWER4p:
+		seq_printf(m, "POWER4+ (gq)\n");
 		break;
 	case PV_630:
 		seq_printf(m, "POWER3 (630)\n");
@@ -338,7 +335,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if (ppc_md.setup_residual != NULL)
 		ppc_md.setup_residual(m, cpu_id);
 
-	seq_printf(m, "revision\t: %hd.%hd\n", maj, min);
+	seq_printf(m, "revision\t: %hd.%hd\n\n", maj, min);
 	
 	return 0;
 }
@@ -356,10 +353,10 @@ static void c_stop(struct seq_file *m, void *v)
 {
 }
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo,
+	.start =c_start,
+	.next =	c_next,
+	.stop =	c_stop,
+	.show =	show_cpuinfo,
 };
 
 /*
@@ -499,6 +496,7 @@ void __init ppc64_calibrate_delay(void)
 }	
 
 extern void (*calibrate_delay)(void);
+extern void sort_exception_table(void);
 
 /*
  * Called into from start_kernel, after lock_kernel has been called.

@@ -34,6 +34,7 @@
 #endif
 #ifdef CONFIG_ATARI
 #include <asm/atarihw.h>
+#include <asm/atari_stram.h>
 #endif
 #ifdef CONFIG_SUN3X
 #include <asm/dvma.h>
@@ -71,11 +72,12 @@ char m68k_debug_device[6] = "";
 
 void (*mach_sched_init) (void (*handler)(int, void *, struct pt_regs *)) __initdata = NULL;
 /* machine dependent keyboard functions */
+#ifdef CONFIG_VT
 int (*mach_keyb_init) (void) __initdata = NULL;
 int (*mach_kbdrate) (struct kbd_repeat *) = NULL;
 void (*mach_kbd_leds) (unsigned int) = NULL;
 int (*mach_kbd_translate)(unsigned char scancode, unsigned char *keycode, char raw_mode) = NULL;
-unsigned int SYSRQ_KEY;
+#endif
 /* machine dependent irq functions */
 void (*mach_init_IRQ) (void) __initdata = NULL;
 void (*(*mach_default_handler)[]) (int, void *, struct pt_regs *) = NULL;
@@ -103,13 +105,14 @@ void (*mach_l2_flush) (int) = NULL;
 #endif
 
 #ifdef CONFIG_MAGIC_SYSRQ
+unsigned int SYSRQ_KEY;
 int mach_sysrq_key = -1;
 int mach_sysrq_shift_state = 0;
 int mach_sysrq_shift_mask = 0;
 char *mach_sysrq_xlate = NULL;
 #endif
 
-#if defined(CONFIG_ISA)
+#if defined(CONFIG_ISA) && defined(MULTI_ISA)
 int isa_type;
 int isa_sex;
 #endif
@@ -217,8 +220,20 @@ void __init setup_arch(char **cmdline_p)
 	int i;
 	char *p, *q;
 
-	/* The bootinfo is located right after the kernel bss */
-	m68k_parse_bootinfo((const struct bi_record *)&_end);
+	if (!MACH_IS_HP300) {
+		/* The bootinfo is located right after the kernel bss */
+		m68k_parse_bootinfo((const struct bi_record *)&_end);
+	} else {
+		/* FIXME HP300 doesn't use bootinfo yet */
+		extern unsigned long hp300_phys_ram_base;
+		unsigned long hp300_mem_size = 0xffffffff-hp300_phys_ram_base;
+		m68k_cputype = CPU_68030;
+		m68k_fputype = FPU_68882;
+		m68k_memory[0].addr = hp300_phys_ram_base;
+		/* 0.5M fudge factor */
+		m68k_memory[0].size = hp300_mem_size-512*1024;
+		m68k_num_memory++;
+	}
 
 	if (CPU_IS_040)
 		m68k_is040or060 = 4;
@@ -371,7 +386,7 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_ATARI
 	if (MACH_IS_ATARI)
-		atari_stram_reserve_pages(availmem);
+		atari_stram_reserve_pages((void *)availmem);
 #endif
 #ifdef CONFIG_SUN3X
 	if (MACH_IS_SUN3X) {
@@ -387,7 +402,7 @@ void __init setup_arch(char **cmdline_p)
 	paging_init();
 
 /* set ISA defs early as possible */
-#if defined(CONFIG_ISA)
+#if defined(CONFIG_ISA) && defined(MULTI_ISA)
 #if defined(CONFIG_Q40) 
 	if (MACH_IS_Q40) {
 	    isa_type = Q40_ISA;
@@ -494,10 +509,10 @@ static void c_stop(struct seq_file *m, void *v)
 {
 }
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo,
+	.start =	c_start,
+	.next =		c_next,
+	.stop =		c_stop,
+	.show =		show_cpuinfo,
 };
 
 int get_hardware_list(char *buffer)
@@ -513,7 +528,6 @@ int get_hardware_list(char *buffer)
 	strcpy(model, "Unknown m68k");
 
     len += sprintf(buffer+len, "Model:\t\t%s\n", model);
-    len += get_cpuinfo(buffer+len);
     for (mem = 0, i = 0; i < m68k_num_memory; i++)
 	mem += m68k_memory[i].size;
     len += sprintf(buffer+len, "System Memory:\t%ldK\n", mem>>10);

@@ -90,6 +90,7 @@
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
+#include <linux/tty.h>
 
 #include <asm/setup.h>
 #include <asm/amigaints.h>

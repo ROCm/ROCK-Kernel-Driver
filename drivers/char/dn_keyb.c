@@ -5,6 +5,7 @@
 #include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/kd.h>
+#include <linux/kbd_ll.h>
 #include <linux/random.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -18,8 +19,6 @@
 #include <asm/uaccess.h>
 
 #include "busmouse.h"
-
-/* extern void handle_scancode(unsigned char,int ); */
 
 #define DNKEY_CAPS 0x7e
 #define BREAK_FLAG 0x80
@@ -336,7 +335,8 @@ static void dn_keyb_process_mouse_event(unsigned char mouse_data) {
 
 	static short mouse_byte_count=0;
 	static u_char mouse_packet[3];
-	short mouse_buttons;	
+	short buttons;
+	int dx, dy;
 
 	mouse_packet[mouse_byte_count++]=mouse_data;
 
@@ -347,24 +347,12 @@ static void dn_keyb_process_mouse_event(unsigned char mouse_data) {
 /*			printk("modechange: %d\n",mouse_packet[1]); */
 			if(kbd_mode==APOLLO_KBD_MODE_KEYB)
 				dn_keyb_process_key_event(mouse_packet[2]);
-		}				
+		}
 		if((mouse_packet[0] & 0x8f) == 0x80) {
-			if(mouse_update_allowed) {
-				mouse_ready=1;
-				mouse_buttons=(mouse_packet[0] >> 4) & 0x7;
-				mouse_dx+=mouse_packet[1] == 0xff ? 0 : (signed char)mouse_packet[1];
-				mouse_dy+=mouse_packet[2] == 0xff ? 0 : (signed char)mouse_packet[2];
-				wake_up_interruptible(&mouse_wait);
-				if (mouse_dx < -2048)
-              				mouse_dx = -2048;
-          			else if (mouse_dx >  2048)
-              				mouse_dx =  2048;
-         	 		if (mouse_dy < -2048)
-              				mouse_dy = -2048;
-          			else if (mouse_dy >  2048)
-             			 	mouse_dy =  2048;
-              			kill_fasync(&mouse_fasyncptr, SIGIO, POLL_IN);
-			}
+			buttons = (mouse_packet[0] >> 4) & 0x7;
+			dx = mouse_packet[1] == 0xff ? 0 : (signed char)mouse_packet[1];
+			dy = mouse_packet[2] == 0xff ? 0 : (signed char)mouse_packet[2];
+			busmouse_add_movementbuttons(msedev, dx, dy, buttons);
 			mouse_byte_count=0;
 /*			printk("mouse: %d, %d, %x\n",mouse_x,mouse_y,buttons); */
 		}

@@ -120,6 +120,8 @@ static void pmu_done(struct adb_request *req);
 static void pmu_handle_data(unsigned char *data, int len,
 			    struct pt_regs *regs);
 static void set_volume(int level);
+static void pmu_enable_backlight(int on);
+static void pmu_set_brightness(int level);
 
 struct adb_driver via_pmu_driver = {
 	"68K PMU",
@@ -746,7 +748,7 @@ int backlight_enabled = 0;
 
 #define LEVEL_TO_BRIGHT(lev)	((lev) < 1? 0x7f: 0x4a - ((lev) << 1))
 
-void 
+static void 
 pmu_enable_backlight(int on)
 {
 	struct adb_request req;
@@ -780,7 +782,7 @@ pmu_enable_backlight(int on)
 	backlight_enabled = on;
 }
 
-void 
+static void 
 pmu_set_brightness(int level)
 {
 	int bright;

@@ -47,6 +47,15 @@ ifeq ($(ARCH),m68k)
    endif
 endif
 
+ifdef CONFIG_Q40
+  KEYBD += q40_keyb.o
+  SERIAL = serial.o
+endif
+
+ifdef CONFIG_APOLLO
+  KEYBD += dn_keyb.o
+endif
+
 ifeq ($(ARCH),arm)
   ifneq ($(CONFIG_PC_KEYMAP),y)
     KEYMAP   =

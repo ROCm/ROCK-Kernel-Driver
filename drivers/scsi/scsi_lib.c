@@ -360,7 +360,7 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 {
 	request_queue_t *q = &SCpnt->device->request_queue;
 	struct request *req = SCpnt->request;
-	int flags;
+	unsigned long flags;
 
 	ASSERT_LOCK(q->queue_lock, 0);
 
