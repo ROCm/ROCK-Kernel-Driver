@@ -12,7 +12,10 @@
 #ifndef __CAPILLI_H__
 #define __CAPILLI_H__
 
+#include <linux/kernel.h>
 #include <linux/list.h>
+#include <linux/capi.h>
+#include <linux/kernelcapi.h>
 
 typedef struct capiloaddatapart {
 	int user;		/* data in userspace ? */
@@ -60,10 +63,6 @@ struct capi_ctr {
         void (*handle_capimsg)(struct capi_ctr * card,
 			   	__u16 appl, struct sk_buff *skb);
 
-        void (*new_ncci)(struct capi_ctr * card,
-			   	__u16 appl, __u32 ncci, __u32 winsize);
-        void (*free_ncci)(struct capi_ctr * card, __u16 appl, __u32 ncci);
-
 	/* management information for kcapi */
 
 	unsigned long nrecvctlpkt;
@@ -85,7 +84,7 @@ struct capi_driver {
 	void (*register_appl)(struct capi_ctr *, __u16 appl,
 			      capi_register_params *);
 	void (*release_appl)(struct capi_ctr *, __u16 appl);
-	void (*send_message)(struct capi_ctr *, struct sk_buff *skb);
+	u16  (*send_message)(struct capi_ctr *, struct sk_buff *skb);
 	
 	char *(*procinfo)(struct capi_ctr *);
 	int (*ctr_read_proc)(char *page, char **start, off_t off,
@@ -108,5 +107,17 @@ void detach_capi_driver(struct capi_driver *driver);
 
 struct capi_ctr *attach_capi_ctr(struct capi_driver *driver, char *name, void *data);
 int detach_capi_ctr(struct capi_ctr *);
+
+
+
+// ---------------------------------------------------------------------------
+// library functions for use by hardware controller drivers
+
+void capilib_new_ncci(struct list_head *head, u16 applid, u32 ncci, u32 winsize);
+void capilib_free_ncci(struct list_head *head, u16 applid, u32 ncci);
+void capilib_release_appl(struct list_head *head, u16 applid);
+void capilib_release(struct list_head *head);
+void capilib_data_b3_conf(struct list_head *head, u16 applid, u32 ncci, u16 msgid);
+u16  capilib_data_b3_req(struct list_head *head, u16 applid, u32 ncci, u16 msgid);
 
 #endif				/* __CAPILLI_H__ */

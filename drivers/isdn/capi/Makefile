@@ -6,11 +6,11 @@ O_TARGET	:= vmlinux-obj.o
 
 # Objects that export symbols.
 
-export-objs	:= kcapi.o capiutil.o capifs.o
+export-objs	:= kcapi.o capiutil.o capilib.o capifs.o
 
 # Multipart objects.
 
-kernelcapi-objs	:= kcapi.o capiutil.o
+kernelcapi-objs	:= kcapi.o capiutil.o capilib.o
 
 # Ordering constraints: kernelcapi.o first
 

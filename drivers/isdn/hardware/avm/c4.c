@@ -548,6 +548,7 @@ static void c4_handle_rx(avmcard *card)
 		MsgLen = _get_slice(&p, card->msgbuf);
 		cidx = CAPIMSG_CONTROLLER(card->msgbuf)-card->cardnr;
 		if (cidx >= card->nlogcontr) cidx = 0;
+		cinfo = &card->ctrlinfo[cidx];
 		ctrl = card->ctrlinfo[cidx].capi_ctrl;
 
 		if (!(skb = alloc_skb(MsgLen, GFP_ATOMIC))) {
@@ -555,6 +556,11 @@ static void c4_handle_rx(avmcard *card)
 					card->name);
 		} else {
 			memcpy(skb_put(skb, MsgLen), card->msgbuf, MsgLen);
+			if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_CONF)
+				capilib_data_b3_conf(&cinfo->ncci_head, ApplId,
+						     CAPIMSG_NCCI(skb->data),
+						     CAPIMSG_MSGID(skb->data));
+
 			ctrl->handle_capimsg(ctrl, ApplId, skb);
 		}
 		break;
@@ -566,9 +572,8 @@ static void c4_handle_rx(avmcard *card)
 		WindowSize = _get_word(&p);
 		cidx = (NCCI&0x7f) - card->cardnr;
 		if (cidx >= card->nlogcontr) cidx = 0;
-		ctrl = card->ctrlinfo[cidx].capi_ctrl;
 
-		ctrl->new_ncci(ctrl, ApplId, NCCI, WindowSize);
+		capilib_new_ncci(&card->ctrlinfo[cidx].ncci_head, ApplId, NCCI, WindowSize);
 
 		break;
 
@@ -580,9 +585,7 @@ static void c4_handle_rx(avmcard *card)
 		if (NCCI != 0xffffffff) {
 			cidx = (NCCI&0x7f) - card->cardnr;
 			if (cidx >= card->nlogcontr) cidx = 0;
-			ctrl = card->ctrlinfo[cidx].capi_ctrl;
-			if (ctrl)
-				ctrl->free_ncci(ctrl, ApplId, NCCI);
+			capilib_free_ncci(&card->ctrlinfo[cidx].ncci_head, ApplId, NCCI);
 		}
 		break;
 
@@ -675,6 +678,7 @@ static void c4_handle_interrupt(avmcard *card)
                 for (i=0; i < 4; i++) {
 			avmctrl_info *cinfo = &card->ctrlinfo[i];
 			memset(cinfo->version, 0, sizeof(cinfo->version));
+			capilib_release(&cinfo->ncci_head);
 			if (cinfo->capi_ctrl)
 				cinfo->capi_ctrl->reseted(cinfo->capi_ctrl);
 		}
@@ -974,6 +978,8 @@ void c4_release_appl(struct capi_ctr *ctrl, u16 appl)
 	struct sk_buff *skb;
 	void *p;
 
+	capilib_release_appl(&cinfo->ncci_head, appl);
+
 	if (ctrl->cnr == card->cardnr) {
 		skb = alloc_skb(7, GFP_ATOMIC);
 		if (!skb) {
@@ -996,12 +1002,25 @@ void c4_release_appl(struct capi_ctr *ctrl, u16 appl)
 /* ------------------------------------------------------------- */
 
 
-static void c4_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
+static u16 c4_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
-	skb_queue_tail(&card->dma->send_queue, skb);
-	c4_dispatch_tx(card);
+	u16 retval = CAPI_NOERROR;
+
+ 	if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_REQ) {
+		retval = capilib_data_b3_req(&cinfo->ncci_head,
+					     CAPIMSG_APPID(skb->data),
+					     CAPIMSG_NCCI(skb->data),
+					     CAPIMSG_MSGID(skb->data));
+	}
+	if (retval == CAPI_NOERROR) {
+		skb_queue_tail(&card->dma->send_queue, skb);
+		c4_dispatch_tx(card);
+	} else {
+		dev_kfree_skb_any(skb);
+	}
+	return retval;
 }
 
 /* ------------------------------------------------------------- */

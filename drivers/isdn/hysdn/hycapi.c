@@ -15,7 +15,7 @@
 #include <linux/signal.h>
 #include <linux/kernel.h>
 #include <linux/skbuff.h>
-
+#include <linux/netdevice.h>
 
 #define	VER_DRIVER	0
 #define	VER_CARDTYPE	1
@@ -62,9 +62,12 @@ Kernel-Capi callback reset_ctr
 void 
 hycapi_reset_ctr(struct capi_ctr *ctrl)
 {
+	hycapictrl_info *cinfo = ctrl->driverdata;
+
 #ifdef HYCAPI_PRINTFNAMES
 	printk(KERN_NOTICE "HYCAPI hycapi_reset_ctr\n");
 #endif
+	capilib_release(&cinfo->ncci_head);
 	ctrl->reseted(ctrl);
 }
 
@@ -269,6 +272,9 @@ static void hycapi_release_internal(struct capi_ctr *ctrl, __u16 appl)
 	__u16 len;
 	__u8 _command = 0xa1, _subcommand = 0x80;
 	__u16 MessageNumber = 0x0000;
+
+	capilib_release_appl(&cinfo->ncci_head, appl);
+
 #ifdef HYCAPI_PRINTFNAMES
 	printk(KERN_NOTICE "hycapi_release_appl\n");
 #endif
@@ -373,12 +379,14 @@ firmware-releases that do not check the MsgLen-Indication!
 
 ***************************************************************/
 
-void hycapi_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
+u16 hycapi_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 {
 	__u16 appl_id;
 	int _len, _len2;
 	__u8 msghead[64];
-	
+	hycapictrl_info *cinfo = ctrl->driverdata;
+	u16 retval = CAPI_NOERROR;
+
 	appl_id = CAPIMSG_APPID(skb->data);
 	switch(_hycapi_appCheck(appl_id, ctrl->cnr))
 	{
@@ -392,12 +400,13 @@ void hycapi_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 			break;
 		default:
 			printk(KERN_ERR "HYCAPI: Controller mixup!\n");
-			return;
+			retval = CAPI_ILLAPPNR;
+			goto out;
 	}
 	switch(CAPIMSG_CMD(skb->data)) {		
 		case CAPI_DISCONNECT_B3_RESP:
-			ctrl->free_ncci(ctrl, appl_id, 
-					CAPIMSG_NCCI(skb->data));
+			capilib_free_ncci(&cinfo->ncci_head, appl_id, 
+					  CAPIMSG_NCCI(skb->data));
 			break;
 		case CAPI_DATA_B3_REQ:
 			_len = CAPIMSG_LEN(skb->data);
@@ -407,6 +416,10 @@ void hycapi_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 				memcpy(skb->data + _len2, msghead, 22);
 				skb_pull(skb, _len2);
 				CAPIMSG_SETLEN(skb->data, 22);
+				retval = capilib_data_b3_req(&cinfo->ncci_head,
+							     CAPIMSG_APPID(skb->data),
+							     CAPIMSG_NCCI(skb->data),
+							     CAPIMSG_MSGID(skb->data));
 			}
 			break;
 		case CAPI_LISTEN_REQ:
@@ -423,7 +436,13 @@ void hycapi_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 		default:
 			break;
 	}
-	hycapi_sendmsg_internal(ctrl, skb);
+ out:
+	if (retval == CAPI_NOERROR)
+		hycapi_sendmsg_internal(ctrl, skb);
+	else 
+		dev_kfree_skb_any(skb);
+
+	return retval;
 }
 
 /*********************************************************************
@@ -575,8 +594,8 @@ hycapi_rx_capipkt(hysdn_card * card, uchar * buf, word len)
 			switch(info)
 			{
 				case 0:
-					ctrl->new_ncci(ctrl, ApplId, CAPIMSG_NCCI(skb->data), 
-						       hycapi_applications[ApplId-1].rp.datablkcnt); 
+					capilib_new_ncci(&cinfo->ncci_head, ApplId, CAPIMSG_NCCI(skb->data), 
+							 hycapi_applications[ApplId-1].rp.datablkcnt); 
 					
 					break;
 				case 0x0001:
@@ -604,9 +623,14 @@ hycapi_rx_capipkt(hysdn_card * card, uchar * buf, word len)
 			}
 			break;
 		case CAPI_CONNECT_B3_IND:
-			ctrl->new_ncci(ctrl, ApplId, 
-				       CAPIMSG_NCCI(skb->data), 
-				       hycapi_applications[ApplId-1].rp.datablkcnt);
+			capilib_new_ncci(&cinfo->ncci_head, ApplId, 
+					 CAPIMSG_NCCI(skb->data), 
+					 hycapi_applications[ApplId-1].rp.datablkcnt);
+			break;
+	        case CAPI_DATA_B3_CONF:
+			capilib_data_b3_conf(&cinfo->ncci_head, ApplId,
+					     CAPIMSG_NCCI(skb->data),
+					     CAPIMSG_MSGID(skb->data));
 			break;
 		default:
 			break;
@@ -786,6 +810,7 @@ hycapi_capi_create(hysdn_card *card)
 		card->hyctrlinfo = cinfo;
 		cinfo->card = card;
 		spin_lock_init(&cinfo->lock);
+		INIT_LIST_HEAD(&cinfo->ncci_head);
 
 		switch (card->brdtype) {
 			case BD_PCCARD:  strcpy(cinfo->cardname,"HYSDN Hycard"); break;

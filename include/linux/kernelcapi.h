@@ -47,6 +47,8 @@ typedef struct kcapi_carddef {
 
 #ifdef __KERNEL__
 
+#include <linux/skbuff.h>
+
 struct capi_interface {
 	__u16 (*capi_isinstalled) (void);
 
