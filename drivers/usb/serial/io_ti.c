@@ -1577,17 +1577,17 @@ static void handle_new_msr (struct edgeport_port *edge_port, __u8 msr)
 
 	dbg ("%s - %02x", __FUNCTION__, msr);
 
-	if (msr & (MSR_DELTA_CTS | MSR_DELTA_DSR | MSR_DELTA_RI | MSR_DELTA_CD)) {
+	if (msr & (EDGEPORT_MSR_DELTA_CTS | EDGEPORT_MSR_DELTA_DSR | EDGEPORT_MSR_DELTA_RI | EDGEPORT_MSR_DELTA_CD)) {
 		icount = &edge_port->icount;
 
 		/* update input line counters */
-		if (msr & MSR_DELTA_CTS)
+		if (msr & EDGEPORT_MSR_DELTA_CTS)
 			icount->cts++;
-		if (msr & MSR_DELTA_DSR)
+		if (msr & EDGEPORT_MSR_DELTA_DSR)
 			icount->dsr++;
-		if (msr & MSR_DELTA_CD)
+		if (msr & EDGEPORT_MSR_DELTA_CD)
 			icount->dcd++;
-		if (msr & MSR_DELTA_RI)
+		if (msr & EDGEPORT_MSR_DELTA_RI)
 			icount->rng++;
 		wake_up_interruptible (&edge_port->delta_msr_wait);
 	}
@@ -2449,10 +2449,10 @@ static int edge_tiocmget(struct usb_serial_port *port, struct file *file)
 	mcr = edge_port->shadow_mcr;
 	result = ((mcr & MCR_DTR)	? TIOCM_DTR: 0)	  /* 0x002 */
 		  | ((mcr & MCR_RTS)	? TIOCM_RTS: 0)   /* 0x004 */
-		  | ((msr & MSR_CTS)	? TIOCM_CTS: 0)   /* 0x020 */
-		  | ((msr & MSR_CD)	? TIOCM_CAR: 0)   /* 0x040 */
-		  | ((msr & MSR_RI)	? TIOCM_RI:  0)   /* 0x080 */
-		  | ((msr & MSR_DSR)	? TIOCM_DSR: 0);  /* 0x100 */
+		  | ((msr & EDGEPORT_MSR_CTS)	? TIOCM_CTS: 0)   /* 0x020 */
+		  | ((msr & EDGEPORT_MSR_CD)	? TIOCM_CAR: 0)   /* 0x040 */
+		  | ((msr & EDGEPORT_MSR_RI)	? TIOCM_RI:  0)   /* 0x080 */
+		  | ((msr & EDGEPORT_MSR_DSR)	? TIOCM_DSR: 0);  /* 0x100 */
 
 
 	dbg("%s -- %x", __FUNCTION__, result);

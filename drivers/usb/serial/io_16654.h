@@ -142,14 +142,14 @@
 #define LSR_FIFO_ERR		0x80	// Rx Fifo contains at least 1 erred char
 
 
-#define MSR_DELTA_CTS		0x01	// CTS changed from last read
-#define MSR_DELTA_DSR		0x02	// DSR changed from last read
-#define MSR_DELTA_RI		0x04	// RI  changed from 0 -> 1
-#define MSR_DELTA_CD		0x08	// CD  changed from last read
-#define MSR_CTS			0x10	// Current state of CTS
-#define MSR_DSR			0x20	// Current state of DSR
-#define MSR_RI			0x40	// Current state of RI
-#define MSR_CD			0x80	// Current state of CD
+#define EDGEPORT_MSR_DELTA_CTS	0x01	// CTS changed from last read
+#define EDGEPORT_MSR_DELTA_DSR	0x02	// DSR changed from last read
+#define EDGEPORT_MSR_DELTA_RI	0x04	// RI  changed from 0 -> 1
+#define EDGEPORT_MSR_DELTA_CD	0x08	// CD  changed from last read
+#define EDGEPORT_MSR_CTS	0x10	// Current state of CTS
+#define EDGEPORT_MSR_DSR	0x20	// Current state of DSR
+#define EDGEPORT_MSR_RI		0x40	// Current state of RI
+#define EDGEPORT_MSR_CD		0x80	// Current state of CD
 
 
 
