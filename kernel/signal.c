@@ -1375,7 +1375,7 @@ out:
  * Joy. Or not. Pthread wants us to wake up every thread
  * in our parent group.
  */
-static inline void __wake_up_parent(struct task_struct *p,
+static void __wake_up_parent(struct task_struct *p,
 				    struct task_struct *parent)
 {
 	struct task_struct *tsk = parent;
