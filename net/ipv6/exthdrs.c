@@ -432,7 +432,7 @@ static int ipv6_hop_jumbo(struct sk_buff *skb, int optoff)
 	}
 
 	pkt_len = ntohl(*(u32*)(skb->nh.raw+optoff+2));
-	if (pkt_len < 0x10000) {
+	if (pkt_len <= IPV6_MAXPLEN) {
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, optoff+2);
 		return 0;
 	}

@@ -606,13 +606,13 @@ static inline unsigned int ipv6_advmss(unsigned int mtu)
 		mtu = ip6_rt_min_advmss;
 
 	/*
-	 * Maximal non-jumbo IPv6 payload is 65535 and 
-	 * corresponding MSS is 65535 - tcp_header_size. 
-	 * 65535 is also valid and means: "any MSS, 
+	 * Maximal non-jumbo IPv6 payload is IPV6_MAXPLEN and 
+	 * corresponding MSS is IPV6_MAXPLEN - tcp_header_size. 
+	 * IPV6_MAXPLEN is also valid and means: "any MSS, 
 	 * rely only on pmtu discovery"
 	 */
-	if (mtu > 65535 - sizeof(struct tcphdr))
-		mtu = 65535;
+	if (mtu > IPV6_MAXPLEN - sizeof(struct tcphdr))
+		mtu = IPV6_MAXPLEN;
 	return mtu;
 }
 
