@@ -545,6 +545,7 @@ static inline void kmem_freepages (kmem_cache_t *cachep, void *addr)
 	 */
 	while (i--) {
 		ClearPageSlab(page);
+		dec_page_state(nr_slab);
 		page++;
 	}
 	free_pages((unsigned long)addr, cachep->gfporder);
@@ -1203,6 +1204,7 @@ static int kmem_cache_grow (kmem_cache_t * cachep, int flags)
 		SET_PAGE_CACHE(page, cachep);
 		SET_PAGE_SLAB(page, slabp);
 		SetPageSlab(page);
+		inc_page_state(nr_slab);
 		page++;
 	} while (--i);
 

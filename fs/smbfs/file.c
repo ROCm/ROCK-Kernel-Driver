@@ -287,10 +287,10 @@ static int smb_commit_write(struct file *file, struct page *page,
 }
 
 struct address_space_operations smb_file_aops = {
-	readpage: smb_readpage,
-	writepage: smb_writepage,
-	prepare_write: smb_prepare_write,
-	commit_write: smb_commit_write
+	.readpage = smb_readpage,
+	.writepage = smb_writepage,
+	.prepare_write = smb_prepare_write,
+	.commit_write = smb_commit_write
 };
 
 /* 
@@ -382,19 +382,19 @@ smb_file_permission(struct inode *inode, int mask)
 
 struct file_operations smb_file_operations =
 {
-	llseek:		remote_llseek,
-	read:		smb_file_read,
-	write:		smb_file_write,
-	ioctl:		smb_ioctl,
-	mmap:		smb_file_mmap,
-	open:		smb_file_open,
-	release:	smb_file_release,
-	fsync:		smb_fsync,
+	.llseek		= remote_llseek,
+	.read		= smb_file_read,
+	.write		= smb_file_write,
+	.ioctl		= smb_ioctl,
+	.mmap		= smb_file_mmap,
+	.open		= smb_file_open,
+	.release	= smb_file_release,
+	.fsync		= smb_fsync,
 };
 
 struct inode_operations smb_file_inode_operations =
 {
-	permission:	smb_file_permission,
-	getattr:	smb_getattr,
-	setattr:	smb_notify_change,
+	.permission	= smb_file_permission,
+	.getattr	= smb_getattr,
+	.setattr	= smb_notify_change,
 };

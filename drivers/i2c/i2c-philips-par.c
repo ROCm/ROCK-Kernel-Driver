@@ -201,6 +201,7 @@ static void i2c_parport_attach (struct parport *port)
 						NULL);
 	if (!adapter->pdev) {
 		printk(KERN_ERR "i2c-philips-par: Unable to register with parport.\n");
+		kfree(adapter);
 		return;
 	}
 
@@ -211,6 +212,7 @@ static void i2c_parport_attach (struct parport *port)
 
 	if (parport_claim_or_block(adapter->pdev) < 0 ) {
 		printk(KERN_ERR "i2c-philips-par: Could not claim parallel port.\n");
+		kfree(adapter);
 		return;
 	}
 	/* reset hardware to sane state */

@@ -154,5 +154,5 @@ err_nolock_nocleanup:
  * depending on the access mode of the file...
  */
 struct file_operations def_fifo_fops = {
-	open:		fifo_open,	/* will set read or write pipe_fops */
+	.open		= fifo_open,	/* will set read or write pipe_fops */
 };

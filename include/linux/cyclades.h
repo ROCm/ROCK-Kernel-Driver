@@ -503,6 +503,7 @@ struct ZFW_CTRL {
 #endif
 
 /* Per card data structure */
+struct resource;
 struct cyclades_card {
     unsigned long base_phys;
     unsigned long ctl_phys;
@@ -514,10 +515,13 @@ struct cyclades_card {
     int nports;		/* Number of ports in the card */
     int bus_index;	/* address shift - 0 for ISA, 1 for PCI */
     int	intr_enabled;	/* FW Interrupt flag - 0 disabled, 1 enabled */
+    struct resource *resource;
+    unsigned long res_start;
+	unsigned long res_len;
 #ifdef __KERNEL__
     spinlock_t card_lock;
 #else
-    uclong filler;
+    unsigned long filler;
 #endif
 };
 

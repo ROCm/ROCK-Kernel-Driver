@@ -28,6 +28,8 @@
 #include "../atm/lec.h"
 #endif
 
+int (*br_should_route_hook) (struct sk_buff **pskb) = NULL;
+
 void br_dec_use_count()
 {
 	MOD_DEC_USE_COUNT;
@@ -73,6 +75,8 @@ static void __exit br_deinit(void)
 	br_fdb_put_hook = NULL;
 #endif
 }
+
+EXPORT_SYMBOL(br_should_route_hook);
 
 module_init(br_init)
 module_exit(br_deinit)

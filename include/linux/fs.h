@@ -1231,8 +1231,6 @@ static inline void insert_inode_hash(struct inode *inode) {
 
 extern struct file * get_empty_filp(void);
 extern void file_move(struct file *f, struct list_head *list);
-extern void ll_rw_block(int, int, struct buffer_head * bh[]);
-extern int submit_bh(int, struct buffer_head *);
 struct bio;
 extern int submit_bio(int, struct bio *);
 extern int bdev_read_only(struct block_device *);

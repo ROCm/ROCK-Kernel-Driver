@@ -444,69 +444,69 @@ pipe_rdwr_open(struct inode *inode, struct file *filp)
  * are also used in linux/fs/fifo.c to do operations on FIFOs.
  */
 struct file_operations read_fifo_fops = {
-	llseek:		no_llseek,
-	read:		pipe_read,
-	write:		bad_pipe_w,
-	poll:		fifo_poll,
-	ioctl:		pipe_ioctl,
-	open:		pipe_read_open,
-	release:	pipe_read_release,
-	fasync:         pipe_read_fasync,
+	.llseek		= no_llseek,
+	.read		= pipe_read,
+	.write		= bad_pipe_w,
+	.poll		= fifo_poll,
+	.ioctl		= pipe_ioctl,
+	.open		= pipe_read_open,
+	.release	= pipe_read_release,
+	.fasync         = pipe_read_fasync,
 };
 
 struct file_operations write_fifo_fops = {
-	llseek:		no_llseek,
-	read:		bad_pipe_r,
-	write:		pipe_write,
-	poll:		fifo_poll,
-	ioctl:		pipe_ioctl,
-	open:		pipe_write_open,
-	release:	pipe_write_release,
-	fasync:         pipe_write_fasync,
+	.llseek		= no_llseek,
+	.read		= bad_pipe_r,
+	.write		= pipe_write,
+	.poll		= fifo_poll,
+	.ioctl		= pipe_ioctl,
+	.open		= pipe_write_open,
+	.release	= pipe_write_release,
+	.fasync         = pipe_write_fasync,
 };
 
 struct file_operations rdwr_fifo_fops = {
-	llseek:		no_llseek,
-	read:		pipe_read,
-	write:		pipe_write,
-	poll:		fifo_poll,
-	ioctl:		pipe_ioctl,
-	open:		pipe_rdwr_open,
-	release:	pipe_rdwr_release,
-	fasync:         pipe_rdwr_fasync,
+	.llseek		= no_llseek,
+	.read		= pipe_read,
+	.write		= pipe_write,
+	.poll		= fifo_poll,
+	.ioctl		= pipe_ioctl,
+	.open		= pipe_rdwr_open,
+	.release	= pipe_rdwr_release,
+	.fasync         = pipe_rdwr_fasync,
 };
 
 struct file_operations read_pipe_fops = {
-	llseek:		no_llseek,
-	read:		pipe_read,
-	write:		bad_pipe_w,
-	poll:		pipe_poll,
-	ioctl:		pipe_ioctl,
-	open:		pipe_read_open,
-	release:	pipe_read_release,
-	fasync:         pipe_read_fasync,
+	.llseek		= no_llseek,
+	.read		= pipe_read,
+	.write		= bad_pipe_w,
+	.poll		= pipe_poll,
+	.ioctl		= pipe_ioctl,
+	.open		= pipe_read_open,
+	.release	= pipe_read_release,
+	.fasync         = pipe_read_fasync,
 };
 
 struct file_operations write_pipe_fops = {
-	llseek:		no_llseek,
-	read:		bad_pipe_r,
-	write:		pipe_write,
-	poll:		pipe_poll,
-	ioctl:		pipe_ioctl,
-	open:		pipe_write_open,
-	release:	pipe_write_release,
-	fasync:         pipe_write_fasync,
+	.llseek		= no_llseek,
+	.read		= bad_pipe_r,
+	.write		= pipe_write,
+	.poll		= pipe_poll,
+	.ioctl		= pipe_ioctl,
+	.open		= pipe_write_open,
+	.release	= pipe_write_release,
+	.fasync         = pipe_write_fasync,
 };
 
 struct file_operations rdwr_pipe_fops = {
-	llseek:		no_llseek,
-	read:		pipe_read,
-	write:		pipe_write,
-	poll:		pipe_poll,
-	ioctl:		pipe_ioctl,
-	open:		pipe_rdwr_open,
-	release:	pipe_rdwr_release,
-	fasync:         pipe_rdwr_fasync,
+	.llseek		= no_llseek,
+	.read		= pipe_read,
+	.write		= pipe_write,
+	.poll		= pipe_poll,
+	.ioctl		= pipe_ioctl,
+	.open		= pipe_rdwr_open,
+	.release	= pipe_rdwr_release,
+	.fasync         = pipe_rdwr_fasync,
 };
 
 struct inode* pipe_new(struct inode* inode)
@@ -541,7 +541,7 @@ static int pipefs_delete_dentry(struct dentry *dentry)
 	return 1;
 }
 static struct dentry_operations pipefs_dentry_operations = {
-	d_delete:	pipefs_delete_dentry,
+	.d_delete	= pipefs_delete_dentry,
 };
 
 static struct inode * get_pipe_inode(void)
@@ -672,9 +672,9 @@ static struct super_block *pipefs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type pipe_fs_type = {
-	name:		"pipefs",
-	get_sb:		pipefs_get_sb,
-	kill_sb:	kill_anon_super,
+	.name		= "pipefs",
+	.get_sb		= pipefs_get_sb,
+	.kill_sb	= kill_anon_super,
 };
 
 static int __init init_pipe_fs(void)

@@ -92,13 +92,13 @@ static void destroy_inodecache(void)
 
 static struct super_operations smb_sops =
 {
-	alloc_inode:	smb_alloc_inode,
-	destroy_inode:	smb_destroy_inode,
-	drop_inode:	generic_delete_inode,
-	delete_inode:	smb_delete_inode,
-	put_super:	smb_put_super,
-	statfs:		smb_statfs,
-	show_options:	smb_show_options,
+	.alloc_inode	= smb_alloc_inode,
+	.destroy_inode	= smb_destroy_inode,
+	.drop_inode	= generic_delete_inode,
+	.delete_inode	= smb_delete_inode,
+	.put_super	= smb_put_super,
+	.statfs		= smb_statfs,
+	.show_options	= smb_show_options,
 };
 
 
@@ -738,10 +738,10 @@ static struct super_block *smb_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type smb_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"smbfs",
-	get_sb:		smb_get_sb,
-	kill_sb:	kill_anon_super,
+	.owner		= THIS_MODULE,
+	.name		= "smbfs",
+	.get_sb		= smb_get_sb,
+	.kill_sb	= kill_anon_super,
 };
 
 static int __init init_smb_fs(void)
