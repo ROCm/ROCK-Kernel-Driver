@@ -76,13 +76,14 @@ cifs_open(struct inode *inode, struct file *file)
 	    	FreeXid(xid);
 		return rc;
 	    } else {
-		cERROR(1,("could not find file instance for new file %p ",file));
+		if(file->f_flags & O_EXCL)
+			cERROR(1,("could not find file instance for new file %p ",file));
 	    }
 	}
 
 	full_path = build_path_from_dentry(file->f_dentry);
 
-	cFYI(1, (" inode = 0x%p file flags are %x for %s", inode, file->f_flags,full_path));
+	cFYI(1, (" inode = 0x%p file flags are 0x%x for %s", inode, file->f_flags,full_path));
 	if ((file->f_flags & O_ACCMODE) == O_RDONLY)
 		desiredAccess = GENERIC_READ;
 	else if ((file->f_flags & O_ACCMODE) == O_WRONLY)

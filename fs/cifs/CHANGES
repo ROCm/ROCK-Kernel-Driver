@@ -1,6 +1,7 @@
 Version 0.89
 ------------
-Fix oops on write to dead tcp session.
+Fix oops on write to dead tcp session. Remove error log write for case when file open
+O_CREAT but not O_EXCL
 
 Version 0.88
 ------------
