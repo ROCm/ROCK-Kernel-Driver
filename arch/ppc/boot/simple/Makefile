@@ -76,6 +76,9 @@ zimageinitrd-$(CONFIG_OCOTEA)		:= zImage.initrd-TREE
          end-$(CONFIG_EV64260)		:= ev64260
    cacheflag-$(CONFIG_EV64260)		:= -include $(clear_L2_L3)
 
+     extra.o-$(CONFIG_CHESTNUT)		:= misc-chestnut.o
+         end-$(CONFIG_CHESTNUT)		:= chestnut
+
       zimage-$(CONFIG_GEMINI)		:= zImage-STRIPELF
 zimageinitrd-$(CONFIG_GEMINI)		:= zImage.initrd-STRIPELF
          end-$(CONFIG_GEMINI)		:= gemini

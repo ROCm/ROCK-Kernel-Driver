@@ -849,6 +849,8 @@
 #define	MV64x60_GPP_VALUE			0xf104
 #define	MV64x60_GPP_INTR_CAUSE			0xf108
 #define	MV64x60_GPP_INTR_MASK			0xf10c
+#define	MV64x60_GPP_VALUE_SET			0xf118
+#define	MV64x60_GPP_VALUE_CLR			0xf11c
 
 
 /*

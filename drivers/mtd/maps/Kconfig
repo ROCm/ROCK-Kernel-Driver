@@ -397,6 +397,14 @@ config MTD_REDWOOD
 	  Redwood board. If you have one of these boards and would like to
 	  use the flash chips on it, say 'Y'.
 
+config MTD_CHESTNUT
+	tristate "CFI Flash devices mapped on IBM 750FX or IBM 750GX Eval Boards"
+	depends on MTD_CFI && PPC32 && CHESTNUT
+	help
+	  This enables access routines for the flash chips on the IBM
+	  750FX and 750GX Eval Boards. If you have one of these boards and
+	  would like to use the flash chips on it, say 'Y'
+
 config MTD_CSTM_MIPS_IXX
 	tristate "Flash chip mapping on ITE QED-4N-S01B, Globespan IVR or custom board"
 	depends on MIPS && MTD_CFI && MTD_JEDECPROBE && MTD_PARTITIONS
