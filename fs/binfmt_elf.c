@@ -492,7 +492,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
   	struct exec interp_ex;
 	char passed_fileno[6];
 	struct files_struct *files;
-	int executable_stack = EXSTACK_DEFAULT;
+	int have_pt_gnu_stack, executable_stack = EXSTACK_DEFAULT;
 	unsigned long def_flags = 0;
 	
 	/* Get the exec-header */
@@ -627,10 +627,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 				executable_stack = EXSTACK_DISABLE_X;
 			break;
 		}
-#ifdef LEGACY_BINARIES
-	if (i == elf_ex.e_phnum)
-		current->personality |= READ_IMPLIES_EXEC;
-#endif
+	have_pt_gnu_stack = (i < elf_ex.e_phnum);
 
 	/* Some simple consistency checks for the interpreter */
 	if (elf_interpreter) {
@@ -703,6 +700,8 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	/* Do this immediately, since STACK_TOP as used in setup_arg_pages
 	   may depend on the personality.  */
 	SET_PERSONALITY(elf_ex, ibcs2_interpreter);
+	if (elf_read_implies_exec(elf_ex, have_pt_gnu_stack))
+		current->personality |= READ_IMPLIES_EXEC;
 
 	/* Do this so that we can load the interpreter, if need be.  We will
 	   change some of these later */
