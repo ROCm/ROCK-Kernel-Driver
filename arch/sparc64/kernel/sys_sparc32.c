@@ -1445,28 +1445,15 @@ asmlinkage int sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz
 
 asmlinkage int sys32_utimes(char *filename, struct compat_timeval *tvs)
 {
-	char *kfilename;
 	struct timeval ktvs[2];
-	mm_segment_t old_fs;
-	int ret;
 
-	kfilename = getname(filename);
-	ret = PTR_ERR(kfilename);
-	if (!IS_ERR(kfilename)) {
-		if (tvs) {
-			if (get_tv32(&ktvs[0], tvs) ||
-			    get_tv32(&ktvs[1], 1+tvs))
-				return -EFAULT;
-		}
-
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		ret = do_utimes(kfilename, (tvs ? &ktvs[0] : NULL));
-		set_fs(old_fs);
-
-		putname(kfilename);
+	if (tvs) {
+		if (get_tv32(&ktvs[0], tvs) ||
+		    get_tv32(&ktvs[1], 1+tvs))
+			return -EFAULT;
 	}
-	return ret;
+
+	return do_utimes(filename, (tvs ? &ktvs[0] : NULL));
 }
 
 /* These are here just in case some old sparc32 binary calls it. */
