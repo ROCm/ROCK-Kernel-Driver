@@ -38,9 +38,9 @@ EXPORT_SYMBOL(unblock_signals);
 /*
  * OK, we're invoking a handler
  */	
-static void handle_signal(struct pt_regs *regs, unsigned long signr,
-			  struct k_sigaction *ka, siginfo_t *info,
-			  sigset_t *oldset)
+static int handle_signal(struct pt_regs *regs, unsigned long signr,
+			 struct k_sigaction *ka, siginfo_t *info,
+			 sigset_t *oldset)
 {
 	unsigned long sp;
 	int err;
@@ -94,23 +94,25 @@ static void handle_signal(struct pt_regs *regs, unsigned long signr,
 		recalc_sigpending();
 		spin_unlock_irq(&current->sighand->siglock);
 	}
+
+	return err;
 }
 
 static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset)
 {
 	struct k_sigaction ka_copy;
 	siginfo_t info;
-	int sig;
+	int sig, handled_sig = 0;
 
-	sig = get_signal_to_deliver(&info, &ka_copy, regs, NULL);
-	if(sig > 0){
+	while((sig = get_signal_to_deliver(&info, &ka_copy, regs, NULL)) > 0){
+		handled_sig = 1;
 		/* Whee!  Actually deliver the signal.  */
-		handle_signal(regs, sig, &ka_copy, &info, oldset);
-		return(1);
+		if(!handle_signal(regs, sig, &ka_copy, &info, oldset))
+			break;
 	}
 
 	/* Did we come from a system call? */
-	if(PT_REGS_SYSCALL_NR(regs) >= 0){
+	if(!handled_sig && (PT_REGS_SYSCALL_NR(regs) >= 0)){
 		/* Restart the system call - no handlers present */
 		if(PT_REGS_SYSCALL_RET(regs) == -ERESTARTNOHAND ||
 		   PT_REGS_SYSCALL_RET(regs) == -ERESTARTSYS ||
@@ -134,7 +136,7 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset)
 	if(current->ptrace & PT_DTRACE)
 		current->thread.singlestep_syscall =
 			is_syscall(PT_REGS_IP(&current->thread.regs));
-	return(0);
+	return(handled_sig);
 }
 
 int do_signal(void)
