@@ -16,6 +16,7 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/tqueue.h>
+#include <linux/percpu.h>
 
 /*
    - No shared variables, all the data are CPU local.
@@ -145,42 +146,43 @@ void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
 
 
 /* Tasklets */
+struct tasklet_head
+{
+	struct tasklet_struct *list;
+};
 
-struct tasklet_head tasklet_vec[NR_CPUS] __cacheline_aligned_in_smp;
-struct tasklet_head tasklet_hi_vec[NR_CPUS] __cacheline_aligned_in_smp;
+static struct tasklet_head tasklet_vec __per_cpu_data;
+static struct tasklet_head tasklet_hi_vec __per_cpu_data;
 
 void __tasklet_schedule(struct tasklet_struct *t)
 {
-	int cpu = smp_processor_id();
 	unsigned long flags;
 
 	local_irq_save(flags);
-	t->next = tasklet_vec[cpu].list;
-	tasklet_vec[cpu].list = t;
-	cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
+	t->next = this_cpu(tasklet_vec).list;
+	this_cpu(tasklet_vec).list = t;
+	cpu_raise_softirq(smp_processor_id(), TASKLET_SOFTIRQ);
 	local_irq_restore(flags);
 }
 
 void __tasklet_hi_schedule(struct tasklet_struct *t)
 {
-	int cpu = smp_processor_id();
 	unsigned long flags;
 
 	local_irq_save(flags);
-	t->next = tasklet_hi_vec[cpu].list;
-	tasklet_hi_vec[cpu].list = t;
-	cpu_raise_softirq(cpu, HI_SOFTIRQ);
+	t->next = this_cpu(tasklet_hi_vec).list;
+	this_cpu(tasklet_hi_vec).list = t;
+	cpu_raise_softirq(smp_processor_id(), HI_SOFTIRQ);
 	local_irq_restore(flags);
 }
 
 static void tasklet_action(struct softirq_action *a)
 {
-	int cpu = smp_processor_id();
 	struct tasklet_struct *list;
 
 	local_irq_disable();
-	list = tasklet_vec[cpu].list;
-	tasklet_vec[cpu].list = NULL;
+	list = this_cpu(tasklet_vec).list;
+	this_cpu(tasklet_vec).list = NULL;
 	local_irq_enable();
 
 	while (list) {
@@ -200,21 +202,20 @@ static void tasklet_action(struct softirq_action *a)
 		}
 
 		local_irq_disable();
-		t->next = tasklet_vec[cpu].list;
-		tasklet_vec[cpu].list = t;
-		__cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
+		t->next = this_cpu(tasklet_vec).list;
+		this_cpu(tasklet_vec).list = t;
+		__cpu_raise_softirq(smp_processor_id(), TASKLET_SOFTIRQ);
 		local_irq_enable();
 	}
 }
 
 static void tasklet_hi_action(struct softirq_action *a)
 {
-	int cpu = smp_processor_id();
 	struct tasklet_struct *list;
 
 	local_irq_disable();
-	list = tasklet_hi_vec[cpu].list;
-	tasklet_hi_vec[cpu].list = NULL;
+	list = this_cpu(tasklet_hi_vec).list;
+	this_cpu(tasklet_hi_vec).list = NULL;
 	local_irq_enable();
 
 	while (list) {
@@ -234,9 +235,9 @@ static void tasklet_hi_action(struct softirq_action *a)
 		}
 
 		local_irq_disable();
-		t->next = tasklet_hi_vec[cpu].list;
-		tasklet_hi_vec[cpu].list = t;
-		__cpu_raise_softirq(cpu, HI_SOFTIRQ);
+		t->next = this_cpu(tasklet_hi_vec).list;
+		this_cpu(tasklet_hi_vec).list = t;
+		__cpu_raise_softirq(smp_processor_id(), HI_SOFTIRQ);
 		local_irq_enable();
 	}
 }
