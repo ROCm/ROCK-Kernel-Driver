@@ -203,7 +203,7 @@ scripts/docproc scripts/fixdep scripts/split-include : scripts ;
 
 .PHONY: scripts
 scripts:
-	+@$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts
 
 # Objects we will link into vmlinux / subdirs we need to visit
 # ---------------------------------------------------------------------------
@@ -435,7 +435,7 @@ include/config/MARKER: scripts/split-include include/linux/autoconf.h
 # 	with it and forgot to run make oldconfig
 
 include/linux/autoconf.h: .config
-	+@$(call descend,scripts/kconfig,scripts/kconfig/conf)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts/kconfig scripts/kconfig/conf
 	./scripts/kconfig/conf -s arch/$(ARCH)/Kconfig
 
 # Generate some files
@@ -639,13 +639,13 @@ ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 	make_with_config
 
 scripts/kconfig/conf scripts/kconfig/mconf scripts/kconfig/qconf: scripts/fixdep FORCE
-	+@$(call descend,scripts/kconfig,$@)
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts/kconfig $@
 
 xconfig: scripts/kconfig/qconf
 	./scripts/kconfig/qconf arch/$(ARCH)/Kconfig
 
 menuconfig: scripts/kconfig/mconf
-	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts lxdialog
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=scripts/lxdialog
 	./scripts/kconfig/mconf arch/$(ARCH)/Kconfig
 
 config: scripts/kconfig/conf
@@ -827,7 +827,7 @@ else # ifneq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 # ===========================================================================
 
 %:: FORCE
-	$(MAKE) $@
+	$(Q)$(MAKE) $@
 
 endif # ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 endif # ifdef include_config
@@ -888,6 +888,6 @@ endef
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target>
 
-descend = $(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
+descend =$(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
 
 FORCE:
