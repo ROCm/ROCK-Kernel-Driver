@@ -241,6 +241,9 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		struct backing_dev_info *bdi = mapping->backing_dev_info;
 		int really_sync;
 
+		if (bdi->memory_backed)
+			break;
+
 		if (wbc->nonblocking && bdi_write_congested(bdi)) {
 			wbc->encountered_congestion = 1;
 			if (sb != blockdev_superblock)
