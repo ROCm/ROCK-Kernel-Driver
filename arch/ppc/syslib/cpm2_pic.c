@@ -3,11 +3,11 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <asm/irq.h>
-#include <asm/immap_8260.h>
+#include <asm/immap_cpm2.h>
 #include <asm/mpc8260.h>
-#include "ppc8260_pic.h"
+#include "cpm2_pic.h"
 
-/* The 8260 internal interrupt controller.  It is usually
+/* The CPM2 internal interrupt controller.  It is usually
  * the only interrupt controller.
  * There are two 32-bit registers (high/low) for up to 64
  * possible interrupts.
@@ -40,7 +40,7 @@ static	u_char	irq_to_siubit[] = {
 	 7,  6,  5,  4,  3,  2,  1,  0
 };
 
-static void m8260_mask_irq(unsigned int irq_nr)
+static void cpm2_mask_irq(unsigned int irq_nr)
 {
 	int	bit, word;
 	volatile uint	*simr;
@@ -48,12 +48,12 @@ static void m8260_mask_irq(unsigned int irq_nr)
 	bit = irq_to_siubit[irq_nr];
 	word = irq_to_siureg[irq_nr];
 
-	simr = &(immr->im_intctl.ic_simrh);
+	simr = &(cpm2_immr->im_intctl.ic_simrh);
 	ppc_cached_irq_mask[word] &= ~(1 << (31 - bit));
 	simr[word] = ppc_cached_irq_mask[word];
 }
 
-static void m8260_unmask_irq(unsigned int irq_nr)
+static void cpm2_unmask_irq(unsigned int irq_nr)
 {
 	int	bit, word;
 	volatile uint	*simr;
@@ -61,12 +61,12 @@ static void m8260_unmask_irq(unsigned int irq_nr)
 	bit = irq_to_siubit[irq_nr];
 	word = irq_to_siureg[irq_nr];
 
-	simr = &(immr->im_intctl.ic_simrh);
+	simr = &(cpm2_immr->im_intctl.ic_simrh);
 	ppc_cached_irq_mask[word] |= (1 << (31 - bit));
 	simr[word] = ppc_cached_irq_mask[word];
 }
 
-static void m8260_mask_and_ack(unsigned int irq_nr)
+static void cpm2_mask_and_ack(unsigned int irq_nr)
 {
 	int	bit, word;
 	volatile uint	*simr, *sipnr;
@@ -74,14 +74,14 @@ static void m8260_mask_and_ack(unsigned int irq_nr)
 	bit = irq_to_siubit[irq_nr];
 	word = irq_to_siureg[irq_nr];
 
-	simr = &(immr->im_intctl.ic_simrh);
-	sipnr = &(immr->im_intctl.ic_sipnrh);
+	simr = &(cpm2_immr->im_intctl.ic_simrh);
+	sipnr = &(cpm2_immr->im_intctl.ic_sipnrh);
 	ppc_cached_irq_mask[word] &= ~(1 << (31 - bit));
 	simr[word] = ppc_cached_irq_mask[word];
 	sipnr[word] = 1 << (31 - bit);
 }
 
-static void m8260_end_irq(unsigned int irq_nr)
+static void cpm2_end_irq(unsigned int irq_nr)
 {
 	int	bit, word;
 	volatile uint	*simr;
@@ -92,33 +92,33 @@ static void m8260_end_irq(unsigned int irq_nr)
 		bit = irq_to_siubit[irq_nr];
 		word = irq_to_siureg[irq_nr];
 
-		simr = &(immr->im_intctl.ic_simrh);
+		simr = &(cpm2_immr->im_intctl.ic_simrh);
 		ppc_cached_irq_mask[word] |= (1 << (31 - bit));
 		simr[word] = ppc_cached_irq_mask[word];
 	}
 }
 
-struct hw_interrupt_type ppc8260_pic = {
-	" 8260 SIU  ",
+struct hw_interrupt_type cpm2_pic = {
+	" CPM2 SIU  ",
 	NULL,
 	NULL,
-	m8260_unmask_irq,
-	m8260_mask_irq,
-	m8260_mask_and_ack,
-	m8260_end_irq,
+	cpm2_unmask_irq,
+	cpm2_mask_irq,
+	cpm2_mask_and_ack,
+	cpm2_end_irq,
 	0
 };
 
 
 int
-m8260_get_irq(struct pt_regs *regs)
+cpm2_get_irq(struct pt_regs *regs)
 {
 	int irq;
         unsigned long bits;
 
-        /* For MPC8260, read the SIVEC register and shift the bits down
+        /* For CPM2, read the SIVEC register and shift the bits down
          * to get the irq number.         */
-        bits = immr->im_intctl.ic_sivec;
+        bits = cpm2_immr->im_intctl.ic_sivec;
         irq = bits >> 26;
 
 	if (irq == 0)

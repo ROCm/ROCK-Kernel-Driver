@@ -20,7 +20,7 @@
 #include <linux/config.h>
 #include <linux/mtd/partitions.h>
 
-#include <asm/immap_8260.h>
+#include <asm/immap_cpm2.h>
 
 static struct mtd_info *sbcmtd[3];
 static struct mtd_partition *sbcmtd_parts[3];
@@ -59,7 +59,7 @@ static const char *part_probes[] __initdata = {"cmdlinepart", "RedBoot", NULL};
 
 int __init init_sbc82xx_flash(void)
 {
-	volatile  memctl8260_t *mc = &immr->im_memctl;
+	volatile  memctl_cpm2_t *mc = &cpm2_immr->im_memctl;
 	int bigflash;
 	int i;
 

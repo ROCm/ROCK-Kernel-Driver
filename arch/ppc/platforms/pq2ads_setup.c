@@ -1,12 +1,12 @@
 /*
- * arch/ppc/platforms/tqm8260_setup.c
+ * arch/ppc/platforms/pq2ads_setup.c
  *
- * TQM8260 platform support
+ * PQ2ADS platform support
  *
- * Author: Allen Curtis <acurtis@onz.com>
- * Derived from: m8260_setup.c by Dan Malek, MVista
+ * Author: Kumar Gala <kumar.gala@freescale.com>
+ * Derived from: est8260_setup.c by Allen Curtis
  *
- * Copyright 2002 Ones and Zeros, Inc.
+ * Copyright 2004 Freescale Semiconductor, Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -17,7 +17,6 @@
 #include <linux/config.h>
 #include <linux/seq_file.h>
 
-#include <asm/immap_cpm2.h>
 #include <asm/mpc8260.h>
 #include <asm/machdep.h>
 
@@ -29,38 +28,27 @@ extern void m8260_init(unsigned long r3, unsigned long r4,
 	unsigned long r5, unsigned long r6, unsigned long r7);
 
 static int
-tqm8260_show_cpuinfo(struct seq_file *m)
+pq2ads_show_cpuinfo(struct seq_file *m)
 {
 	bd_t	*binfo = (bd_t *)__res;
 
-	seq_printf(m, "vendor\t\t: IN2 Systems\n"
-		      "machine\t\t: TQM8260 PowerPC\n"
-		      "mem size\t\t: 0x%08x\n"
+	seq_printf(m, "vendor\t\t: Motorola\n"
+		      "machine\t\t: PQ2 ADS PowerPC\n"
+		      "\n"
+		      "mem size\t\t: 0x%08lx\n"
+		      "console baud\t\t: %ld\n"
 		      "\n",
-		      binfo->bi_memsize);
+		      binfo->bi_memsize,
+		      binfo->bi_baudrate);
 	return 0;
 }
 
-static int
-tqm8260_set_rtc_time(unsigned long time)
-{
-	((cpm2_map_t *)CPM_MAP_ADDR)->im_sit.sit_tmcnt = time;
-	((cpm2_map_t *)CPM_MAP_ADDR)->im_sit.sit_tmcntsc = 0x3;
-
-	return(0);
-}
-
-static unsigned long
-tqm8260_get_rtc_time(void)
-{
-	return ((cpm2_map_t *)CPM_MAP_ADDR)->im_sit.sit_tmcnt;
-}
-
 static void __init
-tqm8260_setup_arch(void)
+pq2ads_setup_arch(void)
 {
-	printk("IN2 Systems TQM8260 port\n");
+	printk("PQ2 ADS Port\n");
 	callback_setup_arch();
+        *(volatile uint *)(BCSR_ADDR + 4) &= ~BCSR1_RS232_EN2;
 }
 
 void __init
@@ -71,9 +59,8 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	m8260_init(r3, r4, r5, r6, r7);
 
 	/* Anything special for this platform */
-	ppc_md.show_cpuinfo	= tqm8260_show_cpuinfo;
-	ppc_md.set_rtc_time	= tqm8260_set_rtc_time;
-	ppc_md.get_rtc_time	= tqm8260_get_rtc_time;
+	ppc_md.show_cpuinfo	= pq2ads_show_cpuinfo;
 
 	callback_setup_arch	= ppc_md.setup_arch;
-	ppc_md.setup_arch	= tqm8260_setup_arch;
+	ppc_md.setup_arch	= pq2ads_setup_arch;
+}
