@@ -16,3 +16,4 @@ $(obj)/vsyscall.so: $(src)/vsyscall.lds $(obj)/vsyscall.o
 clean-files += vsyscall.so
 
 AFLAGS_vsyscall.o = -m32
+CFLAGS_ia32_ioctl.o += -Ifs/
