@@ -113,7 +113,7 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.product_name = "UA-100",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_COMPOSITE,
-		.data = & (const snd_usb_audio_quirk_t[]) {
+		.data = (const snd_usb_audio_quirk_t[]) {
 			{
 				.ifnum = 0,
 				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
@@ -274,7 +274,7 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.product_name = "SC-D70",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_COMPOSITE,
-		.data = & (const snd_usb_audio_quirk_t[]) {
+		.data = (const snd_usb_audio_quirk_t[]) {
 			{
 				.ifnum = 0,
 				.type = QUIRK_AUDIO_FIXED_ENDPOINT,
@@ -338,7 +338,7 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.product_name = "UA-5",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_COMPOSITE,
-		.data = & (const snd_usb_audio_quirk_t[]) {
+		.data = (const snd_usb_audio_quirk_t[]) {
 			{
 				.ifnum = 1,
 				.type = QUIRK_AUDIO_STANDARD_INTERFACE
@@ -443,7 +443,7 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.product_name = "UA-20",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_COMPOSITE,
-		.data = & (const snd_usb_audio_quirk_t[]) {
+		.data = (const snd_usb_audio_quirk_t[]) {
 			{
 				.ifnum = 1,
 				.type = QUIRK_AUDIO_STANDARD_INTERFACE
@@ -629,7 +629,7 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.product_name = "UA-3FX",
 		.ifnum = QUIRK_ANY_INTERFACE,
 		.type = QUIRK_COMPOSITE,
-		.data = & (const snd_usb_audio_quirk_t[]) {
+		.data = (const snd_usb_audio_quirk_t[]) {
 			{
 				.ifnum = 1,
 				.type = QUIRK_AUDIO_STANDARD_INTERFACE
