@@ -1814,10 +1814,9 @@ init_imstt(struct fb_info_imstt *p)
 		return;
 	}
 
-	i = GET_FB_IDX(p->info.node);
 	tmp = (in_le32(&p->dc_regs[SSTATUS]) & 0x0f00) >> 8;
 	printk("fb%u: %s frame buffer; %uMB vram; chip version %u\n",
-		i, p->fix.id, p->total_vram >> 20, tmp);
+		minor(p->info.node), p->fix.id, p->total_vram >> 20, tmp);
 }
 
 static int __devinit

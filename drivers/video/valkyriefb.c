@@ -471,7 +471,7 @@ static void __init init_valkyrie(struct fb_info_valkyrie *p)
 		return;
 	}
 	
-	printk(KERN_INFO "fb%d: valkyrie frame buffer device\n", GET_FB_IDX(p->info.node));	
+	printk(KERN_INFO "fb%d: valkyrie frame buffer device\n", minor(p->info.node));	
 }
 
 static void valkyrie_set_par(const struct fb_par_valkyrie *par,
