@@ -292,7 +292,7 @@ static struct miscdevice amdtco_miscdev =
 
 static struct pci_device_id amdtco_pci_tbl[] __initdata = {
 	/* AMD 766 PCI_IDs here */
-	{ 0x1022, 0x7443, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_OPUS_7443, PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0, }
 };
 
