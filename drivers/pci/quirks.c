@@ -301,7 +301,8 @@ static void __devinit quirk_vt82c686_acpi(struct pci_dev *dev)
 
 
 #ifdef CONFIG_X86_IO_APIC 
-extern int nr_ioapics;
+
+#include <asm/io_apic.h>
 
 /*
  * VIA 686A/B: If an IO-APIC is active, we need to route all on-chip
