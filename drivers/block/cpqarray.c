@@ -918,7 +918,7 @@ DBGPX(	printk("Submitting %d sectors in %d segments\n", creq->nr_sectors, seg); 
 	goto queue_next;
 
 startio:
-	blk_stop_queue(q);
+	__blk_stop_queue(q);
 	start_io(h);
 }
 
