@@ -34,6 +34,8 @@ obj-$(CONFIG_MODULES)		+= module.o
 obj-y				+= topology.o
 obj-y				+= intel_cacheinfo.o
 
+CFLAGS_vsyscall.o		:= $(PROFILING) -g0
+
 bootflag-y			+= ../../i386/kernel/bootflag.o
 cpuid-$(subst m,y,$(CONFIG_X86_CPUID))  += ../../i386/kernel/cpuid.o
 topology-y                     += ../../i386/mach-default/topology.o
