@@ -56,6 +56,7 @@ static int acpi_pm_prepare(u32 pm_state)
 			(acpi_physical_address) acpi_wakeup_address);
 	}
 	ACPI_FLUSH_CPU_CACHE();
+	acpi_enable_wakeup_device_prep(acpi_state);
 	acpi_enter_sleep_state_prep(acpi_state);
 	return 0;
 }
@@ -87,6 +88,7 @@ static int acpi_pm_enter(u32 pm_state)
 
 
 	local_irq_save(flags);
+	acpi_enable_wakeup_device(acpi_state);
 	switch (pm_state)
 	{
 	case PM_SUSPEND_STANDBY:
@@ -136,6 +138,7 @@ static int acpi_pm_finish(u32 pm_state)
 	u32 acpi_state = acpi_suspend_states[pm_state];
 
 	acpi_leave_sleep_state(acpi_state);
+	acpi_disable_wakeup_device(acpi_state);
 
 	/* reset firmware waking vector */
 	acpi_set_firmware_waking_vector((acpi_physical_address) 0);
