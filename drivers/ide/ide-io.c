@@ -928,13 +928,10 @@ queue_next:
 		 * 
 		 * We let requests forced at head of queue with ide-preempt
 		 * though. I hope that doesn't happen too much, hopefully not
-		 * unless the subdriver triggers such a thing in it's own PM
+		 * unless the subdriver triggers such a thing in its own PM
 		 * state machine.
 		 */
 		if (drive->blocked && !blk_pm_request(rq) && !(rq->flags & REQ_PREEMPT)) {
-#ifdef DEBUG_PM
-			printk("%s: a request made it's way while we are power managing...\n", drive->name);
-#endif
 			/* We clear busy, there should be no pending ATA command at this point. */
 			hwgroup->busy = 0;
 			break;
@@ -1417,8 +1414,9 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	}
 
 	spin_lock_irqsave(&ide_lock, flags);
-	if (action == ide_preempt || action == ide_head_wait) {
+	if (action == ide_preempt)
 		hwgroup->rq = NULL;
+	if (action == ide_preempt || action == ide_head_wait) {
 		where = ELEVATOR_INSERT_FRONT;
 		rq->flags |= REQ_PREEMPT;
 	}
