@@ -177,6 +177,8 @@ static void __init fixrange_init (unsigned long start, unsigned long end, pgd_t 
 	}
 }
 
+unsigned long __PAGE_KERNEL = _PAGE_KERNEL;
+
 static void __init pagetable_init (void)
 {
 	unsigned long vaddr, end;
@@ -196,6 +198,14 @@ static void __init pagetable_init (void)
 	for (i = 0; i < PTRS_PER_PGD; i++)
 		set_pgd(pgd_base + i, __pgd(1 + __pa(empty_zero_page)));
 #endif
+	if (cpu_has_pse) {
+		set_in_cr4(X86_CR4_PSE);
+	}
+	if (cpu_has_pge) {
+		set_in_cr4(X86_CR4_PGE);
+		__PAGE_KERNEL |= _PAGE_GLOBAL;
+	}
+
 	i = __pgd_offset(PAGE_OFFSET);
 	pgd = pgd_base + i;
 
@@ -216,17 +226,7 @@ static void __init pagetable_init (void)
 			if (end && (vaddr >= end))
 				break;
 			if (cpu_has_pse) {
-				unsigned long __pe;
-
-				set_in_cr4(X86_CR4_PSE);
-				boot_cpu_data.wp_works_ok = 1;
-				__pe = _KERNPG_TABLE + _PAGE_PSE + __pa(vaddr);
-				/* Make it "global" too if supported */
-				if (cpu_has_pge) {
-					set_in_cr4(X86_CR4_PGE);
-					__pe += _PAGE_GLOBAL;
-				}
-				set_pmd(pmd, __pmd(__pe));
+				set_pmd(pmd, pfn_pmd(__pa(vaddr) >> PAGE_SHIFT, PAGE_KERNEL_LARGE));
 				continue;
 			}
 
@@ -358,13 +358,16 @@ static int do_test_wp_bit(unsigned long vaddr);
 
 void __init test_wp_bit(void)
 {
-/*
- * Ok, all PSE-capable CPUs are definitely handling the WP bit right.
- */
 	const unsigned long vaddr = PAGE_OFFSET;
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte, old_pte;
+
+	if (cpu_has_pse) {
+		/* Ok, all PSE-capable CPUs are definitely handling the WP bit right. */
+		boot_cpu_data.wp_works_ok = 1;
+		return;
+	}
 
 	printk("Checking if this processor honours the WP bit even in supervisor mode... ");
 
