@@ -1292,6 +1292,8 @@ extern struct dentry *simple_lookup(struct inode *, struct dentry *);
 extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
 extern struct file_operations simple_dir_operations;
 extern struct inode_operations simple_dir_inode_operations;
+struct tree_descr { char *name; struct file_operations *ops; int mode; };
+extern int simple_fill_super(struct super_block *, int, struct tree_descr *);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 extern unsigned int real_root_dev;

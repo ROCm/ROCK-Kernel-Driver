@@ -48,7 +48,6 @@ enum {
 	NFSD_List,
 	NFSD_Fh,
 	NFSD_Threads,
-	NFSD_END
 };
 
 /*
@@ -202,22 +201,6 @@ static struct file_operations exports_operations = {
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= exports_release,
-};
-
-/*
- *	Description of fs contents.
- */
-static struct { char *name; struct file_operations *ops; int mode; } files[] = {
-	[NFSD_Svc] = {".svc", &transaction_ops, S_IWUSR},
-	[NFSD_Add] = {".add", &transaction_ops, S_IWUSR},
-	[NFSD_Del] = {".del", &transaction_ops, S_IWUSR},
-	[NFSD_Export] = {".export", &transaction_ops, S_IWUSR},
-	[NFSD_Unexport] = {".unexport", &transaction_ops, S_IWUSR},
-	[NFSD_Getfd] = {".getfd", &transaction_ops, S_IWUSR|S_IRUSR},
-	[NFSD_Getfs] = {".getfs", &transaction_ops, S_IWUSR|S_IRUSR},
-	[NFSD_List] = {"exports", &exports_operations, S_IRUGO},
-	[NFSD_Fh] = {"filehandle", &transaction_ops, S_IWUSR|S_IRUSR},
-	[NFSD_Threads] = {"threads", &transaction_ops, S_IWUSR|S_IRUSR},
 };
 
 /*----------------------------------------------------------------------------*/
@@ -431,64 +414,22 @@ static ssize_t write_threads(struct file *file, char *buf, size_t size)
  *	populating the filesystem.
  */
 
-static struct super_operations s_ops = {
-	.statfs		= simple_statfs,
-};
-
 static int nfsd_fill_super(struct super_block * sb, void * data, int silent)
 {
-	struct inode *inode;
-	struct dentry *root;
-	struct dentry *dentry;
-	int i;
-
-	sb->s_blocksize = PAGE_CACHE_SIZE;
-	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
-	sb->s_magic = 0x6e667364;
-	sb->s_op = &s_ops;
-
-	inode = new_inode(sb);
-	if (!inode)
-		return -ENOMEM;
-	inode->i_mode = S_IFDIR | 0755;
-	inode->i_uid = inode->i_gid = 0;
-	inode->i_blksize = PAGE_CACHE_SIZE;
-	inode->i_blocks = 0;
-	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-	inode->i_op = &simple_dir_inode_operations;
-	inode->i_fop = &simple_dir_operations;
-	root = d_alloc_root(inode);
-	if (!root) {
-		iput(inode);
-		return -ENOMEM;
-	}
-	for (i = NFSD_Svc; i < NFSD_END; i++) {
-		struct qstr name;
-		name.name = files[i].name;
-		name.len = strlen(name.name);
-		name.hash = full_name_hash(name.name, name.len);
-		dentry = d_alloc(root, &name);
-		if (!dentry)
-			goto out;
-		inode = new_inode(sb);
-		if (!inode)
-			goto out;
-		inode->i_mode = S_IFREG | files[i].mode;
-		inode->i_uid = inode->i_gid = 0;
-		inode->i_blksize = PAGE_CACHE_SIZE;
-		inode->i_blocks = 0;
-		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-		inode->i_fop = files[i].ops;
-		inode->i_ino = i;
-		d_add(dentry, inode);
-	}
-	sb->s_root = root;
-	return 0;
-
-out:
-	d_genocide(root);
-	dput(root);
-	return -ENOMEM;
+	static struct tree_descr nfsd_files[] = {
+		[NFSD_Svc] = {".svc", &transaction_ops, S_IWUSR},
+		[NFSD_Add] = {".add", &transaction_ops, S_IWUSR},
+		[NFSD_Del] = {".del", &transaction_ops, S_IWUSR},
+		[NFSD_Export] = {".export", &transaction_ops, S_IWUSR},
+		[NFSD_Unexport] = {".unexport", &transaction_ops, S_IWUSR},
+		[NFSD_Getfd] = {".getfd", &transaction_ops, S_IWUSR|S_IRUSR},
+		[NFSD_Getfs] = {".getfs", &transaction_ops, S_IWUSR|S_IRUSR},
+		[NFSD_List] = {"exports", &exports_operations, S_IRUGO},
+		[NFSD_Fh] = {"filehandle", &transaction_ops, S_IWUSR|S_IRUSR},
+		[NFSD_Threads] = {"threads", &transaction_ops, S_IWUSR|S_IRUSR},
+		/* last one */ {""}
+	};
+	return simple_fill_super(sb, 0x6e667364, nfsd_files);
 }
 
 static struct super_block *nfsd_get_sb(struct file_system_type *fs_type,

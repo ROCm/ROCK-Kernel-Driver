@@ -630,64 +630,20 @@ static struct file_operations bm_status_operations = {
 
 static struct super_operations s_ops = {
 	.statfs		= simple_statfs,
-	.drop_inode	= generic_delete_inode,
 	.clear_inode	= bm_clear_inode,
 };
 
 static int bm_fill_super(struct super_block * sb, void * data, int silent)
 {
-	struct qstr names[2] = {{.name = "status"}, {.name = "register"}};
-	struct inode * inode;
-	struct dentry * dentry[3];
-	int i;
-
-	for (i=0; i<sizeof(names)/sizeof(names[0]); i++) {
-		names[i].len = strlen(names[i].name);
-		names[i].hash = full_name_hash(names[i].name, names[i].len);
-	}
-
-	sb->s_blocksize = PAGE_CACHE_SIZE;
-	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
-	sb->s_magic = 0x42494e4d;
-	sb->s_op = &s_ops;
-
-	inode = bm_get_inode(sb, S_IFDIR | 0755);
-	if (!inode)
-		return -ENOMEM;
-	inode->i_op = &simple_dir_inode_operations;
-	inode->i_fop = &simple_dir_operations;
-	dentry[0] = d_alloc_root(inode);
-	if (!dentry[0]) {
-		iput(inode);
-		return -ENOMEM;
-	}
-	dentry[1] = d_alloc(dentry[0], &names[0]);
-	if (!dentry[1])
-		goto out1;
-	dentry[2] = d_alloc(dentry[0], &names[1]);
-	if (!dentry[2])
-		goto out2;
-	inode = bm_get_inode(sb, S_IFREG | 0644);
-	if (!inode)
-		goto out3;
-	inode->i_fop = &bm_status_operations;
-	d_add(dentry[1], inode);
-	inode = bm_get_inode(sb, S_IFREG | 0400);
-	if (!inode)
-		goto out3;
-	inode->i_fop = &bm_register_operations;
-	d_add(dentry[2], inode);
-
-	sb->s_root = dentry[0];
-	return 0;
-
-out3:
-	dput(dentry[2]);
-out2:
-	dput(dentry[1]);
-out1:
-	dput(dentry[0]);
-	return -ENOMEM;
+	static struct tree_descr bm_files[] = {
+		[1] = {"status", &bm_status_operations, S_IWUSR|S_IRUGO},
+		[2] = {"register", &bm_register_operations, S_IWUSR},
+		/* last one */ {""}
+	};
+	int err = simple_fill_super(sb, 0x42494e4d, bm_files);
+	if (!err)
+		sb->s_op = &s_ops;
+	return err;
 }
 
 static struct super_block *bm_get_sb(struct file_system_type *fs_type,
