@@ -474,7 +474,8 @@ e1000_init_hw(struct e1000_hw *hw)
     DEBUGFUNC("e1000_init_hw");
 
     /* Initialize Identification LED */
-    if((ret_val = e1000_id_led_init(hw))) {
+    ret_val = e1000_id_led_init(hw);
+    if(ret_val) {
         DEBUGOUT("Error Initializing Identification LED\n");
         return ret_val;
     }
@@ -595,16 +596,16 @@ e1000_adjust_serdes_amplitude(struct e1000_hw *hw)
         return E1000_SUCCESS;
     }
 
-    if ((ret_val = e1000_read_eeprom(hw, EEPROM_SERDES_AMPLITUDE, 1,
-                                     &eeprom_data))) {
+    ret_val = e1000_read_eeprom(hw, EEPROM_SERDES_AMPLITUDE, 1, &eeprom_data);
+    if (ret_val) {
         return ret_val;
     }
 
     if(eeprom_data != EEPROM_RESERVED_WORD) {
         /* Adjust SERDES output amplitude only. */
         eeprom_data &= EEPROM_SERDES_AMPLITUDE_MASK; 
-        if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_EXT_CTRL,
-                                          eeprom_data)))
+        ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_EXT_CTRL, eeprom_data);
+        if(ret_val)
             return ret_val;
     }
 
@@ -753,14 +754,16 @@ e1000_setup_fiber_serdes_link(struct e1000_hw *hw)
     if(hw->media_type == e1000_media_type_fiber)
         signal = (hw->mac_type > e1000_82544) ? E1000_CTRL_SWDPIN1 : 0;
 
-    if((ret_val = e1000_adjust_serdes_amplitude(hw)))
+    ret_val = e1000_adjust_serdes_amplitude(hw);
+    if(ret_val)
         return ret_val;
 
     /* Take the link out of reset */
     ctrl &= ~(E1000_CTRL_LRST);
 
     /* Adjust VCO speed to improve BER performance */
-    if((ret_val = e1000_set_vco_speed(hw)))
+    ret_val = e1000_set_vco_speed(hw);
+    if(ret_val)
         return ret_val;
 
     e1000_config_collision_dist(hw);
@@ -847,7 +850,8 @@ e1000_setup_fiber_serdes_link(struct e1000_hw *hw)
              * we detect a signal. This will allow us to communicate with
              * non-autonegotiating link partners.
              */
-            if((ret_val = e1000_check_for_link(hw))) {
+            ret_val = e1000_check_for_link(hw);
+            if(ret_val) {
                 DEBUGOUT("Error while checking for link\n");
                 return ret_val;
             }
@@ -894,7 +898,8 @@ e1000_setup_copper_link(struct e1000_hw *hw)
     }
 
     /* Make sure we have a valid PHY */
-    if((ret_val = e1000_detect_gig_phy(hw))) {
+    ret_val = e1000_detect_gig_phy(hw);
+    if(ret_val) {
         DEBUGOUT("Error, did not detect valid phy.\n");
         return ret_val;
     }
@@ -913,7 +918,8 @@ e1000_setup_copper_link(struct e1000_hw *hw)
     if(!hw->phy_reset_disable) {
         if (hw->phy_type == e1000_phy_igp) {
 
-            if((ret_val = e1000_phy_reset(hw))) {
+            ret_val = e1000_phy_reset(hw);
+            if(ret_val) {
                 DEBUGOUT("Error Resetting the PHY\n");
                 return ret_val;
             }
@@ -928,14 +934,16 @@ e1000_setup_copper_link(struct e1000_hw *hw)
             E1000_WRITE_REG(hw, LEDCTL, led_ctrl);
 
             /* disable lplu d3 during driver init */
-            if((ret_val = e1000_set_d3_lplu_state(hw, FALSE))) {
+            ret_val = e1000_set_d3_lplu_state(hw, FALSE);
+            if(ret_val) {
                 DEBUGOUT("Error Disabling LPLU D3\n");
                 return ret_val;
             }
 
             /* Configure mdi-mdix settings */
-            if((ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_CTRL,
-                                             &phy_data)))
+            ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_CTRL,
+                                         &phy_data);
+            if(ret_val)
                 return ret_val;
 
             if((hw->mac_type == e1000_82541) || (hw->mac_type == e1000_82547)) {
@@ -962,8 +970,9 @@ e1000_setup_copper_link(struct e1000_hw *hw)
                     break;
                 }
             }
-            if((ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_PORT_CTRL,
-                                              phy_data)))
+            ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_PORT_CTRL,
+                                          phy_data);
+            if(ret_val)
                 return ret_val;
 
             /* set auto-master slave resolution settings */
@@ -981,27 +990,28 @@ e1000_setup_copper_link(struct e1000_hw *hw)
                  * resolution as hardware default. */
                 if(hw->autoneg_advertised == ADVERTISE_1000_FULL) {
                     /* Disable SmartSpeed */
-                    if((ret_val = e1000_read_phy_reg(hw,
-                                                    IGP01E1000_PHY_PORT_CONFIG,
-                                                    &phy_data)))
+                    ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG,
+                                                 &phy_data);
+                    if(ret_val)
                         return ret_val;
                     phy_data &= ~IGP01E1000_PSCFR_SMART_SPEED;
-                    if((ret_val = e1000_write_phy_reg(hw,
-                                                     IGP01E1000_PHY_PORT_CONFIG,
-                                                     phy_data)))
+                    ret_val = e1000_write_phy_reg(hw,
+                                                  IGP01E1000_PHY_PORT_CONFIG,
+                                                  phy_data);
+                    if(ret_val)
                         return ret_val;
                     /* Set auto Master/Slave resolution process */
-                    if((ret_val = e1000_read_phy_reg(hw, PHY_1000T_CTRL,
-                                                     &phy_data)))
+                    ret_val = e1000_read_phy_reg(hw, PHY_1000T_CTRL, &phy_data);
+                    if(ret_val)
                         return ret_val;
                     phy_data &= ~CR_1000T_MS_ENABLE;
-                    if((ret_val = e1000_write_phy_reg(hw, PHY_1000T_CTRL,
-                                                      phy_data)))
+                    ret_val = e1000_write_phy_reg(hw, PHY_1000T_CTRL, phy_data);
+                    if(ret_val)
                         return ret_val;
                 }
 
-                if((ret_val = e1000_read_phy_reg(hw, PHY_1000T_CTRL,
-                                                 &phy_data)))
+                ret_val = e1000_read_phy_reg(hw, PHY_1000T_CTRL, &phy_data);
+                if(ret_val)
                     return ret_val;
 
                 /* load defaults for future use */
@@ -1024,14 +1034,15 @@ e1000_setup_copper_link(struct e1000_hw *hw)
                 default:
                     break;
                 }
-                if((ret_val = e1000_write_phy_reg(hw, PHY_1000T_CTRL,
-                                                  phy_data)))
+                ret_val = e1000_write_phy_reg(hw, PHY_1000T_CTRL, phy_data);
+                if(ret_val)
                     return ret_val;
             }
         } else {
             /* Enable CRS on TX. This must be set for half-duplex operation. */
-            if((ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL,
-                                             &phy_data)))
+            ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL,
+                                         &phy_data);
+            if(ret_val)
                 return ret_val;
 
             phy_data |= M88E1000_PSCR_ASSERT_CRS_ON_TX;
@@ -1070,15 +1081,17 @@ e1000_setup_copper_link(struct e1000_hw *hw)
             phy_data &= ~M88E1000_PSCR_POLARITY_REVERSAL;
             if(hw->disable_polarity_correction == 1)
                 phy_data |= M88E1000_PSCR_POLARITY_REVERSAL;
-            if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL,
-                                              phy_data)))
+            ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL,
+                                          phy_data);
+            if(ret_val)
                 return ret_val;
 
             /* Force TX_CLK in the Extended PHY Specific Control Register
              * to 25MHz clock.
              */
-            if((ret_val = e1000_read_phy_reg(hw, M88E1000_EXT_PHY_SPEC_CTRL,
-                                             &phy_data)))
+            ret_val = e1000_read_phy_reg(hw, M88E1000_EXT_PHY_SPEC_CTRL,
+                                         &phy_data);
+            if(ret_val)
                 return ret_val;
 
             phy_data |= M88E1000_EPSCR_TX_CLK_25;
@@ -1089,14 +1102,15 @@ e1000_setup_copper_link(struct e1000_hw *hw)
                               M88E1000_EPSCR_SLAVE_DOWNSHIFT_MASK);
                 phy_data |= (M88E1000_EPSCR_MASTER_DOWNSHIFT_1X |
                              M88E1000_EPSCR_SLAVE_DOWNSHIFT_1X);
-                if((ret_val = e1000_write_phy_reg(hw,
-                                                  M88E1000_EXT_PHY_SPEC_CTRL,
-                                                  phy_data)))
+                ret_val = e1000_write_phy_reg(hw, M88E1000_EXT_PHY_SPEC_CTRL,
+                                              phy_data);
+                if(ret_val)
                     return ret_val;
             }
 
             /* SW Reset the PHY so all changes take effect */
-            if((ret_val = e1000_phy_reset(hw))) {
+            ret_val = e1000_phy_reset(hw);
+            if(ret_val) {
                 DEBUGOUT("Error Resetting the PHY\n");
                 return ret_val;
             }
@@ -1130,7 +1144,8 @@ e1000_setup_copper_link(struct e1000_hw *hw)
                 hw->autoneg_advertised = AUTONEG_ADVERTISE_SPEED_DEFAULT;
 
             DEBUGOUT("Reconfiguring auto-neg advertisement params\n");
-            if((ret_val = e1000_phy_setup_autoneg(hw))) {
+            ret_val = e1000_phy_setup_autoneg(hw);
+            if(ret_val) {
                 DEBUGOUT("Error Setting up Auto-Negotiation\n");
                 return ret_val;
             }
@@ -1139,18 +1154,21 @@ e1000_setup_copper_link(struct e1000_hw *hw)
             /* Restart auto-negotiation by setting the Auto Neg Enable bit and
              * the Auto Neg Restart bit in the PHY control register.
              */
-            if((ret_val = e1000_read_phy_reg(hw, PHY_CTRL, &phy_data)))
+            ret_val = e1000_read_phy_reg(hw, PHY_CTRL, &phy_data);
+            if(ret_val)
                 return ret_val;
 
             phy_data |= (MII_CR_AUTO_NEG_EN | MII_CR_RESTART_AUTO_NEG);
-            if((ret_val = e1000_write_phy_reg(hw, PHY_CTRL, phy_data)))
+            ret_val = e1000_write_phy_reg(hw, PHY_CTRL, phy_data);
+            if(ret_val)
                 return ret_val;
 
             /* Does the user want to wait for Auto-Neg to complete here, or
              * check at a later time (for example, callback routine).
              */
             if(hw->wait_autoneg_complete) {
-                if((ret_val = e1000_wait_autoneg(hw))) {
+                ret_val = e1000_wait_autoneg(hw);
+                if(ret_val) {
                     DEBUGOUT("Error while waiting for autoneg to complete\n");
                     return ret_val;
                 }
@@ -1158,7 +1176,8 @@ e1000_setup_copper_link(struct e1000_hw *hw)
             hw->get_link_status = TRUE;
         } else {
             DEBUGOUT("Forcing speed and duplex\n");
-            if((ret_val = e1000_phy_force_speed_duplex(hw))) {
+            ret_val = e1000_phy_force_speed_duplex(hw);
+            if(ret_val) {
                 DEBUGOUT("Error Forcing Speed and Duplex\n");
                 return ret_val;
             }
@@ -1169,9 +1188,11 @@ e1000_setup_copper_link(struct e1000_hw *hw)
      * valid.
      */
     for(i = 0; i < 10; i++) {
-        if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data);
+        if(ret_val)
             return ret_val;
-        if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data);
+        if(ret_val)
             return ret_val;
 
         if(phy_data & MII_SR_LINK_STATUS) {
@@ -1186,19 +1207,22 @@ e1000_setup_copper_link(struct e1000_hw *hw)
             if(hw->mac_type >= e1000_82544) {
                 e1000_config_collision_dist(hw);
             } else {
-                if((ret_val = e1000_config_mac_to_phy(hw))) {
+                ret_val = e1000_config_mac_to_phy(hw);
+                if(ret_val) {
                     DEBUGOUT("Error configuring MAC to PHY settings\n");
                     return ret_val;
                 }
             }
-            if((ret_val = e1000_config_fc_after_link_up(hw))) {
+            ret_val = e1000_config_fc_after_link_up(hw);
+            if(ret_val) {
                 DEBUGOUT("Error Configuring Flow Control\n");
                 return ret_val;
             }
             DEBUGOUT("Valid link established!!!\n");
 
             if(hw->phy_type == e1000_phy_igp) {
-                if((ret_val = e1000_config_dsp_after_link_change(hw, TRUE))) {
+                ret_val = e1000_config_dsp_after_link_change(hw, TRUE);
+                if(ret_val) {
                     DEBUGOUT("Error Configuring DSP after link up\n");
                     return ret_val;
                 }
@@ -1228,12 +1252,13 @@ e1000_phy_setup_autoneg(struct e1000_hw *hw)
     DEBUGFUNC("e1000_phy_setup_autoneg");
 
     /* Read the MII Auto-Neg Advertisement Register (Address 4). */
-    if((ret_val = e1000_read_phy_reg(hw, PHY_AUTONEG_ADV,
-                                     &mii_autoneg_adv_reg)))
+    ret_val = e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &mii_autoneg_adv_reg);
+    if(ret_val)
         return ret_val;
 
     /* Read the MII 1000Base-T Control Register (Address 9). */
-    if((ret_val = e1000_read_phy_reg(hw, PHY_1000T_CTRL, &mii_1000t_ctrl_reg)))
+    ret_val = e1000_read_phy_reg(hw, PHY_1000T_CTRL, &mii_1000t_ctrl_reg);
+    if(ret_val)
         return ret_val;
 
     /* Need to parse both autoneg_advertised and fc and set up
@@ -1340,13 +1365,14 @@ e1000_phy_setup_autoneg(struct e1000_hw *hw)
         return -E1000_ERR_CONFIG;
     }
 
-    if((ret_val = e1000_write_phy_reg(hw, PHY_AUTONEG_ADV,
-                                      mii_autoneg_adv_reg)))
+    ret_val = e1000_write_phy_reg(hw, PHY_AUTONEG_ADV, mii_autoneg_adv_reg);
+    if(ret_val)
         return ret_val;
 
     DEBUGOUT1("Auto-Neg Advertising %x\n", mii_autoneg_adv_reg);
 
-    if((ret_val = e1000_write_phy_reg(hw, PHY_1000T_CTRL, mii_1000t_ctrl_reg)))
+    ret_val = e1000_write_phy_reg(hw, PHY_1000T_CTRL, mii_1000t_ctrl_reg);
+    if(ret_val)
         return ret_val;
 
     return E1000_SUCCESS;
@@ -1385,7 +1411,8 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
     ctrl &= ~E1000_CTRL_ASDE;
 
     /* Read the MII Control Register. */
-    if((ret_val = e1000_read_phy_reg(hw, PHY_CTRL, &mii_ctrl_reg)))
+    ret_val = e1000_read_phy_reg(hw, PHY_CTRL, &mii_ctrl_reg);
+    if(ret_val)
         return ret_val;
 
     /* We need to disable autoneg in order to force link and duplex. */
@@ -1432,16 +1459,16 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
     E1000_WRITE_REG(hw, CTRL, ctrl);
 
     if (hw->phy_type == e1000_phy_m88) {
-        if((ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, &phy_data);
+        if(ret_val)
             return ret_val;
 
         /* Clear Auto-Crossover to force MDI manually. M88E1000 requires MDI
          * forced whenever speed are duplex are forced.
          */
         phy_data &= ~M88E1000_PSCR_AUTO_X_MODE;
-        if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL,
-                                          phy_data)))
+        ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, phy_data);
+        if(ret_val)
             return ret_val;
 
         DEBUGOUT1("M88E1000 PSCR: %x \n", phy_data);
@@ -1452,20 +1479,21 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
         /* Clear Auto-Crossover to force MDI manually.  IGP requires MDI
          * forced whenever speed or duplex are forced.
          */
-        if((ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_CTRL,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_CTRL, &phy_data);
+        if(ret_val)
             return ret_val;
 
         phy_data &= ~IGP01E1000_PSCR_AUTO_MDIX;
         phy_data &= ~IGP01E1000_PSCR_FORCE_MDI_MDIX;
 
-        if((ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_PORT_CTRL,
-                                          phy_data)))
+        ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_PORT_CTRL, phy_data);
+        if(ret_val)
             return ret_val;
     }
 
     /* Write back the modified PHY MII control register. */
-    if((ret_val = e1000_write_phy_reg(hw, PHY_CTRL, mii_ctrl_reg)))
+    ret_val = e1000_write_phy_reg(hw, PHY_CTRL, mii_ctrl_reg);
+    if(ret_val)
         return ret_val;
 
     udelay(1);
@@ -1487,10 +1515,12 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
             /* Read the MII Status Register and wait for Auto-Neg Complete bit
              * to be set.
              */
-            if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg)))
+            ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg);
+            if(ret_val)
                 return ret_val;
 
-            if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg)))
+            ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg);
+            if(ret_val)
                 return ret_val;
 
             if(mii_status_reg & MII_SR_LINK_STATUS) break;
@@ -1498,7 +1528,8 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
         }
         if((i == 0) && (hw->phy_type == e1000_phy_m88)) {
             /* We didn't get link.  Reset the DSP and wait again for link. */
-            if((ret_val = e1000_phy_reset_dsp(hw))) {
+            ret_val = e1000_phy_reset_dsp(hw);
+            if(ret_val) {
                 DEBUGOUT("Error Resetting PHY DSP\n");
                 return ret_val;
             }
@@ -1510,10 +1541,12 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
             /* Read the MII Status Register and wait for Auto-Neg Complete bit
              * to be set.
              */
-            if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg)))
+            ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg);
+            if(ret_val)
                 return ret_val;
 
-            if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg)))
+            ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg);
+            if(ret_val)
                 return ret_val;
         }
     }
@@ -1523,25 +1556,25 @@ e1000_phy_force_speed_duplex(struct e1000_hw *hw)
          * Extended PHY Specific Control Register to 25MHz clock.  This value
          * defaults back to a 2.5MHz clock when the PHY is reset.
          */
-        if((ret_val = e1000_read_phy_reg(hw, M88E1000_EXT_PHY_SPEC_CTRL,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, M88E1000_EXT_PHY_SPEC_CTRL, &phy_data);
+        if(ret_val)
             return ret_val;
 
         phy_data |= M88E1000_EPSCR_TX_CLK_25;
-        if((ret_val = e1000_write_phy_reg(hw, M88E1000_EXT_PHY_SPEC_CTRL,
-                                          phy_data)))
+        ret_val = e1000_write_phy_reg(hw, M88E1000_EXT_PHY_SPEC_CTRL, phy_data);
+        if(ret_val)
             return ret_val;
 
         /* In addition, because of the s/w reset above, we need to enable CRS on
          * TX.  This must be set for both full and half duplex operation.
          */
-        if((ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, &phy_data);
+        if(ret_val)
             return ret_val;
 
         phy_data |= M88E1000_PSCR_ASSERT_CRS_ON_TX;
-        if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL,
-                                          phy_data)))
+        ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, phy_data);
+        if(ret_val)
             return ret_val;
     }
     return E1000_SUCCESS;
@@ -1600,8 +1633,9 @@ e1000_config_mac_to_phy(struct e1000_hw *hw)
      * registers depending on negotiated values.
      */
     if (hw->phy_type == e1000_phy_igp) {
-        if((ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_STATUS,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_STATUS,
+                                     &phy_data);
+        if(ret_val)
             return ret_val;
 
         if(phy_data & IGP01E1000_PSSR_FULL_DUPLEX) ctrl |= E1000_CTRL_FD;
@@ -1619,8 +1653,9 @@ e1000_config_mac_to_phy(struct e1000_hw *hw)
                 IGP01E1000_PSSR_SPEED_100MBPS)
             ctrl |= E1000_CTRL_SPD_100;
     } else {
-        if((ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_STATUS,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_STATUS,
+                                     &phy_data);
+        if(ret_val)
             return ret_val;
 
         if(phy_data & M88E1000_PSSR_DPLX) ctrl |= E1000_CTRL_FD;
@@ -1738,7 +1773,8 @@ e1000_config_fc_after_link_up(struct e1000_hw *hw)
     if(((hw->media_type == e1000_media_type_fiber) && (hw->autoneg_failed)) ||
        ((hw->media_type == e1000_media_type_internal_serdes) && (hw->autoneg_failed)) ||
        ((hw->media_type == e1000_media_type_copper) && (!hw->autoneg))) {
-        if((ret_val = e1000_force_mac_fc(hw))) {
+        ret_val = e1000_force_mac_fc(hw);
+        if(ret_val) {
             DEBUGOUT("Error forcing flow control settings\n");
             return ret_val;
         }
@@ -1754,9 +1790,11 @@ e1000_config_fc_after_link_up(struct e1000_hw *hw)
          * has completed.  We read this twice because this reg has
          * some "sticky" (latched) bits.
          */
-        if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg)))
+        ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg);
+        if(ret_val)
             return ret_val;
-        if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg)))
+        ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &mii_status_reg);
+        if(ret_val)
             return ret_val;
 
         if(mii_status_reg & MII_SR_AUTONEG_COMPLETE) {
@@ -1766,11 +1804,13 @@ e1000_config_fc_after_link_up(struct e1000_hw *hw)
              * Register (Address 5) to determine how flow control was
              * negotiated.
              */
-            if((ret_val = e1000_read_phy_reg(hw, PHY_AUTONEG_ADV,
-                                             &mii_nway_adv_reg)))
+            ret_val = e1000_read_phy_reg(hw, PHY_AUTONEG_ADV,
+                                         &mii_nway_adv_reg);
+            if(ret_val)
                 return ret_val;
-            if((ret_val = e1000_read_phy_reg(hw, PHY_LP_ABILITY,
-                                             &mii_nway_lp_ability_reg)))
+            ret_val = e1000_read_phy_reg(hw, PHY_LP_ABILITY,
+                                         &mii_nway_lp_ability_reg);
+            if(ret_val)
                 return ret_val;
 
             /* Two bits in the Auto Negotiation Advertisement Register
@@ -1887,7 +1927,8 @@ e1000_config_fc_after_link_up(struct e1000_hw *hw)
              * negotiated to HALF DUPLEX, flow control should not be
              * enabled per IEEE 802.3 spec.
              */
-            if((ret_val = e1000_get_speed_and_duplex(hw, &speed, &duplex))) {
+            ret_val = e1000_get_speed_and_duplex(hw, &speed, &duplex);
+            if(ret_val) {
                 DEBUGOUT("Error getting link speed and duplex\n");
                 return ret_val;
             }
@@ -1898,7 +1939,8 @@ e1000_config_fc_after_link_up(struct e1000_hw *hw)
             /* Now we call a subroutine to actually force the MAC
              * controller to use the correct flow control settings.
              */
-            if((ret_val = e1000_force_mac_fc(hw))) {
+            ret_val = e1000_force_mac_fc(hw);
+            if(ret_val) {
                 DEBUGOUT("Error forcing flow control settings\n");
                 return ret_val;
             }
@@ -1952,9 +1994,11 @@ e1000_check_for_link(struct e1000_hw *hw)
          * of the PHY.
          * Read the register twice since the link bit is sticky.
          */
-        if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data);
+        if(ret_val)
             return ret_val;
-        if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data);
+        if(ret_val)
             return ret_val;
 
         if(phy_data & MII_SR_LINK_STATUS) {
@@ -1988,7 +2032,8 @@ e1000_check_for_link(struct e1000_hw *hw)
         if(hw->mac_type >= e1000_82544)
             e1000_config_collision_dist(hw);
         else {
-            if((ret_val = e1000_config_mac_to_phy(hw))) {
+            ret_val = e1000_config_mac_to_phy(hw);
+            if(ret_val) {
                 DEBUGOUT("Error configuring MAC to PHY settings\n");
                 return ret_val;
             }
@@ -1998,7 +2043,8 @@ e1000_check_for_link(struct e1000_hw *hw)
          * need to restore the desired flow control settings because we may
          * have had to re-autoneg with a different link partner.
          */
-        if((ret_val = e1000_config_fc_after_link_up(hw))) {
+        ret_val = e1000_config_fc_after_link_up(hw);
+        if(ret_val) {
             DEBUGOUT("Error configuring flow control\n");
             return ret_val;
         }
@@ -2066,7 +2112,8 @@ e1000_check_for_link(struct e1000_hw *hw)
         E1000_WRITE_REG(hw, CTRL, ctrl);
 
         /* Configure Flow Control after forcing link up. */
-        if((ret_val = e1000_config_fc_after_link_up(hw))) {
+        ret_val = e1000_config_fc_after_link_up(hw);
+        if(ret_val) {
             DEBUGOUT("Error configuring flow control\n");
             return ret_val;
         }
@@ -2159,13 +2206,15 @@ e1000_get_speed_and_duplex(struct e1000_hw *hw,
      * match the duplex in the link partner's capabilities.
      */
     if(hw->phy_type == e1000_phy_igp && hw->speed_downgraded) {
-        if((ret_val = e1000_read_phy_reg(hw, PHY_AUTONEG_EXP, &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, PHY_AUTONEG_EXP, &phy_data);
+        if(ret_val)
             return ret_val;
 
         if(!(phy_data & NWAY_ER_LP_NWAY_CAPS))
             *duplex = HALF_DUPLEX;
         else {
-            if((ret_val == e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_data)))
+            ret_val = e1000_read_phy_reg(hw, PHY_LP_ABILITY, &phy_data);
+            if(ret_val)
                 return ret_val;
             if((*speed == SPEED_100 && !(phy_data & NWAY_LPAR_100TX_FD_CAPS)) ||
                (*speed == SPEED_10 && !(phy_data & NWAY_LPAR_10T_FD_CAPS)))
@@ -2196,9 +2245,11 @@ e1000_wait_autoneg(struct e1000_hw *hw)
         /* Read the MII Status Register and wait for Auto-Neg
          * Complete bit to be set.
          */
-        if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data);
+        if(ret_val)
             return ret_val;
-        if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data);
+        if(ret_val)
             return ret_val;
         if(phy_data & MII_SR_AUTONEG_COMPLETE) {
             return E1000_SUCCESS;
@@ -2363,8 +2414,9 @@ e1000_read_phy_reg(struct e1000_hw *hw,
 
     if(hw->phy_type == e1000_phy_igp &&
        (reg_addr > MAX_PHY_MULTI_PAGE_REG)) {
-        if((ret_val = e1000_write_phy_reg_ex(hw, IGP01E1000_PHY_PAGE_SELECT,
-                                             (uint16_t)reg_addr)))
+        ret_val = e1000_write_phy_reg_ex(hw, IGP01E1000_PHY_PAGE_SELECT,
+                                         (uint16_t)reg_addr);
+        if(ret_val)
             return ret_val;
     }
 
@@ -2466,8 +2518,9 @@ e1000_write_phy_reg(struct e1000_hw *hw,
 
     if(hw->phy_type == e1000_phy_igp &&
        (reg_addr > MAX_PHY_MULTI_PAGE_REG)) {
-        if((ret_val = e1000_write_phy_reg_ex(hw, IGP01E1000_PHY_PAGE_SELECT,
-                                             (uint16_t)reg_addr)))
+        ret_val = e1000_write_phy_reg_ex(hw, IGP01E1000_PHY_PAGE_SELECT,
+                                         (uint16_t)reg_addr);
+        if(ret_val)
             return ret_val;
     }
 
@@ -2606,11 +2659,13 @@ e1000_phy_reset(struct e1000_hw *hw)
     DEBUGFUNC("e1000_phy_reset");
 
     if(hw->mac_type != e1000_82541_rev_2) {
-        if((ret_val = e1000_read_phy_reg(hw, PHY_CTRL, &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, PHY_CTRL, &phy_data);
+        if(ret_val)
             return ret_val;
 
         phy_data |= MII_CR_RESET;
-        if((ret_val = e1000_write_phy_reg(hw, PHY_CTRL, phy_data)))
+        ret_val = e1000_write_phy_reg(hw, PHY_CTRL, phy_data);
+        if(ret_val)
             return ret_val;
 
         udelay(1);
@@ -2637,12 +2692,14 @@ e1000_detect_gig_phy(struct e1000_hw *hw)
     DEBUGFUNC("e1000_detect_gig_phy");
 
     /* Read the PHY ID Registers to identify which PHY is onboard. */
-    if((ret_val = e1000_read_phy_reg(hw, PHY_ID1, &phy_id_high)))
+    ret_val = e1000_read_phy_reg(hw, PHY_ID1, &phy_id_high);
+    if(ret_val)
         return ret_val;
 
     hw->phy_id = (uint32_t) (phy_id_high << 16);
     udelay(20);
-    if((ret_val = e1000_read_phy_reg(hw, PHY_ID2, &phy_id_low)))
+    ret_val = e1000_read_phy_reg(hw, PHY_ID2, &phy_id_low);
+    if(ret_val)
         return ret_val;
 
     hw->phy_id |= (uint32_t) (phy_id_low & PHY_REVISION_MASK);
@@ -2694,9 +2751,12 @@ e1000_phy_reset_dsp(struct e1000_hw *hw)
     DEBUGFUNC("e1000_phy_reset_dsp");
 
     do {
-        if((ret_val = e1000_write_phy_reg(hw, 29, 0x001d))) break;
-        if((ret_val = e1000_write_phy_reg(hw, 30, 0x00c1))) break;
-        if((ret_val = e1000_write_phy_reg(hw, 30, 0x0000))) break;
+        ret_val = e1000_write_phy_reg(hw, 29, 0x001d);
+        if(ret_val) break;
+        ret_val = e1000_write_phy_reg(hw, 30, 0x00c1);
+        if(ret_val) break;
+        ret_val = e1000_write_phy_reg(hw, 30, 0x0000);
+        if(ret_val) break;
         ret_val = E1000_SUCCESS;
     } while(0);
 
@@ -2729,13 +2789,14 @@ e1000_phy_igp_get_info(struct e1000_hw *hw,
     phy_info->polarity_correction = e1000_polarity_reversal_enabled;
 
     /* Check polarity status */
-    if((ret_val = e1000_check_polarity(hw, &polarity)))
+    ret_val = e1000_check_polarity(hw, &polarity);
+    if(ret_val)
         return ret_val;
 
     phy_info->cable_polarity = polarity;
 
-    if((ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_STATUS,
-                                     &phy_data)))
+    ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_STATUS, &phy_data);
+    if(ret_val)
         return ret_val;
 
     phy_info->mdix_mode = (phy_data & IGP01E1000_PSSR_MDIX) >>
@@ -2744,7 +2805,8 @@ e1000_phy_igp_get_info(struct e1000_hw *hw,
     if((phy_data & IGP01E1000_PSSR_SPEED_MASK) ==
        IGP01E1000_PSSR_SPEED_1000MBPS) {
         /* Local/Remote Receiver Information are only valid at 1000 Mbps */
-        if((ret_val = e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_data);
+        if(ret_val)
             return ret_val;
 
         phy_info->local_rx = (phy_data & SR_1000T_LOCAL_RX_STATUS) >>
@@ -2753,7 +2815,8 @@ e1000_phy_igp_get_info(struct e1000_hw *hw,
                               SR_1000T_REMOTE_RX_STATUS_SHIFT;
 
         /* Get cable length */
-        if((ret_val = e1000_get_cable_length(hw, &min_length, &max_length)))
+        ret_val = e1000_get_cable_length(hw, &min_length, &max_length);
+        if(ret_val)
             return ret_val;
 
         /* transalte to old method */
@@ -2793,7 +2856,8 @@ e1000_phy_m88_get_info(struct e1000_hw *hw,
      * and it stored in the hw->speed_downgraded parameter. */
     phy_info->downshift = hw->speed_downgraded;
 
-    if((ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, &phy_data)))
+    ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, &phy_data);
+    if(ret_val)
         return ret_val;
 
     phy_info->extended_10bt_distance =
@@ -2804,12 +2868,14 @@ e1000_phy_m88_get_info(struct e1000_hw *hw,
         M88E1000_PSCR_POLARITY_REVERSAL_SHIFT;
 
     /* Check polarity status */
-    if((ret_val = e1000_check_polarity(hw, &polarity)))
+    ret_val = e1000_check_polarity(hw, &polarity);
+    if(ret_val)
         return ret_val;
 
     phy_info->cable_polarity = polarity;
 
-    if((ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_STATUS, &phy_data)))
+    ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_STATUS, &phy_data);
+    if(ret_val)
         return ret_val;
 
     phy_info->mdix_mode = (phy_data & M88E1000_PSSR_MDIX) >>
@@ -2822,7 +2888,8 @@ e1000_phy_m88_get_info(struct e1000_hw *hw,
         phy_info->cable_length = ((phy_data & M88E1000_PSSR_CABLE_LENGTH) >>
                                   M88E1000_PSSR_CABLE_LENGTH_SHIFT);
 
-        if((ret_val = e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_data);
+        if(ret_val)
             return ret_val;
 
         phy_info->local_rx = (phy_data & SR_1000T_LOCAL_RX_STATUS) >>
@@ -2864,10 +2931,12 @@ e1000_phy_get_info(struct e1000_hw *hw,
         return -E1000_ERR_CONFIG;
     }
 
-    if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data)))
+    ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data);
+    if(ret_val)
         return ret_val;
 
-    if((ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data)))
+    ret_val = e1000_read_phy_reg(hw, PHY_STATUS, &phy_data);
+    if(ret_val)
         return ret_val;
 
     if((phy_data & MII_SR_LINK_STATUS) != MII_SR_LINK_STATUS) {
@@ -4099,12 +4168,14 @@ e1000_setup_led(struct e1000_hw *hw)
     case e1000_82541_rev_2:
     case e1000_82547_rev_2:
         /* Turn off PHY Smart Power Down (if enabled) */
-        if((ret_val = e1000_read_phy_reg(hw, IGP01E1000_GMII_FIFO,
-                                         &hw->phy_spd_default)))
+        ret_val = e1000_read_phy_reg(hw, IGP01E1000_GMII_FIFO,
+                                     &hw->phy_spd_default);
+        if(ret_val)
             return ret_val;
-        if((ret_val = e1000_write_phy_reg(hw, IGP01E1000_GMII_FIFO,
-                                          (uint16_t)(hw->phy_spd_default &
-                                          ~IGP01E1000_GMII_SPD))))
+        ret_val = e1000_write_phy_reg(hw, IGP01E1000_GMII_FIFO,
+                                      (uint16_t)(hw->phy_spd_default &
+                                      ~IGP01E1000_GMII_SPD));
+        if(ret_val)
             return ret_val;
         /* Fall Through */
     default:
@@ -4151,8 +4222,9 @@ e1000_cleanup_led(struct e1000_hw *hw)
     case e1000_82541_rev_2:
     case e1000_82547_rev_2:
         /* Turn on PHY Smart Power Down (if previously enabled) */
-        if((ret_val = e1000_write_phy_reg(hw, IGP01E1000_GMII_FIFO,
-                                          hw->phy_spd_default)))
+        ret_val = e1000_write_phy_reg(hw, IGP01E1000_GMII_FIFO,
+                                      hw->phy_spd_default);
+        if(ret_val)
             return ret_val;
         /* Fall Through */
     default:
@@ -4599,8 +4671,9 @@ e1000_get_cable_length(struct e1000_hw *hw,
 
     /* Use old method for Phy older than IGP */
     if(hw->phy_type == e1000_phy_m88) {
-        if((ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_STATUS,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_STATUS,
+                                     &phy_data);
+        if(ret_val)
             return ret_val;
 
         /* Convert the enum value to ranged values */
@@ -4639,7 +4712,8 @@ e1000_get_cable_length(struct e1000_hw *hw,
         /* Read the AGC registers for all channels */
         for(i = 0; i < IGP01E1000_PHY_CHANNEL_NUM; i++) {
 
-            if((ret_val = e1000_read_phy_reg(hw, agc_reg_array[i], &phy_data)))
+            ret_val = e1000_read_phy_reg(hw, agc_reg_array[i], &phy_data);
+            if(ret_val)
                 return ret_val;
 
             cur_agc = phy_data >> IGP01E1000_AGC_LENGTH_SHIFT;
@@ -4706,15 +4780,17 @@ e1000_check_polarity(struct e1000_hw *hw,
 
     if(hw->phy_type == e1000_phy_m88) {
         /* return the Polarity bit in the Status register. */
-        if((ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_STATUS,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_STATUS,
+                                     &phy_data);
+        if(ret_val)
             return ret_val;
         *polarity = (phy_data & M88E1000_PSSR_REV_POLARITY) >>
                     M88E1000_PSSR_REV_POLARITY_SHIFT;
     } else if(hw->phy_type == e1000_phy_igp) {
         /* Read the Status register to check the speed */
-        if((ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_STATUS,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_STATUS,
+                                     &phy_data);
+        if(ret_val)
             return ret_val;
 
         /* If speed is 1000 Mbps, must read the IGP01E1000_PHY_PCS_INIT_REG to
@@ -4723,8 +4799,9 @@ e1000_check_polarity(struct e1000_hw *hw,
            IGP01E1000_PSSR_SPEED_1000MBPS) {
 
             /* Read the GIG initialization PCS register (0x00B4) */
-            if((ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PCS_INIT_REG,
-                                             &phy_data)))
+            ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PCS_INIT_REG,
+                                         &phy_data);
+            if(ret_val)
                 return ret_val;
 
             /* Check the polarity bits */
@@ -4762,15 +4839,17 @@ e1000_check_downshift(struct e1000_hw *hw)
     DEBUGFUNC("e1000_check_downshift");
 
     if(hw->phy_type == e1000_phy_igp) {
-        if((ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_LINK_HEALTH,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_LINK_HEALTH,
+                                     &phy_data);
+        if(ret_val)
             return ret_val;
 
         hw->speed_downgraded = (phy_data & IGP01E1000_PLHR_SS_DOWNGRADE) ? 1 : 0;
     }
     else if(hw->phy_type == e1000_phy_m88) {
-        if((ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_STATUS,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_STATUS,
+                                     &phy_data);
+        if(ret_val)
             return ret_val;
 
         hw->speed_downgraded = (phy_data & M88E1000_PSSR_DOWNSHIFT) >>
@@ -4810,7 +4889,8 @@ e1000_config_dsp_after_link_change(struct e1000_hw *hw,
         return E1000_SUCCESS;
 
     if(link_up) {
-        if((ret_val = e1000_get_speed_and_duplex(hw, &speed, &duplex))) {
+        ret_val = e1000_get_speed_and_duplex(hw, &speed, &duplex);
+        if(ret_val) {
             DEBUGOUT("Error getting link speed and duplex\n");
             return ret_val;
         }
@@ -4823,14 +4903,16 @@ e1000_config_dsp_after_link_change(struct e1000_hw *hw,
                 min_length >= e1000_igp_cable_length_50) {
 
                 for(i = 0; i < IGP01E1000_PHY_CHANNEL_NUM; i++) {
-                    if((ret_val = e1000_read_phy_reg(hw, dsp_reg_array[i],
-                                                     &phy_data)))
+                    ret_val = e1000_read_phy_reg(hw, dsp_reg_array[i],
+                                                 &phy_data);
+                    if(ret_val)
                         return ret_val;
 
                     phy_data &= ~IGP01E1000_PHY_EDAC_MU_INDEX;
 
-                    if((ret_val = e1000_write_phy_reg(hw, dsp_reg_array[i],
-                                                      phy_data)))
+                    ret_val = e1000_write_phy_reg(hw, dsp_reg_array[i],
+                                                  phy_data);
+                    if(ret_val)
                         return ret_val;
                 }
                 hw->dsp_config_state = e1000_dsp_config_activated;
@@ -4843,23 +4925,26 @@ e1000_config_dsp_after_link_change(struct e1000_hw *hw,
                 uint32_t idle_errs = 0;
 
                 /* clear previous idle error counts */
-                if((ret_val = e1000_read_phy_reg(hw, PHY_1000T_STATUS,
-                                                 &phy_data)))
+                ret_val = e1000_read_phy_reg(hw, PHY_1000T_STATUS,
+                                             &phy_data);
+                if(ret_val)
                     return ret_val;
 
                 for(i = 0; i < ffe_idle_err_timeout; i++) {
                     udelay(1000);
-                    if((ret_val = e1000_read_phy_reg(hw, PHY_1000T_STATUS,
-                                                     &phy_data)))
+                    ret_val = e1000_read_phy_reg(hw, PHY_1000T_STATUS,
+                                                 &phy_data);
+                    if(ret_val)
                         return ret_val;
 
                     idle_errs += (phy_data & SR_1000T_IDLE_ERROR_CNT);
                     if(idle_errs > SR_1000T_PHY_EXCESSIVE_IDLE_ERR_COUNT) {
                         hw->ffe_config_state = e1000_ffe_config_active;
 
-                        if((ret_val = e1000_write_phy_reg(hw,
+                        ret_val = e1000_write_phy_reg(hw,
                                     IGP01E1000_PHY_DSP_FFE,
-                                    IGP01E1000_PHY_DSP_FFE_CM_CP)))
+                                    IGP01E1000_PHY_DSP_FFE_CM_CP);
+                        if(ret_val)
                             return ret_val;
                         break;
                     }
@@ -4871,41 +4956,46 @@ e1000_config_dsp_after_link_change(struct e1000_hw *hw,
         }
     } else {
         if(hw->dsp_config_state == e1000_dsp_config_activated) {
-            if((ret_val = e1000_write_phy_reg(hw, 0x0000,
-                IGP01E1000_IEEE_FORCE_GIGA)))
+            ret_val = e1000_write_phy_reg(hw, 0x0000,
+                                          IGP01E1000_IEEE_FORCE_GIGA);
+            if(ret_val)
                 return ret_val;
             for(i = 0; i < IGP01E1000_PHY_CHANNEL_NUM; i++) {
-                if((ret_val = e1000_read_phy_reg(hw, dsp_reg_array[i],
-                                                 &phy_data)))
+                ret_val = e1000_read_phy_reg(hw, dsp_reg_array[i], &phy_data);
+                if(ret_val)
                     return ret_val;
 
                 phy_data &= ~IGP01E1000_PHY_EDAC_MU_INDEX;
                 phy_data |=  IGP01E1000_PHY_EDAC_SIGN_EXT_9_BITS;
 
-                if((ret_val = e1000_write_phy_reg(hw,dsp_reg_array[i],
-                                                  phy_data)))
+                ret_val = e1000_write_phy_reg(hw,dsp_reg_array[i], phy_data);
+                if(ret_val)
                     return ret_val;
             }
 
-            if((ret_val = e1000_write_phy_reg(hw, 0x0000,
-                                              IGP01E1000_IEEE_RESTART_AUTONEG)))
+            ret_val = e1000_write_phy_reg(hw, 0x0000,
+                                          IGP01E1000_IEEE_RESTART_AUTONEG);
+            if(ret_val)
                 return ret_val;
 
             hw->dsp_config_state = e1000_dsp_config_enabled;
         }
 
         if(hw->ffe_config_state == e1000_ffe_config_active) {
-            if((ret_val = e1000_write_phy_reg(hw, 0x0000,
-                                              IGP01E1000_IEEE_FORCE_GIGA)))
+            ret_val = e1000_write_phy_reg(hw, 0x0000,
+                                          IGP01E1000_IEEE_FORCE_GIGA);
+            if(ret_val)
                 return ret_val;
-            if((ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_DSP_FFE,
-                                              IGP01E1000_PHY_DSP_FFE_DEFAULT)))
+            ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_DSP_FFE,
+                                          IGP01E1000_PHY_DSP_FFE_DEFAULT);
+            if(ret_val)
                 return ret_val;
 
-            if((ret_val = e1000_write_phy_reg(hw, 0x0000,
-                                              IGP01E1000_IEEE_RESTART_AUTONEG)))
+            ret_val = e1000_write_phy_reg(hw, 0x0000,
+                                          IGP01E1000_IEEE_RESTART_AUTONEG);
+            if(ret_val)
                 return ret_val;
-        hw->ffe_config_state = e1000_ffe_config_enabled;
+            hw->ffe_config_state = e1000_ffe_config_enabled;
         }
     }
     return E1000_SUCCESS;
@@ -4979,25 +5069,27 @@ e1000_set_d3_lplu_state(struct e1000_hw *hw,
     /* During driver activity LPLU should not be used or it will attain link
      * from the lowest speeds starting from 10Mbps. The capability is used for
      * Dx transitions and states */
-    if((ret_val = e1000_read_phy_reg(hw, IGP01E1000_GMII_FIFO, &phy_data)))
+    ret_val = e1000_read_phy_reg(hw, IGP01E1000_GMII_FIFO, &phy_data);
+    if(ret_val)
         return ret_val;
 
     if(!active) {
         phy_data &= ~IGP01E1000_GMII_FLEX_SPD;
-        if((ret_val = e1000_write_phy_reg(hw, IGP01E1000_GMII_FIFO, phy_data)))
+        ret_val = e1000_write_phy_reg(hw, IGP01E1000_GMII_FIFO, phy_data);
+        if(ret_val)
             return ret_val;
 
         /* LPLU and SmartSpeed are mutually exclusive.  LPLU is used during
          * Dx states where the power conservation is most important.  During
          * driver activity we should enable SmartSpeed, so performance is
          * maintained. */
-        if((ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG, &phy_data);
+        if(ret_val)
             return ret_val;
 
         phy_data |= IGP01E1000_PSCFR_SMART_SPEED;
-        if((ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG,
-                                          phy_data)))
+        ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG, phy_data);
+        if(ret_val)
             return ret_val;
 
     } else if((hw->autoneg_advertised == AUTONEG_ADVERTISE_SPEED_DEFAULT) ||
@@ -5005,17 +5097,18 @@ e1000_set_d3_lplu_state(struct e1000_hw *hw,
               (hw->autoneg_advertised == AUTONEG_ADVERTISE_10_100_ALL)) {
 
         phy_data |= IGP01E1000_GMII_FLEX_SPD;
-        if((ret_val = e1000_write_phy_reg(hw, IGP01E1000_GMII_FIFO, phy_data)))
+        ret_val = e1000_write_phy_reg(hw, IGP01E1000_GMII_FIFO, phy_data);
+        if(ret_val)
             return ret_val;
 
         /* When LPLU is enabled we should disable SmartSpeed */
-        if((ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG,
-                                         &phy_data)))
+        ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG, &phy_data);
+        if(ret_val)
             return ret_val;
 
         phy_data &= ~IGP01E1000_PSCFR_SMART_SPEED;
-        if((ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG,
-                                          phy_data)))
+        ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG, phy_data);
+        if(ret_val)
             return ret_val;
 
     }
@@ -5046,34 +5139,40 @@ e1000_set_vco_speed(struct e1000_hw *hw)
 
     /* Set PHY register 30, page 5, bit 8 to 0 */
 
-    if((ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_PAGE_SELECT,
-                                     &default_page)))
+    ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_PAGE_SELECT, &default_page);
+    if(ret_val)
         return ret_val;
 
-    if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0005)))
+    ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0005);
+    if(ret_val)
         return ret_val;
 
-    if((ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_GEN_CONTROL, &phy_data)))
+    ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_GEN_CONTROL, &phy_data);
+    if(ret_val)
         return ret_val;
 
     phy_data &= ~M88E1000_PHY_VCO_REG_BIT8;
-    if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_GEN_CONTROL, phy_data)))
+    ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_GEN_CONTROL, phy_data);
+    if(ret_val)
         return ret_val;
 
     /* Set PHY register 30, page 4, bit 11 to 1 */
 
-    if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0004)))
+    ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0004);
+    if(ret_val)
         return ret_val;
 
-    if((ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_GEN_CONTROL, &phy_data)))
+    ret_val = e1000_read_phy_reg(hw, M88E1000_PHY_GEN_CONTROL, &phy_data);
+    if(ret_val)
         return ret_val;
 
     phy_data |= M88E1000_PHY_VCO_REG_BIT11;
-    if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_GEN_CONTROL, phy_data)))
+    ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_GEN_CONTROL, phy_data);
+    if(ret_val)
         return ret_val;
 
-    if((ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT,
-                                      default_page)))
+    ret_val = e1000_write_phy_reg(hw, M88E1000_PHY_PAGE_SELECT, default_page);
+    if(ret_val)
         return ret_val;
 
     return E1000_SUCCESS;
