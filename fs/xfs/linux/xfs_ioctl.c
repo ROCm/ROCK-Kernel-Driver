@@ -517,7 +517,7 @@ xfs_attrmulti_by_handle(
 		return -error;
 
 	size = am_hreq.opcount * sizeof(attr_multiop_t);
-	ops = (xfs_attr_multiop_t *)kmalloc(size, GFP_KERNEL | __GFP_NO_COMP);
+	ops = (xfs_attr_multiop_t *)kmalloc(size, GFP_KERNEL);
 	if (!ops) {
 		VN_RELE(vp);
 		return -XFS_ERROR(ENOMEM);
