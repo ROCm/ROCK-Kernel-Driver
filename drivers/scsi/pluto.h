@@ -55,7 +55,6 @@ int pluto_slave_attach(Scsi_Device *);
 	sg_tablesize:		1,				\
 	cmd_per_lun:		1,				\
 	use_clustering:		ENABLE_CLUSTERING,		\
-	abort:			fcp_old_abort,			\
 	eh_abort_handler:	fcp_scsi_abort,			\
 	eh_device_reset_handler:fcp_scsi_dev_reset,		\
 	eh_bus_reset_handler:	fcp_scsi_bus_reset,		\

@@ -57,7 +57,7 @@ const char * qlogicpti_info(struct Scsi_Host *);
 int qlogicpti_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
 int qlogicpti_queuecommand_slow(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
 int qlogicpti_abort(Scsi_Cmnd *);
-int qlogicpti_reset(Scsi_Cmnd *, unsigned int);
+int qlogicpti_reset(Scsi_Cmnd *);
 
 /* mailbox command complete status codes */
 #define MBOX_COMMAND_COMPLETE		0x4000
@@ -515,36 +515,26 @@ struct qlogicpti {
 #define HCCTRL_B0ENAB           0x0004      /* Breakpoint 0 enable              */
 
 #ifdef CONFIG_SPARC64
-#define QLOGICPTI {						   \
-	detect:		qlogicpti_detect,			   \
-	release:	qlogicpti_release,			   \
-	info:		qlogicpti_info,				   \
-	queuecommand:	qlogicpti_queuecommand_slow,		   \
-	abort:		qlogicpti_abort,			   \
-	reset:		qlogicpti_reset,			   \
-	can_queue:	QLOGICPTI_REQ_QUEUE_LEN,		   \
-	this_id:	7,					   \
-	sg_tablesize:	QLOGICPTI_MAX_SG(QLOGICPTI_REQ_QUEUE_LEN), \
-	cmd_per_lun:	1,					   \
-	use_clustering:	ENABLE_CLUSTERING,			   \
-	highmem_io:	1,			   		   \
-}
+#define QLOGICPTI_HIGHMEM_IO 1
 #else
 /* Sparc32's iommu code cannot handle highmem pages yet. */
-#define QLOGICPTI {						   \
-	detect:		qlogicpti_detect,			   \
-	release:	qlogicpti_release,			   \
-	info:		qlogicpti_info,				   \
-	queuecommand:	qlogicpti_queuecommand_slow,		   \
-	abort:		qlogicpti_abort,			   \
-	reset:		qlogicpti_reset,			   \
-	can_queue:	QLOGICPTI_REQ_QUEUE_LEN,		   \
-	this_id:	7,					   \
-	sg_tablesize:	QLOGICPTI_MAX_SG(QLOGICPTI_REQ_QUEUE_LEN), \
-	cmd_per_lun:	1,					   \
-	use_clustering:	ENABLE_CLUSTERING,			   \
-}
+#define QLOGICPTI_HIGHMEM_IO 0
 #endif
+
+#define QLOGICPTI {						\
+	.detect		=	qlogicpti_detect,		\
+	.release	=	qlogicpti_release,		\
+	.info		=	qlogicpti_info,			\
+	.queuecommand	=	qlogicpti_queuecommand_slow,	\
+	.eh_abort_handler	=	qlogicpti_abort,	\
+	.eh_bus_reset_handler	=	qlogicpti_reset,	\
+	.can_queue	=	QLOGICPTI_REQ_QUEUE_LEN,	\
+	.this_id	=	7,				\
+	.sg_tablesize	=	QLOGICPTI_MAX_SG(QLOGICPTI_REQ_QUEUE_LEN), \
+	.cmd_per_lun	=	1,				\
+	.use_clustering	=	ENABLE_CLUSTERING,		\
+	.highmem_io	=	QLOGICPTI_HIGHMEM_IO,		\
+}
 
 /* For our interrupt engine. */
 #define for_each_qlogicpti(qp) \

@@ -99,6 +99,7 @@ struct _snd_sb {
 	snd_rawmidi_t *rmidi;
 	snd_rawmidi_substream_t *midi_substream_input;
 	snd_rawmidi_substream_t *midi_substream_output;
+	void (*rmidi_callback)(int irq, void *dev_id, struct pt_regs *regs);
 
 	spinlock_t reg_lock;
 	spinlock_t open_lock;

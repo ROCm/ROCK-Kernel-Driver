@@ -39,6 +39,7 @@
 #include <linux/seq_file.h>
 #include <linux/times.h>
 #include <linux/profile.h>
+#include <linux/blkdev.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -404,10 +405,14 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	len += sprintf(page + len,
 		"\nctxt %lu\n"
 		"btime %lu\n"
-		"processes %lu\n",
+		"processes %lu\n"
+		"procs_running %lu\n"
+		"procs_blocked %u\n",
 		nr_context_switches(),
 		xtime.tv_sec - jif / HZ,
-		total_forks);
+		total_forks,
+		nr_running(),
+		atomic_read(&nr_iowait_tasks));
 
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }

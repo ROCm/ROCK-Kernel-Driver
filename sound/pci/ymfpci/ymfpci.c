@@ -41,31 +41,31 @@ MODULE_DEVICES("{{Yamaha,YMF724},"
 		"{Yamaha,YMF744},"
 		"{Yamaha,YMF754}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static long snd_fm_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
-static long snd_mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
-static int snd_rear_switch[SNDRV_CARDS];
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static long fm_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
+static long mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
+static int rear_switch[SNDRV_CARDS];
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for the Yamaha DS-XG PCI soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for the Yamaha DS-XG PCI soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable Yamaha DS-XG soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_mpu_port, "MPU-401 Port.");
-MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_ENABLED);
-MODULE_PARM(snd_fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_fm_port, "FM OPL-3 Port.");
-MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED);
-MODULE_PARM(snd_rear_switch, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_rear_switch, "Enable shared rear/line-in switch");
-MODULE_PARM_SYNTAX(snd_rear_switch, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for the Yamaha DS-XG PCI soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for the Yamaha DS-XG PCI soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable Yamaha DS-XG soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(mpu_port, "MPU-401 Port.");
+MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED);
+MODULE_PARM(fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(fm_port, "FM OPL-3 Port.");
+MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED);
+MODULE_PARM(rear_switch, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(rear_switch, "Enable shared rear/line-in switch");
+MODULE_PARM_SYNTAX(rear_switch, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 static struct pci_device_id snd_ymfpci_ids[] __devinitdata = {
         { 0x1073, 0x0004, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* YMF724 */
@@ -80,7 +80,7 @@ static struct pci_device_id snd_ymfpci_ids[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, snd_ymfpci_ids);
 
 static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
-					   const struct pci_device_id *id)
+					   const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -92,16 +92,16 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
-	switch (id->device) {
+	switch (pci_id->device) {
 	case 0x0004: str = "YMF724"; break;
 	case 0x000d: str = "YMF724F"; break;
 	case 0x000a: str = "YMF740"; break;
@@ -114,54 +114,54 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 	legacy_ctrl = 0;
 	legacy_ctrl2 = 0x0800;	/* SMOD = 01 */
 
-	if (id->device >= 0x0010) { /* YMF 744/754 */
-		if (snd_fm_port[dev] < 0)
-			snd_fm_port[dev] = pci_resource_start(pci, 1);
-		else if (check_region(snd_fm_port[dev], 4))
-			snd_fm_port[dev] = -1;
-		if (snd_fm_port[dev] >= 0) {
+	if (pci_id->device >= 0x0010) { /* YMF 744/754 */
+		if (fm_port[dev] < 0)
+			fm_port[dev] = pci_resource_start(pci, 1);
+		else if (check_region(fm_port[dev], 4))
+			fm_port[dev] = -1;
+		if (fm_port[dev] >= 0) {
 			legacy_ctrl |= 2;
-			pci_write_config_word(pci, PCIR_DSXG_FMBASE, snd_fm_port[dev]);
+			pci_write_config_word(pci, PCIR_DSXG_FMBASE, fm_port[dev]);
 		}
-		if (snd_mpu_port[dev] < 0)
-			snd_mpu_port[dev] = pci_resource_start(pci, 1) + 0x20;
-		else if (check_region(snd_mpu_port[dev], 2))
-			snd_mpu_port[dev] = -1;
-		if (snd_mpu_port[dev] >= 0) {
+		if (mpu_port[dev] < 0)
+			mpu_port[dev] = pci_resource_start(pci, 1) + 0x20;
+		else if (check_region(mpu_port[dev], 2))
+			mpu_port[dev] = -1;
+		if (mpu_port[dev] >= 0) {
 			legacy_ctrl |= 8;
-			pci_write_config_word(pci, PCIR_DSXG_MPU401BASE, snd_mpu_port[dev]);
-			//snd_printd("MPU401 supported on 0x%lx\n", snd_mpu_port[dev]);
+			pci_write_config_word(pci, PCIR_DSXG_MPU401BASE, mpu_port[dev]);
+			//snd_printd("MPU401 supported on 0x%lx\n", mpu_port[dev]);
 		}
 	} else {
-		switch (snd_fm_port[dev]) {
+		switch (fm_port[dev]) {
 		case 0x388: legacy_ctrl2 |= 0; break;
 		case 0x398: legacy_ctrl2 |= 1; break;
 		case 0x3a0: legacy_ctrl2 |= 2; break;
 		case 0x3a8: legacy_ctrl2 |= 3; break;
-		default: snd_fm_port[dev] = -1; break;
+		default: fm_port[dev] = -1; break;
 		}
-		if (snd_fm_port[dev] > 0 && check_region(snd_fm_port[dev], 4) == 0)
+		if (fm_port[dev] > 0 && check_region(fm_port[dev], 4) == 0)
 			legacy_ctrl |= 2;
 		else {
 			legacy_ctrl2 &= ~3;
-			snd_fm_port[dev] = -1;
+			fm_port[dev] = -1;
 		}
-		switch (snd_mpu_port[dev]) {
+		switch (mpu_port[dev]) {
 		case 0x330: legacy_ctrl2 |= 0 << 4; break;
 		case 0x300: legacy_ctrl2 |= 1 << 4; break;
 		case 0x332: legacy_ctrl2 |= 2 << 4; break;
 		case 0x334: legacy_ctrl2 |= 3 << 4; break;
-		default: snd_mpu_port[dev] = -1; break;
+		default: mpu_port[dev] = -1; break;
 		}
-		if (snd_mpu_port[dev] > 0 && check_region(snd_mpu_port[dev], 2) == 0) {
-			//snd_printd("MPU401 supported on 0x%lx\n", snd_mpu_port[dev]);
+		if (mpu_port[dev] > 0 && check_region(mpu_port[dev], 2) == 0) {
+			//snd_printd("MPU401 supported on 0x%lx\n", mpu_port[dev]);
 			legacy_ctrl |= 8;
 		} else {
 			legacy_ctrl2 &= ~(3 << 4);
-			snd_mpu_port[dev] = -1;
+			mpu_port[dev] = -1;
 		}
 	}
-	if (snd_mpu_port[dev] > 0) {
+	if (mpu_port[dev] > 0) {
 		// this bit is for legacy mpu irqs
 		// legacy_ctrl |= 0x10; /* MPU401 irq enable */
 		legacy_ctrl2 |= 1 << 15; /* IMOD */
@@ -193,28 +193,28 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	if ((err = snd_ymfpci_mixer(chip, snd_rear_switch[dev])) < 0) {
+	if ((err = snd_ymfpci_mixer(chip, rear_switch[dev])) < 0) {
 		snd_card_free(card);
 		return err;
 	}
-	if (snd_mpu_port[dev] > 0) {
+	if (mpu_port[dev] > 0) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_YMFPCI,
-					       snd_mpu_port[dev], 0,
+					       mpu_port[dev], 0,
 					       pci->irq, 0, &chip->rawmidi)) < 0) {
-			printk(KERN_WARNING "ymfpci: cannot initialize MPU401 at 0x%lx, skipping...\n", snd_mpu_port[dev]);
-			snd_mpu_port[dev] = 0;
+			printk(KERN_WARNING "ymfpci: cannot initialize MPU401 at 0x%lx, skipping...\n", mpu_port[dev]);
+			mpu_port[dev] = 0;
 			// only for legacy mpu irqs
 			// legacy_ctrl &= ~0x10; /* disable MPU401 irq */
 			// pci_write_config_word(pci, PCIR_DSXG_LEGACY, legacy_ctrl);
 		}
 	}
-	if (snd_fm_port[dev] > 0) {
+	if (fm_port[dev] > 0) {
 		if ((err = snd_opl3_create(card,
-					   snd_fm_port[dev],
-					   snd_fm_port[dev] + 2,
+					   fm_port[dev],
+					   fm_port[dev] + 2,
 					   OPL3_HW_OPL3, 0, &opl3)) < 0) {
-			printk(KERN_WARNING "ymfpci: cannot initialize FM OPL3 at 0x%lx, skipping...\n", snd_fm_port[dev]);
-			snd_fm_port[dev] = 0;
+			printk(KERN_WARNING "ymfpci: cannot initialize FM OPL3 at 0x%lx, skipping...\n", fm_port[dev]);
+			fm_port[dev] = 0;
 			legacy_ctrl &= ~2;
 			pci_write_config_word(pci, PCIR_DSXG_LEGACY, legacy_ctrl);
 		} else if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
@@ -312,8 +312,8 @@ module_exit(alsa_card_ymfpci_exit)
 
 #ifndef MODULE
 
-/* format is: snd-ymfpci=snd_enable,snd_index,snd_id,
-			 snd_fm_port,snd_mpu_port */
+/* format is: snd-ymfpci=enable,index,id,
+			 fm_port,mpu_port */
 
 static int __init alsa_card_ymfpci_setup(char *str)
 {
@@ -321,11 +321,11 @@ static int __init alsa_card_ymfpci_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_fm_port[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_mpu_port[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&fm_port[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&mpu_port[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

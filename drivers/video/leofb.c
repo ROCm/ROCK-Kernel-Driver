@@ -258,7 +258,7 @@ static void leo_putc(struct vc_data *conp, struct display *p, int c, int yy, int
 	sbus_writel(attr_bgcol(p,c) << 24, &ss->bg);
 	sbus_writel(0xFFFFFFFF<<(32-fontwidth(p)),
 		    &us->fontmsk);
-	u = ((u32 *)p->fb_info.screen_base) + y + x;
+	u = ((u32 *)fb->info.screen_base) + y + x;
 	if (fontwidth(p) <= 8) {
 		for (i = 0; i < fontheight(p); i++, u += 2048) {
 			u32 val = *fd++ << 24;
@@ -304,7 +304,7 @@ static void leo_putcs(struct vc_data *conp, struct display *p, const unsigned sh
 		y = yy << (fontheightlog(p) + 11);
 	else
 		y = (yy * fontheight(p)) << 11;
-	u = ((u32 *)p->fb_info.screen_base) + y + x;
+	u = ((u32 *)fb->info.screen_base) + y + x;
 	if (fontwidth(p) <= 8) {
 		sbus_writel(0xFFFFFFFF<<(32-4*fontwidth(p)), &us->fontmsk);
 		x = 4*fontwidth(p) - fontheight(p)*2048;
@@ -594,7 +594,7 @@ leo_wid_put (struct fb_info_sbusfb *fb, struct fb_wid_list *wl)
 
 static void leo_margins (struct fb_info_sbusfb *fb, struct display *p, int x_margin, int y_margin)
 {
-	fb->fb_info.screen_base += 8192 * (y_margin - fb->y_margin) + 4 * (x_margin - fb->x_margin);
+	fb->info.screen_base += 8192 * (y_margin - fb->y_margin) + 4 * (x_margin - fb->x_margin);
 }
 
 static void leo_switch_from_graph (struct fb_info_sbusfb *fb)
@@ -640,8 +640,8 @@ static char idstring[40] __initdata = { 0 };
 
 char * __init leofb_init(struct fb_info_sbusfb *fb)
 {
-	struct fb_fix_screeninfo *fix = &fb->fix;
-	struct fb_var_screeninfo *var = &fb->var;
+	struct fb_fix_screeninfo *fix = &fb->info.fix;
+	struct fb_var_screeninfo *var = &fb->info.var;
 	struct display *disp = &fb->disp;
 	struct fbtype *type = &fb->type;
 	struct sbus_dev *sdev = fb->sbdp;

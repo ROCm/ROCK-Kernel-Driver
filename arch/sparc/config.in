@@ -226,6 +226,8 @@ source drivers/input/Config.in
 
 source fs/Config.in
 
+mainmenu_option next_comment
+comment 'Sound card support'
 tristate 'Sound card support' CONFIG_SOUND
 if [ "$CONFIG_SOUND" != "n" ]; then
    source sound/Config.in
@@ -252,4 +254,5 @@ bool 'Spinlock debugging' CONFIG_DEBUG_SPINLOCK
 endmenu
 
 source security/Config.in
+source crypto/Config.in
 source lib/Config.in

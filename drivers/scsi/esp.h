@@ -196,6 +196,7 @@ struct esp {
 	 * cannot be assosciated with any specific command.
 	 */
 	u8			resetting_bus;
+	wait_queue_head_t	reset_queue;
 };
 
 /* Bitfield meanings for the above registers. */
@@ -407,50 +408,36 @@ extern const char *esp_info(struct Scsi_Host *);
 extern int esp_queue(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 extern int esp_command(Scsi_Cmnd *);
 extern int esp_abort(Scsi_Cmnd *);
-extern int esp_reset(Scsi_Cmnd *, unsigned int);
+extern int esp_reset(Scsi_Cmnd *);
 extern int esp_proc_info(char *buffer, char **start, off_t offset, int length,
 			 int hostno, int inout);
 extern void esp_slave_detach(Scsi_Device* SDptr);
 
 #ifdef CONFIG_SPARC64
-#define SCSI_SPARC_ESP {                                        \
-		proc_name:      "esp",				\
-		proc_info:      &esp_proc_info,			\
-		name:           "Sun ESP 100/100a/200",		\
-		detect:         esp_detect,			\
-		slave_detach:	esp_slave_detach,		\
-		info:           esp_info,			\
-		command:        esp_command,			\
-		queuecommand:   esp_queue,			\
-		abort:          esp_abort,			\
-		reset:          esp_reset,			\
-		can_queue:      7,				\
-		this_id:        7,				\
-		sg_tablesize:   SG_ALL,				\
-		cmd_per_lun:    1,				\
-		use_clustering: ENABLE_CLUSTERING,		\
-		highmem_io:	1,				\
-}
+#define ESP_HIGHMEM_IO	1
 #else
 /* Sparc32's iommu code cannot handle highmem pages yet. */
-#define SCSI_SPARC_ESP {                                        \
-		proc_name:      "esp",				\
-		proc_info:      &esp_proc_info,			\
-		name:           "Sun ESP 100/100a/200",		\
-		detect:         esp_detect,			\
-		slave_detach:	esp_slave_detach,		\
-		info:           esp_info,			\
-		command:        esp_command,			\
-		queuecommand:   esp_queue,			\
-		abort:          esp_abort,			\
-		reset:          esp_reset,			\
-		can_queue:      7,				\
-		this_id:        7,				\
-		sg_tablesize:   SG_ALL,				\
-		cmd_per_lun:    1,				\
-		use_clustering: ENABLE_CLUSTERING,		\
-}
+#define ESP_HIGHMEM_IO	0
 #endif
+
+#define SCSI_SPARC_ESP {					\
+		.proc_name	=	"esp",			\
+		.proc_info	=	&esp_proc_info,		\
+		.name		=	"Sun ESP 100/100a/200",	\
+		.detect		=	esp_detect,		\
+		.slave_detach	=	esp_slave_detach,	\
+		.info		=	esp_info,		\
+		.command	=	esp_command,		\
+		.queuecommand	=	esp_queue,		\
+		.eh_abort_handler =	esp_abort,		\
+		.eh_bus_reset_handler =	esp_reset,		\
+		.can_queue	=	7,			\
+		.this_id	=	7,			\
+		.sg_tablesize	=	SG_ALL,			\
+		.cmd_per_lun	=	1,			\
+		.use_clustering	=	ENABLE_CLUSTERING,	\
+		.highmem_io	=	ESP_HIGHMEM_IO,		\
+}
 
 /* For our interrupt engine. */
 #define for_each_esp(esp) \

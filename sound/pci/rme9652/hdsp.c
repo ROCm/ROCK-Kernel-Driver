@@ -38,31 +38,31 @@
 #include "multiface_firmware.dat"
 #include "digiface_firmware.dat"
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static int snd_precise_ptr[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0 }; /* Enable precise pointer */
-static int snd_line_outs_monitor[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0}; /* Send all inputs/playback to line outs */
-static int snd_force_firmware[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0}; /* Force firmware reload */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int precise_ptr[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0 }; /* Enable precise pointer */
+static int line_outs_monitor[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0}; /* Send all inputs/playback to line outs */
+static int force_firmware[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0}; /* Force firmware reload */
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for RME Hammerfall DSP interface.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for RME Hammerfall DSP interface.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable/disable specific Hammerfall DSP soundcards.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_precise_ptr, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_precise_ptr, "Enable precise pointer (doesn't work reliably).");
-MODULE_PARM_SYNTAX(snd_precise_ptr, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-MODULE_PARM(snd_line_outs_monitor,"1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_line_outs_monitor, "Send all input and playback streams to line outs by default.");
-MODULE_PARM_SYNTAX(snd_line_outs_monitor, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-MODULE_PARM(snd_force_firmware,"1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_force_firmware, "Force a reload of the I/O box firmware");
-MODULE_PARM_SYNTAX(snd_force_firmware, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for RME Hammerfall DSP interface.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for RME Hammerfall DSP interface.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable/disable specific Hammerfall DSP soundcards.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(precise_ptr, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(precise_ptr, "Enable precise pointer (doesn't work reliably).");
+MODULE_PARM_SYNTAX(precise_ptr, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM(line_outs_monitor,"1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(line_outs_monitor, "Send all input and playback streams to line outs by default.");
+MODULE_PARM_SYNTAX(line_outs_monitor, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM(force_firmware,"1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(force_firmware, "Force a reload of the I/O box firmware");
+MODULE_PARM_SYNTAX(force_firmware, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 MODULE_AUTHOR("Paul Davis <pbd@op.net>");
 MODULE_DESCRIPTION("RME Hammerfall DSP");
 MODULE_LICENSE("GPL");
@@ -2190,7 +2190,7 @@ static void snd_hdsp_set_defaults(hdsp_t *hdsp)
 	for (i = 0; i < 2048; i++)
 		hdsp_write_gain (hdsp, i, MINUS_INFINITY_GAIN);
 
-	if (snd_line_outs_monitor[hdsp->dev]) {
+	if (line_outs_monitor[hdsp->dev]) {
 		
 		snd_printk ("sending all inputs and playback streams to line outs.\n");
 
@@ -2848,7 +2848,7 @@ static int __devinit snd_hdsp_initialize_firmware (hdsp_t *hdsp)
 		hdsp_write (hdsp, HDSP_outputEnable + (4 * i), 1);
 	}
 
-	if (snd_force_firmware[hdsp->dev] || (hdsp_read (hdsp, HDSP_statusRegister) & HDSP_DllError) != 0) {
+	if (force_firmware[hdsp->dev] || (hdsp_read (hdsp, HDSP_statusRegister) & HDSP_DllError) != 0) {
 
 		snd_printk ("loading firmware\n");
 
@@ -3068,7 +3068,7 @@ static void snd_hdsp_card_free(snd_card_t *card)
 }
 
 static int __devinit snd_hdsp_probe(struct pci_dev *pci,
-				    const struct pci_device_id *id)
+				    const struct pci_device_id *pci_id)
 {
 	static int dev;
 	hdsp_t *hdsp;
@@ -3077,12 +3077,12 @@ static int __devinit snd_hdsp_probe(struct pci_dev *pci,
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	if (!(card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, sizeof(hdsp_t))))
+	if (!(card = snd_card_new(index[dev], id[dev], THIS_MODULE, sizeof(hdsp_t))))
 		return -ENOMEM;
 
 	hdsp = (hdsp_t *) card->private_data;
@@ -3090,7 +3090,7 @@ static int __devinit snd_hdsp_probe(struct pci_dev *pci,
 	hdsp->dev = dev;
 	hdsp->pci = pci;
 
-	if ((err = snd_hdsp_create(card, hdsp, snd_precise_ptr[dev])) < 0) {
+	if ((err = snd_hdsp_create(card, hdsp, precise_ptr[dev])) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -3143,7 +3143,7 @@ module_exit(alsa_card_hdsp_exit)
 
 #ifndef MODULE
 
-/* format is: snd-hdsp=snd_enable,snd_index,snd_id */
+/* format is: snd-hdsp=enable,index,id */
 
 static int __init alsa_card_hdsp_setup(char *str)
 {
@@ -3151,9 +3151,9 @@ static int __init alsa_card_hdsp_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

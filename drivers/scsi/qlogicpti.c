@@ -1466,7 +1466,7 @@ int qlogicpti_abort(Scsi_Cmnd *Cmnd)
 	u_short param[6];
 	struct Scsi_Host *host = Cmnd->host;
 	struct qlogicpti *qpti = (struct qlogicpti *) host->hostdata;
-	int return_status = SCSI_ABORT_SUCCESS;
+	int return_status = SUCCESS;
 	unsigned long flags;
 	u32 cmd_cookie;
 	int i;
@@ -1493,7 +1493,7 @@ int qlogicpti_abort(Scsi_Cmnd *Cmnd)
 	if (qlogicpti_mbox_command(qpti, param, 0) ||
 	    (param[0] != MBOX_COMMAND_COMPLETE)) {
 		printk(KERN_EMERG "qlogicpti : scsi abort failure: %x\n", param[0]);
-		return_status = SCSI_ABORT_ERROR;
+		return_status = FAILED;
 	}
 
 	qlogicpti_enable_irqs(qpti);
@@ -1503,12 +1503,12 @@ int qlogicpti_abort(Scsi_Cmnd *Cmnd)
 	return return_status;
 }
 
-int qlogicpti_reset(Scsi_Cmnd *Cmnd, unsigned int reset_flags)
+int qlogicpti_reset(Scsi_Cmnd *Cmnd)
 {
 	u_short param[6];
 	struct Scsi_Host *host = Cmnd->host;
 	struct qlogicpti *qpti = (struct qlogicpti *) host->hostdata;
-	int return_status = SCSI_RESET_SUCCESS;
+	int return_status = SUCCESS;
 	unsigned long flags;
 
 	printk(KERN_WARNING "qlogicpti : Resetting SCSI bus!\n");
@@ -1522,7 +1522,7 @@ int qlogicpti_reset(Scsi_Cmnd *Cmnd, unsigned int reset_flags)
 	if (qlogicpti_mbox_command(qpti, param, 0) ||
 	   (param[0] != MBOX_COMMAND_COMPLETE)) {
 		printk(KERN_EMERG "qlogicisp : scsi bus reset failure: %x\n", param[0]);
-		return_status = SCSI_RESET_ERROR;
+		return_status = FAILED;
 	}
 
 	qlogicpti_enable_irqs(qpti);

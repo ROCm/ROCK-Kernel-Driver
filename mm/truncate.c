@@ -53,7 +53,34 @@ truncate_complete_page(struct address_space *mapping, struct page *page)
 	clear_page_dirty(page);
 	ClearPageUptodate(page);
 	remove_from_page_cache(page);
-	page_cache_release(page);
+	page_cache_release(page);	/* pagecache ref */
+}
+
+/*
+ * This is for invalidate_inode_pages().  That function can be called at
+ * any time, and is not supposed to throw away dirty pages.  But pages can
+ * be marked dirty at any time too.  So we re-check the dirtiness inside
+ * ->page_lock.  That provides exclusion against the __set_page_dirty
+ * functions.
+ */
+static void
+invalidate_complete_page(struct address_space *mapping, struct page *page)
+{
+	if (page->mapping != mapping)
+		return;
+
+	if (PagePrivate(page) && !try_to_release_page(page, 0))
+		return;
+
+	write_lock(&mapping->page_lock);
+	if (PageDirty(page)) {
+		write_unlock(&mapping->page_lock);
+	} else {
+		__remove_from_page_cache(page);
+		write_unlock(&mapping->page_lock);
+		ClearPageUptodate(page);
+		page_cache_release(page);	/* pagecache ref */
+	}
 }
 
 /**
@@ -172,11 +199,9 @@ void invalidate_inode_pages(struct address_space *mapping)
 			next++;
 			if (PageDirty(page) || PageWriteback(page))
 				goto unlock;
-			if (PagePrivate(page) && !try_to_release_page(page, 0))
-				goto unlock;
 			if (page_mapped(page))
 				goto unlock;
-			truncate_complete_page(mapping, page);
+			invalidate_complete_page(mapping, page);
 unlock:
 			unlock_page(page);
 		}
@@ -213,7 +238,7 @@ void invalidate_inode_pages2(struct address_space *mapping)
 				if (page_mapped(page))
 					clear_page_dirty(page);
 				else
-					truncate_complete_page(mapping, page);
+					invalidate_complete_page(mapping, page);
 			}
 			unlock_page(page);
 		}

@@ -34,13 +34,13 @@
 #include "seq_info.h"
 #include <sound/seq_device.h>
 
-int snd_seq_client_load[64] = {[0 ... 63] = -1};
-int snd_seq_default_timer_class = SNDRV_TIMER_CLASS_GLOBAL;
-int snd_seq_default_timer_sclass = SNDRV_TIMER_SCLASS_NONE;
-int snd_seq_default_timer_card = -1;
-int snd_seq_default_timer_device = SNDRV_TIMER_GLOBAL_SYSTEM;
-int snd_seq_default_timer_subdevice = 0;
-int snd_seq_default_timer_resolution = 0;	/* Hz */
+int seq_client_load[64] = {[0 ... 63] = -1};
+int seq_default_timer_class = SNDRV_TIMER_CLASS_GLOBAL;
+int seq_default_timer_sclass = SNDRV_TIMER_SCLASS_NONE;
+int seq_default_timer_card = -1;
+int seq_default_timer_device = SNDRV_TIMER_GLOBAL_SYSTEM;
+int seq_default_timer_subdevice = 0;
+int seq_default_timer_resolution = 0;	/* Hz */
 
 MODULE_AUTHOR("Frank van de Pol <fvdpol@home.nl>, Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture sequencer.");
@@ -48,20 +48,20 @@ MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_SUPPORTED_DEVICE("sound");
 
-MODULE_PARM(snd_seq_client_load, "1-64i");
-MODULE_PARM_DESC(snd_seq_client_load, "The numbers of global (system) clients to load through kmod.");
-MODULE_PARM(snd_seq_default_timer_class, "i");
-MODULE_PARM_DESC(snd_seq_default_timer_class, "The default timer class.");
-MODULE_PARM(snd_seq_default_timer_sclass, "i");
-MODULE_PARM_DESC(snd_seq_default_timer_sclass, "The default timer slave class.");
-MODULE_PARM(snd_seq_default_timer_card, "i");
-MODULE_PARM_DESC(snd_seq_default_timer_card, "The default timer card number.");
-MODULE_PARM(snd_seq_default_timer_device, "i");
-MODULE_PARM_DESC(snd_seq_default_timer_device, "The default timer device number.");
-MODULE_PARM(snd_seq_default_timer_subdevice, "i");
-MODULE_PARM_DESC(snd_seq_default_timer_subdevice, "The default timer subdevice number.");
-MODULE_PARM(snd_seq_default_timer_resolution, "i");
-MODULE_PARM_DESC(snd_seq_default_timer_resolution, "The default timer resolution in Hz.");
+MODULE_PARM(seq_client_load, "1-64i");
+MODULE_PARM_DESC(seq_client_load, "The numbers of global (system) clients to load through kmod.");
+MODULE_PARM(seq_default_timer_class, "i");
+MODULE_PARM_DESC(seq_default_timer_class, "The default timer class.");
+MODULE_PARM(seq_default_timer_sclass, "i");
+MODULE_PARM_DESC(seq_default_timer_sclass, "The default timer slave class.");
+MODULE_PARM(seq_default_timer_card, "i");
+MODULE_PARM_DESC(seq_default_timer_card, "The default timer card number.");
+MODULE_PARM(seq_default_timer_device, "i");
+MODULE_PARM_DESC(seq_default_timer_device, "The default timer device number.");
+MODULE_PARM(seq_default_timer_subdevice, "i");
+MODULE_PARM_DESC(seq_default_timer_subdevice, "The default timer subdevice number.");
+MODULE_PARM(seq_default_timer_resolution, "i");
+MODULE_PARM_DESC(seq_default_timer_resolution, "The default timer resolution in Hz.");
 
 /*
  *  INIT PART

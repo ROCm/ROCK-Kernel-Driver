@@ -89,5 +89,5 @@ SECTIONS
   .debug_pubnames 0 : { *(.debug_pubnames) }
   .debug_sfnames  0 : { *(.debug_sfnames) }
   .line           0 : { *(.line) }
-  /DISCARD/ : { *(.text.exit) *(.data.exit) *(.exitcall.exit) }
+  /DISCARD/ : { *(.exit.text) *(.exit.data) *(.exitcall.exit) }
 }

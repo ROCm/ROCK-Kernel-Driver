@@ -1,0 +1,177 @@
+
+                    Scatterlist Cryptographic API
+                   
+INTRODUCTION
+
+The Scatterlist Crypto API takes page vectors (scatterlists) as
+arguments, and works directly on pages.  In some cases (e.g. ECB
+mode ciphers), this will allow for pages to be encrypted in-place
+with no copying.
+
+One of the initial goals of this design was to readily support IPsec,
+so that processing can be applied to paged skb's without the need
+for linearization.
+
+
+DETAILS
+
+At the lowest level are algorithms, which register dynamically with the
+API.
+
+'Transforms' are user-instantiated objects, which maintain state, handle all
+of the implementation logic (e.g. manipulating page vectors), provide an 
+abstraction to the underlying algorithms, and handle common logical 
+operations (e.g. cipher modes, HMAC for digests).  However, at the user 
+level they are very simple.
+
+Conceptually, the API layering looks like this:
+
+  [transform api]  (user interface)
+  [transform ops]  (per-type logic glue e.g. cipher.c, digest.c)
+  [algorithm api]  (for registering algorithms)
+  
+The idea is to make the user interface and algorithm registration API
+very simple, while hiding the core logic from both.  Many good ideas
+from existing APIs such as Cryptoapi and Nettle have been adapted for this.
+
+The API currently supports three types of transforms: Ciphers, Digests and
+Compressors.  The compression algorithms especially seem to be performing
+very well so far.
+
+An asynchronous scheduling interface is in planning but not yet
+implemented, as we need to further analyze the requirements of all of
+the possible hardware scenarios (e.g. IPsec NIC offload).
+
+Here's an example of how to use the API:
+
+	#include <linux/crypto.h>
+	
+	struct scatterlist sg[2];
+	char result[128];
+	struct crypto_tfm *tfm;
+	
+	tfm = crypto_alloc_tfm("md5", 0);
+	if (tfm == NULL)
+		fail();
+		
+	/* ... set up the scatterlists ... */
+	
+	crypto_digest_init(tfm);
+	crypto_digest_update(tfm, &sg, 2);
+	crypto_digest_final(tfm, result);
+	
+	crypto_free_tfm(tfm);
+
+    
+Many real examples are available in the regression test module (tcrypt.c).
+
+
+CONFIGURATION NOTES
+
+As Triple DES is part of the DES module, for those using modular builds,
+add the following line to /etc/modules.conf:
+
+  alias des3_ede des
+
+
+DEVELOPER NOTES
+
+None of this code should be called from hardirq context, only softirq and
+user contexts.
+
+When using the API for ciphers, performance will be optimal if each
+scatterlist contains data which is a multiple of the cipher's block
+size (typically 8 bytes).  This prevents having to do any copying
+across non-aligned page fragment boundaries.
+
+
+ADDING NEW ALGORITHMS
+
+When submitting a new algorithm for inclusion, a mandatory requirement
+is that at least a few test vectors from known sources (preferably
+standards) be included.
+
+Converting existing well known code is preferred, as it is more likely
+to have been reviewed and widely tested.  If submitting code from LGPL
+sources, please consider changing the license to GPL (see section 3 of
+the LGPL).
+
+Algorithms submitted must also be generally patent-free (e.g. IDEA
+will not be included in the mainline until around 2011), and be based
+on a recognized standard and/or have been subjected to appropriate
+peer review.
+
+
+BUGS
+
+Send bug reports to:
+James Morris <jmorris@intercode.com.au>
+Cc: David S. Miller <davem@redhat.com>
+
+
+FURTHER INFORMATION
+
+For further patches and various updates, including the current TODO
+list, see:
+http://samba.org/~jamesm/crypto/
+
+Ongoing development discussion may also be found on
+kerneli cryptoapi-devel, 
+see http://www.kerneli.org/mailman/listinfo/cryptoapi-devel
+
+
+AUTHORS
+
+James Morris
+David S. Miller
+Jean-Francois Dive (SHA1 algorithm module)
+
+
+CREDITS
+
+The following people provided invaluable feedback during the development
+of the API:
+
+  Alexey Kuznetzov
+  Rusty Russell
+  Herbert Valerio Riedel
+  Jeff Garzik
+  Michael Richardson
+  Andrew Morton
+  Ingo Oeser
+  Christoph Hellwig
+
+Portions of this API were derived from the following projects:
+  
+  Kerneli Cryptoapi (http://www.kerneli.org/)
+    Alexander Kjeldaas
+    Herbert Valerio Riedel
+    Kyle McMartin
+    Jean-Luc Cooke
+    David Bryson
+    Clemens Fruhwirth
+    Tobias Ringstrom
+    Harald Welte
+
+and;
+  
+  Nettle (http://www.lysator.liu.se/~nisse/nettle/)
+    Niels Möller
+
+Original developers of the initial set of crypto algorithms:
+
+  Dana L. How (DES)
+  Andrew Tridgell and Steve French (MD4)
+  Colin Plumb (MD5)
+  Steve Raid (SHA1)
+  USAGI project members (HMAC)
+
+The DES code was subsequently redeveloped by:
+
+  Raimar Falke
+  Gisle Sælensminde
+  Niels Möller
+
+Please send any credits updates or corrections to:
+James Morris <jmorris@intercode.com.au>
+

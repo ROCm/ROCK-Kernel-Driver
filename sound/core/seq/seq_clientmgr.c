@@ -110,7 +110,7 @@ static client_t *clientptr(int clientid)
 	return clienttab[clientid];
 }
 
-extern int snd_seq_client_load[];
+extern int seq_client_load[];
 
 client_t *snd_seq_client_use_ptr(int clientid)
 {
@@ -141,9 +141,9 @@ client_t *snd_seq_client_use_ptr(int clientid)
 			if (! client_requested[clientid]) {
 				client_requested[clientid] = 1;
 				for (idx = 0; idx < 64; idx++) {
-					if (snd_seq_client_load[idx] < 0)
+					if (seq_client_load[idx] < 0)
 						break;
-					if (snd_seq_client_load[idx] == clientid) {
+					if (seq_client_load[idx] == clientid) {
 						sprintf(name, "snd-seq-client-%i", clientid);
 						request_module(name);
 						break;

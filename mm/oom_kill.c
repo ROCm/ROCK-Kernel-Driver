@@ -175,9 +175,13 @@ static void oom_kill(void)
 	if (p == NULL)
 		panic("Out of memory and no killable processes...\n");
 
-	/* kill all processes that share the ->mm (i.e. all threads) */
+	oom_kill_task(p);
+	/*
+	 * kill all processes that share the ->mm (i.e. all threads),
+	 * but are in a different thread group
+	 */
 	do_each_thread(g, q)
-		if (q->mm == p->mm)
+		if (q->mm == p->mm && q->tgid != p->tgid)
 			oom_kill_task(q);
 	while_each_thread(g, q);
 

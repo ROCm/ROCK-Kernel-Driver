@@ -120,7 +120,7 @@ blkdev_direct_IO(int rw, struct file *file, const struct iovec *iov,
 {
 	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
 
-	return generic_direct_IO(rw, inode, iov, offset,
+	return generic_direct_IO(rw, inode, inode->i_bdev, iov, offset,
 				nr_segs, blkdev_get_blocks);
 }
 
@@ -308,6 +308,7 @@ struct block_device *bdget(dev_t dev)
 			new_bdev->bd_dev = dev;
 			new_bdev->bd_contains = NULL;
 			new_bdev->bd_inode = inode;
+			new_bdev->bd_block_size = (1 << inode->i_blkbits);
 			new_bdev->bd_part_count = 0;
 			new_bdev->bd_invalidated = 0;
 			inode->i_mode = S_IFBLK;

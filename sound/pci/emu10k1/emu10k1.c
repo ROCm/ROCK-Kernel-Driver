@@ -40,43 +40,43 @@ MODULE_DEVICES("{{Creative Labs,SB Live!/PCI512/E-mu APS},"
 #include <sound/emu10k1_synth.h>
 #endif
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static int snd_extin[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-static int snd_extout[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-static int snd_seq_ports[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4};
-static int snd_max_synth_voices[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 64};
-static int snd_max_buffer_size[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 128};
-static int snd_enable_ir[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int extin[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int extout[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int seq_ports[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4};
+static int max_synth_voices[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 64};
+static int max_buffer_size[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 128};
+static int enable_ir[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for the EMU10K1 soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for the EMU10K1 soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable the EMU10K1 soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_extin, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_extin, "Available external inputs for FX8010. Zero=default.");
-MODULE_PARM_SYNTAX(snd_extin, SNDRV_ENABLED "allows:{{0,0x0ffff}},base:16");
-MODULE_PARM(snd_extout, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_extout, "Available external outputs for FX8010. Zero=default.");
-MODULE_PARM_SYNTAX(snd_extout, SNDRV_ENABLED "allows:{{0,0x0ffff}},base:16");
-MODULE_PARM(snd_seq_ports, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_seq_ports, "Allocated sequencer ports for internal synthesizer.");
-MODULE_PARM_SYNTAX(snd_seq_ports, SNDRV_ENABLED "allows:{{0,32}}");
-MODULE_PARM(snd_max_synth_voices, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_max_synth_voices, "Maximum number of voices for WaveTable.");
-MODULE_PARM_SYNTAX(snd_max_synth_voices, SNDRV_ENABLED);
-MODULE_PARM(snd_max_buffer_size, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_max_buffer_size, "Maximum sample buffer size in MB.");
-MODULE_PARM_SYNTAX(snd_max_buffer_size, SNDRV_ENABLED);
-MODULE_PARM(snd_enable_ir, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable_ir, "Enable IR.");
-MODULE_PARM_SYNTAX(snd_enable_ir, SNDRV_ENABLE_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for the EMU10K1 soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for the EMU10K1 soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable the EMU10K1 soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(extin, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(extin, "Available external inputs for FX8010. Zero=default.");
+MODULE_PARM_SYNTAX(extin, SNDRV_ENABLED "allows:{{0,0x0ffff}},base:16");
+MODULE_PARM(extout, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(extout, "Available external outputs for FX8010. Zero=default.");
+MODULE_PARM_SYNTAX(extout, SNDRV_ENABLED "allows:{{0,0x0ffff}},base:16");
+MODULE_PARM(seq_ports, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(seq_ports, "Allocated sequencer ports for internal synthesizer.");
+MODULE_PARM_SYNTAX(seq_ports, SNDRV_ENABLED "allows:{{0,32}}");
+MODULE_PARM(max_synth_voices, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(max_synth_voices, "Maximum number of voices for WaveTable.");
+MODULE_PARM_SYNTAX(max_synth_voices, SNDRV_ENABLED);
+MODULE_PARM(max_buffer_size, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(max_buffer_size, "Maximum sample buffer size in MB.");
+MODULE_PARM_SYNTAX(max_buffer_size, SNDRV_ENABLED);
+MODULE_PARM(enable_ir, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable_ir, "Enable IR.");
+MODULE_PARM_SYNTAX(enable_ir, SNDRV_ENABLE_DESC);
 
 static struct pci_device_id snd_emu10k1_ids[] __devinitdata = {
 	{ 0x1102, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* EMU10K1 */
@@ -87,7 +87,7 @@ static struct pci_device_id snd_emu10k1_ids[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, snd_emu10k1_ids);
 
 static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
-					    const struct pci_device_id *id)
+					    const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -99,21 +99,21 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 
 	if (dev >= SNDRV_CARDS)
         	return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
-	if (snd_max_buffer_size[dev] < 32)
-		snd_max_buffer_size[dev] = 32;
-	else if (snd_max_buffer_size[dev] > 1024)
-		snd_max_buffer_size[dev] = 1024;
-	if ((err = snd_emu10k1_create(card, pci, snd_extin[dev], snd_extout[dev],
-				      (long)snd_max_buffer_size[dev] * 1024 * 1024,
-				      snd_enable_ir[dev],
+	if (max_buffer_size[dev] < 32)
+		max_buffer_size[dev] = 32;
+	else if (max_buffer_size[dev] > 1024)
+		max_buffer_size[dev] = 1024;
+	if ((err = snd_emu10k1_create(card, pci, extin[dev], extout[dev],
+				      (long)max_buffer_size[dev] * 1024 * 1024,
+				      enable_ir[dev],
 				      &emu)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -166,8 +166,8 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 		strcpy(wave->name, "Emu-10k1 Synth");
 		arg->hwptr = emu;
 		arg->index = 1;
-		arg->seq_ports = snd_seq_ports[dev];
-		arg->max_voices = snd_max_synth_voices[dev];
+		arg->seq_ports = seq_ports[dev];
+		arg->max_voices = max_synth_voices[dev];
 	}
 #endif
  
@@ -228,8 +228,8 @@ module_exit(alsa_card_emu10k1_exit)
 
 #ifndef MODULE
 
-/* format is: snd-emu10k1=snd_enable,snd_index,snd_id,
-			  snd_seq_ports,snd_max_synth_voices */
+/* format is: snd-emu10k1=enable,index,id,
+			  seq_ports,max_synth_voices */
 
 static int __init alsa_card_emu10k1_setup(char *str)
 {
@@ -237,11 +237,11 @@ static int __init alsa_card_emu10k1_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,&snd_seq_ports[nr_dev]) == 2 &&
-	       get_option(&str,&snd_max_synth_voices[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,&seq_ports[nr_dev]) == 2 &&
+	       get_option(&str,&max_synth_voices[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

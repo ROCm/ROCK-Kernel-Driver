@@ -53,43 +53,43 @@ MODULE_DEVICES("{{NeoMagic,NM256AV},"
  * some compile conditions.
  */
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;
-static int snd_playback_bufsize[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 16};
-static int snd_capture_bufsize[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 16};
-static int snd_force_ac97[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled as default */
-static int snd_buffer_top[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* not specified */
-static int snd_use_cache[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled */
-static int snd_vaio_hack[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;
+static int playback_bufsize[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 16};
+static int capture_bufsize[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 16};
+static int force_ac97[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled as default */
+static int buffer_top[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* not specified */
+static int use_cache[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled */
+static int vaio_hack[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled */
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable this soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_playback_bufsize, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_playback_bufsize, "DAC frame size in kB for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_playback_bufsize, SNDRV_ENABLED);
-MODULE_PARM(snd_capture_bufsize, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_capture_bufsize, "ADC frame size in kB for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_capture_bufsize, SNDRV_ENABLED);
-MODULE_PARM(snd_force_ac97, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_force_ac97, "Force to use AC97 codec for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_force_ac97, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-MODULE_PARM(snd_buffer_top, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_buffer_top, "Set the top address of audio buffer for " CARD_NAME " soundcard.");
-MODULE_PARM_SYNTAX(snd_buffer_top, SNDRV_ENABLED);
-MODULE_PARM(snd_use_cache, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_use_cache, "Enable the cache for coefficient table access.");
-MODULE_PARM_SYNTAX(snd_use_cache, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-MODULE_PARM(snd_vaio_hack, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_vaio_hack, "Enable workaround for Sony VAIO notebooks.");
-MODULE_PARM_SYNTAX(snd_vaio_hack, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable this soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(playback_bufsize, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(playback_bufsize, "DAC frame size in kB for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(playback_bufsize, SNDRV_ENABLED);
+MODULE_PARM(capture_bufsize, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(capture_bufsize, "ADC frame size in kB for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(capture_bufsize, SNDRV_ENABLED);
+MODULE_PARM(force_ac97, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(force_ac97, "Force to use AC97 codec for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(force_ac97, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM(buffer_top, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(buffer_top, "Set the top address of audio buffer for " CARD_NAME " soundcard.");
+MODULE_PARM_SYNTAX(buffer_top, SNDRV_ENABLED);
+MODULE_PARM(use_cache, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(use_cache, "Enable the cache for coefficient table access.");
+MODULE_PARM_SYNTAX(use_cache, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM(vaio_hack, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(vaio_hack, "Enable workaround for Sony VAIO notebooks.");
+MODULE_PARM_SYNTAX(vaio_hack, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 /*
  * hw definitions
@@ -1448,7 +1448,7 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 			if (! force_load) {
 				printk(KERN_ERR "nm256: no ac97 is found!\n");
 				printk(KERN_ERR "  force the driver to load by passing in the module parameter\n");
-				printk(KERN_ERR "    snd_force_ac97=1\n");
+				printk(KERN_ERR "    force_ac97=1\n");
 				printk(KERN_ERR "  or try sb16 or cs423x drivers instead.\n");
 				err = -ENXIO;
 				goto __error;
@@ -1562,25 +1562,25 @@ __error:
 
 
 static int __devinit snd_nm256_probe(struct pci_dev *pci,
-				     const struct pci_device_id *id)
+				     const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
 	nm256_t *chip;
 	int err;
-	unsigned int buffer_top;
+	unsigned int xbuffer_top;
 
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
@@ -1597,25 +1597,25 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 		return -EINVAL;
 	}
 
-	if (snd_vaio_hack[dev])
-		buffer_top = 0x25a800;	/* this avoids conflicts with XFree86 server */
+	if (vaio_hack[dev])
+		xbuffer_top = 0x25a800;	/* this avoids conflicts with XFree86 server */
 	else
-		buffer_top = snd_buffer_top[dev];
+		xbuffer_top = buffer_top[dev];
 
-	if (snd_playback_bufsize[dev] < 4)
-		snd_playback_bufsize[dev] = 4;
-	if (snd_playback_bufsize[dev] > 128)
-		snd_playback_bufsize[dev] = 128;
-	if (snd_capture_bufsize[dev] < 4)
-		snd_capture_bufsize[dev] = 4;
-	if (snd_capture_bufsize[dev] > 128)
-		snd_capture_bufsize[dev] = 128;
+	if (playback_bufsize[dev] < 4)
+		playback_bufsize[dev] = 4;
+	if (playback_bufsize[dev] > 128)
+		playback_bufsize[dev] = 128;
+	if (capture_bufsize[dev] < 4)
+		capture_bufsize[dev] = 4;
+	if (capture_bufsize[dev] > 128)
+		capture_bufsize[dev] = 128;
 	if ((err = snd_nm256_create(card, pci,
-				    snd_playback_bufsize[dev] * 1024, /* in bytes */
-				    snd_capture_bufsize[dev] * 1024,  /* in bytes */
-				    snd_force_ac97[dev],
-				    buffer_top,
-				    snd_use_cache[dev],
+				    playback_bufsize[dev] * 1024, /* in bytes */
+				    capture_bufsize[dev] * 1024,  /* in bytes */
+				    force_ac97[dev],
+				    xbuffer_top,
+				    use_cache[dev],
 				    &chip)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -1679,9 +1679,9 @@ module_exit(alsa_card_nm256_exit)
 
 #ifndef MODULE
 
-/* format is: snd-nm256=snd_enable,snd_index,snd_id,
-			snd_playback_bufsize,snd_capture_bufsize,
-			snd_force_ac97,snd_buffer_top,snd_use_cache */
+/* format is: snd-nm256=enable,index,id,
+			playback_bufsize,capture_bufsize,
+			force_ac97,buffer_top,use_cache */
 
 static int __init alsa_card_nm256_setup(char *str)
 {
@@ -1689,14 +1689,14 @@ static int __init alsa_card_nm256_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,&snd_playback_bufsize[nr_dev]) == 2 &&
-	       get_option(&str,&snd_capture_bufsize[nr_dev]) == 2 &&
-	       get_option(&str,&snd_force_ac97[nr_dev]) == 2 &&
-	       get_option(&str,&snd_buffer_top[nr_dev]) == 2 &&
-	       get_option(&str,&snd_use_cache[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,&playback_bufsize[nr_dev]) == 2 &&
+	       get_option(&str,&capture_bufsize[nr_dev]) == 2 &&
+	       get_option(&str,&force_ac97[nr_dev]) == 2 &&
+	       get_option(&str,&buffer_top[nr_dev]) == 2 &&
+	       get_option(&str,&use_cache[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }
