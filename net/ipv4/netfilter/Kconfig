@@ -603,5 +603,15 @@ config IP_NF_RAW
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 	  help
 
+config IP_NF_MATCH_ADDRTYPE
+	tristate  'address type match support'
+	depends on IP_NF_IPTABLES
+	help
+	  This option allows you to match what routing thinks of an address,
+	  eg. UNICAST, LOCAL, BROADCAST, ...
+	
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say `N'.
+
 endmenu
 
