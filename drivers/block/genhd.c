@@ -278,7 +278,7 @@ int __init device_init(void)
 	return 0;
 }
 
-__initcall(device_init);
+subsys_initcall(device_init);
 
 
 
