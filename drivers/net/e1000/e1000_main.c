@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -30,7 +30,12 @@
 
 /* Change Log
  *
- * 5.2.27	12/14/03
+ * 5.2.30.1	1/29/03
+ *   o Set VLAN filtering to IEEE 802.1Q after reset so we don't break
+ *     SoL connections that use VLANs.
+ *   o Allow 1000/Full setting for AutoNeg param for Fiber connections
+ *     Jon D Mason [jonmason@us.ibm.com].
+ *   o Race between Tx queue and Tx clean fixed with a spin lock.
  *   o Added netpoll support.
  *   o Fixed endianess bug causing ethtool loopback diags to fail on ppc.
  *   o Use pdev->irq rather than netdev->irq in preparation for MSI support.
@@ -63,8 +68,8 @@
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.2.27-k1";
-char e1000_copyright[] = "Copyright (c) 1999-2003 Intel Corporation.";
+char e1000_driver_version[] = "5.2.30.1-k1";
+char e1000_copyright[] = "Copyright (c) 1999-2004 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
  *
