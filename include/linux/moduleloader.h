@@ -15,20 +15,26 @@ unsigned long find_symbol_internal(Elf_Shdr *sechdrs,
 
 /* These must be implemented by the specific architecture */
 
-/* vmalloc AND zero for the non-releasable code; return ERR_PTR() on error. */
-void *module_core_alloc(const Elf_Ehdr *hdr,
-			const Elf_Shdr *sechdrs,
-			const char *secstrings,
-			struct module *mod);
+/* Total size to allocate for the non-releasable code; return len or
+   -error.  mod->core_size is the current generic tally. */
+long module_core_size(const Elf_Ehdr *hdr,
+		      const Elf_Shdr *sechdrs,
+		      const char *secstrings,
+		      struct module *mod);
 
-/* vmalloc and zero (if any) for sections to be freed after init.
-   Return ERR_PTR() on error. */
-void *module_init_alloc(const Elf_Ehdr *hdr,
-			const Elf_Shdr *sechdrs,
-			const char *secstrings,
-			struct module *mod);
+/* Total size of (if any) sections to be freed after init.  Return 0
+   for none, len, or -error. mod->init_size is the current generic
+   tally. */
+long module_init_size(const Elf_Ehdr *hdr,
+		      const Elf_Shdr *sechdrs,
+		      const char *secstrings,
+		      struct module *mod);
 
-/* Free memory returned from module_core_alloc/module_init_alloc */
+/* Allocator used for allocating struct module, core sections and init
+   sections.  Returns NULL on failure. */
+void *module_alloc(unsigned long size);
+
+/* Free memory returned from module_alloc. */
 void module_free(struct module *mod, void *module_region);
 
 /* Apply the given relocation to the (simplified) ELF.  Return -error

@@ -557,7 +557,7 @@ static void free_module(struct module *mod)
 	module_unload_free(mod);
 
 	/* Finally, free the module structure */
-	kfree(mod);
+	module_free(mod, mod);
 }
 
 void *__symbol_get(const char *symbol)
@@ -805,7 +805,7 @@ static struct module *load_module(void *umod,
 	unsigned long common_length;
 	struct sizes sizes, used;
 	struct module *mod;
-	int err = 0;
+	long err = 0;
 	void *ptr = NULL; /* Stops spurious gcc uninitialized warning */
 
 	DEBUGP("load_module: umod=%p, len=%lu, uargs=%p\n",
@@ -894,7 +894,7 @@ static struct module *load_module(void *umod,
 		goto free_hdr;
 	arglen = err;
 
-	mod = kmalloc(sizeof(*mod) + arglen+1, GFP_KERNEL);
+	mod = module_alloc(sizeof(*mod) + arglen+1);
 	if (!mod) {
 		err = -ENOMEM;
 		goto free_hdr;
@@ -925,20 +925,36 @@ static struct module *load_module(void *umod,
 	common_length = read_commons(hdr, &sechdrs[symindex]);
 	sizes.core_size += common_length;
 
-	/* Set these up: arch's can add to them */
+	/* Set these up, and allow archs to manipulate them. */
 	mod->core_size = sizes.core_size;
 	mod->init_size = sizes.init_size;
 
-	/* Allocate (this is arch specific) */
-	ptr = module_core_alloc(hdr, sechdrs, secstrings, mod);
-	if (IS_ERR(ptr))
+	/* Allow archs to add to them. */
+	err = module_init_size(hdr, sechdrs, secstrings, mod);
+	if (err < 0)
 		goto free_mod;
+	mod->init_size = err;
 
+	err = module_core_size(hdr, sechdrs, secstrings, mod);
+	if (err < 0)
+		goto free_mod;
+	mod->core_size = err;
+
+	/* Do the allocs. */
+	ptr = module_alloc(mod->core_size);
+	if (!ptr) {
+		err = -ENOMEM;
+		goto free_mod;
+	}
+	memset(ptr, 0, mod->core_size);
 	mod->module_core = ptr;
 
-	ptr = module_init_alloc(hdr, sechdrs, secstrings, mod);
-	if (IS_ERR(ptr))
+	ptr = module_alloc(mod->init_size);
+	if (!ptr) {
+		err = -ENOMEM;
 		goto free_core;
+	}
+	memset(ptr, 0, mod->init_size);
 	mod->module_init = ptr;
 
 	/* Transfer each section which requires ALLOC, and set sh_offset
@@ -1015,7 +1031,7 @@ static struct module *load_module(void *umod,
  free_core:
 	module_free(mod, mod->module_core);
  free_mod:
-	kfree(mod);
+	module_free(mod, mod);
  free_hdr:
 	vfree(hdr);
 	if (err < 0) return ERR_PTR(err);
