@@ -75,13 +75,13 @@ static struct cpufreq_frequency_table op_900[] =
 
 /* Ultra Low Voltage Intel Pentium M processor 1000MHz */
 static struct cpufreq_frequency_table op_1000[] =
-  {
-    OP(600,  844),
-    OP(800,  972),
-    OP(900, 988),
-    OP(1000, 1004),
-    { .frequency = CPUFREQ_TABLE_END }
-  };
+{
+	OP(600,  844),
+	OP(800,  972),
+	OP(900,  988),
+	OP(1000, 1004),
+	{ .frequency = CPUFREQ_TABLE_END }
+};
 
 /* Low Voltage Intel Pentium M processor 1.10GHz */
 static struct cpufreq_frequency_table op_1100[] =
@@ -175,7 +175,7 @@ static struct cpufreq_frequency_table op_1700[] =
 static const struct cpu_model models[] = 
 {
        _CPU( 900, " 900"),
-       CPU(1000),
+	CPU(1000),
 	CPU(1100),
 	CPU(1200),
 	CPU(1300),
