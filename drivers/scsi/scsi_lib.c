@@ -1388,7 +1388,7 @@ __scsi_mode_sense(struct scsi_request *sreq, int dbd, int modepage,
 	sreq->sr_cmd_len = 0;
 	sreq->sr_sense_buffer[0] = 0;
 	sreq->sr_sense_buffer[2] = 0;
-	sreq->sr_data_direction = SCSI_DATA_READ;
+	sreq->sr_data_direction = DMA_FROM_DEVICE;
 
 	memset(buffer, 0, len);
 
