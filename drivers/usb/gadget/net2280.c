@@ -2663,7 +2663,7 @@ static void gadget_release (struct device *_dev)
 
 /* tear down the binding between this driver and the pci device */
 
-static void __exit net2280_remove (struct pci_dev *pdev)
+static void net2280_remove (struct pci_dev *pdev)
 {
 	struct net2280		*dev = pci_get_drvdata (pdev);
 
@@ -2884,7 +2884,7 @@ static struct pci_driver net2280_pci_driver = {
 	.id_table =	pci_ids,
 
 	.probe =	net2280_probe,
-	.remove =	__exit_p(net2280_remove),
+	.remove =	net2280_remove,
 
 	/* FIXME add power management support */
 };
