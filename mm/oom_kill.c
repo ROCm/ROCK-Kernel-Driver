@@ -97,11 +97,12 @@ int badness(struct task_struct *p)
 	/* 
 	 * Adjust the score by oomkilladj.
 	 */
-	if (p->oomkilladj)
+	if (p->oomkilladj) {
 		if (p->oomkilladj > 0)
 			points <<= p->oomkilladj;
 		else
 			points >>= -(p->oomkilladj);
+	}
 	/* 
 	 * One point for already having received a warning 
 	 */
