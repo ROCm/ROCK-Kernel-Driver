@@ -975,18 +975,18 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 /* ----------------------------------------------------------------------- */
 
 static struct i2c_driver driver = {
-        name:           "i2c TV tuner driver",
-        id:             I2C_DRIVERID_TUNER,
-        flags:          I2C_DF_NOTIFY,
-        attach_adapter: tuner_probe,
-        detach_client:  tuner_detach,
-        command:        tuner_command,
+	.name		= "i2cTVtunerdriver",
+	.id		= I2C_DRIVERID_TUNER,
+	.flags		= I2C_DF_NOTIFY,
+	.attach_adapter	= tuner_probe,
+	.detach_client	= tuner_detach,
+	.command	= tuner_command,
 };
-static struct i2c_client client_template =
+static structi2c_clientclient_template = 
 {
-        name:   "(tuner unset)",
-	flags:  I2C_CLIENT_ALLOW_USE,
-        driver: &driver,
+	.name	= "(tunerunset)",
+	.flags	= I2C_CLIENT_ALLOW_USE,
+	.driver	= &driver,
 };
 
 static int tuner_init_module(void)

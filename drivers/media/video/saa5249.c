@@ -678,20 +678,20 @@ module_init(init_saa_5249);
 module_exit(cleanup_saa_5249);
 
 static struct file_operations saa_fops = {
-	owner:		THIS_MODULE,
-	open:		saa5249_open,
-	release:       	saa5249_release,
-	ioctl:          saa5249_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open		= saa5249_open,
+	.release       	= saa5249_release,
+	.ioctl          = saa5249_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device saa_template =
 {
-	owner:		THIS_MODULE,
-	name:		IF_NAME,
-	type:		VID_TYPE_TELETEXT,	/*| VID_TYPE_TUNER ?? */
-	hardware:	VID_HARDWARE_SAA5249,
-	fops:           &saa_fops,
+	.owner		= THIS_MODULE,
+	.name		= IF_NAME,
+	.type		= VID_TYPE_TELETEXT,	/*| VID_TYPE_TUNER ?? */
+	.hardware	= VID_HARDWARE_SAA5249,
+	.fops           = &saa_fops,
 };
 
 MODULE_LICENSE("GPL");

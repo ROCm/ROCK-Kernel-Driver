@@ -875,21 +875,21 @@ static int pms_read(struct file *file, char *buf,
 }
 
 static struct file_operations pms_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:          pms_ioctl,
-	read:           pms_read,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl          = pms_ioctl,
+	.read           = pms_read,
+	.llseek         = no_llseek,
 };
 
 static struct video_device pms_template=
 {
-	owner:		THIS_MODULE,
-	name:		"Mediavision PMS",
-	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_PMS,
-	fops:           &pms_fops,
+	.owner		= THIS_MODULE,
+	.name		= "Mediavision PMS",
+	.type		= VID_TYPE_CAPTURE,
+	.hardware	= VID_HARDWARE_PMS,
+	.fops           = &pms_fops,
 };
 
 struct pms_device pms_device;
