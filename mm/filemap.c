@@ -1488,7 +1488,7 @@ repeat:
 	return 0;
 }
 
-static struct vm_operations_struct generic_file_vm_ops = {
+struct vm_operations_struct generic_file_vm_ops = {
 	.nopage		= filemap_nopage,
 	.populate	= filemap_populate,
 };
