@@ -120,11 +120,11 @@
  *
  *	V.   Miscellaneous
  *
- * 	VLAN offload support of tagging, stripping and filtering is not
+ * 	VLAN offloading of tagging, stripping and filtering is not
  * 	supported, but driver will accommodate the extra 4-byte VLAN tag
  * 	for processing by upper layers.  Tx/Rx Checksum offloading is not
  * 	supported.  Tx Scatter/Gather is not supported.  Jumbo Frames is
- * 	not supported.
+ * 	not supported (hardware limitation).
  *
  * 	NAPI support is enabled with CONFIG_E100_NAPI.
  *
@@ -149,11 +149,12 @@
 #include <linux/if_vlan.h>
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
+#include <linux/string.h>
 #include <asm/unaligned.h>
 
 
 #define DRV_NAME		"e100"
-#define DRV_VERSION		"3.0.9_dev"
+#define DRV_VERSION		"3.0.11_dev"
 #define DRV_DESCRIPTION		"Intel(R) PRO/100 Network Driver"
 #define DRV_COPYRIGHT		"Copyright(c) 1999-2003 Intel Corporation"
 #define PFX			DRV_NAME ": "
@@ -166,7 +167,7 @@ MODULE_AUTHOR(DRV_COPYRIGHT);
 MODULE_LICENSE("GPL");
 
 static int debug = 3;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
 #define DPRINTK(nlevel, klevel, fmt, args...) \
 	(void)((NETIF_MSG_##nlevel & nic->msg_enable) && \
@@ -196,6 +197,14 @@ static struct pci_device_id e100_id_table[] = {
 	INTEL_8255X_ETHERNET_DEVICE(0x1053, 5),
 	INTEL_8255X_ETHERNET_DEVICE(0x1054, 5),
 	INTEL_8255X_ETHERNET_DEVICE(0x1055, 5),
+	INTEL_8255X_ETHERNET_DEVICE(0x1064, 6),
+	INTEL_8255X_ETHERNET_DEVICE(0x1065, 6),
+	INTEL_8255X_ETHERNET_DEVICE(0x1066, 6),
+	INTEL_8255X_ETHERNET_DEVICE(0x1067, 6),
+	INTEL_8255X_ETHERNET_DEVICE(0x1068, 6),
+	INTEL_8255X_ETHERNET_DEVICE(0x1069, 6),
+	INTEL_8255X_ETHERNET_DEVICE(0x106A, 6),
+	INTEL_8255X_ETHERNET_DEVICE(0x106B, 6),
 	INTEL_8255X_ETHERNET_DEVICE(0x1059, 0),
 	INTEL_8255X_ETHERNET_DEVICE(0x1209, 0),
 	INTEL_8255X_ETHERNET_DEVICE(0x1229, 0),
@@ -216,7 +225,9 @@ enum mac {
 	mac_82559_D101S   = 9,
 	mac_82550_D102    = 12,
 	mac_82550_D102_C  = 13,
-	mac_82550_D102_E  = 15,
+	mac_82551_E       = 14,
+	mac_82551_F       = 15,
+	mac_82551_10      = 16,
 	mac_unknown       = 0xFF,
 };
 
@@ -955,14 +966,8 @@ static void e100_configure(struct nic *nic, struct cb *cb, struct sk_buff *skb)
 static void e100_setup_iaaddr(struct nic *nic, struct cb *cb,
 	struct sk_buff *skb)
 {
-	u8 *dev_addr = nic->netdev->dev_addr;
-
-	DPRINTK(HW, DEBUG, "dev_addr=%02X:%02X:%02X:%02X:%02X:%02X\n", 
-		dev_addr[0], dev_addr[1], dev_addr[2],
-		dev_addr[3], dev_addr[4], dev_addr[5]);
-	
 	cb->command = cpu_to_le16(cb_iaaddr);
-	memcpy(cb->u.iaaddr, dev_addr, ETH_ALEN);
+	memcpy(cb->u.iaaddr, nic->netdev->dev_addr, ETH_ALEN);
 }
 
 static void e100_dump(struct nic *nic, struct cb *cb, struct sk_buff *skb)
@@ -1239,8 +1244,7 @@ static int e100_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 
 	switch(err) {
 	case -ENOSPC:
-		/* We queued the skb, but now we're out of space, so
-		 * stop the queue before we completely run out. */
+		/* We queued the skb, but now we're out of space. */
 		netif_stop_queue(netdev);
 		break;
 	case -ENOMEM:
@@ -1381,9 +1385,7 @@ static inline int e100_rx_alloc_skb(struct nic *nic, struct rx_list *curr)
 
 static inline void e100_rx_rfa_add_tail(struct nic *nic, struct rx_list *curr)
 {
-	struct rfd *rfd = (struct rfd *)curr->skb->data;
-	
-	*rfd = nic->blank_rfd;
+	memcpy(curr->skb->data, &nic->blank_rfd, sizeof(struct rfd));
 	pci_dma_sync_single(nic->pdev, curr->dma_addr, 
 		sizeof(struct rfd), PCI_DMA_TODEVICE);
 
@@ -1542,7 +1544,7 @@ static irqreturn_t e100_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	DPRINTK(INTR, DEBUG, "stat_ack = 0x%02X\n", stat_ack);
 
-	if(stat_ack == 0x00 ||	/* Not our interurpt */
+	if(stat_ack == 0x00 ||	/* Not our interrupt */
 	   stat_ack == 0xFF)	/* Hardware is ejected (cardbus, hotswap)  */
 		return IRQ_NONE;
 
@@ -2180,10 +2182,10 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 
 	if((err = e100_eeprom_load(nic)))
 		goto err_out_free;
-	((u16 *)nic->netdev->dev_addr)[0] = le16_to_cpu(nic->eeprom[0]);
-	((u16 *)nic->netdev->dev_addr)[1] = le16_to_cpu(nic->eeprom[1]);
-	((u16 *)nic->netdev->dev_addr)[2] = le16_to_cpu(nic->eeprom[2]);
-	if(!is_valid_ether_addr(nic->netdev->dev_addr)) {
+	((u16 *)netdev->dev_addr)[0] = le16_to_cpu(nic->eeprom[0]);
+	((u16 *)netdev->dev_addr)[1] = le16_to_cpu(nic->eeprom[1]);
+	((u16 *)netdev->dev_addr)[2] = le16_to_cpu(nic->eeprom[2]);
+	if(!is_valid_ether_addr(netdev->dev_addr)) {
 		DPRINTK(PROBE, ERR, "Invalid MAC address from "
 			"EEPROM, aborting.\n");
 		err = -EAGAIN;
@@ -2201,6 +2203,12 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 		DPRINTK(PROBE, ERR, "Cannot register net device, aborting.\n");
 		goto err_out_free;
 	}
+
+	DPRINTK(PROBE, INFO, "addr 0x%lx, irq %d, "
+		"MAC addr %02X:%02X:%02X:%02X:%02X:%02X\n",
+		pci_resource_start(pdev, 0), pdev->irq,
+		netdev->dev_addr[0], netdev->dev_addr[1], netdev->dev_addr[2],
+		netdev->dev_addr[3], netdev->dev_addr[4], netdev->dev_addr[5]);
 
 	return 0;
 
