@@ -939,7 +939,7 @@ static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 	mtu = dst_pmtu(&rt->u.dst) - hlen - sizeof(struct frag_hdr);
 
 	if (skb_shinfo(skb)->frag_list) {
-		int first_len = 0;
+		int first_len = skb_pagelen(skb);
 
 		if (first_len - hlen > mtu ||
 		    ((first_len - hlen) & 7) ||

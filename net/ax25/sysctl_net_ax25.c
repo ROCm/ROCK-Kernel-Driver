@@ -36,7 +36,6 @@ static ctl_table ax25_dir_table[] = {
 	{
 		.ctl_name	= NET_AX25,
 		.procname	= "ax25",
-		.maxlen		= 0,
 		.mode		= 0555,
 	},
 	{ .ctl_name = 0 }
@@ -46,7 +45,6 @@ static ctl_table ax25_root_table[] = {
 	{
 		.ctl_name	= CTL_NET,
 		.procname	= "net",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= ax25_dir_table
 	},
