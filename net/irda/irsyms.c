@@ -165,13 +165,6 @@ EXPORT_SYMBOL(irda_calc_crc16);
 EXPORT_SYMBOL(irda_crc16_table);
 EXPORT_SYMBOL(irda_start_timer);
 
-#ifdef CONFIG_IRTTY
-EXPORT_SYMBOL(irtty_set_dtr_rts);
-EXPORT_SYMBOL(irtty_register_dongle);
-EXPORT_SYMBOL(irtty_unregister_dongle);
-EXPORT_SYMBOL(irtty_set_packet_mode);
-#endif
-
 #ifdef CONFIG_IRDA_DEBUG
 __u32 irda_debug = IRDA_DEBUG_LEVEL;
 #endif
