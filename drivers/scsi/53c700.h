@@ -45,25 +45,6 @@
 #error "Config.in must define either CONFIG_53C700_IO_MAPPED or CONFIG_53C700_MEM_MAPPED to use this scsi core."
 #endif
 
-/* macros for consistent memory allocation */
-
-#ifdef CONFIG_53C700_USE_CONSISTENT
-#define NCR_700_dma_cache_wback(mem, size) \
-	if(!hostdata->consistent) \
-		dma_cache_wback(mem, size)
-#define NCR_700_dma_cache_inv(mem, size) \
-	if(!hostdata->consistent) \
-		dma_cache_inv(mem, size)
-#define NCR_700_dma_cache_wback_inv(mem, size) \
-	if(!hostdata->consistent) \
-		dma_cache_wback_inv(mem, size)
-#else
-#define NCR_700_dma_cache_wback(mem, size) dma_cache_wback(mem,size)
-#define NCR_700_dma_cache_inv(mem, size) dma_cache_inv(mem,size)
-#define NCR_700_dma_cache_wback_inv(mem, size) dma_cache_wback_inv(mem,size)
-#endif
-
-
 struct NCR_700_Host_Parameters;
 
 /* These are the externally used routines */
@@ -215,7 +196,7 @@ struct NCR_700_Host_Parameters {
 	/* These must be filled in by the calling driver */
 	int	clock;			/* board clock speed in MHz */
 	unsigned long	base;		/* the base for the port (copied to host) */
-	struct pci_dev	*pci_dev;
+	struct device	*dev;
 	__u32	dmode_extra;	/* adjustable bus settings */
 	__u32	differential:1;	/* if we are differential */
 #ifdef CONFIG_53C700_LE_ON_BE
@@ -229,10 +210,6 @@ struct NCR_700_Host_Parameters {
 	/* NOTHING BELOW HERE NEEDS ALTERING */
 	__u32	fast:1;		/* if we can alter the SCSI bus clock
                                    speed (so can negiotiate sync) */
-#ifdef CONFIG_53C700_USE_CONSISTENT
-	__u32	consistent:1;
-#endif
-
 	int	sync_clock;	/* The speed of the SYNC core */
 
 	__u32	*script;		/* pointer to script location */
@@ -442,7 +419,7 @@ struct NCR_700_Host_Parameters {
 	for(i=0; i< (sizeof(A_##symbol##_used) / sizeof(__u32)); i++) { \
 		__u32 val = bS_to_cpu((script)[A_##symbol##_used[i]]) + value; \
 		(script)[A_##symbol##_used[i]] = bS_to_host(val); \
-		dma_cache_wback((unsigned long)&(script)[A_##symbol##_used[i]], 4); \
+		dma_cache_sync(&(script)[A_##symbol##_used[i]], 4, DMA_TO_DEVICE); \
 		DEBUG((" script, patching %s at %d to 0x%lx\n", \
 		       #symbol, A_##symbol##_used[i], (value))); \
 	} \
@@ -453,7 +430,7 @@ struct NCR_700_Host_Parameters {
 	int i; \
 	for(i=0; i< (sizeof(A_##symbol##_used) / sizeof(__u32)); i++) { \
 		(script)[A_##symbol##_used[i]] = bS_to_host(value); \
-		dma_cache_wback((unsigned long)&(script)[A_##symbol##_used[i]], 4); \
+		dma_cache_sync(&(script)[A_##symbol##_used[i]], 4, DMA_TO_DEVICE); \
 		DEBUG((" script, patching %s at %d to 0x%lx\n", \
 		       #symbol, A_##symbol##_used[i], (value))); \
 	} \
@@ -468,7 +445,7 @@ struct NCR_700_Host_Parameters {
 		val &= 0xff00ffff; \
 		val |= ((value) & 0xff) << 16; \
 		(script)[A_##symbol##_used[i]] = bS_to_host(val); \
-		dma_cache_wback((unsigned long)&(script)[A_##symbol##_used[i]], 4); \
+		dma_cache_sync(&(script)[A_##symbol##_used[i]], 4, DMA_TO_DEVICE); \
 		DEBUG((" script, patching ID field %s at %d to 0x%x\n", \
 		       #symbol, A_##symbol##_used[i], val)); \
 	} \
@@ -482,7 +459,7 @@ struct NCR_700_Host_Parameters {
 		val &= 0xffff0000; \
 		val |= ((value) & 0xffff); \
 		(script)[A_##symbol##_used[i]] = bS_to_host(val); \
-		dma_cache_wback((unsigned long)&(script)[A_##symbol##_used[i]], 4); \
+		dma_cache_sync(&(script)[A_##symbol##_used[i]], 4, DMA_TO_DEVICE); \
 		DEBUG((" script, patching short field %s at %d to 0x%x\n", \
 		       #symbol, A_##symbol##_used[i], val)); \
 	} \

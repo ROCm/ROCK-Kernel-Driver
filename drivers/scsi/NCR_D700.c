@@ -307,6 +307,7 @@ NCR_D700_probe(struct device *dev)
 			continue;
 		}
 		scsi_set_device(host, dev);
+		hostdata->dev = dev;
 		found++;
 	}
 	info->found += found;
