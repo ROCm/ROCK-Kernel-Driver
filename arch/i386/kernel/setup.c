@@ -998,7 +998,7 @@ void __init setup_arch(char **cmdline_p)
 	generic_apic_probe(*cmdline_p);
 #endif	
 
-#ifdef CONFIG_ACPI
+#ifdef CONFIG_ACPI_BOOT
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
