@@ -56,6 +56,18 @@
  * History:
  *
  *	$Log: skge.c,v $
+ *	Revision 1.16  2003/09/23 11:07:35  mlindner
+ *	Fix: IO-control return race condition
+ *	Fix: Interrupt moderation value check
+ *	
+ *	Revision 1.15  2003/09/22 08:40:05  mlindner
+ *	Add: Added DRIVER_FILE_NAME and DRIVER_REL_DATE
+ *	
+ *	Revision 1.14  2003/09/22 08:11:10  mlindner
+ *	Add: New function for PCI initialization (SkGeInitPCI)
+ *	Add: Yukon Plus changes (ChipID, PCI...)
+ *	Fix: TCP and UDP Checksum calculation
+ *	
  *	Revision 1.11  2003/08/26 16:05:19  mlindner
  *	Fix: Compiler warnings (void *)
  *	
@@ -394,6 +406,7 @@
  *	<linux/module.h>
  *
  *	"h/skdrv1st.h"
+ *		<linux/version.h>
  *		<linux/types.h>
  *		<linux/kernel.h>
  *		<linux/string.h>
@@ -550,6 +563,7 @@ static void	ClearTxRing(SK_AC*, TX_PORT*);
 static int	SkGeChangeMtu(struct SK_NET_DEVICE *dev, int new_mtu);
 static void	PortReInitBmu(SK_AC*, int);
 static int	SkGeIocMib(DEV_NET*, unsigned int, int);
+static int	SkGeInitPCI(SK_AC *pAC);
 static void	StartDrvCleanupTimer(SK_AC *pAC);
 static void	StopDrvCleanupTimer(SK_AC *pAC);
 static int	XmitFrameSG(SK_AC*, TX_PORT*, struct sk_buff*);
@@ -619,10 +633,10 @@ static int __init skge_probe (void)
 	SK_AC			*pAC;
 	DEV_NET			*pNet = NULL;
 	struct pci_dev	*pdev = NULL;
-	unsigned long		base_address;
 	struct SK_NET_DEVICE *dev = NULL;
 	SK_BOOL DeviceFound = SK_FALSE;
 	SK_BOOL BootStringCount = SK_FALSE;
+	int			retval;
 #ifdef CONFIG_PROC_FS
 	int			proc_root_initialized = 0;
 	struct proc_dir_entry	*pProcFile;
@@ -667,6 +681,8 @@ static int __init skge_probe (void)
 		pNet = dev->priv;
 		pNet->pAC = kmalloc(sizeof(SK_AC), GFP_KERNEL);
 		if (pNet->pAC == NULL){
+			dev->get_stats = NULL;
+			unregister_netdev(dev);
 			kfree(dev->priv);
 			printk(KERN_ERR "Unable to allocate adapter "
 			       "structure!\n");
@@ -693,6 +709,14 @@ static int __init skge_probe (void)
 		pNet->Mtu = 1500;
 		pNet->Up = 0;
 		dev->irq = pdev->irq;
+		retval = SkGeInitPCI(pAC);
+		if (retval) {
+			printk("SKGE: PCI setup failed: %i\n", retval);
+			dev->get_stats = NULL;
+			unregister_netdev(dev);
+			kfree(dev);
+			continue;
+		}
 
 		SET_MODULE_OWNER(dev);
 		dev->open =		&SkGeOpen;
@@ -715,41 +739,6 @@ static int __init skge_probe (void)
 		}
 #endif
 #endif
-
-		/*
-		 * Dummy value.
-		 */
-		dev->base_addr = 42;
-		pci_set_master(pdev);
-
-		pci_set_master(pdev);
-		base_address = pci_resource_start (pdev, 0);
-
-#ifdef SK_BIG_ENDIAN
-		/*
-		 * On big endian machines, we use the adapter's aibility of
-		 * reading the descriptors as big endian.
-		 */
-		{
-		SK_U32		our2;
-			SkPciReadCfgDWord(pAC, PCI_OUR_REG_2, &our2);
-			our2 |= PCI_REV_DESC;
-			SkPciWriteCfgDWord(pAC, PCI_OUR_REG_2, our2);
-		}
-#endif
-
-		/*
-		 * Remap the regs into kernel space.
-		 */
-		pAC->IoBase = (char*)ioremap(base_address, 0x4000);
-
-		if (!pAC->IoBase){
-			printk(KERN_ERR "%s:  Unable to map I/O register, "
-			       "SK 98xx No. %i will be disabled.\n",
-			       dev->name, boards_found);
-			kfree(dev);
-			break;
-		}
 
 		pAC->Index = boards_found;
 		if (SkGeBoardInit(dev, pAC)) {
@@ -887,6 +876,68 @@ static int __init skge_probe (void)
 } /* skge_probe */
 
 
+
+/*****************************************************************************
+ *
+ * 	SkGeInitPCI - Init the PCI resources
+ *
+ * Description:
+ *	This function initialize the PCI resources and IO
+ *
+ * Returns: N/A
+ *	
+ */
+int SkGeInitPCI(SK_AC *pAC)
+{
+	struct SK_NET_DEVICE *dev = pAC->dev[0];
+	struct pci_dev *pdev = pAC->PciDev;
+	int retval;
+
+	if (pci_enable_device(pdev) != 0) {
+		return 1;
+	}
+
+	dev->mem_start = pci_resource_start (pdev, 0);
+	pci_set_master(pdev);
+
+	if (pci_request_regions(pdev, pAC->Name) != 0) {
+		retval = 2;
+		goto out_disable;
+	}
+
+#ifdef SK_BIG_ENDIAN
+	/*
+	 * On big endian machines, we use the adapter's aibility of
+	 * reading the descriptors as big endian.
+	 */
+	{
+		SK_U32		our2;
+		SkPciReadCfgDWord(pAC, PCI_OUR_REG_2, &our2);
+		our2 |= PCI_REV_DESC;
+		SkPciWriteCfgDWord(pAC, PCI_OUR_REG_2, our2);
+	}
+#endif
+
+	/*
+	 * Remap the regs into kernel space.
+	 */
+	pAC->IoBase = (char*)ioremap_nocache(dev->mem_start, 0x4000);
+
+	if (!pAC->IoBase){
+		retval = 3;
+		goto out_release;
+	}
+
+	return 0;
+
+ out_release:
+	pci_release_regions(pdev);
+ out_disable:
+	pci_disable_device(pdev);
+	return retval;
+}
+
+
 /*****************************************************************************
  *
  * 	FreeResources - release resources allocated for adapter
@@ -908,6 +959,9 @@ SK_AC		*pAC;
 		pNet = (DEV_NET*) dev->priv;
 		pAC = pNet->pAC;
 		AllocFlag = pAC->AllocFlag;
+		if (pAC->PciDev) {
+			pci_release_regions(pAC->PciDev);
+		}
 		if (AllocFlag & SK_ALLOC_IRQ) {
 			free_irq(dev->irq, dev);
 		}
@@ -2172,7 +2226,7 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 	*/
 	if (BytesSend < C_LEN_ETHERNET_MINSIZE) {
 	    skb_put(pMessage, (C_LEN_ETHERNET_MINSIZE-BytesSend));
-	    memset( ((int *)(pMessage->data))+BytesSend,
+	    SK_MEMSET( ((char *)(pMessage->data))+BytesSend,
 	            0, C_LEN_ETHERNET_MINSIZE-BytesSend);
 	}
 
@@ -2205,10 +2259,12 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 
 	if (pMessage->ip_summed == CHECKSUM_HW) {
 		Protocol = ((SK_U8)pMessage->data[C_OFFSET_IPPROTO] & 0xff);
-		if ((Protocol == C_PROTO_ID_UDP) && (pAC->GIni.GIChipRev != 0)) {
-			pTxd->TBControl = BMU_UDP_CHECK;
+		if ((Protocol == C_PROTO_ID_UDP) && 
+			(pAC->GIni.GIChipRev == 0) &&
+			(pAC->GIni.GIChipId == CHIP_ID_YUKON)) {
+			pTxd->TBControl = BMU_TCP_CHECK;
 		} else {
-			pTxd->TBControl = BMU_TCP_CHECK ;
+			pTxd->TBControl = BMU_UDP_CHECK;
 		}
 
 		IpHeaderLength  = (SK_U8)pMessage->data[C_OFFSET_IPHEADER];
@@ -2232,7 +2288,7 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 #ifdef USE_TX_COMPLETE
 				   BMU_IRQ_EOF |
 #endif
-				   pMessage->len;
+			pMessage->len;
 	}
 
 	/* 
@@ -2333,10 +2389,12 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 		** (Revision 2.0)
 		*/
 		Protocol = ((SK_U8)pMessage->data[C_OFFSET_IPPROTO] & 0xff);
-		if ((Protocol == C_PROTO_ID_UDP) && (pAC->GIni.GIChipRev != 0)) {
-			pTxd->TBControl |= BMU_UDP_CHECK;
+		if ((Protocol == C_PROTO_ID_UDP) && 
+			(pAC->GIni.GIChipRev == 0) &&
+			(pAC->GIni.GIChipId == CHIP_ID_YUKON)) {
+			pTxd->TBControl |= BMU_TCP_CHECK;
 		} else {
-			pTxd->TBControl |= BMU_TCP_CHECK ;
+			pTxd->TBControl |= BMU_UDP_CHECK;
 		}
 
 		IpHeaderLength  = ((SK_U8)pMessage->data[C_OFFSET_IPHEADER] & 0xf)*4;
@@ -2383,11 +2441,12 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 			** opcode for udp is not working in the hardware yet 
 			** (revision 2.0)
 			*/
-			if ( (Protocol == C_PROTO_ID_UDP) && 
-			     (pAC->GIni.GIChipRev != 0) ) {
-				pTxd->TBControl |= BMU_UDP_CHECK ;
+			if ((Protocol == C_PROTO_ID_UDP) && 
+				(pAC->GIni.GIChipRev == 0) &&
+				(pAC->GIni.GIChipId == CHIP_ID_YUKON)) {
+				pTxd->TBControl |= BMU_TCP_CHECK;
 			} else {
-				pTxd->TBControl |= BMU_TCP_CHECK ;
+				pTxd->TBControl |= BMU_UDP_CHECK;
 			}
 		} else {
 			pTxd->TBControl = BMU_CHECK | BMU_SW | BMU_OWN;
@@ -3616,21 +3675,26 @@ int		HeaderLength = sizeof(SK_U32) + sizeof(SK_U32);
 			Length = sizeof(pAC->PnmiStruct) + HeaderLength;
 		}
 		if (NULL == (pMemBuf = kmalloc(Length, GFP_KERNEL))) {
-			return -EFAULT;
+			return -ENOMEM;
 		}
 		if(copy_from_user(pMemBuf, Ioctl.pData, Length)) {
-			return -EFAULT;
+			Err = -EFAULT;
+			goto fault_gen;
 		}
 		if ((Ret = SkPnmiGenIoctl(pAC, pAC->IoBase, pMemBuf, &Length, 0)) < 0) {
-			return -EFAULT;
+			Err = -EFAULT;
+			goto fault_gen;
 		}
 		if(copy_to_user(Ioctl.pData, pMemBuf, Length) ) {
-			return -EFAULT;
+			Err = -EFAULT;
+			goto fault_gen;
 		}
 		Ioctl.Len = Length;
 		if(copy_to_user(rq->ifr_data, &Ioctl, sizeof(SK_GE_IOCTL))) {
-			return -EFAULT;
+			Err = -EFAULT;
+			goto fault_gen;
 		}
+fault_gen:
 		kfree(pMemBuf); /* cleanup everything */
 		break;
 	default:
@@ -4370,7 +4434,7 @@ int	Capabilities[3][3] =
         }
 
         if (IntsPerSec[pAC->Index] != 0) {
-           if ((IntsPerSec[pAC->Index]< 30)&&(IntsPerSec[pAC->Index]> 40000)) {
+           if ((IntsPerSec[pAC->Index]< 30) || (IntsPerSec[pAC->Index]> 40000)) {
               pAC->DynIrqModInfo.MaxModIntsPerSec = C_INTS_PER_SEC_DEFAULT;
            } else {
               pAC->DynIrqModInfo.MaxModIntsPerSec = IntsPerSec[pAC->Index];
