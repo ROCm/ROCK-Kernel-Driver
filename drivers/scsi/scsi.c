@@ -2241,21 +2241,8 @@ static void scsi_dump_status(int level)
 }
 #endif				/* CONFIG_PROC_FS */
 
-static char *scsihosts;
-
-MODULE_PARM(scsihosts, "s");
 MODULE_DESCRIPTION("SCSI core");
 MODULE_LICENSE("GPL");
-
-#ifndef MODULE
-int __init scsi_setup(char *str)
-{
-	scsihosts = str;
-	return 1;
-}
-
-__setup("scsihosts=", scsi_setup);
-#endif
 
 static void *scsi_pool_alloc(int gfp_mask, void *data)
 {
@@ -2381,7 +2368,7 @@ static int __init init_scsi(void)
 
         scsi_devfs_handle = devfs_mk_dir (NULL, "scsi", NULL);
 
-	scsi_host_hn_init(scsihosts);
+	scsi_host_init();
 
 	bus_register(&scsi_driverfs_bus_type);
 
@@ -2396,8 +2383,6 @@ static void __exit exit_scsi(void)
 	int i;
 
         devfs_unregister (scsi_devfs_handle);
-
-	scsi_host_hn_release();
 
 #ifdef CONFIG_PROC_FS
 	/* No, we're not here anymore. Don't show the /proc/scsi files. */
