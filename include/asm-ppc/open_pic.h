@@ -41,6 +41,8 @@ extern void* OpenPIC_Addr;
 extern void openpic_set_sources(int first_irq, int num_irqs, void *isr);
 extern void openpic_init(int linux_irq_offset);
 extern void openpic_init_nmi_irq(u_int irq);
+extern void openpic_hookup_cascade(u_int irq, char *name,
+				   int (*cascade_fn)(struct pt_regs *));
 extern u_int openpic_irq(void);
 extern void openpic_eoi(void);
 extern void openpic_request_IPIs(void);

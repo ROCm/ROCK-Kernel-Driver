@@ -1325,7 +1325,6 @@ int vfs_quota_off(struct super_block *sb, int type)
 		dqopt->ops[cnt] = NULL;
 	}
 	up(&dqopt->dqonoff_sem);
-out:
 	return 0;
 }
 
