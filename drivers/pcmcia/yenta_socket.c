@@ -461,6 +461,7 @@ static void yenta_clear_maps(struct yenta_socket *socket)
 static int yenta_sock_init(struct pcmcia_socket *sock)
 {
 	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
+	u32 state;
 	u16 bridge;
 
 	bridge = config_readw(socket, CB_BRIDGE_CONTROL) & ~CB_BRIDGE_INTR;
@@ -472,7 +473,10 @@ static int yenta_sock_init(struct pcmcia_socket *sock)
 	exca_writeb(socket, I365_GENCTL, 0x00);
 
 	/* Redo card voltage interrogation */
-	cb_writel(socket, CB_SOCKET_FORCE, CB_CVSTEST);
+	state = cb_readl(socket, CB_SOCKET_STATE);
+	if (!(state & (CB_CDETECT1 | CB_CDETECT2 | CB_5VCARD |
+	               CB_3VCARD | CB_XVCARD | CB_YVCARD)))
+		cb_writel(socket, CB_SOCKET_FORCE, CB_CVSTEST);
 
 	yenta_clear_maps(socket);
 
