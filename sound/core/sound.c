@@ -68,10 +68,6 @@ static struct list_head snd_minors_hash[SNDRV_CARDS];
 
 static DECLARE_MUTEX(sound_mutex);
 
-#ifdef CONFIG_DEVFS_FS
-static devfs_handle_t devfs_handle = NULL;
-#endif
-
 #ifdef CONFIG_KMOD
 
 /**
@@ -343,15 +339,7 @@ static int __init alsa_sound_init(void)
 	if ((err = snd_oss_init_module()) < 0)
 		return err;
 #endif
-#ifdef CONFIG_DEVFS_FS
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-	devfs_handle = devfs_mk_dir(NULL, "snd", 3, NULL);
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,5,67)
-	devfs_handle = devfs_mk_dir(NULL, "snd", NULL);
-#else
-	devfs_handle = devfs_mk_dir("snd");
-#endif
-#endif
+	devfs_mk_dir("snd");
 	if (register_chrdev(major, "alsa", &snd_fops)) {
 		snd_printk(KERN_ERR "unable to register native major device number %d\n", major);
 		return -EIO;
@@ -404,9 +392,7 @@ static void __exit alsa_sound_exit(void)
 #endif
 	if (unregister_chrdev(major, "alsa") != 0)
 		snd_printk(KERN_ERR "unable to unregister major device number %d\n", major);
-#ifdef CONFIG_DEVFS_FS
-	devfs_unregister(devfs_handle);
-#endif
+	devfs_remove("snd");
 }
 
 module_init(alsa_sound_init)
