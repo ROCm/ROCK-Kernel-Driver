@@ -7757,7 +7757,7 @@ static void ncr_init_ccb(ncb_p np, ccb_p cp)
 	cp->start.schedule.l_cmd = cpu_to_scr(SCR_JUMP);
 	cp->start.p_phys	 = cpu_to_scr(CCB_PHYS(cp, phys));
 
-	bcopy(&cp->start, &cp->restart, sizeof(cp->restart));
+	memcpy(&cp->restart, &cp->start, sizeof(cp->restart));
 
 	cp->start.schedule.l_paddr   = cpu_to_scr(NCB_SCRIPT_PHYS (np, idle));
 	cp->restart.schedule.l_paddr = cpu_to_scr(NCB_SCRIPTH_PHYS (np, abort));

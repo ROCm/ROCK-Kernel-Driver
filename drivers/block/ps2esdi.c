@@ -39,7 +39,7 @@
 #include <linux/genhd.h>
 #include <linux/ps2esdi.h>
 #include <linux/blkdev.h>
-#include <linux/mca.h>
+#include <linux/mca-legacy.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
