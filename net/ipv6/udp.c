@@ -112,7 +112,9 @@ gotit:
 			    &udp_hash[snum & (UDP_HTABLE_SIZE - 1)]) {
 			if (inet_sk(sk2)->num == snum &&
 			    sk2 != sk &&
-			    sk2->sk_bound_dev_if == sk->sk_bound_dev_if &&
+			    (!sk2->sk_bound_dev_if ||
+			     !sk->sk_bound_dev_if ||
+			     sk2->sk_bound_dev_if == sk->sk_bound_dev_if) &&
 			    (!sk2->sk_reuse || !sk->sk_reuse) &&
 			    ipv6_rcv_saddr_equal(sk, sk2))
 				goto fail;
