@@ -20,9 +20,12 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/device.h>
+#include <linux/ioport.h>
 #include <linux/pm.h>
 
 #include <asm/hardware.h>
+#include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/pgtable.h>
 #include <asm/mach/map.h>
@@ -138,3 +141,40 @@ void __init pxa_map_io(void)
 	iotable_init(standard_io_desc, ARRAY_SIZE(standard_io_desc));
 	get_clk_frequency_khz(1);
 }
+
+
+static struct resource pxamci_resources[] = {
+	[0] = {
+		.start	= 0x41100000,
+		.end	= 0x41100fff,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= IRQ_MMC,
+		.end	= IRQ_MMC,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static u64 pxamci_dmamask = 0xffffffffUL;
+
+static struct platform_device pxamci_device = {
+	.name		= "pxamci",
+	.id		= 0,
+	.dev		= {
+		.dma_mask = &pxamci_dmamask,
+	},
+	.num_resources	= ARRAY_SIZE(pxamci_resources),
+	.resource	= pxamci_resources,
+};
+
+static struct platform_device *devices[] __initdata = {
+	&pxamci_device,
+};
+
+static int __init pxa_init(void)
+{
+	return platform_add_devices(devices, ARRAY_SIZE(devices));
+}
+
+subsys_initcall(pxa_init);
