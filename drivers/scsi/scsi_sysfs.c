@@ -15,6 +15,43 @@
 #include "hosts.h"
 
 #include "scsi_priv.h"
+#include "scsi_logging.h"
+
+static int check_set(unsigned int *val, char *src)
+{
+	char *last;
+
+	if (strncmp(src, "-", 20) == 0) {
+		*val = SCAN_WILD_CARD;
+	} else {
+		/*
+		 * Doesn't check for int overflow
+		 */
+		*val = simple_strtoul(src, &last, 0);
+		if (*last != '\0')
+			return 1;
+	}
+	return 0;
+}
+
+static int scsi_scan(struct Scsi_Host *shost, const char *str)
+{
+	char s1[15], s2[15], s3[15], junk;
+	unsigned int channel, id, lun;
+	int res;
+
+	res = sscanf(str, "%10s %10s %10s %c", s1, s2, s3, &junk);
+	if (res != 3)
+		return -EINVAL;
+	if (check_set(&channel, s1))
+		return -EINVAL;
+	if (check_set(&id, s2))
+		return -EINVAL;
+	if (check_set(&lun, s3))
+		return -EINVAL;
+	res = scsi_scan_host_selected(shost, channel, id, lun, 1);
+	return res;
+}
 
 /*
  * shost_show_function: macro to create an attr function that can be used to
@@ -39,6 +76,20 @@ static CLASS_DEVICE_ATTR(field, S_IRUGO, show_##field, NULL)
 /*
  * Create the actual show/store functions and data structures.
  */
+
+static ssize_t store_scan(struct class_device *class_dev, const char *buf,
+			  size_t count)
+{
+	struct Scsi_Host *shost = class_to_shost(class_dev);
+	int res;
+
+	res = scsi_scan(shost, buf);
+	if (res == 0)
+		res = count;
+	return res;
+};
+static CLASS_DEVICE_ATTR(scan, S_IWUSR, NULL, store_scan);
+
 shost_rd_attr(unique_id, "%u\n");
 shost_rd_attr(host_busy, "%hu\n");
 shost_rd_attr(cmd_per_lun, "%hd\n");
@@ -51,6 +102,7 @@ static struct class_device_attribute *scsi_sysfs_shost_attrs[] = {
 	&class_device_attr_cmd_per_lun,
 	&class_device_attr_sg_tablesize,
 	&class_device_attr_unchecked_isa_dma,
+	&class_device_attr_scan,
 	NULL
 };
 
@@ -88,7 +140,6 @@ struct bus_type scsi_bus_type = {
         .name		= "scsi",
         .match		= scsi_bus_match,
 };
-
 
 int scsi_sysfs_register(void)
 {
@@ -210,6 +261,24 @@ store_rescan_field (struct device *dev, const char *buf, size_t count)
 
 static DEVICE_ATTR(rescan, S_IWUSR, NULL, store_rescan_field)
 
+static ssize_t sdev_store_delete(struct device *dev, const char *buf,
+				 size_t count)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	int res = count;
+
+	if (sdev->access_count)
+		/*
+		 * FIXME and scsi_proc.c: racey use of access_count,
+		 * possibly add a new arg to scsi_remove_device.
+		 */
+		res = -EBUSY;
+	else
+		scsi_remove_device(sdev);
+	return res;
+};
+static DEVICE_ATTR(delete, S_IWUSR, NULL, sdev_store_delete);
+
 /* Default template for device attributes.  May NOT be modified */
 static struct device_attribute *scsi_sysfs_sdev_attrs[] = {
 	&dev_attr_device_blocked,
@@ -222,6 +291,7 @@ static struct device_attribute *scsi_sysfs_sdev_attrs[] = {
 	&dev_attr_rev,
 	&dev_attr_online,
 	&dev_attr_rescan,
+	&dev_attr_delete,
 	NULL
 };
 
