@@ -46,14 +46,10 @@ extern unsigned long __bad_increment_for_ia64_fetch_and_add (void);
 		IA64_FETCHADD(_tmp, _v, -8, sizeof(*(v)));				\
 	else if ((i) == -4)								\
 		IA64_FETCHADD(_tmp, _v, -4, sizeof(*(v)));				\
-	else if ((i) == -2)								\
-		IA64_FETCHADD(_tmp, _v, -2, sizeof(*(v)));				\
 	else if ((i) == -1)								\
 		IA64_FETCHADD(_tmp, _v, -1, sizeof(*(v)));				\
 	else if ((i) == 1)								\
 		IA64_FETCHADD(_tmp, _v, 1, sizeof(*(v)));				\
-	else if ((i) == 2)								\
-		IA64_FETCHADD(_tmp, _v, 2, sizeof(*(v)));				\
 	else if ((i) == 4)								\
 		IA64_FETCHADD(_tmp, _v, 4, sizeof(*(v)));				\
 	else if ((i) == 8)								\

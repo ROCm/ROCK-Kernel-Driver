@@ -1497,7 +1497,7 @@ static int sba_proc_info(char *buf, char **start, off_t offset, int len)
 		ioc = &sba_dev->ioc[0];	/* FIXME: Multi-IOC support! */
 		total_pages = (int) (ioc->res_size << 3); /* 8 bits per byte */
 
-		sprintf(buf, "%s rev %d.%d\n", "Hewlett Packard zx1 SBA",
+		sprintf(buf, "%s rev %d.%d\n", "Hewlett-Packard zx1 SBA",
 			((sba_dev->hw_rev >> 4) & 0xF), (sba_dev->hw_rev & 0xF));
 		sprintf(buf, "%sIO PDIR size    : %d bytes (%d entries)\n", buf,
 			(int) ((ioc->res_size << 3) * sizeof(u64)), /* 8 bits/byte */ total_pages);

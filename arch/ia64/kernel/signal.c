@@ -191,6 +191,10 @@ copy_siginfo_to_user (siginfo_t *to, siginfo_t *from)
 				err |= __put_user(from->si_pfm_ovfl[2], &to->si_pfm_ovfl[2]);
 				err |= __put_user(from->si_pfm_ovfl[3], &to->si_pfm_ovfl[3]);
 			}
+		      case __SI_TIMER >> 16:
+			err |= __put_user(from->si_tid, &to->si_tid);
+			err |= __put_user(from->si_overrun, &to->si_overrun);
+			err |= __put_user(from->si_value, &to->si_value);
 			break;
 		      default:
 			err |= __put_user(from->si_uid, &to->si_uid);

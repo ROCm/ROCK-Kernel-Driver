@@ -1,8 +1,9 @@
 #!/bin/sh
 dir=$(dirname $0)
 CC=$1
+OBJDUMP=$2
 $CC -c $dir/check-gas-asm.S
-res=$(objdump -r --section .data check-gas-asm.o | fgrep 00004 | tr -s ' ' |cut -f3 -d' ')
+res=$($OBJDUMP -r --section .data check-gas-asm.o | fgrep 00004 | tr -s ' ' |cut -f3 -d' ')
 if [ $res != ".text" ]; then
 	echo buggy
 else
