@@ -166,6 +166,17 @@ void *DRM(alloc)(size_t size, int area)
 	return pt;
 }
 
+void *DRM(calloc)(size_t size, size_t nmemb, int area)
+{
+	void *addr;
+
+	addr = DRM(alloc)(nmemb * size, area);
+	if (addr != NULL)
+		memset((void *)addr, 0, size * nmemb);
+
+	return addr;
+}
+
 void *DRM(realloc)(void *oldpt, size_t oldsize, size_t size, int area)
 {
 	void *pt;
