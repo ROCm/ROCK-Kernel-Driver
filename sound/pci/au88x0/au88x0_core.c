@@ -82,8 +82,8 @@
 /*  MIXER (CAsp4Mix.s and CAsp4Mixer.s) */
 
 // FIXME: get rid of this.
-int mchannels[NR_MIXIN];
-int rampchs[NR_MIXIN];
+static int mchannels[NR_MIXIN];
+static int rampchs[NR_MIXIN];
 
 static void vortex_mixer_en_sr(vortex_t * vortex, int channel)
 {

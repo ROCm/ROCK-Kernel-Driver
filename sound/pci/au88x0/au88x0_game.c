@@ -37,6 +37,8 @@
 #include "au88x0.h"
 #include <linux/gameport.h>
 
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
+
 #define VORTEX_GAME_DWAIT	20	/* 20 ms */
 
 static struct gameport gameport;
@@ -119,3 +121,10 @@ static int vortex_gameport_unregister(vortex_t * vortex)
 		gameport_unregister_port(vortex->gameport);
 	return 0;
 }
+
+#else
+
+static inline int vortex_gameport_register(vortex_t * vortex) { return 0; }
+static inline int vortex_gameport_unregister(vortex_t * vortex) { return 0; }
+
+#endif
