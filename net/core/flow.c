@@ -310,13 +310,10 @@ void flow_cache_flush(void)
 	up(&flow_flush_sem);
 }
 
-static void __devinit flow_cache_cpu_prepare(int cpu)
+static int __devinit flow_cache_cpu_prepare(int cpu)
 {
 	struct tasklet_struct *tasklet;
 	unsigned long order;
-
-	flow_hash_rnd_recalc(cpu) = 1;
-	flow_count(cpu) = 0;
 
 	for (order = 0;
 	     (PAGE_SIZE << order) <
@@ -327,18 +324,28 @@ static void __devinit flow_cache_cpu_prepare(int cpu)
 	flow_table(cpu) = (struct flow_cache_entry **)
 		__get_free_pages(GFP_KERNEL, order);
 
+	if (!flow_table(cpu))
+		return NOTIFY_BAD;
+
 	memset(flow_table(cpu), 0, PAGE_SIZE << order);
+
+	flow_hash_rnd_recalc(cpu) = 1;
+	flow_count(cpu) = 0;
 
 	tasklet = flow_flush_tasklet(cpu);
 	tasklet_init(tasklet, flow_cache_flush_tasklet, 0);
+
+	return NOTIFY_OK;
 }
 
-static void __devinit flow_cache_cpu_online(int cpu)
+static int __devinit flow_cache_cpu_online(int cpu)
 {
 	down(&flow_cache_cpu_sem);
 	set_bit(cpu, &flow_cache_cpu_map);
 	flow_cache_cpu_count++;
 	up(&flow_cache_cpu_sem);
+
+	return NOTIFY_OK;
 }
 
 static int __devinit flow_cache_cpu_notify(struct notifier_block *self,
@@ -347,10 +354,10 @@ static int __devinit flow_cache_cpu_notify(struct notifier_block *self,
 	unsigned long cpu = (unsigned long)cpu;
 	switch (action) {
 	case CPU_UP_PREPARE:
-		flow_cache_cpu_prepare(cpu);
+		return flow_cache_cpu_prepare(cpu);
 		break;
 	case CPU_ONLINE:
-		flow_cache_cpu_online(cpu);
+		return flow_cache_cpu_online(cpu);
 		break;
 	}
 	return NOTIFY_OK;
