@@ -1336,14 +1336,12 @@ int ata_attach(ide_drive_t *drive)
 			continue;
 		spin_unlock(&drivers_lock);
 		if (driver->attach(drive) == 0) {
-			if (driver->owner)
-				__MOD_DEC_USE_COUNT(driver->owner);
+			module_put(driver->owner);
 			drive->gendev.driver = &driver->gen_driver;
 			return 0;
 		}
 		spin_lock(&drivers_lock);
-		if (driver->owner)
-			__MOD_DEC_USE_COUNT(driver->owner);
+		module_put(driver->owner);
 	}
 	spin_unlock(&drivers_lock);
 	spin_lock(&drives_lock);

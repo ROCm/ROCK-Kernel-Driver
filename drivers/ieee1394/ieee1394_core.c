@@ -1135,28 +1135,19 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 		   unloading while the file is open, and will be
 		   dropped by the VFS when the file is released.
 		*/
-		
-		if(THIS_MODULE)
-			__MOD_DEC_USE_COUNT((struct module*) THIS_MODULE);
-		
-		/* note that if ieee1394 is compiled into the kernel,
-		   THIS_MODULE will be (void*) NULL, hence the if and
-		   the cast are necessary */
-
+		module_put(THIS_MODULE);
 	} else {
-
-		/* if the open() failed, then we need to drop the
-		   extra reference we gave to the task-specific
-		   driver */
-		
-		if(module)
-			__MOD_DEC_USE_COUNT(module);
-	
 		/* point the file's f_ops back to ieee1394. The VFS will then
 		   decrement ieee1394's reference count immediately after this
 		   function returns. */
 		
 		file->f_op = &ieee1394_chardev_ops;
+
+		/* if the open() failed, then we need to drop the
+		   extra reference we gave to the task-specific
+		   driver */
+		module_put(module);
+	
 	}
 
 	return retval;

@@ -233,13 +233,6 @@ static wavefront_command wavefront_commands[] = {
 	{ 0x00 }
 };
 
-static inline void
-dec_mod_count(struct module *module)
-{
-	if (module)
-		__MOD_DEC_USE_COUNT(module);
-}
-
 static const char *
 wavefront_errorstr (int errnum)
 
@@ -1623,7 +1616,7 @@ int
 snd_wavefront_synth_release (snd_hwdep_t *hw, struct file *file)
 
 {
-	dec_mod_count(hw->card->module);
+	module_put(hw->card->module);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }

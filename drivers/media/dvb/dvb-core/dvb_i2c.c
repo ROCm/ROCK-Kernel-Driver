@@ -63,18 +63,11 @@ int register_i2c_client (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
 static
 void try_attach_device (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
 {
-	if (dev->owner) {
-		if (!MOD_CAN_QUERY(dev->owner))
-			return;
-
-		__MOD_INC_USE_COUNT(dev->owner);
-	}
-
-	if (dev->attach (i2c) == 0) {
-		register_i2c_client (i2c, dev);
-	} else {
-		if (dev->owner)
-			__MOD_DEC_USE_COUNT(dev->owner);
+	if (try_module_get(dev->owner)) {
+		if (dev->attach(i2c) == 0)
+			register_i2c_client(i2c, dev);
+		else
+			module_put(dev->owner);
 	}
 }
 
@@ -82,10 +75,8 @@ void try_attach_device (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
 static
 void detach_device (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *dev)
 {
-	dev->detach (i2c);
-
-	if (dev->owner)
-		__MOD_DEC_USE_COUNT(dev->owner);
+	dev->detach(i2c);
+	module_put(dev->owner);
 }
 
 

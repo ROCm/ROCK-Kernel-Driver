@@ -435,7 +435,7 @@ void rxrpc_put_call(struct rxrpc_call *call)
 		rxrpc_put_message(msg);
 	}
 
-	if (call->owner) __MOD_DEC_USE_COUNT(call->owner);
+	module_put(call->owner);
 
 	down_write(&rxrpc_calls_sem);
 	list_del(&call->call_link);

@@ -1757,8 +1757,7 @@ dasd_release(struct inode *inp, struct file *filp)
 	}
 	if (atomic_dec_return(&device->open_count) == 0) {
 		invalidate_buffers(inp->i_rdev);
-		if (device->discipline->owner)
-			__MOD_DEC_USE_COUNT(device->discipline->owner);
+		module_put(device->discipline->owner);
 	}
 	return 0;
 }

@@ -175,8 +175,7 @@ void pi_release(PIA * pi)
 #endif				/* !CONFIG_PARPORT */
 	if (pi->proto->release_proto)
 		pi->proto->release_proto(pi);
-	if (pi->proto->owner)
-		__MOD_DEC_USE_COUNT(pi->proto->owner);
+	module_put(pi->proto->owner);
 }
 
 EXPORT_SYMBOL(pi_release);
@@ -238,7 +237,6 @@ int pi_register(PIP * pr)
 		printk("paride: protocol table full\n");
 		return 0;
 	}
-	MOD_INC_USE_COUNT;
 	protocols[k] = pr;
 	pr->index = k;
 	printk("paride: %s registered as protocol %d\n", pr->name, k);
@@ -256,7 +254,6 @@ void pi_unregister(PIP * pr)
 		return;
 	}
 	protocols[pr->index] = 0;
-	MOD_DEC_USE_COUNT;
 }
 
 EXPORT_SYMBOL(pi_unregister);
@@ -392,14 +389,13 @@ int pi_init(PIA * pi, int autoprobe, int port, int mode,
 		if (!proto)
 			continue;
 		/* still racy */
-		if (proto->owner)
-			__MOD_INC_USE_COUNT(proto->owner);
+		if (!try_module_get(proto->owner))
+			continue;
 		pi->proto = proto;
 		pi->private = 0;
 		if (proto->init_proto && proto->init_proto(pi) < 0) {
 			pi->proto = NULL;
-			if (proto->owner)
-				__MOD_DEC_USE_COUNT(proto->owner);
+			module_put(proto->owner);
 			continue;
 		}
 		if (delay == -1)
@@ -432,8 +428,7 @@ int pi_init(PIA * pi, int autoprobe, int port, int mode,
 		}
 		if (pi->proto->release_proto)
 			pi->proto->release_proto(pi);
-		if (proto->owner)
-			__MOD_DEC_USE_COUNT(proto->owner);
+		module_put(proto->owner);
 	}
 
 	if (!pi->port) {
