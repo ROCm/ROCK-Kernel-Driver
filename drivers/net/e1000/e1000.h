@@ -71,6 +71,7 @@
 #include <linux/mii.h>
 #include <linux/ethtool.h>
 #include <linux/if_vlan.h>
+#include <linux/moduleparam.h>
 
 #define BAR_0		0
 #define BAR_1		1
@@ -88,6 +89,12 @@ struct e1000_adapter;
 #endif
 
 #define E1000_ERR(args...) printk(KERN_ERR "e1000: " args)
+
+#define PFX "e1000: "
+#define DPRINTK(nlevel, klevel, fmt, args...) \
+	(void)((NETIF_MSG_##nlevel & adapter->msg_enable) && \
+	printk(KERN_##klevel PFX "%s: %s: " fmt, adapter->netdev->name, \
+		__FUNCTION__ , ## args))
 
 #define E1000_MAX_INTR 10
 

@@ -27,55 +27,32 @@
 *******************************************************************************/
 
 #include "e1000.h"
+#include <linux/rtnetlink.h>
 
 /* Change Log
  *
+ * 5.2.51   5/14/04
+ *   o set default configuration to 'NAPI disabled'. NAPI enabled driver
+ *     causes kernel panic when the interface is shutdown while data is being
+ *     transferred.
+ * 5.2.47   5/04/04
+ *   o fixed ethtool -t implementation
+ * 5.2.45   4/29/04
+ *   o fixed ethtool -e implementation
+ *   o Support for ethtool ops [Stephen Hemminger (shemminger@osdl.org)]
+ * 5.2.42   4/26/04
+ *   o Added support for the DPRINTK macro for enhanced error logging.  Some
+ *     parts of the patch were supplied by Jon Mason.
+ *   o Move the register_netdevice() donw in the probe routine due to a 
+ *     loading/unloading test issue.
+ *   o Added a long RX byte count the the extra ethtool data members for BER
+ *     testing purposes.
  * 5.2.39	3/12/04
- *   o Added support to read/write eeprom data in proper order.
- *     By default device eeprom is always little-endian, word
- *     addressable 
- *   o Disable TSO as the default for the driver until hangs
- *     reported against non-IA acrhs can be root-caused.
- *   o Back out the CSA fix for 82547 as it continues to cause
- *     systems lock-ups with production systems.
- *   o Fixed FC high/low water mark values to actually be in the
- *     range of the Rx FIFO area.  It was a math error.
- *     [Dainis Jonitis (dainis_jonitis@exigengroup.lv)]
- *   o Handle failure to get new resources when doing ethtool
- *     ring paramater changes.  Previously, driver would free old,
- *     but fails to allocate new, causing problems.  Now, driver 
- *     allocates new, and if sucessful, frees old.
- *   o Changed collision threshold from 16 to 15 to comply with IEEE
- *     spec.
- *   o Toggle chip-select when checking ready status on SPI eeproms.
- *   o Put PHY into class A mode to pass IEEE tests on some designs.
- *     Designs with EEPROM word 0x7, bit 15 set will have their PHYs
- *     set to class A mode, rather than the default class AB.
- *   o Handle failures of register_netdev.  Stephen Hemminger
- *     [shemminger@osdl.org].
- *   o updated README & MAN pages, number of Transmit/Receive
- *     descriptors may be denied depending on system resources.
- *
- * 5.2.30	1/14/03
- *   o Set VLAN filtering to IEEE 802.1Q after reset so we don't break
- *     SoL connections that use VLANs.
- *   o Allow 1000/Full setting for AutoNeg param for Fiber connections
- *     Jon D Mason [jonmason@us.ibm.com].
- *   o Race between Tx queue and Tx clean fixed with a spin lock.
- *   o Added netpoll support.
- *   o Fixed endianess bug causing ethtool loopback diags to fail on ppc.
- *   o Use pdev->irq rather than netdev->irq in preparation for MSI support.
- *   o Report driver message on user override of InterruptThrottleRate
- *     module parameter.
- *   o Change I/O address storage from uint32_t to unsigned long.
- *   o Added ethtool RINGPARAM support.
- *
- * 5.2.22	10/15/03
  */
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "5.2.39-k2";
+char e1000_driver_version[] = "5.2.52-k2";
 char e1000_copyright[] = "Copyright (c) 1999-2004 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -224,6 +201,10 @@ static struct pci_driver e1000_driver = {
 MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
 MODULE_DESCRIPTION("Intel(R) PRO/1000 Network Driver");
 MODULE_LICENSE("GPL");
+
+static int debug = 3;
+module_param(debug, int, 0);
+MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
 
 /**
  * e1000_init_module - Driver Registration Routine
@@ -420,6 +401,12 @@ e1000_probe(struct pci_dev *pdev,
 	adapter->netdev = netdev;
 	adapter->pdev = pdev;
 	adapter->hw.back = adapter;
+	adapter->msg_enable = (1 << debug) - 1;
+
+	rtnl_lock();
+	/* we need to set the name early since the DPRINTK macro needs it set */
+	if (dev_alloc_name(netdev, netdev->name) < 0) 
+		goto err_free_unlock;
 
 	mmio_start = pci_resource_start(pdev, BAR_0);
 	mmio_len = pci_resource_len(pdev, BAR_0);
@@ -504,7 +491,7 @@ e1000_probe(struct pci_dev *pdev,
 	/* make sure the EEPROM is good */
 
 	if(e1000_validate_eeprom_checksum(&adapter->hw) < 0) {
-		printk(KERN_ERR "The EEPROM Checksum Is Not Valid\n");
+		DPRINTK(PROBE, ERR, "The EEPROM Checksum Is Not Valid\n");
 		err = -EIO;
 		goto err_eeprom;
 	}
@@ -538,16 +525,12 @@ e1000_probe(struct pci_dev *pdev,
 	INIT_WORK(&adapter->tx_timeout_task,
 		(void (*)(void *))e1000_tx_timeout_task, netdev);
 
-	if((err = register_netdev(netdev)))
-		goto err_register;
-
 	/* we're going to reset, so assume we have no link for now */
 
 	netif_carrier_off(netdev);
 	netif_stop_queue(netdev);
 
-	printk(KERN_INFO "%s: Intel(R) PRO/1000 Network Connection\n",
-	       netdev->name);
+	DPRINTK(PROBE, INFO, "Intel(R) PRO/1000 Network Connection\n");
 	e1000_check_options(adapter);
 
 	/* Initial Wake on LAN setting
@@ -581,7 +564,12 @@ e1000_probe(struct pci_dev *pdev,
 
 	e1000_reset(adapter);
 
+	/* since we are holding the rtnl lock already, call the no-lock version */
+	if((err = register_netdevice(netdev)))
+		goto err_register;
+
 	cards_found++;
+	rtnl_unlock();
 	return 0;
 
 err_register:
@@ -589,6 +577,8 @@ err_sw_init:
 err_eeprom:
 	iounmap(adapter->hw.hw_addr);
 err_ioremap:
+err_free_unlock:
+	rtnl_unlock();
 	free_netdev(netdev);
 err_alloc_etherdev:
 	pci_release_regions(pdev);
@@ -666,7 +656,7 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	/* identify the MAC */
 
 	if (e1000_set_mac_type(hw)) {
-		E1000_ERR("Unknown MAC Type\n");
+		DPRINTK(PROBE, ERR, "Unknown MAC Type\n");
 		return -EIO;
 	}
 
@@ -1393,9 +1383,8 @@ e1000_watchdog(unsigned long data)
 			                           &adapter->link_speed,
 			                           &adapter->link_duplex);
 
-			printk(KERN_INFO
-			       "e1000: %s NIC Link is Up %d Mbps %s\n",
-			       netdev->name, adapter->link_speed,
+			DPRINTK(LINK, INFO, "NIC Link is Up %d Mbps %s\n",
+			       adapter->link_speed,
 			       adapter->link_duplex == FULL_DUPLEX ?
 			       "Full Duplex" : "Half Duplex");
 
@@ -1408,9 +1397,7 @@ e1000_watchdog(unsigned long data)
 		if(netif_carrier_ok(netdev)) {
 			adapter->link_speed = 0;
 			adapter->link_duplex = 0;
-			printk(KERN_INFO
-			       "e1000: %s NIC Link is Down\n",
-			       netdev->name);
+			DPRINTK(LINK, INFO, "NIC Link is Down\n");
 			netif_carrier_off(netdev);
 			netif_stop_queue(netdev);
 			mod_timer(&adapter->phy_info_timer, jiffies + 2 * HZ);
@@ -1888,7 +1875,7 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 
 	if((max_frame < MINIMUM_ETHERNET_FRAME_SIZE) ||
 	   (max_frame > MAX_JUMBO_FRAME_SIZE)) {
-		E1000_ERR("Invalid MTU setting\n");
+		DPRINTK(PROBE, ERR, "Invalid MTU setting\n");
 		return -EINVAL;
 	}
 
@@ -1896,7 +1883,7 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 		adapter->rx_buffer_len = E1000_RXBUFFER_2048;
 
 	} else if(adapter->hw.mac_type < e1000_82543) {
-		E1000_ERR("Jumbo Frames not supported on 82542\n");
+		DPRINTK(PROBE, ERR, "Jumbo Frames not supported on 82542\n");
 		return -EINVAL;
 
 	} else if(max_frame <= E1000_RXBUFFER_4096) {
@@ -2282,7 +2269,8 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 
 			/* All receives must fit into a single buffer */
 
-			E1000_DBG("Receive packet consumed multiple buffers\n");
+			E1000_DBG("%s: Receive packet consumed multiple buffers\n",
+				netdev->name);
 
 			dev_kfree_skb_irq(skb);
 			rx_desc->status = 0;
