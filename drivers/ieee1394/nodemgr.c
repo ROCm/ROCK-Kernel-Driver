@@ -70,8 +70,7 @@ static char *nodemgr_find_oui_name(int oui)
 
 static DECLARE_MUTEX(nodemgr_serialize);
 
-static LIST_HEAD(host_info_list);
-static spinlock_t host_info_lock = SPIN_LOCK_UNLOCKED;
+static struct hpsb_highlevel *nodemgr_hl;
 
 struct host_info {
 	struct hpsb_host *host;
@@ -917,7 +916,7 @@ static void nodemgr_process_unit_directory(struct host_info *hi, struct node_ent
 	address += 4;
 
 	infop = (quadlet_t *) ud->quadlets;
-	for (; length > 0; length--, address += 4, infop++) {
+	for (; length > 0; length--, address += 4) {
 		int code;
 		quadlet_t value;
 		quadlet_t *quadp;
@@ -990,7 +989,7 @@ static void nodemgr_process_unit_directory(struct host_info *hi, struct node_ent
 			   CSR offsets for now.  */
 			code &= CONFIG_ROM_KEY_TYPE_MASK;
 			if ((code & 0x80) == 0)
-				*infop = quad;
+				*infop++ = quad;
 			break;
 		}
 	}
@@ -1140,30 +1139,10 @@ static int nodemgr_hotplug(struct device *dev, char **envp, int num_envp,
 
 static int nodemgr_alloc_host_num(void)
 {
-	int hostnum = 0;
-	unsigned long flags;
-	struct list_head *lh;
+	int hostnum;
 
-	spin_lock_irqsave (&host_info_lock, flags);
-
-	while (1) {
-		int found = 0;
-
-		list_for_each(lh, &host_info_list) {
-			struct host_info *hi = list_entry(lh, struct host_info, list);
-			if (hi->id == hostnum) {
-				found = 1;
-				break;
-			}
-		}
-
-		if (!found)
-			break;
-
-		hostnum++;
-	}
-
-	spin_unlock_irqrestore (&host_info_lock, flags);
+	for (hostnum = 0; hpsb_get_hostinfo_bykey(nodemgr_hl, hostnum); hostnum++)
+		/* Do nothing */;
 
 	return hostnum;
 }
@@ -1491,7 +1470,7 @@ static void nodemgr_node_probe(struct host_info *hi, int generation)
 
 /* Because we are a 1394a-2000 compliant IRM, we need to inform all the other
  * nodes of the broadcast channel.  (Really we're only setting the validity
- * bit). */
+ * bit).  Other IRM responsibilities go in here as well. */
 static void nodemgr_do_irm_duties(struct hpsb_host *host)
 {
 	quadlet_t bc;
@@ -1506,12 +1485,30 @@ static void nodemgr_do_irm_duties(struct hpsb_host *host)
 	hpsb_write(host, LOCAL_BUS | ALL_NODES, get_hpsb_generation(host),
 		   (CSR_REGISTER_BASE | CSR_BROADCAST_CHANNEL),
 		   &bc, sizeof(quadlet_t));
+
+	/* If there is no bus manager then we should set the root node's
+	 * force_root bit to promote bus stability per the 1394
+	 * spec. (8.4.2.6) */
+	if(host->busmgr_id == 0x3f && host->node_count > 1)
+        {
+		u16 root_node = host->node_count - 1;
+		struct node_entry *ne = hpsb_nodeid_get_entry(host, root_node);
+		
+		if(ne->busopt.cmc)
+			hpsb_send_phy_config(host, root_node, -1);
+		else {
+			HPSB_DEBUG("The root node is not cycle master capable; "
+				   "selecting a new root node and resetting...");
+			hpsb_send_phy_config(host, host->node_id, -1);
+			hpsb_reset_bus(host, LONG_RESET_FORCE_ROOT);
+		}
+	}
 }
 
 /* We need to ensure that if we are not the IRM, that the IRM node is capable of
  * everything we can do, otherwise issue a bus reset and try to become the IRM
  * ourselves. */
-static int nodemgr_check_root_capability(struct hpsb_host *host)
+static int nodemgr_check_irm_capability(struct hpsb_host *host)
 {
 	quadlet_t bc;
 	int status;
@@ -1525,9 +1522,10 @@ static int nodemgr_check_root_capability(struct hpsb_host *host)
 			   &bc, sizeof(quadlet_t));
 
 	if (status < 0 || !(be32_to_cpu(bc) & 0x80000000)) {
-		/* The root node does not have a valid BROADCAST_CHANNEL
+		/* The current irm node does not have a valid BROADCAST_CHANNEL
 		 * register and we do, so reset the bus with force_root set */
-		HPSB_DEBUG("Remote root is not IRM capable, resetting...");
+		HPSB_DEBUG("Current remote IRM is not 1394a-2000 compliant, resetting...");
+		hpsb_send_phy_config(host, host->node_id, -1);
 		hpsb_reset_bus(host, LONG_RESET_FORCE_ROOT);
 		return 0;
 	}
@@ -1565,7 +1563,7 @@ static int nodemgr_host_thread(void *__hi)
 			 * for the read transactions, so that if another reset occurs
 			 * during the scan the transactions will fail instead of
 			 * returning bogus data. */
-			generation = get_hpsb_generation(hi->host);
+			generation = get_hpsb_generation(host);
 
 			/* If we get a reset before we are done waiting, then
 			 * start the the waiting over again */
@@ -1573,7 +1571,7 @@ static int nodemgr_host_thread(void *__hi)
 				i = HZ/4;
 		}
 
-		if (!nodemgr_check_root_capability(host)) {
+		if (!nodemgr_check_irm_capability(host)) {
 			/* Do nothing, we are resetting */
 			up(&nodemgr_serialize);
 			continue;
@@ -1683,12 +1681,11 @@ int hpsb_node_lock(struct node_entry *ne, u64 addr,
 			 addr, extcode, data, arg);
 }
 
-static void nodemgr_add_host(struct hpsb_host *host)
+static void nodemgr_add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
 {
 	struct host_info *hi;
-	unsigned long flags;
 
-	hi = kmalloc(sizeof (struct host_info), in_interrupt() ? SLAB_ATOMIC : SLAB_KERNEL);
+	hi = hpsb_create_hostinfo(hl, host, sizeof(*hi));
 
 	if (!hi) {
 		HPSB_ERR ("NodeMgr: out of memory in add host");
@@ -1698,13 +1695,13 @@ static void nodemgr_add_host(struct hpsb_host *host)
 	/* Initialize the hostinfo here and start the thread.  The
 	 * thread blocks on the reset semaphore until a bus reset
 	 * happens. */
-	memset(hi, 0, sizeof(*hi));
 	hi->host = host;
-	INIT_LIST_HEAD(&hi->list);
 	init_completion(&hi->exited);
         sema_init(&hi->reset_sem, 0);
 
 	hi->id = nodemgr_alloc_host_num();
+
+	hpsb_set_hostinfo_key(hl, host, hi->id);
 
 	memcpy(&host->device, &nodemgr_dev_template_host,
 	       sizeof(host->device));
@@ -1715,40 +1712,22 @@ static void nodemgr_add_host(struct hpsb_host *host)
 
 	sprintf(hi->daemon_name, "knodemgrd_%d", hi->id);
 
-	spin_lock_irqsave (&host_info_lock, flags);
-
 	hi->pid = kernel_thread(nodemgr_host_thread, hi,
 				CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
-	
+
 	if (hi->pid < 0) {
 		HPSB_ERR ("NodeMgr: failed to start %s thread for %s",
 			  hi->daemon_name, host->driver->name);
-		kfree(hi);
-		spin_unlock_irqrestore (&host_info_lock, flags);
+		hpsb_destroy_hostinfo(hl, host);
 		return;
 	}
-
-	list_add_tail (&hi->list, &host_info_list);
-
-	spin_unlock_irqrestore (&host_info_lock, flags);
 
 	return;
 }
 
 static void nodemgr_host_reset(struct hpsb_host *host)
 {
-	struct list_head *lh;
-	struct host_info *hi = NULL;
-	unsigned long flags;
-
-	spin_lock_irqsave (&host_info_lock, flags);
-	list_for_each(lh, &host_info_list) {
-		struct host_info *myhi = list_entry(lh, struct host_info, list);
-		if (myhi->host == host) {
-			hi = myhi;
-			break;
-		}
-	}
+	struct host_info *hi = hpsb_get_hostinfo(nodemgr_hl, host);
 
 	if (hi != NULL) {
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
@@ -1756,29 +1735,14 @@ static void nodemgr_host_reset(struct hpsb_host *host)
 #endif
 		up(&hi->reset_sem);
 	} else
-		HPSB_ERR ("NodeMgr: could not process reset of non-existent host");
-
-	spin_unlock_irqrestore (&host_info_lock, flags);
+		HPSB_ERR ("NodeMgr: could not process reset of unused host");
 
 	return;
 }
 
 static void nodemgr_remove_host(struct hpsb_host *host)
 {
-	struct list_head *lh, *next;
-	unsigned long flags;
-	struct host_info *hi = NULL;
-
-	spin_lock_irqsave (&host_info_lock, flags);
-	list_for_each_safe(lh, next, &host_info_list) {
-		struct host_info *myhi = list_entry(lh, struct host_info, list);
-		if (myhi->host == host) {
-			list_del(&myhi->list);
-			hi = myhi;
-			break;
-		}
-	}
-	spin_unlock_irqrestore (&host_info_lock, flags);
+	struct host_info *hi = hpsb_get_hostinfo(nodemgr_hl, host);
 
 	if (hi) {
 		if (hi->pid >= 0) {
@@ -1787,7 +1751,6 @@ static void nodemgr_remove_host(struct hpsb_host *host)
 			nodemgr_remove_host_dev(&host->device);
 			device_unregister(&host->device);
 		}
-		kfree(hi);
 	} else
 		HPSB_ERR("NodeMgr: host %s does not exist, cannot remove",
 			 host->driver->name);
@@ -1801,21 +1764,19 @@ static struct hpsb_highlevel_ops nodemgr_ops = {
 	.remove_host =	nodemgr_remove_host,
 };
 
-static struct hpsb_highlevel *hl;
-
 void init_ieee1394_nodemgr(void)
 {
 	bus_register(&ieee1394_bus_type);
 
-        hl = hpsb_register_highlevel("Node manager", &nodemgr_ops);
-        if (!hl) {
+        nodemgr_hl = hpsb_register_highlevel("Node manager", &nodemgr_ops);
+        if (!nodemgr_hl) {
 		HPSB_ERR("NodeMgr: out of memory during ieee1394 initialization");
         }
 }
 
 void cleanup_ieee1394_nodemgr(void)
 {
-        hpsb_unregister_highlevel(hl);
+        hpsb_unregister_highlevel(nodemgr_hl);
 
 	bus_unregister(&ieee1394_bus_type);
 }
