@@ -1,18 +1,11 @@
 /*
  * elevator noop
  */
-#include <linux/kernel.h>
-#include <linux/fs.h>
 #include <linux/blkdev.h>
 #include <linux/elevator.h>
 #include <linux/bio.h>
-#include <linux/config.h>
 #include <linux/module.h>
-#include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/compiler.h>
-
-#include <asm/uaccess.h>
 
 /*
  * See if we can find a request that this buffer can be coalesced with.
