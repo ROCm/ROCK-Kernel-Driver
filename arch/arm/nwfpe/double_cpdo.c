@@ -174,7 +174,6 @@ unsigned int DoubleCPDO(const unsigned int opcode)
 
    Fd = getFd(opcode);
    fpa11->fpreg[Fd].fDouble = rFd;
-   fpa11->fType[Fd] = typeDouble;
 
    return 1;
 }

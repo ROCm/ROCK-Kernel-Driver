@@ -136,7 +136,6 @@ unsigned int SingleCPDO(const unsigned int opcode)
 
    Fd = getFd(opcode);
    fpa11->fpreg[Fd].fSingle = rFd;
-   fpa11->fType[Fd] = typeSingle;
 
    return 1;
 }

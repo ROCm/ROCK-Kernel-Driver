@@ -67,7 +67,7 @@ unsigned int EmulateCPDO(const unsigned int opcode)
       default           : nRc = 0;
    }
 
-   /* The CPDO functions always set the destination type
+   /* The CPDO functions used to always set the destination type
       to be the same as their working size. */
 
    if ((0 != nRc) && (nDest != nType))
@@ -112,7 +112,10 @@ unsigned int EmulateCPDO(const unsigned int opcode)
        }
        break;
      }
-     
+   }
+
+   if (nRc != 0)
+   {
      fpa11->fType[Fd] = nDest;
    }
    

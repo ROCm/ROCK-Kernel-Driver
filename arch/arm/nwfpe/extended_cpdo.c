@@ -168,7 +168,6 @@ unsigned int ExtendedCPDO(const unsigned int opcode)
 
    Fd = getFd(opcode);
    fpa11->fpreg[Fd].fExtended = rFd;
-   fpa11->fType[Fd] = typeExtended;
 
    return 1;
 }
