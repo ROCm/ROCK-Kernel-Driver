@@ -14,6 +14,9 @@ static int i8042_aux_irq = -1;
 
 static unsigned long kbd_iobase;
 
+#define I8042_COMMAND_REG	(kbd_iobase + 0x64UL)
+#define I8042_DATA_REG		(kbd_iobase + 0x60UL)
+
 static inline int i8042_read_data(void)
 {
 	return readb(kbd_iobase + 0x60UL);
@@ -87,9 +90,6 @@ static int i8042_platform_init(void)
 			return 0;
 		}
 	}
-
-	printk("i8042: kbd_base[%lx] irq[kbd(%x):aux(%x)]\n",
-	       kbd_iobase, i8042_kbd_irq, i8042_aux_irq);
 
 	return 1;
 }
