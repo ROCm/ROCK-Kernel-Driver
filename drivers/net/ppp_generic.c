@@ -776,8 +776,6 @@ static struct file_operations ppp_device_fops = {
 
 #define PPP_MAJOR	108
 
-static devfs_handle_t devfs_handle;
-
 /* Called at boot time if ppp is compiled into the kernel,
    or at module load time (from init_module) if compiled as a module. */
 int __init ppp_init(void)
@@ -788,11 +786,8 @@ int __init ppp_init(void)
 	err = register_chrdev(PPP_MAJOR, "ppp", &ppp_device_fops);
 	if (err)
 		printk(KERN_ERR "failed to register PPP device (%d)\n", err);
-	devfs_handle = devfs_register(NULL, "ppp", DEVFS_FL_DEFAULT,
-				      PPP_MAJOR, 0,
-				      S_IFCHR | S_IRUSR | S_IWUSR,
-				      &ppp_device_fops, NULL);
-
+	devfs_register(NULL, "ppp", DEVFS_FL_DEFAULT, PPP_MAJOR, 0,
+		       S_IFCHR | S_IRUSR | S_IWUSR, &ppp_device_fops, NULL);
 	return 0;
 }
 
@@ -2511,7 +2506,7 @@ static void __exit ppp_cleanup(void)
 	cardmap_destroy(&all_ppp_units);
 	if (unregister_chrdev(PPP_MAJOR, "ppp") != 0)
 		printk(KERN_ERR "PPP: failed to unregister PPP device\n");
-	devfs_unregister(devfs_handle);
+	devfs_remove("ppp");
 }
 
 /*
