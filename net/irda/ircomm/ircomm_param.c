@@ -220,9 +220,16 @@ static int ircomm_param_service_type(void *instance, irda_param_t *param,
 
 	/* 
 	 * Now the line is ready for some communication. Check if we are a
-         * server, and send over some initial parameters 
+         * server, and send over some initial parameters.
+	 * Client do it in ircomm_tty_state_setup().
+	 * Note : we may get called from ircomm_tty_getvalue_confirm(),
+	 * therefore before we even have open any socket. And self->client
+	 * is initialised to TRUE only later. So, we check if the link is
+	 * really initialised. - Jean II
 	 */
-	if (!self->client && (self->settings.service_type != IRCOMM_3_WIRE_RAW))
+	if ((self->max_header_size != IRCOMM_TTY_HDR_UNINITIALISED) &&
+	    (!self->client) &&
+	    (self->settings.service_type != IRCOMM_3_WIRE_RAW))
 	{
 		/* Init connection */
 		ircomm_tty_send_initial_parameters(self);
