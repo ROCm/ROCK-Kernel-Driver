@@ -46,7 +46,7 @@ enum wl3501_signals {
 	WL3501_SIG_DISASSOC_REQ,
 	WL3501_SIG_GET_REQ,
 	WL3501_SIG_JOIN_REQ,
-	WL3501_SIG_POWERMGT_REQ,
+	WL3501_SIG_PWR_MGMT_REQ,
 	WL3501_SIG_REASSOC_REQ,
 	WL3501_SIG_SCAN_REQ,
 	WL3501_SIG_SET_REQ,
@@ -345,6 +345,21 @@ struct wl3501_join_confirm {
 	u16		status;
 };
 
+struct wl3501_pwr_mgmt_req {
+	u16		next_blk;
+	unsigned char	sig_id;
+	u8		pwr_save;
+	u8		wake_up;
+	u8		receive_dtims;
+};
+
+struct wl3501_pwr_mgmt_confirm {
+	u16		next_blk;
+	unsigned char	sig_id;
+	unsigned char	reserved;
+	u16		status;
+};
+
 struct wl3501_scan_req {
 	u16			next_blk;
 	unsigned char		sig_id;
@@ -503,6 +518,7 @@ struct wl3501_card {
 	spinlock_t			lock;
 	wait_queue_head_t		wait;
 	struct wl3501_get_confirm	sig_get_confirm;
+	struct wl3501_pwr_mgmt_confirm	sig_pwr_mgmt_confirm;
 	u16				tx_buffer_size;
 	u16				tx_buffer_head;
 	u16				tx_buffer_tail;

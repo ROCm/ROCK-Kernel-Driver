@@ -88,6 +88,9 @@ MODULE_PARM(pc_debug, "i");
 #define WL3501_RELEASE_TIMEOUT (25 * HZ)
 #define WL3501_MAX_ADHOC_TRIES 16
 
+#define WL3501_RESUME	0
+#define WL3501_SUSPEND	1
+
 /* Parameters that can be set with 'insmod' */
 /* Bit map of interrupts to choose from */
 /* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
@@ -437,6 +440,38 @@ static int wl3501_get_mib_value(struct wl3501_card *this, u8 index,
 			if (!rc)
 				memcpy(bf, this->sig_get_confirm.mib_value,
 				       size);
+			goto out;
+		}
+	}
+	spin_unlock_irqrestore(&this->lock, flags);
+out:
+	return rc;
+}
+
+static int wl3501_pwr_mgmt(struct wl3501_card *this, int suspend)
+{
+	struct wl3501_pwr_mgmt_req sig = {
+		.sig_id		= WL3501_SIG_PWR_MGMT_REQ,
+		.pwr_save	= suspend,
+		.wake_up	= !suspend,
+		.receive_dtims	= 10,
+	};
+	unsigned long flags;
+	int rc = -EIO;
+
+	spin_lock_irqsave(&this->lock, flags);
+	if (wl3501_esbq_req_test(this)) {
+		u16 ptr = wl3501_get_tx_buffer(this, sizeof(sig));
+		if (ptr) {
+			wl3501_set_to_wla(this, ptr, &sig, sizeof(sig));
+			wl3501_esbq_req(this, &ptr);
+			this->sig_pwr_mgmt_confirm.status = 255;
+			spin_unlock_irqrestore(&this->lock, flags);
+			rc = wait_event_interruptible(this->wait,
+				this->sig_pwr_mgmt_confirm.status != 255);
+			printk(KERN_INFO "%s: %s status=%d\n", __FUNCTION__,
+			       suspend ? "suspend" : "resume",
+			       this->sig_pwr_mgmt_confirm.status);
 			goto out;
 		}
 	}
@@ -956,7 +991,7 @@ static inline void wl3501_md_ind_interrupt(struct net_device *dev,
 }
 
 static inline void wl3501_get_confirm_interrupt(struct wl3501_card *this,
-						u16 addr)
+						u16 addr, void *sig, int size)
 {
 	dprintk(3, "entry");
 	wl3501_get_from_wla(this, addr, &this->sig_get_confirm,
@@ -1031,7 +1066,14 @@ loop:
 		wl3501_md_ind_interrupt(dev, this, addr);
 		break;
 	case WL3501_SIG_GET_CONFIRM:
-		wl3501_get_confirm_interrupt(this, addr);
+		wl3501_get_confirm_interrupt(this, addr,
+					     &this->sig_get_confirm,
+					     sizeof(this->sig_get_confirm));
+		break;
+	case WL3501_SIG_PWR_MGMT_CONFIRM:
+		wl3501_get_confirm_interrupt(this, addr,
+					     &this->sig_pwr_mgmt_confirm,
+					    sizeof(this->sig_pwr_mgmt_confirm));
 		break;
 	case WL3501_SIG_START_CONFIRM:
 		wl3501_start_confirm_interrupt(dev, this, addr);
@@ -2167,6 +2209,7 @@ static int wl3501_event(event_t event, int pri, event_callback_args_t *args)
 		break;
 	case CS_EVENT_PM_SUSPEND:
 		link->state |= DEV_SUSPEND;
+		wl3501_pwr_mgmt(dev->priv, WL3501_SUSPEND);
 		/* Fall through... */
 	case CS_EVENT_RESET_PHYSICAL:
 		if (link->state & DEV_CONFIG) {
@@ -2177,6 +2220,7 @@ static int wl3501_event(event_t event, int pri, event_callback_args_t *args)
 		break;
 	case CS_EVENT_PM_RESUME:
 		link->state &= ~DEV_SUSPEND;
+		wl3501_pwr_mgmt(dev->priv, WL3501_RESUME);
 		/* Fall through... */
 	case CS_EVENT_CARD_RESET:
 		if (link->state & DEV_CONFIG) {
