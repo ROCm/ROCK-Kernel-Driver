@@ -36,8 +36,8 @@ int task_statm(struct mm_struct *mm, int *shared, int *text,
 	       int *data, int *resident)
 {
 	*shared = mm->shared_vm;
-	*text = mm->exec_vm - ((mm->end_code - mm->start_code) >> PAGE_SHIFT);
-	*data = mm->total_vm - mm->shared_vm;
+	*text = (mm->end_code - mm->start_code) >> PAGE_SHIFT;
+	*data = mm->total_vm - mm->shared_vm - *text;
 	*resident = mm->rss;
 	return mm->total_vm;
 }
