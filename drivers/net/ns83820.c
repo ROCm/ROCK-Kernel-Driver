@@ -1858,9 +1858,17 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 		goto out_disable;
 	}
 
-	err = register_netdev(ndev);
-	if (err) {
-		printk(KERN_INFO "ns83820: unable to register netdev: %d\n", err);
+	/*
+	 * FIXME: we are holding rtnl_lock() over obscenely long area only
+	 * because some of the setup code uses dev->name.  It's Wrong(tm) -
+	 * we should be using driver-specific names for all that stuff.
+	 * For now that will do, but we really need to come back and kill
+	 * most of the dev_alloc_name() users later.
+	 */
+	rtnl_lock();
+	err = dev_alloc_name(ndev, ndev->name);
+	if (err < 0) {
+		printk(KERN_INFO "ns83820: unable to get netdev name: %d\n", err);
 		goto out_free_irq;
 	}
 
@@ -2045,9 +2053,21 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 	ns83820_probe_phy(ndev);
 #endif
 
+	err = register_netdevice(ndev);
+	if (err) {
+		printk(KERN_INFO "ns83820: unable to register netdev: %d\n", err);
+		goto out_cleanup;
+	}
+	rtnl_unlock();
+
 	return 0;
 
+out_cleanup:
+	writel(0, dev->base + IMR);	/* paranoia */
+	writel(0, dev->base + IER);
+	readl(dev->base + IER);
 out_free_irq:
+	rtnl_unlock();
 	free_irq(pci_dev->irq, ndev);
 out_disable:
 	if (dev->base)
