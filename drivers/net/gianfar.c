@@ -1190,8 +1190,8 @@ irqreturn_t gfar_receive(int irq, void *dev_id, struct pt_regs *regs)
 	} else {
 #ifdef VERBOSE_GFAR_ERRORS
 		printk(KERN_DEBUG "%s: receive called twice (%x)[%x]\n",
-		       dev->name, gfar_read(priv->regs->ievent),
-		       gfar_read(priv->regs->imask));
+		       dev->name, gfar_read(&priv->regs->ievent),
+		       gfar_read(&priv->regs->imask));
 #endif
 	}
 #else
@@ -1415,7 +1415,7 @@ static irqreturn_t gfar_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 #ifdef VERBOSE_GFAR_ERRORS
 		printk(KERN_DEBUG "%s: busy error (rhalt: %x)\n", dev->name,
-		       gfar_read(priv->regs->rstat));
+		       gfar_read(&priv->regs->rstat));
 #endif
 	}
 	if (events & IEVENT_BABR) {
@@ -1793,7 +1793,7 @@ static irqreturn_t gfar_error(int irq, void *dev_id, struct pt_regs *regs)
 
 #ifdef VERBOSE_GFAR_ERRORS
 		printk(KERN_DEBUG "%s: busy error (rhalt: %x)\n", dev->name,
-		       gfar_read(priv->regs->rstat));
+		       gfar_read(&priv->regs->rstat));
 #endif
 	}
 	if (events & IEVENT_BABR) {
