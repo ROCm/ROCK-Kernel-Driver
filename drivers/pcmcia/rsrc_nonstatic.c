@@ -48,16 +48,14 @@ INT_MODULE_PARM(mem_limit,	0x10000);
 #endif
 
 /* for io_db and mem_db */
-struct resource_map_t {
+struct resource_map {
 	u_long			base, num;
-	struct resource_map_t	*next;
+	struct resource_map	*next;
 };
 
-typedef struct resource_map_t resource_map_t;
-
 struct socket_data {
-	struct resource_map_t		mem_db;
-	struct resource_map_t		io_db;
+	struct resource_map		mem_db;
+	struct resource_map		io_db;
 	unsigned int			rsrc_mem_probe;
 };
 
@@ -123,9 +121,9 @@ static void free_region(struct resource *res)
 
 ======================================================================*/
 
-static int add_interval(resource_map_t *map, u_long base, u_long num)
+static int add_interval(struct resource_map *map, u_long base, u_long num)
 {
-    resource_map_t *p, *q;
+    struct resource_map *p, *q;
 
     for (p = map; ; p = p->next) {
 	if ((p != map) && (p->base+p->num-1 >= base))
@@ -133,7 +131,7 @@ static int add_interval(resource_map_t *map, u_long base, u_long num)
 	if ((p->next == map) || (p->next->base > base+num-1))
 	    break;
     }
-    q = kmalloc(sizeof(resource_map_t), GFP_KERNEL);
+    q = kmalloc(sizeof(struct resource_map), GFP_KERNEL);
     if (!q) return CS_OUT_OF_RESOURCE;
     q->base = base; q->num = num;
     q->next = p->next; p->next = q;
@@ -142,9 +140,9 @@ static int add_interval(resource_map_t *map, u_long base, u_long num)
 
 /*====================================================================*/
 
-static int sub_interval(resource_map_t *map, u_long base, u_long num)
+static int sub_interval(struct resource_map *map, u_long base, u_long num)
 {
-    resource_map_t *p, *q;
+    struct resource_map *p, *q;
 
     for (p = map; ; p = q) {
 	q = p->next;
@@ -168,7 +166,7 @@ static int sub_interval(resource_map_t *map, u_long base, u_long num)
 		q->num = base - q->base;
 	    } else {
 		/* Split the block into two pieces */
-		p = kmalloc(sizeof(resource_map_t), GFP_KERNEL);
+		p = kmalloc(sizeof(struct resource_map), GFP_KERNEL);
 		if (!p) return CS_OUT_OF_RESOURCE;
 		p->base = base+num;
 		p->num = q->base+q->num - p->base;
@@ -401,7 +399,7 @@ static int do_mem_probe(u_long base, u_long num, struct pcmcia_socket *s)
 
 #ifdef CONFIG_PCMCIA_PROBE
 
-static u_long inv_probe(resource_map_t *m, struct pcmcia_socket *s)
+static u_long inv_probe(struct resource_map *m, struct pcmcia_socket *s)
 {
     struct socket_data *s_data = s->resource_data;
     u_long ok;
@@ -420,7 +418,7 @@ static u_long inv_probe(resource_map_t *m, struct pcmcia_socket *s)
 
 static void validate_mem(struct pcmcia_socket *s, unsigned int probe_mask)
 {
-    resource_map_t *m, mm;
+    struct resource_map *m, mm;
     static u_char order[] = { 0xd0, 0xe0, 0xc0, 0xf0 };
     u_long b, i, ok = 0;
     struct socket_data *s_data = s->resource_data;
@@ -459,7 +457,7 @@ static void validate_mem(struct pcmcia_socket *s, unsigned int probe_mask)
 
 static void validate_mem(struct pcmcia_socket *s, unsigned int probe_mask)
 {
-	resource_map_t *m, mm;
+	struct resource_map *m, mm;
 	struct socket_data *s_data = s->resource_data;
 
 	for (m = s_data->mem_db.next; m != &s_data->mem_db; m = mm.next) {
@@ -506,7 +504,7 @@ static void pcmcia_nonstatic_validate_mem(struct pcmcia_socket *s)
 struct pcmcia_align_data {
 	unsigned long	mask;
 	unsigned long	offset;
-	resource_map_t	*map;
+	struct resource_map	*map;
 };
 
 static void
@@ -529,7 +527,7 @@ pcmcia_align(void *align_data, struct resource *res,
 	     unsigned long size, unsigned long align)
 {
 	struct pcmcia_align_data *data = align_data;
-	resource_map_t *m;
+	struct resource_map *m;
 
 	pcmcia_common_align(data, res, size, align);
 
@@ -572,7 +570,7 @@ pcmcia_align(void *align_data, struct resource *res,
 static int nonstatic_adjust_io_region(struct resource *res, unsigned long r_start,
 				      unsigned long r_end, struct pcmcia_socket *s)
 {
-	resource_map_t *m;
+	struct resource_map *m;
 	struct socket_data *s_data = s->resource_data;
 	int ret = -ENOMEM;
 
@@ -791,7 +789,7 @@ static int nonstatic_init(struct pcmcia_socket *s)
 static void nonstatic_release_resource_db(struct pcmcia_socket *s)
 {
 	struct socket_data *data = s->resource_data;
-	resource_map_t *p, *q;
+	struct resource_map *p, *q;
 
 	for (p = data->mem_db.next; p != &data->mem_db; p = q) {
 		q = p->next;
