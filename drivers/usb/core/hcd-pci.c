@@ -229,7 +229,6 @@ EXPORT_SYMBOL (usb_hcd_pci_probe);
 void usb_hcd_pci_remove (struct pci_dev *dev)
 {
 	struct usb_hcd		*hcd;
-	struct usb_device	*hub;
 
 	hcd = pci_get_drvdata(dev);
 	if (!hcd)
@@ -239,12 +238,11 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 	if (in_interrupt ())
 		BUG ();
 
-	hub = hcd->self.root_hub;
 	if (HCD_IS_RUNNING (hcd->state))
 		hcd->state = USB_STATE_QUIESCING;
 
 	dev_dbg (hcd->self.controller, "roothub graceful disconnect\n");
-	usb_disconnect (&hub);
+	usb_disconnect (&hcd->self.root_hub);
 
 	hcd->driver->stop (hcd);
 	hcd_buffer_destroy (hcd);

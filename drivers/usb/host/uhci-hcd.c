@@ -2185,7 +2185,7 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	uhci->rh_numports = port;
 
-	hcd->self.root_hub = udev = usb_alloc_dev(NULL, &hcd->self, 0);
+	udev = usb_alloc_dev(NULL, &hcd->self, 0);
 	if (!udev) {
 		dev_err(uhci_dev(uhci), "unable to allocate root hub\n");
 		goto err_alloc_root_hub;
@@ -2267,7 +2267,7 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	udev->speed = USB_SPEED_FULL;
 
-	if (usb_register_root_hub(udev, uhci_dev(uhci)) != 0) {
+	if (hcd_register_root(udev, &uhci->hcd) != 0) {
 		dev_err(uhci_dev(uhci), "unable to start root hub\n");
 		retval = -ENOMEM;
 		goto err_start_root_hub;
@@ -2295,7 +2295,6 @@ err_alloc_skelqh:
 
 err_alloc_term_td:
 	usb_put_dev(udev);
-	hcd->self.root_hub = NULL;
 
 err_alloc_root_hub:
 	dma_pool_destroy(uhci->qh_pool);

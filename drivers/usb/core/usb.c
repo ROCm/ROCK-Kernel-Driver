@@ -883,6 +883,8 @@ struct usb_device *usb_find_device(u16 vendor_id, u16 product_id)
 	     buslist != &usb_bus_list; 
 	     buslist = buslist->next) {
 		bus = container_of(buslist, struct usb_bus, bus_list);
+		if (!bus->root_hub)
+			continue;
 		dev = match_device(bus->root_hub, vendor_id, product_id);
 		if (dev)
 			goto exit;

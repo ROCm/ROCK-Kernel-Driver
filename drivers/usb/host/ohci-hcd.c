@@ -561,7 +561,7 @@ static int hc_start (struct ohci_hcd *ohci)
 	}
  
 	/* connect the virtual root hub */
-	bus->root_hub = udev = usb_alloc_dev (NULL, bus, 0);
+	udev = usb_alloc_dev (NULL, bus, 0);
 	ohci->hcd.state = USB_STATE_RUNNING;
 	if (!udev) {
 		disable (ohci);
@@ -571,9 +571,8 @@ static int hc_start (struct ohci_hcd *ohci)
 	}
 
 	udev->speed = USB_SPEED_FULL;
-	if (hcd_register_root (&ohci->hcd) != 0) {
+	if (hcd_register_root (udev, &ohci->hcd) != 0) {
 		usb_put_dev (udev);
-		bus->root_hub = NULL;
 		disable (ohci);
 		ohci->hc_control &= ~OHCI_CTRL_HCFS;
 		writel (ohci->hc_control, &ohci->regs->control);

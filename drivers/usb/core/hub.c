@@ -892,12 +892,14 @@ void usb_disconnect(struct usb_device **pdev)
 	}
 	ops = bus->op;
 
-	*pdev = NULL;
-
 	/* mark the device as inactive, so any further urb submissions for
 	 * this device will fail.
 	 */
 	udev->state = USB_STATE_NOTATTACHED;
+
+	/* lock the bus list on behalf of HCDs unregistering their root hubs */
+	if (!udev->parent)
+		down(&usb_bus_list_lock);
 	down(&udev->serialize);
 
 	dev_info (&udev->dev, "USB disconnect, address %d\n", udev->devnum);
@@ -914,12 +916,20 @@ void usb_disconnect(struct usb_device **pdev)
 	 */
 	usb_disable_device(udev, 0);
 
-	/* Free the device number and remove the /proc/bus/usb entry */
+	/* Free the device number, remove the /proc/bus/usb entry and
+	 * the sysfs attributes, and delete the parent's children[]
+	 * (or root_hub) pointer.
+	 */
 	dev_dbg (&udev->dev, "unregistering device\n");
 	release_address(udev);
 	usbfs_remove_device(udev);
-	up(&udev->serialize);
 	usb_remove_sysfs_dev_files(udev);
+	*pdev = NULL;
+
+	up(&udev->serialize);
+	if (!udev->parent)
+		up(&usb_bus_list_lock);
+
 	device_unregister(&udev->dev);
 }
 
@@ -1403,8 +1413,6 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 		goto fail;
 	}
 
-	/* now dev is visible to other tasks */
-	hdev->children[port] = udev;
 	retval = 0;
 
 fail:
@@ -1550,7 +1558,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 			goto loop;
 		}
 
-		/* reset, get descriptor, add to hub's children */
+		/* reset and get descriptor */
 		status = hub_port_init(hdev, udev, port);
 		if (status < 0)
 			goto loop;
@@ -1603,6 +1611,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 			check_highspeed (hub, udev, port);
 
 		/* Run it through the hoops (find a driver, etc) */
+		hdev->children[port] = udev;
 		status = usb_new_device(udev);
 		if (status)
 			goto loop;

@@ -1664,7 +1664,7 @@ clean0:
 	INIT_LIST_HEAD (&hcd->dev_list);
 	usb_register_bus (bus);
 
-	bus->root_hub = root = usb_alloc_dev (0, bus, 0);
+	root = usb_alloc_dev (0, bus, 0);
 	if (!root) {
 		retval = -ENOMEM;
 clean1:
@@ -1678,8 +1678,7 @@ clean1:
 	root->speed = USB_SPEED_HIGH;
 
 	/* ...then configured, so khubd sees us. */
-	if ((retval = hcd_register_root (&dum->hcd)) != 0) {
-		bus->root_hub = 0;
+	if ((retval = hcd_register_root (root, &dum->hcd)) != 0) {
 		usb_put_dev (root);
 clean2:
 		dum->hcd.state = USB_STATE_QUIESCING;

@@ -520,7 +520,7 @@ static int ehci_start (struct usb_hcd *hcd)
 
 	/* wire up the root hub */
 	bus = hcd_to_bus (hcd);
-	bus->root_hub = udev = usb_alloc_dev (NULL, bus, 0);
+	udev = usb_alloc_dev (NULL, bus, 0);
 	if (!udev) {
 done2:
 		ehci_mem_cleanup (ehci);
@@ -553,11 +553,10 @@ done2:
 	 * and device drivers may start it running.
 	 */
 	udev->speed = USB_SPEED_HIGH;
-	if (hcd_register_root (hcd) != 0) {
+	if (hcd_register_root (udev, hcd) != 0) {
 		if (hcd->state == USB_STATE_RUNNING)
 			ehci_ready (ehci);
 		ehci_reset (ehci);
-		bus->root_hub = 0;
 		usb_put_dev (udev); 
 		retval = -ENODEV;
 		goto done2;

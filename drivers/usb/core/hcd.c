@@ -764,8 +764,9 @@ EXPORT_SYMBOL (usb_deregister_bus);
  *
  * The USB host controller calls this function to register the root hub
  * properly with the USB subsystem.  It sets up the device properly in
- * the device model tree, and then calls usb_new_device() to register the
- * usb device.  It also assigns the root hub's USB address (always 1).
+ * the device tree and stores the root_hub pointer in the bus structure,
+ * then calls usb_new_device() to register the usb device.  It also
+ * assigns the root hub's USB address (always 1).
  */
 int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev)
 {
@@ -779,6 +780,9 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	set_bit (devnum, usb_dev->bus->devmap.devicemap);
 	usb_dev->state = USB_STATE_ADDRESS;
 
+	down (&usb_bus_list_lock);
+	usb_dev->bus->root_hub = usb_dev;
+
 	usb_dev->epmaxpacketin[0] = usb_dev->epmaxpacketout[0] = 64;
 	retval = usb_get_device_descriptor(usb_dev, USB_DT_DEVICE_SIZE);
 	if (retval != sizeof usb_dev->descriptor) {
@@ -790,9 +794,12 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	down (&usb_dev->serialize);
 	retval = usb_new_device (usb_dev);
 	up (&usb_dev->serialize);
-	if (retval)
+	if (retval) {
+		usb_dev->bus->root_hub = NULL;
 		dev_err (parent_dev, "can't register root hub for %s, %d\n",
 				usb_dev->dev.bus_id, retval);
+	}
+	up (&usb_bus_list_lock);
 	return retval;
 }
 EXPORT_SYMBOL (usb_register_root_hub);
