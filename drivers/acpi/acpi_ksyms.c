@@ -106,7 +106,7 @@ EXPORT_SYMBOL(acpi_os_signal_semaphore);
 EXPORT_SYMBOL(acpi_os_create_semaphore);
 EXPORT_SYMBOL(acpi_os_delete_semaphore);
 EXPORT_SYMBOL(acpi_os_wait_semaphore);
-
+EXPORT_SYMBOL(acpi_os_wait_events_complete);
 EXPORT_SYMBOL(acpi_os_read_pci_configuration);
 
 /* ACPI Utilities (acpi_utils.c) */
