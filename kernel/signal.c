@@ -874,9 +874,23 @@ int __broadcast_thread_group(struct task_struct *p, int sig)
 	return err;
 }
 
+struct task_struct * find_unblocked_thread(struct task_struct *p, int signr)
+{
+	struct task_struct *tmp;
+	struct list_head *l;
+	struct pid *pid;
+
+	for_each_task_pid(p->tgid, PIDTYPE_TGID, tmp, l, pid)
+		if (!sigismember(&tmp->blocked, signr) &&
+					!sigismember(&tmp->real_blocked, signr))
+			return tmp;
+	return NULL;
+}
+
 int
 send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
+	struct task_struct *t;
 	unsigned long flags;
 	int ret = 0;
 
@@ -905,21 +919,19 @@ send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	if (sig_ignored(p, sig))
 		goto out_unlock;
 
-	/* blocked (or ptraced) signals get posted */
-	spin_lock(&p->sigmask_lock);
-	if ((p->ptrace & PT_PTRACED) || sigismember(&p->blocked, sig) ||
-					sigismember(&p->real_blocked, sig)) {
-		spin_unlock(&p->sigmask_lock);
+	if (sig_kernel_specific(sig))
 		goto out_send;
-	}
-	spin_unlock(&p->sigmask_lock);
 
+	/* Does any of the threads unblock the signal? */
+	t = find_unblocked_thread(p, sig);
+	if (!t) {
+		ret = __send_sig_info(sig, info, p, 1);
+		goto out_unlock;
+	}
 	if (sig_kernel_broadcast(sig) || sig_kernel_coredump(sig)) {
 		ret = __broadcast_thread_group(p, sig);
 		goto out_unlock;
 	}
-	if (sig_kernel_specific(sig))
-		goto out_send;
 
 	/* must not happen */
 	BUG();
