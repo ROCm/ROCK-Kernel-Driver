@@ -49,9 +49,6 @@ static unsigned int ata_busy_sleep (struct ata_port *ap,
 				    unsigned long tmout_pat,
 			    	    unsigned long tmout);
 static void __ata_dev_select (struct ata_port *ap, unsigned int device);
-#if 0 /* to be used eventually */
-static void ata_qc_push (struct ata_queued_cmd *qc, unsigned int append);
-#endif
 static void ata_dma_complete(struct ata_port *ap, u8 host_stat,
 			     unsigned int done_late);
 static void ata_host_set_pio(struct ata_port *ap);
@@ -59,6 +56,7 @@ static void ata_host_set_udma(struct ata_port *ap);
 static void ata_dev_set_pio(struct ata_port *ap, unsigned int device);
 static void ata_dev_set_udma(struct ata_port *ap, unsigned int device);
 static void ata_set_mode(struct ata_port *ap);
+static int ata_qc_issue_prot(struct ata_queued_cmd *qc);
 
 static unsigned int ata_unique_id = 1;
 
@@ -2178,21 +2176,6 @@ static void ata_pio_sector(struct ata_port *ap)
 	kunmap(sg[qc->cursg].page);
 }
 
-#if 0 /* to be used eventually */
-/**
- *	ata_eng_schedule - run an iteration of the pio/dma/whatever engine
- *	@ap: port on which activity will occur
- *	@eng: instance of engine
- *
- *	LOCKING:
- *	spin_lock_irqsave(host_set lock)
- */
-static void ata_eng_schedule (struct ata_port *ap, struct ata_engine *eng)
-{
-	/* FIXME */
-}
-#endif
-
 /**
  *	ata_eng_timeout - Handle timeout of queued command
  *	@ap: Port on which timed-out command is active
@@ -2317,7 +2300,6 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 		qc->ap = ap;
 		qc->dev = dev;
 		qc->cursect = qc->cursg = qc->cursg_ofs = 0;
-		INIT_LIST_HEAD(&qc->node);
 		init_MUTEX_LOCKED(&qc->sem);
 
 		ata_tf_init(ap, &qc->tf, dev->devno);
@@ -2381,46 +2363,25 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat, unsigned int done_l
 		clear_bit(tag, &ap->qactive);
 }
 
-#if 0 /* to be used eventually */
 /**
- *	ata_qc_push -
- *	@qc:
- *	@append:
+ *	ata_qc_issue - issue taskfile to device
+ *	@qc: command to issue to device
  *
- *	LOCKING:
- *	spin_lock_irqsave(host_set lock)
- */
-static void ata_qc_push (struct ata_queued_cmd *qc, unsigned int append)
-{
-	struct ata_port *ap = qc->ap;
-	struct ata_engine *eng = &ap->eng;
-
-	if (likely(append))
-		list_add_tail(&qc->node, &eng->q);
-	else
-		list_add(&qc->node, &eng->q);
-
-	if (!test_and_set_bit(ATA_EFLG_ACTIVE, &eng->flags))
-		ata_eng_schedule(ap, eng);
-}
-#endif
-
-/**
- *	ata_qc_issue -
- *	@qc:
+ *	Prepare an ATA command to submission to device.
+ *	This includes mapping the data into a DMA-able
+ *	area, filling in the S/G table, and finally
+ *	writing the taskfile to hardware, starting the command.
  *
  *	LOCKING:
  *
  *	RETURNS:
- *
+ *	Zero on success, negative on error.
  */
+
 int ata_qc_issue(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	struct scsi_cmnd *cmd = qc->scsicmd;
-	unsigned int dma = qc->flags & ATA_QCFLAG_DMA;
-
-	ata_dev_select(ap, qc->dev->devno, 1, 0);
 
 	/* set up SG table */
 	if (cmd->use_sg) {
@@ -2436,17 +2397,53 @@ int ata_qc_issue(struct ata_queued_cmd *qc)
 	qc->ap->active_tag = qc->tag;
 	qc->flags |= ATA_QCFLAG_ACTIVE;
 
-	if (likely(dma)) {
-		ap->ops->tf_load(ap, &qc->tf);	/* load tf registers */
-		ap->ops->bmdma_start(qc);	/* initiate bmdma */
-	} else
-		/* load tf registers, initiate polling pio */
-		ata_pio_start(qc);
-
-	return 0;
+	return ata_qc_issue_prot(qc);
 
 err_out:
 	return -1;
+}
+
+/**
+ *	ata_qc_issue_prot - issue taskfile to device in proto-dependent manner
+ *	@qc: command to issue to device
+ *
+ *	Using various libata functions and hooks, this function
+ *	starts an ATA command.  ATA commands are grouped into
+ *	classes called "protocols", and issuing each type of protocol
+ *	is slightly different.
+ *
+ *	LOCKING:
+ *
+ *	RETURNS:
+ *	Zero on success, negative on error.
+ */
+
+static int ata_qc_issue_prot(struct ata_queued_cmd *qc)
+{
+	struct ata_port *ap = qc->ap;
+
+	ata_dev_select(ap, qc->dev->devno, 1, 0);
+
+	switch (qc->tf.protocol) {
+	case ATA_PROT_NODATA:
+		ata_tf_to_host_nolock(ap, &qc->tf);
+		break;
+
+	case ATA_PROT_DMA:
+		ap->ops->tf_load(ap, &qc->tf);	 /* load tf registers */
+		ap->ops->bmdma_start(qc);	    /* initiate bmdma */
+		break;
+
+	case ATA_PROT_PIO: /* load tf registers, initiate polling pio */
+		ata_pio_start(qc);
+		break;
+
+	default:
+		WARN_ON(1);
+		return -1;
+	}
+
+	return 0;
 }
 
 /**
