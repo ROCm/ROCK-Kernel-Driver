@@ -128,6 +128,41 @@ int fat_add_cluster(struct inode *inode)
 	int count, nr, limit, last, curr, file_cluster;
 	int cluster_bits = MSDOS_SB(sb)->cluster_bits;
 	
+	/* 
+	 * We must locate the last cluster of the file to add this new
+	 * one (nr) to the end of the link list (the FAT).
+	 *
+	 * In order to confirm that the cluster chain is valid, we
+	 * find out EOF first.
+	 */
+	nr = -EIO;
+	last = file_cluster = 0;
+	if ((curr = MSDOS_I(inode)->i_start) != 0) {
+		int max_cluster = MSDOS_I(inode)->mmu_private >> cluster_bits;
+
+		fat_cache_lookup(inode, INT_MAX, &last, &curr);
+		file_cluster = last;
+		while (curr && curr != FAT_ENT_EOF) {
+			file_cluster++;
+			curr = fat_access(sb, last = curr, -1);
+			if (curr < 0)
+				return curr;
+			else if (curr == FAT_ENT_FREE) {
+				fat_fs_panic(sb, "%s: invalid cluster chain"
+					     " (ino %lu)",
+					     __FUNCTION__, inode->i_ino);
+				goto out;
+			}
+			if (file_cluster > max_cluster) {
+				fat_fs_panic(sb, "%s: bad cluster counts"
+					     " (ino %lu)",
+					     __FUNCTION__, inode->i_ino);
+				goto out;
+			}
+		}
+	}
+
+	/* find free FAT entry */
 	lock_fat(sb);
 	
 	if (MSDOS_SB(sb)->free_clusters == 0) {
@@ -135,10 +170,9 @@ int fat_add_cluster(struct inode *inode)
 		return -ENOSPC;
 	}
 	limit = MSDOS_SB(sb)->clusters;
-	nr = limit; /* to keep GCC happy */
 	for (count = 0; count < limit; count++) {
 		nr = ((count + MSDOS_SB(sb)->prev_free) % limit) + 2;
-		if (fat_access(sb, nr, -1) == 0)
+		if (fat_access(sb, nr, -1) == FAT_ENT_FREE)
 			break;
 	}
 	if (count >= limit) {
@@ -148,43 +182,15 @@ int fat_add_cluster(struct inode *inode)
 	}
 	
 	MSDOS_SB(sb)->prev_free = (count + MSDOS_SB(sb)->prev_free + 1) % limit;
-	fat_access(sb, nr, EOF_FAT(sb));
+	fat_access(sb, nr, FAT_ENT_EOF);
 	if (MSDOS_SB(sb)->free_clusters != -1)
 		MSDOS_SB(sb)->free_clusters--;
 	if (MSDOS_SB(sb)->fat_bits == 32)
 		fat_clusters_flush(sb);
 	
 	unlock_fat(sb);
-	
-	/* We must locate the last cluster of the file to add this
-	   new one (nr) to the end of the link list (the FAT).
-	   
-	   Here file_cluster will be the number of the last cluster of the
-	   file (before we add nr).
-	   
-	   last is the corresponding cluster number on the disk. We will
-	   use last to plug the nr cluster. We will use file_cluster to
-	   update the cache.
-	*/
-	last = file_cluster = 0;
-	if ((curr = MSDOS_I(inode)->i_start) != 0) {
-		int max_cluster = MSDOS_I(inode)->mmu_private >> cluster_bits;
 
-		fat_cache_lookup(inode, INT_MAX, &last, &curr);
-		file_cluster = last;
-		while (curr && curr != -1) {
-			file_cluster++;
-			if (!(curr = fat_access(sb, last = curr, -1))) {
-				fat_fs_panic(sb, "File without EOF");
-				return -EIO;
-			}
-			if (file_cluster > max_cluster) {
-				fat_fs_panic(sb,"inode %lu: bad cluster counts",
-					     inode->i_ino);
-				return -EIO;
-			}
-		}
-	}
+	/* add new one to the last of the cluster chain */
 	if (last) {
 		fat_access(sb, last, nr);
 		fat_cache_add(inode, file_cluster, nr);
@@ -200,6 +206,7 @@ int fat_add_cluster(struct inode *inode)
 	}
 	inode->i_blocks += (1 << cluster_bits) >> 9;
 
+out:
 	return nr;
 }
 
@@ -330,33 +337,33 @@ int fat__get_entry(struct inode *dir, loff_t *pos,struct buffer_head **bh,
 {
 	struct super_block *sb = dir->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
-	int sector, offset;
+	int sector, offset, iblock;
 
-	while (1) {
-		offset = *pos;
-		PRINTK (("get_entry offset %d\n",offset));
-		if (*bh)
-			fat_brelse(sb, *bh);
-		*bh = NULL;
-		if ((sector = fat_bmap(dir,offset >> sb->s_blocksize_bits)) == -1)
-			return -1;
-		PRINTK (("get_entry sector %d %p\n",sector,*bh));
-		PRINTK (("get_entry sector apres brelse\n"));
-		if (!sector)
-			return -1; /* beyond EOF */
-		*pos += sizeof(struct msdos_dir_entry);
-		if (!(*bh = fat_bread(sb, sector))) {
-			printk("Directory sread (sector 0x%x) failed\n",sector);
-			continue;
-		}
-		PRINTK (("get_entry apres sread\n"));
+next:
+	offset = *pos;
+	if (*bh)
+		fat_brelse(sb, *bh);
 
-		offset &= sb->s_blocksize - 1;
-		*de = (struct msdos_dir_entry *) ((*bh)->b_data + offset);
-		*ino = (sector << sbi->dir_per_block_bits) + (offset >> MSDOS_DIR_BITS);
+	*bh = NULL;
+	iblock = *pos >> sb->s_blocksize_bits;
+	sector = fat_bmap(dir, iblock);
+	if (sector <= 0)
+		return -1;	/* beyond EOF or error */
 
-		return 0;
+	*bh = fat_bread(sb, sector);
+	if (*bh == NULL) {
+		printk("FAT: Directory bread(block %d) failed\n", sector);
+		/* skip this block */
+		*pos = (iblock + 1) << sb->s_blocksize_bits;
+		goto next;
 	}
+
+	offset &= sb->s_blocksize - 1;
+	*pos += sizeof(struct msdos_dir_entry);
+	*de = (struct msdos_dir_entry *)((*bh)->b_data + offset);
+	*ino = (sector << sbi->dir_per_block_bits) + (offset >> MSDOS_DIR_BITS);
+
+	return 0;
 }
 
 
@@ -503,14 +510,18 @@ static int raw_scan_nonroot(struct super_block *sb,int start,const char *name,
 				     start);
 			break;
 		}
-		if (!(start = fat_access(sb,start,-1))) {
-			fat_fs_panic(sb,"FAT error");
+		start = fat_access(sb, start, -1);
+		if (start < 0)
+			return start;
+		else if (start == FAT_ENT_FREE) {
+			fat_fs_panic(sb, "%s: invalid cluster chain",
+				     __FUNCTION__);
 			break;
 		}
 #ifdef DEBUG
 	printk("next start: %d\n",start);
 #endif
-	} while (start != -1);
+	} while (start != FAT_ENT_EOF);
 
 	return -ENOENT;
 }

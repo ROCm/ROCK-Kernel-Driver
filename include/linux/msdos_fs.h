@@ -54,11 +54,23 @@
 
 #define MSDOS_FAT12 4084 /* maximum number of clusters in a 12 bit FAT */
 
-#define EOF_FAT12 0xFF8		/* standard EOF */
+/* bad cluster mark */
+#define BAD_FAT12 0xFF7
+#define BAD_FAT16 0xFFF7
+#define BAD_FAT32 0xFFFFFF7
+#define BAD_FAT(s) (MSDOS_SB(s)->fat_bits == 32 ? BAD_FAT32 : \
+	MSDOS_SB(s)->fat_bits == 16 ? BAD_FAT16 : BAD_FAT12)
+
+/* standard EOF */
+#define EOF_FAT12 0xFF8
 #define EOF_FAT16 0xFFF8
 #define EOF_FAT32 0xFFFFFF8
 #define EOF_FAT(s) (MSDOS_SB(s)->fat_bits == 32 ? EOF_FAT32 : \
 	MSDOS_SB(s)->fat_bits == 16 ? EOF_FAT16 : EOF_FAT12)
+
+#define FAT_ENT_FREE	(0)
+#define FAT_ENT_BAD	(BAD_FAT32)
+#define FAT_ENT_EOF	(EOF_FAT32)
 
 #define FAT_FSINFO_SIG1		0x41615252
 #define FAT_FSINFO_SIG2		0x61417272
@@ -237,7 +249,6 @@ extern void fat_cache_lookup(struct inode *inode, int cluster, int *f_clu,
 extern void fat_cache_add(struct inode *inode, int f_clu, int d_clu);
 extern void fat_cache_inval_inode(struct inode *inode);
 extern void fat_cache_inval_dev(struct super_block *sb);
-extern int fat_get_cluster(struct inode *inode, int cluster);
 extern int fat_free(struct inode *inode, int skip);
 
 /* fat/dir.c */
