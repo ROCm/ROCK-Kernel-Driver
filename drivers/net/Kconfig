@@ -2085,6 +2085,50 @@ config TIGON3
 
 endmenu
 
+#
+#	10 Gigabit Ethernet
+#
+
+menu "Ethernet (10000 Mbit)"
+	depends on NETDEVICES
+
+config IXGB
+	tristate "Intel(R) PRO/10GbE support"
+	depends on PCI
+	---help---
+	  This driver supports Intel(R) PRO/10GbE family of
+	  adapters, which includes:
+
+	  Controller  Adapter Name                           Board IDs
+	  ----------  ------------                           ---------
+	  82597EX     Intel(R) PRO/10GbE LR Server Adapter   A82505-xxx
+
+	  For more information on how to identify your adapter, go to the
+	  Adapter & Driver ID Guide at:
+
+	  <http://support.intel.com/support/network/adapter/pro100/21397.htm>
+
+	  For general information and support, go to the Intel support
+	  website at:
+
+	  <http://support.intel.com>
+
+	  More specific information on configuring the driver is in 
+	  <file:Documentation/networking/ixgb.txt>.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called ixgb.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.
+
+config IXGB_NAPI
+	bool "Use Rx Polling (NAPI) (EXPERIMENTAL)"
+	depends on IXGB && EXPERIMENTAL
+
+endmenu
+
+
 config VETH
 	tristate "iSeries Virtual Ethernet driver support"
 	depends on NETDEVICES && PPC_ISERIES
