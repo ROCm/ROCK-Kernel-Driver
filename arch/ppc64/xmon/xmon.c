@@ -173,7 +173,8 @@ Commands:\n\
   S	print special registers\n\
   t	print backtrace\n\
   T	Enable/Disable PPCDBG flags\n\
-  x	exit monitor\n\
+  x	exit monitor and recover\n\
+  X	exit monitor and dont recover\n\
   u	dump segment table or SLB\n\
   ?	help\n"
   "\
@@ -339,6 +340,9 @@ xmon(struct pt_regs *excp)
 	cpu_clear(smp_processor_id(), cpus_in_xmon);
 #endif /* CONFIG_SMP */
 	set_msrd(msr);		/* restore interrupt enable */
+
+	if (cmd == 'X')
+		return 0;
 
 	return 1;
 }
@@ -559,6 +563,7 @@ cmds(struct pt_regs *excp)
 			break;
 		case 's':
 		case 'x':
+		case 'X':
 		case EOF:
 			return cmd;
 		case '?':
