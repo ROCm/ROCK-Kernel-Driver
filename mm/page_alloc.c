@@ -35,6 +35,7 @@
 #include <linux/vmalloc.h>
 
 #include <asm/tlbflush.h>
+#include "internal.h"
 
 nodemask_t node_online_map = NODE_MASK_NONE;
 nodemask_t node_possible_map = NODE_MASK_ALL;
@@ -284,6 +285,13 @@ void __free_pages_ok(struct page *page, unsigned int order)
 	arch_free_page(page, order);
 
 	mod_page_state(pgfree, 1 << order);
+
+#ifndef CONFIG_MMU
+	if (order > 0)
+		for (i = 1 ; i < (1 << order) ; ++i)
+			__put_page(page + i);
+#endif
+
 	for (i = 0 ; i < (1 << order) ; ++i)
 		free_pages_check(__FUNCTION__, page + i);
 	list_add(&page->lru, &list);
@@ -326,7 +334,7 @@ expand(struct zone *zone, struct page *page,
 	return page;
 }
 
-static inline void set_page_refs(struct page *page, int order)
+void set_page_refs(struct page *page, int order)
 {
 #ifdef CONFIG_MMU
 	set_page_count(page, 1);
@@ -336,9 +344,10 @@ static inline void set_page_refs(struct page *page, int order)
 	/*
 	 * We need to reference all the pages for this order, otherwise if
 	 * anyone accesses one of the pages with (get/put) it will be freed.
+	 * - eg: access_process_vm()
 	 */
 	for (i = 0; i < (1 << order); i++)
-		set_page_count(page+i, 1);
+		set_page_count(page + i, 1);
 #endif /* CONFIG_MMU */
 }
 

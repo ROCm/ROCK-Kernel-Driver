@@ -67,6 +67,7 @@
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 #include <asm/io.h>
 
 #include "power.h"
