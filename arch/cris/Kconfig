@@ -1,0 +1,753 @@
+#
+# For a description of the syntax of this configuration file,
+# see the Configure script.
+#
+
+mainmenu "Linux/CRIS Kernel Configuration"
+
+config UID16
+	bool
+	default y
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	default y
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+
+source "init/Kconfig"
+
+
+menu "General setup"
+
+config BINFMT_ELF
+	tristate "Kernel support for ELF binaries"
+	---help---
+	  ELF (Executable and Linkable Format) is a format for libraries and
+	  executables used across different architectures and operating
+	  systems. Saying Y here will enable your kernel to run ELF binaries
+	  and enlarge it by about 13 KB. ELF support under Linux has now all
+	  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
+	  because it is portable (this does *not* mean that you will be able
+	  to run executables from different architectures or operating systems
+	  however) and makes building run-time libraries very easy. Many new
+	  executables are distributed solely in ELF format. You definitely
+	  want to say Y here.
+
+	  Information about ELF is contained in the ELF HOWTO available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  If you find that after upgrading from Linux kernel 1.2 and saying Y
+	  here, you still can't run any ELF binaries (they just crash), then
+	  you'll have to install the newest ELF runtime libraries, including
+	  ld.so (check the file <file:Documentation/Changes> for location and
+	  latest version).
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called binfmt_elf.o. Saying M or N here is dangerous because
+	  some crucial programs on your system might be in ELF format.
+
+config ETRAX_KGDB
+	bool "Use kernel gdb debugger"
+	---help---
+	  The CRIS version of gdb can be used to remotely debug a running
+	  Linux kernel via the serial debug port.  Provided you have gdb-cris
+	  installed, run gdb-cris vmlinux, then type
+
+	  (gdb) set remotebaud 115200           <- kgdb uses 115200 as default
+	  (gdb) target remote /dev/ttyS0        <- maybe you use another port
+
+	  This should connect you to your booted kernel (or boot it now if you
+	  didn't before).  The kernel halts when it boots, waiting for gdb if
+	  this option is turned on!
+
+config ETRAX_WATCHDOG
+	bool "Enable Etrax100 watchdog"
+	help
+	  Enable the built-in watchdog timer support on Etrax100 embedded
+	  network computers.
+
+config ETRAX_WATCHDOG_NICE_DOGGY
+	bool "Disable watchdog during Oops printouts"
+	depends on ETRAX_WATCHDOG
+	help
+	  By enabling this you make sure that the watchdog does not bite while
+	  printing oopses. Recommended for development systems but not for
+	  production releases.
+
+endmenu
+
+
+menu "Hardware setup"
+
+choice
+	prompt "Processor type"
+	default ETRAX100LX
+
+config ETRAX100LX
+	bool "Etrax-100-LX-v1"
+	help
+	  Support version 1 of the Etrax 100LX.
+
+config ETRAX100LX_V2
+	bool "Etrax-100-LX-v2"
+	help
+	  Support version 2 of the Etrax 100LX.
+
+config SVINTO_SIM
+	bool "Etrax-100-LX-for-xsim-simulator"
+	help
+	  Support the xsim ETRAX Simulator.
+
+endchoice
+
+# Etrax100 LX v1 has a MMU "feature" requiring a low mapping
+config CRIS_LOW_MAP
+	bool
+	depends on ETRAX100LX
+	default y
+
+config ETRAX_DRAM_VIRTUAL_BASE
+	hex
+	default "c0000000" if !ETRAX100LX
+	default "60000000" if ETRAX100LX
+
+config ETRAX_DRAM_SIZE
+	int "DRAM size (dec, in MB)"
+	default "8"
+	help
+	  Size of DRAM (decimal in MB) typically 2, 8 or 16.
+
+config ETRAX_FLASH_BUSWIDTH
+	int "Buswidth of flash in bytes"
+	default "2"
+	help
+	  Width in bytes of the Flash bus (1, 2 or 4). Is usually 2.
+
+config ETRAX_ROOT_DEVICE
+	string "Root device name"
+	default "/dev/mtdblock3"
+	help
+	  Specifies the device that should be mounted as root file system
+	  when booting from flash. The axisflashmap driver adds an additional
+	  mtd partition for the appended root file system image, so this option
+	  should normally be the mtdblock device for the partition after the
+	  last partition in the partition table.
+
+choice
+	prompt "Product LED port"
+	default ETRAX_PA_LEDS
+
+config ETRAX_PA_LEDS
+	bool "Port-PA-LEDs"
+	help
+	  The Etrax network driver is responsible for flashing LED's when
+	  packets arrive and are sent.  It uses macros defined in
+	  <file:include/asm-cris/io.h>, and those macros are defined after what
+	  YOU choose in this option.  The actual bits used are configured
+	  separately.  Select this if the LEDs are on port PA.  Some products
+	  put the leds on PB or a memory-mapped latch (CSP0) instead.
+
+config ETRAX_PB_LEDS
+	bool "Port-PB-LEDs"
+	help
+	  The Etrax network driver is responsible for flashing LED's when
+	  packets arrive and are sent.  It uses macros defined in
+	  <file:include/asm-cris/io.h>, and those macros are defined after what
+	  YOU choose in this option.  The actual bits used are configured
+	  separately.  Select this if the LEDs are on port PB.  Some products
+	  put the leds on PA or a memory-mapped latch (CSP0) instead.
+
+config ETRAX_CSP0_LEDS
+	bool "Port-CSP0-LEDs"
+	help
+	  The Etrax network driver is responsible for flashing LED's when
+	  packets arrive and are sent. It uses macros defined in
+	  <file:include/asm-cris/io.h>, and those macros are defined after what
+	  YOU choose in this option.  The actual bits used are configured
+	  separately.  Select this if the LEDs are on a memory-mapped latch
+	  using chip select CSP0, this is mapped at 0x90000000.
+	  Some products put the leds on PA or PB instead.
+
+config ETRAX_NO_LEDS
+	bool "None"
+	help
+	  Select this option if you don't have any LED at all.
+
+endchoice
+
+config ETRAX_LED1G
+	int "First green LED bit"
+	depends on !ETRAX_NO_LEDS
+	default "2"
+	help
+	  Bit to use for the first green LED.
+	  Most Axis products use bit 2 here.
+
+config ETRAX_LED1R
+	int "First red LED bit"
+	depends on !ETRAX_NO_LEDS
+	default "3"
+	help
+	  Bit to use for the first red LED.
+	  Most Axis products use bit 3 here.
+	  For products with only one controllable LED,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED2G
+	int "Second green LED bit"
+	depends on !ETRAX_NO_LEDS
+	default "4"
+	help
+	  Bit to use for the second green LED. The "Active" LED.
+	  Most Axis products use bit 4 here.
+	  For products with only one controllable LED,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED2R
+	int "Second red LED bit"
+	depends on !ETRAX_NO_LEDS
+	default "5"
+	help
+	  Bit to use for the second red LED.
+	  Most Axis products use bit 5 here.
+	  For products with only one controllable LED,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED3G
+	int "Third green LED bit"
+	depends on !ETRAX_NO_LEDS
+	default "2"
+	help
+	  Bit to use for the third green LED. The "Drive" LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED3R
+	int "Third red LED bit"
+	depends on !ETRAX_NO_LEDS
+	default "2"
+	help
+	  Bit to use for the third red LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED4R
+	int "Fourth red LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the fourth red LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED4G
+	int "Fourth green LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the fourth green LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED5R
+	int "Fifth red LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the fifth red LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED5G
+	int "Fifth green LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the fifth green LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED6R
+	int "Sixth red LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the sixth red LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED6G
+	int "Sixth green LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the sixth green LED. The "Drive" LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED7R
+	int "Seventh red LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the seventh red LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED7G
+	int "Seventh green LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the seventh green LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED8Y
+	int "Eigth yellow LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the eighth yellow LED. The "Drive" LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED9Y
+	int "Ninth yellow LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the ninth yellow LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED10Y
+	int "Tenth yellow LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the tenth yellow LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED11Y
+	int "Eleventh yellow LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the eleventh yellow LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+config ETRAX_LED12R
+	int "Twelfth red LED bit"
+	depends on ETRAX_CSP0_LEDS
+	default "2"
+	help
+	  Bit to use for the twelfth red LED.
+	  For products with only one or two controllable LEDs,
+	  set this to same as CONFIG_ETRAX_LED1G (normally 2).
+
+choice
+	prompt "Product debug-port"
+	default ETRAX_DEBUG_PORT0
+
+config ETRAX_DEBUG_PORT0
+	bool "Serial-0"
+	help
+	  Choose a serial port for the ETRAX debug console.  Default to
+	  port 0.
+
+config ETRAX_DEBUG_PORT1
+	bool "Serial-1"
+	help
+	  Use serial port 1 for the console.
+
+config ETRAX_DEBUG_PORT2
+	bool "Serial-2"
+	help
+	  Use serial port 2 for the console.
+
+config ETRAX_DEBUG_PORT3
+	bool "Serial-3"
+	help
+	  Use serial port 3 for the console.
+
+config ETRAX_DEBUG_PORT_NULL
+	bool "disabled"
+	help
+	  Disable serial-port debugging.
+
+endchoice
+
+choice
+	prompt "Product rescue-port"
+	default ETRAX_RESCUE_SER0
+
+config ETRAX_RESCUE_SER0
+	bool "Serial-0"
+	help
+	  Select one of the four serial ports as a rescue port.  The default
+	  is port 0.
+
+config ETRAX_RESCUE_SER1
+	bool "Serial-1"
+	help
+	  Use serial port 1 as the rescue port.
+
+config ETRAX_RESCUE_SER2
+	bool "Serial-2"
+	help
+	  Use serial port 2 as the rescue port.
+
+config ETRAX_RESCUE_SER3
+	bool "Serial-3"
+	help
+	  Use serial port 3 as the rescue port.
+
+endchoice
+
+config ETRAX_DEF_R_WAITSTATES
+	hex "R_WAITSTATES"
+	default "95a6"
+	help
+	  Waitstates for SRAM, Flash and peripherials (not DRAM).  95f8 is a
+	  good choice for most Axis products...
+
+config ETRAX_DEF_R_BUS_CONFIG
+	hex "R_BUS_CONFIG"
+	default "104"
+	help
+	  Assorted bits controlling write mode, DMA burst length etc.  104 is
+	  a good choice for most Axis products...
+
+config ETRAX_SDRAM
+	bool "SDRAM support"
+	help
+	  Enable this if you use SDRAM chips and configure
+	  R_SDRAM_CONFIG and R_SDRAM_TIMING as well.
+
+config ETRAX_DEF_R_DRAM_CONFIG
+	hex "R_DRAM_CONFIG"
+	depends on !ETRAX_SDRAM
+	default "1a200040"
+	help
+	  The R_DRAM_CONFIG register specifies everything on how the DRAM
+	  chips in the system are connected to the Etrax CPU.  This is
+	  different depending on the manufacturer, chip type and number of
+	  chips.  So this value often needs to be different for each Axis
+	  product.
+
+config ETRAX_DEF_R_DRAM_TIMING
+	hex "R_DRAM_TIMING"
+	depends on !ETRAX_SDRAM
+	default "5611"
+	help
+	  Different DRAM chips have different speeds.  Current Axis products
+	  use 50ns DRAM chips which can use the timing: 5611.
+
+config ETRAX_DEF_R_SDRAM_CONFIG
+	hex "R_SDRAM_CONFIG"
+	depends on ETRAX_SDRAM
+	default "d2fa7878"
+	help
+	  The R_SDRAM_CONFIG register specifies everything on how the SDRAM
+	  chips in the system are connected to the Etrax CPU.  This is
+	  different depending on the manufacturer, chip type and number of
+	  chips.  So this value often needs to be different for each Axis
+	  product.
+
+config ETRAX_DEF_R_SDRAM_TIMING
+	hex "R_SDRAM_TIMING"
+	depends on ETRAX_SDRAM
+	default "80004801"
+	help
+	  Different SDRAM chips have different timing.
+
+config ETRAX_DEF_R_PORT_PA_DIR
+	hex "R_PORT_PA_DIR"
+	default "1c"
+	help
+	  Configures the direction of general port A bits.  1 is out, 0 is in.
+	  This is often totally different depending on the product used.
+	  There are some guidelines though - if you know that only LED's are
+	  connected to port PA, then they are usually connected to bits 2-4
+	  and you can therefore use 1c.  On other boards which don't have the
+	  LED's at the general ports, these bits are used for all kinds of
+	  stuff.  If you don't know what to use, it is always safe to put all
+	  as inputs, although floating inputs isn't good.
+
+config ETRAX_DEF_R_PORT_PA_DATA
+	hex "R_PORT_PA_DATA"
+	default "00"
+	help
+	  Configures the initial data for the general port A bits.  Most
+	  products should use 00 here.
+
+config ETRAX_DEF_R_PORT_PB_CONFIG
+	hex "R_PORT_PB_CONFIG"
+	default "00"
+	help
+	  Configures the type of the general port B bits.  1 is chip select,
+	  0 is port.  Most products should use 00 here.
+
+config ETRAX_DEF_R_PORT_PB_DIR
+	hex "R_PORT_PB_DIR"
+	default "00"
+	help
+	  Configures the direction of general port B bits. 1 is out, 0 is in.
+	  This is often totally different depending on the product used.  Bits
+	  0 and 1 on port PB are usually used for I2C communication, but the
+	  kernel I2C driver sets the appropriate directions itself so you
+	  don't need to take that into consideration when setting this option.
+	  If you don't know what to use, it is always safe to put all as
+	  inputs.
+
+config ETRAX_DEF_R_PORT_PB_DATA
+	hex "R_PORT_PB_DATA"
+	default "ff"
+	help
+	  Configures the initial data for the general port A bits.  Most
+	  products should use FF here.
+
+config ETRAX_SOFT_SHUTDOWN
+	bool "Software Shutdown Support"
+	help
+	  Enable this if Etrax is used with a power-supply that can be turned
+	  off and on with PS_ON signal. Gives the possibility to detect
+	  powerbutton and then do a power off after unmounting disks.
+
+config ETRAX_SHUTDOWN_BIT
+	int "Shutdown bit on port CSP0"
+	depends on ETRAX_SOFT_SHUTDOWN
+	default "12"
+	help
+	  Configure what pin on CSPO-port that is used for controlling power
+	  supply.
+
+config ETRAX_POWERBUTTON_BIT
+	int "Power button bit on port G"
+	depends on ETRAX_SOFT_SHUTDOWN
+	default "25"
+	help
+	  Configure where power button is connected.
+
+endmenu
+
+# bring in Etrax built-in drivers
+source "arch/cris/drivers/Kconfig"
+
+# standard linux drivers
+source "drivers/mtd/Kconfig"
+
+source "drivers/parport/Kconfig"
+
+source "drivers/pnp/Kconfig"
+
+source "drivers/block/Kconfig"
+
+source "drivers/md/Kconfig"
+
+
+menu "ATA/IDE/MFM/RLL support"
+
+config IDE
+	tristate "ATA/IDE/MFM/RLL support"
+
+source "drivers/ide/Kconfig"
+
+endmenu
+
+
+menu "SCSI support"
+
+config SCSI
+	tristate "SCSI support"
+	---help---
+	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+	  any other SCSI device under Linux, say Y and make sure that you know
+	  the name of your SCSI host adapter (the card inside your computer
+	  that "speaks" the SCSI protocol, also called SCSI controller),
+	  because you will be asked for it.
+
+	  You also need to say Y here if you want support for the parallel
+	  port version of the 100 MB IOMEGA ZIP drive.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called scsi_mod.o.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt> and
+	  <file:Documentation/scsi.txt>.  However, do not compile this as a
+	  module if your root file system (the one containing the directory /)
+	  is located on a SCSI device.
+
+source "drivers/scsi/Kconfig"
+
+endmenu
+
+source "drivers/ieee1394/Kconfig"
+
+source "drivers/message/i2o/Kconfig"
+
+source "net/Kconfig"
+
+
+menu "Network device support"
+	depends on NET
+
+config NETDEVICES
+	bool "Network device support"
+	---help---
+	  You can say N here if you don't intend to connect your Linux box to
+	  any other computer at all or if all your connections will be over a
+	  telephone line with a modem either via UUCP (UUCP is a protocol to
+	  forward mail and news between unix hosts over telephone lines; read
+	  the UUCP-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>) or dialing up a shell
+	  account or a BBS, even using term (term is a program which gives you
+	  almost full Internet connectivity if you have a regular dial up
+	  shell account on some Internet connected Unix computer. Read
+	  <http://www.bart.nl/~patrickr/term-howto/Term-HOWTO.html>).
+
+	  You'll have to say Y if your computer contains a network card that
+	  you want to use under Linux (make sure you know its name because you
+	  will be asked for it and read the Ethernet-HOWTO (especially if you
+	  plan to use more than one network card under Linux)) or if you want
+	  to use SLIP (Serial Line Internet Protocol is the protocol used to
+	  send Internet traffic over telephone lines or null modem cables) or
+	  CSLIP (compressed SLIP) or PPP (Point to Point Protocol, a better
+	  and newer replacement for SLIP) or PLIP (Parallel Line Internet
+	  Protocol is mainly used to create a mini network by connecting the
+	  parallel ports of two local machines) or AX.25/KISS (protocol for
+	  sending Internet traffic over amateur radio links).
+
+	  Make sure to read the NET-3-HOWTO. Eventually, you will have to read
+	  Olaf Kirch's excellent and free book "Network Administrator's
+	  Guide", to be found in <http://www.linuxdoc.org/docs.html#guide>. If
+	  unsure, say Y.
+
+source "drivers/net/Kconfig"
+
+source "drivers/atm/Kconfig"
+
+endmenu
+
+source "net/ax25/Kconfig"
+
+source "net/irda/Kconfig"
+
+source "drivers/isdn/Kconfig"
+
+source "drivers/telephony/Kconfig"
+
+
+menu "Old CD-ROM drivers (not SCSI, not IDE)"
+
+config CD_NO_IDESCSI
+	bool "Support non-SCSI/IDE/ATAPI CDROM drives"
+	---help---
+	  If you have a CD-ROM drive that is neither SCSI nor IDE/ATAPI, say Y
+	  here, otherwise N. Read the CD-ROM-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  Note that the answer to this question doesn't directly affect the
+	  kernel: saying N will just cause the configurator to skip all
+	  the questions about these CD-ROM drives. If you are unsure what you
+	  have, say Y and find out whether you have one of the following
+	  drives.
+
+	  For each of these drivers, a file Documentation/cdrom/{driver_name}
+	  exists. Especially in cases where you do not know exactly which kind
+	  of drive you have you should read there. Most of these drivers use a
+	  file drivers/cdrom/{driver_name}.h where you can define your
+	  interface parameters and switch some internal goodies.
+
+	  All these CD-ROM drivers are also usable as a module ( = code which
+	  can be inserted in and removed from the running kernel whenever you
+	  want). If you want to compile them as module, say M instead of Y and
+	  read <file:Documentation/modules.txt>.
+
+	  If you want to use any of these CD-ROM drivers, you also have to
+	  answer Y or M to "ISO 9660 CD-ROM file system support" below (this
+	  answer will get "defaulted" for you if you enable any of the Linux
+	  CD-ROM drivers).
+
+source "drivers/cdrom/Kconfig"
+
+endmenu
+
+#
+# input before char - char/joystick depends on it. As does USB.
+#
+source "drivers/input/Kconfig"
+
+source "drivers/char/Kconfig"
+
+#source drivers/misc/Config.in
+source "drivers/media/Kconfig"
+
+source "fs/Kconfig"
+
+
+menu "Sound"
+
+config SOUND
+	tristate "Sound card support"
+	---help---
+	  If you have a sound card in your computer, i.e. if it can say more
+	  than an occasional beep, say Y.  Be sure to have all the information
+	  about your sound card and its configuration down (I/O port,
+	  interrupt and DMA channel), because you will be asked for it.
+
+	  You want to read the Sound-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  the modular sound system is contained in the files
+	  <file:Documentation/sound/Introduction>.  The file
+	  <file:Documentation/sound/README.OSS> contains some slightly
+	  outdated but still useful information as well.
+
+	  If you have a PnP sound card and you want to configure it at boot
+	  time using the ISA PnP tools (read
+	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
+	  compile the sound card support as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want)
+	  and load that module after the PnP configuration is finished.  To do
+	  this, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/sound/README.modules>; the module will be
+	  called soundcore.o.
+
+	  I'm told that even without a sound card, you can make your computer
+	  say more than an occasional beep, by programming the PC speaker.
+	  Kernel patches and supporting utilities to do that are in the pcsp
+	  package, available at <ftp://ftp.infradead.org/pub/pcsp/>.
+
+source "sound/Kconfig"
+
+endmenu
+
+source "drivers/usb/Kconfig"
+
+
+menu "Kernel hacking"
+
+#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
+config PROFILE
+	bool "Kernel profiling support"
+
+config PROFILE_SHIFT
+	int "Profile shift count"
+	depends on PROFILE
+	default "2"
+
+endmenu
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+
