@@ -21,7 +21,7 @@ obj-$(CONFIG_IA64_CYCLONE)	+= cyclone.o
 # The gate DSO image is built using a special linker script.
 targets += gate.so gate-syms.o
 
-extra-y := gate.so gate-syms.o gate.lds gate.o
+extra-y += gate.so gate-syms.o gate.lds gate.o
 
 # fp_emulate() expects f2-f5,f16-f31 to contain the user-level state.
 CFLAGS_traps.o  += -mfixed-range=f2-f5,f16-f31
