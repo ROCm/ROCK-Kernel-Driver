@@ -219,6 +219,31 @@ struct s_drive_stuff {
 int mcdx_init(void);
 void do_mcdx_request(request_queue_t * q);
 
+static int mcdx_dev_open(struct inode *inode, struct file *file)
+{
+	int err;
+	MOD_INC_USE_COUNT;
+	err = cdrom_open(inode, file);
+	if (err)
+		MOD_DEC_USE_COUNT;
+	return err;
+}
+
+static int mcdx_dev_release(struct inode *inode, struct file *file)
+{
+	int err = cdrom_release(inode, file);
+	MOD_DEC_USE_COUNT;
+	return err;
+}
+
+struct block_device_operations mcdx_bdops =
+{
+	open:			mcdx_dev_open,
+	release:		mcdx_dev_release,
+	ioctl:			cdrom_ioctl,
+	check_media_change:	cdrom_media_changed,
+};
+
 
 /*	Indirect exported functions. These functions are exported by their
 	addresses, such as mcdx_open and mcdx_close in the
@@ -640,13 +665,10 @@ static int mcdx_open(struct cdrom_device_info *cdi, int purpose)
 	/* Make the modules looking used ... (thanx bjorn).
 	 * But we shouldn't forget to decrement the module counter
 	 * on error return */
-	MOD_INC_USE_COUNT;
 
 	/* this is only done to test if the drive talks with us */
-	if (-1 == mcdx_getstatus(stuffp, 1)) {
-		MOD_DEC_USE_COUNT;
+	if (-1 == mcdx_getstatus(stuffp, 1))
 		return -EIO;
-	}
 
 	if (stuffp->xxx) {
 
@@ -705,10 +727,8 @@ static int mcdx_open(struct cdrom_device_info *cdi, int purpose)
 		}
 
 		xtrace(OPENCLOSE, "open() init irq generation\n");
-		if (-1 == mcdx_config(stuffp, 1)) {
-			MOD_DEC_USE_COUNT;
+		if (-1 == mcdx_config(stuffp, 1))
 			return -EIO;
-		}
 #if FALLBACK
 		/* Set the read speed */
 		xwarn("AAA %x AAA\n", stuffp->readcmd);
@@ -745,7 +765,7 @@ static int mcdx_open(struct cdrom_device_info *cdi, int purpose)
 								  MODE2 :
 								  MODE1,
 								  1))) {
-					/* MOD_DEC_USE_COUNT, return -EIO; */
+					/* return -EIO; */
 					stuffp->xa = 0;
 					break;
 				}
@@ -765,10 +785,8 @@ static int mcdx_open(struct cdrom_device_info *cdi, int purpose)
 		/* xa disks will be read in raw mode, others not */
 		if (-1 == mcdx_setdrivemode(stuffp,
 					    stuffp->xa ? RAW : COOKED,
-					    1)) {
-			MOD_DEC_USE_COUNT;
+					    1))
 			return -EIO;
-		}
 		if (stuffp->audio) {
 			xinfo("open() audio disk found\n");
 		} else if (stuffp->lastsector >= 0) {
@@ -792,8 +810,6 @@ static void mcdx_close(struct cdrom_device_info *cdi)
 	stuffp = mcdx_stuffp[MINOR(cdi->dev)];
 
 	--stuffp->users;
-
-	MOD_DEC_USE_COUNT;
 }
 
 static int mcdx_media_changed(struct cdrom_device_info *cdi, int disc_nr)
@@ -1180,7 +1196,7 @@ int __init mcdx_init_drive(int drive)
 	}
 
 	xtrace(INIT, "init() register blkdev\n");
-	if (devfs_register_blkdev(MAJOR_NR, "mcdx", &cdrom_fops) != 0) {
+	if (devfs_register_blkdev(MAJOR_NR, "mcdx", &mcdx_bdops) != 0) {
 		xwarn("%s=0x%3p,%d: Init failed. Can't get major %d.\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq, MAJOR_NR);
 		kfree(stuffp);
@@ -1240,6 +1256,7 @@ int __init mcdx_init_drive(int drive)
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		return 2;
 	}
+	devfs_plain_cdrom(&mcdx_info, &mcdx_bdops);
 	printk(msg);
 	return 0;
 }

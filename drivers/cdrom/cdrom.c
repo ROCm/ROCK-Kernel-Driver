@@ -310,11 +310,6 @@ MODULE_PARM(check_media_type, "i");
 #define CHECKAUDIO if ((ret=check_for_audio_disc(cdi, cdo))) return ret
 
 /* Not-exported routines. */
-static int cdrom_open(struct inode *ip, struct file *fp);
-static int cdrom_release(struct inode *ip, struct file *fp);
-static int cdrom_ioctl(struct inode *ip, struct file *fp,
-				unsigned int cmd, unsigned long arg);
-static int cdrom_media_changed(kdev_t dev);
 static int open_for_data(struct cdrom_device_info * cdi);
 static int check_for_audio_disc(struct cdrom_device_info * cdi,
 			 struct cdrom_device_ops * cdo);
@@ -333,14 +328,6 @@ static struct cdrom_device_info *topCdromPtr;
 static devfs_handle_t devfs_handle;
 static struct unique_numspace cdrom_numspace = UNIQUE_NUMBERSPACE_INITIALISER;
 
-struct block_device_operations cdrom_fops =
-{
-	open:			cdrom_open,
-	release:		cdrom_release,
-	ioctl:			cdrom_ioctl,
-	check_media_change:	cdrom_media_changed,
-};
-
 /* This macro makes sure we don't have to check on cdrom_device_ops
  * existence in the run-time routines below. Change_capability is a
  * hack to have the capability flags defined const, while we can still
@@ -354,7 +341,6 @@ int register_cdrom(struct cdrom_device_info *cdi)
 	int major = MAJOR(cdi->dev);
         struct cdrom_device_ops *cdo = cdi->ops;
         int *change_capability = (int *)&cdo->capability; /* hack */
-	char vname[16];
 
 	cdinfo(CD_OPEN, "entering register_cdrom\n"); 
 
@@ -396,7 +382,6 @@ int register_cdrom(struct cdrom_device_info *cdi)
 	if (!devfs_handle)
 		devfs_handle = devfs_mk_dir (NULL, "cdroms", NULL);
 	cdi->number = devfs_alloc_unique_number (&cdrom_numspace);
-	sprintf (vname, "cdrom%d", cdi->number);
 	if (cdi->de) {
 		int pos;
 		devfs_handle_t slave;
@@ -405,19 +390,14 @@ int register_cdrom(struct cdrom_device_info *cdi)
 		pos = devfs_generate_path (cdi->de, rname + 3,
 					   sizeof rname - 3);
 		if (pos >= 0) {
+			char vname[16];
+			sprintf (vname, "cdrom%d", cdi->number);
 			strncpy (rname + pos, "../", 3);
 			devfs_mk_symlink (devfs_handle, vname,
 					  DEVFS_FL_DEFAULT,
 					  rname + pos, &slave, NULL);
 			devfs_auto_unregister (cdi->de, slave);
 		}
-	}
-	else {
-		cdi->de =
-		    devfs_register (devfs_handle, vname, DEVFS_FL_DEFAULT,
-				    MAJOR (cdi->dev), MINOR (cdi->dev),
-				    S_IFBLK | S_IRUGO | S_IWUGO,
-				    &cdrom_fops, NULL);
 	}
 	cdinfo(CD_REG_UNREG, "drive \"/dev/%s\" registered\n", cdi->name);
 	cdi->next = topCdromPtr; 	
@@ -475,7 +455,6 @@ struct cdrom_device_info *cdrom_find_device(kdev_t dev)
  * is in their own interest: device control becomes a lot easier
  * this way.
  */
-static
 int cdrom_open(struct inode *ip, struct file *fp)
 {
 	struct cdrom_device_info *cdi;
@@ -669,7 +648,6 @@ int check_for_audio_disc(struct cdrom_device_info * cdi,
 
 
 /* Admittedly, the logic below could be performed in a nicer way. */
-static
 int cdrom_release(struct inode *ip, struct file *fp)
 {
 	kdev_t dev = ip->i_rdev;
@@ -867,7 +845,7 @@ int media_changed(struct cdrom_device_info *cdi, int queue)
 	return ret;
 }
 
-static int cdrom_media_changed(kdev_t dev)
+int cdrom_media_changed(kdev_t dev)
 {
 	struct cdrom_device_info *cdi = cdrom_find_device(dev);
 	/* This talks to the VFS, which doesn't like errors - just 1 or 0.  
@@ -1480,7 +1458,7 @@ static int cdrom_read_block(struct cdrom_device_info *cdi,
  * these days. ATAPI / SCSI specific code now mainly resides in
  * mmc_ioct().
  */
-static int cdrom_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
+int cdrom_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 		       unsigned long arg)
 {
 	kdev_t dev = ip->i_rdev;
@@ -2391,7 +2369,10 @@ EXPORT_SYMBOL(cdrom_get_last_written);
 EXPORT_SYMBOL(cdrom_count_tracks);
 EXPORT_SYMBOL(register_cdrom);
 EXPORT_SYMBOL(unregister_cdrom);
-EXPORT_SYMBOL(cdrom_fops);
+EXPORT_SYMBOL(cdrom_open);
+EXPORT_SYMBOL(cdrom_release);
+EXPORT_SYMBOL(cdrom_ioctl);
+EXPORT_SYMBOL(cdrom_media_changed);
 EXPORT_SYMBOL(cdrom_number_of_slots);
 EXPORT_SYMBOL(cdrom_select_disc);
 EXPORT_SYMBOL(cdrom_mode_select);

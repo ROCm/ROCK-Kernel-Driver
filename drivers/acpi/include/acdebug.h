@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdebug.h - ACPI/AML debugger
- *       $Revision: 47 $
+ *       $Revision: 50 $
  *
  *****************************************************************************/
 
@@ -35,7 +35,7 @@
 
 extern int                      optind;
 extern NATIVE_CHAR              *optarg;
-extern u8                       *aml_ptr;
+extern u8                       *aml_start;
 extern u32                      aml_length;
 
 extern u8                       acpi_gbl_db_opt_tables;
@@ -57,6 +57,7 @@ extern NATIVE_CHAR              *acpi_gbl_db_disasm_indent;
 extern u8                       acpi_gbl_db_output_flags;
 extern u32                      acpi_gbl_db_debug_level;
 extern u32                      acpi_gbl_db_console_debug_level;
+extern acpi_table_header        *acpi_gbl_db_table_ptr;
 
 /*
  * Statistic globals
@@ -119,11 +120,15 @@ int
 acpi_db_initialize (
 	void);
 
+void
+acpi_db_terminate (
+	void);
+
 acpi_status
 acpi_db_single_step (
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op,
-	u8                      op_type);
+	u32                     op_type);
 
 
 /*

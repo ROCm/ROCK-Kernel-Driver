@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utdebug - Debug print routines
- *              $Revision: 87 $
+ *              $Revision: 90 $
  *
  *****************************************************************************/
 
@@ -87,10 +87,6 @@ acpi_ut_track_stack_ptr (
 
 	if (acpi_gbl_nesting_level > acpi_gbl_deepest_nesting) {
 		acpi_gbl_deepest_nesting = acpi_gbl_nesting_level;
-
-		if (acpi_gbl_deepest_nesting == 34) {
-			acpi_os_printf ("hit deepest nesting\n");
-		}
 	}
 }
 
@@ -119,7 +115,7 @@ void
 acpi_ut_debug_print (
 	u32                     requested_debug_level,
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	char                    *format,
 	...)
 {
@@ -192,7 +188,7 @@ void
 acpi_ut_debug_print_raw (
 	u32                     requested_debug_level,
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	char                    *format,
 	...)
 {
@@ -230,7 +226,7 @@ acpi_ut_debug_print_raw (
 void
 acpi_ut_trace (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info)
+	acpi_debug_print_info   *dbg_info)
 {
 
 	acpi_gbl_nesting_level++;
@@ -262,7 +258,7 @@ acpi_ut_trace (
 void
 acpi_ut_trace_ptr (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	void                    *pointer)
 {
 	acpi_gbl_nesting_level++;
@@ -294,7 +290,7 @@ acpi_ut_trace_ptr (
 void
 acpi_ut_trace_str (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	NATIVE_CHAR             *string)
 {
 
@@ -327,7 +323,7 @@ acpi_ut_trace_str (
 void
 acpi_ut_trace_u32 (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	u32                     integer)
 {
 
@@ -359,7 +355,7 @@ acpi_ut_trace_u32 (
 void
 acpi_ut_exit (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info)
+	acpi_debug_print_info   *dbg_info)
 {
 
 	acpi_ut_debug_print (ACPI_LV_FUNCTIONS, line_number, dbg_info,
@@ -390,7 +386,7 @@ acpi_ut_exit (
 void
 acpi_ut_status_exit (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	acpi_status             status)
 {
 
@@ -430,12 +426,12 @@ acpi_ut_status_exit (
 void
 acpi_ut_value_exit (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	acpi_integer            value)
 {
 
 	acpi_ut_debug_print (ACPI_LV_FUNCTIONS, line_number, dbg_info,
-			"%s %08X\n", acpi_gbl_fn_exit_str, value);
+			"%s %8.8X%8.8X\n", acpi_gbl_fn_exit_str, HIDWORD(value), LODWORD(value));
 
 	acpi_gbl_nesting_level--;
 }
@@ -462,7 +458,7 @@ acpi_ut_value_exit (
 void
 acpi_ut_ptr_exit (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	u8                      *ptr)
 {
 

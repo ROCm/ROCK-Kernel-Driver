@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: acobject.h - Definition of acpi_operand_object  (Internal object only)
- *       $Revision: 90 $
+ *       $Revision: 93 $
  *
  *****************************************************************************/
 
@@ -98,6 +98,13 @@
 #define AFIELD_SINGLE_DATUM         0x1
 
 
+/*
+ * Fields common to both Strings and Buffers
+ */
+#define ACPI_COMMON_BUFFER_INFO \
+	u32                         length;
+
+
 /******************************************************************************
  *
  * Individual Object Descriptors
@@ -132,8 +139,7 @@ typedef struct /* NUMBER - has value */
 typedef struct /* STRING - has length and pointer - Null terminated, ASCII characters only */
 {
 	ACPI_OBJECT_COMMON_HEADER
-
-	u32                         length;
+	ACPI_COMMON_BUFFER_INFO
 	NATIVE_CHAR                 *pointer;           /* String value in AML stream or in allocated space */
 
 } ACPI_OBJECT_STRING;
@@ -142,9 +148,8 @@ typedef struct /* STRING - has length and pointer - Null terminated, ASCII chara
 typedef struct /* BUFFER - has length and pointer - not null terminated */
 {
 	ACPI_OBJECT_COMMON_HEADER
-
-	u32                         length;
-	u8                          *pointer;           /* points to the buffer in allocated space */
+	ACPI_COMMON_BUFFER_INFO
+	u8                          *pointer;           /* Buffer value in AML stream or in allocated space */
 
 } ACPI_OBJECT_BUFFER;
 
@@ -154,7 +159,6 @@ typedef struct /* PACKAGE - has count, elements, next element */
 	ACPI_OBJECT_COMMON_HEADER
 
 	u32                         count;              /* # of elements in package */
-
 	union acpi_operand_obj      **elements;         /* Array of pointers to Acpi_objects */
 	union acpi_operand_obj      **next_element;     /* used only while initializing */
 
@@ -188,10 +192,10 @@ typedef struct /* METHOD */
 	u8                          method_flags;
 	u8                          param_count;
 
-	u32                         pcode_length;
+	u32                         aml_length;
 
 	void                        *semaphore;
-	u8                          *pcode;
+	u8                          *aml_start;
 
 	u8                          concurrency;
 	u8                          thread_count;
@@ -341,7 +345,7 @@ typedef struct /* NOTIFY HANDLER */
 	ACPI_OBJECT_COMMON_HEADER
 
 	acpi_namespace_node         *node;               /* Parent device */
-	ACPI_NOTIFY_HANDLER         handler;
+	acpi_notify_handler         handler;
 	void                        *context;
 
 } ACPI_OBJECT_NOTIFY_HANDLER;
@@ -358,11 +362,11 @@ typedef struct /* ADDRESS HANDLER */
 
 	u8                          space_id;
 	u16                         hflags;
-	ACPI_ADR_SPACE_HANDLER      handler;
+	acpi_adr_space_handler      handler;
 
 	acpi_namespace_node         *node;              /* Parent device */
 	void                        *context;
-	ACPI_ADR_SPACE_SETUP        setup;
+	acpi_adr_space_setup        setup;
 	union acpi_operand_obj      *region_list;       /* regions using this handler */
 	union acpi_operand_obj      *next;
 
@@ -402,8 +406,8 @@ typedef struct /* EXTRA */
 	ACPI_OBJECT_COMMON_HEADER
 	u8                          byte_fill1;
 	u16                         word_fill1;
-	u32                         pcode_length;
-	u8                          *pcode;
+	u32                         aml_length;
+	u8                          *aml_start;
 	acpi_namespace_node         *method_REG;        /* _REG method for this region (if any) */
 	void                        *region_context;    /* Region-specific data */
 

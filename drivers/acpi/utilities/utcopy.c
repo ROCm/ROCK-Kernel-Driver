@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utcopy - Internal to external object translation utilities
- *              $Revision: 82 $
+ *              $Revision: 83 $
  *
  *****************************************************************************/
 
@@ -135,7 +135,7 @@ acpi_ut_copy_isimple_to_esimple (
 
 		case AML_REVISION_OP:
 			external_object->type = ACPI_TYPE_INTEGER;
-			external_object->integer.value = ACPI_CA_VERSION;
+			external_object->integer.value = ACPI_CA_SUPPORT_LEVEL;
 			break;
 
 		case AML_INT_NAMEPATH_OP:

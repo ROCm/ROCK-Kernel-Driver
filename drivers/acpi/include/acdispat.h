@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdispat.h - dispatcher (parser to interpreter interface)
- *       $Revision: 40 $
+ *       $Revision: 45 $
  *
  *****************************************************************************/
 
@@ -86,24 +86,19 @@ acpi_ds_exec_end_control_op (
 acpi_status
 acpi_ds_get_predicate_value (
 	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op,
 	u32                     has_result_obj);
 
 acpi_status
 acpi_ds_exec_begin_op (
-	u16                     opcode,
-	acpi_parse_object       *op,
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       **out_op);
 
 acpi_status
 acpi_ds_exec_end_op (
-	acpi_walk_state         *state,
-	acpi_parse_object       *op);
+	acpi_walk_state         *state);
 
 
 /* dsfield - Parser/Interpreter interface for AML fields */
-
 
 acpi_status
 acpi_ds_create_field (
@@ -123,44 +118,36 @@ acpi_ds_create_index_field (
 	acpi_namespace_node     *region_node,
 	acpi_walk_state         *walk_state);
 
+acpi_status
+acpi_ds_create_buffer_field (
+	acpi_parse_object       *op,
+	acpi_walk_state         *walk_state);
+
 
 /* dsload - Parser/Interpreter interface, namespace load callbacks */
 
 acpi_status
 acpi_ds_load1_begin_op (
-	u16                     opcode,
-	acpi_parse_object       *op,
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       **out_op);
 
 acpi_status
 acpi_ds_load1_end_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op);
+	acpi_walk_state         *walk_state);
 
 acpi_status
 acpi_ds_load2_begin_op (
-	u16                     opcode,
-	acpi_parse_object       *op,
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       **out_op);
 
 acpi_status
 acpi_ds_load2_end_op (
-	acpi_walk_state         *state,
-	acpi_parse_object       *op);
+	acpi_walk_state         *walk_state);
 
 acpi_status
-acpi_ds_load3_begin_op (
-	u16                     opcode,
-	acpi_parse_object       *op,
+acpi_ds_init_callbacks (
 	acpi_walk_state         *walk_state,
-	acpi_parse_object       **out_op);
-
-acpi_status
-acpi_ds_load3_end_op (
-	acpi_walk_state         *state,
-	acpi_parse_object       *op);
+	u32                     pass_number);
 
 
 /* dsmthdat - method data (locals/args) */
@@ -374,7 +361,7 @@ acpi_ds_scope_stack_clear (
 	acpi_walk_state         *walk_state);
 
 
-/* Acpi_dswstate - parser WALK_STATE management routines */
+/* dswstate - parser WALK_STATE management routines */
 
 acpi_walk_state *
 acpi_ds_create_walk_state (
@@ -382,6 +369,17 @@ acpi_ds_create_walk_state (
 	acpi_parse_object       *origin,
 	acpi_operand_object     *mth_desc,
 	acpi_walk_list          *walk_list);
+
+acpi_status
+acpi_ds_init_aml_walk (
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op,
+	acpi_namespace_node     *method_node,
+	u8                      *aml_start,
+	u32                     aml_length,
+	acpi_operand_object     **params,
+	acpi_operand_object     **return_obj_desc,
+	u32                     pass_number);
 
 acpi_status
 acpi_ds_obj_stack_delete_all (
@@ -398,6 +396,11 @@ acpi_ds_delete_walk_state (
 
 acpi_walk_state *
 acpi_ds_pop_walk_state (
+	acpi_walk_list          *walk_list);
+
+void
+acpi_ds_push_walk_state (
+	acpi_walk_state         *walk_state,
 	acpi_walk_list          *walk_list);
 
 acpi_status

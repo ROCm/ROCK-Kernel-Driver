@@ -1051,7 +1051,8 @@ static int __init ace_init(struct net_device *dev)
 	struct ace_private *ap;
 	struct ace_regs *regs;
 	struct ace_info *info = NULL;
-	unsigned long tmp_ptr, myjif;
+	u64 tmp_ptr;
+	unsigned long myjif;
 	u32 tig_ver, mac1, mac2, tmp, pci_state;
 	int board_idx, ecode = 0;
 	short i;

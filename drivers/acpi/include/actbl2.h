@@ -65,7 +65,7 @@ typedef struct
 typedef struct
 {
 	acpi_table_header       header;                 /* Table header */
-	UINT64                  table_offset_entry [1]; /* Array of pointers to  */
+	u64                     table_offset_entry [1]; /* Array of pointers to  */
 			 /* other tables' headers */
 } XSDT_DESCRIPTOR_REV2;
 
@@ -80,9 +80,9 @@ typedef struct
 	u32                     hardware_signature;     /* hardware configuration signature */
 	u32                     firmware_waking_vector; /* 32bit physical address of the Firmware Waking Vector. */
 	u32                     global_lock;            /* Global Lock used to synchronize access to shared hardware resources */
-	u32                     S4_bios_f       : 1;    /* Indicates if S4_bIOS support is present */
+	u32                     S4bios_f        : 1;    /* Indicates if S4BIOS support is present */
 	u32                     reserved1       : 31;   /* must be 0 */
-	UINT64                  Xfirmware_waking_vector; /* 64bit physical address of the Firmware Waking Vector. */
+	u64                     Xfirmware_waking_vector; /* 64bit physical address of the Firmware Waking Vector. */
 	u8                      version;                /* Version of this table */
 	u8                      reserved3 [31];         /* reserved - must be zero */
 
@@ -98,7 +98,7 @@ typedef struct
 	u8                      register_bit_width;     /* Size in bits of given register */
 	u8                      register_bit_offset;    /* Bit offset within the register */
 	u8                      reserved;               /* Must be 0 */
-	UINT64                  address;                /* 64-bit address of struct or register */
+	u64                     address;                /* 64-bit address of struct or register */
 
 } acpi_generic_address;
 
@@ -117,7 +117,7 @@ typedef struct
 	u32                     smi_cmd;            /* Port address of SMI command port */
 	u8                      acpi_enable;        /* value to write to smi_cmd to enable ACPI */
 	u8                      acpi_disable;       /* value to write to smi_cmd to disable ACPI */
-	u8                      S4_bios_req;        /* Value to write to SMI CMD to enter S4_bIOS state */
+	u8                      S4bios_req;         /* Value to write to SMI CMD to enter S4BIOS state */
 	u8                      pstate_cnt;         /* processor performance state control*/
 	u32                     V1_pm1a_evt_blk;    /* Port address of Power Mgt 1a Acpi_event Reg Blk */
 	u32                     V1_pm1b_evt_blk;    /* Port address of Power Mgt 1b Acpi_event Reg Blk */
@@ -139,8 +139,8 @@ typedef struct
 	u16                     plvl3_lat;          /* worst case HW latency to enter/exit C3 state */
 	u16                     flush_size;         /* number of flush strides that need to be read */
 	u16                     flush_stride;       /* Processor's memory cache line width, in bytes */
-	u8                      duty_offset;        /* Processor’s duty cycle index in processor's P_CNT reg*/
-	u8                      duty_width;         /* Processor’s duty cycle value bit width in P_CNT register.*/
+	u8                      duty_offset;        /* Processor_’s duty cycle index in processor's P_CNT reg*/
+	u8                      duty_width;         /* Processor_’s duty cycle value bit width in P_CNT register.*/
 	u8                      day_alrm;           /* index to day-of-month alarm in RTC CMOS RAM */
 	u8                      mon_alrm;           /* index to month-of-year alarm in RTC CMOS RAM */
 	u8                      century;            /* index to century in RTC CMOS RAM */
@@ -166,8 +166,8 @@ typedef struct
 	acpi_generic_address    reset_register;     /* Reset register address in GAS format */
 	u8                      reset_value;        /* Value to write to the Reset_register port to reset the system. */
 	u8                      reserved7[3];       /* These three bytes must be zero */
-	UINT64                  Xfirmware_ctrl;     /* 64-bit physical address of FACS */
-	UINT64                  Xdsdt;              /* 64-bit physical address of DSDT */
+	u64                     Xfirmware_ctrl;     /* 64-bit physical address of FACS */
+	u64                     Xdsdt;              /* 64-bit physical address of DSDT */
 	acpi_generic_address    Xpm1a_evt_blk;      /* Extended Power Mgt 1a Acpi_event Reg Blk address */
 	acpi_generic_address    Xpm1b_evt_blk;      /* Extended Power Mgt 1b Acpi_event Reg Blk address */
 	acpi_generic_address    Xpm1a_cnt_blk;      /* Extended Power Mgt 1a Control Reg Blk address */

@@ -798,6 +798,8 @@ size_t parport_pc_compat_write_block_pio (struct parport *port,
 {
 	size_t written;
 	int r;
+	long int expire;
+	const struct parport_pc_private *priv = port->physport->private_data;
 
 	/* Special case: a timeout of zero means we cannot call schedule(). */
 	if (!port->physport->cad->timeout)
@@ -819,9 +821,19 @@ size_t parport_pc_compat_write_block_pio (struct parport *port,
 		written = parport_pc_fifo_write_block_pio (port, buf, length);
 
 	/* Finish up. */
-	if (change_mode (port, ECR_PS2) == -EBUSY) {
-		const struct parport_pc_private *priv = 
-			port->physport->private_data;
+	/* For some hardware we don't want to touch the mode until
+	 * the FIFO is empty, so allow 4 seconds for each position
+	 * in the fifo.
+	 */
+        expire = jiffies + (priv->fifo_depth * HZ * 4);
+	do {
+		/* Wait for the FIFO to empty */
+		r = change_mode (port, ECR_PS2);
+		if (r != -EBUSY) {
+			break;
+		}
+	} while (time_before (jiffies, expire));
+	if (r == -EBUSY) {
 
 		printk (KERN_DEBUG "%s: FIFO is stuck\n", port->name);
 
@@ -862,6 +874,8 @@ size_t parport_pc_ecp_write_block_pio (struct parport *port,
 {
 	size_t written;
 	int r;
+	long int expire;
+	const struct parport_pc_private *priv = port->physport->private_data;
 
 	/* Special case: a timeout of zero means we cannot call schedule(). */
 	if (!port->physport->cad->timeout)
@@ -904,9 +918,19 @@ size_t parport_pc_ecp_write_block_pio (struct parport *port,
 		written = parport_pc_fifo_write_block_pio (port, buf, length);
 
 	/* Finish up. */
-	if (change_mode (port, ECR_PS2) == -EBUSY) {
-		const struct parport_pc_private *priv =
-			port->physport->private_data;
+	/* For some hardware we don't want to touch the mode until
+	 * the FIFO is empty, so allow 4 seconds for each position
+	 * in the fifo.
+	 */
+	expire = jiffies + (priv->fifo_depth * (HZ * 4));
+	do {
+		/* Wait for the FIFO to empty */
+		r = change_mode (port, ECR_PS2);
+		if (r != -EBUSY) {
+			break;
+		}
+	} while (time_before (jiffies, expire));
+	if (r == -EBUSY) {
 
 		printk (KERN_DEBUG "%s: FIFO is stuck\n", port->name);
 
@@ -2382,6 +2406,105 @@ void parport_pc_unregister_port (struct parport *p)
 }
 
 #ifdef CONFIG_PCI
+
+/* ITE support maintained by Rich Liu <richliu@poorman.org> */
+static int __devinit sio_ite_8872_probe (struct pci_dev *pdev, int autoirq,
+					 int autodma)
+{
+	short inta_addr[6] = { 0x2A0, 0x2C0, 0x220, 0x240, 0x1E0 };
+	u32 ite8872set;
+	u32 ite8872_lpt, ite8872_lpthi;
+	u8 ite8872_irq, type;
+	int irq;
+	int i;
+
+	DPRINTK (KERN_DEBUG "sio_ite_8872_probe()\n");
+	
+	// make sure which one chip
+	for(i = 0; i < 5; i++) {
+		if (check_region (inta_addr[i], 0x8) >= 0) {
+			int test;
+			pci_write_config_dword (pdev, 0x60,
+						0xe7000000 | inta_addr[i]);
+			pci_write_config_dword (pdev, 0x78,
+						0x00000000 | inta_addr[i]);
+			test = inb (inta_addr[i]);
+			if (test != 0xff) break;
+		}
+	}
+	if(i >= 5) {
+		printk (KERN_INFO "parport_pc: cannot find ITE8872 INTA\n");
+		return 0;
+	}
+
+	type = inb (inta_addr[i] + 0x18);
+	type &= 0x0f;
+
+	switch (type) {
+	case 0x2:
+		printk (KERN_INFO "parport_pc: ITE8871 found (1P)\n");
+		ite8872set = 0x64200000;
+		break;
+	case 0xa:
+		printk (KERN_INFO "parport_pc: ITE8875 found (1P)\n");
+		ite8872set = 0x64200000;
+		break;
+	case 0xe:
+		printk (KERN_INFO "parport_pc: ITE8872 found (2S1P)\n");
+		ite8872set = 0x64e00000;
+		break;
+	case 0x6:
+		printk (KERN_INFO "parport_pc: ITE8873 found (1S1P)\n");
+		ite8872set = 0x64a00000;
+		break;
+	case 0x8:
+		DPRINTK (KERN_DEBUG "parport_pc: ITE8874 found (2S)\n");
+		return 0;
+	default:
+		printk (KERN_INFO "parport_pc: unknown ITE887x\n");
+		printk (KERN_INFO "parport_pc: please mail 'lspci -nvv' "
+			"output to Rich.Liu@ite.com.tw\n");
+		return 0;
+	}
+
+	pci_read_config_byte (pdev, 0x3c, &ite8872_irq);
+	pci_read_config_dword (pdev, 0x1c, &ite8872_lpt);
+	ite8872_lpt &= 0x0000ff00;
+	pci_read_config_dword (pdev, 0x20, &ite8872_lpthi);
+	ite8872_lpthi &= 0x0000ff00;
+	pci_write_config_dword (pdev, 0x6c, 0xe3000000 | ite8872_lpt);
+	pci_write_config_dword (pdev, 0x70, 0xe3000000 | ite8872_lpthi);
+	pci_write_config_dword (pdev, 0x80, (ite8872_lpthi<<16) | ite8872_lpt);
+	// SET SPP&EPP , Parallel Port NO DMA , Enable All Function
+	// SET Parallel IRQ
+	pci_write_config_dword (pdev, 0x9c,
+				ite8872set | (ite8872_irq * 0x11111));
+
+	DPRINTK (KERN_DEBUG "ITE887x: The IRQ is %d.\n", ite8872_irq);
+	DPRINTK (KERN_DEBUG "ITE887x: The PARALLEL I/O port is 0x%x.\n",
+		 ite8872_lpt);
+	DPRINTK (KERN_DEBUG "ITE887x: The PARALLEL I/O porthi is 0x%x.\n",
+		 ite8872_lpthi);
+
+	/* Let the user (or defaults) steer us away from interrupts */
+	irq = ite8872_irq;
+	if (autoirq != PARPORT_IRQ_AUTO)
+		irq = PARPORT_IRQ_NONE;
+
+	if (parport_pc_probe_port (ite8872_lpt, ite8872_lpthi,
+				   irq, PARPORT_DMA_NONE, NULL)) {
+		printk (KERN_INFO
+			"parport_pc: ITE 8872 parallel port: io=0x%X",
+			ite8872_lpt);
+		if (irq != PARPORT_IRQ_NONE)
+			printk (", irq=%d", irq);
+		printk ("\n");
+		return 1;
+	}
+
+	return 0;
+}
+
 /* Via support maintained by Jeff Garzik <jgarzik@mandrakesoft.com> */
 static int __devinit sio_via_686a_probe (struct pci_dev *pdev, int autoirq,
 					 int autodma)
@@ -2492,6 +2615,7 @@ static int __devinit sio_via_686a_probe (struct pci_dev *pdev, int autoirq,
 
 enum parport_pc_sio_types {
 	sio_via_686a = 0,	/* Via VT82C686A motherboard Super I/O */
+	sio_ite_8872,
 	last_sio
 };
 
@@ -2500,6 +2624,7 @@ static struct parport_pc_superio {
 	int (*probe) (struct pci_dev *pdev, int autoirq, int autodma);
 } parport_pc_superio_info[] __devinitdata = {
 	{ sio_via_686a_probe, },
+	{ sio_ite_8872_probe, },
 };
 
 
@@ -2559,6 +2684,7 @@ enum parport_pc_pci_cards {
 	avlab_2p,
 	oxsemi_954,
 	oxsemi_840,
+	aks_0100,
 };
 
 
@@ -2632,11 +2758,14 @@ static struct parport_pc_pci {
 	 * and 840 locks up if you write 1 to bit 2! */
 	/* oxsemi_954 */		{ 1, { { 0, -1 }, } },
 	/* oxsemi_840 */		{ 1, { { 0, -1 }, } },
+	/* aks_0100 */			{ 1, { { 0, 1 }, } },
 };
 
 static struct pci_device_id parport_pc_pci_tbl[] __devinitdata = {
 	/* Super-IO onboard chips */
 	{ 0x1106, 0x0686, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sio_via_686a },
+	{ PCI_VENDOR_ID_ITE, PCI_DEVICE_ID_ITE_8872,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, sio_ite_8872 },
 
 	/* PCI cards */
 	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_10x_550,
@@ -2725,6 +2854,8 @@ static struct pci_device_id parport_pc_pci_tbl[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, oxsemi_954 },
 	{ PCI_VENDOR_ID_OXSEMI, PCI_DEVICE_ID_OXSEMI_12PCI840,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, oxsemi_840 },
+	{ PCI_VENDOR_ID_AKS, PCI_DEVICE_ID_AKS_ALADDINCARD,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, aks_0100 },
 	{ 0, } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci,parport_pc_pci_tbl);

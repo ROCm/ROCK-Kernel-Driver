@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsxface - Public interfaces to the resource manager
- *              $Revision: 14 $
+ *              $Revision: 15 $
  *
  ******************************************************************************/
 
@@ -67,13 +67,6 @@ acpi_get_irq_routing_table (
 	FUNCTION_TRACE ("Acpi_get_irq_routing_table ");
 
 
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
 	/*
 	 * Must have a valid handle and buffer, So we have to have a handle
 	 * and a return buffer structure, and if there is a non-zero buffer length
@@ -126,13 +119,6 @@ acpi_get_current_resources (
 	FUNCTION_TRACE ("Acpi_get_current_resources");
 
 
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
 	/*
 	 * Must have a valid handle and buffer, So we have to have a handle
 	 * and a return buffer structure, and if there is a non-zero buffer length
@@ -182,13 +168,6 @@ acpi_get_possible_resources (
 	FUNCTION_TRACE ("Acpi_get_possible_resources");
 
 
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
 	/*
 	 * Must have a valid handle and buffer, So we have to have a handle
 	 * and a return buffer structure, and if there is a non-zero buffer length
@@ -234,13 +213,6 @@ acpi_set_current_resources (
 
 	FUNCTION_TRACE ("Acpi_set_current_resources");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/*
 	 * Must have a valid handle and buffer

@@ -174,7 +174,6 @@ static void l1m_debug(struct FsmInst *fi, char *fmt, ...)
 	
 	va_start(args, fmt);
 	vsprintf(buf, fmt, args);
-	printk("buf %s\n", buf);
 	DBG(8, "%s", buf);
 	va_end(args);
 }

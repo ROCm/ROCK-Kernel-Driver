@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: bt.h
- *   $Revision: 16 $
+ *   $Revision: 18 $
  *
  *****************************************************************************/
 
@@ -66,15 +66,15 @@
  */
 typedef struct
 {
-	u32             power_unit;
-	u32             design_capacity;
-	u32             last_full_capacity;
-	u32             battery_technology;
-	u32             design_voltage;
-	u32             design_capacity_warning;
-	u32             design_capacity_low;
-	u32             battery_capacity_granularity_1;
-	u32             battery_capacity_granularity_2;
+	acpi_integer    power_unit;
+	acpi_integer    design_capacity;
+	acpi_integer    last_full_capacity;
+	acpi_integer    battery_technology;
+	acpi_integer    design_voltage;
+	acpi_integer    design_capacity_warning;
+	acpi_integer    design_capacity_low;
+	acpi_integer    battery_capacity_granularity_1;
+	acpi_integer    battery_capacity_granularity_2;
 	acpi_string     model_number;
 	acpi_string     serial_number;
 	acpi_string     battery_type;
@@ -89,10 +89,10 @@ typedef struct
  */
 typedef struct
 {
-	u32         state;
-	u32         present_rate;
-	u32         remaining_capacity;
-	u32         present_voltage;
+	acpi_integer    state;
+	acpi_integer    present_rate;
+	acpi_integer    remaining_capacity;
+	acpi_integer    present_voltage;
 
 } BT_BATTERY_STATUS;
 
@@ -137,7 +137,7 @@ bt_request(
 
 acpi_status
 bt_get_status (
-	BT_CONTEXT			*battery,
+	BT_CONTEXT		*battery,
 	BT_BATTERY_STATUS   **battery_status);
 
 acpi_status

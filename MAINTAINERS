@@ -296,9 +296,7 @@ W:	ftp.compaq.com/pub/products/drivers/linux
 S:	Supported 
 
 COMPUTONE INTELLIPORT MULTIPORT CARD
-P:     Doug McNash
 P:     Michael H. Warfield
-M:     Doug McNash <dougm@computone.com>
 M:     Michael H. Warfield <mhw@wittsend.com>
 W:     http://www.computone.com/
 W:     http://www.wittsend.com/computone.html

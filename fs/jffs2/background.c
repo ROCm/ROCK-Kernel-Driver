@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: background.c,v 1.15 2001/09/20 08:05:04 dwmw2 Exp $
+ * $Id: background.c,v 1.16 2001/10/08 09:22:38 dwmw2 Exp $
  *
  */
 
@@ -118,6 +118,11 @@ static int jffs2_garbage_collect_thread(void *_c)
 		if (!thread_should_wake(c)) {
                         set_current_state (TASK_INTERRUPTIBLE);
 			D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread sleeping...\n"));
+			/* Yes, there's a race here; we checked thread_should_wake() before
+			   setting current->state to TASK_INTERRUPTIBLE. But it doesn't
+			   matter - We don't care if we miss a wakeup, because the GC thread
+			   is only an optimisation anyway. */
+			schedule();
 		}
                 
 		if (current->need_resched)

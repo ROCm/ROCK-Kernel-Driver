@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 106 $
+ *       $Revision: 116 $
  *
  *****************************************************************************/
 
@@ -179,28 +179,50 @@ acpi_ex_write_data_to_field (
  */
 
 acpi_status
-acpi_ex_triadic (
-	u16                     opcode,
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     **return_desc);
-
-acpi_status
-acpi_ex_hexadic (
-	u16                     opcode,
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     **return_desc);
-
-acpi_status
-acpi_ex_create_buffer_field (
-	u8                      *aml_ptr,
-	u32                     aml_length,
-	acpi_namespace_node     *node,
+acpi_ex_opcode_3A_0T_0R (
 	acpi_walk_state         *walk_state);
 
 acpi_status
-acpi_ex_reconfiguration (
-	u16                     opcode,
+acpi_ex_opcode_3A_1T_1R (
 	acpi_walk_state         *walk_state);
+
+acpi_status
+acpi_ex_opcode_6A_0T_1R (
+	acpi_walk_state         *walk_state);
+
+acpi_status
+acpi_ex_get_object_reference (
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     **return_desc,
+	acpi_walk_state         *walk_state);
+
+acpi_status
+acpi_ex_do_concatenate (
+	acpi_operand_object     *obj_desc,
+	acpi_operand_object     *obj_desc2,
+	acpi_operand_object     **actual_return_desc,
+	acpi_walk_state         *walk_state);
+
+u8
+acpi_ex_do_logical_op (
+	u16                     opcode,
+	acpi_integer            operand0,
+	acpi_integer            operand1);
+
+acpi_integer
+acpi_ex_do_math_op (
+	u16                     opcode,
+	acpi_integer            operand0,
+	acpi_integer            operand1);
+
+acpi_status
+acpi_ex_load_op (
+	acpi_operand_object     *rgn_desc,
+	acpi_operand_object     *ddb_handle);
+
+acpi_status
+acpi_ex_unload_table (
+	acpi_operand_object     *ddb_handle);
 
 acpi_status
 acpi_ex_create_mutex (
@@ -208,19 +230,21 @@ acpi_ex_create_mutex (
 
 acpi_status
 acpi_ex_create_processor (
-	acpi_parse_object       *op,
-	acpi_namespace_node     *processor_node);
+	acpi_walk_state         *walk_state);
 
 acpi_status
 acpi_ex_create_power_resource (
-	acpi_parse_object       *op,
-	acpi_namespace_node     *power_node);
+	acpi_walk_state         *walk_state);
 
 acpi_status
 acpi_ex_create_region (
-	u8                      *aml_ptr,
+	u8                      *aml_start,
 	u32                     aml_length,
 	u8                      region_space,
+	acpi_walk_state         *walk_state);
+
+acpi_status
+acpi_ex_create_table_region (
 	acpi_walk_state         *walk_state);
 
 acpi_status
@@ -233,10 +257,9 @@ acpi_ex_create_alias (
 
 acpi_status
 acpi_ex_create_method (
-	u8                      *aml_ptr,
+	u8                      *aml_start,
 	u32                     aml_length,
-	u32                     method_flags,
-	acpi_namespace_node     *method);
+	acpi_walk_state         *walk_state);
 
 
 /*
@@ -301,6 +324,9 @@ acpi_ex_prep_index_field_value (
 	u32                     field_position,
 	u32                     field_length);
 
+acpi_status
+acpi_ex_prep_field_value (
+	ACPI_CREATE_FIELD_INFO  *info);
 
 /*
  * amsystem - Interface to OS services
@@ -352,49 +378,40 @@ acpi_ex_system_wait_semaphore (
  */
 
 acpi_status
-acpi_ex_monadic1 (
-	u16                     opcode,
+acpi_ex_opcode_1A_0T_0R (
 	acpi_walk_state         *walk_state);
 
 acpi_status
-acpi_ex_monadic2 (
-	u16                     opcode,
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     **return_desc);
+acpi_ex_opcode_1A_0T_1R (
+	acpi_walk_state         *walk_state);
 
 acpi_status
-acpi_ex_monadic2_r (
-	u16                     opcode,
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     **return_desc);
+acpi_ex_opcode_1A_1T_1R (
+	acpi_walk_state         *walk_state);
 
+acpi_status
+acpi_ex_opcode_1A_1T_0R (
+	acpi_walk_state         *walk_state);
 
 /*
  * amdyadic - ACPI AML (p-code) execution, dyadic operators
  */
 
 acpi_status
-acpi_ex_dyadic1 (
-	u16                     opcode,
+acpi_ex_opcode_2A_0T_0R (
 	acpi_walk_state         *walk_state);
 
 acpi_status
-acpi_ex_dyadic2 (
-	u16                     opcode,
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     **return_desc);
+acpi_ex_opcode_2A_0T_1R (
+	acpi_walk_state         *walk_state);
 
 acpi_status
-acpi_ex_dyadic2_r (
-	u16                     opcode,
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     **return_desc);
+acpi_ex_opcode_2A_1T_1R (
+	acpi_walk_state         *walk_state);
 
 acpi_status
-acpi_ex_dyadic2_s (
-	u16                     opcode,
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     **return_desc);
+acpi_ex_opcode_2A_2T_1R (
+	acpi_walk_state         *walk_state);
 
 
 /*
@@ -429,7 +446,7 @@ acpi_ex_get_buffer_field_value (
 void
 acpi_ex_show_hex_value (
 	u32                     byte_count,
-	u8                      *aml_ptr,
+	u8                      *aml_start,
 	u32                     lead_space);
 
 
@@ -640,6 +657,24 @@ acpi_ex_system_io_space_handler (
 
 acpi_status
 acpi_ex_pci_config_space_handler (
+	u32                     function,
+	ACPI_PHYSICAL_ADDRESS   address,
+	u32                     bit_width,
+	u32                     *value,
+	void                    *handler_context,
+	void                    *region_context);
+
+acpi_status
+acpi_ex_cmos_space_handler (
+	u32                     function,
+	ACPI_PHYSICAL_ADDRESS   address,
+	u32                     bit_width,
+	u32                     *value,
+	void                    *handler_context,
+	void                    *region_context);
+
+acpi_status
+acpi_ex_pci_bar_space_handler (
 	u32                     function,
 	ACPI_PHYSICAL_ADDRESS   address,
 	u32                     bit_width,

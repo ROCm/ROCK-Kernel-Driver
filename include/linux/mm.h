@@ -402,6 +402,7 @@ extern unsigned long FASTCALL(get_zeroed_page(unsigned int gfp_mask));
 /*
  * There is only one 'core' page-freeing function.
  */
+extern void FASTCALL(free_lru_page(struct page *));
 extern void FASTCALL(__free_pages(struct page *page, unsigned int order));
 extern void FASTCALL(free_pages(unsigned long addr, unsigned int order));
 
@@ -413,6 +414,7 @@ extern void show_free_areas_node(pg_data_t *pgdat);
 
 extern void clear_page_tables(struct mm_struct *, unsigned long, int);
 
+extern int fail_writepage(struct page *);
 struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int no_share);
 struct file *shmem_file_setup(char * name, loff_t size);
 extern void shmem_lock(struct file * file, int lock);

@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: ec_osl.c
- *   $Revision: 10 $
+ *   $Revision: 11 $
  *
  *****************************************************************************/
 
@@ -36,25 +36,6 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - Embedded Controller Driver");
-MODULE_LICENSE("GPL");
-
-#ifdef ACPI_DEBUG
-
-static int dbg_layer = ACPI_COMPONENT_DEFAULT;
-MODULE_PARM(dbg_layer, "i");
-MODULE_PARM_DESC(dbg_layer, "Controls debug output (see acpi_dbg_layer).\n");
-
-static int dbg_level = DEBUG_DEFAULT;
-MODULE_PARM(dbg_level, "i");
-MODULE_PARM_DESC(dbg_level, "Controls debug output (see acpi_dbg_level).\n");
-
-#endif /*ACPI_DEBUG*/
-
-
-#ifdef ACPI_DEBUG
-static u32			save_dbg_layer;
-static u32			save_dbg_level;
-#endif /*ACPI_DEBUG*/
 
 extern struct proc_dir_entry	*bm_proc_root;
 
@@ -80,14 +61,6 @@ ec_osl_init (void)
 	if (!bm_proc_root)
 		return -ENODEV;
 
-#ifdef ACPI_DEBUG
-	save_dbg_layer = acpi_dbg_layer;
-	acpi_dbg_layer = dbg_layer;
-
-	save_dbg_level = acpi_dbg_level;
-	acpi_dbg_level = dbg_level;
-#endif /*ACPI_DEBUG*/
-
 	status = ec_initialize();
 
 	return (ACPI_SUCCESS(status)) ? 0 : -ENODEV;
@@ -109,11 +82,6 @@ static void __exit
 ec_osl_cleanup(void)
 {
 	ec_terminate();
-
-#ifdef ACPI_DEBUG
-	acpi_dbg_layer = save_dbg_layer;
-	acpi_dbg_level = save_dbg_level;
-#endif /*ACPI_DEBUG*/
 
 	return;
 }

@@ -9,7 +9,7 @@
 
 O_TARGET := mm.o
 
-export-objs := shmem.o
+export-objs := shmem.o filemap.o
 
 obj-y	 := memory.o mmap.o filemap.o mprotect.o mlock.o mremap.o \
 	    vmalloc.o slab.o bootmem.o swap.o vmscan.o page_io.o \

@@ -189,6 +189,31 @@ int mcd_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		    void *arg);
 int mcd_drive_status(struct cdrom_device_info *cdi, int slot_nr);
 
+static int mcd_dev_open(struct inode *inode, struct file *file)
+{
+	int err;
+	MOD_INC_USE_COUNT;
+	err = cdrom_open(inode, file);
+	if (err)
+		MOD_DEC_USE_COUNT;
+	return err;
+}
+
+static int mcd_dev_release(struct inode *inode, struct file *file)
+{
+	int err = cdrom_release(inode, file);
+	MOD_DEC_USE_COUNT;
+	return err;
+}
+
+struct block_device_operations mcd_bdops =
+{
+	open:			mcd_dev_open,
+	release:		mcd_dev_release,
+	ioctl:			cdrom_ioctl,
+	check_media_change:	cdrom_media_changed,
+};
+
 static struct timer_list mcd_timer;
 
 static struct cdrom_device_ops mcd_dops = {
@@ -978,8 +1003,6 @@ static int mcd_open(struct cdrom_device_info *cdi, int purpose)
 	if (mcdPresent == 0)
 		return -ENXIO;	/* no hardware */
 
-	MOD_INC_USE_COUNT;
-
 	if (mcd_open_count || mcd_state != MCD_S_IDLE)
 		goto bump_count;
 
@@ -1002,7 +1025,6 @@ bump_count:
 	return 0;
 
 err_out:
-	MOD_DEC_USE_COUNT;
 	return -EIO;
 }
 
@@ -1015,7 +1037,6 @@ static void mcd_release(struct cdrom_device_info *cdi)
 	if (!--mcd_open_count) {
 		mcd_invalidate_buffers();
 	}
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -1060,7 +1081,7 @@ int __init mcd_init(void)
 		return -EIO;
 	}
 
-	if (devfs_register_blkdev(MAJOR_NR, "mcd", &cdrom_fops) != 0) {
+	if (devfs_register_blkdev(MAJOR_NR, "mcd", &mcd_bdops) != 0) {
 		printk(KERN_ERR "mcd: Unable to get major %d for Mitsumi CD-ROM\n", MAJOR_NR);
 		return -EIO;
 	}
@@ -1152,6 +1173,7 @@ int __init mcd_init(void)
 		cleanup(3);
 		return -EIO;
 	}
+	devfs_plain_cdrom(&mcd_info, &mcd_bdops);
 	printk(msg);
 
 	return 0;

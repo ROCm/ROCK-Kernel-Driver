@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsmethod - Parser/Interpreter interface - control method parsing
- *              $Revision: 65 $
+ *              $Revision: 69 $
  *
  *****************************************************************************/
 
@@ -65,6 +65,7 @@ acpi_ds_parse_method (
 	acpi_parse_object       *op;
 	acpi_namespace_node     *node;
 	acpi_owner_id           owner_id;
+	acpi_walk_state         *walk_state;
 
 
 	FUNCTION_TRACE_PTR ("Ds_parse_method", obj_handle);
@@ -77,7 +78,7 @@ acpi_ds_parse_method (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** Parsing [%4.4s] **** Named_obj=%p\n",
-		&((acpi_namespace_node *)obj_handle)->name, obj_handle));
+		(char*)&((acpi_namespace_node *)obj_handle)->name, obj_handle));
 
 
 	/* Extract the method object from the method Node */
@@ -88,7 +89,7 @@ acpi_ds_parse_method (
 		return_ACPI_STATUS (AE_NULL_OBJECT);
 	}
 
-	 /* Create a mutex for the method if there is a concurrency limit */
+	/* Create a mutex for the method if there is a concurrency limit */
 
 	if ((obj_desc->method.concurrency != INFINITE_CONCURRENCY) &&
 		(!obj_desc->method.semaphore)) {
@@ -114,6 +115,20 @@ acpi_ds_parse_method (
 	acpi_ps_set_name (op, node->name);
 	op->node = node;
 
+	/* Create and initialize a new walk state */
+
+	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT,
+			   NULL, NULL, NULL);
+	if (!walk_state) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
+	}
+
+	status = acpi_ds_init_aml_walk (walk_state, op, node, obj_desc->method.aml_start,
+			  obj_desc->method.aml_length, NULL, NULL, 1);
+	if (ACPI_FAILURE (status)) {
+		/* TBD: delete walk state */
+		return_ACPI_STATUS (status);
+	}
 
 	/*
 	 * Parse the method, first pass
@@ -125,12 +140,7 @@ acpi_ds_parse_method (
 	 * method so that operands to the named objects can
 	 * take on dynamic run-time values.
 	 */
-	status = acpi_ps_parse_aml (op, obj_desc->method.pcode,
-			   obj_desc->method.pcode_length,
-			   ACPI_PARSE_LOAD_PASS1 | ACPI_PARSE_DELETE_TREE,
-			   node, NULL, NULL,
-			   acpi_ds_load1_begin_op, acpi_ds_load1_end_op);
-
+	status = acpi_ps_parse_aml (walk_state);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -141,10 +151,7 @@ acpi_ds_parse_method (
 	obj_desc->method.owning_id = owner_id;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** [%4.4s] Parsed **** Named_obj=%p Op=%p\n",
-		&((acpi_namespace_node *)obj_handle)->name, obj_handle, op));
-
-	/* Install the parsed tree in the method object */
-	/* TBD: [Restructure] Obsolete field? */
+		(char*)&((acpi_namespace_node *)obj_handle)->name, obj_handle, op));
 
 	acpi_ps_delete_parse_tree (op);
 
@@ -242,13 +249,12 @@ acpi_status
 acpi_ds_call_control_method (
 	acpi_walk_list          *walk_list,
 	acpi_walk_state         *this_walk_state,
-	acpi_parse_object       *op)
+	acpi_parse_object       *op)  /* TBD: This operand is obsolete */
 {
 	acpi_status             status;
 	acpi_namespace_node     *method_node;
 	acpi_operand_object     *obj_desc;
 	acpi_walk_state         *next_walk_state;
-	acpi_parse_state        *parser_state;
 	u32                     i;
 
 
@@ -270,7 +276,6 @@ acpi_ds_call_control_method (
 		return_ACPI_STATUS (AE_NULL_OBJECT);
 	}
 
-
 	/* Init for new method, wait on concurrency semaphore */
 
 	status = acpi_ds_begin_method_execution (method_node, obj_desc,
@@ -279,77 +284,61 @@ acpi_ds_call_control_method (
 		return_ACPI_STATUS (status);
 	}
 
-	/* Create and initialize a new parser state */
 
-	parser_state = acpi_ps_create_state (obj_desc->method.pcode,
-			   obj_desc->method.pcode_length);
-	if (!parser_state) {
-		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
-
-	acpi_ps_init_scope (parser_state, NULL);
-	parser_state->start_node = method_node;
-
-
-	/* Create a new state for the preempting walk */
+	/* 1) Parse: Create a new walk state for the preempting walk */
 
 	next_walk_state = acpi_ds_create_walk_state (obj_desc->method.owning_id,
-			  NULL, obj_desc, walk_list);
+			  op, obj_desc, NULL);
 	if (!next_walk_state) {
-		/* TBD: delete parser state */
-
 		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
-
-	next_walk_state->walk_type          = WALK_METHOD;
-	next_walk_state->method_node        = method_node;
-	next_walk_state->parser_state       = parser_state;
-	next_walk_state->parse_flags        = this_walk_state->parse_flags;
-	next_walk_state->descending_callback = this_walk_state->descending_callback;
-	next_walk_state->ascending_callback = this_walk_state->ascending_callback;
-
-	/* The Next_op of the Next_walk will be the beginning of the method */
-	/* TBD: [Restructure] -- obsolete? */
-
-	next_walk_state->next_op = NULL;
-
-	/* Open a new scope */
-
-	status = acpi_ds_scope_stack_push (method_node,
-			   ACPI_TYPE_METHOD, next_walk_state);
-	if (ACPI_FAILURE (status)) {
 		goto cleanup;
 	}
-
-
-	/*
-	 * Initialize the arguments for the method.  The resolved
-	 * arguments were put on the previous walk state's operand
-	 * stack.  Operands on the previous walk state stack always
-	 * start at index 0.
-	 */
-	status = acpi_ds_method_data_init_args (&this_walk_state->operands[0],
-			 this_walk_state->num_operands,
-			 next_walk_state);
-	if (ACPI_FAILURE (status)) {
-		goto cleanup;
-	}
-
 
 	/* Create and init a Root Node */
 
 	op = acpi_ps_alloc_op (AML_SCOPE_OP);
 	if (!op) {
-		return_ACPI_STATUS (AE_NO_MEMORY);
+		status = AE_NO_MEMORY;
+		goto cleanup;
 	}
 
-	status = acpi_ps_parse_aml (op, obj_desc->method.pcode,
-			  obj_desc->method.pcode_length,
-			  ACPI_PARSE_LOAD_PASS1 | ACPI_PARSE_DELETE_TREE,
-			  method_node, NULL, NULL,
-			  acpi_ds_load1_begin_op, acpi_ds_load1_end_op);
+	status = acpi_ds_init_aml_walk (next_walk_state, op, method_node,
+			  obj_desc->method.aml_start, obj_desc->method.aml_length,
+			  NULL, NULL, 1);
+	if (ACPI_FAILURE (status)) {
+		/* TBD: delete walk state */
+		goto cleanup;
+	}
+
+	/* Begin AML parse */
+
+	status = acpi_ps_parse_aml (next_walk_state);
 	acpi_ps_delete_parse_tree (op);
 
+
+	/* 2) Execute: Create a new state for the preempting walk */
+
+	next_walk_state = acpi_ds_create_walk_state (obj_desc->method.owning_id,
+			  NULL, obj_desc, walk_list);
+	if (!next_walk_state) {
+		status = AE_NO_MEMORY;
+		goto cleanup;
+	}
+
+	/*
+	 * The resolved arguments were put on the previous walk state's operand
+	 * stack.  Operands on the previous walk state stack always
+	 * start at index 0.
+	 * Null terminate the list of arguments
+	 */
+	this_walk_state->operands [this_walk_state->num_operands] = NULL;
+
+	status = acpi_ds_init_aml_walk (next_walk_state, NULL, method_node,
+			  obj_desc->method.aml_start, obj_desc->method.aml_length,
+			  &this_walk_state->operands[0], NULL, 3);
+	if (ACPI_FAILURE (status)) {
+		goto cleanup;
+	}
 
 	/*
 	 * Delete the operands on the previous walkstate operand stack
@@ -363,7 +352,6 @@ acpi_ds_call_control_method (
 	/* Clear the operand stack */
 
 	this_walk_state->num_operands = 0;
-
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Starting nested execution, newstate=%p\n",
 		next_walk_state));

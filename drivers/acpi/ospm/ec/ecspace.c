@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: ecspace.c
- *   $Revision: 22 $
+ *   $Revision: 23 $
  *
  *****************************************************************************/
 
@@ -113,7 +113,7 @@ ec_space_handler (
 		break;
 
 	default:
-		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Received request with invalid function [%p].\n", function));
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Received request with invalid function [%X].\n", function));
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 		break;
 	}

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evregion - ACPI Address_space (Op_region) handler dispatch
- *              $Revision: 110 $
+ *              $Revision: 113 $
  *
  *****************************************************************************/
 
@@ -147,17 +147,16 @@ acpi_ev_execute_reg_method (
 
 	params[1] = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
 	if (!params[1]) {
-		acpi_ut_remove_reference (params[0]);
-		return_ACPI_STATUS (AE_NO_MEMORY);
+		status = AE_NO_MEMORY;
+		goto cleanup;
 	}
-
-	params[2] = NULL;
 
 	/*
 	 *  Set up the parameter objects
 	 */
 	params[0]->integer.value  = region_obj->region.space_id;
 	params[1]->integer.value = function;
+	params[2] = NULL;
 
 	/*
 	 *  Execute the method, no return value
@@ -165,9 +164,10 @@ acpi_ev_execute_reg_method (
 	DEBUG_EXEC(acpi_ut_display_init_pathname (region_obj->region.extra->extra.method_REG, " [Method]"));
 	status = acpi_ns_evaluate_by_handle (region_obj->region.extra->extra.method_REG, params, NULL);
 
-
-	acpi_ut_remove_reference (params[0]);
 	acpi_ut_remove_reference (params[1]);
+
+cleanup:
+	acpi_ut_remove_reference (params[0]);
 
 	return_ACPI_STATUS (status);
 }
@@ -200,8 +200,8 @@ acpi_ev_address_space_dispatch (
 	u32                     *value)
 {
 	acpi_status             status;
-	ACPI_ADR_SPACE_HANDLER  handler;
-	ACPI_ADR_SPACE_SETUP    region_setup;
+	acpi_adr_space_handler  handler;
+	acpi_adr_space_setup    region_setup;
 	acpi_operand_object     *handler_desc;
 	void                    *region_context = NULL;
 
@@ -276,7 +276,7 @@ acpi_ev_address_space_dispatch (
 	handler = handler_desc->addr_handler.handler;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
-		"Addrhandler %p (%p), Address %8.8lX%8.8lX\n",
+		"Addrhandler %p (%p), Address %8.8X%8.8X\n",
 		&region_obj->region.addr_handler->addr_handler, handler, HIDWORD(address),
 		LODWORD(address)));
 
@@ -335,7 +335,7 @@ acpi_ev_disassociate_region_from_handler(
 	acpi_operand_object     *handler_obj;
 	acpi_operand_object     *obj_desc;
 	acpi_operand_object     **last_obj_ptr;
-	ACPI_ADR_SPACE_SETUP    region_setup;
+	acpi_adr_space_setup    region_setup;
 	void                    *region_context;
 	acpi_status             status;
 
@@ -548,7 +548,7 @@ acpi_ev_addr_handler_helper (
 
 	/* Convert and validate the device handle */
 
-	node = acpi_ns_convert_handle_to_entry (obj_handle);
+	node = acpi_ns_map_handle_to_node (obj_handle);
 	if (!node) {
 		return (AE_BAD_PARAMETER);
 	}

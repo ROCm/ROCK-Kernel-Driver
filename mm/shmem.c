@@ -422,7 +422,6 @@ void shmem_unuse(swp_entry_t entry, struct page *page)
  */
 static int shmem_writepage(struct page * page)
 {
-	int error;
 	struct shmem_inode_info *info;
 	swp_entry_t *entry, swap;
 	struct address_space *mapping;
@@ -438,12 +437,8 @@ static int shmem_writepage(struct page * page)
 	info = SHMEM_I(inode);
 getswap:
 	swap = get_swap_page();
-	if (!swap.val) {
-		activate_page(page);
-		SetPageDirty(page);
-		error = -ENOMEM;
-		goto out;
-	}
+	if (!swap.val)
+		return fail_writepage(page);
 
 	spin_lock(&info->lock);
 	entry = shmem_swp_entry(info, index, 0);
@@ -474,10 +469,8 @@ getswap:
 	info->swapped++;
 	spin_unlock(&info->lock);
 	set_page_dirty(page);
-	error = 0;
-out:
 	UnlockPage(page);
-	return error;
+	return 0;
 }
 
 /*

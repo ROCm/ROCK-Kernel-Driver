@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psargs - Parse AML opcode arguments
- *              $Revision: 51 $
+ *              $Revision: 52 $
  *
  *****************************************************************************/
 
@@ -391,11 +391,11 @@ acpi_ps_get_next_namepath (
 					name_op->node = method_node;
 					acpi_ps_append_arg (arg, name_op);
 
-					if (!(acpi_operand_object  *) method_node->object) {
+					if (!method_node->object) {
 						return_VOID;
 					}
 
-					*arg_count = ((acpi_operand_object *) method_node->object)->method.param_count;
+					*arg_count = (method_node->object)->method.param_count;
 				}
 
 				return_VOID;

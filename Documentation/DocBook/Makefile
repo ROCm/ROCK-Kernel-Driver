@@ -8,7 +8,7 @@ PDF	:=	$(patsubst %.sgml, %.pdf, $(BOOKS))
 HTML    :=      $(patsubst %.sgml, %, $(BOOKS))
 IMG-parportbook := parport-share.fig parport-multi.fig parport-structure.fig
 EPS-parportbook := $(patsubst %.fig, %.eps, $(IMG-parportbook))
-JPG-parportbook := $(patsubst %.fig, %.jpeg, $(IMG-parportbook))
+PNG-parportbook := $(patsubst %.fig, %.png, $(IMG-parportbook))
 C-procfs-example = procfs_example.sgml
 
 books:	$(BOOKS)
@@ -26,8 +26,8 @@ html:	$(HTML)
 %.eps: %.fig
 	fig2dev -Leps $< $@
 
-%.jpeg: %.fig
-	fig2dev -Ljpeg $< $@
+%.png: %.fig
+	fig2dev -Lpng $< $@
 
 %.sgml: %.c
 	echo "<programlisting>" > $@
@@ -129,8 +129,8 @@ kernel-api-man: $(APISOURCES)
 	$(TOPDIR)/scripts/kernel-doc -man $^ | \
 		$(PERL) $(TOPDIR)/scripts/split-man $(TOPDIR)/Documentation/man
 
-parportbook: $(JPG-parportbook)
-parportbook.ps parportbook.pdf: $(EPS-parportbook)
+parportbook parportbook.pdf: $(PNG-parportbook)
+parportbook.ps: $(EPS-parportbook)
 parportbook.sgml: parportbook.tmpl $(TOPDIR)/drivers/parport/init.c
 	$(TOPDIR)/scripts/docgen $(TOPDIR)/drivers/parport/init.c <$< >$@
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 113 $
+ *       $Revision: 117 $
  *
  *****************************************************************************/
 
@@ -270,47 +270,47 @@ acpi_ut_track_stack_ptr (
 void
 acpi_ut_trace (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info);
+	acpi_debug_print_info   *dbg_info);
 
 void
 acpi_ut_trace_ptr (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	void                    *pointer);
 
 void
 acpi_ut_trace_u32 (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	u32                     integer);
 
 void
 acpi_ut_trace_str (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	NATIVE_CHAR             *string);
 
 void
 acpi_ut_exit (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info);
+	acpi_debug_print_info   *dbg_info);
 
 void
 acpi_ut_status_exit (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	acpi_status             status);
 
 void
 acpi_ut_value_exit (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	acpi_integer            value);
 
 void
 acpi_ut_ptr_exit (
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	u8                      *ptr);
 
 void
@@ -342,17 +342,17 @@ void
 acpi_ut_debug_print (
 	u32                     requested_debug_level,
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	char                    *format,
-	...);
+	...) ACPI_PRINTF_LIKE_FUNC;
 
 void
 acpi_ut_debug_print_raw (
 	u32                     requested_debug_level,
 	u32                     line_number,
-	ACPI_DEBUG_PRINT_INFO   *dbg_info,
+	acpi_debug_print_info   *dbg_info,
 	char                    *format,
-	...);
+	...) ACPI_PRINTF_LIKE_FUNC;
 
 
 /*
@@ -389,6 +389,7 @@ acpi_ut_delete_internal_object_list (
 #define METHOD_NAME__REG        "_REG"
 #define METHOD_NAME__SEG        "_SEG"
 #define METHOD_NAME__BBN        "_BBN"
+#define METHOD_NAME__PRT        "_PRT"
 
 
 acpi_status
@@ -400,7 +401,7 @@ acpi_ut_evaluate_numeric_object (
 acpi_status
 acpi_ut_execute_HID (
 	acpi_namespace_node     *device_node,
-	ACPI_DEVICE_ID          *hid);
+	acpi_device_id          *hid);
 
 acpi_status
 acpi_ut_execute_STA (
@@ -410,7 +411,7 @@ acpi_ut_execute_STA (
 acpi_status
 acpi_ut_execute_UID (
 	acpi_namespace_node     *device_node,
-	ACPI_DEVICE_ID          *uid);
+	acpi_device_id          *uid);
 
 
 /*
@@ -562,8 +563,22 @@ acpi_ut_delete_object_cache (
 	void);
 
 /*
- * Ututils
+ * utmisc
  */
+
+acpi_status
+acpi_ut_divide (
+	acpi_integer            *in_dividend,
+	acpi_integer            *in_divisor,
+	acpi_integer            *out_quotient,
+	acpi_integer            *out_remainder);
+
+acpi_status
+acpi_ut_short_divide (
+	acpi_integer            *in_dividend,
+	u32                     divisor,
+	acpi_integer            *out_quotient,
+	u32                     *out_remainder);
 
 u8
 acpi_ut_valid_acpi_name (
@@ -638,7 +653,7 @@ acpi_ut_dump_allocation_info (
 	void);
 
 void
-acpi_ut_dump_current_allocations (
+acpi_ut_dump_allocations (
 	u32                     component,
 	NATIVE_CHAR             *module);
 #endif

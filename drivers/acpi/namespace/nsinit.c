@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsinit - namespace initialization
- *              $Revision: 31 $
+ *              $Revision: 33 $
  *
  *****************************************************************************/
 
@@ -51,7 +51,7 @@ acpi_ns_initialize_objects (
 	void)
 {
 	acpi_status             status;
-	ACPI_INIT_WALK_INFO     info;
+	acpi_init_walk_info     info;
 
 
 	FUNCTION_TRACE ("Ns_initialize_objects");
@@ -112,7 +112,7 @@ acpi_ns_initialize_devices (
 	void)
 {
 	acpi_status             status;
-	ACPI_DEVICE_WALK_INFO   info;
+	acpi_device_walk_info   info;
 
 
 	FUNCTION_TRACE ("Ns_initialize_devices");
@@ -170,7 +170,7 @@ acpi_ns_init_one_object (
 {
 	acpi_object_type8       type;
 	acpi_status             status;
-	ACPI_INIT_WALK_INFO     *info = (ACPI_INIT_WALK_INFO *) context;
+	acpi_init_walk_info     *info = (acpi_init_walk_info *) context;
 	acpi_namespace_node     *node = (acpi_namespace_node *) obj_handle;
 	acpi_operand_object     *obj_desc;
 
@@ -218,7 +218,7 @@ acpi_ns_init_one_object (
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR, "\n"));
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 					"%s while getting region arguments [%4.4s]\n",
-					acpi_format_exception (status), &node->name));
+					acpi_format_exception (status), (char*)&node->name));
 		}
 
 		if (!(acpi_dbg_level & ACPI_LV_INIT)) {
@@ -241,7 +241,7 @@ acpi_ns_init_one_object (
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR, "\n"));
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 					"%s while getting buffer field arguments [%4.4s]\n",
-					acpi_format_exception (status), &node->name));
+					acpi_format_exception (status), (char*)&node->name));
 		}
 		if (!(acpi_dbg_level & ACPI_LV_INIT)) {
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "."));
@@ -268,7 +268,7 @@ acpi_ns_init_one_object (
  *
  * FUNCTION:    Acpi_ns_init_one_device
  *
- * PARAMETERS:  ACPI_WALK_CALLBACK
+ * PARAMETERS:  acpi_walk_callback
  *
  * RETURN:      acpi_status
  *
@@ -288,7 +288,7 @@ acpi_ns_init_one_device (
 	acpi_status             status;
 	acpi_namespace_node    *node;
 	u32                     flags;
-	ACPI_DEVICE_WALK_INFO  *info = (ACPI_DEVICE_WALK_INFO *) context;
+	acpi_device_walk_info  *info = (acpi_device_walk_info *) context;
 
 
 	FUNCTION_TRACE ("Ns_init_one_device");
@@ -302,7 +302,7 @@ acpi_ns_init_one_device (
 
 	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
-	node = acpi_ns_convert_handle_to_entry (obj_handle);
+	node = acpi_ns_map_handle_to_node (obj_handle);
 	if (!node) {
 		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 		return (AE_BAD_PARAMETER);

@@ -40,7 +40,6 @@
 #include <linux/acpi.h>
 #include <asm/uaccess.h>
 #include "acpi.h"
-#include "driver.h"
 
 
 #define _COMPONENT	OS_DEPENDENT
@@ -49,6 +48,70 @@
 FADT_DESCRIPTOR acpi_fadt;
 
 static int acpi_disabled = 0;
+
+enum acpi_blacklist_predicates
+{
+	all_versions,
+	less_than_or_equal,
+	equal,
+	greater_than_or_equal,
+};
+
+struct acpi_blacklist_item
+{
+	char oem_id[7];
+	char oem_table_id[9];
+	u32  oem_revision;
+	enum acpi_blacklist_predicates oem_revision_predicate;
+};
+
+/*
+ * Currently, this blacklists based on items in the FADT. We may want to
+ * expand this to using other ACPI tables in the future, too.
+ */
+static struct acpi_blacklist_item acpi_blacklist[] __initdata = 
+{
+	{"TOSHIB", "750     ", 0x970814, less_than_or_equal}, /* Portege 7020, BIOS 8.10 */
+	{""}
+};
+
+int
+acpi_blacklisted(FADT_DESCRIPTOR *fadt)
+{
+	int i = 0;
+
+	while (acpi_blacklist[i].oem_id[0] != '\0')
+	{
+		if (strncmp(acpi_blacklist[i].oem_id, fadt->header.oem_id, 6)) {
+			i++;
+			continue;
+		}
+
+		if (strncmp(acpi_blacklist[i].oem_table_id, fadt->header.oem_table_id, 8)) {
+			i++;
+			continue;
+		}
+
+		if (acpi_blacklist[i].oem_revision_predicate == all_versions)
+			return TRUE;
+
+		if (acpi_blacklist[i].oem_revision_predicate == less_than_or_equal
+		    && fadt->header.oem_revision <= acpi_blacklist[i].oem_revision)
+			return TRUE;
+
+		if (acpi_blacklist[i].oem_revision_predicate == greater_than_or_equal
+		    && fadt->header.oem_revision >= acpi_blacklist[i].oem_revision)
+			return TRUE;
+
+		if (acpi_blacklist[i].oem_revision_predicate == equal
+		    && fadt->header.oem_revision == acpi_blacklist[i].oem_revision)
+			return TRUE;
+
+		i++;
+	}
+
+	return FALSE;
+}
 
 /*
  * Start the interpreter
@@ -63,7 +126,6 @@ acpi_init(void)
 		printk(KERN_NOTICE "ACPI: APM is already active, exiting\n");
 		return -ENODEV;
 	}
-
 
 	if (acpi_disabled) {
 		printk(KERN_NOTICE "ACPI: disabled by cmdline, exiting\n");
@@ -89,6 +151,12 @@ acpi_init(void)
 
 	if (!ACPI_SUCCESS(acpi_get_table(ACPI_TABLE_FADT, 1, &buffer))) {
 		printk(KERN_ERR "ACPI: Could not get FADT\n");
+		acpi_terminate();
+		return -ENODEV;
+	}
+
+	if (acpi_blacklisted(&acpi_fadt)) {
+		printk(KERN_ERR "ACPI: On blacklist -- BIOS not fully ACPI compliant\n");
 		acpi_terminate();
 		return -ENODEV;
 	}

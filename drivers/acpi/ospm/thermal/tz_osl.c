@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tz_osl.c
- *   $Revision: 21 $
+ *   $Revision: 25 $
  *
  *****************************************************************************/
 
@@ -35,7 +35,6 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - Thermal Zone Driver");
-MODULE_LICENSE("GPL");
 
 int TZP = 0;
 MODULE_PARM(TZP, "i");
@@ -65,17 +64,64 @@ tz_osl_proc_read_info (
 	int 			*eof,
 	void			*context)
 {
-	TZ_CONTEXT		*thermal_zone = NULL;
+	acpi_status		status = AE_OK;
+	char			name[5];
+	acpi_buffer		buffer = {sizeof(name), &name};
+	TZ_CONTEXT		*tz = NULL;
+	TZ_THRESHOLDS		*thresholds = NULL;
 	char			*p = page;
 	int 			len = 0;
+	u32			i,j;
+	u32			t = 0;
 
-	if (!context || (off != 0)) {
+	if (!context || (off != 0))
 		goto end;
+
+	tz = (TZ_CONTEXT*)context;
+
+	thresholds = &(tz->policy.thresholds);
+
+	p += sprintf(p, "critical (S5): trip=%d\n", thresholds->critical.temperature);
+	
+	if (thresholds->hot.is_valid)
+		p += sprintf(p, "critical (S4): trip=%d\n", thresholds->hot.temperature);
+
+	if (thresholds->passive.is_valid) {
+		p += sprintf(p, "passive:       trip=%d tc1=%d tc2=%d tsp=%d devices=", thresholds->passive.temperature, thresholds->passive.tc1, thresholds->passive.tc2, thresholds->passive.tsp);
+		for (j=0; j<thresholds->passive.devices.count; j++)
+			p += sprintf(p, "%08x%c", thresholds->passive.devices.handles[j], (j==thresholds->passive.devices.count-1)?'\n':',');
 	}
 
-	thermal_zone = (TZ_CONTEXT*)context;
+	for (i=0; i<TZ_MAX_ACTIVE_THRESHOLDS; i++) {
+		if (!(thresholds->active[i].is_valid))
+			break;
+		p += sprintf(p, "active[%d]:     trip=%d devices=", i, thresholds->active[i].temperature);
+		for (j=0; j<thresholds->active[i].devices.count; j++)
+			p += sprintf(p, "%08x%c", thresholds->active[i].devices.handles[j], (j==thresholds->passive.devices.count-1)?'\n':',');
+	}
 
-	p += sprintf(p, "<TBD>\n");
+	p += sprintf(p, "cooling mode:  ");
+	switch (tz->policy.cooling_mode) {
+	case TZ_COOLING_MODE_ACTIVE:
+		p += sprintf(p, "active (noisy)\n");
+		break;
+	case TZ_COOLING_MODE_PASSIVE:
+		p += sprintf(p, "passive (quiet)\n");
+		break;
+	default:
+		p += sprintf(p, "unknown\n");
+		break;
+	}
+
+	p += sprintf(p, "polling:       ");
+	switch (tz->policy.polling_freq) {
+	case 0:
+		p += sprintf(p, "disabled\n");
+		break;
+	default:
+		p += sprintf(p, "%d dS\n", tz->policy.polling_freq);
+		break;
+	}
 
 end:
 	len = (p - page);
@@ -85,7 +131,49 @@ end:
 	if (len>count) len = count;
 	if (len<0) len = 0;
 
-	return(len);
+	return len;
+}
+
+
+/****************************************************************************
+ *
+ * FUNCTION:	tz_osl_proc_write_info
+ *
+ ****************************************************************************/
+
+static int tz_osl_proc_write_info (
+        struct file		*file, 
+        const char		*buffer, 
+        unsigned long		count, 
+        void			*data)
+{
+	TZ_CONTEXT		*tz = NULL;
+	u32			state = 0;
+	u32			size = 0;
+
+	if (!buffer || (count==0) || !data) {
+		goto end;
+	}
+
+	tz = (TZ_CONTEXT*)data;
+
+	size = strlen(buffer);
+	if (size < 4)
+		goto end;
+	
+	/* Cooling preference: "scp=0" (active) or "scp=1" (passive) */
+	if (0 == strncmp(buffer, "scp=", 4)) {
+		tz_set_cooling_preference(tz, (buffer[4] - '0'));
+	}
+
+	/* Polling frequency: "tzp=X" (poll every X [0-9] seconds) */
+	else if (0 == strncmp(buffer, "tzp=", 4)) {
+		tz->policy.polling_freq = (buffer[4] - '0') * 10;
+		tz_policy_check(tz);
+	}
+
+end:
+        return count;
 }
 
 
@@ -104,7 +192,7 @@ tz_osl_proc_read_status (
 	int 			*eof,
 	void			*context)
 {
-	TZ_CONTEXT		*thermal_zone = NULL;
+	TZ_CONTEXT		*tz = NULL;
 	char			*p = page;
 	int 			len = 0;
 
@@ -112,47 +200,27 @@ tz_osl_proc_read_status (
 		goto end;
 	}
 
-	thermal_zone = (TZ_CONTEXT*)context;
+	tz = (TZ_CONTEXT*)context;
 
-	p += sprintf(p, "Temperature:             %d (1/10th degrees Kelvin)\n",
-		thermal_zone->policy.temperature);
+	/* Temperature */
 
-	p += sprintf(p, "State:                   ");
-	if (thermal_zone->policy.state & TZ_STATE_ACTIVE) {
-		p += sprintf(p, "active[%d] ", thermal_zone->policy.state & 0x07);
-	}
-	if (thermal_zone->policy.state & TZ_STATE_PASSIVE) {
-		p += sprintf(p, "passive ");
-	}
-	if (thermal_zone->policy.state & TZ_STATE_CRITICAL) {
-		p += sprintf(p, "critical ");
-	}
-	if (thermal_zone->policy.state == 0) {
-		p += sprintf(p, "ok ");
-	}
-	p += sprintf(p, "\n");
+	tz_get_temperature(tz);
 
-	p += sprintf(p, "Cooling Mode:            ");
-	switch (thermal_zone->policy.cooling_mode) {
-	case TZ_COOLING_MODE_ACTIVE:
-		p += sprintf(p, "active (noisy)\n");
-		break;
-	case TZ_COOLING_MODE_PASSIVE:
-		p += sprintf(p, "passive (quiet)\n");
-		break;
-	default:
-		p += sprintf(p, "unknown\n");
-		break;
-	}
+	p += sprintf(p, "temperature:   %d dK\n", tz->policy.temperature);
 
-	p += sprintf(p, "Polling Frequency:       ");
-	switch (thermal_zone->policy.polling_freq) {
-	case 0:
-		p += sprintf(p, "n/a\n");
-		break;
-	default:
-		p += sprintf(p, "%d (1/10th seconds)\n", thermal_zone->policy.polling_freq);
-		break;
+	p += sprintf(p, "state:         ");
+	if (tz->policy.state == 0)
+		p += sprintf(p, "ok\n");
+	else if (tz->policy.state & TZ_STATE_CRITICAL)
+		p += sprintf(p, "critical\n");
+	else if (tz->policy.state & TZ_STATE_HOT)
+		p += sprintf(p, "hot\n");
+	else {
+		if (tz->policy.state & TZ_STATE_ACTIVE)
+			p += sprintf(p, "active[%d] ", tz->policy.state & 0x07);
+		if (tz->policy.state & TZ_STATE_PASSIVE)
+			p += sprintf(p, "passive ");
+		p += sprintf(p, "\n");
 	}
 
 end:
@@ -175,29 +243,32 @@ end:
 
 acpi_status
 tz_osl_add_device(
-	TZ_CONTEXT		*thermal_zone)
+	TZ_CONTEXT		*tz)
 {
-	struct proc_dir_entry	*proc_entry = NULL, *proc;
+	struct proc_dir_entry	*proc_entry = NULL;
+	struct proc_dir_entry	*proc_child_entry = NULL;
 
-	if (!thermal_zone) {
+	if (!tz) {
 		return(AE_BAD_PARAMETER);
 	}
 
-	printk("Thermal Zone: found\n");
+	printk("ACPI: Thermal Zone found\n");
 
-	proc_entry = proc_mkdir(thermal_zone->uid, tz_proc_root);
-	if (!proc_entry)
+	proc_entry = proc_mkdir(tz->uid, tz_proc_root);
+	if (!proc_entry) 
 		return(AE_ERROR);
 
-	proc = create_proc_read_entry(TZ_PROC_STATUS, S_IFREG | S_IRUGO,
-		proc_entry, tz_osl_proc_read_status, (void*)thermal_zone);
-	if (!proc)
+	proc_child_entry = create_proc_read_entry(TZ_PROC_STATUS, S_IFREG | S_IRUGO, proc_entry, tz_osl_proc_read_status, (void*)tz);
+	if (!proc_child_entry) 
 		return(AE_ERROR);
 
-	proc = create_proc_read_entry(TZ_PROC_INFO, S_IFREG | S_IRUGO,
-		proc_entry, tz_osl_proc_read_info, (void*)thermal_zone);
-	if (!proc)
+	proc_child_entry = create_proc_entry(TZ_PROC_INFO, S_IFREG | 0644, proc_entry);
+	if (!proc_child_entry)
 		return(AE_ERROR);
+
+	proc_child_entry->read_proc = tz_osl_proc_read_info;
+	proc_child_entry->write_proc = tz_osl_proc_write_info;
+	proc_child_entry->data = (void*)tz;
 
 	return(AE_OK);
 }
@@ -211,21 +282,21 @@ tz_osl_add_device(
 
 acpi_status
 tz_osl_remove_device (
-	TZ_CONTEXT		*thermal_zone)
+	TZ_CONTEXT		*tz)
 {
 	char			proc_entry[64];
 
-	if (!thermal_zone) {
+	if (!tz) {
 		return(AE_BAD_PARAMETER);
 	}
 
-	sprintf(proc_entry, "%s/%s", thermal_zone->uid, TZ_PROC_INFO);
+	sprintf(proc_entry, "%s/%s", tz->uid, TZ_PROC_INFO);
 	remove_proc_entry(proc_entry, tz_proc_root);
 
-	sprintf(proc_entry, "%s/%s", thermal_zone->uid, TZ_PROC_STATUS);
+	sprintf(proc_entry, "%s/%s", tz->uid, TZ_PROC_STATUS);
 	remove_proc_entry(proc_entry, tz_proc_root);
 
-	sprintf(proc_entry, "%s", thermal_zone->uid);
+	sprintf(proc_entry, "%s", tz->uid);
 	remove_proc_entry(proc_entry, tz_proc_root);
 
 	return(AE_OK);
@@ -241,26 +312,26 @@ tz_osl_remove_device (
 acpi_status
 tz_osl_generate_event (
 	u32			event,
-	TZ_CONTEXT		*thermal_zone)
+	TZ_CONTEXT		*tz)
 {
 	acpi_status		status = AE_OK;
 
-	if (!thermal_zone) {
+	if (!tz) {
 		return(AE_BAD_PARAMETER);
 	}
 
 	switch (event) {
 
 	case TZ_NOTIFY_TEMPERATURE_CHANGE:
-		status = bm_osl_generate_event(thermal_zone->device_handle,
-			TZ_PROC_ROOT, thermal_zone->uid, event,
-			thermal_zone->policy.temperature);
+		status = bm_osl_generate_event(tz->device_handle,
+			TZ_PROC_ROOT, tz->uid, event,
+			tz->policy.temperature);
 		break;
 
 	case TZ_NOTIFY_THRESHOLD_CHANGE:
 	case TZ_NOTIFY_DEVICE_LISTS_CHANGE:
-		status = bm_osl_generate_event(thermal_zone->device_handle,
-			TZ_PROC_ROOT, thermal_zone->uid, event, 0);
+		status = bm_osl_generate_event(tz->device_handle,
+			TZ_PROC_ROOT, tz->uid, event, 0);
 		break;
 
 	default:
@@ -275,12 +346,6 @@ tz_osl_generate_event (
 /****************************************************************************
  *
  * FUNCTION:	tz_osl_init
- *
- * PARAMETERS:	<none>
- *
- * RETURN:	0: Success
- *
- * DESCRIPTION: Module initialization.
  *
  ****************************************************************************/
 
@@ -312,12 +377,6 @@ tz_osl_init (void)
 /****************************************************************************
  *
  * FUNCTION:	tz_osl_cleanup
- *
- * PARAMETERS:	<none>
- *
- * RETURN:	<none>
- *
- * DESCRIPTION: Module cleanup.
  *
  ****************************************************************************/
 

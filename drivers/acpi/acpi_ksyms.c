@@ -38,6 +38,14 @@ EXPORT_SYMBOL(acpi_in_debugger);
 EXPORT_SYMBOL(acpi_db_user_commands);
 #endif
 
+#ifdef ACPI_DEBUG
+EXPORT_SYMBOL(acpi_ut_debug_print_raw);
+EXPORT_SYMBOL(acpi_ut_debug_print);
+EXPORT_SYMBOL(acpi_ut_status_exit);
+EXPORT_SYMBOL(acpi_ut_exit);
+EXPORT_SYMBOL(acpi_ut_trace);
+#endif
+
 EXPORT_SYMBOL(acpi_gbl_FADT);
 
 EXPORT_SYMBOL(acpi_os_free);
@@ -103,6 +111,5 @@ EXPORT_SYMBOL(acpi_leave_sleep_state);
 EXPORT_SYMBOL(acpi_hw_register_read);
 EXPORT_SYMBOL(acpi_set_firmware_waking_vector);
 EXPORT_SYMBOL(acpi_subsystem_status);
-
 
 EXPORT_SYMBOL(acpi_os_signal);

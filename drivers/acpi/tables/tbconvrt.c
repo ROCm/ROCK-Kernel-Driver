@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 27 $
+ *              $Revision: 28 $
  *
  *****************************************************************************/
 
@@ -66,7 +66,7 @@ acpi_tb_get_table_count (
 	else
 #endif
 	{
-		pointer_size = sizeof (UINT64);
+		pointer_size = sizeof (u64);
 	}
 
 	/*
@@ -109,7 +109,7 @@ acpi_tb_convert_to_xsdt (
 
 	/* Compute size of the converted XSDT */
 
-	table_size = (*number_of_tables * sizeof (UINT64)) + sizeof (acpi_table_header);
+	table_size = (*number_of_tables * sizeof (u64)) + sizeof (acpi_table_header);
 
 
 	/* Allocate an XSDT */
@@ -239,7 +239,7 @@ acpi_tb_convert_table_fadt (void)
 		FADT2->sci_int      = FADT71->sci_int;
 		FADT2->acpi_enable  = FADT71->acpi_enable;
 		FADT2->acpi_disable = FADT71->acpi_disable;
-		FADT2->S4_bios_req  = FADT71->S4_bios_req;
+		FADT2->S4bios_req   = FADT71->S4bios_req;
 		FADT2->plvl2_lat    = FADT71->plvl2_lat;
 		FADT2->plvl3_lat    = FADT71->plvl3_lat;
 		FADT2->day_alrm     = FADT71->day_alrm;
@@ -476,7 +476,7 @@ acpi_tb_convert_table_fadt (void)
 	/* Dump the entire FADT */
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_TABLES,
-		"Hex dump of common internal FADT, size %ld (%lX)\n",
+		"Hex dump of common internal FADT, size %d (%X)\n",
 		acpi_gbl_FADT->header.length, acpi_gbl_FADT->header.length));
 	DUMP_BUFFER ((u8 *) (acpi_gbl_FADT), acpi_gbl_FADT->header.length);
 
@@ -540,7 +540,7 @@ acpi_tb_build_common_facs (
 		FACS1 = (facs_descriptor_rev1 *) acpi_gbl_FACS;
 
 		common_facs->global_lock = &(FACS1->global_lock);
-		common_facs->firmware_waking_vector = (UINT64 *) &FACS1->firmware_waking_vector;
+		common_facs->firmware_waking_vector = (u64 *) &FACS1->firmware_waking_vector;
 		common_facs->vector_width = 32;
 
 #endif

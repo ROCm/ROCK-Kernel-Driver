@@ -94,7 +94,7 @@ extern      ACPI_TABLE_SUPPORT          acpi_gbl_acpi_table_data[NUM_ACPI_TABLES
  * actual OS mutex handles, indexed by the local ACPI_MUTEX_HANDLEs.
  * (The table maps local handles to the real OS handles)
  */
-ACPI_EXTERN ACPI_MUTEX_INFO             acpi_gbl_acpi_mutex_info [NUM_MTX];
+ACPI_EXTERN acpi_mutex_info             acpi_gbl_acpi_mutex_info [NUM_MTX];
 
 
 /*****************************************************************************
@@ -172,7 +172,7 @@ ACPI_EXTERN acpi_walk_list             *acpi_gbl_current_walk_list;
 
 /* Address Space handlers */
 
-ACPI_EXTERN ACPI_ADR_SPACE_INFO         acpi_gbl_address_spaces[ACPI_NUM_ADDRESS_SPACES];
+ACPI_EXTERN acpi_adr_space_info         acpi_gbl_address_spaces[ACPI_NUM_ADDRESS_SPACES];
 
 /* Control method single step flag */
 
@@ -194,10 +194,10 @@ ACPI_EXTERN acpi_parse_object           *acpi_gbl_parsed_namespace_root;
  *
  ****************************************************************************/
 
-ACPI_EXTERN ACPI_FIXED_EVENT_INFO       acpi_gbl_fixed_event_handlers[ACPI_NUM_FIXED_EVENTS];
+ACPI_EXTERN acpi_fixed_event_info       acpi_gbl_fixed_event_handlers[ACPI_NUM_FIXED_EVENTS];
 ACPI_EXTERN acpi_handle                 acpi_gbl_gpe_obj_handle;
 ACPI_EXTERN u32                         acpi_gbl_gpe_register_count;
-ACPI_EXTERN ACPI_GPE_REGISTERS         *acpi_gbl_gpe_registers;
+ACPI_EXTERN acpi_gpe_registers         *acpi_gbl_gpe_registers;
 ACPI_EXTERN acpi_gpe_level_info        *acpi_gbl_gpe_info;
 
 /*

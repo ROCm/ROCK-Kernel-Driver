@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfldio - Aml Field I/O
- *              $Revision: 64 $
+ *              $Revision: 66 $
  *
  *****************************************************************************/
 
@@ -71,7 +71,6 @@ acpi_ex_setup_field (
 		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 	}
 
-
 	/*
 	 * If the Region Address and Length have not been previously evaluated,
 	 * evaluate them now and save the results.
@@ -83,7 +82,6 @@ acpi_ex_setup_field (
 			return_ACPI_STATUS (status);
 		}
 	}
-
 
 	/*
 	 * Validate the request.  The entire request from the byte offset for a
@@ -158,7 +156,6 @@ acpi_ex_read_field_datum (
 
 	*value = 0;
 
-
 	/*
 	 * Buffer_fields - Read from a Buffer
 	 * Other Fields - Read from a Operation Region.
@@ -189,7 +186,6 @@ acpi_ex_read_field_datum (
 			return_ACPI_STATUS (status);
 		}
 
-
 		/*
 		 * The physical address of this field datum is:
 		 *
@@ -201,12 +197,11 @@ acpi_ex_read_field_datum (
 		address = rgn_desc->region.address + obj_desc->common_field.base_byte_offset +
 				 field_datum_byte_offset;
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Region %s(%X) width %X base:off %X:%X at %8.8lX%8.8lX\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Region %s(%X) width %X base:off %X:%X at %8.8X%8.8X\n",
 			acpi_ut_get_region_name (rgn_desc->region.space_id),
 			rgn_desc->region.space_id, obj_desc->common_field.access_bit_width,
 			obj_desc->common_field.base_byte_offset, field_datum_byte_offset,
 			HIDWORD(address), LODWORD(address)));
-
 
 		/* Invoke the appropriate Address_space/Op_region handler */
 
@@ -235,7 +230,7 @@ acpi_ex_read_field_datum (
 	}
 
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Returned value=%08lX \n", *value));
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Returned value=%08X \n", *value));
 
 	return_ACPI_STATUS (status);
 }
@@ -381,7 +376,6 @@ acpi_ex_extract_from_field (
 		byte_field_length, datum_count, obj_desc->common_field.access_bit_width,
 		obj_desc->common_field.access_byte_width));
 
-
 	/*
 	 * Clear the caller's buffer (the whole buffer length as given)
 	 * This is very important, especially in the cases where a byte is read,
@@ -485,7 +479,6 @@ acpi_ex_extract_from_field (
 			}
 		}
 
-
 		/*
 		 * Store the merged field datum in the caller's buffer, according to
 		 * the granularity of the field (size of each datum).
@@ -500,7 +493,6 @@ acpi_ex_extract_from_field (
 		previous_raw_datum = this_raw_datum;
 		datum_offset++;
 	}
-
 
 	return_ACPI_STATUS (AE_OK);
 }
@@ -576,7 +568,7 @@ acpi_ex_write_field_datum (
 				 field_datum_byte_offset;
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-			"Store %X in Region %s(%X) at %8.8lX%8.8lX width %X\n",
+			"Store %X in Region %s(%X) at %8.8X%8.8X width %X\n",
 			value, acpi_ut_get_region_name (rgn_desc->region.space_id),
 			rgn_desc->region.space_id, HIDWORD(address), LODWORD(address),
 			obj_desc->common_field.access_bit_width));
@@ -612,7 +604,7 @@ acpi_ex_write_field_datum (
 	}
 
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Value written=%08lX \n", value));
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD, "Value written=%08X \n", value));
 	return_ACPI_STATUS (status);
 }
 
@@ -649,16 +641,13 @@ acpi_ex_write_field_datum_with_update_rule (
 
 	merged_value = field_value;
 
-
 	/* If the mask is all ones, we don't need to worry about the update rule */
 
 	if (mask != ACPI_UINT32_MAX) {
 		/* Decode the update rule */
 
 		switch (obj_desc->common_field.update_rule) {
-
 		case UPDATE_PRESERVE:
-
 			/*
 			 * Check if update rule needs to be applied (not if mask is all
 			 * ones)  The left shift drops the bits we want to ignore.
@@ -772,7 +761,6 @@ acpi_ex_insert_into_field (
 		byte_field_length, datum_count, obj_desc->common_field.access_bit_width,
 		obj_desc->common_field.access_byte_width));
 
-
 	/*
 	 * Break the request into up to three parts (similar to an I/O request):
 	 * 1) non-aligned part at start
@@ -868,31 +856,34 @@ acpi_ex_insert_into_field (
 			merged_datum = this_raw_datum;
 		}
 
-
 		/*
 		 * Special handling for the last datum if the field does NOT end on
 		 * a datum boundary.  Update Rule must be applied to the bits outside
 		 * the field.
 		 */
-		if ((datum_offset == datum_count)           &&
-			obj_desc->common_field.end_field_valid_bits) {
+		if (datum_offset == datum_count) {
 			/*
-			 * Part3:
-			 * This is the last datum and the field does not end on a datum boundary.
-			 * Build the partial datum and write with the update rule.
+			 * If there are dangling non-aligned bits, perform one more merged write
+			 * Else - field is aligned at the end, no need for any more writes
 			 */
+			if (obj_desc->common_field.end_field_valid_bits) {
+				/*
+				 * Part3:
+				 * This is the last datum and the field does not end on a datum boundary.
+				 * Build the partial datum and write with the update rule.
+				 *
+				 * Mask off the unused bits above (after) the end-of-field
+				 */
+				mask = MASK_BITS_ABOVE (obj_desc->common_field.end_field_valid_bits);
+				merged_datum &= mask;
 
-			/* Mask off the unused bits above (after) the end-of-field */
+				/* Write the last datum with the update rule */
 
-			mask = MASK_BITS_ABOVE (obj_desc->common_field.end_field_valid_bits);
-			merged_datum &= mask;
-
-			/* Write the last datum with the update rule */
-
-			status = acpi_ex_write_field_datum_with_update_rule (obj_desc, mask,
-					  merged_datum, field_datum_byte_offset);
-			if (ACPI_FAILURE (status)) {
-				return_ACPI_STATUS (status);
+				status = acpi_ex_write_field_datum_with_update_rule (obj_desc, mask,
+						  merged_datum, field_datum_byte_offset);
+				if (ACPI_FAILURE (status)) {
+					return_ACPI_STATUS (status);
+				}
 			}
 		}
 
@@ -912,7 +903,6 @@ acpi_ex_insert_into_field (
 		 */
 		previous_raw_datum = this_raw_datum;
 	}
-
 
 	return_ACPI_STATUS (status);
 }

@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: bt.c
- *   $Revision: 27 $
+ *   $Revision: 29 $
  *
  *****************************************************************************/
 
@@ -76,7 +76,7 @@ bt_print (
 	 */
 
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Battery[%02x]:[%p] %s\n", battery->device_handle, battery->acpi_handle, buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Battery[%02x]:[%p] %s\n", battery->device_handle, battery->acpi_handle, (char*)buffer.pointer));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   uid[%s] is_present[%d] power_units[%s]\n", battery->uid, battery->is_present, battery->power_units));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
 
@@ -116,7 +116,7 @@ bt_get_info (
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
-	MEMSET(&bif_buffer, 0, sizeof(acpi_buffer));
+	memset(&bif_buffer, 0, sizeof(acpi_buffer));
 
 	/*
 	 * Evalute _BIF:
@@ -147,7 +147,7 @@ bt_get_info (
 	package_format.length = sizeof("NNNNNNNNNSSSS");
 	package_format.pointer = "NNNNNNNNNSSSS";
 
-	MEMSET(&package_data, 0, sizeof(acpi_buffer));
+	memset(&package_data, 0, sizeof(acpi_buffer));
 
 	status = bm_extract_package_data(package, &package_format,
 		&package_data);
@@ -206,7 +206,7 @@ bt_get_status (
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
-	MEMSET(&bst_buffer, 0, sizeof(acpi_buffer));
+	memset(&bst_buffer, 0, sizeof(acpi_buffer));
 
 	/*
 	 * Evalute _BST:
@@ -237,7 +237,7 @@ bt_get_status (
 	package_format.length = sizeof("NNNN");
 	package_format.pointer = "NNNN";
 
-	MEMSET(&package_data, 0, sizeof(acpi_buffer));
+	memset(&package_data, 0, sizeof(acpi_buffer));
 
 	status = bm_extract_package_data(package, &package_format,
 		&package_data);
@@ -495,8 +495,8 @@ bt_initialize (void)
 
 	FUNCTION_TRACE("bt_initialize");
 
-	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
-	MEMSET(&driver, 0, sizeof(BM_DRIVER));
+	memset(&criteria, 0, sizeof(BM_DEVICE_ID));
+	memset(&driver, 0, sizeof(BM_DRIVER));
 
 	/*
 	 * Register driver for driver method battery devices.
@@ -533,8 +533,8 @@ bt_terminate (void)
 
 	FUNCTION_TRACE("bt_terminate");
 
-	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
-	MEMSET(&driver, 0, sizeof(BM_DRIVER));
+	memset(&criteria, 0, sizeof(BM_DEVICE_ID));
+	memset(&driver, 0, sizeof(BM_DRIVER));
 
 	/*
 	 * Unregister driver for driver method battery devices.

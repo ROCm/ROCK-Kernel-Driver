@@ -2863,7 +2863,7 @@ int ide_cdrom_ioctl (ide_drive_t *drive,
 		     struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
-	return cdrom_fops.ioctl (inode, file, cmd, arg);
+	return cdrom_ioctl (inode, file, cmd, arg);
 }
 
 static
@@ -2875,7 +2875,7 @@ int ide_cdrom_open (struct inode *ip, struct file *fp, ide_drive_t *drive)
 	MOD_INC_USE_COUNT;
 	if (info->buffer == NULL)
 		info->buffer = (char *) kmalloc(SECTOR_BUFFER_SIZE, GFP_KERNEL);
-        if ((info->buffer == NULL) || (rc = cdrom_fops.open(ip, fp))) {
+        if ((info->buffer == NULL) || (rc = cdrom_open(ip, fp))) {
 		drive->usage--;
 		MOD_DEC_USE_COUNT;
 	}
@@ -2886,14 +2886,14 @@ static
 void ide_cdrom_release (struct inode *inode, struct file *file,
 			ide_drive_t *drive)
 {
-	cdrom_fops.release (inode, file);
+	cdrom_release (inode, file);
 	MOD_DEC_USE_COUNT;
 }
 
 static
 int ide_cdrom_check_media_change (ide_drive_t *drive)
 {
-	return cdrom_fops.check_media_change(MKDEV (HWIF (drive)->major,
+	return cdrom_media_changed(MKDEV (HWIF (drive)->major,
 			(drive->select.b.unit) << PARTN_BITS));
 }
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: bt_osl.c
- *   $Revision: 22 $
+ *   $Revision: 24 $
  *
  *****************************************************************************/
 
@@ -44,7 +44,6 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - Control Method Battery Driver");
-MODULE_LICENSE("GPL");
 
 
 #define BT_PROC_ROOT		"battery"
@@ -107,7 +106,7 @@ bt_osl_proc_read_info (
 	}
 	else {
 		p += sprintf(p, "Design Capacity:         %d %sh\n",
-			 battery_info->design_capacity,
+			 (u32)battery_info->design_capacity,
 			 battery->power_units);
 	}
 	
@@ -116,7 +115,7 @@ bt_osl_proc_read_info (
 	}
 	else {
 		p += sprintf(p, "Last Full Capacity:      %d %sh\n",
-			 battery_info->last_full_capacity,
+			 (u32)battery_info->last_full_capacity,
 			 battery->power_units);
 	}
 
@@ -135,20 +134,20 @@ bt_osl_proc_read_info (
 	}
 	else {
 		p += sprintf(p, "Design Voltage:          %d mV\n",
-			 battery_info->design_voltage);
+			 (u32)battery_info->design_voltage);
 	}
 	
 	p += sprintf(p, "Design Capacity Warning: %d %sh\n",
-		battery_info->design_capacity_warning,
+		(u32)battery_info->design_capacity_warning,
 		battery->power_units);
 	p += sprintf(p, "Design Capacity Low:     %d %sh\n",
-		battery_info->design_capacity_low,
+		(u32)battery_info->design_capacity_low,
 		battery->power_units);
 	p += sprintf(p, "Capacity Granularity 1:  %d %sh\n",
-		battery_info->battery_capacity_granularity_1,
+		(u32)battery_info->battery_capacity_granularity_1,
 		battery->power_units);
 	p += sprintf(p, "Capacity Granularity 2:  %d %sh\n",
-		battery_info->battery_capacity_granularity_2,
+		(u32)battery_info->battery_capacity_granularity_2,
 		battery->power_units);
 	p += sprintf(p, "Model Number:            %s\n",
 		battery_info->model_number);
@@ -242,7 +241,7 @@ bt_osl_proc_read_status (
 	}
 	else {
 		p += sprintf(p, "Present Rate:            %d %s\n",
-			battery_status->present_rate,
+			(u32)battery_status->present_rate,
 			battery->power_units);
 	}
 
@@ -251,7 +250,7 @@ bt_osl_proc_read_status (
 	}
 	else {
 		p += sprintf(p, "Remaining Capacity:      %d %sh\n",
-			battery_status->remaining_capacity,
+			(u32)battery_status->remaining_capacity,
 			battery->power_units);
 	}
 
@@ -260,7 +259,7 @@ bt_osl_proc_read_status (
 	}
 	else {
 		p += sprintf(p, "Battery Voltage:         %d mV\n",
-			battery_status->present_voltage);
+			(u32)battery_status->present_voltage);
 	}
 
 end:
@@ -294,10 +293,10 @@ bt_osl_add_device(
 	}
 
 	if (battery->is_present) {
-		printk("Battery: socket found, battery present\n");
+		printk("ACPI: Battery socket found, battery present\n");
 	}
 	else {
-		printk("Battery: socket found, battery absent\n");
+		printk("ACPI: Battery socket found, battery absent\n");
 	}
 
 	proc_entry = proc_mkdir(battery->uid, bt_proc_root);

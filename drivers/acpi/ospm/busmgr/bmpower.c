@@ -1,7 +1,7 @@
 /****************************************************************************
  *
  * Module Name: bmpower.c - Driver for ACPI Power Resource 'devices'
- *   $Revision: 19 $
+ *   $Revision: 20 $
  *
  ****************************************************************************/
 
@@ -95,7 +95,7 @@ bm_pr_print (
 	acpi_os_printf("Power Resource: found\n");
 
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Power_resource[%02x]:[%p] %s\n", pr->device_handle, pr->acpi_handle, buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Power_resource[%02x]:[%p] %s\n", pr->device_handle, pr->acpi_handle, (char*)buffer.pointer));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   system_level[S%d] resource_order[%d]\n", pr->system_level, pr->resource_order));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   state[D%d] reference_count[%d]\n", pr->state, pr->reference_count));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));

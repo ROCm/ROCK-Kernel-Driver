@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: prperf.c
- *              $Revision: 19 $
+ *              $Revision: 21 $
  *
  *****************************************************************************/
 
@@ -179,7 +179,8 @@ pr_perf_set_state (
 		return_ACPI_STATUS(AE_BAD_DATA);
 	}
 
-	if (processor->performance.state_count == 1) {
+	if ((state == processor->performance.active_state) ||
+		(processor->performance.state_count == 1)) {
 		return_ACPI_STATUS(AE_OK);
 	}
 
@@ -233,6 +234,8 @@ pr_perf_set_state (
 		acpi_os_write_port(processor->pblk.address, pblk_value, 32);
 	}
 
+	processor->performance.active_state = state;
+
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Processor [%02x] set to performance state [%d%%].\n", processor->device_handle, processor->performance.state[state].performance));
 
 	return_ACPI_STATUS(AE_OK);
@@ -279,14 +282,14 @@ pr_perf_set_limit (
 		if (performance->active_state <
 			(performance->state_count-1)) {
 			status = pr_perf_set_state(processor,
-				(performance->active_state-1));
+				(performance->active_state+1));
 		}
 		break;
 
 	case PR_PERF_INC:
 		if (performance->active_state > 0) {
 			status = pr_perf_set_state(processor,
-				(performance->active_state+1));
+				(performance->active_state-1));
 		}
 		break;
 
@@ -302,7 +305,7 @@ pr_perf_set_limit (
 	}
 
 	if (ACPI_SUCCESS(status)) {
-		performance->thermal_limit = limit;
+		performance->thermal_limit = performance->active_state;
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Processor [%02x] thermal performance limit set to [%d%%].\n", processor->device_handle, processor->performance.state[performance->active_state].performance));
@@ -403,8 +406,20 @@ pr_perf_add_device (
 	 * Get Current State:
 	 * ------------------
 	 */
-	status = pr_perf_get_state(processor,
-		&(processor->performance.active_state));
+	status = pr_perf_get_state(processor, &(processor->performance.active_state));
+	if (ACPI_FAILURE(status)) {
+		return_ACPI_STATUS(status);
+	}
+
+	/*
+	 * Set to Maximum Performance:
+	 * ---------------------------
+	 * We'll let subsequent policy (e.g. thermal/power) decide to lower
+	 * performance if it so chooses, but for now crank up the speed.
+	 */
+	if (0 != processor->performance.active_state) {
+		status = pr_perf_set_state(processor, 0);
+	}
 
 	return_ACPI_STATUS(status);
 }

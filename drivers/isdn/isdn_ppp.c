@@ -2453,10 +2453,15 @@ static void isdn_ppp_receive_ccp(isdn_net_dev *net_dev, isdn_net_local *lp,
 		/* if we RECEIVE an ackowledge we enable the decompressor */
 		if(is->debug & 0x10)
 			printk(KERN_DEBUG "Enable decompression here!\n");
-		if(proto == PPP_CCP)
+		if(proto == PPP_CCP) {
+			if (!mis->decompressor)
+				break;
 			mis->compflags |= SC_DECOMP_ON;
-		else
+		} else {
+			if (!is->decompressor)
+				break;
 			is->compflags |= SC_LINK_DECOMP_ON;
+		}
 		break;
 
 	case CCP_RESETACK:
@@ -2620,10 +2625,15 @@ static void isdn_ppp_send_ccp(isdn_net_dev *net_dev, isdn_net_local *lp, struct 
 		/* if we SEND an ackowledge we can/must enable the compressor */
 		if(is->debug & 0x10)
 			printk(KERN_DEBUG "Enable compression here!\n");
-		if(proto == PPP_CCP)
+		if(proto == PPP_CCP) {
+			if (!is->compressor)
+				break;
 			is->compflags |= SC_COMP_ON;
-		else
+		} else {
+			if (!is->compressor)
+				break;
 			is->compflags |= SC_LINK_COMP_ON;
+		}
 		break;
 	case CCP_RESETACK:
 		/* If we send a ACK we should reset our compressor */

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 22 $
+ *              $Revision: 24 $
  *
  *****************************************************************************/
 
@@ -230,7 +230,7 @@ acpi_ex_convert_to_buffer (
 		new_buf = ACPI_MEM_CALLOCATE (integer_size);
 		if (!new_buf) {
 			REPORT_ERROR
-				(("Ex_dyadic2_r/Concat_op: Buffer allocation failure\n"));
+				(("Ex_convert_to_buffer: Buffer allocation failure\n"));
 			acpi_ut_remove_reference (ret_desc);
 			return (AE_NO_MEMORY);
 		}
@@ -296,8 +296,9 @@ acpi_ex_convert_to_ascii (
 	u32                     k = 0;
 	u8                      hex_digit;
 	acpi_integer            digit;
-	u8                      leading_zero = TRUE;
+	u32                     remainder;
 	u32                     length = sizeof (acpi_integer);
+	u8                      leading_zero = TRUE;
 
 
 	FUNCTION_ENTRY ();
@@ -306,12 +307,13 @@ acpi_ex_convert_to_ascii (
 	switch (base) {
 	case 10:
 
+		remainder = 0;
 		for (i = ACPI_MAX_DECIMAL_DIGITS; i > 0 ; i--) {
 			/* Divide by nth factor of 10 */
 
 			digit = integer;
 			for (j = 1; j < i; j++) {
-				digit = ACPI_DIVIDE (digit, 10);
+				acpi_ut_short_divide (&digit, 10, &digit, &remainder);
 			}
 
 			/* Create the decimal digit */
@@ -321,7 +323,7 @@ acpi_ex_convert_to_ascii (
 			}
 
 			if (!leading_zero) {
-				string[k] = (u8) (ASCII_ZERO + ACPI_MODULO (digit, 10));
+				string[k] = (u8) (ASCII_ZERO + remainder);
 				k++;
 			}
 		}

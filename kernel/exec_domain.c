@@ -100,7 +100,7 @@ lookup_exec_domain(u_long personality)
 	}
 #endif
 
-	ep = &default_exec_domain;
+	ep = NULL;
 out:
 	read_unlock(&exec_domains_lock);
 	return (ep);

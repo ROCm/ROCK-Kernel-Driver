@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: hwacpi - ACPI Hardware Initialization/Mode Interface
- *              $Revision: 45 $
+ *              $Revision: 46 $
  *
  *****************************************************************************/
 
@@ -220,7 +220,7 @@ acpi_hw_set_mode (
 
 	/* Give the platform some time to react */
 
-	acpi_os_stall (5000);
+	acpi_os_stall (20000);
 
 	if (acpi_hw_get_mode () == mode) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Mode %X successfully enabled\n", mode));

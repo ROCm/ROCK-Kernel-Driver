@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 75 $
+ *              $Revision: 81 $
  *
  *****************************************************************************/
 
@@ -64,7 +64,7 @@ acpi_ds_init_one_object (
 {
 	acpi_object_type8       type;
 	acpi_status             status;
-	ACPI_INIT_WALK_INFO     *info = (ACPI_INIT_WALK_INFO *) context;
+	acpi_init_walk_info     *info = (acpi_init_walk_info *) context;
 	u8                      table_revision;
 
 
@@ -118,15 +118,14 @@ acpi_ds_init_one_object (
 		 * Always parse methods to detect errors, we may delete
 		 * the parse tree below
 		 */
-
 		status = acpi_ds_parse_method (obj_handle);
-
-		/* TBD: [Errors] what do we do with an error? */
-
 		if (ACPI_FAILURE (status)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Method %p [%4.4s] parse failed! %s\n",
-				obj_handle, &((acpi_namespace_node *)obj_handle)->name,
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Method %p [%4.4s] - parse failure, %s\n",
+				obj_handle, (char*)&((acpi_namespace_node *)obj_handle)->name,
 				acpi_format_exception (status)));
+
+			/* This parse failed, but we will continue parsing more methods */
+
 			break;
 		}
 
@@ -168,7 +167,7 @@ acpi_ds_initialize_objects (
 	acpi_namespace_node     *start_node)
 {
 	acpi_status             status;
-	ACPI_INIT_WALK_INFO     info;
+	acpi_init_walk_info     info;
 
 
 	FUNCTION_TRACE ("Ds_initialize_objects");
@@ -241,7 +240,7 @@ acpi_ds_init_object_from_op (
 
 	obj_desc = *ret_obj_desc;
 	op_info = acpi_ps_get_opcode_info (opcode);
-	if (ACPI_GET_OP_TYPE (op_info) != ACPI_OP_TYPE_OPCODE) {
+	if (op_info->class == AML_CLASS_UNKNOWN) {
 		/* Unknown opcode */
 
 		return (AE_TYPE);
@@ -308,7 +307,7 @@ acpi_ds_init_object_from_op (
 		byte_list = (acpi_parse2_object *) arg->next;
 		if (byte_list) {
 			if (byte_list->opcode != AML_INT_BYTELIST_OP) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Expecting bytelist, got: %x\n",
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Expecting bytelist, got: %p\n",
 					byte_list));
 				return (AE_TYPE);
 			}
@@ -356,8 +355,8 @@ acpi_ds_init_object_from_op (
 
 	case INTERNAL_TYPE_REFERENCE:
 
-		switch (ACPI_GET_OP_CLASS (op_info)) {
-		case OPTYPE_LOCAL_VARIABLE:
+		switch (op_info->type) {
+		case AML_TYPE_LOCAL_VARIABLE:
 
 			/* Split the opcode into a base opcode + offset */
 
@@ -366,7 +365,7 @@ acpi_ds_init_object_from_op (
 			break;
 
 
-		case OPTYPE_METHOD_ARGUMENT:
+		case AML_TYPE_METHOD_ARGUMENT:
 
 			/* Split the opcode into a base opcode + offset */
 
@@ -655,6 +654,15 @@ acpi_ds_create_node (
 	FUNCTION_TRACE_PTR ("Ds_create_node", op);
 
 
+	/*
+	 * Because of the execution pass through the non-control-method
+	 * parts of the table, we can arrive here twice.  Only init
+	 * the named object node the first time through
+	 */
+	if (node->object) {
+		return_ACPI_STATUS (AE_OK);
+	}
+
 	if (!op->value.arg) {
 		/* No arguments, there is nothing to do */
 
@@ -675,14 +683,8 @@ acpi_ds_create_node (
 	/* Init obj */
 
 	status = acpi_ns_attach_object (node, obj_desc, (u8) node->type);
-	if (ACPI_FAILURE (status)) {
-		goto cleanup;
-	}
 
-	return_ACPI_STATUS (status);
-
-
-cleanup:
+	/* Remove local reference to the object */
 
 	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);

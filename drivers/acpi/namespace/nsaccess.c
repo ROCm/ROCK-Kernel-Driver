@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 133 $
+ *              $Revision: 135 $
  *
  ******************************************************************************/
 
@@ -185,6 +185,10 @@ acpi_ns_root_initialize (void)
 			/* Store pointer to value descriptor in the Node */
 
 			acpi_ns_attach_object (new_node, obj_desc, obj_desc->common.type);
+
+			/* Remove local reference to the object */
+
+			acpi_ut_remove_reference (obj_desc);
 		}
 	}
 
@@ -434,7 +438,7 @@ acpi_ns_lookup (
 		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "["));
 
 		for (i = 0; i < num_segments; i++) {
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_NAMES, "%4.4s/", &pathname[i * 4]));
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_NAMES, "%4.4s/", (char*)&pathname[i * 4]));
 		}
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_NAMES, "]\n"));
 #endif
@@ -474,8 +478,8 @@ acpi_ns_lookup (
 				/* Name not found in ACPI namespace  */
 
 				ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-					"Name [%4.4s] not found in scope %X\n",
-					&simple_name, current_node));
+					"Name [%4.4s] not found in scope %p\n",
+					(char*)&simple_name, current_node));
 			}
 
 			return_ACPI_STATUS (status);
@@ -507,7 +511,7 @@ acpi_ns_lookup (
 
 			REPORT_WARNING (
 				("Ns_lookup: %4.4s, type %X, checking for type %X\n",
-				&simple_name, this_node->type, type_to_check_for));
+				(char*)&simple_name, this_node->type, type_to_check_for));
 		}
 
 		/*
@@ -525,7 +529,7 @@ acpi_ns_lookup (
 			 * More segments or the type implies enclosed scope,
 			 * and the next scope has not been allocated.
 			 */
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Load mode=%X  This_node=%X\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Load mode=%X  This_node=%p\n",
 				interpreter_mode, this_node));
 		}
 

@@ -1412,6 +1412,12 @@ CONFIG_PARIDE_EPAT
   have a high-level driver for the type of device that you want to
   support.
 
+Shuttle EPAT c7/c8 extension 
+CONFIG_PARIDE_EPATC8
+  This option enables support for the newer Shuttle EP1284 (aka c7 and
+  c8) chip. You need this if you are using any recent Imation SuperDisk
+  (LS-120) drive.
+
 Shuttle EPIA protocol
 CONFIG_PARIDE_EPIA
   This option enables support for the (obsolete) EPIA parallel port

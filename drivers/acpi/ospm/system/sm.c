@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: sm.c
- *   $Revision: 19 $
+ *   $Revision: 20 $
  *
  *****************************************************************************/
 
@@ -71,7 +71,7 @@ sm_print (
 	 * Print out basic system information.
 	 */
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| System[%02x]:[%p] %s\n", system->device_handle, system->acpi_handle, buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| System[%02x]:[%p] %s\n", system->device_handle, system->acpi_handle, (char*)buffer.pointer));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   states: %cS0 %cS1 %cS2 %cS3 %cS4 %cS5\n", (system->states[0]?'+':'-'), (system->states[1]?'+':'-'), (system->states[2]?'+':'-'), (system->states[3]?'+':'-'), (system->states[4]?'+':'-'), (system->states[5]?'+':'-')));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
 

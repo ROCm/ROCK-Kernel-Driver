@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisply - debug display commands
- *              $Revision: 52 $
+ *              $Revision: 57 $
  *
  ******************************************************************************/
 
@@ -246,7 +246,7 @@ dump_nte:
 	}
 
 	else {
-		acpi_os_printf ("Object Pathname: %s\n", ret_buf.pointer);
+		acpi_os_printf ("Object (%p) Pathname: %s\n", node, ret_buf.pointer);
 	}
 
 	if (!acpi_os_readable (node, sizeof (acpi_namespace_node))) {
@@ -264,7 +264,7 @@ dump_nte:
 			return;
 		}
 
-		acpi_ut_dump_buffer (node->object, sizeof (acpi_operand_object), display, ACPI_UINT32_MAX);
+		acpi_ut_dump_buffer ((void *) node->object, sizeof (acpi_operand_object), display, ACPI_UINT32_MAX);
 		acpi_ex_dump_object_descriptor (node->object, 1);
 	}
 }
@@ -402,7 +402,7 @@ acpi_db_display_internal_object (
 				break;
 
 			case AML_REVISION_OP:
-				acpi_os_printf ("[Const]         Revision (%X)", ACPI_CA_VERSION);
+				acpi_os_printf ("[Const]         Revision (%X)", ACPI_CA_SUPPORT_LEVEL);
 				break;
 
 			case AML_LOCAL_OP:
@@ -520,28 +520,22 @@ acpi_db_display_method_info (
 			num_remaining_ops++;
 		}
 
-		op_info = acpi_ps_get_opcode_info (op->opcode);
-		if (ACPI_GET_OP_TYPE (op_info) != ACPI_OP_TYPE_OPCODE) {
-			/* Bad opcode or ASCII character */
-
-			continue;
-		}
-
-
 		/* Decode the opcode */
 
-		switch (ACPI_GET_OP_CLASS (op_info)) {
-		case OPTYPE_CONSTANT:           /* argument type only */
-		case OPTYPE_LITERAL:            /* argument type only */
-		case OPTYPE_DATA_TERM:          /* argument type only */
-		case OPTYPE_LOCAL_VARIABLE:     /* argument type only */
-		case OPTYPE_METHOD_ARGUMENT:    /* argument type only */
+		op_info = acpi_ps_get_opcode_info (op->opcode);
+		switch (op_info->class) {
+		case AML_CLASS_ARGUMENT:
 			if (count_remaining) {
 				num_remaining_operands++;
 			}
 
 			num_operands++;
 			break;
+
+		case AML_CLASS_UNKNOWN:
+			/* Bad opcode or ASCII character */
+
+			continue;
 
 		default:
 			if (count_remaining) {

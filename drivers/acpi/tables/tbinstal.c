@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbinstal - ACPI table installation and removal
- *              $Revision: 42 $
+ *              $Revision: 45 $
  *
  *****************************************************************************/
 
@@ -142,7 +142,7 @@ acpi_tb_recognize_table (
 			status          = acpi_gbl_acpi_table_data[i].status;
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Found %4.4s\n",
-				acpi_gbl_acpi_table_data[i].signature));
+				(char*)acpi_gbl_acpi_table_data[i].signature));
 			break;
 		}
 	}
@@ -266,7 +266,7 @@ acpi_tb_init_table_descriptor (
 	table_desc->base_pointer        = table_info->base_pointer;
 	table_desc->length              = table_info->length;
 	table_desc->allocation          = table_info->allocation;
-	table_desc->aml_pointer         = (u8 *) (table_desc->pointer + 1),
+	table_desc->aml_start           = (u8 *) (table_desc->pointer + 1),
 	table_desc->aml_length          = (u32) (table_desc->length -
 			 (u32) sizeof (acpi_table_header));
 	table_desc->table_id            = acpi_ut_allocate_owner_id (OWNER_TYPE_TABLE);

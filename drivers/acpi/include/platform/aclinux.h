@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclinux.h - OS specific defines, etc.
- *       $Revision: 13 $
+ *       $Revision: 14 $
  *
  *****************************************************************************/
 
@@ -57,15 +57,6 @@
 
 #undef DEBUGGER_THREADING
 #define DEBUGGER_THREADING          DEBUGGER_SINGLE_THREADED
-
-#ifndef _IA64
-/* Linux ia32 can't do int64 well */
-#define ACPI_NO_INTEGER64_SUPPORT
-/* And the ia32 kernel doesn't include 64-bit divide support */
-#define ACPI_DIV64(dividend, divisor) do_div(dividend, divisor)
-#else
-#define ACPI_DIV64(dividend, divisor) ACPI_DIVIDE(dividend, divisor)
-#endif
 
 
 #endif /* __ACLINUX_H__ */

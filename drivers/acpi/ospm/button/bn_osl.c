@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: bn_osl.c
- *   $Revision: 14 $
+ *   $Revision: 16 $
  *
  *****************************************************************************/
 
@@ -35,7 +35,6 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - Button Driver");
-MODULE_LICENSE("GPL");
 
 
 #define BN_PROC_ROOT		"button"
@@ -45,6 +44,15 @@ MODULE_LICENSE("GPL");
 
 extern struct proc_dir_entry	*bm_proc_root;
 static struct proc_dir_entry	*bn_proc_root = NULL;
+
+
+#define BN_TYPE_UNKNOWN		0
+#define BN_TYPE_FIXED		1
+#define BN_TYPE_GENERIC		2
+
+static int bn_power_button = BN_TYPE_UNKNOWN;
+static int bn_sleep_button = BN_TYPE_UNKNOWN;
+static int bn_lid_switch = BN_TYPE_UNKNOWN;
 
 
 /****************************************************************************
@@ -65,24 +73,77 @@ bn_osl_add_device(
 
 	switch (button->type) {
 
-	case BN_TYPE_POWER_BUTTON:
 	case BN_TYPE_POWER_BUTTON_FIXED:
-		printk(KERN_INFO "Power Button: found\n");
+		bn_power_button = BN_TYPE_FIXED;
+		printk(KERN_INFO "ACPI: Power Button (FF) found\n");
 		if (!proc_mkdir(BN_PROC_POWER_BUTTON, bn_proc_root)) {
 			status = AE_ERROR;
 		}
 		break;
 
-	case BN_TYPE_SLEEP_BUTTON:
+	case BN_TYPE_POWER_BUTTON:
+		/* 
+		 * Avoid creating multiple /proc entries when (buggy) ACPI
+		 * BIOS tables erroneously list both fixed- and generic-
+		 * feature buttons.  Note that fixed-feature buttons are 
+		 * always enumerated first (and there can only be one) so
+		 * we only need to check here.
+		 */
+		switch (bn_power_button) {
+		case BN_TYPE_GENERIC:
+			printk(KERN_WARNING "ACPI: Multiple generic-space power buttons detected, using first\n");
+			break;
+		case BN_TYPE_FIXED:
+			printk(KERN_WARNING "ACPI: Multiple power buttons detected, ignoring fixed-feature\n");
+		default:
+			printk(KERN_INFO "ACPI: Power Button (CM) found\n");
+			bn_power_button = BN_TYPE_GENERIC;
+			if (!proc_mkdir(BN_PROC_POWER_BUTTON, bn_proc_root)) {
+				status = AE_ERROR;
+			}
+			break;
+		}
+		break;
+
 	case BN_TYPE_SLEEP_BUTTON_FIXED:
-		printk(KERN_INFO "Sleep Button: found\n");
+		bn_sleep_button = BN_TYPE_FIXED;
+		printk(KERN_INFO "ACPI: Sleep Button (FF) found\n");
 		if (!proc_mkdir(BN_PROC_SLEEP_BUTTON, bn_proc_root)) {
 			status = AE_ERROR;
 		}
 		break;
 
+	case BN_TYPE_SLEEP_BUTTON:
+		/* 
+		 * Avoid creating multiple /proc entries when (buggy) ACPI
+		 * BIOS tables erroneously list both fixed- and generic-
+		 * feature buttons.  Note that fixed-feature buttons are 
+		 * always enumerated first (and there can only be one) so
+		 * we only need to check here.
+		 */
+		switch (bn_sleep_button) {
+		case BN_TYPE_GENERIC:
+			printk(KERN_WARNING "ACPI: Multiple generic-space sleep buttons detected, using first\n");
+			break;
+		case BN_TYPE_FIXED:
+			printk(KERN_WARNING "ACPI: Multiple sleep buttons detected, ignoring fixed-feature\n");
+		default:
+			bn_sleep_button = BN_TYPE_GENERIC;
+			printk(KERN_INFO "ACPI: Sleep Button (CM) found\n");
+			if (!proc_mkdir(BN_PROC_SLEEP_BUTTON, bn_proc_root)) {
+				status = AE_ERROR;
+			}
+			break;
+		}
+		break;
+
 	case BN_TYPE_LID_SWITCH:
-		printk(KERN_INFO "Lid Switch: found\n");
+		if (bn_lid_switch) {
+			printk(KERN_WARNING "ACPI: Multiple generic-space lid switches detected, using first\n");
+			break;
+		}
+		bn_lid_switch = BN_TYPE_GENERIC;
+		printk(KERN_INFO "ACPI: Lid Switch (CM) found\n");
 		if (!proc_mkdir(BN_PROC_LID_SWITCH, bn_proc_root)) {
 			status = AE_ERROR;
 		}

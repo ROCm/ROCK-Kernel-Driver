@@ -373,7 +373,7 @@ struct hash_list_t {
 
 typedef struct ohci {
 	struct ohci_hcca *hcca;		/* hcca */
-	u32 hcca_dma;
+	dma_addr_t hcca_dma;
 
 	int irq;
 	int disabled;			/* e.g. got a UE, we're hung */

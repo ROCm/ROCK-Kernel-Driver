@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: prpower.c
- *   $Revision: 30 $
+ *   $Revision: 32 $
  *
  *****************************************************************************/
 
@@ -41,7 +41,7 @@
  *                                  Globals
  ****************************************************************************/
 
-extern fadt_descriptor_rev2	acpi_fadt;
+extern FADT_DESCRIPTOR		acpi_fadt;
 static u32			last_idle_jiffies = 0;
 static PR_CONTEXT		*processor_list[NR_CPUS];
 static void			(*pr_pm_idle_save)(void) = NULL;
@@ -207,7 +207,10 @@ pr_power_idle (void)
 	case PR_C1:
 		/* Invoke C1 */
 		enable(); halt();
-		/* no C1 time measurement, so just enter some number of times */
+		/*
+	 * TBD: Can't get time duration while in C1, as resumes
+		 *      go to an ISR rather than here.
+		 */
 		time_elapsed = 0xFFFFFFFF;
 		break;
 
@@ -217,8 +220,7 @@ pr_power_idle (void)
 		/* Invoke C2 */
 		acpi_os_read_port(processor->power.p_lvl2, NULL, 8);
 		/* Dummy op - must do something useless after P_LVL2 read */
-		acpi_hw_register_bit_access(ACPI_READ, ACPI_MTX_DO_NOT_LOCK,
-			BM_STS);
+		acpi_hw_register_bit_access(ACPI_READ, ACPI_MTX_DO_NOT_LOCK, BM_STS);
 		/* Compute time elapsed */
 		acpi_get_timer(&end_ticks);
 		/* Re-enable interrupts */
@@ -228,15 +230,13 @@ pr_power_idle (void)
 
 	case PR_C3:
 		/* Disable bus master arbitration */
-		acpi_hw_register_bit_access(ACPI_WRITE, ACPI_MTX_DO_NOT_LOCK,
-			ARB_DIS, 1);
+		acpi_hw_register_bit_access(ACPI_WRITE, ACPI_MTX_DO_NOT_LOCK, ARB_DIS, 1);
 		/* See how long we're asleep for */
 		acpi_get_timer(&start_ticks);
 		/* Invoke C3 */
 		acpi_os_read_port(processor->power.p_lvl3, NULL, 8);
 		/* Dummy op - must do something useless after P_LVL3 read */
-		acpi_hw_register_bit_access(ACPI_READ, ACPI_MTX_DO_NOT_LOCK,
-			BM_STS);
+		acpi_hw_register_bit_access(ACPI_READ, ACPI_MTX_DO_NOT_LOCK, BM_STS);
 		/* Compute time elapsed */
 		acpi_get_timer(&end_ticks);
 		/* Enable bus master arbitration */
@@ -266,18 +266,14 @@ pr_power_idle (void)
 		c_state->promotion.count++;
  		c_state->demotion.count = 0;
 
-		if (c_state->promotion.count >=
-			c_state->promotion.count_threshold) {
-
+		if (c_state->promotion.count >= c_state->promotion.count_threshold) {
 			/*
 			 * Bus Mastering Activity, if active and used
 			 * by this state's promotion policy, prevents
 			 * promotions from occuring.
 			 */
-			if (bm_control && !(processor->power.bm_activity &
-				c_state->promotion.bm_threshold)) {
+			if (!bm_control || !(processor->power.bm_activity & c_state->promotion.bm_threshold))
 				next_state = c_state->promotion.target_state;
-			}
 		}
 	}
 
@@ -305,10 +301,8 @@ pr_power_idle (void)
 		 * state's promotion policy, causes an immediate demotion
 		 * to occur.
 		 */
-		if (bm_control && (processor->power.bm_activity &
-			c_state->demotion.bm_threshold)) {
+		if (bm_control && (processor->power.bm_activity & c_state->demotion.bm_threshold))
 			next_state = c_state->demotion.target_state;
-		}
 	}
 
 	/*
@@ -627,7 +621,7 @@ pr_power_initialize (void)
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Max CPUs[%d], this CPU[%d].\n", NR_CPUS, smp_processor_id()));
 
-	/* only use C3 if we can control busmastering */
+	/* Only use C3 if we can control bus mastering. */
 	if (acpi_fadt.V1_pm2_cnt_blk && acpi_fadt.pm2_cnt_len)
 		bm_control = 1;
 

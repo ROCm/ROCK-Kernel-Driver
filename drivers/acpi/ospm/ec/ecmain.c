@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: ecmain.c
- *   $Revision: 28 $
+ *   $Revision: 29 $
  *
  *****************************************************************************/
 
@@ -79,7 +79,7 @@ ec_print (
 	 * Print out basic thermal zone information.
 	 */
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Embedded_controller[%02x]:[%p] %s\n", ec->device_handle, ec->acpi_handle, buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Embedded_controller[%02x]:[%p] %s\n", ec->device_handle, ec->acpi_handle, (char*)buffer.pointer));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   gpe_bit[%02x] status/command_port[%02x] data_port[%02x]\n", ec->gpe_bit, ec->status_port, ec->data_port));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
 

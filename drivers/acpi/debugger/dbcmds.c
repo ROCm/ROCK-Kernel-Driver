@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbcmds - debug commands and output routines
- *              $Revision: 65 $
+ *              $Revision: 66 $
  *
  ******************************************************************************/
 
@@ -422,7 +422,7 @@ acpi_db_dump_namespace (
 	/* Display the subtree */
 
 	acpi_db_set_output_destination (DB_REDIRECTABLE_OUTPUT);
-	acpi_ns_dump_objects (ACPI_TYPE_ANY, max_depth, ACPI_UINT32_MAX, subtree_entry);
+	acpi_ns_dump_objects (ACPI_TYPE_ANY, ACPI_DISPLAY_SUMMARY, max_depth, ACPI_UINT32_MAX, subtree_entry);
 	acpi_db_set_output_destination (DB_CONSOLE_OUTPUT);
 }
 
@@ -466,7 +466,7 @@ acpi_db_dump_namespace_by_owner (
 	/* Display the subtree */
 
 	acpi_db_set_output_destination (DB_REDIRECTABLE_OUTPUT);
-	acpi_ns_dump_objects (ACPI_TYPE_ANY, max_depth, owner_id, subtree_entry);
+	acpi_ns_dump_objects (ACPI_TYPE_ANY, ACPI_DISPLAY_SUMMARY, max_depth, owner_id, subtree_entry);
 	acpi_db_set_output_destination (DB_CONSOLE_OUTPUT);
 }
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actables.h - ACPI table management
- *       $Revision: 31 $
+ *       $Revision: 32 $
  *
  *****************************************************************************/
 
@@ -176,10 +176,6 @@ acpi_tb_find_rsdp (
 /*
  * tbutils - common table utilities
  */
-
-u8
-acpi_tb_system_table_pointer (
-	void                    *where);
 
 acpi_status
 acpi_tb_map_acpi_table (

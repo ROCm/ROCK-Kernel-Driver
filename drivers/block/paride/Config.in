@@ -27,6 +27,12 @@ dep_tristate '    DataStor EP-2000 protocol' CONFIG_PARIDE_DSTR $CONFIG_PARIDE
 dep_tristate '    FIT TD-2000 protocol' CONFIG_PARIDE_FIT2 $CONFIG_PARIDE
 dep_tristate '    FIT TD-3000 protocol' CONFIG_PARIDE_FIT3 $CONFIG_PARIDE
 dep_tristate '    Shuttle EPAT/EPEZ protocol' CONFIG_PARIDE_EPAT $CONFIG_PARIDE
+if [ "$CONFIG_PARIDE_EPAT" != "n" ]; then
+  if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+    bool '     Support c7/c8 chips (EXPERIMENTAL)' CONFIG_PARIDE_EPATC8 $CONFIG_PARIDE
+  fi
+fi
+
 dep_tristate '    Shuttle EPIA protocol' CONFIG_PARIDE_EPIA $CONFIG_PARIDE
 dep_tristate '    Freecom IQ ASIC-2 protocol' CONFIG_PARIDE_FRIQ $CONFIG_PARIDE
 dep_tristate '    FreeCom power protocol' CONFIG_PARIDE_FRPW $CONFIG_PARIDE

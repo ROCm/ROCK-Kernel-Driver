@@ -1,3 +1,27 @@
+2001-10-24  Dave Strauss  <D.Strauss@motorola.com>
+
+	* parport_pc.c (parport_pc_compat_write_block_pio,
+	parport_pc_ecp_write_block_pio): Allow a few seconds for an ECP
+	transfer to finish up.
+
+2001-10-11  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc (sio_ite_8872_probe): New function, submitted by Rich
+	Liu from ITE.  Cleaned up, removed bogus phys_to_virt calls.
+
+2001-10-24  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c: Support for AKS AladdinCARD.  Patch from
+	Aladdin Knowledge Systems (Christian Groessler).
+
+2001-10-24  Tim Waugh  <twaugh@redhat.com>
+	
+	* ieee1284_ops.c (parport_ieee1284_ecp_read_data): Try to minimise
+	turnaround time.
+
+	* ieee1284.c (parport_poll_peripheral): Try a couple of times
+	first without delaying.
+
 2001-10-10  Tim Waugh  <twaugh@redhat.com>
 
 	* parport_pc.c: Support for OX16PCI954 PCI card.

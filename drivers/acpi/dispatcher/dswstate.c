@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 51 $
+ *              $Revision: 54 $
  *
  *****************************************************************************/
 
@@ -368,6 +368,7 @@ acpi_ds_result_stack_push (
 		return (AE_NO_MEMORY);
 	}
 
+	state->common.data_type = ACPI_DESC_TYPE_STATE_RESULT;
 	acpi_ut_push_generic_state (&walk_state->results, state);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Results=%p State=%p\n",
@@ -744,7 +745,7 @@ acpi_ds_get_current_walk_state (
  *
  ******************************************************************************/
 
-static void
+void
 acpi_ds_push_walk_state (
 	acpi_walk_state         *walk_state,
 	acpi_walk_list          *walk_list)
@@ -855,10 +856,101 @@ acpi_ds_create_walk_state (
 
 	/* Put the new state at the head of the walk list */
 
-	acpi_ds_push_walk_state (walk_state, walk_list);
+	if (walk_list) {
+		acpi_ds_push_walk_state (walk_state, walk_list);
+	}
 
 	return_PTR (walk_state);
 }
+
+
+#ifndef _ACPI_ASL_COMPILER
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ds_init_aml_walk
+ *
+ * PARAMETERS:  Walk_state      - New state to be initialized
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Initialize a walk state for a pass 1 or 2 parse tree walk
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ds_init_aml_walk (
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op,
+	acpi_namespace_node     *method_node,
+	u8                      *aml_start,
+	u32                     aml_length,
+	acpi_operand_object     **params,
+	acpi_operand_object     **return_obj_desc,
+	u32                     pass_number)
+{
+	acpi_status             status;
+	acpi_parse_state        *parser_state = &walk_state->parser_state;
+
+
+	FUNCTION_TRACE ("Ds_init_aml_walk");
+
+
+	walk_state->parser_state.aml    =
+	walk_state->parser_state.aml_start = aml_start;
+	walk_state->parser_state.aml_end =
+	walk_state->parser_state.pkg_end = aml_start + aml_length;
+
+	/* The Next_op of the Next_walk will be the beginning of the method */
+	/* TBD: [Restructure] -- obsolete? */
+
+	walk_state->next_op             = NULL;
+	walk_state->params              = params;
+	walk_state->caller_return_desc  = return_obj_desc;
+
+	status = acpi_ps_init_scope (&walk_state->parser_state, op);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	if (method_node) {
+		walk_state->parser_state.start_node = method_node;
+		walk_state->walk_type               = WALK_METHOD;
+		walk_state->method_node             = method_node;
+		walk_state->method_desc             = acpi_ns_get_attached_object (method_node);
+
+
+		/* Push start scope on scope stack and make it current  */
+
+		status = acpi_ds_scope_stack_push (method_node, ACPI_TYPE_METHOD, walk_state);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
+
+		/* Init the method arguments */
+
+		acpi_ds_method_data_init_args (params, MTH_NUM_ARGS, walk_state);
+	}
+
+	else {
+		/* Setup the current scope */
+
+		parser_state->start_node = parser_state->start_op->node;
+		if (parser_state->start_node) {
+			/* Push start scope on scope stack and make it current  */
+
+			status = acpi_ds_scope_stack_push (parser_state->start_node,
+					  parser_state->start_node->type, walk_state);
+			if (ACPI_FAILURE (status)) {
+				return_ACPI_STATUS (status);
+			}
+		}
+	}
+
+	acpi_ds_init_callbacks (walk_state, pass_number);
+
+	return_ACPI_STATUS (AE_OK);
+}
+#endif
 
 
 /*******************************************************************************
@@ -893,7 +985,11 @@ acpi_ds_delete_walk_state (
 	}
 
 
-	/* Always must free any linked control states */
+	if (walk_state->parser_state.scope) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "%p walk still has a scope list\n", walk_state));
+	}
+
+   /* Always must free any linked control states */
 
 	while (walk_state->control_state) {
 		state = walk_state->control_state;

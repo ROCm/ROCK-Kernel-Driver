@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 131 $
+ *              $Revision: 133 $
  *
  *****************************************************************************/
 
@@ -147,7 +147,7 @@ const u8                    acpi_gbl_decode_to8bit [8] = {1,2,4,8,16,32,64,128};
 
 const NATIVE_CHAR           *acpi_gbl_db_sleep_states[ACPI_NUM_SLEEP_STATES] = {
 			  "\\_S0_","\\_S1_","\\_S2_","\\_S3_",
-			  "\\_S4_","\\_S5_","\\_S4_b"};
+			  "\\_S4_","\\_S5_","\\_S4B"};
 
 
 /******************************************************************************
@@ -331,7 +331,7 @@ acpi_ut_get_mutex_name (
  */
 
 static const NATIVE_CHAR    acpi_gbl_bad_type[] = "UNDEFINED";
-#define TYPE_NAME_LENGTH    9                           /* Maximum length of each string */
+#define TYPE_NAME_LENGTH    12                           /* Maximum length of each string */
 
 static const NATIVE_CHAR    *acpi_gbl_ns_type_names[] = /* printable names of ACPI types */
 {
@@ -349,21 +349,21 @@ static const NATIVE_CHAR    *acpi_gbl_ns_type_names[] = /* printable names of AC
 	/* 11 */ "Power",
 	/* 12 */ "Processor",
 	/* 13 */ "Thermal",
-	/* 14 */ "Buff_field",
+	/* 14 */ "Buffer_field",
 	/* 15 */ "Ddb_handle",
-	/* 16 */ "Debug_obj",
-	/* 17 */ "Regn_field",
+	/* 16 */ "Debug_object",
+	/* 17 */ "Region_field",
 	/* 18 */ "Bank_field",
-	/* 19 */ "Indx_field",
+	/* 19 */ "Index_field",
 	/* 20 */ "Reference",
 	/* 21 */ "Alias",
 	/* 22 */ "Notify",
-	/* 23 */ "Addr_hndlr",
-	/* 24 */ "Rsrc_desc",
-	/* 25 */ "Rsrc_field",
-	/* 26 */ "Rgn_fld_dfn",
-	/* 27 */ "Bnk_fld_dfn",
-	/* 28 */ "Idx_fld_dfn",
+	/* 23 */ "Addr_handler",
+	/* 24 */ "Resource_desc",
+	/* 25 */ "Resource_fld",
+	/* 26 */ "Region_fld_dfn",
+	/* 27 */ "Bank_fld_dfn",
+	/* 28 */ "Index_fld_dfn",
 	/* 29 */ "If",
 	/* 30 */ "Else",
 	/* 31 */ "While",

@@ -2,7 +2,7 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 89 $
+ *              $Revision: 92 $
  *
  *****************************************************************************/
 
@@ -148,7 +148,7 @@ acpi_ns_local (
 
 acpi_status
 acpi_ns_get_internal_name_length (
-	ACPI_NAMESTRING_INFO    *info)
+	acpi_namestring_info    *info)
 {
 	NATIVE_CHAR             *next_external_char;
 	u32                     i;
@@ -225,7 +225,7 @@ acpi_ns_get_internal_name_length (
 
 acpi_status
 acpi_ns_build_internal_name (
-	ACPI_NAMESTRING_INFO    *info)
+	acpi_namestring_info    *info)
 {
 	u32                     num_segments = info->num_segments;
 	NATIVE_CHAR             *internal_name = info->internal_name;
@@ -356,7 +356,7 @@ acpi_ns_internalize_name (
 	NATIVE_CHAR             **converted_name)
 {
 	NATIVE_CHAR             *internal_name;
-	ACPI_NAMESTRING_INFO    info;
+	acpi_namestring_info    info;
 	acpi_status             status;
 
 
@@ -549,7 +549,7 @@ acpi_ns_externalize_name (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_convert_handle_to_entry
+ * FUNCTION:    Acpi_ns_map_handle_to_node
  *
  * PARAMETERS:  Handle          - Handle to be converted to an Node
  *
@@ -560,7 +560,7 @@ acpi_ns_externalize_name (
  ******************************************************************************/
 
 acpi_namespace_node *
-acpi_ns_convert_handle_to_entry (
+acpi_ns_map_handle_to_node (
 	acpi_handle             handle)
 {
 
@@ -829,7 +829,7 @@ acpi_ns_find_parent_name (
 		parent_node = acpi_ns_get_parent_object (child_node);
 		if (parent_node) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Parent of %p [%4.4s] is %p [%4.4s]\n",
-				child_node, &child_node->name, parent_node, &parent_node->name));
+				child_node, (char*)&child_node->name, parent_node, (char*)&parent_node->name));
 
 			if (parent_node->name) {
 				return_VALUE (parent_node->name);
@@ -837,7 +837,7 @@ acpi_ns_find_parent_name (
 		}
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "unable to find parent of %p (%4.4s)\n",
-			child_node, &child_node->name));
+			child_node, (char*)&child_node->name));
 	}
 
 	return_VALUE (ACPI_UNKNOWN_NAME);
@@ -925,21 +925,21 @@ acpi_ns_get_parent_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_get_next_valid_object
+ * FUNCTION:    Acpi_ns_get_next_valid_node
  *
  * PARAMETERS:  Node       - Current table entry
  *
- * RETURN:      Next valid object in the table.  NULL if no more valid
- *              objects
+ * RETURN:      Next valid Node in the linked node list.  NULL if no more valid
+ *              nodess
  *
- * DESCRIPTION: Find the next valid object within a name table.
+ * DESCRIPTION: Find the next valid node within a name table.
  *              Useful for implementing NULL-end-of-list loops.
  *
  ******************************************************************************/
 
 
 acpi_namespace_node *
-acpi_ns_get_next_valid_object (
+acpi_ns_get_next_valid_node (
 	acpi_namespace_node     *node)
 {
 

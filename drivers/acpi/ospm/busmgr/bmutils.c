@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: bmutils.c
- *   $Revision: 38 $
+ *   $Revision: 43 $
  *
  *****************************************************************************/
 
@@ -81,11 +81,11 @@ bm_print_eval_error (
 	}
 
 	if (pathname) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Evaluate object [%s.%s], %s\n", buffer.pointer, pathname,
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Evaluate object [%s.%s], %s\n", (char*)buffer.pointer, pathname,
 			acpi_format_exception(status)));
 	}
 	else {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Evaluate object [%s], %s\n", buffer.pointer,
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Evaluate object [%s], %s\n", (char*)buffer.pointer,
 			acpi_format_exception(status)));
 	}
 
@@ -175,68 +175,70 @@ bm_cast_buffer (
  *
  ****************************************************************************/
 
-/*
- * TBD: Don't assume numbers (in ASL) are 32-bit values!!!!  (IA64)
- * TBD: Issue with 'assumed' types coming out of interpreter...
- *       (e.g. toshiba _BIF)
- */
-
 acpi_status
 bm_extract_package_data (
 	acpi_object             *package,
-	acpi_buffer             *package_format,
+	acpi_buffer             *format,
 	acpi_buffer             *buffer)
 {
-	acpi_status             status = AE_OK;
-	u8                      *head = NULL;
-	u8                      *tail = NULL;
-	u8                      **pointer = NULL;
 	u32                     tail_offset = 0;
-	acpi_object             *element = NULL;
 	u32                     size_required = 0;
-	char*                   format = NULL;
+	char			*format_string = NULL;
 	u32                     format_count = 0;
 	u32                     i = 0;
+	u8                      *head = NULL;
+	u8                      *tail = NULL;
 
 	FUNCTION_TRACE("bm_extract_package_data");
 
-	if (!package || (package->type != ACPI_TYPE_PACKAGE) ||
-		(package->package.count == 0) || !package_format ||
-		(package_format->length < 1) ||
-		(!package_format->pointer) || !buffer) {
+	if (!package || (package->type != ACPI_TYPE_PACKAGE) || (package->package.count < 1)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Invalid 'package' argument\n"));
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
-	format_count = package_format->length - 1;
+	if (!format || !format->pointer || (format->length < 1)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Invalid 'format' argument\n"));
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+	}
 
+	if (!buffer) {
+		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Invalid 'buffer' argument\n"));
+		return_ACPI_STATUS(AE_BAD_PARAMETER);
+	}
+
+	format_count = (format->length/sizeof(char)) - 1;
 	if (format_count > package->package.count) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Format specifies more objects [%d] than exist in package [%d].", format_count, package->package.count));
+		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Format specifies more objects [%d] than exist in package [%d].", format_count, package->package.count));
 		return_ACPI_STATUS(AE_BAD_DATA);
 	}
 
-	format = (char*)package_format->pointer;
+	format_string = (char*)format->pointer;
 
 	/*
 	 * Calculate size_required.
 	 */
 	for (i=0; i<format_count; i++) {
-		element = &(package->package.elements[i]);
+
+		acpi_object *element = &(package->package.elements[i]);
+
+		if (!element) {
+			return_ACPI_STATUS(AE_BAD_DATA);
+		}
 
 		switch (element->type) {
 
 		case ACPI_TYPE_INTEGER:
-			switch (format[i]) {
+			switch (format_string[i]) {
 			case 'N':
 				size_required += sizeof(acpi_integer);
 				tail_offset += sizeof(acpi_integer);
 				break;
 			case 'S':
-				size_required += sizeof(u8*) +
-					sizeof(acpi_integer) + 1;
-				tail_offset += sizeof(acpi_integer);
+				size_required += sizeof(char*) + sizeof(acpi_integer) + sizeof(char);
+				tail_offset += sizeof(char*);
 				break;
 			default:
-				ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Invalid package element [%d]: got number, expecing [%c].\n", i, format[i]));
+				ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Invalid package element [%d]: got number, expecing [%c].\n", i, format_string[i]));
 				return_ACPI_STATUS(AE_BAD_DATA);
 				break;
 			}
@@ -244,19 +246,17 @@ bm_extract_package_data (
 
 		case ACPI_TYPE_STRING:
 		case ACPI_TYPE_BUFFER:
-			switch (format[i]) {
+			switch (format_string[i]) {
 			case 'S':
-				size_required += sizeof(u8*) +
-					element->string.length + 1;
-				tail_offset += sizeof(u8*);
+				size_required += sizeof(char*) + (element->string.length * sizeof(char)) + sizeof(char);
+				tail_offset += sizeof(char*);
 				break;
 			case 'B':
-				size_required += sizeof(u8*) +
-					element->buffer.length;
+				size_required += sizeof(u8*) + (element->buffer.length * sizeof(u8));
 				tail_offset += sizeof(u8*);
 				break;
 			default:
-				ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Invalid package element [%d] got string/buffer, expecing [%c].\n", i, format[i]));
+				ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Invalid package element [%d] got string/buffer, expecing [%c].\n", i, format_string[i]));
 				return_ACPI_STATUS(AE_BAD_DATA);
 				break;
 			}
@@ -264,52 +264,52 @@ bm_extract_package_data (
 
 		case ACPI_TYPE_PACKAGE:
 		default:
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found unsupported element at index=%d\n", i));
 			/* TBD: handle nested packages... */
 			return_ACPI_STATUS(AE_SUPPORT);
 			break;
 		}
 	}
 
-	if (size_required > buffer->length) {
+	/* 
+	 * Validate output buffer. 
+	 */
+	if (buffer->length < size_required) {
 		buffer->length = size_required;
 		return_ACPI_STATUS(AE_BUFFER_OVERFLOW);
 	}
-
-	buffer->length = size_required;
-
-	if (!buffer->pointer) {
+	else if (buffer->length != size_required || !buffer->pointer) {
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 	}
 
 	head = buffer->pointer;
 	tail = buffer->pointer + tail_offset;
 
-	/*
-	 * Extract package data:
+	/* 
+	 * Extract package data.
 	 */
 	for (i=0; i<format_count; i++) {
 
-		element = &(package->package.elements[i]);
+		u8 **pointer = NULL;
+		acpi_object *element = &(package->package.elements[i]);
 
 		switch (element->type) {
 
 		case ACPI_TYPE_INTEGER:
-			switch (format[i]) {
+			switch (format_string[i]) {
 			case 'N':
-				*((acpi_integer*)head) =
-					element->integer.value;
+				*((acpi_integer*)head) = element->integer.value;
 				head += sizeof(acpi_integer);
 				break;
 			case 'S':
 				pointer = (u8**)head;
 				*pointer = tail;
-				*((acpi_integer*)tail) =
-					element->integer.value;
+				*((acpi_integer*)tail) = element->integer.value;
 				head += sizeof(acpi_integer*);
 				tail += sizeof(acpi_integer);
 				/* NULL terminate string */
-				*tail = 0;
-				tail++;
+				*tail = (char)0;
+				tail += sizeof(char);
 				break;
 			default:
 				/* Should never get here */
@@ -319,25 +319,23 @@ bm_extract_package_data (
 
 		case ACPI_TYPE_STRING:
 		case ACPI_TYPE_BUFFER:
-			switch (format[i]) {
+			switch (format_string[i]) {
 			case 'S':
 				pointer = (u8**)head;
 				*pointer = tail;
-				memcpy(tail, element->string.pointer,
-					element->string.length);
-				head += sizeof(u8*);
-				tail += element->string.length;
+				memcpy(tail, element->string.pointer, element->string.length);
+				head += sizeof(char*);
+				tail += element->string.length * sizeof(char);
 				/* NULL terminate string */
-				*tail = 0;
-				tail++;
+				*tail = (char)0;
+				tail += sizeof(char);
 				break;
 			case 'B':
 				pointer = (u8**)head;
 				*pointer = tail;
-				memcpy(tail, element->buffer.pointer,
-					element->buffer.length);
+				memcpy(tail, element->buffer.pointer, element->buffer.length);
 				head += sizeof(u8*);
-				tail += element->buffer.length;
+				tail += element->buffer.length * sizeof(u8);
 				break;
 			default:
 				/* Should never get here */
@@ -353,7 +351,7 @@ bm_extract_package_data (
 		}
 	}
 
-	return_ACPI_STATUS(status);
+	return_ACPI_STATUS(AE_OK);
 }
 
 
@@ -465,7 +463,7 @@ bm_evaluate_simple_integer (
 	 */
 	status = bm_evaluate_object(handle, pathname, NULL, &buffer);
 	if (ACPI_FAILURE(status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "failed to evaluate object (%s)\n",
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "failed to evaluate object (%s)\n",
 			acpi_format_exception(status)));
 		goto end;
 	}
@@ -569,7 +567,7 @@ bm_evaluate_reference_list (
 
 		if (!element || (element->type != ACPI_TYPE_STRING)) {
 			status = AE_BAD_DATA;
-			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Invalid element in package (not a device reference).\n"));
+			ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Invalid element in package (not a device reference).\n"));
 			DEBUG_EVAL_ERROR (ACPI_LV_WARN, handle, pathname, status);
 			break;
 		}
@@ -582,7 +580,7 @@ bm_evaluate_reference_list (
 			element->string.pointer, &reference_handle);
 		if (ACPI_FAILURE(status)) {
 			status = AE_BAD_DATA;
-			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to resolve device reference [%s].\n", element->string.pointer));
+			ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Unable to resolve device reference [%s].\n", element->string.pointer));
 			DEBUG_EVAL_ERROR (ACPI_LV_WARN, handle, pathname, status);
 			break;
 		}
@@ -594,12 +592,12 @@ bm_evaluate_reference_list (
 			&(reference_list->handles[i]));
 		if (ACPI_FAILURE(status)) {
 			status = AE_BAD_DATA;
-			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Unable to resolve device reference for [%p].\n", reference_handle));
+			ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Unable to resolve device reference for [%p].\n", reference_handle));
 			DEBUG_EVAL_ERROR (ACPI_LV_WARN, handle, pathname, status);
 			break;
 		}
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Resolved reference [%s]->[%p]->[%02x]\n", element->string.pointer, reference_handle, reference_list->handles[i]));
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Resolved reference [%s]->[%p]->[%02x]\n", element->string.pointer, reference_handle, reference_list->handles[i]));
 
 		(reference_list->count)++;
 	}

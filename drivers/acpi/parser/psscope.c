@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psscope - Parser scope stack management routines
- *              $Revision: 29 $
+ *              $Revision: 30 $
  *
  *****************************************************************************/
 
@@ -103,6 +103,7 @@ acpi_ps_init_scope (
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
+	scope->common.data_type     = ACPI_DESC_TYPE_STATE_RPSCOPE;
 	scope->parse_scope.op       = root_op;
 	scope->parse_scope.arg_count = ACPI_VAR_ARGS;
 	scope->parse_scope.arg_end  = parser_state->aml_end;
@@ -149,6 +150,7 @@ acpi_ps_push_scope (
 	}
 
 
+	scope->common.data_type        = ACPI_DESC_TYPE_STATE_PSCOPE;
 	scope->parse_scope.op          = op;
 	scope->parse_scope.arg_list    = remaining_args;
 	scope->parse_scope.arg_count   = arg_count;

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
- *              $Revision: 84 $
+ *              $Revision: 85 $
  *
  *****************************************************************************/
 
@@ -265,16 +265,16 @@ acpi_ex_release_global_lock (
  *
  * FUNCTION:    Acpi_ex_digits_needed
  *
- * PARAMETERS:  val             - Value to be represented
- *              base            - Base of representation
+ * PARAMETERS:  Value           - Value to be represented
+ *              Base            - Base of representation
  *
- * RETURN:      the number of digits needed to represent val in base
+ * RETURN:      the number of digits needed to represent Value in Base
  *
  ******************************************************************************/
 
 u32
 acpi_ex_digits_needed (
-	acpi_integer            val,
+	acpi_integer            value,
 	u32                     base)
 {
 	u32                     num_digits = 0;
@@ -289,9 +289,11 @@ acpi_ex_digits_needed (
 
 	else {
 		/*
-		 * acpi_integer is unsigned, which is why we don't worry about the '-'
+		 * acpi_integer is unsigned, which is why we don't worry about a '-'
 		 */
-		for (num_digits = 1; (val = ACPI_DIVIDE (val,base)); ++num_digits) { ; }
+		for (num_digits = 1;
+			(acpi_ut_short_divide (&value, base, &value, NULL));
+			++num_digits) { ; }
 	}
 
 	return_VALUE (num_digits);
@@ -394,17 +396,18 @@ acpi_ex_unsigned_integer_to_string (
 {
 	u32                     count;
 	u32                     digits_needed;
+	u32                     remainder;
 
 
 	FUNCTION_ENTRY ();
 
 
 	digits_needed = acpi_ex_digits_needed (value, 10);
-	out_string[digits_needed] = '\0';
+	out_string[digits_needed] = 0;
 
 	for (count = digits_needed; count > 0; count--) {
-		out_string[count-1] = (NATIVE_CHAR) ('0' + (ACPI_MODULO (value, 10)));
-		value = ACPI_DIVIDE (value, 10);
+		acpi_ut_short_divide (&value, 10, &value, &remainder);
+		out_string[count-1] = (NATIVE_CHAR) ('0' + remainder);
 	}
 
 	return (AE_OK);

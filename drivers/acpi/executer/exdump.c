@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 123 $
+ *              $Revision: 126 $
  *
  *****************************************************************************/
 
@@ -46,12 +46,12 @@
  * FUNCTION:    Acpi_ex_show_hex_value
  *
  * PARAMETERS:  Byte_count          - Number of bytes to print (1, 2, or 4)
- *              *Aml_ptr            - Address in AML stream of bytes to print
+ *              *Aml_start            - Address in AML stream of bytes to print
  *              Interpreter_mode    - Current running mode (load1/Load2/Exec)
  *              Lead_space          - # of spaces to print ahead of value
  *                                    0 => none ahead but one behind
  *
- * DESCRIPTION: Print Byte_count byte(s) starting at Aml_ptr as a single
+ * DESCRIPTION: Print Byte_count byte(s) starting at Aml_start as a single
  *              value, in hex.  If Byte_count > 1 or the value printed is > 9, also
  *              print in decimal.
  *
@@ -60,7 +60,7 @@
 void
 acpi_ex_show_hex_value (
 	u32                     byte_count,
-	u8                      *aml_ptr,
+	u8                      *aml_start,
 	u32                     lead_space)
 {
 	u32                     value;                  /*  Value retrieved from AML stream */
@@ -72,7 +72,7 @@ acpi_ex_show_hex_value (
 	FUNCTION_TRACE ("Ex_show_hex_value");
 
 
-	if (!aml_ptr) {
+	if (!aml_start) {
 		REPORT_ERROR (("Ex_show_hex_value: null pointer\n"));
 	}
 
@@ -80,9 +80,9 @@ acpi_ex_show_hex_value (
 	 * AML numbers are always stored little-endian,
 	 * even if the processor is big-endian.
 	 */
-	for (current_aml_ptr = aml_ptr + byte_count,
+	for (current_aml_ptr = aml_start + byte_count,
 			value = 0;
-			current_aml_ptr > aml_ptr; ) {
+			current_aml_ptr > aml_start; ) {
 		value = (value << 8) + (u32)* --current_aml_ptr;
 	}
 
@@ -96,14 +96,12 @@ acpi_ex_show_hex_value (
 		length += 3 + acpi_ex_digits_needed (value, 10);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_LOAD, ""));
-
 	for (length = lead_space; length; --length ) {
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_LOAD, " "));
 	}
 
 	while (byte_count--) {
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_LOAD, "%02x", *aml_ptr++));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_LOAD, "%02x", *aml_start++));
 
 		if (byte_count) {
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_LOAD, " "));
@@ -111,7 +109,7 @@ acpi_ex_show_hex_value (
 	}
 
 	if (show_decimal_value) {
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_LOAD, " [%ld]", value));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_LOAD, " [%d]", value));
 	}
 
 	if (0 == lead_space) {
@@ -160,12 +158,6 @@ acpi_ex_dump_operand (
 	if (VALID_DESCRIPTOR_TYPE (entry_desc, ACPI_DESC_TYPE_NAMED)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%p NS Node: ", entry_desc));
 		DUMP_ENTRY (entry_desc, ACPI_LV_INFO);
-		return (AE_OK);
-	}
-
-	if (acpi_tb_system_table_pointer (entry_desc)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%p is an AML pointer\n",
-			entry_desc));
 		return (AE_OK);
 	}
 
@@ -236,8 +228,9 @@ acpi_ex_dump_operand (
 			if (ACPI_TYPE_INTEGER == entry_desc->common.type) {
 				/* Value is a Number */
 
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, " value is [%ld]",
-						  entry_desc->integer.value));
+				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, " value is [%8.8X%8.8x]",
+						  HIDWORD(entry_desc->integer.value),
+						  LODWORD(entry_desc->integer.value)));
 			}
 
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "\n"));
@@ -253,8 +246,9 @@ acpi_ex_dump_operand (
 
 				/* Value is a Number */
 
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, " value is [%ld]",
-						  entry_desc->integer.value));
+				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, " value is [%8.8X%8.8x]",
+						  HIDWORD(entry_desc->integer.value),
+						  LODWORD(entry_desc->integer.value)));
 			}
 
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "\n"));
@@ -262,7 +256,7 @@ acpi_ex_dump_operand (
 
 
 		case AML_INT_NAMEPATH_OP:
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "Reference.Node->Name %x\n",
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "Reference.Node->Name %X\n",
 					 entry_desc->reference.node->name));
 			break;
 
@@ -297,8 +291,7 @@ acpi_ex_dump_operand (
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "Buffer Contents: "));
 
 			for (buf = entry_desc->buffer.pointer; length--; ++buf) {
-				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO,
-					length ? " %02x" : " %02x", *buf));
+				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, " %02x", *buf));
 			}
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO,"\n"));
 		}
@@ -371,8 +364,10 @@ acpi_ex_dump_operand (
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "\n"));
 		}
 		else {
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, " base %p Length %X\n",
-				entry_desc->region.address, entry_desc->region.length));
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, " base %8.8X%8.8X Length %X\n",
+				HIDWORD(entry_desc->region.address),
+				LODWORD(entry_desc->region.address),
+				entry_desc->region.length));
 		}
 		break;
 
@@ -400,7 +395,7 @@ acpi_ex_dump_operand (
 	case INTERNAL_TYPE_REGION_FIELD:
 
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO,
-			"Region_field: bits=%X bitaccwidth=%X lock=%X update=%X at byte=%lX bit=%X of below:\n",
+			"Region_field: bits=%X bitaccwidth=%X lock=%X update=%X at byte=%X bit=%X of below:\n",
 			entry_desc->field.bit_length,    entry_desc->field.access_bit_width,
 			entry_desc->field.lock_rule,     entry_desc->field.update_rule,
 			entry_desc->field.base_byte_offset, entry_desc->field.start_field_bit_offset));
@@ -417,7 +412,7 @@ acpi_ex_dump_operand (
 	case ACPI_TYPE_BUFFER_FIELD:
 
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO,
-			"Buffer_field: %X bits at byte %lX bit %X of \n",
+			"Buffer_field: %X bits at byte %X bit %X of \n",
 			entry_desc->buffer_field.bit_length, entry_desc->buffer_field.base_byte_offset,
 			entry_desc->buffer_field.start_field_bit_offset));
 
@@ -449,9 +444,9 @@ acpi_ex_dump_operand (
 	case ACPI_TYPE_METHOD:
 
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO,
-			"Method(%X) @ %p:%lX\n",
+			"Method(%X) @ %p:%X\n",
 			entry_desc->method.param_count,
-			entry_desc->method.pcode, entry_desc->method.pcode_length));
+			entry_desc->method.aml_start, entry_desc->method.aml_length));
 		break;
 
 
@@ -608,7 +603,7 @@ acpi_ex_dump_node (
 	}
 
 
-	acpi_os_printf ("%20s : %4.4s\n", "Name",           &node->name);
+	acpi_os_printf ("%20s : %4.4s\n", "Name",           (char*)&node->name);
 	acpi_os_printf ("%20s : %s\n",  "Type",             acpi_ut_get_type_name (node->type));
 	acpi_os_printf ("%20s : %X\n",  "Flags",            node->flags);
 	acpi_os_printf ("%20s : %X\n",  "Owner Id",         node->owner_id);
@@ -730,8 +725,8 @@ acpi_ex_dump_object_descriptor (
 		acpi_os_printf ("%20s : %X\n", "Param_count", obj_desc->method.param_count);
 		acpi_os_printf ("%20s : %X\n", "Concurrency", obj_desc->method.concurrency);
 		acpi_os_printf ("%20s : %p\n", "Semaphore", obj_desc->method.semaphore);
-		acpi_os_printf ("%20s : %X\n", "Pcode_length", obj_desc->method.pcode_length);
-		acpi_os_printf ("%20s : %X\n", "Pcode", obj_desc->method.pcode);
+		acpi_os_printf ("%20s : %X\n", "Aml_length", obj_desc->method.aml_length);
+		acpi_os_printf ("%20s : %X\n", "Aml_start", obj_desc->method.aml_start);
 		break;
 
 

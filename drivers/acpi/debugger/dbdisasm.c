@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisasm - parser op tree display routines
- *              $Revision: 48 $
+ *              $Revision: 50 $
  *
  ******************************************************************************/
 
@@ -97,6 +97,7 @@ acpi_db_block_type (
 
 acpi_status
 acpi_ps_display_object_pathname (
+	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op)
 {
 	acpi_parse_object       *target_op;
@@ -130,26 +131,43 @@ acpi_ps_display_object_pathname (
 
 acpi_status
 acpi_ps_display_object_pathname (
+	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op)
 {
 	acpi_status             status;
 	acpi_namespace_node     *node;
 	NATIVE_CHAR             buffer[MAX_SHOW_ENTRY];
 	u32                     buffer_size = MAX_SHOW_ENTRY;
+	u32                     debug_level;
 
 
-	acpi_os_printf (" (Path ");
+	/* Save current debug level so we don't get extraneous debug output */
+
+	debug_level = acpi_dbg_level;
+	acpi_dbg_level = 0;
 
 	/* Just get the Node out of the Op object */
 
 	node = op->node;
 	if (!node) {
-		/*
-		 * No Named obj,  so we can't get the pathname since the object
-		 * is not in the namespace.  This can happen during single
-		 * stepping where a dynamic named object is *about* to be created.
-		 */
-		return (AE_OK);
+		/* Node not defined in this scope, look it up */
+
+		status = acpi_ns_lookup (walk_state->scope_info, op->value.string, ACPI_TYPE_ANY,
+				  IMODE_EXECUTE, NS_SEARCH_PARENT, walk_state, &(node));
+
+		if (ACPI_FAILURE (status)) {
+			/*
+			 * We can't get the pathname since the object
+			 * is not in the namespace.  This can happen during single
+			 * stepping where a dynamic named object is *about* to be created.
+			 */
+			acpi_os_printf (" [Path not found]");
+			goto exit;
+		}
+
+		/* Save it for next time. */
+
+		op->node = node;
 	}
 
 	/* Convert Named_desc/handle to a full pathname */
@@ -157,11 +175,17 @@ acpi_ps_display_object_pathname (
 	status = acpi_ns_handle_to_pathname (node, &buffer_size, buffer);
 	if (ACPI_FAILURE (status)) {
 		acpi_os_printf ("****Could not get pathname****)");
-		return (status);
+		goto exit;
 	}
 
-	acpi_os_printf ("%s)", buffer);
-	return (AE_OK);
+	acpi_os_printf (" (Path %s)", buffer);
+
+
+exit:
+	/* Restore the debug level */
+
+	acpi_dbg_level = debug_level;
+	return (status);
 }
 
 #endif
@@ -275,7 +299,7 @@ acpi_db_display_op (
 			if ((op->opcode == AML_INT_NAMEPATH_OP && op->value.name)  &&
 				(op->parent) &&
 				(acpi_gbl_db_opt_verbose)) {
-				acpi_ps_display_object_pathname (op);
+				acpi_ps_display_object_pathname (walk_state, op);
 			}
 
 			acpi_os_printf ("\n");
@@ -561,7 +585,7 @@ acpi_db_display_opcode (
 	case AML_QWORD_OP:
 
 		if (acpi_gbl_db_opt_verbose) {
-			acpi_os_printf ("(UINT64) 0x%8.8X%8.8X", op->value.integer64.hi,
+			acpi_os_printf ("(u64) 0x%8.8X%8.8X", op->value.integer64.hi,
 					 op->value.integer64.lo);
 		}
 

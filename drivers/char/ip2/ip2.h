@@ -94,10 +94,20 @@
   * /etc/modules.conf and load with modprobe, kerneld or kmod, the kernel
   * module loader
   */
+
+ /* This structure is NOW always initialized when the driver is initialized.
+  * Compiled in defaults MUST be added to the io and irq arrays in
+  * ip2.c.  Those values are configurable from insmod parameters in the
+  * case of modules or from command line parameters (ip2=io,irq) when
+  * compiled in.
+  */
+
 static ip2config_t ip2config =
 {
 	{0,0,0,0},		// irqs
 	{				// Addresses
+	/* Do NOT set compile time defaults HERE!  Use the arrays in
+		ip2.c!  These WILL be overwritten!  =mhw= */
 		0x0000,		// Board 0, ttyF0   - ttyF63
 		0x0000,		// Board 1, ttyF64  - ttyF127
 		0x0000,		// Board 2, ttyF128 - ttyF191

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxface - External interfaces for ACPI events
- *              $Revision: 112 $
+ *              $Revision: 116 $
  *
  *****************************************************************************/
 
@@ -54,7 +54,7 @@
 acpi_status
 acpi_install_fixed_event_handler (
 	u32                     event,
-	ACPI_EVENT_HANDLER      handler,
+	acpi_event_handler      handler,
 	void                    *context)
 {
 	acpi_status             status;
@@ -62,13 +62,6 @@ acpi_install_fixed_event_handler (
 
 	FUNCTION_TRACE ("Acpi_install_fixed_event_handler");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/* Parameter validation */
 
@@ -86,12 +79,12 @@ acpi_install_fixed_event_handler (
 	}
 
 
-	/* Install the handler before enabling the event - just in case... */
+	/* Install the handler before enabling the event */
 
 	acpi_gbl_fixed_event_handlers[event].handler = handler;
 	acpi_gbl_fixed_event_handlers[event].context = context;
 
-	status = acpi_enable_event (event, ACPI_EVENT_FIXED);
+	status = acpi_enable_event (event, ACPI_EVENT_FIXED, 0);
 	if (!ACPI_SUCCESS (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Could not enable fixed event.\n"));
 
@@ -129,20 +122,13 @@ cleanup:
 acpi_status
 acpi_remove_fixed_event_handler (
 	u32                     event,
-	ACPI_EVENT_HANDLER      handler)
+	acpi_event_handler      handler)
 {
 	acpi_status             status = AE_OK;
 
 
 	FUNCTION_TRACE ("Acpi_remove_fixed_event_handler");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/* Parameter validation */
 
@@ -152,21 +138,19 @@ acpi_remove_fixed_event_handler (
 
 	acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
 
-	/* Disable the event before removing the handler - just in case... */
+	/* Disable the event before removing the handler */
 
-	status = acpi_disable_event(event, ACPI_EVENT_FIXED);
+	status = acpi_disable_event(event, ACPI_EVENT_FIXED, 0);
 
 	/* Always Remove the handler */
 
 	acpi_gbl_fixed_event_handlers[event].handler = NULL;
 	acpi_gbl_fixed_event_handlers[event].context = NULL;
 
-
-	if (!ACPI_SUCCESS(status)) {
+	if (!ACPI_SUCCESS (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_WARN,
 			"Could not write to fixed event enable register.\n"));
 	}
-
 	else {
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Disabled fixed event %X.\n", event));
 	}
@@ -197,7 +181,7 @@ acpi_status
 acpi_install_notify_handler (
 	acpi_handle             device,
 	u32                     handler_type,
-	ACPI_NOTIFY_HANDLER     handler,
+	acpi_notify_handler     handler,
 	void                    *context)
 {
 	acpi_operand_object     *obj_desc;
@@ -208,13 +192,6 @@ acpi_install_notify_handler (
 
 	FUNCTION_TRACE ("Acpi_install_notify_handler");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/* Parameter validation */
 
@@ -227,7 +204,7 @@ acpi_install_notify_handler (
 
 	/* Convert and validate the device handle */
 
-	device_node = acpi_ns_convert_handle_to_entry (device);
+	device_node = acpi_ns_map_handle_to_node (device);
 	if (!device_node) {
 		status = AE_BAD_PARAMETER;
 		goto unlock_and_exit;
@@ -235,7 +212,6 @@ acpi_install_notify_handler (
 
 	/*
 	 * Root Object:
-	 * ------------
 	 * Registering a notify handler on the root object indicates that the
 	 * caller wishes to receive notifications for all objects.  Note that
 	 * only one <external> global handler can be regsitered (per notify type).
@@ -266,8 +242,7 @@ acpi_install_notify_handler (
 	}
 
 	/*
-	 * Other Objects:
-	 * --------------
+	 * All Other Objects:
 	 * Caller will only receive notifications specific to the target object.
 	 * Note that only certain object types can receive notifications.
 	 */
@@ -338,6 +313,7 @@ acpi_install_notify_handler (
 		}
 	}
 
+
 unlock_and_exit:
 	acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
@@ -363,7 +339,7 @@ acpi_status
 acpi_remove_notify_handler (
 	acpi_handle             device,
 	u32                     handler_type,
-	ACPI_NOTIFY_HANDLER     handler)
+	acpi_notify_handler     handler)
 {
 	acpi_operand_object     *notify_obj;
 	acpi_operand_object     *obj_desc;
@@ -373,13 +349,6 @@ acpi_remove_notify_handler (
 
 	FUNCTION_TRACE ("Acpi_remove_notify_handler");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/* Parameter validation */
 
@@ -392,18 +361,16 @@ acpi_remove_notify_handler (
 
 	/* Convert and validate the device handle */
 
-	device_node = acpi_ns_convert_handle_to_entry (device);
+	device_node = acpi_ns_map_handle_to_node (device);
 	if (!device_node) {
 		status = AE_BAD_PARAMETER;
 		goto unlock_and_exit;
 	}
 
 	/*
-	 * Root Object:
-	 * ------------
+	 * Root Object
 	 */
 	if (device == ACPI_ROOT_OBJECT) {
-
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing notify handler for ROOT object.\n"));
 
 		if (((handler_type == ACPI_SYSTEM_NOTIFY) &&
@@ -415,20 +382,19 @@ acpi_remove_notify_handler (
 		}
 
 		if (handler_type == ACPI_SYSTEM_NOTIFY) {
-			acpi_gbl_sys_notify.node = NULL;
+			acpi_gbl_sys_notify.node  = NULL;
 			acpi_gbl_sys_notify.handler = NULL;
 			acpi_gbl_sys_notify.context = NULL;
 		}
 		else {
-			acpi_gbl_drv_notify.node = NULL;
+			acpi_gbl_drv_notify.node  = NULL;
 			acpi_gbl_drv_notify.handler = NULL;
 			acpi_gbl_drv_notify.context = NULL;
 		}
 	}
 
 	/*
-	 * Other Objects:
-	 * --------------
+	 * All Other Objects
 	 */
 	else {
 		/*
@@ -505,7 +471,7 @@ acpi_status
 acpi_install_gpe_handler (
 	u32                     gpe_number,
 	u32                     type,
-	ACPI_GPE_HANDLER        handler,
+	acpi_gpe_handler        handler,
 	void                    *context)
 {
 	acpi_status             status = AE_OK;
@@ -513,13 +479,6 @@ acpi_install_gpe_handler (
 
 	FUNCTION_TRACE ("Acpi_install_gpe_handler");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/* Parameter validation */
 
@@ -553,6 +512,7 @@ acpi_install_gpe_handler (
 	acpi_hw_clear_gpe (gpe_number);
 	acpi_hw_enable_gpe (gpe_number);
 
+
 cleanup:
 	acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
@@ -575,20 +535,13 @@ cleanup:
 acpi_status
 acpi_remove_gpe_handler (
 	u32                     gpe_number,
-	ACPI_GPE_HANDLER        handler)
+	acpi_gpe_handler        handler)
 {
 	acpi_status             status = AE_OK;
 
 
 	FUNCTION_TRACE ("Acpi_remove_gpe_handler");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/* Parameter validation */
 
@@ -621,6 +574,7 @@ acpi_remove_gpe_handler (
 	acpi_gbl_gpe_info[gpe_number].handler = NULL;
 	acpi_gbl_gpe_info[gpe_number].context = NULL;
 
+
 cleanup:
 	acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
@@ -639,19 +593,13 @@ cleanup:
  * DESCRIPTION: Acquire the ACPI Global Lock
  *
  ******************************************************************************/
+
 acpi_status
 acpi_acquire_global_lock (
 	void)
 {
 	acpi_status             status;
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return (status);
-	}
 
 	status = acpi_ex_enter_interpreter ();
 	if (ACPI_FAILURE (status)) {
@@ -685,15 +633,6 @@ acpi_status
 acpi_release_global_lock (
 	void)
 {
-	acpi_status             status;
-
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return (status);
-	}
 
 	acpi_ev_release_global_lock ();
 	return (AE_OK);

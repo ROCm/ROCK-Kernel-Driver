@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exprep - ACPI AML (p-code) execution - field prep utilities
- *              $Revision: 95 $
+ *              $Revision: 99 $
  *
  *****************************************************************************/
 
@@ -243,7 +243,7 @@ acpi_ex_prep_common_field_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_prep_region_field_value
+ * FUNCTION:    Acpi_ex_prep_field_value
  *
  * PARAMETERS:  Node                - Owning Node
  *              Region_node         - Region in which field is being defined
@@ -253,280 +253,128 @@ acpi_ex_prep_common_field_object (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Construct an acpi_operand_object  of type Def_field and
+ * DESCRIPTION: Construct an acpi_operand_object of type Def_field and
  *              connect it to the parent Node.
  *
  ******************************************************************************/
 
 acpi_status
-acpi_ex_prep_region_field_value (
-	acpi_namespace_node     *node,
-	acpi_handle             region_node,
-	u8                      field_flags,
-	u32                     field_bit_position,
-	u32                     field_bit_length)
+acpi_ex_prep_field_value (
+	ACPI_CREATE_FIELD_INFO  *info)
 {
 	acpi_operand_object     *obj_desc;
 	u32                     type;
 	acpi_status             status;
 
 
-	FUNCTION_TRACE ("Ex_prep_region_field_value");
+	FUNCTION_TRACE ("Ex_prep_field_value");
 
 
 	/* Parameter validation */
 
-	if (!region_node) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Region_node\n"));
-		return_ACPI_STATUS (AE_AML_NO_OPERAND);
+	if (info->field_type != INTERNAL_TYPE_INDEX_FIELD) {
+		if (!info->region_node) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Region_node\n"));
+			return_ACPI_STATUS (AE_AML_NO_OPERAND);
+		}
+
+		type = acpi_ns_get_type (info->region_node);
+		if (type != ACPI_TYPE_REGION) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Needed Region, found type %X %s\n",
+				type, acpi_ut_get_type_name (type)));
+
+			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
+		}
 	}
 
-	type = acpi_ns_get_type (region_node);
-	if (type != ACPI_TYPE_REGION) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Needed Region, found type %X %s\n",
-			type, acpi_ut_get_type_name (type)));
-		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
-	}
+	/* Allocate a new region object */
 
-	/* Allocate a new object */
-
-	obj_desc = acpi_ut_create_internal_object (INTERNAL_TYPE_REGION_FIELD);
+	obj_desc = acpi_ut_create_internal_object (info->field_type);
 	if (!obj_desc) {
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
 
-
-	/* Obj_desc and Region valid */
-
-	DUMP_OPERANDS ((acpi_operand_object  **) &node, IMODE_EXECUTE,
-			  "Ex_prep_region_field_value", 1, "case Region_field");
-	DUMP_OPERANDS ((acpi_operand_object  **) &region_node, IMODE_EXECUTE,
-			  "Ex_prep_region_field_value", 1, "case Region_field");
-
 	/* Initialize areas of the object that are common to all fields */
 
-	status = acpi_ex_prep_common_field_object (obj_desc, field_flags,
-			  field_bit_position, field_bit_length);
+	status = acpi_ex_prep_common_field_object (obj_desc, info->field_flags,
+			  info->field_bit_position, info->field_bit_length);
 	if (ACPI_FAILURE (status)) {
+		acpi_ut_delete_object_desc (obj_desc);
 		return_ACPI_STATUS (status);
 	}
 
-	/* Initialize areas of the object that are specific to this field type */
+	/* Initialize areas of the object that are specific to the field type */
 
-	obj_desc->field.region_obj = acpi_ns_get_attached_object (region_node);
+	switch (info->field_type) {
+	case INTERNAL_TYPE_REGION_FIELD:
 
-	/* An additional reference for the container */
+		obj_desc->field.region_obj  = acpi_ns_get_attached_object (info->region_node);
 
-	acpi_ut_add_reference (obj_desc->field.region_obj);
+		/* An additional reference for the container */
+
+		acpi_ut_add_reference (obj_desc->field.region_obj);
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Region_field: Bitoff=%X Off=%X Gran=%X Region %p\n",
+			obj_desc->field.start_field_bit_offset, obj_desc->field.base_byte_offset,
+			obj_desc->field.access_bit_width, obj_desc->field.region_obj));
+		break;
 
 
-	/* Debug info */
+	case INTERNAL_TYPE_BANK_FIELD:
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Bitoff=%X Off=%X Gran=%X Region %p\n",
-		obj_desc->field.start_field_bit_offset, obj_desc->field.base_byte_offset,
-		obj_desc->field.access_bit_width, obj_desc->field.region_obj));
+		obj_desc->bank_field.value         = info->bank_value;
+		obj_desc->bank_field.region_obj    = acpi_ns_get_attached_object (info->region_node);
+		obj_desc->bank_field.bank_register_obj = acpi_ns_get_attached_object (info->register_node);
+
+		/* An additional reference for the attached objects */
+
+		acpi_ut_add_reference (obj_desc->bank_field.region_obj);
+		acpi_ut_add_reference (obj_desc->bank_field.bank_register_obj);
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Bank Field: Bit_off=%X Off=%X Gran=%X Region %p Bank_reg %p\n",
+			obj_desc->bank_field.start_field_bit_offset, obj_desc->bank_field.base_byte_offset,
+			obj_desc->field.access_bit_width, obj_desc->bank_field.region_obj,
+			obj_desc->bank_field.bank_register_obj));
+		break;
+
+
+	case INTERNAL_TYPE_INDEX_FIELD:
+
+		obj_desc->index_field.index_obj = acpi_ns_get_attached_object (info->register_node);
+		obj_desc->index_field.data_obj = acpi_ns_get_attached_object (info->data_register_node);
+		obj_desc->index_field.value  = (u32) (info->field_bit_position /
+				  obj_desc->field.access_bit_width);
+
+		if (!obj_desc->index_field.data_obj || !obj_desc->index_field.index_obj) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Index Object\n"));
+			return_ACPI_STATUS (AE_AML_INTERNAL);
+		}
+
+		/* An additional reference for the attached objects */
+
+		acpi_ut_add_reference (obj_desc->index_field.data_obj);
+		acpi_ut_add_reference (obj_desc->index_field.index_obj);
+
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Index_field: bitoff=%X off=%X gran=%X Index %p Data %p\n",
+			obj_desc->index_field.start_field_bit_offset, obj_desc->index_field.base_byte_offset,
+			obj_desc->field.access_bit_width, obj_desc->index_field.index_obj,
+			obj_desc->index_field.data_obj));
+		break;
+	}
+
+	/*
+	 * Store the constructed descriptor (Obj_desc) into the parent Node,
+	 * preserving the current type of that Named_obj.
+	 */
+	status = acpi_ns_attach_object (info->field_node, obj_desc,
+			  (u8) acpi_ns_get_type (info->field_node));
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "set Named_obj %p (%4.4s) val = %p\n",
-		node, &(node->name), obj_desc));
+		info->field_node, (char*)&(info->field_node->name), obj_desc));
 
+	/* Remove local reference to the object */
 
-	/*
-	 * Store the constructed descriptor (Obj_desc) into the parent Node,
-	 * preserving the current type of that Named_obj.
-	 */
-	status = acpi_ns_attach_object (node, obj_desc, (u8) acpi_ns_get_type (node));
-	return_ACPI_STATUS (status);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ex_prep_bank_field_value
- *
- * PARAMETERS:  Node                - Owning Node
- *              Region_node         - Region in which field is being defined
- *              Bank_register_node  - Bank selection register node
- *              Bank_val            - Value to store in selection register
- *              Field_flags         - Access, Lock_rule, and Update_rule
- *              Field_bit_position  - Field start position
- *              Field_bit_length    - Field length in number of bits
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Construct an object of type Bank_field and attach it to the
- *              parent Node.
- *
- ******************************************************************************/
-
-acpi_status
-acpi_ex_prep_bank_field_value (
-	acpi_namespace_node     *node,
-	acpi_namespace_node     *region_node,
-	acpi_namespace_node     *bank_register_node,
-	u32                     bank_val,
-	u8                      field_flags,
-	u32                     field_bit_position,
-	u32                     field_bit_length)
-{
-	acpi_operand_object     *obj_desc;
-	u32                     type;
-	acpi_status             status;
-
-
-	FUNCTION_TRACE ("Ex_prep_bank_field_value");
-
-
-	/* Parameter validation */
-
-	if (!region_node) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Region_node\n"));
-		return_ACPI_STATUS (AE_AML_NO_OPERAND);
-	}
-
-	type = acpi_ns_get_type (region_node);
-	if (type != ACPI_TYPE_REGION) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Needed Region, found type %X %s\n",
-			type, acpi_ut_get_type_name (type)));
-		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
-	}
-
-	/* Allocate a new object */
-
-	obj_desc = acpi_ut_create_internal_object (INTERNAL_TYPE_BANK_FIELD);
-	if (!obj_desc) {
-		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
-
-	/*  Obj_desc and Region valid   */
-
-	DUMP_OPERANDS ((acpi_operand_object  **) &node, IMODE_EXECUTE,
-			  "Ex_prep_bank_field_value", 1, "case Bank_field");
-	DUMP_OPERANDS ((acpi_operand_object  **) &region_node, IMODE_EXECUTE,
-			  "Ex_prep_bank_field_value", 1, "case Bank_field");
-
-	/* Initialize areas of the object that are common to all fields */
-
-	status = acpi_ex_prep_common_field_object (obj_desc, field_flags,
-			  field_bit_position, field_bit_length);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
-	/* Initialize areas of the object that are specific to this field type */
-
-	obj_desc->bank_field.value         = bank_val;
-	obj_desc->bank_field.region_obj    = acpi_ns_get_attached_object (region_node);
-	obj_desc->bank_field.bank_register_obj = acpi_ns_get_attached_object (bank_register_node);
-
-	/* An additional reference for the attached objects */
-
-	acpi_ut_add_reference (obj_desc->bank_field.region_obj);
-	acpi_ut_add_reference (obj_desc->bank_field.bank_register_obj);
-
-	/* Debug info */
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Bit_off=%X Off=%X Gran=%X Region %p Bank_reg %p\n",
-		obj_desc->bank_field.start_field_bit_offset, obj_desc->bank_field.base_byte_offset,
-		obj_desc->field.access_bit_width, obj_desc->bank_field.region_obj,
-		obj_desc->bank_field.bank_register_obj));
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Set Named_obj %p (%4.4s) val=%p\n",
-		node, &(node->name), obj_desc));
-
-
-	/*
-	 * Store the constructed descriptor (Obj_desc) into the parent Node,
-	 * preserving the current type of that Named_obj.
-	 */
-	status = acpi_ns_attach_object (node, obj_desc, (u8) acpi_ns_get_type (node));
-	return_ACPI_STATUS (status);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    Acpi_ex_prep_index_field_value
- *
- * PARAMETERS:  Node                - Owning Node
- *              Index_reg           - Index register
- *              Data_reg            - Data register
- *              Field_flags         - Access, Lock_rule, and Update_rule
- *              Field_bit_position  - Field start position
- *              Field_bit_length    - Field length in number of bits
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Construct an acpi_operand_object  of type Index_field and
- *              connect it to the parent Node.
- *
- ******************************************************************************/
-
-acpi_status
-acpi_ex_prep_index_field_value (
-	acpi_namespace_node     *node,
-	acpi_namespace_node     *index_reg,
-	acpi_namespace_node     *data_reg,
-	u8                      field_flags,
-	u32                     field_bit_position,
-	u32                     field_bit_length)
-{
-	acpi_operand_object     *obj_desc;
-	acpi_status             status;
-
-
-	FUNCTION_TRACE ("Ex_prep_index_field_value");
-
-
-	/* Parameter validation */
-
-	if (!index_reg || !data_reg) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null handle\n"));
-		return_ACPI_STATUS (AE_AML_NO_OPERAND);
-	}
-
-	/* Allocate a new object descriptor */
-
-	obj_desc = acpi_ut_create_internal_object (INTERNAL_TYPE_INDEX_FIELD);
-	if (!obj_desc) {
-		return_ACPI_STATUS (AE_NO_MEMORY);
-	}
-
-	/* Initialize areas of the object that are common to all fields */
-
-	status = acpi_ex_prep_common_field_object (obj_desc, field_flags,
-			  field_bit_position, field_bit_length);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
-	/* Initialize areas of the object that are specific to this field type */
-
-	obj_desc->index_field.data_obj = acpi_ns_get_attached_object (data_reg);
-	obj_desc->index_field.index_obj = acpi_ns_get_attached_object (index_reg);
-	obj_desc->index_field.value  = (u32) (field_bit_position /
-			  obj_desc->field.access_bit_width);
-
-	/* An additional reference for the attached objects */
-
-	acpi_ut_add_reference (obj_desc->index_field.data_obj);
-	acpi_ut_add_reference (obj_desc->index_field.index_obj);
-
-	/* Debug info */
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "bitoff=%X off=%X gran=%X Index %p Data %p\n",
-		obj_desc->index_field.start_field_bit_offset, obj_desc->index_field.base_byte_offset,
-		obj_desc->field.access_bit_width, obj_desc->index_field.index_obj,
-		obj_desc->index_field.data_obj));
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "set Named_obj %p (%4.4s) val = %p\n",
-		node, &(node->name), obj_desc));
-
-
-	/*
-	 * Store the constructed descriptor (Obj_desc) into the parent Node,
-	 * preserving the current type of that Named_obj.
-	 */
-	status = acpi_ns_attach_object (node, obj_desc, (u8) acpi_ns_get_type (node));
+	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
 }
 

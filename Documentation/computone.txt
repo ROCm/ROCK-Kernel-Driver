@@ -4,16 +4,15 @@ Computone Intelliport II/Plus Multiport Serial Driver
 
 Release Notes For Linux Kernel 2.2 and higher.
 These notes are for the drivers which have already been integrated into the
-kernel and have been tested on Linux kernels 2.0, 2.2, and 2.3.
+kernel and have been tested on Linux kernels 2.0, 2.2, 2.3, and 2.4.
 
-Version: 1.2.9
-Date: 04/12/2000
-Author: Andrew Manison <amanison@america.net>
+Version: 1.2.12
+Date: 10/24/2001
+Historical Author: Andrew Manison <amanison@america.net>
+Primary Author: Doug McNash <dougm@computone.com>
 Testing: larryg@computone.com
 Support: support@computone.com
-Fixes and Updates: Doug McNash <dougm@computone.com>
-Proc Filesystem and Kernel Integration: Mike Warfield <mhw@wittsend.com>
-
+Fixes and Updates: Mike Warfield <mhw@wittsend.com>
 
 This file assumes that you are using the Computone drivers which are
 integrated into the kernel sources.  For updating the drivers or installing
@@ -42,7 +41,7 @@ Hardware - If you have an ISA card, find a free interrupt and io port.
 		   before or after drivers installation.
 
 	Note the hardware address from the Computone ISA cards installed into
-		the system.  These are required for editing ip2.h or editing
+		the system.  These are required for editing ip2.c or editing
 		/etc/modules.conf, or for specification on the modprobe
 		command line.
 
@@ -58,7 +57,7 @@ b) Run "make config" or "make menuconfig" or "make xconfig"
    Select (m) module for CONFIG_COMPUTONE under character
    devices.  CONFIG_PCI and CONFIG_MODULES also may need to be set.
 c) Set address on ISA cards then:
-   edit /usr/src/linux/drivers/char/ip2/ip2.h if needed 
+   edit /usr/src/linux/drivers/char/ip2.c if needed 
 	or
    edit /etc/modules.conf if needed (module).
 	or both to match this setting.
@@ -77,7 +76,8 @@ b) Run "make config" or "make menuconfig" or "make xconfig"
    Select (y) kernel for CONFIG_COMPUTONE under character
    devices.  CONFIG_PCI may need to be set if you have PCI bus.
 c) Set address on ISA cards then:
-	   edit /usr/src/linux/drivers/char/ip2/ip2.h  
+	   edit /usr/src/linux/drivers/char/ip2.c  
+           (Optional - may be specified on kernel command line now)
 d) Run "make dep"
 e) Run "make zImage" or whatever target you prefer.
 f) mv /usr/src/linux/arch/i386/boot/zImage to /boot.
@@ -85,6 +85,41 @@ g) Add new config for this kernel into /etc/lilo.conf, run "lilo"
 	or copy to a floppy disk and boot from that floppy disk.
 h) Reboot using this kernel
 i) run ip2mkdev (either the script below or the binary version)
+
+Kernel command line options:
+
+When compiling the driver into the kernel, io and irq may be
+compiled into the driver by editing ip2.c and setting the values for
+io and irq in the appropriate array.  An alternative is to specify
+a command line parameter to the kernel at boot up.
+
+        ip2=io0,irq0,io1,irq1,io2,irq2,io3,irq3
+
+Note that this order is very different from the specifications for the
+modload parameters which have separate IRQ and IO specifiers.
+
+The io port also selects PCI (1) and EISA (2) boards.
+
+        io=0    No board
+        io=1    PCI board
+        io=2    EISA board
+        else    ISA board io address
+
+You only need to specify the boards which are present.
+
+        Examples:
+
+                2 PCI boards:
+
+                        ip2=1,0,1,0
+
+                1 ISA board at 0x310 irq 5:
+
+                        ip2=0x310,5
+
+This can be added to and "append" option in lilo.conf similar to this:
+
+        append="ip2=1,0,1,0"
 
 
 3. INSTALLATION
@@ -100,7 +135,7 @@ running patch -p1 < ThePatchFile.  Otherwise run ip2build.
 The driver can be installed as a module (recommended) or built into the 
 kernel. This is selected as for other drivers through the `make config`
 command from the root of the Linux source tree. If the driver is built 
-into the kernel you will need to edit the file ip2.h to match the boards 
+into the kernel you will need to edit the file ip2.c to match the boards 
 you are installing. See that file for instructions. If the driver is 
 installed as a module the configuration can also be specified on the
 modprobe command line as follows:
@@ -109,13 +144,13 @@ modprobe command line as follows:
 
 where irqnum is one of the valid Intelliport II interrupts (3,4,5,7,10,11,
 12,15) and addr1-4 are the base addresses for up to four controllers. If 
-the irqs are not specified the driver uses the default in ip2/ip2.h (which 
+the irqs are not specified the driver uses the default in ip2.c (which 
 selects polled mode). If no base addresses are specified the defaults in 
-ip2.h are used. If you are autoloading the driver module with kerneld or
-kmod the base addresses and interrupt number must also be set in ip2/ip2.h
+ip2.c are used. If you are autoloading the driver module with kerneld or
+kmod the base addresses and interrupt number must also be set in ip2.c
 and recompile or just insert and options line in /etc/modules.conf or both. 
 The options line is equivalent to the command line and takes precidence over 
-what is in ip2.h. 
+what is in ip2.c. 
 
 /etc/modules.conf sample:
 	options ip2 io=1,0x328 irq=1,10
@@ -123,22 +158,18 @@ what is in ip2.h.
 	alias char-major-72 ip2
 	alias char-major-73 ip2
 
-equivelant ip2.h:
-static ip2config_t ip2config =
-{
-	{1,10,0,0},
-	{
-		0x0001,    // Board 0, ttyF0   - ttyF63		/* PCI card */
-		0x0328,    // Board 1, ttyF64  - ttyF127	/* ISA card */
-		0x0000,    // Board 2, ttyF128 - ttyF191	/* empty */
-		0x0000     // Board 3, ttyF192 - ttyF255	/* empty */
-	}
-};
+The equivalent in ip2.c:
+
+static int io[IP2_MAX_BOARDS]= { 1, 0x328, 0, 0 };
+static int irq[IP2_MAX_BOARDS] = { 1, 10, -1, -1 }; 
+
+The equivalent for the kernel command line (in lilo.conf):
+
+        append="ip2=1,1,0x328,10"
 
 
 Note:	Both io and irq should be updated to reflect YOUR system.  An "io"
-	address of "1/2" indicates a PCI/EISA card in the board table.  The
-	PCI or EISA irq will be assigned automatically.
+	address of 1 or 2 indicates a PCI or EISA card in the board table.		The PCI or EISA irq will be assigned automatically.
 
 Specifying an invalid or in-use irq will default the driver into
 running in polled mode for that card.  If all irq entries are 0 then

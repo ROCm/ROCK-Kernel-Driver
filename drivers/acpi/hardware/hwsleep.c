@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: hwsleep.c - ACPI Hardware Sleep/Wake Interface
- *              $Revision: 21 $
+ *              $Revision: 22 $
  *
  *****************************************************************************/
 
@@ -137,8 +137,8 @@ acpi_enter_sleep_state (
 	acpi_object         arg;
 	u8                  type_a;
 	u8                  type_b;
-	u16                 PM1_acontrol;
-	u16                 PM1_bcontrol;
+	u16                 PM1Acontrol;
+	u16                 PM1Bcontrol;
 
 
 	FUNCTION_TRACE ("Acpi_enter_sleep_state");
@@ -171,31 +171,31 @@ acpi_enter_sleep_state (
 
 	disable ();
 
-	/* TODO: disable all non-wake GPEs here */
+	acpi_hw_disable_non_wakeup_gpes();
 
-	PM1_acontrol = (u16) acpi_hw_register_read (ACPI_MTX_LOCK, PM1_CONTROL);
+	PM1Acontrol = (u16) acpi_hw_register_read (ACPI_MTX_LOCK, PM1_CONTROL);
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_OK, "Entering S%d\n", sleep_state));
 
 	/* mask off SLP_EN and SLP_TYP fields */
 
-	PM1_acontrol &= ~(SLP_TYPE_X_MASK | SLP_EN_MASK);
-	PM1_bcontrol = PM1_acontrol;
+	PM1Acontrol &= ~(SLP_TYPE_X_MASK | SLP_EN_MASK);
+	PM1Bcontrol = PM1Acontrol;
 
 	/* mask in SLP_TYP */
 
-	PM1_acontrol |= (type_a << acpi_hw_get_bit_shift (SLP_TYPE_X_MASK));
-	PM1_bcontrol |= (type_b << acpi_hw_get_bit_shift (SLP_TYPE_X_MASK));
+	PM1Acontrol |= (type_a << acpi_hw_get_bit_shift (SLP_TYPE_X_MASK));
+	PM1Bcontrol |= (type_b << acpi_hw_get_bit_shift (SLP_TYPE_X_MASK));
 
 	/* write #1: fill in SLP_TYP data */
 
-	acpi_hw_register_write (ACPI_MTX_LOCK, PM1_a_CONTROL, PM1_acontrol);
-	acpi_hw_register_write (ACPI_MTX_LOCK, PM1_b_CONTROL, PM1_bcontrol);
+	acpi_hw_register_write (ACPI_MTX_LOCK, PM1A_CONTROL, PM1Acontrol);
+	acpi_hw_register_write (ACPI_MTX_LOCK, PM1B_CONTROL, PM1Bcontrol);
 
 	/* mask in SLP_EN */
 
-	PM1_acontrol |= (1 << acpi_hw_get_bit_shift (SLP_EN_MASK));
-	PM1_bcontrol |= (1 << acpi_hw_get_bit_shift (SLP_EN_MASK));
+	PM1Acontrol |= (1 << acpi_hw_get_bit_shift (SLP_EN_MASK));
+	PM1Bcontrol |= (1 << acpi_hw_get_bit_shift (SLP_EN_MASK));
 
 	/* flush caches */
 
@@ -203,8 +203,8 @@ acpi_enter_sleep_state (
 
 	/* write #2: SLP_TYP + SLP_EN */
 
-	acpi_hw_register_write (ACPI_MTX_LOCK, PM1_a_CONTROL, PM1_acontrol);
-	acpi_hw_register_write (ACPI_MTX_LOCK, PM1_b_CONTROL, PM1_bcontrol);
+	acpi_hw_register_write (ACPI_MTX_LOCK, PM1A_CONTROL, PM1Acontrol);
+	acpi_hw_register_write (ACPI_MTX_LOCK, PM1B_CONTROL, PM1Bcontrol);
 
 	/*
 	 * Wait a second, then try again. This is to get S4/5 to work on all machines.
@@ -222,6 +222,8 @@ acpi_enter_sleep_state (
 		acpi_os_stall(10000);
 	}
 	while (!acpi_hw_register_bit_access (ACPI_READ, ACPI_MTX_LOCK, WAK_STS));
+
+	acpi_hw_enable_non_wakeup_gpes();
 
 	enable ();
 
@@ -264,7 +266,7 @@ acpi_leave_sleep_state (
 
 	/* _WAK returns stuff - do we want to look at it? */
 
-	/* Re-enable GPEs */
+	acpi_hw_enable_non_wakeup_gpes();
 
 	return_ACPI_STATUS (AE_OK);
 }

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbutils - AML debugger utilities
- *              $Revision: 43 $
+ *              $Revision: 45 $
  *
  ******************************************************************************/
 
@@ -135,7 +135,7 @@ acpi_db_dump_object (
 
 	case ACPI_TYPE_INTEGER:
 
-		acpi_os_printf ("[Integer] = %X%8.8X\n", HIDWORD (obj_desc->integer.value),
+		acpi_os_printf ("[Integer] = %8.8X%8.8X\n", HIDWORD (obj_desc->integer.value),
 				 LODWORD (obj_desc->integer.value));
 		break;
 
@@ -265,15 +265,37 @@ acpi_db_second_pass_parse (
 	acpi_parse_object       *start_op;
 	acpi_status             status = AE_OK;
 	u32                     base_aml_offset;
+	acpi_walk_state         *walk_state;
+
+
+	FUNCTION_ENTRY ();
 
 
 	acpi_os_printf ("Pass two parse ....\n");
 
+
 	while (op) {
 		if (op->opcode == AML_METHOD_OP) {
 			method = (acpi_parse2_object *) op;
-			status = acpi_ps_parse_aml (op, method->data, method->length, 0,
-					 NULL, NULL, NULL, acpi_ds_load1_begin_op, acpi_ds_load1_end_op);
+
+			walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT,
+					   NULL, NULL, NULL);
+			if (!walk_state) {
+				return (AE_NO_MEMORY);
+			}
+
+
+			walk_state->parser_state.aml        =
+			walk_state->parser_state.aml_start  = method->data;
+			walk_state->parser_state.aml_end    =
+			walk_state->parser_state.pkg_end    = method->data + method->length;
+			walk_state->parser_state.start_scope = op;
+
+			walk_state->descending_callback     = acpi_ds_load1_begin_op;
+			walk_state->ascending_callback      = acpi_ds_load1_end_op;
+
+
+			status = acpi_ps_parse_aml (walk_state);
 
 
 			base_aml_offset = (method->value.arg)->aml_offset + 1;
@@ -297,7 +319,7 @@ acpi_db_second_pass_parse (
 		}
 
 		if (ACPI_FAILURE (status)) {
-			return (status);
+			break;
 		}
 
 		op = acpi_ps_get_depth_next (root, op);

@@ -2,7 +2,7 @@
  *
  * Module Name: nseval - Object evaluation interfaces -- includes control
  *                       method lookup and execution.
- *              $Revision: 97 $
+ *              $Revision: 102 $
  *
  ******************************************************************************/
 
@@ -93,7 +93,7 @@ acpi_ns_evaluate_relative (
 
 	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
-	prefix_node = acpi_ns_convert_handle_to_entry (handle);
+	prefix_node = acpi_ns_map_handle_to_node (handle);
 	if (!prefix_node) {
 		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 		status = AE_BAD_PARAMETER;
@@ -271,7 +271,7 @@ acpi_ns_evaluate_by_handle (
 
 	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
-	node = acpi_ns_convert_handle_to_entry (handle);
+	node = acpi_ns_map_handle_to_node (handle);
 	if (!node) {
 		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
@@ -378,17 +378,18 @@ acpi_ns_execute_control_method (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No attached method object\n"));
 
 		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
-		return_ACPI_STATUS (AE_ERROR);
+		return_ACPI_STATUS (AE_NULL_OBJECT);
 	}
 
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Control method at Offset %x Length %lx]\n",
-		obj_desc->method.pcode + 1, obj_desc->method.pcode_length - 1));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Control method at Offset %p Length %x]\n",
+		obj_desc->method.aml_start + 1, obj_desc->method.aml_length - 1));
 
 	DUMP_PATHNAME (method_node, "Ns_execute_control_method: Executing",
 		ACPI_LV_NAMES, _COMPONENT);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "At offset %8XH\n", obj_desc->method.pcode + 1));
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "At offset %p\n",
+			obj_desc->method.aml_start + 1));
 
 
 	/*
@@ -437,7 +438,7 @@ acpi_ns_get_object_value (
 {
 	acpi_status             status = AE_OK;
 	acpi_operand_object     *obj_desc;
-	acpi_operand_object     *val_desc;
+	acpi_operand_object     *source_desc;
 
 
 	FUNCTION_TRACE ("Ns_get_object_value");
@@ -460,8 +461,8 @@ acpi_ns_get_object_value (
 		/*
 		 *  Get the attached object
 		 */
-		val_desc = acpi_ns_get_attached_object (node);
-		if (!val_desc) {
+		source_desc = acpi_ns_get_attached_object (node);
+		if (!source_desc) {
 			status = AE_NULL_OBJECT;
 			goto unlock_and_exit;
 		}
@@ -472,7 +473,7 @@ acpi_ns_get_object_value (
 		 * TBD: [Future] - need a low-level object copy that handles
 		 * the reference count automatically.  (Don't want to copy it)
 		 */
-		MEMCPY (obj_desc, val_desc, sizeof (acpi_operand_object));
+		MEMCPY (obj_desc, source_desc, sizeof (acpi_operand_object));
 		obj_desc->common.reference_count = 1;
 		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	}

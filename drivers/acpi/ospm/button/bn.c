@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: bn.c
- *   $Revision: 25 $
+ *   $Revision: 27 $
  *
  *****************************************************************************/
 
@@ -81,16 +81,16 @@ bn_print (
 
 	case BN_TYPE_POWER_BUTTON:
 	case BN_TYPE_POWER_BUTTON_FIXED:
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Power_button[%02x]:[%p] %s\n", button->device_handle, button->acpi_handle, buffer.pointer));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Power_button[%02x]:[%p] %s\n", button->device_handle, button->acpi_handle, (char*)buffer.pointer));
 		break;
 
 	case BN_TYPE_SLEEP_BUTTON:
 	case BN_TYPE_SLEEP_BUTTON_FIXED:
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Sleep_button[%02x]:[%p] %s\n", button->device_handle, button->acpi_handle, buffer.pointer));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Sleep_button[%02x]:[%p] %s\n", button->device_handle, button->acpi_handle, (char*)buffer.pointer));
 		break;
 
 	case BN_TYPE_LID_SWITCH:
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Lid_switch[%02x]:[%p] %s\n", button->device_handle, button->acpi_handle, buffer.pointer));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Lid_switch[%02x]:[%p] %s\n", button->device_handle, button->acpi_handle, (char*)buffer.pointer));
 		break;
 	}
 

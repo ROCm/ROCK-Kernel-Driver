@@ -3,7 +3,7 @@
  *
  * Module Name: hwregs - Read/write access functions for the various ACPI
  *                       control and status registers.
- *              $Revision: 109 $
+ *              $Revision: 110 $
  *
  ******************************************************************************/
 
@@ -453,8 +453,9 @@ acpi_hw_register_bit_access (
 
 		register_value = acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK, PM2_CONTROL);
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_IO, "PM2 control: Read %X from %p\n",
-			register_value, ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm2_cnt_blk.address)));
+		ACPI_DEBUG_PRINT ((ACPI_DB_IO, "PM2 control: Read %X from %8.8X%8.8X\n",
+			register_value, HIDWORD(acpi_gbl_FADT->Xpm2_cnt_blk.address),
+			LODWORD(acpi_gbl_FADT->Xpm2_cnt_blk.address)));
 
 		if (read_write == ACPI_WRITE) {
 			register_value &= ~mask;
@@ -462,8 +463,10 @@ acpi_hw_register_bit_access (
 			value          &= mask;
 			register_value |= value;
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_IO, "About to write %04X to %p\n", register_value,
-				acpi_gbl_FADT->Xpm2_cnt_blk.address));
+			ACPI_DEBUG_PRINT ((ACPI_DB_IO, "About to write %04X to %8.8X%8.8X\n",
+				register_value,
+				HIDWORD(acpi_gbl_FADT->Xpm2_cnt_blk.address),
+				LODWORD(acpi_gbl_FADT->Xpm2_cnt_blk.address)));
 
 			acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK,
 					   PM2_CONTROL, (u8) (register_value));
@@ -476,8 +479,10 @@ acpi_hw_register_bit_access (
 		mask = TMR_VAL_MASK;
 		register_value = acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK,
 				 PM_TIMER);
-		ACPI_DEBUG_PRINT ((ACPI_DB_IO, "PM_TIMER: Read %X from %p\n",
-			register_value, ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm_tmr_blk.address)));
+		ACPI_DEBUG_PRINT ((ACPI_DB_IO, "PM_TIMER: Read %X from %8.8X%8.8X\n",
+			register_value,
+			HIDWORD(acpi_gbl_FADT->Xpm_tmr_blk.address),
+			LODWORD(acpi_gbl_FADT->Xpm_tmr_blk.address)));
 
 		break;
 
@@ -732,13 +737,13 @@ acpi_hw_register_write (
 		break;
 
 
-	case PM1_a_CONTROL: /* 16-bit access */
+	case PM1A_CONTROL: /* 16-bit access */
 
 		acpi_hw_low_level_write (16, value, &acpi_gbl_FADT->Xpm1a_cnt_blk, 0);
 		break;
 
 
-	case PM1_b_CONTROL: /* 16-bit access */
+	case PM1B_CONTROL: /* 16-bit access */
 
 		acpi_hw_low_level_write (16, value, &acpi_gbl_FADT->Xpm1b_cnt_blk, 0);
 		break;

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresolv - AML Interpreter object resolution
- *              $Revision: 99 $
+ *              $Revision: 101 $
  *
  *****************************************************************************/
 
@@ -131,12 +131,14 @@ acpi_ex_get_buffer_field_value (
 		(result_desc->integer.value >> obj_desc->buffer_field.start_field_bit_offset) & mask;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-		"** Read from buffer %p byte %ld bit %d width %d addr %p mask %08lx val %08lx\n",
+		"** Read from buffer %p byte %d bit %d width %d addr %p mask %08X val %8.8X%8.8X\n",
 		obj_desc->buffer_field.buffer_obj->buffer.pointer,
 		obj_desc->buffer_field.base_byte_offset,
 		obj_desc->buffer_field.start_field_bit_offset,
 		obj_desc->buffer_field.bit_length,
-		location, mask, result_desc->integer.value));
+		location, mask,
+		HIDWORD(result_desc->integer.value),
+		LODWORD(result_desc->integer.value)));
 
 	return_ACPI_STATUS (AE_OK);
 }
@@ -323,7 +325,7 @@ acpi_ex_resolve_object_to_value (
 				break;
 
 			case AML_REVISION_OP:
-				obj_desc->integer.value = ACPI_CA_VERSION;
+				obj_desc->integer.value = ACPI_CA_SUPPORT_LEVEL;
 				break;
 			}
 

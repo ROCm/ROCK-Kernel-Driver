@@ -368,11 +368,11 @@ acpi_db_display_statistics (
 
 			if (acpi_gbl_memory_lists[i].object_size)
 			{
-				size = ROUND_UP_TO_1_k (outstanding * acpi_gbl_memory_lists[i].object_size);
+				size = ROUND_UP_TO_1K (outstanding * acpi_gbl_memory_lists[i].object_size);
 			}
 			else
 			{
-				size = ROUND_UP_TO_1_k (acpi_gbl_memory_lists[i].current_total_size);
+				size = ROUND_UP_TO_1K (acpi_gbl_memory_lists[i].current_total_size);
 			}
 
 			acpi_os_printf ("  Mem:   [Alloc Free Outstanding Size]  % 7d % 7d % 7d % 7d Kb\n",

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actypes.h - Common data types for the entire ACPI subsystem
- *       $Revision: 188 $
+ *       $Revision: 193 $
  *
  *****************************************************************************/
 
@@ -68,9 +68,8 @@ typedef NATIVE_UINT                     ACPI_TBLPTR;
 typedef UINT64                          ACPI_IO_ADDRESS;
 typedef UINT64                          ACPI_PHYSICAL_ADDRESS;
 
-#define ALIGNED_ADDRESS_BOUNDARY        0x00000008
-
-/* (No hardware alignment support in IA64) */
+#define ALIGNED_ADDRESS_BOUNDARY        0x00000008      /* No hardware alignment support in IA64 */
+#define ACPI_USE_NATIVE_DIVIDE                          /* Native 64-bit integer support */
 
 
 #elif _IA16
@@ -101,6 +100,7 @@ typedef char                            *ACPI_PHYSICAL_ADDRESS;
 
 #define ALIGNED_ADDRESS_BOUNDARY        0x00000002
 #define _HW_ALIGNMENT_SUPPORT
+#define ACPI_USE_NATIVE_DIVIDE                          /* No 64-bit integers, ok to use native divide */
 
 /*
  * (16-bit only) internal integers must be 32-bits, so
@@ -196,10 +196,17 @@ typedef void*                           acpi_handle;    /* Actually a ptr to an 
 
 typedef struct
 {
-	u32                                     lo;
-	u32                                     hi;
+	u32                         lo;
+	u32                         hi;
 
 } uint64_struct;
+
+typedef union
+{
+	u64                         full;
+	uint64_struct               part;
+
+} uint64_overlay;
 
 
 /*
@@ -220,17 +227,23 @@ typedef u32                             acpi_integer;
 #define ACPI_MAX_BCD_DIGITS             8
 #define ACPI_MAX_DECIMAL_DIGITS         10
 
+#define ACPI_USE_NATIVE_DIVIDE          /* Use compiler native 32-bit divide */
+
+
 #else
 
 /* 64-bit integers */
 
-typedef UINT64                          acpi_integer;
+typedef u64                             acpi_integer;
 #define ACPI_INTEGER_MAX                ACPI_UINT64_MAX
 #define ACPI_INTEGER_BIT_SIZE           64
 #define ACPI_MAX_BCD_VALUE              9999999999999999
 #define ACPI_MAX_BCD_DIGITS             16
 #define ACPI_MAX_DECIMAL_DIGITS         19
 
+#ifdef _IA64
+#define ACPI_USE_NATIVE_DIVIDE          /* Use compiler native 64-bit divide */
+#endif
 #endif
 
 
@@ -453,24 +466,36 @@ typedef u32                             acpi_event_type;
 #define ACPI_EVENT_EDGE_TRIGGERED       (acpi_event_type) 2
 
 /*
+ * GPEs
+ */
+#define ACPI_EVENT_ENABLE               0x1
+#define ACPI_EVENT_WAKE_ENABLE	        0x2
+
+#define ACPI_EVENT_DISABLE              0x1
+#define ACPI_EVENT_WAKE_DISABLE         0x2
+
+
+/*
  * Acpi_event Status:
  * -------------
  * The encoding of acpi_event_status is illustrated below.
  * Note that a set bit (1) indicates the property is TRUE
  * (e.g. if bit 0 is set then the event is enabled).
- * +---------------+-+-+
- * |   Bits 31:2   |1|0|
- * +---------------+-+-+
- *          |       | |
- *          |       | +- Enabled?
- *          |       +--- Set?
+ * +-------------+-+-+-+
+ * |   Bits 31:3 |2|1|0|
+ * +-------------+-+-+-+
+ *          |     | | |
+ *          |     | | +- Enabled?
+ *          |     | +--- Enabled for wake?
+ *          |     +----- Set?
  *          +----------- <Reserved>
  */
 typedef u32                             acpi_event_status;
 
 #define ACPI_EVENT_FLAG_DISABLED        (acpi_event_status) 0x00
 #define ACPI_EVENT_FLAG_ENABLED         (acpi_event_status) 0x01
-#define ACPI_EVENT_FLAG_SET             (acpi_event_status) 0x02
+#define ACPI_EVENT_FLAG_WAKE_ENABLED    (acpi_event_status) 0x02
+#define ACPI_EVENT_FLAG_SET             (acpi_event_status) 0x04
 
 
 /* Notify types */
@@ -604,7 +629,7 @@ typedef struct acpi_table_info
 {
 	u32                         count;
 
-} ACPI_TABLE_INFO;
+} acpi_table_info;
 
 
 /*
@@ -621,7 +646,7 @@ typedef struct _acpi_sys_info
 	u32                         debug_level;
 	u32                         debug_layer;
 	u32                         num_table_types;
-	ACPI_TABLE_INFO             table_info [NUM_ACPI_TABLES];
+	acpi_table_info             table_info [NUM_ACPI_TABLES];
 
 } acpi_system_info;
 
@@ -631,15 +656,15 @@ typedef struct _acpi_sys_info
  */
 
 typedef
-u32 (*ACPI_EVENT_HANDLER) (
+u32 (*acpi_event_handler) (
 	void                        *context);
 
 typedef
-void (*ACPI_GPE_HANDLER) (
+void (*acpi_gpe_handler) (
 	void                        *context);
 
 typedef
-void (*ACPI_NOTIFY_HANDLER) (
+void (*acpi_notify_handler) (
 	acpi_handle                 device,
 	u32                         value,
 	void                        *context);
@@ -651,7 +676,7 @@ void (*ACPI_NOTIFY_HANDLER) (
 #define ACPI_WRITE_ADR_SPACE    2
 
 typedef
-acpi_status (*ACPI_ADR_SPACE_HANDLER) (
+acpi_status (*acpi_adr_space_handler) (
 	u32                         function,
 	ACPI_PHYSICAL_ADDRESS       address,
 	u32                         bit_width,
@@ -659,11 +684,11 @@ acpi_status (*ACPI_ADR_SPACE_HANDLER) (
 	void                        *handler_context,
 	void                        *region_context);
 
-#define ACPI_DEFAULT_HANDLER            ((ACPI_ADR_SPACE_HANDLER) NULL)
+#define ACPI_DEFAULT_HANDLER            ((acpi_adr_space_handler) NULL)
 
 
 typedef
-acpi_status (*ACPI_ADR_SPACE_SETUP) (
+acpi_status (*acpi_adr_space_setup) (
 	acpi_handle                 region_handle,
 	u32                         function,
 	void                        *handler_context,
@@ -673,7 +698,7 @@ acpi_status (*ACPI_ADR_SPACE_SETUP) (
 #define ACPI_REGION_DEACTIVATE  1
 
 typedef
-acpi_status (*ACPI_WALK_CALLBACK) (
+acpi_status (*acpi_walk_callback) (
 	acpi_handle                 obj_handle,
 	u32                         nesting_level,
 	void                        *context,
@@ -758,7 +783,7 @@ typedef struct
 
 /*
  *  IO Attributes
- *  The ISA IO ranges are: n000-n0FFh,  n400-n4_fFh, n800-n8_fFh, n_c00-n_cFFh.
+ *  The ISA IO ranges are:     n000-n0FFh,  n400-n4_fFh, n800-n8_fFh, n_c00-n_cFFh.
  *  The non-ISA IO ranges are: n100-n3_fFh, n500-n7_fFh, n900-n_bFFh, n_cD0-n_fFFh.
  */
 #define NON_ISA_ONLY_RANGES             (u8) 0x01
@@ -988,11 +1013,11 @@ typedef struct
 	u32                         min_address_fixed;
 	u32                         max_address_fixed;
 	acpi_resource_attribute     attribute;
-	UINT64                      granularity;
-	UINT64                      min_address_range;
-	UINT64                      max_address_range;
-	UINT64                      address_translation_offset;
-	UINT64                      address_length;
+	u64                         granularity;
+	u64                         min_address_range;
+	u64                         max_address_range;
+	u64                         address_translation_offset;
+	u64                         address_length;
 	acpi_resource_source        resource_source;
 
 } acpi_resource_address64;

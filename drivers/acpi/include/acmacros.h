@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 94 $
+ *       $Revision: 97 $
  *
  *****************************************************************************/
 
@@ -104,7 +104,7 @@
  * Full 64-bit address/integer on both 32-bit and 64-bit platforms
  */
 #ifndef LODWORD
-#define LODWORD(l)                      ((u32)(UINT64)(l))
+#define LODWORD(l)                      ((u32)(u64)(l))
 #endif
 
 #ifndef HIDWORD
@@ -142,7 +142,7 @@
 #define MOVE_UNALIGNED16_TO_16(d,s)     *(u16*)(d) = *(u16*)(s)
 #define MOVE_UNALIGNED32_TO_32(d,s)     *(u32*)(d) = *(u32*)(s)
 #define MOVE_UNALIGNED16_TO_32(d,s)     *(u32*)(d) = *(u16*)(s)
-#define MOVE_UNALIGNED64_TO_64(d,s)     *(UINT64*)(d) = *(UINT64*)(s)
+#define MOVE_UNALIGNED64_TO_64(d,s)     *(u64*)(d) = *(u64*)(s)
 
 #else
 /*
@@ -197,11 +197,6 @@
 #define MUL_16(a)                       _MUL(a,4)
 #define MOD_16(a)                       _MOD(a,16)
 
-/*
- * Divide and Modulo
- */
-#define ACPI_DIVIDE(n,d)                ((n) / (d))
-#define ACPI_MODULO(n,d)                ((n) % (d))
 
 /*
  * Rounding macros (Power of two boundaries only)
@@ -223,7 +218,7 @@
 #define ROUND_BITS_UP_TO_BYTES(a)       DIV_8((a) + 7)
 #define ROUND_BITS_DOWN_TO_BYTES(a)     DIV_8((a))
 
-#define ROUND_UP_TO_1_k(a)              (((a) + 1023) >> 10)
+#define ROUND_UP_TO_1K(a)               (((a) + 1023) >> 10)
 
 /* Generic (non-power-of-two) rounding */
 
@@ -243,9 +238,9 @@
 
 #ifndef _IA16
 
-#define ACPI_PCI_DEVICE_MASK            (UINT64) 0x0000FFFF00000000
-#define ACPI_PCI_FUNCTION_MASK          (UINT64) 0x00000000FFFF0000
-#define ACPI_PCI_REGISTER_MASK          (UINT64) 0x000000000000FFFF
+#define ACPI_PCI_DEVICE_MASK            (u64) 0x0000FFFF00000000
+#define ACPI_PCI_FUNCTION_MASK          (u64) 0x00000000FFFF0000
+#define ACPI_PCI_REGISTER_MASK          (u64) 0x000000000000FFFF
 
 #define ACPI_PCI_FUNCTION(a)            (u16) ((((a) & ACPI_PCI_FUNCTION_MASK) >> 16))
 #define ACPI_PCI_DEVICE(a)              (u16) ((((a) & ACPI_PCI_DEVICE_MASK) >> 32))
@@ -279,10 +274,6 @@
 
 #define IS_SINGLE_TABLE(x)              (((x) & 0x01) == ACPI_TABLE_SINGLE ? 1 : 0)
 
-/* Check if ACPI has been initialized properly */
-
-#define ACPI_IS_INITIALIZATION_COMPLETE(s)  {if (acpi_gbl_root_node) s = AE_OK; else s=AE_NO_NAMESPACE;}
-
 /*
  * Macro to check if a pointer is within an ACPI table.
  * Parameter (a) is the pointer to check.  Parameter (b) must be defined
@@ -303,9 +294,9 @@
  * Macros for the master AML opcode table
  */
 #ifdef ACPI_DEBUG
-#define ACPI_OP(name,Pargs,Iargs,flags)     {Pargs,Iargs,flags,name}
+#define ACPI_OP(name,Pargs,Iargs,class,type,flags)     {Pargs,Iargs,flags,class,type,name}
 #else
-#define ACPI_OP(name,Pargs,Iargs,flags)     {Pargs,Iargs,flags}
+#define ACPI_OP(name,Pargs,Iargs,class,type,flags)     {Pargs,Iargs,flags,class,type}
 #endif
 
 #define ARG_TYPE_WIDTH                  5
@@ -409,7 +400,7 @@
  * as a local string ("_Proc_name) so that it can be also used by the function exit macros below.
  */
 
-#define PROC_NAME(a)                    ACPI_DEBUG_PRINT_INFO _dbg;     \
+#define PROC_NAME(a)                    acpi_debug_print_info _dbg;     \
 										_dbg.component_id = _COMPONENT; \
 										_dbg.proc_name   = a;           \
 										_dbg.module_name = _THIS_MODULE;

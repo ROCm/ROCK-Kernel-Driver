@@ -75,17 +75,6 @@ static int ramfs_readpage(struct file *file, struct page * page)
 	return 0;
 }
 
-/*
- * Writing: just make sure the page gets marked dirty, so that
- * the page stealer won't grab it.
- */
-static int ramfs_writepage(struct page *page)
-{
-	SetPageDirty(page);
-	UnlockPage(page);
-	return 0;
-}
-
 static int ramfs_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
 	void *addr = kmap(page);
@@ -278,7 +267,7 @@ static int ramfs_sync_file(struct file * file, struct dentry *dentry, int datasy
 
 static struct address_space_operations ramfs_aops = {
 	readpage:	ramfs_readpage,
-	writepage:	ramfs_writepage,
+	writepage:	fail_writepage,
 	prepare_write:	ramfs_prepare_write,
 	commit_write:	ramfs_commit_write
 };

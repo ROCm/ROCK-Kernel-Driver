@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbutils - Table manipulation utilities
- *              $Revision: 40 $
+ *              $Revision: 42 $
  *
  *****************************************************************************/
 
@@ -196,10 +196,10 @@ acpi_tb_validate_table_header (
 	MOVE_UNALIGNED32_TO_32 (&signature, &table_header->signature);
 	if (!acpi_ut_valid_acpi_name (signature)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Table signature at %p [%X] has invalid characters\n",
+			"Table signature at %p [%p] has invalid characters\n",
 			table_header, &signature));
 
-		REPORT_WARNING (("Invalid table signature %4.4s found\n", &signature));
+		REPORT_WARNING (("Invalid table signature %4.4s found\n", (char*)&signature));
 		DUMP_BUFFER (table_header, sizeof (acpi_table_header));
 		return (AE_BAD_SIGNATURE);
 	}
@@ -210,7 +210,7 @@ acpi_tb_validate_table_header (
 	if (table_header->length < sizeof (acpi_table_header)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Invalid length in table header %p name %4.4s\n",
-			table_header, &signature));
+			table_header, (char*)&signature));
 
 		REPORT_WARNING (("Invalid table header length found\n"));
 		DUMP_BUFFER (table_header, sizeof (acpi_table_header));
@@ -334,7 +334,7 @@ acpi_tb_verify_table_checksum (
 
 	if (checksum) {
 		REPORT_WARNING (("Invalid checksum (%X) in table %4.4s\n",
-			checksum, &table_header->signature));
+			checksum, (char*)&table_header->signature));
 
 		status = AE_BAD_CHECKSUM;
 	}

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsalloc - Namespace allocation and deletion utilities
- *              $Revision: 56 $
+ *              $Revision: 60 $
  *
  ******************************************************************************/
 
@@ -210,7 +210,7 @@ acpi_ns_install_node (
 		 * real definition is found later.
 		 */
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "[%4.4s] is a forward reference\n",
-			&node->name));
+			(char*)&node->name));
 	}
 
 	/*
@@ -235,7 +235,7 @@ acpi_ns_install_node (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%4.4s added to %p at %p\n",
-		&node->name, parent_node, node));
+		(char*)&node->name, parent_node, node));
 
 	/*
 	 * Increment the reference count(s) of all parents up to
@@ -297,7 +297,7 @@ acpi_ns_delete_children (
 		/* Grandchildren should have all been deleted already */
 
 		if (child_node->child) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Found a grandchild! P=%X C=%X\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Found a grandchild! P=%p C=%p\n",
 				parent_node, child_node));
 		}
 
@@ -309,12 +309,9 @@ acpi_ns_delete_children (
 			child_node, acpi_gbl_current_node_count));
 
 		/*
-		 * Detach an object if there is one
+		 * Detach an object if there is one, then free the child node
 		 */
-		if (child_node->object) {
-			acpi_ns_detach_object (child_node);
-		}
-
+		acpi_ns_detach_object (child_node);
 		ACPI_MEM_FREE (child_node);
 
 		/* And move on to the next child in the list */
@@ -349,9 +346,8 @@ acpi_status
 acpi_ns_delete_namespace_subtree (
 	acpi_namespace_node     *parent_node)
 {
-	acpi_namespace_node     *child_node;
-	acpi_operand_object     *obj_desc;
-	u32                     level;
+	acpi_namespace_node     *child_node = NULL;
+	u32                     level = 1;
 
 
 	FUNCTION_TRACE ("Ns_delete_namespace_subtree");
@@ -361,39 +357,26 @@ acpi_ns_delete_namespace_subtree (
 		return_ACPI_STATUS (AE_OK);
 	}
 
-
-	child_node  = 0;
-	level       = 1;
-
 	/*
 	 * Traverse the tree of objects until we bubble back up
 	 * to where we started.
 	 */
 	while (level > 0) {
-		/*
-		 * Get the next typed object in this scope.
-		 * Null returned if not found
-		 */
-		child_node = acpi_ns_get_next_object (ACPI_TYPE_ANY, parent_node,
+		/* Get the next node in this scope (NULL if none) */
+
+		child_node = acpi_ns_get_next_node (ACPI_TYPE_ANY, parent_node,
 				 child_node);
 		if (child_node) {
-			/*
-			 * Found an object - delete the object within
-			 * the Value field
-			 */
-			obj_desc = acpi_ns_get_attached_object (child_node);
-			if (obj_desc) {
-				acpi_ns_detach_object (child_node);
-				acpi_ut_remove_reference (obj_desc);
-			}
+			/* Found a child node - detach any attached object */
 
+			acpi_ns_detach_object (child_node);
 
-			/* Check if this object has any children */
+			/* Check if this node has any children */
 
-			if (acpi_ns_get_next_object (ACPI_TYPE_ANY, child_node, 0)) {
+			if (acpi_ns_get_next_node (ACPI_TYPE_ANY, child_node, 0)) {
 				/*
-				 * There is at least one child of this object,
-				 * visit the object
+				 * There is at least one child of this node,
+				 * visit the node
 				 */
 				level++;
 				parent_node   = child_node;
@@ -403,8 +386,8 @@ acpi_ns_delete_namespace_subtree (
 
 		else {
 			/*
-			 * No more children in this object.
-			 * We will move up to the grandparent.
+			 * No more children of this parent node.
+			 * Move up to the grandparent.
 			 */
 			level--;
 
@@ -414,16 +397,15 @@ acpi_ns_delete_namespace_subtree (
 			 */
 			acpi_ns_delete_children (parent_node);
 
-			/* New "last child" is this parent object */
+			/* New "last child" is this parent node */
 
 			child_node = parent_node;
 
-			/* Now we can move up the tree to the grandparent */
+			/* Move up the tree to the grandparent */
 
 			parent_node = acpi_ns_get_parent_object (parent_node);
 		}
 	}
-
 
 	return_ACPI_STATUS (AE_OK);
 }
@@ -433,13 +415,13 @@ acpi_ns_delete_namespace_subtree (
  *
  * FUNCTION:    Acpi_ns_remove_reference
  *
- * PARAMETERS:  Node           - Named object whose reference count is to be
+ * PARAMETERS:  Node           - Named node whose reference count is to be
  *                               decremented
  *
  * RETURN:      None.
  *
  * DESCRIPTION: Remove a Node reference.  Decrements the reference count
- *              of all parent Nodes up to the root.  Any object along
+ *              of all parent Nodes up to the root.  Any node along
  *              the way that reaches zero references is freed.
  *
  ******************************************************************************/
@@ -455,19 +437,19 @@ acpi_ns_remove_reference (
 
 
 	/*
-	 * Decrement the reference count(s) of this object and all
-	 * objects up to the root,  Delete anything with zero remaining references.
+	 * Decrement the reference count(s) of this node and all
+	 * nodes up to the root,  Delete anything with zero remaining references.
 	 */
 	next_node = node;
 	while (next_node) {
-		/* Decrement the reference count on this object*/
+		/* Decrement the reference count on this node*/
 
 		next_node->reference_count--;
 
-		/* Delete the object if no more references */
+		/* Delete the node if no more references */
 
 		if (!next_node->reference_count) {
-			/* Delete all children and delete the object */
+			/* Delete all children and delete the node */
 
 			acpi_ns_delete_children (next_node);
 			acpi_ns_delete_node (next_node);
@@ -500,7 +482,6 @@ acpi_ns_delete_namespace_by_owner (
 {
 	acpi_namespace_node     *child_node;
 	u32                     level;
-	acpi_operand_object     *obj_desc;
 	acpi_namespace_node     *parent_node;
 
 
@@ -512,38 +493,28 @@ acpi_ns_delete_namespace_by_owner (
 	level       = 1;
 
 	/*
-	 * Traverse the tree of objects until we bubble back up
+	 * Traverse the tree of nodes until we bubble back up
 	 * to where we started.
 	 */
 	while (level > 0) {
-		/*
-		 * Get the next typed object in this scope.
-		 * Null returned if not found
-		 */
-		child_node = acpi_ns_get_next_object (ACPI_TYPE_ANY, parent_node,
-				 child_node);
+		/* Get the next node in this scope (NULL if none) */
 
+		child_node = acpi_ns_get_next_node (ACPI_TYPE_ANY, parent_node,
+				 child_node);
 		if (child_node) {
 			if (child_node->owner_id == owner_id) {
-				/*
-				 * Found an object - delete the object within
-				 * the Value field
-				 */
-				obj_desc = acpi_ns_get_attached_object (child_node);
-				if (obj_desc) {
-					acpi_ns_detach_object (child_node);
-					acpi_ut_remove_reference (obj_desc);
-				}
+				/* Found a child node - detach any attached object */
+
+				acpi_ns_detach_object (child_node);
 			}
 
-			/* Check if this object has any children */
+			/* Check if this node has any children */
 
-			if (acpi_ns_get_next_object (ACPI_TYPE_ANY, child_node, 0)) {
+			if (acpi_ns_get_next_node (ACPI_TYPE_ANY, child_node, 0)) {
 				/*
-				 * There is at least one child of this object,
-				 * visit the object
+				 * There is at least one child of this node,
+				 * visit the node
 				 */
-
 				level++;
 				parent_node   = child_node;
 				child_node    = 0;
@@ -556,7 +527,8 @@ acpi_ns_delete_namespace_by_owner (
 
 		else {
 			/*
-			 * No more children in this object.  Move up to grandparent.
+			 * No more children of this parent node.
+			 * Move up to the grandparent.
 			 */
 			level--;
 
@@ -566,16 +538,15 @@ acpi_ns_delete_namespace_by_owner (
 				}
 			}
 
-			/* New "last child" is this parent object */
+			/* New "last child" is this parent node */
 
 			child_node = parent_node;
 
-			/* Now we can move up the tree to the grandparent */
+			/* Move up the tree to the grandparent */
 
 			parent_node = acpi_ns_get_parent_object (parent_node);
 		}
 	}
-
 
 	return_ACPI_STATUS (AE_OK);
 }

@@ -500,6 +500,7 @@ size_t parport_ieee1284_ecp_read_data (struct parport *port,
 	struct pardevice *dev = port->cad;
 	unsigned char *buf = buffer;
 	int rle_count = 0; /* shut gcc up */
+	unsigned char ctl;
 	int rle = 0;
 	ssize_t count = 0;
 
@@ -512,11 +513,10 @@ size_t parport_ieee1284_ecp_read_data (struct parport *port,
 	port->ieee1284.phase = IEEE1284_PH_REV_DATA;
 
 	/* Set HostAck low to start accepting data. */
-	parport_frob_control (port,
-			      PARPORT_CONTROL_AUTOFD
-			      | PARPORT_CONTROL_STROBE
-			      | PARPORT_CONTROL_INIT,
-			      PARPORT_CONTROL_AUTOFD);
+	ctl = parport_read_control (port);
+	ctl &= ~(PARPORT_CONTROL_STROBE | PARPORT_CONTROL_INIT);
+	parport_write_control (port,
+			       ctl | PARPORT_CONTROL_AUTOFD);
 	while (count < len) {
 		long expire = jiffies + dev->timeout;
 		unsigned char byte;
@@ -592,7 +592,7 @@ size_t parport_ieee1284_ecp_read_data (struct parport *port,
 		}
 
 		/* Event 44: Set HostAck high, acknowledging handshake. */
-		parport_frob_control (port, PARPORT_CONTROL_AUTOFD, 0);
+		parport_write_control (port, ctl);
 
 		/* Event 45: The peripheral has 35ms to set nAck high. */
 		if (parport_wait_peripheral (port, PARPORT_STATUS_ACK,
@@ -610,9 +610,8 @@ size_t parport_ieee1284_ecp_read_data (struct parport *port,
 		}
 
 		/* Event 46: Set HostAck low and accept the data. */
-		parport_frob_control (port,
-				      PARPORT_CONTROL_AUTOFD,
-				      PARPORT_CONTROL_AUTOFD);
+		parport_write_control (port,
+				       ctl | PARPORT_CONTROL_AUTOFD);
 
 		/* If we just read a run-length count, fetch the data. */
 		if (command)

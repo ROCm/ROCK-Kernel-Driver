@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: tz.h
- *   $Revision: 21 $
+ *   $Revision: 24 $
  *
  *****************************************************************************/
 
@@ -116,68 +116,42 @@ typedef u32			TZ_COOLING_MODE;
 typedef u32			TZ_STATE;
 
 #define TZ_STATE_OK		((TZ_STATE) 0x00000000)
+#define TZ_STATE_HOT		((TZ_STATE) 0x10000000)
 #define TZ_STATE_ACTIVE		((TZ_STATE) 0x20000000)
 #define TZ_STATE_PASSIVE	((TZ_STATE) 0x40000000)
 #define TZ_STATE_CRITICAL	((TZ_STATE) 0x80000000)
 
-
-/*
- * TZ_THRESHOLD:
- * -------------
- * Information on an individual threshold.
- */
 typedef struct {
-	TZ_THRESHOLD_TYPE	type;
-	u32			index;
 	u32			temperature;
-	TZ_COOLING_STATE	cooling_state;
-	BM_HANDLE_LIST		cooling_devices;
-} TZ_THRESHOLD;
+} TZ_CRITICAL_THRESHOLD;
 
-
-/*
- * TZ_THRESHOLD_LIST:
- * ------------------
- * Container for the thresholds of a given thermal zone.
- * Note that thresholds are always ordered by increasing
- * temperature value to simplify use by thermal policy.
- */
 typedef struct {
-	u32			count;
-	TZ_THRESHOLD		thresholds[TZ_MAX_THRESHOLDS];
-} TZ_THRESHOLD_LIST;
+	u8			is_valid;
+	u32			temperature;
+} TZ_HOT_THRESHOLD;
 
-
-/*
- * TZ_CRITICAL_POLICY:
- * -------------------
- */
 typedef struct {
-	TZ_THRESHOLD		*threshold;
-} TZ_CRITICAL_POLICY;
-
-
-/*
- * TZ_PASSIVE_POLICY:
- * ------------------
- */
-typedef struct {
+	u8			is_valid;
+	u32			temperature;
 	u32			tc1;
 	u32			tc2;
 	u32			tsp;
-	TZ_THRESHOLD		*threshold;
-} TZ_PASSIVE_POLICY;
+	BM_HANDLE_LIST		devices;
+} TZ_PASSIVE_THRESHOLD;
 
-
-/*
- * TZ_ACTIVE_POLICY:
- * -----------------
- */
 typedef struct {
-	u32			threshold_count;
-	TZ_THRESHOLD		*threshold[TZ_MAX_ACTIVE_THRESHOLDS];
-} TZ_ACTIVE_POLICY;
+	u8			is_valid;
+	u32			temperature;
+	TZ_COOLING_STATE	cooling_state;
+	BM_HANDLE_LIST		devices;
+} TZ_ACTIVE_THRESHOLD;
 
+typedef struct {
+	TZ_CRITICAL_THRESHOLD	critical;
+	TZ_HOT_THRESHOLD	hot;
+	TZ_PASSIVE_THRESHOLD	passive;
+	TZ_ACTIVE_THRESHOLD	active[TZ_MAX_ACTIVE_THRESHOLDS];
+} TZ_THRESHOLDS;
 
 /*
  * TZ_POLICY:
@@ -188,11 +162,7 @@ typedef struct {
 	TZ_STATE		state;
 	TZ_COOLING_MODE		cooling_mode;
 	u32			polling_freq;
-	TZ_THRESHOLD_LIST	threshold_list;
-	TZ_CRITICAL_POLICY	critical;
-	TZ_PASSIVE_POLICY	passive;
-	TZ_ACTIVE_POLICY	active;
-	/* TBD: Linux-specific */
+	TZ_THRESHOLDS		thresholds;
 	struct timer_list	timer;
 } TZ_POLICY;
 
@@ -213,7 +183,7 @@ typedef struct {
  *                             Function Prototypes
  *****************************************************************************/
 
-/* thermal_zone.c */
+/* tz.c */
 
 acpi_status
 tz_initialize (void);
@@ -234,46 +204,49 @@ tz_request (
 
 acpi_status
 tz_get_temperature (
-	TZ_CONTEXT              *thermal_zone,
-	u32                     *temperature);
+	TZ_CONTEXT		*tz);
 
 acpi_status
 tz_get_thresholds (
-	TZ_CONTEXT              *thermal_zone,
-	TZ_THRESHOLD_LIST       *threshold_list);
+	TZ_CONTEXT		*tz);
+
+acpi_status
+tz_set_cooling_preference (
+	TZ_CONTEXT              *tz,
+	TZ_COOLING_MODE         cooling_mode);
 
 void
 tz_print (
-	TZ_CONTEXT              *thermal_zone);
+	TZ_CONTEXT              *tz);
 
 /* tzpolicy.c */
 
 acpi_status
 tz_policy_add_device (
-	TZ_CONTEXT              *thermal_zone);
+	TZ_CONTEXT              *tz);
 
 acpi_status
 tz_policy_remove_device (
-	TZ_CONTEXT              *thermal_zone);
+	TZ_CONTEXT              *tz);
 
 void
 tz_policy_check (
 	void                    *context);
 
-/* Thermal Zone Driver OSL */
+/* tz_osl.c */
 
 acpi_status
 tz_osl_add_device (
-	TZ_CONTEXT		*thermal_zone);
+	TZ_CONTEXT		*tz);
 
 acpi_status
 tz_osl_remove_device (
-	TZ_CONTEXT		*thermal_zone);
+	TZ_CONTEXT		*tz);
 
 acpi_status
 tz_osl_generate_event (
 	u32			event,
-	TZ_CONTEXT		*thermal_zone);
+	TZ_CONTEXT		*tz);
 
 
 #endif  /* __TZ_H__ */

@@ -2,7 +2,7 @@
  *
  * Module Name: evevent - Fixed and General Purpose Acpi_event
  *                          handling and dispatch
- *              $Revision: 50 $
+ *              $Revision: 51 $
  *
  *****************************************************************************/
 
@@ -354,7 +354,7 @@ acpi_ev_gpe_initialize (void)
 	 * Allocate the Gpe information block
 	 */
 	acpi_gbl_gpe_registers = ACPI_MEM_CALLOCATE (acpi_gbl_gpe_register_count *
-			  sizeof (ACPI_GPE_REGISTERS));
+			  sizeof (acpi_gpe_registers));
 	if (!acpi_gbl_gpe_registers) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Could not allocate the Gpe_registers block\n"));
@@ -442,9 +442,9 @@ acpi_ev_gpe_initialize (void)
 		register_index++;
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "GPE registers: %X@%p (Blk0) %X@%p (Blk1)\n",
-		gpe0register_count, acpi_gbl_FADT->Xgpe0blk.address, gpe1_register_count,
-		acpi_gbl_FADT->Xgpe1_blk.address));
+	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "GPE registers: %X@%8.8X%8.8X (Blk0) %X@%8.8X%8.8X (Blk1)\n",
+		gpe0register_count, HIDWORD(acpi_gbl_FADT->Xgpe0blk.address), LODWORD(acpi_gbl_FADT->Xgpe0blk.address),
+		gpe1_register_count, HIDWORD(acpi_gbl_FADT->Xgpe1_blk.address), LODWORD(acpi_gbl_FADT->Xgpe1_blk.address)));
 
 	return_ACPI_STATUS (AE_OK);
 }

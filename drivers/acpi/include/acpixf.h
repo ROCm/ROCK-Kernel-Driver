@@ -135,14 +135,14 @@ acpi_walk_namespace (
 	acpi_object_type        type,
 	acpi_handle             start_object,
 	u32                     max_depth,
-	ACPI_WALK_CALLBACK      user_function,
+	acpi_walk_callback      user_function,
 	void                    *context,
 	void *                  *return_value);
 
 acpi_status
 acpi_get_devices (
 	NATIVE_CHAR             *HID,
-	ACPI_WALK_CALLBACK      user_function,
+	acpi_walk_callback      user_function,
 	void                    *context,
 	void                    **return_value);
 
@@ -200,46 +200,46 @@ acpi_get_parent (
 acpi_status
 acpi_install_fixed_event_handler (
 	u32                     acpi_event,
-	ACPI_EVENT_HANDLER      handler,
+	acpi_event_handler      handler,
 	void                    *context);
 
 acpi_status
 acpi_remove_fixed_event_handler (
 	u32                     acpi_event,
-	ACPI_EVENT_HANDLER      handler);
+	acpi_event_handler      handler);
 
 acpi_status
 acpi_install_notify_handler (
 	acpi_handle             device,
 	u32                     handler_type,
-	ACPI_NOTIFY_HANDLER     handler,
+	acpi_notify_handler     handler,
 	void                    *context);
 
 acpi_status
 acpi_remove_notify_handler (
 	acpi_handle             device,
 	u32                     handler_type,
-	ACPI_NOTIFY_HANDLER     handler);
+	acpi_notify_handler     handler);
 
 acpi_status
 acpi_install_address_space_handler (
 	acpi_handle             device,
 	ACPI_ADR_SPACE_TYPE     space_id,
-	ACPI_ADR_SPACE_HANDLER  handler,
-	ACPI_ADR_SPACE_SETUP    setup,
+	acpi_adr_space_handler  handler,
+	acpi_adr_space_setup    setup,
 	void                    *context);
 
 acpi_status
 acpi_remove_address_space_handler (
 	acpi_handle             device,
 	ACPI_ADR_SPACE_TYPE     space_id,
-	ACPI_ADR_SPACE_HANDLER  handler);
+	acpi_adr_space_handler  handler);
 
 acpi_status
 acpi_install_gpe_handler (
 	u32                     gpe_number,
 	u32                     type,
-	ACPI_GPE_HANDLER        handler,
+	acpi_gpe_handler        handler,
 	void                    *context);
 
 acpi_status
@@ -253,17 +253,19 @@ acpi_release_global_lock (
 acpi_status
 acpi_remove_gpe_handler (
 	u32                     gpe_number,
-	ACPI_GPE_HANDLER        handler);
+	acpi_gpe_handler        handler);
 
 acpi_status
 acpi_enable_event (
 	u32                     acpi_event,
-	u32                     type);
+	u32                     type,
+	u32                     flags);
 
 acpi_status
 acpi_disable_event (
 	u32                     acpi_event,
-	u32                     type);
+	u32                     type,
+	u32                     flags);
 
 acpi_status
 acpi_clear_event (

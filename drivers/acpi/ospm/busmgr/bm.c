@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: bm.c
- *   $Revision: 47 $
+ *   $Revision: 48 $
  *
  *****************************************************************************/
 
@@ -223,7 +223,7 @@ bm_print_node (
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+-------------------------------------------------------------------------------\n"));
 	}
 
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| %s[%02x]:[%p] flags[%02x] hid[%s] %s\n", type_string, device->handle, device->acpi_handle, device->flags, (device->id.hid[0] ? device->id.hid : "       "), buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| %s[%02x]:[%p] flags[%02x] hid[%s] %s\n", type_string, device->handle, device->acpi_handle, device->flags, (device->id.hid[0] ? device->id.hid : "       "), (char*)buffer.pointer));
 
 	if (flags & BM_PRINT_IDENTIFICATION) {
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   identification: uid[%s] adr[%08x]\n", device->id.uid, device->id.adr));
@@ -919,7 +919,7 @@ bm_get_handle (
 	for (i=0; i<node_list.count; i++) {
 
 		if (!node_list.nodes[i]) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) node entry [%02x] detected.\n", device_handle));
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Invalid (NULL) node entry [%p] detected.\n", device_handle));
 			status = AE_NULL_ENTRY;
 			break;
 		}

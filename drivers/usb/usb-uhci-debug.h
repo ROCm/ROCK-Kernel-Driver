@@ -5,7 +5,7 @@ static void __attribute__((__unused__)) uhci_show_qh (puhci_desc_t qh)
 		dbg("qh has not QH_TYPE");
 		return;
 	}
-	dbg("QH @ %p/%08X:", qh, qh->dma_addr);
+	dbg("QH @ %p/%08llX:", qh, (u64)qh->dma_addr);
 
 	if (qh->hw.qh.head & UHCI_PTR_TERM)
 		dbg("    Head Terminate");

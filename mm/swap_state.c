@@ -152,7 +152,7 @@ void free_page_and_swap_cache(struct page *page)
 			delete_from_swap_cache(page);
 		UnlockPage(page);
 	}
-	page_cache_release(page);
+	free_lru_page(page);
 }
 
 /*

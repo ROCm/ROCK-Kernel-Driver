@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbxface - AML Debugger external interfaces
- *              $Revision: 41 $
+ *              $Revision: 45 $
  *
  ******************************************************************************/
 
@@ -46,7 +46,7 @@
  *
  * PARAMETERS:  Walk_state      - Current walk
  *              Op              - Current executing op
- *              Op_type         - Type of the current AML Opcode
+ *              Opcode_class    - Class of the current AML Opcode
  *
  * RETURN:      Status
  *
@@ -58,7 +58,7 @@ acpi_status
 acpi_db_single_step (
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op,
-	u8                      op_type)
+	u32                     opcode_class)
 {
 	acpi_parse_object       *next;
 	acpi_status             status = AE_OK;
@@ -91,22 +91,11 @@ acpi_db_single_step (
 		return (AE_OK);
 	}
 
-	switch (op_type) {
-	case OPTYPE_UNDEFINED:
-	case OPTYPE_CONSTANT:           /* argument type only */
-	case OPTYPE_LITERAL:            /* argument type only */
-	case OPTYPE_DATA_TERM:          /* argument type only */
-	case OPTYPE_LOCAL_VARIABLE:     /* argument type only */
-	case OPTYPE_METHOD_ARGUMENT:    /* argument type only */
+	switch (opcode_class) {
+	case AML_CLASS_UNKNOWN:
+	case AML_CLASS_ARGUMENT:    /* constants, literals, etc.  do nothing */
 		return (AE_OK);
 		break;
-
-	case OPTYPE_NAMED_OBJECT:
-		switch (op->opcode) {
-		case AML_INT_NAMEPATH_OP:
-			return (AE_OK);
-			break;
-		}
 	}
 
 	/*
@@ -270,7 +259,7 @@ acpi_db_initialize (void)
 
 	/* Init globals */
 
-	acpi_gbl_db_buffer = acpi_os_allocate (ACPI_DEBUG_BUFFER_SIZE);
+	acpi_gbl_db_buffer = acpi_os_callocate (ACPI_DEBUG_BUFFER_SIZE);
 
 	/* Initial scope is the root */
 
@@ -301,6 +290,31 @@ acpi_db_initialize (void)
 	}
 
 	return (0);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_db_terminate
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Stop debugger
+ *
+ ******************************************************************************/
+
+void
+acpi_db_terminate (void)
+{
+
+	if (acpi_gbl_db_table_ptr) {
+		acpi_os_free (acpi_gbl_db_table_ptr);
+	}
+	if (acpi_gbl_db_buffer) {
+		acpi_os_free (acpi_gbl_db_buffer);
+	}
 }
 
 

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstore - AML Interpreter object store support
- *              $Revision: 148 $
+ *              $Revision: 150 $
  *
  *****************************************************************************/
 
@@ -42,15 +42,14 @@
  *
  * FUNCTION:    Acpi_ex_store
  *
- * PARAMETERS:  *Val_desc           - Value to be stored
+ * PARAMETERS:  *Source_desc        - Value to be stored
  *              *Dest_desc          - Where to store it.  Must be an NS node
  *                                    or an acpi_operand_object of type
- *                                    Reference; if the latter the descriptor
- *                                    will be either reused or deleted.
+ *                                    Reference;
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Store the value described by Val_desc into the location
+ * DESCRIPTION: Store the value described by Source_desc into the location
  *              described by Dest_desc. Called by various interpreter
  *              functions to store the result of an operation into
  *              the destination operand.
@@ -59,7 +58,7 @@
 
 acpi_status
 acpi_ex_store (
-	acpi_operand_object     *val_desc,
+	acpi_operand_object     *source_desc,
 	acpi_operand_object     *dest_desc,
 	acpi_walk_state         *walk_state)
 {
@@ -72,7 +71,7 @@ acpi_ex_store (
 
 	/* Validate parameters */
 
-	if (!val_desc || !dest_desc) {
+	if (!source_desc || !dest_desc) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Internal - null pointer\n"));
 		return_ACPI_STATUS (AE_AML_NO_OPERAND);
 	}
@@ -84,7 +83,7 @@ acpi_ex_store (
 		 * Dest is a namespace node,
 		 * Storing an object into a Name "container"
 		 */
-		status = acpi_ex_store_object_to_node (val_desc,
+		status = acpi_ex_store_object_to_node (source_desc,
 				 (acpi_namespace_node *) dest_desc, walk_state);
 
 		/* All done, that's it */
@@ -101,7 +100,7 @@ acpi_ex_store (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Destination is not a Reference_obj [%p]\n", dest_desc));
 
-		DUMP_STACK_ENTRY (val_desc);
+		DUMP_STACK_ENTRY (source_desc);
 		DUMP_STACK_ENTRY (dest_desc);
 		DUMP_OPERANDS (&dest_desc, IMODE_EXECUTE, "Ex_store",
 				  2, "Target is not a Reference_obj");
@@ -125,7 +124,7 @@ acpi_ex_store (
 
 		/* Storing an object into a Name "container" */
 
-		status = acpi_ex_store_object_to_node (val_desc, ref_desc->reference.object,
+		status = acpi_ex_store_object_to_node (source_desc, ref_desc->reference.object,
 				  walk_state);
 		break;
 
@@ -134,7 +133,7 @@ acpi_ex_store (
 
 		/* Storing to an Index (pointer into a packager or buffer) */
 
-		status = acpi_ex_store_object_to_index (val_desc, ref_desc, walk_state);
+		status = acpi_ex_store_object_to_index (source_desc, ref_desc, walk_state);
 		break;
 
 
@@ -144,7 +143,7 @@ acpi_ex_store (
 		/* Store to a method local/arg  */
 
 		status = acpi_ds_store_object_to_local (ref_desc->reference.opcode,
-				  ref_desc->reference.offset, val_desc, walk_state);
+				  ref_desc->reference.offset, source_desc, walk_state);
 		break;
 
 
@@ -157,39 +156,39 @@ acpi_ex_store (
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** Write to Debug Object: ****:\n\n"));
 
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "[ACPI Debug] %s: ",
-				  acpi_ut_get_type_name (val_desc->common.type)));
+				  acpi_ut_get_type_name (source_desc->common.type)));
 
-		switch (val_desc->common.type) {
+		switch (source_desc->common.type) {
 		case ACPI_TYPE_INTEGER:
 
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "0x%X (%d)\n",
-				(u32) val_desc->integer.value, (u32) val_desc->integer.value));
+				(u32) source_desc->integer.value, (u32) source_desc->integer.value));
 			break;
 
 
 		case ACPI_TYPE_BUFFER:
 
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "Length 0x%X\n",
-				(u32) val_desc->buffer.length));
+				(u32) source_desc->buffer.length));
 			break;
 
 
 		case ACPI_TYPE_STRING:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "%s\n", val_desc->string.pointer));
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "%s\n", source_desc->string.pointer));
 			break;
 
 
 		case ACPI_TYPE_PACKAGE:
 
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "Elements - 0x%X\n",
-				(u32) val_desc->package.elements));
+				(u32) source_desc->package.elements));
 			break;
 
 
 		default:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "@0x%p\n", val_desc));
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "@0x%p\n", source_desc));
 			break;
 		}
 
@@ -224,12 +223,6 @@ acpi_ex_store (
 	}   /* switch (Ref_desc->Reference.Opcode) */
 
 
-	/* Always delete the reference descriptor object */
-
-	if (ref_desc) {
-		acpi_ut_remove_reference (ref_desc);
-	}
-
 	return_ACPI_STATUS (status);
 }
 
@@ -238,7 +231,7 @@ acpi_ex_store (
  *
  * FUNCTION:    Acpi_ex_store_object_to_index
  *
- * PARAMETERS:  *Val_desc           - Value to be stored
+ * PARAMETERS:  *Source_desc          - Value to be stored
  *              *Node               - Named object to receive the value
  *
  * RETURN:      Status
@@ -249,7 +242,7 @@ acpi_ex_store (
 
 acpi_status
 acpi_ex_store_object_to_index (
-	acpi_operand_object     *val_desc,
+	acpi_operand_object     *source_desc,
 	acpi_operand_object     *dest_desc,
 	acpi_walk_state         *walk_state)
 {
@@ -278,7 +271,7 @@ acpi_ex_store_object_to_index (
 		if (dest_desc->reference.target_type == ACPI_TYPE_PACKAGE) {
 			/*
 			 * The object at *(Dest_desc->Reference.Where) is the
-			 *  element within the package that is to be modified.
+			 * element within the package that is to be modified.
 			 */
 			obj_desc = *(dest_desc->reference.where);
 			if (obj_desc) {
@@ -288,16 +281,12 @@ acpi_ex_store_object_to_index (
 				 *
 				 * TBD: [Investigate] Should both the src and dest be required
 				 *      to be packages?
-				 *       && (Val_desc->Common.Type == ACPI_TYPE_PACKAGE)
+				 *       && (Source_desc->Common.Type == ACPI_TYPE_PACKAGE)
 				 */
 				if (obj_desc->common.type == ACPI_TYPE_PACKAGE) {
-					/*
-					 * Take away the reference for being part of a package and
-					 * delete
-					 */
-					acpi_ut_remove_reference (obj_desc);
-					acpi_ut_remove_reference (obj_desc);
+					/* Take away the reference for being part of a package */
 
+					acpi_ut_remove_reference (obj_desc);
 					obj_desc = NULL;
 				}
 			}
@@ -307,9 +296,9 @@ acpi_ex_store_object_to_index (
 				 * If the Obj_desc is NULL, it means that an uninitialized package
 				 * element has been used as a destination (this is OK), therefore,
 				 * we must create the destination element to match the type of the
-				 * source element NOTE: Val_desc can be of any type.
+				 * source element NOTE: Source_desccan be of any type.
 				 */
-				obj_desc = acpi_ut_create_internal_object (val_desc->common.type);
+				obj_desc = acpi_ut_create_internal_object (source_desc->common.type);
 				if (!obj_desc) {
 					return_ACPI_STATUS (AE_NO_MEMORY);
 				}
@@ -318,29 +307,25 @@ acpi_ex_store_object_to_index (
 				 * If the source is a package, copy the source to the new dest
 				 */
 				if (ACPI_TYPE_PACKAGE == obj_desc->common.type) {
-					status = acpi_ut_copy_ipackage_to_ipackage (val_desc, obj_desc, walk_state);
+					status = acpi_ut_copy_ipackage_to_ipackage (source_desc, obj_desc, walk_state);
 					if (ACPI_FAILURE (status)) {
 						acpi_ut_remove_reference (obj_desc);
 						return_ACPI_STATUS (status);
 					}
 				}
 
-				/*
-				 * Install the new descriptor into the package and add a
-				 * reference to the newly created descriptor for now being
-				 * part of the parent package
-				 */
+				/* Install the new descriptor into the package */
+
 				*(dest_desc->reference.where) = obj_desc;
-				acpi_ut_add_reference (obj_desc);
 			}
 
 			if (ACPI_TYPE_PACKAGE != obj_desc->common.type) {
 				/*
 				 * The destination element is not a package, so we need to
-				 * convert the contents of the source (Val_desc) and copy into
+				 * convert the contents of the source (Source_desc) and copy into
 				 * the destination (Obj_desc)
 				 */
-				status = acpi_ex_store_object_to_object (val_desc, obj_desc,
+				status = acpi_ex_store_object_to_object (source_desc, obj_desc,
 						  walk_state);
 				if (ACPI_FAILURE (status)) {
 					/*
@@ -380,7 +365,7 @@ acpi_ex_store_object_to_index (
 		 * The assignment of the individual elements will be slightly
 		 * different for each source type.
 		 */
-		switch (val_desc->common.type) {
+		switch (source_desc->common.type) {
 		case ACPI_TYPE_INTEGER:
 			/*
 			 * Type is Integer, assign bytewise
@@ -389,7 +374,7 @@ acpi_ex_store_object_to_index (
 			 */
 			length = sizeof (acpi_integer);
 			for (i = length; i != 0; i--) {
-				value = (u8)(val_desc->integer.value >> (MUL_8 (i - 1)));
+				value = (u8)(source_desc->integer.value >> (MUL_8 (i - 1)));
 				obj_desc->buffer.pointer[dest_desc->reference.offset] = value;
 			}
 			break;
@@ -400,9 +385,9 @@ acpi_ex_store_object_to_index (
 			 * Type is Buffer, the Length is in the structure.
 			 * Just loop through the elements and assign each one in turn.
 			 */
-			length = val_desc->buffer.length;
+			length = source_desc->buffer.length;
 			for (i = 0; i < length; i++) {
-				value = val_desc->buffer.pointer[i];
+				value = source_desc->buffer.pointer[i];
 				obj_desc->buffer.pointer[dest_desc->reference.offset] = value;
 			}
 			break;
@@ -413,9 +398,9 @@ acpi_ex_store_object_to_index (
 			 * Type is String, the Length is in the structure.
 			 * Just loop through the elements and assign each one in turn.
 			 */
-			length = val_desc->string.length;
+			length = source_desc->string.length;
 			for (i = 0; i < length; i++) {
-				value = val_desc->string.pointer[i];
+				value = source_desc->string.pointer[i];
 				obj_desc->buffer.pointer[dest_desc->reference.offset] = value;
 			}
 			break;
@@ -427,7 +412,7 @@ acpi_ex_store_object_to_index (
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"Source must be Number/Buffer/String type, not %X\n",
-				val_desc->common.type));
+				source_desc->common.type));
 			status = AE_AML_OPERAND_TYPE;
 			break;
 		}
@@ -548,6 +533,7 @@ acpi_ex_store_object_to_node (
 		 * Source_desc reference count is incremented by Attach_object.
 		 */
 		status = acpi_ns_attach_object (node, target_desc, target_type);
+
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 			"Store %s into %s via Convert/Attach\n",
 			acpi_ut_get_type_name (target_desc->common.type),
@@ -564,7 +550,6 @@ acpi_ex_store_object_to_node (
 		/* No conversions for all other types.  Just attach the source object */
 
 		status = acpi_ns_attach_object (node, source_desc, source_desc->common.type);
-
 		break;
 	}
 

@@ -174,6 +174,25 @@ iiSendPendingMail(i2eBordStrPtr pB)
 			pB->i2eWaitingForEmptyFifo |=
 				(pB->i2eOutMailWaiting & MB_OUT_STUFFED);
 			pB->i2eOutMailWaiting = 0;
+			pB->SendPendingRetry = 0;
+		} else {
+/*		The only time we hit this area is when "iiTrySendMail" has
+		failed.  That only occurs when the outbound mailbox is
+		still busy with the last message.  We take a short breather
+		to let the board catch up with itself and then try again.
+		16 Retries is the limit - then we got a borked board.
+			/\/\|=mhw=|\/\/				*/
+
+			if( ++pB->SendPendingRetry < 16 ) {
+
+				init_timer( &(pB->SendPendingTimer) );
+				pB->SendPendingTimer.expires  = jiffies + 1;
+				pB->SendPendingTimer.function = (void*)(unsigned long)iiSendPendingMail;
+				pB->SendPendingTimer.data     = (unsigned long)pB;
+				add_timer( &(pB->SendPendingTimer) );
+			} else {
+				printk( KERN_ERR "IP2: iiSendPendingMail unable to queue outbound mail\n" );
+			}
 		}
 	}
 }
@@ -224,6 +243,8 @@ i2InitChannels ( i2eBordStrPtr pB, int nChannels, i2ChanStrPtr pCh)
 	pB->i2Fbuf_strip = pB->i2Fbuf_stuff = 0;
 	pB->i2Dbuf_strip = pB->i2Dbuf_stuff = 0;
 	pB->i2Bbuf_strip = pB->i2Bbuf_stuff = 0;
+
+	pB->SendPendingRetry = 0;
 
 	memset ( pCh, 0, sizeof (i2ChanStr) * nChannels );
 
@@ -311,13 +332,11 @@ i2InitChannels ( i2eBordStrPtr pB, int nChannels, i2ChanStrPtr pCh)
 		pCh->ClosingDelay     = 5*HZ/10;
 		pCh->ClosingWaitTime  = 30*HZ;
 
-#ifdef USE_IQ
 		// Initialize task queue objects
 		pCh->tqueue_input.routine = (void(*)(void*)) do_input;
 		pCh->tqueue_input.data = pCh;
 		pCh->tqueue_status.routine = (void(*)(void*)) do_status;
 		pCh->tqueue_status.data = pCh;
-#endif
 
 		pCh->trace = ip2trace;
 
@@ -1294,6 +1313,7 @@ i2DrainWakeup(i2ChanStrPtr pCh)
 static void
 i2DrainOutput(i2ChanStrPtr pCh, int timeout)
 {
+	wait_queue_t wait;
 	i2eBordStrPtr pB;
 
 #ifdef IP2DEBUG_TRACE
@@ -1323,9 +1343,18 @@ i2DrainOutput(i2ChanStrPtr pCh, int timeout)
 	}
 	
 	i2QueueCommands( PTYPE_INLINE, pCh, -1, 1, CMD_BMARK_REQ );
+
+	init_waitqueue_entry(&wait, current);
+	add_wait_queue(&(pCh->pBookmarkWait), &wait);
+	set_current_state( TASK_INTERRUPTIBLE );
+
 	serviceOutgoingFifo( pB );
 	
-	interruptible_sleep_on( &(pCh->pBookmarkWait) );
+	schedule();	// Now we take our interruptible sleep on
+
+	// Clean up the queue
+	set_current_state( TASK_RUNNING );
+	remove_wait_queue(&(pCh->pBookmarkWait), &wait);
 
 	// if expires == 0 then timer poped, then do not need to del_timer
 	if ((timeout > 0) && pCh->BookmarkTimer.expires && 
@@ -2212,7 +2241,11 @@ i2ServiceBoard ( i2eBordStrPtr pB )
 	unsigned long flags;
 
 
-	inmail = iiGetMail(pB);
+	/* This should be atomic because of the way we are called... */
+	if (NO_MAIL_HERE == ( inmail = pB->i2eStartMail ) ) {
+		inmail = iiGetMail(pB);
+	}
+	pB->i2eStartMail = NO_MAIL_HERE;
 
 #ifdef IP2DEBUG_TRACE
 	ip2trace (ITRC_NO_PORT, ITRC_INTR, 2, 1, inmail );

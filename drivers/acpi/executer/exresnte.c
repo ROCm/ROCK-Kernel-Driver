@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresnte - AML Interpreter object resolution
- *              $Revision: 41 $
+ *              $Revision: 43 $
  *
  *****************************************************************************/
 
@@ -43,14 +43,15 @@
  *
  * FUNCTION:    Acpi_ex_resolve_node_to_value
  *
- * PARAMETERS:  Stack_ptr       - Pointer to a location on a stack that contains
- *                                a pointer to a Node
- *              Walk_state      - Current state
+ * PARAMETERS:  Object_ptr      - Pointer to a location that contains
+ *                                a pointer to a NS node, and will recieve a
+ *                                pointer to the resolved object.
+ *              Walk_state      - Current state.  Valid only if executing AML
+ *                                code.  NULL if simply resolving an object
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Resolve a Namespace node (AKA a "direct name pointer") to
- *              a valued object
+ * DESCRIPTION: Resolve a Namespace node to a valued object
  *
  * Note: for some of the data types, the pointer attached to the Node
  * can be either a pointer to an actual internal object or a pointer into the
@@ -66,12 +67,12 @@
 
 acpi_status
 acpi_ex_resolve_node_to_value (
-	acpi_namespace_node     **stack_ptr,
+	acpi_namespace_node     **object_ptr,
 	acpi_walk_state         *walk_state)
 
 {
 	acpi_status             status = AE_OK;
-	acpi_operand_object     *val_desc;
+	acpi_operand_object     *source_desc;
 	acpi_operand_object     *obj_desc = NULL;
 	acpi_namespace_node     *node;
 	acpi_object_type8       entry_type;
@@ -85,12 +86,12 @@ acpi_ex_resolve_node_to_value (
 	 * The stack pointer points to a acpi_namespace_node (Node).  Get the
 	 * object that is attached to the Node.
 	 */
-	node      = *stack_ptr;
-	val_desc  = acpi_ns_get_attached_object (node);
+	node      = *object_ptr;
+	source_desc  = acpi_ns_get_attached_object (node);
 	entry_type = acpi_ns_get_type ((acpi_handle) node);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Entry=%p Val_desc=%p Type=%X\n",
-		 node, val_desc, entry_type));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Entry=%p Source_desc=%p Type=%X\n",
+		 node, source_desc, entry_type));
 
 
 	/*
@@ -103,7 +104,7 @@ acpi_ex_resolve_node_to_value (
 		return_ACPI_STATUS (AE_OK);
 	}
 
-	if (!val_desc) {
+	if (!source_desc) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No object attached to node %p\n",
 			node));
 		return_ACPI_STATUS (AE_AML_NO_OPERAND);
@@ -117,60 +118,60 @@ acpi_ex_resolve_node_to_value (
 
 	case ACPI_TYPE_PACKAGE:
 
-		if (ACPI_TYPE_PACKAGE != val_desc->common.type) {
+		if (ACPI_TYPE_PACKAGE != source_desc->common.type) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Object not a Package, type %s\n",
-				acpi_ut_get_type_name (val_desc->common.type)));
+				acpi_ut_get_type_name (source_desc->common.type)));
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
 		/* Return an additional reference to the object */
 
-		obj_desc = val_desc;
+		obj_desc = source_desc;
 		acpi_ut_add_reference (obj_desc);
 		break;
 
 
 	case ACPI_TYPE_BUFFER:
 
-		if (ACPI_TYPE_BUFFER != val_desc->common.type) {
+		if (ACPI_TYPE_BUFFER != source_desc->common.type) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Object not a Buffer, type %s\n",
-				acpi_ut_get_type_name (val_desc->common.type)));
+				acpi_ut_get_type_name (source_desc->common.type)));
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
 		/* Return an additional reference to the object */
 
-		obj_desc = val_desc;
+		obj_desc = source_desc;
 		acpi_ut_add_reference (obj_desc);
 		break;
 
 
 	case ACPI_TYPE_STRING:
 
-		if (ACPI_TYPE_STRING != val_desc->common.type) {
+		if (ACPI_TYPE_STRING != source_desc->common.type) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Object not a String, type %s\n",
-				acpi_ut_get_type_name (val_desc->common.type)));
+				acpi_ut_get_type_name (source_desc->common.type)));
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
 		/* Return an additional reference to the object */
 
-		obj_desc = val_desc;
+		obj_desc = source_desc;
 		acpi_ut_add_reference (obj_desc);
 		break;
 
 
 	case ACPI_TYPE_INTEGER:
 
-		if (ACPI_TYPE_INTEGER != val_desc->common.type) {
+		if (ACPI_TYPE_INTEGER != source_desc->common.type) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Object not a Integer, type %s\n",
-				acpi_ut_get_type_name (val_desc->common.type)));
+				acpi_ut_get_type_name (source_desc->common.type)));
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
 		/* Return an additional reference to the object */
 
-		obj_desc = val_desc;
+		obj_desc = source_desc;
 		acpi_ut_add_reference (obj_desc);
 		break;
 
@@ -180,10 +181,10 @@ acpi_ex_resolve_node_to_value (
 	case INTERNAL_TYPE_BANK_FIELD:
 	case INTERNAL_TYPE_INDEX_FIELD:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Field_read Node=%p Val_desc=%p Type=%X\n",
-			node, val_desc, entry_type));
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Field_read Node=%p Source_desc=%p Type=%X\n",
+			node, source_desc, entry_type));
 
-		status = acpi_ex_read_data_from_field (val_desc, &obj_desc);
+		status = acpi_ex_read_data_from_field (source_desc, &obj_desc);
 		break;
 
 
@@ -200,7 +201,7 @@ acpi_ex_resolve_node_to_value (
 
 		/* Return an additional reference to the object */
 
-		obj_desc = val_desc;
+		obj_desc = source_desc;
 		acpi_ut_add_reference (obj_desc);
 		break;
 
@@ -222,7 +223,7 @@ acpi_ex_resolve_node_to_value (
 	 */
 	case INTERNAL_TYPE_REFERENCE:
 
-		switch (val_desc->reference.opcode) {
+		switch (source_desc->reference.opcode) {
 
 		case AML_ZERO_OP:
 
@@ -241,13 +242,13 @@ acpi_ex_resolve_node_to_value (
 
 		case AML_REVISION_OP:
 
-			temp_val = ACPI_CA_VERSION;
+			temp_val = ACPI_CA_SUPPORT_LEVEL;
 			break;
 
 		default:
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unsupported reference opcode %X\n",
-				val_desc->reference.opcode));
+				source_desc->reference.opcode));
 
 			return_ACPI_STATUS (AE_AML_BAD_OPCODE);
 		}
@@ -261,9 +262,15 @@ acpi_ex_resolve_node_to_value (
 
 		obj_desc->integer.value = temp_val;
 
-		/* Truncate value if we are executing from a 32-bit ACPI table */
-
-		acpi_ex_truncate_for32bit_table (obj_desc, walk_state);
+		/*
+		 * Truncate value if we are executing from a 32-bit ACPI table
+		 * AND actually executing AML code.  If we are resolving
+		 * an object in the namespace via an external call to the
+		 * subsystem, we will have a null Walk_state
+		 */
+		if (walk_state) {
+			acpi_ex_truncate_for32bit_table (obj_desc, walk_state);
+		}
 		break;
 
 
@@ -281,7 +288,7 @@ acpi_ex_resolve_node_to_value (
 
 	/* Put the object descriptor on the stack */
 
-	*stack_ptr = (void *) obj_desc;
+	*object_ptr = (void *) obj_desc;
 	return_ACPI_STATUS (status);
 }
 

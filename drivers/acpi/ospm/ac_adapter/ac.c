@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: ac.c
- *   $Revision: 22 $
+ *   $Revision: 23 $
  *
  *****************************************************************************/
 
@@ -76,7 +76,7 @@ ac_print (
 	 * Print out basic adapter information.
 	 */
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| AC Adapter[%02x]:[%p] %s\n", ac_adapter->device_handle, ac_adapter->acpi_handle, buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| AC Adapter[%02x]:[%p] %s\n", ac_adapter->device_handle, ac_adapter->acpi_handle, (char*)buffer.pointer));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
 
 	acpi_os_free(buffer.pointer);

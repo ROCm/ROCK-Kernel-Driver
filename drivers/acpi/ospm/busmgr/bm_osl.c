@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: bm_osl.c
- *   $Revision: 16 $
+ *   $Revision: 17 $
  *
  *****************************************************************************/
 
@@ -38,20 +38,6 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - ACPI Bus Manager");
-MODULE_LICENSE("GPL");
-
-
-#ifdef ACPI_DEBUG
-
-static int dbg_layer = ACPI_COMPONENT_DEFAULT;
-MODULE_PARM(dbg_layer, "i");
-MODULE_PARM_DESC(dbg_layer, "Controls debug output (see acpi_dbg_layer).\n");
-
-static int dbg_level = DEBUG_DEFAULT;
-MODULE_PARM(dbg_level, "i");
-MODULE_PARM_DESC(dbg_level, "Controls debug output (see acpi_dbg_level).\n");
-
-#endif /*ACPI_DEBUG*/
 
 
 /*****************************************************************************
@@ -317,14 +303,6 @@ bm_osl_init(void)
 	if (ACPI_FAILURE(status))
 		return -ENODEV;
 
-#ifdef ACPI_DEBUG
-	save_dbg_layer = acpi_dbg_layer;
-	acpi_dbg_layer = dbg_layer;
-
-	save_dbg_level = acpi_dbg_level;
-	acpi_dbg_level = dbg_level;
-#endif /*ACPI_DEBUG*/
-
 	bm_proc_root = proc_mkdir(BM_PROC_ROOT, NULL);
 	if (!bm_proc_root) {
 		return(AE_ERROR);
@@ -361,11 +339,6 @@ bm_osl_cleanup(void)
 		remove_proc_entry(BM_PROC_ROOT, NULL);
 		bm_proc_root = NULL;
 	}
-
-#ifdef ACPI_DEBUG
-	acpi_dbg_layer = save_dbg_layer;
-	acpi_dbg_level = save_dbg_level;
-#endif /*ACPI_DEBUG*/
 
 	return;
 }

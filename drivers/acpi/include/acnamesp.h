@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acnamesp.h - Namespace subcomponent prototypes and defines
- *       $Revision: 107 $
+ *       $Revision: 110 $
  *
  *****************************************************************************/
 
@@ -98,17 +98,15 @@ acpi_ns_walk_namespace (
 	acpi_handle             start_object,
 	u32                     max_depth,
 	u8                      unlock_before_callback,
-	ACPI_WALK_CALLBACK      user_function,
+	acpi_walk_callback      user_function,
 	void                    *context,
 	void                    **return_value);
 
-
 acpi_namespace_node *
-acpi_ns_get_next_object (
+acpi_ns_get_next_node (
 	acpi_object_type8       type,
 	acpi_namespace_node     *parent,
 	acpi_namespace_node     *child);
-
 
 acpi_status
 acpi_ns_delete_namespace_by_owner (
@@ -224,6 +222,7 @@ acpi_ns_dump_root_devices (
 void
 acpi_ns_dump_objects (
 	acpi_object_type8       type,
+	u8                      display_type,
 	u32                     max_depth,
 	u32                     ownder_id,
 	acpi_handle             start_handle);
@@ -304,7 +303,6 @@ acpi_ns_pattern_match (
 	acpi_namespace_node     *obj_node,
 	NATIVE_CHAR             *search_for);
 
-
 acpi_status
 acpi_ns_get_node (
 	NATIVE_CHAR             *pathname,
@@ -382,11 +380,11 @@ acpi_ns_local (
 
 acpi_status
 acpi_ns_build_internal_name (
-	ACPI_NAMESTRING_INFO    *info);
+	acpi_namestring_info    *info);
 
 acpi_status
 acpi_ns_get_internal_name_length (
-	ACPI_NAMESTRING_INFO    *info);
+	acpi_namestring_info    *info);
 
 acpi_status
 acpi_ns_internalize_name (
@@ -401,7 +399,7 @@ acpi_ns_externalize_name (
 	NATIVE_CHAR             **converted_name);
 
 acpi_namespace_node *
-acpi_ns_convert_handle_to_entry (
+acpi_ns_map_handle_to_node (
 	acpi_handle             handle);
 
 acpi_handle
@@ -418,7 +416,7 @@ acpi_ns_get_parent_object (
 
 
 acpi_namespace_node *
-acpi_ns_get_next_valid_object (
+acpi_ns_get_next_valid_node (
 	acpi_namespace_node     *node);
 
 

@@ -427,8 +427,8 @@ st5481_setup_isocpipes(struct urb* urb[2], struct usb_device *dev,
 			
 		// Fill the isochronous URB
 		fill_isoc_urb(urb[j], dev, pipe, buf, 
-				     num_packets, packet_size, complete,
-				     context);
+			      num_packets, packet_size, complete,
+			      context);
 	}
 	return 0;
 

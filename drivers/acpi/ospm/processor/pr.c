@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Module Name: pr.c
- *   $Revision: 32 $
+ *   $Revision: 34 $
  *
  *****************************************************************************/
 
@@ -63,7 +63,7 @@ pr_print (
 #ifdef ACPI_DEBUG
 	acpi_buffer             buffer;
 
-	PROC_NAME("pr_print");
+	FUNCTION_TRACE("pr_print");
 
 	buffer.length = 256;
 	buffer.pointer = acpi_os_callocate(buffer.length);
@@ -80,7 +80,7 @@ pr_print (
 	 * Print out basic processor information.
 	 */
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Processor[%02x]:[%p] uid[%02x] %s\n", processor->device_handle, processor->acpi_handle, processor->uid, buffer.pointer));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "| Processor[%02x]:[%p] uid[%02x] %s\n", processor->device_handle, processor->acpi_handle, processor->uid, (char*)buffer.pointer));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   power: %cC0 %cC1 %cC2[%d] %cC3[%d]\n", (processor->power.state[0].is_valid?'+':'-'), (processor->power.state[1].is_valid?'+':'-'), (processor->power.state[2].is_valid?'+':'-'), processor->power.state[2].latency, (processor->power.state[3].is_valid?'+':'-'), processor->power.state[3].latency));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "|   performance: states[%d]\n", processor->performance.state_count));
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INFO, "+------------------------------------------------------------\n"));
@@ -140,7 +140,7 @@ pr_add_device(
 	 * Processor Block:
 	 * ----------------
 	 */
-	MEMSET(&acpi_object, 0, sizeof(acpi_object));
+	memset(&acpi_object, 0, sizeof(acpi_object));
 
 	buffer.length = sizeof(acpi_object);
 	buffer.pointer = &acpi_object;
@@ -261,8 +261,8 @@ pr_initialize (void)
 
 	FUNCTION_TRACE("pr_initialize");
 
-	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
-	MEMSET(&driver, 0, sizeof(BM_DRIVER));
+	memset(&criteria, 0, sizeof(BM_DEVICE_ID));
+	memset(&driver, 0, sizeof(BM_DRIVER));
 
 	/*
 	 * Initialize power (Cx state) policy.
@@ -307,8 +307,8 @@ pr_terminate (void)
 
 	FUNCTION_TRACE("pr_terminate");
 
-	MEMSET(&criteria, 0, sizeof(BM_DEVICE_ID));
-	MEMSET(&driver, 0, sizeof(BM_DRIVER));
+	memset(&criteria, 0, sizeof(BM_DEVICE_ID));
+	memset(&driver, 0, sizeof(BM_DRIVER));
 
 	/*
 	 * Terminate power (Cx state) policy.

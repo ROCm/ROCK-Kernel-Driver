@@ -963,7 +963,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	if (!new_page)
 		goto no_mem;
 	copy_cow_page(old_page,new_page,address);
-	page_cache_release(old_page);
+	free_lru_page(old_page);
 
 	/*
 	 * Re-check the pte - we dropped the lock
@@ -973,18 +973,19 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		if (PageReserved(old_page))
 			++mm->rss;
 		break_cow(vma, new_page, address, page_table);
+		lru_cache_add(new_page);
 
 		/* Free the old page.. */
 		new_page = old_page;
 	}
-	page_cache_release(new_page);
+	free_lru_page(new_page);
 	return 1;	/* Minor fault */
 
 bad_wp_page:
 	printk("do_wp_page: bogus page at address %08lx (page 0x%lx)\n",address,(unsigned long)old_page);
 	return -1;
 no_mem:
-	page_cache_release(old_page);
+	free_lru_page(old_page);
 	spin_lock(&mm->page_table_lock);
 	return -1;
 }
@@ -1212,6 +1213,7 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		mm->rss++;
 		flush_page_to_ram(page);
 		entry = pte_mkwrite(pte_mkdirty(mk_pte(page, vma->vm_page_prot)));
+		lru_cache_add(page);
 	}
 
 	set_pte(page_table, entry);

@@ -87,11 +87,11 @@ void activate_page(struct page * page)
  */
 void lru_cache_add(struct page * page)
 {
-	if (!PageLocked(page))
-		BUG();
-	spin_lock(&pagemap_lru_lock);
-	add_page_to_inactive_list(page);
-	spin_unlock(&pagemap_lru_lock);
+	if (!PageActive(page) && !PageInactive(page)) {
+		spin_lock(&pagemap_lru_lock);
+		add_page_to_inactive_list(page);
+		spin_unlock(&pagemap_lru_lock);
+	}
 }
 
 /**
@@ -107,8 +107,9 @@ void __lru_cache_del(struct page * page)
 		del_page_from_active_list(page);
 	} else if (PageInactive(page)) {
 		del_page_from_inactive_list(page);
-	} else
-		printk("VM: __lru_cache_del, found unknown page ?!\n");
+	} else {
+//		printk("VM: __lru_cache_del, found unknown page ?!\n");
+	}
 	DEBUG_LRU_PAGE(page);
 }
 
@@ -118,8 +119,6 @@ void __lru_cache_del(struct page * page)
  */
 void lru_cache_del(struct page * page)
 {
-	if (!PageLocked(page))
-		BUG();
 	spin_lock(&pagemap_lru_lock);
 	__lru_cache_del(page);
 	spin_unlock(&pagemap_lru_lock);

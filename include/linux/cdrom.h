@@ -777,10 +777,25 @@ struct cdrom_device_ops {
 };
 
 /* the general block_device operations structure: */
-extern struct block_device_operations cdrom_fops;
+extern int cdrom_open(struct inode *, struct file *);
+extern int cdrom_release(struct inode *, struct file *);
+extern int cdrom_ioctl(struct inode *, struct file *, unsigned, unsigned long);
+extern int cdrom_media_changed(kdev_t);
 
 extern int register_cdrom(struct cdrom_device_info *cdi);
 extern int unregister_cdrom(struct cdrom_device_info *cdi);
+
+static inline void devfs_plain_cdrom(struct cdrom_device_info *cdi,
+				struct block_device_operations *ops)
+{
+	char vname[23];
+
+	sprintf (vname, "cdroms/cdrom%d", cdi->number);
+	cdi->de = devfs_register (NULL, vname, DEVFS_FL_DEFAULT,
+				    MAJOR (cdi->dev), MINOR (cdi->dev),
+				    S_IFBLK | S_IRUGO | S_IWUGO,
+				    ops, NULL);
+}
 
 typedef struct {
     int data;

@@ -2,7 +2,7 @@
  *
  * Module Name: tbxface - Public interfaces to the ACPI subsystem
  *                         ACPI table oriented interfaces
- *              $Revision: 43 $
+ *              $Revision: 45 $
  *
  *****************************************************************************/
 
@@ -57,14 +57,6 @@ acpi_load_tables (void)
 
 
 	FUNCTION_TRACE ("Acpi_load_tables");
-
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 
 	/* Get the RSDP */
@@ -154,13 +146,6 @@ acpi_load_table (
 	FUNCTION_TRACE ("Acpi_load_table");
 
 
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
 	if (!table_ptr) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
@@ -213,18 +198,10 @@ acpi_unload_table (
 	acpi_table_type         table_type)
 {
 	acpi_table_desc         *list_head;
-	acpi_status             status;
 
 
 	FUNCTION_TRACE ("Acpi_unload_table");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/* Parameter validation */
 
@@ -288,13 +265,6 @@ acpi_get_table_header (
 
 	FUNCTION_TRACE ("Acpi_get_table_header");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	if ((instance == 0)                 ||
 		(table_type == ACPI_TABLE_RSDP) ||
@@ -371,13 +341,6 @@ acpi_get_table (
 
 	FUNCTION_TRACE ("Acpi_get_table");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/*
 	 *  If we have a buffer, we must have a length too

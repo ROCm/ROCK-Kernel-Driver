@@ -2,7 +2,7 @@
  *
  * Module Name: nsobject - Utilities for objects attached to namespace
  *                         table entries
- *              $Revision: 65 $
+ *              $Revision: 67 $
  *
  ******************************************************************************/
 
@@ -63,7 +63,6 @@ acpi_ns_attach_object (
 	acpi_operand_object     *previous_obj_desc;
 	acpi_object_type8       obj_type = ACPI_TYPE_ANY;
 	u8                      flags;
-	u16                     opcode;
 
 
 	FUNCTION_TRACE ("Ns_attach_object");
@@ -158,87 +157,6 @@ acpi_ns_attach_object (
 			obj_type = type;
 		}
 
-		/*
-		 * Type is TYPE_Any, we must try to determinte the
-		 * actual type of the object.
-		 * Check if value points into the AML code
-		 */
-		else if (acpi_tb_system_table_pointer (object)) {
-			/*
-			 * Object points into the AML stream.
-			 * Set a flag bit in the Node to indicate this
-			 */
-			flags |= ANOBJ_AML_ATTACHMENT;
-
-			/*
-			 * The next byte (perhaps the next two bytes)
-			 * will be the AML opcode
-			 */
-			MOVE_UNALIGNED16_TO_16 (&opcode, object);
-
-			/* Check for a recognized Opcode */
-
-			switch ((u8) opcode) {
-
-			case AML_OP_PREFIX:
-
-				if (opcode != AML_REVISION_OP) {
-					/*
-					 * Op_prefix is unrecognized unless part
-					 * of Revision_op
-					 */
-					break;
-				}
-
-				/* case AML_REVISION_OP: fall through and set the type to Integer */
-
-			case AML_ZERO_OP:
-			case AML_ONES_OP:
-			case AML_ONE_OP:
-			case AML_BYTE_OP:
-			case AML_WORD_OP:
-			case AML_DWORD_OP:
-			case AML_QWORD_OP:
-
-				obj_type = ACPI_TYPE_INTEGER;
-				break;
-
-
-			case AML_STRING_OP:
-
-				obj_type = ACPI_TYPE_STRING;
-				break;
-
-
-			case AML_BUFFER_OP:
-
-				obj_type = ACPI_TYPE_BUFFER;
-				break;
-
-
-			case AML_MUTEX_OP:
-
-				obj_type = ACPI_TYPE_MUTEX;
-				break;
-
-
-			case AML_PACKAGE_OP:
-
-				obj_type = ACPI_TYPE_PACKAGE;
-				break;
-
-
-			default:
-
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-					"AML Opcode/Type [%x] not supported in attach\n",
-					(u8) opcode));
-
-				return_ACPI_STATUS (AE_TYPE);
-				break;
-			}
-		}
-
 		else {
 			/*
 			 * Cannot figure out the type -- set to Def_any which
@@ -249,12 +167,7 @@ acpi_ns_attach_object (
 					"Ns_attach_object confused: setting bogus type for ",
 					ACPI_LV_INFO, _COMPONENT);
 
-				if (acpi_tb_system_table_pointer (object)) {
-					ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-						"AML-stream code %02x\n", *(u8 *) object));
-				}
-
-				else if (VALID_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_NAMED)) {
+				if (VALID_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_NAMED)) {
 					DUMP_PATHNAME (object, "name ", ACPI_LV_INFO, _COMPONENT);
 				}
 
@@ -270,7 +183,7 @@ acpi_ns_attach_object (
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Installing %p into Node %p [%4.4s]\n",
-		obj_desc, node, &node->name));
+		obj_desc, node, (char*)&node->name));
 
 
 	/*
@@ -340,21 +253,12 @@ acpi_ns_detach_object (
 
 	node->object = NULL;
 
-	/* Found a valid value */
-
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Object=%p Value=%p Name %4.4s\n",
-		node, obj_desc, &node->name));
+		node, obj_desc, (char*)&node->name));
 
-	/*
-	 * Not every value is an object allocated via ACPI_MEM_CALLOCATE,
-	 * - must check
-	 */
-	if (!acpi_tb_system_table_pointer (obj_desc)) {
-		/* Attempt to delete the object (and all subobjects) */
+	/* Remove one reference on the object (and all subobjects) */
 
-		acpi_ut_remove_reference (obj_desc);
-	}
-
+	acpi_ut_remove_reference (obj_desc);
 	return_VOID;
 }
 

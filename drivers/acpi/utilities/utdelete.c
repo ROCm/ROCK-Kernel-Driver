@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utdelete - object deletion and reference count utilities
- *              $Revision: 76 $
+ *              $Revision: 81 $
  *
  ******************************************************************************/
 
@@ -183,13 +183,9 @@ acpi_ut_delete_internal_obj (
 	 * Delete any allocated memory found above
 	 */
 	if (obj_pointer) {
-		if (!acpi_tb_system_table_pointer (obj_pointer)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Deleting Obj Ptr %p \n", obj_pointer));
-
-			ACPI_MEM_FREE (obj_pointer);
-		}
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Deleting Obj Ptr %p \n", obj_pointer));
+		ACPI_MEM_FREE (obj_pointer);
 	}
-
 
 	/* Only delete the object if it was dynamically allocated */
 
@@ -346,8 +342,8 @@ acpi_ut_update_ref_count (
 	 */
 	if (count > MAX_REFERENCE_COUNT) {
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"**** AE_ERROR **** Invalid Reference Count (%X) in object %p\n\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_WARN,
+			"**** Warning **** Large Reference Count (%X) in object %p\n\n",
 			count, object));
 	}
 
@@ -405,11 +401,6 @@ acpi_ut_update_object_reference (
 	 */
 	if (VALID_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_NAMED)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Object %p is NS handle\n", object));
-		return_ACPI_STATUS (AE_OK);
-	}
-
-	if (acpi_tb_system_table_pointer (object)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "**** Object %p is Pcode Ptr\n", object));
 		return_ACPI_STATUS (AE_OK);
 	}
 
@@ -529,24 +520,9 @@ acpi_ut_update_object_reference (
 
 
 		case ACPI_TYPE_REGION:
-
-	/* TBD: [Investigate]
-			Acpi_ut_update_ref_count (Object->Region.Addr_handler, Action);
-	*/
-/*
-			Status =
-				Acpi_ut_create_update_state_and_push (Object->Region.Addr_handler,
-						   Action, &State_list);
-			if (ACPI_FAILURE (Status))
-			{
-				return_ACPI_STATUS (Status);
-			}
-*/
-			break;
-
-
 		case INTERNAL_TYPE_REFERENCE:
 
+			/* No subobjects */
 			break;
 		}
 
@@ -625,6 +601,15 @@ acpi_ut_remove_reference (
 
 	FUNCTION_TRACE_PTR ("Ut_remove_reference", object);
 
+	/*
+	 * Allow a NULL pointer to be passed in, just ignore it.  This saves
+	 * each caller from having to check.  Also, ignore NS nodes.
+	 *
+	 */
+	if (!object ||
+		(VALID_DESCRIPTOR_TYPE (object, ACPI_DESC_TYPE_NAMED))) {
+		return_VOID;
+	}
 
 	/*
 	 * Ensure that we have a valid object

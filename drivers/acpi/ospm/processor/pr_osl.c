@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: pr_osl.c
- *   $Revision: 18 $
+ *   $Revision: 21 $
  *
  *****************************************************************************/
 
@@ -37,7 +37,6 @@
 
 MODULE_AUTHOR("Andrew Grover");
 MODULE_DESCRIPTION("ACPI Component Architecture (CA) - IA32 Processor Driver");
-MODULE_LICENSE("GPL");
 
 
 #define PR_PROC_ROOT		"processor"
@@ -157,14 +156,10 @@ pr_osl_add_device(
 			printk(" C%d", i);
 		}
 	}
-
-	if (processor->performance.state_count > 1) {
-		printk(", throttling states: %d", processor->performance.state_count);
-	}
-
-	if (acpi_piix4_bmisx)
-		printk(", PIIX workaround active");
-
+	if (processor->performance.state_count > 1)
+		printk(", %d throttling states", processor->performance.state_count);
+	if (acpi_piix4_bmisx && processor->power.state[3].is_valid)
+		printk(" (PIIX errata enabled)");
 	printk("\n");
 
 	sprintf(processor_uid, "%d", processor->uid);

@@ -204,6 +204,8 @@ MODULE_PARM(drive3,"1-6i");
 int pcd_init(void);
 void cleanup_module( void );
 
+static int pcd_dev_open(struct inode *inode, struct file *file);
+static void pcd_dev_release(struct inode *inode, struct file *file);
 static int pcd_open(struct cdrom_device_info *cdi, int purpose);
 static void pcd_release(struct cdrom_device_info *cdi);
 static int pcd_drive_status(struct cdrom_device_info *cdi, int slot_nr);
@@ -264,6 +266,13 @@ static char * pcd_buf;			/* buffer for request in progress */
 static int pcd_warned = 0;		/* Have we logged a phase warning ? */
 
 /* kernel glue structures */
+
+struct block_device_operations pcd_bdops = {
+	open:			pcd_dev_open,
+	release:		pcd_dev_release,
+	ioctl:			cdrom_ioctl,
+	check_media_change:	cdrom_media_changed,
+}
 
 static struct cdrom_device_ops pcd_dops = {
 	pcd_open,
@@ -335,13 +344,17 @@ int pcd_init (void)	/* preliminary initialisation */
 	/* get the atapi capabilities page */
 	pcd_probe_capabilities();
 
-	if (register_blkdev(MAJOR_NR,name,&cdrom_fops)) {
+	if (register_blkdev(MAJOR_NR,name,&pcd_bdops)) {
 		printk("pcd: unable to get major number %d\n",MAJOR_NR);
 		return -1;
 	}
 
-	for (unit=0;unit<PCD_UNITS;unit++)
-		if (PCD.present) register_cdrom(&PCD.info);
+	for (unit=0;unit<PCD_UNITS;unit++) {
+		if (PCD.present) {
+			register_cdrom(&PCD.info);
+			devfs_plain_cdrom(&PCD.info, &pcd_bdops);
+		}
+	}
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
 	read_ahead[MAJOR_NR] = 8;	/* 8 sector (4kB) read ahead */
@@ -352,20 +365,36 @@ int pcd_init (void)	/* preliminary initialisation */
 	return 0;
 }
 
+static int pcd_dev_open(struct inode *inode, struct file *file)
+{
+	int err;
+
+	MOD_INC_USE_COUNT;
+	err = cdrom_open(inode, file);
+	if (err)
+		MOD_DEC_USE_COUNT;
+	return err;
+}
+
+static int pcd_dev_release(struct inode *inode, struct file *file)
+{
+	int err = cdrom_release(inode, file);
+	MOD_DEC_USE_COUNT;
+	return err;
+}
+
 static int pcd_open(struct cdrom_device_info *cdi, int purpose)
 
 {	int unit = DEVICE_NR(cdi->dev);
 
 	if  ((unit >= PCD_UNITS) || (!PCD.present)) return -ENODEV;
 
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
 static void pcd_release(struct cdrom_device_info *cdi)
 
-{	MOD_DEC_USE_COUNT;
+{
 }
 
 #ifdef MODULE

@@ -2,7 +2,7 @@
  *
  * Module Name: dbfileio - Debugger file I/O commands.  These can't usually
  *              be used when running the debugger in Ring 0 (Kernel mode)
- *              $Revision: 48 $
+ *              $Revision: 53 $
  *
  ******************************************************************************/
 
@@ -38,16 +38,18 @@
 	 MODULE_NAME         ("dbfileio")
 
 
+/*
+ * NOTE: this is here for lack of a better place.  It is used in all
+ * flavors of the debugger, need LCD file
+ */
 #ifdef ACPI_APPLICATION
 #include <stdio.h>
 FILE                        *acpi_gbl_debug_file = NULL;
 #endif
 
 
-/*
- * NOTE: this is here for lack of a better place.  It is used in all
- *  flavors of the debugger, need LCD file
- */
+acpi_table_header           *acpi_gbl_db_table_ptr = NULL;
+
 
 /*******************************************************************************
  *
@@ -172,7 +174,7 @@ acpi_db_load_table(
 	u32                     *table_length)
 {
 	acpi_table_header       table_header;
-	u8                      *aml_ptr;
+	u8                      *aml_start;
 	u32                     aml_length;
 	u32                     actual;
 	acpi_status             status;
@@ -209,7 +211,7 @@ acpi_db_load_table(
 	/* Allocate a buffer for the table */
 
 	*table_length = table_header.length;
-	*table_ptr = ACPI_MEM_ALLOCATE ((size_t) *table_length);
+	*table_ptr = acpi_os_allocate ((size_t) *table_length);
 	if (!*table_ptr) {
 		acpi_os_printf ("Could not allocate memory for ACPI table %4.4s (size=%X)\n",
 				 table_header.signature, table_header.length);
@@ -217,8 +219,8 @@ acpi_db_load_table(
 	}
 
 
-	aml_ptr     = (u8 *) *table_ptr + sizeof (table_header);
-	aml_length  = *table_length - sizeof (table_header);
+	aml_start = (u8 *) *table_ptr + sizeof (table_header);
+	aml_length = *table_length - sizeof (table_header);
 
 	/* Copy the header to the buffer */
 
@@ -226,19 +228,19 @@ acpi_db_load_table(
 
 	/* Get the rest of the table */
 
-	actual = fread (aml_ptr, 1, (size_t) aml_length, fp);
+	actual = fread (aml_start, 1, (size_t) aml_length, fp);
 	if (actual == aml_length) {
 		return (AE_OK);
 	}
 
 	if (actual > 0) {
 		acpi_os_printf ("Warning - reading table, asked for %X got %X\n", aml_length, actual);
-	   return (AE_OK);
+		return (AE_OK);
 	}
 
 
 	acpi_os_printf ("Error - could not read the table file\n");
-	ACPI_MEM_FREE (*table_ptr);
+	acpi_os_free (*table_ptr);
 	*table_ptr = NULL;
 	*table_length = 0;
 
@@ -325,7 +327,6 @@ acpi_db_load_acpi_table (
 #ifdef ACPI_APPLICATION
 	FILE                    *fp;
 	acpi_status             status;
-	acpi_table_header       *table_ptr;
 	u32                     table_length;
 
 
@@ -341,7 +342,7 @@ acpi_db_load_acpi_table (
 	/* Get the entire file */
 
 	acpi_os_printf ("Loading Acpi table from file %s\n", filename);
-	status = acpi_db_load_table (fp, &table_ptr, &table_length);
+	status = acpi_db_load_table (fp, &acpi_gbl_db_table_ptr, &table_length);
 	fclose(fp);
 
 	if (ACPI_FAILURE (status)) {
@@ -349,27 +350,25 @@ acpi_db_load_acpi_table (
 		return (status);
 	}
 
-
 	/* Attempt to recognize and install the table */
-	status = ae_local_load_table (table_ptr);
 
+	status = ae_local_load_table (acpi_gbl_db_table_ptr);
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_EXIST) {
 			acpi_os_printf ("Table %4.4s is already installed\n",
-					  &table_ptr->signature);
+					  &acpi_gbl_db_table_ptr->signature);
 		}
-
 		else {
 			acpi_os_printf ("Could not install table, %s\n",
 					  acpi_format_exception (status));
 		}
 
-		ACPI_MEM_FREE (table_ptr);
+		acpi_os_free (acpi_gbl_db_table_ptr);
 		return (status);
 	}
 
 	acpi_os_printf ("%4.4s at %p successfully installed and loaded\n",
-			  &table_ptr->signature, table_ptr);
+			  &acpi_gbl_db_table_ptr->signature, acpi_gbl_db_table_ptr);
 
 	acpi_gbl_acpi_hardware_present = FALSE;
 

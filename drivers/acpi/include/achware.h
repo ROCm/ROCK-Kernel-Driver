@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: achware.h -- hardware specific interfaces
- *       $Revision: 55 $
+ *       $Revision: 56 $
  *
  *****************************************************************************/
 
@@ -105,20 +105,37 @@ acpi_hw_get_bit_shift (
 
 void
 acpi_hw_enable_gpe (
-	u32                     gpe_index);
+	u32                     gpe_number);
+
+void
+acpi_hw_enable_gpe_for_wakeup (
+	u32                     gpe_number);
 
 void
 acpi_hw_disable_gpe (
-	u32                     gpe_index);
+	u32                     gpe_number);
+
+void
+acpi_hw_disable_gpe_for_wakeup (
+	u32                     gpe_number);
 
 void
 acpi_hw_clear_gpe (
-	u32                     gpe_index);
+	u32                     gpe_number);
 
 void
 acpi_hw_get_gpe_status (
 	u32                     gpe_number,
 	acpi_event_status       *event_status);
+
+void
+acpi_hw_disable_non_wakeup_gpes (
+	void);
+
+void
+acpi_hw_enable_non_wakeup_gpes (
+	void);
+
 
 /* Sleep Prototypes */
 

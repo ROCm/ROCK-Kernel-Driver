@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evrgnini- ACPI Address_space (Op_region) init
- *              $Revision: 46 $
+ *              $Revision: 48 $
  *
  *****************************************************************************/
 
@@ -145,7 +145,7 @@ acpi_ev_pci_config_region_setup (
 	acpi_operand_object     *handler_obj;
 	acpi_namespace_node     *node;
 	acpi_operand_object     *region_obj = (acpi_operand_object *) handle;
-	ACPI_DEVICE_ID          object_hID;
+	acpi_device_id          object_hID;
 
 
 	FUNCTION_TRACE ("Ev_pci_config_region_setup");
@@ -158,7 +158,7 @@ acpi_ev_pci_config_region_setup (
 		 *  routine checks before we get here, but we check again just in case.
 		 */
 		ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
-			"Attempting to init a region %X, with no handler\n", region_obj));
+			"Attempting to init a region %p, with no handler\n", region_obj));
 		return_ACPI_STATUS (AE_NOT_EXIST);
 	}
 
@@ -257,6 +257,70 @@ acpi_ev_pci_config_region_setup (
 	}
 
 	*region_context = pci_id;
+	return_ACPI_STATUS (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ev_pci_bar_region_setup
+ *
+ * PARAMETERS:  Region_obj          - region we are interested in
+ *              Function            - start or stop
+ *              Handler_context     - Address space handler context
+ *              Region_context      - Region specific context
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Do any prep work for region handling
+ *
+ * MUTEX:       Assumes namespace is not locked
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ev_pci_bar_region_setup (
+	acpi_handle             handle,
+	u32                     function,
+	void                    *handler_context,
+	void                    **region_context)
+{
+
+	FUNCTION_TRACE ("Ev_pci_bar_region_setup");
+
+
+	return_ACPI_STATUS (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ev_cmos_region_setup
+ *
+ * PARAMETERS:  Region_obj          - region we are interested in
+ *              Function            - start or stop
+ *              Handler_context     - Address space handler context
+ *              Region_context      - Region specific context
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Do any prep work for region handling
+ *
+ * MUTEX:       Assumes namespace is not locked
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ev_cmos_region_setup (
+	acpi_handle             handle,
+	u32                     function,
+	void                    *handler_context,
+	void                    **region_context)
+{
+
+	FUNCTION_TRACE ("Ev_cmos_region_setup");
+
+
 	return_ACPI_STATUS (AE_OK);
 }
 

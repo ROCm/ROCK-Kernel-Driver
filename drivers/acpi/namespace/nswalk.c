@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nswalk - Functions for walking the ACPI namespace
- *              $Revision: 24 $
+ *              $Revision: 26 $
  *
  *****************************************************************************/
 
@@ -33,27 +33,27 @@
 	 MODULE_NAME         ("nswalk")
 
 
-/****************************************************************************
+/*******************************************************************************
  *
- * FUNCTION:    Acpi_get_next_object
+ * FUNCTION:    Acpi_ns_get_next_node
  *
- * PARAMETERS:  Type                - Type of object to be searched for
- *              Parent              - Parent object whose children we are
- *                                      getting
- *              Last_child          - Previous child that was found.
+ * PARAMETERS:  Type                - Type of node to be searched for
+ *              Parent_node         - Parent node whose children we are
+ *                                     getting
+ *              Child_node          - Previous child that was found.
  *                                    The NEXT child will be returned
  *
  * RETURN:      acpi_namespace_node - Pointer to the NEXT child or NULL if
- *                                      none is found.
+ *                                    none is found.
  *
- * DESCRIPTION: Return the next peer object within the namespace.  If Handle
- *              is valid, Scope is ignored.  Otherwise, the first object
+ * DESCRIPTION: Return the next peer node within the namespace.  If Handle
+ *              is valid, Scope is ignored.  Otherwise, the first node
  *              within Scope is returned.
  *
- ****************************************************************************/
+ ******************************************************************************/
 
 acpi_namespace_node *
-acpi_ns_get_next_object (
+acpi_ns_get_next_node (
 	acpi_object_type8       type,
 	acpi_namespace_node     *parent_node,
 	acpi_namespace_node     *child_node)
@@ -73,11 +73,10 @@ acpi_ns_get_next_object (
 	}
 
 	else {
-		/* Start search at the NEXT object */
+		/* Start search at the NEXT node */
 
-		next_node = acpi_ns_get_next_valid_object (child_node);
+		next_node = acpi_ns_get_next_valid_node (child_node);
 	}
-
 
 	/* If any type is OK, we are done */
 
@@ -87,8 +86,7 @@ acpi_ns_get_next_object (
 		return (next_node);
 	}
 
-
-	/* Must search for the object -- but within this scope only */
+	/* Must search for the node -- but within this scope only */
 
 	while (next_node) {
 		/* If type matches, we are done */
@@ -97,11 +95,10 @@ acpi_ns_get_next_object (
 			return (next_node);
 		}
 
-		/* Otherwise, move on to the next object */
+		/* Otherwise, move on to the next node */
 
-		next_node = acpi_ns_get_next_valid_object (next_node);
+		next_node = acpi_ns_get_next_valid_node (next_node);
 	}
-
 
 	/* Not found */
 
@@ -109,7 +106,7 @@ acpi_ns_get_next_object (
 }
 
 
-/******************************************************************************
+/*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_walk_namespace
  *
@@ -120,13 +117,13 @@ acpi_ns_get_next_object (
  *                                    the callback routine
  *              User_function       - Called when an object of "Type" is found
  *              Context             - Passed to user function
- *
- * RETURNS      Return value from the User_function if terminated early.
- *              Otherwise, returns NULL.
+ *              Return_value        - from the User_function if terminated early.
+ *                                    Otherwise, returns NULL.
+ * RETURNS:     Status
  *
  * DESCRIPTION: Performs a modified depth-first walk of the namespace tree,
- *              starting (and ending) at the object specified by Start_handle.
- *              The User_function is called whenever an object that matches
+ *              starting (and ending) at the node specified by Start_handle.
+ *              The User_function is called whenever a node that matches
  *              the type parameter is found.  If the user function returns
  *              a non-zero value, the search is terminated immediately and this
  *              value is returned to the caller.
@@ -145,7 +142,7 @@ acpi_ns_walk_namespace (
 	acpi_handle             start_node,
 	u32                     max_depth,
 	u8                      unlock_before_callback,
-	ACPI_WALK_CALLBACK      user_function,
+	acpi_walk_callback      user_function,
 	void                    *context,
 	void                    **return_value)
 {
@@ -165,32 +162,26 @@ acpi_ns_walk_namespace (
 		start_node = acpi_gbl_root_node;
 	}
 
-
-	/* Null child means "get first object" */
+	/* Null child means "get first node" */
 
 	parent_node = start_node;
-	child_node = 0;
+	child_node  = 0;
 	child_type  = ACPI_TYPE_ANY;
 	level       = 1;
 
 	/*
-	 * Traverse the tree of objects until we bubble back up to where we
+	 * Traverse the tree of nodes until we bubble back up to where we
 	 * started. When Level is zero, the loop is done because we have
 	 * bubbled up to (and passed) the original parent handle (Start_entry)
 	 */
 	while (level > 0) {
-		/*
-		 * Get the next typed object in this scope.  Null returned
-		 * if not found
-		 */
-		status = AE_OK;
-		child_node = acpi_ns_get_next_object (ACPI_TYPE_ANY,
-				 parent_node,
-				 child_node);
+		/* Get the next node in this scope.  Null if not found */
 
+		status = AE_OK;
+		child_node = acpi_ns_get_next_node (ACPI_TYPE_ANY, parent_node, child_node);
 		if (child_node) {
 			/*
-			 * Found an object, Get the type if we are not
+			 * Found node, Get the type if we are not
 			 * searching for ANY
 			 */
 			if (type != ACPI_TYPE_ANY) {
@@ -199,7 +190,7 @@ acpi_ns_walk_namespace (
 
 			if (child_type == type) {
 				/*
-				 * Found a matching object, invoke the user
+				 * Found a matching node, invoke the user
 				 * callback function
 				 */
 				if (unlock_before_callback) {
@@ -245,11 +236,10 @@ acpi_ns_walk_namespace (
 			 * maximum depth has been reached.
 			 */
 			if ((level < max_depth) && (status != AE_CTRL_DEPTH)) {
-				if (acpi_ns_get_next_object (ACPI_TYPE_ANY,
-						 child_node, 0)) {
+				if (acpi_ns_get_next_node (ACPI_TYPE_ANY, child_node, 0)) {
 					/*
 					 * There is at least one child of this
-					 * object, visit the object
+					 * node, visit the onde
 					 */
 					level++;
 					parent_node   = child_node;
@@ -260,9 +250,9 @@ acpi_ns_walk_namespace (
 
 		else {
 			/*
-			 * No more children in this object (Acpi_ns_get_next_object
+			 * No more children of this node (Acpi_ns_get_next_node
 			 * failed), go back upwards in the namespace tree to
-			 * the object's parent.
+			 * the node's parent.
 			 */
 			level--;
 			child_node = parent_node;

@@ -192,7 +192,6 @@ do {						\
 	list_del(&(page)->lru);			\
 	ClearPageActive(page);			\
 	nr_active_pages--;			\
-	DEBUG_LRU_PAGE(page);			\
 } while (0)
 
 #define del_page_from_inactive_list(page)	\
@@ -200,7 +199,6 @@ do {						\
 	list_del(&(page)->lru);			\
 	ClearPageInactive(page);		\
 	nr_inactive_pages--;			\
-	DEBUG_LRU_PAGE(page);			\
 } while (0)
 
 /*

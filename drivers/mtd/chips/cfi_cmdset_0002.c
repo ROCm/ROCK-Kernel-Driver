@@ -8,7 +8,7 @@
  *
  * This code is GPL
  *
- * $Id: cfi_cmdset_0002.c,v 1.51 2001/10/02 15:05:12 dwmw2 Exp $
+ * $Id: cfi_cmdset_0002.c,v 1.52 2001/10/24 09:37:30 dwmw2 Exp $
  *
  */
 
@@ -66,7 +66,7 @@ struct mtd_info *cfi_cmdset_0002(struct map_info *map, int primary)
 		major = cfi_read_query(map, base + (adr+3)*ofs_factor);
 		minor = cfi_read_query(map, base + (adr+4)*ofs_factor);
 		
-		printk(" Amd/Fujitsu Extended Query Table v%c.%c at 0x%4.4X\n",
+		printk(KERN_NOTICE " Amd/Fujitsu Extended Query Table v%c.%c at 0x%4.4X\n",
 		       major, minor, adr);
 				cfi_send_gen_cmd(0xf0, 0x55, base, map, cfi, cfi->device_type, NULL);
 		
@@ -148,10 +148,10 @@ static struct mtd_info *cfi_amdstd_setup(struct map_info *map)
 	unsigned long devsize = (1<<cfi->cfiq->DevSize) * cfi->interleave;
 
 	mtd = kmalloc(sizeof(*mtd), GFP_KERNEL);
-	printk("number of %s chips: %d\n", (cfi->cfi_mode)?"JEDEC":"CFI",cfi->numchips);
+	printk(KERN_NOTICE "number of %s chips: %d\n", (cfi->cfi_mode)?"CFI":"JEDEC",cfi->numchips);
 
 	if (!mtd) {
-	  printk("Failed to allocate memory for MTD device\n");
+	  printk(KERN_WARNING "Failed to allocate memory for MTD device\n");
 	  kfree(cfi->cmdset_priv);
 	  return NULL;
 	}
@@ -172,7 +172,7 @@ static struct mtd_info *cfi_amdstd_setup(struct map_info *map)
 		mtd->numeraseregions = cfi->cfiq->NumEraseRegions * cfi->numchips;
 		mtd->eraseregions = kmalloc(sizeof(struct mtd_erase_region_info) * mtd->numeraseregions, GFP_KERNEL);
 		if (!mtd->eraseregions) { 
-			printk("Failed to allocate memory for MTD erase region info\n");
+			printk(KERN_WARNING "Failed to allocate memory for MTD erase region info\n");
 			kfree(cfi->cmdset_priv);
 			return NULL;
 		}
@@ -194,11 +194,12 @@ static struct mtd_info *cfi_amdstd_setup(struct map_info *map)
 		}
 		if (offset != devsize) {
 			/* Argh */
-			printk("Sum of regions (%lx) != total size of set of interleaved chips (%lx)\n", offset, devsize);
+			printk(KERN_WARNING "Sum of regions (%lx) != total size of set of interleaved chips (%lx)\n", offset, devsize);
 			kfree(mtd->eraseregions);
 			kfree(cfi->cmdset_priv);
 			return NULL;
 		}
+#if 0
 		// debug
 		for (i=0; i<mtd->numeraseregions;i++){
 			printk("%d: offset=0x%x,size=0x%x,blocks=%d\n",
@@ -206,6 +207,7 @@ static struct mtd_info *cfi_amdstd_setup(struct map_info *map)
 			       mtd->eraseregions[i].erasesize,
 			       mtd->eraseregions[i].numblocks);
 		}
+#endif
 	}
 
 	switch (CFIDEV_BUSWIDTH)
@@ -224,7 +226,7 @@ static struct mtd_info *cfi_amdstd_setup(struct map_info *map)
 		break;
 
 	default:
-	        printk("Unsupported buswidth\n");
+	        printk(KERN_WARNING "Unsupported buswidth\n");
 		kfree(mtd);
 		kfree(cfi->cmdset_priv);
 		return NULL;
@@ -249,7 +251,9 @@ static inline int do_read_onechip(struct map_info *map, struct flchip *chip, lof
 	cfi_spin_lock(chip->mutex);
 
 	if (chip->state != FL_READY){
-	        printk("Waiting for chip to read, status = %d\n", chip->state);
+#if 0
+	        printk(KERN_DEBUG "Waiting for chip to read, status = %d\n", chip->state);
+#endif
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		add_wait_queue(&chip->wq, &wait);
                 
@@ -332,7 +336,9 @@ static int do_write_oneword(struct map_info *map, struct flchip *chip, unsigned 
 	cfi_spin_lock(chip->mutex);
 
 	if (chip->state != FL_READY){
-	        printk("Waiting for chip to write, status = %d\n", chip->state);
+#if 0
+	        printk(KERN_DEBUG "Waiting for chip to write, status = %d\n", chip->state);
+#endif
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		add_wait_queue(&chip->wq, &wait);
                 
@@ -340,8 +346,8 @@ static int do_write_oneword(struct map_info *map, struct flchip *chip, unsigned 
 
 		schedule();
 		remove_wait_queue(&chip->wq, &wait);
-		printk("Wake up to write:\n");
 #if 0
+		printk(KERN_DEBUG "Wake up to write:\n");
 		if(signal_pending(current))
 			return -EINTR;
 #endif
@@ -386,7 +392,7 @@ static int do_write_oneword(struct map_info *map, struct flchip *chip, unsigned 
 	}
 	
 	if (Last[(Count - 1) % 4] != datum){
-		printk("Last[%ld] is %x, datum is %x\n",(Count - 1) % 4,Last[(Count - 1) % 4],datum);
+		printk(KERN_WARNING "Last[%ld] is %x, datum is %x\n",(Count - 1) % 4,Last[(Count - 1) % 4],datum);
 	        cfi_send_gen_cmd(0xF0, 0, chip->start, map, cfi, cfi->device_type, NULL);
 		DISABLE_VPP(map);
 		ret = -EIO;
@@ -600,7 +606,7 @@ static inline int do_erase_oneblock(struct map_info *map, struct flchip *chip, u
 			add_wait_queue(&chip->wq, &wait);
 			
 			cfi_spin_unlock(chip->mutex);
-			printk("erase suspended. Sleeping\n");
+			printk(KERN_DEBUG "erase suspended. Sleeping\n");
 			
 			schedule();
 			remove_wait_queue(&chip->wq, &wait);
@@ -617,7 +623,7 @@ static inline int do_erase_oneblock(struct map_info *map, struct flchip *chip, u
 		if (time_after(jiffies, timeo)) {
 			chip->state = FL_READY;
 			cfi_spin_unlock(chip->mutex);
-			printk("waiting for erase to complete timed out.");
+			printk(KERN_WARNING "waiting for erase to complete timed out.");
 			DISABLE_VPP(map);
 			return -EIO;
 		}
@@ -627,7 +633,7 @@ static inline int do_erase_oneblock(struct map_info *map, struct flchip *chip, u
 
 		z++;
 		if ( 0 && !(z % 100 )) 
-			printk("chip not ready yet after erase. looping\n");
+			printk(KERN_WARNING "chip not ready yet after erase. looping\n");
 
 		cfi_udelay(1);
 		
@@ -914,7 +920,7 @@ static void cfi_amdstd_resume(struct mtd_info *mtd)
 			wake_up(&chip->wq);
 		}
 		else
-			printk("Argh. Chip not in PM_SUSPENDED state upon resume()\n");
+			printk(KERN_ERR "Argh. Chip not in PM_SUSPENDED state upon resume()\n");
 
 		cfi_spin_unlock(chip->mutex);
 	}

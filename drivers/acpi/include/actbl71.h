@@ -41,7 +41,7 @@
 
 /* Only for clarity in declarations */
 
-typedef UINT64              IO_ADDRESS;
+typedef u64                 IO_ADDRESS;
 
 
 #pragma pack(1)
@@ -51,7 +51,7 @@ typedef struct  /* Root System Descriptor Pointer */
 	u8                      checksum;               /* to make sum of struct == 0 */
 	NATIVE_CHAR             oem_id [6];             /* OEM identification */
 	u8                      reserved;               /* Must be 0 for 1.0, 2 for 2.0 */
-	UINT64                  rsdt_physical_address;  /* 64-bit physical address of RSDT */
+	u64                     rsdt_physical_address;  /* 64-bit physical address of RSDT */
 } RSDP_DESCRIPTOR_REV071;
 
 
@@ -63,7 +63,7 @@ typedef struct
 {
 	acpi_table_header   header;                 /* Table header */
 	u32                 reserved_pad;           /* IA64 alignment, must be 0 */
-	UINT64              table_offset_entry [1]; /* Array of pointers to other */
+	u64                 table_offset_entry [1]; /* Array of pointers to other */
 			   /* tables' headers */
 } RSDT_DESCRIPTOR_REV071;
 
@@ -78,9 +78,9 @@ typedef struct
 	u32                 length;               /* length of structure, in bytes */
 	u32                 hardware_signature;   /* hardware configuration signature */
 	u32                 reserved4;            /* must be 0 */
-	UINT64              firmware_waking_vector; /* ACPI OS waking vector */
-	UINT64              global_lock;          /* Global Lock */
-	u32                 S4_bios_f     : 1;    /* Indicates if S4_bIOS support is present */
+	u64                 firmware_waking_vector; /* ACPI OS waking vector */
+	u64                 global_lock;          /* Global Lock */
+	u32                 S4bios_f      : 1;    /* Indicates if S4BIOS support is present */
 	u32                 reserved1     : 31;   /* must be 0 */
 	u8                  reserved3 [28];       /* reserved - must be zero */
 
@@ -95,24 +95,24 @@ typedef struct
 {
 	acpi_table_header   header;             /* table header */
 	u32                 reserved_pad;       /* IA64 alignment, must be 0 */
-	UINT64              firmware_ctrl;      /* 64-bit Physical address of FACS */
-	UINT64              dsdt;               /* 64-bit Physical address of DSDT */
+	u64                 firmware_ctrl;      /* 64-bit Physical address of FACS */
+	u64                 dsdt;               /* 64-bit Physical address of DSDT */
 	u8                  model;              /* System Interrupt Model */
 	u8                  address_space;      /* Address Space Bitmask */
 	u16                 sci_int;            /* System vector of SCI interrupt */
 	u8                  acpi_enable;        /* value to write to smi_cmd to enable ACPI */
 	u8                  acpi_disable;       /* value to write to smi_cmd to disable ACPI */
-	u8                  S4_bios_req;        /* Value to write to SMI CMD to enter S4_bIOS state */
+	u8                  S4bios_req;         /* Value to write to SMI CMD to enter S4BIOS state */
 	u8                  reserved2;          /* reserved - must be zero */
-	UINT64              smi_cmd;            /* Port address of SMI command port */
-	UINT64              pm1a_evt_blk;       /* Port address of Power Mgt 1a Acpi_event Reg Blk */
-	UINT64              pm1b_evt_blk;       /* Port address of Power Mgt 1b Acpi_event Reg Blk */
-	UINT64              pm1a_cnt_blk;       /* Port address of Power Mgt 1a Control Reg Blk */
-	UINT64              pm1b_cnt_blk;       /* Port address of Power Mgt 1b Control Reg Blk */
-	UINT64              pm2_cnt_blk;        /* Port address of Power Mgt 2 Control Reg Blk */
-	UINT64              pm_tmr_blk;         /* Port address of Power Mgt Timer Ctrl Reg Blk */
-	UINT64              gpe0blk;            /* Port addr of General Purpose Acpi_event 0 Reg Blk */
-	UINT64              gpe1_blk;           /* Port addr of General Purpose Acpi_event 1 Reg Blk */
+	u64                 smi_cmd;            /* Port address of SMI command port */
+	u64                 pm1a_evt_blk;       /* Port address of Power Mgt 1a Acpi_event Reg Blk */
+	u64                 pm1b_evt_blk;       /* Port address of Power Mgt 1b Acpi_event Reg Blk */
+	u64                 pm1a_cnt_blk;       /* Port address of Power Mgt 1a Control Reg Blk */
+	u64                 pm1b_cnt_blk;       /* Port address of Power Mgt 1b Control Reg Blk */
+	u64                 pm2_cnt_blk;        /* Port address of Power Mgt 2 Control Reg Blk */
+	u64                 pm_tmr_blk;         /* Port address of Power Mgt Timer Ctrl Reg Blk */
+	u64                 gpe0blk;            /* Port addr of General Purpose Acpi_event 0 Reg Blk */
+	u64                 gpe1_blk;           /* Port addr of General Purpose Acpi_event 1 Reg Blk */
 	u8                  pm1_evt_len;        /* Byte Length of ports at pm1_x_evt_blk */
 	u8                  pm1_cnt_len;        /* Byte Length of ports at pm1_x_cnt_blk */
 	u8                  pm2_cnt_len;        /* Byte Length of ports at pm2_cnt_blk */

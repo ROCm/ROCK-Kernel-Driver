@@ -430,6 +430,15 @@ unsigned long get_zeroed_page(unsigned int gfp_mask)
 	return 0;
 }
 
+void free_lru_page(struct page *page)
+{
+	if (!PageReserved(page) && put_page_testzero(page)) {
+		if (PageActive(page) || PageInactive(page))
+			lru_cache_del(page);
+		__free_pages_ok(page, 0);
+	}
+}
+
 void __free_pages(struct page *page, unsigned int order)
 {
 	if (!PageReserved(page) && put_page_testzero(page))

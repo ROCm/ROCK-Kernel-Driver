@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbxfroot - Find the root ACPI table (RSDT)
- *              $Revision: 49 $
+ *              $Revision: 52 $
  *
  *****************************************************************************/
 
@@ -152,7 +152,7 @@ acpi_tb_find_rsdp (
 {
 	u8                      *table_ptr;
 	u8                      *mem_rover;
-	UINT64                  phys_addr;
+	u64                     phys_addr;
 	acpi_status             status = AE_OK;
 
 
@@ -277,10 +277,10 @@ acpi_get_firmware_table (
 	acpi_table_header       **table_pointer)
 {
 	ACPI_PHYSICAL_ADDRESS   physical_address;
-	acpi_table_header       *rsdt_ptr;
+	acpi_table_header       *rsdt_ptr = NULL;
 	acpi_table_header       *table_ptr;
 	acpi_status             status;
-	u32                     rsdt_size;
+	u32                     rsdt_size = 0;
 	u32                     table_size;
 	u32                     table_count;
 	u32                     i;
@@ -304,18 +304,49 @@ acpi_get_firmware_table (
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	/* Get the RSDP */
+	if (!acpi_gbl_RSDP) {
+		/* Get the RSDP */
 
-	status = acpi_os_get_root_pointer (flags, &physical_address);
-	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "RSDP  not found\n"));
-		return_ACPI_STATUS (AE_NO_ACPI_TABLES);
+		status = acpi_os_get_root_pointer (flags, &physical_address);
+		if (ACPI_FAILURE (status)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "RSDP  not found\n"));
+			return_ACPI_STATUS (AE_NO_ACPI_TABLES);
+		}
+
+		/* Map and validate the RSDP */
+
+		if ((flags & ACPI_MEMORY_MODE) == ACPI_LOGICAL_ADDRESSING) {
+			status = acpi_os_map_memory (physical_address, sizeof (RSDP_DESCRIPTOR),
+					  (void **) &acpi_gbl_RSDP);
+			if (ACPI_FAILURE (status)) {
+				return_ACPI_STATUS (status);
+			}
+		}
+		else {
+			acpi_gbl_RSDP = (void *) (NATIVE_UINT) physical_address;
+		}
+
+		/*
+		 *  The signature and checksum must both be correct
+		 */
+		if (STRNCMP ((NATIVE_CHAR *) acpi_gbl_RSDP, RSDP_SIG, sizeof (RSDP_SIG)-1) != 0) {
+			/* Nope, BAD Signature */
+
+			status = AE_BAD_SIGNATURE;
+			goto cleanup;
+		}
+
+		if (acpi_tb_checksum (acpi_gbl_RSDP, RSDP_CHECKSUM_LENGTH) != 0) {
+			/* Nope, BAD Checksum */
+
+			status = AE_BAD_CHECKSUM;
+			goto cleanup;
+		}
 	}
 
-	acpi_gbl_RSDP = (RSDP_DESCRIPTOR *) (ACPI_TBLPTR) physical_address;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-		"RSDP located at %p, RSDT physical=%8.8lX%8.8lX \n",
+		"RSDP located at %p, RSDT physical=%8.8X%8.8X \n",
 		acpi_gbl_RSDP, HIDWORD(acpi_gbl_RSDP->rsdt_physical_address),
 		LODWORD(acpi_gbl_RSDP->rsdt_physical_address)));
 
@@ -377,7 +408,8 @@ acpi_get_firmware_table (
 
 		/* Delete table mapping if using virtual addressing */
 
-		if (table_size) {
+		if ((table_size) &&
+			((flags & ACPI_MEMORY_MODE) == ACPI_LOGICAL_ADDRESSING)) {
 			acpi_os_unmap_memory (table_ptr, table_size);
 		}
 	}

@@ -145,6 +145,9 @@ struct lp_struct {
 	struct semaphore port_mutex;
 	wait_queue_head_t dataq;
 	long timeout;
+	unsigned int best_mode;
+	unsigned int current_mode;
+	unsigned long bits;
 };
 
 /*

@@ -203,17 +203,6 @@ static int ramdisk_readpage(struct file *file, struct page * page)
 	return 0;
 }
 
-/*
- * Writing: just make sure the page gets marked dirty, so that
- * the page stealer won't grab it.
- */
-static int ramdisk_writepage(struct page *page)
-{
-	SetPageDirty(page);
-	UnlockPage(page);
-	return 0;
-}
-
 static int ramdisk_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
 	if (!Page_Uptodate(page)) {
@@ -233,7 +222,7 @@ static int ramdisk_commit_write(struct file *file, struct page *page, unsigned o
 
 static struct address_space_operations ramdisk_aops = {
 	readpage: ramdisk_readpage,
-	writepage: ramdisk_writepage,
+	writepage: fail_writepage,
 	prepare_write: ramdisk_prepare_write,
 	commit_write: ramdisk_commit_write,
 };

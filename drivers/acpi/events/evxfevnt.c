@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evxfevnt - External Interfaces, ACPI event disable/enable
- *              $Revision: 36 $
+ *              $Revision: 38 $
  *
  *****************************************************************************/
 
@@ -106,13 +106,6 @@ acpi_disable (void)
 	FUNCTION_TRACE ("Acpi_disable");
 
 
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
 	/* Restore original mode  */
 
 	status = acpi_hw_set_mode (acpi_gbl_original_mode);
@@ -136,6 +129,7 @@ acpi_disable (void)
  *
  * PARAMETERS:  Event           - The fixed event or GPE to be enabled
  *              Type            - The type of event
+ *              Flags           - Just enable, or also wake enable?
  *
  * RETURN:      Status
  *
@@ -146,7 +140,8 @@ acpi_disable (void)
 acpi_status
 acpi_enable_event (
 	u32                     event,
-	u32                     type)
+	u32                     type,
+	u32                     flags)
 {
 	acpi_status             status = AE_OK;
 	u32                     register_id;
@@ -154,13 +149,6 @@ acpi_enable_event (
 
 	FUNCTION_TRACE ("Acpi_enable_event");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/* The Type must be either Fixed Acpi_event or GPE */
 
@@ -223,7 +211,13 @@ acpi_enable_event (
 
 		/* Enable the requested GPE number */
 
-		acpi_hw_enable_gpe (event);
+		if (flags & ACPI_EVENT_ENABLE) {
+			acpi_hw_enable_gpe (event);
+		}
+		if (flags & ACPI_EVENT_WAKE_ENABLE) {
+			acpi_hw_enable_gpe_for_wakeup (event);
+		}
+
 		break;
 
 
@@ -242,7 +236,8 @@ acpi_enable_event (
  * FUNCTION:    Acpi_disable_event
  *
  * PARAMETERS:  Event           - The fixed event or GPE to be enabled
- *              Type            - The type of event
+ *              Type            - The type of event, fixed or general purpose
+ *              Flags           - Wake disable vs. non-wake disable
  *
  * RETURN:      Status
  *
@@ -253,7 +248,8 @@ acpi_enable_event (
 acpi_status
 acpi_disable_event (
 	u32                     event,
-	u32                     type)
+	u32                     type,
+	u32                     flags)
 {
 	acpi_status             status = AE_OK;
 	u32                     register_id;
@@ -261,13 +257,6 @@ acpi_disable_event (
 
 	FUNCTION_TRACE ("Acpi_disable_event");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/* The Type must be either Fixed Acpi_event or GPE */
 
@@ -329,7 +318,13 @@ acpi_disable_event (
 
 		/* Disable the requested GPE number */
 
-		acpi_hw_disable_gpe (event);
+		if (flags & ACPI_EVENT_DISABLE) {
+			acpi_hw_disable_gpe (event);
+		}
+		if (flags & ACPI_EVENT_WAKE_DISABLE) {
+			acpi_hw_disable_gpe_for_wakeup (event);
+		}
+
 		break;
 
 
@@ -365,13 +360,6 @@ acpi_clear_event (
 
 	FUNCTION_TRACE ("Acpi_clear_event");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	/* The Type must be either Fixed Acpi_event or GPE */
 
@@ -466,13 +454,6 @@ acpi_get_event_status (
 
 	FUNCTION_TRACE ("Acpi_get_event_status");
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
 
 	if (!event_status) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);

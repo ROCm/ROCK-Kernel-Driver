@@ -2,7 +2,7 @@
  *
  * Module Name: evmisc - ACPI device notification handler dispatch
  *                       and ACPI Global Lock support
- *              $Revision: 33 $
+ *              $Revision: 35 $
  *
  *****************************************************************************/
 
@@ -88,7 +88,7 @@ acpi_ev_queue_notify_request (
 		break;
 
 	default:
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Unknown Notify Value: %lx \n", notify_value));
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Unknown Notify Value: %X \n", notify_value));
 		break;
 	}
 
@@ -134,6 +134,7 @@ acpi_ev_queue_notify_request (
 			return (AE_NO_MEMORY);
 		}
 
+		notify_info->common.data_type = ACPI_DESC_TYPE_STATE_NOTIFY;
 		notify_info->notify.node      = node;
 		notify_info->notify.value     = (u16) notify_value;
 		notify_info->notify.handler_obj = handler_obj;
@@ -173,7 +174,7 @@ acpi_ev_notify_dispatch (
 	void                    *context)
 {
 	acpi_generic_state      *notify_info = (acpi_generic_state *) context;
-	ACPI_NOTIFY_HANDLER     global_handler = NULL;
+	acpi_notify_handler     global_handler = NULL;
 	void                    *global_context = NULL;
 	acpi_operand_object     *handler_obj;
 

@@ -119,9 +119,10 @@ int parport_poll_peripheral(struct parport *port,
 			    int usec)
 {
 	/* Zero return code is success, >0 is timeout. */
-	int counter = usec / 5;
+	int count = usec / 5 + 2;
+	int i;
 	unsigned char status;
-	for (; counter > 0; counter--) {
+	for (i = 0; i < count; i++) {
 		status = parport_read_status (port);
 		if ((status & mask) == result)
 			return 0;
@@ -129,7 +130,8 @@ int parport_poll_peripheral(struct parport *port,
 			return -EINTR;
 		if (current->need_resched)
 			break;
-		udelay (5);
+		if (i >= 2)
+			udelay (5);
 	}
 
 	return 1;

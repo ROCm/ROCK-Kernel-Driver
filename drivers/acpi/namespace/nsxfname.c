@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfname - Public interfaces to the ACPI subsystem
  *                         ACPI Namespace oriented interfaces
- *              $Revision: 80 $
+ *              $Revision: 82 $
  *
  *****************************************************************************/
 
@@ -70,13 +70,6 @@ acpi_get_handle (
 	FUNCTION_ENTRY ();
 
 
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return (status);
-	}
-
 	/* Parameter Validation */
 
 	if (!ret_handle || !pathname) {
@@ -88,7 +81,7 @@ acpi_get_handle (
 	if (parent) {
 		acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
-		prefix_node = acpi_ns_convert_handle_to_entry (parent);
+		prefix_node = acpi_ns_map_handle_to_node (parent);
 		if (!prefix_node) {
 			acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 			return (AE_BAD_PARAMETER);
@@ -144,13 +137,6 @@ acpi_get_name (
 	acpi_namespace_node     *node;
 
 
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return (status);
-	}
-
 	/* Buffer pointer must be valid always */
 
 	if (!ret_path_ptr || (name_type > ACPI_NAME_TYPE_MAX)) {
@@ -177,7 +163,7 @@ acpi_get_name (
 	 * Validate handle and convert to an Node
 	 */
 	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
-	node = acpi_ns_convert_handle_to_entry (handle);
+	node = acpi_ns_map_handle_to_node (handle);
 	if (!node) {
 		status = AE_BAD_PARAMETER;
 		goto unlock_and_exit;
@@ -226,20 +212,13 @@ acpi_get_object_info (
 	acpi_handle             handle,
 	acpi_device_info        *info)
 {
-	ACPI_DEVICE_ID          hid;
-	ACPI_DEVICE_ID          uid;
+	acpi_device_id          hid;
+	acpi_device_id          uid;
 	acpi_status             status;
 	u32                     device_status = 0;
 	acpi_integer            address = 0;
 	acpi_namespace_node     *node;
 
-
-	/* Ensure that ACPI has been initialized */
-
-	ACPI_IS_INITIALIZATION_COMPLETE (status);
-	if (ACPI_FAILURE (status)) {
-		return (status);
-	}
 
 	/* Parameter validation */
 
@@ -249,7 +228,7 @@ acpi_get_object_info (
 
 	acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
 
-	node = acpi_ns_convert_handle_to_entry (handle);
+	node = acpi_ns_map_handle_to_node (handle);
 	if (!node) {
 		acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 		return (AE_BAD_PARAMETER);

@@ -84,7 +84,7 @@ typedef struct  /* Root System Descriptor Pointer */
 	u8                      revision;               /* Must be 0 for 1.0, 2 for 2.0 */
 	u32                     rsdt_physical_address;  /* 32-bit physical address of RSDT */
 	u32                     length;                 /* XSDT Length in bytes including hdr */
-	UINT64                  xsdt_physical_address;  /* 64-bit physical address of XSDT */
+	u64                     xsdt_physical_address;  /* 64-bit physical address of XSDT */
 	u8                      extended_checksum;      /* Checksum of entire table */
 	NATIVE_CHAR             reserved [3];           /* reserved field must be 0 */
 
@@ -110,7 +110,7 @@ typedef struct  /* ACPI common table header */
 typedef struct  /* Common FACS for internal use */
 {
 	u32                     *global_lock;
-	UINT64                  *firmware_waking_vector;
+	u64                     *firmware_waking_vector;
 	u8                      vector_width;
 
 } acpi_common_facs;

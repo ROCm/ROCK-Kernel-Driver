@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswscope - Scope stack manipulation
- *              $Revision: 48 $
+ *              $Revision: 49 $
  *
  *****************************************************************************/
 
@@ -116,8 +116,9 @@ acpi_ds_scope_stack_push (
 
 	/* Init new scope object */
 
-	scope_info->scope.node = node;
-	scope_info->common.value = (u16) type;
+	scope_info->common.data_type = ACPI_DESC_TYPE_STATE_WSCOPE;
+	scope_info->scope.node      = node;
+	scope_info->common.value    = (u16) type;
 
 	/* Push new scope object onto stack */
 

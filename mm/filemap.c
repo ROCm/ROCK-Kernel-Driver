@@ -524,6 +524,29 @@ int generic_buffer_fdatasync(struct inode *inode, unsigned long start_idx, unsig
 	return retval;
 }
 
+/*
+ * In-memory filesystems have to fail their
+ * writepage function - and this has to be
+ * worked around in the VM layer..
+ *
+ * We
+ *  - mark the page dirty again (but do NOT
+ *    add it back to the inode dirty list, as
+ *    that would livelock in fdatasync)
+ *  - activate the page so that the page stealer
+ *    doesn't try to write it out over and over
+ *    again.
+ */
+int fail_writepage(struct page *page)
+{
+	activate_page(page);
+	SetPageDirty(page);
+	UnlockPage(page);
+	return 0;
+}
+
+EXPORT_SYMBOL(fail_writepage);
+
 /**
  *      filemap_fdatasync - walk the list of dirty pages of the given address space
  *     	and writepage() all of them.

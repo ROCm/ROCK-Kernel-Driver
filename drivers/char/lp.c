@@ -153,6 +153,10 @@ static struct parport *console_registered; // initially NULL
 
 #undef LP_DEBUG
 
+/* Bits used to manage claiming the parport device */
+#define LP_PREEMPT_REQUEST 1
+#define LP_PARPORT_CLAIMED 2
+
 /* --- low-level port access ----------------------------------- */
 
 #define r_dtr(x)	(parport_read_data(lp_table[(x)].dev->port))
@@ -160,15 +164,55 @@ static struct parport *console_registered; // initially NULL
 #define w_ctr(x,y)	do { parport_write_control(lp_table[(x)].dev->port, (y)); } while (0)
 #define w_dtr(x,y)	do { parport_write_data(lp_table[(x)].dev->port, (y)); } while (0)
 
+/* Claim the parport or block trying unless we've already claimed it */
+static void lp_claim_parport_or_block(struct lp_struct *this_lp)
+{
+	if (!test_and_set_bit(LP_PARPORT_CLAIMED, &this_lp->bits)) {
+		parport_claim_or_block (this_lp->dev);
+	}
+}
+
+/* Claim the parport or block trying unless we've already claimed it */
+static void lp_release_parport(struct lp_struct *this_lp)
+{
+	if (test_and_clear_bit(LP_PARPORT_CLAIMED, &this_lp->bits)) {
+		parport_release (this_lp->dev);
+	}
+}
+
+
+
+static int lp_preempt(void *handle)
+{
+	struct lp_struct *this_lp = (struct lp_struct *)handle;
+	set_bit(LP_PREEMPT_REQUEST, &this_lp->bits);
+	return (1);
+}
+
+
+/* 
+ * Try to negotiate to a new mode; if unsuccessful negotiate to
+ * compatibility mode.  Return the mode we ended up in.
+ */
+static int lp_negotiate(struct parport * port, int mode)
+{
+	if (parport_negotiate (port, mode) != 0) {
+		mode = IEEE1284_MODE_COMPAT;
+		parport_negotiate (port, mode);
+	}
+
+	return (mode);
+}
+
 static int lp_reset(int minor)
 {
 	int retval;
-	parport_claim_or_block (lp_table[minor].dev);
+	lp_claim_parport_or_block (&lp_table[minor]);
 	w_ctr(minor, LP_PSELECP);
 	udelay (LP_DELAY);
 	w_ctr(minor, LP_PSELECP | LP_PINITP);
 	retval = r_str(minor);
-	parport_release (lp_table[minor].dev);
+	lp_release_parport (&lp_table[minor]);
 	return retval;
 }
 
@@ -180,10 +224,10 @@ static void lp_error (int minor)
 		return;
 
 	polling = lp_table[minor].dev->port->irq == PARPORT_IRQ_NONE;
-	if (polling) parport_release (lp_table[minor].dev);
+	if (polling) lp_release_parport (&lp_table[minor]);
 	interruptible_sleep_on_timeout (&lp_table[minor].waitq,
 					LP_TIMEOUT_POLLED);
-	if (polling) parport_claim_or_block (lp_table[minor].dev);
+	if (polling) lp_claim_parport_or_block (&lp_table[minor]);
 	else parport_yield_blocking (lp_table[minor].dev);
 }
 
@@ -229,6 +273,12 @@ static int lp_check_status(int minor)
 static int lp_wait_ready(int minor)
 {
 	int error = 0;
+
+	/* If we're not in compatibility mode, we're ready now! */
+	if (lp_table[minor].current_mode != IEEE1284_MODE_COMPAT) {
+	  return (0);
+	}
+
 	do {
 		error = lp_check_status (minor);
 		if (error && (LP_F(minor) & LP_ABORT))
@@ -270,10 +320,10 @@ static ssize_t lp_write(struct file * file, const char * buf,
 
  	/* Claim Parport or sleep until it becomes available
  	 */
- 	parport_claim_or_block (lp_table[minor].dev);
-
-	/* Go to compatibility mode. */
-	parport_negotiate (port, IEEE1284_MODE_COMPAT);
+	lp_claim_parport_or_block (&lp_table[minor]);
+	/* Go to the proper mode. */
+	lp_table[minor].current_mode = lp_negotiate (port, 
+						     lp_table[minor].best_mode);
 
 	parport_set_timeout (lp_table[minor].dev,
 			     lp_table[minor].timeout);
@@ -298,7 +348,13 @@ static ssize_t lp_write(struct file * file, const char * buf,
 
 		if (copy_size > 0) {
 			/* incomplete write -> check error ! */
-			int error = lp_wait_ready (minor);
+			int error;
+
+			parport_negotiate (lp_table[minor].dev->port, 
+					   IEEE1284_MODE_COMPAT);
+			lp_table[minor].current_mode = IEEE1284_MODE_COMPAT;
+
+			error = lp_wait_ready (minor);
 
 			if (error) {
 				if (retv == 0)
@@ -307,6 +363,10 @@ static ssize_t lp_write(struct file * file, const char * buf,
 			}
 
 			parport_yield_blocking (lp_table[minor].dev);
+			lp_table[minor].current_mode 
+			  = lp_negotiate (port, 
+					  lp_table[minor].best_mode);
+
 		} else if (current->need_resched)
 			schedule ();
 
@@ -323,7 +383,14 @@ static ssize_t lp_write(struct file * file, const char * buf,
 		}	
 	} while (count > 0);
 
- 	parport_release (lp_table[minor].dev);
+	if (test_and_clear_bit(LP_PREEMPT_REQUEST, 
+			       &lp_table[minor].bits)) {
+		printk(KERN_INFO "lp%d releasing parport\n", minor);
+		parport_negotiate (lp_table[minor].dev->port, 
+				   IEEE1284_MODE_COMPAT);
+		lp_table[minor].current_mode = IEEE1284_MODE_COMPAT;
+		lp_release_parport (&lp_table[minor]);
+	}
 
 	up (&lp_table[minor].port_mutex);
 
@@ -347,9 +414,9 @@ static ssize_t lp_read(struct file * file, char * buf,
 	if (down_interruptible (&lp_table[minor].port_mutex))
 		return -EINTR;
 
-	parport_claim_or_block (lp_table[minor].dev);
+	lp_claim_parport_or_block (&lp_table[minor]);
 	retval = parport_read (port, kbuf, count);
-	parport_release (lp_table[minor].dev);
+	lp_release_parport (&lp_table[minor]);
 
 	if (retval > 0 && copy_to_user (buf, kbuf, retval))
 		retval = -EFAULT;
@@ -379,9 +446,9 @@ static int lp_open(struct inode * inode, struct file * file)
 	   should most likely only ever be used by the tunelp application. */
 	if ((LP_F(minor) & LP_ABORTOPEN) && !(file->f_flags & O_NONBLOCK)) {
 		int status;
-		parport_claim_or_block (lp_table[minor].dev);
+		lp_claim_parport_or_block (&lp_table[minor]);
 		status = r_str(minor);
-		parport_release (lp_table[minor].dev);
+		lp_release_parport (&lp_table[minor]);
 		if (status & LP_POUTPA) {
 			printk(KERN_INFO "lp%d out of paper\n", minor);
 			LP_F(minor) &= ~LP_BUSY;
@@ -401,6 +468,21 @@ static int lp_open(struct inode * inode, struct file * file)
 		LP_F(minor) &= ~LP_BUSY;
 		return -ENOMEM;
 	}
+	/* Determine if the peripheral supports ECP mode */
+	lp_claim_parport_or_block (&lp_table[minor]);
+	if ( (lp_table[minor].dev->port->modes & PARPORT_MODE_ECP) &&
+             !parport_negotiate (lp_table[minor].dev->port, 
+                                 IEEE1284_MODE_ECP)) {
+		printk (KERN_INFO "lp%d: ECP mode\n", minor);
+		lp_table[minor].best_mode = IEEE1284_MODE_ECP;
+	} else {
+		printk (KERN_INFO "lp%d: compatibility mode\n", minor);
+		lp_table[minor].best_mode = IEEE1284_MODE_COMPAT;
+	}
+	/* Leave peripheral in compatibility mode */
+	parport_negotiate (lp_table[minor].dev->port, IEEE1284_MODE_COMPAT);
+	lp_release_parport (&lp_table[minor]);
+	lp_table[minor].current_mode = IEEE1284_MODE_COMPAT;
 	return 0;
 }
 
@@ -408,6 +490,10 @@ static int lp_release(struct inode * inode, struct file * file)
 {
 	unsigned int minor = MINOR(inode->i_rdev);
 
+	lp_claim_parport_or_block (&lp_table[minor]);
+	parport_negotiate (lp_table[minor].dev->port, IEEE1284_MODE_COMPAT);
+	lp_table[minor].current_mode = IEEE1284_MODE_COMPAT;
+	lp_release_parport (&lp_table[minor]);
 	lock_kernel();
 	kfree(lp_table[minor].lp_buffer);
 	lp_table[minor].lp_buffer = NULL;
@@ -470,9 +556,9 @@ static int lp_ioctl(struct inode *inode, struct file *file,
 				return -EFAULT;
 			break;
 		case LPGETSTATUS:
-			parport_claim_or_block (lp_table[minor].dev);
+			lp_claim_parport_or_block (&lp_table[minor]);
 			status = r_str(minor);
-			parport_release (lp_table[minor].dev);
+			lp_release_parport (&lp_table[minor]);
 
 			if (copy_to_user((int *) arg, &status, sizeof(int)))
 				return -EFAULT;
@@ -657,7 +743,7 @@ static int lp_register(int nr, struct parport *port)
 	char name[8];
 
 	lp_table[nr].dev = parport_register_device(port, "lp", 
-						   NULL, NULL, NULL, 0,
+						   lp_preempt, NULL, NULL, 0,
 						   (void *) &lp_table[nr]);
 	if (lp_table[nr].dev == NULL)
 		return 1;

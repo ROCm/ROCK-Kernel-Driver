@@ -2,7 +2,7 @@
  *
  * Module Name: dsopcode - Dispatcher Op Region support and handling of
  *                         "control" opcodes
- *              $Revision: 52 $
+ *              $Revision: 56 $
  *
  *****************************************************************************/
 
@@ -61,6 +61,7 @@ acpi_ds_get_buffer_field_arguments (
 	acpi_parse_object       *field_op;
 	acpi_status             status;
 	acpi_table_desc         *table_desc;
+	acpi_walk_state         *walk_state;
 
 
 	FUNCTION_TRACE_PTR ("Ds_get_buffer_field_arguments", obj_desc);
@@ -78,7 +79,7 @@ acpi_ds_get_buffer_field_arguments (
 
 	DEBUG_EXEC(acpi_ut_display_init_pathname (node, " [Field]"));
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] Buffer_field JIT Init\n",
-		&node->name));
+		(char*)&node->name));
 
 
 	/*
@@ -101,17 +102,34 @@ acpi_ds_get_buffer_field_arguments (
 		return_ACPI_STATUS (status);
 	}
 
+	/* Create and initialize a new parser state */
+
+	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT,
+			   NULL, NULL, NULL);
+	if (!walk_state) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
+	}
+
+	status = acpi_ds_init_aml_walk (walk_state, op, NULL, extra_desc->extra.aml_start,
+			  extra_desc->extra.aml_length, NULL, NULL, 1);
+	if (ACPI_FAILURE (status)) {
+		/* TBD: delete walk state */
+		return_ACPI_STATUS (status);
+	}
+
+	/* TBD: No Walk flags?? */
+
+	walk_state->parse_flags = 0;
+
 	/* Pass1: Parse the entire Buffer_field declaration */
 
-	status = acpi_ps_parse_aml (op, extra_desc->extra.pcode,
-			  extra_desc->extra.pcode_length, 0,
-			  NULL, NULL, NULL, acpi_ds_load1_begin_op, acpi_ds_load1_end_op);
+	status = acpi_ps_parse_aml (walk_state);
 	if (ACPI_FAILURE (status)) {
 		acpi_ps_delete_parse_tree (op);
 		return_ACPI_STATUS (status);
 	}
 
-	/* Get and init the actual Fiel_unit_op created above */
+	/* Get and init the actual Field_unit Op created above */
 
 	field_op = op->value.arg;
 	op->node = node;
@@ -121,7 +139,7 @@ acpi_ds_get_buffer_field_arguments (
 	field_op->node = node;
 	acpi_ps_delete_parse_tree (op);
 
-	/* Acpi_evaluate the address and length arguments for the Op_region */
+	/* Evaluate the address and length arguments for the Op_region */
 
 	op = acpi_ps_alloc_op (AML_SCOPE_OP);
 	if (!op) {
@@ -130,15 +148,23 @@ acpi_ds_get_buffer_field_arguments (
 
 	op->node = acpi_ns_get_parent_object (node);
 
-	status = acpi_ps_parse_aml (op, extra_desc->extra.pcode,
-			  extra_desc->extra.pcode_length,
-			  ACPI_PARSE_EXECUTE | ACPI_PARSE_DELETE_TREE,
-			  NULL /*Method_desc*/, NULL, NULL,
-			  acpi_ds_exec_begin_op, acpi_ds_exec_end_op);
-	/* All done with the parse tree, delete it */
+	/* Create and initialize a new parser state */
 
+	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT,
+			   NULL, NULL, NULL);
+	if (!walk_state) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
+	}
+
+	status = acpi_ds_init_aml_walk (walk_state, op, NULL, extra_desc->extra.aml_start,
+			  extra_desc->extra.aml_length, NULL, NULL, 3);
+	if (ACPI_FAILURE (status)) {
+		/* TBD: delete walk state */
+		return_ACPI_STATUS (status);
+	}
+
+	status = acpi_ps_parse_aml (walk_state);
 	acpi_ps_delete_parse_tree (op);
-
 
 	/*
 	 * The pseudo-method object is no longer needed since the region is
@@ -174,6 +200,7 @@ acpi_ds_get_region_arguments (
 	acpi_parse_object       *region_op;
 	acpi_status             status;
 	acpi_table_desc         *table_desc;
+	acpi_walk_state         *walk_state;
 
 
 	FUNCTION_TRACE_PTR ("Ds_get_region_arguments", obj_desc);
@@ -191,9 +218,8 @@ acpi_ds_get_region_arguments (
 
 	DEBUG_EXEC(acpi_ut_display_init_pathname (node, " [Operation Region]"));
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] Op_region Init at AML %p[%x]\n",
-		&node->name, extra_desc->extra.pcode,
-		*(u32*) extra_desc->extra.pcode));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[%4.4s] Op_region Init at AML %p\n",
+		(char*)&node->name, extra_desc->extra.aml_start));
 
 	/*
 	 * Allocate a new parser op to be the root of the parsed
@@ -215,11 +241,28 @@ acpi_ds_get_region_arguments (
 		return_ACPI_STATUS (status);
 	}
 
+	/* Create and initialize a new parser state */
+
+	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT,
+			   op, NULL, NULL);
+	if (!walk_state) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
+	}
+
+	status = acpi_ds_init_aml_walk (walk_state, op, NULL, extra_desc->extra.aml_start,
+			  extra_desc->extra.aml_length, NULL, NULL, 1);
+	if (ACPI_FAILURE (status)) {
+		/* TBD: delete walk state */
+		return_ACPI_STATUS (status);
+	}
+
+	/* TBD: No Walk flags?? */
+
+	walk_state->parse_flags = 0;
+
 	/* Parse the entire Op_region declaration, creating a parse tree */
 
-	status = acpi_ps_parse_aml (op, extra_desc->extra.pcode,
-			  extra_desc->extra.pcode_length, 0,
-			  NULL, NULL, NULL, acpi_ds_load1_begin_op, acpi_ds_load1_end_op);
+	status = acpi_ps_parse_aml (walk_state);
 	if (ACPI_FAILURE (status)) {
 		acpi_ps_delete_parse_tree (op);
 		return_ACPI_STATUS (status);
@@ -244,14 +287,22 @@ acpi_ds_get_region_arguments (
 
 	op->node = acpi_ns_get_parent_object (node);
 
-	status = acpi_ps_parse_aml (op, extra_desc->extra.pcode,
-			  extra_desc->extra.pcode_length,
-			  ACPI_PARSE_EXECUTE | ACPI_PARSE_DELETE_TREE,
-			  NULL /*Method_desc*/, NULL, NULL,
-			  acpi_ds_exec_begin_op, acpi_ds_exec_end_op);
+	/* Create and initialize a new parser state */
 
-	/* All done with the parse tree, delete it */
+	walk_state = acpi_ds_create_walk_state (TABLE_ID_DSDT,
+			   op, NULL, NULL);
+	if (!walk_state) {
+		return_ACPI_STATUS (AE_NO_MEMORY);
+	}
 
+	status = acpi_ds_init_aml_walk (walk_state, op, NULL, extra_desc->extra.aml_start,
+			  extra_desc->extra.aml_length, NULL, NULL, 3);
+	if (ACPI_FAILURE (status)) {
+		/* TBD: delete walk state */
+		return_ACPI_STATUS (status);
+	}
+
+	status = acpi_ps_parse_aml (walk_state);
 	acpi_ps_delete_parse_tree (op);
 
 	return_ACPI_STATUS (status);
@@ -668,7 +719,7 @@ acpi_ds_eval_region_operands (
 	acpi_ut_remove_reference (operand_desc);
 
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Rgn_obj %p Addr %8.8lX%8.8lX Len %X\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Rgn_obj %p Addr %8.8X%8.8X Len %X\n",
 		obj_desc, HIDWORD(obj_desc->region.address), LODWORD(obj_desc->region.address),
 		obj_desc->region.length));
 
@@ -731,7 +782,7 @@ acpi_ds_exec_begin_control_op (
 		 * of a loop
 		 */
 		walk_state->control_state->control.aml_predicate_start =
-				 walk_state->parser_state->aml - 1;
+				 walk_state->parser_state.aml - 1;
 				 /* TBD: can this be removed? */
 				 /*Acpi_ps_pkg_length_encoding_size (GET8 (Walk_state->Parser_state->Aml));*/
 		break;
