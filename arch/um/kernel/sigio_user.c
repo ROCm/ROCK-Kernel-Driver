@@ -420,7 +420,8 @@ int read_sigio_fd(int fd)
 
 static void sigio_cleanup(void)
 {
-	if(write_sigio_pid != -1) kill(write_sigio_pid, SIGKILL);
+	if(write_sigio_pid != -1)
+		kill(write_sigio_pid, SIGKILL);
 }
 
 __uml_exitcall(sigio_cleanup);

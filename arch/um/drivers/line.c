@@ -35,7 +35,7 @@ void line_timer_cb(void *arg)
 	line_interrupt(dev->driver->read_irq, dev, NULL);
 }
 
-void buffer_data(struct line *line, const char *buf, int len)
+static void buffer_data(struct line *line, const char *buf, int len)
 {
 	int end;
 
