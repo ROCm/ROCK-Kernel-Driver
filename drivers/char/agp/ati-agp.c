@@ -1,5 +1,5 @@
 /*
- * ALi AGPGART routines.
+ * ATi AGPGART routines.
  */
 
 #include <linux/types.h>
