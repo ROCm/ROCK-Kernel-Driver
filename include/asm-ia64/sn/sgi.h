@@ -17,20 +17,14 @@
 #include <asm/uaccess.h>		/* for copy_??_user */
 #include <linux/mm.h>
 #include <linux/devfs_fs_kernel.h>
-#ifdef CONFIG_HWGFS_FS
 #include <linux/fs.h>
 #include <asm/sn/hwgfs.h>
+
 typedef hwgfs_handle_t vertex_hdl_t;
-#else
-typedef devfs_handle_t vertex_hdl_t;
-#endif
 
 typedef int64_t  __psint_t;	/* needed by klgraph.c */
 
 typedef enum { B_FALSE, B_TRUE } boolean_t;
-
-#define ctob(x)			((uint64_t)(x)*NBPC)
-#define btoc(x)			(((uint64_t)(x)+(NBPC-1))/NBPC)
 
 
 /*
@@ -60,19 +54,9 @@ typedef uint64_t vhandl_t;
 #define NBPP PAGE_SIZE
 #define _PAGESZ PAGE_SIZE
 
-#ifndef D_MP
-#define D_MP 1
-#endif
-
 #ifndef MAXDEVNAME
 #define MAXDEVNAME 256
 #endif
-
-#ifndef NBPC
-#define NBPC 0
-#endif
-
-typedef uint64_t mrlock_t;	/* needed by devsupport.c */
 
 #define HUB_PIO_CONVEYOR 0x1
 #define CNODEID_NONE ((cnodeid_t)-1)
@@ -82,10 +66,6 @@ typedef uint64_t mrlock_t;	/* needed by devsupport.c */
 
 #define COPYIN(a, b, c)		copy_from_user(b,a,c)
 #define COPYOUT(a, b, c)	copy_to_user(b,a,c)
-
-#define kvtophys(x)		(alenaddr_t) (x)
-#define POFFMASK		(NBPP - 1)
-#define poff(X)			((__psunsigned_t)(X) & POFFMASK)
 
 #define BZERO(a,b)		memset(a, 0, b)
 
@@ -171,10 +151,6 @@ extern void print_register(unsigned long long, struct reg_desc *);
 /******************************************
  * Definitions that do not exist in linux *
  ******************************************/
-
-typedef int cred_t;	/* This is for compilation reasons */
-struct cred { int x; };
-
 
 #define DELAY(a)
 

@@ -15,7 +15,6 @@
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/sn_private.h>
-#include <asm/sn/pci/pciba.h>
 #include <linux/smp.h>
 #include <asm/sn/simulator.h>
 

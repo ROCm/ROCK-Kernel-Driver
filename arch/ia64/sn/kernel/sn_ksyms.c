@@ -26,25 +26,6 @@ extern cnodeid_t master_node_get(devfs_handle_t vhdl);
 EXPORT_SYMBOL(base_io_scsi_ctlr_vhdl);
 EXPORT_SYMBOL(master_node_get);
 
-
-/*
- * symbols referenced by the PCIBA module
- */
-#include <asm/sn/invent.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/pci/pciio.h>
-#include <asm/sn/sn_cpuid.h>
-
-devfs_handle_t
-devfn_to_vertex(unsigned char busnum, unsigned int devfn);
-EXPORT_SYMBOL(devfn_to_vertex);
-EXPORT_SYMBOL(hwgraph_vertex_unref);
-EXPORT_SYMBOL(pciio_config_get);
-EXPORT_SYMBOL(pciio_info_slot_get);
-EXPORT_SYMBOL(hwgraph_edge_add);
-EXPORT_SYMBOL(pciio_info_master_get);
-EXPORT_SYMBOL(pciio_info_get);
-
 #ifdef CONFIG_IA64_SGI_SN_DEBUG
 EXPORT_SYMBOL(__pa_debug);
 EXPORT_SYMBOL(__va_debug);

@@ -35,8 +35,6 @@ extern char *bcopy(const char * src, char * dest, int count);
 
 #define PCI_BUS_NO_1 1
 
-int pic_devflag = D_MP;
-
 extern int pcibr_attach2(vertex_hdl_t, bridge_t *, vertex_hdl_t, int, pcibr_soft_t *);
 extern void pcibr_driver_reg_callback(vertex_hdl_t, int, int, int);
 extern void pcibr_driver_unreg_callback(vertex_hdl_t, int, int, int);

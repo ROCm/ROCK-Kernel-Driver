@@ -566,6 +566,134 @@ sn_pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 	return 1;
 }
 
+#ifdef CONFIG_PCI
+
+/*
+ * New generic DMA routines just wrap sn2 PCI routines until we
+ * support other bus types (if ever).
+ */
+
+int
+sn_dma_supported(struct device *dev, u64 mask)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	return pci_dma_supported(to_pci_dev(dev), mask);
+}
+EXPORT_SYMBOL(sn_dma_supported);
+
+int
+sn_dma_set_mask(struct device *dev, u64 dma_mask)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	return pci_set_dma_mask(to_pci_dev(dev), dma_mask);
+}
+EXPORT_SYMBOL(sn_dma_set_mask);
+
+void *
+sn_dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
+		   int flag)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	return pci_alloc_consistent(to_pci_dev(dev), size, dma_handle);
+}
+EXPORT_SYMBOL(sn_dma_alloc_coherent);
+
+void
+sn_dma_free_coherent(struct device *dev, size_t size, void *cpu_addr,
+		    dma_addr_t dma_handle)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	pci_free_consistent(to_pci_dev(dev), size, cpu_addr, dma_handle);
+}
+EXPORT_SYMBOL(sn_dma_free_coherent);
+
+dma_addr_t
+sn_dma_map_single(struct device *dev, void *cpu_addr, size_t size,
+	       int direction)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	return pci_map_single(to_pci_dev(dev), cpu_addr, size, (int)direction);
+}
+EXPORT_SYMBOL(sn_dma_map_single);
+
+void
+sn_dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
+		 int direction)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	pci_unmap_single(to_pci_dev(dev), dma_addr, size, (int)direction);
+}
+EXPORT_SYMBOL(sn_dma_unmap_single);
+
+dma_addr_t
+sn_dma_map_page(struct device *dev, struct page *page,
+	     unsigned long offset, size_t size,
+	     int direction)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	return pci_map_page(to_pci_dev(dev), page, offset, size, (int)direction);
+}
+EXPORT_SYMBOL(sn_dma_map_page);
+
+void
+sn_dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
+	       int direction)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	pci_unmap_page(to_pci_dev(dev), dma_address, size, (int)direction);
+}
+EXPORT_SYMBOL(sn_dma_unmap_page);
+
+int
+sn_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+	   int direction)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	return pci_map_sg(to_pci_dev(dev), sg, nents, (int)direction);
+}
+EXPORT_SYMBOL(sn_dma_map_sg);
+
+void
+sn_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
+	     int direction)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	pci_unmap_sg(to_pci_dev(dev), sg, nhwentries, (int)direction);
+}
+EXPORT_SYMBOL(sn_dma_unmap_sg);
+
+void
+sn_dma_sync_single(struct device *dev, dma_addr_t dma_handle, size_t size,
+		int direction)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	pci_dma_sync_single(to_pci_dev(dev), dma_handle, size, (int)direction);
+}
+EXPORT_SYMBOL(sn_dma_sync_single);
+
+void
+sn_dma_sync_sg(struct device *dev, struct scatterlist *sg, int nelems,
+	    int direction)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	pci_dma_sync_sg(to_pci_dev(dev), sg, nelems, (int)direction);
+}
+EXPORT_SYMBOL(sn_dma_sync_sg);
+
+#endif /* CONFIG_PCI */
+
 EXPORT_SYMBOL(sn_pci_unmap_single);
 EXPORT_SYMBOL(sn_pci_map_single);
 EXPORT_SYMBOL(sn_pci_dma_sync_single);

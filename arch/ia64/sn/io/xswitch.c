@@ -23,8 +23,6 @@
 #define	NEW(ptr)	(ptr = kmalloc(sizeof (*(ptr)), GFP_KERNEL))
 #define	DEL(ptr)	(kfree(ptr))
 
-int                     xswitch_devflag = D_MP;
-
 /*
  * This file provides generic support for Crosstalk
  * Switches, in a way that insulates crosstalk providers

@@ -9,7 +9,7 @@
 # Makefile for the sn io routines.
 #
 
-EXTRA_CFLAGS    := -DLITTLE_ENDIAN -DSHUB_SWAP_WAR
+EXTRA_CFLAGS    := -DLITTLE_ENDIAN
 
 obj-y += sgi_if.o xswitch.o sgi_io_sim.o cdl.o ate_utils.o \
 	 io.o machvec/ drivers/ platform_init/ sn2/ hwgfs/

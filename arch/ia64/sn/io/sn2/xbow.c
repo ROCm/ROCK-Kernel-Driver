@@ -45,8 +45,6 @@
 #define NEW(ptr)	(ptr = kmalloc(sizeof (*(ptr)), GFP_KERNEL))
 #define DEL(ptr)	(kfree(ptr))
 
-int                     xbow_devflag = D_MP;
-
 /*
  * This file supports the Xbow chip.  Main functions: initializtion,
  * error handling, and GBR.
@@ -92,14 +90,6 @@ struct xbow_soft_s {
 void                    xbow_mlreset(xbow_t *);
 int                     xbow_attach(vertex_hdl_t);
 
-static int              xbow_open(struct inode *, struct file *);
-
-int                     xbow_close(vertex_hdl_t, int, int, cred_t *);
-
-int                     xbow_map(vertex_hdl_t, vhandl_t *, off_t, size_t, uint);
-int                     xbow_unmap(vertex_hdl_t, vhandl_t *);
-int                     xbow_ioctl(vertex_hdl_t, int, void *, int, struct cred *, int *);
-
 int                     xbow_widget_present(xbow_t *, int);
 static int              xbow_link_alive(xbow_t *, int);
 vertex_hdl_t            xbow_widget_lookup(vertex_hdl_t, int);
@@ -127,32 +117,6 @@ xswitch_provider_t      xbow_provider =
     xbow_reset_link,
 };
 
-/*
- * This is the file operation table for the pcibr driver.
- * As each of the functions are implemented, put the
- * appropriate function name below.
- */
-static int xbow_mmap(struct file * file, struct vm_area_struct * vma);
-struct file_operations xbow_fops = {
-        owner:  THIS_MODULE,
-        llseek: NULL,
-        read: NULL,
-        write: NULL,
-        readdir: NULL,
-        poll: NULL,
-        ioctl: NULL,
-        mmap: xbow_mmap,
-        open: xbow_open,
-        flush: NULL,
-        release: NULL,
-        fsync: NULL,
-        fasync: NULL,
-        lock: NULL,
-        readv: NULL,
-        writev: NULL,
-        sendpage: NULL,
-        get_unmapped_area: NULL
-};
 
 static int
 xbow_mmap(struct file * file, struct vm_area_struct * vma)
@@ -169,6 +133,15 @@ xbow_mmap(struct file * file, struct vm_area_struct * vma)
         return(error);
 }
 
+/*
+ * This is the file operation table for the pcibr driver.
+ * As each of the functions are implemented, put the
+ * appropriate function name below.
+ */
+struct file_operations xbow_fops = {
+        .owner		= THIS_MODULE,
+        .mmap		= xbow_mmap,
+};
 
 /*
  *    xbow_mlreset: called at mlreset time if the
@@ -446,42 +419,6 @@ xbow_attach(vertex_hdl_t conn)
     return 0;				/* attach successful */
 }
 
-/*ARGSUSED */
-static int
-xbow_open(struct inode *xx, struct file *yy)
-{
-    return 0;
-}
-
-/*ARGSUSED */
-int
-xbow_close(vertex_hdl_t dev, int oflag, int otyp, cred_t *crp)
-{
-    return 0;
-}
-
-/*ARGSUSED */
-int
-xbow_map(vertex_hdl_t dev, vhandl_t *vt, off_t off, size_t len, uint prot)
-{
-    vertex_hdl_t            vhdl = dev_to_vhdl(dev);
-    xbow_soft_t             soft = xbow_soft_get(vhdl);
-    int                     error;
-
-    ASSERT(soft);
-    len = ctob(btoc(len));
-    /* XXX- this ignores the offset!!! */
-    error = v_mapphys(vt, (void *) soft->base, len);
-    return error;
-}
-
-/*ARGSUSED */
-int
-xbow_unmap(vertex_hdl_t dev, vhandl_t *vt)
-{
-    return 0;
-}
-
 /* This contains special-case code for grio. There are plans to make
  * this general sometime in the future, but till then this should
  * be good enough.
@@ -517,58 +454,6 @@ xbow_widget_num_get(vertex_hdl_t dev)
 	}
 
 	return XWIDGET_NONE;
-}
-
-int
-xbow_ioctl(vertex_hdl_t dev,
-	   int cmd,
-	   void *arg,
-	   int flag,
-	   struct cred *cr,
-	   int *rvalp)
-{
-    vertex_hdl_t            vhdl;
-    int                     error = 0;
-
-#if defined (DEBUG)
-    int                     rc;
-    vertex_hdl_t            conn;
-    struct xwidget_info_s  *xwidget_info;
-    xbow_soft_t             xbow_soft;
-#endif
-    *rvalp = 0;
-
-    vhdl = dev_to_vhdl(dev);
-#if defined (DEBUG)
-    xbow_soft = xbow_soft_get(vhdl);
-    conn = xbow_soft->conn;
-
-    xwidget_info = xwidget_info_get(conn);
-    ASSERT_ALWAYS(xwidget_info != NULL);
-
-    rc = xwidget_hwid_is_xswitch(&xwidget_info->w_hwid);
-    ASSERT_ALWAYS(rc != 0);
-#endif
-    switch (cmd) {
-
-    case XBOWIOC_LLP_ERROR_ENABLE:
-	if ((error = xbow_enable_llp_monitor(vhdl)) != 0)
-	    error = EINVAL;
-
-	break;
-
-    case XBOWIOC_LLP_ERROR_DISABLE:
-
-	if ((error = xbow_disable_llp_monitor(vhdl)) != 0)
-	    error = EINVAL;
-
-	break;
-
-    default:
-	break;
-
-    }
-    return error;
 }
 
 /*

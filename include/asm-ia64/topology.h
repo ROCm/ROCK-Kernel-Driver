@@ -63,4 +63,6 @@
 /* Cross-node load balancing interval. */
 #define NODE_BALANCE_RATE 10
 
+void build_cpu_to_node_map(void);
+
 #endif /* _ASM_IA64_TOPOLOGY_H */

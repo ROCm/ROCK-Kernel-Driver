@@ -77,8 +77,6 @@ int	   pcibr_debug_slot = -1;		/* '-1' for all slots    */
 #define USS302_BRIDGE_TIMEOUT_HLD	4
 #endif
 
-int                     pcibr_devflag = D_MP;
-
 /* kbrick widgetnum-to-bus layout */
 int p_busnum[MAX_PORT_NUM] = {                  /* widget#      */
         0, 0, 0, 0, 0, 0, 0, 0,                 /* 0x0 - 0x7    */
@@ -148,10 +146,6 @@ int                      pcibr_attach(vertex_hdl_t);
 int			 pcibr_attach2(vertex_hdl_t, bridge_t *, vertex_hdl_t,
 				       int, pcibr_soft_t *);
 int			 pcibr_detach(vertex_hdl_t);
-int                      pcibr_close(vertex_hdl_t, int, int, cred_t *);
-int                      pcibr_map(vertex_hdl_t, vhandl_t *, off_t, size_t, uint);
-int                      pcibr_unmap(vertex_hdl_t, vhandl_t *);
-int                      pcibr_ioctl(vertex_hdl_t, int, void *, int, struct cred *, int *);
 int			 pcibr_pcix_rbars_calc(pcibr_soft_t);
 extern int               pcibr_init_ext_ate_ram(bridge_t *);
 extern int               pcibr_ate_alloc(pcibr_soft_t, int);
@@ -269,34 +263,6 @@ extern int              pcibr_slot_detach(vertex_hdl_t, pciio_slot_t, int,
 
 extern int		pcibr_slot_initial_rrb_alloc(vertex_hdl_t, pciio_slot_t);
 extern int		pcibr_initial_rrb(vertex_hdl_t, pciio_slot_t, pciio_slot_t);
-
-/*
- * This is the file operation table for the pcibr driver.
- * As each of the functions are implemented, put the
- * appropriate function name below.
- */
-static int pcibr_mmap(struct file * file, struct vm_area_struct * vma);
-static int pcibr_open(struct inode *, struct file *);
-struct file_operations pcibr_fops = {
-        owner:  THIS_MODULE,
-        llseek: NULL,
-        read: NULL,
-        write: NULL,
-        readdir: NULL,
-        poll: NULL,
-        ioctl: NULL,
-        mmap: pcibr_mmap,
-        open: pcibr_open,
-        flush: NULL,
-        release: NULL,
-        fsync: NULL,
-        fasync: NULL,
-        lock: NULL,
-        readv: NULL,
-        writev: NULL,
-	sendpage: NULL,
-	get_unmapped_area: NULL
-};
 
 /* =====================================================================
  *    Device(x) register management
@@ -622,44 +588,15 @@ pcibr_device_write_gather_flush(pcibr_soft_t pcibr_soft,
  */
 
 
-/*
- * open/close mmap/munmap interface would be used by processes
- * that plan to map the PCI bridge, and muck around with the
- * registers. This is dangerous to do, and will be allowed
- * to a select brand of programs. Typically these are
- * diagnostics programs, or some user level commands we may
- * write to do some weird things.
- * To start with expect them to have root priveleges.
- * We will ask for more later.
- */
-/* ARGSUSED */
-int
-pcibr_open(struct inode *x, struct file *y)
-{
-    return 0;
-}
-
-/*ARGSUSED */
-int
-pcibr_close(vertex_hdl_t dev, int oflag, int otyp, cred_t *crp)
-{
-    return 0;
-}
-
 static int
 pcibr_mmap(struct file * file, struct vm_area_struct * vma)
 {
-	vertex_hdl_t		pcibr_vhdl;
+	vertex_hdl_t		pcibr_vhdl = file->f_dentry->d_fsdata;
 	pcibr_soft_t            pcibr_soft;
 	bridge_t               *bridge;
 	unsigned long		phys_addr;
 	int			error = 0;
 
-#ifdef CONFIG_HWGFS_FS
-	pcibr_vhdl = (vertex_hdl_t) file->f_dentry->d_fsdata;
-#else
-	pcibr_vhdl = (vertex_hdl_t) file->private_data;
-#endif
 	pcibr_soft = pcibr_soft_get(pcibr_vhdl);
 	bridge = pcibr_soft->bs_base;
 	phys_addr = (unsigned long)bridge & ~0xc000000000000000; /* Mask out the Uncache bits */
@@ -671,114 +608,17 @@ pcibr_mmap(struct file * file, struct vm_area_struct * vma)
 	return(error);
 }
 
-/*ARGSUSED */
-int
-pcibr_map(vertex_hdl_t dev, vhandl_t *vt, off_t off, size_t len, uint prot)
-{
-    int                     error;
-    vertex_hdl_t            vhdl = dev_to_vhdl(dev);
-    vertex_hdl_t            pcibr_vhdl = hwgraph_connectpt_get(vhdl);
-    pcibr_soft_t            pcibr_soft = pcibr_soft_get(pcibr_vhdl);
-    bridge_t               *bridge = pcibr_soft->bs_base;
+/*
+ * This is the file operation table for the pcibr driver.
+ * As each of the functions are implemented, put the
+ * appropriate function name below.
+ */
+static int pcibr_mmap(struct file * file, struct vm_area_struct * vma);
+struct file_operations pcibr_fops = {
+	.owner		= THIS_MODULE,
+	.mmap		= pcibr_mmap,
+};
 
-    hwgraph_vertex_unref(pcibr_vhdl);
-
-    ASSERT(pcibr_soft);
-    len = ctob(btoc(len));		/* Make len page aligned */
-    error = v_mapphys(vt, (void *) ((__psunsigned_t) bridge + off), len);
-
-    /*
-     * If the offset being mapped corresponds to the flash prom
-     * base, and if the mapping succeeds, and if the user
-     * has requested the protections to be WRITE, enable the
-     * flash prom to be written.
-     *
-     * XXX- deprecate this in favor of using the
-     * real flash driver ...
-     */
-    if (IS_BRIDGE_SOFT(pcibr_soft) && !error &&
-	((off == BRIDGE_EXTERNAL_FLASH) ||
-	 (len > BRIDGE_EXTERNAL_FLASH))) {
-	int                     s;
-
-	/*
-	 * ensure that we write and read without any interruption.
-	 * The read following the write is required for the Bridge war
-	 */
-	s = splhi();
-
-	if (io_get_sh_swapper(NASID_GET(bridge))) {
-		BRIDGE_REG_SET32((&bridge->b_wid_control)) |= __swab32(BRIDGE_CTRL_FLASH_WR_EN);
-		BRIDGE_REG_GET32((&bridge->b_wid_control));          /* inval addr bug war */
-	} else {
-		bridge->b_wid_control |= BRIDGE_CTRL_FLASH_WR_EN;
-		bridge->b_wid_control;          /* inval addr bug war */
-	}
-	splx(s);
-    }
-    return error;
-}
-
-/*ARGSUSED */
-int
-pcibr_unmap(vertex_hdl_t dev, vhandl_t *vt)
-{
-    vertex_hdl_t            pcibr_vhdl = hwgraph_connectpt_get((vertex_hdl_t) dev);
-    pcibr_soft_t            pcibr_soft = pcibr_soft_get(pcibr_vhdl);
-    bridge_t               *bridge = pcibr_soft->bs_base;
-
-    hwgraph_vertex_unref(pcibr_vhdl);
-
-    if ( IS_PIC_SOFT(pcibr_soft) ) {
-	/*
-	 * If flashprom write was enabled, disable it, as
-	 * this is the last unmap.
-	 */
-	if (IS_BRIDGE_SOFT(pcibr_soft) && 
-			(bridge->b_wid_control & BRIDGE_CTRL_FLASH_WR_EN)) {
-		int                     s;
-
-		/*
-		 * ensure that we write and read without any interruption.
-		 * The read following the write is required for the Bridge war
-		 */
-		s = splhi();
-		bridge->b_wid_control &= ~BRIDGE_CTRL_FLASH_WR_EN;
-		bridge->b_wid_control;		/* inval addr bug war */
-		splx(s);
-	}
-    }
-    else {
-	if (io_get_sh_swapper(NASID_GET(bridge))) {
-		if (BRIDGE_REG_GET32((&bridge->b_wid_control)) & BRIDGE_CTRL_FLASH_WR_EN) {
-			int                     s;
-
-			/*
-			 * ensure that we write and read without any interruption.
-			 * The read following the write is required for the Bridge war
-			 */
-			s = splhi();
-			BRIDGE_REG_SET32((&bridge->b_wid_control)) &= __swab32((unsigned int)~BRIDGE_CTRL_FLASH_WR_EN);
-			BRIDGE_REG_GET32((&bridge->b_wid_control));          /* inval addr bug war */
-			splx(s);
-		} else {
-			if (bridge->b_wid_control & BRIDGE_CTRL_FLASH_WR_EN) {
-				int                     s;
-
-				/*
-				 * ensure that we write and read without any interruption.
-				 * The read following the write is required for the Bridge war
-				 */
-				s = splhi();
-				bridge->b_wid_control &= ~BRIDGE_CTRL_FLASH_WR_EN;
-				bridge->b_wid_control;          /* inval addr bug war */
-				splx(s);
-    			}
-		}
-	}
-    }
-    return 0;
-}
 
 /* This is special case code used by grio. There are plans to make
  * this a bit more general in the future, but till then this should
@@ -810,18 +650,6 @@ pcibr_device_slot_get(vertex_hdl_t dev_vhdl)
     hwgraph_vertex_unref(tdev);
 
     return slot;
-}
-
-/*ARGSUSED */
-int
-pcibr_ioctl(vertex_hdl_t dev,
-	    int cmd,
-	    void *arg,
-	    int flag,
-	    struct cred *cr,
-	    int *rvalp)
-{
-    return 0;
 }
 
 pcibr_info_t

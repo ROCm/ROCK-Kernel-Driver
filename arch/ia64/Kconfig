@@ -292,16 +292,6 @@ config IOSAPIC
 	depends on IA64_GENERIC || IA64_DIG || IA64_HP_ZX1 || IA64_SGI_SN2
 	default y
 
-config IA64_SGI_SN
-	bool
-	depends on IA64_SGI_SN2
-	default y
-
-config HWGFS_FS
-	bool
-	depends on IA64_SGI_SN2
-	default y
-
 config IA64_SGI_SN_DEBUG
 	bool "Enable extra debugging code"
 	depends on IA64_SGI_SN2
@@ -339,14 +329,6 @@ config PERCPU_IRQ
 	bool
 	depends on IA64_SGI_SN2
 	default y
-
-config PCIBA
-	tristate "PCIBA support"
-	depends on IA64_SGI_SN2
-	help
-	  IRIX PCIBA-inspired user mode PCI interface for the SGI SN (Scalable
-	  NUMA) platform for IA-64.  Unless you are compiling a kernel for an
-	  SGI SN IA-64 box, say N.
 
 # On IA-64, we always want an ELF /proc/kcore.
 config KCORE_ELF

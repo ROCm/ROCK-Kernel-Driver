@@ -47,7 +47,6 @@ ifeq ($(GCC_VERSION),3)
 endif
 
 cflags-$(CONFIG_ITANIUM_BSTEP_SPECIFIC)	+= -mb-step
-cflags-$(CONFIG_IA64_SGI_SN)		+= -DBRINGUP
 
 CFLAGS += $(cflags-y)
 head-y := arch/ia64/kernel/head.o arch/ia64/kernel/init_task.o
@@ -58,7 +57,7 @@ core-$(CONFIG_IA32_SUPPORT)	+= arch/ia64/ia32/
 core-$(CONFIG_IA64_DIG) 	+= arch/ia64/dig/
 core-$(CONFIG_IA64_GENERIC) 	+= arch/ia64/dig/
 core-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/dig/
-core-$(CONFIG_IA64_SGI_SN)	+= arch/ia64/sn/
+core-$(CONFIG_IA64_SGI_SN2)	+= arch/ia64/sn/
 
 drivers-$(CONFIG_PCI)		+= arch/ia64/pci/
 drivers-$(CONFIG_IA64_HP_SIM)	+= arch/ia64/hp/sim/
