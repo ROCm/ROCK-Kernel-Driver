@@ -34,30 +34,31 @@ static int matroxfb_g450_program(void* md) {
 }
 
 static struct matrox_altout matroxfb_g450_altout = {
+	.name		= "Secondary output",
 	.compute	= matroxfb_g450_compute,
 	.program	= matroxfb_g450_program,
 };
 
 void matroxfb_g450_connect(WPMINFO2) {
-	/* hardware is not G450... */
-	if (!ACCESS_FBINFO(devflags.g450dac))
-		return;
-	down_write(&ACCESS_FBINFO(altout.lock));
-	ACCESS_FBINFO(altout.device) = MINFO;
-	ACCESS_FBINFO(altout.output) = &matroxfb_g450_altout;
-	up_write(&ACCESS_FBINFO(altout.lock));
-	ACCESS_FBINFO(output.all) |= MATROXFB_OUTPUT_CONN_SECONDARY;
-	matroxfb_switch(ACCESS_FBINFO(fbcon.currcon), (struct fb_info*)MINFO);
+	if (ACCESS_FBINFO(devflags.g450dac)) {
+		down_write(&ACCESS_FBINFO(altout.lock));
+		ACCESS_FBINFO(outputs[1]).src = MATROXFB_SRC_CRTC1;
+		ACCESS_FBINFO(outputs[1]).data = MINFO;
+		ACCESS_FBINFO(outputs[1]).output = &matroxfb_g450_altout;
+		ACCESS_FBINFO(outputs[1]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
+		up_write(&ACCESS_FBINFO(altout.lock));
+	}
 }
 
 void matroxfb_g450_shutdown(WPMINFO2) {
-	ACCESS_FBINFO(output.all) &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-	ACCESS_FBINFO(output.ph) &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-	ACCESS_FBINFO(output.sh) &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-	down_write(&ACCESS_FBINFO(altout.lock));
-	ACCESS_FBINFO(altout.device) = NULL;
-	ACCESS_FBINFO(altout.output) = NULL;
-	up_write(&ACCESS_FBINFO(altout.lock));
+	if (ACCESS_FBINFO(devflags.g450dac)) {
+		down_write(&ACCESS_FBINFO(altout.lock));
+		ACCESS_FBINFO(outputs[1]).src = MATROXFB_SRC_NONE;
+		ACCESS_FBINFO(outputs[1]).output = NULL;
+		ACCESS_FBINFO(outputs[1]).data = NULL;
+		ACCESS_FBINFO(outputs[1]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
+		up_write(&ACCESS_FBINFO(altout.lock));
+	}
 }
 
 EXPORT_SYMBOL(matroxfb_g450_connect);

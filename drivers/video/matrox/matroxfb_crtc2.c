@@ -118,25 +118,22 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 			break;
 	}
 
-	if (ACCESS_FBINFO(output.sh)) {
-		tmp |= 0x00000001;	/* enable CRTC2 */
-
-		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_SECONDARY) {
-			if (ACCESS_FBINFO(devflags.g450dac)) {
-				tmp |= 0x00000006; /* source from secondary pixel PLL */
-				/* no vidrst */
-			} else {
-				tmp |= 0x00000002; /* source from VDOCLK */
-				tmp |= 0xC0000000; /* enable vvidrst & hvidrst */
-				/* MGA TVO is our clock source */
-			}
-		} else if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_PRIMARY) {
-			tmp |= 0x00000004; /* source from pixclock */
-			/* PIXPLL is our clock source */
+	tmp |= 0x00000001;	/* enable CRTC2 */
+	if (ACCESS_FBINFO(outputs[1]).src == MATROXFB_SRC_CRTC2) {
+		if (ACCESS_FBINFO(devflags.g450dac)) {
+			tmp |= 0x00000006; /* source from secondary pixel PLL */
+			/* no vidrst */
+		} else {
+			tmp |= 0x00000002; /* source from VDOCLK */
+			tmp |= 0xC0000000; /* enable vvidrst & hvidrst */
+			/* MGA TVO is our clock source */
 		}
-
-		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_PRIMARY)
-			tmp |= 0x00100000;	/* connect CRTC2 to DAC */
+	} else if (ACCESS_FBINFO(outputs[0]).src == MATROXFB_SRC_CRTC2) {
+		tmp |= 0x00000004; /* source from pixclock */
+		/* PIXPLL is our clock source */
+	}
+	if (ACCESS_FBINFO(outputs[0]).src == MATROXFB_SRC_CRTC2) {
+		tmp |= 0x00100000;	/* connect CRTC2 to DAC */
 	}
 	if (mt->interlaced) {
 		tmp |= 0x02000000;	/* interlaced, second field is bigger, as G450 apparently ignores it */
@@ -170,6 +167,12 @@ static void matroxfb_dh_restore(struct matroxfb_dh_fb_info* m2info,
 		tmp |= 0x00000200;
 	mga_outl(0x3C44, tmp);
 	mga_outl(0x3C4C, 0);		/* data control */
+}
+
+static void matroxfb_dh_disable(struct matroxfb_dh_fb_info* m2info) {
+	MINFO_FROM(m2info->primary_dev);
+
+	mga_outl(0x3C10, 0x00000004);	/* disable CRTC2, CRTC1->DAC1, PLL as clock source */
 }
 
 static void matroxfb_dh_cfbX_init(struct matroxfb_dh_fb_info* m2info,
@@ -411,6 +414,8 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 	if (con == m2info->fbcon.currcon) {
 		struct my_timming mt;
 		unsigned int pos;
+		int out;
+		int cnt;
 
 		matroxfb_var2my(var, &mt);
 		/* CRTC2 delay */
@@ -418,39 +423,38 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 
 		pos = (var->yoffset * var->xres_virtual + var->xoffset) * var->bits_per_pixel >> 3;
 		pos += m2info->video.offbase;
+		cnt = 0;
+		down_read(&ACCESS_FBINFO(altout).lock);
+		for (out = 0; out < MATROXFB_MAX_OUTPUTS; out++) {
+			if (ACCESS_FBINFO(outputs[out]).src == MATROXFB_SRC_CRTC2) {
+				cnt++;
+				if (ACCESS_FBINFO(outputs[out]).output->compute) {
+					ACCESS_FBINFO(outputs[out]).output->compute(ACCESS_FBINFO(outputs[out]).data, &mt);
+				}
+			}
+		}
+		up_read(&ACCESS_FBINFO(altout).lock);
+		if (cnt) {
+			matroxfb_dh_restore(m2info, &mt, p, mode, pos);
+		} else {
+			matroxfb_dh_disable(m2info);
+		}
 		DAC1064_global_init(PMINFO2);
-		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_PRIMARY) {
-			if (ACCESS_FBINFO(primout) && ACCESS_FBINFO(primout)->compute)
-				ACCESS_FBINFO(primout)->compute(MINFO, &mt);
-		}
-		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_SECONDARY) {
-			down_read(&ACCESS_FBINFO(altout.lock));
-			if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.output)->compute)
-				ACCESS_FBINFO(altout.output)->compute(ACCESS_FBINFO(altout.device), &mt);
-			up_read(&ACCESS_FBINFO(altout.lock));
-		}
-		matroxfb_dh_restore(m2info, &mt, p, mode, pos);
 		DAC1064_global_restore(PMINFO2);
-		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_PRIMARY) {
-			if (ACCESS_FBINFO(primout) && ACCESS_FBINFO(primout)->program)
-				ACCESS_FBINFO(primout)->program(MINFO);
+		down_read(&ACCESS_FBINFO(altout).lock);
+		for (out = 0; out < MATROXFB_MAX_OUTPUTS; out++) {
+			if (ACCESS_FBINFO(outputs[out]).src == MATROXFB_SRC_CRTC2 &&
+			    ACCESS_FBINFO(outputs[out]).output->program) {
+				ACCESS_FBINFO(outputs[out]).output->program(ACCESS_FBINFO(outputs[out]).data);
+			}
 		}
-		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_SECONDARY) {
-			down_read(&ACCESS_FBINFO(altout.lock));
-			if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.output)->program)
-				ACCESS_FBINFO(altout.output)->program(ACCESS_FBINFO(altout.device));
-			up_read(&ACCESS_FBINFO(altout.lock));
+		for (out = 0; out < MATROXFB_MAX_OUTPUTS; out++) {
+			if (ACCESS_FBINFO(outputs[out]).src == MATROXFB_SRC_CRTC2 &&
+			    ACCESS_FBINFO(outputs[out]).output->start) {
+				ACCESS_FBINFO(outputs[out]).output->start(ACCESS_FBINFO(outputs[out]).data);
+			}
 		}
-		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_PRIMARY) {
-			if (ACCESS_FBINFO(primout) && ACCESS_FBINFO(primout)->start)
-				ACCESS_FBINFO(primout)->start(MINFO);
-		}
-		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_SECONDARY) {
-			down_read(&ACCESS_FBINFO(altout.lock));
-			if (ACCESS_FBINFO(altout.output) && ACCESS_FBINFO(altout.output)->start)
-				ACCESS_FBINFO(altout.output)->start(ACCESS_FBINFO(altout.device));
-			up_read(&ACCESS_FBINFO(altout.lock));
-		}
+		up_read(&ACCESS_FBINFO(altout).lock);
 		matroxfb_dh_cfbX_init(m2info, p);
 		my_install_cmap(m2info);
 	}
@@ -563,38 +567,84 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 		case MATROXFB_SET_OUTPUT_CONNECTION:
 			{
 				u_int32_t tmp;
+				int out;
+				int changes;
 
 				if (get_user(tmp, (u_int32_t*)arg))
 					return -EFAULT;
-				if (tmp & ~ACCESS_FBINFO(output.all))
-					return -EINVAL;
-				if (tmp & ACCESS_FBINFO(output.ph))
-					return -EINVAL;
-				if (tmp & MATROXFB_OUTPUT_CONN_DFP)
-					return -EINVAL;
-				if ((ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_DFP) && tmp)
-					return -EINVAL;
-				if (tmp == ACCESS_FBINFO(output.sh))
+				for (out = 0; out < 32; out++) {
+					if (tmp & (1 << out)) {
+						if (out >= MATROXFB_MAX_OUTPUTS)
+							return -ENXIO;
+						if (!ACCESS_FBINFO(outputs[out]).output)
+							return -ENXIO;
+						switch (ACCESS_FBINFO(outputs[out]).src) {
+							case MATROXFB_SRC_NONE:
+							case MATROXFB_SRC_CRTC2:
+								break;
+							default:
+								return -EBUSY;
+						}
+					}
+				}
+				if (ACCESS_FBINFO(devflags.panellink)) {
+					if (tmp & MATROXFB_OUTPUT_CONN_DFP)
+						return -EINVAL;
+					if ((ACCESS_FBINFO(outputs[2]).src == MATROXFB_SRC_CRTC1) && tmp)
+						return -EBUSY;
+				}
+				changes = 0;
+				for (out = 0; out < MATROXFB_MAX_OUTPUTS; out++) {
+					if (tmp & (1 << out)) {
+						if (ACCESS_FBINFO(outputs[out]).src != MATROXFB_SRC_CRTC2) {
+							changes = 1;
+							ACCESS_FBINFO(outputs[out]).src = MATROXFB_SRC_CRTC2;
+						}
+					} else if (ACCESS_FBINFO(outputs[out]).src == MATROXFB_SRC_CRTC2) {
+						changes = 1;
+						ACCESS_FBINFO(outputs[out]).src = MATROXFB_SRC_NONE;
+					}
+				}
+				if (!changes)
 					return 0;
-				ACCESS_FBINFO(output.sh) = tmp;
 				matroxfb_dh_switch(m2info->fbcon.currcon, info);
 				return 0;
 			}
 		case MATROXFB_GET_OUTPUT_CONNECTION:
 			{
-				if (put_user(ACCESS_FBINFO(output.sh), (u_int32_t*)arg))
+				u_int32_t conn = 0;
+				int out;
+
+				for (out = 0; out < MATROXFB_MAX_OUTPUTS; out++) {
+					if (ACCESS_FBINFO(outputs[out]).src == MATROXFB_SRC_CRTC2) {
+						conn |= 1 << out;
+					}
+				}
+				if (put_user(conn, (u_int32_t*)arg))
 					return -EFAULT;
 				return 0;
 			}
 		case MATROXFB_GET_AVAILABLE_OUTPUTS:
 			{
-				u_int32_t tmp;
+				u_int32_t tmp = 0;
+				int out;
 
-				/* we do not support DFP from CRTC2 */
-				tmp = ACCESS_FBINFO(output.all) & ~ACCESS_FBINFO(output.ph) & ~MATROXFB_OUTPUT_CONN_DFP;
-				/* CRTC1 in DFP mode disables CRTC2 at all (I know, I'm lazy) */
-				if (ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_DFP)
-					tmp = 0;
+				for (out = 0; out < MATROXFB_MAX_OUTPUTS; out++) {
+					if (ACCESS_FBINFO(outputs[out]).output) {
+						switch (ACCESS_FBINFO(outputs[out]).src) {
+							case MATROXFB_SRC_NONE:
+							case MATROXFB_SRC_CRTC2:
+								tmp |= 1 << out;
+								break;
+						}
+					}
+				}
+				if (ACCESS_FBINFO(devflags.panellink)) {
+					tmp &= ~MATROXFB_OUTPUT_CONN_DFP;
+					if (ACCESS_FBINFO(outputs[2]).src == MATROXFB_SRC_CRTC1) {
+						tmp = 0;
+					}
+				}
 				if (put_user(tmp, (u_int32_t*)arg))
 					return -EFAULT;
 				return 0;
@@ -730,11 +780,10 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	/*
 	 *  If we have unused output, connect CRTC2 to it...
 	 */
-	if ((ACCESS_FBINFO(output.all) & MATROXFB_OUTPUT_CONN_SECONDARY) && 
-	   !(ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_SECONDARY) &&
-	   !(ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_DFP)) {
-		ACCESS_FBINFO(output.sh) |= MATROXFB_OUTPUT_CONN_SECONDARY;
-		ACCESS_FBINFO(output.sh) &= ~MATROXFB_OUTPUT_CONN_DFP;
+	if (ACCESS_FBINFO(outputs[1]).output &&
+	    ACCESS_FBINFO(outputs[1]).src == MATROXFB_SRC_NONE &&
+	    ACCESS_FBINFO(outputs[2]).src == MATROXFB_SRC_NONE) {
+		ACCESS_FBINFO(outputs[1]).src = MATROXFB_SRC_CRTC2;
 	}
 
 	matroxfb_dh_set_var(&matroxfb_dh_defined, -2, &m2info->fbcon);
@@ -839,7 +888,7 @@ static void matroxfb_crtc2_exit(void) {
 	matroxfb_unregister_driver(&crtc2);
 }
 
-MODULE_AUTHOR("(c) 1999-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
+MODULE_AUTHOR("(c) 1999-2002 Petr Vandrovec <vandrove@vc.cvut.cz>");
 MODULE_DESCRIPTION("Matrox G400 CRTC2 driver");
 MODULE_LICENSE("GPL");
 module_init(matroxfb_crtc2_init);

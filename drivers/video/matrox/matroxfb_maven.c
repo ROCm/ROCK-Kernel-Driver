@@ -327,7 +327,7 @@ static void maven_init_TVdata(const struct maven_data* md, struct mavenregs* dat
 	}, MODE_NTSC, 525, 60 };
 	MINFO_FROM(md->primary_head);
 	
-	if (ACCESS_FBINFO(altout.mode) == MODE_PAL)
+	if (ACCESS_FBINFO(outputs[1]).mode == MODE_PAL)
 		*data = palregs;
 	else
 		*data = ntscregs;
@@ -585,7 +585,7 @@ static inline int maven_compute_timming(struct maven_data* md,
 	unsigned int a, bv, c;
 	MINFO_FROM(md->primary_head);
 
-	m->mode = ACCESS_FBINFO(altout.mode);
+	m->mode = ACCESS_FBINFO(outputs[1]).mode;
 	if (MODE_TV(m->mode)) {
 		unsigned int lmargin;
 		unsigned int umargin;
@@ -893,6 +893,7 @@ static int maven_out_verify_mode(void* md, u_int32_t arg) {
 }
 
 static struct matrox_altout maven_altout = {
+	.name		= "Secondary output",
 	.compute	= maven_out_compute,
 	.program	= maven_out_program,
 	.start		= maven_out_start,
@@ -904,14 +905,14 @@ static int maven_init_client(struct i2c_client* clnt) {
 	struct maven_data* md = clnt->data;
 	MINFO_FROM(((struct i2c_bit_adapter*)a)->minfo);
 
-	ACCESS_FBINFO(altout.mode) = MODE_MONITOR;
 	md->primary_head = MINFO;
 	md->client = clnt;
 	down_write(&ACCESS_FBINFO(altout.lock));
-	ACCESS_FBINFO(altout.device) = md;
-	ACCESS_FBINFO(altout.output) = &maven_altout;
+	ACCESS_FBINFO(outputs[1]).output = &maven_altout;
+	ACCESS_FBINFO(outputs[1]).src = MATROXFB_SRC_NONE;
+	ACCESS_FBINFO(outputs[1]).data = md;
+	ACCESS_FBINFO(outputs[1]).mode = MODE_MONITOR;
 	up_write(&ACCESS_FBINFO(altout.lock));
-	ACCESS_FBINFO(output.all) |= MATROXFB_OUTPUT_CONN_SECONDARY;
 	if (maven_get_reg(clnt, 0xB2) < 0x14) {
 		md->version = MGATVO_B;
 	} else {
@@ -924,13 +925,14 @@ static int maven_shutdown_client(struct i2c_client* clnt) {
 	struct maven_data* md = clnt->data;
 
 	if (md->primary_head) {
-		md->primary_head->output.all &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-		md->primary_head->output.ph &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-		md->primary_head->output.sh &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-		down_write(&md->primary_head->altout.lock);
-		md->primary_head->altout.device = NULL;
-		md->primary_head->altout.output = NULL;
-		up_write(&md->primary_head->altout.lock);
+		MINFO_FROM(md->primary_head);
+
+		down_write(&ACCESS_FBINFO(altout.lock));
+		ACCESS_FBINFO(outputs[1]).src = MATROXFB_SRC_NONE;
+		ACCESS_FBINFO(outputs[1]).output = NULL;
+		ACCESS_FBINFO(outputs[1]).data = NULL;
+		ACCESS_FBINFO(outputs[1]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
+		up_write(&ACCESS_FBINFO(altout.lock));
 		md->primary_head = NULL;
 	}
 	return 0;

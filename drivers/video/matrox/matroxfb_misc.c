@@ -360,7 +360,8 @@ int matroxfb_vgaHWinit(WPMINFO struct my_timming* m, struct display* p) {
 			  ((hd      & 0x100) >> 7) | /* blanking */
 			  ((hs      & 0x100) >> 6) | /* sync start */
 			   (hbe     & 0x040);	 /* end hor. blanking */
-	if (ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_SECONDARY)
+	/* FIXME: Enable vidrst only on G400, and only if TV-out is used */
+	if (ACCESS_FBINFO(outputs[1]).src == MATROXFB_SRC_CRTC1)
 		hw->CRTCEXT[1] |= 0x88;		/* enable horizontal and vertical vidrst */
 	hw->CRTCEXT[2] =  ((vt & 0xC00) >> 10) |
 			  ((vd & 0x400) >>  8) |	/* disp end */

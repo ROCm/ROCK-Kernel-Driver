@@ -396,11 +396,16 @@ struct matrox_accel_data {
 };
 
 struct matrox_altout {
+	const char	*name;
 	int		(*compute)(void* altout_dev, struct my_timming* input);
 	int		(*program)(void* altout_dev);
 	int		(*start)(void* altout_dev);
 	int		(*verifymode)(void* altout_dev, u_int32_t mode);
 };
+
+#define MATROXFB_SRC_NONE	0
+#define MATROXFB_SRC_CRTC1	1
+#define MATROXFB_SRC_CRTC2	2
 
 enum mga_chip { MGA_2064, MGA_2164, MGA_1064, MGA_1164, MGA_G100, MGA_G200, MGA_G400, MGA_G450, MGA_G550 };
 
@@ -436,21 +441,19 @@ struct matrox_fb_info {
 	struct pci_dev*		pcidev;
 
 	struct {
-		u_int32_t	all;
-		u_int32_t	ph;
-		u_int32_t	sh;
-			      } output;
-	struct matrox_altout*	primout;
-	struct {
 	struct fb_info*		info;
 	struct rw_semaphore	lock;
 			      } crtc2;
 	struct {
-	struct matrox_altout*	output;
-	void*			device;
-	struct rw_semaphore	lock;
-	unsigned int		mode;
+ 	struct rw_semaphore	lock;
 			      } altout;
+#define MATROXFB_MAX_OUTPUTS		3
+	struct {
+	unsigned int		src;
+	struct matrox_altout*	output;
+	void*			data;
+	unsigned int		mode;
+			      } outputs[MATROXFB_MAX_OUTPUTS];
 
 #define MATROXFB_MAX_FB_DRIVERS		5
 	struct matroxfb_driver* (drivers[MATROXFB_MAX_FB_DRIVERS]);
@@ -539,6 +542,7 @@ struct matrox_fb_info {
 		int		memtype;
 		int		g450dac;
 		int		dfp_type;
+		int		panellink;	/* G400 DFP possible (not G450/G550) */
 		int		dualhead;
 		unsigned int	fbResource;
 			      } devflags;

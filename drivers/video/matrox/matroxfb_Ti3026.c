@@ -2,11 +2,11 @@
  *
  * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200 and G400
  *
- * (c) 1998,1999,2000 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998-2002 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
  * Portions Copyright (c) 2001 Matrox Graphics Inc.
  *
- * Version: 1.62 2000/11/29
+ * Version: 1.64 2002/06/10
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -84,6 +84,7 @@
 #include "matroxfb_Ti3026.h"
 #include "matroxfb_misc.h"
 #include "matroxfb_accel.h"
+#include <linux/matroxfb.h>
 
 #ifdef CONFIG_FB_MATROX_MILLENIUM
 #define outTi3026 matroxfb_DAC_out
@@ -811,6 +812,10 @@ static void Ti3026_reset(WPMINFO2) {
 	ti3026_ramdac_init(PMINFO2);
 }
 
+static struct matrox_altout ti3026_output = {
+	.name	 = "Primary output",
+};
+
 static int Ti3026_preinit(WPMINFO2) {
 	static const int vxres_mill2[] = { 512,        640, 768,  800,  832,  960,
 					  1024, 1152, 1280,      1600, 1664, 1920,
@@ -828,6 +833,11 @@ static int Ti3026_preinit(WPMINFO2) {
 	ACCESS_FBINFO(capable.text) = 1; /* isMilleniumII(MINFO); */
 	ACCESS_FBINFO(capable.vxres) = isMilleniumII(MINFO)?vxres_mill2:vxres_mill1;
 	ACCESS_FBINFO(cursor.timer.function) = matroxfb_ti3026_flashcursor;
+
+	ACCESS_FBINFO(outputs[0]).data = MINFO;
+	ACCESS_FBINFO(outputs[0]).output = &ti3026_output;
+	ACCESS_FBINFO(outputs[0]).src = MATROXFB_SRC_CRTC1;
+	ACCESS_FBINFO(outputs[0]).mode = MATROXFB_OUTPUT_MODE_MONITOR;
 
 	if (ACCESS_FBINFO(devflags.noinit))
 		return 0;
