@@ -785,6 +785,8 @@ int dev_alloc_name(struct net_device *dev, const char *name)
  */
 int dev_change_name(struct net_device *dev, char *newname)
 {
+	int err = 0;
+
 	ASSERT_RTNL();
 
 	if (dev->flags & IFF_UP)
@@ -794,7 +796,7 @@ int dev_change_name(struct net_device *dev, char *newname)
 		return -EINVAL;
 
 	if (strchr(newname, '%')) {
-		int err = dev_alloc_name(dev, newname);
+		err = dev_alloc_name(dev, newname);
 		if (err < 0)
 			return err;
 		strcpy(newname, dev->name);
@@ -804,12 +806,14 @@ int dev_change_name(struct net_device *dev, char *newname)
 	else
 		strlcpy(dev->name, newname, IFNAMSIZ);
 
-	hlist_del(&dev->name_hlist);
-	hlist_add_head(&dev->name_hlist, dev_name_hash(dev->name));
+	err = class_device_rename(&dev->class_dev, dev->name);
+	if (!err) {
+		hlist_del(&dev->name_hlist);
+		hlist_add_head(&dev->name_hlist, dev_name_hash(dev->name));
+		notifier_call_chain(&netdev_chain, NETDEV_CHANGENAME, dev);
+	}
 
-	class_device_rename(&dev->class_dev, dev->name);
-	notifier_call_chain(&netdev_chain, NETDEV_CHANGENAME, dev);
-	return 0;
+	return err;
 }
 
 struct dev_tq { 
