@@ -24,9 +24,22 @@ endif
 
 include $(TOPDIR)/Rules.make
 
+# Dependencies for generated files need to be listed explicitly
+
+aic7xxx_core.o: aic7xxx_seq.h
+
+$(aic7xxx-objs): aic7xxx_reg.h
+
 ifeq ($(CONFIG_AIC7XXX_BUILD_FIRMWARE),y)
+
 aic7xxx_seq.h aic7xxx_reg.h: aic7xxx.seq aic7xxx.reg aicasm/aicasm
 	aicasm/aicasm -I. -r aic7xxx_reg.h -o aic7xxx_seq.h aic7xxx.seq
+
+else
+
+aic7xxx_seq.h aic7xxx_reg.h: %.h : shipped_%.h
+	cp $< $@
+
 endif
 
 aicasm/aicasm: aicasm/*.[chyl]
