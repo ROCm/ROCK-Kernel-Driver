@@ -61,31 +61,6 @@ int cfb_cursor(struct fb_info *info, struct fbcursor *cursor)
 	return 0;
 }
 
-int fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
-{
-	int xoffset = var->xoffset;
-	int yoffset = var->yoffset;
-	int err;
-
-	if (xoffset < 0 || yoffset < 0 ||
-	    xoffset + info->var.xres > info->var.xres_virtual ||
-	    yoffset + info->var.yres > info->var.yres_virtual)
-		return -EINVAL;
-	if (info->fbops->fb_pan_display) {
-		if ((err = info->fbops->fb_pan_display(var, info)))
-			return err;
-		else
-			return -EINVAL;
-	}
-	info->var.xoffset = var->xoffset;
-	info->var.yoffset = var->yoffset;
-	if (var->vmode & FB_VMODE_YWRAP)
-		info->var.vmode |= FB_VMODE_YWRAP;
-	else
-		info->var.vmode &= ~FB_VMODE_YWRAP;
-	return 0;
-}
-
 int fb_blank(int blank, struct fb_info *info)
 {
 	struct fb_cmap cmap;
@@ -116,7 +91,6 @@ int fb_blank(int blank, struct fb_info *info)
 
 /* generic frame buffer operations */
 EXPORT_SYMBOL(cfb_cursor);
-EXPORT_SYMBOL(fb_pan_display);
 EXPORT_SYMBOL(fb_blank);
 
 MODULE_LICENSE("GPL");

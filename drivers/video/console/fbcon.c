@@ -232,9 +232,9 @@ static void fbcon_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
 
 static void cursor_timer_handler(unsigned long dev_addr);
 
-static struct timer_list cursor_timer = {
-    function: cursor_timer_handler
-};
+
+static struct timer_list cursor_timer =
+		TIMER_INITIALIZER(cursor_timer_handler, 0, 0);
 
 static void cursor_timer_handler(unsigned long dev_addr)
 {
@@ -1533,6 +1533,8 @@ static int fbcon_switch(struct vc_data *vc)
     }
     scrollback_max = 0;
     scrollback_current = 0;
+
+    update_var(unit, info);	
 
     if (p->dispsw->clear_margins && vt_cons[unit]->vc_mode == KD_TEXT)
 	p->dispsw->clear_margins(vc, p, 0);

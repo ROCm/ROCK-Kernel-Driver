@@ -228,7 +228,7 @@ config FONT_8x8
 
 config FONT_8x16
 	bool "VGA 8x16 font" if FBCON_FONTS
-	depends on FB && SGI_NEWPORT_CONSOLE=y
+	depends on FB || SGI_NEWPORT_CONSOLE=y
 	default y if !SPARC32 && !SPARC64 && !FBCON_FONTS
 	help
 	  This is the "high resolution" font for the VGA frame buffer (the one

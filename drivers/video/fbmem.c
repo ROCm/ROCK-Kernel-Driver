@@ -464,6 +464,31 @@ static void try_to_load(int fb)
 }
 #endif /* CONFIG_KMOD */
 
+int fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+{
+        int xoffset = var->xoffset;
+        int yoffset = var->yoffset;
+        int err;
+
+        if (xoffset < 0 || yoffset < 0 ||
+            xoffset + info->var.xres > info->var.xres_virtual ||
+            yoffset + info->var.yres > info->var.yres_virtual)
+                return -EINVAL;
+        if (info->fbops->fb_pan_display) {
+                if ((err = info->fbops->fb_pan_display(var, info)))
+                        return err;
+                else
+                        return -EINVAL;
+        }
+        info->var.xoffset = var->xoffset;
+        info->var.yoffset = var->yoffset;
+        if (var->vmode & FB_VMODE_YWRAP)
+                info->var.vmode |= FB_VMODE_YWRAP;
+        else
+                info->var.vmode &= ~FB_VMODE_YWRAP;
+        return 0;
+}
+
 int fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	int err;
@@ -483,8 +508,7 @@ int fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info)
 			if (info->fbops->fb_set_par)
 				info->fbops->fb_set_par(info);
 
-			if (info->fbops->fb_pan_display)
-				info->fbops->fb_pan_display(&info->var, info);
+			fb_pan_display(&info->var, info);
 
 			fb_set_cmap(&info->cmap, 1, info);
 		}
@@ -534,9 +558,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOPAN_DISPLAY:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
-		if (fb->fb_pan_display == NULL)
-			return (var.xoffset || var.yoffset) ? -EINVAL : 0;
-		if ((i=fb->fb_pan_display(&var, info)))
+		if ((i = fb_pan_display(&var, info)))
 			return i;
 		if (copy_to_user((void *) arg, &var, sizeof(var)))
 			return -EFAULT;
