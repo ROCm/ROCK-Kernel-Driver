@@ -1,15 +1,20 @@
+#include <linux/config.h>
+#include <linux/module.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <linux/crypto.h>
+#include <linux/pfkeyv2.h>
 #include <net/icmp.h>
+#include <asm/scatterlist.h>
 
 struct ah_data
 {
 	u8			*key;
 	int			key_len;
+	u8			*work_digest;
 	int			digest_len;
 
-	void			(*digest)(struct xfrm_state*,
+	void			(*digest)(struct ah_data*,
 					  struct sk_buff *skb,
 					  u8 *digest);
 
@@ -67,12 +72,19 @@ void skb_ah_walk(const struct sk_buff *skb, struct crypto_tfm *tfm)
 	int len = skb->len;
 	int start = skb->len - skb->data_len;
 	int i, copy = start - offset;
+	struct scatterlist sg;
 
 	/* Checksum header. */
 	if (copy > 0) {
 		if (copy > len)
 			copy = len;
-		tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, skb->data+offset, copy);
+		
+		sg.page = virt_to_page(skb->data + offset);
+		sg.offset = (unsigned long)(skb->data + offset) % PAGE_SIZE;
+		sg.length = copy;
+		
+		crypto_hmac_update(tfm, &sg, 1);
+		
 		if ((len -= copy) == 0)
 			return;
 		offset += copy;
@@ -85,14 +97,17 @@ void skb_ah_walk(const struct sk_buff *skb, struct crypto_tfm *tfm)
 
 		end = start + skb_shinfo(skb)->frags[i].size;
 		if ((copy = end - offset) > 0) {
-			u8 *vaddr;
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
 
 			if (copy > len)
 				copy = len;
-			vaddr = kmap_skb_frag(frag);
-			tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx, vaddr+frag->page_offset+offset-start, copy);
-			kunmap_skb_frag(vaddr);
+			
+			sg.page = frag->page;
+			sg.offset = frag->page_offset + offset-start;
+			sg.length = copy;
+			
+			crypto_hmac_update(tfm, &sg, 1);
+			
 			if (!(len -= copy))
 				return;
 			offset += copy;
@@ -124,6 +139,18 @@ void skb_ah_walk(const struct sk_buff *skb, struct crypto_tfm *tfm)
 		BUG();
 }
 
+static void
+ah_hmac_digest(struct ah_data *ahp, struct sk_buff *skb, u8 *auth_data)
+{
+	struct crypto_tfm *tfm = ahp->tfm;
+
+	memset(auth_data, 0, ahp->digest_len);
+ 	crypto_hmac_init(tfm, ahp->key, &ahp->key_len);
+  	skb_ah_walk(skb, tfm);
+	crypto_hmac_final(tfm, ahp->key, &ahp->key_len, ahp->work_digest);
+	memcpy(auth_data, ahp->work_digest, ahp->digest_len);
+}
+
 int ah_output(struct sk_buff *skb)
 {
 	int err;
@@ -149,12 +176,13 @@ int ah_output(struct sk_buff *skb)
 	iph = skb->nh.iph;
 	if (x->props.mode) {
 		top_iph = (struct iphdr*)skb_push(skb, x->props.header_len);
-		top_iph->ihl = 4;
-		top_iph->version = 5;
+		top_iph->ihl = 5;
+		top_iph->version = 4;
 		top_iph->tos = 0;
 		top_iph->tot_len = htons(skb->len);
-		top_iph->id = inet_getid(((struct rtable*)dst)->peer, 0);
 		top_iph->frag_off = 0;
+		if (!(iph->frag_off&htons(IP_DF)))
+			__ip_select_ident(top_iph, dst, 0);
 		top_iph->ttl = 0;
 		top_iph->protocol = IPPROTO_AH;
 		top_iph->check = 0;
@@ -186,7 +214,7 @@ int ah_output(struct sk_buff *skb)
 	ah->reserved = 0;
 	ah->spi = x->id.spi;
 	ah->seq_no = htonl(++x->replay.oseq);
-	ahp->digest(x, skb, ah->auth_data);
+	ahp->digest(ahp, skb, ah->auth_data);
 	top_iph->tos = iph->tos;
 	top_iph->ttl = iph->ttl;
 	if (x->props.mode) {
@@ -202,7 +230,7 @@ int ah_output(struct sk_buff *skb)
 
 	skb->nh.raw = skb->data;
 
-	x->stats.bytes += skb->len;
+	x->curlft.bytes += skb->len;
 	spin_unlock_bh(&x->lock);
 	if ((skb->dst = dst_pop(dst)) == NULL)
 		goto error;
@@ -258,7 +286,7 @@ int ah_input(struct xfrm_state *x, struct sk_buff *skb)
 		u8 auth_data[ahp->digest_len];
 		memcpy(auth_data, ah->auth_data, ahp->digest_len);
 		skb_push(skb, skb->data - skb->nh.raw);
-		ahp->digest(x, skb, ah->auth_data);
+		ahp->digest(ahp, skb, ah->auth_data);
 		if (memcmp(ah->auth_data, auth_data, ahp->digest_len)) {
 			x->stats.integrity_failed++;
 			goto out;
@@ -295,16 +323,90 @@ void ah4_err(struct sk_buff *skb, u32 info)
 	xfrm_state_put(x);
 }
 
+int ah_init_state(struct xfrm_state *x, void *args)
+{
+	struct ah_data *ahp = NULL;
+
+	if (x->aalg == NULL || x->aalg->alg_key_len == 0 ||
+	    x->aalg->alg_key_len > 512)
+		goto error;
+
+	ahp = kmalloc(sizeof(*ahp), GFP_KERNEL);
+	if (ahp == NULL)
+		return -ENOMEM;
+
+	memset(ahp, 0, sizeof(*ahp));
+
+	ahp->key = x->aalg->alg_key;
+	ahp->key_len = (x->aalg->alg_key_len+7)/8;
+	ahp->tfm = crypto_alloc_tfm(x->aalg->alg_name, 0);
+	if (!ahp->tfm)
+		goto error;
+	ahp->digest = ah_hmac_digest;
+	ahp->digest_len = 12;
+	ahp->work_digest = kmalloc(crypto_tfm_alg_digestsize(ahp->tfm),
+				   GFP_KERNEL);
+	if (!ahp->work_digest)
+		goto error;
+	x->props.header_len = (12 + ahp->digest_len + 7)&~7;
+	if (x->props.mode)
+		x->props.header_len += 20;
+	x->data = ahp;
+
+	return 0;
+
+error:
+	if (ahp) {
+		if (ahp->work_digest)
+			kfree(ahp->work_digest);
+		if (ahp->tfm)
+			crypto_free_tfm(ahp->tfm);
+		kfree(ahp);
+	}
+	return -EINVAL;
+}
+
+void ah_destroy(struct xfrm_state *x)
+{
+	struct ah_data *ahp = x->data;
+
+	if (ahp->work_digest) {
+		kfree(ahp->work_digest);
+		ahp->work_digest = NULL;
+	}
+	if (ahp->tfm) {
+		crypto_free_tfm(ahp->tfm);
+		ahp->tfm = NULL;
+	}
+}
+
+
+static struct xfrm_type ah_type =
+{
+	.description	= "AH4",
+	.proto	     	= IPPROTO_AH,
+	.init_state	= ah_init_state,
+	.destructor	= ah_destroy,
+	.input		= ah_input,
+	.output		= ah_output
+};
+
 static struct inet_protocol ah4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	ah4_err,
+	.no_policy	=	1,
 };
-
 
 int __init ah4_init(void)
 {
+	SET_MODULE_OWNER(&ah_type);
+	if (xfrm_register_type(&ah_type) < 0) {
+		printk(KERN_INFO "ip ah init: can't add xfrm type\n");
+		return -EAGAIN;
+	}
 	if (inet_add_protocol(&ah4_protocol, IPPROTO_AH) < 0) {
 		printk(KERN_INFO "ip ah init: can't add protocol\n");
+		xfrm_unregister_type(&ah_type);
 		return -EAGAIN;
 	}
 	return 0;
@@ -314,4 +416,10 @@ static void __exit ah4_fini(void)
 {
 	if (inet_del_protocol(&ah4_protocol, IPPROTO_AH) < 0)
 		printk(KERN_INFO "ip ah close: can't remove protocol\n");
+	if (xfrm_unregister_type(&ah_type) < 0)
+		printk(KERN_INFO "ip ah close: can't remove xfrm type\n");
 }
+
+module_init(ah4_init);
+module_exit(ah4_fini);
+MODULE_LICENSE("GPL");

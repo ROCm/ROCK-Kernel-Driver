@@ -3454,10 +3454,6 @@ int tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 				__set_current_state(TASK_RUNNING);
 
 				if (!tcp_copy_to_iovec(sk, skb, tcp_header_len)) {
-					__skb_pull(skb, tcp_header_len);
-					tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
-					NET_INC_STATS_BH(TCPHPHitsToUser);
-					eaten = 1;
 					/* Predicted packet is in window by definition.
 					 * seq == rcv_nxt and rcv_wup <= rcv_nxt.
 					 * Hence, check seq<=rcv_wup reduces to:
@@ -3467,6 +3463,11 @@ int tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 					     TCPOLEN_TSTAMP_ALIGNED) &&
 					    tp->rcv_nxt == tp->rcv_wup)
 						tcp_store_ts_recent(tp);
+
+					__skb_pull(skb, tcp_header_len);
+					tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
+					NET_INC_STATS_BH(TCPHPHitsToUser);
+					eaten = 1;
 				}
 			}
 			if (!eaten) {

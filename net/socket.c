@@ -1389,7 +1389,7 @@ asmlinkage long sys_recvfrom(int fd, void * ubuf, size_t size, unsigned flags,
 		flags |= MSG_DONTWAIT;
 	err=sock_recvmsg(sock, &msg, size, flags);
 
-	if(err >= 0 && addr != NULL && msg.msg_namelen)
+	if(err >= 0 && addr != NULL)
 	{
 		err2=move_addr_to_user(address, msg.msg_namelen, addr, addr_len);
 		if(err2<0)
@@ -1613,7 +1613,7 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 		goto out_freeiov;
 	len = err;
 
-	if (uaddr != NULL && msg_sys.msg_namelen) {
+	if (uaddr != NULL) {
 		err = move_addr_to_user(addr, msg_sys.msg_namelen, uaddr, uaddr_len);
 		if (err < 0)
 			goto out_freeiov;

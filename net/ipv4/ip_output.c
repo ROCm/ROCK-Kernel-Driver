@@ -321,7 +321,7 @@ int ip_queue_xmit(struct sk_buff *skb)
 			 * keep trying until route appears or the connection times
 			 * itself out.
 			 */
-			if (ip_route_output_key(&rt, &fl))
+			if (ip_route_output_flow(&rt, &fl, sk, 0))
 				goto no_route;
 		}
 		__sk_dst_set(sk, &rt->u.dst);
@@ -1220,6 +1220,10 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
 					      { .daddr = daddr,
 						.saddr = rt->rt_spec_dst,
 						.tos = RT_TOS(skb->nh.iph->tos) } },
+				    /* Not quite clean, but right. */
+				    .uli_u = { .ports =
+					       { .sport = skb->h.th->dest,
+					         .dport = skb->h.th->source } },
 				    .proto = sk->protocol };
 		if (ip_route_output_key(&rt, &fl))
 			return;

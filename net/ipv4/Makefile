@@ -16,9 +16,11 @@ obj-$(CONFIG_IP_MROUTE) += ipmr.o
 obj-$(CONFIG_NET_IPIP) += ipip.o
 obj-$(CONFIG_NET_IPGRE) += ip_gre.o
 obj-$(CONFIG_SYN_COOKIES) += syncookies.o
+obj-$(CONFIG_INET_AH) += ah.o
+obj-$(CONFIG_INET_ESP) += esp.o
 obj-$(CONFIG_IP_PNP) += ipconfig.o
 obj-$(CONFIG_NETFILTER)	+= netfilter/
 
-obj-y += xfrm_policy.o xfrm_state.o xfrm_input.o ah.o
+obj-y += xfrm_policy.o xfrm_state.o xfrm_input.o
 
 include $(TOPDIR)/Rules.make

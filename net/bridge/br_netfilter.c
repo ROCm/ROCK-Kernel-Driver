@@ -57,7 +57,8 @@ static struct rtable __fake_rtable = {
 		dst: {
 			__refcnt:		ATOMIC_INIT(1),
 			dev:			&__fake_net_device,
-			pmtu:			1500
+			path:			&__fake_rtable.u.dst,
+			metrics:		{[RTAX_MTU] 1500},
 		}
 	},
 
@@ -109,8 +110,8 @@ static void __br_dnat_complain(void)
  * Let us now consider the case that ip_route_input() fails:
  *
  * After a "echo '0' > /proc/sys/net/ipv4/ip_forward" ip_route_input()
- * will fail, while ip_route_output() will return success. The source
- * address for ip_route_output() is set to zero, so ip_route_output()
+ * will fail, while __ip_route_output_key() will return success. The source
+ * address for __ip_route_output_key() is set to zero, so __ip_route_output_key
  * thinks we're handling a locally generated packet and won't care
  * if IP forwarding is allowed. We send a warning message to the users's
  * log telling her to put IP forwarding on.
@@ -158,8 +159,11 @@ static int br_nf_pre_routing_finish(struct sk_buff *skb)
 		if (ip_route_input(skb, iph->daddr, iph->saddr, iph->tos,
 		    dev)) {
 			struct rtable *rt;
+			struct flowi fl = { .nl_u = 
+			{ .ip4_u = { .daddr = iph->daddr, .saddr = 0 ,
+				     .tos = iph->tos} }, .proto = 0};
 
-			if (!ip_route_output(&rt, iph->daddr, 0, iph->tos, 0)) {
+			if (!ip_route_output_key(&rt, &fl)) {
 				/* Bridged-and-DNAT'ed traffic doesn't
 				 * require ip_forwarding.
 				 */

@@ -35,13 +35,21 @@ static inline void crypto_yield(struct crypto_tfm *tfm)
 		cond_resched();
 }
 
-static inline int crypto_cipher_flags(u32 flags)
+static inline u32 crypto_cipher_flags(u32 flags)
 {
 	return flags & (CRYPTO_TFM_MODE_MASK|CRYPTO_TFM_REQ_WEAK_KEY);
 }
 
+struct crypto_alg *crypto_alg_lookup(const char *name);
+
 #ifdef CONFIG_KMOD
 void crypto_alg_autoload(const char *name);
+struct crypto_alg *crypto_alg_mod_lookup(const char *name);
+#else
+static inline struct crypto_alg *crypto_alg_mod_lookup(const char *name)
+{
+	return crypto_alg_lookup(name);
+}
 #endif
 
 int crypto_init_digest_flags(struct crypto_tfm *tfm, u32 flags);
