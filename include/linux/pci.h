@@ -768,6 +768,11 @@ static inline int pci_module_init(struct pci_driver *drv)
  */
 #ifndef CONFIG_PCI_DOMAINS
 static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
+static inline int pci_name_bus(char *name, struct pci_bus *bus)
+{
+	sprintf(name, "%02x", bus->number);
+	return 0;
+}
 #endif
 
 #endif /* !CONFIG_PCI */

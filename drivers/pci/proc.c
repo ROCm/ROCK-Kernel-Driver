@@ -389,7 +389,8 @@ int pci_proc_attach_device(struct pci_dev *dev)
 		return -EACCES;
 
 	if (!(de = bus->procdir)) {
-		sprintf(name, "%02x", bus->number);
+		if (!pci_name_bus(name, bus))
+			return -EEXIST;
 		de = bus->procdir = proc_mkdir(name, proc_bus_pci_dir);
 		if (!de)
 			return -ENOMEM;
