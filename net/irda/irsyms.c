@@ -84,9 +84,6 @@ EXPORT_SYMBOL(irttp_dup);
 EXPORT_SYMBOL(irda_debug);
 #endif
 EXPORT_SYMBOL(irda_notify_init);
-#ifdef CONFIG_PROC_FS
-EXPORT_SYMBOL(proc_irda);
-#endif
 EXPORT_SYMBOL(irda_param_insert);
 EXPORT_SYMBOL(irda_param_extract);
 EXPORT_SYMBOL(irda_param_extract_all);
