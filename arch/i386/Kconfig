@@ -408,6 +408,17 @@ config HUGETLB_PAGE
 
 	  Otherwise, say N.
 
+config HPET_TIMER
+	bool "HPET Timer Support"
+	help
+	  This enables the use of the HPET for the kernel's internal timer.
+	  HPET is the next generation timer replacing legacy 8254s.
+	  You can safely choose Y here.  However, HPET will only be
+	  activated if the platform and the BIOS support this feature.
+	  Otherwise the 8254 will be used for timing services.
+
+	  Choose N to continue using the legacy 8254 timer.
+
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---
