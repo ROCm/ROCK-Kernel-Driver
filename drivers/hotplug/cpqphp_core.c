@@ -79,6 +79,8 @@ static int get_power_status	(struct hotplug_slot *slot, u8 *value);
 static int get_attention_status	(struct hotplug_slot *slot, u8 *value);
 static int get_latch_status	(struct hotplug_slot *slot, u8 *value);
 static int get_adapter_status	(struct hotplug_slot *slot, u8 *value);
+static int get_max_bus_speed	(struct hotplug_slot *slot, enum pci_bus_speed *value);
+static int get_cur_bus_speed	(struct hotplug_slot *slot, enum pci_bus_speed *value);
 
 static struct hotplug_slot_ops cpqphp_hotplug_slot_ops = {
 	.owner =		THIS_MODULE,
@@ -90,6 +92,8 @@ static struct hotplug_slot_ops cpqphp_hotplug_slot_ops = {
 	.get_attention_status =	get_attention_status,
 	.get_latch_status =	get_latch_status,
 	.get_adapter_status =	get_adapter_status,
+  	.get_max_bus_speed =	get_max_bus_speed,
+  	.get_cur_bus_speed =	get_cur_bus_speed,
 };
 
 
@@ -378,7 +382,7 @@ static int ctrl_slot_setup (struct controller * ctrl, void *smbios_start, void *
 			new_slot->capabilities |= PCISLOT_64_BIT_SUPPORTED;
 		if (is_slot66mhz(new_slot))
 			new_slot->capabilities |= PCISLOT_66_MHZ_SUPPORTED;
-		if (ctrl->speed == 1)
+		if (ctrl->speed == PCI_SPEED_66MHz)
 			new_slot->capabilities |= PCISLOT_66_MHZ_OPERATION;
 
 		ctrl_slot = slot_device - (readb(ctrl->hpc_reg + SLOT_MASK) >> 4);
@@ -782,6 +786,44 @@ static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
 	return 0;
 }
 
+static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
+{
+	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	struct controller *ctrl;
+	
+	if (slot == NULL)
+		return -ENODEV;
+
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
+
+	ctrl = slot->ctrl;
+	if (ctrl == NULL)
+		return -ENODEV;
+	
+	*value = ctrl->speed_capability;
+
+	return 0;
+}
+
+static int get_cur_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
+{
+	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	struct controller *ctrl;
+	
+	if (slot == NULL)
+		return -ENODEV;
+
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
+
+	ctrl = slot->ctrl;
+	if (ctrl == NULL)
+		return -ENODEV;
+	
+	*value = ctrl->speed;
+
+	return 0;
+}
+
 static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	u8 num_of_slots = 0;
@@ -853,28 +895,28 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 					case PCI_SUB_HPC_ID:
 						/* Original 6500/7000 implementation */
 						ctrl->slot_switch_type = 1;		// Switch is present
-						ctrl->speed_capability = CTRL_SPEED_33MHz;
+						ctrl->speed_capability = PCI_SPEED_33MHz;
 						ctrl->push_button = 0;			// No pushbutton
 						ctrl->pci_config_space = 1;		// Index/data access to working registers 0 = not supported, 1 = supported
-						ctrl->defeature_PHP = 1;			// PHP is supported
+						ctrl->defeature_PHP = 1;		// PHP is supported
 						ctrl->pcix_support = 0;			// PCI-X not supported
-						ctrl->pcix_speed_capability = 0;		// N/A since PCI-X not supported
+						ctrl->pcix_speed_capability = 0;	// N/A since PCI-X not supported
 						break;
 					case PCI_SUB_HPC_ID2:
 						/* First Pushbutton implementation */
 						ctrl->push_flag = 1;
 						ctrl->slot_switch_type = 1;		// Switch is present
-						ctrl->speed_capability = CTRL_SPEED_33MHz;
+						ctrl->speed_capability = PCI_SPEED_33MHz;
 						ctrl->push_button = 1;			// Pushbutton is present
 						ctrl->pci_config_space = 1;		// Index/data access to working registers 0 = not supported, 1 = supported
-						ctrl->defeature_PHP = 1;			// PHP is supported
+						ctrl->defeature_PHP = 1;		// PHP is supported
 						ctrl->pcix_support = 0;			// PCI-X not supported
-						ctrl->pcix_speed_capability = 0;		// N/A since PCI-X not supported
+						ctrl->pcix_speed_capability = 0;	// N/A since PCI-X not supported
 						break;
 					case PCI_SUB_HPC_ID_INTC:
 						/* Third party (6500/7000) */
 						ctrl->slot_switch_type = 1;		// Switch is present
-						ctrl->speed_capability = CTRL_SPEED_33MHz;
+						ctrl->speed_capability = PCI_SPEED_33MHz;
 						ctrl->push_button = 0;			// No pushbutton
 						ctrl->pci_config_space = 1;		// Index/data access to working registers 0 = not supported, 1 = supported
 						ctrl->defeature_PHP = 1;			// PHP is supported
@@ -885,7 +927,7 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 						/* First 66 Mhz implementation */
 						ctrl->push_flag = 1;
 						ctrl->slot_switch_type = 1;		// Switch is present
-						ctrl->speed_capability = CTRL_SPEED_66MHz;
+						ctrl->speed_capability = PCI_SPEED_66MHz;
 						ctrl->push_button = 1;			// Pushbutton is present
 						ctrl->pci_config_space = 1;		// Index/data access to working registers 0 = not supported, 1 = supported
 						ctrl->defeature_PHP = 1;		// PHP is supported
@@ -903,9 +945,9 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 			case PCI_VENDOR_ID_INTEL:
 				/* Check for speed capability (0=33, 1=66) */
 				if (subsystem_deviceid & 0x0001) {
-					ctrl->speed_capability = CTRL_SPEED_66MHz;
+					ctrl->speed_capability = PCI_SPEED_66MHz;
 				} else {
-					ctrl->speed_capability = CTRL_SPEED_33MHz;
+					ctrl->speed_capability = PCI_SPEED_33MHz;
 				}
 
 				/* Check for push button */
@@ -982,7 +1024,7 @@ static int cpqhpc_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	info("Initializing the PCI hot plug controller residing on PCI bus %d\n", pdev->bus->number);
 
 	dbg ("Hotplug controller capabilities:\n");
-	dbg ("    speed_capability       %s\n", ctrl->speed_capability == CTRL_SPEED_33MHz ? "33MHz" : "66Mhz");
+	dbg ("    speed_capability       %s\n", ctrl->speed_capability == PCI_SPEED_33MHz ? "33MHz" : "66Mhz");
 	dbg ("    slot_switch_type       %s\n", ctrl->slot_switch_type == 0 ? "no switch" : "switch present");
 	dbg ("    defeature_PHP          %s\n", ctrl->defeature_PHP == 0 ? "PHP not supported" : "PHP supported");
 	dbg ("    alternate_base_address %s\n", ctrl->alternate_base_address == 0 ? "not supported" : "supported");

@@ -1462,6 +1462,7 @@ sg_attach(Scsi_Device * scsidp)
 	}
 
 	SCSI_LOG_TIMEOUT(3, printk("sg_attach: dev=%d \n", k));
+	memset(sdp, 0, sizeof(*sdp));
 	sdp->device = scsidp;
 	init_waitqueue_head(&sdp->o_excl_wait);
 	sdp->headfp = NULL;
