@@ -2729,7 +2729,7 @@ static int snd_hdsp_get_autosync_ref(snd_kcontrol_t * kcontrol, snd_ctl_elem_val
 {
 	hdsp_t *hdsp = snd_kcontrol_chip(kcontrol);
 	
-	ucontrol->value.enumerated.item[0] = hdsp_pref_sync_ref(hdsp);
+	ucontrol->value.enumerated.item[0] = hdsp_autosync_ref(hdsp);
 	return 0;
 }
 
