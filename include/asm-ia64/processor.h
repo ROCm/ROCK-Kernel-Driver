@@ -289,19 +289,19 @@ struct thread_struct {
 	struct ia64_fpreg fph[96];	/* saved/loaded on demand */
 };
 
-#define INIT_THREAD {				\
-	.flags =	0,			\
-	.on_ustack =	0,			\
-	.ksp =		0,			\
-	.map_base =	DEFAULT_MAP_BASE,	\
-	.rbs_bot =	DEFAULT_USER_STACK_SIZE,	\
-	.task_size =	DEFAULT_TASK_SIZE,	\
-	.last_fph_cpu =  -1,			\
-	INIT_THREAD_IA32			\
-	INIT_THREAD_PM				\
-	.dbr =		{0, },			\
-	.ibr =		{0, },			\
-	.fph =		{{{{0}}}, }		\
+#define INIT_THREAD {						\
+	.flags =	0,					\
+	.on_ustack =	0,					\
+	.ksp =		0,					\
+	.map_base =	DEFAULT_MAP_BASE,			\
+	.rbs_bot =	STACK_TOP - DEFAULT_USER_STACK_SIZE,	\
+	.task_size =	DEFAULT_TASK_SIZE,			\
+	.last_fph_cpu =  -1,					\
+	INIT_THREAD_IA32					\
+	INIT_THREAD_PM						\
+	.dbr =		{0, },					\
+	.ibr =		{0, },					\
+	.fph =		{{{{0}}}, }				\
 }
 
 #define start_thread(regs,new_ip,new_sp) do {							\
