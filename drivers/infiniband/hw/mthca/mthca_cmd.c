@@ -1757,3 +1757,8 @@ int mthca_MGID_HASH(struct mthca_dev *dev, void *gid, u16 *hash,
 	pci_unmap_single(dev->pdev, indma, 16, PCI_DMA_TODEVICE);
 	return err;
 }
+
+int mthca_NOP(struct mthca_dev *dev, u8 *status)
+{
+	return mthca_cmd(dev, 0, 0x1f, 0, CMD_NOP, msecs_to_jiffies(100), status);
+}

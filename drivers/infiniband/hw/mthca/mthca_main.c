@@ -570,6 +570,7 @@ static int __devinit mthca_init_hca(struct mthca_dev *mdev)
 static int __devinit mthca_setup_hca(struct mthca_dev *dev)
 {
 	int err;
+	u8 status;
 
 	MTHCA_INIT_DOORBELL_LOCK(&dev->doorbell_lock);
 
@@ -614,6 +615,18 @@ static int __devinit mthca_setup_hca(struct mthca_dev *dev)
 			  "firmware commands, aborting.\n");
 		goto err_eq_table_free;
 	}
+
+	err = mthca_NOP(dev, &status);
+	if (err || status) {
+		mthca_err(dev, "NOP command failed to generate interrupt, aborting.\n");
+		if (dev->mthca_flags & (MTHCA_FLAG_MSI | MTHCA_FLAG_MSI_X))
+			mthca_err(dev, "Try again with MSI/MSI-X disabled.\n");
+		else
+			mthca_err(dev, "BIOS or ACPI interrupt routing problem?\n");
+
+		goto err_cmd_poll;
+	} else
+		mthca_dbg(dev, "NOP command IRQ test passed\n");
 
 	err = mthca_init_cq_table(dev);
 	if (err) {

@@ -289,6 +289,7 @@ int mthca_WRITE_MGM(struct mthca_dev *dev, int index, void *mgm,
 		    u8 *status);
 int mthca_MGID_HASH(struct mthca_dev *dev, void *gid, u16 *hash,
 		    u8 *status);
+int mthca_NOP(struct mthca_dev *dev, u8 *status);
 
 #define MAILBOX_ALIGN(x) ((void *) ALIGN((unsigned long) (x), MTHCA_CMD_MAILBOX_ALIGN))
 
