@@ -152,7 +152,6 @@ char *disk_name (struct gendisk *hd, int minor, char *buf)
 			maj = s;
 			break;
 		case ACSI_MAJOR:
-		case PS2ESDI_MAJOR:
 		case XT_DISK_MAJOR:
 		case I2O_MAJOR:
 		case DASD_MAJOR:
