@@ -94,27 +94,70 @@ asmlinkage void machine_check(void);
 
 static int kstack_depth_to_print = 24;
 
-void show_trace(struct task_struct *task, unsigned long * stack)
+static int valid_stack_ptr(struct task_struct *task, void *p)
+{
+	if (p <= (void *)task->thread_info)
+		return 0;
+	if (kstack_end(p))
+		return 0;
+	return 1;
+}
+
+#ifdef CONFIG_FRAME_POINTER
+void print_context_stack(struct task_struct *task, unsigned long *stack,
+			 unsigned long ebp)
 {
 	unsigned long addr;
 
-	if (!stack)
-		stack = (unsigned long*)&stack;
+	while (valid_stack_ptr(task, (void *)ebp)) {
+		addr = *(unsigned long *)(ebp + 4);
+		printk(" [<%08lx>] ", addr);
+		print_symbol("%s", addr);
+		printk("\n");
+		ebp = *(unsigned long *)ebp;
+	}
+}
+#else
+void print_context_stack(struct task_struct *task, unsigned long *stack,
+			 unsigned long ebp)
+{
+	unsigned long addr;
 
-	printk("Call Trace:");
-#ifdef CONFIG_KALLSYMS
-	printk("\n");
+	while (!kstack_end(stack)) {
+		addr = *stack++;
+		if (kernel_text_address(addr)) {
+			printk(" [<%08lx>] ", addr);
+			print_symbol("%s\n", addr);
+		}
+	}
+}
 #endif
+
+void show_trace(struct task_struct *task, unsigned long * stack)
+{
+	unsigned long ebp;
+
+	if (!task)
+		task = current;
+
+	if (!valid_stack_ptr(task, stack)) {
+		printk("Stack pointer is garbage, not printing trace\n");
+		return;
+	}
+
+	if (task == current) {
+		/* Grab ebp right from our regs */
+		asm ("movl %%ebp, %0" : "=r" (ebp) : );
+	} else {
+		/* ebp is the last reg pushed by switch_to */
+		ebp = *(unsigned long *) task->thread.esp;
+	}
+
 	while (1) {
 		struct thread_info *context;
-		context = (struct thread_info*) ((unsigned long)stack & (~(THREAD_SIZE - 1)));
-		while (!kstack_end(stack)) {
-			addr = *stack++;
-			if (kernel_text_address(addr)) {
-				printk(" [<%08lx>] ", addr);
-				print_symbol("%s\n", addr);
-			}
-		}
+		context = (struct thread_info *)
+			((unsigned long)stack & (~(THREAD_SIZE - 1)));
+		print_context_stack(task, stack, ebp);
 		stack = (unsigned long*)context->previous_esp;
 		if (!stack)
 			break;
@@ -143,7 +186,7 @@ void show_stack(struct task_struct *task, unsigned long *esp)
 			printk("\n       ");
 		printk("%08lx ", *stack++);
 	}
-	printk("\n");
+	printk("\nCall Trace:\n");
 	show_trace(task, esp);
 }
 
