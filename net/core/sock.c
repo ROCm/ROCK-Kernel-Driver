@@ -1147,6 +1147,8 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	skb_queue_head_init(&sk->sk_write_queue);
 	skb_queue_head_init(&sk->sk_error_queue);
 
+	sk->sk_send_head	=	NULL;
+
 	init_timer(&sk->sk_timer);
 	
 	sk->sk_allocation	=	GFP_KERNEL;

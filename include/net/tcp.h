@@ -1186,13 +1186,6 @@ struct tcp_skb_cb {
 
 #define TCP_SKB_CB(__skb)	((struct tcp_skb_cb *)&((__skb)->cb[0]))
 
-#define for_retrans_queue(skb, sk, tp) \
-		for (skb = (sk)->sk_write_queue.next;			\
-		     (skb != (tp)->send_head) &&			\
-		     (skb != (struct sk_buff *)&(sk)->sk_write_queue);	\
-		     skb=skb->next)
-
-
 #include <net/tcp_ecn.h>
 
 /* This determines how many packets are "in the network" to the best
@@ -1400,7 +1393,7 @@ tcp_nagle_check(struct tcp_opt *tp, struct sk_buff *skb, unsigned mss_now, int n
 		  tcp_minshall_check(tp))));
 }
 
-/* This checks if the data bearing packet SKB (usually tp->send_head)
+/* This checks if the data bearing packet SKB (usually sk->sk_send_head)
  * should be put on the wire right now.
  */
 static __inline__ int tcp_snd_test(struct tcp_opt *tp, struct sk_buff *skb,
@@ -1457,7 +1450,7 @@ static __inline__ void __tcp_push_pending_frames(struct sock *sk,
 						 unsigned cur_mss,
 						 int nonagle)
 {
-	struct sk_buff *skb = tp->send_head;
+	struct sk_buff *skb = sk->sk_send_head;
 
 	if (skb) {
 		if (!tcp_skb_is_last(sk, skb))
@@ -1477,7 +1470,7 @@ static __inline__ void tcp_push_pending_frames(struct sock *sk,
 
 static __inline__ int tcp_may_send_now(struct sock *sk, struct tcp_opt *tp)
 {
-	struct sk_buff *skb = tp->send_head;
+	struct sk_buff *skb = sk->sk_send_head;
 
 	return (skb &&
 		tcp_snd_test(tp, skb, tcp_current_mss(sk, 1),
@@ -2023,8 +2016,8 @@ static inline int tcp_use_frto(const struct sock *sk)
 	 * unsent new data, and the advertised window should allow
 	 * sending it.
 	 */
-	return (sysctl_tcp_frto && tp->send_head &&
-		!after(TCP_SKB_CB(tp->send_head)->end_seq,
+	return (sysctl_tcp_frto && sk->sk_send_head &&
+		!after(TCP_SKB_CB(sk->sk_send_head)->end_seq,
 		       tp->snd_una + tp->snd_wnd));
 }
 

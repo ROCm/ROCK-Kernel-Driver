@@ -167,6 +167,7 @@ struct sock_common {
   *	@sk_socket - Identd and reporting IO signals
   *	@sk_user_data - RPC layer private data
   *	@sk_owner - module that owns this socket
+  *	@sk_send_head - front of stuff to transmit
   *	@sk_write_pending - a write to stream socket waits to start
   *	@sk_queue_shrunk - write queue has been shrunk recently
   *	@sk_state_change - callback to indicate change in the state of the sock
@@ -248,6 +249,7 @@ struct sock {
 	struct timeval		sk_stamp;
 	struct socket		*sk_socket;
 	void			*sk_user_data;
+	struct sk_buff		*sk_send_head;
 	struct module		*sk_owner;
 	int			sk_write_pending;
 	void			*sk_security;
@@ -1102,6 +1104,12 @@ static inline void sk_stream_moderate_sndbuf(struct sock *sk)
 		sk->sk_sndbuf = max(sk->sk_sndbuf, SOCK_MIN_SNDBUF);
 	}
 }
+
+#define sk_stream_for_retrans_queue(skb, sk)				\
+		for (skb = (sk)->sk_write_queue.next;			\
+		     (skb != (sk)->sk_send_head) &&			\
+		     (skb != (struct sk_buff *)&(sk)->sk_write_queue);	\
+		     skb = skb->next)
 
 /*
  *	Default write policy as shown to user space via poll/select/SIGIO

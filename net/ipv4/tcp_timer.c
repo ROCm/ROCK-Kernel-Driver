@@ -269,7 +269,7 @@ static void tcp_probe_timer(struct sock *sk)
 	struct tcp_opt *tp = tcp_sk(sk);
 	int max_probes;
 
-	if (tp->packets_out || !tp->send_head) {
+	if (tp->packets_out || !sk->sk_send_head) {
 		tp->probes_out = 0;
 		return;
 	}
@@ -606,7 +606,7 @@ static void tcp_keepalive_timer (unsigned long data)
 	elapsed = keepalive_time_when(tp);
 
 	/* It is alive without keepalive 8) */
-	if (tp->packets_out || tp->send_head)
+	if (tp->packets_out || sk->sk_send_head)
 		goto resched;
 
 	elapsed = tcp_time_stamp - tp->rcv_tstamp;

@@ -297,7 +297,6 @@ struct tcp_opt {
 	struct sk_buff_head	out_of_order_queue; /* Out of order segments go here */
 
 	struct tcp_func		*af_specific;	/* Operations which are AF_INET{4,6} specific	*/
-	struct sk_buff		*send_head;	/* Front of stuff to transmit			*/
 
  	__u32	rcv_wnd;	/* Current receiver window		*/
 	__u32	rcv_wup;	/* rcv_nxt on last window update sent	*/
