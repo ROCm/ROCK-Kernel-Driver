@@ -943,7 +943,6 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	ichdev_t *ichdev = get_ichdev(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	size_t size = params_buffer_bytes(hw_params);
 	int dbl = params_rate(hw_params) > 48000;
 	int err;
 
