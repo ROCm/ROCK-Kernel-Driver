@@ -578,6 +578,16 @@ ia32_sys_call_table:
 	.quad sys_tgkill
 	.quad compat_sys_utimes
 	.quad sys32_fadvise64_64
+	.quad sys_ni_syscall	/* sys_vserver */
+	.quad sys_ni_syscall	/* sys_mbind */
+	.quad sys_ni_syscall	/* 275 sys_get_mempolicy */
+	.quad sys_ni_syscall	/* sys_set_mempolicy */
+	.quad compat_sys_mq_open
+	.quad sys_mq_unlink
+	.quad compat_sys_mq_timedsend
+	.quad compat_sys_mq_timedreceive	/* 280 */
+	.quad compat_sys_mq_notify
+	.quad compat_sys_mq_getsetattr
 	/* don't forget to change IA32_NR_syscalls */
 ia32_syscall_end:		
 	.rept IA32_NR_syscalls-(ia32_syscall_end-ia32_sys_call_table)/8
