@@ -106,8 +106,8 @@ static int udsl_print_packet (const unsigned char *data, int len);
 #endif
 
 #define DRIVER_AUTHOR	"Johan Verrept, Duncan Sands <duncan.sands@free.fr>"
-#define DRIVER_DESC	"Alcatel SpeedTouch USB driver"
-#define DRIVER_VERSION	"1.7"
+#define DRIVER_VERSION	"1.8"
+#define DRIVER_DESC	"Alcatel SpeedTouch USB driver version " DRIVER_VERSION
 
 static const char udsl_driver_name [] = "speedtch";
 
@@ -1347,6 +1347,7 @@ module_exit (udsl_usb_cleanup);
 MODULE_AUTHOR (DRIVER_AUTHOR);
 MODULE_DESCRIPTION (DRIVER_DESC);
 MODULE_LICENSE ("GPL");
+MODULE_VERSION (DRIVER_VERSION);
 
 
 /************
