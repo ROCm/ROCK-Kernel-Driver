@@ -2335,7 +2335,7 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 	setup_driver_defaults(drive);
 	spin_unlock_irqrestore(&ide_lock, flags);
 	spin_lock(&drives_lock);
-	list_add(&drive->list, &driver->drives);
+	list_add_tail(&drive->list, &driver->drives);
 	spin_unlock(&drives_lock);
 //	printk(KERN_INFO "%s: attached %s driver.\n", drive->name, driver->name);
 	if ((drive->autotune == IDE_TUNE_DEFAULT) ||
