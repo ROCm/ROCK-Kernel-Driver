@@ -404,6 +404,8 @@ static void adi_init_input(struct adi *adi, struct adi_port *port, int half)
 
 	if (!adi->length) return;
 
+	init_input_dev(&adi->dev);
+
 	t = adi->id < ADI_ID_MAX ? adi->id : ADI_ID_MAX;
 
 	sprintf(buf, adi_names[t], adi->id);

@@ -155,6 +155,7 @@ static void warrior_connect(struct serio *serio, struct serio_dev *dev)
 
 	sprintf(warrior->phys, "%s/input0", serio->phys);
 
+	init_input_dev(&warrior->dev);
 	warrior->dev.name = warrior_name;
 	warrior->dev.phys = warrior->phys;
 	warrior->dev.id.bustype = BUS_RS232;
@@ -180,7 +181,7 @@ static void warrior_connect(struct serio *serio, struct serio_dev *dev)
 	
 	serio->private = warrior;
 
-	if (serio_open(serio, dev)) {
+	if (serio_open(serio, dev)) { 
 		kfree(warrior);
 		return;
 	}

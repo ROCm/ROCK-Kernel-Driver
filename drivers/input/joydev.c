@@ -1,30 +1,13 @@
 /*
- * $Id: joydev.c,v 1.43 2002/04/09 23:59:01 jsimmons Exp $
+ * Joystick device driver for the input driver suite.
  *
- *  Copyright (c) 1999-2001 Vojtech Pavlik 
- *  Copyright (c) 1999 Colin Van Dyke 
+ * Copyright (c) 1999-2002 Vojtech Pavlik 
+ * Copyright (c) 1999 Colin Van Dyke 
  *
- *  Joystick device driver for the input driver suite.
- */
-
-/*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or 
  * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <asm/io.h>
@@ -63,8 +46,7 @@ struct joydev {
 	struct input_handle handle;
 	wait_queue_head_t wait;
 	devfs_handle_t devfs;
-	struct joydev *next;
-	struct joydev_list *list;
+	struct list_head list;
 	struct js_corr corr[ABS_MAX];
 	struct JS_DATA_SAVE_TYPE glue;
 	int nabs;
@@ -83,7 +65,7 @@ struct joydev_list {
 	int startup;
 	struct fasync_struct *fasync;
 	struct joydev *joydev;
-	struct joydev_list *next;
+	struct list_head node;
 };
 
 static struct joydev *joydev_table[JOYDEV_MINORS];
@@ -111,7 +93,7 @@ static int joydev_correct(int value, struct js_corr *corr)
 static void joydev_event(struct input_handle *handle, unsigned int type, unsigned int code, int value)
 {
 	struct joydev *joydev = handle->private;
-	struct joydev_list *list = joydev->list;
+	struct joydev_list *list;
 	struct js_event event;
 
 	switch (type) {
@@ -137,7 +119,7 @@ static void joydev_event(struct input_handle *handle, unsigned int type, unsigne
 
 	event.time = MSECS(jiffies);
 
-	while (list) {
+	list_for_each_entry(list, &joydev->list, node) {
 
 		memcpy(list->buffer + list->head, &event, sizeof(struct js_event));
 
@@ -146,8 +128,6 @@ static void joydev_event(struct input_handle *handle, unsigned int type, unsigne
 				list->startup = 0;
 
 		kill_fasync(&list->fasync, SIGIO, POLL_IN);
-
-		list = list->next;
 	}
 
 	wake_up_interruptible(&joydev->wait);
@@ -164,14 +144,10 @@ static int joydev_fasync(int fd, struct file *file, int on)
 static int joydev_release(struct inode * inode, struct file * file)
 {
 	struct joydev_list *list = file->private_data;
-	struct joydev_list **listptr;
 
-	listptr = &list->joydev->list;
 	joydev_fasync(-1, file, 0);
 
-	while (*listptr && (*listptr != list))
-		listptr = &((*listptr)->next);
-	*listptr = (*listptr)->next;
+	list_del(&list->node);
 
 	if (!--list->joydev->open) {
 		if (list->joydev->exist) {
@@ -201,9 +177,7 @@ static int joydev_open(struct inode *inode, struct file *file)
 	memset(list, 0, sizeof(struct joydev_list));
 
 	list->joydev = joydev_table[i];
-	list->next = joydev_table[i]->list;
-	joydev_table[i]->list = list;	
-
+	list_add_tail(&list->node, &joydev_table[i]->list);
 	file->private_data = list;
 
 	if (!list->joydev->open++)
@@ -220,11 +194,13 @@ static ssize_t joydev_write(struct file * file, const char * buffer, size_t coun
 
 static ssize_t joydev_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
-	DECLARE_WAITQUEUE(wait, current);
 	struct joydev_list *list = file->private_data;
 	struct joydev *joydev = list->joydev;
 	struct input_dev *input = joydev->handle.dev;
 	int retval = 0;
+
+	if (!list->joydev->exist)
+		return -ENODEV;
 
 	if (count < sizeof(struct js_event))
 		return -EINVAL;
@@ -248,35 +224,18 @@ static ssize_t joydev_read(struct file *file, char *buf, size_t count, loff_t *p
 		return sizeof(struct JS_DATA_TYPE);
 	}
 
-	if (list->head == list->tail && list->startup == joydev->nabs + joydev->nkey) {
+	if (list->startup == joydev->nabs + joydev->nkey
+		&& list->head == list->tail && (file->f_flags & O_NONBLOCK))
+			return -EAGAIN;
 
-		add_wait_queue(&list->joydev->wait, &wait);
-		set_current_state(TASK_INTERRUPTIBLE);
-
-		while (list->head == list->tail) {
-
-			if (!joydev->exist) {
-				retval = -ENODEV;
-				break;
-			}
-			if (file->f_flags & O_NONBLOCK) {
-				retval = -EAGAIN;
-				break;
-			}
-			if (signal_pending(current)) {
-				retval = -ERESTARTSYS;
-				break;
-			}
-
-			schedule();
-		}
-
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&list->joydev->wait, &wait);
-	}
+	retval = wait_event_interruptible(list->joydev->wait, list->joydev->exist
+		&& (list->startup < joydev->nabs + joydev->nkey || list->head != list->tail));
 
 	if (retval)
 		return retval;
+
+	if (!list->joydev->exist)
+		return -ENODEV;
 
 	while (list->startup < joydev->nabs + joydev->nkey && retval + sizeof(struct js_event) <= count) {
 
@@ -431,17 +390,16 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 		return NULL;
 	memset(joydev, 0, sizeof(struct joydev));
 
+	INIT_LIST_HEAD(&joydev->list);
 	init_waitqueue_head(&joydev->wait);
 
 	joydev->minor = minor;
-	joydev_table[minor] = joydev;
-
-	sprintf(joydev->name, "js%d", minor);
-
+	joydev->exist = 1;
 	joydev->handle.dev = dev;
 	joydev->handle.name = joydev->name;
 	joydev->handle.handler = handler;
 	joydev->handle.private = joydev;
+	sprintf(joydev->name, "js%d", minor);
 
 	for (i = 0; i < ABS_MAX; i++)
 		if (test_bit(i, dev->absbit)) {
@@ -482,9 +440,8 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 		joydev->abs[i] = joydev_correct(dev->abs[j], joydev->corr + i);
 	}
 
+	joydev_table[minor] = joydev;
 	joydev->devfs = input_register_minor("js%d", minor, JOYDEV_MINOR_BASE);
-
-	joydev->exist = 1;
 
 	return &joydev->handle;
 }

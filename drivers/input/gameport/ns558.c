@@ -53,13 +53,13 @@ struct ns558 {
 	int type;
 	int size;
 	struct pci_dev *dev;
-	struct ns558 *next;
+	struct list_head node;
 	struct gameport gameport;
 	char phys[32];
 	char name[32];
 };
 	
-static struct ns558 *ns558;
+static LIST_HEAD(ns558_list);
 
 /*
  * ns558_isa_probe() tries to find an isa gameport at the
@@ -67,7 +67,7 @@ static struct ns558 *ns558;
  * A joystick must be attached for this to work.
  */
 
-static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
+static void ns558_isa_probe(int io)
 {
 	int i, j, b;
 	unsigned char c, u, v;
@@ -78,7 +78,7 @@ static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
  */
 
 	if (check_region(io, 1))
-		return next;
+		return;
 
 /*
  * We must not be able to write arbitrary values to the port.
@@ -89,7 +89,7 @@ static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
 	outb(~c & ~3, io);
 	if (~(u = v = inb(io)) & 3) {
 		outb(c, io);
-		return next;
+		return;
 	}
 /*
  * After a trigger, there must be at least some bits changing.
@@ -99,7 +99,7 @@ static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
 
 	if (u == v) {
 		outb(c, io);
-		return next;
+		return;
 	}
 	wait_ms(3);
 /*
@@ -110,7 +110,7 @@ static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
 	for (i = 0; i < 1000; i++)
 		if ((u ^ inb(io)) & 0xf) {
 			outb(c, io);
-			return next;
+			return;
 		}
 /* 
  * And now find the number of mirrors of the port.
@@ -134,11 +134,10 @@ static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
 
 	if (!(port = kmalloc(sizeof(struct ns558), GFP_KERNEL))) {
 		printk(KERN_ERR "ns558: Memory allocation failed.\n");
-		return next;
+		return;
 	}
        	memset(port, 0, sizeof(struct ns558));
 	
-	port->next = next;
 	port->type = NS558_ISA;
 	port->size = (1 << i);
 	port->gameport.io = io & (-1 << i);
@@ -157,7 +156,7 @@ static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
 	if (port->size > 1) printk(" size %d", port->size);
 	printk(" speed %d kHz\n", port->gameport.speed);
 
-	return port;
+	list_add(&port->node, &ns558_list);
 }
 
 #ifdef __ISAPNP__
@@ -194,22 +193,22 @@ static struct isapnp_device_id pnp_devids[] = {
 
 MODULE_DEVICE_TABLE(isapnp, pnp_devids);
 
-static struct ns558* ns558_pnp_probe(struct pci_dev *dev, struct ns558 *next)
+static void ns558_pnp_probe(struct pci_dev *dev)
 {
 	int ioport, iolen;
 	struct ns558 *port;
 
 	if (dev->prepare && dev->prepare(dev) < 0)
-		return next;
+		return;
 
 	if (!(dev->resource[0].flags & IORESOURCE_IO)) {
 		printk(KERN_WARNING "ns558: No i/o ports on a gameport? Weird\n");
-		return next;
+		return;
 	}
 
 	if (dev->activate && dev->activate(dev) < 0) {
 		printk(KERN_ERR "ns558: PnP resource allocation failed\n");
-		return next;
+		return;
 	}
 	
 	ioport = pci_resource_start(dev, 0);
@@ -224,7 +223,6 @@ static struct ns558* ns558_pnp_probe(struct pci_dev *dev, struct ns558 *next)
 	}
 	memset(port, 0, sizeof(struct ns558));
 
-	port->next = next;
 	port->type = NS558_PNP;
 	port->size = iolen;
 	port->dev = dev;
@@ -247,12 +245,12 @@ static struct ns558* ns558_pnp_probe(struct pci_dev *dev, struct ns558 *next)
 	if (iolen > 1) printk(" size %d", iolen);
 	printk(" speed %d kHz\n", port->gameport.speed);
 
-	return port;
+	list_add_tail(&port->node, &ns558_list);
+	return;
 
 deactivate:
 	if (dev->deactivate)
 		dev->deactivate(dev);
-	return next;
 }
 #endif
 
@@ -269,28 +267,26 @@ int __init ns558_init(void)
  */
 
 	while (ns558_isa_portlist[i]) 
-		ns558 = ns558_isa_probe(ns558_isa_portlist[i++], ns558);
+		ns558_isa_probe(ns558_isa_portlist[i++]);
 
 /*
  * Probe for PnP ports.
  */
 
 #ifdef __ISAPNP__
-	for (devid = pnp_devids; devid->vendor; devid++) {
-		while ((dev = isapnp_find_dev(NULL, devid->vendor, devid->function, dev))) {
-			ns558 = ns558_pnp_probe(dev, ns558);
-		}
-	}
+	for (devid = pnp_devids; devid->vendor; devid++)
+		while ((dev = isapnp_find_dev(NULL, devid->vendor, devid->function, dev)))
+			ns558_pnp_probe(dev);
 #endif
 
-	return ns558 ? 0 : -ENODEV;
+	return list_empty(&ns558_list) ? -ENODEV : 0;
 }
 
 void __exit ns558_exit(void)
 {
-	struct ns558 *next, *port = ns558;
+	struct ns558 *port;
 
-	while (port) {
+	list_for_each_entry(port, &ns558_list, node) {
 		gameport_unregister_port(&port->gameport);
 		switch (port->type) {
 
@@ -308,10 +304,6 @@ void __exit ns558_exit(void)
 			default:
 				break;
 		}
-		
-		next = port->next;
-		kfree(port);
-		port = next;
 	}
 }
 

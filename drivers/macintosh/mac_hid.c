@@ -91,6 +91,8 @@ static void emumousebtn_input_register(void)
 {
 	emumousebtn.name = "Macintosh mouse button emulation";
 
+	init_input_dev(&emumousebtn);
+
 	emumousebtn.evbit[0] = BIT(EV_KEY) | BIT(EV_REL);
 	emumousebtn.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT);
 	emumousebtn.relbit[0] = BIT(REL_X) | BIT(REL_Y);

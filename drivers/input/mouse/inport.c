@@ -115,6 +115,12 @@ static struct input_dev inport_dev = {
 	.close	= inport_close,
 	.name	= INPORT_NAME,
 	.phys	= "isa023c/input0",
+	.id = { 
+ 		.bustype = BUS_ISA,
+        	.vendor  = INPORT_VENDOR,
+        	.product = 0x0001,
+        	.version = 0x0100,
+	},
 };
 
 static void inport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -158,30 +164,27 @@ static int __init inport_init(void)
 {
 	unsigned char a,b,c;
 
-	if (check_region(INPORT_BASE, INPORT_EXTENT))
+	if (!request_region(INPORT_BASE, INPORT_EXTENT, "inport")) {
+		printk(KERN_ERR "inport.c: Can't allocate ports at %#x\n", INPORT_BASE);
 		return -EBUSY;
+	}
 
 	a = inb(INPORT_SIGNATURE_PORT);
 	b = inb(INPORT_SIGNATURE_PORT);
 	c = inb(INPORT_SIGNATURE_PORT);
-	if (( a == b ) || ( a != c ))
+	if (( a == b ) || ( a != c )) {
+		release_region(INPORT_BASE, INPORT_EXTENT);
+		printk(KERN_ERR "inport.c: Didn't find InPort mouse at %#x\n", INPORT_BASE);
 		return -ENODEV;
+	}
 
 	outb(INPORT_RESET, INPORT_CONTROL_PORT);
 	outb(INPORT_REG_MODE, INPORT_CONTROL_PORT);
 	outb(INPORT_MODE_BASE, INPORT_DATA_PORT);
 
-	request_region(INPORT_BASE, INPORT_EXTENT, "inport");
-
 	input_register_device(&inport_dev);
-	inport_dev.id.bustype	=BUS_ISA;
-	inport_dev.id.vendor	=INPORT_VENDOR;
-	inport_dev.id.product	=0x0001;
-	inport_dev.id.version	=0x0100;
 
-
-	printk(KERN_INFO "input: " INPORT_NAME " at %#x irq %d\n",
-		INPORT_BASE, inport_irq);
+	printk(KERN_INFO "input: " INPORT_NAME " at %#x irq %d\n", INPORT_BASE, inport_irq);
 
 	return 0;
 }

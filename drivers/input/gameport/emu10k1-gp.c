@@ -44,7 +44,6 @@ MODULE_LICENSE("GPL");
 
 struct emu {
 	struct pci_dev *dev;
-	struct emu *next;
 	struct gameport gameport;
 	int size;
 	char phys[32];

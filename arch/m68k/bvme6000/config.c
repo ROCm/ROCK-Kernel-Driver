@@ -45,12 +45,9 @@ static void bvme6000_get_model(char *model);
 static int  bvme6000_get_hardware_list(char *buffer);
 extern int  bvme6000_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id);
 extern void bvme6000_sched_init(void (*handler)(int, void *, struct pt_regs *));
-extern int  bvme6000_keyb_init(void);
-extern int  bvme6000_kbdrate (struct kbd_repeat *);
 extern unsigned long bvme6000_gettimeoffset (void);
 extern int bvme6000_hwclk (int, struct rtc_time *);
 extern int bvme6000_set_clock_mmss (unsigned long);
-extern void bvme6000_mksound( unsigned int count, unsigned int ticks );
 extern void bvme6000_reset (void);
 extern void bvme6000_waitbut(void);
 void bvme6000_set_vectors (void);
@@ -70,15 +67,6 @@ int bvme6000_parse_bootinfo(const struct bi_record *bi)
 		return 0;
 	else
 		return 1;
-}
-
-int bvme6000_kbdrate (struct kbd_repeat *k)
-{
-	return 0;
-}
-
-void bvme6000_mksound( unsigned int count, unsigned int ticks )
-{
 }
 
 void bvme6000_reset()
@@ -133,15 +121,10 @@ void __init config_bvme6000(void)
 
     mach_max_dma_address = 0xffffffff;
     mach_sched_init      = bvme6000_sched_init;
-#ifdef CONFIG_VT
-    mach_keyb_init       = bvme6000_keyb_init;
-    mach_kbdrate         = bvme6000_kbdrate;
-#endif
     mach_init_IRQ        = bvme6000_init_IRQ;
     mach_gettimeoffset   = bvme6000_gettimeoffset;
     mach_hwclk           = bvme6000_hwclk;
     mach_set_clock_mmss	 = bvme6000_set_clock_mmss;
-/*  mach_mksound         = bvme6000_mksound; */
     mach_reset		 = bvme6000_reset;
     mach_free_irq	 = bvme6000_free_irq;
     mach_process_int	 = bvme6000_process_int;
@@ -394,8 +377,3 @@ int bvme6000_set_clock_mmss (unsigned long nowtime)
 	return retval;
 }
 
-
-int bvme6000_keyb_init (void)
-{
-	return 0;
-}

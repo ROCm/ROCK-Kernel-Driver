@@ -187,6 +187,7 @@ static void spaceorb_connect(struct serio *serio, struct serio_dev *dev)
 
 	sprintf(spaceorb->phys, "%s/input0", serio->phys);
 
+	init_input_dev(&spaceorb->dev);
 	spaceorb->dev.name = spaceorb_name;
 	spaceorb->dev.phys = spaceorb->phys;
 	spaceorb->dev.id.bustype = BUS_RS232;

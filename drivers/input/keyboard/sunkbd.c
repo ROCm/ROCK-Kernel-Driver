@@ -234,6 +234,8 @@ static void sunkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	memset(sunkbd, 0, sizeof(struct sunkbd));
 
+	init_input_dev(&sunkbd->dev);
+
 	sunkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_SND) | BIT(EV_REP);
 	sunkbd->dev.ledbit[0] = BIT(LED_CAPSL) | BIT(LED_COMPOSE) | BIT(LED_SCROLLL) | BIT(LED_NUML);
 	sunkbd->dev.sndbit[0] = BIT(SND_CLICK) | BIT(SND_BELL);

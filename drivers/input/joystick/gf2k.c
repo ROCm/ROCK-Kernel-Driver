@@ -290,6 +290,8 @@ static void gf2k_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	gf2k->length = gf2k_lens[gf2k->id];
 
+	init_input_dev(&gf2k->dev);
+
 	gf2k->dev.private = gf2k;
 	gf2k->dev.open = gf2k_open;
 	gf2k->dev.close = gf2k_close;

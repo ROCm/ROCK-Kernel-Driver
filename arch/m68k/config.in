@@ -3,6 +3,7 @@
 # see Documentation/kbuild/config-language.txt.
 #
 
+define_bool CONFIG_M68K y
 define_bool CONFIG_UID16 y
 define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
