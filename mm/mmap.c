@@ -96,7 +96,7 @@ int vm_enough_memory(long pages)
 		 * this compensates for the swap-space over-allocation
 		 * (ie "nr_swap_pages" being too small).
 		 */
-		free += swapper_space.nrpages;
+		free += total_swapcache_pages;
 
 		/*
 		 * The code below doesn't account for free space in the

@@ -249,6 +249,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 
 		mapping = page->mapping;
 
+#ifdef CONFIG_SWAP
 		/*
 		 * Anonymous process memory without backing store. Try to
 		 * allocate it some swap space here.
@@ -281,6 +282,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 			}
 		}
 		pte_chain_unlock(page);
+#endif /* CONFIG_SWAP */
 
 		/*
 		 * FIXME: this is CPU-inefficient for shared mappings.
@@ -376,16 +378,21 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 			goto keep_locked;
 		}
 
+#ifdef CONFIG_SWAP
 		if (PageSwapCache(page)) {
 			swp_entry_t swap = { .val = page->index };
 			__delete_from_swap_cache(page);
 			write_unlock(&mapping->page_lock);
 			swap_free(swap);
-		} else {
-			__remove_from_page_cache(page);
-			write_unlock(&mapping->page_lock);
+			__put_page(page);	/* The pagecache ref */
+			goto free_it;
 		}
-		__put_page(page);	/* The pagecache ref */
+#endif /* CONFIG_SWAP */
+
+		__remove_from_page_cache(page);
+		write_unlock(&mapping->page_lock);
+		__put_page(page);
+
 free_it:
 		unlock_page(page);
 		ret++;

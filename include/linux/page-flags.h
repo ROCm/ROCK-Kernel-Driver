@@ -237,8 +237,12 @@ extern void get_full_page_state(struct page_state *ret);
  * The PageSwapCache predicate doesn't use a PG_flag at this time,
  * but it may again do so one day.
  */
+#ifdef CONFIG_SWAP
 extern struct address_space swapper_space;
 #define PageSwapCache(page) ((page)->mapping == &swapper_space)
+#else
+#define PageSwapCache(page) 0
+#endif
 
 struct page;	/* forward declaration */
 

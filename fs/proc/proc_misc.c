@@ -62,7 +62,6 @@ extern int get_filesystem_list(char *);
 extern int get_exec_domain_list(char *);
 extern int get_dma_list(char *);
 extern int get_locks_status (char *, char **, off_t, int);
-extern int get_swaparea_info (char *);
 #ifdef CONFIG_SGI_DS1286
 extern int get_ds1286_status(char *);
 #endif
@@ -291,18 +290,6 @@ static int partitions_open(struct inode *inode, struct file *file)
 }
 static struct file_operations proc_partitions_operations = {
 	.open		= partitions_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release,
-};
-
-extern struct seq_operations swaps_op;
-static int swaps_open(struct inode *inode, struct file *file)
-{
-	return seq_open(file, &swaps_op);
-}
-static struct file_operations proc_swaps_operations = {
-	.open		= swaps_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= seq_release,
@@ -641,7 +628,6 @@ void __init proc_misc_init(void)
 		entry->proc_fops = &proc_kmsg_operations;
 	create_seq_entry("cpuinfo", 0, &proc_cpuinfo_operations);
 	create_seq_entry("partitions", 0, &proc_partitions_operations);
-	create_seq_entry("swaps", 0, &proc_swaps_operations);
 #if !defined(CONFIG_ARCH_S390)
 	create_seq_entry("interrupts", 0, &proc_interrupts_operations);
 #endif
