@@ -93,7 +93,8 @@ static const int rtm_min[(RTM_MAX+1-RTM_BASE)/4] =
 	NLMSG_LENGTH(sizeof(struct rtmsg)),
 	NLMSG_LENGTH(sizeof(struct tcmsg)),
 	NLMSG_LENGTH(sizeof(struct tcmsg)),
-	NLMSG_LENGTH(sizeof(struct tcmsg))
+	NLMSG_LENGTH(sizeof(struct tcmsg)),
+	NLMSG_LENGTH(sizeof(struct tcamsg))
 };
 
 static const int rta_max[(RTM_MAX+1-RTM_BASE)/4] =
@@ -105,7 +106,8 @@ static const int rta_max[(RTM_MAX+1-RTM_BASE)/4] =
 	RTA_MAX,
 	TCA_MAX,
 	TCA_MAX,
-	TCA_MAX
+	TCA_MAX,
+	TCAA_MAX
 };
 
 void __rta_fill(struct sk_buff *skb, int attrtype, int attrlen, const void *data)
