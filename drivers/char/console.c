@@ -661,6 +661,7 @@ int vc_allocate(unsigned int currcons)	/* return 0 on success */
 	    p = (long) kmalloc(structsize, GFP_KERNEL);
 	    if (!p)
 		return -ENOMEM;
+	    memset((void *)p, 0, structsize);
 	    vc_cons[currcons].d = (struct vc_data *)p;
 	    vt_cons[currcons] = (struct vt_struct *)(p+sizeof(struct vc_data));
 	    visual_init(currcons, 1);

@@ -111,7 +111,9 @@ void bust_spinlocks(int yes)
 #endif
 	} else {
 		int loglevel_save = console_loglevel;
+#ifdef CONFIG_VT
 		unblank_screen();
+#endif
 		oops_in_progress = 0;
 		/*
 		 * OK, the message is on the console.  Now we call printk()
@@ -124,16 +126,11 @@ void bust_spinlocks(int yes)
 	}
 }
 
-#if 0
-/*
- * Verbose bug reporting: call do_BUG(__FILE__, __LINE__) in page.h:BUG() to enable this
- */
 void do_BUG(const char *file, int line)
 {
 	bust_spinlocks(1);
 	printk("kernel BUG at %s:%d!\n", file, line);
 }
-#endif
 
 asmlinkage void do_invalid_op(struct pt_regs *, unsigned long);
 extern unsigned long idt;

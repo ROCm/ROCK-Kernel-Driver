@@ -38,6 +38,18 @@ int apic_version [MAX_APICS];
 int mp_bus_id_to_type [MAX_MP_BUSSES];
 int mp_bus_id_to_pci_bus [MAX_MP_BUSSES] = { [0 ... MAX_MP_BUSSES-1] = -1 };
 int mp_current_pci_id;
+
+/* I/O APIC entries */
+struct mpc_config_ioapic mp_ioapics[MAX_IO_APICS];
+
+/* # of MP IRQ source entries */
+struct mpc_config_intsrc mp_irqs[MAX_IRQ_SOURCES];
+
+/* MP IRQ source entries */
+int mp_irq_entries;
+
+int nr_ioapics;
+
 int pic_mode;
 unsigned long mp_lapic_addr;
 
@@ -225,6 +237,11 @@ static void __init MP_ioapic_info (struct mpc_config_ioapic *m)
 			MAX_IO_APICS, nr_ioapics);
 		panic("Recompile kernel with bigger MAX_IO_APICS!.\n");
 	}
+	if (!m->mpc_apicaddr) {
+		printk(KERN_ERR "WARNING: bogus zero I/O APIC address"
+			" found in MP table, skipping!\n");
+		return;
+	}
 	mp_ioapics[nr_ioapics] = *m;
 	nr_ioapics++;
 }
@@ -365,10 +382,19 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	return num_processors;
 }
 
+static int __init ELCR_trigger(unsigned int irq)
+{
+	unsigned int port;
+
+	port = 0x4d0 + (irq >> 3);
+	return (inb(port) >> (irq & 7)) & 1;
+}
+
 static void __init construct_default_ioirq_mptable(int mpc_default_type)
 {
 	struct mpc_config_intsrc intsrc;
 	int i;
+	int ELCR_fallback = 0;
 
 	intsrc.mpc_type = MP_INTSRC;
 	intsrc.mpc_irqflag = 0;			/* conforming */
@@ -376,6 +402,26 @@ static void __init construct_default_ioirq_mptable(int mpc_default_type)
 	intsrc.mpc_dstapic = mp_ioapics[0].mpc_apicid;
 
 	intsrc.mpc_irqtype = mp_INT;
+
+	/*
+	 *  If true, we have an ISA/PCI system with no IRQ entries
+	 *  in the MP table. To prevent the PCI interrupts from being set up
+	 *  incorrectly, we try to use the ELCR. The sanity check to see if
+	 *  there is good ELCR data is very simple - IRQ0, 1, 2 and 13 can
+	 *  never be level sensitive, so we simply see if the ELCR agrees.
+	 *  If it does, we assume it's valid.
+	 */
+	if (mpc_default_type == 5) {
+		printk("ISA/PCI bus type with no IRQ information... falling back to ELCR\n");
+
+		if (ELCR_trigger(0) || ELCR_trigger(1) || ELCR_trigger(2) || ELCR_trigger(13))
+			printk("ELCR contains invalid data... not using ELCR\n");
+		else {
+			printk("Using ELCR to identify PCI interrupts\n");
+			ELCR_fallback = 1;
+		}
+	}
+
 	for (i = 0; i < 16; i++) {
 		switch (mpc_default_type) {
 		case 2:
@@ -385,6 +431,18 @@ static void __init construct_default_ioirq_mptable(int mpc_default_type)
 		default:
 			if (i == 2)
 				continue;	/* IRQ2 is never connected */
+		}
+
+		if (ELCR_fallback) {
+			/*
+			 *  If the ELCR indicates a level-sensitive interrupt, we
+			 *  copy that information over to the MP table in the
+			 *  irqflag field (level sensitive, active high polarity).
+			 */
+			if (ELCR_trigger(i))
+				intsrc.mpc_irqflag = 13;
+			else
+				intsrc.mpc_irqflag = 0;
 		}
 
 		intsrc.mpc_srcbusirq = i;
@@ -641,7 +699,7 @@ void __init find_visws_smp(void)
  */
 void __init find_smp_config (void)
 {
-#ifdef CONFIG_X86_IO_APIC
+#ifdef CONFIG_X86_LOCAL_APIC
 	find_intel_smp();
 #endif
 #ifdef CONFIG_VISWS

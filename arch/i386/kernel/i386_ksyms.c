@@ -165,3 +165,13 @@ EXPORT_SYMBOL(empty_zero_page);
 #ifdef CONFIG_HAVE_DEC_LOCK
 EXPORT_SYMBOL(atomic_dec_and_lock);
 #endif
+
+#ifdef CONFIG_DEBUG_BUGVERBOSE
+EXPORT_SYMBOL(do_BUG);
+#endif
+
+#if defined(CONFIG_SONYPI) || defined(CONFIG_SONYPI_MODULE)
+extern int is_sony_vaio_laptop;
+EXPORT_SYMBOL(is_sony_vaio_laptop);
+#endif
+

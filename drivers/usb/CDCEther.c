@@ -1271,6 +1271,7 @@ module_exit( CDCEther_exit );
 
 MODULE_AUTHOR("Brad Hards and another");
 MODULE_DESCRIPTION("USB CDC Ethernet driver");
+MODULE_LICENSE("GPL");
 
 MODULE_DEVICE_TABLE (usb, CDCEther_ids);
 

@@ -5,6 +5,8 @@
  *
  * David E. Nelson (dnelson@jump.net)
  *
+ * 08/16/2001 added devfs support Yves Duret <yduret@mandrakesoft.com>
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2 of the
@@ -31,6 +33,7 @@
 #include <linux/ioctl.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
+#include <linux/devfs_fs_kernel.h>
 
 // #define DEBUG
 
@@ -40,6 +43,7 @@ static __s32 vendor=-1, product=-1, read_timeout=0;
 
 MODULE_AUTHOR("David E. Nelson, dnelson@jump.net, http://www.jump.net/~dnelson");
 MODULE_DESCRIPTION("USB Scanner Driver");
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(vendor, "i");
 MODULE_PARM_DESC(vendor, "User specified USB idVendor");
@@ -174,6 +178,7 @@ MODULE_DEVICE_TABLE (usb, scanner_device_ids);
 
 struct scn_usb_data {
 	struct usb_device *scn_dev;
+	devfs_handle_t devfs;	/* devfs device */
 	struct urb scn_irq;
 	unsigned int ifnum;	/* Interface number of the USB device */
 	kdev_t scn_minor;	/* Scanner minor - used in disconnect() */
@@ -190,3 +195,5 @@ struct scn_usb_data {
 static struct scn_usb_data *p_scn_table[SCN_MAX_MNR] = { NULL, /* ... */};
 
 static struct usb_driver scanner_driver;
+
+extern devfs_handle_t usb_devfs_handle; /* /dev/usb dir. */

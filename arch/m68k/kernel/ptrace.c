@@ -87,6 +87,19 @@ static inline int put_reg(struct task_struct *task, int regno,
 	return 0;
 }
 
+/*
+ * Called by kernel/ptrace.c when detaching..
+ *
+ * Make sure the single step bit is not set.
+ */
+void ptrace_disable(struct task_struct *child)
+{
+	unsigned long tmp;
+	/* make sure the single step bit is not set. */
+	tmp = get_reg(child, PT_SR) & ~(TRACE_BITS << 16);
+	put_reg(child, PT_SR, tmp);
+}
+
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 {
 	struct task_struct *child;
@@ -279,26 +292,9 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			break;
 		}
 
-		case PTRACE_DETACH: { /* detach a process that was attached. */
-			long tmp;
-
-			ret = -EIO;
-			if ((unsigned long) data > _NSIG)
-				break;
-			child->ptrace &= ~(PT_PTRACED|PT_TRACESYS);
-			child->exit_code = data;
-			write_lock_irqsave(&tasklist_lock, flags);
-			REMOVE_LINKS(child);
-			child->p_pptr = child->p_opptr;
-			SET_LINKS(child);
-			write_unlock_irqrestore(&tasklist_lock, flags);
-			/* make sure the single step bit is not set. */
-			tmp = get_reg(child, PT_SR) & ~(TRACE_BITS << 16);
-			put_reg(child, PT_SR, tmp);
-			wake_up_process(child);
-			ret = 0;
+		case PTRACE_DETACH:	/* detach a process that was attached. */
+			ret = ptrace_detach(child, data);
 			break;
-		}
 
 		case PTRACE_GETREGS: { /* Get all gp regs from the child. */
 		  	int i;

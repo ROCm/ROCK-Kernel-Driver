@@ -82,6 +82,16 @@ static inline int put_reg(struct task_struct *task, unsigned int regno,
 	return 0;
 }
 
+/*
+ * Called by kernel/ptrace.c when detaching..
+ *
+ * Make sure the single step bit is not set.
+ */
+void ptrace_disable(struct task_struct *child)
+{
+	/* Todo - pending singlesteps? */
+}
+
 /* Note that this implementation of ptrace behaves differently from vanilla
  * ptrace.  Contrary to what the man page says, in the PTRACE_PEEKTEXT,
  * PTRACE_PEEKDATA, and PTRACE_PEEKUSER requests the data variable is not
@@ -245,24 +255,9 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			break;
 		}
 
-		case PTRACE_DETACH: { /* detach a process that was attached. */
-			long tmp;
-
-			ret = -EIO;
-			if ((unsigned long) data > _NSIG)
-				break;
-			child->ptrace &= ~(PT_PTRACED | PT_TRACESYS);
-			child->exit_code = data;
-			write_lock_irq(&tasklist_lock);
-			REMOVE_LINKS(child);
-			child->p_pptr = child->p_opptr;
-			SET_LINKS(child);
-			write_unlock_irq(&tasklist_lock);
-			/* TODO: make sure any pending breakpoint is killed */
-			wake_up_process(child);
-			ret = 0;
+		case PTRACE_DETACH:
+			ret = ptrace_detach(child, data);
 			break;
-		}
 
 		case PTRACE_GETREGS: { /* Get all gp regs from the child. */
 		  	int i;

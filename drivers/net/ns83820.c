@@ -80,15 +80,12 @@
 #include <linux/ip.h>	/* for iph */
 #include <linux/in.h>	/* for IPPROTO_... */
 #include <linux/eeprom.h>
+#include <linux/compiler.h>
 //#include <linux/skbrefill.h>
 
 /* Dprintk is used for more interesting debug events */
 #undef Dprintk
 #define	Dprintk			dprintk
-
-#if !defined(GCC_VERSION) || (GCC_VERSION < 2096)
-#define __builtin_expect(x,y)	(x)
-#endif
 
 #ifdef CONFIG_HIGHMEM64G
 #define USE_64BIT_ADDR

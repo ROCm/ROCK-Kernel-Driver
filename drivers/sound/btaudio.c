@@ -1,7 +1,7 @@
 /*
     btaudio - bt878 audio dma driver for linux 2.4.x
 
-    (c) 2000 Gerd Knorr <kraxel@goldbach.in-berlin.de>
+    (c) 2000 Gerd Knorr <kraxel@bytesex.org>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,9 +32,7 @@
 #include <linux/poll.h>
 #include <linux/sound.h>
 #include <linux/soundcard.h>
-#include <linux/slab.h>
 #include <asm/uaccess.h>
-#include <asm/io.h>
 
 
 /* mmio access */
@@ -91,7 +89,6 @@
 #define RISC_SYNC_VRO     0x0c
 
 #define HWBASE_AD (448000)
-#define HWBASE_DA 31928 /* 48000 */
 
 /* -------------------------------------------------------------- */
 
@@ -100,7 +97,8 @@ struct btaudio {
 	struct btaudio *next;
 
 	/* device info */
-	int            dsp_dev;
+	int            dsp_digital;
+	int            dsp_analog;
 	int            mixer_dev;
 	struct pci_dev *pci;
 	unsigned int   irq;
@@ -142,14 +140,18 @@ struct btaudio {
 	int mixcount;
 	int sampleshift;
 	int channels;
+	int analog;
 };
 
 static struct btaudio *btaudios = NULL;
-static unsigned int dsp = -1;
+static unsigned int dsp1 = -1;
+static unsigned int dsp2 = -1;
 static unsigned int mixer = -1;
 static unsigned int debug = 0;
 static unsigned int irq_debug = 0;
-static int analog = 0;
+static int digital = 1;
+static int analog = 1;
+static int rate = 32000;
 
 /* -------------------------------------------------------------- */
 
@@ -210,7 +212,8 @@ static int make_risc(struct btaudio *bta)
 	if (bta->line_count > 255)
 		return -EINVAL;
 	if (debug)
-		printk("btaudio: bufsize=%d - bs=%d bc=%d - ls=%d, lc=%d\n",
+		printk(KERN_DEBUG
+		       "btaudio: bufsize=%d - bs=%d bc=%d - ls=%d, lc=%d\n",
 		       bta->buf_size,bta->block_bytes,bta->block_count,
 		       bta->line_bytes,bta->line_count);
         rp = 0; bp = 0;
@@ -250,7 +253,7 @@ static int start_recording(struct btaudio *bta)
 	btwrite((bta->line_count << 16) | bta->line_bytes,
 		REG_PACKET_LEN);
 	btwrite(IRQ_BTAUDIO, REG_INT_MASK);
-	if (analog) {
+	if (bta->analog) {
 		btwrite(DMA_CTL_ACAP_EN |
 			DMA_CTL_RISC_EN |
 			DMA_CTL_FIFO_EN |
@@ -278,7 +281,7 @@ static int start_recording(struct btaudio *bta)
 	bta->read_count = 0;
 	bta->recording = 1;
 	if (debug)
-		printk("btaudio: recording started\n");
+		printk(KERN_DEBUG "btaudio: recording started\n");
 	return 0;
 }
 
@@ -287,15 +290,9 @@ static void stop_recording(struct btaudio *bta)
         btand(~15, REG_GPIO_DMA_CTL);
 	bta->recording = 0;
 	if (debug)
-		printk("btaudio: recording stopped\n");
+		printk(KERN_DEBUG "btaudio: recording stopped\n");
 }
 
-/* -------------------------------------------------------------- */
-
-static loff_t btaudio_llseek(struct file *file, loff_t offset, int origin)
-{
-        return -ESPIPE;
-}
 
 /* -------------------------------------------------------------- */
 
@@ -310,6 +307,8 @@ static int btaudio_mixer_open(struct inode *inode, struct file *file)
 	if (NULL == bta)
 		return -ENODEV;
 
+	if (debug)
+		printk("btaudio: open mixer [%d]\n",minor);
 	file->private_data = bta;
 	return 0;
 }
@@ -327,8 +326,9 @@ static int btaudio_mixer_ioctl(struct inode *inode, struct file *file,
 
 	if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-                strncpy(info.id, "bt878", sizeof(info.id));
-                strncpy(info.name, "Brooktree Bt878 audio", sizeof(info.name));
+		memset(&info,0,sizeof(info));
+                strncpy(info.id,"bt878",sizeof(info.id)-1);
+                strncpy(info.name,"Brooktree Bt878 audio",sizeof(info.name)-1);
                 info.modify_counter = bta->mixcount;
                 if (copy_to_user((void *)arg, &info, sizeof(info)))
                         return -EFAULT;
@@ -336,8 +336,9 @@ static int btaudio_mixer_ioctl(struct inode *inode, struct file *file,
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-                strncpy(info.id, "bt878", sizeof(info.id));
-                strncpy(info.name, "Brooktree Bt878 audio", sizeof(info.name));
+		memset(&info,0,sizeof(info));
+                strncpy(info.id,"bt878",sizeof(info.id)-1);
+                strncpy(info.name,"Brooktree Bt878 audio",sizeof(info.name)-1);
                 if (copy_to_user((void *)arg, &info, sizeof(info)))
                         return -EFAULT;
 		return 0;
@@ -423,7 +424,7 @@ static int btaudio_mixer_ioctl(struct inode *inode, struct file *file,
 
 static struct file_operations btaudio_mixer_fops = {
 	owner:   THIS_MODULE,
-	llseek:  btaudio_llseek,
+	llseek:  no_llseek,
 	open:    btaudio_mixer_open,
 	release: btaudio_mixer_release,
 	ioctl:   btaudio_mixer_ioctl,
@@ -431,23 +432,16 @@ static struct file_operations btaudio_mixer_fops = {
 
 /* -------------------------------------------------------------- */
 
-static int btaudio_dsp_open(struct inode *inode, struct file *file)
+static int btaudio_dsp_open(struct inode *inode, struct file *file,
+			    struct btaudio *bta, int analog)
 {
-	int minor = MINOR(inode->i_rdev);
-	struct btaudio *bta;
-
-	for (bta = btaudios; bta != NULL; bta = bta->next)
-		if (bta->dsp_dev == minor)
-			break;
-	if (NULL == bta)
-		return -ENODEV;
-
 	down(&bta->lock);
 	if (bta->users)
 		goto busy;
 	bta->users++;
 	file->private_data = bta;
 
+	bta->analog = analog;
 	bta->dma_block = 0;
 	bta->read_offset = 0;
 	bta->read_count = 0;
@@ -459,6 +453,38 @@ static int btaudio_dsp_open(struct inode *inode, struct file *file)
  busy:
 	up(&bta->lock);
 	return -EBUSY;
+}
+
+static int btaudio_dsp_open_digital(struct inode *inode, struct file *file)
+{
+	int minor = MINOR(inode->i_rdev);
+	struct btaudio *bta;
+
+	for (bta = btaudios; bta != NULL; bta = bta->next)
+		if (bta->dsp_digital == minor)
+			break;
+	if (NULL == bta)
+		return -ENODEV;
+	
+	if (debug)
+		printk("btaudio: open digital dsp [%d]\n",minor);
+	return btaudio_dsp_open(inode,file,bta,0);
+}
+
+static int btaudio_dsp_open_analog(struct inode *inode, struct file *file)
+{
+	int minor = MINOR(inode->i_rdev);
+	struct btaudio *bta;
+
+	for (bta = btaudios; bta != NULL; bta = bta->next)
+		if (bta->dsp_analog == minor)
+			break;
+	if (NULL == bta)
+		return -ENODEV;
+
+	if (debug)
+		printk("btaudio: open analog dsp [%d]\n",minor);
+	return btaudio_dsp_open(inode,file,bta,1);
 }
 
 static int btaudio_dsp_release(struct inode *inode, struct file *file)
@@ -511,9 +537,9 @@ static ssize_t btaudio_dsp_read(struct file *file, char *buffer,
 		if (nsrc > bta->buf_size - bta->read_offset)
 			nsrc = bta->buf_size - bta->read_offset;
 		ndst = nsrc >> bta->sampleshift;
-
-		if ((analog  && 0 == bta->sampleshift) ||
-		    (!analog && 2 == bta->channels)) {
+		
+		if ((bta->analog  && 0 == bta->sampleshift) ||
+		    (!bta->analog && 2 == bta->channels)) {
 			/* just copy */
 			if (copy_to_user(buffer + ret, bta->buf_cpu + bta->read_offset, nsrc)) {
 				if (0 == ret)
@@ -521,11 +547,11 @@ static ssize_t btaudio_dsp_read(struct file *file, char *buffer,
 				break;
 			}
 
-		} else if (!analog) {
+		} else if (!bta->analog) {
 			/* stereo => mono (digital audio) */
-			__u16 *src = (__u16*)(bta->buf_cpu + bta->read_offset);
-			__u16 *dst = (__u16*)(buffer + ret);
-			__u16 avg;
+			__s16 *src = (__s16*)(bta->buf_cpu + bta->read_offset);
+			__s16 *dst = (__s16*)(buffer + ret);
+			__s16 avg;
 			int n = ndst>>1;
 			if (0 != verify_area(VERIFY_WRITE,dst,ndst)) {
 				if (0 == ret)
@@ -533,9 +559,9 @@ static ssize_t btaudio_dsp_read(struct file *file, char *buffer,
 				break;
 			}
 			for (; n; n--, dst++) {
-				avg  = *(src++) >> 1;
-				avg += *(src++) >> 1;
-				__put_user(avg,(__u16*)(dst));
+				avg  = (__s16)le16_to_cpu(*src) / 2; src++;
+				avg += (__s16)le16_to_cpu(*src) / 2; src++;
+				__put_user(cpu_to_le16(avg),(__u16*)(dst));
 			}
 
 		} else if (8 == bta->bits) {
@@ -600,7 +626,7 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
         case SNDCTL_DSP_SPEED:
 		if (get_user(val, (int*)arg))
 			return -EFAULT;
-		if (analog) {
+		if (bta->analog) {
 			for (s = 0; s < 16; s++)
 				if (val << s >= HWBASE_AD*4/15)
 					break;
@@ -610,7 +636,8 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
 			bta->sampleshift = s;
 			bta->decimation  = i;
 			if (debug)
-				printk("btaudio: rate: req=%d  dec=%d shift=%d hwrate=%d swrate=%d\n",
+				printk(KERN_DEBUG "btaudio: rate: req=%d  "
+				       "dec=%d shift=%d hwrate=%d swrate=%d\n",
 				       val,i,s,(HWBASE_AD*4/i),(HWBASE_AD*4/i)>>s);
 		} else {
 			bta->sampleshift = (bta->channels == 2) ? 0 : 1;
@@ -624,26 +651,30 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
 		}
 		/* fall through */
         case SOUND_PCM_READ_RATE:
-		if (analog) {
+		if (bta->analog) {
 			return put_user(HWBASE_AD*4/bta->decimation>>bta->sampleshift, (int*)arg);
 		} else {
-			return put_user(HWBASE_DA, (int*)arg);
+			return put_user(rate, (int*)arg);
 		}
 
         case SNDCTL_DSP_STEREO:
-		if (!analog) {
+		if (!bta->analog) {
 			if (get_user(val, (int*)arg))
 				return -EFAULT;
 			bta->channels    = (val > 0) ? 2 : 1;
 			bta->sampleshift = (bta->channels == 2) ? 0 : 1;
-			printk("btaudio: stereo=%d channels=%d\n",
-			       val,bta->channels);
+			if (debug)
+				printk(KERN_INFO
+				       "btaudio: stereo=%d channels=%d\n",
+				       val,bta->channels);
 		} else {
 			if (val == 1)
 				return -EFAULT;
 			else {
 				bta->channels = 1;
-				printk("btaudio: stereo=0 channels=1\n");
+				if (debug)
+					printk(KERN_INFO
+					       "btaudio: stereo=0 channels=1\n");
 			}
 		}
 		return put_user((bta->channels)-1, (int *)arg);
@@ -654,8 +685,10 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
 				return -EFAULT;
 			bta->channels    = (val > 1) ? 2 : 1;
 			bta->sampleshift = (bta->channels == 2) ? 0 : 1;
-			printk("btaudio: val=%d channels=%d\n",
-			       val,bta->channels);
+			if (debug)
+				printk(KERN_DEBUG
+				       "btaudio: val=%d channels=%d\n",
+				       val,bta->channels);
 		}
 		/* fall through */
         case SOUND_PCM_READ_CHANNELS:
@@ -683,7 +716,7 @@ static int btaudio_dsp_ioctl(struct inode *inode, struct file *file,
 			}
 		}
 		if (debug)
-			printk("btaudio: fmt: bits=%d\n",bta->bits);
+			printk(KERN_DEBUG "btaudio: fmt: bits=%d\n",bta->bits);
                 return put_user((bta->bits==16) ? AFMT_S16_LE : AFMT_S8,
 				(int*)arg);
 		break;
@@ -736,10 +769,21 @@ static unsigned int btaudio_dsp_poll(struct file *file, struct poll_table_struct
 	return mask;
 }
 
-static struct file_operations btaudio_dsp_fops = {
+static struct file_operations btaudio_digital_dsp_fops = {
 	owner:   THIS_MODULE,
-	llseek:  btaudio_llseek,
-	open:    btaudio_dsp_open,
+	llseek:  no_llseek,
+	open:    btaudio_dsp_open_digital,
+	release: btaudio_dsp_release,
+	read:    btaudio_dsp_read,
+	write:   btaudio_dsp_write,
+	ioctl:   btaudio_dsp_ioctl,
+	poll:    btaudio_dsp_poll,
+};
+
+static struct file_operations btaudio_analog_dsp_fops = {
+	owner:   THIS_MODULE,
+	llseek:  no_llseek,
+	open:    btaudio_dsp_open_analog,
 	release: btaudio_dsp_release,
 	read:    btaudio_dsp_read,
 	write:   btaudio_dsp_write,
@@ -769,7 +813,7 @@ static void btaudio_irq(int irq, void *dev_id, struct pt_regs * regs)
 
 		if (irq_debug) {
 			int i;
-			printk("btaudio: irq loop=%d risc=%x, bits:",
+			printk(KERN_DEBUG "btaudio: irq loop=%d risc=%x, bits:",
 			       count, stat>>28);
 			for (i = 0; i < (sizeof(irq_name)/sizeof(char*)); i++) {
 				if (stat & (1 << i))
@@ -787,7 +831,7 @@ static void btaudio_irq(int irq, void *dev_id, struct pt_regs * regs)
 			bta->dma_block = stat >> 28;
 			if (bta->read_count + 2*bta->block_bytes > bta->buf_size) {
 				stop_recording(bta);
-				printk("btaudio: buffer overrun\n");
+				printk(KERN_INFO "btaudio: buffer overrun\n");
 			}
 			if (blocks > 0) {
 				bta->read_count += blocks * bta->block_bytes;
@@ -795,7 +839,8 @@ static void btaudio_irq(int irq, void *dev_id, struct pt_regs * regs)
 			}
 		}
 		if (count > 10) {
-			printk("btaudio: Oops - irq mask cleared\n");
+			printk(KERN_WARNING
+			       "btaudio: Oops - irq mask cleared\n");
 			btwrite(0, REG_INT_MASK);
 		}
 	}
@@ -831,7 +876,7 @@ static int __devinit btaudio_probe(struct pci_dev *pci_dev,
 	bta->source     = 1;
 	bta->bits       = 8;
 	bta->channels   = 1;
-	if (analog) {
+	if (bta->analog) {
 		bta->decimation  = 15;
 	} else {
 		bta->decimation  = 0;
@@ -843,7 +888,7 @@ static int __devinit btaudio_probe(struct pci_dev *pci_dev,
 
         pci_read_config_byte(pci_dev, PCI_CLASS_REVISION, &revision);
         pci_read_config_byte(pci_dev, PCI_LATENCY_TIMER, &latency);
-        printk("btaudio: Bt%x (rev %d) at %02x:%02x.%x, ",
+        printk(KERN_INFO "btaudio: Bt%x (rev %d) at %02x:%02x.%x, ",
 	       pci_dev->device,revision,pci_dev->bus->number,
 	       PCI_SLOT(pci_dev->devfn),PCI_FUNC(pci_dev->devfn));
         printk("irq: %d, latency: %d, memory: 0x%lx\n",
@@ -852,31 +897,44 @@ static int __devinit btaudio_probe(struct pci_dev *pci_dev,
 	/* init hw */
         btwrite(0, REG_GPIO_DMA_CTL);
         btwrite(0, REG_INT_MASK);
-        btwrite(~(u32)0x0, REG_INT_STAT);
+        btwrite(~0x0UL, REG_INT_STAT);
 	pci_set_master(pci_dev);
 
 	if ((rc = request_irq(bta->irq, btaudio_irq, SA_SHIRQ|SA_INTERRUPT,
 			       "btaudio",(void *)bta)) < 0) {
-		printk("btaudio: can't request irq (rc=%d)\n",rc);
+		printk(KERN_WARNING
+		       "btaudio: can't request irq (rc=%d)\n",rc);
 		goto fail1;
 	}
 
 	/* register devices */
-	rc = bta->dsp_dev = register_sound_dsp(&btaudio_dsp_fops,dsp);
-	if (rc < 0) {
-		printk("btaudio: can't register dsp (rc=%d)\n",rc);
-		goto fail2;
+	if (digital) {
+		rc = bta->dsp_digital =
+			register_sound_dsp(&btaudio_digital_dsp_fops,dsp1);
+		if (rc < 0) {
+			printk(KERN_WARNING
+			       "btaudio: can't register digital dsp (rc=%d)\n",rc);
+			goto fail2;
+		}
 	}
 	if (analog) {
+		rc = bta->dsp_analog =
+			register_sound_dsp(&btaudio_analog_dsp_fops,dsp2);
+		if (rc < 0) {
+			printk(KERN_WARNING
+			       "btaudio: can't register analog dsp (rc=%d)\n",rc);
+			goto fail3;
+		}
 		rc = bta->mixer_dev = register_sound_mixer(&btaudio_mixer_fops,mixer);
 		if (rc < 0) {
-			printk("btaudio: can't register mixer (rc=%d)\n",rc);
-			goto fail3;
+			printk(KERN_WARNING
+			       "btaudio: can't register mixer (rc=%d)\n",rc);
+			goto fail4;
 		}
 	}
 	if (debug)
-		printk("btaudio: dsp: minor=%d, mixer: minor=%d\n",
-		       bta->dsp_dev,bta->mixer_dev);
+		printk(KERN_DEBUG "btaudio: minors: digital=%d, analog=%d, mixer=%d\n",
+		       bta->dsp_digital, bta->dsp_analog, bta->mixer_dev);
 
 	/* hook into linked list */
 	bta->next = btaudios;
@@ -885,8 +943,11 @@ static int __devinit btaudio_probe(struct pci_dev *pci_dev,
 	pci_set_drvdata(pci_dev,bta);
         return 0;
 
+ fail4:
+	unregister_sound_dsp(bta->dsp_analog);
  fail3:
-	unregister_sound_dsp(bta->dsp_dev);
+	if (digital)
+		unregister_sound_dsp(bta->dsp_digital);
  fail2:
         free_irq(bta->irq,bta);	
  fail1:
@@ -904,12 +965,16 @@ static void __devexit btaudio_remove(struct pci_dev *pci_dev)
 	/* turn off all DMA / IRQs */
         btand(~15, REG_GPIO_DMA_CTL);
         btwrite(0, REG_INT_MASK);
-        btwrite(~(u32)0x0, REG_INT_STAT);
+        btwrite(~0x0UL, REG_INT_STAT);
 
 	/* unregister devices */
-	unregister_sound_dsp(bta->dsp_dev);
-	if (analog)
+	if (digital) {
+		unregister_sound_dsp(bta->dsp_digital);
+	}
+	if (analog) {
+		unregister_sound_dsp(bta->dsp_analog);
 		unregister_sound_mixer(bta->mixer_dev);
+	}
 
 	/* free resources */
 	free_buffer(bta);
@@ -950,8 +1015,10 @@ static struct pci_driver btaudio_pci_driver = {
 
 int btaudio_init_module(void)
 {
-	printk("btaudio: driver version 0.5 loaded [%s mode]\n",
-	       analog ? "audio A/D" : "digital audio");
+	printk(KERN_INFO "btaudio: driver version 0.6 loaded [%s%s%s]\n",
+	       analog ? "analog" : "",
+	       analog && digital ? "+" : "",
+	       digital ? "digital" : "");
 	return pci_module_init(&btaudio_pci_driver);
 }
 
@@ -964,15 +1031,19 @@ void btaudio_cleanup_module(void)
 module_init(btaudio_init_module);
 module_exit(btaudio_cleanup_module);
 
-MODULE_PARM(dsp,"i");
+MODULE_PARM(dsp1,"i");
+MODULE_PARM(dsp2,"i");
 MODULE_PARM(mixer,"i");
 MODULE_PARM(debug,"i");
 MODULE_PARM(irq_debug,"i");
+MODULE_PARM(digital,"i");
 MODULE_PARM(analog,"i");
+MODULE_PARM(rate,"i");
 
 MODULE_DEVICE_TABLE(pci, btaudio_pci_tbl);
-MODULE_DESCRIPTION("btaudio - bt878 audio dma driver");
+MODULE_DESCRIPTION("bt878 audio dma driver");
 MODULE_AUTHOR("Gerd Knorr");
+MODULE_LICENSE("GPL");
 
 /*
  * Local variables:

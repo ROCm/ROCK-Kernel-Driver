@@ -78,7 +78,15 @@ static int rw_swap_page_base(int rw, swp_entry_t entry, struct page *page)
  	if (!wait) {
  		SetPageDecrAfter(page);
  		atomic_inc(&nr_async_pages);
- 	}
+ 	} else
+		/*
+		 * Must hold a reference until after wait_on_page()
+		 * returned or it could be freed by the VM after
+		 * I/O is completed and the page is been unlocked.
+		 * The asynchronous path is fine since it never
+		 * references the page after brw_page().
+		 */
+		page_cache_get(page);
 
  	/* block_size == PAGE_SIZE/zones_used */
  	brw_page(rw, page, dev, zones, block_size);
@@ -94,6 +102,7 @@ static int rw_swap_page_base(int rw, swp_entry_t entry, struct page *page)
 	/* This shouldn't happen, but check to be sure. */
 	if (page_count(page) == 0)
 		printk(KERN_ERR "rw_swap_page: page unused while waiting!\n");
+	page_cache_release(page);
 
 	return 1;
 }

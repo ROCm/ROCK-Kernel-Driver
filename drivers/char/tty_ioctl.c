@@ -18,6 +18,7 @@
 #include <linux/fcntl.h>
 #include <linux/string.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 
 #include <asm/io.h>
 #include <asm/bitops.h>
@@ -27,11 +28,6 @@
 #undef TTY_DEBUG_WAIT_UNTIL_SENT
 
 #undef	DEBUG
-#ifdef DEBUG
-# define	PRINTK(x)	printk (x)
-#else
-# define	PRINTK(x)	/**/
-#endif
 
 /*
  * Internal flag options for termios setting behavior
@@ -145,18 +141,19 @@ static void change_termios(struct tty_struct * tty, struct termios * new_termios
 static int set_termios(struct tty_struct * tty, unsigned long arg, int opt)
 {
 	struct termios tmp_termios;
-	int retval;
+	int retval = tty_check_change(tty);
 
-	retval = tty_check_change(tty);
 	if (retval)
 		return retval;
 
 	if (opt & TERMIOS_TERMIO) {
 		memcpy(&tmp_termios, tty->termios, sizeof(struct termios));
-		if (user_termio_to_kernel_termios(&tmp_termios, (struct termio *) arg))
+		if (user_termio_to_kernel_termios(&tmp_termios,
+						  (struct termio *) arg))
 			return -EFAULT;
 	} else {
-		if (user_termios_to_kernel_termios(&tmp_termios, (struct termios *) arg))
+		if (user_termios_to_kernel_termios(&tmp_termios,
+						   (struct termios *) arg))
 			return -EFAULT;
 	}
 
@@ -232,9 +229,7 @@ static int get_sgttyb(struct tty_struct * tty, struct sgttyb * sgttyb)
 	tmp.sg_erase = tty->termios->c_cc[VERASE];
 	tmp.sg_kill = tty->termios->c_cc[VKILL];
 	tmp.sg_flags = get_sgflags(tty);
-	if (copy_to_user(sgttyb, &tmp, sizeof(tmp)))
-		return -EFAULT;
-	return 0;
+	return copy_to_user(sgttyb, &tmp, sizeof(tmp)) ? -EFAULT : 0;
 }
 
 static void set_sgflags(struct termios * termios, int flags)
@@ -247,7 +242,8 @@ static void set_sgflags(struct termios * termios, int flags)
 		termios->c_lflag &= ~ICANON;
 	}
 	if (flags & 0x08) {		/* echo */
-		termios->c_lflag |= ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE | IEXTEN;
+		termios->c_lflag |= ECHO | ECHOE | ECHOK |
+				    ECHOCTL | ECHOKE | IEXTEN;
 	}
 	if (flags & 0x10) {		/* crmod */
 		termios->c_oflag |= OPOST | ONLCR;
@@ -293,9 +289,7 @@ static int get_tchars(struct tty_struct * tty, struct tchars * tchars)
 	tmp.t_stopc = tty->termios->c_cc[VSTOP];
 	tmp.t_eofc = tty->termios->c_cc[VEOF];
 	tmp.t_brkc = tty->termios->c_cc[VEOL2];	/* what is brkc anyway? */
-	if (copy_to_user(tchars, &tmp, sizeof(tmp)))
-		return -EFAULT;
-	return 0;
+	return copy_to_user(tchars, &tmp, sizeof(tmp)) ? -EFAULT : 0;
 }
 
 static int set_tchars(struct tty_struct * tty, struct tchars * tchars)
@@ -325,9 +319,7 @@ static int get_ltchars(struct tty_struct * tty, struct ltchars * ltchars)
 	tmp.t_flushc = tty->termios->c_cc[VEOL2];	/* what is flushc anyway? */
 	tmp.t_werasc = tty->termios->c_cc[VWERASE];
 	tmp.t_lnextc = tty->termios->c_cc[VLNEXT];
-	if (copy_to_user(ltchars, &tmp, sizeof(tmp)))
-		return -EFAULT;
-	return 0;
+	return copy_to_user(ltchars, &tmp, sizeof(tmp)) ? -EFAULT : 0;
 }
 
 static int set_ltchars(struct tty_struct * tty, struct ltchars * ltchars)
@@ -480,7 +472,7 @@ int n_tty_ioctl(struct tty_struct * tty, struct file * file,
 			return 0;
 
 		case TIOCSLCKTRMIOS:
-			if (!suser())
+			if (!capable(CAP_SYS_ADMIN))
 				return -EPERM;
 			if (user_termios_to_kernel_termios(real_tty->termios_locked, (struct termios *) arg))
 				return -EFAULT;
@@ -493,9 +485,8 @@ int n_tty_ioctl(struct tty_struct * tty, struct file * file,
 			if (tty->driver.type != TTY_DRIVER_TYPE_PTY ||
 			    tty->driver.subtype != PTY_TYPE_MASTER)
 				return -ENOTTY;
-			retval = get_user(pktmode, (int *) arg);
-			if (retval)
-				return retval;
+			if (get_user(pktmode, (int *) arg))
+				return -EFAULT;
 			if (pktmode) {
 				if (!tty->packet) {
 					tty->packet = 1;
@@ -508,9 +499,8 @@ int n_tty_ioctl(struct tty_struct * tty, struct file * file,
 		case TIOCGSOFTCAR:
 			return put_user(C_CLOCAL(tty) ? 1 : 0, (int *) arg);
 		case TIOCSSOFTCAR:
-			retval = get_user(arg, (unsigned int *) arg);
-			if (retval)
-				return retval;
+			if (get_user(arg, (unsigned int *) arg))
+				return -EFAULT;
 			tty->termios->c_cflag =
 				((tty->termios->c_cflag & ~CLOCAL) |
 				 (arg ? CLOCAL : 0));
@@ -519,3 +509,5 @@ int n_tty_ioctl(struct tty_struct * tty, struct file * file,
 			return -ENOIOCTLCMD;
 		}
 }
+
+EXPORT_SYMBOL(n_tty_ioctl);

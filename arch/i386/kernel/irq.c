@@ -166,7 +166,7 @@ int get_irq_list(char *buf)
 		p += sprintf(p, "%10u ",
 			nmi_count(cpu_logical_map(j)));
 	p += sprintf(p, "\n");
-#if CONFIG_SMP
+#if CONFIG_X86_LOCAL_APIC
 	p += sprintf(p, "LOC: ");
 	for (j = 0; j < smp_num_cpus; j++)
 		p += sprintf(p, "%10u ",
@@ -471,14 +471,15 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
  *	disable_irq_nosync - disable an irq without waiting
  *	@irq: Interrupt to disable
  *
- *	Disable the selected interrupt line. Disables of an interrupt
- *	stack. Unlike disable_irq(), this function does not ensure existing
+ *	Disable the selected interrupt line.  Disables and Enables are
+ *	nested.
+ *	Unlike disable_irq(), this function does not ensure existing
  *	instances of the IRQ handler have completed before returning.
  *
  *	This function may be called from IRQ context.
  */
  
-void inline disable_irq_nosync(unsigned int irq)
+inline void disable_irq_nosync(unsigned int irq)
 {
 	irq_desc_t *desc = irq_desc + irq;
 	unsigned long flags;
@@ -495,9 +496,9 @@ void inline disable_irq_nosync(unsigned int irq)
  *	disable_irq - disable an irq and wait for completion
  *	@irq: Interrupt to disable
  *
- *	Disable the selected interrupt line. Disables of an interrupt
- *	stack. That is for two disables you need two enables. This
- *	function waits for any pending IRQ handlers for this interrupt
+ *	Disable the selected interrupt line.  Enables and Disables are
+ *	nested.
+ *	This function waits for any pending IRQ handlers for this interrupt
  *	to complete before returning. If you use this function while
  *	holding a resource the IRQ handler may need you will deadlock.
  *
@@ -516,11 +517,12 @@ void disable_irq(unsigned int irq)
 }
 
 /**
- *	enable_irq - enable interrupt handling on an irq
+ *	enable_irq - enable handling of an irq
  *	@irq: Interrupt to enable
  *
- *	Re-enables the processing of interrupts on this IRQ line
- *	providing no disable_irq calls are now in effect.
+ *	Undoes the effect of one call to disable_irq().  If this
+ *	matches the last disable, processing of interrupts on this
+ *	IRQ line is re-enabled.
  *
  *	This function may be called from IRQ context.
  */
@@ -1027,19 +1029,8 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 
 static struct proc_dir_entry * root_irq_dir;
 static struct proc_dir_entry * irq_dir [NR_IRQS];
-static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
-
-static unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
 
 #define HEX_DIGITS 8
-
-static int irq_affinity_read_proc (char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	if (count < HEX_DIGITS+1)
-		return -EINVAL;
-	return sprintf (page, "%08lx\n", irq_affinity[(long)data]);
-}
 
 static unsigned int parse_hex_value (const char *buffer,
 		unsigned long count, unsigned long *ret)
@@ -1078,6 +1069,19 @@ out:
 	return 0;
 }
 
+#if CONFIG_SMP
+
+static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
+
+static unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
+static int irq_affinity_read_proc (char *page, char **start, off_t off,
+			int count, int *eof, void *data)
+{
+	if (count < HEX_DIGITS+1)
+		return -EINVAL;
+	return sprintf (page, "%08lx\n", irq_affinity[(long)data]);
+}
+
 static int irq_affinity_write_proc (struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
@@ -1089,7 +1093,6 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 
 	err = parse_hex_value(buffer, count, &new_value);
 
-#if CONFIG_SMP
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
 	 * way to make the system unusable accidentally :-) At least
@@ -1097,13 +1100,14 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	 */
 	if (!(new_value & cpu_online_map))
 		return -EINVAL;
-#endif
 
 	irq_affinity[irq] = new_value;
 	irq_desc[irq].handler->set_affinity(irq, new_value);
 
 	return full_count;
 }
+
+#endif
 
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
@@ -1132,7 +1136,6 @@ static int prof_cpu_mask_write_proc (struct file *file, const char *buffer,
 
 static void register_irq_proc (unsigned int irq)
 {
-	struct proc_dir_entry *entry;
 	char name [MAX_NAMELEN];
 
 	if (!root_irq_dir || (irq_desc[irq].handler == &no_irq_type) ||
@@ -1145,15 +1148,23 @@ static void register_irq_proc (unsigned int irq)
 	/* create /proc/irq/1234 */
 	irq_dir[irq] = proc_mkdir(name, root_irq_dir);
 
-	/* create /proc/irq/1234/smp_affinity */
-	entry = create_proc_entry("smp_affinity", 0600, irq_dir[irq]);
+#if CONFIG_SMP
+	{
+		struct proc_dir_entry *entry;
 
-	entry->nlink = 1;
-	entry->data = (void *)(long)irq;
-	entry->read_proc = irq_affinity_read_proc;
-	entry->write_proc = irq_affinity_write_proc;
+		/* create /proc/irq/1234/smp_affinity */
+		entry = create_proc_entry("smp_affinity", 0600, irq_dir[irq]);
 
-	smp_affinity_entry[irq] = entry;
+		if (entry) {
+			entry->nlink = 1;
+			entry->data = (void *)(long)irq;
+			entry->read_proc = irq_affinity_read_proc;
+			entry->write_proc = irq_affinity_write_proc;
+		}
+
+		smp_affinity_entry[irq] = entry;
+	}
+#endif
 }
 
 unsigned long prof_cpu_mask = -1;
@@ -1168,6 +1179,9 @@ void init_irq_proc (void)
 
 	/* create /proc/irq/prof_cpu_mask */
 	entry = create_proc_entry("prof_cpu_mask", 0600, root_irq_dir);
+
+	if (!entry)
+	    return;
 
 	entry->nlink = 1;
 	entry->data = (void *)&prof_cpu_mask;

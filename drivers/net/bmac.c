@@ -76,6 +76,8 @@ struct bmac_data {
 	struct net_device_stats stats;
 	struct timer_list tx_timeout;
 	int timeout_active;
+	int sleeping;
+	int opened;
 	unsigned short hash_use_count[64];
 	unsigned short hash_table_mask[4];
 	struct net_device *next_bmac;
@@ -466,11 +468,15 @@ static int
 bmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
 {
 	struct bmac_data *bp;
-
+	unsigned long flags;
+	unsigned short config;
+	struct net_device* dev = bmac_devs;
+	int i;
+	
 	if (bmac_devs == 0)
 		return PBOOK_SLEEP_OK;
 		
-	bp = (struct bmac_data *) bmac_devs->priv;
+	bp = (struct bmac_data *) dev->priv;
 	
 	switch (when) {
 	case PBOOK_SLEEP_REQUEST:
@@ -478,21 +484,57 @@ bmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
 	case PBOOK_SLEEP_REJECT:
 		break;
 	case PBOOK_SLEEP_NOW:
+		netif_device_detach(dev);
 		/* prolly should wait for dma to finish & turn off the chip */
-		disable_irq(bmac_devs->irq);
+		save_flags(flags); cli();
+		if (bp->timeout_active) {
+			del_timer(&bp->tx_timeout);
+			bp->timeout_active = 0;
+		}
+		disable_irq(dev->irq);
 		disable_irq(bp->tx_dma_intr);
 		disable_irq(bp->rx_dma_intr);
+		bp->sleeping = 1;
+		restore_flags(flags);
+		if (bp->opened) {
+			volatile struct dbdma_regs *rd = bp->rx_dma;
+			volatile struct dbdma_regs *td = bp->tx_dma;
+			
+			config = bmread(dev, RXCFG);
+			bmwrite(dev, RXCFG, (config & ~RxMACEnable));
+			config = bmread(dev, TXCFG);
+			bmwrite(dev, TXCFG, (config & ~TxMACEnable));
+			bmwrite(dev, INTDISABLE, DisableAll); /* disable all intrs */
+			/* disable rx and tx dma */
+			st_le32(&rd->control, DBDMA_CLEAR(RUN|PAUSE|FLUSH|WAKE));	/* clear run bit */
+			st_le32(&td->control, DBDMA_CLEAR(RUN|PAUSE|FLUSH|WAKE));	/* clear run bit */
+			/* free some skb's */
+			for (i=0; i<N_RX_RING; i++) {
+				if (bp->rx_bufs[i] != NULL) {
+					dev_kfree_skb(bp->rx_bufs[i]);
+					bp->rx_bufs[i] = NULL;
+				}
+			}
+			for (i = 0; i<N_TX_RING; i++) {
+				if (bp->tx_bufs[i] != NULL) {
+					dev_kfree_skb(bp->tx_bufs[i]);
+					bp->tx_bufs[i] = NULL;
+				}
+			}
+		}
 		feature_set(bp->node, FEATURE_BMac_reset);
-		udelay(10000);
+		mdelay(10);
 		feature_clear(bp->node, FEATURE_BMac_IO_enable);
-		udelay(10000);
+		mdelay(10);
 		break;
 	case PBOOK_WAKE:
 		/* see if this is enough */
-		bmac_reset_and_enable(bmac_devs);
-		enable_irq(bmac_devs->irq);
+		if (bp->opened)
+			bmac_reset_and_enable(dev);
+		enable_irq(dev->irq);
 		enable_irq(bp->tx_dma_intr);
 		enable_irq(bp->rx_dma_intr);
+		netif_device_attach(dev);
 		break;
 	}
 	return PBOOK_SLEEP_OK;
@@ -975,6 +1017,9 @@ static void bmac_set_multicast(struct net_device *dev)
 	unsigned short rx_cfg;
 	int i;
 
+	if (bp->sleeping)
+		return;
+
 	XXDEBUG(("bmac: enter bmac_set_multicast, n_addrs=%d\n", num_addrs));
 
 	if((dev->flags & IFF_ALLMULTI) || (dev->mc_count > 64)) {
@@ -1228,7 +1273,8 @@ static void bmac_reset_and_enable(struct net_device *dev)
 	bmac_init_chip(dev);
 	bmac_start_chip(dev);
 	bmwrite(dev, INTDISABLE, EnableNormal);
-
+	bp->sleeping = 0;
+	
 	/*
 	 * It seems that the bmac can't receive until it's transmitted
 	 * a packet.  So we give it a dummy packet to transmit.
@@ -1396,8 +1442,10 @@ err_out:
 
 static int bmac_open(struct net_device *dev)
 {
+	struct bmac_data *bp = (struct bmac_data *) dev->priv;
 	/* XXDEBUG(("bmac: enter open\n")); */
 	/* reset the chip */
+	bp->opened = 1;
 	bmac_reset_and_enable(dev);
 	dev->flags |= IFF_RUNNING;
 	return 0;
@@ -1443,6 +1491,8 @@ static int bmac_close(struct net_device *dev)
 	}
 	XXDEBUG(("bmac: all bufs freed\n"));
 
+	bp->opened = 0;
+
 	return 0;
 }
 
@@ -1454,6 +1504,9 @@ bmac_start(struct net_device *dev)
 	struct sk_buff *skb;
 	unsigned long flags;
 
+	if (bp->sleeping)
+		return;
+		
 	save_flags(flags); cli();
 	while (1) {
 		i = bp->tx_fill + 1;

@@ -690,12 +690,13 @@ init_trackpad(int id)
 	printk(" (trackpad)");
 
 	adb_request(&req, NULL, ADBREQ_SYNC | ADBREQ_REPLY, 1,
-	ADB_READREG(id,1));
+		ADB_READREG(id,1));
 	if (req.reply_len < 8)
 	    printk("bad length for reg. 1\n");
 	else
 	{
 	    memcpy(r1_buffer, &req.reply[1], 8);
+
 	    adb_request(&req, NULL, ADBREQ_SYNC, 9,
 	        ADB_WRITEREG(id,1),
 	            r1_buffer[0],
@@ -704,7 +705,7 @@ init_trackpad(int id)
 	            r1_buffer[3],
 	            r1_buffer[4],
 	            r1_buffer[5],
-	            0x0d, /*r1_buffer[6],*/
+	            0x0d,
 	            r1_buffer[7]);
 
             adb_request(&req, NULL, ADBREQ_SYNC, 9,
@@ -717,7 +718,7 @@ init_trackpad(int id)
 	    	    0x8a,
 	    	    0x1b,
 	    	    0x50);
-	    
+
 	    adb_request(&req, NULL, ADBREQ_SYNC, 9,
 	        ADB_WRITEREG(id,1),
 	            r1_buffer[0],
@@ -728,6 +729,9 @@ init_trackpad(int id)
 	            r1_buffer[5],
 	            0x03, /*r1_buffer[6],*/
 	            r1_buffer[7]);
+
+	    /* Without this flush, the trackpad may be locked up */	    
+	    adb_request(&req, NULL, ADBREQ_SYNC, 1, ADB_FLUSH(id));
         }
 }
 

@@ -504,8 +504,6 @@ EXPORT_SYMBOL(dev_close);
 EXPORT_SYMBOL(dev_mc_add);
 EXPORT_SYMBOL(dev_mc_delete);
 EXPORT_SYMBOL(dev_mc_upload);
-EXPORT_SYMBOL(n_tty_ioctl);
-EXPORT_SYMBOL(tty_register_ldisc);
 EXPORT_SYMBOL(__kill_fasync);
 
 EXPORT_SYMBOL(if_port_text);

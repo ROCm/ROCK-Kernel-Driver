@@ -422,7 +422,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 	if (!user_mode(regs))
 		x86_do_profile(regs->eip);
 #else
-	if (!smp_found_config)
+	if (!using_apic_timer)
 		smp_local_timer_interrupt(regs);
 #endif
 

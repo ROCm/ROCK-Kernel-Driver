@@ -31,6 +31,20 @@
 #define PT_SINGLESTEP	0x10000
 #define PT_BLOCKSTEP	0x20000
 
+/*
+ * Called by kernel/ptrace.c when detaching..
+ *
+ * Make sure single step bits etc are not set.
+ */
+void ptrace_disable(struct task_struct *child)
+{
+	/* make sure the trap bits are not set */
+	pa_psw(child)->r = 0;
+	pa_psw(child)->t = 0;
+	pa_psw(child)->h = 0;
+	pa_psw(child)->l = 0;
+}
+
 long sys_ptrace(long request, pid_t pid, long addr, long data)
 {
 	struct task_struct *child;
@@ -226,17 +240,8 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 		goto out_wake;
 
 	case PTRACE_DETACH:
-		ret = -EIO;
-		if ((unsigned long) data > _NSIG)
-			goto out_tsk;
-		child->ptrace &= ~(PT_PTRACED|PT_TRACESYS|PT_SINGLESTEP|PT_BLOCKSTEP);
-		child->exit_code = data;
-		write_lock_irq(&tasklist_lock);
-		REMOVE_LINKS(child);
-		child->p_pptr = child->p_opptr;
-		SET_LINKS(child);
-		write_unlock_irq(&tasklist_lock);
-		goto out_wake_notrap;
+		ret = ptrace_detach(child, data);
+		goto out_tsk;
 
 	default:
 		ret = -EIO;

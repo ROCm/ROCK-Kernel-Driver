@@ -425,6 +425,7 @@ struct task_struct {
 #define PT_TRACESYS	0x00000002
 #define PT_DTRACE	0x00000004	/* delayed trace (used on m68k, i386) */
 #define PT_TRACESYSGOOD	0x00000008
+#define PT_PTRACE_CAP	0x00000010	/* ptracer can follow suid-exec */
 
 /*
  * Limit the stack by to some sane default: root can always

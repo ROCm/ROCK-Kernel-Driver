@@ -536,6 +536,8 @@ MODULE_PARM_DESC(rd_size, "Size of each RAM disk in kbytes.");
 MODULE_PARM     (rd_blocksize, "i");
 MODULE_PARM_DESC(rd_blocksize, "Blocksize of each RAM disk in bytes.");
 
+MODULE_LICENSE("GPL");
+
 /* End of non-loading portions of the RAM disk driver */
 
 #ifdef RD_LOADER 

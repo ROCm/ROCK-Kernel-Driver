@@ -48,6 +48,7 @@ static int minor = -1;
 static int verbose; /* = 0 */
 static int fnkeyinit; /* = 0 */
 static int camera; /* = 0 */
+extern int is_sony_vaio_laptop; /* set in DMI table parse routines */
 
 /* Inits the queue */
 static inline void sonypi_initq(void) {
@@ -108,32 +109,23 @@ static inline int sonypi_emptyq(void) {
 }
 
 static void sonypi_ecrset(u16 addr, u16 value) {
-	int n = 100;
 
-	while (n-- && (inw_p(SONYPI_CST_IOPORT) & 3))
-		udelay(1);
+	wait_on_command(inw_p(SONYPI_CST_IOPORT) & 3);
 	outw_p(0x81, SONYPI_CST_IOPORT);
-	while (inw_p(SONYPI_CST_IOPORT) & 2)
-		udelay(1);
+	wait_on_command(inw_p(SONYPI_CST_IOPORT) & 2);
 	outw_p(addr, SONYPI_DATA_IOPORT);
-	while (inw_p(SONYPI_CST_IOPORT) & 2)
-		udelay(1);
+	wait_on_command(inw_p(SONYPI_CST_IOPORT) & 2);
 	outw_p(value, SONYPI_DATA_IOPORT);
-	while (inw_p(SONYPI_CST_IOPORT) & 2)
-		udelay(1);
+	wait_on_command(inw_p(SONYPI_CST_IOPORT) & 2);
 }
 
 static u16 sonypi_ecrget(u16 addr) {
-	int n = 100;
 
-	while (n-- && (inw_p(SONYPI_CST_IOPORT) & 3))
-		udelay(1);
+	wait_on_command(inw_p(SONYPI_CST_IOPORT) & 3);
 	outw_p(0x80, SONYPI_CST_IOPORT);
-	while (inw_p(SONYPI_CST_IOPORT) & 2)
-		udelay(1);
+	wait_on_command(inw_p(SONYPI_CST_IOPORT) & 2);
 	outw_p(addr, SONYPI_DATA_IOPORT);
-	while (inw_p(SONYPI_CST_IOPORT) & 2)
-		udelay(1);
+	wait_on_command(inw_p(SONYPI_CST_IOPORT) & 2);
 	return inw_p(SONYPI_DATA_IOPORT);
 }
 
@@ -189,8 +181,7 @@ static void __devexit sonypi_r505_dis(void) {
 static u8 sonypi_call1(u8 dev) {
 	u8 v1, v2;
 
-	while (inb_p(sonypi_device.ioport2) & 2)
-		udelay(1);
+	wait_on_command(inb_p(sonypi_device.ioport2) & 2);
 	outb(dev, sonypi_device.ioport2);
 	v1 = inb_p(sonypi_device.ioport2);
 	v2 = inb_p(sonypi_device.ioport1);
@@ -200,14 +191,10 @@ static u8 sonypi_call1(u8 dev) {
 static u8 sonypi_call2(u8 dev, u8 fn) {
 	u8 v1;
 
-	while (inb_p(sonypi_device.ioport2) & 2)
-		udelay(1);
+	wait_on_command(inb_p(sonypi_device.ioport2) & 2);
 	outb(dev, sonypi_device.ioport2);
-
-	while (inb_p(sonypi_device.ioport2) & 2)
-		udelay(1);
+	wait_on_command(inb_p(sonypi_device.ioport2) & 2);
 	outb(fn, sonypi_device.ioport1);
-
 	v1 = inb_p(sonypi_device.ioport1);
 	return v1;
 }
@@ -215,18 +202,12 @@ static u8 sonypi_call2(u8 dev, u8 fn) {
 static u8 sonypi_call3(u8 dev, u8 fn, u8 v) {
 	u8 v1;
 
-	while (inb_p(sonypi_device.ioport2) & 2)
-		udelay(1);
+	wait_on_command(inb_p(sonypi_device.ioport2) & 2);
 	outb(dev, sonypi_device.ioport2);
-
-	while (inb_p(sonypi_device.ioport2) & 2)
-		udelay(1);
+	wait_on_command(inb_p(sonypi_device.ioport2) & 2);
 	outb(fn, sonypi_device.ioport1);
-
-	while (inb_p(sonypi_device.ioport2) & 2)
-		udelay(1);
+	wait_on_command(inb_p(sonypi_device.ioport2) & 2);
 	outb(v, sonypi_device.ioport1);
-
 	v1 = inb_p(sonypi_device.ioport1);
 	return v1;
 }
@@ -246,11 +227,8 @@ static u8 sonypi_read(u8 fn) {
 
 /* Set brightness, hue etc */
 static void sonypi_set(u8 fn, u8 v) {
-	int n = 100;
 	
-	while (n--)
-		if (sonypi_call3(0x90, fn, v) == 0) 
-			break;
+	wait_on_command(sonypi_call3(0x90, fn, v));
 }
 
 /* Tests if the camera is ready */
@@ -325,6 +303,13 @@ void sonypi_irq(int irq, void *dev_id, struct pt_regs *regs) {
 	v1 = inb_p(sonypi_device.ioport1);
 	v2 = inb_p(sonypi_device.ioport2);
 
+	if ((v2 & SONYPI_NORMAL_PKEY_EV) == SONYPI_NORMAL_PKEY_EV) {
+		for (i = 0; sonypi_pkeyev[i].event; i++)
+			if (sonypi_pkeyev[i].data == v1) {
+				event = sonypi_pkeyev[i].event;
+				goto found;
+			}
+	}
 	if ((v2 & sonypi_jogger_ev) == sonypi_jogger_ev) {
 		for (i = 0; sonypi_joggerev[i].event; i++)
 			if (sonypi_joggerev[i].data == v1) {
@@ -608,7 +593,7 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev,
 
 	for (i = 0; irq_list[i].irq; i++) {
 		if (!request_irq(irq_list[i].irq, sonypi_irq, 
-				 SA_INTERRUPT, "sonypi", sonypi_irq)) {
+				 SA_SHIRQ, "sonypi", sonypi_irq)) {
 			sonypi_device.irq = irq_list[i].irq;
 			sonypi_device.bits = irq_list[i].bits;
 			break;
@@ -690,7 +675,10 @@ static struct pci_driver sonypi_driver = {
 };
 
 static int __init sonypi_init_module(void) {
-	return pci_module_init(&sonypi_driver);
+	if (is_sony_vaio_laptop)
+		return pci_module_init(&sonypi_driver);
+	else
+		return -ENODEV;
 }
 
 static void __exit sonypi_cleanup_module(void) {
@@ -703,6 +691,8 @@ module_exit(sonypi_cleanup_module);
 
 MODULE_AUTHOR("Stelian Pop <stelian.pop@fr.alcove.com>");
 MODULE_DESCRIPTION("Sony Programmable I/O Control Device driver");
+MODULE_LICENSE("GPL");
+
 
 MODULE_PARM(minor,"i");
 MODULE_PARM_DESC(minor, "minor number of the misc device, default is -1 (automatic)");

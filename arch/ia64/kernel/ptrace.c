@@ -789,6 +789,21 @@ access_uarea (struct task_struct *child, unsigned long addr, unsigned long *data
 	return 0;
 }
 
+/*
+ * Called by kernel/ptrace.c when detaching..
+ *
+ * Make sure the single step bit is not set.
+ */
+void ptrace_disable(struct task_struct *child)
+{
+	/* make sure the single step/take-branch tra bits are not set: */
+	ia64_psr(pt)->ss = 0;
+	ia64_psr(pt)->tb = 0;
+
+	/* Turn off flag indicating that the KRBS is sync'd with child's VM: */
+	child->thread.flags &= ~IA64_THREAD_KRBS_SYNCED;
+}
+
 asmlinkage long
 sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 	    long arg4, long arg5, long arg6, long arg7, long stack)
@@ -965,27 +980,7 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		goto out_tsk;
 
 	      case PTRACE_DETACH:		/* detach a process that was attached. */
-		ret = -EIO;
-		if (data > _NSIG)
-			goto out_tsk;
-
-		child->ptrace &= ~(PT_PTRACED|PT_TRACESYS);
-		child->exit_code = data;
-		write_lock_irqsave(&tasklist_lock, flags);
-		REMOVE_LINKS(child);
-		child->p_pptr = child->p_opptr;
-		SET_LINKS(child);
-		write_unlock_irqrestore(&tasklist_lock, flags);
-
-		/* make sure the single step/take-branch tra bits are not set: */
-		ia64_psr(pt)->ss = 0;
-		ia64_psr(pt)->tb = 0;
-
-		/* Turn off flag indicating that the KRBS is sync'd with child's VM: */
-		child->thread.flags &= ~IA64_THREAD_KRBS_SYNCED;
-
-		wake_up_process(child);
-		ret = 0;
+		ret = ptrace_detach(child, data);
 		goto out_tsk;
 
 	      default:

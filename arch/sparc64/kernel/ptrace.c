@@ -105,6 +105,16 @@ char *pt_rq [] = {
 };
 #endif
 
+/*
+ * Called by kernel/ptrace.c when detaching..
+ *
+ * Make sure single step bits etc are not set.
+ */
+void ptrace_disable(struct task_struct *child)
+{
+	/* nothing to do */
+}
+
 asmlinkage void do_ptrace(struct pt_regs *regs)
 {
 	int request = regs->u_regs[UREG_I0];
@@ -562,22 +572,11 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 	}
 
 	case PTRACE_SUNDETACH: { /* detach a process that was attached. */
-		unsigned long flags;
-
-		if ((unsigned long) data > _NSIG) {
+		int error = ptrace_detach(child, data);
+		if (error) {
 			pt_error_return(regs, EIO);
 			goto out_tsk;
 		}
-		child->ptrace &= ~(PT_PTRACED|PT_TRACESYS);
-		child->exit_code = data;
-
-		write_lock_irqsave(&tasklist_lock, flags);
-		REMOVE_LINKS(child);
-		child->p_pptr = child->p_opptr;
-		SET_LINKS(child);
-		write_unlock_irqrestore(&tasklist_lock, flags);
-
-		wake_up_process(child);
 		pt_succ_return(regs, 0);
 		goto out_tsk;
 	}

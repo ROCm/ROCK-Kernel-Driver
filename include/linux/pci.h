@@ -746,6 +746,7 @@ extern int pci_pci_problems;
 #define PCIPCI_TRITON		2
 #define PCIPCI_NATOMA		4
 #define PCIPCI_VIAETBF		8
+#define PCIPCI_VSFX		16
 
 #endif /* __KERNEL__ */
 #endif /* LINUX_PCI_H */

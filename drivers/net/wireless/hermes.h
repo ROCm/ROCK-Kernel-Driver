@@ -210,14 +210,16 @@
  * Frame structures and constants
  */
 
+#define __PACKED__ __attribute__ ((packed))
+
 typedef struct hermes_frame_desc {
 	/* Hermes - i.e. little-endian byte-order */
-	uint16_t status; /* 0x0 */
-	uint16_t res1, res2; /* 0x2, 0x4 */
-	uint16_t q_info; /* 0x6 */
-	uint16_t res3, res4; /* 0x8, 0xA */
-	uint16_t tx_ctl; /* 0xC */
-} __attribute__ ((packed)) hermes_frame_desc_t;
+	uint16_t status __PACKED__;
+	uint16_t res1, res2 __PACKED__;
+	uint16_t q_info __PACKED__;
+	uint16_t res3, res4 __PACKED__;
+	uint16_t tx_ctl __PACKED__;
+} hermes_frame_desc_t;
 
 #define		HERMES_RXSTAT_ERR		(0x0003)
 #define		HERMES_RXSTAT_MACPORT		(0x0700)
@@ -246,20 +248,11 @@ typedef struct hermes_response {
 	uint16_t status, resp0, resp1, resp2;
 } hermes_response_t;
 
-/* Firmware information structure */
-typedef struct hermes_identity {
-	uint16_t id, vendor, major, minor;
-} __attribute__ ((packed)) hermes_identity_t;
-
 /* "ID" structure - used for ESSID and station nickname */
 typedef struct hermes_id {
 	uint16_t len;
 	uint16_t val[16];
 } __attribute__ ((packed)) hermes_id_t;
-
-typedef struct hermes_commsqual {
-	uint16_t qual, signal, noise;
-} __attribute__ ((packed)) hermes_commsqual_t;
 
 typedef struct hermes_multicast {
 	uint8_t addr[HERMES_MAX_MULTICAST][ETH_ALEN];
@@ -349,37 +342,6 @@ static inline int hermes_write_wordrec(hermes_t *hw, int bap, uint16_t rid, uint
 {
 	uint16_t rec = cpu_to_le16(word);
 	return HERMES_WRITE_RECORD(hw, bap, rid, &rec);
-}
-
-static inline int hermes_read_staidentity(hermes_t *hw, int bap, hermes_identity_t *buf)
-{
-	int err;
-
-	err = HERMES_READ_RECORD(hw, bap, HERMES_RID_STAIDENTITY, buf);
-	if (err)
-		return err;
-
-	le16_to_cpus(&buf->id);
-	le16_to_cpus(&buf->vendor);
-	le16_to_cpus(&buf->major);
-	le16_to_cpus(&buf->minor);
-	
-	return 0;
-}
-
-static inline int hermes_read_commsqual(hermes_t *hw, int bap, hermes_commsqual_t *buf)
-{
-	int err;
-
-	err = HERMES_READ_RECORD(hw, bap, HERMES_RID_COMMSQUALITY, buf);
-	if (err)
-		return err;
-
-	le16_to_cpus(&buf->qual);
-	le16_to_cpus(&buf->signal);
-	le16_to_cpus(&buf->noise);
-	
-	return 0;
 }
 
 #else /* ! __KERNEL__ */

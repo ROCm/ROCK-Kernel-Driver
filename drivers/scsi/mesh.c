@@ -29,6 +29,10 @@
 #include <asm/hydra.h>
 #include <asm/processor.h>
 #include <asm/feature.h>
+#ifdef CONFIG_PMAC_PBOOK
+#include <linux/adb.h>
+#include <linux/pmu.h>
+#endif
 
 #include "scsi.h"
 #include "hosts.h"
@@ -151,6 +155,7 @@ struct mesh_state {
 	struct mesh_target tgts[8];
 	void	*dma_cmd_space;
 	struct device_node *ofnode;
+	u8*	mio_base;
 #ifndef MESH_NEW_STYLE_EH
 	Scsi_Cmnd *completed_q;
 	Scsi_Cmnd *completed_qtail;
@@ -210,6 +215,15 @@ static void set_dma_cmds(struct mesh_state *, Scsi_Cmnd *);
 static void halt_dma(struct mesh_state *);
 static int data_goes_out(Scsi_Cmnd *);
 static void do_abort(struct mesh_state *ms);
+static void set_mesh_power(struct mesh_state *ms, int state);
+
+#ifdef CONFIG_PMAC_PBOOK
+static int mesh_notify_sleep(struct pmu_sleep_notifier *self, int when);
+static struct pmu_sleep_notifier mesh_sleep_notifier = {
+	mesh_notify_sleep,
+	SLEEP_LEVEL_BLOCK,
+};
+#endif
 
 static struct notifier_block mesh_notifier = {
 	mesh_notify_reboot,
@@ -244,6 +258,8 @@ mesh_detect(Scsi_Host_Template *tp)
 	if (mesh == 0)
 		mesh = find_compatible_devices("scsi", "chrp,mesh0");
 	for (; mesh != 0; mesh = mesh->next) {
+		struct device_node *mio;
+		
 		if (mesh->n_addrs != 2 || mesh->n_intrs != 2) {
 			printk(KERN_ERR "mesh: expected 2 addrs and 2 intrs"
 			       " (got %d,%d)", mesh->n_addrs, mesh->n_intrs);
@@ -309,8 +325,13 @@ mesh_detect(Scsi_Host_Template *tp)
 		if (mesh_sync_period < minper)
 			mesh_sync_period = minper;
 
-		feature_set(mesh, FEATURE_MESH_enable);
-		mdelay(200);
+		ms->mio_base = 0;
+		for (mio = ms->ofnode->parent; mio; mio = mio->parent)
+			if (strcmp(mio->name, "mac-io") == 0 && mio->n_addrs > 0)
+				break;
+		if (mio)
+			ms->mio_base = (u8 *) ioremap(mio->addrs[0].address, 0x40);
+		set_mesh_power(ms, 1);
 
 		mesh_init(ms);
 
@@ -321,8 +342,12 @@ mesh_detect(Scsi_Host_Template *tp)
 		++nmeshes;
 	}
 
-	if ((_machine == _MACH_Pmac) && (nmeshes > 0))
+	if ((_machine == _MACH_Pmac) && (nmeshes > 0)) {
+#ifdef CONFIG_PMAC_PBOOK
+		pmu_register_sleep_notifier(&mesh_sleep_notifier);
+#endif /* CONFIG_PMAC_PBOOK */
 		register_reboot_notifier(&mesh_notifier);
+	}
 
 	return nmeshes;
 }
@@ -338,11 +363,69 @@ mesh_release(struct Scsi_Host *host)
 		iounmap((void *) ms->mesh);
 	if (ms->dma)
 		iounmap((void *) ms->dma);
+	if (ms->mio_base)
+		iounmap((void *) ms->mio_base);
 	kfree(ms->dma_cmd_space);
 	free_irq(ms->meshintr, ms);
 	feature_clear(ms->ofnode, FEATURE_MESH_enable);
 	return 0;
 }
+
+static void
+set_mesh_power(struct mesh_state *ms, int state)
+{
+	if (_machine != _MACH_Pmac)
+		return;
+	if (state) {
+		feature_set(ms->ofnode, FEATURE_MESH_enable);
+		/* This seems to enable the termination power. strangely
+		   this doesn't fully agree with OF, but with MacOS */
+		if (ms->mio_base)
+			out_8(ms->mio_base + 0x36, 0x70);
+		mdelay(200);
+	} else {
+		feature_clear(ms->ofnode, FEATURE_MESH_enable);
+		if (ms->mio_base)
+			out_8(ms->mio_base + 0x36, 0x34);
+		mdelay(10);
+	}
+}			
+
+#ifdef CONFIG_PMAC_PBOOK
+/*
+ * notify clients before sleep and reset bus afterwards
+ */
+int
+mesh_notify_sleep(struct pmu_sleep_notifier *self, int when)
+{
+	struct mesh_state *ms;
+	
+	switch (when) {
+	case PBOOK_SLEEP_REQUEST:
+		/* XXX We should wait for current transactions and queue
+		 * new ones that would be posted beyond this point 
+		 */ 
+		break;
+	case PBOOK_SLEEP_REJECT:
+		break;
+		
+	case PBOOK_SLEEP_NOW:
+		for (ms = all_meshes; ms != 0; ms = ms->next) {
+			disable_irq(ms->meshintr);
+			set_mesh_power(ms, 0);
+		}
+		break;
+	case PBOOK_WAKE:
+		for (ms = all_meshes; ms != 0; ms = ms->next) {
+			set_mesh_power(ms, 1);
+			mesh_init(ms);
+			enable_irq(ms->meshintr);
+		}
+		break;
+	}
+	return PBOOK_SLEEP_OK;
+}
+#endif /* CONFIG_PMAC_PBOOK */
 
 int
 mesh_queue(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))

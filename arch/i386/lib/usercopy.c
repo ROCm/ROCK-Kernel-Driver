@@ -44,6 +44,7 @@ __generic_copy_from_user(void *to, const void *from, unsigned long n)
 unsigned long
 __generic_copy_to_user(void *to, const void *from, unsigned long n)
 {
+	prefetch(from);
 	if (access_ok(VERIFY_WRITE, to, n))
 		__copy_user(to,from,n);
 	return n;
@@ -52,6 +53,7 @@ __generic_copy_to_user(void *to, const void *from, unsigned long n)
 unsigned long
 __generic_copy_from_user(void *to, const void *from, unsigned long n)
 {
+	prefetchw(to);
 	if (access_ok(VERIFY_READ, from, n))
 		__copy_user_zeroing(to,from,n);
 	else

@@ -216,6 +216,17 @@ int copy_user(struct task_struct *task,saddr_t useraddr, addr_t copyaddr,
 	return(0);
 }
 
+/*
+ * Called by kernel/ptrace.c when detaching..
+ *
+ * Make sure single step bits etc are not set.
+ */
+void ptrace_disable(struct task_struct *child)
+{
+	/* make sure the single step bit is not set. */
+	clear_single_step(child);
+}
+
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 {
 	struct task_struct *child;
@@ -341,21 +352,9 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		break;
 
 	case PTRACE_DETACH:  /* detach a process that was attached. */
-		ret = -EIO;
-		if ((unsigned long) data >= _NSIG)
-			break;
-		child->ptrace &= ~(PT_PTRACED|PT_TRACESYS);
-		child->exit_code = data;
-		write_lock_irqsave(&tasklist_lock, flags);
-		REMOVE_LINKS(child);
-		child->p_pptr = child->p_opptr;
-		SET_LINKS(child);
-		write_unlock_irqrestore(&tasklist_lock, flags);
-		/* make sure the single step bit is not set. */
-		clear_single_step(child);
-		wake_up_process(child);
-		ret = 0;
+		ret = ptrace_detach(child, data);
 		break;
+
 	case PTRACE_PEEKUSR_AREA:
 	case PTRACE_POKEUSR_AREA:
 		if((ret=copy_from_user(&parea,(void *)addr,sizeof(parea)))==0)  

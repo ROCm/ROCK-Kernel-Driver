@@ -21,6 +21,7 @@
 #include <linux/init.h>
 #include <linux/highmem.h>
 #include <linux/file.h>
+#include <linux/compiler.h>
 
 #include <asm/pgalloc.h>
 
@@ -46,19 +47,23 @@ static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* 
 {
 	pte_t pte;
 	swp_entry_t entry;
+	int right_classzone;
 
 	/* Don't look at this pte if it's been accessed recently. */
 	if (ptep_test_and_clear_young(page_table)) {
 		flush_tlb_page(vma, address);
-		SetPageReferenced(page);
+		activate_page(page);
 		return 0;
 	}
-
-	if (!memclass(page->zone, classzone))
+	if ((PageInactive(page) || PageActive(page)) && PageReferenced(page))
 		return 0;
 
 	if (TryLockPage(page))
 		return 0;
+
+	right_classzone = 1;
+	if (!memclass(page->zone, classzone))
+		right_classzone = 0;
 
 	/* From this point on, the odds are that we're going to
 	 * nuke this pte, so read and clear the pte.  This hook
@@ -89,7 +94,7 @@ drop_pte:
 			if (freeable)
 				deactivate_page(page);
 			page_cache_release(page);
-			return freeable;
+			return freeable & right_classzone;
 		}
 	}
 
@@ -292,8 +297,10 @@ static int swap_out(unsigned int priority, zone_t * classzone, unsigned int gfp_
 	/* Then, look at the other mm's */
 	counter = mmlist_nr / priority;
 	do {
-		if (current->need_resched)
+		if (unlikely(current->need_resched)) {
+			__set_current_state(TASK_RUNNING);
 			schedule();
+		}
 
 		spin_lock(&mmlist_lock);
 		mm = swap_mm;
@@ -323,20 +330,19 @@ empty:
 	return 0;
 }
 
-static int FASTCALL(shrink_cache(struct list_head * lru, int * max_scan, int nr_pages, zone_t * classzone, unsigned int gfp_mask));
-static int shrink_cache(struct list_head * lru, int * max_scan, int nr_pages, zone_t * classzone, unsigned int gfp_mask)
+static int FASTCALL(shrink_cache(struct list_head * lru, int * max_scan, int this_max_scan, int nr_pages, zone_t * classzone, unsigned int gfp_mask));
+static int shrink_cache(struct list_head * lru, int * max_scan, int this_max_scan, int nr_pages, zone_t * classzone, unsigned int gfp_mask)
 {
-	LIST_HEAD(active_local_lru);
-	LIST_HEAD(inactive_local_lru);
 	struct list_head * entry;
 	int __max_scan = *max_scan;
 
 	spin_lock(&pagemap_lru_lock);
-	while (__max_scan && (entry = lru->prev) != lru) {
+	while (__max_scan && this_max_scan && (entry = lru->prev) != lru) {
 		struct page * page;
 
-		if (__builtin_expect(current->need_resched, 0)) {
+		if (unlikely(current->need_resched)) {
 			spin_unlock(&pagemap_lru_lock);
+			__set_current_state(TASK_RUNNING);
 			schedule();
 			spin_lock(&pagemap_lru_lock);
 			continue;
@@ -344,26 +350,38 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int nr_pages, zo
 
 		page = list_entry(entry, struct page, lru);
 
-		if (__builtin_expect(!PageInactive(page) && !PageActive(page), 0))
+		if (unlikely(!PageInactive(page) && !PageActive(page)))
 			BUG();
 
+		this_max_scan--;
+
 		if (PageTestandClearReferenced(page)) {
-			if (PageInactive(page)) {
-				del_page_from_inactive_list(page);
-				add_page_to_active_list(page);
-			} else if (PageActive(page)) {
+			if (!PageSwapCache(page)) {
+				if (PageInactive(page)) {
+					del_page_from_inactive_list(page);
+					add_page_to_active_list(page);
+				} else if (PageActive(page)) {
+					list_del(entry);
+					list_add(entry, &active_list);
+				} else
+					BUG();
+			} else {
 				list_del(entry);
-				list_add(entry, &active_list);
-			} else
-				BUG();
+				list_add(entry, lru);
+			}
 			continue;
 		}
 
-		deactivate_page_nolock(page);
-		list_del(entry);
-		list_add_tail(entry, &inactive_local_lru);
+		if (PageInactive(page)) {
+			/* just roll it over, no need to update any stat */
+			list_del(entry);
+			list_add(entry, &inactive_list);
+		} else {
+			del_page_from_active_list(page);
+			add_page_to_inactive_list(page);
+		}
 
-		if (__builtin_expect(!memclass(page->zone, classzone), 0))
+		if (unlikely(!memclass(page->zone, classzone)))
 			continue;
 
 		__max_scan--;
@@ -371,8 +389,6 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int nr_pages, zo
 		/* Racy check to avoid trylocking when not worthwhile */
 		if (!page->buffers && page_count(page) != 1) {
 			activate_page_nolock(page);
-			list_del(entry);
-			list_add_tail(entry, &active_local_lru);
 			continue;
 		}
 
@@ -380,7 +396,7 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int nr_pages, zo
 		 * The page is locked. IO in progress?
 		 * Move it to the back of the list.
 		 */
-		if (__builtin_expect(TryLockPage(page), 0))
+		if (unlikely(TryLockPage(page)))
 			continue;
 
 		if (PageDirty(page) && is_page_cache_freeable(page)) {
@@ -456,10 +472,10 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int nr_pages, zo
 			}
 		}
 
-		if (__builtin_expect(!page->mapping, 0))
+		if (unlikely(!page->mapping))
 			BUG();
 
-		if (__builtin_expect(!spin_trylock(&pagecache_lock), 0)) {
+		if (unlikely(!spin_trylock(&pagecache_lock))) {
 			/* we hold the page lock so the page cannot go away from under us */
 			spin_unlock(&pagemap_lru_lock);
 
@@ -479,7 +495,7 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int nr_pages, zo
 		}
 
 		/* point of no return */
-		if (__builtin_expect(!PageSwapCache(page), 1))
+		if (likely(!PageSwapCache(page)))
 			__remove_inode_page(page);
 		else
 			__delete_from_swap_cache(page);
@@ -496,29 +512,48 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int nr_pages, zo
 			continue;
 		break;
 	}
-
-	list_splice(&inactive_local_lru, &inactive_list);
-	list_splice(&active_local_lru, &active_list);
 	spin_unlock(&pagemap_lru_lock);
 
 	*max_scan = __max_scan;
 	return nr_pages;
 }
 
+static void refill_inactive(int nr_pages)
+{
+	struct list_head * entry;
+
+	spin_lock(&pagemap_lru_lock);
+	entry = active_list.prev;
+	while (nr_pages-- && entry != &active_list) {
+		struct page * page;
+
+		page = list_entry(entry, struct page, lru);
+		entry = entry->prev;
+
+		if (!page->buffers && page_count(page) != 1)
+			continue;
+
+		del_page_from_active_list(page);
+		add_page_to_inactive_list(page);
+	}
+	spin_unlock(&pagemap_lru_lock);
+}
+
 static int FASTCALL(shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask, int nr_pages));
 static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask, int nr_pages)
 {
-	int max_scan = (nr_inactive_pages + nr_active_pages / priority) / priority;
+	int max_scan = (nr_inactive_pages + nr_active_pages / DEF_PRIORITY) / priority;
 
 	nr_pages -= kmem_cache_reap(gfp_mask);
 	if (nr_pages <= 0)
 		return 0;
 
-	nr_pages = shrink_cache(&inactive_list, &max_scan, nr_pages, classzone, gfp_mask);
+	refill_inactive(nr_pages / 2);
+	nr_pages = shrink_cache(&inactive_list, &max_scan, nr_inactive_pages, nr_pages, classzone, gfp_mask);
 	if (nr_pages <= 0)
 		return 0;
 
-	nr_pages = shrink_cache(&active_list, &max_scan, nr_pages, classzone, gfp_mask);
+	nr_pages = shrink_cache(&active_list, &max_scan, nr_active_pages / DEF_PRIORITY, nr_pages, classzone, gfp_mask);
 	if (nr_pages <= 0)
 		return 0;
 
@@ -531,6 +566,7 @@ static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask
 int try_to_free_pages(zone_t * classzone, unsigned int gfp_mask, unsigned int order)
 {
 	int priority = DEF_PRIORITY;
+	int ret = 0;
 
 	do {
 		int nr_pages = SWAP_CLUSTER_MAX;
@@ -538,10 +574,10 @@ int try_to_free_pages(zone_t * classzone, unsigned int gfp_mask, unsigned int or
 		if (nr_pages <= 0)
 			return 1;
 
-		swap_out(priority, classzone, gfp_mask, SWAP_CLUSTER_MAX);
+		ret |= swap_out(priority, classzone, gfp_mask, SWAP_CLUSTER_MAX << 2);
 	} while (--priority);
 
-	return 0;
+	return ret;
 }
 
 DECLARE_WAIT_QUEUE_HEAD(kswapd_wait);
@@ -566,12 +602,14 @@ static int kswapd_balance_pgdat(pg_data_t * pgdat)
 
 	for (i = pgdat->nr_zones-1; i >= 0; i--) {
 		zone = pgdat->node_zones + i;
-		if (current->need_resched)
+		if (unlikely(current->need_resched))
 			schedule();
 		if (!zone->need_balance)
 			continue;
 		if (!try_to_free_pages(zone, GFP_KSWAPD, 0)) {
 			zone->need_balance = 0;
+			__set_current_state(TASK_INTERRUPTIBLE);
+			schedule_timeout(HZ*5);
 			continue;
 		}
 		if (check_classzone_need_balance(zone))

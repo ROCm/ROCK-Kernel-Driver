@@ -32,7 +32,9 @@ obj-$(CONFIG_AIRONET4500_CS)	+= aironet4500_cs.o
 
 # Cardbus client drivers
 obj-$(CONFIG_PCMCIA_XIRTULIP)	+= xircom_tulip_cb.o
+obj-$(CONFIG_PCMCIA_XIRCOM)	+= xircom_cb.o
 
 obj-$(CONFIG_PCMCIA_IBMTR)	+= ibmtr_cs.o
 
 include $(TOPDIR)/Rules.make
+

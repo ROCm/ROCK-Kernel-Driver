@@ -31,23 +31,28 @@ Still somewhat experimental.  The driver should work stable, i.e. it
 should'nt crash your box.  It might not work as expected, have bugs,
 not being fully OSS API compilant, ...
 
+Latest versions are available from http://bytesex.org/bttv/, the
+driver is in the bttv tarball.  Kernel patches might be available too,
+have a look at http://bytesex.org/bttv/listing.html.
+
+The chip knows two different modes.  btaudio registers two dsp
+devices, one for each mode.  They can not be used at the same time.
+
 
 Digital audio mode
 ==================
 
-The chip knows different modes.  Right now you have to pick the one you
-want to use at insmod time.  Digital audio mode is the default.  The
-chip gives you 16 bit stereo sound with ~32 kHz sample rate.  According
-to the specs it should be possible to get up to 48 kHz, but I havn't
-figured out yet how this works.  The specs are not very verbose :-(
+The chip gives you 16 bit stereo sound.  The sample rate depends on
+the external source which feeds the bt878 with digital sound via I2S
+interface.  There is a insmod option (rate) to tell the driver which
+sample rate the hardware uses (32000 is the default).
 
-Lower sample rates are possible too, but the code isn't written yet.
-For now you are limited to the fixed 32 kHz.  Mono works throuth, the
-driver will do that in software for you.
+One possible source for digital sound is the msp34xx audio processor
+chip which provides digital sound via I2S with 32 kHz sample rate.  My
+Hauppauge board works this way.
 
-With my Hauppauge I get clear sound, but I got also reports saying that
-digital audio mode does'nt work.  Guess Hauppauge connected the msp34xx
-output to the bt878's I2S digital audio input port.
+The Osprey-200 reportly gives you digital sound with 44100 Hz sample
+rate.  It is also possible that you get no sound at all.
 
 
 analog mode (A/D)
@@ -67,11 +72,17 @@ With my Hauppauge I get noisy sound on the second input (mapped to line2
 by the mixer device).  Others get a useable signal on line1.
 
 
-more hints
-==========
+some examples
+=============
 
-/me uses "sox -w -r 32000 -t ossdsp /dev/dsp2 -t ossdsp /dev/dsp"
-to dump audio data from btaudio (dsp2) to es1730 (dsp,dsp1).
+* read audio data from btaudio (dsp2), send to es1730 (dsp,dsp1):
+  $ sox -w -r 32000 -t ossdsp /dev/dsp2 -t ossdsp /dev/dsp
+
+* read audio data from btaudio, send to esound daemon (which might be
+  running on another host):
+  $ sox -c 2 -w -r 32000 -t ossdsp /dev/dsp2 -t sw - | esdcat -r 32000
+  $ sox -c 1 -w -r 32000 -t ossdsp /dev/dsp2 -t sw - | esdcat -m -r 32000
+
 
 Have fun,
 

@@ -311,10 +311,10 @@
  * You can try raising me if tagged queueing is enabled, or lowering
  * me if you only have 4 SCBs.
  */
-#ifdef CONFIG_AIC7XXX_CMDS_PER_DEVICE
-#define AIC7XXX_CMDS_PER_DEVICE CONFIG_AIC7XXX_CMDS_PER_DEVICE
+#ifdef CONFIG_AIC7XXX_OLD_CMDS_PER_DEVICE
+#define AIC7XXX_CMDS_PER_DEVICE CONFIG_AIC7XXX_OLD_CMDS_PER_DEVICE
 #else
-#define AIC7XXX_CMDS_PER_DEVICE 8
+#define AIC7XXX_CMDS_PER_DEVICE 32
 #endif
 
 /*
@@ -323,7 +323,7 @@
  * NOTE: Do NOT enable this when running on kernels version 1.2.x and below.
  * NOTE: This does affect performance since it has to maintain statistics.
  */
-#ifdef CONFIG_AIC7XXX_PROC_STATS
+#ifdef CONFIG_AIC7XXX_OLD_PROC_STATS
 #define AIC7XXX_PROC_STATS
 #endif
 
@@ -347,7 +347,7 @@ typedef struct
  * Make a define that will tell the driver not to use tagged queueing
  * by default.
  */
-#ifdef CONFIG_AIC7XXX_TCQ_ON_BY_DEFAULT
+#ifdef CONFIG_AIC7XXX_OLD_TCQ_ON_BY_DEFAULT
 #define DEFAULT_TAG_COMMANDS {0, 0, 0, 0, 0, 0, 0, 0,\
                               0, 0, 0, 0, 0, 0, 0, 0}
 #else
@@ -8865,6 +8865,7 @@ aic7xxx_alloc(Scsi_Host_Template *sht, struct aic7xxx_host *temp)
     memset(p, 0, sizeof(struct aic7xxx_host));
     *p = *temp;
     p->host = host;
+    host->max_sectors = 512;
 
     p->scb_data = kmalloc(sizeof(scb_data_type), GFP_ATOMIC);
     if (p->scb_data != NULL)

@@ -23,6 +23,7 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <linux/nmi.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
 #include <linux/completion.h>
@@ -536,6 +537,7 @@ asmlinkage void schedule(void)
 	struct list_head *tmp;
 	int this_cpu, c;
 
+
 	spin_lock_prefetch(&runqueue_lock);
 
 	if (!current->active_mm) BUG();
@@ -723,18 +725,16 @@ scheduling_in_interrupt:
 static inline void __wake_up_common (wait_queue_head_t *q, unsigned int mode,
 			 	     int nr_exclusive, const int sync)
 {
-	struct list_head *tmp, *head;
+	struct list_head *tmp;
 	struct task_struct *p;
 
 	CHECK_MAGIC_WQHEAD(q);
-	head = &q->task_list;
-	WQ_CHECK_LIST_HEAD(head);
-	tmp = head->next;
-	while (tmp != head) {
+	WQ_CHECK_LIST_HEAD(&q->task_list);
+	
+	list_for_each(tmp,&q->task_list) {
 		unsigned int state;
                 wait_queue_t *curr = list_entry(tmp, wait_queue_t, task_list);
 
-		tmp = tmp->next;
 		CHECK_MAGIC(curr->__magic);
 		p = curr->task;
 		state = p->state;
@@ -1054,7 +1054,7 @@ asmlinkage long sys_sched_yield(void)
 #if CONFIG_SMP
 	int i;
 
-	// Substract non-idle processes running on other CPUs.
+	// Subtract non-idle processes running on other CPUs.
 	for (i = 0; i < smp_num_cpus; i++) {
 		int cpu = cpu_logical_map(i);
 		if (aligned_data[cpu].schedule_data.curr != idle_task(cpu))

@@ -186,7 +186,10 @@ mainmenu_option next_comment
 comment 'General setup'
 
 bool 'Networking support' CONFIG_NET
-bool 'SGI Visual Workstation support' CONFIG_VISWS
+
+# Visual Workstation support is utterly broken.
+# If you want to see it working mail an VW540 to hch@infradead.org 8)
+#bool 'SGI Visual Workstation support' CONFIG_VISWS
 if [ "$CONFIG_VISWS" = "y" ]; then
    define_bool CONFIG_X86_VISWS_APIC y
    define_bool CONFIG_X86_LOCAL_APIC y
@@ -388,6 +391,13 @@ fi
 mainmenu_option next_comment
 comment 'Kernel hacking'
 
-#bool 'Debug kmalloc/kfree' CONFIG_DEBUG_MALLOC
-bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
+if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
+   bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
+   bool '  Memory mapped I/O debugging' CONFIG_DEBUG_IOVIRT
+   bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
+   bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
+   bool '  Verbose BUG() reporting (adds 70K)' CONFIG_DEBUG_BUGVERBOSE
+fi
+
 endmenu

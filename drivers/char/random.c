@@ -1591,12 +1591,9 @@ random_ioctl(struct inode * inode, struct file * file,
 			return -EPERM;
 		p = (int *) arg;
 		ent_count = random_state->entropy_count;
-		if (put_user(ent_count, p++))
-			return -EFAULT;
-			
-		if (get_user(size, p))
-			return -EFAULT;
-		if (put_user(random_state->poolinfo.poolwords, p++))
+		if (put_user(ent_count, p++) ||
+		    get_user(size, p) ||
+		    put_user(random_state->poolinfo.poolwords, p++))
 			return -EFAULT;
 		if (size < 0)
 			return -EINVAL;
@@ -1809,13 +1806,13 @@ static int uuid_strategy(ctl_table *table, int *name, int nlen,
 	if (uuid[8] == 0)
 		generate_random_uuid(uuid);
 
-	get_user(len, oldlenp);
+	if (get_user(len, oldlenp))
+		return -EFAULT;
 	if (len) {
 		if (len > 16)
 			len = 16;
-		if (copy_to_user(oldval, uuid, len))
-			return -EFAULT;
-		if (put_user(len, oldlenp))
+		if (copy_to_user(oldval, uuid, len) ||
+		    put_user(len, oldlenp))
 			return -EFAULT;
 	}
 	return 1;

@@ -13,6 +13,7 @@
  * - /proc/adb to list the devices and infos
  * - more /dev/adb to allow userland to receive the
  *   flow of auto-polling datas from a given device.
+ * - move bus probe to a kernel thread
  */
 
 #include <linux/config.h>
@@ -32,6 +33,7 @@
 #include <linux/notifier.h>
 #include <linux/wait.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 #include <asm/uaccess.h>
 #ifdef CONFIG_PPC
 #include <asm/prom.h>
@@ -74,6 +76,11 @@ struct adb_driver *adb_controller;
 struct notifier_block *adb_client_list = NULL;
 static int adb_got_sleep = 0;
 static int adb_inited = 0;
+static pid_t adb_probe_task_pid;
+static int adb_probe_task_flag;
+static wait_queue_head_t adb_probe_task_wq;
+static int sleepy_trackpad;
+int __adb_probe_sync;
 
 #ifdef CONFIG_PMAC_PBOOK
 static int adb_notify_sleep(struct pmu_sleep_notifier *self, int when);
@@ -84,6 +91,9 @@ static struct pmu_sleep_notifier adb_sleep_notifier = {
 #endif
 
 static int adb_scan_bus(void);
+static int do_adb_reset_bus(void);
+static void adbdev_init(void);
+
 
 static struct adb_handler {
 	void (*handler)(unsigned char *, int, struct pt_regs *, int);
@@ -103,6 +113,17 @@ static void printADBreply(struct adb_request *req)
 
 }
 #endif
+
+
+static __inline__ void adb_wait_ms(unsigned int ms)
+{
+	if (current->pid && adb_probe_task_pid &&
+	  adb_probe_task_pid == current->pid) {
+		current->state = TASK_UNINTERRUPTIBLE;
+		schedule_timeout(1 + ms * HZ / 1000);
+	} else
+		mdelay(ms);
+}
 
 static int adb_scan_bus(void)
 {
@@ -201,6 +222,64 @@ static int adb_scan_bus(void)
 	return devmask;
 }
 
+/*
+ * This kernel task handles ADB probing. It dies once probing is
+ * completed.
+ */
+static int
+adb_probe_task(void *x)
+{
+	strcpy(current->comm, "kadbprobe");
+	
+	spin_lock_irq(&current->sigmask_lock);
+	sigfillset(&current->blocked);
+	flush_signals(current);
+	spin_unlock_irq(&current->sigmask_lock);
+
+	printk(KERN_INFO "adb: starting probe task...\n");
+	do_adb_reset_bus();
+	printk(KERN_INFO "adb: finished probe task...\n");
+	
+	adb_probe_task_pid = 0;
+	clear_bit(0, &adb_probe_task_flag);
+	return 0;
+}
+
+static void
+__adb_probe_task(void *data)
+{
+	adb_probe_task_pid = kernel_thread(adb_probe_task, NULL,
+		SIGCHLD | CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+}
+
+int
+adb_reset_bus(void)
+{
+	static struct tq_struct tqs = {
+		routine:	__adb_probe_task,
+	};
+
+	if (__adb_probe_sync) {
+		do_adb_reset_bus();
+		return 0;
+	}
+		
+	/* We need to get a lock on the probe thread */
+	while (test_and_set_bit(0, &adb_probe_task_flag))
+		schedule();
+
+	/* Just wait for PID to be 0 just in case (possible race) */
+	while (adb_probe_task_pid != 0)
+		schedule();
+
+	/* Create probe thread as a child of keventd */
+	if (current_is_keventd())
+		__adb_probe_task(NULL);
+	else
+		schedule_task(&tqs);
+	return 0;
+}
+
 int __init adb_init(void)
 {
 	struct adb_driver *driver;
@@ -231,11 +310,16 @@ int __init adb_init(void)
 	}
 	if ((adb_controller == NULL) || adb_controller->init()) {
 		printk(KERN_WARNING "Warning: no ADB interface detected\n");
+		adb_controller = NULL;
 	} else {
 #ifdef CONFIG_PMAC_PBOOK
 		pmu_register_sleep_notifier(&adb_sleep_notifier);
 #endif /* CONFIG_PMAC_PBOOK */
-
+		if (machine_is_compatible("AAPL,PowerBook1998") ||
+			machine_is_compatible("PowerBook1,1"))
+			sleepy_trackpad = 1;
+		init_waitqueue_head(&adb_probe_task_wq);
+		adbdev_init();
 		adb_reset_bus();
 	}
 	return 0;
@@ -255,6 +339,12 @@ adb_notify_sleep(struct pmu_sleep_notifier *self, int when)
 	switch (when) {
 	case PBOOK_SLEEP_REQUEST:
 		adb_got_sleep = 1;
+		/* We need to get a lock on the probe thread */
+		while (test_and_set_bit(0, &adb_probe_task_flag))
+			schedule();
+		/* Just wait for PID to be 0 just in case (possible race) */
+		while (adb_probe_task_pid != 0)
+			schedule();
 		if (adb_controller->autopoll)
 			adb_controller->autopoll(0);
 		ret = notifier_call_chain(&adb_client_list, ADB_MSG_POWERDOWN, NULL);
@@ -264,6 +354,7 @@ adb_notify_sleep(struct pmu_sleep_notifier *self, int when)
 	case PBOOK_SLEEP_REJECT:
 		if (adb_got_sleep) {
 			adb_got_sleep = 0;
+			clear_bit(0, &adb_probe_task_flag);
 			adb_reset_bus();
 		}
 		break;
@@ -271,16 +362,17 @@ adb_notify_sleep(struct pmu_sleep_notifier *self, int when)
 	case PBOOK_SLEEP_NOW:
 		break;
 	case PBOOK_WAKE:
-		adb_reset_bus();
 		adb_got_sleep = 0;
+		clear_bit(0, &adb_probe_task_flag);
+		adb_reset_bus();
 		break;
 	}
 	return PBOOK_SLEEP_OK;
 }
 #endif /* CONFIG_PMAC_PBOOK */
 
-int
-adb_reset_bus(void)
+static int
+do_adb_reset_bus(void)
 {
 	int ret, nret, devs;
 	unsigned long flags;
@@ -298,15 +390,26 @@ adb_reset_bus(void)
 		return -EBUSY;
 	}
 
+	if (sleepy_trackpad) {
+		/* Let the trackpad settle down */
+		adb_wait_ms(500);
+	}
+	
 	save_flags(flags);
 	cli();
 	memset(adb_handler, 0, sizeof(adb_handler));
 	restore_flags(flags);
-	
+
+	/* That one is still a bit synchronous, oh well... */
 	if (adb_controller->reset_bus)
 		ret = adb_controller->reset_bus();
 	else
 		ret = 0;
+
+	if (sleepy_trackpad) {
+		/* Let the trackpad settle down */
+		adb_wait_ms(1500);
+	}
 
 	if (!ret) {
 		devs = adb_scan_bus();
@@ -329,24 +432,40 @@ adb_poll(void)
 	adb_controller->poll();
 }
 
+static void
+adb_probe_wakeup(struct adb_request *req)
+{
+	wake_up(&adb_probe_task_wq);
+}
+
+static struct adb_request adb_sreq;
+static int adb_sreq_lock; // Use semaphore ! */ 
 
 int
 adb_request(struct adb_request *req, void (*done)(struct adb_request *),
 	    int flags, int nbytes, ...)
 {
 	va_list list;
-	int i;
-	struct adb_request sreq;
+	int i, use_sreq;
+	int rc;
 
 	if ((adb_controller == NULL) || (adb_controller->send_request == NULL))
 		return -ENXIO;
 	if (nbytes < 1)
 		return -EINVAL;
+	if (req == NULL && (flags & ADBREQ_NOSEND))
+		return -EINVAL;
 	
 	if (req == NULL) {
-		req = &sreq;
+		if (test_and_set_bit(0,&adb_sreq_lock)) {
+			printk("adb.c: Warning: contention on static request !\n");
+			return -EPERM;
+		}
+		req = &adb_sreq;
 		flags |= ADBREQ_SYNC;
-	}
+		use_sreq = 1;
+	} else
+		use_sreq = 0;
 	req->nbytes = nbytes+1;
 	req->done = done;
 	req->reply_expected = flags & ADBREQ_REPLY;
@@ -359,7 +478,36 @@ adb_request(struct adb_request *req, void (*done)(struct adb_request *),
 	if (flags & ADBREQ_NOSEND)
 		return 0;
 
-	return adb_controller->send_request(req, flags & ADBREQ_SYNC);
+	/* Synchronous requests send from the probe thread cause it to
+	 * block. Beware that the "done" callback will be overriden !
+	 */
+	if ((flags & ADBREQ_SYNC) &&
+	    (current->pid && adb_probe_task_pid &&
+	    adb_probe_task_pid == current->pid)) {
+		DECLARE_WAITQUEUE(wait, current);
+		req->done = adb_probe_wakeup;
+		add_wait_queue(&adb_probe_task_wq, &wait);
+		rc = adb_controller->send_request(req, 0);
+		if (rc || req->complete)
+			goto bail;
+		for (;;) {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			if (req->complete)
+				break;
+			schedule();
+		}
+		current->state = TASK_RUNNING;
+		remove_wait_queue(&adb_probe_task_wq, &wait);
+		rc = 0;
+		goto bail;
+	}
+
+	rc = adb_controller->send_request(req, flags & ADBREQ_SYNC);
+bail:
+	if (use_sreq)
+		clear_bit(0, &adb_sreq_lock);
+
+	return rc;
 }
 
  /* Ultimately this should return the number of devices with
@@ -462,8 +610,6 @@ adb_get_infos(int address, int *original_address, int *handler_id)
  */
 
 #define ADB_MAJOR	56	/* major number for /dev/adb */
-
-extern void adbdev_init(void);
 
 struct adbdev_state {
 	spinlock_t	lock;
@@ -636,7 +782,7 @@ static ssize_t adb_write(struct file *file, const char *buf,
 	   the controller */
 	if ((req->data[0] == ADB_PACKET)&&(count > 1)
 		&&(req->data[1] == ADB_BUSRESET)) {
-		ret = adb_reset_bus();
+		ret = do_adb_reset_bus();
 		atomic_dec(&state->n_pending);
 		goto out;
 	} else {	
@@ -667,17 +813,9 @@ static struct file_operations adb_fops = {
 	release:	adb_release,
 };
 
-void adbdev_init()
+static void
+adbdev_init(void)
 {
-#ifdef CONFIG_PPC
-	if ( (_machine != _MACH_chrp) && (_machine != _MACH_Pmac) )
-		return;
-#endif
-#ifdef CONFIG_MAC
-	if (!MACH_IS_MAC)
-		return;
-#endif
-
 	if (devfs_register_chrdev(ADB_MAJOR, "adb", &adb_fops))
 		printk(KERN_ERR "adb: unable to get major %d\n", ADB_MAJOR);
 	else

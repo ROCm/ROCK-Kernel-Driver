@@ -1,4 +1,4 @@
-/* orinoco.c 0.06f	- (formerly known as dldwd_cs.c and orinoco_cs.c)
+/* orinoco.c 0.07	- (formerly known as dldwd_cs.c and orinoco_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -184,6 +184,13 @@
  *	  00:00:00.  We really need a better way of handling this, but the module flag
  *	  is better than nothing for now.
  *
+ * v0.06f -> v0.07 - 20/8/2001 - David Gibson
+ *	o Removed BAP error retries from hermes_bap_seek().  For Tx we now
+ *	  let the upper layers handle the retry, we retry explicitly in the
+ *	  Rx path, but don't make as much noise about it.
+ *	o Firmware detection cleanups.
+ *
+ *
  * TODO - Jean II
  *	o inline functions (lot's of candidate, need to reorder code)
  *	o Test PrismII/Symbol cards & firmware versions
@@ -195,7 +202,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/ptrace.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/ioport.h>
@@ -220,9 +227,10 @@
 #include "hermes.h"
 #include "orinoco.h"
 
-static const char version[] __initdata = "orinoco.c 0.06f (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char version[] __initdata = "orinoco.c 0.07 (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_DESCRIPTION("Driver for Lucent Orinoco, Prism II based and similar wireless cards");
+MODULE_LICENSE("Dual MPL/GPL");
 
 /* Level of debugging. Used in the macros in orinoco.h */
 #ifdef ORINOCO_DEBUG
@@ -276,20 +284,22 @@ struct p80211_hdr {
 #define DLDWD_FTYPE_CTL			0x0004
 #define DLDWD_FTYPE_DATA		0x0008
 
+#define __PACKED__ __attribute__ ((packed))
+
 struct p8022_hdr {
-	uint8_t dsap;
-	uint8_t ssap;
-	uint8_t ctrl;
-	uint8_t oui[3];
-} __attribute__ ((packed));
+	uint8_t dsap __PACKED__;
+	uint8_t ssap __PACKED__;
+	uint8_t ctrl __PACKED__;
+	uint8_t oui[3] __PACKED__;
+};
 
 struct dldwd_frame_hdr {
-	hermes_frame_desc_t desc;
-	struct p80211_hdr p80211;
-	struct ethhdr p8023;
-	struct p8022_hdr p8022;
-	uint16_t ethertype;
-} __attribute__ ((packed));
+	hermes_frame_desc_t desc __PACKED__;
+	struct p80211_hdr p80211 __PACKED__;
+	struct ethhdr p8023 __PACKED__;
+	struct p8022_hdr p8022 __PACKED__;
+	uint16_t ethertype __PACKED__;
+};
 
 #define P8023_OFFSET		(sizeof(hermes_frame_desc_t) + \
 				sizeof(struct p80211_hdr))
@@ -302,6 +312,14 @@ struct p8022_hdr encaps_hdr = {
 struct p8022_hdr alternate_encaps_hdr = {
 	0xaa, 0xaa, 0x03, {0x00, 0x00, 0x00}
 };
+
+/* How many times to retry if we get an EIO reading the BAP in the Rx path */
+#define RX_EIO_RETRY		10
+
+typedef struct dldwd_commsqual {
+	uint16_t qual, signal, noise;
+} __PACKED__ dldwd_commsqual_t;
+
 
 /*
  * Function prototypes
@@ -419,11 +437,6 @@ set_port_type(dldwd_priv_t *priv)
 			priv->port_type = 3;
 			priv->allow_ibss = 0;
 		} else {
-			/* Symbol is different here */
-			if (priv->firmware_type == FIRMWARE_TYPE_SYMBOL)
-				priv->port_type = 4;
-			else
-				priv->port_type = 1;
 			priv->port_type = priv->ibss_port;
 			priv->allow_ibss = 1;
 		}
@@ -673,7 +686,7 @@ static int __dldwd_hw_setup_wep(dldwd_priv_t *priv)
 			return err;
 		break;
 
-	case FIRMWARE_TYPE_PRISM2: /* Prism II style WEP */
+	case FIRMWARE_TYPE_INTERSIL: /* Intersil style WEP */
 	case FIRMWARE_TYPE_SYMBOL: /* Symbol style WEP */
 		master_wep_flag = 0;		/* Off */
 		if (priv->wep_on) {
@@ -703,7 +716,7 @@ static int __dldwd_hw_setup_wep(dldwd_priv_t *priv)
 			if (err)
 				return err;
 
-			/* Authentication is where Prism2 and Symbol
+			/* Authentication is where Intersil and Symbol
 			 * firmware differ... */
 			if (priv->firmware_type == FIRMWARE_TYPE_SYMBOL) {
 				/* Symbol cards : set the authentication :
@@ -877,7 +890,7 @@ static int dldwd_hw_get_bitratelist(dldwd_priv_t *priv, int *numrates,
 	return 0;
 }
 
-#ifndef PCMCIA_DEBUG
+#ifndef ORINOCO_DEBUG
 static inline void show_rx_frame(struct dldwd_frame_hdr *frame) {}
 #else
 static void show_rx_frame(struct dldwd_frame_hdr *frame)
@@ -1052,6 +1065,7 @@ static void __dldwd_ev_rx(dldwd_priv_t *priv, hermes_t *hw)
 	struct net_device_stats *stats = &priv->stats;
 	struct iw_statistics *wstats = &priv->wstats;
 	struct sk_buff *skb = NULL;
+	int l = RX_EIO_RETRY;
 	uint16_t rxfid, status;
 	int length, data_len, data_off;
 	char *p;
@@ -1066,13 +1080,20 @@ static void __dldwd_ev_rx(dldwd_priv_t *priv, hermes_t *hw)
 	   necessary, since we ignore most of it, but it's
 	   conceptually simpler. We can tune this later if
 	   necessary. */
-	err = hermes_bap_pread(hw, IRQ_BAP, &hdr, sizeof(hdr), rxfid, 0);
+	do {
+		err = hermes_bap_pread(hw, IRQ_BAP, &hdr, sizeof(hdr),
+				       rxfid, 0);
+	} while ( (err == -EIO) && (--l) );
 	if (err) {
-		printk(KERN_ERR "%s: error %d reading frame header. "
-		       "Frame dropped.\n", dev->name, err);
+		if (err == -EIO)
+			DEBUG(1, "%s: EIO reading frame header.\n", dev->name);
+		else
+			printk(KERN_ERR "%s: error %d reading frame header. "
+			       "Frame dropped.\n", dev->name, err);
 		stats->rx_errors++;
 		goto drop;
 	}
+	DEBUG(2, "%s: BAP read suceeded: l=%d\n", dev->name, l);
 
 	status = le16_to_cpu(hdr.desc.status);
 	
@@ -1138,8 +1159,7 @@ static void __dldwd_ev_rx(dldwd_priv_t *priv, hermes_t *hw)
 	   (!memcmp(&hdr.p8022, &encaps_hdr, 3))) {
 		/* These indicate a SNAP within 802.2 LLC within
 		   802.11 frame which we'll need to de-encapsulate to
-		   the original EthernetII frame.
-		   IEEE and ISO OSI have a lot to answer for.  */
+		   the original EthernetII frame. */
 
 		/* Remove SNAP header, reconstruct EthernetII frame */
 		data_len = length - ENCAPS_OVERHEAD;
@@ -1161,13 +1181,20 @@ static void __dldwd_ev_rx(dldwd_priv_t *priv, hermes_t *hw)
 	}
 
 	p = skb_put(skb, data_len);
-	if (hermes_bap_pread(hw, IRQ_BAP, p, RUP_EVEN(data_len),
-			     rxfid, data_off) != 0) {
-		printk(KERN_WARNING "%s: Error reading packet data\n",
-		       dev->name);
+	do {
+		err = hermes_bap_pread(hw, IRQ_BAP, p, RUP_EVEN(data_len),
+				       rxfid, data_off);
+	} while ( (err == -EIO) && (--l) );
+	if (err) {
+		if (err == -EIO)
+			DEBUG(1, "%s: EIO reading frame header.\n", dev->name);
+		else
+			printk(KERN_ERR "%s: error %d reading frame header. "
+			       "Frame dropped.\n", dev->name, err);
 		stats->rx_errors++;
 		goto drop;
 	}
+	DEBUG(2, "%s: BAP read suceeded: l=%d\n", dev->name, l);
 
 	dev->last_rx = jiffies;
 	skb->dev = dev;
@@ -1231,28 +1258,38 @@ static void determine_firmware(struct net_device *dev)
 	dldwd_priv_t *priv = dev->priv;
 	hermes_t *hw = &priv->hw;
 	int err;
+	struct sta_id {
+		uint16_t id, vendor, major, minor;
+	} __PACKED__ sta_id;
 	uint32_t firmver;
-	char *vendor_str;
 
 	/* Get the firmware version */
-	err = hermes_read_staidentity(hw, USER_BAP, &priv->firmware_info);
+	err = HERMES_READ_RECORD(hw, USER_BAP,
+				 HERMES_RID_STAIDENTITY, &sta_id);
 	if (err) {
 		printk(KERN_WARNING "%s: Error %d reading firmware info. Wildly guessing capabilities...\n",
 		       dev->name, err);
-		memset(&priv->firmware_info, 0, sizeof(priv->firmware_info));
+		memset(&sta_id, 0, sizeof(sta_id));
 	}
+	le16_to_cpus(&sta_id.id);
+	le16_to_cpus(&sta_id.vendor);
+	le16_to_cpus(&sta_id.major);
+	le16_to_cpus(&sta_id.minor);
 
-	firmver = ((uint32_t)priv->firmware_info.major << 16) | priv->firmware_info.minor;
-	DEBUG(2, "%s: firmver = 0x%X\n", dev->name, firmver);
+	firmver = ((uint32_t)sta_id.major << 16) | sta_id.minor;
+
+	printk(KERN_DEBUG "%s: Station identity %04x:%04x:%04x:%04x\n",
+	       dev->name, sta_id.id, sta_id.vendor,
+	       sta_id.major, sta_id.minor);
 
 	/* Determine capabilities from the firmware version */
 
-	switch (priv->firmware_info.vendor) {
-	case 0x1:
+	if (sta_id.vendor == 1) {
 		/* Lucent Wavelan IEEE, Lucent Orinoco, Cabletron RoamAbout,
-		 * ELSA, Melco, HP, IBM, Dell 1150 cards */
-		vendor_str = "Lucent";
-		/* Lucent MAC : 00:60:1D:* & 00:02:2D:* */
+		   ELSE, Meloc, HP, IBM, Dell 1150 */
+		printk(KERN_DEBUG "%s: Looks like a Lucent/Agere firmware "
+		       "version %d.%02d\n", dev->name,
+		       sta_id.major, sta_id.minor);
 
 		priv->firmware_type = FIRMWARE_TYPE_LUCENT;
 		priv->tx_rate_ctrl = 0x3;	/* 11 Mb/s auto */
@@ -1268,118 +1305,62 @@ static void determine_firmware(struct net_device *dev)
 		priv->has_mwo = (firmver >= 0x60000);
 		priv->has_pm = (firmver >= 0x40020);
 		priv->has_preamble = 0;
+		priv->ibss_port = 1;
 		/* Tested with Lucent firmware :
 		 *	1.16 ; 4.08 ; 4.52 ; 6.04 ; 6.16 ; 7.28 => Jean II
 		 * Tested CableTron firmware : 4.32 => Anton */
-		break;
-	case 0x2:
-		vendor_str = "Generic Prism II";
-		/* Some D-Link cards report vendor 0x02... */
+	} else if ((sta_id.vendor == 2) &&
+		   ((firmver == 0x10001) || (firmver == 0x20001))) {
+		/* Symbol , 3Com AirConnect, Intel, Ericsson WLAN */
+		/* Intel MAC : 00:02:B3:* */
+		/* 3Com MAC : 00:50:DA:* */
+		printk(KERN_DEBUG "%s: Looks like a Symbol firmware "
+		       "(unknown version)\n", dev->name);
 
-		priv->firmware_type = FIRMWARE_TYPE_PRISM2;
+		/* FIXME : we need to get Symbol firmware revision.
+		 * I tried to use SYMBOL_***ARY_VER, but it didn't
+		 * returned anything proper... */
+		priv->firmware_type = FIRMWARE_TYPE_SYMBOL;
 		priv->tx_rate_ctrl = 0xF;	/* 11 Mb/s auto */
-		priv->need_card_reset = 0;
+		priv->need_card_reset = 1;
 		priv->broken_reset = 0;
-		priv->broken_allocate = 0;
+		priv->broken_allocate = 1;
 		priv->has_port3 = 1;
-		priv->has_ibss = (firmver >= 0x00007); /* FIXME */
-		priv->has_wep = (firmver >= 0x00007); /* FIXME */
-		priv->has_big_wep = 0;
+		priv->has_ibss = 1; /* FIXME */
+		priv->has_wep = 1; /* FIXME */
+		priv->has_big_wep = 1;	/* RID_SYMBOL_KEY_LENGTH */
 		priv->has_mwo = 0;
-		priv->has_pm = (firmver >= 0x00007); /* FIXME */
-		priv->has_preamble = 0;
-
-		/* Tim Hurley -> D-Link card, vendor 02, firmware 0.08 */
-
-		/* Special case for Symbol cards */
-		if(firmver == 0x10001) {
-			/* Symbol , 3Com AirConnect, Intel, Ericsson WLAN */
-			vendor_str = "Symbol";
-			/* Intel MAC : 00:02:B3:* */
-			/* 3Com MAC : 00:50:DA:* */
-
-			/* FIXME : we need to get Symbol firmware revision.
-			 * I tried to use SYMBOL_***ARY_VER, but it didn't
-			 * returned anything proper... */
-			priv->firmware_type = FIRMWARE_TYPE_SYMBOL;
-			priv->tx_rate_ctrl = 0xF;	/* 11 Mb/s auto */
-			priv->need_card_reset = 1;
-			priv->broken_reset = 0;
-			priv->broken_allocate = 1;
-			priv->has_port3 = 1;
-			priv->has_ibss = 1; /* FIXME */
-			priv->has_wep = 1; /* FIXME */
-			priv->has_big_wep = 1;	/* RID_SYMBOL_KEY_LENGTH */
-			priv->has_mwo = 0;
-			priv->has_pm = 1; /* FIXME */
-			priv->has_preamble = 0; /* FIXME */
-			/* Tested with Intel firmware : v15 => Jean II */
-		}
-		break;
-	case 0x3:
-		vendor_str = "Samsung";
-		/* To check - Should cover Samsung & Compaq */
-
-		priv->firmware_type = FIRMWARE_TYPE_PRISM2;
-		priv->tx_rate_ctrl = 0xF;	/* 11 Mb/s auto */
-		priv->need_card_reset = 0;
-		priv->broken_reset = 0;
-		priv->broken_allocate = 0;
-		priv->has_port3 = 1;
-		priv->has_ibss = 0; /* FIXME: available in later firmwares */
-		priv->has_wep = (firmver >= 0x20000); /* FIXME */
-		priv->has_big_wep = 0; /* FIXME */
-		priv->has_mwo = 0;
-		priv->has_pm = (firmver >= 0x20000); /* FIXME */
-		priv->has_preamble = 0;
-		break;
-	case 0x6:
-		/* D-Link DWL 650, ... */
-		vendor_str = "LinkSys/D-Link";
-		/* D-Link MAC : 00:40:05:* */
-
-		priv->firmware_type = FIRMWARE_TYPE_PRISM2;
-		priv->tx_rate_ctrl = 0xF;	/* 11 Mb/s auto */
-		priv->need_card_reset = 0;
-		priv->broken_reset = 0;
-		priv->broken_allocate = 0;
-		priv->has_port3 = 1;
-		priv->has_ibss = (firmver >= 0x00007); /* FIXME */
-		priv->has_wep = (firmver >= 0x00007); /* FIXME */
-		priv->has_big_wep = 0;
-		priv->has_mwo = 0;
-		priv->has_pm = (firmver >= 0x00007); /* FIXME */
-		priv->has_preamble = 0;
-		/* Tested with D-Link firmware 0.07 => Jean II */
-		/* Note : with 0.07, IBSS to a Lucent card seem flaky */
-		break;
-	default:
-		vendor_str = "UNKNOWN";
-
-		priv->firmware_type = 0;
-		priv->tx_rate_ctrl = 0x3;		/* Hum... */
-		priv->need_card_reset = 0;
-		priv->broken_reset = 0;
-		priv->broken_allocate = 0;
-		priv->has_port3 = 0;
-		priv->has_ibss = 0;
-		priv->has_wep = 0;
-		priv->has_big_wep = 0;
-		priv->has_mwo = 0;
-		priv->has_pm = 0;
-		priv->has_preamble = 0;
-	}
-	
-	if (priv->firmware_type == FIRMWARE_TYPE_SYMBOL)
+		priv->has_pm = 1; /* FIXME */
+		priv->has_preamble = 0; /* FIXME */
 		priv->ibss_port = 4;
-	else if ( (priv->firmware_type == FIRMWARE_TYPE_PRISM2) && (firmver >= 0x00008) )
-		priv->ibss_port = 0;
-	else
-		priv->ibss_port = 1;
+		/* Tested with Intel firmware : v15 => Jean II */
+	} else {
+		printk(KERN_DEBUG "%s: Looks like an Intersil firmware "
+		       "version %d.%02d\n", dev->name,
+		       sta_id.major, sta_id.minor);
 
-	printk(KERN_DEBUG "%s: Firmware ID %02X vendor 0x%x (%s) version %d.%02d\n",
-	       dev->name, priv->firmware_info.id, priv->firmware_info.vendor,
-	       vendor_str, priv->firmware_info.major, priv->firmware_info.minor);
+		priv->firmware_type = FIRMWARE_TYPE_INTERSIL;
+		priv->tx_rate_ctrl = 0xF;	/* 11 Mb/s auto */
+		priv->need_card_reset = 0;
+		priv->broken_reset = 0;
+		priv->broken_allocate = 0;
+		priv->has_port3 = 1;
+		priv->has_ibss = (firmver >= 0x00007); /* FIXME */
+		priv->has_wep = (firmver >= 0x00008);
+		priv->has_big_wep = 0;
+		priv->has_mwo = 0;
+		priv->has_pm = (firmver >= 0x00007);
+		priv->has_preamble = 0;
+
+		if (firmver >= 0x00008)
+			priv->ibss_port = 0;
+		else {
+			printk(KERN_NOTICE "%s: Intersil firmware earlier "
+			       "than v0.08 - several features not supported.",
+			       dev->name);
+			priv->ibss_port = 1;
+		}
+	}
 }
 
 /*
@@ -1551,7 +1532,6 @@ dldwd_get_wireless_stats(struct net_device *dev)
 	hermes_t *hw = &priv->hw;
 	struct iw_statistics *wstats = &priv->wstats;
 	int err = 0;
-	hermes_commsqual_t cq;
 
 	if (!priv->hw_ready)
 		return NULL;
@@ -1571,7 +1551,14 @@ dldwd_get_wireless_stats(struct net_device *dev)
 		}
 #endif /* WIRELESS_SPY */
 	} else {
-		err = hermes_read_commsqual(hw, USER_BAP, &cq);
+		dldwd_commsqual_t cq;
+
+		err = HERMES_READ_RECORD(hw, USER_BAP,
+					 HERMES_RID_COMMSQUALITY, &cq);
+		
+		le16_to_cpus(&cq.qual);
+		le16_to_cpus(&cq.signal);
+		le16_to_cpus(&cq.noise);
 		
 		DEBUG(3, "%s: Global stats = %X-%X-%X\n", dev->name,
 		      cq.qual, cq.signal, cq.noise);
@@ -1597,7 +1584,7 @@ dldwd_get_wireless_stats(struct net_device *dev)
 #ifdef WIRELESS_SPY
 static inline void dldwd_spy_gather(struct net_device *dev,
 				    u_char *mac,
-				    hermes_commsqual_t *cq)
+				    dldwd_commsqual_t *cq)
 {
 	dldwd_priv_t *priv = (dldwd_priv_t *)dev->priv;
 	int i;
@@ -1620,7 +1607,7 @@ dldwd_stat_gather( struct net_device *dev,
 		   struct dldwd_frame_hdr *hdr)
 {
 	dldwd_priv_t *priv = (dldwd_priv_t *)dev->priv;
-	hermes_commsqual_t cq;
+	dldwd_commsqual_t cq;
 
 	/* Using spy support with lots of Rx packets, like in an
 	 * infrastructure (AP), will really slow down everything, because
@@ -1722,9 +1709,15 @@ dldwd_xmit(struct sk_buff *skb, struct net_device *dev)
 		err  = hermes_bap_pwrite(hw, USER_BAP, &hdr, sizeof(hdr),
 					 txfid, 0);
 		if (err) {
-			printk(KERN_ERR
-			       "%s: Error %d writing packet header to BAP\n",
-			       dev->name, err);
+			if (err == -EIO)
+				/* We get these errors reported by the
+				   firmware every so often apparently at
+				   random.  Let the upper layers
+				   handle the retry */
+				DEBUG(1, "%s: DEBUG: EIO writing packet header to BAP\n", dev->name);
+			else
+				printk(KERN_ERR "%s: Error %d writing packet header to BAP\n",
+				       dev->name, err);
 			stats->tx_errors++;
 			goto fail;
 		}
@@ -1749,12 +1742,14 @@ dldwd_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Round up for odd length packets */
 	err = hermes_bap_pwrite(hw, USER_BAP, p, RUP_EVEN(data_len), txfid, data_off);
 	if (err) {
-		printk(KERN_ERR "%s: Error %d writing packet data to BAP\n",
-		       dev->name, err);
+		if (err == -EIO)
+			DEBUG(1, "%s: DEBUG: EIO writing packet header to BAP\n", dev->name);
+		else
+			printk(KERN_ERR "%s: Error %d writing packet header to BAP",
+			       dev->name, err);
 		stats->tx_errors++;
 		goto fail;
 	}
-	
 
 	/* Finally, we actually initiate the send */
 	err = hermes_docmd_wait(hw, HERMES_CMD_TX | HERMES_CMD_RECL, txfid, &resp);
@@ -1941,7 +1936,9 @@ static int dldwd_ioctl_setiwencode(struct net_device *dev, struct iw_point *erq)
 
 	if (erq->pointer) {
 		/* We actually have a key to set */
-		
+		if(erq->length > MAX_KEY_SIZE)
+			return -EINVAL;
+
 		if (copy_from_user(keybuf, erq->pointer, erq->length))
 			return -EFAULT;
 	}
@@ -2344,7 +2341,7 @@ static int dldwd_ioctl_setrate(struct net_device *dev, struct iw_param *rrq)
 		else
 			priv->tx_rate_ctrl = rate_ctrl;
 		break;
-	case FIRMWARE_TYPE_PRISM2: /* Prism II style rate */
+	case FIRMWARE_TYPE_INTERSIL: /* Intersil style rate */
 	case FIRMWARE_TYPE_SYMBOL: /* Symbol style rate */
 		switch(brate) {
 		case 0:
@@ -2418,7 +2415,7 @@ static int dldwd_ioctl_getrate(struct net_device *dev, struct iw_param *rrq)
 		} else
 			rrq->fixed = 1;
 		break;
-	case FIRMWARE_TYPE_PRISM2: /* Prism II style rate */
+	case FIRMWARE_TYPE_INTERSIL: /* Intersil style rate */
 	case FIRMWARE_TYPE_SYMBOL: /* Symbol style rate */
 		/* Check if auto or fixed (crude approximation) */
 		if((val & 0x1) && (val > 1)) {
@@ -3649,32 +3646,32 @@ dldwd_proc_cleanup(void)
 int
 dldwd_setup(dldwd_priv_t* priv)
 {
-	struct net_device *ndev = &priv->ndev;;
+	struct net_device *dev = &priv->ndev;;
 
 	spin_lock_init(&priv->lock);
 
 	/* Set up the net_device */
-	ether_setup(ndev);
-	ndev->priv = priv;
+	ether_setup(dev);
+	dev->priv = priv;
 
 	/* Setup up default routines */
 	priv->card_reset_handler = NULL;	/* Caller may override */
-	ndev->init = dldwd_init;
-	ndev->open = NULL;		/* Caller *must* override */
-	ndev->stop = NULL;
-	ndev->hard_start_xmit = dldwd_xmit;
-	ndev->tx_timeout = dldwd_tx_timeout;
-	ndev->watchdog_timeo = 4*HZ; /* 4 second timeout */
+	dev->init = dldwd_init;
+	dev->open = NULL;		/* Caller *must* override */
+	dev->stop = NULL;
+	dev->hard_start_xmit = dldwd_xmit;
+	dev->tx_timeout = dldwd_tx_timeout;
+	dev->watchdog_timeo = HZ; /* 4 second timeout */
 
-	ndev->get_stats = dldwd_get_stats;
-	ndev->get_wireless_stats = dldwd_get_wireless_stats;
+	dev->get_stats = dldwd_get_stats;
+	dev->get_wireless_stats = dldwd_get_wireless_stats;
 
-	ndev->do_ioctl = dldwd_ioctl;
+	dev->do_ioctl = dldwd_ioctl;
 
-	ndev->change_mtu = dldwd_change_mtu;
-	ndev->set_multicast_list = dldwd_set_multicast_list;
+	dev->change_mtu = dldwd_change_mtu;
+	dev->set_multicast_list = dldwd_set_multicast_list;
 
-	netif_stop_queue(ndev);
+	netif_stop_queue(dev);
 
 	return 0;
 }

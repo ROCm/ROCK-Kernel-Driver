@@ -282,7 +282,7 @@ static inline void irda_usb_send_empty(struct irda_usb_cb *self)
 		IRDA_DEBUG(0, __FUNCTION__ "(), failed Empty URB\n");
 	}
 }
-#endif IU_BUG_KICK_TX
+#endif /* IU_BUG_KICK_TX */
 
 /*------------------------------------------------------------------*/
 /*
@@ -404,7 +404,7 @@ static int irda_usb_hard_xmit(struct sk_buff *skb, struct net_device *netdev)
 	 * insert empty packet to separate our frames.
 	 * This flag was previously called USB_DISABLE_SPD - Jean II */
 	purb->transfer_flags |= USB_ZERO_PACKET;
-#endif IU_USE_USB_ZERO_FLAG
+#endif /* IU_USE_USB_ZERO_FLAG */
 	purb->timeout = MSECS_TO_JIFFIES(100);
 	
 	/* Generate min turn time. FIXME: can we do better than this? */
@@ -472,7 +472,7 @@ static int irda_usb_hard_xmit(struct sk_buff *skb, struct net_device *netdev)
 			IRDA_DEBUG(2, __FUNCTION__ "(), Kick Tx...\n");
 			irda_usb_send_empty(self);
 		}
-#endif IU_BUG_KICK_TX
+#endif /* IU_BUG_KICK_TX */
 	}
 	spin_unlock_irqrestore(&self->lock, flags);
 	
@@ -580,7 +580,7 @@ static void irda_usb_net_timeout(struct net_device *netdev)
 			break;
 		}
 	}
-#endif IU_BUG_KICK_TX
+#endif /* IU_BUG_KICK_TX */
 
 	/* Check speed URB */
 	purb = &(self->speed_urb);
@@ -624,7 +624,7 @@ static void irda_usb_net_timeout(struct net_device *netdev)
 		if(self->new_xbofs == -1)
 			self->new_xbofs = self->xbofs;
 		irda_usb_change_speed_xbofs(self);
-#endif IU_BUG_KICK_TIMEOUT
+#endif /* IU_BUG_KICK_TIMEOUT */
 
 		switch (purb->status) {
 		case -ECONNABORTED:		/* -103 */
@@ -1325,7 +1325,7 @@ static inline void irda_usb_dump_class_desc(struct irda_class_desc *desc)
 	printk("bIrdaRateSniff=%x\n", desc->bIrdaRateSniff);
 	printk("bMaxUnicastList=%x\n", desc->bMaxUnicastList);
 }
-#endif IU_DUMP_CLASS_DESC
+#endif /* IU_DUMP_CLASS_DESC */
 
 /*------------------------------------------------------------------*/
 /*
@@ -1370,7 +1370,7 @@ static inline struct irda_class_desc *irda_usb_find_class_desc(struct usb_device
 	*desc = *ptr;
 #ifdef IU_DUMP_CLASS_DESC
 	irda_usb_dump_class_desc(desc);
-#endif	IU_DUMP_CLASS_DESC
+#endif	/* IU_DUMP_CLASS_DESC */
 	return desc;
 }
 

@@ -28,7 +28,7 @@
 
 #include <linux/sched.h>
 #include <linux/ptrace.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
@@ -44,6 +44,7 @@
 #include <linux/ioport.h>
 #include <linux/config.h>
 #include <linux/pci.h>
+#include <asm/uaccess.h>
 
 #ifdef CONFIG_PCI
 static struct pci_device_id card_ids[] = __devinitdata {
@@ -69,11 +70,12 @@ static struct pci_driver airo_driver = {
 
 /* Include Wireless Extension definition and check version - Jean II */
 #include <linux/wireless.h>
+#define WIRELESS_SPY		// enable iwspy support
 #if WIRELESS_EXT < 9
 #warning "Wireless extension v9 or newer required - please upgrade your kernel"
 #undef WIRELESS_EXT
+#undef WIRELESS_SPY
 #endif
-#define WIRELESS_SPY		// enable iwspy support
 #define CISCO_EXT		// enable Cisco extensions
 
 #ifdef CISCO_EXT
@@ -226,6 +228,7 @@ MODULE_AUTHOR("Benjamin Reed");
 MODULE_DESCRIPTION("Support for Cisco/Aironet 802.11 wireless ethernet \
                    cards.  Direct support for ISA/PCI cards and support \
 		   for PCMCIA when used with airo_cs.");
+MODULE_LICENSE("Dual BSD/GPL");
 MODULE_SUPPORTED_DEVICE("Aironet 4500, 4800 and Cisco 340");
 MODULE_PARM(io,"1-4i");
 MODULE_PARM(irq,"1-4i");
@@ -273,6 +276,7 @@ static int do8bitIO = 0;
 #define NOP 0x0010
 #define MAC_ENABLE 0x0001
 #define MAC_DISABLE 0x0002
+#define CMD_LOSE_SYNC 0x0003 /* Not sure what this does... */
 #define CMD_ACCESS 0x0021
 #define CMD_ALLOCATETX 0x000a
 #define CMD_TRANSMIT 0x000b
@@ -280,6 +284,7 @@ static int do8bitIO = 0;
 #define CMD_SETMODE 0x0009
 #define CMD_ENABLEAUX 0x0111
 #define CMD_SOFTRESET 0x0004
+#define CMD_LISTBSS 0x0103
 
 /* Registers */
 #define COMMAND 0x00
@@ -351,12 +356,31 @@ static int do8bitIO = 0;
 #define RID_STATS      0xFF68
 #define RID_STATSDELTA 0xFF69
 #define RID_STATSDELTACLEAR 0xFF6A
+#define RID_BSSLISTFIRST 0xFF72
+#define RID_BSSLISTNEXT  0xFF73
+
+typedef struct {
+	u16 cmd;
+	u16 parm0;
+	u16 parm1;
+	u16 parm2;
+} Cmd;
+
+typedef struct {
+	u16 status;
+	u16 rsp0;
+	u16 rsp1;
+	u16 rsp2;
+} Resp;
 
 /*
  * Rids and endian-ness:  The Rids will always be in cpu endian, since
  * this all the patches from the big-endian guys end up doing that.
  * so all rid access should use the read/writeXXXRid routines.
  */
+
+/* This is redundant for x86 archs, but it seems necessary for ARM */
+#pragma pack(1)
 
 /* This structure came from an email sent to me from an engineer at
    aironet for inclusion into this driver */
@@ -386,20 +410,6 @@ typedef struct {
 #define MOD_CCK 1
 #define MOD_MOK 2
 } ModulationRid;
-
-typedef struct {
-	u16 cmd;
-	u16 parm0;
-	u16 parm1;
-	u16 parm2;
-} Cmd;
-
-typedef struct {
-	u16 status;
-	u16 rsp0;
-	u16 rsp1;
-	u16 rsp2;
-} Resp;
 
 typedef struct {
 	u16 len; /* sizeof(ConfigRid) */
@@ -496,7 +506,10 @@ typedef struct {
 	u16 rssiThreshold;
 #define RSSI_DEFAULT 0
         u16 modulation;
-	u16 shortPreamble;
+#define PREAMBLE_AUTO 0
+#define PREAMBLE_LONG 1
+#define PREAMBLE_SHORT 2
+	u16 preamble;
 	u16 homeProduct;
 	u16 radioSpecific;
 	/*---------- Aironet Extensions ----------*/
@@ -559,6 +572,7 @@ typedef struct {
 typedef struct {
 	u16 len;
 	char oui[3];
+	char zero;
 	u16 prodNum;
 	char manName[32];
 	char prodName[16];
@@ -582,6 +596,38 @@ typedef struct {
 	u16 bootBlockVer;
 	u16 requiredHard;
 } CapabilityRid;
+
+typedef struct {
+  u16 len;
+  u16 index; /* First is 0 and 0xffff means end of list */
+#define RADIO_FH 1 /* Frequency hopping radio type */
+#define RADIO_DS 2 /* Direct sequence radio type */
+#define RADIO_TMA 4 /* Proprietary radio used in old cards (2500) */
+  u16 radioType; 
+  u8 bssid[6]; /* Mac address of the BSS */
+  u8 zero;
+  u8 ssidLen;
+  u8 ssid[32];
+  u16 rssi;
+#define CAP_ESS (1<<0)
+#define CAP_IBSS (1<<1)
+#define CAP_PRIVACY (1<<4)
+#define CAP_SHORTHDR (1<<5)
+  u16 cap;
+  u16 beaconInterval;
+  u8 rates[8]; /* Same as rates for config rid */
+  struct { /* For frequency hopping only */
+    u16 dwell;
+    u8 hopSet;
+    u8 hopPattern;
+    u8 hopIndex;
+    u8 fill;
+  } fh;
+  u16 dsChannel;
+  u16 atimWindow;
+} BSSListRid;
+
+#pragma pack()
 
 #define TXCTL_TXOK (1<<1) /* report if tx is ok */
 #define TXCTL_TXEX (1<<2) /* report if tx fails */
@@ -661,7 +707,7 @@ typedef struct wep_key_t {
 } wep_key_t;
 #endif /* WIRELESS_EXT */
 
-static const char version[] = "airo.c 0.2 (Ben Reed & Javier Achirica)";
+static const char version[] = "airo.c 0.3 (Ben Reed & Javier Achirica)";
 
 struct airo_info;
 
@@ -748,6 +794,35 @@ static int setup_proc_entry( struct net_device *dev,
 			     struct airo_info *apriv );
 static int takedown_proc_entry( struct net_device *dev,
 				struct airo_info *apriv );
+
+static int readBSSListRid(struct airo_info *ai, int first,
+		      BSSListRid *list) {
+	int rc;
+			Cmd cmd;
+			Resp rsp;
+
+	if (first == 1) {
+			memset(&cmd, 0, sizeof(cmd));
+			cmd.cmd=CMD_LISTBSS;
+			issuecommand(ai, &cmd, &rsp);
+			/* Let the command take effect */
+			set_current_state (TASK_INTERRUPTIBLE);
+			schedule_timeout (3*HZ);
+		}
+	rc = PC4500_readrid(ai, 
+		            first ? RID_BSSLISTFIRST : RID_BSSLISTNEXT,
+			    list, sizeof(*list));
+
+	list->len = le16_to_cpu(list->len);
+	list->index = le16_to_cpu(list->index);
+	list->radioType = le16_to_cpu(list->radioType);
+	list->cap = le16_to_cpu(list->cap);
+	list->beaconInterval = le16_to_cpu(list->beaconInterval);
+	list->fh.dwell = le16_to_cpu(list->fh.dwell);
+	list->dsChannel = le16_to_cpu(list->dsChannel);
+	list->atimWindow = le16_to_cpu(list->atimWindow);
+	return rc;
+}
 
 static int readWepKeyRid(struct airo_info*ai, WepKeyRid *wkr, int temp) {
 	int rc = PC4500_readrid(ai, temp ? RID_WEP_TEMP : RID_WEP_PERM, 
@@ -918,7 +993,6 @@ static int airo_start_xmit(struct sk_buff *skb, struct net_device *dev) {
 	
 	len = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN; /* check min length*/
 	buffer = skb->data;
-	
 	status = transmit_802_3_packet( priv, 
 					fids[i],
 					skb->data, len );
@@ -1167,7 +1241,6 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 	struct airo_info *apriv = (struct airo_info *)dev->priv;
 	u16 savedInterrupts;
 	
-
 	if (!netif_device_present(dev))
 		return;
 	
@@ -1362,6 +1435,16 @@ static void airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs) {
 			if(index!=-1)
 				apriv->stats.tx_bytes += len;
 		} else {
+			if (bap_setup(apriv, fid, 0x0004, BAP1) == SUCCESS) {
+				u16 status;
+				bap_read(apriv, &status, 2, BAP1);
+				if (le16_to_cpu(status) & 2)
+					apriv->stats.tx_aborted_errors++;
+				if (le16_to_cpu(status) & 4)
+					apriv->stats.tx_heartbeat_errors++;
+				if (le16_to_cpu(status) & 0x10)
+					apriv->stats.tx_carrier_errors++;
+			}
 			apriv->stats.tx_errors++;
 		}
 	}
@@ -1879,12 +1962,6 @@ static int transmit_802_3_packet(struct airo_info *ai, u16 txFid,
  *  like!  Feel free to clean it up!
  */
 
-/*
- *  Unfortunately sometime between 2.0 and 2.2 the proc interface changed...
- *  Unfortunately I dont know when it was...
- *  Im guessing it is sometime around 0x20155...  Anybody know?
- */
-
 static ssize_t proc_read( struct file *file,
 			  char *buffer,
 			  size_t len,
@@ -1901,6 +1978,7 @@ static int proc_statsdelta_open( struct inode *inode, struct file *file );
 static int proc_status_open( struct inode *inode, struct file *file );
 static int proc_SSID_open( struct inode *inode, struct file *file );
 static int proc_APList_open( struct inode *inode, struct file *file );
+static int proc_BSSList_open( struct inode *inode, struct file *file );
 static int proc_config_open( struct inode *inode, struct file *file );
 static int proc_wepkey_open( struct inode *inode, struct file *file );
 
@@ -1926,6 +2004,13 @@ static struct file_operations proc_SSID_ops = {
 	read:          proc_read,
 	write:         proc_write,
 	open:          proc_SSID_open,
+	release:       proc_close
+};
+
+static struct file_operations proc_BSSList_ops = {
+	read:          proc_read,
+	write:         proc_write,
+	open:          proc_BSSList_open,
 	release:       proc_close
 };
 
@@ -1962,6 +2047,10 @@ struct proc_data {
 	void (*on_close) (struct inode *, struct file *);
 };
 
+#ifndef SETPROC_OPS
+#define SETPROC_OPS(entry, ops) (entry)->proc_fops = &(ops)
+#endif
+
 static int setup_proc_entry( struct net_device *dev,
 			     struct airo_info *apriv ) {
 	struct proc_dir_entry *entry;
@@ -1979,11 +2068,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
-/*	This is what was needed right up to the last few versions
-        of 2.3:
-	entry->ops = &proc_inode_statsdelta_ops;
-*/
-	entry->proc_fops = &proc_statsdelta_ops;
+	SETPROC_OPS(entry, proc_statsdelta_ops);
 	
 	/* Setup the Stats */
 	entry = create_proc_entry("Stats",
@@ -1992,7 +2077,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
-	entry->proc_fops = &proc_stats_ops;
+	SETPROC_OPS(entry, proc_stats_ops);
 	
 	/* Setup the Status */
 	entry = create_proc_entry("Status",
@@ -2001,7 +2086,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
-	entry->proc_fops = &proc_status_ops;
+	SETPROC_OPS(entry, proc_status_ops);
 	
 	/* Setup the Config */
 	entry = create_proc_entry("Config",
@@ -2010,7 +2095,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
-	entry->proc_fops = &proc_config_ops;
+	SETPROC_OPS(entry, proc_config_ops);
 
 	/* Setup the SSID */
 	entry = create_proc_entry("SSID",
@@ -2019,7 +2104,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
-	entry->proc_fops = &proc_SSID_ops;
+	SETPROC_OPS(entry, proc_SSID_ops);
 
 	/* Setup the APList */
 	entry = create_proc_entry("APList",
@@ -2028,7 +2113,16 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
-	entry->proc_fops = &proc_APList_ops;
+	SETPROC_OPS(entry, proc_APList_ops);
+
+	/* Setup the BSSList */
+	entry = create_proc_entry("BSSList",
+				  S_IFREG | proc_perm,
+				  apriv->proc_entry);
+	entry->uid = proc_uid;
+	entry->gid = proc_gid;
+	entry->data = dev;
+	SETPROC_OPS(entry, proc_BSSList_ops);
 
 	/* Setup the WepKey */
 	entry = create_proc_entry("WepKey",
@@ -2037,7 +2131,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
-	entry->proc_fops = &proc_wepkey_ops;
+	SETPROC_OPS(entry, proc_wepkey_ops);
 
 	return 0;
 }
@@ -2051,6 +2145,7 @@ static int takedown_proc_entry( struct net_device *dev,
 	remove_proc_entry("Config",apriv->proc_entry);
 	remove_proc_entry("SSID",apriv->proc_entry);
 	remove_proc_entry("APList",apriv->proc_entry);
+	remove_proc_entry("BSSList",apriv->proc_entry);
 	remove_proc_entry("WepKey",apriv->proc_entry);
 	remove_proc_entry(dev->name,airo_entry);
 	return 0;
@@ -2124,6 +2219,7 @@ static int proc_status_open( struct inode *inode, struct file *file ) {
 	struct airo_info *apriv = (struct airo_info *)dev->priv;
 	CapabilityRid cap_rid;
 	StatusRid status_rid;
+	int i;
 	
 	MOD_INC_USE_COUNT;
 	
@@ -2141,7 +2237,17 @@ static int proc_status_open( struct inode *inode, struct file *file ) {
 	readStatusRid(apriv, &status_rid);
 	readCapabilityRid(apriv, &cap_rid);
 	
-	sprintf( data->rbuffer, "Mode: %x\n"
+        i = sprintf(data->rbuffer, "Status: %s%s%s%s%s%s%s%s%s\n",
+                    status_rid.mode & 1 ? "CFG ": "",
+                    status_rid.mode & 2 ? "ACT ": "",
+                    status_rid.mode & 0x10 ? "SYN ": "",
+                    status_rid.mode & 0x20 ? "LNK ": "",
+                    status_rid.mode & 0x40 ? "LEAP ": "",
+                    status_rid.mode & 0x80 ? "PRIV ": "",
+                    status_rid.mode & 0x100 ? "KEY ": "",
+                    status_rid.mode & 0x200 ? "WEP ": "",
+                    status_rid.mode & 0x8000 ? "ERR ": "");
+	sprintf( data->rbuffer+i, "Mode: %x\n"
 		 "Signal Strength: %d\n"
 		 "Signal Quality: %d\n"
 		 "SSID: %-.*s\n"
@@ -2425,6 +2531,14 @@ static void proc_config_on_close( struct inode *inode, struct file *file ) {
 			default:
 				printk( KERN_WARNING "airo: Unknown modulation\n" );
 			}
+		} else if (!strncmp(line, "Preamble: ", 10)) {
+			line += 10;
+			switch(*line) {
+			case 'a': config.preamble=PREAMBLE_AUTO; break;
+			case 'l': config.preamble=PREAMBLE_LONG; break;
+			case 's': config.preamble=PREAMBLE_SHORT; break;
+		        default: printk(KERN_WARNING "airo: Unknown preamble\n");
+			}
 		} else {
 			printk( KERN_WARNING "Couldn't figure out %s\n", line );
 		}
@@ -2516,7 +2630,8 @@ static int proc_config_open( struct inode *inode, struct file *file ) {
 		 "RXDiversity: %s\n"
 		 "FragThreshold: %d\n"
 		 "WEP: %s\n"
-		 "Modulation: %s\n",
+		 "Modulation: %s\n"
+		 "Preamble: %s\n",
 		 (int)config.longRetryLimit,
 		 (int)config.shortRetryLimit,
 		 (int)config.rtsThres,
@@ -2531,7 +2646,10 @@ static int proc_config_open( struct inode *inode, struct file *file ) {
 		 config.authType == AUTH_SHAREDKEY ? "shared" : "open",
 		 config.modulation == 0 ? "default" :
 		 config.modulation == MOD_CCK ? "cck" :
-		 config.modulation == MOD_MOK ? "mok" : "error"
+		 config.modulation == MOD_MOK ? "mok" : "error",
+		 config.preamble == PREAMBLE_AUTO ? "auto" :
+		 config.preamble == PREAMBLE_LONG ? "long" :
+		 config.preamble == PREAMBLE_SHORT ? "short" : "error"
 		);
 	data->readlen = strlen( data->rbuffer );
 	return 0;
@@ -2862,6 +2980,76 @@ static int proc_APList_open( struct inode *inode, struct file *file ) {
 	return 0;
 }
 
+static int proc_BSSList_open( struct inode *inode, struct file *file ) {
+	struct proc_data *data;
+	struct proc_dir_entry *dp = inode->u.generic_ip;
+	struct net_device *dev = dp->data;
+	struct airo_info *ai = (struct airo_info*)dev->priv;
+	char *ptr;
+	BSSListRid BSSList_rid;
+	int rc;
+	/* If doLoseSync is not 1, we won't do a Lose Sync */
+	int doLoseSync = -1;
+        
+	MOD_INC_USE_COUNT;
+	
+	dp = (struct proc_dir_entry *) inode->u.generic_ip;
+	
+	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
+		return -ENOMEM;
+	memset(file->private_data, 0, sizeof(struct proc_data));
+	data = (struct proc_data *)file->private_data;
+	if ((data->rbuffer = kmalloc( 1024, GFP_KERNEL )) == NULL) {
+		kfree (file->private_data);
+		return -ENOMEM;
+	}
+	data->writelen = 0;
+	data->maxwritelen = 0;
+	data->wbuffer = 0;
+	data->on_close = 0;
+	
+	if (file->f_mode & FMODE_WRITE) {
+		if (!(file->f_mode & FMODE_READ)) {
+			Cmd cmd;
+			Resp rsp;
+                        
+			memset(&cmd, 0, sizeof(cmd));
+			cmd.cmd=CMD_LISTBSS;
+			issuecommand(ai, &cmd, &rsp);
+			data->readlen = 0;
+			return 0;
+		}
+		doLoseSync = 1;
+	}
+	ptr = data->rbuffer;
+	/* There is a race condition here if there are concurrent opens.
+           Since it is a rare condition, we'll just live with it, otherwise
+           we have to add a spin lock... */
+	rc = readBSSListRid(ai, doLoseSync, &BSSList_rid);
+	while(rc == 0 && BSSList_rid.index != 0xffff) {
+		ptr += sprintf(ptr, "%02x:%02x:%02x:%02x:%02x:%02x %*s rssi = %d",
+				(int)BSSList_rid.bssid[0],
+				(int)BSSList_rid.bssid[1],
+				(int)BSSList_rid.bssid[2],
+				(int)BSSList_rid.bssid[3],
+				(int)BSSList_rid.bssid[4],
+				(int)BSSList_rid.bssid[5],
+				(int)BSSList_rid.ssidLen,
+				BSSList_rid.ssid,
+				(int)BSSList_rid.rssi);
+		ptr += sprintf(ptr, " channel = %d %s %s %s %s\n",
+				(int)BSSList_rid.dsChannel,
+				BSSList_rid.cap & CAP_ESS ? "ESS" : "",
+				BSSList_rid.cap & CAP_IBSS ? "adhoc" : "",
+				BSSList_rid.cap & CAP_PRIVACY ? "wep" : "",
+				BSSList_rid.cap & CAP_SHORTHDR ? "shorthdr" : "");
+		rc = readBSSListRid(ai, 0, &BSSList_rid);
+	}
+	*ptr = '\0';
+	data->readlen = strlen( data->rbuffer );
+	return 0;
+}
+
 static int proc_close( struct inode *inode, struct file *file ) 
 {
 	struct proc_data *data = (struct proc_data *)file->private_data;
@@ -2971,7 +3159,6 @@ static void __devexit airo_pci_remove(struct pci_dev *pdev)
 {
 	stop_airo_card(pdev->driver_data, 1);
 }
-
 #endif
 
 static int __init airo_init_module( void )
@@ -3041,14 +3228,13 @@ static void __exit airo_cleanup_module( void )
  */
 static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	int rc = 0;
+	int i, rc = 0;
 #ifdef WIRELESS_EXT
 	struct airo_info *local = (struct airo_info*) dev->priv;
 	struct iwreq *wrq = (struct iwreq *) rq;
 	ConfigRid config;		/* Configuration info */
 	CapabilityRid cap_rid;		/* Card capability info */
 	StatusRid status_rid;		/* Card status info */
-	int i;
 
 #ifdef CISCO_EXT
 	if (cmd != SIOCGIWPRIV && cmd != AIROIOCTL && cmd != AIROIDIFC)
@@ -3557,31 +3743,50 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 #endif /* WIRELESS_EXT > 9 */
 
 #if WIRELESS_EXT > 10
-	case SIOCGIWRETRY:
-		wrq->u.retry.disabled = 0;
-		if ((wrq->u.retry.flags & IW_RETRY_TYPE) == IW_RETRY_LIFETIME)
-			wrq->u.retry.value = (int)config.txLifetime * 1024;
-		else {
-			wrq->u.retry.value = (int)config.shortRetryLimit;
-			wrq->u.retry.flags = IW_RETRY_LIMIT;
+	case SIOCSIWRETRY:
+		if(wrq->u.retry.disabled) {
+			rc = -EINVAL;
+			break;
+		}
+		local->need_commit = 0;
+		if(wrq->u.retry.flags & IW_RETRY_LIMIT) {
+			if(wrq->u.retry.flags & IW_RETRY_MAX)
+				config.longRetryLimit = wrq->u.retry.value;
+			else if (wrq->u.retry.flags & IW_RETRY_MIN)
+				config.shortRetryLimit = wrq->u.retry.value;
+			else {
+				/* No modifier : set both */
+				config.longRetryLimit = wrq->u.retry.value;
+				config.shortRetryLimit = wrq->u.retry.value;
+			}
+			local->need_commit = 1;
+		}
+		if(wrq->u.retry.flags & IW_RETRY_LIFETIME) {
+			config.txLifetime = wrq->u.retry.value / 1024;
+			local->need_commit = 1;
+		}
+		if(local->need_commit == 0) {
+			rc = -EINVAL;
 		}
 		break;
 
-	case SIOCSIWRETRY: 
-		if (wrq->u.retry.disabled) {
-			config.shortRetryLimit = 0;
-			config.longRetryLimit = 0;
-			config.txLifetime = 0;
-			local->need_commit = 1;
-			break;
+	case SIOCGIWRETRY:
+		wrq->u.retry.disabled = 0;      /* Can't be disabled */
+
+		/* Note : by default, display the min retry number */
+		if((wrq->u.retry.flags & IW_RETRY_TYPE) == IW_RETRY_LIFETIME) {
+			wrq->u.retry.flags = IW_RETRY_LIFETIME;
+			wrq->u.retry.value = (int)config.txLifetime * 1024;
+		} else if((wrq->u.retry.flags & IW_RETRY_MAX)) {
+			wrq->u.retry.flags = IW_RETRY_LIMIT | IW_RETRY_MAX;
+			wrq->u.retry.value = (int)config.longRetryLimit;
+		} else {
+			wrq->u.retry.flags = IW_RETRY_LIMIT;
+			wrq->u.retry.value = (int)config.shortRetryLimit;
+			if((int)config.shortRetryLimit != (int)config.longRetryLimit)
+				wrq->u.retry.flags |= IW_RETRY_MIN;
 		}
-		if ((wrq->u.retry.flags & IW_RETRY_TYPE) == IW_RETRY_LIFETIME) {
-			config.txLifetime = (wrq->u.retry.value + 500) / 1024;
-			local->need_commit = 1;
-		} else if ((wrq->u.retry.flags & IW_RETRY_TYPE) == IW_RETRY_LIMIT) {
-			config.shortRetryLimit = config.longRetryLimit = wrq->u.retry.value;
-			local->need_commit = 1;
-		}
+
 		break;
 #endif /* WIRELESS_EXT > 10 */
 
@@ -3593,8 +3798,7 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			int		k;
 
 			wrq->u.data.length = sizeof(range);
-			/* Should adapt depending on max rate */
-			range.throughput = 1.6 * 1024 * 1024;
+			memset(&range, 0, sizeof(range));
 			range.min_nwid = 0x0000;
 			range.max_nwid = 0x0000;
 			range.num_channels = 14;
@@ -3620,6 +3824,14 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 					break;
 			}
 			range.num_bitrates = i;
+
+			/* Set an indication of the max TCP throughput
+			 * in bit/s that we can expect using this interface.
+			 * May be use for QoS stuff... Jean II */
+			if(i > 2)
+				range.throughput = 5 * 1000 * 1000;
+			else
+				range.throughput = 1.5 * 1000 * 1000;
 
 			range.min_rts = 0;
 			range.max_rts = 2312;
@@ -3753,15 +3965,53 @@ static int airo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	case SIOCGIWAPLIST:
 		if (wrq->u.data.pointer) {
-			int i;
-			struct sockaddr s[4];
-
-			for (i = 0; i < 4; i++) {
-				memcpy(s[i].sa_data, status_rid.bssid[i], 6);
+			int i, rc;
+			struct sockaddr s[IW_MAX_AP];
+			struct iw_quality qual[IW_MAX_AP];
+			BSSListRid BSSList;
+			int loseSync = capable(CAP_NET_ADMIN) ? 1: -1;
+			for (i = 0; i < IW_MAX_AP; i++) {
+				if (readBSSListRid(local, loseSync, &BSSList))
+					break;
+				loseSync = 0;
+				memcpy(s[i].sa_data, BSSList.bssid, 6);
 				s[i].sa_family = ARPHRD_ETHER;
+				qual[i].level = BSSList.rssi;
+				qual[i].qual = qual[i].noise = 0;
+				qual[i].updated = 2;
+				if (BSSList.index == 0xffff) break;
 			}
-			wrq->u.data.length = 4;
-			if (copy_to_user(wrq->u.data.pointer, &s, sizeof(s)))
+			if (!i) {
+				for (i = 0; 
+				     i < min(IW_MAX_AP, 4) &&
+					     (status_rid.bssid[i][0]
+					      & status_rid.bssid[i][1]
+					      & status_rid.bssid[i][2]
+					      & status_rid.bssid[i][3]
+					      & status_rid.bssid[i][4]
+					      & status_rid.bssid[i][5])!=-1 &&
+					     (status_rid.bssid[i][0]
+					      | status_rid.bssid[i][1]
+					      | status_rid.bssid[i][2]
+					      | status_rid.bssid[i][3]
+					      | status_rid.bssid[i][4]
+					      | status_rid.bssid[i][5]);
+				     i++) {
+					memcpy(s[i].sa_data, 
+					       status_rid.bssid[i], 6);
+					s[i].sa_family = ARPHRD_ETHER;
+				}
+			} else {
+				wrq->u.data.flags = 1; /* Should be define'd */
+				if (copy_to_user(wrq->u.data.pointer
+						 + sizeof(struct sockaddr)*i,
+						 &qual,
+						 sizeof(struct iw_quality)*i))
+					rc = -EFAULT;
+			}
+			wrq->u.data.length = i;
+			if (copy_to_user(wrq->u.data.pointer, &s, 
+					 sizeof(struct sockaddr)*i))
 				rc = -EFAULT;
 		}
 		break;

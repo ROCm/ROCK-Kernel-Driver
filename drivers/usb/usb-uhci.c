@@ -3021,6 +3021,11 @@ uhci_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 
 	if (pci_enable_device(dev) < 0)
 		return -ENODEV;
+		
+	if (!dev->irq) {
+		err("found UHCI device with no IRQ assigned. check BIOS settings!");
+		return -ENODEV;
+	}
 	
 	pci_set_master(dev);
 

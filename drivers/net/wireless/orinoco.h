@@ -64,10 +64,9 @@ typedef struct dldwd_priv {
 	uint16_t txfid;
 
 	/* Capabilities of the hardware/firmware */
-	hermes_identity_t firmware_info;
 	int firmware_type;
 #define FIRMWARE_TYPE_LUCENT 1
-#define FIRMWARE_TYPE_PRISM2 2
+#define FIRMWARE_TYPE_INTERSIL 2
 #define FIRMWARE_TYPE_SYMBOL 3
 	int has_ibss, has_port3, prefer_port3, has_ibss_any, ibss_port;
 	int has_wep, has_big_wep;
@@ -142,6 +141,5 @@ extern int dldwd_setup(dldwd_priv_t* priv);
 extern int dldwd_proc_dev_init(dldwd_priv_t *dev);
 extern void dldwd_proc_dev_cleanup(dldwd_priv_t *priv);
 extern void dldwd_interrupt(int irq, void * dev_id, struct pt_regs *regs);
-
 
 #endif

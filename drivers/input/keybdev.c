@@ -48,6 +48,8 @@ static int sparc_l1_a_state = 0;
 extern void batten_down_hatches(void);
 #endif
 
+static int jp_kbd_109 = 1;	/* Yes, .jp is the default. See 51142. */
+
 static unsigned short x86_keycodes[256] =
 	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
 	 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
@@ -220,6 +222,15 @@ static int __init keybdev_init(void)
 {
 	input_register_handler(&keybdev_handler);
 	kbd_ledfunc = keybdev_ledfunc;
+
+	if (jp_kbd_109) {
+		x86_keycodes[0xb5] = 0x73;	/* backslash, underscore */
+		x86_keycodes[0xb6] = 0x70;
+		x86_keycodes[0xb7] = 0x7d;	/* Yen, pipe */
+		x86_keycodes[0xb8] = 0x79;
+		x86_keycodes[0xb9] = 0x7b;
+	}
+
 	return 0;
 }
 
@@ -234,3 +245,4 @@ module_exit(keybdev_exit);
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Input driver to keyboard driver binding");
+MODULE_PARM(jp_kbd_109, "i");

@@ -33,24 +33,16 @@
 #include <asm/smp.h>
 #include <asm/desc.h>
 
+#undef APIC_LOCKUP_DEBUG
+
 #define APIC_LOCKUP_DEBUG
 
 static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
 
 /*
- * # of IO-APICs and # of IRQ routing registers
+ * # of IRQ routing registers
  */
-int nr_ioapics;
 int nr_ioapic_registers[MAX_IO_APICS];
-
-/* I/O APIC entries */
-struct mpc_config_ioapic mp_ioapics[MAX_IO_APICS];
-
-/* # of MP IRQ source entries */
-struct mpc_config_intsrc mp_irqs[MAX_IRQ_SOURCES];
-
-/* MP IRQ source entries */
-int mp_irq_entries;
 
 #if CONFIG_SMP
 # define TARGET_CPUS cpu_online_map
@@ -754,11 +746,9 @@ void __init print_IO_APIC(void)
 	printk(KERN_DEBUG ".... register #01: %08X\n", *(int *)&reg_01);
 	printk(KERN_DEBUG ".......     : max redirection entries: %04X\n", reg_01.entries);
 	if (	(reg_01.entries != 0x0f) && /* older (Neptune) boards */
-		(reg_01.entries != 0x11) &&
 		(reg_01.entries != 0x17) && /* typical ISA+PCI boards */
 		(reg_01.entries != 0x1b) && /* Compaq Proliant boards */
 		(reg_01.entries != 0x1f) && /* dual Xeon boards */
-		(reg_01.entries != 0x20) &&
 		(reg_01.entries != 0x22) && /* bigger Xeon boards */
 		(reg_01.entries != 0x2E) &&
 		(reg_01.entries != 0x3F)
@@ -769,7 +759,8 @@ void __init print_IO_APIC(void)
 	if (	(reg_01.version != 0x01) && /* 82489DX IO-APICs */
 		(reg_01.version != 0x10) && /* oldest IO-APICs */
 		(reg_01.version != 0x11) && /* Pentium/Pro IO-APICs */
-		(reg_01.version != 0x13)    /* Xeon IO-APICs */
+		(reg_01.version != 0x13) && /* Xeon IO-APICs */
+		(reg_01.entries != 0x20)    /* Intel P64H (82806 AA) */
 	)
 		UNEXPECTED_IO_APIC();
 	if (reg_01.__reserved_1 || reg_01.__reserved_2)
@@ -820,7 +811,7 @@ void __init print_IO_APIC(void)
 			continue;
 		printk(KERN_DEBUG "IRQ%d ", i);
 		for (;;) {
-			printk("-> %d", entry->pin);
+			printk("-> %d:%d", entry->apic, entry->pin);
 			if (!entry->next)
 				break;
 			entry = irq_2_pin + entry->next;
@@ -1128,25 +1119,6 @@ static int __init timer_irq_works(void)
 	return 0;
 }
 
-static int __init nmi_irq_works(void)
-{
-	irq_cpustat_t tmp[NR_CPUS];
-	int j, cpu;
-
-	memcpy(tmp, irq_stat, sizeof(tmp));
-	sti();
-	mdelay(50);
-
-	for (j = 0; j < smp_num_cpus; j++) {
-		cpu = cpu_logical_map(j);
-		if (nmi_count(cpu) - tmp[cpu].__nmi_count <= 3) {
-			printk(KERN_WARNING "CPU#%d NMI appears to be stuck.\n", cpu);
-			return 0;
-		}
-	}
-	return 1;
-}
-
 /*
  * In the SMP+IOAPIC case it might happen that there are an unspecified
  * number of pending IRQ events unhandled. These cases are very rare,
@@ -1236,6 +1208,7 @@ static unsigned int startup_level_ioapic_irq (unsigned int irq)
 static void end_level_ioapic_irq (unsigned int irq)
 {
 	unsigned long v;
+	int i;
 
 /*
  * It appears there is an erratum which affects at least version 0x11
@@ -1256,11 +1229,12 @@ static void end_level_ioapic_irq (unsigned int irq)
  * operation to prevent an edge-triggered interrupt escaping meanwhile.
  * The idea is from Manfred Spraul.  --macro
  */
-	v = apic_read(APIC_TMR + ((IO_APIC_VECTOR(irq) & ~0x1f) >> 1));
+	i = IO_APIC_VECTOR(irq);
+	v = apic_read(APIC_TMR + ((i & ~0x1f) >> 1));
 
 	ack_APIC_irq();
 
-	if (!(v & (1 << (IO_APIC_VECTOR(irq) & 0x1f)))) {
+	if (!(v & (1 << (i & 0x1f)))) {
 #ifdef APIC_MISMATCH_DEBUG
 		atomic_inc(&irq_mis_count);
 #endif
@@ -1524,7 +1498,7 @@ static inline void check_timer(void)
 	pin1 = find_isa_irq_pin(0, mp_INT);
 	pin2 = find_isa_irq_pin(0, mp_ExtINT);
 
-	printk(KERN_INFO "..TIMER: vector=%02X pin1=%d pin2=%d\n", vector, pin1, pin2);
+	printk(KERN_INFO "..TIMER: vector=0x%02X pin1=%d pin2=%d\n", vector, pin1, pin2);
 
 	if (pin1 != -1) {
 		/*
@@ -1532,11 +1506,11 @@ static inline void check_timer(void)
 		 */
 		unmask_IO_APIC_irq(0);
 		if (timer_irq_works()) {
-			if (nmi_watchdog) {
+			if (nmi_watchdog == NMI_IO_APIC) {
 				disable_8259A_irq(0);
 				setup_nmi();
 				enable_8259A_irq(0);
-				nmi_irq_works();
+				check_nmi_watchdog();
 			}
 			return;
 		}
@@ -1553,9 +1527,9 @@ static inline void check_timer(void)
 		setup_ExtINT_IRQ0_pin(pin2, vector);
 		if (timer_irq_works()) {
 			printk("works.\n");
-			if (nmi_watchdog) {
+			if (nmi_watchdog == NMI_IO_APIC) {
 				setup_nmi();
-				nmi_irq_works();
+				check_nmi_watchdog();
 			}
 			return;
 		}
@@ -1636,19 +1610,3 @@ void __init setup_IO_APIC(void)
 	check_timer();
 	print_IO_APIC();
 }
-
-#ifndef CONFIG_SMP
-/*
- * This initializes the IO-APIC and APIC hardware if this is
- * a UP kernel.
- */
-void IO_APIC_init_uniprocessor (void)
-{
-	if (!smp_found_config)
-		return;
-	connect_bsp_APIC();
-	setup_local_APIC();
-	setup_IO_APIC();
-	setup_APIC_clocks();
-}
-#endif

@@ -20,6 +20,7 @@
 #include <asm/pgtable.h>
 #include <asm/delay.h>
 #include <asm/desc.h>
+#include <asm/apic.h>
 
 #include <linux/irq.h>
 
@@ -415,6 +416,9 @@ void __init init_ISA_irqs (void)
 {
 	int i;
 
+#ifdef CONFIG_X86_LOCAL_APIC
+	init_bsp_APIC();
+#endif
 	init_8259A(0);
 
 	for (i = 0; i < NR_IRQS; i++) {

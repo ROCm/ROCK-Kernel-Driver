@@ -13,19 +13,27 @@ if [ "$CONFIG_MTD_PHYSMAP" = "y" -o "$CONFIG_MTD_PHYSMAP" = "m" ]; then
    int '    Bus width in octets' CONFIG_MTD_PHYSMAP_BUSWIDTH 2
 fi
 
-dep_tristate '  Sun Microsystems userflash support' CONFIG_MTD_SUN_UFLASH $CONFIG_SPARC64
-dep_tristate '  CFI Flash device mapped on Nora' CONFIG_MTD_NORA $CONFIG_MTD_CFI
+if [ "$CONFIG_SPARC" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
+   dep_tristate '  Sun Microsystems userflash support' CONFIG_MTD_SUN_UFLASH $CONFIG_SPARC64
+fi
+if [ "$CONFIG_ARM" = "y" ]; then
+   dep_tristate '  CFI Flash device mapped on Nora' CONFIG_MTD_NORA $CONFIG_MTD_CFI
+fi
 dep_tristate '  CFI Flash device mapped on Photron PNC-2000' CONFIG_MTD_PNC2000 $CONFIG_MTD_CFI $CONFIG_MTD_PARTITIONS
 dep_tristate '  CFI Flash device mapped on RPX Lite or CLLF' CONFIG_MTD_RPXLITE $CONFIG_MTD_CFI 
-dep_tristate '  CFI Flash device mapped on AMD SC520 CDP' CONFIG_MTD_SC520CDP $CONFIG_MTD_CFI
-dep_tristate '  CFI Flash device mapped on AMD NetSc520'  CONFIG_MTD_NETSC520 $CONFIG_MTD_CFI $CONFIG_MTD_PARTITIONS
+if [ "$CONFIG_X86" = "y"  ]; then
+   dep_tristate '  CFI Flash device mapped on AMD SC520 CDP' CONFIG_MTD_SC520CDP $CONFIG_MTD_CFI
+   dep_tristate '  CFI Flash device mapped on AMD NetSc520'  CONFIG_MTD_NETSC520 $CONFIG_MTD_CFI $CONFIG_MTD_PARTITIONS
+fi
 dep_tristate '  CFI Flash device mapped on Arcom SBC-GXx boards' CONFIG_MTD_SBC_GXX $CONFIG_MTD_CFI_INTELEXT $CONFIG_MTD_PARTITIONS
 dep_tristate '  CFI Flash device mapped on Arcom ELAN-104NC' CONFIG_MTD_ELAN_104NC $CONFIG_MTD_CFI_INTELEXT $CONFIG_MTD_PARTITIONS
+if [ "$CONFIG_ARM" = "y" ]; then
 dep_tristate '  CFI Flash device mapped on StrongARM SA11x0' CONFIG_MTD_SA1100 $CONFIG_MTD_CFI $CONFIG_ARCH_SA1100 $CONFIG_MTD_PARTITIONS
    dep_bool '    Support for RedBoot partition tables on SA11x0' CONFIG_MTD_SA1100_REDBOOT_PARTITIONS $CONFIG_MTD_SA1100 $CONFIG_MTD_REDBOOT_PARTS
    dep_bool '    Support for Compaq bootldr partition tables on SA11x0' CONFIG_MTD_SA1100_BOOTLDR_PARTITIONS $CONFIG_MTD_SA1100 $CONFIG_MTD_BOOTLDR_PARTS
-dep_tristate '  CFI Flash device mapped on DC21285 Footbridge' CONFIG_MTD_DC21285 $CONFIG_MTD_CFI $CONFIG_ARCH_FOOTBRIDGE $CONFIG_MTD_PARTITIONS
-dep_tristate '  CFI Flash device mapped on the XScale IQ80310 board' CONFIG_MTD_IQ80310 $CONFIG_MTD_CFI $CONFIG_XSCALE_IQ80310
+   dep_tristate '  CFI Flash device mapped on DC21285 Footbridge' CONFIG_MTD_DC21285 $CONFIG_MTD_CFI $CONFIG_ARCH_FOOTBRIDGE $CONFIG_MTD_PARTITIONS
+   dep_tristate '  CFI Flash device mapped on the XScale IQ80310 board' CONFIG_MTD_IQ80310 $CONFIG_MTD_CFI $CONFIG_XSCALE_IQ80310
+fi
 dep_tristate '  CFI Flash device mapped on D-Box2' CONFIG_MTD_DBOX2 $CONFIG_MTD_CFI_INTELSTD $CONFIG_MTD_CFI_INTELEXT $CONFIG_MTD_CFI_AMDSTD
 dep_tristate '  Flash chip mapping on ITE QED-4N-S01B, Globespan IVR or custom board' CONFIG_MTD_CSTM_MIPS_IXX $CONFIG_MTD_CFI $CONFIG_MTD_JEDEC $CONFIG_MTD_PARTITIONS 
 if [ "$CONFIG_MTD_CSTM_MIPS_IXX" = "y" -o "$CONFIG_MTD_CSTM_MIPS_IXX" = "m" ]; then

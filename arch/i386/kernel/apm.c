@@ -148,6 +148,10 @@
  *   1.14: Make connection version persist across module unload/load.
  *         Enable and engage power management earlier.
  *         Disengage power management on module unload.
+ *         Changed to use the sysrq-register hack for registering the
+ *         power off function called by magic sysrq based upon discussions
+ *         in irc://irc.openprojects.net/#kernelnewbies
+ *         (Crutcher Dunnavant <crutcher+kernel@datastacks.com>).
  *         Make CONFIG_APM_REAL_MODE_POWER_OFF run time configurable.
  *         (Arjan van de Ven <arjanv@redhat.com>) modified by sfr.
  *         Work around byte swap bug in one of the Vaio's BIOS's
@@ -197,12 +201,11 @@
 #include <asm/uaccess.h>
 #include <asm/desc.h>
 
+#include <linux/sysrq.h>
+
 extern unsigned long get_cmos_time(void);
 extern void machine_real_restart(unsigned char *, int);
 
-#ifdef CONFIG_MAGIC_SYSRQ
-extern void (*sysrq_power_off)(void);
-#endif
 #if defined(CONFIG_APM_DISPLAY_BLANK) && defined(CONFIG_VT)
 extern int (*console_blank_hook)(int);
 #endif
@@ -685,6 +688,23 @@ static void apm_power_off(void)
 	else
 		(void) apm_set_power_state(APM_STATE_OFF);
 }
+
+#ifdef CONFIG_MAGIC_SYSRQ
+/*
+ * Magic sysrq key and handler for the power off function
+ */
+
+void handle_poweroff (int key, struct pt_regs *pt_regs,
+		                        struct kbd_struct *kbd, struct tty_struct *tty) {
+	        apm_power_off();
+}
+struct sysrq_key_op sysrq_poweroff_op = {
+	handler:        handle_poweroff,
+	help_msg:       "Off",
+	action_msg:     "Power Off\n"
+};
+#endif
+
 
 #ifdef CONFIG_APM_DO_ENABLE
 static int apm_enable_power_management(int enable)
@@ -1544,9 +1564,8 @@ static int apm(void *unused)
 	/* Install our power off handler.. */
 	if (power_off)
 		pm_power_off = apm_power_off;
-#ifdef CONFIG_MAGIC_SYSRQ
-	sysrq_power_off = apm_power_off;
-#endif
+	register_sysrq_key('o',&sysrq_poweroff_op);
+
 	if (smp_num_cpus == 1) {
 #if defined(CONFIG_APM_DISPLAY_BLANK) && defined(CONFIG_VT)
 		console_blank_hook = apm_console_blank;
@@ -1761,9 +1780,7 @@ static void __exit apm_exit(void)
 	}
 	misc_deregister(&apm_device);
 	remove_proc_entry("apm", NULL);
-#ifdef CONFIG_MAGIC_SYSRQ
-	sysrq_power_off = NULL;
-#endif
+	unregister_sysrq_key('o',&sysrq_poweroff_op);
 	if (power_off)
 		pm_power_off = NULL;
 	exit_kapmd = 1;

@@ -89,6 +89,17 @@ clear_single_step(struct task_struct *task)
 		regs->msr &= ~MSR_SE;
 }
 
+/*
+ * Called by kernel/ptrace.c when detaching..
+ *
+ * Make sure single step bits etc are not set.
+ */
+void ptrace_disable(struct task_struct *child)
+{
+	/* make sure the single step bit is not set. */
+	clear_single_step(child);
+}
+
 int sys_ptrace(long request, long pid, long addr, long data)
 {
 	struct task_struct *child;
@@ -249,23 +260,9 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		break;
 	}
 
-	case PTRACE_DETACH: { /* detach a process that was attached. */
-		ret = -EIO;
-		if ((unsigned long) data > _NSIG)
-			break;
-		child->ptrace &= ~(PT_PTRACED|PT_TRACESYS);
-		child->exit_code = data;
-		write_lock_irq(&tasklist_lock);
-		REMOVE_LINKS(child);
-		child->p_pptr = child->p_opptr;
-		SET_LINKS(child);
-		write_unlock_irq(&tasklist_lock);
-		/* make sure the single step bit is not set. */
-		clear_single_step(child);
-		wake_up_process(child);
-		ret = 0;
+	case PTRACE_DETACH:
+		ret = ptrace_detach(child, data);
 		break;
-	}
 
 	default:
 		ret = -EIO;

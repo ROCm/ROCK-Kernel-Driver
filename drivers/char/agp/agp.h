@@ -120,6 +120,9 @@ struct agp_bridge_data {
 	void (*free_by_type) (agp_memory *);
 	unsigned long (*agp_alloc_page) (void);
 	void (*agp_destroy_page) (unsigned long);
+	int (*suspend)(void);
+	void (*resume)(void);
+	
 };
 
 #define OUTREG32(mmap, addr, val)   __raw_writel((val), (mmap)+(addr))
@@ -156,6 +159,9 @@ struct agp_bridge_data {
 #endif
 #ifndef PCI_DEVICE_ID_VIA_8363_0
 #define PCI_DEVICE_ID_VIA_8363_0      0x0305
+#endif
+#ifndef PCI_DEVICE_ID_VIA_82C694X_0
+#define PCI_DEVICE_ID_VIA_82C694X_0      0x0605
 #endif
 #ifndef PCI_DEVICE_ID_INTEL_810_0
 #define PCI_DEVICE_ID_INTEL_810_0       0x7120
@@ -196,8 +202,8 @@ struct agp_bridge_data {
 #ifndef PCI_DEVICE_ID_AMD_IRONGATE_0
 #define PCI_DEVICE_ID_AMD_IRONGATE_0    0x7006
 #endif
-#ifndef PCI_DEVICE_ID_AMD_761_0
-#define PCI_DEVICE_ID_AMD_761_0         0x700e
+#ifndef PCI_DEVICE_ID_AMD_762_0
+#define PCI_DEVICE_ID_AMD_762_0		0x700C
 #endif
 #ifndef PCI_VENDOR_ID_AL
 #define PCI_VENDOR_ID_AL		0x10b9

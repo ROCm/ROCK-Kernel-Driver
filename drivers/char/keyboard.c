@@ -911,6 +911,10 @@ static void kbd_bh(unsigned long dummy)
 EXPORT_SYMBOL(keyboard_tasklet);
 DECLARE_TASKLET_DISABLED(keyboard_tasklet, kbd_bh, 0);
 
+typedef void (pm_kbd_func) (void);
+
+pm_callback pm_kbd_request_override = NULL;
+
 int __init kbd_init(void)
 {
 	int i;
@@ -934,7 +938,7 @@ int __init kbd_init(void)
 	tasklet_enable(&keyboard_tasklet);
 	tasklet_schedule(&keyboard_tasklet);
 	
-	pm_kbd = pm_register(PM_SYS_DEV, PM_SYS_KBC, NULL);
+	pm_kbd = pm_register(PM_SYS_DEV, PM_SYS_KBC, pm_kbd_request_override);
 
 	return 0;
 }

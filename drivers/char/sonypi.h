@@ -35,7 +35,7 @@
 #ifdef __KERNEL__
 
 #define SONYPI_DRIVER_MAJORVERSION	1
-#define SONYPI_DRIVER_MINORVERSION	2
+#define SONYPI_DRIVER_MINORVERSION	5
 
 #include <linux/types.h>
 #include <linux/pci.h>
@@ -138,6 +138,7 @@ static struct sonypi_irq_list sonypi_r505_irq_list[] = {
 #define SONYPI_NORMAL_FNKEY_EV	0x20
 #define SONYPI_R505_FNKEY_EV	0x08
 #define SONYPI_BLUETOOTH_EV	0x30
+#define SONYPI_NORMAL_PKEY_EV	0x40
 
 struct sonypi_event {
 	u8	data;
@@ -189,6 +190,14 @@ static struct sonypi_event sonypi_fnkeyev[] = {
 	{ 0x00, 0x00 }
 };
 
+/* The set of possible program key events */
+static struct sonypi_event sonypi_pkeyev[] = {
+	{ 0x01, SONYPI_EVENT_PKEY_P1 },
+	{ 0x02, SONYPI_EVENT_PKEY_P2 },
+	{ 0x04, SONYPI_EVENT_PKEY_P3 },
+	{ 0x00, 0x00 }
+};
+
 /* The set of possible bluetooth events */
 static struct sonypi_event sonypi_blueev[] = {
 	{ 0x55, SONYPI_EVENT_BLUETOOTH_PRESSED },
@@ -222,6 +231,14 @@ struct sonypi_device {
 	int open_count;
 	int model;
 };
+
+#define wait_on_command(command) { \
+	unsigned int n = 10000; \
+	while (--n && (command)) \
+		udelay(1); \
+	if (!n) \
+		printk(KERN_WARNING "sonypi command failed at " __FILE__ " : " __FUNCTION__ "(line %d)\n", __LINE__); \
+}
 
 #endif /* __KERNEL__ */
 

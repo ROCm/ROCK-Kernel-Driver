@@ -30,9 +30,10 @@
 
 #include "hermes.h"
 
-static const char version[] __initdata = "hermes.c: 1 Aug 2001 David Gibson <hermes@gibson.dropbear.id.au>";
+static char version[] __initdata = "hermes.c: 1 Aug 2001 David Gibson <hermes@gibson.dropbear.id.au>";
 MODULE_DESCRIPTION("Low-level driver helper for Lucent Hermes chipset and Prism II HFA384x wireless MAC controller");
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
+MODULE_LICENSE("GPL");
 
 /* These are maximum timeouts. Most often, card wil react much faster */
 #define CMD_BUSY_TIMEOUT (100) /* In iterations of ~1us */
@@ -40,7 +41,6 @@ MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 #define CMD_COMPL_TIMEOUT (20000) /* in iterations of ~10us */
 #define ALLOC_COMPL_TIMEOUT (1000) /* in iterations of ~10us */
 #define BAP_BUSY_TIMEOUT (500) /* In iterations of ~1us */
-#define BAP_ERROR_RETRY (10) /* How many times to retry a BAP seek when there is an error */
 
 #define MAX(a, b) ( (a) > (b) ? (a) : (b) )
 #define MIN(a, b) ( (a) < (b) ? (a) : (b) )
@@ -64,12 +64,6 @@ MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 #define DEBUG(lvl, stuff...) do { } while (0)
 
 #endif /* ! HERMES_DEBUG */
-
-/*
- * Prototypes
- */
-
-static int hermes_issue_cmd(hermes_t *hw, uint16_t cmd, uint16_t param0);
 
 /*
  * Internal functions
@@ -303,7 +297,6 @@ static int hermes_bap_seek(hermes_t *hw, int bap, uint16_t id, uint16_t offset)
 	int sreg = bap ? HERMES_SELECT1 : HERMES_SELECT0;
 	int oreg = bap ? HERMES_OFFSET1 : HERMES_OFFSET0;
 	int k;
-	int l = BAP_ERROR_RETRY;
 	uint16_t reg;
 
 	/* Paranoia.. */
@@ -317,7 +310,6 @@ static int hermes_bap_seek(hermes_t *hw, int bap, uint16_t id, uint16_t offset)
 		return -EBUSY;
 
 	/* Now we actually set up the transfer */
- retry:
 	hermes_write_reg(hw, sreg, id);
 	hermes_write_reg(hw, oreg, offset);
 
@@ -331,19 +323,15 @@ static int hermes_bap_seek(hermes_t *hw, int bap, uint16_t id, uint16_t offset)
 	}
 
 	if (reg & HERMES_OFFSET_BUSY) {
-		DEBUG(0,"hermes_bap_seek: returning ETIMEDOUT...\n");
+		DEBUG(1,"hermes_bap_seek: timeout\n");
 		return -ETIMEDOUT;
 	}
 
-	/* For some reason, seeking the BAP seems to randomly fail somewhere
-	   (firmware bug?). We retry a few times before giving up. */
 	if (reg & HERMES_OFFSET_ERR) {
-		if (l--) {
-			udelay(1);
-			goto retry;
-		} else
-			return -EIO;
+		DEBUG(1,"hermes_bap_seek: BAP error\n");
+		return -EIO;
 	}
+
 
 	return 0;
 }

@@ -780,7 +780,6 @@ static void __init do_boot_cpu (int apicid)
 }
 
 cycles_t cacheflush_time;
-extern unsigned long cpu_khz;
 
 static void smp_tune_scheduling (void)
 {
@@ -870,12 +869,15 @@ void __init smp_boot_cpus(void)
 	 * get out of here now!
 	 */
 	if (!smp_found_config) {
-		printk(KERN_NOTICE "SMP motherboard not detected. Using dummy APIC emulation.\n");
+		printk(KERN_NOTICE "SMP motherboard not detected.\n");
 #ifndef CONFIG_VISWS
 		io_apic_irqs = 0;
 #endif
 		cpu_online_map = phys_cpu_present_map = 1;
 		smp_num_cpus = 1;
+		if (APIC_init_uniprocessor())
+			printk(KERN_NOTICE "Local APIC not detected."
+					   " Using dummy APIC emulation.\n");
 		goto smp_done;
 	}
 
@@ -1003,7 +1005,7 @@ void __init smp_boot_cpus(void)
 	 * Here we can be sure that there is an IO-APIC in the system. Let's
 	 * go and set it up:
 	 */
-	if (!skip_ioapic_setup)
+	if (!skip_ioapic_setup && nr_ioapics)
 		setup_IO_APIC();
 #endif
 
@@ -1021,4 +1023,3 @@ void __init smp_boot_cpus(void)
 smp_done:
 	zap_low_mappings();
 }
-

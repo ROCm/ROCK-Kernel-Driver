@@ -72,6 +72,7 @@
 #include	<linux/slab.h>
 #include	<linux/interrupt.h>
 #include	<linux/init.h>
+#include	<linux/compiler.h>
 #include	<asm/uaccess.h>
 
 /*
@@ -1230,7 +1231,7 @@ static inline void * kmem_cache_alloc_one_tail (kmem_cache_t *cachep,
 	objp = slabp->s_mem + slabp->free*cachep->objsize;
 	slabp->free=slab_bufctl(slabp)[slabp->free];
 
-	if (__builtin_expect(slabp->free == BUFCTL_END, 0)) {
+	if (unlikely(slabp->free == BUFCTL_END)) {
 		list_del(&slabp->list);
 		list_add(&slabp->list, &cachep->slabs_full);
 	}
@@ -1264,11 +1265,11 @@ static inline void * kmem_cache_alloc_one_tail (kmem_cache_t *cachep,
 								\
 	slabs_partial = &(cachep)->slabs_partial;		\
 	entry = slabs_partial->next;				\
-	if (__builtin_expect(entry == slabs_partial, 0)) {	\
+	if (unlikely(entry == slabs_partial)) {			\
 		struct list_head * slabs_free;			\
 		slabs_free = &(cachep)->slabs_free;		\
 		entry = slabs_free->next;			\
-		if (__builtin_expect(entry == slabs_free, 0))	\
+		if (unlikely(entry == slabs_free))		\
 			goto alloc_new_slab;			\
 		list_del(entry);				\
 		list_add(entry, slabs_partial);			\
@@ -1291,11 +1292,11 @@ void* kmem_cache_alloc_batch(kmem_cache_t* cachep, int flags)
 		/* Get slab alloc is to come from. */
 		slabs_partial = &(cachep)->slabs_partial;
 		entry = slabs_partial->next;
-		if (__builtin_expect(entry == slabs_partial, 0)) {
+		if (unlikely(entry == slabs_partial)) {
 			struct list_head * slabs_free;
 			slabs_free = &(cachep)->slabs_free;
 			entry = slabs_free->next;
-			if (__builtin_expect(entry == slabs_free, 0))
+			if (unlikely(entry == slabs_free))
 				break;
 			list_del(entry);
 			list_add(entry, slabs_partial);
@@ -1436,11 +1437,11 @@ static inline void kmem_cache_free_one(kmem_cache_t *cachep, void *objp)
 	/* fixup slab chains */
 	{
 		int inuse = slabp->inuse;
-		if (__builtin_expect(!--slabp->inuse, 0)) {
+		if (unlikely(!--slabp->inuse)) {
 			/* Was partial or full, now empty. */
 			list_del(&slabp->list);
 			list_add(&slabp->list, &cachep->slabs_free);
-		} else if (__builtin_expect(inuse == cachep->num, 0)) {
+		} else if (unlikely(inuse == cachep->num)) {
 			/* Was full. */
 			list_del(&slabp->list);
 			list_add(&slabp->list, &cachep->slabs_partial);

@@ -12,7 +12,10 @@
  * BenH <benh@kernel.crashing.org> - 03/09/2000
  * - Add support for new PHYs
  * - Add some PowerBook sleep code
- * 
+ * BenH <benh@kernel.crashing.org> - ??/??/????
+ *  - PHY updates
+ * BenH <benh@kernel.crashing.org> - 08/08/2001
+ * - Add more PHYs, fixes to sleep code
  */
 
 #include <linux/module.h>
@@ -46,8 +49,8 @@
 
 #define DEBUG_PHY
 
-/* Driver version 1.3, kernel 2.4.x */
-#define GMAC_VERSION	"v1.4k4"
+/* Driver version 1.5, kernel 2.4.x */
+#define GMAC_VERSION	"v1.5k4"
 
 #define DUMMY_BUF_LEN	RX_BUF_ALLOC_SIZE + RX_OFFSET + GMAC_BUFFER_ALIGN
 static unsigned char *dummy_buf;
@@ -213,7 +216,7 @@ mii_interrupt(struct gmac *gm)
 		int		link_100 = 0;
 		int		gigabit = 0;
 #ifdef DEBUG_PHY
-		printk("%s: Link state change, phy_status: 0x%04x\n",
+		printk(KERN_INFO "%s: Link state change, phy_status: 0x%04x\n",
 			gm->dev->name, phy_status);
 #endif
 		gm->phy_status = phy_status;
@@ -228,37 +231,49 @@ mii_interrupt(struct gmac *gm)
 		/* Link ? Check for speed and duplex */
 		if ((phy_status & MII_SR_LKS) && (phy_status & MII_SR_ASSC)) {
 		    int restart = 0;
-		    if (gm->phy_type == PHY_B5201) {
-		    	int aux_stat = mii_read(gm, gm->phy_addr, MII_BCM5201_AUXCTLSTATUS);
+		    int aux_stat, link;
+		    switch (gm->phy_type) {
+		      case PHY_B5201:
+		      case PHY_B5221:
+		    	aux_stat = mii_read(gm, gm->phy_addr, MII_BCM5201_AUXCTLSTATUS);
 #ifdef DEBUG_PHY
-			printk("    Link up ! BCM5201 aux_stat: 0x%04x\n", aux_stat);
+			printk(KERN_INFO "%s:    Link up ! BCM5201/5221 aux_stat: 0x%04x\n",
+				gm->dev->name, aux_stat);
 #endif
 		    	full_duplex = ((aux_stat & MII_BCM5201_AUXCTLSTATUS_DUPLEX) != 0);
 		    	link_100 = ((aux_stat & MII_BCM5201_AUXCTLSTATUS_SPEED) != 0);
-		    } else if (gm->phy_type == PHY_B5400) {
-		    	int aux_stat = mii_read(gm, gm->phy_addr, MII_BCM5400_AUXSTATUS);
-		    	int link = (aux_stat & MII_BCM5400_AUXSTATUS_LINKMODE_MASK) >>
+		        break;
+		      case PHY_B5400:
+		      case PHY_B5401:
+		      case PHY_B5411:
+		    	aux_stat = mii_read(gm, gm->phy_addr, MII_BCM5400_AUXSTATUS);
+		    	link = (aux_stat & MII_BCM5400_AUXSTATUS_LINKMODE_MASK) >>
 		    			MII_BCM5400_AUXSTATUS_LINKMODE_SHIFT;
 #ifdef DEBUG_PHY
-			printk("    Link up ! BCM5400 aux_stat: 0x%04x (link mode: %d)\n",
-				aux_stat, link);
+			printk(KERN_INFO "%s:    Link up ! BCM54xx aux_stat: 0x%04x (link mode: %d)\n",
+				gm->dev->name, aux_stat, link);
 #endif
 		    	full_duplex = phy_BCM5400_link_table[link][0];
 		    	link_100 = phy_BCM5400_link_table[link][1];
 		    	gigabit = phy_BCM5400_link_table[link][2];
-		    } else if (gm->phy_type == PHY_LXT971) {
-		    	int stat2 = mii_read(gm, gm->phy_addr, MII_LXT971_STATUS2);
+		    	break;
+		      case PHY_LXT971:
+		    	aux_stat = mii_read(gm, gm->phy_addr, MII_LXT971_STATUS2);
 #ifdef DEBUG_PHY
-			printk("    Link up ! LXT971 stat2: 0x%04x\n", stat2);
+			printk(KERN_INFO "%s:    Link up ! LXT971 stat2: 0x%04x\n",
+				gm->dev->name, aux_stat);
 #endif
-		    	full_duplex = ((stat2 & MII_LXT971_STATUS2_FULLDUPLEX) != 0);
-		    	link_100 = ((stat2 & MII_LXT971_STATUS2_SPEED) != 0);
-		    } else {
+		    	full_duplex = ((aux_stat & MII_LXT971_STATUS2_FULLDUPLEX) != 0);
+		    	link_100 = ((aux_stat & MII_LXT971_STATUS2_SPEED) != 0);
+		    	break;
+		      default:
 		    	full_duplex = (lpar_ability & MII_ANLPA_FDAM) != 0;
 		    	link_100 = (lpar_ability & MII_ANLPA_100M) != 0;
+		    	break;
 		    }
 #ifdef DEBUG_PHY
-		    printk("    full_duplex: %d, speed: %s\n", full_duplex,
+		    printk(KERN_INFO "%s:    Full Duplex: %d, Speed: %s\n",
+		    	gm->dev->name, full_duplex,
 		    	gigabit ? "1000" : (link_100 ? "100" : "10"));
 #endif
                     if (gigabit != gm->gigabit) {
@@ -275,13 +290,15 @@ mii_interrupt(struct gmac *gm)
 			gmac_start_dma(gm);
 		} else if (!(phy_status & MII_SR_LKS)) {
 #ifdef DEBUG_PHY
-		    printk("    Link down !\n");
+		    printk(KERN_INFO "%s:    Link down !\n", gm->dev->name);
 #endif
 		}
 	}
 }
 
 /* Power management: stop PHY chip for suspend mode
+ * 
+ * TODO: This will have to be modified is WOL is to be supported.
  */
 static void
 gmac_suspend(struct gmac* gm)
@@ -290,7 +307,7 @@ gmac_suspend(struct gmac* gm)
 	unsigned long flags;
 	
 	gm->sleeping = 1;
-	netif_stop_queue(gm->dev);
+	netif_device_detach(gm->dev);
 
 
 	spin_lock_irqsave(&gm->lock, flags);
@@ -318,7 +335,7 @@ gmac_suspend(struct gmac* gm)
 	}
 
 	/* Clear interrupts on 5201 */
-	if (gm->phy_type == PHY_B5201)
+	if (gm->phy_type == PHY_B5201 || gm->phy_type == PHY_B5221)
 		mii_write(gm, gm->phy_addr, MII_BCM5201_INTERRUPT, 0);
 		
 	/* Drive MDIO high */
@@ -328,12 +345,6 @@ gmac_suspend(struct gmac* gm)
 	data = mii_read(gm, gm->phy_addr, MII_ANLPA);
 	mii_write(gm, gm->phy_addr, MII_ANLPA, data);
 	
-	/* Put MDIO in sane state */
-	GM_OUT(GM_MIF_CFG, GM_MIF_CFGBB);
-	GM_OUT(GM_MIF_BB_CLOCK, 0);
-	GM_OUT(GM_MIF_BB_DATA, 0);
-	GM_OUT(GM_MIF_BB_OUT_ENABLE, 0);
-	
 	/* Stop everything */
 	GM_OUT(GM_MAC_RX_CONFIG, 0);
 	GM_OUT(GM_MAC_TX_CONFIG, 0);
@@ -341,7 +352,7 @@ gmac_suspend(struct gmac* gm)
 	GM_OUT(GM_TX_CONF, 0);
 	GM_OUT(GM_RX_CONF, 0);
 	
-	/* Set reset state */
+	/* Set MAC in reset state */
 	GM_OUT(GM_RESET, GM_RESET_TX | GM_RESET_RX);
 	for (timeout = 100; timeout > 0; --timeout) {
 		mdelay(10);
@@ -352,11 +363,23 @@ gmac_suspend(struct gmac* gm)
 	GM_OUT(GM_MAC_RX_RESET, GM_MAC_RX_RESET_NOW);
 
 	/* Superisolate PHY */
-	if (gm->phy_type == PHY_B5201)
+	if (gm->phy_type == PHY_B5201 || gm->phy_type == PHY_B5221)
 		mii_write(gm, gm->phy_addr, MII_BCM5201_MULTIPHY,
 			MII_BCM5201_MULTIPHY_SUPERISOLATE);
 
-	/* Unclock chip */
+	/* Put MDIO in sane electric state. According to an obscure
+	 * Apple comment, not doing so may let them drive some current
+	 * during sleep and possibly damage BCM PHYs.
+	 */
+	GM_OUT(GM_MIF_CFG, GM_MIF_CFGBB);
+	GM_OUT(GM_MIF_BB_CLOCK, 0);
+	GM_OUT(GM_MIF_BB_DATA, 0);
+	GM_OUT(GM_MIF_BB_OUT_ENABLE, 0);
+	GM_OUT(GM_MAC_XIF_CONFIG,
+		GM_MAC_XIF_CONF_GMII_MODE|GM_MAC_XIF_CONF_MII_INT_LOOP);
+	(void)GM_IN(GM_MAC_XIF_CONFIG);
+	
+	/* Unclock the GMAC chip */
 	gmac_set_power(gm, 0);
 }
 
@@ -390,7 +413,7 @@ gmac_resume(struct gmac *gm)
 	mdelay(20);
 	GM_BIS(GM_MAC_RX_CONFIG, GM_MAC_RX_CONF_ENABLE);
 	mdelay(20);
-	if (gm->phy_type == PHY_B5201) {
+	if (gm->phy_type == PHY_B5201 || gm->phy_type == PHY_B5221) {
 		data = mii_read(gm, gm->phy_addr, MII_BCM5201_MULTIPHY);
 		mii_write(gm, gm->phy_addr, MII_BCM5201_MULTIPHY,
 			data & ~MII_BCM5201_MULTIPHY_SUPERISOLATE);
@@ -402,7 +425,7 @@ gmac_resume(struct gmac *gm)
 		mii_interrupt(gm);
 		/* restart DMA operations */
 		gmac_start_dma(gm);
-		netif_start_queue(gm->dev);
+		netif_device_attach(gm->dev);
 		enable_irq(gm->dev->irq);
 	} else {
 		/* Driver not opened, just leave things off. Note that
@@ -446,11 +469,19 @@ mii_do_reset_phy(struct gmac *gm, int phy_addr)
 	return 0;
 }
 
+/* Here's a bunch of configuration routines for
+ * Broadcom PHYs used on various Mac models. Unfortunately,
+ * except for the 5201, Broadcom never sent me any documentation,
+ * so this is from my understanding of Apple's Open Firmware
+ * drivers and Darwin's implementation
+ */
+ 
 static void
 mii_init_BCM5400(struct gmac *gm)
 {
 	int data;
 
+	/* Configure for gigabit full duplex */
 	data = mii_read(gm, gm->phy_addr, MII_BCM5400_AUXCONTROL);
 	data |= MII_BCM5400_AUXCONTROL_PWR10BASET;
 	mii_write(gm, gm->phy_addr, MII_BCM5400_AUXCONTROL, data);
@@ -460,6 +491,8 @@ mii_init_BCM5400(struct gmac *gm)
 	mii_write(gm, gm->phy_addr, MII_BCM5400_GB_CONTROL, data);
 	
 	mdelay(10);
+
+	/* Reset and configure cascaded 10/100 PHY */
 	mii_do_reset_phy(gm, 0x1f);
 	
 	data = mii_read(gm, 0x1f, MII_BCM5201_MULTIPHY);
@@ -479,7 +512,14 @@ mii_init_BCM5401(struct gmac *gm)
 
 	rev = mii_read(gm, gm->phy_addr, MII_ID1) & 0x000f;
 	if (rev == 0 || rev == 3) {
-		/* A bit of black magic from Apple */
+		/* Some revisions of 5401 appear to need this
+		 * initialisation sequence to disable, according
+		 * to OF, "tap power management"
+		 * 
+		 * WARNING ! OF and Darwin don't agree on the
+		 * register addresses. OF seem to interpret the
+		 * register numbers below as decimal
+		 */
 		mii_write(gm, gm->phy_addr, 0x18, 0x0c20);
 		mii_write(gm, gm->phy_addr, 0x17, 0x0012);
 		mii_write(gm, gm->phy_addr, 0x15, 0x1804);
@@ -493,16 +533,47 @@ mii_init_BCM5401(struct gmac *gm)
 		mii_write(gm, gm->phy_addr, 0x15, 0x0a20);
 	}
 	
+	/* Configure for gigabit full duplex */
 	data = mii_read(gm, gm->phy_addr, MII_BCM5400_GB_CONTROL);
 	data |= MII_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
 	mii_write(gm, gm->phy_addr, MII_BCM5400_GB_CONTROL, data);
 
 	mdelay(10);
+
+	/* Reset and configure cascaded 10/100 PHY */
 	mii_do_reset_phy(gm, 0x1f);
 	
 	data = mii_read(gm, 0x1f, MII_BCM5201_MULTIPHY);
 	data |= MII_BCM5201_MULTIPHY_SERIALMODE;
 	mii_write(gm, 0x1f, MII_BCM5201_MULTIPHY, data);
+}
+
+static void
+mii_init_BCM5411(struct gmac *gm)
+{
+	int data;
+
+	/* Here's some more Apple black magic to setup
+	 * some voltage stuffs.
+	 */
+	mii_write(gm, gm->phy_addr, 0x1c, 0x8c23);
+	mii_write(gm, gm->phy_addr, 0x1c, 0x8ca3);
+	mii_write(gm, gm->phy_addr, 0x1c, 0x8c23);
+
+	/* Here, Apple seems to want to reset it, do
+	 * it as well
+	 */
+	mii_write(gm, gm->phy_addr, MII_CR, MII_CR_RST);
+
+	/* Start autoneg */
+	mii_write(gm, gm->phy_addr, MII_CR,
+			MII_CR_ASSE|MII_CR_FDM|	/* Autospeed, full duplex */
+			MII_CR_RAN|
+			MII_CR_SPEEDSEL2 /* chip specific, gigabit enable ? */);
+
+	data = mii_read(gm, gm->phy_addr, MII_BCM5400_GB_CONTROL);
+	data |= MII_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
+	mii_write(gm, gm->phy_addr, MII_BCM5400_GB_CONTROL, data);
 }
 
 static int
@@ -536,29 +607,34 @@ mii_lookup_and_reset(struct gmac *gm)
 	gm->phy_id = (mii_read(gm, gm->phy_addr, MII_ID0) << 16) |
 		mii_read(gm, gm->phy_addr, MII_ID1);
 #ifdef DEBUG_PHY
-	printk("%s PHY ID: 0x%08x\n", gm->dev->name, gm->phy_id);
+	printk(KERN_INFO "%s: PHY ID: 0x%08x\n", gm->dev->name, gm->phy_id);
 #endif
 	if ((gm->phy_id & MII_BCM5400_MASK) == MII_BCM5400_ID) {
 		gm->phy_type = PHY_B5400;
-		printk(KERN_ERR "%s Found Broadcom BCM5400 PHY (Gigabit)\n",
+		printk(KERN_INFO  "%s: Found Broadcom BCM5400 PHY (Gigabit)\n",
 			gm->dev->name);
 		mii_init_BCM5400(gm);		
 	} else if ((gm->phy_id & MII_BCM5401_MASK) == MII_BCM5401_ID) {
 		gm->phy_type = PHY_B5401;
-		printk(KERN_ERR "%s Found Broadcom BCM5401 PHY (Gigabit)\n",
+		printk(KERN_INFO  "%s: Found Broadcom BCM5401 PHY (Gigabit)\n",
 			gm->dev->name);
 		mii_init_BCM5401(gm);		
+	} else if ((gm->phy_id & MII_BCM5411_MASK) == MII_BCM5411_ID) {
+		gm->phy_type = PHY_B5411;
+		printk(KERN_INFO  "%s: Found Broadcom BCM5411 PHY (Gigabit)\n",
+			gm->dev->name);
+		mii_init_BCM5411(gm);		
 	} else if ((gm->phy_id & MII_BCM5201_MASK) == MII_BCM5201_ID) {
 		gm->phy_type = PHY_B5201;
-		printk(KERN_INFO "%s Found Broadcom BCM5201 PHY\n", gm->dev->name);
+		printk(KERN_INFO "%s: Found Broadcom BCM5201 PHY\n", gm->dev->name);
 	} else if ((gm->phy_id & MII_BCM5221_MASK) == MII_BCM5221_ID) {
-		gm->phy_type = PHY_B5201; /* Same as 5201 for now */
-		printk(KERN_INFO "%s Found Broadcom BCM5221 PHY\n", gm->dev->name);
+		gm->phy_type = PHY_B5221;
+		printk(KERN_INFO "%s: Found Broadcom BCM5221 PHY\n", gm->dev->name);
 	} else if ((gm->phy_id & MII_LXT971_MASK) == MII_LXT971_ID) {
 		gm->phy_type = PHY_LXT971;
-		printk(KERN_INFO "%s Found LevelOne LX971 PHY\n", gm->dev->name);
+		printk(KERN_INFO "%s: Found LevelOne LX971 PHY\n", gm->dev->name);
 	} else {
-		printk(KERN_ERR "%s: Warning ! Unknown PHY ID 0x%08x, using generic mode...\n",
+		printk(KERN_WARNING "%s: Warning ! Unknown PHY ID 0x%08x, using generic mode...\n",
 			gm->dev->name, gm->phy_id);
 	}
 

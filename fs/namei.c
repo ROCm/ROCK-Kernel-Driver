@@ -329,6 +329,10 @@ static inline int do_follow_link(struct dentry *dentry, struct nameidata *nd)
 	int err;
 	if (current->link_count >= 8)
 		goto loop;
+	if (current->need_resched) {
+		current->state = TASK_RUNNING;
+		schedule();
+	}
 	current->link_count++;
 	UPDATE_ATIME(dentry->d_inode);
 	err = dentry->d_inode->i_op->follow_link(dentry, nd);

@@ -457,11 +457,12 @@ static void ymf_wait_dac(struct ymf_state *state)
 	}
 #endif
 
+	set_current_state(TASK_UNINTERRUPTIBLE);
 	while (ypcm->running) {
 		spin_unlock_irqrestore(&unit->reg_lock, flags);
-		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule();
 		spin_lock_irqsave(&unit->reg_lock, flags);
+		set_current_state(TASK_UNINTERRUPTIBLE);
 	}
 	spin_unlock_irqrestore(&unit->reg_lock, flags);
 
@@ -1198,12 +1199,13 @@ ymf_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
 	ret = 0;
 
 	add_wait_queue(&dmabuf->wait, &waita);
+	set_current_state(TASK_INTERRUPTIBLE);
 	while (count > 0) {
 		spin_lock_irqsave(&unit->reg_lock, flags);
 		if (unit->suspended) {
 			spin_unlock_irqrestore(&unit->reg_lock, flags);
-			set_current_state(TASK_INTERRUPTIBLE);
 			schedule();
+			set_current_state(TASK_INTERRUPTIBLE);
 			if (signal_pending(current)) {
 				if (!ret) ret = -EAGAIN;
 				break;
@@ -1241,9 +1243,9 @@ ymf_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
 			   is TOO LATE for the process to be scheduled to run (scheduler latency)
 			   which results in a (potential) buffer overrun. And worse, there is
 			   NOTHING we can do to prevent it. */
-			set_current_state(TASK_INTERRUPTIBLE);
 			tmo = schedule_timeout(tmo);
 			spin_lock_irqsave(&state->unit->reg_lock, flags);
+			set_current_state(TASK_INTERRUPTIBLE);
 			if (tmo == 0 && dmabuf->count == 0) {
 				printk(KERN_ERR "ymfpci%d: recording schedule timeout, "
 				    "dmasz %u fragsz %u count %i hwptr %u swptr %u\n",
@@ -1326,12 +1328,13 @@ ymf_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
 	redzone *= 3;	/* 2 redzone + 1 possible uncertainty reserve. */
 
 	add_wait_queue(&dmabuf->wait, &waita);
+	set_current_state(TASK_INTERRUPTIBLE);
 	while (count > 0) {
 		spin_lock_irqsave(&unit->reg_lock, flags);
 		if (unit->suspended) {
 			spin_unlock_irqrestore(&unit->reg_lock, flags);
-			set_current_state(TASK_INTERRUPTIBLE);
 			schedule();
+			set_current_state(TASK_INTERRUPTIBLE);
 			if (signal_pending(current)) {
 				if (!ret) ret = -EAGAIN;
 				break;
@@ -1389,8 +1392,8 @@ ymf_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
 				if (!ret) ret = -EAGAIN;
 				break;
 			}
-			set_current_state(TASK_INTERRUPTIBLE);
 			schedule();
+			set_current_state(TASK_INTERRUPTIBLE);
 			if (signal_pending(current)) {
 				if (!ret) ret = -ERESTARTSYS;
 				break;

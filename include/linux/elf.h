@@ -16,8 +16,10 @@ typedef __u64	Elf64_Addr;
 typedef __u16	Elf64_Half;
 typedef __s16	Elf64_SHalf;
 typedef __u64	Elf64_Off;
-typedef __s64	Elf64_Sword;
-typedef __u64	Elf64_Word;
+typedef __s32	Elf64_Sword;
+typedef __u32	Elf64_Word;
+typedef __u64	Elf64_Xword;
+typedef __s64	Elf64_Sxword;
 
 /* These constants are for the segment types stored in the image headers */
 #define PT_NULL    0
@@ -65,6 +67,7 @@ typedef __u64	Elf64_Word;
 #define EM_SPARC32PLUS 18	/* Sun's "v8plus" */
 
 #define EM_PPC	       20	/* PowerPC */
+#define EM_PPC64       21       /* PowerPC64 */
 
 #define EM_SH	       42	/* SuperH */
 
@@ -180,10 +183,10 @@ typedef struct dynamic{
 } Elf32_Dyn;
 
 typedef struct {
-  Elf64_Word d_tag;		/* entry tag value */
+  Elf64_Sxword d_tag;		/* entry tag value */
   union {
-    Elf64_Word d_val;
-    Elf64_Word d_ptr;
+    Elf64_Xword d_val;
+    Elf64_Addr d_ptr;
   } d_un;
 } Elf64_Dyn;
 
@@ -229,7 +232,7 @@ typedef struct {
 #define R_MIPS_GOT_PAGE		20
 #define R_MIPS_GOT_OFST		21
 /*
- * The following two relocation types are specified in the the MIPS ABI
+ * The following two relocation types are specified in the MIPS ABI
  * conformance guide version 1.2 but not yet in the psABI.
  */
 #define R_MIPS_GOTHI16		22
@@ -241,7 +244,7 @@ typedef struct {
 #define R_MIPS_HIGHER		28
 #define R_MIPS_HIGHEST		29
 /*
- * The following two relocation types are specified in the the MIPS ABI
+ * The following two relocation types are specified in the MIPS ABI
  * conformance guide version 1.2 but not yet in the psABI.
  */
 #define R_MIPS_CALLHI16		30
@@ -374,7 +377,7 @@ typedef struct elf32_rel {
 
 typedef struct elf64_rel {
   Elf64_Addr r_offset;	/* Location at which to apply the action */
-  Elf64_Word r_info;	/* index and type of relocation */
+  Elf64_Xword r_info;	/* index and type of relocation */
 } Elf64_Rel;
 
 typedef struct elf32_rela{
@@ -385,8 +388,8 @@ typedef struct elf32_rela{
 
 typedef struct elf64_rela {
   Elf64_Addr r_offset;	/* Location at which to apply the action */
-  Elf64_Word r_info;	/* index and type of relocation */
-  Elf64_Word r_addend;	/* Constant addend used to compute value */
+  Elf64_Xword r_info;	/* index and type of relocation */
+  Elf64_Sxword r_addend;	/* Constant addend used to compute value */
 } Elf64_Rela;
 
 typedef struct elf32_sym{
@@ -399,12 +402,12 @@ typedef struct elf32_sym{
 } Elf32_Sym;
 
 typedef struct elf64_sym {
-  Elf32_Word st_name;		/* Symbol name, index in string tbl (yes, Elf32) */
+  Elf64_Word st_name;		/* Symbol name, index in string tbl */
   unsigned char	st_info;	/* Type and binding attributes */
   unsigned char	st_other;	/* No defined meaning, 0 */
   Elf64_Half st_shndx;		/* Associated section index */
   Elf64_Addr st_value;		/* Value of the symbol */
-  Elf64_Word st_size;		/* Associated symbol size */
+  Elf64_Xword st_size;		/* Associated symbol size */
 } Elf64_Sym;
 
 
@@ -429,19 +432,19 @@ typedef struct elf32_hdr{
 
 typedef struct elf64_hdr {
   unsigned char	e_ident[16];		/* ELF "magic number" */
-  Elf64_SHalf e_type;
+  Elf64_Half e_type;
   Elf64_Half e_machine;
-  __s32 e_version;
+  Elf64_Word e_version;
   Elf64_Addr e_entry;		/* Entry point virtual address */
   Elf64_Off e_phoff;		/* Program header table file offset */
   Elf64_Off e_shoff;		/* Section header table file offset */
-  __s32 e_flags;
-  Elf64_SHalf e_ehsize;
-  Elf64_SHalf e_phentsize;
-  Elf64_SHalf e_phnum;
-  Elf64_SHalf e_shentsize;
-  Elf64_SHalf e_shnum;
-  Elf64_SHalf e_shstrndx;
+  Elf64_Word e_flags;
+  Elf64_Half e_ehsize;
+  Elf64_Half e_phentsize;
+  Elf64_Half e_phnum;
+  Elf64_Half e_shentsize;
+  Elf64_Half e_shnum;
+  Elf64_Half e_shstrndx;
 } Elf64_Ehdr;
 
 /* These constants define the permissions on sections in the program
@@ -462,14 +465,14 @@ typedef struct elf32_phdr{
 } Elf32_Phdr;
 
 typedef struct elf64_phdr {
-  __s32 p_type;
-  __s32 p_flags;
+  Elf64_Word p_type;
+  Elf64_Word p_flags;
   Elf64_Off p_offset;		/* Segment file offset */
   Elf64_Addr p_vaddr;		/* Segment virtual address */
   Elf64_Addr p_paddr;		/* Segment physical address */
-  Elf64_Word p_filesz;		/* Segment size in file */
-  Elf64_Word p_memsz;		/* Segment size in memory */
-  Elf64_Word p_align;		/* Segment alignment, file & memory */
+  Elf64_Xword p_filesz;		/* Segment size in file */
+  Elf64_Xword p_memsz;		/* Segment size in memory */
+  Elf64_Xword p_align;		/* Segment alignment, file & memory */
 } Elf64_Phdr;
 
 /* sh_type */
@@ -526,16 +529,16 @@ typedef struct {
 } Elf32_Shdr;
 
 typedef struct elf64_shdr {
-  Elf32_Word sh_name;		/* Section name, index in string tbl (yes Elf32) */
-  Elf32_Word sh_type;		/* Type of section (yes Elf32) */
-  Elf64_Word sh_flags;		/* Miscellaneous section attributes */
+  Elf64_Word sh_name;		/* Section name, index in string tbl */
+  Elf64_Word sh_type;		/* Type of section */
+  Elf64_Xword sh_flags;		/* Miscellaneous section attributes */
   Elf64_Addr sh_addr;		/* Section virtual addr at execution */
   Elf64_Off sh_offset;		/* Section file offset */
-  Elf64_Word sh_size;		/* Size of section in bytes */
-  Elf32_Word sh_link;		/* Index of another section (yes Elf32) */
-  Elf32_Word sh_info;		/* Additional section information (yes Elf32) */
-  Elf64_Word sh_addralign;	/* Section alignment */
-  Elf64_Word sh_entsize;	/* Entry size if section holds table */
+  Elf64_Xword sh_size;		/* Size of section in bytes */
+  Elf64_Word sh_link;		/* Index of another section */
+  Elf64_Word sh_info;		/* Additional section information */
+  Elf64_Xword sh_addralign;	/* Section alignment */
+  Elf64_Xword sh_entsize;	/* Entry size if section holds table */
 } Elf64_Shdr;
 
 #define	EI_MAG0		0		/* e_ident[] indexes */
@@ -582,15 +585,10 @@ typedef struct elf32_note {
 } Elf32_Nhdr;
 
 /* Note header in a PT_NOTE section */
-/*
- * For now we use the 32 bit version of the structure until we figure
- * out whether we need anything better.  Note - on the Alpha, "unsigned int"
- * is only 32 bits.
- */
 typedef struct elf64_note {
-  Elf32_Word n_namesz;	/* Name size */
-  Elf32_Word n_descsz;	/* Content size */
-  Elf32_Word n_type;	/* Content type */
+  Elf64_Word n_namesz;	/* Name size */
+  Elf64_Word n_descsz;	/* Content size */
+  Elf64_Word n_type;	/* Content type */
 } Elf64_Nhdr;
 
 #if ELF_CLASS == ELFCLASS32

@@ -42,6 +42,8 @@ int ptrace_attach(struct task_struct *task)
 
 	/* Go */
 	task->ptrace |= PT_PTRACED;
+	if (capable(CAP_SYS_PTRACE))
+		task->ptrace |= PT_PTRACE_CAP;
 	task_unlock(task);
 
 	write_lock_irq(&tasklist_lock);
@@ -60,6 +62,27 @@ bad:
 	return -EPERM;
 }
 
+int ptrace_detach(struct task_struct *child, unsigned int data)
+{
+	if ((unsigned long) data > _NSIG)
+		return	-EIO;
+
+	/* Architecture-specific hardware disable .. */
+	ptrace_disable(child);
+
+	/* .. re-parent .. */
+	child->ptrace = 0;
+	child->exit_code = data;
+	write_lock_irq(&tasklist_lock);
+	REMOVE_LINKS(child);
+	child->p_pptr = child->p_opptr;
+	SET_LINKS(child);
+	write_unlock_irq(&tasklist_lock);
+
+	/* .. and wake it up. */
+	wake_up_process(child);
+	return 0;
+}
 
 /*
  * Access another process' address space, one page at a time.

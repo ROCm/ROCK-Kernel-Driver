@@ -154,6 +154,12 @@ static long no_idt[2];
 static int reboot_mode;
 int reboot_thru_bios;
 
+#ifdef CONFIG_SMP
+int reboot_smp = 0;
+static int reboot_cpu = -1;
+/* shamelessly grabbed from lib/vsprintf.c for readability */
+#define is_digit(c)	((c) >= '0' && (c) <= '9')
+#endif
 static int __init reboot_setup(char *str)
 {
 	while(1) {
@@ -170,6 +176,19 @@ static int __init reboot_setup(char *str)
 		case 'h': /* "hard" reboot by toggling RESET and/or crashing the CPU */
 			reboot_thru_bios = 0;
 			break;
+#ifdef CONFIG_SMP
+		case 's': /* "smp" reboot by executing reset on BSP or other CPU*/
+			reboot_smp = 1;
+			if (is_digit(*(str+1))) {
+				reboot_cpu = (int) (*(str+1) - '0');
+				if (is_digit(*(str+2))) 
+					reboot_cpu = reboot_cpu*10 + (int)(*(str+2) - '0');
+			}
+				/* we will leave sorting out the final value 
+				when we are ready to reboot, since we might not
+ 				have set up boot_cpu_id or smp_num_cpu */
+			break;
+#endif
 		}
 		if((str = strchr(str,',')) != NULL)
 			str++;
@@ -346,6 +365,34 @@ void machine_real_restart(unsigned char *code, int length)
 void machine_restart(char * __unused)
 {
 #if CONFIG_SMP
+	int cpuid;
+	
+	cpuid = GET_APIC_ID(apic_read(APIC_ID));
+
+	if (reboot_smp) {
+
+		/* check to see if reboot_cpu is valid 
+		   if its not, default to the BSP */
+		if ((reboot_cpu == -1) ||  
+		      (reboot_cpu > (NR_CPUS -1))  || 
+		      !(phys_cpu_present_map & (1<<cpuid))) 
+			reboot_cpu = boot_cpu_id;
+
+		reboot_smp = 0;  /* use this as a flag to only go through this once*/
+		/* re-run this function on the other CPUs
+		   it will fall though this section since we have 
+		   cleared reboot_smp, and do the reboot if it is the
+		   correct CPU, otherwise it halts. */
+		if (reboot_cpu != cpuid)
+			smp_call_function((void *)machine_restart , NULL, 1, 0);
+	}
+
+	/* if reboot_cpu is still -1, then we want a tradional reboot, 
+	   and if we are not running on the reboot_cpu,, halt */
+	if ((reboot_cpu != -1) && (cpuid != reboot_cpu)) {
+		for (;;)
+		__asm__ __volatile__ ("hlt");
+	}
 	/*
 	 * Stop all CPUs and turn off local APICs and the IO-APIC, so
 	 * other OSs see a clean IRQ state.

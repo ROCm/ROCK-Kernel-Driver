@@ -59,6 +59,13 @@ static const char *awc_version =
 
 #include <linux/pci.h>
 
+static struct pci_device_id aironet4500_card_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_AIRONET, PCI_DEVICE_AIRONET_4800_1, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_AIRONET, PCI_DEVICE_AIRONET_4800, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_AIRONET, PCI_DEVICE_AIRONET_4500, PCI_ANY_ID, PCI_ANY_ID, },
+	{ }			/* Terminating entry */
+};
+MODULE_DEVICE_TABLE(pci, aironet4500_card_pci_tbl);
 
 static int reverse_probe;
 
@@ -168,6 +175,13 @@ static int awc_pci_init(struct net_device * dev, struct pci_dev *pdev,
 		allocd_dev = 1;
 	}
 	dev->priv = kmalloc(sizeof(struct awc_private),GFP_KERNEL );
+        if (!dev->priv) {
+                if (allocd_dev) {
+                        unregister_netdev(dev);
+                        kfree(dev);
+                }
+                return -ENOMEM;
+        }       
 	memset(dev->priv,0,sizeof(struct awc_private));
 	if (!dev->priv) {
 		printk(KERN_CRIT "aironet4x00: could not allocate device private, some unstability may follow\n");
@@ -488,6 +502,14 @@ static void awc_pnp_release(void) {
 
 } 
 
+static struct isapnp_device_id id_table[] = {
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('A','W','L'), ISAPNP_DEVICE(1), 0 },
+	{0}
+};
+
+MODULE_DEVICE_TABLE(isapnp, id_table);
+
 #endif //MODULE
 #endif /* CONFIG_AIRONET4500_PNP */
 
@@ -634,7 +656,7 @@ static void awc_isa_release(void) {
 
 #endif /* CONFIG_AIRONET4500_ISA */
 
-#ifdef  CONFIG_AIRONET4500_365 
+#ifdef  CONFIG_AIRONET4500_I365 
 
 #define port_range 0x40
 
@@ -954,7 +976,7 @@ failed:
 
 }
 
-#endif /* CONFIG_AIRONET4500_365 */
+#endif /* CONFIG_AIRONET4500_I365 */
 
 #ifdef MODULE        
 int init_module(void)

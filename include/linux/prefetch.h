@@ -54,7 +54,7 @@ static inline void prefetchw(const void *x) {;}
 #endif
 
 #ifndef PREFETCH_STRIDE
-#define PREFETCH_STRIDE (4*L1_CACHE_BYTE)
+#define PREFETCH_STRIDE (4*L1_CACHE_BYTES)
 #endif
 
 #endif

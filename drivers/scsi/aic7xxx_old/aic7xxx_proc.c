@@ -162,7 +162,7 @@ aic7xxx_proc_info ( char *buffer, char **start, off_t offset, int length,
   size += sprintf(BLS, "%s", AIC7XXX_H_VERSION);
   size += sprintf(BLS, "\n");
   size += sprintf(BLS, "Compile Options:\n");
-#ifdef CONFIG_AIC7XXX_TCQ_ON_BY_DEFAULT
+#ifdef CONFIG_AIC7XXX_OLD_TCQ_ON_BY_DEFAULT
   size += sprintf(BLS, "  TCQ Enabled By Default : Enabled\n");
 #else
   size += sprintf(BLS, "  TCQ Enabled By Default : Disabled\n");

@@ -17,6 +17,7 @@
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>
 #include <linux/slab.h>
+#include <linux/compiler.h>
 
 int nr_swap_pages;
 int nr_active_pages;
@@ -253,7 +254,7 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 
 		local_pages = &current->local_pages;
 
-		if (__freed) {
+		if (likely(__freed)) {
 			/* pick from the last inserted so we're lifo */
 			entry = local_pages->next;
 			do {
@@ -372,19 +373,21 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 		return page;
 
 	zone = zonelist->zones;
-	if (__builtin_expect(freed, 1)) {
+	if (likely(freed)) {
 		for (;;) {
 			zone_t *z = *(zone++);
 			if (!z)
 				break;
 
-			if (zone_free_pages(z, order) > (gfp_mask & __GFP_HIGH ? z->pages_min / 2 : z->pages_min)) {
-				page = rmqueue(z, order);
-				if (page)
-					return page;
-			}
+			page = rmqueue(z, order);
+			if (page)
+				return page;
 		}
 	} else {
+		/* 
+		 * Check that no other task is been killed meanwhile,
+		 * in such a case we can succeed the allocation.
+		 */
 		for (;;) {
 			zone_t *z = *(zone++);
 			if (!z)
@@ -683,6 +686,7 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 		zone->lock = SPIN_LOCK_UNLOCKED;
 		zone->zone_pgdat = pgdat;
 		zone->free_pages = 0;
+		zone->need_balance = 0;
 		if (!size)
 			continue;
 

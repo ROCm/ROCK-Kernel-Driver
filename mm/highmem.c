@@ -273,6 +273,13 @@ static inline void bounce_end_io (struct buffer_head *bh, int uptodate)
 
 static __init int init_emergency_pool(void)
 {
+	struct sysinfo i;
+        si_meminfo(&i);
+        si_swapinfo(&i);
+        
+        if (!i.totalhigh)
+        	return 0;
+
 	spin_lock_irq(&emergency_lock);
 	while (nr_emergency_pages < POOL_SIZE) {
 		struct page * page = alloc_page(GFP_ATOMIC);

@@ -54,6 +54,7 @@ void deactivate_page_nolock(struct page * page)
 		del_page_from_active_list(page);
 		add_page_to_inactive_list(page);
 	}
+	ClearPageReferenced(page);
 }	
 
 void deactivate_page(struct page * page)
@@ -72,6 +73,7 @@ void activate_page_nolock(struct page * page)
 		del_page_from_inactive_list(page);
 		add_page_to_active_list(page);
 	}
+	SetPageReferenced(page);
 }
 
 void activate_page(struct page * page)

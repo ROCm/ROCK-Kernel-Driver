@@ -2564,7 +2564,6 @@ int awc_simple_bridge;
 #if LINUX_VERSION_CODE >= 0x20100
 
 MODULE_PARM(awc_debug,"i");
-MODULE_PARM(rx_queue_len,"i");
 MODULE_PARM(tx_rate,"i");
 MODULE_PARM(channel,"i");
 //MODULE_PARM(tx_full_rate,"i");
@@ -2600,7 +2599,6 @@ EXPORT_SYMBOL(awc_debug);
 EXPORT_SYMBOL(awc_private_init);
 EXPORT_SYMBOL(awc_tx_timeout);
 EXPORT_SYMBOL(awc_start_xmit);
-//EXPORT_SYMBOL(awc_rx);
 EXPORT_SYMBOL(awc_interrupt);
 EXPORT_SYMBOL(awc_get_stats);
 EXPORT_SYMBOL(awc_change_mtu);
@@ -2976,7 +2974,7 @@ int awc_private_init(struct net_device * dev){
 	
 	awc_reset(dev);
 	
-	udelay(10000);
+	mdelay(10);
 	
 	AWC_LOCK_COMMAND_ISSUING(priv);
 
@@ -3072,31 +3070,7 @@ int awc_start_xmit(struct sk_buff *skb, struct net_device *dev) {
 	return retval;
 }
 
-inline int awc_rx(struct net_device *dev, struct awc_fid * rx_fid) {
-
-//	struct awc_private *lp = (struct awc_private *)dev->priv;
-
-	DEBUG(3, "%s: in rx_packet \n",dev->name);
-
-	if (!rx_fid ){
-		DEBUG(3, "%s: not rx_buff in rx_packet \n",dev->name);
-		return -1;
-	};
-	if ( !rx_fid->skb){
-		DEBUG(3, "%s: not  rx_buff->skb in rx_packet \n",dev->name);
-		return -1;
-	};
-
-	
-    	rx_fid->skb->protocol = eth_type_trans(rx_fid->skb,dev);
-      	netif_rx(rx_fid->skb);
-        rx_fid = NULL;
-
-	return 0;
-}
-
-
- void awc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+void awc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct awc_private *priv;
@@ -3115,8 +3089,6 @@ inline int awc_rx(struct net_device *dev, struct awc_fid * rx_fid) {
 	awc_interrupt_process(dev);
 
 	spin_unlock_irqrestore(&priv->interrupt_spinlock, flags);	  
-
-	return;
 }
 
 

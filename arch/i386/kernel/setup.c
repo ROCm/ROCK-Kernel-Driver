@@ -943,7 +943,7 @@ void __init setup_arch(char **cmdline_p)
 	reserve_bootmem(PAGE_SIZE, PAGE_SIZE);
 #endif
 
-#ifdef CONFIG_X86_IO_APIC
+#ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * Find and reserve possible boot-time SMP configuration:
 	 */
@@ -976,16 +976,15 @@ void __init setup_arch(char **cmdline_p)
 	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
 #endif
 	paging_init();
-#ifdef CONFIG_X86_IO_APIC
+#ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * get boot-time SMP configuration:
 	 */
 	if (smp_found_config)
 		get_smp_config();
-#endif
-#ifdef CONFIG_X86_LOCAL_APIC
 	init_apic_mappings();
 #endif
+
 
 	/*
 	 * Request address space for all standard RAM and ROM resources

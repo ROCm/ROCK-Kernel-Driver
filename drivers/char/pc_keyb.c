@@ -397,6 +397,32 @@ char pckbd_unexpected_up(unsigned char keycode)
 	    return 0200;
 }
 
+void pckbd_pm_resume(void)
+{
+#if defined CONFIG_PSMOUSE
+       unsigned long flags;
+
+       if (queue) {                    /* Aux port detected */
+               if (aux_count == 0) {   /* Mouse not in use */ 
+                       spin_lock_irqsave(&kbd_controller_lock, flags);
+                       /*
+                        * Dell Lat. C600 A06 enables mouse after resume.
+                        * When user touches the pad, it posts IRQ 12
+                        * (which we do not process), thus holding keyboard.
+                        */
+                       kbd_write_command(KBD_CCMD_MOUSE_DISABLE);
+                       /* kbd_write_cmd(AUX_INTS_OFF); */ /* Config & lock */
+                       kb_wait();
+                       kbd_write_command(KBD_CCMD_WRITE_MODE);
+                       kb_wait();
+                       kbd_write_output(AUX_INTS_OFF);
+                       spin_unlock_irqrestore(&kbd_controller_lock, flags);
+               }
+       }
+#endif       
+}
+
+
 static inline void handle_mouse_event(unsigned char scancode)
 {
 #ifdef CONFIG_PSMOUSE
@@ -521,7 +547,7 @@ static int send_data(unsigned char data)
 			mdelay(1);
 			if (!--timeout) {
 #ifdef KBD_REPORT_TIMEOUTS
-				printk(KERN_WARNING "keyboard: Timeout - AT keyboard not present?\n");
+				printk(KERN_WARNING "keyboard: Timeout - AT keyboard not present?(%02x)\n", data);
 #endif
 				return 0;
 			}
@@ -707,6 +733,53 @@ static void kbd_write_output_w(int data)
 	spin_unlock_irqrestore(&kbd_controller_lock, flags);
 }
 
+#if defined(__alpha__)
+/*
+ * Some Alphas cannot mask some/all interrupts, so we have to
+ * make sure not to allow interrupts AT ALL when polling for
+ * specific return values from the keyboard.
+ *
+ * I think this should work on any architecture, but for now, only Alpha.
+ */
+static int kbd_write_command_w_and_wait(int data)
+{
+	unsigned long flags;
+	int input;
+
+	spin_lock_irqsave(&kbd_controller_lock, flags);
+	kb_wait();
+	kbd_write_command(data);
+	input = kbd_wait_for_input();
+	spin_unlock_irqrestore(&kbd_controller_lock, flags);
+	return input;
+}
+
+static int kbd_write_output_w_and_wait(int data)
+{
+	unsigned long flags;
+	int input;
+
+	spin_lock_irqsave(&kbd_controller_lock, flags);
+	kb_wait();
+	kbd_write_output(data);
+	input = kbd_wait_for_input();
+	spin_unlock_irqrestore(&kbd_controller_lock, flags);
+	return input;
+}
+#else
+static int kbd_write_command_w_and_wait(int data)
+{
+	kbd_write_command_w(data);
+	return kbd_wait_for_input();
+}
+
+static int kbd_write_output_w_and_wait(int data)
+{
+	kbd_write_output_w(data);
+	return kbd_wait_for_input();
+}
+#endif /* __alpha__ */
+
 #if defined CONFIG_PSMOUSE
 static void kbd_write_cmd(int cmd)
 {
@@ -790,8 +863,8 @@ static char * __init initialize_kbd(void)
 			      | KBD_MODE_KCC);
 
 	/* ibm powerpc portables need this to use scan-code set 1 -- Cort */
-	kbd_write_command_w(KBD_CCMD_READ_MODE);
-	if (!(kbd_wait_for_input() & KBD_MODE_KCC)) {
+	if (!(kbd_write_command_w_and_wait(KBD_CCMD_READ_MODE) & KBD_MODE_KCC))
+	{
 		/*
 		 * If the controller does not support conversion,
 		 * Set the keyboard to scan-code set 1.
@@ -802,20 +875,16 @@ static char * __init initialize_kbd(void)
 		kbd_wait_for_input();
 	}
 
-	
-	kbd_write_output_w(KBD_CMD_ENABLE);
-	if (kbd_wait_for_input() != KBD_REPLY_ACK)
+	if (kbd_write_output_w_and_wait(KBD_CMD_ENABLE) != KBD_REPLY_ACK)
 		return "Enable keyboard: no ACK";
 
 	/*
 	 * Finally, set the typematic rate to maximum.
 	 */
-	kbd_write_output_w(KBD_CMD_SET_RATE);
-	if (kbd_wait_for_input() != KBD_REPLY_ACK)
+	if (kbd_write_output_w_and_wait(KBD_CMD_SET_RATE) != KBD_REPLY_ACK)
 		return "Set rate: no ACK";
-	kbd_write_output_w(0x00);
-	if (kbd_wait_for_input() != KBD_REPLY_ACK)
-		return "Set rate: no ACK";
+	if (kbd_write_output_w_and_wait(0x00) != KBD_REPLY_ACK)
+		return "Set rate: no 2nd ACK";
 
 	return NULL;
 }
@@ -1109,13 +1178,20 @@ static struct miscdevice psaux_mouse = {
 
 static int __init psaux_init(void)
 {
+	int retval;
+
 	if (!detect_auxiliary_port())
 		return -EIO;
 
-	misc_register(&psaux_mouse);
+	if ((retval = misc_register(&psaux_mouse)))
+		return retval;
+
 	queue = (struct aux_queue *) kmalloc(sizeof(*queue), GFP_KERNEL);
-	if (queue == NULL)
-		panic("psaux_init(): out of memory");
+	if (queue == NULL) {
+		printk(KERN_ERR "psaux_init(): out of memory\n");
+		misc_deregister(&psaux_mouse);
+		return -ENOMEM;
+	}
 	memset(queue, 0, sizeof(*queue));
 	queue->head = queue->tail = 0;
 	init_waitqueue_head(&queue->proc_list);

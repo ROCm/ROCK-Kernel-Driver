@@ -429,9 +429,10 @@ struct call_data_struct {
 	atomic_t started;
 	atomic_t finished;
 	int wait;
-};
+} __attribute__ ((__aligned__(SMP_CACHE_BYTES)));
 
 static struct call_data_struct * call_data;
+static struct call_data_struct call_data_array[NR_CPUS];
 
 /*
  * this function sends a 'generic call function' IPI to all other CPUs
@@ -453,33 +454,45 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
  * hardware interrupt handler, you may call it from a bottom half handler.
  */
 {
-	struct call_data_struct data;
-	int cpus = smp_num_cpus-1;
+	struct call_data_struct *data;
+	int cpus = (cpu_online_map & ~(1 << smp_processor_id()));
 
 	if (!cpus)
 		return 0;
 
-	data.func = func;
-	data.info = info;
-	atomic_set(&data.started, 0);
-	data.wait = wait;
+	data = &call_data_array[smp_processor_id()];
+	
+	data->func = func;
+	data->info = info;
+	data->wait = wait;
 	if (wait)
-		atomic_set(&data.finished, 0);
+		atomic_set(&data->finished, 0);
+	/* We have do to this one last to make sure that the IPI service
+	 * code desn't get confused if it gets an unexpected repeat
+	 * trigger of an old IPI while we're still setting up the new
+	 * one. */
+	atomic_set(&data->started, 0);
 
-	spin_lock_bh(&call_lock);
-	call_data = &data;
-	wmb();
+	local_bh_disable();
+	spin_lock(&call_lock);
+	call_data = data;
 	/* Send a message to all other CPUs and wait for them to respond */
 	send_IPI_allbutself(CALL_FUNCTION_VECTOR);
 
 	/* Wait for response */
-	while (atomic_read(&data.started) != cpus)
+	while (atomic_read(&data->started) != cpus)
 		barrier();
 
+	/* It is now safe to reuse the "call_data" global, but we need
+	 * to keep local bottom-halves disabled until after waiters have
+	 * been acknowledged to prevent reuse of the per-cpu call data
+	 * entry. */
+	spin_unlock(&call_lock);
+
 	if (wait)
-		while (atomic_read(&data.finished) != cpus)
+		while (atomic_read(&data->finished) != cpus)
 			barrier();
-	spin_unlock_bh(&call_lock);
+	local_bh_enable();
 
 	return 0;
 }
@@ -529,18 +542,17 @@ asmlinkage void smp_call_function_interrupt(void)
 
 	ack_APIC_irq();
 	/*
-	 * Notify initiating CPU that I've grabbed the data and am
-	 * about to execute the function
+	 * Notify initiating CPU that I've grabbed the data and am about
+	 * to execute the function (and avoid servicing any single IPI
+	 * twice)
 	 */
-	mb();
-	atomic_inc(&call_data->started);
+	if (test_and_set_bit(smp_processor_id(), &call_data->started))
+		return;
 	/*
 	 * At this point the info structure may be out of scope unless wait==1
 	 */
 	(*func)(info);
-	if (wait) {
-		mb();
-		atomic_inc(&call_data->finished);
-	}
+	if (wait)
+		set_bit(smp_processor_id(), &call_data->finished);
 }
 

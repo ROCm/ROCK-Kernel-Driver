@@ -182,6 +182,7 @@ extern int mp_bus_id_to_pci_bus [MAX_MP_BUSSES];
 extern int mp_current_pci_id;
 extern unsigned long mp_lapic_addr;
 extern int pic_mode;
+extern int using_apic_timer;
 
 #endif
 

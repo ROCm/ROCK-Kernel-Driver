@@ -6,6 +6,9 @@
 #include <linux/apm_bios.h>
 #include <linux/slab.h>
 #include <asm/io.h>
+#include <linux/pm.h>
+#include <linux/keyboard.h>
+#include <asm/keyboard.h>
 
 struct dmi_header
 {
@@ -87,7 +90,15 @@ int __init dmi_iterate(void (*decode)(struct dmi_header *))
 	unsigned char buf[20];
 	long fp=0xE0000L;
 	fp -= 16;
-	
+
+#ifdef CONFIG_SIMNOW
+	/*
+ 	 *	Skip on x86/64 with simnow. Will eventually go away
+ 	 *	If you see this ifdef in 2.6pre mail me !
+ 	 */
+	return;
+#endif
+ 	
 	while( fp < 0xFFFFF)
 	{
 		fp+=16;
@@ -191,6 +202,11 @@ static __init int disable_ide_dma(struct dmi_blacklist *d)
 }
 
 /* 
+ * Reboot options and system auto-detection code provided by
+ * Dell Computer Corporation so their systems "just work". :-)
+ */
+
+/* 
  * Some machines require the "reboot=b"  commandline option, this quirk makes that automatic.
  */
 static __init int set_bios_reboot(struct dmi_blacklist *d)
@@ -201,6 +217,32 @@ static __init int set_bios_reboot(struct dmi_blacklist *d)
 		reboot_thru_bios = 1;
 		printk(KERN_INFO "%s series board detected. Selecting BIOS-method for reboots.\n", d->ident);
 	}
+	return 0;
+}
+
+/*
+ * Some machines require the "reboot=s"  commandline option, this quirk makes that automatic.
+ */
+static __init int set_smp_reboot(struct dmi_blacklist *d)
+{
+#ifdef CONFIG_SMP
+	extern int reboot_smp;
+	if (reboot_smp == 0)
+	{
+		reboot_smp = 1;
+		printk(KERN_INFO "%s series board detected. Selecting SMP-method for reboots.\n", d->ident);
+	}
+#endif
+	return 0;
+}
+
+/*
+ * Some machines require the "reboot=b,s"  commandline option, this quirk makes that automatic.
+ */
+static __init int set_smp_bios_reboot(struct dmi_blacklist *d)
+{
+	set_smp_reboot(d);
+	set_bios_reboot(d);
 	return 0;
 }
 
@@ -271,6 +313,27 @@ static __init int broken_apm_power(struct dmi_blacklist *d)
 	return 0;
 }		
 
+#if defined(CONFIG_SONYPI) || defined(CONFIG_SONYPI_MODULE)
+/*
+ * Check for a Sony Vaio system in order to enable the use of
+ * the sonypi driver (we don't want this driver to be used on
+ * other systems, even if they have the good PCI IDs).
+ *
+ * This one isn't a bug detect for those who asked, we simply want to
+ * activate Sony specific goodies like the camera and jogdial..
+ */
+int is_sony_vaio_laptop;
+
+static __init int sony_vaio_laptop(struct dmi_blacklist *d)
+{
+	if (is_sony_vaio_laptop == 0)
+	{
+		is_sony_vaio_laptop = 1;
+		printk(KERN_INFO "%s laptop detected.\n", d->ident);
+	}
+	return 0;
+}
+#endif
 
 /*
  * This bios swaps the APM minute reporting bytes over (Many sony laptops
@@ -283,6 +346,46 @@ static __init int swab_apm_power_in_minutes(struct dmi_blacklist *d)
 	printk(KERN_WARNING "BIOS strings suggest APM reports battery life in minutes and wrong byte order.\n");
 	return 0;
 }
+
+/*
+ * The Intel 440GX hall of shame. 
+ *
+ * On many (all we have checked) of these boxes the $PIRQ table is wrong.
+ * The MP1.4 table is right however and so SMP kernels tend to work. 
+ */
+ 
+static __init int broken_pirq(struct dmi_blacklist *d)
+{
+	printk(KERN_INFO " *** Possibly defective BIOS detected (irqtable)\n");
+	printk(KERN_INFO " *** Many BIOSes matching this signature have incorrect IRQ routing tables.\n");
+	printk(KERN_INFO " *** If you see IRQ problems, in paticular SCSI resets and hangs at boot\n");
+	printk(KERN_INFO " *** contact your vendor and ask about updates.\n");
+	printk(KERN_INFO " *** Building an SMP kernel may evade the bug some of the time.\n");
+	return 0;
+}
+
+/*
+ * Some Bioses enable the PS/2 mouse (touchpad) at resume, even if it
+ * was disabled before the suspend. Linux gets terribly confused by that.
+ */
+
+typedef void (pm_kbd_func) (void);
+extern pm_kbd_func *pm_kbd_request_override;
+
+static __init int broken_ps2_resume(struct dmi_blacklist *d)
+{
+#ifdef CONFIG_VT
+	if (pm_kbd_request_override == NULL)
+	{
+		pm_kbd_request_override = pckbd_pm_resume;
+		printk(KERN_INFO "%s machine detected. Mousepad Resume Bug workaround enabled.\n", d->ident);
+	}
+#endif	
+	return 0;
+}
+
+
+
 /*
  *	Process the DMI blacklists
  */
@@ -300,6 +403,11 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			NO_MATCH, NO_MATCH, NO_MATCH
 			} },
 #endif			
+	{ broken_ps2_resume, "Dell Latitude C600", {	/* Handle problems with APM on the C600 */
+		        MATCH(DMI_SYS_VENDOR, "Dell"),
+			MATCH(DMI_PRODUCT_NAME, "Latitude C600"),
+			NO_MATCH, NO_MATCH
+	                } },
 	{ broken_apm_power, "Dell Inspiron 5000e", {	/* Handle problems with APM on Inspiron 5000e */
 			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
 			MATCH(DMI_BIOS_VERSION, "A04"),
@@ -310,14 +418,14 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_VERSION, "4.60 PGMA"),
 			MATCH(DMI_BIOS_DATE, "134526184"), NO_MATCH
 			} },
-	{ set_bios_reboot, "PowerEdge 1300/500", {	/* Handle problems with rebooting on Dell 1300's */
+	{ set_smp_bios_reboot, "Dell PowerEdge 1300", {	/* Handle problems with rebooting on Dell 1300's */
 			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
-			MATCH(DMI_PRODUCT_NAME, "PowerEdge 1300/500"),
+			MATCH(DMI_PRODUCT_NAME, "PowerEdge 1300/"),
 			NO_MATCH, NO_MATCH
 			} },
-	{ set_bios_reboot, "PowerEdge 1300/550", {	/* Handle problems with rebooting on Dell 1300's */
+	{ set_bios_reboot, "Dell PowerEdge 300", {	/* Handle problems with rebooting on Dell 1300's */
 			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
-			MATCH(DMI_PRODUCT_NAME, "PowerEdge 1300/550"),
+			MATCH(DMI_PRODUCT_NAME, "PowerEdge 300/"),
 			NO_MATCH, NO_MATCH
 			} },
 	{ set_apm_ints, "IBM", {	/* Allow interrupts during suspend on IBM laptops */
@@ -329,6 +437,12 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME, "Inspiron 4000"),
 			NO_MATCH, NO_MATCH
 			} },
+	{ set_apm_ints, "Compaq 12XL125", {	/* Allow interrupts during suspend on Compaq Laptops*/
+			MATCH(DMI_SYS_VENDOR, "Compaq"),
+			MATCH(DMI_PRODUCT_NAME, "Compaq PC"),
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION,"4.06")
+			} },
 	{ set_apm_ints, "ASUSTeK", {   /* Allow interrupts during APM or the clock goes slow */
 			MATCH(DMI_SYS_VENDOR, "ASUSTeK Computer Inc."),
 			MATCH(DMI_PRODUCT_NAME, "L8400K series Notebook PC"),
@@ -339,21 +453,97 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME, "Delhi3"),
 			NO_MATCH, NO_MATCH,
 			} },
-	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-Z505LS */
-			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
-			MATCH(DMI_BIOS_VERSION, "R0203Z3"),
-			MATCH(DMI_BIOS_DATE, "08/25/00"), NO_MATCH
+	{ apm_is_horked, "Sharp PC-PJ/AX", { /* APM crashes */
+			MATCH(DMI_SYS_VENDOR, "SHARP"),
+			MATCH(DMI_PRODUCT_NAME, "PC-PJ/AX"),
+			MATCH(DMI_BIOS_VENDOR,"SystemSoft"),
+			MATCH(DMI_BIOS_VERSION,"Version R2.08")
 			} },
-	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-Z505LS */
-			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
-			MATCH(DMI_BIOS_VERSION, "R0203D0"),
-			MATCH(DMI_BIOS_DATE, "05/12/00"), NO_MATCH
+#if defined(CONFIG_SONYPI) || defined(CONFIG_SONYPI_MODULE)
+	{ sony_vaio_laptop, "Sony Vaio", { /* This is a Sony Vaio laptop */
+			MATCH(DMI_SYS_VENDOR, "Sony Corporation"),
+			MATCH(DMI_PRODUCT_NAME, "PCG-"),
+			NO_MATCH, NO_MATCH,
 			} },
+#endif
+	{ swab_apm_power_in_minutes, "Sony VAIO", { /* Handle problems with APM on Sony Vaio PCG-N505X(DE) */
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION, "R0206H"),
+			MATCH(DMI_BIOS_DATE, "08/23/99"), NO_MATCH
+	} },
+
+	{ swab_apm_power_in_minutes, "Sony VAIO", { /* Handle problems with APM on Sony Vaio PCG-N505VX */
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION, "W2K06H0"),
+			MATCH(DMI_BIOS_DATE, "02/03/00"), NO_MATCH
+			} },
+			
+	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-XG29 */
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION, "R0117A0"),
+			MATCH(DMI_BIOS_DATE, "04/25/00"), NO_MATCH
+			} },
+
 	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-Z600NE */
 			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
 			MATCH(DMI_BIOS_VERSION, "R0121Z1"),
 			MATCH(DMI_BIOS_DATE, "05/11/00"), NO_MATCH
 			} },
+
+	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-Z505LS */
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION, "R0203D0"),
+			MATCH(DMI_BIOS_DATE, "05/12/00"), NO_MATCH
+			} },
+
+	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-Z505LS */
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION, "R0203Z3"),
+			MATCH(DMI_BIOS_DATE, "08/25/00"), NO_MATCH
+			} },
+	
+	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-F104K */
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION, "R0204K2"),
+			MATCH(DMI_BIOS_DATE, "08/28/00"), NO_MATCH
+			} },
+	
+	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-C1VN/C1VE */
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION, "R0208P1"),
+			MATCH(DMI_BIOS_DATE, "11/09/00"), NO_MATCH
+			} },
+	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-C1VE */
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION, "R0204P1"),
+			MATCH(DMI_BIOS_DATE, "09/12/00"), NO_MATCH
+			} },
+
+	/* Problem Intel 440GX bioses */
+
+	{ broken_pirq, "SABR1 Bios", {			/* Bad $PIR */
+			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
+			MATCH(DMI_BIOS_VERSION,"SABR1"),
+			NO_MATCH, NO_MATCH
+			} },
+	{ broken_pirq, "l44GX Bios", {        		/* Bad $PIR */
+			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
+			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0094.P10"),
+			NO_MATCH, NO_MATCH
+                        } },
+	{ broken_pirq, "l44GX Bios", {		/* Bad $PIR */
+			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
+			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0125.P13"),
+			NO_MATCH, NO_MATCH
+			} },
+                        
+	/* Intel in disgiuse - In this case they can't hide and they don't run
+	   too well either... */
+	{ broken_pirq, "Dell PowerEdge 8450", {		/* Bad $PIR */
+			MATCH(DMI_PRODUCT_NAME, "Dell PowerEdge 8450"),
+			NO_MATCH, NO_MATCH, NO_MATCH
+			} },
+
 	{ NULL, }
 };
 	

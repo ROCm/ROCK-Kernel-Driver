@@ -20,7 +20,8 @@ if [ "$CONFIG_NET_PCMCIA" = "y" ]; then
    fi
 
    if [ "$CONFIG_CARDBUS" = "y" ]; then
-      tristate '  Xircom Tulip-like CardBus support' CONFIG_PCMCIA_XIRTULIP
+      tristate '  Xircom CardBus support (new driver)' CONFIG_PCMCIA_XIRCOM
+      tristate '  Xircom Tulip-like CardBus support (old driver)' CONFIG_PCMCIA_XIRTULIP
    fi
 
    bool '  Pcmcia Wireless LAN' CONFIG_NET_PCMCIA_RADIO

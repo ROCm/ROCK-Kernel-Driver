@@ -1340,9 +1340,13 @@ void __bforget(struct buffer_head * buf)
 	spin_unlock(&lru_list_lock);
 }
 
-/*
- * bread() reads a specified block and returns the buffer that contains
- * it. It returns NULL if the block was unreadable.
+/**
+ *	bread() - reads a specified block and returns the bh
+ *	@block: number of block
+ *	@size: size (in bytes) to read
+ * 
+ *	Reads a specified block, and returns buffer head that
+ *	contains it. It returns NULL if the block was unreadable.
  */
 struct buffer_head * bread(kdev_t dev, int block, int size)
 {

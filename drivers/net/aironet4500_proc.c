@@ -59,7 +59,7 @@ struct awc_proc_private{
 	char 				proc_name[10];
 };	        
 static char awc_drive_info[AWC_STR_SIZE]="Zcom \n\0";
-static char awc_proc_buff[AWC_STR_SIZE]="\0";
+static char awc_proc_buff[AWC_STR_SIZE];
 static int  awc_int_buff;
 static struct awc_proc_private awc_proc_priv[MAX_AWCS]; 
 
@@ -403,7 +403,7 @@ ctl_table awc_root_table[] = {
         {0}
 };
 
-struct ctl_table_header * awc_driver_sysctl_header = NULL;
+struct ctl_table_header * awc_driver_sysctl_header;
 
 const char awc_procname[]= "awc5";
 

@@ -352,7 +352,7 @@ static void nodemgr_node_probe(void *data)
 {
 	struct hpsb_host *host = (struct hpsb_host *)data;
         struct selfid *sid = (struct selfid *)host->topology_map;
-	struct list_head *lh;
+	struct list_head *lh,*spare;
 	struct node_entry *ne;
         int nodecount = host->node_count;
         nodeid_t nodeid = LOCAL_BUS;
@@ -442,7 +442,7 @@ set_options:
 	/* Now check to see if we have any nodes that aren't referenced
 	 * any longer.  */
         write_lock_irqsave(&node_lock, flags);
-	list_for_each(lh, &node_list) {
+	list_for_each_safe(lh, spare, &node_list) {
 		ne = list_entry(lh, struct node_entry, list);
 
 		/* Only checking this host */

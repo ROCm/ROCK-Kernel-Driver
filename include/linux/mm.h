@@ -438,6 +438,8 @@ extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *
 extern int ptrace_readdata(struct task_struct *tsk, unsigned long src, char *dst, int len);
 extern int ptrace_writedata(struct task_struct *tsk, char * src, unsigned long dst, int len);
 extern int ptrace_attach(struct task_struct *tsk);
+extern int ptrace_detach(struct task_struct *, unsigned int);
+extern void ptrace_disable(struct task_struct *);
 
 /*
  * On a two-level page table, this ends up being trivial. Thus the

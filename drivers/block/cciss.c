@@ -416,6 +416,8 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case BLKRASET:
 	case BLKRAGET:
 	case BLKPG:
+	case BLKELVGET:
+	case BLKELVSET:
 		return( blk_ioctl(inode->i_rdev, cmd, arg));
 	case CCISS_GETPCIINFO:
 	{

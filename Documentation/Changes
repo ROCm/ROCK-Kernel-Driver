@@ -48,7 +48,7 @@ necessary on all systems; obviously, if you don't have any PCMCIA (PC
 Card) hardware, for example, you probably needn't concern yourself
 with pcmcia-cs.
 
-o  Gnu C                  2.91.66                 # gcc --version
+o  Gnu C                  2.95.3                  # gcc --version
 o  Gnu make               3.77                    # make --version
 o  binutils               2.9.1.0.25              # ld -v
 o  util-linux             2.10o                   # fdformat --version
@@ -70,17 +70,23 @@ computer. The next paragraph applies to users of x86 CPUs, but not
 necessarily to users of other CPUs. Users of other CPUs should obtain
 information about their gcc version requirements from another source.
 
-The recommended compiler for the kernel is egcs 1.1.2 (gcc 2.91.66), and it
-should be used when you need absolute stability. You may use gcc 2.95.x
-instead if you wish, although it may cause problems. Later versions of gcc
-have not received much testing for Linux kernel compilation, and there are
+The recommended compiler for the kernel is gcc 2.95.3 or .4, and it
+should be used when you need absolute stability. You may use gcc 3.0.x
+instead if you wish, although it may cause problems. Later  versions of gcc 
+have not received much testing for Linux kernel compilation, and there are 
 almost certainly bugs (mainly, but not exclusively, in the kernel) that
 will need to be fixed in order to use these compilers. In any case, using
 pgcc instead of egcs or plain gcc is just asking for trouble.
 
 Note that gcc 2.7.2.3 is no longer a supported kernel compiler. The kernel
 no longer works around bugs in gcc 2.7.2.3 and, in fact, will refuse to
-be compiled with it.
+be compiled with it. egcs-1.1.2 has register allocation problems in very
+obscure cases. We have ensured the kernel does not trip these in any known
+situation. The 2.5 tree is likely to drop egcs-1.1.2 workarounds.
+
+The Red Hat gcc 2.96 compiler subtree can also be used to build this tree.
+You should ensure you use gcc-2.96-74 or later. gcc-2.96-54 will not build
+the kernel correctly.
 
 In addition, please pay attention to compiler optimization.  Anything
 greater than -O2 may not be wise.  Similarly, if you choose to use gcc-2.95.x

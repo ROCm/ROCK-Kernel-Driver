@@ -396,8 +396,9 @@ pci_disable_device(struct pci_dev *dev)
 
 /**
  * pci_enable_wake - enable device to generate PME# when suspended
- * @dev - PCI device to operate on
- * @enable - Flag to enable or disable generation
+ * @dev: - PCI device to operate on
+ * @state: - Current state of device.
+ * @enable: - Flag to enable or disable generation
  * 
  * Set the bits in the device's PM Capabilities to generate PME# when
  * the system is suspended. 

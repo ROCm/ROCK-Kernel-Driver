@@ -228,6 +228,9 @@
  *    - Added Epson Perfection 1640SU and 1640SU Photo.  Thanks to
  *      Jean-Luc <f5ibh@db0bm.ampr.org>.
  *
+ * 0.4.6 08/16/2001 Yves Duret <yduret@mandrakesoft.com>
+ *    - added devfs support (from printer.c)
+ *
  *  TODO
  *
  *    - Performance
@@ -579,6 +582,100 @@ read_scanner(struct file * file, char * buffer,
 	return ret ? ret : bytes_read;
 }
 
+#ifdef SCN_IOCTL
+static int
+ioctl_scanner(struct inode *inode, struct file *file,
+	      unsigned int cmd, unsigned long arg)
+{
+	struct usb_device *dev;
+
+	int result;
+
+	kdev_t scn_minor;
+
+	scn_minor = USB_SCN_MINOR(inode);
+
+	if (!p_scn_table[scn_minor]) {
+		err("ioctl_scanner(%d): invalid scn_minor", scn_minor);
+		return -ENODEV;
+	}
+
+	dev = p_scn_table[scn_minor]->scn_dev;
+
+	switch (cmd)
+	{
+	case IOCTL_SCANNER_VENDOR :
+		return (put_user(dev->descriptor.idVendor, (unsigned int *) arg));
+	case IOCTL_SCANNER_PRODUCT :
+		return (put_user(dev->descriptor.idProduct, (unsigned int *) arg));
+	case PV8630_IOCTL_INREQUEST :
+	{
+		struct {
+			__u8  data;
+			__u8  request;
+			__u16 value;
+			__u16 index;
+		} args;
+
+		if (copy_from_user(&args, (void *)arg, sizeof(args)))
+			return -EFAULT;
+
+		result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
+					 args.request, USB_TYPE_VENDOR|
+					 USB_RECIP_DEVICE|USB_DIR_IN,
+					 args.value, args.index, &args.data,
+					 1, HZ*5);
+
+		dbg("ioctl_scanner(%d): inreq: args.data:%x args.value:%x args.index:%x args.request:%x\n", scn_minor, args.data, args.value, args.index, args.request);
+
+		if (copy_to_user((void *)arg, &args, sizeof(args)))
+			return -EFAULT;
+
+		dbg("ioctl_scanner(%d): inreq: result:%d\n", scn_minor, result);
+
+		return result;
+	}
+	case PV8630_IOCTL_OUTREQUEST :
+	{
+		struct {
+			__u8  request;
+			__u16 value;
+			__u16 index;
+		} args;
+
+		if (copy_from_user(&args, (void *)arg, sizeof(args)))
+			return -EFAULT;
+
+		dbg("ioctl_scanner(%d): outreq: args.value:%x args.index:%x args.request:%x\n", scn_minor, args.value, args.index, args.request);
+
+		result = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+					 args.request, USB_TYPE_VENDOR|
+					 USB_RECIP_DEVICE|USB_DIR_OUT,
+					 args.value, args.index, NULL,
+					 0, HZ*5);
+
+		dbg("ioctl_scanner(%d): outreq: result:%d\n", scn_minor, result);
+
+		return result;
+	}
+	default:
+		return -ENOTTY;
+	}
+	return 0;
+}
+#endif /* SCN_IOCTL */
+
+static struct
+file_operations usb_scanner_fops = {
+	read:		read_scanner,
+	write:		write_scanner,
+#ifdef SCN_IOCTL
+	ioctl:		ioctl_scanner,
+#endif /* SCN_IOCTL */
+	open:		open_scanner,
+	release:	close_scanner,
+};
+
 static void *
 probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	      const struct usb_device_id *id)
@@ -813,6 +910,14 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 
 	init_MUTEX(&(scn->gen_lock));
 
+	/* if we have devfs, create with perms=660 */
+	scn->devfs = devfs_register(usb_devfs_handle, "scanner",
+				      DEVFS_FL_DEFAULT, USB_MAJOR,
+				      SCN_BASE_MNR + scn_minor,
+				      S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
+				      S_IWGRP, &usb_scanner_fops, NULL);
+
+
 	return p_scn_table[scn_minor] = scn;
 }
 
@@ -828,6 +933,8 @@ disconnect_scanner(struct usb_device *dev, void *ptr)
         usb_driver_release_interface(&scanner_driver,
                 &scn->scn_dev->actconfig->interface[scn->ifnum]);
 
+	devfs_unregister (scn->devfs);
+
 	kfree(scn->ibuf);
 	kfree(scn->obuf);
 
@@ -836,99 +943,6 @@ disconnect_scanner(struct usb_device *dev, void *ptr)
 	kfree (scn);
 }
 
-#ifdef SCN_IOCTL
-static int
-ioctl_scanner(struct inode *inode, struct file *file,
-	      unsigned int cmd, unsigned long arg)
-{
-	struct usb_device *dev;
-
-	int result;
-
-	kdev_t scn_minor;
-
-	scn_minor = USB_SCN_MINOR(inode);
-
-	if (!p_scn_table[scn_minor]) {
-		err("ioctl_scanner(%d): invalid scn_minor", scn_minor);
-		return -ENODEV;
-	}
-
-	dev = p_scn_table[scn_minor]->scn_dev;
-
-	switch (cmd)
-	{
-	case IOCTL_SCANNER_VENDOR :
-		return (put_user(dev->descriptor.idVendor, (unsigned int *) arg));
-	case IOCTL_SCANNER_PRODUCT :
-		return (put_user(dev->descriptor.idProduct, (unsigned int *) arg));
-	case PV8630_IOCTL_INREQUEST :
-	{
-		struct {
-			__u8  data;
-			__u8  request;
-			__u16 value;
-			__u16 index;
-		} args;
-
-		if (copy_from_user(&args, (void *)arg, sizeof(args)))
-			return -EFAULT;
-
-		result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-					 args.request, USB_TYPE_VENDOR|
-					 USB_RECIP_DEVICE|USB_DIR_IN,
-					 args.value, args.index, &args.data,
-					 1, HZ*5);
-
-		dbg("ioctl_scanner(%d): inreq: args.data:%x args.value:%x args.index:%x args.request:%x\n", scn_minor, args.data, args.value, args.index, args.request);
-
-		if (copy_to_user((void *)arg, &args, sizeof(args)))
-			return -EFAULT;
-
-		dbg("ioctl_scanner(%d): inreq: result:%d\n", scn_minor, result);
-
-		return result;
-	}
-	case PV8630_IOCTL_OUTREQUEST :
-	{
-		struct {
-			__u8  request;
-			__u16 value;
-			__u16 index;
-		} args;
-
-		if (copy_from_user(&args, (void *)arg, sizeof(args)))
-			return -EFAULT;
-
-		dbg("ioctl_scanner(%d): outreq: args.value:%x args.index:%x args.request:%x\n", scn_minor, args.value, args.index, args.request);
-
-		result = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-					 args.request, USB_TYPE_VENDOR|
-					 USB_RECIP_DEVICE|USB_DIR_OUT,
-					 args.value, args.index, NULL,
-					 0, HZ*5);
-
-		dbg("ioctl_scanner(%d): outreq: result:%d\n", scn_minor, result);
-
-		return result;
-	}
-	default:
-		return -ENOTTY;
-	}
-	return 0;
-}
-#endif /* SCN_IOCTL */
-
-static struct
-file_operations usb_scanner_fops = {
-	read:		read_scanner,
-	write:		write_scanner,
-#ifdef SCN_IOCTL
-	ioctl:		ioctl_scanner,
-#endif /* SCN_IOCTL */
-	open:		open_scanner,
-	release:	close_scanner,
-};
 
 static struct
 usb_driver scanner_driver = {

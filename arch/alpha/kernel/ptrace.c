@@ -233,6 +233,16 @@ ptrace_cancel_bpt(struct task_struct * child)
 	return (nsaved != 0);
 }
 
+/*
+ * Called by kernel/ptrace.c when detaching..
+ *
+ * Make sure the single step bit is not set.
+ */
+void ptrace_disable(struct task_struct *child)
+{ 
+	ptrace_cancel_bpt(child);
+}
+
 asmlinkage long
 sys_ptrace(long request, long pid, long addr, long data,
 	   int a4, int a5, struct pt_regs regs)
@@ -362,21 +372,8 @@ sys_ptrace(long request, long pid, long addr, long data,
 		ret = 0;
 		goto out;
 
-	case PTRACE_DETACH: /* detach a process that was attached. */
-		ret = -EIO;
-		if ((unsigned long) data > _NSIG)
-			goto out;
-		child->ptrace &= ~(PT_PTRACED|PT_TRACESYS);
-		wake_up_process(child);
-		child->exit_code = data;
-		write_lock_irq(&tasklist_lock);
-		REMOVE_LINKS(child);
-		child->p_pptr = child->p_opptr;
-		SET_LINKS(child);
-		write_unlock_irq(&tasklist_lock);
-		/* make sure single-step breakpoint is gone. */
-		ptrace_cancel_bpt(child);
-		ret = 0;
+	case PTRACE_DETACH:	 /* detach a process that was attached. */
+		ret = ptrace_detach(child, data);
 		goto out;
 
 	default:

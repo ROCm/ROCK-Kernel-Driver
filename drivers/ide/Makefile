@@ -66,6 +66,12 @@ ide-obj-$(CONFIG_BLK_DEV_TRM290)	+= trm290.o
 ide-obj-$(CONFIG_BLK_DEV_UMC8672)	+= umc8672.o
 ide-obj-$(CONFIG_BLK_DEV_VIA82CXXX)	+= via82cxxx.o
 
+# The virtualised raid layers MUST come after the ide itself or bad stuff
+# will happen.
+obj-$(CONFIG_BLK_DEV_ATARAID)	+= ataraid.o
+obj-$(CONFIG_BLK_DEV_ATARAID_PDC)	+= pdcraid.o
+obj-$(CONFIG_BLK_DEV_ATARAID_HPT)	+= hptraid.o
+
 ide-obj-$(CONFIG_PROC_FS)		+= ide-proc.o
 
 ide-mod-objs		:= $(export-objs) $(ide-obj-y)

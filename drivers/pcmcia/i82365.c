@@ -934,7 +934,7 @@ static void pcic_bh(void *dummy)
 		"we have a card coming in" electronics have seen it. 
 		*/
 		if (events & SS_DETECT) 
-			mdelay(2);
+			mdelay(4);
 		if (socket[i].handler)
 			socket[i].handler(socket[i].info, events);
 	}

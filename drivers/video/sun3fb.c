@@ -586,9 +586,11 @@ sizechange:
 	fb->cursor.hwsize.fbx = 32;
 	fb->cursor.hwsize.fby = 32;
 	
-	if (depth > 1 && !fb->color_map)
+	if (depth > 1 && !fb->color_map) {
 		fb->color_map = kmalloc(256 * 3, GFP_ATOMIC);
-		
+		return -ENOMEM;
+	}
+			
 	switch(fbtype) {
 #ifdef CONFIG_FB_CGSIX
 	case FBTYPE_SUNFAST_COLOR:
@@ -687,3 +689,5 @@ int __init sun3fb_init(void)
 	}
 #endif			
 }
+
+MODULE_LICENSE("GPL");
