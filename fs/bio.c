@@ -372,6 +372,38 @@ int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
 			      len, offset);
 }
 
+struct bio_map_data {
+	struct bio_vec *iovecs;
+	void __user *userptr;
+};
+
+static void bio_set_map_data(struct bio_map_data *bmd, struct bio *bio)
+{
+	memcpy(bmd->iovecs, bio->bi_io_vec, sizeof(struct bio_vec) * bio->bi_vcnt);
+	bio->bi_private = bmd;
+}
+
+static void bio_free_map_data(struct bio_map_data *bmd)
+{
+	kfree(bmd->iovecs);
+	kfree(bmd);
+}
+
+static struct bio_map_data *bio_alloc_map_data(int nr_segs)
+{
+	struct bio_map_data *bmd = kmalloc(sizeof(*bmd), GFP_KERNEL);
+
+	if (!bmd)
+		return NULL;
+
+	bmd->iovecs = kmalloc(sizeof(struct bio_vec) * nr_segs, GFP_KERNEL);
+	if (bmd)
+		return bmd;
+
+	kfree(bmd);
+	return NULL;
+}
+
 /**
  *	bio_uncopy_user	-	finish previously mapped bio
  *	@bio: bio being terminated
@@ -381,20 +413,22 @@ int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
  */
 int bio_uncopy_user(struct bio *bio)
 {
+	struct bio_map_data *bmd = bio->bi_private;
+	const int read = bio_data_dir(bio) == READ;
 	struct bio_vec *bvec;
 	int i, ret = 0;
 
-	char *uaddr = bio->bi_private;
-
 	__bio_for_each_segment(bvec, bio, i, 0) {
 		char *addr = page_address(bvec->bv_page);
-		if (bio_data_dir(bio) == READ && !ret &&
-		    copy_to_user(uaddr, addr, bvec->bv_len))
+		unsigned int len = bmd->iovecs[i].bv_len;
+
+		if (read && !ret && copy_to_user(bmd->userptr, addr, len))
 			ret = -EFAULT;
 
 		__free_page(bvec->bv_page);
-		uaddr += bvec->bv_len;
+		bmd->userptr += len;
 	}
+	bio_free_map_data(bmd);
 	bio_put(bio);
 	return ret;
 }
@@ -415,14 +449,25 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 {
 	unsigned long end = (uaddr + len + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	unsigned long start = uaddr >> PAGE_SHIFT;
+	struct bio_map_data *bmd;
 	struct bio_vec *bvec;
 	struct page *page;
 	struct bio *bio;
 	int i, ret;
 
-	bio = bio_alloc(GFP_KERNEL, end - start);
-	if (!bio)
+	bmd = bio_alloc_map_data(end - start);
+	if (!bmd)
 		return ERR_PTR(-ENOMEM);
+
+	bmd->userptr = (void __user *) uaddr;
+
+	bio = bio_alloc(GFP_KERNEL, end - start);
+	if (!bio) {
+		bio_free_map_data(bmd);
+		return ERR_PTR(-ENOMEM);
+	}
+
+	bio->bi_rw |= (!write_to_vm << BIO_RW);
 
 	ret = 0;
 	while (len) {
@@ -445,33 +490,30 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 		len -= bytes;
 	}
 
+	if (ret)
+		goto cleanup;
+
 	/*
 	 * success
 	 */
-	if (!ret) {
-		if (!write_to_vm) {
-			unsigned long p = uaddr;
-			bio->bi_rw |= (1 << BIO_RW);
-			/*
-	 		 * for a write, copy in data to kernel pages
-			 */
-			ret = -EFAULT;
-			bio_for_each_segment(bvec, bio, i) {
-				char *addr = page_address(bvec->bv_page);
+	if (!write_to_vm) {
+		unsigned long p = uaddr;
 
-				if (copy_from_user(addr, (char *) p, bvec->bv_len))
-					goto cleanup;
-				p += bvec->bv_len;
-			}
+		/*
+		 * for a write, copy in data to kernel pages
+		 */
+		ret = -EFAULT;
+		bio_for_each_segment(bvec, bio, i) {
+			char *addr = page_address(bvec->bv_page);
+
+			if (copy_from_user(addr, (char *) p, bvec->bv_len))
+				goto cleanup;
+			p += bvec->bv_len;
 		}
-
-		bio->bi_private = (void *) uaddr;
-		return bio;
 	}
 
-	/*
-	 * cleanup
-	 */
+	bio_set_map_data(bmd, bio);
+	return bio;
 cleanup:
 	bio_for_each_segment(bvec, bio, i)
 		__free_page(bvec->bv_page);

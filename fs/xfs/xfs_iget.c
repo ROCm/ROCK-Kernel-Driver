@@ -457,7 +457,7 @@ inode_allocate:
 			error = xfs_iget_core(vp, mp, tp, ino,
 						lock_flags, ipp, bno);
 			if (error) {
-				make_bad_inode(inode);
+				vn_mark_bad(vp);
 				if (inode->i_state & I_NEW)
 					unlock_new_inode(inode);
 				iput(inode);
@@ -576,11 +576,8 @@ xfs_iput_new(xfs_inode_t	*ip,
 
 	vn_trace_entry(vp, "xfs_iput_new", (inst_t *)__return_address);
 
-	/* We shouldn't get here without this being true, but just in case */
-	if (inode->i_state & I_NEW) {
-		make_bad_inode(inode);
+	if (inode->i_state & I_NEW)
 		unlock_new_inode(inode);
-	}
 	if (lock_flags)
 		xfs_iunlock(ip, lock_flags);
 	VN_RELE(vp);
