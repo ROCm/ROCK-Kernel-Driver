@@ -224,6 +224,9 @@ static int hid_add_field(struct hid_parser *parser, unsigned report_type, unsign
 	offset = report->size;
 	report->size += parser->global.report_size * parser->global.report_count;
 
+	if (usages < parser->global.report_count)
+		usages = parser->global.report_count;
+
 	if (usages == 0)
 		return 0; /* ignore padding fields */
 
@@ -235,9 +238,13 @@ static int hid_add_field(struct hid_parser *parser, unsigned report_type, unsign
 	field->application = hid_lookup_collection(parser, HID_COLLECTION_APPLICATION);
 
 	for (i = 0; i < usages; i++) {
-		field->usage[i].hid = parser->local.usage[i];
+		int j = i;
+		/* Duplicate the last usage we parsed if we have excess values */
+		if (i >= parser->local.usage_index)
+			j = parser->local.usage_index - 1;
+		field->usage[i].hid = parser->local.usage[j];
 		field->usage[i].collection_index =
-			parser->local.collection_index[i];
+			parser->local.collection_index[j];
 	}
 
 	field->maxusage = usages;
