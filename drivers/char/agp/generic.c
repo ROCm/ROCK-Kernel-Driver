@@ -328,47 +328,39 @@ u32 agp_collect_device_status(u32 mode, u32 command)
 		pci_read_config_dword(device, agp + PCI_AGP_STATUS, &scratch);
 
 		/* adjust RQ depth */
-		command = ((command & ~0xff000000) |
-		     min_t(u32, (mode & 0xff000000),
-			 min_t(u32, (command & 0xff000000),
-			     (scratch & 0xff000000))));
+		command = ((command & ~AGPSTAT_RQ_DEPTH) |
+		     min_t(u32, (mode & AGPSTAT_RQ_DEPTH),
+			 min_t(u32, (command & AGPSTAT_RQ_DEPTH),
+			     (scratch & AGPSTAT_RQ_DEPTH))));
 
 		/* disable SBA if it's not supported */
-		if (!((command & 0x00000200) &&
-		      (scratch & 0x00000200) &&
-		      (mode & 0x00000200)))
-			command &= ~0x00000200;
+		if (!((command & AGPSTAT_SBA) && (scratch & AGPSTAT_SBA) && (mode & AGPSTAT_SBA)))
+			command &= ~AGPSTAT_SBA;
 
 		/* disable FW if it's not supported */
-		if (!((command & 0x00000010) &&
-		      (scratch & 0x00000010) &&
-		      (mode & 0x00000010)))
-			command &= ~0x00000010;
+		if (!((command & AGPSTAT_FW) && (scratch & AGPSTAT_FW) && (mode & AGPSTAT_FW)))
+			command &= ~AGPSTAT_FW;
 
-		if (!((command & 4) &&
-		      (scratch & 4) &&
-		      (mode & 4)))
-			command &= ~0x00000004;
+		/* Set speed */
+		if (!((command & AGPSTAT2_4X) && (scratch & AGPSTAT2_4X) && (mode & AGPSTAT2_4X)))
+			command &= ~AGPSTAT2_4X;
 
-		if (!((command & 2) &&
-		      (scratch & 2) &&
-		      (mode & 2)))
-			command &= ~0x00000002;
+		if (!((command & AGPSTAT2_2X) && (scratch & AGPSTAT2_2X) && (mode & AGPSTAT2_2X)))
+			command &= ~AGPSTAT2_2X;
 
-		if (!((command & 1) &&
-		      (scratch & 1) &&
-		      (mode & 1)))
-			command &= ~0x00000001;
+		if (!((command & AGPSTAT2_1X) && (scratch & AGPSTAT2_1X) && (mode & AGPSTAT2_1X)))
+			command &= ~AGPSTAT2_1X;
 	}
 
-	if (command & 4)
-		command &= ~3;	/* 4X */
+	/* Now we know what mode it should be, clear out the unwanted bits. */
+	if (command & AGPSTAT2_4X)
+		command &= ~(AGPSTAT2_1X | AGPSTAT2_2X);	/* 4X */
 
-	if (command & 2)
-		command &= ~5;	/* 2X (8X for AGP3.0) */
+	if (command & AGPSTAT2_2X)
+		command &= ~(AGPSTAT2_1X | AGPSTAT2_4X);	/* 2X */
 
-	if (command & 1)
-		command &= ~6;	/* 1X (4X for AGP3.0) */
+	if (command & AGPSTAT2_1X)
+		command &= ~(AGPSTAT2_2X | AGPSTAT2_4X);	/* 1Xf */
 
 	return command;
 }
