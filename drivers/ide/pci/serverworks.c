@@ -582,7 +582,7 @@ static unsigned int __init init_chipset_svwks (struct pci_dev *dev, const char *
 			 * This is a device pin issue on CSB6.
 			 * Since there will be a future raid mode,
 			 * early versions of the chipset require the
-			 * interrupt pin to be set, and it is a compatiblity
+			 * interrupt pin to be set, and it is a compatibility
 			 * mode issue.
 			 */
 			dev->irq = 0;

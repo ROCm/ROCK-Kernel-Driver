@@ -2,12 +2,12 @@
  * linux/drivers/ide/pci/cy82c693.c		Version 0.40	Sep. 10, 2002
  *
  *  Copyright (C) 1998-2000 Andreas S. Krebs (akrebs@altavista.net), Maintainer
- *  Copyright (C) 1998-2002 Andre Hedrick <andre@linux-ide.org>, Integrater
+ *  Copyright (C) 1998-2002 Andre Hedrick <andre@linux-ide.org>, Integrator
  *
  * CYPRESS CY82C693 chipset IDE controller
  *
  * The CY82C693 chipset is used on Digital's PC-Alpha 164SX boards.
- * Writting the driver was quite simple, since most of the job is
+ * Writing the driver was quite simple, since most of the job is
  * done by the generic pci-ide support. 
  * The hard part was finding the CY82C693's datasheet on Cypress's
  * web page :-(. But Altavista solved this problem :-).

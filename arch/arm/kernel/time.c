@@ -89,7 +89,7 @@ static inline void do_profile(struct pt_regs *regs)
 	}
 }
 
-static long next_rtc_update;
+static unsigned long next_rtc_update;
 
 /*
  * If we have an externally synchronized linux clock, then update

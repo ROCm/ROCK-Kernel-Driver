@@ -437,7 +437,7 @@ static int ioctl_parms(unsigned long arg, unsigned int type)
 	put_user(len, kcmd.reslen);
 	if(len > reslen)
 		ret = -ENOBUFS;
-	else if(copy_to_user(cmd->resbuf, res, len))
+	else if(copy_to_user(kcmd.resbuf, res, len))
 		ret = -EFAULT;
 
 	kfree(res);

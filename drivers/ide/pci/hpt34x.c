@@ -166,7 +166,7 @@ static void hpt34x_tune_drive (ide_drive_t *drive, u8 pio)
 /*
  * This allows the configuration of ide_pci chipset registers
  * for cards that learn about the drive's UDMA, DMA, PIO capabilities
- * after the drive is reported by the OS.  Initally for designed for
+ * after the drive is reported by the OS.  Initially for designed for
  * HPT343 UDMA chipset by HighPoint|Triones Technologies, Inc.
  */
 

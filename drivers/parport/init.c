@@ -227,17 +227,3 @@ EXPORT_SYMBOL(parport_daisy_init);
 EXPORT_SYMBOL(parport_find_device);
 EXPORT_SYMBOL(parport_find_class);
 #endif
-
-void inc_parport_count(void)
-{
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-}
-
-void dec_parport_count(void)
-{
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
-}

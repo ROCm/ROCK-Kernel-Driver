@@ -191,7 +191,7 @@ static int __init eisa_probe (struct eisa_root_device *root)
 			eisa_register_device (root, str, i);
                 }
         }
-        printk (KERN_INFO "EISA: Detected %d card%s.\n", c, c < 2 ? "" : "s");
+        printk (KERN_INFO "EISA: Detected %d card%s.\n", c, c == 1 ? "" : "s");
 
 	return 0;
 }

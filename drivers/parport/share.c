@@ -55,37 +55,44 @@ static unsigned char dead_frob_lines (struct parport *p, unsigned char b,
 static void dead_onearg (struct parport *p){}
 static void dead_initstate (struct pardevice *d, struct parport_state *s) { }
 static void dead_state (struct parport *p, struct parport_state *s) { }
-static void dead_noargs (void) { }
 static size_t dead_write (struct parport *p, const void *b, size_t l, int f)
 { return 0; }
 static size_t dead_read (struct parport *p, void *b, size_t l, int f)
 { return 0; }
 static struct parport_operations dead_ops = {
-	dead_write_lines,	/* data */
-	dead_read_lines,
-	dead_write_lines,	/* control */
-	dead_read_lines,
-	dead_frob_lines,
-	dead_read_lines,	/* status */
-	dead_onearg,		/* enable_irq */
-	dead_onearg,		/* disable_irq */
-	dead_onearg,		/* data_forward */
-	dead_onearg,		/* data_reverse */
-	dead_initstate,		/* init_state */
-	dead_state,
-	dead_state,
-	dead_noargs,		/* xxx_use_count */
-	dead_noargs,
-	dead_write,		/* epp */
-	dead_read,
-	dead_write,
-	dead_read,
-	dead_write,		/* ecp */
-	dead_read,
-	dead_write,
-	dead_write,		/* compat */
-	dead_read,		/* nibble */
-	dead_read		/* byte */
+	.write_data	= dead_write_lines,	/* data */
+	.read_data	= dead_read_lines,
+
+	.write_control	= dead_write_lines,	/* control */
+	.read_control	= dead_read_lines,
+	.frob_control	= dead_frob_lines,
+
+	.read_status	= dead_read_lines,	/* status */
+
+	.enable_irq	= dead_onearg,		/* enable_irq */
+	.disable_irq	= dead_onearg,		/* disable_irq */
+
+	.data_forward	= dead_onearg,		/* data_forward */
+	.data_reverse	= dead_onearg,		/* data_reverse */
+
+	.init_state	= dead_initstate,	/* init_state */
+	.save_state	= dead_state,
+	.restore_state	= dead_state,
+
+	.epp_write_data	= dead_write,		/* epp */
+	.epp_read_data	= dead_read,
+	.epp_write_addr	= dead_write,
+	.epp_read_addr	= dead_read,
+
+	.ecp_write_data	= dead_write,		/* ecp */
+	.ecp_read_data	= dead_read,
+	.ecp_write_addr	= dead_write,
+ 
+	.compat_write_data	= dead_write,	/* compat */
+	.nibble_read_data	= dead_read,	/* nibble */
+	.byte_read_data		= dead_read,	/* byte */
+
+	.owner		= NULL,
 };
 
 /* Call attach(port) for each registered driver. */
@@ -390,25 +397,6 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 		return NULL;
 	}
 
-	/* Search for the lowest free parport number. */
-
-	spin_lock_irq (&parportlist_lock);
-	for (portnum = 0; ; portnum++) {
-		struct parport *itr = portlist;
-		while (itr) {
-			if (itr->number == portnum)
-				/* No good, already used. */
-				break;
-			else
-				itr = itr->next;
-		}
-
-		if (itr == NULL)
-			/* Got to the end of the list. */
-			break;
-	}
-	spin_unlock_irq (&parportlist_lock);
-	
 	/* Init our structure */
  	memset(tmp, 0, sizeof(struct parport));
 	tmp->base = base;
@@ -420,7 +408,6 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 	tmp->devices = tmp->cad = NULL;
 	tmp->flags = 0;
 	tmp->ops = ops;
-	tmp->portnum = tmp->number = portnum;
 	tmp->physport = tmp;
 	memset (tmp->probe_info, 0, 5 * sizeof (struct parport_device_info));
 	tmp->cad_lock = RW_LOCK_UNLOCKED;
@@ -438,17 +425,38 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 		kfree(tmp);
 		return NULL;
 	}
+	/* Search for the lowest free parport number. */
+
+	spin_lock_irq (&parportlist_lock);
+	for (portnum = 0; ; portnum++) {
+		struct parport *itr = portlist;
+		while (itr) {
+			if (itr->number == portnum)
+				/* No good, already used. */
+				break;
+			else
+				itr = itr->next;
+		}
+
+		if (itr == NULL)
+			/* Got to the end of the list. */
+			break;
+	}
+
+	/*
+	 * Now that the portnum is known finish doing the Init.
+	 */
+	tmp->portnum = tmp->number = portnum;
 	sprintf(name, "parport%d", portnum);
 	tmp->name = name;
 
+	
 	/*
 	 * Chain the entry to our list.
 	 *
 	 * This function must not run from an irq handler so we don' t need
 	 * to clear irq on the local CPU. -arca
 	 */
-
-	spin_lock(&parportlist_lock);
 
 	/* We are locked against anyone else performing alterations, but
 	 * because of parport_enumerate people can still _read_ the list
@@ -664,8 +672,10 @@ parport_register_device(struct parport *port, const char *name,
            kmalloc.  To be absolutely safe, we have to require that
            our caller doesn't sleep in between parport_enumerate and
            parport_register_device.. */
-	inc_parport_count();
-	port->ops->inc_use_count();
+	if (!try_module_get(port->ops->owner)) {
+		return NULL;
+	}
+		
 	parport_get_port (port);
 
 	tmp = kmalloc(sizeof(struct pardevice), GFP_KERNEL);
@@ -736,9 +746,9 @@ parport_register_device(struct parport *port, const char *name,
  out_free_pardevice:
 	kfree (tmp);
  out:
-	dec_parport_count();
-	port->ops->dec_use_count();
 	parport_put_port (port);
+	module_put(port->ops->owner);
+
 	return NULL;
 }
 
@@ -801,8 +811,7 @@ void parport_unregister_device(struct pardevice *dev)
 	kfree(dev->state);
 	kfree(dev);
 
-	dec_parport_count();
-	port->ops->dec_use_count();
+	module_put(port->ops->owner);
 	parport_put_port (port);
 
 	/* Yes, that's right, someone _could_ still have a pointer to
