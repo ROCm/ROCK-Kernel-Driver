@@ -512,7 +512,7 @@ filldir32 (void *__buf, const char *name, int namlen, loff_t offset, ino_t ino,
 {
 	struct linux32_dirent * dirent;
 	struct getdents32_callback * buf = (struct getdents32_callback *) __buf;
-	int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 1, 4);
+	int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 2, 4);
 
 	buf->error = -EINVAL;	/* only used if we fail.. */
 	if (reclen > buf->count)
@@ -526,6 +526,7 @@ filldir32 (void *__buf, const char *name, int namlen, loff_t offset, ino_t ino,
 	put_user(reclen, &dirent->d_reclen);
 	copy_to_user(dirent->d_name, name, namlen);
 	put_user(0, dirent->d_name + namlen);
+	put_user(d_type, (char *)dirent + reclen - 1); 
 	dirent = ((void *)dirent) + reclen;
 	buf->current_dir = dirent;
 	buf->count -= reclen;
@@ -881,7 +882,10 @@ static char *badfs[] = {
 static int checktype(char *user_type) 
 { 
 	int err = 0; 
-	char **s,*kernel_type = getname(user_type); 
+	char **s,*kernel_type;
+	if (!user_type) 
+		return 0;
+	kernel_type = getname(user_type); 
 	if (!kernel_type || IS_ERR(kernel_type)) 
 		return -EFAULT; 
 	for (s = badfs; *s; ++s) 
