@@ -38,47 +38,12 @@
 #include <asm/hardware.h>
 
 /*
- * Function: arm720_cache_clean_invalidate_all (void)
- *	   : arm720_cache_clean_invalidate_page (unsigned long address, int size,
- *                                    int flags)
- *
- * Params  : address	Area start address
- *	   : size	size of area
- *	   : flags	b0 = I cache as well
- *
- * Purpose : Flush all cache lines
- */
-ENTRY(cpu_arm720_cache_clean_invalidate_all)
-ENTRY(cpu_arm720_cache_clean_invalidate_range)
-ENTRY(cpu_arm720_icache_invalidate_range)
-ENTRY(cpu_arm720_icache_invalidate_page)
-ENTRY(cpu_arm720_dcache_invalidate_range)
-		mov	r0, #0
-		mcr	p15, 0, r0, c7, c7, 0		@ flush cache
-		mov	pc, lr
-
-/*
- * These just expect cache lines to be cleaned.  Since we have a writethrough
- * cache, we never have any dirty cachelines to worry about.
- */
-ENTRY(cpu_arm720_dcache_clean_range)
-ENTRY(cpu_arm720_dcache_clean_page)
-ENTRY(cpu_arm720_dcache_clean_entry)
-		mov	pc, lr
-
-/*
- * Function: arm720_check_bugs (void)
- *	   : arm720_proc_init (void)
+ * Function: arm720_proc_init (void)
  *	   : arm720_proc_fin (void)
  *
  * Notes   : This processor does not require these
  */
-ENTRY(cpu_arm720_check_bugs)
-		mrs	ip, cpsr
-		bic	ip, ip, #PSR_F_BIT
-		msr	cpsr, ip
-		mov	pc, lr
-
+ENTRY(cpu_arm720_dcache_clean_area)
 ENTRY(cpu_arm720_proc_init)
 		mov	pc, lr
 
@@ -102,26 +67,16 @@ ENTRY(cpu_arm720_do_idle)
 		mov	pc, lr
 
 /*
- * Function: arm720_set_pgd(unsigned long pgd_phys)
+ * Function: arm720_switch_mm(unsigned long pgd_phys)
  * Params  : pgd_phys	Physical address of page table
  * Purpose : Perform a task switch, saving the old process' state and restoring
  *	     the new.
  */
-ENTRY(cpu_arm720_set_pgd)
+ENTRY(cpu_arm720_switch_mm)
 		mov	r1, #0
 		mcr	p15, 0, r1, c7, c7, 0		@ invalidate cache
 		mcr	p15, 0, r0, c2, c0, 0		@ update page table ptr
 		mcr	p15, 0, r1, c8, c7, 0		@ flush TLB (v4)
-		mov	pc, lr
-
-/*
- * Function: arm720_flush_pmd(pmdp)
- *
- * Params  : r0 = Address to set
- *
- * Purpose : Set a PMD and flush it out of any WB cache
- */
-ENTRY(cpu_arm720_flush_pmd)
 		mov	pc, lr
 
 /*
@@ -140,7 +95,7 @@ ENTRY(cpu_arm720_set_pte)
 		bic	r2, r2, #3
 		orr	r2, r2, #HPTE_TYPE_SMALL
 
-		tst	r1, #LPTE_USER | LPTE_EXEC	@ User or Exec?
+		tst	r1, #LPTE_USER			@ User?
 		orrne	r2, r2, #HPTE_AP_READ
 
 		tst	r1, #LPTE_WRITE | LPTE_DIRTY	@ Write and Dirty?
@@ -194,31 +149,13 @@ __arm720_setup:	mov	r0, #0
 		.type	arm720_processor_functions, #object
 ENTRY(arm720_processor_functions)
 		.word	v4t_late_abort
-		.word	cpu_arm720_check_bugs
 		.word	cpu_arm720_proc_init
 		.word	cpu_arm720_proc_fin
 		.word	cpu_arm720_reset
 		.word	cpu_arm720_do_idle
-
-		/* cache */
-		.word	cpu_arm720_cache_clean_invalidate_all
-		.word	cpu_arm720_cache_clean_invalidate_range
-
-		/* dcache */
-		.word	cpu_arm720_dcache_invalidate_range
-		.word	cpu_arm720_dcache_clean_range
-		.word	cpu_arm720_dcache_clean_page
-		.word	cpu_arm720_dcache_clean_entry
-
-		/* icache */
-		.word	cpu_arm720_icache_invalidate_range
-		.word	cpu_arm720_icache_invalidate_page
-
-		/* pgtable */
-		.word	cpu_arm720_set_pgd
-		.word	cpu_arm720_flush_pmd
+		.word	cpu_arm720_dcache_clean_area
+		.word	cpu_arm720_switch_mm
 		.word	cpu_arm720_set_pte
-
 		.size	arm720_processor_functions, . - arm720_processor_functions
 
 		.type	cpu_arch_name, #object
@@ -249,4 +186,5 @@ __arm720_proc_info:
 		.long	arm720_processor_functions
 		.long	v4_tlb_fns
 		.long	v4wt_user_fns
+		.long	v4_cache_fns
 		.size	__arm720_proc_info, . - __arm720_proc_info

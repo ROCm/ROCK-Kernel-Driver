@@ -6,6 +6,7 @@
  * Page table allocation/freeing primitives for 32-bit ARM processors.
  */
 #include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 #include "pgtable.h"
 
 /*
@@ -92,7 +93,7 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
 	pmdval = __pa(pte_ptr) | _PAGE_KERNEL_TABLE;
 	pmdp[0] = __pmd(pmdval);
 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
-	cpu_flush_pmd(pmdp);
+	flush_pmd_entry(pmdp);
 }
 
 static inline void
@@ -105,5 +106,5 @@ pmd_populate(struct mm_struct *mm, pmd_t *pmdp, struct page *ptep)
 	pmdval = page_to_pfn(ptep) << PAGE_SHIFT | _PAGE_USER_TABLE;
 	pmdp[0] = __pmd(pmdval);
 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
-	cpu_flush_pmd(pmdp);
+	flush_pmd_entry(pmdp);
 }

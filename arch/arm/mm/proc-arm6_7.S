@@ -188,20 +188,6 @@ Ldata_lateldrpostreg:
 		addeq	r7, r0, r2
 		b	Ldata_saver7
 
-/*
- * Function: arm6_7_check_bugs (void)
- *	   : arm6_7_proc_init (void)
- *	   : arm6_7_proc_fin (void)
- *
- * Notes   : This processor does not require these
- */
-ENTRY(cpu_arm6_check_bugs)
-ENTRY(cpu_arm7_check_bugs)
-		mrs	ip, cpsr
-		bic	ip, ip, #PSR_F_BIT
-		msr	cpsr, ip
-		mov	pc, lr
-
 ENTRY(cpu_arm6_proc_init)
 ENTRY(cpu_arm7_proc_init)
 		mov	pc, lr
@@ -220,28 +206,17 @@ ENTRY(cpu_arm7_do_idle)
 		mov	pc, lr
 
 /*
- * Function: arm6_7_set_pgd(unsigned long pgd_phys)
+ * Function: arm6_7_switch_mm(unsigned long pgd_phys)
  * Params  : pgd_phys	Physical address of page table
  * Purpose : Perform a task switch, saving the old processes state, and restoring
  *	     the new.
  */
-ENTRY(cpu_arm6_set_pgd)
-ENTRY(cpu_arm7_set_pgd)
+ENTRY(cpu_arm6_switch_mm)
+ENTRY(cpu_arm7_switch_mm)
 		mov	r1, #0
 		mcr	p15, 0, r1, c7, c0, 0		@ flush cache
 		mcr	p15, 0, r0, c2, c0, 0		@ update page table ptr
 		mcr	p15, 0, r1, c5, c0, 0		@ flush TLBs
-		mov	pc, lr
-
-/*
- * Function: arm6_flush_pmd(pmdp)
- *
- * Params  : r0 = Address to set
- *
- * Purpose : Set a PMD and flush it out of any WB cache
- */
-ENTRY(cpu_arm6_flush_pmd)
-ENTRY(cpu_arm7_flush_pmd)
 		mov	pc, lr
 
 /*
@@ -324,7 +299,6 @@ __arm7_setup:	mov	r0, #0
 		.type	arm6_processor_functions, #object
 ENTRY(arm6_processor_functions)
 		.word	cpu_arm6_data_abort
-		.word	cpu_arm6_check_bugs
 		.word	cpu_arm6_proc_init
 		.word	cpu_arm6_proc_fin
 		.word	cpu_arm6_reset
@@ -345,8 +319,7 @@ ENTRY(arm6_processor_functions)
 		.word	cpu_arm6_icache_invalidate_page
 
 		/* pgtable */
-		.word	cpu_arm6_set_pgd
-		.word	cpu_arm6_flush_pmd
+		.word	cpu_arm6_switch_mm
 		.word	cpu_arm6_set_pte
 
 		.size	arm6_processor_functions, . - arm6_processor_functions
@@ -358,7 +331,6 @@ ENTRY(arm6_processor_functions)
 		.type	arm7_processor_functions, #object
 ENTRY(arm7_processor_functions)
 		.word	cpu_arm7_data_abort
-		.word	cpu_arm7_check_bugs
 		.word	cpu_arm7_proc_init
 		.word	cpu_arm7_proc_fin
 		.word	cpu_arm7_reset
@@ -379,8 +351,7 @@ ENTRY(arm7_processor_functions)
 		.word	cpu_arm7_icache_invalidate_page
 
 		/* pgtable */
-		.word	cpu_arm7_set_pgd
-		.word	cpu_arm7_flush_pmd
+		.word	cpu_arm7_switch_mm
 		.word	cpu_arm7_set_pte
 
 		.size	arm7_processor_functions, . - arm7_processor_functions

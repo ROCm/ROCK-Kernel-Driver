@@ -189,15 +189,15 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 		case WIN_WRITEDMA_ONCE:
 		case WIN_WRITEDMA:
 		case WIN_WRITEDMA_EXT:
-			if (hwif->ide_dma_write(drive))
-				return ide_stopped;
+			if (!hwif->ide_dma_write(drive))
+				return ide_started;
 			break;
 		case WIN_READDMA_ONCE:
 		case WIN_READDMA:
 		case WIN_READDMA_EXT:
 		case WIN_IDENTIFY_DMA:
-			if (hwif->ide_dma_read(drive))
-				return ide_stopped;
+			if (!hwif->ide_dma_read(drive))
+				return ide_started;
 			break;
 		case WIN_READDMA_QUEUED:
 		case WIN_READDMA_QUEUED_EXT:

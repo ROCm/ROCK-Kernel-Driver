@@ -437,6 +437,23 @@ void bd_release(struct block_device *bdev)
 }
 
 /*
+ * Tries to open block device by device number.  Use it ONLY if you
+ * really do not have anything better - i.e. when you are behind a
+ * truly sucky interface and all you are given is a device number.  _Never_
+ * to be used for internal purposes.  If you ever need it - reconsider
+ * your API.
+ */
+struct block_device *open_by_devnum(dev_t dev, unsigned mode, int kind)
+{
+	struct block_device *bdev = bdget(dev);
+	int err = -ENOMEM;
+	int flags = mode & FMODE_WRITE ? O_RDWR : O_RDONLY;
+	if (bdev)
+		err = blkdev_get(bdev, mode, flags, kind);
+	return err ? ERR_PTR(err) : bdev;
+}
+
+/*
  * This routine checks whether a removable media has been changed,
  * and invalidates all buffer-cache-entries in that case. This
  * is a relatively slow routine, so we have to try to minimize using
@@ -518,7 +535,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		} else {
 			struct hd_struct *p;
 			struct block_device *whole;
-			whole = bdget(MKDEV(disk->major, disk->first_minor));
+			whole = bdget_disk(disk, 0);
 			ret = -ENOMEM;
 			if (!whole)
 				goto out_first;
