@@ -2,15 +2,16 @@
  * structures and definitions for the int 15, ax=e820 memory map
  * scheme.
  *
- * In a nutshell, arch/x86_64/boot/setup.S populates a scratch table
- * in the empty_zero_block that contains a list of usable address/size
- * duples.   In arch/x86_64/kernel/setup.c, this information is
- * transferred into the e820map, and in arch/i386/x86_64/init.c, that
- * new information is used to mark pages reserved or not.
- *
+ * In a nutshell, setup.S populates a scratch table in the
+ * empty_zero_block that contains a list of usable address/size
+ * duples.  setup.c, this information is transferred into the e820map,
+ * and in init.c/numa.c, that new information is used to mark pages
+ * reserved or not.
  */
 #ifndef __E820_HEADER
 #define __E820_HEADER
+
+#include <linux/mmzone.h>
 
 #define E820MAP	0x2d0		/* our map */
 #define E820MAX	32		/* number of entries in E820MAP */
@@ -23,16 +24,38 @@
 
 #define HIGH_MEMORY	(1024*1024)
 
+#define LOWMEMSIZE()	(0x9f000)
+
+#define MAXMEM		(120UL * 1024 * 1024 * 1024 * 1024)  /* 120TB */ 
+
+
 #ifndef __ASSEMBLY__
+struct e820entry {
+	u64 addr;	/* start of memory segment */
+	u64 size;	/* size of memory segment */
+	u32 type;	/* type of memory segment */
+} __attribute__((packed));
 
 struct e820map {
     int nr_map;
-    struct e820entry {
-	u64 addr __attribute__((packed));	/* start of memory segment */
-	u64 size __attribute__((packed));	/* size of memory segment */
-	u32 type __attribute__((packed));	/* type of memory segment */
-    } map[E820MAX];
+	struct e820entry map[E820MAX];
 };
+
+extern unsigned long find_e820_area(unsigned long start, unsigned long end, 
+				    unsigned size);
+extern void add_memory_region(unsigned long start, unsigned long size, 
+			      int type);
+extern void setup_memory_region(void);
+extern void contig_e820_setup(void); 
+extern void e820_end_of_ram(void);
+extern void e820_reserve_resources(void);
+extern void e820_print_map(char *who);
+extern int e820_mapped(unsigned long start, unsigned long end, int type);
+
+extern void e820_bootmem_free(pg_data_t *pgdat, unsigned long start,unsigned long end);
+
+extern void __init parse_memopt(char *p);
+extern void __init print_user_map(void);
 
 extern struct e820map e820;
 #endif/*!__ASSEMBLY__*/

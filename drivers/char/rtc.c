@@ -86,7 +86,9 @@ static unsigned long rtc_port;
 static int rtc_irq = PCI_IRQ_NONE;
 #endif
 
+#if RTC_IRQ
 static int rtc_has_irq = 1;
+#endif
 
 /*
  *	We sponge a minor off of the misc major. No need slurping
@@ -99,7 +101,9 @@ static struct fasync_struct *rtc_async_queue;
 
 static DECLARE_WAIT_QUEUE_HEAD(rtc_wait);
 
+#if RTC_IRQ
 static struct timer_list rtc_irq_timer;
+#endif
 
 static ssize_t rtc_read(struct file *file, char *buf,
 			size_t count, loff_t *ppos);

@@ -20,14 +20,14 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
  * This is used to ensure we don't load something for the wrong architecture.
  */
 #define elf_check_arch(x) \
-	((x)->e_machine == EM_X8664)
+	((x)->e_machine == EM_X86_64)
 
 /*
  * These are used to set parameters in the core dumps.
  */
 #define ELF_CLASS	ELFCLASS64
 #define ELF_DATA	ELFDATA2LSB
-#define ELF_ARCH	EM_X8664
+#define ELF_ARCH	EM_X86_64
 
 /* SVR4/i386 ABI (pages 3-31, 3-32) says that when the program starts %edx
    contains a pointer to a function which might be registered using `atexit'.

@@ -47,6 +47,7 @@ extern unsigned long get_cmos_time(void);
 EXPORT_SYMBOL(boot_cpu_data);
 EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(__ioremap);
+EXPORT_SYMBOL(ioremap_nocache);
 EXPORT_SYMBOL(iounmap);
 EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
@@ -109,18 +110,11 @@ EXPORT_SYMBOL(mmx_copy_page);
 
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(cpu_data);
-EXPORT_SYMBOL(smp_num_cpus);
 EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL_NOVERS(__write_lock_failed);
 EXPORT_SYMBOL_NOVERS(__read_lock_failed);
 
-/* Global SMP irq stuff */
 EXPORT_SYMBOL(synchronize_irq);
-EXPORT_SYMBOL(global_irq_holder);
-EXPORT_SYMBOL(__global_cli);
-EXPORT_SYMBOL(__global_sti);
-EXPORT_SYMBOL(__global_save_flags);
-EXPORT_SYMBOL(__global_restore_flags);
 EXPORT_SYMBOL(smp_call_function);
 
 #endif

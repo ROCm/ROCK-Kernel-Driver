@@ -85,17 +85,17 @@ out:
 
 struct file_operations qnx4_dir_operations =
 {
-	read:		generic_read_dir,
-	readdir:	qnx4_readdir,
-	fsync:		file_fsync,
+	.read		= generic_read_dir,
+	.readdir	= qnx4_readdir,
+	.fsync		= file_fsync,
 };
 
 struct inode_operations qnx4_dir_inode_operations =
 {
-	lookup:		qnx4_lookup,
+	.lookup		= qnx4_lookup,
 #ifdef CONFIG_QNX4FS_RW
-	create:		qnx4_create,
-	unlink:		qnx4_unlink,
-	rmdir:		qnx4_rmdir,
+	.create		= qnx4_create,
+	.unlink		= qnx4_unlink,
+	.rmdir		= qnx4_rmdir,
 #endif
 };

@@ -4,9 +4,27 @@
  * Raw interface to the bus
  *
  * Copyright (C) 1999, 2000 Andreas E. Bombe
+ *               2001, 2002 Manfred Weihs <weihs@ict.tuwien.ac.at>
+ *                     2002 Christian Toegel <christian.toegel@gmx.at>
  *
  * This code is licensed under the GPL.  See the file COPYING in the root
  * directory of the kernel sources for details.
+ *
+ *
+ * Contributions:
+ *
+ * Manfred Weihs <weihs@ict.tuwien.ac.at>
+ *        configuration ROM manipulation
+ *        address range mapping
+ *        adaptation for new (transparent) loopback mechanism
+ *        sending of arbitrary async packets
+ * Christian Toegel <christian.toegel@gmx.at>
+ *        address range mapping
+ *        lock64 request
+ *        transmit physical packet
+ *        busreset notification control (switch on/off)
+ *        busreset with selection of type (short/long)
+ *        request_reply
  */
 
 #include <linux/kernel.h>
@@ -40,6 +58,16 @@
 #define ptr2int(x) ((u64)(u32)x)
 #endif
 
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+#define RAW1394_DEBUG
+#endif
+
+#ifdef RAW1394_DEBUG
+#define DBGMSG(fmt, args...) \
+printk(KERN_INFO "raw1394:" fmt "\n" , ## args)
+#else
+#define DBGMSG(fmt, args...)
+#endif
 
 static devfs_handle_t devfs_handle;
 
@@ -53,6 +81,21 @@ static struct hpsb_highlevel *hl_handle;
 static atomic_t iso_buffer_size;
 static const int iso_buffer_max = 4 * 1024 * 1024; /* 4 MB */
 
+static int arm_read (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
+             u64 addr, unsigned int length, u16 flags);
+static int arm_write (struct hpsb_host *host, int nodeid, int destid,
+              quadlet_t *data, u64 addr, unsigned int length, u16 flags);
+static int arm_lock (struct hpsb_host *host, int nodeid, quadlet_t *store,
+             u64 addr, quadlet_t data, quadlet_t arg, int ext_tcode, u16 flags);
+static int arm_lock64 (struct hpsb_host *host, int nodeid, octlet_t *store,
+               u64 addr, octlet_t data, octlet_t arg, int ext_tcode, u16 flags);
+static struct hpsb_address_ops arm_ops = {
+        read:     arm_read,
+        write:    arm_write,
+        lock:     arm_lock,
+        lock64:   arm_lock64,
+};
+
 static void queue_complete_cb(struct pending_request *req);
 
 static struct pending_request *__alloc_pending_request(int flags)
@@ -64,7 +107,7 @@ static struct pending_request *__alloc_pending_request(int flags)
         if (req != NULL) {
                 memset(req, 0, sizeof(struct pending_request));
                 INIT_LIST_HEAD(&req->list);
-		INIT_TQUEUE(&req->tq, (void(*)(void*))queue_complete_cb, NULL);
+                HPSB_INIT_WORK(&req->tq, (void(*)(void*))queue_complete_cb, NULL);
         }
 
         return req;
@@ -128,7 +171,8 @@ static void queue_complete_cb(struct pending_request *req)
                 req->req.length = 0;
         }
 
-        free_tlabel(packet->host, packet->node_id, packet->tlabel);
+        if (req->req.type != RAW1394_REQ_PHYPACKET)
+                free_tlabel(packet->host, packet->node_id, packet->tlabel);
 
         queue_complete_req(req);
 }
@@ -137,6 +181,7 @@ static void queue_complete_cb(struct pending_request *req)
 static void add_host(struct hpsb_host *host)
 {
         struct host_info *hi;
+        unsigned long flags;
 
         hi = (struct host_info *)kmalloc(sizeof(struct host_info), SLAB_KERNEL);
         if (hi != NULL) {
@@ -144,10 +189,10 @@ static void add_host(struct hpsb_host *host)
                 hi->host = host;
                 INIT_LIST_HEAD(&hi->file_info_list);
 
-                spin_lock_irq(&host_info_lock);
+                spin_lock_irqsave(&host_info_lock, flags);
                 list_add_tail(&hi->list, &host_info_list);
                 host_count++;
-                spin_unlock_irq(&host_info_lock);
+                spin_unlock_irqrestore(&host_info_lock, flags);
         }
 
         atomic_inc(&internal_generation);
@@ -172,15 +217,22 @@ static struct host_info *find_host_info(struct hpsb_host *host)
 static void remove_host(struct hpsb_host *host)
 {
         struct host_info *hi;
+        unsigned long flags;
 
-        spin_lock_irq(&host_info_lock);
+        spin_lock_irqsave(&host_info_lock, flags);
         hi = find_host_info(host);
 
         if (hi != NULL) {
                 list_del(&hi->list);
                 host_count--;
+                /* 
+                   FIXME: adressranges should be removed 
+                   and fileinfo states should be initialized
+                   (including setting generation to 
+                   internal-generation ...)
+                */
         }
-        spin_unlock_irq(&host_info_lock);
+        spin_unlock_irqrestore(&host_info_lock, flags);
 
         if (hi == NULL) {
                 printk(KERN_ERR "raw1394: attempt to remove unknown host "
@@ -207,20 +259,22 @@ static void host_reset(struct hpsb_host *host)
         if (hi != NULL) {
                 list_for_each(lh, &hi->file_info_list) {
                         fi = list_entry(lh, struct file_info, list);
-                        req = __alloc_pending_request(SLAB_ATOMIC);
+                        if (fi->notification == RAW1394_NOTIFY_ON) {
+                                req = __alloc_pending_request(SLAB_ATOMIC);
 
-                        if (req != NULL) {
-                                req->file_info = fi;
-                                req->req.type = RAW1394_REQ_BUS_RESET;
-                                req->req.generation = get_hpsb_generation(host);
-                                req->req.misc = (host->node_id << 16)
-                                        | host->node_count;
-                                if (fi->protocol_version > 3) {
-                                        req->req.misc |= ((host->irm_id
-                                                           & NODE_MASK) << 8);
+                                if (req != NULL) {
+                                        req->file_info = fi;
+                                        req->req.type = RAW1394_REQ_BUS_RESET;
+                                        req->req.generation = get_hpsb_generation(host);
+                                        req->req.misc = (host->node_id << 16)
+                                                | host->node_count;
+                                        if (fi->protocol_version > 3) {
+                                                req->req.misc |= ((host->irm_id
+                                                                   & NODE_MASK) << 8);
+                                        }
+
+                                        queue_complete_req(req);
                                 }
-
-                                queue_complete_req(req);
                         }
                 }
         }
@@ -529,7 +583,7 @@ static void handle_iso_listen(struct file_info *fi, struct pending_request *req)
 {
         int channel = req->req.misc;
 
-        spin_lock(&host_info_lock);
+        spin_lock_irq(&host_info_lock);
         if ((channel > 63) || (channel < -64)) {
                 req->req.error = RAW1394_ERROR_INVALID_ARG;
         } else if (channel >= 0) {
@@ -556,7 +610,7 @@ static void handle_iso_listen(struct file_info *fi, struct pending_request *req)
 
         req->req.length = 0;
         queue_complete_req(req);
-        spin_unlock(&host_info_lock);
+        spin_unlock_irq(&host_info_lock);
 }
 
 static void handle_fcp_listen(struct file_info *fi, struct pending_request *req)
@@ -579,84 +633,9 @@ static void handle_fcp_listen(struct file_info *fi, struct pending_request *req)
         queue_complete_req(req);
 }
 
-static int handle_local_request(struct file_info *fi,
+
+static int handle_async_request(struct file_info *fi,
                                 struct pending_request *req, int node)
-{
-        u64 addr = req->req.address & 0xffffffffffffULL;
-
-        req->data = kmalloc(req->req.length, SLAB_KERNEL);
-        if (!req->data) return -ENOMEM;
-        req->free_data = 1;
-
-        switch (req->req.type) {
-        case RAW1394_REQ_ASYNC_READ:
-                req->req.error = highlevel_read(fi->host, node, req->data, addr,
-                                                req->req.length);
-                break;
-
-        case RAW1394_REQ_ASYNC_WRITE:
-                if (copy_from_user(req->data, int2ptr(req->req.sendb),
-                                   req->req.length)) {
-                        req->req.error = RAW1394_ERROR_MEMFAULT;
-                        break;
-                }
-
-                req->req.error = highlevel_write(fi->host, node, node, req->data,
-                                                 addr, req->req.length);
-                req->req.length = 0;
-                break;
-
-        case RAW1394_REQ_LOCK:
-                if ((req->req.misc == EXTCODE_FETCH_ADD)
-                    || (req->req.misc == EXTCODE_LITTLE_ADD)) {
-                        if (req->req.length != 4) {
-                                req->req.error = RAW1394_ERROR_INVALID_ARG;
-                                break;
-                        }
-                } else {
-                        if (req->req.length != 8) {
-                                req->req.error = RAW1394_ERROR_INVALID_ARG;
-                                break;
-                        }
-                }
-
-                if (copy_from_user(req->data, int2ptr(req->req.sendb),
-                                   req->req.length)) {
-                        req->req.error = RAW1394_ERROR_MEMFAULT;
-                        break;
-                }
-
-                if (req->req.length == 8) {
-                        req->req.error = highlevel_lock(fi->host, node,
-                                                        req->data, addr,
-                                                        req->data[1],
-                                                        req->data[0],
-                                                        req->req.misc);
-                        req->req.length = 4;
-                } else {
-                        req->req.error = highlevel_lock(fi->host, node,
-                                                        req->data, addr,
-                                                        req->data[0], 0,
-                                                        req->req.misc);
-                }
-                break;
-
-        case RAW1394_REQ_LOCK64:
-        default:
-                req->req.error = RAW1394_ERROR_STATE_ORDER;
-        }
-
-        if (req->req.error)
-                req->req.length = 0;
-        if (req->req.error >= 0)
-                req->req.error |= ACK_PENDING << 16;
-
-        queue_complete_req(req);
-        return sizeof(struct raw1394_request);
-}
-
-static int handle_remote_request(struct file_info *fi,
-                                 struct pending_request *req, int node)
 {
         struct hpsb_packet *packet = NULL;
         u64 addr = req->req.address & 0xffffffffffffULL;
@@ -664,11 +643,13 @@ static int handle_remote_request(struct file_info *fi,
         switch (req->req.type) {
         case RAW1394_REQ_ASYNC_READ:
                 if (req->req.length == 4) {
+                        DBGMSG("quadlet_read_request called");        
                         packet = hpsb_make_readqpacket(fi->host, node, addr);
                         if (!packet) return -ENOMEM;
 
                         req->data = &packet->header[3];
                 } else {
+                        DBGMSG("block_read_request called");
                         packet = hpsb_make_readbpacket(fi->host, node, addr,
                                                        req->req.length);
                         if (!packet) return -ENOMEM;
@@ -681,6 +662,7 @@ static int handle_remote_request(struct file_info *fi,
                 if (req->req.length == 4) {
                         quadlet_t x;
 
+                        DBGMSG("quadlet_write_request called");
                         if (copy_from_user(&x, int2ptr(req->req.sendb), 4)) {
                                 req->req.error = RAW1394_ERROR_MEMFAULT;
                         }
@@ -689,6 +671,7 @@ static int handle_remote_request(struct file_info *fi,
                                                         x);
                         if (!packet) return -ENOMEM;
                 } else {
+                        DBGMSG("block_write_request called");
                         packet = hpsb_make_writebpacket(fi->host, node, addr,
                                                         req->req.length);
                         if (!packet) return -ENOMEM;
@@ -702,6 +685,7 @@ static int handle_remote_request(struct file_info *fi,
                 break;
 
         case RAW1394_REQ_LOCK:
+                DBGMSG("lock_request called");
                 if ((req->req.misc == EXTCODE_FETCH_ADD)
                     || (req->req.misc == EXTCODE_LITTLE_ADD)) {
                         if (req->req.length != 4) {
@@ -730,6 +714,33 @@ static int handle_remote_request(struct file_info *fi,
                 break;
 
         case RAW1394_REQ_LOCK64:
+                DBGMSG("lock64_request called");
+                if ((req->req.misc == EXTCODE_FETCH_ADD)
+                    || (req->req.misc == EXTCODE_LITTLE_ADD)) {
+                        if (req->req.length != 8) {
+                                req->req.error = RAW1394_ERROR_INVALID_ARG;
+                                break;
+                        }
+                } else {
+                        if (req->req.length != 16) {
+                                req->req.error = RAW1394_ERROR_INVALID_ARG;
+                                break;
+                        }
+                }
+                packet = hpsb_make_lock64packet(fi->host, node, addr,
+                                                req->req.misc);
+                if (!packet) return -ENOMEM;
+
+                if (copy_from_user(packet->data, int2ptr(req->req.sendb),
+                                   req->req.length)) {
+                        req->req.error = RAW1394_ERROR_MEMFAULT;
+                        break;
+                }
+
+                req->data = packet->data;
+                req->req.length = 8;
+                break;
+
         default:
                 req->req.error = RAW1394_ERROR_STATE_ORDER;
         }
@@ -783,8 +794,7 @@ static int handle_iso_send(struct file_info *fi, struct pending_request *req,
                 return sizeof(struct raw1394_request);
         }
 
-        req->tq.data = req;
-        req->tq.routine = (void (*)(void*))queue_complete_req;
+	HPSB_PREPARE_WORK(&req->tq, (void (*)(void*))queue_complete_req, req);
         req->req.length = 0;
 	hpsb_add_packet_complete_task(packet, &req->tq);
 
@@ -803,14 +813,1120 @@ static int handle_iso_send(struct file_info *fi, struct pending_request *req,
         return sizeof(struct raw1394_request);
 }
 
+static int handle_async_send(struct file_info *fi, struct pending_request *req)
+{
+        struct hpsb_packet *packet;
+        int header_length = req->req.misc & 0xffff;
+        int expect_response = req->req.misc >> 16;
+
+        if ((header_length > req->req.length) ||
+            (header_length  < 12))
+        {
+                req->req.error = RAW1394_ERROR_INVALID_ARG;
+                req->req.length = 0;
+                queue_complete_req(req);
+                return sizeof(struct raw1394_request);
+        } 
+
+        packet = alloc_hpsb_packet(req->req.length-header_length);
+        req->packet = packet;
+        if (!packet) return -ENOMEM;
+
+        if (copy_from_user(packet->header, int2ptr(req->req.sendb),
+                           header_length)) {
+                req->req.error = RAW1394_ERROR_MEMFAULT;
+                req->req.length = 0;
+                queue_complete_req(req);
+                return sizeof(struct raw1394_request);
+        }
+
+        if (copy_from_user(packet->data, ((u8*) int2ptr(req->req.sendb)) + header_length,
+                           packet->data_size)) {
+                req->req.error = RAW1394_ERROR_MEMFAULT;
+                req->req.length = 0;
+                queue_complete_req(req);
+                return sizeof(struct raw1394_request);
+        }
+
+        packet->type = hpsb_async;
+        packet->node_id = packet->header[0] >> 16;
+        packet->tcode = (packet->header[0] >> 4) & 0xf;
+        packet->tlabel = (packet->header[0] >> 10) &0x3f;
+        packet->host = fi->host;
+        packet->expect_response = expect_response;
+        packet->header_size=header_length;
+        packet->data_size=req->req.length-header_length;
+
+	HPSB_PREPARE_WORK(&req->tq, (void (*)(void*))queue_complete_req, req);
+        req->req.length = 0;
+        hpsb_add_packet_complete_task(packet, &req->tq);
+
+        spin_lock_irq(&fi->reqlists_lock);
+        list_add_tail(&req->list, &fi->req_pending);
+        spin_unlock_irq(&fi->reqlists_lock);
+
+        /* Update the generation of the packet just before sending. */
+        packet->generation = get_hpsb_generation(fi->host);
+
+        if (!hpsb_send_packet(packet)) {
+                req->req.error = RAW1394_ERROR_SEND_ERROR;
+                queue_complete_req(req);
+        }
+
+        return sizeof(struct raw1394_request);
+}
+
+static int arm_read (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
+             u64 addr, unsigned int length, u16 flags)
+{
+        struct pending_request *req;
+        struct list_head *lh;
+        struct host_info *hi;
+        struct file_info *fi = NULL;
+        struct list_head *entry;
+        struct arm_addr  *arm_addr = NULL;
+        struct arm_request  *arm_req = NULL;
+        struct arm_response *arm_resp = NULL;
+        int found=0, size=0, rcode=-1;
+        struct arm_request_response *arm_req_resp = NULL;
+
+        DBGMSG("arm_read  called by node: %X"
+              "addr: %4.4x %8.8x length: %u", nodeid,
+              (u16) ((addr >>32) & 0xFFFF), (u32) (addr & 0xFFFFFFFF),
+              length);
+        spin_lock(&host_info_lock);
+        hi = find_host_info(host); /* search address-entry */
+        if (hi != NULL) {
+                list_for_each(lh, &hi->file_info_list) {
+                        fi = list_entry(lh, struct file_info, list);
+                        entry = fi->addr_list.next;
+                        while (entry != &(fi->addr_list)) {
+                                arm_addr = list_entry(entry, struct arm_addr, addr_list);
+                                if (((arm_addr->start) <= (addr)) && 
+                                        ((arm_addr->end) >= (addr+length))) {
+                                        found = 1;
+                                        break;
+                                }
+                                entry = entry->next;
+                        }
+                        if (found) {
+                                break;
+                        }
+                }
+        }
+        rcode = -1;
+        if (!found) {
+                printk(KERN_ERR "raw1394: arm_read FAILED addr_entry not found"
+                " -> rcode_address_error\n");
+                spin_unlock(&host_info_lock);
+                return (RCODE_ADDRESS_ERROR);
+        } else {
+                DBGMSG("arm_read addr_entry FOUND");
+        }
+        if (arm_addr->rec_length < length) {
+                DBGMSG("arm_read blocklength too big -> rcode_data_error");
+                rcode = RCODE_DATA_ERROR; /* hardware error, data is unavailable */
+        }
+        if (rcode == -1) {
+                if (arm_addr->access_rights & ARM_READ) {
+                        if (!(arm_addr->client_transactions & ARM_READ)) {
+                                memcpy(buffer,(arm_addr->addr_space_buffer)+(addr-(arm_addr->start)), 
+                                       length);
+                                DBGMSG("arm_read -> (rcode_complete)");
+                                rcode = RCODE_COMPLETE;
+                        }
+                } else {
+                        rcode = RCODE_TYPE_ERROR; /* function not allowed */
+                        DBGMSG("arm_read -> rcode_type_error (access denied)");
+                }
+        }
+        if (arm_addr->notification_options & ARM_READ) {
+                DBGMSG("arm_read -> entering notification-section");
+                req = __alloc_pending_request(SLAB_ATOMIC);
+                if (!req) {
+                        DBGMSG("arm_read -> rcode_conflict_error");
+                        spin_unlock(&host_info_lock);
+                        return(RCODE_CONFLICT_ERROR); /* A resource conflict was detected. 
+                                                        The request may be retried */
+                }
+                if (rcode == RCODE_COMPLETE) {
+                        size =  sizeof(struct arm_request)+sizeof(struct arm_response) +
+                                length * sizeof(byte_t) +
+                                sizeof (struct arm_request_response);
+                } else {
+                        size =  sizeof(struct arm_request)+sizeof(struct arm_response) +
+                                sizeof (struct arm_request_response);
+                }
+                req->data = kmalloc(size, SLAB_ATOMIC);
+                if (!(req->data)) {
+                        free_pending_request(req);
+                        DBGMSG("arm_read -> rcode_conflict_error");
+                        spin_unlock(&host_info_lock);
+                        return(RCODE_CONFLICT_ERROR); /* A resource conflict was detected. 
+                                                        The request may be retried */
+                }
+                req->free_data=1;
+                req->file_info = fi;
+                req->req.type = RAW1394_REQ_ARM;
+                req->req.generation = get_hpsb_generation(host);
+                req->req.misc = ( ((length << 16) & (0xFFFF0000)) | (ARM_READ & 0xFF));
+                req->req.tag  = arm_addr->arm_tag;
+                req->req.recvb = arm_addr->recvb;
+                req->req.length = size;
+                arm_req_resp = (struct arm_request_response *) (req->data);
+                arm_req  = (struct arm_request *) ((byte_t *)(req->data) + 
+                        (sizeof (struct arm_request_response)));
+                arm_resp = (struct arm_response *) ((byte_t *)(arm_req) + 
+                        (sizeof(struct arm_request)));
+                arm_req->buffer  = NULL;
+                arm_resp->buffer = NULL;
+                if (rcode == RCODE_COMPLETE) {
+                        arm_resp->buffer = ((byte_t *)(arm_resp) + 
+                                (sizeof(struct arm_response)));
+                        memcpy (arm_resp->buffer,
+                                (arm_addr->addr_space_buffer)+(addr-(arm_addr->start)), 
+                                length);
+                        arm_resp->buffer = int2ptr((arm_addr->recvb) + 
+                                sizeof (struct arm_request_response) +
+                                sizeof (struct arm_request) +
+                                sizeof (struct arm_response));
+                }
+                arm_resp->buffer_length = (rcode == RCODE_COMPLETE) ? length : 0;
+                arm_resp->response_code = rcode;
+                arm_req->buffer_length = 0;
+                arm_req->generation = req->req.generation;
+                arm_req->extended_transaction_code = 0;
+                arm_req->destination_offset = addr;
+                arm_req->source_nodeid = nodeid;
+                arm_req->destination_nodeid = host->node_id;
+                arm_req->tlabel = (flags >> 10) & 0x3f;
+                arm_req->tcode = (flags >> 4) & 0x0f;
+                arm_req_resp->request  = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response));
+                arm_req_resp->response = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response) +
+                        sizeof (struct arm_request));
+                queue_complete_req(req);
+        }
+        spin_unlock(&host_info_lock);
+        return(rcode);
+}
+
+static int arm_write (struct hpsb_host *host, int nodeid, int destid,
+              quadlet_t *data, u64 addr, unsigned int length, u16 flags)
+{
+        struct pending_request *req;
+        struct list_head *lh;
+        struct host_info *hi;
+        struct file_info *fi = NULL;
+        struct list_head *entry;
+        struct arm_addr  *arm_addr = NULL;
+        struct arm_request  *arm_req = NULL;
+        struct arm_response *arm_resp = NULL;        
+        int found=0, size=0, rcode=-1, length_conflict=0;
+        struct arm_request_response *arm_req_resp = NULL;
+
+        DBGMSG("arm_write called by node: %X"
+              "addr: %4.4x %8.8x length: %u", nodeid,
+              (u16) ((addr >>32) & 0xFFFF), (u32) (addr & 0xFFFFFFFF),
+              length);
+        spin_lock(&host_info_lock);
+        hi = find_host_info(host); /* search address-entry */
+        if (hi != NULL) {
+                list_for_each(lh, &hi->file_info_list) {
+                        fi = list_entry(lh, struct file_info, list);
+                        entry = fi->addr_list.next;
+                        while (entry != &(fi->addr_list)) {
+                                arm_addr = list_entry(entry, struct arm_addr, addr_list);
+                                if (((arm_addr->start) <= (addr)) && 
+                                        ((arm_addr->end) >= (addr+length))) {
+                                        found = 1;
+                                        break;
+                                }
+                                entry = entry->next;
+                        }
+                        if (found) {
+                                break;
+                        }
+                }
+        }
+        rcode = -1;
+        if (!found) {
+                printk(KERN_ERR "raw1394: arm_write FAILED addr_entry not found"
+                " -> rcode_address_error\n");
+                spin_unlock(&host_info_lock);
+                return (RCODE_ADDRESS_ERROR);
+        } else {
+                DBGMSG("arm_write addr_entry FOUND");
+        }
+        if (arm_addr->rec_length < length) {
+                DBGMSG("arm_write blocklength too big -> rcode_data_error");
+                length_conflict = 1;
+                rcode = RCODE_DATA_ERROR; /* hardware error, data is unavailable */
+        }
+        if (rcode == -1) {
+                if (arm_addr->access_rights & ARM_WRITE) {
+                        if (!(arm_addr->client_transactions & ARM_WRITE)) {
+                                memcpy((arm_addr->addr_space_buffer)+(addr-(arm_addr->start)),
+                                        data, length);
+                                DBGMSG("arm_write -> (rcode_complete)");
+                                rcode = RCODE_COMPLETE;
+                        }
+                } else {
+                        rcode = RCODE_TYPE_ERROR; /* function not allowed */
+                        DBGMSG("arm_write -> rcode_type_error (access denied)");
+                }
+        }
+        if (arm_addr->notification_options & ARM_WRITE) {
+                DBGMSG("arm_write -> entering notification-section");
+                req = __alloc_pending_request(SLAB_ATOMIC);
+                if (!req) {
+                        DBGMSG("arm_write -> rcode_conflict_error");
+                        spin_unlock(&host_info_lock);
+                        return(RCODE_CONFLICT_ERROR); /* A resource conflict was detected. 
+                                                        The request my be retried */
+                }
+                size =  sizeof(struct arm_request)+sizeof(struct arm_response) +
+                        (length) * sizeof(byte_t) +
+                        sizeof (struct arm_request_response);
+                req->data = kmalloc(size, SLAB_ATOMIC);
+                if (!(req->data)) {
+                        free_pending_request(req);
+                        DBGMSG("arm_write -> rcode_conflict_error");
+                        spin_unlock(&host_info_lock);
+                        return(RCODE_CONFLICT_ERROR); /* A resource conflict was detected. 
+                                                        The request may be retried */
+                }
+                req->free_data=1;
+                req->file_info = fi;
+                req->req.type = RAW1394_REQ_ARM;
+                req->req.generation = get_hpsb_generation(host);
+                req->req.misc = ( ((length << 16) & (0xFFFF0000)) | (ARM_WRITE & 0xFF));
+                req->req.tag  = arm_addr->arm_tag;
+                req->req.recvb = arm_addr->recvb;
+                req->req.length = size;
+                arm_req_resp = (struct arm_request_response *) (req->data);
+                arm_req  = (struct arm_request *) ((byte_t *)(req->data) + 
+                        (sizeof (struct arm_request_response)));
+                arm_resp = (struct arm_response *) ((byte_t *)(arm_req) + 
+                        (sizeof(struct arm_request)));
+                arm_req->buffer = ((byte_t *)(arm_resp) + 
+                        (sizeof(struct arm_response)));
+                arm_resp->buffer = NULL;
+                memcpy (arm_req->buffer, data, length);
+                arm_req->buffer = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response) +
+                        sizeof (struct arm_request) +
+                        sizeof (struct arm_response));
+                arm_req->buffer_length = length;
+                arm_req->generation = req->req.generation;
+                arm_req->extended_transaction_code = 0;
+                arm_req->destination_offset = addr;
+                arm_req->source_nodeid = nodeid;
+                arm_req->destination_nodeid = destid;
+                arm_req->tlabel = (flags >> 10) & 0x3f;
+                arm_req->tcode = (flags >> 4) & 0x0f;
+                arm_resp->buffer_length = 0;
+                arm_resp->response_code = rcode;
+                arm_req_resp->request  = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response));
+                arm_req_resp->response = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response) +
+                        sizeof (struct arm_request));
+                queue_complete_req(req);
+        }
+        spin_unlock(&host_info_lock);
+        return(rcode);
+}
+
+static int arm_lock (struct hpsb_host *host, int nodeid, quadlet_t *store,
+             u64 addr, quadlet_t data, quadlet_t arg, int ext_tcode, u16 flags)
+{
+        struct pending_request *req;
+        struct list_head *lh;
+        struct host_info *hi;
+        struct file_info *fi = NULL;
+        struct list_head *entry;
+        struct arm_addr  *arm_addr = NULL;
+        struct arm_request  *arm_req = NULL;
+        struct arm_response *arm_resp = NULL;        
+        int found=0, size=0, rcode=-1;
+        quadlet_t old, new;
+        struct arm_request_response *arm_req_resp = NULL;
+
+        if (((ext_tcode & 0xFF) == EXTCODE_FETCH_ADD) ||
+                ((ext_tcode & 0xFF) == EXTCODE_LITTLE_ADD)) {
+                DBGMSG("arm_lock  called by node: %X "
+                      "addr: %4.4x %8.8x extcode: %2.2X data: %8.8X", 
+                      nodeid, (u16) ((addr >>32) & 0xFFFF), (u32) (addr & 0xFFFFFFFF),
+                      ext_tcode & 0xFF , be32_to_cpu(data));
+        } else {
+                DBGMSG("arm_lock  called by node: %X "
+                      "addr: %4.4x %8.8x extcode: %2.2X data: %8.8X arg: %8.8X", 
+                      nodeid, (u16) ((addr >>32) & 0xFFFF), (u32) (addr & 0xFFFFFFFF),
+                      ext_tcode & 0xFF , be32_to_cpu(data), be32_to_cpu(arg));
+        }
+        spin_lock(&host_info_lock);
+        hi = find_host_info(host); /* search address-entry */
+        if (hi != NULL) {
+                list_for_each(lh, &hi->file_info_list) {
+                        fi = list_entry(lh, struct file_info, list);
+                        entry = fi->addr_list.next;
+                        while (entry != &(fi->addr_list)) {
+                                arm_addr = list_entry(entry, struct arm_addr, addr_list);
+                                if (((arm_addr->start) <= (addr)) && 
+                                        ((arm_addr->end) >= (addr+sizeof(*store)))) {
+                                        found = 1;
+                                        break;
+                                }
+                                entry = entry->next;
+                        }
+                        if (found) {
+                                break;
+                        }
+                }
+        }
+        rcode = -1;
+        if (!found) {
+                printk(KERN_ERR "raw1394: arm_lock FAILED addr_entry not found"
+                " -> rcode_address_error\n");
+                spin_unlock(&host_info_lock);
+                return (RCODE_ADDRESS_ERROR);
+        } else {
+                DBGMSG("arm_lock addr_entry FOUND");
+        }
+        if (rcode == -1) {
+                if (arm_addr->access_rights & ARM_LOCK) {
+                        if (!(arm_addr->client_transactions & ARM_LOCK)) {
+                                memcpy(&old,(arm_addr->addr_space_buffer)+(addr-(arm_addr->start)),
+                                        sizeof(old));
+                                switch (ext_tcode) {
+                                        case (EXTCODE_MASK_SWAP):
+                                                new = data | (old & ~arg);
+                                                break;
+                                        case (EXTCODE_COMPARE_SWAP):
+                                                if (old == arg) {
+                                                        new = data;
+                                                } else {
+                                                        new = old;
+                                                }
+                                                break;
+                                        case (EXTCODE_FETCH_ADD):
+                                                new = cpu_to_be32(be32_to_cpu(data) + be32_to_cpu(old));
+                                                break;
+                                        case (EXTCODE_LITTLE_ADD):
+                                                new = cpu_to_le32(le32_to_cpu(data) + le32_to_cpu(old));
+                                                break;
+                                        case (EXTCODE_BOUNDED_ADD):
+                                                if (old != arg) {
+                                                        new = cpu_to_be32(be32_to_cpu(data) + 
+                                                                be32_to_cpu(old));
+                                                } else {
+                                                        new = old;
+                                                }
+                                                break;
+                                        case (EXTCODE_WRAP_ADD):
+                                                if (old != arg) {
+                                                        new = cpu_to_be32(be32_to_cpu(data) + 
+                                                                be32_to_cpu(old));
+                                                } else {
+                                                        new = data;
+                                                }
+                                                break;
+                                        default:
+                                                rcode = RCODE_TYPE_ERROR; /* function not allowed */
+                                                printk(KERN_ERR "raw1394: arm_lock FAILED "
+                                                "ext_tcode not allowed -> rcode_type_error\n");
+                                                break;
+                                } /*switch*/
+                                if (rcode == -1) {
+                                        DBGMSG("arm_lock -> (rcode_complete)");
+                                        rcode = RCODE_COMPLETE;
+                                        memcpy (store, &old, sizeof(*store));
+                                        memcpy ((arm_addr->addr_space_buffer)+
+                                                (addr-(arm_addr->start)), 
+                                                &new, sizeof(*store));
+                                }
+                        }
+                } else {
+                        rcode = RCODE_TYPE_ERROR; /* function not allowed */
+                        DBGMSG("arm_lock -> rcode_type_error (access denied)");
+                }
+        }
+        if (arm_addr->notification_options & ARM_LOCK) {
+                DBGMSG("arm_lock -> entering notification-section");
+                req = __alloc_pending_request(SLAB_ATOMIC);
+                if (!req) {
+                        DBGMSG("arm_lock -> rcode_conflict_error");
+                        spin_unlock(&host_info_lock);
+                        return(RCODE_CONFLICT_ERROR); /* A resource conflict was detected. 
+                                                        The request may be retried */
+                }
+                size =  sizeof(struct arm_request)+sizeof(struct arm_response) +
+                        3 * sizeof(*store) + 
+                        sizeof (struct arm_request_response);  /* maximum */
+                req->data = kmalloc(size, SLAB_ATOMIC);
+                if (!(req->data)) {
+                        free_pending_request(req);
+                        DBGMSG("arm_lock -> rcode_conflict_error");
+                        spin_unlock(&host_info_lock);
+                        return(RCODE_CONFLICT_ERROR); /* A resource conflict was detected. 
+                                                        The request may be retried */
+                }
+                req->free_data=1;
+                arm_req_resp = (struct arm_request_response *) (req->data);
+                arm_req  = (struct arm_request *) ((byte_t *)(req->data) + 
+                        (sizeof (struct arm_request_response)));
+                arm_resp = (struct arm_response *) ((byte_t *)(arm_req) + 
+                        (sizeof(struct arm_request)));
+                arm_req->buffer = ((byte_t *)(arm_resp) + 
+                        (sizeof(struct arm_response)));
+                arm_resp->buffer = ((byte_t *)(arm_req->buffer) + 
+                        (2* sizeof(*store)));
+                if ((ext_tcode == EXTCODE_FETCH_ADD) || 
+                        (ext_tcode == EXTCODE_LITTLE_ADD)) {
+                        arm_req->buffer_length = sizeof(*store);
+                        memcpy (arm_req->buffer, &data, sizeof(*store));
+
+                } else {
+                        arm_req->buffer_length = 2 * sizeof(*store);
+                        memcpy (arm_req->buffer, &arg,  sizeof(*store));
+                        memcpy (((arm_req->buffer) + sizeof(*store)), 
+                                &data, sizeof(*store));
+                }
+                if (rcode == RCODE_COMPLETE) {
+                        arm_resp->buffer_length = sizeof(*store);
+                        memcpy (arm_resp->buffer, &old, sizeof(*store));
+                } else {
+                        arm_resp->buffer = NULL;
+                        arm_resp->buffer_length = 0;
+                }
+                req->file_info = fi;
+                req->req.type = RAW1394_REQ_ARM;
+                req->req.generation = get_hpsb_generation(host);
+                req->req.misc = ( (((sizeof(*store)) << 16) & (0xFFFF0000)) | 
+                        (ARM_LOCK & 0xFF));
+                req->req.tag  = arm_addr->arm_tag;
+                req->req.recvb = arm_addr->recvb;
+                req->req.length = size;
+                arm_req->generation = req->req.generation;
+                arm_req->extended_transaction_code = ext_tcode;
+                arm_req->destination_offset = addr;
+                arm_req->source_nodeid = nodeid;
+                arm_req->destination_nodeid = host->node_id;
+                arm_req->tlabel = (flags >> 10) & 0x3f;
+                arm_req->tcode = (flags >> 4) & 0x0f;
+                arm_resp->response_code = rcode;
+                arm_req_resp->request  = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response));
+                arm_req_resp->response = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response) +
+                        sizeof (struct arm_request));
+                arm_req->buffer = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response) +
+                        sizeof (struct arm_request) +
+                        sizeof (struct arm_response));
+                arm_resp->buffer = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response) +
+                        sizeof (struct arm_request) +
+                        sizeof (struct arm_response) +
+                        2* sizeof (*store));
+                queue_complete_req(req);
+        }
+        spin_unlock(&host_info_lock);
+        return(rcode);
+}
+
+static int arm_lock64 (struct hpsb_host *host, int nodeid, octlet_t *store,
+               u64 addr, octlet_t data, octlet_t arg, int ext_tcode, u16 flags)
+{
+        struct pending_request *req;
+        struct list_head *lh;
+        struct host_info *hi;
+        struct file_info *fi = NULL;
+        struct list_head *entry;
+        struct arm_addr  *arm_addr = NULL;
+        struct arm_request  *arm_req = NULL;
+        struct arm_response *arm_resp = NULL;
+        int found=0, size=0, rcode=-1;
+        octlet_t old, new;
+        struct arm_request_response *arm_req_resp = NULL;
+
+        if (((ext_tcode & 0xFF) == EXTCODE_FETCH_ADD) ||
+                ((ext_tcode & 0xFF) == EXTCODE_LITTLE_ADD)) {
+                DBGMSG("arm_lock64 called by node: %X "
+                      "addr: %4.4x %8.8x extcode: %2.2X data: %8.8X %8.8X ",
+                      nodeid, (u16) ((addr >>32) & 0xFFFF),
+                      (u32) (addr & 0xFFFFFFFF), 
+                      ext_tcode & 0xFF , 
+                      (u32) ((be64_to_cpu(data) >> 32) & 0xFFFFFFFF), 
+                      (u32) (be64_to_cpu(data) & 0xFFFFFFFF));
+        } else {
+                DBGMSG("arm_lock64 called by node: %X "
+                      "addr: %4.4x %8.8x extcode: %2.2X data: %8.8X %8.8X arg: "
+                      "%8.8X %8.8X ",
+                      nodeid, (u16) ((addr >>32) & 0xFFFF),
+                      (u32) (addr & 0xFFFFFFFF), 
+                      ext_tcode & 0xFF , 
+                      (u32) ((be64_to_cpu(data) >> 32) & 0xFFFFFFFF), 
+                      (u32) (be64_to_cpu(data) & 0xFFFFFFFF),
+                      (u32) ((be64_to_cpu(arg)  >> 32) & 0xFFFFFFFF), 
+                      (u32) (be64_to_cpu(arg)  & 0xFFFFFFFF));
+        }
+        spin_lock(&host_info_lock);
+        hi = find_host_info(host); /* search addressentry in file_info's for host */
+        if (hi != NULL) {
+                list_for_each(lh, &hi->file_info_list) {
+                        fi = list_entry(lh, struct file_info, list);
+                        entry = fi->addr_list.next;
+                        while (entry != &(fi->addr_list)) {
+                                arm_addr = list_entry(entry, struct arm_addr, addr_list);
+                                if (((arm_addr->start) <= (addr)) && 
+                                        ((arm_addr->end) >= (addr+sizeof(*store)))) {
+                                        found = 1;
+                                        break;
+                                }
+                                entry = entry->next;
+                        }
+                        if (found) {
+                                break;
+                        }
+                }
+        }
+        rcode = -1;
+        if (!found) {
+                printk(KERN_ERR "raw1394: arm_lock64 FAILED addr_entry not found"
+                " -> rcode_address_error\n");
+                spin_unlock(&host_info_lock);
+                return (RCODE_ADDRESS_ERROR);
+        } else {
+                DBGMSG("arm_lock64 addr_entry FOUND");
+        }
+        if (rcode == -1) {
+                if (arm_addr->access_rights & ARM_LOCK) {
+                        if (!(arm_addr->client_transactions & ARM_LOCK)) {
+                                memcpy(&old,(arm_addr->addr_space_buffer)+(addr-(arm_addr->start)),
+                                        sizeof(old));
+                                switch (ext_tcode) {
+                                        case (EXTCODE_MASK_SWAP):
+                                                new = data | (old & ~arg);
+                                                break;
+                                        case (EXTCODE_COMPARE_SWAP):
+                                                if (old == arg) {
+                                                        new = data;
+                                                } else {
+                                                        new = old;
+                                                }
+                                                break;
+                                        case (EXTCODE_FETCH_ADD):
+                                                new = cpu_to_be64(be64_to_cpu(data) + be64_to_cpu(old));
+                                                break;
+                                        case (EXTCODE_LITTLE_ADD):
+                                                new = cpu_to_le64(le64_to_cpu(data) + le64_to_cpu(old));
+                                                break;
+                                        case (EXTCODE_BOUNDED_ADD):
+                                                if (old != arg) {
+                                                        new = cpu_to_be64(be64_to_cpu(data) + 
+                                                                be64_to_cpu(old));
+                                                } else {
+                                                        new = old;
+                                                }
+                                                break;
+                                        case (EXTCODE_WRAP_ADD):
+                                                if (old != arg) {
+                                                        new = cpu_to_be64(be64_to_cpu(data) + 
+                                                                be64_to_cpu(old));
+                                                } else {
+                                                        new = data;
+                                                }
+                                                break;
+                                        default:
+                                                printk(KERN_ERR "raw1394: arm_lock64 FAILED "
+                                                "ext_tcode not allowed -> rcode_type_error\n");
+                                                rcode = RCODE_TYPE_ERROR; /* function not allowed */
+                                                break;
+                                } /*switch*/
+                                if (rcode == -1) {
+                                        DBGMSG("arm_lock64 -> (rcode_complete)");
+                                        rcode = RCODE_COMPLETE;
+                                        memcpy (store, &old, sizeof(*store));
+                                        memcpy ((arm_addr->addr_space_buffer)+
+                                                (addr-(arm_addr->start)), 
+                                                &new, sizeof(*store));
+                                } 
+                        }
+                } else {
+                        rcode = RCODE_TYPE_ERROR; /* function not allowed */
+                        DBGMSG("arm_lock64 -> rcode_type_error (access denied)");
+                }
+        }
+        if (arm_addr->notification_options & ARM_LOCK) {
+                DBGMSG("arm_lock64 -> entering notification-section");
+                req = __alloc_pending_request(SLAB_ATOMIC);
+                if (!req) {
+                        spin_unlock(&host_info_lock);
+                        DBGMSG("arm_lock64 -> rcode_conflict_error");
+                        return(RCODE_CONFLICT_ERROR); /* A resource conflict was detected. 
+                                                        The request may be retried */
+                }
+                size =  sizeof(struct arm_request)+sizeof(struct arm_response) +
+                        3 * sizeof(*store) +
+                        sizeof (struct arm_request_response); /* maximum */
+                req->data = kmalloc(size, SLAB_ATOMIC);
+                if (!(req->data)) {
+                        free_pending_request(req);
+                        spin_unlock(&host_info_lock);
+                        DBGMSG("arm_lock64 -> rcode_conflict_error");
+                        return(RCODE_CONFLICT_ERROR); /* A resource conflict was detected. 
+                                                        The request may be retried */
+                }
+                req->free_data=1;
+                arm_req_resp = (struct arm_request_response *) (req->data);
+                arm_req  = (struct arm_request *) ((byte_t *)(req->data) + 
+                        (sizeof (struct arm_request_response)));
+                arm_resp = (struct arm_response *) ((byte_t *)(arm_req) + 
+                        (sizeof(struct arm_request)));
+                arm_req->buffer = ((byte_t *)(arm_resp) + 
+                        (sizeof(struct arm_response)));
+                arm_resp->buffer = ((byte_t *)(arm_req->buffer) + 
+                        (2* sizeof(*store)));
+                if ((ext_tcode == EXTCODE_FETCH_ADD) || 
+                        (ext_tcode == EXTCODE_LITTLE_ADD)) {
+                        arm_req->buffer_length = sizeof(*store);
+                        memcpy (arm_req->buffer, &data, sizeof(*store));
+
+                } else {
+                        arm_req->buffer_length = 2 * sizeof(*store);
+                        memcpy (arm_req->buffer, &arg,  sizeof(*store));
+                        memcpy (((arm_req->buffer) + sizeof(*store)), 
+                                &data, sizeof(*store));
+                }
+                if (rcode == RCODE_COMPLETE) {
+                        arm_resp->buffer_length = sizeof(*store);
+                        memcpy (arm_resp->buffer, &old, sizeof(*store));
+                } else {
+                        arm_resp->buffer = NULL;
+                        arm_resp->buffer_length = 0;
+                }
+                req->file_info = fi;
+                req->req.type = RAW1394_REQ_ARM;
+                req->req.generation = get_hpsb_generation(host);
+                req->req.misc = ( (((sizeof(*store)) << 16) & (0xFFFF0000)) | 
+                        (ARM_LOCK & 0xFF));
+                req->req.tag  = arm_addr->arm_tag;
+                req->req.recvb = arm_addr->recvb;
+                req->req.length = size;
+                arm_req->generation = req->req.generation;
+                arm_req->extended_transaction_code = ext_tcode;
+                arm_req->destination_offset = addr;
+                arm_req->source_nodeid = nodeid;
+                arm_req->destination_nodeid = host->node_id;
+                arm_req->tlabel = (flags >> 10) & 0x3f;
+                arm_req->tcode = (flags >> 4) & 0x0f;
+                arm_resp->response_code = rcode;
+                arm_req_resp->request  = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response));
+                arm_req_resp->response = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response) +
+                        sizeof (struct arm_request));
+                arm_req->buffer = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response) +
+                        sizeof (struct arm_request) +
+                        sizeof (struct arm_response));
+                arm_resp->buffer = int2ptr((arm_addr->recvb) + 
+                        sizeof (struct arm_request_response) +
+                        sizeof (struct arm_request) +
+                        sizeof (struct arm_response) +
+                        2* sizeof (*store));
+                queue_complete_req(req);
+        }
+        spin_unlock(&host_info_lock);
+        return(rcode);
+}
+
+static int arm_register(struct file_info *fi, struct pending_request *req)
+{
+        int retval;
+        struct arm_addr *addr;
+        struct list_head *lh, *lh_1, *lh_2;
+        struct host_info *hi;
+        struct file_info *fi_hlp = NULL;
+        struct list_head *entry;
+        struct arm_addr  *arm_addr = NULL;
+        int same_host, another_host;
+        unsigned long flags;
+
+        DBGMSG("arm_register called "
+              "addr(Offset): %8.8x %8.8x length: %u "
+              "rights: %2.2X notify: %2.2X "
+              "max_blk_len: %4.4X",
+              (u32) ((req->req.address >>32) & 0xFFFF),
+              (u32) (req->req.address & 0xFFFFFFFF),
+              req->req.length, ((req->req.misc >> 8) & 0xFF),
+              (req->req.misc & 0xFF),((req->req.misc >> 16) & 0xFFFF));
+        /* check addressrange */
+        if ((((req->req.address) & ~(0xFFFFFFFFFFFF)) != 0) ||
+                (((req->req.address + req->req.length) & ~(0xFFFFFFFFFFFF)) != 0)) {
+                req->req.length = 0;
+                return (-EINVAL);
+        }
+        /* addr-list-entry for fileinfo */
+        addr = (struct arm_addr *)kmalloc(sizeof(struct arm_addr), SLAB_KERNEL); 
+        if (!addr) {
+                req->req.length = 0;
+                return (-ENOMEM);
+        } 
+        /* allocation of addr_space_buffer */
+        addr->addr_space_buffer = (u8 *)kmalloc(req->req.length,SLAB_KERNEL);
+        if (!(addr->addr_space_buffer)) {
+                kfree(addr);
+                req->req.length = 0;
+                return (-ENOMEM);
+        }
+        /* initialization of addr_space_buffer */
+        if ((req->req.sendb)== (unsigned long)NULL) {
+                /* init: set 0 */
+                memset(addr->addr_space_buffer, 0,req->req.length);
+        } else {
+                /* init: user -> kernel */
+                if (copy_from_user(addr->addr_space_buffer,int2ptr(req->req.sendb),
+                        req->req.length)) {
+                        kfree(addr->addr_space_buffer);
+                        kfree(addr);
+                        return (-EFAULT);
+                }
+        }
+        INIT_LIST_HEAD(&addr->addr_list);
+        addr->arm_tag   = req->req.tag;
+        addr->start     = req->req.address;
+        addr->end       = req->req.address + req->req.length;
+        addr->access_rights = (u8) (req->req.misc & 0x0F);
+        addr->notification_options = (u8) ((req->req.misc >> 4) & 0x0F);
+        addr->client_transactions = (u8) ((req->req.misc >> 8) & 0x0F);
+        addr->access_rights |= addr->client_transactions;
+        addr->notification_options |= addr->client_transactions;
+        addr->recvb     = req->req.recvb;
+        addr->rec_length = (u16) ((req->req.misc >> 16) & 0xFFFF);
+        spin_lock_irqsave(&host_info_lock, flags);
+        hi = find_host_info(fi->host);
+        same_host = 0;
+        another_host = 0;
+        /* same host with address-entry containing same addressrange ? */
+        list_for_each(lh, &hi->file_info_list) {
+                fi_hlp = list_entry(lh, struct file_info, list);
+                entry = fi_hlp->addr_list.next;
+                while (entry != &(fi_hlp->addr_list)) {
+                        arm_addr = list_entry(entry, struct arm_addr, addr_list);
+                        if ( (arm_addr->start == addr->start) && 
+                                (arm_addr->end == addr->end)) {
+                                DBGMSG("same host ownes same "
+                                        "addressrange -> EALREADY");
+                                same_host = 1;
+                                break;
+                        }
+                        entry = entry->next;
+                }
+                if (same_host) {
+                        break;
+                }
+        }
+        if (same_host) {
+                /* addressrange occupied by same host */
+                kfree(addr->addr_space_buffer);
+                kfree(addr);
+                spin_unlock_irqrestore(&host_info_lock, flags);
+                return (-EALREADY);
+        }
+        /* another host with valid address-entry containing same addressrange */
+        list_for_each(lh_1, &host_info_list) {
+                hi = list_entry(lh_1, struct host_info, list);
+                if (hi->host != fi->host) {
+                        list_for_each(lh_2, &hi->file_info_list) {
+                                fi_hlp = list_entry(lh_2, struct file_info, list);
+                                entry = fi_hlp->addr_list.next;
+                                while (entry != &(fi_hlp->addr_list)) {
+                                        arm_addr = list_entry(entry, struct arm_addr, addr_list);
+                                        if ( (arm_addr->start == addr->start) && 
+                                                (arm_addr->end == addr->end)) {
+                                                DBGMSG("another host ownes same "
+                                                "addressrange");
+                                                another_host = 1;
+                                                break;
+                                        }
+                                        entry = entry->next;
+                                }
+                                if (another_host) {
+                                        break;
+                                }
+                        }
+                }
+        }
+        if (another_host) {
+                DBGMSG("another hosts entry is valid -> SUCCESS");
+                if (copy_to_user(int2ptr(req->req.recvb),
+                        int2ptr(&addr->start),sizeof(u64))) {
+                        printk(KERN_ERR "raw1394: arm_register failed "
+                              " address-range-entry is invalid -> EFAULT !!!\n");
+                        kfree(addr->addr_space_buffer);
+                        kfree(addr);
+                        spin_unlock_irqrestore(&host_info_lock, flags);
+                        return (-EFAULT);
+                }
+                free_pending_request(req); /* immediate success or fail */
+                /* INSERT ENTRY */
+                list_add_tail(&addr->addr_list, &fi->addr_list);
+                spin_unlock_irqrestore(&host_info_lock, flags);
+                return sizeof(struct raw1394_request);
+        }
+        retval = hpsb_register_addrspace(hl_handle, &arm_ops, req->req.address,
+                req->req.address + req->req.length);
+        if (retval) {
+               /* INSERT ENTRY */
+               list_add_tail(&addr->addr_list, &fi->addr_list);
+        } else {
+                DBGMSG("arm_register failed errno: %d \n",retval);
+                kfree(addr->addr_space_buffer);
+                kfree(addr);
+                spin_unlock_irqrestore(&host_info_lock, flags);
+                return (-EALREADY); 
+        }
+        spin_unlock_irqrestore(&host_info_lock, flags);
+        free_pending_request(req); /* immediate success or fail */
+        return sizeof(struct raw1394_request);
+}
+
+static int arm_unregister(struct file_info *fi, struct pending_request *req)
+{
+        int found  = 0;
+        int retval = 0;
+        struct list_head *entry;
+        struct arm_addr  *addr = NULL;
+        struct list_head *lh_1, *lh_2;
+        struct host_info *hi;
+        struct file_info *fi_hlp = NULL;
+        struct arm_addr  *arm_addr = NULL;
+        int another_host;
+        unsigned long flags;
+
+        DBGMSG("arm_Unregister called addr(Offset): "
+              "%8.8x %8.8x",
+              (u32) ((req->req.address >>32) & 0xFFFF),
+              (u32) (req->req.address & 0xFFFFFFFF));
+        spin_lock_irqsave(&host_info_lock, flags);
+        /* get addr */
+        entry = fi->addr_list.next;
+        while (entry != &(fi->addr_list)) {
+                addr = list_entry(entry, struct arm_addr, addr_list);
+                if (addr->start == req->req.address) {
+                        found = 1;
+                        break;
+                }
+                entry = entry->next;
+        }
+        if (!found) {
+                DBGMSG("arm_Unregister addr not found");
+                spin_unlock_irqrestore(&host_info_lock, flags);
+                return (-EINVAL);
+        }
+        DBGMSG("arm_Unregister addr found");
+        another_host = 0;
+        /* another host with valid address-entry containing 
+           same addressrange */
+        list_for_each(lh_1, &host_info_list) {
+                hi = list_entry(lh_1, struct host_info, list);
+                if (hi->host != fi->host) {
+                        list_for_each(lh_2, &hi->file_info_list) {
+                                fi_hlp = list_entry(lh_2, struct file_info, list);
+                                entry = fi_hlp->addr_list.next;
+                                while (entry != &(fi_hlp->addr_list)) {
+                                        arm_addr = list_entry(entry, 
+                                                struct arm_addr, addr_list);
+                                        if (arm_addr->start == 
+                                                addr->start) {
+                                                DBGMSG("another host ownes "
+                                                "same addressrange");
+                                                another_host = 1;
+                                                break;
+                                        }
+                                        entry = entry->next;
+                                }
+                                if (another_host) {
+                                        break;
+                                }
+                        }
+                }
+        }
+        if (another_host) {
+                DBGMSG("delete entry from list -> success");
+                list_del(&addr->addr_list);
+                kfree(addr->addr_space_buffer);
+                kfree(addr);
+                free_pending_request(req); /* immediate success or fail */
+                spin_unlock_irqrestore(&host_info_lock, flags);
+                return sizeof(struct raw1394_request);
+        } 
+        retval = hpsb_unregister_addrspace(hl_handle, addr->start);
+        if (!retval) {
+                printk(KERN_ERR "raw1394: arm_Unregister failed -> EINVAL\n");
+                spin_unlock_irqrestore(&host_info_lock, flags);
+                return (-EINVAL);
+        }
+        DBGMSG("delete entry from list -> success");
+        list_del(&addr->addr_list);
+        spin_unlock_irqrestore(&host_info_lock, flags);
+        kfree(addr->addr_space_buffer);
+        kfree(addr);
+        free_pending_request(req); /* immediate success or fail */
+        return sizeof(struct raw1394_request);
+}
+
+static int reset_notification(struct file_info *fi, struct pending_request *req)
+{
+        DBGMSG("reset_notification called - switch %s ",
+                (req->req.misc == RAW1394_NOTIFY_OFF)?"OFF":"ON");
+        if ((req->req.misc == RAW1394_NOTIFY_OFF) ||
+                (req->req.misc == RAW1394_NOTIFY_ON)) {
+                fi->notification=(u8)req->req.misc;
+                free_pending_request(req); /* we have to free the request, because we queue no response, and therefore nobody will free it */
+                return sizeof(struct raw1394_request);
+        } 
+        /* error EINVAL (22) invalid argument */
+        return (-EINVAL);
+}
+
+static int write_phypacket(struct file_info *fi, struct pending_request *req)
+{
+        struct hpsb_packet *packet = NULL;
+        int retval=0;
+        quadlet_t data;
+
+        data = be32_to_cpu((u32)req->req.sendb);
+        DBGMSG("write_phypacket called - quadlet 0x%8.8x ",data);
+        packet = hpsb_make_phypacket (fi->host, data);
+        if (!packet) return -ENOMEM;
+        req->req.length=0;
+        req->packet=packet;
+        req->tq.data=req;
+        hpsb_add_packet_complete_task(packet, &req->tq);
+        spin_lock_irq(&fi->reqlists_lock);
+        list_add_tail(&req->list, &fi->req_pending);
+        spin_unlock_irq(&fi->reqlists_lock);
+        packet->generation = req->req.generation;
+        retval = hpsb_send_packet(packet);
+        DBGMSG("write_phypacket send_packet called => retval: %d ",
+                retval);
+        if (! retval) {
+                req->req.error = RAW1394_ERROR_SEND_ERROR;
+                req->req.length = 0;
+                queue_complete_req(req);
+        }
+        return sizeof(struct raw1394_request);
+}
+
+static int get_config_rom(struct file_info *fi, struct pending_request *req)
+{
+        size_t return_size;
+        unsigned char rom_version;
+        int ret=sizeof(struct raw1394_request);
+        quadlet_t *data = kmalloc(req->req.length, SLAB_KERNEL);
+        int status;
+        if (!data) return -ENOMEM;
+        status = hpsb_get_config_rom(fi->host, data, 
+                req->req.length, &return_size, &rom_version);
+        if (copy_to_user(int2ptr(req->req.recvb), data, 
+                req->req.length))
+                ret = -EFAULT;
+        if (copy_to_user(int2ptr(req->req.tag), &return_size, 
+                sizeof(return_size)))
+                ret = -EFAULT;
+        if (copy_to_user(int2ptr(req->req.address), &rom_version, 
+                sizeof(rom_version)))
+                ret = -EFAULT;
+        if (copy_to_user(int2ptr(req->req.sendb), &status, 
+                sizeof(status)))
+                ret = -EFAULT;
+        kfree(data);
+        if (ret >= 0) {
+                free_pending_request(req); /* we have to free the request, because we queue no response, and therefore nobody will free it */
+        }
+        return ret;
+}
+
+static int update_config_rom(struct file_info *fi, struct pending_request *req)
+{
+        int ret=sizeof(struct raw1394_request);
+        quadlet_t *data = kmalloc(req->req.length, SLAB_KERNEL);
+        if (!data) return -ENOMEM;
+        if (copy_from_user(data,int2ptr(req->req.sendb), 
+                req->req.length)) {
+                ret= -EFAULT;
+        } else {
+                int status = hpsb_update_config_rom(fi->host, 
+                        data, req->req.length, 
+                        (unsigned char) req->req.misc);
+                if (copy_to_user(int2ptr(req->req.recvb), 
+                        &status, sizeof(status)))
+                        ret = -ENOMEM;
+        }
+        kfree(data);
+        if (ret >= 0) {
+                free_pending_request(req); /* we have to free the request, because we queue no response, and therefore nobody will free it */
+        }
+        return ret;
+}
+
 static int state_connected(struct file_info *fi, struct pending_request *req)
 {
         int node = req->req.address >> 48;
 
         req->req.error = RAW1394_ERROR_NONE;
 
-        if (req->req.type ==  RAW1394_REQ_ISO_SEND) {
+        switch (req->req.type) {
+
+        case RAW1394_REQ_ECHO:
+                queue_complete_req(req);
+                return sizeof(struct raw1394_request);
+
+        case RAW1394_REQ_ISO_SEND:
                 return handle_iso_send(fi, req, node);
+
+        case RAW1394_REQ_ARM_REGISTER:
+                return arm_register(fi, req);
+
+        case RAW1394_REQ_ARM_UNREGISTER:
+                return arm_unregister(fi, req);
+
+        case RAW1394_REQ_RESET_NOTIFY:
+                return reset_notification(fi, req);
+
+        case RAW1394_REQ_ISO_LISTEN:
+                handle_iso_listen(fi, req);
+                return sizeof(struct raw1394_request);
+
+        case RAW1394_REQ_FCP_LISTEN:
+                handle_fcp_listen(fi, req);
+                return sizeof(struct raw1394_request);
+
+        case RAW1394_REQ_RESET_BUS:
+                if (req->req.misc == RAW1394_LONG_RESET) {
+                        DBGMSG("busreset called (type: LONG)");
+                        hpsb_reset_bus(fi->host, LONG_RESET);
+                        free_pending_request(req); /* we have to free the request, because we queue no response, and therefore nobody will free it */
+                        return sizeof(struct raw1394_request);
+                }
+                if (req->req.misc == RAW1394_SHORT_RESET) {
+                        DBGMSG("busreset called (type: SHORT)");
+                        hpsb_reset_bus(fi->host, SHORT_RESET);
+                        free_pending_request(req); /* we have to free the request, because we queue no response, and therefore nobody will free it */
+                        return sizeof(struct raw1394_request);
+                }
+                /* error EINVAL (22) invalid argument */
+                return (-EINVAL);
+        case RAW1394_REQ_GET_ROM:
+                return get_config_rom(fi, req);
+
+        case RAW1394_REQ_UPDATE_ROM:
+                return update_config_rom(fi, req);
         }
 
         if (req->req.generation != get_hpsb_generation(fi->host)) {
@@ -822,17 +1938,10 @@ static int state_connected(struct file_info *fi, struct pending_request *req)
         }
 
         switch (req->req.type) {
-        case RAW1394_REQ_ISO_LISTEN:
-                handle_iso_listen(fi, req);
-                return sizeof(struct raw1394_request);
-
-        case RAW1394_REQ_FCP_LISTEN:
-                handle_fcp_listen(fi, req);
-                return sizeof(struct raw1394_request);
-
-        case RAW1394_REQ_RESET_BUS:
-                hpsb_reset_bus(fi->host, LONG_RESET);
-                return sizeof(struct raw1394_request);
+        case RAW1394_REQ_PHYPACKET:
+                return write_phypacket(fi, req);
+        case RAW1394_REQ_ASYNC_SEND:
+                return handle_async_send(fi, req);
         }
 
         if (req->req.length == 0) {
@@ -841,11 +1950,7 @@ static int state_connected(struct file_info *fi, struct pending_request *req)
                 return sizeof(struct raw1394_request);
         }
 
-        if (fi->host->node_id == node) {
-                return handle_local_request(fi, req, node);
-        }
-
-        return handle_remote_request(fi, req, node);
+        return handle_async_request(fi, req, node);
 }
 
 
@@ -921,6 +2026,7 @@ static int raw1394_open(struct inode *inode, struct file *file)
                 return -ENOMEM;
         
         memset(fi, 0, sizeof(struct file_info));
+        fi->notification = (u8) RAW1394_NOTIFY_ON; /* busreset notification */
 
         INIT_LIST_HEAD(&fi->list);
         fi->state = opened;
@@ -929,6 +2035,7 @@ static int raw1394_open(struct inode *inode, struct file *file)
         sema_init(&fi->complete_sem, 0);
         spin_lock_init(&fi->reqlists_lock);
         init_waitqueue_head(&fi->poll_wait_complete);
+        INIT_LIST_HEAD(&fi->addr_list);
 
         file->private_data = fi;
 
@@ -940,7 +2047,15 @@ static int raw1394_release(struct inode *inode, struct file *file)
         struct file_info *fi = file->private_data;
         struct list_head *lh;
         struct pending_request *req;
-        int done = 0, i;
+        int done = 0, i, fail = 0;
+        int retval = 0;
+        struct list_head *entry;
+        struct arm_addr  *addr = NULL;
+        struct list_head *lh_1, *lh_2;
+        struct host_info *hi;
+        struct file_info *fi_hlp = NULL;
+        struct arm_addr  *arm_addr = NULL;
+        int another_host;
 
         for (i = 0; i < 64; i++) {
                 if (fi->listen_channels & (1ULL << i)) {
@@ -948,9 +2063,63 @@ static int raw1394_release(struct inode *inode, struct file *file)
                 }
         }
 
-        spin_lock(&host_info_lock);
+        spin_lock_irq(&host_info_lock);
         fi->listen_channels = 0;
-        spin_unlock(&host_info_lock);
+        spin_unlock_irq(&host_info_lock);
+
+        fail = 0;
+        /* set address-entries invalid */
+        spin_lock_irq(&host_info_lock);
+
+        while (!list_empty(&fi->addr_list)) {
+                another_host = 0;
+                lh = fi->addr_list.next;
+                addr = list_entry(lh, struct arm_addr, addr_list);
+                /* another host with valid address-entry containing 
+                   same addressrange? */
+                list_for_each(lh_1, &host_info_list) {
+                        hi = list_entry(lh_1, struct host_info, list);
+                        if (hi->host != fi->host) {
+                                list_for_each(lh_2, &hi->file_info_list) {
+                                        fi_hlp = list_entry(lh_2, struct file_info, list);
+                                        entry = fi_hlp->addr_list.next;
+                                        while (entry != &(fi_hlp->addr_list)) {
+                                                arm_addr = list_entry(entry, 
+                                                        struct arm_addr, addr_list);
+                                                if (arm_addr->start == 
+                                                        addr->start) {
+                                                        DBGMSG("raw1394_release: "
+                                                        "another host ownes "
+                                                        "same addressrange");
+                                                        another_host = 1;
+                                                        break;
+                                                }
+                                                entry = entry->next;
+                                        }
+                                        if (another_host) {
+                                                break;
+                                        }
+                                }
+                        }
+                }
+                if (!another_host) {
+                        DBGMSG("raw1394_release: call hpsb_arm_unregister");
+                        retval = hpsb_unregister_addrspace(hl_handle, addr->start);
+                        if (!retval) {
+                                ++fail;
+                                printk(KERN_ERR "raw1394_release arm_Unregister failed\n");
+                        }
+                }
+                DBGMSG("raw1394_release: delete addr_entry from list");
+                list_del(&addr->addr_list);
+                kfree(addr->addr_space_buffer);
+                kfree(addr);
+        } /* while */
+        spin_unlock_irq(&host_info_lock);
+        if (fail > 0) {
+                printk(KERN_ERR "raw1394: during addr_list-release "
+                        "error(s) occured \n");
+        }
 
         while (!done) {
                 spin_lock_irq(&fi->reqlists_lock);
@@ -1009,28 +2178,28 @@ static int __init init_raw1394(void)
                 return -ENOMEM;
         }
 
-	devfs_handle = devfs_register(NULL,
-				      RAW1394_DEVICE_NAME, DEVFS_FL_NONE,
+        devfs_handle = devfs_register(NULL,
+                                      RAW1394_DEVICE_NAME, DEVFS_FL_NONE,
                                       IEEE1394_MAJOR,
-				      IEEE1394_MINOR_BLOCK_RAW1394 * 16,
+                                      IEEE1394_MINOR_BLOCK_RAW1394 * 16,
                                       S_IFCHR | S_IRUSR | S_IWUSR, &file_ops,
                                       NULL);
 
         if (ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_RAW1394,
-				      THIS_MODULE, &file_ops)) {
+                                      THIS_MODULE, &file_ops)) {
                 HPSB_ERR("raw1394 failed to register minor device block");
-		devfs_unregister(devfs_handle);
-		hpsb_unregister_highlevel(hl_handle);
+                devfs_unregister(devfs_handle);
+                hpsb_unregister_highlevel(hl_handle);
                 return -EBUSY;
         }
-	printk(KERN_INFO "raw1394: /dev/%s device initialized\n", RAW1394_DEVICE_NAME);
+        printk(KERN_INFO "raw1394: /dev/%s device initialized\n", RAW1394_DEVICE_NAME);
         return 0;
 }
 
 static void __exit cleanup_raw1394(void)
 {
         ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_RAW1394);
-	devfs_unregister(devfs_handle);
+        devfs_unregister(devfs_handle);
         hpsb_unregister_highlevel(hl_handle);
 }
 

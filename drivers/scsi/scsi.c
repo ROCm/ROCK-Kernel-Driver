@@ -1399,14 +1399,10 @@ static void scsi_softirq(struct softirq_action *h)
  */
 int scsi_retry_command(Scsi_Cmnd * SCpnt)
 {
-	memcpy((void *) SCpnt->cmnd, (void *) SCpnt->data_cmnd,
-	       sizeof(SCpnt->data_cmnd));
-	SCpnt->request_buffer = SCpnt->buffer;
-	SCpnt->request_bufflen = SCpnt->bufflen;
-	SCpnt->use_sg = SCpnt->old_use_sg;
-	SCpnt->cmd_len = SCpnt->old_cmd_len;
-	SCpnt->sc_data_direction = SCpnt->sc_old_data_direction;
-	SCpnt->underflow = SCpnt->old_underflow;
+	/*
+	 * Restore the SCSI command state.
+	 */
+	scsi_setup_cmd_retry(SCpnt);
 
         /*
          * Zero the sense information from the last time we tried

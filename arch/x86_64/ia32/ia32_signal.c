@@ -81,11 +81,11 @@ sys32_sigsuspend(int history0, int history1, old_sigset_t mask, struct pt_regs r
 	sigset_t saveset;
 
 	mask &= _BLOCKABLE;
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	regs.rax = -EINTR;
 	while (1) {
@@ -170,10 +170,7 @@ ia32_restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 *sc, unsign
     	  asm volatile("movl %%" #seg ",%0" : "=r" (cur));		\
 	  if (pre != cur) loadsegment(seg,pre); }
 
-	/* Reload fs and gs if they have changed in the signal handler.
-	   This does not handle long fs/gs base changes in the handler, but does not clobber 
-	   them at least in the normal case. */ 
-	
+	/* Reload fs and gs if they have changed in the signal handler. */
 	
 	{
 		unsigned short gs; 
@@ -181,11 +178,18 @@ ia32_restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 *sc, unsign
 		load_gs_index(gs); 
 	} 
 	RELOAD_SEG(fs);
+	RELOAD_SEG(ds);
+	RELOAD_SEG(es);
 
 	COPY(di); COPY(si); COPY(bp); COPY(sp); COPY(bx);
 	COPY(dx); COPY(cx); COPY(ip);
 	/* Don't touch extended registers */ 
 	
+	err |= __get_user(regs->cs, &sc->cs); 
+	regs->cs |= 2;  
+	err |= __get_user(regs->ss, &sc->ss); 
+	regs->ss |= 2; 
+
 	{
 		unsigned int tmpflags;
 		err |= __get_user(tmpflags, &sc->eflags);
@@ -231,10 +235,10 @@ asmlinkage int sys32_sigreturn(struct pt_regs regs)
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	
 	if (ia32_restore_sigcontext(&regs, &frame->sc, &eax))
 		goto badframe;
@@ -258,10 +262,10 @@ asmlinkage int sys32_rt_sigreturn(struct pt_regs regs)
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	
 	if (ia32_restore_sigcontext(&regs, &frame->uc.uc_mcontext, &eax))
 		goto badframe;
@@ -299,6 +303,10 @@ ia32_setup_sigcontext(struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate,
 	err |= __put_user(tmp, (unsigned int *)&sc->gs);
 	__asm__("movl %%fs,%0" : "=r"(tmp): "0"(tmp));
 	err |= __put_user(tmp, (unsigned int *)&sc->fs);
+	__asm__("movl %%ds,%0" : "=r"(tmp): "0"(tmp));
+	err |= __put_user(tmp, (unsigned int *)&sc->ds);
+	__asm__("movl %%es,%0" : "=r"(tmp): "0"(tmp));
+	err |= __put_user(tmp, (unsigned int *)&sc->es);
 
 	err |= __put_user((u32)regs->rdi, &sc->edi);
 	err |= __put_user((u32)regs->rsi, &sc->esi);
@@ -308,6 +316,8 @@ ia32_setup_sigcontext(struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate,
 	err |= __put_user((u32)regs->rdx, &sc->edx);
 	err |= __put_user((u32)regs->rcx, &sc->ecx);
 	err |= __put_user((u32)regs->rax, &sc->eax);
+	err |= __put_user((u32)regs->cs, &sc->cs);
+	err |= __put_user((u32)regs->ss, &sc->ss);
 	err |= __put_user(current->thread.trap_no, &sc->trapno);
 	err |= __put_user(current->thread.error_code, &sc->err);
 	err |= __put_user((u32)regs->rip, &sc->eip);
@@ -406,8 +416,13 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 	regs->rsp = (unsigned long) frame;
 	regs->rip = (unsigned long) ka->sa.sa_handler;
 
+	asm volatile("movl %0,%%ds" :: "r" (__USER32_DS)); 
+	asm volatile("movl %0,%%es" :: "r" (__USER32_DS)); 
+
+	regs->cs = __USER32_CS; 
+	regs->ss = __USER32_DS; 
+
 	set_fs(USER_DS);
-	// XXX: cs
 	regs->eflags &= ~TF_MASK;
 
 #if DEBUG_SIG
@@ -479,8 +494,13 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	regs->rsp = (unsigned long) frame;
 	regs->rip = (unsigned long) ka->sa.sa_handler;
 
+	asm volatile("movl %0,%%ds" :: "r" (__USER32_DS)); 
+	asm volatile("movl %0,%%es" :: "r" (__USER32_DS)); 
+	
+	regs->cs = __USER32_CS; 
+	regs->ss = __USER32_DS; 
+
 	set_fs(USER_DS);
-	// XXX: cs
 	regs->eflags &= ~TF_MASK;
 
 #if DEBUG_SIG

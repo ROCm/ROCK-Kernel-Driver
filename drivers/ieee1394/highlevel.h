@@ -74,17 +74,22 @@ struct hpsb_address_ops {
          */
 
         /* These functions have to implement block reads for themselves. */
+        /* These functions either return a response code
+           or a negative number. In the first case a response will be generated; in the 
+           later case, no response will be sent and the driver, that handled the request
+           will send the response itself
+        */
         int (*read) (struct hpsb_host *host, int nodeid, quadlet_t *buffer,
-                     u64 addr, unsigned int length);
+                     u64 addr, unsigned int length, u16 flags);
         int (*write) (struct hpsb_host *host, int nodeid, int destid,
-		      quadlet_t *data, u64 addr, unsigned int length);
+		      quadlet_t *data, u64 addr, unsigned int length, u16 flags);
 
         /* Lock transactions: write results of ext_tcode operation into
          * *store. */
         int (*lock) (struct hpsb_host *host, int nodeid, quadlet_t *store,
-                     u64 addr, quadlet_t data, quadlet_t arg, int ext_tcode);
+                     u64 addr, quadlet_t data, quadlet_t arg, int ext_tcode, u16 flags);
         int (*lock64) (struct hpsb_host *host, int nodeid, octlet_t *store,
-                       u64 addr, octlet_t data, octlet_t arg, int ext_tcode);
+                       u64 addr, octlet_t data, octlet_t arg, int ext_tcode, u16 flags);
 };
 
 
@@ -94,14 +99,23 @@ void highlevel_add_host(struct hpsb_host *host);
 void highlevel_remove_host(struct hpsb_host *host);
 void highlevel_host_reset(struct hpsb_host *host);
 
+
+/* these functions are called to handle transactions. They are called, when
+   a packet arrives. The flags argument contains the second word of the first header
+   quadlet of the incoming packet (containing transaction label, retry code,
+   transaction code and priority). These functions either return a response code
+   or a negative number. In the first case a response will be generated; in the 
+   later case, no response will be sent and the driver, that handled the request
+   will send the response itself.
+*/
 int highlevel_read(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
-                   u64 addr, unsigned int length);
+                   u64 addr, unsigned int length, u16 flags);
 int highlevel_write(struct hpsb_host *host, int nodeid, int destid,
-		    quadlet_t *data, u64 addr, unsigned int length);
+		    quadlet_t *data, u64 addr, unsigned int length, u16 flags);
 int highlevel_lock(struct hpsb_host *host, int nodeid, quadlet_t *store,
-                   u64 addr, quadlet_t data, quadlet_t arg, int ext_tcode);
+                   u64 addr, quadlet_t data, quadlet_t arg, int ext_tcode, u16 flags);
 int highlevel_lock64(struct hpsb_host *host, int nodeid, octlet_t *store,
-                     u64 addr, octlet_t data, octlet_t arg, int ext_tcode);
+                     u64 addr, octlet_t data, octlet_t arg, int ext_tcode, u16 flags);
 
 void highlevel_iso_receive(struct hpsb_host *host, quadlet_t *data,
                            unsigned int length);
@@ -129,6 +143,8 @@ void hpsb_unregister_highlevel(struct hpsb_highlevel *hl);
  */
 int hpsb_register_addrspace(struct hpsb_highlevel *hl,
                             struct hpsb_address_ops *ops, u64 start, u64 end);
+
+int hpsb_unregister_addrspace(struct hpsb_highlevel *hl, u64 start);
 
 /*
  * Enable or disable receving a certain isochronous channel through the

@@ -27,12 +27,12 @@
  */
 
 #define CPIA_MAJ_VER	0
-#define CPIA_MIN_VER    7
-#define CPIA_PATCH_VER	4
+#define CPIA_MIN_VER    8
+#define CPIA_PATCH_VER	1
 
 #define CPIA_PP_MAJ_VER       0
-#define CPIA_PP_MIN_VER       7
-#define CPIA_PP_PATCH_VER     4
+#define CPIA_PP_MIN_VER       8
+#define CPIA_PP_PATCH_VER     1
 
 #define CPIA_MAX_FRAME_SIZE_UNALIGNED	(352 * 288 * 4)   /* CIF at RGB32 */
 #define CPIA_MAX_FRAME_SIZE	((CPIA_MAX_FRAME_SIZE_UNALIGNED + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1)) /* align above to PAGE_SIZE */
@@ -203,7 +203,14 @@ struct cam_params {
 		u8 videoSize;		/* CIF/QCIF */
 		u8 subSample;
 		u8 yuvOrder;
-	} format;
+ 	} format;
+        struct {                        /* Intel QX3 specific data */
+                u8 qx3_detected;        /* a QX3 is present */
+                u8 toplight;            /* top light lit , R/W */
+                u8 bottomlight;         /* bottom light lit, R/W */
+                u8 button;              /* snapshot button pressed (R/O) */
+                u8 cradled;             /* microscope is in cradle (R/O) */
+        } qx3;
 	struct {
 		u8 colStart;		/* skip first 8*colStart pixels */
 		u8 colEnd;		/* finish at 8*colEnd pixels */
@@ -393,36 +400,12 @@ void cpia_unregister_camera(struct cam_data *cam);
       (p)&0x80?1:0, (p)&0x40?1:0, (p)&0x20?1:0, (p)&0x10?1:0,\
         (p)&0x08?1:0, (p)&0x04?1:0, (p)&0x02?1:0, (p)&0x01?1:0);
 
-#define ADD_TO_LIST(l, drv) \
-  {\
-    lock_kernel();\
-    (drv)->next = l;\
-    (drv)->previous = &(l);\
-    (l) = drv;\
-    unlock_kernel();\
-  } while(0)
-
-#define REMOVE_FROM_LIST(drv) \
-  {\
-    if ((drv)->previous != NULL) {\
-      lock_kernel();\
-      if ((drv)->next != NULL)\
-        (drv)->next->previous = (drv)->previous;\
-      *((drv)->previous) = (drv)->next;\
-      (drv)->previous = NULL;\
-      (drv)->next = NULL;\
-      unlock_kernel();\
-    }\
-  } while (0)
-
-
 static inline void cpia_add_to_list(struct cam_data* l, struct cam_data* drv)
 {
 	drv->next = l;
 	drv->previous = &l;
 	l = drv;
 }
-
 
 static inline void cpia_remove_from_list(struct cam_data* drv)
 {
@@ -434,7 +417,6 @@ static inline void cpia_remove_from_list(struct cam_data* drv)
 		drv->next = NULL;
 	}
 }
-
 
 #endif /* __KERNEL__ */
 

@@ -4,20 +4,33 @@
  * CSR implementation, iso/bus manager implementation.
  *
  * Copyright (C) 1999 Andreas E. Bombe
+ *               2002 Manfred Weihs <weihs@ict.tuwien.ac.at>
  *
  * This code is licensed under the GPL.  See the file COPYING in the root
  * directory of the kernel sources for details.
+ *
+ *
+ * Contributions:
+ *
+ * Manfred Weihs <weihs@ict.tuwien.ac.at>
+ *        configuration ROM manipulation
+ *
  */
 
 #include <linux/string.h>
+#include <linux/module.h> /* needed for MODULE_PARM */
 
 #include "ieee1394_types.h"
 #include "hosts.h"
 #include "ieee1394.h"
 #include "highlevel.h"
 
+/* Module Parameters */
+/* this module parameter can be used to disable mapping of the FCP registers */
+MODULE_PARM(fcp,"i");
+MODULE_PARM_DESC(fcp, "FCP-registers");
+static int fcp = 1;
 
-/* FIXME: this one won't work on little endian with big endian data */
 static u16 csr_crc16(unsigned *data, int length)
 {
         int check=0, i;
@@ -25,7 +38,7 @@ static u16 csr_crc16(unsigned *data, int length)
 
         for (i = length; i; i--) {
                 for (next = check, shift = 28; shift >= 0; shift -= 4 ) {
-                        sum = ((next >> 12) ^ (*data >> shift)) & 0xf;
+                        sum = ((next >> 12) ^ (be32_to_cpu(*data) >> shift)) & 0xf;
                         next = (next << 4) ^ (sum << 12) ^ (sum << 5) ^ (sum);
                 }
                 check = next & 0xffff;
@@ -60,6 +73,8 @@ static void host_reset(struct hpsb_host *host)
                             | csr_crc16(host->csr.topology_map + 1,
                                         host->selfid_count + 2));
 
+        host->csr.speed_map[1] = 
+                cpu_to_be32(be32_to_cpu(host->csr.speed_map[1]) + 1);
         host->csr.speed_map[0] = cpu_to_be32(0x3f1 << 16 
                                              | csr_crc16(host->csr.speed_map+1,
                                                          0x3f1));
@@ -71,7 +86,7 @@ static void add_host(struct hpsb_host *host)
         host->csr.lock = SPIN_LOCK_UNLOCKED;
 
         host->csr.rom_size = host->driver->get_rom(host, &host->csr.rom);
-
+        host->csr.rom_version           = 0;
         host->csr.state                 = 0;
         host->csr.node_ids              = 0;
         host->csr.split_timeout_hi      = 0;
@@ -84,13 +99,52 @@ static void add_host(struct hpsb_host *host)
         host->csr.channels_available_lo = ~0;
 }
 
+int hpsb_update_config_rom(struct hpsb_host *host, const quadlet_t *new_rom, 
+	size_t size, unsigned char rom_version)
+{
+        int ret,flags;
+        spin_lock_irqsave(&host->csr.lock, flags); 
+        if (rom_version != host->csr.rom_version)
+                 ret = -1;
+        else if (size > (CSR_CONFIG_ROM_SIZE << 2))
+                 ret = -2;
+        else {
+                 memcpy(host->csr.rom,new_rom,size);
+                 host->csr.rom_size=size;
+                 host->csr.rom_version++;
+                 ret=0;
+        }
+        spin_unlock_irqrestore(&host->csr.lock, flags);
+        return ret;
+}
+
+int hpsb_get_config_rom(struct hpsb_host *host, quadlet_t *buffer, 
+	size_t buffersize, size_t *rom_size, unsigned char *rom_version)
+{
+        int ret,flags;
+        spin_lock_irqsave(&host->csr.lock, flags); 
+        *rom_version=host->csr.rom_version;
+        *rom_size=host->csr.rom_size;
+        if (buffersize < host->csr.rom_size)
+                 ret = -1;
+        else {
+                 memcpy(buffer,host->csr.rom,host->csr.rom_size);
+                 ret=0;
+        }
+        spin_unlock_irqrestore(&host->csr.lock, flags);
+        return ret;
+}
+
 
 /* Read topology / speed maps and configuration ROM */
 static int read_maps(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
-                     u64 addr, unsigned int length)
+                     u64 addr, unsigned int length, u16 fl)
 {
         int csraddr = addr - CSR_REGISTER_BASE;
         const char *src;
+        int flags;
+
+        spin_lock_irqsave(&host->csr.lock, flags); 
 
         if (csraddr < CSR_TOPOLOGY_MAP) {
                 if (csraddr + length > CSR_CONFIG_ROM + host->csr.rom_size) {
@@ -105,6 +159,7 @@ static int read_maps(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
         }
 
         memcpy(buffer, src, length);
+        spin_unlock_irqrestore(&host->csr.lock, flags);
         return RCODE_COMPLETE;
 }
 
@@ -112,7 +167,7 @@ static int read_maps(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
 #define out if (--length == 0) break
 
 static int read_regs(struct hpsb_host *host, int nodeid, quadlet_t *buf,
-                     u64 addr, unsigned int length)
+                     u64 addr, unsigned int length, u16 flags)
 {
         int csraddr = addr - CSR_REGISTER_BASE;
         int oldcycle;
@@ -222,7 +277,7 @@ static int read_regs(struct hpsb_host *host, int nodeid, quadlet_t *buf,
 }
 
 static int write_regs(struct hpsb_host *host, int nodeid, int destid,
-		      quadlet_t *data, u64 addr, unsigned int length)
+		      quadlet_t *data, u64 addr, unsigned int length, u16 flags)
 {
         int csraddr = addr - CSR_REGISTER_BASE;
         
@@ -302,7 +357,7 @@ static int write_regs(struct hpsb_host *host, int nodeid, int destid,
 
 
 static int lock_regs(struct hpsb_host *host, int nodeid, quadlet_t *store,
-                     u64 addr, quadlet_t data, quadlet_t arg, int extcode)
+                     u64 addr, quadlet_t data, quadlet_t arg, int extcode, u16 fl)
 {
         int csraddr = addr - CSR_REGISTER_BASE;
         unsigned long flags;
@@ -379,7 +434,7 @@ static int lock_regs(struct hpsb_host *host, int nodeid, quadlet_t *store,
 }
 
 static int write_fcp(struct hpsb_host *host, int nodeid, int dest,
-		     quadlet_t *data, u64 addr, unsigned int length)
+		     quadlet_t *data, u64 addr, unsigned int length, u16 flags)
 {
         int csraddr = addr - CSR_REGISTER_BASE;
 
@@ -436,9 +491,11 @@ void init_csr(void)
         hpsb_register_addrspace(hl, &map_ops, 
                                 CSR_REGISTER_BASE + CSR_CONFIG_ROM,
                                 CSR_REGISTER_BASE + CSR_CONFIG_ROM_END);
-        hpsb_register_addrspace(hl, &fcp_ops,
+        if (fcp) {
+		hpsb_register_addrspace(hl, &fcp_ops,
                                 CSR_REGISTER_BASE + CSR_FCP_COMMAND,
                                 CSR_REGISTER_BASE + CSR_FCP_END);
+	}
         hpsb_register_addrspace(hl, &map_ops,
                                 CSR_REGISTER_BASE + CSR_TOPOLOGY_MAP,
                                 CSR_REGISTER_BASE + CSR_TOPOLOGY_MAP_END);

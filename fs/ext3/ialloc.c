@@ -458,7 +458,8 @@ struct inode *ext3_orphan_get (struct super_block * sb, ino_t ino)
 	/* Error cases - e2fsck has already cleaned up for us */
 	if (ino > max_ino) {
 		ext3_warning(sb, __FUNCTION__,
-			     "bad orphan ino %ld!  e2fsck was run?\n", ino);
+			     "bad orphan ino %lu!  e2fsck was run?\n",
+			     (unsigned long) ino);
 		goto out;
 	}
 
@@ -467,7 +468,8 @@ struct inode *ext3_orphan_get (struct super_block * sb, ino_t ino)
 	bitmap_bh = read_inode_bitmap(sb, block_group);
 	if (!bitmap_bh) {
 		ext3_warning(sb, __FUNCTION__,
-			     "inode bitmap error for orphan %ld\n", ino);
+			     "inode bitmap error for orphan %lu\n",
+			     (unsigned long) ino);
 		goto out;
 	}
 
@@ -490,7 +492,8 @@ struct inode *ext3_orphan_get (struct super_block * sb, ino_t ino)
 			       is_bad_inode(inode));
 			printk(KERN_NOTICE "NEXT_ORPHAN(inode)=%d\n",
 			       NEXT_ORPHAN(inode));
-			printk(KERN_NOTICE "max_ino=%ld\n", max_ino);
+			printk(KERN_NOTICE "max_ino=%lu\n",
+			       (unsigned long) max_ino);
 		}
 		/* Avoid freeing blocks if we got a bad deleted inode */
 		if (inode && inode->i_nlink == 0)

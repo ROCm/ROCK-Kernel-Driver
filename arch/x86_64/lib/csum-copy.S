@@ -28,6 +28,10 @@
  * Wrappers need to take care of valid exception sum and zeroing.		 
  */
 
+/* for now - should vary this based on direction */
+ #define prefetch prefetcht2
+ #define movnti   movq
+
 	.macro source
 10:
 	.section __ex_table,"a"
@@ -163,7 +167,8 @@ loop_8:
 	movnti %rbx,(%rsi)
 	leaq (%rsi,%rdx),%rsi /* preserve carry */
 	leaq (%rdi,%rdx),%rdi
-	loop loop_8
+	decl %ecx
+	jnz	loop_8
 	adcq %r9,%rax	/* add in carry */
 
 fold:
@@ -188,7 +193,8 @@ loop_1:
 	movw %bx,(%rsi)
 	addq %rdx,%rdi
 	addq %rdx,%rsi
-	loop loop_1
+	decl %ecx
+	jnz loop_1
 	adcw %r9w,%ax	/* add in carry */
 	
 	/* handle last odd byte */
@@ -235,7 +241,8 @@ align_loop:
 	movw %bx,(%rsi)
 	addq %r10,%rdi
 	addq %r10,%rsi
-	loop align_loop 
+	decl %ecx
+	jnz align_loop
 	jmp after_bad_alignment
 
 	/* weird case. need to swap the sum at the end because the spec requires

@@ -348,7 +348,7 @@ static void devfs_create_cdrom(struct gendisk *dev)
 		cdroms = devfs_mk_dir (NULL, "cdroms", NULL);
 
 	dev->number = devfs_alloc_unique_number(&cdrom_numspace);
-	sprintf(vname, "cdroms/cdrom%d", dev->number);
+	sprintf(vname, "cdrom%d", dev->number);
 	if (dev->de) {
 		int pos;
 		devfs_handle_t slave;

@@ -55,17 +55,17 @@ SECTIONS
   . = ALIGN(64);
   .vxtime_sequence : AT ((LOADADDR(.vsyscall_0) + SIZEOF(.vsyscall_0) + 63) & ~(63)) { *(.vxtime_sequence) }
   vxtime_sequence = LOADADDR(.vxtime_sequence);
-  .last_tsc_low : AT (LOADADDR(.vxtime_sequence) + SIZEOF(.vxtime_sequence)) { *(.last_tsc_low) }
-  last_tsc_low = LOADADDR(.last_tsc_low);
-  .delay_at_last_interrupt : AT (LOADADDR(.last_tsc_low) + SIZEOF(.last_tsc_low)) { *(.delay_at_last_interrupt) }
-  delay_at_last_interrupt = LOADADDR(.delay_at_last_interrupt);
-  .fast_gettimeoffset_quotient : AT (LOADADDR(.delay_at_last_interrupt) + SIZEOF(.delay_at_last_interrupt)) { *(.fast_gettimeoffset_quotient) }
-  fast_gettimeoffset_quotient = LOADADDR(.fast_gettimeoffset_quotient);
-  .wall_jiffies : AT (LOADADDR(.fast_gettimeoffset_quotient) + SIZEOF(.fast_gettimeoffset_quotient)) { *(.wall_jiffies) }
+  . = ALIGN(16);
+  .hpet : AT ((LOADADDR(.vxtime_sequence) + SIZEOF(.vxtime_sequence) + 15) & ~(15)) { *(.hpet) }
+  hpet = LOADADDR(.hpet);
+  . = ALIGN(16);
+  .wall_jiffies : AT ((LOADADDR(.hpet) + SIZEOF(.hpet) + 15) & ~(15)) { *(.wall_jiffies) }
   wall_jiffies = LOADADDR(.wall_jiffies);
-  .sys_tz : AT (LOADADDR(.wall_jiffies) + SIZEOF(.wall_jiffies)) { *(.sys_tz) }
+  . = ALIGN(16);
+  .sys_tz : AT ((LOADADDR(.wall_jiffies) + SIZEOF(.wall_jiffies) + 15) & ~(15)) { *(.sys_tz) }
   sys_tz = LOADADDR(.sys_tz);
-  .jiffies : AT (LOADADDR(.sys_tz) + SIZEOF(.sys_tz)) { *(.jiffies) }
+  . = ALIGN(16);
+  .jiffies : AT ((LOADADDR(.sys_tz) + SIZEOF(.sys_tz) + 15) & ~(15)) { *(.jiffies) }
   jiffies = LOADADDR(.jiffies);
   . = ALIGN(16);
   .xtime : AT ((LOADADDR(.jiffies) + SIZEOF(.jiffies) + 15) & ~(15)) { *(.xtime) }
@@ -100,7 +100,6 @@ SECTIONS
   __initcall_end = .;
   . = ALIGN(32);
   __per_cpu_start = .;
-  . = ALIGN(64); 
   .data.percpu  : { *(.data.percpu) }
   __per_cpu_end = .;
   . = ALIGN(4096);

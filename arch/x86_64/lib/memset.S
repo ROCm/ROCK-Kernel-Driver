@@ -1,4 +1,4 @@
-/* Copyright 2002 Andi Kleen */
+/* Copyright 2002 Andi Kleen, SuSE Labs */
 
 /*
  * ISO C memset - set a memory block to a byte value.
@@ -34,16 +34,17 @@ after_bad_alignment:
 	jz	 handle_tail
 
 loop_64:	
-	movnti  %rax,(%rdi) 
-	movnti  %rax,8(%rdi) 
-	movnti  %rax,16(%rdi) 
-	movnti  %rax,24(%rdi) 
-	movnti  %rax,32(%rdi) 
-	movnti  %rax,40(%rdi) 
-	movnti  %rax,48(%rdi) 
-	movnti  %rax,56(%rdi) 
+	movq  %rax,(%rdi) 
+	movq  %rax,8(%rdi) 
+	movq  %rax,16(%rdi) 
+	movq  %rax,24(%rdi) 
+	movq  %rax,32(%rdi) 
+	movq  %rax,40(%rdi) 
+	movq  %rax,48(%rdi) 
+	movq  %rax,56(%rdi) 
 	addq    %r8,%rdi
-	loop	loop_64
+	decl   %ecx
+	jnz    loop_64
 
 	/* Handle tail in loops. The loops should be faster than hard
 	   to predict jump tables. */ 
@@ -53,9 +54,10 @@ handle_tail:
 	jz 	handle_7
 	shrl	$3,%ecx
 loop_8:
-	movnti  %rax,(%rdi) 
+	movq  %rax,(%rdi) 
 	addq    $8,%rdi
-	loop 	loop_8   
+	decl   %ecx
+	jnz    loop_8
 
 handle_7:
 	movl	%r11d,%ecx
@@ -64,7 +66,8 @@ handle_7:
 loop_1:
 	movb 	%al,(%rdi)
 	addq	$1,%rdi
-	loop	loop_1
+	decl    %ecx
+	jnz     loop_1
 	
 ende:	
 	movq	%r10,%rax
@@ -73,7 +76,7 @@ ende:
 bad_alignment:
 	cmpq $7,%r11
 	jbe	handle_7
-	movnti %rax,(%rdi)	/* unaligned store */
+	movq %rax,(%rdi)	/* unaligned store */
 	movq $8,%r8			
 	subq %r9,%r8 
 	addq %r8,%rdi

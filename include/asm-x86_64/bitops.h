@@ -384,6 +384,32 @@ static __inline__ int find_next_bit(void * addr, int size, int offset)
 	return (offset + set + res);
 }
 
+/* 
+ * Find string of zero bits in a bitmap. -1 when not found.
+ */ 
+extern unsigned long 
+find_next_zero_string(unsigned long *bitmap, long start, long nbits, int len);
+
+static inline void set_bit_string(unsigned long *bitmap, unsigned long i, 
+				  int len) 
+{ 
+	unsigned long end = i + len; 
+	while (i < end) {
+		__set_bit(i, bitmap); 
+		i++;
+	}
+} 
+
+static inline void clear_bit_string(unsigned long *bitmap, unsigned long i, 
+				    int len) 
+{ 
+	unsigned long end = i + len; 
+	while (i < end) {
+		clear_bit(i, bitmap); 
+		i++;
+	}
+} 
+
 /**
  * ffz - find first zero in word.
  * @word: The word to search

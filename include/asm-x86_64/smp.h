@@ -7,13 +7,12 @@
 #ifndef __ASSEMBLY__
 #include <linux/config.h>
 #include <linux/threads.h>
-#include <linux/ptrace.h>
+#include <linux/bitops.h>
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #ifndef __ASSEMBLY__
 #include <asm/fixmap.h>
-#include <asm/bitops.h>
 #include <asm/mpspec.h>
 #ifdef CONFIG_X86_IO_APIC
 #include <asm/io_apic.h>
@@ -27,6 +26,8 @@
 #ifndef ASSEMBLY
 
 #include <asm/pda.h>
+
+struct pt_regs;
 
 /*
  * Private routines/data
@@ -50,6 +51,11 @@ extern void zap_low_mappings (void);
  * This simplifies scheduling and IPI sending and
  * compresses data structures.
  */
+
+extern volatile unsigned long cpu_callout_map;
+
+#define cpu_possible(cpu) (cpu_callout_map & (1<<(cpu)))
+
 extern inline int cpu_logical_map(int cpu)
 {
 	return cpu;
@@ -57,6 +63,34 @@ extern inline int cpu_logical_map(int cpu)
 extern inline int cpu_number_map(int cpu)
 {
 	return cpu;
+}
+
+extern inline unsigned int num_online_cpus(void)
+{
+	return hweight32(cpu_online_map);
+}
+
+extern inline int find_next_cpu(unsigned cpu) 
+{ 
+	unsigned long left = cpu_online_map >> (cpu+1); 
+	if (!left) 
+		return -1; 
+	return ffz(~left) + cpu; 		
+} 
+
+extern inline int find_first_cpu(void)
+{ 
+	return ffz(~cpu_online_map); 	
+} 
+
+#define for_each_cpu(i) \
+	for((i) = find_first_cpu(); (i)>=0; (i)=find_next_cpu(i))
+
+extern volatile unsigned long cpu_callout_map;
+/* We don't mark CPUs online until __cpu_up(), so we need another measure */
+static inline int num_booting_cpus(void)
+{
+	return hweight32(cpu_callout_map);
 }
 
 /*
@@ -67,13 +101,6 @@ extern volatile int x86_apicid_to_cpu[NR_CPUS];
 extern volatile int x86_cpu_to_apicid[NR_CPUS];
 
 /*
- * General functions that each host system must provide.
- */
- 
-extern void smp_boot_cpus(void);
-extern void smp_store_cpu_info(int id);		/* Store per CPU info (like the initial udelay numbers */
-
-/*
  * This function is needed by all SMP systems. It must _always_ be valid
  * from the initial startup. We map APIC_BASE very early in page_setup(),
  * so this is correct in the x86 case.
@@ -81,12 +108,14 @@ extern void smp_store_cpu_info(int id);		/* Store per CPU info (like the initial
 
 #define smp_processor_id() read_pda(cpunumber)
 
+
 extern __inline int hard_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */
-	return GET_APIC_ID(*(unsigned long *)(APIC_BASE+APIC_ID));
+	return GET_APIC_ID(*(unsigned int *)(APIC_BASE+APIC_ID));
 }
 
+#define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
 #endif /* !ASSEMBLY */
 
 #define NO_PROC_ID		0xFF		/* No processor magic marker */
@@ -98,6 +127,8 @@ extern __inline int hard_smp_processor_id(void)
 
 #ifndef CONFIG_SMP
 #define stack_smp_processor_id() 0
+#define for_each_cpu(x) (x)=0;
+#define cpu_logical_map(x) (x)
 #else
 #include <asm/thread_info.h>
 #define stack_smp_processor_id() \

@@ -20,7 +20,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptctl.h,v 1.10 2002/05/28 15:57:16 pdelaney Exp $
+ *  $Id: mptctl.h,v 1.11 2002/10/03 13:10:13 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -319,12 +319,12 @@ struct mpt_ioctl_command32 {
 #define CPQFCTS_IOC_MAGIC 'Z'
 
 #define CPQFCTS_GETPCIINFO		_IOR(CPQFCTS_IOC_MAGIC, 1, cpqfc_pci_info_struct)
-#define CPQFCTS_GETDRIVER		_IOR(CPQFCTS_IOC_MAGIC, 2, int)
+#define CPQFCTS_GETDRIVVER		_IOR(CPQFCTS_IOC_MAGIC, 9, int)
 #define CPQFCTS_CTLR_STATUS		_IOR(CPQFCTS_IOC_MAGIC, 3, struct _cpqfc_ctlr_status)
-#define CPQFCTS_SCSI_IOCTL_FC_TARGET_ADDRESS	_IOR(CPQFCTS_IOC_MAGIC, 4, struct scsi_fctargaddress)
-#define CPQFCTS_SCSI_PASSTHRU		_IOWR(CPQFCTS_IOC_MAGIC, 5, VENDOR_IOCTL_REQ)
+#define CPQFCTS_SCSI_IOCTL_FC_TARGET_ADDRESS	_IOR(CPQFCTS_IOC_MAGIC, 13, struct scsi_fctargaddress)
+#define CPQFCTS_SCSI_PASSTHRU		_IOWR(CPQFCTS_IOC_MAGIC, 11, VENDOR_IOCTL_REQ)
 #if defined(__sparc__) && defined(__sparc_v9__)
-#define CPQFCTS_SCSI_PASSTHRU32		_IOWR(CPQFCTS_IOC_MAGIC, 5, VENDOR_IOCTL_REQ32)
+#define CPQFCTS_SCSI_PASSTHRU32		_IOWR(CPQFCTS_IOC_MAGIC, 11, VENDOR_IOCTL_REQ32)
 #endif
 
 typedef struct {

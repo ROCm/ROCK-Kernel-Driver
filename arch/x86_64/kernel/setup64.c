@@ -20,10 +20,11 @@
 #include <asm/mmu_context.h>
 #include <asm/smp.h>
 #include <asm/i387.h>
+#include <asm/percpu.h>
 
 char x86_boot_params[2048] __initdata = {0,};
 
-static unsigned long cpu_initialized __initdata = 0;
+unsigned long cpu_initialized __initdata = 0;
 
 struct x8664_pda cpu_pda[NR_CPUS] __cacheline_aligned; 
 
@@ -34,10 +35,14 @@ extern struct task_struct init_task;
 
 extern unsigned char __per_cpu_start[], __per_cpu_end[]; 
 
-struct desc_ptr gdt_descr = { 0 /* filled in */, (unsigned long) gdt_table }; 
+extern struct desc_ptr cpu_gdt_descr[];
 struct desc_ptr idt_descr = { 256 * 16, (unsigned long) idt_table }; 
 
 char boot_cpu_stack[IRQSTACKSIZE] __cacheline_aligned;
+
+#ifndef  __GENERIC_PER_CPU
+
+unsigned long __per_cpu_offset[NR_CPUS];
 
 void __init setup_per_cpu_areas(void)
 { 
@@ -52,10 +57,15 @@ void __init setup_per_cpu_areas(void)
 	ptr = alloc_bootmem(size * NR_CPUS);
 
 	for (i = 0; i < NR_CPUS; i++, ptr += size) {
-		cpu_pda[cpu_logical_map(i)].cpudata_offset = ptr - __per_cpu_start;
+		/* hide this from the compiler to avoid problems */ 
+		unsigned long offset;
+		asm("subq %[b],%0" : "=r" (offset) : "0" (ptr), [b] "r" (&__per_cpu_start));
+		__per_cpu_offset[i] = offset;
+		cpu_pda[i].cpudata_offset = offset;
 		memcpy(ptr, __per_cpu_start, size);
 	}
 } 
+#endif
 
 void pda_init(int cpu)
 { 
@@ -111,37 +121,47 @@ char boot_exception_stacks[N_EXCEPTION_STACKS*EXCEPTION_STKSZ];
 void __init cpu_init (void)
 {
 #ifdef CONFIG_SMP
-	int nr = stack_smp_processor_id();
+	int cpu = stack_smp_processor_id();
 #else
-	int nr = smp_processor_id();
+	int cpu = smp_processor_id();
 #endif
-	struct tss_struct * t = &init_tss[nr];
+	struct tss_struct * t = &init_tss[cpu];
 	unsigned long v; 
 	char *estacks; 
 	struct task_struct *me;
 
 	/* CPU 0 is initialised in head64.c */
-	if (nr != 0) {
+	if (cpu != 0) {
 		estacks = (char *)__get_free_pages(GFP_ATOMIC, 0); 
 		if (!estacks)
-			panic("Can't allocate exception stacks for CPU %d\n",nr);
-		pda_init(nr);  
+			panic("Can't allocate exception stacks for CPU %d\n",cpu);
+		pda_init(cpu);  
 	} else 
 		estacks = boot_exception_stacks; 
 
 	me = current;
 
-	if (test_and_set_bit(nr, &cpu_initialized))
-		panic("CPU#%d already initialized!\n", nr);
+	if (test_and_set_bit(cpu, &cpu_initialized))
+		panic("CPU#%d already initialized!\n", cpu);
 
-	printk("Initializing CPU#%d\n", nr);
+	printk("Initializing CPU#%d\n", cpu);
 
 		clear_in_cr4(X86_CR4_VME|X86_CR4_PVI|X86_CR4_TSD|X86_CR4_DE);
 
-	gdt_descr.size = (__u8*) gdt_end - (__u8*)gdt_table; 
+	/*
+	 * Initialize the per-CPU GDT with the boot GDT,
+	 * and set up the GDT descriptor:
+	 */
+	if (cpu) {
+		memcpy(cpu_gdt_table[cpu], cpu_gdt_table[0], GDT_SIZE);
+	}	
 
-	__asm__ __volatile__("lgdt %0": "=m" (gdt_descr));
+	cpu_gdt_descr[cpu].size = GDT_SIZE;
+	cpu_gdt_descr[cpu].address = (unsigned long)cpu_gdt_table[cpu];
+	__asm__ __volatile__("lgdt %0": "=m" (cpu_gdt_descr[cpu]));
 	__asm__ __volatile__("lidt %0": "=m" (idt_descr));
+
+	memcpy(me->thread.tls_array, cpu_gdt_table[cpu], GDT_ENTRY_TLS_ENTRIES * 8);
 
 	/*
 	 * Delete NT
@@ -177,14 +197,16 @@ void __init cpu_init (void)
 		estacks += EXCEPTION_STKSZ;
 	}
 
+	t->io_map_base = INVALID_IO_BITMAP_OFFSET;
+
 	atomic_inc(&init_mm.mm_count);
 	me->active_mm = &init_mm;
 	if (me->mm)
 		BUG();
-	enter_lazy_tlb(&init_mm, me, nr);
+	enter_lazy_tlb(&init_mm, me, cpu);
 
-	set_tss_desc(nr, t);
-	load_TR(nr);
+	set_tss_desc(cpu, t);
+	load_TR_desc();
 	load_LDT(&init_mm.context);
 
 	/*

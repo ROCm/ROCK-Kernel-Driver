@@ -1,5 +1,5 @@
 /*
- * $Id: synclinkmp.c,v 4.4 2002/04/22 16:05:41 paulkf Exp $
+ * $Id: synclinkmp.c,v 4.6 2002/10/10 14:50:47 paulkf Exp $
  *
  * Device driver for Microgate SyncLink Multiport
  * high speed multiprotocol serial adapter.
@@ -503,7 +503,7 @@ MODULE_PARM(maxframe,"1-" __MODULE_STRING(MAX_DEVICES) "i");
 MODULE_PARM(dosyncppp,"1-" __MODULE_STRING(MAX_DEVICES) "i");
 
 static char *driver_name = "SyncLink MultiPort driver";
-static char *driver_version = "$Revision: 4.4 $";
+static char *driver_version = "$Revision: 4.6 $";
 
 static int synclinkmp_init_one(struct pci_dev *dev,const struct pci_device_id *ent);
 static void synclinkmp_remove_one(struct pci_dev *dev);
@@ -1204,7 +1204,7 @@ static void wait_until_sent(struct tty_struct *tty, int timeout)
 			schedule_timeout(char_time);
 			if (signal_pending(current))
 				break;
-			if (timeout && ((orig_jiffies + timeout) < jiffies))
+			if (timeout && time_after(jiffies, orig_jiffies + timeout))
 				break;
 		}
 	} else {
@@ -1215,7 +1215,7 @@ static void wait_until_sent(struct tty_struct *tty, int timeout)
 			schedule_timeout(char_time);
 			if (signal_pending(current))
 				break;
-			if (timeout && ((orig_jiffies + timeout) < jiffies))
+			if (timeout && time_after(jiffies, orig_jiffies + timeout))
 				break;
 		}
 	}
@@ -2605,18 +2605,11 @@ static int startup(SLMP_INFO * info)
 
 	info->pending_bh = 0;
 
-	init_timer(&info->tx_timer);
-	info->tx_timer.data = (unsigned long)info;
-	info->tx_timer.function = tx_timeout;
-
 	/* program hardware for current parameters */
 	reset_port(info);
 
 	change_params(info);
 
-	init_timer(&info->status_timer);
-	info->status_timer.data = (unsigned long)info;
-	info->status_timer.function = status_timeout;
 	info->status_timer.expires = jiffies + jiffies_from_ms(10);
 	add_timer(&info->status_timer);
 
@@ -3304,12 +3297,12 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 		printk("%s(%d):%s block_til_ready() before block, count=%d\n",
 			 __FILE__,__LINE__, tty->driver.name, info->count );
 
-	save_flags(flags); cli();
+	spin_lock_irqsave(&info->lock, flags);
 	if (!tty_hung_up_p(filp)) {
 		extra_count = 1;
 		info->count--;
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&info->lock, flags);
 	info->blocked_open++;
 
 	while (1) {
@@ -3772,6 +3765,14 @@ SLMP_INFO *alloc_dev(int adapter_num, int port_num, struct pci_dev *pdev)
 		info->bus_type = MGSL_BUS_TYPE_PCI;
 		info->irq_flags = SA_SHIRQ;
 
+		init_timer(&info->tx_timer);
+		info->tx_timer.data = (unsigned long)info;
+		info->tx_timer.function = tx_timeout;
+
+		init_timer(&info->status_timer);
+		info->status_timer.data = (unsigned long)info;
+		info->status_timer.function = status_timeout;
+
 		/* Store the PCI9050 misc control register value because a flaw
 		 * in the PCI9050 prevents LCR registers from being read if
 		 * BIOS assigns an LCR base address with bit 7 set.
@@ -3959,15 +3960,13 @@ static void __exit synclinkmp_exit(void)
 	SLMP_INFO *tmp;
 
 	printk("Unloading %s %s\n", driver_name, driver_version);
-	save_flags(flags);
-	cli();
+
 	if ((rc = tty_unregister_driver(&serial_driver)))
 		printk("%s(%d) failed to unregister tty driver err=%d\n",
 		       __FILE__,__LINE__,rc);
 	if ((rc = tty_unregister_driver(&callout_driver)))
 		printk("%s(%d) failed to unregister callout driver err=%d\n",
 		       __FILE__,__LINE__,rc);
-	restore_flags(flags);
 
 	info = synclinkmp_device_list;
 	while(info) {

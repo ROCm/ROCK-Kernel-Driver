@@ -593,7 +593,7 @@ static int uart_get_info(struct uart_info *info, struct serial_struct *retinfo)
 	tmp.line	    = port->line;
 	tmp.port	    = port->iobase;
 	if (HIGH_BITS_OFFSET)
-		tmp.port_high = port->iobase >> HIGH_BITS_OFFSET;
+		tmp.port_high = (long) port->iobase >> HIGH_BITS_OFFSET;
 	tmp.irq		    = port->irq;
 	tmp.flags	    = port->flags | info->flags;
 	tmp.xmit_fifo_size  = port->fifosize;

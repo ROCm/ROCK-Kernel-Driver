@@ -58,6 +58,8 @@
 #define VENDOR_TOSHIBA         3
 #define VENDOR_WRITER          4	/* pre-scsi3 writers */
 
+#define VENDOR_TIMEOUT	30*HZ
+
 void sr_vendor_init(Scsi_CD *cd)
 {
 #ifndef CONFIG_BLK_DEV_SR_VENDOR
@@ -104,7 +106,7 @@ void sr_vendor_init(Scsi_CD *cd)
 int sr_set_blocklength(Scsi_CD *cd, int blocklength)
 {
 	unsigned char *buffer;	/* the buffer for the ioctl */
-	unsigned char cmd[MAX_COMMAND_SIZE];	/* the scsi-command */
+	struct cdrom_generic_command cgc;
 	struct ccs_modesel_head *modesel;
 	int rc, density = 0;
 
@@ -120,19 +122,23 @@ int sr_set_blocklength(Scsi_CD *cd, int blocklength)
 #ifdef DEBUG
 	printk("%s: MODE SELECT 0x%x/%d\n", cd->cdi.name, density, blocklength);
 #endif
-	memset(cmd, 0, MAX_COMMAND_SIZE);
-	cmd[0] = MODE_SELECT;
-	cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-	         (cd->device->lun << 5) : 0;
-	cmd[1] |= (1 << 4);
-	cmd[4] = 12;
+	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+	cgc.cmd[0] = MODE_SELECT;
+	cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+		     (cd->device->lun << 5) : 0;
+	cgc.cmd[1] |= (1 << 4);
+	cgc.cmd[4] = 12;
 	modesel = (struct ccs_modesel_head *) buffer;
 	memset(modesel, 0, sizeof(*modesel));
 	modesel->block_desc_length = 0x08;
 	modesel->density = density;
 	modesel->block_length_med = (blocklength >> 8) & 0xff;
 	modesel->block_length_lo = blocklength & 0xff;
-	if (0 == (rc = sr_do_ioctl(cd, cmd, buffer, sizeof(*modesel), 0, SCSI_DATA_WRITE, NULL))) {
+	cgc.buffer = buffer;
+	cgc.buflen = sizeof(*modesel);
+	cgc.data_direction = SCSI_DATA_WRITE;
+	cgc.timeout = VENDOR_TIMEOUT;
+	if (0 == (rc = sr_do_ioctl(cd, &cgc))) {
 		cd->device->sector_size = blocklength;
 	}
 #ifdef DEBUG
@@ -154,7 +160,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	Scsi_CD *cd = cdi->handle;
 	unsigned long sector;
 	unsigned char *buffer;	/* the buffer for the ioctl */
-	unsigned char cmd[MAX_COMMAND_SIZE];	/* the scsi-command */
+	struct cdrom_generic_command cgc;
 	int rc, no_multi;
 
 	if (cd->cdi.mask & CDC_MULTI_SESSION)
@@ -168,16 +174,22 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	no_multi = 0;		/* flag: the drive can't handle multisession */
 	rc = 0;
 
+	memset(&cgc, 0, sizeof(struct cdrom_generic_command));
+
 	switch (cd->vendor) {
 
 	case VENDOR_SCSI3:
-		memset(cmd, 0, MAX_COMMAND_SIZE);
-		cmd[0] = READ_TOC;
-		cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		         (cd->device->lun << 5) : 0;
-		cmd[8] = 12;
-		cmd[9] = 0x40;
-		rc = sr_do_ioctl(cd, cmd, buffer, 12, 1, SCSI_DATA_READ, NULL);
+		cgc.cmd[0] = READ_TOC;
+		cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+			     (cd->device->lun << 5) : 0;
+		cgc.cmd[8] = 12;
+		cgc.cmd[9] = 0x40;
+		cgc.buffer = buffer;
+		cgc.buflen = 12;
+		cgc.quiet = 1;
+		cgc.data_direction = SCSI_DATA_READ;
+		cgc.timeout = VENDOR_TIMEOUT;
+		rc = sr_do_ioctl(cd, &cgc);
 		if (rc != 0)
 			break;
 		if ((buffer[0] << 8) + buffer[1] < 0x0a) {
@@ -197,13 +209,17 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 #ifdef CONFIG_BLK_DEV_SR_VENDOR
 	case VENDOR_NEC:{
 			unsigned long min, sec, frame;
-			memset(cmd, 0, MAX_COMMAND_SIZE);
-			cmd[0] = 0xde;
-			cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-			         (cd->device->lun << 5) : 0;
-			cmd[1] |= 0x03;
-			cmd[2] = 0xb0;
-			rc = sr_do_ioctl(cd, cmd, buffer, 0x16, 1, SCSI_DATA_READ, NULL);
+			cgc.cmd[0] = 0xde;
+			cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+				     (cd->device->lun << 5) : 0;
+			cgc.cmd[1] |= 0x03;
+			cgc.cmd[2] = 0xb0;
+			cgc.buffer = buffer;
+			cgc.buflen = 0x16;
+			cgc.quiet = 1;
+			cgc.data_direction = SCSI_DATA_READ;
+			cgc.timeout = VENDOR_TIMEOUT;
+			rc = sr_do_ioctl(cd, &cgc);
 			if (rc != 0)
 				break;
 			if (buffer[14] != 0 && buffer[14] != 0xb0) {
@@ -225,12 +241,16 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 
 			/* we request some disc information (is it a XA-CD ?,
 			 * where starts the last session ?) */
-			memset(cmd, 0, MAX_COMMAND_SIZE);
-			cmd[0] = 0xc7;
-			cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-			         (cd->device->lun << 5) : 0;
-			cmd[1] |= 0x03;
-			rc = sr_do_ioctl(cd, cmd, buffer, 4, 1, SCSI_DATA_READ, NULL);
+			cgc.cmd[0] = 0xc7;
+			cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+				     (cd->device->lun << 5) : 0;
+			cgc.cmd[1] |= 0x03;
+			cgc.buffer = buffer;
+			cgc.buflen = 4;
+			cgc.quiet = 1;
+			cgc.data_direction = SCSI_DATA_READ;
+			cgc.timeout = VENDOR_TIMEOUT;
+			rc = sr_do_ioctl(cd, &cgc);
 			if (rc == -EINVAL) {
 				printk(KERN_INFO "%s: Hmm, seems the drive "
 				       "doesn't support multisession CD's\n",
@@ -251,13 +271,17 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 		}
 
 	case VENDOR_WRITER:
-		memset(cmd, 0, MAX_COMMAND_SIZE);
-		cmd[0] = READ_TOC;
-		cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		         (cd->device->lun << 5) : 0;
-		cmd[8] = 0x04;
-		cmd[9] = 0x40;
-		rc = sr_do_ioctl(cd, cmd, buffer, 0x04, 1, SCSI_DATA_READ, NULL);
+		cgc.cmd[0] = READ_TOC;
+		cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+			     (cd->device->lun << 5) : 0;
+		cgc.cmd[8] = 0x04;
+		cgc.cmd[9] = 0x40;
+		cgc.buffer = buffer;
+		cgc.buflen = 0x04;
+		cgc.quiet = 1;
+		cgc.data_direction = SCSI_DATA_READ;
+		cgc.timeout = VENDOR_TIMEOUT;
+		rc = sr_do_ioctl(cd, &cgc);
 		if (rc != 0) {
 			break;
 		}
@@ -266,13 +290,18 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			       "%s: No finished session\n", cd->cdi.name);
 			break;
 		}
-		cmd[0] = READ_TOC;	/* Read TOC */
-		cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
-		         (cd->device->lun << 5) : 0;
-		cmd[6] = rc & 0x7f;	/* number of last session */
-		cmd[8] = 0x0c;
-		cmd[9] = 0x40;
-		rc = sr_do_ioctl(cd, cmd, buffer, 12, 1, SCSI_DATA_READ, NULL);
+		cgc.cmd[0] = READ_TOC;	/* Read TOC */
+		cgc.cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
+			     (cd->device->lun << 5) : 0;
+		cgc.cmd[6] = rc & 0x7f;	/* number of last session */
+		cgc.cmd[8] = 0x0c;
+		cgc.cmd[9] = 0x40;
+		cgc.buffer = buffer;
+		cgc.buflen = 12;
+		cgc.quiet = 1;
+		cgc.data_direction = SCSI_DATA_READ;
+		cgc.timeout = VENDOR_TIMEOUT;
+		rc = sr_do_ioctl(cd, &cgc);
 		if (rc != 0) {
 			break;
 		}

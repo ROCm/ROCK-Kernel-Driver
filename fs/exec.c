@@ -37,6 +37,7 @@
 #include <linux/personality.h>
 #include <linux/binfmts.h>
 #include <linux/swap.h>
+#include <linux/utsname.h>
 #define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/namei.h>
@@ -52,6 +53,8 @@
 #endif
 
 int core_uses_pid;
+char core_pattern[65] = "core";
+/* The maximal length of core_pattern is also specified in sysctl.c */ 
 
 static struct linux_binfmt *formats;
 static rwlock_t binfmt_lock = RW_LOCK_UNLOCKED;
@@ -1090,10 +1093,126 @@ void set_binfmt(struct linux_binfmt *new)
 		__MOD_DEC_USE_COUNT(old->module);
 }
 
+#define CORENAME_MAX_SIZE 64
+
+/* format_corename will inspect the pattern parameter, and output a
+ * name into corename, which must have space for at least
+ * CORENAME_MAX_SIZE bytes plus one byte for the zero terminator.
+ */
+void format_corename(char *corename, const char *pattern, long signr)
+{
+	const char *pat_ptr = pattern;
+	char *out_ptr = corename;
+	char *const out_end = corename + CORENAME_MAX_SIZE;
+	int rc;
+	int pid_in_pattern = 0;
+
+	/* Repeat as long as we have more pattern to process and more output
+	   space */
+	while (*pat_ptr) {
+		if (*pat_ptr != '%') {
+			if (out_ptr == out_end)
+				goto out;
+			*out_ptr++ = *pat_ptr++;
+		} else {
+			switch (*++pat_ptr) {
+			case 0:
+				goto out;
+			/* Double percent, output one percent */
+			case '%':
+				if (out_ptr == out_end)
+					goto out;
+				*out_ptr++ = '%';
+				break;
+			/* pid */
+			case 'p':
+				pid_in_pattern = 1;
+				rc = snprintf(out_ptr, out_end - out_ptr,
+					      "%d", current->pid);
+				if (rc > out_end - out_ptr)
+					goto out;
+				out_ptr += rc;
+				break;
+			/* uid */
+			case 'u':
+				rc = snprintf(out_ptr, out_end - out_ptr,
+					      "%d", current->uid);
+				if (rc > out_end - out_ptr)
+					goto out;
+				out_ptr += rc;
+				break;
+			/* gid */
+			case 'g':
+				rc = snprintf(out_ptr, out_end - out_ptr,
+					      "%d", current->gid);
+				if (rc > out_end - out_ptr)
+					goto out;
+				out_ptr += rc;
+				break;
+			/* signal that caused the coredump */
+			case 's':
+				rc = snprintf(out_ptr, out_end - out_ptr,
+					      "%ld", signr);
+				if (rc > out_end - out_ptr)
+					goto out;
+				out_ptr += rc;
+				break;
+			/* UNIX time of coredump */
+			case 't': {
+				struct timeval tv;
+				do_gettimeofday(&tv);
+				rc = snprintf(out_ptr, out_end - out_ptr,
+					      "%lu", tv.tv_sec);
+				if (rc > out_end - out_ptr)
+					goto out;
+				out_ptr += rc;
+				break;
+			}
+			/* hostname */
+			case 'h':
+				down_read(&uts_sem);
+				rc = snprintf(out_ptr, out_end - out_ptr,
+					      "%s", system_utsname.nodename);
+				up_read(&uts_sem);
+				if (rc > out_end - out_ptr)
+					goto out;
+				out_ptr += rc;
+				break;
+			/* executable */
+			case 'e':
+				rc = snprintf(out_ptr, out_end - out_ptr,
+					      "%s", current->comm);
+				if (rc > out_end - out_ptr)
+					goto out;
+				out_ptr += rc;
+				break;
+			default:
+				break;
+			}
+			++pat_ptr;
+		}
+	}
+	/* Backward compatibility with core_uses_pid:
+	 *
+	 * If core_pattern does not include a %p (as is the default)
+	 * and core_uses_pid is set, then .%pid will be appended to
+	 * the filename */
+	if (!pid_in_pattern
+            && (core_uses_pid || atomic_read(&current->mm->mm_users) != 1)) {
+		rc = snprintf(out_ptr, out_end - out_ptr,
+			      ".%d", current->pid);
+		if (rc > out_end - out_ptr)
+			goto out;
+		out_ptr += rc;
+	}
+      out:
+	*out_ptr = 0;
+}
+
 int do_coredump(long signr, struct pt_regs * regs)
 {
 	struct linux_binfmt * binfmt;
-	char corename[6+sizeof(current->comm)+10];
+	char corename[CORENAME_MAX_SIZE + 1];
 	struct file * file;
 	struct inode * inode;
 	int retval = 0;
@@ -1108,9 +1227,7 @@ int do_coredump(long signr, struct pt_regs * regs)
 	if (current->rlim[RLIMIT_CORE].rlim_cur < binfmt->min_coredump)
 		goto fail;
 
-	memcpy(corename,"core", 5); /* include trailing \0 */
- 	if (core_uses_pid || atomic_read(&current->mm->mm_users) != 1)
- 		sprintf(&corename[4], ".%d", current->pid);
+ 	format_corename(corename, core_pattern, signr);
 	file = filp_open(corename, O_CREAT | 2 | O_NOFOLLOW, 0600);
 	if (IS_ERR(file))
 		goto fail;

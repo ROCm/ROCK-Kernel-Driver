@@ -15,6 +15,8 @@
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/compatmac.h>
+#include <linux/buffer_head.h>
+#include <linux/genhd.h>
 
 #define LOCAL_END_REQUEST
 #define MAJOR_NR MTD_BLOCK_MAJOR
@@ -47,7 +49,7 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 		return -EINVAL;
 	}
 
-	set_capacit(disk, mtd->size>>9);
+	set_capacity(disk, mtd->size>>9);
 	add_disk(disk);
 
 	DEBUG(1, "ok\n");
@@ -119,7 +121,7 @@ static void mtdblock_request(RQFUNC_ARG)
 
       mtd = __get_mtd_device(NULL, minor(current_request->rq_dev));
       if (!mtd) {
-	      printk("MTD device %d doesn't appear to exist any more\n", DEVICE_NR(CURRENT->rq_dev));
+	      printk("MTD device %s doesn't appear to exist any more\n", kdevname(DEVICE_NR(CURRENT->rq_dev)));
 	      mtdblock_end_request(current_request, 0);
       }
 

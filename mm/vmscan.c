@@ -35,12 +35,17 @@
 #include <linux/swapops.h>
 
 /*
- * The "priority" of VM scanning is how much of the queues we
- * will scan in one go. A value of 12 for DEF_PRIORITY implies
- * that we'll scan 1/4096th of the queues ("queue_length >> 12")
- * during a normal aging round.
+ * The "priority" of VM scanning is how much of the queues we will scan in one
+ * go. A value of 12 for DEF_PRIORITY implies that we will scan 1/4096th of the
+ * queues ("queue_length >> 12") during an aging round.
  */
 #define DEF_PRIORITY 12
+
+/*
+ * From 0 .. 100.  Higher means more swappy.
+ */
+int vm_swappiness = 60;
+static long total_memory;
 
 #ifdef ARCH_HAS_PREFETCH
 #define prefetch_prev_lru_page(_page, _base, _field)			\
@@ -100,7 +105,6 @@ static inline int is_page_cache_freeable(struct page *page)
 {
 	return page_count(page) - !!PagePrivate(page) == 2;
 }
-
 
 /*
  * shrink_list returns the number of reclaimed pages
@@ -439,7 +443,8 @@ done:
  * But we had to alter page->flags anyway.
  */
 static /* inline */ void
-refill_inactive_zone(struct zone *zone, const int nr_pages_in)
+refill_inactive_zone(struct zone *zone, const int nr_pages_in,
+			struct page_state *ps, int priority)
 {
 	int pgdeactivate = 0;
 	int nr_pages = nr_pages_in;
@@ -448,6 +453,10 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 	LIST_HEAD(l_active);	/* Pages to go onto the active_list */
 	struct page *page;
 	struct pagevec pvec;
+	int reclaim_mapped = 0;
+	long mapped_ratio;
+	long distress;
+	long swap_tendency;
 
 	lru_add_drain();
 	spin_lock_irq(&zone->lru_lock);
@@ -469,6 +478,37 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 	}
 	spin_unlock_irq(&zone->lru_lock);
 
+	/*
+	 * `distress' is a measure of how much trouble we're having reclaiming
+	 * pages.  0 -> no problems.  100 -> great trouble.
+	 */
+	distress = 100 >> priority;
+
+	/*
+	 * The point of this algorithm is to decide when to start reclaiming
+	 * mapped memory instead of just pagecache.  Work out how much memory
+	 * is mapped.
+	 */
+	mapped_ratio = (ps->nr_mapped * 100) / total_memory;
+
+	/*
+	 * Now decide how much we really want to unmap some pages.  The mapped
+	 * ratio is downgraded - just because there's a lot of mapped memory
+	 * doesn't necessarily mean that page reclaim isn't succeeding.
+	 *
+	 * The distress ratio is important - we don't want to start going oom.
+	 *
+	 * A 100% value of vm_swappiness overrides this algorithm altogether.
+	 */
+	swap_tendency = mapped_ratio / 2 + distress + vm_swappiness;
+
+	/*
+	 * Now use this metric to decide whether to start moving mapped memory
+	 * onto the inactive list.
+	 */
+	if (swap_tendency >= 100)
+		reclaim_mapped = 1;
+
 	while (!list_empty(&l_hold)) {
 		page = list_entry(l_hold.prev, struct page, lru);
 		list_del(&page->lru);
@@ -480,6 +520,10 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 				continue;
 			}
 			pte_chain_unlock(page);
+			if (!reclaim_mapped) {
+				list_add(&page->lru, &l_active);
+				continue;
+			}
 		}
 		/*
 		 * FIXME: need to consider page_count(page) here if/when we
@@ -546,7 +590,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
  */
 static /* inline */ int
 shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
-		const int nr_pages, int *nr_mapped)
+	const int nr_pages, int *nr_mapped, struct page_state *ps, int priority)
 {
 	unsigned long ratio;
 
@@ -563,11 +607,23 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
 	ratio = (unsigned long)nr_pages * zone->nr_active /
 				((zone->nr_inactive | 1) * 2);
 	atomic_add(ratio+1, &zone->refill_counter);
-	while (atomic_read(&zone->refill_counter) > SWAP_CLUSTER_MAX) {
-		atomic_sub(SWAP_CLUSTER_MAX, &zone->refill_counter);
-		refill_inactive_zone(zone, SWAP_CLUSTER_MAX);
+	if (atomic_read(&zone->refill_counter) > SWAP_CLUSTER_MAX) {
+		int count;
+
+		/*
+		 * Don't try to bring down too many pages in one attempt.
+		 * If this fails, the caller will increase `priority' and
+		 * we'll try again, with an increased chance of reclaiming
+		 * mapped memory.
+		 */
+		count = atomic_read(&zone->refill_counter);
+		if (count > SWAP_CLUSTER_MAX * 4)
+			count = SWAP_CLUSTER_MAX * 4;
+		atomic_sub(count, &zone->refill_counter);
+		refill_inactive_zone(zone, count, ps, priority);
 	}
-	return shrink_cache(nr_pages, zone, gfp_mask, max_scan, nr_mapped);
+	return shrink_cache(nr_pages, zone, gfp_mask,
+				max_scan, nr_mapped);
 }
 
 /*
@@ -603,7 +659,8 @@ static void shrink_slab(int total_scanned, int gfp_mask)
  */
 static int
 shrink_caches(struct zone *classzone, int priority, int *total_scanned,
-		int gfp_mask, const int nr_pages, int order)
+		int gfp_mask, const int nr_pages, int order,
+		struct page_state *ps)
 {
 	struct zone *first_classzone;
 	struct zone *zone;
@@ -630,7 +687,7 @@ shrink_caches(struct zone *classzone, int priority, int *total_scanned,
 		if (max_scan < to_reclaim * 2)
 			max_scan = to_reclaim * 2;
 		ret += shrink_zone(zone, max_scan, gfp_mask,
-				to_reclaim, &nr_mapped);
+				to_reclaim, &nr_mapped, ps, priority);
 		*total_scanned += max_scan;
 		*total_scanned += nr_mapped;
 		if (ret >= nr_pages)
@@ -666,12 +723,14 @@ try_to_free_pages(struct zone *classzone,
 
 	inc_page_state(pageoutrun);
 
-	for (priority = DEF_PRIORITY; priority; priority--) {
+	for (priority = DEF_PRIORITY; priority >= 0; priority--) {
 		int total_scanned = 0;
+		struct page_state ps;
 
+		get_page_state(&ps);
 		nr_reclaimed += shrink_caches(classzone, priority,
 					&total_scanned, gfp_mask,
-					nr_pages, order);
+					nr_pages, order, &ps);
 		if (nr_reclaimed >= nr_pages)
 			return 1;
 		if (total_scanned == 0)
@@ -695,12 +754,19 @@ try_to_free_pages(struct zone *classzone,
 }
 
 /*
- * kswapd will work across all this node's zones until they are all at
- * pages_high.
+ * For kswapd, balance_pgdat() will work across all this node's zones until
+ * they are all at pages_high.
+ *
+ * If `nr_pages' is non-zero then it is the number of pages which are to be
+ * reclaimed, regardless of the zone occupancies.  This is a software suspend
+ * special.
+ *
+ * Returns the number of pages which were actually freed.
  */
-static void kswapd_balance_pgdat(pg_data_t *pgdat)
+static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 {
-	int priority = DEF_PRIORITY;
+	int to_free = nr_pages;
+	int priority;
 	int i;
 
 	for (priority = DEF_PRIORITY; priority; priority--) {
@@ -713,20 +779,23 @@ static void kswapd_balance_pgdat(pg_data_t *pgdat)
 			int to_reclaim;
 
 			to_reclaim = zone->pages_high - zone->free_pages;
+			if (nr_pages && to_free > 0)
+				to_reclaim = min(to_free, SWAP_CLUSTER_MAX*8);
 			if (to_reclaim <= 0)
 				continue;
 			success = 0;
 			max_scan = zone->nr_inactive >> priority;
 			if (max_scan < to_reclaim * 2)
 				max_scan = to_reclaim * 2;
-			shrink_zone(zone, max_scan, GFP_KSWAPD,
-					to_reclaim, &nr_mapped);
+			to_free -= shrink_zone(zone, max_scan, GFP_KSWAPD,
+					to_reclaim, &nr_mapped, ps, priority);
 			shrink_slab(max_scan + nr_mapped, GFP_KSWAPD);
 		}
 		if (success)
-			break;	/* All zones are at pages_high */
+			break;
 		blk_congestion_wait(WRITE, HZ/4);
 	}
+	return nr_pages - to_free;
 }
 
 /*
@@ -768,15 +837,44 @@ int kswapd(void *p)
 	tsk->flags |= PF_MEMALLOC|PF_KSWAPD;
 
 	for ( ; ; ) {
+		struct page_state ps;
+
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_IOTHREAD);
 		prepare_to_wait(&pgdat->kswapd_wait, &wait, TASK_INTERRUPTIBLE);
 		schedule();
 		finish_wait(&pgdat->kswapd_wait, &wait);
-		kswapd_balance_pgdat(pgdat);
+		get_page_state(&ps);
+		balance_pgdat(pgdat, 0, &ps);
 		blk_run_queues();
 	}
 }
+
+#ifdef CONFIG_SOFTWARE_SUSPEND
+/*
+ * Try to free `nr_pages' of memory, system-wide.  Returns the number of freed
+ * pages.
+ */
+int shrink_all_memory(int nr_pages)
+{
+	pg_data_t *pgdat;
+	int nr_to_free = nr_pages;
+	int ret = 0;
+
+	for_each_pgdat(pgdat) {
+		int freed;
+		struct page_state ps;
+
+		get_page_state(&ps);
+		freed = balance_pgdat(pgdat, nr_to_free, &ps);
+		ret += freed;
+		nr_to_free -= freed;
+		if (nr_to_free <= 0)
+			break;
+	}
+	return ret;
+}
+#endif
 
 static int __init kswapd_init(void)
 {
@@ -785,6 +883,7 @@ static int __init kswapd_init(void)
 	swap_setup();
 	for_each_pgdat(pgdat)
 		kernel_thread(kswapd, pgdat, CLONE_KERNEL);
+	total_memory = nr_free_pagecache_pages();
 	return 0;
 }
 

@@ -8,6 +8,10 @@ if you want to format from within Linux.
 
 VFAT MOUNT OPTIONS
 ----------------------------------------------------------------------
+umask=###     -- The permission mask (see umask(1)) for the regulare file.
+                 The default is the umask of current process.
+dmask=###     -- The permission mask for the directory.
+                 The default is the umask of current process.
 codepage=###  -- Sets the codepage for converting to shortname characters
 		 on FAT and VFAT filesystems.  By default, codepage 437
 		 is used.  This is the default for the U.S. and some
@@ -31,10 +35,6 @@ uni_xlate=<bool> -- Translate unhandled Unicode characters to special
 		 illegal on the vfat filesystem.  The escape sequence
 		 that gets used is ':' and the four digits of hexadecimal
 		 unicode.
-posix=<bool>  -- Allow names of same letters, different case such as
-                 'LongFileName' and 'longfilename' to coexist.  This has some
-                 problems currently because 8.3 conflicts are not handled
-                 correctly for POSIX filesystem compliance.
 nonumtail=<bool> -- When creating 8.3 aliases, normally the alias will
                  end in '~1' or tilde followed by some number.  If this
                  option is set, then if the filename is 
@@ -65,10 +65,6 @@ TODO
 * Need to get rid of the raw scanning stuff.  Instead, always use
   a get next directory entry approach.  The only thing left that uses
   raw scanning is the directory renaming code.
-
-* Fix the POSIX filesystem support to work in 8.3 space.  This involves
-  renaming aliases if a conflict occurs between a new filename and
-  an old alias.  This is quite a mess.
 
 
 POSSIBLE PROBLEMS

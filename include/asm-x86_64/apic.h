@@ -9,13 +9,15 @@
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
-#define APIC_DEBUG 0
+#define APIC_DEBUG 1
 
 #if APIC_DEBUG
 #define Dprintk(x...) printk(x)
 #else
 #define Dprintk(x...)
 #endif
+
+struct pt_regs;
 
 /*
  * Basic functions accessing APICs.
@@ -70,7 +72,8 @@ extern void init_bsp_APIC (void);
 extern void setup_local_APIC (void);
 extern void init_apic_mappings (void);
 extern void smp_local_timer_interrupt (struct pt_regs * regs);
-extern void setup_APIC_clocks (void);
+extern void setup_boot_APIC_clock (void);
+extern void setup_secondary_APIC_clock (void);
 extern void setup_apic_nmi_watchdog (void);
 extern inline void nmi_watchdog_tick (struct pt_regs * regs);
 extern int APIC_init_uniprocessor (void);
@@ -80,7 +83,6 @@ extern void enable_APIC_timer(void);
 extern struct pm_dev *apic_pm_register(pm_dev_t, unsigned long, pm_callback);
 extern void apic_pm_unregister(struct pm_dev*);
 
-extern unsigned int apic_timer_irqs [NR_CPUS];
 extern int check_nmi_watchdog (void);
 
 extern unsigned int nmi_watchdog;

@@ -297,14 +297,6 @@ int hpsb_packet_success(struct hpsb_packet *packet)
         HPSB_PANIC("reached unreachable code 2 in %s", __FUNCTION__);
 }
 
-
-int hpsb_read_trylocal(struct hpsb_host *host, nodeid_t node, u64 addr, 
-                       quadlet_t *buffer, size_t length)
-{
-        if (host->node_id != node) return -1;
-        return highlevel_read(host, node, buffer, addr, length);
-}
-
 struct hpsb_packet *hpsb_make_readqpacket(struct hpsb_host *host, nodeid_t node,
                                           u64 addr)
 {
@@ -400,6 +392,31 @@ struct hpsb_packet *hpsb_make_lockpacket(struct hpsb_host *host, nodeid_t node,
         return p;
 }
 
+struct hpsb_packet *hpsb_make_lock64packet(struct hpsb_host *host, nodeid_t node,
+                                           u64 addr, int extcode)
+{
+        struct hpsb_packet *p;
+
+        p = alloc_hpsb_packet(16);
+        if (!p) return NULL;
+
+        p->host = host;
+        p->tlabel = get_tlabel(host, node, 1);
+        p->node_id = node;
+
+        switch (extcode) {
+        case EXTCODE_FETCH_ADD:
+        case EXTCODE_LITTLE_ADD:
+                fill_async_lock(p, addr, extcode, 8);
+                break;
+        default:
+                fill_async_lock(p, addr, extcode, 16);
+                break;
+        }
+
+        return p;
+}
+
 struct hpsb_packet *hpsb_make_phypacket(struct hpsb_host *host,
                                         quadlet_t data) 
 {
@@ -427,18 +444,6 @@ int hpsb_read(struct hpsb_host *host, nodeid_t node, unsigned int generation,
         
         if (length == 0) {
                 return -EINVAL;
-        }
-
-        if (host->node_id == node) {
-                switch(highlevel_read(host, node, buffer, addr, length)) {
-                case RCODE_COMPLETE:
-                        return 0;
-                case RCODE_TYPE_ERROR:
-                        return -EACCES;
-                case RCODE_ADDRESS_ERROR:
-                default:
-                        return -EINVAL;
-                }
         }
 
         if (length == 4) {
@@ -509,18 +514,6 @@ int hpsb_write(struct hpsb_host *host, nodeid_t node, unsigned int generation,
 	if (length == 0)
 		return -EINVAL;
 
-	if (host->node_id == node) {
-		switch(highlevel_write(host, node, node, buffer, addr, length)) {
-		case RCODE_COMPLETE:
-			return 0;
-		case RCODE_TYPE_ERROR:
-			return -EACCES;
-		case RCODE_ADDRESS_ERROR:
-		default:
-			return -EINVAL;
-		}
-	}
-
 	packet = hpsb_make_packet (host, node, addr, buffer, length);
 
 	if (!packet)
@@ -551,19 +544,6 @@ int hpsb_lock(struct hpsb_host *host, nodeid_t node, unsigned int generation,
         struct hpsb_packet *packet;
         int retval = 0, length;
         
-        if (host->node_id == node) {
-                switch(highlevel_lock(host, node, data, addr, *data, arg,
-                                      extcode)) {
-                case RCODE_COMPLETE:
-                        return 0;
-                case RCODE_TYPE_ERROR:
-                        return -EACCES;
-                case RCODE_ADDRESS_ERROR:
-                default:
-                        return -EINVAL;
-                }
-        }
-
         packet = alloc_hpsb_packet(8);
         if (!packet) {
                 return -ENOMEM;

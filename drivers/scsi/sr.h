@@ -20,6 +20,10 @@
 #include "scsi.h"
 #include <linux/genhd.h>
 
+/* The CDROM is fairly slow, so we need a little extra time */
+/* In fact, it is very slow if it has to spin up first */
+#define IOCTL_TIMEOUT 30*HZ
+
 typedef struct {
 	unsigned capacity;	/* size in blocks                       */
 	Scsi_Device *device;
@@ -34,7 +38,7 @@ typedef struct {
 	struct gendisk *disk;
 } Scsi_CD;
 
-int sr_do_ioctl(Scsi_CD *, unsigned char *, void *, unsigned, int, int, struct request_sense *);
+int sr_do_ioctl(Scsi_CD *, struct cdrom_generic_command *);
 
 int sr_lock_door(struct cdrom_device_info *, int);
 int sr_tray_move(struct cdrom_device_info *, int);

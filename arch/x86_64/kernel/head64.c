@@ -71,6 +71,7 @@ static void __init setup_boot_cpu_data(void)
 }
 
 extern void start_kernel(void), pda_init(int), setup_early_printk(char *); 
+extern int disable_apic;
 
 void __init x86_64_start_kernel(char * real_mode_data)
 {
@@ -82,6 +83,10 @@ void __init x86_64_start_kernel(char * real_mode_data)
 	s = strstr(saved_command_line, "earlyprintk="); 
 	if (s != NULL)
 		setup_early_printk(s+12); 
+#ifdef CONFIG_X86_IO_APIC
+	if (strstr(saved_command_line, "disableapic"))
+		disable_apic = 1;
+#endif
 	setup_boot_cpu_data();
 	start_kernel();
 }

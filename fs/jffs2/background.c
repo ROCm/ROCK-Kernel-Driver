@@ -66,7 +66,7 @@ void jffs2_stop_garbage_collect_thread(struct jffs2_sb_info *c)
 		/* stop a eventually scheduled wbuf flush timer */
 		del_timer_sync(&c->wbuf_timer);
 		/* make sure, that a scheduled wbuf flush task is completed */
-		flush_scheduled_tasks();
+		flush_scheduled_work();
 	}
 
 	spin_lock_bh(&c->erase_completion_lock);
@@ -115,10 +115,7 @@ static int jffs2_garbage_collect_thread(void *_c)
                         unsigned long signr = 0 ;
 
                         spin_lock_irq(&current->sig->siglock);
-			if (current->sig->shared_pending.head)
-				signr = dequeue_signal(&current->sig->shared_pending, &info);
-			if (!signr)
-				signr = dequeue_signal(&current->pending, &info);
+			signr = dequeue_signal(&current->blocked, &info);
                         spin_unlock_irq(&current->sig->siglock);
 
                         switch(signr) {

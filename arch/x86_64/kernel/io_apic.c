@@ -17,6 +17,7 @@
  *					thanks to Eric Gilmore
  *					and Rolf G. Tews
  *					for testing these extensively
+ *	Paul Diefenbaugh	:	Added full ACPI support
  */
 
 #include <linux/mm.h>
@@ -28,6 +29,7 @@
 #include <linux/config.h>
 #include <linux/smp_lock.h>
 #include <linux/mc146818rtc.h>
+#include <linux/acpi.h>
 
 #include <asm/io.h>
 #include <asm/smp.h>
@@ -746,7 +748,8 @@ void __init print_IO_APIC(void)
 		(reg_01.entries != 0x1f) && /* dual Xeon boards */
 		(reg_01.entries != 0x22) && /* bigger Xeon boards */
 		(reg_01.entries != 0x2E) &&
-		(reg_01.entries != 0x3F)
+		(reg_01.entries != 0x3F) &&
+		(reg_01.entries != 0x03) 
 	)
 		UNEXPECTED_IO_APIC();
 
@@ -1014,6 +1017,8 @@ static void __init setup_ioapic_ids_from_mpc (void)
 	unsigned char old_id;
 	unsigned long flags;
 
+	if (acpi_ioapic) return; /* ACPI does that already */
+
 	/*
 	 * Set the IOAPIC ID to the value stored in the MPC table.
 	 */
@@ -1104,7 +1109,7 @@ static int __init timer_irq_works(void)
 {
 	unsigned int t1 = jiffies;
 
-	sti();
+	local_irq_enable();
 	/* Let ten ticks pass... */
 	mdelay((10 * 1000) / HZ);
 
@@ -1117,7 +1122,6 @@ static int __init timer_irq_works(void)
 	 */
 	if (jiffies - t1 > 4)
 		return 1;
-
 	return 0;
 }
 
@@ -1376,7 +1380,7 @@ static struct hw_interrupt_type lapic_irq_type = {
 	end_lapic_irq
 };
 
-static void enable_NMI_through_LVT0 (void * dummy)
+void enable_NMI_through_LVT0 (void * dummy)
 {
 	unsigned int v, ver;
 
@@ -1401,7 +1405,6 @@ static void setup_nmi (void)
 	 */ 
 	printk(KERN_INFO "activating NMI Watchdog ...");
 
-	smp_call_function(enable_NMI_through_LVT0, NULL, 1, 1);
 	enable_NMI_through_LVT0(NULL);
 
 	printk(" done.\n");
@@ -1477,7 +1480,6 @@ static inline void unlock_ExtINT_logic(void)
  */
 static inline void check_timer(void)
 {
-	extern int timer_ack;
 	int pin1, pin2;
 	int vector;
 
@@ -1497,7 +1499,6 @@ static inline void check_timer(void)
 	 */
 	apic_write_around(APIC_LVT0, APIC_LVT_MASKED | APIC_DM_EXTINT);
 	init_8259A(1);
-	timer_ack = 1;
 	enable_8259A_irq(0);
 
 	pin1 = find_isa_irq_pin(0, mp_INT);
@@ -1605,8 +1606,7 @@ void __init setup_IO_APIC(void)
 	printk("ENABLING IO-APIC IRQs\n");
 
 	/*
-	 * Set up the IO-APIC IRQ routing table by parsing the MP-BIOS
-	 * mptable:
+	 * Set up the IO-APIC IRQ routing table.
 	 */
 	setup_ioapic_ids_from_mpc();
 	sync_Arb_IDs();
@@ -1615,3 +1615,175 @@ void __init setup_IO_APIC(void)
 	check_timer();
 	print_IO_APIC();
 }
+
+/* Ensure the ACPI SCI interrupt level is active low, edge-triggered */
+
+void __init mp_config_ioapic_for_sci(int irq)
+{
+#if 0 /* fixme */
+       int ioapic;
+       int ioapic_pin;
+
+       ioapic = mp_find_ioapic(irq);
+
+       ioapic_pin = irq - mp_ioapic_routing[ioapic].irq_start;
+
+       io_apic_set_pci_routing(ioapic, ioapic_pin, irq);
+#endif
+}
+
+
+/* --------------------------------------------------------------------------
+                          ACPI-based IOAPIC Configuration
+   -------------------------------------------------------------------------- */
+
+#ifdef CONFIG_ACPI_BOOT
+
+#define IO_APIC_MAX_ID		15
+
+int __init io_apic_get_unique_id (int ioapic, int apic_id)
+{
+	struct IO_APIC_reg_00 reg_00;
+	static unsigned long apic_id_map = 0;
+	unsigned long flags;
+	int i = 0;
+
+	/*
+	 * The P4 platform supports up to 256 APIC IDs on two separate APIC 
+	 * buses (one for LAPICs, one for IOAPICs), where predecessors only 
+	 * supports up to 16 on one shared APIC bus.
+	 * 
+	 * TBD: Expand LAPIC/IOAPIC support on P4-class systems to take full
+	 *      advantage of new APIC bus architecture.
+	 */
+
+	if (!apic_id_map)
+		apic_id_map = phys_cpu_present_map;
+
+	spin_lock_irqsave(&ioapic_lock, flags);
+	*(int *)&reg_00 = io_apic_read(ioapic, 0);
+	spin_unlock_irqrestore(&ioapic_lock, flags);
+
+	if (apic_id >= IO_APIC_MAX_ID) {
+		printk(KERN_WARNING "IOAPIC[%d]: Invalid apic_id %d, trying "
+			"%d\n", ioapic, apic_id, reg_00.ID);
+		apic_id = reg_00.ID;
+	}
+
+	/*
+	 * Every APIC in a system must have a unique ID or we get lots of nice 
+	 * 'stuck on smp_invalidate_needed IPI wait' messages.
+	 */
+	if (apic_id_map & (1 << apic_id)) {
+
+		for (i = 0; i < IO_APIC_MAX_ID; i++) {
+			if (!(apic_id_map & (1 << i)))
+				break;
+		}
+
+		if (i == IO_APIC_MAX_ID)
+			panic("Max apic_id exceeded!\n");
+
+		printk(KERN_WARNING "IOAPIC[%d]: apic_id %d already used, "
+			"trying %d\n", ioapic, apic_id, i);
+
+		apic_id = i;
+	} 
+
+	apic_id_map |= (1 << apic_id);
+
+	if (reg_00.ID != apic_id) {
+		reg_00.ID = apic_id;
+
+		spin_lock_irqsave(&ioapic_lock, flags);
+		io_apic_write(ioapic, 0, *(int *)&reg_00);
+		*(int *)&reg_00 = io_apic_read(ioapic, 0);
+		spin_unlock_irqrestore(&ioapic_lock, flags);
+
+		/* Sanity check */
+		if (reg_00.ID != apic_id)
+			panic("IOAPIC[%d]: Unable change apic_id!\n", ioapic);
+	}
+
+	printk(KERN_INFO "IOAPIC[%d]: Assigned apic_id %d\n", ioapic, apic_id);
+
+	return apic_id;
+}
+
+
+int __init io_apic_get_version (int ioapic)
+{
+	struct IO_APIC_reg_01	reg_01;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ioapic_lock, flags);
+	*(int *)&reg_01 = io_apic_read(ioapic, 1);
+	spin_unlock_irqrestore(&ioapic_lock, flags);
+
+	return reg_01.version;
+}
+
+
+int __init io_apic_get_redir_entries (int ioapic)
+{
+	struct IO_APIC_reg_01	reg_01;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ioapic_lock, flags);
+	*(int *)&reg_01 = io_apic_read(ioapic, 1);
+	spin_unlock_irqrestore(&ioapic_lock, flags);
+
+	return reg_01.entries;
+}
+
+
+int io_apic_set_pci_routing (int ioapic, int pin, int irq)
+{
+	struct IO_APIC_route_entry entry;
+	unsigned long flags;
+
+	if (!IO_APIC_IRQ(irq)) {
+		printk(KERN_ERR "IOAPIC[%d]: Invalid reference to IRQ 0/n", 
+			ioapic);
+		return -EINVAL;
+	}
+
+	/*
+	 * Generate a PCI IRQ routing entry and program the IOAPIC accordingly.
+	 * Note that we mask (disable) IRQs now -- these get enabled when the
+	 * corresponding device driver registers for this IRQ.
+	 */
+
+	memset(&entry,0,sizeof(entry));
+
+	entry.delivery_mode = dest_LowestPrio;
+	entry.dest_mode = INT_DELIVERY_MODE;
+	entry.dest.logical.logical_dest = TARGET_CPUS;
+	entry.mask = 1;					 /* Disabled (masked) */
+	entry.trigger = 1;				   /* Level sensitive */
+	entry.polarity = 1;					/* Low active */
+
+	add_pin_to_irq(irq, ioapic, pin);
+
+	entry.vector = assign_irq_vector(irq);
+
+	printk(KERN_DEBUG "IOAPIC[%d]: Set PCI routing entry (%d-%d -> 0x%x -> "
+		"IRQ %d)\n", ioapic, 
+		mp_ioapics[ioapic].mpc_apicid, pin, entry.vector, irq);
+
+	irq_desc[irq].handler = &ioapic_level_irq_type;
+
+	set_intr_gate(entry.vector, interrupt[irq]);
+
+	if (!ioapic && (irq < 16))
+		disable_8259A_irq(irq);
+
+	spin_lock_irqsave(&ioapic_lock, flags);
+	io_apic_write(ioapic, 0x11+2*pin, *(((int *)&entry)+1));
+	io_apic_write(ioapic, 0x10+2*pin, *(((int *)&entry)+0));
+	spin_unlock_irqrestore(&ioapic_lock, flags);
+
+	return entry.vector;
+}
+
+#endif /*CONFIG_ACPI_BOOT*/

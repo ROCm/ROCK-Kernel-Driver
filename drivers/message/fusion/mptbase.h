@@ -13,7 +13,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptbase.h,v 1.133 2002/09/05 22:30:09 pdelaney Exp $
+ *  $Id: mptbase.h,v 1.134 2002/10/03 13:10:12 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -80,8 +80,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2002 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"2.02.01.01"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.02.01.01"
+#define MPT_LINUX_VERSION_COMMON	"2.02.01.07"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-2.02.01.07"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -91,7 +91,7 @@
 /*
  *  Fusion MPT(linux) driver configurable stuff...
  */
-#define MPT_MAX_ADAPTERS		16
+#define MPT_MAX_ADAPTERS		18
 #define MPT_MAX_PROTOCOL_DRIVERS	16
 #define MPT_MAX_BUS			1
 #define MPT_MAX_FC_DEVICES		255
@@ -397,8 +397,10 @@ typedef struct _VirtDevice {
 	ScsiCmndTracker		 SentQ;
 	ScsiCmndTracker		 DoneQ;
 //--- LUN split here?
+#ifdef MPT_SAVE_AUTOSENSE
 	u8			 sense[SCSI_STD_SENSE_BYTES];		/* 18 */
 	u8			 rsvd2[2];	/* alignment */
+#endif
 	u32			 luns;		/* Max LUNs is 32 */
 	u8			 inq_data[SCSI_STD_INQUIRY_BYTES];	/* 36 */
 	u8			 pad0[4];
@@ -424,7 +426,9 @@ typedef struct _VirtDevice {
 #define MPT_TARGET_DEFAULT_DV_STATUS	0
 #define MPT_TARGET_FLAGS_VALID_NEGO	0x01
 #define MPT_TARGET_FLAGS_VALID_INQUIRY	0x02
+#ifdef MPT_SAVE_AUTOSENSE
 #define MPT_TARGET_FLAGS_VALID_SENSE	0x04
+#endif
 #define MPT_TARGET_FLAGS_Q_YES		0x08
 #define MPT_TARGET_FLAGS_VALID_56	0x10
 
@@ -890,6 +894,8 @@ typedef struct _MPT_SCSI_HOST {
 	MPT_Q_TRACKER		  taskQ;		/* TM request Q */
 	spinlock_t		  freedoneQlock;
 	int			  taskQcnt;
+	int			  num_chain;		/* Number of chain buffers */
+	int			  max_sge;		/* Max No of SGE*/
 	u8			  numTMrequests;
 	u8			  tmPending;
 	u8			  resetPending;

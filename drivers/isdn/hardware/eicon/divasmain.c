@@ -21,7 +21,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <linux/ioport.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/smp_lock.h>
@@ -73,7 +73,7 @@ static devfs_handle_t devfs_handle;
 typedef struct _diva_os_thread_dpc {
 	struct tasklet_struct divas_task;
   diva_os_soft_isr_t*   psoft_isr;
-	struct tq_struct      trap_script_task;
+	struct work_struct      trap_script_task;
   int                   card_failed;
 } diva_os_thread_dpc_t;
 
@@ -297,7 +297,7 @@ void diva_run_trap_script (PISDN_ADAPTER IoAdapter, dword ANum)
 
   if (context && !context->card_failed) {
     context->card_failed = ANum+1;
-    schedule_task(&context->trap_script_task);
+    schedule_work(&context->trap_script_task);
 	}
 }
 
@@ -607,7 +607,7 @@ int diva_os_initialize_soft_isr (diva_os_soft_isr_t* psoft_isr,
   psoft_isr->callback         = callback;
   psoft_isr->callback_context = callback_context;
   pdpc->psoft_isr             = psoft_isr;
-  INIT_TQUEUE(&pdpc->trap_script_task, diva_adapter_trapped, pdpc);
+  INIT_WORK(&pdpc->trap_script_task, diva_adapter_trapped, pdpc);
 	tasklet_init(&pdpc->divas_task, diva_os_dpc_proc, (unsigned long)pdpc);
 
   return (0);
@@ -643,7 +643,7 @@ void diva_os_remove_soft_isr (diva_os_soft_isr_t* psoft_isr)
 
     mem = psoft_isr->object;
     psoft_isr->object = 0;
-		flush_scheduled_tasks();
+    flush_scheduled_work();
     diva_os_free (0, mem);
 	}
 }

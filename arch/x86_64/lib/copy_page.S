@@ -1,6 +1,7 @@
 /*
  * Copyright 2002 Andi Kleen, SuSE Labs.
  */	 	
+	
 	#include <linux/linkage.h>
 	#include <linux/config.h>
 	#ifdef CONFIG_PREEMPT
@@ -18,7 +19,9 @@
  * Warning: in case of super lazy FP save this needs to be preempt_stop	
  */
 	
-ENTRY(copy_page)
+	.globl copy_page
+	.p2align
+copy_page:
 	prefetchnta (%rsi) 
 	prefetchnta 64(%rsi)
 	    
@@ -37,22 +40,22 @@ loop:
 	prefetchnta 64(%rsi) 
 loop_no_prefetch:	
 	movdqa (%rsi),%xmm0 	 			 
-	movdqa 1*16(%rsi),%xmm1
-	movdqa 2*16(%rsi),%xmm2 	 			 
-	movdqa 3*16(%rsi),%xmm3 	 			 
+	movdqa 16(%rsi),%xmm1
+	movdqa 32(%rsi),%xmm2 	 			 
+	movdqa 48(%rsi),%xmm3 	 			 
 	movntdq %xmm0,(%rdi)	 
 	movntdq %xmm1,16(%rdi)	 
-	movntdq %xmm2,2*16(%rdi)	 
-	movntdq %xmm3,3*16(%rdi)
+	movntdq %xmm2,32(%rdi)	 
+	movntdq %xmm3,48(%rdi)
 	
-	movdqa 4*16(%rsi),%xmm0 	 			 
-	movdqa 5*16(%rsi),%xmm1
-	movdqa 6*16(%rsi),%xmm2 	 			 
-	movdqa 7*16(%rsi),%xmm3 	 			 
-	movntdq %xmm0,4*16(%rdi)	 
-	movntdq %xmm1,5*16(%rdi)	 
-	movntdq %xmm2,6*16(%rdi)	 
-	movntdq %xmm3,7*16(%rdi)
+	movdqa 64(%rsi),%xmm0 	 			 
+	movdqa 80(%rsi),%xmm1
+	movdqa 96(%rsi),%xmm2 	 			 
+	movdqa 112(%rsi),%xmm3 	 			 
+	movntdq %xmm0,64(%rdi)	 
+	movntdq %xmm1,80(%rdi)	 
+	movntdq %xmm2,96(%rdi)	 
+	movntdq %xmm3,112(%rdi)
 
 	addq   %rdx,%rdi	
 	addq   %rdx,%rsi

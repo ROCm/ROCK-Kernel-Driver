@@ -1068,7 +1068,7 @@ static void __init NCR5380_init(struct Scsi_Host *instance, int flags)
  *      twiddling done to the host specific fields of cmd.  If the 
  *      main coroutine is not running, it is restarted.
  *
- *	Locks: io_request lock held by caller. Called functions drop and
+ *	Locks: host lock taken by caller. Called functions drop and
  *	retake this lock. Called functions take dma lock.
  */
 
@@ -1080,6 +1080,7 @@ int NCR5380_queue_command(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *)) {
 	struct Scsi_Host *instance = cmd->host;
 	struct NCR5380_hostdata *hostdata = (struct NCR5380_hostdata *) instance->hostdata;
 	Scsi_Cmnd *tmp;
+	unsigned long flags;
 
 #if (NDEBUG & NDEBUG_NO_WRITE)
 	switch (cmd->cmnd[0]) {
@@ -1092,6 +1093,7 @@ int NCR5380_queue_command(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *)) {
 	}
 #endif				/* (NDEBUG & NDEBUG_NO_WRITE) */
 
+	spin_lock_irqsave(instance->host_lock, flags);
 #ifdef NCR5380_STATS
 	switch (cmd->cmnd[0]) {
 		case WRITE:
@@ -1139,8 +1141,8 @@ int NCR5380_queue_command(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *)) {
 	dprintk(NDEBUG_QUEUES, ("scsi%d : command added to %s of queue\n", instance->host_no, (cmd->cmnd[0] == REQUEST_SENSE) ? "head" : "tail"));
 
 	/* Run the coroutine if it isn't already running. */
+	spin_unlock_irqrestore(instance->host_lock, flags);
 	
-	/* FIMXE: drop any locks here */
 	run_main();
 	return 0;
 }
@@ -1892,7 +1894,6 @@ static int NCR5380_transfer_pio(struct Scsi_Host *instance, unsigned char *phase
  *	back into sane shape.
  *
  *	Locks: caller holds queue lock
- *	FIXME: sort this out and get new_eh running
  */
  
 static void do_reset(struct Scsi_Host *host) {
@@ -2841,7 +2842,7 @@ static void NCR5380_dma_complete(NCR5380_instance * instance) {
  *	a problem, we could implement longjmp() / setjmp(), setjmp()
  *	called where the loop started in NCR5380_main().
  *
- *	Locks: io_request_lock held by caller
+ * Locks: host lock taken by function
  */
 
 #ifndef NCR5380_abort
@@ -2850,8 +2851,11 @@ static
 int NCR5380_abort(Scsi_Cmnd * cmd) {
 	NCR5380_local_declare();
 	struct Scsi_Host *instance = cmd->host;
+	unsigned long flags;
 	struct NCR5380_hostdata *hostdata = (struct NCR5380_hostdata *) instance->hostdata;
 	Scsi_Cmnd *tmp, **prev;
+	
+	spin_lock_irqsave(instance->host_lock, flags);
 
 	printk(KERN_WARNING "scsi%d : aborting command\n", instance->host_no);
 	print_Scsi_Cmnd(cmd);
@@ -2895,6 +2899,7 @@ int NCR5380_abort(Scsi_Cmnd * cmd) {
  * aborted flag and get back into our main loop.
  */
 
+		spin_unlock_irqrestore(instance->host_lock, flags);
 		return 0;
 	}
 #endif
@@ -2915,6 +2920,7 @@ int NCR5380_abort(Scsi_Cmnd * cmd) {
 			tmp->result = DID_ABORT << 16;
 			dprintk(NDEBUG_ABORT, ("scsi%d : abort removed command from issue queue.\n", instance->host_no));
 			tmp->done(tmp);
+			spin_unlock_irqrestore(instance->host_lock, flags);
 			return SUCCESS;
 		}
 #if (NDEBUG  & NDEBUG_ABORT)
@@ -2936,6 +2942,7 @@ int NCR5380_abort(Scsi_Cmnd * cmd) {
 
 	if (hostdata->connected) {
 		dprintk(NDEBUG_ABORT, ("scsi%d : abort failed, command connected.\n", instance->host_no));
+		spin_unlock_irqrestore(instance->host_lock, flags);
 		return FAILED;
 	}
 /*
@@ -2980,6 +2987,7 @@ int NCR5380_abort(Scsi_Cmnd * cmd) {
 					tmp->host_scribble = NULL;
 					tmp->result = DID_ABORT << 16;
 					tmp->done(tmp);
+					spin_unlock_irqrestore(instance->host_lock, flags);
 					return SUCCESS;
 				}
 		}
@@ -2992,7 +3000,9 @@ int NCR5380_abort(Scsi_Cmnd * cmd) {
  * so we won't panic, but we will notify the user in case something really
  * broke.
  */
-	printk(KERN_WARNING "scsi%d : warning : SCSI command probably completed successfully\n" "         before abortion\n", instance->host_no);
+	spin_unlock_irqrestore(instance->host_lock, flags);
+	printk(KERN_WARNING "scsi%d : warning : SCSI command probably completed successfully\n"
+			"         before abortion\n", instance->host_no);
 	return FAILED;
 }
 
@@ -3004,19 +3014,22 @@ int NCR5380_abort(Scsi_Cmnd * cmd) {
  *
  * Returns : SUCCESS
  *
- * Locks: io_request_lock held by caller
+ * Locks: host lock taken by function
  */
 
 #ifndef NCR5380_bus_reset
 static
 #endif
 int NCR5380_bus_reset(Scsi_Cmnd * cmd) {
+	unsigned long flags;
+	struct Scsi_Host *instance = cmd->host;
 	NCR5380_local_declare();
 	NCR5380_setup(cmd->host);
 
+	spin_lock_irqsave(instance->host_lock, flags);
 	NCR5380_print_status(cmd->host);
 	do_reset(cmd->host);
-
+	spin_unlock_irqrestore(instance->host_lock, flags);
 	return SUCCESS;
 }
 
