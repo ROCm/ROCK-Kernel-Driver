@@ -384,7 +384,8 @@ int bio_uncopy_user(struct bio *bio)
 		char *uaddr = bio->bi_private;
 
 		__bio_for_each_segment(bvec, bio, i, 0) {
-			char *addr = page_address(bvec->bv_page) + bvec->bv_offset;
+			char *addr = page_address(bvec->bv_page);
+
 			if (!ret && copy_to_user(uaddr, addr, bvec->bv_len))
 				ret = -EFAULT;
 
@@ -416,16 +417,15 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 	struct bio_vec *bvec;
 	struct page *page;
 	struct bio *bio;
-	int offset, i, ret;
+	int i, ret;
 
 	bio = bio_alloc(GFP_KERNEL, end - start);
 	if (!bio)
 		return ERR_PTR(-ENOMEM);
 
 	ret = 0;
-	offset = uaddr & ~PAGE_MASK;
 	while (len) {
-		unsigned int bytes = PAGE_SIZE - offset;
+		unsigned int bytes = PAGE_SIZE;
 
 		if (bytes > len)
 			bytes = len;
@@ -436,12 +436,11 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 			break;
 		}
 
-		if (__bio_add_page(q, bio, page, bytes, offset) < bytes) {
+		if (__bio_add_page(q, bio, page, bytes, 0) < bytes) {
 			ret = -EINVAL;
 			break;
 		}
 
-		offset = 0;
 		len -= bytes;
 	}
 
@@ -456,7 +455,8 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 			 */
 			ret = -EFAULT;
 			bio_for_each_segment(bvec, bio, i) {
-				char *addr = page_address(bvec->bv_page) + bvec->bv_offset;
+				char *addr = page_address(bvec->bv_page);
+
 				if (copy_from_user(addr, (char *) uaddr, bvec->bv_len))
 					goto cleanup;
 			}
