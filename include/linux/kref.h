@@ -15,7 +15,7 @@
 #ifndef _KREF_H_
 #define _KREF_H_
 
-#if __KERNEL__
+#ifdef __KERNEL__
 
 #include <linux/types.h>
 #include <asm/atomic.h>

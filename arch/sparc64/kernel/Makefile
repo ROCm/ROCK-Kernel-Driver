@@ -22,6 +22,7 @@ obj-$(CONFIG_BINFMT_AOUT32) += binfmt_aout32.o
 obj-$(CONFIG_MODULES) += module.o
 obj-$(CONFIG_US3_FREQ) += us3_cpufreq.o
 obj-$(CONFIG_US2E_FREQ) += us2e_cpufreq.o
+obj-$(CONFIG_KPROBES) += kprobes.o
 
 ifdef CONFIG_SUNOS_EMUL
   obj-y += sys_sunos32.o sunos_ioctl32.o

@@ -74,7 +74,7 @@ sys_call_table:
 /*260*/	.long sys_sched_getaffinity, sys_sched_setaffinity, sys_timer_settime, sys_timer_gettime, sys_timer_getoverrun
 /*265*/	.long sys_timer_delete, sys_timer_create, sys_nis_syscall, sys_io_setup, sys_io_destroy
 /*270*/	.long sys_io_submit, sys_io_cancel, sys_io_getevents, sys_mq_open, sys_mq_unlink
-/*275*/	.long sys_mq_timedsend, sys_mq_timedreceive, sys_mq_notify, sys_mq_getsetattr, sys_ni_syscall
+/*275*/	.long sys_mq_timedsend, sys_mq_timedreceive, sys_mq_notify, sys_mq_getsetattr, sys_waitid
 /*280*/	.long sys_ni_syscall, sys_ni_syscall, sys_ni_syscall
 
 #ifdef CONFIG_SUNOS_EMUL

@@ -24,57 +24,8 @@ typedef union sigval32 {
 	u32 sival_ptr;
 } sigval_t32;
 
-typedef struct siginfo32 {
-	int si_signo;
-	int si_errno;
-	int si_code;
+struct siginfo32;
 
-	union {
-		int _pad[SI_PAD_SIZE32];
-
-		/* kill() */
-		struct {
-			compat_pid_t _pid;		/* sender's pid */
-			unsigned int _uid;		/* sender's uid */
-		} _kill;
-
-		/* POSIX.1b timers */
-		struct {
-			timer_t _tid;			/* timer id */
-			int _overrun;			/* overrun count */
-			sigval_t32 _sigval;		/* same as below */
-			int _sys_private;		/* not to be passed to user */
-		} _timer;
-
-		/* POSIX.1b signals */
-		struct {
-			compat_pid_t _pid;		/* sender's pid */
-			unsigned int _uid;		/* sender's uid */
-			sigval_t32 _sigval;
-		} _rt;
-
-		/* SIGCHLD */
-		struct {
-			compat_pid_t _pid;		/* which child */
-			unsigned int _uid;		/* sender's uid */
-			int _status;			/* exit code */
-			compat_clock_t _utime;
-			compat_clock_t _stime;
-		} _sigchld;
-
-		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS, SIGEMT */
-		struct {
-			u32 _addr; /* faulting insn/memory ref. */
-			int _trapno;
-		} _sigfault;
-
-		/* SIGPOLL */
-		struct {
-			int _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
-			int _fd;
-		} _sigpoll;
-	} _sifields;
-} siginfo_t32;
 #endif /* CONFIG_COMPAT */
 
 #endif /* __KERNEL__ */
@@ -105,7 +56,8 @@ typedef struct sigevent32 {
 	} _sigev_un;
 } sigevent_t32;
 
-extern int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from);
+extern int copy_siginfo_to_user32(struct siginfo32 __user *to, siginfo_t *from);
+extern int copy_siginfo_to_kernel32(siginfo_t *to, struct siginfo32 __user *from);
 
 #endif /* CONFIG_COMPAT */
 
