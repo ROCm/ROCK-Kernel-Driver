@@ -291,6 +291,7 @@ struct dscc4_dev_priv {
 #define Hold		0x40000000
 #define SccBusy		0x10000000
 #define PowerUp		0x80000000
+#define Vis		0x00001000
 #define FrameOk		(FrameVfr | FrameCrc)
 #define FrameVfr	0x80
 #define FrameRdo	0x40
@@ -331,6 +332,12 @@ struct dscc4_dev_priv {
 #define NeedIDR		0x00000001
 #define NeedIDT		0x00000002
 #define RdoSet		0x00000004
+/* Don't mask RDO. Ever. */
+#ifdef DSCC4_POLLING
+#define EventsMask	0xfffeef7f
+#else
+#define EventsMask	0xfffa8f7a
+#endif
 
 /* Functions prototypes */
 static inline void dscc4_rx_irq(struct dscc4_pci_priv *, struct dscc4_dev_priv *);
@@ -579,7 +586,7 @@ static void dscc4_rx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 {
 	/* Cf errata DS5 p.6 */
 	writel(0x00000000, dev->base_addr + CH0LRDA + dpriv->dev_id*4);
-	scc_writel(~PowerUp & scc_readl(dpriv, CCR0), dpriv, dev, CCR0);
+	scc_patchl(PowerUp, 0, dpriv, dev, CCR0);
 	readl(dev->base_addr + CH0LRDA + dpriv->dev_id*4);
 	writel(MTFi|Rdr, dev->base_addr + dpriv->dev_id*0x0c + CH0CFG);
 	writel(Action, dev->base_addr + GCMDR);
@@ -590,7 +597,7 @@ static void dscc4_tx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 	u16 i = 0;
 
 	/* Cf errata DS5 p.7 */
-	scc_writel(~PowerUp & scc_readl(dpriv, CCR0), dpriv, dev, CCR0);
+	scc_patchl(PowerUp, 0, dpriv, dev, CCR0);
 	scc_writel(0x00050000, dpriv, dev, CCR2);
 	/*
 	 * Must be longer than the time required to fill the fifo.
@@ -815,7 +822,8 @@ err_out:
 static void dscc4_init_registers(struct dscc4_dev_priv *dpriv,
 				 struct net_device *dev)
 {
-	scc_writel(0x80001000, dpriv, dev, CCR0);
+	/* No interrupts, SCC core disabled. Let's relax */
+	scc_writel(0x00000000, dpriv, dev, CCR0);
 
 	scc_writel(LengthCheck | (HDLC_MAX_MRU >> 5), dpriv, dev, RLCR);
 
@@ -830,15 +838,6 @@ static void dscc4_init_registers(struct dscc4_dev_priv *dpriv,
 	scc_writel(0x00050008 & ~RxActivate, dpriv, dev, CCR2);
 	// crc forwarded
 	//scc_writel(0x00250008 & ~RxActivate, dpriv, dev, CCR2);
-
-	/* Don't mask RDO. Ever. */
-#ifdef DSCC4_POLLING
-	scc_writel(0xfffeef7f, dpriv, dev, IMR); /* Interrupt mask */
-#else
-	//scc_writel(0xfffaef7f, dpriv, dev, IMR); /* Interrupt mask */
-	//scc_writel(0xfffaef7e, dpriv, dev, IMR); /* Interrupt mask */
-	scc_writel(0xfffa8f7a, dpriv, dev, IMR); /* Interrupt mask */
-#endif
 }
 
 static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
@@ -964,6 +963,8 @@ static int dscc4_open(struct net_device *dev)
 	/* IDT+IDR during XPR */
 	dpriv->flags = NeedIDR | NeedIDT;
 
+	scc_patchl(0, PowerUp | Vis, dpriv, dev, CCR0);
+
 	/*
 	 * The following is a bit paranoid...
 	 *
@@ -978,11 +979,13 @@ static int dscc4_open(struct net_device *dev)
 	} else
 		printk(KERN_INFO "%s: available. Good\n", dev->name);
 
+	scc_writel(EventsMask, dpriv, dev, IMR);
+
 	/* Posted write is flushed in the wait_ack loop */
 	scc_writel(TxSccRes | RxSccRes, dpriv, dev, CMDR);
 
 	if ((ret = dscc4_wait_ack_cec(dpriv, dev, "Cec")) < 0)
-		goto err_free_ring;
+		goto err_disable_scc_events;
 
 	/*
 	 * I would expect XPR near CE completion (before ? after ?).
@@ -993,7 +996,7 @@ static int dscc4_open(struct net_device *dev)
 	 */
 	if ((ret = dscc4_xpr_ack(dpriv)) < 0) {
 		printk(KERN_ERR "%s: %s timeout\n", DRV_NAME, "XPR");
-		goto err_free_ring;
+		goto err_disable_scc_events;
 	}
 	
 	if (debug > 2)
@@ -1010,7 +1013,10 @@ static int dscc4_open(struct net_device *dev)
 
 	return 0;
 
+err_disable_scc_events:
+	scc_writel(0xffffffff, dpriv, dev, IMR);
 err_free_ring:
+	scc_patchl(PowerUp | Vis, 0, dpriv, dev, CCR0);
 	dscc4_release_ring(dpriv);
 err_out:
 	hdlc_close(hdlc);
@@ -1076,6 +1082,9 @@ static int dscc4_close(struct net_device *dev)
 	spin_unlock_irqrestore(&dpriv->pci_priv->lock, flags);
 
 	dscc4_tx_reset(dpriv, dev);
+
+	scc_patchl(PowerUp | Vis, 0, dpriv, dev, CCR0);
+	scc_writel(0xffffffff, dpriv, dev, IMR);
 
 	hdlc_close(hdlc);
 	dscc4_release_ring(dpriv);
@@ -1277,7 +1286,7 @@ static int dscc4_clock_setting(struct dscc4_dev_priv *dpriv,
 			settings->clock_rate = bps;
 		}
 	} else { /* DTE */
-		state |= 0x80001000;
+		state |= PowerUp | Vis;
 		printk(KERN_DEBUG "%s: external RxClk (DTE)\n", dev->name);
 	}
 	scc_writel(state, dpriv, dev, CCR0);
@@ -1522,9 +1531,19 @@ try:
 		}
 		if (state & Xpr) {
 			u32 scc_addr, ring;
+			int i;
 
-			if (scc_readl_star(dpriv, dev) & SccBusy)
-				printk(KERN_ERR "%s busy. Fatal\n", dev->name);
+			/*
+			 * - the busy condition happens (sometimes);
+			 * - it doesn't seem to make the handler unreliable.
+			 */
+			for (i = 1; i; i <<= 1) {
+				if (!(scc_readl_star(dpriv, dev) & SccBusy))
+					break;
+			}
+			if (!i)
+				printk(KERN_INFO "%s busy in irq\n", dev->name);
+
 			scc_addr = dev->base_addr + 0x0c*dpriv->dev_id;
 			/* Keep this order: IDT before IDR */
 			if (dpriv->flags & NeedIDT) {
