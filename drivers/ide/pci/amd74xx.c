@@ -104,7 +104,7 @@ static int amd74xx_get_info(char *buffer, char **addr, off_t offset, int count)
 	amd_print("----------AMD BusMastering IDE Configuration----------------");
 
 	amd_print("Driver Version:                     2.9");
-	amd_print("South Bridge:                       %s", bmide_dev->dev.name);
+	amd_print("South Bridge:                       %s", pci_name(bmide_dev));
 
 	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
 	amd_print("Revision:                           IDE %#x", t);
@@ -365,7 +365,7 @@ static unsigned int __init init_chipset_amd74xx(struct pci_dev *dev, const char 
 
 	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
 	printk(KERN_INFO "AMD_IDE: %s (rev %02x) %s controller on pci%s\n",
-		dev->dev.name, t, amd_dma[amd_config->flags & AMD_UDMA], pci_name(dev));
+		pci_name(dev), t, amd_dma[amd_config->flags & AMD_UDMA], pci_name(dev));
 
 /*
  * Register /proc/ide/amd74xx entry
