@@ -1,15 +1,6 @@
 #
 # Makefile for the kernel Parallel port device drivers.
 #
-# Note! Parport is the Borg.  We have assimilated some other
-# drivers in the `char', `net' and `scsi' directories,
-# but left them there to allay suspicion.
-#
-# 7 October 2000, Bartlomiej Zolnierkiewicz <bkz@linux-ide.org>
-# Rewritten to use lists instead of if-statements.
-#
-
-O_TARGET := driver.o
 
 export-objs	:= init.o parport_pc.o
 

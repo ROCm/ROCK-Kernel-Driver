@@ -110,56 +110,8 @@ NETWORKS	=net/network.o
 LIBS		=$(TOPDIR)/lib/lib.a
 SUBDIRS		=init kernel lib drivers mm fs net ipc sound
 
-DRIVERS-n :=
-DRIVERS-y :=
-DRIVERS-m :=
-DRIVERS-  :=
-
-DRIVERS-$(CONFIG_PCI) += drivers/pci/driver.o
-DRIVERS-$(CONFIG_ACPI) += drivers/acpi/acpi.o
-DRIVERS-$(CONFIG_PARPORT) += drivers/parport/driver.o
-DRIVERS-y += drivers/base/base.o \
-	drivers/char/char.o \
-	drivers/block/block.o \
-	drivers/misc/misc.o \
-	drivers/net/net.o \
-	drivers/media/media.o
-DRIVERS-$(CONFIG_NUBUS) += drivers/nubus/built-in.o
-DRIVERS-$(CONFIG_ATM) += drivers/atm/atm.o
-DRIVERS-$(CONFIG_IDE) += drivers/ide/idedriver.o
-DRIVERS-$(CONFIG_FC4) += drivers/fc4/built-in.o
-DRIVERS-$(CONFIG_SCSI) += drivers/scsi/scsidrv.o
-DRIVERS-$(CONFIG_FUSION) += drivers/message/message.o
-DRIVERS-$(CONFIG_IEEE1394) += drivers/ieee1394/ieee1394drv.o
-
-ifneq ($(CONFIG_CD_NO_IDESCSI)$(CONFIG_BLK_DEV_IDECD)$(CONFIG_BLK_DEV_SR)$(CONFIG_PARIDE_PCD),)
-DRIVERS-y += drivers/cdrom/driver.o
-endif
-
+DRIVERS-y 	= drivers/built-in.o
 DRIVERS-$(CONFIG_SOUND) += sound/sound.o
-DRIVERS-$(CONFIG_MTD) += drivers/mtd/mtdlink.o
-DRIVERS-$(CONFIG_PCMCIA) += drivers/pcmcia/pcmcia.o
-DRIVERS-$(CONFIG_DIO) += drivers/dio/built-in.o
-DRIVERS-$(CONFIG_SBUS) += drivers/sbus/sbus_all.o
-DRIVERS-$(CONFIG_ZORRO) += drivers/zorro/driver.o
-DRIVERS-$(CONFIG_ALL_PPC) += drivers/macintosh/macintosh.o
-DRIVERS-$(CONFIG_MAC) += drivers/macintosh/macintosh.o
-DRIVERS-$(CONFIG_PNP) += drivers/pnp/pnp.o
-DRIVERS-$(CONFIG_SGI_IP22) += drivers/sgi/built-in.o
-DRIVERS-$(CONFIG_VT) += drivers/video/video.o
-DRIVERS-$(CONFIG_PARIDE) += drivers/block/paride/built-in.o
-DRIVERS-$(CONFIG_TC) += drivers/tc/built-in.o
-DRIVERS-$(CONFIG_USB) += drivers/usb/usbdrv.o
-DRIVERS-$(CONFIG_INPUT) += drivers/input/inputdrv.o
-DRIVERS-$(CONFIG_GAMEPORT) += drivers/input/gameport/gamedrv.o
-DRIVERS-$(CONFIG_SERIO) += drivers/input/serio/seriodrv.o
-DRIVERS-$(CONFIG_I2O) += drivers/message/message.o
-DRIVERS-$(CONFIG_I2C) += drivers/i2c/i2c.o
-DRIVERS-$(CONFIG_PHONE) += drivers/telephony/telephony.o
-DRIVERS-$(CONFIG_MD) += drivers/md/mddev.o
-DRIVERS-$(CONFIG_BLUEZ) += drivers/bluetooth/bluetooth.o
-DRIVERS-$(CONFIG_HOTPLUG_PCI) += drivers/hotplug/vmlinux-obj.o
-DRIVERS-$(CONFIG_ISDN) += drivers/isdn/vmlinux-obj.o
 
 DRIVERS := $(DRIVERS-y)
 

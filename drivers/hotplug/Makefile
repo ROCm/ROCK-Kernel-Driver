@@ -2,8 +2,6 @@
 # Makefile for the Linux kernel pci hotplug controller drivers.
 #
 
-O_TARGET	:= vmlinux-obj.o
-
 export-objs	:= pci_hotplug_core.o pci_hotplug_util.o
 
 obj-$(CONFIG_HOTPLUG_PCI)		+= pci_hotplug.o

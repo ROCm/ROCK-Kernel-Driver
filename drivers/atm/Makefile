@@ -2,8 +2,6 @@
 # Makefile for the Linux network (ATM) device drivers.
 #
 
-O_TARGET := atm.o
-
 export-objs := uPD98402.o suni.o idt77105.o
 
 obj-y := atmdev_init.o

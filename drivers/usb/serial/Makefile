@@ -2,8 +2,6 @@
 # Makefile for the USB serial device drivers.
 #
 
-O_TARGET	:= serial.o
-
 # Object file lists.
 
 obj-$(CONFIG_USB_SERIAL)                        += usbserial.o

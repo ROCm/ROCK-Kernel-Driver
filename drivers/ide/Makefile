@@ -8,14 +8,8 @@
 # In the future, some of these should be built conditionally.
 #
 
-O_TARGET := idedriver.o
-
 export-objs	:= ide-taskfile.o main.o ide.o ide-features.o ide-probe.o quirks.o pcidma.o tcq.o \
 		   atapi.o ataraid.o
-
-obj-y		:=
-obj-m		:=
-ide-obj-y	:=
 
 obj-$(CONFIG_BLK_DEV_HD)	+= hd.o
 obj-$(CONFIG_BLK_DEV_IDE)       += ide-mod.o

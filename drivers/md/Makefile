@@ -2,8 +2,6 @@
 # Makefile for the kernel software RAID and LVM drivers.
 #
 
-O_TARGET	:= mddev.o
-
 export-objs	:= md.o xor.o
 lvm-mod-objs	:= lvm.o lvm-snap.o lvm-fs.o
 

@@ -189,7 +189,7 @@ endif
 
 ifeq ($(findstring y,$(CONFIG_ARCH_CLPS7500) $(CONFIG_ARCH_L7200)),y)
 SUBDIRS		+=drivers/acorn/char
-DRIVERS		+=drivers/acorn/char/acorn-char.o
+DRIVERS		+=drivers/acorn/char/built-in.o
 endif
 
 MAKEBOOT	 =$(MAKE) -C arch/$(ARCH)/boot
