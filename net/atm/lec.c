@@ -223,7 +223,8 @@ lec_send_packet(struct sk_buff *skb, struct net_device *dev)
         struct lecdatahdr_8023 *lec_h;
         struct atm_vcc *send_vcc;
 	struct lec_arp_table *entry;
-        unsigned char *nb, *dst;
+        unsigned char *dst;
+	int min_frame_size;
 #ifdef CONFIG_TR
         unsigned char rdesc[ETH_ALEN]; /* Token Ring route descriptor */
 #endif
@@ -294,26 +295,24 @@ lec_send_packet(struct sk_buff *skb, struct net_device *dev)
 #endif /* DUMP_PACKETS > 0 */
 
         /* Minimum ethernet-frame size */
-        if (skb->len <62) {
-                if (skb->truesize < 62) {
-                        printk("%s:data packet %d / %d\n",
-                               dev->name,
-                               skb->len,skb->truesize);
-                        nb=(unsigned char*)kmalloc(64, GFP_ATOMIC);
-                        if (nb == NULL) {
+#ifdef CONFIG_TR
+        if (priv->is_trdev)
+                min_frame_size = LEC_MINIMUM_8025_SIZE;
+	else
+#endif
+        min_frame_size = LEC_MINIMUM_8023_SIZE;
+        if (skb->len < min_frame_size) {
+                if (skb->truesize < min_frame_size) {
+                        skb2 = skb_copy_expand(skb, 0,
+                            min_frame_size - skb->truesize, GFP_ATOMIC);
                                 dev_kfree_skb(skb);
+                        if (skb2 == NULL) {
+                                priv->stats.tx_dropped++;
                                 return 0;
                         }
-                        memcpy(nb,skb->data,skb->len);
-                        kfree(skb->head);
-                        skb->head = skb->data = nb;
-                        skb->tail = nb+62;
-                        skb->end = nb+64;
-                        skb->len=62;
-                        skb->truesize = 64;
-                } else {
-                        skb->len = 62;
+                        skb = skb2;
                 }
+		skb_put(skb, min_frame_size - skb->len);
         }
         
         /* Send to right vcc */
