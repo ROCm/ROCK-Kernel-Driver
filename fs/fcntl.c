@@ -551,7 +551,7 @@ void kill_fasync(struct fasync_struct **fp, int sig, int band)
 
 static int __init fasync_init(void)
 {
-	fasync_cache = kmem_cache_create("fasync cache",
+	fasync_cache = kmem_cache_create("fasync_cache",
 		sizeof(struct fasync_struct), 0, 0, NULL, NULL);
 	if (!fasync_cache)
 		panic("cannot create fasync slab cache");

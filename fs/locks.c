@@ -1940,7 +1940,7 @@ int lock_may_write(struct inode *inode, loff_t start, unsigned long len)
 
 static int __init filelock_init(void)
 {
-	filelock_cache = kmem_cache_create("file lock cache",
+	filelock_cache = kmem_cache_create("file_lock_cache",
 			sizeof(struct file_lock), 0, 0, init_once, NULL);
 	if (!filelock_cache)
 		panic("cannot create file lock slab cache");
