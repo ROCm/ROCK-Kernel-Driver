@@ -146,7 +146,8 @@ static void elan_104nc_copy_from(struct map_info *map, void *to, unsigned long f
 		
 		spin_lock(&elan_104nc_spin);
 		elan_104nc_page(map, from);
-		memcpy_fromio(to, iomapadr + (from & WINDOW_MASK), thislen);
+		memcpy_fromio(to, (char *)iomapadr + (from & WINDOW_MASK),
+			      thislen);
 		spin_unlock(&elan_104nc_spin);
 		to += thislen;
 		from += thislen;
@@ -187,7 +188,8 @@ static void elan_104nc_copy_to(struct map_info *map, unsigned long to, const voi
 		
 		spin_lock(&elan_104nc_spin);
 		elan_104nc_page(map, to);
-		memcpy_toio(iomapadr + (to & WINDOW_MASK), from, thislen);
+		memcpy_toio((char *)iomapadr + (to & WINDOW_MASK), from,
+			    thislen);
 		spin_unlock(&elan_104nc_spin);
 		to += thislen;
 		from += thislen;

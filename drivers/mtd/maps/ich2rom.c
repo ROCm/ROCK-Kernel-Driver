@@ -64,7 +64,7 @@ static __u32 ich2rom_read32(struct map_info *map, unsigned long ofs)
 
 static void ich2rom_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
 {
-	memcpy_fromio(to, addr(map, from), len);
+	memcpy_fromio(to, (void *)addr(map, from), len);
 }
 
 static void ich2rom_write8(struct map_info *map, __u8 d, unsigned long ofs)
@@ -87,7 +87,7 @@ static void ich2rom_write32(struct map_info *map, __u32 d, unsigned long ofs)
 
 static void ich2rom_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
 {
-	memcpy_toio(addr(map, to), from, len);
+	memcpy_toio((void *)addr(map, to), from, len);
 }
 
 static struct ich2rom_map_info ich2rom_map = {
