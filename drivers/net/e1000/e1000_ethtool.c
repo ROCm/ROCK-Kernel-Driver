@@ -128,7 +128,6 @@ e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 				     SUPPORTED_Autoneg);
 
 		ecmd->port = PORT_FIBRE;
-
 		ecmd->transceiver = XCVR_EXTERNAL;
 	}
 
@@ -151,8 +150,6 @@ e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 	}
 
 	ecmd->autoneg = (hw->autoneg ? AUTONEG_ENABLE : AUTONEG_DISABLE);
-
-	return;
 }
 
 static int
@@ -215,7 +212,6 @@ e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
 	strncpy(drvinfo->fw_version, "", 32);
 	strncpy(drvinfo->bus_info, adapter->pdev->slot_name, 32);
 	drvinfo->eedump_len  = e1000_eeprom_size(&adapter->hw);
-	return;
 }
 
 static void
@@ -261,8 +257,6 @@ e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 		wol->wolopts |= WAKE_BCAST;
 	if(adapter->wol & E1000_WUFC_MAG)
 		wol->wolopts |= WAKE_MAGIC;
-
-	return;
 }
 
 static int
@@ -271,7 +265,7 @@ e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 	struct e1000_hw *hw = &adapter->hw;
 
 	if(hw->mac_type < e1000_82544)
-		return wol->wolopts == 0 ? 0 : -EOPNOTSUPP;
+		return wol->wolopts ? -EOPNOTSUPP : 0;
 
 	adapter->wol = 0;
 

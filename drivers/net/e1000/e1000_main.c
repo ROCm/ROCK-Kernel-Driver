@@ -229,8 +229,6 @@ static void __exit
 e1000_exit_module(void)
 {
 	pci_unregister_driver(&e1000_driver);
-
-	return;
 }
 
 module_exit(e1000_exit_module);
@@ -490,7 +488,6 @@ e1000_remove(struct pci_dev *pdev)
 	pci_release_regions(pdev);
 
 	kfree(netdev);
-	return;
 }
 
 /**
@@ -771,8 +768,6 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 		adapter->txd_cmd |= E1000_TXD_CMD_RS;
 	else
 		adapter->txd_cmd |= E1000_TXD_CMD_RPS;
-
-	return;
 }
 
 /**
@@ -917,8 +912,6 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 	/* Enable Receives */
 
 	E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
-
-	return;
 }
 
 /**
@@ -942,8 +935,6 @@ e1000_free_tx_resources(struct e1000_adapter *adapter)
 	                    adapter->tx_ring.desc, adapter->tx_ring.dma);
 
 	adapter->tx_ring.desc = NULL;
-
-	return;
 }
 
 /**
@@ -986,8 +977,6 @@ e1000_clean_tx_ring(struct e1000_adapter *adapter)
 
 	E1000_WRITE_REG(&adapter->hw, TDH, 0);
 	E1000_WRITE_REG(&adapter->hw, TDT, 0);
-
-	return;
 }
 
 /**
@@ -1011,8 +1000,6 @@ e1000_free_rx_resources(struct e1000_adapter *adapter)
 	                    adapter->rx_ring.desc, adapter->rx_ring.dma);
 
 	adapter->rx_ring.desc = NULL;
-
-	return;
 }
 
 /**
@@ -1055,8 +1042,6 @@ e1000_clean_rx_ring(struct e1000_adapter *adapter)
 
 	E1000_WRITE_REG(&adapter->hw, RDH, 0);
 	E1000_WRITE_REG(&adapter->hw, RDT, 0);
-
-	return;
 }
 
 /* The 82542 2.0 (revision 2) needs to have the receive unit in reset
@@ -1082,7 +1067,6 @@ e1000_enter_82542_rst(struct e1000_adapter *adapter)
 
 	if(netif_running(netdev))
 		e1000_clean_rx_ring(adapter);
-	return;
 }
 
 static void
@@ -1105,7 +1089,6 @@ e1000_leave_82542_rst(struct e1000_adapter *adapter)
 		e1000_configure_rx(adapter);
 		e1000_alloc_rx_buffers(adapter);
 	}
-	return;
 }
 
 /**
@@ -1208,7 +1191,6 @@ e1000_set_multi(struct net_device *netdev)
 
 	if(hw->mac_type == e1000_82542_rev2_0)
 		e1000_leave_82542_rst(adapter);
-	return;
 }
 
 
@@ -1219,7 +1201,6 @@ e1000_update_phy_info(unsigned long data)
 {
 	struct e1000_adapter *adapter = (struct e1000_adapter *) data;
 	e1000_phy_get_info(&adapter->hw, &adapter->phy_info);
-	return;
 }
 
 /**
@@ -1684,7 +1665,6 @@ e1000_irq_disable(struct e1000_adapter *adapter)
 	atomic_inc(&adapter->irq_sem);
 	E1000_WRITE_REG(&adapter->hw, IMC, ~0);
 	synchronize_irq();
-	return;
 }
 
 /**
@@ -1697,7 +1677,6 @@ e1000_irq_enable(struct e1000_adapter *adapter)
 {
 	if(atomic_dec_and_test(&adapter->irq_sem))
 		E1000_WRITE_REG(&adapter->hw, IMS, IMS_ENABLE_MASK);
-	return;
 }
 
 /**
@@ -1786,7 +1765,6 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 
 		netif_wake_queue(netdev);
 	}
-	return;
 }
 
 /**
@@ -1898,8 +1876,6 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 	rx_ring->next_to_clean = i;
 
 	e1000_alloc_rx_buffers(adapter);
-
-	return;
 }
 
 /**
@@ -1961,7 +1937,6 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 	}
 
 	rx_ring->next_to_use = i;
-	return;
 }
 
 /**
@@ -2015,9 +1990,7 @@ e1000_rx_checksum(struct e1000_adapter *adapter,
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 		adapter->hw_csum_good++;
 	}
-	return;
 }
-
 
 /**
  * e1000_enable_WOL - Wake On Lan Support (Magic Pkt)
@@ -2040,8 +2013,6 @@ e1000_enable_WOL(struct e1000_adapter *adapter)
 
 		E1000_WRITE_REG(&adapter->hw, WUFC, adapter->wol);
 	}
-
-	return;
 }
 
 void

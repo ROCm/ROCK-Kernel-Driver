@@ -516,7 +516,7 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		adapter->hw.autoneg_advertised = AUTONEG_ADV_DEFAULT;
 	} else { /* Autoneg */
 		struct e1000_opt_list an_list[] =
-			#define AA "Autoneg advertising "
+			#define AA "AutoNeg advertising "
 			{{ 0x01, AA "10/HD" },
 			 { 0x02, AA "10/FD" },
 			 { 0x03, AA "10/FD, 10/HD" },
@@ -551,7 +551,7 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 
 		struct e1000_option opt = {
 			type: list_option,
-			name: "Autoneg",
+			name: "AutoNeg",
 			err:  "parameter ignored",
 			def:  AUTONEG_ADV_DEFAULT,
 			arg: { l: { nr: ARRAY_SIZE(an_list), p: an_list }}
@@ -574,22 +574,22 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		printk(KERN_INFO "Using Autonegotiation at Half Duplex only\n");
 		adapter->hw.autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_10_HALF | 
-		                                     ADVERTISE_100_HALF;
+		                                 ADVERTISE_100_HALF;
 		break;
 	case FULL_DUPLEX:
 		printk(KERN_INFO "Full Duplex specified without Speed\n");
 		printk(KERN_INFO "Using Autonegotiation at Full Duplex only\n");
 		adapter->hw.autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_10_FULL |
-		                                     ADVERTISE_100_FULL |
-		                                     ADVERTISE_1000_FULL;
+		                                 ADVERTISE_100_FULL |
+		                                 ADVERTISE_1000_FULL;
 		break;
 	case SPEED_10:
 		printk(KERN_INFO "10 Mbps Speed specified without Duplex\n");
 		printk(KERN_INFO "Using Autonegotiation at 10 Mbps only\n");
 		adapter->hw.autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_10_HALF |
-		                                     ADVERTISE_10_FULL;
+		                                 ADVERTISE_10_FULL;
 		break;
 	case SPEED_10 + HALF_DUPLEX:
 		printk(KERN_INFO "Forcing to 10 Mbps Half Duplex\n");
@@ -608,7 +608,7 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		printk(KERN_INFO "Using Autonegotiation at 100 Mbps only\n");
 		adapter->hw.autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_100_HALF |
-		                                     ADVERTISE_100_FULL;
+		                                 ADVERTISE_100_FULL;
 		break;
 	case SPEED_100 + HALF_DUPLEX:
 		printk(KERN_INFO "Forcing to 100 Mbps Half Duplex\n");
