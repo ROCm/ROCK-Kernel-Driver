@@ -157,7 +157,7 @@
 #define __NR_stat64		139 /* Linux sparc32 Specific			   */
 #define __NR_sendfile64         140 /* adjtime under SunOS                         */
 #define __NR_getpeername        141 /* Common                                      */
-/* #define __NR_gethostid       142    SunOS Specific                              */
+#define __NR_futex              142 /* gethostid under SunOS                       */
 #define __NR_gettid             143 /* ENOSYS under SunOS                          */
 #define __NR_getrlimit          144 /* Common                                      */
 #define __NR_setrlimit          145 /* Common                                      */
