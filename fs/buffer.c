@@ -856,8 +856,9 @@ void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
 		if (mapping->assoc_mapping != buffer_mapping)
 			BUG();
 	}
-	buffer_insert_list(&buffer_mapping->private_lock,
-			bh, &mapping->private_list);
+	if (list_empty(&bh->b_assoc_buffers))
+		buffer_insert_list(&buffer_mapping->private_lock,
+				bh, &mapping->private_list);
 }
 EXPORT_SYMBOL(mark_buffer_dirty_inode);
 
@@ -1243,10 +1244,17 @@ void __brelse(struct buffer_head * buf)
  * bforget() is like brelse(), except it discards any
  * potentially dirty data.
  */
-void __bforget(struct buffer_head * buf)
+void __bforget(struct buffer_head *bh)
 {
-	clear_buffer_dirty(buf);
-	__brelse(buf);
+	clear_buffer_dirty(bh);
+	if (!list_empty(&bh->b_assoc_buffers)) {
+		struct address_space *buffer_mapping = bh->b_page->mapping;
+
+		spin_lock(&buffer_mapping->private_lock);
+		list_del_init(&bh->b_assoc_buffers);
+		spin_unlock(&buffer_mapping->private_lock);
+	}
+	__brelse(bh);
 }
 
 /**
