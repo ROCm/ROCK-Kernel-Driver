@@ -1,7 +1,7 @@
 /* $Id: sungem.c,v 1.49 2002/01/23 15:40:45 davem Exp $
  * sungem.c: Sun GEM ethernet driver.
  *
- * Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com)
+ * Copyright (C) 2000, 2001, 2002 David S. Miller (davem@redhat.com)
  * 
  * Support for Apple GMAC and assorted PHYs by
  * Benjamin Herrenscmidt (benh@kernel.crashing.org)
@@ -67,8 +67,8 @@
 			 NETIF_MSG_LINK)
 
 #define DRV_NAME	"sungem"
-#define DRV_VERSION	"0.96"
-#define DRV_RELDATE	"11/17/01"
+#define DRV_VERSION	"0.97"
+#define DRV_RELDATE	"3/20/02"
 #define DRV_AUTHOR	"David S. Miller (davem@redhat.com)"
 
 static char version[] __devinitdata =
@@ -2570,13 +2570,63 @@ static int gem_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return rc;
 }
 
+#if (!defined(__sparc__) && !defined(CONFIG_ALL_PPC))
+/* Fetch MAC address from vital product data of PCI ROM. */
+static void find_eth_addr_in_vpd(void *rom_base, int len, unsigned char *dev_addr)
+{
+	int this_offset;
+
+	for (this_offset = 0x20; this_offset < len; this_offset++) {
+		void *p = rom_base + this_offset;
+		int i;
+
+		if (readb(p + 0) != 0x90 ||
+		    readb(p + 1) != 0x00 ||
+		    readb(p + 2) != 0x09 ||
+		    readb(p + 3) != 0x4e ||
+		    readb(p + 4) != 0x41 ||
+		    readb(p + 5) != 0x06)
+			continue;
+
+		this_offset += 6;
+		p += 6;
+
+		for (i = 0; i < 6; i++)
+			dev_addr[i] = readb(p + i);
+		break;
+	}
+}
+
+static void get_gem_mac_nonobp(struct pci_dev *pdev, unsigned char *dev_addr)
+{
+	u32 rom_reg_orig;
+	void *p;
+
+	if (pdev->resource[PCI_ROM_RESOURCE].parent == NULL)
+		pci_assign_resource(pdev, PCI_ROM_RESOURCE);
+
+	pci_read_config_dword(pdev, pdev->rom_base_reg, &rom_reg_orig);
+	pci_write_config_dword(pdev, pdev->rom_base_reg,
+			       rom_reg_orig | PCI_ROM_ADDRESS_ENABLE);
+
+	p = ioremap(pci_resource_start(pdev, PCI_ROM_RESOURCE), (64 * 1024));
+	if (p != NULL && readb(p) == 0x55 && readb(p + 1) == 0xaa)
+		find_eth_addr_in_vpd(p, (64 * 1024), dev_addr);
+
+	if (p != NULL)
+		iounmap(p);
+
+	pci_write_config_dword(pdev, pdev->rom_base_reg, rom_reg_orig);
+}
+#endif /* not Sparc and not PPC */
+
 static int __devinit gem_get_device_address(struct gem *gp)
 {
 #if defined(__sparc__) || defined(CONFIG_ALL_PPC)
 	struct net_device *dev = gp->dev;
 #endif
 
-#ifdef __sparc__
+#if defined(__sparc__)
 	struct pci_dev *pdev = gp->pdev;
 	struct pcidev_cookie *pcp = pdev->sysdata;
 	int node = -1;
@@ -2591,8 +2641,7 @@ static int __devinit gem_get_device_address(struct gem *gp)
 	}
 	if (node == -1)
 		memcpy(dev->dev_addr, idprom->id_ethaddr, 6);
-#endif
-#ifdef CONFIG_ALL_PPC
+#elif defined(CONFIG_ALL_PPC)
 	unsigned char *addr;
 
 	addr = get_property(gp->of_node, "local-mac-address", NULL);
@@ -2602,6 +2651,8 @@ static int __devinit gem_get_device_address(struct gem *gp)
 		return -1;
 	}
 	memcpy(dev->dev_addr, addr, MAX_ADDR_LEN);
+#else
+	get_gem_mac_nonobp(gp->pdev, gp->dev->dev_addr);
 #endif
 	return 0;
 }

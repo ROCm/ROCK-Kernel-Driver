@@ -3,7 +3,7 @@
  *           auto carrier detecting ethernet driver.  Also known as the
  *           "Happy Meal Ethernet" found on SunSwift SBUS cards.
  *
- * Copyright (C) 1996, 1998, 1999 David S. Miller (davem@redhat.com)
+ * Copyright (C) 1996, 1998, 1999, 2002 David S. Miller (davem@redhat.com)
  *
  * Changes :
  * 2000/11/11 Willy Tarreau <willy AT meta-x.org>
@@ -14,7 +14,7 @@
  */
 
 static char version[] =
-        "sunhme.c:v1.99 12/Sep/99 David S. Miller (davem@redhat.com)\n";
+        "sunhme.c:v2.00 20/Mar/2002 David S. Miller (davem@redhat.com)\n";
 
 #include <linux/module.h>
 
@@ -2682,6 +2682,7 @@ static int __init happy_meal_sbus_init(struct sbus_dev *sdev, int is_qfe)
 	if (i < 6) { /* a mac address was given */
 		for (i = 0; i < 6; i++)
 			dev->dev_addr[i] = macaddr[i];
+		macaddr[5]++;
 	} else if (qfe_slot != -1 &&
 		   prom_getproplen(sdev->prom_node,
 				   "local-mac-address") == 6) {
@@ -2853,6 +2854,99 @@ err_out:
 #endif
 
 #ifdef CONFIG_PCI
+#ifndef __sparc__
+static int is_quattro_p(struct pci_dev *pdev)
+{
+	struct pci_dev *busdev = pdev->bus->self;
+	struct list_head *tmp;
+	int n_hmes;
+
+	if (busdev->vendor != PCI_VENDOR_ID_DEC ||
+	    busdev->device != PCI_DEVICE_ID_DEC_21153)
+		return 0;
+
+	n_hmes = 0;
+	tmp = pdev->bus->devices.next;
+	while (tmp != &pdev->bus->devices) {
+		struct pci_dev *this_pdev = pci_dev_b(tmp);
+
+		if (this_pdev->vendor == PCI_VENDOR_ID_SUN &&
+		    this_pdev->device == PCI_DEVICE_ID_SUN_HAPPYMEAL)
+			n_hmes++;
+
+		tmp = tmp->next;
+	}
+
+	if (n_hmes != 4)
+		return 0;
+
+	return 1;
+}
+
+/* Fetch MAC address from vital product data of PCI ROM. */
+static void find_eth_addr_in_vpd(void *rom_base, int len, int index, unsigned char *dev_addr)
+{
+	int this_offset;
+	int orig_index = index;
+
+	for (this_offset = 0x20; this_offset < len; this_offset++) {
+		void *p = rom_base + this_offset;
+
+		if (readb(p + 0) != 0x90 ||
+		    readb(p + 1) != 0x00 ||
+		    readb(p + 2) != 0x09 ||
+		    readb(p + 3) != 0x4e ||
+		    readb(p + 4) != 0x41 ||
+		    readb(p + 5) != 0x06)
+			continue;
+
+		this_offset += 6;
+		p += 6;
+
+		if (index == 0) {
+			int i;
+
+			printk("MAC(%d): [%02x %02x %02x %02x %02x %02x]\n",
+			       orig_index,
+			       readb(p + 0), readb(p + 1), readb(p + 2),
+			       readb(p + 3), readb(p + 4), readb(p + 5));
+
+			for (i = 0; i < 6; i++)
+				dev_addr[i] = readb(p + i);
+			break;
+		}
+		index--;
+	}
+}
+
+static void get_hme_mac_nonsparc(struct pci_dev *pdev, unsigned char *dev_addr)
+{
+	u32 rom_reg_orig;
+	void *p;
+	int index;
+
+	index = 0;
+	if (is_quattro_p(pdev))
+		index = PCI_SLOT(pdev->devfn);
+
+	if (pdev->resource[PCI_ROM_RESOURCE].parent == NULL)
+		pci_assign_resource(pdev, PCI_ROM_RESOURCE);
+
+	pci_read_config_dword(pdev, pdev->rom_base_reg, &rom_reg_orig);
+	pci_write_config_dword(pdev, pdev->rom_base_reg,
+			       rom_reg_orig | PCI_ROM_ADDRESS_ENABLE);
+
+	p = ioremap(pci_resource_start(pdev, PCI_ROM_RESOURCE), (64 * 1024));
+	if (p != NULL && readb(p) == 0x55 && readb(p + 1) == 0xaa)
+		find_eth_addr_in_vpd(p, (64 * 1024), index, dev_addr);
+
+	if (p != NULL)
+		iounmap(p);
+
+	pci_write_config_dword(pdev, pdev->rom_base_reg, rom_reg_orig);
+}
+#endif /* !(__sparc__) */
+
 static int __init happy_meal_pci_init(struct pci_dev *pdev)
 {
 	struct quattro *qp = NULL;
@@ -2878,8 +2972,10 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 	
 	prom_getstring(node, "name", prom_name, sizeof(prom_name));
 #else
-/* This needs to be corrected... -DaveM */
-	strcpy(prom_name, "qfe");
+	if (is_quattro_p(pdev))
+		strcpy(prom_name, "SUNW,qfe");
+	else
+		strcpy(prom_name, "SUNW,hme");
 #endif
 
 	err = -ENODEV;
@@ -2959,6 +3055,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 	if (i < 6) { /* a mac address was given */
 		for (i = 0; i < 6; i++)
 			dev->dev_addr[i] = macaddr[i];
+		macaddr[5]++;
 	} else {
 #ifdef __sparc__
 		if (qfe_slot != -1 &&
@@ -2969,7 +3066,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 			memcpy(dev->dev_addr, idprom->id_ethaddr, 6);
 		}
 #else
-		memset(dev->dev_addr, 0, 6);
+		get_hme_mac_nonsparc(pdev, &dev->dev_addr[0]);
 #endif
 	}
 	
