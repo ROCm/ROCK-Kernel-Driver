@@ -18,8 +18,6 @@
  * PCMCIA implementation routines for stork
  *
  */
-
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -28,50 +26,58 @@
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
-#include <asm/arch/pcmcia.h>
+#include "sa1100_generic.h"
 
 static int debug = 0;
 
-static struct pcmcia_init sa1100_stork_pcmcia_init;
+static struct irqs {
+	int irq;
+	const char *str;
+} irqs[] = {
+	{ IRQ_GPIO_STORK_PCMCIA_A_CARD_DETECT, "PCMCIA_CD0" },
+	{ IRQ_GPIO_STORK_PCMCIA_B_CARD_DETECT, "PCMCIA_CD1" },
+};
 
 static int stork_pcmcia_init(struct pcmcia_init *init)
 {
-        int irq, res;
-        printk("in stork_pcmcia_init\n");
+	int irq, res;
 
-        sa1100_stork_pcmcia_init = *init;
-
-        /* Enable CF bus: */
-        storkSetLatchA(STORK_PCMCIA_PULL_UPS_POWER_ON);
-
-        /* All those are inputs */
-	GPDR &= ~(GPIO_STORK_PCMCIA_A_CARD_DETECT | GPIO_STORK_PCMCIA_B_CARD_DETECT | GPIO_STORK_PCMCIA_A_RDY| GPIO_STORK_PCMCIA_B_RDY);
+	printk("in stork_pcmcia_init\n");
 
 	/* Set transition detect */
-	set_GPIO_IRQ_edge( GPIO_STORK_PCMCIA_A_CARD_DETECT | GPIO_STORK_PCMCIA_B_CARD_DETECT, GPIO_BOTH_EDGES );
-        set_GPIO_IRQ_edge( GPIO_STORK_PCMCIA_A_RDY| GPIO_STORK_PCMCIA_B_RDY, GPIO_FALLING_EDGE );
+	set_irq_type(IRQ_GPIO_STORK_PCMCIA_A_RDY, IRQT_FALLING);
+	set_irq_type(IRQ_GPIO_STORK_PCMCIA_B_RDY, IRQT_FALLING);
 
 	/* Register interrupts */
-	irq = IRQ_GPIO_STORK_PCMCIA_A_CARD_DETECT;
-	res = request_irq( irq, init->handler, SA_INTERRUPT, "PCMCIA_CD0", NULL );
-	if( res < 0 ) goto irq_err;
-	irq = IRQ_GPIO_STORK_PCMCIA_B_CARD_DETECT;
-	res = request_irq( irq, init->handler, SA_INTERRUPT, "PCMCIA_CD1", NULL );
-	if( res < 0 ) goto irq_err;
+	for (i = 0; i < ARRAY_SIZE(irqs); i++) {
+		set_irq_type(irqs[i].irq, IRQT_NOEDGE);
+		res = request_irq(irqs[i].irq, init->handler, SA_INTERRUPT,
+				  irqs[i].str, NULL);
+		if (res)
+			goto irq_err;
+	}
 
         return 2;
 
  irq_err:
-        printk( KERN_ERR __FUNCTION__ ": Request for IRQ %u failed\n", irq );
-        return -1;
+        printk(KERN_ERR "%s: request for IRQ%d failed (%d)\n",
+	       __FUNCTION__, irq, res);
+
+	while (i--)
+		free_irq(irqs[i].irq, NULL);
+
+        return res;
 }
 
 static int stork_pcmcia_shutdown(void)
 {
+	int i;
+
         printk(__FUNCTION__ "\n");
+
         /* disable IRQs */
-        free_irq( IRQ_GPIO_STORK_PCMCIA_A_CARD_DETECT, NULL );
-        free_irq( IRQ_GPIO_STORK_PCMCIA_B_CARD_DETECT, NULL );
+        for (i = 0; i < ARRAY_SIZE(irqs); i++)
+        	free_irq(irqs[i].irq, NULL);
   
         /* Disable CF bus: */
         storkClearLatchA(STORK_PCMCIA_PULL_UPS_POWER_ON);
@@ -140,7 +146,7 @@ static int stork_pcmcia_configure_socket(const struct pcmcia_configure *configur
 	printk(__FUNCTION__ ": socket=%d vcc=%d vpp=%d reset=%d\n", 
                        card, configure->vcc, configure->vpp, configure->reset);
 
-	save_flags_cli(flags);
+	local_irq_save(flags);
 
         if (card == 0) {
     	    DETECT = GPIO_STORK_PCMCIA_A_CARD_DETECT;
@@ -174,7 +180,7 @@ static int stork_pcmcia_configure_socket(const struct pcmcia_configure *configur
 	default:
 		printk(KERN_ERR "%s(): unrecognized Vcc %u\n", __FUNCTION__,
 		       configure->vcc);
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return -1;
 	}
 
@@ -183,7 +189,7 @@ static int stork_pcmcia_configure_socket(const struct pcmcia_configure *configur
 	else
                 storkClearLatchB(RESET);
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 
         /* silently ignore vpp and speaker enables. */
 
@@ -192,11 +198,57 @@ static int stork_pcmcia_configure_socket(const struct pcmcia_configure *configur
         return 0;
 }
 
-struct pcmcia_low_level stork_pcmcia_ops = { 
-        stork_pcmcia_init,
-        stork_pcmcia_shutdown,
-        stork_pcmcia_socket_state,
-        stork_pcmcia_get_irq_info,
-        stork_pcmcia_configure_socket
+static int stork_pcmcia_socket_init(int sock)
+{
+        storkSetLatchA(STORK_PCMCIA_PULL_UPS_POWER_ON);
+
+        if (sock == 0)
+		set_irq_type(IRQ_GPIO_STORK_PCMCIA_A_CARD_DETECT, IRQT_BOTHEDGE);
+        else if (sock == 1)
+		set_irq_type(IRQ_GPIO_STORK_PCMCIA_B_CARD_DETECT, IRQT_BOTHEDGE);
+
+	return 0;
+}
+
+static int stork_pcmcia_socket_suspend(int sock)
+{
+        if (sock == 0)
+		set_irq_type(IRQ_GPIO_STORK_PCMCIA_A_CARD_DETECT, IRQT_NOEDGE);
+        else if (sock == 1) {
+		set_irq_type(IRQ_GPIO_STORK_PCMCIA_B_CARD_DETECT, IRQT_NOEDGE);
+
+		/*
+		 * Hack!
+		 */
+	        storkClearLatchA(STORK_PCMCIA_PULL_UPS_POWER_ON);
+	}
+
+	return 0;
+}
+
+static struct pcmcia_low_level stork_pcmcia_ops = { 
+	init:			stork_pcmcia_init,
+	shutdown:		stork_pcmcia_shutdown,
+	socket_state:		stork_pcmcia_socket_state,
+	get_irq_info:		stork_pcmcia_get_irq_info,
+	configure_socket:	stork_pcmcia_configure_socket,
+
+	socket_init:		stork_pcmcia_socket_init,
+	socket_suspend:		stork_pcmcia_socket_suspend,
 };
+
+int __init pcmcia_stork_init(void)
+{
+	int ret = -ENODEV;
+
+	if (machine_is_stork())
+		ret = sa1100_register_pcmcia(&stork_pcmcia_ops);
+
+	return ret;
+}
+
+void __exit pcmcia_stork_exit(void)
+{
+	sa1100_unregister_pcmcia(&stork_pcmcia_ops);
+}
 

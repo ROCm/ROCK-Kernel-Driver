@@ -38,9 +38,7 @@
 #include <pcmcia/bulkmem.h>
 #include <pcmcia/cistpl.h>
 #include "cs_internal.h"
-
-#include <asm/arch/pcmcia.h>
-
+#include "sa1100_generic.h"
 
 /* MECR: Expansion Memory Configuration Register
  * (SA-1100 Developers Manual, p.10-13; SA-1110 Developers Manual, p.10-24)
@@ -157,15 +155,24 @@ static inline unsigned int sa1100_pcmcia_cmd_time(unsigned int cpu_clock_khz,
  * use when responding to a Card Services query of some kind.
  */
 struct sa1100_pcmcia_socket {
+  /*
+   * Core PCMCIA state
+   */
   socket_state_t        cs_state;
-  struct pcmcia_state   k_state;
-  unsigned int          irq;
-  void                  (*handler)(void *, unsigned int);
-  void                  *handler_info;
   pccard_io_map         io_map[MAX_IO_WIN];
   pccard_mem_map        mem_map[MAX_WIN];
-  ioaddr_t              virt_io, phys_attr, phys_mem;
+  void                  (*handler)(void *, unsigned int);
+  void                  *handler_info;
+
+  struct pcmcia_state   k_state;
+  ioaddr_t              phys_attr, phys_mem;
+  void			*virt_io;
   unsigned short        speed_io, speed_attr, speed_mem;
+
+  /*
+   * Info from low level handler
+   */
+  unsigned int          irq;
 };
 
 
@@ -180,23 +187,57 @@ struct sa1100_pcmcia_socket {
 
 
 /*
- * Declaration for all implementation specific low_level operations.
+ * Declaration for all machine specific init/exit functions.
  */
-extern struct pcmcia_low_level assabet_pcmcia_ops;
-extern struct pcmcia_low_level neponset_pcmcia_ops;
-extern struct pcmcia_low_level h3600_pcmcia_ops;
-extern struct pcmcia_low_level cerf_pcmcia_ops;
-extern struct pcmcia_low_level gcplus_pcmcia_ops;
-extern struct pcmcia_low_level xp860_pcmcia_ops;
-extern struct pcmcia_low_level yopy_pcmcia_ops;
-extern struct pcmcia_low_level pangolin_pcmcia_ops;
-extern struct pcmcia_low_level freebird_pcmcia_ops;
-extern struct pcmcia_low_level pfs168_pcmcia_ops;
-extern struct pcmcia_low_level jornada720_pcmcia_ops;
-extern struct pcmcia_low_level flexanet_pcmcia_ops;
-extern struct pcmcia_low_level simpad_pcmcia_ops;
-extern struct pcmcia_low_level graphicsmaster_pcmcia_ops;
-extern struct pcmcia_low_level adsbitsy_pcmcia_ops;
-extern struct pcmcia_low_level stork_pcmcia_ops;
+extern int pcmcia_adsbitsy_init(void);
+extern void pcmcia_adsbitsy_exit(void);
+
+extern int pcmcia_assabet_init(void);
+extern void pcmcia_assabet_exit(void);
+
+extern int pcmcia_badge4_init(void);
+extern void pcmcia_badge4_exit(void);
+
+extern int pcmcia_cerf_init(void);
+extern void pcmcia_cerf_exit(void);
+
+extern int pcmcia_flexanet_init(void);
+extern void pcmcia_flexanet_exit(void);
+
+extern int pcmcia_freebird_init(void);
+extern void pcmcia_freebird_exit(void);
+
+extern int pcmcia_gcplus_init(void);
+extern void pcmcia_gcplus_exit(void);
+
+extern int pcmcia_graphicsmaster_init(void);
+extern void pcmcia_graphicsmaster_exit(void);
+
+extern int pcmcia_jornada720_init(void);
+extern void pcmcia_jornada720_exit(void);
+
+extern int pcmcia_neponset_init(void);
+extern void pcmcia_neponset_exit(void);
+
+extern int pcmcia_pangolin_init(void);
+extern void pcmcia_pangolin_exit(void);
+
+extern int pcmcia_pfs168_init(void);
+extern void pcmcia_pfs168_exit(void);
+
+extern int pcmcia_shannon_init(void);
+extern void pcmcia_shannon_exit(void);
+
+extern int pcmcia_simpad_init(void);
+extern void pcmcia_simpad_exit(void);
+
+extern int pcmcia_stork_init(void);
+extern void pcmcia_stork_exit(void);
+
+extern int pcmcia_xp860_init(void);
+extern void pcmcia_xp860_exit(void);
+
+extern int pcmcia_yopy_init(void);
+extern void pcmcia_yopy_exit(void);
 
 #endif  /* !defined(_PCMCIA_SA1100_H) */
