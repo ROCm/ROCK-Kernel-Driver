@@ -180,8 +180,11 @@ int sysdev_register(struct sys_device * sysdev)
 
 	/* But make sure we point to the right type for sysfs translation */
 	sysdev->kobj.ktype = &ktype_sysdev;
-	kobject_set_name(&sysdev->kobj,"%s%d",
+	error = kobject_set_name(&sysdev->kobj,"%s%d",
 			 kobject_name(&cls->kset.kobj),sysdev->id);
+	if (error)
+		return error;
+
 	pr_debug("Registering sys device '%s'\n",kobject_name(&sysdev->kobj));
 
 	/* Register the object */

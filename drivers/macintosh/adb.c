@@ -10,7 +10,7 @@
  *
  * To do:
  *
- * - /proc/adb to list the devices and infos
+ * - /sys/bus/adb to list the devices and infos
  * - more /dev/adb to allow userland to receive the
  *   flow of auto-polling datas from a given device.
  * - move bus probe to a kernel thread
@@ -23,7 +23,6 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/fs.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
@@ -36,6 +35,7 @@
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <linux/completion.h>
+#include <linux/device.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #ifdef CONFIG_PPC
@@ -74,6 +74,8 @@ static struct adb_driver *adb_driver_list[] = {
 #endif
 	NULL
 };
+
+static struct class_simple *adb_dev_class;
 
 struct adb_driver *adb_controller;
 struct notifier_block *adb_client_list = NULL;
@@ -883,6 +885,7 @@ out:
 }
 
 static struct file_operations adb_fops = {
+	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
 	.read		= adb_read,
 	.write		= adb_write,
@@ -893,9 +896,13 @@ static struct file_operations adb_fops = {
 static void
 adbdev_init(void)
 {
-	if (register_chrdev(ADB_MAJOR, "adb", &adb_fops))
+	if (register_chrdev(ADB_MAJOR, "adb", &adb_fops)) {
 		printk(KERN_ERR "adb: unable to get major %d\n", ADB_MAJOR);
-	else
-		devfs_mk_cdev(MKDEV(ADB_MAJOR, 0),
-				S_IFCHR | S_IRUSR | S_IWUSR, "adb");
+		return;
+	}
+	adb_dev_class = class_simple_create(THIS_MODULE, "adb");
+	if (IS_ERR(adb_dev_class)) {
+		return;
+	}
+	class_simple_device_add(adb_dev_class, MKDEV(ADB_MAJOR, 0), NULL, "adb");
 }

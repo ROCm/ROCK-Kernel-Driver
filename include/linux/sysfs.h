@@ -44,7 +44,7 @@ sysfs_create_dir(struct kobject *);
 extern void
 sysfs_remove_dir(struct kobject *);
 
-extern void
+extern int
 sysfs_rename_dir(struct kobject *, const char *new_name);
 
 extern int

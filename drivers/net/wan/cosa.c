@@ -93,6 +93,7 @@
 #include <linux/netdevice.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
+#include <linux/device.h>
 
 #undef COSA_SLOW_IO	/* for testing purposes only */
 #undef REALLY_SLOW_IO
@@ -233,6 +234,9 @@ static int dma[MAX_CARDS+1];
 /* IRQ can be safely autoprobed */
 static int irq[MAX_CARDS+1] = { -1, -1, -1, -1, -1, -1, 0, };
 
+/* for class stuff*/
+static struct class_simple *cosa_class;
+
 #ifdef MODULE
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_CARDS) "i");
 MODULE_PARM_DESC(io, "The I/O bases of the COSA or SRP cards");
@@ -359,7 +363,7 @@ static void debug_status_out(struct cosa_data *cosa, int status);
 
 static int __init cosa_init(void)
 {
-	int i;
+	int i, err = 0;
 
 	printk(KERN_INFO "cosa v1.08 (c) 1997-2000 Jan Kasprzak <kas@fi.muni.cz>\n");
 #ifdef CONFIG_SMP
@@ -369,12 +373,14 @@ static int __init cosa_init(void)
 		if (register_chrdev(cosa_major, "cosa", &cosa_fops)) {
 			printk(KERN_WARNING "cosa: unable to get major %d\n",
 				cosa_major);
-			return -EIO;
+			err = -EIO;
+			goto out;
 		}
 	} else {
 		if (!(cosa_major=register_chrdev(0, "cosa", &cosa_fops))) {
 			printk(KERN_WARNING "cosa: unable to register chardev\n");
-			return -EIO;
+			err = -EIO;
+			goto out;
 		}
 	}
 	for (i=0; i<MAX_CARDS; i++)
@@ -384,15 +390,33 @@ static int __init cosa_init(void)
 	if (!nr_cards) {
 		printk(KERN_WARNING "cosa: no devices found.\n");
 		unregister_chrdev(cosa_major, "cosa");
-		return -ENODEV;
+		err = -ENODEV;
+		goto out;
 	}
 	devfs_mk_dir("cosa");
+	cosa_class = class_simple_create(THIS_MODULE, "cosa");
+	if (IS_ERR(cosa_class)) {
+		err = PTR_ERR(cosa_class);
+		goto out_chrdev;
+	}
 	for (i=0; i<nr_cards; i++) {
-		devfs_mk_cdev(MKDEV(cosa_major, i),
+		class_simple_device_add(cosa_class, MKDEV(cosa_major, i),
+				NULL, "cosa%d", i);
+		err = devfs_mk_cdev(MKDEV(cosa_major, i),
 				S_IFCHR|S_IRUSR|S_IWUSR,
 				"cosa/%d", i);
+		if (err) {
+			class_simple_device_remove(MKDEV(cosa_major, i));
+			goto out_chrdev;		
+		}
 	}
-	return 0;
+	err = 0;
+	goto out;
+	
+out_chrdev:
+	unregister_chrdev(cosa_major, "cosa");
+out:
+	return err;
 }
 module_init(cosa_init);
 
@@ -402,8 +426,11 @@ static void __exit cosa_exit(void)
 	int i;
 	printk(KERN_INFO "Unloading the cosa module\n");
 
-	for (i=0; i<nr_cards; i++)
+	for (i=0; i<nr_cards; i++) {
+		class_simple_device_remove(MKDEV(cosa_major, i));
 		devfs_remove("cosa/%d", i);
+	}
+	class_simple_destroy(cosa_class);
 	devfs_remove("cosa");
 	for (cosa=cosa_cards; nr_cards--; cosa++) {
 		/* Clean up the per-channel data */
