@@ -15,14 +15,15 @@
  * either DMA (default) or PIO (use_dma=n) used for ep-{a,b,c,d}.  Testing
  * with "ttcp" (and the "ether.c" driver) behaves nicely too.
  *
- * DMA is enabled by default, and drivers using transfer queues will use
+ * DMA is enabled by default.  Drivers using transfer queues might use
  * DMA chaining to remove IRQ latencies between transfers.  (Except when
  * short OUT transfers happen.)  Drivers can use the req->no_interrupt
- * hint to completely eliminate some IRQs, if a later IRQ is guaranteed.
+ * hint to completely eliminate some IRQs, if a later IRQ is guaranteed
+ * and DMA chaining is enabled.
  */
 
 // #define NET2280_DMA_OUT_WORKAROUND
-#define USE_DMA_CHAINING
+// #define USE_DMA_CHAINING
 
 
 /*
@@ -614,11 +615,6 @@ read_fifo (struct net2280_ep *ep, struct net2280_request *req)
 	}
 	req->req.actual += count;
 
-	/* FIXME we seem to be getting these w/o ZLPs; why? */
-	if (req->req.actual == 0 && req->req.length != 0) {
-		VDEBUG (ep->dev, "%s pio out -- bogus zlp?\n", ep->ep.name);
-		return 0;
-	}
 	is_short = (count == 0) || ((count % ep->ep.maxpacket) != 0);
 
 	VDEBUG (ep->dev, "read %s fifo (OUT) %d bytes%s%s%s req %p %d/%d\n",
@@ -855,6 +851,10 @@ net2280_queue (struct usb_ep *_ep, struct usb_request *_req, int gfp_flags)
 	dev = ep->dev;
 	if (!dev->driver || dev->gadget.speed == USB_SPEED_UNKNOWN)
 		return -ESHUTDOWN;
+
+	/* FIXME implement PIO fallback for ZLPs with DMA */
+	if (ep->dma && _req->length == 0)
+		return -EOPNOTSUPP;
 
 	/* set up dma mapping in case the caller didn't */
 	if (ep->dma && _req->dma == DMA_ADDR_INVALID) {
