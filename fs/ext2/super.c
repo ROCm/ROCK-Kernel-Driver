@@ -573,6 +573,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	int blocksize = BLOCK_SIZE;
 	int db_count;
 	int i, j;
+	__u32 features;
 
 	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
@@ -662,17 +663,18 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	 * previously didn't change the revision level when setting the flags,
 	 * so there is a chance incompat flags are set on a rev 0 filesystem.
 	 */
-	if ((i = EXT2_HAS_INCOMPAT_FEATURE(sb, ~EXT2_FEATURE_INCOMPAT_SUPP))) {
+	features = EXT2_HAS_INCOMPAT_FEATURE(sb, ~EXT2_FEATURE_INCOMPAT_SUPP);
+	if (features) {
 		printk("EXT2-fs: %s: couldn't mount because of "
 		       "unsupported optional features (%x).\n",
-		       sb->s_id, i);
+		       sb->s_id, le32_to_cpu(features));
 		goto failed_mount;
 	}
 	if (!(sb->s_flags & MS_RDONLY) &&
-	    (i = EXT2_HAS_RO_COMPAT_FEATURE(sb, ~EXT2_FEATURE_RO_COMPAT_SUPP))){
+	    (features = EXT2_HAS_RO_COMPAT_FEATURE(sb, ~EXT2_FEATURE_RO_COMPAT_SUPP))){
 		printk("EXT2-fs: %s: couldn't mount RDWR because of "
 		       "unsupported optional features (%x).\n",
-		       sb->s_id, i);
+		       sb->s_id, le32_to_cpu(features));
 		goto failed_mount;
 	}
 	blocksize = BLOCK_SIZE << le32_to_cpu(sbi->s_es->s_log_block_size);
@@ -938,12 +940,12 @@ static int ext2_remount (struct super_block * sb, int * flags, char * data)
 		es->s_state = cpu_to_le16(sbi->s_mount_state);
 		es->s_mtime = cpu_to_le32(get_seconds());
 	} else {
-		int ret;
-		if ((ret = EXT2_HAS_RO_COMPAT_FEATURE(sb,
-					       ~EXT2_FEATURE_RO_COMPAT_SUPP))) {
+		__u32 ret = EXT2_HAS_RO_COMPAT_FEATURE(sb,
+					       ~EXT2_FEATURE_RO_COMPAT_SUPP);
+		if (ret) {
 			printk("EXT2-fs: %s: couldn't remount RDWR because of "
 			       "unsupported optional features (%x).\n",
-			       sb->s_id, ret);
+			       sb->s_id, le32_to_cpu(ret));
 			return -EROFS;
 		}
 		/*
