@@ -518,20 +518,29 @@ static int __init i2c_dev_init(void)
 
 	printk(KERN_INFO "i2c /dev entries driver\n");
 
-	if (register_chrdev(I2C_MAJOR,"i2c",&i2cdev_fops)) {
-		printk(KERN_ERR "i2c-dev.o: unable to get major %d for i2c bus\n",
-		       I2C_MAJOR);
-		return -EIO;
-	}
+	res = register_chrdev(I2C_MAJOR, "i2c", &i2cdev_fops);
+	if (res)
+		goto out;
+
+	res = class_register(&i2c_dev_class);
+	if (res)
+		goto out_unreg_chrdev;
+
+	res = i2c_add_driver(&i2cdev_driver);
+	if (res)
+		goto out_unreg_class;
+
 	devfs_mk_dir("i2c");
-	class_register(&i2c_dev_class);
-	if ((res = i2c_add_driver(&i2cdev_driver))) {
-		printk(KERN_ERR "i2c-dev.o: Driver registration failed, module not inserted.\n");
-		devfs_remove("i2c");
-		unregister_chrdev(I2C_MAJOR,"i2c");
-		return res;
-	}
+
 	return 0;
+
+out_unreg_class:
+	class_unregister(&i2c_dev_class);
+out_unreg_chrdev:
+	unregister_chrdev(I2C_MAJOR, "i2c");
+out:
+	printk(KERN_ERR "%s: Driver Initialisation failed", __FILE__);
+	return res;
 }
 
 static void __exit i2c_dev_exit(void)
