@@ -385,6 +385,7 @@ static struct pcmcia_bus_socket * get_socket_info_by_nr(unsigned int nr);
 static void pcmcia_release_bus_socket(struct kref *refcount)
 {
 	struct pcmcia_bus_socket *s = container_of(refcount, struct pcmcia_bus_socket, refcount);
+	pcmcia_put_socket(s->parent);
 	kfree(s);
 }
 
@@ -1243,7 +1244,7 @@ static struct file_operations ds_fops = {
 
 static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 {
-	struct pcmcia_socket *socket = class_dev->class_data;
+	struct pcmcia_socket *socket = class_get_devdata(class_dev);
 	struct pcmcia_bus_socket *s;
 	int ret;
 
@@ -1251,6 +1252,15 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	if(!s)
 		return -ENOMEM;
 	memset(s, 0, sizeof(struct pcmcia_bus_socket));
+
+	/* get reference to parent socket */
+	s->parent = pcmcia_get_socket(socket);
+	if (!s->parent) {
+		printk(KERN_ERR "PCMCIA obtaining reference to socket %p failed\n", socket);
+		kfree (s);
+		return -ENODEV;
+	}
+
 	kref_init(&s->refcount);
     
 	/*
@@ -1262,9 +1272,6 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	init_waitqueue_head(&s->queue);
 	init_waitqueue_head(&s->request);
 	INIT_LIST_HEAD(&s->devices_list);
-
-	/* initialize data */
-	s->parent = socket;
 
 	/* Set up hotline to Card Services */
 	s->callback.owner = THIS_MODULE;
@@ -1285,7 +1292,7 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 
 static void pcmcia_bus_remove_socket(struct class_device *class_dev)
 {
-	struct pcmcia_socket *socket = class_dev->class_data;
+	struct pcmcia_socket *socket = class_get_devdata(class_dev);
 
 	if (!socket || !socket->pcmcia)
 		return;
