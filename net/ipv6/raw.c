@@ -461,9 +461,9 @@ static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct r
 		 * Only one fragment on the socket.
 		 */
 		/* should be check HW csum miyazawa */
-		*csum = csum_ipv6_magic(fl->fl6_src,
-					     fl->fl6_dst,
-					     len, fl->proto, skb->csum);
+		*csum = csum_ipv6_magic(&fl->fl6_src,
+					&fl->fl6_dst,
+					len, fl->proto, skb->csum);
 	} else {
 		u32 tmp_csum = 0;
 
@@ -471,9 +471,9 @@ static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct r
 			tmp_csum = csum_add(tmp_csum, skb->csum);
 		}
 
-		tmp_csum = csum_ipv6_magic(fl->fl6_src,
-					fl->fl6_dst,
-					len, fl->proto, tmp_csum);
+		tmp_csum = csum_ipv6_magic(&fl->fl6_src,
+					   &fl->fl6_dst,
+					   len, fl->proto, tmp_csum);
 		*csum = tmp_csum;
 	}
 	if (*csum == 0)
@@ -540,7 +540,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 {
 	struct ipv6_txoptions opt_space;
 	struct sockaddr_in6 * sin6 = (struct sockaddr_in6 *) msg->msg_name;
-	struct in6_addr *daddr, *saddr = NULL;
+	struct in6_addr *daddr;
 	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct raw6_opt *raw_opt = raw6_sk(sk);
@@ -566,9 +566,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	/*
 	 *	Get and verify the address. 
 	 */
-
-	fl.fl6_flowlabel = 0;
-	fl.oif = 0;
+	memset(&fl, 0, sizeof(fl));
 
 	if (sin6) {
 		if (addr_len < SIN6_LEN_RFC2133) 
@@ -628,7 +626,6 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 
 	if (fl.oif == 0)
 		fl.oif = sk->bound_dev_if;
-	fl.fl6_src = NULL;
 
 	if (msg->msg_controllen) {
 		opt = &opt_space;
@@ -653,26 +650,25 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		opt = fl6_merge_options(&opt_space, flowlabel, opt);
 
 	fl.proto = proto;
-	fl.fl6_dst = daddr;
-	if (fl.fl6_src == NULL && !ipv6_addr_any(&np->saddr))
-		fl.fl6_src = &np->saddr;
-	fl.fl_icmp_type = 0;
-	fl.fl_icmp_code = 0;
+	ipv6_addr_copy(&fl.fl6_dst, daddr);
+	if (ipv6_addr_any(&fl.fl6_src) && !ipv6_addr_any(&np->saddr))
+		ipv6_addr_copy(&fl.fl6_src, &np->saddr);
 
 	/* merge ip6_build_xmit from ip6_output */
 	if (opt && opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *) opt->srcrt;
-		fl.fl6_dst = rt0->addr;
+		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 	}
 
-	if (!fl.oif && ipv6_addr_is_multicast(fl.nl_u.ip6_u.daddr))
+	if (!fl.oif && ipv6_addr_is_multicast(&fl.fl6_dst))
 		fl.oif = np->mcast_oif;
 
-	err = ip6_dst_lookup(sk, &dst, &fl, &saddr);
-	if (err) goto out;
+	err = ip6_dst_lookup(sk, &dst, &fl);
+	if (err)
+		goto out;
 
 	if (hlimit < 0) {
-		if (ipv6_addr_is_multicast(fl.fl6_dst))
+		if (ipv6_addr_is_multicast(&fl.fl6_dst))
 			hlimit = np->mcast_hops;
 		else
 			hlimit = np->hop_limit;
@@ -702,14 +698,15 @@ back_from_confirm:
 		}
 	}
 done:
-	ip6_dst_store(sk, dst, fl.nl_u.ip6_u.daddr == &np->daddr ? &np->daddr : NULL);
+	ip6_dst_store(sk, dst,
+		      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
+		      &np->daddr : NULL);
 	if (err > 0)
 		err = np->recverr ? net_xmit_errno(err) : 0;
 
 	release_sock(sk);
 out:	
 	fl6_sock_release(flowlabel);
-	if (saddr) kfree(saddr);
 	return err<0?err:len;
 do_confirm:
 	dst_confirm(dst);
