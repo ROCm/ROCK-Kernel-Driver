@@ -149,8 +149,8 @@ dasd_destroy_partitions(struct dasd_device * device)
 	 * Can't call delete_partitions directly. Use ioctl.
 	 * The ioctl also does locking and invalidation.
 	 */
-	memset(&bpart, sizeof(struct blkpg_partition), 0);
-	memset(&barg, sizeof(struct blkpg_ioctl_arg), 0);
+	memset(&bpart, 0, sizeof(struct blkpg_partition));
+	memset(&barg, 0, sizeof(struct blkpg_ioctl_arg));
 	barg.data = &bpart;
 	barg.op = BLKPG_DEL_PARTITION;
 	for (bpart.pno = device->gdp->minors - 1; bpart.pno > 0; bpart.pno--)

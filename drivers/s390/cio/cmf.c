@@ -526,7 +526,7 @@ readall_cmb (struct ccw_device *cdev, struct cmbdata *data)
 	time = get_clock() - cdev->private->cmb_start_time;
 	spin_unlock_irqrestore(cdev->ccwlock, flags);
 
-	memset(data, sizeof(struct cmbdata), 0);
+	memset(data, 0, sizeof(struct cmbdata));
 
 	/* we only know values before device_busy_time */
 	data->size = offsetof(struct cmbdata, device_busy_time);
@@ -736,7 +736,7 @@ readall_cmbe (struct ccw_device *cdev, struct cmbdata *data)
 	time = get_clock() - cdev->private->cmb_start_time;
 	spin_unlock_irqrestore(cdev->ccwlock, flags);
 
-	memset (data, sizeof(struct cmbdata), 0);
+	memset (data, 0, sizeof(struct cmbdata));
 
 	/* we only know values before device_busy_time */
 	data->size = offsetof(struct cmbdata, device_busy_time);
