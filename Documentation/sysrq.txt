@@ -33,6 +33,10 @@ in /proc/sys/kernel/sysrq:
 You can set the value in the file by the following command:
     echo "number" >/proc/sys/kernel/sysrq
 
+Note that the value of /proc/sys/kernel/sysrq influences only the invocation
+via a keyboard. Invocation of any operation via /proc/sysrq-trigger is always
+allowed.
+
 *  How do I use the magic SysRq key?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 On x86   - You press the key combo 'ALT-SysRq-<command key>'. Note - Some

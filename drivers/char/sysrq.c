@@ -333,7 +333,7 @@ void __sysrq_put_key_op (int key, struct sysrq_key_op *op_p) {
  * as they are inside of the lock
  */
 
-void __handle_sysrq(int key, struct pt_regs *pt_regs, struct tty_struct *tty)
+void __handle_sysrq(int key, struct pt_regs *pt_regs, struct tty_struct *tty, int check_mask)
 {
 	struct sysrq_key_op *op_p;
 	int orig_log_level;
@@ -347,7 +347,10 @@ void __handle_sysrq(int key, struct pt_regs *pt_regs, struct tty_struct *tty)
 
         op_p = __sysrq_get_key_op(key);
         if (op_p) {
-		if (sysrq_enabled == 1 || sysrq_enabled & op_p->enable_mask) {
+		/* Should we check for enabled operations (/proc/sysrq-trigger should not)
+		 * and is the invoked operation enabled? */
+		if (!check_mask || sysrq_enabled == 1 ||
+		    sysrq_enabled & op_p->enable_mask) {
 			printk ("%s\n", op_p->action_msg);
 			console_loglevel = orig_log_level;
 			op_p->handler(key, pt_regs, tty);
@@ -378,7 +381,7 @@ void handle_sysrq(int key, struct pt_regs *pt_regs, struct tty_struct *tty)
 {
 	if (!sysrq_enabled)
 		return;
-	__handle_sysrq(key, pt_regs, tty);
+	__handle_sysrq(key, pt_regs, tty, 1);
 }
 
 int __sysrq_swap_key_ops(int key, struct sysrq_key_op *insert_op_p,

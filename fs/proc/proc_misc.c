@@ -624,7 +624,7 @@ static ssize_t write_sysrq_trigger(struct file *file, const char __user *buf,
 
 		if (get_user(c, buf))
 			return -EFAULT;
-		__handle_sysrq(c, NULL, NULL);
+		__handle_sysrq(c, NULL, NULL, 0);
 	}
 	return count;
 }

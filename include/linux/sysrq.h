@@ -42,7 +42,7 @@ struct sysrq_key_op {
  */
 
 void handle_sysrq(int, struct pt_regs *, struct tty_struct *);
-void __handle_sysrq(int, struct pt_regs *, struct tty_struct *);
+void __handle_sysrq(int, struct pt_regs *, struct tty_struct *, int check_mask);
 int register_sysrq_key(int, struct sysrq_key_op *);
 int unregister_sysrq_key(int, struct sysrq_key_op *);
 struct sysrq_key_op *__sysrq_get_key_op(int key);
