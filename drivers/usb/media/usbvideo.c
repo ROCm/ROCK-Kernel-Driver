@@ -1192,7 +1192,7 @@ static int usbvideo_v4l_mmap(struct file *file, struct vm_area_struct *vma)
 	if (!CAMERA_IS_OPERATIONAL(uvd))
 		return -EFAULT;
 
-	if (size > (((2 * uvd->max_frame_size) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1)))
+	if (size > (((USBVIDEO_NUMFRAMES * uvd->max_frame_size) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1)))
 		return -EINVAL;
 
 	pos = (unsigned long) uvd->fbuf;
@@ -1471,12 +1471,14 @@ static int usbvideo_v4l_do_ioctl(struct inode *inode, struct file *file,
 		case VIDIOCGMBUF:
 		{
 			struct video_mbuf *vm = arg;
+			int i;
 
 			memset(vm, 0, sizeof(*vm));
-			vm->size = uvd->max_frame_size * 2;
-			vm->frames = 2;
-			vm->offsets[0] = 0;
-			vm->offsets[1] = uvd->max_frame_size;
+			vm->size = uvd->max_frame_size * USBVIDEO_NUMFRAMES;
+			vm->frames = USBVIDEO_NUMFRAMES;
+			for(i = 0; i < USBVIDEO_NUMFRAMES; i++) 
+			  vm->offsets[i] = i * uvd->max_frame_size;
+
 			return 0;
 		}
 		case VIDIOCMCAPTURE:
@@ -1518,8 +1520,8 @@ static int usbvideo_v4l_do_ioctl(struct inode *inode, struct file *file,
 				}
 				return -EINVAL;
 			}
-			if ((vm->frame != 0) && (vm->frame != 1)) {
-				err("VIDIOCMCAPTURE: vm.frame=%d. !E [0,1]", vm->frame);
+			if ((vm->frame < 0) || (vm->frame >= USBVIDEO_NUMFRAMES)) {
+				err("VIDIOCMCAPTURE: vm.frame=%d. !E [0-%d]", vm->frame, USBVIDEO_NUMFRAMES-1);
 				return -EINVAL;
 			}
 			if (uvd->frame[vm->frame].frameState == FrameState_Grabbing) {
@@ -1618,7 +1620,7 @@ static int usbvideo_v4l_read(struct file *file, char *buf,
 	static const char proc[] = "usbvideo_v4l_read";
 	uvd_t *uvd = file->private_data;
 	int noblock = file->f_flags & O_NONBLOCK;
-	int frmx = -1;
+	int frmx = -1, i;
 	usbvideo_frame_t *frame;
 
 	if (!CAMERA_IS_OPERATIONAL(uvd) || (buf == NULL))
@@ -1630,14 +1632,13 @@ static int usbvideo_v4l_read(struct file *file, char *buf,
 	down(&uvd->lock);	
 
 	/* See if a frame is completed, then use it. */
-	if ((uvd->frame[0].frameState == FrameState_Done) ||
-	    (uvd->frame[0].frameState == FrameState_Done_Hold) ||
-	    (uvd->frame[0].frameState == FrameState_Error)) {
-		frmx = 0;
-	} else if ((uvd->frame[1].frameState >= FrameState_Done) ||
-		   (uvd->frame[1].frameState == FrameState_Done_Hold) ||
-		   (uvd->frame[1].frameState >= FrameState_Done)) {
-		frmx = 1;
+	for(i = 0; i < USBVIDEO_NUMFRAMES; i++) {
+		if ((uvd->frame[i].frameState == FrameState_Done) ||
+		    (uvd->frame[i].frameState == FrameState_Done_Hold) ||
+		    (uvd->frame[i].frameState == FrameState_Error)) {
+			frmx = i;
+			break;
+		}
 	}
 
 	/* FIXME: If we don't start a frame here then who ever does? */
@@ -1652,10 +1653,12 @@ static int usbvideo_v4l_read(struct file *file, char *buf,
 	 * We will need to wait until it becomes cooked, of course.
 	 */
 	if (frmx == -1) {
-		if (uvd->frame[0].frameState == FrameState_Grabbing)
-			frmx = 0;
-		else if (uvd->frame[1].frameState == FrameState_Grabbing)
-			frmx = 1;
+		for(i = 0; i < USBVIDEO_NUMFRAMES; i++) {
+			if (uvd->frame[i].frameState == FrameState_Grabbing) {
+				frmx = i;
+				break;
+			}
+		}
 	}
 
 	/*
@@ -1753,7 +1756,7 @@ static int usbvideo_v4l_read(struct file *file, char *buf,
 
 		/* Mark it as available to be used again. */
 		uvd->frame[frmx].frameState = FrameState_Unused;
-		if (usbvideo_NewFrame(uvd, frmx ? 0 : 1)) {
+		if (usbvideo_NewFrame(uvd, (frmx + 1) % USBVIDEO_NUMFRAMES)) {
 			err("%s: usbvideo_NewFrame failed.", proc);
 		}
 	}
@@ -1990,7 +1993,7 @@ static int usbvideo_NewFrame(uvd_t *uvd, int framenum)
 		uvd->settingsAdjusted = 1;
 	}
 
-	n = (framenum - 1 + USBVIDEO_NUMFRAMES) % USBVIDEO_NUMFRAMES;
+	n = (framenum + 1) % USBVIDEO_NUMFRAMES;
 	if (uvd->frame[n].frameState == FrameState_Ready)
 		framenum = n;
 
@@ -2022,7 +2025,8 @@ static int usbvideo_NewFrame(uvd_t *uvd, int framenum)
 	 */
 	if (!(uvd->flags & FLAGS_SEPARATE_FRAMES)) {
 		/* This copies previous frame into this one to mask losses */
-		memmove(frame->data, uvd->frame[1-framenum].data, uvd->max_frame_size);
+		int prev = (framenum - 1 + USBVIDEO_NUMFRAMES) % USBVIDEO_NUMFRAMES;
+		memmove(frame->data, uvd->frame[prev].data, uvd->max_frame_size);
 	} else {
 		if (uvd->flags & FLAGS_CLEAN_FRAMES) {
 			/* This provides a "clean" frame but slows things down */
