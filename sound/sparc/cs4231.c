@@ -119,10 +119,10 @@ static cs4231_t *cs4231_list;
 
 #define CS4231P(chip, x)	((chip)->port + c_d_c_CS4231##x)
 
-#define c_d_c_CS4231REGSEL	0
-#define c_d_c_CS4231REG		1
-#define c_d_c_CS4231STATUS	2
-#define c_d_c_CS4231PIO		3
+#define c_d_c_CS4231REGSEL	0x0
+#define c_d_c_CS4231REG		0x4
+#define c_d_c_CS4231STATUS	0x8
+#define c_d_c_CS4231PIO		0xc
 
 /* codec registers */
 
@@ -455,6 +455,7 @@ static void snd_cs4231_out(cs4231_t *chip, unsigned char reg, unsigned char valu
 static unsigned char snd_cs4231_in(cs4231_t *chip, unsigned char reg)
 {
 	int timeout;
+	unsigned char ret;
 
 	for (timeout = 250;
 	     timeout > 0 && (__cs4231_readb(chip, CS4231P(chip, REGSEL)) & CS4231_INIT);
@@ -466,7 +467,11 @@ static unsigned char snd_cs4231_in(cs4231_t *chip, unsigned char reg)
 #endif
 	__cs4231_writeb(chip, chip->mce_bit | reg, CS4231P(chip, REGSEL));
 	mb();
-	return __cs4231_readb(chip, CS4231P(chip, REG));
+	ret = __cs4231_readb(chip, CS4231P(chip, REG));
+#if 0
+	printk("codec in - reg 0x%x = 0x%x\n", chip->mce_bit | reg, ret);
+#endif
+	return ret;
 }
 
 #ifdef CONFIG_SND_DEBUG
@@ -1329,12 +1334,12 @@ static int snd_cs4231_probe(cs4231_t *chip)
 			snd_cs4231_out(chip, CS4231_MISC_INFO, CS4231_MODE2);
 			id = snd_cs4231_in(chip, CS4231_MISC_INFO) & 0x0f;
 			spin_unlock_irqrestore(&chip->lock, flags);
-			if (id == 0x0a || id == 0x0c)
+			if (id == 0x0a)
 				break;	/* this is valid value */
 		}
 	}
 	snd_printdd("cs4231: port = 0x%lx, id = 0x%x\n", chip->port, id);
-	if (id != 0x0a && id != 0x0c)
+	if (id != 0x0a)
 		return -ENODEV;	/* no valid device found */
 
 	spin_lock_irqsave(&chip->lock, flags);
