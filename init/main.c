@@ -71,6 +71,7 @@ extern void pte_chain_init(void);
 extern void radix_tree_init(void);
 extern void free_initmem(void);
 extern void populate_rootfs(void);
+extern void driver_init(void);
 
 #ifdef CONFIG_TC
 extern void tc_init(void);
@@ -476,6 +477,8 @@ static void __init do_initcalls(void)
  */
 static void __init do_basic_setup(void)
 {
+	driver_init();
+
 #ifdef CONFIG_SYSCTL
 	sysctl_init();
 #endif
