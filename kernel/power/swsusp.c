@@ -523,56 +523,85 @@ static int pfn_is_nosave(unsigned long pfn)
 	return (pfn >= nosave_begin_pfn) && (pfn < nosave_end_pfn);
 }
 
-/* if *pagedir_p != NULL it also copies the counted pages */
-static int count_and_copy_zone(struct zone *zone, struct pbe **pagedir_p)
-{
-	unsigned long zone_pfn, chunk_size, nr_copy_pages = 0;
-	struct pbe *pbe = *pagedir_p;
-	for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn) {
-		struct page *page;
-		unsigned long pfn = zone_pfn + zone->zone_start_pfn;
+/**
+ *	saveable - Determine whether a page should be cloned or not.
+ *	@pfn:	The page
+ *
+ *	We save a page if it's Reserved, and not in the range of pages
+ *	statically defined as 'unsaveable', or if it isn't reserved, and
+ *	isn't part of a free chunk of pages.
+ *	If it is part of a free chunk, we update @pfn to point to the last 
+ *	page of the chunk.
+ */
 
-		if (!(pfn%1000))
-			printk(".");
-		if (!pfn_valid(pfn))
-			continue;
-		page = pfn_to_page(pfn);
-		BUG_ON(PageReserved(page) && PageNosave(page));
-		if (PageNosave(page))
-			continue;
-		if (PageReserved(page) && pfn_is_nosave(pfn)) {
-			PRINTK("[nosave pfn 0x%lx]", pfn);
-			continue;
-		}
-		if ((chunk_size = is_head_of_free_region(page))) {
-			pfn += chunk_size - 1;
-			zone_pfn += chunk_size - 1;
-			continue;
-		}
-		nr_copy_pages++;
-		if (!pbe)
-			continue;
-		pbe->orig_address = (long) page_address(page);
-		/* Copy page is dangerous: it likes to mess with
-		   preempt count on specific cpus. Wrong preempt count is then copied,
-		   oops. */
-		copy_page((void *)pbe->address, (void *)pbe->orig_address);
-		pbe++;
+static int saveable(struct zone * zone, unsigned long * zone_pfn)
+{
+	unsigned long pfn = *zone_pfn + zone->zone_start_pfn;
+	unsigned long chunk_size;
+	struct page * page;
+
+	if (!pfn_valid(pfn))
+		return 0;
+
+	if (!(pfn%1000))
+		printk(".");
+	page = pfn_to_page(pfn);
+	BUG_ON(PageReserved(page) && PageNosave(page));
+	if (PageNosave(page))
+		return 0;
+	if (PageReserved(page) && pfn_is_nosave(pfn)) {
+		PRINTK("[nosave pfn 0x%lx]", pfn);
+		return 0;
 	}
-	*pagedir_p = pbe;
-	return nr_copy_pages;
+	if ((chunk_size = is_head_of_free_region(page))) {
+		zone_pfn += chunk_size - 1;
+		return 0;
+	}
+
+	return 1;
 }
 
-static int count_and_copy_data_pages(struct pbe *pagedir_p)
+static void count_data_pages(void)
 {
-	int nr_copy_pages = 0;
 	struct zone *zone;
+	unsigned long zone_pfn;
+
+	nr_copy_pages = 0;
+
+	for_each_zone(zone) {
+		if (!is_highmem(zone)) {
+			for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn)
+				nr_copy_pages += saveable(zone, &zone_pfn);
+		}
+	}
+}
+
+
+static void copy_data_pages(struct pbe * pbe)
+{
+	struct zone *zone;
+	unsigned long zone_pfn;
+
+	
 	for_each_zone(zone) {
 		if (!is_highmem(zone))
-			nr_copy_pages += count_and_copy_zone(zone, &pagedir_p);
+			for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn) {
+				if (saveable(zone, &zone_pfn)) {
+					struct page * page;
+					page = pfn_to_page(zone_pfn + zone->zone_start_pfn);
+					pbe->orig_address = (long) page_address(page);
+					/* Copy page is dangerous: it likes to mess with
+					   preempt count on specific cpus. Wrong preempt 
+					   count is then copied, oops. 
+					*/
+					copy_page((void *)pbe->address, 
+						  (void *)pbe->orig_address);
+					pbe++;
+				}
+			}
 	}
-	return nr_copy_pages;
 }
+
 
 static void free_suspend_pagedir_zone(struct zone *zone, unsigned long pagedir)
 {
@@ -734,7 +763,7 @@ static int enough_swap(void)
 	return 1;
 }
 
-int swsusp_alloc(void)
+static int swsusp_alloc(void)
 {
 	int error;
 
@@ -763,7 +792,7 @@ int swsusp_alloc(void)
 	return 0;
 }
 
-static int suspend_prepare_image(void)
+int suspend_prepare_image(void)
 {
 	unsigned int nr_needed_pages = 0;
 
@@ -779,14 +808,16 @@ static int suspend_prepare_image(void)
 
 	printk("counting pages to copy" );
 	drain_local_pages();
-	nr_copy_pages = count_and_copy_data_pages(NULL);
+	count_data_pages();
 	nr_needed_pages = nr_copy_pages + PAGES_FOR_IO;
 
 	swsusp_alloc();
 	
-	drain_local_pages();	/* During allocating of suspend pagedir, new cold pages may appear. Kill them */
-	if (nr_copy_pages != count_and_copy_data_pages(pagedir_nosave))	/* copy */
-		BUG();
+	/* During allocating of suspend pagedir, new cold pages may appear. 
+	 * Kill them.
+	 */
+	drain_local_pages();
+	copy_data_pages(pagedir_nosave);
 
 	/*
 	 * End of critical section. From now on, we can write to memory,

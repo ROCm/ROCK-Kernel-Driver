@@ -37,15 +37,6 @@
 
 extern asmlinkage int pmdisk_arch_suspend(int resume);
 
-#define __ADDRESS(x)  ((unsigned long) phys_to_virt(x))
-#define ADDRESS(x) __ADDRESS((x) << PAGE_SHIFT)
-#define ADDRESS2(x) __ADDRESS(__pa(x))		/* Needed for x86-64 where some pages are in memory twice */
-
-/* References to section boundaries */
-extern char __nosave_begin, __nosave_end;
-
-extern int is_head_of_free_region(struct page *);
-
 /* Variables to be preserved over suspend */
 extern int pagedir_order_check;
 extern int nr_copy_pages_check;
@@ -257,102 +248,8 @@ static int write_suspend_image(void)
 }
 
 
-
-/**
- *	saveable - Determine whether a page should be cloned or not.
- *	@pfn:	The page
- *
- *	We save a page if it's Reserved, and not in the range of pages
- *	statically defined as 'unsaveable', or if it isn't reserved, and
- *	isn't part of a free chunk of pages.
- *	If it is part of a free chunk, we update @pfn to point to the last 
- *	page of the chunk.
- */
-
-static int saveable(unsigned long * pfn)
-{
-	struct page * page = pfn_to_page(*pfn);
-
-	if (PageNosave(page))
-		return 0;
-
-	if (!PageReserved(page)) {
-		int chunk_size;
-
-		if ((chunk_size = is_head_of_free_region(page))) {
-			*pfn += chunk_size - 1;
-			return 0;
-		}
-	} else if (PageReserved(page)) {
-		/* Just copy whole code segment. 
-		 * Hopefully it is not that big.
-		 */
-		if ((ADDRESS(*pfn) >= (unsigned long) ADDRESS2(&__nosave_begin)) && 
-		    (ADDRESS(*pfn) <  (unsigned long) ADDRESS2(&__nosave_end))) {
-			pr_debug("[nosave %lx]\n", ADDRESS(*pfn));
-			return 0;
-		}
-		/* Hmm, perhaps copying all reserved pages is not 
-		 * too healthy as they may contain 
-		 * critical bios data? 
-		 */
-	}
-	return 1;
-}
-
-
-
-/**
- *	count_pages - Determine size of page directory.
- *	
- *	Iterate over all the pages in the system and tally the number
- *	we need to clone.
- */
-
-static void count_pages(void)
-{
-	unsigned long pfn;
-	int n = 0;
-	
-	for (pfn = 0; pfn < max_pfn; pfn++) {
-		if (saveable(&pfn))
-			n++;
-	}
-	nr_copy_pages = n;
-}
-
-
-/**
- *	copy_pages - Atomically snapshot memory.
- *
- *	Iterate over all the pages in the system and copy each one 
- *	into its corresponding location in the pagedir.
- *	We rely on the fact that the number of pages that we're snap-
- *	shotting hasn't changed since we counted them. 
- */
-
-static void copy_pages(void)
-{
-	struct pbe * p = pagedir_save;
-	unsigned long pfn;
-	int n = 0;
-
-	for (pfn = 0; pfn < max_pfn; pfn++) {
-		if (saveable(&pfn)) {
-			n++;
-			p->orig_address = ADDRESS(pfn);
-			copy_page((void *) p->address, 
-				  (void *) p->orig_address);
-			p++;
-		}
-	}
-	BUG_ON(n != nr_copy_pages);
-}
-
-
-
-extern int swsusp_alloc(void);
 extern void free_suspend_pagedir(unsigned long);
+extern int suspend_prepare_image(void);
 
 /**
  *	pmdisk_suspend - Atomically snapshot the system.
@@ -372,29 +269,7 @@ int pmdisk_suspend(void)
 
 	if ((error = swsusp_swap_check()))
 		return error;
-
-	drain_local_pages();
-	pr_debug("pmdisk: Counting pages to copy.\n" );
-	count_pages();
-
-	error = swsusp_alloc();
-	
-	/* During allocating of suspend pagedir, new cold pages may appear. 
-	 * Kill them 
-	 */
-	drain_local_pages();
-
-	/* copy */
-	copy_pages();
-
-	/*
-	 * End of critical section. From now on, we can write to memory,
-	 * but we should not touch disk. This specially means we must _not_
-	 * touch swap space! Except we must write out our image of course.
-	 */
-
-	pr_debug("pmdisk: %d pages copied\n", nr_copy_pages );
-	return 0;
+	return suspend_prepare_image();
 }
 
 
