@@ -310,7 +310,12 @@ retry:
 				goto sync_retry;
 		}
 
-                tot_bytes += result;
+		tot_bytes += result;
+
+		/* in case of a short write: stop now, let the app recover */
+		if (result < wdata.args.count)
+			break;
+
                 wdata.args.offset += result;
 		wdata.args.pgbase += result;
 		curpage += wdata.args.pgbase >> PAGE_SHIFT;
