@@ -131,7 +131,7 @@ static drm_ioctl_desc_t ioctls[] = {
  [DRM_IOCTL_NR(DRM_RADEON_SETPARAM)]   = { radeon_cp_setparam,  1, 0 },
 };
 
-static struct drm_driver_fn driver_fn = {
+static struct drm_driver driver = {
 	.driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG | DRIVER_HAVE_IRQ | DRIVER_HAVE_DMA | DRIVER_IRQ_SHARED | DRIVER_IRQ_VBL,
 	.dev_priv_size = sizeof(drm_radeon_buf_priv_t),
 	.prerelease = radeon_driver_prerelease,
@@ -159,12 +159,12 @@ static struct drm_driver_fn driver_fn = {
 
 static int __init radeon_init(void)
 {
-	return drm_init(&driver_fn);
+	return drm_init(&driver);
 }
 
 static void __exit radeon_exit(void)
 {
-	drm_exit(&driver_fn);
+	drm_exit(&driver);
 }
 
 module_init(radeon_init);

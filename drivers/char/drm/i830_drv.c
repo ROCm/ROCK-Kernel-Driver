@@ -94,7 +94,7 @@ static drm_ioctl_desc_t ioctls[] = {
 	[DRM_IOCTL_NR(DRM_I830_SETPARAM)] = { i830_setparam,    1, 0 } 
 };
 
-static struct drm_driver_fn driver_fn = {
+static struct drm_driver driver = {
 	.driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_DMA | DRIVER_DMA_QUEUE,
 #if USE_IRQS
 	.driver_features |= DRIVER_HAVE_IRQ | DRIVER_SHARED_IRQ,
@@ -125,12 +125,12 @@ static struct drm_driver_fn driver_fn = {
 
 static int __init i830_init(void)
 {
-	return drm_init(&driver_fn);
+	return drm_init(&driver);
 }
 
 static void __exit i830_exit(void)
 {
-	drm_exit(&driver_fn);
+	drm_exit(&driver);
 }
 
 module_init(i830_init);

@@ -417,8 +417,8 @@ int drm_addctx( struct inode *inode, struct file *filp,
 
 	if ( ctx.handle != DRM_KERNEL_CONTEXT )
 	{
-		if (dev->fn_tbl->context_ctor)
-			dev->fn_tbl->context_ctor(dev, ctx.handle);
+		if (dev->driver->context_ctor)
+			dev->driver->context_ctor(dev, ctx.handle);
 	}
 
 	ctx_entry = drm_alloc( sizeof(*ctx_entry), DRM_MEM_CTXLIST );
@@ -552,8 +552,8 @@ int drm_rmctx( struct inode *inode, struct file *filp,
 		priv->remove_auth_on_close = 1;
 	}
 	if ( ctx.handle != DRM_KERNEL_CONTEXT ) {
-		if (dev->fn_tbl->context_dtor)
-			dev->fn_tbl->context_dtor(dev, ctx.handle);
+		if (dev->driver->context_dtor)
+			dev->driver->context_dtor(dev, ctx.handle);
 		drm_ctxbitmap_free( dev, ctx.handle );
 	}
 

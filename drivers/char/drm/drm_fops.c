@@ -73,8 +73,8 @@ int drm_open_helper(struct inode *inode, struct file *filp, drm_device_t *dev)
 	priv->authenticated = capable(CAP_SYS_ADMIN);
 	priv->lock_count    = 0;
 
-	if (dev->fn_tbl->open_helper) {
-		ret=dev->fn_tbl->open_helper(dev, priv);
+	if (dev->driver->open_helper) {
+		ret=dev->driver->open_helper(dev, priv);
 		if (ret < 0)
 			goto out_free;
 	}

@@ -106,12 +106,12 @@ int drm_setunique(struct inode *inode, struct file *filp,
 
 	dev->unique[dev->unique_len] = '\0';
 
-	dev->devname = drm_alloc(strlen(dev->fn_tbl->pci_driver.name) + strlen(dev->unique) + 2,
+	dev->devname = drm_alloc(strlen(dev->driver->pci_driver.name) + strlen(dev->unique) + 2,
 				  DRM_MEM_DRIVER);
 	if (!dev->devname)
 		return -ENOMEM;
 
-	sprintf(dev->devname, "%s@%s", dev->fn_tbl->pci_driver.name, dev->unique);
+	sprintf(dev->devname, "%s@%s", dev->driver->pci_driver.name, dev->unique);
 
 	/* Return error if the busid submitted doesn't match the device's actual
 	 * busid.
@@ -145,12 +145,12 @@ drm_set_busid(drm_device_t *dev)
 	snprintf(dev->unique, dev->unique_len, "pci:%04x:%02x:%02x.%d",
 		dev->pci_domain, dev->pci_bus, dev->pci_slot, dev->pci_func);
 
-	dev->devname = drm_alloc(strlen(dev->fn_tbl->pci_driver.name) + dev->unique_len + 2,
+	dev->devname = drm_alloc(strlen(dev->driver->pci_driver.name) + dev->unique_len + 2,
 				DRM_MEM_DRIVER);
 	if (dev->devname == NULL)
 		return ENOMEM;
 
-	sprintf(dev->devname, "%s@%s", dev->fn_tbl->pci_driver.name, dev->unique);
+	sprintf(dev->devname, "%s@%s", dev->driver->pci_driver.name, dev->unique);
 
 	return 0;
 }
@@ -340,8 +340,8 @@ int drm_setversion(DRM_IOCTL_ARGS)
 		    sv.drm_dd_minor < 0 || sv.drm_dd_minor > DRIVER_MINOR)
 			return EINVAL;
 
-		if (dev->fn_tbl->set_version)
-			dev->fn_tbl->set_version(dev, &sv);
+		if (dev->driver->set_version)
+			dev->driver->set_version(dev, &sv);
 	}
 	return 0;
 }

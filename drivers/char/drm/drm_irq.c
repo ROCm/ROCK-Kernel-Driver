@@ -128,13 +128,13 @@ int drm_irq_install( drm_device_t *dev )
 	}
 
 				/* Before installing handler */
-	dev->fn_tbl->irq_preinstall(dev);
+	dev->driver->irq_preinstall(dev);
 
 				/* Install handler */
 	if (drm_core_check_feature(dev, DRIVER_IRQ_SHARED))
 		sh_flags = SA_SHIRQ;
 	
-	ret = request_irq( dev->irq, dev->fn_tbl->irq_handler,
+	ret = request_irq( dev->irq, dev->driver->irq_handler,
 			   sh_flags, dev->devname, dev );
 	if ( ret < 0 ) {
 		down( &dev->struct_sem );
@@ -144,7 +144,7 @@ int drm_irq_install( drm_device_t *dev )
 	}
 
 				/* After installing handler */
-	dev->fn_tbl->irq_postinstall(dev);
+	dev->driver->irq_postinstall(dev);
 
 	return 0;
 }
@@ -173,7 +173,7 @@ int drm_irq_uninstall( drm_device_t *dev )
 
 	DRM_DEBUG( "%s: irq=%d\n", __FUNCTION__, dev->irq );
 
-	dev->fn_tbl->irq_uninstall(dev);
+	dev->driver->irq_uninstall(dev);
 
 	free_irq( dev->irq, dev );
 
@@ -317,8 +317,8 @@ int drm_wait_vblank( DRM_IOCTL_ARGS )
 
 		spin_unlock_irqrestore( &dev->vbl_lock, irqflags );
 	} else {
-		if (dev->fn_tbl->vblank_wait)
-			ret = dev->fn_tbl->vblank_wait( dev, &vblwait.request.sequence );
+		if (dev->driver->vblank_wait)
+			ret = dev->driver->vblank_wait( dev, &vblwait.request.sequence );
 
 		do_gettimeofday( &now );
 		vblwait.reply.tval_sec = now.tv_sec;

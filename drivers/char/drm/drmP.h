@@ -554,7 +554,7 @@ typedef struct drm_vbl_sig {
  */
 struct drm_device;
 
-struct drm_driver_fn {
+struct drm_driver {
 	int (*preinit)(struct drm_device *);
 	void (*prerelease)(struct drm_device *, struct file *filp);
 	void (*pretakedown)(struct drm_device *);
@@ -718,7 +718,7 @@ typedef struct drm_device {
 	struct file_operations *fops;	/**< file operations */
 	struct proc_dir_entry  *dev_root; /**< proc directory entry */
 
-	struct            drm_driver_fn *fn_tbl;
+	struct            drm_driver *driver;
 	drm_local_map_t   *agp_buffer_map;
 } drm_device_t;
 
@@ -733,7 +733,7 @@ typedef struct drm_minor {
 
 static __inline__ int drm_core_check_feature(struct drm_device *dev, int feature)
 {
-	return ((dev->fn_tbl->driver_features & feature) ? 1 : 0);
+	return ((dev->driver->driver_features & feature) ? 1 : 0);
 }
 
 #if __OS_HAS_AGP
@@ -764,8 +764,8 @@ extern void	     drm_parse_options( char *s );
 extern int           drm_cpu_valid( void );
 
 				/* Driver support (drm_drv.h) */
-extern int           drm_init(struct drm_driver_fn *driver_fn);
-extern void          drm_exit(struct drm_driver_fn *driver_fn);
+extern int           drm_init(struct drm_driver *driver);
+extern void          drm_exit(struct drm_driver *driver);
 extern int           drm_version(struct inode *inode, struct file *filp,
 				  unsigned int cmd, unsigned long arg);
 extern int           drm_open(struct inode *inode, struct file *filp);
@@ -777,7 +777,7 @@ extern int           drm_lock(struct inode *inode, struct file *filp,
 extern int           drm_unlock(struct inode *inode, struct file *filp,
 				 unsigned int cmd, unsigned long arg);
 extern int 	     drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev,
-				 const struct pci_device_id *ent, struct drm_driver_fn *driver_fn);
+				 const struct pci_device_id *ent, struct drm_driver *driver);
 
 				/* Device support (drm_fops.h) */
 extern int	     drm_open_helper(struct inode *inode, struct file *filp,
@@ -955,7 +955,7 @@ extern int            drm_agp_bind_memory(DRM_AGP_MEM *handle, off_t start);
 extern int            drm_agp_unbind_memory(DRM_AGP_MEM *handle);
 
 				/* Stub support (drm_stub.h) */
-extern int            drm_probe(struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_driver_fn *driver_fn);
+extern int            drm_probe(struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_driver *driver);
 
 extern int 	      drm_put_minor(drm_device_t *dev);
 extern unsigned int   drm_debug;

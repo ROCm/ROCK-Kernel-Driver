@@ -106,7 +106,7 @@ struct file_operations drm_stub_fops = {
  * then register the character device and inter module information.
  * Try and register, if we fail to register, backout previous work.
  */
-int drm_probe(struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_driver_fn *driver_fn)
+int drm_probe(struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_driver *driver)
 {
 	struct class_device *dev_class;
 	drm_device_t *dev;
@@ -126,7 +126,7 @@ int drm_probe(struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_
 
 			*minors = (drm_minor_t){.dev = dev, .type=DRM_MINOR_PRIMARY};
 			dev->minor = minor;
-			if ((ret=drm_fill_in_dev(dev, pdev, ent, driver_fn))) {
+			if ((ret=drm_fill_in_dev(dev, pdev, ent, driver))) {
 				printk(KERN_ERR "DRM: Fill_in_dev failed.\n");
 				goto err_g1;
 			}

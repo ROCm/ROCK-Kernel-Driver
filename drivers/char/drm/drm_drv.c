@@ -138,9 +138,9 @@ static int drm_setup( drm_device_t *dev )
 	int i;
 	int ret;
 
-	if (dev->fn_tbl->presetup)
+	if (dev->driver->presetup)
 	{
-		ret=dev->fn_tbl->presetup(dev);
+		ret=dev->driver->presetup(dev);
 		if (ret!=0) 
 			return ret;
 	}
@@ -213,8 +213,8 @@ static int drm_setup( drm_device_t *dev )
 	 * drm_select_queue fails between the time the interrupt is
 	 * initialized and the time the queues are initialized.
 	 */
-	if (dev->fn_tbl->postsetup)
-		dev->fn_tbl->postsetup(dev);
+	if (dev->driver->postsetup)
+		dev->driver->postsetup(dev);
 
 	return 0;
 }
@@ -240,8 +240,8 @@ static int drm_takedown( drm_device_t *dev )
 
 	DRM_DEBUG( "\n" );
 
-	if (dev->fn_tbl->pretakedown)
-	  dev->fn_tbl->pretakedown(dev);
+	if (dev->driver->pretakedown)
+	  dev->driver->pretakedown(dev);
 
 	if ( dev->irq_enabled ) drm_irq_uninstall( dev );
 
@@ -373,7 +373,7 @@ static int drm_takedown( drm_device_t *dev )
 	return 0;
 }
 
-int drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_driver_fn *driver_fn)
+int drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_driver *driver)
 {
 	int retcode;
 
@@ -405,10 +405,10 @@ int drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev, const struct pci_de
 	dev->types[4]  = _DRM_STAT_LOCKS;
 	dev->types[5]  = _DRM_STAT_UNLOCKS;
 
-	dev->fn_tbl = driver_fn;
+	dev->driver = driver;
 	
-	if (dev->fn_tbl->preinit)
-		if ((retcode = dev->fn_tbl->preinit(dev)))
+	if (dev->driver->preinit)
+		if ((retcode = dev->driver->preinit(dev)))
 			goto error_out_unreg;
 
 	if (drm_core_has_AGP(dev)) {
@@ -436,7 +436,7 @@ int drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev, const struct pci_de
 	dev->device = MKDEV(DRM_MAJOR, dev->minor );
 
 	/* postinit is a required function to display the signon banner */
-	if ((retcode = dev->fn_tbl->postinit(dev, ent->driver_data)))
+	if ((retcode = dev->driver->postinit(dev, ent->driver_data)))
 		goto error_out_unreg;
 
 	return 0;
@@ -459,7 +459,7 @@ error_out_unreg:
  * Expands the \c DRIVER_PREINIT and \c DRIVER_POST_INIT macros before and
  * after the initialization for driver customization.
  */
-int drm_init( struct drm_driver_fn *driver_fn )
+int drm_init( struct drm_driver *driver )
 {
 	struct pci_dev *pdev = NULL;
 	struct pci_device_id *pid;
@@ -469,15 +469,15 @@ int drm_init( struct drm_driver_fn *driver_fn )
 
 	drm_mem_init();
 
-	for (i=0; driver_fn->pci_driver.id_table[i].vendor != 0; i++) {
-		pid = (struct pci_device_id *)&driver_fn->pci_driver.id_table[i];
+	for (i=0; driver->pci_driver.id_table[i].vendor != 0; i++) {
+		pid = (struct pci_device_id *)&driver->pci_driver.id_table[i];
 		
 		pdev=NULL;
 		/* pass back in pdev to account for multiple identical cards */		
 		while ((pdev = pci_get_subsys(pid->vendor, pid->device, pid->subvendor, pid->subdevice, pdev)) != NULL) {
 			/* stealth mode requires a manual probe */
 			pci_dev_get(pdev);
-			drm_probe(pdev, pid, driver_fn);
+			drm_probe(pdev, pid, driver);
 		}
 	}
 	return 0;
@@ -519,14 +519,14 @@ static void drm_cleanup( drm_device_t *dev )
 		dev->agp = NULL;
 	}
 
-	if (dev->fn_tbl->postcleanup)
-		dev->fn_tbl->postcleanup(dev);
+	if (dev->driver->postcleanup)
+		dev->driver->postcleanup(dev);
 	
 	if ( drm_put_minor(dev) )
 		DRM_ERROR( "Cannot unload module\n" );
 }
 
-void drm_exit (struct drm_driver_fn *driver_fn)
+void drm_exit (struct drm_driver *driver)
 {
 	int i;
 	drm_device_t *dev = NULL;
@@ -538,7 +538,7 @@ void drm_exit (struct drm_driver_fn *driver_fn)
 		minor = &drm_minors[i];
 		if (!minor->dev)
 			continue;
-		if (minor->dev->fn_tbl!=driver_fn)
+		if (minor->dev->driver!=driver)
 			continue;
 
 		dev = minor->dev;
@@ -639,7 +639,7 @@ int drm_version( struct inode *inode, struct file *filp,
 		return -EFAULT;
 
 	/* version is a required function to return the personality module version */
-	if ((ret = dev->fn_tbl->version(&version)))
+	if ((ret = dev->driver->version(&version)))
 		return ret;
 		
 	if ( copy_to_user( argp, &version, sizeof(version) ) )
@@ -709,8 +709,8 @@ int drm_release( struct inode *inode, struct file *filp )
 
 	DRM_DEBUG( "open_count = %d\n", dev->open_count );
 
-	if (dev->fn_tbl->prerelease)
-		dev->fn_tbl->prerelease(dev, filp);
+	if (dev->driver->prerelease)
+		dev->driver->prerelease(dev, filp);
 
 	/* ========================================================
 	 * Begin inline drm_release
@@ -726,8 +726,8 @@ int drm_release( struct inode *inode, struct file *filp )
 			filp,
 			_DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock) );
 		
-		if (dev->fn_tbl->release)
-			dev->fn_tbl->release(dev, filp);
+		if (dev->driver->release)
+			dev->driver->release(dev, filp);
 
 		drm_lock_free( dev, &dev->lock.hw_lock->lock,
 				_DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock) );
@@ -737,7 +737,7 @@ int drm_release( struct inode *inode, struct file *filp )
                                    processed via a callback to the X
                                    server. */
 	}
-	else if ( dev->fn_tbl->release && priv->lock_count && dev->lock.hw_lock ) {
+	else if ( dev->driver->release && priv->lock_count && dev->lock.hw_lock ) {
 		/* The lock is required to reclaim buffers */
 		DECLARE_WAITQUEUE( entry, current );
 
@@ -766,8 +766,8 @@ int drm_release( struct inode *inode, struct file *filp )
 		__set_current_state(TASK_RUNNING);
 		remove_wait_queue( &dev->lock.lock_queue, &entry );
 		if( !retcode ) {
-			if (dev->fn_tbl->release)
-				dev->fn_tbl->release(dev, filp);
+			if (dev->driver->release)
+				dev->driver->release(dev, filp);
 			drm_lock_free( dev, &dev->lock.hw_lock->lock,
 					DRM_KERNEL_CONTEXT );
 		}
@@ -775,7 +775,7 @@ int drm_release( struct inode *inode, struct file *filp )
 	
 	if (drm_core_check_feature(dev, DRIVER_HAVE_DMA))
 	{
-		dev->fn_tbl->reclaim_buffers(filp);
+		dev->driver->reclaim_buffers(filp);
 	}
 
 	drm_fasync( -1, filp, 0 );
@@ -787,8 +787,8 @@ int drm_release( struct inode *inode, struct file *filp )
 		list_for_each_entry_safe( pos, n, &dev->ctxlist->head, head ) {
 			if ( pos->tag == priv &&
 			     pos->handle != DRM_KERNEL_CONTEXT ) {
-				if (dev->fn_tbl->context_dtor)
-					dev->fn_tbl->context_dtor(dev, pos->handle);
+				if (dev->driver->context_dtor)
+					dev->driver->context_dtor(dev, pos->handle);
 
 				drm_ctxbitmap_free( dev, pos->handle );
 
@@ -820,8 +820,8 @@ int drm_release( struct inode *inode, struct file *filp )
 	}
 	up( &dev->struct_sem );
 	
-	if (dev->fn_tbl->free_filp_priv)
-		dev->fn_tbl->free_filp_priv(dev, priv);
+	if (dev->driver->free_filp_priv)
+		dev->driver->free_filp_priv(dev, priv);
 
 	drm_free( priv, sizeof(*priv), DRM_MEM_FILES );
 
@@ -884,15 +884,15 @@ int drm_ioctl( struct inode *inode, struct file *filp,
 	
 	if (nr < DRIVER_IOCTL_COUNT)
 		ioctl = &drm_ioctls[nr];
-	else if ((nr >= DRM_COMMAND_BASE) || (nr < DRM_COMMAND_BASE + dev->fn_tbl->num_ioctls))
-		ioctl = &dev->fn_tbl->ioctls[nr - DRM_COMMAND_BASE];
+	else if ((nr >= DRM_COMMAND_BASE) || (nr < DRM_COMMAND_BASE + dev->driver->num_ioctls))
+		ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
 	else
 		goto err_i1;
 	
 	func = ioctl->func;
 	/* is there a local override? */
-	if ((nr == DRM_IOCTL_NR(DRM_IOCTL_DMA)) && dev->fn_tbl->dma_ioctl)
-		func = dev->fn_tbl->dma_ioctl;
+	if ((nr == DRM_IOCTL_NR(DRM_IOCTL_DMA)) && dev->driver->dma_ioctl)
+		func = dev->driver->dma_ioctl;
 	
 	if ( !func ) {
 		DRM_DEBUG( "no function\n" );
@@ -986,19 +986,19 @@ int drm_lock( struct inode *inode, struct file *filp,
 	block_all_signals( drm_notifier,
 			   &dev->sigdata, &dev->sigmask );
 	
-	if (dev->fn_tbl->dma_ready && (lock.flags & _DRM_LOCK_READY))
-		dev->fn_tbl->dma_ready(dev);
+	if (dev->driver->dma_ready && (lock.flags & _DRM_LOCK_READY))
+		dev->driver->dma_ready(dev);
 	
-	if ( dev->fn_tbl->dma_quiescent && (lock.flags & _DRM_LOCK_QUIESCENT ))
-		return dev->fn_tbl->dma_quiescent(dev);
+	if ( dev->driver->dma_quiescent && (lock.flags & _DRM_LOCK_QUIESCENT ))
+		return dev->driver->dma_quiescent(dev);
 	
-	/* dev->fn_tbl->kernel_context_switch isn't used by any of the x86 
+	/* dev->driver->kernel_context_switch isn't used by any of the x86 
 	 *  drivers but is used by the Sparc driver.
 	 */
 	
-	if (dev->fn_tbl->kernel_context_switch && 
+	if (dev->driver->kernel_context_switch && 
 	    dev->last_context != lock.context) {
-	  dev->fn_tbl->kernel_context_switch(dev, dev->last_context, 
+	  dev->driver->kernel_context_switch(dev, dev->last_context, 
 					    lock.context);
 	}
         DRM_DEBUG( "%d %s\n", lock.context, ret ? "interrupted" : "has lock" );
@@ -1038,8 +1038,8 @@ int drm_unlock( struct inode *inode, struct file *filp,
 	/* kernel_context_switch isn't used by any of the x86 drm
 	 * modules but is required by the Sparc driver.
 	 */
-	if (dev->fn_tbl->kernel_context_switch_unlock)
-		dev->fn_tbl->kernel_context_switch_unlock(dev, &lock);
+	if (dev->driver->kernel_context_switch_unlock)
+		dev->driver->kernel_context_switch_unlock(dev, &lock);
 	else {
 		drm_lock_transfer( dev, &dev->lock.hw_lock->lock, 
 				    DRM_KERNEL_CONTEXT );

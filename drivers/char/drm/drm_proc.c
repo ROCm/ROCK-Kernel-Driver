@@ -176,9 +176,9 @@ static int drm_name_info(char *buf, char **start, off_t offset, int request,
 
 	if (dev->unique) {
 		DRM_PROC_PRINT("%s 0x%lx %s\n",
-			       dev->fn_tbl->pci_driver.name, (long)old_encode_dev(dev->device), dev->unique);
+			       dev->driver->pci_driver.name, (long)old_encode_dev(dev->device), dev->unique);
 	} else {
-		DRM_PROC_PRINT("%s 0x%lx\n", dev->fn_tbl->pci_driver.name, (long)old_encode_dev(dev->device));
+		DRM_PROC_PRINT("%s 0x%lx\n", dev->driver->pci_driver.name, (long)old_encode_dev(dev->device));
 	}
 
 	if (len > request + offset) return request;

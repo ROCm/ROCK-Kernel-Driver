@@ -448,7 +448,7 @@ int drm_addbufs_agp( struct inode *inode, struct file *filp,
 		init_waitqueue_head( &buf->dma_wait );
 		buf->filp    = NULL;
 
-		buf->dev_priv_size = dev->fn_tbl->dev_priv_size;
+		buf->dev_priv_size = dev->driver->dev_priv_size;
 		buf->dev_private = drm_alloc( buf->dev_priv_size,
 					       DRM_MEM_BUFS );
 		if(!buf->dev_private) {
@@ -666,7 +666,7 @@ int drm_addbufs_pci( struct inode *inode, struct file *filp,
 			init_waitqueue_head( &buf->dma_wait );
 			buf->filp    = NULL;
 
-			buf->dev_priv_size = dev->fn_tbl->dev_priv_size;
+			buf->dev_priv_size = dev->driver->dev_priv_size;
 			buf->dev_private = drm_alloc( buf->dev_priv_size,
 						       DRM_MEM_BUFS );
 			if(!buf->dev_private) {
@@ -844,7 +844,7 @@ int drm_addbufs_sg( struct inode *inode, struct file *filp,
 		init_waitqueue_head( &buf->dma_wait );
 		buf->filp    = NULL;
 
-		buf->dev_priv_size = dev->fn_tbl->dev_priv_size;
+		buf->dev_priv_size = dev->driver->dev_priv_size;
 		buf->dev_private = drm_alloc( buf->dev_priv_size,
 					       DRM_MEM_BUFS );
 		if(!buf->dev_private) {

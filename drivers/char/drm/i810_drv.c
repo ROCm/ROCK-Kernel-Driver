@@ -94,7 +94,7 @@ static drm_ioctl_desc_t ioctls[] = {
 	[DRM_IOCTL_NR(DRM_I810_FLIP)]    = { i810_flip_bufs,   1, 0 }
 };
 
-static struct drm_driver_fn driver_fn = {
+static struct drm_driver driver = {
 	.driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_DMA | DRIVER_DMA_QUEUE,
 	.dev_priv_size = sizeof(drm_i810_buf_priv_t),
 	.pretakedown = i810_driver_pretakedown,
@@ -115,12 +115,12 @@ static struct drm_driver_fn driver_fn = {
 
 static int __init i810_init(void)
 {
-	return drm_init(&driver_fn);
+	return drm_init(&driver);
 }
 
 static void __exit i810_exit(void)
 {
-	drm_exit(&driver_fn);
+	drm_exit(&driver);
 }
 
 module_init(i810_init);

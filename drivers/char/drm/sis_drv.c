@@ -72,7 +72,7 @@ static drm_ioctl_desc_t ioctls[] = {
 	[DRM_IOCTL_NR(DRM_SIS_FB_INIT)]   = { sis_fb_init,         1, 1 }
 };
 
-static struct drm_driver_fn driver_fn = {
+static struct drm_driver driver = {
 	.driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR,
 	.context_ctor = sis_init_context,
 	.context_dtor = sis_final_context,
@@ -91,12 +91,12 @@ static struct drm_driver_fn driver_fn = {
 
 static int __init sis_init(void)
 {
-	return drm_init(&driver_fn);
+	return drm_init(&driver);
 }
 
 static void __exit sis_exit(void)
 {
-	drm_exit(&driver_fn);
+	drm_exit(&driver);
 }
 
 module_init(sis_init);
