@@ -172,28 +172,15 @@ xfs_map_blocks(
 	struct inode		*inode,
 	loff_t			offset,
 	ssize_t			count,
-	xfs_iomap_t		*iomapp,
+	xfs_iomap_t		*mapp,
 	int			flags)
 {
 	vnode_t			*vp = LINVFS_GET_VP(inode);
-	int			error, niomaps = 1;
+	int			error, nmaps = 1;
 
-	if (((flags & (BMAPI_DIRECT|BMAPI_SYNC)) == BMAPI_DIRECT) &&
-	    (offset >= i_size_read(inode)))
-		count = max_t(ssize_t, count, XFS_WRITE_IO_LOG);
-retry:
-	VOP_BMAP(vp, offset, count, flags, iomapp, &niomaps, error);
-	if ((error == EAGAIN) || (error == EIO))
-		return -error;
-	if (unlikely((flags & (BMAPI_WRITE|BMAPI_DIRECT)) ==
-					(BMAPI_WRITE|BMAPI_DIRECT) && niomaps &&
-					(iomapp->iomap_flags & IOMAP_DELAY))) {
-		flags = BMAPI_ALLOCATE;
-		goto retry;
-	}
-	if (flags & (BMAPI_WRITE|BMAPI_ALLOCATE)) {
+	VOP_BMAP(vp, offset, count, flags, mapp, &nmaps, error);
+	if (!error && (flags & (BMAPI_WRITE|BMAPI_ALLOCATE)))
 		VMODIFY(vp);
-	}
 	return -error;
 }
 
