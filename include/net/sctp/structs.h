@@ -697,7 +697,6 @@ struct sctp_transport {
          */
 	int rto_pending;
 
-
 	/*
 	 * These are the congestion stats.
 	 */

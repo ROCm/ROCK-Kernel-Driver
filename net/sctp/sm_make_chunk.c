@@ -1055,7 +1055,7 @@ sctp_chunk_t *sctp_make_chunk(const struct sctp_association *asoc,
 	sk = asoc ? asoc->base.sk : NULL;
 	retval = sctp_chunkify(skb, asoc, sk);
 	if (!retval) {
-		dev_kfree_skb(skb);
+		kfree_skb(skb);
 		goto nodata;
 	}
 

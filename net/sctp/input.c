@@ -224,9 +224,7 @@ int sctp_rcv(struct sk_buff *skb)
 	return ret;
 
 bad_packet:
-#if 0 /* FIXME */
-	SCTP_INC_STATS(SctpInErrs);
-#endif /* FIXME*/
+	SCTP_INC_STATS(SctpChecksumErrors);
 
 discard_it:
 	kfree_skb(skb);
