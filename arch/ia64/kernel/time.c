@@ -17,6 +17,7 @@
 #include <linux/time.h>
 #include <linux/interrupt.h>
 #include <linux/efi.h>
+#include <linux/timex.h>
 
 #include <asm/delay.h>
 #include <asm/hw_irq.h>
@@ -26,8 +27,13 @@
 
 extern unsigned long wall_jiffies;
 extern unsigned long last_nsec_offset;
+static unsigned long __ia64_gettimeoffset (void);
+
+unsigned long (*gettimeoffset)(void) = &__ia64_gettimeoffset;
 
 u64 jiffies_64 = INITIAL_JIFFIES;
+
+#define TIME_KEEPER_ID	0	/* smp_processor_id() of time-keeper */
 
 #ifdef CONFIG_IA64_DEBUG_IRQ
 
@@ -63,15 +69,14 @@ do_profile (unsigned long ip)
  * Return the number of nano-seconds that elapsed since the last update to jiffy.  The
  * xtime_lock must be at least read-locked when calling this routine.
  */
-static inline unsigned long
-gettimeoffset (void)
+static unsigned long
+__ia64_gettimeoffset (void)
 {
 	unsigned long elapsed_cycles, lost = jiffies - wall_jiffies;
 	unsigned long now, last_tick;
-#	define time_keeper_id	0	/* smp_processor_id() of time-keeper */
 
-	last_tick = (cpu_data(time_keeper_id)->itm_next
-		     - (lost + 1)*cpu_data(time_keeper_id)->itm_delta);
+	last_tick = (cpu_data(TIME_KEEPER_ID)->itm_next
+		     - (lost + 1)*cpu_data(TIME_KEEPER_ID)->itm_delta);
 
 	now = ia64_get_itc();
 	if (unlikely((long) (now - last_tick) < 0)) {
@@ -112,7 +117,7 @@ do_settimeofday (struct timeval *tv)
 		 * Discover what correction gettimeofday would have done, and then undo
 		 * it!
 		 */
-		nsec -= gettimeoffset();
+		nsec -= (*gettimeoffset)();
 
 		wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
 		wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
@@ -124,6 +129,9 @@ do_settimeofday (struct timeval *tv)
 		time_status |= STA_UNSYNC;
 		time_maxerror = NTP_PHASE_LIMIT;
 		time_esterror = NTP_PHASE_LIMIT;
+		if (update_wall_time_hook)
+			(*update_wall_time_hook)();
+
 	}
 	write_sequnlock_irq(&xtime_lock);
 	clock_was_set();
@@ -138,7 +146,7 @@ do_gettimeofday (struct timeval *tv)
 		seq = read_seqbegin(&xtime_lock);
 		{
 			old = last_nsec_offset;
-			offset = gettimeoffset();
+			offset = (*gettimeoffset)();
 			sec = xtime.tv_sec;
 			nsec = xtime.tv_nsec;
 		}
@@ -214,7 +222,7 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 #endif
 		new_itm += local_cpu_data->itm_delta;
 
-		if (smp_processor_id() == 0) {
+		if (smp_processor_id() == TIME_KEEPER_ID) {
 			/*
 			 * Here we are in the timer irq handler. We have irqs locally
 			 * disabled, but we don't know if the timer_bh is running on

@@ -25,4 +25,6 @@ get_cycles (void)
 	return ret;
 }
 
+extern unsigned long (*gettimeoffset)(void);
+
 #endif /* _ASM_IA64_TIMEX_H */

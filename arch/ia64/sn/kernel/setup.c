@@ -78,9 +78,9 @@ DEFINE_PER_CPU(struct pda_s, pda_percpu);
 
 extern void bte_init_node (nodepda_t *, cnodeid_t);
 extern void bte_init_cpu (void);
+extern void sn_timer_init (void);
 
 unsigned long sn_rtc_cycles_per_second;   
-unsigned long sn_rtc_usec_per_cyc;
 
 partid_t sn_partid = -1;
 char sn_system_serial_number_string[128];
@@ -263,13 +263,6 @@ sn_setup(char **cmdline_p)
 	else
 		sn_rtc_cycles_per_second = ticks_per_sec;
 
-#ifdef CONFIG_IA64_SGI_SN1
-	/* PROM has wrong value on SN1 */
-	sn_rtc_cycles_per_second = 990177;
-#endif
-	sn_rtc_usec_per_cyc = ((1000000000UL<<IA64_NSEC_PER_CYC_SHIFT)
-			       + sn_rtc_cycles_per_second/2) / sn_rtc_cycles_per_second;
-		
 	for (i=0;i<NR_CPUS;i++)
 		_sn_irq_desc[i] = _irq_desc;
 
@@ -309,6 +302,8 @@ sn_setup(char **cmdline_p)
 	 * Turn off "floating-point assist fault" warnings by default.
 	 */
 	current->thread.flags |= IA64_THREAD_FPEMU_NOPRINT;
+
+	sn_timer_init();
 }
 
 /**

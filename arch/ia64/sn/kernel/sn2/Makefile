@@ -11,4 +11,4 @@
 
 EXTRA_CFLAGS := -DLITTLE_ENDIAN
 
-obj-y += cache.o iomv.o ptc_deadlock.o sn2_smp.o sn_proc_fs.o
+obj-y += cache.o iomv.o ptc_deadlock.o sn2_smp.o sn_proc_fs.o timer.o

@@ -14,6 +14,7 @@
 #include <asm/offsets.h>
 #include <asm/percpu.h>
 #include <asm/thread_info.h>
+#include <asm/sal.h>
 
 /*
  * See Documentation/ia64/fsys.txt for details on fsyscalls.
@@ -142,23 +143,30 @@ END(fsys_set_tid_address)
  *	   we ought to either skip the ITC-based interpolation or run an ntp-like
  *	   daemon to keep the ITCs from drifting too far apart.
  */
+
 ENTRY(fsys_gettimeofday)
 	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
 	movl r3=THIS_CPU(cpu_info)
 
 	mov.m r31=ar.itc		// put time stamp into r31 (ITC) == now		(35 cyc)
-	movl r19=xtime			// xtime is a timespec struct
-	;;
-
 #ifdef CONFIG_SMP
 	movl r10=__per_cpu_offset
+	movl r2=sal_platform_features
 	;;
+
+	ld8 r2=[r2]
+	movl r19=xtime			// xtime is a timespec struct
+
 	ld8 r10=[r10]			// r10 <- __per_cpu_offset[0]
 	movl r21=cpu_info__per_cpu
 	;;
 	add r10=r21, r10		// r10 <- &cpu_data(time_keeper_id)
+	tbit.nz p8,p0 = r2, IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT_BIT
+(p8)	br.spnt.many fsys_fallback_syscall
 #else
+	;;
 	mov r10=r3
+	movl r19=xtime			// xtime is a timespec struct
 #endif
 	ld4 r9=[r9]
 	movl r17=xtime_lock
