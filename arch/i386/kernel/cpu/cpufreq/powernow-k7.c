@@ -24,6 +24,7 @@
 #include <asm/msr.h>
 #include <asm/timex.h>
 #include <asm/io.h>
+#include <asm/system.h>
 
 #include "powernow-k7.h"
 
