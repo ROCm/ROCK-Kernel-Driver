@@ -518,7 +518,7 @@ int rxrpc_conn_newmsg(struct rxrpc_connection *conn,
 		      struct rxrpc_call *call,
 		      uint8_t type,
 		      int dcount,
-		      struct iovec diov[],
+		      struct kvec diov[],
 		      int alloc_flags,
 		      struct rxrpc_message **_msg)
 {
@@ -634,7 +634,11 @@ int rxrpc_conn_sendmsg(struct rxrpc_connection *conn,
 	/* set up the message to be transmitted */
 	msghdr.msg_name		= &conn->addr;
 	msghdr.msg_namelen	= sizeof(conn->addr);
-	msghdr.msg_iov		= msg->data;
+	/*
+	 * the following is safe, since for compiler definitions of kvec and
+	 * iovec are identical, yielding the same in-core layout and alignment
+	 */
+	msghdr.msg_iov		= (struct iovec *)msg->data;
 	msghdr.msg_iovlen	= msg->dcount;
 	msghdr.msg_control	= NULL;
 	msghdr.msg_controllen	= 0;

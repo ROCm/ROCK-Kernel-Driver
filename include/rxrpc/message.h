@@ -44,7 +44,7 @@ struct rxrpc_message
 	int			dcount;		/* data part count */
 	size_t			dsize;		/* data size */
 #define RXRPC_MSG_MAX_IOCS 8
-	struct iovec		data[RXRPC_MSG_MAX_IOCS]; /* message data */
+	struct kvec		data[RXRPC_MSG_MAX_IOCS]; /* message data */
 	unsigned long		dfree;		/* bit mask indicating kfree(data[x]) if T */
 };
 
@@ -62,7 +62,7 @@ extern int rxrpc_conn_newmsg(struct rxrpc_connection *conn,
 			     struct rxrpc_call *call,
 			     uint8_t type,
 			     int count,
-			     struct iovec diov[],
+			     struct kvec *diov,
 			     int alloc_flags,
 			     struct rxrpc_message **_msg);
 

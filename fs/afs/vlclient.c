@@ -97,7 +97,7 @@ int afs_rxvl_probe(struct afs_server *server, int alloc_flags)
 {
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
-	struct iovec piov[1];
+	struct kvec piov[1];
 	size_t sent;
 	int ret;
 	u32 param[1];
@@ -187,7 +187,7 @@ int afs_rxvl_get_entry_by_name(struct afs_server *server,
 
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
-	struct iovec piov[3];
+	struct kvec piov[3];
 	unsigned tmp;
 	size_t sent;
 	int ret, loop;
@@ -322,7 +322,7 @@ int afs_rxvl_get_entry_by_id(struct afs_server *server,
 
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
-	struct iovec piov[1];
+	struct kvec piov[1];
 	unsigned tmp;
 	size_t sent;
 	int ret, loop;
@@ -459,7 +459,7 @@ int afs_rxvl_get_entry_by_id_async(struct afs_async_op *op,
 {
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
-	struct iovec piov[1];
+	struct kvec piov[1];
 	size_t sent;
 	int ret;
 	u32 param[3];
