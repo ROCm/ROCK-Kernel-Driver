@@ -20,4 +20,14 @@ static inline unsigned long calculate_ldr(unsigned long old)
 #define APIC_BROADCAST_ID      0x0F
 #define check_apicid_used(bitmap, apicid) (bitmap & (1 << apicid))
 
+static inline void summit_check(char *oem, char *productid) 
+{
+}
+
+static inline void clustered_apic_check(void)
+{
+	printk("Enabling APIC mode:  %s.  Using %d I/O APICs\n",
+		(clustered_apic_mode ? "NUMA-Q" : "Flat"), nr_ioapics);
+}
+
 #endif /* __ASM_MACH_APIC_H */

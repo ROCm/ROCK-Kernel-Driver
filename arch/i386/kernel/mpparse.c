@@ -30,6 +30,7 @@
 #include <asm/mpspec.h>
 #include <asm/pgalloc.h>
 #include <asm/io_apic.h>
+#include "mach_apic.h"
 
 /* Have we found an MP table */
 int smp_found_config;
@@ -68,6 +69,8 @@ static unsigned int __initdata num_processors;
 
 /* Bitmask of physically existing CPUs */
 unsigned long phys_cpu_present_map;
+
+int summit_x86 = 0;
 
 /*
  * Intel MP BIOS table parsing routines:
@@ -356,6 +359,7 @@ static void __init smp_read_mpc_oem(struct mp_config_oemtable *oemtable, \
 static int __init smp_read_mpc(struct mp_config_table *mpc)
 {
 	char str[16];
+	char oem[10];
 	int count=sizeof(*mpc);
 	unsigned char *mpt=((unsigned char *)mpc)+count;
 
@@ -380,13 +384,15 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 		printk(KERN_ERR "SMP mptable: null local APIC address!\n");
 		return 0;
 	}
-	memcpy(str,mpc->mpc_oem,8);
-	str[8]=0;
-	printk("OEM ID: %s ",str);
+	memcpy(oem,mpc->mpc_oem,8);
+	oem[8]=0;
+	printk("OEM ID: %s ",oem);
 
 	memcpy(str,mpc->mpc_productid,12);
 	str[12]=0;
 	printk("Product ID: %s ",str);
+
+	summit_check(oem, str);
 
 	printk("APIC at: 0x%lX\n",mpc->mpc_lapic);
 
@@ -465,6 +471,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 		}
 		++mpc_record;
 	}
+	clustered_apic_check();
 	if (!num_processors)
 		printk(KERN_ERR "SMP mptable: no processors registered!\n");
 	return num_processors;
