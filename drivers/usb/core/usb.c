@@ -765,6 +765,7 @@ usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port)
 
 	if (dev->bus->op->allocate)
 		if (dev->bus->op->allocate(dev)) {
+			usb_bus_put(bus);
 			kfree(dev);
 			return NULL;
 		}
