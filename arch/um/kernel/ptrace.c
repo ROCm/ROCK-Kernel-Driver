@@ -94,7 +94,7 @@ long sys_ptrace(long request, long pid, long addr, long data)
 			break;
 
 		tmp = 0;  /* Default return condition */
-		if(addr < FRAME_SIZE_OFFSET){
+		if(addr < MAX_REG_OFFSET){
 			tmp = getreg(child, addr);
 		}
 		else if((addr >= offsetof(struct user, u_debugreg[0])) &&
@@ -122,10 +122,11 @@ long sys_ptrace(long request, long pid, long addr, long data)
 		if ((addr & 3) || addr < 0)
 			break;
 
-		if (addr < FRAME_SIZE_OFFSET) {
+		if (addr < MAX_REG_OFFSET) {
 			ret = putreg(child, addr, data);
 			break;
 		}
+#if 0 /* XXX x86_64 */
 		else if((addr >= offsetof(struct user, u_debugreg[0])) &&
 			(addr <= offsetof(struct user, u_debugreg[7]))){
 			  addr -= offsetof(struct user, u_debugreg[0]);
@@ -134,6 +135,7 @@ long sys_ptrace(long request, long pid, long addr, long data)
 			  child->thread.arch.debugregs[addr] = data;
 			  ret = 0;
 		}
+#endif
 
 		break;
 
@@ -196,11 +198,11 @@ long sys_ptrace(long request, long pid, long addr, long data)
 #ifdef PTRACE_GETREGS
 	case PTRACE_GETREGS: { /* Get all gp regs from the child. */
 	  	if (!access_ok(VERIFY_WRITE, (unsigned long *)data, 
-			       FRAME_SIZE_OFFSET)) {
+			       MAX_REG_OFFSET)) {
 			ret = -EIO;
 			break;
 		}
-		for ( i = 0; i < FRAME_SIZE_OFFSET; i += sizeof(long) ) {
+		for ( i = 0; i < MAX_REG_OFFSET; i += sizeof(long) ) {
 			__put_user(getreg(child, i),
 				   (unsigned long __user *) data);
 			data += sizeof(long);
@@ -213,11 +215,11 @@ long sys_ptrace(long request, long pid, long addr, long data)
 	case PTRACE_SETREGS: { /* Set all gp regs in the child. */
 		unsigned long tmp = 0;
 	  	if (!access_ok(VERIFY_READ, (unsigned *)data, 
-			       FRAME_SIZE_OFFSET)) {
+			       MAX_REG_OFFSET)) {
 			ret = -EIO;
 			break;
 		}
-		for ( i = 0; i < FRAME_SIZE_OFFSET; i += sizeof(long) ) {
+		for ( i = 0; i < MAX_REG_OFFSET; i += sizeof(long) ) {
 			__get_user(tmp, (unsigned long __user *) data);
 			putreg(child, i, tmp);
 			data += sizeof(long);
