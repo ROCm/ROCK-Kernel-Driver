@@ -2396,16 +2396,18 @@ int ata_qc_issue(struct ata_queued_cmd *qc)
 	struct ata_port *ap = qc->ap;
 	struct scsi_cmnd *cmd = qc->scsicmd;
 
-	/* set up SG table */
-	if (cmd->use_sg) {
-		if (ata_sg_setup(qc))
-			goto err_out;
-	} else {
-		if (ata_sg_setup_one(qc))
-			goto err_out;
-	}
+	if (qc->flags & ATA_QCFLAG_SG) {
+		/* set up SG table */
+		if (cmd->use_sg) {
+			if (ata_sg_setup(qc))
+				goto err_out;
+		} else {
+			if (ata_sg_setup_one(qc))
+				goto err_out;
+		}
 
-	ap->ops->fill_sg(qc);
+		ap->ops->fill_sg(qc);
+	}
 
 	qc->ap->active_tag = qc->tag;
 	qc->flags |= ATA_QCFLAG_ACTIVE;
@@ -2445,15 +2447,26 @@ static int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 
 	case ATA_PROT_DMA:
 		ap->ops->tf_load(ap, &qc->tf);	 /* load tf registers */
+		ap->ops->bmdma_setup(qc);	    /* set up bmdma */
 		ap->ops->bmdma_start(qc);	    /* initiate bmdma */
 		break;
 
 	case ATA_PROT_PIO: /* load tf registers, initiate polling pio */
-		qc->flags |= ATA_QCFLAG_POLL;
-		qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
+		ata_qc_set_polling(qc);
 		ata_tf_to_host_nolock(ap, &qc->tf);
 		ap->pio_task_state = PIO_ST;
 		queue_work(ata_wq, &ap->pio_task);
+		break;
+
+	case ATA_PROT_ATAPI:
+		ata_tf_to_host_nolock(ap, &qc->tf);
+		queue_work(ata_wq, &ap->packet_task);
+		break;
+
+	case ATA_PROT_ATAPI_DMA:
+		ap->ops->tf_load(ap, &qc->tf);	 /* load tf registers */
+		ap->ops->bmdma_setup(qc);	    /* set up bmdma */
+		queue_work(ata_wq, &ap->packet_task);
 		break;
 
 	default:
@@ -2465,14 +2478,14 @@ static int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 }
 
 /**
- *	ata_bmdma_start_mmio -
- *	@qc:
+ *	ata_bmdma_setup_mmio - Set up PCI IDE BMDMA transaction (MMIO)
+ *	@qc: Info associated with this ATA transaction.
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
  */
 
-void ata_bmdma_start_mmio (struct ata_queued_cmd *qc)
+void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	unsigned int rw = (qc->tf.flags & ATA_TFLAG_WRITE);
@@ -2496,8 +2509,24 @@ void ata_bmdma_start_mmio (struct ata_queued_cmd *qc)
 
 	/* issue r/w command */
 	ap->ops->exec_command(ap, &qc->tf);
+}
+
+/**
+ *	ata_bmdma_start_mmio - Start a PCI IDE BMDMA transaction (MMIO)
+ *	@qc: Info associated with this ATA transaction.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
+ */
+
+void ata_bmdma_start_mmio (struct ata_queued_cmd *qc)
+{
+	struct ata_port *ap = qc->ap;
+	void *mmio = (void *) ap->ioaddr.bmdma_addr;
+	u8 dmactl;
 
 	/* start host DMA transaction */
+	dmactl = readb(mmio + ATA_DMA_CMD);
 	writeb(dmactl | ATA_DMA_START, mmio + ATA_DMA_CMD);
 
 	/* Strictly, one may wish to issue a readb() here, to
@@ -2514,14 +2543,14 @@ void ata_bmdma_start_mmio (struct ata_queued_cmd *qc)
 }
 
 /**
- *	ata_bmdma_start_pio -
- *	@qc:
+ *	ata_bmdma_setup_pio - Set up PCI IDE BMDMA transaction (PIO)
+ *	@qc: Info associated with this ATA transaction.
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
  */
 
-void ata_bmdma_start_pio (struct ata_queued_cmd *qc)
+void ata_bmdma_setup_pio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	unsigned int rw = (qc->tf.flags & ATA_TFLAG_WRITE);
@@ -2544,8 +2573,23 @@ void ata_bmdma_start_pio (struct ata_queued_cmd *qc)
 
 	/* issue r/w command */
 	ap->ops->exec_command(ap, &qc->tf);
+}
+
+/**
+ *	ata_bmdma_start_pio - Start a PCI IDE BMDMA transaction (PIO)
+ *	@qc: Info associated with this ATA transaction.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
+ */
+
+void ata_bmdma_start_pio (struct ata_queued_cmd *qc)
+{
+	struct ata_port *ap = qc->ap;
+	u8 dmactl;
 
 	/* start host DMA transaction */
+	dmactl = inb(ap->ioaddr.bmdma_addr + ATA_DMA_CMD);
 	outb(dmactl | ATA_DMA_START,
 	     ap->ioaddr.bmdma_addr + ATA_DMA_CMD);
 }
@@ -2689,7 +2733,7 @@ irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 			struct ata_queued_cmd *qc;
 
 			qc = ata_qc_from_tag(ap, ap->active_tag);
-			if (qc && ((qc->flags & ATA_QCFLAG_POLL) == 0))
+			if (qc && (!(qc->tf.ctl & ATA_NIEN)))
 				handled += ata_host_intr(ap, qc);
 		}
 	}
@@ -2755,20 +2799,6 @@ static unsigned long ata_thread_iter(struct ata_port *ap)
 	return timeout;
 }
 
-void atapi_start(struct ata_queued_cmd *qc)
-{
-	struct ata_port *ap = qc->ap;
-
-	qc->flags |= ATA_QCFLAG_ACTIVE;
-	ap->active_tag = qc->tag;
-
-	ata_dev_select(ap, qc->dev->devno, 1, 0);
-	ata_tf_to_host_nolock(ap, &qc->tf);
-	queue_work(ata_wq, &ap->packet_task);
-
-	VPRINTK("EXIT\n");
-}
-
 /**
  *	atapi_packet_task - Write CDB bytes to hardware
  *	@_data: Port to which ATAPI device is attached.
@@ -2811,7 +2841,7 @@ static void atapi_packet_task(void *_data)
 
 	/* if we are DMA'ing, irq handler takes over from here */
 	if (qc->tf.protocol == ATA_PROT_ATAPI_DMA) {
-		/* FIXME: start DMA here */
+		ap->ops->bmdma_start(qc);	    /* initiate bmdma */
 	} else {
 		ap->pio_task_state = PIO_ST;
 		queue_work(ata_wq, &ap->pio_task);
@@ -3475,7 +3505,9 @@ EXPORT_SYMBOL_GPL(ata_port_start);
 EXPORT_SYMBOL_GPL(ata_port_stop);
 EXPORT_SYMBOL_GPL(ata_interrupt);
 EXPORT_SYMBOL_GPL(ata_fill_sg);
+EXPORT_SYMBOL_GPL(ata_bmdma_setup_pio);
 EXPORT_SYMBOL_GPL(ata_bmdma_start_pio);
+EXPORT_SYMBOL_GPL(ata_bmdma_setup_mmio);
 EXPORT_SYMBOL_GPL(ata_bmdma_start_mmio);
 EXPORT_SYMBOL_GPL(ata_port_probe);
 EXPORT_SYMBOL_GPL(sata_phy_reset);
