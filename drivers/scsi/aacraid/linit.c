@@ -62,6 +62,7 @@ MODULE_DESCRIPTION("Dell PERC2, 2/Si, 3/Si, 3/Di, "
 		   "Adaptec Advanced Raid Products, "
 		   "and HP NetRAID-4M SCSI driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(AAC_DRIVER_VERSION);
 
 
 int nondasd = -1;

@@ -4517,3 +4517,4 @@ module_exit(qla2x00_module_exit);
 MODULE_AUTHOR("QLogic Corporation");
 MODULE_DESCRIPTION("QLogic Fibre Channel HBA Driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(QLA2XXX_VERSION);

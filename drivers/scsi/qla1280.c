@@ -4947,6 +4947,7 @@ module_exit(qla1280_exit);
 MODULE_AUTHOR("Qlogic & Jes Sorensen");
 MODULE_DESCRIPTION("Qlogic ISP SCSI (qla1x80/qla1x160) driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(QLA1280_VERSION);
 
 /*
  * Overrides for Emacs so that we almost follow Linus's tabbing style.

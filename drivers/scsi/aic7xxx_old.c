@@ -11139,6 +11139,7 @@ aic7xxx_print_scratch_ram(struct aic7xxx_host *p)
 #include "aic7xxx_old/aic7xxx_proc.c"
 
 MODULE_LICENSE("Dual BSD/GPL");
+MODULE_VERSION(AIC7XXX_H_VERSION);
 
 
 static Scsi_Host_Template driver_template = {

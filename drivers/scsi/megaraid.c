@@ -50,9 +50,12 @@
 
 #include "megaraid.h"
 
+#define MEGARAID_MODULE_VERSION "2.00.3"
+
 MODULE_AUTHOR ("LSI Logic Corporation");
 MODULE_DESCRIPTION ("LSI Logic MegaRAID driver");
 MODULE_LICENSE ("GPL");
+MODULE_VERSION(MEGARAID_MODULE_VERSION);
 
 static unsigned int max_cmd_per_lun = DEF_CMD_PER_LUN;
 MODULE_PARM(max_cmd_per_lun, "i");
