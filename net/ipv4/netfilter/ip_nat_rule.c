@@ -16,6 +16,7 @@
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
 #include <net/checksum.h>
+#include <net/route.h>
 #include <linux/bitops.h>
 
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_nat_lock)
@@ -120,6 +121,25 @@ static unsigned int ipt_snat_target(struct sk_buff **pskb,
 	return ip_nat_setup_info(ct, &mr->range[0], hooknum);
 }
 
+/* Before 2.6.11 we did implicit source NAT if required. Warn about change. */
+static void warn_if_extra_mangle(u32 dstip, u32 srcip)
+{
+	static int warned = 0;
+	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = dstip } } };
+	struct rtable *rt;
+
+	if (ip_route_output_key(&rt, &fl) != 0)
+		return;
+
+	if (rt->rt_src != srcip && !warned) {
+		printk("NAT: no longer support implicit source local NAT\n");
+		printk("NAT: packet src %u.%u.%u.%u -> dst %u.%u.%u.%u\n",
+		       NIPQUAD(srcip), NIPQUAD(dstip));
+		warned = 1;
+	}
+	ip_rt_put(rt);
+}
+
 static unsigned int ipt_dnat_target(struct sk_buff **pskb,
 				    const struct net_device *in,
 				    const struct net_device *out,
@@ -138,6 +158,11 @@ static unsigned int ipt_dnat_target(struct sk_buff **pskb,
 
 	/* Connection must be valid and new. */
 	IP_NF_ASSERT(ct && (ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED));
+
+	if (hooknum == NF_IP_LOCAL_OUT
+	    && mr->range[0].flags & IP_NAT_RANGE_MAP_IPS)
+		warn_if_extra_mangle((*pskb)->nh.iph->daddr,
+				     mr->range[0].min_ip);
 
 	return ip_nat_setup_info(ct, &mr->range[0], hooknum);
 }

@@ -42,7 +42,6 @@
 #endif
 
 DECLARE_RWLOCK(ip_nat_lock);
-DECLARE_RWLOCK_EXTERN(ip_conntrack_lock);
 
 /* Calculated at init based on memory size */
 static unsigned int ip_nat_htable_size;
@@ -52,25 +51,21 @@ struct ip_nat_protocol *ip_nat_protos[MAX_IP_NAT_PROTO];
 
 
 /* We keep an extra hash for each conntrack, for fast searching. */
-static inline size_t
-hash_by_src(const struct ip_conntrack_manip *manip, u_int16_t proto)
+static inline unsigned int
+hash_by_src(const struct ip_conntrack_tuple *tuple)
 {
 	/* Original src, to ensure we map it consistently if poss. */
-	return (manip->ip + manip->u.all + proto) % ip_nat_htable_size;
+	return jhash_3words(tuple->src.ip, tuple->src.u.all,
+			    tuple->dst.protonum, 0) % ip_nat_htable_size;
 }
 
 /* Noone using conntrack by the time this called. */
 static void ip_nat_cleanup_conntrack(struct ip_conntrack *conn)
 {
 	struct ip_nat_info *info = &conn->nat.info;
-	unsigned int hs;
 
 	if (!info->initialized)
 		return;
-
-	hs = hash_by_src(&conn->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src,
-	                 conn->tuplehash[IP_CT_DIR_ORIGINAL]
-	                 .tuple.dst.protonum);
 
 	WRITE_LOCK(&ip_nat_lock);
 	list_del(&info->bysource);
@@ -102,25 +97,6 @@ ip_nat_used_tuple(const struct ip_conntrack_tuple *tuple,
 
 	invert_tuplepr(&reply, tuple);
 	return ip_conntrack_tuple_taken(&reply, ignored_conntrack);
-}
-
-/* Before 2.6.11 we did implicit source NAT if required. Warn about change. */
-static void warn_if_extra_mangle(u32 dstip, u32 srcip)
-{
-	static int warned = 0;
-	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = dstip } } };
-	struct rtable *rt;
-
-	if (ip_route_output_key(&rt, &fl) != 0)
-		return;
-
-	if (rt->rt_src != srcip && !warned) {
-		printk("NAT: no longer support implicit source local NAT\n");
-		printk("NAT: packet src %u.%u.%u.%u -> dst %u.%u.%u.%u\n",
-		       NIPQUAD(srcip), NIPQUAD(dstip));
-		warned = 1;
-	}
-	ip_rt_put(rt);
 }
 
 /* If we source map this tuple so reply looks like reply_tuple, will
@@ -165,11 +141,10 @@ find_appropriate_src(const struct ip_conntrack_tuple *tuple,
 		     struct ip_conntrack_tuple *result,
 		     const struct ip_nat_range *range)
 {
-	unsigned int h = hash_by_src(&tuple->src, tuple->dst.protonum);
+	unsigned int h = hash_by_src(tuple);
 	struct ip_conntrack *ct;
 
-	MUST_BE_READ_LOCKED(&ip_nat_lock);
-
+	READ_LOCK(&ip_nat_lock);
 	list_for_each_entry(ct, &bysource[h], nat.info.bysource) {
 		if (same_src(ct, tuple)) {
 			/* Copy source part from reply tuple. */
@@ -177,10 +152,13 @@ find_appropriate_src(const struct ip_conntrack_tuple *tuple,
 				       &ct->tuplehash[IP_CT_DIR_REPLY].tuple);
 			result->dst = tuple->dst;
 
-			if (in_range(result, range))
+			if (in_range(result, range)) {
+				READ_UNLOCK(&ip_nat_lock);
 				return 1;
+			}
 		}
 	}
+	READ_UNLOCK(&ip_nat_lock);
 	return 0;
 }
 
@@ -194,7 +172,7 @@ static void
 find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 		    const struct ip_nat_range *range,
 		    const struct ip_conntrack *conntrack,
-		    unsigned int hooknum)
+		    enum ip_nat_manip_type maniptype)
 {
 	u_int32_t *var_ipp;
 	/* Host order */
@@ -204,7 +182,7 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 	if (!(range->flags & IP_NAT_RANGE_MAP_IPS))
 		return;
 
-	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC)
+	if (maniptype == IP_NAT_MANIP_SRC)
 		var_ipp = &tuple->src.ip;
 	else
 		var_ipp = &tuple->dst.ip;
@@ -219,7 +197,7 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 	 * spread in practice (if there are a small number of IPs
 	 * involved, there usually aren't that many connections
 	 * anyway).  The consistency means that servers see the same
-	 * client coming from the same IP (some Internet Backing sites
+	 * client coming from the same IP (some Internet Banking sites
 	 * like this), even across reboots. */
 	minip = ntohl(range->min_ip);
 	maxip = ntohl(range->max_ip);
@@ -238,7 +216,7 @@ get_unique_tuple(struct ip_conntrack_tuple *tuple,
 		 const struct ip_conntrack_tuple *orig_tuple,
 		 const struct ip_nat_range *range,
 		 struct ip_conntrack *conntrack,
-		 unsigned int hooknum)
+		 enum ip_nat_manip_type maniptype)
 {
 	struct ip_nat_protocol *proto
 		= ip_nat_find_proto(orig_tuple->dst.protonum);
@@ -250,7 +228,7 @@ get_unique_tuple(struct ip_conntrack_tuple *tuple,
 	   This is only required for source (ie. NAT/masq) mappings.
 	   So far, we don't do local source mappings, so multiple
 	   manips not an issue.  */
-	if (hooknum == NF_IP_POST_ROUTING) {
+	if (maniptype == IP_NAT_MANIP_SRC) {
 		if (find_appropriate_src(orig_tuple, tuple, range)) {
 			DEBUGP("get_unique_tuple: Found current src map\n");
 			if (!ip_nat_used_tuple(tuple, conntrack))
@@ -261,56 +239,19 @@ get_unique_tuple(struct ip_conntrack_tuple *tuple,
 	/* 2) Select the least-used IP/proto combination in the given
 	   range. */
 	*tuple = *orig_tuple;
-	find_best_ips_proto(tuple, range, conntrack, hooknum);
-
-	if (hooknum == NF_IP_LOCAL_OUT && tuple->dst.ip != orig_tuple->dst.ip)
-		warn_if_extra_mangle(tuple->src.ip, tuple->dst.ip);
+	find_best_ips_proto(tuple, range, conntrack, maniptype);
 
 	/* 3) The per-protocol part of the manip is made to map into
 	   the range to make a unique tuple. */
 
 	/* Only bother mapping if it's not already in range and unique */
 	if ((!(range->flags & IP_NAT_RANGE_PROTO_SPECIFIED)
-	     || proto->in_range(tuple, HOOK2MANIP(hooknum),
-				&range->min, &range->max))
+	     || proto->in_range(tuple, maniptype, &range->min, &range->max))
 	    && !ip_nat_used_tuple(tuple, conntrack))
 		return;
 
 	/* Last change: get protocol to try to obtain unique tuple. */
-	proto->unique_tuple(tuple, range, HOOK2MANIP(hooknum), conntrack);
-}
-
-/* Where to manip the reply packets (will be reverse manip). */
-static unsigned int opposite_hook[NF_IP_NUMHOOKS]
-= { [NF_IP_PRE_ROUTING] = NF_IP_POST_ROUTING,
-    [NF_IP_POST_ROUTING] = NF_IP_PRE_ROUTING,
-    [NF_IP_LOCAL_OUT] = NF_IP_LOCAL_IN,
-    [NF_IP_LOCAL_IN] = NF_IP_LOCAL_OUT,
-};
-
-static void replace_in_hashes(struct ip_conntrack *conntrack,
-			      struct ip_nat_info *info)
-{
-	/* Source has changed, so replace in hashes. */
-	unsigned int srchash
-		= hash_by_src(&conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
-			      .tuple.src,
-			      conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
-			      .tuple.dst.protonum);
-	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
-	list_move(&info->bysource, &bysource[srchash]);
-}
-
-static void place_in_hashes(struct ip_conntrack *conntrack,
-			    struct ip_nat_info *info)
-{
-	unsigned int srchash
-		= hash_by_src(&conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
-			      .tuple.src,
-			      conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
-			      .tuple.dst.protonum);
-	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
-	list_add(&info->bysource, &bysource[srchash]);
+	proto->unique_tuple(tuple, range, maniptype, conntrack);
 }
 
 unsigned int
@@ -318,121 +259,53 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 		  const struct ip_nat_range *range,
 		  unsigned int hooknum)
 {
-	struct ip_conntrack_tuple new_tuple, inv_tuple, reply;
-	struct ip_conntrack_tuple orig_tp;
+	struct ip_conntrack_tuple curr_tuple, new_tuple;
 	struct ip_nat_info *info = &conntrack->nat.info;
-	int in_hashes = info->initialized;
+	int have_to_hash = !info->initialized;
+	enum ip_nat_manip_type maniptype = HOOK2MANIP(hooknum);
 
-	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
 	IP_NF_ASSERT(hooknum == NF_IP_PRE_ROUTING
 		     || hooknum == NF_IP_POST_ROUTING
 		     || hooknum == NF_IP_LOCAL_IN
 		     || hooknum == NF_IP_LOCAL_OUT);
-	IP_NF_ASSERT(info->num_manips < IP_NAT_MAX_MANIPS);
-	IP_NF_ASSERT(!(info->initialized & (1 << HOOK2MANIP(hooknum))));
+	IP_NF_ASSERT(!(info->initialized & (1 << maniptype)));
 
 	/* What we've got will look like inverse of reply. Normally
 	   this is what is in the conntrack, except for prior
 	   manipulations (future optimization: if num_manips == 0,
 	   orig_tp =
 	   conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple) */
-	invert_tuplepr(&orig_tp,
+	invert_tuplepr(&curr_tuple,
 		       &conntrack->tuplehash[IP_CT_DIR_REPLY].tuple);
 
-#if 0
-	{
-	unsigned int i;
+	get_unique_tuple(&new_tuple, &curr_tuple, range, conntrack, maniptype);
 
-	DEBUGP("Hook %u (%s), ", hooknum,
-	       HOOK2MANIP(hooknum)==IP_NAT_MANIP_SRC ? "SRC" : "DST");
-	DUMP_TUPLE(&orig_tp);
-	DEBUGP("Range %p: ", mr);
-	for (i = 0; i < mr->rangesize; i++) {
-		DEBUGP("%u:%s%s %u.%u.%u.%u - %u.%u.%u.%u %u - %u\n",
-		       i,
-		       (mr->range[i].flags & IP_NAT_RANGE_MAP_IPS)
-		       ? " MAP_IPS" : "",
-		       (mr->range[i].flags
-			& IP_NAT_RANGE_PROTO_SPECIFIED)
-		       ? " PROTO_SPECIFIED" : "",
-		       NIPQUAD(mr->range[i].min_ip),
-		       NIPQUAD(mr->range[i].max_ip),
-		       mr->range[i].min.all,
-		       mr->range[i].max.all);
-	}
-	}
-#endif
+	if (!ip_ct_tuple_equal(&new_tuple, &curr_tuple)) {
+		struct ip_conntrack_tuple reply;
 
-	get_unique_tuple(&new_tuple, &orig_tp, range, conntrack, hooknum);
+		/* Alter conntrack table so will recognize replies. */
+		invert_tuplepr(&reply, &new_tuple);
+		ip_conntrack_alter_reply(conntrack, &reply);
 
-	/* We now have two tuples (SRCIP/SRCPT/DSTIP/DSTPT):
-	   the original (A/B/C/D') and the mangled one (E/F/G/H').
-
-	   We're only allowed to work with the SRC per-proto
-	   part, so we create inverses of both to start, then
-	   derive the other fields we need.  */
-
-	/* Reply connection: simply invert the new tuple
-	   (G/H/E/F') */
-	invert_tuplepr(&reply, &new_tuple);
-
-	/* Alter conntrack table so will recognize replies. */
-	ip_conntrack_alter_reply(conntrack, &reply);
-
-	/* FIXME: We can simply used existing conntrack reply tuple
-           here --RR */
-	/* Create inverse of original: C/D/A/B' */
-	invert_tuplepr(&inv_tuple, &orig_tp);
-
-	/* Has source changed?. */
-	if (!ip_ct_tuple_src_equal(&new_tuple, &orig_tp)) {
-		IP_NF_ASSERT(HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC);
-		IP_NF_ASSERT(ip_ct_tuple_dst_equal(&new_tuple, &orig_tp));
-
-		/* In this direction, a source manip. */
-		info->manips[info->num_manips++] =
-			((struct ip_nat_info_manip)
-			 { IP_CT_DIR_ORIGINAL, hooknum,
-			   IP_NAT_MANIP_SRC, new_tuple.src });
-
-		IP_NF_ASSERT(info->num_manips < IP_NAT_MAX_MANIPS);
-
-		/* In the reverse direction, a destination manip. */
-		info->manips[info->num_manips++] =
-			((struct ip_nat_info_manip)
-			 { IP_CT_DIR_REPLY, opposite_hook[hooknum],
-			   IP_NAT_MANIP_DST, orig_tp.src });
-		IP_NF_ASSERT(info->num_manips <= IP_NAT_MAX_MANIPS);
+		/* Non-atomic: we own this at the moment. */
+		if (maniptype == IP_NAT_MANIP_SRC)
+			conntrack->status |= IPS_SRC_NAT;
+		else
+			conntrack->status |= IPS_DST_NAT;
 	}
 
-	/* Has destination changed? */
-	if (!ip_ct_tuple_dst_equal(&new_tuple, &orig_tp)) {
-		IP_NF_ASSERT(HOOK2MANIP(hooknum) == IP_NAT_MANIP_DST);
-
-		/* In this direction, a destination manip */
-		info->manips[info->num_manips++] =
-			((struct ip_nat_info_manip)
-			 { IP_CT_DIR_ORIGINAL, hooknum,
-			   IP_NAT_MANIP_DST, reply.src });
-
-		IP_NF_ASSERT(info->num_manips < IP_NAT_MAX_MANIPS);
-
-		/* In the reverse direction, a source manip. */
-		info->manips[info->num_manips++] =
-			((struct ip_nat_info_manip)
-			 { IP_CT_DIR_REPLY, opposite_hook[hooknum],
-			   IP_NAT_MANIP_SRC, inv_tuple.src });
-		IP_NF_ASSERT(info->num_manips <= IP_NAT_MAX_MANIPS);
+	/* Place in source hash if this is the first time. */
+	if (have_to_hash) {
+		unsigned int srchash
+			= hash_by_src(&conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
+				      .tuple);
+		WRITE_LOCK(&ip_nat_lock);
+		list_add(&info->bysource, &bysource[srchash]);
+		WRITE_UNLOCK(&ip_nat_lock);
 	}
 
 	/* It's done. */
-	info->initialized |= (1 << HOOK2MANIP(hooknum));
-
-	if (in_hashes)
-		replace_in_hashes(conntrack, info);
-	else
-		place_in_hashes(conntrack, info);
-
+	info->initialized |= (1 << maniptype);
 	return NF_ACCEPT;
 }
 
@@ -441,121 +314,95 @@ static int
 manip_pkt(u_int16_t proto,
 	  struct sk_buff **pskb,
 	  unsigned int iphdroff,
-	  const struct ip_conntrack_manip *manip,
+	  const struct ip_conntrack_tuple *target,
 	  enum ip_nat_manip_type maniptype)
 {
 	struct iphdr *iph;
 
 	(*pskb)->nfcache |= NFC_ALTERED;
-	if (!skb_ip_make_writable(pskb, iphdroff+sizeof(*iph)))
+	if (!skb_ip_make_writable(pskb, iphdroff + sizeof(*iph)))
 		return 0;
 
 	iph = (void *)(*pskb)->data + iphdroff;
 
 	/* Manipulate protcol part. */
 	if (!ip_nat_find_proto(proto)->manip_pkt(pskb, iphdroff,
-	                                         manip, maniptype))
+	                                         target, maniptype))
 		return 0;
 
 	iph = (void *)(*pskb)->data + iphdroff;
 
 	if (maniptype == IP_NAT_MANIP_SRC) {
-		iph->check = ip_nat_cheat_check(~iph->saddr, manip->ip,
+		iph->check = ip_nat_cheat_check(~iph->saddr, target->src.ip,
 						iph->check);
-		iph->saddr = manip->ip;
+		iph->saddr = target->src.ip;
 	} else {
-		iph->check = ip_nat_cheat_check(~iph->daddr, manip->ip,
+		iph->check = ip_nat_cheat_check(~iph->daddr, target->dst.ip,
 						iph->check);
-		iph->daddr = manip->ip;
+		iph->daddr = target->dst.ip;
 	}
 	return 1;
 }
 
-/* Do packet manipulations according to binding. */
-unsigned int
-do_bindings(struct ip_conntrack *ct,
-	    enum ip_conntrack_info ctinfo,
-	    struct ip_nat_info *info,
-	    unsigned int hooknum,
-	    struct sk_buff **pskb)
+/* Do packet manipulations according to ip_nat_setup_info. */
+unsigned int nat_packet(struct ip_conntrack *ct,
+			enum ip_conntrack_info ctinfo,
+			unsigned int hooknum,
+			struct sk_buff **pskb)
 {
-	int i, ret = NF_ACCEPT;
 	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
-	int proto = (*pskb)->nh.iph->protocol;
+	unsigned long statusbit;
+	enum ip_nat_manip_type mtype = HOOK2MANIP(hooknum);
 
-	/* Need nat lock to protect against modification, but neither
-	   conntrack (referenced) and helper (deleted with
-	   synchronize_bh()) can vanish. */
-	READ_LOCK(&ip_nat_lock);
-	for (i = 0; i < info->num_manips; i++) {
-		if (info->manips[i].direction == dir
-		    && info->manips[i].hooknum == hooknum) {
-			DEBUGP("Mangling %p: %s to %u.%u.%u.%u %u\n",
-			       *pskb,
-			       info->manips[i].maniptype == IP_NAT_MANIP_SRC
-			       ? "SRC" : "DST",
-			       NIPQUAD(info->manips[i].manip.ip),
-			       htons(info->manips[i].manip.u.all));
-			if (!manip_pkt(proto, pskb, 0,
-				       &info->manips[i].manip,
-				       info->manips[i].maniptype)) {
-				READ_UNLOCK(&ip_nat_lock);
-				return NF_DROP;
-			}
-		}
-	}
-	READ_UNLOCK(&ip_nat_lock);
-
-	/* FIXME: NAT/conntrack helpers should set ctinfo &
-	 * CT_INFO_RESYNC on packets, so we don't have to adjust all
-	 * connections with conntrack helpers --RR */
+	/* FIXME: use a bit in status for this. */
 	if (ct->helper
-	    && proto == IPPROTO_TCP
+	    && ct->tuplehash[0].tuple.dst.protonum == IPPROTO_TCP
 	    && (hooknum == NF_IP_POST_ROUTING || hooknum == NF_IP_LOCAL_IN)) {
 		DEBUGP("ip_nat_core: adjusting sequence number\n");
 		/* future: put this in a l4-proto specific function,
 		 * and call this function here. */
 		if (!ip_nat_seq_adjust(pskb, ct, ctinfo))
-			ret = NF_DROP;
+			return NF_DROP;
 	}
 
-	return ret;
-}
+	if (mtype == IP_NAT_MANIP_SRC)
+		statusbit = IPS_SRC_NAT;
+	else
+		statusbit = IPS_DST_NAT;
 
-static inline int tuple_src_equal_dst(const struct ip_conntrack_tuple *t1,
-                                      const struct ip_conntrack_tuple *t2)
-{
-	if (t1->dst.protonum != t2->dst.protonum || t1->src.ip != t2->dst.ip)
-		return 0;
-	if (t1->dst.protonum != IPPROTO_ICMP)
-		return t1->src.u.all == t2->dst.u.all;
-	else {
-		struct ip_conntrack_tuple inv;
+	/* Invert if this is reply dir. */
+	if (dir == IP_CT_DIR_REPLY)
+		statusbit ^= IPS_NAT_MASK;
 
-		/* ICMP tuples are asymetric */
-		invert_tuplepr(&inv, t1);
-		return inv.src.u.all == t2->src.u.all &&
-		       inv.dst.u.all == t2->dst.u.all;
+	/* Non-atomic: these bits don't change. */
+	if (ct->status & statusbit) {
+		struct ip_conntrack_tuple target;
+
+		/* We are aiming to look like inverse of other direction. */
+		invert_tuplepr(&target, &ct->tuplehash[!dir].tuple);
+
+		if (!manip_pkt(target.dst.protonum, pskb, 0, &target, mtype))
+			return NF_DROP;
 	}
+	return NF_ACCEPT;
 }
 
-int
-icmp_reply_translation(struct sk_buff **pskb,
-		       struct ip_conntrack *conntrack,
-		       unsigned int hooknum,
-		       int dir)
+/* Dir is direction ICMP is coming from (opposite to packet it contains) */
+int icmp_reply_translation(struct sk_buff **pskb,
+			   struct ip_conntrack *ct,
+			   enum ip_nat_manip_type manip,
+			   enum ip_conntrack_dir dir)
 {
 	struct {
 		struct icmphdr icmp;
 		struct iphdr ip;
 	} *inside;
-	unsigned int i;
-	struct ip_nat_info *info = &conntrack->nat.info;
-	struct ip_conntrack_tuple *cttuple, innertuple;
-	int hdrlen;
+	struct ip_conntrack_tuple inner, target;
+	int hdrlen = (*pskb)->nh.iph->ihl * 4;
 
-	if (!skb_ip_make_writable(pskb,(*pskb)->nh.iph->ihl*4+sizeof(*inside)))
+	if (!skb_ip_make_writable(pskb, hdrlen + sizeof(*inside)))
 		return 0;
+
 	inside = (void *)(*pskb)->data + (*pskb)->nh.iph->ihl*4;
 
 	/* We're actually going to mangle it beyond trivial checksum
@@ -576,92 +423,51 @@ icmp_reply_translation(struct sk_buff **pskb,
            confused... --RR */
 	if (inside->icmp.type == ICMP_REDIRECT) {
 		/* Don't care about races here. */
-		if (info->initialized
+		if (ct->nat.info.initialized
 		    != ((1 << IP_NAT_MANIP_SRC) | (1 << IP_NAT_MANIP_DST))
-		    || info->num_manips != 0)
+		    || (ct->status & IPS_NAT_MASK))
 			return 0;
 	}
 
-	DEBUGP("icmp_reply_translation: translating error %p hook %u dir %s\n",
-	       *pskb, hooknum, dir == IP_CT_DIR_ORIGINAL ? "ORIG" : "REPLY");
-	/* Note: May not be from a NAT'd host, but probably safest to
-	   do translation always as if it came from the host itself
-	   (even though a "host unreachable" coming from the host
-	   itself is a bit weird).
-
-	   More explanation: some people use NAT for anonymizing.
-	   Also, CERT recommends dropping all packets from private IP
-	   addresses (although ICMP errors from internal links with
-	   such addresses are not too uncommon, as Alan Cox points
-	   out) */
+	DEBUGP("icmp_reply_translation: translating error %p manp %u dir %s\n",
+	       *pskb, manip, dir == IP_CT_DIR_ORIGINAL ? "ORIG" : "REPLY");
 
 	if (!ip_ct_get_tuple(&inside->ip, *pskb, (*pskb)->nh.iph->ihl*4 +
 	                     sizeof(struct icmphdr) + inside->ip.ihl*4,
-	                     &innertuple,
-	                     ip_ct_find_proto(inside->ip.protocol)))
+	                     &inner, ip_ct_find_proto(inside->ip.protocol)))
 		return 0;
-	cttuple = &conntrack->tuplehash[dir].tuple;
 
-	READ_LOCK(&ip_nat_lock);
-	for (i = 0; i < info->num_manips; i++) {
-		DEBUGP("icmp_reply: manip %u dir %s hook %u\n",
-		       i, info->manips[i].direction == IP_CT_DIR_ORIGINAL ?
-		       "ORIG" : "REPLY", info->manips[i].hooknum);
+	/* Change inner back to look like incoming packet.  We do the
+	   opposite manip on this hook to normal, because it might not
+	   pass all hooks (locally-generated ICMP).  Consider incoming
+	   packet: PREROUTING (DST manip), routing produces ICMP, goes
+	   through POSTROUTING (which must correct the DST manip). */
+	if (!manip_pkt(inside->ip.protocol, pskb,
+		       (*pskb)->nh.iph->ihl*4
+		       + sizeof(inside->icmp),
+		       &ct->tuplehash[!dir].tuple,
+		       !manip))
+		return 0;
 
-		if (info->manips[i].direction != dir)
-			continue;
+	/* Change outer to look the reply to an incoming packet
+	 * (proto 0 means don't invert per-proto part). */
 
-		/* Mapping the inner packet is just like a normal packet, except
-		 * it was never src/dst reversed, so where we would normally
-		 * apply a dst manip, we apply a src, and vice versa. */
+	/* Obviously, we need to NAT destination IP, but source IP
+	   should be NAT'ed only if it is from a NAT'd host.
 
-		/* Only true for forwarded packets, locally generated packets
-		 * never hit PRE_ROUTING, we need to apply their PRE_ROUTING
-		 * manips in LOCAL_OUT. */
-		if (hooknum == NF_IP_LOCAL_OUT &&
-		    info->manips[i].hooknum == NF_IP_PRE_ROUTING)
-			hooknum = info->manips[i].hooknum;
-
-		if (info->manips[i].hooknum != hooknum)
-			continue;
-
-		/* ICMP errors may be generated locally for packets that
-		 * don't have all NAT manips applied yet. Verify manips
-		 * have been applied before reversing them */
-		if (info->manips[i].maniptype == IP_NAT_MANIP_SRC) {
-			if (!tuple_src_equal_dst(cttuple, &innertuple))
-				continue;
-		} else {
-			if (!tuple_src_equal_dst(&innertuple, cttuple))
-				continue;
-		}
-
-		DEBUGP("icmp_reply: inner %s -> %u.%u.%u.%u %u\n",
-		       info->manips[i].maniptype == IP_NAT_MANIP_SRC
-		       ? "DST" : "SRC", NIPQUAD(info->manips[i].manip.ip),
-		       ntohs(info->manips[i].manip.u.udp.port));
-		if (!manip_pkt(inside->ip.protocol, pskb,
-			       (*pskb)->nh.iph->ihl*4 + sizeof(inside->icmp),
-			       &info->manips[i].manip,
-			       !info->manips[i].maniptype))
-			goto unlock_fail;
-
-		/* Outer packet needs to have IP header NATed like
-                   it's a reply. */
-
-		/* Use mapping to map outer packet: 0 give no
-                          per-proto mapping */
-		DEBUGP("icmp_reply: outer %s -> %u.%u.%u.%u\n",
-		       info->manips[i].maniptype == IP_NAT_MANIP_SRC
-		       ? "SRC" : "DST", NIPQUAD(info->manips[i].manip.ip));
-		if (!manip_pkt(0, pskb, 0, &info->manips[i].manip,
-			       info->manips[i].maniptype))
-			goto unlock_fail;
+	   Explanation: some people use NAT for anonymizing.  Also,
+	   CERT recommends dropping all packets from private IP
+	   addresses (although ICMP errors from internal links with
+	   such addresses are not too uncommon, as Alan Cox points
+	   out) */
+	if (manip != IP_NAT_MANIP_SRC
+	    || ((*pskb)->nh.iph->saddr == ct->tuplehash[dir].tuple.src.ip)) {
+		invert_tuplepr(&target, &ct->tuplehash[!dir].tuple);
+		if (!manip_pkt(0, pskb, 0, &target, manip))
+			return 0;
 	}
-	READ_UNLOCK(&ip_nat_lock);
 
-	hdrlen = (*pskb)->nh.iph->ihl * 4;
-
+	/* Reloading "inside" here since manip_pkt inner. */
 	inside = (void *)(*pskb)->data + (*pskb)->nh.iph->ihl*4;
 
 	inside->icmp.checksum = 0;
@@ -669,10 +475,6 @@ icmp_reply_translation(struct sk_buff **pskb,
 						       (*pskb)->len - hdrlen,
 						       0));
 	return 1;
-
- unlock_fail:
-	READ_UNLOCK(&ip_nat_lock);
-	return 0;
 }
 
 int __init ip_nat_init(void)

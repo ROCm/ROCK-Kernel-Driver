@@ -15,11 +15,11 @@ struct ip_nat_protocol
 	/* Protocol number. */
 	unsigned int protonum;
 
-	/* Do a packet translation according to the ip_nat_proto_manip
-	 * and manip type.  Return true if succeeded. */
+	/* Translate a packet to the target according to manip type.
+	   Return true if succeeded. */
 	int (*manip_pkt)(struct sk_buff **pskb,
 			 unsigned int iphdroff,
-			 const struct ip_conntrack_manip *manip,
+			 const struct ip_conntrack_tuple *tuple,
 			 enum ip_nat_manip_type maniptype);
 
 	/* Is the manipable part of the tuple between min and max incl? */

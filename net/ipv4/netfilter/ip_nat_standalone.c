@@ -106,7 +106,7 @@ ip_nat_fn(unsigned int hooknum,
 	case IP_CT_RELATED:
 	case IP_CT_RELATED+IP_CT_IS_REPLY:
 		if ((*pskb)->nh.iph->protocol == IPPROTO_ICMP) {
-			if (!icmp_reply_translation(pskb, ct, hooknum,
+			if (!icmp_reply_translation(pskb, ct, maniptype,
 						    CTINFO2DIR(ctinfo)))
 				return NF_DROP;
 			else
@@ -116,7 +116,6 @@ ip_nat_fn(unsigned int hooknum,
 	case IP_CT_NEW:
 		info = &ct->nat.info;
 
-		WRITE_LOCK(&ip_nat_lock);
 		/* Seen it before?  This can happen for loopback, retrans,
 		   or local packets.. */
 		if (!(info->initialized & (1 << maniptype))) {
@@ -131,14 +130,12 @@ ip_nat_fn(unsigned int hooknum,
 						       info);
 
 			if (ret != NF_ACCEPT) {
-				WRITE_UNLOCK(&ip_nat_lock);
 				return ret;
 			}
 		} else
 			DEBUGP("Already setup manip %s for ct %p\n",
 			       maniptype == IP_NAT_MANIP_SRC ? "SRC" : "DST",
 			       ct);
-		WRITE_UNLOCK(&ip_nat_lock);
 		break;
 
 	default:
@@ -149,7 +146,7 @@ ip_nat_fn(unsigned int hooknum,
 	}
 
 	IP_NF_ASSERT(info);
-	return do_bindings(ct, ctinfo, info, hooknum, pskb);
+	return nat_packet(ct, ctinfo, hooknum, pskb);
 }
 
 static unsigned int

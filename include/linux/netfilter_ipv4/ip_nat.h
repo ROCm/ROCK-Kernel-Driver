@@ -48,41 +48,15 @@ struct ip_nat_multi_range_compat
 	struct ip_nat_range range[1];
 };
 
-/* Worst case: local-out manip + 1 post-routing, and reverse dirn. */
-#define IP_NAT_MAX_MANIPS (2*2)
-
-struct ip_nat_info_manip
-{
-	/* The direction. */
-	u_int8_t direction;
-
-	/* Which hook the manipulation happens on. */
-	u_int8_t hooknum;
-
-	/* The manipulation type. */
-	u_int8_t maniptype;
-
-	/* Manipulations to occur at each conntrack in this dirn. */
-	struct ip_conntrack_manip manip;
-};
-
 #ifdef __KERNEL__
 #include <linux/list.h>
 #include <linux/netfilter_ipv4/lockhelp.h>
-
-/* Protects NAT hash tables, and NAT-private part of conntracks. */
-DECLARE_RWLOCK_EXTERN(ip_nat_lock);
 
 /* The structure embedded in the conntrack structure. */
 struct ip_nat_info
 {
 	/* Set to zero when conntrack created: bitmask of maniptypes */
 	u_int16_t initialized;
-
-	u_int16_t num_manips;
-
-	/* Manipulations to be done on this conntrack. */
-	struct ip_nat_info_manip manips[IP_NAT_MAX_MANIPS];
 
 	struct list_head bysource;
 
