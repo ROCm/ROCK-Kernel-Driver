@@ -96,7 +96,7 @@ int sctp_rcv(struct sk_buff *skb)
 	struct sctphdr *sh;
 	union sctp_addr src;
 	union sctp_addr dest;
-	struct sctp_func *af;
+	struct sctp_af *af;
 	int ret = 0;
 
 	if (skb->pkt_type!=PACKET_HOST)
