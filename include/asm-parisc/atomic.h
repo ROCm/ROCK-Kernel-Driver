@@ -52,7 +52,7 @@ extern spinlock_t __atomic_hash[ATOMIC_HASH_SIZE] __lock_aligned;
  * Cache-line alignment would conflict with, for example, linux/module.h
  */
 
-typedef struct { volatile long counter; } atomic_t;
+typedef struct { volatile int counter; } atomic_t;
 
 
 /* This should get optimized out since it's never called.
