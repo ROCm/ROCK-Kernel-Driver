@@ -691,7 +691,7 @@ struct nfs4_mount_data;
 #ifdef __KERNEL__
 # undef ifdebug
 # ifdef NFS_DEBUG
-#  define ifdebug(fac)		if (nfs_debug & NFSDBG_##fac)
+#  define ifdebug(fac)		if (unlikely(nfs_debug & NFSDBG_##fac))
 # else
 #  define ifdebug(fac)		if (0)
 # endif

@@ -1625,7 +1625,7 @@ static struct super_block *nfs4_get_sb(struct file_system_type *fs_type,
 
 	if (data->version != NFS4_MOUNT_VERSION) {
 		printk("nfs warning: mount version %s than kernel\n",
-			data->version < NFS_MOUNT_VERSION ? "older" : "newer");
+			data->version < NFS4_MOUNT_VERSION ? "older" : "newer");
 	}
 
 	p = nfs_copy_user_string(NULL, &data->hostname, 256);

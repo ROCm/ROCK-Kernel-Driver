@@ -61,6 +61,17 @@ extern struct rpc_procinfo nfs4_procedures[];
 
 extern nfs4_stateid zero_stateid;
 
+/* Prevent leaks of NFSv4 errors into userland */
+static inline int nfs4_map_errors(int err)
+{
+	if (err < -1000) {
+		printk(KERN_WARNING "%s could not handle NFSv4 error %d\n",
+				__FUNCTION__, -err);
+		return -EIO;
+	}
+	return err;
+}
+
 static void
 nfs4_setup_compound(struct nfs4_compound *cp, struct nfs4_op *ops,
 		    struct nfs_server *server, char *tag)
@@ -506,6 +517,8 @@ nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *state)
 
 	status = rpc_call_sync(server->client, &msg, 0);
 	nfs4_increment_seqid(status, sp);
+	if (status == 0)
+		memcpy(&state->stateid, &o_res.stateid, sizeof(state->stateid));
 	/* Update the inode attributes */
 	nfs_refresh_inode(inode, &fattr);
 	return status;
@@ -690,12 +703,12 @@ nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
 retry:
         fattr->valid = 0;
 
-	if (state)
+	if (sattr->ia_valid & ATTR_SIZE)
 		nfs4_copy_stateid(&arg.stateid, state, 0);
-        else
+	else
 		memcpy(&arg.stateid, &zero_stateid, sizeof(arg.stateid));
 
-        status = rpc_call_sync(server->client, &msg, 0);
+	status = rpc_call_sync(server->client, &msg, 0);
 	if (status) {
 		status = nfs4_handle_error(server, status);
 		if (!status)
@@ -872,7 +885,7 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	}
 out:
 	if (status)
-		return status;
+		return nfs4_map_errors(status);
 	return nfs4_proc_fsinfo(server, fhandle, info);
 }
 
@@ -887,7 +900,7 @@ nfs4_proc_getattr(struct inode *inode, struct nfs_fattr *fattr)
 	nfs4_setup_compound(&compound, ops, NFS_SERVER(inode), "getattr");
 	nfs4_setup_putfh(&compound, NFS_FH(inode));
 	nfs4_setup_getattr(&compound, fattr);
-	return nfs4_call_compound(&compound, NULL, 0);
+	return nfs4_map_errors(nfs4_call_compound(&compound, NULL, 0));
 }
 
 /* 
@@ -973,7 +986,7 @@ nfs4_proc_lookup(struct inode *dir, struct qstr *name,
 
 	if (status >= 0)
 		status = nfs_refresh_inode(dir, &dir_attr);
-	return status;
+	return nfs4_map_errors(status);
 }
 
 static int
@@ -1020,7 +1033,7 @@ nfs4_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
 		else if (req_access != resp_access)
 			status = -EACCES;
 	}
-	return status;
+	return nfs4_map_errors(status);
 }
 
 /*
@@ -1056,7 +1069,7 @@ nfs4_proc_readlink(struct inode *inode, struct page *page)
 	nfs4_setup_compound(&compound, ops, NFS_SERVER(inode), "readlink");
 	nfs4_setup_putfh(&compound, NFS_FH(inode));
 	nfs4_setup_readlink(&compound, PAGE_CACHE_SIZE, &page);
-	return nfs4_call_compound(&compound, NULL, 0);
+	return nfs4_map_errors(nfs4_call_compound(&compound, NULL, 0));
 }
 
 static int
@@ -1095,7 +1108,7 @@ nfs4_proc_read(struct nfs_read_data *rdata, struct file *filp)
 	if (!status)
 		renew_lease(server, timestamp);
 	dprintk("NFS reply read: %d\n", status);
-	return status;
+	return nfs4_map_errors(status);
 }
 
 static int
@@ -1131,7 +1144,7 @@ nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, rpcflags);
 	dprintk("NFS reply write: %d\n", status);
-	return status;
+	return nfs4_map_errors(status);
 }
 
 static int
@@ -1166,7 +1179,7 @@ nfs4_proc_commit(struct nfs_write_data *cdata, struct file *filp)
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, 0);
 	dprintk("NFS reply commit: %d\n", status);
-	return status;
+	return nfs4_map_errors(status);
 }
 
 /*
@@ -1233,7 +1246,7 @@ nfs4_proc_remove(struct inode *dir, struct qstr *name)
 		process_cinfo(&dir_cinfo, &dir_attr);
 		nfs_refresh_inode(dir, &dir_attr);
 	}
-	return status;
+	return nfs4_map_errors(status);
 }
 
 struct unlink_desc {
@@ -1311,7 +1324,7 @@ nfs4_proc_rename(struct inode *old_dir, struct qstr *old_name,
 		nfs_refresh_inode(old_dir, &old_dir_attr);
 		nfs_refresh_inode(new_dir, &new_dir_attr);
 	}
-	return status;
+	return nfs4_map_errors(status);
 }
 
 static int
@@ -1341,7 +1354,7 @@ nfs4_proc_link(struct inode *inode, struct inode *dir, struct qstr *name)
 		nfs_refresh_inode(dir, &dir_attr);
 		nfs_refresh_inode(inode, &fattr);
 	}
-	return status;
+	return nfs4_map_errors(status);
 }
 
 static int
@@ -1372,7 +1385,7 @@ nfs4_proc_symlink(struct inode *dir, struct qstr *name, struct qstr *path,
 		process_cinfo(&dir_cinfo, &dir_attr);
 		nfs_refresh_inode(dir, &dir_attr);
 	}
-	return status;
+	return nfs4_map_errors(status);
 }
 
 static int
@@ -1402,7 +1415,7 @@ nfs4_proc_mkdir(struct inode *dir, struct qstr *name, struct iattr *sattr,
 		process_cinfo(&dir_cinfo, &dir_attr);
 		nfs_refresh_inode(dir, &dir_attr);
 	}
-	return status;
+	return nfs4_map_errors(status);
 }
 
 static int
@@ -1420,9 +1433,11 @@ nfs4_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
 	nfs4_setup_putfh(&compound, NFS_FH(dir));
 	nfs4_setup_readdir(&compound, cookie, NFS_COOKIEVERF(dir), &page, count, dentry);
 	status = nfs4_call_compound(&compound, cred, 0);
+	if (status == 0)
+		memcpy(NFS_COOKIEVERF(dir), ops[1].u.readdir.rd_resp_verifier.data, NFS4_VERIFIER_SIZE);
 
 	unlock_kernel();
-	return status;
+	return nfs4_map_errors(status);
 }
 
 static int
@@ -1452,7 +1467,7 @@ nfs4_proc_mknod(struct inode *dir, struct qstr *name, struct iattr *sattr,
 		process_cinfo(&dir_cinfo, &dir_attr);
 		nfs_refresh_inode(dir, &dir_attr);
 	}
-	return status;
+	return nfs4_map_errors(status);
 }
 
 static int
@@ -1465,7 +1480,7 @@ nfs4_proc_statfs(struct nfs_server *server, struct nfs_fh *fhandle,
 	nfs4_setup_compound(&compound, ops, server, "statfs");
 	nfs4_setup_putfh(&compound, fhandle);
 	nfs4_setup_statfs(&compound, fsstat);
-	return nfs4_call_compound(&compound, NULL, 0);
+	return nfs4_map_errors(nfs4_call_compound(&compound, NULL, 0));
 }
 
 static int
@@ -1478,7 +1493,7 @@ nfs4_proc_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle,
 		.rpc_resp = fsinfo,
 	};
 
-	return rpc_call_sync(server->client, &msg, 0);
+	return nfs4_map_errors(rpc_call_sync(server->client, &msg, 0));
 }
 
 static int
@@ -1491,7 +1506,7 @@ nfs4_proc_pathconf(struct nfs_server *server, struct nfs_fh *fhandle,
 	nfs4_setup_compound(&compound, ops, server, "statfs");
 	nfs4_setup_putfh(&compound, fhandle);
 	nfs4_setup_pathconf(&compound, pathconf);
-	return nfs4_call_compound(&compound, NULL, 0);
+	return nfs4_map_errors(nfs4_call_compound(&compound, NULL, 0));
 }
 
 static void
@@ -1829,7 +1844,7 @@ nfs4_async_handle_error(struct rpc_task *task, struct nfs_server *server)
 {
 	struct nfs4_client *clp = server->nfs4_state;
 
-	if (!clp)
+	if (!clp || task->tk_status >= 0)
 		return 0;
 	switch(task->tk_status) {
 		case -NFS4ERR_STALE_CLIENTID:
@@ -1848,6 +1863,7 @@ nfs4_async_handle_error(struct rpc_task *task, struct nfs_server *server)
 			task->tk_status = 0;
 			return -EAGAIN;
 	}
+	task->tk_status = nfs4_map_errors(task->tk_status);
 	return 0;
 }
 
@@ -1925,16 +1941,9 @@ nfs4_handle_error(struct nfs_server *server, int errorcode)
 			break;
 		case -NFS4ERR_OLD_STATEID:
 			ret = 0;
-			break;
-		default:
-			if (errorcode <= -1000) {
-				printk(KERN_WARNING "%s could not handle NFSv4 error %d\n",
-						__FUNCTION__, -errorcode);
-				ret = -EIO;
-			}
 	}
 	/* We failed to handle the error */
-	return ret;
+	return nfs4_map_errors(ret);
 }
 
 
@@ -2109,7 +2118,7 @@ nfs4_proc_getlk(struct nfs4_state *state, int cmd, struct file_lock *request)
 	if (lsp)
 		nfs4_put_lock_state(lsp);
 	up(&state->lock_sema);
-	return status;
+	return nfs4_map_errors(status);
 }
 
 int
@@ -2154,7 +2163,7 @@ nfs4_proc_unlck(struct nfs4_state *state, int cmd, struct file_lock *request)
 	nfs4_put_lock_state(lsp);
 out:
 	up(&state->lock_sema);
-	return status;
+	return nfs4_map_errors(status);
 }
 
 static int
@@ -2230,7 +2239,7 @@ nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock *request)
 	nfs4_put_lock_state(lsp);
 out:
 	up(&state->lock_sema);
-	return status;
+	return nfs4_map_errors(status);
 }
 
 static int

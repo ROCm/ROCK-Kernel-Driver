@@ -790,7 +790,7 @@ reclaimer(void *ptr)
 restart_loop:
 	spin_lock(&clp->cl_lock);
 	list_for_each_entry(sp, &clp->cl_state_owners, so_list) {
-		if (sp->so_generation - generation <= 0)
+		if (sp->so_generation - generation >= 0)
 			continue;
 		atomic_inc(&sp->so_count);
 		spin_unlock(&clp->cl_lock);

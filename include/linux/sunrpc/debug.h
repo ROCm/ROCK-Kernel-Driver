@@ -54,7 +54,7 @@ extern unsigned int		nlm_debug;
 
 #undef ifdebug
 #ifdef RPC_DEBUG			
-# define ifdebug(fac)		if (rpc_debug & RPCDBG_##fac)
+# define ifdebug(fac)		if (unlikely(rpc_debug & RPCDBG_##fac))
 # define dfprintk(fac, args...)	do { ifdebug(fac) printk(args); } while(0)
 # define RPC_IFDEBUG(x)		x
 #else
