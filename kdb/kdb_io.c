@@ -55,6 +55,9 @@
 static struct console *kdbcons;
 #endif
 
+#ifdef CONFIG_PPC64
+#include <asm/udbg.h>
+#endif
 
 #define CMD_BUFLEN 256
 char kdb_prompt_str[CMD_BUFLEN];
@@ -521,6 +524,13 @@ kdb_printf(const char *fmt, ...)
 		prom_printf("%s", kdb_buffer);
 	else
 #endif
+
+#ifdef CONFIG_PPC64
+	if (udbg_write)
+		udbg_write(kdb_buffer, strlen(kdb_buffer));
+	else
+#endif
+
 	while (c) {
 		c->write(c, kdb_buffer, strlen(kdb_buffer));
 		c = c->next;
@@ -569,6 +579,13 @@ kdb_printf(const char *fmt, ...)
 			prom_printf("%s", moreprompt);
 		else
 #endif
+
+#ifdef CONFIG_PPC64
+		if (udbg_write)
+			udbg_write(moreprompt, strlen(moreprompt));
+		else
+#endif
+
 		while (c) {
 			c->write(c, moreprompt, strlen(moreprompt));
 			c = c->next;
