@@ -633,6 +633,8 @@ unsigned long probe_irq_on(void)
 
 		irq_desc[i].probing = 1;
 		irq_desc[i].triggered = 0;
+		if (irq_desc[i].chip->type)
+			irq_desc[i].chip->type(i, IRQT_PROBE);
 		irq_desc[i].chip->unmask(i);
 		irqs += 1;
 	}

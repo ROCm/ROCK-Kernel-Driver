@@ -117,10 +117,11 @@ static int sa1111_type_lowirq(unsigned int irq, unsigned int flags)
 {
 	unsigned int mask = SA1111_IRQMASK_LO(irq);
 
+	if (flags == IRQT_PROBE)
+		return 0;
+
 	if ((!(flags & __IRQT_RISEDGE) ^ !(flags & __IRQT_FALEDGE)) == 0)
 		return -EINVAL;
-
-	printk("IRQ%d: %s edge\n", irq, flags & __IRQT_RISEDGE ? "rising" : "falling");
 
 	if (flags & __IRQT_RISEDGE)
 		INTPOL0 &= ~mask;
@@ -181,10 +182,11 @@ static int sa1111_type_highirq(unsigned int irq, unsigned int flags)
 {
 	unsigned int mask = SA1111_IRQMASK_HI(irq);
 
+	if (flags == IRQT_PROBE)
+		return 0;
+
 	if ((!(flags & __IRQT_RISEDGE) ^ !(flags & __IRQT_FALEDGE)) == 0)
 		return -EINVAL;
-
-	printk("IRQ%d: %s edge\n", irq, flags & __IRQT_RISEDGE ? "rising" : "falling");
 
 	if (flags & __IRQT_RISEDGE)
 		INTPOL1 &= ~mask;
