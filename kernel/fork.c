@@ -215,6 +215,7 @@ static inline int dup_mmap(struct mm_struct * mm)
 	mm->locked_vm = 0;
 	mm->mmap = NULL;
 	mm->mmap_cache = NULL;
+	mm->free_area_cache = TASK_UNMAPPED_BASE;
 	mm->map_count = 0;
 	mm->rss = 0;
 	mm->cpu_vm_mask = 0;
@@ -308,6 +309,8 @@ static struct mm_struct * mm_init(struct mm_struct * mm)
 	mm->page_table_lock = SPIN_LOCK_UNLOCKED;
 	mm->ioctx_list_lock = RW_LOCK_UNLOCKED;
 	mm->default_kioctx = (struct kioctx)INIT_KIOCTX(mm->default_kioctx, *mm);
+	mm->free_area_cache = TASK_UNMAPPED_BASE;
+
 	mm->pgd = pgd_alloc(mm);
 	if (mm->pgd)
 		return mm;

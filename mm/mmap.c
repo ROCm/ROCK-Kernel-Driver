@@ -639,24 +639,33 @@ unacct_error:
 #ifndef HAVE_ARCH_UNMAPPED_AREA
 static inline unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
 {
+	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
+	int found_hole = 0;
 
 	if (len > TASK_SIZE)
 		return -ENOMEM;
 
 	if (addr) {
 		addr = PAGE_ALIGN(addr);
-		vma = find_vma(current->mm, addr);
+		vma = find_vma(mm, addr);
 		if (TASK_SIZE - len >= addr &&
 		    (!vma || addr + len <= vma->vm_start))
 			return addr;
 	}
-	addr = PAGE_ALIGN(TASK_UNMAPPED_BASE);
+	addr = mm->free_area_cache;
 
-	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
+	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
 		/* At this point:  (!vma || addr < vma->vm_end). */
 		if (TASK_SIZE - len < addr)
 			return -ENOMEM;
+		/*
+		 * Record the first available hole.
+		 */
+		if (!found_hole && (!vma || addr < vma->vm_start)) {
+			mm->free_area_cache = addr;
+			found_hole = 1;
+		}
 		if (!vma || addr + len <= vma->vm_start)
 			return addr;
 		addr = vma->vm_end;
@@ -947,6 +956,12 @@ void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
 	area->vm_mm->total_vm -= len >> PAGE_SHIFT;
 	if (area->vm_flags & VM_LOCKED)
 		area->vm_mm->locked_vm -= len >> PAGE_SHIFT;
+	/*
+	 * Is this a new hole at the lowest possible address?
+	 */
+	if (area->vm_start >= TASK_UNMAPPED_BASE &&
+				area->vm_start < area->vm_mm->free_area_cache)
+	      area->vm_mm->free_area_cache = area->vm_start;
 
 	remove_shared_vm_struct(area);
 
