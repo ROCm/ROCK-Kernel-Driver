@@ -255,6 +255,8 @@ pci_insert_device(struct pci_dev *dev, struct pci_bus *bus)
 #ifdef CONFIG_PROC_FS
 	pci_proc_attach_device(dev);
 #endif
+	/* add sysfs device files */
+	pci_create_sysfs_dev_files(dev);
 }
 
 static void
