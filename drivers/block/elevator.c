@@ -431,10 +431,12 @@ int elv_register_queue(struct gendisk *disk)
 void elv_unregister_queue(struct gendisk *disk)
 {
 	request_queue_t *q = disk->queue;
-	elevator_t *e = &q->elevator;
 
-	kobject_unregister(&e->kobj);
-	kobject_put(&disk->kobj);
+	if (q) {
+		elevator_t * e = &q->elevator;
+		kobject_unregister(&e->kobj);
+		kobject_put(&disk->kobj);
+	}
 }
 
 elevator_t elevator_noop = {

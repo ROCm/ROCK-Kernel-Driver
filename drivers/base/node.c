@@ -28,10 +28,10 @@ struct device_driver node_driver = {
 };
 
 
-static ssize_t node_read_cpumap(struct device * dev, char * buf, size_t count, loff_t off)
+static ssize_t node_read_cpumap(struct device * dev, char * buf)
 {
 	struct node *node_dev = to_node(to_root(dev));
-        return off ? 0 : sprintf(buf,"%lx\n",node_dev->cpumap);
+        return sprintf(buf,"%lx\n",node_dev->cpumap);
 }
 static DEVICE_ATTR(cpumap,S_IRUGO,node_read_cpumap,NULL);
 

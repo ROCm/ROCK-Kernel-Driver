@@ -1473,11 +1473,11 @@ txtime_show (struct device *dev, char *buf)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
-	return snprintf(buf, count, "%ld\n", priv->conn->prof.tx_time);
+	return sprintf(buf, "%ld\n", priv->conn->prof.tx_time);
 }
 
 static ssize_t
-txtime_write (struct device *dev, const char *buf)
+txtime_write (struct device *dev, const char *buf, size_t count)
 {
 	netiucv_priv *priv = dev->driver_data;
 	
