@@ -180,8 +180,8 @@ nfs_writepage_sync(struct file *file, struct inode *inode, struct page *page,
 		 * If we've extended the file, update the inode
 		 * now so we don't invalidate the cache.
 		 */
-		if (base > inode->i_size)
-			inode->i_size = base;
+		if (base > i_size_read(inode))
+			i_size_write(inode, base);
 	} while (count);
 
 	if (PageError(page))
@@ -211,8 +211,8 @@ nfs_writepage_async(struct file *file, struct inode *inode, struct page *page,
 	nfs_unlock_request(req);
 	nfs_strategy(inode);
 	end = ((loff_t)page->index<<PAGE_CACHE_SHIFT) + (loff_t)(offset + count);
-	if (inode->i_size < end)
-		inode->i_size = end;
+	if (i_size_read(inode) < end)
+		i_size_write(inode, end);
 
  out:
 	return status;
@@ -227,9 +227,10 @@ nfs_writepage(struct page *page, struct writeback_control *wbc)
 	struct inode *inode = page->mapping->host;
 	unsigned long end_index;
 	unsigned offset = PAGE_CACHE_SIZE;
+	loff_t i_size = i_size_read(inode);
 	int err;
 
-	end_index = inode->i_size >> PAGE_CACHE_SHIFT;
+	end_index = i_size >> PAGE_CACHE_SHIFT;
 
 	/* Ensure we've flushed out any previous writes */
 	nfs_wb_page(inode,page);
@@ -238,7 +239,7 @@ nfs_writepage(struct page *page, struct writeback_control *wbc)
 	if (page->index < end_index)
 		goto do_it;
 	/* things got complicated... */
-	offset = inode->i_size & (PAGE_CACHE_SIZE-1);
+	offset = i_size & (PAGE_CACHE_SIZE-1);
 
 	/* OK, are we completely out? */
 	err = -EIO;
@@ -701,8 +702,8 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 
 	status = 0;
 	end = ((loff_t)page->index<<PAGE_CACHE_SHIFT) + (loff_t)(offset + count);
-	if (inode->i_size < end)
-		inode->i_size = end;
+	if (i_size_read(inode) < end)
+		i_size_write(inode, end);
 
 	/* If we wrote past the end of the page.
 	 * Call the strategy routine so it can send out a bunch
@@ -716,7 +717,7 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 		nfs_unlock_request(req);
 done:
         dprintk("NFS:      nfs_updatepage returns %d (isize %Ld)\n",
-                                                status, (long long)inode->i_size);
+			status, (long long)i_size_read(inode));
 	if (status < 0)
 		ClearPageUptodate(page);
 	return status;
@@ -951,7 +952,7 @@ nfs_commit_rpcsetup(struct list_head *head, struct nfs_write_data *data, int how
 	end = req_offset(last) + last->wb_bytes;
 	len = end - start;
 	/* If 'len' is not a 32-bit quantity, pass '0' in the COMMIT call */
-	if (end >= inode->i_size || len < 0 || len > (~((u32)0) >> 1))
+	if (end >= i_size_read(inode) || len < 0 || len > (~((u32)0) >> 1))
 		len = 0;
 
 	data->inode	  = inode;

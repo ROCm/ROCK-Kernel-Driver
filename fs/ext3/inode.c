@@ -1200,7 +1200,7 @@ static int ext3_journalled_commit_write(struct file *file,
 	if (!partial)
 		SetPageUptodate(page);
 	if (pos > inode->i_size)
-		inode->i_size = pos;
+		i_size_write(inode, pos);
 	EXT3_I(inode)->i_state |= EXT3_STATE_JDATA;
 	if (inode->i_size > EXT3_I(inode)->i_disksize) {
 		EXT3_I(inode)->i_disksize = inode->i_size;
@@ -1574,7 +1574,7 @@ out_stop:
 			loff_t end = offset + ret;
 			if (end > inode->i_size) {
 				ei->i_disksize = end;
-				inode->i_size = end;
+				i_size_write(inode, end);
 				err = ext3_mark_inode_dirty(handle, inode);
 				if (!ret) 
 					ret = err;

@@ -703,7 +703,7 @@ long sys_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 	}
 		
 	file = shp->shm_file;
-	size = file->f_dentry->d_inode->i_size;
+	size = i_size_read(file->f_dentry->d_inode);
 	shp->shm_nattch++;
 	shm_unlock(shp);
 

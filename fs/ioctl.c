@@ -40,7 +40,7 @@ static int file_ioctl(struct file *filp,unsigned int cmd,unsigned long arg)
 				return -EBADF;
 			return put_user(inode->i_sb->s_blocksize, (int *) arg);
 		case FIONREAD:
-			return put_user(inode->i_size - filp->f_pos, (int *) arg);
+			return put_user(i_size_read(inode) - filp->f_pos, (int *) arg);
 	}
 	if (filp->f_op && filp->f_op->ioctl)
 		return filp->f_op->ioctl(inode, filp, cmd, arg);

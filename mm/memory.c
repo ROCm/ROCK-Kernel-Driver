@@ -1109,7 +1109,7 @@ int vmtruncate(struct inode * inode, loff_t offset)
 
 	if (inode->i_size < offset)
 		goto do_expand;
-	inode->i_size = offset;
+	i_size_write(inode, offset);
 	pgoff = (offset + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	down(&mapping->i_shared_sem);
 	if (unlikely(!list_empty(&mapping->i_mmap)))
@@ -1126,7 +1126,7 @@ do_expand:
 		goto out_sig;
 	if (offset > inode->i_sb->s_maxbytes)
 		goto out;
-	inode->i_size = offset;
+	i_size_write(inode, offset);
 
 out_truncate:
 	if (inode->i_op && inode->i_op->truncate)

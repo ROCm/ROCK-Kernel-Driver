@@ -140,7 +140,8 @@ figure_loop_size(struct loop_device *lo)
 	sector_t x;
 
 	/* Compute loopsize in bytes */
-	size = lo->lo_backing_file->f_dentry->d_inode->i_mapping->host->i_size;
+	size = i_size_read(lo->lo_backing_file->f_dentry->
+				d_inode->i_mapping->host);
 	offset = lo->lo_offset;
 	loopsize = size - offset;
 	if (lo->lo_sizelimit > 0 && lo->lo_sizelimit < loopsize)

@@ -48,7 +48,7 @@ int vmtruncate(struct inode *inode, loff_t offset)
 
 	if (inode->i_size < offset)
 		goto do_expand;
-	inode->i_size = offset;
+	i_size_write(inode, offset);
 
 	truncate_inode_pages(mapping, offset);
 	goto out_truncate;
@@ -59,7 +59,7 @@ do_expand:
 		goto out_sig;
 	if (offset > inode->i_sb->s_maxbytes)
 		goto out;
-	inode->i_size = offset;
+	i_size_write(inode, offset);
 
 out_truncate:
 	if (inode->i_op && inode->i_op->truncate)

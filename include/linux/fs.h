@@ -349,6 +349,17 @@ struct block_device {
 	struct gendisk *	bd_disk;
 };
 
+/*
+ * Use sequence counter to get consistent i_size on 32-bit processors.
+ */
+#if BITS_PER_LONG==32 && defined(CONFIG_SMP)
+#include <linux/seqlock.h>
+#define __NEED_I_SIZE_ORDERED
+#define i_size_ordered_init(inode) seqcount_init(&inode->i_size_seqcount)
+#else
+#define i_size_ordered_init(inode) do { } while (0)
+#endif
+
 struct inode {
 	struct hlist_node	i_hash;
 	struct list_head	i_list;
@@ -399,7 +410,59 @@ struct inode {
 	union {
 		void		*generic_ip;
 	} u;
+#ifdef __NEED_I_SIZE_ORDERED
+	seqcount_t		i_size_seqcount;
+#endif
 };
+
+/*
+ * NOTE: in a 32bit arch with a preemptable kernel and
+ * an UP compile the i_size_read/write must be atomic
+ * with respect to the local cpu (unlike with preempt disabled),
+ * but they don't need to be atomic with respect to other cpus like in
+ * true SMP (so they need either to either locally disable irq around
+ * the read or for example on x86 they can be still implemented as a
+ * cmpxchg8b without the need of the lock prefix). For SMP compiles
+ * and 64bit archs it makes no difference if preempt is enabled or not.
+ */
+static inline loff_t i_size_read(struct inode *inode)
+{
+#if BITS_PER_LONG==32 && defined(CONFIG_SMP)
+	loff_t i_size;
+	unsigned int seq;
+
+	do {
+		seq = read_seqcount_begin(&inode->i_size_seqcount);
+		i_size = inode->i_size;
+	} while (read_seqcount_retry(&inode->i_size_seqcount, seq));
+	return i_size;
+#elif BITS_PER_LONG==32 && defined(CONFIG_PREEMPT)
+	loff_t i_size;
+
+	preempt_disable();
+	i_size = inode->i_size;
+	preempt_enable();
+	return i_size;
+#else
+	return inode->i_size;
+#endif
+}
+
+
+static inline void i_size_write(struct inode *inode, loff_t i_size)
+{
+#if BITS_PER_LONG==32 && defined(CONFIG_SMP)
+	write_seqcount_begin(&inode->i_size_seqcount);
+	inode->i_size = i_size;
+	write_seqcount_end(&inode->i_size_seqcount);
+#elif BITS_PER_LONG==32 && defined(CONFIG_PREEMPT)
+	preempt_disable();
+	inode->i_size = i_size;
+	preempt_enable();
+#else
+	inode->i_size = i_size;
+#endif
+}
 
 struct fown_struct {
 	rwlock_t lock;          /* protects pid, uid, euid fields */

@@ -1001,6 +1001,7 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	loff_t		new_isize;
 	int		invalid = 0;
 	int		mtime_update = 0;
+	loff_t		cur_isize;
 
 	dfprintk(VFS, "NFS: refresh_inode(%s/%ld ct=%d info=0x%x)\n",
 			inode->i_sb->s_id, inode->i_ino,
@@ -1087,8 +1088,9 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	 * If we have pending writebacks, things can get
 	 * messy.
 	 */
-	if (nfs_have_writebacks(inode) && new_isize < inode->i_size)
-		new_isize = inode->i_size;
+	cur_isize = i_size_read(inode);
+	if (nfs_have_writebacks(inode) && new_isize < cur_isize)
+		new_isize = cur_isize;
 
 	nfsi->read_cache_ctime = fattr->ctime;
 	inode->i_ctime = fattr->ctime;
@@ -1102,7 +1104,7 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	}
 
 	nfsi->read_cache_isize = new_size;
-	inode->i_size = new_isize;
+	i_size_write(inode, new_isize);
 
 	if (inode->i_mode != fattr->mode ||
 	    inode->i_uid != fattr->uid ||

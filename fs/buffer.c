@@ -1721,7 +1721,7 @@ static int __block_write_full_page(struct inode *inode, struct page *page,
 
 	BUG_ON(!PageLocked(page));
 
-	last_block = (inode->i_size - 1) >> inode->i_blkbits;
+	last_block = (i_size_read(inode) - 1) >> inode->i_blkbits;
 
 	if (!page_has_buffers(page)) {
 		if (!PageUptodate(page))
@@ -2057,7 +2057,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	head = page_buffers(page);
 
 	iblock = (sector_t)page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
-	lblock = (inode->i_size+blocksize-1) >> inode->i_blkbits;
+	lblock = (i_size_read(inode)+blocksize-1) >> inode->i_blkbits;
 	bh = head;
 	nr = 0;
 	i = 0;
@@ -2282,8 +2282,12 @@ int generic_commit_write(struct file *file, struct page *page,
 	struct inode *inode = page->mapping->host;
 	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
 	__block_commit_write(inode,page,from,to);
+	/*
+	 * No need to use i_size_read() here, the i_size
+	 * cannot change under us because we hold i_sem.
+	 */
 	if (pos > inode->i_size) {
-		inode->i_size = pos;
+		i_size_write(inode, pos);
 		mark_inode_dirty(inode);
 	}
 	return 0;
@@ -2435,7 +2439,7 @@ int nobh_commit_write(struct file *file, struct page *page,
 
 	set_page_dirty(page);
 	if (pos > inode->i_size) {
-		inode->i_size = pos;
+		i_size_write(inode, pos);
 		mark_inode_dirty(inode);
 	}
 	return 0;
@@ -2565,7 +2569,8 @@ int block_write_full_page(struct page *page, get_block_t *get_block,
 			struct writeback_control *wbc)
 {
 	struct inode * const inode = page->mapping->host;
-	const unsigned long end_index = inode->i_size >> PAGE_CACHE_SHIFT;
+	loff_t i_size = i_size_read(inode);
+	const unsigned long end_index = i_size >> PAGE_CACHE_SHIFT;
 	unsigned offset;
 	void *kaddr;
 
@@ -2574,7 +2579,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block,
 		return __block_write_full_page(inode, page, get_block, wbc);
 
 	/* Is the page fully outside i_size? (truncate in progress) */
-	offset = inode->i_size & (PAGE_CACHE_SIZE-1);
+	offset = i_size & (PAGE_CACHE_SIZE-1);
 	if (page->index >= end_index+1 || !offset) {
 		/*
 		 * The page may have dirty, unmapped buffers.  For example,

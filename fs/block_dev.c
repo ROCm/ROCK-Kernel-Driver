@@ -29,7 +29,7 @@
 static sector_t max_block(struct block_device *bdev)
 {
 	sector_t retval = ~((sector_t)0);
-	loff_t sz = bdev->bd_inode->i_size;
+	loff_t sz = i_size_read(bdev->bd_inode);
 
 	if (sz) {
 		unsigned int size = block_size(bdev);
@@ -161,7 +161,7 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 
 	bd_inode = file->f_dentry->d_inode->i_bdev->bd_inode;
 	down(&bd_inode->i_sem);
-	size = bd_inode->i_size;
+	size = i_size_read(bd_inode);
 
 	switch (origin) {
 		case 2:
@@ -487,7 +487,7 @@ int check_disk_change(struct block_device *bdev)
 static void bd_set_size(struct block_device *bdev, loff_t size)
 {
 	unsigned bsize = bdev_hardsect_size(bdev);
-	bdev->bd_inode->i_size = size;
+	i_size_write(bdev->bd_inode, size);
 	while (bsize < PAGE_CACHE_SIZE) {
 		if (size & bsize)
 			break;

@@ -757,7 +757,7 @@ do_holes:
 				char *kaddr;
 
 				if (dio->block_in_file >=
-						dio->inode->i_size>>blkbits) {
+					i_size_read(dio->inode)>>blkbits) {
 					/* We hit eof */
 					page_cache_release(page);
 					goto out;
@@ -943,13 +943,15 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 		if (ret == 0)
 			ret = dio->page_errors;
 		if (ret == 0 && dio->result) {
+			loff_t i_size = i_size_read(inode);
+
 			ret = dio->result;
 			/*
 			 * Adjust the return value if the read crossed a
 			 * non-block-aligned EOF.
 			 */
-			if (rw == READ && (offset + ret > inode->i_size))
-				ret = inode->i_size - offset;
+			if (rw == READ && (offset + ret > i_size))
+				ret = i_size - offset;
 		}
 		kfree(dio);
 	}
