@@ -40,8 +40,8 @@ struct nfs_page {
 	unsigned long		wb_index;	/* Offset >> PAGE_CACHE_SHIFT */
 	unsigned int		wb_offset,	/* Offset & ~PAGE_CACHE_MASK */
 				wb_pgbase,	/* Start of page data */
-				wb_bytes,	/* Length of request */
-				wb_count;	/* reference count */
+				wb_bytes;	/* Length of request */
+	atomic_t		wb_count;	/* reference count */
 	unsigned long		wb_flags;
 	struct nfs_writeverf	wb_verf;	/* Commit cookie */
 };
@@ -65,8 +65,6 @@ extern	int nfs_coalesce_requests(struct list_head *, struct list_head *,
 				  unsigned int);
 extern  int nfs_wait_on_request(struct nfs_page *);
 
-extern	spinlock_t nfs_wreq_lock;
-
 /*
  * Lock the page of an asynchronous request without incrementing the wb_count
  */
@@ -86,7 +84,7 @@ nfs_lock_request(struct nfs_page *req)
 {
 	if (test_and_set_bit(PG_BUSY, &req->wb_flags))
 		return 0;
-	req->wb_count++;
+	atomic_inc(&req->wb_count);
 	return 1;
 }
 

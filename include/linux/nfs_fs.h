@@ -147,6 +147,7 @@ struct nfs_inode {
 	/*
 	 * This is the list of dirty unwritten pages.
 	 */
+	spinlock_t		req_lock;
 	struct list_head	dirty;
 	struct list_head	commit;
 	struct radix_tree_root	nfs_page_tree;

@@ -389,7 +389,7 @@ nfs_inode_add_request(struct inode *inode, struct nfs_page *req)
 		nfs_begin_data_update(inode);
 	}
 	nfsi->npages++;
-	req->wb_count++;
+	atomic_inc(&req->wb_count);
 	return 0;
 }
 
@@ -399,21 +399,20 @@ nfs_inode_add_request(struct inode *inode, struct nfs_page *req)
 static void
 nfs_inode_remove_request(struct nfs_page *req)
 {
-	struct nfs_inode *nfsi;
-	struct inode *inode;
+	struct inode *inode = req->wb_inode;
+	struct nfs_inode *nfsi = NFS_I(inode);
 
 	BUG_ON (!NFS_WBACK_BUSY(req));
-	spin_lock(&nfs_wreq_lock);
-	inode = req->wb_inode;
-	nfsi = NFS_I(inode);
+
+	spin_lock(&nfsi->req_lock);
 	radix_tree_delete(&nfsi->nfs_page_tree, req->wb_index);
 	nfsi->npages--;
 	if (!nfsi->npages) {
-		spin_unlock(&nfs_wreq_lock);
+		spin_unlock(&nfsi->req_lock);
 		nfs_end_data_update_defer(inode);
 		iput(inode);
 	} else
-		spin_unlock(&nfs_wreq_lock);
+		spin_unlock(&nfsi->req_lock);
 	nfs_clear_request(req);
 	nfs_release_request(req);
 }
@@ -429,7 +428,7 @@ _nfs_find_request(struct inode *inode, unsigned long index)
 
 	req = (struct nfs_page*)radix_tree_lookup(&nfsi->nfs_page_tree, index);
 	if (req)
-		req->wb_count++;
+		atomic_inc(&req->wb_count);
 	return req;
 }
 
@@ -437,10 +436,11 @@ static struct nfs_page *
 nfs_find_request(struct inode *inode, unsigned long index)
 {
 	struct nfs_page		*req;
+	struct nfs_inode	*nfsi = NFS_I(inode);
 
-	spin_lock(&nfs_wreq_lock);
+	spin_lock(&nfsi->req_lock);
 	req = _nfs_find_request(inode, index);
-	spin_unlock(&nfs_wreq_lock);
+	spin_unlock(&nfsi->req_lock);
 	return req;
 }
 
@@ -453,10 +453,10 @@ nfs_mark_request_dirty(struct nfs_page *req)
 	struct inode *inode = req->wb_inode;
 	struct nfs_inode *nfsi = NFS_I(inode);
 
-	spin_lock(&nfs_wreq_lock);
+	spin_lock(&nfsi->req_lock);
 	nfs_list_add_request(req, &nfsi->dirty);
 	nfsi->ndirty++;
-	spin_unlock(&nfs_wreq_lock);
+	spin_unlock(&nfsi->req_lock);
 	inc_page_state(nr_dirty);
 	mark_inode_dirty(inode);
 }
@@ -481,10 +481,10 @@ nfs_mark_request_commit(struct nfs_page *req)
 	struct inode *inode = req->wb_inode;
 	struct nfs_inode *nfsi = NFS_I(inode);
 
-	spin_lock(&nfs_wreq_lock);
+	spin_lock(&nfsi->req_lock);
 	nfs_list_add_request(req, &nfsi->commit);
 	nfsi->ncommit++;
-	spin_unlock(&nfs_wreq_lock);
+	spin_unlock(&nfsi->req_lock);
 	inc_page_state(nr_unstable);
 	mark_inode_dirty(inode);
 }
@@ -509,7 +509,7 @@ nfs_wait_on_requests(struct inode *inode, unsigned long idx_start, unsigned int 
 	else
 		idx_end = idx_start + npages - 1;
 
-	spin_lock(&nfs_wreq_lock);
+	spin_lock(&nfsi->req_lock);
 	next = idx_start;
 	while (radix_tree_gang_lookup(&nfsi->nfs_page_tree, (void **)&req, next, 1)) {
 		if (req->wb_index > idx_end)
@@ -519,16 +519,16 @@ nfs_wait_on_requests(struct inode *inode, unsigned long idx_start, unsigned int 
 		if (!NFS_WBACK_BUSY(req))
 			continue;
 
-		req->wb_count++;
-		spin_unlock(&nfs_wreq_lock);
+		atomic_inc(&req->wb_count);
+		spin_unlock(&nfsi->req_lock);
 		error = nfs_wait_on_request(req);
 		nfs_release_request(req);
 		if (error < 0)
 			return error;
-		spin_lock(&nfs_wreq_lock);
+		spin_lock(&nfsi->req_lock);
 		res++;
 	}
-	spin_unlock(&nfs_wreq_lock);
+	spin_unlock(&nfsi->req_lock);
 	return res;
 }
 
@@ -624,6 +624,7 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 		   unsigned int offset, unsigned int bytes)
 {
 	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs_inode *nfsi = NFS_I(inode);
 	struct nfs_page		*req, *new = NULL;
 	unsigned long		rqend, end;
 
@@ -635,19 +636,19 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 		/* Loop over all inode entries and see if we find
 		 * A request for the page we wish to update
 		 */
-		spin_lock(&nfs_wreq_lock);
+		spin_lock(&nfsi->req_lock);
 		req = _nfs_find_request(inode, page->index);
 		if (req) {
 			if (!nfs_lock_request_dontget(req)) {
 				int error;
-				spin_unlock(&nfs_wreq_lock);
+				spin_unlock(&nfsi->req_lock);
 				error = nfs_wait_on_request(req);
 				nfs_release_request(req);
 				if (error < 0)
 					return ERR_PTR(error);
 				continue;
 			}
-			spin_unlock(&nfs_wreq_lock);
+			spin_unlock(&nfsi->req_lock);
 			if (new)
 				nfs_release_request(new);
 			break;
@@ -658,15 +659,15 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 			nfs_lock_request_dontget(new);
 			error = nfs_inode_add_request(inode, new);
 			if (error) {
-				spin_unlock(&nfs_wreq_lock);
+				spin_unlock(&nfsi->req_lock);
 				nfs_unlock_request(new);
 				return ERR_PTR(error);
 			}
-			spin_unlock(&nfs_wreq_lock);
+			spin_unlock(&nfsi->req_lock);
 			nfs_mark_request_dirty(new);
 			return new;
 		}
-		spin_unlock(&nfs_wreq_lock);
+		spin_unlock(&nfsi->req_lock);
 
 		new = nfs_create_request(file, inode, page, offset, bytes);
 		if (IS_ERR(new))
@@ -1347,13 +1348,14 @@ nfs_commit_done(struct rpc_task *task)
 int nfs_flush_inode(struct inode *inode, unsigned long idx_start,
 		   unsigned int npages, int how)
 {
+	struct nfs_inode *nfsi = NFS_I(inode);
 	LIST_HEAD(head);
 	int			res,
 				error = 0;
 
-	spin_lock(&nfs_wreq_lock);
+	spin_lock(&nfsi->req_lock);
 	res = nfs_scan_dirty(inode, &head, idx_start, npages);
-	spin_unlock(&nfs_wreq_lock);
+	spin_unlock(&nfsi->req_lock);
 	if (res)
 		error = nfs_flush_list(&head, NFS_SERVER(inode)->wpages, how);
 	if (error < 0)
@@ -1365,18 +1367,19 @@ int nfs_flush_inode(struct inode *inode, unsigned long idx_start,
 int nfs_commit_inode(struct inode *inode, unsigned long idx_start,
 		    unsigned int npages, int how)
 {
+	struct nfs_inode *nfsi = NFS_I(inode);
 	LIST_HEAD(head);
 	int			res,
 				error = 0;
 
-	spin_lock(&nfs_wreq_lock);
+	spin_lock(&nfsi->req_lock);
 	res = nfs_scan_commit(inode, &head, idx_start, npages);
 	if (res) {
 		res += nfs_scan_commit(inode, &head, 0, 0);
-		spin_unlock(&nfs_wreq_lock);
+		spin_unlock(&nfsi->req_lock);
 		error = nfs_commit_list(&head, how);
 	} else
-		spin_unlock(&nfs_wreq_lock);
+		spin_unlock(&nfsi->req_lock);
 	if (error < 0)
 		return error;
 	return res;

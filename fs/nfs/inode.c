@@ -1764,6 +1764,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
 		inode_init_once(&nfsi->vfs_inode);
+		spin_lock_init(&nfsi->req_lock);
 		INIT_LIST_HEAD(&nfsi->dirty);
 		INIT_LIST_HEAD(&nfsi->commit);
 		INIT_RADIX_TREE(&nfsi->nfs_page_tree, GFP_ATOMIC);
