@@ -1464,8 +1464,11 @@ tcp_find_option(u_int8_t option,
 	unsigned int i;
 
 	duprintf("tcp_match: finding option\n");
+
+	if (!optlen)
+		return invert;
+
 	/* If we don't have the whole header, drop packet. */
-	BUG_ON(!optlen);
 	op = skb_header_pointer(skb,
 				skb->nh.iph->ihl*4 + sizeof(struct tcphdr),
 				optlen, _opt);
@@ -1534,7 +1537,7 @@ tcp_match(const struct sk_buff *skb,
 		      IPT_TCP_INV_FLAGS))
 		return 0;
 	if (tcpinfo->option) {
-		if (th->doff * 4 <= sizeof(_tcph)) {
+		if (th->doff * 4 < sizeof(_tcph)) {
 			*hotdrop = 1;
 			return 0;
 		}
