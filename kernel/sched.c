@@ -715,15 +715,26 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	if (unlikely(task_running(rq, p) || cpu_is_offline(this_cpu)))
 		goto out_activate;
 
-	new_cpu = this_cpu; /* Wake to this CPU if we can */
+	new_cpu = cpu;
 
 	if (cpu == this_cpu || unlikely(!cpu_isset(this_cpu, p->cpus_allowed)))
 		goto out_set_cpu;
 
-	/* Passive load balancing */
 	load = get_low_cpu_load(cpu);
-	this_load = get_high_cpu_load(this_cpu) + SCHED_LOAD_SCALE;
-	if (load > this_load)
+	this_load = get_high_cpu_load(this_cpu);
+
+	/* Don't pull the task off an idle CPU to a busy one */
+	if (load < SCHED_LOAD_SCALE/2 && this_load > SCHED_LOAD_SCALE/2)
+		goto out_set_cpu;
+
+	new_cpu = this_cpu; /* Wake to this CPU if we can */
+
+	/*
+	 * Passive load balancing. If the queues are very out of balance
+	 * we might as well balance here rather than the periodic load
+	 * balancing.
+	 */
+	if (load > this_load + SCHED_LOAD_SCALE*2)
 		goto out_set_cpu;
 
 	now = sched_clock();
@@ -735,7 +746,7 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	for_each_domain(this_cpu, sd) {
 		if (!(sd->flags & SD_WAKE_AFFINE))
 			break;
-		if (now - p->timestamp < sd->cache_hot_time)
+		if (rq->timestamp_last_tick - p->timestamp < sd->cache_hot_time)
 			break;
 
 		if (cpu_isset(cpu, sd->span))
@@ -1274,8 +1285,7 @@ int can_migrate_task(task_t *p, runqueue_t *rq, int this_cpu,
 	/* Aggressive migration if we've failed balancing */
 	if (idle == NEWLY_IDLE ||
 			sd->nr_balance_failed < sd->cache_nice_tries) {
-		if ((rq->timestamp_last_tick - p->timestamp)
-						< sd->cache_hot_time)
+		if (rq->timestamp_last_tick - p->timestamp < sd->cache_hot_time)
 			return 0;
 	}
 
