@@ -1,13 +1,11 @@
 #ifndef __X8664_A_OUT_H__
 #define __X8664_A_OUT_H__
 
-
-/* Note: a.out is not supported in 64bit mode. This is just here to 
-   still let some old things compile. */ 
+/* 32bit a.out */
 
 struct exec
 {
-  unsigned long a_info;		/* Use macros N_MAGIC, etc for access */
+  unsigned int a_info;		/* Use macros N_MAGIC, etc for access */
   unsigned a_text;		/* length of text, in bytes */
   unsigned a_data;		/* length of data, in bytes */
   unsigned a_bss;		/* length of uninitialized data area for file, in bytes */
@@ -23,7 +21,7 @@ struct exec
 
 #ifdef __KERNEL__
 
-#define STACK_TOP	TASK_SIZE
+#define STACK_TOP	0xc0000000
 
 #endif
 

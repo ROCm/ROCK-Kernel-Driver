@@ -221,7 +221,7 @@ ia32_sys_call_table:
 	.quad sys_chmod		/* 15 */
 	.quad sys_lchown16
 	.quad ni_syscall			/* old break syscall holder */
-	.quad ni_syscall	/* (old)stat */ 
+	.quad sys_stat
 	.quad sys32_lseek
 	.quad sys_getpid		/* 20 */
 	.quad sys_mount	/* mount  */
@@ -231,7 +231,7 @@ ia32_sys_call_table:
 	.quad sys_stime		/* stime */		/* 25 */
 	.quad sys32_ptrace	/* ptrace */
 	.quad sys_alarm		/* XXX sign extension??? */ 
-	.quad ni_syscall	/* (old)fstat */
+	.quad sys_fstat	/* (old)fstat */
 	.quad sys_pause
 	.quad compat_sys_utime	/* 30 */
 	.quad ni_syscall	/* old stty syscall holder */
@@ -287,7 +287,7 @@ ia32_sys_call_table:
 	.quad sys_setgroups16
 	.quad sys32_old_select
 	.quad sys_symlink
-	.quad ni_syscall	/* (old)lstat */
+	.quad sys_lstat
 	.quad sys_readlink		/* 85 */
 	.quad sys_uselib
 	.quad sys_swapon
