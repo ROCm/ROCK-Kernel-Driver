@@ -299,13 +299,14 @@ static int powernow_decode_bios (int maxfid, int startvid)
 			dprintk (" voltage regulator)\n");
 
 			latency = psb->settlingtime;
-			if (latency < 10000) {
+			if (latency < 100) {
 				printk (KERN_INFO PFX "BIOS set settling time to %d microseconds."
-						"Should be at least 10000. Correcting.\n", latency);
-				latency = 10000;
+						"Should be at least 100. Correcting.\n", latency);
+				latency = 100;
 			}
 			dprintk (KERN_INFO PFX "Settling Time: %d microseconds.\n", psb->settlingtime);
 			dprintk (KERN_INFO PFX "Has %d PST tables. (Only dumping ones relevant to this CPU).\n", psb->numpst);
+			latency *= 100;	/* SGTC needs to be in units of 10ns */
 
 			p += sizeof (struct psb_s);
 
