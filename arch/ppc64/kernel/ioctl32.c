@@ -4590,9 +4590,12 @@ int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, u
 			return -ENOMEM;
 		memset(additional_ioctls, 0, PAGE_SIZE);
 	}
-	for (i = 0; i < PAGE_SIZE/sizeof(struct ioctl_trans); i++)
+	for (i = 0; i < PAGE_SIZE/sizeof(struct ioctl_trans); i++) {
 		if (!additional_ioctls[i].cmd)
 			break;
+		if (additional_ioctls[i].cmd == cmd)
+			printk("duplicate ioctl found: %x\n", cmd);
+	}
 	if (i == PAGE_SIZE/sizeof(struct ioctl_trans))
 		return -ENOMEM;
 	additional_ioctls[i].cmd = cmd;
