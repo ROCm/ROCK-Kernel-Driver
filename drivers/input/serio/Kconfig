@@ -119,3 +119,14 @@ config SERIO_98KBD
 	  The module will be called rpckbd.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
+config SERIO_PCIPS2
+	tristate "PCI PS/2 keyboard and PS/2 mouse controller"
+	depends on PCI && SERIO
+	help
+	  Say Y here if you have a Mobility Docking station with PS/2
+	  keyboard and mice ports.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called rpckbd. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
