@@ -7,7 +7,7 @@
    is part of the Avermedia DVB-T 1.3.26.3 Application. If the software is
    installed in Windows the file will be in the /Program Files/AVerTV DVB-T/
    directory and is called sc_main.mc. Alternatively it can "extracted" from
-   the install cab files. Copy this file to /etc/dvb/sc_main.mc.
+   the install cab files. Copy this file to '/usr/lib/hotplug/firmware/sc_main.mc'.
    With this version of the file the first 10 bytes are discarded and the
    next 0x4000 loaded. This may change in future versions.
  */
@@ -30,7 +30,7 @@
 #include "dvb_functions.h"
 
 #ifndef DVB_SP887X_FIRMWARE_FILE
-#define DVB_SP887X_FIRMWARE_FILE "/etc/dvb/sc_main.mc"
+#define DVB_SP887X_FIRMWARE_FILE "/usr/lib/hotplug/firmware/sc_main.mc"
 #endif
 
 static char *sp887x_firmware = DVB_SP887X_FIRMWARE_FILE;

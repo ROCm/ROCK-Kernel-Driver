@@ -15,7 +15,7 @@ config DVB_AV7110
 
 config DVB_AV7110_FIRMWARE
 	bool "Compile AV7110 firmware into the driver"
-	depends on DVB_AV7110
+	depends on DVB_AV7110 && !STANDALONE
 	help
 	  The AV7110 firmware is normally loaded by the firmware hotplug manager.
 	  If you want to compile the firmware into the driver you need to say
@@ -89,8 +89,7 @@ config DVB_BUDGET_AV
 config DVB_BUDGET_PATCH
 	tristate "AV7110 cards with Budget Patch"
 	depends on DVB_BUDGET
-	select VIDEO_DEV
-	select VIDEO_SAA7146_VV
+	select DVB_AV7110
 	help
 	  Support for Budget Patch (full TS) modification on 
 	  SAA7146+AV7110 based cards (DVB-S cards). This
