@@ -9,7 +9,7 @@
 
 #include <video/fbcon.h>
 
-#include "mach64.h"
+#include <video/mach64.h>
 #include "atyfb.h"
 
 
@@ -73,7 +73,7 @@ static int aty_dsp_gt(const struct fb_info_aty *info, u8 bpp,
     /* fifo_off<<6 */
     fifo_off = ((xclks_per_row*(fifo_size-1))>>5)+(3<<6);
 
-    if (info->total_vram > 1*1024*1024) {
+    if (info->fb_info.fix.smem_len > 1*1024*1024) {
 	if (info->ram_type >= SDRAM) {
 	    /* >1 MB SDRAM */
 	    dsp_loop_latency += 8;

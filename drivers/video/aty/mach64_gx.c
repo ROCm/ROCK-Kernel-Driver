@@ -11,7 +11,7 @@
 
 #include <video/fbcon.h>
 
-#include "mach64.h"
+#include <video/mach64.h>
 #include "atyfb.h"
 
 /* Definitions for the ICS 2595 == ATI 18818_1 Clockchip */

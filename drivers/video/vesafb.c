@@ -32,7 +32,7 @@
 
 /* --------------------------------------------------------------------- */
 
-static struct fb_var_screeninfo vesafb_defined = {
+static struct fb_var_screeninfo vesafb_defined __initdata = {
 	activate:	FB_ACTIVATE_NOW,
 	height:		-1,
 	width:		-1,
@@ -43,7 +43,7 @@ static struct fb_var_screeninfo vesafb_defined = {
 	vmode:		FB_VMODE_NONINTERLACED,
 };
 
-static struct fb_fix_screeninfo vesafb_fix = {
+static struct fb_fix_screeninfo vesafb_fix __initdata = {
 	id:	"VESA VGA",
 	type:	FB_TYPE_PACKED_PIXELS,
 	accel:	FB_ACCEL_NONE,

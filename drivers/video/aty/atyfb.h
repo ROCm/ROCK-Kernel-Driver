@@ -1,4 +1,3 @@
-
 /*
  *  ATI Frame Buffer Device Driver Core Definitions
  */
@@ -89,19 +88,14 @@ struct aty_cursor {
 struct fb_info_aty {
     struct fb_info fb_info;
     struct fb_info_aty *next;
-    unsigned long ati_regbase_phys;
     unsigned long ati_regbase;
-    unsigned long frame_buffer_phys;
-    unsigned long frame_buffer;
     unsigned long clk_wr_offset;
     struct pci_mmap_map *mmap_map;
     struct aty_cursor *cursor;
     struct aty_cmap_regs *aty_cmap_regs;
-    struct { u8 red, green, blue, pad; } palette[256];
     struct atyfb_par default_par;
     struct atyfb_par current_par;
     u32 features;
-    u32 total_vram;
     u32 ref_clk_per;
     u32 pll_per;
     u32 mclk_per;
@@ -110,19 +104,7 @@ struct fb_info_aty {
     u8 mem_refresh_rate;
     const struct aty_dac_ops *dac_ops;
     const struct aty_pll_ops *pll_ops;
-    struct display disp;
     struct display_switch dispsw;
-    union {
-#ifdef FBCON_HAS_CFB16
-	u16 cfb16[16];
-#endif
-#ifdef FBCON_HAS_CFB24
-	u32 cfb24[16];
-#endif
-#ifdef FBCON_HAS_CFB32
-	u32 cfb32[16];
-#endif
-    } fbcon_cmap;
     u8 blitter_may_be_busy;
 #ifdef __sparc__
     u8 mmaped;

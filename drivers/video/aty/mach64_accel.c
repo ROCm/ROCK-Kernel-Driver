@@ -13,7 +13,7 @@
 #include <video/fbcon-cfb24.h>
 #include <video/fbcon-cfb32.h>
 
-#include "mach64.h"
+#include <video/mach64.h>
 #include "atyfb.h"
 
     /*

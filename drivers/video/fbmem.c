@@ -132,7 +132,7 @@ extern int pmagbafb_init(void);
 extern int pmagbbfb_init(void);
 extern void maxinefb_init(void);
 extern int tx3912fb_init(void);
-extern int tx3912fb_setup(char*);
+extern void tx3912fb_setup(char*);
 extern int radeonfb_init(void);
 extern int radeonfb_setup(char*);
 extern int e1355fb_init(void);

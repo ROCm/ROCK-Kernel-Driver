@@ -720,8 +720,3 @@ CONFIG_FBCON_HGA
   This is the low level frame buffer console driver for Hercules mono
   graphics cards.
 
-CONFIG_FBCON_VGA
-  This is the low level frame buffer console driver for VGA text mode;
-  it is used by frame buffer device drivers that support VGA text
-  mode.
-

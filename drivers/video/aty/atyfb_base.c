@@ -71,7 +71,7 @@
 #include <video/fbcon-cfb24.h>
 #include <video/fbcon-cfb32.h>
 
-#include "mach64.h"
+#include <video/mach64.h>
 #include "atyfb.h"
 
 #ifdef __powerpc__
@@ -133,6 +133,15 @@ struct pci_mmap_map {
     unsigned long prot_mask;
 };
 
+static struct fb_fix_screeninfo atyfb_fix __initdata = {
+	id:		"ATY Mach64",
+	type:		FB_TYPE_PACKED_PIXELS,
+	visual:		FB_VISUAL_PSEUDOCOLOR,
+	xpanstep:	1,
+	ypanstep:	1,
+	ywrapstep:	1,
+	accel:		FB_ACCEL_NONE,
+};
 
     /*
      *  Frame buffer device API
@@ -151,10 +160,6 @@ static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 static int atyfb_pan_display(struct fb_var_screeninfo *var, int con,
 			     struct fb_info *fb);
 static int atyfb_blank(int blank, struct fb_info *fb);
-static int atyfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info);
-static int atyfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info);
 static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 		       u_long arg, int con, struct fb_info *info);
 #ifdef __sparc__
@@ -168,7 +173,6 @@ static int atyfb_rasterimg(struct fb_info *info, int start);
      *  Interface to the low level console driver
      */
 
-static int atyfbcon_switch(int con, struct fb_info *fb);
 static int atyfbcon_updatevar(int con, struct fb_info *fb);
 
     /*
@@ -203,8 +207,6 @@ static int encode_fix(struct fb_fix_screeninfo *fix,
 		      const struct fb_info_aty *info);
 static void atyfb_set_dispsw(struct display *disp, struct fb_info_aty *info,
 			     int bpp, int accel);
-static int atyfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
-			 u_int *transp, struct fb_info *fb);
 #ifdef CONFIG_PPC
 static int read_aty_sense(const struct fb_info_aty *info);
 #endif
@@ -226,8 +228,8 @@ static struct fb_ops atyfb_ops = {
 	fb_get_fix:	atyfb_get_fix,
 	fb_get_var:	atyfb_get_var,
 	fb_set_var:	atyfb_set_var,
-	fb_get_cmap:	atyfb_get_cmap,
-	fb_set_cmap:	atyfb_set_cmap,
+	fb_get_cmap:	gen_get_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	atyfb_setcolreg,
 	fb_pan_display:	atyfb_pan_display,
 	fb_blank:	atyfb_blank,
@@ -361,6 +363,8 @@ static char ram_sgram[] __initdata = "SGRAM";
 static char ram_wram[] __initdata = "WRAM";
 static char ram_off[] __initdata = "OFF";
 static char ram_resv[] __initdata = "RESV";
+
+static u32 pseudo_palette[17];
 
 #ifdef CONFIG_FB_ATY_GX
 static char *aty_gx_ram[8] __initdata = {
@@ -552,7 +556,7 @@ static int aty_var_to_crtc(const struct fb_info_aty *info,
     } else
 	FAIL("invalid bpp");
 
-    if (vxres*vyres*bpp/8 > info->total_vram)
+    if (vxres*vyres*bpp/8 > info->fb_info.fix.smem_len)
 	FAIL("not enough video RAM");
 
     if ((vmode & FB_VMODE_MASK) != FB_VMODE_NONINTERLACED)
@@ -796,7 +800,7 @@ static void atyfb_set_par(const struct atyfb_par *par,
 	aty_init_engine(par, info);
 
 #ifdef CONFIG_BOOTX_TEXT
-	btext_update_display(info->frame_buffer_phys,
+	btext_update_display(info->fb_info.fix.smem_start,
 			(((par->crtc.h_tot_disp>>16) & 0xff)+1)*8,
 			((par->crtc.v_tot_disp>>16) & 0x7ff)+1,
 			par->crtc.bpp,
@@ -922,7 +926,7 @@ static int atyfb_release(struct fb_info *info, int user)
 			else
 				var.accel_flags |= FB_ACCELF_TEXT;
 			if (var.yres == var.yres_virtual) {
-				u32 vram = (fb->total_vram - (PAGE_SIZE << 2));
+				u32 vram = (fb->fb_info.fix.smem_len - (PAGE_SIZE << 2));
 				var.yres_virtual = ((vram * 8) / var.bits_per_pixel) /
 					var.xres_virtual;
 				if (var.yres_virtual < var.yres)
@@ -946,30 +950,11 @@ static int encode_fix(struct fb_fix_screeninfo *fix,
     memset(fix, 0, sizeof(struct fb_fix_screeninfo));
 
     strcpy(fix->id, atyfb_name);
-    fix->smem_start = info->frame_buffer_phys;
-    fix->smem_len = (u32)info->total_vram;
-
-    /*
-     *  Reg Block 0 (CT-compatible block) is at ati_regbase_phys
-     *  Reg Block 1 (multimedia extensions) is at ati_regbase_phys-0x400
-     */
-    if (M64_HAS(GX)) {
-	fix->mmio_start = info->ati_regbase_phys;
-	fix->mmio_len = 0x400;
-	fix->accel = FB_ACCEL_ATI_MACH64GX;
-    } else if (M64_HAS(CT)) {
-	fix->mmio_start = info->ati_regbase_phys;
-	fix->mmio_len = 0x400;
-	fix->accel = FB_ACCEL_ATI_MACH64CT;
-    } else if (M64_HAS(VT)) {
-	fix->mmio_start = info->ati_regbase_phys-0x400;
-	fix->mmio_len = 0x800;
-	fix->accel = FB_ACCEL_ATI_MACH64VT;
-    } else /* if (M64_HAS(GT)) */ {
-	fix->mmio_start = info->ati_regbase_phys-0x400;
-	fix->mmio_len = 0x800;
-	fix->accel = FB_ACCEL_ATI_MACH64GT;
-    }
+    fix->smem_start = info->fb_info.fix.smem_start;
+    fix->smem_len = info->fb_info.fix.smem_len;
+    fix->mmio_start = info->fb_info.fix.mmio_start;
+    fix->mmio_len = info->fb_info.fix.mmio_len;
+    fix->accel = info->fb_info.fix.accel;
     fix->type = FB_TYPE_PACKED_PIXELS;
     fix->type_aux = 0;
     fix->line_length = par->crtc.vxres*par->crtc.bpp/8;
@@ -1033,21 +1018,21 @@ static void atyfb_set_dispsw(struct display *disp, struct fb_info_aty *info,
 		case 16:
 		    info->dispsw = accel ? fbcon_aty16 : fbcon_cfb16;
 		    disp->dispsw = &info->dispsw;
-		    disp->dispsw_data = info->fbcon_cmap.cfb16;
+		    disp->dispsw_data = info->fb_info.pseudo_palette;
 		    break;
 #endif
 #ifdef FBCON_HAS_CFB24
 		case 24:
 		    info->dispsw = accel ? fbcon_aty24 : fbcon_cfb24;
 		    disp->dispsw = &info->dispsw;
-		    disp->dispsw_data = info->fbcon_cmap.cfb24;
+		    disp->dispsw_data = info->fb_info.pseudo_palette;
 		    break;
 #endif
 #ifdef FBCON_HAS_CFB32
 		case 32:
 		    info->dispsw = accel ? fbcon_aty32 : fbcon_cfb32;
 		    disp->dispsw = &info->dispsw;
-		    disp->dispsw_data = info->fbcon_cmap.cfb32;
+		    disp->dispsw_data = info->fb_info.pseudo_palette;
 		    break;
 #endif
 		default:
@@ -1100,7 +1085,6 @@ static int atyfb_set_var(struct fb_var_screeninfo *var, int con,
 	    struct fb_fix_screeninfo fix;
 
 	    encode_fix(&fix, &par, info);
-	    fb->screen_base = (char *)info->frame_buffer;
 	    display->visual = fix.visual;
 	    display->type = fix.type;
 	    display->type_aux = fix.type_aux;
@@ -1157,51 +1141,6 @@ static int atyfb_pan_display(struct fb_var_screeninfo *var, int con,
     return 0;
 }
 
-    /*
-     *  Get the Colormap
-     */
-
-static int atyfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info)
-{
-    if (!info->display_fg || con == info->display_fg->vc_num) /* current console? */
-	return fb_get_cmap(cmap, kspc, atyfb_getcolreg, info);
-    else if (fb_display[con].cmap.len) /* non default colormap? */
-	fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
-    else {
-	int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-	fb_copy_cmap(fb_default_cmap(size), cmap, kspc ? 0 : 2);
-    }
-    return 0;
-}
-
-    /*
-     *  Set the Colormap
-     */
-
-static int atyfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info)
-{
-    int err;
-    struct display *disp;
-
-    if (con >= 0)
-    	disp = &fb_display[con];
-    else
-        disp = info->disp;
-    if (!disp->cmap.len) {	/* no colormap allocated? */
-	int size = disp->var.bits_per_pixel == 16 ? 32 : 256;
-	if ((err = fb_alloc_cmap(&disp->cmap, size, 0)))
-	    return err;
-    }
-    if (!info->display_fg || con == info->display_fg->vc_num)			/* current console? */
-	return fb_set_cmap(cmap, kspc, info);
-    else
-	fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
-    return 0;
-}
-
-
 #ifdef DEBUG
 #define ATYIO_CLKR		0x41545900	/* ATY\00 */
 #define ATYIO_CLKW		0x41545901	/* ATY\01 */
@@ -1248,7 +1187,7 @@ static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 	fbtyp.fb_height = info->current_par.crtc.vyres;
 	fbtyp.fb_depth = info->current_par.crtc.bpp;
 	fbtyp.fb_cmsize = disp->cmap.len;
-	fbtyp.fb_size = info->total_vram;
+	fbtyp.fb_size = info->fb_info.fix.smem_len;
 	if (copy_to_user((struct fbtype *)arg, &fbtyp, sizeof(fbtyp)))
 		return -EFAULT;
 	break;
@@ -1344,8 +1283,8 @@ static int atyfb_mmap(struct fb_info *info, struct file *file,
 	/* To stop the swapper from even considering these pages. */
 	vma->vm_flags |= (VM_SHM | VM_LOCKED);
 
-	if (((vma->vm_pgoff == 0) && (size == fb->total_vram)) ||
-	    ((off == fb->total_vram) && (size == PAGE_SIZE)))
+	if (((vma->vm_pgoff == 0) && (size == fb->fb_info.fix.smem_len)) ||
+	    ((off == fb->fb_info.fix.smem_len) && (size == PAGE_SIZE)))
 		off += 0x8000000000000000UL;
 
 	vma->vm_pgoff = off >> PAGE_SHIFT;	/* propagate off changes */
@@ -1630,7 +1569,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 			/* Backup fb content */	
 			if (info->save_framebuffer)
 				memcpy_fromio(info->save_framebuffer,
-				       (void *)info->frame_buffer, nb);
+				       (void *)info->fb_info.screen_base, nb);
 
 			/* Blank display and LCD */
 			atyfb_blank(VESA_POWERDOWN+1, (struct fb_info *)info);
@@ -1644,7 +1583,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 
 			/* Restore fb content */			
 			if (info->save_framebuffer) {
-				memcpy_toio((void *)info->frame_buffer,
+				memcpy_toio((void *)info->fb_info.screen_base,
 				       info->save_framebuffer, nb);
 				vfree(info->save_framebuffer);
 				info->save_framebuffer = 0;
@@ -1715,15 +1654,13 @@ static struct fb_info_aty *fb_list = NULL;
 
 static int __init aty_init(struct fb_info_aty *info, const char *name)
 {
-    u32 chip_id;
-    u32 i;
-    int j, k;
+    u32 chip_id, i;
     struct fb_var_screeninfo var;
     struct display *disp;
     u16 type;
     u8 rev;
     const char *chipname = NULL, *ramname = NULL, *xtal;
-    int pll, mclk, gtb_memsize;
+    int j, pll, mclk, gtb_memsize;
 #if defined(CONFIG_PPC)
     int sense;
 #endif
@@ -1843,80 +1780,101 @@ found:
     if (gtb_memsize)
 	switch (i & 0xF) {	/* 0xF used instead of MEM_SIZE_ALIAS */
 	    case MEM_SIZE_512K:
-		info->total_vram = 0x80000;
+		info->fb_info.fix.smem_len = 0x80000;
 		break;
 	    case MEM_SIZE_1M:
-		info->total_vram = 0x100000;
+		info->fb_info.fix.smem_len = 0x100000;
 		break;
 	    case MEM_SIZE_2M_GTB:
-		info->total_vram = 0x200000;
+		info->fb_info.fix.smem_len = 0x200000;
 		break;
 	    case MEM_SIZE_4M_GTB:
-		info->total_vram = 0x400000;
+		info->fb_info.fix.smem_len = 0x400000;
 		break;
 	    case MEM_SIZE_6M_GTB:
-		info->total_vram = 0x600000;
+		info->fb_info.fix.smem_len = 0x600000;
 		break;
 	    case MEM_SIZE_8M_GTB:
-		info->total_vram = 0x800000;
+		info->fb_info.fix.smem_len = 0x800000;
 		break;
 	    default:
-		info->total_vram = 0x80000;
+		info->fb_info.fix.smem_len = 0x80000;
 	}
     else
 	switch (i & MEM_SIZE_ALIAS) {
 	    case MEM_SIZE_512K:
-		info->total_vram = 0x80000;
+		info->fb_info.fix.smem_len = 0x80000;
 		break;
 	    case MEM_SIZE_1M:
-		info->total_vram = 0x100000;
+		info->fb_info.fix.smem_len = 0x100000;
 		break;
 	    case MEM_SIZE_2M:
-		info->total_vram = 0x200000;
+		info->fb_info.fix.smem_len = 0x200000;
 		break;
 	    case MEM_SIZE_4M:
-		info->total_vram = 0x400000;
+		info->fb_info.fix.smem_len = 0x400000;
 		break;
 	    case MEM_SIZE_6M:
-		info->total_vram = 0x600000;
+		info->fb_info.fix.smem_len = 0x600000;
 		break;
 	    case MEM_SIZE_8M:
-		info->total_vram = 0x800000;
+		info->fb_info.fix.smem_len = 0x800000;
 		break;
 	    default:
-		info->total_vram = 0x80000;
+		info->fb_info.fix.smem_len = 0x80000;
 	}
 
     if (M64_HAS(MAGIC_VRAM_SIZE)) {
 	if (aty_ld_le32(CONFIG_STAT1, info) & 0x40000000)
-	  info->total_vram += 0x400000;
+	  info->fb_info.fix.smem_len += 0x400000;
     }
 
     if (default_vram) {
-	info->total_vram = default_vram*1024;
+	info->fb_info.fix.smem_len = default_vram*1024;
 	i = i & ~(gtb_memsize ? 0xF : MEM_SIZE_ALIAS);
-	if (info->total_vram <= 0x80000)
+	if (info->fb_info.fix.smem_len <= 0x80000)
 	    i |= MEM_SIZE_512K;
-	else if (info->total_vram <= 0x100000)
+	else if (info->fb_info.fix.smem_len <= 0x100000)
 	    i |= MEM_SIZE_1M;
-	else if (info->total_vram <= 0x200000)
+	else if (info->fb_info.fix.smem_len <= 0x200000)
 	    i |= gtb_memsize ? MEM_SIZE_2M_GTB : MEM_SIZE_2M;
-	else if (info->total_vram <= 0x400000)
+	else if (info->fb_info.fix.smem_len <= 0x400000)
 	    i |= gtb_memsize ? MEM_SIZE_4M_GTB : MEM_SIZE_4M;
-	else if (info->total_vram <= 0x600000)
+	else if (info->fb_info.fix.smem_len <= 0x600000)
 	    i |= gtb_memsize ? MEM_SIZE_6M_GTB : MEM_SIZE_6M;
 	else
 	    i |= gtb_memsize ? MEM_SIZE_8M_GTB : MEM_SIZE_8M;
 	aty_st_le32(MEM_CNTL, i, info);
     }
+    
+    /*
+     *  Reg Block 0 (CT-compatible block) is at mmio_start 
+     *  Reg Block 1 (multimedia extensions) is at mmio_start - 0x400
+     */
+    if (M64_HAS(GX)) {
+	info->fb_info.fix.mmio_len = 0x400;
+	info->fb_info.fix.accel = FB_ACCEL_ATI_MACH64GX;
+    } else if (M64_HAS(CT)) {
+	info->fb_info.fix.mmio_len = 0x400;
+	info->fb_info.fix.accel = FB_ACCEL_ATI_MACH64CT;
+    } else if (M64_HAS(VT)) {
+	info->fb_info.fix.mmio_start =- 0x400;
+	info->fb_info.fix.mmio_len = 0x800;
+	info->fb_info.fix.accel = FB_ACCEL_ATI_MACH64VT;
+    } else /* if (M64_HAS(GT)) */ {
+	info->fb_info.fix.mmio_start =- 0x400;
+	info->fb_info.fix.mmio_len = 0x800;
+	info->fb_info.fix.accel = FB_ACCEL_ATI_MACH64GT;
+    }
+
     if (default_pll)
 	pll = default_pll;
     if (default_mclk)
 	mclk = default_mclk;
 
     printk("%d%c %s, %s MHz XTAL, %d MHz PLL, %d Mhz MCLK\n",
-    	   info->total_vram == 0x80000 ? 512 : (info->total_vram >> 20),
-    	   info->total_vram == 0x80000 ? 'K' : 'M', ramname, xtal, pll, mclk);
+    	   info->fb_info.fix.smem_len == 0x80000 ? 512 : (info->fb_info.fix.smem_len >> 20),
+    	   info->fb_info.fix.smem_len == 0x80000 ? 'K' : 'M', ramname, xtal, pll, mclk);
 
     if (mclk < 44)
 	info->mem_refresh_rate = 0;	/* 000 = 10 Mhz - 43 Mhz */
@@ -1959,23 +1917,24 @@ found:
      *  FIXME: we should use the auxiliary aperture instead so we can access
      *  the full 8 MB of video RAM on 8 MB boards
      */
-    if (info->total_vram == 0x800000 ||
-	(info->bus_type == ISA && info->total_vram == 0x400000))
-	    info->total_vram -= GUI_RESERVE;
+    if (info->fb_info.fix.smem_len == 0x800000 ||
+	(info->bus_type == ISA && info->fb_info.fix.smem_len == 0x400000))
+	    info->fb_info.fix.smem_len -= GUI_RESERVE;
 
     /* Clear the video memory */
-    fb_memset((void *)info->frame_buffer, 0, info->total_vram);
+    fb_memset((void *)info->fb_info.screen_base, 0, info->fb_info.fix.smem_len);
 
-    disp = &info->disp;
+    disp = info->fb_info.disp;
 
     strcpy(info->fb_info.modename, atyfb_name);
     info->fb_info.node = NODEV;
     info->fb_info.fbops = &atyfb_ops;
     info->fb_info.disp = disp;
+    info->fb_info.pseudo_palette = pseudo_palette;	
     info->fb_info.currcon = -1;  	
     strcpy(info->fb_info.fontname, fontname);
     info->fb_info.changevar = NULL;
-    info->fb_info.switch_con = &atyfbcon_switch;
+    info->fb_info.switch_con = gen_switch;
     info->fb_info.updatevar = &atyfbcon_updatevar;
     info->fb_info.flags = FBINFO_FLAG_DEFAULT;
 
@@ -2058,7 +2017,7 @@ found:
         var.accel_flags |= FB_ACCELF_TEXT;
 
     if (var.yres == var.yres_virtual) {
-	u32 vram = (info->total_vram - (PAGE_SIZE << 2));
+	u32 vram = (info->fb_info.fix.smem_len - (PAGE_SIZE << 2));
 	var.yres_virtual = ((vram * 8) / var.bits_per_pixel) / var.xres_virtual;
 	if (var.yres_virtual < var.yres)
 		var.yres_virtual = var.yres;
@@ -2072,12 +2031,6 @@ found:
 #ifdef __sparc__
     atyfb_save_palette(&info->fb_info, 0);
 #endif
-    for (j = 0; j < 16; j++) {
-	k = color_table[j];
-	info->palette[j].red = default_red[k];
-	info->palette[j].green = default_grn[k];
-	info->palette[j].blue = default_blu[k];
-    }
 
 #ifdef CONFIG_FB_ATY_CT
     if (curblink && M64_HAS(INTEGRATED)) {
@@ -2088,6 +2041,9 @@ found:
 	}
     }
 #endif /* CONFIG_FB_ATY_CT */
+    info->fb_info.var = var;	
+
+    fb_alloc_cmap(&info->fb_info.cmap, 256, 0);	
 
     atyfb_set_var(&var, -1, &info->fb_info);
 
@@ -2134,12 +2090,14 @@ int __init atyfb_init(void)
 	    if (i < 0)
 		continue;
 
-	    info = kmalloc(sizeof(struct fb_info_aty), GFP_ATOMIC);
+	    info = kmalloc(sizeof(struct fb_info_aty) + sizeof(struct display), GFP_ATOMIC);
 	    if (!info) {
 		printk("atyfb_init: can't alloc fb_info_aty\n");
 		return -ENXIO;
 	    }
-	    memset(info, 0, sizeof(struct fb_info_aty));
+	    memset(info, 0, sizeof(struct fb_info_aty) + sizeof(struct display));
+
+	    info->fb_info.disp = (struct display *) (info + 1);  	
 
 	    rp = &pdev->resource[0];
 	    if (rp->flags & IORESOURCE_IO)
@@ -2158,13 +2116,13 @@ int __init atyfb_init(void)
 	     * Map memory-mapped registers.
 	     */
 	    info->ati_regbase = addr + 0x7ffc00UL;
-	    info->ati_regbase_phys = addr + 0x7ffc00UL;
+	    info->fb_info.fix.mmio_start = addr + 0x7ffc00UL;
 
 	    /*
 	     * Map in big-endian aperture.
 	     */
-	    info->frame_buffer = (unsigned long) addr + 0x800000UL;
-	    info->frame_buffer_phys = addr + 0x800000UL;
+	    info->fb_info.screen_base = (unsigned long) addr + 0x800000UL;
+	    info->fb_info.fix.smem_start = addr + 0x800000UL;
 
 	    /*
 	     * Figure mmap addresses from PCI config space.
@@ -2358,9 +2316,9 @@ int __init atyfb_init(void)
 	    }
 #else /* __sparc__ */
 
-	    info->ati_regbase_phys = 0x7ff000 + addr;
+	    info->fb_info.fix.mmio_start = 0x7ff000 + addr;
 	    info->ati_regbase = (unsigned long)
-				ioremap(info->ati_regbase_phys, 0x1000);
+				ioremap(info->fb_info.fix.mmio_start, 0x1000);
 
 	    if(!info->ati_regbase) {
 		    kfree(info);
@@ -2368,7 +2326,7 @@ int __init atyfb_init(void)
 		    return -ENOMEM;
 	    }
 
-	    info->ati_regbase_phys += 0xc00;
+	    info->fb_info.fix.mmio_start += 0xc00;
 	    info->ati_regbase += 0xc00;
 
 	    /*
@@ -2387,10 +2345,10 @@ int __init atyfb_init(void)
 #endif
 
 	    /* Map in frame buffer */
-	    info->frame_buffer_phys = addr;
-	    info->frame_buffer = (unsigned long)ioremap(addr, 0x800000);
+	    info->fb_info.fix.smem_start = addr;
+	    info->fb_info.screen_base = (char*)ioremap(addr, 0x800000);
 
-	    if(!info->frame_buffer) {
+	    if(!info->fb_info.screen_base) {
 		    kfree(info);
 		    release_mem_region(res_start, res_size);
 		    return -ENXIO;
@@ -2414,11 +2372,11 @@ int __init atyfb_init(void)
 	     * Add /dev/fb mmap values.
 	     */
 	    info->mmap_map[0].voff = 0x8000000000000000UL;
-	    info->mmap_map[0].poff = info->frame_buffer & PAGE_MASK;
-	    info->mmap_map[0].size = info->total_vram;
+	    info->mmap_map[0].poff = info->fb_info.screen_base & PAGE_MASK;
+	    info->mmap_map[0].size = info->fb_info.fix.smem_len;
 	    info->mmap_map[0].prot_mask = _PAGE_CACHE;
 	    info->mmap_map[0].prot_flag = _PAGE_E;
-	    info->mmap_map[1].voff = info->mmap_map[0].voff + info->total_vram;
+	    info->mmap_map[1].voff = info->mmap_map[0].voff + info->fb_info.fix.smem_len;
 	    info->mmap_map[1].poff = info->ati_regbase & PAGE_MASK;
 	    info->mmap_map[1].size = PAGE_SIZE;
 	    info->mmap_map[1].prot_mask = _PAGE_CACHE;
@@ -2458,10 +2416,10 @@ int __init atyfb_init(void)
 	 *  Map the video memory (physical address given) to somewhere in the
 	 *  kernel address space.
 	 */
-	info->frame_buffer = ioremap(phys_vmembase[m64_num], phys_size[m64_num]);
-	info->frame_buffer_phys = info->frame_buffer;  /* Fake! */
+	info->fb_info.screen_base = ioremap(phys_vmembase[m64_num], phys_size[m64_num]);
+	info->fb_info.fix.smem_start = info->fb_info.screen_base;  /* Fake! */
 	info->ati_regbase = ioremap(phys_guiregbase[m64_num], 0x10000)+0xFC00ul;
-	info->ati_regbase_phys = info->ati_regbase;  /* Fake! */
+	info->fb_info.fix.mmio_start = info->ati_regbase;  /* Fake! */
 
 	aty_st_le32(CLOCK_CNTL, 0x12345678, info);
 	clock_r = aty_ld_le32(CLOCK_CNTL, info);
@@ -2596,41 +2554,21 @@ mach64_invalid:
 }
 #endif /* CONFIG_ATARI */
 
-static int atyfbcon_switch(int con, struct fb_info *fb)
-{
-    struct fb_info_aty *info = (struct fb_info_aty *)fb;
-    struct atyfb_par par;
-
-    /* Do we have to save the colormap? */
-    if (fb_display[fb->currcon].cmap.len)
-	fb_get_cmap(&fb_display[fb->currcon].cmap, 1, atyfb_getcolreg, fb);
-
+/*
 #ifdef CONFIG_FB_ATY_CT
-    /* Erase HW Cursor */
+   * Erase HW Cursor *
     if (info->cursor && (fb->currcon >= 0))
 	atyfb_cursor(&fb_display[fb->currcon], CM_ERASE,
 		     info->cursor->pos.x, info->cursor->pos.y);
-#endif /* CONFIG_FB_ATY_CT */
-
-    fb->currcon = con;
-
-    atyfb_decode_var(&fb_display[con].var, &par, info);
-    atyfb_set_par(&par, info);
-    atyfb_set_dispsw(&fb_display[con], info, par.crtc.bpp,
-		     par.accel_flags & FB_ACCELF_TEXT);
-
-    /* Install new colormap */
-    do_install_cmap(con, fb);
+#endif * CONFIG_FB_ATY_CT *
 
 #ifdef CONFIG_FB_ATY_CT
-    /* Install hw cursor */
+    * Install hw cursor *
     if (info->cursor) {
 	aty_set_cursor_color(info);
 	aty_set_cursor_shape(info);
     }
-#endif /* CONFIG_FB_ATY_CT */
-    return 1;
-}
+#endif * CONFIG_FB_ATY_CT */
 
     /*
      *  Blank the display.
@@ -2673,27 +2611,6 @@ static int atyfb_blank(int blank, struct fb_info *fb)
     return 0;	
 }
 
-
-    /*
-     *  Read a single color register and split it into
-     *  colors/transparent. Return != 0 for invalid regno.
-     */
-
-static int atyfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
-			   u_int *transp, struct fb_info *fb)
-{
-    struct fb_info_aty *info = (struct fb_info_aty *)fb;
-
-    if (regno > 255)
-	return 1;
-    *red = (info->palette[regno].red<<8) | info->palette[regno].red;
-    *green = (info->palette[regno].green<<8) | info->palette[regno].green;
-    *blue = (info->palette[regno].blue<<8) | info->palette[regno].blue;
-    *transp = 0;
-    return 0;
-}
-
-
     /*
      *  Set a single color register. The values supplied are already
      *  rounded down to the hardware's capabilities (according to the
@@ -2711,9 +2628,6 @@ static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
     red >>= 8;
     green >>= 8;
     blue >>= 8;
-    info->palette[regno].red = red;
-    info->palette[regno].green = green;
-    info->palette[regno].blue = blue;
     i = aty_ld_8(DAC_CNTL, info) & 0xfc;
     if (M64_HAS(EXTRA_BRIGHT))
 	i |= 0x2;	/*DAC_CNTL|0x2 turns off the extra brightness for gt*/
@@ -2728,20 +2642,18 @@ static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	switch (info->current_par.crtc.bpp) {
 #ifdef FBCON_HAS_CFB16
 	    case 16:
-		info->fbcon_cmap.cfb16[regno] = (regno << 10) | (regno << 5) |
-						regno;
+		((u16 *) (info->fb_info.pseudo_palette))[regno] = (regno << 10) | (regno << 5) | regno;
 		break;
 #endif
 #ifdef FBCON_HAS_CFB24
 	    case 24:
-		info->fbcon_cmap.cfb24[regno] = (regno << 16) | (regno << 8) |
-						regno;
+		((u32 *) (info->fb_info.pseudo_palette))[regno] = (regno << 16) | (regno << 8) | regno;
 		break;
 #endif
 #ifdef FBCON_HAS_CFB32
 	    case 32:
 		i = (regno << 8) | regno;
-		info->fbcon_cmap.cfb32[regno] = (i << 16) | i;
+		((u32 *) (info->fb_info.pseudo_palette))[regno] = (i << 16) | i;
 		break;
 #endif
 	    }
@@ -2815,8 +2727,8 @@ void cleanup_module(void)
 #ifndef __sparc__
 	if (info->ati_regbase)
 	    iounmap((void *)info->ati_regbase);
-	if (info->frame_buffer)
-	    iounmap((void *)info->frame_buffer);
+	if (info->fb_info.screen_base)
+	    iounmap((void *)info->fb_info.screen_base);
 #ifdef __BIG_ENDIAN
 	if (info->cursor && info->cursor->ram)
 	    iounmap(info->cursor->ram);

@@ -18,7 +18,7 @@
 #include <asm/fbio.h>
 #endif
 
-#include "mach64.h"
+#include <video/mach64.h>
 #include "atyfb.h"
 
 
@@ -242,18 +242,18 @@ struct aty_cursor * __init aty_init_cursor(struct fb_info_aty *fb)
 	memset(cursor->timer, 0, sizeof(*cursor->timer));
 
 	cursor->blink_rate = DEFAULT_CURSOR_BLINK_RATE;
-	fb->total_vram -= PAGE_SIZE;
-	cursor->offset = fb->total_vram;
+	fb->fb_info.fix.smem_len -= PAGE_SIZE;
+	cursor->offset = fb->fb_info.fix.smem_len;
 
 #ifdef __sparc__
-	addr = fb->frame_buffer - 0x800000 + cursor->offset;
+	addr = fb->fb_info.screen_base - 0x800000 + cursor->offset;
 	cursor->ram = (u8 *)addr;
 #else
 #ifdef __BIG_ENDIAN
-	addr = fb->frame_buffer_phys - 0x800000 + cursor->offset;
+	addr = fb->fb_info.fix.smem_start - 0x800000 + cursor->offset;
 	cursor->ram = (u8 *)ioremap(addr, 1024);
 #else
-	addr = fb->frame_buffer + cursor->offset;
+	addr = (unsigned long) fb->fb_info.screen_base + cursor->offset;
 	cursor->ram = (u8 *)addr;
 #endif
 #endif
