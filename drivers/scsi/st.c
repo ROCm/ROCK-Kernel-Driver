@@ -17,7 +17,7 @@
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20030622";
+static char *verstr = "20030811";
 
 #include <linux/module.h>
 
@@ -1312,6 +1312,19 @@ static int setup_buffering(Scsi_Tape *STp, const char *buf, size_t count, int is
 }
 
 
+/* Can be called more than once after each setup_buffer() */
+static void release_buffering(Scsi_Tape *STp)
+{
+	ST_buffer *STbp;
+
+	STbp = STp->buffer;
+	if (STbp->do_dio) {
+		sgl_unmap_user_pages(&(STbp->sg[0]), STbp->do_dio, FALSE);
+		STbp->do_dio = 0;
+	}
+}
+
+
 /* Write command */
 static ssize_t
  st_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
@@ -1589,11 +1602,7 @@ static ssize_t
  out:
 	if (SRpnt != NULL)
 		scsi_release_request(SRpnt);
-	STbp = STp->buffer;
-	if (STbp->do_dio) {
-		sgl_unmap_user_pages(&(STbp->sg[0]), STbp->do_dio, FALSE);
-		STbp->do_dio = 0;
-	}
+	release_buffering(STp);
 	up(&STp->lock);
 
 	return retval;
@@ -1601,7 +1610,10 @@ static ssize_t
 
 /* Read data from the tape. Returns zero in the normal case, one if the
    eof status has changed, and the negative error code in case of a
-   fatal error. Otherwise updates the buffer and the eof state. */
+   fatal error. Otherwise updates the buffer and the eof state.
+
+   Does release user buffer mapping if it is set.
+*/
 static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 {
 	int transfer, blks, bytes;
@@ -1647,6 +1659,7 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 	SRpnt = *aSRpnt;
 	SRpnt = st_do_scsi(SRpnt, STp, cmd, bytes, SCSI_DATA_READ,
 			   STp->timeout, MAX_RETRIES, TRUE);
+	release_buffering(STp);
 	*aSRpnt = SRpnt;
 	if (!SRpnt)
 		return STbp->syscall_result;
@@ -1788,7 +1801,7 @@ static ssize_t
 	ssize_t total;
 	ssize_t retval = 0;
 	ssize_t i, transfer;
-	int special;
+	int special, do_dio = 0;
 	Scsi_Request *SRpnt = NULL;
 	Scsi_Tape *STp = filp->private_data;
 	ST_mode *STm;
@@ -1826,6 +1839,7 @@ static ssize_t
 	retval = setup_buffering(STp, buf, count, TRUE);
 	if (retval)
 		goto out;
+	do_dio = STbp->do_dio;
 
 	if (STbp->buffer_bytes == 0 &&
 	    STps->eof >= ST_EOD_1) {
@@ -1838,7 +1852,7 @@ static ssize_t
 		goto out;
 	}
 
-	if (!STbp->do_dio) {
+	if (do_dio) {
 		/* Check the buffer writability before any tape movement. Don't alter
 		   buffer data. */
 		if (copy_from_user(&i, buf, 1) != 0 ||
@@ -1876,7 +1890,7 @@ static ssize_t
                         ) /* end DEB */
 			transfer = STbp->buffer_bytes < count - total ?
 			    STbp->buffer_bytes : count - total;
-			if (!STbp->do_dio) {
+			if (!do_dio) {
 				i = from_buffer(STbp, buf, transfer);
 				if (i) {
 					retval = i;
@@ -1917,9 +1931,8 @@ static ssize_t
 		scsi_release_request(SRpnt);
 		SRpnt = NULL;
 	}
-	if (STbp->do_dio) {
-		sgl_unmap_user_pages(&(STbp->sg[0]), STbp->do_dio, TRUE);
-		STbp->do_dio = 0;
+	if (do_dio) {
+		release_buffering(STp);
 		STbp->buffer_bytes = 0;
 	}
 	up(&STp->lock);
@@ -2348,6 +2361,7 @@ static int st_int_ioctl(Scsi_Tape *STp, unsigned int cmd_in, unsigned long arg)
 	int datalen = 0, direction = SCSI_DATA_NONE;
 	char *name = tape_name(STp);
 
+	WARN_ON(STp->buffer->do_dio != 0);
 	if (STp->ready != ST_READY) {
 		if (STp->ready == ST_NO_TAPE)
 			return (-ENOMEDIUM);
