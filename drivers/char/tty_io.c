@@ -145,8 +145,6 @@ static int tty_fasync(int fd, struct file * filp, int on);
 extern int vme_scc_init (void);
 extern int serial167_init(void);
 extern int rs_8xx_init(void);
-extern void sclp_tty_init(void);
-extern void tty3215_init(void);
 extern void tub3270_init(void);
 extern void rs_360_init(void);
 extern void tx3912_rs_init(void);
@@ -2479,9 +2477,6 @@ void __init tty_init(void)
 #endif	
 #ifdef CONFIG_TN3270
 	tub3270_init();
-#endif
-#ifdef CONFIG_SCLP_TTY
-	sclp_tty_init();
 #endif
 #ifdef CONFIG_A2232
 	a2232board_init();

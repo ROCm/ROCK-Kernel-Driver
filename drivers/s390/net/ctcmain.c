@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.40 2003/04/08 16:00:17 mschwide Exp $
+ * $Id: ctcmain.c,v 1.42 2003/05/23 17:45:57 felfert Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.40 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.42 $
  *
  */
 
@@ -272,7 +272,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.40 $";
+	char vbuf[] = "$Revision: 1.42 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -1966,7 +1966,7 @@ ctc_irq_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 	if (priv->channel[READ]->cdev == cdev)
 		ch = priv->channel[READ];
 	else if (priv->channel[WRITE]->cdev == cdev)
-		ch = priv->channel[READ];
+		ch = priv->channel[WRITE];
 	else {
 		printk(KERN_ERR
 		       "ctc: Can't determine channel for interrupt, "
@@ -2582,7 +2582,6 @@ ctc_stat_open(struct inode *inode, struct file *file)
 	file->private_data = kmalloc(STATS_BUFSIZE, GFP_KERNEL);
 	if (file->private_data == NULL)
 		return -ENOMEM;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -2590,7 +2589,6 @@ static int
 ctc_stat_close(struct inode *inode, struct file *file)
 {
 	kfree(file->private_data);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -2753,8 +2751,8 @@ ctc_init_netdevice(struct net_device * dev, int alloc_device,
 	dev->addr_len = 0;
 	dev->type = ARPHRD_SLIP;
 	dev->tx_queue_len = 100;
-	dev->owner = THIS_MODULE;
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP;
+	SET_MODULE_OWNER(&tun->dev);
 	return dev;
 }
 
@@ -2915,7 +2913,7 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 
 	ctc_add_attributes(&cgdev->dev);
 
-	strncpy(privptr->fsm->name, dev->name, sizeof (privptr->fsm->name));
+	strlcpy(privptr->fsm->name, dev->name, sizeof (privptr->fsm->name));
 
 	print_banner();
 

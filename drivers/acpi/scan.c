@@ -66,7 +66,7 @@ static void acpi_device_register(struct acpi_device * device, struct acpi_device
 	spin_unlock(&acpi_device_lock);
 
 	kobject_init(&device->kobj);
-	strncpy(device->kobj.name,device->pnp.bus_id,KOBJ_NAME_LEN);
+	strlcpy(device->kobj.name,device->pnp.bus_id,KOBJ_NAME_LEN);
 	if (parent)
 		device->kobj.parent = &parent->kobj;
 	device->kobj.ktype = &ktype_acpi_ns;

@@ -168,8 +168,7 @@ static struct mtd_info *jedec_probe(struct map_info *map)
    /* Generate a part name that includes the number of different chips and
       other configuration information */
    count = 1;
-   strncpy(Part,map->name,sizeof(Part)-10);
-   Part[sizeof(Part)-11] = 0;
+   strlcpy(Part,map->name,sizeof(Part)-10);
    strcat(Part," ");
    Uniq = 0;
    for (I = 0; priv->chips[I].jedec != 0 && I < MAX_JEDEC_CHIPS; I++)
@@ -246,8 +245,7 @@ static struct mtd_info *jedec_probe(struct map_info *map)
    //   printk("Part: '%s'\n",Part);
    
    memset(MTD,0,sizeof(*MTD));
-  // strncpy(MTD->name,Part,sizeof(MTD->name));
-  // MTD->name[sizeof(MTD->name)-1] = 0;
+  // strlcpy(MTD->name,Part,sizeof(MTD->name));
    MTD->name = map->name;
    MTD->type = MTD_NORFLASH;
    MTD->flags = MTD_CAP_NORFLASH;

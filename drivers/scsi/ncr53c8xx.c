@@ -3701,7 +3701,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	/*
 	**	Store input informations in the host data structure.
 	*/
-	strncpy(np->chip_name, device->chip.name, sizeof(np->chip_name) - 1);
+	strlcpy(np->chip_name, device->chip.name, sizeof(np->chip_name));
 	np->unit	= unit;
 	np->verbose	= driver_setup.verbose;
 	sprintf(np->inst_name, "ncr53c%s-%d", np->chip_name, np->unit);
@@ -5033,7 +5033,7 @@ static int ncr_detach(ncb_p np)
 	char inst_name[16];
 
 	/* Local copy so we don't access np after freeing it! */
-	strncpy(inst_name, ncr_name(np), 16);
+	strlcpy(inst_name, ncr_name(np), sizeof(inst_name));
 
 	printk("%s: releasing host resources\n", ncr_name(np));
 

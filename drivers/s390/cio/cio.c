@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.97 $
+ *   $Revision: 1.98 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -146,7 +146,7 @@ cio_tpi(void)
 		/* Not status pending or not operational. */
 		return 1;
 	sch = ioinfo[tpi_info->irq];
-	if (sch)
+	if (!sch)
 		return 1;
 	irq_enter ();
 	spin_lock(&sch->lock);
@@ -658,8 +658,7 @@ wait_cons_dev (void)
 	 * before entering the spinlock we may already have
 	 * processed the interrupt on a different CPU...
 	 */
-	if (!console_subchannel_in_use ||
-	    console_subchannel.schib.scsw.actl == 0)
+	if (!console_subchannel_in_use)
 		return;
 
 	/* disable all but isc 7 (console device) */

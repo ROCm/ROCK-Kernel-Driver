@@ -36,6 +36,7 @@
 #include <linux/hdreg.h>  /* HDIO_GETGEO */
 #include <linux/device.h>
 #include <linux/bio.h>
+#include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>
 
 #define XPRAM_NAME	"xpram"
@@ -459,7 +460,7 @@ static int __init xpram_setup_blkdev(void)
 		disk->private_data = &xpram_devices[i];
 		disk->queue = &xpram_queue;
 		sprintf(disk->disk_name, "slram%d", i);
-		sprintf(disk->disk_name, "slram/%d", i);
+		sprintf(disk->devfs_name, "slram/%d", i);
 		set_capacity(disk, xpram_sizes[i] << 1);
 		add_disk(disk);
 	}

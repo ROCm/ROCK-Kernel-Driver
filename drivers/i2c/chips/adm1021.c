@@ -310,7 +310,7 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* Fill in the remaining client fields and put it into the global list */
-	strncpy(new_client->dev.name, client_name, DEVICE_NAME_SIZE);
+	strlcpy(new_client->dev.name, client_name, DEVICE_NAME_SIZE);
 	data->type = kind;
 
 	new_client->id = adm1021_id++;

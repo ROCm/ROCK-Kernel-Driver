@@ -3356,7 +3356,7 @@ static int do_zoran_ioctl(struct zoran *zr, unsigned int cmd,
 			struct video_capability b;
 			DEBUG2(printk("%s: ioctl VIDIOCGCAP\n", zr->name));
 
-			strncpy(b.name, zr->video_dev.name,
+			strlcpy(b.name, zr->video_dev.name,
 				sizeof(b.name));
 			b.type =
 			    VID_TYPE_CAPTURE | VID_TYPE_OVERLAY |

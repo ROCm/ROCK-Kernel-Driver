@@ -1026,7 +1026,7 @@ int pcmcia_bind_device(bind_req_t *req)
     if (!client) return CS_OUT_OF_RESOURCE;
     memset(client, '\0', sizeof(client_t));
     client->client_magic = CLIENT_MAGIC;
-    strncpy(client->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
+    strlcpy(client->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
     client->Socket = req->Socket;
     client->Function = req->Function;
     client->state = CLIENT_UNBOUND;
@@ -1069,7 +1069,7 @@ int pcmcia_bind_mtd(mtd_bind_t *req)
     }
     if (!region || (region->mtd != NULL))
 	return CS_BAD_OFFSET;
-    strncpy(region->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
+    strlcpy(region->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
     
     DEBUG(1, "cs: bind_mtd(): attr 0x%x, offset 0x%x, dev %s\n",
 	  req->Attributes, req->CardOffset, (char *)req->dev_info);

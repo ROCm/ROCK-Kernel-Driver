@@ -30,6 +30,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/highmem.h>
 #include "drmP.h"
 
 /* Cut down version of drm_memory_debug.h, which used to be called

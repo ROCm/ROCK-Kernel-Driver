@@ -11,38 +11,11 @@
 #define _S390_CCWDEV_H_
 
 #include <linux/device.h>
+#include <linux/mod_devicetable.h>
 
 /* structs from asm/cio.h */
 struct irb;
 struct ccw1;
-
-/* the id is used to identify what hardware a device driver supports. It 
- * is used both by the ccw subsystem driver for probing and from
- * user space for automatic module loading.
- *
- * References:
- *   - struct usb_device_id (include/linux/usb.h)
- *   - devreg_hc_t (include/linux/s390dyn.h)
- *   - chandev_model_info (drivers/s390/misc/chandev.c)
- */
-struct ccw_device_id {
-	__u16	match_flags;	/* which fields to match against */
-
-	__u16	cu_type;	/* control unit type     */
-	__u16	dev_type;	/* device type           */
-	__u8	cu_model;	/* control unit model    */
-	__u8	dev_model;	/* device model          */
-
-	unsigned long driver_info;
-};
-
-enum match_flag {
-	CCW_DEVICE_ID_MATCH_CU_TYPE      = 0x01,
-	CCW_DEVICE_ID_MATCH_CU_MODEL     = 0x02,
-	CCW_DEVICE_ID_MATCH_DEVICE_TYPE  = 0x04,
-	CCW_DEVICE_ID_MATCH_DEVICE_MODEL = 0x08,
-	/* CCW_DEVICE_ID_MATCH_ANY	     = 0x10, */
-};
 
 /* simplified initializers for struct ccw_device:
  * CCW_DEVICE and CCW_DEVICE_DEVTYPE initialize one
