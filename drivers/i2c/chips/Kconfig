@@ -103,8 +103,12 @@ config SENSORS_LM75
 	select I2C_SENSOR
 	help
 	  If you say yes here you get support for National Semiconductor LM75
-	  sensor chips and clones: Dallas Semi DS75 and DS1775, TelCon
-	  TCN75, and National Semiconductor LM77.
+	  sensor chips and clones: Dallas Semiconductor DS75 and DS1775 (in
+	  9-bit precision mode), and TelCom (now Microchip) TCN75.
+
+	  The DS75 and DS1775 in 10- to 12-bit precision modes will require
+	  a force module parameter. The driver will not handle the extra
+	  precision anyhow.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called lm75.
