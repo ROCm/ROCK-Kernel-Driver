@@ -426,7 +426,9 @@ ext3_acl_chmod(struct inode *inode)
 	error = posix_acl_chmod_masq(clone, inode->i_mode);
 	if (!error) {
 		handle_t *handle;
+		int retries = 0;
 
+	retry:
 		handle = ext3_journal_start(inode, EXT3_DATA_TRANS_BLOCKS);
 		if (IS_ERR(handle)) {
 			error = PTR_ERR(handle);
@@ -435,6 +437,9 @@ ext3_acl_chmod(struct inode *inode)
 		}
 		error = ext3_set_acl(handle, inode, ACL_TYPE_ACCESS, clone);
 		ext3_journal_stop(handle);
+		if (error == -ENOSPC && 
+		    ext3_should_retry_alloc(inode->i_sb, &retries))
+			goto retry;
 	}
 out:
 	posix_acl_release(clone);
@@ -514,7 +519,7 @@ ext3_xattr_set_acl(struct inode *inode, int type, const void *value,
 {
 	handle_t *handle;
 	struct posix_acl *acl;
-	int error;
+	int error, retries = 0;
 
 	if (!test_opt(inode->i_sb, POSIX_ACL))
 		return -EOPNOTSUPP;
@@ -533,11 +538,14 @@ ext3_xattr_set_acl(struct inode *inode, int type, const void *value,
 	} else
 		acl = NULL;
 
+retry:
 	handle = ext3_journal_start(inode, EXT3_DATA_TRANS_BLOCKS);
 	if (IS_ERR(handle))
 		return PTR_ERR(handle);
 	error = ext3_set_acl(handle, inode, type, acl);
 	ext3_journal_stop(handle);
+	if (error == -ENOSPC && ext3_should_retry_alloc(inode->i_sb, &retries))
+		goto retry;
 
 release_and_out:
 	posix_acl_release(acl);
