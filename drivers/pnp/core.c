@@ -13,6 +13,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <linux/errno.h>
 
 #include "base.h"
 
@@ -41,7 +42,7 @@ void *pnp_alloc(long size)
  *  Ex protocols: ISAPNP, PNPBIOS, etc
  */
 
-int pnp_protocol_register(struct pnp_protocol *protocol)
+int pnp_register_protocol(struct pnp_protocol *protocol)
 {
 	int nodenum;
 	struct list_head * pos;
@@ -50,6 +51,7 @@ int pnp_protocol_register(struct pnp_protocol *protocol)
 		return -EINVAL;
 
 	INIT_LIST_HEAD(&protocol->devices);
+	INIT_LIST_HEAD(&protocol->cards);
 	nodenum = 0;
 	spin_lock(&pnp_lock);
 
@@ -76,7 +78,7 @@ int pnp_protocol_register(struct pnp_protocol *protocol)
  * @protocol: pointer to the corresponding pnp_protocol structure
  *
  */
-void pnp_protocol_unregister(struct pnp_protocol *protocol)
+void pnp_unregister_protocol(struct pnp_protocol *protocol)
 {
 	spin_lock(&pnp_lock);
 	list_del_init(&protocol->protocol_list);
@@ -84,17 +86,19 @@ void pnp_protocol_unregister(struct pnp_protocol *protocol)
 	device_unregister(&protocol->dev);
 }
 
-/**
- * pnp_init_device - pnp protocols should call this before adding a PnP device
- * @dev: pointer to dev to init
- *
- *  for now it only inits dev->ids, more later?
- */
 
-int pnp_init_device(struct pnp_dev *dev)
+static void pnp_free_ids(struct pnp_dev *dev)
 {
-	INIT_LIST_HEAD(&dev->ids);
-	return 0;
+	struct pnp_id * id;
+	struct pnp_id * next;
+	if (!dev)
+		return;
+	id = dev->id;
+	while (id) {
+		next = id->next;
+		kfree(id);
+		id = next;
+	}
 }
 
 static void pnp_release_device(struct device *dmdev)
@@ -106,7 +110,26 @@ static void pnp_release_device(struct device *dmdev)
 	kfree(dev);
 }
 
-/**
+int __pnp_add_device(struct pnp_dev *dev)
+{
+	int error = 0;
+	pnp_name_device(dev);
+	pnp_fixup_device(dev);
+	strcpy(dev->dev.name,dev->name);
+	dev->dev.bus = &pnp_bus_type;
+	dev->dev.release = &pnp_release_device;
+	error = device_register(&dev->dev);
+	if (error == 0){
+		spin_lock(&pnp_lock);
+		list_add_tail(&dev->global_list, &pnp_global);
+		list_add_tail(&dev->protocol_list, &dev->protocol->devices);
+		spin_unlock(&pnp_lock);
+		pnp_interface_attach_device(dev);
+	}
+	return error;
+}
+
+/*
  * pnp_add_device - adds a pnp device to the pnp layer
  * @dev: pointer to dev to add
  *
@@ -115,30 +138,20 @@ static void pnp_release_device(struct device *dmdev)
 
 int pnp_add_device(struct pnp_dev *dev)
 {
-	int error = 0;
-	if (!dev || !dev->protocol)
+	if (!dev || !dev->protocol || dev->card)
 		return -EINVAL;
-	if (dev->card)
-		sprintf(dev->dev.bus_id, "%02x:%02x.%02x", dev->protocol->number,
-		  dev->card->number,dev->number);
-	else
-		sprintf(dev->dev.bus_id, "%02x:%02x", dev->protocol->number,
-		  dev->number);
-	pnp_name_device(dev);
-	pnp_fixup_device(dev);
-	strcpy(dev->dev.name,dev->name);
 	dev->dev.parent = &dev->protocol->dev;
-	dev->dev.bus = &pnp_bus_type;
-	dev->dev.release = &pnp_release_device;
-	error = device_register(&dev->dev);
-	if (error == 0){
-		spin_lock(&pnp_lock);
-		list_add_tail(&dev->global_list, &pnp_global);
-		list_add_tail(&dev->dev_list, &dev->protocol->devices);
-		spin_unlock(&pnp_lock);
-		pnp_interface_attach_device(dev);
-	}
-	return error;
+	sprintf(dev->dev.bus_id, "%02x:%02x", dev->protocol->number, dev->number);
+	return __pnp_add_device(dev);
+}
+
+void __pnp_remove_device(struct pnp_dev *dev)
+{
+	spin_lock(&pnp_lock);
+	list_del_init(&dev->global_list);
+	list_del_init(&dev->protocol_list);
+	spin_unlock(&pnp_lock);
+	device_unregister(&dev->dev);
 }
 
 /**
@@ -147,27 +160,23 @@ int pnp_add_device(struct pnp_dev *dev)
  *
  * this function will free all mem used by dev
  */
+
 void pnp_remove_device(struct pnp_dev *dev)
 {
-	if (!dev)
+	if (!dev || dev->card)
 		return;
-	device_unregister(&dev->dev);
-	spin_lock(&pnp_lock);
-	list_del_init(&dev->global_list);
-	list_del_init(&dev->dev_list);
-	spin_unlock(&pnp_lock);
+	__pnp_remove_device(dev);
 }
 
 static int __init pnp_init(void)
 {
-	printk(KERN_INFO "Linux Plug and Play Support v0.9 (c) Adam Belay\n");
+	printk(KERN_INFO "Linux Plug and Play Support v0.93 (c) Adam Belay\n");
 	return bus_register(&pnp_bus_type);
 }
 
 subsys_initcall(pnp_init);
 
-EXPORT_SYMBOL(pnp_protocol_register);
-EXPORT_SYMBOL(pnp_protocol_unregister);
+EXPORT_SYMBOL(pnp_register_protocol);
+EXPORT_SYMBOL(pnp_unregister_protocol);
 EXPORT_SYMBOL(pnp_add_device);
 EXPORT_SYMBOL(pnp_remove_device);
-EXPORT_SYMBOL(pnp_init_device);

@@ -13,12 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 
-static const struct pnp_id pnp_card_table[] = {
-	{	"ANYDEVS",		0	},
-	{	"",			0	}
-};
-
-static const struct pnp_id pnp_dev_table[] = {
+static const struct pnp_device_id pnp_dev_table[] = {
 	/* General ID for reserving resources */
 	{	"PNP0c02",		0	},
 	/* memory controller */
@@ -101,7 +96,7 @@ static void __init reserve_resources_of_dev( struct pnp_dev *dev )
 	return;
 }
 
-static int system_pnp_probe(struct pnp_dev * dev, const struct pnp_id *card_id, const struct pnp_id *dev_id)
+static int system_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id)
 {
 	reserve_resources_of_dev(dev);
 	return 0;
@@ -109,7 +104,6 @@ static int system_pnp_probe(struct pnp_dev * dev, const struct pnp_id *card_id, 
 
 static struct pnp_driver system_pnp_driver = {
 	.name		= "system",
-	.card_id_table	= pnp_card_table,
 	.id_table	= pnp_dev_table,
 	.probe		= system_pnp_probe,
 	.remove		= NULL,

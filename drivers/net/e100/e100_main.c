@@ -87,8 +87,8 @@
 extern int e100_create_proc_subdir(struct e100_private *, char *);
 extern void e100_remove_proc_subdir(struct e100_private *, char *);
 #else
-#define e100_create_proc_subdir(X) 0
-#define e100_remove_proc_subdir(X) do {} while(0)
+#define e100_create_proc_subdir(X, Y) 0
+#define e100_remove_proc_subdir(X, Y) do {} while(0)
 #endif
 
 static int e100_do_ethtool_ioctl(struct net_device *, struct ifreq *);
