@@ -89,6 +89,8 @@ static int multicast_filter_limit = 32;
 #define NUM_TX_DESC	64	/* Number of Tx descriptor registers */
 #define NUM_RX_DESC	64	/* Number of Rx descriptor registers */
 #define RX_BUF_SIZE	1536	/* Rx Buffer size */
+#define R8169_TX_RING_BYTES	(NUM_TX_DESC * sizeof(struct TxDesc))
+#define R8169_RX_RING_BYTES	(NUM_RX_DESC * sizeof(struct RxDesc))
 
 #define RTL_MIN_IO_SIZE 0x80
 #define TX_TIMEOUT  (6*HZ)
@@ -280,10 +282,10 @@ struct rtl8169_private {
 	unsigned long cur_rx;	/* Index into the Rx descriptor buffer of next Rx pkt. */
 	unsigned long cur_tx;	/* Index into the Tx descriptor buffer of next Rx pkt. */
 	unsigned long dirty_tx;
-	unsigned char *TxDescArrays;	/* Index of Tx Descriptor buffer */
-	unsigned char *RxDescArrays;	/* Index of Rx Descriptor buffer */
 	struct TxDesc *TxDescArray;	/* Index of 256-alignment Tx Descriptor buffer */
 	struct RxDesc *RxDescArray;	/* Index of 256-alignment Rx Descriptor buffer */
+	dma_addr_t TxPhyAddr;
+	dma_addr_t RxPhyAddr;
 	unsigned char *RxBufferRings;	/* Index of Rx Buffer  */
 	unsigned char *RxBufferRing[NUM_RX_DESC];	/* Index of Rx Buffer array */
 	struct sk_buff *Tx_skbuff[NUM_TX_DESC];	/* Index of Transmit data buffer */
@@ -298,7 +300,7 @@ static int rtl8169_open(struct net_device *dev);
 static int rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static irqreturn_t rtl8169_interrupt(int irq, void *dev_instance,
 			      struct pt_regs *regs);
-static void rtl8169_init_ring(struct net_device *dev);
+static int rtl8169_init_ring(struct net_device *dev);
 static void rtl8169_hw_start(struct net_device *dev);
 static int rtl8169_close(struct net_device *dev);
 static void rtl8169_set_rx_mode(struct net_device *dev);
@@ -651,52 +653,48 @@ static int
 rtl8169_open(struct net_device *dev)
 {
 	struct rtl8169_private *tp = dev->priv;
+	struct pci_dev *pdev = tp->pci_dev;
 	int retval;
-	u8 diff;
-	u32 TxPhyAddr, RxPhyAddr;
 
 	retval =
 	    request_irq(dev->irq, rtl8169_interrupt, SA_SHIRQ, dev->name, dev);
-	if (retval) {
-		return retval;
-	}
+	if (retval < 0)
+		goto out;
 
-	tp->TxDescArrays =
-	    kmalloc(NUM_TX_DESC * sizeof (struct TxDesc) + 256, GFP_KERNEL);
-	// Tx Desscriptor needs 256 bytes alignment;
-	TxPhyAddr = virt_to_bus(tp->TxDescArrays);
-	diff = 256 - (TxPhyAddr - ((TxPhyAddr >> 8) << 8));
-	TxPhyAddr += diff;
-	tp->TxDescArray = (struct TxDesc *) (tp->TxDescArrays + diff);
+	retval = -ENOMEM;
 
-	tp->RxDescArrays =
-	    kmalloc(NUM_RX_DESC * sizeof (struct RxDesc) + 256, GFP_KERNEL);
-	// Rx Desscriptor needs 256 bytes alignment;
-	RxPhyAddr = virt_to_bus(tp->RxDescArrays);
-	diff = 256 - (RxPhyAddr - ((RxPhyAddr >> 8) << 8));
-	RxPhyAddr += diff;
-	tp->RxDescArray = (struct RxDesc *) (tp->RxDescArrays + diff);
+	/*
+	 * Rx and Tx desscriptors needs 256 bytes alignment.
+	 * pci_alloc_consistent provides more.
+	 */
+	tp->TxDescArray = pci_alloc_consistent(pdev, R8169_TX_RING_BYTES,
+					       &tp->TxPhyAddr);
+	if (!tp->TxDescArray)
+		goto err_free_irq;
 
-	if (tp->TxDescArrays == NULL || tp->RxDescArrays == NULL) {
-		printk(KERN_INFO
-		       "Allocate RxDescArray or TxDescArray failed\n");
-		free_irq(dev->irq, dev);
-		if (tp->TxDescArrays)
-			kfree(tp->TxDescArrays);
-		if (tp->RxDescArrays)
-			kfree(tp->RxDescArrays);
-		return -ENOMEM;
-	}
-	tp->RxBufferRings = kmalloc(RX_BUF_SIZE * NUM_RX_DESC, GFP_KERNEL);
-	if (tp->RxBufferRings == NULL) {
-		printk(KERN_INFO "Allocate RxBufferRing failed\n");
-	}
+	tp->RxDescArray = pci_alloc_consistent(pdev, R8169_RX_RING_BYTES,
+					       &tp->RxPhyAddr);
+	if (!tp->RxDescArray)
+		goto err_free_tx;
 
-	rtl8169_init_ring(dev);
+	retval = rtl8169_init_ring(dev);
+	if (retval < 0)
+		goto err_free_rx;
+
 	rtl8169_hw_start(dev);
 
-	return 0;
+out:
+	return retval;
 
+err_free_rx:
+	pci_free_consistent(pdev, R8169_RX_RING_BYTES, tp->RxDescArray,
+			    tp->RxPhyAddr);
+err_free_tx:
+	pci_free_consistent(pdev, R8169_TX_RING_BYTES, tp->TxDescArray,
+			    tp->TxPhyAddr);
+err_free_irq:
+	free_irq(dev->irq, dev);
+	goto out;
 }
 
 static void
@@ -736,8 +734,8 @@ rtl8169_hw_start(struct net_device *dev)
 
 	tp->cur_rx = 0;
 
-	RTL_W32(TxDescStartAddr, virt_to_bus(tp->TxDescArray));
-	RTL_W32(RxDescStartAddr, virt_to_bus(tp->RxDescArray));
+	RTL_W32(TxDescStartAddr, tp->TxPhyAddr);
+	RTL_W32(RxDescStartAddr, tp->RxPhyAddr);
 	RTL_W8(Cfg9346, Cfg9346_Lock);
 	udelay(10);
 
@@ -755,11 +753,16 @@ rtl8169_hw_start(struct net_device *dev)
 
 }
 
-static void
-rtl8169_init_ring(struct net_device *dev)
+static int rtl8169_init_ring(struct net_device *dev)
 {
 	struct rtl8169_private *tp = dev->priv;
 	int i;
+
+	tp->RxBufferRings = kmalloc(RX_BUF_SIZE * NUM_RX_DESC, GFP_KERNEL);
+	if (tp->RxBufferRings == NULL) {
+		printk(KERN_INFO "Allocate RxBufferRing failed\n");
+		return -ENOMEM;
+	}
 
 	tp->cur_rx = 0;
 	tp->cur_tx = 0;
@@ -780,6 +783,7 @@ rtl8169_init_ring(struct net_device *dev)
 		tp->RxBufferRing[i] = &(tp->RxBufferRings[i * RX_BUF_SIZE]);
 		tp->RxDescArray[i].buf_addr = virt_to_bus(tp->RxBufferRing[i]);
 	}
+	return 0;
 }
 
 static void
@@ -1023,6 +1027,7 @@ static int
 rtl8169_close(struct net_device *dev)
 {
 	struct rtl8169_private *tp = dev->priv;
+	struct pci_dev *pdev = tp->pci_dev;
 	void *ioaddr = tp->mmio_addr;
 	int i;
 
@@ -1046,10 +1051,10 @@ rtl8169_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 
 	rtl8169_tx_clear(tp);
-	kfree(tp->TxDescArrays);
-	kfree(tp->RxDescArrays);
-	tp->TxDescArrays = NULL;
-	tp->RxDescArrays = NULL;
+	pci_free_consistent(pdev, R8169_RX_RING_BYTES, tp->RxDescArray,
+			    tp->RxPhyAddr);
+	pci_free_consistent(pdev, R8169_TX_RING_BYTES, tp->TxDescArray,
+			    tp->TxPhyAddr);
 	tp->TxDescArray = NULL;
 	tp->RxDescArray = NULL;
 	kfree(tp->RxBufferRings);
