@@ -360,7 +360,6 @@ static initcall_t pref_init_funcs[FB_MAX];
 static int num_pref_init_funcs __initdata = 0;
 struct fb_info *registered_fb[FB_MAX];
 int num_registered_fb;
-static int nologo;
 
 #ifdef CONFIG_FB_OF
 static int ofonly __initdata = 0;
@@ -993,8 +992,6 @@ fb_open(struct inode *inode, struct file *file)
 		if (res)
 			module_put(info->fbops->owner);
 	}
-	if (!nologo)
-		fb_show_logo(info);
 	return res;
 }
 
@@ -1147,9 +1144,6 @@ int __init video_setup(char *options)
 		return 0;
 	}
 #endif
-
-	if (!strcmp(options, "nologo"))
-		nologo = 1;				
 
 	if (num_pref_init_funcs == FB_MAX)
 		return 0;
