@@ -34,6 +34,9 @@
 #include <linux/interrupt.h>
 #include "ibmvscsi.h"
 
+/* We don't need one workqueue per host, one is enough for all of them */
+static struct workqueue_struct *vscsi_wq = NULL;
+
 /* ------------------------------------------------------------
  * Routines for managing the command/response queue
  */
@@ -53,7 +56,7 @@ static irqreturn_t ibmvscsi_handle_event(int irq,
 	struct ibmvscsi_host_data *hostdata =
 	    (struct ibmvscsi_host_data *)dev_instance;
 	vio_disable_interrupts(to_vio_dev(hostdata->dev));
-	schedule_work(&hostdata->srp_task);
+	queue_work(vscsi_wq, &hostdata->srp_task);
 	return IRQ_HANDLED;
 }
 
@@ -273,12 +276,16 @@ static struct vio_driver ibmvscsi_driver = {
 
 int __init ibmvscsi_module_init(void)
 {
+	vscsi_wq = create_workqueue("vscsi-ev");
+	if (!vscsi_wq)
+		return -ENOMEM;
 	return vio_register_driver(&ibmvscsi_driver);
 }
 
 void __exit ibmvscsi_module_exit(void)
 {
 	vio_unregister_driver(&ibmvscsi_driver);
+	destroy_workqueue(vscsi_wq);
 }
 
 module_init(ibmvscsi_module_init);
