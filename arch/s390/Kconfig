@@ -360,6 +360,8 @@ config PCMCIA
 
 source "drivers/base/Kconfig"
 
+source "drivers/audit/Kconfig"
+
 source "drivers/scsi/Kconfig"
 
 source "drivers/s390/Kconfig"
