@@ -1135,14 +1135,8 @@ static int __init sa1100_pcmcia_init(void)
 	}
 #endif
 
-#ifdef CONFIG_SA1100_ADSBITSY
-	pcmcia_adsbitsy_init();
-#endif
 #ifdef CONFIG_SA1100_ASSABET
 	pcmcia_assabet_init();
-#endif
-#ifdef CONFIG_SA1100_BADGE4
-	pcmcia_badge4_init();
 #endif
 #ifdef CONFIG_SA1100_CERF
 	pcmcia_cerf_init();
@@ -1156,23 +1150,8 @@ static int __init sa1100_pcmcia_init(void)
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
 	pcmcia_gcplus_init();
 #endif
-#ifdef CONFIG_SA1100_GRAPHICSMASTER
-	pcmcia_graphicsmaster_init();
-#endif
-#ifdef CONFIG_SA1100_JORNADA720
-	pcmcia_jornada720_init();
-#endif
-#ifdef CONFIG_ASSABET_NEPONSET
-	pcmcia_neponset_init();
-#endif
 #ifdef CONFIG_SA1100_PANGOLIN
 	pcmcia_pangolin_init();
-#endif
-#ifdef CONFIG_SA1100_PFS168
-	pcmcia_pfs_init();
-#endif
-#ifdef CONFIG_SA1100_PT_SYSTEM3
-	pcmcia_system3_init();
 #endif
 #ifdef CONFIG_SA1100_SHANNON
 	pcmcia_shannon_init();
@@ -1185,9 +1164,6 @@ static int __init sa1100_pcmcia_init(void)
 #endif
 #ifdef CONFIG_SA1100_TRIZEPS
 	pcmcia_trizeps_init();
-#endif
-#ifdef CONFIG_SA1100_XP860
-	pcmcia_xp860_init();
 #endif
 #ifdef CONFIG_SA1100_YOPY
 	pcmcia_yopy_init();
@@ -1203,14 +1179,8 @@ static int __init sa1100_pcmcia_init(void)
  */
 static void __exit sa1100_pcmcia_exit(void)
 {
-#ifdef CONFIG_SA1100_ADSBITSY
-	pcmcia_adsbitsy_exit();
-#endif
 #ifdef CONFIG_SA1100_ASSABET
 	pcmcia_assabet_exit();
-#endif
-#ifdef CONFIG_SA1100_BADGE4
-	pcmcia_badge4_exit();
 #endif
 #ifdef CONFIG_SA1100_CERF
 	pcmcia_cerf_exit();
@@ -1224,20 +1194,8 @@ static void __exit sa1100_pcmcia_exit(void)
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
 	pcmcia_gcplus_exit();
 #endif
-#ifdef CONFIG_SA1100_GRAPHICSMASTER
-	pcmcia_graphicsmaster_exit();
-#endif
-#ifdef CONFIG_SA1100_JORNADA720
-	pcmcia_jornada720_exit();
-#endif
-#ifdef CONFIG_ASSABET_NEPONSET
-	pcmcia_neponset_exit();
-#endif
 #ifdef CONFIG_SA1100_PANGOLIN
 	pcmcia_pangolin_exit();
-#endif
-#ifdef CONFIG_SA1100_PFS168
-	pcmcia_pfs_exit();
 #endif
 #ifdef CONFIG_SA1100_SHANNON
 	pcmcia_shannon_exit();
@@ -1247,9 +1205,6 @@ static void __exit sa1100_pcmcia_exit(void)
 #endif
 #ifdef CONFIG_SA1100_STORK
 	pcmcia_stork_exit();
-#endif
-#ifdef CONFIG_SA1100_XP860
-	pcmcia_xp860_exit();
 #endif
 #ifdef CONFIG_SA1100_YOPY
 	pcmcia_yopy_exit();
