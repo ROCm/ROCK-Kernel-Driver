@@ -1394,6 +1394,10 @@ static int snd_pcm_oss_get_ptr(snd_pcm_oss_file_t *pcm_oss_file, int stream, str
 	}
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DELAY, &delay);
+		if (err == -EPIPE || err == -ESTRPIPE) {
+			err = 0;
+			delay = 0;
+		}
 	} else {
 		err = snd_pcm_oss_capture_position_fixup(substream, &delay);
 	}
@@ -1454,7 +1458,12 @@ static int snd_pcm_oss_get_space(snd_pcm_oss_file_t *pcm_oss_file, int stream, s
 	} else {
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			err = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DELAY, &avail);
-			avail = runtime->buffer_size - avail;
+			if (err == -EPIPE || err == -ESTRPIPE) {
+				avail = runtime->buffer_size;
+				err = 0;
+			} else {
+				avail = runtime->buffer_size - avail;
+			}
 		} else {
 			err = snd_pcm_oss_capture_position_fixup(substream, &avail);
 		}
