@@ -77,6 +77,7 @@ static int dsmark_graft(struct Qdisc *sch,unsigned long arg,
 	*old = xchg(&p->q,new);
 	if (*old)
 		qdisc_reset(*old);
+	sch->q.qlen = 0;
 	sch_tree_unlock(sch); /* @@@ move up ? */
         return 0;
 }
