@@ -167,6 +167,13 @@ static int multipath_make_request (request_queue_t *q, struct bio * bio)
 	mp_bh->master_bio = bio;
 	mp_bh->mddev = mddev;
 
+	if (bio_data_dir(bio)==WRITE) {
+		disk_stat_inc(mddev->gendisk, writes);
+		disk_stat_add(mddev->gendisk, write_sectors, bio_sectors(bio));
+	} else {
+		disk_stat_inc(mddev->gendisk, reads);
+		disk_stat_add(mddev->gendisk, read_sectors, bio_sectors(bio));
+	}
 	/*
 	 * read balancing logic:
 	 */

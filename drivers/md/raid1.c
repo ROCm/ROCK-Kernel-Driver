@@ -474,6 +474,14 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	conf->nr_pending++;
 	spin_unlock_irq(&conf->resync_lock);
 
+	if (bio_data_dir(bio)==WRITE) {
+		disk_stat_inc(mddev->gendisk, writes);
+		disk_stat_add(mddev->gendisk, write_sectors, bio_sectors(bio));
+	} else {
+		disk_stat_inc(mddev->gendisk, reads);
+		disk_stat_add(mddev->gendisk, read_sectors, bio_sectors(bio));
+	}
+
 	/*
 	 * make_request() can abort the operation when READA is being
 	 * used and no empty request is available.

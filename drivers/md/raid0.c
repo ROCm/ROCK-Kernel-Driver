@@ -365,6 +365,14 @@ static int raid0_make_request (request_queue_t *q, struct bio *bio)
 	unsigned long chunk;
 	sector_t block, rsect;
 
+	if (bio_data_dir(bio)==WRITE) {
+		disk_stat_inc(mddev->gendisk, writes);
+		disk_stat_add(mddev->gendisk, write_sectors, bio_sectors(bio));
+	} else {
+		disk_stat_inc(mddev->gendisk, reads);
+		disk_stat_add(mddev->gendisk, read_sectors, bio_sectors(bio));
+	}
+
 	chunk_size = mddev->chunk_size >> 10;
 	chunk_sects = mddev->chunk_size >> 9;
 	chunksize_bits = ffz(~chunk_size);
