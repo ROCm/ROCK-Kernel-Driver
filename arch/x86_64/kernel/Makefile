@@ -26,6 +26,7 @@ obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
 obj-$(CONFIG_GART_IOMMU)	+= pci-gart.o aperture.o
 obj-$(CONFIG_DUMMY_IOMMU)	+= pci-nommu.o pci-dma.o
 obj-$(CONFIG_SWIOTLB)		+= swiotlb.o
+obj-$(CONFIG_KPROBES)		+= kprobes.o
 
 obj-$(CONFIG_MODULES)		+= module.o
 

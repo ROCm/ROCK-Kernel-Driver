@@ -47,6 +47,7 @@
 
 #include <linux/irq.h>
 
+
 extern struct gate_struct idt_table[256]; 
 
 asmlinkage void divide_error(void);
@@ -73,6 +74,17 @@ asmlinkage void spurious_interrupt_bug(void);
 asmlinkage void call_debug(void);
 
 struct notifier_block *die_chain;
+static spinlock_t die_notifier_lock = SPIN_LOCK_UNLOCKED;
+
+int register_die_notifier(struct notifier_block *nb)
+{
+	int err = 0;
+	unsigned long flags;
+	spin_lock_irqsave(&die_notifier_lock, flags);
+	err = notifier_chain_register(&die_chain, nb);
+	spin_unlock_irqrestore(&die_notifier_lock, flags);
+	return err;
+}
 
 static inline void conditional_sti(struct pt_regs *regs)
 {
@@ -475,7 +487,6 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 }
 
 DO_ERROR_INFO( 0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->rip)
-DO_ERROR( 3, SIGTRAP, "int3", int3);
 DO_ERROR( 4, SIGSEGV, "overflow", overflow)
 DO_ERROR( 5, SIGSEGV, "bounds", bounds)
 DO_ERROR_INFO( 6, SIGILL,  "invalid operand", invalid_op, ILL_ILLOPN, regs->rip)
@@ -625,6 +636,15 @@ asmlinkage void default_do_nmi(struct pt_regs *regs)
 	inb(0x71);		/* dummy */
 }
 
+asmlinkage void do_int3(struct pt_regs * regs, long error_code)
+{
+	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP) == NOTIFY_STOP) {
+		return;
+	}
+	do_trap(3, SIGTRAP, "int3", regs, error_code, NULL);
+	return;
+}
+
 /* runs on IST stack. */
 asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
 {
@@ -654,6 +674,10 @@ asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
 
 	asm("movq %%db6,%0" : "=r" (condition));
 
+	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
+						SIGTRAP) == NOTIFY_STOP) {
+		return regs;
+	}
 	conditional_sti(regs);
 
 	/* Mask out spurious debug traps due to lazy DR7 setting */
@@ -886,8 +910,8 @@ void __init trap_init(void)
 	set_intr_gate(0,&divide_error);
 	set_intr_gate_ist(1,&debug,DEBUG_STACK);
 	set_intr_gate_ist(2,&nmi,NMI_STACK);
-	set_system_gate(3,&int3);	/* int3-5 can be called from all */
-	set_system_gate(4,&overflow);
+	set_intr_gate(3,&int3);
+	set_system_gate(4,&overflow);	/* int4-5 can be called from all */
 	set_system_gate(5,&bounds);
 	set_intr_gate(6,&invalid_op);
 	set_intr_gate(7,&device_not_available);
