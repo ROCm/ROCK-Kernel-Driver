@@ -91,6 +91,7 @@ int block_dump;
  * Flag that puts the machine in "laptop mode".
  */
 int laptop_mode;
+EXPORT_SYMBOL(laptop_mode);
 
 /* End of sysctl-exported parameters */
 

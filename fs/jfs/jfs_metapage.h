@@ -64,6 +64,7 @@ struct metapage {
 #define META_sync	4
 #define META_discard	5
 #define META_forced	6
+#define META_stale	7
 
 #define mark_metapage_dirty(mp) set_bit(META_dirty, &(mp)->flag)
 

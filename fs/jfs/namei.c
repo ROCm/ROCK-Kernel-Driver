@@ -149,7 +149,6 @@ static int jfs_create(struct inode *dip, struct dentry *dentry, int mode,
 
 	insert_inode_hash(ip);
 	mark_inode_dirty(ip);
-	d_instantiate(dentry, ip);
 
 	dip->i_ctime = dip->i_mtime = CURRENT_TIME;
 
@@ -164,7 +163,8 @@ static int jfs_create(struct inode *dip, struct dentry *dentry, int mode,
 	if (rc) {
 		ip->i_nlink = 0;
 		iput(ip);
-	}
+	} else
+		d_instantiate(dentry, ip);
 
       out2:
 	free_UCSname(&dname);
@@ -297,7 +297,6 @@ static int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 
 	insert_inode_hash(ip);
 	mark_inode_dirty(ip);
-	d_instantiate(dentry, ip);
 
 	/* update parent directory inode */
 	dip->i_nlink++;		/* for '..' from child directory */
@@ -313,7 +312,8 @@ static int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 	if (rc) {
 		ip->i_nlink = 0;
 		iput(ip);
-	}
+	} else
+		d_instantiate(dentry, ip);
 
       out2:
 	free_UCSname(&dname);
@@ -894,11 +894,13 @@ static int jfs_link(struct dentry *old_dentry,
 	ip->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(dir);
 	atomic_inc(&ip->i_count);
-	d_instantiate(dentry, ip);
 
 	iplist[0] = ip;
 	iplist[1] = dir;
 	rc = txCommit(tid, 2, &iplist[0], 0);
+
+	if (!rc)
+		d_instantiate(dentry, ip);
 
       free_dname:
 	free_UCSname(&dname);
@@ -1104,7 +1106,6 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 
 	insert_inode_hash(ip);
 	mark_inode_dirty(ip);
-	d_instantiate(dentry, ip);
 
 	/*
 	 * commit update of parent directory and link object
@@ -1133,7 +1134,8 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 	if (rc) {
 		ip->i_nlink = 0;
 		iput(ip);
-	}
+	} else
+		d_instantiate(dentry, ip);
 
       out2:
 	free_UCSname(&dname);
@@ -1501,7 +1503,6 @@ static int jfs_mknod(struct inode *dir, struct dentry *dentry,
 
 	insert_inode_hash(ip);
 	mark_inode_dirty(ip);
-	d_instantiate(dentry, ip);
 
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 
@@ -1518,7 +1519,8 @@ static int jfs_mknod(struct inode *dir, struct dentry *dentry,
 	if (rc) {
 		ip->i_nlink = 0;
 		iput(ip);
-	}
+	} else
+		d_instantiate(dentry, ip);
 
       out1:
 	free_UCSname(&dname);
