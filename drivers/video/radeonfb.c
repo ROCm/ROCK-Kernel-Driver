@@ -814,7 +814,7 @@ static void radeon_get_pllinfo(struct radeonfb_info *rinfo, void __iomem *bios_s
 		if (radeon_read_OF(rinfo)) {
 			unsigned int tmp, Nx, M, ref_div, xclk;
 
-			tmp = INPLL(X_MPLL_REF_FB_DIV);
+			tmp = INPLL(M_SPLL_REF_FB_DIV);
 			ref_div = INPLL(PPLL_REF_DIV) & 0x3ff;
 
 			Nx = (tmp & 0xff00) >> 8;

@@ -611,6 +611,16 @@ void acquire_console_sem(void)
 }
 EXPORT_SYMBOL(acquire_console_sem);
 
+int try_acquire_console_sem(void)
+{
+	if (down_trylock(&console_sem))
+		return -1;
+	console_locked = 1;
+	console_may_schedule = 0;
+	return 0;
+}
+EXPORT_SYMBOL(try_acquire_console_sem);
+
 int is_console_locked(void)
 {
 	return console_locked;

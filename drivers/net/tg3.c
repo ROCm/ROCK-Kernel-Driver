@@ -60,8 +60,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"3.21"
-#define DRV_MODULE_RELDATE	"February 8, 2005"
+#define DRV_MODULE_VERSION	"3.22"
+#define DRV_MODULE_RELDATE	"February 11, 2005"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -7503,12 +7503,18 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 	tg3_read_mem(tp, NIC_SRAM_DATA_SIG, &val);
 	if (val == NIC_SRAM_DATA_SIG_MAGIC) {
 		u32 nic_cfg, led_cfg;
-		u32 nic_phy_id, cfg2;
+		u32 nic_phy_id, ver, cfg2 = 0;
 
 		tg3_read_mem(tp, NIC_SRAM_DATA_CFG, &nic_cfg);
 		tp->nic_sram_data_cfg = nic_cfg;
 
-		tg3_read_mem(tp, NIC_SRAM_DATA_CFG_2, &cfg2);
+		tg3_read_mem(tp, NIC_SRAM_DATA_VER, &ver);
+		ver >>= NIC_SRAM_DATA_VER_SHIFT;
+		if ((GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700) &&
+		    (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5701) &&
+		    (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5703) &&
+		    (ver > 0) && (ver < 0x100))
+			tg3_read_mem(tp, NIC_SRAM_DATA_CFG_2, &cfg2);
 
 		eeprom_signature_found = 1;
 

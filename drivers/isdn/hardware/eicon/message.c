@@ -55,7 +55,7 @@
 /* and it is not necessary to save it separate for every adapter    */
 /* Macrose defined here have only local meaning                     */
 /*------------------------------------------------------------------*/
-dword diva_xdi_extended_features = 0;
+static dword diva_xdi_extended_features = 0;
 
 #define DIVA_CAPI_USE_CMA                 0x00000001
 #define DIVA_CAPI_XDI_PROVIDES_SDRAM_BAR  0x00000002
@@ -72,11 +72,10 @@ dword diva_xdi_extended_features = 0;
 /* local function prototypes                                        */
 /*------------------------------------------------------------------*/
 
-void group_optimization(DIVA_CAPI_ADAPTER   * a, PLCI   * plci);
-void set_group_ind_mask (PLCI   *plci);
-void set_group_ind_mask_bit (PLCI   *plci, word b);
-void clear_group_ind_mask_bit (PLCI   *plci, word b);
-byte test_group_ind_mask_bit (PLCI   *plci, word b);
+static void group_optimization(DIVA_CAPI_ADAPTER   * a, PLCI   * plci);
+static void set_group_ind_mask (PLCI   *plci);
+static void clear_group_ind_mask_bit (PLCI   *plci, word b);
+static byte test_group_ind_mask_bit (PLCI   *plci, word b);
 void AutomaticLaw(DIVA_CAPI_ADAPTER   *);
 word CapiRelease(word);
 word CapiRegister(word);
@@ -88,7 +87,7 @@ static void api_load_msg(API_SAVE   *in, API_PARSE   *out);
 word api_remove_start(void);
 void api_remove_complete(void);
 
-void plci_remove(PLCI   *);
+static void plci_remove(PLCI   *);
 static void diva_get_extended_adapter_features (DIVA_CAPI_ADAPTER  * a);
 static void diva_ask_for_xdi_sdram_bar (DIVA_CAPI_ADAPTER  *, IDI_SYNC_REQ  *);
 
@@ -100,9 +99,9 @@ static void data_ack(PLCI   *, byte);
 static void sig_ind(PLCI   *);
 static void SendInfo(PLCI   *, dword, byte   * *, byte);
 static void SendSetupInfo(APPL   *, PLCI   *, dword, byte   * *, byte);
-void SendSSExtInd(APPL   *, PLCI   * plci, dword Id, byte   * * parms);
+static void SendSSExtInd(APPL   *, PLCI   * plci, dword Id, byte   * * parms);
 
-void VSwitchReqInd(PLCI   *plci, dword Id, byte   **parms);
+static void VSwitchReqInd(PLCI   *plci, dword Id, byte   **parms);
 
 static void nl_ind(PLCI   *);
 
@@ -254,11 +253,11 @@ extern APPL   * application;
 
 
 
-byte remove_started = FALSE;
-PLCI dummy_plci;
+static byte remove_started = FALSE;
+static PLCI dummy_plci;
 
 
-struct _ftable {
+static struct _ftable {
   word command;
   byte * format;
   byte (* function)(dword, word, DIVA_CAPI_ADAPTER   *, PLCI   *, APPL   *, API_PARSE *);
@@ -291,7 +290,7 @@ struct _ftable {
   {_MANUFACTURER_I|RESPONSE,            "",             manufacturer_res}
 };
 
-byte * cip_bc[29][2] = {
+static byte * cip_bc[29][2] = {
   { "",                     ""                     }, /* 0 */
   { "\x03\x80\x90\xa3",     "\x03\x80\x90\xa2"     }, /* 1 */
   { "\x02\x88\x90",         "\x02\x88\x90"         }, /* 2 */
@@ -324,7 +323,7 @@ byte * cip_bc[29][2] = {
   { "\x02\x88\x90",         "\x02\x88\x90"         }  /* 28 */
 };
 
-byte * cip_hlc[29] = {
+static byte * cip_hlc[29] = {
   "",                           /* 0 */
   "",                           /* 1 */
   "",                           /* 2 */
@@ -716,7 +715,7 @@ word api_remove_start(void)
 /* internal command queue                                           */
 /*------------------------------------------------------------------*/
 
-void init_internal_command_queue (PLCI   *plci)
+static void init_internal_command_queue (PLCI   *plci)
 {
   word i;
 
@@ -729,7 +728,7 @@ void init_internal_command_queue (PLCI   *plci)
 }
 
 
-void start_internal_command (dword Id, PLCI   *plci, t_std_internal_command command_function)
+static void start_internal_command (dword Id, PLCI   *plci, t_std_internal_command command_function)
 {
   word i;
 
@@ -751,7 +750,7 @@ void start_internal_command (dword Id, PLCI   *plci, t_std_internal_command comm
 }
 
 
-void next_internal_command (dword Id, PLCI   *plci)
+static void next_internal_command (dword Id, PLCI   *plci)
 {
   word i;
 
@@ -1048,7 +1047,7 @@ static void plci_free_msg_in_queue (PLCI   *plci)
 }
 
 
-void plci_remove(PLCI   * plci)
+static void plci_remove(PLCI   * plci)
 {
 
   if(!plci) {
@@ -1094,7 +1093,7 @@ void plci_remove(PLCI   * plci)
 /* Application Group function helpers                               */
 /*------------------------------------------------------------------*/
 
-void set_group_ind_mask (PLCI   *plci)
+static void set_group_ind_mask (PLCI   *plci)
 {
   word i;
 
@@ -1102,17 +1101,12 @@ void set_group_ind_mask (PLCI   *plci)
     plci->group_optimization_mask_table[i] = 0xffffffffL;
 }
 
-void set_group_ind_mask_bit (PLCI   *plci, word b)
-{
-  plci->group_optimization_mask_table[b >> 5] |= (1L << (b & 0x1f));
-}
-
-void clear_group_ind_mask_bit (PLCI   *plci, word b)
+static void clear_group_ind_mask_bit (PLCI   *plci, word b)
 {
   plci->group_optimization_mask_table[b >> 5] &= ~(1L << (b & 0x1f));
 }
 
-byte test_group_ind_mask_bit (PLCI   *plci, word b)
+static byte test_group_ind_mask_bit (PLCI   *plci, word b)
 {
   return ((plci->group_optimization_mask_table[b >> 5] & (1L << (b & 0x1f))) != 0);
 }
@@ -1121,7 +1115,7 @@ byte test_group_ind_mask_bit (PLCI   *plci, word b)
 /* c_ind_mask operations for arbitrary MAX_APPL                     */
 /*------------------------------------------------------------------*/
 
-void clear_c_ind_mask (PLCI   *plci)
+static void clear_c_ind_mask (PLCI   *plci)
 {
   word i;
 
@@ -1129,7 +1123,7 @@ void clear_c_ind_mask (PLCI   *plci)
     plci->c_ind_mask_table[i] = 0;
 }
 
-byte c_ind_mask_empty (PLCI   *plci)
+static byte c_ind_mask_empty (PLCI   *plci)
 {
   word i;
 
@@ -1139,22 +1133,22 @@ byte c_ind_mask_empty (PLCI   *plci)
   return (i == C_IND_MASK_DWORDS);
 }
 
-void set_c_ind_mask_bit (PLCI   *plci, word b)
+static void set_c_ind_mask_bit (PLCI   *plci, word b)
 {
   plci->c_ind_mask_table[b >> 5] |= (1L << (b & 0x1f));
 }
 
-void clear_c_ind_mask_bit (PLCI   *plci, word b)
+static void clear_c_ind_mask_bit (PLCI   *plci, word b)
 {
   plci->c_ind_mask_table[b >> 5] &= ~(1L << (b & 0x1f));
 }
 
-byte test_c_ind_mask_bit (PLCI   *plci, word b)
+static byte test_c_ind_mask_bit (PLCI   *plci, word b)
 {
   return ((plci->c_ind_mask_table[b >> 5] & (1L << (b & 0x1f))) != 0);
 }
 
-void dump_c_ind_mask (PLCI   *plci)
+static void dump_c_ind_mask (PLCI   *plci)
 {
 static char hex_digit_table[0x10] =
   {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
@@ -6426,7 +6420,7 @@ byte SendMultiIE(PLCI   * plci, dword Id, byte   * * parms, byte ie_type, dword 
   return iesent;
 }
 
-void SendSSExtInd(APPL   * appl, PLCI   * plci, dword Id, byte   * * parms)
+static void SendSSExtInd(APPL   * appl, PLCI   * plci, dword Id, byte   * * parms)
 {
   word i;
    /* Format of multi_ssext_parms[i][]:
@@ -14720,71 +14714,6 @@ static int channel_can_xon (PLCI   * plci, byte ch) {
 
 /*------------------------------------------------------------------*/
 
-/* to be completed */
-void disable_adapter(byte adapter_number)
-{
-  word j, ncci;
-  DIVA_CAPI_ADAPTER   *a;
-  PLCI   *plci;
-  dword Id;
-
-  if ((adapter_number == 0) || (adapter_number > max_adapter) || !adapter[adapter_number-1].request)
-  {
-    dbug(1,dprintf("disable adapter: number %d invalid",adapter_number));
-    return;
-  }
-  dbug(1,dprintf("disable adapter number %d",adapter_number));
-    /* Capi20 starts with Nr. 1, internal field starts with 0 */
-  a = &adapter[adapter_number-1];
-  a->adapter_disabled = TRUE;
-  for(j=0;j<a->max_plci;j++)
-  {
-    if(a->plci[j].Id) /* disconnect logical links */
-    {
-      plci = &a->plci[j];
-      if(plci->channels)
-      {
-        for(ncci=1;ncci<MAX_NCCI+1 && plci->channels;ncci++)
-        {
-          if(a->ncci_plci[ncci]==plci->Id)
-          {
-            Id = (((dword)ncci)<<16)|((word)plci->Id<<8)|a->Id;
-            sendf(plci->appl,_DISCONNECT_B3_I,Id,0,"ws",0,"");
-            plci->channels--;
-          }
-        }
-      }
-
-      if(plci->State!=LISTENING) /* disconnect physical links */
-      {
-        Id = ((word)plci->Id<<8)|a->Id;
-        sendf(plci->appl, _DISCONNECT_I, Id, 0, "w", _L1_ERROR);
-        plci_remove(plci);
-        plci->Sig.Id = 0;
-        plci->NL.Id = 0;
-        plci_remove(plci);
-      }
-    }
-  }
-}
-
-void enable_adapter(byte adapter_number)
-{
-  DIVA_CAPI_ADAPTER   *a;
-
-  if ((adapter_number == 0) || (adapter_number > max_adapter) || !adapter[adapter_number-1].request)
-  {
-    dbug(1,dprintf("enable adapter: number %d invalid",adapter_number));
-    return;
-  }
-  dbug(1,dprintf("enable adapter number %d",adapter_number));
-    /* Capi20 starts with Nr. 1, internal field starts with 0 */
-  a = &adapter[adapter_number-1];
-  a->adapter_disabled = FALSE;
-  listen_check(a);
-}
-
-
 static word CPN_filter_ok(byte   *cpn,DIVA_CAPI_ADAPTER   * a,word offset)
 {
   return 1;
@@ -14800,7 +14729,7 @@ static word CPN_filter_ok(byte   *cpn,DIVA_CAPI_ADAPTER   * a,word offset)
 /* function must be enabled by setting "a->group_optimization_enabled" from the   */
 /* OS specific part (per adapter).                                                */
 /**********************************************************************************/
-void group_optimization(DIVA_CAPI_ADAPTER   * a, PLCI   * plci)
+static void group_optimization(DIVA_CAPI_ADAPTER   * a, PLCI   * plci)
 {
   word i,j,k,busy,group_found;
   dword info_mask_group[MAX_CIP_TYPES];
@@ -14967,7 +14896,7 @@ word CapiRegister(word id)
 
 /* Functions for virtual Switching e.g. Transfer by join, Conference */
 
-void VSwitchReqInd(PLCI   *plci, dword Id, byte   **parms)
+static void VSwitchReqInd(PLCI   *plci, dword Id, byte   **parms)
 {
  word i;
  /* Format of vswitch_t:

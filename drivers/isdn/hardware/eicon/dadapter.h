@@ -25,11 +25,10 @@
  */
 #ifndef __DIVA_DIDD_DADAPTER_INC__
 #define __DIVA_DIDD_DADAPTER_INC__
+ 
 void diva_didd_load_time_init (void);
 void diva_didd_load_time_finit (void);
-int diva_didd_add_descriptor (DESCRIPTOR* d);
-int diva_didd_remove_descriptor (IDI_CALL request);
-int diva_didd_read_adapter_array (DESCRIPTOR* buffer, int length);
-#define OLD_MAX_DESCRIPTORS     16
+
 #define NEW_MAX_DESCRIPTORS     64
+
 #endif
