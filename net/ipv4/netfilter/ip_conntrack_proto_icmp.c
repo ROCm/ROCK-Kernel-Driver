@@ -12,6 +12,7 @@
 #include <linux/netfilter.h>
 #include <linux/in.h>
 #include <linux/icmp.h>
+#include <linux/seq_file.h>
 #include <net/ip.h>
 #include <net/checksum.h>
 #include <linux/netfilter.h>
@@ -70,18 +71,18 @@ static int icmp_invert_tuple(struct ip_conntrack_tuple *tuple,
 }
 
 /* Print out the per-protocol part of the tuple. */
-static unsigned int icmp_print_tuple(char *buffer,
-				     const struct ip_conntrack_tuple *tuple)
+static int icmp_print_tuple(struct seq_file *s,
+			    const struct ip_conntrack_tuple *tuple)
 {
-	return sprintf(buffer, "type=%u code=%u id=%u ",
-		       tuple->dst.u.icmp.type,
-		       tuple->dst.u.icmp.code,
-		       ntohs(tuple->src.u.icmp.id));
+	return seq_printf(s, "type=%u code=%u id=%u ",
+			  tuple->dst.u.icmp.type,
+			  tuple->dst.u.icmp.code,
+			  ntohs(tuple->src.u.icmp.id));
 }
 
 /* Print out the private part of the conntrack. */
-static unsigned int icmp_print_conntrack(char *buffer,
-				     const struct ip_conntrack *conntrack)
+static int icmp_print_conntrack(struct seq_file *s,
+				const struct ip_conntrack *conntrack)
 {
 	return 0;
 }

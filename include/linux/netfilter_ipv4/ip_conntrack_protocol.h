@@ -3,10 +3,7 @@
 #define _IP_CONNTRACK_PROTOCOL_H
 #include <linux/netfilter_ipv4/ip_conntrack.h>
 
-/* length of buffer to which print_tuple/print_conntrack members are
- * writing */
-
-#define IP_CT_PRINT_BUFLEN 100
+struct seq_file;
 
 struct ip_conntrack_protocol
 {
@@ -31,13 +28,12 @@ struct ip_conntrack_protocol
 	int (*invert_tuple)(struct ip_conntrack_tuple *inverse,
 			    const struct ip_conntrack_tuple *orig);
 
-	/* Print out the per-protocol part of the tuple. */
-	unsigned int (*print_tuple)(char *buffer,
-				    const struct ip_conntrack_tuple *);
+	/* Print out the per-protocol part of the tuple. Return like seq_* */
+	int (*print_tuple)(struct seq_file *,
+			   const struct ip_conntrack_tuple *);
 
 	/* Print out the private part of the conntrack. */
-	unsigned int (*print_conntrack)(char *buffer,
-					const struct ip_conntrack *);
+	int (*print_conntrack)(struct seq_file *, const struct ip_conntrack *);
 
 	/* Returns verdict for packet, or -1 for invalid. */
 	int (*packet)(struct ip_conntrack *conntrack,

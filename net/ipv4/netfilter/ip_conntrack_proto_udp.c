@@ -12,6 +12,7 @@
 #include <linux/netfilter.h>
 #include <linux/in.h>
 #include <linux/udp.h>
+#include <linux/seq_file.h>
 #include <net/checksum.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
@@ -46,17 +47,17 @@ static int udp_invert_tuple(struct ip_conntrack_tuple *tuple,
 }
 
 /* Print out the per-protocol part of the tuple. */
-static unsigned int udp_print_tuple(char *buffer,
-				    const struct ip_conntrack_tuple *tuple)
+static int udp_print_tuple(struct seq_file *s,
+			   const struct ip_conntrack_tuple *tuple)
 {
-	return sprintf(buffer, "sport=%hu dport=%hu ",
-		       ntohs(tuple->src.u.udp.port),
-		       ntohs(tuple->dst.u.udp.port));
+	return seq_printf(s, "sport=%hu dport=%hu ",
+			  ntohs(tuple->src.u.udp.port),
+			  ntohs(tuple->dst.u.udp.port));
 }
 
 /* Print out the private part of the conntrack. */
-static unsigned int udp_print_conntrack(char *buffer,
-					const struct ip_conntrack *conntrack)
+static int udp_print_conntrack(struct seq_file *s,
+			       const struct ip_conntrack *conntrack)
 {
 	return 0;
 }

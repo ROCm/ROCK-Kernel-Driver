@@ -22,6 +22,7 @@
 #include <linux/ip.h>
 #include <linux/sctp.h>
 #include <linux/string.h>
+#include <linux/seq_file.h>
 
 #include <linux/netfilter_ipv4/ip_conntrack.h>
 #include <linux/netfilter_ipv4/ip_conntrack_protocol.h>
@@ -178,20 +179,20 @@ static int sctp_invert_tuple(struct ip_conntrack_tuple *tuple,
 }
 
 /* Print out the per-protocol part of the tuple. */
-static unsigned int sctp_print_tuple(char *buffer,
-				     const struct ip_conntrack_tuple *tuple)
+static int sctp_print_tuple(struct seq_file *s,
+			    const struct ip_conntrack_tuple *tuple)
 {
 	DEBUGP(__FUNCTION__);
 	DEBUGP("\n");
 
-	return sprintf(buffer, "sport=%hu dport=%hu ",
-		       ntohs(tuple->src.u.sctp.port),
-		       ntohs(tuple->dst.u.sctp.port));
+	return seq_printf(s, "sport=%hu dport=%hu ",
+			  ntohs(tuple->src.u.sctp.port),
+			  ntohs(tuple->dst.u.sctp.port));
 }
 
 /* Print out the private part of the conntrack. */
-static unsigned int sctp_print_conntrack(char *buffer,
-					 const struct ip_conntrack *conntrack)
+static int sctp_print_conntrack(struct seq_file *s,
+				const struct ip_conntrack *conntrack)
 {
 	enum sctp_conntrack state;
 
@@ -202,7 +203,7 @@ static unsigned int sctp_print_conntrack(char *buffer,
 	state = conntrack->proto.sctp.state;
 	READ_UNLOCK(&sctp_lock);
 
-	return sprintf(buffer, "%s ", sctp_conntrack_names[state]);
+	return seq_printf(s, "%s ", sctp_conntrack_names[state]);
 }
 
 #define for_each_sctp_chunk(skb, sch, offset, count)	\
