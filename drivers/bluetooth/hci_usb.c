@@ -904,6 +904,8 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	hdev->send  = hci_usb_send_frame;
 	hdev->destruct = hci_usb_destruct;
 
+	hdev->owner = THIS_MODULE;
+
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device");
 		goto probe_error;
@@ -940,7 +942,6 @@ static void hci_usb_disconnect(struct usb_interface *intf)
 }
 
 static struct usb_driver hci_usb_driver = {
-	.owner      =  THIS_MODULE,
 	.name       =  "hci_usb",
 	.probe      =  hci_usb_probe,
 	.disconnect =  hci_usb_disconnect,
