@@ -2037,6 +2037,9 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		if (copy_from_user(&eeprom, useraddr, sizeof(eeprom)))
 			return -EFAULT;
 		
+		if (eeprom.offset > eeprom.offset+eeprom.len)
+			return -EINVAL;
+
 		if ((eeprom.offset+eeprom.len) > NATSEMI_EEPROM_SIZE) {
 			eeprom.len = NATSEMI_EEPROM_SIZE-eeprom.offset;
 		}
