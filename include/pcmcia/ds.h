@@ -127,6 +127,8 @@ typedef struct dev_link_t {
     ((l) && ((l->state & ~DEV_BUSY) == (DEV_CONFIG|DEV_PRESENT)))
 
 
+struct pcmcia_socket;
+
 extern struct bus_type pcmcia_bus_type;
 
 struct pcmcia_driver {
@@ -140,6 +142,26 @@ struct pcmcia_driver {
 /* driver registration */
 int pcmcia_register_driver(struct pcmcia_driver *driver);
 void pcmcia_unregister_driver(struct pcmcia_driver *driver);
+
+struct pcmcia_device {
+	/* the socket and the device_no [for multifunction devices]
+	   uniquely define a pcmcia_device */
+	struct pcmcia_socket	*socket;
+
+	u8			device_no;
+
+	/* the hardware "function" device; certain subdevices can
+	 * share one hardware "function" device. */
+	u8			func;
+
+	struct list_head	socket_device_list;
+
+	struct device		dev;
+};
+
+#define to_pcmcia_dev(n) container_of(n, struct pcmcia_device, dev)
+#define to_pcmcia_drv(n) container_of(n, struct pcmcia_driver, drv)
+
 
 /* error reporting */
 void cs_error(client_handle_t handle, int func, int ret);

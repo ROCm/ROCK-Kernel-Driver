@@ -101,7 +101,15 @@ struct pcmcia_bus_socket {
 	wait_queue_head_t	queue, request;
 	socket_bind_t		*bind;
 	struct pcmcia_socket	*parent;
+
+	/* the PCMCIA devices connected to this socket (normally one, more
+	 * for multifunction devices: */
+	struct list_head	devices_list;
+	u8			device_count; /* the number of devices, used
+					       * only internally and subject
+					       * to incorrectness and change */
 };
+static spinlock_t pcmcia_dev_list_lock;
 
 #define DS_SOCKET_PRESENT		0x01
 #define DS_SOCKET_BUSY			0x02
@@ -328,6 +336,16 @@ static int proc_read_drivers(char *buf, char **start, off_t pos,
 }
 #endif
 
+/* pcmcia_device handling */
+
+static void pcmcia_release_dev(struct device *dev)
+{
+	struct pcmcia_device *p_dev = to_pcmcia_dev(dev);
+	p_dev->socket->pcmcia->device_count = 0;
+	kfree(p_dev);
+}
+
+
 /*======================================================================
 
     These manage a ring buffer of events pending for one user process
@@ -491,8 +509,10 @@ static int bind_mtd(struct pcmcia_bus_socket *bus_sock, mtd_info_t *mtd_info)
 static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 {
 	struct pcmcia_driver *driver;
+	struct pcmcia_device *p_dev;
 	socket_bind_t *b;
 	client_t *client;
+	unsigned long flags;
 
 	if (!s)
 		return -EINVAL;
@@ -542,6 +562,38 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	b->instance = NULL;
 	b->next = s->bind;
 	s->bind = b;
+
+	/* Currently, the userspace pcmcia cardmgr detects pcmcia devices.
+	 * Here this information is translated into a kernel
+	 * struct pcmcia_device.
+	 */
+
+	p_dev = kmalloc(sizeof(struct pcmcia_device), GFP_KERNEL);
+	if (!p_dev) {
+		/* FIXME: client isn't freed here */
+		goto no_p_dev;
+	}
+	memset(p_dev, 0, sizeof(struct pcmcia_device));
+
+	p_dev->socket = s->parent;
+	p_dev->device_no = (s->device_count++);
+	p_dev->func   = bind_info->function;
+
+	p_dev->dev.bus = &pcmcia_bus_type;
+	p_dev->dev.parent = s->parent->dev.dev;
+	p_dev->dev.release = pcmcia_release_dev;
+	sprintf (p_dev->dev.bus_id, "pcmcia%d.%d", p_dev->socket->sock, p_dev->device_no);
+	p_dev->dev.driver = &driver->drv;
+	if (device_register(&p_dev->dev)) {
+		/* FIXME: client isn't freed here */
+		kfree(p_dev);
+		goto no_p_dev;
+	}
+	spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
+	list_add_tail(&p_dev->socket_device_list, &s->devices_list);
+	spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+
+ no_p_dev:
 
 	driver->use_count++;
 	if (driver->attach) {
@@ -632,6 +684,8 @@ static int get_device_info(struct pcmcia_bus_socket *s, bind_info_t *bind_info, 
 static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 {
     socket_bind_t **b, *c;
+    struct pcmcia_device *p_dev;
+    unsigned long flags;
 
     ds_dbg(2, "unbind_request(%d, '%s')\n", s->parent->sock,
 	  (char *)bind_info->dev_info);
@@ -652,6 +706,22 @@ static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
     module_put(c->driver->owner);
     *b = c->next;
     kfree(c);
+
+ restart:
+    /* unregister the pcmcia_device */
+    spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
+    list_for_each_entry(p_dev, &s->devices_list, socket_device_list) {
+	    if (p_dev->func == bind_info->function) {
+		    list_del(&p_dev->socket_device_list);
+		    spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+
+		    device_unregister(&p_dev->dev);
+
+		    /* multiple devices may be registered to this "function" */
+		    goto restart;
+	    }
+    }
+    spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
     return 0;
 } /* unbind_request */
 
@@ -1034,6 +1104,7 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 
 	init_waitqueue_head(&s->queue);
 	init_waitqueue_head(&s->request);
+	INIT_LIST_HEAD(&s->devices_list);
 
 	/* initialize data */
 	s->parent = socket;
@@ -1089,6 +1160,8 @@ EXPORT_SYMBOL(pcmcia_bus_type);
 static int __init init_pcmcia_bus(void)
 {
 	int i;
+
+	spin_lock_init(&pcmcia_dev_list_lock);
 
 	bus_register(&pcmcia_bus_type);
 	class_interface_register(&pcmcia_bus_interface);
