@@ -110,6 +110,11 @@ struct devprobe
 	int status;	/* non-zero if autoprobe has failed */
 };
 
+struct devprobe2 {
+	struct net_device *(*probe)(int unit);
+	int status;	/* non-zero if autoprobe has failed */
+};
+
 /*
  * probe_list walks a list of probe functions and calls each so long
  * as a non-zero ioaddr is given, or as long as it hasn't already failed 
@@ -131,6 +136,21 @@ static int __init probe_list(struct net_device *dev, struct devprobe *plist)
 				return 0;
 		}
 		p++;
+	}
+	return -ENODEV;
+}
+
+static int __init probe_list2(int unit, struct devprobe2 *p, int autoprobe)
+{
+	struct net_device *dev;
+	for (; p->probe; p++) {
+		if (autoprobe && p->status)
+			continue;
+		dev = p->probe(unit);
+		if (!IS_ERR(dev))
+			return 0;
+		if (autoprobe)
+			p->status = PTR_ERR(dev);
 	}
 	return -ENODEV;
 }
@@ -372,6 +392,16 @@ static int __init ethif_probe(int unit)
 	return err;
 
 }
+ 
+static void __init ethif_probe2(int unit)
+{
+	unsigned long base_addr = netdev_boot_base("eth", unit);
+
+	if (base_addr == 1)
+		return;
+
+	return;	/* nothing yet */
+}
 
 #ifdef CONFIG_TR
 /* Token-ring device probe */
@@ -440,7 +470,8 @@ static int __init net_olddevs_init(void)
 		trif_probe(num);
 #endif
 	for (num = 0; num < 8; ++num)
-		ethif_probe(num);
+		if (!ethif_probe(num))
+			ethif_probe2(num);
 
 #ifdef CONFIG_COPS
 	cops_probe(0);
