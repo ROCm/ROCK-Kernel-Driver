@@ -191,13 +191,13 @@ static int trizeps_pcmcia_socket_suspend(int sock)
  *
  ******************************************************/
 struct pcmcia_low_level trizeps_pcmcia_ops = {
-	init:			trizeps_pcmcia_init,
-	shutdown:		trizeps_pcmcia_shutdown,
-	socket_state:		trizeps_pcmcia_socket_state,
-	get_irq_info:		trizeps_pcmcia_get_irq_info,
-	configure_socket:	trizeps_pcmcia_configure_socket,
-	socket_init:		trizeps_pcmcia_socket_init,
-	socket_suspend:		trizeps_pcmcia_socket_suspend,
+	.init			= trizeps_pcmcia_init,
+	.shutdown		= trizeps_pcmcia_shutdown,
+	.socket_state		= trizeps_pcmcia_socket_state,
+	.get_irq_info		= trizeps_pcmcia_get_irq_info,
+	.configure_socket	= trizeps_pcmcia_configure_socket,
+	.socket_init		= trizeps_pcmcia_socket_init,
+	.socket_suspend		= trizeps_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_trizeps_init(void)

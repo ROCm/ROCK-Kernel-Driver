@@ -158,14 +158,14 @@ static int simpad_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level simpad_pcmcia_ops = { 
-  init:			simpad_pcmcia_init,
-  shutdown:		simpad_pcmcia_shutdown,
-  socket_state:		simpad_pcmcia_socket_state,
-  get_irq_info:		simpad_pcmcia_get_irq_info,
-  configure_socket:	simpad_pcmcia_configure_socket,
+  .init			= simpad_pcmcia_init,
+  .shutdown		= simpad_pcmcia_shutdown,
+  .socket_state		= simpad_pcmcia_socket_state,
+  .get_irq_info		= simpad_pcmcia_get_irq_info,
+  .configure_socket	= simpad_pcmcia_configure_socket,
 
-  socket_init:		simpad_pcmcia_socket_init,
-  socket_suspend:	simpad_pcmcia_socket_suspend,
+  .socket_init		= simpad_pcmcia_socket_init,
+  .socket_suspend	= simpad_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_simpad_init(void)

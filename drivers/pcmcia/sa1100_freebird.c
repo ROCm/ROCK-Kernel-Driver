@@ -178,14 +178,14 @@ static int freebird_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level freebird_pcmcia_ops = {
-  init:			freebird_pcmcia_init,
-  shutdown:		freebird_pcmcia_shutdown,
-  socket_state:		freebird_pcmcia_socket_state,
-  get_irq_info:		freebird_pcmcia_get_irq_info,
-  configure_socket:	freebird_pcmcia_configure_socket,
+  .init			= freebird_pcmcia_init,
+  .shutdown		= freebird_pcmcia_shutdown,
+  .socket_state		= freebird_pcmcia_socket_state,
+  .get_irq_info		= freebird_pcmcia_get_irq_info,
+  .configure_socket	= freebird_pcmcia_configure_socket,
 
-  socket_init:		freebird_pcmcia_socket_init,
-  socket_suspend:	freebird_pcmcia_socket_suspend,
+  .socket_init		= freebird_pcmcia_socket_init,
+  .socket_suspend	= freebird_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_freebird_init(void)

@@ -227,14 +227,14 @@ static int stork_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level stork_pcmcia_ops = { 
-	init:			stork_pcmcia_init,
-	shutdown:		stork_pcmcia_shutdown,
-	socket_state:		stork_pcmcia_socket_state,
-	get_irq_info:		stork_pcmcia_get_irq_info,
-	configure_socket:	stork_pcmcia_configure_socket,
+	.init			= stork_pcmcia_init,
+	.shutdown		= stork_pcmcia_shutdown,
+	.socket_state		= stork_pcmcia_socket_state,
+	.get_irq_info		= stork_pcmcia_get_irq_info,
+	.configure_socket	= stork_pcmcia_configure_socket,
 
-	socket_init:		stork_pcmcia_socket_init,
-	socket_suspend:		stork_pcmcia_socket_suspend,
+	.socket_init		= stork_pcmcia_socket_init,
+	.socket_suspend		= stork_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_stork_init(void)

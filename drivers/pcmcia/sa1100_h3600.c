@@ -185,13 +185,13 @@ static int h3600_pcmcia_socket_suspend(int sock)
 }
 
 struct pcmcia_low_level h3600_pcmcia_ops = { 
-	init:			h3600_pcmcia_init,
-	shutdown:		h3600_pcmcia_shutdown,
-	socket_state:		h3600_pcmcia_socket_state,
-	get_irq_info:		h3600_pcmcia_get_irq_info,
-	configure_socket:	h3600_pcmcia_configure_socket,
+	.init			= h3600_pcmcia_init,
+	.shutdown		= h3600_pcmcia_shutdown,
+	.socket_state		= h3600_pcmcia_socket_state,
+	.get_irq_info		= h3600_pcmcia_get_irq_info,
+	.configure_socket	= h3600_pcmcia_configure_socket,
 
-	socket_init:		h3600_pcmcia_socket_init,
-	socket_suspend:		h3600_pcmcia_socket_suspend,
+	.socket_init		= h3600_pcmcia_socket_init,
+	.socket_suspend		= h3600_pcmcia_socket_suspend,
 };
 

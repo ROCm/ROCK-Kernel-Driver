@@ -151,14 +151,14 @@ static int shannon_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level shannon_pcmcia_ops = {
-	init:			shannon_pcmcia_init,
-	shutdown:		shannon_pcmcia_shutdown,
-	socket_state:		shannon_pcmcia_socket_state,
-	get_irq_info:		shannon_pcmcia_get_irq_info,
-	configure_socket:	shannon_pcmcia_configure_socket,
+	.init			= shannon_pcmcia_init,
+	.shutdown		= shannon_pcmcia_shutdown,
+	.socket_state		= shannon_pcmcia_socket_state,
+	.get_irq_info		= shannon_pcmcia_get_irq_info,
+	.configure_socket	= shannon_pcmcia_configure_socket,
 
-	socket_init:		shannon_pcmcia_socket_init,
-	socket_suspend:		shannon_pcmcia_socket_suspend,
+	.socket_init		= shannon_pcmcia_socket_init,
+	.socket_suspend		= shannon_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_shannon_init(void)

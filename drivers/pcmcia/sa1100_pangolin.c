@@ -159,13 +159,13 @@ static int pangolin_pcmcia_socket_suspend(int sock)
 }
 
 static struct pcmcia_low_level pangolin_pcmcia_ops = { 
-  init:			pangolin_pcmcia_init,
-  shutdown:		pangolin_pcmcia_shutdown,
-  socket_state:		pangolin_pcmcia_socket_state,
-  get_irq_info:		pangolin_pcmcia_get_irq_info,
-  configure_socket:	pangolin_pcmcia_configure_socket,
+  .init			= pangolin_pcmcia_init,
+  .shutdown		= pangolin_pcmcia_shutdown,
+  .socket_state		= pangolin_pcmcia_socket_state,
+  .get_irq_info		= pangolin_pcmcia_get_irq_info,
+  .configure_socket	= pangolin_pcmcia_configure_socket,
 
-  socket_init:		pangolin_pcmcia_socket_init,
+  .socket_init		= pangolin_pcmcia_socket_init,
   socket_suspend,	pangolin_pcmcia_socket_suspend,
 };
 
