@@ -15,16 +15,11 @@
  * for more info.
  *
  * History :
- *  16/07/2002 : v1.04 -- Julien BLACHE <jb@jblache.org>
- *    + removed useless usblp_cleanup()
- *    + removed {un,}lock_kernel() as suggested on lkml
- *    + inlined clear_pipes() (used once)
- *    + inlined clear_device() (small, used twice)
- *    + removed tiglusb_find_struct() (used once, simple code)
- *    + replaced down() with down_interruptible() wherever possible
- *    + fixed double unregistering wrt devfs, causing devfs
- *      to force an oops when the device is deconnected
- *    + removed unused fields from struct tiglusb_t
+ *   1.0x, Romain & Julien: initial submit.
+ *   1.03, Greg Kroah: modifications.
+ *   1.04, Julien: clean-up & fixes; Romain: 2.4 backport.
+ *   1.05, Randy Dunlap: bug fix with the timeout parameter (divide-by-zero).
+ *   1.06, Romain: synched with 2.5, version/firmware changed (confusing).
  */
 
 #include <linux/module.h>
@@ -44,7 +39,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "1.04"
+#define DRIVER_VERSION "1.06"
 #define DRIVER_AUTHOR  "Romain Lievin <roms@lpg.ticalc.org> & Julien Blache <jb@jblache.org>"
 #define DRIVER_DESC    "TI-GRAPH LINK USB (aka SilverLink) driver"
 #define DRIVER_LICENSE "GPL"
@@ -387,7 +382,7 @@ tiglusb_probe (struct usb_interface *intf,
 			    &tiglusb_fops, NULL);
 
 	/* Display firmware version */
-	info ("link cable version %i.%02x",
+	info ("firmware revision %i.%02x",
 		dev->descriptor.bcdDevice >> 8,
 		dev->descriptor.bcdDevice & 0xff);
 
@@ -453,7 +448,7 @@ tiglusb_setup (char *str)
 	if (ints[0] > 0) {
 		timeout = ints[1];
 	}
-	if (!timeout)
+	if (timeout <= 0)
 		timeout = TIMAXTIME;
 
 	return 1;
@@ -494,9 +489,9 @@ tiglusb_init (void)
 		return -1;
 	}
 
-	info (DRIVER_DESC ", " DRIVER_VERSION);
+	info (DRIVER_DESC ", version " DRIVER_VERSION);
 
-	if (!timeout)
+	if (timeout <= 0)
 		timeout = TIMAXTIME;
 
 	return 0;
