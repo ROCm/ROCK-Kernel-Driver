@@ -37,6 +37,10 @@ config ISA
 	bool
 	default y
 
+config PCI
+	bool
+	default n
+
 source "init/Kconfig"
 
 menu "Processor type and features"
