@@ -228,6 +228,8 @@ void locks_copy_lock(struct file_lock *new, struct file_lock *fl)
 	new->fl_lmops = fl->fl_lmops;
 	if (fl->fl_ops && fl->fl_ops->fl_copy_lock)
 		fl->fl_ops->fl_copy_lock(new, fl);
+	if (fl->fl_lmops && fl->fl_lmops->fl_copy_lock)
+		fl->fl_lmops->fl_copy_lock(new, fl);
 }
 
 EXPORT_SYMBOL(locks_copy_lock);
