@@ -224,16 +224,19 @@ cifs_get_inode_info(struct inode **pinode,
 		    cifs_NTtimeToUnix(le64_to_cpu(findData.LastWriteTime));
 		inode->i_ctime =
 		    cifs_NTtimeToUnix(le64_to_cpu(findData.ChangeTime));
-		inode->i_mode = S_IALLUGO & ~(S_ISUID | S_IXGRP);	/* 2767 perms indicate mandatory locking - will override for dirs later */
 		cFYI(0,
 		     (" Attributes came in as 0x%x ", findData.Attributes));
-		if (findData.Attributes & ATTR_REPARSE) {	
-   /* Can IFLNK be set as it basically is on windows with IFREG or IFDIR? */
+
+		/* set default mode. will override for dirs below */
+		inode->i_mode = cifs_sb->mnt_file_mode;
+
+		if (findData.Attributes & ATTR_REPARSE) {
+	/* Can IFLNK be set as it basically is on windows with IFREG or IFDIR? */
 			inode->i_mode |= S_IFLNK;
 		} else if (findData.Attributes & ATTR_DIRECTORY) {
-   /* override default perms since we do not do byte range locking on dirs */
-			inode->i_mode = S_IRWXUGO;	
-            inode->i_mode |= S_IFDIR;
+	/* override default perms since we do not do byte range locking on dirs */
+			inode->i_mode = cifs_sb->mnt_dir_mode;
+			inode->i_mode |= S_IFDIR;
 		} else {
 			inode->i_mode |= S_IFREG;
 			/* treat the dos attribute of read-only as read-only mode e.g. 555 */
@@ -250,8 +253,11 @@ cifs_get_inode_info(struct inode **pinode,
 		      (unsigned long) inode->i_size, inode->i_blocks));
 		inode->i_nlink = le32_to_cpu(findData.NumberOfLinks);
 
-		/* BB fill in uid and gid here? with help from winbind? */
-
+		/* BB fill in uid and gid here? with help from winbind? 
+			or retrieve from NTFS stream extended attribute */
+		inode->i_uid = cifs_sb->mnt_uid;
+		inode->i_gid = cifs_sb->mnt_gid;
+		
 		if (S_ISREG(inode->i_mode)) {
 			cFYI(1, (" File inode "));
 			inode->i_op = &cifs_file_inode_ops;
