@@ -316,6 +316,14 @@ static unsigned long __srmmu_get_nocache(int size, int align)
 	unsigned long va_tmp, phys_tmp;
 	int lowest_failed = 0;
 
+	if (size < SRMMU_NOCACHE_BITMAP_SHIFT) {
+		printk("Size 0x%x too small for nocache request\n", size);
+		size = SRMMU_NOCACHE_BITMAP_SHIFT;
+	}
+	if (size & (SRMMU_NOCACHE_BITMAP_SHIFT-1)) {
+		printk("Size 0x%x unaligned int nocache request\n", size);
+		size += SRMMU_NOCACHE_BITMAP_SHIFT-1;
+	}
 	size = size >> SRMMU_NOCACHE_BITMAP_SHIFT;
 
 	spin_lock(&srmmu_nocache_spinlock);
@@ -376,8 +384,32 @@ unsigned inline long srmmu_get_nocache(int size, int align)
 
 void srmmu_free_nocache(unsigned long vaddr, int size)
 {
-	int offset = (vaddr - SRMMU_NOCACHE_VADDR) >> SRMMU_NOCACHE_BITMAP_SHIFT;
+	int offset;
 
+	if (vaddr < SRMMU_NOCACHE_VADDR) {
+		printk("Vaddr %x is smaller than nocache base 0x%x\n",
+		    vaddr, SRMMU_NOCACHE_VADDR);
+		BUG();
+	}
+	if (vaddr >= SRMMU_NOCACHE_END) {
+		printk("Vaddr %x is bigger than nocache end 0x%x\n",
+		    vaddr, SRMMU_NOCACHE_END);
+		BUG();
+	}
+	if (size & (size-1)) {
+		printk("Size 0x%x is not a power of 2\n", size);
+		BUG();
+	}
+	if (size < SRMMU_NOCACHE_BITMAP_SHIFT) {
+		printk("Size 0x%x is too small\n", size);
+		BUG();
+	}
+	if (vaddr & (size-1)) {
+		printk("Vaddr 0x%x is not aligned to size 0x%x\n", vaddr, size);
+		BUG();
+	}
+
+	offset = (vaddr - SRMMU_NOCACHE_VADDR) >> SRMMU_NOCACHE_BITMAP_SHIFT;
 	size = size >> SRMMU_NOCACHE_BITMAP_SHIFT;
 
 	spin_lock(&srmmu_nocache_spinlock);
@@ -501,9 +533,13 @@ static void srmmu_free_pte_fast(pte_t *pte)
 
 static void srmmu_pte_free(struct page *pte)
 {
-	unsigned long p = (unsigned long)page_address(pte);
+	unsigned long p;
+
+	p = (unsigned long)page_address(pte);	/* Cached address (for test) */
 	if (p == 0)
 		BUG();
+	p = ((pte - mem_map) << PAGE_SHIFT);	/* Physical address */
+	p = (unsigned long) __nocache_va(p);	/* Nocached virtual */
 	srmmu_free_nocache(p, SRMMU_PTE_SZ_SOFT);
 }
 
