@@ -3732,7 +3732,7 @@ static void ipr_erp_start(struct ipr_ioa_cfg *ioa_cfg,
 
 	switch (ioasc & IPR_IOASC_IOASC_MASK) {
 	case IPR_IOASC_ABORTED_CMD_TERM_BY_HOST:
-		scsi_cmd->result |= (DID_ERROR << 16);
+		scsi_cmd->result |= (DID_IMM_RETRY << 16);
 		break;
 	case IPR_IOASC_IR_RESOURCE_HANDLE:
 		scsi_cmd->result |= (DID_NO_CONNECT << 16);
