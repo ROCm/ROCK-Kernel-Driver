@@ -2390,8 +2390,7 @@ static int __devinit cs46xx_detect_codec(cs46xx_t *chip, int codec)
 
 	snd_cs46xx_codec_write(chip, AC97_MASTER, 0x8000, codec);
 	for (idx = 0; idx < 100; ++idx) {
-		if (snd_cs46xx_codec_read(chip, AC97_MASTER,
-					  CS46XX_PRIMARY_CODEC_INDEX) == 0x8000) {
+		if (snd_cs46xx_codec_read(chip, AC97_MASTER, codec) == 0x8000) {
 			err = snd_ac97_mixer(chip->ac97_bus, &ac97, &chip->ac97[codec]);
 			return err;
 		}
