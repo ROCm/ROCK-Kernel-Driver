@@ -798,12 +798,3 @@ void cleanup_module(void)
 	}
 }
 #endif /* MODULE */
-
-
-/*
- * Local variables:
- *  compile-command: "gcc -DKERNEL -Wall -O6 -fomit-frame-pointer -I/usr/src/linux/net/tcp -c ne.c"
- *  version-control: t
- *  kept-new-versions: 5
- * End:
- */
