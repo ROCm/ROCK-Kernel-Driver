@@ -703,9 +703,9 @@ pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask)
 
 static int __devinit pci_init(void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		pci_fixup_device(PCI_FIXUP_FINAL, dev);
 	}
 	return 0;
