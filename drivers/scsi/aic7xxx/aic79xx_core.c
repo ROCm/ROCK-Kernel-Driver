@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#183 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#184 $
  *
  * $FreeBSD$
  */
@@ -604,7 +604,16 @@ ahd_handle_seqint(struct ahd_softc *ahd, u_int intstat)
 		break;
 	case STATUS_OVERRUN:
 	{
-		printf("%s: Status Overrun", ahd_name(ahd));
+		struct	scb *scb;
+		u_int	scbid;
+
+		scbid = ahd_get_scbptr(ahd);
+		scb = ahd_lookup_scb(ahd, scbid);
+		if (scb != NULL)
+			ahd_print_path(ahd, scb);
+		else
+			printf("%s: ", ahd_name(ahd));
+		printf("SCB %d Packetized Status Overrun", scbid);
 		ahd_dump_card_state(ahd);
 		ahd_reset_channel(ahd, 'A', /*Initiate Reset*/TRUE);
 		break;
@@ -6056,7 +6065,6 @@ ahd_chip_init(struct ahd_softc *ahd)
 	for (i = 0; i < 2; i++) {
 		ahd_set_modes(ahd, AHD_MODE_DFF0 + i, AHD_MODE_DFF0 + i);
 		ahd_outb(ahd, LONGJMP_ADDR + 1, INVALID_ADDR);
-		ahd_outw(ahd, LONGJMP_SCB, SCB_LIST_NULL);
 		ahd_outb(ahd, SG_STATE, 0);
 		ahd_outb(ahd, CLRSEQINTSRC, 0xFF);
 		ahd_outb(ahd, SEQIMODE,
@@ -8611,11 +8619,11 @@ ahd_dump_card_state(struct ahd_softc *ahd)
 	LIST_FOREACH(scb, &ahd->pending_scbs, pending_links) {
 		if (i++ > AHD_SCB_MAX)
 			break;
-		cur_col = printf("\n%3d ", SCB_GET_TAG(scb));
+		cur_col = printf("\n%3d FIFO_USE[0x%x] ", SCB_GET_TAG(scb),
+				 ahd_inb(ahd, SCB_FIFO_USE_COUNT));
 		ahd_set_scbptr(ahd, SCB_GET_TAG(scb));
 		ahd_scb_control_print(ahd_inb(ahd, SCB_CONTROL), &cur_col, 60);
 		ahd_scb_scsiid_print(ahd_inb(ahd, SCB_SCSIID), &cur_col, 60);
-		ahd_scb_tag_print(ahd_inb(ahd, SCB_TAG), &cur_col, 60);
 	}
 	printf("\nTotal %d\n", i);
 
@@ -8678,12 +8686,10 @@ ahd_dump_card_state(struct ahd_softc *ahd)
 
 		ahd_set_modes(ahd, AHD_MODE_DFF0 + i, AHD_MODE_DFF0 + i);
 		fifo_scbptr = ahd_get_scbptr(ahd);
-		printf("\n%s: FIFO%d %s, LONGJMP == 0x%x, "
-		       "SCB 0x%x, LJSCB 0x%x\n",
+		printf("\n%s: FIFO%d %s, LONGJMP == 0x%x, SCB 0x%x\n",
 		       ahd_name(ahd), i,
 		       (dffstat & (FIFO0FREE << i)) ? "Free" : "Active",
-		       ahd_inw(ahd, LONGJMP_ADDR), fifo_scbptr,
-		       ahd_inw(ahd, LONGJMP_SCB));
+		       ahd_inw(ahd, LONGJMP_ADDR), fifo_scbptr);
 		cur_col = 0;
 		ahd_seqimode_print(ahd_inb(ahd, SEQIMODE), &cur_col, 50);
 		ahd_seqintsrc_print(ahd_inb(ahd, SEQINTSRC), &cur_col, 50);
