@@ -79,31 +79,21 @@ static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 	return pte;
 }
 
-static int
+static void
 copy_one_pte(struct vm_area_struct *vma, unsigned long old_addr,
 	     pte_t *src, pte_t *dst, struct pte_chain **pte_chainp)
 {
-	int error = 0;
-	pte_t pte;
-	struct page *page = NULL;
+	pte_t pte = ptep_clear_flush(vma, old_addr, src);
+	set_pte(dst, pte);
 
-	if (pte_present(*src))
-		page = pte_page(*src);
-
-	if (!pte_none(*src)) {
-		if (page)
+	if (pte_present(pte)) {
+		unsigned long pfn = pte_pfn(pte);
+		if (pfn_valid(pfn)) {
+			struct page *page = pfn_to_page(pfn);
 			page_remove_rmap(page, src);
-		pte = ptep_clear_flush(vma, old_addr, src);
-		if (!dst) {
-			/* No dest?  We must put it back. */
-			dst = src;
-			error++;
-		}
-		set_pte(dst, pte);
-		if (page)
 			*pte_chainp = page_add_rmap(page, dst, *pte_chainp);
+		}
 	}
-	return error;
 }
 
 static int
@@ -140,8 +130,11 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		 * page_table_lock, we should re-check the src entry...
 		 */
 		if (src) {
-			error = copy_one_pte(vma, old_addr, src,
+			if (dst)
+				copy_one_pte(vma, old_addr, src,
 						dst, &pte_chain);
+			else
+				error = -ENOMEM;
 			pte_unmap_nested(src);
 		}
 		pte_unmap(dst);
