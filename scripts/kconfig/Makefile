@@ -34,6 +34,7 @@ $(obj)/conf.o $(obj)/mconf.o $(obj)/qconf.o: $(obj)/zconf.tab.h
 
 $(obj)/qconf.o: $(obj)/.tmp_qtcheck
 
+ifeq ($(MAKECMDGOALS),$(obj)/qconf)
 -include $(obj)/.tmp_qtcheck
 
 # QT needs some extra effort...
@@ -52,6 +53,7 @@ $(obj)/.tmp_qtcheck:
 	LIB=qt; \
 	if [ -f $$DIR/lib/libqt-mt.so ]; then LIB=qt-mt; fi; \
 	echo "QTDIR=$$DIR" > $@; echo "QTLIB=$$LIB" >> $@
+endif
 
 $(obj)/zconf.tab.o: $(obj)/lex.zconf.c
 
