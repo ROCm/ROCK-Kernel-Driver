@@ -1881,6 +1881,8 @@ int __init arlan_probe(struct net_device *dev)
 
 #ifdef  MODULE
 
+static int probe = probeUNKNOWN;
+
 static int __init arlan_find_devices(void)
 {
 	int m;
