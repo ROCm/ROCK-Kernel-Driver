@@ -1,5 +1,4 @@
-/**** vi:set ts=8 sts=8 sw=8:************************************************
- *
+/*
  * linux/drivers/ide/cs5530.c		Version 0.6	Mar. 18, 2000
  *
  * Copyright (C) 2000			Andre Hedrick <andre@linux-ide.org>
@@ -20,29 +19,74 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
+#include <linux/hdreg.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>
-#include <linux/hdreg.h>
 #include <linux/ide.h>
-
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "timing.h"
-#include "pcihost.h"
+#include "ide_modes.h"
+
+#define DISPLAY_CS5530_TIMINGS
+
+#if defined(DISPLAY_CS5530_TIMINGS) && defined(CONFIG_PROC_FS)
+#include <linux/stat.h>
+#include <linux/proc_fs.h>
+
+static int cs5530_get_info(char *, char **, off_t, int);
+extern int (*cs5530_display_info)(char *, char **, off_t, int); /* ide-proc.c */
+static struct pci_dev *bmide_dev;
+
+static int cs5530_get_info (char *buffer, char **addr, off_t offset, int count)
+{
+	char *p = buffer;
+	u32 bibma = pci_resource_start(bmide_dev, 4);
+	u8  c0 = 0, c1 = 0;
+
+	/*
+	 * at that point bibma+0x2 et bibma+0xa are byte registers
+	 * to investigate:
+	 */
+
+	c0 = inb_p((unsigned short)bibma + 0x02);
+	c1 = inb_p((unsigned short)bibma + 0x0a);
+
+	p += sprintf(p, "\n                                "
+			"Cyrix 5530 Chipset.\n");
+	p += sprintf(p, "--------------- Primary Channel "
+			"---------------- Secondary Channel "
+			"-------------\n");
+	p += sprintf(p, "                %sabled "
+			"                        %sabled\n",
+			(c0&0x80) ? "dis" : " en",
+			(c1&0x80) ? "dis" : " en");
+	p += sprintf(p, "--------------- drive0 --------- drive1 "
+			"-------- drive0 ---------- drive1 ------\n");
+	p += sprintf(p, "DMA enabled:    %s              %s "
+			"            %s               %s\n",
+			(c0&0x20) ? "yes" : "no ", (c0&0x40) ? "yes" : "no ",
+			(c1&0x20) ? "yes" : "no ", (c1&0x40) ? "yes" : "no " );
+
+	p += sprintf(p, "UDMA\n");
+	p += sprintf(p, "DMA\n");
+	p += sprintf(p, "PIO\n");
+
+	return p-buffer;
+}
+#endif /* DISPLAY_CS5530_TIMINGS && CONFIG_PROC_FS */
+
+byte cs5530_proc = 0;
 
 /*
  * Set a new transfer mode at the drive
  */
-int cs5530_set_xfer_mode(struct ata_device *drive, u8 mode)
+int cs5530_set_xfer_mode (ide_drive_t *drive, byte mode)
 {
-	int error = 0;
-
-	printk("%s: cs5530_set_xfer_mode(%02x)\n", drive->name, mode);
-	error = ide_config_drive_speed(drive, mode);
-
-	return error;
+	printk("%s: cs5530_set_xfer_mode(%s)\n",
+		drive->name, ide_xfer_verbose(mode));
+	return (ide_config_drive_speed(drive, mode));
 }
 
 /*
@@ -58,51 +102,50 @@ static unsigned int cs5530_pio_timings[2][5] =
  * After chip reset, the PIO timings are set to 0x0000e132, which is not valid.
  */
 #define CS5530_BAD_PIO(timings) (((timings)&~0x80000000)==0x0000e132)
-#define CS5530_BASEREG(ch)	(((ch)->dma_base & ~0xf) + ((ch)->unit ? 0x30 : 0x20))
+#define CS5530_BASEREG(hwif)	(((hwif)->dma_base & ~0xf) + ((hwif)->channel ? 0x30 : 0x20))
 
 /*
- * Handle selection/setting of PIO modes for both the chipset and drive.
+ * cs5530_tuneproc() handles selection/setting of PIO modes
+ * for both the chipset and drive.
  *
- * The ide_init_cs5530() routine guarantees that all drives will have valid
- * default PIO timings set up before we get here.
+ * The ide_init_cs5530() routine guarantees that all drives
+ * will have valid default PIO timings set up before we get here.
  */
-static void cs5530_tuneproc(struct ata_device *drive, u8 pio)
+static void cs5530_tuneproc (ide_drive_t *drive, byte pio)	/* pio=255 means "autotune" */
 {
-	unsigned int format;
-	unsigned int basereg = CS5530_BASEREG(drive->channel);
+	ide_hwif_t	*hwif = HWIF(drive);
+	unsigned int	format, basereg = CS5530_BASEREG(hwif);
+	static byte	modes[5] = { XFER_PIO_0, XFER_PIO_1, XFER_PIO_2, XFER_PIO_3, XFER_PIO_4};
 
-	if (pio == 255)
-		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
-	else
-		pio = XFER_PIO_0 + min_t(u8, pio, 4);
-
-	if (!cs5530_set_xfer_mode(drive, pio)) {
+	pio = ide_get_best_pio_mode(drive, pio, 4, NULL);
+	if (!cs5530_set_xfer_mode(drive, modes[pio])) {
 		format = (inl(basereg+4) >> 31) & 1;
-		outl(cs5530_pio_timings[format][pio], basereg+(drive->select.b.unit<<3));
+		outl(cs5530_pio_timings[format][pio],
+			basereg+(drive->select.b.unit<<3));
 	}
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-
 /*
- * Handle selection/setting of DMA/UDMA modes for both the chipset and drive.
+ * cs5530_config_dma() handles selection/setting of DMA/UDMA modes
+ * for both the chipset and drive.
  */
-static int cs5530_config_dma(struct ata_device *drive)
+static int cs5530_config_dma (ide_drive_t *drive)
 {
-	int udma_ok = 1;
-	int mode = 0;
-	struct ata_channel *ch = drive->channel;
-	int unit = drive->select.b.unit;
-	struct ata_device *mate = &ch->drives[unit^1];
-	struct hd_driveid *id = drive->id;
-	unsigned int basereg, reg, timings;
-
+	int			udma_ok = 1, mode = 0;
+	ide_hwif_t		*hwif = HWIF(drive);
+	int			unit = drive->select.b.unit;
+	ide_drive_t		*mate = &hwif->drives[unit^1];
+	struct hd_driveid	*id = drive->id;
+	unsigned int		basereg, reg, timings;
 
 	/*
 	 * Default to DMA-off in case we run into trouble here.
 	 */
-	udma_enable(drive, 0, 0);
-	outb(inb(ch->dma_base+2)&~(unit?0x40:0x20), ch->dma_base+2); /* clear DMA_capable bit */
+	(void)hwif->dmaproc(ide_dma_off_quietly, drive);
+	/* turn off DMA while we fiddle */
+	(void)hwif->dmaproc(ide_dma_host_off, drive);
+	/* clear DMA_capable bit */
 
 	/*
 	 * The CS5530 specifies that two drives sharing a cable cannot
@@ -115,10 +158,13 @@ static int cs5530_config_dma(struct ata_device *drive)
 	 */
 	if (mate->present) {
 		struct hd_driveid *mateid = mate->id;
-		if (mateid && (mateid->capability & 1) && !udma_black_list(mate)) {
-			if ((mateid->field_valid & 4) && (mateid->dma_ultra & 7))
+		if (mateid && (mateid->capability & 1) &&
+		    !hwif->dmaproc(ide_dma_bad_drive, mate)) {
+			if ((mateid->field_valid & 4) &&
+			    (mateid->dma_ultra & 7))
 				udma_ok = 1;
-			else if ((mateid->field_valid & 2) && (mateid->dma_mword & 7))
+			else if ((mateid->field_valid & 2) &&
+				 (mateid->dma_mword & 7))
 				udma_ok = 0;
 			else
 				udma_ok = 1;
@@ -129,7 +175,8 @@ static int cs5530_config_dma(struct ata_device *drive)
 	 * Now see what the current drive is capable of,
 	 * selecting UDMA only if the mate said it was ok.
 	 */
-	if (id && (id->capability & 1) && ch->autodma && !udma_black_list(drive)) {
+	if (id && (id->capability & 1) && hwif->autodma &&
+	    !hwif->dmaproc(ide_dma_bad_drive, drive)) {
 		if (udma_ok && (id->field_valid & 4) && (id->dma_ultra & 7)) {
 			if      (id->dma_ultra & 4)
 				mode = XFER_UDMA_2;
@@ -165,11 +212,12 @@ static int cs5530_config_dma(struct ata_device *drive)
 		case XFER_MW_DMA_1:	timings = 0x00012121; break;
 		case XFER_MW_DMA_2:	timings = 0x00002020; break;
 		default:
-			printk("%s: cs5530_config_dma: huh? mode=%02x\n", drive->name, mode);
+			printk("%s: cs5530_config_dma: huh? mode=%02x\n",
+				drive->name, mode);
 			return 1;	/* failure */
 	}
-	basereg = CS5530_BASEREG(ch);
-	reg = inl(basereg+4);			/* get drive0 config register */
+	basereg = CS5530_BASEREG(hwif);
+	reg = inl(basereg+4);		/* get drive0 config register */
 	timings |= reg & 0x80000000;		/* preserve PIO format bit */
 	if (unit == 0) {			/* are we configuring drive0? */
 		outl(timings, basereg+4);	/* write drive0 config register */
@@ -181,33 +229,51 @@ static int cs5530_config_dma(struct ata_device *drive)
 		outl(reg,     basereg+4);	/* write drive0 config register */
 		outl(timings, basereg+12);	/* write drive1 config register */
 	}
-	outb(inb(ch->dma_base+2)|(unit?0x40:0x20), ch->dma_base+2);	/* set DMA_capable bit */
+	(void)hwif->dmaproc(ide_dma_host_on, drive);
+	/* set DMA_capable bit */
 
 	/*
 	 * Finally, turn DMA on in software, and exit.
 	 */
-	udma_enable(drive, 1, 1);	/* success */
-
-	return 0;
+	return hwif->dmaproc(ide_dma_on, drive);	/* success */
 }
 
-static int cs5530_udma_setup(struct ata_device *drive, int map)
+/*
+ * This is a CS5530-specific wrapper for the standard ide_dmaproc().
+ * We need it for our custom "ide_dma_check" function.
+ * All other requests are forwarded to the standard ide_dmaproc().
+ */
+int cs5530_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 {
-	return cs5530_config_dma(drive);
+	switch (func) {
+		case ide_dma_check:
+			return cs5530_config_dma(drive);
+		default:
+			break;
+	}
+	/* Other cases are done by generic IDE-DMA code. */
+	return ide_dmaproc(func, drive);
 }
-#endif
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /*
  * Initialize the cs5530 bridge for reliable IDE DMA operation.
  */
-static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
+unsigned int __init pci_init_cs5530 (struct pci_dev *dev, const char *name)
 {
-	struct pci_dev *master_0 = NULL;
-	struct pci_dev *cs5530_0 = NULL;
+	struct pci_dev *master_0 = NULL, *cs5530_0 = NULL;
 	unsigned short pcicmd = 0;
 	unsigned long flags;
 
-	pci_for_each_dev(dev) {
+#if defined(DISPLAY_CS5530_TIMINGS) && defined(CONFIG_PROC_FS)
+	if (!cs5530_proc) {
+		cs5530_proc = 1;
+		bmide_dev = dev;
+		cs5530_display_info = &cs5530_get_info;
+	}
+#endif /* DISPLAY_CS5530_TIMINGS && CONFIG_PROC_FS */
+
+	pci_for_each_dev (dev) {
 		if (dev->vendor == PCI_VENDOR_ID_CYRIX) {
 			switch (dev->device) {
 				case PCI_DEVICE_ID_CYRIX_PCI_MASTER:
@@ -219,23 +285,24 @@ static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
 			}
 		}
 	}
-
 	if (!master_0) {
-		printk("%s: unable to locate PCI MASTER function\n", dev->name);
+		printk("%s: unable to locate PCI MASTER function\n", name);
 		return 0;
 	}
 	if (!cs5530_0) {
-		printk("%s: unable to locate CS5530 LEGACY function\n", dev->name);
+		printk("%s: unable to locate CS5530 LEGACY function\n", name);
 		return 0;
 	}
+
+	spin_lock_irqsave(&ide_lock, flags);
+		/* all CPUs (there should only be one CPU with this chipset) */
 
 	/*
 	 * Enable BusMaster and MemoryWriteAndInvalidate for the cs5530:
 	 * -->  OR 0x14 into 16-bit PCI COMMAND reg of function 0 of the cs5530
 	 */
-	 
-	pci_set_master(cs5530_0);
-	pci_set_mwi(cs5530_0);
+	pci_read_config_word (cs5530_0, PCI_COMMAND, &pcicmd);
+	pci_write_config_word(cs5530_0, PCI_COMMAND, pcicmd | PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE);
 
 	/*
 	 * Set PCI CacheLineSize to 16-bytes:
@@ -256,7 +323,7 @@ static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
 	 */
 	pci_write_config_byte(master_0, 0x40, 0x1e);
 
-	/*
+	/* 
 	 * Set max PCI burst size (16-bytes seems to work best):
 	 *	   16bytes: set bit-1 at 0x41 (reg value of 0x16)
 	 *	all others: clear bit-1 at 0x41, and do:
@@ -274,60 +341,46 @@ static unsigned int __init pci_init_cs5530(struct pci_dev *dev)
 	pci_write_config_byte(master_0, 0x42, 0x00);
 	pci_write_config_byte(master_0, 0x43, 0xc1);
 
+	spin_unlock_irqrestore(&ide_lock, flags);
+
 	return 0;
 }
 
 /*
- * This gets invoked once for each channel, and performs channel-specific
- * pre-initialization before drive probing.
+ * This gets invoked by the IDE driver once for each channel,
+ * and performs channel-specific pre-initialization before drive probing.
  */
-static void __init ide_init_cs5530(struct ata_channel *ch)
+void __init ide_init_cs5530 (ide_hwif_t *hwif)
 {
-	u32 basereg;
-	u32 d0_timings;
+	unsigned int basereg, d0_timings;
+	hwif->autodma = 0;
 
-	ch->serialized = 1;
+	if (hwif->mate)
+		hwif->serialized = hwif->mate->serialized = 1;
 
-	/* We think a 64kB transfer is a 0 byte transfer, so set our
-	   segment size to be one sector smaller than 64kB. */
-	ch->max_segment_size = (1<<16) - 512;
+	hwif->tuneproc = &cs5530_tuneproc;
+	basereg = CS5530_BASEREG(hwif);
+	d0_timings = inl(basereg+0);
+	if (CS5530_BAD_PIO(d0_timings)) {
+		/* PIO timings not initialized? */
+		outl(cs5530_pio_timings[(d0_timings>>31)&1][0], basereg+0);
+		if (!hwif->drives[0].autotune)
+			hwif->drives[0].autotune = 1;
+			/* needs autotuning later */
+	}
+	if (CS5530_BAD_PIO(inl(basereg+8))) {
+	/* PIO timings not initialized? */
+		outl(cs5530_pio_timings[(d0_timings>>31)&1][0], basereg+8);
+		if (!hwif->drives[1].autotune)
+			hwif->drives[1].autotune = 1;
+			/* needs autotuning later */
+	}
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	if (ch->dma_base) {
-		ch->highmem = 1;
-		ch->udma_setup = cs5530_udma_setup;
-	}
-#endif
-
-	ch->tuneproc = &cs5530_tuneproc;
-	basereg = CS5530_BASEREG(ch);
-	d0_timings = inl(basereg+0);
-	if (CS5530_BAD_PIO(d0_timings)) {	/* PIO timings not initialized? */
-		outl(cs5530_pio_timings[(d0_timings>>31)&1][0], basereg+0);
-		if (!ch->drives[0].autotune)
-			ch->drives[0].autotune = 1;	/* needs autotuning later */
-	}
-	if (CS5530_BAD_PIO(inl(basereg+8))) {	/* PIO timings not initialized? */
-		outl(cs5530_pio_timings[(d0_timings>>31)&1][0], basereg+8);
-		if (!ch->drives[1].autotune)
-			ch->drives[1].autotune = 1;	/* needs autotuning later */
-	}
-}
-
-
-/* module data table */
-static struct ata_pci_device chipset __initdata = {
-	.vendor = PCI_VENDOR_ID_CYRIX,
-	.device = PCI_DEVICE_ID_CYRIX_5530_IDE,
-	.init_chipset = pci_init_cs5530,
-	.init_channel = ide_init_cs5530,
-	.bootable = ON_BOARD,
-	.flags = ATA_F_DMA
-};
-
-int __init init_cs5530(void)
-{
-	ata_register_chipset(&chipset);
-
-        return 0;
+	hwif->dmaproc  = &cs5530_dmaproc;
+#ifdef CONFIG_IDEDMA_AUTO
+	if (!noautodma)
+		hwif->autodma = 1;
+#endif /* CONFIG_IDEDMA_AUTO */
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 }

@@ -1,5 +1,10 @@
 /*
+ *  linux/drivers/ide/ht6560b.c		Version 0.07	Feb  1, 2000
+ *
  *  Copyright (C) 1995-2000  Linus Torvalds & author (see below)
+ */
+
+/*
  *
  *  Version 0.01        Initial version hacked out of ide.c
  *
@@ -31,6 +36,8 @@
 
 #define HT6560B_VERSION "v0.07"
 
+#undef REALLY_SLOW_IO		/* most systems can safely undef this */
+
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -38,13 +45,13 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
-#include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
+#include <linux/init.h>
 
 #include <asm/io.h>
 
-#include "timing.h"
+#include "ide_modes.h"
 
 /* #define DEBUG */  /* remove comments for DEBUG messages */
 
@@ -61,7 +68,7 @@
  *    bit3 (0x08): "1" 3 cycle time, "0" 2 cycle time	      (?)
  */
 #define HT_CONFIG_PORT	  0x3e6
-#define HT_CONFIG(drivea) (u8)(((drivea)->drive_data & 0xff00) >> 8)
+#define HT_CONFIG(drivea) (byte)(((drivea)->drive_data & 0xff00) >> 8)
 /*
  * FIFO + PREFETCH (both a/b-model)
  */
@@ -107,7 +114,7 @@
  * Active Time for each drive. Smaller value gives higher speed.
  * In case of failures you should probably fall back to a higher value.
  */
-#define HT_TIMING(drivea) (u8)((drivea)->drive_data & 0x00ff)
+#define HT_TIMING(drivea) (byte)((drivea)->drive_data & 0x00ff)
 #define HT_TIMING_DEFAULT 0xff
 
 /*
@@ -120,35 +127,36 @@
 /*
  * This routine is invoked from ide.c to prepare for access to a given drive.
  */
-static void ht6560b_selectproc(struct ata_device *drive)
+static void ht6560b_selectproc (ide_drive_t *drive)
 {
 	unsigned long flags;
-	static u8 current_select = 0;
-	static u8 current_timing = 0;
-	u8 select, timing;
-
+	static byte current_select = 0;
+	static byte current_timing = 0;
+	byte select, timing;
+	
 	local_irq_save(flags);
-
+	
 	select = HT_CONFIG(drive);
 	timing = HT_TIMING(drive);
-
+	
 	if (select != current_select || timing != current_timing) {
 		current_select = select;
 		current_timing = timing;
-		if (drive->type != ATA_DISK || !drive->present)
+		if (drive->media != ide_disk || !drive->present)
 			select |= HT_PREFETCH_MODE;
-		(void) inb(HT_CONFIG_PORT);
-		(void) inb(HT_CONFIG_PORT);
-		(void) inb(HT_CONFIG_PORT);
-		(void) inb(HT_CONFIG_PORT);
-		outb(select, HT_CONFIG_PORT);
+		(void) IN_BYTE(HT_CONFIG_PORT);
+		(void) IN_BYTE(HT_CONFIG_PORT);
+		(void) IN_BYTE(HT_CONFIG_PORT);
+		(void) IN_BYTE(HT_CONFIG_PORT);
+		OUT_BYTE(select, HT_CONFIG_PORT);
 		/*
 		 * Set timing for this drive:
 		 */
-		outb(timing, IDE_SELECT_REG);
-		ata_status(drive, 0, 0);
+		OUT_BYTE(timing, IDE_SELECT_REG);
+		(void) IN_BYTE(IDE_STATUS_REG);
 #ifdef DEBUG
-		printk("ht6560b: %s: select=%#x timing=%#x\n", drive->name, select, timing);
+		printk("ht6560b: %s: select=%#x timing=%#x\n",
+			drive->name, select, timing);
 #endif
 	}
 	local_irq_restore(flags);
@@ -159,32 +167,32 @@ static void ht6560b_selectproc(struct ata_device *drive)
  */
 static int __init try_to_init_ht6560b(void)
 {
-	u8 orig_value;
+	byte orig_value;
 	int i;
-
+	
 	/* Autodetect ht6560b */
-	if ((orig_value=inb(HT_CONFIG_PORT)) == 0xff)
+	if ((orig_value = IN_BYTE(HT_CONFIG_PORT)) == 0xff)
 		return 0;
-
+	
 	for (i=3;i>0;i--) {
-		outb(0x00, HT_CONFIG_PORT);
-		if (!( (~inb(HT_CONFIG_PORT)) & 0x3f )) {
-			outb(orig_value, HT_CONFIG_PORT);
+		OUT_BYTE(0x00, HT_CONFIG_PORT);
+		if (!( (~IN_BYTE(HT_CONFIG_PORT)) & 0x3f )) {
+			OUT_BYTE(orig_value, HT_CONFIG_PORT);
 			return 0;
 		}
 	}
-	outb(0x00, HT_CONFIG_PORT);
-	if ((~inb(HT_CONFIG_PORT))& 0x3f) {
-		outb(orig_value, HT_CONFIG_PORT);
+	OUT_BYTE(0x00, HT_CONFIG_PORT);
+	if ((~IN_BYTE(HT_CONFIG_PORT))& 0x3f) {
+		OUT_BYTE(orig_value, HT_CONFIG_PORT);
 		return 0;
 	}
 	/*
 	 * Ht6560b autodetected
 	 */
-	outb(HT_CONFIG_DEFAULT, HT_CONFIG_PORT);
-	outb(HT_TIMING_DEFAULT, 0x1f6);  /* SELECT */
-	(void) inb(0x1f7);               /* STATUS */
-
+	OUT_BYTE(HT_CONFIG_DEFAULT, HT_CONFIG_PORT);
+	OUT_BYTE(HT_TIMING_DEFAULT, 0x1f6);  /* IDE_SELECT_REG */
+	(void) IN_BYTE(0x1f7);               /* IDE_STATUS_REG */
+	
 	printk("\nht6560b " HT6560B_VERSION
 	       ": chipset detected and initialized"
 #ifdef DEBUG
@@ -194,32 +202,30 @@ static int __init try_to_init_ht6560b(void)
 	return 1;
 }
 
-static u8 ht_pio2timings(struct ata_device *drive, u8 pio)
+static byte ht_pio2timings(ide_drive_t *drive, byte pio)
 {
 	int active_time, recovery_time;
 	int active_cycles, recovery_cycles;
-	struct ata_timing *t;
-
+	ide_pio_data_t d;
+	int bus_speed = system_bus_clock();
+	
         if (pio) {
-		if (pio == 255)
-			pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
-		else
-			pio = XFER_PIO_0 + min_t(u8, pio, 4);
-
-		t = ata_timing_data(pio);
-
+		pio = ide_get_best_pio_mode(drive, pio, 5, &d);
+		
 		/*
 		 *  Just like opti621.c we try to calculate the
 		 *  actual cycle time for recovery and activity
 		 *  according system bus speed.
 		 */
-		active_time = t->active;
-		recovery_time = t->cycle - active_time - t->setup;
+		active_time = ide_pio_timings[pio].active_time;
+		recovery_time = d.cycle_time 
+			- active_time
+			- ide_pio_timings[pio].setup_time;
 		/*
 		 *  Cycle times should be Vesa bus cycles
 		 */
-		active_cycles   = (active_time   * system_bus_speed + 999999) / 1000000;
-		recovery_cycles = (recovery_time * system_bus_speed + 999999) / 1000000;
+		active_cycles   = (active_time   * bus_speed + 999) / 1000;
+		recovery_cycles = (recovery_time * bus_speed + 999) / 1000;
 		/*
 		 *  Upper and lower limits
 		 */
@@ -227,19 +233,18 @@ static u8 ht_pio2timings(struct ata_device *drive, u8 pio)
 		if (recovery_cycles < 2)  recovery_cycles = 2;
 		if (active_cycles   > 15) active_cycles   = 15;
 		if (recovery_cycles > 15) recovery_cycles = 0;  /* 0==16 */
-
+		
 #ifdef DEBUG
-		printk("ht6560b: drive %s setting pio=%d recovery=%d (%dns) active=%d (%dns)\n",
-			drive->name, pio - XFER_PIO_0, recovery_cycles, recovery_time, active_cycles, active_time);
+		printk("ht6560b: drive %s setting pio=%d recovery=%d (%dns) active=%d (%dns)\n", drive->name, pio, recovery_cycles, recovery_time, active_cycles, active_time);
 #endif
-
-		return (u8)((recovery_cycles << 4) | active_cycles);
+		
+		return (byte)((recovery_cycles << 4) | active_cycles);
 	} else {
-
+		
 #ifdef DEBUG
 		printk("ht6560b: drive %s setting pio=0\n", drive->name);
 #endif
-
+		
 		return HT_TIMING_DEFAULT;    /* default setting */
 	}
 }
@@ -247,46 +252,53 @@ static u8 ht_pio2timings(struct ata_device *drive, u8 pio)
 /*
  *  Enable/Disable so called prefetch mode
  */
-static void ht_set_prefetch(struct ata_device *drive, u8 state)
+static void ht_set_prefetch(ide_drive_t *drive, byte state)
 {
+	unsigned long flags;
 	int t = HT_PREFETCH_MODE << 8;
-
+	
+	spin_lock_irqsave(&ide_lock, flags);
+	
 	/*
 	 *  Prefetch mode and unmask irq seems to conflict
 	 */
 	if (state) {
 		drive->drive_data |= t;   /* enable prefetch mode */
-		drive->channel->no_unmask = 1;
-		drive->channel->unmask = 0;
+		drive->no_unmask = 1;
+		drive->unmask = 0;
 	} else {
 		drive->drive_data &= ~t;  /* disable prefetch mode */
-		drive->channel->no_unmask = 0;
+		drive->no_unmask = 0;
 	}
-
+	
+	spin_unlock_irqrestore(&ide_lock, flags);
+	
 #ifdef DEBUG
 	printk("ht6560b: drive %s prefetch mode %sabled\n", drive->name, (state ? "en" : "dis"));
 #endif
 }
 
-/* Assumes IRQ's are disabled or at least that no other process will attempt to
- * access the IDE registers concurrently.
- */
-static void tune_ht6560b(struct ata_device *drive, u8 pio)
+static void tune_ht6560b (ide_drive_t *drive, byte pio)
 {
-	u8 timing;
-
+	unsigned long flags;
+	byte timing;
+	
 	switch (pio) {
 	case 8:         /* set prefetch off */
 	case 9:         /* set prefetch on */
 		ht_set_prefetch(drive, pio & 1);
 		return;
 	}
-
+	
 	timing = ht_pio2timings(drive, pio);
-
+	
+	spin_lock_irqsave(&ide_lock, flags);
+	
 	drive->drive_data &= 0xff00;
 	drive->drive_data |= timing;
-
+	
+	spin_unlock_irqrestore(&ide_lock, flags);
+	
 #ifdef DEBUG
 	printk("ht6560b: drive %s tuned to pio mode %#x timing=%#x\n", drive->name, pio, timing);
 #endif
@@ -295,7 +307,7 @@ static void tune_ht6560b(struct ata_device *drive, u8 pio)
 void __init init_ht6560b (void)
 {
 	int t;
-
+	
 	if (check_region(HT_CONFIG_PORT,1)) {
 		printk(KERN_ERR "ht6560b: PORT %#x ALREADY IN USE\n", HT_CONFIG_PORT);
 	} else {
@@ -309,9 +321,10 @@ void __init init_ht6560b (void)
 			ide_hwifs[1].tuneproc = &tune_ht6560b;
 			ide_hwifs[0].serialized = 1;  /* is this needed? */
 			ide_hwifs[1].serialized = 1;  /* is this needed? */
-			ide_hwifs[0].unit = ATA_PRIMARY;
-			ide_hwifs[1].unit = ATA_SECONDARY;
-
+			ide_hwifs[0].mate = &ide_hwifs[1];
+			ide_hwifs[1].mate = &ide_hwifs[0];
+			ide_hwifs[1].channel = 1;
+			
 			/*
 			 * Setting default configurations for drives
 			 */

@@ -1,25 +1,32 @@
 /*
- *  Copyright (C) 1996-2001  Linus Torvalds & author (see below)
+ *  linux/drivers/ide/qd65xx.c		Version 0.07	Sep 30, 2001
  *
+ *  Copyright (C) 1996-2001  Linus Torvalds & author (see below)
+ */
+
+/*
  *  Version 0.03	Cleaned auto-tune, added probe
  *  Version 0.04	Added second channel tuning
  *  Version 0.05	Enhanced tuning ; added qd6500 support
  *  Version 0.06	Added dos driver's list
- *  Version 0.07	Second channel bug fix
+ *  Version 0.07	Second channel bug fix 
  *
  * QDI QD6500/QD6580 EIDE controller fast support
  *
  * Please set local bus speed using kernel parameter idebus
- *	for example, "idebus=33" stands for 33Mhz VLbus
+ * 	for example, "idebus=33" stands for 33Mhz VLbus
  * To activate controller support, use "ide0=qd65xx"
  * To enable tuning, use "ide0=autotune"
  * To enable second channel tuning (qd6580 only), use "ide1=autotune"
- *
+ */
+
+/*
  * Rewritten from the work of Colten Edwards <pje120@cs.usask.ca> by
  * Samuel Thibault <samuel.thibault@fnac.net>
  */
 
-#include <linux/module.h>
+#undef REALLY_SLOW_IO		/* most systems can safely undef this */
+
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -27,13 +34,12 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
-#include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
-
+#include <linux/init.h>
 #include <asm/io.h>
 
-#include "timing.h"
+#include "ide_modes.h"
 #include "qd65xx.h"
 
 /*
@@ -79,62 +85,90 @@
  * bit 5 : status, but of what ?
  * bit 6 : always set 1 by dos driver
  * bit 7 : set 1 for non-ATAPI devices on primary port
- *	(maybe read-ahead and post-write buffer ?)
+ * 	(maybe read-ahead and post-write buffer ?)
  */
 
 static int timings[4]={-1,-1,-1,-1}; /* stores current timing for each timer */
 
-/*
- * This routine is invoked from ide.c to prepare for access to a given drive.
- */
-
-static void qd_select(struct ata_device *drive)
+static void qd_write_reg (byte content, byte reg)
 {
-	u8 index = (((QD_TIMREG(drive)) & 0x80 ) >> 7) |
-		(QD_TIMREG(drive) & 0x02);
+	unsigned long flags;
 
-	if (timings[index] != QD_TIMING(drive))
-		outb(timings[index] = QD_TIMING(drive), QD_TIMREG(drive));
+	spin_lock_irqsave(&ide_lock, flags);
+	OUT_BYTE(content,reg);
+	spin_unlock_irqrestore(&ide_lock, flags);
+}
+
+byte __init qd_read_reg (byte reg)
+{
+	unsigned long flags;
+	byte read;
+
+	spin_lock_irqsave(&ide_lock, flags);
+	read = IN_BYTE(reg);
+	spin_unlock_irqrestore(&ide_lock, flags);
+	return read;
 }
 
 /*
- * computes the timing value where
- *	lower nibble represents active time,   in count of VLB clocks
- *	upper nibble represents recovery time, in count of VLB clocks
+ * qd_select:
+ *
+ * This routine is invoked from ide.c to prepare for access to a given drive.
  */
 
-static u8 qd6500_compute_timing(struct ata_channel *hwif, int active_time, int recovery_time)
+static void qd_select (ide_drive_t *drive)
 {
-	u8 active_cycle,recovery_cycle;
+	byte index = (( (QD_TIMREG(drive)) & 0x80 ) >> 7) |
+			(QD_TIMREG(drive) & 0x02);
 
-	if (system_bus_speed <= 33333) {
-		active_cycle =   9  - IDE_IN(active_time   * system_bus_speed / 1000000 + 1, 2, 9);
-		recovery_cycle = 15 - IDE_IN(recovery_time * system_bus_speed / 1000000 + 1, 0, 15);
+	if (timings[index] != QD_TIMING(drive))
+		qd_write_reg(timings[index] = QD_TIMING(drive), QD_TIMREG(drive));
+}
+
+/*
+ * qd6500_compute_timing
+ *
+ * computes the timing value where
+ * 	lower nibble represents active time,   in count of VLB clocks
+ * 	upper nibble represents recovery time, in count of VLB clocks
+ */
+
+static byte qd6500_compute_timing (ide_hwif_t *hwif, int active_time, int recovery_time)
+{
+	byte active_cycle,recovery_cycle;
+
+	if (ide_system_bus_speed()<=33) {
+		active_cycle =   9  - IDE_IN(active_time   * ide_system_bus_speed() / 1000 + 1, 2, 9);
+		recovery_cycle = 15 - IDE_IN(recovery_time * ide_system_bus_speed() / 1000 + 1, 0, 15);
 	} else {
-		active_cycle =   8  - IDE_IN(active_time   * system_bus_speed / 1000000 + 1, 1, 8);
-		recovery_cycle = 18 - IDE_IN(recovery_time * system_bus_speed / 1000000 + 1, 3, 18);
+		active_cycle =   8  - IDE_IN(active_time   * ide_system_bus_speed() / 1000 + 1, 1, 8);
+		recovery_cycle = 18 - IDE_IN(recovery_time * ide_system_bus_speed() / 1000 + 1, 3, 18);
 	}
 
 	return((recovery_cycle<<4) | 0x08 | active_cycle);
 }
 
 /*
+ * qd6580_compute_timing
+ *
  * idem for qd6580
  */
 
-static u8 qd6580_compute_timing(int active_time, int recovery_time)
+static byte qd6580_compute_timing (int active_time, int recovery_time)
 {
-	u8 active_cycle   = 17 - IDE_IN(active_time   * system_bus_speed / 1000000 + 1, 2, 17);
-	u8 recovery_cycle = 15 - IDE_IN(recovery_time * system_bus_speed / 1000000 + 1, 2, 15);
+	byte active_cycle   = 17-IDE_IN(active_time   * ide_system_bus_speed() / 1000 + 1, 2, 17);
+	byte recovery_cycle = 15-IDE_IN(recovery_time * ide_system_bus_speed() / 1000 + 1, 2, 15);
 
-	return (recovery_cycle<<4) | active_cycle;
+	return((recovery_cycle<<4) | active_cycle);
 }
 
 /*
+ * qd_find_disk_type
+ *
  * tries to find timing from dos driver's table
  */
 
-static int qd_find_disk_type(struct ata_device *drive,
+static int qd_find_disk_type (ide_drive_t *drive,
 		int *active_time, int *recovery_time)
 {
 	struct qd65xx_timing_s *p;
@@ -142,10 +176,12 @@ static int qd_find_disk_type(struct ata_device *drive,
 
 	if (!*drive->id->model) return 0;
 
-	strncpy(model,drive->id->model, 40);
+	strncpy(model,drive->id->model,40);
+	ide_fixstring(model,40,1); /* byte-swap */
+
 	for (p = qd65xx_timing ; p->offset != -1 ; p++) {
-		if (!strncmp(p->model, model+p->offset, 4)) {
-			printk(KERN_DEBUG "%s: listed !\n", drive->name);
+		if (!strncmp(p->model, model+p->offset,4)) {
+			printk(KERN_DEBUG "%s: listed !\n",drive->name);
 			*active_time = p->active;
 			*recovery_time = p->recovery;
 			return 1;
@@ -155,10 +191,12 @@ static int qd_find_disk_type(struct ata_device *drive,
 }
 
 /*
+ * qd_timing_ok:
+ *
  * check whether timings don't conflict
  */
 
-static int qd_timing_ok(struct ata_device drives[])
+static int qd_timing_ok (ide_drive_t drives[])
 {
 	return (IDE_IMPLY(drives[0].present && drives[1].present,
 			IDE_IMPLY(QD_TIMREG(drives) == QD_TIMREG(drives+1),
@@ -167,12 +205,14 @@ static int qd_timing_ok(struct ata_device drives[])
 }
 
 /*
+ * qd_set_timing:
+ *
  * records the timing, and enables selectproc as needed
  */
 
-static void qd_set_timing(struct ata_device *drive, u8 timing)
+static void qd_set_timing (ide_drive_t *drive, byte timing)
 {
-	struct ata_channel *hwif = drive->channel;
+	ide_hwif_t *hwif = HWIF(drive);
 
 	drive->drive_data &= 0xff00;
 	drive->drive_data |= timing;
@@ -182,91 +222,101 @@ static void qd_set_timing(struct ata_device *drive, u8 timing)
 	} else
 		hwif->selectproc = &qd_select;
 
-	printk(KERN_DEBUG "%s: %#x\n", drive->name, timing);
+	printk(KERN_DEBUG "%s: %#x\n",drive->name,timing);
 }
 
-static void qd6500_tune_drive(struct ata_device *drive, u8 pio)
+/*
+ * qd6500_tune_drive
+ */
+
+static void qd6500_tune_drive (ide_drive_t *drive, byte pio)
 {
 	int active_time   = 175;
 	int recovery_time = 415; /* worst case values from the dos driver */
 
-	if (drive->id && !qd_find_disk_type(drive, &active_time, &recovery_time)
+	if (drive->id && !qd_find_disk_type(drive,&active_time,&recovery_time)
 		&& drive->id->tPIO && (drive->id->field_valid & 0x02)
 		&& drive->id->eide_pio >= 240) {
 
-		printk(KERN_INFO "%s: PIO mode%d\n", drive->name, drive->id->tPIO);
+		printk(KERN_INFO "%s: PIO mode%d\n", drive->name,
+				drive->id->tPIO);
 		active_time = 110;
 		recovery_time = drive->id->eide_pio - 120;
 	}
 
-	qd_set_timing(drive, qd6500_compute_timing(drive->channel, active_time, recovery_time));
+	qd_set_timing(drive,qd6500_compute_timing(HWIF(drive),active_time,recovery_time));
 }
 
-static void qd6580_tune_drive(struct ata_device *drive, u8 pio)
+/*
+ * qd6580_tune_drive
+ */
+
+static void qd6580_tune_drive (ide_drive_t *drive, byte pio)
 {
-	struct ata_timing *t;
-	int base = drive->channel->select_data;
+	ide_pio_data_t d;
+	int base = HWIF(drive)->select_data;
 	int active_time   = 175;
 	int recovery_time = 415; /* worst case values from the dos driver */
 
-	if (drive->id && !qd_find_disk_type(drive, &active_time, &recovery_time)) {
-
-		if (pio == 255)
-			pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
-		else
-			pio = XFER_PIO_0 + min_t(u8, pio, 4);
-
-		t = ata_timing_data(pio);
+	if (drive->id && !qd_find_disk_type(drive,&active_time,&recovery_time)) {
+		pio = ide_get_best_pio_mode(drive, pio, 255, &d);
+		pio = IDE_MIN(pio,4);
 
 		switch (pio) {
 			case 0: break;
 			case 3:
-				if (t->cycle >= 110) {
+				if (d.cycle_time >= 110) {
 					active_time = 86;
-					recovery_time = t->cycle - 102;
+					recovery_time = d.cycle_time-102;
 				} else
 					printk(KERN_WARNING "%s: Strange recovery time !\n",drive->name);
 				break;
 			case 4:
-				if (t->cycle >= 69) {
+				if (d.cycle_time >= 69) {
 					active_time = 70;
-					recovery_time = t->cycle - 61;
+					recovery_time = d.cycle_time-61;
 				} else
 					printk(KERN_WARNING "%s: Strange recovery time !\n",drive->name);
 				break;
 			default:
-				if (t->cycle >= 180) {
+				if (d.cycle_time >= 180) {
 					active_time = 110;
-					recovery_time = t->cycle - 120;
+					recovery_time = d.cycle_time - 120;
 				} else {
-					active_time = t->active;
-					recovery_time = t->cycle - active_time;
+					active_time = ide_pio_timings[pio].active_time;
+					recovery_time = d.cycle_time
+							-active_time;
 				}
 		}
-		printk(KERN_INFO "%s: PIO mode%d\n", drive->name, pio - XFER_PIO_0);
+		printk(KERN_INFO "%s: PIO mode%d\n",drive->name,pio);
 	}
 
-	if (!drive->channel->unit && drive->type != ATA_DISK) {
-		outb(0x5f, QD_CONTROL_PORT);
-		printk(KERN_WARNING "%s: ATAPI: disabled read-ahead FIFO and post-write buffer on %s.\n", drive->name, drive->channel->name);
+	if (!HWIF(drive)->channel && drive->media != ide_disk) {
+		qd_write_reg(0x5f,QD_CONTROL_PORT);
+		printk(KERN_WARNING "%s: ATAPI: disabled read-ahead FIFO and post-write buffer on %s.\n",drive->name,HWIF(drive)->name);
 	}
 
-	qd_set_timing(drive, qd6580_compute_timing(active_time, recovery_time));
+	qd_set_timing(drive,qd6580_compute_timing(active_time,recovery_time));
 }
 
 /*
+ * qd_testreg
+ *
  * tests if the given port is a register
  */
 
 static int __init qd_testreg(int port)
 {
-	u8 savereg;
-	u8 readreg;
+	byte savereg;
+	byte readreg;
+	unsigned long flags;
 
+	spin_lock_irqsave(&ide_lock, flags);
 	savereg = inb_p(port);
-	outb_p(QD_TESTVAL, port);	/* safe value */
+	outb_p(QD_TESTVAL,port);	/* safe value */
 	readreg = inb_p(port);
-	outb(savereg, port);
+	OUT_BYTE(savereg,port);
+	spin_unlock_irqrestore(&ide_lock, flags);
 
 	if (savereg == QD_TESTVAL) {
 		printk(KERN_ERR "Outch ! the probe for qd65xx isn't reliable !\n");
@@ -279,115 +329,110 @@ static int __init qd_testreg(int port)
 }
 
 /*
- * called to setup an ata channel : adjusts attributes & links for tuning
- */
-
-void __init qd_setup(int unit, int base, int config, unsigned int data0, unsigned int data1, void (*tuneproc) (struct ata_device *, u8 pio))
-{
-	struct ata_channel *hwif = &ide_hwifs[unit];
-
-	hwif->chipset = ide_qd65xx;
-	hwif->unit = unit;
-	hwif->select_data = base;
-	hwif->config_data = config;
-	hwif->drives[0].drive_data = data0;
-	hwif->drives[1].drive_data = data1;
-	hwif->io_32bit = 1;
-	hwif->tuneproc = tuneproc;
-}
-
-/*
- * called to unsetup an ata channel : back to default values, unlinks tuning
- */
-void __init qd_unsetup(int unit) {
-	struct ata_channel *hwif = &ide_hwifs[unit];
-	u8 config = hwif->config_data;
-	int base = hwif->select_data;
-	void *tuneproc = (void *) hwif->tuneproc;
-
-	if (!(hwif->chipset == ide_qd65xx)) return;
-
-	printk(KERN_NOTICE "%s: back to defaults\n", hwif->name);
-
-	hwif->selectproc = NULL;
-	hwif->tuneproc = NULL;
-
-	if (tuneproc == (void *) qd6500_tune_drive) {
-		// will do it for both
-		outb(QD6500_DEF_DATA, QD_TIMREG(&hwif->drives[0]));
-	} else if (tuneproc == (void *) qd6580_tune_drive) {
-		if (QD_CONTROL(hwif) & QD_CONTR_SEC_DISABLED) {
-			outb(QD6580_DEF_DATA, QD_TIMREG(&hwif->drives[0]));
-			outb(QD6580_DEF_DATA2, QD_TIMREG(&hwif->drives[1]));
-		} else {
-			outb(unit ? QD6580_DEF_DATA2 : QD6580_DEF_DATA, QD_TIMREG(&hwif->drives[0]));
-		}
-	} else {
-		printk(KERN_WARNING "Unknown qd65xx tuning fonction !\n");
-		printk(KERN_WARNING "keeping settings !\n");
-	}
-}
-
-/*
+ * probe:
+ *
  * looks at the specified baseport, and if qd found, registers & initialises it
  * return 1 if another qd may be probed
  */
 
-int __init qd_probe(int base)
+int __init probe (int base)
 {
-	u8 config;
-	int unit;
+	byte config;
+	byte index;
 
-	config = inb(QD_CONFIG_PORT);
+	config = qd_read_reg(QD_CONFIG_PORT);
 
 	if (! ((config & QD_CONFIG_BASEPORT) >> 1 == (base == 0xb0)) ) return 1;
 
-	unit = ! (config & QD_CONFIG_IDE_BASEPORT);
+	index = ! (config & QD_CONFIG_IDE_BASEPORT);
 
 	if ((config & 0xf0) == QD_CONFIG_QD6500) {
+		ide_hwif_t *hwif = &ide_hwifs[index];
+
 		if (qd_testreg(base)) return 1;		/* bad register */
 
-		/* qd6500 found */
+			/* qd6500 found */
 
-		printk(KERN_NOTICE "%s: qd6500 at %#x\n", ide_hwifs[unit].name, base);
-		printk(KERN_DEBUG "qd6500: config=%#x, ID3=%u\n", config, QD_ID3);
-
+		printk(KERN_NOTICE "%s: qd6500 at %#x\n",
+			ide_hwifs[index].name, base);
+		
+		printk(KERN_DEBUG "qd6500: config=%#x, ID3=%u\n",
+			config, QD_ID3);
+		
 		if (config & QD_CONFIG_DISABLED) {
 			printk(KERN_WARNING "qd6500 is disabled !\n");
 			return 1;
 		}
 
-		qd_setup(unit, base, config, QD6500_DEF_DATA, QD6500_DEF_DATA, &qd6500_tune_drive);
+		hwif->chipset = ide_qd65xx;
+		hwif->select_data = base;
+		hwif->config_data = config;
+		hwif->drives[0].drive_data =
+		hwif->drives[1].drive_data = QD6500_DEF_DATA;
+		hwif->drives[0].io_32bit =
+		hwif->drives[1].io_32bit = 1;
+		hwif->tuneproc = &qd6500_tune_drive;
 		return 1;
 	}
 
 	if (((config & 0xf0) == QD_CONFIG_QD6580_A) || ((config & 0xf0) == QD_CONFIG_QD6580_B)) {
-		u8 control;
+
+		byte control;
 
 		if (qd_testreg(base) || qd_testreg(base+0x02)) return 1;
 			/* bad registers */
 
-		/* qd6580 found */
+			/* qd6580 found */
 
-		control = inb(QD_CONTROL_PORT);
+		control = qd_read_reg(QD_CONTROL_PORT);
 
 		printk(KERN_NOTICE "qd6580 at %#x\n", base);
-		printk(KERN_DEBUG "qd6580: config=%#x, control=%#x, ID3=%u\n", config, control, QD_ID3);
+		printk(KERN_DEBUG "qd6580: config=%#x, control=%#x, ID3=%u\n",
+			config, control, QD_ID3);
 
 		if (control & QD_CONTR_SEC_DISABLED) {
+			ide_hwif_t *hwif = &ide_hwifs[index];
+
 			/* secondary disabled */
-			printk(KERN_INFO "%s: qd6580: single IDE board\n", ide_hwifs[unit].name);
-			qd_setup(unit, base, config | (control << 8), QD6580_DEF_DATA, QD6580_DEF_DATA2, &qd6580_tune_drive);
-			outb(QD_DEF_CONTR, QD_CONTROL_PORT);
+			printk(KERN_INFO "%s: qd6580: single IDE board\n",
+					ide_hwifs[index].name);
+
+			hwif->chipset = ide_qd65xx;
+			hwif->select_data = base;
+			hwif->config_data = config | (control <<8);
+			hwif->drives[0].drive_data =
+			hwif->drives[1].drive_data = QD6580_DEF_DATA;
+			hwif->drives[0].io_32bit =
+			hwif->drives[1].io_32bit = 1;
+			hwif->tuneproc = &qd6580_tune_drive;
+
+			qd_write_reg(QD_DEF_CONTR,QD_CONTROL_PORT);
 
 			return 1;
 		} else {
+			int i,j;
 			/* secondary enabled */
-			printk(KERN_INFO "%s&%s: qd6580: dual IDE board\n", ide_hwifs[0].name, ide_hwifs[1].name);
+			printk(KERN_INFO "%s&%s: qd6580: dual IDE board\n",
+					ide_hwifs[0].name,ide_hwifs[1].name);
 
-			qd_setup(ATA_PRIMARY, base, config | (control << 8), QD6580_DEF_DATA, QD6580_DEF_DATA, &qd6580_tune_drive);
-			qd_setup(ATA_SECONDARY, base, config | (control << 8), QD6580_DEF_DATA2, QD6580_DEF_DATA2, &qd6580_tune_drive);
-			outb(QD_DEF_CONTR, QD_CONTROL_PORT);
+			for (i=0;i<2;i++) {
+
+				ide_hwifs[i].chipset = ide_qd65xx;
+				ide_hwifs[i].mate = &ide_hwifs[i^1];
+				ide_hwifs[i].channel = i;
+
+				ide_hwifs[i].select_data = base;
+				ide_hwifs[i].config_data = config | (control <<8);
+				ide_hwifs[i].tuneproc = &qd6580_tune_drive;
+
+				for (j=0;j<2;j++) {
+					ide_hwifs[i].drives[j].drive_data =
+					       i?QD6580_DEF_DATA2:QD6580_DEF_DATA;
+					ide_hwifs[i].drives[j].io_32bit = 1;
+				}
+			}
+
+			qd_write_reg(QD_DEF_CONTR,QD_CONTROL_PORT);
 
 			return 0; /* no other qd65xx possible */
 		}
@@ -396,34 +441,13 @@ int __init qd_probe(int base)
 	return 1;
 }
 
-#ifndef MODULE
 /*
- * called by ide.c when parsing command line
+ * init_qd65xx:
+ *
+ * called at the very beginning of initialization ; should just probe and link
  */
 
-void __init init_qd65xx(void)
+void __init init_qd65xx (void)
 {
-	if (qd_probe(0x30)) qd_probe(0xb0);
+	if (probe(0x30)) probe(0xb0);
 }
-
-#else
-
-MODULE_AUTHOR("Samuel Thibault");
-MODULE_DESCRIPTION("support of qd65xx vlb ide chipset");
-MODULE_LICENSE("GPL");
-
-int __init qd65xx_mod_init(void)
-{
-	if (qd_probe(0x30)) qd_probe(0xb0);
-	if (ide_hwifs[0].chipset != ide_qd65xx && ide_hwifs[1].chipset != ide_qd65xx) return -ENODEV;
-	return 0;
-}
-module_init(qd65xx_mod_init);
-
-void __init qd65xx_mod_exit(void)
-{
-	qd_unsetup(ATA_PRIMARY);
-	qd_unsetup(ATA_SECONDARY);
-}
-module_exit(qd65xx_mod_exit);
-#endif

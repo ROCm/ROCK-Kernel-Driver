@@ -1,7 +1,10 @@
-/**** vi:set ts=8 sts=8 sw=8:************************************************
+/*
+ *  linux/drivers/ide/rz1000.c		Version 0.05	December 8, 1997
  *
  *  Copyright (C) 1995-1998  Linus Torvalds & author (see below)
- *
+ */
+
+/*
  *  Principal Author:  mlord@pobox.com (Mark Lord)
  *
  *  See linux/MAINTAINERS for address of current maintainer.
@@ -12,7 +15,9 @@
  *  Dunno if this fixes both ports, or only the primary port (?).
  */
 
-#include <linux/config.h> /* for CONFIG_PCI */
+#undef REALLY_SLOW_IO		/* most systems can safely undef this */
+
+#include <linux/config.h> /* for CONFIG_BLK_DEV_IDEPCI */
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -22,56 +27,30 @@
 #include <linux/blkdev.h>
 #include <linux/hdreg.h>
 #include <linux/pci.h>
-#include <linux/init.h>
 #include <linux/ide.h>
+#include <linux/init.h>
 
 #include <asm/io.h>
 
-#ifdef CONFIG_PCI
+#ifdef CONFIG_BLK_DEV_IDEPCI
 
-#include "pcihost.h"
-
-static void __init rz1000_init_channel(struct ata_channel *hwif)
+void __init ide_init_rz1000 (ide_hwif_t *hwif)	/* called from ide-pci.c */
 {
 	unsigned short reg;
 	struct pci_dev *dev = hwif->pci_dev;
 
 	hwif->chipset = ide_rz1000;
-	if (!pci_read_config_word (dev, 0x40, &reg)
-	 && !pci_write_config_word(dev, 0x40, reg & 0xdfff))
-	{
-		printk("%s: disabled chipset read-ahead (buggy RZ1000/RZ1001)\n", hwif->name);
+	if (!pci_read_config_word (dev, 0x40, &reg) &&
+	    !pci_write_config_word(dev, 0x40, reg & 0xdfff)) {
+		printk("%s: disabled chipset read-ahead "
+			"(buggy RZ1000/RZ1001)\n", hwif->name);
 	} else {
 		hwif->serialized = 1;
-		hwif->no_unmask = 1;
-		printk("%s: serialized, disabled unmasking (buggy RZ1000/RZ1001)\n", hwif->name);
+		hwif->drives[0].no_unmask = 1;
+		hwif->drives[1].no_unmask = 1;
+		printk("%s: serialized, disabled unmasking "
+			"(buggy RZ1000/RZ1001)\n", hwif->name);
 	}
-}
-
-/* module data table */
-static struct ata_pci_device chipsets[] __initdata = {
-	{
-		.vendor = PCI_VENDOR_ID_PCTECH,
-		.device = PCI_DEVICE_ID_PCTECH_RZ1000,
-		.init_channel = rz1000_init_channel,
-		.bootable = ON_BOARD
-	},
-	{
-		.vendor = PCI_VENDOR_ID_PCTECH,
-		.device = PCI_DEVICE_ID_PCTECH_RZ1001,
-		.init_channel = rz1000_init_channel,
-		.bootable = ON_BOARD
-	},
-};
-
-int __init init_rz1000(void)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(chipsets); ++i)
-		ata_register_chipset(&chipsets[i]);
-
-        return 0;
 }
 
 #else
@@ -80,27 +59,29 @@ static void __init init_rz1000 (struct pci_dev *dev, const char *name)
 {
 	unsigned short reg, h;
 
-	if (!pci_read_config_word (dev, PCI_COMMAND, &reg) && !(reg & PCI_COMMAND_IO)) {
+	if (!pci_read_config_word (dev, PCI_COMMAND, &reg) &&
+	    !(reg & PCI_COMMAND_IO)) {
 		printk("%s: buggy IDE controller disabled (BIOS)\n", name);
 		return;
 	}
-	if (!pci_read_config_word (dev, 0x40, &reg)
-	 && !pci_write_config_word(dev, 0x40, reg & 0xdfff))
-	{
+	if (!pci_read_config_word (dev, 0x40, &reg) &&
+	    !pci_write_config_word(dev, 0x40, reg & 0xdfff)) {
 		printk("IDE: disabled chipset read-ahead (buggy %s)\n", name);
 	} else {
 		for (h = 0; h < MAX_HWIFS; ++h) {
-			struct ata_channel *hwif = &ide_hwifs[h];
-			if ((hwif->io_ports[IDE_DATA_OFFSET] == 0x1f0 || hwif->io_ports[IDE_DATA_OFFSET] == 0x170)
-			 && (hwif->chipset == ide_unknown || hwif->chipset == ide_generic))
-			{
+			ide_hwif_t *hwif = &ide_hwifs[h];
+			if ((hwif->io_ports[IDE_DATA_OFFSET] == 0x1f0 ||
+			     hwif->io_ports[IDE_DATA_OFFSET] == 0x170)  &&
+			    (hwif->chipset == ide_unknown ||
+			     hwif->chipset == ide_generic)) {
 				hwif->chipset = ide_rz1000;
 				hwif->serialized = 1;
 				hwif->drives[0].no_unmask = 1;
 				hwif->drives[1].no_unmask = 1;
 				if (hwif->io_ports[IDE_DATA_OFFSET] == 0x170)
-					hwif->unit = 1;
-				printk("%s: serialized, disabled unmasking (buggy %s)\n", hwif->name, name);
+					hwif->channel = 1;
+				printk("%s: serialized, disabled unmasking "
+					"(buggy %s)\n", hwif->name, name);
 			}
 		}
 	}
@@ -111,9 +92,9 @@ void __init ide_probe_for_rz100x (void)	/* called from ide.c */
 	struct pci_dev *dev = NULL;
 
 	while ((dev = pci_find_device(PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1000, dev))!=NULL)
-		rz1000_init (dev, "RZ1000");
+		init_rz1000 (dev, "RZ1000");
 	while ((dev = pci_find_device(PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_RZ1001, dev))!=NULL)
-		rz1000_init (dev, "RZ1001");
+		init_rz1000 (dev, "RZ1001");
 }
 
-#endif
+#endif /* CONFIG_BLK_DEV_IDEPCI */

@@ -16,6 +16,7 @@
 #include <linux/hdreg.h>
 #include <linux/ide.h>
 #include <linux/init.h>
+#include <linux/zorro.h>
 
 #include <asm/setup.h>
 #include <asm/amigahw.h>
@@ -84,31 +85,31 @@ int ide_doubler = 0;	/* support IDE doublers? */
      *  Check and acknowledge the interrupt status
      */
 
-static int gayle_ack_intr_a4000(struct ata_channel *hwif)
+static int gayle_ack_intr_a4000(ide_hwif_t *hwif)
 {
     unsigned char ch;
 
-    ch = inb(hwif->io_ports[IDE_IRQ_OFFSET]);
+    ch = z_readb(hwif->io_ports[IDE_IRQ_OFFSET]);
     if (!(ch & GAYLE_IRQ_IDE))
 	return 0;
     return 1;
 }
 
-static int gayle_ack_intr_a1200(struct ata_channel *hwif)
+static int gayle_ack_intr_a1200(ide_hwif_t *hwif)
 {
     unsigned char ch;
 
-    ch = inb(hwif->io_ports[IDE_IRQ_OFFSET]);
+    ch = z_readb(hwif->io_ports[IDE_IRQ_OFFSET]);
     if (!(ch & GAYLE_IRQ_IDE))
 	return 0;
-    (void)inb(hwif->io_ports[IDE_STATUS_OFFSET]);
-    outb(0x7c, hwif->io_ports[IDE_IRQ_OFFSET]);
+    (void)z_readb(hwif->io_ports[IDE_STATUS_OFFSET]);
+    z_writeb(0x7c, hwif->io_ports[IDE_IRQ_OFFSET]);
     return 1;
 }
 
-/*
- *  Probe for a Gayle IDE interface (and optionally for an IDE doubler)
- */
+    /*
+     *  Probe for a Gayle IDE interface (and optionally for an IDE doubler)
+     */
 
 void __init gayle_init(void)
 {
@@ -122,7 +123,7 @@ void __init gayle_init(void)
 
     for (i = 0; i < GAYLE_NUM_PROBE_HWIFS; i++) {
 	ide_ioreg_t base, ctrlport, irqport;
-	int (*ack_intr)(struct ata_channel *);
+	ide_ack_intr_t *ack_intr;
 	hw_regs_t hw;
 	int index;
 	unsigned long phys_base, res_start, res_n;
@@ -150,7 +151,7 @@ void __init gayle_init(void)
 	ide_setup_ports(&hw, base, gayle_offsets,
 			ctrlport, irqport, ack_intr, IRQ_AMIGA_PORTS);
 
-	index = ide_register_hw(&hw);
+	index = ide_register_hw(&hw, NULL);
 	if (index != -1) {
 	    switch (i) {
 		case 0:

@@ -5,13 +5,11 @@
  *
  * Maintainer unknown.
  *
- * Changelog:
- *
- * 15/11/1998	RMK	Drive tuning added from Rebel.com's kernel
- *			sources
- * 30/03/2002	RMK	Add fixes specified in W83C553F errata.
- *			(with special thanks to Todd Inglett)
+ * Drive tuning added from Rebel.com's kernel sources
+ *  -- Russell King (15/11/98) linux@arm.linux.org.uk
  */
+
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>
@@ -19,39 +17,27 @@
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/blkdev.h>
-#include <linux/pci.h>
 #include <linux/hdreg.h>
+#include <linux/pci.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
 #include <asm/dma.h>
 
-#include "timing.h"
-#include "pcihost.h"
-
-/*
- * SL82C105 PCI config register 0x40 bits.
- */
-#define CTRL_IDE_IRQB	(1 << 30)
-#define CTRL_IDE_IRQA	(1 << 28)
-#define CTRL_LEGIRQ	(1 << 11)
-#define CTRL_P1F16	(1 << 5)
-#define CTRL_P1EN	(1 << 4)
-#define CTRL_P0F16	(1 << 1)
-#define	CTRL_P0EN	(1 << 0)
+#include "ide_modes.h"
 
 /*
  * Convert a PIO mode and cycle time to the required on/off
  * times for the interface.  This has protection against run-away
  * timings.
  */
-static unsigned int get_timing_sl82c105(struct ata_timing *t)
+static unsigned int get_timing_sl82c105(ide_pio_data_t *p)
 {
 	unsigned int cmd_on;
 	unsigned int cmd_off;
 
-	cmd_on = (t->active + 29) / 30;
-	cmd_off = (t->cycle - 30 * cmd_on + 29) / 30;
+	cmd_on = (ide_pio_timings[p->pio_mode].active_time + 29) / 30;
+	cmd_off = (p->cycle_time - 30 * cmd_on + 29) / 30;
 
 	if (cmd_on > 32)
 		cmd_on = 32;
@@ -63,33 +49,37 @@ static unsigned int get_timing_sl82c105(struct ata_timing *t)
 	if (cmd_off == 0)
 		cmd_off = 1;
 
-	return (cmd_on - 1) << 8 | (cmd_off - 1) | ((t->mode > XFER_PIO_2) ? 0x40 : 0x00);
+	return (cmd_on - 1) << 8 | (cmd_off - 1) | (p->use_iordy ? 0x40 : 0x00);
 }
 
 /*
  * Configure the drive and chipset for PIO
  */
-static void config_for_pio(struct ata_device *drive, int pio, int report)
+static void config_for_pio(ide_drive_t *drive, int pio, int report)
 {
-	struct ata_channel *hwif = drive->channel;
+	ide_hwif_t *hwif = HWIF(drive);
 	struct pci_dev *dev = hwif->pci_dev;
-	struct ata_timing *t;
+	ide_pio_data_t p;
 	unsigned short drv_ctrl = 0x909;
 	unsigned int xfer_mode, reg;
 
-	reg = (hwif->unit ? 0x4c : 0x44) + (drive->select.b.unit ? 4 : 0);
+	reg = (hwif->channel ? 0x4c : 0x44) + (drive->select.b.unit ? 4 : 0);
 
-	if (pio == 255)
-		xfer_mode = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
-	else
-		xfer_mode = XFER_PIO_0 + min_t(u8, pio, 4);
+	pio = ide_get_best_pio_mode(drive, pio, 5, &p);
 
-	t = ata_timing_data(xfer_mode);
+	switch (pio) {
+	default:
+	case 0:		xfer_mode = XFER_PIO_0;		break;
+	case 1:		xfer_mode = XFER_PIO_1;		break;
+	case 2:		xfer_mode = XFER_PIO_2;		break;
+	case 3:		xfer_mode = XFER_PIO_3;		break;
+	case 4:		xfer_mode = XFER_PIO_4;		break;
+	}
 
 	if (ide_config_drive_speed(drive, xfer_mode) == 0)
-		drv_ctrl = get_timing_sl82c105(t);
+		drv_ctrl = get_timing_sl82c105(&p);
 
-	if (!drive->using_dma) {
+	if (drive->using_dma == 0) {
 		/*
 		 * If we are actually using MW DMA, then we can not
 		 * reprogram the interface drive control register.
@@ -98,9 +88,8 @@ static void config_for_pio(struct ata_device *drive, int pio, int report)
 		pci_read_config_word(dev, reg, &drv_ctrl);
 
 		if (report) {
-			printk("%s: selected %02x (%dns) (%04X)\n",
-					drive->name, xfer_mode,
-					t->cycle, drv_ctrl);
+			printk("%s: selected %s (%dns) (%04X)\n", drive->name,
+			       ide_xfer_verbose(xfer_mode), p.cycle_time, drv_ctrl);
 		}
 	}
 }
@@ -108,14 +97,14 @@ static void config_for_pio(struct ata_device *drive, int pio, int report)
 /*
  * Configure the drive and the chipset for DMA
  */
-static int config_for_dma(struct ata_device *drive)
+static int config_for_dma(ide_drive_t *drive)
 {
-	struct ata_channel *hwif = drive->channel;
+	ide_hwif_t *hwif = HWIF(drive);
 	struct pci_dev *dev = hwif->pci_dev;
 	unsigned short drv_ctrl = 0x909;
 	unsigned int reg;
 
-	reg = (hwif->unit ? 0x4c : 0x44) + (drive->select.b.unit ? 4 : 0);
+	reg = (hwif->channel ? 0x4c : 0x44) + (drive->select.b.unit ? 4 : 0);
 
 	if (ide_config_drive_speed(drive, XFER_MW_DMA_2) == 0)
 		drv_ctrl = 0x0240;
@@ -125,18 +114,17 @@ static int config_for_dma(struct ata_device *drive)
 	return 0;
 }
 
-
 /*
  * Check to see if the drive and
  * chipset is capable of DMA mode
  */
-static int sl82c105_dma_setup(struct ata_device *drive, int map)
+static int sl82c105_check_drive(ide_drive_t *drive)
 {
-	int on = 0;
+	ide_dma_action_t dma_func = ide_dma_off_quietly;
 
 	do {
 		struct hd_driveid *id = drive->id;
-		struct ata_channel *hwif = drive->channel;
+		ide_hwif_t *hwif = HWIF(drive);
 
 		if (!hwif->autodma)
 			break;
@@ -145,120 +133,53 @@ static int sl82c105_dma_setup(struct ata_device *drive, int map)
 			break;
 
 		/* Consult the list of known "bad" drives */
-		if (udma_black_list(drive)) {
-			on = 0;
+		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
+			dma_func = ide_dma_off;
 			break;
 		}
 
 		if (id->field_valid & 2) {
 			if  (id->dma_mword & 7 || id->dma_1word & 7)
-				on = 1;
+				dma_func = ide_dma_on;
 			break;
 		}
 
-		if (udma_white_list(drive)) {
-			on = 1;
+		if (ide_dmaproc(ide_dma_good_drive, drive)) {
+			dma_func = ide_dma_on;
 			break;
 		}
 	} while (0);
 
-	if (on)
-		config_for_dma(drive);
-	else
+	return HWIF(drive)->dmaproc(dma_func, drive);
+}
+
+/*
+ * Our own dmaproc, only to intercept ide_dma_check
+ */
+static int sl82c105_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
+{
+	switch (func) {
+	case ide_dma_check:
+		return sl82c105_check_drive(drive);
+	case ide_dma_on:
+		if (config_for_dma(drive))
+			func = ide_dma_off;
+		/* fall through */
+	case ide_dma_off_quietly:
+	case ide_dma_off:
 		config_for_pio(drive, 4, 0);
-
-	udma_enable(drive, on, 0);
-
-	return 0;
-}
-
-/*
- * The SL82C105 holds off all IDE interrupts while in DMA mode until
- * all DMA activity is completed.  Sometimes this causes problems (eg,
- * when the drive wants to report an error condition).
- *
- * 0x7e is a "chip testing" register.  Bit 2 resets the DMA controller
- * state machine.  We need to kick this to work around various bugs.
- */
-static inline void sl82c105_reset_host(struct pci_dev *dev)
-{
-	u16 val;
-
-	pci_read_config_word(dev, 0x7e, &val);
-	pci_write_config_word(dev, 0x7e, val | (1 << 2));
-	pci_write_config_word(dev, 0x7e, val & ~(1 << 2));
-}
-
-static void sl82c105_dma_enable(struct ata_device *drive, int on, int verbose)
-{
-	if (!on || config_for_dma(drive)) {
-		config_for_pio(drive, 4, 0);
-		on = 0;
+		break;
+	default:
+		break;
 	}
-	udma_pci_enable(drive, on, verbose);
-}
-
-/*
- * ATAPI devices can cause the SL82C105 DMA state machine to go gaga.
- * Winbond recommend that the DMA state machine is reset prior to
- * setting the bus master DMA enable bit.
- *
- * The generic IDE core will have disabled the BMEN bit before this
- * function is called.
- */
-static int sl82c105_dma_init(struct ata_device *drive, struct request *rq)
-{
-	sl82c105_reset_host(drive->channel->pci_dev);
-
-	return udma_pci_init(drive, rq);
-}
-
-static void sl82c105_timeout(struct ata_device *drive)
-{
-	sl82c105_reset_host(drive->channel->pci_dev);
-}
-
-/*
- * If we get an IRQ timeout, it might be that the DMA state machine
- * got confused.  Fix from Todd Inglett.  Details from Winbond.
- *
- * This function is called when the IDE timer expires, the drive
- * indicates that it is READY, and we were waiting for DMA to complete.
- */
-static void sl82c105_lostirq(struct ata_device *drive)
-{
-	struct ata_channel *ch = drive->channel;
-	struct pci_dev *dev = ch->pci_dev;
-	u32 val, mask = ch->unit ? CTRL_IDE_IRQB : CTRL_IDE_IRQA;
-	unsigned long dma_base = ch->dma_base;
-
-	printk("sl82c105: lost IRQ: resetting host\n");
-
-	/*
-	 * Check the raw interrupt from the drive.
-	 */
-	pci_read_config_dword(dev, 0x40, &val);
-	if (val & mask)
-		printk("sl82c105: drive was requesting IRQ, but host lost it\n");
-
-	/*
-	 * Was DMA enabled?  If so, disable it - we're resetting the
-	 * host.  The IDE layer will be handling the drive for us.
-	 */
-	val = inb(dma_base);
-	if (val & 1) {
-		outb(val & ~1, dma_base);
-		printk("sl82c105: DMA was enabled\n");
-	}
-
-	sl82c105_reset_host(dev);
+	return ide_dmaproc(func, drive);
 }
 
 /*
  * We only deal with PIO mode here - DMA mode 'using_dma' is not
  * initialised at the point that this function is called.
  */
-static void tune_sl82c105(struct ata_device *drive, u8 pio)
+static void tune_sl82c105(ide_drive_t *drive, byte pio)
 {
 	config_for_pio(drive, pio, 1);
 
@@ -266,33 +187,29 @@ static void tune_sl82c105(struct ata_device *drive, u8 pio)
 	 * We support 32-bit I/O on this interface, and it
 	 * doesn't have problems with interrupts.
 	 */
-	drive->channel->io_32bit = 1;
-	drive->channel->unmask = 1;
+	drive->io_32bit = 1;
+	drive->unmask = 1;
 }
 
 /*
  * Return the revision of the Winbond bridge
  * which this function is part of.
  */
-static __init unsigned int sl82c105_bridge_revision(struct pci_dev *dev)
+static unsigned int sl82c105_bridge_revision(struct pci_dev *dev)
 {
 	struct pci_dev *bridge;
 	unsigned char rev;
 
-	/*
-	 * The bridge should be part of the same device, but function 0.
-	 */
-	bridge = pci_find_slot(dev->bus->number,
-			       PCI_DEVFN(PCI_SLOT(dev->devfn), 0));
-	if (!bridge)
-		return -1;
+	bridge = pci_find_device(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_83C553, NULL);
 
 	/*
-	 * Make sure it is a Winbond 553 and is an ISA bridge.
+	 * If we are part of a Winbond 553
 	 */
-	if (bridge->vendor != PCI_VENDOR_ID_WINBOND ||
-	    bridge->device != PCI_DEVICE_ID_WINBOND_83C553 ||
-	    bridge->class >> 8 != PCI_CLASS_BRIDGE_ISA)
+	if (!bridge || bridge->class >> 8 != PCI_CLASS_BRIDGE_ISA)
+		return -1;
+
+	if (bridge->bus != dev->bus ||
+	    PCI_SLOT(bridge->devfn) != PCI_SLOT(dev->devfn))
 		return -1;
 
 	/*
@@ -306,72 +223,50 @@ static __init unsigned int sl82c105_bridge_revision(struct pci_dev *dev)
 /*
  * Enable the PCI device
  */
-static unsigned int __init sl82c105_init_chipset(struct pci_dev *dev)
+unsigned int __init pci_init_sl82c105(struct pci_dev *dev, const char *msg)
 {
-	u32 val;
+	unsigned char ctrl_stat;
 
-	pci_read_config_dword(dev, 0x40, &val);
-	val |= CTRL_P0EN | CTRL_P0F16 | CTRL_P1EN | CTRL_P1F16;
-	pci_write_config_dword(dev, 0x40, val);
+	/*
+	 * Enable the ports
+	 */
+	pci_read_config_byte(dev, 0x40, &ctrl_stat);
+	pci_write_config_byte(dev, 0x40, ctrl_stat | 0x33);
 
 	return dev->irq;
 }
 
-static void __init sl82c105_init_dma(struct ata_channel *ch, unsigned long dma_base)
+void __init dma_init_sl82c105(ide_hwif_t *hwif, unsigned long dma_base)
 {
-	unsigned int bridge_rev;
-	u8 dma_state;
+	unsigned int rev;
+	byte dma_state;
 
-	dma_state = inb(dma_base + 2);
-	bridge_rev = sl82c105_bridge_revision(ch->pci_dev);
-	if (bridge_rev <= 5) {
-		ch->autodma = 0;
-		ch->drives[0].autotune = 1;
-		ch->drives[1].autotune = 1;
+	dma_state = IN_BYTE(dma_base + 2);
+	rev = sl82c105_bridge_revision(hwif->pci_dev);
+	if (rev <= 5) {
+		hwif->autodma = 0;
+		hwif->drives[0].autotune = 1;
+		hwif->drives[1].autotune = 1;
 		printk("    %s: Winbond 553 bridge revision %d, BM-DMA disabled\n",
-		       ch->name, bridge_rev);
+		       hwif->name, rev);
 		dma_state &= ~0x60;
 	} else {
 		dma_state |= 0x60;
+		hwif->autodma = 1;
 	}
-	outb(dma_state, dma_base + 2);
+	OUT_BYTE(dma_state, dma_base + 2);
 
-	ata_init_dma(ch, dma_base);
-
-	if (bridge_rev <= 5)
-		ch->udma_setup = NULL;
-	else {
-		ch->udma_setup    = sl82c105_dma_setup;
-		ch->udma_enable   = sl82c105_dma_enable;
-		ch->udma_init	  = sl82c105_dma_init;
-		ch->udma_timeout  = sl82c105_timeout;
-		ch->udma_irq_lost = sl82c105_lostirq;
-	}
+	hwif->dmaproc = NULL;
+	ide_setup_dma(hwif, dma_base, 8);
+	if (hwif->dmaproc)
+		hwif->dmaproc = sl82c105_dmaproc;
 }
 
 /*
  * Initialise the chip
  */
-static void __init sl82c105_init_channel(struct ata_channel *ch)
+void __init ide_init_sl82c105(ide_hwif_t *hwif)
 {
-	ch->tuneproc = tune_sl82c105;
+	hwif->tuneproc = tune_sl82c105;
 }
 
-
-/* module data table */
-static struct ata_pci_device chipset __initdata = {
-	.vendor = PCI_VENDOR_ID_WINBOND,
-	.device = PCI_DEVICE_ID_WINBOND_82C105,
-	.init_chipset = sl82c105_init_chipset,
-	.init_channel = sl82c105_init_channel,
-	.init_dma = sl82c105_init_dma,
-	.enablebits = { {0x40,0x01,0x01}, {0x40,0x10,0x10} },
-	.bootable = ON_BOARD
-};
-
-int __init init_sl82c105(void)
-{
-	ata_register_chipset(&chipset);
-
-	return 0;
-}

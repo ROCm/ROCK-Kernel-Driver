@@ -41,7 +41,7 @@ static inline int rapide_register(struct expansion_card *ec)
 	hw.io_ports[IDE_CONTROL_OFFSET] = port + 0x206;
 	hw.irq = ec->irq;
 
-	return ide_register_hw(&hw);
+	return ide_register_hw(&hw, NULL);
 }
 
 int __init rapide_init(void)

@@ -117,7 +117,7 @@ typedef enum BuddhaType_Enum {
      *  Check and acknowledge the interrupt status
      */
 
-static int buddha_ack_intr(struct ata_channel *hwif)
+static int buddha_ack_intr(ide_hwif_t *hwif)
 {
     unsigned char ch;
 
@@ -127,7 +127,7 @@ static int buddha_ack_intr(struct ata_channel *hwif)
     return 1;
 }
 
-static int xsurf_ack_intr(struct ata_channel *hwif)
+static int xsurf_ack_intr(ide_hwif_t *hwif)
 {
     unsigned char ch;
 
@@ -202,9 +202,9 @@ fail_base2:
 						xsurf_offsets, 0,
 						(ide_ioreg_t)(buddha_board+xsurf_irqports[i]),
 						xsurf_ack_intr, IRQ_AMIGA_PORTS);
-			}
-
-			index = ide_register_hw(&hw);
+			}	
+			
+			index = ide_register_hw(&hw, NULL);
 			if (index != -1) {
 				printk("ide%d: ", index);
 				switch(type) {

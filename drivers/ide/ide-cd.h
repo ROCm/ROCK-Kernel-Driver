@@ -15,7 +15,7 @@
    memory, though. */
 
 #ifndef VERBOSE_IDE_CD_ERRORS
-# define VERBOSE_IDE_CD_ERRORS 1
+#define VERBOSE_IDE_CD_ERRORS 1
 #endif
 
 
@@ -24,7 +24,7 @@
    this will give you a slightly smaller kernel. */
 
 #ifndef STANDARD_ATAPI
-# define STANDARD_ATAPI 0
+#define STANDARD_ATAPI 0
 #endif
 
 
@@ -32,14 +32,14 @@
    This is apparently needed for supermount. */
 
 #ifndef NO_DOOR_LOCKING
-# define NO_DOOR_LOCKING 0
+#define NO_DOOR_LOCKING 0
 #endif
 
 /************************************************************************/
 
-#define SECTOR_BITS		9
+#define SECTOR_BITS 		9
 #ifndef SECTOR_SIZE
-# define SECTOR_SIZE		(1 << SECTOR_BITS)
+#define SECTOR_SIZE		(1 << SECTOR_BITS)
 #endif
 #define SECTORS_PER_FRAME	(CD_FRAMESIZE >> SECTOR_BITS)
 #define SECTOR_BUFFER_SIZE	(CD_FRAMESIZE * 32)
@@ -49,6 +49,12 @@
 #define BLOCKS_PER_FRAME	(CD_FRAMESIZE / BLOCK_SIZE)
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
+
+/* special command codes for strategy routine. */
+#define PACKET_COMMAND        4315
+#define REQUEST_SENSE_COMMAND 4316
+#define RESET_DRIVE_COMMAND   4317
+
 
 /* Configuration flags.  These describe the capabilities of the drive.
    They generally do not change after initialization, unless we learn
@@ -80,10 +86,11 @@ struct ide_cd_config_flags {
 	__u8 close_tray		: 1; /* can close the tray */
 	__u8 writing		: 1; /* pseudo write in progress */
 	__u8 reserved		: 3;
-	u8 max_speed;		     /* Max speed of the drive */
+	byte max_speed;		     /* Max speed of the drive */
 };
 #define CDROM_CONFIG_FLAGS(drive) (&(((struct cdrom_info *)(drive->driver_data))->config_flags))
 
+ 
 /* State flags.  These give information about the current state of the
    drive, and will change during normal operation. */
 struct ide_cd_state_flags {
@@ -92,7 +99,7 @@ struct ide_cd_state_flags {
 	__u8 door_locked   : 1; /* We think that the drive door is locked. */
 	__u8 writing       : 1; /* the drive is currently writing */
 	__u8 reserved      : 4;
-	u8 current_speed;	/* Current speed of the drive */
+	byte current_speed;	/* Current speed of the drive */
 };
 
 #define CDROM_STATE_FLAGS(drive) (&(((struct cdrom_info *)(drive->driver_data))->state_flags))
@@ -104,35 +111,27 @@ struct packet_command {
 	int quiet;
 	int timeout;
 	struct request_sense *sense;
-
-	/* This is currently used to pass failed commands through the request
-	 * queue.  Is this for asynchronos error reporting?
-	 *
-	 * Can we always be sure that this didn't valish from stack beneath us
-	 * - we can't!
-	 */
-
-	struct packet_command *failed_command;
+	unsigned char c[12];
 };
 
 /* Structure of a MSF cdrom address. */
 struct atapi_msf {
-	u8 __reserved;
-	u8 minute;
-	u8 second;
-	u8 frame;
-} __attribute__((packed));
+	byte reserved;
+	byte minute;
+	byte second;
+	byte frame;
+};
 
 /* Space to hold the disk TOC. */
 #define MAX_TRACKS 99
 struct atapi_toc_header {
-	u16 toc_length;
-	u8 first_track;
-	u8 last_track;
-} __attribute__((packed));
+	unsigned short toc_length;
+	byte first_track;
+	byte last_track;
+};
 
 struct atapi_toc_entry {
-	u8 reserved1;
+	byte reserved1;
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 adr     : 4;
 	__u8 control : 4;
@@ -142,8 +141,8 @@ struct atapi_toc_entry {
 #else
 #error "Please fix <asm/byteorder.h>"
 #endif
-	u8 track;
-	u8 reserved2;
+	byte track;
+	byte reserved2;
 	union {
 		unsigned lba;
 		struct atapi_msf msf;
@@ -151,33 +150,34 @@ struct atapi_toc_entry {
 };
 
 struct atapi_toc {
-	int last_session_lba;
-	int xa_flag;
-	u32 capacity;
+	int    last_session_lba;
+	int    xa_flag;
+	unsigned long capacity;
 	struct atapi_toc_header hdr;
-	struct atapi_toc_entry ent[MAX_TRACKS+1];  /* one extra for the leadout. */
+	struct atapi_toc_entry  ent[MAX_TRACKS+1];
+	  /* One extra for the leadout. */
 };
 
 
 /* This structure is annoyingly close to, but not identical with,
    the cdrom_subchnl structure from cdrom.h. */
 struct atapi_cdrom_subchnl {
-	u8	acdsc_reserved;
-	u8	acdsc_audiostatus;
-	u16	acdsc_length;
-	u8	acdsc_format;
+ 	u_char  acdsc_reserved;
+ 	u_char  acdsc_audiostatus;
+ 	u_short acdsc_length;
+	u_char  acdsc_format;
 
 #if defined(__BIG_ENDIAN_BITFIELD)
-	u8	acdsc_ctrl:     4;
-	u8	acdsc_adr:      4;
+	u_char  acdsc_ctrl:     4;
+	u_char  acdsc_adr:      4;
 #elif defined(__LITTLE_ENDIAN_BITFIELD)
-	u8	acdsc_adr:	4;
-	u8	acdsc_ctrl:	4;
+	u_char  acdsc_adr:	4;
+	u_char  acdsc_ctrl:	4;
 #else
 #error "Please fix <asm/byteorder.h>"
 #endif
-	u8	acdsc_trk;
-	u8	acdsc_ind;
+	u_char  acdsc_trk;
+	u_char  acdsc_ind;
 	union {
 		struct atapi_msf msf;
 		int	lba;
@@ -207,7 +207,7 @@ struct atapi_capabilities_page {
 #error "Please fix <asm/byteorder.h>"
 #endif
 
-	u8 page_length;
+	byte     page_length;
 
 #if defined(__BIG_ENDIAN_BITFIELD)
 	__u8 reserved2           : 2;
@@ -435,9 +435,9 @@ struct atapi_mechstat_header {
 #error "Please fix <asm/byteorder.h>"
 #endif
 
-	u8 curlba[3];
-	u8 nslots;
-	__u16 slot_tablelen;
+	byte     curlba[3];
+	byte     nslots;
+	__u8 short slot_tablelen;
 };
 
 
@@ -454,7 +454,7 @@ struct atapi_slot {
 #error "Please fix <asm/byteorder.h>"
 #endif
 
-	u8 reserved2[3];
+	byte reserved2[3];
 };
 
 struct atapi_changer_info {
@@ -514,11 +514,13 @@ struct cdrom_info {
 #define ABORTED_COMMAND         0x0b
 #define MISCOMPARE              0x0e
 
+ 
+
 /* This stuff should be in cdrom.h, since it is now generic... */
 #if VERBOSE_IDE_CD_ERRORS
 
  /* The generic packet command opcodes for CD/DVD Logical Units,
- * From Table 57 of the SFF8090 Ver. 3 (Mt. Fuji) draft standard. */
+ * From Table 57 of the SFF8090 Ver. 3 (Mt. Fuji) draft standard. */ 
 const struct {
 	unsigned short packet_command;
 	const char * const text;

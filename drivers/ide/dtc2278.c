@@ -1,6 +1,10 @@
 /*
+ *  linux/drivers/ide/dtc2278.c		Version 0.02	Feb 10, 1996
+ *
  *  Copyright (C) 1996  Linus Torvalds & author (see below)
  */
+
+#undef REALLY_SLOW_IO           /* most systems can safely undef this */
 
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -9,13 +13,13 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
-#include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
+#include <linux/init.h>
 
 #include <asm/io.h>
 
-#include "timing.h"
+#include "ide_modes.h"
 
 /*
  * Changing this #undef to #define may solve start up problems in some systems.
@@ -53,31 +57,33 @@ static void sub22 (char b, char c)
 	int i;
 
 	for(i = 0; i < 3; ++i) {
-		inb(0x3f6);
+		IN_BYTE(0x3f6);
 		outb_p(b,0xb0);
-		inb(0x3f6);
+		IN_BYTE(0x3f6);
 		outb_p(c,0xb4);
-		inb(0x3f6);
-		if(inb(0xb4) == c) {
+		IN_BYTE(0x3f6);
+		if(IN_BYTE(0xb4) == c) {
 			outb_p(7,0xb0);
-			inb(0x3f6);
+			IN_BYTE(0x3f6);
 			return;	/* success */
 		}
 	}
 }
 
-/* Assumes IRQ's are disabled or at least that no other process will
-   attempt to access the IDE registers concurrently. */
-static void tune_dtc2278(struct ata_device *drive, u8 pio)
+static void tune_dtc2278 (ide_drive_t *drive, byte pio)
 {
-	pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
+	unsigned long flags;
+
+	pio = ide_get_best_pio_mode(drive, pio, 4, NULL);
 
 	if (pio >= 3) {
+		spin_lock_irqsave(&ide_lock, flags);
 		/*
 		 * This enables PIO mode4 (3?) on the first interface
 		 */
 		sub22(1,0xc3);
 		sub22(0,0xa0);
+		spin_unlock_irqrestore(&ide_lock, flags);
 	} else {
 		/* we don't know how to set it back again.. */
 	}
@@ -85,7 +91,8 @@ static void tune_dtc2278(struct ata_device *drive, u8 pio)
 	/*
 	 * 32bit I/O has to be enabled for *both* drives at the same time.
 	 */
-	drive->channel->io_32bit = 1;
+	drive->io_32bit = 1;
+	HWIF(drive)->drives[!drive->select.b.unit].io_32bit = 1;
 }
 
 void __init init_dtc2278 (void)
@@ -97,9 +104,9 @@ void __init init_dtc2278 (void)
 	 * This enables the second interface
 	 */
 	outb_p(4,0xb0);
-	inb(0x3f6);
+	IN_BYTE(0x3f6);
 	outb_p(0x20,0xb4);
-	inb(0x3f6);
+	IN_BYTE(0x3f6);
 #ifdef ALWAYS_SET_DTC2278_PIO_MODE
 	/*
 	 * This enables PIO mode4 (3?) on the first interface
@@ -115,11 +122,11 @@ void __init init_dtc2278 (void)
 	ide_hwifs[0].chipset = ide_dtc2278;
 	ide_hwifs[1].chipset = ide_dtc2278;
 	ide_hwifs[0].tuneproc = &tune_dtc2278;
-	/* FIXME: What about the following?!
-	ide_hwifs[1].tuneproc = &tune_dtc2278;
-	 */
-	ide_hwifs[0].no_unmask = 1;
-	ide_hwifs[1].no_unmask = 1;
-	ide_hwifs[0].unit = ATA_PRIMARY;
-	ide_hwifs[1].unit = ATA_SECONDARY;
+	ide_hwifs[0].drives[0].no_unmask = 1;
+	ide_hwifs[0].drives[1].no_unmask = 1;
+	ide_hwifs[1].drives[0].no_unmask = 1;
+	ide_hwifs[1].drives[1].no_unmask = 1;
+	ide_hwifs[0].mate = &ide_hwifs[1];
+	ide_hwifs[1].mate = &ide_hwifs[0];
+	ide_hwifs[1].channel = 1;
 }

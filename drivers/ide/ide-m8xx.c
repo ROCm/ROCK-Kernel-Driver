@@ -29,9 +29,8 @@
 #include <linux/init.h>
 #include <linux/blk.h>
 #include <linux/ioport.h>
-#include <linux/bootmem.h>
-#include <linux/hdreg.h>
 #include <linux/ide.h>
+#include <linux/bootmem.h>
 
 #include <asm/mpc8xx.h>
 #include <asm/mmu.h>
@@ -44,15 +43,14 @@
 #include <asm/machdep.h>
 #include <asm/irq.h>
 
-#include "timing.h"
-
+#include "ide_modes.h"
 static int identify  (volatile unsigned char *p);
 static void print_fixed (volatile unsigned char *p);
 static void print_funcid (int func);
 static int check_ide_device (unsigned long base);
 
-static int ide_interrupt_ack(struct ata_channel *);
-static void m8xx_ide_tuneproc(struct ata_device *drive, u8 pio);
+static void ide_interrupt_ack (void *dev);
+static void m8xx_ide_tuneproc(ide_drive_t *drive, byte pio);
 
 typedef	struct ide_ioport_desc {
 	unsigned long	base_off;		/* Offset to PCMCIA memory	*/
@@ -96,12 +94,6 @@ ide_ioport_desc_t ioport_dsc[MAX_HWIFS] = {
 #endif /* IDE1_BASE_OFFSET */
 #endif	/* IDE0_BASE_OFFSET */
 };
-
-typedef struct ide_pio_timings_s {
-	int	setup_time;	/* Address setup (ns) minimum */
-	int	active_time;	/* Active pulse (ns) minimum */
-	int	cycle_time;	/* Cycle time (ns) minimum = (setup + active + recovery) */
-} ide_pio_timings_t;
 
 ide_pio_timings_t ide_pio_clocks[6];
 int hold_time[6] =  {30, 20, 15, 10, 10, 10 };   /* PIO Mode 5 with IORDY (nonstandard) */
@@ -236,19 +228,19 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port,
 		/* Compute clock cycles for PIO timings */
 		for (i=0; i<6; ++i) {
 			bd_t	*binfo = (bd_t *)__res;
-			struct ata_timing *t;
-
-			t = ata_timing_data(i + XFER_PIO_0);
 
 			hold_time[i]   =
 				PCMCIA_MK_CLKS (hold_time[i],
 						binfo->bi_busfreq);
 			ide_pio_clocks[i].setup_time  =
-				PCMCIA_MK_CLKS (t->setup, binfo->bi_busfreq);
+				PCMCIA_MK_CLKS (ide_pio_timings[i].setup_time,
+						binfo->bi_busfreq);
 			ide_pio_clocks[i].active_time =
-				PCMCIA_MK_CLKS (t->active, binfo->bi_busfreq);
+				PCMCIA_MK_CLKS (ide_pio_timings[i].active_time,
+						binfo->bi_busfreq);
 			ide_pio_clocks[i].cycle_time  =
-				PCMCIA_MK_CLKS (t->cycle, binfo->bi_busfreq);
+				PCMCIA_MK_CLKS (ide_pio_timings[i].cycle_time,
+						binfo->bi_busfreq);
 #if 0
 			printk ("PIO mode %d timings: %d/%d/%d => %d/%d/%d\n",
 				i,
@@ -256,7 +248,10 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port,
 				ide_pio_clocks[i].active_time,
 				ide_pio_clocks[i].hold_time,
 				ide_pio_clocks[i].cycle_time,
-				t->setup, t->active, hold_time[i], t->cycle);
+				ide_pio_timings[i].setup_time,
+				ide_pio_timings[i].active_time,
+				ide_pio_timings[i].hold_time,
+				ide_pio_timings[i].cycle_time);
 #endif
 		}
 	}
@@ -327,7 +322,7 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port,
 	/* register routine to tune PIO mode */
 	ide_hwifs[data_port].tuneproc = m8xx_ide_tuneproc;
 
-	hw->ack_intr = ide_interrupt_ack;
+	hw->ack_intr = (ide_ack_intr_t *) ide_interrupt_ack;
 	/* Enable Harddisk Interrupt,
 	 * and make it edge sensitive
 	 */
@@ -402,7 +397,7 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 			ioport_dsc[data_port].reg_off[i],
 			i, base + ioport_dsc[data_port].reg_off[i]);
 #endif
-		*p++ = base + ioport_dsc[data_port].reg_off[i];
+	 	*p++ = base + ioport_dsc[data_port].reg_off[i];
 	}
 
 	if (irq) {
@@ -413,16 +408,16 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 	/* register routine to tune PIO mode */
 	ide_hwifs[data_port].tuneproc = m8xx_ide_tuneproc;
 
-	hw->ack_intr = ide_interrupt_ack;
+	hw->ack_intr = (ide_ack_intr_t *) ide_interrupt_ack;
 	/* Enable Harddisk Interrupt,
 	 * and make it edge sensitive
 	 */
 	/* (11-18) Set edge detect for irq, no wakeup from low power mode */
 	((immap_t *) IMAP_ADDR)->im_siu_conf.sc_siel |=
 			(0x80000000 >> ioport_dsc[data_port].irq);
-}	/* m8xx_ide_init_hwif_ports() for CONFIG_IDE_8xx_DIRECT */
+}	/* m8xx_ide_init_hwif_ports() for CONFIG_IDE_8xx_DIRECT */ 
 
-#endif
+#endif	/* CONFIG_IDE_8xx_DIRECT */
 
 
 /* -------------------------------------------------------------------- */
@@ -438,15 +433,15 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 
 /* Calculate PIO timings */
 static void
-m8xx_ide_tuneproc(struct ata_device *drive, u8 pio)
+m8xx_ide_tuneproc(ide_drive_t *drive, byte pio)
 {
+	ide_pio_data_t d;
 #if defined(CONFIG_IDE_8xx_PCCARD) || defined(CONFIG_IDE_8xx_DIRECT)
 	volatile pcmconf8xx_t	*pcmp;
 	ulong timing, mask, reg;
 #endif
 
-	if (pio == 255)
-		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
+	pio = ide_get_best_pio_mode(drive, pio, 4, &d);
 
 #if 1
 	printk("%s[%d] %s: best PIO mode: %d\n",
@@ -494,10 +489,11 @@ m8xx_ide_tuneproc(struct ata_device *drive, u8 pio)
 
 	printk("%s[%d] %s: not implemented yet!\n",
 		__FILE__,__LINE__,__FUNCTION__);
-#endif
+#endif /* defined(CONFIG_IDE_8xx_PCCARD) || defined(CONFIG_IDE_8xx_PCMCIA */
 }
 
-static int ide_interrupt_ack(struct ata_channel *ch)
+static void
+ide_interrupt_ack (void *dev)
 {
 #ifdef CONFIG_IDE_8xx_PCCARD
 	u_int pscr, pipr;
@@ -529,17 +525,17 @@ static int ide_interrupt_ack(struct ata_channel *ch)
 	/* clear the interrupt sources */
 	((immap_t *)IMAP_ADDR)->im_pcmcia.pcmc_pscr = pscr;
 
-#else
+#else /* ! CONFIG_IDE_8xx_PCCARD */
 	/*
 	 * Only CONFIG_IDE_8xx_PCCARD is using the interrupt of the
 	 * MPC8xx's PCMCIA controller, so there is nothing to be done here
 	 * for CONFIG_IDE_8xx_DIRECT and CONFIG_IDE_EXT_DIRECT.
 	 * The interrupt is handled somewhere else.	-- Steven
 	 */
-#endif
-
-	return 0;
+#endif /* CONFIG_IDE_8xx_PCCARD */
 }
+
+
 
 /*
  * CIS Tupel codes
@@ -655,7 +651,7 @@ static int check_ide_device (unsigned long base)
 				q+= 2;
 			}
 		}
-#endif
+#endif	/* DEBUG_PCMCIA */
 		switch (code) {
 		case CISTPL_VERS_1:
 			ident = p + 4;

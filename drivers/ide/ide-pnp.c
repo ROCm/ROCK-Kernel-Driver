@@ -1,4 +1,5 @@
-/**** vi:set ts=8 sts=8 sw=8:************************************************
+/*
+ * linux/drivers/ide/ide-pnp.c
  *
  * This file provides autodetection for ISA PnP IDE interfaces.
  * It was tested with "ESS ES1868 Plug and Play AudioDrive" IDE interface.
@@ -12,10 +13,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * (for example /usr/src/linux/COPYING); if not, write to the Free
- * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  
  */
 
-#include <linux/types.h>
 #include <linux/ide.h>
 #include <linux/init.h>
 
@@ -32,6 +32,21 @@
 
 #define DEV_NAME(dev) (dev->bus->name ? dev->bus->name : "ISA PnP")
 
+#define GENERIC_HD_DATA		0
+#define GENERIC_HD_ERROR	1
+#define GENERIC_HD_NSECTOR	2
+#define GENERIC_HD_SECTOR	3
+#define GENERIC_HD_LCYL		4
+#define GENERIC_HD_HCYL		5
+#define GENERIC_HD_SELECT	6
+#define GENERIC_HD_STATUS	7
+
+static int generic_ide_offsets[IDE_NR_PORTS] __initdata = {
+	GENERIC_HD_DATA, GENERIC_HD_ERROR, GENERIC_HD_NSECTOR, 
+	GENERIC_HD_SECTOR, GENERIC_HD_LCYL, GENERIC_HD_HCYL,
+	GENERIC_HD_SELECT, GENERIC_HD_STATUS, -1, -1
+};
+
 /* ISA PnP device table entry */
 struct pnp_dev_t {
 	unsigned short card_vendor, card_device, vendor, device;
@@ -43,7 +58,6 @@ static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
 {
 	hw_regs_t hw;
 	int index;
-	int i;
 
 	if (!enable)
 		return 0;
@@ -51,24 +65,14 @@ static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
 	if (!(DEV_IO(dev, 0) && DEV_IO(dev, 1) && DEV_IRQ(dev, 0)))
 		return 1;
 
-	/* Initialize register access base values. */
-	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; ++i)
-		hw.io_ports[i] = DEV_IO(dev, 0) + i;
-	hw.io_ports[IDE_CONTROL_OFFSET] = DEV_IO(dev, 1);
+	ide_setup_ports(&hw, (ide_ioreg_t) DEV_IO(dev, 0),
+			generic_ide_offsets, (ide_ioreg_t) DEV_IO(dev, 1),
+			0, NULL, DEV_IRQ(dev, 0));
 
-	hw.irq = DEV_IRQ(dev, 0);
-	hw.dma = NO_DMA;
-	hw.ack_intr = NULL;
-
-	index = ide_register_hw(&hw);
+	index = ide_register_hw(&hw, NULL);
 
 	if (index != -1) {
-		struct ata_channel *ch;
-
-		ch = &ide_hwifs[index];
-		ch->pci_dev = dev;
-		printk(KERN_INFO "ide%d: %s IDE interface\n", index, DEV_NAME(dev));
-
+	    	printk("ide%d: %s IDE interface\n", index, DEV_NAME(dev));
 		return 0;
 	}
 
@@ -76,13 +80,11 @@ static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
 }
 
 /* Add your devices here :)) */
-static struct pnp_dev_t pnp_devices[] __initdata = {
-	/* Generic ESDI/IDE/ATA compatible hard disk controller */
-	{
-		ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+struct pnp_dev_t idepnp_devices[] __initdata = {
+  	/* Generic ESDI/IDE/ATA compatible hard disk controller */
+	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('P', 'N', 'P'), ISAPNP_DEVICE(0x0600),
-		pnpide_generic_init
-	},
+		pnpide_generic_init },
 	{	0 }
 };
 
@@ -120,20 +122,20 @@ void __init pnpide_init(int enable)
 		return;
 	}
 #endif
-	for (dev_type = pnp_devices; dev_type->vendor; dev_type++) {
+	for (dev_type = idepnp_devices; dev_type->vendor; dev_type++) {
 		while ((dev = isapnp_find_dev(NULL, dev_type->vendor,
 			dev_type->device, dev))) {
 
 			if (dev->active)
 				continue;
 
-			if (PREPARE_FUNC(dev) && (PREPARE_FUNC(dev))(dev) < 0) {
-				printk(KERN_ERR "ide: %s prepare failed\n", DEV_NAME(dev));
+       			if (PREPARE_FUNC(dev) && (PREPARE_FUNC(dev))(dev) < 0) {
+				printk("ide: %s prepare failed\n", DEV_NAME(dev));
 				continue;
 			}
 
 			if (ACTIVATE_FUNC(dev) && (ACTIVATE_FUNC(dev))(dev) < 0) {
-				printk(KERN_ERR "ide: %s activate failed\n", DEV_NAME(dev));
+				printk("ide: %s activate failed\n", DEV_NAME(dev));
 				continue;
 			}
 

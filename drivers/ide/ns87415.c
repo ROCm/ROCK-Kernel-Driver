@@ -19,23 +19,21 @@
 #include <linux/hdreg.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
-#include <linux/init.h>
 #include <linux/ide.h>
+#include <linux/init.h>
 
 #include <asm/io.h>
-
-#include "pcihost.h"
 
 static unsigned int ns87415_count = 0, ns87415_control[MAX_HWIFS] = { 0 };
 
 /*
  * This routine either enables/disables (according to drive->present)
- * the IRQ associated with the port (drive->channel),
+ * the IRQ associated with the port (HWIF(drive)),
  * and selects either PIO or DMA handshaking for the next I/O operation.
  */
-static void ns87415_prepare_drive(struct ata_device *drive, unsigned int use_dma)
+static void ns87415_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
 {
-	struct ata_channel *hwif = drive->channel;
+	ide_hwif_t *hwif = HWIF(drive);
 	unsigned int bit, other, new, *old = (unsigned int *) hwif->select_data;
 	struct pci_dev *dev = hwif->pci_dev;
 	unsigned long flags;
@@ -44,12 +42,12 @@ static void ns87415_prepare_drive(struct ata_device *drive, unsigned int use_dma
 	new = *old;
 
 	/* Adjust IRQ enable bit */
-	bit = 1 << (8 + hwif->unit);
+	bit = 1 << (8 + hwif->channel);
 	new = drive->present ? (new & ~bit) : (new | bit);
 
 	/* Select PIO or DMA, DMA may only be selected for one drive/channel. */
-	bit   = 1 << (20 + drive->select.b.unit       + (hwif->unit << 1));
-	other = 1 << (20 + (1 - drive->select.b.unit) + (hwif->unit << 1));
+	bit   = 1 << (20 + drive->select.b.unit       + (hwif->channel << 1));
+	other = 1 << (20 + (1 - drive->select.b.unit) + (hwif->channel << 1));
 	new = use_dma ? ((new & ~other) | bit) : (new & ~bit);
 
 	if (new != *old) {
@@ -77,56 +75,61 @@ static void ns87415_prepare_drive(struct ata_device *drive, unsigned int use_dma
 	local_irq_restore(flags);
 }
 
-static void ns87415_selectproc(struct ata_device *drive)
+static void ns87415_selectproc (ide_drive_t *drive)
 {
 	ns87415_prepare_drive (drive, drive->using_dma);
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-
-static int ns87415_udma_stop(struct ata_device *drive)
+static int ns87415_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 {
-	struct ata_channel *ch = drive->channel;
-	unsigned long dma_base = ch->dma_base;
-	u8 dma_stat;
+	ide_hwif_t	*hwif = HWIF(drive);
+	byte		dma_stat;
 
-	dma_stat = inb(ch->dma_base+2);
-	outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
-	outb(inb(dma_base)|6, dma_base);	/* from ERRATA: clear the INTR & ERROR bits */
-	udma_destroy_table(ch);				/* and free any DMA resources */
-
-	return (dma_stat & 7) != 4;	/* verify good DMA status */
-
-}
-
-static int ns87415_udma_init(struct ata_device *drive, struct request *rq)
-{
-	ns87415_prepare_drive(drive, 1);	/* select DMA xfer */
-
-	if (udma_pci_init(drive, rq))		/* use standard DMA stuff */
-		return ATA_OP_CONTINUES;
-
-	ns87415_prepare_drive(drive, 0);	/* DMA failed: select PIO xfer */
-
-	return ATA_OP_FINISHED;
-}
-
-static int ns87415_udma_setup(struct ata_device *drive, int map)
-{
-	if (drive->type != ATA_DISK) {
-		udma_enable(drive, 0, 0);
-
-		return 0;
+	switch (func) {
+		case ide_dma_end: /* returns 1 on error, 0 otherwise */
+			drive->waiting_for_dma = 0;
+			dma_stat = IN_BYTE(hwif->dma_base+2);
+			/* stop DMA */
+			OUT_BYTE(IN_BYTE(hwif->dma_base)&~1, hwif->dma_base);
+			/* from ERRATA: clear the INTR & ERROR bits */
+			OUT_BYTE(IN_BYTE(hwif->dma_base)|6, hwif->dma_base);
+			/* and free any DMA resources */
+			ide_destroy_dmatable(drive);
+			/* verify good DMA status */
+			return (dma_stat & 7) != 4;
+		case ide_dma_write:
+		case ide_dma_read:
+			/* select DMA xfer */
+			ns87415_prepare_drive(drive, 1);
+			/* use standard DMA stuff */
+			if (!ide_dmaproc(func, drive))
+				return 0;
+			/* DMA failed: select PIO xfer */
+			ns87415_prepare_drive(drive, 0);
+			return 1;
+		case ide_dma_check:
+			if (drive->media != ide_disk)
+				return ide_dmaproc(ide_dma_off_quietly, drive);
+			/* Fallthrough... */
+		default:
+			return ide_dmaproc(func, drive);	/* use standard DMA stuff */
 	}
-	return udma_pci_setup(drive, map);
 }
-#endif
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 
-static void __init ide_init_ns87415(struct ata_channel *hwif)
+void __init ide_init_ns87415 (ide_hwif_t *hwif)
 {
 	struct pci_dev *dev = hwif->pci_dev;
 	unsigned int ctrl, using_inta;
-	u8 progif;
+	byte progif;
+#ifdef __sparc_v9__
+	int timeout;
+	byte stat;
+#endif
+
+	hwif->autodma = 0;
+	hwif->selectproc = &ns87415_selectproc;
 
 	/* Set a good latency timer and cache line size value. */
 	(void) pci_write_config_byte(dev, PCI_LATENCY_TIMER, 64);
@@ -144,24 +147,14 @@ static void __init ide_init_ns87415(struct ata_channel *hwif)
 	(void) pci_read_config_dword(dev, 0x40, &ctrl);
 	(void) pci_read_config_byte(dev, 0x09, &progif);
 	/* is irq in "native" mode? */
-	using_inta = progif & (1 << (hwif->unit << 1));
+	using_inta = progif & (1 << (hwif->channel << 1));
 	if (!using_inta)
-		using_inta = ctrl & (1 << (4 + hwif->unit));
-	if (hwif->unit == ATA_SECONDARY) {
-
-		/* FIXME: If we are initializing the secondary channel, let us
-		 * assume that the primary channel got initialized just a tad
-		 * bit before now.  It would be much cleaner if the data in
-		 * ns87415_control just got duplicated.
-		 */
-
-		if (!hwif->select_data)
-		    hwif->select_data = (unsigned long)
-			&ns87415_control[ns87415_count - 1];
+		using_inta = ctrl & (1 << (4 + hwif->channel));
+	if (hwif->mate) {
+		hwif->select_data = hwif->mate->select_data;
 	} else {
-		if (!hwif->select_data)
-		    hwif->select_data = (unsigned long)
-			&ns87415_control[ns87415_count++];
+		hwif->select_data = (unsigned long)
+					&ns87415_control[ns87415_count++];
 		ctrl |= (1 << 8) | (1 << 9);	/* mask both IRQs */
 		if (using_inta)
 			ctrl &= ~(1 << 6);	/* unmask INTA */
@@ -177,52 +170,35 @@ static void __init ide_init_ns87415(struct ata_channel *hwif)
 #ifdef __sparc_v9__
 		/*
 		 * XXX: Reset the device, if we don't it will not respond
-		 *      to select properly during first probe.
+		 *      to SELECT_DRIVE() properly during first probe_hwif().
 		 */
-		ata_reset(hwif);
+		timeout = 10000;
+		OUT_BYTE(12, hwif->io_ports[IDE_CONTROL_OFFSET]);
+		udelay(10);
+		OUT_BYTE(8, hwif->io_ports[IDE_CONTROL_OFFSET]);
+		do {
+			udelay(50);
+			stat = IN_BYTE(hwif->io_ports[IDE_STATUS_OFFSET]);
+                	if (stat == 0xff)
+                        	break;
+        	} while ((stat & BUSY_STAT) && --timeout);
 #endif
 	}
-
-	if (hwif->dma_base)
-		outb(0x60, hwif->dma_base + 2);
 
 	if (!using_inta)
-		hwif->irq = hwif->unit ? 15 : 14;	/* legacy mode */
-	else {
-		static int primary_irq = 0;
+		hwif->irq = hwif->channel ? 15 : 14;	/* legacy mode */
+	else if (!hwif->irq && hwif->mate && hwif->mate->irq)
+		hwif->irq = hwif->mate->irq;	/* share IRQ with mate */
 
-		/* Ugly way to let the primary and secondary channel on the
-		 * chip use the same IRQ line.
-		 */
-
-		if (hwif->unit == ATA_PRIMARY)
-			primary_irq = hwif->irq;
-		else if (!hwif->irq)
-			hwif->irq = primary_irq;
-	}
+	if (!hwif->dma_base)
+		return;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-	if (hwif->dma_base) {
-		hwif->udma_stop = ns87415_udma_stop;
-		hwif->udma_init = ns87415_udma_init;
-		hwif->udma_setup = ns87415_udma_setup;
-	}
-#endif
-
-	hwif->selectproc = &ns87415_selectproc;
-}
-
-/* module data table */
-static struct ata_pci_device chipset __initdata = {
-	.vendor = PCI_VENDOR_ID_NS,
-	.device = PCI_DEVICE_ID_NS_87415,
-	.init_channel = ide_init_ns87415,
-	.bootable = ON_BOARD,
-};
-
-int __init init_ns87415(void)
-{
-	ata_register_chipset(&chipset);
-
-        return 0;
+	OUT_BYTE(0x60, hwif->dma_base + 2);
+	hwif->dmaproc = &ns87415_dmaproc;
+#ifdef CONFIG_IDEDMA_AUTO
+	if (!noautodma)
+		hwif->autodma = 1;
+#endif /* CONFIG_IDEDMA_AUTO */
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 }

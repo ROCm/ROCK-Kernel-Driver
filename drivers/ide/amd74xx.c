@@ -1,371 +1,519 @@
-/**** vi:set ts=8 sts=8 sw=8:************************************************
- *
- * $Id: amd74xx.c,v 2.8 2002/03/14 11:52:20 vojtech Exp $
- *
- *  Copyright (c) 2000-2002 Vojtech Pavlik
- *
- *  Based on the work of:
- *	Andre Hedrick
- */
-
 /*
- * AMD 755/756/766/8111 IDE driver for Linux.
+ * linux/drivers/ide/amd74xx.c		Version 0.05	June 9, 2000
  *
- * UDMA66 and higher modes are autoenabled only in case the BIOS has detected a
- * 80 wire cable. To ignore the BIOS data and assume the cable is present, use
- * 'ide0=ata66' or 'ide1=ata66' on the kernel command line.
- */
-
-/*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright (C) 1999-2000		Andre Hedrick <andre@linux-ide.org>
+ * May be copied or modified under the terms of the GNU General Public License
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/config.h>
+#include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/delay.h>
+#include <linux/timer.h>
+#include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
-#include <linux/pci.h>
-#include <linux/init.h>
 #include <linux/hdreg.h>
+
+#include <linux/interrupt.h>
+#include <linux/init.h>
+#include <linux/pci.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
+#include <asm/irq.h>
 
-#include "timing.h"
-#include "pcihost.h"
+#include "ide_modes.h"
 
-#define AMD_IDE_ENABLE		(0x00 + amd_config->base)
-#define AMD_IDE_CONFIG		(0x01 + amd_config->base)
-#define AMD_CABLE_DETECT	(0x02 + amd_config->base)
-#define AMD_DRIVE_TIMING	(0x08 + amd_config->base)
-#define AMD_8BIT_TIMING		(0x0e + amd_config->base)
-#define AMD_ADDRESS_SETUP	(0x0c + amd_config->base)
-#define AMD_UDMA_TIMING		(0x10 + amd_config->base)
+#define DISPLAY_VIPER_TIMINGS
 
-#define AMD_UDMA		0x07
-#define AMD_UDMA_33		0x01
-#define AMD_UDMA_66		0x02
-#define AMD_UDMA_100		0x03
-#define AMD_BAD_SWDMA		0x08
-#define AMD_BAD_FIFO		0x10
+#if defined(DISPLAY_VIPER_TIMINGS) && defined(CONFIG_PROC_FS)
+#include <linux/stat.h>
+#include <linux/proc_fs.h>
 
-/*
- * AMD SouthBridge chips.
- */
+static int amd74xx_get_info(char *, char **, off_t, int);
+extern int (*amd74xx_display_info)(char *, char **, off_t, int); /* ide-proc.c */
+static struct pci_dev *bmide_dev;
 
-static struct amd_ide_chip {
-	unsigned short id;
-	unsigned char rev;
-	unsigned int base;
-	unsigned char flags;
-} amd_ide_chips[] = {
-	{ PCI_DEVICE_ID_AMD_8111_IDE,  0x00, 0x40, AMD_UDMA_100 },			/* AMD-8111 */
-	{ PCI_DEVICE_ID_AMD_OPUS_7441, 0x00, 0x40, AMD_UDMA_100 },			/* AMD-768 Opus */
-	{ PCI_DEVICE_ID_AMD_VIPER_7411, 0x00, 0x40, AMD_UDMA_100 | AMD_BAD_FIFO },	/* AMD-766 Viper */
-	{ PCI_DEVICE_ID_AMD_VIPER_7409, 0x07, 0x40, AMD_UDMA_66 },			/* AMD-756/c4+ Viper */
-	{ PCI_DEVICE_ID_AMD_VIPER_7409, 0x00, 0x40, AMD_UDMA_66 | AMD_BAD_SWDMA },	/* AMD-756 Viper */
-	{ PCI_DEVICE_ID_AMD_COBRA_7401, 0x00, 0x40, AMD_UDMA_33 | AMD_BAD_SWDMA },	/* AMD-755 Cobra */
-	{ PCI_DEVICE_ID_NVIDIA_NFORCE_IDE, 0x00, 0x50, AMD_UDMA_100 },			/* nVidia nForce */
-	{ 0 }
-};
-
-static struct amd_ide_chip *amd_config;
-static unsigned char amd_enabled;
-static unsigned int amd_80w;
-
-static unsigned char amd_cyc2udma[] = { 6, 6, 5, 4, 0, 1, 1, 2, 2, 3, 3 };
-#if 0
-static unsigned char amd_udma2cyc[] = { 4, 6, 8, 10, 3, 2, 1, 1 };
-#endif
-static char *amd_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100" };
-
-/*
- * amd_set_speed() writes timing values to the chipset registers
- */
-
-static void amd_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_timing *timing)
+static int amd74xx_get_info (char *buffer, char **addr, off_t offset, int count)
 {
-	unsigned char t;
+	char *p = buffer;
+	u32 bibma = pci_resource_start(bmide_dev, 4);
+	u8 c0 = 0, c1 = 0;
 
-	pci_read_config_byte(dev, AMD_ADDRESS_SETUP, &t);
-	t = (t & ~(3 << ((3 - dn) << 1))) | ((FIT(timing->setup, 1, 4) - 1) << ((3 - dn) << 1));
-	pci_write_config_byte(dev, AMD_ADDRESS_SETUP, t);
+	/*
+	 * at that point bibma+0x2 et bibma+0xa are byte registers
+	 * to investigate:
+	 */
+	c0 = IN_BYTE((unsigned short)bibma + 0x02);
+	c1 = IN_BYTE((unsigned short)bibma + 0x0a);
 
-	pci_write_config_byte(dev, AMD_8BIT_TIMING + (1 - (dn >> 1)),
-		((FIT(timing->act8b, 1, 16) - 1) << 4) | (FIT(timing->rec8b, 1, 16) - 1));
+	p += sprintf(p, "\n                                "
+			"AMD %04X VIPER Chipset.\n", bmide_dev->device);
+	p += sprintf(p, "--------------- Primary Channel "
+			"---------------- Secondary Channel "
+			"-------------\n");
+	p += sprintf(p, "                %sabled "
+			"                        %sabled\n",
+			(c0&0x80) ? "dis" : " en",
+			(c1&0x80) ? "dis" : " en");
+	p += sprintf(p, "--------------- drive0 --------- drive1 "
+			"-------- drive0 ---------- drive1 ------\n");
+	p += sprintf(p, "DMA enabled:    %s              %s "
+			"            %s               %s\n",
+			(c0&0x20) ? "yes" : "no ", (c0&0x40) ? "yes" : "no ",
+			(c1&0x20) ? "yes" : "no ", (c1&0x40) ? "yes" : "no " );
+	p += sprintf(p, "UDMA\n");
+	p += sprintf(p, "DMA\n");
+	p += sprintf(p, "PIO\n");
 
-	pci_write_config_byte(dev, AMD_DRIVE_TIMING + (3 - dn),
-		((FIT(timing->active, 1, 16) - 1) << 4) | (FIT(timing->recover, 1, 16) - 1));
+	return p-buffer;	/* => must be less than 4k! */
+}
+#endif  /* defined(DISPLAY_VIPER_TIMINGS) && defined(CONFIG_PROC_FS) */
 
-	switch (amd_config->flags & AMD_UDMA) {
-		case AMD_UDMA_33:  t = timing->udma ? (0xc0 | (FIT(timing->udma, 2, 5) - 2)) : 0x03; break;
-		case AMD_UDMA_66:  t = timing->udma ? (0xc0 | amd_cyc2udma[FIT(timing->udma, 2, 10)]) : 0x03; break;
-		case AMD_UDMA_100: t = timing->udma ? (0xc0 | amd_cyc2udma[FIT(timing->udma, 1, 10)]) : 0x03; break;
-		default: return;
+byte amd74xx_proc = 0;
+
+static int amd74xx_mode5_check (struct pci_dev *dev)
+{
+	switch(dev->device) {
+		case PCI_DEVICE_ID_AMD_VIPER_7411:
+		case PCI_DEVICE_ID_AMD_OPUS_7441:
+			return 1;
+		default:
+			return 0;
 	}
-
-	pci_write_config_byte(dev, AMD_UDMA_TIMING + (3 - dn), t);
 }
 
-/*
- * amd_set_drive() computes timing values configures the drive and
- * the chipset to a desired transfer mode. It also can be called
- * by upper layers.
- */
-
-static int amd_set_drive(struct ata_device *drive, unsigned char speed)
+static unsigned int amd74xx_swdma_check (struct pci_dev *dev)
 {
-	struct ata_device *peer = drive->channel->drives + (~drive->dn & 1);
-	struct ata_timing t, p;
-	int T, UT;
+	unsigned int class_rev;
 
-	if (speed != XFER_PIO_SLOW && speed != drive->current_speed)
-		if (ide_config_drive_speed(drive, speed))
-			printk(KERN_WARNING "ide%d: Drive %d didn't accept speed setting. Oh, well.\n",
-				drive->dn >> 1, drive->dn & 1);
+	if (amd74xx_mode5_check(dev))
+		return 1;
 
-	T = 1000000000 / system_bus_speed;
-	UT = T / min_t(int, max_t(int, amd_config->flags & AMD_UDMA, 1), 2);
+	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
+	class_rev &= 0xff;
+	return ((int) (class_rev >= 7) ? 1 : 0);
+}
 
-	ata_timing_compute(drive, speed, &t, T, UT);
-
-	if (peer->present) {
-		ata_timing_compute(peer, peer->current_speed, &p, T, UT);
-		ata_timing_merge(&p, &t, &t, IDE_TIMING_8BIT);
-	}
-
-	if (speed == XFER_UDMA_5 && system_bus_speed <= 33333) t.udma = 1;
-
-	amd_set_speed(drive->channel->pci_dev, drive->dn, &t);
-
+static int amd74xx_swdma_error (ide_drive_t *drive)
+{
+	printk("%s: single-word DMA not support (revision < C4)\n", drive->name);
 	return 0;
 }
 
-/*
- * amd74xx_tune_drive() is a callback from upper layers for
- * PIO-only tuning.
- */
-
-static void amd74xx_tune_drive(struct ata_device *drive, u8 pio)
+static byte amd74xx_ratemask (ide_drive_t *drive)
 {
-	if (!((amd_enabled >> drive->channel->unit) & 1))
-		return;
+	struct pci_dev *dev = HWIF(drive)->pci_dev;
+	byte mode = 0x00;
 
-	if (pio == 255) {
-		amd_set_drive(drive, ata_timing_mode(drive, XFER_PIO | XFER_EPIO));
-		return;
+        switch(dev->device) {
+		case PCI_DEVICE_ID_AMD_OPUS_7441:
+		case PCI_DEVICE_ID_AMD_VIPER_7411:	{ mode |= 0x03; break; }
+		case PCI_DEVICE_ID_AMD_VIPER_7409:	{ mode |= 0x02; break; }
+		case PCI_DEVICE_ID_AMD_COBRA_7401:	{ mode |= 0x01; break; }
+		default:
+			return (mode &= ~0xFF);
 	}
 
-	amd_set_drive(drive, XFER_PIO_0 + min_t(u8, pio, 5));
+	if (!eighty_ninty_three(drive)) {
+		mode &= ~0xFE;
+		mode |= 0x01;
+	}
+	return (mode &= ~0xF8);
+}
+
+static byte amd74xx_ratefilter (ide_drive_t *drive, byte speed)
+{
+#ifdef CONFIG_BLK_DEV_IDEDMA
+	byte mode = amd74xx_ratemask(drive);
+
+	switch(mode) {
+		case 0x04:	// while (speed > XFER_UDMA_6) speed--; break;
+		case 0x03:	while (speed > XFER_UDMA_5) speed--; break;
+		case 0x02:	while (speed > XFER_UDMA_4) speed--; break;
+		case 0x01:	while (speed > XFER_UDMA_2) speed--; break;
+		case 0x00:
+		default:	while (speed > XFER_MW_DMA_2) speed--; break;
+			break;
+	}
+#else
+	while (speed > XFER_PIO_4) speed--;
+#endif /* CONFIG_BLK_DEV_IDEDMA */
+//	printk("%s: mode == %02x speed == %02x\n", drive->name, mode, speed);
+	return speed;
+}
+
+/*
+ * Here is where all the hard work goes to program the chipset.
+ */
+static int amd74xx_tune_chipset (ide_drive_t *drive, byte xferspeed)
+{
+	ide_hwif_t *hwif	= HWIF(drive);
+	struct pci_dev *dev	= hwif->pci_dev;
+	byte speed		= amd74xx_ratefilter(drive, xferspeed);
+	byte drive_pci		= 0x00;
+	byte drive_pci2		= 0x00;
+	byte ultra_timing	= 0x00;
+	byte dma_pio_timing	= 0x00;
+	byte pio_timing		= 0x00;
+
+        switch (drive->dn) {
+		case 0: drive_pci = 0x53; drive_pci2 = 0x4b; break;
+		case 1: drive_pci = 0x52; drive_pci2 = 0x4a; break;
+		case 2: drive_pci = 0x51; drive_pci2 = 0x49; break;
+		case 3: drive_pci = 0x50; drive_pci2 = 0x48; break;
+		default:
+                        return -1;
+        }
+
+	pci_read_config_byte(dev, drive_pci, &ultra_timing);
+	pci_read_config_byte(dev, drive_pci2, &dma_pio_timing);
+	pci_read_config_byte(dev, 0x4c, &pio_timing);
+
+	ultra_timing	&= ~0xC7;
+	dma_pio_timing	&= ~0xFF;
+	pio_timing	&= ~(0x03 << drive->dn);
+
+	switch(speed) {
+#ifdef CONFIG_BLK_DEV_IDEDMA
+		case XFER_UDMA_7:
+		case XFER_UDMA_6:
+			speed = XFER_UDMA_5;
+		case XFER_UDMA_5:
+			ultra_timing |= 0x46;
+			dma_pio_timing |= 0x20;
+			break;
+		case XFER_UDMA_4:
+			ultra_timing |= 0x45;
+			dma_pio_timing |= 0x20;
+			break;
+		case XFER_UDMA_3:
+			ultra_timing |= 0x44;
+			dma_pio_timing |= 0x20;
+			break;
+		case XFER_UDMA_2:
+			ultra_timing |= 0x40;
+			dma_pio_timing |= 0x20;
+			break;
+		case XFER_UDMA_1:
+			ultra_timing |= 0x41;
+			dma_pio_timing |= 0x20;
+			break;
+		case XFER_UDMA_0:
+			ultra_timing |= 0x42;
+			dma_pio_timing |= 0x20;
+			break;
+		case XFER_MW_DMA_2:
+			dma_pio_timing |= 0x20;
+			break;
+		case XFER_MW_DMA_1:
+			dma_pio_timing |= 0x21;
+			break;
+		case XFER_MW_DMA_0:
+			dma_pio_timing |= 0x77;
+			break;
+		case XFER_SW_DMA_2:
+			if (!amd74xx_swdma_check(dev))
+				return amd74xx_swdma_error(drive);
+			dma_pio_timing |= 0x42;
+			break;
+		case XFER_SW_DMA_1:
+			if (!amd74xx_swdma_check(dev))
+				return amd74xx_swdma_error(drive);
+			dma_pio_timing |= 0x65;
+			break;
+		case XFER_SW_DMA_0:
+			if (!amd74xx_swdma_check(dev))
+				return amd74xx_swdma_error(drive);
+			dma_pio_timing |= 0xA8;
+			break;
+#endif /* CONFIG_BLK_DEV_IDEDMA */
+		case XFER_PIO_4:
+			dma_pio_timing |= 0x20;
+			break;
+		case XFER_PIO_3:
+			dma_pio_timing |= 0x22;
+			break;
+		case XFER_PIO_2:
+			dma_pio_timing |= 0x42;
+			break;
+		case XFER_PIO_1:
+			dma_pio_timing |= 0x65;
+			break;
+		case XFER_PIO_0:
+		default:
+			dma_pio_timing |= 0xA8;
+			break;
+        }
+
+	pio_timing |= (0x03 << drive->dn);
+
+#ifdef CONFIG_BLK_DEV_IDEDMA
+	pci_write_config_byte(dev, drive_pci, ultra_timing);
+#endif /* CONFIG_BLK_DEV_IDEDMA */
+	pci_write_config_byte(dev, drive_pci2, dma_pio_timing);
+	pci_write_config_byte(dev, 0x4c, pio_timing);
+
+	return (ide_config_drive_speed(drive, speed));
+}
+
+static void amd74xx_tune_drive (ide_drive_t *drive, byte pio)
+{
+	byte speed;
+	pio = ide_get_best_pio_mode(drive, pio, 5, NULL);
+	switch(pio) {
+		case 4:		speed = XFER_PIO_4;break;
+		case 3:		speed = XFER_PIO_3;break;
+		case 2:		speed = XFER_PIO_2;break;
+		case 1:		speed = XFER_PIO_1;break;
+		default:	speed = XFER_PIO_0;break;
+	}
+	(void) amd74xx_tune_chipset(drive, speed);
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int __init amd_modes_map(struct ata_channel *ch)
+/*
+ * This allows the configuration of ide_pci chipset registers
+ * for cards that learn about the drive's UDMA, DMA, PIO capabilities
+ * after the drive is reported by the OS.
+ */
+static int config_chipset_for_dma (ide_drive_t *drive)
 {
-	short w80 = ch->udma_four;
-	int map = XFER_EPIO | XFER_MWDMA | XFER_UDMA |
-		  ((amd_config->flags & AMD_BAD_SWDMA) ? 0 : XFER_SWDMA) |
-		  (w80 && (amd_config->flags & AMD_UDMA) >= AMD_UDMA_66 ? XFER_UDMA_66 : 0) |
-		  (w80 && (amd_config->flags & AMD_UDMA) >= AMD_UDMA_100 ? XFER_UDMA_100 : 0);
+	struct hd_driveid *id   = drive->id;
+	byte mode		= amd74xx_ratemask(drive);
+	byte swdma		= amd74xx_swdma_check(HWIF(drive)->pci_dev);
+	byte speed		= 0;
+	int  rval;
 
-	return map;
+	amd74xx_tune_drive(drive, 5);
+	
+	switch(mode) {
+		case 0x04:
+			if (id->dma_ultra & 0x0040)
+				{ speed = XFER_UDMA_6; break; }
+		case 0x03:
+			if (id->dma_ultra & 0x0020)
+				{ speed = XFER_UDMA_5; break; }
+		case 0x02:
+			if (id->dma_ultra & 0x0010)
+				{ speed = XFER_UDMA_4; break; }
+			if (id->dma_ultra & 0x0008)
+				{ speed = XFER_UDMA_3; break; }
+		case 0x01:
+			if (id->dma_ultra & 0x0004)
+				{ speed = XFER_UDMA_2; break; }
+			if (id->dma_ultra & 0x0002)
+				{ speed = XFER_UDMA_1; break; }
+			if (id->dma_ultra & 0x0001)
+				{ speed = XFER_UDMA_0; break; }
+		case 0x00:
+			if (id->dma_mword & 0x0004)
+				{ speed = XFER_MW_DMA_2; break; }
+			if (id->dma_mword & 0x0002)
+				{ speed = XFER_MW_DMA_1; break; }
+			if (id->dma_mword & 0x0001)
+				{ speed = XFER_MW_DMA_0; break; }
+			if ((id->dma_1word & 0x0004) && (swdma))
+				{ speed = XFER_SW_DMA_2; break; }
+			if ((id->dma_1word & 0x0002) && (swdma))
+				{ speed = XFER_SW_DMA_1; break; }
+			if ((id->dma_1word & 0x0001) && (swdma))
+				{ speed = XFER_SW_DMA_0; break; }
+		default:
+			return ((int) ide_dma_off_quietly);
+	}
+
+	(void) amd74xx_tune_chipset(drive, speed);
+//	return ((int) (dma) ? ide_dma_on : ide_dma_off_quietly);
+	rval = (int)(   ((id->dma_ultra >> 11) & 7) ? ide_dma_on :
+			 ((id->dma_ultra >> 8) & 7) ? ide_dma_on :
+			 ((id->dma_mword >> 8) & 7) ? ide_dma_on :
+			 (((id->dma_1word >> 8) & 7) && (swdma)) ? ide_dma_on :
+						     ide_dma_off_quietly);
+	return rval;
 }
-#endif
 
-/*
- * The initialization callback. Here we determine the IDE chip type
- * and initialize its drive independent registers.
- */
-
-static unsigned int __init amd74xx_init_chipset(struct pci_dev *dev)
+static int config_drive_xfer_rate (ide_drive_t *drive)
 {
-	unsigned char t;
-	unsigned int u;
-	int i;
+	struct hd_driveid *id	= drive->id;
+	ide_hwif_t *hwif	= HWIF(drive);
+	ide_dma_action_t dma_func = ide_dma_on;
 
-/*
- * Find out what AMD IDE is this.
- */
+	drive->init_speed = 0;
 
-	for (amd_config = amd_ide_chips; amd_config->id; amd_config++) {
-			pci_read_config_byte(dev, PCI_REVISION_ID, &t);
-			if (dev->device == amd_config->id && t >= amd_config->rev)
-				break;
+	if (id && (id->capability & 1) && hwif->autodma) {
+		/* Consult the list of known "bad" drives */
+		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
+			dma_func = ide_dma_off;
+			goto fast_ata_pio;
 		}
-
-	if (!amd_config->id) {
-		printk(KERN_WARNING "AMD_IDE: Unknown AMD IDE Chip, contact Vojtech Pavlik <vojtech@ucw.cz>\n");
-		return -ENODEV;
+		dma_func = ide_dma_off_quietly;
+		if (id->field_valid & 4) {
+			if (id->dma_ultra & 0x003F) {
+				/* Force if Capable UltraDMA */
+				dma_func = config_chipset_for_dma(drive);
+				if ((id->field_valid & 2) &&
+				    (dma_func != ide_dma_on))
+					goto try_dma_modes;
+			}
+		} else if (id->field_valid & 2) {
+try_dma_modes:
+			if ((id->dma_mword & 0x0007) ||
+			    ((id->dma_1word & 0x007) &&
+			     (amd74xx_swdma_check(HWIF(drive)->pci_dev)))) {
+				/* Force if Capable regular DMA modes */
+				dma_func = config_chipset_for_dma(drive);
+				if (dma_func != ide_dma_on)
+					goto no_dma_set;
+			}
+			
+		} else if (ide_dmaproc(ide_dma_good_drive, drive)) {
+			if (id->eide_dma_time > 150) {
+				goto no_dma_set;
+			}
+			/* Consult the list of known "good" drives */
+			dma_func = config_chipset_for_dma(drive);
+			if (dma_func != ide_dma_on)
+				goto no_dma_set;
+		} else {
+			goto fast_ata_pio;
+		}
+	} else if ((id->capability & 8) || (id->field_valid & 2)) {
+fast_ata_pio:
+		dma_func = ide_dma_off_quietly;
+no_dma_set:
+		amd74xx_tune_drive(drive, 5);
 	}
+	return HWIF(drive)->dmaproc(dma_func, drive);
+}
 
 /*
- * Check 80-wire cable presence.
+ * amd74xx_dmaproc() initiates/aborts (U)DMA read/write operations on a drive.
  */
 
-	switch (amd_config->flags & AMD_UDMA) {
-
-		case AMD_UDMA_100:
-			pci_read_config_byte(dev, AMD_CABLE_DETECT, &t);
-			amd_80w = ((u & 0x3) ? 1 : 0) | ((u & 0xc) ? 2 : 0);
-			for (i = 24; i >= 0; i -= 8)
-				if (((u >> i) & 4) && !(amd_80w & (1 << (1 - (i >> 4))))) {
-					printk(KERN_WARNING "AMD_IDE: Bios didn't set cable bits corectly. Enabling workaround.\n");
-					amd_80w |= (1 << (1 - (i >> 4)));
-				}
-			break;
-
-		case AMD_UDMA_66:
-			pci_read_config_dword(dev, AMD_UDMA_TIMING, &u);
-			for (i = 24; i >= 0; i -= 8)
-				if ((u >> i) & 4)
-					amd_80w |= (1 << (1 - (i >> 4)));
+int amd74xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+{
+	switch (func) {
+		case ide_dma_check:
+			return config_drive_xfer_rate(drive);
+		default:
 			break;
 	}
+	return ide_dmaproc(func, drive);	/* use standard DMA stuff */
+}
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 
-	pci_read_config_dword(dev, AMD_IDE_ENABLE, &u);
-	amd_enabled = ((u & 1) ? 2 : 0) | ((u & 2) ? 1 : 0);
+unsigned int __init pci_init_amd74xx (struct pci_dev *dev, const char *name)
+{
+	unsigned long fixdma_base = pci_resource_start(dev, 4);
 
-/*
- * Take care of prefetch & postwrite.
- */
+#ifdef CONFIG_BLK_DEV_IDEDMA
+	if (!amd74xx_swdma_check(dev))
+		printk("%s: disabling single-word DMA support (revision < C4)\n", name);
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 
-	pci_read_config_byte(dev, AMD_IDE_CONFIG, &t);
-	pci_write_config_byte(dev, AMD_IDE_CONFIG,
-		(amd_config->flags & AMD_BAD_FIFO) ? (t & 0x0f) : (t | 0xf0));
+	if (!fixdma_base) {
+		/*
+		 *
+		 */
+	} else {
+		/*
+		 * enable DMA capable bit, and "not" simplex only
+		 */
+		OUT_BYTE(IN_BYTE(fixdma_base+2) & 0x60, fixdma_base+2);
 
-/*
- * Print the boot message.
- */
-
-	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
-	printk(KERN_INFO "AMD_IDE: %s (rev %02x) %s controller on pci%s\n",
-		dev->name, t, amd_dma[amd_config->flags & AMD_UDMA], dev->slot_name);
+		if (IN_BYTE(fixdma_base+2) & 0x80)
+			printk("%s: simplex device: DMA will fail!!\n", name);
+	}
+#if defined(DISPLAY_VIPER_TIMINGS) && defined(CONFIG_PROC_FS)
+	if (!amd74xx_proc) {
+		amd74xx_proc = 1;
+		bmide_dev = dev;
+		amd74xx_display_info = &amd74xx_get_info;
+	}
+#endif /* DISPLAY_VIPER_TIMINGS && CONFIG_PROC_FS */
 
 	return 0;
 }
 
-static unsigned int __init amd74xx_ata66_check(struct ata_channel *hwif)
+unsigned int __init ata66_amd74xx (ide_hwif_t *hwif)
 {
-	return ((amd_enabled & amd_80w) >> hwif->unit) & 1;
+	struct pci_dev *dev	= hwif->pci_dev;
+	byte cable_80_pin[2]	= { 0, 0 };
+	byte ata66		= 0;
+	byte tmpbyte;
+
+	/*
+	 * Ultra66 cable detection (from Host View)
+	 * 7411, 7441, 0x42, bit0: primary, bit2: secondary 80 pin
+	 */
+	pci_read_config_byte(dev, 0x42, &tmpbyte);
+
+	/*
+	 * 0x42, bit0 is 1 => primary channel
+	 * has 80-pin (from host view)
+	 */
+	if (tmpbyte & 0x01) cable_80_pin[0] = 1;
+
+	/*
+	 * 0x42, bit2 is 1 => secondary channel
+	 * has 80-pin (from host view)
+	 */
+	if (tmpbyte & 0x04) cable_80_pin[1] = 1;
+
+	switch(dev->device) {
+		case PCI_DEVICE_ID_AMD_OPUS_7441:
+		case PCI_DEVICE_ID_AMD_VIPER_7411:
+			ata66 = (hwif->channel) ?
+				cable_80_pin[1] :
+				cable_80_pin[0];
+		default:
+			break;
+	}
+#ifdef CONFIG_AMD74XX_OVERRIDE
+	return(1);
+#else
+	return (unsigned int) ata66;
+#endif /* CONFIG_AMD74XX_OVERRIDE */
 }
 
-static void __init amd74xx_init_channel(struct ata_channel *hwif)
+void __init ide_init_amd74xx (ide_hwif_t *hwif)
 {
-	int i;
-
-	hwif->udma_four = amd74xx_ata66_check(hwif);
-
 	hwif->tuneproc = &amd74xx_tune_drive;
-	hwif->speedproc = &amd_set_drive;
+	hwif->speedproc = &amd74xx_tune_chipset;
 
-	hwif->io_32bit = 1;
-	hwif->unmask = 1;
-
-	for (i = 0; i < 2; i++) {
-		hwif->drives[i].autotune = 1;
-		hwif->drives[i].dn = hwif->unit * 2 + i;
+	if (!hwif->dma_base) {
+		hwif->drives[0].autotune = 1;
+		hwif->drives[1].autotune = 1;
+		hwif->autodma = 0;
+		return;
 	}
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
-	if (hwif->dma_base) {
-		hwif->highmem = 1;
-		hwif->modes_map = amd_modes_map(hwif);
-		hwif->udma_setup = udma_generic_setup;
-	}
-#endif
+#ifndef CONFIG_BLK_DEV_IDEDMA
+	hwif->dmaproc = &amd74xx_dmaproc;
+#ifdef CONFIG_IDEDMA_AUTO
+	if (!noautodma)
+		hwif->autodma = 1;
+#endif /* CONFIG_IDEDMA_AUTO */
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
-/*
- * We allow the BM-DMA driver only work on enabled interfaces.
- */
-static void __init amd74xx_init_dma(struct ata_channel *ch, unsigned long dmabase)
+void __init ide_dmacapable_amd74xx (ide_hwif_t *hwif, unsigned long dmabase)
 {
-	if ((amd_enabled >> ch->unit) & 1)
-		ata_init_dma(ch, dmabase);
+	ide_setup_dma(hwif, dmabase, 8);
 }
 
+extern void ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *d);
 
-/* module data table */
-static struct ata_pci_device chipsets[] __initdata = {
-	{
-		.vendor = PCI_VENDOR_ID_AMD,
-		.device = PCI_DEVICE_ID_AMD_COBRA_7401,
-		.init_chipset = amd74xx_init_chipset,
-		.init_channel = amd74xx_init_channel,
-		.init_dma = amd74xx_init_dma,
-		.enablebits = {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
-		.bootable = ON_BOARD
-	},
-	{
-		.vendor = PCI_VENDOR_ID_AMD,
-		.device = PCI_DEVICE_ID_AMD_VIPER_7409,
-		.init_chipset = amd74xx_init_chipset,
-		.init_channel = amd74xx_init_channel,
-		.init_dma = amd74xx_init_dma,
-		.enablebits = {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
-		.bootable = ON_BOARD,
-		.flags = ATA_F_SIMPLEX
-	},
-	{
-		.vendor = PCI_VENDOR_ID_AMD,
-		.device = PCI_DEVICE_ID_AMD_VIPER_7411,
-		.init_chipset = amd74xx_init_chipset,
-		.init_channel = amd74xx_init_channel,
-		.init_dma = amd74xx_init_dma,
-		.enablebits = {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
-		.bootable = ON_BOARD
-	},
-	{
-		.vendor = PCI_VENDOR_ID_AMD,
-		.device = PCI_DEVICE_ID_AMD_OPUS_7441,
-		.init_chipset = amd74xx_init_chipset,
-		.init_channel = amd74xx_init_channel,
-		.init_dma = amd74xx_init_dma,
-		.enablebits = {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
-		.bootable = ON_BOARD
-	},
-	{
-		.vendor = PCI_VENDOR_ID_AMD,
-		.device = PCI_DEVICE_ID_AMD_8111_IDE,
-		.init_chipset = amd74xx_init_chipset,
-		.init_channel = amd74xx_init_channel,
-		.init_dma = amd74xx_init_dma,
-		.enablebits = {{0x40,0x01,0x01}, {0x40,0x02,0x02}},
-		.bootable = ON_BOARD
-	},
-	{
-		.vendor = PCI_VENDOR_ID_NVIDIA,
-		.device = PCI_DEVICE_ID_NVIDIA_NFORCE_IDE,
-		.init_chipset = amd74xx_init_chipset,
-		.init_channel = amd74xx_init_channel,
-		.init_dma = amd74xx_init_dma,
-		.enablebits = {{0x50,0x01,0x01}, {0x50,0x02,0x02}},
-		.bootable = ON_BOARD
-	},
-};
-
-int __init init_amd74xx(void)
+void __init fixup_device_amd74xx (struct pci_dev *dev, ide_pci_device_t *d)
 {
-	int i;
+	if (dev->resource[0].start != 0x01F1)
+		ide_register_xp_fix(dev);
 
-	for (i = 0; i < ARRAY_SIZE(chipsets); ++i)
-		ata_register_chipset(&chipsets[i]);
-
-        return 0;
+	printk("%s: IDE controller on PCI bus %02x dev %02x\n",
+		d->name, dev->bus->number, dev->devfn);
+	ide_setup_pci_device(dev, d);
 }
+

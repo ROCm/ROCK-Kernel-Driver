@@ -60,7 +60,7 @@ void __init falconide_init(void)
 
 	ide_setup_ports(&hw, (ide_ioreg_t)ATA_HD_BASE, falconide_offsets,
 			0, 0, NULL, IRQ_MFP_IDE);
-	index = ide_register_hw(&hw);
+	index = ide_register_hw(&hw, NULL);
 
 	if (index != -1)
 	    printk("ide%d: Falcon IDE interface\n", index);

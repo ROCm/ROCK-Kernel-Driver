@@ -1,7 +1,10 @@
-/**** vi:set ts=8 sts=8 sw=8:************************************************
+/*
+ *  linux/drivers/ide/opti621.c		Version 0.6	Jan 02, 1999
  *
  *  Copyright (C) 1996-1998  Linus Torvalds & authors (see below)
- *
+ */
+
+/*
  * Authors:
  * Jaromir Koutek <miri@punknet.cz>,
  * Jan Harkes <jaharkes@cwi.nl>,
@@ -59,9 +62,9 @@
  * by hdparm.
  *
  * Version 0.1, Nov 8, 1996
- * by Jaromir Koutek, for 2.1.8.
+ * by Jaromir Koutek, for 2.1.8. 
  * Initial version of driver.
- *
+ * 
  * Version 0.2
  * Number 0.2 skipped.
  *
@@ -77,13 +80,14 @@
  * by Jaromir Koutek
  * Updates for use with (again) new IDE block driver.
  * Update of documentation.
- *
+ * 
  * Version 0.6, Jan 2, 1999
  * by Jaromir Koutek
  * Reversed to version 0.3 of the driver, because
  * 0.5 doesn't work.
  */
 
+#undef REALLY_SLOW_IO	/* most systems can safely undef this */
 #define OPTI621_DEBUG		/* define for debug messages */
 
 #include <linux/types.h>
@@ -99,8 +103,7 @@
 
 #include <asm/io.h>
 
-#include "timing.h"
-#include "pcihost.h"
+#include "ide_modes.h"
 
 #define OPTI621_MAX_PIO 3
 /* In fact, I do not have any PIO 4 drive
@@ -137,7 +140,7 @@ int reg_base;
 
 /* there are stored pio numbers from other calls of opti621_tune_drive */
 
-static void compute_pios(struct ata_device *drive, u8 pio)
+static void compute_pios(ide_drive_t *drive, byte pio)
 /* Store values into drive->drive_data
  *	second_contr - 0 for primary controller, 1 for secondary
  *	slave_drive - 0 -> pio is for master, 1 -> pio is for slave
@@ -145,18 +148,14 @@ static void compute_pios(struct ata_device *drive, u8 pio)
  */
 {
 	int d;
-	struct ata_channel *hwif = drive->channel;
+	ide_hwif_t *hwif = HWIF(drive);
 
-	if (pio == PIO_DONT_KNOW)
-		drive->drive_data = min(ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0, OPTI621_MAX_PIO);
-	else
-		drive->drive_data = pio;
-
+	drive->drive_data = ide_get_best_pio_mode(drive, pio, OPTI621_MAX_PIO, NULL);
 	for (d = 0; d < 2; ++d) {
 		drive = &hwif->drives[d];
 		if (drive->present) {
 			if (drive->drive_data == PIO_DONT_KNOW)
-				drive->drive_data = min(ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0, OPTI621_MAX_PIO);
+				drive->drive_data = ide_get_best_pio_mode(drive, 255, OPTI621_MAX_PIO, NULL);
 #ifdef OPTI621_DEBUG
 			printk("%s: Selected PIO mode %d\n", drive->name, drive->drive_data);
 #endif
@@ -166,7 +165,7 @@ static void compute_pios(struct ata_device *drive, u8 pio)
 	}
 }
 
-static int cmpt_clk(int time, int bus_speed)
+int cmpt_clk(int time, int bus_speed)
 /* Returns (rounded up) time in clocks for time in ns,
  * with bus_speed in MHz.
  * Example: bus_speed = 40 MHz, time = 80 ns
@@ -175,36 +174,36 @@ static int cmpt_clk(int time, int bus_speed)
  * Use idebus=xx to select right frequency.
  */
 {
-	return ((time*bus_speed+999999)/1000000);
+	return ((time*bus_speed+999)/1000);
 }
 
-static void write_reg(u8 value, int reg)
+static void write_reg(byte value, int reg)
 /* Write value to register reg, base of register
  * is at reg_base (0x1f0 primary, 0x170 secondary,
  * if not changed by PCI configuration).
  * This is from setupvic.exe program.
  */
 {
-	inw(reg_base+1);
-	inw(reg_base+1);
-	outb(3, reg_base+2);
-	outb(value, reg_base+reg);
-	outb(0x83, reg_base+2);
+	IN_WORD(reg_base+1);
+	IN_WORD(reg_base+1);
+	OUT_BYTE(3, reg_base+2);
+	OUT_BYTE(value, reg_base+reg);
+	OUT_BYTE(0x83, reg_base+2);
 }
 
-static u8 read_reg(int reg)
+static byte read_reg(int reg)
 /* Read value from register reg, base of register
  * is at reg_base (0x1f0 primary, 0x170 secondary,
  * if not changed by PCI configuration).
  * This is from setupvic.exe program.
  */
 {
-	u8 ret;
-	inw(reg_base+1);
-	inw(reg_base+1);
-	outb(3, reg_base+2);
-	ret=inb(reg_base+reg);
-	outb(0x83, reg_base+2);
+	byte ret;
+	IN_WORD(reg_base+1);
+	IN_WORD(reg_base+1);
+	OUT_BYTE(3, reg_base+2);
+	ret=IN_BYTE(reg_base+reg);
+	OUT_BYTE(0x83, reg_base+2);
 	return ret;
 }
 
@@ -217,52 +216,47 @@ typedef struct pio_clocks_s {
 static void compute_clocks(int pio, pio_clocks_t *clks)
 {
         if (pio != PIO_NOT_EXIST) {
-		int adr_setup;
-		int data_pls;
-		struct ata_timing *t;
+        	int adr_setup, data_pls;
+		int bus_speed = system_bus_clock();
 
-		t = ata_timing_data(pio);
-
-		adr_setup = t->setup;
-		data_pls = t->active;
-		clks->address_time = cmpt_clk(adr_setup, system_bus_speed);
-		clks->data_time = cmpt_clk(data_pls, system_bus_speed);
-		clks->recovery_time = cmpt_clk(t->cycle
-			- adr_setup-data_pls, system_bus_speed);
-		if (clks->address_time<1) clks->address_time = 1;
-		if (clks->address_time>4) clks->address_time = 4;
-		if (clks->data_time<1) clks->data_time = 1;
-		if (clks->data_time>16) clks->data_time = 16;
-		if (clks->recovery_time<2) clks->recovery_time = 2;
-		if (clks->recovery_time>17) clks->recovery_time = 17;
+ 	       	adr_setup = ide_pio_timings[pio].setup_time;
+  	      	data_pls = ide_pio_timings[pio].active_time;
+	  	clks->address_time = cmpt_clk(adr_setup, bus_speed);
+	     	clks->data_time = cmpt_clk(data_pls, bus_speed);
+     		clks->recovery_time = cmpt_clk(ide_pio_timings[pio].cycle_time
+     			- adr_setup-data_pls, bus_speed);
+     		if (clks->address_time<1) clks->address_time = 1;
+     		if (clks->address_time>4) clks->address_time = 4;
+     		if (clks->data_time<1) clks->data_time = 1;
+     		if (clks->data_time>16) clks->data_time = 16;
+     		if (clks->recovery_time<2) clks->recovery_time = 2;
+     		if (clks->recovery_time>17) clks->recovery_time = 17;
 	} else {
 		clks->address_time = 1;
 		clks->data_time = 1;
 		clks->recovery_time = 2;
 		/* minimal values */
 	}
-
+ 
 }
 
-/* Main tune procedure, called from tuneproc.
-   Assumes IRQ's are disabled or at least that no other process will
-   attempt to access the IDE registers concurrently.
-*/
-static void opti621_tune_drive(struct ata_device *drive, u8 pio)
+/* Main tune procedure, called from tuneproc. */
+static void opti621_tune_drive (ide_drive_t *drive, byte pio)
 {
 	/* primary and secondary drives share some registers,
 	 * so we have to program both drives
 	 */
-	u8 pio1, pio2;
+	unsigned long flags;
+	byte pio1, pio2;
 	pio_clocks_t first, second;
 	int ax, drdy;
-	u8 cycle1, cycle2, misc;
-	struct ata_channel *hwif = drive->channel;
+	byte cycle1, cycle2, misc;
+	ide_hwif_t *hwif = HWIF(drive);
 
 	/* sets drive->drive_data for both drives */
 	compute_pios(drive, pio);
-	pio1 = hwif->drives[0].drive_data;
-	pio2 = hwif->drives[1].drive_data;
+ 	pio1 = hwif->drives[0].drive_data;
+ 	pio2 = hwif->drives[1].drive_data;
 
 	compute_clocks(pio1, &first);
 	compute_clocks(pio2, &second);
@@ -283,10 +277,12 @@ static void opti621_tune_drive(struct ata_device *drive, u8 pio)
 		hwif->name, ax, second.data_time, second.recovery_time, drdy);
 #endif
 
-	reg_base = hwif->io_ports[IDE_DATA_OFFSET];
-	outb(0xc0, reg_base+CNTRL_REG);	/* allow Register-B */
-	outb(0xff, reg_base+5);		/* hmm, setupvic.exe does this ;-) */
-	inb(reg_base+CNTRL_REG);	/* if reads 0xff, adapter not exist? */
+	spin_lock_irqsave(&ide_lock, flags);
+
+     	reg_base = hwif->io_ports[IDE_DATA_OFFSET];
+	OUT_BYTE(0xc0, reg_base+CNTRL_REG);	/* allow Register-B */
+	OUT_BYTE(0xff, reg_base+5);	/* hmm, setupvic.exe does this ;-) */
+	IN_BYTE(reg_base+CNTRL_REG); 	/* if reads 0xff, adapter not exist? */
 	read_reg(CNTRL_REG);		/* if reads 0xc0, no interface exist? */
 	read_reg(STRAP_REG);		/* read version, probably 0 */
 
@@ -303,44 +299,41 @@ static void opti621_tune_drive(struct ata_device *drive, u8 pio)
 	write_reg(0x85, CNTRL_REG);	/* use Register-A for drive 0 */
 					/* use Register-B for drive 1 */
 
-	write_reg(misc, MISC_REG);	/* set address setup, DRDY timings,   */
-					/*  and read prefetch for both drives */
+ 	write_reg(misc, MISC_REG);	/* set address setup, DRDY timings,   */
+ 					/*  and read prefetch for both drives */
+
+	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
 /*
  * ide_init_opti621() is called once for each hwif found at boot.
  */
-static void __init ide_init_opti621(struct ata_channel *hwif)
+void __init ide_init_opti621 (ide_hwif_t *hwif)
 {
+	hwif->autodma = 0;
 	hwif->drives[0].drive_data = PIO_DONT_KNOW;
 	hwif->drives[1].drive_data = PIO_DONT_KNOW;
 	hwif->tuneproc = &opti621_tune_drive;
+
+	/* safety call for Anton A */
+	hwif->dma_base = 0;
 }
 
-/* module data table */
-static struct ata_pci_device chipsets[] __initdata = {
-	{
-		.vendor = PCI_VENDOR_ID_OPTI,
-		.device = PCI_DEVICE_ID_OPTI_82C621,
-		.init_channel = ide_init_opti621,
-		.enablebits = {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
-		.bootable = ON_BOARD
-	},
-	{
-		.vendor = PCI_VENDOR_ID_OPTI,
-		.device = PCI_DEVICE_ID_OPTI_82C825,
-		.init_channel = ide_init_opti621,
-		.enablebits = {{0x45,0x80,0x00}, {0x40,0x08,0x00}},
-		.bootable = ON_BOARD
-	},
-};
+extern void ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *d);
 
-int __init init_opti621(void)
+void __init fixup_device_opti621 (struct pci_dev *dev, ide_pci_device_t *d)
 {
-	int i;
+#if 0
+	if (IDE_PCI_DEVID_EQ(d->devid, DEVID_OPTI621V) &&
+	    !(PCI_FUNC(dev->devfn) & 1))
+#else
+	if ((dev->device == PCI_DEVICE_ID_OPTI_82C558) &&
+	    (!(PCI_FUNC(dev->devfn) & 1)))
+#endif
+		return; /* OPTI621 is more than only a IDE controller */
 
-	for (i = 0; i < ARRAY_SIZE(chipsets); ++i)
-		ata_register_chipset(&chipsets[i]);
-
-        return 0;
+	printk("%s: IDE controller on PCI bus %02x dev %02x\n",
+		d->name, dev->bus->number, dev->devfn);
+	ide_setup_pci_device(dev, d);
 }
+

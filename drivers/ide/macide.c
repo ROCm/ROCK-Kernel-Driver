@@ -69,7 +69,7 @@ static int macide_offsets[IDE_NR_PORTS] = {
     IDE_HCYL, IDE_SELECT, IDE_STATUS,  IDE_CONTROL
 };
 
-int macide_ack_intr(struct ata_channel *hwif)
+int macide_ack_intr(ide_hwif_t* hwif)
 {
 	if (*ide_ifr & 0x20) {
 		*ide_ifr &= ~0x20;
@@ -100,17 +100,17 @@ void macide_init(void)
 	case MAC_IDE_QUADRA:
 		ide_setup_ports(&hw, (ide_ioreg_t)IDE_BASE, macide_offsets,
 				0, 0, macide_ack_intr, IRQ_NUBUS_F);
-		index = ide_register_hw(&hw);
+		index = ide_register_hw(&hw, NULL);
 		break;
 	case MAC_IDE_PB:
 		ide_setup_ports(&hw, (ide_ioreg_t)IDE_BASE, macide_offsets,
 				0, 0, macide_ack_intr, IRQ_NUBUS_C);
-		index = ide_register_hw(&hw);
+		index = ide_register_hw(&hw, NULL);
 		break;
 	case MAC_IDE_BABOON:
 		ide_setup_ports(&hw, (ide_ioreg_t)BABOON_BASE, macide_offsets,
 				0, 0, NULL, IRQ_BABOON_1);
-		index = ide_register_hw(&hw);
+		index = ide_register_hw(&hw, NULL);
 		if (index == -1) break;
 		if (macintosh_config->ident == MAC_MODEL_PB190) {
 
@@ -119,7 +119,7 @@ void macide_init(void)
 			/* hardware ID, and we cna't get that without	*/
 			/* probing the drive which freezes a 190.	*/
 
-			struct ata_device *drive = &ide_hwifs[index].drives[0];
+			ide_drive_t *drive = &ide_hwifs[index].drives[0];
         		drive->capacity = drive->cyl*drive->head*drive->sect;
 
 #ifdef CONFIG_BLK_DEV_MAC_MEDIABAY
