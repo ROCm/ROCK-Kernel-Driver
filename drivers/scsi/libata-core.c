@@ -3032,6 +3032,8 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	ap->ctl = ATA_DEVCTL_OBS;
 	ap->host_set = host_set;
 	ap->port_no = port_no;
+	ap->hard_port_no =
+		ent->legacy_mode ? ent->hard_port_no : port_no;
 	ap->pio_mask = ent->pio_mask;
 	ap->mwdma_mask = ent->mwdma_mask;
 	ap->udma_mask = ent->udma_mask;
@@ -3338,8 +3340,14 @@ ata_pci_init_legacy_mode(struct pci_dev *pdev, struct ata_port_info **port)
 	probe_ent[0].n_ports = 1;
 	probe_ent[0].irq = 14;
 
+	probe_ent[0].hard_port_no = 0;
+	probe_ent[0].legacy_mode = 1;
+
 	probe_ent[1].n_ports = 1;
 	probe_ent[1].irq = 15;
+
+	probe_ent[1].hard_port_no = 1;
+	probe_ent[1].legacy_mode = 1;
 
 	probe_ent[0].port[0].cmd_addr = 0x1f0;
 	probe_ent[0].port[0].altstatus_addr =
