@@ -230,7 +230,7 @@ static int __devinit olympic_probe(struct pci_dev *pdev, const struct pci_device
 	dev->irq=pdev->irq;
 	dev->base_addr=pci_resource_start(pdev, 0);
 	dev->init=NULL; /* Must be NULL otherwise we get called twice */
-	olympic_priv->olympic_card_name = (char *)pdev->name ; 
+	olympic_priv->olympic_card_name = (char *)pdev->dev.name ; 
 	olympic_priv->olympic_mmio = ioremap(pci_resource_start(pdev,1),256);
 	olympic_priv->olympic_lap = ioremap(pci_resource_start(pdev,2),2048);
 	olympic_priv->pdev = pdev ; 
@@ -654,8 +654,8 @@ static int olympic_open(struct net_device *dev)
 	printk(" stat_ring[7]: %p\n", &(olympic_priv->olympic_rx_status_ring[7])  );
 
 	printk("RXCDA: %x, rx_ring[0]: %p\n",readl(olympic_mmio+RXCDA),&olympic_priv->olympic_rx_ring[0]);
-	printk("Rx_ring_dma_addr = %08x, rx_status_dma_addr =
-%08x\n",olympic_priv->rx_ring_dma_addr,olympic_priv->rx_status_ring_dma_addr) ; 
+	printk("Rx_ring_dma_addr = %08x, rx_status_dma_addr = %08x\n",
+		olympic_priv->rx_ring_dma_addr,olympic_priv->rx_status_ring_dma_addr) ; 
 #endif
 
 	writew((((readw(olympic_mmio+RXENQ)) & 0x8000) ^ 0x8000) | i,olympic_mmio+RXENQ);
