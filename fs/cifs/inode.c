@@ -665,7 +665,12 @@ cifs_truncate_file(struct inode *inode)
 			if(rc == 0) {
 				FreeXid(xid);
 				return;
-			}
+			} 
+			/* Do not need reopen and retry on EAGAIN since we will
+				retry by pathname below */
+			if(rc == -EAGAIN)
+				rc = -EHOSTDOWN;
+
 			break;  /* now that we found one valid file handle no
 				sense continuing to loop trying others */
 		}
@@ -767,19 +772,31 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 			if((open_file->pfile) && 
 				((open_file->pfile->f_flags & O_RDWR) || 
 				 (open_file->pfile->f_flags & O_WRONLY))) {
-				read_unlock(&GlobalSMBSeslock);
-				found = TRUE;
-				rc = CIFSSMBSetFileSize(xid, pTcon, attrs->ia_size,
-					   open_file->netfid,open_file->pid,FALSE);
-				cFYI(1,("SetFileSize by handle (setattrs) rc = %d",rc));
-				break;  /* now that we found one valid file handle no
+				if(open_file->invalidHandle == FALSE) {
+					/* we found a valid, writeable network file 
+					handle to use to try to set the file size */
+					__u16 nfid = open_file->netfid;
+					__u32 npid = open_file->pid;
+					read_unlock(&GlobalSMBSeslock);
+					found = TRUE;
+					rc = CIFSSMBSetFileSize(xid, pTcon, attrs->ia_size,
+					   nfid,npid,FALSE);
+					cFYI(1,("SetFileSize by handle (setattrs) rc = %d",rc));
+				/* Do not need reopen and retry on EAGAIN since we will
+					retry by pathname below */
+
+					break;  /* now that we found one valid file handle no
 						sense continuing to loop trying others */
+				}
 			}
 		}
 		if(found == FALSE)
 			read_unlock(&GlobalSMBSeslock);
 
 		if(rc != 0) {
+			/* Set file size by pathname rather than by handle either
+			because no valid, writeable file handle for it was found or
+			because there was an error setting it by handle */
 			rc = CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size,FALSE,
 				   cifs_sb->local_nls);
 			cFYI(1,(" SetEOF by path (setattrs) rc = %d",rc));

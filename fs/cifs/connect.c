@@ -821,7 +821,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 	/* Eventually check for other socket options to change from 
 		the default. sock_setsockopt not used because it expects 
 		user space buffer */
-	(*csocket)->sk->sk_rcvtimeo = 8 * HZ;
+	(*csocket)->sk->sk_rcvtimeo = 7 * HZ;
 		
 	return rc;
 }
@@ -1002,8 +1002,9 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 				strncpy(pSesInfo->domainName,
 					volume_info.domainname,MAX_USERNAME_SIZE);
 			pSesInfo->linux_uid = volume_info.linux_uid;
-
+			down(&pSesInfo->sesSem);
 			rc = setup_session(xid,pSesInfo, cifs_sb->local_nls);
+			up(&pSesInfo->sesSem);
 			if(!rc)
 				atomic_inc(&srvTcp->socketUseCount);
 		}

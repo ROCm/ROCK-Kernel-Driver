@@ -21,7 +21,11 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
- /* SMB/CIFS PDU handling routines here - except for leftovers in connect.c */
+ /* SMB/CIFS PDU handling routines here - except for leftovers in connect.c   */
+ /* These are mostly routines that operate on a pathname, or on a tree id     */
+ /* (mounted volume), but there are eight handle based routines which must be */
+ /* treated slightly different for reconnection purposes since we never want  */
+ /* to reuse a stale file handle and the caller knows the file handle */
 
 #include <linux/fs.h>
 #include <linux/kernel.h>
@@ -49,21 +53,45 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 {
 	int rc = 0;
 
-	if(tcon && (tcon->tidStatus == CifsNeedReconnect)) {
-		if(tcon->ses) {
+	/* SMBs NegProt, SessSetup, uLogoff do not have tcon yet so
+	   check for tcp and smb session status done differently
+	   for those three - in the calling routine */
+	if(tcon) {
+		if((tcon->ses) && (tcon->ses->server)){
+			if(tcon->ses->server->tcpStatus == CifsNeedReconnect) {
+				/* Give Demultiplex thread up to 10 seconds to 
+					reconnect, should be greater than cifs socket
+					timeout which is 7 seconds */
+				wait_event_interruptible_timeout(tcon->ses->server->response_q,
+					(tcon->ses->server->tcpStatus == CifsGood), 10 * HZ);
+				if(tcon->ses->server->tcpStatus == CifsNeedReconnect)
+					return -EHOSTDOWN;
+			}
+			
+		/* need to prevent multiple threads trying to
+		simultaneously reconnect the same SMB session */
+			down(&tcon->ses->sesSem);
 			struct nls_table *nls_codepage = load_nls_default();
 			if(tcon->ses->status == CifsNeedReconnect)
 				rc = setup_session(0, tcon->ses, nls_codepage);
-			if(!rc) {
+			if(!rc && (tcon->tidStatus == CifsNeedReconnect)) {
 				rc = CIFSTCon(0, tcon->ses, tcon->treeName, tcon,
 					nls_codepage);
+				up(&tcon->ses->sesSem);
 				cFYI(1, ("reconnect tcon rc = %d", rc));
-				if(!rc)
-					reopen_files(tcon,nls_codepage);
+				/* Remove call to reopen files here - 
+					it is safer (and faster) to reopen
+					files as needed in read and write */
+				/* if(!rc)
+					reopen_files(tcon,nls_codepage);*/
+			} else {
+				up(&tcon->ses->sesSem);
 			}
 			unload_nls(nls_codepage);
-		} else
-			rc = -EIO;
+
+		} else {
+			return -EIO;
+		}
 	}
 	if(rc)
 		return rc;
@@ -209,7 +237,6 @@ CIFSSMBTDis(const int xid, struct cifsTconInfo *tcon)
 	 *  (and inside session disconnect we should check if tcp socket needs 
 	 *  to be freed and kernel thread woken up).
 	 */
-tdisRetry:
 	if (tcon)
 		down(&tcon->tconSem);
 	else
@@ -221,12 +248,19 @@ tdisRetry:
 		return -EBUSY;
 	}
 
+	/* No need to return error on this operation if tid invalidated and 
+	closed on server already e.g. due to tcp session crashing */
+	if(tcon->tidStatus == CifsNeedReconnect) {
+		up(&tcon->tconSem);
+		return 0;  
+	}
+
 /* BB remove (from server) list of shares - but with smp safety  BB */
 /* BB is ses active - do we need to check here - but how? BB */
-    if((tcon->ses == 0) || (tcon->ses->server == 0)) {    
-        up(&tcon->tconSem);
-        return -EIO;
-    }
+	if((tcon->ses == 0) || (tcon->ses->server == 0)) {    
+		up(&tcon->tconSem);
+		return -EIO;
+	}
 
 	rc = smb_init(SMB_COM_TREE_DISCONNECT, 0, tcon,
 		      (void **) &smb_buffer, (void **) &smb_buffer_response);
@@ -242,8 +276,12 @@ tdisRetry:
 	if (smb_buffer)
 		buf_release(smb_buffer);
 	up(&tcon->tconSem);
+
+	/* No need to return error on this operation if tid invalidated and 
+	closed on server already e.g. due to tcp session crashing */
 	if (rc == -EAGAIN)
-		goto tdisRetry;
+		rc = 0;
+
 	return rc;
 }
 
@@ -256,9 +294,8 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 	int length;
 
 	cFYI(1, ("In SMBLogoff for session disconnect"));
-LogoffRetry:
 	if (ses)
-		down(&ses->sesSem); /* check this sem more places */
+		down(&ses->sesSem);
 	else
 		return -EIO;
 
@@ -292,8 +329,12 @@ LogoffRetry:
 	if (pSMB)
 		buf_release(pSMB);
 	up(&ses->sesSem);
+
+	/* if session dead then we do not need to do ulogoff,
+		since server closed smb session, no sense reporting 
+		error */
 	if (rc == -EAGAIN)
-		goto LogoffRetry;
+		rc = 0;
 	return rc;
 }
 
@@ -537,7 +578,6 @@ CIFSSMBRead(const int xid, struct cifsTconInfo *tcon,
 	char *pReadData = NULL;
 	int bytes_returned;
 
-readRetry:
 	*nbytes = 0;
 	rc = smb_init(SMB_COM_READ_ANDX, 12, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
@@ -588,9 +628,9 @@ readRetry:
 		else
 			*buf = (char *)pSMB;
 	}
-	if (rc == -EAGAIN)
-		goto readRetry;
 
+	/* Note: On -EAGAIN error only caller can retry on handle based calls 
+		since file handle passed in no longer valid */
 	return rc;
 }
 
@@ -605,7 +645,6 @@ CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 	WRITE_RSP *pSMBr = NULL;
 	int bytes_returned;
 
-writeRetry:
 	rc = smb_init(SMB_COM_WRITE_ANDX, 14, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -646,8 +685,8 @@ writeRetry:
 	if (pSMB)
 		buf_release(pSMB);
 
-	if (rc == -EAGAIN)
-		goto writeRetry;
+	/* Note: On -EAGAIN error only caller can retry on handle based calls 
+		since file handle passed in no longer valid */
 
 	return rc;
 }
@@ -666,7 +705,6 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	__u64 temp;
 
 	cFYI(1, ("In CIFSSMBLock"));
-lockRetry:
 	rc = smb_init(SMB_COM_LOCKING_ANDX, 8, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -701,8 +739,9 @@ lockRetry:
 	}
 	if (pSMB)
 		buf_release(pSMB);
-	if (rc == -EAGAIN)
-		goto lockRetry;
+
+	/* Note: On -EAGAIN error only caller can retry on handle based calls 
+	since file handle passed in no longer valid */
 	return rc;
 }
 
@@ -732,9 +771,9 @@ CIFSSMBClose(const int xid, struct cifsTconInfo *tcon, int smb_file_id)
 	if (pSMB)
 		buf_release(pSMB);
 
-	/* file will be closed on server if session is dead */
+	/* Since session is dead, file will be closed on server already */
 	if(rc == -EAGAIN)
-		rc = -EHOSTDOWN; /* should we fake success? */
+		rc = 0;
 
 	return rc;
 }
@@ -822,7 +861,6 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 	int len_of_str;
 
         cFYI(1, ("Rename to File by handle"));
-renameOpenFileRetry:
         rc = smb_init(SMB_COM_TRANSACTION2, 15, pTcon, (void **) &pSMB,
                       (void **) &pSMBr);
         if (rc)
@@ -880,8 +918,8 @@ renameOpenFileRetry:
 	if (pSMB)
                 buf_release(pSMB);
 
-	if (rc == -EAGAIN)
-		goto renameOpenFileRetry;
+	/* Note: On -EAGAIN error only caller can retry on handle based calls
+		since file handle passed in no longer valid */
 
 	return rc;
 }
@@ -1249,7 +1287,6 @@ CIFSSMBQueryReparseLinkInfo(const int xid, struct cifsTconInfo *tcon,
 	struct smb_com_transaction_ioctl_rsp * pSMBr;
 
 	cFYI(1, ("In Windows reparse style QueryLink for path %s", searchName));
-queryReparseLinkInfoRetry:
 	rc = smb_init(SMB_COM_NT_TRANSACT, 23, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1314,8 +1351,9 @@ queryReparseLinkInfoRetry:
 	}
 	if (pSMB)
 		buf_release(pSMB);
-	if (rc == -EAGAIN)
-		goto queryReparseLinkInfoRetry;
+
+	/* Note: On -EAGAIN error only caller can retry on handle based calls
+		since file handle passed in no longer valid */
 
 	return rc;
 }
@@ -1686,7 +1724,6 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 
 	cFYI(1, ("In FindNext"));
 
-findNextRetry:
 	if(resume_file_name == NULL) {
 		return -EIO;
 	}
@@ -1771,8 +1808,8 @@ findNextRetry:
 	if (pSMB)
 		buf_release(pSMB);
 
-	if (rc == -EAGAIN)
-		goto findNextRetry;
+	/* Note: On -EAGAIN error only caller can retry on handle based calls
+		since file handle passed in no longer valid */
 
 	return rc;
 }
@@ -1784,8 +1821,8 @@ CIFSFindClose(const int xid, struct cifsTconInfo *tcon, const __u16 searchHandle
 	FINDCLOSE_REQ *pSMB = NULL;
 	CLOSE_RSP *pSMBr = NULL;
 	int bytes_returned;
+
 	cFYI(1, ("In CIFSSMBFindClose"));
-findCloseRetry:
 	rc = smb_init(SMB_COM_FIND_CLOSE2, 1, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -1801,8 +1838,9 @@ findCloseRetry:
 	if (pSMB)
 		buf_release(pSMB);
 
+	/* Since session is dead, search handle closed on server already */
 	if (rc == -EAGAIN)
-		goto findCloseRetry;
+		rc = 0;
 
 	return rc;
 }
@@ -2363,7 +2401,6 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	__u32 tmp;
 
 	cFYI(1, ("SetFileSize (via SetFileInfo)"));
-SetFileSizeRetry:
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)
@@ -2434,8 +2471,8 @@ SetFileSizeRetry:
 	if (pSMB)
 		buf_release(pSMB);
 
-	if (rc == -EAGAIN)
-		goto SetFileSizeRetry;
+ 	/* Note: On -EAGAIN error only caller can retry on handle based calls 
+		since file handle passed in no longer valid */
 
 	return rc;
 }

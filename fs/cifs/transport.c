@@ -184,9 +184,6 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		return -ENOENT;
 	} else if (ses->server->tcpStatus == CifsNeedReconnect) {
 		cFYI(1,("tcp session dead - return to caller to retry"));
-		/* Give Demultiplex thread up to 10 seconds to reconnect */
-		wait_event_interruptible_timeout(ses->server->response_q,
-				(ses->server->tcpStatus == CifsGood), 10 * HZ);
 		return -EAGAIN;
 	} else if (ses->status != CifsGood) {
 		/* check if SMB session is bad because we are setting it up */

@@ -740,10 +740,22 @@ cifs_commit_write(struct file *file, struct page *page, unsigned offset,
 		if (file->private_data == NULL) {
 			rc = -EBADF;
 		} else {
-			cifs_sb = CIFS_SB(inode->i_sb);
 			open_file = (struct cifsFileInfo *)file->private_data;
-			rc = CIFSSMBSetFileSize(xid, cifs_sb->tcon, position,
-				open_file->netfid,open_file->pid,FALSE);
+			cifs_sb = CIFS_SB(inode->i_sb);
+			rc = -EAGAIN;
+			while(rc == -EAGAIN) {
+				if((open_file->invalidHandle == TRUE) && 
+				   (open_file->closePend == FALSE)) {
+						open_file->reopenPend = TRUE;
+						rc = cifs_reopen_file(file->f_dentry->d_inode,file);
+						open_file->reopenPend = FALSE;
+				}
+				if(rc != 0)
+					break;
+				rc = CIFSSMBSetFileSize(xid, cifs_sb->tcon, 
+						position, open_file->netfid,
+						open_file->pid,FALSE);
+			}
 			cFYI(1,(" SetEOF (commit write) rc = %d",rc));
 		}
     }
