@@ -709,6 +709,9 @@ iosapic_parse_prt (void)
 
 		vector = gsi_to_vector(gsi);
 		if (vector < 0) {
+			if (find_iosapic(gsi) < 0)
+				continue;
+
 			/* allocate a vector for this interrupt line */
 			if (pcat_compat && (gsi < 16))
 				vector = isa_irq_to_vector(gsi);
