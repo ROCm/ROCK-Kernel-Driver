@@ -27,7 +27,8 @@
  *		Tim Hockin	:	Added insmod parameters, comment cleanup
  *					Parameterized timeout
  *		Tigran Aivazian	:	Restructured wdt_init() to handle failures
- *		Matt Domsch	:	added nowayout and timeout module options
+ *		Joel Becker	:	Added WDIOC_GET/SETTIMEOUT
+ *		Matt Domsch	:	Added nowayout module option
  */
 
 #include <linux/config.h>
@@ -57,12 +58,10 @@ static int expect_close;
 static int io=0x240;
 static int irq=11;
 
+/* Default margin */
 #define WD_TIMO (100*60)		/* 1 minute */
 
-static int timeout_val = WD_TIMO;	/* value passed to card */
-static int timeout = 60;	        /* in seconds */
-MODULE_PARM(timeout,"i");
-MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default=60)");
+static int wd_margin = WD_TIMO;
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -72,12 +71,6 @@ static int nowayout = 0;
 
 MODULE_PARM(nowayout,"i");
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
-
-static void __init
-wdt_validate_timeout(void)
-{
-	timeout_val = timeout * 100;
-}
 
 #ifndef MODULE
 
@@ -233,7 +226,7 @@ static void wdt_ping(void)
 	/* Write a watchdog value */
 	inb_p(WDT_DC);
 	wdt_ctr_mode(1,2);
-	wdt_ctr_load(1,timeout_val);		/* Timeout */
+	wdt_ctr_load(1,wd_margin);		/* Timeout */
 	outb_p(0, WDT_DC);
 }
 
@@ -324,6 +317,8 @@ static ssize_t wdt_read(struct file *file, char *buf, size_t count, loff_t *ptr)
 static int wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
+	int new_margin;
+
 	static struct watchdog_info ident=
 	{
 		.options = WDIOF_OVERHEAT|WDIOF_POWERUNDER|WDIOF_POWEROVER
@@ -348,6 +343,17 @@ static int wdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case WDIOC_KEEPALIVE:
 			wdt_ping();
 			return 0;
+		case WDIOC_SETTIMEOUT:
+			if (get_user(new_margin, (int *)arg))
+				return -EFAULT;
+			/* Arbitrary, can't find the card's limits */
+			if ((new_margin < 0) || (new_margin > 60))
+				return -EINVAL;
+			wd_margin = new_margin * 100;
+			wdt_ping();
+			/* Fall */
+		case WDIOC_GETTIMEOUT:
+			return put_user(wd_margin / 100, (int *)arg);
 	}
 }
 
@@ -370,19 +376,17 @@ static int wdt_open(struct inode *inode, struct file *file)
 		case WATCHDOG_MINOR:
 			if(test_and_set_bit(0, &wdt_is_open))
 				return -EBUSY;
-			if (nowayout) {
-				MOD_INC_USE_COUNT;
-			}
 			/*
 			 *	Activate 
 			 */
 	 
+			wdt_is_open=1;
 			inb_p(WDT_DC);		/* Disable */
 			wdt_ctr_mode(0,3);
 			wdt_ctr_mode(1,2);
 			wdt_ctr_mode(2,0);
 			wdt_ctr_load(0, 8948);		/* count at 100Hz */
-			wdt_ctr_load(1,timeout_val);	/* Timeout */
+			wdt_ctr_load(1,wd_margin);	/* Timeout 120 seconds */
 			wdt_ctr_load(2,65535);
 			outb_p(0, WDT_DC);	/* Enable */
 			return 0;
@@ -520,7 +524,6 @@ static int __init wdt_init(void)
 {
 	int ret;
 
-	wdt_validate_timeout();
 	ret = misc_register(&wdt_miscdev);
 	if (ret) {
 		printk(KERN_ERR "wdt: can't misc_register on minor=%d\n", WATCHDOG_MINOR);
