@@ -95,7 +95,7 @@ struct machdep_calls {
 	 * hook used to control some machine specific features (like reset
 	 * lines, chip power control, etc...).
 	 */
-	int (*feature_call)(unsigned int feature, ...);
+	long (*feature_call)(unsigned int feature, ...);
 
 #ifdef CONFIG_SMP
 	/* functions for dealing with other cpus */
