@@ -913,8 +913,12 @@ static int snd_emu10k1_verify_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *ic
 			return -EFAULT;
 		if (snd_emu10k1_look_for_ctl(emu, &gctl.id))
 			continue;
-		if (snd_ctl_find_id(emu->card, &gctl.id) != NULL)
+		down_read(&emu->card->controls_rwsem);
+		if (snd_ctl_find_id(emu->card, &gctl.id) != NULL) {
+			up_read(&emu->card->controls_rwsem);
 			return -EEXIST;
+		}
+		up_read(&emu->card->controls_rwsem);
 		if (gctl.id.iface != SNDRV_CTL_ELEM_IFACE_MIXER &&
 		    gctl.id.iface != SNDRV_CTL_ELEM_IFACE_PCM)
 			return -EINVAL;

@@ -37,9 +37,6 @@ typedef struct _snd_kctl_ioctl {
 
 #define snd_kctl_ioctl(n) list_entry(n, snd_kctl_ioctl_t, list)
 
-/* find id without lock */
-static snd_kcontrol_t *_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id);
-
 static DECLARE_RWSEM(snd_ioctl_rwsem);
 static LIST_HEAD(snd_control_ioctls);
 
@@ -311,7 +308,7 @@ int snd_ctl_add(snd_card_t * card, snd_kcontrol_t * kcontrol)
 	snd_assert(kcontrol->info != NULL, return -EINVAL);
 	id = kcontrol->id;
 	down_write(&card->controls_rwsem);
-	if (_ctl_find_id(card, &id)) {
+	if (snd_ctl_find_id(card, &id)) {
 		up_write(&card->controls_rwsem);
 		snd_ctl_free_one(kcontrol);
 		snd_printd(KERN_ERR "control %i:%i:%i:%s:%i is already present\n",
@@ -379,7 +376,7 @@ int snd_ctl_remove_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 	int ret;
 
 	down_write(&card->controls_rwsem);
-	kctl = _ctl_find_id(card, id);
+	kctl = snd_ctl_find_id(card, id);
 	if (kctl == NULL) {
 		up_write(&card->controls_rwsem);
 		return -ENOENT;
@@ -406,7 +403,7 @@ static int snd_ctl_remove_unlocked_id(snd_ctl_file_t * file, snd_ctl_elem_id_t *
 	int idx, ret;
 
 	down_write(&card->controls_rwsem);
-	kctl = _ctl_find_id(card, id);
+	kctl = snd_ctl_find_id(card, id);
 	if (kctl == NULL) {
 		up_write(&card->controls_rwsem);
 		return -ENOENT;
@@ -437,7 +434,7 @@ int snd_ctl_rename_id(snd_card_t * card, snd_ctl_elem_id_t *src_id, snd_ctl_elem
 	snd_kcontrol_t *kctl;
 
 	down_write(&card->controls_rwsem);
-	kctl = _ctl_find_id(card, src_id);
+	kctl = snd_ctl_find_id(card, src_id);
 	if (kctl == NULL) {
 		up_write(&card->controls_rwsem);
 		return -ENOENT;
@@ -449,7 +446,19 @@ int snd_ctl_rename_id(snd_card_t * card, snd_ctl_elem_id_t *src_id, snd_ctl_elem
 	return 0;
 }
 
-static snd_kcontrol_t *_ctl_find_numid(snd_card_t * card, unsigned int numid)
+/**
+ * snd_ctl_find_numid - find the control instance with the given number-id
+ * @card: the card instance
+ * @numid: the number-id to search
+ *
+ * Finds the control instance with the given number-id from the card.
+ *
+ * Returns the pointer of the instance if found, or NULL if not.
+ *
+ * The caller must down card->controls_rwsem before calling this function
+ * (if the race condition can happen).
+ */
+snd_kcontrol_t *snd_ctl_find_numid(snd_card_t * card, unsigned int numid)
 {
 	struct list_head *list;
 	snd_kcontrol_t *kctl;
@@ -463,14 +472,26 @@ static snd_kcontrol_t *_ctl_find_numid(snd_card_t * card, unsigned int numid)
 	return NULL;
 }
 
-static snd_kcontrol_t *_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id)
+/**
+ * snd_ctl_find_id - find the control instance with the given id
+ * @card: the card instance
+ * @id: the id to search
+ *
+ * Finds the control instance with the given id from the card.
+ *
+ * Returns the pointer of the instance if found, or NULL if not.
+ *
+ * The caller must down card->controls_rwsem before calling this function
+ * (if the race condition can happen).
+ */
+snd_kcontrol_t *snd_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 {
 	struct list_head *list;
 	snd_kcontrol_t *kctl;
 
 	snd_runtime_check(card != NULL && id != NULL, return NULL);
 	if (id->numid != 0)
-		return _ctl_find_numid(card, id->numid);
+		return snd_ctl_find_numid(card, id->numid);
 	list_for_each(list, &card->controls) {
 		kctl = snd_kcontrol(list);
 		if (kctl->id.iface != id->iface)
@@ -488,42 +509,6 @@ static snd_kcontrol_t *_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 		return kctl;
 	}
 	return NULL;
-}
-
-/**
- * snd_ctl_find_id - find the control instance with the given id
- * @card: the card instance
- * @id: the id to search
- *
- * Finds the control instance with the given id from the card.
- *
- * Returns the pointer of the instance if found, or NULL if not.
- */
-snd_kcontrol_t *snd_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id)
-{
-	snd_kcontrol_t *kctl;
-	down_read(&card->controls_rwsem);
-	kctl = _ctl_find_id(card, id);
-	up_read(&card->controls_rwsem);
-	return kctl;
-}
-
-/**
- * snd_ctl_find_numid - find the control instance with the given number-id
- * @card: the card instance
- * @numid: the number-id to search
- *
- * Finds the control instance with the given number-id from the card.
- *
- * Returns the pointer of the instance if found, or NULL if not.
- */
-snd_kcontrol_t *snd_ctl_find_numid(snd_card_t * card, unsigned int numid)
-{
-	snd_kcontrol_t *kctl;
-	down_read(&card->controls_rwsem);
-	kctl = _ctl_find_numid(card, numid);
-	up_read(&card->controls_rwsem);
-	return kctl;
 }
 
 static int snd_ctl_card_info(snd_card_t * card, snd_ctl_file_t * ctl,
@@ -620,7 +605,7 @@ static int snd_ctl_elem_info(snd_ctl_file_t *ctl, snd_ctl_elem_info_t *_info)
 	if (copy_from_user(&info, _info, sizeof(info)))
 		return -EFAULT;
 	down_read(&card->controls_rwsem);
-	kctl = _ctl_find_id(card, &info.id);
+	kctl = snd_ctl_find_id(card, &info.id);
 	if (kctl == NULL) {
 		up_read(&card->controls_rwsem);
 		return -ENOENT;
@@ -665,7 +650,7 @@ static int snd_ctl_elem_read(snd_card_t *card, snd_ctl_elem_value_t *_control)
 	if (copy_from_user(control, _control, sizeof(*control)))
 		return -EFAULT;
 	down_read(&card->controls_rwsem);
-	kctl = _ctl_find_id(card, &control->id);
+	kctl = snd_ctl_find_id(card, &control->id);
 	if (kctl == NULL) {
 		result = -ENOENT;
 	} else {
@@ -706,7 +691,7 @@ static int snd_ctl_elem_write(snd_ctl_file_t *file, snd_ctl_elem_value_t *_contr
 	if (copy_from_user(control, _control, sizeof(*control)))
 		return -EFAULT;
 	down_read(&card->controls_rwsem);
-	kctl = _ctl_find_id(card, &control->id);
+	kctl = snd_ctl_find_id(card, &control->id);
 	if (kctl == NULL) {
 		result = -ENOENT;
 	} else {
@@ -752,7 +737,7 @@ static int snd_ctl_elem_lock(snd_ctl_file_t *file, snd_ctl_elem_id_t *_id)
 	if (copy_from_user(&id, _id, sizeof(id)))
 		return -EFAULT;
 	down_write(&card->controls_rwsem);
-	kctl = _ctl_find_id(card, &id);
+	kctl = snd_ctl_find_id(card, &id);
 	if (kctl == NULL) {
 		result = -ENOENT;
 	} else {
@@ -780,7 +765,7 @@ static int snd_ctl_elem_unlock(snd_ctl_file_t *file, snd_ctl_elem_id_t *_id)
 	if (copy_from_user(&id, _id, sizeof(id)))
 		return -EFAULT;
 	down_write(&card->controls_rwsem);
-	kctl = _ctl_find_id(card, &id);
+	kctl = snd_ctl_find_id(card, &id);
 	if (kctl == NULL) {
 		result = -ENOENT;
 	} else {
@@ -877,7 +862,7 @@ static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t *_info, in
 	info.id.numid = 0;
 	memset(&kctl, 0, sizeof(kctl));
 	down_write(&card->controls_rwsem);
-	if (!!((_kctl = _ctl_find_id(card, &info.id)) != NULL) ^ replace) {
+	if (!!((_kctl = snd_ctl_find_id(card, &info.id)) != NULL) ^ replace) {
 		up_write(&card->controls_rwsem);
 		return !replace ? -EBUSY : -ENOENT;
 	}
