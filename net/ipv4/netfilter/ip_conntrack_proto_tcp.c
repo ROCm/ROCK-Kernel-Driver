@@ -386,7 +386,7 @@ static inline __u32 segment_seq_plus_len(__u32 seq,
 /*
  * Simplified tcp_parse_options routine from tcp_input.c
  */
-static void tcp_options(struct sk_buff *skb,
+static void tcp_options(const struct sk_buff *skb,
 			struct iphdr *iph,
 			struct tcphdr *tcph, 
 			struct ip_ct_tcp_state *state)
