@@ -701,7 +701,13 @@ static struct hci_uart_proto bcsp = {
 
 int bcsp_init(void)
 {
-	return hci_uart_register_proto(&bcsp);
+	int err = hci_uart_register_proto(&bcsp);
+	if (!err)
+		BT_INFO("HCI BCSP protocol initialized");
+	else
+		BT_ERR("HCI BCSP protocol registration failed");
+
+	return err;
 }
 
 int bcsp_deinit(void)

@@ -701,15 +701,22 @@ int bnep_get_coninfo(struct bnep_coninfo *ci)
 }
 
 static int __init bnep_init_module(void)
-{
+{	
+	char flt[50] = "";	
+
+#ifdef CONFIG_BT_BNEP_PROTO_FILTER
+	strcat(flt, "protocol ");
+#endif
+
+#ifdef CONFIG_BT_BNEP_MC_FILTER
+	strcat(flt, "multicast");
+#endif
+
+	BT_INFO("BNEP (Ethernet Emulation) ver %s", VERSION);
+	if (flt[0])
+		BT_INFO("BNEP filters: %s", flt);
+
 	bnep_sock_init();
-
-	BT_INFO("Bluetooth BNEP ver %s", VERSION);
-	BT_INFO("Copyright (C) 2001,2002 Inventel Systemes");
-	BT_INFO("Written 2001,2002 by Clement Moreau <clement.moreau@inventel.fr>");
-	BT_INFO("Written 2001,2002 by David Libault <david.libault@inventel.fr>");
-	BT_INFO("Copyright (C) 2002 Maxim Krasnyanskiy <maxk@qualcomm.com>");
-
 	return 0;
 }
 
