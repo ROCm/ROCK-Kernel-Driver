@@ -31,7 +31,9 @@ extern int afinet_get_info(char *, char **, off_t, int);
 extern int tcp_get_info(char *, char **, off_t, int);
 
 #ifdef CONFIG_PROC_FS
-#ifdef CONFIG_AX25
+#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
+
+#include <linux/ax25.h>
 
 /* ------------------------------------------------------------------------ */
 /*
@@ -64,7 +66,7 @@ static char *ax2asc2(ax25_address *a, char *buf)
 	return buf;
 
 }
-#endif /* CONFIG_AX25 */
+#endif /* CONFIG_AX25 || CONFIG_AX25_MODULE */
 
 struct arp_iter_state {
 	int is_pneigh, bucket;
@@ -196,7 +198,7 @@ static __inline__ void arp_format_neigh_entry(struct seq_file *seq,
 
 	read_lock(&n->lock);
 	/* Convert hardware address to XX:XX:XX:XX ... form. */
-#ifdef CONFIG_AX25
+#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
 	if (hatype == ARPHRD_AX25 || hatype == ARPHRD_NETROM)
 		ax2asc2((ax25_address *)n->ha, hbuffer);
 	else {
@@ -207,7 +209,7 @@ static __inline__ void arp_format_neigh_entry(struct seq_file *seq,
 		hbuffer[k++] = ':';
 	}
 	hbuffer[--k] = 0;
-#ifdef CONFIG_AX25
+#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
 	}
 #endif
 	sprintf(tbuf, "%u.%u.%u.%u", NIPQUAD(*(u32*)n->primary_key));
