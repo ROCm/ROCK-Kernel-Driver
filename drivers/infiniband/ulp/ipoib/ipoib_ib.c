@@ -247,12 +247,12 @@ static void ipoib_ib_handle_wc(struct net_device *dev,
 
 		dev_kfree_skb_any(tx_req->skb);
 
-		spin_lock_irqsave(&dev->xmit_lock, flags);
+		spin_lock_irqsave(&priv->tx_lock, flags);
 		++priv->tx_tail;
 		if (netif_queue_stopped(dev) &&
 		    priv->tx_head - priv->tx_tail <= IPOIB_TX_RING_SIZE / 2)
 			netif_wake_queue(dev);
-		spin_unlock_irqrestore(&dev->xmit_lock, flags);
+		spin_unlock_irqrestore(&priv->tx_lock, flags);
 
 		if (wc->status != IB_WC_SUCCESS &&
 		    wc->status != IB_WC_WR_FLUSH_ERR)

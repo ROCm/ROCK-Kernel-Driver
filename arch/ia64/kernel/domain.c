@@ -151,10 +151,9 @@ void __devinit arch_init_sched_domains(void)
 	 * Set up domains. Isolated domains just stay on the dummy domain.
 	 */
 	for_each_cpu_mask(i, cpu_default_map) {
-		int node = cpu_to_node(i);
 		int group;
 		struct sched_domain *sd = NULL, *p;
-		cpumask_t nodemask = node_to_cpumask(node);
+		cpumask_t nodemask = node_to_cpumask(cpu_to_node(i));
 
 		cpus_and(nodemask, nodemask, cpu_default_map);
 
@@ -172,7 +171,7 @@ void __devinit arch_init_sched_domains(void)
 
 		sd = &per_cpu(node_domains, i);
 		*sd = SD_NODE_INIT;
-		sd->span = sched_domain_node_span(node);
+		sd->span = sched_domain_node_span(cpu_to_node(i));
 		sd->parent = p;
 		cpus_and(sd->span, sd->span, cpu_default_map);
 #endif

@@ -4,9 +4,11 @@ config DVB_B2C2_SKYSTAR
 	select DVB_STV0299
 	select DVB_MT352
 	select DVB_MT312
+	select DVB_NXT2002
 	help
 	  Support for the Skystar2 PCI DVB card by Technisat, which
-	  is equipped with the FlexCopII chipset by B2C2.
+	  is equipped with the FlexCopII chipset by B2C2, and
+	  for the B2C2/BBTI Air2PC-ATSC card.
 
 	  Say Y if you own such a device and want to use it.
 
@@ -17,7 +19,7 @@ config DVB_B2C2_USB
 	select DVB_MT352
 	help
 	  Support for the Air/Sky/Cable2PC USB DVB device by B2C2. Currently
-	  this does nothing, but providing basic function for the used usb
+	  the does nothing, but providing basic function for the used usb 
 	  protocol.
 
 	  Say Y if you own such a device and want to use it.

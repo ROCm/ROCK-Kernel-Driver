@@ -21,7 +21,8 @@
 use File::Temp qw/ tempdir /;
 use IO::Handle;
 
-@components = ( "sp8870", "sp887x", "tda10045", "tda10046", "av7110", "dec2000t", "dec2540t", "dec3000s", "vp7041", "dibusb" );
+@components = ( "sp8870", "sp887x", "tda10045", "tda10046", "av7110", "dec2000t",
+		"dec2540t", "dec3000s", "vp7041", "dibusb", "nxt2002" );
 
 # Check args
 syntax() if (scalar(@ARGV) != 1);
@@ -231,6 +232,23 @@ sub dibusb {
 	verify($outfile,$hash);
 
 	$outfile;
+}
+
+sub nxt2002 {
+    my $sourcefile = "Broadband4PC_4_2_11.zip";
+    my $url = "http://www.bbti.us/download/windows/$sourcefile";
+    my $hash = "c6d2ea47a8f456d887ada0cfb718ff2a";
+    my $outfile = "dvb-fe-nxt2002.fw";
+    my $tmpdir = tempdir(DIR => "/tmp", CLEANUP => 1);
+
+    checkstandard();
+    
+    wgetfile($sourcefile, $url);
+    unzip($sourcefile, $tmpdir);
+    verify("$tmpdir/SkyNETU.sys", $hash);
+    extract("$tmpdir/SkyNETU.sys", 375832, 5908, $outfile);
+
+    $outfile;
 }
 
 # ---------------------------------------------------------------

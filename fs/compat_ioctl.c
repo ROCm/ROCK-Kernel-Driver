@@ -645,8 +645,11 @@ int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	/* Don't check these user accesses, just let that get trapped
 	 * in the ioctl handler instead.
 	 */
-	copy_to_user(&u_ifreq64->ifr_ifrn.ifrn_name[0], &tmp_buf[0], IFNAMSIZ);
-	__put_user(data64, &u_ifreq64->ifr_ifru.ifru_data);
+	if (copy_to_user(&u_ifreq64->ifr_ifrn.ifrn_name[0], &tmp_buf[0],
+			 IFNAMSIZ))
+		return -EFAULT;
+	if (__put_user(data64, &u_ifreq64->ifr_ifru.ifru_data))
+		return -EFAULT;
 
 	return sys_ioctl(fd, cmd, (unsigned long) u_ifreq64);
 }
@@ -2343,7 +2346,9 @@ put_dirent32 (struct dirent *d, struct compat_dirent __user *d32)
         __put_user(d->d_ino, &d32->d_ino);
         __put_user(d->d_off, &d32->d_off);
         __put_user(d->d_reclen, &d32->d_reclen);
-        __copy_to_user(d32->d_name, d->d_name, d->d_reclen);
+        if (__copy_to_user(d32->d_name, d->d_name, d->d_reclen))
+		return -EFAULT;
+
         return ret;
 }
 
@@ -2486,7 +2491,8 @@ static int serial_struct_ioctl(unsigned fd, unsigned cmd, unsigned long arg)
         if (cmd == TIOCSSERIAL) {
                 if (verify_area(VERIFY_READ, ss32, sizeof(SS32)))
                         return -EFAULT;
-                __copy_from_user(&ss, ss32, offsetof(SS32, iomem_base));
+                if (__copy_from_user(&ss, ss32, offsetof(SS32, iomem_base)))
+			return -EFAULT;
                 __get_user(udata, &ss32->iomem_base);
                 ss.iomem_base = compat_ptr(udata);
                 __get_user(ss.iomem_reg_shift, &ss32->iomem_reg_shift);
@@ -2499,7 +2505,8 @@ static int serial_struct_ioctl(unsigned fd, unsigned cmd, unsigned long arg)
         if (cmd == TIOCGSERIAL && err >= 0) {
                 if (verify_area(VERIFY_WRITE, ss32, sizeof(SS32)))
                         return -EFAULT;
-                __copy_to_user(ss32,&ss,offsetof(SS32,iomem_base));
+                if (__copy_to_user(ss32,&ss,offsetof(SS32,iomem_base)))
+			return -EFAULT;
                 __put_user((unsigned long)ss.iomem_base  >> 32 ?
                             0xffffffff : (unsigned)(unsigned long)ss.iomem_base,
                             &ss32->iomem_base);

@@ -90,8 +90,6 @@ free_irq_vector (int vector)
 		printk(KERN_WARNING "%s: double free!\n", __FUNCTION__);
 }
 
-extern unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs);
-
 #ifdef CONFIG_SMP
 #	define IS_RESCHEDULE(vec)	(vec == IA64_IPI_RESCHEDULE)
 #else
@@ -150,7 +148,7 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 			ia64_setreg(_IA64_REG_CR_TPR, vector);
 			ia64_srlz_d();
 
-			do_IRQ(local_vector_to_irq(vector), regs);
+			__do_IRQ(local_vector_to_irq(vector), regs);
 
 			/*
 			 * Disable interrupts and send EOI:
@@ -201,7 +199,7 @@ void ia64_process_pending_intr(void)
 			 * Probably could shared code.
 			 */
 			vectors_in_migration[local_vector_to_irq(vector)]=0;
-			do_IRQ(local_vector_to_irq(vector), NULL);
+			__do_IRQ(local_vector_to_irq(vector), NULL);
 
 			/*
 			 * Disable interrupts and send EOI

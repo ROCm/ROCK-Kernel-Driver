@@ -99,18 +99,6 @@ hw_resend_irq (struct hw_interrupt_type *h, unsigned int vector)
 extern irq_desc_t irq_desc[NR_IRQS];
 
 #ifndef CONFIG_IA64_GENERIC
-static inline irq_desc_t *
-__ia64_irq_desc (unsigned int irq)
-{
-	return irq_desc + irq;
-}
-
-static inline ia64_vector
-__ia64_irq_to_vector (unsigned int irq)
-{
-	return (ia64_vector) irq;
-}
-
 static inline unsigned int
 __ia64_local_vector_to_irq (ia64_vector vec)
 {
@@ -132,14 +120,14 @@ __ia64_local_vector_to_irq (ia64_vector vec)
 static inline irq_desc_t *
 irq_descp (int irq)
 {
-	return platform_irq_desc(irq);
+	return irq_desc + irq;
 }
 
 /* Extract the IA-64 vector that corresponds to IRQ.  */
 static inline ia64_vector
 irq_to_vector (int irq)
 {
-	return platform_irq_to_vector(irq);
+	return (ia64_vector) irq;
 }
 
 /*

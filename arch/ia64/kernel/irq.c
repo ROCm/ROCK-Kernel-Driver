@@ -32,35 +32,7 @@ void ack_bad_irq(unsigned int irq)
 	printk(KERN_ERR "Unexpected irq vector 0x%x on CPU %u!\n", irq, smp_processor_id());
 }
 
-/*
- * do_IRQ handles all normal device IRQ's (the special
- * SMP cross-CPU interrupts have their own specific
- * handlers).
- */
-unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
-{
-	return __do_IRQ(irq, regs);
-}
-
-#ifdef CONFIG_SMP
-/*
- * This is updated when the user sets irq affinity via /proc
- */
-cpumask_t __cacheline_aligned pending_irq_cpumask[NR_IRQS];
-static unsigned long pending_irq_redir[BITS_TO_LONGS(NR_IRQS)];
-#endif
-
 #ifdef CONFIG_IA64_GENERIC
-irq_desc_t * __ia64_irq_desc (unsigned int irq)
-{
-	return irq_desc + irq;
-}
-
-ia64_vector __ia64_irq_to_vector (unsigned int irq)
-{
-	return (ia64_vector) irq;
-}
-
 unsigned int __ia64_local_vector_to_irq (ia64_vector vec)
 {
 	return (unsigned int) vec;
@@ -113,27 +85,19 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 skip:
 		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
-	} else if (i == NR_IRQS) {
-#if defined(CONFIG_X86_LOCAL_APIC)
-		seq_puts(p, "LOC: ");
-		for (j = 0; j < NR_CPUS; j++)
-			if (cpu_online(j))
-				seq_printf(p, "%10u ",
-					   irq_stat[j].apic_timer_irqs);
-		seq_putc(p, '\n');
-#endif
+	} else if (i == NR_IRQS)
 		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
-#if defined(CONFIG_X86_IO_APIC)
-		seq_printf(p, "MIS: %10u\n", atomic_read(&irq_mis_count));
-#endif
-	}
 	return 0;
 }
 
 #ifdef CONFIG_SMP
+/*
+ * This is updated when the user sets irq affinity via /proc
+ */
+cpumask_t __cacheline_aligned pending_irq_cpumask[NR_IRQS];
+static unsigned long pending_irq_redir[BITS_TO_LONGS(NR_IRQS)];
 
 static cpumask_t irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
-
 static char irq_redir [NR_IRQS]; // = { [0 ... NR_IRQS-1] = 1 };
 
 void set_irq_affinity_info (unsigned int irq, int hwid, int redir)
@@ -250,7 +214,7 @@ void fixup_irqs(void)
 	for (irq=0; irq < NR_IRQS; irq++) {
 		if (vectors_in_migration[irq]) {
 			vectors_in_migration[irq]=0;
-			do_IRQ(irq, NULL);
+			__do_IRQ(irq, NULL);
 		}
 	}
 

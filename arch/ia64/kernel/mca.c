@@ -936,8 +936,6 @@ ia64_mca_ucmc_handler(void)
 			&ia64_sal_to_os_handoff_state,
 			&ia64_os_to_sal_handoff_state)); 
 
-return_to_sal:
-
 	if (recover) {
 		sal_log_record_header_t *rh = IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_MCA);
 		rh->severity = sal_log_severity_corrected;

@@ -76,6 +76,7 @@ struct ethtool_ops;
 /* Driver transmit return codes */
 #define NETDEV_TX_OK 0		/* driver took care of packet */
 #define NETDEV_TX_BUSY 1	/* driver tx path was busy*/
+#define NETDEV_TX_LOCKED -1	/* driver tx lock was already taken */
 
 /*
  *	Compute the worst case header length according to the protocols
@@ -414,7 +415,7 @@ struct net_device
 #define NETIF_F_HW_VLAN_FILTER	512	/* Receive filtering on VLAN */
 #define NETIF_F_VLAN_CHALLENGED	1024	/* Device cannot handle VLAN packets */
 #define NETIF_F_TSO		2048	/* Can offload TCP/IP segmentation */
-#define NETIF_F_LLTX		4096	/* Do not grab xmit_lock during ->hard_start_xmit */
+#define NETIF_F_LLTX		4096	/* LockLess TX */
 
 	/* Called after device is detached from network. */
 	void			(*uninit)(struct net_device *dev);
@@ -894,11 +895,9 @@ static inline void __netif_rx_complete(struct net_device *dev)
 
 static inline void netif_tx_disable(struct net_device *dev)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&dev->xmit_lock, flags);
+	spin_lock_bh(&dev->xmit_lock);
 	netif_stop_queue(dev);
-	spin_unlock_irqrestore(&dev->xmit_lock, flags);
+	spin_unlock_bh(&dev->xmit_lock);
 }
 
 /* These functions live elsewhere (drivers/net/net_init.c, but related) */

@@ -442,17 +442,18 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 		if (next > end || next <= addr)
 			next = end;
 		if (pgd_none(*src_pgd))
-			continue;
+			goto next_pgd;
 		if (pgd_bad(*src_pgd)) {
 			pgd_ERROR(*src_pgd);
 			pgd_clear(src_pgd);
-			continue;
+			goto next_pgd;
 		}
 		err = copy_pud_range(dst, src, dst_pgd, src_pgd,
 							vma, addr, next);
 		if (err)
 			break;
 
+next_pgd:
 		src_pgd++;
 		dst_pgd++;
 		addr = next;

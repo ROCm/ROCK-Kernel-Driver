@@ -132,7 +132,7 @@ extern long __get_user_unaligned_unknown (void);
 
 #ifdef ASM_SUPPORTED
   struct __large_struct { unsigned long buf[100]; };
-# define __m(x) (*(struct __large_struct *)(x))
+# define __m(x) (*(struct __large_struct __user *)(x))
 
 /* We need to declare the __ex_table section before we can use it in .xdata.  */
 asm (".section \"__ex_table\", \"a\"\n\t.previous");

@@ -359,7 +359,7 @@ hweight64 (unsigned long x)
 
 #endif /* __KERNEL__ */
 
-extern int __find_next_zero_bit (void *addr, unsigned long size,
+extern int __find_next_zero_bit (const void *addr, unsigned long size,
 			unsigned long offset);
 extern int __find_next_bit(const void *addr, unsigned long size,
 			unsigned long offset);

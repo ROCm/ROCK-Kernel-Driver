@@ -57,11 +57,12 @@ do {									\
 		if (debug) printk(KERN_DEBUG "mt352: " args); \
 } while (0)
 
-int mt352_write(struct dvb_frontend* fe, u8* ibuf, int ilen)
+static int mt352_single_write(struct dvb_frontend *fe, u8 reg, u8 val)
 {
 	struct mt352_state* state = (struct mt352_state*) fe->demodulator_priv;
+	u8 buf[2] = { reg, val };
 	struct i2c_msg msg = { .addr = state->config->demod_address, .flags = 0,
-			       .buf = ibuf, .len = ilen };
+			       .buf = buf, .len = 2 };
 	if (debug) {
 		int i;
 		printk("%s:",__FUNCTION__);
@@ -73,9 +74,19 @@ int mt352_write(struct dvb_frontend* fe, u8* ibuf, int ilen)
 	int err = i2c_transfer(state->i2c, &msg, 1);
 	if (err != 1) {
 		printk(KERN_WARNING
-		       "mt352_write() failed (err = %d)!\n", err);
+		       "mt352_write() to reg %x failed (err = %d)!\n", reg, err);
 		return err;
 	}
+
+	return 0;
+}
+
+int mt352_write(struct dvb_frontend* fe, u8* ibuf, int ilen)
+{
+	int err,i;
+	for (i=0; i < ilen-1; i++)
+		if ((err = mt352_single_write(fe,ibuf[0]+i,ibuf[i+1]))) 
+			return err;
 
 	return 0;
 }
@@ -108,6 +119,11 @@ static int mt352_read_register(struct mt352_state* state, u8 reg)
 	}
 
 	return b1[0];
+}
+
+u8 mt352_read(struct dvb_frontend *fe, u8 reg)
+{
+	return mt352_read_register(fe->demodulator_priv,reg);
 }
 
 static int mt352_sleep(struct dvb_frontend* fe)
@@ -631,6 +647,7 @@ MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(mt352_attach);
 EXPORT_SYMBOL(mt352_write);
+EXPORT_SYMBOL(mt352_read);
 /*
  * Local variables:
  * c-basic-offset: 8

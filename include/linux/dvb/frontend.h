@@ -158,9 +158,10 @@ typedef enum fe_modulation {
         QAM_64,
         QAM_128,
         QAM_256,
-	QAM_AUTO
+	QAM_AUTO,
+	VSB_8,
+	VSB_16
 } fe_modulation_t;
-
 
 typedef enum fe_transmit_mode {
 	TRANSMISSION_MODE_2K,
@@ -206,6 +207,9 @@ struct dvb_qam_parameters {
         fe_modulation_t  modulation;  /* modulation type (see above) */
 };
 
+struct dvb_vsb_parameters {
+	fe_modulation_t	modulation;  /* modulation type (see above) */
+};
 
 struct dvb_ofdm_parameters {
         fe_bandwidth_t      bandwidth;
@@ -219,13 +223,14 @@ struct dvb_ofdm_parameters {
 
 
 struct dvb_frontend_parameters {
-        __u32 frequency;     /* (absolute) frequency in Hz for QAM/OFDM */
+	__u32 frequency;     /* (absolute) frequency in Hz for QAM/OFDM/ATSC */
                                   /* intermediate frequency in kHz for QPSK */
 	fe_spectral_inversion_t inversion;
 	union {
 		struct dvb_qpsk_parameters qpsk;
 		struct dvb_qam_parameters  qam;
 		struct dvb_ofdm_parameters ofdm;
+		struct dvb_vsb_parameters vsb;
 	} u;
 };
 

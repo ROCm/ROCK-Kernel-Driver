@@ -374,7 +374,7 @@ asmlinkage unsigned long sys_mmap2(
 				int fd, long pgoff);
 struct pt_regs;
 struct sigaction;
-asmlinkage long sys_execve(char __user *filename, char __user * __user *argv,
+long sys_execve(char __user *filename, char __user * __user *argv,
 			   char __user * __user *envp, struct pt_regs *regs);
 asmlinkage long sys_pipe(long arg0, long arg1, long arg2, long arg3,
 			long arg4, long arg5, long arg6, long arg7, long stack);

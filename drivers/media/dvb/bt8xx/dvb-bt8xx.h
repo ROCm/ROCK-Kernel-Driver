@@ -22,6 +22,9 @@
  *
  */
 
+#ifndef DVB_BT8XX_H
+#define DVB_BT8XX_H
+
 #include <linux/i2c.h>
 #include "dvbdev.h"
 #include "dvb_net.h"
@@ -51,3 +54,5 @@ struct dvb_bt8xx_card {
 				
 	struct dvb_frontend* fe;
 };
+
+#endif /* DVB_BT8XX_H */

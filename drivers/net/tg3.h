@@ -1274,6 +1274,7 @@
 #define  GRC_MODE_HOST_STACKUP		0x00010000
 #define  GRC_MODE_HOST_SENDBDS		0x00020000
 #define  GRC_MODE_NO_TX_PHDR_CSUM	0x00100000
+#define  GRC_MODE_NVRAM_WR_ENABLE	0x00200000
 #define  GRC_MODE_NO_RX_PHDR_CSUM	0x00800000
 #define  GRC_MODE_IRQ_ON_TX_CPU_ATTN	0x01000000
 #define  GRC_MODE_IRQ_ON_RX_CPU_ATTN	0x02000000
@@ -1366,6 +1367,8 @@
 #define  NVRAM_CMD_ERASE		 0x00000040
 #define  NVRAM_CMD_FIRST		 0x00000080
 #define  NVRAM_CMD_LAST			 0x00000100
+#define  NVRAM_CMD_WREN			 0x00010000
+#define  NVRAM_CMD_WRDI			 0x00020000
 #define NVRAM_STAT			0x00007004
 #define NVRAM_WRDATA			0x00007008
 #define NVRAM_ADDR			0x0000700c
@@ -1375,8 +1378,18 @@
 #define  NVRAM_CFG1_FLASHIF_ENAB	 0x00000001
 #define  NVRAM_CFG1_BUFFERED_MODE	 0x00000002
 #define  NVRAM_CFG1_PASS_THRU		 0x00000004
+#define  NVRAM_CFG1_STATUS_BITS		 0x00000070
 #define  NVRAM_CFG1_BIT_BANG		 0x00000008
+#define  NVRAM_CFG1_FLASH_SIZE		 0x02000000
 #define  NVRAM_CFG1_COMPAT_BYPASS	 0x80000000
+#define  NVRAM_CFG1_VENDOR_MASK		 0x03000003
+#define  FLASH_VENDOR_ATMEL_EEPROM	 0x02000000
+#define  FLASH_VENDOR_ATMEL_FLASH_BUFFERED	 0x02000003
+#define  FLASH_VENDOR_ATMEL_FLASH_UNBUFFERED	 0x00000003
+#define  FLASH_VENDOR_ST			 0x03000001
+#define  FLASH_VENDOR_SAIFUN		 0x01000003
+#define  FLASH_VENDOR_SST_SMALL		 0x00000001
+#define  FLASH_VENDOR_SST_LARGE		 0x02000001
 #define NVRAM_CFG2			0x00007018
 #define NVRAM_CFG3			0x0000701c
 #define NVRAM_SWARB			0x00007020
@@ -1396,14 +1409,15 @@
 #define  SWARB_REQ1			 0x00002000
 #define  SWARB_REQ2			 0x00004000
 #define  SWARB_REQ3			 0x00008000
-#define    NVRAM_BUFFERED_PAGE_SIZE	   264
-#define    NVRAM_BUFFERED_PAGE_POS	   9
 #define NVRAM_ACCESS			0x00007024
 #define  ACCESS_ENABLE			 0x00000001
 #define  ACCESS_WR_ENABLE		 0x00000002
-/* 0x7024 --> 0x7400 unused */
+#define NVRAM_WRITE1			0x00007028
+/* 0x702c --> 0x7400 unused */
 
 /* 0x7400 --> 0x8000 unused */
+
+#define TG3_EEPROM_MAGIC		0x669955aa
 
 /* 32K Window into NIC internal memory */
 #define NIC_SRAM_WIN_BASE		0x00008000
@@ -1980,11 +1994,12 @@ struct tg3 {
 	 * lock: Held during all operations except TX packet
 	 *       processing.
 	 *
-	 * dev->xmit_lock: Held during tg3_start_xmit and tg3_tx
+	 * tx_lock: Held during tg3_start_xmit{,_4gbug} and tg3_tx
 	 *
 	 * If you want to shut up all asynchronous processing you must
-	 * acquire both locks, 'lock' taken before 'xmit_lock'.  IRQs must
-	 * be disabled to take either lock.
+	 * acquire both locks, 'lock' taken before 'tx_lock'.  IRQs must
+	 * be disabled to take 'lock' but only softirq disabling is
+	 * necessary for acquisition of 'tx_lock'.
 	 */
 	spinlock_t			lock;
 	spinlock_t			indirect_lock;
@@ -2002,6 +2017,8 @@ struct tg3 {
 	u32				tx_prod;
 	u32				tx_cons;
 	u32				tx_pending;
+
+	spinlock_t			tx_lock;
 
 	struct tg3_tx_buffer_desc	*tx_ring;
 	struct tx_ring_info		*tx_buffers;
@@ -2087,6 +2104,7 @@ struct tg3 {
 #define TG3_FLG2_PHY_JUST_INITTED	0x00001000
 #define TG3_FLG2_PHY_SERDES		0x00002000
 #define TG3_FLG2_CAPACITIVE_COUPLING	0x00004000
+#define TG3_FLG2_FLASH			0x00008000
 
 	u32				split_mode_max_reqs;
 #define SPLIT_MODE_5704_MAX_REQ		3
@@ -2160,6 +2178,34 @@ struct tg3 {
 	struct tg3_hw_stats		*hw_stats;
 	dma_addr_t			stats_mapping;
 	struct work_struct		reset_task;
+
+	u32				nvram_size;
+	u32				nvram_pagesize;
+	u32				nvram_jedecnum;
+
+#define JEDEC_ATMEL			0x1f
+#define JEDEC_ST			0x20
+#define JEDEC_SAIFUN			0x4f
+#define JEDEC_SST			0xbf
+
+#define ATMEL_AT24C64_CHIP_SIZE		(64 * 1024)
+#define ATMEL_AT24C64_PAGE_SIZE		(32)
+
+#define ATMEL_AT24C512_CHIP_SIZE	(512 * 1024)
+#define ATMEL_AT24C512_PAGE_SIZE	(128)
+
+#define ATMEL_AT45DB0X1B_PAGE_POS	9
+#define ATMEL_AT45DB0X1B_PAGE_SIZE	264
+
+#define ATMEL_AT25F512_PAGE_SIZE	256
+
+#define ST_M45PEX0_PAGE_SIZE		256
+
+#define SAIFUN_SA25F0XX_PAGE_SIZE	256
+
+#define SST_25VF0X0_PAGE_SIZE		4098
+
+
 };
 
 #endif /* !(_T3_H) */

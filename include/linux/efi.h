@@ -305,6 +305,27 @@ extern unsigned long __init efi_get_time(void);
 extern int __init efi_set_rtc_mmss(unsigned long nowtime);
 extern struct efi_memory_map memmap;
 
+/**
+ * efi_range_is_wc - check the WC bit on an address range
+ * @start: starting kvirt address
+ * @len: length of range
+ *
+ * Consult the EFI memory map and make sure it's ok to set this range WC.
+ * Returns true or false.
+ */
+static inline int efi_range_is_wc(unsigned long start, unsigned long len)
+{
+	int i;
+
+	for (i = 0; i < len; i += (1UL << EFI_PAGE_SHIFT)) {
+		unsigned long paddr = __pa(start + i);
+		if (!(efi_mem_attributes(paddr) & EFI_MEMORY_WC))
+			return 0;
+	}
+	/* The range checked out */
+	return 1;
+}
+
 #ifdef CONFIG_EFI_PCDP
 extern int __init efi_setup_pcdp_console(char *);
 #endif

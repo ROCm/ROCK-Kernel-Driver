@@ -183,7 +183,9 @@ static void sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 
 			sn_irq_info = sn_irq_info->irq_next;
 
+#ifdef CONFIG_SMP
 			set_irq_affinity_info((irq & 0xff), cpuphys, 0);
+#endif
 		} else {
 			break;	/* snp_affinity failed the intr_alloc */
 		}
@@ -201,16 +203,6 @@ struct hw_interrupt_type irq_type_sn = {
 	sn_end_irq,
 	sn_set_affinity_irq
 };
-
-struct irq_desc *sn_irq_desc(unsigned int irq)
-{
-	return (irq_desc + irq);
-}
-
-u8 sn_irq_to_vector(unsigned int irq)
-{
-	return irq;
-}
 
 unsigned int sn_local_vector_to_irq(u8 vector)
 {

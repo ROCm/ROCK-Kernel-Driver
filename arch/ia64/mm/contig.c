@@ -195,7 +195,7 @@ per_cpu_init (void)
 			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
 			cpu_data += PERCPU_PAGE_SIZE;
 			per_cpu(local_per_cpu_offset, cpu) = __per_cpu_offset[cpu];
-			__per_cpu_mca[cpu] = (unsigned long)mca_data;
+			__per_cpu_mca[cpu] = (unsigned long)__pa(mca_data);
 			mca_data += PERCPU_MCA_SIZE;
 		}
 	}
