@@ -19,7 +19,7 @@
 static struct backing_dev_info swap_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
-	.unplug_io_fn	= swap_unplug_io_fn,
+	.state		= 0,	/* uncongested */
 };
 
 extern struct address_space_operations swap_aops;
@@ -27,6 +27,7 @@ extern struct address_space_operations swap_aops;
 struct address_space swapper_space = {
 	.page_tree	= RADIX_TREE_INIT(GFP_ATOMIC),
 	.tree_lock	= SPIN_LOCK_UNLOCKED,
+	.nrpages	= 0,	/* total_swapcache_pages */
 	.a_ops		= &swap_aops,
 	.backing_dev_info = &swap_backing_dev_info,
 	.i_mmap		= PRIO_TREE_ROOT_INIT,

@@ -133,8 +133,12 @@ static inline int sync_page(struct page *page)
 	
 	smp_mb();
 	mapping = page_mapping(page);
-	if (mapping && mapping->a_ops && mapping->a_ops->sync_page)
-		return mapping->a_ops->sync_page(page);
+	if (mapping) {
+		if (mapping->a_ops && mapping->a_ops->sync_page)
+			return mapping->a_ops->sync_page(page);
+	} else if (PageSwapCache(page)) {
+		swap_unplug_io_fn(page);
+	}
 	return 0;
 }
 
