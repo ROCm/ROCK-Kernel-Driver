@@ -55,6 +55,31 @@
 static DECLARE_MUTEX(sem);
 LIST_HEAD(isdn_net_devs); /* Linked list of isdn_net_dev's */ // FIXME static
 
+/* Reference counting for net devices (they work on isdn_net_local *,
+ * but count references to the related isdn_net_dev's as well.
+ * Basic rule: When state of isdn_net_dev changes from ST_NULL -> sth,
+ * get a reference, when it changes back to ST_NULL, put it
+ */ 
+
+static inline void
+lp_get(isdn_net_local *lp)
+{
+	if (atomic_read(&lp->refcnt) < 1)
+		isdn_BUG();
+
+	atomic_inc(&lp->refcnt);
+}
+
+static inline void
+lp_put(isdn_net_local *lp)
+{
+	atomic_dec(&lp->refcnt);
+
+	/* the last reference, the list should always remain */
+	if (atomic_read(&lp->refcnt) < 1)
+		isdn_BUG();
+}
+
 int isdn_net_handle_event(isdn_net_dev *idev, int pr, void *arg); /* FIXME */
 
 static void isdn_net_tasklet(unsigned long data);
@@ -1182,7 +1207,10 @@ isdn_net_unbind_channel(isdn_net_dev *idev)
 
 	idev->isdn_slot = -1;
 
-	fsm_change_state(&idev->fi, ST_NULL);
+	if (idev->fi.state != ST_NULL) {
+		lp_put(mlp);
+		fsm_change_state(&idev->fi, ST_NULL);
+	}
 }
 
 /*
@@ -1211,9 +1239,13 @@ isdn_net_dial(isdn_net_dev *idev)
 {
 	int retval;
 
+	lp_get(idev->mlp);
 	retval = fsm_event(&idev->fi, EV_DO_DIAL, NULL);
 	if (retval == -ESRCH) /* event not handled in this state */
 		retval = -EBUSY;
+
+	if (retval)
+		lp_put(idev->mlp);
 
 	return retval;
 }
@@ -1249,6 +1281,7 @@ static int
 do_callback(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
+	isdn_net_local *mlp = idev->mlp;
 
 	printk(KERN_DEBUG "%s: start callback\n", idev->name);
 
@@ -1321,19 +1354,23 @@ isdn_net_dev_icall(isdn_net_dev *idev, int di, int ch, int si1,
 		       idev->name);
 		return 3;
 	}
+	lp_get(mlp);
 	/* check callback */
 	if (mlp->flags & ISDN_NET_CALLBACK) {
-		if (fsm_event(&idev->fi, EV_DO_CALLBACK, NULL))
+		if (fsm_event(&idev->fi, EV_DO_CALLBACK, NULL)) {
+			lp_put(mlp);
 			return 0;
+		}
 		/* Initiate dialing by returning 2 or 4 */
 		return (mlp->flags & ISDN_NET_CBHUP) ? 2 : 4;
 	}
 	printk(KERN_INFO "%s: call from %s -> %s accepted\n",
 	       idev->name, nr, eaz);
 
-	if (fsm_event(&idev->fi, EV_DO_ACCEPT, (void *) slot))
+	if (fsm_event(&idev->fi, EV_DO_ACCEPT, (void *) slot)) {
+		lp_put(mlp);
 		return 0;
-
+	}
 	return 1; // accepted
 }
 
@@ -1400,7 +1437,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 	retval = 0;
 	spin_lock_irqsave(&running_devs_lock, flags);
 	list_for_each_entry(lp, &running_devs, running_devs) {
-		atomic_inc(&lp->refcnt);
+		lp_get(lp);
 		spin_unlock_irqrestore(&running_devs_lock, flags);
 
 		list_for_each_entry(idev, &lp->slaves, slaves) {
@@ -1410,7 +1447,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		}
 
 		spin_lock_irqsave(&running_devs_lock, flags);
-		atomic_dec(&lp->refcnt);
+		lp_put(lp);
 		if (retval > 0)
 			break;
 		
@@ -1449,7 +1486,7 @@ static int dialout_next(struct fsm_inst *fi, int pr, void *arg);
 /* Initiate dialout. */
 
 static int
-dialout_first(struct fsm_inst *fi, int pr, void *arg)
+do_dial(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_net_dev *idev = fi->userdata;
 	isdn_net_local *mlp = idev->mlp;
@@ -1480,7 +1517,8 @@ dialout_first(struct fsm_inst *fi, int pr, void *arg)
 	idev->dial = 0;
 	idev->dialretry = 0;
 
-	return dialout_next(fi, pr, arg);
+	dialout_next(fi, pr, arg);
+	return 0;
 }
 
 /* Try dialing the next number. */
@@ -1779,7 +1817,7 @@ got_bsent(struct fsm_inst *fi, int pr, void *arg)
 }
 
 static struct fsm_node isdn_net_fn_tbl[] = {
-	{ ST_NULL,           EV_DO_DIAL,         dialout_first },
+	{ ST_NULL,           EV_DO_DIAL,         do_dial       },
 	{ ST_NULL,           EV_DO_ACCEPT,       accept_icall  },
 	{ ST_NULL,           EV_DO_CALLBACK,     do_callback   },
 
@@ -1807,7 +1845,7 @@ static struct fsm_node isdn_net_fn_tbl[] = {
 
 	{ ST_WAIT_DHUP,      EV_STAT_DHUP,       dhup          },
 
-	{ ST_WAIT_BEFORE_CB, EV_TIMER_CB_IN,     dialout_first },
+	{ ST_WAIT_BEFORE_CB, EV_TIMER_CB_IN,     do_dial       },
 
 	{ ST_OUT_DIAL_WAIT,  EV_TIMER_DIAL_WAIT, dialout_next  },
 };
