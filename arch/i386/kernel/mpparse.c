@@ -956,7 +956,7 @@ void __init mp_override_legacy_irq (
 	intsrc.mpc_dstapic = mp_ioapics[ioapic].mpc_apicid;	   /* APIC ID */
 	intsrc.mpc_dstirq = pin;				    /* INTIN# */
 
-	printk("Int: type %d, pol %d, trig %d, bus %d, irq %d, %d-%d\n",
+	Dprintk("Int: type %d, pol %d, trig %d, bus %d, irq %d, %d-%d\n",
 		intsrc.mpc_irqtype, intsrc.mpc_irqflag & 3, 
 		(intsrc.mpc_irqflag >> 2) & 3, intsrc.mpc_srcbus, 
 		intsrc.mpc_srcbusirq, intsrc.mpc_dstapic, intsrc.mpc_dstirq);
@@ -1013,7 +1013,7 @@ void __init mp_config_acpi_legacy_irqs (void)
 		intsrc.mpc_srcbusirq = i;		   /* Identity mapped */
 		intsrc.mpc_dstirq = i;
 
-		printk("Int: type %d, pol %d, trig %d, bus %d, irq %d, "
+		Dprintk("Int: type %d, pol %d, trig %d, bus %d, irq %d, "
 			"%d-%d\n", intsrc.mpc_irqtype, intsrc.mpc_irqflag & 3, 
 			(intsrc.mpc_irqflag >> 2) & 3, intsrc.mpc_srcbus, 
 			intsrc.mpc_srcbusirq, intsrc.mpc_dstapic, 
