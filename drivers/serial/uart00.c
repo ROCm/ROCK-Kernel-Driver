@@ -317,7 +317,7 @@ static void
 uart00_set_termios(struct uart_port *port, struct termios *termios,
 		   struct termios *old)
 {
-	unsigned int uart_mc, old_ies, quot;
+	unsigned int uart_mc, old_ies, baud, quot;
 	unsigned long flags;
 
 	/*
@@ -328,7 +328,8 @@ uart00_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Ask the core to calculate the divisor for us.
 	 */
-	quot = uart_get_divisor(port, termios, old);
+	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16); 
+	quot = uart_get_divisor(port, baud);
 
 	/* byte size and parity */
 	switch (termios->c_cflag & CSIZE) {
@@ -358,7 +359,7 @@ uart00_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Update the per-port timeout.
 	 */
-	uart_update_timeout(port, termios->c_cflag, quot);
+	uart_update_timeout(port, termios->c_cflag, baud);
 
 	port->read_status_mask = UART_RDS_OE_MSK;
 	if (termios->c_iflag & INPCK)
