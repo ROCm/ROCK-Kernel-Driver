@@ -125,7 +125,6 @@ extern inline struct request *elv_next_request(request_queue_t *q)
 static void floppy_off(unsigned int nr);
 
 #define DEVICE_NAME "floppy"
-#define DEVICE_INTR do_floppy
 #define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
 
 #elif (MAJOR_NR == HD_MAJOR)
@@ -149,14 +148,14 @@ static void floppy_off(unsigned int nr);
 #elif (MAJOR_NR == SCSI_TAPE_MAJOR)
 
 #define DEVICE_NAME "scsitape"
-#define DEVICE_INTR do_st  
+#define DEVICE_INTR do_st
 #define DEVICE_NR(device) (minor(device) & 0x7f)
 
 #elif (MAJOR_NR == OSST_MAJOR)
 
-#define DEVICE_NAME "onstream" 
+#define DEVICE_NAME "onstream"
 #define DEVICE_INTR do_osst
-#define DEVICE_NR(device) (minor(device) & 0x7f) 
+#define DEVICE_NR(device) (minor(device) & 0x7f)
 
 #elif (MAJOR_NR == SCSI_CDROM_MAJOR)
 
@@ -187,33 +186,16 @@ static void floppy_off(unsigned int nr);
 #elif (MAJOR_NR == MITSUMI_CDROM_MAJOR)
 
 #define DEVICE_NAME "Mitsumi CD-ROM"
-/* #define DEVICE_INTR do_mcd */
 #define DEVICE_NR(device) (minor(device))
 
 #elif (MAJOR_NR == MITSUMI_X_CDROM_MAJOR)
 
 #define DEVICE_NAME "Mitsumi CD-ROM"
-/* #define DEVICE_INTR do_mcdx */
 #define DEVICE_NR(device) (minor(device))
 
 #elif (MAJOR_NR == MATSUSHITA_CDROM_MAJOR)
 
-#define DEVICE_NAME "Matsushita CD-ROM controller #1"
-#define DEVICE_NR(device) (minor(device))
-
-#elif (MAJOR_NR == MATSUSHITA_CDROM2_MAJOR)
-
-#define DEVICE_NAME "Matsushita CD-ROM controller #2"
-#define DEVICE_NR(device) (minor(device))
-
-#elif (MAJOR_NR == MATSUSHITA_CDROM3_MAJOR)
-
-#define DEVICE_NAME "Matsushita CD-ROM controller #3"
-#define DEVICE_NR(device) (minor(device))
-
-#elif (MAJOR_NR == MATSUSHITA_CDROM4_MAJOR)
-
-#define DEVICE_NAME "Matsushita CD-ROM controller #4"
+#define DEVICE_NAME "Matsushita CD-ROM controller"
 #define DEVICE_NR(device) (minor(device))
 
 #elif (MAJOR_NR == AZTECH_CDROM_MAJOR)
@@ -292,11 +274,11 @@ static void floppy_off(unsigned int nr);
 #if (MAJOR_NR != SCSI_TAPE_MAJOR) && (MAJOR_NR != OSST_MAJOR)
 #if !defined(IDE_DRIVER)
 
-#ifndef CURRENT
-# define CURRENT elv_next_request(&blk_dev[MAJOR_NR].request_queue)
-#endif
 #ifndef QUEUE
 # define QUEUE (&blk_dev[MAJOR_NR].request_queue)
+#endif
+#ifndef CURRENT
+# define CURRENT elv_next_request(QUEUE)
 #endif
 #ifndef DEVICE_NAME
 # define DEVICE_NAME "unknown"
@@ -304,15 +286,11 @@ static void floppy_off(unsigned int nr);
 
 #ifdef DEVICE_INTR
 static void (*DEVICE_INTR)(void) = NULL;
-#endif
-
-#define SET_INTR(x) (DEVICE_INTR = (x))
-
-# ifdef DEVICE_INTR
-#  define CLEAR_INTR SET_INTR(NULL)
+#  define CLEAR_INTR DEVICE_INTR = NULL
 # else
 #  define CLEAR_INTR
 # endif
+
 #endif /* !defined(IDE_DRIVER) */
 
 /*

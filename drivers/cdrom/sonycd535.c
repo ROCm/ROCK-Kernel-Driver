@@ -118,6 +118,7 @@
 #include <linux/timer.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
+#include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/hdreg.h>
 #include <linux/genhd.h>
@@ -134,7 +135,8 @@
 #include <linux/cdrom.h>
 
 #define MAJOR_NR CDU535_CDROM_MAJOR
-# include <linux/blk.h>
+#include <linux/blk.h>
+
 #define sony535_cd_base_io sonycd535 /* for compatible parameter passing with "insmod" */
 #include "sonycd535.h"
 
@@ -1589,7 +1591,6 @@ sony535_init(void)
 								&cdu_fops, NULL);
 				if (devfs_register_blkdev(MAJOR_NR, CDU535_HANDLE, &cdu_fops)) {
 					printk("Unable to get major %d for %s\n",
-					devfs_unregister(sony_devfs_handle);
 							MAJOR_NR, CDU535_MESSAGE_NAME);
 					return -EIO;
 				}
@@ -1663,8 +1664,7 @@ sony535_init(void)
 		devfs_unregister(sony_devfs_handle);
 		if (sony535_irq_used)
 			free_irq(sony535_irq_used, NULL);
-		}
-	
+
 		return -EIO;
 		}
 	register_disk(NULL, mk_kdev(MAJOR_NR,0), 1, &cdu_fops, 0);

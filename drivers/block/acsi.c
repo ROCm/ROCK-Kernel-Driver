@@ -1041,7 +1041,7 @@ static void redo_acsi_request( void )
 	}
 	CurrentBuffer = buffer;
 	CurrentNSect  = nsect;
-	
+
 	if (CURRENT->cmd == WRITE) {
 		CMDSET_TARG_LUN( write_cmd, target, lun );
 		CMDSET_BLOCK( write_cmd, block );
@@ -1049,7 +1049,7 @@ static void redo_acsi_request( void )
 		if (buffer == acsi_buffer)
 			copy_to_acsibuffer();
 		dma_cache_maintenance( pbuffer, nsect*512, 1 );
-		SET_INTR(write_intr);
+		DEVICE_INTR = write_intr;
 		if (!acsicmd_dma( write_cmd, buffer, nsect, 1, 1)) {
 			CLEAR_INTR;
 			printk( KERN_ERR "ACSI (write): Timeout in command block\n" );
@@ -1063,7 +1063,7 @@ static void redo_acsi_request( void )
 		CMDSET_TARG_LUN( read_cmd, target, lun );
 		CMDSET_BLOCK( read_cmd, block );
 		CMDSET_LEN( read_cmd, nsect );
-		SET_INTR(read_intr);
+		DEVICE_INTR = read_intr;
 		if (!acsicmd_dma( read_cmd, buffer, nsect, 0, 1)) {
 			CLEAR_INTR;
 			printk( KERN_ERR "ACSI (read): Timeout in command block\n" );

@@ -633,6 +633,8 @@ static void is_alive(const char *message)
 }
 #endif
 
+static void (*do_floppy)(void) = NULL;
+
 #ifdef FLOPPY_SANITY_CHECK
 
 #define OLOGSIZE 20
@@ -920,9 +922,9 @@ static inline void unlock_fdc(void)
 	if (!fdc_busy)
 		DPRINT("FDC access conflict!\n");
 
-	if (DEVICE_INTR)
+	if (do_floppy)
 		DPRINT("device interrupt still active at FDC release: %p!\n",
-			DEVICE_INTR);
+			do_floppy);
 	command_status = FD_COMMAND_NONE;
 	del_timer(&fd_timeout);
 	cont = NULL;
@@ -1005,7 +1007,7 @@ static struct timer_list fd_timer;
 
 static void cancel_activity(void)
 {
-	CLEAR_INTR;
+	do_floppy = NULL;
 	floppy_tq.routine = (void *)(void *) empty;
 	del_timer(&fd_timer);
 }
@@ -1524,7 +1526,7 @@ static void setup_rw_floppy(void)
 		setup_DMA();
 
 	if (flags & FD_RAW_INTR)
-		SET_INTR(main_command_interrupt);
+		do_floppy = main_command_interrupt;
 
 	r=0;
 	for (i=0; i< raw_cmd->cmd_count; i++)
@@ -1656,7 +1658,7 @@ static void seek_floppy(void)
 		}
 	}
 
-	SET_INTR(seek_interrupt);
+	do_floppy = seek_interrupt;
 	output_byte(FD_SEEK);
 	output_byte(UNIT(current_drive));
 	LAST_OUT(track);
@@ -1736,7 +1738,7 @@ static void print_result(char *message, int inr)
 /* interrupt handler. Note that this can be called externally on the Sparc */
 void floppy_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
-	void (*handler)(void) = DEVICE_INTR;
+	void (*handler)(void) = do_floppy;
 	int do_print;
 	unsigned long f;
 
@@ -1746,9 +1748,9 @@ void floppy_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	f=claim_dma_lock();
 	fd_disable_dma();
 	release_dma_lock(f);
-	
+
 	floppy_enable_hlt();
-	CLEAR_INTR;
+	do_floppy = NULL;
 	if (fdc >= N_FDC || FDCS->address == -1){
 		/* we don't even know which FDC is the culprit */
 		printk("DOR0=%x\n", fdc_state[0].dor);
@@ -1795,7 +1797,7 @@ static void recalibrate_floppy(void)
 #ifdef DEBUGT
 	debugt("recalibrate floppy:");
 #endif
-	SET_INTR(recal_interrupt);
+	do_floppy = recal_interrupt;
 	output_byte(FD_RECALIBRATE);
 	LAST_OUT(UNIT(current_drive));
 }
@@ -1823,14 +1825,14 @@ static void reset_interrupt(void)
 static void reset_fdc(void)
 {
 	unsigned long flags;
-	
-	SET_INTR(reset_interrupt);
+
+	do_floppy = reset_interrupt;
 	FDCS->reset = 0;
 	reset_fdc_info(0);
 
 	/* Pseudo-DMA may intercept 'reset finished' interrupt.  */
 	/* Irrelevant for systems with true DMA (i386).          */
-	
+
 	flags=claim_dma_lock();
 	fd_disable_dma();
 	release_dma_lock(flags);
@@ -1873,8 +1875,8 @@ static void show_floppy(void)
 
 	printk("status=%x\n", fd_inb(FD_STATUS));
 	printk("fdc_busy=%lu\n", fdc_busy);
-	if (DEVICE_INTR)
-		printk("DEVICE_INTR=%p\n", DEVICE_INTR);
+	if (do_floppy)
+		printk("do_floppy=%p\n", do_floppy);
 	if (floppy_tq.sync)
 		printk("floppy_tq.routine=%p\n", floppy_tq.routine);
 	if (timer_pending(&fd_timer))
@@ -2920,7 +2922,7 @@ static void redo_fd_request(void)
 
 	for (;;) {
 		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+			do_floppy = NULL;
 			unlock_fdc();
 			return;
 		}
