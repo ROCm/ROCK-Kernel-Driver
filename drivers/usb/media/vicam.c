@@ -1004,6 +1004,10 @@ vicam_read( struct file *file, char *buf, size_t count, loff_t *ppos )
 		*ppos += count;
 	}
 
+	if (count == VICAM_MAX_FRAME_SIZE) {
+		*ppos = 0;
+	}
+
 	up(&cam->busy_lock);
 
 	return count;
