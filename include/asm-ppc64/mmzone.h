@@ -12,7 +12,7 @@
 
 #ifdef CONFIG_DISCONTIGMEM
 
-extern struct pglist_data node_data[];
+extern struct pglist_data *node_data[];
 
 /*
  * Following are specific to this numa platform.
@@ -52,7 +52,7 @@ static inline int pa_to_nid(unsigned long pa)
 /*
  * Return a pointer to the node data for node n.
  */
-#define NODE_DATA(nid)		(&node_data[nid])
+#define NODE_DATA(nid)		(node_data[nid])
 
 #define node_localnr(pfn, nid)	((pfn) - NODE_DATA(nid)->node_start_pfn)
 
