@@ -8,7 +8,7 @@
  * Find next zero bit in a bitmap reasonably efficiently..
  */
 
-int __find_next_zero_bit (void *addr, unsigned long size, unsigned long offset)
+int __find_next_zero_bit (const void *addr, unsigned long size, unsigned long offset)
 {
 	unsigned long *p = ((unsigned long *) addr) + (offset >> 6);
 	unsigned long result = offset & ~63UL;
