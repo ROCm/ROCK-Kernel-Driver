@@ -92,8 +92,7 @@ dasd_register_major(int major)
 	}
 
 	/* Register block device. */
-	new_major = devfs_register_blkdev(major, "dasd",
-					  &dasd_device_operations);
+	new_major = register_blkdev(major, "dasd", &dasd_device_operations);
 	if (new_major < 0) {
 		MESSAGE(KERN_WARNING,
 			"Cannot register to major no %d, rc = %d", major, rc);
@@ -168,7 +167,7 @@ dasd_unregister_major(struct major_info * mi)
 	bs = blk_size[major];
 	blk_clear(major);
 
-	rc = devfs_unregister_blkdev(major, "dasd");
+	rc = unregister_blkdev(major, "dasd");
 	if (rc < 0)
 		MESSAGE(KERN_WARNING,
 			"Cannot unregister from major no %d, rc = %d",

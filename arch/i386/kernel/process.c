@@ -851,17 +851,6 @@ asmlinkage int sys_set_thread_area(unsigned long base, unsigned long flags)
 	if (flags & ~TLS_FLAGS_MASK)
 		return -EINVAL;
 
-	/*
-	 * Clear the TLS?
-	 */
-	if (flags & TLS_FLAG_CLEAR) {
-		cpu = get_cpu();
-        	t->tls_desc.a = t->tls_desc.b = 0;
-		load_TLS_desc(t, cpu);
-		put_cpu();
-		return 0;
-	}
-
 	if (flags & TLS_FLAG_WRITABLE)
 		writable = 1;
 

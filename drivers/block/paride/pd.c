@@ -940,7 +940,7 @@ static int __init pd_init(void)
 	int unit;
 
 	if (disable) return -1;
-        if (devfs_register_blkdev(MAJOR_NR,name,&pd_fops)) {
+        if (register_blkdev(MAJOR_NR,name,&pd_fops)) {
                 printk("%s: unable to get major number %d\n",
                         name,major);
                 return -1;
@@ -958,7 +958,7 @@ static int __init pd_init(void)
 	pd_init_units();
 	pd_gendisk.nr_real = pd_detect();
         if (!pd_gendisk.nr_real) {
-		devfs_unregister_blkdev(MAJOR_NR, name);
+		unregister_blkdev(MAJOR_NR, name);
 		del_gendisk(&pd_gendisk);
 		for (unit=0; unit<PD_UNITS; unit++) 
 			if (PD.present)
@@ -971,7 +971,7 @@ static int __init pd_init(void)
 static void __exit pd_exit(void)
 {
 	int unit;
-	devfs_unregister_blkdev(MAJOR_NR, name);
+	unregister_blkdev(MAJOR_NR, name);
 	del_gendisk(&pd_gendisk);
 	for (unit=0; unit<PD_UNITS; unit++) 
 		if (PD.present)

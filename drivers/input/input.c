@@ -822,7 +822,7 @@ static int __init input_init(void)
 	entry = create_proc_read_entry("handlers", 0, proc_bus_input_dir, input_handlers_read, NULL);
 	entry->owner = THIS_MODULE;
 #endif
-	if (devfs_register_chrdev(INPUT_MAJOR, "input", &input_fops)) {
+	if (register_chrdev(INPUT_MAJOR, "input", &input_fops)) {
 		printk(KERN_ERR "input: unable to register char major %d", INPUT_MAJOR);
 		return -EBUSY;
 	}
@@ -840,7 +840,7 @@ static void __exit input_exit(void)
 	remove_proc_entry("input", proc_bus);
 #endif
 	devfs_unregister(input_devfs_handle);
-        if (devfs_unregister_chrdev(INPUT_MAJOR, "input"))
+        if (unregister_chrdev(INPUT_MAJOR, "input"))
                 printk(KERN_ERR "input: can't unregister char major %d", INPUT_MAJOR);
 }
 

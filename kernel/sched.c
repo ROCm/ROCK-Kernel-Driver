@@ -1963,7 +1963,7 @@ out:
  */
 static int migration_thread(void * data)
 {
-	struct sched_param param = { sched_priority: MAX_RT_PRIO-1 };
+	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
 	int cpu = (long) data;
 	runqueue_t *rq;
 	int ret;

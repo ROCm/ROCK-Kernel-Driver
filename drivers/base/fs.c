@@ -26,23 +26,13 @@ extern struct driver_file_entry * device_default_files[];
  */
 int device_create_file(struct device * dev, struct driver_file_entry * entry)
 {
-	struct driver_file_entry * new_entry;
-	int error = -ENOMEM;
+	int error = -EINVAL;
 
-	if (!dev)
-		return -EINVAL;
-	get_device(dev);
-
-	new_entry = kmalloc(sizeof(*new_entry),GFP_KERNEL);
-	if (!new_entry)
-		goto done;
-
-	memcpy(new_entry,entry,sizeof(*entry));
-	error = driverfs_create_file(new_entry,&dev->dir);
-	if (error)
-		kfree(new_entry);
- done:
-	put_device(dev);
+	if (dev) {
+		get_device(dev);
+		error = driverfs_create_file(entry,&dev->dir);
+		put_device(dev);
+	}
 	return error;
 }
 
@@ -103,22 +93,6 @@ static void fill_devpath(struct device * dev, char * path, int length)
 	pr_debug("%s: path = '%s'\n",__FUNCTION__,path);
 }
 
-static int create_symlink(struct driver_dir_entry * parent, char * name, char * path)
-{
-	struct driver_file_entry * entry;
-	int error;
-
-	entry = kmalloc(sizeof(struct driver_file_entry),GFP_KERNEL);
-	if (!entry)
-		return -ENOMEM;
-	entry->name = name;
-	entry->mode = S_IRUGO;
-	error = driverfs_create_symlink(parent,entry,path);
-	if (error)
-		kfree(entry);
-	return error;
-}
-
 int device_bus_link(struct device * dev)
 {
 	char * path;
@@ -148,15 +122,13 @@ int device_bus_link(struct device * dev)
 	strcpy(path,"../../..");
 
 	fill_devpath(dev,path,length);
-	error = create_symlink(&dev->bus->device_dir,dev->bus_id,path);
-
+	error = driverfs_create_symlink(&dev->bus->device_dir,dev->bus_id,path);
 	kfree(path);
 	return error;
 }
 
 int device_create_dir(struct driver_dir_entry * dir, struct driver_dir_entry * parent)
 {
-	INIT_LIST_HEAD(&dir->files);
 	dir->mode  = (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO);
 	return driverfs_create_dir(dir,parent);
 }

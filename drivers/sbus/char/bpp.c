@@ -1041,7 +1041,7 @@ static int __init bpp_init(void)
 	if (rc == 0)
 		return -ENODEV;
 
-	rc = devfs_register_chrdev(BPP_MAJOR, dev_name, &bpp_fops);
+	rc = register_chrdev(BPP_MAJOR, dev_name, &bpp_fops);
 	if (rc < 0)
 		return rc;
 
@@ -1062,7 +1062,7 @@ static void __exit bpp_cleanup(void)
 	unsigned idx;
 
 	devfs_unregister (devfs_handle);
-	devfs_unregister_chrdev(BPP_MAJOR, dev_name);
+	unregister_chrdev(BPP_MAJOR, dev_name);
 
 	for (idx = 0 ;  idx < BPP_NO ;  idx += 1) {
 		if (instances[idx].present)

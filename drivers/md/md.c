@@ -3207,8 +3207,7 @@ int __init md_init(void)
 			MD_MAJOR_VERSION, MD_MINOR_VERSION,
 			MD_PATCHLEVEL_VERSION, MAX_MD_DEVS, MD_SB_DISKS);
 
-	if (devfs_register_blkdev (MAJOR_NR, "md", &md_fops))
-	{
+	if (register_blkdev (MAJOR_NR, "md", &md_fops)) {
 		printk(KERN_ALERT "md: Unable to get major %d for md\n", MAJOR_NR);
 		return (-1);
 	}
@@ -3568,7 +3567,7 @@ void cleanup_module(void)
 	md_unregister_thread(md_recovery_thread);
 	devfs_unregister(devfs_handle);
 
-	devfs_unregister_blkdev(MAJOR_NR,"md");
+	unregister_blkdev(MAJOR_NR,"md");
 	unregister_reboot_notifier(&md_notifier);
 	unregister_sysctl_table(raid_table_header);
 #ifdef CONFIG_PROC_FS

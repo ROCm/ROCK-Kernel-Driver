@@ -420,9 +420,9 @@ nfs_xdr_readdirres(struct rpc_rqst *req, u32 *p, void *dummy)
 	kunmap(*page);
 	return nr;
  short_pkt:
-	kunmap(*page);
 	printk(KERN_NOTICE "NFS: short packet in readdir reply!\n");
 	entry[0] = entry[1] = 0;
+	kunmap(*page);
 	return nr;
 err_unmap:
 	kunmap(*page);

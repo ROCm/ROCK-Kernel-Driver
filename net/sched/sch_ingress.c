@@ -106,7 +106,7 @@ static int ingress_change(struct Qdisc *sch, u32 classid, u32 parent,
 #endif
 	DPRINTK("ingress_change(sch %p,[qdisc %p],classid %x,parent %x),"
 		"arg 0x%lx\n", sch, p, classid, parent, *arg);
-	DPRINTK("No effect. sch_ingress doesnt maintain classes at the moment");
+	DPRINTK("No effect. sch_ingress doesn't maintain classes at the moment");
 	return 0;
 }
 
@@ -118,7 +118,7 @@ static void ingress_walk(struct Qdisc *sch,struct qdisc_walker *walker)
 	struct ingress_qdisc_data *p = PRIV(sch);
 #endif
 	DPRINTK("ingress_walk(sch %p,[qdisc %p],walker %p)\n", sch, p, walker);
-	DPRINTK("No effect. sch_ingress doesnt maintain classes at the moment");
+	DPRINTK("No effect. sch_ingress doesn't maintain classes at the moment");
 }
 
 

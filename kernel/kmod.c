@@ -346,15 +346,15 @@ int call_usermodehelper(char *path, char **argv, char **envp)
 {
 	DECLARE_COMPLETION(work);
 	struct subprocess_info sub_info = {
-		complete:	&work,
-		path:		path,
-		argv:		argv,
-		envp:		envp,
-		retval:		0,
+		.complete	= &work,
+		.path		= path,
+		.argv		= argv,
+		.envp		= envp,
+		.retval		= 0,
 	};
 	struct tq_struct tqs = {
-		routine:	__call_usermodehelper,
-		data:		&sub_info,
+		.routine	= __call_usermodehelper,
+		.data		= &sub_info,
 	};
 
 	if (path[0] == '\0')

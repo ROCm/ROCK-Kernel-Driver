@@ -1615,7 +1615,7 @@ void __init keyboard_zsinit(void (*put_char)(unsigned char))
 			KBD_MAJOR, 0,
 			S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH,
 			&kbd_fops, NULL);
-	if (devfs_register_chrdev (KBD_MAJOR, "kbd", &kbd_fops)){
+	if (register_chrdev (KBD_MAJOR, "kbd", &kbd_fops)){
 		printk ("Could not register /dev/kbd device\n");
 		return;
 	}

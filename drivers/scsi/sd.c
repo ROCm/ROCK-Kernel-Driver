@@ -1198,8 +1198,7 @@ static int sd_init()
 
 	if (!sd_registered) {
 		for (k = 0; k < N_USED_SD_MAJORS; k++) {
-			if (devfs_register_blkdev(SD_MAJOR(k), "sd",
-						  &sd_fops)) {
+			if (register_blkdev(SD_MAJOR(k), "sd", &sd_fops)) {
 				printk(KERN_NOTICE "Unable to get major %d "
 				       "for SCSI disk\n", SD_MAJOR(k));
 				return 1;
@@ -1296,7 +1295,7 @@ cleanup_mem:
 		sd_dsk_arr = NULL;
 	}
 	for (k = 0; k < N_USED_SD_MAJORS; k++) {
-		devfs_unregister_blkdev(SD_MAJOR(k), "sd");
+		unregister_blkdev(SD_MAJOR(k), "sd");
 	}
 	sd_registered--;
 	return 1;
@@ -1560,7 +1559,7 @@ static void __exit exit_sd(void)
 	SCSI_LOG_HLQUEUE(3, printk("exit_sd: exiting sd driver\n"));
 	scsi_unregister_device(&sd_template);
 	for (k = 0; k < N_USED_SD_MAJORS; k++)
-		devfs_unregister_blkdev(SD_MAJOR(k), "sd");
+		unregister_blkdev(SD_MAJOR(k), "sd");
 
 	sd_registered--;
 	if (sd_dsk_arr != NULL) {

@@ -1027,7 +1027,7 @@ int __init loop_init(void)
 		max_loop = 8;
 	}
 
-	if (devfs_register_blkdev(MAJOR_NR, "loop", &lo_fops)) {
+	if (register_blkdev(MAJOR_NR, "loop", &lo_fops)) {
 		printk(KERN_WARNING "Unable to get major number %d for loop"
 				    " device\n", MAJOR_NR);
 		return -EIO;
@@ -1078,7 +1078,7 @@ out_mem:
 void loop_exit(void) 
 {
 	devfs_unregister(devfs_handle);
-	if (devfs_unregister_blkdev(MAJOR_NR, "loop"))
+	if (unregister_blkdev(MAJOR_NR, "loop"))
 		printk(KERN_WARNING "loop: cannot unregister blkdev\n");
 
 	kfree(loop_dev);
