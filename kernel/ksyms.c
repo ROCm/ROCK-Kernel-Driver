@@ -157,6 +157,7 @@ EXPORT_SYMBOL(inode_init_once);
 EXPORT_SYMBOL(follow_up);
 EXPORT_SYMBOL(follow_down);
 EXPORT_SYMBOL(lookup_mnt);
+EXPORT_SYMBOL(lookup_create);
 EXPORT_SYMBOL(path_lookup);
 EXPORT_SYMBOL(path_walk);
 EXPORT_SYMBOL(path_release);
