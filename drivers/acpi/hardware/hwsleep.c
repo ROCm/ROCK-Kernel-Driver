@@ -226,7 +226,7 @@ acpi_enter_sleep_state (
 
 	/* Clear wake status */
 
-	status = acpi_set_register (ACPI_BITREG_WAKE_STATUS, 1, ACPI_MTX_LOCK);
+	status = acpi_set_register (ACPI_BITREG_WAKE_STATUS, 1, ACPI_MTX_DO_NOT_LOCK);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -238,7 +238,7 @@ acpi_enter_sleep_state (
 
 	/* Disable BM arbitration */
 
-	status = acpi_set_register (ACPI_BITREG_ARB_DISABLE, 1, ACPI_MTX_LOCK);
+	status = acpi_set_register (ACPI_BITREG_ARB_DISABLE, 1, ACPI_MTX_DO_NOT_LOCK);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -327,11 +327,6 @@ acpi_enter_sleep_state (
 
 	} while (!in_value);
 
-	status = acpi_set_register (ACPI_BITREG_ARB_DISABLE, 0, ACPI_MTX_DO_NOT_LOCK);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
-	}
-
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -366,7 +361,7 @@ acpi_enter_sleep_state_s4bios (
 
 	ACPI_FLUSH_CPU_CACHE();
 
-	status = acpi_os_write_port (acpi_gbl_FADT->smi_cmd, (acpi_integer) acpi_gbl_FADT->S4bios_req, 8);
+	status = acpi_os_write_port (acpi_gbl_FADT->smi_cmd, (u32) acpi_gbl_FADT->S4bios_req, 8);
 
 	do {
 		acpi_os_stall(1000);

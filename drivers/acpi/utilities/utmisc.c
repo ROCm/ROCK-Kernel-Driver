@@ -592,7 +592,7 @@ acpi_ut_mutex_terminate (
 		(void) acpi_ut_delete_mutex (i);
 	}
 
-	(void) acpi_os_delete_lock (acpi_gbl_gpe_lock);
+	acpi_os_delete_lock (acpi_gbl_gpe_lock);
 	return_VOID;
 }
 
