@@ -765,7 +765,7 @@ $(vmlinux-dirs): prepare-all scripts
 prepare2:
 ifneq ($(KBUILD_SRC),)
 	@echo '  Using $(srctree) as source for kernel'
-	$(Q)if [ -h $(srctree)/include/asm -o -f $(srctree)/.config ]; then \
+	$(Q)if [ -f $(srctree)/.config ]; then \
 		echo "  $(srctree) is not clean, please run 'make mrproper'";\
 		echo "  in the '$(srctree)' directory.";\
 		/bin/false; \
@@ -777,7 +777,7 @@ endif
 # prepare1 creates a makefile if using a separate output directory
 prepare1: prepare2 outputmakefile
 
-prepare0: prepare1 include/linux/version.h include/asm include/config/MARKER
+prepare0: prepare1 include/linux/version.h $(objtree)/include/asm include/config/MARKER
 ifneq ($(KBUILD_MODULES),)
 	$(Q)rm -rf $(MODVERDIR)
 	$(Q)mkdir -p $(MODVERDIR)
@@ -813,7 +813,8 @@ export CPPFLAGS_vmlinux.lds += -P -C -U$(ARCH)
 #	hard to detect, but I suppose "make mrproper" is a good idea
 #	before switching between archs anyway.
 
-include/asm:
+include/asm: $(objtree)/include/asm
+$(objtree)/include/asm:
 	@echo '  SYMLINK $@ -> include/asm-$(ARCH)'
 	$(Q)if [ ! -d include ]; then mkdir -p include; fi;
 	@ln -fsn asm-$(ARCH) $@
