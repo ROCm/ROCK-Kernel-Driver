@@ -525,12 +525,12 @@ out:
  * Pages can be moved from clean_pages or locked_pages onto dirty_pages
  * at any time - it's not possible to lock against that.  So pages which
  * have already been added to a BIO may magically reappear on the dirty_pages
- * list.  And generic_writepages() will again try to lock those pages.
+ * list.  And mpage_writepages() will again try to lock those pages.
  * But I/O has not yet been started against the page.  Thus deadlock.
  *
- * To avoid this, the entire contents of the dirty_pages list are moved
- * onto io_pages up-front.  We then walk io_pages, locking the
- * pages and submitting them for I/O, moving them to locked_pages.
+ * To avoid this, mpage_writepages() will only write pages from io_pages. The
+ * caller must place them there.  We walk io_pages, locking the pages and
+ * submitting them for I/O, moving them to locked_pages.
  *
  * This has the added benefit of preventing a livelock which would otherwise
  * occur if pages are being dirtied faster than we can write them out.
@@ -539,8 +539,8 @@ out:
  * if it's dirty.  This is desirable behaviour for memory-cleaning writeback,
  * but it is INCORRECT for data-integrity system calls such as fsync().  fsync()
  * and msync() need to guarentee that all the data which was dirty at the time
- * the call was made get new I/O started against them.  The way to do this is
- * to run filemap_fdatawait() before calling filemap_fdatawrite().
+ * the call was made get new I/O started against them.  So if called_for_sync()
+ * is true, we must wait for existing IO to complete.
  *
  * It's fairly rare for PageWriteback pages to be on ->dirty_pages.  It
  * means that someone redirtied the page while it was under I/O.
@@ -570,10 +570,7 @@ mpage_writepages(struct address_space *mapping,
 
 	pagevec_init(&pvec, 0);
 	write_lock(&mapping->page_lock);
-
-	list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
-
-        while (!list_empty(&mapping->io_pages) && !done) {
+	while (!list_empty(&mapping->io_pages) && !done) {
 		struct page *page = list_entry(mapping->io_pages.prev,
 					struct page, list);
 		list_del(&page->list);

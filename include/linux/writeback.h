@@ -41,6 +41,7 @@ struct writeback_control {
 					   this for each page written */
 	int nonblocking;		/* Don't get stuck on request queues */
 	int encountered_congestion;	/* An output: a queue is full */
+	int for_kupdate;		/* A kupdate writeback */
 };
 
 /*

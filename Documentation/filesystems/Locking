@@ -211,6 +211,9 @@ written.  The address_space implementation may write more (or less) pages
 than *nr_to_write asks for, but it should try to be reasonably close.  If
 nr_to_write is NULL, all dirty pages must be written.
 
+writepages should _only_ write pages which are present on
+mapping->io_pages.
+
 	->set_page_dirty() is called from various places in the kernel
 when the target page is marked as needing writeback.  It may be called
 under spinlock (it cannot block) and is sometimes called with the page

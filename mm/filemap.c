@@ -62,6 +62,7 @@
  *          ->mapping->page_lock
  *  ->inode_lock
  *    ->sb_lock			(fs/fs-writeback.c)
+ *    ->mapping->page_lock	(__sync_single_inode)
  *  ->page_table_lock
  *    ->swap_device_lock	(try_to_unmap_one)
  *    ->private_lock		(try_to_unmap_one)
@@ -133,6 +134,9 @@ int filemap_fdatawrite(struct address_space *mapping)
 		return 0;
 
 	current->flags |= PF_SYNC;
+	write_lock(&mapping->page_lock);
+	list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
+	write_unlock(&mapping->page_lock);
 	ret = do_writepages(mapping, &wbc);
 	current->flags &= ~PF_SYNC;
 	return ret;

@@ -67,13 +67,9 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 
 	spin_lock(&inode_lock);
 	if ((inode->i_state & flags) != flags) {
-		const int was_dirty = inode->i_state & I_DIRTY;
 		struct address_space *mapping = inode->i_mapping;
 
 		inode->i_state |= flags;
-
-		if (!was_dirty)
-			mapping->dirtied_when = jiffies;
 
 		/*
 		 * If the inode is locked, just update its dirty state. 
@@ -84,18 +80,20 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 			goto out;
 
 		/*
-		 * Only add valid (hashed) inode to the superblock's
+		 * Only add valid (hashed) inodes to the superblock's
 		 * dirty list.  Add blockdev inodes as well.
 		 */
 		if (list_empty(&inode->i_hash) && !S_ISBLK(inode->i_mode))
 			goto out;
 
 		/*
-		 * If the inode was already on s_dirty, don't reposition
-		 * it (that would break s_dirty time-ordering).
+		 * If the inode was already on s_dirty or s_io, don't
+		 * reposition it (that would break s_dirty time-ordering).
 		 */
-		if (!was_dirty)
+		if (!mapping->dirtied_when) {
+			mapping->dirtied_when = jiffies|1; /* 0 is special */
 			list_move(&inode->i_list, &sb->s_dirty);
+		}
 	}
 out:
 	spin_unlock(&inode_lock);
@@ -110,19 +108,17 @@ static void write_inode(struct inode *inode, int sync)
 
 /*
  * Write a single inode's dirty pages and inode data out to disk.
- * If `sync' is set, wait on the writeout.
- * Subtract the number of written pages from nr_to_write.
+ * If `wait' is set, wait on the writeout.
  *
- * Normally it is not legal for a single process to lock more than one
- * page at a time, due to ab/ba deadlock problems.  But writepages()
- * does want to lock a large number of pages, without immediately submitting
- * I/O against them (starting I/O is a "deferred unlock_page").
+ * The whole writeout design is quite complex and fragile.  We want to avoid
+ * starvation of particular inodes when others are being redirtied, prevent
+ * livelocks, etc.
  *
- * However it *is* legal to lock multiple pages, if this is only ever performed
- * by a single process.  We provide that exclusion via locking in the
- * filesystem's ->writepages a_op. This ensures that only a single
- * process is locking multiple pages against this inode.  And as I/O is
- * submitted against all those locked pages, there is no deadlock.
+ * So what we do is to move all pages which are to be written from dirty_pages
+ * onto io_pages.  And keep on writing io_pages until it's empty.  Refusing to
+ * move more pages onto io_pages until io_pages is empty.  Once that point has
+ * been reached, we are ready to take another pass across the inode's dirty
+ * pages.
  *
  * Called under inode_lock.
  */
@@ -131,7 +127,6 @@ __sync_single_inode(struct inode *inode, int wait,
 			struct writeback_control *wbc)
 {
 	unsigned dirty;
-	unsigned long orig_dirtied_when;
 	struct address_space *mapping = inode->i_mapping;
 	struct super_block *sb = inode->i_sb;
 
@@ -141,8 +136,11 @@ __sync_single_inode(struct inode *inode, int wait,
 	dirty = inode->i_state & I_DIRTY;
 	inode->i_state |= I_LOCK;
 	inode->i_state &= ~I_DIRTY;
-	orig_dirtied_when = mapping->dirtied_when;
-	mapping->dirtied_when = 0;	/* assume it's whole-file writeback */
+
+	write_lock(&mapping->page_lock);
+	if (wait || !wbc->for_kupdate || list_empty(&mapping->io_pages))
+		list_splice_init(&mapping->dirty_pages, &mapping->io_pages);
+	write_unlock(&mapping->page_lock);
 	spin_unlock(&inode_lock);
 
 	do_writepages(mapping, wbc);
@@ -155,24 +153,26 @@ __sync_single_inode(struct inode *inode, int wait,
 		filemap_fdatawait(mapping);
 
 	spin_lock(&inode_lock);
-
 	inode->i_state &= ~I_LOCK;
 	if (!(inode->i_state & I_FREEING)) {
-		list_del(&inode->i_list);
-		if (inode->i_state & I_DIRTY) {		/* Redirtied */
-			list_add(&inode->i_list, &sb->s_dirty);
+		if (!list_empty(&mapping->io_pages)) {
+		 	/* Needs more writeback */
+			inode->i_state |= I_DIRTY_PAGES;
+		} else if (!list_empty(&mapping->dirty_pages)) {
+			/* Redirtied */
+			inode->i_state |= I_DIRTY_PAGES;
+			mapping->dirtied_when = jiffies|1;
+			list_move(&inode->i_list, &sb->s_dirty);
+		} else if (inode->i_state & I_DIRTY) {
+			/* Redirtied */
+			mapping->dirtied_when = jiffies|1;
+			list_move(&inode->i_list, &sb->s_dirty);
+		} else if (atomic_read(&inode->i_count)) {
+			mapping->dirtied_when = 0;
+			list_move(&inode->i_list, &inode_in_use);
 		} else {
-			if (!list_empty(&mapping->dirty_pages) ||
-					!list_empty(&mapping->io_pages)) {
-			 	/* Not a whole-file writeback */
-				mapping->dirtied_when = orig_dirtied_when;
-				inode->i_state |= I_DIRTY_PAGES;
-				list_add_tail(&inode->i_list, &sb->s_dirty);
-			} else if (atomic_read(&inode->i_count)) {
-				list_add(&inode->i_list, &inode_in_use);
-			} else {
-				list_add(&inode->i_list, &inode_unused);
-			}
+			mapping->dirtied_when = 0;
+			list_move(&inode->i_list, &inode_unused);
 		}
 	}
 	wake_up_inode(inode);
@@ -185,8 +185,10 @@ static void
 __writeback_single_inode(struct inode *inode, int sync,
 			struct writeback_control *wbc)
 {
-	if (current_is_pdflush() && (inode->i_state & I_LOCK))
+	if (current_is_pdflush() && (inode->i_state & I_LOCK)) {
+		list_move(&inode->i_list, &inode->i_sb->s_dirty);
 		return;
+	}
 
 	while (inode->i_state & I_LOCK) {
 		__iget(inode);
@@ -233,7 +235,9 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 {
 	const unsigned long start = jiffies;	/* livelock avoidance */
 
-	list_splice_init(&sb->s_dirty, &sb->s_io);
+	if (!wbc->for_kupdate || list_empty(&sb->s_io))
+		list_splice_init(&sb->s_dirty, &sb->s_io);
+
 	while (!list_empty(&sb->s_io)) {
 		struct inode *inode = list_entry(sb->s_io.prev,
 						struct inode, i_list);
@@ -275,7 +279,6 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		really_sync = (wbc->sync_mode == WB_SYNC_ALL);
 		BUG_ON(inode->i_state & I_FREEING);
 		__iget(inode);
-		list_move(&inode->i_list, &sb->s_dirty);
 		__writeback_single_inode(inode, really_sync, wbc);
 		if (wbc->sync_mode == WB_SYNC_HOLD) {
 			mapping->dirtied_when = jiffies;
