@@ -351,6 +351,8 @@ running once the system is up.
 
 	hugepages=	[HW,IA-32,IA-64] Maximal number of HugeTLB pages.
 
+	noirqbalance	[IA-32,SMP,KNL] Disable kernel irq balancing
+
 	i8042_direct	[HW] Non-translated mode
 	i8042_dumbkbd
 	i8042_noaux
