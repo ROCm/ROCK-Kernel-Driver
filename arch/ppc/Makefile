@@ -71,7 +71,7 @@ BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd vmlinux.sm
 
 .PHONY: $(BOOT_TARGETS)
 
-all: zImage
+all: uImage zImage
 
 CPPFLAGS_vmlinux.lds	:= -Upowerpc
 
