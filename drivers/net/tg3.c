@@ -5604,7 +5604,8 @@ static void tg3_timer(unsigned long __opaque)
 				need_setup = 1;
 			}
 			if (! netif_carrier_ok(tp->dev) &&
-			    (mac_stat & MAC_STATUS_PCS_SYNCED)) {
+			    (mac_stat & (MAC_STATUS_PCS_SYNCED |
+					 MAC_STATUS_SIGNAL_DET))) {
 				need_setup = 1;
 			}
 			if (need_setup) {
