@@ -414,6 +414,10 @@ extern int sk_isa_probe(struct net_device *);
 extern int proteon_probe(struct net_device *);
 extern int smctr_probe(struct net_device *);
 
+static struct devprobe2 tr_probes2[] __initdata = {
+	{NULL, 0},
+};
+
 static __init int trif_probe(int unit)
 {
 	struct net_device *dev;
@@ -446,6 +450,15 @@ static __init int trif_probe(int unit)
 	return err;
 
 }
+
+static void __init trif_probe2(int unit)
+{
+	unsigned long base_addr = netdev_boot_base("tr", unit);
+
+	if (base_addr == 1)
+		return;
+	probe_list2(unit, tr_probes2, base_addr == 0);
+}
 #endif
 
 	
@@ -471,7 +484,8 @@ static int __init net_olddevs_init(void)
 #endif
 #ifdef CONFIG_TR
 	for (num = 0; num < 8; ++num)
-		trif_probe(num);
+		if (!trif_probe(num))
+			trif_probe2(num);
 #endif
 	for (num = 0; num < 8; ++num)
 		if (!ethif_probe(num))
