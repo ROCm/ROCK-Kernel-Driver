@@ -42,6 +42,7 @@
 #include <asm/sections.h>
 #include <asm/btext.h>
 #include <asm/nvram.h>
+#include <asm/system.h>
 
 extern unsigned long klimit;
 /* extern void *stab; */
@@ -78,10 +79,6 @@ unsigned long decr_overclock_set = 0;
 unsigned long decr_overclock_proc0_set = 0;
 
 int powersave_nap;
-
-#ifdef CONFIG_XMON
-extern void xmon_map_scc(void);
-#endif
 
 char saved_command_line[256];
 unsigned char aux_device_present;
@@ -159,15 +156,11 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {
 #ifdef CONFIG_PPC_PSERIES
-        unsigned int ret, i;
+	unsigned int ret, i;
 #endif
 
 #ifdef CONFIG_XMON_DEFAULT
-	debugger = xmon;
-	debugger_bpt = xmon_bpt;
-	debugger_sstep = xmon_sstep;
-	debugger_iabr_match = xmon_iabr_match;
-	debugger_dabr_match = xmon_dabr_match;
+	xmon_init();
 #endif
 
 #ifdef CONFIG_PPC_ISERIES
@@ -601,12 +594,14 @@ void __init setup_arch(char **cmdline_p)
 	calibrate_delay = ppc64_calibrate_delay;
 
 	ppc64_boot_msg(0x12, "Setup Arch");
-#ifdef CONFIG_XMON
-	xmon_map_scc();
-	if (strstr(cmd_line, "xmon"))
-		xmon(0);
-#endif /* CONFIG_XMON */
 
+#ifdef CONFIG_XMON
+	if (strstr(cmd_line, "xmon")) {
+		/* ensure xmon is enabled */
+		xmon_init();
+		debugger(0);
+	}
+#endif /* CONFIG_XMON */
 
 	/*
 	 * Set cache line size based on type of cpu as a default.
