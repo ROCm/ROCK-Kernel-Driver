@@ -17,6 +17,7 @@
 
 #include <linux/mm.h>
 #include <linux/threads.h>
+#include <linux/compiler.h>
 
 #include <asm/mmu_context.h>
 #include <asm/processor.h>
@@ -37,7 +38,7 @@ pgd_alloc_one_fast (struct mm_struct *mm)
 {
 	unsigned long *ret = pgd_quicklist;
 
-	if (__builtin_expect(ret != NULL, 1)) {
+	if (likely(ret != NULL)) {
 		pgd_quicklist = (unsigned long *)(*ret);
 		ret[0] = 0;
 		--pgtable_cache_size;
@@ -52,9 +53,9 @@ pgd_alloc (struct mm_struct *mm)
 	/* the VM system never calls pgd_alloc_one_fast(), so we do it here. */
 	pgd_t *pgd = pgd_alloc_one_fast(mm);
 
-	if (__builtin_expect(pgd == NULL, 0)) {
+	if (unlikely(pgd == NULL)) {
 		pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
-		if (__builtin_expect(pgd != NULL, 1))
+		if (likely(pgd != NULL))
 			clear_page(pgd);
 	}
 	return pgd;
@@ -80,7 +81,7 @@ pmd_alloc_one_fast (struct mm_struct *mm, unsigned long addr)
 {
 	unsigned long *ret = (unsigned long *)pmd_quicklist;
 
-	if (__builtin_expect(ret != NULL, 1)) {
+	if (likely(ret != NULL)) {
 		pmd_quicklist = (unsigned long *)(*ret);
 		ret[0] = 0;
 		--pgtable_cache_size;
@@ -93,7 +94,7 @@ pmd_alloc_one (struct mm_struct *mm, unsigned long addr)
 {
 	pmd_t *pmd = (pmd_t *) __get_free_page(GFP_KERNEL);
 
-	if (__builtin_expect(pmd != NULL, 1))
+	if (likely(pmd != NULL))
 		clear_page(pmd);
 	return pmd;
 }
@@ -125,7 +126,7 @@ pte_alloc_one (struct mm_struct *mm, unsigned long addr)
 {
 	struct page *pte = alloc_pages(GFP_KERNEL, 0);
 
-	if (__builtin_expect(pte != NULL, 1))
+	if (likely(pte != NULL))
 		clear_page(page_address(pte));
 	return pte;
 }
@@ -135,7 +136,7 @@ pte_alloc_one_kernel (struct mm_struct *mm, unsigned long addr)
 {
 	pte_t *pte = (pte_t *) __get_free_page(GFP_KERNEL);
 
-	if (__builtin_expect(pte != NULL, 1))
+	if (likely(pte != NULL))
 		clear_page(pte);
 	return pte;
 }
