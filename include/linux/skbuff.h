@@ -1132,7 +1132,7 @@ static inline struct sk_buff *skb_padto(struct sk_buff *skb, unsigned int len)
  *	is returned and the old skb data released.
  */
 extern int __skb_linearize(struct sk_buff *skb, int gfp);
-static inline int __deprecated skb_linearize(struct sk_buff *skb, int gfp)
+static inline int skb_linearize(struct sk_buff *skb, int gfp)
 {
 	return __skb_linearize(skb, gfp);
 }
