@@ -43,7 +43,7 @@
 extern struct net_device *ne2_probe(int unit);
 extern struct net_device *hp100_probe(int unit);
 extern struct net_device *ultra_probe(int unit);
-extern int ultra32_probe(struct net_device *dev);
+extern struct net_device *ultra32_probe(int unit);
 extern struct net_device *wd_probe(int unit);
 extern struct net_device *el2_probe(int unit);
 extern struct net_device *ne_probe(int unit);
@@ -160,14 +160,11 @@ static int __init probe_list2(int unit, struct devprobe2 *p, int autoprobe)
  * drivers that probe for EISA cards (in the ISA group).  These are the
  * legacy EISA only driver probes, and also the legacy PCI probes
  */
-static struct devprobe eisa_probes[] __initdata = {
+
+static struct devprobe2 eisa_probes[] __initdata = {
 #ifdef CONFIG_ULTRA32 
 	{ultra32_probe, 0},	
 #endif
-	{NULL, 0},
-};
-
-static struct devprobe2 eisa_probes2[] __initdata = {
 #ifdef CONFIG_AC3200	
 	{ac3200_probe, 0},
 #endif
@@ -379,8 +376,7 @@ static int __init ethif_probe(int unit)
 	 * will be probed before other ISA/EISA/MCA/PCI bus cards.
 	 */
 	if (probe_list(dev, m68k_probes) == 0 ||
-	    probe_list(dev, mips_probes) == 0 ||
-	    probe_list(dev, eisa_probes) == 0)
+	    probe_list(dev, mips_probes) == 0)
 		err = register_netdev(dev);
 
 	if (err)
@@ -396,7 +392,7 @@ static void __init ethif_probe2(int unit)
 	if (base_addr == 1)
 		return;
 
-	probe_list2(unit, eisa_probes2, base_addr == 0) &&
+	probe_list2(unit, eisa_probes, base_addr == 0) &&
 	probe_list2(unit, mca_probes, base_addr == 0) &&
 	probe_list2(unit, isa_probes, base_addr == 0) &&
 	probe_list2(unit, parport_probes, base_addr == 0);
