@@ -164,9 +164,8 @@ zfcp_ccw_set_online(struct ccw_device *ccw_device)
 		goto out;
 	retval = zfcp_erp_thread_setup(adapter);
 	if (retval) {
-		ZFCP_LOG_INFO("error: out of resources. "
-			      "error recovery thread for adapter %s "
-			      "could not be started\n",
+		ZFCP_LOG_INFO("error: start of error recovery thread for "
+			      "adapter %s failed\n",
 			      zfcp_get_busid_by_adapter(adapter));
 		goto out_erp_thread;
 	}
@@ -231,15 +230,15 @@ zfcp_ccw_notify(struct ccw_device *ccw_device, int event)
 	adapter = dev_get_drvdata(&ccw_device->dev);
 	switch (event) {
 	case CIO_GONE:
-		ZFCP_LOG_NORMAL("Adapter %s: device gone.\n",
+		ZFCP_LOG_NORMAL("adapter %s: device gone\n",
 				zfcp_get_busid_by_adapter(adapter));
 		break;
 	case CIO_NO_PATH:
-		ZFCP_LOG_NORMAL("Adapter %s: no path.\n",
+		ZFCP_LOG_NORMAL("adapter %s: no path\n",
 				zfcp_get_busid_by_adapter(adapter));
 		break;
 	case CIO_OPER:
-		ZFCP_LOG_NORMAL("Adapter %s: operational again.\n",
+		ZFCP_LOG_NORMAL("adapter %s: operational again\n",
 				zfcp_get_busid_by_adapter(adapter));
 		zfcp_erp_modify_adapter_status(adapter,
 					       ZFCP_STATUS_COMMON_RUNNING,

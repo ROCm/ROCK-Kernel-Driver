@@ -156,7 +156,6 @@ extern int  zfcp_erp_unit_reopen(struct zfcp_unit *, int);
 extern int  zfcp_erp_unit_shutdown(struct zfcp_unit *, int);
 extern void zfcp_erp_unit_failed(struct zfcp_unit *);
 
-extern void zfcp_erp_scsi_low_mem_buffer_timeout_handler(unsigned long);
 extern int  zfcp_erp_thread_setup(struct zfcp_adapter *);
 extern int  zfcp_erp_thread_kill(struct zfcp_adapter *);
 extern int  zfcp_erp_wait(struct zfcp_adapter *);

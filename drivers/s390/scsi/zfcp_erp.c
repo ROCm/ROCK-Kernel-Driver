@@ -159,31 +159,6 @@ zfcp_erp_adapter_shutdown_all(void)
 }
 
 /*
- * function:     zfcp_erp_scsi_low_mem_buffer_timeout_handler
- *
- * purpose:      This function needs to be called whenever the SCSI command
- *               in the low memory buffer does not return.
- *               Re-opening the adapter means that the command can be returned
- *               by zfcp (it is guarranteed that it does not return via the
- *               adapter anymore). The buffer can then be used again.
- *    
- * returns:      sod all
- */
-void
-zfcp_erp_scsi_low_mem_buffer_timeout_handler(unsigned long data)
-{
-	struct zfcp_adapter *adapter = (struct zfcp_adapter *) data;
-
-	ZFCP_LOG_NORMAL("warning: Emergency buffer for SCSI I/O timed out. "
-			"Restarting all operations on the adapter %s.\n",
-			zfcp_get_busid_by_adapter(adapter));
-	debug_text_event(adapter->erp_dbf, 1, "scsi_lmem_tout");
-	zfcp_erp_adapter_reopen(adapter, 0);
-
-	return;
-}
-
-/*
  * function:	zfcp_fsf_scsi_er_timeout_handler
  *
  * purpose:     This function needs to be called whenever a SCSI error recovery
@@ -199,10 +174,9 @@ zfcp_fsf_scsi_er_timeout_handler(unsigned long data)
 {
 	struct zfcp_adapter *adapter = (struct zfcp_adapter *) data;
 
-	ZFCP_LOG_NORMAL
-	    ("warning: Emergency buffer for SCSI error handling timed out. "
-	     "Restarting all operations on the adapter %s.\n",
-	     zfcp_get_busid_by_adapter(adapter));
+	ZFCP_LOG_NORMAL("warning: SCSI error recovery timed out. "
+			"Restarting all operations on the adapter %s\n",
+			zfcp_get_busid_by_adapter(adapter));
 	debug_text_event(adapter->erp_dbf, 1, "eh_lmem_tout");
 	zfcp_erp_adapter_reopen(adapter, 0);
 
@@ -225,13 +199,13 @@ zfcp_erp_adapter_reopen_internal(struct zfcp_adapter *adapter, int clear_mask)
 	int retval;
 
 	debug_text_event(adapter->erp_dbf, 5, "a_ro");
-	ZFCP_LOG_DEBUG("Reopen on the adapter %s.\n",
+	ZFCP_LOG_DEBUG("reopen adapter %s\n",
 		       zfcp_get_busid_by_adapter(adapter));
 
 	zfcp_erp_adapter_block(adapter, clear_mask);
 
 	if (atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &adapter->status)) {
-		ZFCP_LOG_DEBUG("skipped reopen on the failed adapter %s.\n",
+		ZFCP_LOG_DEBUG("skipped reopen of failed adapter %s\n",
 			       zfcp_get_busid_by_adapter(adapter));
 		debug_text_event(adapter->erp_dbf, 5, "a_ro_f");
 		/* ensure propagation of failed status to new devices */
@@ -390,9 +364,8 @@ zfcp_els(struct zfcp_port *port, u8 ls_code)
 	case ZFCP_LS_RTV:
 		send_els->req->length = sizeof(struct zfcp_ls_rtv);
 		send_els->resp->length = sizeof(struct zfcp_ls_rtv_acc);
-		ZFCP_LOG_NORMAL(
-			"RTV request from sid 0x%06x to did 0x%06x\n",
-			port->adapter->s_id, port->d_id);
+		ZFCP_LOG_INFO("RTV request from s_id 0x%08x to d_id 0x%08x\n",
+			      port->adapter->s_id, port->d_id);
 		break;
 
 	case ZFCP_LS_RLS:
@@ -400,10 +373,9 @@ zfcp_els(struct zfcp_port *port, u8 ls_code)
 		send_els->resp->length = sizeof(struct zfcp_ls_rls_acc);
 		rls = (struct zfcp_ls_rls*)req;
 		rls->port_id = port->adapter->s_id;
-		ZFCP_LOG_NORMAL(
-			"RLS request from sid 0x%06x to did 0x%06x "
-			"with payload(port_id=0x%06x)\n",
-			port->adapter->s_id, port->d_id, rls->port_id);
+		ZFCP_LOG_INFO("RLS request from s_id 0x%08x to d_id 0x%08x "
+			      "(port_id=0x%08x)\n",
+			      port->adapter->s_id, port->d_id, rls->port_id);
 		break;
 
 	case ZFCP_LS_PDISC:
@@ -412,11 +384,10 @@ zfcp_els(struct zfcp_port *port, u8 ls_code)
 		pdisc = (struct zfcp_ls_pdisc*)req;
 		pdisc->wwpn = port->adapter->wwpn;
 		pdisc->wwnn = port->adapter->wwnn;
-		ZFCP_LOG_NORMAL(
-			"PDISC request from sid 0x%06x to did 0x%06x "
-			"with payload(wwpn=0x%016Lx wwnn=0x%016Lx)\n",
-			port->adapter->s_id, port->d_id,
-			pdisc->wwpn, pdisc->wwnn);
+		ZFCP_LOG_INFO("PDISC request from s_id 0x%08x to d_id 0x%08x "
+			      "(wwpn=0x%016Lx, wwnn=0x%016Lx)\n",
+			      port->adapter->s_id, port->d_id,
+			      pdisc->wwpn, pdisc->wwnn);
 		break;
 
 	case ZFCP_LS_ADISC:
@@ -427,35 +398,33 @@ zfcp_els(struct zfcp_port *port, u8 ls_code)
 		adisc->wwpn = port->adapter->wwpn;
 		adisc->wwnn = port->adapter->wwnn;
 		adisc->nport_id = port->adapter->s_id;
-		ZFCP_LOG_NORMAL(
-			"ADISC request from sid 0x%06x to did 0x%06x "
-			"with payload(wwpn=0x%016Lx wwnn=0x%016Lx "
-			"hard_nport_id=0x%06x nport_id=0x%06x)\n",
-			port->adapter->s_id, port->d_id,
-			adisc->wwpn, adisc->wwnn,
-			adisc->hard_nport_id, adisc->nport_id);
+		ZFCP_LOG_INFO("ADISC request from s_id 0x%08x to d_id 0x%08x "
+			      "(wwpn=0x%016Lx, wwnn=0x%016Lx, "
+			      "hard_nport_id=0x%08x, nport_id=0x%08x)\n",
+			      port->adapter->s_id, port->d_id,
+			      adisc->wwpn, adisc->wwnn,
+			      adisc->hard_nport_id, adisc->nport_id);
 		break;
 
 	default:
-		ZFCP_LOG_NORMAL(
-			"ELS command code 0x%02x is not supported\n", ls_code);
+		ZFCP_LOG_NORMAL("ELS command code 0x%02x is not supported\n",
+				ls_code);
 		retval = -EINVAL;
 		goto invalid_ls_code;
 	}
 
 	retval = zfcp_fsf_send_els(send_els);
 	if (retval != 0) {
-		ZFCP_LOG_NORMAL(
-			"ELS request could not be processed "
-			"(sid=0x%06x did=0x%06x)\n",
-			port->adapter->s_id, port->d_id);
+		ZFCP_LOG_NORMAL("error: initiation of Send ELS failed for port "
+				"0x%016Lx on adapter %s\n",
+				port->wwpn, zfcp_get_busid_by_port(port));
 		retval = -EPERM;
 	}
 
 	goto out;
 
 nomem:
-	ZFCP_LOG_INFO("Out of memory!\n");
+	ZFCP_LOG_DEBUG("out of memory\n");
 	retval = -ENOMEM;
 
 invalid_ls_code:
@@ -513,68 +482,53 @@ zfcp_els_handler(unsigned long data)
 		switch (rjt->reason_code) {
 
 		case ZFCP_LS_RJT_INVALID_COMMAND_CODE:
-			ZFCP_LOG_NORMAL(
-				"Invalid command code "
-				"(wwpn=0x%016Lx command=0x%02x)\n",
-				(unsigned long long)port->wwpn,
-				req_code);
+			ZFCP_LOG_INFO("invalid LS command code "
+				      "(wwpn=0x%016Lx, command=0x%02x)\n",
+				      port->wwpn, req_code);
 			break;
 
 		case ZFCP_LS_RJT_LOGICAL_ERROR:
-			ZFCP_LOG_NORMAL(
-				"Logical error "
-				"(wwpn=0x%016Lx reason_explanation=0x%02x)\n",
-				(unsigned long long)port->wwpn,
-				rjt->reason_expl);
+			ZFCP_LOG_INFO("logical error (wwpn=0x%016Lx, "
+				      "reason_expl=0x%02x)\n",
+				      port->wwpn, rjt->reason_expl);
 			break;
 
 		case ZFCP_LS_RJT_LOGICAL_BUSY:
-			ZFCP_LOG_NORMAL(
-				"Logical busy "
-				"(wwpn=0x%016Lx reason_explanation=0x%02x)\n",
-				(unsigned long long)port->wwpn,
-				rjt->reason_expl);
+			ZFCP_LOG_INFO("logical busy (wwpn=0x%016Lx, "
+				      "reason_expl=0x%02x)\n",
+				      port->wwpn, rjt->reason_expl);
 			break;
 
 		case ZFCP_LS_RJT_PROTOCOL_ERROR:
-			ZFCP_LOG_NORMAL(
-				"Protocol error "
-				"(wwpn=0x%016Lx reason_explanation=0x%02x)\n",
-				(unsigned long long)port->wwpn,
-				rjt->reason_expl);
+			ZFCP_LOG_INFO("protocol error (wwpn=0x%016Lx, "
+				      "reason_expl=0x%02x)\n",
+				      port->wwpn, rjt->reason_expl);
 			break;
 
 		case ZFCP_LS_RJT_UNABLE_TO_PERFORM:
-			ZFCP_LOG_NORMAL(
-				"Unable to perform command requested "
-				"(wwpn=0x%016Lx reason_explanation=0x%02x)\n",
-				(unsigned long long)port->wwpn,
-				rjt->reason_expl);
+			ZFCP_LOG_INFO("unable to perform command requested "
+				      "(wwpn=0x%016Lx, reason_expl=0x%02x)\n",
+				      port->wwpn, rjt->reason_expl);
 			break;
 
 		case ZFCP_LS_RJT_COMMAND_NOT_SUPPORTED:
-			ZFCP_LOG_NORMAL(
-				"Command not supported "
-				"(wwpn=0x%016Lx command=0x%02x)\n",
-				(unsigned long long)port->wwpn,
-				req_code);
+			ZFCP_LOG_INFO("command not supported (wwpn=0x%016Lx, "
+				      "command=0x%02x)\n",
+				      port->wwpn, req_code);
 			break;
 
 		case ZFCP_LS_RJT_VENDOR_UNIQUE_ERROR:
-			ZFCP_LOG_NORMAL(
-				"Vendor unique error "
-				"(wwpn=0x%016Lx vendor_unique=0x%02x)\n",
-				(unsigned long long)port->wwpn,
-				rjt->vendor_unique);
+			ZFCP_LOG_INFO("vendor specific error (wwpn=0x%016Lx, "
+				      "vendor_unique=0x%02x)\n",
+				      port->wwpn, rjt->vendor_unique);
 			break;
 
 		default:
-			ZFCP_LOG_NORMAL(
-				"ELS has been rejected by remote port "
-				"with WWPN 0x%Lx on the adapter %s "
-				"with the reason code 0x%02x\n",
-				port->wwpn, zfcp_get_busid_by_port(port),
-				rjt->reason_code);
+			ZFCP_LOG_NORMAL("ELS rejected by remote port 0x%016Lx "
+					"on adapter %s (reason_code=0x%02x)\n",
+					port->wwpn,
+					zfcp_get_busid_by_port(port),
+					rjt->reason_code);
 		}
 		retval = -ENXIO;
 		break;
@@ -584,57 +538,51 @@ zfcp_els_handler(unsigned long data)
 
 		case ZFCP_LS_RTV:
 			rtv = (struct zfcp_ls_rtv_acc*)resp;
-			ZFCP_LOG_NORMAL(
-				"RTV response from did 0x%06x to sid 0x%06x "
-				"with payload(R_A_TOV=%ds E_D_TOV=%d%cs)\n",
-				port->d_id, port->adapter->s_id,
-				rtv->r_a_tov, rtv->e_d_tov,
-				rtv->qualifier & ZFCP_LS_RTV_E_D_TOV_FLAG ?
-					'n' : 'm');
+			ZFCP_LOG_INFO("RTV response from d_id 0x%08x to s_id "
+				      "0x%08x (R_A_TOV=%ds E_D_TOV=%d%cs)\n",
+				      port->d_id, port->adapter->s_id,
+				      rtv->r_a_tov, rtv->e_d_tov,
+				      rtv->qualifier &
+				      ZFCP_LS_RTV_E_D_TOV_FLAG ? 'n' : 'm');
 			break;
 
 		case ZFCP_LS_RLS:
 			rls = (struct zfcp_ls_rls_acc*)resp;
-			ZFCP_LOG_NORMAL(
-				"RLS response from did 0x%06x to sid 0x%06x "
-				"with payload(link_failure_count=%u "
-				"loss_of_sync_count=%u "
-				"loss_of_signal_count=%u "
-				"primitive_sequence_protocol_error=%u "
-				"invalid_transmition_word=%u "
-				"invalid_crc_count=%u)\n",
-				port->d_id, port->adapter->s_id,
-				rls->link_failure_count,
-				rls->loss_of_sync_count,
-				rls->loss_of_signal_count,
-				rls->prim_seq_prot_error,
-				rls->invalid_transmition_word,
-				rls->invalid_crc_count);
+			ZFCP_LOG_INFO("RLS response from d_id 0x%08x to s_id "
+				      "0x%08x (link_failure_count=%u, "
+				      "loss_of_sync_count=%u, "
+				      "loss_of_signal_count=%u, "
+				      "primitive_sequence_protocol_error=%u, "
+				      "invalid_transmition_word=%u, "
+				      "invalid_crc_count=%u)\n",
+				      port->d_id, port->adapter->s_id,
+				      rls->link_failure_count,
+				      rls->loss_of_sync_count,
+				      rls->loss_of_signal_count,
+				      rls->prim_seq_prot_error,
+				      rls->invalid_transmition_word,
+				      rls->invalid_crc_count);
 			break;
 
 		case ZFCP_LS_PDISC:
 			pdisc = (struct zfcp_ls_pdisc_acc*)resp;
-			ZFCP_LOG_NORMAL(
-				"PDISC response from did 0x%06x to sid 0x%06x "
-				"with payload(wwpn=0x%016Lx wwnn=0x%016Lx "
-				"vendor='%-16s')\n",
-				port->d_id, port->adapter->s_id,
-				(unsigned long long)pdisc->wwpn,
-				(unsigned long long)pdisc->wwnn,
-				pdisc->vendor_version);
+			ZFCP_LOG_INFO("PDISC response from d_id 0x%08x to s_id "
+				      "0x%08x (wwpn=0x%016Lx, wwnn=0x%016Lx, "
+				      "vendor='%-16s')\n", port->d_id,
+				      port->adapter->s_id, pdisc->wwpn,
+				      pdisc->wwnn, pdisc->vendor_version);
 			break;
 
 		case ZFCP_LS_ADISC:
 			adisc = (struct zfcp_ls_adisc_acc*)resp;
-			ZFCP_LOG_NORMAL(
-				"ADISC response from did 0x%06x to sid 0x%06x "
-				"with payload(wwpn=0x%016Lx wwnn=0x%016Lx "
-				"hard_nport_id=0x%06x nport_id=0x%06x)\n",
-				port->d_id, port->adapter->s_id,
-				(unsigned long long)adisc->wwpn,
-				(unsigned long long)adisc->wwnn,
-				adisc->hard_nport_id, adisc->nport_id);
-			/* FIXME: missing wwnn value in port struct */
+			ZFCP_LOG_INFO("ADISC response from d_id 0x%08x to s_id "
+				      "0x%08x (wwpn=0x%016Lx, wwnn=0x%016Lx, "
+				      "hard_nport_id=0x%08x, "
+				      "nport_id=0x%08x)\n", port->d_id,
+				      port->adapter->s_id, adisc->wwpn,
+				      adisc->wwnn, adisc->hard_nport_id,
+				      adisc->nport_id);
+			/* FIXME: set wwnn in during open port */
 			if (port->wwnn == 0)
 				port->wwnn = adisc->wwnn;
 			break;
@@ -642,17 +590,16 @@ zfcp_els_handler(unsigned long data)
 		break;
 
 	default:
-		ZFCP_LOG_NORMAL(
-			"Unknown payload code 0x%02x received on a request "
-			"0x%02x from sid 0x%06x to did 0x%06x, "
-			"port needs to be reopened\n",
-			req_code, resp_code, port->adapter->s_id, port->d_id);
+		ZFCP_LOG_NORMAL("unknown payload code 0x%02x received for "
+				"request 0x%02x to d_id 0x%08x, reopen needed "
+				"for port 0x%016Lx on adapter %s\n", resp_code,
+				req_code, port->d_id,  port->wwpn,
+				zfcp_get_busid_by_port(port));
 		retval = zfcp_erp_port_forced_reopen(port, 0);
 		if (retval != 0) {
-			ZFCP_LOG_NORMAL(
-				"Cannot reopen a remote port "
-				"with WWPN 0x%Lx on the adapter %s\n",
-				port->wwpn, zfcp_get_busid_by_port(port));
+			ZFCP_LOG_NORMAL("reopen of remote port 0x%016Lx on "
+					"adapter %s failed\n", port->wwpn,
+					zfcp_get_busid_by_port(port));
 			retval = -EPERM;
 		}
 	}
@@ -681,16 +628,14 @@ zfcp_test_link(struct zfcp_port *port)
 
 	retval = zfcp_els(port, ZFCP_LS_ADISC);
 	if (retval != 0) {
-		ZFCP_LOG_NORMAL(
-			"Port with WWPN 0x%Lx on the adapter %s "
-			"needs to be reopened\n",
-			port->wwpn, zfcp_get_busid_by_port(port));
+		ZFCP_LOG_NORMAL("reopen needed for port 0x%016Lx "
+				"on adapter %s\n ", port->wwpn,
+				zfcp_get_busid_by_port(port));
 		retval = zfcp_erp_port_forced_reopen(port, 0);
 		if (retval != 0) {
-			ZFCP_LOG_NORMAL(
-				"Cannot reopen a remote port "
-				"with WWPN 0x%Lx on the adapter %s\n",
-				port->wwpn, zfcp_get_busid_by_port(port));
+			ZFCP_LOG_NORMAL("reopen of remote port 0x%016Lx "
+					"on adapter %s failed\n", port->wwpn,
+					zfcp_get_busid_by_port(port));
 			retval = -EPERM;
 		}
 	}
@@ -718,16 +663,15 @@ zfcp_erp_port_forced_reopen_internal(struct zfcp_port *port, int clear_mask)
 	debug_text_event(adapter->erp_dbf, 5, "pf_ro");
 	debug_event(adapter->erp_dbf, 5, &port->wwpn, sizeof (wwn_t));
 
-	ZFCP_LOG_DEBUG("Forced reopen of the port with WWPN 0x%Lx "
-		       "on the adapter %s.\n",
+	ZFCP_LOG_DEBUG("forced reopen of port 0x%016Lx on adapter %s\n",
 		       port->wwpn, zfcp_get_busid_by_port(port));
 
 	zfcp_erp_port_block(port, clear_mask);
 
 	if (atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &port->status)) {
-		ZFCP_LOG_DEBUG("skipped forced reopen on the failed port "
-			       "with WWPN 0x%Lx on the adapter %s.\n",
-			       port->wwpn, zfcp_get_busid_by_port(port));
+		ZFCP_LOG_DEBUG("skipped forced reopen of failed port 0x%016Lx "
+			       "on adapter %s\n", port->wwpn,
+			       zfcp_get_busid_by_port(port));
 		debug_text_event(adapter->erp_dbf, 5, "pf_ro_f");
 		debug_event(adapter->erp_dbf, 5, &port->wwpn, sizeof (wwn_t));
 		retval = -EIO;
@@ -786,17 +730,15 @@ zfcp_erp_port_reopen_internal(struct zfcp_port *port, int clear_mask)
 	debug_text_event(adapter->erp_dbf, 5, "p_ro");
 	debug_event(adapter->erp_dbf, 5, &port->wwpn, sizeof (wwn_t));
 
-	ZFCP_LOG_DEBUG("Reopen of the port with WWPN 0x%Lx "
-		       "on the adapter %s.\n",
+	ZFCP_LOG_DEBUG("reopen of port 0x%016Lx on adapter %s\n",
 		       port->wwpn, zfcp_get_busid_by_port(port));
 
 	zfcp_erp_port_block(port, clear_mask);
 
 	if (atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &port->status)) {
-		ZFCP_LOG_DEBUG
-		    ("skipped reopen on the failed port with WWPN 0x%Lx "
-		     "on the adapter %s.\n", port->wwpn,
-		     zfcp_get_busid_by_port(port));
+		ZFCP_LOG_DEBUG("skipped reopen of failed port 0x%016Lx "
+			       "on adapter %s\n", port->wwpn,
+			       zfcp_get_busid_by_port(port));
 		debug_text_event(adapter->erp_dbf, 5, "p_ro_f");
 		debug_event(adapter->erp_dbf, 5, &port->wwpn, sizeof (wwn_t));
 		/* ensure propagation of failed status to new devices */
@@ -855,20 +797,17 @@ zfcp_erp_unit_reopen_internal(struct zfcp_unit *unit, int clear_mask)
 
 	debug_text_event(adapter->erp_dbf, 5, "u_ro");
 	debug_event(adapter->erp_dbf, 5, &unit->fcp_lun, sizeof (fcp_lun_t));
-	ZFCP_LOG_DEBUG("Reopen of the unit with FCP LUN 0x%Lx on the "
-		       "port with WWPN 0x%Lx "
-		       "on the adapter %s.\n",
-		       unit->fcp_lun,
+	ZFCP_LOG_DEBUG("reopen of unit 0x%016Lx on port 0x%016Lx "
+		       "on adapter %s\n", unit->fcp_lun,
 		       unit->port->wwpn, zfcp_get_busid_by_unit(unit));
 
 	zfcp_erp_unit_block(unit, clear_mask);
 
 	if (atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &unit->status)) {
-		ZFCP_LOG_DEBUG
-		    ("skipped reopen on the failed unit with FCP LUN 0x%Lx "
-		     "on the port with WWPN 0x%Lx " "on the adapter %s.\n",
-		     unit->fcp_lun, unit->port->wwpn,
-		     zfcp_get_busid_by_unit(unit));
+		ZFCP_LOG_DEBUG("skipped reopen of failed unit 0x%016Lx "
+			       "on port 0x%016Lx on adapter %s\n",
+			       unit->fcp_lun, unit->port->wwpn,
+			       zfcp_get_busid_by_unit(unit));
 		debug_text_event(adapter->erp_dbf, 5, "u_ro_f");
 		debug_event(adapter->erp_dbf, 5, &unit->fcp_lun,
 			    sizeof (fcp_lun_t));
@@ -1115,14 +1054,10 @@ zfcp_erp_strategy_check_fsfreq(struct zfcp_erp_action *erp_action)
 				fsf_req->status |= ZFCP_STATUS_FSFREQ_DISMISSED;
 			}
 			if (erp_action->status & ZFCP_STATUS_ERP_TIMEDOUT) {
-				ZFCP_LOG_NORMAL
-					("error: Error Recovery Procedure "
-					 "step timed out. The action flag "
-					 "is 0x%x. The FSF request "
-					 "is at 0x%lx\n",
-					 erp_action->action,
-					 (unsigned long)
-					 erp_action->fsf_req);
+				ZFCP_LOG_NORMAL("error: erp step timed out "
+						"(action=%d, fsf_req=%p)\n ",
+						erp_action->action,
+						erp_action->fsf_req);
 			}
 			/*
 			 * If fsf_req is neither dismissed nor completed
@@ -1287,9 +1222,8 @@ zfcp_erp_thread_setup(struct zfcp_adapter *adapter)
 
 	retval = kernel_thread(zfcp_erp_thread, adapter, SIGCHLD);
 	if (retval < 0) {
-		ZFCP_LOG_NORMAL("error: Out of resources. Could not create an "
-				"error recovery procedure thread "
-				"for the adapter %s.\n",
+		ZFCP_LOG_NORMAL("error: creation of erp thread failed for "
+				"adapter %s\n",
 				zfcp_get_busid_by_adapter(adapter));
 		debug_text_event(adapter->erp_dbf, 5, "a_thset_fail");
 	} else {
@@ -1475,11 +1409,10 @@ zfcp_erp_strategy(struct zfcp_erp_action *erp_action)
 		 */
 		if (adapter->erp_total_count == adapter->erp_low_mem_count) {
 			debug_text_event(adapter->erp_dbf, 3, "a_st_lowmem");
-			ZFCP_LOG_NORMAL
-				("error: Out of memory. No mempool elements "
-				 "available. Restarting IO on the adapter %s "
-				 "to free mempool.\n",
-				 zfcp_get_busid_by_adapter(adapter));
+			ZFCP_LOG_NORMAL("error: no mempool elements available, "
+					"restarting I/O on adapter %s "
+					"to free mempool\n",
+					zfcp_get_busid_by_adapter(adapter));
 			zfcp_erp_adapter_reopen_internal(adapter, 0);
 		} else {
 		debug_text_event(adapter->erp_dbf, 2, "a_st_memw");
@@ -1618,9 +1551,8 @@ zfcp_erp_strategy_do_action(struct zfcp_erp_action *erp_action)
 		debug_text_exception(adapter->erp_dbf, 1, "a_stda_bug");
 		debug_event(adapter->erp_dbf, 1, &erp_action->action,
 			    sizeof (int));
-		ZFCP_LOG_NORMAL("bug: Unknown error recovery procedure "
-				"action requested on the adapter %s "
-				"(debug info %d)\n",
+		ZFCP_LOG_NORMAL("bug: unknown erp action requested on "
+				"adapter %s (action=%d)\n",
 				zfcp_get_busid_by_adapter(erp_action->adapter),
 				erp_action->action);
 	}
@@ -1664,8 +1596,8 @@ zfcp_erp_adapter_failed(struct zfcp_adapter *adapter)
 {
 	zfcp_erp_modify_adapter_status(adapter,
 				       ZFCP_STATUS_COMMON_ERP_FAILED, ZFCP_SET);
-	ZFCP_LOG_NORMAL("Adapter recovery failed on the "
-			"adapter %s.\n", zfcp_get_busid_by_adapter(adapter));
+	ZFCP_LOG_NORMAL("adapter erp failed on adapter %s\n",
+			zfcp_get_busid_by_adapter(adapter));
 	debug_text_event(adapter->erp_dbf, 2, "a_afail");
 }
 
@@ -1681,9 +1613,7 @@ zfcp_erp_port_failed(struct zfcp_port *port)
 	zfcp_erp_modify_port_status(port,
 				    ZFCP_STATUS_COMMON_ERP_FAILED, ZFCP_SET);
 
-	ZFCP_LOG_NORMAL("Port recovery failed on the "
-			"port with WWPN 0x%Lx at the "
-			"adapter %s.\n",
+	ZFCP_LOG_NORMAL("port erp failed on port 0x%016Lx on adapter %s\n",
 			port->wwpn, zfcp_get_busid_by_port(port));
 	debug_text_event(port->adapter->erp_dbf, 2, "p_pfail");
 	debug_event(port->adapter->erp_dbf, 2, &port->wwpn, sizeof (wwn_t));
@@ -1701,10 +1631,8 @@ zfcp_erp_unit_failed(struct zfcp_unit *unit)
 	zfcp_erp_modify_unit_status(unit,
 				    ZFCP_STATUS_COMMON_ERP_FAILED, ZFCP_SET);
 
-	ZFCP_LOG_NORMAL("Unit recovery failed on the unit with FCP LUN 0x%Lx "
-			"connected to the port with WWPN 0x%Lx at the "
-			"adapter %s.\n",
-			unit->fcp_lun,
+	ZFCP_LOG_NORMAL("unit erp failed on unit 0x%016Lx on port 0x%016Lx "
+			" on adapter %s\n", unit->fcp_lun,
 			unit->port->wwpn, zfcp_get_busid_by_unit(unit));
 	debug_text_event(unit->port->adapter->erp_dbf, 2, "u_ufail");
 	debug_event(unit->port->adapter->erp_dbf, 2,
@@ -1863,13 +1791,10 @@ zfcp_erp_schedule_work(struct zfcp_unit *unit)
 		return 0;
 
 	if ((p = kmalloc(sizeof(*p), GFP_KERNEL)) == NULL) {
-		ZFCP_LOG_NORMAL("error: Out of resources. Could not register "
-			      "the FCP-LUN 0x%Lx connected to "
-			      "the port with WWPN 0x%Lx connected to "
-			      "the adapter %s with the SCSI stack.\n",
-			      unit->fcp_lun,
-			      unit->port->wwpn,
-			      zfcp_get_busid_by_unit(unit));
+		ZFCP_LOG_NORMAL("error: registration at SCSI stack failed for "
+				"unit 0x%016Lx on port 0x%016Lx on "
+				"adapter %s\n", unit->fcp_lun, unit->port->wwpn,
+				zfcp_get_busid_by_unit(unit));
 		atomic_set(&unit->scsi_add_work, 0);
 		return -ENOMEM;
 	}
@@ -2279,7 +2204,7 @@ zfcp_erp_adapter_strategy(struct zfcp_erp_action *erp_action)
 
 	if (retval == ZFCP_ERP_FAILED) {
 		ZFCP_LOG_INFO("Waiting to allow the adapter %s "
-			      "to recover itself\n.",
+			      "to recover itself\n",
 			      zfcp_get_busid_by_adapter(adapter));
 		/*
 		 * SUGGESTION: substitute by
@@ -2395,25 +2320,23 @@ zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 	int retval_cleanup = 0;
 
 	if (atomic_test_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status)) {
-		ZFCP_LOG_NORMAL
-		    ("bug: QDIO (data transfer mechanism) start-up on "
-		     "adapter %s attempted twice. Second attempt ignored.\n",
-		     zfcp_get_busid_by_adapter(adapter));
+		ZFCP_LOG_NORMAL("bug: second attempt to set up QDIO on "
+				"adapter %s\n",
+				zfcp_get_busid_by_adapter(adapter));
 		goto failed_sanity;
 	}
 
 	if (qdio_establish(&adapter->qdio_init_data) != 0) {
-		ZFCP_LOG_INFO
-		    ("error: Could not establish queues for QDIO (data "
-		     "transfer mechanism) operation on adapter %s\n.",
-		     zfcp_get_busid_by_adapter(adapter));
+		ZFCP_LOG_INFO("error: establishment of QDIO queues failed "
+			      "on adapter %s\n.",
+			      zfcp_get_busid_by_adapter(adapter));
 		goto failed_qdio_establish;
 	}
 	ZFCP_LOG_DEBUG("queues established\n");
 
 	if (qdio_activate(adapter->ccw_device, 0) != 0) {
-		ZFCP_LOG_INFO("error: Could not activate queues for QDIO (data "
-			      "transfer mechanism) operation on adapter %s\n.",
+		ZFCP_LOG_INFO("error: activation of QDIO queues failed "
+			      "on adapter %s\n",
 			      zfcp_get_busid_by_adapter(adapter));
 		goto failed_qdio_activate;
 	}
@@ -2429,8 +2352,8 @@ zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 		sbale->addr = 0;
 	}
 
-	ZFCP_LOG_TRACE("Calling do QDIO busid=%s, flags=0x%x, queue_no=%i, "
-		       "index_in_queue=%i, count=%i\n",
+	ZFCP_LOG_TRACE("calling do_QDIO on adapter %s (flags=0x%x, "
+		       "queue_no=%i, index_in_queue=%i, count=%i)\n",
 		       zfcp_get_busid_by_adapter(adapter),
 		       QDIO_FLAG_SYNC_INPUT, 0, 0, QDIO_MAX_BUFFERS_PER_Q);
 
@@ -2439,17 +2362,14 @@ zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 			 0, 0, QDIO_MAX_BUFFERS_PER_Q, NULL);
 
 	if (retval) {
-		ZFCP_LOG_NORMAL
-		    ("bug: QDIO (data transfer mechanism) inobund transfer "
-		     "structures could not be set-up (debug info %d)\n",
-		     retval);
+		ZFCP_LOG_NORMAL("bug: setup of QDIO failed (retval=%d)\n",
+				retval);
 		goto failed_do_qdio;
 	} else {
 		adapter->response_queue.free_index = 0;
 		atomic_set(&adapter->response_queue.free_count, 0);
-		ZFCP_LOG_DEBUG
-		    ("%i buffers successfully enqueued to response queue\n",
-		     QDIO_MAX_BUFFERS_PER_Q);
+		ZFCP_LOG_DEBUG("%i buffers successfully enqueued to "
+			       "response queue\n", QDIO_MAX_BUFFERS_PER_Q);
 	}
 	/* set index of first avalable SBALS / number of available SBALS */
 	adapter->request_queue.free_index = 0;
@@ -2474,9 +2394,8 @@ zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 	retval_cleanup = qdio_shutdown(adapter->ccw_device,
 				       QDIO_FLAG_CLEANUP_USING_CLEAR);
 	if (retval_cleanup) {
-		ZFCP_LOG_NORMAL
-		    ("bug: Could not clean QDIO (data transfer mechanism) "
-		     "queues. (debug info %i).\n", retval_cleanup);
+		ZFCP_LOG_NORMAL("bug: shutdown of QDIO queues failed "
+				"(retval=%d)\n", retval_cleanup);
 	}
 	else
 		debug_text_event(adapter->req_dbf, 1, "q_clean");
@@ -2508,9 +2427,8 @@ zfcp_erp_adapter_strategy_close_qdio(struct zfcp_erp_action *erp_action)
 	struct zfcp_adapter *adapter = erp_action->adapter;
 
 	if (!atomic_test_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status)) {
-		ZFCP_LOG_DEBUG("Termination of QDIO (data transfer operation) "
-			       "attempted for an inactive qdio on the "
-			       "adapter %s....ignored.\n",
+		ZFCP_LOG_DEBUG("error: attempt to shut down inactive QDIO "
+			       "queues on adapter %s\n",
 			       zfcp_get_busid_by_adapter(adapter));
 		retval = ZFCP_ERP_FAILED;
 		goto out;
@@ -2547,10 +2465,9 @@ zfcp_erp_adapter_strategy_close_qdio(struct zfcp_erp_action *erp_action)
 		 * FIXME(design):
 		 * What went wrong? What to do best? Proper retval?
 		 */
-		ZFCP_LOG_NORMAL
-		    ("error: Clean-up of QDIO (data transfer mechanism) "
-		     "structures failed for adapter %s.\n",
-		     zfcp_get_busid_by_adapter(adapter));
+		ZFCP_LOG_NORMAL("bug: shutdown of QDIO queues failed on "
+				"adapter %s\n",
+				zfcp_get_busid_by_adapter(adapter));
 	} else {
 		ZFCP_LOG_DEBUG("queues cleaned up\n");
 		debug_text_event(adapter->req_dbf, 1, "q_clean");
@@ -2631,10 +2548,9 @@ zfcp_erp_adapter_strategy_open_fsf_xconfig(struct zfcp_erp_action *erp_action)
 		if (zfcp_fsf_exchange_config_data(erp_action)) {
 			retval = ZFCP_ERP_FAILED;
 			debug_text_event(adapter->erp_dbf, 5, "a_fstx_xf");
-			ZFCP_LOG_INFO("error: Out of resources. Could not "
-				      "start exchange of configuration data "
-				      "between the adapter %s "
-				      "and the device driver.\n",
+			ZFCP_LOG_INFO("error:  initiation of exchange of "
+				      "configuration data failed for "
+				      "adapter %s\n",
 				      zfcp_get_busid_by_adapter(adapter));
 			break;
 		}
@@ -2656,17 +2572,15 @@ zfcp_erp_adapter_strategy_open_fsf_xconfig(struct zfcp_erp_action *erp_action)
 		 */
 		down_interruptible(&adapter->erp_ready_sem);
 		if (erp_action->status & ZFCP_STATUS_ERP_TIMEDOUT) {
-			ZFCP_LOG_INFO
-			    ("error: Exchange of configuration data between "
-			     "the adapter with %s and the device "
-			     "driver timed out\n",
-			     zfcp_get_busid_by_adapter(adapter));
+			ZFCP_LOG_INFO("error: exchange of configuration data "
+				      "for adapter %s timed out\n",
+				      zfcp_get_busid_by_adapter(adapter));
 			break;
 		}
 		if (atomic_test_mask(ZFCP_STATUS_ADAPTER_HOST_CON_INIT,
 				     &adapter->status)) {
-			ZFCP_LOG_DEBUG("Host connection still initialising... "
-				       "waiting and retrying....\n");
+			ZFCP_LOG_DEBUG("host connection still initialising... "
+				       "waiting and retrying...\n");
 			/* sleep a little bit before retry */
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(ZFCP_EXCHANGE_CONFIG_DATA_SLEEP);
@@ -2677,8 +2591,8 @@ zfcp_erp_adapter_strategy_open_fsf_xconfig(struct zfcp_erp_action *erp_action)
 
 	if (!atomic_test_mask(ZFCP_STATUS_ADAPTER_XCONFIG_OK,
 			      &adapter->status)) {
-		ZFCP_LOG_INFO("error: Exchange of configuration data between "
-			      "the adapter %s and the device driver failed.\n",
+		ZFCP_LOG_INFO("error: exchange of configuration data for "
+			      "adapter %s failed\n",
 			      zfcp_get_busid_by_adapter(adapter));
 		retval = ZFCP_ERP_FAILED;
 	}
@@ -2706,10 +2620,8 @@ zfcp_erp_adapter_strategy_open_fsf_statusread(struct zfcp_erp_action
 	for (i = 0; i < ZFCP_STATUS_READS_RECOM; i++) {
 		temp_ret = zfcp_fsf_status_read(adapter, ZFCP_WAIT_FOR_SBAL);
 		if (temp_ret < 0) {
-			ZFCP_LOG_INFO("error: Out of resources. Could not "
-				      "set-up the infrastructure for "
-				      "unsolicited status presentation "
-				      "for the adapter %s.\n",
+			ZFCP_LOG_INFO("error: set-up of unsolicited status "
+				      "notification failed on adapter %s\n",
 				      zfcp_get_busid_by_adapter(adapter));
 			retval = ZFCP_ERP_FAILED;
 			i--;
@@ -2781,9 +2693,8 @@ zfcp_erp_port_forced_strategy(struct zfcp_erp_action *erp_action)
 		if (atomic_test_mask((ZFCP_STATUS_PORT_PHYS_OPEN |
 				      ZFCP_STATUS_COMMON_OPEN),
 			             &port->status)) {
-			ZFCP_LOG_DEBUG("Port wwpn=0x%Lx is open -> trying "
-				       " close physical\n",
-				       port->wwpn);
+			ZFCP_LOG_DEBUG("port 0x%016Lx is open -> trying "
+				       "close physical\n", port->wwpn);
 			retval =
 			    zfcp_erp_port_forced_strategy_close(erp_action);
 		} else
@@ -2793,9 +2704,8 @@ zfcp_erp_port_forced_strategy(struct zfcp_erp_action *erp_action)
 	case ZFCP_ERP_STEP_PHYS_PORT_CLOSING:
 		if (atomic_test_mask(ZFCP_STATUS_PORT_PHYS_OPEN,
 				     &port->status)) {
-			ZFCP_LOG_DEBUG
-				("failed to close physical port wwpn=0x%Lx\n",
-				 port->wwpn);
+			ZFCP_LOG_DEBUG("close physical failed for port "
+				       "0x%016Lx\n", port->wwpn);
 			retval = ZFCP_ERP_FAILED;
 		} else
 			retval = ZFCP_ERP_SUCCEEDED;
@@ -2835,9 +2745,8 @@ zfcp_erp_port_strategy(struct zfcp_erp_action *erp_action)
 	case ZFCP_ERP_STEP_UNINITIALIZED:
 		zfcp_erp_port_strategy_clearstati(port);
 		if (atomic_test_mask(ZFCP_STATUS_COMMON_OPEN, &port->status)) {
-			ZFCP_LOG_DEBUG
-			    ("port wwpn=0x%Lx is open -> trying close\n",
-			     port->wwpn);
+			ZFCP_LOG_DEBUG("port 0x%016Lx is open -> trying "
+				       "close\n", port->wwpn);
 			retval = zfcp_erp_port_strategy_close(erp_action);
 			goto out;
 		}		/* else it's already closed, open it */
@@ -2845,7 +2754,7 @@ zfcp_erp_port_strategy(struct zfcp_erp_action *erp_action)
 
 	case ZFCP_ERP_STEP_PORT_CLOSING:
 		if (atomic_test_mask(ZFCP_STATUS_COMMON_OPEN, &port->status)) {
-			ZFCP_LOG_DEBUG("failed to close port wwpn=0x%Lx\n",
+			ZFCP_LOG_DEBUG("close failed for port 0x%016Lx\n",
 				       port->wwpn);
 			retval = ZFCP_ERP_FAILED;
 			goto out;
@@ -2911,19 +2820,17 @@ zfcp_erp_port_strategy_open_common(struct zfcp_erp_action *erp_action)
 		if (!(adapter->nameserver_port)) {
 			retval = zfcp_nameserver_enqueue(adapter);
 			if (retval != 0) {
-				ZFCP_LOG_NORMAL
-				    ("error: nameserver port not available "
-				     "(adapter with busid %s)\n",
-				     zfcp_get_busid_by_adapter(adapter));
+				ZFCP_LOG_NORMAL("error: nameserver port "
+						"unavailable for adapter %s\n",
+						zfcp_get_busid_by_adapter(adapter));
 				retval = ZFCP_ERP_FAILED;
 				break;
 			}
 		}
 		if (!atomic_test_mask(ZFCP_STATUS_COMMON_UNBLOCKED,
 				      &adapter->nameserver_port->status)) {
-			ZFCP_LOG_DEBUG
-			    ("nameserver port is not open -> open "
-			     "nameserver port\n");
+			ZFCP_LOG_DEBUG("nameserver port is not open -> open "
+				       "nameserver port\n");
 			/* nameserver port may live again */
 			atomic_set_mask(ZFCP_STATUS_COMMON_RUNNING,
 					&adapter->nameserver_port->status);
@@ -2936,12 +2843,11 @@ zfcp_erp_port_strategy_open_common(struct zfcp_erp_action *erp_action)
 	case ZFCP_ERP_STEP_NAMESERVER_OPEN:
 		if (!atomic_test_mask(ZFCP_STATUS_COMMON_OPEN,
 				      &adapter->nameserver_port->status)) {
-			ZFCP_LOG_DEBUG("failed to open nameserver port\n");
+			ZFCP_LOG_DEBUG("open failed for nameserver port\n");
 			retval = ZFCP_ERP_FAILED;
 		} else {
 			ZFCP_LOG_DEBUG("nameserver port is open -> "
-				       "ask nameserver for current D_ID of "
-				       "port with WWPN 0x%Lx\n",
+				       "nameserver look-up for port 0x%016Lx\n",
 				       port->wwpn);
 			retval = zfcp_erp_port_strategy_open_common_lookup
 				(erp_action);
@@ -2952,21 +2858,20 @@ zfcp_erp_port_strategy_open_common(struct zfcp_erp_action *erp_action)
 		if (!atomic_test_mask(ZFCP_STATUS_PORT_DID_DID, &port->status)) {
 			if (atomic_test_mask
 			    (ZFCP_STATUS_PORT_INVALID_WWPN, &port->status)) {
-				ZFCP_LOG_DEBUG
-				    ("failed to look up the D_ID of the port wwpn=0x%Lx "
-				     "(misconfigured WWPN?)\n", port->wwpn);
+				ZFCP_LOG_DEBUG("nameserver look-up failed "
+					       "for port 0x%016Lx "
+					       "(misconfigured WWPN?)\n",
+					       port->wwpn);
 				zfcp_erp_port_failed(port);
 				retval = ZFCP_ERP_EXIT;
 			} else {
-				ZFCP_LOG_DEBUG
-				    ("failed to look up the D_ID of the port wwpn=0x%Lx\n",
-				     port->wwpn);
+				ZFCP_LOG_DEBUG("nameserver look-up failed for "
+					       "port 0x%016Lx\n", port->wwpn);
 				retval = ZFCP_ERP_FAILED;
 			}
 		} else {
-			ZFCP_LOG_DEBUG
-			    ("port wwpn=0x%Lx has D_ID=0x%6.6x -> trying open\n",
-			     port->wwpn, (unsigned int) port->d_id);
+			ZFCP_LOG_DEBUG("port 0x%016Lx has d_id=0x%08x -> "
+				       "trying open\n", port->wwpn, port->d_id);
 			retval = zfcp_erp_port_strategy_open_port(erp_action);
 		}
 		break;
@@ -2976,17 +2881,17 @@ zfcp_erp_port_strategy_open_common(struct zfcp_erp_action *erp_action)
 		if (atomic_test_mask((ZFCP_STATUS_COMMON_OPEN |
 				      ZFCP_STATUS_PORT_DID_DID),
 				     &port->status)) {
-			ZFCP_LOG_DEBUG("port wwpn=0x%Lx is open\n", port->wwpn);
+			ZFCP_LOG_DEBUG("port 0x%016Lx is open\n", port->wwpn);
 			retval = ZFCP_ERP_SUCCEEDED;
 		} else {
-			ZFCP_LOG_DEBUG("failed to open port wwpn=0x%Lx\n",
+			ZFCP_LOG_DEBUG("open failed for port 0x%016Lx\n",
 				       port->wwpn);
 			retval = ZFCP_ERP_FAILED;
 		}
 		break;
 
 	default:
-		ZFCP_LOG_NORMAL("bug: unkown erp step 0x%x\n",
+		ZFCP_LOG_NORMAL("bug: unknown erp step 0x%08x\n",
 				erp_action->step);
 		retval = ZFCP_ERP_FAILED;
 	}
@@ -3012,9 +2917,8 @@ zfcp_erp_port_strategy_open_nameserver(struct zfcp_erp_action *erp_action)
 	case ZFCP_ERP_STEP_UNINITIALIZED:
 	case ZFCP_ERP_STEP_PHYS_PORT_CLOSING:
 	case ZFCP_ERP_STEP_PORT_CLOSING:
-		ZFCP_LOG_DEBUG
-		    ("port wwpn=0x%Lx has D_ID=0x%6.6x -> trying open\n",
-		     port->wwpn, (unsigned int) port->d_id);
+		ZFCP_LOG_DEBUG("port 0x%016Lx has d_id=0x%08x -> trying open\n",
+			       port->wwpn, port->d_id);
 		retval = zfcp_erp_port_strategy_open_port(erp_action);
 		break;
 
@@ -3023,7 +2927,7 @@ zfcp_erp_port_strategy_open_nameserver(struct zfcp_erp_action *erp_action)
 			ZFCP_LOG_DEBUG("nameserver port is open\n");
 			retval = ZFCP_ERP_SUCCEEDED;
 		} else {
-			ZFCP_LOG_DEBUG("failed to open nameserver port\n");
+			ZFCP_LOG_DEBUG("open failed for nameserver port\n");
 			retval = ZFCP_ERP_FAILED;
 		}
 		/* this is needed anyway (dont care for retval of wakeup) */
@@ -3032,7 +2936,7 @@ zfcp_erp_port_strategy_open_nameserver(struct zfcp_erp_action *erp_action)
 		break;
 
 	default:
-		ZFCP_LOG_NORMAL("bug: unkown erp step 0x%x\n",
+		ZFCP_LOG_NORMAL("bug: unknown erp step 0x%08x\n",
 				erp_action->step);
 		retval = ZFCP_ERP_FAILED;
 	}
@@ -3278,25 +3182,23 @@ zfcp_erp_unit_strategy(struct zfcp_erp_action *erp_action)
 	case ZFCP_ERP_STEP_UNINITIALIZED:
 		zfcp_erp_unit_strategy_clearstati(unit);
 		if (atomic_test_mask(ZFCP_STATUS_COMMON_OPEN, &unit->status)) {
-			ZFCP_LOG_DEBUG
-			    ("unit fcp_lun=0x%Lx is open -> trying close\n",
-			     unit->fcp_lun);
+			ZFCP_LOG_DEBUG("unit 0x%016Lx is open -> "
+				       "trying close\n", unit->fcp_lun);
 			retval = zfcp_erp_unit_strategy_close(erp_action);
 			break;
 		}
 		/* else it's already closed, fall through */
 	case ZFCP_ERP_STEP_UNIT_CLOSING:
 		if (atomic_test_mask(ZFCP_STATUS_COMMON_OPEN, &unit->status)) {
-			ZFCP_LOG_DEBUG("failed to close unit fcp_lun=0x%Lx\n",
+			ZFCP_LOG_DEBUG("close failed for unit 0x%016Lx\n",
 				       unit->fcp_lun);
 			retval = ZFCP_ERP_FAILED;
 		} else {
 			if (erp_action->status & ZFCP_STATUS_ERP_CLOSE_ONLY)
 				retval = ZFCP_ERP_EXIT;
 			else {
-				ZFCP_LOG_DEBUG("unit fcp_lun=0x%Lx is not "
-					       "open -> trying open\n",
-					       unit->fcp_lun);
+				ZFCP_LOG_DEBUG("unit 0x%016Lx is not open -> "
+					       "trying open\n", unit->fcp_lun);
 				retval =
 				    zfcp_erp_unit_strategy_open(erp_action);
 			}
@@ -3305,11 +3207,11 @@ zfcp_erp_unit_strategy(struct zfcp_erp_action *erp_action)
 
 	case ZFCP_ERP_STEP_UNIT_OPENING:
 		if (atomic_test_mask(ZFCP_STATUS_COMMON_OPEN, &unit->status)) {
-			ZFCP_LOG_DEBUG("unit fcp_lun=0x%Lx is open\n",
+			ZFCP_LOG_DEBUG("unit 0x%016Lx is open\n",
 				       unit->fcp_lun);
 			retval = ZFCP_ERP_SUCCEEDED;
 		} else {
-			ZFCP_LOG_DEBUG("failed to open unit fcp_lun=0x%Lx\n",
+			ZFCP_LOG_DEBUG("open failed for unit 0x%016Lx\n",
 				       unit->fcp_lun);
 			retval = ZFCP_ERP_FAILED;
 		}
@@ -3546,9 +3448,8 @@ zfcp_erp_action_enqueue(int action,
 	default:
 		debug_text_exception(adapter->erp_dbf, 1, "a_actenq_bug");
 		debug_event(adapter->erp_dbf, 1, &action, sizeof (int));
-		ZFCP_LOG_NORMAL("bug: Unknown error recovery procedure "
-				"action requested on the adapter %s "
-				"(debug info %d)\n",
+		ZFCP_LOG_NORMAL("bug: unknown erp action requested "
+				"on adapter %s (action=%d)\n",
 				zfcp_get_busid_by_adapter(adapter), action);
 		goto out;
 	}
@@ -3558,8 +3459,8 @@ zfcp_erp_action_enqueue(int action,
 		debug_text_event(adapter->erp_dbf, 4, "a_actenq_str");
 		debug_event(adapter->erp_dbf, 4, &stronger_action,
 			    sizeof (int));
-		ZFCP_LOG_DEBUG("shortcut: need erp action %i before "
-			       "erp action %i (adapter busid=%s)\n",
+		ZFCP_LOG_DEBUG("stronger erp action %d needed before "
+			       "erp action %d on adapter %s\n",
 			       stronger_action, action,
 			       zfcp_get_busid_by_adapter(adapter));
 		action = stronger_action;
