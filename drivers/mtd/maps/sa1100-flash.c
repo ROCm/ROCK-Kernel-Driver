@@ -5,7 +5,6 @@
  * 
  * $Id: sa1100-flash.c,v 1.47 2004/11/01 13:44:36 rmk Exp $
  */
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -14,6 +13,7 @@
 #include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
+#include <linux/device.h>
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -1067,75 +1067,9 @@ static void __exit sa1100_destroy_mtd(struct sa_info *sa, struct mtd_info *mtd)
 	kfree(sa[0].map);
 }
 
-/*
- * A Thought: can we automatically detect the flash?
- *  - Check to see if the region is busy (yes -> failure)
- *  - Is the MSC setup for flash (no -> failure)
- *  - Probe for flash
- */
-static void __init sa1100_probe_one_cs(unsigned int msc, unsigned long phys)
-{
-	struct map_info map;
-	struct mtd_info *mtd;
-
-	printk(KERN_INFO "* Probing 0x%08lx: MSC = 0x%04x %d bit ",
-		phys, msc & 0xffff, msc & MSC_RBW ? 16 : 32);
-
-	if (check_mem_region(phys, 0x08000000)) {
-		printk("busy\n");
-		return;
-	}
-
-	if ((msc & 3) == 1) {
-		printk("wrong type\n");
-		return;
-	}
-
-	memset(&map, 0, sizeof(struct map_info));
-
-	map.name = "Probe";
-	map.bankwidth = msc & MSC_RBW ? 2 : 4;
-	map.size = SZ_1M;
-	map.phys = phys;
-	map.virt = ioremap(phys, SZ_1M);
-	if (map.virt == NULL)
-		goto fail;
-
-	simple_map_init(&map);
-
-	/* Shame cfi_probe blurts out kernel messages... */
-	mtd = do_map_probe("cfi_probe", &map);
-	if (mtd)
-		map_destroy(mtd);
-	iounmap(map.virt);
-
-	if (!mtd)
-		goto fail;
-
-	printk("pass\n");
-	return;
-
- fail:
-	printk("failed\n");
-}
-
-static void __init sa1100_probe_flash(void)
-{
-	printk(KERN_INFO "-- SA11xx Flash probe.  Please report results.\n");
-	sa1100_probe_one_cs(MSC0, SA1100_CS0_PHYS);
-	sa1100_probe_one_cs(MSC0 >> 16, SA1100_CS1_PHYS);
-	sa1100_probe_one_cs(MSC1, SA1100_CS2_PHYS);
-	sa1100_probe_one_cs(MSC1 >> 16, SA1100_CS3_PHYS);
-	sa1100_probe_one_cs(MSC2, SA1100_CS4_PHYS);
-	sa1100_probe_one_cs(MSC2 >> 16, SA1100_CS5_PHYS);
-	printk(KERN_INFO "-- SA11xx Flash probe complete.\n");
-}
-
 static int __init sa1100_locate_flash(void)
 {
 	int i, nr = -ENODEV;
-
-	sa1100_probe_flash();
 
 	if (machine_is_adsbitsy()) {
 		info[0].base = SA1100_CS1_PHYS;
@@ -1358,30 +1292,63 @@ static void __exit sa1100_destroy_partitions(void)
 
 static struct mtd_info *mymtd;
 
-static int __init sa1100_mtd_init(void)
+static int __init sa1100_mtd_probe(struct device *dev)
 {
-	int ret;
+	int err;
 	int nr;
 
 	nr = sa1100_locate_flash();
 	if (nr < 0)
 		return nr;
 
-	ret = sa1100_setup_mtd(info, nr, &mymtd);
-	if (ret == 0)
+	err = sa1100_setup_mtd(info, nr, &mymtd);
+	if (err == 0)
 		sa1100_locate_partitions(mymtd);
 
-	return ret;
+	return err;
 }
 
-static void __exit sa1100_mtd_cleanup(void)
+static int __exit sa1100_mtd_remove(struct device *dev)
 {
 	sa1100_destroy_mtd(info, mymtd);
 	sa1100_destroy_partitions();
+	return 0;
+}
+
+#ifdef CONFIG_PM
+static int sa1100_mtd_suspend(struct device *dev, u32 state, u32 level)
+{
+}
+
+static int sa1100_mtd_resume(struct device *dev, u32 level)
+{
+}
+#else
+#define sa1100_mtd_suspend NULL
+#define sa1100_mtd_resume  NULL
+#endif
+
+static struct device_driver sa1100_mtd_driver = {
+	.name		= "flash",
+	.bus		= &platform_bus_type,
+	.probe		= sa1100_mtd_probe,
+	.remove		= __exit_p(sa1100_mtd_remove),
+	.suspend	= sa1100_mtd_suspend,
+	.resume		= sa1100_mtd_resume,
+};
+
+static int __init sa1100_mtd_init(void)
+{
+	return driver_register(&sa1100_mtd_driver);
+}
+
+static void __exit sa1100_mtd_exit(void)
+{
+	driver_unregister(&sa1100_mtd_driver);
 }
 
 module_init(sa1100_mtd_init);
-module_exit(sa1100_mtd_cleanup);
+module_exit(sa1100_mtd_exit);
 
 MODULE_AUTHOR("Nicolas Pitre");
 MODULE_DESCRIPTION("SA1100 CFI map driver");
