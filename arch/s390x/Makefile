@@ -14,7 +14,6 @@
 #
 
 LDFLAGS		:= -m elf64_s390
-CPP=$(CC) -E
 OBJCOPYFLAGS	:= -O binary
 ifeq ($(CONFIG_SHARED_KERNEL),y)
   LINKSCRIPT := arch/s390x/vmlinux-shared.lds

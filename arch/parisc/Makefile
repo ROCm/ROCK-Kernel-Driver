@@ -19,7 +19,6 @@
 
 FINAL_LD=$(CROSS_COMPILE)ld --warn-common --warn-section-align 
 
-CPP=$(CC) -E
 OBJCOPY_FLAGS =-O binary -R .note -R .comment -S
 LDFLAGS_vmlinux =-T arch/parisc/vmlinux.lds
 

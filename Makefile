@@ -315,6 +315,12 @@ $(SUBDIRS): .hdepend prepare
 prepare: include/linux/version.h include/asm include/config/MARKER
 	@echo '  Starting the build. KBUILD_BUILTIN=$(KBUILD_BUILTIN) KBUILD_MODULES=$(KBUILD_MODULES)'
 
+#	This can be used by arch/$ARCH/Makefile to preprocess
+#	their vmlinux.lds.S file
+
+arch/$ARCH/vmlinux.lds.s: arch/$ARCH/vmlinux.lds.S
+	$(CPP) $(CPPFLAGS) $(CPPFLAGS_$@) -P -C -U$(ARCH) $< -o $@
+
 # Single targets
 # ---------------------------------------------------------------------------
 

@@ -45,7 +45,7 @@ endif
 # error messages during linking.  Select a default linkscript if
 # none has been choosen above.
 #
-LINKSCRIPT    = arch/sh/vmlinux.lds
+LINKSCRIPT    = arch/sh/vmlinux.lds.s
 LDFLAGS_vmlinux     += -T $(word 1,$(LINKSCRIPT)) -e _stext
 
 ifdef LOADADDR
@@ -70,10 +70,9 @@ SUBDIRS += arch/sh/stboards
 CORE_FILES += arch/sh/stboards/stboards.o
 endif
 
-vmlinux: arch/sh/vmlinux.lds
+vmlinux: arch/sh/vmlinux.lds.s
 
-arch/sh/vmlinux.lds: arch/sh/vmlinux.lds.S FORCE
-	$(CPP) $(CPPFLAGS) -traditional -C -P -Ush $< > $@
+CPPFLAGS_arch/sh/vmlinux.lds.s := -traditional
 
 FORCE: ;
 
@@ -92,4 +91,4 @@ archclean:
 #	$(MAKE) -C arch/$(ARCH)/tools clean
 
 archmrproper:
-	rm -f arch/sh/vmlinux.lds
+
