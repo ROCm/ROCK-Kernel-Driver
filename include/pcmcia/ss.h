@@ -175,7 +175,6 @@ struct pcmcia_socket {
 	u_short				functions;
 	u_short				lock_count;
 	client_handle_t			clients;
-	u_int				real_clients;
 	pccard_mem_map			cis_mem;
 	u_char				*cis_virt;
 	struct config_t			*config;
