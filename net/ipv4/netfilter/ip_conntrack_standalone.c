@@ -227,6 +227,7 @@ static unsigned int ip_conntrack_local(unsigned int hooknum,
    make it the first hook. */
 static struct nf_hook_ops ip_conntrack_in_ops = {
 	.hook		= ip_conntrack_in,
+	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_PRE_ROUTING,
 	.priority	= NF_IP_PRI_CONNTRACK,
@@ -234,6 +235,7 @@ static struct nf_hook_ops ip_conntrack_in_ops = {
 
 static struct nf_hook_ops ip_conntrack_local_out_ops = {
 	.hook		= ip_conntrack_local,
+	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_LOCAL_OUT,
 	.priority	= NF_IP_PRI_CONNTRACK,
@@ -242,6 +244,7 @@ static struct nf_hook_ops ip_conntrack_local_out_ops = {
 /* Refragmenter; last chance. */
 static struct nf_hook_ops ip_conntrack_out_ops = {
 	.hook		= ip_refrag,
+	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_POST_ROUTING,
 	.priority	= NF_IP_PRI_LAST,
@@ -249,6 +252,7 @@ static struct nf_hook_ops ip_conntrack_out_ops = {
 
 static struct nf_hook_ops ip_conntrack_local_in_ops = {
 	.hook		= ip_confirm,
+	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_LOCAL_IN,
 	.priority	= NF_IP_PRI_LAST-1,

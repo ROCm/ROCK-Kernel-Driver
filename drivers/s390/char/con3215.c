@@ -840,10 +840,10 @@ con3215_write(struct console *co, const char *str, unsigned int count)
 	}
 }
 
-static kdev_t
-con3215_device(struct console *c)
+static struct tty_driver *con3215_device(struct console *c, int *index)
 {
-	return mk_kdev(TTY_MAJOR, c->index + 64 );
+	*index = c->index;
+	return &tty3215_driver;
 }
 
 /*

@@ -185,7 +185,7 @@ static int olympic_xmit(struct sk_buff *skb, struct net_device *dev);
 static int olympic_close(struct net_device *dev);
 static void olympic_set_rx_mode(struct net_device *dev);
 static void olympic_freemem(struct net_device *dev) ;  
-static void olympic_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t olympic_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static struct net_device_stats * olympic_get_stats(struct net_device *dev);
 static int olympic_set_mac_address(struct net_device *dev, void *addr) ; 
 static void olympic_arb_cmd(struct net_device *dev);
@@ -910,7 +910,7 @@ static void olympic_freemem(struct net_device *dev)
 	return ; 
 }
  
-static void olympic_interrupt(int irq, void *dev_id, struct pt_regs *regs) 
+static irqreturn_t olympic_interrupt(int irq, void *dev_id, struct pt_regs *regs) 
 {
 	struct net_device *dev= (struct net_device *)dev_id;
 	struct olympic_private *olympic_priv=(struct olympic_private *)dev->priv;
@@ -925,7 +925,7 @@ static void olympic_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */ 
 	sisr=readl(olympic_mmio+SISR) ; 
 	if (!(sisr & SISR_MI)) /* Interrupt isn't for us */ 
-		return ;
+		return IRQ_NONE;
 	sisr=readl(olympic_mmio+SISR_RR) ;  /* Read & Reset sisr */ 
 
 	spin_lock(&olympic_priv->olympic_lock);
@@ -937,7 +937,7 @@ static void olympic_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		free_irq(dev->irq, dev) ;
 		dev->stop = NULL ;  
 		spin_unlock(&olympic_priv->olympic_lock) ; 
-		return ;
+		return IRQ_NONE;
 	} 
 		
 	if (sisr & (SISR_SRB_REPLY | SISR_TX1_EOF | SISR_RX_STATUS | SISR_ADAPTER_CHECK |  
@@ -954,7 +954,7 @@ static void olympic_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			free_irq(dev->irq, dev) ;
 			dev->stop = NULL ;  
 			spin_unlock(&olympic_priv->olympic_lock) ; 
-			return ;
+			return IRQ_HANDLED;
 		} /* SISR_ERR */
 
 		if(sisr & SISR_SRB_REPLY) {
@@ -999,7 +999,7 @@ static void olympic_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			free_irq(dev->irq, dev) ;
 			dev->stop = NULL ;  
 			spin_unlock(&olympic_priv->olympic_lock) ; 
-			return ; 
+			return IRQ_HANDLED; 
 		} /* SISR_ADAPTER_CHECK */
 	
 		if (sisr & SISR_ASB_FREE) {
@@ -1032,6 +1032,7 @@ static void olympic_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	writel(SISR_MI,olympic_mmio+SISR_MASK_SUM);
 	
 	spin_unlock(&olympic_priv->olympic_lock) ; 
+	return IRQ_HANDLED;
 }	
 
 static int olympic_xmit(struct sk_buff *skb, struct net_device *dev) 

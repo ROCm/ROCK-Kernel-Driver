@@ -396,7 +396,7 @@ struct fb_ops {
 };
 
 struct fb_info {
-   kdev_t node;
+   int node;
    int flags;
    int open;                            /* Has this been open already ? */
 #define FBINFO_FLAG_MODULE	1	/* Low-level driver is a module */

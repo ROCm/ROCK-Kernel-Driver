@@ -3463,10 +3463,11 @@ static void i2o_pci_dispose(struct i2o_controller *c)
  *	to be rather simple. We keep the controller pointer in the cookie.
  */
  
-static void i2o_pci_interrupt(int irq, void *dev_id, struct pt_regs *r)
+static irqreturn_t i2o_pci_interrupt(int irq, void *dev_id, struct pt_regs *r)
 {
 	struct i2o_controller *c = dev_id;
 	i2o_run_queue(c);
+	return IRQ_HANDLED;
 }	
 
 /**

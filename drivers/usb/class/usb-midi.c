@@ -33,7 +33,6 @@
 #include <linux/sched.h>
 #include <linux/list.h>
 #include <linux/slab.h>
-#include <linux/wrapper.h>
 #include <linux/usb.h>
 #include <linux/poll.h>
 #include <linux/sound.h>
@@ -820,7 +819,7 @@ static int usb_midi_open(struct inode *inode, struct file *file)
 	struct list_head      *devs, *mdevs;
 	struct usb_midi_state *s;
 	struct usb_mididev    *m;
-	int flags;
+	unsigned long flags;
 	int succeed = 0;
 
 #if 0

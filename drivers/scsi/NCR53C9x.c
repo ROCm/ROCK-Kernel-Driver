@@ -30,6 +30,7 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/blk.h>
+#include <linux/interrupt.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
 #include <linux/init.h>
@@ -96,7 +97,7 @@ enum {
 struct NCR_ESP *espchain = 0;
 int nesps = 0, esps_in_use = 0, esps_running = 0;
 
-void esp_intr(int irq, void *dev_id, struct pt_regs *pregs);
+irqreturn_t esp_intr(int irq, void *dev_id, struct pt_regs *pregs);
 
 /* Debugging routines */
 struct esp_cmdstrings {
@@ -3559,7 +3560,7 @@ state_machine:
 }
 
 #ifndef CONFIG_SMP
-void esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
+irqreturn_t esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 {
 	struct NCR_ESP *esp;
 	unsigned long flags;
@@ -3592,10 +3593,11 @@ repeat:
 	if(again)
 		goto repeat;
 	spin_unlock_irqrestore(dev->host_lock, flags);
+	return IRQ_HANDLED;
 }
 #else
 /* For SMP we only service one ESP on the list list at our IRQ level! */
-void esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
+irqreturn_t esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 {
 	struct NCR_ESP *esp;
 	unsigned long flags;
@@ -3620,6 +3622,7 @@ void esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 	}
 out:
 	spin_unlock_irqrestore(dev->host_lock, flags);
+	return IRQ_HANDLED;
 }
 #endif
 

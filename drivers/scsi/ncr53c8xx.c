@@ -115,15 +115,15 @@
 **==========================================================
 */
 
-#define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
+#include <linux/version.h>
 
 #include <linux/module.h>
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,17)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,17)
 #include <linux/spinlock.h>
-#elif LINUX_VERSION_CODE >= LinuxVersionCode(2,1,93)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 #include <asm/spinlock.h>
 #endif
 #include <linux/delay.h>
@@ -140,10 +140,9 @@
 #include <linux/timer.h>
 #include <linux/stat.h>
 
-#include <linux/version.h>
 #include <linux/blk.h>
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,35)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,35)
 #include <linux/init.h>
 #endif
 
@@ -154,7 +153,7 @@
 #define	__initdata
 #endif
 
-#if LINUX_VERSION_CODE <= LinuxVersionCode(2,1,92)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,1,92)
 #include <linux/bios32.h>
 #endif
 
@@ -205,7 +204,7 @@ typedef	u_long		vm_offset_t;
 **	Donnot compile integrity checking code for Linux-2.3.0 
 **	and above since SCSI data structures are not ready yet.
 */
-/* #if LINUX_VERSION_CODE < LinuxVersionCode(2,3,0) */
+/* #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) */
 #if 0
 #define	SCSI_NCR_INTEGRITY_CHECKING
 #endif
@@ -398,7 +397,7 @@ static Scsi_Host_Template	*the_template	= NULL;
 
 #define ScsiResult(host_code, scsi_code) (((host_code) << 16) + ((scsi_code) & 0x7f))
 
-static void ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs);
+static irqreturn_t ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs);
 static void ncr53c8xx_timeout(unsigned long np);
 static int ncr53c8xx_proc_info(char *buffer, char **start, off_t offset,
 			int length, int hostno, int func);
@@ -1049,7 +1048,7 @@ struct ncb {
 					/*  when lcb is not allocated.	*/
 	Scsi_Cmnd	*done_list;	/* Commands waiting for done()  */
 					/* callback to be invoked.      */ 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,93)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 	spinlock_t	smp_lock;	/* Lock for SMP threading       */
 #endif
 
@@ -3816,7 +3815,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	instance->max_id	= np->maxwide ? 16 : 8;
 	instance->max_lun	= SCSI_NCR_MAX_LUN;
 #ifndef SCSI_NCR_IOMAPPED
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,29)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,29)
 	instance->base		= (unsigned long) np->reg;
 #else
 	instance->base		= (char *) np->reg;
@@ -3901,7 +3900,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 
 	if (request_irq(device->slot.irq, ncr53c8xx_intr,
 			((driver_setup.irqm & 0x10) ? 0 : SA_SHIRQ) |
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,2,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,2,0)
 			((driver_setup.irqm & 0x20) ? 0 : SA_INTERRUPT),
 #else
 			0,
@@ -4883,7 +4882,7 @@ static int ncr_reset_bus (ncb_p np, Scsi_Cmnd *cmd, int sync_reset)
  * Return immediately if reset is in progress.
  */
 	if (np->settle_time) {
-		return SCSI_RESET_PUNT;
+		return FAILED;
 	}
 /*
  * Start the reset process.
@@ -4929,7 +4928,7 @@ static int ncr_reset_bus (ncb_p np, Scsi_Cmnd *cmd, int sync_reset)
 		ncr_queue_done_cmd(np, cmd);
 	}
 
-	return SCSI_RESET_SUCCESS;
+	return SUCCESS;
 }
 
 /*==========================================================
@@ -8775,7 +8774,7 @@ printk("ncr53c8xx : command successfully queued\n");
 **   routine for each host that uses this IRQ.
 */
 
-static void ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
 {
      unsigned long flags;
      ncb_p np = (ncb_p) dev_id;
@@ -8800,6 +8799,7 @@ static void ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
           ncr_flush_done_cmds(done_list);
           NCR_UNLOCK_SCSI_DONE(done_list->device->host, flags);
      }
+     return IRQ_HANDLED;
 }
 
 /*
@@ -8829,59 +8829,24 @@ static void ncr53c8xx_timeout(unsigned long npref)
 **   Linux entry point of reset() function
 */
 
-#if defined SCSI_RESET_SYNCHRONOUS && defined SCSI_RESET_ASYNCHRONOUS
-int ncr53c8xx_reset(Scsi_Cmnd *cmd, unsigned int reset_flags)
-#else
-int ncr53c8xx_reset(Scsi_Cmnd *cmd)
-#endif
+int ncr53c8xx_bus_reset(Scsi_Cmnd *cmd)
 {
 	ncb_p np = ((struct host_data *) cmd->device->host->hostdata)->ncb;
 	int sts;
 	unsigned long flags;
 	Scsi_Cmnd *done_list;
 
-#if defined SCSI_RESET_SYNCHRONOUS && defined SCSI_RESET_ASYNCHRONOUS
-	printk("ncr53c8xx_reset: pid=%lu reset_flags=%x serial_number=%ld serial_number_at_timeout=%ld\n",
-		cmd->pid, reset_flags, cmd->serial_number, cmd->serial_number_at_timeout);
-#else
-	printk("ncr53c8xx_reset: command pid %lu\n", cmd->pid);
-#endif
-
 	NCR_LOCK_NCB(np, flags);
 
-	/*
-	 * We have to just ignore reset requests in some situations.
-	 */
-#if defined SCSI_RESET_NOT_RUNNING
-	if (cmd->serial_number != cmd->serial_number_at_timeout) {
-		sts = SCSI_RESET_NOT_RUNNING;
-		goto out;
-	}
-#endif
 	/*
 	 * If the mid-level driver told us reset is synchronous, it seems 
 	 * that we must call the done() callback for the involved command, 
 	 * even if this command was not queued to the low-level driver, 
-	 * before returning SCSI_RESET_SUCCESS.
+	 * before returning SUCCESS.
 	 */
 
-#if defined SCSI_RESET_SYNCHRONOUS && defined SCSI_RESET_ASYNCHRONOUS
-	sts = ncr_reset_bus(np, cmd,
-	(reset_flags & (SCSI_RESET_SYNCHRONOUS | SCSI_RESET_ASYNCHRONOUS)) == SCSI_RESET_SYNCHRONOUS);
-#else
-	sts = ncr_reset_bus(np, cmd, 0);
-#endif
+	sts = ncr_reset_bus(np, cmd, 1);
 
-	/*
-	 * Since we always reset the controller, when we return success, 
-	 * we add this information to the return code.
-	 */
-#if defined SCSI_RESET_HOST_RESET
-	if (sts == SCSI_RESET_SUCCESS)
-		sts |= SCSI_RESET_HOST_RESET;
-#endif
-
-out:
 	done_list     = np->done_list;
 	np->done_list = 0;
 	NCR_UNLOCK_NCB(np, flags);
@@ -9335,7 +9300,7 @@ printk("ncr53c8xx_proc_info: hostno=%d, func=%d\n", hostno, func);
 **
 **==========================================================
 */
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,3,27)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,27)
 static struct proc_dir_entry proc_scsi_ncr53c8xx = {
     PROC_SCSI_NCR53C8XX, 9, NAME53C8XX,
     S_IFDIR | S_IRUGO | S_IXUGO, 2
@@ -9350,7 +9315,7 @@ static struct proc_dir_entry proc_scsi_ncr53c8xx = {
 */
 #ifdef	MODULE
 char *ncr53c8xx = 0;	/* command line passed by insmod */
-# if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,30)
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,30)
 MODULE_PARM(ncr53c8xx, "s");
 # endif
 #endif
@@ -9360,7 +9325,7 @@ int __init ncr53c8xx_setup(char *str)
 	return sym53c8xx__setup(str);
 }
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,13)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,13)
 #ifndef MODULE
 __setup("ncr53c8xx=", ncr53c8xx_setup);
 #endif
@@ -9469,7 +9434,7 @@ int __init ncr53c8xx_detect(Scsi_Host_Template *tpnt)
 	**    Initialize driver general stuff.
 	*/
 #ifdef SCSI_NCR_PROC_INFO_SUPPORT
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,3,27)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,27)
      tpnt->proc_dir  = &proc_scsi_ncr53c8xx;
 #else
      tpnt->proc_name = NAME53C8XX;
@@ -9502,10 +9467,10 @@ const char *ncr53c8xx_info (struct Scsi_Host *host)
 */
 MODULE_LICENSE("GPL");
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static
 #endif
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0) || defined(MODULE)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0) || defined(MODULE)
 #ifdef ENABLE_SCSI_ZALON
 Scsi_Host_Template driver_template =  {
 	.proc_name =		"zalon720",
@@ -9513,6 +9478,8 @@ Scsi_Host_Template driver_template =  {
 	.release =		zalon7xx_release,
 	.info =			ncr53c8xx_info,
 	.queuecommand =		ncr53c8xx_queue_command,
+	.slave_configure =	ncr53c8xx_slave_configure,
+	.eh_bus_reset_handler =	ncr53c8xx_bus_reset,
 	.can_queue =		SCSI_NCR_CAN_QUEUE,
 	.this_id =		7,
 	.sg_tablesize =		SCSI_NCR_SG_TABLESIZE,

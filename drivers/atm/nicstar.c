@@ -220,7 +220,7 @@ static scq_info *get_scq(int size, u32 scd);
 static void free_scq(scq_info *scq, struct atm_vcc *vcc);
 static void push_rxbufs(ns_dev *card, u32 type, u32 handle1, u32 addr1,
                        u32 handle2, u32 addr2);
-static void ns_irq_handler(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t ns_irq_handler(int irq, void *dev_id, struct pt_regs *regs);
 static int ns_open(struct atm_vcc *vcc, short vpi, int vci);
 static void ns_close(struct atm_vcc *vcc);
 static void fill_tst(ns_dev *card, int n, vc_map *vc);
@@ -1186,7 +1186,7 @@ static void push_rxbufs(ns_dev *card, u32 type, u32 handle1, u32 addr1,
 
 
 
-static void ns_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ns_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
    u32 stat_r;
    ns_dev *card;
@@ -1366,6 +1366,7 @@ static void ns_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
    
    spin_unlock_irqrestore(&card->int_lock, flags);
    PRINTK("nicstar%d: end of interrupt service\n", card->index);
+   return IRQ_HANDLED;
 }
 
 

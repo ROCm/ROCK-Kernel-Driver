@@ -1121,7 +1121,8 @@ static void wd7000_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 	dprintk("wd7000_intr_handle: return from interrupt handler\n");
 }
 
-static void do_wd7000_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_wd7000_intr_handle(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	unsigned long flags;
 	struct Scsi_Host *host = dev_id;
@@ -1129,6 +1130,7 @@ static void do_wd7000_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock_irqsave(host->host_lock, flags);
 	wd7000_intr_handle(irq, dev_id, regs);
 	spin_unlock_irqrestore(host->host_lock, flags);
+	return IRQ_HANDLED;
 }
 
 

@@ -151,7 +151,7 @@ static int smctr_init_shared_memory(struct net_device *dev);
 static int smctr_init_tx_bdbs(struct net_device *dev);
 static int smctr_init_tx_fcbs(struct net_device *dev);
 static int smctr_internal_self_test(struct net_device *dev);
-static void smctr_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t smctr_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static int smctr_issue_enable_int_cmd(struct net_device *dev,
         __u16 interrupt_enable_mask);
 static int smctr_issue_int_ack(struct net_device *dev, __u16 iack_code,
@@ -2002,7 +2002,7 @@ static int smctr_internal_self_test(struct net_device *dev)
 /*
  * The typical workload of the driver: Handle the network interface interrupts.
  */
-static void smctr_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t smctr_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         struct net_device *dev = dev_id;
         struct net_local *tp;
@@ -2015,7 +2015,7 @@ static void smctr_interrupt(int irq, void *dev_id, struct pt_regs *regs)
         if(dev == NULL)
         {
                 printk(KERN_CRIT "%s: irq %d for unknown device.\n", dev->name, irq);
-                return;
+                return IRQ_NONE;
         }
 
         ioaddr = dev->base_addr;
@@ -2023,7 +2023,7 @@ static void smctr_interrupt(int irq, void *dev_id, struct pt_regs *regs)
         
 
         if(tp->status == NOT_INITIALIZED)
-                return;
+                return IRQ_NONE;
 
         spin_lock(&tp->lock);
         
@@ -2047,7 +2047,7 @@ static void smctr_interrupt(int irq, void *dev_id, struct pt_regs *regs)
                 {
                         smctr_disable_16bit(dev);
 		        spin_unlock(&tp->lock);
-                        return;
+                        return IRQ_HANDLED;
                 }
 
                 err = HARDWARE_FAILED;
@@ -2486,7 +2486,7 @@ static void smctr_interrupt(int irq, void *dev_id, struct pt_regs *regs)
         smctr_enable_bic_int(dev);
         spin_unlock(&tp->lock);
 
-        return;
+        return IRQ_HANDLED;
 }
 
 static int smctr_issue_enable_int_cmd(struct net_device *dev,

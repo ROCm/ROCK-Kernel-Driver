@@ -88,7 +88,7 @@ fail:
 	return NULL;
 }
 
-/* Intialize a new association from provided memory. */
+/* Initialize a new association from provided memory. */
 sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 					  const sctp_endpoint_t *ep,
 					  const struct sock *sk,

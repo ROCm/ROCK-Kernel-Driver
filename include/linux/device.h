@@ -1,7 +1,7 @@
 /*
  * device.h - generic, centralized driver model
  *
- * Copyright (c) 2001 Patrick Mochel <mochel@osdl.org>
+ * Copyright (c) 2001-2003 Patrick Mochel <mochel@osdl.org>
  *
  * This is a relatively simple centralized driver model.
  * The data structures were mainly lifted directly from the PCI
@@ -60,7 +60,8 @@ enum device_state {
 
 struct device;
 struct device_driver;
-struct device_class;
+struct class;
+struct class_device;
 
 struct bus_type {
 	char			* name;
@@ -116,11 +117,9 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
 struct device_driver {
 	char			* name;
 	struct bus_type		* bus;
-	struct device_class	* devclass;
 
 	struct semaphore	unload_sem;
 	struct kobject		kobj;
-	struct list_head	class_list;
 	struct list_head	devices;
 
 	int	(*probe)	(struct device * dev);
@@ -160,74 +159,106 @@ extern void driver_remove_file(struct device_driver *, struct driver_attribute *
 /*
  * device classes
  */
-struct device_class {
+struct class {
 	char			* name;
-	u32			devnum;
 
 	struct subsystem	subsys;
-	struct kset		devices;
-	struct kset		drivers;
+	struct list_head	children;
+	struct list_head	interfaces;
 
-	int	(*add_device)(struct device *);
-	void	(*remove_device)(struct device *);
-	int	(*hotplug)(struct device *dev, char **envp, 
+	int	(*hotplug)(struct class_device *dev, char **envp, 
 			   int num_envp, char *buffer, int buffer_size);
 };
 
-extern int devclass_register(struct device_class *);
-extern void devclass_unregister(struct device_class *);
+extern int class_register(struct class *);
+extern void class_unregister(struct class *);
 
-extern struct device_class * get_devclass(struct device_class *);
-extern void put_devclass(struct device_class *);
+extern struct class * class_get(struct class *);
+extern void class_put(struct class *);
 
 
-struct devclass_attribute {
+struct class_attribute {
 	struct attribute	attr;
-	ssize_t (*show)(struct device_class *, char * buf);
-	ssize_t (*store)(struct device_class *, const char * buf, size_t count);
+	ssize_t (*show)(struct class *, char * buf);
+	ssize_t (*store)(struct class *, const char * buf, size_t count);
 };
 
-#define DEVCLASS_ATTR(_name,_str,_mode,_show,_store)	\
-struct devclass_attribute devclass_attr_##_name = { 		\
-	.attr = {.name	= _str,	.mode	= _mode },	\
-	.show	= _show,				\
-	.store	= _store,				\
+#define CLASS_ATTR(_name,_mode,_show,_store)			\
+struct class_attribute class_attr_##_name = { 			\
+	.attr = {.name = __stringify(_name), .mode = _mode },	\
+	.show	= _show,					\
+	.store	= _store,					\
 };
 
-extern int devclass_create_file(struct device_class *, struct devclass_attribute *);
-extern void devclass_remove_file(struct device_class *, struct devclass_attribute *);
+extern int class_create_file(struct class *, struct class_attribute *);
+extern void class_remove_file(struct class *, struct class_attribute *);
 
 
-/*
- * device interfaces
- * These are the logical interfaces of device classes. 
- * These entities map directly to specific userspace interfaces, like 
- * device nodes.
- * Interfaces are registered with the device class they belong to. When
- * a device is registered with the class, each interface's add_device 
- * callback is called. It is up to the interface to decide whether or not
- * it supports the device.
- */
+struct class_device {
+	struct list_head	node;
 
-struct device_interface {
-	char			* name;
-	struct device_class	* devclass;
+	struct kobject		kobj;
+	struct class		* class;	/* required */
+	struct device		* dev;		/* not necessary, but nice to have */
+	void			* class_data;	/* class-specific data */
 
-	struct kset		kset;
-	u32			devnum;
-
-	int (*add_device)	(struct device *);
-	int (*remove_device)	(struct device *);
+	char	class_id[BUS_ID_SIZE];	/* unique to this class */
 };
 
-extern int interface_register(struct device_interface *);
-extern void interface_unregister(struct device_interface *);
+static inline void *
+class_get_devdata (struct class_device *dev)
+{
+	return dev->class_data;
+}
+
+static inline void
+class_set_devdata (struct class_device *dev, void *data)
+{
+	dev->class_data = data;
+}
+
+
+extern int class_device_register(struct class_device *);
+extern void class_device_unregister(struct class_device *);
+extern void class_device_initialize(struct class_device *);
+extern int class_device_add(struct class_device *);
+extern void class_device_del(struct class_device *);
+
+extern struct class_device * class_device_get(struct class_device *);
+extern void class_device_put(struct class_device *);
+
+struct class_device_attribute {
+	struct attribute	attr;
+	ssize_t (*show)(struct class_device *, char * buf);
+	ssize_t (*store)(struct class_device *, const char * buf, size_t count);
+};
+
+#define CLASS_DEVICE_ATTR(_name,_mode,_show,_store)		\
+struct class_device_attribute class_device_attr_##_name = { 	\
+	.attr = {.name = __stringify(_name), .mode = _mode },	\
+	.show	= _show,					\
+	.store	= _store,					\
+};
+
+extern int class_device_create_file(struct class_device *, struct class_device_attribute *);
+extern void class_device_remove_file(struct class_device *, struct class_device_attribute *);
+
+
+struct class_interface {
+	struct list_head	node;
+	struct class		*class;
+
+	int (*add)	(struct class_device *);
+	void (*remove)	(struct class_device *);
+};
+
+extern int class_interface_register(struct class_interface *);
+extern void class_interface_unregister(struct class_interface *);
 
 
 struct device {
 	struct list_head node;		/* node in sibling list */
 	struct list_head bus_list;	/* node in bus's list */
-	struct list_head class_list;
 	struct list_head driver_list;
 	struct list_head children;
 	struct device 	* parent;
@@ -240,14 +271,10 @@ struct device {
 	struct device_driver *driver;	/* which driver has allocated this
 					   device */
 	void		*driver_data;	/* data private to the driver */
-
-	u32		class_num;	/* class-enumerated value */
-	void		* class_data;	/* class-specific data */
-
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
 					   BIOS data relevant to device) */
 
-	u32		power_state;  /* Current operating state. In
+	u32		power_state;	/* Current operating state. In
 					   ACPI-speak, this is D0-D3, D0
 					   being fully functional, and D3
 					   being off. */
@@ -347,6 +374,7 @@ struct sys_device {
 	u32		id;
 	struct sys_root	* root;
 	struct device	dev;
+	struct class_device class_dev;
 };
 
 extern int sys_device_register(struct sys_device *);

@@ -73,7 +73,7 @@ static int au1000_open(struct net_device *);
 static int au1000_close(struct net_device *);
 static int au1000_tx(struct sk_buff *, struct net_device *);
 static int au1000_rx(struct net_device *);
-static void au1000_interrupt(int, void *, struct pt_regs *);
+static irqreturn_t au1000_interrupt(int, void *, struct pt_regs *);
 static void au1000_tx_timeout(struct net_device *);
 static int au1000_set_config(struct net_device *dev, struct ifmap *map);
 static void set_rx_mode(struct net_device *);
@@ -1236,16 +1236,17 @@ static int au1000_rx(struct net_device *dev)
 /*
  * Au1000 interrupt service routine.
  */
-void au1000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t au1000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 
 	if (dev == NULL) {
 		printk(KERN_ERR "%s: isr: null dev ptr\n", dev->name);
-		return;
+		return IRQ_NONE;
 	}
 	au1000_tx_ack(dev);
 	au1000_rx(dev);
+	return IRQ_HANDLED;
 }
 
 

@@ -56,6 +56,7 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 	priv->dev	    = dev;
 	priv->ioctl_count   = 0;
 	priv->authenticated = capable(CAP_SYS_ADMIN);
+	priv->lock_count    = 0;
 
 	down(&dev->struct_sem);
 	if (!dev->file_last) {
@@ -111,98 +112,17 @@ int DRM(fasync)(int fd, struct file *filp, int on)
 	return 0;
 }
 
-
-/* The drm_read and drm_write_string code (especially that which manages
-   the circular buffer), is based on Alessandro Rubini's LINUX DEVICE
-   DRIVERS (Cambridge: O'Reilly, 1998), pages 111-113. */
-
-ssize_t DRM(read)(struct file *filp, char *buf, size_t count, loff_t *off)
-{
-	drm_file_t    *priv   = filp->private_data;
-	drm_device_t  *dev    = priv->dev;
-	int	      left;
-	int	      avail;
-	int	      send;
-	int	      cur;
-
-	DRM_DEBUG("%p, %p\n", dev->buf_rp, dev->buf_wp);
-
-	while (dev->buf_rp == dev->buf_wp) {
-		DRM_DEBUG("  sleeping\n");
-		if (filp->f_flags & O_NONBLOCK) {
-			return -EAGAIN;
-		}
-		interruptible_sleep_on(&dev->buf_readers);
-		if (signal_pending(current)) {
-			DRM_DEBUG("  interrupted\n");
-			return -ERESTARTSYS;
-		}
-		DRM_DEBUG("  awake\n");
-	}
-
-	left  = (dev->buf_rp + DRM_BSZ - dev->buf_wp) % DRM_BSZ;
-	avail = DRM_BSZ - left;
-	send  = DRM_MIN(avail, count);
-
-	while (send) {
-		if (dev->buf_wp > dev->buf_rp) {
-			cur = DRM_MIN(send, dev->buf_wp - dev->buf_rp);
-		} else {
-			cur = DRM_MIN(send, dev->buf_end - dev->buf_rp);
-		}
-		if (copy_to_user(buf, dev->buf_rp, cur))
-			return -EFAULT;
-		dev->buf_rp += cur;
-		if (dev->buf_rp == dev->buf_end) dev->buf_rp = dev->buf;
-		send -= cur;
-	}
-
-	wake_up_interruptible(&dev->buf_writers);
-	return DRM_MIN(avail, count);;
-}
-
-int DRM(write_string)(drm_device_t *dev, const char *s)
-{
-	int left   = (dev->buf_rp + DRM_BSZ - dev->buf_wp) % DRM_BSZ;
-	int send   = strlen(s);
-	int count;
-
-	DRM_DEBUG("%d left, %d to send (%p, %p)\n",
-		  left, send, dev->buf_rp, dev->buf_wp);
-
-	if (left == 1 || dev->buf_wp != dev->buf_rp) {
-		DRM_ERROR("Buffer not empty (%d left, wp = %p, rp = %p)\n",
-			  left,
-			  dev->buf_wp,
-			  dev->buf_rp);
-	}
-
-	while (send) {
-		if (dev->buf_wp >= dev->buf_rp) {
-			count = DRM_MIN(send, dev->buf_end - dev->buf_wp);
-			if (count == left) --count; /* Leave a hole */
-		} else {
-			count = DRM_MIN(send, dev->buf_rp - dev->buf_wp - 1);
-		}
-		strncpy(dev->buf_wp, s, count);
-		dev->buf_wp += count;
-		if (dev->buf_wp == dev->buf_end) dev->buf_wp = dev->buf;
-		send -= count;
-	}
-
-	if (dev->buf_async) kill_fasync(&dev->buf_async, SIGIO, POLL_IN);
-
-	DRM_DEBUG("waking\n");
-	wake_up_interruptible(&dev->buf_readers);
-	return 0;
-}
-
+#if !__HAVE_DRIVER_FOPS_POLL
 unsigned int DRM(poll)(struct file *filp, struct poll_table_struct *wait)
 {
-	drm_file_t   *priv = filp->private_data;
-	drm_device_t *dev  = priv->dev;
-
-	poll_wait(filp, &dev->buf_readers, wait);
-	if (dev->buf_wp != dev->buf_rp) return POLLIN | POLLRDNORM;
 	return 0;
 }
+#endif
+
+
+#if !__HAVE_DRIVER_FOPS_READ
+ssize_t DRM(read)(struct file *filp, char *buf, size_t count, loff_t *off)
+{
+	return 0;
+}
+#endif

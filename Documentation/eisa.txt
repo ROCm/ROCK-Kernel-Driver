@@ -79,8 +79,9 @@ struct eisa_driver {
 };
 
 id_table	: an array of NULL terminated EISA id strings,
-		  followed by an empty string. Each string can be
-		  paired with a driver-dependant value (driver_data).
+		  followed by an empty string. Each string can
+		  optionnaly be paired with a driver-dependant value
+		  (driver_data).
 
 driver		: a generic driver, such as described in
 		  Documentation/driver-model/driver.txt. Only .name,
@@ -88,19 +89,19 @@ driver		: a generic driver, such as described in
 
 An example is the 3c509 driver :
 
-struct eisa_device_id el3_eisa_ids[] = {
-        { "TCM5092" },
-        { "TCM5093" },
-        { "" }
+static struct eisa_device_id vortex_eisa_ids[] = {
+	{ "TCM5920", EISA_3C592_OFFSET },
+	{ "TCM5970", EISA_3C597_OFFSET },
+	{ "" }
 };
 
-struct eisa_driver el3_eisa_driver = {
-        .id_table = el3_eisa_ids,
-        .driver   = {
-                .name    = "3c509",
-                .probe   = el3_eisa_probe,
-                .remove  = __devexit_p (el3_device_remove)
-        }
+static struct eisa_driver vortex_eisa_driver = {
+	.id_table = vortex_eisa_ids,
+	.driver   = {
+		.name    = "3c59x",
+		.probe   = vortex_eisa_probe,
+		.remove  = vortex_eisa_remove
+	}
 };
 
 ** Device :

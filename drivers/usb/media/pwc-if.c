@@ -55,7 +55,6 @@
 #include <linux/poll.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
-#include <linux/wrapper.h>
 #include <asm/io.h>
 
 #include "pwc.h"

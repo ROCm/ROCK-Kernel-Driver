@@ -167,7 +167,7 @@ static int uinput_validate_absbits(struct input_dev *dev)
 
 static int uinput_alloc_device(struct file *file, const char *buffer, size_t count)
 {
-	struct uinput_user_dev	user_dev;
+	struct uinput_user_dev	*user_dev;
 	struct input_dev	*dev;
 	struct uinput_device	*udev;
 	int			size,
@@ -178,34 +178,40 @@ static int uinput_alloc_device(struct file *file, const char *buffer, size_t cou
 	udev = (struct uinput_device *)file->private_data;
 	dev = udev->dev;
 
-	if (copy_from_user(&user_dev, buffer, sizeof(struct uinput_user_dev))) {
+	user_dev = kmalloc(sizeof(*user_dev), GFP_KERNEL);
+	if (!user_dev) {
+		retval = -ENOMEM;
+		goto exit;
+	}
+
+	if (copy_from_user(user_dev, buffer, sizeof(struct uinput_user_dev))) {
 		retval = -EFAULT;
 		goto exit;
 	}
 
 	if (NULL != dev->name) 
 		kfree(dev->name);
-		
-	size = strnlen(user_dev.name, UINPUT_MAX_NAME_SIZE);
+
+	size = strnlen(user_dev->name, UINPUT_MAX_NAME_SIZE);
 	dev->name = kmalloc(size + 1, GFP_KERNEL);
 	if (!dev->name) {
 		retval = -ENOMEM;
 		goto exit;
 	}
 
-	strncpy(dev->name, user_dev.name, size);
+	strncpy(dev->name, user_dev->name, size);
 	dev->name[size] = '\0';
-	dev->id.bustype	= user_dev.id.bustype;
-	dev->id.vendor	= user_dev.id.vendor;
-	dev->id.product	= user_dev.id.product;
-	dev->id.version	= user_dev.id.version;
-	dev->ff_effects_max = user_dev.ff_effects_max;
+	dev->id.bustype	= user_dev->id.bustype;
+	dev->id.vendor	= user_dev->id.vendor;
+	dev->id.product	= user_dev->id.product;
+	dev->id.version	= user_dev->id.version;
+	dev->ff_effects_max = user_dev->ff_effects_max;
 
 	size = sizeof(int) * (ABS_MAX + 1);
-	memcpy(dev->absmax, user_dev.absmax, size);
-	memcpy(dev->absmin, user_dev.absmin, size);
-	memcpy(dev->absfuzz, user_dev.absfuzz, size);
-	memcpy(dev->absflat, user_dev.absflat, size);
+	memcpy(dev->absmax, user_dev->absmax, size);
+	memcpy(dev->absmin, user_dev->absmin, size);
+	memcpy(dev->absfuzz, user_dev->absfuzz, size);
+	memcpy(dev->absflat, user_dev->absflat, size);
 
 	/* check if absmin/absmax/absfuzz/absflat are filled as
 	 * told in Documentation/input/input-programming.txt */
@@ -216,6 +222,7 @@ static int uinput_alloc_device(struct file *file, const char *buffer, size_t cou
 	}
 
 exit:
+	kfree(user_dev);
 	return retval;
 }
 

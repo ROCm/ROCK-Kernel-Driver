@@ -353,14 +353,6 @@ static inline short get_int16(u_char* staddr)
     return readw(staddr);
 }
 
-/**************************************************************************/
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
 /* 
  * Wait until the WOC (Write Operation Complete) bit in the 
  * ASR (Adapter Status Register) is asserted. 

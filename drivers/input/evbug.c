@@ -88,19 +88,8 @@ static struct input_handler evbug_handler = {
 	.id_table =	evbug_ids,
 };
 
-static struct device_interface evbug_intf = {
-	.name		= "debug",
-	.devclass	= &input_devclass,
-};
-
 int __init evbug_init(void)
 {
-	int retval;
-
-	retval = interface_register(&evbug_intf);
-	if(retval < 0)
-		return retval;
-
 	input_register_handler(&evbug_handler);
 	return 0;
 }
@@ -108,7 +97,6 @@ int __init evbug_init(void)
 void __exit evbug_exit(void)
 {
 	input_unregister_handler(&evbug_handler);
-	interface_unregister(&evbug_intf);
 }
 
 module_init(evbug_init);

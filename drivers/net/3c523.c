@@ -179,7 +179,7 @@ sizeof(nop_cmd) = 8;
       	dev->name,__LINE__); \
       elmc_id_reset586(); } } }
 
-static void elmc_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr);
+static irqreturn_t elmc_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr);
 static int elmc_open(struct net_device *dev);
 static int elmc_close(struct net_device *dev);
 static int elmc_send_packet(struct sk_buff *, struct net_device *);
@@ -876,7 +876,8 @@ static void *alloc_rfa(struct net_device *dev, void *ptr)
  * Interrupt Handler ...
  */
 
-static void elmc_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr)
+static irqreturn_t
+elmc_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	unsigned short stat;
@@ -884,7 +885,7 @@ static void elmc_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr)
 
 	if (dev == NULL) {
 		printk(KERN_ERR "elmc-interrupt: irq %d for unknown device.\n", (int) -(((struct pt_regs *) reg_ptr)->orig_eax + 2));
-		return;
+		return IRQ_NONE;
 	} else if (!netif_running(dev)) {
 		/* The 3c523 has this habit of generating interrupts during the
 		   reset.  I'm not sure if the ni52 has this same problem, but it's
@@ -893,10 +894,10 @@ static void elmc_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr)
 		   might have missed a few. */
 
 		elmc_id_attn586();	/* ack inter. and disable any more */
-		return;
+		return IRQ_HANDLED;
 	} else if (!(ELMC_CTRL_INT & inb(dev->base_addr + ELMC_CTRL))) {
 		/* wasn't this device */
-		return;
+		return IRQ_NONE;
 	}
 	/* reading ELMC_CTRL also clears the INT bit. */
 
@@ -943,6 +944,7 @@ static void elmc_interrupt(int irq, void *dev_id, struct pt_regs *reg_ptr)
 			break;
 		}
 	}
+	return IRQ_HANDLED;
 }
 
 /*******************************************************

@@ -6,7 +6,6 @@
 #include <linux/delay.h>	/* for delay-stuff */
 #include <linux/slab.h>		/* for kmalloc/kfree */
 #include <linux/pci.h>		/* for pci-config-stuff, vendor ids etc. */
-#include <linux/wrapper.h>	/* for mem_map_reserve */
 #include <linux/init.h>		/* for "__init" */
 #include <linux/interrupt.h>	/* for IMMEDIATE_BH */
 #include <linux/kmod.h>		/* for kernel module loader */

@@ -72,37 +72,37 @@ several floating point instructions.  */
 
 	.globl	nwfpe_enter
 nwfpe_enter:
-        mov r4, lr			@ save the failure-return addresses
-	mov sl, sp
+	mov	r4, lr			@ save the failure-return addresses
+	mov	sl, sp			@ we access the registers via 'sl'
 
-        ldr r5, [sp, #60]	 	@ get contents of PC;
+	ldr	r5, [sp, #60]		@ get contents of PC;
 emulate:
-	bl EmulateAll			@ emulate the instruction
-   	cmp r0, #0			@ was emulation successful
-        moveq pc, r4			@ no, return failure
+	bl	EmulateAll		@ emulate the instruction
+	cmp	r0, #0			@ was emulation successful
+	moveq	pc, r4			@ no, return failure
 
 next:
-.Lx1:	ldrt r6, [r5], #4		@ get the next instruction and
+.Lx1:	ldrt	r6, [r5], #4		@ get the next instruction and
 					@ increment PC
 
-	and   r2, r6, #0x0F000000	@ test for FP insns
-        teq   r2, #0x0C000000
-        teqne r2, #0x0D000000
-        teqne r2, #0x0E000000
-        movne pc, r9			@ return ok if not a fp insn
+	and	r2, r6, #0x0F000000	@ test for FP insns
+	teq	r2, #0x0C000000
+	teqne	r2, #0x0D000000
+	teqne	r2, #0x0E000000
+	movne	pc, r9			@ return ok if not a fp insn
 
-        str r5, [sp, #60]		@ update PC copy in regs
+	str	r5, [sp, #60]		@ update PC copy in regs
 
-        mov r0, r6			@ save a copy
-        ldr r1, [sp, #64]		@ fetch the condition codes
-   	bl  checkCondition		@ check the condition
-   	cmp r0, #0			@ r0 = 0 ==> condition failed
+	mov	r0, r6			@ save a copy
+	ldr	r1, [sp, #64]		@ fetch the condition codes
+	bl	checkCondition		@ check the condition
+	cmp	r0, #0			@ r0 = 0 ==> condition failed
 
-        @ if condition code failed to match, next insn
-   	beq next			@ get the next instruction;
-   	    
-        mov r0, r6			@ prepare for EmulateAll()
-   	b emulate			@ if r0 != 0, goto EmulateAll
+	@ if condition code failed to match, next insn
+	beq	next			@ get the next instruction;
+
+	mov	r0, r6			@ prepare for EmulateAll()
+	b	emulate			@ if r0 != 0, goto EmulateAll
 
 	@ We need to be prepared for the instructions at .Lx1 and .Lx2 
 	@ to fault.  Emit the appropriate exception gunk to fix things up.

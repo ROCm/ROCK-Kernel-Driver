@@ -178,7 +178,7 @@ static int tda9840_command(struct i2c_client *client, unsigned int cmd, void* ar
 	return 0;
 }
 
-static int tda9840_detect(struct i2c_adapter *adapter, int address, unsigned short flags, int kind)
+static int tda9840_detect(struct i2c_adapter *adapter, int address, int kind)
 {
 	struct	i2c_client *client;
 	int result = 0;

@@ -207,5 +207,7 @@ static int __init init(void)
 	return 0;
 }
 
+EXPORT_SYMBOL(ip_amanda_lock);
+
 module_init(init);
 module_exit(fini);

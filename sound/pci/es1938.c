@@ -1492,7 +1492,7 @@ static int __devinit snd_es1938_create(snd_card_t * card,
  * -------------------------------------------------------------------- */
 static irqreturn_t snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	es1938_t *chip = snd_magic_cast(es1938_t, dev_id, return);
+	es1938_t *chip = snd_magic_cast(es1938_t, dev_id, return IRQ_NONE);
 	unsigned char status, audiostatus;
 	int handled = 0;
 

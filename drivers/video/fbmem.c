@@ -753,7 +753,7 @@ static int fbmem_read_proc(char *buf, char **start, off_t offset,
 	for (fi = registered_fb; fi < &registered_fb[FB_MAX] && len < 4000; fi++)
 		if (*fi)
 			clen += sprintf(buf + clen, "%d %s\n",
-				        minor((*fi)->node),
+				        (*fi)->node,
 				        (*fi)->fix.id);
 	*start = buf + offset;
 	if (clen > offset)
@@ -1223,7 +1223,7 @@ register_framebuffer(struct fb_info *fb_info)
 	for (i = 0 ; i < FB_MAX; i++)
 		if (!registered_fb[i])
 			break;
-	fb_info->node = mk_kdev(FB_MAJOR, i);
+	fb_info->node = i;
 	
 	if (fb_info->pixmap.addr == NULL) {
 		fb_info->pixmap.addr = kmalloc(FBPIXMAPSIZE, GFP_KERNEL);
@@ -1265,7 +1265,7 @@ unregister_framebuffer(struct fb_info *fb_info)
 {
 	int i;
 
-	i = minor(fb_info->node);
+	i = fb_info->node;
 	if (!registered_fb[i])
 		return -EINVAL;
 	devfs_remove("fb/%d", i);

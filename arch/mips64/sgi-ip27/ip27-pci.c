@@ -149,7 +149,6 @@ void __init pcibios_init(void)
 	int	i;
 
 	ioport_resource.end = ~0UL;
-	iomem_resource.end = ~0UL;
 
 	for (i=0; i<num_bridges; i++) {
 		printk("PCI: Probing PCI hardware on host bus %2d.\n", i);

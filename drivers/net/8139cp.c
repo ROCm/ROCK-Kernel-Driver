@@ -1779,7 +1779,6 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	long pciaddr;
 	unsigned int addr_len, i;
 	u8 pci_rev, cache_size;
-	u16 pci_command;
 	unsigned int board_type = (unsigned int) ent->driver_data;
 
 #ifndef MODULE
@@ -1937,12 +1936,8 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	}
 
 	/* enable busmastering and memory-write-invalidate */
-	pci_read_config_word(pdev, PCI_COMMAND, &pci_command);
-	if (!(pci_command & PCI_COMMAND_INVALIDATE)) {
-		pci_command |= PCI_COMMAND_INVALIDATE;
-		pci_write_config_word(pdev, PCI_COMMAND, pci_command);
-	}
 	pci_set_master(pdev);
+	pci_set_mwi(pdev);
 
 	if (cp->wol_enabled) cp_set_d3_state (cp);
 

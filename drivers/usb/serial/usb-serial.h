@@ -251,6 +251,8 @@ struct usb_serial_device_type {
 	int  (*chars_in_buffer)	(struct usb_serial_port *port);
 	void (*throttle)	(struct usb_serial_port *port);
 	void (*unthrottle)	(struct usb_serial_port *port);
+	int  (*tiocmget)	(struct usb_serial_port *port, struct file *file);
+	int  (*tiocmset)	(struct usb_serial_port *port, struct file *file, unsigned int set, unsigned int clear);
 
 	void (*read_int_callback)(struct urb *urb, struct pt_regs *regs);
 	void (*read_bulk_callback)(struct urb *urb, struct pt_regs *regs);
@@ -368,7 +370,7 @@ static inline void usb_serial_debug_data (const char *file, const char *function
 
 /* Use our own dbg macro */
 #undef dbg
-#define dbg(format, arg...) do { if (debug) printk(KERN_DEBUG __FILE__ ": " format "\n" , ## arg); } while (0)
+#define dbg(format, arg...) do { if (debug) printk(KERN_DEBUG "%s: " format "\n" , __FILE__ , ## arg); } while (0)
 
 
 

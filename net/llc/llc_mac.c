@@ -2,7 +2,7 @@
  * llc_mac.c - Manages interface between LLC and MAC
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
- * 		 2001 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * 		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.
@@ -78,7 +78,8 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 	}
 	sap = llc_sap_find(pdu->dsap);
 	if (!sap) {/* unknown SAP */
-		dprintk("%s: llc_sap_find(%02X) failed!\n", __FUNCTION__, pdu->dsap);
+		dprintk("%s: llc_sap_find(%02X) failed!\n", __FUNCTION__,
+		        pdu->dsap);
 		goto drop;
 	}
 	llc_decode_pdu_type(skb, &dest);
@@ -255,41 +256,41 @@ u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da)
 
 	switch (skb->dev->type) {
 #ifdef CONFIG_TR
-		case ARPHRD_IEEE802_TR: {
-			struct trh_hdr *trh;
-			struct net_device *dev = skb->dev;
+	case ARPHRD_IEEE802_TR: {
+		struct trh_hdr *trh;
+		struct net_device *dev = skb->dev;
 
-			trh = (struct trh_hdr *)skb_push(skb, sizeof(*trh));
-			trh->ac = AC;
-			trh->fc = LLC_FRAME;
-			if (sa)
-				memcpy(trh->saddr, sa, dev->addr_len);
-			else
-				memset(trh->saddr, 0, dev->addr_len);
-			if (da) {
-				memcpy(trh->daddr, da, dev->addr_len);
-				tr_source_route(skb, trh, dev);
-			}
-			skb->mac.raw = skb->data;
-			break;
+		trh = (struct trh_hdr *)skb_push(skb, sizeof(*trh));
+		trh->ac = AC;
+		trh->fc = LLC_FRAME;
+		if (sa)
+			memcpy(trh->saddr, sa, dev->addr_len);
+		else
+			memset(trh->saddr, 0, dev->addr_len);
+		if (da) {
+			memcpy(trh->daddr, da, dev->addr_len);
+			tr_source_route(skb, trh, dev);
 		}
+		skb->mac.raw = skb->data;
+		break;
+	}
 #endif
-		case ARPHRD_ETHER:
-		case ARPHRD_LOOPBACK: {
-			unsigned short len = skb->len;
-			struct ethhdr *eth;
+	case ARPHRD_ETHER:
+	case ARPHRD_LOOPBACK: {
+		unsigned short len = skb->len;
+		struct ethhdr *eth;
 
-			skb->mac.raw = skb_push(skb, sizeof(*eth));
-			eth = (struct ethhdr *)skb->mac.raw;
-			eth->h_proto = htons(len);
-			memcpy(eth->h_dest, da, ETH_ALEN);
-			memcpy(eth->h_source, sa, ETH_ALEN);
-			break;
-		}
-		default:
-			printk(KERN_WARNING "Unknown DEVICE type : %d\n",
-			       skb->dev->type);
-			rc = 1;
+		skb->mac.raw = skb_push(skb, sizeof(*eth));
+		eth = (struct ethhdr *)skb->mac.raw;
+		eth->h_proto = htons(len);
+		memcpy(eth->h_dest, da, ETH_ALEN);
+		memcpy(eth->h_source, sa, ETH_ALEN);
+		break;
+	}
+	default:
+		printk(KERN_WARNING "Unknown DEVICE type : %d\n",
+		       skb->dev->type);
+		rc = 1;
 	}
 	return rc;
 }

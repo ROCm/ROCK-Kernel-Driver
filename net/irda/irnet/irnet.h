@@ -115,9 +115,9 @@
  * socket is then connected in the originating node to the pppd instance.
  * At this point, in the originating node, the first socket is closed.
  *
- * I admit, this is a bit messy and waste some ressources. The alternative
+ * I admit, this is a bit messy and waste some resources. The alternative
  * is caching incoming socket, and that's also quite messy and waste
- * ressources.
+ * resources.
  * We also make connection time slower. For example, on a 115 kb/s link it
  * adds 60ms to the connection time (770 ms). However, this is slower than
  * the time it takes to fire up pppd on my P133...

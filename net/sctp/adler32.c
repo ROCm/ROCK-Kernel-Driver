@@ -73,7 +73,7 @@
 
 /* Performance work as shown this pig to be the
  * worst CPU wise guy. I have done what I could think
- * of on my flight to Austrialia but I am sure some
+ * of on my flight to Australia but I am sure some
  * clever assembly could speed this up, but of
  * course this would require the dreaded #ifdef's for
  * architecture. If you can speed this up more, pass
@@ -105,7 +105,7 @@ unsigned long update_adler32(unsigned long adler,
 		/* first we add */
 		s2 = (s2 + s1);
 
-		/* again, it is more efficent (it seems) to
+		/* again, it is more efficient (it seems) to
 		 * subtract since the most s2 will ever be
 		 * is (BASE-1 + BASE-1) in the worse case.
 		 * This would then be (2 * BASE) - 2, which

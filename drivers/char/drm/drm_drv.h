@@ -87,6 +87,12 @@
 #ifndef __HAVE_KERNEL_CTX_SWITCH
 #define __HAVE_KERNEL_CTX_SWITCH	0
 #endif
+#ifndef __HAVE_DRIVER_FOPS_READ
+#define __HAVE_DRIVER_FOPS_READ		0
+#endif
+#ifndef __HAVE_DRIVER_FOPS_POLL
+#define __HAVE_DRIVER_FOPS_POLL		0
+#endif
 
 #ifndef DRIVER_PREINIT
 #define DRIVER_PREINIT()
@@ -121,9 +127,9 @@ static struct file_operations	DRM(fops) = {	\
 	.release = DRM(release),		\
 	.ioctl	 = DRM(ioctl),			\
 	.mmap	 = DRM(mmap),			\
-	.read	 = DRM(read),			\
 	.fasync  = DRM(fasync),			\
 	.poll	 = DRM(poll),			\
+	.read	 = DRM(read),			\
 }
 #endif
 
@@ -167,8 +173,8 @@ static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_STATS)]     = { DRM(getstats),    0, 0 },
 
 	[DRM_IOCTL_NR(DRM_IOCTL_SET_UNIQUE)]    = { DRM(setunique),   1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_BLOCK)]         = { DRM(block),       1, 1 },
-	[DRM_IOCTL_NR(DRM_IOCTL_UNBLOCK)]       = { DRM(unblock),     1, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_BLOCK)]         = { DRM(noop),        1, 1 },
+	[DRM_IOCTL_NR(DRM_IOCTL_UNBLOCK)]       = { DRM(noop),        1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_AUTH_MAGIC)]    = { DRM(authmagic),   1, 1 },
 
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_MAP)]       = { DRM(addmap),      1, 1 },
@@ -192,7 +198,13 @@ static drm_ioctl_desc_t		  DRM(ioctls)[] = {
 
 	[DRM_IOCTL_NR(DRM_IOCTL_LOCK)]	        = { DRM(lock),        1, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_UNLOCK)]        = { DRM(unlock),      1, 0 },
+
+#if __HAVE_DMA_FLUSH
+	/* Gamma only, really */
 	[DRM_IOCTL_NR(DRM_IOCTL_FINISH)]        = { DRM(finish),      1, 0 },
+#else
+	[DRM_IOCTL_NR(DRM_IOCTL_FINISH)]        = { DRM(noop),      1, 0 },
+#endif
 
 #if __HAVE_DMA
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_BUFS)]      = { DRM(addbufs),     1, 1 },
@@ -307,7 +319,6 @@ static int DRM(setup)( drm_device_t *dev )
 	if(dev->maplist == NULL) return -ENOMEM;
 	memset(dev->maplist, 0, sizeof(*dev->maplist));
 	INIT_LIST_HEAD(&dev->maplist->head);
-	dev->map_count = 0;
 
 	dev->vmalist = NULL;
 	dev->sigdata.lock = dev->lock.hw_lock = NULL;
@@ -475,7 +486,9 @@ static int DRM(takedown)( drm_device_t *dev )
 #if __HAVE_DMA_QUEUE || __HAVE_MULTIPLE_DMA_QUEUES
 	if ( dev->queuelist ) {
 		for ( i = 0 ; i < dev->queue_count ; i++ ) {
+#if __HAVE_DMA_WAITLIST
 			DRM(waitlist_destroy)( &dev->queuelist[i]->waitlist );
+#endif
 			if ( dev->queuelist[i] ) {
 				DRM(free)( dev->queuelist[i],
 					  sizeof(*dev->queuelist[0]),
@@ -764,7 +777,7 @@ int DRM(release)( struct inode *inode, struct file *filp )
 	DRM_DEBUG( "pid = %d, device = 0x%lx, open_count = %d\n",
 		   current->pid, (long)dev->device, dev->open_count );
 
-	if ( dev->lock.hw_lock &&
+	if ( priv->lock_count && dev->lock.hw_lock &&
 	     _DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock) &&
 	     dev->lock.filp == filp ) {
 		DRM_DEBUG( "File %p released, freeing lock for context %d\n",
@@ -782,7 +795,7 @@ int DRM(release)( struct inode *inode, struct file *filp )
                                    server. */
 	}
 #if __HAVE_RELEASE
-	else if ( dev->lock.hw_lock ) {
+	else if ( priv->lock_count && dev->lock.hw_lock ) {
 		/* The lock is required to reclaim buffers */
 		DECLARE_WAITQUEUE( entry, current );
 
@@ -802,9 +815,6 @@ int DRM(release)( struct inode *inode, struct file *filp )
 				break;	/* Got lock */
 			}
 				/* Contention */
-#if 0
-			atomic_inc( &dev->total_sleeps );
-#endif
 			schedule();
 			if ( signal_pending( current ) ) {
 				retcode = -ERESTARTSYS;
@@ -925,11 +935,8 @@ int DRM(lock)( struct inode *inode, struct file *filp,
 #if __HAVE_MULTIPLE_DMA_QUEUES
 	drm_queue_t *q;
 #endif
-#if __HAVE_DMA_HISTOGRAM
-        cycles_t start;
 
-        dev->lck_start = start = get_cycles();
-#endif
+	++priv->lock_count;
 
         if ( copy_from_user( &lock, (drm_lock_t *)arg, sizeof(lock) ) )
 		return -EFAULT;
@@ -1019,9 +1026,6 @@ int DRM(lock)( struct inode *inode, struct file *filp,
 
         DRM_DEBUG( "%d %s\n", lock.context, ret ? "interrupted" : "has lock" );
 
-#if __HAVE_DMA_HISTOGRAM
-        atomic_inc(&dev->histo.lacq[DRM(histogram_slot)(get_cycles()-start)]);
-#endif
         return ret;
 }
 

@@ -378,19 +378,8 @@ static struct input_handler tsdev_handler = {
 	.id_table =	tsdev_ids,
 };
 
-static struct device_interface tsdev_intf = {
-	.name		= "touchscreen",
-	.devclass	= &input_devclass,
-};
-
 static int __init tsdev_init(void)
 {
-	int retval;
-
-	retval = interface_register(&tsdev_intf);
-	if(retval < 0)
-		return retval;
-
 	input_register_handler(&tsdev_handler);
 	printk(KERN_INFO "ts: Compaq touchscreen protocol output\n");
 	return 0;
@@ -399,7 +388,6 @@ static int __init tsdev_init(void)
 static void __exit tsdev_exit(void)
 {
 	input_unregister_handler(&tsdev_handler);
-	interface_unregister(&tsdev_intf);
 }
 
 module_init(tsdev_init);

@@ -31,6 +31,7 @@
 #define __GFP_REPEAT	0x400	/* Retry the allocation.  Might fail */
 #define __GFP_NOFAIL	0x800	/* Retry for ever.  Cannot fail */
 #define __GFP_NORETRY	0x1000	/* Do not retry.  Might fail */
+#define __GFP_NO_GROW	0x2000	/* Slab internal usage */
 
 #define GFP_ATOMIC	(__GFP_HIGH)
 #define GFP_NOIO	(__GFP_WAIT)

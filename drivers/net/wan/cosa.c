@@ -343,7 +343,7 @@ static void put_driver_status(struct cosa_data *cosa);
 static void put_driver_status_nolock(struct cosa_data *cosa);
 
 /* Interrupt handling */
-static void cosa_interrupt(int irq, void *cosa, struct pt_regs *regs);
+static irqreturn_t cosa_interrupt(int irq, void *cosa, struct pt_regs *regs);
 
 /* I/O ops debugging */
 #ifdef DEBUG_IO
@@ -1983,7 +1983,7 @@ out:
 	spin_unlock_irqrestore(&cosa->lock, flags);
 }
 
-static void cosa_interrupt(int irq, void *cosa_, struct pt_regs *regs)
+static irqreturn_t cosa_interrupt(int irq, void *cosa_, struct pt_regs *regs)
 {
 	unsigned status;
 	int count = 0;
@@ -2023,6 +2023,7 @@ again:
 	else
 		printk(KERN_INFO "%s: returning from IRQ\n", cosa->name);
 #endif
+	return IRQ_HANDLED;
 }
 
 

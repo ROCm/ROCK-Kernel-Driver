@@ -153,7 +153,6 @@ int __init hitfb_init(void)
 	}
 	hitfb_var.yres = ldvntr+1;
 
-	fb_info.node		= NODEV;
 	fb_info.fbops 		= &hitfb_ops;
 	fb_info.var 		= hitfb_var;
 	fb_info.fix 		= hitfb_fix;
@@ -169,7 +168,7 @@ int __init hitfb_init(void)
 		return -EINVAL;
     
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-			minor(fb_info.node), fb_info.fix.id);
+			fb_info.node, fb_info.fix.id);
 	return 0;
 }
 

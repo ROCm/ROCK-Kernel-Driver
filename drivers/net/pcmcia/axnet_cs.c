@@ -157,14 +157,6 @@ static void flush_stale_links(void)
     }
 }
 
-/*====================================================================*/
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
 /*======================================================================
 
     We never need to do anything when a axnet device is "initialized"
@@ -930,28 +922,25 @@ static void block_output(struct net_device *dev, int count,
     outsw(nic_base + AXNET_DATAPORT, buf, count>>1);
 }
 
-/*====================================================================*/
+static struct pcmcia_driver axnet_cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "axnet_cs",
+	},
+	.attach		= axnet_attach,
+	.detach		= axnet_detach,
+};
 
 static int __init init_axnet_cs(void)
 {
-    servinfo_t serv;
-    DEBUG(0, "%s\n", version);
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "axnet_cs: Card Services release "
-	       "does not match!\n");
-	return -EINVAL;
-    }
-    register_pccard_driver(&dev_info, &axnet_attach, &axnet_detach);
-    return 0;
+	return pcmcia_register_driver(&axnet_cs_driver);
 }
 
 static void __exit exit_axnet_cs(void)
 {
-    DEBUG(0, "axnet_cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
-    while (dev_list != NULL)
-	axnet_detach(dev_list);
+	pcmcia_unregister_driver(&axnet_cs_driver);
+	while (dev_list != NULL)
+		axnet_detach(dev_list);
 }
 
 module_init(init_axnet_cs);

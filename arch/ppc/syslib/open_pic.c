@@ -821,9 +821,10 @@ static void openpic_end_ipi(unsigned int irq_nr)
 {
 }
 
-static void openpic_ipi_action(int cpl, void *dev_id, struct pt_regs *regs)
+static irqreturn_t openpic_ipi_action(int cpl, void *dev_id, struct pt_regs *regs)
 {
 	smp_message_recv(cpl-OPENPIC_VEC_IPI-open_pic_irq_offset, regs);
+	return IRQ_HANDLED;
 }
 
 #endif /* CONFIG_SMP */

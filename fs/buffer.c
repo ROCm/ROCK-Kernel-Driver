@@ -447,15 +447,6 @@ void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
 	invalidate_inode_pages(bdev->bd_inode->i_mapping);
 }
 
-void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
-{
-	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
-	if (bdev) {
-		invalidate_bdev(bdev, destroy_dirty_buffers);
-		bdput(bdev);
-	}
-}
-
 /*
  * Kick pdflush then try to free up some ZONE_NORMAL memory.
  */
@@ -2028,7 +2019,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 	struct inode *inode = page->mapping->host;
 	sector_t iblock, lblock;
 	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
-	unsigned int blocksize, blocks;
+	unsigned int blocksize;
 	int nr, i;
 	int fully_mapped = 1;
 
@@ -2041,7 +2032,6 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 		create_empty_buffers(page, blocksize, 0);
 	head = page_buffers(page);
 
-	blocks = PAGE_CACHE_SIZE >> inode->i_blkbits;
 	iblock = (sector_t)page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
 	lblock = (inode->i_size+blocksize-1) >> inode->i_blkbits;
 	bh = head;

@@ -1474,9 +1474,6 @@ static int floppy_open(struct inode *inode, struct file *filp)
 
 	fd_device[drive] = type;
 
-	if (old_dev && old_dev != type)
-		invalidate_buffers(mk_kdev(MAJOR_NR, drive + (old_dev<<2)));
-
 	if (filp->f_flags & O_NDELAY)
 		return 0;
 

@@ -733,15 +733,9 @@ static void lp_console_write (struct console *co, const char *s,
 	parport_release (dev);
 }
 
-static kdev_t lp_console_device (struct console *c)
-{
-	return mk_kdev(LP_MAJOR, CONSOLE_LP);
-}
-
 static struct console lpcons = {
 	.name		= "lp",
 	.write		= lp_console_write,
-	.device		= lp_console_device,
 	.flags		= CON_PRINTBUFFER,
 };
 

@@ -2135,7 +2135,7 @@ typhoon_close(struct net_device *dev)
 	return 0;
 }
 
-#if CONFIG_PM
+#ifdef CONFIG_PM
 static int
 typhoon_resume(struct pci_dev *pdev)
 {
@@ -2483,7 +2483,7 @@ static struct pci_driver typhoon_driver = {
 	.id_table	= typhoon_pci_tbl,
 	.probe		= typhoon_init_one,
 	.remove		= __devexit_p(typhoon_remove_one),
-#if CONFIG_PM
+#ifdef CONFIG_PM
 	.suspend	= typhoon_suspend,
 	.resume		= typhoon_resume,
 	.enable_wake	= typhoon_enable_wake,

@@ -437,6 +437,23 @@ void bd_release(struct block_device *bdev)
 }
 
 /*
+ * Tries to open block device by device number.  Use it ONLY if you
+ * really do not have anything better - i.e. when you are behind a
+ * truly sucky interface and all you are given is a device number.  _Never_
+ * to be used for internal purposes.  If you ever need it - reconsider
+ * your API.
+ */
+struct block_device *open_by_devnum(dev_t dev, unsigned mode, int kind)
+{
+	struct block_device *bdev = bdget(dev);
+	int err = -ENOMEM;
+	int flags = mode & FMODE_WRITE ? O_RDWR : O_RDONLY;
+	if (bdev)
+		err = blkdev_get(bdev, mode, flags, kind);
+	return err ? ERR_PTR(err) : bdev;
+}
+
+/*
  * This routine checks whether a removable media has been changed,
  * and invalidates all buffer-cache-entries in that case. This
  * is a relatively slow routine, so we have to try to minimize using
@@ -449,14 +466,13 @@ int check_disk_change(struct block_device *bdev)
 {
 	struct gendisk *disk = bdev->bd_disk;
 	struct block_device_operations * bdops = disk->fops;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	if (!bdops->media_changed)
 		return 0;
 	if (!bdops->media_changed(bdev->bd_disk))
 		return 0;
 
-	if (invalidate_device(dev, 0))
+	if (__invalidate_device(bdev, 0))
 		printk("VFS: busy inodes on changed media.\n");
 
 	if (bdops->revalidate_disk)
@@ -464,36 +480,6 @@ int check_disk_change(struct block_device *bdev)
 	if (bdev->bd_disk->minors > 1)
 		bdev->bd_invalidated = 1;
 	return 1;
-}
-
-int full_check_disk_change(struct block_device *bdev)
-{
-	int res = 0;
-	if (bdev->bd_contains != bdev)
-		BUG();
-	down(&bdev->bd_sem);
-	if (check_disk_change(bdev) && bdev->bd_invalidated) {
-		rescan_partitions(bdev->bd_disk, bdev);
-		res = 1;
-	}
-	up(&bdev->bd_sem);
-	return res;
-}
-
-/*
- * Will die as soon as two remaining callers get converted.
- */
-int __check_disk_change(dev_t dev)
-{
-	struct block_device *bdev = bdget(dev);
-	int res;
-	if (!bdev)
-		return 0;
-	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW) < 0)
-		return 0;
-	res = full_check_disk_change(bdev);
-	blkdev_put(bdev, BDEV_RAW);
-	return res;
 }
 
 static void bd_set_size(struct block_device *bdev, loff_t size)
@@ -549,7 +535,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		} else {
 			struct hd_struct *p;
 			struct block_device *whole;
-			whole = bdget(MKDEV(disk->major, disk->first_minor));
+			whole = bdget_disk(disk, 0);
 			ret = -ENOMEM;
 			if (!whole)
 				goto out_first;
@@ -703,6 +689,15 @@ static ssize_t blkdev_file_write(struct file *file, const char *buf,
 	return generic_file_write_nolock(file, &local_iov, 1, ppos);
 }
 
+static ssize_t blkdev_file_aio_write(struct kiocb *iocb, const char *buf,
+				   size_t count, loff_t pos)
+{
+	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
+
+	return generic_file_aio_write_nolock(iocb, &local_iov, 1, &iocb->ki_pos);
+}
+
+
 struct address_space_operations def_blk_aops = {
 	.readpage	= blkdev_readpage,
 	.writepage	= blkdev_writepage,
@@ -719,6 +714,8 @@ struct file_operations def_blk_fops = {
 	.llseek		= block_llseek,
 	.read		= generic_file_read,
 	.write		= blkdev_file_write,
+  	.aio_read	= generic_file_aio_read,
+  	.aio_write	= blkdev_file_aio_write, 
 	.mmap		= generic_file_mmap,
 	.fsync		= block_fsync,
 	.ioctl		= blkdev_ioctl,

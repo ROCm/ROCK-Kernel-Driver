@@ -850,8 +850,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			init_waitqueue_head(&srvTcp->response_q);
 			INIT_LIST_HEAD(&srvTcp->pending_mid_q);
 			srvTcp->tcpStatus = CifsGood;
-			kernel_thread((void *) (void *)
-				      cifs_demultiplex_thread, srvTcp,
+			kernel_thread((void *)(void *)cifs_demultiplex_thread, srvTcp,
 				      CLONE_FS | CLONE_FILES | CLONE_VM);
 		}
 	}

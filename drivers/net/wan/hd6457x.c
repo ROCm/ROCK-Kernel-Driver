@@ -408,17 +408,19 @@ static inline void sca_tx_intr(port_t *port)
 
 
 
-static void sca_intr(int irq, void* dev_id, struct pt_regs *regs)
+static irqreturn_t sca_intr(int irq, void* dev_id, struct pt_regs *regs)
 {
 	card_t *card = dev_id;
 	int i;
 	u8 stat;
+	int handled = 0;
 
 #ifndef ALL_PAGES_ALWAYS_MAPPED
 	u8 page = sca_get_page(card);
 #endif
 
 	while((stat = sca_intr_status(card)) != 0) {
+		handled = 1;
 		for (i = 0; i < 2; i++) {
 			port_t *port = get_port(card, i);
 			if (port) {
@@ -437,6 +439,7 @@ static void sca_intr(int irq, void* dev_id, struct pt_regs *regs)
 #ifndef ALL_PAGES_ALWAYS_MAPPED
 	openwin(card, page);		/* Restore original page */
 #endif
+	return IRQ_RETVAL(handled);
 }
 
 

@@ -2364,7 +2364,6 @@ typedef struct DAC960_Controller
   unsigned short MaxBlocksPerCommand;
   unsigned short ControllerScatterGatherLimit;
   unsigned short DriverScatterGatherLimit;
-  unsigned int ControllerUsageCount;
   u64		BounceBufferLimit;
   unsigned int CombinedStatusBufferLength;
   unsigned int InitialStatusLength;
@@ -2397,7 +2396,6 @@ typedef struct DAC960_Controller
   DAC960_Command_T InitialCommand;
   DAC960_Command_T *Commands[DAC960_MaxDriverQueueDepth];
   PROC_DirectoryEntry_T *ControllerProcEntry;
-  unsigned int LogicalDriveUsageCount[DAC960_MaxLogicalDrives];
   boolean LogicalDriveInitiallyAccessible[DAC960_MaxLogicalDrives];
   void (*QueueCommand)(DAC960_Command_T *Command);
   boolean (*ReadControllerConfiguration)(struct DAC960_Controller *);
@@ -4242,9 +4240,6 @@ static irqreturn_t DAC960_P_InterruptHandler(int, void *, Registers_T *);
 static void DAC960_V1_QueueMonitoringCommand(DAC960_Command_T *);
 static void DAC960_V2_QueueMonitoringCommand(DAC960_Command_T *);
 static void DAC960_MonitoringTimerFunction(unsigned long);
-static int DAC960_Open(Inode_T *, File_T *);
-static int DAC960_Release(Inode_T *, File_T *);
-static int DAC960_IOCTL(Inode_T *, File_T *, unsigned int, unsigned long);
 static int DAC960_UserIOCTL(Inode_T *, File_T *, unsigned int, unsigned long);
 static void DAC960_Message(DAC960_MessageLevel_T, unsigned char *,
 			   DAC960_Controller_T *, ...);

@@ -1208,8 +1208,7 @@ done:
 
 /* ----------------------------------------------------------------------- */
 
-static int msp_attach(struct i2c_adapter *adap, int addr,
-		      unsigned short flags, int kind);
+static int msp_attach(struct i2c_adapter *adap, int addr, int kind);
 static int msp_detach(struct i2c_client *client);
 static int msp_probe(struct i2c_adapter *adap);
 static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg);
@@ -1233,8 +1232,7 @@ static struct i2c_client client_template =
 	},
 };
 
-static int msp_attach(struct i2c_adapter *adap, int addr,
-		      unsigned short flags, int kind)
+static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
 {
 	DECLARE_MUTEX_LOCKED(sem);
 	struct msp3400c *msp;

@@ -204,7 +204,7 @@ static struct specialix_port sx_port[SX_NBOARD * SX_NPORT];
 
 #ifdef SPECIALIX_TIMER
 static struct timer_list missed_irq_timer;
-static void sx_interrupt(int irq, void * dev_id, struct pt_regs * regs);
+static irqreturn_t sx_interrupt(int irq, void * dev_id, struct pt_regs * regs);
 #endif
 
 
@@ -876,7 +876,7 @@ static inline void sx_check_modem(struct specialix_board * bp)
 
 
 /* The main interrupt processing routine */
-static void sx_interrupt(int irq, void * dev_id, struct pt_regs * regs)
+static irqreturn_t sx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned char status;
 	unsigned char ack;
@@ -890,7 +890,7 @@ static void sx_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 #ifdef SPECIALIX_DEBUG 
 		printk (KERN_DEBUG "sx: False interrupt. irq %d.\n", irq);
 #endif
-		return;
+		return IRQ_NONE;
 	}
 
 	saved_reg = bp->reg;
@@ -933,6 +933,7 @@ static void sx_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 	}
 	bp->reg = saved_reg;
 	outb (bp->reg, bp->base + SX_ADDR_REG);
+	return IRQ_HANDLED;
 }
 
 

@@ -1421,7 +1421,7 @@ int __init ip_conntrack_init(void)
 	ip_conntrack_max = 8 * ip_conntrack_htable_size;
 
 	printk("ip_conntrack version %s (%u buckets, %d max)"
-	       " - %d bytes per conntrack\n", IP_CONNTRACK_VERSION,
+	       " - %Zd bytes per conntrack\n", IP_CONNTRACK_VERSION,
 	       ip_conntrack_htable_size, ip_conntrack_max,
 	       sizeof(struct ip_conntrack));
 

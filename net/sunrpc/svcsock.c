@@ -1469,7 +1469,7 @@ svc_defer(struct cache_req *req)
 }
 
 /*
- * recv data from a defered request into an active one
+ * recv data from a deferred request into an active one
  */
 static int svc_deferred_recv(struct svc_rqst *rqstp)
 {

@@ -317,15 +317,17 @@ disable_interrupts(void)
 #endif
 }
 
-static void
+static irqreturn_t
 cdu535_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	disable_interrupts();
-	if (waitqueue_active(&cdu535_irq_wait))
+	if (waitqueue_active(&cdu535_irq_wait)) {
 		wake_up(&cdu535_irq_wait);
-	else
-		printk(CDU535_MESSAGE_NAME
-				": Got an interrupt but nothing was waiting\n");
+		return IRQ_HANDLED;
+	}
+	printk(CDU535_MESSAGE_NAME
+			": Got an interrupt but nothing was waiting\n");
+	return IRQ_NONE;
 }
 
 

@@ -26,123 +26,64 @@
 #include "fpmodule.h"
 #include "fpmodule.inl"
 
+#ifdef CONFIG_FPE_NWFPE_XP
 const floatx80 floatx80Constant[] = {
-  { 0x0000, 0x0000000000000000ULL},	/* extended 0.0 */
-  { 0x3fff, 0x8000000000000000ULL},	/* extended 1.0 */
-  { 0x4000, 0x8000000000000000ULL},	/* extended 2.0 */
-  { 0x4000, 0xc000000000000000ULL},	/* extended 3.0 */
-  { 0x4001, 0x8000000000000000ULL},	/* extended 4.0 */
-  { 0x4001, 0xa000000000000000ULL},	/* extended 5.0 */
-  { 0x3ffe, 0x8000000000000000ULL},	/* extended 0.5 */
-  { 0x4002, 0xa000000000000000ULL}	/* extended 10.0 */
-};  
+	{0x0000, 0x0000000000000000ULL},	/* extended 0.0 */
+	{0x3fff, 0x8000000000000000ULL},	/* extended 1.0 */
+	{0x4000, 0x8000000000000000ULL},	/* extended 2.0 */
+	{0x4000, 0xc000000000000000ULL},	/* extended 3.0 */
+	{0x4001, 0x8000000000000000ULL},	/* extended 4.0 */
+	{0x4001, 0xa000000000000000ULL},	/* extended 5.0 */
+	{0x3ffe, 0x8000000000000000ULL},	/* extended 0.5 */
+	{0x4002, 0xa000000000000000ULL}		/* extended 10.0 */
+};
+#endif
 
 const float64 float64Constant[] = {
-  0x0000000000000000ULL,		/* double 0.0 */
-  0x3ff0000000000000ULL,		/* double 1.0 */
-  0x4000000000000000ULL,		/* double 2.0 */
-  0x4008000000000000ULL,		/* double 3.0 */
-  0x4010000000000000ULL,		/* double 4.0 */
-  0x4014000000000000ULL,		/* double 5.0 */
-  0x3fe0000000000000ULL,		/* double 0.5 */
-  0x4024000000000000ULL			/* double 10.0 */
-};  
+	0x0000000000000000ULL,	/* double 0.0 */
+	0x3ff0000000000000ULL,	/* double 1.0 */
+	0x4000000000000000ULL,	/* double 2.0 */
+	0x4008000000000000ULL,	/* double 3.0 */
+	0x4010000000000000ULL,	/* double 4.0 */
+	0x4014000000000000ULL,	/* double 5.0 */
+	0x3fe0000000000000ULL,	/* double 0.5 */
+	0x4024000000000000ULL	/* double 10.0 */
+};
 
 const float32 float32Constant[] = {
-  0x00000000,				/* single 0.0 */
-  0x3f800000,				/* single 1.0 */
-  0x40000000,				/* single 2.0 */
-  0x40400000,				/* single 3.0 */
-  0x40800000,				/* single 4.0 */
-  0x40a00000,				/* single 5.0 */
-  0x3f000000,				/* single 0.5 */
-  0x41200000				/* single 10.0 */
-};  
-
-unsigned int getTransferLength(const unsigned int opcode)
-{
-  unsigned int nRc;
-  
-  switch (opcode & MASK_TRANSFER_LENGTH)
-  {
-    case 0x00000000: nRc = 1; break; /* single precision */
-    case 0x00008000: nRc = 2; break; /* double precision */
-    case 0x00400000: nRc = 3; break; /* extended precision */
-    default: nRc = 0;
-  }
-  
-  return(nRc);
-}
-
-unsigned int getRegisterCount(const unsigned int opcode)
-{
-  unsigned int nRc;
-  
-  switch (opcode & MASK_REGISTER_COUNT)
-  {
-    case 0x00000000: nRc = 4; break;
-    case 0x00008000: nRc = 1; break;
-    case 0x00400000: nRc = 2; break;
-    case 0x00408000: nRc = 3; break;
-    default: nRc = 0;
-  }
-  
-  return(nRc);
-}
-
-unsigned int getRoundingPrecision(const unsigned int opcode)
-{
-  unsigned int nRc;
-  
-  switch (opcode & MASK_ROUNDING_PRECISION)
-  {
-    case 0x00000000: nRc = 1; break;
-    case 0x00000080: nRc = 2; break;
-    case 0x00080000: nRc = 3; break;
-    default: nRc = 0;
-  }
-  
-  return(nRc);
-}
-
-unsigned int getDestinationSize(const unsigned int opcode)
-{
-  unsigned int nRc;
-  
-  switch (opcode & MASK_DESTINATION_SIZE)
-  {
-    case 0x00000000: nRc = typeSingle; break;
-    case 0x00000080: nRc = typeDouble; break;
-    case 0x00080000: nRc = typeExtended; break;
-    default: nRc = typeNone;
-  }
-  
-  return(nRc);
-}
+	0x00000000,		/* single 0.0 */
+	0x3f800000,		/* single 1.0 */
+	0x40000000,		/* single 2.0 */
+	0x40400000,		/* single 3.0 */
+	0x40800000,		/* single 4.0 */
+	0x40a00000,		/* single 5.0 */
+	0x3f000000,		/* single 0.5 */
+	0x41200000		/* single 10.0 */
+};
 
 /* condition code lookup table
  index into the table is test code: EQ, NE, ... LT, GT, AL, NV
  bit position in short is condition code: NZCV */
 static const unsigned short aCC[16] = {
-    0xF0F0, // EQ == Z set
-    0x0F0F, // NE
-    0xCCCC, // CS == C set
-    0x3333, // CC
-    0xFF00, // MI == N set
-    0x00FF, // PL
-    0xAAAA, // VS == V set
-    0x5555, // VC
-    0x0C0C, // HI == C set && Z clear
-    0xF3F3, // LS == C clear || Z set
-    0xAA55, // GE == (N==V)
-    0x55AA, // LT == (N!=V)
-    0x0A05, // GT == (!Z && (N==V))
-    0xF5FA, // LE == (Z || (N!=V))
-    0xFFFF, // AL always
-    0 // NV
+	0xF0F0,			// EQ == Z set
+	0x0F0F,			// NE
+	0xCCCC,			// CS == C set
+	0x3333,			// CC
+	0xFF00,			// MI == N set
+	0x00FF,			// PL
+	0xAAAA,			// VS == V set
+	0x5555,			// VC
+	0x0C0C,			// HI == C set && Z clear
+	0xF3F3,			// LS == C clear || Z set
+	0xAA55,			// GE == (N==V)
+	0x55AA,			// LT == (N!=V)
+	0x0A05,			// GT == (!Z && (N==V))
+	0xF5FA,			// LE == (Z || (N!=V))
+	0xFFFF,			// AL always
+	0			// NV
 };
 
 unsigned int checkCondition(const unsigned int opcode, const unsigned int ccodes)
 {
-  return (aCC[opcode>>28] >> (ccodes>>28)) & 1;
+	return (aCC[opcode >> 28] >> (ccodes >> 28)) & 1;
 }

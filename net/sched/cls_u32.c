@@ -203,17 +203,17 @@ static __inline__ struct tc_u_knode *
 u32_lookup_key(struct tc_u_hnode *ht, u32 handle)
 {
 	unsigned sel;
-	struct tc_u_knode *n;
+	struct tc_u_knode *n = NULL;
 
 	sel = TC_U32_HASH(handle);
 	if (sel > ht->divisor)
-		return 0;
+		goto out;
 
 	for (n = ht->ht[sel]; n; n = n->next)
 		if (n->handle == handle)
-			return n;
-
-	return NULL;
+			break;
+out:
+	return n;
 }
 
 

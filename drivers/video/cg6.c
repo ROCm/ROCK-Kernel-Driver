@@ -680,7 +680,6 @@ static void cg6_init_one(struct sbus_dev *sdev)
 		sbus_ioremap(&sdev->resource[0], CG6_FHC_OFFSET,
 			     sizeof(u32), "cgsix fhc");
 
-	all->info.node = NODEV;
 	all->info.flags = FBINFO_FLAG_DEFAULT;
 	all->info.fbops = &cg6_ops;
 #ifdef CONFIG_SPARC32

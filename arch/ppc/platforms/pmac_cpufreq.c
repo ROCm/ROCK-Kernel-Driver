@@ -262,13 +262,19 @@ pmac_cpufreq_setup(void)
 		goto out;
 	cur_freq = (*value) / 1000;
 
-	/* Check for tibook 800Mhz or 1Ghz */
-	if (machine_is_compatible("PowerBook3,4") || machine_is_compatible("PowerBook3,5")) {
+	/* Check for newer machines */
+	if (machine_is_compatible("PowerBook3,4") ||
+	    machine_is_compatible("PowerBook3,5") ||
+	    machine_is_compatible("MacRISC3")) {
 		value = (u32 *)get_property(cpunode, "min-clock-frequency", NULL);
 		if (!value)
 			goto out;
 		low_freq = (*value) / 1000;
-
+		/* The PowerBook G4 12" (PowerBook6,1) has an error in the device-tree
+		 * here */
+		if (low_freq < 100000)
+			low_freq *= 10;
+		
 		value = (u32 *)get_property(cpunode, "max-clock-frequency", NULL);
 		if (!value)
 			goto out;

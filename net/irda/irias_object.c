@@ -140,7 +140,7 @@ void __irias_delete_object(struct ias_object *obj)
 /*
  * Function irias_delete_object (obj)
  *
- *    Remove object from hashbin and deallocate all attributes assosiated with
+ *    Remove object from hashbin and deallocate all attributes associated with
  *    with this object and the object itself
  *
  */

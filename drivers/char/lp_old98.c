@@ -441,15 +441,9 @@ static void lp_old98_console_write(struct console *console,
 	}
 }
 
-static kdev_t lp_old98_console_device(struct console *console)
-{
-	return mk_kdev(LP_MAJOR, 0);
-}
-
 static struct console lp_old98_console = {
 	.name	= "lp_old98",
 	.write	= lp_old98_console_write,
-	.device	= lp_old98_console_device,
 	.flags	= CON_PRINTBUFFER,
 	.index	= -1,
 };

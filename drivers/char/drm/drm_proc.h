@@ -49,10 +49,6 @@ static int	   DRM(bufs_info)(char *buf, char **start, off_t offset,
 static int	   DRM(vma_info)(char *buf, char **start, off_t offset,
 				 int request, int *eof, void *data);
 #endif
-#if __HAVE_DMA_HISTOGRAM
-static int	   DRM(histo_info)(char *buf, char **start, off_t offset,
-				   int request, int *eof, void *data);
-#endif
 
 struct drm_proc_list {
 	const char *name;
@@ -66,9 +62,6 @@ struct drm_proc_list {
 	{ "bufs",    DRM(bufs_info)    },
 #if DRM_DEBUG_CODE
 	{ "vma",     DRM(vma_info)     },
-#endif
-#if __HAVE_DMA_HISTOGRAM
-	{ "histo",   DRM(histo_info)   },
 #endif
 };
 #define DRM_PROC_ENTRIES (sizeof(DRM(proc_list))/sizeof(DRM(proc_list)[0]))
@@ -444,31 +437,6 @@ static int DRM(_vma_info)(char *buf, char **start, off_t offset, int request,
 			       pgprot & _PAGE_GLOBAL   ? 'g' : 'l' );
 #endif
 		DRM_PROC_PRINT("\n");
-#if 0
-		for (i = vma->vm_start; i < vma->vm_end; i += PAGE_SIZE) {
-			pgd = pgd_offset(vma->vm_mm, i);
-			pmd = pmd_offset(pgd, i);
-			preempt_disable();
-			pte = pte_offset_map(pmd, i);
-			if (pte_present(*pte)) {
-				address = __pa(pte_page(*pte))
-					+ (i & (PAGE_SIZE-1));
-				DRM_PROC_PRINT("      0x%08lx -> 0x%08lx"
-					       " %c%c%c%c%c\n",
-					       i,
-					       address,
-					       pte_read(*pte)  ? 'r' : '-',
-					       pte_write(*pte) ? 'w' : '-',
-					       pte_exec(*pte)  ? 'x' : '-',
-					       pte_dirty(*pte) ? 'd' : '-',
-					       pte_young(*pte) ? 'a' : '-' );
-			} else {
-				DRM_PROC_PRINT("      0x%08lx\n", i);
-			}
-			pte_unmap(pte);
-			preempt_enable();
-		}
-#endif
 	}
 
 	if (len > request + offset) return request;
@@ -490,143 +458,3 @@ static int DRM(vma_info)(char *buf, char **start, off_t offset, int request,
 #endif
 
 
-#if __HAVE_DMA_HISTOGRAM
-static int DRM(_histo_info)(char *buf, char **start, off_t offset, int request,
-			    int *eof, void *data)
-{
-	drm_device_t	 *dev = (drm_device_t *)data;
-	int              len  = 0;
-	drm_device_dma_t *dma = dev->dma;
-	int		 i;
-	unsigned long	 slot_value = DRM_DMA_HISTOGRAM_INITIAL;
-	unsigned long	 prev_value = 0;
-	drm_buf_t	 *buffer;
-
-	if (offset > DRM_PROC_LIMIT) {
-		*eof = 1;
-		return 0;
-	}
-
-	*start = &buf[offset];
-	*eof   = 0;
-
-	DRM_PROC_PRINT("general statistics:\n");
-	DRM_PROC_PRINT("total	 %10u\n", atomic_read(&dev->histo.total));
-	DRM_PROC_PRINT("open	 %10u\n",
-		       atomic_read(&dev->counts[_DRM_STAT_OPENS]));
-	DRM_PROC_PRINT("close	 %10u\n",
-		       atomic_read(&dev->counts[_DRM_STAT_CLOSES]));
-	DRM_PROC_PRINT("ioctl	 %10u\n",
-		       atomic_read(&dev->counts[_DRM_STAT_IOCTLS]));
-
-	DRM_PROC_PRINT("\nlock statistics:\n");
-	DRM_PROC_PRINT("locks	 %10u\n",
-		       atomic_read(&dev->counts[_DRM_STAT_LOCKS]));
-	DRM_PROC_PRINT("unlocks	 %10u\n",
-		       atomic_read(&dev->counts[_DRM_STAT_UNLOCKS]));
-
-	if (dma) {
-#if 0
-		DRM_PROC_PRINT("\ndma statistics:\n");
-		DRM_PROC_PRINT("prio	 %10u\n",
-			       atomic_read(&dma->total_prio));
-		DRM_PROC_PRINT("bytes	 %10u\n",
-			       atomic_read(&dma->total_bytes));
-		DRM_PROC_PRINT("dmas	 %10u\n",
-			       atomic_read(&dma->total_dmas));
-		DRM_PROC_PRINT("missed:\n");
-		DRM_PROC_PRINT("  dma	 %10u\n",
-			       atomic_read(&dma->total_missed_dma));
-		DRM_PROC_PRINT("  lock	 %10u\n",
-			       atomic_read(&dma->total_missed_lock));
-		DRM_PROC_PRINT("  free	 %10u\n",
-			       atomic_read(&dma->total_missed_free));
-		DRM_PROC_PRINT("  sched	 %10u\n",
-			       atomic_read(&dma->total_missed_sched));
-		DRM_PROC_PRINT("tried	 %10u\n",
-			       atomic_read(&dma->total_tried));
-		DRM_PROC_PRINT("hit	 %10u\n",
-			       atomic_read(&dma->total_hit));
-		DRM_PROC_PRINT("lost	 %10u\n",
-			       atomic_read(&dma->total_lost));
-#endif
-
-		buffer = dma->next_buffer;
-		if (buffer) {
-			DRM_PROC_PRINT("next_buffer %7d\n", buffer->idx);
-		} else {
-			DRM_PROC_PRINT("next_buffer    none\n");
-		}
-		buffer = dma->this_buffer;
-		if (buffer) {
-			DRM_PROC_PRINT("this_buffer %7d\n", buffer->idx);
-		} else {
-			DRM_PROC_PRINT("this_buffer    none\n");
-		}
-	}
-
-
-	DRM_PROC_PRINT("\nvalues:\n");
-	if (dev->lock.hw_lock) {
-		DRM_PROC_PRINT("lock	       0x%08x\n",
-			       dev->lock.hw_lock->lock);
-	} else {
-		DRM_PROC_PRINT("lock		     none\n");
-	}
-	DRM_PROC_PRINT("context_flag   0x%08lx\n", dev->context_flag);
-	DRM_PROC_PRINT("interrupt_flag 0x%08lx\n", dev->interrupt_flag);
-	DRM_PROC_PRINT("dma_flag       0x%08lx\n", dev->dma_flag);
-
-	DRM_PROC_PRINT("queue_count    %10d\n",	 dev->queue_count);
-	DRM_PROC_PRINT("last_context   %10d\n",	 dev->last_context);
-	DRM_PROC_PRINT("last_switch    %10lu\n", dev->last_switch);
-	DRM_PROC_PRINT("last_checked   %10d\n",	 dev->last_checked);
-
-
-	DRM_PROC_PRINT("\n		       q2d	  d2c	     c2f"
-		       "	q2c	   q2f	      dma	 sch"
-		       "	ctx	  lacq	     lhld\n\n");
-	for (i = 0; i < DRM_DMA_HISTOGRAM_SLOTS; i++) {
-		DRM_PROC_PRINT("%s %10lu %10u %10u %10u %10u %10u"
-			       " %10u %10u %10u %10u %10u\n",
-			       i == DRM_DMA_HISTOGRAM_SLOTS - 1 ? ">=" : "< ",
-			       i == DRM_DMA_HISTOGRAM_SLOTS - 1
-			       ? prev_value : slot_value ,
-
-			       atomic_read(&dev->histo
-					   .queued_to_dispatched[i]),
-			       atomic_read(&dev->histo
-					   .dispatched_to_completed[i]),
-			       atomic_read(&dev->histo
-					   .completed_to_freed[i]),
-
-			       atomic_read(&dev->histo
-					   .queued_to_completed[i]),
-			       atomic_read(&dev->histo
-					   .queued_to_freed[i]),
-			       atomic_read(&dev->histo.dma[i]),
-			       atomic_read(&dev->histo.schedule[i]),
-			       atomic_read(&dev->histo.ctx[i]),
-			       atomic_read(&dev->histo.lacq[i]),
-			       atomic_read(&dev->histo.lhld[i]));
-		prev_value = slot_value;
-		slot_value = DRM_DMA_HISTOGRAM_NEXT(slot_value);
-	}
-
-	if (len > request + offset) return request;
-	*eof = 1;
-	return len - offset;
-}
-
-static int DRM(histo_info)(char *buf, char **start, off_t offset, int request,
-			   int *eof, void *data)
-{
-	drm_device_t *dev = (drm_device_t *)data;
-	int	     ret;
-
-	down(&dev->struct_sem);
-	ret = DRM(_histo_info)(buf, start, offset, request, eof, data);
-	up(&dev->struct_sem);
-	return ret;
-}
-#endif

@@ -21,6 +21,7 @@
 #include <linux/fs.h>
 #include <linux/seq_file.h>
 
+#include <asm/bitext.h>
 #include <asm/page.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
@@ -137,29 +138,26 @@ static inline int srmmu_device_memory(unsigned long x)
 int srmmu_cache_pagetables;
 
 /* these will be initialized in srmmu_nocache_calcsize() */
-int srmmu_nocache_npages;
 unsigned long srmmu_nocache_size;
 unsigned long srmmu_nocache_end;
 unsigned long pkmap_base;
 unsigned long pkmap_base_end;
-unsigned long srmmu_nocache_bitmap_size;
 extern unsigned long fix_kmap_begin;
 extern unsigned long fix_kmap_end;
 
+/* 1 bit <=> 256 bytes of nocache <=> 64 PTEs */
 #define SRMMU_NOCACHE_BITMAP_SHIFT (PAGE_SHIFT - 4)
 
 void *srmmu_nocache_pool;
 void *srmmu_nocache_bitmap;
-int srmmu_nocache_low;
-int srmmu_nocache_used;
-static spinlock_t srmmu_nocache_spinlock = SPIN_LOCK_UNLOCKED;
+static struct bit_map srmmu_nocache_map;
 
 /* This makes sense. Honest it does - Anton */
 #define __nocache_pa(VADDR) (((unsigned long)VADDR) - SRMMU_NOCACHE_VADDR + __pa((unsigned long)srmmu_nocache_pool))
 #define __nocache_va(PADDR) (__va((unsigned long)PADDR) - (unsigned long)srmmu_nocache_pool + SRMMU_NOCACHE_VADDR)
 #define __nocache_fix(VADDR) __va(__nocache_pa(VADDR))
 
-static inline unsigned long srmmu_pte_pfn(pte_t pte)
+static unsigned long srmmu_pte_pfn(pte_t pte)
 {
 	if (srmmu_device_memory(pte_val(pte))) {
 		/* XXX Anton obviously had something in mind when he did this.
@@ -218,15 +216,6 @@ static inline int srmmu_pgd_present(pgd_t pgd)
 
 static inline void srmmu_pgd_clear(pgd_t * pgdp)
 { srmmu_set_pte((pte_t *)pgdp, __pte(0)); }
-
-static inline int srmmu_pte_write(pte_t pte)
-{ return pte_val(pte) & SRMMU_WRITE; }
-
-static inline int srmmu_pte_dirty(pte_t pte)
-{ return pte_val(pte) & SRMMU_DIRTY; }
-
-static inline int srmmu_pte_young(pte_t pte)
-{ return pte_val(pte) & SRMMU_REF; }
 
 static inline pte_t srmmu_pte_wrprotect(pte_t pte)
 { return __pte(pte_val(pte) & ~SRMMU_WRITE);}
@@ -321,10 +310,7 @@ static inline pte_t *srmmu_pte_offset(pmd_t * dir, unsigned long address)
  */
 static unsigned long __srmmu_get_nocache(int size, int align)
 {
-	int offset = srmmu_nocache_low;
-	int i;
-	unsigned long va_tmp, phys_tmp;
-	int lowest_failed = 0;
+	int offset;
 
 	if (size < SRMMU_NOCACHE_BITMAP_SHIFT) {
 		printk("Size 0x%x too small for nocache request\n", size);
@@ -334,48 +320,19 @@ static unsigned long __srmmu_get_nocache(int size, int align)
 		printk("Size 0x%x unaligned int nocache request\n", size);
 		size += SRMMU_NOCACHE_BITMAP_SHIFT-1;
 	}
-	size = size >> SRMMU_NOCACHE_BITMAP_SHIFT;
 
-	spin_lock(&srmmu_nocache_spinlock);
-
-repeat:
-	offset = find_next_zero_bit(srmmu_nocache_bitmap, srmmu_nocache_bitmap_size, offset);
-
-	/* we align on physical address */
-	if (align) {
-		va_tmp = (SRMMU_NOCACHE_VADDR + (offset << SRMMU_NOCACHE_BITMAP_SHIFT));
-		phys_tmp = (__nocache_pa(va_tmp) + align - 1) & ~(align - 1);
-		va_tmp = (unsigned long)__nocache_va(phys_tmp);
-		offset = (va_tmp - SRMMU_NOCACHE_VADDR) >> SRMMU_NOCACHE_BITMAP_SHIFT;
-	}
-
-	if ((srmmu_nocache_bitmap_size - offset) < size) {
-		printk("Run out of nocached RAM!\n");
-		spin_unlock(&srmmu_nocache_spinlock);
+	offset = bit_map_string_get(&srmmu_nocache_map,
+		       			size >> SRMMU_NOCACHE_BITMAP_SHIFT,
+					align >> SRMMU_NOCACHE_BITMAP_SHIFT);
+/* P3 */ /* printk("srmmu: get size %d align %d, got %d (0x%x)\n",
+   size >> SRMMU_NOCACHE_BITMAP_SHIFT, align >> SRMMU_NOCACHE_BITMAP_SHIFT,
+   offset, offset); */
+	if (offset == -1) {
+		printk("srmmu: out of nocache %d: %d/%d\n",
+		    size, (int) srmmu_nocache_size,
+		    srmmu_nocache_map.used << SRMMU_NOCACHE_BITMAP_SHIFT);
 		return 0;
 	}
-
-	i = 0;
-	while(i < size) {
-		if (test_bit(offset + i, srmmu_nocache_bitmap)) {
-			lowest_failed = 1;
-			offset = offset + i + 1;
-			goto repeat;
-		}
-		i++;
-	}
-
-	i = 0;
-	while(i < size) {
-		set_bit(offset + i, srmmu_nocache_bitmap);
-		i++;
-		srmmu_nocache_used++;
-	}
-
-	if (!lowest_failed && ((align >> SRMMU_NOCACHE_BITMAP_SHIFT) <= 1) && (offset > srmmu_nocache_low))
-		srmmu_nocache_low = offset;
-
-	spin_unlock(&srmmu_nocache_spinlock);
 
 	return (SRMMU_NOCACHE_VADDR + (offset << SRMMU_NOCACHE_BITMAP_SHIFT));
 }
@@ -422,63 +379,57 @@ void srmmu_free_nocache(unsigned long vaddr, int size)
 	offset = (vaddr - SRMMU_NOCACHE_VADDR) >> SRMMU_NOCACHE_BITMAP_SHIFT;
 	size = size >> SRMMU_NOCACHE_BITMAP_SHIFT;
 
-	spin_lock(&srmmu_nocache_spinlock);
-
-	while(size--) {
-		clear_bit(offset + size, srmmu_nocache_bitmap);
-		srmmu_nocache_used--;
-	}
-
-	if (offset < srmmu_nocache_low)
-		srmmu_nocache_low = offset;
-
-	spin_unlock(&srmmu_nocache_spinlock);
+/* P3 */ /* printk("srmmu: free off %d (0x%x) size %d\n", offset, offset, size); */
+	bit_map_clear(&srmmu_nocache_map, offset, size);
 }
 
 void srmmu_early_allocate_ptable_skeleton(unsigned long start, unsigned long end);
 
 extern unsigned long probe_memory(void);	/* in fault.c */
 
-/* Reserve nocache dynamically proportionally to the amount of
+/*
+ * Reserve nocache dynamically proportionally to the amount of
  * system RAM. -- Tomas Szepe <szepe@pinerecords.com>, June 2002
  */
 void srmmu_nocache_calcsize(void)
 {
 	unsigned long sysmemavail = probe_memory() / 1024;
+	int srmmu_nocache_npages;
 
 	srmmu_nocache_npages =
 		sysmemavail / SRMMU_NOCACHE_ALCRATIO / 1024 * 256;
-	if (sysmemavail % (SRMMU_NOCACHE_ALCRATIO * 1024))
-		srmmu_nocache_npages += 256;
+
+ /* P3 XXX The 4x overuse: corroborated by /proc/meminfo. */
+	// if (srmmu_nocache_npages < 256) srmmu_nocache_npages = 256;
+	if (srmmu_nocache_npages < 550) srmmu_nocache_npages = 550;
 
 	/* anything above 1280 blows up */
 	if (srmmu_nocache_npages > 1280) srmmu_nocache_npages = 1280;
 
 	srmmu_nocache_size = srmmu_nocache_npages * PAGE_SIZE;
-	srmmu_nocache_bitmap_size = srmmu_nocache_npages * 16;
 	srmmu_nocache_end = SRMMU_NOCACHE_VADDR + srmmu_nocache_size;
 	fix_kmap_begin = srmmu_nocache_end;
 	fix_kmap_end = fix_kmap_begin + (KM_TYPE_NR * NR_CPUS - 1) * PAGE_SIZE;
 	pkmap_base = SRMMU_NOCACHE_VADDR + srmmu_nocache_size + 0x40000;
 	pkmap_base_end = pkmap_base + LAST_PKMAP * PAGE_SIZE;
-
-	/* printk("system memory available = %luk\nnocache ram size = %luk\n",
-		sysmemavail, srmmu_nocache_size / 1024); */
 }
 
 void srmmu_nocache_init(void)
 {
+	unsigned int bitmap_bits;
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte;
 	unsigned long paddr, vaddr;
 	unsigned long pteval;
 
+	bitmap_bits = srmmu_nocache_size >> SRMMU_NOCACHE_BITMAP_SHIFT;
+
 	srmmu_nocache_pool = __alloc_bootmem(srmmu_nocache_size, PAGE_SIZE, 0UL);
 	memset(srmmu_nocache_pool, 0, srmmu_nocache_size);
 
-	srmmu_nocache_bitmap = __alloc_bootmem(srmmu_nocache_bitmap_size, SMP_CACHE_BYTES, 0UL);
-	memset(srmmu_nocache_bitmap, 0, srmmu_nocache_bitmap_size);
+	srmmu_nocache_bitmap = __alloc_bootmem(bitmap_bits >> 3, SMP_CACHE_BYTES, 0UL);
+	bit_map_init(&srmmu_nocache_map, srmmu_nocache_bitmap, bitmap_bits);
 
 	srmmu_swapper_pg_dir = (pgd_t *)__srmmu_get_nocache(SRMMU_PGD_TABLE_SIZE, SRMMU_PGD_TABLE_SIZE);
 	memset(__nocache_fix(srmmu_swapper_pg_dir), 0, SRMMU_PGD_TABLE_SIZE);
@@ -486,10 +437,11 @@ void srmmu_nocache_init(void)
 
 	srmmu_early_allocate_ptable_skeleton(SRMMU_NOCACHE_VADDR, srmmu_nocache_end);
 
-	spin_lock_init(&srmmu_nocache_spinlock);
-
 	paddr = __pa((unsigned long)srmmu_nocache_pool);
 	vaddr = SRMMU_NOCACHE_VADDR;
+
+/* P3 */ printk("srmmu: pool 0x%x vaddr 0x%x bitmap 0x%x bits %d (0x%x)\n",
+  (int)srmmu_nocache_pool, vaddr, srmmu_nocache_bitmap, bitmap_bits, bitmap_bits);
 
 	while (vaddr < srmmu_nocache_end) {
 		pgd = pgd_offset_k(vaddr);
@@ -637,7 +589,8 @@ static void srmmu_switch_mm(struct mm_struct *old_mm, struct mm_struct *mm,
 }
 
 /* Low level IO area allocation on the SRMMU. */
-void srmmu_mapioaddr(unsigned long physaddr, unsigned long virt_addr, int bus_type, int rdonly)
+static inline void srmmu_mapioaddr(unsigned long physaddr,
+    unsigned long virt_addr, int bus_type)
 {
 	pgd_t *pgdp;
 	pmd_t *pmdp;
@@ -656,16 +609,24 @@ void srmmu_mapioaddr(unsigned long physaddr, unsigned long virt_addr, int bus_ty
 	 * 36-bit physical address on the I/O space lines...
 	 */
 	tmp |= (bus_type << 28);
-	if(rdonly)
-		tmp |= SRMMU_PRIV_RDONLY;
-	else
-		tmp |= SRMMU_PRIV;
+	tmp |= SRMMU_PRIV;
 	__flush_page_to_ram(virt_addr);
 	srmmu_set_pte(ptep, __pte(tmp));
+}
+
+static void srmmu_mapiorange(unsigned int bus, unsigned long xpa,
+    unsigned long xva, unsigned int len)
+{
+	while (len != 0) {
+		len -= PAGE_SIZE;
+		srmmu_mapioaddr(xpa, xva, bus);
+		xva += PAGE_SIZE;
+		xpa += PAGE_SIZE;
+	}
 	flush_tlb_all();
 }
 
-void srmmu_unmapioaddr(unsigned long virt_addr)
+static inline void srmmu_unmapioaddr(unsigned long virt_addr)
 {
 	pgd_t *pgdp;
 	pmd_t *pmdp;
@@ -677,6 +638,15 @@ void srmmu_unmapioaddr(unsigned long virt_addr)
 
 	/* No need to flush uncacheable page. */
 	srmmu_pte_clear(ptep);
+}
+
+static void srmmu_unmapiorange(unsigned long virt_addr, unsigned int len)
+{
+	while (len != 0) {
+		len -= PAGE_SIZE;
+		srmmu_unmapioaddr(virt_addr);
+		virt_addr += PAGE_SIZE;
+	}
 	flush_tlb_all();
 }
 
@@ -1398,7 +1368,7 @@ static void srmmu_mmu_info(struct seq_file *m)
 		   srmmu_name,
 		   num_contexts,
 		   srmmu_nocache_size,
-		   (srmmu_nocache_used << SRMMU_NOCACHE_BITMAP_SHIFT));
+		   srmmu_nocache_map.used << SRMMU_NOCACHE_BITMAP_SHIFT);
 }
 
 static void srmmu_update_mmu_cache(struct vm_area_struct * vma, unsigned long address, pte_t pte)
@@ -2258,7 +2228,10 @@ void __init ld_mmu_srmmu(void)
 	BTFIXUPSET_CALL(pte_mkyoung, srmmu_pte_mkyoung, BTFIXUPCALL_ORINT(SRMMU_REF));
 	BTFIXUPSET_CALL(update_mmu_cache, srmmu_update_mmu_cache, BTFIXUPCALL_NOP);
 	BTFIXUPSET_CALL(destroy_context, srmmu_destroy_context, BTFIXUPCALL_NORM);
-	
+
+	BTFIXUPSET_CALL(sparc_mapiorange, srmmu_mapiorange, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(sparc_unmapiorange, srmmu_unmapiorange, BTFIXUPCALL_NORM);
+
 	BTFIXUPSET_CALL(mmu_info, srmmu_mmu_info, BTFIXUPCALL_NORM);
 
 	BTFIXUPSET_CALL(alloc_thread_info, srmmu_alloc_thread_info, BTFIXUPCALL_NORM);

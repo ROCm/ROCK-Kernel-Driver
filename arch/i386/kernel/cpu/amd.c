@@ -178,6 +178,15 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 			break;
 	}
 
+	switch (c->x86) {
+	case 15:
+		set_bit(X86_FEATURE_K8, c->x86_capability);
+		break;
+	case 6:
+		set_bit(X86_FEATURE_K7, c->x86_capability); 
+		break;
+	}
+
 	display_cacheinfo(c);
 }
 

@@ -65,16 +65,6 @@
  * (wavelan modem or i82593)
  */
 
-/*------------------------------------------------------------------*/
-/*
- * Wrapper for reporting error to cardservices
- */
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
 #ifdef STRUCT_CHECK
 /*------------------------------------------------------------------*/
 /*

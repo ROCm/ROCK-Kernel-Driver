@@ -4524,7 +4524,6 @@ int __init sisfb_init(void)
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)		/* ---- 2.5 series init ---- */
-		sis_fb_info.node = NODEV;
 		sis_fb_info.flags = FBINFO_FLAG_DEFAULT;
 		sis_fb_info.var = default_var;
 		sis_fb_info.fix = sisfb_fix;
@@ -4571,7 +4570,7 @@ int __init sisfb_init(void)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 		printk(KERN_INFO "fb%d: %s frame buffer device, Version %d.%d.%02d\n",
-	       		minor(sis_fb_info.node), myid, VER_MAJOR, VER_MINOR, VER_LEVEL);			     
+	       		sis_fb_info.node, myid, VER_MAJOR, VER_MINOR, VER_LEVEL);			     
 #endif
 
 	}	/* TW: if mode = "none" */

@@ -96,7 +96,7 @@ extern struct comx_hardware hicomx_hw;
 extern struct comx_hardware comx_hw;
 extern struct comx_hardware cmx_hw;
 
-static void COMX_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t COMX_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 static void COMX_board_on(struct net_device *dev)
 {
@@ -335,7 +335,7 @@ static inline char comx_line_change(struct net_device *dev, char linestat)
 
 
 
-static void COMX_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t COMX_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct comx_channel *ch = dev->priv;
@@ -348,7 +348,7 @@ static void COMX_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (dev == NULL) {
 		printk(KERN_ERR "COMX_interrupt: irq %d for unknown device\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	jiffs = jiffies;
@@ -445,6 +445,7 @@ static void COMX_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	ch->HW_release_board(dev, interrupted);
+	return IRQ_HANDLED;
 }
 
 static int COMX_open(struct net_device *dev)

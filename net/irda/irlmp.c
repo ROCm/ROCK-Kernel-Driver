@@ -975,7 +975,7 @@ void irlmp_discovery_confirm(hashbin_t *log, DISCOVERY_MODE mode)
 /*
  * Function irlmp_discovery_expiry (expiry)
  *
- *	This device is no longer been discovered, and therefore it is beeing
+ *	This device is no longer been discovered, and therefore it is being
  *	purged from the discovery log. Inform all clients who have
  *	registered for this event...
  *
@@ -1279,7 +1279,7 @@ void irlmp_flow_indication(struct lap_cb *self, LOCAL_FLOW flow)
  * Function irlmp_hint_to_service (hint)
  *
  *    Returns a list of all servics contained in the given hint bits. This
- *    funtion assumes that the hint bits have the size of two bytes only
+ *    function assumes that the hint bits have the size of two bytes only
  */
 __u8 *irlmp_hint_to_service(__u8 *hint)
 {
@@ -1576,7 +1576,7 @@ int irlmp_slsap_inuse(__u8 slsap_sel)
 
 	/*
 	 *  Check if slsap is already in use. To do this we have to loop over
-	 *  every IrLAP connection and check every LSAP assosiated with each
+	 *  every IrLAP connection and check every LSAP associated with each
 	 *  the connection.
 	 */
 	spin_lock_irqsave(&irlmp->links->hb_spinlock, flags);

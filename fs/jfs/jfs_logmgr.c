@@ -1105,13 +1105,10 @@ int lmLogOpen(struct super_block *sb, struct jfs_log ** logptr)
 	 */
       externalLog:
 
-	if (!(bdev = bdget(JFS_SBI(sb)->logdev))) {
-		rc = ENODEV;
-		goto free;
-	}
-
-	if ((rc = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS))) {
-		rc = -rc;
+	bdev = open_by_devnum(JFS_SBI(sb)->logdev,
+					FMODE_READ|FMODE_WRITE, BDEV_FS);
+	if (IS_ERR(bdev)) {
+		rc = -PTR_ERR(bdev);
 		goto free;
 	}
 

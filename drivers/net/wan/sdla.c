@@ -856,7 +856,7 @@ static void sdla_receive(struct net_device *dev)
 	restore_flags(flags);
 }
 
-static void sdla_isr(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t sdla_isr(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device     *dev;
 	struct frad_local *flp;
@@ -867,7 +867,7 @@ static void sdla_isr(int irq, void *dev_id, struct pt_regs * regs)
 	if (dev == NULL)
 	{
 		printk(KERN_WARNING "sdla_isr(): irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	flp = dev->priv;
@@ -875,7 +875,7 @@ static void sdla_isr(int irq, void *dev_id, struct pt_regs * regs)
 	if (!flp->initialized)
 	{
 		printk(KERN_WARNING "%s: irq %d for uninitialized device.\n", dev->name, irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	byte = sdla_byte(dev, flp->type == SDLA_S508 ? SDLA_508_IRQ_INTERFACE : SDLA_502_IRQ_INTERFACE);
@@ -910,6 +910,7 @@ static void sdla_isr(int irq, void *dev_id, struct pt_regs * regs)
 	/* this clears the byte, informing the Z80 we're done */
 	byte = 0;
 	sdla_write(dev, flp->type == SDLA_S508 ? SDLA_508_IRQ_INTERFACE : SDLA_502_IRQ_INTERFACE, &byte, sizeof(byte));
+	return IRQ_HANDLED;
 }
 
 static void sdla_poll(unsigned long device)

@@ -141,11 +141,6 @@ typedef struct dev_link_t {
 #define DEV_OK(l) \
     ((l) && ((l->state & ~DEV_BUSY) == (DEV_CONFIG|DEV_PRESENT)))
 
-int register_pccard_driver(dev_info_t *dev_info,
-			   dev_link_t *(*attach)(void),
-			   void (*detach)(dev_link_t *));
-
-int unregister_pccard_driver(dev_info_t *dev_info);
 
 extern struct bus_type pcmcia_bus_type;
 
@@ -157,9 +152,18 @@ struct pcmcia_driver {
 	struct device_driver	drv;
 };
 
+/* driver registration */
 int pcmcia_register_driver(struct pcmcia_driver *driver);
 void pcmcia_unregister_driver(struct pcmcia_driver *driver);
 
-#endif /* __KERNEL__ */
+/* legacy driver registration interface.  don't use in new code */
+int register_pccard_driver(dev_info_t *dev_info,
+			   dev_link_t *(*attach)(void),
+			   void (*detach)(dev_link_t *));
+int unregister_pccard_driver(dev_info_t *dev_info);
 
+/* error reporting */
+void cs_error(client_handle_t handle, int func, int ret);
+
+#endif /* __KERNEL__ */
 #endif /* _LINUX_DS_H */

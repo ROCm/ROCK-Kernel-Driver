@@ -292,8 +292,11 @@ skip_copy_pte_range:
 				 * and not mapped via rmap - duplicate the
 				 * mapping as is.
 				 */
-				page = pfn_to_page(pfn);
-				if (!pfn_valid(pfn) || PageReserved(page)) {
+				page = NULL;
+				if (pfn_valid(pfn)) 
+					page = pfn_to_page(pfn); 
+
+				if (!page || PageReserved(page)) {
 					set_pte(dst_pte, pte);
 					goto cont_copy_pte_range_noset;
 				}

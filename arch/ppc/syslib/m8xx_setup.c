@@ -44,6 +44,7 @@
 #include <asm/machdep.h>
 #include <asm/bootinfo.h>
 #include <asm/time.h>
+#include <asm/xmon.h>
 
 #include "ppc8xx_pic.h"
 

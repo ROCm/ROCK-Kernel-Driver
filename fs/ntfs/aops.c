@@ -2,8 +2,8 @@
  * aops.c - NTFS kernel address space operations and page cache handling.
  * 	    Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (c) 2002 Richard Russon.
+ * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -111,7 +111,7 @@ static void ntfs_end_buffer_async_read(struct buffer_head *bh, int uptodate)
 		unsigned int i, recs, nr_err;
 		u32 rec_size;
 
-		rec_size = ni->_IDM(index_block_size);
+		rec_size = ni->itype.index.block_size;
 		recs = PAGE_CACHE_SIZE / rec_size;
 		addr = kmap_atomic(page, KM_BIO_SRC_IRQ);
 		for (i = nr_err = 0; i < recs; i++) {
@@ -124,7 +124,7 @@ static void ntfs_end_buffer_async_read(struct buffer_head *bh, int uptodate)
 					ni->mft_no ? "index" : "mft",
 					(long long)(((s64)page->index <<
 					PAGE_CACHE_SHIFT >>
-					ni->_IDM(index_block_size_bits)) + i));
+					ni->itype.index.block_size_bits) + i));
 		}
 		flush_dcache_page(page);
 		kunmap_atomic(addr, KM_BIO_SRC_IRQ);
@@ -383,7 +383,7 @@ int ntfs_readpage(struct file *file, struct page *page)
 	if (!NInoAttr(ni))
 		base_ni = ni;
 	else
-		base_ni = ni->_INE(base_ntfs_ino);
+		base_ni = ni->ext.base_ntfs_ino;
 
 	/* Map, pin, and lock the mft record. */
 	mrec = map_mft_record(base_ni);
@@ -406,7 +406,7 @@ int ntfs_readpage(struct file *file, struct page *page)
 	attr_pos = page->index << PAGE_CACHE_SHIFT;
 
 	/* The total length of the attribute value. */
-	attr_len = le32_to_cpu(ctx->attr->_ARA(value_length));
+	attr_len = le32_to_cpu(ctx->attr->data.resident.value_length);
 
 	addr = kmap(page);
 	/* Copy over in bounds data, zeroing the remainder of the page. */
@@ -418,8 +418,8 @@ int ntfs_readpage(struct file *file, struct page *page)
 			memset(addr + bytes, 0, PAGE_CACHE_SIZE - bytes);
 		/* Copy the data to the page. */
 		memcpy(addr, attr_pos + (char*)ctx->attr +
-				le16_to_cpu(ctx->attr->_ARA(value_offset)),
-				bytes);
+				le16_to_cpu(
+				ctx->attr->data.resident.value_offset), bytes);
 	} else
 		memset(addr, 0, PAGE_CACHE_SIZE);
 	flush_dcache_page(page);
@@ -892,7 +892,7 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	if (!NInoAttr(ni))
 		base_ni = ni;
 	else
-		base_ni = ni->_INE(base_ntfs_ino);
+		base_ni = ni->ext.base_ntfs_ino;
 
 	/* Map, pin, and lock the mft record. */
 	m = map_mft_record(base_ni);
@@ -917,7 +917,7 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	attr_pos = page->index << PAGE_CACHE_SHIFT;
 
 	/* The total length of the attribute value. */
-	attr_len = le32_to_cpu(ctx->attr->_ARA(value_length));
+	attr_len = le32_to_cpu(ctx->attr->data.resident.value_length);
 
 	if (unlikely(vi->i_size != attr_len)) {
 		ntfs_error(vi->i_sb, "BUG()! i_size (0x%Lx) doesn't match "
@@ -956,8 +956,9 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 
 	kaddr = kmap_atomic(page, KM_USER0);
 	/* Copy the data from the page to the mft record. */
-	memcpy((u8*)ctx->attr + le16_to_cpu(ctx->attr->_ARA(value_offset)) +
-			attr_pos, kaddr, bytes);
+	memcpy((u8*)ctx->attr + le16_to_cpu(
+			ctx->attr->data.resident.value_offset) + attr_pos,
+			kaddr, bytes);
 	flush_dcache_mft_record_page(ctx->ntfs_ino);
 #if 0
 	/* Zero out of bounds area. */
@@ -1656,7 +1657,7 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 	if (!NInoAttr(ni))
 		base_ni = ni;
 	else
-		base_ni = ni->_INE(base_ntfs_ino);
+		base_ni = ni->ext.base_ntfs_ino;
 
 	/* Map, pin, and lock the mft record. */
 	m = map_mft_record(base_ni);
@@ -1681,7 +1682,7 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 	attr_pos = page->index << PAGE_CACHE_SHIFT;
 
 	/* The total length of the attribute value. */
-	attr_len = le32_to_cpu(ctx->attr->_ARA(value_length));
+	attr_len = le32_to_cpu(ctx->attr->data.resident.value_length);
 
 	if (unlikely(vi->i_size != attr_len)) {
 		ntfs_error(vi->i_sb, "BUG()! i_size (0x%Lx) doesn't match "
@@ -1705,8 +1706,8 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 	 * Calculate the address of the attribute value corresponding to the
 	 * beginning of the current data @page.
 	 */
-	kattr = (u8*)ctx->attr + le16_to_cpu(ctx->attr->_ARA(value_offset)) +
-			attr_pos;
+	kattr = (u8*)ctx->attr + le16_to_cpu(
+			ctx->attr->data.resident.value_offset) + attr_pos;
 
 	kaddr = kmap_atomic(page, KM_USER0);
 

@@ -1347,7 +1347,7 @@ static void set_chan_state (struct net_device *dev, u8 state)
 {
 	x25_channel_t *chan = dev->priv;
 	cycx_t *card = chan->card;
-	long flags;
+	unsigned long flags;
 	char *string_state = NULL;
 
 	spin_lock_irqsave(&card->lock, flags);

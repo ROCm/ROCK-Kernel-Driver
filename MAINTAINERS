@@ -505,6 +505,17 @@ W:	http://www.qsl.net/dl1bke/
 L:	linux-hams@vger.kernel.org
 S:	Maintained
 
+DC395x SCSI driver
+P:	Oliver Neukum
+M:	oliver@neukum.name
+P:	Ali Akcaagac
+M:	aliakc@web.de
+P:	Jamie Lenehan
+M:	lenehan@twibble.org
+W:	http://twibble.org/dist/dc395x/
+L:	http://lists.twibble.org/mailman/listinfo/dc395x/
+S:	Maintained
+
 DC390/AM53C974 SCSI driver
 P:	Kurt Garloff
 M:	garloff@suse.de
@@ -930,6 +941,13 @@ M:	cramerj@intel.com
 P:	Scott Feldman
 M:	scott.feldman@intel.com
 W:	http://sourceforge.net/projects/e1000/
+S:	Supported
+
+INTEL PRO/10GbE SUPPORT
+P:	Ganesh Venkatesan
+M:	Ganesh.Venkatesan@intel.com
+P:	Scott Feldman
+M:	scott.feldman@intel.com
 S:	Supported
 
 INTERMEZZO FILE SYSTEM

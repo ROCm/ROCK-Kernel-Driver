@@ -40,12 +40,12 @@ void DRM(dma_service)(int irq, void *device, struct pt_regs *regs)
 	drm_device_t	 *dev = (drm_device_t *)device;
       	drm_i830_private_t *dev_priv = (drm_i830_private_t *)dev->dev_private;
    	u16 temp;
-   
+
       	temp = I830_READ16(I830REG_INT_IDENTITY_R);
-	printk("%s: %x\n", __FUNCTION__, temp);
-	
-   	if(temp == 0) 
-	   return;
+	DRM_DEBUG("%x\n", temp);
+
+   	if (temp == 0) 
+		return;
 
 	I830_WRITE16(I830REG_INT_IDENTITY_R, temp); 
 
@@ -175,3 +175,34 @@ int i830_irq_wait( struct inode *inode, struct file *filp, unsigned int cmd,
 	return i830_wait_irq( dev, irqwait.irq_seq );
 }
 
+
+/* drm_dma.h hooks
+*/
+void DRM(driver_irq_preinstall)( drm_device_t *dev ) {
+	drm_i830_private_t *dev_priv =
+		(drm_i830_private_t *)dev->dev_private;
+
+	I830_WRITE16( I830REG_HWSTAM, 0xffff );
+	I830_WRITE16( I830REG_INT_MASK_R, 0x0 );
+	I830_WRITE16( I830REG_INT_ENABLE_R, 0x0 );
+	atomic_set(&dev_priv->irq_received, 0);
+	atomic_set(&dev_priv->irq_emitted, 0);
+	init_waitqueue_head(&dev_priv->irq_queue);
+}
+
+void DRM(driver_irq_postinstall)( drm_device_t *dev ) {
+	drm_i830_private_t *dev_priv =
+		(drm_i830_private_t *)dev->dev_private;
+
+	I830_WRITE16( I830REG_INT_ENABLE_R, 0x2 );
+}
+
+void DRM(driver_irq_uninstall)( drm_device_t *dev ) {
+	drm_i830_private_t *dev_priv =
+		(drm_i830_private_t *)dev->dev_private;
+	if (!dev_priv)
+		return;
+
+	I830_WRITE16( I830REG_INT_MASK_R, 0xffff );
+	I830_WRITE16( I830REG_INT_ENABLE_R, 0x0 );
+}

@@ -103,14 +103,6 @@ static void ide_detach(dev_link_t *);
 
 static dev_link_t *dev_list = NULL;
 
-/*====================================================================*/
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
 /*======================================================================
 
     ide_attach() creates an "instance" of the driver, allocating

@@ -84,7 +84,7 @@ extern int sb1000_probe(struct net_device *dev);
 static int sb1000_open(struct net_device *dev);
 static int sb1000_dev_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd);
 static int sb1000_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void sb1000_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t sb1000_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static struct net_device_stats *sb1000_stats(struct net_device *dev);
 static int sb1000_close(struct net_device *dev);
 
@@ -1112,7 +1112,7 @@ sb1000_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 /* SB1000 interrupt handler. */
-static void sb1000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sb1000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	char *name;
 	unsigned char st;
@@ -1127,7 +1127,7 @@ static void sb1000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (dev == NULL) {
 		printk(KERN_ERR "sb1000_interrupt(): irq %d for unknown device.\n",
 			irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	ioaddr[0] = dev->base_addr;
@@ -1138,7 +1138,7 @@ static void sb1000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* is it a good interrupt? */
 	st = inb(ioaddr[1] + 6);
 	if (!(st & 0x08 && st & 0x20)) {
-		return;
+		return IRQ_NONE;
 	}
 
 	if (sb1000_debug > 3)
@@ -1169,7 +1169,7 @@ static void sb1000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		lp->rx_error_count = 0;
 	}
 
-	return;
+	return IRQ_HANDLED;
 }
 
 static struct net_device_stats *sb1000_stats(struct net_device *dev)

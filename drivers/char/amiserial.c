@@ -2288,9 +2288,10 @@ static void serial_console_write(struct console *co, const char *s,
 	custom.intena = IF_SETCLR | (intena & IF_TBE);
 }
 
-static kdev_t serial_console_device(struct console *c)
+static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
-	return mk_kdev(TTY_MAJOR, 64);
+	*index = 0;
+	return &serial_driver;
 }
 
 static struct console sercons = {

@@ -2196,6 +2196,21 @@ void end_request(struct request *req, int uptodate)
 	}
 }
 
+void blk_rq_bio_prep(request_queue_t *q, struct request *rq, struct bio *bio)
+{
+	/* first three bits are identical in rq->flags and bio->bi_rw */
+	rq->flags |= (bio->bi_rw & 7);
+
+	rq->nr_phys_segments = bio_phys_segments(q, bio);
+	rq->nr_hw_segments = bio_hw_segments(q, bio);
+	rq->current_nr_sectors = bio_cur_sectors(bio);
+	rq->hard_cur_sectors = rq->current_nr_sectors;
+	rq->hard_nr_sectors = rq->nr_sectors = bio_sectors(bio);
+	rq->buffer = bio_data(bio);
+
+	rq->bio = rq->biotail = bio;
+}
+
 int __init blk_dev_init(void)
 {
 	int total_ram = nr_free_pages() << (PAGE_SHIFT - 10);
@@ -2285,3 +2300,5 @@ EXPORT_SYMBOL(blk_stop_queue);
 EXPORT_SYMBOL(__blk_stop_queue);
 EXPORT_SYMBOL(blk_run_queue);
 EXPORT_SYMBOL(blk_run_queues);
+
+EXPORT_SYMBOL(blk_rq_bio_prep);

@@ -868,7 +868,8 @@ static inline void interrupts_off (amb_dev * dev) {
 
 /********** interrupt handling **********/
 
-static void interrupt_handler (int irq, void * dev_id, struct pt_regs * pt_regs) {
+static irqreturn_t interrupt_handler(int irq, void *dev_id,
+					struct pt_regs *pt_regs) {
   amb_dev * dev = amb_devs;
   (void) pt_regs;
   
@@ -876,7 +877,7 @@ static void interrupt_handler (int irq, void * dev_id, struct pt_regs * pt_regs)
   
   if (!dev_id) {
     PRINTD (DBG_IRQ|DBG_ERR, "irq with NULL dev_id: %d", irq);
-    return;
+    return IRQ_NONE;
   }
   // Did one of our cards generate the interrupt?
   while (dev) {
@@ -889,12 +890,12 @@ static void interrupt_handler (int irq, void * dev_id, struct pt_regs * pt_regs)
   // the card generates an IRQ at startup - should not happen again
   if (!dev) {
     PRINTD (DBG_IRQ, "irq for unknown device: %d", irq);
-    return;
+    return IRQ_NONE;
   }
   // impossible - unless we have memory corruption of dev or kernel
   if (irq != dev->irq) {
     PRINTD (DBG_IRQ|DBG_ERR, "irq mismatch: %d", irq);
-    return;
+    return IRQ_NONE;
   }
   
   {
@@ -903,7 +904,7 @@ static void interrupt_handler (int irq, void * dev_id, struct pt_regs * pt_regs)
     // for us or someone else sharing the same interrupt
     if (!interrupt) {
       PRINTD (DBG_IRQ, "irq not for me: %d", irq);
-      return;
+      return IRQ_NONE;
     }
     
     // definitely for us
@@ -934,7 +935,7 @@ static void interrupt_handler (int irq, void * dev_id, struct pt_regs * pt_regs)
   }
   
   PRINTD (DBG_IRQ|DBG_FLOW, "interrupt_handler done: %p", dev_id);
-  return;
+  return IRQ_HANDLED;
 }
 
 /********** don't panic... yeah, right **********/

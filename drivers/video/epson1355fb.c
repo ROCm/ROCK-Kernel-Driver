@@ -500,7 +500,6 @@ int __init e1355fb_init(void)
 	fb_info.gen.fbhw->detect();
 	strcpy(fb_info.gen.info.modename, "SED1355");
 	fb_info.gen.info.changevar = NULL;
-	fb_info.gen.info.node = NODEV;
 	fb_info.gen.info.fbops = &e1355fb_ops;
 	fb_info.gen.info.screen_base = (void *)E1355_FB_BASE;
 	fb_info.gen.currcon = -1;
@@ -517,7 +516,7 @@ int __init e1355fb_init(void)
 		do_install_cmap(0, &fb_info.gen);
 	if (register_framebuffer(&fb_info.gen.info) < 0)
 		return -EINVAL;
-	printk(KERN_INFO "fb%d: %s frame buffer device\n", minor(fb_info.gen.info.node),
+	printk(KERN_INFO "fb%d: %s frame buffer device\n", fb_info.gen.info.node,
 	       fb_info.gen.info.modename);
 
 	return 0;

@@ -1944,11 +1944,6 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 	serial_out(up, UART_IER, ier);
 }
 
-static kdev_t serial8250_console_device(struct console *co)
-{
-	return mk_kdev(TTY_MAJOR, 64 + co->index);
-}
-
 static int __init serial8250_console_setup(struct console *co, char *options)
 {
 	struct uart_port *port;
@@ -1977,13 +1972,15 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	return uart_set_options(port, co, baud, parity, bits, flow);
 }
 
+extern struct uart_driver serial8250_reg;
 static struct console serial8250_console = {
 	.name		= "ttyS",
 	.write		= serial8250_console_write,
-	.device		= serial8250_console_device,
+	.device		= uart_console_device,
 	.setup		= serial8250_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,
+	.data		= &serial8250_reg,
 };
 
 static int __init serial8250_console_init(void)

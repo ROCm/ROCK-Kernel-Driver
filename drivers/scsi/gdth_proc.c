@@ -1471,7 +1471,10 @@ static char *gdth_ioctl_alloc(int hanum, int size, int scratch,
         ret_val = NULL;
     } else {
 #if LINUX_VERSION_CODE >= 0x020400
-        ret_val = pci_alloc_consistent(ha->pdev, size, paddr);
+	dma_addr_t dma_addr;
+
+        ret_val = pci_alloc_consistent(ha->pdev, size, &dma_addr);
+	*paddr = (ulong32)dma_addr;
 #else
         ret_val = scsi_init_malloc(size, GFP_ATOMIC | GFP_DMA);
         if (ret_val)

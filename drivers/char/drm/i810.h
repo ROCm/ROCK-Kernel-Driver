@@ -86,14 +86,18 @@
  */
 #define __HAVE_RELEASE		1
 #define DRIVER_RELEASE() do {						\
-	i810_reclaim_buffers( filp );				\
+	i810_reclaim_buffers( filp );					\
+} while (0)
+
+#define DRIVER_PRETAKEDOWN() do {					\
+	i810_dma_cleanup( dev );					\
 } while (0)
 
 /* DMA customization:
  */
 #define __HAVE_DMA		1
 #define __HAVE_DMA_QUEUE	1
-#define __HAVE_DMA_WAITLIST	1
+#define __HAVE_DMA_WAITLIST	0
 #define __HAVE_DMA_RECLAIM	1
 
 #define __HAVE_DMA_QUIESCENT	1
@@ -104,6 +108,7 @@
 /* Don't need an irq any more.  The template code will make sure that
  * a noop stub is generated for compatibility.
  */
+/* XXX: Add vblank support? */
 #define __HAVE_DMA_IRQ		0
 
 /* Buffer customization:

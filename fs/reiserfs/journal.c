@@ -1911,21 +1911,16 @@ static int journal_init_dev( struct super_block *super,
 
 	/* there is no "jdev" option and journal is on separate device */
 	if( ( !jdev_name || !jdev_name[ 0 ] ) ) {
-		journal -> j_dev_bd = bdget(jdev);
-		if( journal -> j_dev_bd )
-			result = blkdev_get( journal -> j_dev_bd, 
-					     blkdev_mode, 0, 
-					     BDEV_FS );
-		else
-			result = -ENOMEM;
-		if( result != 0 )
+		journal->j_dev_bd = open_by_devnum(jdev, blkdev_mode, BDEV_FS);
+		if (IS_ERR(journal->j_dev_bd)) {
+			result = PTR_ERR(journal->j_dev_bd);
+			journal->j_dev_bd = NULL;
 			printk( "sh-458: journal_init_dev: cannot init journal device\n '%s': %i", 
-				bdevname(journal->j_dev_bd, b), result );
-
-		else if (jdev != super->s_dev) {
+				__bdevname(jdev, b), result );
+			return result;
+		} else if (jdev != super->s_dev)
 			set_blocksize(journal->j_dev_bd, super->s_blocksize);
-		}
-		return result;
+		return 0;
 	}
 
 	journal -> j_dev_file = filp_open( jdev_name, 0, 0 );

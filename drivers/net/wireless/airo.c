@@ -3158,7 +3158,7 @@ static int proc_stats_rid_open( struct inode *inode,
 	readStatsRid(apriv, &stats, rid);
 
         j = 0;
-	for(i=0; (int)statsLabels[i]!=-1 &&
+	for(i=0; statsLabels[i]!=(char *)-1 &&
 		    i*4<stats.len; i++){
 		if (!statsLabels[i]) continue;
 		if (j+strlen(statsLabels[i])+16>4096) {

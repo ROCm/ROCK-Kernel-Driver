@@ -267,7 +267,7 @@ async_bump(struct net_device *dev,
 /*
  * Function async_unwrap_bof(dev, byte)
  *
- *    Handle Beggining Of Frame character received within a frame
+ *    Handle Beginning Of Frame character received within a frame
  *
  */
 static inline void
@@ -386,7 +386,7 @@ async_unwrap_ce(struct net_device *dev,
 	case BEGIN_FRAME:
 	case INSIDE_FRAME:
 	default:
-		/* Stuffed byte comming */
+		/* Stuffed byte coming */
 		rx_buff->state = LINK_ESCAPE;
 		break;
 	}

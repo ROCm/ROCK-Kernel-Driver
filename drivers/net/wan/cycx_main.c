@@ -75,7 +75,7 @@ static int shutdown (wan_device_t *wandev);
 static int ioctl (wan_device_t *wandev, unsigned cmd, unsigned long arg);
 
 /* Miscellaneous functions */
-static void cycx_isr (int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t cycx_isr (int irq, void *dev_id, struct pt_regs *regs);
 
 /* Global Data
  * Note: All data must be explicitly initialized!!!
@@ -316,7 +316,7 @@ static int ioctl (wan_device_t *wandev, unsigned cmd, unsigned long arg)
  * o acknowledge Cyclom 2X hardware interrupt.
  * o call protocol-specific interrupt service routine, if any.
  */
-static void cycx_isr (int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t cycx_isr (int irq, void *dev_id, struct pt_regs *regs)
 {
 	cycx_t *card = (cycx_t *)dev_id;
 
@@ -331,7 +331,8 @@ static void cycx_isr (int irq, void *dev_id, struct pt_regs *regs)
 
 	if (card->isr)
 		card->isr(card);
-out:	return;
+	return IRQ_HANDLED;
+out:	return IRQ_NONE;
 }
 
 /*

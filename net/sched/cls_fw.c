@@ -152,7 +152,7 @@ static int fw_delete(struct tcf_proto *tp, unsigned long arg)
 	struct fw_filter **fp;
 
 	if (head == NULL || f == NULL)
-		return -EINVAL;
+		goto out;
 
 	for (fp=&head->ht[fw_hash(f->id)]; *fp; fp = &(*fp)->next) {
 		if (*fp == f) {
@@ -171,6 +171,7 @@ static int fw_delete(struct tcf_proto *tp, unsigned long arg)
 			return 0;
 		}
 	}
+out:
 	return -EINVAL;
 }
 

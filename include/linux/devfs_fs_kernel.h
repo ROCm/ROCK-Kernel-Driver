@@ -62,7 +62,7 @@ static inline int devfs_mk_dir(const char *fmt, ...)
 static inline void devfs_remove(const char *fmt, ...)
 {
 }
-static inline int devfs_register_tape (devfs_handle_t de)
+static inline int devfs_register_tape (const char *name)
 {
     return -1;
 }

@@ -1046,12 +1046,9 @@ static int lock_rdev(mdk_rdev_t *rdev, dev_t dev)
 	int err = 0;
 	struct block_device *bdev;
 
-	bdev = bdget(dev);
-	if (!bdev)
-		return -ENOMEM;
-	err = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_RAW);
-	if (err)
-		return err;
+	bdev = open_by_devnum(dev, FMODE_READ|FMODE_WRITE, BDEV_RAW);
+	if (IS_ERR(bdev))
+		return PTR_ERR(bdev);
 	err = bd_claim(bdev, rdev);
 	if (err) {
 		blkdev_put(bdev, BDEV_RAW);
@@ -1687,7 +1684,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 
 		del_timer_sync(&mddev->safemode_timer);
 
-		invalidate_device(mk_kdev(disk->major, disk->first_minor), 1);
+		invalidate_partition(disk, 0);
 
 		if (ro) {
 			err  = -ENXIO;

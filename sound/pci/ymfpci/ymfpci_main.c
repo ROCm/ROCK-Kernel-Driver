@@ -743,7 +743,7 @@ static void snd_ymfpci_irq_wait(ymfpci_t *chip)
 
 static irqreturn_t snd_ymfpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, dev_id, return);
+	ymfpci_t *chip = snd_magic_cast(ymfpci_t, dev_id, return IRQ_NONE);
 	u32 status, nvoice, mode;
 	ymfpci_voice_t *voice;
 

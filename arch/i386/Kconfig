@@ -273,6 +273,13 @@ config MVIAC3_2
 
 endchoice
 
+config X86_GENERIC
+       bool "Generic x86 support" 
+       help
+       	  Including some tuning for non selected x86 CPUs too.
+	  when it has moderate overhead. This is intended for generic 
+	  distributions kernels.
+
 #
 # Define implied options from the CPU selection here
 #
@@ -288,10 +295,10 @@ config X86_XADD
 
 config X86_L1_CACHE_SHIFT
 	int
+	default "7" if MPENTIUM4 || X86_GENERIC
 	default "4" if MELAN || M486 || M386
 	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MCYRIXIII || MK6 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || M586 || MVIAC3_2
 	default "6" if MK7 || MK8
-	default "7" if MPENTIUM4
 
 config RWSEM_GENERIC_SPINLOCK
 	bool
@@ -345,7 +352,7 @@ config X86_GOOD_APIC
 
 config X86_INTEL_USERCOPY
 	bool
-	depends on MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M586MMX
+	depends on MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M586MMX || X86_GENERIC || MK8 || MK7
 	default y
 
 config X86_USE_PPRO_CHECKSUM
@@ -361,16 +368,6 @@ config X86_USE_3DNOW
 config X86_OOSTORE
 	bool
 	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6
-	default y
-
-config X86_PREFETCH
-	bool
-	depends on MPENTIUMIII || MPENTIUM4 || MVIAC3_2
-	default y
-
-config X86_SSE2
-	bool
-	depends on MK8 || MPENTIUM4
 	default y
 
 config HUGETLB_PAGE
@@ -412,6 +409,18 @@ config SMP
 	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
+
+config NR_CPUS
+	int "Maximum number of CPUs (2-32)"
+	depends on SMP
+	default "32"
+	help
+	  This allows you to specify the maximum number of CPUs which this
+	  kernel will support.  The maximum supported value is 32 and the
+	  minimum value which makes sense is 2.
+
+	  This is purely to save memory - each supported CPU adds
+	  approximately eight kilobytes to the kernel image.
 
 config PREEMPT
 	bool "Preemptible Kernel"
@@ -464,18 +473,6 @@ config X86_IO_APIC
 	bool
 	depends on !SMP && X86_UP_IOAPIC
 	default y
-
-config NR_CPUS
-	int "Maximum number of CPUs (2-32)"
-	depends on SMP
-	default "32"
-	help
-	  This allows you to specify the maximum number of CPUs which this
-	  kernel will support.  The maximum supported value is 32 and the
-	  minimum value which makes sense is 2.
-
-	  This is purely to save memory - each supported CPU adds
-	  approximately eight kilobytes to the kernel image.
 
 config X86_TSC
 	bool
@@ -989,6 +986,11 @@ config X86_LOCAL_APIC
 	depends on (X86_VISWS || SMP) && !X86_VOYAGER
 	default y
 
+config X86_IO_APIC
+	bool
+	depends on SMP && !(X86_VISWS || X86_VOYAGER)
+	default y
+
 config PCI
 	bool "PCI support" if !X86_VISWS
 	depends on !X86_VOYAGER
@@ -1003,11 +1005,6 @@ config PCI
 	  <http://www.tldp.org/docs.html#howto>, contains valuable
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
-
-config X86_IO_APIC
-	bool
-	depends on SMP && !(X86_VISWS || X86_VOYAGER)
-	default y
 
 choice
 	prompt "PCI access mode"
@@ -1047,18 +1044,6 @@ config PCI_DIRECT
 	bool
  	depends on PCI && ((PCI_GODIRECT || PCI_GOANY) || X86_VISWS)
 	default y
-
-config SCx200
-	tristate "NatSemi SCx200 support"
-	depends on !X86_VOYAGER
-	help
-	  This provides basic support for the National Semiconductor SCx200 
-	  processor.  Right now this is just a driver for the GPIO pins.
-
-	  If you don't know what to do here, say N.
-
-	  This support is also available as a module.  If compiled as a
-	  module, it will be called scx200.
 
 source "drivers/pci/Kconfig"
 
@@ -1104,6 +1089,18 @@ config MCA
 	default y if X86_VOYAGER
 
 source "drivers/mca/Kconfig"
+
+config SCx200
+	tristate "NatSemi SCx200 support"
+	depends on !X86_VOYAGER
+	help
+	  This provides basic support for the National Semiconductor SCx200 
+	  processor.  Right now this is just a driver for the GPIO pins.
+
+	  If you don't know what to do here, say N.
+
+	  This support is also available as a module.  If compiled as a
+	  module, it will be called scx200.
 
 config HOTPLUG
 	bool "Support for hot-pluggable devices"

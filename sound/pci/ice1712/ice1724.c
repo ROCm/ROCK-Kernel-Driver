@@ -196,7 +196,7 @@ static unsigned int snd_vt1724_get_gpio_data(ice1712_t *ice)
 
 static irqreturn_t snd_vt1724_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, dev_id, return);
+	ice1712_t *ice = snd_magic_cast(ice1712_t, dev_id, return IRQ_NONE);
 	unsigned char status;
 	int handled = 0;
 

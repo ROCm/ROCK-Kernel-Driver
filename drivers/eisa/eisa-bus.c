@@ -56,13 +56,22 @@ static char __init *decode_eisa_sig(unsigned long addr)
         u16 rev;
 	int i;
 
-	sig[0] = inb (addr);
-
-	if (sig[0] & 0x80)
-                return NULL;
-
-	for (i = 1; i < 4; i++)
+	for (i = 0; i < 4; i++) {
+#ifdef CONFIG_EISA_VLB_PRIMING
+		/*
+		 * This ugly stuff is used to wake up VL-bus cards
+		 * (AHA-284x is the only known example), so we can
+		 * read the EISA id.
+		 *
+		 * Thankfully, this only exists on x86...
+		 */
+		outb(0x80 + i, addr);
+#endif
 		sig[i] = inb (addr + i);
+
+		if (!i && (sig[0] & 0x80))
+			return NULL;
+	}
 	
         sig_str[0] = ((sig[0] >> 2) & 0x1f) + ('A' - 1);
         sig_str[1] = (((sig[0] & 3) << 3) | (sig[1] >> 5)) + ('A' - 1);
@@ -123,47 +132,28 @@ static ssize_t eisa_show_sig (struct device *dev, char *buf)
 
 static DEVICE_ATTR(signature, S_IRUGO, eisa_show_sig, NULL);
 
-static void __init eisa_register_device (struct eisa_root_device *root,
-					 char *sig, int slot)
+static int __init eisa_register_device (struct eisa_root_device *root,
+					struct eisa_device *edev,
+					char *sig, int slot)
 {
-	struct eisa_device *edev;
-
-	if (!(edev = kmalloc (sizeof (*edev), GFP_KERNEL)))
-		return;
-
-	memset (edev, 0, sizeof (*edev));
-	memcpy (edev->id.sig, sig, 7);
+	memcpy (edev->id.sig, sig, EISA_SIG_LEN);
 	edev->slot = slot;
 	edev->base_addr = SLOT_ADDRESS (root, slot);
+	edev->dma_mask = 0xffffffff; /* Default DMA mask */
 	eisa_name_device (edev);
 	edev->dev.parent = root->dev;
 	edev->dev.bus = &eisa_bus_type;
+	edev->dev.dma_mask = &edev->dma_mask;
 	sprintf (edev->dev.bus_id, "%02X:%02X", root->bus_nr, slot);
 
-	/* Don't register resource for slot 0, since this will surely
-	 * fail... :-( */
+	edev->res.name  = edev->dev.name;
 
-	if (slot) {
-		edev->res.name  = edev->dev.name;
-		edev->res.start = edev->base_addr;
-		edev->res.end   = edev->res.start + 0xfff;
-		edev->res.flags = IORESOURCE_IO;
-
-		if (request_resource (root->res, &edev->res)) {
-			printk (KERN_WARNING \
-				"Cannot allocate resource for EISA slot %d\n",
-				slot);
-			kfree (edev);
-			return;
-		}
-	}
-	
-	if (device_register (&edev->dev)) {
-		kfree (edev);
-		return;
-	}
+	if (device_register (&edev->dev))
+		return -1;
 
 	device_create_file (&edev->dev, &dev_attr_signature);
+
+	return 0;
 }
 
 static int __init eisa_probe (struct eisa_root_device *root)
@@ -171,54 +161,106 @@ static int __init eisa_probe (struct eisa_root_device *root)
         int i, c;
         char *str;
         unsigned long sig_addr;
+	struct eisa_device *edev;
 
         printk (KERN_INFO "EISA: Probing bus %d at %s\n",
 		root->bus_nr, root->dev->name);
 	
         for (c = 0, i = 0; i <= root->slots; i++) {
-                sig_addr = SLOT_ADDRESS (root, i) + EISA_VENDOR_ID_OFFSET;
-                if ((str = decode_eisa_sig (sig_addr))) {
-			if (!i)
-				printk (KERN_INFO "EISA: Motherboard %s detected\n",
-					str);
-			else {
-				printk (KERN_INFO "EISA: slot %d : %s detected.\n",
-					i, str);
+		if (!(edev = kmalloc (sizeof (*edev), GFP_KERNEL))) {
+			printk (KERN_ERR "EISA: Out of memory for slot %d\n",
+				i);
+			continue;
+		}
+		
+		memset (edev, 0, sizeof (*edev));
 
-				c++;
-			}
+		/* Don't register resource for slot 0, since this is
+		 * very likely to fail... :-( Instead, grab the EISA
+		 * id, now we can display something in /proc/ioports.
+		 */
 
-			eisa_register_device (root, str, i);
-                }
+		if (i) {
+			edev->res.name  = NULL;
+			edev->res.start = SLOT_ADDRESS (root, i);
+			edev->res.end   = edev->res.start + 0xfff;
+			edev->res.flags = IORESOURCE_IO;
+		} else {
+			edev->res.name  = NULL;
+			edev->res.start = SLOT_ADDRESS (root, i) + EISA_VENDOR_ID_OFFSET;
+			edev->res.end   = edev->res.start + 3;
+			edev->res.flags = IORESOURCE_BUSY;
+		}
+	
+		if (request_resource (root->res, &edev->res)) {
+			printk (KERN_WARNING \
+				"Cannot allocate resource for EISA slot %d\n",
+				i);
+			kfree (edev);
+			continue;
+		}
+
+		sig_addr = SLOT_ADDRESS (root, i) + EISA_VENDOR_ID_OFFSET;
+
+                if (!(str = decode_eisa_sig (sig_addr))) {
+			release_resource (&edev->res);
+			kfree (edev);
+			continue;
+		}
+		
+		if (!i)
+			printk (KERN_INFO "EISA: Motherboard %s detected\n",
+				str);
+		else {
+			printk (KERN_INFO "EISA: slot %d : %s detected.\n",
+				i, str);
+
+			c++;
+		}
+
+		if (eisa_register_device (root, edev, str, i)) {
+			printk (KERN_ERR "EISA: Failed to register %s\n", str);
+			release_resource (&edev->res);
+			kfree (edev);
+		}
         }
         printk (KERN_INFO "EISA: Detected %d card%s.\n", c, c == 1 ? "" : "s");
 
 	return 0;
 }
 
-
-static LIST_HEAD (eisa_root_head);
+static struct resource eisa_root_res = {
+	.name  = "EISA root resource",
+	.start = 0,
+	.end   = 0xffffffff,
+	.flags = IORESOURCE_IO,
+};
 
 static int eisa_bus_count;
 
-int eisa_root_register (struct eisa_root_device *root)
+int __init eisa_root_register (struct eisa_root_device *root)
 {
-	struct list_head *node;
-	struct eisa_root_device *tmp_root;
+	int err;
 
-	/* Check if this bus base address has been already
-	 * registered. This prevents the virtual root device from
-	 * registering after the real one has, for example... */
+	/* Use our own resources to check if this bus base address has
+	 * been already registered. This prevents the virtual root
+	 * device from registering after the real one has, for
+	 * example... */
 	
-	list_for_each (node, &eisa_root_head) {
-		tmp_root = list_entry (node, struct eisa_root_device, node);
-		if (tmp_root->bus_base_addr == root->bus_base_addr)
-			return -1; /* Space already taken, buddy... */
-	}
+	root->eisa_root_res.name  = eisa_root_res.name;
+	root->eisa_root_res.start = root->res->start;
+	root->eisa_root_res.end   = root->res->end;
+	root->eisa_root_res.flags = IORESOURCE_BUSY;
+
+	if ((err = request_resource (&eisa_root_res, &root->eisa_root_res)))
+		return err;
 	
 	root->bus_nr = eisa_bus_count++;
-	list_add_tail (&root->node, &eisa_root_head);
-	return eisa_probe (root);
+
+	if ((err = eisa_probe (root)))
+		release_resource (&root->eisa_root_res);
+
+	return err;
 }
 
 static int __init eisa_init (void)

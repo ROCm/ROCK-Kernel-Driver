@@ -679,7 +679,7 @@ static int hd_ioctl(struct inode * inode, struct file * file,
  * be forgotten about...
  */
 
-static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	void (*handler)(void) = do_hd;
 
@@ -689,6 +689,7 @@ static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		handler = unexpected_hd_interrupt;
 	handler();
 	local_irq_enable();
+	return IRQ_HANDLED;
 }
 
 static struct block_device_operations hd_fops = {

@@ -530,7 +530,6 @@ static int	stl_getportstruct(unsigned long arg);
 static int	stl_getbrdstruct(unsigned long arg);
 static int	stl_waitcarrier(stlport_t *portp, struct file *filp);
 static void	stl_delay(int len);
-static void	stl_intr(int irq, void *dev_id, struct pt_regs *regs);
 static void	stl_eiointr(stlbrd_t *brdp);
 static void	stl_echatintr(stlbrd_t *brdp);
 static void	stl_echmcaintr(stlbrd_t *brdp);
@@ -2085,10 +2084,11 @@ stl_readdone:
  *	calls off to the approrpriate board interrupt handlers.
  */
 
-static void stl_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t stl_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	stlbrd_t	*brdp;
 	int		i;
+	int handled = 0;
 
 #if DEBUG
 	printk("stl_intr(irq=%d,regs=%x)\n", irq, (int) regs);
@@ -2099,8 +2099,10 @@ static void stl_intr(int irq, void *dev_id, struct pt_regs *regs)
 			continue;
 		if (brdp->state == 0)
 			continue;
+		handled = 1;
 		(* brdp->isr)(brdp);
 	}
+	return IRQ_RETVAL(handled);
 }
 
 /*****************************************************************************/

@@ -129,7 +129,6 @@ static struct ecard_driver serial_card_driver = {
 	.remove 	= __devexit_p(serial_card_remove),
 	.id_table	= serial_cids,
 	.drv = {
-		.devclass	= &tty_devclass,
 		.name		= "8250_acorn",
 	},
 };

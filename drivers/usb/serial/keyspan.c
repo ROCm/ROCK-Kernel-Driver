@@ -282,48 +282,46 @@ static void keyspan_set_termios (struct usb_serial_port *port,
 	keyspan_send_setup(port, 0);
 }
 
-static int keyspan_ioctl(struct usb_serial_port *port, struct file *file,
-			     unsigned int cmd, unsigned long arg)
+static int keyspan_tiocmget(struct usb_serial_port *port, struct file *file)
 {
-	unsigned int			value, set;
+	unsigned int			value;
 	struct keyspan_port_private 	*p_priv;
 
 	p_priv = usb_get_serial_port_data(port);
 	
-	switch (cmd) {
-	case TIOCMGET:
-		value = ((p_priv->rts_state) ? TIOCM_RTS : 0) |
-			((p_priv->dtr_state) ? TIOCM_DTR : 0) |
-			((p_priv->cts_state) ? TIOCM_CTS : 0) |
-			((p_priv->dsr_state) ? TIOCM_DSR : 0) |
-			((p_priv->dcd_state) ? TIOCM_CAR : 0) |
-			((p_priv->ri_state) ? TIOCM_RNG : 0); 
+	value = ((p_priv->rts_state) ? TIOCM_RTS : 0) |
+		((p_priv->dtr_state) ? TIOCM_DTR : 0) |
+		((p_priv->cts_state) ? TIOCM_CTS : 0) |
+		((p_priv->dsr_state) ? TIOCM_DSR : 0) |
+		((p_priv->dcd_state) ? TIOCM_CAR : 0) |
+		((p_priv->ri_state) ? TIOCM_RNG : 0); 
 
-		if (put_user(value, (unsigned int *) arg))
-			return -EFAULT;
-		return 0;
+	return value;
+}
+
+static int keyspan_tiocmset(struct usb_serial_port *port, struct file *file,
+			    unsigned int set, unsigned int clear)
+{
+	struct keyspan_port_private 	*p_priv;
+
+	p_priv = usb_get_serial_port_data(port);
 	
-	case TIOCMSET:
-		if (get_user(value, (unsigned int *) arg))
-			return -EFAULT;
-		p_priv->rts_state = ((value & TIOCM_RTS) ? 1 : 0);
-		p_priv->dtr_state = ((value & TIOCM_DTR) ? 1 : 0);
-		keyspan_send_setup(port, 0);
-		return 0;
+	if (set & TIOCM_RTS)
+		p_priv->rts_state = 1;
+	if (set & TIOCM_DTR)
+		p_priv->dtr_state = 1;
 
-	case TIOCMBIS:
-	case TIOCMBIC:
-		if (get_user(value, (unsigned int *) arg))
-			return -EFAULT;
-		set = (cmd == TIOCMBIS);
-		if (value & TIOCM_RTS)
-			p_priv->rts_state = set;
-		if (value & TIOCM_DTR)
-			p_priv->dtr_state = set;
-		keyspan_send_setup(port, 0);
-		return 0;
-	}
+	if (clear & TIOCM_RTS)
+		p_priv->rts_state = 0;
+	if (clear & TIOCM_DTR)
+		p_priv->dtr_state = 0;
+	keyspan_send_setup(port, 0);
+	return 0;
+}
 
+static int keyspan_ioctl(struct usb_serial_port *port, struct file *file,
+			     unsigned int cmd, unsigned long arg)
+{
 	return -ENOIOCTLCMD;
 }
 
@@ -342,8 +340,8 @@ static int keyspan_write(struct usb_serial_port *port, int from_user,
 	p_priv = usb_get_serial_port_data(port);
 	d_details = p_priv->device_details;
 
-	dbg("%s - for port %d (%d chars [%x]), flip=%d",
-	    __FUNCTION__, port->number, count, buf[0], p_priv->out_flip);
+	dbg("%s - for port %d (%d chars), flip=%d",
+	    __FUNCTION__, port->number, count, p_priv->out_flip);
 
 	for (left = count; left > 0; left -= todo) {
 		todo = left;

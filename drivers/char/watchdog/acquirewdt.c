@@ -29,6 +29,7 @@
 #include <linux/watchdog.h>
 #include <linux/ioport.h>
 #include <linux/notifier.h>
+#include <linux/fs.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>

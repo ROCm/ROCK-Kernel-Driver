@@ -311,8 +311,7 @@ static int device_attach(struct device * dev)
  *	Walk the list of devices that the bus has on it and try to match
  *	the driver with each one.
  *	If bus_match() returns 0 and the @dev->driver is set, we've found
- *	a compatible pair, so we call devclass_add_device() to add the 
- *	device to the class. 
+ *	a compatible pair.
  *
  *	Note that we ignore the error from bus_match(), since it's perfectly
  *	valid for a driver not to bind to any devices.
@@ -328,8 +327,7 @@ static void driver_attach(struct device_driver * drv)
 	list_for_each(entry,&bus->devices.list) {
 		struct device * dev = container_of(entry,struct device,bus_list);
 		if (!dev->driver) {
-			if (!bus_match(dev,drv))
-				devclass_add_device(dev);
+			bus_match(dev,drv);
 		}
 	}
 }
@@ -351,7 +349,6 @@ void device_release_driver(struct device * dev)
 	if (drv) {
 		sysfs_remove_link(&drv->kobj,dev->kobj.name);
 		list_del_init(&dev->driver_list);
-		devclass_remove_device(dev);
 		if (drv->remove)
 			drv->remove(dev);
 		dev->driver = NULL;
@@ -443,8 +440,7 @@ int bus_add_driver(struct device_driver * drv)
 		}
 
 		down_write(&bus->subsys.rwsem);
-		if (!(error = devclass_add_driver(drv)))
-			driver_attach(drv);
+		driver_attach(drv);
 		up_write(&bus->subsys.rwsem);
 
 		if (error) {
@@ -471,7 +467,6 @@ void bus_remove_driver(struct device_driver * drv)
 		down_write(&drv->bus->subsys.rwsem);
 		pr_debug("bus %s: remove driver %s\n",drv->bus->name,drv->name);
 		driver_detach(drv);
-		devclass_remove_driver(drv);
 		up_write(&drv->bus->subsys.rwsem);
 		kobject_unregister(&drv->kobj);
 		put_bus(drv->bus);

@@ -1127,7 +1127,7 @@ static void snd_opti93x_overrange(opti93x_t *chip)
 
 irqreturn_t snd_opti93x_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	opti93x_t *codec = snd_magic_cast(opti93x_t, dev_id, return);
+	opti93x_t *codec = snd_magic_cast(opti93x_t, dev_id, return IRQ_NONE);
 	unsigned char status;
 
 	status = snd_opti9xx_read(codec->chip, OPTi9XX_MC_REG(11));

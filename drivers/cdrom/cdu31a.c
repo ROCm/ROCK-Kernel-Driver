@@ -451,7 +451,7 @@ static inline void reset_drive(void)
  */
 static int scd_reset(struct cdrom_device_info *cdi)
 {
-	int retry_count;
+	unsigned long retry_count;
 
 	reset_drive();
 
@@ -511,7 +511,7 @@ static inline void write_cmd(unsigned char cmd)
 	outb(cmd, sony_cd_cmd_reg);
 }
 
-static void cdu31a_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t cdu31a_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned char val;
 
@@ -545,6 +545,7 @@ static void cdu31a_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		printk
 		    ("CDU31A: Got an interrupt but nothing was waiting\n");
 	}
+	return IRQ_HANDLED;
 }
 
 /*
@@ -712,7 +713,7 @@ static void restart_on_error(void)
 {
 	unsigned char res_reg[12];
 	unsigned int res_size;
-	unsigned int retry_count;
+	unsigned long retry_count;
 
 
 	printk("cdu31a: Resetting drive on error\n");
@@ -772,7 +773,7 @@ get_result(unsigned char *result_buffer, unsigned int *result_size)
 {
 	unsigned char a, b;
 	int i;
-	unsigned int retry_count;
+	unsigned long retry_count;
 
 
 	while (handle_sony_cd_attention());
@@ -900,7 +901,7 @@ do_sony_cd_cmd(unsigned char cmd,
 	       unsigned int num_params,
 	       unsigned char *result_buffer, unsigned int *result_size)
 {
-	unsigned int retry_count;
+	unsigned long retry_count;
 	int num_retries;
 	int recursive_call;
 	unsigned long flags;
@@ -1148,7 +1149,7 @@ start_request(unsigned int sector, unsigned int nsect, int read_nsect_only)
 {
 	unsigned char params[6];
 	unsigned int read_size;
-	unsigned int retry_count;
+	unsigned long retry_count;
 
 
 #if DEBUG
@@ -1339,7 +1340,7 @@ read_data_block(char *buffer,
 		unsigned int nblocks,
 		unsigned char res_reg[], int *res_size)
 {
-	unsigned int retry_count;
+	unsigned long retry_count;
 	unsigned int bytesleft;
 	unsigned int offset;
 	unsigned int skip;
@@ -2372,7 +2373,7 @@ static int sony_get_subchnl_info(struct cdrom_subchnl *schi)
 static void
 read_audio_data(char *buffer, unsigned char res_reg[], int *res_size)
 {
-	unsigned int retry_count;
+	unsigned long retry_count;
 	int result_read;
 
 
@@ -3206,7 +3207,7 @@ static void __init
 get_drive_configuration(unsigned short base_io,
 			unsigned char res_reg[], unsigned int *res_size)
 {
-	int retry_count;
+	unsigned long retry_count;
 
 
 	/* Set the base address */

@@ -55,6 +55,10 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
+#ifdef __arm__
+#include <asm/mach-types.h>
+#endif
+
 #include "cyber2000fb.h"
 
 struct cfb_info {
@@ -1281,7 +1285,6 @@ cyberpro_alloc_fb_info(unsigned int id, char *name)
 
 	cfb->fb.fbops		= &cyber2000fb_ops;
 	cfb->fb.flags		= FBINFO_FLAG_DEFAULT;
-	cfb->fb.node		= NODEV;
 	cfb->fb.pseudo_palette	= (void *)(cfb + 1);
 
 	fb_alloc_cmap(&cfb->fb.cmap, NR_PALETTE, 0);

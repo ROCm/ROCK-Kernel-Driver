@@ -1253,6 +1253,7 @@ static void mld_sendpack(struct sk_buff *skb)
 	struct ipv6hdr *pip6 = skb->nh.ipv6h;
 	struct mld2_report *pmr = (struct mld2_report *)skb->h.raw;
 	int payload_len, mldlen;
+	struct inet6_dev *idev = in6_dev_get(skb->dev);
 
 	payload_len = skb->tail - (unsigned char *)skb->nh.ipv6h -
 		sizeof(struct ipv6hdr);
@@ -1262,7 +1263,9 @@ static void mld_sendpack(struct sk_buff *skb)
 	pmr->csum = csum_ipv6_magic(&pip6->saddr, &pip6->daddr, mldlen,
 		IPPROTO_ICMPV6, csum_partial(skb->h.raw, mldlen, 0));
 	dev_queue_xmit(skb);
-	ICMP6_INC_STATS(Icmp6OutMsgs);
+	ICMP6_INC_STATS(idev,Icmp6OutMsgs);
+	if (likely(idev != NULL))
+		in6_dev_put(idev);
 }
 
 static int grec_size(struct ifmcaddr6 *pmc, int type, int gdel, int sdel)
@@ -1520,6 +1523,7 @@ static void mld_send_cr(struct inet6_dev *idev)
 static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 {
 	struct sock *sk = igmp6_socket->sk;
+	struct inet6_dev *idev;
         struct sk_buff *skb;
         struct icmp6hdr *hdr;
 	struct in6_addr *snd_addr;
@@ -1577,12 +1581,17 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 					   IPPROTO_ICMPV6,
 					   csum_partial((__u8 *) hdr, len, 0));
 
+	idev = in6_dev_get(skb->dev);
+
 	dev_queue_xmit(skb);
 	if (type == ICMPV6_MGM_REDUCTION)
-		ICMP6_INC_STATS(Icmp6OutGroupMembReductions);
+		ICMP6_INC_STATS(idev, Icmp6OutGroupMembReductions);
 	else
-		ICMP6_INC_STATS(Icmp6OutGroupMembResponses);
-	ICMP6_INC_STATS(Icmp6OutMsgs);
+		ICMP6_INC_STATS(idev, Icmp6OutGroupMembResponses);
+	ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+
+	if (likely(idev != NULL))
+		in6_dev_put(idev);
 	return;
 
 out:
@@ -2095,7 +2104,7 @@ static int ip6_mcf_read_proc(char *buffer, char **start, off_t offset,
 
 		for (imc=idev->mc_list; imc; imc=imc->next) {
 			struct ip6_sf_list *psf;
-			unsigned long icount, xcount, i;
+			unsigned long i;
 
 			spin_lock_bh(&imc->mca_lock);
 			for (psf=imc->mca_sources; psf; psf=psf->sf_next) {

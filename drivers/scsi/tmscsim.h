@@ -11,7 +11,7 @@
 #include <linux/types.h>
 #include <linux/config.h>
 
-#define IRQ_NONE 255
+#define SCSI_IRQ_NONE 255
 
 #define MAX_ADAPTER_NUM 	4
 #define MAX_SG_LIST_BUF 	16	/* Not used */

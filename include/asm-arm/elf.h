@@ -6,6 +6,7 @@
  */
 
 #include <asm/ptrace.h>
+#include <asm/user.h>
 #include <asm/proc/elf.h>
 #include <asm/procinfo.h>
 
@@ -18,7 +19,7 @@ typedef unsigned long elf_freg_t[3];
 #define ELF_NGREG (sizeof (struct pt_regs) / sizeof(elf_greg_t))
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 
-typedef struct { void *null; } elf_fpregset_t;
+typedef struct user_fp elf_fpregset_t;
 
 /*
  * This is used to ensure we don't load something for the wrong architecture.

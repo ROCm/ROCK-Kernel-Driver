@@ -32,17 +32,7 @@ static rwlock_t file_systems_lock = RW_LOCK_UNLOCKED;
 /* WARNING: This can be used only if we _already_ own a reference */
 void get_filesystem(struct file_system_type *fs)
 {
-	if (!try_module_get(fs->owner)) {
-#ifdef CONFIG_MODULE_UNLOAD
-		unsigned int cpu = get_cpu();
-		local_inc(&fs->owner->ref[cpu].count);
-		put_cpu();
-#else
-		/* Getting filesystem while it's starting up?  We're
-                   already supposed to have a reference. */
-		BUG();
-#endif
-	}
+	__module_get(fs->owner);
 }
 
 void put_filesystem(struct file_system_type *fs)

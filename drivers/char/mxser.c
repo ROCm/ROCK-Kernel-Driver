@@ -348,7 +348,7 @@ static void mxser_set_termios(struct tty_struct *, struct termios *);
 static void mxser_stop(struct tty_struct *);
 static void mxser_start(struct tty_struct *);
 static void mxser_hangup(struct tty_struct *);
-static void mxser_interrupt(int, void *, struct pt_regs *);
+static irqreturn_t mxser_interrupt(int, void *, struct pt_regs *);
 static inline void mxser_receive_chars(struct mxser_struct *, int *);
 static inline void mxser_transmit_chars(struct mxser_struct *);
 static inline void mxser_check_modem_status(struct mxser_struct *, int);
@@ -1362,13 +1362,14 @@ void mxser_hangup(struct tty_struct *tty)
 /*
  * This is the serial driver's generic interrupt routine
  */
-static void mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int status, i;
 	struct mxser_struct *info;
 	struct mxser_struct *port;
 	int max, irqbits, bits, msr;
 	int pass_counter = 0;
+	int handled = 0;
 
 	port = 0;
 	for (i = 0; i < MXSER_BOARDS; i++) {
@@ -1379,15 +1380,16 @@ static void mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	if (i == MXSER_BOARDS)
-		return;
+		return IRQ_NONE;
 	if (port == 0)
-		return;
+		return IRQ_NONE;
 	max = mxser_numports[mxsercfg[i].board_type];
 
 	while (1) {
 		irqbits = inb(port->vector) & port->vectormask;
 		if (irqbits == port->vectormask)
 			break;
+		handled = 1;
 		for (i = 0, bits = 1; i < max; i++, irqbits |= bits, bits <<= 1) {
 			if (irqbits == port->vectormask)
 				break;
@@ -1417,6 +1419,7 @@ static void mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			break;	/* Prevent infinite loops */
 		}
 	}
+	return IRQ_RETVAL(handled);
 }
 
 static inline void mxser_receive_chars(struct mxser_struct *info,

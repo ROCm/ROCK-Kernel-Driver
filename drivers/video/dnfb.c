@@ -229,7 +229,6 @@ unsigned long __init dnfb_init(unsigned long mem_start)
 {
 	int err;
 
-	fb_info.node = NODEV;
 	fb_info.fbops = &dn_fb_ops;
 	fb_info.fix = dnfb_fix;
 	fb_info.var = dnfb_var;

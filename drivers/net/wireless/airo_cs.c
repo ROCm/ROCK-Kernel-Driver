@@ -161,14 +161,6 @@ typedef struct local_info_t {
 	struct net_device *eth_dev;
 } local_info_t;
 
-/*====================================================================*/
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-	error_info_t err = { func, ret };
-	CardServices(ReportError, handle, &err);
-}
-
 /*======================================================================
   
   This bit of code is used to avoid unregistering network devices

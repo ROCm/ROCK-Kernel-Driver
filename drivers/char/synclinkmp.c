@@ -652,7 +652,6 @@ static void isr_rxdmaerror(SLMP_INFO *info);
 static void isr_txdmaok(SLMP_INFO *info);
 static void isr_txdmaerror(SLMP_INFO *info);
 static void isr_io_pin(SLMP_INFO *info, u16 status);
-static void synclinkmp_interrupt(int irq, void *dev_id, struct pt_regs * regs);
 
 static int  alloc_dma_bufs(SLMP_INFO *info);
 static void free_dma_bufs(SLMP_INFO *info);
@@ -2446,7 +2445,8 @@ void isr_io_pin( SLMP_INFO *info, u16 status )
  * 	dev_id		device ID supplied during interrupt registration
  * 	regs		interrupted processor context
  */
-static void synclinkmp_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t synclinkmp_interrupt(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	SLMP_INFO * info;
 	unsigned char status, status0, status1=0;
@@ -2462,7 +2462,7 @@ static void synclinkmp_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	info = (SLMP_INFO *)dev_id;
 	if (!info)
-		return;
+		return IRQ_NONE;
 
 	spin_lock(&info->lock);
 
@@ -2564,6 +2564,7 @@ static void synclinkmp_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	if ( debug_level >= DEBUG_LEVEL_ISR )
 		printk("%s(%d):synclinkmp_interrupt(%d)exit.\n",
 			__FILE__,__LINE__,irq);
+	return IRQ_HANDLED;
 }
 
 /* Initialize and start device.

@@ -222,8 +222,6 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	usb_serial_debug_data (__FILE__, __FUNCTION__, count, buf);
-
 	while (count > 0) {
 
 		/* try to find a free urb in our list of them */
@@ -263,6 +261,8 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 		} else {
 			memcpy (urb->transfer_buffer, current_position, transfer_size);
 		}
+
+		usb_serial_debug_data (__FILE__, __FUNCTION__, transfer_size, urb->transfer_buffer);
 
 		/* build up our urb */
 		usb_fill_bulk_urb (

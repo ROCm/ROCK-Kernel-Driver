@@ -232,7 +232,7 @@ static __inline__ void rt6_release(struct rt6_info *rt)
 /*
  *	Routing Table
  *
- *	return the apropriate node for a routing tree "add" operation
+ *	return the appropriate node for a routing tree "add" operation
  *	by either creating and inserting or by returning an existing
  *	node.
  */
@@ -697,7 +697,7 @@ struct fib6_node * fib6_lookup(struct fib6_node *root, struct in6_addr *daddr,
 }
 
 /*
- *	Get node with sepciafied destination prefix (and source prefix,
+ *	Get node with specified destination prefix (and source prefix,
  *	if subtrees are used)
  */
 

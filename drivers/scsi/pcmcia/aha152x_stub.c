@@ -113,16 +113,6 @@ static void aha152x_detach(dev_link_t *);
 static dev_link_t *dev_list;
 static dev_info_t dev_info = "aha152x_cs";
 
-/*====================================================================*/
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
-/*====================================================================*/
-
 static dev_link_t *aha152x_attach(void)
 {
     scsi_info_t *info;

@@ -509,7 +509,7 @@ static int notify_cmd(char cmd, short ignore_ex)
 static int wait_for_ready(time_t timeout)
 {
 	int stat;
-	time_t spin_t;
+	unsigned long spin_t;
 
 	/* Wait for ready or exception, without driving the loadavg up too much.
 	 * In most cases, the tape drive already has READY asserted,
@@ -1604,7 +1604,7 @@ static void qic02_tape_times_out(unsigned long dummy)
  * When we are finished, set flags to indicate end, disable timer.
  * NOTE: This *must* be fast! 
  */
-static void qic02_tape_interrupt(int irq, void *dev_id,
+static irqreturn_t qic02_tape_interrupt(int irq, void *dev_id,
 				 struct pt_regs *regs)
 {
 	int stat, r, i;
@@ -1622,7 +1622,7 @@ static void qic02_tape_interrupt(int irq, void *dev_id,
 			if (((stat & (AR_STAT_DMADONE)) == 0) &&
 			    ((stat & (QIC02_STAT_EXCEPTION)) != 0)) {
 				TIMERCONT;
-				return;	/* "Linux with IRQ sharing" */
+				return IRQ_NONE;/* "Linux with IRQ sharing" */
 			}
 		}
 
@@ -1642,7 +1642,7 @@ static void qic02_tape_interrupt(int irq, void *dev_id,
 			dma_mode = 0;	/* wake up rw() */
 			status_expect_int = NO;
 			wake_up(&qic02_tape_transfer);
-			return;
+			return IRQ_HANDLED;
 		}
 		/* return if tape controller not ready, or
 		 * if dma channel hasn't finished last byte yet.
@@ -1668,7 +1668,7 @@ static void qic02_tape_interrupt(int irq, void *dev_id,
 		release_dma_lock(flags);
 
 		if (r)
-			return;
+			return IRQ_HANDLED;
 
 		/* finish DMA cycle */
 
@@ -1688,6 +1688,7 @@ static void qic02_tape_interrupt(int irq, void *dev_id,
 	} else {
 		printk(TPQIC02_NAME ": Unexpected interrupt, stat == %x\n", inb(QIC02_STAT_PORT));
 	}
+	return IRQ_HANDLED;
 }				/* qic02_tape_interrupt */
 
 

@@ -185,6 +185,8 @@ static read_proc_t cifsFYI_read;
 static write_proc_t cifsFYI_write;
 static read_proc_t oplockEnabled_read;
 static write_proc_t oplockEnabled_write;
+static read_proc_t lookupFlag_read;
+static write_proc_t lookupFlag_write;
 static read_proc_t traceSMB_read;
 static write_proc_t traceSMB_write;
 static read_proc_t multiuser_mount_read;
@@ -242,6 +244,12 @@ cifs_proc_init(void)
 				   extended_security_read, 0);
 	if (pde)
 		pde->write_proc = extended_security_write;
+
+	pde =
+	create_proc_read_entry("LookupCacheEnable", 0, proc_fs_cifs,
+		lookupFlag_read, 0);
+	if (pde)
+		pde->write_proc = lookupFlag_write;
 
 	pde =
 	    create_proc_read_entry("NTLMV2Enabled", 0, proc_fs_cifs,
@@ -353,6 +361,44 @@ oplockEnabled_write(struct file *file, const char *buffer,
 	return count;
 }
 
+static int
+lookupFlag_read(char *page, char **start, off_t off,
+		   int count, int *eof, void *data)
+{
+	int len;
+
+	len = sprintf(page, "%d\n", lookupCacheEnabled);
+
+	len -= off;
+	*start = page + off;
+
+	if (len > count)
+		len = count;
+	else
+		*eof = 1;
+
+	if (len < 0)
+		len = 0;
+
+	return len;
+}
+static int
+lookupFlag_write(struct file *file, const char *buffer,
+		    unsigned long count, void *data)
+{
+	char c;
+	int rc;
+
+	rc = get_user(c, buffer);
+	if (rc)
+		return rc;
+	if (c == '0' || c == 'n' || c == 'N')
+		lookupCacheEnabled = 0;
+	else if (c == '1' || c == 'y' || c == 'Y')
+		lookupCacheEnabled = 1;
+
+	return count;
+}
 static int
 traceSMB_read(char *page, char **start, off_t off, int count,
 	      int *eof, void *data)

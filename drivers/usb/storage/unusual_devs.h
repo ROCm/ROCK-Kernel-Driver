@@ -35,6 +35,14 @@
 
 /* If you edit this file, please try to keep it sorted first by VendorID,
  * then by ProductID.
+ *
+ * If you want to add an entry for this file, please send the following
+ * to greg@kroah.com:
+ *	- patch that adds the entry for your device which includes your
+ *	  email address right above the entry.
+ *	- a copy of /proc/bus/usb/devices with your device plugged in
+ *	  running with this patch.
+ *
  */
 
 UNUSUAL_DEV(  0x03ee, 0x0000, 0x0000, 0x0245, 
@@ -229,10 +237,18 @@ UNUSUAL_DEV(  0x0525, 0xa140, 0x0100, 0x0100,
 		US_SC_8070, US_PR_BULK, NULL,
 		US_FL_FIX_INQUIRY | US_FL_START_STOP ),
 
+/* Submitted by Lars Gemeinhardt <linux-usb@gemeinhardt.info>
+ * Needed for START_STOP flag */
+UNUSUAL_DEV(  0x0547, 0x2810, 0x0001, 0x0001,
+                "Mello",
+                "MP3 Player",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_START_STOP),
+
 /* This entry is needed because the device reports Sub=ff */
-UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0440, 
+UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0450, 
 		"Sony",
-		"DSC-S30/S70/S75/505V/F505/F707/F717", 
+		"DSC-S30/S70/S75/505V/F505/F707/F717/P8", 
 		US_SC_SCSI, US_PR_CB, NULL,
 		US_FL_SINGLE_LUN | US_FL_START_STOP | US_FL_MODE_XLATE ),
 
@@ -285,6 +301,19 @@ UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200,
 		"LaCie",
 		"USB Hard Disk",
 		US_SC_RBC, US_PR_CB, NULL, 0 ), 
+
+/* This Pentax still camera is not conformant
+ * to the USB storage specification: -
+ * - It does not like the INQUIRY command. So we must handle this command
+ *   of the SCSI layer ourselves.
+ * Tested on Rev. 10.00 (0x1000)
+ * Submitted by James Courtier-Dutton <James@superbug.demon.co.uk>
+ */
+UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
+                "ASAHI PENTAX",
+                "PENTAX OPTIO 430",
+                US_SC_8070, US_PR_CBI, NULL,
+                US_FL_FIX_INQUIRY ),
 
 /* This Pentax still camera is not conformant
  * to the USB storage specification: -

@@ -412,7 +412,7 @@ static int     eth16i_close(struct net_device *dev);
 static int     eth16i_tx(struct sk_buff *skb, struct net_device *dev);
 static void    eth16i_rx(struct net_device *dev);
 static void    eth16i_timeout(struct net_device *dev);
-static void    eth16i_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t eth16i_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void    eth16i_reset(struct net_device *dev);
 static void    eth16i_timeout(struct net_device *dev);
 static void    eth16i_skip_packet(struct net_device *dev);
@@ -1219,11 +1219,12 @@ static void eth16i_rx(struct net_device *dev)
 	} /* while */
 }
 
-static void eth16i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t eth16i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct eth16i_local *lp;
 	int ioaddr = 0, status;
+	int handled = 0;
 
 	ioaddr = dev->base_addr;
 	lp = (struct eth16i_local *)dev->priv;
@@ -1236,6 +1237,9 @@ static void eth16i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	status = inw(ioaddr + TX_STATUS_REG);      /* Get the status */
 	outw(status, ioaddr + TX_STATUS_REG);      /* Clear status bits */
+
+	if (status)
+		handled = 1;
 
 	if(eth16i_debug > 3)
 		printk(KERN_DEBUG "%s: Interrupt with status %04x.\n", dev->name, status);
@@ -1314,7 +1318,7 @@ static void eth16i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	
 	spin_unlock(&lp->lock);
 	
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 static void eth16i_skip_packet(struct net_device *dev)

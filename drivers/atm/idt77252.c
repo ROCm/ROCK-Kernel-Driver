@@ -134,8 +134,6 @@ static int idt77252_change_qos(struct atm_vcc *vcc, struct atm_qos *qos,
 			       int flags);
 static int idt77252_proc_read(struct atm_dev *dev, loff_t * pos,
 			      char *page);
-static void idt77252_interrupt(int irq, void *dev_id,
-			       struct pt_regs *regs);
 static void idt77252_softint(void *dev_id);
 
 
@@ -2812,7 +2810,7 @@ idt77252_collect_stat(struct idt77252_dev *card)
 #endif
 }
 
-static void
+static irqreturn_t
 idt77252_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 	struct idt77252_dev *card = dev_id;
@@ -2820,7 +2818,7 @@ idt77252_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 
 	stat = readl(SAR_REG_STAT) & 0xffff;
 	if (!stat)	/* no interrupt for us */
-		return;
+		return IRQ_NONE;
 
 	if (test_and_set_bit(IDT77252_BIT_INTERRUPT, &card->flags)) {
 		printk("%s: Re-entering irq_handler()\n", card->name);
@@ -2901,6 +2899,7 @@ idt77252_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 
 out:
 	clear_bit(IDT77252_BIT_INTERRUPT, &card->flags);
+	return IRQ_HANDLED;
 }
 
 static void

@@ -483,7 +483,7 @@ try_again:
 	if (register_framebuffer(&p->info) < 0)
 		return -ENXIO;
 	
-	printk(KERN_INFO "fb%d: control display adapter\n", minor(p->info.node));	
+	printk(KERN_INFO "fb%d: control display adapter\n", p->info.node);	
 
 	return 0;
 }
@@ -1008,7 +1008,6 @@ static void __init control_init_info(struct fb_info *info, struct fb_info_contro
 {
 	/* Fill fb_info */
 	info->par = &p->par;
-	info->node = NODEV;
 	info->fbops = &controlfb_ops;
 	info->pseudo_palette = p->pseudo_palette;
         info->flags = FBINFO_FLAG_DEFAULT;

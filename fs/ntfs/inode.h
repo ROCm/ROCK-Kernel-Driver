@@ -2,8 +2,8 @@
  * inode.h - Defines for inode structures NTFS Linux kernel driver. Part of
  *	     the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (c) 2002 Richard Russon.
+ * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -93,23 +93,21 @@ struct _ntfs_inode {
 		struct { /* It is a directory or $MFT. */
 			struct inode *bmp_ino;	/* Attribute inode for the
 						   directory index $BITMAP. */
-			u32 index_block_size;	/* Size of an index block. */
-			u32 index_vcn_size;	/* Size of a vcn in this
+			u32 block_size;		/* Size of an index block. */
+			u32 vcn_size;		/* Size of a vcn in this
 						   directory index. */
-			u8 index_block_size_bits; /* Log2 of the above. */
-			u8 index_vcn_size_bits;	/* Log2 of the above. */
-		} SN(idm);
+			u8 block_size_bits; 	/* Log2 of the above. */
+			u8 vcn_size_bits;	/* Log2 of the above. */
+		} index;
 		struct { /* It is a compressed file or fake inode. */
-			s64 compressed_size;		/* Copy from $DATA. */
-			u32 compression_block_size;     /* Size of a compression
-						           block (cb). */
-			u8 compression_block_size_bits; /* Log2 of the size of
-							   a cb. */
-			u8 compression_block_clusters;  /* Number of clusters
-							   per compression
-							   block. */
-		} SN(icf);
-	} SN(idc);
+			s64 size;		/* Copy of compressed_size from
+						   $DATA. */
+			u32 block_size;		/* Size of a compression block
+						   (cb). */
+			u8 block_size_bits;	/* Log2 of the size of a cb. */
+			u8 block_clusters;	/* Number of clusters per cb. */
+		} compressed;
+	} itype;
 	struct semaphore extent_lock;	/* Lock for accessing/modifying the
 					   below . */
 	s32 nr_extents;	/* For a base mft record, the number of attached extent
@@ -126,12 +124,8 @@ struct _ntfs_inode {
 						   record. For fake inodes, the
 						   real (base) inode to which
 						   the attribute belongs. */
-	} SN(ine);
+	} ext;
 };
-
-#define _IDM(X)  SC(idc.idm,X)
-#define _ICF(X)  SC(idc.icf,X)
-#define _INE(X)  SC(ine,X)
 
 /*
  * Defined bits for the state field in the ntfs_inode structure.

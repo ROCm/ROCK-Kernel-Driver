@@ -31,7 +31,6 @@
 #include <linux/ac97_codec.h>
 #include <linux/smp_lock.h>
 #include <linux/ioport.h>
-#include <linux/wrapper.h>
 #include <linux/delay.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>

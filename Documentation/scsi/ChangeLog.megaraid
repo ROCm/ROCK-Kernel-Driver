@@ -1,0 +1,42 @@
+### Version 2.00.3
+Wed Jan 29 09:13:44 EST 200 - Atul Mukker <atulm@lsil.com>
+i.	Change the handshake in ISR while acknowledging interrupts. Write the
+	valid interrupt pattern 0x10001234 as soon as it is read from the
+	outdoor register. In existing driver and on certain platform, invalid
+	command ids were being returned.
+
+	Also, do not wait on status be become 0xFF, since FW can return this
+	status in certain circumstances.
+
+	Initialize the numstatus field of mailbox to 0xFF so that we can wait
+	on this wait in next interrupt. Firmware does not change its value
+	unless there are some status to be posted
+
+ii.	Specify the logical drive number while issuing the RESERVATION_STATUS
+
+iii.	Reduce the default mailbox busy wait time from 300us to 10us. This is
+	done to avaoid a possible deadlock in FW because of longer bust waits.
+
+iv.	The max outstanding commands are reduced to 126 because that't the
+	safest value on all FW.
+
+v.	Number of sectors per IO are reduced to 128 (64kb), becuase FW needs
+	resources in special circumstances like check consistency, rebuilds
+	etc.
+
+vi.	max_commands is no longer a module parameter because of iv.
+
+### Version: 2.00.2
+i.	Intermediate release with kernel specific code
+
+
+### Version: 2.00.1i
+Wed Dec  4 14:34:51 EST 2002 - Atul Mukker <atulm@lsil.com>
+i.	Making the older IO based controllers to work with this driver
+
+
+### Version 2.00.1
+Fri Nov 15 10:59:44 EST 2002 - Atul Mukker <atulm@lsil.com>
+i.	Release host lock before issuing internal command to reset
+	reservations in megaraid_reset() and reacquire after internal command
+	is completed.
