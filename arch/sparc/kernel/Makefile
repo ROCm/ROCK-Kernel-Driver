@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-EXTRA_TARGETS	:= head.o init_task.o
+extra-y		:= head.o init_task.o
 
 EXTRA_AFLAGS	:= -ansi
 

@@ -7,8 +7,8 @@
 ROOT_IMG	:= /usr/src/root.img
 ELFTOAOUT	:= elftoaout
 
-host-progs    := piggyback
-EXTRA_TARGETS := tftpboot.img vmlinux.aout
+host-progs	:= piggyback
+targets		:= tftpboot.img vmlinux.aout
 
 quiet_cmd_elftoaout = ELT2AOUT $@
       cmd_elftoaout = $(ELFTOAOUT) vmlinux -o $@

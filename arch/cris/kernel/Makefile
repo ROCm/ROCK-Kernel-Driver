@@ -3,7 +3,7 @@
 # Makefile for the linux kernel.
 #
 
-EXTRA_TARGETS	:= head.o
+extra-y	:= head.o
 
 obj-y   := process.o signal.o entry.o traps.o irq.o \
            ptrace.o setup.o time.o sys_cris.o shadows.o \

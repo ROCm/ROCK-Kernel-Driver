@@ -4,4 +4,4 @@
 
 obj-y := config.o commproc.o entry.o ints.o
 
-EXTRA_TARGETS := $(BOARD)/crt0_$(MODEL).o
+extra-y := $(BOARD)/crt0_$(MODEL).o

@@ -59,12 +59,12 @@ src-sec = $(foreach section, $(1), $(patsubst %,$(obj)/kernel-%.c, $(section)))
 gz-sec  = $(foreach section, $(1), $(patsubst %,$(obj)/kernel-%.gz, $(section)))
 
 host-progs		:= piggy addnote addSystemMap addRamDisk
-EXTRA_TARGETS 		+= zImage zImage.initrd imagesize.c \
+targets 		+= zImage zImage.initrd imagesize.c \
 			   $(patsubst $(obj)/%,%, $(call obj-sec, $(required) $(initrd))) \
 			   $(patsubst $(obj)/%,%, $(call src-sec, $(required) $(initrd))) \
 			   $(patsubst $(obj)/%,%, $(call gz-sec, $(required) $(initrd))) \
-			   vmlinux.sm vmlinux.initrd vmlinux.sminitrd \
-			   sysmap.o initrd.o
+			   vmlinux.sm vmlinux.initrd vmlinux.sminitrd
+extra-y			:= sysmap.o initrd.o
 
 quiet_cmd_sysmap = SYSMAP   $@
       cmd_sysmap = $(obj)/addSystemMap System.map $< $@

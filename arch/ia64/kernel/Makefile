@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-EXTRA_TARGETS	:= head.o init_task.o
+extra-y	:= head.o init_task.o
 
 obj-y := acpi.o entry.o gate.o efi.o efi_stub.o ia64_ksyms.o \
 	 irq.o irq_ia64.o irq_lsapic.o ivt.o \

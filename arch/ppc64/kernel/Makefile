@@ -3,7 +3,7 @@
 #
 
 EXTRA_CFLAGS	+= -mno-minimal-toc
-EXTRA_TARGETS	:= head.o
+extra-y		:= head.o
 obj-y               :=	setup.o entry.o traps.o irq.o idle.o \
 			time.o process.o signal.o syscalls.o misc.o ptrace.o \
 			align.o semaphore.o bitops.o stab.o htab.o pacaData.o \
