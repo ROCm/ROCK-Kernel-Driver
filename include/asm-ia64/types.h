@@ -14,6 +14,11 @@
 #ifdef __ASSEMBLY__
 # define __IA64_UL(x)		(x)
 # define __IA64_UL_CONST(x)	x
+
+# ifdef __KERNEL__
+#  define BITS_PER_LONG 64
+# endif
+
 #else
 # define __IA64_UL(x)		((unsigned long)(x))
 # define __IA64_UL_CONST(x)	x##UL

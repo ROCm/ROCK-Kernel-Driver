@@ -9,6 +9,8 @@
 #ifndef _S390_TYPES_H
 #define _S390_TYPES_H
 
+#ifndef __ASSEMBLY__
+
 typedef unsigned short umode_t;
 
 /*
@@ -36,10 +38,16 @@ typedef unsigned long __u64;
 typedef unsigned long  addr_t; 
 typedef signed long  saddr_t;
 
+#endif /* __ASSEMBLY__ */
+
 /*
  * These aren't exported outside the kernel to avoid name space clashes
  */
 #ifdef __KERNEL__
+
+#define BITS_PER_LONG 64
+
+#ifndef __ASSEMBLY__
 
 typedef signed char s8;
 typedef unsigned char u8;
@@ -53,9 +61,9 @@ typedef unsigned int u32;
 typedef signed long s64;
 typedef unsigned  long u64;
 
-#define BITS_PER_LONG 64
-
 typedef u32 dma_addr_t;
+
+#endif /* __ASSEMBLY__ */
 
 #endif                                 /* __KERNEL__                       */
 #endif

@@ -10,6 +10,8 @@
  * need to be careful to avoid a name clashes.
  */
 
+#ifndef __ASSEMBLY__
+
 typedef unsigned short umode_t;
 
 /*
@@ -29,7 +31,13 @@ typedef unsigned int __u32;
 typedef __signed__ long __s64;
 typedef unsigned long __u64;
 
+#endif /* __ASSEMBLY__ */
+
 #ifdef __KERNEL__
+
+#define BITS_PER_LONG 64
+
+#ifndef __ASSEMBLY__
 
 typedef __signed__ char s8;
 typedef unsigned char u8;
@@ -43,12 +51,12 @@ typedef unsigned int u32;
 typedef __signed__ long s64;
 typedef unsigned long u64;
 
-#define BITS_PER_LONG 64
-
 /* Dma addresses come in generic and 64-bit flavours.  */
 
 typedef u32 dma_addr_t;
 typedef u64 dma64_addr_t;
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* __KERNEL__ */
 

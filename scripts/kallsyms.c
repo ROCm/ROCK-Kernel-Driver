@@ -95,10 +95,19 @@ write_src(void)
 	int i, valid = 0;
 	char *prev;
 
+	printf("#include <asm/types.h>\n");
+	printf("#if BITS_PER_LONG == 64\n");
+	printf("#define PTR .quad\n");
+	printf("#define ALGN .align 8\n");
+	printf("#else\n");
+	printf("#define PTR .long\n");
+	printf("#define ALGN .align 4\n");
+	printf("#endif\n");
+
 	printf(".data\n");
 
 	printf(".globl kallsyms_addresses\n");
-	printf("\t.align 8\n");
+	printf("\tALGN\n");
 	printf("kallsyms_addresses:\n");
 	for (i = 0, last_addr = 0; i < cnt; i++) {
 		if (!symbol_valid(&table[i]))
@@ -107,20 +116,20 @@ write_src(void)
 		if (table[i].addr == last_addr)
 			continue;
 
-		printf("\t.long\t%#llx\n", table[i].addr);
+		printf("\tPTR\t%#llx\n", table[i].addr);
 		valid++;
 		last_addr = table[i].addr;
 	}
 	printf("\n");
 
 	printf(".globl kallsyms_num_syms\n");
-	printf("\t.align 8\n");
+	printf("\tALGN\n");
 	printf("kallsyms_num_syms:\n");
-	printf("\t.long\t%d\n", valid);
+	printf("\tPTR\t%d\n", valid);
 	printf("\n");
 
 	printf(".globl kallsyms_names\n");
-	printf("\t.align 8\n");
+	printf("\tALGN\n");
 	printf("kallsyms_names:\n");
 	prev = ""; 
 	for (i = 0, last_addr = 0; i < cnt; i++) {

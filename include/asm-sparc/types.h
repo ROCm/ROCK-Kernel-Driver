@@ -15,6 +15,8 @@
  * need to be careful to avoid a name clashes.
  */
 
+#ifndef __ASSEMBLY__
+
 typedef unsigned short umode_t;
 
 typedef __signed__ char __s8;
@@ -29,7 +31,13 @@ typedef unsigned int __u32;
 typedef __signed__ long long __s64;
 typedef unsigned long long __u64;
 
+#endif /* __ASSEMBLY__ */
+
 #ifdef __KERNEL__
+
+#define BITS_PER_LONG 32
+
+#ifndef __ASSEMBLY__
 
 typedef __signed__ char s8;
 typedef unsigned char u8;
@@ -43,10 +51,10 @@ typedef unsigned int u32;
 typedef __signed__ long long s64;
 typedef unsigned long long u64;
 
-#define BITS_PER_LONG 32
-
 typedef u32 dma_addr_t;
 typedef u32 dma64_addr_t;
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* __KERNEL__ */
 

@@ -39,10 +39,16 @@ typedef struct {
 	__u32 u[4];
 } __attribute((aligned(16))) __vector128;
 
+#endif /* __ASSEMBLY__ */
+
 #ifdef __KERNEL__
 /*
  * These aren't exported outside the kernel to avoid name space clashes
  */
+#define BITS_PER_LONG 64
+
+#ifndef __ASSEMBLY__
+
 typedef signed char s8;
 typedef unsigned char u8;
 
@@ -57,12 +63,11 @@ typedef unsigned long u64;
 
 typedef __vector128 vector128;
 
-#define BITS_PER_LONG 64
-
 typedef u32 dma_addr_t;
 typedef u64 dma64_addr_t;
 
-#endif /* __KERNEL__ */
 #endif /* __ASSEMBLY__ */
+
+#endif /* __KERNEL__ */
 
 #endif /* _PPC64_TYPES_H */
