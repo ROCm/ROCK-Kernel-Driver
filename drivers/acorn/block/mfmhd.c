@@ -321,14 +321,14 @@ static void console_printf(const char *fmt,...)
 	unsigned long flags;
 	va_list ap;
 
-	save_flags_cli(flags);
+	local_irq_save(flags);
 
 	va_start(ap, fmt);
 	vsprintf(buffer, fmt, ap);
 	console_print(buffer);
 	va_end(fmt);
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 };	/* console_printf */
 
 #define DBG(x...) console_printf(x)
@@ -1451,13 +1451,13 @@ static int mfm_reread_partitions(kdev_t dev)
 	unsigned int start, i, maxp, target = DEVICE_NR(MINOR(dev));
 	unsigned long flags;
 
-	save_flags_cli(flags);
+	local_irq_save(flags);
 	if (mfm_info[target].busy || mfm_info[target].access_count > 1) {
-		restore_flags (flags);
+		local_irq_restore (flags);
 		return -EBUSY;
 	}
 	mfm_info[target].busy = 1;
-	restore_flags (flags);
+	local_irq_restore (flags);
 
 	maxp = 1 << mfm_gendisk.minor_shift;
 	start = target << mfm_gendisk.minor_shift;
