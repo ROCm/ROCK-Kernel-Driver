@@ -170,7 +170,6 @@ static int nr_set_mac_address(struct net_device *dev, void *addr)
 
 static int nr_open(struct net_device *dev)
 {
-	MOD_INC_USE_COUNT;
 	netif_start_queue(dev);
 	ax25_listen_register((ax25_address *)dev->dev_addr, NULL);
 	return 0;
@@ -180,7 +179,6 @@ static int nr_close(struct net_device *dev)
 {
 	netif_stop_queue(dev);
 	ax25_listen_release((ax25_address *)dev->dev_addr, NULL);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -199,6 +197,7 @@ static struct net_device_stats *nr_get_stats(struct net_device *dev)
 
 int nr_init(struct net_device *dev)
 {
+	SET_MODULE_OWNER(dev);
 	dev->mtu		= NR_MAX_PACKET_SIZE;
 	dev->hard_start_xmit	= nr_xmit;
 	dev->open		= nr_open;
