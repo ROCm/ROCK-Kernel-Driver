@@ -641,7 +641,8 @@ static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 
 	/* map the initial fragment */
 	desc[0].fields.length  = nfrags ? skb->len - skb->data_len : skb->len;
-	desc[0].fields.address = vio_map_single(adapter->vdev, skb->data, desc[0].fields.length, PCI_DMA_TODEVICE);
+	desc[0].fields.address = vio_map_single(adapter->vdev, skb->data,
+					desc[0].fields.length, DMA_TO_DEVICE);
 	desc[0].fields.valid   = 1;
 
 	if(dma_mapping_error(desc[0].fields.address)) {
@@ -657,9 +658,10 @@ static int ibmveth_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 	/* map fragments past the initial portion if there are any */
 	while(curfrag--) {
 		skb_frag_t *frag = &skb_shinfo(skb)->frags[curfrag];
-		desc[curfrag+1].fields.address = vio_map_single(adapter->vdev,
-								page_address(frag->page) + frag->page_offset,
-								frag->size, PCI_DMA_TODEVICE);
+		desc[curfrag+1].fields.address
+			= vio_map_single(adapter->vdev,
+				page_address(frag->page) + frag->page_offset,
+				frag->size, DMA_TO_DEVICE);
 		desc[curfrag+1].fields.length = frag->size;
 		desc[curfrag+1].fields.valid  = 1;
 
