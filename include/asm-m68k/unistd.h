@@ -281,8 +281,11 @@
 #define __NR_mq_getsetattr	276
 #define __NR_waitid		277
 #define __NR_vserver		278
+#define __NR_add_key		279
+#define __NR_request_key	280
+#define __NR_keyctl		281
 
-#define NR_syscalls		279
+#define NR_syscalls		282
 
 /* user-visible error numbers are in the range -1 - -124: see
    <asm-m68k/errno.h> */
