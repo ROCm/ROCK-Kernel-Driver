@@ -417,6 +417,13 @@ UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0x0001,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
+/* Reported by Henning Schild <henning@wh9.tu-dresden.de> */
+UNUSUAL_DEV(  0x05e3, 0x0702, 0x0113, 0x0113,
+		"EagleTec",
+		"External Hard Disk",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_INQUIRY ),
+
 /* Reported by Hanno Boeck <hanno@gmx.de>
  * Taken from the Lycoris Kernel */
 UNUSUAL_DEV(  0x0636, 0x0003, 0x0000, 0x9999,
