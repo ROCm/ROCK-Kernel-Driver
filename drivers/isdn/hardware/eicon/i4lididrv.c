@@ -589,12 +589,6 @@ eicon_command(eicon_card * card, isdn_ctrl * c)
 			chan->l2prot = (c->arg >> 8);
                         memcpy(chan->a_para, c->parm.aux.para, sizeof(chan->a_para));
 			return 0;
-		case ISDN_CMD_GETL2:
-			if (!card->flags & EICON_FLAGS_RUNNING)
-				return -ENODEV;
-			if (!(chan = find_channel(card, c->arg & 0x1f)))
-				break;
-			return chan->l2prot;
 		case ISDN_CMD_SETL3:
 			if (!card->flags & EICON_FLAGS_RUNNING)
 				return -ENODEV;
@@ -607,33 +601,6 @@ eicon_command(eicon_card * card, isdn_ctrl * c)
 				eicon_log(card, 128, "idi_cmd: Ch%d: SETL3 struct fax=0x%x\n",chan->No, chan->fax);
 			}
 #endif
-			return 0;
-		case ISDN_CMD_GETL3:
-			if (!card->flags & EICON_FLAGS_RUNNING)
-				return -ENODEV;
-			if (!(chan = find_channel(card, c->arg & 0x1f)))
-				break;
-			return chan->l3prot;
-		case ISDN_CMD_GETEAZ:
-			if (!card->flags & EICON_FLAGS_RUNNING)
-				return -ENODEV;
-			eicon_log(card, 1, "%s: CMD_GETEAZ not implemented\n", DRIVERLNAME);
-			return 0;
-		case ISDN_CMD_SETSIL:
-			if (!card->flags & EICON_FLAGS_RUNNING)
-				return -ENODEV;
-			eicon_log(card, 1, "%s: CMD_SETSIL not implemented\n",DRIVERLNAME);
-			return 0;
-		case ISDN_CMD_GETSIL:
-			if (!card->flags & EICON_FLAGS_RUNNING)
-				return -ENODEV;
-			eicon_log(card, 1, "%s: CMD_GETSIL not implemented\n", DRIVERLNAME);
-			return 0;
-		case ISDN_CMD_LOCK:
-			MOD_INC_USE_COUNT;
-			return 0;
-		case ISDN_CMD_UNLOCK:
-			MOD_DEC_USE_COUNT;
 			return 0;
 #ifdef CONFIG_ISDN_TTY_FAX
 		case ISDN_CMD_FAXCMD:
@@ -961,6 +928,7 @@ eicon_alloccard(DESCRIPTOR *d)
 	skb_queue_head_init(&card->sackq);
 	skb_queue_head_init(&card->statq);
 	card->statq_entries = 0;
+	SET_MODULE_OWNER(&card->interface);
 	card->interface.maxbufsize = 4000;
 	card->interface.command = if_command;
 	card->interface.writebuf_skb = if_sendbuf;

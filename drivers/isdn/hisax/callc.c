@@ -29,8 +29,6 @@ const char *lli_revision = "$Revision: 2.51.6.6 $";
 
 extern struct IsdnCard cards[];
 extern int nrcards;
-extern void HiSax_mod_dec_use_count(struct IsdnCardState *cs);
-extern void HiSax_mod_inc_use_count(struct IsdnCardState *cs);
 
 static int init_b_st(struct Channel *chanp, int incoming);
 static void release_b_st(struct Channel *chanp);
@@ -1584,22 +1582,6 @@ HiSax_command(isdn_ctrl * ic)
 					break;
 			}
 			break;
-		case (ISDN_CMD_LOCK):
-			HiSax_mod_inc_use_count(csta);
-#ifdef MODULE
-			if (csta->channel[0].debug & 0x400)
-				HiSax_putstatus(csta, "   LOCK ", "modcnt %lx",
-					MOD_USE_COUNT);
-#endif				/* MODULE */
-			break;
-		case (ISDN_CMD_UNLOCK):
-			HiSax_mod_dec_use_count(csta);
-#ifdef MODULE
-			if (csta->channel[0].debug & 0x400)
-				HiSax_putstatus(csta, " UNLOCK ", "modcnt %lx",
-					MOD_USE_COUNT);
-#endif				/* MODULE */
-			break;
 		case (ISDN_CMD_IOCTL):
 			switch (ic->arg) {
 				case (0):
@@ -1622,14 +1604,6 @@ HiSax_command(isdn_ctrl * ic)
 						csta->cardnr + 1, num);
 					printk(KERN_DEBUG "HiSax: delay card %d set to %d ms\n",
 						csta->cardnr + 1, num);
-					break;
-				case (3):
-					for (i = 0; i < *(unsigned int *) ic->parm.num; i++)
-						HiSax_mod_dec_use_count(NULL);
-					break;
-				case (4):
-					for (i = 0; i < *(unsigned int *) ic->parm.num; i++)
-						HiSax_mod_inc_use_count(NULL);
 					break;
 				case (5):	/* set card in leased mode */
 					num = *(unsigned int *) ic->parm.num;
@@ -1693,12 +1667,6 @@ HiSax_command(isdn_ctrl * ic)
 					}
 					L4L3(chanp->d_st, DL_ESTABLISH | REQUEST, NULL);
 					break;
-#ifdef MODULE
-				case (55):
-					MOD_USE_COUNT = 0;
-					HiSax_mod_inc_use_count(NULL);
-					break;
-#endif				/* MODULE */
 				case (11):
 					num = csta->debug & DEB_DLOG_HEX;
 					csta->debug = *(unsigned int *) ic->parm.num;

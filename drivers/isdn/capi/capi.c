@@ -1289,9 +1289,7 @@ static int capinc_tty_init(void)
 	
 	memset(drv, 0, sizeof(struct tty_driver));
 	drv->magic = TTY_DRIVER_MAGIC;
-#if (LINUX_VERSION_CODE > 0x20100)
 	drv->driver_name = "capi_nc";
-#endif
 	drv->name = "capi/%d";
 	drv->major = capi_ttymajor;
 	drv->minor_start = 0;
@@ -1323,15 +1321,11 @@ static int capinc_tty_init(void)
 	drv->stop = capinc_tty_stop;
 	drv->start = capinc_tty_start;
 	drv->hangup = capinc_tty_hangup;
-#if (LINUX_VERSION_CODE >= 131394) /* Linux 2.1.66 */
 	drv->break_ctl = capinc_tty_break_ctl;
-#endif
 	drv->flush_buffer = capinc_tty_flush_buffer;
 	drv->set_ldisc = capinc_tty_set_ldisc;
-#if (LINUX_VERSION_CODE >= 131343)
 	drv->send_xchar = capinc_tty_send_xchar;
 	drv->read_proc = capinc_tty_read_proc;
-#endif
 	if (tty_register_driver(drv)) {
 		printk(KERN_ERR "Couldn't register capi_nc driver\n");
 		return -1;
