@@ -210,7 +210,7 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
 
         pos += size; len += size;
 	cciss_proc_tape_report(ctlr, buffer, &pos, &len);
-	for(i=0; i<h->highest_lun; i++) {
+	for(i=0; i<=h->highest_lun; i++) {
 		sector_t tmp;
 
                 drv = &h->drv[i];
