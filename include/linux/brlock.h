@@ -85,7 +85,8 @@ static inline void br_read_lock (enum brlock_indices idx)
 	if (idx >= __BR_END)
 		__br_lock_usage_bug();
 
-	read_lock(&__brlock_array[smp_processor_id()][idx]);
+	preempt_disable();
+	_raw_read_lock(&__brlock_array[smp_processor_id()][idx]);
 }
 
 static inline void br_read_unlock (enum brlock_indices idx)
@@ -109,6 +110,7 @@ static inline void br_read_lock (enum brlock_indices idx)
 	if (idx >= __BR_END)
 		__br_lock_usage_bug();
 
+	preempt_disable();
 	ctr = &__brlock_array[smp_processor_id()][idx];
 	lock = &__br_write_locks[idx].lock;
 again:
@@ -147,6 +149,7 @@ static inline void br_read_unlock (enum brlock_indices idx)
 
 	wmb();
 	(*ctr)--;
+	preempt_enable();
 }
 #endif /* __BRLOCK_USE_ATOMICS */
 
