@@ -33,14 +33,5 @@ if [ "$CONFIG_USB" = "y" -o  "$CONFIG_USB" = "m" ]; then
    dep_tristate '  USB Auerswald ISDN support (EXPERIMENTAL)' CONFIG_USB_AUERSWALD $CONFIG_USB $CONFIG_EXPERIMENTAL
    dep_tristate '  USB Diamond Rio500 support (EXPERIMENTAL)' CONFIG_USB_RIO500 $CONFIG_USB $CONFIG_EXPERIMENTAL
 
-   # Turn on CONFIG_USB_MISC if any of the drivers are compiled into the kernel
-   # to make our Makefile logic a bit simpler
-   if [ "$CONFIG_USB_USS720" = "y" -o "$CONFIG_USB_EMI26" = "y" -o "$CONFIG_USB_RIO500" = "y" ]; then
-      define_bool CONFIG_USB_MISC y
-   fi
-   if [ "$CONFIG_USB_AUERSWALD" = "y" -o "$CONFIG_USB_TIGL" = "y" ]; then
-      define_bool CONFIG_USB_MISC y
-   fi
-
 fi
 endmenu
