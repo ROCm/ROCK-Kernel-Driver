@@ -198,7 +198,7 @@ static void __init init_hwif_ns87415 (ide_hwif_t *hwif)
 	}
 
 	if (!using_inta)
-		hwif->irq = hwif->channel ? 15 : 14;	/* legacy mode */
+		hwif->irq = ide_default_irq(hwif->io_ports[IDE_DATA_OFFSET]);
 	else if (!hwif->irq && hwif->mate && hwif->mate->irq)
 		hwif->irq = hwif->mate->irq;	/* share IRQ with mate */
 
