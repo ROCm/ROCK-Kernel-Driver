@@ -1431,7 +1431,7 @@ config E100
 
 config E100_NAPI
 	bool "Use Rx Polling (NAPI)"
-	depends on E100
+	depends on E100 && !PPC_PSERIES
 
 config LNE390
 	tristate "Mylex EISA LNE390A/B support (EXPERIMENTAL)"
