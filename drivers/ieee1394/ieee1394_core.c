@@ -45,6 +45,7 @@
 #include "nodemgr.h"
 #include "dma.h"
 #include "iso.h"
+#include "config_roms.h"
 
 /*
  * Disable the nodemgr detection and config rom reading functionality.
@@ -1052,6 +1053,11 @@ static int __init ieee1394_init(void)
 {
 	int i;
 
+	if (hpsb_init_config_roms()) {
+		HPSB_ERR("Failed to initialize some config rom entries.\n");
+		HPSB_ERR("Some features may not be available\n");
+	}
+
 	khpsbpkt_pid = kernel_thread(hpsbpkt_thread, NULL, CLONE_KERNEL);
 	if (khpsbpkt_pid < 0) {
 		HPSB_ERR("Failed to start hpsbpkt thread!\n");
@@ -1114,6 +1120,8 @@ static void __exit ieee1394_cleanup(void)
 
 	mempool_destroy(hpsb_packet_mempool);
 	kmem_cache_destroy(hpsb_packet_cache);
+
+	hpsb_cleanup_config_roms();
 
 	unregister_chrdev_region(IEEE1394_CORE_DEV, 256);
 	devfs_remove("ieee1394");

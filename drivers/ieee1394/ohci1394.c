@@ -3153,11 +3153,6 @@ do {						\
 static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 					const struct pci_device_id *ent)
 {
-	struct csr1212_keyval *root;
-	struct csr1212_keyval *vend_id = NULL;
-	struct csr1212_keyval *text = NULL;
-	int ret;
-
 	static int version_printed = 0;
 
 	struct hpsb_host *host;
@@ -3342,38 +3337,6 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	ohci->init_state = OHCI_INIT_HAVE_IRQ;
 	ohci_initialize(ohci);
 
-	/* Setup initial root directory entries */
-	root = host->csr.rom->root_kv;
-
-	vend_id = csr1212_new_immediate(CSR1212_KV_ID_VENDOR,
-					reg_read(ohci, OHCI1394_GUIDHi) >> 8);
-	text = csr1212_new_string_descriptor_leaf("Linux 1394 - OHCI");
-
-	if (!vend_id || !text) {
-		if (vend_id) {
-			csr1212_release_keyval(vend_id);
-		}
-		if (text) {
-			csr1212_release_keyval(text);
-		}
-		FAIL(-ENOMEM, "Failed to allocate memory for mandatory ConfigROM entries!");
-	}
-
-	ret = csr1212_associate_keyval(vend_id, text);
-	csr1212_release_keyval(text);
-	if(ret != CSR1212_SUCCESS) {
-		csr1212_release_keyval(vend_id);
-		FAIL(ret, "Failed to associate text descriptor to vendor id");
-	}
-
-	ret = csr1212_attach_keyval_to_directory(root, vend_id);
-	if(ret != CSR1212_SUCCESS) {
-		csr1212_release_keyval(vend_id);
-		FAIL(ret, "Failed to attach vendor id to root directory");
-	}
-
-	host->update_config_rom = 1;
-
 	/* Set certain csr values */
 	host->csr.guid_hi = reg_read(ohci, OHCI1394_GUIDHi);
 	host->csr.guid_lo = reg_read(ohci, OHCI1394_GUIDLo);
@@ -3382,7 +3345,9 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	host->csr.lnk_spd = reg_read(ohci, OHCI1394_BusOptions) & 0x7;
 
 	/* Tell the highlevel this host is ready */
-	hpsb_add_host(host);
+	if (hpsb_add_host(host))
+		FAIL(-ENOMEM, "Failed to register host with highlevel");
+
 	ohci->init_state = OHCI_INIT_DONE;
 
 	return 0;

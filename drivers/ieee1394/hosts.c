@@ -27,6 +27,7 @@
 #include "highlevel.h"
 #include "nodemgr.h"
 #include "csr.h"
+#include "config_roms.h"
 
 
 static void delayed_reset_bus(unsigned long __reset_info)
@@ -173,9 +174,16 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
 	return h;
 }
 
-void hpsb_add_host(struct hpsb_host *host)
+int hpsb_add_host(struct hpsb_host *host)
 {
-        highlevel_add_host(host);
+	if (hpsb_default_host_entry(host))
+		return -ENOMEM;
+
+	hpsb_add_extra_config_roms(host);
+
+	highlevel_add_host(host);
+
+	return 0;
 }
 
 void hpsb_remove_host(struct hpsb_host *host)
@@ -184,6 +192,8 @@ void hpsb_remove_host(struct hpsb_host *host)
         host->driver = &dummy_driver;
 
         highlevel_remove_host(host);
+
+	hpsb_remove_extra_config_roms(host);
 
 	class_device_unregister(&host->class_dev);
 	device_unregister(&host->device);
