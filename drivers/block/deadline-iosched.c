@@ -25,7 +25,7 @@
  * front fifo request expires.
  */
 static int read_expire = HZ / 2;	/* 500ms start timeout */
-static int fifo_batch = 32;		/* 4 seeks, or 64 contig */
+static int fifo_batch = 16;
 static int seek_cost = 16;		/* seek is 16 times more expensive */
 
 /*
