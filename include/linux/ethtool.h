@@ -307,14 +307,14 @@ int ethtool_op_set_tso(struct net_device *dev, u32 data);
  *
  * get_eeprom:
  *	Should fill in the magic field.  Don't need to check len for zero
- *	or wraparound but must check offset + len < size.  Fill in the data
- *	argument with the eeprom values from offset to offset + len.  Update
- *	len to the amount read.  Returns an error or zero.
+ *	or wraparound.  Fill in the data argument with the eeprom values
+ *	from offset to offset + len.  Update len to the amount read.
+ *	Returns an error or zero.
  *
  * set_eeprom:
  *	Should validate the magic field.  Don't need to check len for zero
- *	or wraparound but must check offset + len < size.  Update len to
- *	the amount written.  Returns an error or zero.
+ *	or wraparound.  Update len to the amount written.  Returns an error
+ *	or zero.
  */
 struct ethtool_ops {
 	int	(*get_settings)(struct net_device *, struct ethtool_cmd *);
@@ -328,6 +328,7 @@ struct ethtool_ops {
 	void	(*set_msglevel)(struct net_device *, u32);
 	int	(*nway_reset)(struct net_device *);
 	u32	(*get_link)(struct net_device *);
+	int	(*get_eeprom_len)(struct net_device *);
 	int	(*get_eeprom)(struct net_device *, struct ethtool_eeprom *, u8 *);
 	int	(*set_eeprom)(struct net_device *, struct ethtool_eeprom *, u8 *);
 	int	(*get_coalesce)(struct net_device *, struct ethtool_coalesce *);

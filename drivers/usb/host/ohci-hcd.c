@@ -102,14 +102,8 @@
 #include <asm/unaligned.h>
 #include <asm/byteorder.h>
 
-/*
- * TO DO:
- *
- *	- "disabled" and "sleeping" should be in hcd->state
- *	- lots more testing!!
- */
 
-#define DRIVER_VERSION "2003 Feb 24"
+#define DRIVER_VERSION "2003 Oct 13"
 #define DRIVER_AUTHOR "Roman Weissgaerber, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
 
@@ -131,7 +125,6 @@ static const char	hcd_name [] = "ohci_hcd";
 
 static inline void disable (struct ohci_hcd *ohci)
 {
-	ohci->disabled = 1;
 	ohci->hcd.state = USB_STATE_HALT;
 }
 
@@ -222,7 +215,7 @@ static int ohci_urb_enqueue (
 	spin_lock_irqsave (&ohci->lock, flags);
 
 	/* don't submit to a dead HC */
-	if (ohci->disabled || ohci->sleeping) {
+	if (!HCD_IS_RUNNING(ohci->hcd.state)) {
 		retval = -ENODEV;
 		goto fail;
 	}
@@ -278,7 +271,7 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 #endif		  
 
 	spin_lock_irqsave (&ohci->lock, flags);
-	if (!ohci->disabled) {
+ 	if (HCD_IS_RUNNING(ohci->hcd.state)) {
 		urb_priv_t  *urb_priv;
 
 		/* Unless an IRQ completed the unlink while it was being
@@ -287,7 +280,6 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		 */
 		urb_priv = urb->hcpriv;
 		if (urb_priv) {
-			urb_priv->state = URB_DEL; 
 			if (urb_priv->ed->state == ED_OPER)
 				start_urb_unlink (ohci, urb_priv->ed);
 		}
@@ -334,7 +326,7 @@ rescan:
 	if (!ed)
 		goto done;
 
-	if (!HCD_IS_RUNNING (ohci->hcd.state) || ohci->disabled)
+	if (!HCD_IS_RUNNING (ohci->hcd.state))
 		ed->state = ED_IDLE;
 	switch (ed->state) {
 	case ED_UNLINK:		/* wait for hw to finish? */
@@ -355,9 +347,9 @@ rescan:
 		/* caller was supposed to have unlinked any requests;
 		 * that's not our job.  can't recover; must leak ed.
 		 */
-		ohci_err (ohci, "ed %p (#%d) state %d%s\n",
+		ohci_err (ohci, "leak ed %p (#%d) state %d%s\n",
 			ed, epnum, ed->state,
-			list_empty (&ed->td_list) ? "" : "(has tds)");
+			list_empty (&ed->td_list) ? "" : " (has tds)");
 		td_free (ohci, ed->dummy);
 		break;
 	}
@@ -466,8 +458,7 @@ static int hc_start (struct ohci_hcd *ohci)
   	struct usb_bus		*bus;
 
 	spin_lock_init (&ohci->lock);
-	ohci->disabled = 1;
-	ohci->sleeping = 0;
+	disable (ohci);
 
 	/* Tell the controller where the control and bulk lists are
 	 * The lists are empty now. */
@@ -496,8 +487,8 @@ static int hc_start (struct ohci_hcd *ohci)
  	/* start controller operations */
 	ohci->hc_control &= OHCI_CTRL_RWC;
  	ohci->hc_control |= OHCI_CONTROL_INIT | OHCI_USB_OPER;
-	ohci->disabled = 0;
  	writel (ohci->hc_control, &ohci->regs->control);
+	ohci->hcd.state = USB_STATE_RUNNING;
 
 	/* Choose the interrupts we care about now, others later on demand */
 	mask = OHCI_INTR_MIE | OHCI_INTR_UE | OHCI_INTR_WDH;
@@ -586,9 +577,11 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 	}
   
 	if (ints & OHCI_INTR_WDH) {
-		writel (OHCI_INTR_WDH, &regs->intrdisable);	
+		if (HCD_IS_RUNNING(hcd->state))
+			writel (OHCI_INTR_WDH, &regs->intrdisable);	
 		dl_done_list (ohci, dl_reverse_done_list (ohci), ptregs);
-		writel (OHCI_INTR_WDH, &regs->intrenable); 
+		if (HCD_IS_RUNNING(hcd->state))
+			writel (OHCI_INTR_WDH, &regs->intrenable); 
 	}
   
 	/* could track INTR_SO to reduce available PCI/... bandwidth */
@@ -600,14 +593,17 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 	if (ohci->ed_rm_list)
 		finish_unlinks (ohci, le16_to_cpu (ohci->hcca->frame_no),
 				ptregs);
-	if ((ints & OHCI_INTR_SF) != 0 && !ohci->ed_rm_list)
+	if ((ints & OHCI_INTR_SF) != 0 && !ohci->ed_rm_list
+			&& HCD_IS_RUNNING(ohci->hcd.state))
 		writel (OHCI_INTR_SF, &regs->intrdisable);	
 	spin_unlock (&ohci->lock);
 
-	writel (ints, &regs->intrstatus);
-	writel (OHCI_INTR_MIE, &regs->intrenable);	
-	// flush those pci writes
-	(void) readl (&ohci->regs->control);
+	if (HCD_IS_RUNNING(ohci->hcd.state)) {
+		writel (ints, &regs->intrstatus);
+		writel (OHCI_INTR_MIE, &regs->intrenable);	
+		// flush those pci writes
+		(void) readl (&ohci->regs->control);
+	}
 }
 
 /*-------------------------------------------------------------------------*/
@@ -616,13 +612,12 @@ static void ohci_stop (struct usb_hcd *hcd)
 {	
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 
-	ohci_dbg (ohci, "stop %s controller%s\n",
+	ohci_dbg (ohci, "stop %s controller (state 0x%02x)\n",
 		hcfs2string (ohci->hc_control & OHCI_CTRL_HCFS),
-		ohci->disabled ? " (disabled)" : ""
-		);
+		ohci->hcd.state);
 	ohci_dump (ohci, 1);
 
-	if (!ohci->disabled)
+	if (HCD_IS_RUNNING(ohci->hcd.state))
 		hc_reset (ohci);
 	
 	remove_debug_files (ohci);
@@ -649,8 +644,7 @@ static int hc_restart (struct ohci_hcd *ohci)
 	int temp;
 	int i;
 
-	ohci->disabled = 1;
-	ohci->sleeping = 0;
+	disable (ohci);
 	if (hcd_to_bus (&ohci->hcd)->root_hub)
 		usb_disconnect (&hcd_to_bus (&ohci->hcd)->root_hub);
 	

@@ -1616,7 +1616,7 @@ config SUNDANCE_MMIO
 
 config TLAN
 	tristate "TI ThunderLAN support"
-	depends on NET_PCI && (PCI || EISA)
+	depends on NET_PCI && (PCI || EISA) && !64BIT
 	---help---
 	  If you have a PCI Ethernet network card based on the ThunderLAN chip
 	  which is supported by this driver, say Y and read the
@@ -2412,7 +2412,7 @@ config IPHASE5526
 
 config RCPCI
 	tristate "Red Creek Hardware VPN (EXPERIMENTAL)"
-	depends on NETDEVICES && EXPERIMENTAL && PCI
+	depends on NETDEVICES && EXPERIMENTAL && PCI && !64BIT
 	help
 	  This is a driver for hardware which provides a Virtual Private
 	  Network (VPN). Say Y if you have it.

@@ -84,7 +84,7 @@ static u_int irq_mask = 0xdeb8;
 static int irq_list[4] = { -1 };
 
 MODULE_AUTHOR("Simon Kelley");
-MODULE_DESCRIPTION("Support for Atmel at76c50x 802.11 wireless ethnet cards.");
+MODULE_DESCRIPTION("Support for Atmel at76c50x 802.11 wireless ethernet cards.");
 MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("Atmel at76c50x PCMCIA cards");
 MODULE_PARM(irq_mask, "i");
@@ -404,9 +404,12 @@ static void atmel_config(dev_link_t *link)
 					goto mismatch;
 				for (k = 0; k < j; k++) {
 					while ((*p != '\0') && (*p != '/')) p++;
-					if (*p == '\0')
-						goto mismatch;
-					p++;
+					if (*p == '\0') {
+						if (*q != '\0')
+							goto mismatch;
+					} else {
+						p++;
+					}
 				}
 				while((*q != '\0') && (*p != '\0') && 
 				      (*p != '/') && (*p == *q)) p++, q++;

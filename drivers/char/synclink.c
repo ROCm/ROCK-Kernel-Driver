@@ -8020,8 +8020,8 @@ int mgsl_sppp_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 #endif /* ifdef CONFIG_SYNCLINK_SYNCPPP */
 
-static int __init synclink_init_one (struct pci_dev *dev,
-				     const struct pci_device_id *ent)
+static int __devinit synclink_init_one (struct pci_dev *dev,
+					const struct pci_device_id *ent)
 {
 	struct mgsl_struct *info;
 
