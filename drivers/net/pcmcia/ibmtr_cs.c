@@ -317,13 +317,10 @@ static void ibmtr_config(dev_link_t *link)
     /* Try PRIMARY card at 0xA20-0xA23 */
     link->io.BasePort1 = 0xA20;
     i = pcmcia_request_io(link->handle, &link->io);
-    if (i == CS_SUCCESS) {
-	memcpy(info->node.dev_name, "tr0\0", 4);
-    } else {
+    if (i != CS_SUCCESS) {
 	/* Couldn't get 0xA20-0xA23.  Try ALTERNATE at 0xA24-0xA27. */
 	link->io.BasePort1 = 0xA24;
 	CS_CHECK(RequestIO, pcmcia_request_io(link->handle, &link->io));
-	memcpy(info->node.dev_name, "tr1\0", 4);
     }
     dev->base_addr = link->io.BasePort1;
 
@@ -367,15 +364,17 @@ static void ibmtr_config(dev_link_t *link)
         Adapters Technical Reference"  SC30-3585 for this info.  */
     ibmtr_hw_setup(dev, mmiobase);
 
+    link->dev = &info->node;
+    link->state &= ~DEV_CONFIG_PENDING;
+
     i = ibmtr_probe_card(dev);
-    
     if (i != 0) {
 	printk(KERN_NOTICE "ibmtr_cs: register_netdev() failed\n");
+	link->dev = NULL;
 	goto failed;
     }
 
-    link->dev = &info->node;
-    link->state &= ~DEV_CONFIG_PENDING;
+    strcpy(info->node.dev_name, dev->name);
 
     printk(KERN_INFO "%s: port %#3lx, irq %d,",
            dev->name, dev->base_addr, dev->irq);

@@ -54,7 +54,6 @@
 #include <asm/io.h>
 #include <asm/system.h>
 #include <linux/wireless.h>
-#include <linux/802_11.h>
 
 
 /*
@@ -104,7 +103,7 @@ MODULE_PARM(irq_list, "1-4i");
 struct net_device *init_atmel_card(int, int, char *, struct device *, 
 				    int (*present_func)(void *), void * );
 void stop_atmel_card( struct net_device *, int );
-int reset_atmel_card( struct net_device * );
+int atmel_open( struct net_device * );
 
 static void atmel_config(dev_link_t *link);
 static void atmel_release(dev_link_t *link);
@@ -335,7 +334,7 @@ static struct {
 	{ 0, 0, "ATMEL/AT76C504A", "atmel_at76c504a_2958%s.bin", "NoName-504a-2958" },
 	{ 0, 0, "ATMEL/AT76C504_R", "atmel_at76c504_2958%s.bin", "NoName-504-2958" },
 	{ MANFID_3COM, 0x0620, NULL, "atmel_at76c502_3com%s.bin", "3com 3CRWE62092B" }, 
-	{ MANFID_3COM, 0x0696, NULL, "atmel_at76c502_3com%s.bin", "3com 3CRSHPW_96" }, 
+	{ MANFID_3COM, 0x0696, NULL, "atmel_at76c502_3com%s.bin", "3com 3CRSHPW196" }, 
 	{ 0, 0, "SMC/2632W-V2", "atmel_at76c502%s.bin", "SMC 2632W-V2" },
         { 0, 0, "SMC/2632W", "atmel_at76c502d%s.bin", "SMC 2632W-V3" },
 	{ 0xd601, 0x0007, NULL, "atmel_at76c502%s.bin", "Sitecom WLAN-011" }, 
@@ -661,7 +660,7 @@ static int atmel_event(event_t event, int priority,
 	case CS_EVENT_CARD_RESET:
 		if (link->state & DEV_CONFIG) {
 			pcmcia_request_configuration(link->handle, &link->conf);
-			reset_atmel_card(local->eth_dev);
+			atmel_open(local->eth_dev);
 			netif_device_attach(local->eth_dev);
 		}
 		break;

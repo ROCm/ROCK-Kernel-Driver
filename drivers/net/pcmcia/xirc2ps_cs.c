@@ -1114,17 +1114,20 @@ xirc2ps_config(dev_link_t * link)
     /* we can now register the device with the net subsystem */
     dev->irq = link->irq.AssignedIRQ;
     dev->base_addr = link->io.BasePort1;
+
+    if (local->dingo)
+	do_reset(dev, 1); /* a kludge to make the cem56 work */
+
+    link->dev = &local->node;
+    link->state &= ~DEV_CONFIG_PENDING;
+
     if ((err=register_netdev(dev))) {
 	printk(KNOT_XIRC "register_netdev() failed\n");
+	link->dev = NULL;
 	goto config_error;
     }
 
     strcpy(local->node.dev_name, dev->name);
-    link->dev = &local->node;
-    link->state &= ~DEV_CONFIG_PENDING;
-
-    if (local->dingo)
-	do_reset(dev, 1); /* a kludge to make the cem56 work */
 
     /* give some infos about the hardware */
     printk(KERN_INFO "%s: %s: port %#3lx, irq %d, hwaddr",
