@@ -28,7 +28,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_UNIT_C_REVISION "$Revision: 1.29 $"
+#define ZFCP_SYSFS_UNIT_C_REVISION "$Revision: 1.30 $"
 
 #include "zfcp_ext.h"
 
@@ -69,11 +69,11 @@ ZFCP_DEFINE_UNIT_ATTR(scsi_lun, "0x%x\n", unit->scsi_lun);
 ZFCP_DEFINE_UNIT_ATTR(in_recovery, "%d\n", atomic_test_mask
 		      (ZFCP_STATUS_COMMON_ERP_INUSE, &unit->status));
 ZFCP_DEFINE_UNIT_ATTR(access_denied, "%d\n", atomic_test_mask
-		      (ZFCP_STATUS_UNIT_ACCESS_DENIED, &unit->status));
+		      (ZFCP_STATUS_COMMON_ACCESS_DENIED, &unit->status));
 ZFCP_DEFINE_UNIT_ATTR(access_shared, "%d\n", atomic_test_mask
-		      (ZFCP_STATUS_UNIT_ACCESS_SHARED, &unit->status));
+		      (ZFCP_STATUS_UNIT_SHARED, &unit->status));
 ZFCP_DEFINE_UNIT_ATTR(access_readonly, "%d\n", atomic_test_mask
-		      (ZFCP_STATUS_UNIT_ACCESS_READONLY, &unit->status));
+		      (ZFCP_STATUS_UNIT_READONLY, &unit->status));
 
 /**
  * zfcp_sysfs_unit_failed_store - failed state of unit

@@ -28,7 +28,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.46 $"
+#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.47 $"
 
 #include "zfcp_ext.h"
 
@@ -71,7 +71,7 @@ ZFCP_DEFINE_PORT_ATTR(scsi_id, "0x%x\n", port->scsi_id);
 ZFCP_DEFINE_PORT_ATTR(in_recovery, "%d\n", atomic_test_mask
 		      (ZFCP_STATUS_COMMON_ERP_INUSE, &port->status));
 ZFCP_DEFINE_PORT_ATTR(access_denied, "%d\n", atomic_test_mask
-		      (ZFCP_STATUS_PORT_ACCESS_DENIED, &port->status));
+		      (ZFCP_STATUS_COMMON_ACCESS_DENIED, &port->status));
 
 /**
  * zfcp_sysfs_unit_add_store - add a unit to sysfs tree

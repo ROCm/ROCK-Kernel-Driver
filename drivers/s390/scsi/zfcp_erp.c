@@ -32,7 +32,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_ERP_REVISION "$Revision: 1.76 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.79 $"
 
 #include "zfcp_ext.h"
 
@@ -1785,34 +1785,22 @@ zfcp_erp_strategy_followup_actions(int action,
 static int
 zfcp_erp_strategy_check_queues(struct zfcp_adapter *adapter)
 {
-	int retval = 0;
 	unsigned long flags;
-	struct zfcp_port *nport = adapter->nameserver_port;
 
 	read_lock_irqsave(&zfcp_data.config_lock, flags);
 	read_lock(&adapter->erp_lock);
 	if (list_empty(&adapter->erp_ready_head) &&
 	    list_empty(&adapter->erp_running_head)) {
-		if (nport
-		    && atomic_test_mask(ZFCP_STATUS_COMMON_OPEN,
-					&nport->status)) {
-			debug_text_event(adapter->erp_dbf, 4, "a_cq_nspsd");
-			/* taking down nameserver port */
-			zfcp_erp_port_reopen_internal(nport,
-						      ZFCP_STATUS_COMMON_RUNNING |
-						      ZFCP_STATUS_COMMON_ERP_FAILED);
-		} else {
 			debug_text_event(adapter->erp_dbf, 4, "a_cq_wake");
 			atomic_clear_mask(ZFCP_STATUS_ADAPTER_ERP_PENDING,
 					  &adapter->status);
 			wake_up(&adapter->erp_done_wqh);
-		}
 	} else
 		debug_text_event(adapter->erp_dbf, 5, "a_cq_notempty");
 	read_unlock(&adapter->erp_lock);
 	read_unlock_irqrestore(&zfcp_data.config_lock, flags);
 
-	return retval;
+	return 0;
 }
 
 /**
@@ -2808,10 +2796,11 @@ zfcp_erp_port_strategy_clearstati(struct zfcp_port *port)
 
 	atomic_clear_mask(ZFCP_STATUS_COMMON_OPENING |
 			  ZFCP_STATUS_COMMON_CLOSING |
+			  ZFCP_STATUS_COMMON_ACCESS_DENIED |
 			  ZFCP_STATUS_PORT_DID_DID |
 			  ZFCP_STATUS_PORT_PHYS_CLOSING |
-			  ZFCP_STATUS_PORT_INVALID_WWPN |
-			  ZFCP_STATUS_PORT_ACCESS_DENIED, &port->status);
+			  ZFCP_STATUS_PORT_INVALID_WWPN,
+			  &port->status);
 	return retval;
 }
 
@@ -3016,9 +3005,10 @@ zfcp_erp_unit_strategy_clearstati(struct zfcp_unit *unit)
 
 	atomic_clear_mask(ZFCP_STATUS_COMMON_OPENING |
 			  ZFCP_STATUS_COMMON_CLOSING |
-			  ZFCP_STATUS_UNIT_ACCESS_DENIED |
-			  ZFCP_STATUS_UNIT_ACCESS_SHARED |
-			  ZFCP_STATUS_UNIT_ACCESS_READONLY, &unit->status);
+			  ZFCP_STATUS_COMMON_ACCESS_DENIED |
+			  ZFCP_STATUS_UNIT_SHARED |
+			  ZFCP_STATUS_UNIT_READONLY,
+			  &unit->status);
 
 	return retval;
 }
@@ -3357,9 +3347,11 @@ zfcp_erp_action_cleanup(int action, struct zfcp_adapter *adapter,
 		if ((result == ZFCP_ERP_SUCCEEDED)
 		    && (!atomic_test_mask(ZFCP_STATUS_UNIT_TEMPORARY,
 					  &unit->status))
-		    && (!unit->device))
+		    && (!unit->device)) {
  			scsi_add_device(unit->port->adapter->scsi_host, 0,
  					unit->port->scsi_id, unit->scsi_lun);
+			zfcp_cb_unit_add(unit);
+		}
 		zfcp_unit_put(unit);
 		break;
 	case ZFCP_ERP_ACTION_REOPEN_PORT_FORCED:
@@ -3478,4 +3470,126 @@ zfcp_erp_action_to_ready(struct zfcp_erp_action *erp_action)
 	list_move(&erp_action->list, &erp_action->adapter->erp_ready_head);
 }
 
+/*
+ * function:	zfcp_erp_port_access_denied
+ *
+ * purpose:
+ */
+void
+zfcp_erp_port_access_denied(struct zfcp_port *port)
+{
+	struct zfcp_adapter *adapter = port->adapter;
+	unsigned long flags;
+
+	debug_text_event(adapter->erp_dbf, 3, "p_access_block");
+	debug_event(adapter->erp_dbf, 3, &port->wwpn, sizeof(wwn_t));
+	read_lock_irqsave(&zfcp_data.config_lock, flags);
+	zfcp_erp_modify_port_status(port,
+		ZFCP_STATUS_COMMON_ERP_FAILED | ZFCP_STATUS_COMMON_ACCESS_DENIED,
+		ZFCP_SET);
+	read_unlock_irqrestore(&zfcp_data.config_lock, flags);
+}
+
+/*
+ * function:	zfcp_erp_unit_access_denied
+ *
+ * purpose:
+ */
+void
+zfcp_erp_unit_access_denied(struct zfcp_unit *unit)
+{
+	struct zfcp_adapter *adapter = unit->port->adapter;
+
+	debug_text_event(adapter->erp_dbf, 3, "u_access_block");
+	debug_event(adapter->erp_dbf, 3, &unit->fcp_lun, sizeof(fcp_lun_t));
+	zfcp_erp_modify_unit_status(unit,
+		ZFCP_STATUS_COMMON_ERP_FAILED | ZFCP_STATUS_COMMON_ACCESS_DENIED,
+		ZFCP_SET);
+}
+
+/*
+ * function:	zfcp_erp_adapter_access_changed
+ *
+ * purpose:
+ */
+void
+zfcp_erp_adapter_access_changed(struct zfcp_adapter *adapter)
+{
+	struct zfcp_port *port;
+	unsigned long flags;
+
+	debug_text_event(adapter->erp_dbf, 3, "a_access_unblock");
+	debug_event(adapter->erp_dbf, 3, &adapter->name, 8);
+
+	zfcp_erp_port_access_changed(adapter->nameserver_port);
+	read_lock_irqsave(&zfcp_data.config_lock, flags);
+	list_for_each_entry(port, &adapter->port_list_head, list)
+		if (port != adapter->nameserver_port)
+			zfcp_erp_port_access_changed(port);
+	read_unlock_irqrestore(&zfcp_data.config_lock, flags);
+}
+
+/*
+ * function:	zfcp_erp_port_access_changed
+ *
+ * purpose:
+ */
+void
+zfcp_erp_port_access_changed(struct zfcp_port *port)
+{
+	struct zfcp_adapter *adapter = port->adapter;
+	struct zfcp_unit *unit;
+
+	debug_text_event(adapter->erp_dbf, 3, "p_access_unblock");
+	debug_event(adapter->erp_dbf, 3, &port->wwpn, sizeof(wwn_t));
+
+	if (!atomic_test_mask(ZFCP_STATUS_COMMON_ACCESS_DENIED, &port->status)) {
+		if (!atomic_test_mask(ZFCP_STATUS_PORT_WKA, &port->status))
+			list_for_each_entry(unit, &port->unit_list_head, list)
+				zfcp_erp_unit_access_changed(unit);
+		return;
+	}
+
+	ZFCP_LOG_NORMAL("Trying to reopen port 0x%016Lx on adapter %s "
+			"due to update to access control table\n",
+			port->wwpn, zfcp_get_busid_by_adapter(adapter));
+	if (zfcp_erp_port_reopen(port, ZFCP_STATUS_COMMON_ERP_FAILED) != 0)
+		ZFCP_LOG_NORMAL("Reopen of port 0x%016Lx on adapter %s failed\n",
+				port->wwpn, zfcp_get_busid_by_adapter(adapter));
+}
+
+/*
+ * function:	zfcp_erp_unit_access_changed
+ *
+ * purpose:
+ */
+void
+zfcp_erp_unit_access_changed(struct zfcp_unit *unit)
+{
+	struct zfcp_adapter *adapter = unit->port->adapter;
+
+	debug_text_event(adapter->erp_dbf, 3, "u_access_unblock");
+	debug_event(adapter->erp_dbf, 3, &unit->fcp_lun, sizeof(fcp_lun_t));
+
+	if (!atomic_test_mask(ZFCP_STATUS_COMMON_ACCESS_DENIED, &unit->status))
+		return;
+
+	ZFCP_LOG_NORMAL("Trying to reopen unit 0x%016Lx "
+			"on port 0x%016Lx on adapter %s "
+			"due to update to access control table\n",
+			unit->fcp_lun, unit->port->wwpn,
+			zfcp_get_busid_by_adapter(adapter));
+	if (zfcp_erp_unit_reopen(unit, ZFCP_STATUS_COMMON_ERP_FAILED) != 0)
+		ZFCP_LOG_NORMAL("Reopen of unit 0x%016Lx "
+				"on port 0x%016Lx on adapter %s failed\n",
+				unit->fcp_lun, unit->port->wwpn,
+				zfcp_get_busid_by_adapter(adapter));
+}
+
 #undef ZFCP_LOG_AREA
+
+EXPORT_SYMBOL(zfcp_erp_wait);
+EXPORT_SYMBOL(zfcp_erp_port_reopen);
+EXPORT_SYMBOL(zfcp_erp_unit_reopen);
+EXPORT_SYMBOL(zfcp_erp_unit_shutdown);
+EXPORT_SYMBOL(zfcp_fsf_request_timeout_handler);

@@ -31,7 +31,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_FSF_C_REVISION "$Revision: 1.80 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.83 $"
 
 #include "zfcp_ext.h"
 
@@ -1020,6 +1020,8 @@ zfcp_fsf_status_read_handler(struct zfcp_fsf_req *fsf_req)
 		atomic_set_mask(ZFCP_STATUS_ADAPTER_LINK_UNPLUGGED,
 				&adapter->status);
 		zfcp_erp_adapter_failed(adapter);
+
+		zfcp_cb_link_down(adapter);
 		break;
 
 	case FSF_STATUS_READ_LINK_UP:
@@ -1036,6 +1038,8 @@ zfcp_fsf_status_read_handler(struct zfcp_fsf_req *fsf_req)
 					ZFCP_STATUS_ADAPTER_LINK_UNPLUGGED
 					| ZFCP_STATUS_COMMON_ERP_FAILED);
 
+		zfcp_cb_link_up(adapter);
+
 		break;
 
 	case FSF_STATUS_READ_CFDC_UPDATED:
@@ -1043,6 +1047,7 @@ zfcp_fsf_status_read_handler(struct zfcp_fsf_req *fsf_req)
 		debug_text_event(adapter->erp_dbf, 2, "unsol_cfdc_update:");
 		ZFCP_LOG_INFO("CFDC has been updated on the adapter %s\n",
 			      zfcp_get_busid_by_adapter(adapter));
+		zfcp_erp_adapter_access_changed(adapter);
 		break;
 
 	case FSF_STATUS_READ_CFDC_HARDENED:
@@ -1620,7 +1625,8 @@ zfcp_fsf_send_ct_handler(struct zfcp_fsf_req *fsf_req)
 				break;
 			}
 		}
-		debug_text_event(fsf_req->adapter->erp_dbf, 1, "fsf_s_access");
+		debug_text_event(adapter->erp_dbf, 1, "fsf_s_access");
+		zfcp_erp_port_access_denied(port);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
 
@@ -2000,6 +2006,11 @@ static int zfcp_fsf_send_els_handler(struct zfcp_fsf_req *fsf_req)
 			}
 		}
 		debug_text_event(adapter->erp_dbf, 1, "fsf_s_access");
+		read_lock(&zfcp_data.config_lock);
+		port = zfcp_get_port_by_did(adapter, d_id);
+		if (port != NULL)
+			zfcp_erp_port_access_denied(port);
+		read_unlock(&zfcp_data.config_lock);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
 
@@ -2244,6 +2255,8 @@ zfcp_fsf_exchange_config_data_handler(struct zfcp_fsf_req *fsf_req)
 		}
 		atomic_set_mask(ZFCP_STATUS_ADAPTER_XCONFIG_OK,
 				&adapter->status);
+		zfcp_cb_adapter_add(adapter);
+
 		break;
 	case FSF_EXCHANGE_CONFIG_DATA_INCOMPLETE:
 		debug_text_event(adapter->erp_dbf, 0, "xchg-inco");
@@ -2478,7 +2491,7 @@ zfcp_fsf_open_port_handler(struct zfcp_fsf_req *fsf_req)
 		ZFCP_LOG_FLAGS(2, "FSF_ACCESS_DENIED\n");
 		ZFCP_LOG_NORMAL("Access denied, cannot open port 0x%016Lx "
 				"on adapter %s\n",
-			port->wwpn, zfcp_get_busid_by_port(port));
+				port->wwpn, zfcp_get_busid_by_port(port));
 		for (counter = 0; counter < 2; counter++) {
 			subtable = header->fsf_status_qual.halfword[counter * 2];
 			rule = header->fsf_status_qual.halfword[counter * 2 + 1];
@@ -2493,8 +2506,7 @@ zfcp_fsf_open_port_handler(struct zfcp_fsf_req *fsf_req)
 			}
 		}
 		debug_text_event(fsf_req->adapter->erp_dbf, 1, "fsf_s_access");
-		atomic_set_mask(ZFCP_STATUS_PORT_ACCESS_DENIED, &port->status);
-		zfcp_erp_port_failed(port);
+		zfcp_erp_port_access_denied(port);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
 
@@ -2886,9 +2898,8 @@ zfcp_fsf_close_physical_port_handler(struct zfcp_fsf_req *fsf_req)
 	case FSF_ACCESS_DENIED:
 		ZFCP_LOG_FLAGS(2, "FSF_ACCESS_DENIED\n");
 		ZFCP_LOG_NORMAL("Access denied, cannot close "
-				"physical port 0x%016Lx on "
-				"adapter %s\n", port->wwpn,
-				zfcp_get_busid_by_port(port));
+				"physical port 0x%016Lx on adapter %s\n",
+				port->wwpn, zfcp_get_busid_by_port(port));
 		for (counter = 0; counter < 2; counter++) {
 			subtable = header->fsf_status_qual.halfword[counter * 2];
 			rule = header->fsf_status_qual.halfword[counter * 2 + 1];
@@ -2903,6 +2914,7 @@ zfcp_fsf_close_physical_port_handler(struct zfcp_fsf_req *fsf_req)
 			}
 		}
 		debug_text_event(fsf_req->adapter->erp_dbf, 1, "fsf_s_access");
+		zfcp_erp_port_access_denied(port);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
 
@@ -3073,7 +3085,6 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 	u16 subtable, rule, counter;
 	u32 allowed, exclusive, readwrite;
 
-
 	unit = fsf_req->data.open_unit.unit;
 
 	if (fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR) {
@@ -3085,14 +3096,61 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 	header = &fsf_req->qtcb->header;
 	bottom = &fsf_req->qtcb->bottom.support;
 	queue_designator = &header->fsf_status_qual.fsf_queue_designator;
-	allowed = bottom->lun_access_info & FSF_UNIT_ACCESS_OPEN_LUN_ALLOWED;
-	exclusive = bottom->lun_access_info & FSF_UNIT_ACCESS_EXCLUSIVE_ACCESS;
+
+	allowed   = bottom->lun_access_info & FSF_UNIT_ACCESS_OPEN_LUN_ALLOWED;
+	exclusive = bottom->lun_access_info & FSF_UNIT_ACCESS_EXCLUSIVE;
 	readwrite = bottom->lun_access_info & FSF_UNIT_ACCESS_OUTBOUND_TRANSFER;
 
-        atomic_clear_mask(ZFCP_STATUS_UNIT_ACCESS_DENIED |
-			  ZFCP_STATUS_UNIT_ACCESS_SHARED |
-			  ZFCP_STATUS_UNIT_ACCESS_READONLY,
+	if (!adapter->supported_features & FSF_FEATURE_CFDC)
+		goto no_cfdc;
+
+	atomic_clear_mask(ZFCP_STATUS_COMMON_ACCESS_DENIED |
+			  ZFCP_STATUS_UNIT_SHARED |
+			  ZFCP_STATUS_UNIT_READONLY,
 			  &unit->status);
+
+	if (!allowed)
+		atomic_set_mask(ZFCP_STATUS_COMMON_ACCESS_DENIED, &unit->status);
+
+	if (!adapter->supported_features & FSF_FEATURE_LUN_SHARING)
+		goto no_lun_sharing;
+
+	if (!exclusive)
+		atomic_set_mask(ZFCP_STATUS_UNIT_SHARED, &unit->status);
+
+	if (!readwrite) {
+		atomic_set_mask(ZFCP_STATUS_UNIT_READONLY, &unit->status);
+		ZFCP_LOG_NORMAL("Unit 0x%016Lx on port 0x%016Lx on adapter %s "
+				"accessed read-only\n", unit->fcp_lun,
+				unit->port->wwpn, zfcp_get_busid_by_unit(unit));
+	}
+
+	if (exclusive && !readwrite) {
+		ZFCP_LOG_NORMAL("Exclusive access of read-only unit not "
+				"supported\n");
+		zfcp_erp_unit_failed(unit);
+		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
+		goto skip_fsfstatus;
+	}
+	if (!exclusive && readwrite) {
+		ZFCP_LOG_NORMAL("Shared access of read-write unit is not "
+				"supported\n");
+		zfcp_erp_unit_failed(unit);
+		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
+		goto skip_fsfstatus;
+	}
+
+ no_lun_sharing:
+ no_cfdc:
+	if (!(adapter->supported_features & FSF_FEATURE_CFDC) &&
+	    (adapter->supported_features & FSF_FEATURE_LUN_SHARING)) {
+		ZFCP_LOG_NORMAL("LUN sharing without access control is not "
+				"supported.\n");
+		zfcp_erp_unit_failed(unit);
+		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
+		goto skip_fsfstatus;
+	}
+
 
 	/* evaluate FSF status in QTCB */
 	switch (header->fsf_status) {
@@ -3144,12 +3202,7 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 			}
 		}
 		debug_text_event(adapter->erp_dbf, 1, "fsf_s_access");
-		atomic_set_mask(ZFCP_STATUS_UNIT_ACCESS_DENIED, &unit->status);
-		atomic_clear_mask(ZFCP_STATUS_UNIT_ACCESS_SHARED,
-				  &unit->status);
-                atomic_clear_mask(ZFCP_STATUS_UNIT_ACCESS_READONLY,
-				  &unit->status);
-		zfcp_erp_unit_failed(unit);
+		zfcp_erp_unit_access_denied(unit);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
 
@@ -3279,13 +3332,12 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 
 		if (adapter->supported_features & FSF_FEATURE_LUN_SHARING){
 			if (!exclusive)
-		                atomic_set_mask(ZFCP_STATUS_UNIT_ACCESS_SHARED,
+		                atomic_set_mask(ZFCP_STATUS_UNIT_SHARED,
 						&unit->status);
 
 			if (!readwrite) {
-                		atomic_set_mask(
-					ZFCP_STATUS_UNIT_ACCESS_READONLY,
-					&unit->status);
+                		atomic_set_mask(ZFCP_STATUS_UNIT_READONLY,
+						&unit->status);
                 		ZFCP_LOG_NORMAL("read-only access for unit "
 						"(adapter %s, wwpn=0x%016Lx, "
 						"fcp_lun=0x%016Lx)\n",
@@ -3322,7 +3374,7 @@ zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *fsf_req)
 		break;
 	}
 
-      skip_fsfstatus:
+ skip_fsfstatus:
 	atomic_clear_mask(ZFCP_STATUS_COMMON_OPENING, &unit->status);
 	return retval;
 }
@@ -3643,8 +3695,7 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 	/* set FCP_LUN in FCP_CMND IU in QTCB */
 	fcp_cmnd_iu->fcp_lun = unit->fcp_lun;
 
-	mask = ZFCP_STATUS_UNIT_ACCESS_READONLY |
-		ZFCP_STATUS_UNIT_ACCESS_SHARED;
+	mask = ZFCP_STATUS_UNIT_READONLY | ZFCP_STATUS_UNIT_SHARED;
 
 	/* set task attributes in FCP_CMND IU in QTCB */
 	if (likely((scsi_cmnd->device->simple_tags) ||
@@ -3986,6 +4037,7 @@ zfcp_fsf_send_fcp_command_handler(struct zfcp_fsf_req *fsf_req)
 			}
 		}
 		debug_text_event(fsf_req->adapter->erp_dbf, 1, "fsf_s_access");
+		zfcp_erp_unit_access_denied(unit);
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		break;
 
@@ -5086,3 +5138,7 @@ zfcp_fsf_req_cleanup(struct zfcp_fsf_req *fsf_req)
 }
 
 #undef ZFCP_LOG_AREA
+
+EXPORT_SYMBOL(zfcp_fsf_exchange_port_data);
+EXPORT_SYMBOL(zfcp_fsf_send_ct);
+EXPORT_SYMBOL(zfcp_fsf_send_els);

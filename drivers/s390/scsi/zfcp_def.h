@@ -490,8 +490,8 @@ do { \
  * Note, the leftmost status byte is common among adapter, port 
  * and unit
  */
-#define ZFCP_COMMON_FLAGS                       0xff000000
-#define ZFCP_SPECIFIC_FLAGS                     0x00ffffff
+#define ZFCP_COMMON_FLAGS			0xfff00000
+#define ZFCP_SPECIFIC_FLAGS			0x000fffff
 
 /* common status bits */
 #define ZFCP_STATUS_COMMON_REMOVE		0x80000000
@@ -502,6 +502,7 @@ do { \
 #define ZFCP_STATUS_COMMON_OPEN                 0x04000000
 #define ZFCP_STATUS_COMMON_CLOSING              0x02000000
 #define ZFCP_STATUS_COMMON_ERP_INUSE		0x01000000
+#define ZFCP_STATUS_COMMON_ACCESS_DENIED	0x00800000
 
 /* adapter status */
 #define ZFCP_STATUS_ADAPTER_QDIOUP		0x00000002
@@ -540,12 +541,10 @@ do { \
 		 ZFCP_STATUS_PORT_NO_SCSI_ID)
 
 /* logical unit status */
-#define ZFCP_STATUS_UNIT_NOTSUPPUNITRESET       0x00000001
-#define ZFCP_STATUS_UNIT_ACCESS_DENIED          0x00000002
-#define ZFCP_STATUS_UNIT_ACCESS_SHARED          0x00000004
-#define ZFCP_STATUS_UNIT_ACCESS_READONLY        0x00000008
-#define ZFCP_STATUS_UNIT_TEMPORARY		0x00000010
-
+#define ZFCP_STATUS_UNIT_NOTSUPPUNITRESET	0x00000001
+#define ZFCP_STATUS_UNIT_TEMPORARY		0x00000002
+#define ZFCP_STATUS_UNIT_SHARED			0x00000004
+#define ZFCP_STATUS_UNIT_READONLY		0x00000008
 
 /* FSF request status (this does not have a common part) */
 #define ZFCP_STATUS_FSFREQ_NOT_INIT		0x00000000
@@ -1118,5 +1117,30 @@ zfcp_adapter_wait(struct zfcp_adapter *adapter)
 {
 	wait_event(adapter->remove_wq, atomic_read(&adapter->refcount) == 0);
 }
+
+
+/*
+ *  stuff needed for callback handling
+ */
+
+typedef void (*zfcp_cb_incoming_els_t) (struct zfcp_adapter *, void *);
+typedef void (*zfcp_cb_link_down_t) (struct zfcp_adapter *);
+typedef void (*zfcp_cb_link_up_t) (struct zfcp_adapter *);
+typedef void (*zfcp_cb_adapter_add_t) (struct zfcp_adapter *);
+typedef void (*zfcp_cb_port_add_t) (struct zfcp_port *);
+typedef void (*zfcp_cb_unit_add_t) (struct zfcp_unit *);
+
+struct zfcp_callbacks {
+	atomic_t refcount;
+	wait_queue_head_t wq;
+	zfcp_cb_incoming_els_t incoming_els;
+	zfcp_cb_link_down_t link_down;
+	zfcp_cb_link_up_t link_up;
+	zfcp_cb_adapter_add_t adapter_add;
+	zfcp_cb_port_add_t port_add;
+	zfcp_cb_unit_add_t unit_add;
+};
+
+extern struct zfcp_callbacks zfcp_callbacks;
 
 #endif /* ZFCP_DEF_H */
