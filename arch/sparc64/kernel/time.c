@@ -64,7 +64,16 @@ static unsigned long mstk48t59_regs = 0UL;
 
 static int set_rtc_mmss(unsigned long);
 
-struct sparc64_tick_ops *tick_ops;
+static __init unsigned long dummy_get_tick(void)
+{
+	return 0;
+}
+
+static __initdata struct sparc64_tick_ops dummy_tick_ops = {
+	.get_tick	= dummy_get_tick,
+};
+
+struct sparc64_tick_ops *tick_ops = &dummy_tick_ops;
 
 #define TICK_PRIV_BIT	(1UL << 63)
 
