@@ -488,8 +488,6 @@ xfs_dir2_block_getdents(
 
 		dep = (xfs_dir2_data_entry_t *)ptr;
 
-		savptr = ptr;		/* In case we need it.. */
-
 		/*
 		 * Bump pointer for the next iteration.
 		 */
@@ -504,14 +502,8 @@ xfs_dir2_block_getdents(
 		 */
 		p.namelen = dep->namelen;
 
-		/*
-		 * NOTE! Linux "filldir" semantics require that the
-		 *	 offset "cookie" be for this entry, not the
-		 *	 next; all the actual shuffling to make it
-		 *	 "look right" to the user is done in filldir.
-		 */
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
-						    savptr - (char *)block);
+						    ptr - (char *)block);
 #if XFS_BIG_FILESYSTEMS
 		p.ino = INT_GET(dep->inumber, ARCH_CONVERT) + mp->m_inoadd;
 #else

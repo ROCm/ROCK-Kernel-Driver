@@ -752,14 +752,8 @@ xfs_dir2_sf_getdents(
 	if (dir_offset <=
 		    XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
 					       XFS_DIR2_DATA_DOT_OFFSET)) {
-		/*
-		 * NOTE! Linux "filldir" semantics require that the
-		 *	 offset "cookie" be for this entry, not the
-		 *	 next; all the actual shuffling to make it
-		 *	 "look right" to the user is done in filldir.
-		 */
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, 0,
-						XFS_DIR2_DATA_DOT_OFFSET);
+						XFS_DIR2_DATA_DOTDOT_OFFSET);
 #if XFS_BIG_FILESYSTEMS
 		p.ino = dp->i_ino + mp->m_inoadd;
 #else
@@ -784,14 +778,8 @@ xfs_dir2_sf_getdents(
 	if (dir_offset <=
 		    XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
 					       XFS_DIR2_DATA_DOTDOT_OFFSET)) {
-		/*
-		 * NOTE! Linux "filldir" semantics require that the
-		 *	 offset "cookie" be for this entry, not the
-		 *	 next; all the actual shuffling to make it
-		 *	 "look right" to the user is done in filldir.
-		 */
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
-						XFS_DIR2_DATA_DOTDOT_OFFSET);
+						XFS_DIR2_DATA_FIRST_OFFSET);
 #if XFS_BIG_FILESYSTEMS
 		p.ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, ARCH_CONVERT) +
 			mp->m_inoadd;
@@ -826,14 +814,9 @@ xfs_dir2_sf_getdents(
 
 		p.namelen = sfep->namelen;
 
-		/*
-		 * NOTE! Linux "filldir" semantics require that the
-		 *	 offset "cookie" be for this entry, not the
-		 *	 next; all the actual shuffling to make it
-		 *	 "look right" to the user is done in filldir.
-		 */
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
-				XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, ARCH_CONVERT));
+			XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, ARCH_CONVERT) +
+			XFS_DIR2_DATA_ENTSIZE(p.namelen));
 
 #if XFS_BIG_FILESYSTEMS
 		p.ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,

@@ -227,8 +227,8 @@ linvfs_readdir(
 	int		eof = 0;
 	caddr_t		read_buf;
 	int		namelen, size = 0;
-	size_t		rlen = PAGE_CACHE_SIZE << 2;
-	xfs_off_t	start_offset;
+	size_t		rlen = PAGE_CACHE_SIZE;
+	xfs_off_t	start_offset, curr_offset;
 	xfs_dirent_t	*dbp = NULL;
 
 	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
@@ -247,7 +247,7 @@ linvfs_readdir(
 	uio.uio_iov = &iov;
 	uio.uio_fmode = filp->f_mode;
 	uio.uio_segflg = UIO_SYSSPACE;
-	uio.uio_offset = filp->f_pos;
+	curr_offset = uio.uio_offset = filp->f_pos;
 
 	while (!eof) {
 		uio.uio_resid = iov.iov_len = rlen;
@@ -268,12 +268,13 @@ linvfs_readdir(
 			namelen = strlen(dbp->d_name);
 
 			if (filldir(dirent, dbp->d_name, namelen,
-					(loff_t) dbp->d_off,
+					(loff_t) curr_offset,
 					(ino_t) dbp->d_ino,
 					DT_UNKNOWN)) {
 				goto done;
 			}
 			size -= dbp->d_reclen;
+			curr_offset = (loff_t)dbp->d_off;
 			dbp = nextdp(dbp);
 		}
 	}
@@ -282,7 +283,7 @@ done:
 		if (size == 0)
 			filp->f_pos = uio.uio_offset;
 		else if (dbp)
-			filp->f_pos = dbp->d_off;
+			filp->f_pos = curr_offset;
 	}
 
 	kfree(read_buf);
