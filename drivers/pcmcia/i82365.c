@@ -1211,6 +1211,7 @@ static int i365_set_mem_map(u_short sock, struct pccard_mem_map *mem)
     return 0;
 } /* i365_set_mem_map */
 
+#if 0 /* driver model ordering issue */
 /*======================================================================
 
     Routines for accessing socket information and register dumps via
@@ -1250,6 +1251,7 @@ static ssize_t show_exca(struct class_device *class_dev, char *buf)
 
 static CLASS_DEVICE_ATTR(exca, S_IRUGO, show_exca, NULL);
 static CLASS_DEVICE_ATTR(info, S_IRUGO, show_info, NULL);
+#endif
 
 /*====================================================================*/
 
@@ -1414,10 +1416,12 @@ static int __init init_i82365(void)
 			    pcmcia_unregister_socket(&socket[i].socket);
 		    break;
 	    }
+#if 0 /* driver model ordering issue */
 	   class_device_create_file(&socket[i].socket.dev,
 			   	    &class_device_attr_info);
 	   class_device_create_file(&socket[i].socket.dev,
 			   	    &class_device_attr_exca);
+#endif
     }
 
     /* Finally, schedule a polling interrupt */
