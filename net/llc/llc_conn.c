@@ -109,6 +109,7 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 					sk->dead = 1;
 				}
 			}
+			kfree_skb(skb);
 			sock_put(sk);
 			break;
 		default:
