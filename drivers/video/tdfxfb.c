@@ -939,7 +939,7 @@ static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *pixmap)
 	u8 *chardata = (u8 *) pixmap->data;
 	u32 srcfmt;
 
-	if (pixmap->depth != 1) {
+	if (pixmap->depth != 0) {
 		//banshee_make_room(par, 6 + ((size + 3) >> 2));
 		//srcfmt = stride | ((bpp+((bpp==8) ? 0 : 8)) << 13) | 0x400000;
 		cfb_imageblit(info, pixmap);

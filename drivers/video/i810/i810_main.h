@@ -43,12 +43,16 @@ static struct pci_device_id i810fb_pci_tbl[] __initdata = {
 static int  __init i810fb_init_pci (struct pci_dev *dev, 
 				       const struct pci_device_id *entry);
 static void __exit i810fb_remove_pci(struct pci_dev *dev);
+static int i810fb_resume(struct pci_dev *dev);
+static int i810fb_suspend(struct pci_dev *dev, u32 state);
 
 static struct pci_driver i810fb_driver = {
 	.name     =	"i810fb",
 	.id_table =	i810fb_pci_tbl,
 	.probe    =	i810fb_init_pci,
 	.remove   =	__exit_p(i810fb_remove_pci),
+	.suspend  =     i810fb_suspend,
+	.resume   =     i810fb_resume,
 };	
 
 static int i810_init  __initdata = 0;
@@ -121,9 +125,11 @@ extern void i810fb_encode_registers(const struct fb_var_screeninfo *var,
 extern void i810fb_fill_var_timings(struct fb_var_screeninfo *var);
 				    
 /* Accelerated Functions */
-extern void i810fb_fillrect (struct fb_info *p, const struct fb_fillrect *rect);
-extern void i810fb_copyarea (struct fb_info *p, struct fb_copyarea *region);
-extern void i810fb_imageblit(struct fb_info *p, struct fb_image *image);
+extern void i810fb_fillrect (struct fb_info *p, 
+			     const struct fb_fillrect *rect);
+extern void i810fb_copyarea (struct fb_info *p, 
+			     const struct fb_copyarea *region);
+extern void i810fb_imageblit(struct fb_info *p, const struct fb_image *image);
 extern int  i810fb_sync     (struct fb_info *p);
 
 extern void i810fb_init_ringbuffer   (struct i810fb_par *par);

@@ -305,7 +305,8 @@ static int vga16fb_open(struct fb_info *info, int user)
 
 	if (!cnt) {
 		memset(&par->state, 0, sizeof(struct vgastate));
-		par->state.flags = 8;
+		par->state.flags = VGA_SAVE_FONTS | VGA_SAVE_MODE |
+			VGA_SAVE_CMAP;
 		save_vga(&par->state);
 	}
 	atomic_inc(&par->ref_count);
@@ -1164,14 +1165,14 @@ static unsigned int transl_l[] =
 #endif
 #endif
 
-void vga_8planes_imageblit(struct fb_info *info, const struct fb_image *image)
+void vga_8planes_imageblit(struct fb_info *info, struct fb_image *image)
 {
         char oldindex = getindex();
         char oldmode = setmode(0x40);
         char oldop = setop(0);
         char oldsr = setsr(0);
         char oldmask = selectmask();
-        u8 *cdat = image->data;
+        const char *cdat = image->data;
 	u32 dx = image->dx;
         char *where;
         int y;
@@ -1195,12 +1196,12 @@ void vga_8planes_imageblit(struct fb_info *info, const struct fb_image *image)
         setindex(oldindex);
 }
 
-void vga_imageblit_expand(struct fb_info *info, const struct fb_image *image)
+void vga_imageblit_expand(struct fb_info *info, struct fb_image *image)
 {
 	char *where = info->screen_base + (image->dx/8) + 
 		image->dy * info->fix.line_length;
 	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
-	u8 *cdat = image->data, *dst;
+	char *cdat = (char *) image->data, *dst;
 	int x, y;
 
 	switch (info->fix.type) {
@@ -1258,7 +1259,7 @@ void vga_imageblit_expand(struct fb_info *info, const struct fb_image *image)
 	}
 }
 
-void vga_imageblit_color(struct fb_info *info, const struct fb_image *image) 
+void vga_imageblit_color(struct fb_info *info, struct fb_image *image) 
 {
 	/*
 	 * Draw logo 
@@ -1266,7 +1267,7 @@ void vga_imageblit_color(struct fb_info *info, const struct fb_image *image)
 	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
 	char *where = info->screen_base + image->dy * info->fix.line_length + 
 		image->dx/8;
-	char *cdat = image->data, *dst;
+	const char *cdat = image->data, *dst;
 	int x, y;
 
 	switch (info->fix.type) {
@@ -1301,12 +1302,14 @@ void vga_imageblit_color(struct fb_info *info, const struct fb_image *image)
 	}
 }
 				
-void vga16fb_imageblit(struct fb_info *info, const struct fb_image *image)
+void vga16fb_imageblit(struct fb_info *info, const struct fb_image *img)
 {
-	if (image->depth == 1)
-		vga_imageblit_expand(info, image);
-	else if (image->depth == info->var.bits_per_pixel)
-		vga_imageblit_color(info, image);
+	struct fb_image image = *img;
+
+	if (image.depth == 0)
+		vga_imageblit_expand(info, &image);
+	else if (image.depth == info->var.bits_per_pixel)
+		vga_imageblit_color(info, &image);
 }
 
 static struct fb_ops vga16fb_ops = {

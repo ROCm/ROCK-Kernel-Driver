@@ -77,6 +77,7 @@
 #include <video/fbcon-cfb16.h>
 #include <video/fbcon-cfb24.h>
 #include <video/fbcon-cfb32.h>
+#include <video/pm3fb.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -84,8 +85,6 @@
 #ifdef CONFIG_FB_OF
 #include <asm/prom.h>
 #endif
-
-#include "pm3fb.h"
 
 /* ************************************* */
 /* ***** The various "global" data ***** */

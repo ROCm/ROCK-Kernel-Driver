@@ -256,6 +256,7 @@ struct i810fb_par {
 	drm_agp_t                *drm_agp;
 	atomic_t                 use_count;
 	u32 pseudo_palette[17];
+	u32 pci_state[16];
 	unsigned long mmio_start_phys;
 	u8 *mmio_start_virtual;
 	u32 cursor_reset;
@@ -273,6 +274,7 @@ struct i810fb_par {
 	u32 depth;
 	u32 blit_bpp;
 	u32 ovract;
+	u32 cur_state;
 	int mtrr_reg;
 	u16 bltcntl;
 	u8 interlace;

@@ -1437,6 +1437,68 @@ static struct fb_ops i810fb_ops __initdata = {
 };
 
 /***********************************************************************
+ *                         Power Management                            *
+ ***********************************************************************/
+static int i810fb_suspend(struct pci_dev *dev, u32 state)
+{
+	struct fb_info *info = pci_get_drvdata(dev);
+	struct i810fb_par *par = (struct i810fb_par *) info->par;
+	int blank = 0, prev_state = par->cur_state;
+
+	if (state == prev_state)
+		return 0;
+
+	par->cur_state = state;
+
+	switch (state) {
+	case 1:
+		blank = VESA_VSYNC_SUSPEND;
+		break;
+	case 2:
+		blank = VESA_HSYNC_SUSPEND;
+		break;
+	case 3:
+		blank = VESA_POWERDOWN;
+		break;
+	default:
+		return -EINVAL;
+	}
+	info->fbops->fb_blank(blank, info);
+
+	if (!prev_state) { 
+		par->drm_agp->unbind_memory(par->i810_gtt.i810_fb_memory);
+		par->drm_agp->unbind_memory(par->i810_gtt.i810_cursor_memory);
+		pci_disable_device(dev);
+	}
+	pci_save_state(dev, par->pci_state);
+	pci_set_power_state(dev, state);
+
+	return 0;
+}
+
+static int i810fb_resume(struct pci_dev *dev) 
+{
+	struct fb_info *info = pci_get_drvdata(dev);
+	struct i810fb_par *par = (struct i810fb_par *) info->par;
+
+	if (par->cur_state == 0)
+		return 0;
+
+	pci_restore_state(dev, par->pci_state);
+	pci_set_power_state(dev, 0);
+	pci_enable_device(dev);
+	par->drm_agp->bind_memory(par->i810_gtt.i810_fb_memory, 
+				  par->fb.offset);
+	par->drm_agp->bind_memory(par->i810_gtt.i810_cursor_memory, 
+				  par->cursor_heap.offset);
+
+	info->fbops->fb_blank(VESA_NO_BLANKING, info);
+
+	par->cur_state = 0;
+
+	return 0;
+}
+/***********************************************************************
  *                  AGP resource allocation                            *
  ***********************************************************************/
   
@@ -1469,13 +1531,13 @@ static void __init i810_fix_offsets(struct i810fb_par *par)
 	par->fb.offset = v_offset_default << 20;
 	par->fb.offset >>= 12;
 
-	par->iring.offset = par->fb.offset + (par->fb.size >> 12);
-	par->iring.size = RINGBUFFER_SIZE;
-
-	par->pixmap.offset = par->iring.offset + (RINGBUFFER_SIZE >> 12);
+	par->pixmap.offset = par->fb.offset + (par->fb.size >> 12);
 	par->pixmap.size = PIXMAP_SIZE;
 
-	par->cursor_heap.offset = par->pixmap.offset + (PIXMAP_SIZE >> 12);
+	par->iring.offset = par->pixmap.offset + (PIXMAP_SIZE >> 12);
+	par->iring.size = RINGBUFFER_SIZE;
+
+	par->cursor_heap.offset = par->iring.offset + (RINGBUFFER_SIZE >> 12);
 	par->cursor_heap.size = 4096;
 }
 
@@ -1817,12 +1879,16 @@ static int __init i810fb_init_pci (struct pci_dev *dev,
 	vfreq = hfreq/(info->var.yres + info->var.upper_margin +
 		       info->var.vsync_len + info->var.lower_margin);
 
-      	printk("fb: %s v%d.%d.%d%s, (c) Tony Daplas\n"
-      	       "     Video RAM      : %dK\n" 
-	       "     Mode           : %dx%d-%dbpp@%dHz\n",
+      	printk("I810FB: fb%d         : %s v%d.%d.%d%s\n"
+      	       "I810FB: Video RAM   : %dK\n" 
+	       "I810FB: Monitor     : H: %d-%d KHz V: %d-%d Hz\n"
+	       "I810FB: Mode        : %dx%d-%dbpp@%dHz\n",
+	       minor(info->node),
 	       i810_pci_list[entry->driver_data],
 	       VERSION_MAJOR, VERSION_MINOR, VERSION_TEENIE, BRANCH_VERSION,
-	       (int) par->fb.size>>10, info->var.xres, 
+	       (int) par->fb.size>>10, info->monspecs.hfmin/1000,
+	       info->monspecs.hfmax/1000, info->monspecs.vfmin,
+	       info->monspecs.vfmax, info->var.xres, 
 	       info->var.yres, info->var.bits_per_pixel, vfreq);
 	return 0;
 }
@@ -1893,7 +1959,10 @@ int __init i810fb_init(void)
 		return -ENODEV;
 	}
 
-	return (pci_module_init(&i810fb_driver));
+	if (pci_register_driver(&i810fb_driver) > 0)
+		return 0;
+	pci_unregister_driver(&i810fb_driver);
+	return -ENODEV;
 }
 #endif 
 
@@ -1909,7 +1978,10 @@ int __init i810fb_init(void)
 	hsync1 *= 1000;
 	hsync2 *= 1000;
 
-	return (pci_module_init(&i810fb_driver));
+	if (pci_register_driver(&i810fb_driver) > 0)
+		return 0;
+	pci_unregister_driver(&i810fb_driver);
+	return -ENODEV;
 }
 
 MODULE_PARM(vram, "i");

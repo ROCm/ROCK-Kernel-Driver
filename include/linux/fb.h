@@ -462,6 +462,7 @@ extern void cfb_imageblit(struct fb_info *info, const struct fb_image *image);
 /* drivers/video/fbmem.c */
 extern int register_framebuffer(struct fb_info *fb_info);
 extern int unregister_framebuffer(struct fb_info *fb_info);
+extern int fb_prepare_logo(struct fb_info *fb_info);
 extern int fb_show_logo(struct fb_info *fb_info);
 extern struct fb_info *registered_fb[FB_MAX];
 extern int num_registered_fb;

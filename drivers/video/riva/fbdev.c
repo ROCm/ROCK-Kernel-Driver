@@ -286,7 +286,6 @@ MODULE_DEVICE_TABLE(pci, rivafb_pci_tbl);
 
 /* command line data, set in rivafb_setup() */
 static u32 pseudo_palette[17];
-static int noblink = 0;
 static int flatpanel __initdata = -1; /* Autodetect later */
 static int forceCRTC __initdata = -1;
 #ifdef CONFIG_MTRR
@@ -1380,15 +1379,16 @@ static inline void convert_bgcolor_16(u32 *col)
  * CALLED FROM:
  * framebuffer hook
  */
-static void rivafb_imageblit(struct fb_info *info, const struct fb_image *image)
+static void rivafb_imageblit(struct fb_info *info, 
+			     const struct fb_image *image)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
 	u32 fgx = 0, bgx = 0, width, mod, tmp;
-	u8 *cdat = image->data;
+	u8 *cdat = (u8 *) image->data;
 	volatile u32 *d;
 	int i, j, k, size;
 
-	if (image->depth != 1) {
+	if (image->depth != 0) {
 		wait_for_idle(par);
 		cfb_imageblit(info, image);
 		return;
@@ -1854,8 +1854,8 @@ static int __init rivafb_probe(struct pci_dev *pd,
 		default_par->riva.PCRTC = default_par->riva.PCRTC0 = default_par->riva.PGRAPH;
 	}
 
-	rivafb_fix.smem_len = default_par->riva.RamAmountKBytes * 1024;
-	default_par->dclk_max = default_par->riva.MaxVClockFreqKHz * 1000;
+	rivafb_fix.smem_len = riva_get_memlen(default_par) * 1024;
+	default_par->dclk_max = riva_get_maxdclk(default_par) * 1000;
 
 	if (!request_mem_region(rivafb_fix.smem_start,
 				rivafb_fix.smem_len, "rivafb")) {
@@ -1976,8 +1976,6 @@ int __init rivafb_setup(char *options)
 	while ((this_opt = strsep(&options, ",")) != NULL) {
 		if (!*this_opt)
 			continue;
-		if (!strncmp(this_opt, "noblink", 7)) {
-			noblink = 1;
 #ifdef CONFIG_MTRR
 		} else if (!strncmp(this_opt, "nomtrr", 6)) {
 			nomtrr = 1;
@@ -2016,7 +2014,10 @@ static struct pci_driver rivafb_driver = {
 
 int __init rivafb_init(void)
 {
-	return pci_module_init(&rivafb_driver);
+	if (pci_register_driver(&rivafb_driver) > 0)
+		return 0;
+	pci_unregister_driver(&rivafb_driver);
+	return -ENODEV;
 }
 
 
@@ -2029,8 +2030,6 @@ static void __exit rivafb_exit(void)
 module_init(rivafb_init);
 module_exit(rivafb_exit);
 
-MODULE_PARM(noblink, "i");
-MODULE_PARM_DESC(noblink, "Disables hardware cursor blinking (0 or 1=disabled) (default=0)");
 MODULE_PARM(flatpanel, "i");
 MODULE_PARM_DESC(flatpanel, "Enables experimental flat panel support for some chipsets. (0 or 1=enabled) (default=0)");
 MODULE_PARM(forceCRTC, "i");

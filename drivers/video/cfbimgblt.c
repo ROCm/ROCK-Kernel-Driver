@@ -113,7 +113,7 @@ static inline void color_imageblit(const struct fb_image *image,
 	int i, n, bpp = p->var.bits_per_pixel;
 	unsigned long null_bits = BITS_PER_LONG - bpp;
 	u32 *palette = (u32 *) p->pseudo_palette;
-	u8 *src = image->data;
+	u8 *src = (u8 *) image->data;
 
 	dst2 = (unsigned long *) dst1;
 	for (i = image->height; i--; ) {
@@ -173,7 +173,7 @@ static inline void slow_imageblit(const struct fb_image *image,
 	unsigned long *dst, *dst2, val, pitch = p->fix.line_length;
 	unsigned long null_bits = BITS_PER_LONG - bpp;
 	unsigned long spitch = (image->width+7)/8;
-	u8 *src = image->data, *s;
+	const char *src = image->data, *s;
 	unsigned long i, j, l;
 	
 	dst2 = (unsigned long *) dst1;
@@ -246,7 +246,7 @@ static inline void fast_imageblit(const struct fb_image *image,
 	u32 fgx = fgcolor, bgx = bgcolor, bpp = p->var.bits_per_pixel;
 	u32 ppw = BITS_PER_LONG/bpp, spitch = (image->width + 7)/8;
 	u32 bit_mask, end_mask, eorx, shift;
-	char *s = image->data, *src;
+	const char *s = image->data, *src;
 	unsigned long *dst;
 	u32 *tab = NULL;
 	int i, j, k;
@@ -328,7 +328,7 @@ void cfb_imageblit(struct fb_info *p, const struct fb_image *image)
 	if (p->fbops->fb_sync)
 		p->fbops->fb_sync(p);
 
-	if (image->depth == 1) {
+	if (image->depth == 0) {
 		if (p->fix.visual == FB_VISUAL_TRUECOLOR ||
 		    p->fix.visual == FB_VISUAL_DIRECTCOLOR) {
 			fgcolor = ((u32*)(p->pseudo_palette))[image->fg_color];

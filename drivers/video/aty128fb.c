@@ -7,7 +7,7 @@
  *                Ani Joshi / Jeff Garzik
  *                      - Code cleanup
  *
- *                Michel Dänzer <michdaen@iiic.ethz.ch>
+ *                Michel Danzer <michdaen@iiic.ethz.ch>
  *                      - 15/16 bit cleanup
  *                      - fix panning
  *
@@ -153,13 +153,19 @@ static struct pci_device_id aty128_pci_tbl[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128 },
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_RF,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128 },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_RI,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128 },
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_RK,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128 },
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_RL,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128 },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_Rage128_PD,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128_pro },
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_PF,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128_pro },
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_PR,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128_pro },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_PP,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128_pro },
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_U3,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128_pro },
@@ -367,8 +373,9 @@ static int aty128_decode_var(struct fb_var_screeninfo *var,
                              struct aty128fb_par *par);
 #if !defined(CONFIG_PPC) && !defined(__sparc__)
 static void __init aty128_get_pllinfo(struct aty128fb_par *par,
-				      char *bios_seg);
-static char __init *aty128find_ROM(void);
+				      void *bios);
+static void __init *aty128_map_ROM(struct pci_dev *pdev);
+static void __init aty128_unmap_ROM(struct pci_dev *dev, void * rom);
 #endif
 static void aty128_timings(struct aty128fb_par *par);
 static void aty128_init_engine(struct aty128fb_par *par);
@@ -1415,13 +1422,16 @@ aty128fb_setup(char *options)
 #ifdef CONFIG_PMAC_PBOOK
 		if (!strncmp(this_opt, "lcd:", 4)) {
 			default_lcd_on = simple_strtoul(this_opt+4, NULL, 0);
+			continue;
 		} else if (!strncmp(this_opt, "crt:", 4)) {
 			default_crt_on = simple_strtoul(this_opt+4, NULL, 0);
+			continue;
 		}
 #endif
 #ifdef CONFIG_MTRR
 		if(!strncmp(this_opt, "nomtrr", 6)) {
 			mtrr = 0;
+			continue;
 		}
 #endif
 #ifdef CONFIG_ALL_PPC
@@ -1430,6 +1440,7 @@ aty128fb_setup(char *options)
 			unsigned int vmode = simple_strtoul(this_opt+6, NULL, 0);
 			if (vmode > 0 && vmode <= VMODE_MAX)
 				default_vmode = vmode;
+			continue;
 		} else if (!strncmp(this_opt, "cmode:", 6)) {
 			unsigned int cmode = simple_strtoul(this_opt+6, NULL, 0);
 			switch (cmode) {
@@ -1446,10 +1457,10 @@ aty128fb_setup(char *options)
 				default_cmode = CMODE_32;
 				break;
 			}
+			continue;
 		}
 #endif /* CONFIG_ALL_PPC */
-		else
-			mode_option = this_opt;
+		mode_option = this_opt;
 	}
 	return 0;
 }
@@ -1487,6 +1498,9 @@ aty128_init(struct pci_dev *pdev, const struct pci_device_id *ent)
 			break;
 		case PCI_DEVICE_ID_ATI_RAGE128_RL:
 			strcpy(video_card, "Rage128 RL (AGP)");
+			break;
+		case PCI_DEVICE_ID_ATI_Rage128_PD:
+			strcpy(video_card, "Rage128 Pro PD (PCI)");
 			break;
 		case PCI_DEVICE_ID_ATI_RAGE128_PF:
 			strcpy(video_card, "Rage128 Pro PF (AGP)");
@@ -1636,7 +1650,7 @@ aty128_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct fb_info *info;
 	int err, size;
 #if !defined(CONFIG_PPC) && !defined(__sparc__)
-	char *bios_seg = NULL;
+	void *bios = NULL;
 #endif
 
 	/* Enable device in PCI config */
@@ -1651,21 +1665,21 @@ aty128_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 				"aty128fb FB")) {
 		printk(KERN_ERR "aty128fb: cannot reserve frame "
 				"buffer memory\n");
-		goto err_free_fb;
+		return -ENODEV;
 	}
 
 	reg_addr = pci_resource_start(pdev, 2);
 	if (!request_mem_region(reg_addr, pci_resource_len(pdev, 2),
 				"aty128fb MMIO")) {
 		printk(KERN_ERR "aty128fb: cannot reserve MMIO region\n");
-		goto err_free_mmio;
+		goto err_free_fb;
 	}
 
 	/* We have the resources. Now virtualize them */
 	size = sizeof(struct fb_info) + sizeof(struct aty128fb_par);
 	if (!(info = kmalloc(size, GFP_ATOMIC))) {
 		printk(KERN_ERR "aty128fb: can't alloc fb_info_aty128\n");
-		goto err_unmap_out;
+		goto err_free_mmio;
 	}
 	memset(info, 0, size);
 
@@ -1677,19 +1691,18 @@ aty128_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	/* Virtualize mmio region */
 	info->fix.mmio_start = reg_addr;
-	par->regbase = ioremap(reg_addr, 0x2000);
+	par->regbase = ioremap(reg_addr, pci_resource_len(pdev, 2));
 	if (!par->regbase)
 		goto err_free_info;
 
 	/* Grab memory size from the card */
+	// How does this relate to the resource length from the PCI hardware?
 	par->vram_size = aty_ld_le32(CONFIG_MEMSIZE) & 0x03FFFFFF;
 
 	/* Virtualize the framebuffer */
 	info->screen_base = ioremap(fb_addr, par->vram_size);
-	if (!info->screen_base) {
-		iounmap(par->regbase);
-		goto err_free_info;
-	}
+	if (!info->screen_base)
+		goto err_unmap_out;
 
 	/* Set up info->fix */
 	info->fix = aty128fb_fix;
@@ -1704,13 +1717,13 @@ aty128_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 #if !defined(CONFIG_PPC) && !defined(__sparc__)
-	if (!(bios_seg = aty128find_ROM()))
-		printk(KERN_INFO "aty128fb: Rage128 BIOS not located. "
-					"Guessing...\n");
+	if (!(bios = aty128_map_ROM(pdev)))
+		printk(KERN_INFO "aty128fb: BIOS not located, guessing timings.\n");
 	else {
-		printk(KERN_INFO "aty128fb: Rage128 BIOS located at "
-				"segment %4.4X\n", (unsigned int)bios_seg);
-		aty128_get_pllinfo(par, bios_seg);
+		printk(KERN_INFO "aty128fb: Rage128 BIOS located at %lx\n",
+				pdev->resource[PCI_ROM_RESOURCE].start);
+		aty128_get_pllinfo(par, bios);
+		aty128_unmap_ROM(pdev, bios);
 	}
 #endif
 	aty128_timings(par);
@@ -1732,18 +1745,16 @@ aty128_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 err_out:
 	iounmap(info->screen_base);
+err_unmap_out:
 	iounmap(par->regbase);
 err_free_info:
 	kfree(info);
-err_unmap_out:
+err_free_mmio:
 	release_mem_region(pci_resource_start(pdev, 2),
 			pci_resource_len(pdev, 2));
-err_free_mmio:
+err_free_fb:
 	release_mem_region(pci_resource_start(pdev, 0),
 			pci_resource_len(pdev, 0));
-err_free_fb:
-	release_mem_region(pci_resource_start(pdev, 1),
-			pci_resource_len(pdev, 1));
 	return -ENODEV;
 }
 
@@ -1780,86 +1791,65 @@ static void __devexit aty128_remove(struct pci_dev *pdev)
 
 /* PPC and Sparc cannot read video ROM */
 #if !defined(CONFIG_PPC) && !defined(__sparc__)
-static char * __init aty128find_ROM(void)
+static void * __init aty128_map_ROM(struct pci_dev *dev)
 {
-	u32  segstart;
-	char *rom_base;
-	char *rom;
-	int  stage;
-	int  i, j;
-	char aty_rom_sig[] = "761295520";   /* ATI ROM Signature      */
-	char *R128_sig[] = {
-		"R128",		/* Rage128 ROM identifier */
-		"128b"
-	};
-
-	for (segstart=0x000c0000; segstart<0x000f0000; segstart+=0x00001000) {
-        	stage = 1;
-
-		rom_base = (char *)ioremap(segstart, 0x1000);
-
-		if ((*rom_base == 0x55) && (((*(rom_base + 1)) & 0xff) == 0xaa))
-			stage = 2;
-
-		if (stage != 2) {
-			iounmap(rom_base);
-			continue;
-		}
-		rom = rom_base;
-
-		for (i = 0; (i < 128 - strlen(aty_rom_sig)) && (stage != 3); i++) {
-			if (aty_rom_sig[0] == *rom)
-				if (strncmp(aty_rom_sig, rom,
-						strlen(aty_rom_sig)) == 0)
-					stage = 3;
-			rom++;
-		}
-		if (stage != 3) {
-			iounmap(rom_base);
-			continue;
-		}
-		rom = rom_base;
-
-		/* ATI signature found.  Let's see if it's a Rage128 */
-		for (i = 0; (i < 512) && (stage != 4); i++) {
-			for (j = 0; j < sizeof(R128_sig)/sizeof(char *);j++) {
-				if (R128_sig[j][0] == *rom)
-					if (strncmp(R128_sig[j], rom, 
-					    strlen(R128_sig[j])) == 0) {
-						stage = 4;
-						break;
-					}
-			}
-			rom++;
-		}
-		if (stage != 4) {
-			iounmap(rom_base);
-			continue;
-		}
-		return rom_base;
+	// If this is a primary card, there is a shadow copy of the
+	// ROM somewhere in the first meg. We will just ignore the copy
+	// and use the ROM directly.
+	
+	// no need to search for the ROM, just ask the card where it is.
+	struct resource *r = &dev->resource[PCI_ROM_RESOURCE];
+	
+	// assign the ROM an address if it doesn't have one
+	if (r->start == 0)
+		pci_assign_resource(dev, PCI_ROM_RESOURCE);
+	
+	// enable if needed
+	if (!(r->flags & PCI_ROM_ADDRESS_ENABLE))
+		pci_write_config_dword(dev, dev->rom_base_reg, r->start | PCI_ROM_ADDRESS_ENABLE);
+	
+	unsigned char *addr = ioremap(r->start, r->end - r->start + 1);
+	
+	// Very simple test to make sure it appeared
+	if (addr && (*addr != 0x55)) {
+		printk("aty128fb: Invalid ROM signature %x\n", *addr);
+		iounmap(addr);
+		return NULL;
 	}
-	return NULL;
+	return (void *)addr;
 }
 
+static void __init aty128_unmap_ROM(struct pci_dev *dev, void * rom)
+{
+	iounmap(rom);
+	
+	// leave it disabled and unassigned
+	struct resource *r = &dev->resource[PCI_ROM_RESOURCE];
+	r->flags &= !PCI_ROM_ADDRESS_ENABLE;
+	r->end -= r->start;
+	r->start = 0;
+	pci_write_config_dword(dev, dev->rom_base_reg, 0);
+	
+}
 
 static void __init
-aty128_get_pllinfo(struct aty128fb_par *par, char *bios_seg)
+aty128_get_pllinfo(struct aty128fb_par *par, void *bios)
 {
 	void *bios_header;
 	void *header_ptr;
 	u16 bios_header_offset, pll_info_offset;
 	PLL_BLOCK pll;
 
-	bios_header = bios_seg + 0x48L;
+	bios_header = (char *)bios + 0x48L;
 	header_ptr  = bios_header;
 
 	bios_header_offset = readw(header_ptr);
-	bios_header = bios_seg + bios_header_offset;
+	bios_header = (char *)bios + bios_header_offset;
 	bios_header += 0x30;
 
 	header_ptr = bios_header;
 	pll_info_offset = readw(header_ptr);
-	header_ptr = bios_seg + pll_info_offset;
+	header_ptr = (char *)bios + pll_info_offset;
 
 	memcpy_fromio(&pll, header_ptr, 50);
 

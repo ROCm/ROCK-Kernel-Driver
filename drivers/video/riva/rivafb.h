@@ -55,5 +55,7 @@ struct riva_par {
 };
 
 void riva_common_setup(struct riva_par *);
+unsigned long riva_get_memlen(struct riva_par *);
+unsigned long riva_get_maxdclk(struct riva_par *);
 
 #endif /* __RIVAFB_H */

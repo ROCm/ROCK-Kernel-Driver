@@ -46,7 +46,7 @@
 #include <video/fbcon-cfb16.h>
 #include <video/fbcon-cfb24.h>
 #include <video/fbcon-cfb32.h>
-#include "pm2fb.h"
+#include <video/pm2fb.h>
 #include "cvisionppc.h"
 #ifdef __sparc__
 #include <asm/pbm.h>

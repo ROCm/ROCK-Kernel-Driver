@@ -35,6 +35,7 @@
 5 20:47:06 mvojkovi Exp $ */
 
 #include <linux/delay.h>
+#include <linux/pci.h>
 #include <linux/pci_ids.h>
 #include "nv_type.h"
 #include "rivafb.h"
@@ -133,6 +134,159 @@ riva_is_second(struct riva_par *par)
 	riva_override_CRTC(par);
 }
 
+unsigned long riva_get_memlen(struct riva_par *par)
+{
+	RIVA_HW_INST *chip = &par->riva;
+	unsigned long memlen = 0;
+	unsigned int chipset = par->Chipset;
+	struct pci_dev* dev;
+	int amt;
+
+	switch (chip->Architecture) {
+	case NV_ARCH_03:
+		if (chip->PFB[0x00000000/4] & 0x00000020) {
+			if (((chip->PMC[0x00000000/4] & 0xF0) == 0x20)
+			    && ((chip->PMC[0x00000000/4] & 0x0F) >= 0x02)) {
+				/*
+				 * SDRAM 128 ZX.
+				 */
+				switch (chip->PFB[0x00000000/4] & 0x03) {
+				case 2:
+					memlen = 1024 * 4;
+					break;
+				case 1:
+					memlen = 1024 * 2;
+					break;
+				default:
+					memlen = 1024 * 8;
+					break;
+				}
+			} else {
+				memlen = 1024 * 8;
+			}            
+		} else 	{
+			/*
+			 * SGRAM 128.
+			 */
+			switch (chip->PFB[0x00000000/4] & 0x00000003) {
+			case 0:
+				memlen = 1024 * 8;
+				break;
+			case 2:
+				memlen = 1024 * 4;
+				break;
+			default:
+				memlen = 1024 * 2;
+				break;
+			}
+		}        
+		break;
+	case NV_ARCH_04:
+		if (chip->PFB[0x00000000/4] & 0x00000100) {
+			memlen = ((chip->PFB[0x00000000/4] >> 12) & 0x0F) * 
+				1024 * 2 + 1024 * 2;
+		} else {
+			switch (chip->PFB[0x00000000/4] & 0x00000003) {
+			case 0:
+				memlen = 1024 * 32;
+				break;
+			case 1:
+				memlen = 1024 * 4;
+				break;
+			case 2:
+				memlen = 1024 * 8;
+				break;
+			case 3:
+			default:
+				memlen = 1024 * 16;
+				break;
+			}
+		}
+		break;
+	case NV_ARCH_10:
+	case NV_ARCH_20:
+		if(chipset == NV_CHIP_IGEFORCE2) {
+
+			dev = pci_find_slot(0, 1);
+			pci_read_config_dword(dev, 0x7C, &amt);
+			memlen = (((amt >> 6) & 31) + 1) * 1024;
+		} else if (chipset == NV_CHIP_0x01F0) {
+			dev = pci_find_slot(0, 1);
+			pci_read_config_dword(dev, 0x84, &amt);
+			memlen = (((amt >> 4) & 127) + 1) * 1024;
+		} else {
+			switch ((chip->PFB[0x0000020C/4] >> 20) & 0x000000FF){
+			case 0x02:
+				memlen = 1024 * 2;
+				break;
+			case 0x04:
+				memlen = 1024 * 4;
+				break;
+			case 0x08:
+				memlen = 1024 * 8;
+				break;
+			case 0x10:
+				memlen = 1024 * 16;
+				break;
+			case 0x20:
+				memlen = 1024 * 32;
+				break;
+			case 0x40:
+				memlen = 1024 * 64;
+				break;
+			case 0x80:
+				memlen = 1024 * 128;
+				break;
+			default:
+				memlen = 1024 * 16;
+				break;
+			}
+		}
+		break;
+	}
+	return memlen;
+}
+
+unsigned long riva_get_maxdclk(struct riva_par *par)
+{
+	RIVA_HW_INST *chip = &par->riva;
+	unsigned long dclk = 0;
+
+	switch (chip->Architecture) {
+	case NV_ARCH_03:
+		if (chip->PFB[0x00000000/4] & 0x00000020) {
+			if (((chip->PMC[0x00000000/4] & 0xF0) == 0x20)
+			    && ((chip->PMC[0x00000000/4] & 0x0F) >= 0x02)) {   
+				/*
+				 * SDRAM 128 ZX.
+				 */
+				dclk = 800000;
+			} else {
+				dclk = 1000000;
+			}            
+		} else {
+			/*
+			 * SGRAM 128.
+			 */
+			dclk = 1000000;
+		} 
+		break;
+	case NV_ARCH_04:
+	case NV_ARCH_10:
+	case NV_ARCH_20:
+		switch ((chip->PFB[0x00000000/4] >> 3) & 0x00000003) {
+		case 3:
+			dclk = 800000;
+			break;
+		default:
+			dclk = 1000000;
+			break;
+		}
+		break;
+	}
+	return dclk;
+}
+
 void
 riva_common_setup(struct riva_par *par)
 {
@@ -200,8 +354,6 @@ riva_common_setup(struct riva_par *par)
 		par->riva.PRAMDAC = par->riva.PRAMDAC0;
 		par->riva.PDIO = par->riva.PDIO0;
 	}
-
-	RivaGetConfig(&par->riva, par->Chipset);
 
 	if (par->FlatPanel == -1) {
 		/* Fix me, need x86 DDC code */

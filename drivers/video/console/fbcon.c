@@ -555,7 +555,7 @@ void accel_cursor(struct display *p, int flags, int xx, int yy)
 	cursor.image.height = height;
 	cursor.image.dx = xx * width;
 	cursor.image.dy = yy * height;
-	cursor.image.depth = 1;
+	cursor.image.depth = 0;
 	cursor.image.data = image;
 	cursor.image.bg_color = bgcolor;
 	cursor.image.fg_color = fgcolor;
@@ -945,6 +945,7 @@ static void fbcon_set_display(int con, int init, int logo)
 		int cnt;
 		int step;
 
+		logo_height = fb_prepare_logo(info);
 		logo_lines = (logo_height + vc->vc_font.height - 1) /
 			     vc->vc_font.height;
 		q = (unsigned short *) (vc->vc_origin +
@@ -1942,7 +1943,7 @@ static int fbcon_switch(struct vc_data *vc)
 	if (logo_shown == -2) {
 		logo_shown = fg_console;
 		/* This is protected above by initmem_freed */
-		logo_height = fb_show_logo(info);
+		fb_show_logo(info);
 		update_region(fg_console,
 			      vc->vc_origin + vc->vc_size_row * vc->vc_top,
 			      vc->vc_size_row * (vc->vc_bottom -

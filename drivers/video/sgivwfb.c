@@ -13,14 +13,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
-#include <linux/string.h>
-#include <linux/mm.h>
-#include <linux/tty.h>
-#include <linux/slab.h>
-#include <linux/vmalloc.h>
 #include <linux/delay.h>
-#include <linux/interrupt.h>
-#include <asm/uaccess.h>
 #include <linux/fb.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
@@ -29,13 +22,15 @@
 
 #define INCLUDE_TIMING_TABLE_DATA
 #define DBE_REG_BASE default_par.regs
-#include <asm/sgi-vwdbe.h>
+#include <video/sgivw.h>
 
 struct sgivw_par {
 	struct asregs *regs;
 	u32 cmap_fifo;
 	u_long timing_num;
 };
+
+#define FLATPANEL_SGI_1600SW	5
 
 /*
  *  RAM we reserve for the frame buffer. This defines the maximum screen
@@ -54,26 +49,29 @@ static struct fb_info fb_info;
 static int ypan = 0;
 static int ywrap = 0;
 
+static int flatpanel_id = -1;
+
 static struct fb_fix_screeninfo sgivwfb_fix __initdata = {
 	.id		= "SGI Vis WS FB",
 	.type		= FB_TYPE_PACKED_PIXELS,
         .visual		= FB_VISUAL_PSEUDOCOLOR,
 	.mmio_start	= DBE_REG_PHYS,
 	.mmio_len	= DBE_REG_SIZE,
-        .accel		= FB_ACCEL_NONE
+        .accel		= FB_ACCEL_NONE,
+	.line_length	= 640,
 };
 
 static struct fb_var_screeninfo sgivwfb_var __initdata = {
-        /* 640x480, 8 bpp */
-        .xres		= 640,
+	/* 640x480, 8 bpp */
+	.xres		= 640,
 	.yres		= 480,
 	.xres_virtual	= 640,
 	.yres_virtual	= 480,
 	.bits_per_pixel	= 8,
-        .red		= {0, 8, 0},
-	.green		= {0, 8, 0},
-	.blue		= {0, 8, 0},
-        .height		= -1,
+	.red		= { 0, 8, 0 },
+	.green		= { 0, 8, 0 },
+	.blue		= { 0, 8, 0 },
+	.height		= -1,
 	.width		= -1,
 	.pixclock	= 20000,
 	.left_margin	= 64,
@@ -82,14 +80,35 @@ static struct fb_var_screeninfo sgivwfb_var __initdata = {
 	.lower_margin	= 32,
 	.hsync_len	= 64,
 	.vsync_len	= 2,
-        .vmode		= FB_VMODE_NONINTERLACED
+	.vmode		= FB_VMODE_NONINTERLACED
+};
+
+static struct fb_var_screeninfo sgivwfb_var1600sw __initdata = {
+	/* 1600x1024, 8 bpp */
+	.xres		= 1600,
+	.yres		= 1024,
+	.xres_virtual	= 1600,
+	.yres_virtual	= 1024,
+	.bits_per_pixel	= 8,
+	.red		= { 0, 8, 0 },
+	.green		= { 0, 8, 0 },
+	.blue		= { 0, 8, 0 },
+	.height		= -1,
+	.width		= -1,
+	.pixclock	= 9353,
+	.left_margin	= 20,
+	.right_margin	= 30,
+	.upper_margin	= 37,
+	.lower_margin	= 3,
+	.hsync_len	= 20,
+	.vsync_len	= 3,
+	.vmode		= FB_VMODE_NONINTERLACED
 };
 
 /*
  *  Interface used by the world
  */
 int sgivwfb_init(void);
-int sgivwfb_setup(char *);
 
 static int sgivwfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info);
 static int sgivwfb_set_par(struct fb_info *info);
@@ -114,34 +133,24 @@ static struct fb_ops sgivwfb_ops = {
 /*
  *  Internal routines
  */
-static u_long get_line_length(int xres_virtual, int bpp);
-static unsigned long bytes_per_pixel(int bpp);
+static unsigned long bytes_per_pixel(int bpp)
+{
+	switch (bpp) {
+		case 8:
+			return 1;
+		case 16:
+			return 2;
+		case 32:
+			return 4;
+		default:
+			printk(KERN_INFO "sgivwfb: unsupported bpp %d\n", bpp);
+			return 0;
+	}
+}
 
 static unsigned long get_line_length(int xres_virtual, int bpp)
 {
 	return (xres_virtual * bytes_per_pixel(bpp));
-}
-
-static unsigned long bytes_per_pixel(int bpp)
-{
-	unsigned long length;
-
-	switch (bpp) {
-	case 8:
-		length = 1;
-		break;
-	case 16:
-		length = 2;
-		break;
-	case 32:
-		length = 4;
-		break;
-	default:
-		printk(KERN_INFO "sgivwfb: unsupported bpp=%d\n", bpp);
-		length = 0;
-		break;
-	}
-	return (length);
 }
 
 /*
@@ -280,8 +289,7 @@ static int sgivwfb_check_var(struct fb_var_screeninfo *var,
 		test_mode--;
 	min_mode = test_mode;
 	timing = &dbeVTimings[min_mode];
-	printk(KERN_INFO "sgivwfb: granted dot-clock=%d KHz\n",
-	       timing->cfreq);
+	printk(KERN_INFO "sgivwfb: granted dot-clock=%d KHz\n", timing->cfreq);
 
 	/* Adjust virtual resolution, if necessary */
 	if (var->xres > var->xres_virtual || (!ywrap && !ypan))
@@ -292,10 +300,11 @@ static int sgivwfb_check_var(struct fb_var_screeninfo *var,
 	/*
 	 *  Memory limit
 	 */
-	line_length =
-	    get_line_length(var->xres_virtual, var->bits_per_pixel);
+	line_length = get_line_length(var->xres_virtual, var->bits_per_pixel);
 	if (line_length * var->yres_virtual > sgivwfb_mem_size)
 		return -ENOMEM;	/* Virtual resolution to high */
+
+	info->fix.line_length = line_length;
 
 	switch (var->bits_per_pixel) {
 	case 8:
@@ -355,6 +364,48 @@ static int sgivwfb_check_var(struct fb_var_screeninfo *var,
 }
 
 /*
+ *  Setup flatpanel related registers.
+ */
+static void sgivwfb_setup_flatpanel(struct dbe_timing_info *currentTiming)
+{
+	int fp_wid, fp_hgt, fp_vbs, fp_vbe;
+	u32 outputVal = 0;
+
+	SET_DBE_FIELD(VT_FLAGS, HDRV_INVERT, outputVal, 
+		(currentTiming->flags & FB_SYNC_HOR_HIGH_ACT) ? 0 : 1);
+	SET_DBE_FIELD(VT_FLAGS, VDRV_INVERT, outputVal, 
+		(currentTiming->flags & FB_SYNC_VERT_HIGH_ACT) ? 0 : 1);
+	DBE_SETREG(vt_flags, outputVal);
+
+	/* Turn on the flat panel */
+	switch (flatpanel_id) {
+		case FLATPANEL_SGI_1600SW:
+			fp_wid = 1600;
+			fp_hgt = 1024;
+			fp_vbs = 0;
+			fp_vbe = 1600;
+			currentTiming->pll_m = 4;
+			currentTiming->pll_n = 1;
+			currentTiming->pll_p = 0;
+			break;
+		default:
+      			fp_wid = fp_hgt = fp_vbs = fp_vbe = 0xfff;
+  	}
+
+	outputVal = 0;
+	SET_DBE_FIELD(FP_DE, FP_DE_ON, outputVal, fp_vbs);
+	SET_DBE_FIELD(FP_DE, FP_DE_OFF, outputVal, fp_vbe);
+	DBE_SETREG(fp_de, outputVal);
+	outputVal = 0;
+	SET_DBE_FIELD(FP_HDRV, FP_HDRV_OFF, outputVal, fp_wid);
+	DBE_SETREG(fp_hdrv, outputVal);
+	outputVal = 0;
+	SET_DBE_FIELD(FP_VDRV, FP_VDRV_ON, outputVal, 1);
+	SET_DBE_FIELD(FP_VDRV, FP_VDRV_OFF, outputVal, fp_hgt + 1);
+	DBE_SETREG(fp_vdrv, outputVal);
+}
+
+/*
  *  Set the hardware according to 'par'.
  */
 static int sgivwfb_set_par(struct fb_info *info)
@@ -364,7 +415,7 @@ static int sgivwfb_set_par(struct fb_info *info)
 	u32 readVal, outputVal;
 	int wholeTilesX, maxPixelsPerTileX;
 	int frmWrite1, frmWrite2, frmWrite3b;
-	struct dbe_timing_info_t *currentTiming; /* Current Video Timing */
+	struct dbe_timing_info *currentTiming; /* Current Video Timing */
 	int xpmax, ypmax;	// Monitor resolution
 	int bytesPerPixel;	// Bytes per pixel
 
@@ -513,6 +564,9 @@ static int sgivwfb_set_par(struct fb_info *info)
 	SET_DBE_FIELD(VT_HCMAP, VT_HCMAP_OFF, outputVal,
 		      currentTiming->hblank_end - 3);
 	DBE_SETREG(vt_hcmap, outputVal);
+
+	if (flatpanel_id != -1)
+		sgivwfb_setup_flatpanel(currentTiming);
 
 	outputVal = 0;
 	temp = currentTiming->vblank_start - currentTiming->vblank_end - 1;
@@ -680,14 +734,16 @@ int __init sgivwfb_setup(char *options)
 {
 	char *this_opt;
 
-	fb_info.fontname[0] = '\0';
-
 	if (!options || !*options)
 		return 0;
 
 	while ((this_opt = strsep(&options, ",")) != NULL) {
-		if (!strncmp(this_opt, "font:", 5))
-			strcpy(fb_info.fontname, this_opt + 5);
+		if (!strncmp(this_opt, "monitor:", 8)) {
+			if (!strncmp(this_opt + 8, "crt", 3))
+				flatpanel_id = -1;
+			else if (!strncmp(this_opt + 8, "1600sw", 6))
+				flatpanel_id = FLATPANEL_SGI_1600SW;
+		}
 	}
 	return 0;
 }
@@ -697,12 +753,11 @@ int __init sgivwfb_setup(char *options)
  */
 int __init sgivwfb_init(void)
 {
-	printk(KERN_INFO "sgivwfb: framebuffer at 0x%lx, size %ldk\n",
-	       sgivwfb_mem_phys, sgivwfb_mem_size / 1024);
+	char *monitor;
 
 	if (!request_mem_region(DBE_REG_PHYS, DBE_REG_SIZE, "sgivwfb")) {
 		printk(KERN_ERR "sgivwfb: couldn't reserve mmio region\n");
-		goto fail_request_mem_region;
+		return -EBUSY;
 	}
 	default_par.regs = (struct asregs *) ioremap_nocache(DBE_REG_PHYS, DBE_REG_SIZE);
 	if (!default_par.regs) {
@@ -710,10 +765,7 @@ int __init sgivwfb_init(void)
 		goto fail_ioremap_regs;
 	}
 
-#ifdef CONFIG_MTRR
-	mtrr_add((unsigned long) sgivwfb_mem_phys, sgivwfb_mem_size,
-		 MTRR_TYPE_WRCOMB, 1);
-#endif
+	mtrr_add(sgivwfb_mem_phys, sgivwfb_mem_size, MTRR_TYPE_WRCOMB, 1);
 
 	sgivwfb_fix.smem_start = sgivwfb_mem_phys;
 	sgivwfb_fix.smem_len = sgivwfb_mem_size;
@@ -722,13 +774,24 @@ int __init sgivwfb_init(void)
 
 	fb_info.node = NODEV;
 	fb_info.fix = sgivwfb_fix;
-	fb_info.var = sgivwfb_var;
+
+	switch (flatpanel_id) {
+		case FLATPANEL_SGI_1600SW:
+			fb_info.var = sgivwfb_var1600sw;
+			monitor = "SGI 1600SW flatpanel";
+			break;
+		default:
+			fb_info.var = sgivwfb_var;
+			monitor = "CRT";
+	}
+
+	printk(KERN_INFO "sgivwfb: %s monitor selected\n", monitor);
+
 	fb_info.fbops = &sgivwfb_ops;
 	fb_info.pseudo_palette = pseudo_palette;
 	fb_info.par = &default_par;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
-	fb_info.screen_base =
 	fb_info.screen_base = ioremap_nocache((unsigned long) sgivwfb_mem_phys, sgivwfb_mem_size);
 	if (!fb_info.screen_base) {
 		printk(KERN_ERR "sgivwfb: couldn't ioremap screen_base\n");
@@ -742,14 +805,16 @@ int __init sgivwfb_init(void)
 		goto fail_register_framebuffer;
 	}
 
-	printk(KERN_INFO "fb%d: SGI BDE frame buffer device, using %ldK of video memory\n", minor(fb_info.node, sgivwfb_mem_size >> 10);
+	printk(KERN_INFO "fb%d: SGI DBE frame buffer device, using %ldK of video memory at %#lx\n",      
+		minor(fb_info.node), sgivwfb_mem_size >> 10, sgivwfb_mem_phys);
 	return 0;
 
-      fail_register_framebuffer:
+fail_register_framebuffer:
 	iounmap((char *) fb_info.screen_base);
-      fail_ioremap_fbmem:
+fail_ioremap_fbmem:
 	iounmap(default_par.regs);
-      fail_ioremap_regs:
+fail_ioremap_regs:
+	release_mem_region(DBE_REG_PHYS, DBE_REG_SIZE);
 	return -ENXIO;
 }
 
@@ -767,6 +832,7 @@ void cleanup_module(void)
 	dbe_TurnOffDma();
 	iounmap(regs);
 	iounmap(&fb_info.screen_base);
+	release_mem_region(DBE_REG_PHYS, DBE_REG_SIZE);
 }
 
 #endif				/* MODULE */
