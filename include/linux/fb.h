@@ -708,6 +708,7 @@ extern void fb_sysmove_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
 extern void fb_load_cursor_image(struct fb_info *);
 extern void fb_set_suspend(struct fb_info *info, int state);
 extern int fb_get_color_depth(struct fb_info *info);
+extern char* fb_get_options(char *name);
 
 extern struct fb_info *registered_fb[FB_MAX];
 extern int num_registered_fb;

@@ -136,9 +136,6 @@ extern void prom_con_init(void);
 #ifdef CONFIG_MDA_CONSOLE
 extern int mda_console_init(void);
 #endif
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-extern int fb_console_init(void);
-#endif
 
 struct vc vc_cons [MAX_NR_CONSOLES];
 
@@ -2672,9 +2669,6 @@ int __init vty_init(void)
 #ifdef CONFIG_MDA_CONSOLE
 	mda_console_init();
 #endif
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-	fb_console_init();
-#endif	
 	return 0;
 }
 

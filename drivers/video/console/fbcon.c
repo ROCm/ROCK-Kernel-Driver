@@ -2860,6 +2860,8 @@ int __init fb_console_init(void)
 	return 0;
 }
 
+module_init(fb_console_init);
+
 #ifdef MODULE
 
 void __exit fb_console_exit(void)
@@ -2870,7 +2872,6 @@ void __exit fb_console_exit(void)
 	give_up_console(&fb_con);
 }	
 
-module_init(fb_console_init);
 module_exit(fb_console_exit);
 
 #endif
