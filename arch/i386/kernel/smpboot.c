@@ -935,7 +935,7 @@ int cpu_sibling_map[NR_CPUS] __cacheline_aligned;
 
 static void __init smp_boot_cpus(unsigned int max_cpus)
 {
-	int apicid, cpu, bit;
+	int apicid, cpu, bit, kicked;
 
 	/*
 	 * Setup boot CPU information
@@ -1018,7 +1018,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 */
 	Dprintk("CPU present map: %lx\n", phys_cpu_present_map);
 
-	for (bit = 0; bit < NR_CPUS; bit++) {
+	kicked = 1;
+	for (bit = 0; kicked < NR_CPUS && bit < BITS_PER_LONG; bit++) {
 		apicid = cpu_present_to_apicid(bit);
 		/*
 		 * Don't even attempt to start the boot CPU!
@@ -1034,6 +1035,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (do_boot_cpu(apicid))
 			printk("CPU #%d not responding - cannot use it.\n",
 								apicid);
+		else
+			++kicked;
 	}
 
 	/*
