@@ -674,6 +674,12 @@ struct pci_driver {
 	.vendor = PCI_ANY_ID, .device = PCI_ANY_ID, \
 	.subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID
 
+/* 
+ * pci_module_init is obsolete, this stays here till we fix up all usages of it
+ * in the tree.
+ */
+#define pci_module_init	pci_register_driver
+
 /* these external functions are only available when PCI support is enabled */
 #ifdef CONFIG_PCI
 
@@ -894,7 +900,6 @@ static inline int pci_dev_present(const struct pci_device_id *ids)
 static inline void pci_set_master(struct pci_dev *dev) { }
 static inline int pci_enable_device(struct pci_dev *dev) { return -EIO; }
 static inline void pci_disable_device(struct pci_dev *dev) { }
-static inline int pci_module_init(struct pci_driver *drv) { return -ENODEV; }
 static inline int pci_set_dma_mask(struct pci_dev *dev, u64 mask) { return -EIO; }
 static inline int pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask) { return -EIO; }
 static inline int pci_assign_resource(struct pci_dev *dev, int i) { return -EBUSY;}
@@ -913,19 +918,6 @@ static inline int pci_enable_wake(struct pci_dev *dev, u32 state, int enable) { 
 #define	isa_bridge	((struct pci_dev *)NULL)
 
 #else
-
-/*
- * a helper function which helps ensure correct pci_driver
- * setup and cleanup for commonly-encountered hotplug/modular cases
- *
- * This MUST stay in a header, as it checks for -DMODULE
- */
-static inline int pci_module_init(struct pci_driver *drv)
-{
-	int rc = pci_register_driver (drv);
-
-	return rc < 0 ? rc : 0;
-}
 
 /*
  * PCI domain support.  Sometimes called PCI segment (eg by ACPI),
