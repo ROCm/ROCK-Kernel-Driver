@@ -240,8 +240,8 @@ L:	linux-net@vger.kernel.org
 S:	Maintained
 
 AX.25 NETWORK LAYER
-P:	Matthias Welwarsky
-M:	dg2fef@afthd.tu-darmstadt.de
+P:	Ralf Baechle
+M:	ralf@linux-mips.org
 L:	linux-hams@vger.kernel.org
 S:	Maintained
 
@@ -1113,8 +1113,8 @@ L:	netfilter-devel@lists.netfilter.org
 S:	Supported
 
 NETROM NETWORK LAYER
-P:	Tomi Manninen
-M:	Tomi.Manninen@hut.fi
+P:	Ralf Baechle
+M:	ralf@linux-mips.org
 L:	linux-hams@vger.kernel.org
 S:	Maintained
 
@@ -1363,8 +1363,8 @@ W:	http://www.namesys.com
 S:	Supported
 
 ROSE NETWORK LAYER
-P:	Jean-Paul Roubelat
-M:	jpr@f6fbb.org
+P:	Ralf Baechle
+M:	ralf@linux-mips.org
 L:	linux-hams@vger.kernel.org
 S:	Maintained
 

@@ -1,26 +1,13 @@
 /*
- *	NET/ROM release 007
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	NET/ROM 001	Jonathan(G4KLX)	First attempt.
- *	NET/ROM	003	Jonathan(G4KLX)	Use SIOCADDRT/SIOCDELRT ioctl values
- *					for NET/ROM routes.
- *					Use '*' for a blank mnemonic in /proc/net/nr_nodes.
- *					Change default quality for new neighbour when same
- *					as node callsign.
- *			Alan Cox(GW4PTS) Added the firewall hooks.
- *	NET/ROM 006	Jonathan(G4KLX)	Added the setting of digipeated neighbours.
- *			Tomi(OH2BNS)	Routing quality and link failure changes.
+ * Copyright Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright Alan Cox GW4PTS (alan@lxorguk.ukuu.org.uk)
+ * Copyright Tomi Manninen OH2BNS (oh2bns@sral.fi)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -47,12 +34,15 @@
 #include <linux/notifier.h>
 #include <linux/netfilter.h>
 #include <linux/init.h>
+#include <linux/spinlock.h>
 #include <net/netrom.h>
 
 static unsigned int nr_neigh_no = 1;
 
 static struct nr_node  *nr_node_list;
+static spinlock_t nr_node_lock;
 static struct nr_neigh *nr_neigh_list;
+static spinlock_t nr_neigh_lock;
 
 static void nr_remove_neigh(struct nr_neigh *);
 
@@ -66,7 +56,6 @@ static int nr_add_node(ax25_address *nr, const char *mnemonic, ax25_address *ax2
 	struct nr_node  *nr_node;
 	struct nr_neigh *nr_neigh;
 	struct nr_route nr_route;
-	unsigned long flags;
 	int i, found;
 
 	if (nr_dev_get(nr) != NULL)	/* Can't add routes to ourself */
@@ -124,13 +113,10 @@ static int nr_add_node(ax25_address *nr, const char *mnemonic, ax25_address *ax2
 			memcpy(nr_neigh->digipeat, ax25_digi, sizeof(ax25_digi));
 		}
 
-		save_flags(flags);
-		cli();
-
+		spin_lock_bh(&nr_neigh_lock);
 		nr_neigh->next = nr_neigh_list;
 		nr_neigh_list  = nr_neigh;
-
-		restore_flags(flags);
+		spin_unlock_bh(&nr_neigh_lock);
 	}
 
 	if (quality != 0 && ax25cmp(nr, ax25) == 0 && !nr_neigh->locked)
@@ -150,13 +136,10 @@ static int nr_add_node(ax25_address *nr, const char *mnemonic, ax25_address *ax2
 		nr_node->routes[0].obs_count = obs_count;
 		nr_node->routes[0].neighbour = nr_neigh;
 
-		save_flags(flags);
-		cli();
-
+		spin_lock_bh(&nr_node_lock);
 		nr_node->next = nr_node_list;
 		nr_node_list  = nr_node;
-
-		restore_flags(flags);
+		spin_unlock_bh(&nr_node_lock);
 
 		nr_neigh->count++;
 
@@ -207,40 +190,49 @@ static int nr_add_node(ax25_address *nr, const char *mnemonic, ax25_address *ax2
 
 	/* Now re-sort the routes in quality order */
 	switch (nr_node->count) {
-		case 3:
-			if (nr_node->routes[1].quality > nr_node->routes[0].quality) {
-				switch (nr_node->which) {
-					case 0:  nr_node->which = 1; break;
-					case 1:  nr_node->which = 0; break;
-					default: break;
-				}
-				nr_route           = nr_node->routes[0];
-				nr_node->routes[0] = nr_node->routes[1];
-				nr_node->routes[1] = nr_route;
+	case 3:
+		if (nr_node->routes[1].quality > nr_node->routes[0].quality) {
+			switch (nr_node->which) {
+				case 0:  nr_node->which = 1; break;
+				case 1:  nr_node->which = 0; break;
+				default: break;
 			}
-			if (nr_node->routes[2].quality > nr_node->routes[1].quality) {
-				switch (nr_node->which) {
-					case 1:  nr_node->which = 2; break;
-					case 2:  nr_node->which = 1; break;
-					default: break;
-				}
-				nr_route           = nr_node->routes[1];
-				nr_node->routes[1] = nr_node->routes[2];
-				nr_node->routes[2] = nr_route;
+			nr_route           = nr_node->routes[0];
+			nr_node->routes[0] = nr_node->routes[1];
+			nr_node->routes[1] = nr_route;
+		}
+		if (nr_node->routes[2].quality > nr_node->routes[1].quality) {
+			switch (nr_node->which) {
+			case 1:  nr_node->which = 2;
+				break;
+
+			case 2:  nr_node->which = 1;
+				break;
+
+			default:
+				break;
 			}
-		case 2:
-			if (nr_node->routes[1].quality > nr_node->routes[0].quality) {
-				switch (nr_node->which) {
-					case 0:  nr_node->which = 1; break;
-					case 1:  nr_node->which = 0; break;
-					default: break;
-				}
-				nr_route           = nr_node->routes[0];
-				nr_node->routes[0] = nr_node->routes[1];
-				nr_node->routes[1] = nr_route;
+			nr_route           = nr_node->routes[1];
+			nr_node->routes[1] = nr_node->routes[2];
+			nr_node->routes[2] = nr_route;
+		}
+	case 2:
+		if (nr_node->routes[1].quality > nr_node->routes[0].quality) {
+			switch (nr_node->which) {
+			case 0:  nr_node->which = 1;
+				break;
+
+			case 1:  nr_node->which = 0;
+				break;
+
+			default: break;
 			}
-		case 1:
-			break;
+			nr_route           = nr_node->routes[0];
+			nr_node->routes[0] = nr_node->routes[1];
+			nr_node->routes[1] = nr_route;
+			}
+	case 1:
+		break;
 	}
 
 	for (i = 0; i < nr_node->count; i++) {
@@ -257,14 +249,11 @@ static int nr_add_node(ax25_address *nr, const char *mnemonic, ax25_address *ax2
 static void nr_remove_node(struct nr_node *nr_node)
 {
 	struct nr_node *s;
-	unsigned long flags;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_bh(&nr_node_lock);
 	if ((s = nr_node_list) == nr_node) {
 		nr_node_list = nr_node->next;
-		restore_flags(flags);
+		spin_unlock_bh(&nr_node_lock);
 		kfree(nr_node);
 		return;
 	}
@@ -272,7 +261,7 @@ static void nr_remove_node(struct nr_node *nr_node)
 	while (s != NULL && s->next != NULL) {
 		if (s->next == nr_node) {
 			s->next = nr_node->next;
-			restore_flags(flags);
+			spin_unlock_bh(&nr_node_lock);
 			kfree(nr_node);
 			return;
 		}
@@ -280,20 +269,17 @@ static void nr_remove_node(struct nr_node *nr_node)
 		s = s->next;
 	}
 
-	restore_flags(flags);
+	spin_unlock_bh(&nr_node_lock);
 }
 
 static void nr_remove_neigh(struct nr_neigh *nr_neigh)
 {
 	struct nr_neigh *s;
-	unsigned long flags;
-	
-	save_flags(flags);
-	cli();
 
+	spin_lock_bh(&nr_neigh_lock);
 	if ((s = nr_neigh_list) == nr_neigh) {
 		nr_neigh_list = nr_neigh->next;
-		restore_flags(flags);
+		spin_unlock_bh(&nr_neigh_lock);
 		if (nr_neigh->digipeat != NULL)
 			kfree(nr_neigh->digipeat);
 		kfree(nr_neigh);
@@ -303,7 +289,7 @@ static void nr_remove_neigh(struct nr_neigh *nr_neigh)
 	while (s != NULL && s->next != NULL) {
 		if (s->next == nr_neigh) {
 			s->next = nr_neigh->next;
-			restore_flags(flags);
+			spin_unlock_bh(&nr_neigh_lock);
 			if (nr_neigh->digipeat != NULL)
 				kfree(nr_neigh->digipeat);
 			kfree(nr_neigh);
@@ -312,8 +298,7 @@ static void nr_remove_neigh(struct nr_neigh *nr_neigh)
 
 		s = s->next;
 	}
-
-	restore_flags(flags);
+	spin_unlock_bh(&nr_neigh_lock);
 }
 
 /*
@@ -330,13 +315,15 @@ static int nr_del_node(ax25_address *callsign, ax25_address *neighbour, struct n
 		if (ax25cmp(callsign, &nr_node->callsign) == 0)
 			break;
 
-	if (nr_node == NULL) return -EINVAL;
+	if (nr_node == NULL)
+		return -EINVAL;
 
 	for (nr_neigh = nr_neigh_list; nr_neigh != NULL; nr_neigh = nr_neigh->next)
 		if (ax25cmp(neighbour, &nr_neigh->callsign) == 0 && nr_neigh->dev == dev)
 			break;
 
-	if (nr_neigh == NULL) return -EINVAL;
+	if (nr_neigh == NULL)
+		return -EINVAL;
 
 	for (i = 0; i < nr_node->count; i++) {
 		if (nr_node->routes[i].neighbour == nr_neigh) {
@@ -351,12 +338,12 @@ static int nr_del_node(ax25_address *callsign, ax25_address *neighbour, struct n
 				nr_remove_node(nr_node);
 			} else {
 				switch (i) {
-					case 0:
-						nr_node->routes[0] = nr_node->routes[1];
-					case 1:
-						nr_node->routes[1] = nr_node->routes[2];
-					case 2:
-						break;
+				case 0:
+					nr_node->routes[0] = nr_node->routes[1];
+				case 1:
+					nr_node->routes[1] = nr_node->routes[2];
+				case 2:
+					break;
 				}
 			}
 
@@ -373,7 +360,6 @@ static int nr_del_node(ax25_address *callsign, ax25_address *neighbour, struct n
 static int nr_add_neigh(ax25_address *callsign, ax25_digi *ax25_digi, struct net_device *dev, unsigned int quality)
 {
 	struct nr_neigh *nr_neigh;
-	unsigned long flags;
 
 	for (nr_neigh = nr_neigh_list; nr_neigh != NULL; nr_neigh = nr_neigh->next) {
 		if (ax25cmp(callsign, &nr_neigh->callsign) == 0 && nr_neigh->dev == dev) {
@@ -404,15 +390,12 @@ static int nr_add_neigh(ax25_address *callsign, ax25_digi *ax25_digi, struct net
 		memcpy(nr_neigh->digipeat, ax25_digi, sizeof(ax25_digi));
 	}
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_bh(&nr_neigh_lock);
 	nr_neigh->next = nr_neigh_list;
 	nr_neigh_list  = nr_neigh;
+	spin_unlock_bh(&nr_neigh_lock);
 
-	restore_flags(flags);
-
-	return 0;	
+	return 0;
 }
 
 /*
@@ -457,7 +440,6 @@ static int nr_dec_obs(void)
 
 		for (i = 0; i < s->count; i++) {
 			switch (s->routes[i].obs_count) {
-
 			case 0:		/* A locked entry */
 				break;
 
@@ -520,12 +502,12 @@ void nr_rt_device_down(struct net_device *dev)
 						t->count--;
 
 						switch (i) {
-							case 0:
-								t->routes[0] = t->routes[1];
-							case 1:
-								t->routes[1] = t->routes[2];
-							case 2:
-								break;
+						case 0:
+							t->routes[0] = t->routes[1];
+						case 1:
+							t->routes[1] = t->routes[2];
+						case 2:
+							break;
 						}
 					}
 				}
@@ -622,51 +604,50 @@ int nr_rt_ioctl(unsigned int cmd, void *arg)
 	struct net_device *dev;
 
 	switch (cmd) {
-
-		case SIOCADDRT:
-			if (copy_from_user(&nr_route, arg, sizeof(struct nr_route_struct)))
-				return -EFAULT;
-			if ((dev = nr_ax25_dev_get(nr_route.device)) == NULL)
-				return -EINVAL;
-			if (nr_route.ndigis < 0 || nr_route.ndigis > AX25_MAX_DIGIS)
-				return -EINVAL;
-			switch (nr_route.type) {
-				case NETROM_NODE:
-					return nr_add_node(&nr_route.callsign,
-						nr_route.mnemonic,
-						&nr_route.neighbour,
-						nr_call_to_digi(nr_route.ndigis, nr_route.digipeaters),
-						dev, nr_route.quality,
-						nr_route.obs_count);
-				case NETROM_NEIGH:
-					return nr_add_neigh(&nr_route.callsign,
-						nr_call_to_digi(nr_route.ndigis, nr_route.digipeaters),
-						dev, nr_route.quality);
-				default:
-					return -EINVAL;
-			}
-
-		case SIOCDELRT:
-			if (copy_from_user(&nr_route, arg, sizeof(struct nr_route_struct)))
-				return -EFAULT;
-			if ((dev = nr_ax25_dev_get(nr_route.device)) == NULL)
-				return -EINVAL;
-			switch (nr_route.type) {
-				case NETROM_NODE:
-					return nr_del_node(&nr_route.callsign,
-						&nr_route.neighbour, dev);
-				case NETROM_NEIGH:
-					return nr_del_neigh(&nr_route.callsign,
-						dev, nr_route.quality);
-				default:
-					return -EINVAL;
-			}
-
-		case SIOCNRDECOBS:
-			return nr_dec_obs();
-
+	case SIOCADDRT:
+		if (copy_from_user(&nr_route, arg, sizeof(struct nr_route_struct)))
+			return -EFAULT;
+		if ((dev = nr_ax25_dev_get(nr_route.device)) == NULL)
+			return -EINVAL;
+		if (nr_route.ndigis < 0 || nr_route.ndigis > AX25_MAX_DIGIS)
+			return -EINVAL;
+		switch (nr_route.type) {
+		case NETROM_NODE:
+			return nr_add_node(&nr_route.callsign,
+				nr_route.mnemonic,
+				&nr_route.neighbour,
+				nr_call_to_digi(nr_route.ndigis, nr_route.digipeaters),
+				dev, nr_route.quality,
+				nr_route.obs_count);
+		case NETROM_NEIGH:
+			return nr_add_neigh(&nr_route.callsign,
+				nr_call_to_digi(nr_route.ndigis, nr_route.digipeaters),
+				dev, nr_route.quality);
 		default:
 			return -EINVAL;
+		}
+
+	case SIOCDELRT:
+		if (copy_from_user(&nr_route, arg, sizeof(struct nr_route_struct)))
+			return -EFAULT;
+		if ((dev = nr_ax25_dev_get(nr_route.device)) == NULL)
+			return -EINVAL;
+		switch (nr_route.type) {
+		case NETROM_NODE:
+			return nr_del_node(&nr_route.callsign,
+				&nr_route.neighbour, dev);
+		case NETROM_NEIGH:
+			return nr_del_neigh(&nr_route.callsign,
+				dev, nr_route.quality);
+		default:
+			return -EINVAL;
+		}
+
+	case SIOCNRDECOBS:
+		return nr_dec_obs();
+
+	default:
+		return -EINVAL;
 	}
 
 	return 0;
@@ -758,8 +739,7 @@ int nr_nodes_get_info(char *buffer, char **start, off_t offset, int length)
 	off_t begin = 0;
 	int i;
 
-	cli();
-
+	spin_lock_bh(&nr_node_lock);
 	len += sprintf(buffer, "callsign  mnemonic w n qual obs neigh qual obs neigh qual obs neigh\n");
 
 	for (nr_node = nr_node_list; nr_node != NULL; nr_node = nr_node->next) {
@@ -767,7 +747,7 @@ int nr_nodes_get_info(char *buffer, char **start, off_t offset, int length)
 			ax2asc(&nr_node->callsign),
 			(nr_node->mnemonic[0] == '\0') ? "*" : nr_node->mnemonic,
 			nr_node->which + 1,
-			nr_node->count);			
+			nr_node->count);
 
 		for (i = 0; i < nr_node->count; i++) {
 			len += sprintf(buffer + len, "  %3d   %d %05d",
@@ -788,8 +768,7 @@ int nr_nodes_get_info(char *buffer, char **start, off_t offset, int length)
 		if (pos > offset + length)
 			break;
 	}
-
-	sti();
+	spin_unlock_bh(&nr_node_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);
@@ -797,7 +776,7 @@ int nr_nodes_get_info(char *buffer, char **start, off_t offset, int length)
 	if (len > length) len = length;
 
 	return len;
-} 
+}
 
 int nr_neigh_get_info(char *buffer, char **start, off_t offset, int length)
 {
@@ -807,8 +786,7 @@ int nr_neigh_get_info(char *buffer, char **start, off_t offset, int length)
 	off_t begin = 0;
 	int i;
 
-	cli();
-
+	spin_lock_bh(&nr_neigh_lock);
 	len += sprintf(buffer, "addr  callsign  dev  qual lock count failed digipeaters\n");
 
 	for (nr_neigh = nr_neigh_list; nr_neigh != NULL; nr_neigh = nr_neigh->next) {
@@ -839,7 +817,7 @@ int nr_neigh_get_info(char *buffer, char **start, off_t offset, int length)
 			break;
 	}
 
-	sti();
+	spin_unlock_bh(&nr_neigh_lock);
 
 	*start = buffer + (offset - begin);
 	len   -= (offset - begin);
@@ -847,7 +825,7 @@ int nr_neigh_get_info(char *buffer, char **start, off_t offset, int length)
 	if (len > length) len = length;
 
 	return len;
-} 
+}
 
 /*
  *	Free all memory associated with the nodes and routes lists.

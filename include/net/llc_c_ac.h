@@ -211,4 +211,9 @@ extern int llc_conn_ac_send_i_rsp_f_set_ackpf(struct sock* sk,
 					      struct sk_buff *skb);
 extern int llc_conn_ac_send_i_rsp_as_ack(struct sock* sk, struct sk_buff *skb);
 extern int llc_conn_ac_send_i_as_ack(struct sock* sk, struct sk_buff *skb);
+
+extern void llc_conn_busy_tmr_cb(unsigned long timeout_data);
+extern void llc_conn_pf_cycle_tmr_cb(unsigned long timeout_data);
+extern void llc_conn_ack_tmr_cb(unsigned long timeout_data);
+extern void llc_conn_rej_tmr_cb(unsigned long timeout_data);
 #endif /* LLC_C_AC_H */

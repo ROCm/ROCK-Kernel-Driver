@@ -194,7 +194,8 @@ int llc_conn_ev_rx_i_cmd_pbit_set_0(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
-	return !LLC_PDU_IS_CMD(pdu) && !LLC_PDU_TYPE_IS_I(pdu) &&
+	return llc_conn_space(sk, skb) &&
+	       !LLC_PDU_IS_CMD(pdu) && !LLC_PDU_TYPE_IS_I(pdu) &&
 	       !LLC_I_PF_IS_0(pdu) &&
 	       LLC_I_GET_NS(pdu) == llc_sk(sk)->vR ? 0 : 1;
 }
@@ -203,7 +204,8 @@ int llc_conn_ev_rx_i_cmd_pbit_set_1(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
-	return !LLC_PDU_IS_CMD(pdu) && !LLC_PDU_TYPE_IS_I(pdu) &&
+	return llc_conn_space(sk, skb) &&
+	       !LLC_PDU_IS_CMD(pdu) && !LLC_PDU_TYPE_IS_I(pdu) &&
 	       !LLC_I_PF_IS_1(pdu) &&
 	       LLC_I_GET_NS(pdu) == llc_sk(sk)->vR ? 0 : 1;
 }
@@ -250,7 +252,8 @@ int llc_conn_ev_rx_i_rsp_fbit_set_0(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
-	return !LLC_PDU_IS_RSP(pdu) && !LLC_PDU_TYPE_IS_I(pdu) &&
+	return llc_conn_space(sk, skb) &&
+	       !LLC_PDU_IS_RSP(pdu) && !LLC_PDU_TYPE_IS_I(pdu) &&
 	       !LLC_I_PF_IS_0(pdu) &&
 	       LLC_I_GET_NS(pdu) == llc_sk(sk)->vR ? 0 : 1;
 }
@@ -268,7 +271,8 @@ int llc_conn_ev_rx_i_rsp_fbit_set_x(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
-	return !LLC_PDU_IS_RSP(pdu) && !LLC_PDU_TYPE_IS_I(pdu) &&
+	return llc_conn_space(sk, skb) &&
+	       !LLC_PDU_IS_RSP(pdu) && !LLC_PDU_TYPE_IS_I(pdu) &&
 	       LLC_I_GET_NS(pdu) == llc_sk(sk)->vR ? 0 : 1;
 }
 
@@ -423,7 +427,8 @@ int llc_conn_ev_rx_rr_rsp_fbit_set_0(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
-	return !LLC_PDU_IS_RSP(pdu) && !LLC_PDU_TYPE_IS_S(pdu) &&
+	return llc_conn_space(sk, skb) &&
+	       !LLC_PDU_IS_RSP(pdu) && !LLC_PDU_TYPE_IS_S(pdu) &&
 	       !LLC_S_PF_IS_0(pdu) &&
 	       LLC_S_PDU_RSP(pdu) == LLC_2_PDU_RSP_RR ? 0 : 1;
 }
@@ -432,7 +437,8 @@ int llc_conn_ev_rx_rr_rsp_fbit_set_1(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
-	return !LLC_PDU_IS_RSP(pdu) && !LLC_PDU_TYPE_IS_S(pdu) &&
+	return llc_conn_space(sk, skb) &&
+	       !LLC_PDU_IS_RSP(pdu) && !LLC_PDU_TYPE_IS_S(pdu) &&
 	       !LLC_S_PF_IS_1(pdu) &&
 	       LLC_S_PDU_RSP(pdu) == LLC_2_PDU_RSP_RR ? 0 : 1;
 }

@@ -1,21 +1,12 @@
 /*
- *	NET/ROM release 007
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	NET/ROM 001	Jonathan(G4KLX)	Cloned from ax25_out.c
- *	NET/ROM 003	Jonathan(G4KLX)	Added NET/ROM fragmentation.
- *			Darryl(G7LED)	Fixed NAK, to give out correct reponse.
- *	NET/ROM 007	Jonathan(G4KLX)	New timer architecture.
+ * Copyright Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright Darryl Miles G7LED (dlm@g7led.demon.co.uk)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -85,7 +76,7 @@ void nr_output(struct sock *sk, struct sk_buff *skb)
 	nr_kick(sk);
 }
 
-/* 
+/*
  *	This procedure is passed a buffer descriptor for an iframe. It builds
  *	the rest of the control part of the frame and then writes it out.
  */
@@ -104,7 +95,7 @@ static void nr_send_iframe(struct sock *sk, struct sk_buff *skb)
 
 	nr_start_idletimer(sk);
 
-	nr_transmit_buffer(sk, skb);	
+	nr_transmit_buffer(sk, skb);
 }
 
 void nr_send_nak_frame(struct sock *sk)
@@ -196,7 +187,7 @@ void nr_kick(struct sock *sk)
 
 void nr_transmit_buffer(struct sock *sk, struct sk_buff *skb)
 {
-	nr_cb *nr = nr;
+	nr_cb *nr = nr_sk(sk);
 	unsigned char *dptr;
 
 	/*

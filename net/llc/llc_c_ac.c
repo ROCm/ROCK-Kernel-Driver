@@ -28,10 +28,6 @@
 #include <net/llc_pdu.h>
 #include <net/llc_mac.h>
 
-static void llc_conn_pf_cycle_tmr_cb(unsigned long timeout_data);
-static void llc_conn_ack_tmr_cb(unsigned long timeout_data);
-static void llc_conn_rej_tmr_cb(unsigned long timeout_data);
-static void llc_conn_busy_tmr_cb(unsigned long timeout_data);
 static int llc_conn_ac_inc_vs_by_1(struct sock *sk, struct sk_buff *skb);
 static void llc_process_tmr_ev(struct sock *sk, struct sk_buff *skb);
 static int llc_conn_ac_data_confirm(struct sock *sk, struct sk_buff *ev);
@@ -664,11 +660,8 @@ int llc_conn_ac_set_remote_busy(struct sock *sk, struct sk_buff *skb)
 
 	if (!llc->remote_busy_flag) {
 		llc->remote_busy_flag = 1;
-		llc->busy_state_timer.timer.expires = jiffies +
-					llc->busy_state_timer.expire * HZ;
-		llc->busy_state_timer.timer.data     = (unsigned long)sk;
-		llc->busy_state_timer.timer.function = llc_conn_busy_tmr_cb;
-		add_timer(&llc->busy_state_timer.timer);
+		mod_timer(&llc->busy_state_timer.timer,
+			 jiffies + llc->busy_state_timer.expire * HZ);
 	}
 	return 0;
 }
@@ -905,12 +898,8 @@ int llc_conn_ac_start_p_timer(struct sock *sk, struct sk_buff *skb)
 	struct llc_opt *llc = llc_sk(sk);
 
 	llc->p_flag = 1;
-	del_timer(&llc->pf_cycle_timer.timer);
-	llc->pf_cycle_timer.timer.expires  = jiffies +
-						llc->pf_cycle_timer.expire * HZ;
-	llc->pf_cycle_timer.timer.data     = (unsigned long)sk;
-	llc->pf_cycle_timer.timer.function = llc_conn_pf_cycle_tmr_cb;
-	add_timer(&llc->pf_cycle_timer.timer);
+	mod_timer(&llc->pf_cycle_timer.timer,
+		  jiffies + llc->pf_cycle_timer.expire * HZ);
 	return 0;
 }
 
@@ -1181,11 +1170,7 @@ int llc_conn_ac_start_ack_timer(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_opt *llc = llc_sk(sk);
 
-	del_timer(&llc->ack_timer.timer);
-	llc->ack_timer.timer.expires  = jiffies + llc->ack_timer.expire * HZ;
-	llc->ack_timer.timer.data     = (unsigned long)sk;
-	llc->ack_timer.timer.function = llc_conn_ack_tmr_cb;
-	add_timer(&llc->ack_timer.timer);
+	mod_timer(&llc->ack_timer.timer, jiffies + llc->ack_timer.expire * HZ);
 	return 0;
 }
 
@@ -1193,12 +1178,8 @@ int llc_conn_ac_start_rej_timer(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_opt *llc = llc_sk(sk);
 
-	del_timer(&llc->rej_sent_timer.timer);
-	llc->rej_sent_timer.timer.expires = jiffies +
-					    llc->rej_sent_timer.expire * HZ;
-	llc->rej_sent_timer.timer.data     = (unsigned long)sk;
-	llc->rej_sent_timer.timer.function = llc_conn_rej_tmr_cb;
-	add_timer(&llc->rej_sent_timer.timer);
+	mod_timer(&llc->rej_sent_timer.timer,
+		  jiffies + llc->rej_sent_timer.expire * HZ);
 	return 0;
 }
 
@@ -1207,13 +1188,9 @@ int llc_conn_ac_start_ack_tmr_if_not_running(struct sock *sk,
 {
 	struct llc_opt *llc = llc_sk(sk);
 
-	if (!timer_pending(&llc->ack_timer.timer)) {
-		llc->ack_timer.timer.expires  = jiffies +
-						llc->ack_timer.expire * HZ;
-		llc->ack_timer.timer.data     = (unsigned long)sk;
-		llc->ack_timer.timer.function = llc_conn_ack_tmr_cb;
-		add_timer(&llc->ack_timer.timer);
-	}
+	if (!timer_pending(&llc->ack_timer.timer))
+		mod_timer(&llc->ack_timer.timer,
+			  jiffies + llc->ack_timer.expire * HZ);
 	return 0;
 }
 
@@ -1260,13 +1237,9 @@ int llc_conn_ac_upd_nr_received(struct sock *sk, struct sk_buff *skb)
 			llc->failed_data_req = 0;
 			llc_conn_ac_data_confirm(sk, skb);
 		}
-		if (unacked) {
-			llc->ack_timer.timer.expires  = jiffies +
-						   llc->ack_timer.expire * HZ;
-			llc->ack_timer.timer.data     = (unsigned long)sk;
-			llc->ack_timer.timer.function = llc_conn_ack_tmr_cb;
-			add_timer(&llc->ack_timer.timer);
-	       }
+		if (unacked)
+			mod_timer(&llc->ack_timer.timer,
+				  jiffies + llc->ack_timer.expire * HZ);
 	} else if (llc->failed_data_req) {
 		llc_pdu_decode_pf_bit(skb, &fbit);
 		if (fbit == 1) {
@@ -1413,7 +1386,7 @@ void llc_conn_pf_cycle_tmr_cb(unsigned long timeout_data)
 	bh_unlock_sock(sk);
 }
 
-static void llc_conn_busy_tmr_cb(unsigned long timeout_data)
+void llc_conn_busy_tmr_cb(unsigned long timeout_data)
 {
 	struct sock *sk = (struct sock *)timeout_data;
 	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
@@ -1445,7 +1418,7 @@ void llc_conn_ack_tmr_cb(unsigned long timeout_data)
 	bh_unlock_sock(sk);
 }
 
-static void llc_conn_rej_tmr_cb(unsigned long timeout_data)
+void llc_conn_rej_tmr_cb(unsigned long timeout_data)
 {
 	struct sock *sk = (struct sock *)timeout_data;
 	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
