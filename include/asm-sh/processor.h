@@ -147,11 +147,6 @@ extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 #define MCA_bus 0
 #define MCA_bus__is_a_macro /* for versions in ksyms.c */
 
-
-/* Copy and release all segment info associated with a VM */
-#define copy_segments(p, mm)	do { } while(0)
-#define release_segments(mm)	do { } while(0)
-
 /*
  * FPU lazy state save handling.
  */

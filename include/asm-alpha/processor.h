@@ -55,9 +55,6 @@ extern void release_thread(struct task_struct *);
 /* Create a kernel thread without removing it from tasklists.  */
 extern long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
 
-#define copy_segments(tsk, mm)		do { } while (0)
-#define release_segments(mm)		do { } while (0)
-
 unsigned long get_wchan(struct task_struct *p);
 
 /* See arch/alpha/kernel/ptrace.c for details.  */
