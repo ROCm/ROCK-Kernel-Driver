@@ -655,6 +655,18 @@ config JFS_FS
 
 	  If you do not intend to use the JFS filesystem, say N.
 
+config JFS_POSIX_ACL
+	bool "JFS POSIX Access Control Lists"
+	depends on JFS_FS
+	---help---
+	  Posix Access Control Lists (ACLs) support permissions for users and
+	  groups beyond the owner/group/world scheme.
+
+	  To learn more about Access Control Lists, visit the Posix ACLs for
+	  Linux website <http://acl.bestbits.at/>.
+
+	  If you don't know what Access Control Lists are, say N
+
 config JFS_DEBUG
 	bool "JFS debugging"
 	depends on JFS_FS
@@ -1464,10 +1476,10 @@ config FS_MBCACHE
 	default m if EXT2_FS=m || EXT3_FS=m
 	default y if EXT2_FS=y || EXT3_FS=y
 
-# Posix ACL utility routines (for now, only ext2/ext3)
+# Posix ACL utility routines (for now, only ext2/ext3/jfs)
 config FS_POSIX_ACL
 	bool
-	depends on EXT2_FS_POSIX_ACL || EXT3_FS_POSIX_ACL
+	depends on EXT2_FS_POSIX_ACL || EXT3_FS_POSIX_ACL || JFS_POSIX_ACL
 	default y
 
 menu "Partition Types"

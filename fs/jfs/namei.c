@@ -25,6 +25,7 @@
 #include "jfs_unicode.h"
 #include "jfs_metapage.h"
 #include "jfs_xattr.h"
+#include "jfs_acl.h"
 #include "jfs_debug.h"
 
 extern struct inode_operations jfs_file_inode_operations;
@@ -35,6 +36,7 @@ extern struct address_space_operations jfs_aops;
 extern int jfs_fsync(struct file *, struct dentry *, int);
 extern void jfs_truncate_nolock(struct inode *, loff_t);
 extern struct inode *jfs_iget(struct super_block *, ino_t);
+extern int jfs_init_acl(struct inode *, struct inode *);
 
 /*
  * forward references
@@ -149,6 +151,11 @@ int jfs_create(struct inode *dip, struct dentry *dentry, int mode)
 
       out2:
 	free_UCSname(&dname);
+
+#ifdef CONFIG_JFS_POSIX_ACL
+	if (rc == 0)
+		jfs_init_acl(ip, dip);
+#endif
 
       out1:
 
@@ -274,6 +281,11 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 
       out2:
 	free_UCSname(&dname);
+
+#ifdef CONFIG_JFS_POSIX_ACL
+	if (rc == 0)
+		jfs_init_acl(ip, dip);
+#endif
 
       out1:
 
@@ -1016,6 +1028,11 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
       out2:
 	free_UCSname(&dname);
 
+#ifdef CONFIG_JFS_POSIX_ACL
+	if (rc == 0)
+		jfs_init_acl(ip, dip);
+#endif
+
       out1:
 	jFYI(1, ("jfs_symlink: rc:%d\n", -rc));
 	return -rc;
@@ -1364,6 +1381,11 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
       out1:
 	free_UCSname(&dname);
 
+#ifdef CONFIG_JFS_POSIX_ACL
+	if (rc == 0)
+		jfs_init_acl(ip, dir);
+#endif
+
       out:
 	jFYI(1, ("jfs_mknod: returning %d\n", rc));
 	return -rc;
@@ -1445,6 +1467,10 @@ struct inode_operations jfs_dir_inode_operations = {
 	.getxattr	= jfs_getxattr,
 	.listxattr	= jfs_listxattr,
 	.removexattr	= jfs_removexattr,
+#ifdef CONFIG_JFS_POSIX_ACL
+	.setattr	= jfs_setattr,
+	.permission	= jfs_permission,
+#endif
 };
 
 struct file_operations jfs_dir_operations = {

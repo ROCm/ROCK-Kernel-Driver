@@ -28,6 +28,7 @@
 #include "jfs_superblock.h"
 #include "jfs_dmap.h"
 #include "jfs_imap.h"
+#include "jfs_acl.h"
 #include "jfs_debug.h"
 
 MODULE_DESCRIPTION("The Journaled Filesystem (JFS)");
@@ -94,7 +95,16 @@ static struct inode *jfs_alloc_inode(struct super_block *sb)
 
 static void jfs_destroy_inode(struct inode *inode)
 {
-	kmem_cache_free(jfs_inode_cachep, JFS_IP(inode));
+	struct jfs_inode_info *ji = JFS_IP(inode);
+
+#ifdef CONFIG_JFS_POSIX_ACL
+	if (ji->i_acl && (ji->i_acl != JFS_ACL_NOT_CACHED))
+		posix_acl_release(ji->i_acl);
+	if (ji->i_default_acl && (ji->i_default_acl != JFS_ACL_NOT_CACHED))
+		posix_acl_release(ji->i_default_acl);
+#endif
+
+	kmem_cache_free(jfs_inode_cachep, ji);
 }
 
 static int jfs_statfs(struct super_block *sb, struct statfs *buf)
@@ -407,6 +417,10 @@ static void init_once(void *foo, kmem_cache_t * cachep, unsigned long flags)
 		init_MUTEX(&jfs_ip->commit_sem);
 		jfs_ip->atlhead = 0;
 		jfs_ip->active_ag = -1;
+#ifdef CONFIG_JFS_POSIX_ACL
+		jfs_ip->i_acl = JFS_ACL_NOT_CACHED;
+		jfs_ip->i_default_acl = JFS_ACL_NOT_CACHED;
+#endif
 		inode_init_once(&jfs_ip->vfs_inode);
 	}
 }

@@ -26,6 +26,7 @@
 #include "jfs_extent.h"
 #include "jfs_metapage.h"
 #include "jfs_xattr.h"
+#include "jfs_acl.h"
 
 /*
  *	jfs_xattr.c: extended attribute service
@@ -201,7 +202,6 @@ static int ea_write_inline(struct inode *ip, struct jfs_ea_list *ealist,
 			ji->mode2 |= INLINEEA;
 	}
 
-	mark_inode_dirty(ip);
 	return 0;
 }
 
@@ -640,6 +640,71 @@ static int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
 	return rc;
 }
 
+/*
+ * can_set_system_xattr
+ *
+ * This code is specific to the system.* namespace.  It contains policy
+ * which doesn't belong in the main xattr codepath.
+ */
+static int can_set_system_xattr(struct inode *inode, const char *name,
+				const void *value, size_t value_len)
+{
+#ifdef CONFIG_JFS_POSIX_ACL
+	struct posix_acl *acl;
+	int rc;
+
+	if ((current->fsuid != inode->i_uid) && !capable(CAP_FOWNER))
+		return -EPERM;
+
+	/*
+	 * XATTR_NAME_ACL_ACCESS is tied to i_mode
+	 */
+	if (strcmp(name, XATTR_NAME_ACL_ACCESS) == 0) {
+		acl = posix_acl_from_xattr(value, value_len);
+		if (acl < 0) {
+			printk(KERN_ERR "posix_acl_from_xattr returned %d\n",
+			       rc);
+			return rc;
+		}
+		if (acl > 0) {
+			mode_t mode = inode->i_mode;
+			rc = posix_acl_equiv_mode(acl, &mode);
+			posix_acl_release(acl);
+			if (rc < 0) {
+				printk(KERN_ERR
+				       "posix_acl_equiv_mode returned %d\n",
+				       rc);
+				return rc;
+			}
+			inode->i_mode = mode;
+			mark_inode_dirty(inode);
+			if (rc == 0)
+				value = NULL;
+		}
+		/*
+		 * We're changing the ACL.  Get rid of the cached one
+		 */
+		acl =JFS_IP(inode)->i_acl;
+		if (acl && (acl != JFS_ACL_NOT_CACHED))
+			posix_acl_release(acl);
+		JFS_IP(inode)->i_acl = JFS_ACL_NOT_CACHED;
+	} else if (strcmp(name, XATTR_NAME_ACL_DEFAULT) == 0) {
+		/*
+		 * We're changing the default ACL.  Get rid of the cached one
+		 */
+		acl =JFS_IP(inode)->i_default_acl;
+		if (acl && (acl != JFS_ACL_NOT_CACHED))
+			posix_acl_release(acl);
+		JFS_IP(inode)->i_default_acl = JFS_ACL_NOT_CACHED;
+	} else
+		/* Invalid xattr name */
+		return -EINVAL;
+	return 0;
+#else			/* CONFIG_JFS_POSIX_ACL */
+	return -EOPNOTSUPP;
+#endif			/* CONFIG_JFS_POSIX_ACL */
+}
+
 static int can_set_xattr(struct inode *inode, const char *name,
 			 void *value, size_t value_len)
 {
@@ -649,6 +714,12 @@ static int can_set_xattr(struct inode *inode, const char *name,
 	if (IS_IMMUTABLE(inode) || IS_APPEND(inode) || S_ISLNK(inode->i_mode))
 		return -EPERM;
 
+	if(strncmp(name, XATTR_SYSTEM_PREFIX, XATTR_SYSTEM_PREFIX_LEN) == 0)
+		/*
+		 * "system.*"
+		 */
+		return can_set_system_xattr(inode, name, value, value_len);
+
 	if((strncmp(name, XATTR_USER_PREFIX, XATTR_USER_PREFIX_LEN) != 0) &&
 	   (strncmp(name, XATTR_OS2_PREFIX, XATTR_OS2_PREFIX_LEN) != 0))
 		return -EOPNOTSUPP;
@@ -657,7 +728,11 @@ static int can_set_xattr(struct inode *inode, const char *name,
 	    (!S_ISDIR(inode->i_mode) || inode->i_mode &S_ISVTX))
 		return -EPERM;
 
+#ifdef CONFIG_JFS_POSIX_ACL
+	return jfs_permission_have_sem(inode, MAY_WRITE);
+#else
 	return permission(inode, MAY_WRITE);
+#endif
 }
 
 int __jfs_setxattr(struct inode *inode, const char *name, void *value,
@@ -810,9 +885,16 @@ int jfs_setxattr(struct dentry *dentry, const char *name, void *value,
 	return __jfs_setxattr(dentry->d_inode, name, value, value_len, flags);
 }
 
-static inline int can_get_xattr(struct inode *inode, const char *name)
+static int can_get_xattr(struct inode *inode, const char *name)
 {
+#ifdef CONFIG_JFS_POSIX_ACL
+	if(strncmp(name, XATTR_SYSTEM_PREFIX, XATTR_SYSTEM_PREFIX_LEN) == 0)
+		return 0;
+	else
+		return jfs_permission_have_sem(inode, MAY_READ);
+#else
 	return permission(inode, MAY_READ);
+#endif
 }
 
 ssize_t __jfs_getxattr(struct inode *inode, const char *name, void *data,

@@ -22,6 +22,7 @@
 #include "jfs_dmap.h"
 #include "jfs_txnmgr.h"
 #include "jfs_xattr.h"
+#include "jfs_acl.h"
 #include "jfs_debug.h"
 
 
@@ -142,6 +143,10 @@ struct inode_operations jfs_file_inode_operations = {
 	.getxattr	= jfs_getxattr,
 	.listxattr	= jfs_listxattr,
 	.removexattr	= jfs_removexattr,
+#ifdef CONFIG_JFS_POSIX_ACL
+	.setattr	= jfs_setattr,
+	.permission	= jfs_permission,
+#endif
 };
 
 struct file_operations jfs_file_operations = {
