@@ -102,7 +102,7 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
-#include <linux/mca.h>
+#include <linux/mca-legacy.h>
 #include <linux/ethtool.h>
 
 #include <asm/uaccess.h>

@@ -43,7 +43,7 @@
 #include <linux/errno.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
-#include <linux/mca.h>
+#include <linux/mca-legacy.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>

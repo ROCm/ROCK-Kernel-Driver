@@ -113,7 +113,6 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
-#include <linux/mca.h>
 #include <linux/mca-legacy.h>
 #include <linux/spinlock.h>
 
