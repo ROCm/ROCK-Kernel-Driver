@@ -32,5 +32,5 @@ $(obj)/sm_hapn4800.o:   $(obj)/sm_tbl_hapn4800.h
 $(obj)/sm_fsk9600.o:    $(obj)/sm_tbl_fsk9600.h
 
 $(obj)/sm_tbl_%: $(obj)/gentbl
-	$<
+	$(obj)/gentbl
 

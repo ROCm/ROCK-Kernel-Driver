@@ -19,4 +19,4 @@ $(obj)/rfc_time.o: $(obj)/times.h
 # Generated files
 
 $(obj)/times.h: $(obj)/make_times_h
-	$< >$@
+	$(obj)/make_times_h >$@
