@@ -81,7 +81,7 @@ extern void sort_exception_table(void);
  * exception handling means that it's no longer "just"...)
  *
  * The "user64" versions of the user access functions are versions that 
- * allow modification of 64-bit data. The "get_user" functions do not 
+ * allow access of 64-bit data. The "get_user" functions do not 
  * properly handle 64-bit data because the value gets down cast to a long. 
  * The "put_user" functions already handle 64-bit data properly but we add 
  * "user64" versions for completeness
@@ -184,7 +184,7 @@ struct __large_struct { unsigned long buf[100]; };
 ({								\
 	long __gu_err;						\
 	long long __gu_val;					\
-	__get_user_size(__gu_val,(ptr),(size),__gu_err);	\
+	__get_user_size64(__gu_val,(ptr),(size),__gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;			\
 	__gu_err;						\
 })
@@ -205,7 +205,7 @@ struct __large_struct { unsigned long buf[100]; };
 	long long __gu_val = 0;						\
 	const __typeof__(*(ptr)) *__gu_addr = (ptr);			\
 	if (access_ok(VERIFY_READ,__gu_addr,size))			\
-		__get_user_size(__gu_val,__gu_addr,(size),__gu_err);	\
+		__get_user_size64(__gu_val,__gu_addr,(size),__gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;				\
 	__gu_err;							\
 })
@@ -213,6 +213,17 @@ struct __large_struct { unsigned long buf[100]; };
 extern long __get_user_bad(void);
 
 #define __get_user_size(x,ptr,size,retval)			\
+do {								\
+	retval = 0;						\
+	switch (size) {						\
+	  case 1: __get_user_asm(x,ptr,retval,"lbz"); break;	\
+	  case 2: __get_user_asm(x,ptr,retval,"lhz"); break;	\
+	  case 4: __get_user_asm(x,ptr,retval,"lwz"); break;	\
+	  default: (x) = __get_user_bad();			\
+	}							\
+} while (0)
+
+#define __get_user_size64(x,ptr,size,retval)			\
 do {								\
 	retval = 0;						\
 	switch (size) {						\
