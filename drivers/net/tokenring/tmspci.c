@@ -142,8 +142,7 @@ static int __init tms_pci_attach(struct pci_dev *pdev, const struct pci_device_i
 		printk(":%2.2x", dev->dev_addr[i]);
 	printk("\n");
 		
-	ret = tmsdev_init(dev,0, pdev);
-	/* XXX: should be the max PCI32 DMA max */
+	ret = tmsdev_init(dev, PCI_MAX_ADDRESS, pdev);
 	if (ret) {
 		printk("%s: unable to get memory for dev->priv.\n", dev->name);
 		goto err_out_irq;
@@ -165,7 +164,7 @@ static int __init tms_pci_attach(struct pci_dev *pdev, const struct pci_device_i
 	dev->stop = tms380tr_close;
 
 	ret = register_trdev(dev);
-	if (!ret)
+	if (ret)
 		goto err_out_tmsdev;
 	
 	pci_set_drvdata(pdev, dev);

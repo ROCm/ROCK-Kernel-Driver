@@ -42,6 +42,25 @@ calc_npages(long bytes)
 	return (bytes + PAGE_SIZE - 1) >> PAGE_SHIFT;
 }
 
+static void __init
+iommu_arena_fixup(struct pci_iommu_arena * arena)
+{
+	unsigned long base, size;
+
+	/*
+	 * The Cypress chip has a quirk, it get confused by addresses
+	 * above -1M so reserve the pagetables that maps pci addresses
+	 * above -1M.
+	 */
+	base = arena->dma_base;
+	size = arena->size;
+	if (base + size > 0xfff00000) {
+		int i = (0xfff00000 - base) >> PAGE_SHIFT;
+		for (; i < (0x100000 >> PAGE_SHIFT); i++)
+			arena->ptes[i] = IOMMU_INVALID_PTE;
+	}
+}
+
 struct pci_iommu_arena *
 iommu_arena_new(struct pci_controller *hose, dma_addr_t base,
 		unsigned long window_size, unsigned long align)
@@ -70,6 +89,8 @@ iommu_arena_new(struct pci_controller *hose, dma_addr_t base,
 	/* Align allocations to a multiple of a page size.  Not needed
 	   unless there are chip bugs.  */
 	arena->align_entry = 1;
+
+	iommu_arena_fixup(arena);
 
 	return arena;
 }
@@ -115,12 +136,12 @@ iommu_arena_alloc(struct pci_iommu_arena *arena, long n)
 		}
 	}
 
-	/* Success.  Mark them all in use, ie not zero.  Typically
-	   bit zero is the valid bit, so write ~1 into everything.
+	/* Success.  Mark them all in use, ie not zero and invalid
+	   for the iommu tlb that could load them from under us.
 	   The chip specific bits will fill this in with something
 	   kosher when we return.  */
 	for (i = 0; i < n; ++i)
-		ptes[p+i] = ~1UL;
+		ptes[p+i] = IOMMU_INVALID_PTE;
 
 	arena->next_entry = p + n;
 	spin_unlock_irqrestore(&arena->lock, flags);

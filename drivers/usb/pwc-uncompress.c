@@ -21,14 +21,12 @@
    themselves. It also has a decompressor wrapper function.
 */
 
-#include "ccvt.h"
-#include "vcvt.h"
 #include "pwc.h"
 #include "pwc-uncompress.h"
 
 
 /* This contains a list of all registered decompressors */
-LIST_HEAD(pwc_decompressor_list);
+static LIST_HEAD(pwc_decompressor_list);
 
 /* Should the pwc_decompress structure ever change, we increase the 
    version number so that we don't get nasty surprises, or can 
@@ -126,50 +124,14 @@ int pwc_decompress(struct pwc_device *pdev)
 	if (pdev->image.x == pdev->view.x && pdev->image.y == pdev->view.y) {
 		/* Sizes matches; make it quick */
 		switch(pdev->vpalette) {
-		case VIDEO_PALETTE_RGB24 | 0x80:
-			ccvt_420i_rgb24(pdev->image.x, pdev->image.y, yuv, image);
-			break;
-		case VIDEO_PALETTE_RGB24:
-			ccvt_420i_bgr24(pdev->image.x, pdev->image.y, yuv, image);
-			break;
-		case VIDEO_PALETTE_RGB32 | 0x80:
-			ccvt_420i_rgb32(pdev->image.x, pdev->image.y, yuv, image);
-			break;
-		case VIDEO_PALETTE_RGB32:
-			ccvt_420i_bgr32(pdev->image.x, pdev->image.y, yuv, image);
-			break;
-		case VIDEO_PALETTE_YUYV:
-		case VIDEO_PALETTE_YUV422:
-			ccvt_420i_yuyv(pdev->image.x, pdev->image.y, yuv, image); 
-			break;
 		case VIDEO_PALETTE_YUV420:
 			memcpy(image, yuv, pdev->image.size);
-			break;
-		case VIDEO_PALETTE_YUV420P:
-			n = pdev->image.x * pdev->image.y;
-			ccvt_420i_420p(pdev->image.x, pdev->image.y, yuv, image, image + n, image + n + (n / 4));
 			break;
 		}
 	}
 	else {
  		/* Size mismatch; use viewport conversion routines */
 	 	switch(pdev->vpalette) {
- 		case VIDEO_PALETTE_RGB24 | 0x80:
- 			vcvt_420i_rgb24(pdev->image.x, pdev->image.y, pdev->view.x, yuv, image + pdev->offset.size);
-	 		break;
- 		case VIDEO_PALETTE_RGB24:
- 			vcvt_420i_bgr24(pdev->image.x, pdev->image.y, pdev->view.x, yuv, image + pdev->offset.size);
-	 		break;
- 		case VIDEO_PALETTE_RGB32 | 0x80:
- 			vcvt_420i_rgb32(pdev->image.x, pdev->image.y, pdev->view.x, yuv, image + pdev->offset.size);
-	 		break;
- 		case VIDEO_PALETTE_RGB32:
- 			vcvt_420i_bgr32(pdev->image.x, pdev->image.y, pdev->view.x, yuv, image + pdev->offset.size);
- 			break;
-		case VIDEO_PALETTE_YUYV:
-		case VIDEO_PALETTE_YUV422:
-			vcvt_420i_yuyv(pdev->image.x, pdev->image.y, pdev->view.x, yuv, image + pdev->offset.size);
-			break;
 		case VIDEO_PALETTE_YUV420:
 			dst = image + pdev->offset.size;
 			w = pdev->view.x * 6;
@@ -180,41 +142,16 @@ int pwc_decompress(struct pwc_device *pdev)
 				yuv += c;
 			}
 			break;
-		case VIDEO_PALETTE_YUV420P:
-			n = pdev->view.x * pdev->view.y;
-			vcvt_420i_420p(pdev->image.x, pdev->image.y, pdev->view.x, yuv,
-					image +             pdev->offset.size,
-					image + n +         pdev->offset.size / 4,
-					image + n + n / 4 + pdev->offset.size / 4);
-			break;
  		}
  	}
 	return 0;
 }
 
-
-/* wrapper functions.
-   By using these wrapper functions and exporting them with no VERSIONING,
-   I can be sure the pwcx.o module will load on all systems.
-*/
-
-void *pwc_kmalloc(size_t size, int priority)
-{
-	return kmalloc(size, priority);
-}
-
-void pwc_kfree(const void *pointer)
-{
-	kfree(pointer);
-}
-
 /* Make sure these functions are available for the decompressor plugin
    both when this code is compiled into the kernel or as as module.
-   We are using unversioned names!
  */
+
 EXPORT_SYMBOL_NOVERS(pwc_decompressor_version);
-EXPORT_SYMBOL_NOVERS(pwc_register_decompressor);
-EXPORT_SYMBOL_NOVERS(pwc_unregister_decompressor);
-EXPORT_SYMBOL_NOVERS(pwc_find_decompressor);
-EXPORT_SYMBOL_NOVERS(pwc_kmalloc);
-EXPORT_SYMBOL_NOVERS(pwc_kfree);
+EXPORT_SYMBOL(pwc_register_decompressor);
+EXPORT_SYMBOL(pwc_unregister_decompressor);
+EXPORT_SYMBOL(pwc_find_decompressor);

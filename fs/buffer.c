@@ -626,7 +626,7 @@ int inode_has_buffers(struct inode *inode)
    to do in order to release the ramdisk memory is to destroy dirty buffers.
 
    These are two special cases. Normal usage imply the device driver
-   to issue a sync on the device (without waiting I/O completation) and
+   to issue a sync on the device (without waiting I/O completion) and
    then an invalidate_buffers call that doesn't trash dirty buffers. */
 void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
 {
@@ -760,7 +760,12 @@ static void refill_freelist(int size)
 	balance_dirty(NODEV);
 	if (free_shortage())
 		page_launder(GFP_BUFFER, 0);
-	grow_buffers(size);
+	if (!grow_buffers(size)) {
+		wakeup_bdflush(1);
+		current->policy |= SCHED_YIELD;
+		__set_current_state(TASK_RUNNING);
+		schedule();
+	}
 }
 
 void init_buffer(struct buffer_head *bh, bh_end_io_t *handler, void *private)
@@ -1025,12 +1030,13 @@ repeat:
 	write_unlock(&hash_table_lock);
 	spin_unlock(&lru_list_lock);
 	refill_freelist(size);
+	/* FIXME: getblk should fail if there's no enough memory */
 	goto repeat;
 }
 
 /* -1 -> no need to flush
     0 -> async flush
-    1 -> sync flush (wait for I/O completation) */
+    1 -> sync flush (wait for I/O completion) */
 int balance_dirty_state(kdev_t dev)
 {
 	unsigned long dirty, tot, hard_dirty_limit, soft_dirty_limit;
@@ -1419,6 +1425,7 @@ static void create_empty_buffers(struct page *page, kdev_t dev, unsigned long bl
 {
 	struct buffer_head *bh, *head, *tail;
 
+	/* FIXME: create_buffers should fail if there's no enough memory */
 	head = create_buffers(page, blocksize, 1);
 	if (page->buffers)
 		BUG();
@@ -2341,11 +2348,9 @@ cleaned_buffers_try_again:
 	spin_lock(&free_list[index].lock);
 	tmp = bh;
 	do {
-		struct buffer_head *p = tmp;
-
-		tmp = tmp->b_this_page;
-		if (buffer_busy(p))
+		if (buffer_busy(tmp))
 			goto busy_buffer_page;
+		tmp = tmp->b_this_page;
 	} while (tmp != bh);
 
 	spin_lock(&unused_list_lock);

@@ -107,7 +107,7 @@ struct Nala_table_entry {
 
 static struct Nala_table_entry Nala_table[PSZ_MAX][8] =
 {
-#include "nala.inc"
+#include "pwc_nala.h"
 };
 
 /* This tables contains entries for the 675/680/690 (Timon) camera, with
@@ -134,7 +134,7 @@ struct Timon_table_entry
 
 static struct Timon_table_entry Timon_table[PSZ_MAX][6][4] = 
 {
-#include "timon.inc"
+#include "pwc_timon.h"
 };
 
 /* Entries for the Kiara (730/740) camera */
@@ -149,7 +149,7 @@ struct Kiara_table_entry
 
 static struct Kiara_table_entry Kiara_table[PSZ_MAX][6][4] =
 {
-#include "kiara.inc"
+#include "pwc_kiara.h"
 };
 
 
@@ -184,7 +184,6 @@ void pwc_hexdump(void *p, int len)
 
 static inline int send_video_command(struct usb_device *udev, int index, void *buf, int buflen)
 {
-#ifdef __KERNEL__
 	return usb_control_msg(udev,
 		usb_sndctrlpipe(udev, 0),
 		SET_EP_STREAM_CTL,
@@ -192,9 +191,6 @@ static inline int send_video_command(struct usb_device *udev, int index, void *b
 		VIDEO_OUTPUT_CONTROL_FORMATTER,
 		index,
 		buf, buflen, HZ);
-#else
-	return 0;
-#endif	
 }
 
 

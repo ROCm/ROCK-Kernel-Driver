@@ -18,26 +18,15 @@
 #ifndef PWC_H
 #define PWC_H
 
-#ifdef __KERNEL__
+#include <linux/config.h>
 #include <linux/module.h>
-#include <asm/semaphore.h>
-#include <asm/errno.h>
 #include <linux/usb.h>
 #include <linux/spinlock.h>
-#include <linux/slab.h>
-#else
-#include <errno.h>
-#include <sys/types.h>
-
-#define printk printf
-#define KERN_DEBUG "<7>"
-#define KERN_INFO  "<6>"
-#define KERN_ERR   "<3>"
-#endif
-
-#include <linux/config.h>
 #include <linux/videodev.h>
 #include <linux/wait.h>
+
+#include <asm/semaphore.h>
+#include <asm/errno.h>
 
 /* Defines and structures for the Philips webcam */
 /* Used for checking memory corruption/pointer validation */
@@ -56,10 +45,10 @@
 #define TRACE_SIZE	0x0040
 #define TRACE_SEQUENCE	0x1000
 
-#define Trace(R, A...) if (pwc_trace & R) printk(KERN_DEBUG PWC_NAME " " ##A)
-#define Debug(A...) printk(KERN_DEBUG PWC_NAME " " ##A)
-#define Info(A...)  printk(KERN_INFO  PWC_NAME " " ##A)
-#define Err(A...)   printk(KERN_ERR   PWC_NAME " " ##A)
+#define Trace(R, A...) if (pwc_trace & R) printk(KERN_DEBUG PWC_NAME " " A)
+#define Debug(A...) printk(KERN_DEBUG PWC_NAME " " A)
+#define Info(A...)  printk(KERN_INFO  PWC_NAME " " A)
+#define Err(A...)   printk(KERN_ERR   PWC_NAME " " A)
 
 
 /* Defines for ToUCam cameras */
@@ -122,9 +111,7 @@ struct pwc_iso_buf
 	void *data;
 	int  length;
 	int  read;
-#ifdef __KERNEL__
 	purb_t urb;
-#endif
 };
 
 /* intermediate buffers with raw data from the USB cam */
@@ -218,7 +205,6 @@ struct pwc_device
    int image_read_pos;			/* In case we read data in pieces, keep track of were we are in the imagebuffer */
    int image_used[MAX_IMAGES];		/* For MCAPTURE and SYNC */
 
-#ifdef __KERNEL__
    /* Kernel specific structures. These were once moved to the end 
       of the structure and padded with bytes after I found out
       some of these have different sizes in different kernel versions.
@@ -236,7 +222,6 @@ struct pwc_device
    wait_queue_head_t remove_ok;		/* When we got hot unplugged, we have to avoid a few race conditions */
 #if PWC_INT_PIPE
    void *usb_int_handler;		/* for the interrupt endpoint */
-#endif   
 #endif   
 };
 

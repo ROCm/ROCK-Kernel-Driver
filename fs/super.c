@@ -282,6 +282,21 @@ struct file_system_type *get_fs_type(const char *name)
 
 static LIST_HEAD(vfsmntlist);
 
+struct vfsmount *alloc_vfsmnt(void)
+{
+	struct vfsmount *mnt = kmalloc(sizeof(struct vfsmount), GFP_KERNEL); 
+	if (mnt) {
+		memset(mnt, 0, sizeof(struct vfsmount));
+		atomic_set(&mnt->mnt_count,1);
+		INIT_LIST_HEAD(&mnt->mnt_clash);
+		INIT_LIST_HEAD(&mnt->mnt_child);
+		INIT_LIST_HEAD(&mnt->mnt_mounts);
+		INIT_LIST_HEAD(&mnt->mnt_list);
+		mnt->mnt_owner = current->uid;
+	}
+	return mnt;
+}
+
 static void detach_mnt(struct vfsmount *mnt, struct nameidata *old_nd)
 {
 	old_nd->dentry = mnt->mnt_mountpoint;
@@ -314,13 +329,6 @@ static void attach_mnt(struct vfsmount *mnt, struct nameidata *nd)
  *	Potential reason for failure (aside of trivial lack of memory) is a
  *	deleted mountpoint. Caller must hold ->i_zombie on mountpoint
  *	dentry (if any).
- *
- *	Node is marked as MNT_VISIBLE (visible in /proc/mounts) unless both
- *	@nd and @devname are %NULL. It works since we pass non-%NULL @devname
- *	when we are mounting root and kern_mount() filesystems are deviceless.
- *	If we will get a kern_mount() filesystem with nontrivial @devname we
- *	will have to pass the visibility flag explicitly, so if we will add
- *	support for such beasts we'll have to change prototype.
  */
 
 static struct vfsmount *add_vfsmnt(struct nameidata *nd,
@@ -331,13 +339,9 @@ static struct vfsmount *add_vfsmnt(struct nameidata *nd,
 	struct super_block *sb = root->d_inode->i_sb;
 	char *name;
 
-	mnt = kmalloc(sizeof(struct vfsmount), GFP_KERNEL);
+	mnt = alloc_vfsmnt();
 	if (!mnt)
 		goto out;
-	memset(mnt, 0, sizeof(struct vfsmount));
-
-	if (nd || dev_name)
-		mnt->mnt_flags = MNT_VISIBLE;
 
 	/* It may be NULL, but who cares? */
 	if (dev_name) {
@@ -347,8 +351,6 @@ static struct vfsmount *add_vfsmnt(struct nameidata *nd,
 			mnt->mnt_devname = name;
 		}
 	}
-	mnt->mnt_owner = current->uid;
-	atomic_set(&mnt->mnt_count,1);
 	mnt->mnt_sb = sb;
 
 	spin_lock(&dcache_lock);
@@ -361,13 +363,12 @@ static struct vfsmount *add_vfsmnt(struct nameidata *nd,
 	} else {
 		mnt->mnt_mountpoint = mnt->mnt_root;
 		mnt->mnt_parent = mnt;
-		INIT_LIST_HEAD(&mnt->mnt_child);
-		INIT_LIST_HEAD(&mnt->mnt_clash);
 	}
-	INIT_LIST_HEAD(&mnt->mnt_mounts);
 	list_add(&mnt->mnt_instances, &sb->s_mounts);
 	list_add(&mnt->mnt_list, vfsmntlist.prev);
 	spin_unlock(&dcache_lock);
+	if (sb->s_type->fs_flags & FS_SINGLE)
+		get_filesystem(sb->s_type);
 out:
 	return mnt;
 fail:
@@ -500,8 +501,6 @@ int get_filesystem_info( char *buf )
 
 	for (p = vfsmntlist.next; p != &vfsmntlist; p = p->next) {
 		struct vfsmount *tmp = list_entry(p, struct vfsmount, mnt_list);
-		if (!(tmp->mnt_flags & MNT_VISIBLE))
-			continue;
 		path = d_path(tmp->mnt_root, tmp, buffer, PAGE_SIZE);
 		if (!path)
 			continue;
@@ -855,7 +854,6 @@ static struct super_block *get_sb_single(struct file_system_type *fs_type,
 	sb = fs_type->kern_mnt->mnt_sb;
 	if (!sb)
 		BUG();
-	get_filesystem(fs_type);
 	do_remount_sb(sb, flags, data);
 	return sb;
 }
@@ -947,21 +945,31 @@ static int do_remount_sb(struct super_block *sb, int flags, char *data)
 
 struct vfsmount *kern_mount(struct file_system_type *type)
 {
-	kdev_t dev = get_unnamed_dev();
 	struct super_block *sb;
-	struct vfsmount *mnt;
-	if (!dev)
+	struct vfsmount *mnt = alloc_vfsmnt();
+	kdev_t dev;
+
+	if (!mnt)
+		return ERR_PTR(-ENOMEM);
+
+	dev = get_unnamed_dev();
+	if (!dev) {
+		kfree(mnt);
 		return ERR_PTR(-EMFILE);
+	}
 	sb = read_super(dev, NULL, type, 0, NULL, 0);
 	if (!sb) {
 		put_unnamed_dev(dev);
+		kfree(mnt);
 		return ERR_PTR(-EINVAL);
 	}
-	mnt = add_vfsmnt(NULL, sb->s_root, NULL);
-	if (!mnt) {
-		kill_super(sb);
-		return ERR_PTR(-ENOMEM);
-	}
+	mnt->mnt_sb = sb;
+	mnt->mnt_root = dget(sb->s_root);
+	mnt->mnt_mountpoint = mnt->mnt_root;
+	mnt->mnt_parent = mnt;
+	spin_lock(&dcache_lock);
+	list_add(&mnt->mnt_instances, &sb->s_mounts);
+	spin_unlock(&dcache_lock);
 	type->kern_mnt = mnt;
 	return mnt;
 }
@@ -1158,8 +1166,6 @@ static int do_loopback(char *old_name, char *new_name)
 		goto out2;
 
 	err = -ENOMEM;
-	if (old_nd.mnt->mnt_sb->s_type->fs_flags & FS_SINGLE)
-		get_filesystem(old_nd.mnt->mnt_sb->s_type);
 		
 	down(&mount_sem);
 	/* there we go */
@@ -1170,8 +1176,6 @@ static int do_loopback(char *old_name, char *new_name)
 		err = 0;
 	up(&new_nd.dentry->d_inode->i_zombie);
 	up(&mount_sem);
-	if (err && old_nd.mnt->mnt_sb->s_type->fs_flags & FS_SINGLE)
-		put_filesystem(old_nd.mnt->mnt_sb->s_type);
 out2:
 	path_release(&new_nd);
 out1:
@@ -1362,8 +1366,6 @@ fs_out:
 	return retval;
 
 fail:
-	if (fstype->fs_flags & FS_SINGLE)
-		put_filesystem(fstype);
 	kill_super(sb);
 	goto unlock_out;
 }

@@ -2780,12 +2780,12 @@ static
 int ide_cdrom_open (struct inode *ip, struct file *fp, ide_drive_t *drive)
 {
 	struct cdrom_info *info = drive->driver_data;
-	int rc;
+	int rc = -ENOMEM;
 
 	MOD_INC_USE_COUNT;
 	if (info->buffer == NULL)
 		info->buffer = (char *) kmalloc(SECTOR_BUFFER_SIZE, GFP_KERNEL);
-	if ((rc = cdrom_fops.open(ip, fp))) {
+	if ((info->buffer == NULL) || (rc = cdrom_fops.open(ip, fp))) {
 		drive->usage--;
 		MOD_DEC_USE_COUNT;
 	}

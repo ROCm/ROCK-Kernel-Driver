@@ -1,3 +1,13 @@
+/*
+ *
+ * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200, G400 and G450.
+ *
+ * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
+ *
+ * Version: 1.52 2001/05/25
+ *
+ */
+
 #include "matroxfb_maven.h"
 #include "matroxfb_crtc2.h"
 #include "matroxfb_misc.h"
@@ -649,6 +659,9 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	void* oldcrtc2;
 
 	d = kmalloc(sizeof(*d), GFP_KERNEL);
+	if (!d) {
+		return -ENOMEM;
+	}
 
 	memset(d, 0, sizeof(*d));
 
@@ -800,7 +813,7 @@ static void matroxfb_crtc2_exit(void) {
 	matroxfb_unregister_driver(&crtc2);
 }
 
-MODULE_AUTHOR("(c) 1999,2000 Petr Vandrovec <vandrove@vc.cvut.cz>");
+MODULE_AUTHOR("(c) 1999-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
 MODULE_DESCRIPTION("Matrox G400 CRTC2 driver");
 module_init(matroxfb_crtc2_init);
 module_exit(matroxfb_crtc2_exit);

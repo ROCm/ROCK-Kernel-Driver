@@ -767,7 +767,7 @@ static inline void parse_mem_cmdline (char ** cmdline_p)
 
 void __init setup_arch(char **cmdline_p)
 {
-	unsigned long bootmap_size;
+	unsigned long bootmap_size, low_mem_size;
 	unsigned long start_pfn, max_pfn, max_low_pfn;
 	int i;
 
@@ -1013,7 +1013,9 @@ void __init setup_arch(char **cmdline_p)
 		request_resource(&ioport_resource, standard_io_resources+i);
 
 	/* Tell the PCI layer not to allocate too close to the RAM area.. */
-	pci_mem_start = ((max_low_pfn << PAGE_SHIFT) + 0xfffff) & ~0xfffff;
+	low_mem_size = ((max_low_pfn << PAGE_SHIFT) + 0xfffff) & ~0xfffff;
+	if (low_mem_size > pci_mem_start)
+		pci_mem_start = low_mem_size;
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)

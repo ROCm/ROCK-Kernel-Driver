@@ -349,6 +349,7 @@ int __init madgemc_probe(void)
 			printk(":%2.2x", dev->dev_addr[i]);
 		printk("\n");
 
+		/* XXX is ISA_MAX_ADDRESS correct here? */
 		if (tmsdev_init(dev, ISA_MAX_ADDRESS, NULL)) {
 			printk("%s: unable to get memory for dev->priv.\n", 
 			       dev->name);

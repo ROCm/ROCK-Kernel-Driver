@@ -18,18 +18,11 @@ list-multi		:= usbcore.o
 usbcore-objs		:= usb.o usb-debug.o hub.o
 
 ifneq ($(CONFIG_USB_PWC),n)
-	# By default we use the C colour conversion functions unless we
-	# detect an Intel CPU, for which there is assembly available
-	ccvt-objs		:= ccvt_c.o vcvt_c.o
-	ifeq ($(CONFIG_X86),y)
-		ccvt-objs		:= ccvt_i386.o vcvt_i386.o
-	endif
-
 	export-objs		+= pwc-uncompress.o
 	list-multi		+= pwc.o
 endif
 
-pwc-objs		:= pwc-if.o pwc-misc.o pwc-ctrl.o pwc-uncompress.o $(ccvt-objs)
+pwc-objs		:= pwc-if.o pwc-misc.o pwc-ctrl.o pwc-uncompress.o
 
 
 # Optional parts of multipart objects.

@@ -55,7 +55,6 @@
 #endif
 
 /* Function prototypes and driver templates */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 
 /* hotplug device table support */
 static __devinitdata struct usb_device_id pwc_device_table [] = {
@@ -83,20 +82,6 @@ static struct usb_driver pwc_driver =
 	disconnect:		usb_pwc_disconnect,	/* disconnect() */
 };
 
-#else
-
-static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum);
-static void usb_pwc_disconnect(struct usb_device *udev, void *ptr);
-
-static struct usb_driver pwc_driver =
-{
-	name:			"Philips webcam",	/* name */
-	probe:			usb_pwc_probe,		/* probe() */
-	disconnect:		usb_pwc_disconnect,	/* disconnect() */
-};
-#endif
- 
-
 static int default_size = PSZ_QCIF;
 static int default_fps = 10;
 static int default_palette = VIDEO_PALETTE_RGB24; /* This is normal for webcams */
@@ -122,16 +107,10 @@ static int  pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *a
 static int  pwc_video_mmap(struct video_device *dev, const char *adr, unsigned long size);
 
 static struct video_device pwc_template = {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,3)
-	owner:		NULL,
-#endif
+	owner:		THIS_MODULE,
 	name:		"Philips Webcam",	/* Filled in later */
 	type:		VID_TYPE_CAPTURE,
-#ifdef VID_HARDWARE_PWC
 	hardware:	VID_HARDWARE_PWC,	/* Let's pretend for now */
-#else
-	hardware:	0,			/* 2.2.14 backport (?) */
-#endif		
 	open:		pwc_video_open,
 	close:		pwc_video_close,
 	read:		pwc_video_read,
@@ -612,14 +591,8 @@ static inline void pwc_next_image(struct pwc_device *pdev)
 
 static int pwc_set_palette(struct pwc_device *pdev, int pal)
 {
-	if (   pal == VIDEO_PALETTE_RGB24 
-	    || pal == VIDEO_PALETTE_RGB32 
-            || pal == (VIDEO_PALETTE_RGB24 | 0x80)
-            || pal == (VIDEO_PALETTE_RGB32 | 0x80)
-            || pal == VIDEO_PALETTE_YUYV
-            || pal == VIDEO_PALETTE_YUV422
-            || pal == VIDEO_PALETTE_YUV420
-            || pal == VIDEO_PALETTE_YUV420P
+	if (
+            pal == VIDEO_PALETTE_YUV420
 #if PWC_DEBUG
             || pal == VIDEO_PALETTE_RAW
 #endif
@@ -949,17 +922,12 @@ static int pwc_video_open(struct video_device *vdev, int mode)
 
 	Trace(TRACE_OPEN, "video_open called(0x%p, 0%o).\n", vdev, mode);
 	
-	if (vdev == NULL) {
-		Err("video_open() called with NULL structure?\n");
-		return -EFAULT;
-	}
+	if (vdev == NULL)
+		BUG();
 	pdev = (struct pwc_device *)vdev->priv;
-	if (pdev == NULL) {
-		Err("video_open() called with NULL pwc_device.\n");
-		return -EFAULT;
-	}
+	if (pdev == NULL)
+		BUG();
 	
-	MOD_INC_USE_COUNT;
 	down(&pdev->modlock);
 	if (!pdev->usb_init) {
 		Trace(TRACE_OPEN, "Doing first time initialization.\n");
@@ -981,7 +949,6 @@ static int pwc_video_open(struct video_device *vdev, int mode)
 	i = pwc_allocate_buffers(pdev);
 	if (i < 0) {
 		Trace(TRACE_OPEN, "Failed to allocate memory.\n");
-		MOD_DEC_USE_COUNT;
 		up(&pdev->modlock);
 		return i;
 	}
@@ -1026,14 +993,12 @@ static int pwc_video_open(struct video_device *vdev, int mode)
 	}
 	if (i) {
 		Trace(TRACE_OPEN, "Second attempt at set_video_mode failed.\n");
-		MOD_DEC_USE_COUNT;
 		up(&pdev->modlock);
 		return i;
 	}
 	i = usb_set_interface(pdev->udev, 0, pdev->valternate);
 	if (i) {
 		Trace(TRACE_OPEN, "Failed to set alternate interface = %d.\n", i);
-		MOD_DEC_USE_COUNT;
 		up(&pdev->modlock);
 		return -EINVAL;
 	}
@@ -1064,15 +1029,8 @@ static void pwc_video_close(struct video_device *vdev)
 	int i;
 
 	Trace(TRACE_OPEN, "video_close called(0x%p).\n", vdev);
-	if (vdev == NULL) {
-		Err("video_close() called with NULL structure?\n");
-		return;
-	}
+
 	pdev = (struct pwc_device *)vdev->priv;
-	if (pdev == NULL) {
-		Err("video_close() called with NULL pwc_device.\n");
-		return;
-	}
 	if (pdev->vopen == 0)
 		Info("video_close() called on closed device?\n");
 
@@ -1116,10 +1074,12 @@ static void pwc_video_close(struct video_device *vdev)
 	/* wake up _disconnect() routine */
 	if (pdev->unplugged)
 		wake_up(&pdev->remove_ok);
-
-	MOD_DEC_USE_COUNT;
 }
 
+/*
+ *	FIXME: what about two parallel reads ????
+ */
+ 
 static long pwc_video_read(struct video_device *vdev, char *buf, unsigned long count, int noblock)
 {
 	struct pwc_device *pdev;
@@ -1309,6 +1269,9 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 			if (copy_from_user(&p, arg, sizeof(p)))
 				return -EFAULT;
 
+			/*
+			 *	FIXME:	Suppose we are mid read
+			 */
 			pwc_set_brightness(pdev, p.brightness);
 			pwc_set_contrast(pdev, p.contrast);
 			pwc_set_gamma(pdev, p.whiteness);
@@ -1482,6 +1445,8 @@ static int pwc_video_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 			   conflict with read(), but any programmer that uses
 			   read() and mmap() simultaneously should be given 
 			   a job at Micro$oft. As janitor.
+			   
+			   FIXME: needs auditing for safety.
 			 */
 			while (pdev->full_frames == NULL) {
 				interruptible_sleep_on(&pdev->frameq);
@@ -1521,11 +1486,9 @@ static int pwc_video_mmap(struct video_device *vdev, const char *adr, unsigned l
 	unsigned long page, pos;
 	
 	Trace(TRACE_READ, "mmap(0x%p, 0x%p, %lu) called.\n", vdev, adr, size);
-	if (vdev == NULL)
-		return -EFAULT;
 	pdev = vdev->priv;
-	if (pdev == NULL)
-		return -EFAULT;
+
+	/* FIXME - audit mmap during a read */		
 
 	pos = (unsigned long)pdev->image_data;
 	while (size > 0) {
@@ -1551,11 +1514,7 @@ static int pwc_video_mmap(struct video_device *vdev, const char *adr, unsigned l
  * is loaded.
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum, const struct usb_device_id *id)
-#else
-static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum)
-#endif
 {
 	struct pwc_device *pdev = NULL;
 	struct video_device *vdev;
@@ -1579,8 +1538,6 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum)
 	vendor_id = udev->descriptor.idVendor;
 	product_id = udev->descriptor.idProduct;
 	
-	if (vendor_id != 0x0471 && vendor_id != 0x069A)
-		return NULL; /* Not Philips or Askey, for sure. */
 
 	if (vendor_id == 0x0471) {
 		switch (product_id) {
@@ -1621,7 +1578,7 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum)
 			break;
 		}
 	}
-	if (vendor_id == 0x069A) {
+	else if (vendor_id == 0x069A) {
 		switch(product_id) {
 		case 0x0001:
 			Info("Askey VC010 type 1 USB webcam detected.\n");
@@ -1632,6 +1589,8 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum)
 			break;
 		}
 	}
+	else return NULL; /* Not Philips or Askey, for sure. */
+
 	if (udev->descriptor.bNumConfigurations > 1)
 		Info("Warning: more than 1 configuration available.\n");
 
@@ -1665,9 +1624,7 @@ static void *usb_pwc_probe(struct usb_device *udev, unsigned int ifnum)
 	}
 	memcpy(vdev, &pwc_template, sizeof(pwc_template));
 	sprintf(vdev->name, "Philips %d webcam", pdev->type);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,3)
 	SET_MODULE_OWNER(vdev);
-#endif	
 	pdev->vdev = vdev;
 	vdev->priv = pdev;
 
@@ -1827,22 +1784,10 @@ static int __init usb_pwc_init(void)
 	}
 	if (palette) {
 		/* Determine default palette */
-		if (!strcmp(palette, "bgr24"))
-			default_palette = VIDEO_PALETTE_RGB24;
-		else if (!strcmp(palette, "rgb24"))
-			default_palette = VIDEO_PALETTE_RGB24 | 0x80;
-		else if (!strcmp(palette, "bgr32"))
-			default_palette = VIDEO_PALETTE_RGB32;
-		else if (!strcmp(palette, "rgb32"))
-			default_palette = VIDEO_PALETTE_RGB32 | 0x80;
-		else if (!strcmp(palette, "yuyv"))
-			default_palette = VIDEO_PALETTE_YUYV;
-		else if (!strcmp(palette, "yuv420"))
+		if (!strcmp(palette, "yuv420"))
 			default_palette = VIDEO_PALETTE_YUV420;
-		else if (!strcmp(palette, "yuv420p"))
-			default_palette = VIDEO_PALETTE_YUV420P;
 		else {
-			Err("Palette not recognized: try palette=[bgr24 | rgb24 | bgr32 | rgb32 | yuyv | yuv420 | yuv420p].\n");
+			Err("Palette not recognized: try palette=yuv420.\n");
 			return -EINVAL;
 		}
 		Info("Default palette set to %d.\n", default_palette);

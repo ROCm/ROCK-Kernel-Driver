@@ -871,8 +871,11 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 	 * before we get around to moving them to the other
 	 * list, so this is a relatively cheap operation.
 	 */
-	if (free_shortage())
+	if (free_shortage()) {
 		ret += page_launder(gfp_mask, user);
+		shrink_dcache_memory(DEF_PRIORITY, gfp_mask);
+		shrink_icache_memory(DEF_PRIORITY, gfp_mask);
+	}
 
 	/*
 	 * If needed, we move pages from the active list
@@ -882,23 +885,9 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 		ret += refill_inactive(gfp_mask, user);
 
 	/* 	
-	 * Delete pages from the inode and dentry caches and 
-	 * reclaim unused slab cache if memory is low.
+	 * Reclaim unused slab cache if memory is low.
 	 */
-	if (free_shortage()) {
-		shrink_dcache_memory(DEF_PRIORITY, gfp_mask);
-		shrink_icache_memory(DEF_PRIORITY, gfp_mask);
-	} else {
-		/*
-		 * Illogical, but true. At least for now.
-		 *
-		 * If we're _not_ under shortage any more, we
-		 * reap the caches. Why? Because a noticeable
-		 * part of the caches are the buffer-heads, 
-		 * which we'll want to keep if under shortage.
-		 */
-		kmem_cache_reap(gfp_mask);
-	} 
+	kmem_cache_reap(gfp_mask);
 
 	return ret;
 }

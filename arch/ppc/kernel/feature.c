@@ -270,7 +270,7 @@ static struct device_node*		airport_dev;
 static struct board_features_t {
 	char*	compatible;
 	u32	features;
-} board_features_datas[] __init = 
+} board_features_datas[] __initdata = 
 {
   {	"AAPL,PowerMac G3",	0				}, /* Beige G3 */
   {	"iMac,1",		0				}, /* First iMac (gossamer) */

@@ -159,6 +159,19 @@ void kunmap_high(struct page *page)
 	spin_unlock(&kmap_lock);
 }
 
+#define POOL_SIZE 32
+
+/*
+ * This lock gets no contention at all, normally.
+ */
+static spinlock_t emergency_lock = SPIN_LOCK_UNLOCKED;
+
+int nr_emergency_pages;
+static LIST_HEAD(emergency_pages);
+
+int nr_emergency_bhs;
+static LIST_HEAD(emergency_bhs);
+
 /*
  * Simple bounce buffer support for highmem pages.
  * This will be moved to the block layer in 2.5.
@@ -203,16 +216,71 @@ static inline void copy_to_high_bh_irq (struct buffer_head *to,
 
 static inline void bounce_end_io (struct buffer_head *bh, int uptodate)
 {
+	struct page *page;
 	struct buffer_head *bh_orig = (struct buffer_head *)(bh->b_private);
+	unsigned long flags;
 
 	bh_orig->b_end_io(bh_orig, uptodate);
-	__free_page(bh->b_page);
+
+	page = bh->b_page;
+
+	spin_lock_irqsave(&emergency_lock, flags);
+	if (nr_emergency_pages >= POOL_SIZE)
+		__free_page(page);
+	else {
+		/*
+		 * We are abusing page->list to manage
+		 * the highmem emergency pool:
+		 */
+		list_add(&page->list, &emergency_pages);
+		nr_emergency_pages++;
+	}
+	
+	if (nr_emergency_bhs >= POOL_SIZE) {
 #ifdef HIGHMEM_DEBUG
-	/* Don't clobber the constructed slab cache */
-	init_waitqueue_head(&bh->b_wait);
+		/* Don't clobber the constructed slab cache */
+		init_waitqueue_head(&bh->b_wait);
 #endif
-	kmem_cache_free(bh_cachep, bh);
+		kmem_cache_free(bh_cachep, bh);
+	} else {
+		/*
+		 * Ditto in the bh case, here we abuse b_inode_buffers:
+		 */
+		list_add(&bh->b_inode_buffers, &emergency_bhs);
+		nr_emergency_bhs++;
+	}
+	spin_unlock_irqrestore(&emergency_lock, flags);
 }
+
+static __init int init_emergency_pool(void)
+{
+	spin_lock_irq(&emergency_lock);
+	while (nr_emergency_pages < POOL_SIZE) {
+		struct page * page = alloc_page(GFP_ATOMIC);
+		if (!page) {
+			printk("couldn't refill highmem emergency pages");
+			break;
+		}
+		list_add(&page->list, &emergency_pages);
+		nr_emergency_pages++;
+	}
+	while (nr_emergency_bhs < POOL_SIZE) {
+		struct buffer_head * bh = kmem_cache_alloc(bh_cachep, SLAB_ATOMIC);
+		if (!bh) {
+			printk("couldn't refill highmem emergency bhs");
+			break;
+		}
+		list_add(&bh->b_inode_buffers, &emergency_bhs);
+		nr_emergency_bhs++;
+	}
+	spin_unlock_irq(&emergency_lock);
+	printk("allocated %d pages and %d bhs reserved for the highmem bounces\n",
+	       nr_emergency_pages, nr_emergency_bhs);
+
+	return 0;
+}
+
+__initcall(init_emergency_pool);
 
 static void bounce_end_io_write (struct buffer_head *bh, int uptodate)
 {
@@ -228,6 +296,82 @@ static void bounce_end_io_read (struct buffer_head *bh, int uptodate)
 	bounce_end_io(bh, uptodate);
 }
 
+struct page *alloc_bounce_page (void)
+{
+	struct list_head *tmp;
+	struct page *page;
+
+repeat_alloc:
+	page = alloc_page(GFP_BUFFER);
+	if (page)
+		return page;
+	/*
+	 * No luck. First, kick the VM so it doesnt idle around while
+	 * we are using up our emergency rations.
+	 */
+	wakeup_bdflush(0);
+
+	/*
+	 * Try to allocate from the emergency pool.
+	 */
+	tmp = &emergency_pages;
+	spin_lock_irq(&emergency_lock);
+	if (!list_empty(tmp)) {
+		page = list_entry(tmp->next, struct page, list);
+		list_del(tmp->next);
+		nr_emergency_pages--;
+	}
+	spin_unlock_irq(&emergency_lock);
+	if (page)
+		return page;
+
+	/* we need to wait I/O completion */
+	run_task_queue(&tq_disk);
+
+	current->policy |= SCHED_YIELD;
+	__set_current_state(TASK_RUNNING);
+	schedule();
+	goto repeat_alloc;
+}
+
+struct buffer_head *alloc_bounce_bh (void)
+{
+	struct list_head *tmp;
+	struct buffer_head *bh;
+
+repeat_alloc:
+	bh = kmem_cache_alloc(bh_cachep, SLAB_BUFFER);
+	if (bh)
+		return bh;
+	/*
+	 * No luck. First, kick the VM so it doesnt idle around while
+	 * we are using up our emergency rations.
+	 */
+	wakeup_bdflush(0);
+
+	/*
+	 * Try to allocate from the emergency pool.
+	 */
+	tmp = &emergency_bhs;
+	spin_lock_irq(&emergency_lock);
+	if (!list_empty(tmp)) {
+		bh = list_entry(tmp->next, struct buffer_head, b_inode_buffers);
+		list_del(tmp->next);
+		nr_emergency_bhs--;
+	}
+	spin_unlock_irq(&emergency_lock);
+	if (bh)
+		return bh;
+
+	/* we need to wait I/O completion */
+	run_task_queue(&tq_disk);
+
+	current->policy |= SCHED_YIELD;
+	__set_current_state(TASK_RUNNING);
+	schedule();
+	goto repeat_alloc;
+}
+
 struct buffer_head * create_bounce(int rw, struct buffer_head * bh_orig)
 {
 	struct page *page;
@@ -236,24 +380,15 @@ struct buffer_head * create_bounce(int rw, struct buffer_head * bh_orig)
 	if (!PageHighMem(bh_orig->b_page))
 		return bh_orig;
 
-repeat_bh:
-	bh = kmem_cache_alloc(bh_cachep, SLAB_BUFFER);
-	if (!bh) {
-		wakeup_bdflush(1);  /* Sets task->state to TASK_RUNNING */
-		goto repeat_bh;
-	}
+	bh = alloc_bounce_bh();
 	/*
 	 * This is wasteful for 1k buffers, but this is a stopgap measure
 	 * and we are being ineffective anyway. This approach simplifies
 	 * things immensly. On boxes with more than 4GB RAM this should
 	 * not be an issue anyway.
 	 */
-repeat_page:
-	page = alloc_page(GFP_BUFFER);
-	if (!page) {
-		wakeup_bdflush(1);  /* Sets task->state to TASK_RUNNING */
-		goto repeat_page;
-	}
+	page = alloc_bounce_page();
+
 	set_bh_page(bh, page, 0);
 
 	bh->b_next = NULL;

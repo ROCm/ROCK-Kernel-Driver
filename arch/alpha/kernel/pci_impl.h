@@ -135,6 +135,7 @@ struct pci_iommu_arena
 {
 	spinlock_t lock;
 	struct pci_controller *hose;
+#define IOMMU_INVALID_PTE 0x2 /* 32:63 bits MBZ */
 	unsigned long *ptes;
 	dma_addr_t dma_base;
 	unsigned int size;

@@ -137,8 +137,7 @@ static int __init abyss_attach(struct pci_dev *pdev, const struct pci_device_id 
 	 */
 	dev->base_addr += 0x10;
 		
-	ret = tmsdev_init(dev,0,pdev);
-	/* XXX: should be the max PCI32 DMA max */
+	ret = tmsdev_init(dev, PCI_MAX_ADDRESS, pdev);
 	if (ret) {
 		printk("%s: unable to get memory for dev->priv.\n", 
 		       dev->name);

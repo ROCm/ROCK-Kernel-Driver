@@ -3754,6 +3754,10 @@ void md__init md_setup_drive(void)
 			continue;
 		}
 		mddev = alloc_mddev(MKDEV(MD_MAJOR,minor));
+		if (mddev == NULL) {
+			printk("md: kmalloc failed - cannot start array %d\n", minor);
+			continue;
+		}
 		if (md_setup_args.pers[minor]) {
 			/* non-persistent */
 			mdu_array_info_t ainfo;

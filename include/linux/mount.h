@@ -12,8 +12,6 @@
 #define _LINUX_MOUNT_H
 #ifdef __KERNEL__
 
-#define MNT_VISIBLE	1
-
 struct vfsmount
 {
 	struct dentry *mnt_mountpoint;	/* dentry of mountpoint */
