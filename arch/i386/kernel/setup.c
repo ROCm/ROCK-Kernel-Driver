@@ -965,7 +965,6 @@ void __init setup_arch(char **cmdline_p)
 	apm_info.bios = APM_BIOS_INFO;
 	ist_info = IST_INFO;
 	saved_videomode = VIDEO_MODE;
-	printk("Video mode to be used for restore is %lx\n", saved_videomode);
 	if( SYS_DESC_TABLE.length != 0 ) {
 		MCA_bus = SYS_DESC_TABLE.table[3] &0x2;
 		machine_id = SYS_DESC_TABLE.table[0];
