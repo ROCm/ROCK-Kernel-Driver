@@ -7,12 +7,13 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-.S.o:
-	$(CC) -D__ASSEMBLY__ $(AFLAGS) -traditional -c $< -o $*.o
+USE_STANDARD_AS_RULE := true
 
 all: kernel.o head.o init_task.o
 
 O_TARGET	:= kernel.o
+
+EXTRA_AFLAGS := -traditional
 
 export-objs	:= debug.o ebcdic.o irq.o s390_ext.o smp.o s390_ksyms.o \
 		   exec32.o
