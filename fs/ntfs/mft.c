@@ -418,7 +418,8 @@ map_err_out:
 			m = ERR_PTR(-ENOMEM);
 			goto unm_err_out;
 		}
-		if (base_ni->ext.extent_ntfs_inos) {
+		if (base_ni->nr_extents) {
+			BUG_ON(!base_ni->ext.extent_ntfs_inos);
 			memcpy(tmp, base_ni->ext.extent_ntfs_inos, new_size -
 					4 * sizeof(ntfs_inode *));
 			kfree(base_ni->ext.extent_ntfs_inos);
