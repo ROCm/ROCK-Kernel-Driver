@@ -52,7 +52,8 @@ typedef int (*dm_endio_fn) (struct dm_target *ti,
 			    struct bio *bio, int error,
 			    union map_info *map_context);
 
-typedef void (*dm_suspend_fn) (struct dm_target *ti);
+typedef void (*dm_presuspend_fn) (struct dm_target *ti);
+typedef void (*dm_postsuspend_fn) (struct dm_target *ti);
 typedef void (*dm_resume_fn) (struct dm_target *ti);
 
 typedef int (*dm_status_fn) (struct dm_target *ti, status_type_t status_type,
@@ -82,7 +83,8 @@ struct target_type {
 	dm_dtr_fn dtr;
 	dm_map_fn map;
 	dm_endio_fn end_io;
-	dm_suspend_fn suspend;
+	dm_presuspend_fn presuspend;
+	dm_postsuspend_fn postsuspend;
 	dm_resume_fn resume;
 	dm_status_fn status;
 	dm_message_fn message;

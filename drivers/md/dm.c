@@ -919,8 +919,10 @@ void dm_put(struct mapped_device *md)
 	struct dm_table *map = dm_get_table(md);
 
 	if (atomic_dec_and_test(&md->holders)) {
-		if (!test_bit(DMF_SUSPENDED, &md->flags) && map)
-			dm_table_suspend_targets(map);
+		if (!test_bit(DMF_SUSPENDED, &md->flags) && map) {
+			dm_table_presuspend_targets(map);
+			dm_table_postsuspend_targets(map);
+		}
 		__unbind(md);
 		free_dev(md);
 	}
@@ -1032,7 +1034,11 @@ int dm_suspend(struct mapped_device *md)
 		return -EINVAL;
 	}
 
+	map = dm_get_table(md);
+	if (map)
+		dm_table_presuspend_targets(map);
 	__lock_fs(md);
+
 	up_read(&md->lock);
 
 	/*
@@ -1055,7 +1061,6 @@ int dm_suspend(struct mapped_device *md)
 	up_write(&md->lock);
 
 	/* unplug */
-	map = dm_get_table(md);
 	if (map) {
 		dm_table_unplug_all(map);
 		dm_table_put(map);
@@ -1090,7 +1095,7 @@ int dm_suspend(struct mapped_device *md)
 
 	map = dm_get_table(md);
 	if (map)
-		dm_table_suspend_targets(map);
+		dm_table_postsuspend_targets(map);
 	dm_table_put(map);
 	up_write(&md->lock);
 
