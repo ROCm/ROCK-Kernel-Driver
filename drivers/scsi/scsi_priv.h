@@ -85,7 +85,8 @@ extern void scsi_init_cmd_from_req(struct scsi_cmnd *cmd,
 extern void __scsi_release_request(struct scsi_request *sreq);
 
 /* scsi_devinfo.c */
-extern int scsi_get_device_flags(unsigned char *vendor, unsigned char *model);
+extern int scsi_get_device_flags(struct scsi_device *sdev,
+				 unsigned char *vendor, unsigned char *model);
 extern int scsi_init_devinfo(void);
 extern void scsi_exit_devinfo(void);
 

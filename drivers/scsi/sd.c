@@ -1057,6 +1057,11 @@ sd_read_write_protect_flag(struct scsi_disk *sdkp, char *diskname,
 	int res;
 	struct scsi_mode_data data;
 
+	if (sdkp->device->skip_ms_page_3f) {
+		printk(KERN_NOTICE "%s: assuming Write Enabled\n", diskname);
+		return;
+	}
+
 	/*
 	 * First attempt: ask for all pages (0x3F), but only 4 bytes.
 	 * We have to start carefully: some devices hang if we ask
@@ -1103,6 +1108,8 @@ sd_read_cache_type(struct scsi_disk *sdkp, char *diskname,
 	const int modepage = 0x08; /* current values, cache page */
 	struct scsi_mode_data data;
 
+	if (sdkp->device->skip_ms_page_8)
+		goto defaults;
 
 	/* cautiously ask */
 	res = sd_do_mode_sense(SRpnt, dbd, modepage, buffer, 4, &data);
@@ -1160,6 +1167,8 @@ bad_sense:
 		printk(KERN_ERR "%s: asking for cache data failed\n",
 		       diskname);
 	}
+
+defaults:
 	printk(KERN_ERR "%s: assuming drive cache: write through\n",
 	       diskname);
 	sdkp->WCE = 0;
