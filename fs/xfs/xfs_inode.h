@@ -532,8 +532,6 @@ void		xfs_lock_inodes(xfs_inode_t **, int, int, uint);
 
 #define xfs_ipincount(ip)	((unsigned int) atomic_read(&ip->i_pincount))
 
-void xfs_revalidate_inode(struct xfs_mount *, vnode_t *vp, xfs_inode_t *);
-
 #ifdef DEBUG
 void		xfs_isize_check(struct xfs_mount *, xfs_inode_t *, xfs_fsize_t);
 #else	/* DEBUG */
