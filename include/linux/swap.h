@@ -211,7 +211,7 @@ extern struct swap_list_t swap_list;
 asmlinkage long sys_swapoff(const char *);
 asmlinkage long sys_swapon(const char *, int);
 
-extern spinlock_t pagemap_lru_lock;
+extern spinlock_t _pagemap_lru_lock;
 
 extern void FASTCALL(mark_page_accessed(struct page *));
 

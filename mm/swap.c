@@ -41,9 +41,9 @@ static inline void activate_page_nolock(struct page * page)
  */
 void activate_page(struct page * page)
 {
-	spin_lock(&pagemap_lru_lock);
+	spin_lock_irq(&_pagemap_lru_lock);
 	activate_page_nolock(page);
-	spin_unlock(&pagemap_lru_lock);
+	spin_unlock_irq(&_pagemap_lru_lock);
 }
 
 /**
@@ -53,10 +53,10 @@ void activate_page(struct page * page)
 void lru_cache_add(struct page * page)
 {
 	if (!PageLRU(page)) {
-		spin_lock(&pagemap_lru_lock);
+		spin_lock_irq(&_pagemap_lru_lock);
 		if (!TestSetPageLRU(page))
 			add_page_to_inactive_list(page);
-		spin_unlock(&pagemap_lru_lock);
+		spin_unlock_irq(&_pagemap_lru_lock);
 	}
 }
 
@@ -83,9 +83,9 @@ void __lru_cache_del(struct page * page)
  */
 void lru_cache_del(struct page * page)
 {
-	spin_lock(&pagemap_lru_lock);
+	spin_lock_irq(&_pagemap_lru_lock);
 	__lru_cache_del(page);
-	spin_unlock(&pagemap_lru_lock);
+	spin_unlock_irq(&_pagemap_lru_lock);
 }
 
 /*
@@ -116,7 +116,7 @@ void __pagevec_release(struct pagevec *pvec)
 			continue;
 
 		if (!lock_held) {
-			spin_lock(&pagemap_lru_lock);
+			spin_lock_irq(&_pagemap_lru_lock);
 			lock_held = 1;
 		}
 
@@ -130,7 +130,7 @@ void __pagevec_release(struct pagevec *pvec)
 			pagevec_add(&pages_to_free, page);
 	}
 	if (lock_held)
-		spin_unlock(&pagemap_lru_lock);
+		spin_unlock_irq(&_pagemap_lru_lock);
 
 	pagevec_free(&pages_to_free);
 	pagevec_init(pvec);
@@ -175,14 +175,14 @@ void pagevec_deactivate_inactive(struct pagevec *pvec)
 		if (!lock_held) {
 			if (PageActive(page) || !PageLRU(page))
 				continue;
-			spin_lock(&pagemap_lru_lock);
+			spin_lock_irq(&_pagemap_lru_lock);
 			lock_held = 1;
 		}
 		if (!PageActive(page) && PageLRU(page))
 			list_move(&page->lru, &inactive_list);
 	}
 	if (lock_held)
-		spin_unlock(&pagemap_lru_lock);
+		spin_unlock_irq(&_pagemap_lru_lock);
 	__pagevec_release(pvec);
 }
 
@@ -194,7 +194,7 @@ void __pagevec_lru_add(struct pagevec *pvec)
 {
 	int i;
 
-	spin_lock(&pagemap_lru_lock);
+	spin_lock_irq(&_pagemap_lru_lock);
 	for (i = 0; i < pagevec_count(pvec); i++) {
 		struct page *page = pvec->pages[i];
 
@@ -202,7 +202,7 @@ void __pagevec_lru_add(struct pagevec *pvec)
 			BUG();
 		add_page_to_inactive_list(page);
 	}
-	spin_unlock(&pagemap_lru_lock);
+	spin_unlock_irq(&_pagemap_lru_lock);
 	pagevec_release(pvec);
 }
 
@@ -214,7 +214,7 @@ void __pagevec_lru_del(struct pagevec *pvec)
 {
 	int i;
 
-	spin_lock(&pagemap_lru_lock);
+	spin_lock_irq(&_pagemap_lru_lock);
 	for (i = 0; i < pagevec_count(pvec); i++) {
 		struct page *page = pvec->pages[i];
 
@@ -225,7 +225,7 @@ void __pagevec_lru_del(struct pagevec *pvec)
 		else
 			del_page_from_inactive_list(page);
 	}
-	spin_unlock(&pagemap_lru_lock);
+	spin_unlock_irq(&_pagemap_lru_lock);
 	pagevec_release(pvec);
 }
 

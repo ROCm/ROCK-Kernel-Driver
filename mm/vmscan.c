@@ -284,7 +284,7 @@ shrink_cache(int nr_pages, zone_t *classzone,
 
 	pagevec_init(&pvec);
 
-	spin_lock(&pagemap_lru_lock);
+	spin_lock_irq(&_pagemap_lru_lock);
 	while (max_scan > 0 && nr_pages > 0) {
 		struct page *page;
 		int n = 0;
@@ -307,7 +307,7 @@ shrink_cache(int nr_pages, zone_t *classzone,
 			page_cache_get(page);
 			n++;
 		}
-		spin_unlock(&pagemap_lru_lock);
+		spin_unlock_irq(&_pagemap_lru_lock);
 
 		if (list_empty(&page_list))
 			goto done;
@@ -321,7 +321,7 @@ shrink_cache(int nr_pages, zone_t *classzone,
 		if (nr_pages <= 0 && list_empty(&page_list))
 			goto done;
 
-		spin_lock(&pagemap_lru_lock);
+		spin_lock_irq(&_pagemap_lru_lock);
 		/*
 		 * Put back any unfreeable pages.
 		 */
@@ -335,13 +335,13 @@ shrink_cache(int nr_pages, zone_t *classzone,
 			else
 				add_page_to_inactive_list(page);
 			if (!pagevec_add(&pvec, page)) {
-				spin_unlock(&pagemap_lru_lock);
+				spin_unlock_irq(&_pagemap_lru_lock);
 				__pagevec_release(&pvec);
-				spin_lock(&pagemap_lru_lock);
+				spin_lock_irq(&_pagemap_lru_lock);
 			}
 		}
   	}
-	spin_unlock(&pagemap_lru_lock);
+	spin_unlock_irq(&_pagemap_lru_lock);
 done:
 	pagevec_release(&pvec);
 	return nr_pages;	
@@ -374,7 +374,7 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 	struct page *page;
 	struct pagevec pvec;
 
-	spin_lock(&pagemap_lru_lock);
+	spin_lock_irq(&_pagemap_lru_lock);
 	while (nr_pages && !list_empty(&active_list)) {
 		page = list_entry(active_list.prev, struct page, lru);
 		prefetchw_prev_lru_page(page, &active_list, flags);
@@ -384,7 +384,7 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 		list_move(&page->lru, &l_hold);
 		nr_pages--;
 	}
-	spin_unlock(&pagemap_lru_lock);
+	spin_unlock_irq(&_pagemap_lru_lock);
 
 	while (!list_empty(&l_hold)) {
 		page = list_entry(l_hold.prev, struct page, lru);
@@ -406,7 +406,7 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 	}
 
 	pagevec_init(&pvec);
-	spin_lock(&pagemap_lru_lock);
+	spin_lock_irq(&_pagemap_lru_lock);
 	while (!list_empty(&l_inactive)) {
 		page = list_entry(l_inactive.prev, struct page, lru);
 		prefetchw_prev_lru_page(page, &l_inactive, flags);
@@ -416,9 +416,9 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 			BUG();
 		list_move(&page->lru, &inactive_list);
 		if (!pagevec_add(&pvec, page)) {
-			spin_unlock(&pagemap_lru_lock);
+			spin_unlock_irq(&_pagemap_lru_lock);
 			__pagevec_release(&pvec);
-			spin_lock(&pagemap_lru_lock);
+			spin_lock_irq(&_pagemap_lru_lock);
 		}
 	}
 	while (!list_empty(&l_active)) {
@@ -429,12 +429,12 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 		BUG_ON(!PageActive(page));
 		list_move(&page->lru, &active_list);
 		if (!pagevec_add(&pvec, page)) {
-			spin_unlock(&pagemap_lru_lock);
+			spin_unlock_irq(&_pagemap_lru_lock);
 			__pagevec_release(&pvec);
-			spin_lock(&pagemap_lru_lock);
+			spin_lock_irq(&_pagemap_lru_lock);
 		}
 	}
-	spin_unlock(&pagemap_lru_lock);
+	spin_unlock_irq(&_pagemap_lru_lock);
 	pagevec_release(&pvec);
 
 	mod_page_state(nr_active, -pgdeactivate);
