@@ -393,26 +393,36 @@ pcibios_set_master(struct pci_dev *dev)
 }
 
 static void __init
+pcibios_claim_one_bus(struct pci_bus *b)
+{
+	struct list_head *ld;
+	struct pci_bus *child_bus;
+
+	for (ld = b->devices.next; ld != &b->devices; ld = ld->next) {
+		struct pci_dev *dev = pci_dev_b(ld);
+		int i;
+
+		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+			struct resource *r = &dev->resource[i];
+
+			if (r->parent || !r->start || !r->flags)
+				continue;
+			pci_claim_resource(dev, i);
+		}
+	}
+
+	list_for_each_entry(child_bus, &b->children, node)
+		pcibios_claim_one_bus(child_bus);
+}
+
+static void __init
 pcibios_claim_console_setup(void)
 {
 	struct list_head *lb;
 
 	for(lb = pci_root_buses.next; lb != &pci_root_buses; lb = lb->next) {
 		struct pci_bus *b = pci_bus_b(lb);
-		struct list_head *ld;
-
-		for (ld = b->devices.next; ld != &b->devices; ld = ld->next) {
-			struct pci_dev *dev = pci_dev_b(ld);
-			int i;
-
-			for (i = 0; i < PCI_NUM_RESOURCES; i++) {
-				struct resource *r = &dev->resource[i];
-
-				if (r->parent || !r->start || !r->flags)
-					continue;
-				pci_claim_resource(dev, i);
-			}
-		}
+		pcibios_claim_one_bus(b);
 	}
 }
 
