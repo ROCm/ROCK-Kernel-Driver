@@ -163,11 +163,11 @@ ENTRY(cpu_sa110_set_pte)
 
 	eor	r1, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
 
-	bic	r2, r1, #0xff0
-	bic	r2, r2, #3
+	bic	r2, r1, #PTE_SMALL_AP_MASK
+	bic	r2, r2, #PTE_TYPE_MASK
 	orr	r2, r2, #PTE_TYPE_SMALL
 
-	tst	r1, #L_PTE_USER			@ User or Exec?
+	tst	r1, #L_PTE_USER			@ User?
 	orrne	r2, r2, #PTE_SMALL_AP_URO_SRW
 
 	tst	r1, #L_PTE_WRITE | L_PTE_DIRTY	@ Write and Dirty?

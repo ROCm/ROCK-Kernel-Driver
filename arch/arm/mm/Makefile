@@ -2,29 +2,48 @@
 # Makefile for the linux arm-specific parts of the memory manager.
 #
 
-# Object file lists.
+obj-y				:= consistent.o extable.o fault-armv.o \
+				   fault-common.o init.o ioremap.o mm-armv.o
 
-obj-y		:= consistent.o extable.o fault-armv.o fault-common.o \
-		   init.o ioremap.o mm-armv.o
-obj-$(CONFIG_MODULES) += proc-syms.o
+obj-$(CONFIG_MODULES)		+= proc-syms.o
 
-obj-$(CONFIG_ALIGNMENT_TRAP) += alignment.o
-obj-$(CONFIG_DISCONTIGMEM) += discontig.o
+obj-$(CONFIG_ALIGNMENT_TRAP)	+= alignment.o
+obj-$(CONFIG_DISCONTIGMEM)	+= discontig.o
 
-# ARMv3
-p-$(CONFIG_CPU_ARM610)	+= proc-arm6_7.o  tlb-v3.o    cache-v3.o    copypage-v3.o
-p-$(CONFIG_CPU_ARM710)	+= proc-arm6_7.o  tlb-v3.o    cache-v3.o    copypage-v3.o
+obj-$(CONFIG_CPU_ABRT_EV4)	+= abort-ev4.o
+obj-$(CONFIG_CPU_ABRT_EV4T)	+= abort-ev4t.o
+obj-$(CONFIG_CPU_ABRT_LV4T)	+= abort-lv4t.o
+obj-$(CONFIG_CPU_ABRT_EV5T)	+= abort-ev5t.o
+obj-$(CONFIG_CPU_ABRT_EV5TJ)	+= abort-ev5tj.o
 
-# ARMv4
-p-$(CONFIG_CPU_ARM720T)	+= proc-arm720.o  tlb-v4.o    cache-v4.o    copypage-v4wt.o abort-lv4t.o
-p-$(CONFIG_CPU_ARM920T)	+= proc-arm920.o  tlb-v4wbi.o cache-v4wt.o  copypage-v4wb.o abort-ev4t.o
-p-$(CONFIG_CPU_ARM922T)	+= proc-arm922.o  tlb-v4wbi.o cache-v4wt.o  copypage-v4wb.o abort-ev4t.o
-p-$(CONFIG_CPU_ARM1020)	+= proc-arm1020.o tlb-v4wbi.o cache-v4wt.o  copypage-v4wb.o abort-ev4t.o
-p-$(CONFIG_CPU_SA110)	+= proc-sa110.o   tlb-v4wb.o  cache-v4wb.o  copypage-v4wb.o abort-ev4.o
-p-$(CONFIG_CPU_SA1100)	+= proc-sa1100.o  tlb-v4wb.o  cache-v4wb.o  copypage-v4mc.o abort-ev4.o   minicache.o
+obj-$(CONFIG_CPU_CACHE_V3)	+= cache-v3.o
+obj-$(CONFIG_CPU_CACHE_V4)	+= cache-v4.o
+obj-$(CONFIG_CPU_CACHE_V4WT)	+= cache-v4wt.o
+obj-$(CONFIG_CPU_CACHE_V4WB)	+= cache-v4wb.o
 
-# ARMv5
-p-$(CONFIG_CPU_ARM926T)	+= proc-arm926.o  tlb-v4wbi.o copypage-v4wb.o abort-ev5tej.o
-p-$(CONFIG_CPU_XSCALE)	+= proc-xscale.o  tlb-v4wbi.o copypage-xscale.o abort-xscale.o minicache.o
+obj-$(CONFIG_CPU_COPY_V3)	+= copypage-v3.o
+obj-$(CONFIG_CPU_COPY_V4WT)	+= copypage-v4wt.o
+obj-$(CONFIG_CPU_COPY_V4WB)	+= copypage-v4wb.o
+obj-$(CONFIG_CPU_SA1100)	+= copypage-v4mc.o
+obj-$(CONFIG_CPU_XSCALE)	+= copypage-xscale.o
 
-obj-y		+= $(sort $(p-y))
+obj-$(CONFIG_CPU_MINICACHE)	+= minicache.o
+
+obj-$(CONFIG_CPU_TLB_V3)	+= tlb-v3.o
+obj-$(CONFIG_CPU_TLB_V4WT)	+= tlb-v4.o
+obj-$(CONFIG_CPU_TLB_V4WB)	+= tlb-v4wb.o
+obj-$(CONFIG_CPU_TLB_V4WBI)	+= tlb-v4wbi.o
+
+obj-$(CONFIG_CPU_ARM610)	+= proc-arm6_7.o
+obj-$(CONFIG_CPU_ARM710)	+= proc-arm6_7.o
+obj-$(CONFIG_CPU_ARM720T)	+= proc-arm720.o
+obj-$(CONFIG_CPU_ARM920T)	+= proc-arm920.o
+obj-$(CONFIG_CPU_ARM922T)	+= proc-arm922.o
+obj-$(CONFIG_CPU_ARM926T)	+= proc-arm926.o
+obj-$(CONFIG_CPU_ARM1020)	+= proc-arm1020.o
+obj-$(CONFIG_CPU_ARM1020E)	+= proc-arm1020e.o
+obj-$(CONFIG_CPU_ARM1022)	+= proc-arm1022.o
+obj-$(CONFIG_CPU_ARM1026)	+= proc-arm1026.o
+obj-$(CONFIG_CPU_SA110)		+= proc-sa110.o
+obj-$(CONFIG_CPU_SA1100)	+= proc-sa1100.o
+obj-$(CONFIG_CPU_XSCALE)	+= proc-xscale.o

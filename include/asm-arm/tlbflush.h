@@ -52,7 +52,7 @@
 
 #define v3_tlb_flags	(TLB_V3_FULL | TLB_V3_PAGE)
 
-#if defined(CONFIG_CPU_ARM610) || defined(CONFIG_CPU_ARM710)
+#ifdef CONFIG_CPU_TLB_V3
 # define v3_possible_flags	v3_tlb_flags
 # define v3_always_flags	v3_tlb_flags
 # ifdef _TLB
@@ -67,7 +67,7 @@
 
 #define v4_tlb_flags	(TLB_V4_U_FULL | TLB_V4_U_PAGE)
 
-#if defined(CONFIG_CPU_ARM720T)
+#ifdef CONFIG_CPU_TLB_V4WT
 # define v4_possible_flags	v4_tlb_flags
 # define v4_always_flags	v4_tlb_flags
 # ifdef _TLB
@@ -84,9 +84,7 @@
 			 TLB_V4_I_FULL | TLB_V4_D_FULL | \
 			 TLB_V4_I_PAGE | TLB_V4_D_PAGE)
 
-#if defined(CONFIG_CPU_ARM920T) || defined(CONFIG_CPU_ARM922T) || \
-    defined(CONFIG_CPU_ARM926T) || defined(CONFIG_CPU_ARM1020) || \
-    defined(CONFIG_CPU_XSCALE)
+#ifdef CONFIG_CPU_TLB_V4WBI
 # define v4wbi_possible_flags	v4wbi_tlb_flags
 # define v4wbi_always_flags	v4wbi_tlb_flags
 # ifdef _TLB
@@ -103,7 +101,7 @@
 			 TLB_V4_I_FULL | TLB_V4_D_FULL | \
 			 TLB_V4_D_PAGE)
 
-#if defined(CONFIG_CPU_SA110) || defined(CONFIG_CPU_SA1100)
+#ifdef CONFIG_CPU_TLB_V4WB
 # define v4wb_possible_flags	v4wb_tlb_flags
 # define v4wb_always_flags	v4wb_tlb_flags
 # ifdef _TLB
@@ -121,7 +119,7 @@
 			 TLB_V6_I_PAGE | TLB_V6_D_PAGE | \
 			 TLB_V6_I_ASID | TLB_V6_D_ASID)
 
-#if defined(CONFIG_CPU_V6)
+#ifdef CONFIG_CPU_TLB_V6
 # define v6wbi_possible_flags	v6wbi_tlb_flags
 # define v6wbi_always_flags	v6wbi_tlb_flags
 # ifdef _TLB
