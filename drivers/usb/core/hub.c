@@ -1055,8 +1055,6 @@ int usb_new_device(struct usb_device *udev)
 
 fail:
 	udev->state = USB_STATE_NOTATTACHED;
-	release_address(udev);
-	usb_put_dev(udev);
 	return err;
 }
 
@@ -1334,33 +1332,9 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 	udev->epmaxpacketin [0] = i;
 	udev->epmaxpacketout[0] = i;
  
-	/* set the address */
-	if (udev->devnum <= 0) {
-		choose_address(udev);
-		if (udev->devnum <= 0)
-			goto fail;
-
-		/* Set up TT records, if needed  */
-		if (hdev->tt) {
-			udev->tt = hdev->tt;
-			udev->ttport = hdev->ttport;
-		} else if (udev->speed != USB_SPEED_HIGH
-				&& hdev->speed == USB_SPEED_HIGH) {
-			struct usb_hub	*hub;
- 
-			hub = usb_get_intfdata (hdev->actconfig
-							->interface[0]);
-			udev->tt = &hub->tt;
-			udev->ttport = port + 1;
-		}
-
-		/* force the right log message (below) at low speed */
-		oldspeed = USB_SPEED_UNKNOWN;
-	}
- 
 	dev_info (&udev->dev,
 			"%s %s speed USB device using address %d\n",
-			(oldspeed == USB_SPEED_UNKNOWN) ? "new" : "reset",
+			(udev->config) ? "reset" : "new",
 			({ char *speed; switch (udev->speed) {
 			case USB_SPEED_LOW:	speed = "low";	break;
 			case USB_SPEED_FULL:	speed = "full";	break;
@@ -1389,12 +1363,7 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 			dev_err(&udev->dev,
 				"device not accepting address %d, error %d\n",
 				udev->devnum, retval);
- fail:
-			hub_port_disable(hdev, port);
-			release_address(udev);
-			usb_put_dev(udev);
-			up(&usb_address0_sem);
-			return retval;
+			goto fail;
 		}
  
 		/* cope with hardware quirkiness:
@@ -1417,7 +1386,8 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 	if (udev->speed == USB_SPEED_FULL
 			&& (udev->epmaxpacketin [0]
 				!= udev->descriptor.bMaxPacketSize0)) {
-		usb_disable_endpoint(udev, 0);
+		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
+		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
 		usb_endpoint_running(udev, 0, 1);
 		usb_endpoint_running(udev, 0, 0);
 		udev->epmaxpacketin [0] = udev->descriptor.bMaxPacketSize0;
@@ -1435,9 +1405,11 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 
 	/* now dev is visible to other tasks */
 	hdev->children[port] = udev;
+	retval = 0;
 
+fail:
 	up(&usb_address0_sem);
-	return 0;
+	return retval;
 }
 
 static void
@@ -1562,20 +1534,36 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 			goto done;
 		}
 		udev->state = USB_STATE_POWERED;
-	  
+
 		/* hub can tell if it's lowspeed already:  D- pullup (not D+) */
 		if (portstatus & USB_PORT_STAT_LOW_SPEED)
 			udev->speed = USB_SPEED_LOW;
 		else
 			udev->speed = USB_SPEED_UNKNOWN;
 
-		/* reset, set address, get descriptor, add to hub's children */
 		down (&udev->serialize);
+ 
+		/* set the address */
+		choose_address(udev);
+		if (udev->devnum <= 0) {
+			status = -ENOTCONN;	/* Don't retry */
+			goto loop;
+		}
+
+		/* reset, get descriptor, add to hub's children */
 		status = hub_port_init(hdev, udev, port);
-		if (status == -ENOTCONN)
-			break;
 		if (status < 0)
-			continue;
+			goto loop;
+
+		/* Set up TT records, if needed  */
+		if (hdev->tt) {
+			udev->tt = hdev->tt;
+			udev->ttport = hdev->ttport;
+		} else if (udev->speed != USB_SPEED_HIGH
+				&& hdev->speed == USB_SPEED_HIGH) {
+			udev->tt = &hub->tt;
+			udev->ttport = port + 1;
+		}
 
 		/* consecutive bus-powered hubs aren't reliable; they can
 		 * violate the voltage drop budget.  if the new child has
@@ -1591,7 +1579,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 					&devstat);
 			if (status < 0) {
 				dev_dbg(&udev->dev, "get status %d ?\n", status);
-				continue;
+				goto loop;
 			}
 			cpu_to_le16s(&devstat);
 			if ((devstat & (1 << USB_DEVICE_SELF_POWERED)) == 0) {
@@ -1603,10 +1591,8 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 						INDICATOR_AMBER_BLINK;
 					schedule_work (&hub->leds);
 				}
-				hdev->children[port] = NULL;
-				usb_put_dev(udev);
-				hub_port_disable(hdev, port);
-				return;
+				status = -ENOTCONN;	/* Don't retry */
+				goto loop;
 			}
 		}
  
@@ -1618,11 +1604,8 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 
 		/* Run it through the hoops (find a driver, etc) */
 		status = usb_new_device(udev);
-		if (status != 0) {
-			hdev->children[port] = NULL;
-			continue;
-		}
-		up (&udev->serialize);
+		if (status)
+			goto loop;
 
 		status = hub_power_remaining(hub, hdev);
 		if (status)
@@ -1630,7 +1613,19 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 				"%dmA power budget left\n",
 				2 * status);
 
+		up (&udev->serialize);
 		return;
+
+loop:
+		hdev->children[port] = NULL;
+		hub_port_disable(hdev, port);
+		usb_disable_endpoint(udev, 0 + USB_DIR_IN);
+		usb_disable_endpoint(udev, 0 + USB_DIR_OUT);
+		release_address(udev);
+		up (&udev->serialize);
+		usb_put_dev(udev);
+		if (status == -ENOTCONN)
+			break;
 	}
  
 done:
