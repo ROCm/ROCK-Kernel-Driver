@@ -38,6 +38,10 @@
 #error Firmware Loading is not configured in the kernel !
 #endif
 
+#ifndef __iomem
+#define __iomem
+#endif
+
 #define prism54_synchronize_irq(irq) synchronize_irq(irq)
 
 #define PRISM_FW_PDEV		&priv->pdev->dev

@@ -1524,31 +1524,35 @@ send_formatted_event(islpci_private *priv, const char *str,
 		     const struct obj_mlme *mlme, int error)
 {
 	union iwreq_data wrqu;
+	char *memptr;
 
-	wrqu.data.pointer = kmalloc(IW_CUSTOM_MAX, GFP_KERNEL);
-	if (!wrqu.data.pointer)
+	memptr = kmalloc(IW_CUSTOM_MAX, GFP_KERNEL);
+	if (!memptr)
 		return;
+	wrqu.data.pointer = memptr;
 	wrqu.data.length = 0;
-	format_event(priv, wrqu.data.pointer, str, mlme, &wrqu.data.length,
+	format_event(priv, memptr, str, mlme, &wrqu.data.length,
 		     error);
-	wireless_send_event(priv->ndev, IWEVCUSTOM, &wrqu, wrqu.data.pointer);
-	kfree(wrqu.data.pointer);
+	wireless_send_event(priv->ndev, IWEVCUSTOM, &wrqu, memptr);
+	kfree(memptr);
 }
 
 static void
 send_simple_event(islpci_private *priv, const char *str)
 {
 	union iwreq_data wrqu;
+	char *memptr;
 	int n = strlen(str);
 
-	wrqu.data.pointer = kmalloc(IW_CUSTOM_MAX, GFP_KERNEL);
-	if (!wrqu.data.pointer)
+	memptr = kmalloc(IW_CUSTOM_MAX, GFP_KERNEL);
+	if (!memptr)
 		return;
 	BUG_ON(n > IW_CUSTOM_MAX);
+	wrqu.data.pointer = memptr;
 	wrqu.data.length = n;
-	strcpy(wrqu.data.pointer, str);
-	wireless_send_event(priv->ndev, IWEVCUSTOM, &wrqu, wrqu.data.pointer);
-	kfree(wrqu.data.pointer);
+	strcpy(memptr, str);
+	wireless_send_event(priv->ndev, IWEVCUSTOM, &wrqu, memptr);
+	kfree(memptr);
 }
 
 static void
