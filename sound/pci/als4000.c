@@ -652,9 +652,18 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 
 	/* disable all legacy ISA stuff except for joystick */
 #ifdef SUPPORT_JOYSTICK
-	if (joystick_port[dev] > 0 &&
-	    (acard->res_joystick = request_region(joystick_port[dev], 8, "ALS4000 gameport")) != NULL)
+	if (joystick_port[dev] == 1) {
+		/* auto-detect */
+		long p;
+		for (p = 0x200; p <= 0x218; p += 8)
+			if ((acard->res_joystick = request_region(p, 8, "ALS4000 gameport")) != NULL)
+				break;
+	} else if (joystick_port[dev] > 0)
+		acard->res_joystick = request_region(joystick_port[dev], 8, "ALS4000 gameport");
+	if (acard->res_joystick)
 		joystick = joystick_port[dev];
+	else
+		joystick = 0;
 #endif
 	snd_als4000_set_addr(gcr, 0, 0, 0, joystick);
 	

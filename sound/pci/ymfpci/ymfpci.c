@@ -145,10 +145,10 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 			pci_write_config_word(pci, PCIR_DSXG_MPU401BASE, mpu_port[dev]);
 		}
 #ifdef SUPPORT_JOYSTICK
-		if (joystick_port[dev] < 0) {
+		if (joystick_port[dev] == 1) {
 			joystick_port[dev] = pci_resource_start(pci, 2);
 		}
-		if (joystick_port[dev] >= 0 &&
+		if (joystick_port[dev] > 0 &&
 		    (joystick_res = request_region(joystick_port[dev], 1, "YMFPCI gameport")) != NULL) {
 			legacy_ctrl |= YMFPCI_LEGACY_JPEN;
 			pci_write_config_word(pci, PCIR_DSXG_JOYBASE, joystick_port[dev]);
@@ -184,15 +184,28 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 			mpu_port[dev] = -1;
 		}
 #ifdef SUPPORT_JOYSTICK
-		switch (joystick_port[dev]) {
-		case 0x201: legacy_ctrl2 |= 0 << 6; break;
-		case 0x202: legacy_ctrl2 |= 1 << 6; break;
-		case 0x204: legacy_ctrl2 |= 2 << 6; break;
-		case 0x205: legacy_ctrl2 |= 3 << 6; break;
-		default: joystick_port[dev] = -1; break;
+		if (joystick_port[dev] == 1) {
+			/* auto-detect */
+			long p;
+			for (p = 0x201; p <= 0x205; p++) {
+				if (p == 0x203) continue;
+				if ((joystick_res = request_region(p, 1, "YMFPCI gameport")) != NULL)
+					break;
+			}
+			if (joystick_res)
+				joystick_port[dev] = p;
+		} else {
+			switch (joystick_port[dev]) {
+			case 0x201: legacy_ctrl2 |= 0 << 6; break;
+			case 0x202: legacy_ctrl2 |= 1 << 6; break;
+			case 0x204: legacy_ctrl2 |= 2 << 6; break;
+			case 0x205: legacy_ctrl2 |= 3 << 6; break;
+			default: joystick_port[dev] = -1; break;
+			}
+			if (joystick_port[dev] > 0)
+				joystick_res = request_region(joystick_port[dev], 1, "YMFPCI gameport");
 		}
-		if (joystick_port[dev] > 0 &&
-		    (joystick_res = request_region(joystick_port[dev], 1, "YMFPCI gameport")) != NULL) {
+		if (joystick_res) {
 			legacy_ctrl |= YMFPCI_LEGACY_JPEN;
 		} else {
 			legacy_ctrl2 &= ~YMFPCI_LEGACY2_JSIO;

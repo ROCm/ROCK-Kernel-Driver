@@ -1680,11 +1680,24 @@ static int __devinit snd_ensoniq_1370_mixer(ensoniq_t * ensoniq)
 #ifdef SUPPORT_JOYSTICK
 static int snd_ensoniq_joystick(ensoniq_t *ensoniq, long port)
 {
-	ensoniq->gameport.io = port;
-	if (!request_region(ensoniq->gameport.io, 8, "ens137x: gameport")) {
-		snd_printk("gameport io port 0x%03x in use", ensoniq->gameport.io);
-		return -EBUSY;
+#ifdef CHIP1371
+	if (port == 1) { /* auto-detect */
+		for (port = 0x200; port <= 0x218; port += 8)
+			if (request_region(port, 8, "ens137x: gameport"))
+				break;
+		if (port > 0x218) {
+			snd_printk("no gameport available\n");
+			return -EBUSY;
+		}
+	} else
+#endif
+	{
+		if (!request_region(port, 8, "ens137x: gameport")) {
+			snd_printk("gameport io port 0x%03x in use", ensoniq->gameport.io);
+			return -EBUSY;
+		}
 	}
+	ensoniq->gameport.io = port;
 	ensoniq->ctrl |= ES_JYSTK_EN;
 #ifdef CHIP1371
 	ensoniq->ctrl &= ~ES_1371_JOY_ASELM;
@@ -2246,6 +2259,7 @@ static int __devinit snd_audiopci_probe(struct pci_dev *pci,
 #ifdef SUPPORT_JOYSTICK
 #ifdef CHIP1371
 	switch (joystick_port[dev]) {
+	case 1: /* auto-detect */
 	case 0x200:
 	case 0x208:
 	case 0x210:

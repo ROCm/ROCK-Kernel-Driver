@@ -36,11 +36,13 @@ The following PCI drivers support the joystick natively.
 
     Driver	Module Option	Available Values
     ---------------------------------------------------------------------------
-    als4000	joystick_port	any address (e.g. 0x200), 0 = disable (default)
+    als4000	joystick_port	0 = disable (default), 1 = auto-detect,
+                                manual: any address (e.g. 0x200)
     au88x0	N/A		N/A
     azf3328	joystick	0 = disable, 1 = enable, -1 = auto (default)
     ens1370	joystick	0 = disable (default), 1 = enable
-    ens1371	joystick_port	0 = disable (default), 0x200,0x208,0x210,0x218
+    ens1371	joystick_port	0 = disable (default), 1 = auto-detect,
+                                manual: 0x200, 0x208, 0x210, 0x218
     cmipci	joystick	0 = disable (default), 1 = enable
     cs4281	N/A		N/A
     cs46xx	N/A		N/A
@@ -50,13 +52,13 @@ The following PCI drivers support the joystick natively.
     sonicvibes	N/A		N/A
     trident	N/A		N/A
     via82xx(*2)	joystick	0 = disable (default), 1 = enable
-    ymfpci(*3)	joystick_port	0 = disable (default), 0x201,0x202,0x204,0x205
+    ymfpci	joystick_port	0 = disable (default), 1 = auto-detect,
+                                manual: 0x201, 0x202, 0x204, 0x205(*3)
     ---------------------------------------------------------------------------
 
     *1)  not all chips support joystick
     *2)  VIA686A/B only
-    *3)  With YMF744/754 chips, the port address is chosen automatically
-         and enabled by default
+    *3)  With YMF744/754 chips, the port address can be chosen arbitrarily
 
 The following drivers don't support gameport natively, but there are
 additional modules.  Load the corresponding module to add the gameport

@@ -173,7 +173,7 @@ Module parameters
     Module for soundcards based on Avance Logic ALS4000 PCI chip.
 
     joystick_port - port # for legacy joystick support.
-                    0 = disabled (default)
+                    0 = disabled (default), 1 = auto-detect
     
     Module supports up to 8 cards, autoprobe and PnP.
 
@@ -390,7 +390,7 @@ Module parameters
 			* SoundBlaster Vibra PCI
 
     joystick_port	- port # for joystick (0x200,0x208,0x210,0x218),
-			  0 = disable (default)
+			  0 = disable (default), 1 = auto-detect
 
     Module supports up to 8 cards and autoprobe.
     
@@ -1124,9 +1124,10 @@ Module parameters
 
     Module for Yamaha PCI chips (YMF72x, YMF74x & YMF75x).
 
-    mpu_port      - 0x300,0x330,0x332,0x334, -1 (disable) by default
-    fm_port       - 0x388,0x398,0x3a0,0x3a8, -1 (disable) by default
-    joystick_port - 0x201,0x202,0x204,0x205, -1 (disable) by default
+    mpu_port      - 0x300,0x330,0x332,0x334, 0 (disable) by default
+    fm_port       - 0x388,0x398,0x3a0,0x3a8, 0 (disable) by default
+    joystick_port - 0x201,0x202,0x204,0x205, 0 (disable) by default,
+                    1 (auto-detect)
     rear_switch   - enable shared rear/line-in switch (bool)
 
     Module supports autoprobe and multiple chips (max 8).
