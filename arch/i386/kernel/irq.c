@@ -135,6 +135,7 @@ int show_interrupts(struct seq_file *p, void *v)
 {
 	int i, j;
 	struct irqaction * action;
+	unsigned long flags;
 
 	seq_printf(p, "           ");
 	for (j=0; j<NR_CPUS; j++)
@@ -143,9 +144,10 @@ int show_interrupts(struct seq_file *p, void *v)
 	seq_putc(p, '\n');
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
+		spin_lock_irqsave(&irq_desc[i].lock, flags);
 		action = irq_desc[i].action;
 		if (!action) 
-			continue;
+			goto skip;
 		seq_printf(p, "%3d: ",i);
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
@@ -160,7 +162,10 @@ int show_interrupts(struct seq_file *p, void *v)
 
 		for (action=action->next; action; action = action->next)
 			seq_printf(p, ", %s", action->name);
+
 		seq_putc(p, '\n');
+skip:
+		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
 	}
 	seq_printf(p, "NMI: ");
 	for (j = 0; j < NR_CPUS; j++)

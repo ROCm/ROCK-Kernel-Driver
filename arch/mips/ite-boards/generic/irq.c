@@ -222,6 +222,7 @@ int show_interrupts(struct seq_file *p, void *v)
 {
         int i, j;
         struct irqaction * action;
+	unsigned long flags;
 
         seq_printf(p, "           ");
         for (j=0; j<smp_num_cpus; j++)
@@ -229,20 +230,25 @@ int show_interrupts(struct seq_file *p, void *v)
 	seq_putc(p, '\n');
 
         for (i = 0 ; i < NR_IRQS ; i++) {
+		spin_lock_irqsave(&irq_desc[i].lock, flags);
                 action = irq_desc[i].action;
+
                 if ( !action || !action->handler )
-                        continue;
+                        goto skip;
                 seq_printf(p, "%3d: ", i);		
                 seq_printf(p, "%10u ", kstat_irqs(i));
                 if ( irq_desc[i].handler )		
                         seq_printf(p, " %s ", irq_desc[i].handler->typename );
                 else
                         seq_puts(p, "  None      ");
+
                 seq_printf(p, "    %s",action->name);
                 for (action=action->next; action; action = action->next) {
                         seq_printf(p, ", %s", action->name);
                 }
                 seq_putc(p, '\n');
+skip:
+		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
         }
         seq_printf(p, "BAD: %10lu\n", spurious_count);
         return 0;
@@ -437,6 +443,7 @@ void __init init_IRQ(void)
 		irq_desc[i].action	= 0;
 		irq_desc[i].depth	= 1;
 		irq_desc[i].handler	= &it8172_irq_type;
+		spin_lock_init(&irq_desc[i].lock);
 	}
 
 	/*
