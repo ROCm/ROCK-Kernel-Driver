@@ -892,8 +892,6 @@ no_buffers_err_out:
 			}
 			BUG_ON(!rec_is_dirty);
 		}
-		/* Attempting to write outside the initialized size is a bug. */
-		BUG_ON(((block + 1) << bh_size_bits) > ni->initialized_size);
 		if (!buffer_mapped(bh)) {
 			ntfs_error(vol->sb, "Writing ntfs records without "
 					"existing mapped buffers is not "
