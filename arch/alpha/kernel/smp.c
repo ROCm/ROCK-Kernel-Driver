@@ -417,12 +417,7 @@ fork_by_hand(void)
 	/* Don't care about the contents of regs since we'll never
 	   reschedule the forked task. */
 	struct pt_regs regs;
-	int pid;
-	pid = do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
-	if (pid < 0)
-		return NULL;
-
-	return find_task_by_pid (pid);
+	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
 /*
@@ -441,8 +436,10 @@ smp_boot_one_cpu(int cpuid)
 	   wish.  We can't use kernel_thread since we must avoid
 	   rescheduling the child.  */
 	idle = fork_by_hand();
-	if (!idle)
+	if (IS_ERR(idle))
 		panic("failed fork for CPU %d", cpuid);
+
+	wake_up_forked_process(idle);
 
 	init_idle(idle, cpuid);
 	unhash_process(idle);
