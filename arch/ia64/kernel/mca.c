@@ -233,6 +233,7 @@ static void
 ia64_mca_log_sal_error_record(int sal_info_type)
 {
 	u8 *buffer;
+	sal_log_record_header_t *rh;
 	u64 size;
 	int irq_safe = sal_info_type != SAL_INFO_TYPE_MCA && sal_info_type != SAL_INFO_TYPE_INIT;
 #ifdef IA64_MCA_DEBUG_INFO
@@ -251,7 +252,8 @@ ia64_mca_log_sal_error_record(int sal_info_type)
 			sal_info_type < ARRAY_SIZE(rec_name) ? rec_name[sal_info_type] : "UNKNOWN");
 
 	/* Clear logs from corrected errors in case there's no user-level logger */
-	if (sal_info_type == SAL_INFO_TYPE_CPE || sal_info_type == SAL_INFO_TYPE_CMC)
+	rh = (sal_log_record_header_t *)buffer;
+	if (rh->severity == sal_log_severity_corrected)
 		ia64_sal_clear_state_info(sal_info_type);
 }
 
@@ -880,6 +882,13 @@ ia64_mca_ucmc_handler(void)
 			&ia64_sal_to_os_handoff_state,
 			&ia64_os_to_sal_handoff_state)); 
 
+return_to_sal:
+
+	if (recover) {
+		sal_log_record_header_t *rh = IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_MCA);
+		rh->severity = sal_log_severity_corrected;
+		ia64_sal_clear_state_info(SAL_INFO_TYPE_MCA);
+	}
 	/*
 	 *  Wakeup all the processors which are spinning in the rendezvous
 	 *  loop.

@@ -325,6 +325,10 @@ typedef struct sal_log_record_header {
 	efi_guid_t platform_guid;	/* Unique OEM Platform ID */
 } sal_log_record_header_t;
 
+#define sal_log_severity_recoverable	0
+#define sal_log_severity_fatal		1
+#define sal_log_severity_corrected	2
+
 /* Definition of log section header structures */
 typedef struct sal_log_sec_header {
     efi_guid_t guid;			/* Unique Section ID */
