@@ -4223,7 +4223,12 @@ static void cpu_attach_domain(struct sched_domain *sd, int cpu)
 	unlock_cpu_hotplug();
 }
 
-#ifdef CONFIG_NUMA
+/*
+ * To enable disjoint top-level NUMA domains, define SD_NODES_PER_DOMAIN
+ * in arch code. That defines the number of nearby nodes in a node's top
+ * level scheduling domain.
+ */
+#if defined(CONFIG_NUMA) && defined(SD_NODES_PER_DOMAIN)
 /**
  * find_next_best_node - find the next node to include in a sched_domain
  * @node: node whose sched_domain we're building
@@ -4270,7 +4275,7 @@ static int __init find_next_best_node(int node, unsigned long *used_nodes)
  * should be one that prevents unnecessary balancing, but also spreads tasks
  * out optimally.
  */
-cpumask_t __init sched_domain_node_span(int node, int size)
+cpumask_t __init sched_domain_node_span(int node)
 {
 	int i;
 	cpumask_t span;
@@ -4279,7 +4284,7 @@ cpumask_t __init sched_domain_node_span(int node, int size)
 	cpus_clear(span);
 	bitmap_zero(used_nodes, MAX_NUMNODES);
 
-	for (i = 0; i < size; i++) {
+	for (i = 0; i < SD_NODES_PER_DOMAIN; i++) {
 		int next_node = find_next_best_node(node, used_nodes);
 		cpumask_t  nodemask;
 
@@ -4289,7 +4294,12 @@ cpumask_t __init sched_domain_node_span(int node, int size)
 
 	return span;
 }
-#endif /* CONFIG_NUMA */
+#else /* CONFIG_NUMA && SD_NODES_PER_DOMAIN */
+cpumask_t __init sched_domain_node_span(int node)
+{
+	return cpu_possible_map;
+}
+#endif /* CONFIG_NUMA && SD_NODES_PER_DOMAIN */
 
 #ifdef CONFIG_SCHED_SMT
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
@@ -4312,9 +4322,6 @@ __init static int cpu_to_phys_group(int cpu)
 }
 
 #ifdef CONFIG_NUMA
-
-/* Number of nearby nodes in a node's scheduling domain */
-#define SD_NODES_PER_DOMAIN 4
 
 static DEFINE_PER_CPU(struct sched_domain, node_domains);
 static struct sched_group sched_group_nodes[MAX_NUMNODES];
@@ -4442,7 +4449,7 @@ __init static void arch_init_sched_domains(void)
 		group = cpu_to_node_group(i);
 		*sd = SD_NODE_INIT;
 		/* FIXME: should be multilevel, in arch code */
-		sd->span = sched_domain_node_span(i, SD_NODES_PER_DOMAIN);
+		sd->span = sched_domain_node_span(i);
 		cpus_and(sd->span, sd->span, cpu_default_map);
 		sd->groups = &sched_group_nodes[group];
 #endif
