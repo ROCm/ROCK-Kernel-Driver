@@ -2132,7 +2132,7 @@ xfs_dir_leaf_getdents_int(
 						   dp, uio, p.cook.o);
 		}
 #else
-		lasthash = thishash = INT_GET(entry->hashval, ARCH_CONVERT);
+		thishash = INT_GET(entry->hashval, ARCH_CONVERT);
 		XFS_PUT_COOKIE(lastoffset, mp, bno, entno, thishash);
 		lastresid = uio->uio_resid;
 #endif /* BITS_PER_LONG == 32 */
