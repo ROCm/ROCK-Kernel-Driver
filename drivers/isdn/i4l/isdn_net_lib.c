@@ -2338,12 +2338,16 @@ isdn_net_lib_init(void)
 {
 	fsm_new(&isdn_net_fsm);
 
+#ifdef CONFIG_ISDN_NET_SIMPLE
 	register_isdn_netif(ISDN_NET_ENCAP_ETHER,      &isdn_ether_ops);
 	register_isdn_netif(ISDN_NET_ENCAP_RAWIP,      &isdn_rawip_ops);
 	register_isdn_netif(ISDN_NET_ENCAP_IPTYP,      &isdn_iptyp_ops);
 	register_isdn_netif(ISDN_NET_ENCAP_UIHDLC,     &isdn_uihdlc_ops);
+#endif
+#ifdef CONFIG_ISDN_NET_CISCO
 	register_isdn_netif(ISDN_NET_ENCAP_CISCOHDLC,  &isdn_ciscohdlck_ops);
 	register_isdn_netif(ISDN_NET_ENCAP_CISCOHDLCK, &isdn_ciscohdlck_ops);
+#endif
 #ifdef CONFIG_ISDN_X25
 	register_isdn_netif(ISDN_NET_ENCAP_X25IFACE,   &isdn_x25_ops);
 #endif
