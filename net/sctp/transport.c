@@ -421,15 +421,15 @@ void sctp_transport_lower_cwnd(struct sctp_transport *transport,
 {
 	switch (reason) {
 	case SCTP_LOWER_CWND_T3_RTX:
-		/* RFC 2960 Section 7.2.3, sctpimpguide-05 Section 2.9.2
+		/* RFC 2960 Section 7.2.3, sctpimpguide
 		 * When the T3-rtx timer expires on an address, SCTP should
 		 * perform slow start by:
-		 *      ssthresh = max(cwnd/2, 2*MTU)
+		 *      ssthresh = max(cwnd/2, 4*MTU)
 		 *      cwnd = 1*MTU
 		 *      partial_bytes_acked = 0
 		 */
 		transport->ssthresh = max(transport->cwnd/2,
-					  2*transport->asoc->pmtu);
+					  4*transport->asoc->pmtu);
 		transport->cwnd = transport->asoc->pmtu;
 		break;
 
@@ -439,15 +439,15 @@ void sctp_transport_lower_cwnd(struct sctp_transport *transport,
 		 * were last sent, according to the formula described in
 		 * Section 7.2.3.
 	 	 *
-	 	 * RFC 2960 7.2.3, sctpimpguide-05 2.9.2 Upon detection of
-		 * packet losses from SACK (see Section 7.2.4), An endpoint
+	 	 * RFC 2960 7.2.3, sctpimpguide Upon detection of packet
+		 * losses from SACK (see Section 7.2.4), An endpoint
 		 * should do the following:
-		 *      ssthresh = max(cwnd/2, 2*MTU)
+		 *      ssthresh = max(cwnd/2, 4*MTU)
 		 *      cwnd = ssthresh
 		 *      partial_bytes_acked = 0
 		 */
 		transport->ssthresh = max(transport->cwnd/2,
-					  2*transport->asoc->pmtu);
+					  4*transport->asoc->pmtu);
 		transport->cwnd = transport->ssthresh;
 		break;
 
@@ -467,23 +467,24 @@ void sctp_transport_lower_cwnd(struct sctp_transport *transport,
 		if ((jiffies - transport->last_time_ecne_reduced) >
 		    transport->rtt) {
 			transport->ssthresh = max(transport->cwnd/2,
-					  	  2*transport->asoc->pmtu);
+					  	  4*transport->asoc->pmtu);
 			transport->cwnd = transport->ssthresh;
 			transport->last_time_ecne_reduced = jiffies;
 		}
 		break;
 
 	case SCTP_LOWER_CWND_INACTIVE:
-		/* RFC 2960 Section 7.2.1, sctpimpguide-05 Section 2.14.2
-		 * When the association does not transmit data on a given
-		 * transport address within an RTO, the cwnd of the transport
-		 * address should be adjusted to 2*MTU.
+		/* RFC 2960 Section 7.2.1, sctpimpguide
+		 * When the endpoint does not transmit data on a given
+		 * transport address, the cwnd of the transport address
+		 * should be adjusted to max(cwnd/2, 4*MTU) per RTO.
 		 * NOTE: Although the draft recommends that this check needs
 		 * to be done every RTO interval, we do it every hearbeat
 		 * interval.
 		 */
 		if ((jiffies - transport->last_time_used) > transport->rto)
-			transport->cwnd = 2*transport->asoc->pmtu;
+			transport->cwnd = max(transport->cwnd/2,
+						 4*transport->asoc->pmtu);
 		break;
 	};
 
