@@ -8,6 +8,11 @@
  */
 #include <linux/kallsyms.h>
 #include <linux/module.h>
+#include <linux/init.h>
+#include <linux/seq_file.h>
+#include <linux/fs.h>
+#include <linux/err.h>
+#include <linux/proc_fs.h>
 
 /* These will be re-linked against their real values during the second link stage */
 extern unsigned long kallsyms_addresses[] __attribute__((weak));
@@ -116,6 +121,171 @@ void __print_symbol(const char *fmt, unsigned long address)
 		printk(fmt, buffer);
 	}
 }
+
+/* To avoid O(n^2) iteration, we carry prefix along. */
+struct kallsym_iter
+{
+	loff_t pos;
+	struct module *owner;
+	unsigned long value;
+	unsigned int nameoff; /* If iterating in core kernel symbols */
+	char type;
+	char name[128];
+};
+
+/* Only label it "global" if it is exported. */
+static void upcase_if_global(struct kallsym_iter *iter)
+{
+	if (is_exported(iter->name, iter->owner))
+		iter->type += 'A' - 'a';
+}
+
+static int get_ksymbol_mod(struct kallsym_iter *iter)
+{
+	iter->owner = module_get_kallsym(iter->pos - kallsyms_num_syms,
+					 &iter->value,
+					 &iter->type, iter->name);
+	if (iter->owner == NULL)
+		return 0;
+
+	upcase_if_global(iter);
+	return 1;
+}
+
+static void get_ksymbol_core(struct kallsym_iter *iter)
+{
+	unsigned stemlen;
+
+	/* First char of each symbol name indicates prefix length
+	   shared with previous name (stem compresion). */
+	stemlen = kallsyms_names[iter->nameoff++];
+
+	strlcpy(iter->name+stemlen, kallsyms_names+iter->nameoff, 128-stemlen);
+	iter->nameoff += strlen(kallsyms_names + iter->nameoff) + 1;
+	iter->owner = NULL;
+	iter->value = kallsyms_addresses[iter->pos];
+	iter->type = 't';
+
+	upcase_if_global(iter);
+}
+
+static void reset_iter(struct kallsym_iter *iter)
+{
+	iter->name[0] = '\0';
+	iter->nameoff = 0;
+	iter->pos = 0;
+}
+
+/* Returns false if pos at or past end of file. */
+static int update_iter(struct kallsym_iter *iter, loff_t pos)
+{
+	/* Module symbols can be accessed randomly. */
+	if (pos >= kallsyms_num_syms) {
+		iter->pos = pos;
+		return get_ksymbol_mod(iter);
+	}
+	
+	/* If we're past the desired position, reset to start. */
+	if (pos < iter->pos)
+		reset_iter(iter);
+
+	/* We need to iterate through the previous symbols. */
+	for (; iter->pos <= pos; iter->pos++)
+		get_ksymbol_core(iter);
+	return 1;
+}
+
+static void *s_next(struct seq_file *m, void *p, loff_t *pos)
+{
+	(*pos)++;
+
+	if (!update_iter(m->private, *pos))
+		return NULL;
+	return p;
+}
+
+static void *s_start(struct seq_file *m, loff_t *pos)
+{
+	if (!update_iter(m->private, *pos))
+		return NULL;
+	return m->private;
+}
+
+static void s_stop(struct seq_file *m, void *p)
+{
+}
+
+static int s_show(struct seq_file *m, void *p)
+{
+	struct kallsym_iter *iter = m->private;
+
+	/* Some debugging symbols have no name.  Ignore them. */ 
+	if (!iter->name[0])
+		return 0;
+
+	if (iter->owner)
+		seq_printf(m, "%0*lx %c %s\t[%s]\n",
+			   (int)(2*sizeof(void*)),
+			   iter->value, iter->type, iter->name,
+			   module_name(iter->owner));
+	else
+		seq_printf(m, "%0*lx %c %s\n",
+			   (int)(2*sizeof(void*)),
+			   iter->value, iter->type, iter->name);
+	return 0;
+}
+
+struct seq_operations kallsyms_op = {
+	.start = s_start,
+	.next = s_next,
+	.stop = s_stop,
+	.show = s_show
+};
+
+static int kallsyms_open(struct inode *inode, struct file *file)
+{
+	/* We keep iterator in m->private, since normal case is to
+	 * s_start from where we left off, so we avoid O(N^2). */
+	struct kallsym_iter *iter;
+	int ret;
+
+	iter = kmalloc(sizeof(*iter), GFP_KERNEL);
+	if (!iter)
+		return -ENOMEM;
+
+	ret = seq_open(file, &kallsyms_op);
+	if (ret == 0)
+		((struct seq_file *)file->private_data)->private = iter;
+	else
+		kfree(iter);
+	return ret;
+}
+
+static int kallsyms_release(struct inode *inode, struct file *file)
+{
+	struct seq_file *m = (struct seq_file *)file->private_data;
+	kfree(m->private);
+	return seq_release(inode, file);
+}
+
+static struct file_operations kallsyms_operations = {
+	.open = kallsyms_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = kallsyms_release,
+};
+
+int __init kallsyms_init(void)
+{
+	struct proc_dir_entry *entry;
+
+	/* root-only: could chew up lots of cpu by read, seek back, read... */
+	entry = create_proc_entry("kallsyms", 0400, NULL);
+	if (entry)
+		entry->proc_fops = &kallsyms_operations;
+	return 0;
+}
+__initcall(kallsyms_init);
 
 EXPORT_SYMBOL(kallsyms_lookup);
 EXPORT_SYMBOL(__print_symbol);
