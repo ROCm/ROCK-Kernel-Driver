@@ -249,7 +249,6 @@ do_more:
 				      "bit already cleared for block %lu",
 				      block + i);
 		else {
-			DQUOT_FREE_BLOCK(inode, 1);
 			gdp->bg_free_blocks_count =
 				cpu_to_le16(le16_to_cpu(gdp->bg_free_blocks_count)+1);
 			freed++;
@@ -270,7 +269,7 @@ do_more:
 error_return:
 	release_blocks(sb, freed);
 	unlock_super (sb);
-	return;
+	DQUOT_FREE_BLOCK(inode, freed);
 }
 
 /*
