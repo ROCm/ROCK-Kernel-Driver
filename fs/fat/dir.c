@@ -23,10 +23,10 @@
 #include <asm/uaccess.h>
 
 struct file_operations fat_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	fat_readdir,
-	ioctl:		fat_dir_ioctl,
-	fsync:		file_fsync,
+	.read		= generic_read_dir,
+	.readdir	= fat_readdir,
+	.ioctl		= fat_dir_ioctl,
+	.fsync		= file_fsync,
 };
 
 /*
