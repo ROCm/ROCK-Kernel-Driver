@@ -584,6 +584,28 @@ ENTRY(anakin_active_irqs)
   		.macro	irq_prio_table
  		.endm
 
+#elif defined(CONFIG_ARCH_IOP321)
+		.macro  disable_fiq
+		.endm
+
+		/*
+		 * Note: only deal with normal interrupts, not FIQ
+		 */
+		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+		mov     \irqnr, #0
+		mrc     p6, 0, \irqstat, c8, c0, 0      @ Read IINTSRC
+		cmp     \irqstat, #0
+		beq     1001f
+		clz     \irqnr, \irqstat
+		mov     \base, #31
+		subs    \irqnr,\base,\irqnr
+		add     \irqnr,\irqnr,#IRQ_IOP321_DMA0_EOT
+1001:
+		.endm
+
+		.macro  irq_prio_table
+		.endm
+
 #elif defined(CONFIG_ARCH_PXA)
 
 		.macro	disable_fiq

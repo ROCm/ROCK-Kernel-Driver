@@ -12,6 +12,12 @@ config ARCH_IQ80310
 	  Say Y here if you want to run your kernel on the Intel IQ80310
 	  evaluation kit for the IOP310 chipset.
 
+config ARCH_IQ80321
+	bool "IQ80321"
+	depends on ARCH_IOP3XX
+	help
+	  Say Y here if you want to run your kernel on the Intel IQ80321
+	  evaluation kit for the IOP321 chipset.
 endchoice
 
 # Which IOP variant are we running?
@@ -20,6 +26,12 @@ config ARCH_IOP310
 	default ARCH_IQ80310
 	help
 	  The IQ80310 uses the IOP310 variant.
+
+config ARCH_IOP321
+	bool
+	default ARCH_IQ80321
+	help
+	  The IQ80321 uses the IOP321 variant.
 
 comment "IOP3xx Chipset Features"
 

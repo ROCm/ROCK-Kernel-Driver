@@ -654,6 +654,9 @@ ENTRY(cpu_xscale_set_pte)
 cpu_80200_name:
 	.asciz	"XScale-80200"
 
+cpu_80321_name:
+	.asciz	"XScale-IOP80321"
+
 cpu_pxa250_name:
 	.asciz	"XScale-PXA250"
 
@@ -747,6 +750,22 @@ __80200_proc_info:
 	.long	v4wbi_tlb_fns
 	.long	xscale_mc_user_fns
 	.size	__80200_proc_info, . - __80200_proc_info
+
+	.type	__80321_proc_info,#object
+__80321_proc_info:
+	.long	0x69052420
+	.long	0xfffffff0
+	.long	0x00000c0e
+	b	__xscale_setup
+	.long	cpu_arch_name
+	.long	cpu_elf_name
+	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+	.long	cpu_80321_name
+	.long	xscale_processor_functions
+	.long	v4wbi_tlb_fns
+	.long	xscale_mc_user_fns
+	.long	xscale_cache_fns
+	.size	__80321_proc_info, . - __80321_proc_info
 
 	.type	__pxa250_proc_info,#object
 __pxa250_proc_info:

@@ -14,7 +14,11 @@
 #else
 /* This is for the underlying xs80200 PMU clock. We run the core @ 733MHz */
 #define CLOCK_TICK_RATE	733000000
-#endif
+#endif // IQ80310
+
+#elif defined(CONFIG_ARCH_IQ80321)
+
+#define CLOCK_TICK_RATE 200000000
 
 #else
 
