@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -1287,7 +1287,7 @@ xfs_inactive_free_eofblocks(
 	 * of the file.  If not, then there is nothing to do.
 	 */
 	end_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)ip->i_d.di_size));
-	last_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAX_FILE_OFFSET);
+	last_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAXIOFFSET(mp));
 	map_len = last_fsb - end_fsb;
 	if (map_len <= 0)
 		return (0);
@@ -4612,9 +4612,9 @@ xfs_change_file_space(
 	llen = bf->l_len > 0 ? bf->l_len - 1 : bf->l_len;
 
 	if (   (bf->l_start < 0)
-	    || (bf->l_start > XFS_MAX_FILE_OFFSET)
+	    || (bf->l_start > XFS_MAXIOFFSET(mp))
 	    || (bf->l_start + llen < 0)
-	    || (bf->l_start + llen > XFS_MAX_FILE_OFFSET))
+	    || (bf->l_start + llen > XFS_MAXIOFFSET(mp)))
 		return XFS_ERROR(EINVAL);
 
 	bf->l_whence = 0;

@@ -728,6 +728,8 @@ xfs_mountfs(
 	} else
 		mp->m_maxicount = 0;
 
+	mp->m_maxioffset = xfs_max_file_offset(sbp->sb_blocklog);
+
 	/*
 	 * XFS uses the uuid from the superblock as the unique
 	 * identifier for fsid.  We can not use the uuid from the volume
