@@ -86,7 +86,7 @@ Hot plug support for SCSI tape drives
 
 Hot plugging of SCSI tape drives is supported, with some caveats.
 The cciss driver must be informed that changes to the SCSI bus
-have been made, in addition to and prior to informing the the SCSI 
+have been made, in addition to and prior to informing the SCSI 
 mid layer.  This may be done via the /proc filesystem.  For example:
 
 	echo "rescan" > /proc/scsi/cciss0/1
