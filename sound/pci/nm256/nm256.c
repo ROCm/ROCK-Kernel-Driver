@@ -1130,7 +1130,7 @@ snd_nm256_ac97_read(ac97_t *ac97, unsigned short reg)
 		return 0;
 	res = snd_nm256_readw(chip, chip->mixer_base + reg);
 	/* Magic delay.  Bleah yucky.  */
-	udelay(1000);
+	msleep(1);
 	return res;
 }
 
@@ -1151,7 +1151,7 @@ snd_nm256_ac97_write(ac97_t *ac97,
 	/* Wait for the write to take, too. */
 	while (tries-- > 0) {
 		snd_nm256_writew(chip, base + reg, val);
-		udelay(1000);  /* a little delay here seems better.. */
+		msleep(1);  /* a little delay here seems better.. */
 		if (snd_nm256_ac97_ready(chip))
 			return;
 	}
