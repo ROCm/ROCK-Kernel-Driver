@@ -64,6 +64,7 @@ obj-$(CONFIG_HISAX_ELSA_CS)		+= elsa_cs.o
 obj-$(CONFIG_HISAX_ST5481)		+= hisax_st5481.o
 obj-$(CONFIG_HISAX_FRITZ_PCIPNP)        += hisax_isac.o hisax_fcpcipnp.o
 obj-$(CONFIG_HISAX_FRITZ_CLASSIC)       += hisax_isac.o hisax_hscx.o hisax_fcclassic.o
+obj-$(CONFIG_HISAX_FRITZ_PCIPNP)        += hisax_hfcpci.o
 
 CERT := $(shell md5sum -c md5sums.asc >> /dev/null;echo $$?)
 CFLAGS_cert.o := -DCERTIFICATION=$(CERT)
