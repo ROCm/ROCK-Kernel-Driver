@@ -174,7 +174,7 @@ EXPORT_SYMBOL(_write_lock);
  */
 
 #define BUILD_LOCK_OPS(op, locktype)					\
-void __lockfunc _##op##_lock(locktype *lock)				\
+void __lockfunc _##op##_lock(locktype##_t *lock)			\
 {									\
 	preempt_disable();						\
 	for (;;) {							\
@@ -183,14 +183,15 @@ void __lockfunc _##op##_lock(locktype *lock)				\
 		preempt_enable();					\
 		if (!(lock)->break_lock)				\
 			(lock)->break_lock = 1;				\
-		cpu_relax();						\
+		while (!op##_can_lock(lock) && (lock)->break_lock)	\
+			cpu_relax();					\
 		preempt_disable();					\
 	}								\
 }									\
 									\
 EXPORT_SYMBOL(_##op##_lock);						\
 									\
-unsigned long __lockfunc _##op##_lock_irqsave(locktype *lock)		\
+unsigned long __lockfunc _##op##_lock_irqsave(locktype##_t *lock)	\
 {									\
 	unsigned long flags;						\
 									\
@@ -204,7 +205,8 @@ unsigned long __lockfunc _##op##_lock_irqsave(locktype *lock)		\
 		preempt_enable();					\
 		if (!(lock)->break_lock)				\
 			(lock)->break_lock = 1;				\
-		cpu_relax();						\
+		while (!op##_can_lock(lock) && (lock)->break_lock)	\
+			cpu_relax();					\
 		preempt_disable();					\
 	}								\
 	return flags;							\
@@ -212,14 +214,14 @@ unsigned long __lockfunc _##op##_lock_irqsave(locktype *lock)		\
 									\
 EXPORT_SYMBOL(_##op##_lock_irqsave);					\
 									\
-void __lockfunc _##op##_lock_irq(locktype *lock)			\
+void __lockfunc _##op##_lock_irq(locktype##_t *lock)			\
 {									\
 	_##op##_lock_irqsave(lock);					\
 }									\
 									\
 EXPORT_SYMBOL(_##op##_lock_irq);					\
 									\
-void __lockfunc _##op##_lock_bh(locktype *lock)				\
+void __lockfunc _##op##_lock_bh(locktype##_t *lock)			\
 {									\
 	unsigned long flags;						\
 									\
@@ -244,9 +246,9 @@ EXPORT_SYMBOL(_##op##_lock_bh)
  *         _[spin|read|write]_lock_irqsave()
  *         _[spin|read|write]_lock_bh()
  */
-BUILD_LOCK_OPS(spin, spinlock_t);
-BUILD_LOCK_OPS(read, rwlock_t);
-BUILD_LOCK_OPS(write, rwlock_t);
+BUILD_LOCK_OPS(spin, spinlock);
+BUILD_LOCK_OPS(read, rwlock);
+BUILD_LOCK_OPS(write, rwlock);
 
 #endif /* CONFIG_PREEMPT */
 
