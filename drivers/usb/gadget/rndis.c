@@ -18,6 +18,9 @@
  * 
  * 03/25/2004 Kai-Uwe Bloem <linux-development@auerswald.de>
  * 		Fixed rndis_rm_hdr length bug.
+ *
+ * Copyright (C) 2004 by David Brownell
+ *		updates to merge with Linux 2.6, better match RNDIS spec
  */
 
 #include <linux/config.h>
@@ -35,13 +38,18 @@
 #include <asm/byteorder.h>
 #include <asm/system.h>
 
+
+#undef	RNDIS_PM
+#undef	VERBOSE
+
 #include "rndis.h"
 
 
 /* The driver for your USB chip needs to support ep0 OUT to work with
- * RNDIS, plus the same three descriptors as CDC Ethernet.
+ * RNDIS, plus all three CDC Ethernet endpoints (interrupt not optional).
  *
  * Windows hosts need an INF file like Documentation/usb/linux.inf
+ * and will be happier if you provide the host_addr module parameter.
  */
 
 #ifndef	__LITTLE_ENDIAN
@@ -49,14 +57,19 @@
 #endif
 
 #if 0
-#define DEBUG if (rndis_debug) printk 
+#define DEBUG(str,args...) do { \
+	if (rndis_debug) \
+		printk(KERN_DEBUG str , ## args ); \
+	} while (0)
 static int rndis_debug = 0;
 
 module_param (rndis_debug, bool, 0);
 MODULE_PARM_DESC (rndis_debug, "enable debugging");
 
 #else
-#define DEBUG(str,args...) do{}while(0)
+
+#define rndis_debug		0
+#define DEBUG(str,args...)	do{}while(0)
 #endif
 
 #define RNDIS_MAX_CONFIGS	1
@@ -79,10 +92,6 @@ static int rndis_keepalive_response (int configNr,
 
 static rndis_resp_t *rndis_add_response (int configNr, u32 length);
 
-/* FIXME OMITTED OIDs, that RNDIS-on-USB "must" support, include
- *  - power management (OID_PNP_CAPABILITIES, ...)
- *  - network wakeup (OID_PNP_ENABLE_WAKE_UP, ...)
- */
 
 /* NDIS Functions */
 static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
@@ -97,6 +106,9 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 	if (!resp) return -ENOMEM;
 	
 	switch (OID) {
+
+	/* general oids (table 4-1) */
+
 	/* mandatory */
 	case OID_GEN_SUPPORTED_LIST:
 		DEBUG ("%s: OID_GEN_SUPPORTED_LIST\n", __FUNCTION__);
@@ -135,11 +147,7 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 		*((u32 *) resp + 6) = rndis_per_dev_params [configNr].medium;
 		retval = 0;
 		break;
-		
-	case OID_GEN_MAXIMUM_LOOKAHEAD:
-		DEBUG("%s: OID_GEN_MAXIMUM_LOOKAHEAD\n", __FUNCTION__);
-		break;
-		
+
 	/* mandatory */
 	case OID_GEN_MAXIMUM_FRAME_SIZE:
 		DEBUG("%s: OID_GEN_MAXIMUM_FRAME_SIZE\n", __FUNCTION__);
@@ -165,18 +173,7 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 		    *((u32 *) resp + 6) = rndis_per_dev_params [configNr].speed;
 		retval = 0;
 		break;
-		
-	case OID_GEN_TRANSMIT_BUFFER_SPACE:
-		DEBUG("%s: OID_GEN_TRANSMIT_BUFFER_SPACE\n", __FUNCTION__);
-		length = 4;
-		*((u32 *) resp + 6) = 0;
-		retval = 0;
-		break;
-		
-	case OID_GEN_RECEIVE_BUFFER_SPACE:
-		DEBUG("%s: OID_GEN_RECEIVE_BUFFER_SPACE\n", __FUNCTION__);
-		break;
-		
+
 	/* mandatory */
 	case OID_GEN_TRANSMIT_BLOCK_SIZE:
 		DEBUG("%s: OID_GEN_TRANSMIT_BLOCK_SIZE\n", __FUNCTION__);
@@ -216,6 +213,13 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 		retval = 0;
 		break;
 
+	case OID_GEN_VENDOR_DRIVER_VERSION:
+		DEBUG("%s: OID_GEN_VENDOR_DRIVER_VERSION\n", __FUNCTION__);
+		length = 4;
+		*((u32 *) resp + 6) = rndis_driver_version;
+		retval = 0;
+		break;
+
 	/* mandatory */
 	case OID_GEN_CURRENT_PACKET_FILTER:
 		DEBUG("%s: OID_GEN_CURRENT_PACKET_FILTER\n", __FUNCTION__);
@@ -223,15 +227,7 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 		*((u32 *) resp + 6) = rndis_per_dev_params[configNr].filter;
 		retval = 0;
 		break;
-		
-	case OID_GEN_CURRENT_LOOKAHEAD:
-		DEBUG("%s: OID_GEN_CURRENT_LOOKAHEAD\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_DRIVER_VERSION:
-		DEBUG("%s: OID_GEN_DRIVER_VERSION\n", __FUNCTION__);
-		break;
-		
+
 	/* mandatory */
 	case OID_GEN_MAXIMUM_TOTAL_SIZE:
 		DEBUG("%s: OID_GEN_MAXIMUM_TOTAL_SIZE\n", __FUNCTION__);
@@ -239,19 +235,7 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 		*((u32 *) resp + 6) = RNDIS_MAX_TOTAL_SIZE;
 		retval = 0;
 		break;
-		
-	case OID_GEN_PROTOCOL_OPTIONS:
-		DEBUG("%s: OID_GEN_PROTOCOL_OPTIONS\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_MAC_OPTIONS:
-		DEBUG("%s: OID_GEN_MAC_OPTIONS\n", __FUNCTION__);
-		length = 4;
-		*((u32 *) resp + 6) = NDIS_MAC_OPTION_RECEIVE_SERIALIZED | 
-		    NDIS_MAC_OPTION_FULL_DUPLEX;
-		retval = 0;
-		break;
-		
+
 	/* mandatory */
 	case OID_GEN_MEDIA_CONNECT_STATUS:
 		DEBUG("%s: OID_GEN_MEDIA_CONNECT_STATUS\n", __FUNCTION__);
@@ -261,55 +245,14 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 		retval = 0;
 		break;
 		
-	case OID_GEN_MAXIMUM_SEND_PACKETS:
-		DEBUG("%s: OID_GEN_MAXIMUM_SEND_PACKETS\n", __FUNCTION__);
-		break;
-		
-	/* mandatory */
-	case OID_GEN_VENDOR_DRIVER_VERSION:
-		DEBUG("%s: OID_GEN_VENDOR_DRIVER_VERSION\n", __FUNCTION__);
-		length = 4;
-		*((u32 *) resp + 6) = rndis_driver_version;
-		retval = 0;
-		break;
-		
-	case OID_GEN_SUPPORTED_GUIDS:
-		DEBUG("%s: OID_GEN_SUPPORTED_GUIDS\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_NETWORK_LAYER_ADDRESSES:
-		DEBUG("%s: OID_GEN_NETWORK_LAYER_ADDRESSES\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_TRANSPORT_HEADER_OFFSET:
-		DEBUG("%s: OID_GEN_TRANSPORT_HEADER_OFFSET\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_MACHINE_NAME:
-		DEBUG("%s: OID_GEN_MACHINE_NAME\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_RNDIS_CONFIG_PARAMETER:
-		DEBUG("%s: OID_GEN_RNDIS_CONFIG_PARAMETER\n", __FUNCTION__);
-		length = 4;
-		*((u32 *) resp + 6) = 0;
-		retval = 0;
-		break;
-		
-	case OID_GEN_VLAN_ID:
-		DEBUG("%s: OID_GEN_VLAN_ID\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_MEDIA_CAPABILITIES:
-		DEBUG("%s: OID_GEN_MEDIA_CAPABILITIES\n", __FUNCTION__);
-		break;
-		
 	case OID_GEN_PHYSICAL_MEDIUM:
 		DEBUG("%s: OID_GEN_PHYSICAL_MEDIUM\n", __FUNCTION__);
 		length = 4;
 		*((u32 *) resp + 6) = 0;
 		retval = 0;
 		break;
+
+	/* statistics OIDs (table 4-2) */
 		
 	/* mandatory */
 	case OID_GEN_XMIT_OK:
@@ -326,7 +269,7 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 			retval = 0;
 		}
 		break;
-		
+
 	/* mandatory */
 	case OID_GEN_RCV_OK:
 		DEBUG("%s: OID_GEN_RCV_OK\n", __FUNCTION__);
@@ -382,7 +325,8 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 			retval = 0;
 		}
 		break;
-		
+
+#ifdef	RNDIS_OPTIONAL_STATS
 	case OID_GEN_DIRECTED_BYTES_XMIT:
 		DEBUG("%s: OID_GEN_DIRECTED_BYTES_XMIT\n", __FUNCTION__);
 		/* 
@@ -546,47 +490,10 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 		*((u32 *) resp + 6) = 0;
 		retval = 0;
 		break;
-		
-	case OID_GEN_GET_TIME_CAPS:
-		DEBUG("%s: OID_GEN_GET_TIME_CAPS\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_GET_NETCARD_TIME:
-		DEBUG("%s: OID_GEN_GET_NETCARD_TIME\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_NETCARD_LOAD:
-		DEBUG("%s: OID_GEN_NETCARD_LOAD\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_DEVICE_PROFILE:
-		DEBUG("%s: OID_GEN_DEVICE_PROFILE\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_INIT_TIME_MS:
-		DEBUG("%s: OID_GEN_INIT_TIME_MS\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_RESET_COUNTS:
-		DEBUG("%s: OID_GEN_RESET_COUNTS\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_MEDIA_SENSE_COUNTS:
-		DEBUG("%s: OID_GEN_MEDIA_SENSE_COUNTS\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_FRIENDLY_NAME:
-		DEBUG("%s: OID_GEN_FRIENDLY_NAME\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_MINIPORT_INFO:
-		DEBUG("%s: OID_GEN_MINIPORT_INFO\n", __FUNCTION__);
-		break;
-		
-	case OID_GEN_RESET_VERIFY_PARAMETERS:
-		DEBUG("%s: OID_GEN_RESET_VERIFY_PARAMETERS\n", __FUNCTION__);
-		break;
-		
+#endif	/* RNDIS_OPTIONAL_STATS */
+
+	/* ieee802.3 OIDs (table 4-3) */
+
 	/* mandatory */
 	case OID_802_3_PERMANENT_ADDRESS:
 		DEBUG("%s: OID_802_3_PERMANENT_ADDRESS\n", __FUNCTION__);
@@ -631,11 +538,13 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 		*((u32 *) resp + 6) = 1;
 		retval = 0;
 		break;
-		
+
 	case OID_802_3_MAC_OPTIONS:
 		DEBUG("%s: OID_802_3_MAC_OPTIONS\n", __FUNCTION__);
 		break;
-		
+
+	/* ieee802.3 statistics OIDs (table 4-4) */
+
 	/* mandatory */
 	case OID_802_3_RCV_ERROR_ALIGNMENT:
 		DEBUG("%s: OID_802_3_RCV_ERROR_ALIGNMENT\n", __FUNCTION__);
@@ -664,6 +573,7 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 		retval = 0;
 		break;
 		
+#ifdef	RNDIS_OPTIONAL_STATS
 	case OID_802_3_XMIT_DEFERRED:
 		DEBUG("%s: OID_802_3_XMIT_DEFERRED\n", __FUNCTION__);
 		/* TODO */
@@ -698,8 +608,40 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 		DEBUG("%s: OID_802_3_XMIT_LATE_COLLISIONS\n", __FUNCTION__);
 		/* TODO */
 		break;		
-		
-	default: printk (KERN_ERR "%s: unknown OID 0x%08X\n", 
+#endif	/* RNDIS_OPTIONAL_STATS */
+
+#ifdef	RNDIS_PM
+	/* power management OIDs (table 4-5) */
+	case OID_PNP_CAPABILITIES:
+		DEBUG("%s: OID_PNP_CAPABILITIES\n", __FUNCTION__);
+
+		/* just PM, and remote wakeup on link status change
+		 * (not magic packet or pattern match)
+		 */
+		length = sizeof (struct NDIS_PNP_CAPABILITIES);
+		memset (resp, 0, length);
+		{
+			struct NDIS_PNP_CAPABILITIES *caps = (void *) resp;
+
+			caps->Flags = NDIS_DEVICE_WAKE_UP_ENABLE;
+			caps->WakeUpCapabilities.MinLinkChangeWakeUp 
+				 = NdisDeviceStateD3;
+
+			/* FIXME then use usb_gadget_wakeup(), and
+			 * set USB_CONFIG_ATT_WAKEUP in config desc
+			 */
+		}
+		retval = 0;
+		break;
+	case OID_PNP_QUERY_POWER:
+		DEBUG("%s: OID_PNP_QUERY_POWER\n", __FUNCTION__);
+		/* sure, handle any power state that maps to USB suspend */
+		retval = 0;
+		break;
+#endif
+
+	default:
+		printk (KERN_WARNING "%s: query unknown OID 0x%08X\n", 
 			 __FUNCTION__, OID);
 	}
 	
@@ -715,7 +657,6 @@ static int gen_ndis_set_resp (u8 configNr, u32 OID, u8 *buf, u32 buf_len,
 {
 	rndis_set_cmplt_type		*resp;
 	int 				i, retval = -ENOTSUPP;
-	struct rndis_config_parameter	*param;
 	struct rndis_params		*params;
 	u8 *cp;
 
@@ -727,12 +668,31 @@ static int gen_ndis_set_resp (u8 configNr, u32 OID, u8 *buf, u32 buf_len,
 
 	cp = (u8 *)resp;
 
+	DEBUG("set OID %08x value, len %d:\n", OID, buf_len);
+	for (i = 0; i < buf_len; i += 16) {
+		DEBUG ("%03d: "
+			" %02x %02x %02x %02x"
+			" %02x %02x %02x %02x"
+			" %02x %02x %02x %02x"
+			" %02x %02x %02x %02x"
+			"\n",
+			i,
+			buf[i], buf [i+1],
+				buf[i+2], buf[i+3],
+			buf[i+4], buf [i+5],
+				buf[i+6], buf[i+7],
+			buf[i+8], buf [i+9],
+				buf[i+10], buf[i+11],
+			buf[i+12], buf [i+13],
+				buf[i+14], buf[i+15]);
+	}
+
 	switch (OID) {
 	case OID_GEN_CURRENT_PACKET_FILTER:
 		params = &rndis_per_dev_params [configNr];
 		retval = 0;
 
-		/* FIXME use this NDIS_PACKET_TYPE_* bitflags to
+		/* FIXME use these NDIS_PACKET_TYPE_* bitflags to
 		 * filter packets in hard_start_xmit()
 		 * NDIS_PACKET_TYPE_x == CDC_PACKET_TYPE_x for x in:
 		 *	PROMISCUOUS, DIRECTED,
@@ -763,23 +723,40 @@ static int gen_ndis_set_resp (u8 configNr, u32 OID, u8 *buf, u32 buf_len,
 		DEBUG("%s: OID_802_3_MULTICAST_LIST\n", __FUNCTION__);
 		retval = 0;
 		break;
-		
+#if 0
 	case OID_GEN_RNDIS_CONFIG_PARAMETER:
-		DEBUG("%s: OID_GEN_RNDIS_CONFIG_PARAMETER\n", __FUNCTION__);
+		{
+		struct rndis_config_parameter	*param;
 		param = (struct rndis_config_parameter *) buf;
-		if (param) {
-			for (i = 0; i < param->ParameterNameLength; i++) {
-				DEBUG ("%c", 
-				       *(buf + param->ParameterNameOffset + i));
-			}
-			DEBUG ("\n");
+		DEBUG("%s: OID_GEN_RNDIS_CONFIG_PARAMETER '%*s'\n",
+			__FUNCTION__,
+			param->ParameterNameLength,
+			buf + param->ParameterNameOffset);
+		retval = 0;
 		}
-		
+		break;
+#endif
+
+#ifdef	RNDIS_PM
+	case OID_PNP_SET_POWER:
+		DEBUG ("OID_PNP_SET_POWER\n");
+		/* sure, handle any power state that maps to USB suspend */
 		retval = 0;
 		break;
-		
-	default: printk (KERN_ERR "%s: unknown OID 0x%08X\n", 
-			 __FUNCTION__, OID);
+
+	case OID_PNP_ENABLE_WAKE_UP:
+		/* always-connected ... */
+		DEBUG ("OID_PNP_ENABLE_WAKE_UP\n");
+		retval = 0;
+		break;
+
+	// no PM resume patterns supported (specified where?)
+	// so OID_PNP_{ADD,REMOVE}_WAKE_UP_PATTERN always fails
+#endif
+
+	default:
+		printk (KERN_WARNING "%s: set unknown OID 0x%08X, size %d\n", 
+			 __FUNCTION__, OID, buf_len);
 	}
 	
 	return retval;
@@ -833,7 +810,7 @@ static int rndis_query_response (int configNr, rndis_query_msg_type *buf)
 	rndis_query_cmplt_type *resp;
 	rndis_resp_t            *r;
 	
-	DEBUG("%s: OID = %08X\n", __FUNCTION__, buf->OID);
+	// DEBUG("%s: OID = %08X\n", __FUNCTION__, buf->OID);
 	if (!rndis_per_dev_params [configNr].dev) return -ENOTSUPP;
 	
 	/* 
@@ -869,14 +846,14 @@ static int rndis_set_response (int configNr, rndis_set_msg_type *buf)
 {
 	rndis_set_cmplt_type	*resp;
 	rndis_resp_t		*r;
-	int			i;
 	
 	r = rndis_add_response (configNr, sizeof (rndis_set_cmplt_type));
 	
 	if (!r) return -ENOMEM;
 	resp = (rndis_set_cmplt_type *) r->buf;
 	if (!resp) return -ENOMEM;
-	
+
+#ifdef	VERBOSE
 	DEBUG("%s: Length: %d\n", __FUNCTION__, buf->InformationBufferLength);
 	DEBUG("%s: Offset: %d\n", __FUNCTION__, buf->InformationBufferOffset);
 	DEBUG("%s: InfoBuffer: ", __FUNCTION__);
@@ -887,7 +864,8 @@ static int rndis_set_response (int configNr, rndis_set_msg_type *buf)
 	}
 	
 	DEBUG ("\n");
-	
+#endif
+
 	resp->MessageType = REMOTE_NDIS_SET_CMPLT;
 	resp->MessageLength = 16;
 	resp->RequestID = buf->RequestID;
@@ -1025,14 +1003,14 @@ int rndis_msg_parser (u8 configNr, u8 *buf)
 	switch (MsgType)
 	{
 	case REMOTE_NDIS_INITIALIZE_MSG:
-		DEBUG(KERN_INFO "%s: REMOTE_NDIS_INITIALIZE_MSG\n", 
+		DEBUG("%s: REMOTE_NDIS_INITIALIZE_MSG\n", 
 			__FUNCTION__ );
 		params->state = RNDIS_INITIALIZED;
 		return  rndis_init_response (configNr,
 					     (rndis_init_msg_type *) buf);
 		
 	case REMOTE_NDIS_HALT_MSG:
-		DEBUG(KERN_INFO "%s: REMOTE_NDIS_HALT_MSG\n",
+		DEBUG("%s: REMOTE_NDIS_HALT_MSG\n",
 			__FUNCTION__ );
 		params->state = RNDIS_UNINITIALIZED;
 		if (params->dev) {
@@ -1042,34 +1020,53 @@ int rndis_msg_parser (u8 configNr, u8 *buf)
 		return 0;
 		
 	case REMOTE_NDIS_QUERY_MSG:
-		DEBUG(KERN_INFO "%s: REMOTE_NDIS_QUERY_MSG\n", 
-			__FUNCTION__ );
 		return rndis_query_response (configNr, 
 					     (rndis_query_msg_type *) buf);
 		
 	case REMOTE_NDIS_SET_MSG:
-		DEBUG(KERN_INFO "%s: REMOTE_NDIS_SET_MSG\n", 
-			__FUNCTION__ );
 		return rndis_set_response (configNr, 
 					   (rndis_set_msg_type *) buf);
 		
 	case REMOTE_NDIS_RESET_MSG:
-		DEBUG(KERN_INFO "%s: REMOTE_NDIS_RESET_MSG\n", 
+		DEBUG("%s: REMOTE_NDIS_RESET_MSG\n", 
 			__FUNCTION__ );
 		return rndis_reset_response (configNr,
 					     (rndis_reset_msg_type *) buf);
 
 	case REMOTE_NDIS_KEEPALIVE_MSG:
 		/* For USB: host does this every 5 seconds */
-		DEBUG(KERN_INFO "%s: REMOTE_NDIS_KEEPALIVE_MSG\n", 
+#ifdef	VERBOSE
+		DEBUG("%s: REMOTE_NDIS_KEEPALIVE_MSG\n", 
 			__FUNCTION__ );
+#endif
 		return rndis_keepalive_response (configNr,
 						 (rndis_keepalive_msg_type *) 
 						 buf);
 		
 	default: 
-		printk (KERN_ERR "%s: unknown RNDIS Message Type 0x%08X\n", 
-			__FUNCTION__ , MsgType);
+		printk (KERN_WARNING
+			"%s: unknown RNDIS message 0x%08X len %d\n", 
+			__FUNCTION__ , MsgType, MsgLength);
+		{
+			unsigned i;
+			for (i = 0; i < MsgLength; i += 16) {
+				DEBUG ("%03d: "
+					" %02x %02x %02x %02x"
+					" %02x %02x %02x %02x"
+					" %02x %02x %02x %02x"
+					" %02x %02x %02x %02x"
+					"\n",
+					i,
+					buf[i], buf [i+1],
+						buf[i+2], buf[i+3],
+					buf[i+4], buf [i+5],
+						buf[i+6], buf[i+7],
+					buf[i+8], buf [i+9],
+						buf[i+10], buf[i+11],
+					buf[i+12], buf [i+13],
+						buf[i+14], buf[i+15]);
+			}
+		}
 		break;
 	}
 	
@@ -1079,13 +1076,12 @@ int rndis_msg_parser (u8 configNr, u8 *buf)
 int rndis_register (int (* rndis_control_ack) (struct net_device *))
 {
 	u8 i;
-	DEBUG("%s: ", __FUNCTION__ );
 	
 	for (i = 0; i < RNDIS_MAX_CONFIGS; i++) {
 		if (!rndis_per_dev_params [i].used) {
 			rndis_per_dev_params [i].used = 1;
 			rndis_per_dev_params [i].ack = rndis_control_ack;
-			DEBUG("configNr = %d\n", i);
+			DEBUG("%s: configNr = %d\n", __FUNCTION__, i);
 			return i;
 		}
 	}
