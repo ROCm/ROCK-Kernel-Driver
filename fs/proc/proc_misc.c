@@ -424,13 +424,6 @@ static int filesystems_read_proc(char *page, char **start, off_t off,
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
-static int ioports_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
-{
-	int len = get_ioport_list(page);
-	return proc_calc_metrics(page, start, off, count, eof, len);
-}
-
 static int cmdline_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
@@ -466,13 +459,6 @@ static int execdomains_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
 	int len = get_exec_domain_list(page);
-	return proc_calc_metrics(page, start, off, count, eof, len);
-}
-
-static int memory_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data)
-{
-	int len = get_mem_list(page);
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
@@ -569,13 +555,11 @@ void __init proc_misc_init(void)
 		{"stat",	kstat_read_proc},
 		{"devices",	devices_read_proc},
 		{"filesystems",	filesystems_read_proc},
-		{"ioports",	ioports_read_proc},
 		{"cmdline",	cmdline_read_proc},
 #ifdef CONFIG_SGI_DS1286
 		{"rtc",		ds1286_read_proc},
 #endif
 		{"locks",	locks_read_proc},
-		{"iomem",	memory_read_proc},
 		{"execdomains",	execdomains_read_proc},
 		{NULL,}
 	};
