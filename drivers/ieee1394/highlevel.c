@@ -448,7 +448,7 @@ void highlevel_host_reset(struct hpsb_host *host)
         struct hpsb_highlevel *hl;
 
 	read_lock(&hl_irqs_lock);
-	list_for_each_entry(hl, &hl_irqs, hl_list) {
+	list_for_each_entry(hl, &hl_irqs, irq_list) {
                 if (hl->host_reset)
                         hl->host_reset(host);
         }
