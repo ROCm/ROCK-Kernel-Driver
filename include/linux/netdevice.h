@@ -51,6 +51,7 @@ struct ethtool_ops;
 
 #define HAVE_ALLOC_NETDEV		/* feature macro: alloc_xxxdev
 					   functions are available. */
+#define HAVE_FREE_NETDEV
 
 #define NET_XMIT_SUCCESS	0
 #define NET_XMIT_DROP		1	/* skb dropped			*/
