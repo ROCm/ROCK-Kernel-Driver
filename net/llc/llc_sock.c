@@ -1629,6 +1629,13 @@ static int llc_ui_confirm(struct llc_prim_if_block *prim)
 }
 
 #ifdef CONFIG_PROC_FS
+#define MAC_FORMATTED_SIZE 17
+static void llc_ui_format_mac(char *bf, unsigned char *mac)
+{
+	sprintf(bf, "%02X:%02X:%02X:%02X:%02X:%02X",
+		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
 /**
  *	llc_ui_get_info - return info to procfs
  *	@buffer: where to put the formatted output
@@ -1656,41 +1663,25 @@ static int llc_ui_get_info(char *buffer, char **start, off_t offset, int length)
 		if (llc_ui->sap) {
 			if (llc_ui->dev &&
 			    llc_ui_mac_null(llc_ui->addr.sllc_mmac))
-				len += sprintf(buffer + len,
-					"%02X:%02X:%02X:%02X:%02X:%02X",
-					llc_ui->dev->dev_addr[0],
-					llc_ui->dev->dev_addr[1],
-					llc_ui->dev->dev_addr[2],
-					llc_ui->dev->dev_addr[3],
-					llc_ui->dev->dev_addr[4],
-					llc_ui->dev->dev_addr[5]);
+				llc_ui_format_mac(buffer + len,
+						  llc_ui->dev->dev_addr);
 			else {
 				if (!llc_ui_mac_null(llc_ui->addr.sllc_mmac))
-					len += sprintf(buffer + len,
-						"%02X:%02X:%02X:%02X:%02X:%02X",
-						llc_ui->addr.sllc_mmac[0],
-						llc_ui->addr.sllc_mmac[1],
-						llc_ui->addr.sllc_mmac[2],
-						llc_ui->addr.sllc_mmac[3],
-						llc_ui->addr.sllc_mmac[4],
-						llc_ui->addr.sllc_mmac[5]);
+					llc_ui_format_mac(buffer + len,
+							llc_ui->addr.sllc_mmac);
 				else
-					len += sprintf(buffer + len,
-							"00:00:00:00:00:00");
+					sprintf(buffer + len,
+						"00:00:00:00:00:00");
 			}
+			len += MAC_FORMATTED_SIZE;
 			len += sprintf(buffer + len, "@%02X ",
 					llc_ui->sap->laddr.lsap);
 		} else
 			len += sprintf(buffer + len, "00:00:00:00:00:00@00 ");
+		llc_ui_format_mac(buffer + len, llc_ui->addr.sllc_dmac);
+		len += MAC_FORMATTED_SIZE;
 		len += sprintf(buffer + len,
-				"%02X:%02X:%02X:%02X:%02X:%02X@%02X "
-				"%08X:%08X %02X %-3d ",
-				llc_ui->addr.sllc_dmac[0],
-				llc_ui->addr.sllc_dmac[1],
-				llc_ui->addr.sllc_dmac[2],
-				llc_ui->addr.sllc_dmac[3],
-				llc_ui->addr.sllc_dmac[4],
-				llc_ui->addr.sllc_dmac[5],
+				"@%02X %08d:%08d %02d %-3d ",
 				llc_ui->addr.sllc_dsap,
 				atomic_read(&s->wmem_alloc),
 				atomic_read(&s->rmem_alloc), s->state,

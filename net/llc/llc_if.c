@@ -168,15 +168,13 @@ static int llc_unitdata_req_handler(struct llc_prim_if_block *prim)
 
 	if (!sap)
 		goto out;
-	ev = llc_sap_alloc_ev(sap);
-	if (!ev)
-		goto out;
+	ev = llc_sap_ev(prim->data->udata.skb);
 	ev->type	   = LLC_SAP_EV_TYPE_PRIM;
 	ev->data.prim.prim = LLC_DATAUNIT_PRIM;
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 	ev->data.prim.data = prim;
 	rc = 0;
-	llc_sap_send_ev(sap, ev);
+	llc_sap_send_ev(sap, prim->data->udata.skb);
 out:
 	return rc;
 }
@@ -196,15 +194,13 @@ static int llc_test_req_handler(struct llc_prim_if_block *prim)
 	struct llc_sap *sap = llc_sap_find(prim->data->udata.saddr.lsap);
 	if (!sap)
 		goto out;
-	ev = llc_sap_alloc_ev(sap);
-	if (!ev)
-		goto out;
+	ev = llc_sap_ev(prim->data->udata.skb);
 	ev->type	   = LLC_SAP_EV_TYPE_PRIM;
 	ev->data.prim.prim = LLC_TEST_PRIM;
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 	ev->data.prim.data = prim;
 	rc = 0;
-	llc_sap_send_ev(sap, ev);
+	llc_sap_send_ev(sap, prim->data->udata.skb);
 out:
 	return rc;
 }
@@ -225,15 +221,13 @@ static int llc_xid_req_handler(struct llc_prim_if_block *prim)
 
 	if (!sap)
 		goto out;
-	ev = llc_sap_alloc_ev(sap);
-	if (!ev)
-		goto out;
+	ev = llc_sap_ev(prim->data->udata.skb);
 	ev->type	   = LLC_SAP_EV_TYPE_PRIM;
 	ev->data.prim.prim = LLC_XID_PRIM;
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 	ev->data.prim.data = prim;
 	rc = 0;
-	llc_sap_send_ev(sap, ev);
+	llc_sap_send_ev(sap, prim->data->udata.skb);
 out:
 	return rc;
 }
@@ -273,29 +267,26 @@ static int llc_data_req_handler(struct llc_prim_if_block *prim)
 		llc->failed_data_req = 1;
 		goto out;
 	}
-	rc = -ENOMEM;
-	ev = llc_conn_alloc_ev(sk);
-	if (ev) {
-		ev->type	   = LLC_CONN_EV_TYPE_PRIM;
-		ev->data.prim.prim = LLC_DATA_PRIM;
-		ev->data.prim.type = LLC_PRIM_TYPE_REQ;
-		ev->data.prim.data = prim;
-		prim->data->data.skb->dev = llc->dev;
-		rc = llc_conn_send_ev(sk, ev);
-	}
+	ev = llc_conn_ev(prim->data->data.skb);
+	ev->type		  = LLC_CONN_EV_TYPE_PRIM;
+	ev->data.prim.prim	  = LLC_DATA_PRIM;
+	ev->data.prim.type	  = LLC_PRIM_TYPE_REQ;
+	ev->data.prim.data	  = prim;
+	prim->data->data.skb->dev = llc->dev;
+	rc = llc_conn_send_ev(sk, prim->data->data.skb);
 out:
 	release_sock(sk);
 	return rc;
 }
 
 /**
- *	confirm_impossible - Informs upper layer about failed connection
+ *	llc_confirm_impossible - Informs upper layer about failed connection
  *	@prim: pointer to structure that contains confirmation data.
  *
  *	Informs upper layer about failing in connection establishment. This
  *	function is called by llc_conn_req_handler.
  */
-static void confirm_impossible(struct llc_prim_if_block *prim)
+static void llc_confirm_impossible(struct llc_prim_if_block *prim)
 {
 	prim->data->conn.status = LLC_STATUS_IMPOSSIBLE;
 	prim->sap->conf(prim);
@@ -316,7 +307,7 @@ static int llc_conn_req_handler(struct llc_prim_if_block *prim)
 	int rc = -EBUSY;
 	struct llc_opt *llc;
 	struct llc_sap *sap = prim->sap;
-	struct llc_conn_state_ev *ev;
+	struct sk_buff *skb;
 	struct net_device *ddev = mac_dev_peer(prim->data->conn.dev,
 					       prim->data->conn.dev->type,
 					       prim->data->conn.daddr.mac),
@@ -334,7 +325,7 @@ static int llc_conn_req_handler(struct llc_prim_if_block *prim)
 	daddr.lsap = prim->data->conn.daddr.lsap;
 	sk = llc_find_sock(sap, &daddr, &laddr);
 	if (sk) {
-		confirm_impossible(prim);
+		llc_confirm_impossible(prim);
 		goto out_put;
 	}
 	rc = -ENOMEM; 
@@ -345,7 +336,7 @@ static int llc_conn_req_handler(struct llc_prim_if_block *prim)
 	} else {
 		sk = llc_sock_alloc();
 		if (!sk) {
-			confirm_impossible(prim);
+			llc_confirm_impossible(prim);
 			goto out;
 		}
 		prim->data->conn.sk = sk;
@@ -360,18 +351,20 @@ static int llc_conn_req_handler(struct llc_prim_if_block *prim)
 	llc->dev     = ddev;
 	llc->link    = prim->data->conn.link;
 	llc->handler = prim->data->conn.handler;
-	ev = llc_conn_alloc_ev(sk);
-	if (ev) {
+	skb = alloc_skb(1, GFP_ATOMIC);
+	if (skb) {
+		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
+
 		ev->type	   = LLC_CONN_EV_TYPE_PRIM;
 		ev->data.prim.prim = LLC_CONN_PRIM;
 		ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 		ev->data.prim.data = prim;
-		rc = llc_conn_send_ev(sk, ev);
+		rc = llc_conn_send_ev(sk, skb);
 	}
 	if (rc) {
 		llc_sap_unassign_sock(sap, sk);
 		llc_sock_free(sk);
-		confirm_impossible(prim);
+		llc_confirm_impossible(prim);
 	}
 	release_sock(sk);
 out_put:
@@ -393,6 +386,7 @@ static int llc_disc_req_handler(struct llc_prim_if_block *prim)
 {
 	u16 rc = 1;
 	struct llc_conn_state_ev *ev;
+	struct sk_buff *skb;
 	struct sock* sk = prim->data->disc.sk;
 
 	sock_hold(sk);
@@ -400,17 +394,19 @@ static int llc_disc_req_handler(struct llc_prim_if_block *prim)
 	if (llc_sk(sk)->state == LLC_CONN_STATE_ADM ||
 	    llc_sk(sk)->state == LLC_CONN_OUT_OF_SVC)
 		goto out;
-	/* postpone unassigning the connection from its SAP and returning the
+	/*
+	 * Postpone unassigning the connection from its SAP and returning the
 	 * connection until all ACTIONs have been completely executed
 	 */
-	ev = llc_conn_alloc_ev(sk);
-	if (!ev)
+	skb = alloc_skb(1, GFP_ATOMIC);
+	if (!skb)
 		goto out;
-	ev->type = LLC_CONN_EV_TYPE_PRIM;
+	ev = llc_conn_ev(skb);
+	ev->type	   = LLC_CONN_EV_TYPE_PRIM;
 	ev->data.prim.prim = LLC_DISC_PRIM;
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 	ev->data.prim.data = prim;
-	rc = llc_conn_send_ev(sk, ev);
+	rc = llc_conn_send_ev(sk, skb);
 out:
 	release_sock(sk);
 	sock_put(sk);
@@ -428,18 +424,20 @@ out:
  */
 static int llc_rst_req_handler(struct llc_prim_if_block *prim)
 {
+	struct sk_buff *skb;
 	int rc = 1;
 	struct sock *sk = prim->data->res.sk;
-	struct llc_conn_state_ev *ev;
 
 	lock_sock(sk);
-	ev = llc_conn_alloc_ev(sk);
-	if (ev) {
+	skb = alloc_skb(1, GFP_ATOMIC);
+	if (skb) {
+		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
+
 		ev->type = LLC_CONN_EV_TYPE_PRIM;
 		ev->data.prim.prim = LLC_RESET_PRIM;
 		ev->data.prim.type = LLC_PRIM_TYPE_REQ;
 		ev->data.prim.data = prim;
-		rc = llc_conn_send_ev(sk, ev);
+		rc = llc_conn_send_ev(sk, skb);
 	}
 	release_sock(sk);
 	return rc;
@@ -497,18 +495,21 @@ static int llc_conn_rsp_handler(struct llc_prim_if_block *prim)
 static int llc_rst_rsp_handler(struct llc_prim_if_block *prim)
 {
 	int rc = 1;
-	/* network layer supplies connection handle; map it to a connection;
+	/*
+	 * Network layer supplies connection handle; map it to a connection;
 	 * package as event and send it to connection event handler
 	 */
 	struct sock *sk = prim->data->res.sk;
-	struct llc_conn_state_ev *ev = llc_conn_alloc_ev(sk);
+	struct sk_buff *skb = alloc_skb(1, GFP_ATOMIC);
 
-	if (ev) {
+	if (skb) {
+		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
+
 		ev->type	   = LLC_CONN_EV_TYPE_PRIM;
 		ev->data.prim.prim = LLC_RESET_PRIM;
 		ev->data.prim.type = LLC_PRIM_TYPE_RESP;
 		ev->data.prim.data = prim;
-		rc = llc_conn_send_ev(sk, ev);
+		rc = llc_conn_send_ev(sk, skb);
 	}
 	return rc;
 }
