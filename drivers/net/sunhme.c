@@ -17,10 +17,8 @@ static char version[] =
         "sunhme.c:v2.01 26/Mar/2002 David S. Miller (davem@redhat.com)\n";
 
 #include <linux/module.h>
-
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -34,11 +32,15 @@ static char version[] =
 #include <linux/mii.h>
 #include <linux/crc32.h>
 #include <linux/random.h>
+#include <linux/errno.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
+
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
-#include <linux/errno.h>
 #include <asm/byteorder.h>
 
 #ifdef __sparc__
@@ -55,10 +57,6 @@ static char version[] =
 
 #include <asm/pgtable.h>
 #include <asm/irq.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
 
 #ifdef CONFIG_PCI
 #include <linux/pci.h>

@@ -30,9 +30,7 @@ static const char *version =
 DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " tsbogend@alpha.franken.de\n";
 
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
@@ -44,15 +42,15 @@ DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " tsbogend@alpha.franken.de\n";
 #include <linux/ethtool.h>
 #include <linux/mii.h>
 #include <linux/crc32.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-#include <asm/dma.h>
-#include <asm/uaccess.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
+
+#include <asm/bitops.h>
+#include <asm/dma.h>
+#include <asm/io.h>
+#include <asm/uaccess.h>
 
 /*
  * PCI device identifiers for "new style" Linux PCI Device Drivers

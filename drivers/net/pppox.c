@@ -21,22 +21,20 @@
 
 #include <linux/string.h>
 #include <linux/module.h>
-
-#include <asm/uaccess.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
-
 #include <linux/netdevice.h>
 #include <linux/net.h>
 #include <linux/init.h>
 #include <linux/if_pppox.h>
-#include <net/sock.h>
 #include <linux/ppp_defs.h>
 #include <linux/if_ppp.h>
 #include <linux/ppp_channel.h>
+
+#include <net/sock.h>
+
+#include <asm/uaccess.h>
 
 static struct pppox_proto *proto[PX_MAX_PROTO+1];
 

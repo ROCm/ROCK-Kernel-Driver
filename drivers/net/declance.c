@@ -67,7 +67,6 @@ static char *lancestr = "LANCE";
 #include <linux/errno.h>
 #include <linux/hdreg.h>
 #include <linux/ioport.h>
-#include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/stddef.h>
 #include <linux/string.h>

@@ -24,10 +24,8 @@
 static char *version = "sun3lance.c: v1.2 1/12/2001  Sam Creasey (sammy@sammy.net)\n";
 
 #include <linux/module.h>
-
 #include <linux/stddef.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
@@ -35,10 +33,12 @@ static char *version = "sun3lance.c: v1.2 1/12/2001  Sam Creasey (sammy@sammy.ne
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
-
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
@@ -52,10 +52,6 @@ static char *version = "sun3lance.c: v1.2 1/12/2001  Sam Creasey (sammy@sammy.ne
 #else
 #include <asm/sun3xprom.h>
 #endif
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
 
 /* sun3/60 addr/irq for the lance chip.  If your sun is different,
    change this. */

@@ -444,9 +444,7 @@ static const char *version = "de4x5.c:V0.546 2001/02/22 davies@maniac.ultranet.c
 
 #include <linux/config.h>
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
 #include <linux/ptrace.h>
@@ -459,6 +457,13 @@ static const char *version = "de4x5.c:V0.546 2001/02/22 davies@maniac.ultranet.c
 #include <linux/version.h>
 #include <linux/spinlock.h>
 #include <linux/crc32.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
+#include <linux/time.h>
+#include <linux/types.h>
+#include <linux/unistd.h>
+#include <linux/ctype.h>
 
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -469,15 +474,6 @@ static const char *version = "de4x5.c:V0.546 2001/02/22 davies@maniac.ultranet.c
 #ifdef CONFIG_PPC
 #include <asm/machdep.h>
 #endif /* CONFIG_PPC */
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-
-#include <linux/time.h>
-#include <linux/types.h>
-#include <linux/unistd.h>
-#include <linux/ctype.h>
 
 #include "de4x5.h"
 

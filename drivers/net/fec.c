@@ -25,7 +25,6 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/ptrace.h>
 #include <linux/errno.h>
@@ -40,6 +39,7 @@
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
+
 #include <asm/irq.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>

@@ -126,7 +126,6 @@ Include Files
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/sched.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -135,12 +134,6 @@ Include Files
 #include <linux/in.h>
 #include <linux/delay.h>
 #include <linux/ethtool.h>
-
-#include <asm/uaccess.h>
-#include <asm/io.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -153,6 +146,11 @@ Include Files
 #include <pcmcia/cisreg.h>
 #include <pcmcia/cistpl.h>
 #include <pcmcia/ds.h>
+
+#include <asm/uaccess.h>
+#include <asm/io.h>
+#include <asm/system.h>
+#include <asm/bitops.h>
 
 /* ----------------------------------------------------------------------------
 Defines

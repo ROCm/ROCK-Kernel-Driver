@@ -23,10 +23,11 @@ static const char version[] = "tmsisa.c: v1.00 14/01/2001 by Jochen Friedrich\n"
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/netdevice.h>
+#include <linux/trdevice.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -34,8 +35,6 @@ static const char version[] = "tmsisa.c: v1.00 14/01/2001 by Jochen Friedrich\n"
 #include <asm/pci.h>
 #include <asm/dma.h>
 
-#include <linux/netdevice.h>
-#include <linux/trdevice.h>
 #include "tms380tr.h"
 
 #define TMS_ISA_IO_EXTENT 32

@@ -72,7 +72,6 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -83,9 +82,10 @@
 #include <linux/skbuff.h>
 #include <linux/if_arp.h>
 #include <linux/init.h>
+#include <linux/if_shaper.h>
+
 #include <net/dst.h>
 #include <net/arp.h>
-#include <linux/if_shaper.h>
 
 struct shaper_cb { 
 	__u32		shapelatency;		/* Latency on frame */

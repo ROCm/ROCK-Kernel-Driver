@@ -7,7 +7,6 @@
 #include <linux/module.h>
 
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -18,23 +17,22 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/crc32.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/errno.h>
-#include <asm/byteorder.h>
-
-#include <asm/idprom.h>
-#include <asm/sbus.h>
-#include <asm/openprom.h>
-#include <asm/oplib.h>
-#include <asm/auxio.h>
-#include <asm/pgtable.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+
+#include <asm/auxio.h>
+#include <asm/bitops.h>
+#include <asm/byteorder.h>
+#include <asm/dma.h>
+#include <asm/idprom.h>
+#include <asm/io.h>
+#include <asm/openprom.h>
+#include <asm/oplib.h>
+#include <asm/pgtable.h>
+#include <asm/sbus.h>
+#include <asm/system.h>
 
 #include "sunbmac.h"
 

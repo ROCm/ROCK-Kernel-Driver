@@ -62,7 +62,6 @@ All other communication is through memory!
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
