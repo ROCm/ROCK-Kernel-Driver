@@ -1459,7 +1459,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	    up->rev == 0x5201)
 		quot ++;
 
-	if (up->capabilities & UART_USE_FIFO) {
+	if (up->capabilities & UART_USE_FIFO && up->port.fifosize > 1) {
 		if (baud < 2400)
 			fcr = UART_FCR_ENABLE_FIFO | UART_FCR_TRIGGER_1;
 #ifdef CONFIG_SERIAL_8250_RSA
