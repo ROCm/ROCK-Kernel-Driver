@@ -105,6 +105,7 @@ struct vm_area_struct {
 					   units, *not* PAGE_CACHE_SIZE */
 	struct file * vm_file;		/* File we map to (can be NULL). */
 	void * vm_private_data;		/* was vm_pte (shared mem) */
+	unsigned int vm_truncate_count;	/* compare mapping->truncate_count */
 
 #ifndef CONFIG_MMU
 	atomic_t vm_usage;		/* refcount (VMAs shared if !MMU) */
@@ -577,7 +578,12 @@ struct zap_details {
 	struct address_space *check_mapping;	/* Check page->mapping if set */
 	pgoff_t	first_index;			/* Lowest page->index to unmap */
 	pgoff_t last_index;			/* Highest page->index to unmap */
-	int atomic;				/* May not schedule() */
+	spinlock_t *i_mmap_lock;		/* For unmap_mapping_range: */
+	struct vm_area_struct *restart_vma;	/* Where lock was dropped */
+	pgoff_t restart_pgoff;			/* File offset for restart */
+	unsigned long restart_addr;		/* Where we should restart */
+	unsigned long break_addr;		/* Where unmap_vmas stopped */
+	unsigned int truncate_count;		/* Compare vm_truncate_count */
 };
 
 void zap_page_range(struct vm_area_struct *vma, unsigned long address,
