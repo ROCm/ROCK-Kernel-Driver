@@ -183,6 +183,15 @@ _decode_session4(struct sk_buff *skb, struct flowi *fl)
 			}
 			break;
 
+		case IPPROTO_ICMP:
+			if (pskb_may_pull(skb, xprth + 2 - skb->data)) {
+				u8 *icmp = xprth;
+
+				fl->fl_icmp_type = icmp[0];
+				fl->fl_icmp_code = icmp[1];
+			}
+			break;
+
 		case IPPROTO_ESP:
 			if (pskb_may_pull(skb, xprth + 4 - skb->data)) {
 				u32 *ehdr = (u32 *)xprth;
