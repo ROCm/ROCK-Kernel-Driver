@@ -1059,7 +1059,6 @@ asmlinkage long sys_gettid(void)
 {
 	return current->pid;
 }
-#ifndef FOLD_NANO_SLEEP_INTO_CLOCK_NANO_SLEEP
 
 static long nanosleep_restart(struct restart_block *restart)
 {
@@ -1118,7 +1117,6 @@ asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 	}
 	return ret;
 }
-#endif // ! FOLD_NANO_SLEEP_INTO_CLOCK_NANO_SLEEP
 
 /*
  * sys_sysinfo - fill in sysinfo struct
