@@ -31,7 +31,7 @@ if [ "$CONFIG_BLK_DEV_IDE" != "n" ]; then
       dep_bool '    CMD640 enhanced support' CONFIG_BLK_DEV_CMD640_ENHANCED $CONFIG_BLK_DEV_CMD640
       dep_bool '  ISA-PNP EIDE support' CONFIG_BLK_DEV_ISAPNP $CONFIG_ISAPNP
       if [ "$CONFIG_PCI" = "y" ]; then
-	 bool '  Generic PCI IDE chipset support' CONFIG_BLK_DEV_IDEPCI
+	 bool '  PCI IDE chipset support' CONFIG_BLK_DEV_IDEPCI
 	 if [ "$CONFIG_BLK_DEV_IDEPCI" = "y" ]; then
 	    dep_bool '    Generic PCI IDE Chipset Support' CONFIG_BLK_DEV_GENERIC $CONFIG_BLK_DEV_IDEPCI
 	    bool '    Sharing PCI IDE interrupts support' CONFIG_IDEPCI_SHARE_IRQ
