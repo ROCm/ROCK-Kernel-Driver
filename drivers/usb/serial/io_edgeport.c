@@ -2642,6 +2642,9 @@ static int send_cmd_write_uart_register (struct edgeport_port *edge_port, __u8 r
  *	This routine is called to set the UART on the device to match the specified
  *	new settings.
  *****************************************************************************/
+#ifndef CMSPAR
+#define CMSPAR 0
+#endif
 static void change_port_settings (struct edgeport_port *edge_port, struct termios *old_termios)
 {
 	struct tty_struct *tty;
