@@ -110,7 +110,7 @@ struct specialix_port {
 	struct tty_struct 	* tty;
 	int			count;
 	int			blocked_open;
-	int			event;
+	ulong			event;
 	int			timeout;
 	int			close_delay;
 	long			session;
