@@ -15,6 +15,7 @@
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
+#include <asm/page.h>
 
 #include "rock.h"
 
@@ -358,7 +359,7 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
   return 0;
 }
 
-static char *get_symlink_chunk(char *rpnt, struct rock_ridge *rr)
+static char *get_symlink_chunk(char *rpnt, struct rock_ridge *rr, char *plimit)
 {
 	int slen;
 	int rootflag;
@@ -370,16 +371,25 @@ static char *get_symlink_chunk(char *rpnt, struct rock_ridge *rr)
 		rootflag = 0;
 		switch (slp->flags & ~1) {
 		case 0:
+			if (slp->len > plimit - rpnt)
+				return NULL;
 			memcpy(rpnt, slp->text, slp->len);
 			rpnt+=slp->len;
 			break;
-		case 4:
-			*rpnt++='.';
-			/* fallthru */
 		case 2:
+			if (rpnt >= plimit)
+				return NULL;
+			*rpnt++='.';
+			break;
+		case 4:
+			if (2 > plimit - rpnt)
+				return NULL;
+			*rpnt++='.';
 			*rpnt++='.';
 			break;
 		case 8:
+			if (rpnt >= plimit)
+				return NULL;
 			rootflag = 1;
 			*rpnt++='/';
 			break;
@@ -396,17 +406,23 @@ static char *get_symlink_chunk(char *rpnt, struct rock_ridge *rr)
 			 * If there is another SL record, and this component
 			 * record isn't continued, then add a slash.
 			 */
-			if ((!rootflag) && (rr->u.SL.flags & 1) && !(oldslp->flags & 1))
+			if ((!rootflag) && (rr->u.SL.flags & 1) &&
+			    !(oldslp->flags & 1)) {
+				if (rpnt >= plimit)
+					return NULL;
 				*rpnt++='/';
+			}
 			break;
 		}
 
 		/*
 		 * If this component record isn't continued, then append a '/'.
 		 */
-		if (!rootflag && !(oldslp->flags & 1))
+		if (!rootflag && !(oldslp->flags & 1)) {
+			if (rpnt >= plimit)
+				return NULL;
 			*rpnt++='/';
-
+		}
 	}
 	return rpnt;
 }
@@ -487,7 +503,10 @@ static int rock_ridge_symlink_readpage(struct file *file, struct page *page)
 			CHECK_SP(goto out);
 			break;
 		case SIG('S', 'L'):
-			rpnt = get_symlink_chunk(rpnt, rr);
+			rpnt = get_symlink_chunk(rpnt, rr,
+						 link + (PAGE_SIZE - 1));
+			if (rpnt == NULL)
+				goto out;
 			break;
 		case SIG('C', 'E'):
 			/* This tells is if there is a continuation record */

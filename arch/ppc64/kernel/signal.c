@@ -115,7 +115,7 @@ long sys_sigaltstack(const stack_t *uss, stack_t *uoss, unsigned long r5,
  * Set up the sigcontext for the signal frame.
  */
 
-static int setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
+static long setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 		 int signr, sigset_t *set, unsigned long handler)
 {
 	/* When CONFIG_ALTIVEC is set, we _always_ setup v_regs even if the
@@ -129,7 +129,7 @@ static int setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 #ifdef CONFIG_ALTIVEC
 	elf_vrreg_t *v_regs = (elf_vrreg_t *)(((unsigned long)sc->vmx_reserve) & ~0xful);
 #endif
-	int err = 0;
+	long err = 0;
 
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
@@ -173,18 +173,32 @@ static int setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
  * Restore the sigcontext from the signal frame.
  */
 
-static int restore_sigcontext(struct pt_regs *regs, sigset_t *set, int sig, struct sigcontext *sc)
+static long restore_sigcontext(struct pt_regs *regs, sigset_t *set, int sig,
+			      struct sigcontext *sc)
 {
 #ifdef CONFIG_ALTIVEC
 	elf_vrreg_t *v_regs;
 #endif
-	unsigned int err = 0;
+	unsigned long err = 0;
 	unsigned long save_r13;
+	elf_greg_t *gregs = (elf_greg_t *)regs;
+	int i;
 
 	/* If this is not a signal return, we preserve the TLS in r13 */
 	if (!sig)
 		save_r13 = regs->gpr[13];
-	err |= __copy_from_user(regs, &sc->gp_regs, GP_REGS_SIZE);
+
+	/* copy everything before MSR */
+	err |= __copy_from_user(regs, &sc->gp_regs,
+				PT_MSR*sizeof(unsigned long));
+
+	/* skip MSR and SOFTE */
+	for (i = PT_MSR+1; i <= PT_RESULT; i++) {
+		if (i == PT_SOFTE)
+			continue;
+		err |= __get_user(gregs[i], &sc->gp_regs[i]);
+	}
+
 	if (!sig)
 		regs->gpr[13] = save_r13;
 	err |= __copy_from_user(&current->thread.fpr, &sc->fp_regs, FP_REGS_SIZE);
@@ -235,9 +249,10 @@ static inline void * get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
 /*
  * Setup the trampoline code on the stack
  */
-static int setup_trampoline(unsigned int syscall, unsigned int *tramp)
+static long setup_trampoline(unsigned int syscall, unsigned int *tramp)
 {
-	int i, err = 0;
+	int i;
+	long err = 0;
 
 	/* addi r1, r1, __SIGNAL_FRAMESIZE  # Pop the dummy stackframe */
 	err |= __put_user(0x38210000UL | (__SIGNAL_FRAMESIZE & 0xffff), &tramp[0]);
@@ -372,7 +387,7 @@ static void setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 	func_descr_t *funct_desc_ptr;
 	struct rt_sigframe *frame;
 	unsigned long newsp = 0;
-	int err = 0;
+	long err = 0;
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
 
