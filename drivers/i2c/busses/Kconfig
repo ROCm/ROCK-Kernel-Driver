@@ -113,6 +113,20 @@ config I2C_PIIX4
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-piix4.
 
+config I2C_PROSAVAGE
+	tristate "S3/VIA (Pro)Savage"
+	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the
+	  I2C bus and DDC bus of the S3VIA embedded Savage4 and ProSavage8
+	  graphics processors.
+	  chipsets supported:
+	    S3/VIA KM266/VT8375 aka ProSavage8
+	    S3/VIA KM133/VT8365 aka Savage4
+
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-prosavage.
+
 config I2C_SAVAGE4
 	tristate "S3 Savage 4"
 	depends on I2C && PCI && EXPERIMENTAL
