@@ -277,13 +277,17 @@ static int
 nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 {
 	struct nfs_server	*server;
-	struct inode		*root_inode;
+	struct inode		*root_inode = NULL;
 	struct nfs_fattr	fattr;
+	int			res;
 	struct nfs_fsinfo	fsinfo = {
 					.fattr = &fattr,
 				};
 	struct nfs_pathconf pathinfo = {
 			.fattr = &fattr,
+	};
+	struct nfs_fsstat fsstat = {
+			.fattr = &fattr
 	};
 
 	/* We probably want something more informative here */
@@ -292,6 +296,10 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	server = NFS_SB(sb);
 
 	sb->s_magic      = NFS_SUPER_MAGIC;
+
+	res = server->rpc_ops->statfs(server, &server->fh, &fsstat);
+	if (res < 0)
+		return res;
 
 	root_inode = nfs_get_root(sb, &server->fh, &fsinfo);
 	/* Did getting the root inode fail? */
@@ -319,6 +327,18 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 		} else
 			sb->s_blocksize = nfs_block_bits(fsinfo.wtmult,
 							 &sb->s_blocksize_bits);
+#if BITS_PER_LONG != 64
+		/* Prevent statfs from reporting incorrect file system sizes.
+		 * struct statfs holds the number of blocks in a long. A disk
+		 * of 2.8 TB and a wtmult value of 512 will produce a block count
+		 * that doesn't fit into 31 bits, causing statfs to fail with
+		 * EOVERFLOW.
+		 */
+		while ((fsstat.tbytes >> sb->s_blocksize_bits) >= 0x80000000ULL) {
+			sb->s_blocksize = nfs_block_bits(sb->s_blocksize * 2,
+							&sb->s_blocksize_bits);
+		}
+#endif
 	}
 
 	if (fsinfo.rtmax >= 512 && server->rsize > fsinfo.rtmax)
@@ -361,7 +381,7 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	/* Yargs. It didn't work out. */
 out_no_root:
 	printk("nfs_read_super: get root inode failed\n");
-	if (!IS_ERR(root_inode))
+	if (root_inode && !IS_ERR(root_inode))
 		iput(root_inode);
 	return -EINVAL;
 }
