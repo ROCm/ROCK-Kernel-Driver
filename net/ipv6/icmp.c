@@ -99,8 +99,15 @@ static __inline__ void icmpv6_xmit_lock(void)
 {
 	local_bh_disable();
 
-	if (unlikely(!spin_trylock(&icmpv6_socket->sk->sk_lock.slock)))
-		BUG();
+	if (unlikely(!spin_trylock(&icmpv6_socket->sk->sk_lock.slock))) {
+		/* This can happen if the output path (f.e. SIT or
+		 * ip6ip6 tunnel) signals dst_link_failure() for an
+		 * outgoing ICMP6 packet.
+		 */
+		local_bh_enable();
+		return 1;
+	}
+	return 0;
 }
 
 static __inline__ void icmpv6_xmit_unlock(void)
@@ -345,7 +352,8 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	fl.fl_icmp_type = type;
 	fl.fl_icmp_code = code;
 
-	icmpv6_xmit_lock();
+	if (icmpv6_xmit_lock())
+		return;
 
 	if (!icmpv6_xrlim_allow(sk, type, &fl))
 		goto out;
@@ -435,7 +443,8 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 	fl.oif = skb->dev->ifindex;
 	fl.fl_icmp_type = ICMPV6_ECHO_REPLY;
 
-	icmpv6_xmit_lock();
+	if (icmpv6_xmit_lock())
+		return;
 
 	if (!fl.oif && ipv6_addr_is_multicast(&fl.fl6_dst))
 		fl.oif = np->mcast_oif;
