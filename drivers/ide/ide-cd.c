@@ -518,7 +518,7 @@ void cdrom_analyze_sense_data(ide_drive_t *drive,
  */
 static void cdrom_prepare_request(struct request *rq)
 {
-	cdrom_prepare_request(rq);
+	ide_init_drive_cmd(rq);
 	rq->flags = REQ_PC;
 }
 
