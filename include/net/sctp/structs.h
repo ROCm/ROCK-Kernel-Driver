@@ -378,7 +378,7 @@ typedef union {
 typedef union {
 	sctp_ipv4addr_param_t v4;
 	sctp_ipv6addr_param_t v6;
-} sctpIpAddress_t;
+} sctp_addr_param_t;
 
 /* RFC 2960.  Section 3.3.5 Heartbeat.
  *    Heartbeat Information: variable length
