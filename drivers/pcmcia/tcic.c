@@ -829,15 +829,15 @@ static int tcic_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *m
 
     debug(1, "SetMemMap(%d, %d, %#2.2x, %d ns, "
 	  "%#5.5lx-%#5.5lx, %#5.5x)\n", psock, mem->map, mem->flags,
-	  mem->speed, mem->sys_start, mem->sys_stop, mem->card_start);
+	  mem->speed, mem->res->start, mem->res->end, mem->card_start);
     if ((mem->map > 3) || (mem->card_start > 0x3ffffff) ||
-	(mem->sys_start > 0xffffff) || (mem->sys_stop > 0xffffff) ||
-	(mem->sys_start > mem->sys_stop) || (mem->speed > 1000))
+	(mem->res->start > 0xffffff) || (mem->res->end > 0xffffff) ||
+	(mem->res->start > mem->res->end) || (mem->speed > 1000))
 	return -EINVAL;
     tcic_setw(TCIC_ADDR+2, TCIC_ADR2_INDREG | (psock << TCIC_SS_SHFT));
     addr = TCIC_MWIN(psock, mem->map);
 
-    base = mem->sys_start; len = mem->sys_stop - mem->sys_start;
+    base = mem->res->start; len = mem->res->end - mem->res->start;
     if ((len & (len+1)) || (base & len)) return -EINVAL;
     if (len == 0x0fff)
 	base = (base >> TCIC_MBASE_HA_SHFT) | TCIC_MBASE_4K_BIT;
@@ -846,7 +846,7 @@ static int tcic_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *m
     tcic_setw(TCIC_ADDR, addr + TCIC_MBASE_X);
     tcic_setw(TCIC_DATA, base);
     
-    mmap = mem->card_start - mem->sys_start;
+    mmap = mem->card_start - mem->res->start;
     mmap = (mmap >> TCIC_MMAP_CA_SHFT) & TCIC_MMAP_CA_MASK;
     if (mem->flags & MAP_ATTRIB) mmap |= TCIC_MMAP_REG;
     tcic_setw(TCIC_ADDR, addr + TCIC_MMAP_X);
