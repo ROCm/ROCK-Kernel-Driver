@@ -336,12 +336,17 @@ config FB_TGA
 
 config FB_VESA
 	bool "VESA VGA graphics console"
-	depends on FB && X86
+	depends on FB && (X86 || X86_64)
 	help
 	  This is the frame buffer device driver for generic VESA 2.0
 	  compliant graphic cards. The older VESA 1.2 cards are not supported.
 	  You will get a boot time penguin logo at no additional cost. Please
 	  read <file:Documentation/fb/vesafb.txt>. If unsure, say Y.
+
+config VIDEO_SELECT
+	bool
+	depends on FB_VESA
+	default y
 
 config FB_HGA
 	tristate "Hercules mono graphics console"

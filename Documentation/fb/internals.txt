@@ -3,6 +3,7 @@ This is a first start for some documentation about frame buffer device
 internals.
 
 Geert Uytterhoeven <geert@linux-m68k.org>, 21 July 1998
+James Simmons <jsimmons@user.sf.net>, Nov 26 2002
 
 --------------------------------------------------------------------------------
 
@@ -43,10 +44,6 @@ are defined in <linux/fb.h>.
 
     Device dependent information that uniquely defines the video mode for this
     particular piece of hardware.
-
-  - struct display
-
-    Interface between the frame buffer device and the console driver.
 
 
 --------------------------------------------------------------------------------

@@ -100,9 +100,6 @@
 #include <asm/linux_logo.h>
 
 #include "fbcon.h"
-#ifdef CONFIG_FBCON_ACCEL
-#include "fbcon-accel.h"
-#endif
 #include "font.h"
 
 #ifdef FBCONDEBUG
@@ -2487,16 +2484,12 @@ static int __init fbcon_show_logo(void)
 	struct display *p = &fb_display[fg_console];	/* draw to vt in foreground */
 	struct fb_info *info = p->fb_info;
 	struct vc_data *vc = info->display_fg;
-#ifdef CONFIG_FBCON_ACCEL
 	struct fb_image image;
 	u32 *palette = NULL, *saved_palette = NULL;
-#endif
 	int depth = info->var.bits_per_pixel;
-	int line = info->fix.line_length;
 	unsigned char *fb = info->screen_base;
 	unsigned char *logo;
-	unsigned char *dst, *src;
-	int i, j, n, x1, y1, x;
+	int i, j, n, x;
 	int logo_depth, done = 0;
 
 	/* Return if the frame buffer is not mapped */
@@ -2543,7 +2536,6 @@ static int __init fbcon_show_logo(void)
 		logo_depth = 1;
 	}
 
-#if defined(CONFIG_FBCON_ACCEL)
 	if (info->fix.visual == FB_VISUAL_TRUECOLOR) {
 		unsigned char mask[9] =
 		    { 0, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff };
@@ -2593,157 +2585,22 @@ static int __init fbcon_show_logo(void)
 	image.depth = depth;
 	image.data = logo;
 	image.dy = 0;
-#endif
 
 	for (x = 0; x < num_online_cpus() * (LOGO_W + 8) &&
 	     x < info->var.xres - (LOGO_W + 8); x += (LOGO_W + 8)) {
-#if defined (CONFIG_FBCON_ACCEL)
 		image.dx = x;
 		info->fbops->fb_imageblit(info, &image);
 		done = 1;
-#endif
-#if defined(CONFIG_FBCON_AFB) || defined(CONFIG_FBCON_ILBM) || \
-    defined(CONFIG_FBCON_IPLAN2P2) || defined(CONFIG_FBCON_IPLAN2P4) || \
-    defined(CONFIG_FBCON_IPLAN2P8)
-		if (depth >= 2 && (info->fix.type == FB_TYPE_PLANES ||
-				   info->fix.type ==
-				   FB_TYPE_INTERLEAVED_PLANES)) {
-			/* planes (normal or interleaved), with color registers */
-			int bit;
-			unsigned char val, mask;
-
-#if defined(CONFIG_FBCON_IPLAN2P2) || defined(CONFIG_FBCON_IPLAN2P4) || \
-    defined(CONFIG_FBCON_IPLAN2P8)
-			int line_length = info->fix.line_length;
-
-			/* for support of Atari interleaved planes */
-#define MAP_X(x)	(line_length ? (x) : ((x) & ~1)*depth + ((x) & 1))
-#else
-#define MAP_X(x)	(x)
-#endif
-			/* extract a bit from the source image */
-#define	BIT(p,pix,bit)	(p[pix*logo_depth/8] & \
-			 (1 << ((8-((pix*logo_depth)&7)-logo_depth) + bit)))
-
-			src = logo;
-			for (y1 = 0; y1 < LOGO_H; y1++) {
-				for (x1 = 0; x1 < LOGO_LINE;
-				     x1++, src += logo_depth) {
-					dst =
-					    fb + y1 * line + MAP_X(x / 8 +
-								   x1);
-					for (bit = 0; bit < logo_depth;
-					     bit++) {
-						val = 0;
-						for (mask = 0x80, i = 0;
-						     i < 8;
-						     mask >>= 1, i++) {
-							if (BIT
-							    (src, i, bit))
-								val |=
-								    mask;
-						}
-						*dst = val;
-						dst += plane;
-					}
-				}
-			}
-
-			/* fill remaining planes */
-			if (depth > logo_depth) {
-				for (y1 = 0; y1 < LOGO_H; y1++) {
-					for (x1 = 0; x1 < LOGO_LINE; x1++) {
-						dst =
-						    fb + y1 * line +
-						    MAP_X(x / 8 + x1) +
-						    logo_depth * plane;
-						for (i = logo_depth;
-						     i < depth;
-						     i++, dst += plane)
-							*dst = 0x00;
-					}
-				}
-			}
-			done = 1;
-			break;
-		}
-#endif
-#if defined(CONFIG_FBCON_ILBM) || defined(CONFIG_FBCON_AFB)
-		if (depth == 1
-		    && (info->fix.type == FB_TYPE_PACKED_PIXELS
-			|| info->fix.type == FB_TYPE_PLANES
-			|| info->fix.type == FB_TYPE_INTERLEAVED_PLANES)) {
-
-			/* monochrome */
-			unsigned char inverse = p->inverse
-			    || info->fix.visual ==
-			    FB_VISUAL_MONO01 ? 0x00 : 0xff;
-
-			int is_hga = !strncmp(info->fix.id, "HGA", 3);
-			/* can't use simply memcpy because need to apply inverse */
-			for (y1 = 0; y1 < LOGO_H; y1++) {
-				src = logo + y1 * LOGO_LINE;
-				if (is_hga)
-					dst =
-					    fb + (y1 % 4) * 8192 +
-					    (y1 >> 2) * line + x / 8;
-				else
-					dst = fb + y1 * line + x / 8;
-				for (x1 = 0; x1 < LOGO_LINE; ++x1)
-					fb_writeb(*src++ ^ inverse, dst++);
-			}
-			done = 1;
-		}
-#endif
-#if defined(CONFIG_FBCON_VGA_PLANES)
-		if (depth == 4 && info->fix.type == FB_TYPE_VGA_PLANES) {
-			outb_p(1, 0x3ce);
-			outb_p(0xf, 0x3cf);
-			outb_p(3, 0x3ce);
-			outb_p(0, 0x3cf);
-			outb_p(5, 0x3ce);
-			outb_p(0, 0x3cf);
-
-			src = logo;
-			for (y1 = 0; y1 < LOGO_H; y1++) {
-				for (x1 = 0; x1 < LOGO_W / 2; x1++) {
-					dst =
-					    fb + y1 * line + x1 / 4 +
-					    x / 8;
-
-					outb_p(0, 0x3ce);
-					outb_p(*src >> 4, 0x3cf);
-					outb_p(8, 0x3ce);
-					outb_p(1 << (7 - x1 % 4 * 2),
-					       0x3cf);
-					fb_readb(dst);
-					fb_writeb(0, dst);
-
-					outb_p(0, 0x3ce);
-					outb_p(*src & 0xf, 0x3cf);
-					outb_p(8, 0x3ce);
-					outb_p(1 << (7 - (1 + x1 % 4 * 2)),
-					       0x3cf);
-					fb_readb(dst);
-					fb_writeb(0, dst);
-
-					src++;
-				}
-			}
-			done = 1;
-		}
-#endif
 	}
 
-#if defined (CONFIG_FBCON_ACCEL)
 	if (palette != NULL)
 		kfree(palette);
 	if (saved_palette != NULL)
 		info->pseudo_palette = saved_palette;
-#endif
-	/* Modes not yet supported: packed pixels with depth != 8 (does such a
-	 * thing exist in reality?) */
-
+	/* 
+	 * Modes not yet supported: packed pixels with depth != 8 (does such a
+	 * thing exist in reality?) 
+	 */
 	return done ? (LOGO_H + vc->vc_font.height - 1) / vc->vc_font.height : 0;
 }
 
