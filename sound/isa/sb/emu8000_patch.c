@@ -233,11 +233,7 @@ snd_emu8000_sample_new(snd_emux_t *rec, snd_sf_sample_t *sp,
 		/* we may take too long time in this loop.
 		 * so give controls back to kernel if needed.
 		 */
-		if (need_resched()) {
-			if (current->state != TASK_RUNNING)
-				set_current_state(TASK_RUNNING);
-			schedule();
-		}
+		cond_resched();
 
 		if (i == sp->v.loopend &&
 		    (sp->v.mode_flags & (SNDRV_SFNT_SAMPLE_BIDIR_LOOP|SNDRV_SFNT_SAMPLE_REVERSE_LOOP)))

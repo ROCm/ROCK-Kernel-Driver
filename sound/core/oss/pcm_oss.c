@@ -1814,7 +1814,6 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 			break;
 		}
 	}
-	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&pcm->open_wait, &wait);
 	up(&pcm->open_mutex);
 	if (err < 0)

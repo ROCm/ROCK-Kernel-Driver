@@ -697,8 +697,8 @@ int snd_power_wait(snd_card_t *card, unsigned int power_state, struct file *file
 		}
 		if (file && (file->f_flags & O_NONBLOCK))
 			return -EAGAIN;
-		snd_power_unlock(card);
 		set_current_state(TASK_UNINTERRUPTIBLE);
+		snd_power_unlock(card);
 		schedule_timeout(30 * HZ);
 		snd_power_lock(card);
 	}

@@ -25,44 +25,6 @@
 
 #if defined(CONFIG_SMP) || defined(CONFIG_SND_DEBUG)
 
-#if 0 /* NOT USED */
-/* (interruptible) sleep_on during the specified spinlock */
-void snd_seq_sleep_in_lock(wait_queue_head_t *p, spinlock_t *lock)
-{
-	wait_queue_t wait;
-
-	set_current_state(TASK_INTERRUPTIBLE);
-	init_waitqueue_entry(&wait, current);
-
-	add_wait_queue(p, &wait);
-
-	spin_unlock(lock);
-	schedule();
-	spin_lock_irq(lock);
-
-	remove_wait_queue(p, &wait);
-}
-
-/* (interruptible) sleep_on with timeout during the specified spinlock */
-long snd_seq_sleep_timeout_in_lock(wait_queue_head_t *p, spinlock_t *lock, long timeout)
-{
-	wait_queue_t wait;
-
-	set_current_state(TASK_INTERRUPTIBLE);
-	init_waitqueue_entry(&wait, current);
-
-	add_wait_queue(p, &wait);
-
-	spin_unlock(lock);
-	timeout = schedule_timeout(timeout);
-	spin_lock_irq(lock);
-
-	remove_wait_queue(p, &wait);
-
-	return timeout;
-}
-#endif /* NOT USED */
-
 /* wait until all locks are released */
 void snd_use_lock_sync_helper(snd_use_lock_t *lockp, const char *file, int line)
 {

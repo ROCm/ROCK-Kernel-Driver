@@ -191,7 +191,8 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 		err = -EFAULT;
 		goto __error1;
 	}
-	down(&rmidi->open_mutex);
+	if (!(mode & SNDRV_RAWMIDI_LFLG_NOOPENLOCK))
+		down(&rmidi->open_mutex);
 	if (mode & SNDRV_RAWMIDI_LFLG_INPUT) {
 		if (!(rmidi->info_flags & SNDRV_RAWMIDI_INFO_INPUT)) {
 			err = -ENXIO;
@@ -320,7 +321,8 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 	} else {
 		soutput = NULL;
 	}
-	up(&rmidi->open_mutex);
+	if (!(mode & SNDRV_RAWMIDI_LFLG_NOOPENLOCK))
+		up(&rmidi->open_mutex);
 	if (rfile) {
 		rfile->rmidi = rmidi;
 		rfile->input = sinput;
@@ -338,7 +340,8 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 		kfree(output);
 	}
 	module_put(rmidi->card->module);
-	up(&rmidi->open_mutex);
+	if (!(mode & SNDRV_RAWMIDI_LFLG_NOOPENLOCK))
+		up(&rmidi->open_mutex);
       __error1:
 	return err;
 }
@@ -392,6 +395,7 @@ static int snd_rawmidi_open(struct inode *inode, struct file *file)
 	fflags = snd_rawmidi_file_flags(file);
 	if ((file->f_flags & O_APPEND) || maj != CONFIG_SND_MAJOR) /* OSS emul? */
 		fflags |= SNDRV_RAWMIDI_LFLG_APPEND;
+	fflags |= SNDRV_RAWMIDI_LFLG_NOOPENLOCK;
 	rawmidi_file = snd_magic_kmalloc(snd_rawmidi_file_t, 0, GFP_KERNEL);
 	if (rawmidi_file == NULL) {
 		snd_card_file_remove(card, file);
@@ -399,6 +403,7 @@ static int snd_rawmidi_open(struct inode *inode, struct file *file)
 	}
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&rmidi->open_wait, &wait);
+	down(&rmidi->open_lock);
 	while (1) {
 		subdevice = -1;
 		down_read(&card->controls_rwsem);
@@ -421,7 +426,9 @@ static int snd_rawmidi_open(struct inode *inode, struct file *file)
 		} else
 			break;
 		set_current_state(TASK_INTERRUPTIBLE);
+		up(&rmidi->open_lock);
 		schedule();
+		down(&rmidi->open_lock);
 		if (signal_pending(current)) {
 			err = -ERESTARTSYS;
 			break;
@@ -433,7 +440,6 @@ static int snd_rawmidi_open(struct inode *inode, struct file *file)
 	if (rawmidi_file->output && rawmidi_file->output->runtime)
 		rawmidi_file->output->runtime->oss = (maj == SOUND_MAJOR);
 #endif
-	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&rmidi->open_wait, &wait);
 	if (err >= 0) {
 		file->private_data = rawmidi_file;
@@ -441,6 +447,7 @@ static int snd_rawmidi_open(struct inode *inode, struct file *file)
 		snd_card_file_remove(card, file);
 		snd_magic_kfree(rawmidi_file);
 	}
+	up(&rmidi->open_lock);
 	return err;
 }
 
@@ -950,10 +957,9 @@ static ssize_t snd_rawmidi_read(struct file *file, char *buf, size_t count, loff
 			}
 			init_waitqueue_entry(&wait, current);
 			add_wait_queue(&runtime->sleep, &wait);
-			spin_unlock_irq(&runtime->lock);
 			set_current_state(TASK_INTERRUPTIBLE);
+			spin_unlock_irq(&runtime->lock);
 			schedule();
-			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&runtime->sleep, &wait);
 			if (signal_pending(current))
 				return result > 0 ? result : -ERESTARTSYS;
@@ -1179,10 +1185,9 @@ static ssize_t snd_rawmidi_write(struct file *file, const char *buf, size_t coun
 			}
 			init_waitqueue_entry(&wait, current);
 			add_wait_queue(&runtime->sleep, &wait);
-			spin_unlock_irq(&runtime->lock);
 			set_current_state(TASK_INTERRUPTIBLE);
+			spin_unlock_irq(&runtime->lock);
 			timeout = schedule_timeout(30 * HZ);
-			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&runtime->sleep, &wait);
 			if (signal_pending(current))
 				return result > 0 ? result : -ERESTARTSYS;
@@ -1207,10 +1212,9 @@ static ssize_t snd_rawmidi_write(struct file *file, const char *buf, size_t coun
 			unsigned int last_avail = runtime->avail;
 			init_waitqueue_entry(&wait, current);
 			add_wait_queue(&runtime->sleep, &wait);
-			spin_unlock_irq(&runtime->lock);
 			set_current_state(TASK_INTERRUPTIBLE);
+			spin_unlock_irq(&runtime->lock);
 			timeout = schedule_timeout(30 * HZ);
-			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&runtime->sleep, &wait);
 			if (signal_pending(current))
 				return result > 0 ? result : -ERESTARTSYS;
