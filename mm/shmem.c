@@ -486,6 +486,16 @@ done1:
 	}
 done2:
 	BUG_ON(info->swapped > info->next_index);
+	if (inode->i_mapping->nrpages) {
+		/*
+		 * Call truncate_inode_pages again: racing shmem_unuse_inode
+		 * may have swizzled a page in from swap since vmtruncate or
+		 * generic_delete_inode did it, before we lowered next_index.
+		 */
+		spin_unlock(&info->lock);
+		truncate_inode_pages(inode->i_mapping, inode->i_size);
+		spin_lock(&info->lock);
+	}
 	shmem_recalc_inode(inode);
 	spin_unlock(&info->lock);
 }
