@@ -1930,7 +1930,6 @@ static int tcp_v6_init_sock(struct sock *sk)
 	tp->snd_ssthresh = 0x7fffffff;
 	tp->snd_cwnd_clamp = ~0;
 	tp->mss_cache_std = tp->mss_cache = 536;
-	tp->mss_tso_factor = 1;
 
 	tp->reordering = sysctl_tcp_reordering;
 

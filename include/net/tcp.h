@@ -1047,7 +1047,7 @@ static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long
  * is not a big flaw.
  */
 
-static inline unsigned int tcp_current_mss(struct sock *sk, int large, int *factor)
+static inline unsigned int tcp_current_mss(struct sock *sk, int large)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct dst_entry *dst = __sk_dst_get(sk);
@@ -1057,8 +1057,6 @@ static inline unsigned int tcp_current_mss(struct sock *sk, int large, int *fact
 		    (sk->sk_route_caps & NETIF_F_TSO) &&
 		    !tp->urg_mode);
 	mss_now = do_large ? tp->mss_cache : tp->mss_cache_std;
-	if (factor)
-		*factor = do_large ? tp->mss_tso_factor : 1;
 
 	if (dst) {
 		u32 mtu = dst_pmtu(dst);
@@ -1545,7 +1543,7 @@ static __inline__ void __tcp_push_pending_frames(struct sock *sk,
 static __inline__ void tcp_push_pending_frames(struct sock *sk,
 					       struct tcp_opt *tp)
 {
-	__tcp_push_pending_frames(sk, tp, tcp_current_mss(sk, 1, NULL), tp->nonagle);
+	__tcp_push_pending_frames(sk, tp, tcp_current_mss(sk, 1), tp->nonagle);
 }
 
 static __inline__ int tcp_may_send_now(struct sock *sk, struct tcp_opt *tp)
@@ -1553,7 +1551,7 @@ static __inline__ int tcp_may_send_now(struct sock *sk, struct tcp_opt *tp)
 	struct sk_buff *skb = sk->sk_send_head;
 
 	return (skb &&
-		tcp_snd_test(tp, skb, tcp_current_mss(sk, 1, NULL),
+		tcp_snd_test(tp, skb, tcp_current_mss(sk, 1),
 			     tcp_skb_is_last(sk, skb) ? TCP_NAGLE_PUSH : tp->nonagle));
 }
 

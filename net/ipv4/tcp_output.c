@@ -422,6 +422,23 @@ void tcp_push_one(struct sock *sk, unsigned cur_mss)
 	}
 }
 
+static void tcp_set_skb_tso_factor(struct sk_buff *skb, unsigned int mss,
+				   unsigned int mss_std)
+{
+	if (skb->len <= mss_std) {
+		/* Avoid the costly divide in the normal
+		 * non-TSO case.
+		 */
+		TCP_SKB_CB(skb)->tso_factor = 1;
+	} else {
+		unsigned int factor;
+
+		factor = skb->len + (mss_std - 1);
+		factor /= mss;
+		TCP_SKB_CB(skb)->tso_factor = factor;
+	}
+}
+
 /* Function to create two new TCP segments.  Shrinks the given segment
  * to the specified size and appends a new segment with the rest of the
  * packet to the list.  This won't be called frequently, I hope. 
@@ -457,7 +474,6 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	TCP_SKB_CB(buff)->sacked =
 		(TCP_SKB_CB(skb)->sacked &
 		 (TCPCB_LOST | TCPCB_EVER_RETRANS | TCPCB_AT_TAIL));
-	TCP_SKB_CB(buff)->tso_factor = tp->mss_tso_factor;
 	if (TCP_SKB_CB(buff)->sacked&TCPCB_LOST) {
 		tcp_inc_pcount(&tp->lost_out, buff);
 		tcp_inc_pcount(&tp->left_out, buff);
@@ -483,6 +499,10 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	 * skbs, which it never sent before. --ANK
 	 */
 	TCP_SKB_CB(buff)->when = TCP_SKB_CB(skb)->when;
+
+	/* Fix up tso_factor for both original and new SKB.  */
+	tcp_set_skb_tso_factor(skb, tp->mss_cache, tp->mss_cache_std);
+	tcp_set_skb_tso_factor(buff, tp->mss_cache, tp->mss_cache_std);
 
 	/* Link BUFF into the send queue. */
 	__skb_append(skb, buff);
@@ -598,7 +618,6 @@ int tcp_sync_mss(struct sock *sk, u32 pmtu)
 	/* And store cached results */
 	tp->pmtu_cookie = pmtu;
 	tp->mss_cache = tp->mss_cache_std = mss_now;
-	tp->mss_tso_factor = 1;
 
 	if (sk->sk_route_caps & NETIF_F_TSO) {
 		int large_mss, factor;
@@ -617,7 +636,6 @@ int tcp_sync_mss(struct sock *sk, u32 pmtu)
 			factor = tp->snd_cwnd;
 
 		tp->mss_cache = mss_now * factor;
-		tp->mss_tso_factor = factor;
 	}
 
 	return mss_now;
@@ -634,7 +652,7 @@ int tcp_sync_mss(struct sock *sk, u32 pmtu)
 int tcp_write_xmit(struct sock *sk, int nonagle)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
-	unsigned int mss_now;
+	unsigned int mss_now, mss_std;
 
 	/* If we are closed, the bytes will have to remain here.
 	 * In time closedown will finish, we empty the write queue and all
@@ -649,7 +667,8 @@ int tcp_write_xmit(struct sock *sk, int nonagle)
 		 * We also handle things correctly when the user adds some
 		 * IP options mid-stream.  Silly to do, but cover it.
 		 */
-		mss_now = tcp_current_mss(sk, 1, NULL);
+		mss_now = tcp_current_mss(sk, 1);
+		mss_std = tp->mss_cache_std;
 
 		while ((skb = sk->sk_send_head) &&
 		       tcp_snd_test(tp, skb, mss_now,
@@ -658,7 +677,8 @@ int tcp_write_xmit(struct sock *sk, int nonagle)
 			if (skb->len > mss_now) {
 				if (tcp_fragment(sk, skb, mss_now))
 					break;
-			}
+			} else
+				tcp_set_skb_tso_factor(skb, mss_now, mss_std);
 
 			TCP_SKB_CB(skb)->when = tcp_time_stamp;
 			if (tcp_transmit_skb(sk, skb_clone(skb, GFP_ATOMIC)))
@@ -871,7 +891,7 @@ void tcp_simple_retransmit(struct sock *sk)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct sk_buff *skb;
-	unsigned int mss = tcp_current_mss(sk, 0, NULL);
+	unsigned int mss = tcp_current_mss(sk, 0);
 	int lost = 0;
 
 	sk_stream_for_retrans_queue(skb, sk) {
@@ -916,7 +936,7 @@ void tcp_simple_retransmit(struct sock *sk)
 int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
- 	unsigned int cur_mss = tcp_current_mss(sk, 0, NULL);
+ 	unsigned int cur_mss = tcp_current_mss(sk, 0);
 	int err;
 
 	/* Do not sent more than we queued. 1/4 is reserved for possible
@@ -934,7 +954,6 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 			sk->sk_route_caps &= ~NETIF_F_TSO;
 			sk->sk_no_largesend = 1;
 			tp->mss_cache = tp->mss_cache_std;
-			tp->mss_tso_factor = 1;
 		}
 
 		if (tcp_trim_head(sk, skb, tp->snd_una - TCP_SKB_CB(skb)->seq))
@@ -1125,7 +1144,7 @@ void tcp_send_fin(struct sock *sk)
 	 * unsent frames.  But be careful about outgoing SACKS
 	 * and IP options.
 	 */
-	mss_now = tcp_current_mss(sk, 1, NULL);
+	mss_now = tcp_current_mss(sk, 1);
 
 	if (sk->sk_send_head != NULL) {
 		TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_FIN;
@@ -1516,8 +1535,9 @@ int tcp_write_wakeup(struct sock *sk)
 		if ((skb = sk->sk_send_head) != NULL &&
 		    before(TCP_SKB_CB(skb)->seq, tp->snd_una+tp->snd_wnd)) {
 			int err;
-			int mss = tcp_current_mss(sk, 0, NULL);
-			int seg_size = tp->snd_una+tp->snd_wnd-TCP_SKB_CB(skb)->seq;
+			unsigned int mss = tcp_current_mss(sk, 0);
+			unsigned int mss_std = tp->mss_cache_std;
+			unsigned int seg_size = tp->snd_una+tp->snd_wnd-TCP_SKB_CB(skb)->seq;
 
 			if (before(tp->pushed_seq, TCP_SKB_CB(skb)->end_seq))
 				tp->pushed_seq = TCP_SKB_CB(skb)->end_seq;
@@ -1538,9 +1558,10 @@ int tcp_write_wakeup(struct sock *sk)
 					sk->sk_no_largesend = 1;
 					sk->sk_route_caps &= ~NETIF_F_TSO;
 					tp->mss_cache = tp->mss_cache_std;
-					tp->mss_tso_factor = 1;
 				}
-			}
+			} else
+				tcp_set_skb_tso_factor(skb, mss, mss_std);
+
 			TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
 			TCP_SKB_CB(skb)->when = tcp_time_stamp;
 			err = tcp_transmit_skb(sk, skb_clone(skb, GFP_ATOMIC));

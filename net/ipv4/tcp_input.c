@@ -974,7 +974,6 @@ tcp_sacktag_write_queue(struct sock *sk, struct sk_buff *ack_skb, u32 prior_snd_
 		sk->sk_route_caps &= ~NETIF_F_TSO;
 		sk->sk_no_largesend = 1;
 		tp->mss_cache = tp->mss_cache_std;
-		tp->mss_tso_factor = 1;
 	}
 
 	if (!tcp_get_pcount(&tp->sacked_out))
