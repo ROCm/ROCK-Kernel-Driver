@@ -569,20 +569,6 @@ static int param_set_byte(const char *val, struct kernel_param *kp)
 	return 0;
 }
 
-static int param_string(const char *name, const char *val,
-			unsigned int min, unsigned int max,
-			char *dest)
-{
-	if (strlen(val) < min || strlen(val) > max) {
-		printk(KERN_ERR
-		       "Parameter %s length must be %u-%u characters\n",
-		       name, min, max);
-		return -EINVAL;
-	}
-	strcpy(dest, val);
-	return 0;
-}
-
 extern int set_obsolete(const char *val, struct kernel_param *kp)
 {
 	unsigned int min, max;
@@ -618,7 +604,8 @@ extern int set_obsolete(const char *val, struct kernel_param *kp)
 		return param_array(kp->name, val, min, max, obsparm->addr,
 				   sizeof(long), param_set_long);
 	case 's':
-		return param_string(kp->name, val, min, max, obsparm->addr);
+		return param_array(kp->name, val, min, max, obsparm->addr,
+				   sizeof(char *), param_set_charp);
 	}
 	printk(KERN_ERR "Unknown obsolete parameter type %s\n", obsparm->type);
 	return -EINVAL;
