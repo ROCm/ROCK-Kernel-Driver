@@ -22,6 +22,9 @@
 #define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/interrupt.h>
+#include <linux/slab.h>
+#include <linux/vmalloc.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/minors.h>
 #include <sound/info.h>
@@ -338,32 +341,45 @@ static int snd_ctl_elem_list(snd_card_t *card, snd_ctl_elem_list_t *_list)
 	struct list_head *plist;
 	snd_ctl_elem_list_t list;
 	snd_kcontrol_t *kctl;
-	snd_ctl_elem_id_t *id;
+	snd_ctl_elem_id_t *dst, *id;
 	int offset, space;
 	
 	if (copy_from_user(&list, _list, sizeof(list)))
 		return -EFAULT;
 	offset = list.offset;
 	space = list.space;
-	read_lock(&card->control_rwlock);
-	list.count = card->controls_count;
-	plist = card->controls.next;
-	while (offset-- > 0 && plist != &card->controls)
-		plist = plist->next;
-	list.used = 0;
-	id = list.pids;
-	while (space > 0 && plist != &card->controls) {
-		kctl = snd_kcontrol(plist);
-		if (copy_to_user(id, &kctl->id, sizeof(*id))) {
-			read_unlock(&card->control_rwlock);
-			return -EFAULT;
+	/* try limit maximum space */
+	if (space > 16384)
+		return -ENOMEM;
+	if (space > 0) {
+		/* allocate temporary buffer for atomic operation */
+		dst = vmalloc(space * sizeof(snd_ctl_elem_id_t));
+		if (dst == NULL)
+			return -ENOMEM;
+		read_lock(&card->control_rwlock);
+		list.count = card->controls_count;
+		plist = card->controls.next;
+		while (offset-- > 0 && plist != &card->controls)
+			plist = plist->next;
+		list.used = 0;
+		id = dst;
+		while (space > 0 && plist != &card->controls) {
+			kctl = snd_kcontrol(plist);
+			memcpy(id, &kctl->id, sizeof(snd_ctl_elem_id_t));
+			id++;
+			plist = plist->next;
+			space--;
+			list.used++;
 		}
-		id++;
-		plist = plist->next;
-		space--;
-		list.used++;
+		read_unlock(&card->control_rwlock);
+		if (list.used > 0 && copy_to_user(list.pids, dst, list.used * sizeof(snd_ctl_elem_id_t)))
+			return -EFAULT;
+		vfree(dst);
+	} else {
+		read_lock(&card->control_rwlock);
+		list.count = card->controls_count;
+		read_unlock(&card->control_rwlock);
 	}
-	read_unlock(&card->control_rwlock);
 	if (copy_to_user(_list, &list, sizeof(list)))
 		return -EFAULT;
 	return 0;
@@ -662,12 +678,14 @@ static ssize_t snd_ctl_read(struct file *file, char *buffer, size_t count, loff_
 		ev.type = SNDRV_CTL_EVENT_ELEM;
 		ev.data.elem.mask = kev->mask;
 		ev.data.elem.id = kev->id;
+		list_del(&kev->list);
+		spin_unlock_irq(&ctl->read_lock);
+		kfree(kev);
 		if (copy_to_user(buffer, &ev, sizeof(snd_ctl_event_t))) {
 			err = -EFAULT;
 			goto __end;
 		}
-		list_del(&kev->list);
-		kfree(kev);
+		spin_lock_irq(&ctl->read_lock);
 		buffer += sizeof(snd_ctl_event_t);
 		count -= sizeof(snd_ctl_event_t);
 		result += sizeof(snd_ctl_event_t);

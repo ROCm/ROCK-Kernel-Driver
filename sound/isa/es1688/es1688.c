@@ -22,6 +22,8 @@
 #include <sound/driver.h>
 #include <asm/dma.h>
 #include <linux/init.h>
+#include <linux/time.h>
+#include <linux/wait.h>
 #include <sound/core.h>
 #include <sound/es1688.h>
 #include <sound/mpu401.h>

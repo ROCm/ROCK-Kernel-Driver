@@ -26,6 +26,7 @@
 #include <sound/driver.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
@@ -41,14 +42,11 @@ MODULE_CLASSES("{sound}");
 
 #ifdef SNDRV_LITTLE_ENDIAN
 #define CSP_HDR_VALUE(a,b,c,d)	((a) | ((b)<<8) | ((c)<<16) | ((d)<<24))
-#define LE_SHORT(v)		(v)
-#define LE_INT(v)		(v)
 #else
-#include <byteswap.h>
 #define CSP_HDR_VALUE(a,b,c,d)	((d) | ((c)<<8) | ((b)<<16) | ((a)<<24))
-#define LE_SHORT(v)		bswap_16(v)
-#define LE_INT(v)		bswap_32(v)
 #endif
+#define LE_SHORT(v)		le16_to_cpu(v)
+#define LE_INT(v)		le32_to_cpu(v)
 
 #define RIFF_HEADER	CSP_HDR_VALUE('R', 'I', 'F', 'F')
 #define CSP__HEADER	CSP_HDR_VALUE('C', 'S', 'P', ' ')
@@ -320,7 +318,7 @@ static int snd_sb_csp_riff_load(snd_sb_csp_t * p, snd_sb_csp_microcode_t * mcode
 		return -EFAULT;
 	if ((file_h.name != RIFF_HEADER) ||
 	    (LE_INT(file_h.len) >= SNDRV_SB_CSP_MAX_MICROCODE_FILE_SIZE - sizeof(file_h))) {
-		snd_printd(__FUNCTION__ ": Invalid RIFF header\n");
+		snd_printd("%s: Invalid RIFF header\n", __FUNCTION__);
 		return -EINVAL;
 	}
 	data_ptr += sizeof(file_h);
@@ -329,7 +327,7 @@ static int snd_sb_csp_riff_load(snd_sb_csp_t * p, snd_sb_csp_microcode_t * mcode
 	if (copy_from_user(&item_type, data_ptr, sizeof(item_type)))
 		return -EFAULT;
 	if (item_type != CSP__HEADER) {
-		snd_printd(__FUNCTION__ ": Invalid RIFF file type\n");
+		snd_printd("%s: Invalid RIFF file type\n", __FUNCTION__);
 		return -EINVAL;
 	}
 	data_ptr += sizeof (item_type);
@@ -384,7 +382,7 @@ static int snd_sb_csp_riff_load(snd_sb_csp_t * p, snd_sb_csp_microcode_t * mcode
 				return -EFAULT;
 
 			if (code_h.name != MAIN_HEADER) {
-				snd_printd(__FUNCTION__ ": Missing 'main' microcode\n");
+				snd_printd("%s: Missing 'main' microcode\n", __FUNCTION__);
 				return -EINVAL;
 			}
 			data_ptr += sizeof(code_h);
@@ -428,7 +426,8 @@ static int snd_sb_csp_riff_load(snd_sb_csp_t * p, snd_sb_csp_microcode_t * mcode
 			default:	/* other codecs are unsupported */
 				p->acc_format = p->acc_width = p->acc_rates = 0;
 				p->mode = 0;
-				snd_printd(__FUNCTION__ ": Unsupported CSP codec type: 0x%04x\n",
+				snd_printd("%s: Unsupported CSP codec type: 0x%04x\n",
+					   __FUNCTION__,
 					   LE_SHORT(funcdesc_h.VOC_type));
 				return -EINVAL;
 			}
@@ -447,7 +446,7 @@ static int snd_sb_csp_riff_load(snd_sb_csp_t * p, snd_sb_csp_microcode_t * mcode
 			return 0;
 		}
 	}
-	snd_printd(__FUNCTION__ ": Function #%d not found\n", info.func_req);
+	snd_printd("%s: Function #%d not found\n", __FUNCTION__, info.func_req);
 	return -EINVAL;
 }
 
@@ -601,7 +600,7 @@ static int get_version(sb_t *chip)
 static int snd_sb_csp_check_version(snd_sb_csp_t * p)
 {
 	if (p->version < 0x10 || p->version > 0x1f) {
-		snd_printd(__FUNCTION__ ": Invalid CSP version: 0x%x\n", p->version);
+		snd_printd("%s: Invalid CSP version: 0x%x\n", __FUNCTION__, p->version);
 		return 1;
 	}
 	return 0;
@@ -620,7 +619,7 @@ static int snd_sb_csp_load(snd_sb_csp_t * p, const unsigned char *buf, int size,
 	spin_lock_irqsave(&p->chip->reg_lock, flags);
 	snd_sbdsp_command(p->chip, 0x01);	/* CSP download command */
 	if (snd_sbdsp_get_byte(p->chip)) {
-		snd_printd(__FUNCTION__ ": Download command failed\n");
+		snd_printd("%s: Download command failed\n", __FUNCTION__);
 		goto __fail;
 	}
 	/* Send CSP low byte (size - 1) */
@@ -665,7 +664,7 @@ static int snd_sb_csp_load(snd_sb_csp_t * p, const unsigned char *buf, int size,
 			udelay (10);
 		}
 		if (status != 0x55) {
-			snd_printd(__FUNCTION__ ": Microcode initialization failed\n");
+			snd_printd("%s: Microcode initialization failed\n", __FUNCTION__);
 			goto __fail;
 		}
 	} else {
@@ -780,19 +779,19 @@ static int snd_sb_csp_start(snd_sb_csp_t * p, int sample_width, int channels)
 	unsigned long flags;
 
 	if (!(p->running & (SNDRV_SB_CSP_ST_LOADED | SNDRV_SB_CSP_ST_AUTO))) {
-		snd_printd(__FUNCTION__ ": Microcode not loaded\n");
+		snd_printd("%s: Microcode not loaded\n", __FUNCTION__);
 		return -ENXIO;
 	}
 	if (p->running & SNDRV_SB_CSP_ST_RUNNING) {
-		snd_printd(__FUNCTION__ ": CSP already running\n");
+		snd_printd("%s: CSP already running\n", __FUNCTION__);
 		return -EBUSY;
 	}
 	if (!(sample_width & p->acc_width)) {
-		snd_printd(__FUNCTION__ ": Unsupported PCM sample width\n");
+		snd_printd("%s: Unsupported PCM sample width\n", __FUNCTION__);
 		return -EINVAL;
 	}
 	if (!(channels & p->acc_channels)) {
-		snd_printd(__FUNCTION__ ": Invalid number of channels\n");
+		snd_printd("%s: Invalid number of channels\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
@@ -814,11 +813,11 @@ static int snd_sb_csp_start(snd_sb_csp_t * p, int sample_width, int channels)
 		s_type |= 0x22;	/* 00dX 00dX    (d = 1 if 8 bit samples) */
 
 	if (set_codec_parameter(p->chip, 0x81, s_type)) {
-		snd_printd(__FUNCTION__ ": Set sample type command failed\n");
+		snd_printd("%s: Set sample type command failed\n", __FUNCTION__);
 		goto __fail;
 	}
 	if (set_codec_parameter(p->chip, 0x80, 0x00)) {
-		snd_printd(__FUNCTION__ ": Codec start command failed\n");
+		snd_printd("%s: Codec start command failed\n", __FUNCTION__);
 		goto __fail;
 	}
 	p->run_width = sample_width;

@@ -1,5 +1,8 @@
 # ALSA ISA drivers
 
+mainmenu_option next_comment
+comment 'ISA devices'
+
 dep_tristate 'Analog Devices SoundPort AD1816A' CONFIG_SND_AD1816A $CONFIG_SND
 dep_tristate 'Generic AD1848/CS4248 driver' CONFIG_SND_AD1848 $CONFIG_SND
 dep_tristate 'Generic Cirrus Logic CS4231 driver' CONFIG_SND_CS4231 $CONFIG_SND
@@ -20,7 +23,7 @@ dep_tristate 'Sound Blaster 1.0/2.0/Pro (8-bit)' CONFIG_SND_SB8 $CONFIG_SND
 dep_tristate 'Sound Blaster 16 (PnP)' CONFIG_SND_SB16 $CONFIG_SND
 dep_tristate 'Sound Blaster AWE (32,64) (PnP)' CONFIG_SND_SBAWE $CONFIG_SND
 if [ "$CONFIG_SND_SB16" != "n" -o "$CONFIG_SND_SBAWE" != "n" ]; then
-  dep_bool 'Sound Blaster 16/AWE CSP support' CONFIG_SND_SB16_CSP
+  bool '  Sound Blaster 16/AWE CSP support' CONFIG_SND_SB16_CSP
 fi
 dep_tristate 'Turtle Beach Maui,Tropez,Tropez+ (Wavefront)' CONFIG_SND_WAVEFRONT $CONFIG_SND
 dep_tristate 'Avance Logic ALS100/ALS120' CONFIG_SND_ALS100 $CONFIG_SND
@@ -29,3 +32,5 @@ dep_tristate 'C-Media CMI8330' CONFIG_SND_CMI8330 $CONFIG_SND
 dep_tristate 'Diamond Technologies DT-0197H' CONFIG_SND_DT0197H $CONFIG_SND
 dep_tristate 'Yamaha OPL3-SA2/SA3' CONFIG_SND_OPL3SA2 $CONFIG_SND
 dep_tristate 'Aztech Sound Galaxy' CONFIG_SND_SGALAXY $CONFIG_SND
+
+endmenu

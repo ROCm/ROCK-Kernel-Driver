@@ -52,6 +52,7 @@
  */
 
 #include "driver.h"
+#include <linux/time.h>
 #include "core.h"
 #include "hwdep.h"
 #include "timer.h"

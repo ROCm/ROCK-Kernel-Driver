@@ -21,6 +21,8 @@
 
 #define __NO_VERSION__
 #include <sound/driver.h>
+#include <linux/slab.h>
+#include <linux/time.h>
 #include <sound/core.h>
 
 int snd_device_new(snd_card_t *card, snd_device_type_t type,

@@ -28,6 +28,7 @@
 #define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/uaccess.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/soundfont.h>
 

@@ -22,6 +22,8 @@
  *
  */
 
+#include <linux/bitops.h>
+
 extern int snd_pcm_hw_param_mask(snd_pcm_substream_t *pcm, snd_pcm_hw_params_t *params,
 				 snd_pcm_hw_param_t var, const snd_mask_t *val);
 extern unsigned int snd_pcm_hw_param_value_min(const snd_pcm_hw_params_t *params,

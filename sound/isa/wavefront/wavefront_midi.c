@@ -51,6 +51,8 @@
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/init.h>
+#include <linux/time.h>
+#include <linux/wait.h>
 #include <sound/core.h>
 #include <sound/snd_wavefront.h>
 

@@ -216,6 +216,7 @@ typedef struct _snd_gf1_mem {
 
 typedef struct snd_gf1_dma_block {
 	void *buffer;		/* buffer in computer's RAM */
+	unsigned long buf_addr;	/* buffer address */
 	unsigned int addr;	/* address in onboard memory */
 	unsigned int count;	/* count in bytes */
 	unsigned int cmd;	/* DMA command (format) */
@@ -605,7 +606,7 @@ int snd_gf1_mem_proc_done(snd_gus_card_t * gus);
 /* gus_dma.c */
 
 void snd_gf1_dma_program(snd_gus_card_t * gus, unsigned int addr,
-			 const void *buf, unsigned int count,
+			 unsigned long buf_addr, unsigned int count,
 			 unsigned int cmd);
 void snd_gf1_dma_ack(snd_gus_card_t * gus);
 int snd_gf1_dma_init(snd_gus_card_t * gus);

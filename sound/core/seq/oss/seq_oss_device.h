@@ -22,6 +22,10 @@
 #define __SEQ_OSS_DEVICE_H
 
 #include <sound/driver.h>
+#include <linux/time.h>
+#include <linux/wait.h>
+#include <linux/slab.h>
+#include <linux/sched.h>
 #include <sound/core.h>
 #include <sound/seq_oss.h>
 #include <sound/rawmidi.h>

@@ -13,9 +13,12 @@ ifeq ($(CONFIG_SOUND_PRIME),y)
   obj-y += oss/sounddrivers.o
 endif
 
-subdir-$(CONFIG_SND) += core i2c drivers isa pci ppc synth
+_subdirs := core i2c drivers isa pci ppc synth
+
+subdir-$(CONFIG_SND) += $(_subdirs)
 
 ifeq ($(CONFIG_SND),y)
+  subdir-m += $(_subdirs)
   obj-y += core/core.o i2c/_i2c.o
   obj-y += drivers/drivers.o \
 	   drivers/mpu401/_mpu401.o \

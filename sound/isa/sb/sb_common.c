@@ -25,6 +25,7 @@
 #include <asm/dma.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/sb.h>
 #include <sound/initval.h>
@@ -51,7 +52,7 @@ int snd_sbdsp_command(sb_t *chip, unsigned char val)
 			outb(val, SBP(chip, COMMAND));
 			return 1;
 		}
-	snd_printd(__FUNCTION__ " [0x%lx]: timeout (0x%x)\n", chip->port, val);
+	snd_printd("%s [0x%lx]: timeout (0x%x)\n", __FUNCTION__, chip->port, val);
 	return 0;
 }
 
@@ -68,7 +69,7 @@ int snd_sbdsp_get_byte(sb_t *chip)
 			return val;
 		}
 	}
-	snd_printd(__FUNCTION__ " [0x%lx]: timeout\n", chip->port);
+	snd_printd("%s [0x%lx]: timeout\n", __FUNCTION__, chip->port);
 	return -ENODEV;
 }
 
@@ -87,7 +88,7 @@ int snd_sbdsp_reset(sb_t *chip)
 			else
 				break;
 		}
-	snd_printdd(__FUNCTION__ " [0x%lx] failed...\n", chip->port);
+	snd_printdd("%s [0x%lx] failed...\n", __FUNCTION__, chip->port);
 	return -ENODEV;
 }
 
@@ -176,11 +177,11 @@ static int snd_sbdsp_free(sb_t *chip)
 {
 	if (chip->res_port) {
 		release_resource(chip->res_port);
-		kfree(chip->res_port);
+		kfree_nocheck(chip->res_port);
 	}
 	if (chip->res_alt_port) {
 		release_resource(chip->res_alt_port);
-		kfree(chip->res_alt_port);
+		kfree_nocheck(chip->res_alt_port);
 	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *) chip);

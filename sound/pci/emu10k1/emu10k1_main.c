@@ -29,6 +29,8 @@
 #include <sound/driver.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/slab.h>
+#include <linux/vmalloc.h>
 #include <sound/core.h>
 #include <sound/emu10k1.h>
 
@@ -503,7 +505,7 @@ static int snd_emu10k1_free(emu10k1_t *emu)
 		vfree(emu->page_addr_table);
 	if (emu->res_port) {
 		release_resource(emu->res_port);
-		kfree(emu->res_port);
+		kfree_nocheck(emu->res_port);
 	}
 	if (emu->irq >= 0)
 		free_irq(emu->irq, (void *)emu);

@@ -21,6 +21,7 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  *
  */
+#include <linux/time.h>
 #include "asequencer.h"
 
 typedef sndrv_seq_tick_time_t snd_seq_tick_time_t;

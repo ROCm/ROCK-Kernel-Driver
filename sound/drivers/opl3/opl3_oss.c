@@ -20,6 +20,7 @@
 
 #define __NO_VERSION__
 #include "opl3_voice.h"
+#include <linux/slab.h>
 
 static int snd_opl3_open_seq_oss(snd_seq_oss_arg_t *arg, void *closure);
 static int snd_opl3_close_seq_oss(snd_seq_oss_arg_t *arg);

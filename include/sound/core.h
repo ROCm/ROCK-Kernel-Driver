@@ -132,7 +132,7 @@ struct _snd_card {
 	int (*set_power_state) (snd_card_t *card, unsigned int state);
 	void *power_state_private_data;
 	unsigned int power_state;	/* power state */
-	unsigned int power_lock;	/* power lock */
+	struct semaphore power_lock;	/* power lock */
 	wait_queue_head_t power_sleep;
 #endif
 
@@ -143,22 +143,17 @@ struct _snd_card {
 };
 
 #ifdef CONFIG_PM
-static inline void snd_power_lock(snd_card_t *card, int can_schedule)
+static inline void snd_power_lock(snd_card_t *card)
 {
-	while (test_and_set_bit(0, &card->power_lock)) {
-		if (can_schedule) {
-			set_current_state(TASK_INTERRUPTIBLE);
-                        schedule_timeout(1);
-		}
-	}
+	down(&card->power_lock);
 }
 
 static inline void snd_power_unlock(snd_card_t *card)
 {
-	clear_bit(0, &card->power_lock);
+	up(&card->power_lock);
 }
 
-void snd_power_wait(snd_card_t *card, int can_schedule);
+void snd_power_wait(snd_card_t *card);
 
 static inline unsigned int snd_power_get_state(snd_card_t *card)
 {
@@ -171,9 +166,9 @@ static inline void snd_power_change_state(snd_card_t *card, unsigned int state)
 	wake_up(&card->power_sleep);
 }
 #else
-#define snd_power_lock(card, can_schedule) do { ; } while (0)
+#define snd_power_lock(card) do { ; } while (0)
 #define snd_power_unlock(card) do { ; } while (0)
-#define snd_power_wait(card, can_schedule) do { ; } while (0)
+#define snd_power_wait(card) do { ; } while (0)
 #define snd_power_get_state(card) SNDRV_CTL_POWER_D0
 #define snd_power_change_state(card, state) do { ; } while (0)
 #endif
@@ -236,18 +231,26 @@ void *snd_hidden_vmalloc(unsigned long size);
 void snd_hidden_vfree(void *obj);
 #define kmalloc(size, flags) snd_hidden_kmalloc(size, flags)
 #define kfree(obj) snd_hidden_kfree(obj)
+#define kfree_nocheck(obj) snd_wrapper_kfree(obj)
 #define vmalloc(size) snd_hidden_vmalloc(size)
 #define vfree(obj) snd_hidden_vfree(obj)
+#else
+#define kfree_nocheck(obj) kfree(obj)
 #endif
 void *snd_kcalloc(size_t size, int flags);
 char *snd_kmalloc_strdup(const char *string, int flags);
 void *snd_malloc_pages(unsigned long size, unsigned int dma_flags);
 void *snd_malloc_pages_fallback(unsigned long size, unsigned int dma_flags, unsigned long *res_size);
 void snd_free_pages(void *ptr, unsigned long size);
+#ifdef CONFIG_ISA
+void *snd_malloc_isa_pages(unsigned long size, dma_addr_t *dma_addr);
+void *snd_malloc_isa_pages_fallback(unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
+#define snd_free_isa_pages(size, ptr, dma_addr) snd_free_pages(ptr, size)
+#endif
 #ifdef CONFIG_PCI
-void *snd_malloc_pci_pages(struct pci_dev *pci, unsigned long size, dma_addr_t *dmaaddr);
-void *snd_malloc_pci_pages_fallback(struct pci_dev *pci, unsigned long size, dma_addr_t *dmaaddr, unsigned long *res_size);
-void snd_free_pci_pages(struct pci_dev *pci, unsigned long size, void *ptr, dma_addr_t dmaaddr);
+void *snd_malloc_pci_pages(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr);
+void *snd_malloc_pci_pages_fallback(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
+void snd_free_pci_pages(struct pci_dev *pci, unsigned long size, void *ptr, dma_addr_t dma_addr);
 #endif
 int copy_to_user_fromio(void *dst, unsigned long src, size_t count);
 int copy_from_user_toio(unsigned long dst, const void *src, size_t count);
@@ -282,7 +285,7 @@ int snd_device_free_all(snd_card_t *card, snd_device_cmd_t cmd);
 
 #define DMA_MODE_NO_ENABLE	0x0100
 
-void snd_dma_program(unsigned long dma, const void *buf, unsigned int size, unsigned short mode);
+void snd_dma_program(unsigned long dma, unsigned long addr, unsigned int size, unsigned short mode);
 void snd_dma_disable(unsigned long dma);
 unsigned int snd_dma_residue(unsigned long dma);
 

@@ -26,6 +26,7 @@
 */
 
 #include <sound/driver.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/cs46xx.h>
 #define SNDRV_GET_ID
@@ -62,10 +63,10 @@ MODULE_PARM_DESC(snd_enable, "Enable CS46xx soundcard.");
 MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
 MODULE_PARM(snd_external_amp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_external_amp, "Force to enable external amplifer.");
-MODULE_PARM_SYNTAX(snd_external_amp, SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM_SYNTAX(snd_external_amp, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 MODULE_PARM(snd_thinkpad, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_thinkpad, "Force to enable Thinkpad's CLKRUN control.");
-MODULE_PARM_SYNTAX(snd_thinkpad, SNDRV_BOOLEAN_FALSE_DESC);
+MODULE_PARM_SYNTAX(snd_thinkpad, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 static struct pci_device_id snd_cs46xx_ids[] __devinitdata = {
         { 0x1013, 0x6001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* CS4280 */
@@ -134,25 +135,25 @@ static int __devinit snd_card_cs46xx_probe(struct pci_dev *pci,
 static int snd_card_cs46xx_suspend(struct pci_dev *pci, u32 state)
 {
 	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pci_get_drvdata(pci), return -ENXIO);
-	snd_cs46xx_suspend(chip, 0);
+	snd_cs46xx_suspend(chip);
 	return 0;
 }
 static int snd_card_cs46xx_resume(struct pci_dev *pci)
 {
 	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pci_get_drvdata(pci), return -ENXIO);
-	snd_cs46xx_resume(chip, 0);
+	snd_cs46xx_resume(chip);
 	return 0;
 }
 #else
 static void snd_card_cs46xx_suspend(struct pci_dev *pci)
 {
 	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pci_get_drvdata(pci), return);
-	snd_cs46xx_suspend(chip, 0);
+	snd_cs46xx_suspend(chip);
 }
 static void snd_card_cs46xx_resume(struct pci_dev *pci)
 {
 	cs46xx_t *chip = snd_magic_cast(cs46xx_t, pci_get_drvdata(pci), return);
-	snd_cs46xx_resume(chip, 0);
+	snd_cs46xx_resume(chip);
 }
 #endif
 #endif

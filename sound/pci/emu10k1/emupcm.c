@@ -27,6 +27,8 @@
 
 #define __NO_VERSION__
 #include <sound/driver.h>
+#include <linux/slab.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/emu10k1.h>
 

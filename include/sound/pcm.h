@@ -832,11 +832,9 @@ int snd_pcm_lib_free_pages(snd_pcm_substream_t *substream);
 
 #ifdef CONFIG_ISA
 int snd_pcm_lib_preallocate_isa_pages(snd_pcm_substream_t *substream,
-				      size_t size, size_t max,
-				      unsigned int flags);
+				      size_t size, size_t max);
 int snd_pcm_lib_preallocate_isa_pages_for_all(snd_pcm_t *pcm,
-					      size_t size, size_t max,
-					      unsigned int flags);
+					      size_t size, size_t max);
 #endif
 #ifdef CONFIG_PCI
 int snd_pcm_lib_preallocate_pci_pages(struct pci_dev *pci,

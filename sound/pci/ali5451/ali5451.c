@@ -32,6 +32,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/info.h>
@@ -1972,7 +1973,7 @@ static int snd_ali_free(ali_t * codec)
 		free_irq(codec->irq, (void *)codec);
 	if (codec->res_port) {
 		release_resource(codec->res_port);
-		kfree(codec->res_port);
+		kfree_nocheck(codec->res_port);
 	}
 #ifdef CONFIG_PM
 	if (codec->image)

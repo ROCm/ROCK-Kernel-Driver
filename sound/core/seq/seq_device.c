@@ -43,6 +43,7 @@
 #include <sound/seq_device.h>
 #include <sound/initval.h>
 #include <linux/kmod.h>
+#include <linux/slab.h>
 
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("ALSA sequencer device management");

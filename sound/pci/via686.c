@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/info.h>
@@ -44,7 +45,6 @@ static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static long snd_mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
-static int snd_joystick[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
 static int snd_ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
 
 MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
@@ -62,9 +62,6 @@ MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_PORT_DESC);
 MODULE_PARM(snd_ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
 MODULE_PARM_DESC(snd_ac97_clock, "AC'97 codec clock (default 48000Hz).");
 MODULE_PARM_SYNTAX(snd_ac97_clock, SNDRV_ENABLED ",default:48000");
-MODULE_PARM(snd_joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_joystick, "Joystick support.");
-MODULE_PARM_SYNTAX(snd_joystick, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 
 /*
  *  Direct registers
@@ -823,6 +820,53 @@ static int __devinit snd_via686a_mixer(via686a_t *chip)
 }
 
 /*
+ * joystick
+ */
+
+static int snd_via686a_joystick_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 1;
+	return 0;
+}
+
+static int snd_via686a_joystick_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	via686a_t *chip = snd_kcontrol_chip(kcontrol);
+	u16 val;
+
+	pci_read_config_word(chip->pci, 0x42, &val);
+	ucontrol->value.integer.value[0] = (val & 0x08) ? 1 : 0;
+	return 0;
+}
+
+static int snd_via686a_joystick_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	via686a_t *chip = snd_kcontrol_chip(kcontrol);
+	u16 val, oval;
+
+	pci_read_config_word(chip->pci, 0x42, &oval);
+	val = oval & ~0x08;
+	if (ucontrol->value.integer.value[0])
+		val |= 0x08;
+	if (val != oval) {
+		pci_write_config_word(chip->pci, 0x42, val);
+		return 1;
+	}
+	return 0;
+}
+
+static snd_kcontrol_new_t snd_via686a_joystick_control __devinitdata = {
+	name: "Joystick",
+	iface: SNDRV_CTL_ELEM_IFACE_CARD,
+	info: snd_via686a_joystick_info,
+	get: snd_via686a_joystick_get,
+	put: snd_via686a_joystick_put,
+};
+
+/*
  *
  */
 
@@ -947,7 +991,7 @@ static int snd_via686a_free(via686a_t *chip)
 		snd_free_pci_pages(chip->pci, 3 * sizeof(unsigned int) * VIA_MAX_FRAGS * 2, chip->tables, chip->tables_addr);
 	if (chip->res_port) {
 		release_resource(chip->res_port);
-		kfree(chip->res_port);
+		kfree_nocheck(chip->res_port);
 	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
@@ -1094,8 +1138,9 @@ static int __devinit snd_via686a_probe(struct pci_dev *pci,
 #endif
 
 	legacy |= 0x40;		/* disable MIDI */
+	legacy &= ~0x08;	/* disable joystick */
 	if (chip->revision >= 0x20) {
-		if (snd_joystick[dev] > 0 || check_region(pci_resource_start(pci, 2), 4)) {
+		if (check_region(pci_resource_start(pci, 2), 4)) {
 			rev_h = 0;
 			legacy &= ~0x80;	/* disable PCI I/O 2 */
 		} else {
@@ -1105,9 +1150,6 @@ static int __devinit snd_via686a_probe(struct pci_dev *pci,
 	}
 	pci_write_config_byte(pci, 0x42, legacy);
 	pci_write_config_byte(pci, 0x43, legacy_cfg);
-	if (snd_joystick[dev] > 0) {
-		legacy |= 8;
-	}
 	if (rev_h && snd_mpu_port[dev] >= 0x200) {	/* force MIDI */
 		legacy |= 0x02;	/* enable MPU */
 		pci_write_config_dword(pci, 0x18, (snd_mpu_port[dev] & 0xfffc) | 0x01);
@@ -1156,6 +1198,13 @@ static int __devinit snd_via686a_probe(struct pci_dev *pci,
 		;
 	}
 	
+	/* card switches */
+	err = snd_ctl_add(card, snd_ctl_new1(&snd_via686a_joystick_control, chip));
+	if (err < 0) {
+		snd_card_free(card);
+		return err;
+	}
+
 	strcpy(card->driver, "VIA686A");
 	strcpy(card->shortname, "VIA 82C686A/B");
 	
@@ -1208,7 +1257,7 @@ module_exit(alsa_card_via686a_exit)
 #ifndef MODULE
 
 /* format is: snd-via686a=snd_enable,snd_index,snd_id,
-			  snd_mpu_port,snd_joystick,snd_ac97_clock */
+			  snd_mpu_port,snd_ac97_clock */
 
 static int __init alsa_card_via686a_setup(char *str)
 {
@@ -1220,7 +1269,6 @@ static int __init alsa_card_via686a_setup(char *str)
 	       get_option(&str,&snd_index[nr_dev]) == 2 &&
 	       get_id(&str,&snd_id[nr_dev]) == 2 &&
 	       get_option(&str,(int *)&snd_mpu_port[nr_dev]) == 2 &&
-	       get_option(&str,&snd_joystick[nr_dev]) == 2 &&
 	       get_option(&str,&snd_ac97_clock[nr_dev]) == 2);
 	nr_dev++;
 	return 1;

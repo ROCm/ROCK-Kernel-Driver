@@ -27,6 +27,7 @@
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/mpu401.h>
 
@@ -365,7 +366,7 @@ static void snd_mpu401_uart_free(snd_rawmidi_t *rmidi)
 		free_irq(mpu->irq, (void *) mpu);
 	if (mpu->res) {
 		release_resource(mpu->res);
-		kfree(mpu->res);
+		kfree_nocheck(mpu->res);
 	}
 	snd_magic_kfree(mpu);
 }
