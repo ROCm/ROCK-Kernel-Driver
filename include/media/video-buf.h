@@ -61,6 +61,8 @@ int videobuf_unlock(struct page **pages, int nr_pages);
  */
 
 struct videobuf_dmabuf {
+	u32                 magic;
+
 	/* for userland buffer */
 	int                 offset;
 	struct page         **pages;
@@ -78,6 +80,7 @@ struct videobuf_dmabuf {
 	int                 direction;
 };
 
+void videobuf_dma_init(struct videobuf_dmabuf *dma);
 int videobuf_dma_init_user(struct videobuf_dmabuf *dma, int direction,
 			   unsigned long data, unsigned long size);
 int videobuf_dma_init_kernel(struct videobuf_dmabuf *dma, int direction,
@@ -136,6 +139,7 @@ enum videobuf_state {
 
 struct videobuf_buffer {
 	unsigned int            i;
+	u32                     magic;
 
 	/* info about the buffer */
 	unsigned int            width;
