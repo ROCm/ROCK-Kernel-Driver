@@ -1990,6 +1990,7 @@ static void lbmIODone(struct bio *bio)
 
 		jERROR(1, ("lbmIODone: I/O error in JFS log\n"));
 	}
+
 	bio_put(bio);
 
 	/*
@@ -2107,7 +2108,6 @@ static void lbmIODone(struct bio *bio)
 
 		LCACHE_UNLOCK(flags);	/* unlock+enable */
 	}
-	return;
 }
 
 int jfsIOWait(void *arg)
