@@ -312,6 +312,30 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 
 
 /*
+ * psmouse_sliced_command() sends an extended PS/2 command to the mouse
+ * using sliced syntax, understood by advanced devices, such as Logitech
+ * or Synaptics touchpads. The command is encoded as:
+ * 0xE6 0xE8 rr 0xE8 ss 0xE8 tt 0xE8 uu where (rr*64)+(ss*16)+(tt*4)+uu
+ * is the command.
+ */
+int psmouse_sliced_command(struct psmouse *psmouse, unsigned char command)
+{
+	int i;
+
+	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_SETSCALE11))
+		return -1;
+
+	for (i = 6; i >= 0; i -= 2) {
+		unsigned char d = (command >> i) & 3;
+		if (psmouse_command(psmouse, &d, PSMOUSE_CMD_SETRES))
+			return -1;
+	}
+
+	return 0;
+}
+
+
+/*
  * psmouse_reset() resets the mouse into power-on state.
  */
 int psmouse_reset(struct psmouse *psmouse)

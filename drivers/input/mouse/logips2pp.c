@@ -63,7 +63,6 @@ void ps2pp_process_packet(struct psmouse *psmouse)
 		packet[0] &= 0x0f;
 		packet[1] = 0;
 		packet[2] = 0;
-
 	}
 }
 
@@ -76,17 +75,8 @@ void ps2pp_process_packet(struct psmouse *psmouse)
 
 static int ps2pp_cmd(struct psmouse *psmouse, unsigned char *param, unsigned char command)
 {
-	unsigned char d;
-	int i;
-
-	if (psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11))
+	if (psmouse_sliced_command(psmouse, command))
 		return -1;
-
-	for (i = 6; i >= 0; i -= 2) {
-		d = (command >> i) & 3;
-		if(psmouse_command(psmouse, &d, PSMOUSE_CMD_SETRES))
-			return -1;
-	}
 
 	if (psmouse_command(psmouse, param, PSMOUSE_CMD_POLL))
 		return -1;

@@ -44,33 +44,11 @@
  ****************************************************************************/
 
 /*
- * Use the Synaptics extended ps/2 syntax to write a special command byte.
- * special command: 0xE8 rr 0xE8 ss 0xE8 tt 0xE8 uu where (rr*64)+(ss*16)+(tt*4)+uu
- *                  is the command. A 0xF3 or 0xE9 must follow (see synaptics_send_cmd
- *                  and synaptics_mode_cmd)
- */
-static int synaptics_special_cmd(struct psmouse *psmouse, unsigned char command)
-{
-	int i;
-
-	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_SETSCALE11))
-		return -1;
-
-	for (i = 6; i >= 0; i -= 2) {
-		unsigned char d = (command >> i) & 3;
-		if (psmouse_command(psmouse, &d, PSMOUSE_CMD_SETRES))
-			return -1;
-	}
-
-	return 0;
-}
-
-/*
  * Send a command to the synpatics touchpad by special commands
  */
 static int synaptics_send_cmd(struct psmouse *psmouse, unsigned char c, unsigned char *param)
 {
-	if (synaptics_special_cmd(psmouse, c))
+	if (psmouse_sliced_command(psmouse, c))
 		return -1;
 	if (psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO))
 		return -1;
@@ -84,7 +62,7 @@ static int synaptics_mode_cmd(struct psmouse *psmouse, unsigned char mode)
 {
 	unsigned char param[1];
 
-	if (synaptics_special_cmd(psmouse, mode))
+	if (psmouse_sliced_command(psmouse, mode))
 		return -1;
 	param[0] = SYN_PS_SET_MODE2;
 	if (psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE))
@@ -248,7 +226,7 @@ static int synaptics_pt_write(struct serio *port, unsigned char c)
 	struct psmouse *parent = port->driver;
 	char rate_param = SYN_PS_CLIENT_CMD; /* indicates that we want pass-through port */
 
-	if (synaptics_special_cmd(parent, c))
+	if (psmouse_sliced_command(parent, c))
 		return -1;
 	if (psmouse_command(parent, &rate_param, PSMOUSE_CMD_SETRATE))
 		return -1;
