@@ -31,8 +31,6 @@
 #include <linux/types.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
-#include <linux/ppp_defs.h>
-#include <linux/ppp-comp.h>
 #include <linux/timer.h>
 
 #include <net/irda/irlap_event.h>
@@ -52,8 +50,32 @@
 #define CBROADCAST 0xfe       /* Connection broadcast address */
 #define XID_FORMAT 0x01       /* Discovery XID format */
 
+/* Nobody seems to use this constant. */
 #define LAP_WINDOW_SIZE 8
-#define LAP_MAX_QUEUE  10
+/* We keep the LAP queue very small to minimise the amount of buffering.
+ * this improve latency and reduce resource consumption.
+ * This work only because we have synchronous refilling of IrLAP through
+ * the flow control mechanism (via scheduler and IrTTP).
+ * 2 buffers is the minimum we can work with, one that we send while polling
+ * IrTTP, and another to know that we should not send the pf bit.
+ * Jean II */
+#define LAP_HIGH_THRESHOLD     2
+/* Some rare non TTP clients don't implement flow control, and
+ * so don't comply with the above limit (and neither with this one).
+ * For IAP and management, it doesn't matter, because they never transmit much.
+ *.For IrLPT, this should be fixed.
+ * - Jean II */
+#define LAP_MAX_QUEUE 10
+/* Please note that all IrDA management frames (LMP/TTP conn req/disc and
+ * IAS queries) fall in the second category and are sent to LAP even if TTP
+ * is stopped. This means that those frames will wait only a maximum of
+ * two (2) data frames before beeing sent on the "wire", which speed up
+ * new socket setup when the link is saturated.
+ * Same story for two sockets competing for the medium : if one saturates
+ * the LAP, when the other want to transmit it only has to wait for
+ * maximum three (3) packets (2 + one scheduling), which improve performance
+ * of delay sensitive applications.
+ * Jean II */
 
 #define NR_EXPECTED     1
 #define NR_UNEXPECTED   0
@@ -215,5 +237,25 @@ void irlap_apply_connection_parameters(struct irlap_cb *self, int now);
 
 #define IRLAP_GET_HEADER_SIZE(self) (LAP_MAX_HEADER)
 #define IRLAP_GET_TX_QUEUE_LEN(self) skb_queue_len(&self->txq)
+
+/* Return TRUE if the node is in primary mode (i.e. master)
+ * - Jean II */
+static inline int irlap_is_primary(struct irlap_cb *self)
+{
+	int ret;
+	switch(self->state) {
+	case LAP_XMIT_P:
+	case LAP_NRM_P:
+		ret = 1;
+		break;
+	case LAP_XMIT_S:
+	case LAP_NRM_S:
+		ret = 0;
+		break;
+	default:
+		ret = -1;
+	}
+	return(ret);
+}
 
 #endif

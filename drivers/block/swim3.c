@@ -35,7 +35,6 @@
 #include <linux/blk.h>
 #include <linux/devfs_fs_kernel.h>
 
-static int floppy_blocksizes[2] = {512,512};
 static int floppy_sizes[2] = {2880,2880};
 
 #define MAX_FLOPPIES	2
@@ -1034,7 +1033,6 @@ int swim3_init(void)
 		}
 		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request,
 				&swim3_lock);
-		blksize_size[MAJOR_NR] = floppy_blocksizes;
 		blk_size[MAJOR_NR] = floppy_sizes;
 	}
 

@@ -138,6 +138,18 @@ CONFIG_LITELINK_DONGLE
   used by IrTTY.  To activate support for Parallax dongles you will
   have to start irattach like this "irattach -d litelink".
 
+Microchip MCP2120 dongle
+CONFIG_MCP2120_DONGLE
+  Say Y here if you want to build support for the Microchip MCP2120
+  dongle.  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  The MCP2120 dongle attaches to
+  the normal 9-pin serial port connector, and can currently only be
+  used by IrTTY.  To activate support for MCP2120 dongles you will
+  have to insert "irattach -d mcp2120" in the /etc/irda/drivers script.
+
+  You must build this dongle yourself.  For more information see:
+  <http://www.eyetap.org/~tangf/irda_sir_linux.html>
+
 CONFIG_OLD_BELKIN_DONGLE
   Say Y here if you want to build support for the Adaptec Airport 1000
   and 2000 dongles.  If you want to compile it as a module, say M here

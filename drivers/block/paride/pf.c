@@ -265,8 +265,6 @@ static void pf_lock(int unit, int func);
 static void pf_eject(int unit);
 static int pf_check_media(kdev_t dev);
 
-static int pf_blocksizes[PF_UNITS];
-
 #define PF_NM           0
 #define PF_RO           1
 #define PF_RW           2
@@ -362,8 +360,6 @@ int pf_init (void)      /* preliminary initialisation */
 	blk_queue_max_phys_segments(q, cluster);
 	blk_queue_max_hw_segments(q, cluster);
 
-	for (i=0;i<PF_UNITS;i++) pf_blocksizes[i] = 1024;
-	blksize_size[MAJOR_NR] = pf_blocksizes;
 	for (i=0;i<PF_UNITS;i++)
 		register_disk(NULL, mk_kdev(MAJOR_NR, i), 1, &pf_fops, 0);
 

@@ -1330,7 +1330,7 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 	
 	sb_block = EXT3_MIN_BLOCK_SIZE / blocksize;
 	offset = EXT3_MIN_BLOCK_SIZE % blocksize;
-	set_blocksize(j_dev, blocksize);
+	set_blocksize(bdev, blocksize);
 	if (!(bh = __bread(bdev, sb_block, blocksize))) {
 		printk(KERN_ERR "EXT3-fs: couldn't read superblock of "
 		       "external journal\n");

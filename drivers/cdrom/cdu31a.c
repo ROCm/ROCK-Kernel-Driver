@@ -3301,8 +3301,6 @@ __setup("cdu31a=", cdu31a_setup);
 
 #endif
 
-static int cdu31a_block_size;
-
 /*
  * Initialize the driver.
  */
@@ -3442,9 +3440,6 @@ int __init cdu31a_init(void)
 		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR),
 			       do_cdu31a_request,
 			       &cdu31a_lock);
-		cdu31a_block_size = 1024;	/* 1kB default block size */
-		/* use 'mount -o block=2048' */
-		blksize_size[MAJOR_NR] = &cdu31a_block_size;
 
 		init_timer(&cdu31a_abort_timer);
 		cdu31a_abort_timer.function = handle_abort_timeout;

@@ -223,8 +223,6 @@ static void     do_pcd_read_drq(void);
 static void 	do_pcd_request(request_queue_t * q);
 static void 	do_pcd_read(void);
 
-static int pcd_blocksizes[PCD_UNITS];
-
 struct pcd_unit {
 	struct pi_adapter pia;		/* interface to paride layer */
 	struct pi_adapter *pi;
@@ -356,9 +354,6 @@ int pcd_init (void)	/* preliminary initialisation */
 	}
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_pcd_request, &pcd_lock);
-
-	for (i=0;i<PCD_UNITS;i++) pcd_blocksizes[i] = 1024;
-        blksize_size[MAJOR_NR] = pcd_blocksizes;
 
 	return 0;
 }

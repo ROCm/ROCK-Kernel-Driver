@@ -974,8 +974,6 @@ void __init stram_swap_setup(char *str, int *ints)
 /*								ST-RAM device								*/
 /* ------------------------------------------------------------------------ */
 
-static int stram_blocksizes[14] = {
-	0, 0, 0, 0, 0, 0, 0, 0,	0, 0, 0, 0, 0, 4096 };
 static int stram_sizes[14] = {
 	0, 0, 0, 0, 0, 0, 0, 0,	0, 0, 0, 0, 0, 0 };
 static int refcnt = 0;
@@ -1064,7 +1062,6 @@ int __init stram_device_init(void)
     }
 
     blk_init_queue(BLK_DEFAULT_QUEUE(STRAM_MAJOR), do_stram_request);
-    blksize_size[STRAM_MAJOR] = stram_blocksizes;
 	stram_sizes[STRAM_MINOR] = (swap_end - swap_start)/1024;
     blk_size[STRAM_MAJOR] = stram_sizes;
 	register_disk(NULL, MKDEV(STRAM_MAJOR, STRAM_MINOR), 1, &stram_fops,

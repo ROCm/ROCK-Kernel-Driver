@@ -2677,7 +2677,6 @@ int ide_cdrom_setup(ide_drive_t *drive)
 	 * default to read-only always and fix latter at the bottom
 	 */
 	set_device_ro(mk_kdev(drive->channel->major, minor), 1);
-	set_blocksize(mk_kdev(drive->channel->major, minor), CD_FRAMESIZE);
 	blk_queue_hardsect_size(&drive->queue, CD_FRAMESIZE);
 
 	blk_queue_prep_rq(&drive->queue, ll_10byte_cmd_build);
@@ -2861,13 +2860,7 @@ void ide_cdrom_revalidate (ide_drive_t *drive)
 	/* for general /dev/cdrom like mounting, one big disc */
 	drive->part[0].nr_sects = toc->capacity * SECTORS_PER_FRAME;
 	drive->channel->gd->sizes[minor] = toc->capacity * BLOCKS_PER_FRAME;
-
-	/*
-	 * reset block size, ide_revalidate_disk incorrectly sets it to
-	 * 1024 even for CDROM's
-	 */
 	blk_size[drive->channel->major] = drive->channel->gd->sizes;
-	set_blocksize(mk_kdev(drive->channel->major, minor), CD_FRAMESIZE);
 }
 
 static sector_t ide_cdrom_capacity(struct ata_device *drive)

@@ -79,6 +79,7 @@ struct swap_info_struct {
 	unsigned int flags;
 	spinlock_t sdev_lock;
 	struct file *swap_file;
+	unsigned old_block_size;
 	unsigned short * swap_map;
 	unsigned int lowest_bit;
 	unsigned int highest_bit;

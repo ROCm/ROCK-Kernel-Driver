@@ -144,6 +144,7 @@ EXPORT_SYMBOL(force_delete);
 EXPORT_SYMBOL(follow_up);
 EXPORT_SYMBOL(follow_down);
 EXPORT_SYMBOL(lookup_mnt);
+EXPORT_SYMBOL(path_lookup);
 EXPORT_SYMBOL(path_init);
 EXPORT_SYMBOL(path_walk);
 EXPORT_SYMBOL(path_release);
@@ -317,7 +318,6 @@ EXPORT_SYMBOL(tty_unregister_driver);
 EXPORT_SYMBOL(tty_std_termios);
 
 /* block device driver support */
-EXPORT_SYMBOL(blksize_size);
 EXPORT_SYMBOL(blk_size);
 EXPORT_SYMBOL(blk_dev);
 EXPORT_SYMBOL(is_read_only);

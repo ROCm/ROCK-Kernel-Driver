@@ -189,7 +189,6 @@ MODULE_PARM_DESC(sizes, "list of device (partition) sizes " \
 /* The following items are obtained through kmalloc() in init_module() */
 
 Xpram_Dev *xpram_devices = NULL;
-int *xpram_blksizes = NULL;
 int *xpram_offsets = NULL;   /* partition offsets */
 
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
@@ -1062,16 +1061,6 @@ int xpram_init(void)
 		PRINT_DEBUG(" device(%d) offset = %d kB, size = %d kB\n",i, xpram_offsets[i], xpram_sizes[i]);
 #endif
 
-	xpram_blksizes = kmalloc(xpram_devs * sizeof(int), GFP_KERNEL);
-	if (!xpram_blksizes) {
-		PRINT_ERR("Not enough memory for xpram_blksizes\n");
-                PRINT_ERR("Giving up xpram\n");
-		goto fail_malloc_blksizes;
-	}
-	for (i=0; i < xpram_devs; i++) /* all the same blocksize */
-		xpram_blksizes[i] = xpram_blksize;
-	blksize_size[major]=xpram_blksizes;
-
 	/* 
 	 * allocate the devices -- we can't have them static, as the number
 	 * can be specified at load time
@@ -1142,10 +1131,7 @@ int xpram_init(void)
 	}
 	kfree(xpram_devices);
 #endif /* V24 */
- fail_malloc_blksizes:
 	kfree (xpram_offsets);
-	kfree (xpram_blksizes);
-	blksize_size[major] = NULL;
  fail_malloc_devices:
  fail_malloc:
 #if (XPRAM_VERSION == 22)
@@ -1183,7 +1169,6 @@ void cleanup_module(void)
 #if (XPRAM_VERSION == 22)
 	blk_dev[major].request_fn = NULL;
 #endif /* V22 */
-	kfree(blksize_size[major]);
 	kfree(xpram_offsets);
 	blk_clear(major);
 

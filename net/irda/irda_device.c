@@ -368,6 +368,12 @@ int irda_task_kick(struct irda_task *task)
  *    time to complete. We do it this hairy way since we may have been
  *    called from interrupt context, so it's not possible to use
  *    schedule_timeout() 
+ * Two important notes :
+ *	o Make sure you irda_task_delete(task); in case you delete the
+ *	  calling instance.
+ *	o No real need to lock when calling this function, but you may
+ *	  want to lock within the task handler.
+ * Jean II
  */
 struct irda_task *irda_task_execute(void *instance, 
 				    IRDA_TASK_CALLBACK function, 
@@ -466,6 +472,9 @@ int irda_device_txqueue_empty(struct net_device *dev)
  * Function irda_device_init_dongle (self, type, qos)
  *
  *    Initialize attached dongle.
+ *
+ * Important : request_module require us to call this function with
+ * a process context and irq enabled. - Jean II
  */
 dongle_t *irda_device_dongle_init(struct net_device *dev, int type)
 {
@@ -477,6 +486,7 @@ dongle_t *irda_device_dongle_init(struct net_device *dev, int type)
 #ifdef CONFIG_KMOD
 	{
 	char modname[32];
+	ASSERT(!in_interrupt(), return NULL;);
 	/* Try to load the module needed */
 	sprintf(modname, "irda-dongle-%d", type);
 	request_module(modname);

@@ -453,8 +453,21 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 	 */
 	if (tty_hung_up_p(filp) ||
 	    (self->flags & ASYNC_CLOSING)) {
-		if (self->flags & ASYNC_CLOSING)
-			interruptible_sleep_on(&self->close_wait);
+
+		/* Hm, why are we blocking on ASYNC_CLOSING if we
+		 * do return -EAGAIN/-ERESTARTSYS below anyway?
+		 * IMHO it's either not needed in the first place
+		 * or for some reason we need to make sure the async
+		 * closing has been finished - if so, wouldn't we
+		 * probably better sleep uninterruptible?
+		 */
+
+		if (wait_event_interruptible(self->close_wait, !(self->flags&ASYNC_CLOSING))) {
+			WARNING("%s - got signal while blocking on ASYNC_CLOSING!\n",
+				__FUNCTION__);
+			return -ERESTARTSYS;
+		}
+
 		/* MOD_DEC_USE_COUNT; "info->tty" will cause this? */
 #ifdef SERIAL_DO_RESTART
 		return ((self->flags & ASYNC_HUP_NOTIFY) ?
