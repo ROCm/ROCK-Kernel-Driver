@@ -308,6 +308,8 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 		SCpnt->cmnd[4] = (unsigned char) this_count;
 		SCpnt->cmnd[5] = 0;
 	}
+	SCpnt->request_bufflen = SCpnt->bufflen =
+			this_count * sdp->sector_size;
 
 	/*
 	 * We shouldn't disconnect in the middle of a sector, so with a dumb
@@ -1353,9 +1355,13 @@ static int sd_remove(struct device *dev)
 static void sd_shutdown(struct device *dev)
 {
 	struct scsi_device *sdp = to_scsi_device(dev);
-	struct scsi_disk *sdkp = dev_get_drvdata(dev);
+       struct scsi_disk *sdkp;
 	struct scsi_request *sreq;
 	int retries, res;
+
+       sdkp = dev_get_drvdata(dev);
+       if (!sdkp)
+               return;         /* this can happen */
 
 	if (!sdp->online || !sdkp->WCE)
 		return;

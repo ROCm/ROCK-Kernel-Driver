@@ -1361,9 +1361,6 @@ static struct device_driver i82365_driver = {
 static struct platform_device i82365_device = {
 	.name = "i82365",
 	.id = 0,
-	.dev = {
-		.name = "i82365",
-	},
 };
 
 static int __init init_i82365(void)

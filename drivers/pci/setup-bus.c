@@ -203,6 +203,11 @@ pci_setup_bridge(struct pci_bus *bus)
 	   Enable ISA in either case (FIXME!). */
 	l = (bus->resource[0]->flags & IORESOURCE_BUS_HAS_VGA) ? 0x0c : 0x04;
 	pci_write_config_word(bridge, PCI_BRIDGE_CONTROL, l);
+
+	/* Make sure the bridge COMMAND register has the appropriate
+	   bits set, just in case...
+	*/
+	pcibios_enable_device(bridge, 0xfff);
 }
 
 /* Check whether the bridge supports optional I/O and

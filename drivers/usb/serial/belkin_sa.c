@@ -189,8 +189,8 @@ static int belkin_sa_startup (struct usb_serial *serial)
 	priv->bad_flow_control = (dev->descriptor.bcdDevice <= 0x0206) ? 1 : 0;
 	info("bcdDevice: %04x, bfc: %d", dev->descriptor.bcdDevice, priv->bad_flow_control);
 
-	init_waitqueue_head(&serial->port->write_wait);
-	usb_set_serial_port_data(serial->port, priv);
+	init_waitqueue_head(&serial->port[0]->write_wait);
+	usb_set_serial_port_data(serial->port[0], priv);
 	
 	return (0);
 }
@@ -206,7 +206,7 @@ static void belkin_sa_shutdown (struct usb_serial *serial)
 	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
 		/* My special items, the standard routines free my urbs */
-		priv = usb_get_serial_port_data(&serial->port[i]);
+		priv = usb_get_serial_port_data(serial->port[i]);
 		if (priv)
 			kfree(priv);
 	}

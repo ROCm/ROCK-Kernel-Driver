@@ -1566,7 +1566,6 @@ device_initcall(scsi_debug_init);
 module_exit(scsi_debug_exit);
 
 static struct device pseudo_primary = {
-	.name		= "Host/Pseudo Bridge",
 	.bus_id		= "pseudo_0",
 };
 
@@ -1630,7 +1629,6 @@ static int sdebug_add_adapter()
         sdbg_host->dev.bus = &pseudo_lld_bus;
         sdbg_host->dev.parent = &pseudo_primary;
         sdbg_host->dev.release = &sdebug_release_adapter;
-        sprintf(sdbg_host->dev.name, "scsi debug adapter");
         sprintf(sdbg_host->dev.bus_id, "adapter%d", scsi_debug_add_host);
 
         error = device_register(&sdbg_host->dev);

@@ -110,6 +110,9 @@ extern unsigned long wildfire_node_mem_size(int);
 /* setup.c */
 extern unsigned long srm_hae;
 extern int boot_cpuid;
+#ifdef CONFIG_VERBOSE_MCHECK
+extern unsigned long alpha_verbose_mcheck;
+#endif
 
 /* srmcons.c */
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_SRM)
@@ -204,8 +207,6 @@ extern struct mcheck_info
 #define mcheck_taken(cpu)	((void)(cpu), __mcheck_info.taken)
 #define mcheck_extra(cpu)	((void)(cpu), __mcheck_info.extra)
 #endif
-
-#define DEBUG_MCHECK 0          /* 0 = minimal, 1 = debug, 2 = debug+dump.  */
 
 extern void process_mcheck_info(unsigned long vector, unsigned long la_ptr,
 				struct pt_regs *regs, const char *machine,

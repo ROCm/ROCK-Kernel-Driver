@@ -1494,8 +1494,16 @@ EXPORT_SYMBOL (usb_hcd_irq);
 
 static void hcd_panic (void *_hcd)
 {
-	struct usb_hcd *hcd = _hcd;
-	hcd->driver->stop (hcd);
+	struct usb_hcd		*hcd = _hcd;
+	struct usb_device	*hub = hcd->self.root_hub;
+	unsigned		i;
+
+	/* hc's root hub is removed later removed in hcd->stop() */
+	hub->state = USB_STATE_NOTATTACHED;
+	for (i = 0; i < hub->maxchild; i++) {
+		if (hub->children [i])
+			usb_disconnect (&hub->children [i]);
+	}
 }
 
 /**
@@ -1508,29 +1516,9 @@ static void hcd_panic (void *_hcd)
  */
 void usb_hc_died (struct usb_hcd *hcd)
 {
-	struct list_head	*devlist, *urblist;
-	struct hcd_dev		*dev;
-	struct urb		*urb;
-	unsigned long		flags;
-	
-	/* flag every pending urb as done */
-	spin_lock_irqsave (&hcd_data_lock, flags);
-	list_for_each (devlist, &hcd->dev_list) {
-		dev = list_entry (devlist, struct hcd_dev, dev_list);
-		list_for_each (urblist, &dev->urb_list) {
-			urb = list_entry (urblist, struct urb, urb_list);
-			dev_dbg (hcd->controller, "shutdown %s urb %p pipe %x, current status %d\n",
-				hcd->self.bus_name, urb, urb->pipe, urb->status);
-			if (urb->status == -EINPROGRESS)
-				urb->status = -ESHUTDOWN;
-		}
-	}
-	urb = (struct urb *) hcd->rh_timer.data;
-	if (urb)
-		urb->status = -ESHUTDOWN;
-	spin_unlock_irqrestore (&hcd_data_lock, flags);
+	dev_err (hcd->controller, "HC died; cleaning up\n");
 
-	/* hcd->stop() needs a task context */
+	/* clean up old urbs and devices; needs a task context */
 	INIT_WORK (&hcd->work, hcd_panic, hcd);
 	(void) schedule_work (&hcd->work);
 }

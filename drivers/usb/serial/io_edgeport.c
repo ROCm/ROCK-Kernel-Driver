@@ -824,7 +824,7 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 		while ((position < length) && (portNumber < edge_serial->serial->num_ports)) {
 			txCredits = data[position] | (data[position+1] << 8);
 			if (txCredits) {
-				port = &edge_serial->serial->port[portNumber];
+				port = edge_serial->serial->port[portNumber];
 				if (port_paranoia_check (port, __FUNCTION__) == 0) {
 					edge_port = usb_get_serial_port_data(port);
 					if (edge_port->open) {
@@ -1031,7 +1031,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 		return -ENODEV;
 	}
 	if (edge_serial->interrupt_in_buffer == NULL) {
-		struct usb_serial_port *port0 = &serial->port[0];
+		struct usb_serial_port *port0 = serial->port[0];
 		
 		/* not set up yet, so do it now */
 		edge_serial->interrupt_in_buffer = port0->interrupt_in_buffer;
@@ -2065,7 +2065,7 @@ static int process_rcvd_data (struct edgeport_serial *edge_serial, unsigned char
 
 				/* spit this data back into the tty driver if this port is open */
 				if (rxLen) {
-					port = &edge_serial->serial->port[edge_serial->rxPort];
+					port = edge_serial->serial->port[edge_serial->rxPort];
 					if (port_paranoia_check (port, __FUNCTION__) == 0) {
         					edge_port = usb_get_serial_port_data(port);
 						if (edge_port->open) {
@@ -2118,7 +2118,7 @@ static void process_rcvd_status (struct edgeport_serial *edge_serial, __u8 byte2
 	__u8 code = edge_serial->rxStatusCode;
 
 	/* switch the port pointer to the one being currently talked about */
-	port = &edge_serial->serial->port[edge_serial->rxPort];
+	port = edge_serial->serial->port[edge_serial->rxPort];
 	if (port_paranoia_check (port, __FUNCTION__)) {
 		return;
 	}
@@ -3018,8 +3018,8 @@ static int edge_startup (struct usb_serial *serial)
 			return -ENOMEM;
 		}
 		memset (edge_port, 0, sizeof(struct edgeport_port));
-		edge_port->port = &serial->port[i];
-		usb_set_serial_port_data(&serial->port[i], edge_port);
+		edge_port->port = serial->port[i];
+		usb_set_serial_port_data(serial->port[i], edge_port);
 	}
 	
 	return 0;
@@ -3039,8 +3039,8 @@ static void edge_shutdown (struct usb_serial *serial)
 
 	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
-		kfree (usb_get_serial_port_data(&serial->port[i]));
-		usb_set_serial_port_data(&serial->port[i],  NULL);
+		kfree (usb_get_serial_port_data(serial->port[i]));
+		usb_set_serial_port_data(serial->port[i],  NULL);
 	}
 	kfree (usb_get_serial_data(serial));
 	usb_set_serial_data(serial, NULL);

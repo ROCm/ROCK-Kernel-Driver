@@ -134,7 +134,7 @@ struct mca_bus * __devinit mca_attach_bus(int bus)
 		return NULL;
 	memset(mca_bus, 0, sizeof(struct mca_bus));
 	sprintf(mca_bus->dev.bus_id,"mca%d",bus);
-	sprintf(mca_bus->dev.name,"Host %s MCA Bridge", bus ? "Secondary" : "Primary");
+	sprintf(mca_bus->name,"Host %s MCA Bridge", bus ? "Secondary" : "Primary");
 	device_register(&mca_bus->dev);
 
 	mca_root_busses[bus] = mca_bus;

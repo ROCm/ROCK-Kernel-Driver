@@ -28,7 +28,6 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/sched.h>
-#include <linux/timer.h>
 #include <linux/errno.h>
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
@@ -92,7 +91,7 @@ typedef struct btuart_info_t {
 
 
 void btuart_config(dev_link_t *link);
-void btuart_release(u_long arg);
+void btuart_release(dev_link_t *link);
 int btuart_event(event_t event, int priority, event_callback_args_t *args);
 
 static dev_info_t dev_info = "btuart_cs";
@@ -592,9 +591,6 @@ dev_link_t *btuart_attach(void)
 	link = &info->link;
 	link->priv = info;
 
-	init_timer(&link->release);
-	link->release.function = &btuart_release;
-	link->release.data = (u_long)link;
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
 	link->io.NumPorts1 = 8;
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
@@ -651,9 +647,8 @@ void btuart_detach(dev_link_t *link)
 	if (*linkp == NULL)
 		return;
 
-	del_timer(&link->release);
 	if (link->state & DEV_CONFIG)
-		btuart_release((u_long)link);
+		btuart_release(link);
 
 	if (link->handle) {
 		ret = CardServices(DeregisterClient, link->handle);
@@ -797,13 +792,12 @@ cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
 
 failed:
-	btuart_release((u_long) link);
+	btuart_release(link);
 }
 
 
-void btuart_release(u_long arg)
+void btuart_release(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *)arg;
 	btuart_info_t *info = link->priv;
 
 	if (link->state & DEV_PRESENT)
@@ -829,7 +823,7 @@ int btuart_event(event_t event, int priority, event_callback_args_t *args)
 		link->state &= ~DEV_PRESENT;
 		if (link->state & DEV_CONFIG) {
 			btuart_close(info);
-			mod_timer(&link->release, jiffies + HZ / 20);
+			btuart_release(link);
 		}
 		break;
 	case CS_EVENT_CARD_INSERTION:

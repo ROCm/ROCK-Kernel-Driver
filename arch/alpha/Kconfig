@@ -556,6 +556,24 @@ config ALPHA_LARGE_VMALLOC
 config VERBOSE_MCHECK
 	bool "Verbose Machine Checks"
 
+config VERBOSE_MCHECK_ON
+	int "Verbose Printing Mode (0=off, 1=on, 2=all)"
+	depends on VERBOSE_MCHECK
+	default 1
+	---help---
+	  This option allows the default printing mode to be set, and then
+	  possibly overridden by a boot command argument.
+
+	  For example, if one wanted the option of printing verbose
+	  machine checks, but wanted the default to be as if verbose
+	  machine check printing was turned off, then one would choose
+	  the printing mode to be 0. Then, upon reboot, one could add
+	  the boot command line "verbose_mcheck=1" to get the normal
+	  verbose machine check printing, or "verbose_mcheck=2" to get
+	  the maximum information available.
+
+	  Take the default (1) unless you want more control or more info.
+
 source "drivers/pci/Kconfig"
 source "drivers/eisa/Kconfig"
 

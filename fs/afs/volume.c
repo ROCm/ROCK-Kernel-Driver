@@ -43,7 +43,7 @@ const char *afs_voltypes[] = { "R/W", "R/O", "BAK" };
  * - Rule 2: If parent volume is R/O, then mount R/O volume by preference, R/W if not available
  * - Rule 3: If parent volume is R/W, then only mount R/W volume unless explicitly told otherwise
  */
-int afs_volume_lookup(char *name, int rwparent, afs_volume_t **_volume)
+int afs_volume_lookup(const char *name, int rwparent, afs_volume_t **_volume)
 {
 	afs_vlocation_t *vlocation = NULL;
 	afs_voltype_t type;

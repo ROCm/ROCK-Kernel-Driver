@@ -240,6 +240,7 @@ miata_kill_arch(int mode)
 {
 	cia_kill_arch(mode);
 
+#ifndef ALPHA_RESTORE_SRM_SETUP
 	switch(mode) {
 	case LINUX_REBOOT_CMD_RESTART:
 		/* Who said DEC engineers have no sense of humor? ;-)  */ 
@@ -255,6 +256,7 @@ miata_kill_arch(int mode)
 	}
 
 	halt();
+#endif
 }
 
 

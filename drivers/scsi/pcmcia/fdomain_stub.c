@@ -166,13 +166,8 @@ static void fdomain_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    if (link->state & DEV_CONFIG) {
+    if (link->state & DEV_CONFIG)
 	fdomain_release(link);
-	if (link->state & DEV_STALE_CONFIG) {
-	    link->state |= DEV_STALE_LINK;
-	    return;
-	}
-    }
 
     if (link->handle)
 	CardServices(DeregisterClient, link->handle);
@@ -283,9 +278,7 @@ static void fdomain_release(dev_link_t *link)
     scsi_unregister(info->host);
 
     link->state &= ~DEV_CONFIG;
-    if (link->state & DEV_STALE_LINK)
-	fdomain_detach(link);
-} /* fdomain_release */
+}
 
 /*====================================================================*/
 

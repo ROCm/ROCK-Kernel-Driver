@@ -524,7 +524,7 @@ mk_conf_addr(struct pci_bus *pbus, unsigned int devfn, int where)
 	if (!io7_port->enabled)
 		return addr;
 
-	if (hose->bus == pbus) {
+	if (!pbus->parent) { /* No parent means peer PCI bus. */
 		/* Don't support idsel > 20 on primary bus.  */
 		if (devfn >= PCI_DEVFN(21, 0))
 			return addr;

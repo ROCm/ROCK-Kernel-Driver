@@ -254,7 +254,6 @@ struct device {
 	struct device 	* parent;
 
 	struct kobject kobj;
-	char	name[DEVICE_NAME_SIZE];	/* descriptive ascii string */
 	char	bus_id[BUS_ID_SIZE];	/* position on parent bus */
 
 	struct bus_type	* bus;		/* type of bus device is on */

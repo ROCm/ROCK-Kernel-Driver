@@ -79,7 +79,7 @@ struct afs_volume
 	struct rw_semaphore	server_sem;	/* lock for accessing current server */
 };
 
-extern int afs_volume_lookup(char *name, int ro, afs_volume_t **_volume);
+extern int afs_volume_lookup(const char *name, int ro, afs_volume_t **_volume);
 
 #define afs_get_volume(V) do { atomic_inc(&(V)->usage); } while(0)
 

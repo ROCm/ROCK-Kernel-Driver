@@ -135,11 +135,9 @@ zalon_scsi_callback(struct parisc_device *dev)
 	if(!host)
 		goto fail;
 
-	strlcpy(dev->dev.name, "zalon7xx", sizeof(dev->dev.name));
-
-	if(request_irq(irq, ncr53c8xx_intr, SA_SHIRQ, dev->dev.name, host)) {
+	if(request_irq(irq, ncr53c8xx_intr, SA_SHIRQ, dev->dev.bus_id, host)) {
 		printk(KERN_ERR "%s: irq problem with %d, detaching\n ",
-		       dev->dev.name, irq);
+		       dev->dev.bus_id, irq);
 		goto fail;
 	}
 

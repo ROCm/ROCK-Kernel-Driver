@@ -361,7 +361,7 @@ static int whiteheat_attach (struct usb_serial *serial)
 	struct whiteheat_urb_wrap *wrap;
 	struct list_head *tmp;
 
-	command_port = &serial->port[COMMAND_PORT];
+	command_port = serial->port[COMMAND_PORT];
 
 	pipe = usb_sndbulkpipe (serial->dev, command_port->bulk_out_endpointAddress);
 	/*
@@ -400,7 +400,7 @@ static int whiteheat_attach (struct usb_serial *serial)
 	     DRIVER_VERSION, hw_info->sw_major_rev, hw_info->sw_minor_rev);
 
 	for (i = 0; i < serial->num_ports; i++) {
-		port = &serial->port[i];
+		port = serial->port[i];
 
 		info = (struct whiteheat_private *)kmalloc(sizeof(struct whiteheat_private), GFP_KERNEL);
 		if (info == NULL) {
@@ -496,7 +496,7 @@ no_firmware:
 
 no_command_private:
 	for (i = serial->num_ports - 1; i >= 0; i--) {
-		port = &serial->port[i];
+		port = serial->port[i];
 		info = usb_get_serial_port_data(port);
 		for (j = urb_pool_size - 1; j >= 0; j--) {
 			tmp = list_first(&info->tx_urbs_free);
@@ -543,11 +543,11 @@ static void whiteheat_shutdown (struct usb_serial *serial)
 	dbg("%s", __FUNCTION__);
 
 	/* free up our private data for our command port */
-	command_port = &serial->port[COMMAND_PORT];
+	command_port = serial->port[COMMAND_PORT];
 	kfree (usb_get_serial_port_data(command_port));
 
 	for (i = 0; i < serial->num_ports; i++) {
-		port = &serial->port[i];
+		port = serial->port[i];
 		info = usb_get_serial_port_data(port);
 		list_for_each_safe(tmp, tmp2, &info->rx_urbs_free) {
 			list_del(tmp);
@@ -1119,7 +1119,7 @@ static int firm_send_command (struct usb_serial_port *port, __u8 command, __u8 *
 
 	dbg("%s - command %d", __FUNCTION__, command);
 
-	command_port = &port->serial->port[COMMAND_PORT];
+	command_port = port->serial->port[COMMAND_PORT];
 	command_info = usb_get_serial_port_data(command_port);
 	spin_lock_irqsave(&command_info->lock, flags);
 	command_info->command_finished = FALSE;
@@ -1323,7 +1323,7 @@ static int start_command_port(struct usb_serial *serial)
 	unsigned long flags;
 	int retval = 0;
 	
-	command_port = &serial->port[COMMAND_PORT];
+	command_port = serial->port[COMMAND_PORT];
 	command_info = usb_get_serial_port_data(command_port);
 	spin_lock_irqsave(&command_info->lock, flags);
 	if (!command_info->port_running) {
@@ -1351,7 +1351,7 @@ static void stop_command_port(struct usb_serial *serial)
 	struct whiteheat_command_private *command_info;
 	unsigned long flags;
 
-	command_port = &serial->port[COMMAND_PORT];
+	command_port = serial->port[COMMAND_PORT];
 	command_info = usb_get_serial_port_data(command_port);
 	spin_lock_irqsave(&command_info->lock, flags);
 	command_info->port_running--;

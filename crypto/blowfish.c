@@ -456,7 +456,6 @@ static struct crypto_alg alg = {
 	.cra_u			=	{ .cipher = {
 	.cia_min_keysize	=	BF_MIN_KEY_SIZE,
 	.cia_max_keysize	=	BF_MAX_KEY_SIZE,
-	.cia_ivsize		=	BF_BLOCK_SIZE,
 	.cia_setkey   		= 	bf_setkey,
 	.cia_encrypt 		=	bf_encrypt,
 	.cia_decrypt  		=	bf_decrypt } }

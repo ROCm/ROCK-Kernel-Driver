@@ -6,6 +6,8 @@
  * the scsi code for linux.
  */
 
+#include <linux/types.h>
+
 /*
     $Header: /usr/src/linux/include/linux/RCS/scsi.h,v 1.3 1993/09/24 12:20:33 drew Exp $
 
@@ -13,6 +15,8 @@
     please consult the SCSI standard.
 
 */
+
+#include <linux/types.h> 
 
 /*
  * SCSI command lengths
@@ -208,18 +212,18 @@ static inline int scsi_status_is_good(int status)
 
 struct ccs_modesel_head
 {
-    u_char  _r1;    /* reserved */
-    u_char  medium; /* device-specific medium type */
-    u_char  _r2;    /* reserved */
-    u_char  block_desc_length; /* block descriptor length */
-    u_char  density; /* device-specific density code */
-    u_char  number_blocks_hi; /* number of blocks in this block desc */
-    u_char  number_blocks_med;
-    u_char  number_blocks_lo;
-    u_char  _r3;
-    u_char  block_length_hi; /* block length for blocks in this desc */
-    u_char  block_length_med;
-    u_char  block_length_lo;
+	u8 _r1;			/* reserved */
+	u8 medium;		/* device-specific medium type */
+	u8 _r2;			/* reserved */
+	u8 block_desc_length;	/* block descriptor length */
+	u8 density;		/* device-specific density code */
+	u8 number_blocks_hi;	/* number of blocks in this block desc */
+	u8 number_blocks_med;
+	u8 number_blocks_lo;
+	u8 _r3;
+	u8 block_length_hi;	/* block length for blocks in this desc */
+	u8 block_length_med;
+	u8 block_length_lo;
 };
 
 /*

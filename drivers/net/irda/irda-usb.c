@@ -1482,9 +1482,9 @@ static int irda_usb_probe(struct usb_interface *intf,
 		goto err_out_2;
 	}
 
-	/* Is this really necessary? */
-	if (usb_set_configuration (dev, dev->config[0].desc.bConfigurationValue) < 0) {
-		err("set_configuration failed");
+	/* Is this really necessary? (no, except maybe for broken devices) */
+	if (usb_reset_configuration (dev) < 0) {
+		err("reset_configuration failed");
 		ret = -EIO;
 		goto err_out_3;
 	}

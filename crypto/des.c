@@ -1249,7 +1249,6 @@ static struct crypto_alg des_alg = {
 	.cra_u			=	{ .cipher = {
 	.cia_min_keysize	=	DES_KEY_SIZE,
 	.cia_max_keysize	=	DES_KEY_SIZE,
-	.cia_ivsize		=	DES_BLOCK_SIZE,
 	.cia_setkey		= 	des_setkey,
 	.cia_encrypt		=	des_encrypt,
 	.cia_decrypt		=	des_decrypt } }
@@ -1265,7 +1264,6 @@ static struct crypto_alg des3_ede_alg = {
 	.cra_u			=	{ .cipher = {
 	.cia_min_keysize	=	DES3_EDE_KEY_SIZE,
 	.cia_max_keysize	=	DES3_EDE_KEY_SIZE,
-	.cia_ivsize		=	DES3_EDE_BLOCK_SIZE,
 	.cia_setkey	   	= 	des3_ede_setkey,
 	.cia_encrypt	 	=	des3_ede_encrypt,
 	.cia_decrypt	  	=	des3_ede_decrypt } }

@@ -400,6 +400,8 @@ static inline int page_mapped(struct page *page)
 #define VM_FAULT_MINOR	1
 #define VM_FAULT_MAJOR	2
 
+#define offset_in_page(p)	((unsigned long)(p) & ~PAGE_MASK)
+
 extern void show_free_areas(void);
 
 struct page *shmem_nopage(struct vm_area_struct * vma,
@@ -433,6 +435,7 @@ extern int handle_mm_fault(struct mm_struct *mm,struct vm_area_struct *vma, unsi
 extern int make_pages_present(unsigned long addr, unsigned long end);
 extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write);
 extern long sys_remap_file_pages(unsigned long start, unsigned long size, unsigned long prot, unsigned long pgoff, unsigned long nonblock);
+extern long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice);
 void put_dirty_page(struct task_struct *tsk, struct page *page,
 			unsigned long address, pgprot_t prot);
 

@@ -14,13 +14,6 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 
-static ssize_t device_read_name(struct device * dev, char * buf)
-{
-	return sprintf(buf,"%s\n",dev->name);
-}
-
-static DEVICE_ATTR(name,S_IRUGO,device_read_name,NULL);
-
 /**
  *	detach_state - control the default power state for the device.
  *	
@@ -53,7 +46,6 @@ static DEVICE_ATTR(detach_state,0644,detach_show,detach_store);
 
 
 struct attribute * dev_default_attrs[] = {
-	&dev_attr_name.attr,
 	&dev_attr_detach_state.attr,
 	NULL,
 };

@@ -95,9 +95,10 @@
 	sethi	%hi(109f), %g7;				\
 	ba,pt	%xcc, scetrap;				\
 109:	 or	%g7, %lo(109b), %g7;			\
+	sethi	%hi(systbl), %l7;			\
 	ba,pt	%xcc, routine;				\
-	 sethi	%hi(systbl), %l7;			\
-	nop; nop; nop;
+	 or	%l7, %lo(systbl), %l7;			\
+	nop; nop;
 	
 #define INDIRECT_SOLARIS_SYSCALL(num)			\
 	sethi	%hi(109f), %g7;				\

@@ -12,6 +12,7 @@
 #include <linux/config.h>
 #include <asm/sn/sgi.h>
 #include <asm/irq.h>
+#include <asm/topology.h>
 #include <asm/sn/intr.h>
 #include <asm/sn/router.h>
 #include <asm/sn/pda.h>
@@ -127,7 +128,7 @@ typedef struct irqpda_s irqpda_t;
  * Check if given a compact node id the corresponding node has all the
  * cpus disabled. 
  */
-#define is_headless_node(cnode)		(!test_bit(cnode, &node_has_active_cpus))
+#define is_headless_node(cnode)		(!node_to_cpumask(cnode))
 
 /*
  * Check if given a node vertex handle the corresponding node has all the

@@ -208,8 +208,6 @@ struct irlap_cb {
 	int    next_bofs;     /* Negotiated extra BOFs after next frame */
 };
 
-extern hashbin_t *irlap;
-
 /* 
  *  Function prototypes 
  */
@@ -217,7 +215,7 @@ int irlap_init(void);
 void irlap_cleanup(void);
 
 struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
-			    char *	hw_name);
+			    const char *hw_name);
 void irlap_close(struct irlap_cb *self);
 
 void irlap_connect_request(struct irlap_cb *self, __u32 daddr, 

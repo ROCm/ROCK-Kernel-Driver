@@ -464,8 +464,13 @@ static int  empeg_startup (struct usb_serial *serial)
 
 	dbg("%s", __FUNCTION__);
 
-	dbg("%s - Set config to 1", __FUNCTION__);
-	r = usb_set_configuration (serial->dev, 1);
+	if (serial->dev->actconfig->desc.bConfigurationValue != 1) {
+		err("active config #%d != 1 ??",
+			serial->dev->actconfig->desc.bConfigurationValue);
+		return -ENODEV;
+	}
+	dbg("%s - reset config", __FUNCTION__);
+	r = usb_reset_configuration (serial->dev);
 
 	/* continue on with initialization */
 	return r;

@@ -75,7 +75,7 @@ krb5_encrypt(
 
 	memcpy(out, in, length);
 	sg[0].page = virt_to_page(out);
-	sg[0].offset = ((long)out & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(out);
 	sg[0].length = length;
 
 	ret = crypto_cipher_encrypt(tfm, sg, sg, length);
@@ -114,7 +114,7 @@ krb5_decrypt(
 
 	memcpy(out, in, length);
 	sg[0].page = virt_to_page(out);
-	sg[0].offset = ((long)out  & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(out);
 	sg[0].length = length;
 
 	ret = crypto_cipher_decrypt(tfm, sg, sg, length);
@@ -151,7 +151,7 @@ krb5_make_checksum(s32 cksumtype, struct xdr_netobj *input,
 		goto out_free_tfm;
 	}
 	sg[0].page = virt_to_page(input->data);
-	sg[0].offset = ((long)input->data & ~PAGE_MASK);
+	sg[0].offset = offset_in_page(input->data);
 	sg[0].length = input->len;
 
 	crypto_digest_init(tfm);

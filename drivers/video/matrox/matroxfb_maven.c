@@ -1255,7 +1255,7 @@ static int maven_detect_client(struct i2c_adapter* adapter, int address, int kin
 	new_client->adapter = adapter;
 	new_client->driver = &maven_driver;
 	new_client->flags = 0;
-	strcpy(new_client->dev.name, "maven client");
+	strcpy(new_client->name, "maven client");
 	if ((err = i2c_attach_client(new_client)))
 		goto ERROR3;
 	err = maven_init_client(new_client);

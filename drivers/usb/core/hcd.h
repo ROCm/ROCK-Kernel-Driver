@@ -82,7 +82,6 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 #ifdef	CONFIG_PCI
 	int			region;		/* pci region for regs */
 	u32			pci_state [16];	/* for PM state save */
-	atomic_t		resume_count;	/* multiple resumes issue */
 #endif
 
 #define HCD_BUFFER_POOLS	4
@@ -220,11 +219,8 @@ extern int usb_hcd_pci_probe (struct pci_dev *dev,
 extern void usb_hcd_pci_remove (struct pci_dev *dev);
 
 #ifdef CONFIG_PM
-// FIXME:  see Documentation/power/pci.txt (2.4.6 and later?)
-// extern int usb_hcd_pci_save_state (struct pci_dev *dev, u32 state);
 extern int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state);
 extern int usb_hcd_pci_resume (struct pci_dev *dev);
-// extern int usb_hcd_pci_enable_wake (struct pci_dev *dev, u32 state, int flg);
 #endif /* CONFIG_PM */
 
 #endif /* CONFIG_PCI */

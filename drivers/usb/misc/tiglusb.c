@@ -57,7 +57,7 @@ static int timeout = TIMAXTIME;	/* timeout in tenth of seconds     */
 static inline int
 clear_device (struct usb_device *dev)
 {
-	if (usb_set_configuration (dev, dev->config[0].desc.bConfigurationValue) < 0) {
+	if (usb_reset_configuration (dev) < 0) {
 		err ("clear_device failed");
 		return -1;
 	}
@@ -343,8 +343,10 @@ tiglusb_probe (struct usb_interface *intf,
 	    && (dev->descriptor.idVendor != 0x451))
 		return -ENODEV;
 
-	if (usb_set_configuration (dev, dev->config[0].desc.bConfigurationValue) < 0) {
-		err ("tiglusb_probe: set_configuration failed");
+	// NOTE:  it's already in this config, this shouldn't be needed.
+	// is this working around some hardware bug?
+	if (usb_reset_configuration (dev) < 0) {
+		err ("tiglusb_probe: reset_configuration failed");
 		return -ENODEV;
 	}
 

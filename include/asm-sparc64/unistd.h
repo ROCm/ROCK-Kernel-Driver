@@ -225,9 +225,9 @@
 #define __NR_socketcall         206 /* Linux Specific                              */
 #define __NR_syslog             207 /* Linux Specific                              */
 #define __NR_lookup_dcookie     208 /* Linux Specific                              */
-/* #define __NR_iopl            209    Linux Specific - i386 specific, unused      */
-/* #define __NR_idle            210    Linux Specific - was sys_idle, now unused   */
-/* #define __NR_vm86            211    Linux Specific - i386 specific, unused      */
+#define __NR_fadvise64          209 /* Linux Specific                              */
+#define __NR_fadvise64_64       210 /* Linux Specific                              */
+#define __NR_tgkill             211 /* Linux Specific                              */
 #define __NR_waitpid            212 /* Linux Specific                              */
 #define __NR_swapoff            213 /* Linux Specific                              */
 #define __NR_sysinfo            214 /* Linux Specific                              */
@@ -274,10 +274,20 @@
 #define __NR_fdatasync          253
 #define __NR_nfsservctl         254
 #define __NR_aplib              255
-/* WARNING: You MAY NOT add syscall numbers larger than 255, since
- *          all of the syscall tables in the Sparc64 kernel are
- *          sized to have 256 entries (starting at zero).  Therefore
- *          find a free slot in the 0-255 range.
+#define __NR_clock_settime	256
+#define __NR_clock_gettime	257
+#define __NR_clock_getres	258
+#define __NR_clock_nanosleep	259
+#define __NR_sched_getaffinity	260
+#define __NR_sched_setaffinity	261
+#define __NR_timer_settime	262
+#define __NR_timer_gettime	263
+#define __NR_timer_getoverrun	264
+#define __NR_timer_delete	265
+/* WARNING: You MAY NOT add syscall numbers larger than 265, since
+ *          all of the syscall tables in the Sparc kernel are
+ *          sized to have 266 entries (starting at zero).  Therefore
+ *          find a free slot in the 0-265 range.
  */
 
 #define _syscall0(type,name) \

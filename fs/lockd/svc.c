@@ -16,6 +16,8 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/sysctl.h>
+#include <linux/moduleparam.h>
 
 #include <linux/sched.h>
 #include <linux/errno.h>
@@ -51,12 +53,23 @@ static DECLARE_MUTEX_LOCKED(lockd_start);
 static DECLARE_WAIT_QUEUE_HEAD(lockd_exit);
 
 /*
- * Currently the following can be set only at insmod time.
- * Ideally, they would be accessible through the sysctl interface.
+ * These can be set at insmod time (useful for NFS as root filesystem),
+ * and also changed through the sysctl interface.  -- Jamie Lokier, Aug 2003
  */
-unsigned long			nlm_grace_period;
-unsigned long			nlm_timeout = LOCKD_DFLT_TIMEO;
-unsigned long			nlm_udpport, nlm_tcpport;
+static unsigned long		nlm_grace_period;
+static unsigned long		nlm_timeout = LOCKD_DFLT_TIMEO;
+static int			nlm_udpport, nlm_tcpport;
+
+/*
+ * Constants needed for the sysctl interface.
+ */
+static const unsigned long	nlm_grace_period_min = 0;
+static const unsigned long	nlm_grace_period_max = 240;
+static const unsigned long	nlm_timeout_min = 3;
+static const unsigned long	nlm_timeout_max = 20;
+static const int		nlm_port_min = 0, nlm_port_max = 65535;
+
+static struct ctl_table_header * nlm_sysctl_table;
 
 static unsigned long set_grace_period(void)
 {
@@ -302,52 +315,130 @@ out:
 	up(&nlmsvc_sema);
 }
 
-#ifdef MODULE
-/* New module support in 2.1.18 */
+/*
+ * Sysctl parameters (same as module parameters, different interface).
+ */
+
+/* Something that isn't CTL_ANY, CTL_NONE or a value that may clash. */
+#define CTL_UNNUMBERED		-2
+
+static ctl_table nlm_sysctls[] = {
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "nlm_grace_period",
+		.data		= &nlm_grace_period,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_doulongvec_minmax,
+		.extra1		= (unsigned long *) &nlm_grace_period_min,
+		.extra2		= (unsigned long *) &nlm_grace_period_max,
+	},
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "nlm_timeout",
+		.data		= &nlm_timeout,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_doulongvec_minmax,
+		.extra1		= (unsigned long *) &nlm_timeout_min,
+		.extra2		= (unsigned long *) &nlm_timeout_max,
+	},
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "nlm_udpport",
+		.data		= &nlm_udpport,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_minmax,
+		.extra1		= (int *) &nlm_port_min,
+		.extra2		= (int *) &nlm_port_max,
+	},
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "nlm_tcpport",
+		.data		= &nlm_tcpport,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_minmax,
+		.extra1		= (int *) &nlm_port_min,
+		.extra2		= (int *) &nlm_port_max,
+	},
+	{ .ctl_name = 0 }
+};
+
+static ctl_table nlm_sysctl_dir[] = {
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "nfs",
+		.mode		= 0555,
+		.child		= nlm_sysctls,
+	},
+	{ .ctl_name = 0 }
+};
+
+static ctl_table nlm_sysctl_root[] = {
+	{
+		.ctl_name	= CTL_FS,
+		.procname	= "fs",
+		.mode		= 0555,
+		.child		= nlm_sysctl_dir,
+	},
+	{ .ctl_name = 0 }
+};
+
+/*
+ * Module (and driverfs) parameters.
+ */
+
+#define param_set_min_max(name, type, which_strtol, min, max)		\
+static int param_set_##name(const char *val, struct kernel_param *kp)	\
+{									\
+	char *endp;							\
+	__typeof__(type) num = which_strtol(val, &endp, 0);		\
+	if (endp == val || *endp || num < (min) || num > (max))		\
+		return -EINVAL;						\
+	*((int *) kp->arg) = num;					\
+	return 0;							\
+}
+
+param_set_min_max(port, int, simple_strtol, 0, 65535)
+param_set_min_max(grace_period, unsigned long, simple_strtoul,
+		  nlm_grace_period_min, nlm_grace_period_max)
+param_set_min_max(timeout, unsigned long, simple_strtoul,
+		  nlm_timeout_min, nlm_timeout_max)
 
 MODULE_AUTHOR("Olaf Kirch <okir@monad.swb.de>");
 MODULE_DESCRIPTION("NFS file locking service version " LOCKD_VERSION ".");
 MODULE_LICENSE("GPL");
-MODULE_PARM(nlm_grace_period, "10-240l");
-MODULE_PARM(nlm_timeout, "3-20l");
-MODULE_PARM(nlm_udpport, "0-65535l");
-MODULE_PARM(nlm_tcpport, "0-65535l");
 
-int
-init_module(void)
+module_param_call(nlm_grace_period, param_set_grace_period, param_get_ulong,
+		  &nlm_grace_period, 644);
+module_param_call(nlm_timeout, param_set_timeout, param_get_ulong,
+		  &nlm_timeout, 644);
+module_param_call(nlm_udpport, param_set_port, param_get_int,
+		  &nlm_udpport, 644);
+module_param_call(nlm_tcpport, param_set_port, param_get_int,
+		  &nlm_tcpport, 644);
+
+/*
+ * Initialising and terminating the module.
+ */
+
+static int __init init_nlm(void)
 {
-	/* Init the static variables */
-	init_MUTEX(&nlmsvc_sema);
-	nlmsvc_users = 0;
-	nlmsvc_pid = 0;
-	return 0;
+	nlm_sysctl_table = register_sysctl_table(nlm_sysctl_root, 0);
+	return nlm_sysctl_table ? 0 : -ENOMEM;
 }
 
-void
-cleanup_module(void)
+static void __exit exit_nlm(void)
 {
 	/* FIXME: delete all NLM clients */
 	nlm_shutdown_hosts();
+	unregister_sysctl_table(nlm_sysctl_table);
 }
-#else
-/* not a module, so process bootargs
- * lockd.udpport and lockd.tcpport
- */
 
-static int __init udpport_set(char *str)
-{
-	nlm_udpport = simple_strtoul(str, NULL, 0);
-	return 1;
-}
-static int __init tcpport_set(char *str)
-{
-	nlm_tcpport = simple_strtoul(str, NULL, 0);
-	return 1;
-}
-__setup("lockd.udpport=", udpport_set);
-__setup("lockd.tcpport=", tcpport_set);
-
-#endif
+module_init(init_nlm);
+module_exit(exit_nlm);
 
 /*
  * Define NLM program and procedures

@@ -502,14 +502,22 @@ static struct scsi_cmnd *scsi_end_request(struct scsi_cmnd *cmd, int uptodate,
 	 * to queue the remainder of them.
 	 */
 	if (end_that_request_first(req, uptodate, sectors)) {
-		if (requeue) {
-			/*
-			 * Bleah.  Leftovers again.  Stick the leftovers in
-			 * the front of the queue, and goose the queue again.
-			 */
-			scsi_requeue_command(q, cmd);
+		int leftover = req->hard_nr_sectors - sectors;
+
+		/* kill remainder if no retrys */
+		if (!uptodate && blk_noretry_request(req))
+			end_that_request_first(req, 0, leftover);
+		else {
+			if (requeue)
+				/*
+				 * Bleah.  Leftovers again.  Stick the
+				 * leftovers in the front of the
+				 * queue, and goose the queue again.
+				 */
+				scsi_requeue_command(q, cmd);
+
+			return cmd;
 		}
-		return cmd;
 	}
 
 	add_disk_randomness(req->rq_disk);

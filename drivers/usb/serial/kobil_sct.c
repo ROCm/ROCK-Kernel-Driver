@@ -177,7 +177,7 @@ static int kobil_startup (struct usb_serial *serial)
 		printk(KERN_DEBUG "KOBIL KAAN SIM detected\n");
 		break;
 	}
-	usb_set_serial_port_data(serial->port, priv);
+	usb_set_serial_port_data(serial->port[0], priv);
 
 	// search for the necessary endpoints
 	pdev = serial->dev;
@@ -206,14 +206,14 @@ static int kobil_startup (struct usb_serial *serial)
 static void kobil_shutdown (struct usb_serial *serial)
 {
 	int i;
-	dbg("%s - port %d", __FUNCTION__, serial->port->number);
+	dbg("%s - port %d", __FUNCTION__, serial->port[0]->number);
 
 	for (i=0; i < serial->num_ports; ++i) {
-		while (serial->port[i].open_count > 0) {
-			kobil_close (&serial->port[i], NULL);
+		while (serial->port[i]->open_count > 0) {
+			kobil_close (serial->port[i], NULL);
 		}
-		kfree(usb_get_serial_port_data(&serial->port[i]));
-		usb_set_serial_port_data(&serial->port[i], NULL);
+		kfree(usb_get_serial_port_data(serial->port[i]));
+		usb_set_serial_port_data(serial->port[i], NULL);
 	}
 }
 
