@@ -5,7 +5,7 @@ EXTRAVERSION = -test2
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
-# More info can be located in ./Documentation/kbuild
+# More info can be located in ./README
 # Comments in this file are targeted only to the developer, do not
 # expect to learn how to build the kernel reading this file.
 
@@ -112,6 +112,39 @@ endif
 
 export KBUILD_MODULES KBUILD_BUILTIN KBUILD_VERBOSE KBUILD_CHECKSRC
 
+# To put more focus on warnings, less verbose as default
+# Use 'make V=1' to see the full commands
+
+ifdef V
+  ifeq ("$(origin V)", "command line")
+    KBUILD_VERBOSE = $(V)
+  endif
+endif
+ifndef KBUILD_VERBOSE
+  KBUILD_VERBOSE = 0 
+endif
+
+# Call sparse as part of compilation of C files
+# Use 'make C=1' to enable sparse checking
+
+ifdef C
+  ifeq ("$(origin C)", "command line")
+    KBUILD_CHECKSRC = $(C)
+  endif
+endif
+ifndef KBUILD_CHECKSRC
+  KBUILD_CHECKSRC = 0
+endif
+
+# Do not print 'Entering directory ...'
+
+MAKEFLAGS += --no-print-directory
+
+# For maximum performance (+ possibly random breakage, uncomment
+# the following)
+
+#MAKEFLAGS += -rR
+
 # Beautify output
 # ---------------------------------------------------------------------------
 #
@@ -126,37 +159,14 @@ export KBUILD_MODULES KBUILD_BUILTIN KBUILD_VERBOSE KBUILD_CHECKSRC
 # If it is set to "quiet_", only the short version will be printed. 
 # If it is set to "silent_", nothing wil be printed at all, since
 # the variable $(silent_cmd_cc_o_c) doesn't exist.
-
-# To put more focus on warnings, less verbose as default
-
-ifdef V
-  ifeq ("$(origin V)", "command line")
-    KBUILD_VERBOSE = $(V)
-  endif
-endif
-ifndef KBUILD_VERBOSE
-  KBUILD_VERBOSE = 0 
-endif
-
-ifdef C
-  ifeq ("$(origin C)", "command line")
-    KBUILD_CHECKSRC = $(C)
-  endif
-endif
-ifndef KBUILD_CHECKSRC
-  KBUILD_CHECKSRC = 0
-endif
-
-
-MAKEFLAGS += --no-print-directory
-
-# For maximum performance (+ possibly random breakage, uncomment
-# the following)
-
-#MAKEFLAGS += -rR
-
-#	If the user wants quiet mode, echo short versions of the commands 
-#	only
+#
+# A simple variant is to prefix commands with $(Q) - that's usefull
+# for commands that shall be hidden in non-verbose mode.
+#
+#	$(Q)ln $@ :<
+#
+# If KBUILD_VERBOSE equals 0 then the above command will be hidden.
+# If KBUILD_VERBOSE equals 1 then the above command is displayed.
 
 ifeq ($(KBUILD_VERBOSE),1)
   quiet =
@@ -166,8 +176,8 @@ else
   Q = @
 endif
 
-#	If the user is running make -s (silent mode), suppress echoing of
-#	commands
+# If the user is running make -s (silent mode), suppress echoing of
+# commands
 
 ifneq ($(findstring s,$(MAKEFLAGS)),)
   quiet=silent_
@@ -175,7 +185,7 @@ endif
 
 export quiet Q KBUILD_VERBOSE
 
-#	Paths to obj / src tree
+# Paths to obj / src tree
 
 src	:= .
 obj	:= .
@@ -184,7 +194,7 @@ objtree := .
 
 export srctree objtree
 
-# 	Make variables (CC, etc...)
+# Make variables (CC, etc...)
 
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld
@@ -213,9 +223,9 @@ AFLAGS_KERNEL	=
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
 CPPFLAGS	:= -D__KERNEL__ -Iinclude
-CFLAGS 		:= $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
+CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  	   -fno-strict-aliasing -fno-common
-AFLAGS		:= -D__ASSEMBLY__ $(CPPFLAGS)
+AFLAGS		:= -D__ASSEMBLY__
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
@@ -236,7 +246,7 @@ depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 noconfig_targets := xconfig gconfig menuconfig config oldconfig randconfig \
 		    defconfig allyesconfig allnoconfig allmodconfig \
 		    clean mrproper distclean rpm \
-		    help tags TAGS cscope sgmldocs psdocs pdfdocs htmldocs \
+		    help tags TAGS cscope %docs \
 		    checkconfig checkhelp checkincludes
 
 RCS_FIND_IGNORE := \( -name SCCS -o -name BitKeeper -o -name .svn -o -name CVS \) -prune -o
@@ -270,6 +280,10 @@ export include_config := 1
 endif
 
 include arch/$(ARCH)/Makefile
+
+# Let architecture Makefiles change CPPFLAGS if needed
+CFLAGS += $(CPPFLAGS) $(CFLAGS)
+AFLAGS += $(CPPFLAGS) $(AFLAGS)
 
 core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/
 
@@ -306,6 +320,10 @@ ifdef include_config
 
 ifndef CONFIG_FRAME_POINTER
 CFLAGS		+= -fomit-frame-pointer
+endif
+
+ifdef CONFIG_DEBUG_INFO
+CFLAGS		+= -g
 endif
 
 #
@@ -352,7 +370,7 @@ endef
 #	set -e makes the rule exit immediately on error
 
 define rule_vmlinux__
-	set -e;								\
+	+set -e;							\
 	$(if $(filter .tmp_kallsyms%,$^),,				\
 	  echo '  GEN     .version';					\
 	  . $(srctree)/scripts/mkversion > .tmp_version;		\
@@ -825,12 +843,12 @@ help:
 	@echo  '  make C=1   [targets] Check all c source with checker tool'
 	@echo  ''
 	@echo  'Execute "make" or "make all" to build all targets marked with [*] '
-	@echo  'For further info browse Documentation/kbuild/*'
+	@echo  'For further info see the ./README file'
 
 
 # Documentation targets
 # ---------------------------------------------------------------------------
-sgmldocs psdocs pdfdocs htmldocs: scripts/docproc FORCE
+%docs: scripts/docproc FORCE
 	$(Q)$(MAKE) $(build)=Documentation/DocBook $@
 
 # Scripts to check various things for consistency

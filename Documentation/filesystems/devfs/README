@@ -710,9 +710,8 @@ The Kernel
 Finally, you need to make sure devfs is compiled into your kernel. Set
 CONFIG_EXPERIMENTAL=y, CONFIG_DEVFS_FS=y and CONFIG_DEVFS_MOUNT=y by
 using favourite configuration tool (i.e. make config or
-make xconfig) and then make dep; make clean and then
-recompile your kernel and modules. At boot, devfs will be mounted onto
-/dev.
+make xconfig) and then make clean and then recompile your kernel and 
+modules. At boot, devfs will be mounted onto /dev.
 
 If you encounter problems booting (for example if you forgot a
 configuration step), you can pass devfs=nomount at the kernel
