@@ -16,6 +16,7 @@
 #include "linux/binfmts.h"
 #include "asm/signal.h"
 #include "asm/uaccess.h"
+#include "asm/unistd.h"
 #include "user_util.h"
 #include "kern_util.h"
 #include "signal_kern.h"

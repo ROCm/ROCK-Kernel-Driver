@@ -13,6 +13,7 @@
 #include "sysdep/syscalls.h"
 #include "kern_util.h"
 
+extern syscall_handler_t sys_restart_syscall;
 extern syscall_handler_t sys_ni_syscall;
 extern syscall_handler_t sys_exit;
 extern syscall_handler_t sys_fork;
