@@ -80,6 +80,8 @@ subdir-$(CONFIG_USB_RIO500)	+= misc
 subdir-$(CONFIG_USB_TIGL)	+= misc
 subdir-$(CONFIG_USB_USS720)	+= misc
 subdir-$(CONFIG_USB_WACOM)	+= misc
-
+ifeq ($(CONFIG_USB_MISC),y)
+	obj-y += misc/usb-misc.o
+endif
 
 include $(TOPDIR)/Rules.make
