@@ -33,6 +33,11 @@ to the developers under a NDA (which allows the develoment of a GPL
 driver however), but things are not moving very fast (see
 http://r-engine.sourceforge.net/) (PCI vendor/device is 0x10cf/0x2011).
 
+There is a forth model connected on the USB bus in TR1* Vaio laptops.
+This camera is not supported at all by the current driver, in fact
+little information if any is available for this camera
+(USB vendor/device is 0x054c/0x0107).
+
 Driver options:
 ---------------
 
