@@ -813,7 +813,7 @@ static int __init esp_register_irq(struct esp *esp)
 	 * sanely maintain.
 	 */
 	if (request_irq(esp->ehost->irq, esp_intr,
-			SA_SHIRQ, "ESP SCSI", esp->ehost)) {
+			SA_SHIRQ, "ESP SCSI", esp)) {
 		printk("esp%d: Cannot acquire irq line\n",
 		       esp->esp_id);
 		return -1;
