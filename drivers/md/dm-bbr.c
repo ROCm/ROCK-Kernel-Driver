@@ -32,6 +32,7 @@
 #include <linux/slab.h>
 #include <linux/mempool.h>
 #include <linux/workqueue.h>
+#include <linux/vmalloc.h>
 
 #include "dm.h"
 #include "dm-bio-list.h"
