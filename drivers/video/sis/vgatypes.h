@@ -35,7 +35,7 @@
  * * 3) The name of the author may not be used to endorse or promote products
  * *    derived from this software without specific prior written permission.
  * *
- * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESSED OR
+ * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
  * * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
@@ -53,13 +53,9 @@
 #ifndef _VGATYPES_
 #define _VGATYPES_
 
-#ifdef LINUX_XF86
-#include "xf86Version.h"
-#include "xf86Pci.h"
-#endif
-
 #ifdef LINUX_KERNEL  /* We don't want the X driver to depend on kernel source */
 #include <linux/ioctl.h>
+#include <linux/version.h>
 #endif
 
 #ifndef FALSE
@@ -99,15 +95,18 @@ typedef unsigned long ULONG;
 #endif
 
 #ifndef BOOLEAN
-typedef UCHAR BOOLEAN;
+typedef unsigned char BOOLEAN;
 #endif
 
-#ifndef bool
-typedef UCHAR bool;
-#endif
+#define SISIOMEMTYPE
 
 #ifdef LINUX_KERNEL
 typedef unsigned long SISIOADDRESS;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,8)
+#include <linux/types.h>  /* Need __iomem */
+#undef SISIOMEMTYPE
+#define SISIOMEMTYPE __iomem
+#endif
 #endif
 
 #ifdef LINUX_XF86
@@ -143,40 +142,8 @@ enum _SIS_CHIP_TYPE {
     MAX_SIS_CHIP
 };
 
-#ifdef LINUX_KERNEL
-enum _SIS_LCD_TYPE {
-    LCD_INVALID = 0,
-    LCD_800x600,
-    LCD_1024x768,
-    LCD_1280x1024,
-    LCD_1280x960,
-    LCD_640x480,
-    LCD_1600x1200,
-    LCD_1920x1440,
-    LCD_2048x1536,
-    LCD_320x480,       /* FSTN */
-    LCD_1400x1050,
-    LCD_1152x864,
-    LCD_1152x768,
-    LCD_1280x768,
-    LCD_1024x600,
-    LCD_640x480_2,     /* DSTN */
-    LCD_640x480_3,     /* DSTN */
-    LCD_848x480,
-    LCD_1280x800,
-    LCD_1680x1050,
-    LCD_1280x720,
-    LCD_CUSTOM,
-    LCD_UNKNOWN
-};
-typedef unsigned int SIS_LCD_TYPE;
-#endif
-
 #ifndef SIS_HW_INFO
-
 typedef struct _SIS_HW_INFO  SIS_HW_INFO, *PSIS_HW_INFO;
-
-typedef BOOLEAN (*PSIS_QUERYSPACE)   (PSIS_HW_INFO, ULONG, ULONG, ULONG *);
 
 struct _SIS_HW_INFO
 {
@@ -184,14 +151,17 @@ struct _SIS_HW_INFO
     PCITAG PciTag;		 /* PCI Tag */
 #endif
 
-    UCHAR  *pjVirtualRomBase;    /* ROM image */
+    UCHAR *pjVirtualRomBase;	 /* ROM image */
 
     BOOLEAN UseROM;		 /* Use the ROM image if provided */
 
-    UCHAR  *pjVideoMemoryAddress;/* base virtual memory address */
+#ifdef LINUX_KERNEL
+    UCHAR SISIOMEMTYPE *pjVideoMemoryAddress;
+    				 /* base virtual memory address */
                                  /* of Linear VGA memory */
 
     ULONG  ulVideoMemorySize;    /* size, in bytes, of the memory on the board */
+#endif
 
     SISIOADDRESS ulIOAddress;    /* base I/O address of VGA ports (0x3B0; relocated) */
 
@@ -201,11 +171,6 @@ struct _SIS_HW_INFO
     UCHAR  jChipRevision;        /* Used to Identify SiS Graphics Chip Revision */
 
     BOOLEAN bIntegratedMMEnabled;/* supporting integration MM enable */
-
-#ifdef LINUX_KERNEL
-    ULONG  ulCRT2LCDType;        /* defined in the data structure type */
-                                 /* "SIS_LCD_TYPE" */
-#endif
 };
 #endif
 
