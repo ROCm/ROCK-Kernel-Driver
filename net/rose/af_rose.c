@@ -1026,7 +1026,7 @@ int rose_rx_call_request(struct sk_buff *skb, struct net_device *dev, struct ros
 }
 
 static int rose_sendmsg(struct kiocb *iocb, struct socket *sock,
-			struct msghdr *msg, int len, struct scm_cookie *scm)
+			struct msghdr *msg, int len)
 {
 	struct sock *sk = sock->sk;
 	rose_cb *rose = rose_sk(sk);
@@ -1190,8 +1190,7 @@ static int rose_sendmsg(struct kiocb *iocb, struct socket *sock,
 
 
 static int rose_recvmsg(struct kiocb *iocb, struct socket *sock,
-			struct msghdr *msg, int size, int flags,
-			struct scm_cookie *scm)
+			struct msghdr *msg, int size, int flags)
 {
 	struct sock *sk = sock->sk;
 	rose_cb *rose = rose_sk(sk);

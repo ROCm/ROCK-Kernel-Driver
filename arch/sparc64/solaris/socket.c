@@ -267,13 +267,8 @@ struct sol_cmsghdr {
 	unsigned char	cmsg_data[0];
 };
 
-struct iovec32 {
-	u32		iov_base;
-	u32 iov_len;
-};
-
 static inline int iov_from_user32_to_kern(struct iovec *kiov,
-					  struct iovec32 *uiov32,
+					  struct compat_iovec *uiov32,
 					  int niov)
 {
 	int tot_len = 0;
@@ -322,7 +317,7 @@ static inline int msghdr_from_user32_to_kern(struct msghdr *kmsg,
 }
 
 /* I've named the args so it is easy to tell whose space the pointers are in. */
-static int verify_iovec32(struct msghdr *kern_msg, struct iovec *kern_iov,
+static int verify_compat_iovec(struct msghdr *kern_msg, struct iovec *kern_iov,
 			  char *kern_address, int mode)
 {
 	int tot_len;
@@ -347,7 +342,7 @@ static int verify_iovec32(struct msghdr *kern_msg, struct iovec *kern_iov,
 	}
 
 	tot_len = iov_from_user32_to_kern(kern_iov,
-					  (struct iovec32 *)kern_msg->msg_iov,
+					  (struct compat_iovec *)kern_msg->msg_iov,
 					  kern_msg->msg_iovlen);
 	if(tot_len >= 0)
 		kern_msg->msg_iov = kern_iov;
@@ -371,7 +366,7 @@ asmlinkage int solaris_sendmsg(int fd, struct sol_nmsghdr *user_msg, unsigned us
 		return -EFAULT;
 	if(kern_msg.msg_iovlen > UIO_MAXIOV)
 		return -EINVAL;
-	err = verify_iovec32(&kern_msg, iov, address, VERIFY_READ);
+	err = verify_compat_iovec(&kern_msg, iov, address, VERIFY_READ);
 	if (err < 0)
 		goto out;
 	total_len = err;
@@ -439,7 +434,7 @@ asmlinkage int solaris_recvmsg(int fd, struct sol_nmsghdr *user_msg, unsigned in
 
 	uaddr = kern_msg.msg_name;
 	uaddr_len = &user_msg->msg_namelen;
-	err = verify_iovec32(&kern_msg, iov, addr, VERIFY_WRITE);
+	err = verify_compat_iovec(&kern_msg, iov, addr, VERIFY_WRITE);
 	if (err < 0)
 		goto out;
 	total_len = err;

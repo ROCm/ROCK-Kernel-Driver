@@ -179,7 +179,7 @@ sunos_sys_table:
 	.word sunos_nosys, sys_bind, sunos_setsockopt
 	.word sys_listen, sunos_nosys, sunos_sigaction
 	.word sunos_sigblock, sunos_sigsetmask, sys_sigpause
-	.word sys32_sigstack, sys32_recvmsg, sys32_sendmsg
+	.word sys32_sigstack, compat_sys_recvmsg, compat_sys_sendmsg
 	.word sunos_nosys, sys32_gettimeofday, sys32_getrusage
 	.word sunos_getsockopt, sunos_nosys, sunos_readv
 	.word sunos_writev, sys32_settimeofday, sys32_fchown16

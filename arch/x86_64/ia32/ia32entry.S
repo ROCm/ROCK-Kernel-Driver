@@ -302,7 +302,7 @@ ia32_sys_call_table:
 	.quad compat_sys_statfs
 	.quad compat_sys_fstatfs		/* 100 */
 	.quad sys_ioperm
-	.quad sys32_socketcall
+	.quad compat_sys_socketcall
 	.quad sys_syslog
 	.quad compat_sys_setitimer
 	.quad compat_sys_getitimer	/* 105 */

@@ -738,7 +738,7 @@ asmlinkage ssize_t sys_readv(unsigned long,const struct iovec *,unsigned long);
 asmlinkage ssize_t sys_writev(unsigned long,const struct iovec *,unsigned long);
 
 static struct iovec *
-get_iovec32(struct iovec32 *iov32, struct iovec *iov_buf, u32 count, int type, int *errp)
+get_compat_iovec(struct compat_iovec *iov32, struct iovec *iov_buf, u32 count, int type, int *errp)
 {
 	int i;
 	u32 buf, len;
@@ -751,7 +751,7 @@ get_iovec32(struct iovec32 *iov32, struct iovec *iov_buf, u32 count, int type, i
 		return 0;
 	if (count > UIO_MAXIOV)
 		return(struct iovec *)0;
-	if(verify_area(VERIFY_READ, iov32, sizeof(struct iovec32)*count))
+	if(verify_area(VERIFY_READ, iov32, sizeof(struct compat_iovec)*count))
 		return(struct iovec *)0;
 	if (count > UIO_FASTIOV) {
 		*errp = -ENOMEM; 
@@ -792,14 +792,14 @@ error:
 }
 
 asmlinkage long
-sys32_readv(int fd, struct iovec32 *vector, u32 count)
+sys32_readv(int fd, struct compat_iovec *vector, u32 count)
 {
 	struct iovec iovstack[UIO_FASTIOV];
 	struct iovec *iov;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 
-	if ((iov = get_iovec32(vector, iovstack, count, VERIFY_WRITE, &ret)) == NULL)
+	if ((iov = get_compat_iovec(vector, iovstack, count, VERIFY_WRITE, &ret)) == NULL)
 		return ret;
 	set_fs(KERNEL_DS);
 	ret = sys_readv(fd, iov, count);
@@ -810,14 +810,14 @@ sys32_readv(int fd, struct iovec32 *vector, u32 count)
 }
 
 asmlinkage long
-sys32_writev(int fd, struct iovec32 *vector, u32 count)
+sys32_writev(int fd, struct compat_iovec *vector, u32 count)
 {
 	struct iovec iovstack[UIO_FASTIOV];
 	struct iovec *iov;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 
-	if ((iov = get_iovec32(vector, iovstack, count, VERIFY_READ, &ret)) == NULL)
+	if ((iov = get_compat_iovec(vector, iovstack, count, VERIFY_READ, &ret)) == NULL)
 		return ret;
 	set_fs(KERNEL_DS);
 	ret = sys_writev(fd, iov, count);

@@ -54,7 +54,6 @@
 
 #include <asm/atomic.h>
 #include <net/dst.h>
-#include <net/scm.h>
 
 /*
  * This structure really needs to be cleaned up.
@@ -310,9 +309,9 @@ struct sock_iocb {
 	int			size;
 	struct socket		*sock;
 	struct sock		*sk;
+	struct scm_cookie	*scm;
 	struct msghdr		*msg, async_msg;
 	struct iovec		async_iov;
-	struct scm_cookie	*scm, async_scm;
 };
 
 static inline struct sock_iocb *kiocb_to_siocb(struct kiocb *iocb)
@@ -438,11 +437,9 @@ extern int			sock_no_getsockopt(struct socket *, int , int,
 extern int			sock_no_setsockopt(struct socket *, int, int,
 						   char *, int);
 extern int                      sock_no_sendmsg(struct kiocb *, struct socket *,
-						struct msghdr *, int,
-						struct scm_cookie *);
+						struct msghdr *, int);
 extern int                      sock_no_recvmsg(struct kiocb *, struct socket *,
-						struct msghdr *, int, int,
-						struct scm_cookie *);
+						struct msghdr *, int, int);
 extern int			sock_no_mmap(struct file *file,
 					     struct socket *sock,
 					     struct vm_area_struct *vma);

@@ -452,11 +452,11 @@ compat_sys_fstatfs_wrapper:
 	llgtr	%r3,%r3			# struct compat_statfs *
 	jg	compat_sys_fstatfs	# branch to system call
 
-	.globl  sys32_socketcall_wrapper 
-sys32_socketcall_wrapper:
+	.globl  compat_sys_socketcall_wrapper 
+compat_sys_socketcall_wrapper:
 	lgfr	%r2,%r2			# int
 	llgtr	%r3,%r3			# u32 *
-	jg	sys32_socketcall	# branch to system call
+	jg	compat_sys_socketcall	# branch to system call
 
 	.globl  sys32_syslog_wrapper 
 sys32_syslog_wrapper:

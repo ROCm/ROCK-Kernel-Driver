@@ -54,6 +54,7 @@
 #include <linux/personality.h>
 
 /* For SOCKET_I */
+#include <linux/socket.h>
 #include <net/sock.h>
 
 /* Use this to get at 32-bit user passed pointers. */
@@ -1324,8 +1325,6 @@ asmlinkage int sunos_sigaction (int sig, u32 act, u32 oact)
 
 extern asmlinkage int sys_setsockopt(int fd, int level, int optname,
 				     char *optval, int optlen);
-extern asmlinkage int sys32_getsockopt(int fd, int level, int optname,
-				     u32 optval, u32 optlen);
 
 asmlinkage int sunos_setsockopt(int fd, int level, int optname, u32 optval,
 				int optlen)
@@ -1353,6 +1352,6 @@ asmlinkage int sunos_getsockopt(int fd, int level, int optname,
 		if (tr_opt >=2 && tr_opt <= 6)
 			tr_opt += 30;
 	}
-	ret = sys32_getsockopt(fd, level, tr_opt, optval, optlen);
+	ret = compat_sys_getsockopt(fd, level, tr_opt, (void*)(unsigned long)optval, (void*)(unsigned long)optlen);
 	return ret;
 }

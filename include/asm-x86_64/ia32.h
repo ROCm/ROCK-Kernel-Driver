@@ -153,11 +153,6 @@ struct ustat32 {
 	char			f_fpack[6];
 };
 
-struct iovec32 { 
-	unsigned int iov_base; 
-	int iov_len; 
-};
-
 #define IA32_PAGE_OFFSET 0xffffe000
 #define IA32_STACK_TOP IA32_PAGE_OFFSET
 

@@ -97,26 +97,12 @@ static void __bnep_unlink_session(struct bnep_session *s)
 
 static int bnep_send(struct bnep_session *s, void *data, size_t len)
 {
-	struct kiocb iocb;
-	struct sock_iocb *si;
 	struct socket *sock = s->sock;
 	struct iovec iv = { data, len };
-	int err;
 
 	s->msg.msg_iov    = &iv;
 	s->msg.msg_iovlen = 1;
-	init_sync_kiocb(&iocb, NULL);
-	si = kiocb_to_siocb(&iocb);
-	si->scm = NULL;
-	si->sock = sock;
-	si->msg = &s->msg;
-	si->size = len;
-
-	err = sock->ops->sendmsg(&iocb, sock, &s->msg, len, NULL);
-	if (-EIOCBQUEUED == err)
-		err = wait_on_sync_kiocb(&iocb);
-
-	return err;
+	return sock_sendmsg(sock, &s->msg, len);
 }
 
 static int bnep_send_rsp(struct bnep_session *s, u8 ctrl, u16 resp)
@@ -444,20 +430,9 @@ send:
 	
 	/* FIXME: linearize skb */
 	{
-		struct kiocb iocb;
-		struct sock_iocb *si;
-	
 		s->msg.msg_iov    = iv;
 		s->msg.msg_iovlen = il;
-		init_sync_kiocb(&iocb, NULL);
-		si = kiocb_to_siocb(&iocb);
-		si->scm = NULL;
-		si->sock = sock;
-		si->msg = &s->msg;
-		si->size = len;
-		len = sock->ops->sendmsg(&iocb, sock, &s->msg, len, NULL);
-		if (-EIOCBQUEUED == len)
-			len = wait_on_sync_kiocb(&iocb);
+		len = sock_sendmsg(sock, &s->msg, len);
 	}
 	kfree_skb(skb);
 

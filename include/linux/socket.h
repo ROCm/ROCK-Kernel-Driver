@@ -3,6 +3,7 @@
 
 #if defined(__KERNEL__) || !defined(__GLIBC__) || (__GLIBC__ < 2)
 
+#include <linux/linkage.h>
 #include <asm/socket.h>			/* arch-dependent defines	*/
 #include <linux/sockios.h>		/* the SIOCxxx I/O controls	*/
 #include <linux/uio.h>			/* iovec support		*/
@@ -234,6 +235,24 @@ struct ucred {
 
 #define MSG_EOF         MSG_FIN
 
+#if defined(CONFIG_COMPAT)
+#define MSG_CMSG_COMPAT	0x80000000	/* This message needs 32 bit fixups */
+#else
+#define MSG_CMSG_COMPAT	0		/* We never have 32 bit fixups */
+#define compat_msghdr	msghdr		/* Needed to avoid compiler hoops */
+#endif
+
+struct compat_msghdr;
+extern int msghdr_from_user_compat_to_kern(struct msghdr *, struct compat_msghdr *);
+extern int verify_compat_iovec(struct msghdr *, struct iovec *, char *, int);
+extern asmlinkage long compat_sys_sendmsg(int,struct compat_msghdr *,unsigned);
+extern asmlinkage long compat_sys_recvmsg(int,struct compat_msghdr *,unsigned);
+extern asmlinkage long sys_sendmsg(int fd, struct msghdr *msg, unsigned flags);
+extern asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned flags);
+extern asmlinkage long compat_sys_getsockopt(int fd, int level, int optname,
+				char *optval, int *optlen);
+
+
 
 /* Setsockoptions(2) level. Thanks to BSD these must match IPPROTO_xxx */
 #define SOL_IP		0
@@ -276,6 +295,11 @@ extern void memcpy_tokerneliovec(struct iovec *iov, unsigned char *kdata, int le
 extern int move_addr_to_user(void *kaddr, int klen, void *uaddr, int *ulen);
 extern int move_addr_to_kernel(void *uaddr, int ulen, void *kaddr);
 extern int put_cmsg(struct msghdr*, int level, int type, int len, void *data);
+extern int put_cmsg_compat(struct msghdr*, int level, int type, int len, void *data);
+extern void cmsg_compat_recvmsg_fixup(struct msghdr *kmsg, unsigned long orig_cmsg_uptr);
+extern int cmsghdr_from_user_compat_to_kern(struct msghdr *kmsg,
+			       unsigned char *stackbuf, int stackbuf_size);
+
 #endif
 #endif /* not kernel and not glibc */
 #endif /* _LINUX_SOCKET_H */

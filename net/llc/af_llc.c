@@ -672,14 +672,12 @@ out:
  *	@msg: Various user space related information.
  *	@size: Size of user buffer.
  *	@flags: User specified flags.
- *	@scm: Unknown.
  *
  *	Copy received data to the socket user.
  *	Returns non-negative upon success, negative otherwise.
  */
 static int llc_ui_recvmsg(struct kiocb *iocb, struct socket *sock,
-			  struct msghdr *msg, int size, int flags,
-			  struct scm_cookie *scm)
+			  struct msghdr *msg, int size, int flags)
 {
 	struct sock *sk = sock->sk;
 	struct sockaddr_llc *uaddr = (struct sockaddr_llc *)msg->msg_name;
@@ -727,13 +725,12 @@ out:
  *	@sock: Socket to transmit data from.
  *	@msg: Various user related information.
  *	@len: Length of data to transmit.
- *	@scm: Unknown.
  *
  *	Transmit data provided by the socket user.
  *	Returns non-negative upon success, negative otherwise.
  */
 static int llc_ui_sendmsg(struct kiocb *iocb, struct socket *sock,
-			  struct msghdr *msg, int len, struct scm_cookie *scm)
+			  struct msghdr *msg, int len)
 {
 	struct sock *sk = sock->sk;
 	struct llc_opt *llc = llc_sk(sk);

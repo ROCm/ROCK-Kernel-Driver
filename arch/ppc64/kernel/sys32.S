@@ -25,7 +25,7 @@ _GLOBAL(ppc32_lseek)
 	extsw		r4,r4		/* sign extend off_t offset parm */
 	b		.sys_lseek
 
-_GLOBAL(sys32_socketcall)	/* r3=call, r4=args */
+_GLOBAL(compat_sys_socketcall)	/* r3=call, r4=args */
 	cmpwi		r3, 1
 	blt-		.do_einval
 	cmpwi		r3, 17
@@ -221,14 +221,14 @@ _STATIC(do_sys_shutdown) /* sys_shutdown(int, int) */
 	.llong		2b,.do_efault
 	.previous
 
-_STATIC(do_sys_setsockopt) /* sys32_setsockopt(int, int, int, char *, int) */
+_STATIC(do_sys_setsockopt) /* compat_sys_setsockopt(int, int, int, char *, int) */
 	mr		r10,r4
 1:	lwa		r3,0(r10)
 2:	lwa		r4,4(r10)
 3:	lwa		r5,8(r10)
 4:	lwz		r6,12(r10)
 5:	lwa		r7,16(r10)
-	b		.sys32_setsockopt
+	b		.compat_sys_setsockopt
 	.section	__ex_table,"a"
 	.align		3
 	.llong		1b,.do_efault
@@ -238,14 +238,14 @@ _STATIC(do_sys_setsockopt) /* sys32_setsockopt(int, int, int, char *, int) */
 	.llong		5b,.do_efault
 	.previous
 
-_STATIC(do_sys_getsockopt) /* sys32_getsockopt(int, int, int, u32, u32) */
+_STATIC(do_sys_getsockopt) /* compat_sys_getsockopt(int, int, int, u32, u32) */
 	mr		r10,r4
 1:	lwa		r3,0(r10)
 2:	lwa		r4,4(r10)
 3:	lwa		r5,8(r10)
 4:	lwz		r6,12(r10)
 5:	lwz		r7,16(r10)
-	b		.sys32_getsockopt
+	b		.compat_sys_getsockopt
 	.section	__ex_table,"a"
 	.align		3
 	.llong		1b,.do_efault
@@ -255,12 +255,12 @@ _STATIC(do_sys_getsockopt) /* sys32_getsockopt(int, int, int, u32, u32) */
 	.llong		5b,.do_efault
 	.previous
 
-_STATIC(do_sys_sendmsg) /* sys32_sendmsg(int, struct msghdr32 *, unsigned int) */
+_STATIC(do_sys_sendmsg) /* compat_sys_sendmsg(int, struct compat_msghdr *, unsigned int) */
 	mr		r10,r4
 1:	lwa		r3,0(r10)
 2:	lwz		r4,4(r10)
 3:	lwa		r5,8(r10)
-	b		.sys32_sendmsg
+	b		.compat_sys_sendmsg
 	.section	__ex_table,"a"
 	.align		3
 	.llong		1b,.do_efault
@@ -268,12 +268,12 @@ _STATIC(do_sys_sendmsg) /* sys32_sendmsg(int, struct msghdr32 *, unsigned int) *
 	.llong		3b,.do_efault
 	.previous
 
-_STATIC(do_sys_recvmsg) /* sys32_recvmsg(int, struct msghdr32 *, unsigned int) */
+_STATIC(do_sys_recvmsg) /* compat_sys_recvmsg(int, struct compat_msghdr *, unsigned int) */
 	mr		r10,r4
 1:	lwa		r3,0(r10)
 2:	lwz		r4,4(r10)
 3:	lwa		r5,8(r10)
-	b		.sys32_recvmsg
+	b		.compat_sys_recvmsg
 	.section	__ex_table,"a"
 	.align		3
 	.llong		1b,.do_efault
