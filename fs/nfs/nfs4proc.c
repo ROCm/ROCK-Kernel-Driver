@@ -556,9 +556,9 @@ process_cinfo(struct nfs4_change_info *info, struct nfs_fattr *fattr)
 int
 nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
 		struct iattr *sattr, struct nfs_fattr *fattr,
-		struct nfs_fh *fhandle, struct nfs4_shareowner **spp)
+		struct nfs_fh *fhandle, struct nfs4_state_owner **spp)
 {
-	struct nfs4_shareowner  *sp;
+	struct nfs4_state_owner  *sp;
 	struct nfs_server       *server = NFS_SERVER(dir);
 	struct nfs4_change_info d_cinfo;
 	int                     status;
@@ -600,8 +600,8 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags,
 	};
 
 	status = -ENOMEM;
-	if (!(sp = nfs4_get_shareowner(dir))) {
-		dprintk("nfs4_do_open: nfs4_get_shareowner failed!\n");
+	if (!(sp = nfs4_get_state_owner(dir))) {
+		dprintk("nfs4_do_open: nfs4_get_state_owner failed!\n");
 		goto out;
 	}
 	if (o_arg.createmode & NFS4_CREATE_EXCLUSIVE){
@@ -664,7 +664,7 @@ out:
 int
 nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
                 struct nfs_fh *fhandle, struct iattr *sattr,
-                struct nfs4_shareowner *sp)
+                struct nfs4_state_owner *sp)
 {
         struct nfs4_getattr     getattr = {
                 .gt_bmval       = nfs4_fattr_bitmap,
@@ -706,7 +706,7 @@ nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
  * stateid's in the inode.
  */
 int
-nfs4_do_close(struct inode *inode, struct nfs4_shareowner *sp) 
+nfs4_do_close(struct inode *inode, struct nfs4_state_owner *sp) 
 {
 	int status = 0;
 	struct nfs_closeargs arg = {
@@ -728,7 +728,7 @@ nfs4_do_close(struct inode *inode, struct nfs4_shareowner *sp)
 	status = rpc_call_sync(NFS_SERVER(inode)->client, &msg, 0);
 
         /* hmm. we are done with the inode, and in the process of freeing
-	 * the shareowner. we keep this around to process errors
+	 * the state_owner. we keep this around to process errors
 	 */
 	nfs4_increment_seqid(status, sp);
 	up(&sp->so_sema);
@@ -855,7 +855,7 @@ nfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 {
 	struct inode *		inode = dentry->d_inode;
 	int			size_change = sattr->ia_valid & ATTR_SIZE;
-	struct nfs4_shareowner	*sp = NULL;
+	struct nfs4_state_owner	*sp = NULL;
 	int			status;
 
 	fattr->valid = 0;
@@ -1000,7 +1000,7 @@ nfs4_proc_read(struct inode *inode, struct rpc_cred *cred,
 	       struct page *page, int *eofp)
 {
 	struct nfs_server *server = NFS_SERVER(inode);
-	struct nfs4_shareowner	*sp;
+	struct nfs4_state_owner	*sp;
 	uint64_t offset = page_offset(page) + base;
 	struct nfs_readargs arg = {
 		.fh		= NFS_FH(inode),
@@ -1054,7 +1054,7 @@ nfs4_proc_write(struct inode *inode, struct rpc_cred *cred,
 		struct page *page, struct nfs_writeverf *verf)
 {
 	struct nfs_server *server = NFS_SERVER(inode);
-	struct nfs4_shareowner	*sp;
+	struct nfs4_state_owner	*sp;
 	uint64_t offset = page_offset(page) + base;
 	struct nfs_writeargs arg = {
 		.fh		= NFS_FH(inode),
@@ -1115,7 +1115,7 @@ nfs4_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
                  int flags, struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
 	int                     oflags;
-	struct nfs4_shareowner   *sp = NULL;
+	struct nfs4_state_owner   *sp = NULL;
 	int                     status;
 
 	oflags = O_RDONLY | O_CREAT | (flags & O_EXCL);
@@ -1444,7 +1444,7 @@ nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	};
 	struct inode *inode = data->inode;
 	struct nfs_page *req = nfs_list_entry(data->pages.next);
-	struct nfs4_shareowner	*sp;
+	struct nfs4_state_owner	*sp;
 	int flags;
 
 	data->args.fh     = NFS_FH(inode);
@@ -1522,7 +1522,7 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	};
 	struct inode *inode = data->inode;
 	struct nfs_page *req = nfs_list_entry(data->pages.next);
-	struct nfs4_shareowner	*sp;
+	struct nfs4_state_owner	*sp;
 	int stable;
 	int flags;
 	
@@ -1699,14 +1699,14 @@ nfs4_proc_file_open(struct inode *inode, struct file *filp)
 * This ugliness will go away with lookup-intent...
 */
 	while (!nfs4_get_inode_share(inode, flags)) {
-		struct nfs4_shareowner *sp = NULL;
+		struct nfs4_state_owner *sp = NULL;
 		status = nfs4_do_open(dir, &dentry->d_name, flags, NULL, NULL, NULL, &sp);
 		if (status) {
-			nfs4_put_shareowner(inode,sp);
+			nfs4_put_state_owner(inode,sp);
 			break;
 		}
 		if (nfs4_set_inode_share(inode, sp, flags))
-			nfs4_put_shareowner(inode,sp);
+			nfs4_put_state_owner(inode,sp);
 	}
 out:
 	unlock_kernel();

@@ -157,9 +157,9 @@ struct nfs_inode {
 
 #ifdef CONFIG_NFS_V4
         /* NFSv4 state */
-	struct nfs4_shareowner   *ro_owner;
-	struct nfs4_shareowner   *wo_owner;
-	struct nfs4_shareowner   *rw_owner;
+	struct nfs4_state_owner   *ro_owner;
+	struct nfs4_state_owner   *wo_owner;
+	struct nfs4_state_owner   *rw_owner;
 #endif /* CONFIG_NFS_V4*/
 
 	struct inode		vfs_inode;
@@ -477,12 +477,12 @@ struct nfs4_client {
 };
 
 /*
-* The ->so_sema is held during all shareowner seqid-mutating operations:
+* The ->so_sema is held during all state_owner seqid-mutating operations:
 * OPEN, OPEN_DOWNGRADE, and CLOSE.
 * Its purpose is to properly serialize so_seqid, as mandated by
 * the protocol.
 */
-struct nfs4_shareowner {
+struct nfs4_state_owner {
 	u32                  so_id;      /* 32-bit identifier, unique */
 	struct semaphore     so_sema;
 	u32                  so_seqid;   /* protected by so_sema */
@@ -493,7 +493,7 @@ struct nfs4_shareowner {
 
 /* nfs4proc.c */
 extern int nfs4_proc_renew(struct nfs_server *server);
-extern int nfs4_do_close(struct inode *inode, struct nfs4_shareowner *sp);
+extern int nfs4_do_close(struct inode *inode, struct nfs4_state_owner *sp);
 
 /* nfs4renewd.c */
 extern int nfs4_init_renewd(struct nfs_server *server);
@@ -501,13 +501,13 @@ extern int nfs4_init_renewd(struct nfs_server *server);
 /* nfs4state.c */
 extern struct nfs4_client *nfs4_get_client(void);
 extern void nfs4_put_client(struct nfs4_client *clp);
-extern struct nfs4_shareowner * nfs4_get_shareowner(struct inode *inode);
-void nfs4_put_shareowner(struct inode *inode, struct nfs4_shareowner *sp);
+extern struct nfs4_state_owner * nfs4_get_state_owner(struct inode *inode);
+void nfs4_put_state_owner(struct inode *inode, struct nfs4_state_owner *sp);
 extern int nfs4_set_inode_share(struct inode * inode,
-                     struct nfs4_shareowner *sp, unsigned int flags);
-extern void nfs4_increment_seqid(u32 status, struct nfs4_shareowner *sp);
-extern int nfs4_test_shareowner(struct inode *inode, unsigned int open_flags);
-struct nfs4_shareowner * nfs4_get_inode_share(struct inode * inode, unsigned int open_flags);
+                     struct nfs4_state_owner *sp, unsigned int flags);
+extern void nfs4_increment_seqid(u32 status, struct nfs4_state_owner *sp);
+extern int nfs4_test_state_owner(struct inode *inode, unsigned int open_flags);
+struct nfs4_state_owner * nfs4_get_inode_share(struct inode * inode, unsigned int open_flags);
 
 
 
@@ -537,7 +537,7 @@ destroy_nfsv4_state(struct nfs_server *server)
 #else
 #define create_nfsv4_state(server, data)  0
 #define destroy_nfsv4_state(server)       do { } while (0)
-#define nfs4_put_shareowner(inode, owner) do { } while (0)
+#define nfs4_put_state_owner(inode, owner) do { } while (0)
 #endif
 
 #endif /* __KERNEL__ */

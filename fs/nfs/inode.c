@@ -152,9 +152,9 @@ nfs_clear_inode(struct inode *inode)
 	if (cred)
 		put_rpccred(cred);
 	/* Clean up the V4 state */
-	nfs4_put_shareowner(inode, nfsi->wo_owner);
-	nfs4_put_shareowner(inode, nfsi->ro_owner);
-	nfs4_put_shareowner(inode, nfsi->rw_owner);
+	nfs4_put_state_owner(inode, nfsi->wo_owner);
+	nfs4_put_state_owner(inode, nfsi->ro_owner);
+	nfs4_put_state_owner(inode, nfsi->rw_owner);
 }
 
 void

@@ -88,10 +88,10 @@ nfs4_alloc_lockowner_id(struct nfs4_client *clp)
 }
 
 /*
- * nfs4_get_shareowner(): this is called on the OPEN or CREATE path to
- * obtain a new shareowner.
+ * nfs4_get_state_owner(): this is called on the OPEN or CREATE path to
+ * obtain a new state_owner.
  *
- * There are three shareowners (open_owner4 in rfc3010) per inode,
+ * There are three state_owners (open_owner4 in rfc3010) per inode,
  * one for each possible combination of share lock access. Since
  * Linux does not support the deny access type, there are
  * three (not 9) referenced by the nfs_inode:
@@ -100,16 +100,16 @@ nfs4_alloc_lockowner_id(struct nfs4_client *clp)
  * O_RDONLY: inode->ro_owner
  * O_RDWR:   inode->rw_owner
  *
- * We create a new shareowner the first time a file is OPENed with
+ * We create a new state_owner the first time a file is OPENed with
  * one of the above shares. All other OPENs with a similar
  * share use the single stateid associated with the inode.
  *
  */
-struct nfs4_shareowner *
-nfs4_get_shareowner(struct inode *dir)
+struct nfs4_state_owner *
+nfs4_get_state_owner(struct inode *dir)
 {
 	struct nfs4_client *clp;
-	struct nfs4_shareowner *sp;
+	struct nfs4_state_owner *sp;
 
 	sp = kmalloc(sizeof(*sp),GFP_KERNEL);
 	if (!sp)
@@ -124,11 +124,11 @@ nfs4_get_shareowner(struct inode *dir)
 }
 
 /*
- * Called for each non-null inode shareowner in nfs_clear_inode, 
+ * Called for each non-null inode state_owner in nfs_clear_inode, 
  * or if nfs4_do_open fails.
  */
 void
-nfs4_put_shareowner(struct inode *inode, struct nfs4_shareowner *sp)
+nfs4_put_state_owner(struct inode *inode, struct nfs4_state_owner *sp)
 {
 	if (!sp)
 		return;
@@ -145,7 +145,7 @@ nfs4_put_shareowner(struct inode *inode, struct nfs4_shareowner *sp)
 * see comments nfs_fs.h:seqid_mutating_error()
 */
 void
-nfs4_increment_seqid(u32 status, struct nfs4_shareowner *sp)
+nfs4_increment_seqid(u32 status, struct nfs4_state_owner *sp)
 {
 	if (status == NFS_OK || seqid_mutating_err(status))
 		sp->so_seqid++;
@@ -155,7 +155,7 @@ nfs4_increment_seqid(u32 status, struct nfs4_shareowner *sp)
 * Called by nfs4_proc_open to set the appropriate stateid
 */
 int
-nfs4_set_inode_share(struct inode * inode, struct nfs4_shareowner *sp, unsigned int open_flags)
+nfs4_set_inode_share(struct inode * inode, struct nfs4_state_owner *sp, unsigned int open_flags)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 
@@ -187,7 +187,7 @@ nfs4_set_inode_share(struct inode * inode, struct nfs4_shareowner *sp, unsigned 
 * Called by nfs4_proc_open.
 */
 int
-nfs4_test_shareowner(struct inode *inode, unsigned int open_flags)
+nfs4_test_state_owner(struct inode *inode, unsigned int open_flags)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 
@@ -207,7 +207,7 @@ nfs4_test_shareowner(struct inode *inode, unsigned int open_flags)
         return 1;
 }
 
-struct nfs4_shareowner *
+struct nfs4_state_owner *
 nfs4_get_inode_share(struct inode * inode, unsigned int open_flags)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
