@@ -39,12 +39,13 @@
 /* Protect struct usb_device state and children members */
 static spinlock_t device_state_lock = SPIN_LOCK_UNLOCKED;
 
-/* Wakes up khubd */
+/* khubd's worklist and its lock */
 static spinlock_t hub_event_lock = SPIN_LOCK_UNLOCKED;
-
 static LIST_HEAD(hub_event_list);	/* List of hubs needing servicing */
 
+/* Wakes up khubd */
 static DECLARE_WAIT_QUEUE_HEAD(khubd_wait);
+
 static pid_t khubd_pid = 0;			/* PID of khubd */
 static DECLARE_COMPLETION(khubd_exited);
 
@@ -226,6 +227,19 @@ static int get_port_status(struct usb_device *hdev, int port,
 		data, sizeof(*data), HZ * USB_CTRL_GET_TIMEOUT);
 }
 
+static void kick_khubd(struct usb_hub *hub)
+{
+	unsigned long	flags;
+
+	spin_lock_irqsave(&hub_event_lock, flags);
+	if (list_empty(&hub->event_list)) {
+		list_add_tail(&hub->event_list, &hub_event_list);
+		wake_up(&khubd_wait);
+	}
+	spin_unlock_irqrestore(&hub_event_lock, flags);
+}
+
+
 /* completion function, fires on port status changes and various faults */
 static void hub_irq(struct urb *urb, struct pt_regs *regs)
 {
@@ -261,12 +275,7 @@ static void hub_irq(struct urb *urb, struct pt_regs *regs)
 	hub->nerrors = 0;
 
 	/* Something happened, let khubd figure it out */
-	spin_lock(&hub_event_lock);
-	if (list_empty(&hub->event_list)) {
-		list_add_tail(&hub->event_list, &hub_event_list);
-		wake_up(&khubd_wait);
-	}
-	spin_unlock(&hub_event_lock);
+	kick_khubd(hub);
 
 resubmit:
 	if (hub->quiescing)
@@ -579,6 +588,9 @@ static int hub_configure(struct usb_hub *hub,
 		dev_dbg(hub_dev, "%sover-current condition exists\n",
 			(hubstatus & HUB_STATUS_OVERCURRENT) ? "" : "no ");
 
+	/* scan all ports ASAP on new hubs */
+	hub->change_bits[0] = ~0;
+
 	/* Start the interrupt endpoint */
 	pipe = usb_rcvintpipe(hdev, endpoint->bEndpointAddress);
 	maxp = usb_maxpacket(hdev, pipe, usb_pipeout(pipe));
@@ -604,7 +616,7 @@ static int hub_configure(struct usb_hub *hub,
 	}
 
 	/* Wake up khubd */
-	wake_up(&khubd_wait);
+	kick_khubd(hub);
 
 	/* maybe start cycling the hub leds */
 	if (hub->has_indicators && blinkenlights) {
@@ -1408,15 +1420,18 @@ static void hub_port_logical_disconnect(struct usb_device *hdev, int port)
 	dev_dbg(hubdev(hdev), "logical disconnect on port %d\n", port + 1);
 	hub_port_disable(hdev, port);
 
+	/* FIXME let caller ask to power down the port:
+	 *  - some devices won't enumerate without a VBUS power cycle
+	 *  - SRP saves power that way
+	 *  - usb_suspend_device(dev,PM_SUSPEND_DISK)
+	 * That's easy if this hub can switch power per-port, and
+	 * khubd reactivates the port later (timer, SRP, etc).
+	 * Powerdown must be optional, because of reset/DFU.
+	 */
+
 	hub = usb_get_intfdata(hdev->actconfig->interface[0]);
 	set_bit(port, hub->change_bits);
-
-	spin_lock_irq(&hub_event_lock);
-	if (list_empty(&hub->event_list)) {
-		list_add_tail(&hub->event_list, &hub_event_list);
-		wake_up(&khubd_wait);
-	}
-	spin_unlock_irq(&hub_event_lock);
+ 	kick_khubd(hub);
 }
 
 
