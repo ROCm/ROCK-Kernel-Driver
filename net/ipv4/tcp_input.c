@@ -88,7 +88,7 @@ int sysctl_tcp_max_orphans = NR_FILE;
 int sysctl_tcp_frto;
 int sysctl_tcp_nometrics_save;
 int sysctl_tcp_westwood;
-int sysctl_tcp_vegas_cong_avoid = 1;
+int sysctl_tcp_vegas_cong_avoid;
 
 int sysctl_tcp_moderate_rcvbuf = 1;
 
