@@ -162,7 +162,7 @@ void mem_init(void)
 	unsigned long end_mem   = memory_end; /* DAVIDM - this must not include kernel stack at top */
 
 #ifdef DEBUG
-	printk("Mem_init: start=%lx, end=%lx\n", start_mem, end_mem);
+	printk(KERN_DEBUG "Mem_init: start=%lx, end=%lx\n", start_mem, end_mem);
 #endif
 
 	end_mem &= PAGE_MASK;
@@ -179,7 +179,7 @@ void mem_init(void)
 	initk = (&__init_begin - &__init_end) >> 10;
 
 	tmp = nr_free_pages() << PAGE_SHIFT;
-	printk("Memory available: %luk/%luk RAM, %luk/%luk ROM (%dk kernel code, %dk data)\n",
+	printk(KERN_INFO "Memory available: %luk/%luk RAM, %luk/%luk ROM (%dk kernel code, %dk data)\n",
 	       tmp >> 10,
 	       len >> 10,
 	       (rom_length > 0) ? ((rom_length >> 10) - codek) : 0,
@@ -223,7 +223,7 @@ free_initmem()
 		free_page(addr);
 		totalram_pages++;
 	}
-	printk("Freeing unused kernel memory: %ldk freed (0x%x - 0x%x)\n",
+	printk(KERN_INFO "Freeing unused kernel memory: %ldk freed (0x%x - 0x%x)\n",
 			(addr - PAGE_ALIGN((long) &__init_begin)) >> 10,
 			(int)(PAGE_ALIGN((unsigned long)(&__init_begin))),
 			(int)(addr - PAGE_SIZE));

@@ -76,7 +76,7 @@ static inline int h8300_buswidth(unsigned int addr)
 	return (*(volatile unsigned char *)ABWCR & (1 << ((addr >> 21) & 7))) == 0;
 }
 
-static inline void io_outsb(unsigned int addr, void *buf, int len)
+static inline void io_outsb(unsigned int addr, const void *buf, int len)
 {
 	volatile unsigned char  *ap_b = (volatile unsigned char *) addr;
 	volatile unsigned short *ap_w = (volatile unsigned short *) addr;
@@ -91,7 +91,7 @@ static inline void io_outsb(unsigned int addr, void *buf, int len)
 	}
 }
 
-static inline void io_outsw(unsigned int addr, void *buf, int len)
+static inline void io_outsw(unsigned int addr, const void *buf, int len)
 {
 	volatile unsigned short *ap = (volatile unsigned short *) addr;
 	unsigned short *bp = (unsigned short *) buf;
@@ -99,25 +99,29 @@ static inline void io_outsw(unsigned int addr, void *buf, int len)
 		*ap = *bp++;
 }
 
-static inline void io_outsl(unsigned int addr, void *buf, int len)
+static inline void io_outsl(unsigned int addr, const void *buf, int len)
 {
 	volatile unsigned int *ap = (volatile unsigned int *) addr;
-	unsigned int *bp = (unsigned int *) buf;
+	unsigned long *bp = (unsigned long *) buf;
 	while (len--)
 		*ap = *bp++;
 }
 
 static inline void io_insb(unsigned int addr, void *buf, int len)
 {
-	volatile unsigned char  *ap;
+	volatile unsigned char  *ap_b;
+	volatile unsigned short *ap_w;
 	unsigned char *bp = (unsigned char *) buf;
 
-	if(h8300_buswidth(addr))
-		ap = (volatile unsigned char *)(addr ^ 1);
-	else
-		ap = (volatile unsigned char *)addr;
-	while (len--)
-		*bp++ = *ap;
+	if(h8300_buswidth(addr)) {
+		ap_w = (volatile unsigned short *)(addr & ~1);
+		while (len--)
+			*bp++ = *ap_w & 0xff;
+	} else {
+		ap_b = (volatile unsigned char *)addr;
+		while (len--)
+			*bp++ = *ap_b;
+	}
 }
 
 static inline void io_insw(unsigned int addr, void *buf, int len)
@@ -131,7 +135,7 @@ static inline void io_insw(unsigned int addr, void *buf, int len)
 static inline void io_insl(unsigned int addr, void *buf, int len)
 {
 	volatile unsigned int *ap = (volatile unsigned int *) addr;
-	unsigned int *bp = (unsigned int *) buf;
+	unsigned long *bp = (unsigned long *) buf;
 	while (len--)
 		*bp++ = *ap;
 }
@@ -145,10 +149,10 @@ static inline void io_insl(unsigned int addr, void *buf, int len)
 #define memcpy_fromio(a,b,c)	memcpy((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
 
-#define inb(addr)    ((h8300_buswidth(addr))?readb((addr) ^ 1) & 0xff:readb(addr))
+#define inb(addr)    ((h8300_buswidth(addr))?readw((addr) & ~1) & 0xff:readb(addr))
 #define inw(addr)    _swapw(readw(addr))
 #define inl(addr)    _swapl(readl(addr))
-#define outb(x,addr) ((void)((h8300_buswidth(addr) && ((addr) & 1))?writew(x,addr):writeb(x,addr)))
+#define outb(x,addr) ((void)((h8300_buswidth(addr) && ((addr) & 1))?writew(x,(addr) & ~1):writeb(x,addr)))
 #define outw(x,addr) ((void) writew(_swapw(x),addr))
 #define outl(x,addr) ((void) writel(_swapl(x),addr))
 

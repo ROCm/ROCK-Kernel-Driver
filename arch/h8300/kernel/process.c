@@ -55,9 +55,9 @@ void default_idle(void)
 {
 	while(1) {
 		if (need_resched()) {
-			sti();
+			local_irq_enable();
 			__asm__("sleep");
-			cli();
+			local_irq_disable();
 		}
 		schedule();
 	}
@@ -112,14 +112,13 @@ EXPORT_SYMBOL(machine_power_off);
 
 void show_regs(struct pt_regs * regs)
 {
-	printk("\n");
-	printk("PC: %08lx  Status: %02x\n",
+	printk("\nPC: %08lx  Status: %02x",
 	       regs->pc, regs->ccr);
-	printk("ORIG_ER0: %08lx ER0: %08lx ER1: %08lx\n",
+	printk("\nORIG_ER0: %08lx ER0: %08lx ER1: %08lx",
 	       regs->orig_er0, regs->er0, regs->er1);
-	printk("ER2: %08lx ER3: %08lx ER4: %08lx ER5: %08lx\n",
+	printk("\nER2: %08lx ER3: %08lx ER4: %08lx ER5: %08lx",
 	       regs->er2, regs->er3, regs->er4, regs->er5);
-	printk("ER6' %08lx ",regs->er6);
+	printk("\nER6' %08lx ",regs->er6);
 	if (user_mode(regs))
 		printk("USP: %08lx\n", rdusp());
 	else
