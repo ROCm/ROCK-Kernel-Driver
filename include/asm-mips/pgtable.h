@@ -493,12 +493,11 @@ extern void paging_init(void);
 extern void update_mmu_cache(struct vm_area_struct *vma,
 				unsigned long address, pte_t pte);
 
-#define SWP_TYPE(x)		(((x).val >> 1) & 0x3f)
-#define SWP_OFFSET(x)		((x).val >> 8)
-#define SWP_ENTRY(type,offset)	((swp_entry_t) { ((type) << 1) | ((offset) << 8) })
-#define pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
-#define swp_entry_to_pte(x)	((pte_t) { (x).val })
-
+#define __swp_type(x)		(((x).val >> 1) & 0x3f)
+#define __swp_offset(x)		((x).val >> 8)
+#define __swp_entry(type,offset) ((swp_entry_t) { ((type) << 1) | ((offset) << 8) })
+#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)	((pte_t) { (x).val })
 
 #define kern_addr_valid(addr)	(1)
 

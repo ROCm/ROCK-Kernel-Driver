@@ -124,6 +124,14 @@ typedef u64 sector_t;
 typedef unsigned long sector_t;
 #endif
 
+/*
+ * The type of an index into the pagecache.  Use a #define so asm/types.h
+ * can override it.
+ */
+#ifndef pgoff_t
+#define pgoff_t unsigned long
+#endif
+
 #endif /* __KERNEL_STRICT_NAMES */
 
 /*

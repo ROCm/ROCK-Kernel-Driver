@@ -505,12 +505,12 @@ extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 	return pte;
 }
 
-#define SWP_TYPE(entry)		(((entry).val >> 1) & 0x3f)
-#define SWP_OFFSET(entry)	((entry).val >> 12)
-#define SWP_ENTRY(type,offset)	((swp_entry_t) { pte_val(mk_swap_pte((type),(offset))) })
+#define __swp_type(entry)	(((entry).val >> 1) & 0x3f)
+#define __swp_offset(entry)	((entry).val >> 12)
+#define __swp_entry(type,offset) ((swp_entry_t) { pte_val(mk_swap_pte((type),(offset))) })
 
-#define pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
-#define swp_entry_to_pte(x)	((pte_t) { (x).val })
+#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)	((pte_t) { (x).val })
 
 #endif /* !__ASSEMBLY__ */
 

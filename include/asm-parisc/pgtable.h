@@ -312,14 +312,14 @@ extern inline void update_mmu_cache(struct vm_area_struct * vma,
 
 /* Encode and de-code a swap entry */
 
-#define SWP_TYPE(x)                     ((x).val & 0x3f)
-#define SWP_OFFSET(x)                   ( (((x).val >> 6) &  0x7) | \
+#define __swp_type(x)                     ((x).val & 0x3f)
+#define __swp_offset(x)                   ( (((x).val >> 6) &  0x7) | \
 					  (((x).val >> 7) & ~0x7) )
-#define SWP_ENTRY(type, offset)         ((swp_entry_t) { (type) | \
+#define __swp_entry(type, offset)         ((swp_entry_t) { (type) | \
 					    ((offset &  0x7) << 6) | \
 					    ((offset & ~0x7) << 7) })
-#define pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
-#define swp_entry_to_pte(x)		((pte_t) { (x).val })
+#define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
 #define module_map	vmalloc
 #define module_unmap	vfree

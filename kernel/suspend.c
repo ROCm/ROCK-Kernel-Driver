@@ -64,6 +64,7 @@
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
+#include <linux/swapops.h>
 
 unsigned char software_suspend_enabled = 0;
 
@@ -327,7 +328,7 @@ static void mark_swapfiles(swp_entry_t prev, int mode)
 	if (!cur)
 		panic("Out of memory in mark_swapfiles");
 	/* XXX: this is dirty hack to get first page of swap file */
-	entry = SWP_ENTRY(root_swap, 0);
+	entry = swp_entry(root_swap, 0);
 	lock_page(virt_to_page((unsigned long)cur));
 	rw_swap_page_nolock(READ, entry, (char *) cur);
 
@@ -420,7 +421,7 @@ static int write_suspend_image(void)
 		if (!(entry = get_swap_page()).val)
 			panic("\nNot enough swapspace when writing data" );
 		
-		if(swapfile_used[SWP_TYPE(entry)] != SWAPFILE_SUSPEND)
+		if(swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
 			panic("\nPage %d: not enough swapspace on suspend device", i );
 	    
 		address = (pagedir_nosave+i)->address;
@@ -446,7 +447,7 @@ static int write_suspend_image(void)
 			return -ENOSPC;
 		}
 
-		if(swapfile_used[SWP_TYPE(entry)] != SWAPFILE_SUSPEND)
+		if(swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
 		  panic("\nNot enough swapspace for pagedir on suspend device" );
 
 		if (sizeof(swp_entry_t) != sizeof(long))
@@ -466,7 +467,7 @@ static int write_suspend_image(void)
 		panic("union diskpage has bad size");
 	if (!(entry = get_swap_page()).val)
 		panic( "\nNot enough swapspace when writing header" );
-	if(swapfile_used[SWP_TYPE(entry)] != SWAPFILE_SUSPEND)
+	if(swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
 	  panic("\nNot enough swapspace for header on suspend device" );
 
 	cur = (void *) buffer;
@@ -481,7 +482,7 @@ static int write_suspend_image(void)
 
 	PRINTK( ", signature" );
 #if 0
-	if (SWP_TYPE(entry) != 0)
+	if (swp_type(entry) != 0)
 		panic("Need just one swapfile");
 #endif
 	mark_swapfiles(prev, MARK_SWAP_SUSPEND);
@@ -1069,7 +1070,7 @@ static int resume_try_to_read(const char * specialfile, int noresume)
 	if (bdev_read_page(resume_device, pos, ptr)) { error = -EIO; goto resume_read_error; }
 #define PREPARENEXT \
 	{	next = cur->link.next; \
-		next.val = SWP_OFFSET(next) * PAGE_SIZE; \
+		next.val = swp_offset(next) * PAGE_SIZE; \
         }
 
 	error = -EIO;
@@ -1142,7 +1143,7 @@ static int resume_try_to_read(const char * specialfile, int noresume)
 		swp_entry_t swap_address = (pagedir_nosave+i)->swap_address;
 		if (!(i%100))
 			PRINTK( "." );
-		next.val = SWP_OFFSET (swap_address) * PAGE_SIZE;
+		next.val = swp_offset(swap_address) * PAGE_SIZE;
 		/* You do not need to check for overlaps...
 		   ... check_pagedir already did this work */
 		READTO(next.val, (char *)((pagedir_nosave+i)->address));

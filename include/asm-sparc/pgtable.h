@@ -376,11 +376,11 @@ BTFIXUPDEF_CALL(void, update_mmu_cache, struct vm_area_struct *, unsigned long, 
 extern int invalid_segment;
 
 /* Encode and de-code a swap entry */
-#define SWP_TYPE(x)			(((x).val >> 2) & 0x7f)
-#define SWP_OFFSET(x)			(((x).val >> 9) & 0x3ffff)
-#define SWP_ENTRY(type,offset)		((swp_entry_t) { (((type) & 0x7f) << 2) | (((offset) & 0x3ffff) << 9) })
-#define pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
-#define swp_entry_to_pte(x)		((pte_t) { (x).val })
+#define __swp_type(x)			(((x).val >> 2) & 0x7f)
+#define __swp_offset(x)			(((x).val >> 9) & 0x3ffff)
+#define __swp_entry(type,offset)	((swp_entry_t) { (((type) & 0x7f) << 2) | (((offset) & 0x3ffff) << 9) })
+#define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
 struct ctx_list {
 	struct ctx_list *next;
