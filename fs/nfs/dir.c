@@ -672,36 +672,29 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry, stru
 	error = -ENOMEM;
 	dentry->d_op = &nfs_dentry_operations;
 
+	lock_kernel();
+
 	/* If we're doing an exclusive create, optimize away the lookup */
 	if (nfs_is_exclusive_create(dir, nd))
-		return NULL;
-
-	lock_kernel();
-	error = nfs_cached_lookup(dir, dentry, &fhandle, &fattr);
-	if (!error) {
-		error = -EACCES;
-		inode = nfs_fhget(dentry, &fhandle, &fattr);
-		if (inode) {
-			d_add(dentry, inode);
-			nfs_renew_times(dentry);
-			error = 0;
-		}
-		goto out_unlock;
-	}
-
-	error = NFS_PROTO(dir)->lookup(dir, &dentry->d_name, &fhandle, &fattr);
-	if (error == -ENOENT)
 		goto no_entry;
-	if (!error) {
-		error = -EACCES;
-		inode = nfs_fhget(dentry, &fhandle, &fattr);
-		if (inode) {
-	    no_entry:
-			d_add(dentry, inode);
-			error = 0;
-		}
-		nfs_renew_times(dentry);
+
+	error = nfs_cached_lookup(dir, dentry, &fhandle, &fattr);
+	if (error != 0) {
+		error = NFS_PROTO(dir)->lookup(dir, &dentry->d_name,
+				&fhandle, &fattr);
+		if (error == -ENOENT)
+			goto no_entry;
+		if (error != 0)
+			goto out_unlock;
 	}
+	error = -EACCES;
+	inode = nfs_fhget(dentry, &fhandle, &fattr);
+	if (!inode)
+		goto out_unlock;
+no_entry:
+	error = 0;
+	d_add(dentry, inode);
+	nfs_renew_times(dentry);
 out_unlock:
 	unlock_kernel();
 out:
