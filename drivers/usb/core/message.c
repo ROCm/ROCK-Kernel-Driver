@@ -16,7 +16,7 @@ struct usb_api_data {
 	int done;
 };
 
-static void usb_api_blocking_completion(struct urb *urb)
+static void usb_api_blocking_completion(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_api_data *awd = (struct usb_api_data *)urb->context;
 
@@ -210,7 +210,7 @@ static void sg_clean (struct usb_sg_request *io)
 	io->dev = 0;
 }
 
-static void sg_complete (struct urb *urb)
+static void sg_complete (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_sg_request	*io = (struct usb_sg_request *) urb->context;
 	unsigned long		flags;

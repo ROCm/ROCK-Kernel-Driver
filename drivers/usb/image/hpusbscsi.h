@@ -6,7 +6,6 @@
 
 /* A big thanks to Jose for untiring testing */
 
-typedef void (*usb_urb_callback) (struct urb *);
 typedef void (*scsi_callback)(Scsi_Cmnd *);
 
 #define SENSE_COMMAND_SIZE 6
@@ -54,12 +53,12 @@ static const unsigned char scsi_command_direction[256/8] = {
 #define DIRECTION_IS_IN(x) ((scsi_command_direction[x>>3] >> (x & 7)) & 1)
 
 static int hpusbscsi_scsi_detect (struct SHT * sht);
-static void simple_command_callback(struct urb *u);
-static void scatter_gather_callback(struct urb *u);
-static void simple_payload_callback (struct urb *u);
-static void request_sense_callback (struct urb *u);
-static void control_interrupt_callback (struct urb *u);
-static void simple_done (struct urb *u);
+static void simple_command_callback(struct urb *u, struct pt_regs *regs);
+static void scatter_gather_callback(struct urb *u, struct pt_regs *regs);
+static void simple_payload_callback (struct urb *u, struct pt_regs *regs);
+static void request_sense_callback (struct urb *u, struct pt_regs *regs);
+static void control_interrupt_callback (struct urb *u, struct pt_regs *regs);
+static void simple_done (struct urb *u, struct pt_regs *regs);
 static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback);
 static int hpusbscsi_scsi_host_reset (Scsi_Cmnd *srb);
 static int hpusbscsi_scsi_abort (Scsi_Cmnd *srb);

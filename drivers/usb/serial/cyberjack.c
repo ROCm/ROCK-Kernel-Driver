@@ -62,9 +62,9 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp);
 static void cyberjack_close (struct usb_serial_port *port, struct file *filp);
 static int cyberjack_write (struct usb_serial_port *port, int from_user,
 	const unsigned char *buf, int count);
-static void cyberjack_read_int_callback( struct urb *urb );
-static void cyberjack_read_bulk_callback (struct urb *urb);
-static void cyberjack_write_bulk_callback (struct urb *urb);
+static void cyberjack_read_int_callback (struct urb *urb, struct pt_regs *regs);
+static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs);
+static void cyberjack_write_bulk_callback (struct urb *urb, struct pt_regs *regs);
 
 static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(CYBERJACK_VENDOR_ID, CYBERJACK_PRODUCT_ID) },
@@ -276,7 +276,7 @@ static int cyberjack_write (struct usb_serial_port *port, int from_user, const u
 	return (count);
 } 
 
-static void cyberjack_read_int_callback( struct urb *urb )
+static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct cyberjack_private *priv = (struct cyberjack_private *)port->private;
@@ -330,7 +330,7 @@ static void cyberjack_read_int_callback( struct urb *urb )
 	}
 }
 
-static void cyberjack_read_bulk_callback (struct urb *urb)
+static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct cyberjack_private *priv = (struct cyberjack_private *)port->private;
@@ -385,7 +385,7 @@ static void cyberjack_read_bulk_callback (struct urb *urb)
 	}
 }
 
-static void cyberjack_write_bulk_callback (struct urb *urb)
+static void cyberjack_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct cyberjack_private *priv = (struct cyberjack_private *)port->private;

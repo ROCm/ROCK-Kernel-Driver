@@ -169,11 +169,13 @@ struct usb_operations {
 
 /* each driver provides one of these, and hardware init support */
 
+struct pt_regs;
+
 struct hc_driver {
 	const char	*description;	/* "ehci-hcd" etc */
 
 	/* irq handler */
-	void	(*irq) (struct usb_hcd *hcd);
+	void	(*irq) (struct usb_hcd *hcd, struct pt_regs *regs);
 
 	int	flags;
 #define	HCD_MEMORY	0x0001		/* HC regs use memory (else I/O) */
@@ -216,7 +218,7 @@ struct hc_driver {
 				char *buf, u16 wLength);
 };
 
-extern void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb);
+extern void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs);
 extern void usb_bus_init (struct usb_bus *bus);
 extern void usb_rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb);
 

@@ -191,7 +191,7 @@ static void ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb)
 
 	/* complete() can reenter this HCD */
 	spin_unlock (&ehci->lock);
-	usb_hcd_giveback_urb (&ehci->hcd, urb);
+	usb_hcd_giveback_urb (&ehci->hcd, urb, NULL);
 
 	spin_lock (&ehci->lock);
 }
