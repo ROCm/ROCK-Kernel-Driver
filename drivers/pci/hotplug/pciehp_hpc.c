@@ -37,6 +37,7 @@
 #include <linux/spinlock.h>
 #include <linux/pci.h>
 #include <asm/system.h>
+#include "../pci.h"
 #include "pciehp.h"
 
 #ifdef DEBUG
@@ -315,12 +316,13 @@ static int pcie_write_cmd(struct slot *slot, u16 cmd)
 		dbg("%s : CMD_COMPLETED not clear after 1 sec.\n", __FUNCTION__);
 	}
 
-	retval = hp_register_write_word(php_ctlr->pci_dev, SLOT_CTRL, cmd);
+	dbg("%s: Before hp_register_write_word SLOT_CTRL %x\n", __FUNCTION__, cmd);
+	retval = hp_register_write_word(php_ctlr->pci_dev, SLOT_CTRL, cmd | CMD_CMPL_INTR_ENABLE);
 	if (retval) {
 		err("%s : hp_register_write_word SLOT_CTRL failed\n", __FUNCTION__);
 		return retval;
 	}
-	dbg("%s : hp_register_write_word SLOT_CTRL %x\n", __FUNCTION__, cmd);
+	dbg("%s : hp_register_write_word SLOT_CTRL %x\n", __FUNCTION__, cmd | CMD_CMPL_INTR_ENABLE);
 	dbg("%s : Exit\n", __FUNCTION__);
 
 	DBG_LEAVE_ROUTINE 
@@ -918,13 +920,32 @@ static irqreturn_t pcie_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 			return IRQ_NONE;
 		}
 
-		temp_word = (temp_word & ~HP_INTR_ENABLE) | 0x00;
+		dbg("%s: Set Mask Hot-plug Interrupt Enable\n", __FUNCTION__);
+		dbg("%s: hp_register_read_word SLOT_CTRL with value %x\n", __FUNCTION__, temp_word);
+		temp_word = (temp_word & ~HP_INTR_ENABLE & ~CMD_CMPL_INTR_ENABLE) | 0x00;
 
 		rc = hp_register_write_word(php_ctlr->pci_dev, SLOT_CTRL, temp_word);
 		if (rc) {
 			err("%s : hp_register_write_word SLOT_CTRL failed\n", __FUNCTION__);
 			return IRQ_NONE;
 		}
+		dbg("%s: hp_register_write_word SLOT_CTRL with value %x\n", __FUNCTION__, temp_word);
+		
+		rc = hp_register_read_word(php_ctlr->pci_dev, SLOT_STATUS, slot_status);
+		if (rc) {
+			err("%s : hp_register_read_word SLOT_STATUS failed\n", __FUNCTION__);
+			return IRQ_NONE;
+		}
+		dbg("%s: hp_register_read_word SLOT_STATUS with value %x\n", __FUNCTION__, slot_status); 
+		
+		/* Clear command complete interrupt caused by this write */
+		temp_word = 0x1f;
+		rc = hp_register_write_word(php_ctlr->pci_dev, SLOT_STATUS, temp_word);
+		if (rc) {
+			err("%s : hp_register_write_word SLOT_STATUS failed\n", __FUNCTION__);
+			return IRQ_NONE;
+		}
+		dbg("%s: hp_register_write_word SLOT_STATUS with value %x\n", __FUNCTION__, temp_word);
 	}
 	
 	if (intr_loc & CMD_COMPLETED) {
@@ -949,7 +970,7 @@ static irqreturn_t pcie_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 			hp_slot, php_ctlr->callback_instance_id);
 
 	/* Clear all events after serving them */
-	temp_word = slot_status | 0xff;
+	temp_word = 0x1F;
 	rc = hp_register_write_word(php_ctlr->pci_dev, SLOT_STATUS, temp_word);
 	if (rc) {
 		err("%s : hp_register_write_word SLOT_STATUS failed\n", __FUNCTION__);
@@ -963,6 +984,8 @@ static irqreturn_t pcie_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 			return IRQ_NONE;
 		}
 
+		dbg("%s: Unmask Hot-plug Interrupt Enable\n", __FUNCTION__);
+		dbg("%s: hp_register_read_word SLOT_CTRL with value %x\n", __FUNCTION__, temp_word);
 		temp_word = (temp_word & ~HP_INTR_ENABLE) | HP_INTR_ENABLE;
 
 		rc = hp_register_write_word(php_ctlr->pci_dev, SLOT_CTRL, temp_word);
@@ -970,6 +993,23 @@ static irqreturn_t pcie_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 			err("%s : hp_register_write_word SLOT_CTRL failed\n", __FUNCTION__);
 			return IRQ_NONE;
 		}
+		dbg("%s: hp_register_write_word SLOT_CTRL with value %x\n", __FUNCTION__, temp_word); 	
+	
+		rc = hp_register_read_word(php_ctlr->pci_dev, SLOT_STATUS, slot_status);
+		if (rc) {
+			err("%s : hp_register_read_word SLOT_STATUS failed\n", __FUNCTION__);
+			return IRQ_NONE;
+		}
+		dbg("%s: hp_register_read_word SLOT_STATUS with value %x\n", __FUNCTION__, slot_status); 
+		
+		/* Clear command complete interrupt caused by this write */
+		temp_word = 0x1F;
+		rc = hp_register_write_word(php_ctlr->pci_dev, SLOT_STATUS, temp_word);
+		if (rc) {
+			err("%s : hp_register_write_word SLOT_STATUS failed\n", __FUNCTION__);
+			return IRQ_NONE;
+		}
+		dbg("%s: hp_register_write_word SLOT_STATUS with value %x\n", __FUNCTION__, temp_word); 
 	}
 	
 	return IRQ_HANDLED;
@@ -1330,7 +1370,7 @@ int pcie_init(struct controller * ctrl,
 	}
 
 	dbg("%s: SLOT_CTRL %x value read %x\n", __FUNCTION__, SLOT_CTRL, temp_word);
-	temp_word = (temp_word & ~HP_INTR_ENABLE) | 0x00;
+	temp_word = (temp_word & ~HP_INTR_ENABLE & ~CMD_CMPL_INTR_ENABLE) | 0x00;
 
 	rc = hp_register_write_word(pdev, SLOT_CTRL, temp_word);
 	if (rc) {
@@ -1346,12 +1386,13 @@ int pcie_init(struct controller * ctrl,
 	}
 	dbg("%s: Mask HPIE SLOT_STATUS offset %x reads slot_status %x\n", __FUNCTION__, SLOT_STATUS, slot_status);
 
-	rc = hp_register_write_word(php_ctlr->pci_dev, SLOT_STATUS, slot_status);
+	temp_word = 0x1F; /* Clear all events */
+	rc = hp_register_write_word(php_ctlr->pci_dev, SLOT_STATUS, temp_word);
 	if (rc) {
 		err("%s : hp_register_write_word SLOT_STATUS failed\n", __FUNCTION__);
 		goto abort_free_ctlr;
 	}
-	dbg("%s: SLOT_STATUS offset %x writes slot_status %x\n", __FUNCTION__, SLOT_STATUS, slot_status);
+	dbg("%s: SLOT_STATUS offset %x writes slot_status %x\n", __FUNCTION__, SLOT_STATUS, temp_word);
 
 	if (pciehp_poll_mode)  {/* Install interrupt polling code */
 		/* Install and start the interrupt polling timer */
@@ -1359,15 +1400,16 @@ int pcie_init(struct controller * ctrl,
 		start_int_poll_timer( php_ctlr, 10 );   /* start with 10 second delay */
 	} else {
 		/* Installs the interrupt handler */
-#ifdef CONFIG_PCI_USE_VECTOR 
-		rc = pci_enable_msi(pdev);
-		if (rc) {
-			err("Can't get msi for the hotplug controller\n");
-			dbg("%s: rc = %x\n", __FUNCTION__, rc);
-			goto abort_free_ctlr;
+		dbg("%s: pciehp_msi_quirk = %x\n", __FUNCTION__, pciehp_msi_quirk);
+		if (!pciehp_msi_quirk) {
+			rc = pci_enable_msi(pdev);
+			if (rc) {
+				info("Can't get msi for the hotplug controller\n");
+				info("Use INTx for the hotplug controller\n");
+				dbg("%s: rc = %x\n", __FUNCTION__, rc);
+			} else 
+				php_ctlr->irq = pdev->irq;
 		}
-		php_ctlr->irq = pdev->irq;
-#endif		
 		rc = request_irq(php_ctlr->irq, pcie_isr, SA_SHIRQ, MY_NAME, (void *) ctrl);
 		dbg("%s: request_irq %d for hpc%d (returns %d)\n", __FUNCTION__, php_ctlr->irq, ctlr_seq_num, rc);
 		if (rc) {
@@ -1384,7 +1426,7 @@ int pcie_init(struct controller * ctrl,
 	dbg("%s: SLOT_CTRL %x value read %x\n", __FUNCTION__, SLOT_CTRL, temp_word);
 
 	intr_enable = ATTN_BUTTN_ENABLE | PWR_FAULT_DETECT_ENABLE | MRL_DETECT_ENABLE |
-					PRSN_DETECT_ENABLE | CMD_CMPL_INTR_ENABLE;
+					PRSN_DETECT_ENABLE;
 
 	temp_word = (temp_word & ~intr_enable) | intr_enable; 
 
@@ -1402,6 +1444,21 @@ int pcie_init(struct controller * ctrl,
 		goto abort_free_ctlr;
 	}
 	dbg("%s : Unmask HPIE hp_register_write_word SLOT_CTRL with %x\n", __FUNCTION__, temp_word);
+	rc = hp_register_read_word(php_ctlr->pci_dev, SLOT_STATUS, slot_status);
+	if (rc) {
+		err("%s : hp_register_read_word SLOT_STATUS failed\n", __FUNCTION__);
+		goto abort_free_ctlr;
+	}
+	dbg("%s: Unmask HPIE SLOT_STATUS offset %x reads slot_status %x\n", __FUNCTION__, 
+		SLOT_STATUS, slot_status);
+	
+	temp_word =  0x1F; /* Clear all events */
+	rc = hp_register_write_word(php_ctlr->pci_dev, SLOT_STATUS, temp_word);
+	if (rc) {
+		err("%s : hp_register_write_word SLOT_STATUS failed\n", __FUNCTION__);
+		goto abort_free_ctlr;
+	}
+	dbg("%s: SLOT_STATUS offset %x writes slot_status %x\n", __FUNCTION__, SLOT_STATUS, temp_word);
 	
 	/*  Add this HPC instance into the HPC list */
 	spin_lock(&list_lock);

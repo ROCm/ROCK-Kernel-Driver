@@ -235,7 +235,7 @@ sysc_enter:
 	lr	%r7,%r1           # copy svc number to %r7
 	sla	%r7,2             # *4
 sysc_do_restart:
-	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
+	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         l       %r8,sys_call_table-system_call(%r7,%r13) # get system call addr.
         bo      BASED(sysc_tracesys)
         basr    %r14,%r8          # call sys_xxxx
@@ -309,6 +309,8 @@ __critical_end:
 #
 sysc_tracesys:
         l       %r1,BASED(.Ltrace)
+	la	%r2,SP_PTREGS(%r15)    # load pt_regs
+	la	%r3,0
 	srl	%r7,2
 	st	%r7,SP_R2(%r15)
 	basr	%r14,%r1
@@ -323,9 +325,11 @@ sysc_tracego:
 	basr	%r14,%r8          # call sys_xxx
 	st	%r2,SP_R2(%r15)   # store return value
 sysc_tracenogo:
-	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
+	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         bno     BASED(sysc_return)
 	l	%r1,BASED(.Ltrace)
+	la	%r2,SP_PTREGS(%r15)    # load pt_regs
+	la	%r3,1
 	la	%r14,BASED(sysc_return)
 	br	%r1
 
@@ -502,7 +506,7 @@ pgm_svcper:
 	lr	%r7,%r1           # copy svc number to %r7
 	sla	%r7,2             # *4
 pgm_svcstd:
-	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
+	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         l       %r8,sys_call_table-system_call(%r7,%r13) # get system call addr.
         bo      BASED(pgm_tracesys)
         basr    %r14,%r8          # call sys_xxxx
@@ -529,6 +533,8 @@ pgm_svcper_nosig:
 #
 pgm_tracesys:
         l       %r1,BASED(.Ltrace)
+	la	%r2,SP_PTREGS(%r15)    # load pt_regs
+	la	%r3,0
 	srl	%r7,2
 	st	%r7,SP_R2(%r15)
         basr    %r14,%r1
@@ -543,9 +549,11 @@ pgm_svc_go:
         basr    %r14,%r8          # call sys_xxx
         st      %r2,SP_R2(%r15)   # store return value
 pgm_svc_nogo:
-	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
+	tm	__TI_flags+3(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         bno     BASED(pgm_svcret)
         l       %r1,BASED(.Ltrace)
+	la	%r2,SP_PTREGS(%r15)    # load pt_regs
+	la	%r3,1
 	la	%r14,BASED(pgm_svcret)
         br      %r1
 

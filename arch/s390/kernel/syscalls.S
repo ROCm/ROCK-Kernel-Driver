@@ -275,3 +275,13 @@ NI_SYSCALL							/* reserved for vserver */
 SYSCALL(s390_fadvise64_64,sys_ni_syscall,sys32_fadvise64_64_wrapper)
 SYSCALL(sys_statfs64,sys_statfs64,compat_sys_statfs64_wrapper)
 SYSCALL(sys_fstatfs64,sys_fstatfs64,compat_sys_fstatfs64_wrapper)
+NI_SYSCALL							/* 267 new sys_remap_file_pages */
+NI_SYSCALL							/* 268 sys_mbind */
+NI_SYSCALL							/* 269 sys_get_mempolicy */
+NI_SYSCALL							/* 270 sys_set_mempolicy */
+SYSCALL(sys_mq_open,sys_mq_open,compat_sys_mq_open_wrapper)
+SYSCALL(sys_mq_unlink,sys_mq_unlink,sys32_mq_unlink_wrapper)
+SYSCALL(sys_mq_timedsend,sys_mq_timedsend,compat_sys_mq_timedsend_wrapper)
+SYSCALL(sys_mq_timedreceive,sys_mq_timedreceive,compat_sys_mq_timedreceive_wrapper)
+SYSCALL(sys_mq_notify,sys_mq_notify,compat_sys_mq_notify_wrapper)
+SYSCALL(sys_mq_getsetattr,sys_mq_getsetattr,compat_sys_mq_getsetattr_wrapper)

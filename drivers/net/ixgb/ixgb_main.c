@@ -308,10 +308,10 @@ ixgb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return i;
 	}
 
-	if (!(i = pci_set_dma_mask(pdev, PCI_DMA_64BIT))) {
+	if (!(i = pci_set_dma_mask(pdev, DMA_64BIT_MASK))) {
 		pci_using_dac = 1;
 	} else {
-		if ((i = pci_set_dma_mask(pdev, PCI_DMA_32BIT))) {
+		if ((i = pci_set_dma_mask(pdev, DMA_32BIT_MASK))) {
 			IXGB_ERR("No usable DMA configuration, aborting\n");
 			return i;
 		}

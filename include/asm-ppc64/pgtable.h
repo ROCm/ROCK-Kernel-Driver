@@ -313,7 +313,9 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 {
 	unsigned long old;
 
-	old = pte_update(ptep, _PAGE_ACCESSED | _PAGE_HPTEFLAGS);
+       	if ((pte_val(*ptep) & (_PAGE_ACCESSED | _PAGE_HASHPTE)) == 0)
+		return 0;
+	old = pte_update(ptep, _PAGE_ACCESSED);
 	if (old & _PAGE_HASHPTE) {
 		hpte_update(ptep, old, 0);
 		flush_tlb_pending();	/* XXX generic code doesn't flush */
@@ -326,12 +328,13 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
  * moment we always flush but we need to fix hpte_update and test if the
  * optimisation is worth it.
  */
-#if 1
 static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 {
 	unsigned long old;
 
-	old = pte_update(ptep, _PAGE_DIRTY | _PAGE_HPTEFLAGS);
+       	if ((pte_val(*ptep) & _PAGE_DIRTY) == 0)
+		return 0;
+	old = pte_update(ptep, _PAGE_DIRTY);
 	if (old & _PAGE_HASHPTE)
 		hpte_update(ptep, old, 0);
 	return (old & _PAGE_DIRTY) != 0;
@@ -341,7 +344,9 @@ static inline void ptep_set_wrprotect(pte_t *ptep)
 {
 	unsigned long old;
 
-	old = pte_update(ptep, _PAGE_RW | _PAGE_HPTEFLAGS);
+       	if ((pte_val(*ptep) & _PAGE_RW) == 0)
+       		return;
+	old = pte_update(ptep, _PAGE_RW);
 	if (old & _PAGE_HASHPTE)
 		hpte_update(ptep, old, 0);
 }
@@ -358,7 +363,6 @@ static inline void ptep_set_wrprotect(pte_t *ptep)
 #define ptep_clear_flush_young(__vma, __address, __ptep)		\
 ({									\
 	int __young = ptep_test_and_clear_young(__ptep);		\
-	flush_tlb_page(__vma, __address);				\
 	__young;							\
 })
 
@@ -369,27 +373,6 @@ static inline void ptep_set_wrprotect(pte_t *ptep)
 	flush_tlb_page(__vma, __address);				\
 	__dirty;							\
 })
-
-#else
-static inline int ptep_test_and_clear_dirty(pte_t *ptep)
-{
-	unsigned long old;
-
-	old = pte_update(ptep, _PAGE_DIRTY);
-	if ((~old & (_PAGE_HASHPTE | _PAGE_RW | _PAGE_DIRTY)) == 0)
-		hpte_update(ptep, old, 1);
-	return (old & _PAGE_DIRTY) != 0;
-}
-
-static inline void ptep_set_wrprotect(pte_t *ptep)
-{
-	unsigned long old;
-
-	old = pte_update(ptep, _PAGE_RW);
-	if ((~old & (_PAGE_HASHPTE | _PAGE_RW | _PAGE_DIRTY)) == 0)
-		hpte_update(ptep, old, 1);
-}
-#endif
 
 static inline pte_t ptep_get_and_clear(pte_t *ptep)
 {

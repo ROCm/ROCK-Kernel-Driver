@@ -690,8 +690,16 @@ out:
 }
 
 asmlinkage void
-syscall_trace(void)
+syscall_trace(struct pt_regs *regs, int entryexit)
 {
+	if (unlikely(current->audit_context)) {
+		if (!entryexit)
+			audit_syscall_entry(current, regs->gprs[2],
+					    regs->orig_gpr2, regs->gprs[3],
+					    regs->gprs[4], regs->gprs[5]);
+		else
+			audit_syscall_exit(current, regs->gprs[2]);
+	}
 	if (!test_thread_flag(TIF_SYSCALL_TRACE))
 		return;
 	if (!(current->ptrace & PT_PTRACED))

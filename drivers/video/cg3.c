@@ -221,8 +221,12 @@ cg3_blank(int blank, struct fb_info *info)
 }
 
 static struct sbus_mmap_map cg3_mmap_map[] = {
-	{ CG3_MMAP_OFFSET,	CG3_RAM_OFFSET,		SBUS_MMAP_FBSIZE(1) },
-	{ 0,			0,			0		    }
+	{
+		.poff	= CG3_MMAP_OFFSET,
+		.voff	= CG3_RAM_OFFSET,
+		.size	= SBUS_MMAP_FBSIZE(1)
+	},
+	{ .size = 0 }
 };
 
 static int cg3_mmap(struct fb_info *info, struct file *file, struct vm_area_struct *vma)

@@ -532,10 +532,28 @@ __SYSCALL(__NR_tgkill, sys_tgkill)
 __SYSCALL(__NR_utimes, sys_utimes)
 #define __NR_vserver		236
 __SYSCALL(__NR_vserver, sys_ni_syscall)
+#define __NR_vserver		236
+__SYSCALL(__NR_vserver, sys_ni_syscall)
+#define __NR_mbind 			237
+__SYSCALL(__NR_mbind, sys_ni_syscall)
+#define __NR_set_mempolicy 	238
+__SYSCALL(__NR_set_mempolicy, sys_ni_syscall)
+#define __NR_get_mempolicy 	239
+__SYSCALL(__NR_get_mempolicy, sys_ni_syscall)
+#define __NR_mq_open 		240
+__SYSCALL(__NR_mq_open, sys_mq_open)
+#define __NR_mq_unlink 		241
+__SYSCALL(__NR_mq_unlink, sys_mq_unlink)
+#define __NR_mq_timedsend 	242
+__SYSCALL(__NR_mq_timedsend, sys_mq_timedsend)
+#define __NR_mq_timedreceive 243
+__SYSCALL(__NR_mq_timedreceive, sys_mq_timedreceive)
+#define __NR_mq_notify 		244
+__SYSCALL(__NR_mq_notify, sys_mq_notify)
+#define __NR_mq_getsetattr 	245
+__SYSCALL(__NR_mq_getsetattr, sys_mq_getsetattr)
 
-/* 237,238,239 reserved for NUMA API */
-
-#define __NR_syscall_max __NR_vserver
+#define __NR_syscall_max __NR_mq_getsetattr
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */

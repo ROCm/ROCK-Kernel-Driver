@@ -22,16 +22,31 @@
  */
 extern void sync_dquots(struct super_block *sb, int type);
 
-extern void dquot_initialize(struct inode *inode, int type);
-extern void dquot_drop(struct inode *inode);
+extern int dquot_initialize(struct inode *inode, int type);
+extern int dquot_drop(struct inode *inode);
 
-extern int  dquot_alloc_space(struct inode *inode, qsize_t number, int prealloc);
-extern int  dquot_alloc_inode(const struct inode *inode, unsigned long number);
+extern int dquot_alloc_space(struct inode *inode, qsize_t number, int prealloc);
+extern int dquot_alloc_inode(const struct inode *inode, unsigned long number);
 
-extern void dquot_free_space(struct inode *inode, qsize_t number);
-extern void dquot_free_inode(const struct inode *inode, unsigned long number);
+extern int dquot_free_space(struct inode *inode, qsize_t number);
+extern int dquot_free_inode(const struct inode *inode, unsigned long number);
 
-extern int  dquot_transfer(struct inode *inode, struct iattr *iattr);
+extern int dquot_transfer(struct inode *inode, struct iattr *iattr);
+extern int dquot_commit(struct dquot *dquot);
+extern int dquot_acquire(struct dquot *dquot);
+extern int dquot_release(struct dquot *dquot);
+extern int dquot_commit_info(struct super_block *sb, int type);
+extern int dquot_mark_dquot_dirty(struct dquot *dquot);
+
+extern int vfs_quota_on(struct super_block *sb, int type, int format_id, char *path);
+extern int vfs_quota_on_mount(int type, int format_id, struct dentry *dentry);
+extern int vfs_quota_off(struct super_block *sb, int type);
+#define vfs_quota_off_mount(sb, type) vfs_quota_off(sb, type)
+extern int vfs_quota_sync(struct super_block *sb, int type);
+extern int vfs_get_dqinfo(struct super_block *sb, int type, struct if_dqinfo *ii);
+extern int vfs_set_dqinfo(struct super_block *sb, int type, struct if_dqinfo *ii);
+extern int vfs_get_dqblk(struct super_block *sb, int type, qid_t id, struct if_dqblk *di);
+extern int vfs_set_dqblk(struct super_block *sb, int type, qid_t id, struct if_dqblk *di);
 
 /*
  * Operations supported for diskquotas.
@@ -42,6 +57,8 @@ extern struct quotactl_ops vfs_quotactl_ops;
 #define sb_dquot_ops (&dquot_operations)
 #define sb_quotactl_ops (&vfs_quotactl_ops)
 
+/* It is better to call this function outside of any transaction as it might
+ * need a lot of space in journal for dquot structure allocation. */
 static __inline__ void DQUOT_INIT(struct inode *inode)
 {
 	BUG_ON(!inode->i_sb);
@@ -49,6 +66,7 @@ static __inline__ void DQUOT_INIT(struct inode *inode)
 		inode->i_sb->dq_op->initialize(inode, -1);
 }
 
+/* The same as with DQUOT_INIT */
 static __inline__ void DQUOT_DROP(struct inode *inode)
 {
 	if (IS_QUOTAINIT(inode)) {
@@ -57,6 +75,8 @@ static __inline__ void DQUOT_DROP(struct inode *inode)
 	}
 }
 
+/* The following allocation/freeing/transfer functions *must* be called inside
+ * a transaction (deadlocks possible otherwise) */
 static __inline__ int DQUOT_PREALLOC_SPACE_NODIRTY(struct inode *inode, qsize_t nr)
 {
 	if (sb_any_quota_enabled(inode->i_sb)) {
@@ -137,6 +157,7 @@ static __inline__ int DQUOT_TRANSFER(struct inode *inode, struct iattr *iattr)
 	return 0;
 }
 
+/* The following two functions cannot be called inside a transaction */
 #define DQUOT_SYNC(sb)	sync_dquots(sb, -1)
 
 static __inline__ int DQUOT_OFF(struct super_block *sb)

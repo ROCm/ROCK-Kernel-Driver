@@ -700,6 +700,11 @@ config MCOUNT
 	depends on STACK_DEBUG
 	default y
 
+config FRAME_POINTER
+	bool
+	depends on MCOUNT
+	default y
+
 endmenu
 
 source "security/Kconfig"

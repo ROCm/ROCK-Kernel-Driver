@@ -192,7 +192,6 @@ int pciehp_save_config(struct controller *ctrl, int busnumber, int num_ctlr_slot
 	for (device = FirstSupported; device <= LastSupported; device++) {
 		ID = 0xFFFFFFFF;
 		rc = pci_bus_read_config_dword(pci_bus, PCI_DEVFN(device, 0), PCI_VENDOR_ID, &ID);
-		dbg("%s: ID = %x\n", __FUNCTION__, ID);
 
 		if (ID != 0xFFFFFFFF) {	  /*  device in slot */
 			dbg("%s: ID = %x\n", __FUNCTION__, ID);
@@ -325,7 +324,6 @@ int pciehp_save_config(struct controller *ctrl, int busnumber, int num_ctlr_slot
 			new_slot->presence_save = 0;
 			new_slot->switch_save = 0;
 		}
-		dbg("%s: End of For loop\n", __FUNCTION__);
 	} 			/* End of FOR loop */
 
 	dbg("%s: Exit\n", __FUNCTION__);

@@ -203,6 +203,7 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define pdacf_t_magic				0xa15a4500
 #define vortex_t_magic				0xa15a4601
 #define atiixp_t_magic				0xa15a4701
+#define amd7930_t_magic				0xa15a4801
 
 #else
 

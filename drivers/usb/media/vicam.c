@@ -612,15 +612,20 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 
 	case VIDIOCSPICT:
 		{
-			struct video_picture *vp = (struct video_picture *) arg;
+			struct video_picture vp;
+			
+			if (copy_from_user(&vp, arg, sizeof(vp))) {
+				retval = -EFAULT;
+				break;
+			}
+			
+			DBG("VIDIOCSPICT depth = %d, pal = %d\n", vp.depth,
+			    vp.palette);
 
-			DBG("VIDIOCSPICT depth = %d, pal = %d\n", vp->depth,
-			    vp->palette);
+			cam->gain = vp.brightness >> 8;
 
-			cam->gain = vp->brightness >> 8;
-
-			if (vp->depth != 24
-			    || vp->palette != VIDEO_PALETTE_RGB24)
+			if (vp.depth != 24
+			    || vp.palette != VIDEO_PALETTE_RGB24)
 				retval = -EINVAL;
 
 			break;
@@ -660,7 +665,7 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 				break;
 			}
 
-			DBG("VIDIOCSWIN %d x %d\n", vw->width, vw->height);
+			DBG("VIDIOCSWIN %d x %d\n", vw.width, vw.height);
 			
 			if ( vw.width != 320 || vw.height != 240 )
 				retval = -EFAULT;

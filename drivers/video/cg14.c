@@ -367,23 +367,82 @@ static void cg14_init_fix(struct fb_info *info, int linebytes)
 }
 
 static struct sbus_mmap_map __cg14_mmap_map[CG14_MMAP_ENTRIES] __initdata = {
-	{ CG14_REGS,		0x80000000,		0x1000		    },
-	{ CG14_XLUT,		0x80003000,		0x1000		    },
-	{ CG14_CLUT1,		0x80004000,		0x1000		    },
-	{ CG14_CLUT2,		0x80005000,		0x1000		    },
-	{ CG14_CLUT3,		0x80006000,		0x1000		    },
-	{ CG3_MMAP_OFFSET - 
-	  0x7000,		0x80000000,		0x7000		    },
-	{ CG3_MMAP_OFFSET,	0x00000000,		SBUS_MMAP_FBSIZE(1) },
-	{ MDI_CURSOR_MAP,	0x80001000,		0x1000		    },
-	{ MDI_CHUNKY_BGR_MAP,	0x01000000,		0x400000	    },
-	{ MDI_PLANAR_X16_MAP,	0x02000000,		0x200000	    },
-	{ MDI_PLANAR_C16_MAP,	0x02800000,		0x200000	    },
-	{ MDI_PLANAR_X32_MAP,	0x03000000,		0x100000	    },
-	{ MDI_PLANAR_B32_MAP,	0x03400000,		0x100000	    },
-	{ MDI_PLANAR_G32_MAP,	0x03800000,		0x100000	    },
-	{ MDI_PLANAR_R32_MAP,	0x03c00000,		0x100000	    },
-	{ 0,			0,			0		    }
+	{
+		.voff	= CG14_REGS,
+		.poff	= 0x80000000,
+		.size	= 0x1000
+	},
+	{
+		.voff	= CG14_XLUT,
+		.poff	= 0x80003000,
+		.size	= 0x1000
+	},
+	{
+		.voff	= CG14_CLUT1,
+		.poff	= 0x80004000,
+		.size	= 0x1000
+	},
+	{
+		.voff	= CG14_CLUT2,
+		.poff	= 0x80005000,
+		.size	= 0x1000
+	},
+	{
+		.voff	= CG14_CLUT3,
+		.poff	= 0x80006000,
+		.size	= 0x1000
+	},
+	{
+		.voff	= CG3_MMAP_OFFSET - 0x7000,
+		.poff	= 0x80000000,
+		.size	= 0x7000
+	},
+	{
+		.voff	= CG3_MMAP_OFFSET,
+		.poff	= 0x00000000,
+		.size	= SBUS_MMAP_FBSIZE(1)
+	},
+	{
+		.voff	= MDI_CURSOR_MAP,
+		.poff	= 0x80001000,
+		.size	= 0x1000
+	},
+	{
+		.voff	= MDI_CHUNKY_BGR_MAP,
+		.poff	= 0x01000000,
+		.size	= 0x400000
+	},
+	{
+		.voff	= MDI_PLANAR_X16_MAP,
+		.poff	= 0x02000000,
+		.size	= 0x200000
+	},
+	{
+		.voff	= MDI_PLANAR_C16_MAP,
+		.poff	= 0x02800000,
+		.size	= 0x200000
+	},
+	{
+		.voff	= MDI_PLANAR_X32_MAP,
+		.poff	= 0x03000000,
+		.size	= 0x100000
+	},
+	{
+		.voff	= MDI_PLANAR_B32_MAP,
+		.poff	= 0x03400000,
+		.size	= 0x100000
+	},
+	{
+		.voff	= MDI_PLANAR_G32_MAP,
+		.poff	= 0x03800000,
+		.size	= 0x100000
+	},
+	{
+		.voff	= MDI_PLANAR_R32_MAP,
+		.poff	= 0x03c00000,
+		.size	= 0x100000
+	},
+	{ .size = 0 }
 };
 
 struct all_info {

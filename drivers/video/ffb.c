@@ -769,34 +769,142 @@ ffb_blank(int blank, struct fb_info *info)
 }
 
 static struct sbus_mmap_map ffb_mmap_map[] = {
-	{ FFB_SFB8R_VOFF,	FFB_SFB8R_POFF,		0x0400000 },
-	{ FFB_SFB8G_VOFF,	FFB_SFB8G_POFF,		0x0400000 },
-	{ FFB_SFB8B_VOFF,	FFB_SFB8B_POFF,		0x0400000 },
-	{ FFB_SFB8X_VOFF,	FFB_SFB8X_POFF,		0x0400000 },
-	{ FFB_SFB32_VOFF,	FFB_SFB32_POFF,		0x1000000 },
-	{ FFB_SFB64_VOFF,	FFB_SFB64_POFF,		0x2000000 },
-	{ FFB_FBC_REGS_VOFF,	FFB_FBC_REGS_POFF,	0x0002000 },
-	{ FFB_BM_FBC_REGS_VOFF,	FFB_BM_FBC_REGS_POFF,	0x0002000 },
-	{ FFB_DFB8R_VOFF,	FFB_DFB8R_POFF,		0x0400000 },
-	{ FFB_DFB8G_VOFF,	FFB_DFB8G_POFF,		0x0400000 },
-	{ FFB_DFB8B_VOFF,	FFB_DFB8B_POFF,		0x0400000 },
-	{ FFB_DFB8X_VOFF,	FFB_DFB8X_POFF,		0x0400000 },
-	{ FFB_DFB24_VOFF,	FFB_DFB24_POFF,		0x1000000 },
-	{ FFB_DFB32_VOFF,	FFB_DFB32_POFF,		0x1000000 },
-	{ FFB_FBC_KREGS_VOFF,	FFB_FBC_KREGS_POFF,	0x0002000 },
-	{ FFB_DAC_VOFF,		FFB_DAC_POFF,		0x0002000 },
-	{ FFB_PROM_VOFF,	FFB_PROM_POFF,		0x0010000 },
-	{ FFB_EXP_VOFF,		FFB_EXP_POFF,		0x0002000 },
-	{ FFB_DFB422A_VOFF,	FFB_DFB422A_POFF,	0x0800000 },
-	{ FFB_DFB422AD_VOFF,	FFB_DFB422AD_POFF,	0x0800000 },
-	{ FFB_DFB24B_VOFF,	FFB_DFB24B_POFF,	0x1000000 },
-	{ FFB_DFB422B_VOFF,	FFB_DFB422B_POFF,	0x0800000 },
-	{ FFB_DFB422BD_VOFF,	FFB_DFB422BD_POFF,	0x0800000 },
-	{ FFB_SFB16Z_VOFF,	FFB_SFB16Z_POFF,	0x0800000 },
-	{ FFB_SFB8Z_VOFF,	FFB_SFB8Z_POFF,		0x0800000 },
-	{ FFB_SFB422_VOFF,	FFB_SFB422_POFF,	0x0800000 },
-	{ FFB_SFB422D_VOFF,	FFB_SFB422D_POFF,	0x0800000 },
-	{ 0,			0,			0	  }
+	{
+		.voff	= FFB_SFB8R_VOFF,
+		.poff	= FFB_SFB8R_POFF,
+		.size	= 0x0400000
+	},
+	{
+		.voff	= FFB_SFB8G_VOFF,
+		.poff	= FFB_SFB8G_POFF,
+		.size	= 0x0400000
+	},
+	{
+		.voff	= FFB_SFB8B_VOFF,
+		.poff	= FFB_SFB8B_POFF,
+		.size	= 0x0400000
+	},
+	{
+		.voff	= FFB_SFB8X_VOFF,
+		.poff	= FFB_SFB8X_POFF,
+		.size	= 0x0400000
+	},
+	{
+		.voff	= FFB_SFB32_VOFF,
+		.poff	= FFB_SFB32_POFF,
+		.size	= 0x1000000
+	},
+	{
+		.voff	= FFB_SFB64_VOFF,
+		.poff	= FFB_SFB64_POFF,
+		.size	= 0x2000000
+	},
+	{
+		.voff	= FFB_FBC_REGS_VOFF,
+		.poff	= FFB_FBC_REGS_POFF,
+		.size	= 0x0002000
+	},
+	{
+		.voff	= FFB_BM_FBC_REGS_VOFF,
+		.poff	= FFB_BM_FBC_REGS_POFF,
+		.size	= 0x0002000
+	},
+	{
+		.voff	= FFB_DFB8R_VOFF,
+		.poff	= FFB_DFB8R_POFF,
+		.size	= 0x0400000
+	},
+	{
+		.voff	= FFB_DFB8G_VOFF,
+		.poff	= FFB_DFB8G_POFF,
+		.size	= 0x0400000
+	},
+	{
+		.voff	= FFB_DFB8B_VOFF,
+		.poff	= FFB_DFB8B_POFF,
+		.size	= 0x0400000
+	},
+	{
+		.voff	= FFB_DFB8X_VOFF,
+		.poff	= FFB_DFB8X_POFF,
+		.size	= 0x0400000
+	},
+	{
+		.voff	= FFB_DFB24_VOFF,
+		.poff	= FFB_DFB24_POFF,
+		.size	= 0x1000000
+	},
+	{
+		.voff	= FFB_DFB32_VOFF,
+		.poff	= FFB_DFB32_POFF,
+		.size	= 0x1000000
+	},
+	{
+		.voff	= FFB_FBC_KREGS_VOFF,
+		.poff	= FFB_FBC_KREGS_POFF,
+		.size	= 0x0002000
+	},
+	{
+		.voff	= FFB_DAC_VOFF,
+		.poff	= FFB_DAC_POFF,
+		.size	= 0x0002000
+	},
+	{
+		.voff	= FFB_PROM_VOFF,
+		.poff	= FFB_PROM_POFF,
+		.size	= 0x0010000
+	},
+	{
+		.voff	= FFB_EXP_VOFF,
+		.poff	= FFB_EXP_POFF,
+		.size	= 0x0002000
+	},
+	{
+		.voff	= FFB_DFB422A_VOFF,
+		.poff	= FFB_DFB422A_POFF,
+		.size	= 0x0800000
+	},
+	{
+		.voff	= FFB_DFB422AD_VOFF,
+		.poff	= FFB_DFB422AD_POFF,
+		.size	= 0x0800000
+	},
+	{
+		.voff	= FFB_DFB24B_VOFF,
+		.poff	= FFB_DFB24B_POFF,
+		.size	= 0x1000000
+	},
+	{
+		.voff	= FFB_DFB422B_VOFF,
+		.poff	= FFB_DFB422B_POFF,
+		.size	= 0x0800000
+	},
+	{
+		.voff	= FFB_DFB422BD_VOFF,
+		.poff	= FFB_DFB422BD_POFF,
+		.size	= 0x0800000
+	},
+	{
+		.voff	= FFB_SFB16Z_VOFF,
+		.poff	= FFB_SFB16Z_POFF,
+		.size	= 0x0800000
+	},
+	{
+		.voff	= FFB_SFB8Z_VOFF,
+		.poff	= FFB_SFB8Z_POFF,
+		.size	= 0x0800000
+	},
+	{
+		.voff	= FFB_SFB422_VOFF,
+		.poff	= FFB_SFB422_POFF,
+		.size	= 0x0800000
+	},
+	{
+		.voff	= FFB_SFB422D_VOFF,
+		.poff	= FFB_SFB422D_POFF,
+		.size	= 0x0800000
+	},
+	{ .size = 0 }
 };
 
 static int ffb_mmap(struct fb_info *info, struct file *file, struct vm_area_struct *vma)

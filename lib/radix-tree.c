@@ -30,12 +30,7 @@
 #include <linux/string.h>
 #include <linux/bitops.h>
 
-/*
- * Radix tree node definition.
- *
- * RADIX_TREE_MAP_SHIFT must be >= log2(BITS_PER_LONG).  Otherwise the tags
- * array will have zero size and the set_tag() arithmetic will go wrong.
- */
+
 #ifdef __KERNEL__
 #define RADIX_TREE_MAP_SHIFT	6
 #else

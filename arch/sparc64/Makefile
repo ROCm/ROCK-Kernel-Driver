@@ -52,7 +52,6 @@ ifeq ($(INLINE_LIMIT),y)
 endif
 
 ifeq ($(CONFIG_MCOUNT),y)
-  CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS))
   CFLAGS := $(CFLAGS) -pg
 endif
 

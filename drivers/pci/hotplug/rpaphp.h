@@ -85,6 +85,7 @@ struct slot {
 	u32 type;
 	u32 power_domain;
 	char *name;
+	char *location;
 	struct device_node *dn;	/* slot's device_node in OFDT */
 	/* dn has phb info */
 	struct pci_dev *bridge;	/* slot's pci_dev in pci_devices */
@@ -129,5 +130,6 @@ extern struct slot *alloc_slot_struct(struct device_node *dn, int drc_index, cha
 extern int register_slot(struct slot *slot);
 extern int rpaphp_get_power_status(struct slot *slot, u8 * value);
 extern int rpaphp_set_attention_status(struct slot *slot, u8 status);
+extern void rpaphp_sysfs_remove_attr_location(struct hotplug_slot *slot);
 	
 #endif				/* _PPC64PHP_H */

@@ -1,8 +1,8 @@
 /*
  * drivers/pci/pci-sysfs.c
  *
- * (C) Copyright 2002 Greg Kroah-Hartman
- * (C) Copyright 2002 IBM Corp.
+ * (C) Copyright 2002-2004 Greg Kroah-Hartman <greg@kroah.com>
+ * (C) Copyright 2002-2004 IBM Corp.
  * (C) Copyright 2003 Matthew Wilcox
  * (C) Copyright 2003 Hewlett-Packard
  *
@@ -71,7 +71,7 @@ pci_read_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
 
 	/* Several chips lock up trying to read undefined config space */
 	if (capable(CAP_SYS_ADMIN)) {
-		size = 256;
+		size = dev->cfg_size;
 	} else if (dev->hdr_type == PCI_HEADER_TYPE_CARDBUS) {
 		size = 128;
 	}
@@ -123,10 +123,10 @@ pci_write_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
 	unsigned int size = count;
 	loff_t init_off = off;
 
-	if (off > 256)
+	if (off > dev->cfg_size)
 		return 0;
-	if (off + count > 256) {
-		size = 256 - off;
+	if (off + count > dev->cfg_size) {
+		size = dev->cfg_size - off;
 		count = size;
 	}
 
@@ -167,6 +167,17 @@ static struct bin_attribute pci_config_attr = {
 	.write = pci_write_config,
 };
 
+static struct bin_attribute pcie_config_attr = {
+	.attr =	{
+		.name = "config",
+		.mode = S_IRUGO | S_IWUSR,
+		.owner = THIS_MODULE,
+	},
+	.size = 4096,
+	.read = pci_read_config,
+	.write = pci_write_config,
+};
+
 void pci_create_sysfs_dev_files (struct pci_dev *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -179,7 +190,11 @@ void pci_create_sysfs_dev_files (struct pci_dev *pdev)
 	device_create_file (dev, &dev_attr_class);
 	device_create_file (dev, &dev_attr_irq);
 	device_create_file (dev, &dev_attr_resource);
-	sysfs_create_bin_file(&dev->kobj, &pci_config_attr);
+
+	if (pdev->cfg_size < 4096)
+		sysfs_create_bin_file(&dev->kobj, &pci_config_attr);
+	else
+		sysfs_create_bin_file(&dev->kobj, &pcie_config_attr);
 
 	/* add platform-specific attributes */
 	pcibios_add_platform_entries(pdev);

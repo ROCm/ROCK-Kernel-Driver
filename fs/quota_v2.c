@@ -65,7 +65,7 @@ static int v2_read_file_info(struct super_block *sb, int type)
 	set_fs(fs);
 	if (size != sizeof(struct v2_disk_dqinfo)) {
 		printk(KERN_WARNING "Can't read info structure on device %s.\n",
-			f->f_vfsmnt->mnt_sb->s_id);
+			f->f_dentry->d_sb->s_id);
 		return -1;
 	}
 	info->dqi_bgrace = le32_to_cpu(dinfo.dqi_bgrace);
@@ -87,10 +87,12 @@ static int v2_write_file_info(struct super_block *sb, int type)
 	ssize_t size;
 	loff_t offset = V2_DQINFOOFF;
 
+	spin_lock(&dq_data_lock);
 	info->dqi_flags &= ~DQF_INFO_DIRTY;
 	dinfo.dqi_bgrace = cpu_to_le32(info->dqi_bgrace);
 	dinfo.dqi_igrace = cpu_to_le32(info->dqi_igrace);
 	dinfo.dqi_flags = cpu_to_le32(info->dqi_flags & DQF_MASK);
+	spin_unlock(&dq_data_lock);
 	dinfo.dqi_blocks = cpu_to_le32(info->u.v2_i.dqi_blocks);
 	dinfo.dqi_free_blk = cpu_to_le32(info->u.v2_i.dqi_free_blk);
 	dinfo.dqi_free_entry = cpu_to_le32(info->u.v2_i.dqi_free_entry);
@@ -100,7 +102,7 @@ static int v2_write_file_info(struct super_block *sb, int type)
 	set_fs(fs);
 	if (size != sizeof(struct v2_disk_dqinfo)) {
 		printk(KERN_WARNING "Can't write info structure on device %s.\n",
-			f->f_vfsmnt->mnt_sb->s_id);
+			f->f_dentry->d_sb->s_id);
 		return -1;
 	}
 	return 0;
@@ -173,9 +175,10 @@ static ssize_t write_blk(struct file *filp, uint blk, dqbuf_t buf)
 }
 
 /* Remove empty block from list and return it */
-static int get_free_dqblk(struct file *filp, struct mem_dqinfo *info)
+static int get_free_dqblk(struct file *filp, int type)
 {
 	dqbuf_t buf = getdqbuf();
+	struct mem_dqinfo *info = sb_dqinfo(filp->f_dentry->d_sb, type);
 	struct v2_disk_dqdbheader *dh = (struct v2_disk_dqdbheader *)buf;
 	int ret, blk;
 
@@ -193,7 +196,7 @@ static int get_free_dqblk(struct file *filp, struct mem_dqinfo *info)
 			goto out_buf;
 		blk = info->u.v2_i.dqi_blocks++;
 	}
-	mark_info_dirty(info);
+	mark_info_dirty(filp->f_dentry->d_sb, type);
 	ret = blk;
 out_buf:
 	freedqbuf(buf);
@@ -201,8 +204,9 @@ out_buf:
 }
 
 /* Insert empty block to the list */
-static int put_free_dqblk(struct file *filp, struct mem_dqinfo *info, dqbuf_t buf, uint blk)
+static int put_free_dqblk(struct file *filp, int type, dqbuf_t buf, uint blk)
 {
+	struct mem_dqinfo *info = sb_dqinfo(filp->f_dentry->d_sb, type);
 	struct v2_disk_dqdbheader *dh = (struct v2_disk_dqdbheader *)buf;
 	int err;
 
@@ -210,16 +214,17 @@ static int put_free_dqblk(struct file *filp, struct mem_dqinfo *info, dqbuf_t bu
 	dh->dqdh_prev_free = cpu_to_le32(0);
 	dh->dqdh_entries = cpu_to_le16(0);
 	info->u.v2_i.dqi_free_blk = blk;
-	mark_info_dirty(info);
+	mark_info_dirty(filp->f_dentry->d_sb, type);
 	if ((err = write_blk(filp, blk, buf)) < 0)	/* Some strange block. We had better leave it... */
 		return err;
 	return 0;
 }
 
 /* Remove given block from the list of blocks with free entries */
-static int remove_free_dqentry(struct file *filp, struct mem_dqinfo *info, dqbuf_t buf, uint blk)
+static int remove_free_dqentry(struct file *filp, int type, dqbuf_t buf, uint blk)
 {
 	dqbuf_t tmpbuf = getdqbuf();
+	struct mem_dqinfo *info = sb_dqinfo(filp->f_dentry->d_sb, type);
 	struct v2_disk_dqdbheader *dh = (struct v2_disk_dqdbheader *)buf;
 	uint nextblk = le32_to_cpu(dh->dqdh_next_free), prevblk = le32_to_cpu(dh->dqdh_prev_free);
 	int err;
@@ -242,7 +247,7 @@ static int remove_free_dqentry(struct file *filp, struct mem_dqinfo *info, dqbuf
 	}
 	else {
 		info->u.v2_i.dqi_free_entry = nextblk;
-		mark_info_dirty(info);
+		mark_info_dirty(filp->f_dentry->d_sb, type);
 	}
 	freedqbuf(tmpbuf);
 	dh->dqdh_next_free = dh->dqdh_prev_free = cpu_to_le32(0);
@@ -255,9 +260,10 @@ out_buf:
 }
 
 /* Insert given block to the beginning of list with free entries */
-static int insert_free_dqentry(struct file *filp, struct mem_dqinfo *info, dqbuf_t buf, uint blk)
+static int insert_free_dqentry(struct file *filp, int type, dqbuf_t buf, uint blk)
 {
 	dqbuf_t tmpbuf = getdqbuf();
+	struct mem_dqinfo *info = sb_dqinfo(filp->f_dentry->d_sb, type);
 	struct v2_disk_dqdbheader *dh = (struct v2_disk_dqdbheader *)buf;
 	int err;
 
@@ -276,7 +282,7 @@ static int insert_free_dqentry(struct file *filp, struct mem_dqinfo *info, dqbuf
 	}
 	freedqbuf(tmpbuf);
 	info->u.v2_i.dqi_free_entry = blk;
-	mark_info_dirty(info);
+	mark_info_dirty(filp->f_dentry->d_sb, type);
 	return 0;
 out_buf:
 	freedqbuf(tmpbuf);
@@ -307,7 +313,7 @@ static uint find_free_dqentry(struct dquot *dquot, int *err)
 			goto out_buf;
 	}
 	else {
-		blk = get_free_dqblk(filp, info);
+		blk = get_free_dqblk(filp, dquot->dq_type);
 		if ((int)blk < 0) {
 			*err = blk;
 			freedqbuf(buf);
@@ -315,10 +321,10 @@ static uint find_free_dqentry(struct dquot *dquot, int *err)
 		}
 		memset(buf, 0, V2_DQBLKSIZE);
 		info->u.v2_i.dqi_free_entry = blk;	/* This is enough as block is already zeroed and entry list is empty... */
-		mark_info_dirty(info);
+		mark_info_dirty(dquot->dq_sb, dquot->dq_type);
 	}
 	if (le16_to_cpu(dh->dqdh_entries)+1 >= V2_DQSTRINBLK)	/* Block will be full? */
-		if ((*err = remove_free_dqentry(filp, info, buf, blk)) < 0) {
+		if ((*err = remove_free_dqentry(filp, dquot->dq_type, buf, blk)) < 0) {
 			printk(KERN_ERR "VFS: find_free_dqentry(): Can't remove block (%u) from entry free list.\n", blk);
 			goto out_buf;
 		}
@@ -349,7 +355,6 @@ out_buf:
 static int do_insert_tree(struct dquot *dquot, uint *treeblk, int depth)
 {
 	struct file *filp = sb_dqopt(dquot->dq_sb)->files[dquot->dq_type];
-	struct mem_dqinfo *info = sb_dqopt(dquot->dq_sb)->info + dquot->dq_type;
 	dqbuf_t buf;
 	int ret = 0, newson = 0, newact = 0;
 	u32 *ref;
@@ -358,7 +363,7 @@ static int do_insert_tree(struct dquot *dquot, uint *treeblk, int depth)
 	if (!(buf = getdqbuf()))
 		return -ENOMEM;
 	if (!*treeblk) {
-		ret = get_free_dqblk(filp, info);
+		ret = get_free_dqblk(filp, dquot->dq_type);
 		if (ret < 0)
 			goto out_buf;
 		*treeblk = ret;
@@ -392,7 +397,7 @@ static int do_insert_tree(struct dquot *dquot, uint *treeblk, int depth)
 		ret = write_blk(filp, *treeblk, buf);
 	}
 	else if (newact && ret < 0)
-		put_free_dqblk(filp, info, buf, *treeblk);
+		put_free_dqblk(filp, dquot->dq_type, buf, *treeblk);
 out_buf:
 	freedqbuf(buf);
 	return ret;
@@ -417,6 +422,7 @@ static int v2_write_dquot(struct dquot *dquot)
 	ssize_t ret;
 	struct v2_disk_dqblk ddquot;
 
+	/* dq_off is guarded by dqio_sem */
 	if (!dquot->dq_off)
 		if ((ret = dq_insert_tree(dquot)) < 0) {
 			printk(KERN_ERR "VFS: Error %Zd occurred while creating quota.\n", ret);
@@ -424,7 +430,9 @@ static int v2_write_dquot(struct dquot *dquot)
 		}
 	filp = sb_dqopt(dquot->dq_sb)->files[type];
 	offset = dquot->dq_off;
+	spin_lock(&dq_data_lock);
 	mem2diskdqb(&ddquot, &dquot->dq_dqb, dquot->dq_id);
+	spin_unlock(&dq_data_lock);
 	fs = get_fs();
 	set_fs(KERNEL_DS);
 	ret = filp->f_op->write(filp, (char *)&ddquot, sizeof(struct v2_disk_dqblk), &offset);
@@ -445,7 +453,6 @@ static int v2_write_dquot(struct dquot *dquot)
 static int free_dqentry(struct dquot *dquot, uint blk)
 {
 	struct file *filp = sb_dqopt(dquot->dq_sb)->files[dquot->dq_type];
-	struct mem_dqinfo *info = sb_dqopt(dquot->dq_sb)->info + dquot->dq_type;
 	struct v2_disk_dqdbheader *dh;
 	dqbuf_t buf = getdqbuf();
 	int ret = 0;
@@ -463,8 +470,8 @@ static int free_dqentry(struct dquot *dquot, uint blk)
 	dh = (struct v2_disk_dqdbheader *)buf;
 	dh->dqdh_entries = cpu_to_le16(le16_to_cpu(dh->dqdh_entries)-1);
 	if (!le16_to_cpu(dh->dqdh_entries)) {	/* Block got free? */
-		if ((ret = remove_free_dqentry(filp, info, buf, blk)) < 0 ||
-		    (ret = put_free_dqblk(filp, info, buf, blk)) < 0) {
+		if ((ret = remove_free_dqentry(filp, dquot->dq_type, buf, blk)) < 0 ||
+		    (ret = put_free_dqblk(filp, dquot->dq_type, buf, blk)) < 0) {
 			printk(KERN_ERR "VFS: Can't move quota data block (%u) to free list.\n", blk);
 			goto out_buf;
 		}
@@ -473,7 +480,7 @@ static int free_dqentry(struct dquot *dquot, uint blk)
 		memset(buf+(dquot->dq_off & ((1 << V2_DQBLKSIZE_BITS)-1)), 0, sizeof(struct v2_disk_dqblk));
 		if (le16_to_cpu(dh->dqdh_entries) == V2_DQSTRINBLK-1) {
 			/* Insert will write block itself */
-			if ((ret = insert_free_dqentry(filp, info, buf, blk)) < 0) {
+			if ((ret = insert_free_dqentry(filp, dquot->dq_type, buf, blk)) < 0) {
 				printk(KERN_ERR "VFS: Can't insert quota data block (%u) to free entry list.\n", blk);
 				goto out_buf;
 			}
@@ -494,7 +501,6 @@ out_buf:
 static int remove_tree(struct dquot *dquot, uint *blk, int depth)
 {
 	struct file *filp = sb_dqopt(dquot->dq_sb)->files[dquot->dq_type];
-	struct mem_dqinfo *info = sb_dqopt(dquot->dq_sb)->info + dquot->dq_type;
 	dqbuf_t buf = getdqbuf();
 	int ret = 0;
 	uint newblk;
@@ -518,7 +524,7 @@ static int remove_tree(struct dquot *dquot, uint *blk, int depth)
 		ref[GETIDINDEX(dquot->dq_id, depth)] = cpu_to_le32(0);
 		for (i = 0; i < V2_DQBLKSIZE && !buf[i]; i++);	/* Block got empty? */
 		if (i == V2_DQBLKSIZE) {
-			put_free_dqblk(filp, info, buf, *blk);
+			put_free_dqblk(filp, dquot->dq_type, buf, *blk);
 			*blk = 0;
 		}
 		else
@@ -632,7 +638,7 @@ static int v2_read_dquot(struct dquot *dquot)
 		if (offset < 0)
 			printk(KERN_ERR "VFS: Can't read quota structure for id %u.\n", dquot->dq_id);
 		dquot->dq_off = 0;
-		dquot->dq_flags |= DQ_FAKE;
+		set_bit(DQ_FAKE_B, &dquot->dq_flags);
 		memset(&dquot->dq_dqb, 0, sizeof(struct mem_dqblk));
 		ret = offset;
 	}
@@ -650,21 +656,24 @@ static int v2_read_dquot(struct dquot *dquot)
 			ret = 0;
 		set_fs(fs);
 		disk2memdqb(&dquot->dq_dqb, &ddquot);
+		if (!dquot->dq_dqb.dqb_bhardlimit &&
+			!dquot->dq_dqb.dqb_bsoftlimit &&
+			!dquot->dq_dqb.dqb_ihardlimit &&
+			!dquot->dq_dqb.dqb_isoftlimit)
+			set_bit(DQ_FAKE_B, &dquot->dq_flags);
 	}
 	dqstats.reads++;
 
 	return ret;
 }
 
-/* Commit changes of dquot to disk - it might also mean deleting it when quota became fake one and user has no blocks... */
-static int v2_commit_dquot(struct dquot *dquot)
+/* Check whether dquot should not be deleted. We know we are
+ * the only one operating on dquot (thanks to dq_lock) */
+static int v2_release_dquot(struct dquot *dquot)
 {
-	/* We clear the flag everytime so we don't loop when there was an IO error... */
-	dquot->dq_flags &= ~DQ_MOD;
-	if (dquot->dq_flags & DQ_FAKE && !(dquot->dq_dqb.dqb_curinodes | dquot->dq_dqb.dqb_curspace))
+	if (test_bit(DQ_FAKE_B, &dquot->dq_flags) && !(dquot->dq_dqb.dqb_curinodes | dquot->dq_dqb.dqb_curspace))
 		return v2_delete_dquot(dquot);
-	else
-		return v2_write_dquot(dquot);
+	return 0;
 }
 
 static struct quota_format_ops v2_format_ops = {
@@ -673,7 +682,8 @@ static struct quota_format_ops v2_format_ops = {
 	.write_file_info	= v2_write_file_info,
 	.free_file_info		= NULL,
 	.read_dqblk		= v2_read_dquot,
-	.commit_dqblk		= v2_commit_dquot,
+	.commit_dqblk		= v2_write_dquot,
+	.release_dqblk		= v2_release_dquot,
 };
 
 static struct quota_format_type v2_quota_format = {

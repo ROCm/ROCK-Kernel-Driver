@@ -96,23 +96,6 @@ static void *detect_HRT_floating_pointer(void *begin, void *end)
 	return fp;
 }
 
-#if link_available
-/*
- *  Links available memory, IO, and IRQ resources for programming
- *  devices which may be added to the system
- *
- *  Returns 0 if success
- */
-static int
-link_available_resources (
-	struct controller *ctrl,
-	struct pci_func *func,
-	int index )
-{
-	return shpchp_save_used_resources (ctrl, func, !DISABLE_CARD);
-}
-#endif
-
 /*
  * shpchprm_find_available_resources
  *
@@ -345,19 +328,6 @@ int shpchprm_find_available_resources(struct controller *ctrl)
 			}
 		}
 
-#if link_available
-		++index;
-
-		while (index < 8) {
-			if (((func = shpchp_slot_find(primary_bus, dev_func >> 3, index)) != NULL) && populated_slot)
-				rc = link_available_resources(ctrl, func, index);
-			
-			if (rc)
-				break;
-
-			++index;
-		}
-#endif
 		i--;
 		one_slot += sizeof(struct slot_rt);
 	}
