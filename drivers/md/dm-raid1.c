@@ -1205,7 +1205,7 @@ static int mirror_status(struct dm_target *ti, status_type_t type,
 		break;
 
 	case STATUSTYPE_TABLE:
-		MEMIT("%d ", ms->nr_mirrors);
+		EMIT("%d ", ms->nr_mirrors);
 		for (m = 0; m < ms->nr_mirrors; m++) {
 			format_dev_t(buffer, ms->mirror[m].dev->bdev->bd_dev);
 			EMIT("%s " SECTOR_FORMAT " ",

@@ -603,7 +603,7 @@ static region_t core_get_sync_count(struct dirty_log *log)
 
 #define	DMEMIT_SYNC \
 	if (lc->sync != DEFAULTSYNC) \
-		DMEMIT("%ssync ", lc->sync == NOSYNC ? "no" : "")
+		EMIT("%ssync ", lc->sync == NOSYNC ? "no" : "")
 
 static int core_status(struct dirty_log *log, status_type_t status,
 		       char *result, unsigned int maxlen)
@@ -616,7 +616,7 @@ static int core_status(struct dirty_log *log, status_type_t status,
 		break;
 
 	case STATUSTYPE_TABLE:
-		DMEMIT("%s %u " SECTOR_FORMAT " ", log->type->name,
+		EMIT("%s %u " SECTOR_FORMAT " ", log->type->name,
 		       lc->sync == DEFAULTSYNC ? 1 : 2, lc->region_size);
 		DMEMIT_SYNC;
 	}
@@ -637,7 +637,7 @@ static int disk_status(struct dirty_log *log, status_type_t status,
 
 	case STATUSTYPE_TABLE:
 		format_dev_t(buffer, lc->log_dev->bdev->bd_dev);
-		DMEMIT("%s %u %s " SECTOR_FORMAT " ", log->type->name,
+		EMIT("%s %u %s " SECTOR_FORMAT " ", log->type->name,
 		       lc->sync == DEFAULTSYNC ? 2 : 3, buffer,
 		       lc->region_size);
 		DMEMIT_SYNC;
