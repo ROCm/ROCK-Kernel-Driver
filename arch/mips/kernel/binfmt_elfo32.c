@@ -130,15 +130,6 @@ void elf32_core_copy_regs(elf_gregset_t _dest, struct pt_regs *_regs)
 	_dest[i++] = (elf_greg_t) _regs->cp0_cause;
 }
 
-#undef CONFIG_BINFMT_ELF
-#ifdef CONFIG_BINFMT_ELF32
-#define CONFIG_BINFMT_ELF CONFIG_BINFMT_ELF32
-#endif
-#undef CONFIG_BINFMT_ELF_MODULE
-#ifdef CONFIG_BINFMT_ELF32_MODULE
-#define CONFIG_BINFMT_ELF_MODULE CONFIG_BINFMT_ELF32_MODULE
-#endif
-
 MODULE_DESCRIPTION("Binary format loader for compatibility with o32 Linux/MIPS binaries");
 MODULE_AUTHOR("Ralf Baechle (ralf@linux-mips.org)");
 
