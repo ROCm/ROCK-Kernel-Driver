@@ -117,6 +117,31 @@ config I2C_PIIX4
 	  http://www.lm-sensors.nu
 
 
+config I2C_SIS96X
+	tristate "  SiS 96x"
+	depends on I2C && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the SiS
+	  96x SMBus (a subset of I2C) interfaces.  Specifically, the following
+	  chipsets are supported:
+	    645/961
+	    645DX/961
+	    645DX/962
+	    648/961
+	    650/961
+	    735
+
+	  This can also be built as a module which can be inserted and removed 
+	  while the kernel is running.  If you want to compile it as a module,
+	  say M here and read <file:Documentation/modules.txt>.
+
+	  The module will be called i2c-sis96x.
+
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at 
+	  http://www.lm-sensors.nu
+
+
 config I2C_VIAPRO
 	tristate "  VIA 82C596/82C686/823x"
 	depends on I2C && PCI && EXPERIMENTAL

@@ -630,7 +630,6 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 			}
 		}
 	}
-	memset (new_client, 0x00, sizeof(struct i2c_client) + sizeof(struct it87_data));
 
 	/* OK. For now, we presume we have a valid client. We now create the
 	   client structure, even though we cannot fill it completely yet.
