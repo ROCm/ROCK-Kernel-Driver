@@ -299,14 +299,9 @@ extern void __struct_cpy_bug (void);
 static inline void * memmove(void * dest,const void * src, size_t n)
 {
 int d0, d1, d2;
-if (dest<src)
-__asm__ __volatile__(
-	"rep\n\t"
-	"movsb"
-	: "=&c" (d0), "=&S" (d1), "=&D" (d2)
-	:"0" (n),"1" (src),"2" (dest)
-	: "memory");
-else
+if (dest<src) {
+	memcpy(dest,src,n);
+} else
 __asm__ __volatile__(
 	"std\n\t"
 	"rep\n\t"
