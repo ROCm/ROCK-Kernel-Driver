@@ -457,3 +457,63 @@ idx_err_out:
 	err = -EIO;
 	goto err_out;
 }
+
+#ifdef NTFS_RW
+
+/**
+ * __ntfs_index_entry_mark_dirty - mark an index allocation entry dirty
+ * @ictx:	ntfs index context describing the index entry
+ *
+ * NOTE: You want to use fs/ntfs/index.h::ntfs_index_entry_mark_dirty() instead!
+ * 
+ * Mark the index allocation entry described by the index entry context @ictx
+ * dirty.
+ *
+ * The index entry must be in an index block belonging to the index allocation
+ * attribute.  Mark the buffers belonging to the index record as well as the
+ * page cache page the index block is in dirty.  This automatically marks the
+ * VFS inode of the ntfs index inode to which the index entry belongs dirty,
+ * too (I_DIRTY_PAGES) and this in turn ensures the page buffers, and hence the
+ * dirty index block, will be written out to disk later.
+ */
+void __ntfs_index_entry_mark_dirty(ntfs_index_context *ictx)
+{
+	struct address_space *mapping;
+	struct page *page;
+	ntfs_inode *ni;
+
+	BUG_ON(ictx->is_in_root);
+	ni = ictx->idx_ni;
+	page = ictx->page;
+	/*
+	 * If the index block is the same size as the page cache page, set all
+	 * the buffers in the page, as well as the page itself, dirty.
+	 */
+	if (ni->itype.index.block_size == PAGE_CACHE_SIZE) {
+		__set_page_dirty_buffers(page);
+		return;
+	}
+	/* Set only the buffers in which the index block is located dirty. */
+	mapping = page->mapping;
+	if (page_has_buffers(page)) {
+		struct buffer_head *bh, *head;
+		unsigned int bh_start, bh_end, rec_start, rec_end;
+		unsigned int bh_size = ni->vol->sb->s_blocksize;
+
+		bh = head = page_buffers(page);
+		bh_start = 0;
+		rec_start = (unsigned int)((u8*)ictx->ia -
+				(u8*)page_address(page));
+		rec_end = rec_start + ni->itype.index.block_size;
+		do {
+			bh_end = bh_start + bh_size;
+			if ((bh_start >= rec_start) && (bh_end <= rec_end))
+				set_buffer_dirty(bh);
+			bh_start = bh_end;
+		} while ((bh = bh->b_this_page) != head);
+	}
+	/* Finally, set the page itself dirty, too. */
+	__set_page_dirty_nobuffers(page);
+}
+
+#endif /* NTFS_RW */

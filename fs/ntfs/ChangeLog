@@ -83,6 +83,12 @@ ToDo/Notes:
 	  It is simply set to __set_page_dirty_nobuffers() to make sure that
 	  running set_page_dirty() on a page containing mft/ntfs records will
 	  not affect the dirty state of the page buffers.
+	- Add fs/ntfs/index.c::__ntfs_index_entry_mark_dirty() which sets all
+	  buffers that are inside the ntfs record in the page dirty after which
+	  it sets the page dirty.  This allows ->writepage to only write the
+	  dirty index records rather than having to write all the records in
+	  the page.  Modify fs/ntfs/index.h::ntfs_index_entry_mark_dirty() to
+	  use this rather than __set_page_dirty_nobuffers().
 
 2.1.14 - Fix an NFSd caused deadlock reported by several users.
 

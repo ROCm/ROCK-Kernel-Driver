@@ -54,8 +54,8 @@
  * @page are NULL in this case.
  *
  * If @is_in_root is FALSE, @entry is in the index allocation attribute and @ia
- * and @page point to the index allocation block and the locked page it is in,
- * respectively.  @ir, @actx and @base_ni are NULL in this case.
+ * and @page point to the index allocation block and the mapped, locked page it
+ * is in, respectively.  @ir, @actx and @base_ni are NULL in this case.
  *
  * To obtain a context call ntfs_index_ctx_get().
  *
@@ -115,6 +115,8 @@ static inline void ntfs_index_entry_flush_dcache_page(ntfs_index_context *ictx)
 		flush_dcache_page(ictx->page);
 }
 
+extern void __ntfs_index_entry_mark_dirty(ntfs_index_context *ictx);
+
 /**
  * ntfs_index_entry_mark_dirty - mark an index entry dirty
  * @ictx:	ntfs index context describing the index entry
@@ -127,27 +129,18 @@ static inline void ntfs_index_entry_flush_dcache_page(ntfs_index_context *ictx)
  * later.
  *
  * If the index entry is in an index block belonging to the index allocation
- * attribute, simply mark the page cache page the index block is in dirty.
- * This automatically marks the VFS inode of the ntfs index inode to which the
- * index entry belongs dirty, too (I_DIRTY_PAGES) and this in turn ensures the
- * page, and hence the dirty index block, will be written out to disk later.
- *
- * Note, that if an index block is smaller than PAGE_CACHE_SIZE, i.e. if there
- * are multiple index blocks in each page cache page, dirtying an index entry
- * in one index block will cause all index blocks located in the same page
- * cache page to be written out, too but this is a small price to pay
- * considering how much more complicated the code would have to be to keep
- * track of which index block inside a page is dirty and which is not.  And
- * anyway, on ia32 architectures index blocks are usually 4kiB in size which is
- * the PAGE_CACHE_SIZE and hence this problem does not exist in the majority of
- * cases.
+ * attribute, mark the buffers belonging to the index record as well as the
+ * page cache page the index block is in dirty.  This automatically marks the
+ * VFS inode of the ntfs index inode to which the index entry belongs dirty,
+ * too (I_DIRTY_PAGES) and this in turn ensures the page buffers, and hence the
+ * dirty index block, will be written out to disk later.
  */
 static inline void ntfs_index_entry_mark_dirty(ntfs_index_context *ictx)
 {
 	if (ictx->is_in_root)
 		mark_mft_record_dirty(ictx->actx->ntfs_ino);
 	else
-		__set_page_dirty_nobuffers(ictx->page);
+		__ntfs_index_entry_mark_dirty(ictx);
 }
 
 #endif /* NTFS_RW */
