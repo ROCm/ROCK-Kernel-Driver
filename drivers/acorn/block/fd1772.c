@@ -1539,11 +1539,9 @@ int fd1772_init(void)
 			goto err_disk;
 	}
 
-	err = register_blkdev(MAJOR_NR, "fd", &floppy_fops);
-	if (err) {
-		printk("Unable to get major %d for floppy\n", MAJOR_NR);
+	err = register_blkdev(MAJOR_NR, "fd");
+	if (err)
 		goto err_disk;
-	}
 
 	err = -EBUSY;
 	if (request_dma(FLOPPY_DMA, "fd1772")) {

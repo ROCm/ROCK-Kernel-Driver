@@ -4232,8 +4232,7 @@ int __init floppy_init(void)
 	}
 
 	devfs_mk_dir (NULL, "floppy", NULL);
-	if (register_blkdev(FLOPPY_MAJOR,"fd",&floppy_fops)) {
-		printk("Unable to get major %d for floppy\n",FLOPPY_MAJOR);
+	if (register_blkdev(FLOPPY_MAJOR,"fd")) {
 		err = -EBUSY;
 		goto out;
 	}

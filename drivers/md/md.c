@@ -3214,11 +3214,10 @@ int __init md_init(void)
 			MD_MAJOR_VERSION, MD_MINOR_VERSION,
 			MD_PATCHLEVEL_VERSION, MAX_MD_DEVS, MD_SB_DISKS);
 
-	if (register_blkdev (MAJOR_NR, "md", &md_fops)) {
-		printk(KERN_ALERT "md: Unable to get major %d for md\n", MAJOR_NR);
-		return (-1);
-	}
-	devfs_mk_dir (NULL, "md", NULL);
+	if (register_blkdev(MAJOR_NR, "md"))
+		return -1;
+
+	devfs_mk_dir(NULL, "md", NULL);
 	blk_register_region(MKDEV(MAJOR_NR, 0), MAX_MD_DEVS, THIS_MODULE,
 				md_probe, NULL, NULL);
 	for (minor=0; minor < MAX_MD_DEVS; ++minor) {

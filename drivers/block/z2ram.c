@@ -331,21 +331,18 @@ static struct gendisk *z2_find(dev_t dev, int *part, void *data)
 static struct request_queue z2_queue;
 
 int __init 
-z2_init( void )
+z2_init(void)
 {
 
-    if ( !MACH_IS_AMIGA )
+    if (!MACH_IS_AMIGA)
 	return -ENXIO;
 
-    if ( register_blkdev( Z2RAM_MAJOR, DEVICE_NAME, &z2_fops ) )
-    {
-	printk( KERN_ERR DEVICE_NAME ": Unable to get major %d\n",
-	    Z2RAM_MAJOR );
+    if (register_blkdev(Z2RAM_MAJOR, DEVICE_NAME))
 	return -EBUSY;
-    }
+
     z2ram_gendisk = alloc_disk(1);
     if (!z2ram_gendisk) {
-	unregister_blkdev( Z2RAM_MAJOR, DEVICE_NAME );
+	unregister_blkdev(Z2RAM_MAJOR, DEVICE_NAME);
 	return -ENOMEM;
     }
     z2ram_gendisk->major = Z2RAM_MAJOR;

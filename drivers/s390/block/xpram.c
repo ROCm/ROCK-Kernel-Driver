@@ -430,13 +430,11 @@ static int __init xpram_setup_blkdev(void)
 	/*
 	 * Register xpram major.
 	 */
-	rc = register_blkdev(XPRAM_MAJOR, XPRAM_NAME, &xpram_devops);
-	if (rc < 0) {
-		PRINT_ERR("Can't get xpram major %d\n", XPRAM_MAJOR);
+	rc = register_blkdev(XPRAM_MAJOR, XPRAM_NAME);
+	if (rc < 0)
 		goto out;
-	}
 
-	devfs_mk_dir (NULL, "slram", NULL);
+	devfs_mk_dir(NULL, "slram", NULL);
 
 	/*
 	 * Assign the other needed values: make request function, sizes and
@@ -452,6 +450,7 @@ static int __init xpram_setup_blkdev(void)
 	for (i = 0; i < xpram_devs; i++) {
 		struct gendisk *disk = xpram_disks[i];
 		char name[16];
+
 		xpram_devices[i].size = xpram_sizes[i] / 4;
 		xpram_devices[i].offset = offset;
 		offset += xpram_devices[i].size;

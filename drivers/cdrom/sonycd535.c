@@ -1546,9 +1546,7 @@ static int __init sony535_init(void)
 		printk("IRQ%d, ", tmp_irq);
 	printk("using %d byte buffer\n", sony_buffer_size);
 
-	if (register_blkdev(MAJOR_NR, CDU535_HANDLE, &cdu_fops)) {
-		printk("Unable to get major %d for %s\n",
-				MAJOR_NR, CDU535_MESSAGE_NAME);
+	if (register_blkdev(MAJOR_NR, CDU535_HANDLE)) {
 		err = -EIO;
 		goto out1;
 	}

@@ -708,10 +708,10 @@ static struct block_device_operations hd_fops = {
 static int __init hd_init(void)
 {
 	int drive;
-	if (register_blkdev(MAJOR_NR,"hd",&hd_fops)) {
-		printk("hd: unable to get major %d for hard disk\n",MAJOR_NR);
+
+	if (register_blkdev(MAJOR_NR,"hd"))
 		return -1;
-	}
+
 	blk_init_queue(&hd_queue, do_hd_request, &hd_lock);
 	blk_queue_max_sectors(&hd_queue, 255);
 	init_timer(&device_timer);

@@ -1281,11 +1281,9 @@ int init_ftl(void)
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 	DEBUG(0, "$Id: ftl.c,v 1.39 2001/10/02 15:05:11 dwmw2 Exp $\n");
 
-	if (register_blkdev(FTL_MAJOR, "ftl", &ftl_blk_fops)) {
-		printk(KERN_NOTICE "ftl_cs: unable to grab major "
-		       "device number!\n");
+	if (register_blkdev(FTL_MAJOR, "ftl"))
 		return -EAGAIN;
-	}
+
 	blk_init_queue(&ftl_queue, &do_ftl_request, &lock);
 	register_mtd_user(&ftl_notifier);
 	return 0;

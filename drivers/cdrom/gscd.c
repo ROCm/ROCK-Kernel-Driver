@@ -959,12 +959,11 @@ static int __init gscd_init(void)
 	gscd_disk->fops = &gscd_fops;
 	sprintf(gscd_disk->disk_name, "gscd");
 
-	if (register_blkdev(MAJOR_NR, "gscd", &gscd_fops) != 0) {
-		printk(KERN_WARNING "GSCD: Unable to get major %d for GoldStar "
-		       "CD-ROM\n", MAJOR_NR);
+	if (register_blkdev(MAJOR_NR, "gscd")) {
 		ret = -EIO;
 		goto err_out2;
 	}
+
 	devfs_register(NULL, "gscd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 		       S_IFBLK | S_IRUGO | S_IWUGO, &gscd_fops, NULL);
 

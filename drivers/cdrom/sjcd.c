@@ -1677,11 +1677,8 @@ static int __init sjcd_init(void)
 	printk("SJCD: sjcd=0x%x: ", sjcd_base);
 #endif
 
-	if (register_blkdev(MAJOR_NR, "sjcd", &sjcd_fops) != 0) {
-		printk("SJCD: Unable to get major %d for Sanyo CD-ROM\n",
-		       MAJOR_NR);
-		return (-EIO);
-	}
+	if (register_blkdev(MAJOR_NR, "sjcd"))
+		return -EIO;
 
 	blk_init_queue(&sjcd_queue, do_sjcd_request, &sjcd_lock);
 	blk_queue_hardsect_size(&sjcd_queue, 2048);

@@ -835,7 +835,7 @@ static int __init init_sr(void)
 {
 	int rc;
 
-	rc = register_blkdev(SCSI_CDROM_MAJOR, "sr", &sr_bdops);
+	rc = register_blkdev(SCSI_CDROM_MAJOR, "sr");
 	if (rc)
 		return rc;
 	return scsi_register_device(&sr_template);

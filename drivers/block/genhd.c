@@ -14,10 +14,16 @@
 #include <linux/slab.h>
 #include <linux/kmod.h>
 
+#define MAX_PROBE_HASH 255	/* random */
 
 static struct subsystem block_subsys;
 
-#define MAX_PROBE_HASH 23	/* random */
+/* Can be merged with blk_probe or deleted altogether. Later. */
+static struct blk_major_name {
+	struct blk_major_name *next;
+	int major;
+	char name[16];
+} *major_names[MAX_PROBE_HASH];
 
 static struct blk_probe {
 	struct blk_probe *next;
@@ -30,9 +36,132 @@ static struct blk_probe {
 } *probes[MAX_PROBE_HASH];
 
 /* index in the above - for now: assume no multimajor ranges */
+static inline int major_to_index(int major)
+{
+	return major % MAX_PROBE_HASH;
+}
+
 static inline int dev_to_index(dev_t dev)
 {
-	return MAJOR(dev) % MAX_PROBE_HASH;
+	return major_to_index(MAJOR(dev));
+}
+
+const char *__bdevname(dev_t dev)
+{
+	static char buffer[40];
+	char *name = "unknown-block";
+	unsigned int major = MAJOR(dev);
+	unsigned int minor = MINOR(dev);
+	int index = major_to_index(major);
+	struct blk_major_name *n;
+
+	down_read(&block_subsys.rwsem);
+	for (n = major_names[index]; n; n = n->next)
+		if (n->major == major)
+			break;
+	if (n)
+		name = &(n->name[0]);
+	sprintf(buffer, "%s(%u,%u)", name, major, minor);
+	up_read(&block_subsys.rwsem);
+
+	return buffer;
+}
+
+/* get block device names in somewhat random order */
+int get_blkdev_list(char *p)
+{
+	struct blk_major_name *n;
+	int i, len;
+
+	len = sprintf(p, "\nBlock devices:\n");
+
+	down_read(&block_subsys.rwsem);
+	for (i = 0; i < ARRAY_SIZE(major_names); i++) {
+		for (n = major_names[i]; n; n = n->next)
+			len += sprintf(p+len, "%3d %s\n",
+				       n->major, n->name);
+	}
+	up_read(&block_subsys.rwsem);
+
+	return len;
+}
+
+int register_blkdev(unsigned int major, const char *name)
+{
+	struct blk_major_name **n, *p;
+	int index, ret = 0;
+
+	if (devfs_only())
+		return 0;
+
+	/* temporary */
+	if (major == 0) {
+		down_read(&block_subsys.rwsem);
+		for (index = ARRAY_SIZE(major_names)-1; index > 0; index--)
+			if (major_names[index] == NULL)
+				break;
+		up_read(&block_subsys.rwsem);
+
+		if (index == 0) {
+			printk("register_blkdev: failed to get major for %s\n",
+			       name);
+			return -EBUSY;
+		}
+		ret = major = index;
+	}
+
+	p = kmalloc(sizeof(struct blk_major_name), GFP_KERNEL);
+	if (p == NULL)
+		return -ENOMEM;
+
+	p->major = major;
+	strncpy(p->name, name, sizeof(p->name)-1);
+	p->name[sizeof(p->name)-1] = 0;
+	p->next = 0;
+	index = major_to_index(major);
+
+	down_write(&block_subsys.rwsem);
+	for (n = &major_names[index]; *n; n = &(*n)->next)
+		if ((*n)->major == major)
+			break;
+	if (!*n)
+		*n = p;
+	else
+		ret = -EBUSY;
+	up_write(&block_subsys.rwsem);
+
+	if (ret < 0)
+		printk("register_blkdev: cannot get major %d for %s\n",
+		       major, name);
+
+	return ret;
+}
+
+/* todo: make void - error printk here */
+int unregister_blkdev(unsigned int major, const char *name)
+{
+	struct blk_major_name **n, *p;
+	int index;
+	int ret = 0;
+
+	if (devfs_only())
+		return 0;
+	index = major_to_index(major);
+
+	down_write(&block_subsys.rwsem);
+	for (n = &major_names[index]; *n; n = &(*n)->next)
+		if ((*n)->major == major)
+			break;
+	if (!*n || strcmp((*n)->name, name))
+		ret = -EINVAL;
+	else {
+		p = *n;
+		*n = p->next;
+		kfree(p);
+	}
+	up_write(&block_subsys.rwsem);
+
+	return ret;
 }
 
 /*
@@ -47,6 +176,9 @@ void blk_register_region(dev_t dev, unsigned long range, struct module *module,
 	int index = dev_to_index(dev);
 	struct blk_probe *p = kmalloc(sizeof(struct blk_probe), GFP_KERNEL);
 	struct blk_probe **s;
+
+	if (p == NULL)
+		return;
 
 	p->owner = module;
 	p->get = probe;
@@ -98,9 +230,9 @@ static int exact_lock(dev_t dev, void *data)
 
 /**
  * add_gendisk - add partitioning information to kernel list
- * @gp: per-device partitioning information
+ * @disk: per-device partitioning information
  *
- * This function registers the partitioning information in @gp
+ * This function registers the partitioning information in @disk
  * with the kernel.
  */
 void add_disk(struct gendisk *disk)
