@@ -18,18 +18,13 @@ int mce_disabled __initdata = 0;
 int nr_mce_banks;
 
 /* Handle unconfigured int18 (should never happen) */
-static void unexpected_machine_check(struct pt_regs * regs, long error_code)
+static asmlinkage void unexpected_machine_check(struct pt_regs * regs, long error_code)
 {	
 	printk(KERN_ERR "CPU#%d: Unexpected int18 (Machine Check).\n", smp_processor_id());
 }
 
 /* Call the installed machine check handler for this CPU setup. */
-void (*machine_check_vector)(struct pt_regs *, long error_code) = unexpected_machine_check;
-
-asmlinkage void do_machine_check(struct pt_regs * regs, long error_code)
-{
-	machine_check_vector(regs, error_code);
-}
+void asmlinkage (*machine_check_vector)(struct pt_regs *, long error_code) = unexpected_machine_check;
 
 /* This has to be run for each processor */
 void __init mcheck_init(struct cpuinfo_x86 *c)
