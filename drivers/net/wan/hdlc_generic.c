@@ -226,14 +226,33 @@ int hdlc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	}
 }
 
+static void hdlc_setup(struct net_device *dev)
+{
+	hdlc_device *hdlc = dev_to_hdlc(dev);
+
+	dev->get_stats = hdlc_get_stats;
+	dev->change_mtu = hdlc_change_mtu;
+	dev->mtu = HDLC_MAX_MTU;
+
+	dev->type = ARPHRD_RAWHDLC;
+	dev->hard_header_len = 16;
+
+	dev->flags = IFF_POINTOPOINT | IFF_NOARP;
+
+	hdlc->proto.id = -1;
+	hdlc->proto.detach = NULL;
+	hdlc->carrier = 1;
+	hdlc->open = 0;
+	spin_lock_init(&hdlc->state_lock);
+}
+
 struct net_device *alloc_hdlcdev(void *priv)
 {
-	void *p = kmalloc(sizeof(hdlc_device), GFP_KERNEL);
-	if (p) {
-		memset(p, 0, sizeof(hdlc_device));
-		dev_to_hdlc(p)->priv = priv;
-	}
-	return p;
+	struct net_device *dev;
+	dev = alloc_netdev(sizeof(hdlc_device), "hdlc%d", hdlc_setup);
+	if (dev)
+		dev_to_hdlc(dev)->priv = priv;
+	return dev;
 }
 
 int register_hdlc_device(struct net_device *dev)

@@ -325,9 +325,9 @@ static void n2_destroy_card(card_t *card)
 	if (card->io)
 		release_region(card->io, N2_IOPORTS);
 	if (card->ports[0].dev)
-		free_hdlcdev(card->ports[0].dev);
+		free_netdev(card->ports[0].dev);
 	if (card->ports[1].dev)
-		free_hdlcdev(card->ports[1].dev);
+		free_netdev(card->ports[1].dev);
 	kfree(card);
 }
 

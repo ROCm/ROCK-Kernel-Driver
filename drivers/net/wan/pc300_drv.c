@@ -3406,7 +3406,7 @@ static void cpc_init_card(pc300_t * card)
 		} else {
 			printk ("Dev%d on card(0x%08lx): unable to allocate i/f name.\n",
 				 i + 1, card->hw.ramphys);
-			free_hdlcdev(dev);
+			free_netdev(dev);
 			continue;
 		}
 	}
@@ -3653,7 +3653,7 @@ static void __devexit cpc_remove_one(struct pci_dev *pdev)
 		}
 		for (i = 0; i < card->hw.nchan; i++)
 			if (card->chan[i].d.dev);
-				free_hdlcdev(card->chan[i].d.dev);
+				free_netdev(card->chan[i].d.dev);
 		if (card->hw.irq)
 			free_irq(card->hw.irq, card);
 		kfree(card);

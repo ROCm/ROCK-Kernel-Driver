@@ -287,7 +287,7 @@ static void c101_destroy_card(card_t *card)
 		release_mem_region(card->phy_winbase, C101_MAPPED_RAM_SIZE);
 	}
 
-	free_hdlcdev(card->dev);
+	free_netdev(card->dev);
 
 	kfree(card);
 }

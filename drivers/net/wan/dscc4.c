@@ -699,7 +699,7 @@ static void dscc4_free1(struct pci_dev *pdev)
 	pci_set_drvdata(pdev, NULL);
 
 	for (i = 0; i < dev_per_card; i++)
-		free_hdlcdev(root[i].dev);
+		free_netdev(root[i].dev);
 	kfree(root);
 	kfree(ppriv);
 }
@@ -885,7 +885,7 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 		root[i].dev = alloc_hdlcdev(root + i);
 		if (!root[i].dev) {
 			while (i--)
-				free_hdlcdev(root[i].dev);
+				free_netdev(root[i].dev);
 			goto err_free_dev;
 		}
 	}
@@ -953,7 +953,7 @@ err_free_priv:
 	kfree(ppriv);
 err_free_dev2:
 	for (i = 0; i < dev_per_card; i++)
-		free_hdlcdev(root[i].dev);
+		free_netdev(root[i].dev);
 err_free_dev:
 	kfree(root);
 err_out:

@@ -96,7 +96,6 @@ typedef struct pvc_device_struct {
 
 typedef struct hdlc_device_struct {
 	/* To be initialized by hardware driver */
-	struct net_device netdev; /* master net device - must be first */
 	struct net_device_stats stats;
 
 	/* used by HDLC layer to take control over HDLC device from hw driver*/
@@ -191,15 +190,9 @@ void unregister_hdlc_device(struct net_device *dev);
 
 struct net_device *alloc_hdlcdev(void *priv);
 
-static inline void free_hdlcdev(struct net_device *dev)
-{
-	kfree(dev);
-}
-
-
 static __inline__ hdlc_device* dev_to_hdlc(struct net_device *dev)
 {
-	return (hdlc_device*)dev;
+	return netdev_priv(dev);
 }
 
 

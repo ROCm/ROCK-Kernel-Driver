@@ -1465,7 +1465,7 @@ fst_init_card ( struct fst_card_info *card )
                         printk_err ("Cannot register HDLC device for port %d"
                                     " (errno %d)\n", i, -err );
 			for (j = i; j < card->nports; j++) {
-				free_hdlcdev(card->ports[j].dev);
+				free_netdev(card->ports[j].dev);
 				card->ports[j].dev = NULL;
 			}
                         card->nports = i;
@@ -1534,7 +1534,7 @@ fst_add_one ( struct pci_dev *pdev, const struct pci_device_id *ent )
 		hdlc_device *hdlc;
 		if (!dev) {
 			while (i--)
-				free_hdlcdev(card->ports[i].dev);
+				free_netdev(card->ports[i].dev);
 			printk_err ("FarSync: out of memory\n");
 			goto error_free_card;
 		}
@@ -1651,7 +1651,7 @@ error_release_io:
 
 error_free_ports:
 	for (i = 0; i < card->nports; i++)
-		free_hdlcdev(card->ports[i].dev);
+		free_netdev(card->ports[i].dev);
 error_free_card:
         kfree ( card );
         return err;
@@ -1686,7 +1686,7 @@ fst_remove_one ( struct pci_dev *pdev )
         release_region ( card->pci_conf, 0x80 );
 
 	for (i = 0; i < card->nports; i++)
-		free_hdlcdev(card->ports[i].dev);
+		free_netdev(card->ports[i].dev);
 
         kfree ( card );
 }

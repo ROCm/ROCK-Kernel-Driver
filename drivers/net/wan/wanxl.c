@@ -557,7 +557,7 @@ static void wanxl_pci_remove_one(struct pci_dev *pdev)
 
 	for (i = 0; i < card->n_ports; i++)
 		if (card->__ports[i].dev)
-			free_hdlcdev(card->__ports[i].dev);
+			free_netdev(card->__ports[i].dev);
 
 	pci_set_drvdata(pdev, NULL);
 	kfree(card);
