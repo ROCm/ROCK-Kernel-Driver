@@ -110,8 +110,12 @@ cifs_get_inode_info_unix(struct inode **pinode,
 			inode->i_mode |= S_IFDIR;
 		} else if (findData.Type == UNIX_CHARDEV) {
 			inode->i_mode |= S_IFCHR;
+			inode->i_rdev = MKDEV(le64_to_cpu(findData.DevMajor),
+				le64_to_cpu(findData.DevMinor) & MINORMASK);
 		} else if (findData.Type == UNIX_BLOCKDEV) {
 			inode->i_mode |= S_IFBLK;
+			inode->i_rdev = MKDEV(le64_to_cpu(findData.DevMajor),
+				le64_to_cpu(findData.DevMinor) & MINORMASK);
 		} else if (findData.Type == UNIX_FIFO) {
 			inode->i_mode |= S_IFIFO;
 		} else if (findData.Type == UNIX_SOCKET) {

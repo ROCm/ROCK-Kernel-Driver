@@ -1463,9 +1463,13 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	} else if (pfindData->Type == UNIX_CHARDEV) {
 		*pobject_type = DT_CHR;
 		tmp_inode->i_mode |= S_IFCHR;
+		tmp_inode->i_rdev = MKDEV(le64_to_cpu(pfindData->DevMajor),
+				le64_to_cpu(pfindData->DevMinor) & MINORMASK);
 	} else if (pfindData->Type == UNIX_BLOCKDEV) {
 		*pobject_type = DT_BLK;
 		tmp_inode->i_mode |= S_IFBLK;
+		tmp_inode->i_rdev = MKDEV(le64_to_cpu(pfindData->DevMajor),
+				le64_to_cpu(pfindData->DevMinor) & MINORMASK);
 	} else if (pfindData->Type == UNIX_FIFO) {
 		*pobject_type = DT_FIFO;
 		tmp_inode->i_mode |= S_IFIFO;
