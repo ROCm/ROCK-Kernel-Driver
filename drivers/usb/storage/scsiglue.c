@@ -209,17 +209,11 @@ static int usb_storage_device_reset( Scsi_Cmnd *srb )
 	return result;
 }
 
-/* This resets the device port, and simulates the device
- * disconnect/reconnect for all drivers which have claimed
- * interfaces, including ourself. */
+/* This resets the device port */
+/* It refuses to work if there's more than one interface in
+   this device, so that other users are not affected. */
 /* This is always called with scsi_lock(srb->host) held */
 
-/* FIXME: This needs to be re-examined in the face of the new
- * hotplug system -- this will implicitly cause a detach/reattach of
- * usb-storage, which is not what we want now.
- *
- * Can we just skip over usb-storage in the while loop?
- */
 static int usb_storage_bus_reset( Scsi_Cmnd *srb )
 {
 	struct us_data *us;
@@ -244,6 +238,7 @@ static int usb_storage_bus_reset( Scsi_Cmnd *srb )
 		US_DEBUGP("usb_reset_device returns %d\n", result);
 	} else {
 		result = -EBUSY;
+		US_DEBUGP("cannot reset a multiinterface device. failing to reset.\n");
 	}
 
 	US_DEBUGP("bus_reset() complete\n");
