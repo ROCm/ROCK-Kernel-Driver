@@ -1,8 +1,10 @@
 /*
  * Sony Programmable I/O Control Device driver for VAIO
  *
- * Copyright (C) 2001-2004 Stelian Pop <stelian@popies.net>
+ * Copyright (C) 2001-2005 Stelian Pop <stelian@popies.net>
  *
+ * Copyright (C) 2005 Narayanan R S <nars@kadamba.org>
+
  * Copyright (C) 2001-2002 Alcôve <www.alcove.com>
  *
  * Copyright (C) 2001 Michael Ashley <m.ashley@unsw.edu.au>
@@ -117,6 +119,13 @@
 /* get/set bluetooth subsystem state on/off */
 #define SONYPI_IOCGBLUE		_IOR('v', 8, __u8)
 #define SONYPI_IOCSBLUE		_IOW('v', 9, __u8)
+
+/* get/set fan state on/off */
+#define SONYPI_IOCGFAN		_IOR('v', 10, __u8)
+#define SONYPI_IOCSFAN		_IOW('v', 11, __u8)
+
+/* get temperature (C) */
+#define SONYPI_IOCGTEMP		_IOR('v', 12, __u8)
 
 #ifdef __KERNEL__
 

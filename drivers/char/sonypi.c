@@ -3,6 +3,8 @@
  *
  * Copyright (C) 2001-2005 Stelian Pop <stelian@popies.net>
  *
+ * Copyright (C) 2005 Narayanan R S <nars@kadamba.org>
+ *
  * Copyright (C) 2001-2002 Alcôve <www.alcove.com>
  *
  * Copyright (C) 2001 Michael Ashley <m.ashley@unsw.edu.au>
@@ -125,6 +127,10 @@ MODULE_PARM_DESC(useinput,
 #define SONYPI_BAT1_FULL	0xb2
 #define SONYPI_BAT2_MAXTK	0xb8
 #define SONYPI_BAT2_FULL	0xba
+
+/* FAN0 information (reverse engineered from ACPI tables) */
+#define SONYPI_FAN0_STATUS	0x93
+#define SONYPI_TEMP_STATUS	0xC1
 
 /* ioports used for brightness and type2 events */
 #define SONYPI_DATA_IOPORT	0x62
@@ -1008,6 +1014,32 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			break;
 		}
 		sonypi_setbluetoothpower(val8);
+		break;
+	/* FAN Controls */
+	case SONYPI_IOCGFAN:
+		if (sonypi_ec_read(SONYPI_FAN0_STATUS, &val8)) {
+			ret = -EIO;
+			break;
+		}
+		if (copy_to_user((u8 *)arg, &val8, sizeof(val8)))
+			ret = -EFAULT;
+		break;
+	case SONYPI_IOCSFAN:
+		if (copy_from_user(&val8, (u8 *)arg, sizeof(val8))) {
+			ret = -EFAULT;
+			break;
+		}
+		if (sonypi_ec_write(SONYPI_FAN0_STATUS, val8))
+			ret = -EIO;
+		break;
+	/* GET Temperature (useful under APM) */
+	case SONYPI_IOCGTEMP:
+		if (sonypi_ec_read(SONYPI_TEMP_STATUS, &val8)) {
+			ret = -EIO;
+			break;
+		}
+		if (copy_to_user((u8 *)arg, &val8, sizeof(val8)))
+			ret = -EFAULT;
 		break;
 	default:
 		ret = -EINVAL;
