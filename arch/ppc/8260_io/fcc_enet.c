@@ -158,12 +158,21 @@ static int fcc_enet_set_mac_address(struct net_device *dev, void *addr);
 #define PA1_DIRA0	(PA1_RXDAT | PA1_CRS | PA1_COL | PA1_RXER | PA1_RXDV)
 #define PA1_DIRA1	(PA1_TXDAT | PA1_TXEN | PA1_TXER)
 
+#ifdef CONFIG_SBC82xx
+/* rx is clk9, tx is clk10
+ */
+#define PC_F1RXCLK     ((uint)0x00000100)
+#define PC_F1TXCLK     ((uint)0x00000200)
+#define CMX1_CLK_ROUTE ((uint)0x25000000)
+#define CMX1_CLK_MASK  ((uint)0xff000000)
+#else
 /* CLK12 is receive, CLK11 is transmit.  These are board specific.
 */
 #define PC_F1RXCLK	((uint)0x00000800)
 #define PC_F1TXCLK	((uint)0x00000400)
 #define CMX1_CLK_ROUTE	((uint)0x3e000000)
 #define CMX1_CLK_MASK	((uint)0xff000000)
+#endif /* !CONFIG_SBC82xx */
 
 /* I/O Pin assignment for FCC2.  I don't yet know the best way to do this,
  * but there is little variation among the choices.
@@ -1617,6 +1626,9 @@ init_fcc_param(fcc_info_t *fip, struct net_device *dev,
 	 */
 	eap = (unsigned char *)&(ep->fen_paddrh);
 	for (i=5; i>=0; i--) {
+#ifdef CONFIG_SBC82xx
+		*eap++ = dev->dev_addr[i] = bd->bi_enetaddrs[fip->fc_fccnum+1][i];
+#else
 		if (i == 3) {
 			dev->dev_addr[i] = bd->bi_enetaddr[i];
 			dev->dev_addr[i] |= (1 << (7 - fip->fc_fccnum));
@@ -1625,6 +1637,7 @@ init_fcc_param(fcc_info_t *fip, struct net_device *dev,
 		else {
 			*eap++ = dev->dev_addr[i] = bd->bi_enetaddr[i];
 		}
+#endif
 	}
 
 	ep->fen_taddrh = 0;

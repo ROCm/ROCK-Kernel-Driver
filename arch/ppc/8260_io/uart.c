@@ -161,7 +161,7 @@ static struct serial_state rs_table[] = {
 #ifndef CONFIG_SCC1_ENET
 	{ 0,     0, PROFF_SCC1, SIU_INT_SCC1,   0, SCC_NUM_BASE},    /* SCC1 ttyS2 */
 #endif
-#ifndef CONFIG_SCC2_ENET
+#if !defined(CONFIG_SBC82xx) && !defined(CONFIG_SCC2_ENET)
 	{ 0,     0, PROFF_SCC2, SIU_INT_SCC2,   0, SCC_NUM_BASE + 1},    /* SCC2 ttyS3 */
 #endif
 };
@@ -475,7 +475,7 @@ static _INLINE_ void receive_chars(ser_info_t *info, struct pt_regs *regs)
 			if (break_pressed && info->line == sercons.index) {
 				if (ch != 0 && time_before(jiffies,
 							break_pressed + HZ*5)) {
-					handle_sysrq(ch, regs, NULL, NULL);
+					handle_sysrq(ch, regs, NULL);
 					break_pressed = 0;
 					goto ignore_char;
 				} else

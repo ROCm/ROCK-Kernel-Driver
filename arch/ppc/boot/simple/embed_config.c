@@ -484,6 +484,51 @@ clk_8280(bd_t *bd)
 	bd->bi_brgfreq = main_clk / 16;
 }
 #endif
+
+#ifdef CONFIG_SBC82xx
+void
+embed_config(bd_t **bdp)
+{
+	u_char	*cp;
+	int	i;
+	bd_t	*bd;
+	unsigned long pvr;
+
+	bd = *bdp;
+
+	bd = &bdinfo;
+	*bdp = bd;
+	bd->bi_baudrate = 9600;
+	bd->bi_memsize = 256 * 1024 * 1024;	/* just a guess */
+
+	cp = (void*)SBC82xx_MACADDR_NVRAM_SCC1;
+	for (i=0; i<6; i++) {
+		bd->bi_enetaddrs[0][i] = *cp++;
+	}
+	cp = (void*)SBC82xx_MACADDR_NVRAM_FCC1;
+	for (i=0; i<6; i++) {
+		bd->bi_enetaddrs[1][i] = *cp++;
+	}
+	cp = (void*)SBC82xx_MACADDR_NVRAM_FCC2;
+	for (i=0; i<6; i++) {
+		bd->bi_enetaddrs[2][i] = *cp++;
+	}
+	cp = (void*)SBC82xx_MACADDR_NVRAM_FCC3;
+	for (i=0; i<6; i++) {
+		bd->bi_enetaddrs[3][i] = *cp++;
+	}
+
+	/* can busfreq be calculated? */
+	bd->bi_busfreq = 100000000;
+	__asm__ __volatile__ ("mfspr %0, 287" : "=r" (pvr));
+	if ((pvr & 0xffff0000) == 0x80820000)
+		clk_8280(bd);
+	else
+		clk_8260(bd);
+
+}
+#endif /* SBC82xx */
+
 #if defined(CONFIG_EST8260) || defined(CONFIG_TQM8260)
 void
 embed_config(bd_t **bdp)
