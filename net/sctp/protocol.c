@@ -808,7 +808,7 @@ static inline int sctp_v4_xmit(struct sk_buff *skb,
 			  NIPQUAD(((struct rtable *)skb->dst)->rt_src),
 			  NIPQUAD(((struct rtable *)skb->dst)->rt_dst));
 
-	SCTP_INC_STATS(SctpOutSCTPPacks);
+	SCTP_INC_STATS(SCTP_MIB_OUTSCTPPACKS);
 	return ip_queue_xmit(skb, ipfragok);
 }
 

@@ -233,7 +233,7 @@ int ip_mc_output(struct sk_buff **pskb)
 	/*
 	 *	If the indicated interface is up and running, send the packet.
 	 */
-	IP_INC_STATS(OutRequests);
+	IP_INC_STATS(IPSTATS_MIB_OUTREQUESTS);
 
 	skb->dev = dev;
 	skb->protocol = htons(ETH_P_IP);
@@ -288,7 +288,7 @@ int ip_output(struct sk_buff **pskb)
 {
 	struct sk_buff *skb = *pskb;
 
-	IP_INC_STATS(OutRequests);
+	IP_INC_STATS(IPSTATS_MIB_OUTREQUESTS);
 
 	if ((skb->len > dst_pmtu(skb->dst) || skb_shinfo(skb)->frag_list) &&
 	    !skb_shinfo(skb)->tso_size)
@@ -393,7 +393,7 @@ packet_routed:
 		       dst_output);
 
 no_route:
-	IP_INC_STATS(OutNoRoutes);
+	IP_INC_STATS(IPSTATS_MIB_OUTNOROUTES);
 	kfree_skb(skb);
 	return -EHOSTUNREACH;
 }
@@ -550,7 +550,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 		}
 
 		if (err == 0) {
-			IP_INC_STATS(FragOKs);
+			IP_INC_STATS(IPSTATS_MIB_FRAGOKS);
 			return 0;
 		}
 
@@ -559,7 +559,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 			kfree_skb(frag);
 			frag = skb;
 		}
-		IP_INC_STATS(FragFails);
+		IP_INC_STATS(IPSTATS_MIB_FRAGFAILS);
 		return err;
 	}
 
@@ -665,7 +665,7 @@ slow_path:
 		 *	Put this fragment into the sending queue.
 		 */
 
-		IP_INC_STATS(FragCreates);
+		IP_INC_STATS(IPSTATS_MIB_FRAGCREATES);
 
 		iph->tot_len = htons(len + hlen);
 
@@ -676,12 +676,12 @@ slow_path:
 			goto fail;
 	}
 	kfree_skb(skb);
-	IP_INC_STATS(FragOKs);
+	IP_INC_STATS(IPSTATS_MIB_FRAGOKS);
 	return err;
 
 fail:
 	kfree_skb(skb); 
-	IP_INC_STATS(FragFails);
+	IP_INC_STATS(IPSTATS_MIB_FRAGFAILS);
 	return err;
 }
 
@@ -967,7 +967,7 @@ alloc_new_skb:
 
 error:
 	inet->cork.length -= length;
-	IP_INC_STATS(OutDiscards);
+	IP_INC_STATS(IPSTATS_MIB_OUTDISCARDS);
 	return err; 
 }
 
@@ -1080,7 +1080,7 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 
 error:
 	inet->cork.length -= size;
-	IP_INC_STATS(OutDiscards);
+	IP_INC_STATS(IPSTATS_MIB_OUTDISCARDS);
 	return err;
 }
 
@@ -1190,7 +1190,7 @@ out:
 	return err;
 
 error:
-	IP_INC_STATS(OutDiscards);
+	IP_INC_STATS(IPSTATS_MIB_OUTDISCARDS);
 	goto out;
 }
 

@@ -148,8 +148,8 @@ sctp_disposition_t sctp_sf_do_4_C(const struct sctp_endpoint *ep,
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_CLOSED));
 
-	SCTP_INC_STATS(SctpShutdowns);
-	SCTP_DEC_STATS(SctpCurrEstab);
+	SCTP_INC_STATS(SCTP_MIB_SHUTDOWNS);
+	SCTP_DEC_STATS(SCTP_MIB_CURRESTAB);
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_DELETE_TCB, SCTP_NULL());
 
@@ -245,7 +245,7 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const struct sctp_endpoint *ep,
 			if (packet) {
 				sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT,
 						SCTP_PACKET(packet));
-				SCTP_INC_STATS(SctpOutCtrlChunks);
+				SCTP_INC_STATS(SCTP_MIB_OUTCTRLCHUNKS);
 				return SCTP_DISPOSITION_CONSUME;
 			} else {
 				return SCTP_DISPOSITION_NOMEM;
@@ -404,7 +404,7 @@ sctp_disposition_t sctp_sf_do_5_1C_ack(const struct sctp_endpoint *ep,
 		sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(reply));
 		sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 				SCTP_STATE(SCTP_STATE_CLOSED));
-		SCTP_INC_STATS(SctpAborteds);
+		SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
 		sctp_add_cmd_sf(commands, SCTP_CMD_DELETE_TCB, SCTP_NULL());
 		return SCTP_DISPOSITION_DELETE_TCB;
 	}
@@ -415,7 +415,7 @@ sctp_disposition_t sctp_sf_do_5_1C_ack(const struct sctp_endpoint *ep,
 			      (sctp_init_chunk_t *)chunk->chunk_hdr, chunk,
 			      &err_chunk)) {
 
-		SCTP_INC_STATS(SctpAborteds);
+		SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
 
 		/* This chunk contains fatal error. It is to be discarded.
 		 * Send an ABORT, with causes if there is any.
@@ -432,7 +432,7 @@ sctp_disposition_t sctp_sf_do_5_1C_ack(const struct sctp_endpoint *ep,
 			if (packet) {
 				sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT,
 						SCTP_PACKET(packet));
-				SCTP_INC_STATS(SctpOutCtrlChunks);
+				SCTP_INC_STATS(SCTP_MIB_OUTCTRLCHUNKS);
 				sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 						SCTP_STATE(SCTP_STATE_CLOSED));
 				sctp_add_cmd_sf(commands, SCTP_CMD_DELETE_TCB,
@@ -587,8 +587,8 @@ sctp_disposition_t sctp_sf_do_5_1D_ce(const struct sctp_endpoint *ep,
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_ASOC, SCTP_ASOC(new_asoc));
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_ESTABLISHED));
-	SCTP_INC_STATS(SctpCurrEstab);
-	SCTP_INC_STATS(SctpPassiveEstabs);
+	SCTP_INC_STATS(SCTP_MIB_CURRESTAB);
+	SCTP_INC_STATS(SCTP_MIB_PASSIVEESTABS);
 	sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMERS_START, SCTP_NULL());
 
 	if (new_asoc->autoclose)
@@ -684,8 +684,8 @@ sctp_disposition_t sctp_sf_do_5_1E_ca(const struct sctp_endpoint *ep,
 			SCTP_TO(SCTP_EVENT_TIMEOUT_T1_COOKIE));
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_ESTABLISHED));
-	SCTP_INC_STATS(SctpCurrEstab);
-	SCTP_INC_STATS(SctpActiveEstabs);
+	SCTP_INC_STATS(SCTP_MIB_CURRESTAB);
+	SCTP_INC_STATS(SCTP_MIB_ACTIVEESTABS);
 	sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMERS_START, SCTP_NULL());
 	if (asoc->autoclose)
 		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_START,
@@ -757,8 +757,8 @@ sctp_disposition_t sctp_sf_sendbeat_8_3(const struct sctp_endpoint *ep,
 		/* CMD_ASSOC_FAILED calls CMD_DELETE_TCB. */
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_NO_ERROR));
-		SCTP_INC_STATS(SctpAborteds);
-		SCTP_DEC_STATS(SctpCurrEstab);
+		SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
+		SCTP_DEC_STATS(SCTP_MIB_CURRESTAB);
 		return SCTP_DISPOSITION_DELETE_TCB;
 	}
 
@@ -960,7 +960,7 @@ static int sctp_sf_send_restart_abort(union sctp_addr *ssa,
 		goto out;
 	sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT, SCTP_PACKET(pkt));
 
-	SCTP_INC_STATS(SctpOutCtrlChunks);
+	SCTP_INC_STATS(SCTP_MIB_OUTCTRLCHUNKS);
 
 	/* Discard the rest of the inbound packet. */
 	sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET, SCTP_NULL());
@@ -1163,7 +1163,7 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 			if (packet) {
 				sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT,
 						SCTP_PACKET(packet));
-				SCTP_INC_STATS(SctpOutCtrlChunks);
+				SCTP_INC_STATS(SCTP_MIB_OUTCTRLCHUNKS);
 				retval = SCTP_DISPOSITION_CONSUME;
 			} else {
 				retval = SCTP_DISPOSITION_NOMEM;
@@ -1501,7 +1501,7 @@ static sctp_disposition_t sctp_sf_do_dupcook_b(const struct sctp_endpoint *ep,
 	sctp_add_cmd_sf(commands, SCTP_CMD_UPDATE_ASSOC, SCTP_ASOC(new_asoc));
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_ESTABLISHED));
-	SCTP_INC_STATS(SctpCurrEstab);
+	SCTP_INC_STATS(SCTP_MIB_CURRESTAB);
 	sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMERS_START, SCTP_NULL());
 
 	repl = sctp_make_cookie_ack(new_asoc, chunk);
@@ -1585,7 +1585,7 @@ static sctp_disposition_t sctp_sf_do_dupcook_d(const struct sctp_endpoint *ep,
 				SCTP_TO(SCTP_EVENT_TIMEOUT_T1_COOKIE));
 		sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 				SCTP_STATE(SCTP_STATE_ESTABLISHED));
-		SCTP_INC_STATS(SctpCurrEstab);
+		SCTP_INC_STATS(SCTP_MIB_CURRESTAB);
 		sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMERS_START,
 				SCTP_NULL());
 
@@ -2001,8 +2001,8 @@ sctp_disposition_t sctp_sf_do_9_1_abort(const struct sctp_endpoint *ep,
 
  	/* ASSOC_FAILED will DELETE_TCB. */
 	sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED, SCTP_U32(error));
-	SCTP_INC_STATS(SctpAborteds);
-	SCTP_DEC_STATS(SctpCurrEstab);
+	SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
+	SCTP_DEC_STATS(SCTP_MIB_CURRESTAB);
 
 	return SCTP_DISPOSITION_ABORT;
 }
@@ -2027,7 +2027,7 @@ sctp_disposition_t sctp_sf_cookie_wait_abort(const struct sctp_endpoint *ep,
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_CLOSED));
-	SCTP_INC_STATS(SctpAborteds);
+	SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
 	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
 			SCTP_TO(SCTP_EVENT_TIMEOUT_T1_INIT));
 
@@ -2443,8 +2443,8 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const struct sctp_endpoint *ep,
 		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_NO_DATA));
-		SCTP_INC_STATS(SctpAborteds);
-		SCTP_DEC_STATS(SctpCurrEstab);
+		SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
+		SCTP_DEC_STATS(SCTP_MIB_CURRESTAB);
 		return SCTP_DISPOSITION_CONSUME;
 	}
 
@@ -2458,9 +2458,9 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const struct sctp_endpoint *ep,
 	 * if we renege and the chunk arrives again.
 	 */
 	if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
-		SCTP_INC_STATS(SctpInUnorderChunks);
+		SCTP_INC_STATS(SCTP_MIB_INUNORDERCHUNKS);
 	else
-		SCTP_INC_STATS(SctpInOrderChunks);
+		SCTP_INC_STATS(SCTP_MIB_INORDERCHUNKS);
 
 	/* RFC 2960 6.5 Stream Identifier and Stream Sequence Number
 	 *
@@ -2657,8 +2657,8 @@ sctp_disposition_t sctp_sf_eat_data_fast_4_4(const struct sctp_endpoint *ep,
 		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_NO_DATA));
-		SCTP_INC_STATS(SctpAborteds);
-		SCTP_DEC_STATS(SctpCurrEstab);
+		SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
+		SCTP_DEC_STATS(SCTP_MIB_CURRESTAB);
 		return SCTP_DISPOSITION_CONSUME;
 	}
 
@@ -2668,9 +2668,9 @@ sctp_disposition_t sctp_sf_eat_data_fast_4_4(const struct sctp_endpoint *ep,
 	sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_TSN, SCTP_U32(tsn));
 
 	if (chunk->chunk_hdr->flags & SCTP_DATA_UNORDERED)
-		SCTP_INC_STATS(SctpInUnorderChunks);
+		SCTP_INC_STATS(SCTP_MIB_INUNORDERCHUNKS);
 	else
-		SCTP_INC_STATS(SctpInOrderChunks);
+		SCTP_INC_STATS(SCTP_MIB_INORDERCHUNKS);
 
 	/* RFC 2960 6.5 Stream Identifier and Stream Sequence Number
 	 *
@@ -2832,7 +2832,7 @@ sctp_disposition_t sctp_sf_tabort_8_4_8(const struct sctp_endpoint *ep,
 		sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT,
 				SCTP_PACKET(packet));
 
-		SCTP_INC_STATS(SctpOutCtrlChunks);
+		SCTP_INC_STATS(SCTP_MIB_OUTCTRLCHUNKS);
 
 		return SCTP_DISPOSITION_CONSUME;
 	}
@@ -2929,8 +2929,8 @@ sctp_disposition_t sctp_sf_do_9_2_final(const struct sctp_endpoint *ep,
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_CLOSED));
-	SCTP_INC_STATS(SctpShutdowns);
-	SCTP_DEC_STATS(SctpCurrEstab);
+	SCTP_INC_STATS(SCTP_MIB_SHUTDOWNS);
+	SCTP_DEC_STATS(SCTP_MIB_CURRESTAB);
 	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(reply));
 
 	/* ...and remove all record of the association. */
@@ -2971,7 +2971,7 @@ sctp_disposition_t sctp_sf_ootb(const struct sctp_endpoint *ep,
 	__u8 *ch_end;
 	int ootb_shut_ack = 0;
 
-	SCTP_INC_STATS(SctpOutOfBlues);
+	SCTP_INC_STATS(SCTP_MIB_OUTOFBLUES);
 
 	ch = (sctp_chunkhdr_t *) chunk->chunk_hdr;
 	do {
@@ -3040,7 +3040,7 @@ sctp_disposition_t sctp_sf_shut_8_4_5(const struct sctp_endpoint *ep,
 		sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT,
 				SCTP_PACKET(packet));
 
-		SCTP_INC_STATS(SctpOutCtrlChunks);
+		SCTP_INC_STATS(SCTP_MIB_OUTCTRLCHUNKS);
 
 		return SCTP_DISPOSITION_CONSUME;
 	}
@@ -3176,8 +3176,8 @@ sctp_disposition_t sctp_sf_do_asconf_ack(const struct sctp_endpoint *ep,
 		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_ASCONF_ACK));
-		SCTP_INC_STATS(SctpAborteds);
-		SCTP_DEC_STATS(SctpCurrEstab);
+		SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
+		SCTP_DEC_STATS(SCTP_MIB_CURRESTAB);
 		return SCTP_DISPOSITION_ABORT;
 	}
 
@@ -3202,8 +3202,8 @@ sctp_disposition_t sctp_sf_do_asconf_ack(const struct sctp_endpoint *ep,
 		sctp_add_cmd_sf(commands, SCTP_CMD_DISCARD_PACKET,SCTP_NULL());
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_ASCONF_ACK));
-		SCTP_INC_STATS(SctpAborteds);
-		SCTP_DEC_STATS(SctpCurrEstab);
+		SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
+		SCTP_DEC_STATS(SCTP_MIB_CURRESTAB);
 		return SCTP_DISPOSITION_ABORT;
 	}
 
@@ -3797,8 +3797,8 @@ sctp_disposition_t sctp_sf_do_9_1_prm_abort(
 	sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 			SCTP_U32(SCTP_ERROR_USER_ABORT));
 
-	SCTP_INC_STATS(SctpAborteds);
-	SCTP_DEC_STATS(SctpCurrEstab);
+	SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
+	SCTP_DEC_STATS(SCTP_MIB_CURRESTAB);
 
 	return retval;
 }
@@ -3855,7 +3855,7 @@ sctp_disposition_t sctp_sf_cookie_wait_prm_shutdown(
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_CLOSED));
 
-	SCTP_INC_STATS(SctpShutdowns);
+	SCTP_INC_STATS(SCTP_MIB_SHUTDOWNS);
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_DELETE_TCB, SCTP_NULL());
 
@@ -3928,7 +3928,7 @@ sctp_disposition_t sctp_sf_cookie_wait_prm_abort(
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_CLOSED));
 
-	SCTP_INC_STATS(SctpAborteds);
+	SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
 
 	/* Even if we can't send the ABORT due to low memory delete the
 	 * TCB.  This is a departure from our typical NOMEM handling.
@@ -4288,8 +4288,8 @@ sctp_disposition_t sctp_sf_do_6_3_3_rtx(const struct sctp_endpoint *ep,
 		/* CMD_ASSOC_FAILED calls CMD_DELETE_TCB. */
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_NO_ERROR));
-		SCTP_INC_STATS(SctpAborteds);
-		SCTP_DEC_STATS(SctpCurrEstab);
+		SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
+		SCTP_DEC_STATS(SCTP_MIB_CURRESTAB);
 		return SCTP_DISPOSITION_DELETE_TCB;
 	}
 
@@ -4458,8 +4458,8 @@ sctp_disposition_t sctp_sf_t2_timer_expire(const struct sctp_endpoint *ep,
 		/* Note:  CMD_ASSOC_FAILED calls CMD_DELETE_TCB. */
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_NO_ERROR));
-		SCTP_INC_STATS(SctpAborteds);
-		SCTP_DEC_STATS(SctpCurrEstab);
+		SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
+		SCTP_DEC_STATS(SCTP_MIB_CURRESTAB);
 		return SCTP_DISPOSITION_DELETE_TCB;
 	}
 
@@ -4532,8 +4532,8 @@ sctp_disposition_t sctp_sf_t4_timer_expire(
 				SCTP_TO(SCTP_EVENT_TIMEOUT_T4_RTO));
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_NO_ERROR));
-		SCTP_INC_STATS(SctpAborteds);
-		SCTP_INC_STATS(SctpCurrEstab);
+		SCTP_INC_STATS(SCTP_MIB_ABORTEDS);
+		SCTP_INC_STATS(SCTP_MIB_CURRESTAB);
 		return SCTP_DISPOSITION_ABORT;
 	}
 
@@ -4843,7 +4843,7 @@ void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
 			sctp_packet_append_chunk(packet, err_chunk);
 			sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT,
 					SCTP_PACKET(packet));
-			SCTP_INC_STATS(SctpOutCtrlChunks);
+			SCTP_INC_STATS(SCTP_MIB_OUTCTRLCHUNKS);
 		} else
 			sctp_chunk_free (err_chunk);
 	}

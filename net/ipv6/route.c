@@ -1287,7 +1287,7 @@ int ipv6_route_ioctl(unsigned int cmd, void __user *arg)
 
 int ip6_pkt_discard(struct sk_buff *skb)
 {
-	IP6_INC_STATS(OutNoRoutes);
+	IP6_INC_STATS(IPSTATS_MIB_OUTNOROUTES);
 	icmpv6_send(skb, ICMPV6_DEST_UNREACH, ICMPV6_NOROUTE, 0, skb->dev);
 	kfree_skb(skb);
 	return 0;

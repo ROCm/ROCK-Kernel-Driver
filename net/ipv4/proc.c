@@ -88,7 +88,7 @@ static struct file_operations sockstat_seq_fops = {
 };
 
 static unsigned long
-__fold_field(void *mib[], int offt)
+fold_field(void *mib[], int offt)
 {
 	unsigned long res = 0;
 	int i;
@@ -96,40 +96,33 @@ __fold_field(void *mib[], int offt)
 	for (i = 0; i < NR_CPUS; i++) {
 		if (!cpu_possible(i))
 			continue;
-		res +=
-		    *((unsigned long *) (((void *) per_cpu_ptr(mib[0], i)) +
-					 offt));
-		res +=
-		    *((unsigned long *) (((void *) per_cpu_ptr(mib[1], i)) +
-					 offt));
+		res += *(((unsigned long *) per_cpu_ptr(mib[0], i)) + offt);
+		res += *(((unsigned long *) per_cpu_ptr(mib[1], i)) + offt);
 	}
 	return res;
 }
 
-#define fold_field(_mib, _nr)	__fold_field(_mib, (sizeof(unsigned long) * (_nr)))
-
 /* snmp items */
-static struct snmp_item snmp4_ipstats_list[] = {
-#define __SNMP_GEN(x,y)	SNMP_ITEM(struct ipstats_mib, x, y)
-#define SNMP_GEN(x)	__SNMP_GEN(x, #x)
-	SNMP_GEN(InReceives),
-	SNMP_GEN(InHdrErrors),
-	SNMP_GEN(InAddrErrors),
-	__SNMP_GEN(OutForwDatagrams,"ForwDatagrams"),	/* for backward compatibility */
-	SNMP_GEN(InUnknownProtos),
-	SNMP_GEN(InDiscards),
-	SNMP_GEN(InDelivers),
-	SNMP_GEN(OutRequests),
-	SNMP_GEN(OutDiscards),
-	SNMP_GEN(OutNoRoutes),
-	SNMP_GEN(ReasmTimeout),
-	SNMP_GEN(ReasmReqds),
-	SNMP_GEN(ReasmOKs),
-	SNMP_GEN(ReasmFails),
-	SNMP_GEN(FragOKs),
-	SNMP_GEN(FragFails),
-	SNMP_GEN(FragCreates),
-	SNMP_ITEM_SENTINEL
+static struct snmp_mib snmp4_ipstats_list[] = {
+#define SNMP_GEN(n,e)	SNMP_MIB_ITEM(n,e)
+	SNMP_GEN("InReceives", IPSTATS_MIB_INRECEIVES),
+	SNMP_GEN("InHdrErrors", IPSTATS_MIB_INHDRERRORS),
+	SNMP_GEN("InAddrErrors", IPSTATS_MIB_INADDRERRORS),
+	SNMP_GEN("ForwDatagrams", IPSTATS_MIB_OUTFORWDATAGRAMS),
+	SNMP_GEN("InUnknownProtos", IPSTATS_MIB_INUNKNOWNPROTOS),
+	SNMP_GEN("InDiscards", IPSTATS_MIB_INDISCARDS),
+	SNMP_GEN("InDelivers", IPSTATS_MIB_INDELIVERS),
+	SNMP_GEN("OutRequests", IPSTATS_MIB_OUTREQUESTS),
+	SNMP_GEN("OutDiscards", IPSTATS_MIB_OUTDISCARDS),
+	SNMP_GEN("OutNoRoutes", IPSTATS_MIB_OUTNOROUTES),
+	SNMP_GEN("ReasmTimeout", IPSTATS_MIB_REASMTIMEOUT),
+	SNMP_GEN("ReasmReqds", IPSTATS_MIB_REASMREQDS),
+	SNMP_GEN("ReasmOKs", IPSTATS_MIB_REASMOKS),
+	SNMP_GEN("ReasmFails", IPSTATS_MIB_REASMFAILS),
+	SNMP_GEN("FragOKs", IPSTATS_MIB_FRAGOKS),
+	SNMP_GEN("FragFails", IPSTATS_MIB_FRAGFAILS),
+	SNMP_GEN("FragCreates", IPSTATS_MIB_FRAGCREATES),
+	SNMP_MIB_SENTINEL
 #undef SNMP_GEN
 };
 
@@ -150,8 +143,8 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 
 	for (i = 0; snmp4_ipstats_list[i].name != NULL; i++)
 		seq_printf(seq, " %lu",
-			   __fold_field((void **) ip_statistics, 
-					snmp4_ipstats_list[i].offset));
+			   fold_field((void **) ip_statistics, 
+				      snmp4_ipstats_list[i].entry));
 
 	seq_printf(seq, "\nIcmp: InMsgs InErrors InDestUnreachs InTimeExcds "
 			"InParmProbs InSrcQuenchs InRedirects InEchos "
@@ -161,8 +154,7 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 			"OutEchos OutEchoReps OutTimestamps OutTimestampReps "
 			"OutAddrMasks OutAddrMaskReps\nIcmp:");
 
-	for (i = 0;
-	     i < offsetof(struct icmp_mib, dummy) / sizeof(unsigned long); i++)
+	for (i = 1; i < __ICMP_MIB_MAX; i++)
 		seq_printf(seq, " %lu",
 			   fold_field((void **) icmp_statistics, i)); 
 
@@ -170,9 +162,8 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 			"PassiveOpens AttemptFails EstabResets CurrEstab "
 			"InSegs OutSegs RetransSegs InErrs OutRsts\nTcp:");
 
-	for (i = 0;
-	     i < offsetof(struct tcp_mib, __pad) / sizeof(unsigned long); i++) {
-		if (i == (offsetof(struct tcp_mib, TcpMaxConn) / sizeof(unsigned long)))
+	for (i = 1; i < __TCP_MIB_MAX; i++) {
+		if (i == TCP_MIB_MAXCONN)
 			/* MaxConn field is negative, RFC 2012 */
 			seq_printf(seq, " %ld", 
 				   fold_field((void **) tcp_statistics, i));
@@ -184,8 +175,7 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 	seq_printf(seq, "\nUdp: InDatagrams NoPorts InErrors OutDatagrams\n"
 			"Udp:");
 
-	for (i = 0;
-	     i < offsetof(struct udp_mib, __pad) / sizeof(unsigned long); i++)
+	for (i = 1; i < __UDP_MIB_MAX; i++)
 		seq_printf(seq, " %lu", 
 				fold_field((void **) udp_statistics, i));
 
@@ -241,9 +231,7 @@ static int netstat_seq_show(struct seq_file *seq, void *v)
 		      " TCPAbortOnMemory TCPAbortOnTimeout TCPAbortOnLinger"
 		      " TCPAbortFailed TCPMemoryPressures\n"
 		      "TcpExt:");
-	for (i = 0;
-	     i < offsetof(struct linux_mib, __pad) / sizeof(unsigned long); 
-	     i++)
+	for (i = 1; i < __LINUX_MIB_MAX; i++)
 		seq_printf(seq, " %lu", 
 		 	   fold_field((void **) net_statistics, i)); 
 	seq_putc(seq, '\n');

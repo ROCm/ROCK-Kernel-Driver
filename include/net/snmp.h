@@ -22,7 +22,31 @@
 #define _SNMP_H
 
 #include <linux/cache.h>
- 
+#include <linux/snmp.h>
+
+/*
+ * Mibs are stored in array of unsigned long.
+ */
+/*
+ * struct snmp_mib{}
+ *  - list of entries for particular API (such as /proc/net/snmp)
+ *  - name of entries.
+ */
+struct snmp_mib {
+	char *name;
+	int entry;
+};
+
+#define SNMP_MIB_ITEM(_name,_entry)	{	\
+	.name = _name,				\
+	.entry = _entry,			\
+}
+
+#define SNMP_MIB_SENTINEL {	\
+	.name = NULL,		\
+	.entry = 0,		\
+}
+
 /*
  *	We use all unsigned longs. Linux will soon be so reliable that even these
  *	will rapidly get too small 8-). Seriously consider the IpInReceives count
@@ -41,265 +65,50 @@
  * cacheline machine it makes a *lot* of sense -AK
  */ 
 
-struct snmp_item {
-	char *name;
-	int offset;
-};
+#define __SNMP_MIB_ALIGN__	____cacheline_aligned
 
-#define SNMP_ITEM(mib,entry,procname)	{	\
-	.name = procname,			\
-	.offset = offsetof(mib, entry),		\
-}
+/* IPstats */
+#define IPSTATS_MIB_MAX	__IPSTATS_MIB_MAX
+struct ipstats_mib {
+	unsigned long	mibs[IPSTATS_MIB_MAX];
+} __SNMP_MIB_ALIGN__;
 
-#define SNMP_ITEM_SENTINEL {			\
-	.name = NULL,				\
-	.offset = 0,				\
-}
+/* ICMP */
+#define ICMP_MIB_DUMMY	__ICMP_MIB_MAX
+#define ICMP_MIB_MAX	(__ICMP_MIB_MAX + 1)
 
-/*
- * RFC 1213:  MIB-II
- * RFC 2011 (updates 1213):  SNMPv2-MIB-IP
- * RFC 2863:  Interfaces Group MIB
- * RFC 2465:  IPv6 MIB: General Group
- * draft-ietf-ipv6-rfc2011-update-10.txt: MIB for IP: IP Statistics Tables
- */
-struct ipstats_mib
-{
-	unsigned long	InReceives;
- 	unsigned long	InHdrErrors;
- 	unsigned long	InTooBigErrors;
- 	unsigned long	InNoRoutes;
- 	unsigned long	InAddrErrors;
- 	unsigned long	InUnknownProtos;
- 	unsigned long	InTruncatedPkts;
- 	unsigned long	InDiscards;
- 	unsigned long	InDelivers;
- 	unsigned long	OutForwDatagrams;
- 	unsigned long	OutRequests;
- 	unsigned long	OutDiscards;
- 	unsigned long	OutNoRoutes;
- 	unsigned long	ReasmTimeout;
- 	unsigned long	ReasmReqds;
- 	unsigned long	ReasmOKs;
- 	unsigned long	ReasmFails;
- 	unsigned long	FragOKs;
- 	unsigned long	FragFails;
- 	unsigned long	FragCreates;
- 	unsigned long	InMcastPkts;
- 	unsigned long	OutMcastPkts;
-	unsigned long   __pad[0]; 
-};
- 
-/*
- * RFC 1213:  MIB-II ICMP Group
- * RFC 2011 (updates 1213):  SNMPv2 MIB for IP: ICMP group
- */
-struct icmp_mib
-{
- 	unsigned long	IcmpInMsgs;
- 	unsigned long	IcmpInErrors;
-  	unsigned long	IcmpInDestUnreachs;
- 	unsigned long	IcmpInTimeExcds;
- 	unsigned long	IcmpInParmProbs;
- 	unsigned long	IcmpInSrcQuenchs;
- 	unsigned long	IcmpInRedirects;
- 	unsigned long	IcmpInEchos;
- 	unsigned long	IcmpInEchoReps;
- 	unsigned long	IcmpInTimestamps;
- 	unsigned long	IcmpInTimestampReps;
- 	unsigned long	IcmpInAddrMasks;
- 	unsigned long	IcmpInAddrMaskReps;
- 	unsigned long	IcmpOutMsgs;
- 	unsigned long	IcmpOutErrors;
- 	unsigned long	IcmpOutDestUnreachs;
- 	unsigned long	IcmpOutTimeExcds;
- 	unsigned long	IcmpOutParmProbs;
- 	unsigned long	IcmpOutSrcQuenchs;
- 	unsigned long	IcmpOutRedirects;
- 	unsigned long	IcmpOutEchos;
- 	unsigned long	IcmpOutEchoReps;
- 	unsigned long	IcmpOutTimestamps;
- 	unsigned long	IcmpOutTimestampReps;
- 	unsigned long	IcmpOutAddrMasks;
- 	unsigned long	IcmpOutAddrMaskReps;
-	unsigned long	dummy;
-	unsigned long   __pad[0]; 
-};
+struct icmp_mib {
+	unsigned long	mibs[ICMP_MIB_MAX];
+} __SNMP_MIB_ALIGN__;
 
-/*
- * RFC 2466:  ICMPv6-MIB
- */
-struct icmpv6_mib
-{
-	unsigned long	Icmp6InMsgs;
-	unsigned long	Icmp6InErrors;
+/* ICMP6 (IPv6-ICMP) */
+#define ICMP6_MIB_MAX	__ICMP6_MIB_MAX
+struct icmpv6_mib {
+	unsigned long	mibs[ICMP6_MIB_MAX];
+} __SNMP_MIB_ALIGN__;
 
-	unsigned long	Icmp6InDestUnreachs;
-	unsigned long	Icmp6InPktTooBigs;
-	unsigned long	Icmp6InTimeExcds;
-	unsigned long	Icmp6InParmProblems;
+/* TCP */
+#define TCP_MIB_MAX	__TCP_MIB_MAX
+struct tcp_mib {
+	unsigned long	mibs[TCP_MIB_MAX];
+} __SNMP_MIB_ALIGN__;
 
-	unsigned long	Icmp6InEchos;
-	unsigned long	Icmp6InEchoReplies;
-	unsigned long	Icmp6InGroupMembQueries;
-	unsigned long	Icmp6InGroupMembResponses;
-	unsigned long	Icmp6InGroupMembReductions;
-	unsigned long	Icmp6InRouterSolicits;
-	unsigned long	Icmp6InRouterAdvertisements;
-	unsigned long	Icmp6InNeighborSolicits;
-	unsigned long	Icmp6InNeighborAdvertisements;
-	unsigned long	Icmp6InRedirects;
+/* UDP */
+#define UDP_MIB_MAX	__UDP_MIB_MAX
+struct udp_mib {
+	unsigned long	mibs[UDP_MIB_MAX];
+} __SNMP_MIB_ALIGN__;
 
-	unsigned long	Icmp6OutMsgs;
+/* SCTP */
+#define SCTP_MIB_MAX	__SCTP_MIB_MAX
+struct sctp_mib {
+	unsigned long	mibs[SCTP_MIB_MAX];
+} __SNMP_MIB_ALIGN__;
 
-	unsigned long	Icmp6OutDestUnreachs;
-	unsigned long	Icmp6OutPktTooBigs;
-	unsigned long	Icmp6OutTimeExcds;
-	unsigned long	Icmp6OutParmProblems;
-
-	unsigned long	Icmp6OutEchoReplies;
-	unsigned long	Icmp6OutRouterSolicits;
-	unsigned long	Icmp6OutNeighborSolicits;
-	unsigned long	Icmp6OutNeighborAdvertisements;
-	unsigned long	Icmp6OutRedirects;
-	unsigned long	Icmp6OutGroupMembResponses;
-	unsigned long	Icmp6OutGroupMembReductions;
-	unsigned long   __pad[0]; 
-};
- 
-/*
- * RFC 1213:  MIB-II TCP group
- * RFC 2012 (updates 1213):  SNMPv2-MIB-TCP
- */
-struct tcp_mib
-{
- 	unsigned long	TcpRtoAlgorithm;
- 	unsigned long	TcpRtoMin;
- 	unsigned long	TcpRtoMax;
- 	unsigned long	TcpMaxConn;
- 	unsigned long	TcpActiveOpens;
- 	unsigned long	TcpPassiveOpens;
- 	unsigned long	TcpAttemptFails;
- 	unsigned long	TcpEstabResets;
- 	unsigned long	TcpCurrEstab;
- 	unsigned long	TcpInSegs;
- 	unsigned long	TcpOutSegs;
- 	unsigned long	TcpRetransSegs;
- 	unsigned long	TcpInErrs;
- 	unsigned long	TcpOutRsts;
-	unsigned long   __pad[0]; 
-};
- 
-/*
- * RFC 1213:  MIB-II UDP group
- * RFC 2013 (updates 1213):  SNMPv2-MIB-UDP
- */
-struct udp_mib
-{
- 	unsigned long	UdpInDatagrams;
- 	unsigned long	UdpNoPorts;
- 	unsigned long	UdpInErrors;
- 	unsigned long	UdpOutDatagrams;
-	unsigned long   __pad[0];
-}; 
-
-/* draft-ietf-sigtran-sctp-mib-07.txt */
-struct sctp_mib
-{
-	unsigned long   SctpCurrEstab;
-	unsigned long   SctpActiveEstabs;
-	unsigned long   SctpPassiveEstabs;
-	unsigned long   SctpAborteds;
-	unsigned long   SctpShutdowns;
-	unsigned long   SctpOutOfBlues;
-	unsigned long   SctpChecksumErrors;
-	unsigned long   SctpOutCtrlChunks;
-	unsigned long   SctpOutOrderChunks;
-	unsigned long   SctpOutUnorderChunks;
-	unsigned long   SctpInCtrlChunks;
-	unsigned long   SctpInOrderChunks;
-	unsigned long   SctpInUnorderChunks;
-	unsigned long   SctpFragUsrMsgs;
-	unsigned long   SctpReasmUsrMsgs;
-	unsigned long   SctpOutSCTPPacks;
-	unsigned long   SctpInSCTPPacks;
-	unsigned long   SctpRtoAlgorithm;
-	unsigned long   SctpRtoMin;
-	unsigned long   SctpRtoMax;
-	unsigned long   SctpRtoInitial;
-	unsigned long   SctpValCookieLife;
-	unsigned long   SctpMaxInitRetr;
-	unsigned long   __pad[0];
-};
-
-struct linux_mib 
-{
-	unsigned long	SyncookiesSent;
-	unsigned long	SyncookiesRecv;
-	unsigned long	SyncookiesFailed;
-	unsigned long	EmbryonicRsts;
-	unsigned long	PruneCalled; 
-	unsigned long	RcvPruned;
-	unsigned long	OfoPruned;
-	unsigned long	OutOfWindowIcmps; 
-	unsigned long	LockDroppedIcmps; 
-        unsigned long   ArpFilter;
-	unsigned long	TimeWaited; 
-	unsigned long	TimeWaitRecycled; 
-	unsigned long	TimeWaitKilled; 
-	unsigned long	PAWSPassiveRejected; 
-	unsigned long	PAWSActiveRejected; 
-	unsigned long	PAWSEstabRejected; 
-	unsigned long	DelayedACKs;
-	unsigned long	DelayedACKLocked;
-	unsigned long	DelayedACKLost;
-	unsigned long	ListenOverflows;
-	unsigned long	ListenDrops;
-	unsigned long	TCPPrequeued;
-	unsigned long	TCPDirectCopyFromBacklog;
-	unsigned long	TCPDirectCopyFromPrequeue;
-	unsigned long	TCPPrequeueDropped;
-	unsigned long	TCPHPHits;
-	unsigned long	TCPHPHitsToUser;
-	unsigned long	TCPPureAcks;
-	unsigned long	TCPHPAcks;
-	unsigned long	TCPRenoRecovery;
-	unsigned long	TCPSackRecovery;
-	unsigned long	TCPSACKReneging;
-	unsigned long	TCPFACKReorder;
-	unsigned long	TCPSACKReorder;
-	unsigned long	TCPRenoReorder;
-	unsigned long	TCPTSReorder;
-	unsigned long	TCPFullUndo;
-	unsigned long	TCPPartialUndo;
-	unsigned long	TCPDSACKUndo;
-	unsigned long	TCPLossUndo;
-	unsigned long	TCPLoss;
-	unsigned long	TCPLostRetransmit;
-	unsigned long	TCPRenoFailures;
-	unsigned long	TCPSackFailures;
-	unsigned long	TCPLossFailures;
-	unsigned long	TCPFastRetrans;
-	unsigned long	TCPForwardRetrans;
-	unsigned long	TCPSlowStartRetrans;
-	unsigned long	TCPTimeouts;
-	unsigned long	TCPRenoRecoveryFail;
-	unsigned long	TCPSackRecoveryFail;
-	unsigned long	TCPSchedulerFailed;
-	unsigned long	TCPRcvCollapsed;
-	unsigned long	TCPDSACKOldSent;
-	unsigned long	TCPDSACKOfoSent;
-	unsigned long	TCPDSACKRecv;
-	unsigned long	TCPDSACKOfoRecv;
-	unsigned long	TCPAbortOnSyn;
-	unsigned long	TCPAbortOnData;
-	unsigned long	TCPAbortOnClose;
-	unsigned long	TCPAbortOnMemory;
-	unsigned long	TCPAbortOnTimeout;
-	unsigned long	TCPAbortOnLinger;
-	unsigned long	TCPAbortFailed;
-	unsigned long	TCPMemoryPressures;
-	unsigned long   __pad[0];
+/* Linux */
+#define LINUX_MIB_MAX	__LINUX_MIB_MAX
+struct linux_mib {
+	unsigned long	mibs[LINUX_MIB_MAX];
 };
 
 
@@ -317,18 +126,18 @@ struct linux_mib
 #define SNMP_STAT_USRPTR(name)	(name[1])
 
 #define SNMP_INC_STATS_BH(mib, field) 	\
-	(per_cpu_ptr(mib[0], smp_processor_id())->field++)
+	(per_cpu_ptr(mib[0], smp_processor_id())->mibs[field]++)
 #define SNMP_INC_STATS_OFFSET_BH(mib, field, offset)	\
-	((*((&per_cpu_ptr(mib[0], smp_processor_id())->field) + (offset)))++)
+	(per_cpu_ptr(mib[0], smp_processor_id())->mibs[field + (offset)]++)
 #define SNMP_INC_STATS_USER(mib, field) \
-	(per_cpu_ptr(mib[1], smp_processor_id())->field++)
+	(per_cpu_ptr(mib[1], smp_processor_id())->mibs[field]++)
 #define SNMP_INC_STATS(mib, field) 	\
-	(per_cpu_ptr(mib[!in_softirq()], smp_processor_id())->field++)
+	(per_cpu_ptr(mib[!in_softirq()], smp_processor_id())->mibs[field]++)
 #define SNMP_DEC_STATS(mib, field) 	\
-	(per_cpu_ptr(mib[!in_softirq()], smp_processor_id())->field--)
+	(per_cpu_ptr(mib[!in_softirq()], smp_processor_id())->mibs[field]--)
 #define SNMP_ADD_STATS_BH(mib, field, addend) 	\
-	(per_cpu_ptr(mib[0], smp_processor_id())->field += addend)
+	(per_cpu_ptr(mib[0], smp_processor_id())->mibs[field] += addend)
 #define SNMP_ADD_STATS_USER(mib, field, addend) 	\
-	(per_cpu_ptr(mib[1], smp_processor_id())->field += addend)
- 	
+	(per_cpu_ptr(mib[1], smp_processor_id())->mibs[field] += addend)
+
 #endif
