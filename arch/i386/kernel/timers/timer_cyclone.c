@@ -212,26 +212,7 @@ static int __init init_cyclone(char* override)
 		}
 	}
 
-	/* init cpu_khz.
-	 * XXX - This should really be done elsewhere, 
-	 * 		and in a more generic fashion. -johnstul@us.ibm.com
-	 */
-	if (cpu_has_tsc) {
-		unsigned long tsc_quotient = calibrate_tsc();
-		if (tsc_quotient) {
-			/* report CPU clock rate in Hz.
-			 * The formula is (10^6 * 2^32) / (2^32 * 1 / (clocks/us)) =
-			 * clock/second. Our precision is about 100 ppm.
-			 */
-			{	unsigned long eax=0, edx=1000;
-				__asm__("divl %2"
-		       		:"=a" (cpu_khz), "=d" (edx)
-        	       		:"r" (tsc_quotient),
-	                	"0" (eax), "1" (edx));
-				printk("Detected %lu.%03lu MHz processor.\n", cpu_khz / 1000, cpu_khz % 1000);
-			}
-		}
-	}
+	init_cpu_khz();
 
 	/* Everything looks good! */
 	return 0;

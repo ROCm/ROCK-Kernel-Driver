@@ -237,7 +237,7 @@ running once the system is up.
 			Forces specified timesource (if avaliable) to be used
 			when calculating gettimeofday(). If specicified timesource
 			is not avalible, it defaults to PIT. 
-			Format: { pit | tsc | cyclone | ... }
+			Format: { pit | tsc | cyclone | pmtmr }
 
 	hpet=		[IA-32,HPET] option to disable HPET and use PIT.
 			Format: disable

@@ -40,9 +40,13 @@ extern struct timer_opts timer_cyclone;
 #endif
 
 extern unsigned long calibrate_tsc(void);
+extern void init_cpu_khz(void);
 #ifdef CONFIG_HPET_TIMER
 extern struct timer_opts timer_hpet;
 extern unsigned long calibrate_tsc_hpet(unsigned long *tsc_hpet_quotient_ptr);
 #endif
 
+#ifdef CONFIG_X86_PM_TIMER
+extern struct timer_opts timer_pmtmr;
+#endif
 #endif
