@@ -53,9 +53,9 @@ spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 
 static int nohpet __initdata = 0;
+static int notsc __initdata = 0;
 
 #undef HPET_HACK_ENABLE_DANGEROUS
-
 
 unsigned int cpu_khz;					/* TSC clocks / usec, not used here */
 unsigned long hpet_period;				/* fsecs / HPET clock */
@@ -918,10 +918,13 @@ void __init time_init_smp(void)
 	 * Exceptions:
 	 * IBM Summit. Will need to be special cased later.
  	 * AMD dual core may also not need HPET. Check me.
+	 *
+	 * Can be turned off with "notsc".
 	 */
-	if (vxtime.hpet_address &&
-	    num_online_cpus() > 1 &&
-	    boot_cpu_data.x86_vendor == X86_VENDOR_AMD) {
+	if (num_online_cpus() > 1 &&
+	    boot_cpu_data.x86_vendor == X86_VENDOR_AMD)
+		notsc = 1;
+	if (vxtime.hpet_address && notsc) {
 		timetype = "HPET";
 		vxtime.last = hpet_readl(HPET_T0_CMP) - hpet_tick;
 		vxtime.mode = VXTIME_HPET;
@@ -1217,3 +1220,14 @@ static int __init nohpet_setup(char *s)
 } 
 
 __setup("nohpet", nohpet_setup);
+
+
+static int __init notsc_setup(char *s)
+{
+	notsc = 1;
+	return 0;
+}
+
+__setup("notsc", notsc_setup);
+
+
