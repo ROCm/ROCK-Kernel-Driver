@@ -25,15 +25,11 @@
 
 #define CMFA 6
 
-extern int request_irq_boot(unsigned int,
-		             irqreturn_t (*handler)(int, void *, struct pt_regs *),
-		             unsigned long, const char *, void *);
-
 void __init platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
 {
 	outb(H8300_TIMER_COUNT_DATA,TCORA2);
 	outb(0x00,_8TCSR2);
-	request_irq_boot(40,timer_int,0,"timer",0);
+	request_irq(40,timer_int,0,"timer",0);
 	outb(0x40|0x08|0x03,_8TCR2);
 }
 

@@ -58,7 +58,8 @@ struct bus_type {
 	struct device * (*add)	(struct device * parent, char * bus_id);
 	int		(*hotplug) (struct device *dev, char **envp, 
 				    int num_envp, char *buffer, int buffer_size);
-
+	int		(*suspend)(struct device * dev, u32 state);
+	int		(*resume)(struct device * dev);
 };
 
 extern int bus_register(struct bus_type * bus);
@@ -372,8 +373,6 @@ extern struct bus_type platform_bus_type;
 extern struct device legacy_bus;
 
 /* drivers/base/power.c */
-extern int device_suspend(u32 state, u32 level);
-extern void device_resume(u32 level);
 extern void device_shutdown(void);
 
 

@@ -55,12 +55,6 @@ extern struct ia64_boot_param {
 	__u64 initrd_size;
 } *ia64_boot_param;
 
-static inline void
-ia64_insn_group_barrier (void)
-{
-	__asm__ __volatile__ (";;" ::: "memory");
-}
-
 /*
  * Macros to force memory ordering.  In these descriptions, "previous"
  * and "subsequent" refer to program order; "visible" means that all
@@ -83,7 +77,7 @@ ia64_insn_group_barrier (void)
  * it's (presumably) much slower than mf and (b) mf.a is supported for
  * sequential memory pages only.
  */
-#define mb()	__asm__ __volatile__ ("mf" ::: "memory")
+#define mb()	ia64_mf()
 #define rmb()	mb()
 #define wmb()	mb()
 #define read_barrier_depends()	do { } while(0)
@@ -119,22 +113,26 @@ ia64_insn_group_barrier (void)
 
 /* clearing psr.i is implicitly serialized (visible by next insn) */
 /* setting psr.i requires data serialization */
-#define __local_irq_save(x)	__asm__ __volatile__ ("mov %0=psr;;"			\
-						      "rsm psr.i;;"			\
-						      : "=r" (x) :: "memory")
-#define __local_irq_disable()	__asm__ __volatile__ (";; rsm psr.i;;" ::: "memory")
-#define __local_irq_restore(x)	__asm__ __volatile__ ("cmp.ne p6,p7=%0,r0;;"		\
-						      "(p6) ssm psr.i;"			\
-						      "(p7) rsm psr.i;;"		\
-						      "(p6) srlz.d"			\
-						      :: "r" ((x) & IA64_PSR_I)		\
-						      : "p6", "p7", "memory")
+#define __local_irq_save(x)			\
+do {						\
+	(x) = ia64_getreg(_IA64_REG_PSR);	\
+	ia64_stop();				\
+	ia64_rsm(IA64_PSR_I);			\
+} while (0)
+
+#define __local_irq_disable()			\
+do {						\
+	ia64_stop();				\
+	ia64_rsm(IA64_PSR_I);			\
+} while (0)
+
+#define __local_irq_restore(x)	ia64_intrin_local_irq_restore((x) & IA64_PSR_I)
 
 #ifdef CONFIG_IA64_DEBUG_IRQ
 
   extern unsigned long last_cli_ip;
 
-# define __save_ip()		__asm__ ("mov %0=ip" : "=r" (last_cli_ip))
+# define __save_ip()		last_cli_ip = ia64_getreg(_IA64_REG_IP)
 
 # define local_irq_save(x)					\
 do {								\
@@ -164,14 +162,14 @@ do {								\
 # define local_irq_restore(x)	__local_irq_restore(x)
 #endif /* !CONFIG_IA64_DEBUG_IRQ */
 
-#define local_irq_enable()	__asm__ __volatile__ (";; ssm psr.i;; srlz.d" ::: "memory")
-#define local_save_flags(flags)	__asm__ __volatile__ ("mov %0=psr" : "=r" (flags) :: "memory")
+#define local_irq_enable()	({ ia64_ssm(IA64_PSR_I); ia64_srlz_d(); })
+#define local_save_flags(flags)	((flags) = ia64_getreg(_IA64_REG_PSR))
 
 #define irqs_disabled()				\
 ({						\
-	unsigned long flags;			\
-	local_save_flags(flags);		\
-	(flags & IA64_PSR_I) == 0;		\
+	unsigned long __ia64_id_flags;		\
+	local_save_flags(__ia64_id_flags);	\
+	(__ia64_id_flags & IA64_PSR_I) == 0;	\
 })
 
 #ifdef __KERNEL__

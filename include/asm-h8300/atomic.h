@@ -71,56 +71,27 @@ static __inline__ int atomic_dec_and_test(atomic_t *v)
 	return ret == 0;
 }
 
-#if defined(__H8300H__)
 static __inline__ void atomic_clear_mask(unsigned long mask, unsigned long *v)
 {
-	__asm__ __volatile__("stc ccr,r2l\n\t"
+	__asm__ __volatile__("stc ccr,r1l\n\t"
 	                     "orc #0x80,ccr\n\t"
 	                     "mov.l %0,er0\n\t"
-	                     "mov.l %1,er1\n\t"
-	                     "and.l er1,er0\n\t"
+	                     "and.l %1,er0\n\t"
 	                     "mov.l er0,%0\n\t"
-	                     "ldc r2l,ccr" 
-                             : "=m" (*v) : "ir" (~(mask)) :"er0","er1","er2");
+	                     "ldc r1l,ccr" 
+                             : "=m" (*v) : "g" (~(mask)) :"er0","er1");
 }
 
 static __inline__ void atomic_set_mask(unsigned long mask, unsigned long *v)
 {
-	__asm__ __volatile__("stc ccr,r2l\n\t"
+	__asm__ __volatile__("stc ccr,r1l\n\t"
 	                     "orc #0x80,ccr\n\t"
 	                     "mov.l %0,er0\n\t"
-	                     "mov.l %1,er1\n\t"
-	                     "or.l er1,er0\n\t"
+	                     "or.l %1,er0\n\t"
 	                     "mov.l er0,%0\n\t"
-	                     "ldc r2l,ccr" 
-                             : "=m" (*v) : "ir" (mask) :"er0","er1","er2");
+	                     "ldc r1l,ccr" 
+                             : "=m" (*v) : "g" (mask) :"er0","er1");
 }
-#endif
-#if defined(__H8300S__)
-static __inline__ void atomic_clear_mask(unsigned long mask, unsigned long *v)
-{
-	__asm__ __volatile__("stc exr,r2l\n\t"
-	                     "orc #0x07,exr\n\t"
-	                     "mov.l %0,er0\n\t"
-	                     "mov.l %1,er1\n\t"
-	                     "and.l er1,er0\n\t"
-	                     "mov.l er0,%0\n\t"
-	                     "ldc r2l,exr" 
-                             : "=m" (*v) : "ir" (~(mask)) :"er0","er1","er2");
-}
-
-static __inline__ void atomic_set_mask(unsigned long mask, unsigned long *v)
-{
-	__asm__ __volatile__("stc exr,r2l\n\t"
-	                     "orc #0x07,exr\n\t"
-	                     "mov.l %0,er0\n\t"
-	                     "mov.l %1,er1\n\t"
-	                     "or.l er1,er0\n\t"
-	                     "mov.l er0,%0\n\t"
-	                     "ldc r2l,exr" 
-                             : "=m" (*v) : "ir" (mask) :"er0","er1","er2");
-}
-#endif
 
 /* Atomic operations are already serializing */
 #define smp_mb__before_atomic_dec()    barrier()

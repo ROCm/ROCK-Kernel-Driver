@@ -5,7 +5,7 @@
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 #
-# (C) Copyright 2002, Yoshinori Sato <ysato@users.sourceforge.jp>
+# (C) Copyright 2002,2003 Yoshinori Sato <ysato@users.sourceforge.jp>
 #
 ifndef include-config
 -include $(TOPDIR)/.config
@@ -37,8 +37,8 @@ CFLAGS += $(cflags-y)
 CFLAGS += -mint32 -fno-builtin -Os
 CFLAGS += -g
 CFLAGS += -D__linux__
-CFLAGS += -DUTS_SYSNAME=\"uClinux\" -DTARGET=$(BOARD)
-AFLAGS += -DPLATFORM=$(PLATFORM) -DTARGET=$(BOARD) -DMODEL=$(MODEL) $(cflags-y)
+CFLAGS += -DUTS_SYSNAME=\"uClinux\"
+AFLAGS += -DPLATFORM=$(PLATFORM) -DMODEL=$(MODEL) $(cflags-y)
 LDFLAGS += $(ldflags-y)
 
 CROSS_COMPILE = h8300-elf-
@@ -53,28 +53,32 @@ core-y	+= arch/$(ARCH)/kernel/ \
 
 libs-y	+= arch/$(ARCH)/lib/ $(LIBGCC)
 
-export MODEL
+boot := arch/h8300/boot
+
+export MODEL PLATFORM BOARD
 
 archmrproper:
 
 archclean:
-	$(call descend arch/$(ARCH), subdirclean)
+	$(Q)$(MAKE) $(clean)=$(boot)
 
-prepare: include/asm-$(ARCH)/asm-offsets.h
+prepare: include/asm-$(ARCH)/machine-depend.h include/asm-$(ARCH)/asm-offsets.h
+
+include/asm-$(ARCH)/machine-depend.h: include/asm-$(ARCH)/$(BOARD)/machine-depend.h
+	$(Q)ln -sf $(BOARD)/machine-depend.h \
+                   include/asm-$(ARCH)/machine-depend.h
+	@echo '  Create include/asm-$(ARCH)/machine-depend.h'
 
 include/asm-$(ARCH)/asm-offsets.h: arch/$(ARCH)/kernel/asm-offsets.s \
 				   include/asm include/linux/version.h
 	$(call filechk,gen-asm-offsets)
 
-vmlinux.bin: vmlinux
-	$(OBJCOPY) -Obinary $< $@
-
-vmlinux.srec: vmlinux
-	$(OBJCOPY) -Osrec $< $@
+vmlinux.srec vmlinux.bin: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 define archhelp
   echo  'vmlinux.bin  - Create raw binary'
   echo  'vmlinux.srec - Create srec binary'
 endef
 
-CLEAN_FILES += arch/$(ARCH)/vmlinux.bin arch/$(ARCH)/vmlinux.srec
+CLEAN_FILES += include/asm-$(ARCH)/asm-offsets.h include/asm-$(ARCH)/machine-depend.h

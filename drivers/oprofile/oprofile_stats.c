@@ -32,6 +32,7 @@ void oprofile_reset_stats(void)
 	}
  
 	atomic_set(&oprofile_stats.sample_lost_no_mm, 0);
+	atomic_set(&oprofile_stats.sample_lost_no_mapping, 0);
 	atomic_set(&oprofile_stats.event_lost_overflow, 0);
 }
 
@@ -70,6 +71,8 @@ void oprofile_create_stats_files(struct super_block * sb, struct dentry * root)
  
 	oprofilefs_create_ro_atomic(sb, dir, "sample_lost_no_mm",
 		&oprofile_stats.sample_lost_no_mm);
+	oprofilefs_create_ro_atomic(sb, dir, "sample_lost_no_mapping",
+		&oprofile_stats.sample_lost_no_mapping);
 	oprofilefs_create_ro_atomic(sb, dir, "event_lost_overflow",
 		&oprofile_stats.event_lost_overflow);
 }

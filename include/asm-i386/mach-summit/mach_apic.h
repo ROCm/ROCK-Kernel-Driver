@@ -80,12 +80,17 @@ static inline int apicid_to_node(int logical_apicid)
 extern u8 cpu_2_logical_apicid[];
 static inline int cpu_to_logical_apicid(int cpu)
 {
+       if (cpu >= NR_CPUS)
+	       return BAD_APICID;
 	return (int)cpu_2_logical_apicid[cpu];
 }
 
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
-	return (int) bios_cpu_apicid[mps_cpu];
+	if (mps_cpu < NR_CPUS)
+		return (int)bios_cpu_apicid[mps_cpu];
+	else
+		return BAD_APICID;
 }
 
 static inline physid_mask_t ioapic_phys_id_map(physid_mask_t phys_id_map)

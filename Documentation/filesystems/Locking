@@ -28,8 +28,9 @@ d_iput:		no		no		no		yes
 
 --------------------------- inode_operations --------------------------- 
 prototypes:
-	int (*create) (struct inode *,struct dentry *,int);
-	struct dentry * (*lookup) (struct inode *,struct dentry *);
+	int (*create) (struct inode *,struct dentry *,int, struct nameidata *);
+	struct dentry * (*lookup) (struct inode *,struct dentry *, struct nameid
+ata *);
 	int (*link) (struct dentry *,struct inode *,struct dentry *);
 	int (*unlink) (struct inode *,struct dentry *);
 	int (*symlink) (struct inode *,struct dentry *,const char *);
@@ -38,13 +39,13 @@ prototypes:
 	int (*mknod) (struct inode *,struct dentry *,int,dev_t);
 	int (*rename) (struct inode *, struct dentry *,
 			struct inode *, struct dentry *);
-	int (*readlink) (struct dentry *, char *,int);
+	int (*readlink) (struct dentry *, char __user *,int);
 	int (*follow_link) (struct dentry *, struct nameidata *);
 	void (*truncate) (struct inode *);
-	int (*permission) (struct inode *, int);
+	int (*permission) (struct inode *, int, struct nameidata *);
 	int (*setattr) (struct dentry *, struct iattr *);
 	int (*getattr) (struct vfsmount *, struct dentry *, struct kstat *);
-	int (*setxattr) (struct dentry *, const char *, void *, size_t, int);
+	int (*setxattr) (struct dentry *, const char *,const void *,size_t,int);
 	ssize_t (*getxattr) (struct dentry *, const char *, void *, size_t);
 	ssize_t (*listxattr) (struct dentry *, char *, size_t);
 	int (*removexattr) (struct dentry *, const char *);
@@ -85,42 +86,55 @@ of the locking scheme for directory operations.
 
 --------------------------- super_operations ---------------------------
 prototypes:
+	struct inode *(*alloc_inode)(struct super_block *sb);
+	void (*destroy_inode)(struct inode *);
 	void (*read_inode) (struct inode *);
+	void (*dirty_inode) (struct inode *);
 	void (*write_inode) (struct inode *, int);
 	void (*put_inode) (struct inode *);
 	void (*drop_inode) (struct inode *);
 	void (*delete_inode) (struct inode *);
 	void (*put_super) (struct super_block *);
 	void (*write_super) (struct super_block *);
-	int (*sync_fs) (struct super_block *sb, int wait);
-	int (*statfs) (struct super_block *, struct statfs *);
+	int (*sync_fs)(struct super_block *sb, int wait);
+	void (*write_super_lockfs) (struct super_block *);
+	void (*unlockfs) (struct super_block *);
+	int (*statfs) (struct super_block *, struct kstatfs *);
 	int (*remount_fs) (struct super_block *, int *, char *);
 	void (*clear_inode) (struct inode *);
 	void (*umount_begin) (struct super_block *);
+	int (*show_options)(struct seq_file *, struct vfsmount *);
 
 locking rules:
 	All may block.
-		BKL	s_lock	mount_sem
-read_inode:	yes				(see below)
-write_inode:	no	
-put_inode:	no	
-drop_inode:	no				!!!inode_lock!!!
-delete_inode:	no	
-clear_inode:	no	
-put_super:	yes	yes	maybe		(see below)
-write_super:	no	yes	maybe		(see below)
-sync_fs:	no	no	maybe		(see below)
-statfs:		no	no	no
-remount_fs:	yes	yes	maybe		(see below)
-umount_begin:	yes	no	maybe		(see below)
+			BKL	s_lock	s_umount
+alloc_inode:		no	no	no
+destroy_inode:		no
+read_inode:		no				(see below)
+dirty_inode:		no				(must not sleep)
+write_inode:		no
+put_inode:		no
+drop_inode:		no				!!!inode_lock!!!
+delete_inode:		no
+put_super:		yes	yes	no
+write_super:		no	yes	read
+sync_fs:		no	no	read
+write_super_lockfs:	?
+unlockfs:		?
+statfs:			no	no	no
+remount_fs:		no	yes	maybe		(see below)
+clear_inode:		no
+umount_begin:		yes	no	no
+show_options:		no				(vfsmount->sem)
 
 ->read_inode() is not a method - it's a callback used in iget().
-rules for mount_sem are not too nice - it is going to die and be replaced
-by better scheme anyway.
+->remount_fs() will have the s_umount lock if it's already mounted.
+When called from get_sb_single, it does NOT have the s_umount lock.
 
 --------------------------- file_system_type ---------------------------
 prototypes:
-	struct super_block *(*get_sb) (struct file_system_type *, int, const char *, void *);
+	struct super_block *(*get_sb) (struct file_system_type *, int,
+			const char *, void *);
 	void (*kill_sb) (struct super_block *);
 locking rules:
 		may block	BKL
@@ -128,7 +142,7 @@ get_sb		yes		yes
 kill_sb		yes		yes
 
 ->get_sb() returns error or a locked superblock (exclusive on ->s_umount).
-->kill_sb() takes a locked superblock, does all shutdown work on it,
+->kill_sb() takes a write-locked superblock, does all shutdown work on it,
 unlocks and drops the reference.
 
 --------------------------- address_space_operations --------------------------
@@ -138,12 +152,15 @@ prototypes:
 	int (*sync_page)(struct page *);
 	int (*writepages)(struct address_space *, struct writeback_control *);
 	int (*set_page_dirty)(struct page *page);
+	int (*readpages)(struct file *filp, struct address_space *mapping,
+			struct list_head *pages, unsigned nr_pages);
 	int (*prepare_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*commit_write)(struct file *, struct page *, unsigned, unsigned);
-	int (*bmap)(struct address_space *, long);
+	sector_t (*bmap)(struct address_space *, sector_t);
 	int (*invalidatepage) (struct page *, unsigned long);
 	int (*releasepage) (struct page *, int);
-	int (*direct_IO)(int, struct inode *, struct kiobuf *, unsigned long, int);
+	int (*direct_IO)(int, struct kiocb *, const struct iovec *iov,
+			loff_t offset, unsigned long nr_segs);
 
 locking rules:
 	All except set_page_dirty may block
@@ -151,15 +168,16 @@ locking rules:
 			BKL	PageLocked(page)
 writepage:		no	yes, unlocks (see below)
 readpage:		no	yes, unlocks
-readpages:		no
 sync_page:		no	maybe
 writepages:		no
 set_page_dirty		no	no
+readpages:		no
 prepare_write:		no	yes
 commit_write:		no	yes
 bmap:			yes
 invalidatepage:		no	yes
 releasepage:		no	yes
+direct_IO:		no
 
 	->prepare_write(), ->commit_write(), ->sync_page() and ->readpage()
 may be called from the request handler (/dev/loop).
@@ -253,8 +271,8 @@ prototypes:
 locking rules:
 		BKL	may block
 fl_notify:	yes	no
-fl_insert:	yes	maybe
-fl_remove:	yes	maybe
+fl_insert:	yes	no
+fl_remove:	yes	no
 	Currently only NLM provides instances of this class. None of the
 them block. If you have out-of-tree instances - please, show up. Locking
 in that area will change.
@@ -274,57 +292,75 @@ prototypes:
 	int (*open) (struct inode *, struct file *);
 	int (*release) (struct inode *, struct file *);
 	int (*ioctl) (struct inode *, struct file *, unsigned, unsigned long);
-	int (*check_media_change) (kdev_t);
-	int (*revalidate) (kdev_t);
+	int (*media_changed) (struct gendisk *);
+	int (*revalidate_disk) (struct gendisk *);
+
 locking rules:
 			BKL	bd_sem
 open:			yes	yes
 release:		yes	yes
 ioctl:			yes	no
-check_media_change:	yes	no
-revalidate:		yes	no
+media_changed:		no	no
+revalidate_disk:	no	no
 
-The last two are called only from check_disk_change(). Prototypes are very
-bad - as soon as we'll get disk_struct they will change (and methods will
-become per-disk instead of per-partition).
+The last two are called only from check_disk_change().
 
 --------------------------- file_operations -------------------------------
 prototypes:
 	loff_t (*llseek) (struct file *, loff_t, int);
-	ssize_t (*read) (struct file *, char *, size_t, loff_t *);
-	ssize_t (*write) (struct file *, const char *, size_t, loff_t *);
+	ssize_t (*read) (struct file *, char __user *, size_t, loff_t *);
+	ssize_t (*aio_read) (struct kiocb *, char __user *, size_t, loff_t);
+	ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *);
+	ssize_t (*aio_write) (struct kiocb *, const char __user *, size_t,
+			loff_t);
 	int (*readdir) (struct file *, void *, filldir_t);
 	unsigned int (*poll) (struct file *, struct poll_table_struct *);
-	int (*ioctl) (struct inode *, struct file *, unsigned int, unsigned long);
+	int (*ioctl) (struct inode *, struct file *, unsigned int,
+			unsigned long);
 	int (*mmap) (struct file *, struct vm_area_struct *);
 	int (*open) (struct inode *, struct file *);
 	int (*flush) (struct file *);
 	int (*release) (struct inode *, struct file *);
 	int (*fsync) (struct file *, struct dentry *, int datasync);
+	int (*aio_fsync) (struct kiocb *, int datasync);
 	int (*fasync) (int, struct file *, int);
 	int (*lock) (struct file *, int, struct file_lock *);
-	ssize_t (*readv) (struct file *, const struct iovec *, unsigned long, loff_t *);
-	ssize_t (*writev) (struct file *, const struct iovec *, unsigned long, loff_t *);
+	ssize_t (*readv) (struct file *, const struct iovec *, unsigned long,
+			loff_t *);
+	ssize_t (*writev) (struct file *, const struct iovec *, unsigned long,
+			loff_t *);
+	ssize_t (*sendfile) (struct file *, loff_t *, size_t, read_actor_t,
+			void __user *);
+	ssize_t (*sendpage) (struct file *, struct page *, int, size_t,
+			loff_t *, int);
+	unsigned long (*get_unmapped_area)(struct file *, unsigned long,
+			unsigned long, unsigned long, unsigned long);
 };
 
 locking rules:
 	All except ->poll() may block.
-		BKL
-llseek:		yes	(see below)
-read:		no
-write:		no
-readdir: 	no	
-poll:		no
-ioctl:		yes	(see below)
-mmap:		no
-open:		maybe	(see below)
-flush:		no
-release:	no
-fsync:		yes	(see below)
-fasync:		yes	(see below)
-lock:		yes
-readv:		no
-writev:		no
+			BKL
+llseek:			no	(see below)
+read:			no
+aio_read:		no
+write:			no
+aio_write:		no
+readdir: 		no
+poll:			no
+ioctl:			yes	(see below)
+mmap:			no
+open:			maybe	(see below)
+flush:			no
+release:		no
+fsync:			no	(see below)
+aio_fsync:		no
+fasync:			yes	(see below)
+lock:			yes
+readv:			no
+writev:			no
+sendfile:		no
+sendpage:		no
+get_unmapped_area:	no
 
 ->llseek() locking has moved from llseek to the individual llseek
 implementations.  If your fs is not using generic_file_llseek, you

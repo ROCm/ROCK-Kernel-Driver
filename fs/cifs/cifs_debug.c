@@ -197,6 +197,8 @@ static read_proc_t ntlmv2_enabled_read;
 static write_proc_t ntlmv2_enabled_write;
 static read_proc_t packet_signing_enabled_read;
 static write_proc_t packet_signing_enabled_write;
+static read_proc_t quotaEnabled_read;
+static write_proc_t quotaEnabled_write;
 
 void
 cifs_proc_init(void)
@@ -232,6 +234,11 @@ cifs_proc_init(void)
 				     oplockEnabled_read, 0);
 	if (pde)
 		pde->write_proc = oplockEnabled_write;
+
+        pde = create_proc_read_entry("QuotaEnabled", 0, proc_fs_cifs,
+                                     quotaEnabled_read, 0);
+        if (pde)
+                pde->write_proc = quotaEnabled_write;
 
 	pde =
 	    create_proc_read_entry("MultiuserMount", 0, proc_fs_cifs,
@@ -360,6 +367,47 @@ oplockEnabled_write(struct file *file, const char *buffer,
 
 	return count;
 }
+
+static int
+quotaEnabled_read(char *page, char **start, off_t off,
+                   int count, int *eof, void *data)
+{
+        int len;
+
+        len = sprintf(page, "%d\n", quotaEnabled);
+/* could also check if quotas are enabled in kernel
+	as a whole first */
+        len -= off;
+        *start = page + off;
+
+        if (len > count)
+                len = count;
+        else
+                *eof = 1;
+
+        if (len < 0)
+                len = 0;
+
+        return len;
+}
+static int
+quotaEnabled_write(struct file *file, const char *buffer,
+                    unsigned long count, void *data)
+{
+        char c;
+        int rc;
+
+        rc = get_user(c, buffer);
+        if (rc)
+                return rc;
+        if (c == '0' || c == 'n' || c == 'N')
+                quotaEnabled = 0;
+        else if (c == '1' || c == 'y' || c == 'Y')
+                quotaEnabled = 1;
+
+        return count;
+}
+
 
 static int
 lookupFlag_read(char *page, char **start, off_t off,

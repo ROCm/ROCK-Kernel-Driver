@@ -18,9 +18,10 @@
 #include <linux/smp_lock.h>
 #include <linux/tty.h>
 
-#include <asm/uaccess.h>
-#include <asm/rse.h>
+#include <asm/intrinsics.h>
 #include <asm/processor.h>
+#include <asm/rse.h>
+#include <asm/uaccess.h>
 #include <asm/unaligned.h>
 
 extern void die_if_kernel(char *str, struct pt_regs *regs, long err) __attribute__ ((noreturn));
@@ -231,7 +232,7 @@ static u16 fr_info[32]={
 static void
 invala_gr (int regno)
 {
-#	define F(reg)	case reg: __asm__ __volatile__ ("invala.e r%0" :: "i"(reg)); break
+#	define F(reg)	case reg: ia64_invala_gr(reg); break
 
 	switch (regno) {
 		F(  0); F(  1); F(  2); F(  3); F(  4); F(  5); F(  6); F(  7);
@@ -258,7 +259,7 @@ invala_gr (int regno)
 static void
 invala_fr (int regno)
 {
-#	define F(reg)	case reg: __asm__ __volatile__ ("invala.e f%0" :: "i"(reg)); break
+#	define F(reg)	case reg: ia64_invala_fr(reg); break
 
 	switch (regno) {
 		F(  0); F(  1); F(  2); F(  3); F(  4); F(  5); F(  6); F(  7);
@@ -554,13 +555,13 @@ setfpreg (unsigned long regnum, struct ia64_fpreg *fpval, struct pt_regs *regs)
 static inline void
 float_spill_f0 (struct ia64_fpreg *final)
 {
-	__asm__ __volatile__ ("stf.spill [%0]=f0" :: "r"(final) : "memory");
+	ia64_stf_spill(final, 0);
 }
 
 static inline void
 float_spill_f1 (struct ia64_fpreg *final)
 {
-	__asm__ __volatile__ ("stf.spill [%0]=f1" :: "r"(final) : "memory");
+	ia64_stf_spill(final, 1);
 }
 
 static void
@@ -954,57 +955,65 @@ static const unsigned char float_fsz[4]={
 static inline void
 mem2float_extended (struct ia64_fpreg *init, struct ia64_fpreg *final)
 {
-	__asm__ __volatile__ ("ldfe f6=[%0];; stf.spill [%1]=f6"
-			      :: "r"(init), "r"(final) : "f6","memory");
+	ia64_ldfe(6, init);
+	ia64_stop();
+	ia64_stf_spill(final, 6);
 }
 
 static inline void
 mem2float_integer (struct ia64_fpreg *init, struct ia64_fpreg *final)
 {
-	__asm__ __volatile__ ("ldf8 f6=[%0];; stf.spill [%1]=f6"
-			      :: "r"(init), "r"(final) : "f6","memory");
+	ia64_ldf8(6, init);
+	ia64_stop();
+	ia64_stf_spill(final, 6);
 }
 
 static inline void
 mem2float_single (struct ia64_fpreg *init, struct ia64_fpreg *final)
 {
-	__asm__ __volatile__ ("ldfs f6=[%0];; stf.spill [%1]=f6"
-			      :: "r"(init), "r"(final) : "f6","memory");
+	ia64_ldfs(6, init);
+	ia64_stop();
+	ia64_stf_spill(final, 6);
 }
 
 static inline void
 mem2float_double (struct ia64_fpreg *init, struct ia64_fpreg *final)
 {
-	__asm__ __volatile__ ("ldfd f6=[%0];; stf.spill [%1]=f6"
-			      :: "r"(init), "r"(final) : "f6","memory");
+	ia64_ldfd(6, init);
+	ia64_stop();
+	ia64_stf_spill(final, 6);
 }
 
 static inline void
 float2mem_extended (struct ia64_fpreg *init, struct ia64_fpreg *final)
 {
-	__asm__ __volatile__ ("ldf.fill f6=[%0];; stfe [%1]=f6"
-			      :: "r"(init), "r"(final) : "f6","memory");
+	ia64_ldf_fill(6, init);
+	ia64_stop();
+	ia64_stfe(final, 6);
 }
 
 static inline void
 float2mem_integer (struct ia64_fpreg *init, struct ia64_fpreg *final)
 {
-	__asm__ __volatile__ ("ldf.fill f6=[%0];; stf8 [%1]=f6"
-			      :: "r"(init), "r"(final) : "f6","memory");
+	ia64_ldf_fill(6, init);
+	ia64_stop();
+	ia64_stf8(final, 6);
 }
 
 static inline void
 float2mem_single (struct ia64_fpreg *init, struct ia64_fpreg *final)
 {
-	__asm__ __volatile__ ("ldf.fill f6=[%0];; stfs [%1]=f6"
-			      :: "r"(init), "r"(final) : "f6","memory");
+	ia64_ldf_fill(6, init);
+	ia64_stop();
+	ia64_stfs(final, 6);
 }
 
 static inline void
 float2mem_double (struct ia64_fpreg *init, struct ia64_fpreg *final)
 {
-	__asm__ __volatile__ ("ldf.fill f6=[%0];; stfd [%1]=f6"
-			      :: "r"(init), "r"(final) : "f6","memory");
+	ia64_ldf_fill(6, init);
+	ia64_stop();
+	ia64_stfd(final, 6);
 }
 
 static int

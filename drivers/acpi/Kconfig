@@ -30,7 +30,7 @@ config ACPI
 	bool "Full ACPI Support"
 	depends on !X86_VISWS
 	depends on !IA64_HP_SIM
-	depends on IA64 || (X86 && ACPI_HT)
+	depends on IA64 || (X86 || ACPI_HT)
 	default y
 	---help---
 	  Advanced Configuration and Power Interface (ACPI) support for 

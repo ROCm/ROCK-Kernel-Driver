@@ -1151,14 +1151,14 @@ static int __init smctr_chk_isa(struct net_device *dev)
                 if(smctr_read_584_chksum(ioaddr))
                 {
                         printk(KERN_ERR "%s: EEPROM Checksum Failure\n", dev->name);
-                        goto out3;
+			free_irq(dev->irq, dev);
+                        goto out2;
                 }
 		*/
         }
 
         return (0);
-out3:
-	free_irq(dev->irq, dev);
+
 out2:
 	release_region(ioaddr, SMCTR_IO_EXTENT);
 out:

@@ -43,6 +43,7 @@
 #include <asm/setup.h>
 #include <asm/arch_hooks.h>
 #include <asm/sections.h>
+#include <asm/io_apic.h>
 #include "setup_arch_pre.h"
 #include "mach_resources.h"
 
@@ -543,11 +544,12 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			if (!acpi_force) acpi_disabled = 1;
 		}
 
+#ifdef CONFIG_X86_LOCAL_APIC
 		/* disable IO-APIC */
-		else if (!memcmp(from, "noapic", 6)) {
-			skip_ioapic_setup = 1;
-		}
-#endif
+		else if (!memcmp(from, "noapic", 6))
+			disable_ioapic_setup();
+#endif /* CONFIG_X86_LOCAL_APIC */
+#endif /* CONFIG_ACPI_BOOT */
 
 		/*
 		 * highmem=size forces highmem to be exactly 'size' bytes.
@@ -1003,12 +1005,11 @@ void __init setup_arch(char **cmdline_p)
 	generic_apic_probe(*cmdline_p);
 #endif	
 
-#ifdef CONFIG_ACPI_BOOT
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
-	(void) acpi_boot_init();
-#endif
+	acpi_boot_init();
+
 #ifdef CONFIG_X86_LOCAL_APIC
 	if (smp_found_config)
 		get_smp_config();

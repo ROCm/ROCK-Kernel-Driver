@@ -44,14 +44,19 @@ SYMBOL_NAME_LABEL(_start)
 
 	/* copy .data */
 #if !defined(CONFIG_H8300H_SIM)
+	/* copy .data */
 	mov.l	#__begin_data,er5
 	mov.l	#__sdata,er6
 	mov.l	#__edata,er4
-	sub.l	er6,er4		
+	sub.l	er6,er4
+	shlr.l	er4
+	shlr.l	er4
 1:	
-	eepmov.w	
-	dec.w	#1,e4
-	bpl	1b	
+	mov.l	@er5+,er0
+	mov.l	er0,@er6
+	adds	#4,er6
+	dec.l	#1,er4
+	bne	1b	
 #endif
 
 	/* copy kernel commandline */

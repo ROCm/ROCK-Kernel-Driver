@@ -1534,15 +1534,12 @@ int ata_attach(ide_drive_t *drive)
 
 EXPORT_SYMBOL(ata_attach);
 
-int generic_ide_suspend(struct device *dev, u32 state, u32 level)
+static int generic_ide_suspend(struct device *dev, u32 state)
 {
 	ide_drive_t *drive = dev->driver_data;
 	struct request rq;
 	struct request_pm_state rqpm;
 	ide_task_t args;
-
-	if (level == dev->power_state || level != SUSPEND_SAVE_STATE)
-		return 0;
 
 	memset(&rq, 0, sizeof(rq));
 	memset(&rqpm, 0, sizeof(rqpm));
@@ -1556,17 +1553,12 @@ int generic_ide_suspend(struct device *dev, u32 state, u32 level)
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
 
-EXPORT_SYMBOL(generic_ide_suspend);
-
-int generic_ide_resume(struct device *dev, u32 level)
+static int generic_ide_resume(struct device *dev)
 {
 	ide_drive_t *drive = dev->driver_data;
 	struct request rq;
 	struct request_pm_state rqpm;
 	ide_task_t args;
-
-	if (level == dev->power_state || level != RESUME_RESTORE_STATE)
-		return 0;
 
 	memset(&rq, 0, sizeof(rq));
 	memset(&rqpm, 0, sizeof(rqpm));
@@ -1579,8 +1571,6 @@ int generic_ide_resume(struct device *dev, u32 level)
 
 	return ide_do_drive_cmd(drive, &rq, ide_head_wait);
 }
-
-EXPORT_SYMBOL(generic_ide_resume);
 
 int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 			unsigned long arg)
@@ -2594,6 +2584,8 @@ EXPORT_SYMBOL(ide_probe);
 
 struct bus_type ide_bus_type = {
 	.name		= "ide",
+	.suspend	= generic_ide_suspend,
+	.resume		= generic_ide_resume,
 };
 
 /*

@@ -602,8 +602,8 @@ static int aha1740_probe (struct device *dev)
 		outb(G2CNTRL_HRST, G2CNTRL(slotbase));
 		outb(0, G2CNTRL(slotbase));
 	}
-	printk(KERN_INFO "Configuring %s at IO:%x, IRQ %d\n",
-	       dev->name, slotbase, irq_level);
+	printk(KERN_INFO "Configuring slot %d at IO:%x, IRQ %d\n",
+	       edev->slot, slotbase, irq_level);
 	printk(KERN_INFO "aha174x: Extended translation %sabled.\n",
 	       translation ? "en" : "dis");
 	shpnt = scsi_host_alloc(&aha1740_template,
@@ -656,8 +656,7 @@ static __devexit int aha1740_remove (struct device *dev)
 	struct Scsi_Host *shpnt = dev->driver_data;
 	struct aha1740_hostdata *host = HOSTDATA (shpnt);
 
-	if (scsi_remove_host (shpnt))
-		return -EBUSY;
+	scsi_remove_host(shpnt);
 	
 	free_irq (shpnt->irq, shpnt);
 	dma_unmap_single (dev, host->ecb_dma_addr,

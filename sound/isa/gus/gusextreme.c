@@ -284,8 +284,8 @@ static int __init snd_gusextreme_probe(int dev)
 		return err;
 	}
 	if (!gus->ess_flag) {
-		snd_card_free(card);
 		snd_printdd("GUS Extreme soundcard was not detected at 0x%lx\n", gus->gf1.port);
+		snd_card_free(card);
 		return -ENODEV;
 	}
 	if ((err = snd_es1688_pcm(es1688, 0, NULL)) < 0) {

@@ -283,61 +283,16 @@ void sysdev_shutdown(void)
 
 
 /**
- *	sysdev_save - Save system device state
- *	@state:	Power state we're entering.
- *
- *	This is called when the system is going to sleep, but before interrupts 
- *	have been disabled. This allows system device drivers to allocate and 
- *	save device state, including sleeping during the process..
- */
-
-int sysdev_save(u32 state)
-{
-	struct sysdev_class * cls;
-
-	pr_debug("Saving System Device State\n");
-
-	down_write(&system_subsys.rwsem);
-
-	list_for_each_entry_reverse(cls,&system_subsys.kset.list,
-				    kset.kobj.entry) {
-		struct sys_device * sysdev;
-		pr_debug("Saving state for type '%s':\n",cls->kset.kobj.name);
-
-		list_for_each_entry(sysdev,&cls->kset.list,kobj.entry) {
-			struct sysdev_driver * drv;
-
-			pr_debug(" %s\n",sysdev->kobj.name);
-
-			list_for_each_entry(drv,&global_drivers,entry) {
-				if (drv->save)
-					drv->save(sysdev,state);
-			}
-
-			list_for_each_entry(drv,&cls->drivers,entry) {
-				if (drv->save)
-					drv->save(sysdev,state);
-			}
-
-			if (cls->save)
-				cls->save(sysdev,state);
-		}
-	}
-	up_write(&system_subsys.rwsem);
-	return 0;
-}
-
-
-/**
  *	sysdev_suspend - Suspend all system devices.
  *	@state:		Power state to enter.
  *
  *	We perform an almost identical operation as sys_device_shutdown()
- *	above, though calling ->suspend() instead.
+ *	above, though calling ->suspend() instead. Interrupts are disabled
+ *	when this called. Devices are responsible for both saving state and
+ *	quiescing or powering down the device. 
  *
- *	Note: Interrupts are disabled when called, so we can't sleep when
- *	trying to get the subsystem's rwsem. If that happens, print a nasty
- *	warning and return an error.
+ *	This is only called by the device PM core, so we let them handle
+ *	all synchronization.
  */
 
 int sysdev_suspend(u32 state)
@@ -345,11 +300,6 @@ int sysdev_suspend(u32 state)
 	struct sysdev_class * cls;
 
 	pr_debug("Suspending System Devices\n");
-
-	if (!down_write_trylock(&system_subsys.rwsem)) {
-		printk("%s: Cannot acquire semaphore; Failing\n",__FUNCTION__);
-		return -EFAULT;
-	}
 
 	list_for_each_entry_reverse(cls,&system_subsys.kset.list,
 				    kset.kobj.entry) {
@@ -378,8 +328,6 @@ int sysdev_suspend(u32 state)
 				cls->suspend(sysdev,state);
 		}
 	}
-	up_write(&system_subsys.rwsem);
-
 	return 0;
 }
 
@@ -390,7 +338,7 @@ int sysdev_suspend(u32 state)
  *	Similar to sys_device_suspend(), but we iterate the list forwards
  *	to guarantee that parent devices are resumed before their children.
  *
- *	Note: Interrupts are disabled when called.
+ *	Note: Interrupts are disabled when called. 
  */
 
 int sysdev_resume(void)
@@ -398,9 +346,6 @@ int sysdev_resume(void)
 	struct sysdev_class * cls;
 
 	pr_debug("Resuming System Devices\n");
-
-	if(!down_write_trylock(&system_subsys.rwsem))
-		return -EFAULT;
 
 	list_for_each_entry(cls,&system_subsys.kset.list,kset.kobj.entry) {
 		struct sys_device * sysdev;
@@ -429,50 +374,6 @@ int sysdev_resume(void)
 
 		}
 	}
-	up_write(&system_subsys.rwsem);
-	return 0;
-}
-
-
-/**
- *	sysdev_restore - Restore system device state
- *
- *	This is called during a suspend/resume cycle last, after interrupts 
- *	have been re-enabled. This is intended for auxillary drivers, etc, 
- *	that may sleep when restoring state.
- */
-
-int sysdev_restore(void)
-{
-	struct sysdev_class * cls;
-
-	down_write(&system_subsys.rwsem);
-	pr_debug("Restoring System Device State\n");
-
-	list_for_each_entry(cls,&system_subsys.kset.list,kset.kobj.entry) {
-		struct sys_device * sysdev;
-
-		pr_debug("Restoring state for type '%s':\n",cls->kset.kobj.name);
-		list_for_each_entry(sysdev,&cls->kset.list,kobj.entry) {
-			struct sysdev_driver * drv;
-			pr_debug(" %s\n",sysdev->kobj.name);
-
-			if (cls->restore)
-				cls->restore(sysdev);
-
-			list_for_each_entry(drv,&cls->drivers,entry) {
-				if (drv->restore)
-					drv->restore(sysdev);
-			}
-
-			list_for_each_entry(drv,&global_drivers,entry) {
-				if (drv->restore)
-					drv->restore(sysdev);
-			}
-		}
-	}
-
-	up_write(&system_subsys.rwsem);
 	return 0;
 }
 

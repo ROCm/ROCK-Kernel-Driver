@@ -445,17 +445,19 @@ extern int ia32_setup_arg_pages (struct linux_binprm *bprm);
 extern unsigned long ia32_do_mmap (struct file *, unsigned long, unsigned long, int, int, loff_t);
 extern void ia32_load_segment_descriptors (struct task_struct *task);
 
-#define ia32f2ia64f(dst,src) \
-	do { \
-	register double f6 asm ("f6"); \
-	asm volatile ("ldfe f6=[%2];; stf.spill [%1]=f6" : "=f"(f6): "r"(dst), "r"(src) : "memory"); \
-	} while(0)
+#define ia32f2ia64f(dst,src)			\
+do {						\
+	ia64_ldfe(6,src);			\
+	ia64_stop();				\
+	ia64_stf_spill(dst, 6);			\
+} while(0)
 
-#define ia64f2ia32f(dst,src) \
-	do { \
-	register double f6 asm ("f6"); \
-	asm volatile ("ldf.fill f6=[%2];; stfe [%1]=f6" : "=f"(f6): "r"(dst),  "r"(src) : "memory"); \
-	} while(0)
+#define ia64f2ia32f(dst,src)			\
+do {						\
+	ia64_ldf_fill(6, src);			\
+	ia64_stop();				\
+	ia64_stfe(dst, 6);			\
+} while(0)
 
 struct user_regs_struct32 {
 	__u32 ebx, ecx, edx, esi, edi, ebp, eax;
@@ -468,11 +470,8 @@ struct user_regs_struct32 {
 };
 
 /* Prototypes for use in elfcore32.h */
-int save_ia32_fpstate (struct task_struct *tsk,
-                       struct ia32_user_i387_struct *save);
-
-int save_ia32_fpxstate (struct task_struct *tsk,
-			struct ia32_user_fxsr_struct *save);
+extern int save_ia32_fpstate (struct task_struct *tsk, struct ia32_user_i387_struct *save);
+extern int save_ia32_fpxstate (struct task_struct *tsk, struct ia32_user_fxsr_struct *save);
 
 #endif /* !CONFIG_IA32_SUPPORT */
 

@@ -11,22 +11,19 @@
 #ifndef OP_X86_MODEL_H
 #define OP_X86_MODEL_H
 
-/* Pentium IV needs all these */
-#define MAX_MSR 63
- 
 struct op_saved_msr {
 	unsigned int high;
 	unsigned int low;
 };
 
-struct op_msr_group {
-	unsigned int addrs[MAX_MSR];
-	struct op_saved_msr saved[MAX_MSR];
+struct op_msr {
+	unsigned long addr;
+	struct op_saved_msr saved;
 };
 
 struct op_msrs {
-	struct op_msr_group counters;
-	struct op_msr_group controls;
+	struct op_msr * counters;
+	struct op_msr * controls;
 };
 
 struct pt_regs;

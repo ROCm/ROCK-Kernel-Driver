@@ -147,6 +147,7 @@ int ax25_rx_iframe(ax25_cb *ax25, struct sk_buff *skb)
 	}
 
 	if (ax25->sk != NULL && ax25->ax25_dev->values[AX25_VALUES_CONMODE] == 2) {
+		bh_lock_sock(ax25->sk);
 		if ((!ax25->pidincl && ax25->sk->sk_protocol == pid) ||
 		    ax25->pidincl) {
 			if (sock_queue_rcv_skb(ax25->sk, skb) == 0)
@@ -154,6 +155,7 @@ int ax25_rx_iframe(ax25_cb *ax25, struct sk_buff *skb)
 			else
 				ax25->condition |= AX25_COND_OWN_RX_BUSY;
 		}
+		bh_unlock_sock(ax25->sk);
 	}
 
 	return queued;
@@ -329,6 +331,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 		if (ax25_process_rx_frame(ax25, skb, type, dama) == 0)
 			kfree_skb(skb);
 
+		ax25_cb_put(ax25);
 		return 0;
 	}
 
@@ -357,11 +360,14 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 		sk = ax25_find_listener(next_digi, 1, dev, SOCK_SEQPACKET);
 
 	if (sk != NULL) {
+		bh_lock_sock(sk);
 		if (sk->sk_ack_backlog == sk->sk_max_ack_backlog ||
 		    (make = ax25_make_new(sk, ax25_dev)) == NULL) {
 			if (mine)
 				ax25_return_dm(dev, &src, &dest, &dp);
 			kfree_skb(skb);
+			bh_unlock_sock(sk);
+			sock_put(sk);
 
 			return 0;
 		}
@@ -374,6 +380,8 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 		make->sk_pair  = sk;
 
 		sk->sk_ack_backlog++;
+		bh_unlock_sock(sk);
+		sock_put(sk);
 	} else {
 		if (!mine) {
 			kfree_skb(skb);
@@ -429,7 +437,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	ax25->state = AX25_STATE_3;
 
-	ax25_insert_socket(ax25);
+	ax25_cb_add(ax25);
 
 	ax25_start_heartbeat(ax25);
 	ax25_start_t3timer(ax25);

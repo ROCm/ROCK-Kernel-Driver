@@ -16,7 +16,9 @@
  */
 typedef struct {
 	unsigned long buf_size;		/* size of the buffer in bytes */
-	unsigned long reserved[3];	/* for future use */
+	unsigned int  flags;		/* buffer specific flags */
+	unsigned int  res1;		/* for future use */
+	unsigned long reserved[2];	/* for future use */
 } pfm_default_smpl_arg_t;
 
 /*
@@ -46,28 +48,27 @@ typedef struct {
 
 /*
  * Entry header in the sampling buffer.  The header is directly followed
- * with the PMDs saved in increasing index order: PMD4, PMD5, .... How
- * many PMDs are present depends on how the session was programmed.
+ * with the values of the PMD registers of interest saved in increasing 
+ * index order: PMD4, PMD5, and so on. How many PMDs are present depends 
+ * on how the session was programmed.
  *
- * XXX: in this version of the entry, only up to 64 registers can be
- * recorded. This should be enough for quite some time. Always check
- * sampling format before parsing entries!
+ * In the case where multiple counters overflow at the same time, multiple
+ * entries are written consecutively.
  *
- * In the case where multiple counters overflow at the same time, the
- * last_reset_value member indicates the initial value of the
- * overflowed PMD with the smallest index.  For instance, if PMD2 and
- * PMD5 have overflowed, the last_reset_value member contains the
- * initial value of PMD2.
+ * last_reset_value member indicates the initial value of the overflowed PMD. 
  */
 typedef struct {
-	int		pid;			/* current process at PMU interrupt point */
-	int		cpu;			/* cpu on which the overfow occured */
-	unsigned long	last_reset_val;		/* initial value of 1st overflowed PMD */
-	unsigned long	ip;			/* where did the overflow interrupt happened */
-	unsigned long	ovfl_pmds;		/* which PMDS registers overflowed (64 max) */
-	unsigned long   tstamp;			/* ar.itc on the CPU that took the overflow */
-	unsigned int	set;			/* event set active when overflow ocurred   */
-	unsigned int	reserved1;		/* for future use */
+        int             pid;                    /* active process at PMU interrupt point */
+        unsigned char   reserved1[3];           /* reserved for future use */
+        unsigned char   ovfl_pmd;               /* index of overflowed PMD */
+
+        unsigned long   last_reset_val;         /* initial value of overflowed PMD */
+        unsigned long   ip;                     /* where did the overflow interrupt happened  */
+        unsigned long   tstamp;                 /* ar.itc when entering perfmon intr. handler */
+
+        unsigned short  cpu;                    /* cpu on which the overfow occured */
+        unsigned short  set;                    /* event set active when overflow ocurred   */
+        unsigned int    reserved2;              /* for future use */
 } pfm_default_smpl_entry_t;
 
 #define PFM_DEFAULT_MAX_PMDS		64 /* how many pmds supported by data structures (sizeof(unsigned long) */

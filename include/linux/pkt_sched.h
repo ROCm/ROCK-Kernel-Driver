@@ -45,7 +45,7 @@ struct tc_stats
 
 struct tc_estimator
 {
-	char		interval;
+	signed char	interval;
 	unsigned char	ewma_log;
 };
 

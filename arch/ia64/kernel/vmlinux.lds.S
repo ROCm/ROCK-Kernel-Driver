@@ -35,6 +35,7 @@ SECTIONS
     {
 	*(.text.ivt)
 	*(.text)
+	*(.gnu.linkonce.t*)
     }
   .text2 : AT(ADDR(.text2) - LOAD_OFFSET)
 	{ *(.text2) }
@@ -183,7 +184,7 @@ SECTIONS
   . = __phys_per_cpu_start + PERCPU_PAGE_SIZE;	/* ensure percpu data fits into percpu page size */
 
   .data : AT(ADDR(.data) - LOAD_OFFSET)
-	{ *(.data) *(.gnu.linkonce.d*) CONSTRUCTORS }
+	{ *(.data) *(.data1) *(.gnu.linkonce.d*) CONSTRUCTORS }
 
   . = ALIGN(16);
   __gp = . + 0x200000;	/* gp must be 16-byte aligned for exc. table */
@@ -194,7 +195,7 @@ SECTIONS
      can access them all, and initialized data all before uninitialized, so
      we can shorten the on-disk segment size.  */
   .sdata : AT(ADDR(.sdata) - LOAD_OFFSET)
-	{ *(.sdata) }
+	{ *(.sdata) *(.sdata1) *(.srdata) }
   _edata  =  .;
   _bss = .;
   .sbss : AT(ADDR(.sbss) - LOAD_OFFSET)

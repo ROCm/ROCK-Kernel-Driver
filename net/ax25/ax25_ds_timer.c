@@ -74,6 +74,7 @@ static void ax25_ds_timeout(unsigned long arg)
 {
 	ax25_dev *ax25_dev = (struct ax25_dev *) arg;
 	ax25_cb *ax25;
+	struct hlist_node *node;
 
 	if (ax25_dev == NULL || !ax25_dev->dama.slave)
 		return;			/* Yikes! */
@@ -84,7 +85,7 @@ static void ax25_ds_timeout(unsigned long arg)
 	}
 
 	spin_lock_bh(&ax25_list_lock);
-	for (ax25=ax25_list; ax25 != NULL; ax25 = ax25->next) {
+	ax25_for_each(ax25, node, &ax25_list) {
 		if (ax25->ax25_dev != ax25_dev || !(ax25->condition & AX25_COND_DAMA_MODE))
 			continue;
 
@@ -98,15 +99,26 @@ static void ax25_ds_timeout(unsigned long arg)
 
 void ax25_ds_heartbeat_expiry(ax25_cb *ax25)
 {
+	struct sock *sk=ax25->sk;
+
+	if (sk)
+		bh_lock_sock(sk);
+
 	switch (ax25->state) {
 
 	case AX25_STATE_0:
 		/* Magic here: If we listen() and a new link dies before it
 		   is accepted() it isn't 'dead' so doesn't get removed. */
-		if (!ax25->sk || sock_flag(ax25->sk, SOCK_DESTROY) ||
-		    (ax25->sk->sk_state == TCP_LISTEN &&
-		     sock_flag(ax25->sk, SOCK_DEAD))) {
-			ax25_destroy_socket(ax25);
+		if (!sk || sock_flag(sk, SOCK_DESTROY) ||
+		    (sk->sk_state == TCP_LISTEN &&
+		     sock_flag(sk, SOCK_DEAD))) {
+			if (sk) {
+				sock_hold(sk);
+				ax25_destroy_socket(ax25);
+				sock_put(sk);
+				bh_unlock_sock(sk);
+			} else
+				ax25_destroy_socket(ax25);
 			return;
 		}
 		break;
@@ -115,9 +127,9 @@ void ax25_ds_heartbeat_expiry(ax25_cb *ax25)
 		/*
 		 * Check the state of the receive buffer.
 		 */
-		if (ax25->sk != NULL) {
-			if (atomic_read(&ax25->sk->sk_rmem_alloc) <
-			    (ax25->sk->sk_rcvbuf / 2) &&
+		if (sk != NULL) {
+			if (atomic_read(&sk->sk_rmem_alloc) <
+			    (sk->sk_rcvbuf / 2) &&
 			    (ax25->condition & AX25_COND_OWN_RX_BUSY)) {
 				ax25->condition &= ~AX25_COND_OWN_RX_BUSY;
 				ax25->condition &= ~AX25_COND_ACK_PENDING;
@@ -126,6 +138,9 @@ void ax25_ds_heartbeat_expiry(ax25_cb *ax25)
 		}
 		break;
 	}
+
+	if (sk)
+		bh_unlock_sock(sk);
 
 	ax25_start_heartbeat(ax25);
 }
@@ -157,6 +172,7 @@ void ax25_ds_idletimer_expiry(ax25_cb *ax25)
 	ax25_stop_t3timer(ax25);
 
 	if (ax25->sk != NULL) {
+		bh_lock_sock(ax25->sk);
 		ax25->sk->sk_state     = TCP_CLOSE;
 		ax25->sk->sk_err       = 0;
 		ax25->sk->sk_shutdown |= SEND_SHUTDOWN;
@@ -164,6 +180,7 @@ void ax25_ds_idletimer_expiry(ax25_cb *ax25)
 			ax25->sk->sk_state_change(ax25->sk);
 			sock_set_flag(ax25->sk, SOCK_DEAD);
 		}
+		bh_lock_sock(ax25->sk);
 	}
 }
 

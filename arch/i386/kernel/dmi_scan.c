@@ -162,20 +162,6 @@ enum
 
 static char *dmi_ident[DMI_STRING_MAX];
 
-/* print some information suitable for a blacklist entry. */
-static void dmi_dump_system(void)
-{ 
-	printk("DMI: BIOS: %.40s, %.40s, %.40s\n",
-	       dmi_ident[DMI_BIOS_VENDOR], dmi_ident[DMI_BIOS_VERSION],
-	       dmi_ident[DMI_BIOS_DATE]);
-	printk("DMI: System: %.40s, %.40s, %.40s\n",
-	       dmi_ident[DMI_SYS_VENDOR], dmi_ident[DMI_PRODUCT_NAME],
-	       dmi_ident[DMI_PRODUCT_VERSION]); 
-	printk("DMI: Board: %.40s, %.40s, %.40s\n",
-	       dmi_ident[DMI_BOARD_VENDOR], dmi_ident[DMI_BOARD_NAME],
-	       dmi_ident[DMI_BOARD_VERSION]); 
-} 
-
 /*
  *	Save a DMI string
  */
@@ -1116,27 +1102,3 @@ void __init dmi_scan_machine(void)
 }
 
 EXPORT_SYMBOL(is_unsafe_smbus);
-
-#ifdef CONFIG_MOUNT_ROOT_FAILED_MSG
-/*
- * mount_root_failed_msg()
- *
- * Called from mount_block_root() upon failure to mount root.
- * architecture dependent to give different platforms
- * the opportunity to print different handy messages
- * On x86 this lives here b/c it dumps out some DMI info.
- */
-
-void
-mount_root_failed_msg(void)
-{
-#ifdef	CONFIG_ACPI_BOOT
-	printk ("Try booting with pci=noacpi, acpi=ht, "
-		"or acpi=off on the command line.\n");
-	printk ("If one helps, please report the following lines:\n");
-
-	dmi_dump_system();
-#endif
-}
-#endif	/* CONFIG_MOUNT_ROOT_FAILED_MSG */
-

@@ -86,7 +86,10 @@ extern u8 bios_cpu_apicid[];
 
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
-	return (int) bios_cpu_apicid[mps_cpu];
+	if (mps_cpu < NR_CPUS)
+		return (int)bios_cpu_apicid[mps_cpu];
+	else
+		return BAD_APICID;
 }
 
 static inline physid_mask_t apicid_to_cpu_present(int phys_apicid)
@@ -98,6 +101,8 @@ extern u8 cpu_2_logical_apicid[];
 /* Mapping from cpu number to logical apicid */
 static inline int cpu_to_logical_apicid(int cpu)
 {
+       if (cpu >= NR_CPUS)
+	       return BAD_APICID;
        return (int)cpu_2_logical_apicid[cpu];
  }
 

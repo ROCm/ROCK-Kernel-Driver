@@ -1732,10 +1732,6 @@ static ide_driver_t idedisk_driver = {
 	.drives			= LIST_HEAD_INIT(idedisk_driver.drives),
 	.start_power_step	= idedisk_start_power_step,
 	.complete_power_step	= idedisk_complete_power_step,
-	.gen_driver		= {
-		.suspend	= generic_ide_suspend,
-		.resume		= generic_ide_resume,
-	}
 };
 
 static int idedisk_open(struct inode *inode, struct file *filp)

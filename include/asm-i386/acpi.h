@@ -106,21 +106,37 @@
         :"0"(n_hi), "1"(n_lo))
 
 
-#if defined(CONFIG_ACPI_BOOT) && defined(CONFIG_X86_LOCAL_APIC)
-	extern int acpi_lapic;
-#else
-	#define acpi_lapic 0
-#endif
+#ifdef CONFIG_ACPI_BOOT 
+extern int acpi_lapic;
+extern int acpi_ioapic;
 
-#if defined(CONFIG_ACPI_BOOT) && defined(CONFIG_X86_IO_APIC)
-	extern int acpi_ioapic;
-#else
-	#define acpi_ioapic 0
-#endif
 
-#ifdef CONFIG_ACPI_BOOT
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
 #define FIX_ACPI_PAGES 4
+
+#ifdef CONFIG_X86_IO_APIC
+extern int skip_ioapic_setup;
+
+static inline void disable_ioapic_setup(void)
+{
+	skip_ioapic_setup = 1;
+}
+
+static inline int ioapic_setup_disabled(void)
+{
+	return skip_ioapic_setup;
+}
+
+#else
+static inline void disable_ioapic_setup(void)
+{ }
+
+#endif
+
+#else	/* CONFIG_ACPI_BOOT */
+#  define acpi_lapic 0
+#  define acpi_ioapic 0
+
 #endif
 
 #ifdef CONFIG_ACPI_SLEEP

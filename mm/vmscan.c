@@ -279,6 +279,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 	while (!list_empty(page_list)) {
 		struct page *page;
 		int may_enter_fs;
+		int referenced;
 
 		page = list_entry(page_list->prev, struct page, lru);
 		list_del(&page->lru);
@@ -298,7 +299,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 			goto keep_locked;
 
 		pte_chain_lock(page);
-		if (page_referenced(page) && page_mapping_inuse(page)) {
+		referenced = page_referenced(page);
+		if (referenced && page_mapping_inuse(page)) {
 			/* In active use or really unfreeable.  Activate it. */
 			pte_chain_unlock(page);
 			goto activate_locked;
@@ -358,6 +360,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 * See swapfile.c:page_queue_congested().
 		 */
 		if (PageDirty(page)) {
+			if (referenced)
+				goto keep_locked;
 			if (!is_page_cache_freeable(page))
 				goto keep_locked;
 			if (!mapping)
@@ -1064,7 +1068,7 @@ void wakeup_kswapd(struct zone *zone)
 	wake_up_interruptible(&zone->zone_pgdat->kswapd_wait);
 }
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
+#ifdef CONFIG_PM
 /*
  * Try to free `nr_pages' of memory, system-wide.  Returns the number of freed
  * pages.

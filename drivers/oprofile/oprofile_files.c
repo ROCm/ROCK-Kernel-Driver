@@ -19,6 +19,17 @@ unsigned long fs_cpu_buffer_size = 8192;
 unsigned long fs_buffer_watershed = 32768; /* FIXME: tune */
 
  
+static ssize_t pointer_size_read(struct file * file, char * buf, size_t count, loff_t * offset)
+{
+	return oprofilefs_ulong_to_user((unsigned long)sizeof(void *), buf, count, offset);
+}
+
+
+static struct file_operations pointer_size_fops = {
+	.read		= pointer_size_read,
+};
+
+
 static ssize_t cpu_type_read(struct file * file, char * buf, size_t count, loff_t * offset)
 {
 	return oprofilefs_str_to_user(oprofile_ops->cpu_type, buf, count, offset);
@@ -32,7 +43,7 @@ static struct file_operations cpu_type_fops = {
  
 static ssize_t enable_read(struct file * file, char * buf, size_t count, loff_t * offset)
 {
-	return oprofilefs_ulong_to_user(&oprofile_started, buf, count, offset);
+	return oprofilefs_ulong_to_user(oprofile_started, buf, count, offset);
 }
 
 
@@ -85,6 +96,7 @@ void oprofile_create_files(struct super_block * sb, struct dentry * root)
 	oprofilefs_create_ulong(sb, root, "buffer_watershed", &fs_buffer_watershed);
 	oprofilefs_create_ulong(sb, root, "cpu_buffer_size", &fs_cpu_buffer_size);
 	oprofilefs_create_file(sb, root, "cpu_type", &cpu_type_fops); 
+	oprofilefs_create_file(sb, root, "pointer_size", &pointer_size_fops);
 	oprofile_create_stats_files(sb, root);
 	if (oprofile_ops->create_files)
 		oprofile_ops->create_files(sb, root);

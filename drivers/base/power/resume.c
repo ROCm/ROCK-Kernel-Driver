@@ -12,7 +12,6 @@
 #include "power.h"
 
 extern int sysdev_resume(void);
-extern int sysdev_restore(void);
 
 
 /**
@@ -23,59 +22,33 @@ extern int sysdev_restore(void);
 
 int resume_device(struct device * dev)
 {
-	struct device_driver * drv = dev->driver;
-
-	if (drv && drv->resume)
-		return drv->resume(dev,RESUME_RESTORE_STATE);
+	if (dev->bus && dev->bus->resume)
+		return dev->bus->resume(dev);
 	return 0;
 }
 
+
 /**
- *	dpm_resume - Restore all device state.
+ *	device_resume - Restore state of each device in system.
  *
- *	Walk the dpm_suspended list and restore each device. As they are 
- *	resumed, move the devices to the dpm_active list.
+ *	Walk the dpm_off list, remove each entry, resume the device,
+ *	then add it to the dpm_active list. 
  */
 
-int dpm_resume(void)
+void device_resume(void)
 {
-	while(!list_empty(&dpm_suspended)) {
-		struct list_head * entry = dpm_suspended.next;
+	down(&dpm_sem);
+	while(!list_empty(&dpm_off)) {
+		struct list_head * entry = dpm_off.next;
 		struct device * dev = to_device(entry);
 		list_del_init(entry);
 		resume_device(dev);
 		list_add_tail(entry,&dpm_active);
 	}
-	return 0;
-}
-
-
-/**
- *	device_pm_resume - Restore state of each device in system.
- *
- *	Restore system device state, then common device state. Finally,
- *	release dpm_sem, as we're done with device PM.
- */
-
-void device_pm_resume(void)
-{
-	sysdev_restore();
-	dpm_resume();
 	up(&dpm_sem);
 }
 
-
-/**
- *	power_up_device - Power one device on.
- *	@dev:	Device.
- */
-
-void power_up_device(struct device * dev)
-{
-	struct device_driver * drv = dev->driver;
-	if (drv && drv->resume)
-		drv->resume(dev,RESUME_POWER_ON);
-}
+EXPORT_SYMBOL(device_resume);
 
 
 /**
@@ -89,65 +62,31 @@ void power_up_device(struct device * dev)
  *	Interrupts must be disabled when calling this. 
  */
 
-void dpm_power_up_irq(void)
+void dpm_power_up(void)
 {
 	while(!list_empty(&dpm_off_irq)) {
 		struct list_head * entry = dpm_off_irq.next;
 		list_del_init(entry);
-		power_up_device(to_device(entry));
-		list_add_tail(entry,&dpm_suspended);
+		resume_device(to_device(entry));
+		list_add_tail(entry,&dpm_active);
 	}
 }
 
 
 /**
- *	dpm_power_up - Power on most devices.
+ *	device_pm_power_up - Turn on all devices that need special attention.
  *
- *	Walk the dpm_off list and power each device up. This is used
- *	to power on devices that were able to power down with interrupts
- *	enabled. 
+ *	Power on system devices then devices that required we shut them down
+ *	with interrupts disabled.
+ *	Called with interrupts disabled.
  */
 
-void dpm_power_up(void)
-{
-	while (!list_empty(&dpm_off)) {
-		struct list_head * entry = dpm_off.next;
-		list_del_init(entry);
-		power_up_device(to_device(entry));
-		list_add_tail(entry,&dpm_suspended);
-	}
-}
-
-
-/**
- *	device_pm_power_up - Turn on all devices.
- *
- *	First, power on system devices, which must happen with interrupts 
- *	disbled. Then, power on devices that also require interrupts disabled.
- *	Turn interrupts back on, and finally power up the rest of the normal
- *	devices.
- */
-
-void device_pm_power_up(void)
+void device_power_up(void)
 {
 	sysdev_resume();
-	dpm_power_up_irq();
-	local_irq_enable();
 	dpm_power_up();
 }
 
-/**
- * device_resume - resume all the devices in the system
- * @level:	stage of resume process we're at 
- * 
- *	This function is deprecated, and should be replaced with appropriate
- *	calls to device_pm_power_up() and device_pm_resume() above.
- */
+EXPORT_SYMBOL(device_power_up);
 
-void device_resume(u32 level)
-{
-
-	printk("%s is deprecated. Called from:\n",__FUNCTION__);
-	dump_stack();
-}
 
