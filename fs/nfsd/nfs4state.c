@@ -1943,7 +1943,7 @@ access_permit_write(unsigned long access_bmap)
 }
 
 static
-int check_openmode(struct nfs4_stateid *stp, int flags)
+int nfs4_check_openmode(struct nfs4_stateid *stp, int flags)
 {
         int status = nfserr_openmode;
 
@@ -1976,7 +1976,9 @@ out:
 int
 nfs4_preprocess_stateid_op(struct svc_fh *current_fh, stateid_t *stateid, int flags)
 {
-	struct nfs4_stateid *stp;
+	struct nfs4_stateid *stp = NULL;
+	struct nfs4_delegation *dp = NULL;
+	stateid_t *stidp;
 	int status;
 
 	dprintk("NFSD: preprocess_stateid_op: stateid = (%08x/%08x/%08x/%08x)\n",
@@ -1990,35 +1992,47 @@ nfs4_preprocess_stateid_op(struct svc_fh *current_fh, stateid_t *stateid, int fl
 
 	/* BAD STATEID */
 	status = nfserr_bad_stateid;
-	if (!(stp = find_stateid(stateid, flags))) {
-		dprintk("NFSD: preprocess_stateid_op: no open stateid!\n");
-		goto out;
+	if (!stateid->si_fileid) { /* delegation stateid */
+		struct inode *ino = current_fh->fh_dentry->d_inode;
+
+		if(!(dp = find_delegation_stateid(ino, stateid))) {
+			dprintk("NFSD: delegation stateid not found\n");
+			goto out;
+		}
+		stidp = &dp->dl_stateid;
+	} else { /* open or lock stateid */
+		if (!(stp = find_stateid(stateid, flags))) {
+			dprintk("NFSD: open or lock stateid not found\n");
+			goto out;
+		}
+		if ((flags & CHECK_FH) && nfs4_check_fh(current_fh, stp))
+			goto out;
+		if (!stp->st_stateowner->so_confirmed)
+			goto out;
+		stidp = &stp->st_stateid;
 	}
-	if ((flags & CHECK_FH) && nfs4_check_fh(current_fh, stp)) {
-		dprintk("NFSD: preprocess_stateid_op: fh-stateid mismatch!\n");
-		stp->st_vfs_set = 0;
+	if (stateid->si_generation > stidp->si_generation)
 		goto out;
-	}
-	if (!stp->st_stateowner->so_confirmed) {
-		dprintk("preprocess_stateid_op: lockowner not confirmed yet!\n");
-		goto out;
-	}
-	if (stateid->si_generation > stp->st_stateid.si_generation) {
-		dprintk("preprocess_stateid_op: future stateid?!\n");
-		goto out;
-	}
 
 	/* OLD STATEID */
 	status = nfserr_old_stateid;
-	if (stateid->si_generation < stp->st_stateid.si_generation) {
-		dprintk("preprocess_stateid_op: old stateid!\n");
+	if (stateid->si_generation < stidp->si_generation)
 		goto out;
+	if (stp) {
+		if ((status = nfs4_check_openmode(stp,flags)))
+			goto out;
+		renew_client(stp->st_stateowner->so_client);
+	} else if (dp) {
+		if ((status = nfs4_check_delegmode(dp, flags)))
+			goto out;
+		renew_client(dp->dl_client);
+		if (flags & DELEG_RET) {
+			atomic_set(&dp->dl_state,NFS4_RECALL_COMPLETE);
+			spin_lock(&recall_lock);
+			release_delegation(dp);
+			spin_unlock(&recall_lock);
+		}
 	}
-	renew_client(stp->st_stateowner->so_client);
-
-        if((status = check_openmode(stp, flags)))
-		goto out;
-
 	status = nfs_ok;
 out:
 	return status;
