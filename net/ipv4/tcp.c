@@ -688,15 +688,6 @@ static inline void tcp_push(struct sock *sk, struct tcp_opt *tp, int flags,
 	}
 }
 
-static int tcp_error(struct sock *sk, int flags, int err)
-{
-	if (err == -EPIPE)
-		err = sock_error(sk) ? : -EPIPE;
-	if (err == -EPIPE && !(flags & MSG_NOSIGNAL))
-		send_sig(SIGPIPE, current, 0);
-	return err;
-}
-
 static ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffset,
 			 size_t psize, int flags)
 {
@@ -800,7 +791,7 @@ do_error:
 	if (copied)
 		goto out;
 out_err:
-	return tcp_error(sk, flags, err);
+	return sk_stream_error(sk, flags, err);
 }
 
 ssize_t tcp_sendpage(struct socket *sock, struct page *page, int offset,
@@ -1054,7 +1045,7 @@ do_error:
 	if (copied)
 		goto out;
 out_err:
-	err = tcp_error(sk, flags, err);
+	err = sk_stream_error(sk, flags, err);
 	TCP_CHECK_TIMER(sk);
 	release_sock(sk);
 	return err;

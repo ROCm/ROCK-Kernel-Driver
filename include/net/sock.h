@@ -473,6 +473,7 @@ do {	if (!(__sk)->sk_backlog.tail) {				\
 extern int sk_stream_wait_connect(struct sock *sk, long *timeo_p);
 extern int sk_stream_wait_memory(struct sock *sk, long *timeo_p);
 extern void sk_stream_wait_close(struct sock *sk, long timeo_p);
+extern int sk_stream_error(struct sock *sk, int flags, int err);
 
 extern int sk_wait_data(struct sock *sk, long *timeo);
 
