@@ -1780,15 +1780,21 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	},
 	{
 		.vendor = 0x103c,
-		.device = 0x129d,
-		.name = "HP xw8000",
-		.type = AC97_TUNE_HP_ONLY
+		.device = 0x088c,
+		.name = "HP nc8000",
+		.type = AC97_TUNE_MUTE_LED
 	},
 	{
 		.vendor = 0x103c,
 		.device = 0x0890,
-		.name = "HP NC6000",
+		.name = "HP nc6000",
 		.type = AC97_TUNE_MUTE_LED
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x129d,
+		.name = "HP xw8000",
+		.type = AC97_TUNE_HP_ONLY
 	},
 	{
 		.vendor = 0x103c,
