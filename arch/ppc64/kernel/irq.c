@@ -169,10 +169,8 @@ setup_irq(unsigned int irq, struct irqaction * new)
 
 inline void synchronize_irq(unsigned int irq)
 {
-	while (irq_desc[irq].status & IRQ_INPROGRESS) {
-		barrier();
+	while (irq_desc[irq].status & IRQ_INPROGRESS)
 		cpu_relax();
-	}
 }
 
 #endif /* CONFIG_SMP */
@@ -500,7 +498,7 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	 * use the action we have.
 	 */
 	action = NULL;
-	if (!(status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
+	if (likely(!(status & (IRQ_DISABLED | IRQ_INPROGRESS)))) {
 		action = desc->action;
 		if (!action || !action->handler) {
 			ppc_spurious_interrupts++;
@@ -527,9 +525,8 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	   a different instance of this same irq, the other processor
 	   will take care of it.
 	 */
-	if (!action)
+	if (unlikely(!action))
 		goto out;
-
 
 	/*
 	 * Edge triggered interrupts need to remember
@@ -546,12 +543,12 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 		handle_irq_event(irq, regs, action);
 		spin_lock(&desc->lock);
 		
-		if (!(desc->status & IRQ_PENDING))
+		if (likely(!(desc->status & IRQ_PENDING)))
 			break;
 		desc->status &= ~IRQ_PENDING;
 	}
-	desc->status &= ~IRQ_INPROGRESS;
 out:
+	desc->status &= ~IRQ_INPROGRESS;
 	/*
 	 * The ->end() handler has to deal with interrupts which got
 	 * disabled while the handler was running.
@@ -567,7 +564,6 @@ out:
 
 int do_IRQ(struct pt_regs *regs)
 {
-	int cpu = smp_processor_id();
 	int irq, first = 1;
 #ifdef CONFIG_PPC_ISERIES
 	struct paca_struct *lpaca;
@@ -605,7 +601,7 @@ int do_IRQ(struct pt_regs *regs)
 		ppc_spurious_interrupts++;
 #endif
 
-        irq_exit();
+	irq_exit();
 
 #ifdef CONFIG_PPC_ISERIES
 	if (lpaca->xLpPaca.xIntDword.xFields.xDecrInt) {
@@ -614,9 +610,6 @@ int do_IRQ(struct pt_regs *regs)
 		timer_interrupt(regs);
 	}
 #endif
-
-	if (softirq_pending(cpu))
-		do_softirq();
 
 	return 1; /* lets ret_from_int know we can do checks */
 }

@@ -54,12 +54,6 @@
 /* Tell string.h we don't want memcpy etc. as cpp defines */
 #define EXPORT_SYMTAB_STROPS
 
-extern void do_IRQ(struct pt_regs *regs, int isfake);
-extern void SystemResetException(struct pt_regs *regs);
-extern void MachineCheckException(struct pt_regs *regs);
-extern void AlignmentException(struct pt_regs *regs);
-extern void ProgramCheckException(struct pt_regs *regs);
-extern void SingleStepException(struct pt_regs *regs);
 extern int sys_sigreturn(struct pt_regs *regs);
 extern int do_signal(sigset_t *, struct pt_regs *);
 extern int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, unsigned int, unsigned long, struct file *));
@@ -74,17 +68,12 @@ extern struct pci_dev * iSeries_veth_dev;
 extern struct pci_dev * iSeries_vio_dev;
 
 EXPORT_SYMBOL(do_signal);
-EXPORT_SYMBOL(do_IRQ);
-EXPORT_SYMBOL(SystemResetException);
-EXPORT_SYMBOL(MachineCheckException);
-EXPORT_SYMBOL(AlignmentException);
-EXPORT_SYMBOL(ProgramCheckException);
-EXPORT_SYMBOL(SingleStepException);
 EXPORT_SYMBOL(sys_sigreturn);
 EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(disable_irq_nosync);
 #ifdef CONFIG_SMP
+EXPORT_SYMBOL(synchronize_irq);
 EXPORT_SYMBOL(kernel_flag);
 #endif /* CONFIG_SMP */
 
@@ -125,15 +114,6 @@ EXPORT_SYMBOL(__copy_tofrom_user);
 EXPORT_SYMBOL(__clear_user);
 EXPORT_SYMBOL(__strncpy_from_user);
 EXPORT_SYMBOL(__strnlen_user);
-
-/*
-EXPORT_SYMBOL(inb);
-EXPORT_SYMBOL(inw);
-EXPORT_SYMBOL(inl);
-EXPORT_SYMBOL(outb);
-EXPORT_SYMBOL(outw);
-EXPORT_SYMBOL(outl);
-EXPORT_SYMBOL(outsl);*/
 
 #ifdef CONFIG_MSCHUNKS
 EXPORT_SYMBOL(msChunks);
@@ -243,8 +223,6 @@ EXPORT_SYMBOL(abs);
 
 EXPORT_SYMBOL(timer_interrupt);
 EXPORT_SYMBOL(irq_desc);
-void ppc_irq_dispatch_handler(struct pt_regs *, int);
-EXPORT_SYMBOL(ppc_irq_dispatch_handler);
 EXPORT_SYMBOL(get_wchan);
 EXPORT_SYMBOL(console_drivers);
 #ifdef CONFIG_XMON

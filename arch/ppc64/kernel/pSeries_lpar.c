@@ -155,7 +155,7 @@ long plpar_pte_protect(unsigned long flags,
 		       unsigned long ptex,
 		       unsigned long avpn)
 {
-	return plpar_hcall_norets(H_PROTECT, flags, ptex);
+	return plpar_hcall_norets(H_PROTECT, flags, ptex, avpn);
 }
 
 long plpar_tce_get(unsigned long liobn,
@@ -552,6 +552,7 @@ static long pSeries_lpar_insert_hpte(unsigned long hpte_group,
 				     int secondary, unsigned long hpteflags,
 				     int bolted, int large)
 {
+	/* XXX fix for large page */
 	unsigned long avpn = vpn >> 11;
 	unsigned long arpn = physRpn_to_absRpn(prpn);
 	unsigned long lpar_rc;
@@ -651,11 +652,10 @@ static long pSeries_lpar_hpte_updatepp(unsigned long slot, unsigned long newpp,
 				       unsigned long va, int large)
 {
 	unsigned long lpar_rc;
-	unsigned long flags;
-	flags = (newpp & 7) | H_AVPN;
-	unsigned long vpn = va >> PAGE_SHIFT;
+	unsigned long flags = (newpp & 7) | H_AVPN;
+	unsigned long avpn = va >> 23;
 
-	lpar_rc = plpar_pte_protect(flags, slot, (vpn >> 4) & ~0x7fUL);
+	lpar_rc = plpar_pte_protect(flags, slot, (avpn << 7));
 
 	if (lpar_rc == H_Not_Found) {
 		udbg_printf("updatepp missed\n");
@@ -748,18 +748,11 @@ static void pSeries_lpar_hpte_updateboltedpp(unsigned long newpp,
 static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long va,
 					 int large, int local)
 {
-	unsigned long vpn, avpn;
+	unsigned long avpn = va >> 23;
 	unsigned long lpar_rc;
 	unsigned long dummy1, dummy2;
 
-	if (large)
-		vpn = va >> LARGE_PAGE_SHIFT;
-	else
-		vpn = va >> PAGE_SHIFT;
-
-	avpn = vpn >> 11;
-
-	lpar_rc = plpar_pte_remove(H_AVPN, slot, (vpn >> 4) & ~0x7fUL, &dummy1,
+	lpar_rc = plpar_pte_remove(H_AVPN, slot, (avpn << 7), &dummy1,
 				   &dummy2);
 
 	if (lpar_rc == H_Not_Found) {

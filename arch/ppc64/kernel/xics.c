@@ -373,7 +373,7 @@ nextnode:
 	if (naca->platform == PLATFORM_PSERIES) {
 #ifdef CONFIG_SMP
 		for (i = 0; i < NR_CPUS; ++i) {
-			if (!paca[i].active)
+			if (!cpu_possible(i))
 				continue;
 			xics_info.per_cpu[i] =
 			  __ioremap((ulong)inodes[i].addr, 

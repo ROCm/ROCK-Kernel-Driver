@@ -683,8 +683,8 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_rt_sigtimedwait
 	.llong .sys32_rt_sigqueueinfo
 	.llong .sys32_rt_sigsuspend
-	.llong .sys32_pread
-	.llong .sys32_pwrite	        /* 180 */
+	.llong .sys32_pread64
+	.llong .sys32_pwrite64	        /* 180 */
 	.llong .sys_chown
 	.llong .sys_getcwd
 	.llong .sys_capget
@@ -695,7 +695,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* streams2 */
 	.llong .sys32_vfork
 	.llong .sys32_getrlimit	        /* 190 */
-	.llong .sys_ni_syscall		/* 191 */	/* Unused */
+	.llong .sys32_readahead
 	.llong .sys_ni_syscall		/* 192 - reserved - mmap2 */
 	.llong .sys32_truncate64	/* 193 - truncate64 */
 	.llong .sys32_ftruncate64	/* 194 - ftruncate64 */
@@ -726,11 +726,12 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_lremovexattr
 	.llong .sys_fremovexattr	/* 220 */
 	.llong .sys_futex
-	.llong .sys_ni_syscall		/* reserved for tux */
 	.llong .sys32_sched_setaffinity
 	.llong .sys32_sched_getaffinity
+	.llong .sys_ni_syscall		/* reserved for security */
+	.llong .sys_ni_syscall		/* 225 - reserved for tux */
 
-	.rept NR_syscalls-224
+	.rept NR_syscalls-225
 		.llong .sys_ni_syscall
 	.endr
 #endif
@@ -928,6 +929,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall		/* streams2 */
 	.llong .sys_vfork
 	.llong .sys_getrlimit	        /* 190 */
+	.llong .sys_readahead
 	.llong .sys_ni_syscall		/* 191 */	/* Unused */
 	.llong .sys_ni_syscall		/* 192 - reserved - mmap2 */
 	.llong .sys_ni_syscall		/* 193 - reserved - truncate64 */
@@ -959,10 +961,11 @@ _GLOBAL(sys_call_table)
 	.llong .sys_lremovexattr
 	.llong .sys_fremovexattr	/* 220 */
 	.llong .sys_futex
-	.llong .sys_ni_syscall		/* reserved for tux */
 	.llong .sys_sched_setaffinity
 	.llong .sys_sched_getaffinity
+	.llong .sys_ni_syscall		/* reserved for security */
+	.llong .sys_ni_syscall		/* reserved for tux */
 
-	.rept NR_syscalls-224
+	.rept NR_syscalls-225
 	.llong .sys_ni_syscall
 	.endr
