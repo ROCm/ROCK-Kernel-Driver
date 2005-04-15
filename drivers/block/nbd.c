@@ -78,7 +78,7 @@
 #define DBG_RX          0x0200
 #define DBG_TX          0x0400
 static unsigned int debugflags;
-static unsigned int nbds_max;
+static unsigned int nbds_max = 16;
 #endif /* NDEBUG */
 
 static struct nbd_device nbd_dev[MAX_NBD];
@@ -733,7 +733,7 @@ module_exit(nbd_cleanup);
 MODULE_DESCRIPTION("Network Block Device");
 MODULE_LICENSE("GPL");
 
-module_param(nbds_max, int, 16);
+module_param(nbds_max, int, 0444);
 MODULE_PARM_DESC(nbds_max, "How many network block devices to initialize.");
 #ifndef NDEBUG
 module_param(debugflags, int, 0644);
