@@ -44,8 +44,8 @@ static __inline__ unsigned int HandleID(unsigned long lhandle, drm_device_t *dev
     drm_map_list_t *r_list = NULL;
    
     hash = (unsigned int)(((lhandle >> 32) 
-			   + (lhandle >> 16) 
-			   + lhandle) & 0xffff0000);
+			   + (lhandle >> 16 & 0xffff0000) 
+			   + lhandle) & PAGE_MASK);
     while (1) {
 	if (hash == 0) hash = (1 << 16);
 	list = &dev->maplist->head;
@@ -221,16 +221,17 @@ int drm_addmap( struct inode *inode, struct file *filp,
 	list->map = map;
 
 	down(&dev->struct_sem);
+	map->pub_handle =
+	    (map->type == _DRM_SHM 
+			? HandleID((unsigned long)map->handle,dev) 
+			: HandleID(map->offset,dev));
 	list_add(&list->head, &dev->maplist->head);
  	up(&dev->struct_sem);
 	
-	map->pub_handle =
-	tmp_map.handle = (map->type == _DRM_SHM 
-			  ? HandleID((unsigned long)map->handle,dev) 
-			  : HandleID(map->offset,dev));
 	DRM_DEBUG("HandleID = 0x%lx addr = %p offset = 0x%lx\n",
 		   map->pub_handle,map->handle,map->offset);
 
+	tmp_map.handle = map->pub_handle;
 	if ( copy_to_user( argp, &tmp_map, sizeof(tmp_map) ) )
 		return -EFAULT;
 

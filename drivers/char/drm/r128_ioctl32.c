@@ -49,7 +49,7 @@
 #define DRM_IOCTL_R128_INIT32		DRM_IOW( 0x40, drm32_r128_init_t)
 #define DRM_IOCTL_R128_DEPTH32		DRM_IOW( 0x4c, drm32_r128_depth_t)
 #define DRM_IOCTL_R128_STIPPLE32	DRM_IOW( 0x4d, drm32_r128_stipple_t)
-#define DRM_IOCTL_R128_GETPARAM32	DRM_IOW( 0x52, drm32_r128_getparam_t)
+#define DRM_IOCTL_R128_GETPARAM32	DRM_IOWR( 0x52, drm32_r128_getparam_t)
 
 typedef struct drm32_r128_init {
 	int func;

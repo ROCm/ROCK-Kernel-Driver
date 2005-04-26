@@ -66,10 +66,8 @@ MODULE_LICENSE("GPL and additional rights");
 #define DRM_IOCTL_MAP_BUFS_32		DRM_IOWR(0x19, drm32_buf_map_t)
 #define DRM_IOCTL_FREE_BUFS_32		DRM_IOW( 0x1a, drm32_buf_free_t)
 #define DRM_IOCTL_RM_MAP_32		DRM_IOW( 0x1b, drm32_map_t)
-#if 0
 #define DRM_IOCTL_SET_SAREA_CTX_32	DRM_IOW( 0x1c, drm32_ctx_priv_map_t)
 #define DRM_IOCTL_GET_SAREA_CTX_32 	DRM_IOWR(0x1d, drm32_ctx_priv_map_t)
-#endif
 #define DRM_IOCTL_RES_CTX_32		DRM_IOWR(0x26, drm32_ctx_res_t)
 #define DRM_IOCTL_DMA_32		DRM_IOWR(0x29, drm32_dma_t)
 #define DRM_IOCTL_AGP_ENABLE_32		DRM_IOW( 0x32, drm32_agp_mode_t)
@@ -108,12 +106,10 @@ typedef struct drm32_client {
 /*?*/	unsigned int	iocs;	/* Ioctl count                              */
 } drm32_client_t;
 
-#if 0
 typedef struct drm32_ctx_priv_map {
 	unsigned int	ctx_id;  /* Context requesting private mapping */
 /*?*/	u32		handle;  /* Handle of map */
 } drm32_ctx_priv_map_t;
-#endif
 
 typedef struct drm32_buf_desc { /* OK */
 	int	      count;	 /* Number of buffers of this size	     */
@@ -452,7 +448,6 @@ drm_stats_32_64(unsigned int fd, unsigned int cmd,
     return err ? -EFAULT : 0;
 }
 
-#if 0
 static int
 drm_ctx_priv_map_wr_32_64(unsigned int fd, unsigned int cmd, 
 			  unsigned long arg, struct file *file)
@@ -465,7 +460,7 @@ drm_ctx_priv_map_wr_32_64(unsigned int fd, unsigned int cmd,
 
     DEBUG("drm_ctx_priv_map_wr_32_64");
     GET_USER(ctx_id);
-//    GET_USER_P(handle);
+//    GET_USER(handle);
 
     if (err) return -EFAULT;
     
@@ -473,7 +468,7 @@ drm_ctx_priv_map_wr_32_64(unsigned int fd, unsigned int cmd,
     if (err) return err;
     
 //    PUT_USER(ctx_id);
-    PUT_USER_P(handle);
+    PUT_USER(handle);
 
     DEBUG("done");
     return err ? -EFAULT : 0;
@@ -491,7 +486,7 @@ drm_ctx_priv_map_w_32_64(unsigned int fd, unsigned int cmd,
 
     DEBUG("drm_ctx_priv_map_w_32_64");
     GET_USER(ctx_id);
-    GET_USER_P(handle);
+    GET_USER(handle);
 
     if (err) return -EFAULT;
     
@@ -500,7 +495,6 @@ drm_ctx_priv_map_w_32_64(unsigned int fd, unsigned int cmd,
     DEBUG("done");
     return err;
 }
-#endif
 
 static int
 drm_ctx_res_32_64(unsigned int fd, unsigned int cmd, 
@@ -960,10 +954,8 @@ drm_register_ioctl32(void)
     REG_IOCTL32(DRM_IOCTL_MAP_BUFS_32,drm_buf_map_32_64);
     REG_IOCTL32(DRM_IOCTL_FREE_BUFS_32,drm_buf_free_w_32_64);
     REG_IOCTL32(DRM_IOCTL_RM_MAP_32,drm_map_w_32_64);
-#if 0
     REG_IOCTL32(DRM_IOCTL_SET_SAREA_CTX_32,drm_ctx_priv_map_w_32_64);
     REG_IOCTL32(DRM_IOCTL_GET_SAREA_CTX_32,drm_ctx_priv_map_wr_32_64);
-#endif
     REG_IOCTL32(DRM_IOCTL_RES_CTX_32,drm_ctx_res_32_64)
     REG_IOCTL32(DRM_IOCTL_DMA_32,drm_dma_32_64);
     REG_IOCTL32(DRM_IOCTL_AGP_ENABLE_32,drm_agp_mode_w_32_64);
@@ -982,8 +974,10 @@ drm_register_ioctl32(void)
     REG_IOCTL32(DRM_IOCTL_BLOCK,drm32_default_handler);
     REG_IOCTL32(DRM_IOCTL_UNBLOCK,drm32_default_handler);
     REG_IOCTL32(DRM_IOCTL_CONTROL,drm32_default_handler);
+#if 0
     REG_IOCTL32(DRM_IOCTL_SET_SAREA_CTX,drm32_default_handler);
     REG_IOCTL32(DRM_IOCTL_GET_SAREA_CTX,drm32_default_handler);
+#endif
     REG_IOCTL32(DRM_IOCTL_ADD_CTX,drm32_default_handler);
     REG_IOCTL32(DRM_IOCTL_RM_CTX,drm32_default_handler);
     REG_IOCTL32(DRM_IOCTL_MOD_CTX,drm32_default_handler);
@@ -1012,10 +1006,8 @@ drm_unregister_ioctl32(void)
     UNREG_IOCTL32(DRM_IOCTL_VERSION_32);
     UNREG_IOCTL32(DRM_IOCTL_GET_UNIQUE_32);
     UNREG_IOCTL32(DRM_IOCTL_GET_CLIENT_32);
-#if 0
     UNREG_IOCTL32(DRM_IOCTL_SET_SAREA_CTX_32);
     UNREG_IOCTL32(DRM_IOCTL_GET_SAREA_CTX_32);
-#endif
     UNREG_IOCTL32(DRM_IOCTL_RES_CTX_32);
     UNREG_IOCTL32(DRM_IOCTL_DMA_32);
     
@@ -1047,8 +1039,10 @@ drm_unregister_ioctl32(void)
     UNREG_IOCTL32(DRM_IOCTL_BLOCK);
     UNREG_IOCTL32(DRM_IOCTL_UNBLOCK);
     UNREG_IOCTL32(DRM_IOCTL_CONTROL);
+#if 0
     UNREG_IOCTL32(DRM_IOCTL_SET_SAREA_CTX);
     UNREG_IOCTL32(DRM_IOCTL_GET_SAREA_CTX);
+#endif
     UNREG_IOCTL32(DRM_IOCTL_ADD_CTX);
     UNREG_IOCTL32(DRM_IOCTL_RM_CTX);
     UNREG_IOCTL32(DRM_IOCTL_MOD_CTX);
