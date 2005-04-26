@@ -1546,6 +1546,8 @@ kdb_main_loop(kdb_reason_t reason, kdb_reason_t reason2, int error,
 	return(result);
 }
 
+extern int kmsg_redirect;
+
 /*
  * kdb
  *
@@ -1697,6 +1699,9 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	if (!kdb_on && !KDB_FLAG(ONLY_DO_DUMP))
 		goto out;
 
+#ifdef CONFIG_VT
+	kmsg_redirect = 0;
+#endif
 	KDB_DEBUG_STATE("kdb 1", reason);
 	KDB_STATE_CLEAR(SUPPRESS);
 
