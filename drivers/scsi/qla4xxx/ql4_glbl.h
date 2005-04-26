@@ -31,11 +31,11 @@ extern void qla4xxx_start_io(scsi_qla_host_t *ha);
 extern srb_t *del_from_active_array(scsi_qla_host_t *ha, uint32_t index);
 extern uint8_t qla4xxx_complete_request(scsi_qla_host_t *ha, srb_t *srb);
 extern uint8_t qla4xxx_reset_lun(scsi_qla_host_t *ha, ddb_entry_t *ddb_entry, lun_entry_t *lun_entry);
-extern inline uint8_t qla4xxx_soft_reset(scsi_qla_host_t *);
+extern uint8_t qla4xxx_soft_reset(scsi_qla_host_t *);
 extern const char *host_sts_msg[];
 extern void qla4xxx_delete_timer_from_cmd(srb_t *srb);
 extern scsi_qla_host_t *qla4xxx_get_adapter_handle(uint16_t instance);
-extern inline uint32_t qla4xxx_get_hba_count(void);
+extern uint32_t qla4xxx_get_hba_count(void);
 extern void qla4xxx_free_ddb_list(scsi_qla_host_t *ha);
 
 extern void qla4xxx_tgt_free(scsi_qla_host_t *ha, uint16_t t);

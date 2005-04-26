@@ -399,7 +399,7 @@ keywest_smbus_xfer(	struct i2c_adapter*	adap,
  */
 static int
 keywest_xfer(	struct i2c_adapter *adap,
-		struct i2c_msg msgs[], 
+		struct i2c_msg *msgs, 
 		int num)
 {
 	struct keywest_chan* chan = i2c_get_adapdata(adap);

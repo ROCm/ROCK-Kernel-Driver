@@ -75,7 +75,7 @@ uint32_t ql_dbg_level = QLP1;
  * Returns:
  *	QLA_SUCCESS - always
  **************************************************************************/
-inline uint8_t
+uint8_t
 qla4xxx_get_debug_level(uint32_t *dbg_level)
 {
 	*dbg_level = ql_dbg_level;
@@ -96,7 +96,7 @@ qla4xxx_get_debug_level(uint32_t *dbg_level)
  * Returns:
  *	QLA_SUCCESS - always
  **************************************************************************/
-inline uint8_t
+uint8_t
 qla4xxx_set_debug_level(uint32_t dbg_level)
 {
 	ql_dbg_level = dbg_level;

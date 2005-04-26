@@ -1158,7 +1158,7 @@ int dm_suspended(struct mapped_device *md)
 	return test_bit(DMF_SUSPENDED, &md->flags);
 }
 
-inline union map_info *dm_get_mapinfo(struct bio *bio)
+union map_info *dm_get_mapinfo(struct bio *bio)
 {
 	if (bio && bio->bi_private)
 		return &((struct target_io *)bio->bi_private)->info;

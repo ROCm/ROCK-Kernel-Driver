@@ -131,7 +131,7 @@ static int i2c_write(struct i2c_algo_sgi_data *adap, unsigned char *buf,
 	return 0;
 }
 
-static int sgi_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg msgs[],
+static int sgi_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg *msgs,
 		    int num)
 {
 	struct i2c_algo_sgi_data *adap = i2c_adap->algo_data;

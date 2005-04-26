@@ -821,7 +821,7 @@ static void __init sn_sal_switch_to_interrupts(struct sn_cons_port *port)
 
 static void sn_sal_console_write(struct console *, const char *, unsigned);
 static int __init sn_sal_console_setup(struct console *, char *);
-extern struct uart_driver sal_console_uart;
+static struct uart_driver sal_console_uart;
 extern struct tty_driver *uart_console_device(struct console *, int *);
 
 static struct console sal_console = {

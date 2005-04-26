@@ -57,8 +57,8 @@ extern uint32_t ql_dbg_level;
 #define ENTER(x) do {QL4PRINT(QLP12, printk("qla4xxx: Entering %s()\n", x));} while(0);
 #define LEAVE(x) do {QL4PRINT(QLP12, printk("qla4xxx: Leaving  %s()\n", x));} while(0);
 
-inline uint8_t qla4xxx_get_debug_level(uint32_t *dbg_level);
-inline uint8_t qla4xxx_set_debug_level(uint32_t dbg_level);
+uint8_t qla4xxx_get_debug_level(uint32_t *dbg_level);
+uint8_t qla4xxx_set_debug_level(uint32_t dbg_level);
 
 void     qla4xxx_dump_bytes(uint32_t, void *, uint32_t);
 void     qla4xxx_dump_words(uint32_t, void *, uint32_t);

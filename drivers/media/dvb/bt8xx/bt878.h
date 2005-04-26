@@ -89,7 +89,6 @@
 #define BT878_RISC_SYNC_MASK	(1 << 15)
 
 extern int bt878_num;
-extern struct bt878 bt878[BT878_MAX];
 
 struct bt878 {
 	struct semaphore  gpio_lock;
@@ -123,6 +122,8 @@ struct bt878 {
 	struct tasklet_struct tasklet;
 	int shutdown;	
 };
+
+extern struct bt878 bt878[BT878_MAX];
 
 void bt878_start(struct bt878 *bt, u32 controlreg, u32 op_sync_orin,
 		u32 irq_err_ignore);

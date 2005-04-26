@@ -230,7 +230,6 @@ extern int fini_bttv_i2c(struct bttv *btv);
 /* our devices */
 #define BTTV_MAX 16
 extern unsigned int bttv_num;
-extern struct bttv bttvs[BTTV_MAX];
 
 #define BTTV_MAX_FBUF   0x208000
 #define VBIBUF_SIZE     (2048*VBI_MAXLINES*2)
@@ -377,6 +376,7 @@ struct bttv {
 	unsigned int users;
 	struct bttv_fh init;
 };
+extern struct bttv bttvs[BTTV_MAX];
 
 /* private ioctls */
 #define BTTV_VERSION            _IOR('v' , BASE_VIDIOCPRIVATE+6, int)

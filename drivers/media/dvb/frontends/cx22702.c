@@ -633,7 +633,7 @@ static struct i2c_driver demod_driver = {
 	.owner = THIS_MODULE,
 	.name  = __stringify(KBUILD_MODNAME) " demod",
 	.id    = I2C_DRIVERID_DVBFE_CX22702,
-	.driver {
+	.driver = {
 		.suspend = cx22702_suspend,
 		.resume  = cx22702_resume,
 	},

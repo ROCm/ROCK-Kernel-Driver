@@ -252,7 +252,7 @@ static int ttusb_i2c_msg(struct ttusb *ttusb,
 	return rcv_len;
 }
 
-static int master_xfer(struct i2c_adapter* adapter, struct i2c_msg msg[], int num)
+static int master_xfer(struct i2c_adapter* adapter, struct i2c_msg *msg, int num)
 {
 	struct ttusb *ttusb = i2c_get_adapdata(adapter);
 	int i = 0;

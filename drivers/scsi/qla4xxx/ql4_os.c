@@ -203,7 +203,7 @@ uint8_t qla4xxx_reset_target(scsi_qla_host_t *ha, ddb_entry_t *ddb_entry);
 uint8_t qla4xxx_recover_adapter(scsi_qla_host_t *ha, uint8_t renew_ddb_list);
 inline uint32_t qla4xxx_normalize_dma_addr(dma_addr_t *e_addr,  uint32_t *e_len, dma_addr_t *ne_addr, uint32_t *ne_len);
 inline uint8_t qla4xxx_alloc_cont_entry(scsi_qla_host_t *ha, DATA_SEG_A64 **cur_dsd, uint16_t *avail_dsds);
-inline void qla4xxx_config_dma_addressing(scsi_qla_host_t *ha);
+void qla4xxx_config_dma_addressing(scsi_qla_host_t *ha);
 
 static void qla4xxx_free_other_mem(scsi_qla_host_t *ha);
 static int qla4xxx_iospace_config(scsi_qla_host_t *ha);
@@ -881,7 +881,7 @@ qla4xxx_display_config(void)
  * Context:
  *      Kernel context.
  **************************************************************************/
-inline uint32_t
+uint32_t
 qla4xxx_get_hba_count(void)
 {
 	return(qla4xxx_hba_count);
@@ -900,7 +900,7 @@ qla4xxx_get_hba_count(void)
  * At exit, the @ha's flags.enable_64bit_addressing set to indicated
  * supported addressing method.
  */
-inline void
+void
 qla4xxx_config_dma_addressing(scsi_qla_host_t *ha)
 {
 	/* Assume 32bit DMA address. */
@@ -4290,7 +4290,7 @@ qla4xxx_topcat_reset(scsi_qla_host_t *ha){
  * Context:
  *      Kernel context.
  **************************************************************************/
-inline uint8_t
+uint8_t
 qla4xxx_soft_reset(scsi_qla_host_t *ha){
 	if (test_bit(AF_TOPCAT_CHIP_PRESENT, &ha->flags)) {
 		uint8_t status = QLA_ERROR;

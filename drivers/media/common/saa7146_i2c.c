@@ -25,7 +25,7 @@ static inline u32 saa7146_i2c_status(struct saa7146_dev *dev)
    sent through the saa7146. have a look at the specifications p. 122 ff 
    to understand this. it returns the number of u32s to send, or -1
    in case of an error. */
-static int saa7146_i2c_msg_prepare(const struct i2c_msg m[], int num, u32 *op)
+static int saa7146_i2c_msg_prepare(const struct i2c_msg *m, int num, u32 *op)
 {
 	int h1, h2;
 	int i, j, addr;
@@ -89,7 +89,7 @@ static int saa7146_i2c_msg_prepare(const struct i2c_msg m[], int num, u32 *op)
    which bytes were read through the adapter and write them back to the corresponding
    i2c-message. but instead, we simply write back all bytes.
    fixme: this could be improved. */
-static int saa7146_i2c_msg_cleanup(const struct i2c_msg m[], int num, u32 *op)
+static int saa7146_i2c_msg_cleanup(const struct i2c_msg *m, int num, u32 *op)
 {
 	int i, j;
 	int op_count = 0;
@@ -272,7 +272,7 @@ static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword, int short_d
 	return 0;
 }
 
-int saa7146_i2c_transfer(struct saa7146_dev *dev, const struct i2c_msg msgs[], int num, int retries)
+int saa7146_i2c_transfer(struct saa7146_dev *dev, const struct i2c_msg *msgs, int num, int retries)
 {
 	int i = 0, count = 0;
 	u32* buffer = dev->d_i2c.cpu_addr;
@@ -372,7 +372,7 @@ out:
 }
 
 /* utility functions */
-static int saa7146_i2c_xfer(struct i2c_adapter* adapter, struct i2c_msg msg[], int num)
+static int saa7146_i2c_xfer(struct i2c_adapter* adapter, struct i2c_msg *msg, int num)
 {
 	struct saa7146_dev* dev = i2c_get_adapdata(adapter);
 	

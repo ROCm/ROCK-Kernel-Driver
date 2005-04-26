@@ -583,7 +583,7 @@ module_exit(i2c_exit);
  * ----------------------------------------------------
  */
 
-int i2c_transfer(struct i2c_adapter * adap, struct i2c_msg msgs[],int num)
+int i2c_transfer(struct i2c_adapter * adap, struct i2c_msg *msgs, int num)
 {
 	int ret;
 

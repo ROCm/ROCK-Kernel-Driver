@@ -94,11 +94,19 @@ skip:
 /*
  * This is updated when the user sets irq affinity via /proc
  */
-cpumask_t __cacheline_aligned pending_irq_cpumask[NR_IRQS];
+static cpumask_t __cacheline_aligned pending_irq_cpumask[NR_IRQS];
 static unsigned long pending_irq_redir[BITS_TO_LONGS(NR_IRQS)];
 
-static cpumask_t irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
 static char irq_redir [NR_IRQS]; // = { [0 ... NR_IRQS-1] = 1 };
+
+/*
+ * Arch specific routine for deferred write to iosapic rte to reprogram
+ * intr destination.
+ */
+void proc_set_irq_affinity(unsigned int irq, cpumask_t mask_val)
+{
+	pending_irq_cpumask[irq] = mask_val;
+}
 
 void set_irq_affinity_info (unsigned int irq, int hwid, int redir)
 {

@@ -549,7 +549,7 @@ static inline int iic_address_neq(const struct i2c_msg* p1,
  * Generic master transfer entrypoint. 
  * Returns the number of processed messages or error (<0)
  */
-static int iic_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+static int iic_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
     	struct ibm_iic_private* dev = (struct ibm_iic_private*)(i2c_get_adapdata(adap));
 	volatile struct iic_regs __iomem *iic = dev->vaddr;

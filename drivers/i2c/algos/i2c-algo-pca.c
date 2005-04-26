@@ -178,7 +178,7 @@ static void pca_reset(struct i2c_algo_pca_data *adap)
 }
 
 static int pca_xfer(struct i2c_adapter *i2c_adap,
-                    struct i2c_msg msgs[],
+                    struct i2c_msg *msgs,
                     int num)
 {
         struct i2c_algo_pca_data *adap = i2c_adap->algo_data;

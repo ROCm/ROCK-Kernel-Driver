@@ -483,7 +483,7 @@ static int s3c24xx_i2c_set_master(struct s3c24xx_i2c *i2c)
  * this starts an i2c transfer
 */
 
-static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c, struct i2c_msg msgs[], int num)
+static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c, struct i2c_msg *msgs, int num)
 {
 	unsigned long timeout;
 	int ret;
@@ -534,7 +534,7 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c, struct i2c_msg msgs[], in
 */
 
 static int s3c24xx_i2c_xfer(struct i2c_adapter *adap,
-			struct i2c_msg msgs[], int num)
+			struct i2c_msg *msgs, int num)
 {
 	struct s3c24xx_i2c *i2c = (struct s3c24xx_i2c *)adap->algo_data;
 	int retry;

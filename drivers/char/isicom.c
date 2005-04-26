@@ -151,9 +151,6 @@ MODULE_DEVICE_TABLE(pci, isicom_pci_tbl);
 static int prev_card = 3;	/*	start servicing isi_card[0]	*/
 static struct tty_driver *isicom_normal;
 
-static struct isi_board isi_card[BOARD_COUNT];
-static struct isi_port  isi_ports[PORT_COUNT];
-
 static struct timer_list tx;
 static char re_schedule = 1;
 #ifdef ISICOM_DEBUG
@@ -209,6 +206,9 @@ struct	isi_port {
 	int			xmit_tail;
 	int			xmit_cnt;
 };
+
+static struct isi_board isi_card[BOARD_COUNT];
+static struct isi_port  isi_ports[PORT_COUNT];
 
 /*
  *	Locking functions for card level locking. We need to own both

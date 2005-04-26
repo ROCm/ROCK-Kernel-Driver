@@ -38,7 +38,7 @@ int dibusb_i2c_msg(struct usb_dibusb *dib, u8 addr,
 /*
  * I2C master xfer function
  */
-static int dibusb_i2c_xfer(struct i2c_adapter *adap,struct i2c_msg msg[],int num)
+static int dibusb_i2c_xfer(struct i2c_adapter *adap,struct i2c_msg *msg,int num)
 {
 	struct usb_dibusb *dib = i2c_get_adapdata(adap);
 	int i;

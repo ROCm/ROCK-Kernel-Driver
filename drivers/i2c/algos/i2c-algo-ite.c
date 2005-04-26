@@ -490,7 +490,7 @@ static int iic_readbytes(struct i2c_adapter *i2c_adap, char *buf, int count,
  * condition.
  */
 #if 0
-static int iic_combined_transaction(struct i2c_adapter *i2c_adap, struct i2c_msg msgs[], int num) 
+static int iic_combined_transaction(struct i2c_adapter *i2c_adap, struct i2c_msg *msgs, int num) 
 {
    int i;
    struct i2c_msg *pmsg;
@@ -600,7 +600,7 @@ static inline int iic_doAddress(struct i2c_algo_iic_data *adap,
  * verify that the bus is not busy or in some unknown state.
  */
 static int iic_xfer(struct i2c_adapter *i2c_adap,
-		    struct i2c_msg msgs[], 
+		    struct i2c_msg *msgs, 
 		    int num)
 {
 	struct i2c_algo_iic_data *adap = i2c_adap->algo_data;

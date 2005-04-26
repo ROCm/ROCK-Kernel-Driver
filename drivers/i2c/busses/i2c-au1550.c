@@ -253,7 +253,7 @@ i2c_write(struct i2c_au1550_data *adap, unsigned char *buf,
 }
 
 static int
-au1550_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg msgs[], int num)
+au1550_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg *msgs, int num)
 {
 	struct i2c_au1550_data *adap = i2c_adap->algo_data;
 	struct i2c_msg *p;

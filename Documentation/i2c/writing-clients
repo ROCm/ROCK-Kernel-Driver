@@ -642,7 +642,7 @@ contains the i2c address, so you do not have to include it. The second
 parameter contains the bytes the read/write, the third the length of the
 buffer. Returned is the actual number of bytes read/written.
   
-  extern int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
+  extern int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msg,
                           int num);
 
 This sends a series of messages. Each message can be a read or write,

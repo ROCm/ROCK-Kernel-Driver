@@ -237,7 +237,7 @@ static inline int i2c_recv_byte(struct saa7134_dev *dev)
 }
 
 static int saa7134_i2c_xfer(struct i2c_adapter *i2c_adap,
-			    struct i2c_msg msgs[], int num)
+			    struct i2c_msg *msgs, int num)
 {
 	struct saa7134_dev *dev = i2c_adap->algo_data;
 	enum i2c_status status;

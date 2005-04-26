@@ -100,7 +100,7 @@ static struct file_operations apidev_fops = {
 	.ioctl = apidev_ioctl,
 };
 
-inline void *
+void *
 ql4_kzmalloc(int siz, int code)
 {
 	void *		bp;

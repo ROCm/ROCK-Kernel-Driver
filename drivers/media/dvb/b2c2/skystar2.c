@@ -293,7 +293,7 @@ static u32 flex_i2c_write(struct adapter *adapter, u32 device, u32 bus, u32 addr
 	return buf - start;
 }
 
-static int master_xfer(struct i2c_adapter* adapter, struct i2c_msg msgs[], int num)
+static int master_xfer(struct i2c_adapter* adapter, struct i2c_msg *msgs, int num)
 {
 	struct adapter *tmp = i2c_get_adapdata(adapter);
 	int i, ret = 0;

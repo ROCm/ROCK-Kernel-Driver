@@ -233,7 +233,7 @@ static int mpc_read(struct mpc_i2c *i2c, int target,
 	return length;
 }
 
-static int mpc_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+static int mpc_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	struct i2c_msg *pmsg;
 	int i;
