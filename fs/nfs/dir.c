@@ -1495,8 +1495,8 @@ void nfs_access_add_cache(struct inode *inode, struct nfs_access_entry *set)
 		if (cache->cred)
 			put_rpccred(cache->cred);
 		cache->cred = get_rpccred(set->cred);
-		NFS_FLAGS(inode) &= ~NFS_INO_INVALID_ACCESS;
 	}
+	NFS_FLAGS(inode) &= ~NFS_INO_INVALID_ACCESS;
 	cache->jiffies = set->jiffies;
 	cache->mask = set->mask;
 }
