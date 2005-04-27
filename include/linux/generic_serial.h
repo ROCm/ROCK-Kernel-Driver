@@ -91,6 +91,4 @@ int  gs_setserial(struct gs_port *port, struct serial_struct __user *sp);
 int  gs_getserial(struct gs_port *port, struct serial_struct __user *sp);
 void gs_got_break(struct gs_port *port);
 
-extern int gs_debug;
-
 #endif

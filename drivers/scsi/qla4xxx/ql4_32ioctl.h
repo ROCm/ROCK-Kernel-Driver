@@ -19,7 +19,7 @@
 #ifndef _QL4_32IOCTL_H_
 #define _QL4_32IOCTL_H_
 
-extern inline void
+extern void
 ql4_apidev_init_32ioctl(void);
 
 extern inline void
