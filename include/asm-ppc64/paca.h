@@ -22,7 +22,6 @@
 #include	<asm/iSeries/ItLpRegSave.h>
 #include	<asm/mmu.h>
 
-extern struct paca_struct paca[];
 register struct paca_struct *local_paca asm("r13");
 #define get_paca()	local_paca
 
@@ -114,5 +113,7 @@ struct paca_struct {
 	struct ItLpRegSave reg_save;
 #endif
 };
+
+extern struct paca_struct paca[];
 
 #endif /* _PPC64_PACA_H */

@@ -13,9 +13,6 @@
 typedef void *phandle;
 typedef void *ihandle;
 
-extern char *prom_display_paths[];
-extern unsigned int prom_num_displays;
-
 struct address_range {
 	unsigned int space;
 	unsigned int address;
