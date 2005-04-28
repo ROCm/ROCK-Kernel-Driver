@@ -1799,7 +1799,7 @@ martian_source:
 		printk(KERN_WARNING "martian source %u.%u.%u.%u from "
 			"%u.%u.%u.%u, on dev %s\n",
 			NIPQUAD(daddr), NIPQUAD(saddr), dev->name);
-		if (dev->hard_header_len) {
+		if (dev->hard_header_len && skb->mac.raw) {
 			int i;
 			unsigned char *p = skb->mac.raw;
 			printk(KERN_WARNING "ll header: ");
