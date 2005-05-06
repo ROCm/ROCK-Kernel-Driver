@@ -34,6 +34,7 @@
 #include <linux/syscalls.h>
 #include <linux/security.h>
 #include <linux/fs.h>
+#include <linux/module.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -494,6 +495,7 @@ void getnstimeofday (struct timespec *tv)
 	tv->tv_sec = sec;
 	tv->tv_nsec = nsec;
 }
+EXPORT_SYMBOL_GPL(getnstimeofday);
 
 int do_settimeofday (struct timespec *tv)
 {

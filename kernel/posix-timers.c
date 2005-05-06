@@ -46,6 +46,7 @@
 #include <linux/syscalls.h>
 #include <linux/wait.h>
 #include <linux/workqueue.h>
+#include <linux/module.h>
 
 #ifndef div_long_long_rem
 #include <asm/div64.h>
@@ -396,6 +397,7 @@ int posix_timer_event(struct k_itimer *timr,int si_private)
 			timr->it_process);
 	}
 }
+EXPORT_SYMBOL_GPL(posix_timer_event);
 
 /*
  * This function gets called when a POSIX.1b interval timer expires.  It
@@ -490,6 +492,7 @@ void register_posix_clock(int clock_id, struct k_clock *new_clock)
 	}
 	posix_clocks[clock_id] = *new_clock;
 }
+EXPORT_SYMBOL_GPL(register_posix_clock);
 
 static struct k_itimer * alloc_posix_timer(void)
 {
@@ -1197,11 +1200,13 @@ int do_posix_clock_nosettime(struct timespec *tp)
 {
 	return -EINVAL;
 }
+EXPORT_SYMBOL_GPL(do_posix_clock_nosettime);
 
 int do_posix_clock_notimer_create(struct k_itimer *timer)
 {
 	return -EINVAL;
 }
+EXPORT_SYMBOL_GPL(do_posix_clock_notimer_create);
 
 int do_posix_clock_nonanosleep(int which_clock, int flags, struct timespec *t)
 {
@@ -1211,6 +1216,7 @@ int do_posix_clock_nonanosleep(int which_clock, int flags, struct timespec *t)
 	return -ENOTSUP;
 #endif
 }
+EXPORT_SYMBOL_GPL(do_posix_clock_nonanosleep);
 
 asmlinkage long
 sys_clock_settime(clockid_t which_clock, const struct timespec __user *tp)

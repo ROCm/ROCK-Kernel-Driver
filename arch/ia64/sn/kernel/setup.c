@@ -53,6 +53,7 @@
 
 
 DEFINE_PER_CPU(struct pda_s, pda_percpu);
+EXPORT_PER_CPU_SYMBOL(pda_percpu);
 
 #define MAX_PHYS_MEMORY		(1UL << 49)	/* 1 TB */
 
