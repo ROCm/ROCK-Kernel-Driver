@@ -1371,6 +1371,7 @@ EXPORT_SYMBOL(sk_alloc);
 EXPORT_SYMBOL(sk_free);
 EXPORT_SYMBOL(sk_send_sigurg);
 EXPORT_SYMBOL(sock_alloc_send_skb);
+EXPORT_SYMBOL(sock_getsockopt);
 EXPORT_SYMBOL(sock_init_data);
 EXPORT_SYMBOL(sock_kfree_s);
 EXPORT_SYMBOL(sock_kmalloc);
