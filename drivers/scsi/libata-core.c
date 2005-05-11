@@ -2561,7 +2561,7 @@ static void atapi_request_sense(struct ata_port *ap, struct ata_device *dev,
 	ata_sg_init_one(qc, cmd->sense_buffer, sizeof(cmd->sense_buffer));
 	qc->dma_dir = DMA_FROM_DEVICE;
 
-	memset(&qc->cdb, 0, sizeof(ap->cdb_len));
+	memset(&qc->cdb, 0, ap->cdb_len);
 	qc->cdb[0] = REQUEST_SENSE;
 	qc->cdb[4] = SCSI_SENSE_BUFFERSIZE;
 
@@ -2658,6 +2658,7 @@ static void ata_qc_timeout(struct ata_queued_cmd *qc)
 	default:
 		ata_altstatus(ap);
 		drv_stat = ata_chk_status(ap);
+		ap->pio_task_state = PIO_ST_IDLE;
 
 		/* ack bmdma irq events */
 		ap->ops->irq_clear(ap);
@@ -2841,6 +2842,7 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 
 	/* call completion callback */
 	rc = qc->complete_fn(qc, drv_stat);
+	qc->flags &= ~ATA_QCFLAG_ACTIVE;
 
 	/* if callback indicates not to complete command (non-zero),
 	 * return immediately
@@ -2970,6 +2972,7 @@ int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 		ap->ops->tf_load(ap, &qc->tf);
 		ap->ops->exec_command(ap, &qc->tf);
 
+		ap->pio_task_state = PIO_ST_PKT;
 		queue_work(ata_wq, &ap->packet_task);
 		break;
 
@@ -2977,12 +2980,14 @@ int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 		ap->ops->tf_load(ap, &qc->tf);
 		ap->ops->exec_command(ap, &qc->tf);
 
+		ap->pio_task_state = PIO_ST_PKT;
 		queue_work(ata_wq, &ap->packet_task);
 		break;
 
 	case ATA_PROT_ATAPI_DMA:
 		ap->ops->tf_load(ap, &qc->tf);	 /* load tf registers */
 		ap->ops->bmdma_setup(qc);	    /* set up bmdma */
+		ap->pio_task_state = PIO_ST_PKT;
 		queue_work(ata_wq, &ap->packet_task);
 		break;
 
@@ -3180,6 +3185,13 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 {
 	u8 status, host_stat;
 
+	/* ATAPI: Ignore interrupt if CDB is not sent yet  */
+	if (is_atapi_taskfile(&qc->tf) &&
+	    ap->pio_task_state != PIO_ST_CDB_SENT) {
+		DPRINTK("ata%u: not my atapi interrupt\n", ap->id);
+		goto idle_irq;
+	}
+
 	switch (qc->tf.protocol) {
 
 	case ATA_PROT_DMA:
@@ -3211,6 +3223,8 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 			goto idle_irq;
 		DPRINTK("ata%u: protocol %d (dev_stat 0x%X)\n",
 			ap->id, qc->tf.protocol, status);
+
+		ap->pio_task_state = PIO_ST_IDLE;
 
 		/* ack bmdma irq events */
 		ap->ops->irq_clear(ap);
@@ -3268,7 +3282,8 @@ irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 			struct ata_queued_cmd *qc;
 
 			qc = ata_qc_from_tag(ap, ap->active_tag);
-			if (qc && (!(qc->tf.ctl & ATA_NIEN)))
+			if (qc && (!(qc->tf.ctl & ATA_NIEN)) &&
+			    (qc->flags & ATA_QCFLAG_ACTIVE))
 				handled |= ata_host_intr(ap, qc);
 		}
 	}
@@ -3297,6 +3312,7 @@ static void atapi_packet_task(void *_data)
 	struct ata_port *ap = _data;
 	struct ata_queued_cmd *qc;
 	u8 status;
+	unsigned long flags;
 
 	qc = ata_qc_from_tag(ap, ap->active_tag);
 	assert(qc != NULL);
@@ -3312,10 +3328,13 @@ static void atapi_packet_task(void *_data)
 	if ((status & (ATA_BUSY | ATA_DRQ)) != ATA_DRQ)
 		goto err_out;
 
+	spin_lock_irqsave(&ap->host_set->lock, flags);
+
 	/* send SCSI cdb */
 	DPRINTK("send cdb\n");
 	assert(ap->cdb_len >= 12);
 	ata_data_xfer(ap, qc->cdb, ap->cdb_len, 1);
+	ap->pio_task_state = PIO_ST_CDB_SENT;
 
 	/* if we are DMA'ing, irq handler takes over from here */
 	if (qc->tf.protocol == ATA_PROT_ATAPI_DMA)
@@ -3331,6 +3350,8 @@ static void atapi_packet_task(void *_data)
 		ap->pio_task_state = PIO_ST;
 		queue_work(ata_wq, &ap->pio_task);
 	}
+
+	spin_unlock_irqrestore(&ap->host_set->lock, flags);
 
 	return;
 

@@ -162,6 +162,8 @@ enum pio_task_states {
 	PIO_ST_LAST,
 	PIO_ST_LAST_POLL,
 	PIO_ST_ERR,
+	PIO_ST_PKT,
+	PIO_ST_CDB_SENT,
 };
 
 /* forward declarations */
