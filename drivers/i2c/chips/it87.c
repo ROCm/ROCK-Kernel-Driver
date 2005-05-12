@@ -730,10 +730,9 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 			goto ERROR0;
 
 	/* Probe whether there is anything available on this address. Already
-	   done for SMBus clients */
+	   done for SMBus and Super-I/O clients */
 	if (kind < 0) {
-		if (is_isa) {
-
+		if (is_isa && !chip_type) {
 #define REALLY_SLOW_IO
 			/* We need the timeouts for at least some IT87-like chips. But only
 			   if we read 'undefined' registers. */
