@@ -335,6 +335,7 @@ static inline pud_t *__pud_offset_k(pud_t *pud, unsigned long address)
 #define pmd_pfn(x)  ((pmd_val(x) >> PAGE_SHIFT) & __PHYSICAL_MASK)
 
 #define pte_to_pgoff(pte) ((pte_val(pte) & PHYSICAL_PAGE_MASK) >> PAGE_SHIFT)
+#define pte_bad(pte)    (pte_val(pte) & ~(PHYSICAL_PAGE_MASK|_PAGE_NX|0x1ff))
 #define pgoff_to_pte(off) ((pte_t) { ((off) << PAGE_SHIFT) | _PAGE_FILE })
 #define PTE_FILE_MAX_BITS __PHYSICAL_MASK_SHIFT
 
