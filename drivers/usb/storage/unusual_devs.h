@@ -497,8 +497,32 @@ UNUSUAL_DEV(  0x05ab, 0x5701, 0x0100, 0x0110,
 		0 ),
 #endif
 
-/* Reported by Avi Kivity <avi@argo.co.il> */
-UNUSUAL_DEV( 0x05ac, 0x1203, 0x0001, 0x0001,
+/* Submitted by Sven Anderson <sven-linux@anderson.de> 
+ * Based on patch by Avi Kivity <avi@argo.co.il>
+ * There are at least four product ids used for iPods. They just need the
+ * US_FL_FIX_CAPACITY. As the bcdDevice appears to change with firmware
+ * updates, the range is set to maximum.
+ */
+ 
+UNUSUAL_DEV( 0x05ac, 0x1202, 0x0000, 0xffff,
+		"Apple",
+		"iPod",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
+
+UNUSUAL_DEV( 0x05ac, 0x1203, 0x0000, 0xffff,
+		"Apple",
+		"iPod",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
+
+UNUSUAL_DEV( 0x05ac, 0x1204, 0x0000, 0xffff,
+		"Apple",
+		"iPod",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
+
+UNUSUAL_DEV( 0x05ac, 0x1205, 0x0000, 0xffff,
 		"Apple",
 		"iPod",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
