@@ -45,7 +45,14 @@
     err |= put_user((u32)dummy,&x32->elem); \
 } while (0);
 
-#  define GET_USER_P(elem) GET_USER_P_ARGS(arg32,arg64,elem)
+#  define GET_USER_P_ACC(elem,acc,size) \
+    if (size ==  0 || access_ok(acc,(void __user *)&arg32->elem, size)) \
+        GET_USER_P_ARGS(arg32,arg64,elem) \
+    else \
+        err |= -EFAULT;
+
+#  define GET_USER_P(elem,acc)  GET_USER_P_ARGS(arg32,arg64,elem);
+
 #  define PUT_USER_P(elem) PUT_USER_P_ARGS(arg32,arg64,elem)
 
 #  define SYS_IOCTL do { \
@@ -56,6 +63,9 @@
     DEBUG("SYS_IOCTL_FUNC done"); \
     set_fs(old_fs); \
     } while (0);
+
+#define DEBUG_IOCTL32(nr) \
+  printk(KERN_WARNING "Registering IOCTL32: %lx\n",nr);
 
 #  define REG_IOCTL32(nr,c_func) \
   err = register_ioctl32_conversion(nr,c_func); \

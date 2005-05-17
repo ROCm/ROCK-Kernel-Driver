@@ -142,15 +142,22 @@ drm_128_depth_32_64(unsigned int fd, unsigned int cmd,
     mm_segment_t old_fs;
     int err = 0;
     u64 dummy;
+    int buffer_size = 0, mask_size = 0;
 
     DEBUG("r128_depth_32_64");
 
     GET_USER(func);
     GET_USER(n);
-    GET_USER_P(x);
-    GET_USER_P(y);
-    GET_USER_P(buffer);
-    GET_USER_P(mask);
+    GET_USER_P_ACC(x, VERIFY_READ, arg64.n * sizeof(*arg64.x));
+    GET_USER_P_ACC(y, VERIFY_READ, arg64.n * sizeof(*arg64.y));
+    switch (arg64.func) {
+	case R128_WRITE_SPAN:
+	case R128_WRITE_PIXELS:
+	    buffer_size = arg64.n * sizeof(u32);
+	    mask_size = arg64.n * sizeof(u8);
+    }
+    GET_USER_P_ACC(buffer,VERIFY_READ,buffer_size);
+    GET_USER_P_ACC(mask,VERIFY_READ,mask_size);
 
     if (err) return -EFAULT;
     
@@ -170,7 +177,7 @@ drm_128_stipple_32_64(unsigned int fd, unsigned int cmd,
 
     DEBUG("r128_stipple_32_64");
 
-    GET_USER_P(mask);
+    GET_USER_P_ACC(mask, VERIFY_READ, 32 * sizeof(u32));
 
     if (err) return -EFAULT;
     
@@ -190,7 +197,7 @@ drm_128_getparam_32_64(unsigned int fd, unsigned int cmd,
     
     DEBUG("r128_getparam_wr_32_64");
     GET_USER(param);
-    GET_USER_P(value);
+    GET_USER_P_ACC(value, VERIFY_WRITE, sizeof(int));
 
     if (err) return -EFAULT;
     
@@ -242,7 +249,7 @@ r128_unregister_ioctl32(void)
     UNREG_IOCTL32(DRM_IOCTL_R128_INIT32);
     UNREG_IOCTL32(DRM_IOCTL_R128_DEPTH32);
     UNREG_IOCTL32(DRM_IOCTL_R128_STIPPLE32);
-    UNREG_IOCTL32(DRM_IOCTL_R128_GETPARAM);
+    UNREG_IOCTL32(DRM_IOCTL_R128_GETPARAM32);
 
     UNREG_IOCTL32(DRM_IOCTL_R128_CCE_START);
     UNREG_IOCTL32(DRM_IOCTL_R128_CCE_STOP);

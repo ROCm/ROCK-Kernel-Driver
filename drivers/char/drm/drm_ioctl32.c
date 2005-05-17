@@ -254,11 +254,11 @@ drm_version_32_64(unsigned int fd, unsigned int cmd,
     GET_USER(version_minor);
     GET_USER(version_patchlevel);
     GET_USER(name_len);
-    GET_USER_P(name);
+    GET_USER_P_ACC(name,VERIFY_WRITE,arg64.name_len);
     GET_USER(date_len);
-    GET_USER_P(date);
+    GET_USER_P_ACC(date,VERIFY_WRITE,arg64.date_len);
     GET_USER(desc_len);
-    GET_USER_P(desc);
+    GET_USER_P_ACC(desc,VERIFY_WRITE,arg64.desc_len);
 
     if (err) return -EFAULT;
     
@@ -291,7 +291,7 @@ drm_unique_wr_32_64(unsigned int fd, unsigned cmd,
 
     DEBUG("drm_unique_wr_32_64");
     GET_USER(unique_len);
-    GET_USER_P(unique);
+    GET_USER_P_ACC(unique,VERIFY_WRITE,arg64.unique_len);
     
     if (err) return -EFAULT;
     
@@ -316,7 +316,7 @@ drm_unique_w_32_64(unsigned int fd, unsigned int cmd,
 
     DEBUG("drm_unique_w_32_64");
     GET_USER(unique_len);
-    GET_USER_P(unique);
+    GET_USER_P_ACC(unique,VERIFY_WRITE,arg64.unique_len);
     
     if (err) return -EFAULT;
     
@@ -326,7 +326,7 @@ drm_unique_w_32_64(unsigned int fd, unsigned int cmd,
 }
 
 static int
-drm_map_rw_32_64(unsigned int fd, unsigned int cmd, 
+drm_addmap_rw_32_64(unsigned int fd, unsigned int cmd, 
 		 unsigned long arg, struct file *file)
 {
     drm32_map_t *arg32 = (drm32_map_t *) arg;
@@ -335,13 +335,38 @@ drm_map_rw_32_64(unsigned int fd, unsigned int cmd,
     int err = 0;
 //  u64 dummy;
 
-    DEBUG("drm_map_rw_32_64");
+    DEBUG("drm_addmap_rw_32_64");
     GET_USER(offset);
     GET_USER(size);
     GET_USER(type);
     GET_USER(flags);
 //  GET_USER(pub_handle);
     GET_USER(mtrr);
+
+    if (err) return -EFAULT;
+    
+    SYS_IOCTL;
+
+    if (err) return err;
+    
+    PUT_USER(pub_handle);
+
+    DEBUG("done");
+    return err ? -EFAULT : 0;
+}
+
+static int
+drm_getmap_rw_32_64(unsigned int fd, unsigned int cmd, 
+		 unsigned long arg, struct file *file)
+{
+    drm32_map_t *arg32 = (drm32_map_t *) arg;
+    drm_map_t arg64;
+    mm_segment_t old_fs;
+    int err = 0;
+//  u64 dummy;
+
+    DEBUG("drm_getmap_rw_32_64");
+    GET_USER(offset);
 
     if (err) return -EFAULT;
     
@@ -377,7 +402,7 @@ drm_map_w_32_64(unsigned int fd, unsigned int cmd,
     GET_USER(size);
     GET_USER(type);
     GET_USER(flags);
-//  GET_USER_P(handle);
+//  GET_USER(handle);
     GET_USER(mtrr);
 
     if (err) return -EFAULT;
@@ -456,7 +481,6 @@ drm_ctx_priv_map_wr_32_64(unsigned int fd, unsigned int cmd,
     drm_ctx_priv_map_t arg64;
     mm_segment_t old_fs;
     int err = 0;
-    u64 dummy;
 
     DEBUG("drm_ctx_priv_map_wr_32_64");
     GET_USER(ctx_id);
@@ -482,7 +506,6 @@ drm_ctx_priv_map_w_32_64(unsigned int fd, unsigned int cmd,
     drm_ctx_priv_map_t arg64;
     mm_segment_t old_fs;
     int err = 0;
-    u64 dummy;
 
     DEBUG("drm_ctx_priv_map_w_32_64");
     GET_USER(ctx_id);
@@ -508,7 +531,7 @@ drm_ctx_res_32_64(unsigned int fd, unsigned int cmd,
 
     DEBUG("drm_ctx_res_32_64");
     GET_USER(count);
-    GET_USER_P(contexts);
+    GET_USER_P_ACC(contexts,VERIFY_WRITE, arg64.count*sizeof(drm_ctx_t));
 
     if (err) return -EFAULT;
     
@@ -536,13 +559,15 @@ drm_dma_32_64(unsigned int fd, unsigned int cmd,
     DEBUG("drm_dma_32_64");
     GET_USER(context);
     GET_USER(send_count);
-    GET_USER_P(send_indices);
-    GET_USER_P(send_sizes);
+    GET_USER_P_ACC(send_indices, VERIFY_READ, arg64.send_count * sizeof(int));
+    GET_USER_P_ACC(send_sizes, VERIFY_READ, arg64.send_count * sizeof(int));
     GET_USER(flags);
     GET_USER(request_count);
     GET_USER(request_size);
-    GET_USER_P(request_indices);
-    GET_USER_P(request_sizes);
+    GET_USER_P_ACC(request_indices, VERIFY_WRITE, 
+		   arg64.request_count * sizeof(int));
+    GET_USER_P_ACC(request_sizes, VERIFY_WRITE, 
+		   arg64.request_count * sizeof(int));
     GET_USER(granted_count);
 
     if (err) return -EFAULT;
@@ -633,22 +658,19 @@ drm_buf_info_32_64(unsigned int fd, unsigned int cmd,
     int err = 0;
     drm32_buf_desc_t *list32 = (drm32_buf_desc_t*)(u64)arg32->list;
     drm_buf_desc_t *list64;
-    int i;
-    
+    int i, num;
+
+    if (arg32->count < 0) return -EFAULT;
+
+    num = arg32->count < DRM_MAX_ORDER + 1 ? arg32->count 
+	: DRM_MAX_ORDER + 1;
+
     DEBUG("drm_buf_info_32_64");
-    list64 = K_ALLOC(arg32->count * sizeof (drm_buf_desc_t));
+    list64 = K_ALLOC(num * sizeof (drm_buf_desc_t));
     if (!list64) return -EFAULT;
     
     GET_USER(count);
     arg64.list = list64;
-    
-    for (i = 0 ; i < arg32->count; i ++) {
-	err |= get_user(list64[i].count,&list32[i].count);
-	err |= get_user(list64[i].size,&list32[i].size);
-	err |= get_user(list64[i].high_mark,&list32[i].low_mark);
-	err |= get_user(list64[i].flags,&list32[i].flags);
-	err |= get_user(list64[i].agp_start,&list32[i].agp_start);
-    }
     
     if (err) {
 	K_FREE(list64);
@@ -661,14 +683,15 @@ drm_buf_info_32_64(unsigned int fd, unsigned int cmd,
 	return err;
     }
     
-    
-    for (i = 0 ; i < arg32->count; i ++) {
-	err |= put_user(list64[i].count,&list32[i].count);
-	err |= put_user(list64[i].size,&list32[i].size);
-	err |= put_user(list64[i].low_mark,&list32[i].low_mark);
-	err |= put_user(list64[i].high_mark,&list32[i].high_mark);
-	err |= put_user(list64[i].flags,&list32[i].flags);
+    if (num > arg64.count) {
+	for (i = 0 ; i < arg64.count; i ++) {
+	    err |= put_user(list64[i].count,&list32[i].count);
+	    err |= put_user(list64[i].size,&list32[i].size);
+	    err |= put_user(list64[i].low_mark,&list32[i].low_mark);
+	    err |= put_user(list64[i].high_mark,&list32[i].high_mark);
+	    err |= put_user(list64[i].flags,&list32[i].flags);
 //	err |= put_user(list64[i].agp_start,&list32[i].agp_start);
+	}
     }
     PUT_USER(count);
 
@@ -689,39 +712,34 @@ drm_buf_map_32_64(unsigned int fd, unsigned cmd,
     int err = 0;
     drm32_buf_pub_t *list32 = (drm32_buf_pub_t*)(unsigned long)arg32->list;
     drm_buf_pub_t *list64;
-    int count, i;
+    int i, count;
     u64 dummy;
     
     DEBUG("drm_buf_map_32_64");
-    list64 = K_ALLOC(arg32->count * sizeof (drm_buf_pub_t));
-    if (!list64) return -EFAULT;
-    
+
     GET_USER(count);
-    GET_USER_P(virtual);
+    if (arg64.count < 0) return -EFAULT;
+    count = arg64.count;
+
+    list64 = K_ALLOC(arg64.count * sizeof (drm_buf_pub_t));
+    if (!list64) return -EFAULT;
     arg64.list = list64;
-#if 0
-    for (i = 0 ; i < arg32->count; i ++) {
-	err |= get_user(list64[i].idx,&list32[i].idx);
-	err |= get_user(list64[i].total,&list32[i].total);
-	err |= get_user(list64[i].used,&list32[i].used);
-	err |= get_user(dummy,&list32[i].address);
-	list64[i].address = (void *)dummy;
-    }
-#endif
+
     if (err) {
 	K_FREE(list64);
 	return -EFAULT;
     }
-    
+
     SYS_IOCTL;    
     if (err) {
 	K_FREE(list64);
 	return err;
     }
     
-    count = arg32->count < arg64.count ? arg32->count : arg64.count;
     PUT_USER(count);
     PUT_USER_P(virtual);
+
+    if (count > arg64.count) count = arg64.count;
 
     for (i = 0 ; i < count; i ++) {
 	err |= put_user(list64[i].idx,&list32[i].idx);
@@ -743,14 +761,11 @@ drm_buf_free_w_32_64(unsigned int fd, unsigned int cmd,
     drm_buf_free_t arg64;
     mm_segment_t old_fs;
     int err = 0;
-    int i;
-    int *list32 = (int *)(unsigned long)arg32->list;
+    u64 dummy;
 
     DEBUG("drm_buf_free_w_32_64");
     GET_USER(count);
-    for (i = 0; i < arg32->count; i++)
-	err |= get_user(arg64.list[i],&list32[i]);
-	
+    GET_USER_P_ACC(list, VERIFY_READ, arg64.count * sizeof(int));
     
     if (err) return -EFAULT;
     
@@ -943,11 +958,11 @@ drm_register_ioctl32(void)
     int err;
     REG_IOCTL32(DRM_IOCTL_VERSION_32,drm_version_32_64);
     REG_IOCTL32(DRM_IOCTL_GET_UNIQUE_32,drm_unique_wr_32_64);
-    REG_IOCTL32(DRM_IOCTL_GET_MAP_32,drm_map_rw_32_64);
+    REG_IOCTL32(DRM_IOCTL_GET_MAP_32,drm_getmap_rw_32_64);
     REG_IOCTL32(DRM_IOCTL_GET_CLIENT_32,drm_client_32_64);
     REG_IOCTL32(DRM_IOCTL_GET_STATS_32,drm_stats_32_64);
     REG_IOCTL32(DRM_IOCTL_SET_UNIQUE_32,drm_unique_w_32_64);
-    REG_IOCTL32(DRM_IOCTL_ADD_MAP_32,drm_map_rw_32_64);
+    REG_IOCTL32(DRM_IOCTL_ADD_MAP_32,drm_addmap_rw_32_64);
     REG_IOCTL32(DRM_IOCTL_ADD_BUFS_32,drm_buf_desc_wr_32_64);
     REG_IOCTL32(DRM_IOCTL_MARK_BUFS_32,drm_buf_desc_w_32_64);
     REG_IOCTL32(DRM_IOCTL_INFO_BUFS_32,drm_buf_info_32_64);

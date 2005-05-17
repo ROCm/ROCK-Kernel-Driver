@@ -133,7 +133,7 @@ mga_getparam_wr_32_64(unsigned int fd, unsigned int cmd,
     
     DEBUG("mga_getparam_wr_32_64");
     GET_USER(param);
-    GET_USER_P(value);
+    GET_USER_P_ACC(value, VERIFY_WRITE, sizeof(int));
 
     if (err) return -EFAULT;
     

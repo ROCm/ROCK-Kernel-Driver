@@ -42,7 +42,9 @@
 
 #include <asm/ioctl32.h>
 #include "drm.h"
+#include "drmP.h"
 #include "radeon_drm.h"
+#include "radeon_drv.h"
 #define IOCTL32_PRIVATE
 #include "drm_ioctl32.h"
 
@@ -160,13 +162,20 @@ drm_clear_w_32_64(unsigned int fd, unsigned int cmd,
     int err = 0;
     u64 dummy;
 
+    drm_file_t	*priv	= file->private_data;
+    drm_device_t *dev	= priv->dev;
+    drm_radeon_private_t *dev_priv = dev->dev_private;
+    drm_radeon_sarea_t *sarea_priv = dev_priv->sarea_priv;
+    int num = (sarea_priv->nbox > RADEON_NR_SAREA_CLIPRECTS 
+	       ? RADEON_NR_SAREA_CLIPRECTS : sarea_priv->nbox);
+	
     DEBUG("drm_clear_w_32_64");
     GET_USER(flags);
     GET_USER(clear_color);
     GET_USER(clear_depth);
     GET_USER(color_mask);
     GET_USER(depth_mask);
-    GET_USER_P(depth_boxes);
+    GET_USER_P_ACC(depth_boxes, VERIFY_READ, num * sizeof(*arg64.depth_boxes));
 
     if (err) return -EFAULT;
     
@@ -185,7 +194,7 @@ drm_stipple_w_32_64(unsigned int fd, unsigned int cmd,
     u64 dummy;
 
     DEBUG("drm_stipple_w_32_64");
-    GET_USER_P(mask);
+    GET_USER_P_ACC(mask, VERIFY_READ, 32 * sizeof(u32));
 
     if (err) return -EFAULT;
     
@@ -202,7 +211,7 @@ drm_texture_32_64(unsigned int fd, unsigned int cmd,
     drm32_radeon_tex_image_t *image32;
     drm_radeon_tex_image_t image64;
     mm_segment_t old_fs;
-    int err = 0, err_tmp = 0;
+    int err = 0;
     u64 dummy;
 
     DEBUG("drm_texture_32_64");
@@ -217,28 +226,32 @@ drm_texture_32_64(unsigned int fd, unsigned int cmd,
     err |= get_user(image64.y,&image32->y);
     err |= get_user(image64.width,&image32->width);
     err |= get_user(image64.height,&image32->height);
-    err |= get_user(dummy,&image32->data);
-    image64.data = (void *)dummy;
+    {
+        int n;
+        switch (arg64.format) {
+            case RADEON_TXFORMAT_ARGB8888:
+            case RADEON_TXFORMAT_RGBA8888:
+                n = 4;
+                break;
+            case RADEON_TXFORMAT_I8:
+            case RADEON_TXFORMAT_RGB332:
+                n = 1;
+                break;
+            default:
+                n = 1;
+        }
+	if (!access_ok(dummy,VERIFY_READ,image32->width * image32->height * n))
+	    err |= -EFAULT;
+	err |= get_user(dummy,&image32->data);
+	image64.data = (void *)dummy;
+    }
+
     
     if (err) return -EFAULT;
     
     SYS_IOCTL;
-    err_tmp = err;
-    err = 0;
 
-    PUT_USER(offset);
-    PUT_USER(pitch);
-    PUT_USER(format);
-    PUT_USER(width);
-    PUT_USER(height);
-    err |= put_user(image64.x,&image32->x);
-    err |= put_user(image64.y,&image32->y);
-    err |= put_user(image64.width,&image32->width);
-    err |= put_user(image64.height,&image32->height);
-    dummy = (u64)image64.data;
-
-    err |= put_user((u32)dummy,&image32->data);
-    return err ? -EFAULT : err_tmp;
+    return err;
 }
 
 static int
@@ -250,15 +263,20 @@ drm_vertex2_32_64(unsigned int fd, unsigned int cmd,
     mm_segment_t old_fs;
     u64 dummy;
     int err = 0;
-    
+    int i, max_state = 0;
+
     DEBUG("drm_vertex2_32_64");
 
     GET_USER(idx);
     GET_USER(discard);
-    GET_USER(nr_states);
-    GET_USER_P(state);
     GET_USER(nr_prims);
-    GET_USER_P(prim);
+    GET_USER_P_ACC(prim, VERIFY_READ, arg32->nr_prims * sizeof(*arg64.prim));
+    GET_USER(nr_states);
+    for (i = 0; i < arg64.nr_prims; i++) {
+	if (max_state < arg64.prim[i].stateidx)
+	    max_state = arg64.prim[i].stateidx;
+    }
+    GET_USER_P_ACC(state, VERIFY_READ, max_state * sizeof(*arg64.state));
 
     if (err) 
 	return -EFAULT;
@@ -320,9 +338,9 @@ drm_radeon_cmd_buffer_32_64(unsigned int fd, unsigned int cmd,
     DEBUG("radeon_cmd_buffer_32_64");
 
     GET_USER(bufsz);
-    GET_USER_P(buf);
+    GET_USER_P_ACC(buf,VERIFY_READ, arg64.bufsz * sizeof(*arg64.buf));
     GET_USER(nbox);
-    GET_USER_P(boxes);
+    GET_USER_P_ACC(boxes, VERIFY_READ, arg64.nbox * sizeof(*arg64.boxes));
 
     if (err) return -EFAULT;
     
@@ -345,7 +363,7 @@ drm_radeon_mem_alloc_32_64(unsigned int fd, unsigned int cmd,
     GET_USER(region);
     GET_USER(alignment);
     GET_USER(size);
-    GET_USER_P(region_offset);
+    GET_USER_P_ACC(region_offset, VERIFY_WRITE, sizeof(int));
 
     if (err) return -EFAULT;
     
@@ -365,7 +383,7 @@ drm_radeon_irq_emit_32_64(unsigned int fd, unsigned int cmd,
 
     DEBUG("radeon_irq_emit_32_64");
 
-    GET_USER_P(irq_seq);
+    GET_USER_P_ACC(irq_seq, VERIFY_WRITE, sizeof(int));
 
     if (err) return -EFAULT;
     
@@ -386,7 +404,7 @@ drm_radeon_getparam_32_64(unsigned int fd, unsigned int cmd,
     DEBUG("radeon_getpram_32_64");
 
     GET_USER(param);
-    GET_USER_P(value);
+    GET_USER_P_ACC(value, VERIFY_WRITE, sizeof(int));
 
     if (err) return -EFAULT;
     
