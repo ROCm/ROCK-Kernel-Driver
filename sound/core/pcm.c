@@ -270,25 +270,35 @@ static const char *snd_pcm_oss_format_name(int format)
 #ifdef CONFIG_PROC_FS
 static void snd_pcm_proc_info_read(snd_pcm_substream_t *substream, snd_info_buffer_t *buffer)
 {
-	snd_pcm_info_t info;
+	snd_pcm_info_t *info;
 	int err;
+
 	snd_runtime_check(substream, return);
-	err = snd_pcm_info(substream, &info);
-	if (err < 0) {
-		snd_iprintf(buffer, "error %d\n", err);
+
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	if (! info) {
+		printk(KERN_DEBUG "snd_pcm_proc_info_read: cannot malloc\n");
 		return;
 	}
-	snd_iprintf(buffer, "card: %d\n", info.card);
-	snd_iprintf(buffer, "device: %d\n", info.device);
-	snd_iprintf(buffer, "subdevice: %d\n", info.subdevice);
-	snd_iprintf(buffer, "stream: %s\n", snd_pcm_stream_name(info.stream));
-	snd_iprintf(buffer, "id: %s\n", info.id);
-	snd_iprintf(buffer, "name: %s\n", info.name);
-	snd_iprintf(buffer, "subname: %s\n", info.subname);
-	snd_iprintf(buffer, "class: %d\n", info.dev_class);
-	snd_iprintf(buffer, "subclass: %d\n", info.dev_subclass);
-	snd_iprintf(buffer, "subdevices_count: %d\n", info.subdevices_count);
-	snd_iprintf(buffer, "subdevices_avail: %d\n", info.subdevices_avail);
+
+	err = snd_pcm_info(substream, info);
+	if (err < 0) {
+		snd_iprintf(buffer, "error %d\n", err);
+		kfree(info);
+		return;
+	}
+	snd_iprintf(buffer, "card: %d\n", info->card);
+	snd_iprintf(buffer, "device: %d\n", info->device);
+	snd_iprintf(buffer, "subdevice: %d\n", info->subdevice);
+	snd_iprintf(buffer, "stream: %s\n", snd_pcm_stream_name(info->stream));
+	snd_iprintf(buffer, "id: %s\n", info->id);
+	snd_iprintf(buffer, "name: %s\n", info->name);
+	snd_iprintf(buffer, "subname: %s\n", info->subname);
+	snd_iprintf(buffer, "class: %d\n", info->dev_class);
+	snd_iprintf(buffer, "subclass: %d\n", info->dev_subclass);
+	snd_iprintf(buffer, "subdevices_count: %d\n", info->subdevices_count);
+	snd_iprintf(buffer, "subdevices_avail: %d\n", info->subdevices_avail);
+	kfree(info);
 }
 
 static void snd_pcm_stream_proc_info_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
@@ -441,6 +451,7 @@ static int snd_pcm_stream_proc_init(snd_pcm_str_t *pstr)
 		entry->c.text.read = snd_pcm_xrun_debug_read;
 		entry->c.text.write_size = 64;
 		entry->c.text.write = snd_pcm_xrun_debug_write;
+		entry->mode |= S_IWUSR;
 		entry->private_data = pstr;
 		if (snd_info_register(entry) < 0) {
 			snd_info_free_entry(entry);
@@ -1058,6 +1069,7 @@ EXPORT_SYMBOL(snd_pcm_format_little_endian);
 EXPORT_SYMBOL(snd_pcm_format_big_endian);
 EXPORT_SYMBOL(snd_pcm_format_width);
 EXPORT_SYMBOL(snd_pcm_format_physical_width);
+EXPORT_SYMBOL(snd_pcm_format_size);
 EXPORT_SYMBOL(snd_pcm_format_silence_64);
 EXPORT_SYMBOL(snd_pcm_format_set_silence);
 EXPORT_SYMBOL(snd_pcm_build_linear_format);

@@ -142,26 +142,35 @@ static int mixart_enum_connectors(mixart_mgr_t *mgr)
 	u32 k;
 	int err;
 	mixart_msg_t request;
-	mixart_enum_connector_resp_t connector;
-	mixart_audio_info_req_t  audio_info_req;
-	mixart_audio_info_resp_t audio_info;
+	mixart_enum_connector_resp_t *connector;
+	mixart_audio_info_req_t  *audio_info_req;
+	mixart_audio_info_resp_t *audio_info;
 
-	audio_info_req.line_max_level = MIXART_FLOAT_P_22_0_TO_HEX;
-	audio_info_req.micro_max_level = MIXART_FLOAT_M_20_0_TO_HEX;
-	audio_info_req.cd_max_level = MIXART_FLOAT____0_0_TO_HEX;
+	connector = kmalloc(sizeof(*connector), GFP_KERNEL);
+	audio_info_req = kmalloc(sizeof(*audio_info_req), GFP_KERNEL);
+	audio_info = kmalloc(sizeof(*audio_info), GFP_KERNEL);
+	if (! connector || ! audio_info_req || ! audio_info) {
+		err = -ENOMEM;
+		goto __error;
+	}
+
+	audio_info_req->line_max_level = MIXART_FLOAT_P_22_0_TO_HEX;
+	audio_info_req->micro_max_level = MIXART_FLOAT_M_20_0_TO_HEX;
+	audio_info_req->cd_max_level = MIXART_FLOAT____0_0_TO_HEX;
 
 	request.message_id = MSG_SYSTEM_ENUM_PLAY_CONNECTOR;
 	request.uid = (mixart_uid_t){0,0};  /* board num = 0 */
 	request.data = NULL;
 	request.size = 0;
 
-	err = snd_mixart_send_msg(mgr, &request, sizeof(connector), &connector);
-	if((err < 0) || (connector.error_code) || (connector.uid_count > MIXART_MAX_PHYS_CONNECTORS)) {
+	err = snd_mixart_send_msg(mgr, &request, sizeof(*connector), connector);
+	if((err < 0) || (connector->error_code) || (connector->uid_count > MIXART_MAX_PHYS_CONNECTORS)) {
 		snd_printk(KERN_ERR "error MSG_SYSTEM_ENUM_PLAY_CONNECTOR\n");
-		return -EINVAL;
+		err = -EINVAL;
+		goto __error;
 	}
 
-	for(k=0; k < connector.uid_count; k++) {
+	for(k=0; k < connector->uid_count; k++) {
 		mixart_pipe_t* pipe;
 
 		if(k < MIXART_FIRST_DIG_AUDIO_ID) {
@@ -170,25 +179,25 @@ static int mixart_enum_connectors(mixart_mgr_t *mgr)
 			pipe = &mgr->chip[(k-MIXART_FIRST_DIG_AUDIO_ID)/2]->pipe_out_dig;
 		}
 		if(k & 1) {
-			pipe->uid_right_connector = connector.uid[k];   /* odd */
+			pipe->uid_right_connector = connector->uid[k];   /* odd */
 		} else {
-			pipe->uid_left_connector = connector.uid[k];    /* even */
+			pipe->uid_left_connector = connector->uid[k];    /* even */
 		}
 
-		/* snd_printk(KERN_DEBUG "playback connector[%d].object_id = %x\n", k, connector.uid[k].object_id); */
+		/* snd_printk(KERN_DEBUG "playback connector[%d].object_id = %x\n", k, connector->uid[k].object_id); */
 
 		/* TODO: really need send_msg MSG_CONNECTOR_GET_AUDIO_INFO for each connector ? perhaps for analog level caps ? */
 		request.message_id = MSG_CONNECTOR_GET_AUDIO_INFO;
-		request.uid = connector.uid[k];
-		request.data = &audio_info_req;
-		request.size = sizeof(audio_info_req);
+		request.uid = connector->uid[k];
+		request.data = audio_info_req;
+		request.size = sizeof(*audio_info_req);
 
-		err = snd_mixart_send_msg(mgr, &request, sizeof(audio_info), &audio_info);
+		err = snd_mixart_send_msg(mgr, &request, sizeof(*audio_info), audio_info);
 		if( err < 0 ) {
 			snd_printk(KERN_ERR "error MSG_CONNECTOR_GET_AUDIO_INFO\n");
-			return err;
+			goto __error;
 		}
-		/*snd_printk(KERN_DEBUG "play  analog_info.analog_level_present = %x\n", audio_info.info.analog_info.analog_level_present);*/
+		/*snd_printk(KERN_DEBUG "play  analog_info.analog_level_present = %x\n", audio_info->info.analog_info.analog_level_present);*/
 	}
 
 	request.message_id = MSG_SYSTEM_ENUM_RECORD_CONNECTOR;
@@ -196,13 +205,14 @@ static int mixart_enum_connectors(mixart_mgr_t *mgr)
 	request.data = NULL;
 	request.size = 0;
 
-	err = snd_mixart_send_msg(mgr, &request, sizeof(connector), &connector);
-	if((err < 0) || (connector.error_code) || (connector.uid_count > MIXART_MAX_PHYS_CONNECTORS)) {
+	err = snd_mixart_send_msg(mgr, &request, sizeof(*connector), connector);
+	if((err < 0) || (connector->error_code) || (connector->uid_count > MIXART_MAX_PHYS_CONNECTORS)) {
 		snd_printk(KERN_ERR "error MSG_SYSTEM_ENUM_RECORD_CONNECTOR\n");
-		return -EINVAL;
+		err = -EINVAL;
+		goto __error;
 	}
 
-	for(k=0; k < connector.uid_count; k++) {
+	for(k=0; k < connector->uid_count; k++) {
 		mixart_pipe_t* pipe;
 
 		if(k < MIXART_FIRST_DIG_AUDIO_ID) {
@@ -211,28 +221,34 @@ static int mixart_enum_connectors(mixart_mgr_t *mgr)
 			pipe = &mgr->chip[(k-MIXART_FIRST_DIG_AUDIO_ID)/2]->pipe_in_dig;
 		}
 		if(k & 1) {
-			pipe->uid_right_connector = connector.uid[k];   /* odd */
+			pipe->uid_right_connector = connector->uid[k];   /* odd */
 		} else {
-			pipe->uid_left_connector = connector.uid[k];    /* even */
+			pipe->uid_left_connector = connector->uid[k];    /* even */
 		}
 
-		/* snd_printk(KERN_DEBUG "capture connector[%d].object_id = %x\n", k, connector.uid[k].object_id); */
+		/* snd_printk(KERN_DEBUG "capture connector[%d].object_id = %x\n", k, connector->uid[k].object_id); */
 
 		/* TODO: really need send_msg MSG_CONNECTOR_GET_AUDIO_INFO for each connector ? perhaps for analog level caps ? */
 		request.message_id = MSG_CONNECTOR_GET_AUDIO_INFO;
-		request.uid = connector.uid[k];
-		request.data = &audio_info_req;
-		request.size = sizeof(audio_info_req);
+		request.uid = connector->uid[k];
+		request.data = audio_info_req;
+		request.size = sizeof(*audio_info_req);
 
-		err = snd_mixart_send_msg(mgr, &request, sizeof(audio_info), &audio_info);
+		err = snd_mixart_send_msg(mgr, &request, sizeof(*audio_info), audio_info);
 		if( err < 0 ) {
 			snd_printk(KERN_ERR "error MSG_CONNECTOR_GET_AUDIO_INFO\n");
-			return err;
+			goto __error;
 		}
-		/*snd_printk(KERN_DEBUG "rec  analog_info.analog_level_present = %x\n", audio_info.info.analog_info.analog_level_present);*/
+		/*snd_printk(KERN_DEBUG "rec  analog_info.analog_level_present = %x\n", audio_info->info.analog_info.analog_level_present);*/
 	}
+	err = 0;
 
-	return 0;
+ __error:
+	kfree(connector);
+	kfree(audio_info_req);
+	kfree(audio_info);
+
+	return err;
 }
 
 static int mixart_enum_physio(mixart_mgr_t *mgr)
@@ -546,6 +562,7 @@ int snd_mixart_setup_firmware(mixart_mgr_t *mgr)
 		release_firmware(fw_entry);
 		if (err < 0)
 			return err;
+		mgr->dsp_loaded |= 1 << i;
 	}
 	return 0;
 }
@@ -573,7 +590,7 @@ static int mixart_hwdep_dsp_status(snd_hwdep_t *hw, snd_hwdep_dsp_status_t *info
 	strcpy(info->id, "miXart");
         info->num_dsps = MIXART_HARDW_FILES_MAX_INDEX;
 
-	if (mgr->hwdep->dsp_loaded & (1 <<  MIXART_MOTHERBOARD_ELF_INDEX))
+	if (mgr->dsp_loaded & (1 <<  MIXART_MOTHERBOARD_ELF_INDEX))
 		info->chip_ready = 1;
 
 	info->version = MIXART_DRIVER_VERSION;
@@ -599,6 +616,9 @@ static int mixart_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 	}
 	err = mixart_dsp_load(mgr, dsp->index, &fw);
 	vfree(fw.data);
+	if (err < 0)
+		return err;
+	mgr->dsp_loaded |= 1 << dsp->index;
 	return err;
 }
 
@@ -619,8 +639,7 @@ int snd_mixart_setup_firmware(mixart_mgr_t *mgr)
 	hw->ops.dsp_load = mixart_hwdep_dsp_load;
 	hw->exclusive = 1;
 	sprintf(hw->name,  SND_MIXART_HWDEP_ID);
-	mgr->hwdep = hw;
-	mgr->hwdep->dsp_loaded = 0;
+	mgr->dsp_loaded = 0;
 
 	return snd_card_register(mgr->chip[0]->card);
 }

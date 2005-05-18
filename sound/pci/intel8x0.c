@@ -124,6 +124,9 @@ MODULE_PARM_DESC(xbox, "Set to 1 for Xbox, if you have problems with the AC'97 c
 #ifndef PCI_DEVICE_ID_INTEL_ICH7_20
 #define PCI_DEVICE_ID_INTEL_ICH7_20	0x27de
 #endif
+#ifndef PCI_DEVICE_ID_INTEL_ESB2_14
+#define PCI_DEVICE_ID_INTEL_ESB2_14	0x2698
+#endif
 #ifndef PCI_DEVICE_ID_SI_7012
 #define PCI_DEVICE_ID_SI_7012		0x7012
 #endif
@@ -2736,6 +2739,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_INTEL_ESB_5, "Intel 6300ESB" },
 	{ PCI_DEVICE_ID_INTEL_ICH6_18, "Intel ICH6" },
 	{ PCI_DEVICE_ID_INTEL_ICH7_20, "Intel ICH7" },
+	{ PCI_DEVICE_ID_INTEL_ESB2_14, "Intel ESB2" },
 	{ PCI_DEVICE_ID_SI_7012, "SiS SI7012" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia nForce" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO, "NVidia nForce2" },
@@ -2843,7 +2847,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_intel8x0_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_intel8x0_exit(void)

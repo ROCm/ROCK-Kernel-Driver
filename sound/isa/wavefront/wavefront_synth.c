@@ -1201,7 +1201,11 @@ wavefront_send_multisample (snd_wavefront_t *dev, wavefront_patch_info *header)
 {
 	int i;
 	int num_samples;
-	unsigned char msample_hdr[WF_MSAMPLE_BYTES];
+	unsigned char *msample_hdr;
+
+	msample_hdr = kmalloc(sizeof(WF_MSAMPLE_BYTES), GFP_KERNEL);
+	if (! msample_hdr)
+		return -ENOMEM;
 
 	munge_int32 (header->number, &msample_hdr[0], 2);
 
@@ -1234,11 +1238,13 @@ wavefront_send_multisample (snd_wavefront_t *dev, wavefront_patch_info *header)
 			   (unsigned char *) (long) ((num_samples*2)+3),
 			   msample_hdr)) {
 		snd_printk ("download of multisample failed.\n");
+		kfree(msample_hdr);
 		return -(EIO);
 	}
 
 	dev->sample_status[header->number] = (WF_SLOT_FILLED|WF_ST_MULTISAMPLE);
 
+	kfree(msample_hdr);
 	return (0);
 }
 
@@ -1356,78 +1362,103 @@ wavefront_find_free_patch (snd_wavefront_t *dev)
 
 static int
 wavefront_load_patch (snd_wavefront_t *dev, const char __user *addr)
-
 {
-	wavefront_patch_info header;
+	wavefront_patch_info *header;
+	int err;
 	
-	if (copy_from_user (&header, addr, sizeof(wavefront_patch_info) -
+	header = kmalloc(sizeof(*header), GFP_KERNEL);
+	if (! header)
+		return -ENOMEM;
+
+	if (copy_from_user (header, addr, sizeof(wavefront_patch_info) -
 			    sizeof(wavefront_any))) {
 		snd_printk ("bad address for load patch.\n");
-		return -(EFAULT);
+		err = -EFAULT;
+		goto __error;
 	}
 
 	DPRINT (WF_DEBUG_LOAD_PATCH, "download "
 				      "Sample type: %d "
 				      "Sample number: %d "
 				      "Sample size: %d\n",
-				      header.subkey,
-				      header.number,
-				      header.size);
+				      header->subkey,
+				      header->number,
+				      header->size);
 
-	switch (header.subkey) {
+	switch (header->subkey) {
 	case WF_ST_SAMPLE:  /* sample or sample_header, based on patch->size */
 
-		if (copy_from_user (&header.hdr.s, header.hdrptr,
-				    sizeof (wavefront_sample)))
-			return -EFAULT;
+		if (copy_from_user (&header->hdr.s, header->hdrptr,
+				    sizeof (wavefront_sample))) {
+			err = -EFAULT;
+			break;
+		}
 
-		return wavefront_send_sample (dev, &header, header.dataptr, 0);
+		err = wavefront_send_sample (dev, header, header->dataptr, 0);
+		break;
 
 	case WF_ST_MULTISAMPLE:
 
-		if (copy_from_user (&header.hdr.s, header.hdrptr,
-				    sizeof (wavefront_multisample)))
-			return -EFAULT;
+		if (copy_from_user (&header->hdr.s, header->hdrptr,
+				    sizeof (wavefront_multisample))) {
+			err = -EFAULT;
+			break;
+		}
 
-		return wavefront_send_multisample (dev, &header);
-
+		err = wavefront_send_multisample (dev, header);
+		break;
 
 	case WF_ST_ALIAS:
 
-		if (copy_from_user (&header.hdr.a, header.hdrptr,
-				    sizeof (wavefront_alias)))
-			return -EFAULT;
+		if (copy_from_user (&header->hdr.a, header->hdrptr,
+				    sizeof (wavefront_alias))) {
+			err = -EFAULT;
+			break;
+		}
 
-		return wavefront_send_alias (dev, &header);
+		err = wavefront_send_alias (dev, header);
+		break;
 
 	case WF_ST_DRUM:
-		if (copy_from_user (&header.hdr.d, header.hdrptr,
-				    sizeof (wavefront_drum)))
-			return -EFAULT;
+		if (copy_from_user (&header->hdr.d, header->hdrptr,
+				    sizeof (wavefront_drum))) {
+			err = -EFAULT;
+			break;
+		}
 
-		return wavefront_send_drum (dev, &header);
+		err = wavefront_send_drum (dev, header);
+		break;
 
 	case WF_ST_PATCH:
-		if (copy_from_user (&header.hdr.p, header.hdrptr,
-				    sizeof (wavefront_patch)))
-			return -EFAULT;
-
-		return wavefront_send_patch (dev, &header);
+		if (copy_from_user (&header->hdr.p, header->hdrptr,
+				    sizeof (wavefront_patch))) {
+			err = -EFAULT;
+			break;
+		}
+		
+		err = wavefront_send_patch (dev, header);
+		break;
 
 	case WF_ST_PROGRAM:
-		if (copy_from_user (&header.hdr.pr, header.hdrptr,
-				    sizeof (wavefront_program)))
-			return -EFAULT;
+		if (copy_from_user (&header->hdr.pr, header->hdrptr,
+				    sizeof (wavefront_program))) {
+			err = -EFAULT;
+			break;
+		}
 
-		return wavefront_send_program (dev, &header);
+		err = wavefront_send_program (dev, header);
+		break;
 
 	default:
 		snd_printk ("unknown patch type %d.\n",
-			    header.subkey);
-		return -(EINVAL);
+			    header->subkey);
+		err = -EINVAL;
+		break;
 	}
 
-	return 0;
+ __error:
+	kfree(header);
+	return err;
 }
 
 /***********************************************************************
@@ -1620,8 +1651,9 @@ snd_wavefront_synth_ioctl (snd_hwdep_t *hw, struct file *file,
 	snd_card_t *card;
 	snd_wavefront_t *dev;
 	snd_wavefront_card_t *acard;
-	wavefront_control wc;
+	wavefront_control *wc;
 	void __user *argp = (void __user *)arg;
+	int err;
 
 	card = (snd_card_t *) hw->card;
 
@@ -1640,14 +1672,19 @@ snd_wavefront_synth_ioctl (snd_hwdep_t *hw, struct file *file,
 		break;
 
 	case WFCTL_WFCMD:
-		if (copy_from_user (&wc, argp, sizeof (wc)))
-			return -EFAULT;
-		if (wavefront_synth_control (acard, &wc) < 0) {
-			return -EIO;
-		}
-		if (copy_to_user (argp, &wc, sizeof (wc)))
-			return -EFAULT;
-		break;
+		wc = kmalloc(sizeof(*wc), GFP_KERNEL);
+		if (! wc)
+			return -ENOMEM;
+		if (copy_from_user (wc, argp, sizeof (*wc)))
+			err = -EFAULT;
+		else if (wavefront_synth_control (acard, wc) < 0)
+			err = -EIO;
+		else if (copy_to_user (argp, wc, sizeof (*wc)))
+			err = -EFAULT;
+		else
+			err = 0;
+		kfree(wc);
+		return err;
 
 	default:
 		return -EINVAL;

@@ -289,8 +289,8 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 {
 	seq_midisynth_client_t *client;
 	seq_midisynth_t *msynth, *ms;
-	snd_seq_port_info_t port;
-	snd_rawmidi_info_t info;
+	snd_seq_port_info_t *port;
+	snd_rawmidi_info_t *info;
 	int newclient = 0;
 	unsigned int p, ports;
 	snd_seq_client_callback_t callbacks;
@@ -300,20 +300,25 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 	unsigned int input_count = 0, output_count = 0;
 
 	snd_assert(card != NULL && device >= 0 && device < SNDRV_RAWMIDI_DEVICES, return -EINVAL);
-	info.device = device;
-	info.stream = SNDRV_RAWMIDI_STREAM_OUTPUT;
-	info.subdevice = 0;
-	if (snd_rawmidi_info_select(card, &info) >= 0)
-		output_count = info.subdevices_count;
-	info.stream = SNDRV_RAWMIDI_STREAM_INPUT;
-	if (snd_rawmidi_info_select(card, &info) >= 0) {
-		input_count = info.subdevices_count;
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	if (! info)
+		return -ENOMEM;
+	info->device = device;
+	info->stream = SNDRV_RAWMIDI_STREAM_OUTPUT;
+	info->subdevice = 0;
+	if (snd_rawmidi_info_select(card, info) >= 0)
+		output_count = info->subdevices_count;
+	info->stream = SNDRV_RAWMIDI_STREAM_INPUT;
+	if (snd_rawmidi_info_select(card, info) >= 0) {
+		input_count = info->subdevices_count;
 	}
 	ports = output_count;
 	if (ports < input_count)
 		ports = input_count;
-	if (ports == 0)
+	if (ports == 0) {
+		kfree(info);
 		return -ENODEV;
+	}
 	if (ports > (256 / SNDRV_RAWMIDI_DEVICES))
 		ports = 256 / SNDRV_RAWMIDI_DEVICES;
 
@@ -324,6 +329,7 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 		client = kcalloc(1, sizeof(*client), GFP_KERNEL);
 		if (client == NULL) {
 			up(&register_mutex);
+			kfree(info);
 			return -ENOMEM;
 		}
 		memset(&callbacks, 0, sizeof(callbacks));
@@ -333,14 +339,16 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 		if (client->seq_client < 0) {
 			kfree(client);
 			up(&register_mutex);
+			kfree(info);
 			return -ENOMEM;
 		}
-		set_client_name(client, card, &info);
+		set_client_name(client, card, info);
 	} else if (device == 0)
-		set_client_name(client, card, &info); /* use the first device's name */
+		set_client_name(client, card, info); /* use the first device's name */
 
 	msynth = kcalloc(ports, sizeof(seq_midisynth_t), GFP_KERNEL);
-	if (msynth == NULL)
+	port = kmalloc(sizeof(*port), GFP_KERNEL);
+	if (msynth == NULL || port == NULL)
 		goto __nomem;
 
 	for (p = 0; p < ports; p++) {
@@ -350,42 +358,42 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 			goto __nomem;
 
 		/* declare port */
-		memset(&port, 0, sizeof(port));
-		port.addr.client = client->seq_client;
-		port.addr.port = device * (256 / SNDRV_RAWMIDI_DEVICES) + p;
-		port.flags = SNDRV_SEQ_PORT_FLG_GIVEN_PORT;
-		memset(&info, 0, sizeof(info));
-		info.device = device;
+		memset(port, 0, sizeof(*port));
+		port->addr.client = client->seq_client;
+		port->addr.port = device * (256 / SNDRV_RAWMIDI_DEVICES) + p;
+		port->flags = SNDRV_SEQ_PORT_FLG_GIVEN_PORT;
+		memset(info, 0, sizeof(*info));
+		info->device = device;
 		if (p < output_count)
-			info.stream = SNDRV_RAWMIDI_STREAM_OUTPUT;
+			info->stream = SNDRV_RAWMIDI_STREAM_OUTPUT;
 		else
-			info.stream = SNDRV_RAWMIDI_STREAM_INPUT;
-		info.subdevice = p;
-		if (snd_rawmidi_info_select(card, &info) >= 0)
-			strcpy(port.name, info.subname);
-		if (! port.name[0]) {
-			if (info.name[0]) {
+			info->stream = SNDRV_RAWMIDI_STREAM_INPUT;
+		info->subdevice = p;
+		if (snd_rawmidi_info_select(card, info) >= 0)
+			strcpy(port->name, info->subname);
+		if (! port->name[0]) {
+			if (info->name[0]) {
 				if (ports > 1)
-					snprintf(port.name, sizeof(port.name), "%s-%d", info.name, p);
+					snprintf(port->name, sizeof(port->name), "%s-%d", info->name, p);
 				else
-					snprintf(port.name, sizeof(port.name), "%s", info.name);
+					snprintf(port->name, sizeof(port->name), "%s", info->name);
 			} else {
 				/* last resort */
 				if (ports > 1)
-					sprintf(port.name, "MIDI %d-%d-%d", card->number, device, p);
+					sprintf(port->name, "MIDI %d-%d-%d", card->number, device, p);
 				else
-					sprintf(port.name, "MIDI %d-%d", card->number, device);
+					sprintf(port->name, "MIDI %d-%d", card->number, device);
 			}
 		}
-		if ((info.flags & SNDRV_RAWMIDI_INFO_OUTPUT) && p < output_count)
-			port.capability |= SNDRV_SEQ_PORT_CAP_WRITE | SNDRV_SEQ_PORT_CAP_SYNC_WRITE | SNDRV_SEQ_PORT_CAP_SUBS_WRITE;
-		if ((info.flags & SNDRV_RAWMIDI_INFO_INPUT) && p < input_count)
-			port.capability |= SNDRV_SEQ_PORT_CAP_READ | SNDRV_SEQ_PORT_CAP_SYNC_READ | SNDRV_SEQ_PORT_CAP_SUBS_READ;
-		if ((port.capability & (SNDRV_SEQ_PORT_CAP_WRITE|SNDRV_SEQ_PORT_CAP_READ)) == (SNDRV_SEQ_PORT_CAP_WRITE|SNDRV_SEQ_PORT_CAP_READ) &&
-		    info.flags & SNDRV_RAWMIDI_INFO_DUPLEX)
-			port.capability |= SNDRV_SEQ_PORT_CAP_DUPLEX;
-		port.type = SNDRV_SEQ_PORT_TYPE_MIDI_GENERIC;
-		port.midi_channels = 16;
+		if ((info->flags & SNDRV_RAWMIDI_INFO_OUTPUT) && p < output_count)
+			port->capability |= SNDRV_SEQ_PORT_CAP_WRITE | SNDRV_SEQ_PORT_CAP_SYNC_WRITE | SNDRV_SEQ_PORT_CAP_SUBS_WRITE;
+		if ((info->flags & SNDRV_RAWMIDI_INFO_INPUT) && p < input_count)
+			port->capability |= SNDRV_SEQ_PORT_CAP_READ | SNDRV_SEQ_PORT_CAP_SYNC_READ | SNDRV_SEQ_PORT_CAP_SUBS_READ;
+		if ((port->capability & (SNDRV_SEQ_PORT_CAP_WRITE|SNDRV_SEQ_PORT_CAP_READ)) == (SNDRV_SEQ_PORT_CAP_WRITE|SNDRV_SEQ_PORT_CAP_READ) &&
+		    info->flags & SNDRV_RAWMIDI_INFO_DUPLEX)
+			port->capability |= SNDRV_SEQ_PORT_CAP_DUPLEX;
+		port->type = SNDRV_SEQ_PORT_TYPE_MIDI_GENERIC;
+		port->midi_channels = 16;
 		memset(&pcallbacks, 0, sizeof(pcallbacks));
 		pcallbacks.owner = THIS_MODULE;
 		pcallbacks.private_data = ms;
@@ -394,11 +402,11 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 		pcallbacks.use = midisynth_use;
 		pcallbacks.unuse = midisynth_unuse;
 		pcallbacks.event_input = event_process_midi;
-		port.kernel = &pcallbacks;
-		if (snd_seq_kernel_client_ctl(client->seq_client, SNDRV_SEQ_IOCTL_CREATE_PORT, &port)<0)
+		port->kernel = &pcallbacks;
+		if (snd_seq_kernel_client_ctl(client->seq_client, SNDRV_SEQ_IOCTL_CREATE_PORT, port)<0)
 			goto __nomem;
 		ms->seq_client = client->seq_client;
-		ms->seq_port = port.addr.port;
+		ms->seq_port = port->addr.port;
 	}
 	client->ports_per_device[device] = ports;
 	client->ports[device] = msynth;
@@ -406,6 +414,8 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 	if (newclient)
 		synths[card->number] = client;
 	up(&register_mutex);
+	kfree(info);
+	kfree(port);
 	return 0;	/* success */
 
       __nomem:
@@ -418,6 +428,8 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 		snd_seq_delete_kernel_client(client->seq_client);
 		kfree(client);
 	}
+	kfree(info);
+	kfree(port);
 	up(&register_mutex);
 	return -ENOMEM;
 }

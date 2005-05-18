@@ -138,7 +138,15 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 	if ((err = snd_emu10k1_pcm_efx(emu, 2, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
-	}		
+	}
+	/* This stores the periods table. */
+	if (emu->audigy && emu->revision == 4) { /* P16V */	
+		if(snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci), 1024, &emu->p16v_buffer) < 0) {
+			snd_p16v_free(emu);
+			return -ENOMEM;
+		}
+	}
+
 	if ((err = snd_emu10k1_mixer(emu)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -152,8 +160,13 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 	if ((err = snd_emu10k1_pcm_multi(emu, 3, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
-	}		
-
+	}
+	if (emu->audigy && emu->revision == 4) { /* P16V */	
+		if ((err = snd_p16v_pcm(emu, 4, NULL)) < 0) {
+			snd_card_free(card);
+			return err;
+		}
+	}
 	if (emu->audigy) {
 		if ((err = snd_emu10k1_audigy_midi(emu)) < 0) {
 			snd_card_free(card);
@@ -185,23 +198,11 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 	}
 #endif
  
-	if (emu->audigy && (emu->serial == 0x10011102) ) {
-		strcpy(card->driver, "Audigy2");
-		strcpy(card->shortname, "Sound Blaster Audigy2_Value");
-	} else if (emu->audigy && (emu->revision == 4) ) {
-		strcpy(card->driver, "Audigy2");
-		strcpy(card->shortname, "Sound Blaster Audigy2");
-	} else if (emu->audigy) {
-		strcpy(card->driver, "Audigy");
-		strcpy(card->shortname, "Sound Blaster Audigy");
-	} else if (emu->APS) {
-		strcpy(card->driver, "E-mu APS");
-		strcpy(card->shortname, "E-mu APS");
-	} else {
-		strcpy(card->driver, "EMU10K1");
-		strcpy(card->shortname, "Sound Blaster Live!");
-	}
-	sprintf(card->longname, "%s (rev.%d, serial:0x%x) at 0x%lx, irq %i", card->shortname, emu->revision, emu->serial, emu->port, emu->irq);
+	strcpy(card->driver, emu->card_capabilities->driver);
+	strcpy(card->shortname, emu->card_capabilities->name);
+	snprintf(card->longname, sizeof(card->longname),
+		 "%s (rev.%d, serial:0x%x) at 0x%lx, irq %i",
+		 card->shortname, emu->revision, emu->serial, emu->port, emu->irq);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
@@ -227,7 +228,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_emu10k1_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_emu10k1_exit(void)

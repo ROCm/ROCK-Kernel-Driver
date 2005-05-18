@@ -73,26 +73,27 @@ static int send_midi_event(seq_oss_devinfo_t *dp, snd_seq_event_t *ev, seq_oss_m
 int __init
 snd_seq_oss_midi_lookup_ports(int client)
 {
-	snd_seq_system_info_t sysinfo;
-	snd_seq_client_info_t clinfo;
-	snd_seq_port_info_t pinfo;
-	int rc;
+	snd_seq_client_info_t *clinfo;
+	snd_seq_port_info_t *pinfo;
 
-	rc = snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_SYSTEM_INFO, &sysinfo);
-	if (rc < 0)
-		return rc;
-	
-	memset(&clinfo, 0, sizeof(clinfo));
-	memset(&pinfo, 0, sizeof(pinfo));
-	clinfo.client = -1;
-	while (snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_QUERY_NEXT_CLIENT, &clinfo) == 0) {
-		if (clinfo.client == client)
-			continue; /* ignore myself */
-		pinfo.addr.client = clinfo.client;
-		pinfo.addr.port = -1;
-		while (snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_QUERY_NEXT_PORT, &pinfo) == 0)
-			snd_seq_oss_midi_check_new_port(&pinfo);
+	clinfo = kcalloc(1, sizeof(*clinfo), GFP_KERNEL);
+	pinfo = kcalloc(1, sizeof(*pinfo), GFP_KERNEL);
+	if (! clinfo || ! pinfo) {
+		kfree(clinfo);
+		kfree(pinfo);
+		return -ENOMEM;
 	}
+	clinfo->client = -1;
+	while (snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_QUERY_NEXT_CLIENT, clinfo) == 0) {
+		if (clinfo->client == client)
+			continue; /* ignore myself */
+		pinfo->addr.client = clinfo->client;
+		pinfo->addr.port = -1;
+		while (snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_QUERY_NEXT_PORT, pinfo) == 0)
+			snd_seq_oss_midi_check_new_port(pinfo);
+	}
+	kfree(clinfo);
+	kfree(pinfo);
 	return 0;
 }
 

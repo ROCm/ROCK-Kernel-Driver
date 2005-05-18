@@ -292,18 +292,17 @@ static void snd_uart16550_io_loop(snd_uart16550_t * uart)
  */
 static irqreturn_t snd_uart16550_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	unsigned long flags;
 	snd_uart16550_t *uart;
 
 	uart = (snd_uart16550_t *) dev_id;
-	spin_lock_irqsave(&uart->open_lock, flags);
+	spin_lock(&uart->open_lock);
 	if (uart->filemode == SERIAL_MODE_NOT_OPENED) {
-		spin_unlock_irqrestore(&uart->open_lock, flags);
+		spin_unlock(&uart->open_lock);
 		return IRQ_NONE;
 	}
 	inb(uart->base + UART_IIR);		/* indicate to the UART that the interrupt has been serviced */
 	snd_uart16550_io_loop(uart);
-	spin_unlock_irqrestore(&uart->open_lock, flags);
+	spin_unlock(&uart->open_lock);
 	return IRQ_HANDLED;
 }
 

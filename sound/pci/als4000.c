@@ -601,9 +601,9 @@ static int __devinit snd_als4000_create_gameport(snd_card_als4000_t *acard, int 
 
 	gameport_set_name(gp, "ALS4000 Gameport");
 	gameport_set_phys(gp, "pci%s/gameport0", pci_name(acard->pci));
-	gp->dev.parent = &acard->pci->dev;
+	gameport_set_dev_parent(gp, &acard->pci->dev);
 	gp->io = io_port;
-	gp->port_data = r;
+	gameport_set_port_data(gp, r);
 
 	/* Enable legacy joystick port */
 	snd_als4000_set_addr(acard->gcr, 0, 0, 0, 1);
@@ -616,7 +616,7 @@ static int __devinit snd_als4000_create_gameport(snd_card_als4000_t *acard, int 
 static void snd_als4000_free_gameport(snd_card_als4000_t *acard)
 {
 	if (acard->gameport) {
-		struct resource *r = acard->gameport->port_data;
+		struct resource *r = gameport_get_port_data(acard->gameport);
 
 		gameport_unregister_port(acard->gameport);
 		acard->gameport = NULL;
@@ -777,7 +777,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_als4000_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_als4000_exit(void)

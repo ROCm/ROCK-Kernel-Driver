@@ -44,20 +44,20 @@
 
 static unsigned char vortex_game_read(struct gameport *gameport)
 {
-	vortex_t *vortex = gameport->port_data;
+	vortex_t *vortex = gameport_get_port_data(gameport);
 	return hwread(vortex->mmio, VORTEX_GAME_LEGACY);
 }
 
 static void vortex_game_trigger(struct gameport *gameport)
 {
-	vortex_t *vortex = gameport->port_data;
+	vortex_t *vortex = gameport_get_port_data(gameport);
 	hwwrite(vortex->mmio, VORTEX_GAME_LEGACY, 0xff);
 }
 
 static int
 vortex_game_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-	vortex_t *vortex = gameport->port_data;
+	vortex_t *vortex = gameport_get_port_data(gameport);
 	int i;
 
 	*buttons = (~hwread(vortex->mmio, VORTEX_GAME_LEGACY) >> 4) & 0xf;
@@ -73,7 +73,7 @@ vortex_game_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 
 static int vortex_game_open(struct gameport *gameport, int mode)
 {
-	vortex_t *vortex = gameport->port_data;
+	vortex_t *vortex = gameport_get_port_data(gameport);
 
 	switch (mode) {
 	case GAMEPORT_MODE_COOKED:
@@ -94,40 +94,42 @@ static int vortex_game_open(struct gameport *gameport, int mode)
 	return 0;
 }
 
-static int vortex_gameport_register(vortex_t * vortex)
+static int __devinit vortex_gameport_register(vortex_t * vortex)
 {
-	if ((vortex->gameport = kcalloc(1, sizeof(struct gameport), GFP_KERNEL)) == NULL) {
-		return -1;
+	struct gameport *gp;
+
+	vortex->gameport = gp = gameport_allocate_port();
+	if (!gp) {
+		printk(KERN_ERR "vortex: cannot allocate memory for gameport\n");
+		return -ENOMEM;
 	};
-	
-	vortex->gameport->port_data = vortex;
-	vortex->gameport->fuzz = 64;
 
-	vortex->gameport->read = vortex_game_read;
-	vortex->gameport->trigger = vortex_game_trigger;
-	vortex->gameport->cooked_read = vortex_game_cooked_read;
-	vortex->gameport->open = vortex_game_open;
+	gameport_set_name(gp, "AU88x0 Gameport");
+	gameport_set_phys(gp, "pci%s/gameport0", pci_name(vortex->pci_dev));
+	gameport_set_dev_parent(gp, &vortex->pci_dev->dev);
 
-	gameport_register_port((struct gameport *)vortex->gameport);
+	gp->read = vortex_game_read;
+	gp->trigger = vortex_game_trigger;
+	gp->cooked_read = vortex_game_cooked_read;
+	gp->open = vortex_game_open;
 
-/*	printk(KERN_INFO "gameport%d: %s at speed %d kHz\n",
-		vortex->gameport->number, vortex->pci_dev->name, vortex->gameport->speed);
-*/
+	gameport_set_port_data(gp, vortex);
+	gp->fuzz = 64;
+
+	gameport_register_port(gp);
+
 	return 0;
 }
 
-static int vortex_gameport_unregister(vortex_t * vortex)
+static void vortex_gameport_unregister(vortex_t * vortex)
 {
-	if (vortex->gameport != NULL) {
+	if (vortex->gameport) {
 		gameport_unregister_port(vortex->gameport);
-		kfree(vortex->gameport);
+		vortex->gameport = NULL;
 	}
-	return 0;
 }
 
 #else
-
-static inline int vortex_gameport_register(vortex_t * vortex) { return 0; }
-static inline int vortex_gameport_unregister(vortex_t * vortex) { return 0; }
-
+static inline int vortex_gameport_register(vortex_t * vortex) { return -ENOSYS; }
+static inline void vortex_gameport_unregister(vortex_t * vortex) { }
 #endif

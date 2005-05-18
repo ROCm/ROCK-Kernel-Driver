@@ -101,7 +101,7 @@ MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
 module_param_array(ac97_quirk, charp, NULL, 0444);
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
 module_param_array(dxs_support, int, NULL, 0444);
-MODULE_PARM_DESC(dxs_support, "Support for DXS channels (0 = auto, 1 = enable, 2 = disable, 3 = 48k only, 4 = no VRA)");
+MODULE_PARM_DESC(dxs_support, "Support for DXS channels (0 = auto, 1 = enable, 2 = disable, 3 = 48k only, 4 = no VRA, 5 = enable any sample rate)");
 
 
 /* pci ids */
@@ -302,6 +302,7 @@ DEFINE_VIA_REGSET(CAPTURE_8233, 0x60);
 #define VIA_DXS_DISABLE	2
 #define VIA_DXS_48K	3
 #define VIA_DXS_NO_VRA	4
+#define VIA_DXS_SRC	5
 
 
 /*
@@ -380,6 +381,7 @@ struct _snd_via82xx {
 	struct via_rate_lock rates[2]; /* playback and capture */
 	unsigned int dxs_fixed: 1;	/* DXS channel accepts only 48kHz */
 	unsigned int no_vra: 1;		/* no need to set VRA on DXS channels */
+	unsigned int dxs_src: 1;	/* use full SRC capabilities of DXS */
 	unsigned int spdif_on: 1;	/* only spdif rates work to external DACs */
 
 	snd_pcm_t *pcms[2];
@@ -924,15 +926,17 @@ static int snd_via8233_playback_prepare(snd_pcm_substream_t *substream)
 	via82xx_t *chip = snd_pcm_substream_chip(substream);
 	viadev_t *viadev = (viadev_t *)substream->runtime->private_data;
 	snd_pcm_runtime_t *runtime = substream->runtime;
+	int ac97_rate = chip->dxs_src ? 48000 : runtime->rate;
 	int rate_changed;
 	u32 rbits;
 
-	if ((rate_changed = via_lock_rate(&chip->rates[0], runtime->rate)) < 0)
+	if ((rate_changed = via_lock_rate(&chip->rates[0], ac97_rate)) < 0)
 		return rate_changed;
 	if (rate_changed) {
 		snd_ac97_set_rate(chip->ac97, AC97_PCM_FRONT_DAC_RATE,
 				  chip->no_vra ? 48000 : runtime->rate);
-		snd_ac97_set_rate(chip->ac97, AC97_SPDIF, runtime->rate);
+		snd_ac97_set_rate(chip->ac97, AC97_SPDIF,
+				  chip->no_vra ? 48000 : runtime->rate);
 	}
 	if (runtime->rate == 48000)
 		rbits = 0xfffff;
@@ -1074,6 +1078,12 @@ static int snd_via82xx_pcm_open(via82xx_t *chip, viadev_t *viadev, snd_pcm_subst
 		/* fixed DXS playback rate */
 		runtime->hw.rates = SNDRV_PCM_RATE_48000;
 		runtime->hw.rate_min = runtime->hw.rate_max = 48000;
+	} else if (chip->dxs_src && viadev->reg_offset < 0x40) {
+		/* use full SRC capabilities of DXS */
+		runtime->hw.rates = (SNDRV_PCM_RATE_CONTINUOUS |
+				     SNDRV_PCM_RATE_8000_48000);
+		runtime->hw.rate_min = 8000;
+		runtime->hw.rate_max = 48000;
 	} else if (! ratep->rate) {
 		int idx = viadev->direction ? AC97_RATES_ADC : AC97_RATES_FRONT_DAC;
 		runtime->hw.rates = chip->ac97->rates[idx];
@@ -1660,9 +1670,9 @@ static int __devinit snd_via686_create_gameport(via82xx_t *chip, int dev, unsign
 
 	gameport_set_name(gp, "VIA686 Gameport");
 	gameport_set_phys(gp, "pci%s/gameport0", pci_name(chip->pci));
-	gp->dev.parent = &chip->pci->dev;
+	gameport_set_dev_parent(gp, &chip->pci->dev);
 	gp->io = JOYSTICK_ADDR;
-	gp->port_data = r;
+	gameport_set_port_data(gp, r);
 
 	/* Enable legacy joystick port */
 	*legacy |= VIA_FUNC_ENABLE_GAME;
@@ -1676,7 +1686,7 @@ static int __devinit snd_via686_create_gameport(via82xx_t *chip, int dev, unsign
 static void snd_via686_free_gameport(via82xx_t *chip)
 {
 	if (chip->gameport) {
-		struct resource *r = chip->gameport->port_data;
+		struct resource *r = gameport_get_port_data(chip->gameport);
 
 		gameport_unregister_port(chip->gameport);
 		chip->gameport = NULL;
@@ -1838,13 +1848,9 @@ static void __devinit snd_via82xx_proc_init(via82xx_t *chip)
 
 static int __devinit snd_via82xx_chip_init(via82xx_t *chip)
 {
-	ac97_t ac97;
 	unsigned int val;
 	int max_count;
 	unsigned char pval;
-
-	memset(&ac97, 0, sizeof(ac97));
-	ac97.private_data = chip;
 
 #if 0 /* broken on K7M? */
 	if (chip->chip_type == TYPE_VIA686)
@@ -1896,11 +1902,6 @@ static int __devinit snd_via82xx_chip_init(via82xx_t *chip)
 
 	if ((val = snd_via82xx_codec_xread(chip)) & VIA_REG_AC97_BUSY)
 		snd_printk("AC'97 codec is not ready [0x%x]\n", val);
-
-	/* and then reset codec.. */
-	snd_via82xx_codec_ready(chip, 0);
-	snd_via82xx_codec_write(&ac97, AC97_RESET, 0x0000);
-	snd_via82xx_codec_read(&ac97, 0);
 
 #if 0 /* FIXME: we don't support the second codec yet so skip the detection now.. */
 	snd_via82xx_codec_xwrite(chip, VIA_REG_AC97_READ |
@@ -2158,14 +2159,17 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1043, .device = 0x8095, .action = VIA_DXS_NO_VRA }, /* ASUS A7V8X (FIXME: possibly VIA_DXS_ENABLE?)*/
 		{ .vendor = 0x1043, .device = 0x80a1, .action = VIA_DXS_NO_VRA }, /* ASUS A7V8-X */
 		{ .vendor = 0x1043, .device = 0x80b0, .action = VIA_DXS_NO_VRA }, /* ASUS A7V600 & K8V*/ 
+		{ .vendor = 0x1043, .device = 0x812a, .action = VIA_DXS_SRC    }, /* ASUS A8V Deluxe */ 
 		{ .vendor = 0x1071, .device = 0x8375, .action = VIA_DXS_NO_VRA }, /* Vobis/Yakumo/Mitac notebook */
 		{ .vendor = 0x10cf, .device = 0x118e, .action = VIA_DXS_ENABLE }, /* FSC laptop */
 		{ .vendor = 0x1106, .device = 0x4161, .action = VIA_DXS_NO_VRA }, /* ASRock K7VT2 */
 		{ .vendor = 0x1106, .device = 0x4552, .action = VIA_DXS_NO_VRA }, /* QDI Kudoz 7X/600-6AL */
 		{ .vendor = 0x1106, .device = 0xaa01, .action = VIA_DXS_NO_VRA }, /* EPIA MII */
+		{ .vendor = 0x1106, .device = 0xc001, .action = VIA_DXS_SRC }, /* Insight P4-ITX */
 		{ .vendor = 0x1297, .device = 0xa232, .action = VIA_DXS_ENABLE }, /* Shuttle ?? */
 		{ .vendor = 0x1297, .device = 0xc160, .action = VIA_DXS_ENABLE }, /* Shuttle SK41G */
 		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAXP */
+		{ .vendor = 0x1462, .device = 0x0080, .action = VIA_DXS_SRC }, /* MSI K8T Neo-FIS2R */
 		{ .vendor = 0x1462, .device = 0x3800, .action = VIA_DXS_ENABLE }, /* MSI KT266 */
 		{ .vendor = 0x1462, .device = 0x5901, .action = VIA_DXS_NO_VRA }, /* MSI KT6 Delta-SR */
 		{ .vendor = 0x1462, .device = 0x7023, .action = VIA_DXS_NO_VRA }, /* MSI K8T Neo2-FI */
@@ -2297,6 +2301,10 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 				chip->dxs_fixed = 1;
 			else if (dxs_support[dev] == VIA_DXS_NO_VRA)
 				chip->no_vra = 1;
+			else if (dxs_support[dev] == VIA_DXS_SRC) {
+				chip->no_vra = 1;
+				chip->dxs_src = 1;
+			}
 		}
 		if ((err = snd_via8233_init_misc(chip, dev)) < 0)
 			goto __error;
@@ -2343,7 +2351,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_via82xx_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_via82xx_exit(void)

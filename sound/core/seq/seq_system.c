@@ -123,13 +123,19 @@ int __init snd_seq_system_client_init(void)
 
 	snd_seq_client_callback_t callbacks;
 	snd_seq_port_callback_t pcallbacks;
-	snd_seq_client_info_t inf;
-	snd_seq_port_info_t port;
+	snd_seq_client_info_t *inf;
+	snd_seq_port_info_t *port;
+
+	inf = kcalloc(1, sizeof(*inf), GFP_KERNEL);
+	port = kcalloc(1, sizeof(*port), GFP_KERNEL);
+	if (! inf || ! port) {
+		kfree(inf);
+		kfree(port);
+		return -ENOMEM;
+	}
 
 	memset(&callbacks, 0, sizeof(callbacks));
 	memset(&pcallbacks, 0, sizeof(pcallbacks));
-	memset(&inf, 0, sizeof(inf));
-	memset(&port, 0, sizeof(port));
 	pcallbacks.owner = THIS_MODULE;
 	pcallbacks.event_input = event_input_timer;
 
@@ -138,33 +144,35 @@ int __init snd_seq_system_client_init(void)
 	sysclient = snd_seq_create_kernel_client(NULL, 0, &callbacks);
 
 	/* set our name */
-	inf.client = 0;
-	inf.type = KERNEL_CLIENT;
-	strcpy(inf.name, "System");
-	snd_seq_kernel_client_ctl(sysclient, SNDRV_SEQ_IOCTL_SET_CLIENT_INFO, &inf);
+	inf->client = 0;
+	inf->type = KERNEL_CLIENT;
+	strcpy(inf->name, "System");
+	snd_seq_kernel_client_ctl(sysclient, SNDRV_SEQ_IOCTL_SET_CLIENT_INFO, inf);
 
 	/* register timer */
-	strcpy(port.name, "Timer");
-	port.capability = SNDRV_SEQ_PORT_CAP_WRITE; /* accept queue control */
-	port.capability |= SNDRV_SEQ_PORT_CAP_READ|SNDRV_SEQ_PORT_CAP_SUBS_READ; /* for broadcast */
-	port.kernel = &pcallbacks;
-	port.type = 0;
-	port.flags = SNDRV_SEQ_PORT_FLG_GIVEN_PORT;
-	port.addr.client = sysclient;
-	port.addr.port = SNDRV_SEQ_PORT_SYSTEM_TIMER;
-	snd_seq_kernel_client_ctl(sysclient, SNDRV_SEQ_IOCTL_CREATE_PORT, &port);
+	strcpy(port->name, "Timer");
+	port->capability = SNDRV_SEQ_PORT_CAP_WRITE; /* accept queue control */
+	port->capability |= SNDRV_SEQ_PORT_CAP_READ|SNDRV_SEQ_PORT_CAP_SUBS_READ; /* for broadcast */
+	port->kernel = &pcallbacks;
+	port->type = 0;
+	port->flags = SNDRV_SEQ_PORT_FLG_GIVEN_PORT;
+	port->addr.client = sysclient;
+	port->addr.port = SNDRV_SEQ_PORT_SYSTEM_TIMER;
+	snd_seq_kernel_client_ctl(sysclient, SNDRV_SEQ_IOCTL_CREATE_PORT, port);
 
 	/* register announcement port */
-	strcpy(port.name, "Announce");
-	port.capability = SNDRV_SEQ_PORT_CAP_READ|SNDRV_SEQ_PORT_CAP_SUBS_READ; /* for broadcast only */
-	port.kernel = NULL;
-	port.type = 0;
-	port.flags = SNDRV_SEQ_PORT_FLG_GIVEN_PORT;
-	port.addr.client = sysclient;
-	port.addr.port = SNDRV_SEQ_PORT_SYSTEM_ANNOUNCE;
-	snd_seq_kernel_client_ctl(sysclient, SNDRV_SEQ_IOCTL_CREATE_PORT, &port);
-	announce_port = port.addr.port;
+	strcpy(port->name, "Announce");
+	port->capability = SNDRV_SEQ_PORT_CAP_READ|SNDRV_SEQ_PORT_CAP_SUBS_READ; /* for broadcast only */
+	port->kernel = NULL;
+	port->type = 0;
+	port->flags = SNDRV_SEQ_PORT_FLG_GIVEN_PORT;
+	port->addr.client = sysclient;
+	port->addr.port = SNDRV_SEQ_PORT_SYSTEM_ANNOUNCE;
+	snd_seq_kernel_client_ctl(sysclient, SNDRV_SEQ_IOCTL_CREATE_PORT, port);
+	announce_port = port->addr.port;
 
+	kfree(inf);
+	kfree(port);
 	return 0;
 }
 

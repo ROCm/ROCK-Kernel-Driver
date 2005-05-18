@@ -1,10 +1,8 @@
 /*
  *  Copyright (c) by Lee Revell <rlrevell@joe-job.com>
- *  
+ *                   Clemens Ladisch <clemens@ladisch.de>
  *  Routines for control of EMU10K1 chips
  *
- *  Copied from similar code by Clemens Ladisch in the ymfpci driver
- * 
  *  BUGS:
  *    --
  *

@@ -40,7 +40,6 @@ int snd_task_name(struct task_struct *task, char *name, size_t size)
 void snd_verbose_printk(const char *file, int line, const char *format, ...)
 {
 	va_list args;
-	char tmpbuf[512];
 	
 	if (format[0] == '<' && format[1] >= '0' && format[1] <= '9' && format[2] == '>') {
 		char tmp[] = "<0>";
@@ -51,9 +50,8 @@ void snd_verbose_printk(const char *file, int line, const char *format, ...)
 		printk("ALSA %s:%d: ", file, line);
 	}
 	va_start(args, format);
-	vsnprintf(tmpbuf, sizeof(tmpbuf), format, args);
+	vprintk(format, args);
 	va_end(args);
-	printk(tmpbuf);
 }
 #endif
 
@@ -61,7 +59,6 @@ void snd_verbose_printk(const char *file, int line, const char *format, ...)
 void snd_verbose_printd(const char *file, int line, const char *format, ...)
 {
 	va_list args;
-	char tmpbuf[512];
 	
 	if (format[0] == '<' && format[1] >= '0' && format[1] <= '9' && format[2] == '>') {
 		char tmp[] = "<0>";
@@ -72,9 +69,8 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...)
 		printk(KERN_DEBUG "ALSA %s:%d: ", file, line);
 	}
 	va_start(args, format);
-	vsnprintf(tmpbuf, sizeof(tmpbuf), format, args);
+	vprintk(format, args);
 	va_end(args);
-	printk(tmpbuf);
 
 }
 #endif

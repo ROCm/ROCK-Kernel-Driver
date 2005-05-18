@@ -92,19 +92,18 @@ static int snd_info_version_done(void);
 int snd_iprintf(snd_info_buffer_t * buffer, char *fmt,...)
 {
 	va_list args;
-	int res;
-	char sbuffer[512];
+	int len, res;
 
 	if (buffer->stop || buffer->error)
 		return 0;
+	len = buffer->len - buffer->size;
 	va_start(args, fmt);
-	res = vscnprintf(sbuffer, sizeof(sbuffer), fmt, args);
+	res = vsnprintf(buffer->curr, len, fmt, args);
 	va_end(args);
-	if (buffer->size + res >= buffer->len) {
+	if (res >= len) {
 		buffer->stop = 1;
 		return 0;
 	}
-	strcpy(buffer->curr, sbuffer);
 	buffer->curr += res;
 	buffer->size += res;
 	return res;

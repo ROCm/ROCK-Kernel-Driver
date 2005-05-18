@@ -940,13 +940,9 @@ static void __devinit snd_via82xx_proc_init(via82xx_t *chip)
 
 static int __devinit snd_via82xx_chip_init(via82xx_t *chip)
 {
-	ac97_t ac97;
 	unsigned int val;
 	int max_count;
 	unsigned char pval;
-
-	memset(&ac97, 0, sizeof(ac97));
-	ac97.private_data = chip;
 
 	pci_read_config_byte(chip->pci, VIA_MC97_CTRL, &pval);
 	if((pval & VIA_MC97_CTRL_INIT) != VIA_MC97_CTRL_INIT) {
@@ -995,13 +991,6 @@ static int __devinit snd_via82xx_chip_init(via82xx_t *chip)
 
 	if ((val = snd_via82xx_codec_xread(chip)) & VIA_REG_AC97_BUSY)
 		snd_printk("AC'97 codec is not ready [0x%x]\n", val);
-
-	/* and then reset codec.. */
-#if 0 /* do we need it? when? */
-	snd_via82xx_codec_ready(chip, 0);
-	snd_via82xx_codec_write(&ac97, AC97_RESET, 0x0000);
-	snd_via82xx_codec_read(&ac97, 0);
-#endif
 
 	snd_via82xx_codec_xwrite(chip, VIA_REG_AC97_READ |
 				 VIA_REG_AC97_SECONDARY_VALID |
@@ -1244,7 +1233,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_via82xx_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_via82xx_exit(void)

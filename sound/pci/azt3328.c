@@ -1245,9 +1245,9 @@ static int __devinit snd_azf3328_config_joystick(azf3328_t *chip, int dev)
 
 	gameport_set_name(gp, "AZF3328 Gameport");
 	gameport_set_phys(gp, "pci%s/gameport0", pci_name(chip->pci));
-	gp->dev.parent = &chip->pci->dev;
+	gameport_set_dev_parent(gp, &chip->pci->dev);
 	gp->io = 0x200;
-	gp->port_data = r;
+	gameport_set_port_data(gp, r);
 
 	snd_azf3328_io2_write(chip, IDX_IO2_LEGACY_ADDR,
 			      snd_azf3328_io2_read(chip, IDX_IO2_LEGACY_ADDR) | LEGACY_JOY);
@@ -1260,7 +1260,7 @@ static int __devinit snd_azf3328_config_joystick(azf3328_t *chip, int dev)
 static void snd_azf3328_free_joystick(azf3328_t *chip)
 {
 	if (chip->gameport) {
-		struct resource *r = chip->gameport->port_data;
+		struct resource *r = gameport_get_port_data(chip->gameport);
 
 		gameport_unregister_port(chip->gameport);
 		chip->gameport = NULL;
@@ -1520,7 +1520,7 @@ static int __init alsa_card_azf3328_init(void)
 {
 	int err;
 	snd_azf3328_dbgcallenter();
-	err = pci_module_init(&driver);
+	err = pci_register_driver(&driver);
 	snd_azf3328_dbgcallleave();
 	return err;
 }

@@ -519,20 +519,25 @@ snd_kcontrol_t *snd_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 static int snd_ctl_card_info(snd_card_t * card, snd_ctl_file_t * ctl,
 			     unsigned int cmd, void __user *arg)
 {
-	snd_ctl_card_info_t info;
+	snd_ctl_card_info_t *info;
 
-	memset(&info, 0, sizeof(info));
+	info = kcalloc(1, sizeof(*info), GFP_KERNEL);
+	if (! info)
+		return -ENOMEM;
 	down_read(&snd_ioctl_rwsem);
-	info.card = card->number;
-	strlcpy(info.id, card->id, sizeof(info.id));
-	strlcpy(info.driver, card->driver, sizeof(info.driver));
-	strlcpy(info.name, card->shortname, sizeof(info.name));
-	strlcpy(info.longname, card->longname, sizeof(info.longname));
-	strlcpy(info.mixername, card->mixername, sizeof(info.mixername));
-	strlcpy(info.components, card->components, sizeof(info.components));
+	info->card = card->number;
+	strlcpy(info->id, card->id, sizeof(info->id));
+	strlcpy(info->driver, card->driver, sizeof(info->driver));
+	strlcpy(info->name, card->shortname, sizeof(info->name));
+	strlcpy(info->longname, card->longname, sizeof(info->longname));
+	strlcpy(info->mixername, card->mixername, sizeof(info->mixername));
+	strlcpy(info->components, card->components, sizeof(info->components));
 	up_read(&snd_ioctl_rwsem);
-	if (copy_to_user(arg, &info, sizeof(snd_ctl_card_info_t)))
+	if (copy_to_user(arg, info, sizeof(snd_ctl_card_info_t))) {
+		kfree(info);
 		return -EFAULT;
+	}
+	kfree(info);
 	return 0;
 }
 
@@ -1097,7 +1102,7 @@ static long snd_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long arg
 		}
 	}
 	up_read(&snd_ioctl_rwsem);
-	snd_printd("unknown ioctl = 0x%x\n", cmd);
+	snd_printdd("unknown ioctl = 0x%x\n", cmd);
 	return -ENOTTY;
 }
 

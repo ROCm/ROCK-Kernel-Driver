@@ -112,7 +112,7 @@ struct snd_mixart_mgr {
 	struct semaphore setup_mutex; /* mutex used in hw_params, open and close */
 
 	/* hardware interface */
-	snd_hwdep_t *hwdep;
+	unsigned int dsp_loaded;      /* bit flags of loaded dsp indices */
 	unsigned int board_type;      /* read from embedded once elf file is loaded, 250 = miXart8, 251 = with AES, 252 = with Cobranet */
 
 	struct snd_dma_buffer flowinfo;

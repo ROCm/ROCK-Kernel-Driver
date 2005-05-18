@@ -500,6 +500,8 @@ static unsigned short snd_intel8x0_codec_read(ac97_t *ac97,
 			res = 0xffff;
 		}
 	}
+	if (reg == AC97_GPIO_STATUS)
+		iagetword(chip, 0); /* clear semaphore */
 	return res;
 }
 
@@ -1450,7 +1452,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_intel8x0m_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_intel8x0m_exit(void)

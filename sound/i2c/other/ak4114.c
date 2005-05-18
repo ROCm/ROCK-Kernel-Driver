@@ -159,7 +159,7 @@ void snd_ak4114_reinit(ak4114_t *chip)
 	/* bring up statistics / event queing */
 	chip->init = 0;
 	INIT_WORK(&chip->work, ak4114_stats, chip);
-	queue_delayed_work(chip->workqueue, &chip->work, 1);
+	queue_delayed_work(chip->workqueue, &chip->work, HZ / 10);
 }
 
 static unsigned int external_rate(unsigned char rcs1)
@@ -569,7 +569,7 @@ static void ak4114_stats(void *data)
 	if (chip->init)
 		return;
 	snd_ak4114_check_rate_and_errors(chip, 0);
-	queue_delayed_work(chip->workqueue, &chip->work, 1);
+	queue_delayed_work(chip->workqueue, &chip->work, HZ / 10);
 }
 
 EXPORT_SYMBOL(snd_ak4114_create);

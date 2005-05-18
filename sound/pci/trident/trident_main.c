@@ -3112,7 +3112,7 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 
 static unsigned char snd_trident_gameport_read(struct gameport *gameport)
 {
-	trident_t *chip = gameport->port_data;
+	trident_t *chip = gameport_get_port_data(gameport);
 
 	snd_assert(chip, return 0);
 	return inb(TRID_REG(chip, GAMEPORT_LEGACY));
@@ -3120,17 +3120,15 @@ static unsigned char snd_trident_gameport_read(struct gameport *gameport)
 
 static void snd_trident_gameport_trigger(struct gameport *gameport)
 {
-	trident_t *chip = gameport->port_data;
+	trident_t *chip = gameport_get_port_data(gameport);
 
 	snd_assert(chip, return);
 	outb(0xff, TRID_REG(chip, GAMEPORT_LEGACY));
-
-	return;
 }
 
 static int snd_trident_gameport_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-	trident_t *chip = gameport->port_data;
+	trident_t *chip = gameport_get_port_data(gameport);
 	int i;
 
 	snd_assert(chip, return 0);
@@ -3147,7 +3145,7 @@ static int snd_trident_gameport_cooked_read(struct gameport *gameport, int *axes
 
 static int snd_trident_gameport_open(struct gameport *gameport, int mode)
 {
-	trident_t *chip = gameport->port_data;
+	trident_t *chip = gameport_get_port_data(gameport);
 
 	snd_assert(chip, return 0);
 
@@ -3177,9 +3175,9 @@ int __devinit snd_trident_create_gameport(trident_t *chip)
 
 	gameport_set_name(gp, "Trident 4DWave");
 	gameport_set_phys(gp, "pci%s/gameport0", pci_name(chip->pci));
-	gp->dev.parent = &chip->pci->dev;
+	gameport_set_dev_parent(gp, &chip->pci->dev);
 
-	gp->port_data = chip;
+	gameport_set_port_data(gp, chip);
 	gp->fuzz = 64;
 	gp->read = snd_trident_gameport_read;
 	gp->trigger = snd_trident_gameport_trigger;

@@ -525,7 +525,7 @@ static int snd_trident_simple_put_sample(void *private_data, simple_instrument_t
 	if (trident->synth.current_size + size > trident->synth.max_size)
 		return -ENOMEM;
 
-	if (verify_area(VERIFY_READ, data, size))
+	if (!access_ok(VERIFY_READ, data, size))
 		return -EFAULT;
 
 	if (trident->tlb.entries) {
@@ -570,7 +570,7 @@ static int snd_trident_simple_get_sample(void *private_data, simple_instrument_t
 		shift++;
 	size <<= shift;
 
-	if (verify_area(VERIFY_WRITE, data, size))
+	if (!access_ok(VERIFY_WRITE, data, size))
 		return -EFAULT;
 
 	/* FIXME: not implemented yet */

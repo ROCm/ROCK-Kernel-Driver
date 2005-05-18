@@ -2496,8 +2496,9 @@ static int __devinit snd_es1968_create_gameport(es1968_t *chip, int dev)
 
 	gameport_set_name(gp, "ES1968 Gameport");
 	gameport_set_phys(gp, "pci%s/gameport0", pci_name(chip->pci));
-	gp->dev.parent = &chip->pci->dev;
+	gameport_set_dev_parent(gp, &chip->pci->dev);
 	gp->io = JOYSTICK_ADDR;
+	gameport_set_port_data(gp, r);
 
 	gameport_register_port(gp);
 
@@ -2507,7 +2508,7 @@ static int __devinit snd_es1968_create_gameport(es1968_t *chip, int dev)
 static void snd_es1968_free_gameport(es1968_t *chip)
 {
 	if (chip->gameport) {
-		struct resource *r = chip->gameport->port_data;
+		struct resource *r = gameport_get_port_data(chip->gameport);
 
 		gameport_unregister_port(chip->gameport);
 		chip->gameport = NULL;
@@ -2794,7 +2795,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_es1968_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_es1968_exit(void)

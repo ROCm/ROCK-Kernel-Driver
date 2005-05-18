@@ -91,6 +91,38 @@ void snd_emu10k1_ptr_write(emu10k1_t *emu, unsigned int reg, unsigned int chn, u
 	}
 }
 
+unsigned int snd_emu10k1_ptr20_read(emu10k1_t * emu, 
+					  unsigned int reg, 
+					  unsigned int chn)
+{
+	unsigned long flags;
+	unsigned int regptr, val;
+  
+	regptr = (reg << 16) | chn;
+
+	spin_lock_irqsave(&emu->emu_lock, flags);
+	outl(regptr, emu->port + 0x20 + PTR);
+	val = inl(emu->port + 0x20 + DATA);
+	spin_unlock_irqrestore(&emu->emu_lock, flags);
+	return val;
+}
+
+void snd_emu10k1_ptr20_write(emu10k1_t *emu, 
+				   unsigned int reg, 
+				   unsigned int chn, 
+				   unsigned int data)
+{
+	unsigned int regptr;
+	unsigned long flags;
+
+	regptr = (reg << 16) | chn;
+
+	spin_lock_irqsave(&emu->emu_lock, flags);
+	outl(regptr, emu->port + 0x20 + PTR);
+	outl(data, emu->port + 0x20 + DATA);
+	spin_unlock_irqrestore(&emu->emu_lock, flags);
+}
+
 void snd_emu10k1_intr_enable(emu10k1_t *emu, unsigned int intrenb)
 {
 	unsigned long flags;

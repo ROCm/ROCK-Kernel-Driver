@@ -375,7 +375,7 @@ static ssize_t snd_seq_read(struct file *file, char __user *buf, size_t count, l
 	if (!(snd_seq_file_flags(file) & SNDRV_SEQ_LFLG_INPUT))
 		return -ENXIO;
 
-	if (verify_area(VERIFY_WRITE, buf, count))
+	if (!access_ok(VERIFY_WRITE, buf, count))
 		return -EFAULT;
 
 	/* check client structures are in place */

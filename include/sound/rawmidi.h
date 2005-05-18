@@ -79,9 +79,10 @@ struct _snd_rawmidi_runtime {
 	/* misc */
 	spinlock_t lock;
 	wait_queue_head_t sleep;
-	/* event handler (room [output] or new bytes [input]) */
-	struct tasklet_struct event_tasklet;
+	/* event handler (new bytes, input only) */
 	void (*event)(snd_rawmidi_substream_t *substream);
+	/* defers calls to event [input] or ops->trigger [output] */
+	struct tasklet_struct tasklet;
 	/* private data */
 	void *private_data;
 	void (*private_free)(snd_rawmidi_substream_t *substream);

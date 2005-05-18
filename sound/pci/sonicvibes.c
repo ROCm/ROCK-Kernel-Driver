@@ -1183,7 +1183,7 @@ static int __devinit snd_sonicvibes_create_gameport(sonicvibes_t *sonic)
 
 	gameport_set_name(gp, "SonicVibes Gameport");
 	gameport_set_phys(gp, "pci%s/gameport0", pci_name(sonic->pci));
-	gp->dev.parent = &sonic->pci->dev;
+	gameport_set_dev_parent(gp, &sonic->pci->dev);
 	gp->io = sonic->game_port;
 
 	gameport_register_port(gp);
@@ -1522,7 +1522,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_sonicvibes_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_sonicvibes_exit(void)

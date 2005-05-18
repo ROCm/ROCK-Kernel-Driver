@@ -92,21 +92,19 @@ static void snd_mpu401_uart_clear_rx(mpu401_t *mpu)
 
 static void _snd_mpu401_uart_interrupt(mpu401_t *mpu)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&mpu->input_lock, flags);
+	spin_lock(&mpu->input_lock);
 	if (test_bit(MPU401_MODE_BIT_INPUT, &mpu->mode)) {
 		snd_mpu401_uart_input_read(mpu);
 	} else {
 		snd_mpu401_uart_clear_rx(mpu);
 	}
-	spin_unlock_irqrestore(&mpu->input_lock, flags);
+	spin_unlock(&mpu->input_lock);
  	/* ok. for better Tx performance try do some output when input is done */
 	if (test_bit(MPU401_MODE_BIT_OUTPUT, &mpu->mode) &&
 	    test_bit(MPU401_MODE_BIT_OUTPUT_TRIGGER, &mpu->mode)) {
-		spin_lock_irqsave(&mpu->output_lock, flags);
+		spin_lock(&mpu->output_lock);
 		snd_mpu401_uart_output_write(mpu);
-		spin_unlock_irqrestore(&mpu->output_lock, flags);
+		spin_unlock(&mpu->output_lock);
 	}
 }
 
@@ -134,14 +132,13 @@ irqreturn_t snd_mpu401_uart_interrupt(int irq, void *dev_id, struct pt_regs *reg
  */
 static void snd_mpu401_uart_timer(unsigned long data)
 {
-	unsigned long flags;
 	mpu401_t *mpu = (mpu401_t *)data;
 
-	spin_lock_irqsave(&mpu->timer_lock, flags);
+	spin_lock(&mpu->timer_lock);
 	/*mpu->mode |= MPU401_MODE_TIMER;*/
 	mpu->timer.expires = 1 + jiffies;
 	add_timer(&mpu->timer);
-	spin_unlock_irqrestore(&mpu->timer_lock, flags);
+	spin_unlock(&mpu->timer_lock);
 	if (mpu->rmidi)
 		_snd_mpu401_uart_interrupt(mpu);
 }

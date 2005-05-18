@@ -76,8 +76,6 @@ static int keywest_attach_adapter(struct i2c_adapter *adapter)
 	new_client->flags = 0;
 
 	strcpy(i2c_device_name(new_client), keywest_ctx->name);
-
-	new_client->id = keywest_ctx->id++; /* Automatically unique */
 	keywest_ctx->client = new_client;
 	
 	/* Tell the i2c layer a new client has arrived */

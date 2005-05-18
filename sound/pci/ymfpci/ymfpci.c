@@ -138,8 +138,9 @@ static int __devinit snd_ymfpci_create_gameport(ymfpci_t *chip, int dev,
 
 	gameport_set_name(gp, "Yamaha YMF Gameport");
 	gameport_set_phys(gp, "pci%s/gameport0", pci_name(chip->pci));
-	gp->dev.parent = &chip->pci->dev;
+	gameport_set_dev_parent(gp, &chip->pci->dev);
 	gp->io = io_port;
+	gameport_set_port_data(gp, r);
 
 	if (chip->pci->device >= 0x0010) /* YMF 744/754 */
 		pci_write_config_word(chip->pci, PCIR_DSXG_JOYBASE, io_port);
@@ -155,7 +156,7 @@ static int __devinit snd_ymfpci_create_gameport(ymfpci_t *chip, int dev,
 void snd_ymfpci_free_gameport(ymfpci_t *chip)
 {
 	if (chip->gameport) {
-		struct resource *r = chip->gameport->port_data;
+		struct resource *r = gameport_get_port_data(chip->gameport);
 
 		gameport_unregister_port(chip->gameport);
 		chip->gameport = NULL;
@@ -359,7 +360,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_ymfpci_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_ymfpci_exit(void)

@@ -354,39 +354,48 @@ static int snd_virmidi_dev_attach_seq(snd_virmidi_dev_t *rdev)
 	int client;
 	snd_seq_client_callback_t callbacks;
 	snd_seq_port_callback_t pcallbacks;
-	snd_seq_client_info_t info;
-	snd_seq_port_info_t pinfo;
+	snd_seq_client_info_t *info;
+	snd_seq_port_info_t *pinfo;
 	int err;
 
 	if (rdev->client >= 0)
 		return 0;
+
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	pinfo = kmalloc(sizeof(*pinfo), GFP_KERNEL);
+	if (! info || ! pinfo) {
+		err = -ENOMEM;
+		goto __error;
+	}
 
 	memset(&callbacks, 0, sizeof(callbacks));
 	callbacks.private_data = rdev;
 	callbacks.allow_input = 1;
 	callbacks.allow_output = 1;
 	client = snd_seq_create_kernel_client(rdev->card, rdev->device, &callbacks);
-	if (client < 0)
-		return client;
+	if (client < 0) {
+		err = client;
+		goto __error;
+	}
 	rdev->client = client;
 
 	/* set client name */
-	memset(&info, 0, sizeof(info));
-	info.client = client;
-	info.type = KERNEL_CLIENT;
-	sprintf(info.name, "%s %d-%d", rdev->rmidi->name, rdev->card->number, rdev->device);
-	snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_SET_CLIENT_INFO, &info);
+	memset(info, 0, sizeof(*info));
+	info->client = client;
+	info->type = KERNEL_CLIENT;
+	sprintf(info->name, "%s %d-%d", rdev->rmidi->name, rdev->card->number, rdev->device);
+	snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_SET_CLIENT_INFO, info);
 
 	/* create a port */
-	memset(&pinfo, 0, sizeof(pinfo));
-	pinfo.addr.client = client;
-	sprintf(pinfo.name, "VirMIDI %d-%d", rdev->card->number, rdev->device);
+	memset(pinfo, 0, sizeof(*pinfo));
+	pinfo->addr.client = client;
+	sprintf(pinfo->name, "VirMIDI %d-%d", rdev->card->number, rdev->device);
 	/* set all capabilities */
-	pinfo.capability |= SNDRV_SEQ_PORT_CAP_WRITE | SNDRV_SEQ_PORT_CAP_SYNC_WRITE | SNDRV_SEQ_PORT_CAP_SUBS_WRITE;
-	pinfo.capability |= SNDRV_SEQ_PORT_CAP_READ | SNDRV_SEQ_PORT_CAP_SYNC_READ | SNDRV_SEQ_PORT_CAP_SUBS_READ;
-	pinfo.capability |= SNDRV_SEQ_PORT_CAP_DUPLEX;
-	pinfo.type = SNDRV_SEQ_PORT_TYPE_MIDI_GENERIC;
-	pinfo.midi_channels = 16;
+	pinfo->capability |= SNDRV_SEQ_PORT_CAP_WRITE | SNDRV_SEQ_PORT_CAP_SYNC_WRITE | SNDRV_SEQ_PORT_CAP_SUBS_WRITE;
+	pinfo->capability |= SNDRV_SEQ_PORT_CAP_READ | SNDRV_SEQ_PORT_CAP_SYNC_READ | SNDRV_SEQ_PORT_CAP_SUBS_READ;
+	pinfo->capability |= SNDRV_SEQ_PORT_CAP_DUPLEX;
+	pinfo->type = SNDRV_SEQ_PORT_TYPE_MIDI_GENERIC;
+	pinfo->midi_channels = 16;
 	memset(&pcallbacks, 0, sizeof(pcallbacks));
 	pcallbacks.owner = THIS_MODULE;
 	pcallbacks.private_data = rdev;
@@ -395,16 +404,21 @@ static int snd_virmidi_dev_attach_seq(snd_virmidi_dev_t *rdev)
 	pcallbacks.use = snd_virmidi_use;
 	pcallbacks.unuse = snd_virmidi_unuse;
 	pcallbacks.event_input = snd_virmidi_event_input;
-	pinfo.kernel = &pcallbacks;
-	err = snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_CREATE_PORT, &pinfo);
+	pinfo->kernel = &pcallbacks;
+	err = snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_CREATE_PORT, pinfo);
 	if (err < 0) {
 		snd_seq_delete_kernel_client(client);
 		rdev->client = -1;
-		return err;
+		goto __error;
 	}
 
-	rdev->port = pinfo.addr.port;
-	return 0;	/* success */
+	rdev->port = pinfo->addr.port;
+	err = 0; /* success */
+
+ __error:
+	kfree(info);
+	kfree(pinfo);
+	return err;
 }
 
 

@@ -37,10 +37,12 @@
 #include <linux/kerneld.h>
 #endif
 
-#if !defined(CONFIG_SND_RTCTIMER) && !defined(CONFIG_SND_RTCTIMER_MODULE)
-#define DEFAULT_TIMER_LIMIT 1
-#else
+#if defined(CONFIG_SND_HPET) || defined(CONFIG_SND_HPET_MODULE)
+#define DEFAULT_TIMER_LIMIT 3
+#elif defined(CONFIG_SND_RTCTIMER) || defined(CONFIG_SND_RTCTIMER_MODULE)
 #define DEFAULT_TIMER_LIMIT 2
+#else
+#define DEFAULT_TIMER_LIMIT 1
 #endif
 
 static int timer_limit = DEFAULT_TIMER_LIMIT;
@@ -67,6 +69,7 @@ typedef struct {
 	struct timespec tstamp;		/* trigger tstamp */
 	wait_queue_head_t qchange_sleep;
 	struct fasync_struct *fasync;
+	struct semaphore tread_sem;
 } snd_timer_user_t;
 
 /* list of timers */
@@ -1206,6 +1209,7 @@ static int snd_timer_user_open(struct inode *inode, struct file *file)
 		return -ENOMEM;
 	spin_lock_init(&tu->qlock);
 	init_waitqueue_head(&tu->qchange_sleep);
+	init_MUTEX(&tu->tread_sem);
 	tu->ticks = 1;
 	tu->queue_size = 128;
 	tu->queue = (snd_timer_read_t *)kmalloc(tu->queue_size * sizeof(snd_timer_read_t), GFP_KERNEL);
@@ -1345,39 +1349,45 @@ static int snd_timer_user_next_device(snd_timer_id_t __user *_tid)
 
 static int snd_timer_user_ginfo(struct file *file, snd_timer_ginfo_t __user *_ginfo)
 {
-	snd_timer_ginfo_t ginfo;
+	snd_timer_ginfo_t *ginfo;
 	snd_timer_id_t tid;
 	snd_timer_t *t;
 	struct list_head *p;
 	int err = 0;
 
-	if (copy_from_user(&ginfo, _ginfo, sizeof(ginfo)))
+	ginfo = kmalloc(sizeof(*ginfo), GFP_KERNEL);
+	if (! ginfo)
+		return -ENOMEM;
+	if (copy_from_user(ginfo, _ginfo, sizeof(*ginfo))) {
+		kfree(ginfo);
 		return -EFAULT;
-	tid = ginfo.tid;
-	memset(&ginfo, 0, sizeof(ginfo));
-	ginfo.tid = tid;
+	}
+	tid = ginfo->tid;
+	memset(ginfo, 0, sizeof(*ginfo));
+	ginfo->tid = tid;
 	down(&register_mutex);
 	t = snd_timer_find(&tid);
 	if (t != NULL) {
-		ginfo.card = t->card ? t->card->number : -1;
+		ginfo->card = t->card ? t->card->number : -1;
 		if (t->hw.flags & SNDRV_TIMER_HW_SLAVE)
-			ginfo.flags |= SNDRV_TIMER_FLG_SLAVE;
-		strlcpy(ginfo.id, t->id, sizeof(ginfo.id));
-		strlcpy(ginfo.name, t->name, sizeof(ginfo.name));
-		ginfo.resolution = t->hw.resolution;
+			ginfo->flags |= SNDRV_TIMER_FLG_SLAVE;
+		strlcpy(ginfo->id, t->id, sizeof(ginfo->id));
+		strlcpy(ginfo->name, t->name, sizeof(ginfo->name));
+		ginfo->resolution = t->hw.resolution;
 		if (t->hw.resolution_min > 0) {
-			ginfo.resolution_min = t->hw.resolution_min;
-			ginfo.resolution_max = t->hw.resolution_max;
+			ginfo->resolution_min = t->hw.resolution_min;
+			ginfo->resolution_max = t->hw.resolution_max;
 		}
 		list_for_each(p, &t->open_list_head) {
-			ginfo.clients++;
+			ginfo->clients++;
 		}
 	} else {
 		err = -ENODEV;
 	}
 	up(&register_mutex);
-	if (err >= 0 && copy_to_user(_ginfo, &ginfo, sizeof(ginfo)))
+	if (err >= 0 && copy_to_user(_ginfo, ginfo, sizeof(*ginfo)))
 		err = -EFAULT;
+	kfree(ginfo);
 	return err;
 }
 
@@ -1446,18 +1456,23 @@ static int snd_timer_user_tselect(struct file *file, snd_timer_select_t __user *
 	snd_timer_user_t *tu;
 	snd_timer_select_t tselect;
 	char str[32];
-	int err;
+	int err = 0;
 	
 	tu = file->private_data;
-	if (tu->timeri)
+	down(&tu->tread_sem);
+	if (tu->timeri) {
 		snd_timer_close(tu->timeri);
-	if (copy_from_user(&tselect, _tselect, sizeof(tselect)))
-		return -EFAULT;
+		tu->timeri = NULL;
+	}
+	if (copy_from_user(&tselect, _tselect, sizeof(tselect))) {
+		err = -EFAULT;
+		goto __err;
+	}
 	sprintf(str, "application %i", current->pid);
 	if (tselect.id.dev_class != SNDRV_TIMER_CLASS_SLAVE)
 		tselect.id.dev_sclass = SNDRV_TIMER_SCLASS_APPLICATION;
 	if ((err = snd_timer_open(&tu->timeri, str, &tselect.id, current->pid)) < 0)
-		return err;
+		goto __err;
 
 	if (tu->queue) {
 		kfree(tu->queue);
@@ -1469,45 +1484,54 @@ static int snd_timer_user_tselect(struct file *file, snd_timer_select_t __user *
 	}
 	if (tu->tread) {
 		tu->tqueue = (snd_timer_tread_t *)kmalloc(tu->queue_size * sizeof(snd_timer_tread_t), GFP_KERNEL);
-		if (tu->tqueue == NULL) {
-			snd_timer_close(tu->timeri);
-			return -ENOMEM;
-		}
+		if (tu->tqueue == NULL)
+			err = -ENOMEM;
 	} else {
 		tu->queue = (snd_timer_read_t *)kmalloc(tu->queue_size * sizeof(snd_timer_read_t), GFP_KERNEL);
-		if (tu->queue == NULL) {
-			snd_timer_close(tu->timeri);
-			return -ENOMEM;
-		}
+		if (tu->queue == NULL)
+			err = -ENOMEM;
 	}
 	
-	tu->timeri->flags |= SNDRV_TIMER_IFLG_FAST;
-	tu->timeri->callback = tu->tread ? snd_timer_user_tinterrupt : snd_timer_user_interrupt;
-	tu->timeri->ccallback = snd_timer_user_ccallback;
-	tu->timeri->callback_data = (void *)tu;
-	return 0;
+      	if (err < 0) {
+		snd_timer_close(tu->timeri);
+      		tu->timeri = NULL;
+      	} else {
+		tu->timeri->flags |= SNDRV_TIMER_IFLG_FAST;
+		tu->timeri->callback = tu->tread ? snd_timer_user_tinterrupt : snd_timer_user_interrupt;
+		tu->timeri->ccallback = snd_timer_user_ccallback;
+		tu->timeri->callback_data = (void *)tu;
+	}
+
+      __err:
+      	up(&tu->tread_sem);
+	return err;
 }
 
 static int snd_timer_user_info(struct file *file, snd_timer_info_t __user *_info)
 {
 	snd_timer_user_t *tu;
-	snd_timer_info_t info;
+	snd_timer_info_t *info;
 	snd_timer_t *t;
+	int err = 0;
 
 	tu = file->private_data;
 	snd_assert(tu->timeri != NULL, return -ENXIO);
 	t = tu->timeri->timer;
 	snd_assert(t != NULL, return -ENXIO);
-	memset(&info, 0, sizeof(info));
-	info.card = t->card ? t->card->number : -1;
+
+	info = kcalloc(1, sizeof(*info), GFP_KERNEL);
+	if (! info)
+		return -ENOMEM;
+	info->card = t->card ? t->card->number : -1;
 	if (t->hw.flags & SNDRV_TIMER_HW_SLAVE)
-		info.flags |= SNDRV_TIMER_FLG_SLAVE;
-	strlcpy(info.id, t->id, sizeof(info.id));
-	strlcpy(info.name, t->name, sizeof(info.name));
-	info.resolution = t->hw.resolution;
-	if (copy_to_user(_info, &info, sizeof(*_info)))
-		return -EFAULT;
-	return 0;
+		info->flags |= SNDRV_TIMER_FLG_SLAVE;
+	strlcpy(info->id, t->id, sizeof(info->id));
+	strlcpy(info->name, t->name, sizeof(info->name));
+	info->resolution = t->hw.resolution;
+	if (copy_to_user(_info, info, sizeof(*_info)))
+		err = -EFAULT;
+	kfree(info);
+	return err;
 }
 
 static int snd_timer_user_params(struct file *file, snd_timer_params_t __user *_params)
@@ -1656,6 +1680,23 @@ static int snd_timer_user_continue(struct file *file)
 	return (err = snd_timer_continue(tu->timeri)) < 0 ? err : 0;
 }
 
+static int snd_timer_user_pause(struct file *file)
+{
+	int err;
+	snd_timer_user_t *tu;
+		
+	tu = file->private_data;
+	snd_assert(tu->timeri != NULL, return -ENXIO);
+	return (err = snd_timer_pause(tu->timeri)) < 0 ? err : 0;
+}
+
+enum {
+	SNDRV_TIMER_IOCTL_START_OLD = _IO('T', 0x20),
+	SNDRV_TIMER_IOCTL_STOP_OLD = _IO('T', 0x21),
+	SNDRV_TIMER_IOCTL_CONTINUE_OLD = _IO('T', 0x22),
+	SNDRV_TIMER_IOCTL_PAUSE_OLD = _IO('T', 0x23),
+};
+
 static long snd_timer_user_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	snd_timer_user_t *tu;
@@ -1672,11 +1713,17 @@ static long snd_timer_user_ioctl(struct file *file, unsigned int cmd, unsigned l
 	{
 		int xarg;
 		
-		if (tu->timeri)		/* too late */
+		down(&tu->tread_sem);
+		if (tu->timeri)	{	/* too late */
+			up(&tu->tread_sem);
 			return -EBUSY;
-		if (get_user(xarg, p))
+		}
+		if (get_user(xarg, p)) {
+			up(&tu->tread_sem);
 			return -EFAULT;
+		}
 		tu->tread = xarg ? 1 : 0;
+		up(&tu->tread_sem);
 		return 0;
 	}
 	case SNDRV_TIMER_IOCTL_GINFO:
@@ -1694,11 +1741,17 @@ static long snd_timer_user_ioctl(struct file *file, unsigned int cmd, unsigned l
 	case SNDRV_TIMER_IOCTL_STATUS:
 		return snd_timer_user_status(file, argp);
 	case SNDRV_TIMER_IOCTL_START:
+	case SNDRV_TIMER_IOCTL_START_OLD:
 		return snd_timer_user_start(file);
 	case SNDRV_TIMER_IOCTL_STOP:
+	case SNDRV_TIMER_IOCTL_STOP_OLD:
 		return snd_timer_user_stop(file);
 	case SNDRV_TIMER_IOCTL_CONTINUE:
+	case SNDRV_TIMER_IOCTL_CONTINUE_OLD:
 		return snd_timer_user_continue(file);
+	case SNDRV_TIMER_IOCTL_PAUSE:
+	case SNDRV_TIMER_IOCTL_PAUSE_OLD:
+		return snd_timer_user_pause(file);
 	}
 	return -ENOTTY;
 }

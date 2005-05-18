@@ -490,4 +490,13 @@ static inline int snd_timestamp_null(struct timespec *tstamp)
 
 #define SNDRV_OSS_VERSION         ((3<<16)|(8<<8)|(1<<4)|(0))	/* 3.8.1a */
 
+/* for easier backward-porting */
+#if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
+#ifndef gameport_set_dev_parent
+#define gameport_set_dev_parent(gp,xdev) ((gp)->dev.parent = (xdev))
+#define gameport_set_port_data(gp,r) ((gp)->port_data = (r))
+#define gameport_get_port_data(gp) (gp)->port_data
+#endif
+#endif
+
 #endif /* __SOUND_CORE_H */

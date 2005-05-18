@@ -272,12 +272,17 @@ static void pdacf_config(dev_link_t *link)
 	client_handle_t handle = link->handle;
 	pdacf_t *pdacf = link->priv;
 	tuple_t tuple;
-	cisparse_t parse;
+	cisparse_t *parse = NULL;
 	config_info_t conf;
 	u_short buf[32];
 	int last_fn, last_ret;
 
 	snd_printdd(KERN_DEBUG "pdacf_config called\n");
+	parse = kmalloc(sizeof(*parse), GFP_KERNEL);
+	if (! parse) {
+		snd_printk(KERN_ERR "pdacf_config: cannot allocate\n");
+		return;
+	}
 	tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
 	tuple.Attributes = 0;
 	tuple.TupleData = (cisdata_t *)buf;
@@ -286,9 +291,10 @@ static void pdacf_config(dev_link_t *link)
 	tuple.DesiredTuple = CISTPL_CONFIG;
 	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
 	CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
-	CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
-	link->conf.ConfigBase = parse.config.base;
+	CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, parse));
+	link->conf.ConfigBase = parse->config.base;
 	link->conf.ConfigIndex = 0x5;
+	kfree(parse);
 
 	CS_CHECK(GetConfigurationInfo, pcmcia_get_configuration_info(handle, &conf));
 	link->conf.Vcc = conf.Vcc;

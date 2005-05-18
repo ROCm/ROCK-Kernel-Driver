@@ -857,7 +857,7 @@ struct snd_mixer_oss_assign_table {
 
 static int snd_mixer_oss_build_test(snd_mixer_oss_t *mixer, struct slot *slot, const char *name, int index, int item)
 {
-	snd_ctl_elem_info_t info;
+	snd_ctl_elem_info_t *info;
 	snd_kcontrol_t *kcontrol;
 	snd_card_t *card = mixer->card;
 	int err;
@@ -868,15 +868,22 @@ static int snd_mixer_oss_build_test(snd_mixer_oss_t *mixer, struct slot *slot, c
 		up_read(&card->controls_rwsem);
 		return 0;
 	}
-	if ((err = kcontrol->info(kcontrol, &info)) < 0) {
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	if (! info) {
 		up_read(&card->controls_rwsem);
+		return -ENOMEM;
+	}
+	if ((err = kcontrol->info(kcontrol, info)) < 0) {
+		up_read(&card->controls_rwsem);
+		kfree(info);
 		return err;
 	}
 	slot->numid[item] = kcontrol->id.numid;
 	up_read(&card->controls_rwsem);
-	if (info.count > slot->channels)
-		slot->channels = info.count;
+	if (info->count > slot->channels)
+		slot->channels = info->count;
 	slot->present |= 1 << item;
+	kfree(info);
 	return 0;
 }
 
@@ -961,10 +968,16 @@ static int snd_mixer_oss_build_input(snd_mixer_oss_t *mixer, struct snd_mixer_os
 		return 0;
 	down_read(&mixer->card->controls_rwsem);
 	if (ptr->index == 0 && (kctl = snd_mixer_oss_test_id(mixer, "Capture Source", 0)) != NULL) {
-		snd_ctl_elem_info_t uinfo;
+		snd_ctl_elem_info_t *uinfo;
 
-		memset(&uinfo, 0, sizeof(uinfo));
-		if (kctl->info(kctl, &uinfo)) {
+		uinfo = kmalloc(sizeof(*uinfo), GFP_KERNEL);
+		if (! uinfo) {
+			up_read(&mixer->card->controls_rwsem);
+			return -ENOMEM;
+		}
+			
+		memset(uinfo, 0, sizeof(*uinfo));
+		if (kctl->info(kctl, uinfo)) {
 			up_read(&mixer->card->controls_rwsem);
 			return 0;
 		}
@@ -974,21 +987,22 @@ static int snd_mixer_oss_build_input(snd_mixer_oss_t *mixer, struct snd_mixer_os
 		if (!strcmp(str, "Master Mono"))
 			strcpy(str, "Mix Mono");
 		slot.capture_item = 0;
-		if (!strcmp(uinfo.value.enumerated.name, str)) {
+		if (!strcmp(uinfo->value.enumerated.name, str)) {
 			slot.present |= SNDRV_MIXER_OSS_PRESENT_CAPTURE;
 		} else {
-			for (slot.capture_item = 1; slot.capture_item < uinfo.value.enumerated.items; slot.capture_item++) {
-				uinfo.value.enumerated.item = slot.capture_item;
-				if (kctl->info(kctl, &uinfo)) {
+			for (slot.capture_item = 1; slot.capture_item < uinfo->value.enumerated.items; slot.capture_item++) {
+				uinfo->value.enumerated.item = slot.capture_item;
+				if (kctl->info(kctl, uinfo)) {
 					up_read(&mixer->card->controls_rwsem);
 					return 0;
 				}
-				if (!strcmp(uinfo.value.enumerated.name, str)) {
+				if (!strcmp(uinfo->value.enumerated.name, str)) {
 					slot.present |= SNDRV_MIXER_OSS_PRESENT_CAPTURE;
 					break;
 				}
 			}
 		}
+		kfree(uinfo);
 	}
 	up_read(&mixer->card->controls_rwsem);
 	if (slot.present != 0) {

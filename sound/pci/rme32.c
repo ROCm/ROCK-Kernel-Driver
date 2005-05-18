@@ -1183,15 +1183,14 @@ static int snd_rme32_playback_fd_ack(snd_pcm_substream_t *substream)
 {
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
 	snd_pcm_indirect_t *rec, *cprec;
-	unsigned long flags;
 
 	rec = &rme32->playback_pcm;
 	cprec = &rme32->capture_pcm;
-	spin_lock_irqsave(&rme32->lock, flags);
+	spin_lock(&rme32->lock);
 	rec->hw_queue_size = RME32_BUFFER_SIZE;
 	if (rme32->running & (1 << SNDRV_PCM_STREAM_CAPTURE))
 		rec->hw_queue_size -= cprec->hw_ready;
-	spin_unlock_irqrestore(&rme32->lock, flags);
+	spin_unlock(&rme32->lock);
 	snd_pcm_indirect_playback_transfer(substream, rec,
 					   snd_rme32_pb_trans_copy);
 	return 0;
@@ -2032,7 +2031,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_rme32_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_rme32_exit(void)

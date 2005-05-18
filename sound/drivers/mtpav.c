@@ -580,13 +580,12 @@ static void snd_mtpav_read_bytes(mtpav_t * mcrd)
 
 static irqreturn_t snd_mtpav_irqh(int irq, void *dev_id, struct pt_regs *regs)
 {
-	unsigned long flags;
 	mtpav_t *mcard = dev_id;
 
 	//printk("irqh()\n");
-	spin_lock_irqsave(&mcard->spinlock, flags);
+	spin_lock(&mcard->spinlock);
 	snd_mtpav_read_bytes(mcard);
-	spin_unlock_irqrestore(&mcard->spinlock, flags);
+	spin_unlock(&mcard->spinlock);
 	return IRQ_HANDLED;
 }
 

@@ -1,6 +1,6 @@
 # ALSA PA-RISC drivers
 
-menu "ALSA GSC devices"
+menu "GSC devices"
 	depends on SND!=n && GSC
 
 config SND_HARMONY

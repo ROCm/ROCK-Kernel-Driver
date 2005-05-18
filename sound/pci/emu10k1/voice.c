@@ -62,15 +62,13 @@ static int voice_alloc(emu10k1_t *emu, emu10k1_voice_type_t type, int number, em
 			continue;
 		}
 			
-		/* make sure the block of voices does not cross the 32 voice boundary */
-		//if (((i % 32) + number) > 32)
-		//	continue;
-
 		skip = 0;
 		for (k = 0; k < number; k++) {
 			voice = &emu->voices[(i+k) % NUM_G];
-			if (voice->use)
+			if (voice->use) {
 				skip = 1;
+				break;
+			}
 		}
 		if (!skip) {
 			// printk("allocated voice %d\n", i);

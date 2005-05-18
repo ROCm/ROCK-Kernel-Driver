@@ -206,7 +206,10 @@ MODULE_PARM_DESC(dual_codec, "Secondary Codec ID (0 = disabled).");
 
 #define BA0_PMCS		0x0344	/* Power Management Control/Status */
 #define BA0_CWPR		0x03e0	/* Configuration Write Protect */
+
 #define BA0_EPPMC		0x03e4	/* Extended PCI Power Management Control */
+#define BA0_EPPMC_FPDN		(1<<14) /* Full Power DowN */
+
 #define BA0_GPIOR		0x03e8	/* GPIO Pin Interface Register */
 
 #define BA0_SPMC		0x03ec	/* Serial Port Power Management Control (& ASDIN2 enable) */
@@ -1240,7 +1243,7 @@ static void __devinit snd_cs4281_proc_init(cs4281_t * chip)
 
 static void snd_cs4281_gameport_trigger(struct gameport *gameport)
 {
-	cs4281_t *chip = gameport->port_data;
+	cs4281_t *chip = gameport_get_port_data(gameport);
 
 	snd_assert(chip, return);
 	snd_cs4281_pokeBA0(chip, BA0_JSPT, 0xff);
@@ -1248,7 +1251,7 @@ static void snd_cs4281_gameport_trigger(struct gameport *gameport)
 
 static unsigned char snd_cs4281_gameport_read(struct gameport *gameport)
 {
-	cs4281_t *chip = gameport->port_data;
+	cs4281_t *chip = gameport_get_port_data(gameport);
 
 	snd_assert(chip, return 0);
 	return snd_cs4281_peekBA0(chip, BA0_JSPT);
@@ -1257,7 +1260,7 @@ static unsigned char snd_cs4281_gameport_read(struct gameport *gameport)
 #ifdef COOKED_MODE
 static int snd_cs4281_gameport_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-	cs4281_t *chip = gameport->port_data;
+	cs4281_t *chip = gameport_get_port_data(gameport);
 	unsigned js1, js2, jst;
 	
 	snd_assert(chip, return 0);
@@ -1308,12 +1311,12 @@ static int __devinit snd_cs4281_create_gameport(cs4281_t *chip)
 
 	gameport_set_name(gp, "CS4281 Gameport");
 	gameport_set_phys(gp, "pci%s/gameport0", pci_name(chip->pci));
-	gp->dev.parent = &chip->pci->dev;
+	gameport_set_dev_parent(gp, &chip->pci->dev);
 	gp->open = snd_cs4281_gameport_open;
 	gp->read = snd_cs4281_gameport_read;
 	gp->trigger = snd_cs4281_gameport_trigger;
 	gp->cooked_read = snd_cs4281_gameport_cooked_read;
-	gp->port_data = chip;
+	gameport_set_port_data(gp, chip);
 
 	snd_cs4281_pokeBA0(chip, BA0_JSIO, 0xFF); // ?
 	snd_cs4281_pokeBA0(chip, BA0_JSCTL, JSCTL_SP_MEDIUM_SLOW);
@@ -1460,6 +1463,11 @@ static int snd_cs4281_chip_init(cs4281_t *chip)
 	unsigned int tmp;
 	int timeout;
 	int retry_count = 2;
+
+	/* Having EPPMC.FPDN=1 prevent proper chip initialisation */
+	tmp = snd_cs4281_peekBA0(chip, BA0_EPPMC);
+	if (tmp & BA0_EPPMC_FPDN)
+		snd_cs4281_pokeBA0(chip, BA0_EPPMC, tmp & ~BA0_EPPMC_FPDN);
 
       __retry:
 	tmp = snd_cs4281_peekBA0(chip, BA0_CFLR);
@@ -1848,7 +1856,6 @@ static int __devinit snd_cs4281_midi(cs4281_t * chip, int device, snd_rawmidi_t 
 static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	cs4281_t *chip = dev_id;
-	unsigned long flags;
 	unsigned int status, dma, val;
 	cs4281_dma_t *cdma;
 
@@ -1864,7 +1871,7 @@ static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *r
 		for (dma = 0; dma < 4; dma++)
 			if (status & BA0_HISR_DMA(dma)) {
 				cdma = &chip->dma[dma];
-				spin_lock_irqsave(&chip->reg_lock, flags);
+				spin_lock(&chip->reg_lock);
 				/* ack DMA IRQ */
 				val = snd_cs4281_peekBA0(chip, cdma->regHDSR);
 				/* workaround, sometimes CS4281 acknowledges */
@@ -1873,16 +1880,16 @@ static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *r
 				if ((val & BA0_HDSR_DHTC) && !(cdma->frag & 1)) {
 					cdma->frag--;
 					chip->spurious_dhtc_irq++;
-					spin_unlock_irqrestore(&chip->reg_lock, flags);
+					spin_unlock(&chip->reg_lock);
 					continue;
 				}
 				if ((val & BA0_HDSR_DTC) && (cdma->frag & 1)) {
 					cdma->frag--;
 					chip->spurious_dtc_irq++;
-					spin_unlock_irqrestore(&chip->reg_lock, flags);
+					spin_unlock(&chip->reg_lock);
 					continue;
 				}
-				spin_unlock_irqrestore(&chip->reg_lock, flags);
+				spin_unlock(&chip->reg_lock);
 				snd_pcm_period_elapsed(cdma->substream);
 			}
 	}
@@ -1890,7 +1897,7 @@ static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *r
 	if ((status & BA0_HISR_MIDI) && chip->rmidi) {
 		unsigned char c;
 		
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock(&chip->reg_lock);
 		while ((snd_cs4281_peekBA0(chip, BA0_MIDSR) & BA0_MIDSR_RBE) == 0) {
 			c = snd_cs4281_peekBA0(chip, BA0_MIDRP);
 			if ((chip->midcr & BA0_MIDCR_RIE) == 0)
@@ -1907,7 +1914,7 @@ static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *r
 			}
 			snd_cs4281_pokeBA0(chip, BA0_MIDWP, c);
 		}
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock(&chip->reg_lock);
 	}
 
 	/* EOI to the PCI part... reenables interrupts */
@@ -2125,7 +2132,7 @@ static struct pci_driver driver = {
 	
 static int __init alsa_card_cs4281_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_cs4281_exit(void)

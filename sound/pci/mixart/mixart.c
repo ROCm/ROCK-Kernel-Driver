@@ -1062,7 +1062,7 @@ static int snd_mixart_free(mixart_mgr_t *mgr)
 		free_irq(mgr->irq, (void *)mgr);
 
 	/* reset board if some firmware was loaded */
-	if(mgr->hwdep->dsp_loaded) {
+	if(mgr->dsp_loaded) {
 		snd_mixart_reset_board(mgr);
 		snd_printdd("reset miXart !\n");
 	}
@@ -1203,7 +1203,7 @@ static void snd_mixart_proc_read(snd_info_entry_t *entry,
 	snd_iprintf(buffer, "Digigram miXart (alsa card %d)\n\n", chip->chip_idx);
 
 	/* stats available when embedded OS is running */
-	if (chip->mgr->hwdep->dsp_loaded & ( 1 << MIXART_MOTHERBOARD_ELF_INDEX)) {
+	if (chip->mgr->dsp_loaded & ( 1 << MIXART_MOTHERBOARD_ELF_INDEX)) {
 		snd_iprintf(buffer, "- hardware -\n");
 		switch (chip->mgr->board_type ) {
 		case MIXART_DAUGHTER_TYPE_NONE     : snd_iprintf(buffer, "\tmiXart8 (no daughter board)\n\n"); break;
@@ -1381,7 +1381,7 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 		}
 	}
 
-	/* init firmware status (mgr->hwdep->dsp_loaded reset in hwdep_new) */
+	/* init firmware status (mgr->dsp_loaded reset in hwdep_new) */
 	mgr->board_type = MIXART_DAUGHTER_TYPE_NONE;
 
 	/* create array of streaminfo */
@@ -1431,7 +1431,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_mixart_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_mixart_exit(void)

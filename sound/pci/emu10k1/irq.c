@@ -33,11 +33,11 @@
 irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	emu10k1_t *emu = dev_id;
-	unsigned int status, orig_status;
+	unsigned int status, status2, orig_status, orig_status2;
 	int handled = 0;
 
 	while ((status = inl(emu->port + IPR)) != 0) {
-		// printk("irq - status = 0x%x\n", status);
+		//printk("emu10k1 irq - status = 0x%x\n", status);
 		orig_status = status;
 		handled = 1;
 		if (status & IPR_PCIERROR) {
@@ -147,6 +147,33 @@ irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				snd_emu10k1_intr_disable(emu, INTE_FXDSPENABLE);
 			status &= ~IPR_FXDSP;
 		}
+		if (status & IPR_P16V) {
+			while ((status2 = inl(emu->port + IPR2)) != 0) {
+				u32 mask = INTE2_PLAYBACK_CH_0_LOOP;  /* Full Loop */
+				emu10k1_voice_t *pvoice = &(emu->p16v_voices[0]);
+				emu10k1_voice_t *cvoice = &(emu->p16v_capture_voice);
+
+				//printk(KERN_INFO "status2=0x%x\n", status2);
+				orig_status2 = status2;
+				if(status2 & mask) {
+					if(pvoice->use) {
+						snd_pcm_period_elapsed(pvoice->epcm->substream);
+					} else { 
+						snd_printk(KERN_ERR "p16v: status: 0x%08x, mask=0x%08x, pvoice=%p, use=%d\n", status2, mask, pvoice, pvoice->use);
+					}
+				}
+				if(status2 & 0x110000) {
+					//printk(KERN_INFO "capture int found\n");
+					if(cvoice->use) {
+						//printk(KERN_INFO "capture period_elapsed\n");
+						snd_pcm_period_elapsed(cvoice->epcm->substream);
+					}
+				}
+				outl(orig_status2, emu->port + IPR2); /* ack all */
+			}
+			status &= ~IPR_P16V;
+		}
+
 		if (status) {
 			unsigned int bits;
 			snd_printk(KERN_ERR "emu10k1: unhandled interrupt: 0x%08x\n", status);

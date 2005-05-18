@@ -44,7 +44,7 @@ struct hda_gnode {
 	struct list_head list;
 };
 
-/* pathc-specific record */
+/* patch-specific record */
 struct hda_gspec {
 	struct hda_gnode *dac_node;	/* DAC node */
 	struct hda_gnode *out_pin_node;	/* Output pin (Line-Out) node */
@@ -426,7 +426,7 @@ static const char *get_input_type(struct hda_gnode *node, unsigned int *pinctl)
 		return "Line";
 	case AC_JACK_CD:
 		if (pinctl)
-			*pinctl |= AC_PIN_VREF_GRD;
+			*pinctl |= AC_PINCTL_VREF_GRD;
 		return "CD";
 	case AC_JACK_AUX:
 		if ((location & 0x0f) == AC_JACK_LOC_FRONT)
@@ -617,6 +617,7 @@ static int create_mixer(struct hda_codec *codec, struct hda_gnode *node,
 	char name[32];
 	int err;
 	int created = 0;
+	snd_kcontrol_new_t knew;
 
 	if (type)
 		sprintf(name, "%s %s Switch", type, dir_sfx);
@@ -624,16 +625,14 @@ static int create_mixer(struct hda_codec *codec, struct hda_gnode *node,
 		sprintf(name, "%s Switch", dir_sfx);
 	if ((node->wid_caps & AC_WCAP_IN_AMP) &&
 	    (node->amp_in_caps & AC_AMPCAP_MUTE)) {
-		snd_kcontrol_new_t knew =
-			HDA_CODEC_MUTE(name, node->nid, index, HDA_INPUT);
+		knew = (snd_kcontrol_new_t)HDA_CODEC_MUTE(name, node->nid, index, HDA_INPUT);
 		snd_printdd("[%s] NID=0x%x, DIR=IN, IDX=0x%x\n", name, node->nid, index);
 		if ((err = snd_ctl_add(codec->bus->card, snd_ctl_new1(&knew, codec))) < 0)
 			return err;
 		created = 1;
 	} else if ((node->wid_caps & AC_WCAP_OUT_AMP) &&
 		   (node->amp_out_caps & AC_AMPCAP_MUTE)) {
-		snd_kcontrol_new_t knew =
-			HDA_CODEC_MUTE(name, node->nid, 0, HDA_OUTPUT);
+		knew = (snd_kcontrol_new_t)HDA_CODEC_MUTE(name, node->nid, 0, HDA_OUTPUT);
 		snd_printdd("[%s] NID=0x%x, DIR=OUT\n", name, node->nid);
 		if ((err = snd_ctl_add(codec->bus->card, snd_ctl_new1(&knew, codec))) < 0)
 			return err;
@@ -646,16 +645,14 @@ static int create_mixer(struct hda_codec *codec, struct hda_gnode *node,
 		sprintf(name, "%s Volume", dir_sfx);
 	if ((node->wid_caps & AC_WCAP_IN_AMP) &&
 	    (node->amp_in_caps & AC_AMPCAP_NUM_STEPS)) {
-		snd_kcontrol_new_t knew =
-			HDA_CODEC_VOLUME(name, node->nid, index, HDA_INPUT);
+		knew = (snd_kcontrol_new_t)HDA_CODEC_VOLUME(name, node->nid, index, HDA_INPUT);
 		snd_printdd("[%s] NID=0x%x, DIR=IN, IDX=0x%x\n", name, node->nid, index);
 		if ((err = snd_ctl_add(codec->bus->card, snd_ctl_new1(&knew, codec))) < 0)
 			return err;
 		created = 1;
 	} else if ((node->wid_caps & AC_WCAP_OUT_AMP) &&
 		   (node->amp_out_caps & AC_AMPCAP_NUM_STEPS)) {
-		snd_kcontrol_new_t knew =
-			HDA_CODEC_VOLUME(name, node->nid, 0, HDA_OUTPUT);
+		knew = (snd_kcontrol_new_t)HDA_CODEC_VOLUME(name, node->nid, 0, HDA_OUTPUT);
 		snd_printdd("[%s] NID=0x%x, DIR=OUT\n", name, node->nid);
 		if ((err = snd_ctl_add(codec->bus->card, snd_ctl_new1(&knew, codec))) < 0)
 			return err;

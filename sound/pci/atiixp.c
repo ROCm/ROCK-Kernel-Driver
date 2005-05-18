@@ -1376,6 +1376,8 @@ static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock, const char 
 		ac97.pci = chip->pci;
 		ac97.num = i;
 		ac97.scaps = AC97_SCAP_SKIP_MODEM;
+		if (! chip->spdif_over_aclink)
+			ac97.scaps |= AC97_SCAP_NO_SPDIF;
 		if ((err = snd_ac97_mixer(pbus, &ac97, &chip->ac97[i])) < 0) {
 			chip->ac97[i] = NULL; /* to be sure */
 			snd_printdd("atiixp: codec %d not available for audio\n", i);
@@ -1643,7 +1645,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_atiixp_init(void)
 {
-	return pci_module_init(&driver);
+	return pci_register_driver(&driver);
 }
 
 static void __exit alsa_card_atiixp_exit(void)

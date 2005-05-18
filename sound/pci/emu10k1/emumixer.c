@@ -3,6 +3,7 @@
  *                   Takashi Iwai <tiwai@suse.de>
  *                   Creative Labs, Inc.
  *  Routines for control of EMU10K1 chips / mixer routines
+ *  Multichannel PCM support Copyright (c) Lee Revell <rlrevell@joe-job.com>
  *
  *  BUGS:
  *    --
@@ -67,6 +68,7 @@ static int snd_emu10k1_spdif_get_mask(snd_kcontrol_t * kcontrol,
 	return 0;
 }
 
+#if 0
 static int snd_audigy_spdif_output_rate_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	static char *texts[] = {"44100", "48000", "96000"};
@@ -151,6 +153,7 @@ static snd_kcontrol_new_t snd_audigy_spdif_output_rate =
 	.get =          snd_audigy_spdif_output_rate_get,
 	.put =          snd_audigy_spdif_output_rate_put
 };
+#endif
 
 static int snd_emu10k1_spdif_put(snd_kcontrol_t * kcontrol,
                                  snd_ctl_elem_value_t * ucontrol)
@@ -481,9 +484,13 @@ static int snd_emu10k1_efx_send_routing_put(snd_kcontrol_t * kcontrol,
 			change = 1;
 		}
 	}	
-	if (change && mix->epcm->voices[ch])
-		update_emu10k1_fxrt(emu, mix->epcm->voices[ch]->number,
-				    &mix->send_routing[0][0]);
+
+	if (change && mix->epcm) {
+		if (mix->epcm->voices[ch]) {
+			update_emu10k1_fxrt(emu, mix->epcm->voices[ch]->number,
+					&mix->send_routing[0][0]);
+		}
+	}
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
 	return change;
 }
@@ -543,9 +550,12 @@ static int snd_emu10k1_efx_send_volume_put(snd_kcontrol_t * kcontrol,
 			change = 1;
 		}
 	}
-	if (change && mix->epcm->voices[ch])
-		update_emu10k1_send_volume(emu, mix->epcm->voices[ch]->number,
-					   &mix->send_volume[0][0]);
+	if (change && mix->epcm) {
+		if (mix->epcm->voices[ch]) {
+			update_emu10k1_send_volume(emu, mix->epcm->voices[ch]->number,
+						   &mix->send_volume[0][0]);
+		}
+	}
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
 	return change;
 }
@@ -599,8 +609,11 @@ static int snd_emu10k1_efx_attn_put(snd_kcontrol_t * kcontrol,
 		mix->attn[0] = val;
 		change = 1;
 	}
-	if (change && mix->epcm->voices[ch])
-		snd_emu10k1_ptr_write(emu, VTFT_VOLUMETARGET, mix->epcm->voices[ch]->number, mix->attn[0]);
+	if (change && mix->epcm) {
+		if (mix->epcm->voices[ch]) {
+			snd_emu10k1_ptr_write(emu, VTFT_VOLUMETARGET, mix->epcm->voices[ch]->number, mix->attn[0]);
+		}
+	}
 	spin_unlock_irqrestore(&emu->reg_lock, flags);
 	return change;
 }
@@ -780,7 +793,7 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 		NULL
 	};
 
-	if (!emu->no_ac97) {
+	if (emu->card_capabilities->ac97_chip) {
 		ac97_bus_t *pbus;
 		ac97_template_t ac97;
 		static ac97_bus_ops_t ops = {
@@ -795,6 +808,7 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 		memset(&ac97, 0, sizeof(ac97));
 		ac97.private_data = emu;
 		ac97.private_free = snd_emu10k1_mixer_free_ac97;
+		ac97.scaps = AC97_SCAP_NO_SPDIF;
 		if ((err = snd_ac97_mixer(pbus, &ac97, &emu->ac97)) < 0)
 			return err;
 		if (emu->audigy) {
@@ -821,7 +835,7 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 		for (; *c; c++)
 			remove_ctl(card, *c);
 	} else {
-		if (emu->APS)
+		if (emu->card_capabilities->ecard)
 			strcpy(emu->card->mixername, "EMU APS");
 		else if (emu->audigy)
 			strcpy(emu->card->mixername, "SB Audigy");
@@ -906,17 +920,12 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 		mix->attn[0] = 0xffff;
 	}
 	
-	if (! emu->APS) { /* FIXME: APS has these controls? */
+	if (! emu->card_capabilities->ecard) { /* FIXME: APS has these controls? */
 		/* sb live! and audigy */
 		if ((kctl = snd_ctl_new1(&snd_emu10k1_spdif_mask_control, emu)) == NULL)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))
 			return err;
-		if ((kctl = ctl_find(card, SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT))) != NULL) {
-			/* already defined by ac97, remove it */
-			/* FIXME: or do we need both controls? */
-			remove_ctl(card, SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT));
-		}
 		if ((kctl = snd_ctl_new1(&snd_emu10k1_spdif_control, emu)) == NULL)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))
@@ -928,17 +937,23 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))
 			return err;
+#if 0
 		if ((kctl = snd_ctl_new1(&snd_audigy_spdif_output_rate, emu)) == NULL)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))
 			return err;
-	} else if (! emu->APS) {
+#endif
+	} else if (! emu->card_capabilities->ecard) {
 		/* sb live! */
 		if ((kctl = snd_ctl_new1(&snd_emu10k1_shared_spdif, emu)) == NULL)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))
 			return err;
 	}
-
+	if (emu->card_capabilities->ca0151_chip) { /* P16V */
+		if ((err = snd_p16v_mixer(emu)))
+			return err;
+	}
+		
 	return 0;
 }

@@ -136,7 +136,7 @@ typedef struct snd_seq_midi_op {
 #define gm_sustain	 	control[MIDI_CTL_SUSTAIN]
 #define gm_hold			gm_sustain
 #define gm_portamento		control[MIDI_CTL_PORTAMENTO]
-#define gm_sustenuto		control[MIDI_CTL_SUSTENUTO]
+#define gm_sostenuto		control[MIDI_CTL_SOSTENUTO]
 
 /*
  * These macros give the complete value of the controls that consist
@@ -166,7 +166,7 @@ typedef struct snd_seq_midi_op {
 #define SNDRV_MIDI_NOTE_OFF		0x00
 #define SNDRV_MIDI_NOTE_ON		0x01
 #define SNDRV_MIDI_NOTE_RELEASED		0x02
-#define SNDRV_MIDI_NOTE_SUSTENUTO		0x04
+#define SNDRV_MIDI_NOTE_SOSTENUTO		0x04
  
 #define SNDRV_MIDI_PARAM_TYPE_REGISTERED		0
 #define SNDRV_MIDI_PARAM_TYPE_NONREGISTERED	1

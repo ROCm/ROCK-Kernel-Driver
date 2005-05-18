@@ -634,7 +634,8 @@ static int snd_emu10k1_verify_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *ic
 	snd_ctl_elem_id_t __user *_id;
 	snd_ctl_elem_id_t id;
 	emu10k1_fx8010_control_gpr_t __user *_gctl;
-	emu10k1_fx8010_control_gpr_t gctl;
+	emu10k1_fx8010_control_gpr_t *gctl;
+	int err;
 	
 	for (i = 0, _id = icode->gpr_del_controls;
 	     i < icode->gpr_del_control_count; i++, _id++) {
@@ -643,29 +644,42 @@ static int snd_emu10k1_verify_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *ic
 		if (snd_emu10k1_look_for_ctl(emu, &id) == NULL)
 			return -ENOENT;
 	}
+	gctl = kmalloc(sizeof(*gctl), GFP_KERNEL);
+	if (! gctl)
+		return -ENOMEM;
+	err = 0;
 	for (i = 0, _gctl = icode->gpr_add_controls;
 	     i < icode->gpr_add_control_count; i++, _gctl++) {
-		if (copy_from_user(&gctl, _gctl, sizeof(gctl)))
-			return -EFAULT;
-		if (snd_emu10k1_look_for_ctl(emu, &gctl.id))
+		if (copy_from_user(gctl, _gctl, sizeof(*gctl))) {
+			err = -EFAULT;
+			goto __error;
+		}
+		if (snd_emu10k1_look_for_ctl(emu, &gctl->id))
 			continue;
 		down_read(&emu->card->controls_rwsem);
-		if (snd_ctl_find_id(emu->card, &gctl.id) != NULL) {
+		if (snd_ctl_find_id(emu->card, &gctl->id) != NULL) {
 			up_read(&emu->card->controls_rwsem);
-			return -EEXIST;
+			err = -EEXIST;
+			goto __error;
 		}
 		up_read(&emu->card->controls_rwsem);
-		if (gctl.id.iface != SNDRV_CTL_ELEM_IFACE_MIXER &&
-		    gctl.id.iface != SNDRV_CTL_ELEM_IFACE_PCM)
-			return -EINVAL;
+		if (gctl->id.iface != SNDRV_CTL_ELEM_IFACE_MIXER &&
+		    gctl->id.iface != SNDRV_CTL_ELEM_IFACE_PCM) {
+			err = -EINVAL;
+			goto __error;
+		}
 	}
 	for (i = 0, _gctl = icode->gpr_list_controls;
 	     i < icode->gpr_list_control_count; i++, _gctl++) {
 	     	/* FIXME: we need to check the WRITE access */
-		if (copy_from_user(&gctl, _gctl, sizeof(gctl)))
-			return -EFAULT;
+		if (copy_from_user(gctl, _gctl, sizeof(*gctl))) {
+			err = -EFAULT;
+			goto __error;
+		}
 	}
-	return 0;
+ __error:
+	kfree(gctl);
+	return err;
 }
 
 static void snd_emu10k1_ctl_private_free(snd_kcontrol_t *kctl)
@@ -682,52 +696,59 @@ static int snd_emu10k1_add_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icode
 {
 	unsigned int i, j;
 	emu10k1_fx8010_control_gpr_t __user *_gctl;
-	emu10k1_fx8010_control_gpr_t gctl;
-	snd_emu10k1_fx8010_ctl_t *ctl, nctl;
+	emu10k1_fx8010_control_gpr_t *gctl;
+	snd_emu10k1_fx8010_ctl_t *ctl, *nctl;
 	snd_kcontrol_new_t knew;
 	snd_kcontrol_t *kctl;
 	snd_ctl_elem_value_t *val;
 	int err = 0;
 
 	val = (snd_ctl_elem_value_t *)kmalloc(sizeof(*val), GFP_KERNEL);
-	if (!val)
-		return -ENOMEM;
+	gctl = kmalloc(sizeof(*gctl), GFP_KERNEL);
+	nctl = kmalloc(sizeof(*nctl), GFP_KERNEL);
+	if (!val || !gctl || !nctl) {
+		err = -ENOMEM;
+		goto __error;
+	}
+
 	for (i = 0, _gctl = icode->gpr_add_controls;
 	     i < icode->gpr_add_control_count; i++, _gctl++) {
-		if (copy_from_user(&gctl, _gctl, sizeof(gctl))) {
+		if (copy_from_user(gctl, _gctl, sizeof(*gctl))) {
 			err = -EFAULT;
 			goto __error;
 		}
-		snd_runtime_check(gctl.id.iface == SNDRV_CTL_ELEM_IFACE_MIXER ||
-		                  gctl.id.iface == SNDRV_CTL_ELEM_IFACE_PCM, err = -EINVAL; goto __error);
-		snd_runtime_check(gctl.id.name[0] != '\0', err = -EINVAL; goto __error);
-		ctl = snd_emu10k1_look_for_ctl(emu, &gctl.id);
+		snd_runtime_check(gctl->id.iface == SNDRV_CTL_ELEM_IFACE_MIXER ||
+		                  gctl->id.iface == SNDRV_CTL_ELEM_IFACE_PCM, err = -EINVAL; goto __error);
+		snd_runtime_check(gctl->id.name[0] != '\0', err = -EINVAL; goto __error);
+		ctl = snd_emu10k1_look_for_ctl(emu, &gctl->id);
 		memset(&knew, 0, sizeof(knew));
-		knew.iface = gctl.id.iface;
-		knew.name = gctl.id.name;
-		knew.index = gctl.id.index;
-		knew.device = gctl.id.device;
-		knew.subdevice = gctl.id.subdevice;
+		knew.iface = gctl->id.iface;
+		knew.name = gctl->id.name;
+		knew.index = gctl->id.index;
+		knew.device = gctl->id.device;
+		knew.subdevice = gctl->id.subdevice;
 		knew.info = snd_emu10k1_gpr_ctl_info;
 		knew.get = snd_emu10k1_gpr_ctl_get;
 		knew.put = snd_emu10k1_gpr_ctl_put;
-		memset(&nctl, 0, sizeof(nctl));
-		nctl.vcount = gctl.vcount;
-		nctl.count = gctl.count;
+		memset(nctl, 0, sizeof(*nctl));
+		nctl->vcount = gctl->vcount;
+		nctl->count = gctl->count;
 		for (j = 0; j < 32; j++) {
-			nctl.gpr[j] = gctl.gpr[j];
-			nctl.value[j] = ~gctl.value[j];	/* inverted, we want to write new value in gpr_ctl_put() */
-			val->value.integer.value[j] = gctl.value[j];
+			nctl->gpr[j] = gctl->gpr[j];
+			nctl->value[j] = ~gctl->value[j];	/* inverted, we want to write new value in gpr_ctl_put() */
+			val->value.integer.value[j] = gctl->value[j];
 		}
-		nctl.min = gctl.min;
-		nctl.max = gctl.max;
-		nctl.translation = gctl.translation;
+		nctl->min = gctl->min;
+		nctl->max = gctl->max;
+		nctl->translation = gctl->translation;
 		if (ctl == NULL) {
 			ctl = (snd_emu10k1_fx8010_ctl_t *)kmalloc(sizeof(*ctl), GFP_KERNEL);
-			if (ctl == NULL)
-				continue;
+			if (ctl == NULL) {
+				err = -ENOMEM;
+				goto __error;
+			}
 			knew.private_value = (unsigned long)ctl;
-			memcpy(ctl, &nctl, sizeof(nctl));
+			*ctl = *nctl;
 			if ((err = snd_ctl_add(emu->card, kctl = snd_ctl_new1(&knew, emu))) < 0) {
 				kfree(ctl);
 				goto __error;
@@ -737,15 +758,17 @@ static int snd_emu10k1_add_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icode
 			list_add_tail(&ctl->list, &emu->fx8010.gpr_ctl);
 		} else {
 			/* overwrite */
-			nctl.list = ctl->list;
-			nctl.kcontrol = ctl->kcontrol;
-			memcpy(ctl, &nctl, sizeof(nctl));
+			nctl->list = ctl->list;
+			nctl->kcontrol = ctl->kcontrol;
+			*ctl = *nctl;
 			snd_ctl_notify(emu->card, SNDRV_CTL_EVENT_MASK_VALUE |
 			                          SNDRV_CTL_EVENT_MASK_INFO, &ctl->kcontrol->id);
 		}
 		snd_emu10k1_gpr_ctl_put(ctl->kcontrol, val);
 	}
       __error:
+	kfree(nctl);
+	kfree(gctl);
 	kfree(val);
 	return err;
 }
@@ -774,40 +797,47 @@ static int snd_emu10k1_list_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icod
 {
 	unsigned int i = 0, j;
 	unsigned int total = 0;
-	emu10k1_fx8010_control_gpr_t gctl;
+	emu10k1_fx8010_control_gpr_t *gctl;
 	emu10k1_fx8010_control_gpr_t __user *_gctl;
 	snd_emu10k1_fx8010_ctl_t *ctl;
 	snd_ctl_elem_id_t *id;
 	struct list_head *list;
+
+	gctl = kmalloc(sizeof(*gctl), GFP_KERNEL);
+	if (! gctl)
+		return -ENOMEM;
 
 	_gctl = icode->gpr_list_controls;	
 	list_for_each(list, &emu->fx8010.gpr_ctl) {
 		ctl = emu10k1_gpr_ctl(list);
 		total++;
 		if (_gctl && i < icode->gpr_list_control_count) {
-			memset(&gctl, 0, sizeof(gctl));
+			memset(gctl, 0, sizeof(*gctl));
 			id = &ctl->kcontrol->id;
-			gctl.id.iface = id->iface;
-			strlcpy(gctl.id.name, id->name, sizeof(gctl.id.name));
-			gctl.id.index = id->index;
-			gctl.id.device = id->device;
-			gctl.id.subdevice = id->subdevice;
-			gctl.vcount = ctl->vcount;
-			gctl.count = ctl->count;
+			gctl->id.iface = id->iface;
+			strlcpy(gctl->id.name, id->name, sizeof(gctl->id.name));
+			gctl->id.index = id->index;
+			gctl->id.device = id->device;
+			gctl->id.subdevice = id->subdevice;
+			gctl->vcount = ctl->vcount;
+			gctl->count = ctl->count;
 			for (j = 0; j < 32; j++) {
-				gctl.gpr[j] = ctl->gpr[j];
-				gctl.value[j] = ctl->value[j];
+				gctl->gpr[j] = ctl->gpr[j];
+				gctl->value[j] = ctl->value[j];
 			}
-			gctl.min = ctl->min;
-			gctl.max = ctl->max;
-			gctl.translation = ctl->translation;
-			if (copy_to_user(_gctl, &gctl, sizeof(gctl)))
+			gctl->min = ctl->min;
+			gctl->max = ctl->max;
+			gctl->translation = ctl->translation;
+			if (copy_to_user(_gctl, gctl, sizeof(*gctl))) {
+				kfree(gctl);
 				return -EFAULT;
+			}
 			_gctl++;
 			i++;
 		}
 	}
 	icode->gpr_list_control_total = total;
+	kfree(gctl);
 	return 0;
 }
 
@@ -1047,7 +1077,7 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	gpr += 2;
 	
 	/* PCM Side Playback (independent from stereo mix) */
-	if (emu->spk71) {
+	if (emu->card_capabilities->spk71) {
 		A_OP(icode, &ptr, iMAC0, A_GPR(playback+6), A_C_00000000, A_GPR(gpr), A_FXBUS(FXBUS_PCM_LEFT_SIDE));
 		A_OP(icode, &ptr, iMAC0, A_GPR(playback+7), A_C_00000000, A_GPR(gpr+1), A_FXBUS(FXBUS_PCM_RIGHT_SIDE));
 		snd_emu10k1_init_stereo_control(&controls[nctl++], "PCM Side Playback Volume", gpr, 100);
@@ -1115,14 +1145,14 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	A_ADD_VOLUME_IN(stereo_mix, gpr, A_EXTIN_SPDIF_CD_L);
 	A_ADD_VOLUME_IN(stereo_mix+1, gpr+1, A_EXTIN_SPDIF_CD_R);
 	snd_emu10k1_init_stereo_control(&controls[nctl++],
-					emu->no_ac97 ? "CD Playback Volume" : "Audigy CD Playback Volume",
+					emu->card_capabilities->ac97_chip ? "Audigy CD Playback Volume" : "CD Playback Volume",
 					gpr, 0);
 	gpr += 2;
 	/* Audigy CD Capture Volume */
 	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_SPDIF_CD_L);
 	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_SPDIF_CD_R);
 	snd_emu10k1_init_stereo_control(&controls[nctl++],
-					emu->no_ac97 ? "CD Capture Volume" : "Audigy CD Capture Volume",
+					emu->card_capabilities->ac97_chip ? "Audigy CD Capture Volume" : "CD Capture Volume",
 					gpr, 0);
 	gpr += 2;
 
@@ -1141,14 +1171,14 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	A_ADD_VOLUME_IN(stereo_mix, gpr, A_EXTIN_LINE2_L);
 	A_ADD_VOLUME_IN(stereo_mix+1, gpr+1, A_EXTIN_LINE2_R);
 	snd_emu10k1_init_stereo_control(&controls[nctl++],
-					emu->no_ac97 ? "Line Playback Volume" : "Line2 Playback Volume",
+					emu->card_capabilities->ac97_chip ? "Line2 Playback Volume" : "Line Playback Volume",
 					gpr, 0);
 	gpr += 2;
 	/* Line2 Capture Volume */
 	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_LINE2_L);
 	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_LINE2_R);
 	snd_emu10k1_init_stereo_control(&controls[nctl++],
-					emu->no_ac97 ? "Line Capture Volume" : "Line2 Capture Volume",
+					emu->card_capabilities->ac97_chip ? "Line2 Capture Volume" : "Line Capture Volume",
 					gpr, 0);
 	gpr += 2;
         
@@ -1167,14 +1197,14 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	A_ADD_VOLUME_IN(stereo_mix, gpr, A_EXTIN_AUX2_L);
 	A_ADD_VOLUME_IN(stereo_mix+1, gpr+1, A_EXTIN_AUX2_R);
 	snd_emu10k1_init_stereo_control(&controls[nctl++],
-					emu->no_ac97 ? "Aux Playback Volume" : "Aux2 Playback Volume",
+					emu->card_capabilities->ac97_chip ? "Aux2 Playback Volume" : "Aux Playback Volume",
 					gpr, 0);
 	gpr += 2;
 	/* Aux2 Capture Volume */
 	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_AUX2_L);
 	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_AUX2_R);
 	snd_emu10k1_init_stereo_control(&controls[nctl++],
-					emu->no_ac97 ? "Aux Capture Volume" : "Aux2 Capture Volume",
+					emu->card_capabilities->ac97_chip ? "Aux2 Capture Volume" : "Aux Capture Volume",
 					gpr, 0);
 	gpr += 2;
 	
@@ -1202,7 +1232,7 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	snd_emu10k1_init_mono_control(&controls[nctl++], "LFE Playback Volume", gpr, 0);
 	gpr++;
 	
-	if (emu->spk71) {
+	if (emu->card_capabilities->spk71) {
 		/* Stereo Mix Side Playback */
 		A_OP(icode, &ptr, iMAC0, A_GPR(playback+6), A_GPR(playback+6), A_GPR(gpr), A_GPR(stereo_mix));
 		A_OP(icode, &ptr, iMAC0, A_GPR(playback+7), A_GPR(playback+7), A_GPR(gpr+1), A_GPR(stereo_mix+1));
@@ -1236,7 +1266,7 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	A_OP(icode, &ptr, iACC3, A_GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 3), A_GPR(playback + 3), A_C_00000000, A_C_00000000); /* rear right */
 	A_OP(icode, &ptr, iACC3, A_GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 4), A_GPR(playback + 4), A_C_00000000, A_C_00000000); /* center */
 	A_OP(icode, &ptr, iACC3, A_GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 5), A_GPR(playback + 5), A_C_00000000, A_C_00000000); /* LFE */
-	if (emu->spk71) {
+	if (emu->card_capabilities->spk71) {
 		A_OP(icode, &ptr, iACC3, A_GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 6), A_GPR(playback + 6), A_C_00000000, A_C_00000000); /* side left */
 		A_OP(icode, &ptr, iACC3, A_GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 7), A_GPR(playback + 7), A_C_00000000, A_C_00000000); /* side right */
 	}
@@ -1329,7 +1359,7 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	A_PUT_STEREO_OUTPUT(A_EXTOUT_AREAR_L, A_EXTOUT_AREAR_R, playback+2 + SND_EMU10K1_PLAYBACK_CHANNELS);
 	A_PUT_OUTPUT(A_EXTOUT_ACENTER, playback+4 + SND_EMU10K1_PLAYBACK_CHANNELS);
 	A_PUT_OUTPUT(A_EXTOUT_ALFE, playback+5 + SND_EMU10K1_PLAYBACK_CHANNELS);
-	if (emu->spk71)
+	if (emu->card_capabilities->spk71)
 		A_PUT_STEREO_OUTPUT(A_EXTOUT_ASIDE_L, A_EXTOUT_ASIDE_R, playback+6 + SND_EMU10K1_PLAYBACK_CHANNELS);
 
 	/* headphone */
@@ -1339,6 +1369,7 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	/* A_PUT_STEREO_OUTPUT(A_EXTOUT_FRONT_L, A_EXTOUT_FRONT_R, playback + SND_EMU10K1_PLAYBACK_CHANNELS); */
 
 	/* IEC958 Optical Raw Playback Switch */ 
+	gpr_map[gpr++] = 0;
 	gpr_map[gpr++] = 0x1008;
 	gpr_map[gpr++] = 0xffff0000;
 	for (z = 0; z < 2; z++) {
@@ -1349,7 +1380,14 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 		A_SWITCH(icode, &ptr, tmp + 0, tmp + 2, gpr + z);
 		A_SWITCH_NEG(icode, &ptr, tmp + 1, gpr + z);
 		A_SWITCH(icode, &ptr, tmp + 1, playback + SND_EMU10K1_PLAYBACK_CHANNELS + z, tmp + 1);
-		A_OP(icode, &ptr, iACC3, A_EXTOUT(A_EXTOUT_FRONT_L + z), A_GPR(tmp + 0), A_GPR(tmp + 1), A_C_00000000);
+		if ((z==1) && (emu->card_capabilities->spdif_bug)) {
+			/* Due to a SPDIF output bug on some Audigy cards, this code delays the Right channel by 1 sample */
+			snd_printk("Installing spdif_bug patch: %s\n", emu->card_capabilities->name);
+			A_OP(icode, &ptr, iACC3, A_EXTOUT(A_EXTOUT_FRONT_L + z), A_GPR(gpr - 3), A_C_00000000, A_C_00000000);
+			A_OP(icode, &ptr, iACC3, A_GPR(gpr - 3), A_GPR(tmp + 0), A_GPR(tmp + 1), A_C_00000000);
+		} else {
+			A_OP(icode, &ptr, iACC3, A_EXTOUT(A_EXTOUT_FRONT_L + z), A_GPR(tmp + 0), A_GPR(tmp + 1), A_C_00000000);
+		}
 	}
 	snd_emu10k1_init_stereo_onoff_control(controls + nctl++, "IEC958 Optical Raw Playback Switch", gpr, 0);
 	gpr += 2;
@@ -1944,22 +1982,27 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 		OP(icode, &ptr, iACC3, EXTOUT(EXTOUT_MIC_CAP), GPR(capture + 2), C_00000000, C_00000000);
 
 	/* EFX capture - capture the 16 EXTINS */
-	OP(icode, &ptr, iACC3, FXBUS2(14), C_00000000, C_00000000, EXTIN(0));
-	OP(icode, &ptr, iACC3, FXBUS2(15), C_00000000, C_00000000, EXTIN(1));
-	OP(icode, &ptr, iACC3, FXBUS2(0), C_00000000, C_00000000, EXTIN(2));
-	OP(icode, &ptr, iACC3, FXBUS2(3), C_00000000, C_00000000, EXTIN(3));
-	/* Dont connect anything to FXBUS2 1 and 2.  These are shared with 
-	 * Center/LFE on the SBLive 5.1.  The kX driver only changes the 
-	 * routing when it detects an SBLive 5.1.
-	 *
-	 * Since only 14 of the 16 EXTINs are used, this is not a big problem.  
-	 * We route AC97L and R to FX capture 14 and 15, SPDIF CD in to FX capture 
-	 * 0 and 3, then the rest of the EXTINs to the corresponding FX capture 
-	 * channel.
-	 */
-	for (z = 4; z < 14; z++) {
-		OP(icode, &ptr, iACC3, FXBUS2(z), C_00000000, C_00000000, EXTIN(z));
+	if (emu->card_capabilities->sblive51) {
+		/* On the Live! 5.1, FXBUS2(1) and FXBUS(2) are shared with EXTOUT_ACENTER
+		 * and EXTOUT_ALFE, so we can't connect inputs to them for multitrack recording.
+		 *
+		 * Since only 14 of the 16 EXTINs are used, this is not a big problem.  
+		 * We route AC97L and R to FX capture 14 and 15, SPDIF CD in to FX capture 
+		 * 0 and 3, then the rest of the EXTINs to the corresponding FX capture 
+		 * channel.  Multitrack recorders will still see the center/lfe output signal 
+		 * on the second and third channels.
+		 */
+		OP(icode, &ptr, iACC3, FXBUS2(14), C_00000000, C_00000000, EXTIN(0));
+		OP(icode, &ptr, iACC3, FXBUS2(15), C_00000000, C_00000000, EXTIN(1));
+		OP(icode, &ptr, iACC3, FXBUS2(0), C_00000000, C_00000000, EXTIN(2));
+		OP(icode, &ptr, iACC3, FXBUS2(3), C_00000000, C_00000000, EXTIN(3));
+		for (z = 4; z < 14; z++)
+			OP(icode, &ptr, iACC3, FXBUS2(z), C_00000000, C_00000000, EXTIN(z));
+	} else {
+		for (z = 0; z < 16; z++)
+			OP(icode, &ptr, iACC3, FXBUS2(z), C_00000000, C_00000000, EXTIN(z));
 	}
+	    
 
 	if (gpr > tmp) {
 		snd_BUG();
@@ -2090,9 +2133,8 @@ static int snd_emu10k1_fx8010_info(emu10k1_t *emu, emu10k1_fx8010_info_t *info)
 	int res;
 
 	memset(info, 0, sizeof(info));
-	info->card = emu->card_type;
 	info->internal_tram_size = emu->fx8010.itram_size;
-	info->external_tram_size = emu->fx8010.etram_pages.bytes;
+	info->external_tram_size = emu->fx8010.etram_pages.bytes / 2;
 	fxbus = fxbuses;
 	extin = emu->audigy ? audigy_ins : creative_ins;
 	extout = emu->audigy ? audigy_outs : creative_outs;

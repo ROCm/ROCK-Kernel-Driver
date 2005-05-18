@@ -113,10 +113,18 @@ int snd_pcm_info(snd_pcm_substream_t * substream, snd_pcm_info_t *info)
 
 int snd_pcm_info_user(snd_pcm_substream_t * substream, snd_pcm_info_t __user * _info)
 {
-	snd_pcm_info_t info;
-	int err = snd_pcm_info(substream, &info);
-	if (copy_to_user(_info, &info, sizeof(info)))
-		return -EFAULT;
+	snd_pcm_info_t *info;
+	int err;
+
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	if (! info)
+		return -ENOMEM;
+	err = snd_pcm_info(substream, info);
+	if (err >= 0) {
+		if (copy_to_user(_info, info, sizeof(*info)))
+			err = -EFAULT;
+	}
+	kfree(info);
 	return err;
 }
 
@@ -3100,8 +3108,8 @@ int snd_pcm_lib_mmap_iomem(snd_pcm_substream_t *substream, struct vm_area_struct
 	area->vm_flags |= VM_IO;
 	size = area->vm_end - area->vm_start;
 	offset = area->vm_pgoff << PAGE_SHIFT;
-	if (io_remap_page_range(area, area->vm_start,
-				substream->runtime->dma_addr + offset,
+	if (io_remap_pfn_range(area, area->vm_start,
+				(substream->runtime->dma_addr + offset) >> PAGE_SHIFT,
 				size, area->vm_page_prot))
 		return -EAGAIN;
 	atomic_inc(&substream->runtime->mmap_count);

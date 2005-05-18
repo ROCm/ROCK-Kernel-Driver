@@ -49,7 +49,10 @@ struct hda_vendor_id {
 /* codec vendor labels */
 static struct hda_vendor_id hda_vendor_ids[] = {
 	{ 0x10ec, "Realtek" },
+	{ 0x11d4, "Analog Devices" },
+	{ 0x13f6, "C-Media" },
 	{ 0x434d, "C-Media" },
+	{ 0x8384, "SigmaTel" },
 	{} /* terminator */
 };
 
@@ -507,7 +510,7 @@ int snd_hda_codec_new(struct hda_bus *bus, unsigned int codec_addr,
 	/* FIXME: support for multiple AFGs? */
 	codec->afg = look_for_afg_node(codec);
 	if (! codec->afg) {
-		snd_printk(KERN_ERR "hda_codec: no AFG node found\n");
+		snd_printdd("hda_codec: no AFG node found\n");
 		snd_hda_codec_free(codec);
 		return -ENODEV;
 	}
@@ -547,6 +550,9 @@ int snd_hda_codec_new(struct hda_bus *bus, unsigned int codec_addr,
 void snd_hda_codec_setup_stream(struct hda_codec *codec, hda_nid_t nid, u32 stream_tag,
 				int channel_id, int format)
 {
+	if (! nid)
+		return;
+
 	snd_printdd("hda_codec_setup_stream: NID=0x%x, stream=0x%x, channel=%d, format=0x%x\n",
 		    nid, stream_tag, channel_id, format);
 	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_CHANNEL_STREAMID,
@@ -610,6 +616,8 @@ static u32 query_amp_caps(struct hda_codec *codec, hda_nid_t nid, int direction)
 	if (! info)
 		return 0;
 	if (! (info->status & INFO_AMP_CAPS)) {
+		if (!(snd_hda_param_read(codec, nid, AC_PAR_AUDIO_WIDGET_CAP) & AC_WCAP_AMP_OVRD))
+			nid = codec->afg;
 		info->amp_caps = snd_hda_param_read(codec, nid, direction == HDA_OUTPUT ?
 						    AC_PAR_AMP_OUT_CAP : AC_PAR_AMP_IN_CAP);
 		info->status |= INFO_AMP_CAPS;
@@ -655,7 +663,7 @@ static void put_vol_mute(struct hda_codec *codec,
 /*
  * read/write AMP value.  The volume is between 0 to 0x7f, 0x80 = mute bit.
  */
-int snd_hda_codec_amp_read(struct hda_codec *codec, hda_nid_t nid, int ch, int direction, int index)
+static int snd_hda_codec_amp_read(struct hda_codec *codec, hda_nid_t nid, int ch, int direction, int index)
 {
 	struct hda_amp_info *info = get_alloc_amp_hash(codec, HDA_HASH_KEY(nid, direction, index));
 	if (! info)
@@ -664,7 +672,7 @@ int snd_hda_codec_amp_read(struct hda_codec *codec, hda_nid_t nid, int ch, int d
 	return info->vol[ch];
 }
 
-int snd_hda_codec_amp_write(struct hda_codec *codec, hda_nid_t nid, int ch, int direction, int idx, int val)
+static int snd_hda_codec_amp_write(struct hda_codec *codec, hda_nid_t nid, int ch, int direction, int idx, int val)
 {
 	struct hda_amp_info *info = get_alloc_amp_hash(codec, HDA_HASH_KEY(nid, direction, idx));
 	if (! info)
@@ -954,6 +962,9 @@ static int snd_hda_spdif_out_switch_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 	if (change || codec->in_resume) {
 		codec->spdif_ctls = val;
 		snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_DIGI_CONVERT_1, val & 0xff);
+		snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_AMP_GAIN_MUTE,
+				    AC_AMP_SET_RIGHT | AC_AMP_SET_LEFT |
+				    AC_AMP_SET_OUTPUT | ((val & 1) ? 0 : 0x80));
 	}
 	up(&codec->spdif_mutex);
 	return change;
@@ -1442,10 +1453,6 @@ static int set_pcm_default_values(struct hda_codec *codec, struct hda_pcm_stream
 		snd_assert(info->nid, return -EINVAL);
 		info->ops.prepare = hda_pcm_default_prepare;
 	}
-	if (info->ops.prepare == NULL) {
-		snd_assert(info->nid, return -EINVAL);
-		info->ops.prepare = hda_pcm_default_prepare;
-	}
 	if (info->ops.cleanup == NULL) {
 		snd_assert(info->nid, return -EINVAL);
 		info->ops.cleanup = hda_pcm_default_cleanup;
@@ -1524,7 +1531,7 @@ int snd_hda_check_board_config(struct hda_codec *codec, struct hda_board_config 
 	struct hda_board_config *c;
 
 	if (codec->bus->modelname) {
-		for (c = tbl; c->modelname || c->pci_vendor; c++) {
+		for (c = tbl; c->modelname || c->pci_subvendor; c++) {
 			if (c->modelname &&
 			    ! strcmp(codec->bus->modelname, c->modelname)) {
 				snd_printd(KERN_INFO "hda_codec: model '%s' is selected\n", c->modelname);
@@ -1537,9 +1544,9 @@ int snd_hda_check_board_config(struct hda_codec *codec, struct hda_board_config 
 		u16 subsystem_vendor, subsystem_device;
 		pci_read_config_word(codec->bus->pci, PCI_SUBSYSTEM_VENDOR_ID, &subsystem_vendor);
 		pci_read_config_word(codec->bus->pci, PCI_SUBSYSTEM_ID, &subsystem_device);
-		for (c = tbl; c->modelname || c->pci_vendor; c++) {
-			if (c->pci_vendor == subsystem_vendor &&
-			    c->pci_device == subsystem_device)
+		for (c = tbl; c->modelname || c->pci_subvendor; c++) {
+			if (c->pci_subvendor == subsystem_vendor &&
+			    c->pci_subdevice == subsystem_device)
 				return c->config;
 		}
 	}

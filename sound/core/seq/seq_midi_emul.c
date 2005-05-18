@@ -244,8 +244,8 @@ note_off(snd_midi_op_t *ops, void *drv, snd_midi_channel_t *chan, int note, int 
 	if (chan->gm_hold) {
 		/* Hold this note until pedal is turned off */
 		chan->note[note] |= SNDRV_MIDI_NOTE_RELEASED;
-	} else if (chan->note[note] & SNDRV_MIDI_NOTE_SUSTENUTO) {
-		/* Mark this note as release; it will be turned off when sustenuto
+	} else if (chan->note[note] & SNDRV_MIDI_NOTE_SOSTENUTO) {
+		/* Mark this note as release; it will be turned off when sostenuto
 		 * is turned off */
 		chan->note[note] |= SNDRV_MIDI_NOTE_RELEASED;
 	} else {
@@ -287,18 +287,18 @@ do_control(snd_midi_op_t *ops, void *drv, snd_midi_channel_set_t *chset,
 		break;
 	case MIDI_CTL_PORTAMENTO:
 		break;
-	case MIDI_CTL_SUSTENUTO:
+	case MIDI_CTL_SOSTENUTO:
 		if (value) {
 			/* Mark each note that is currently held down */
 			for (i = 0; i < 128; i++) {
 				if (chan->note[i] & SNDRV_MIDI_NOTE_ON)
-					chan->note[i] |= SNDRV_MIDI_NOTE_SUSTENUTO;
+					chan->note[i] |= SNDRV_MIDI_NOTE_SOSTENUTO;
 			}
 		} else {
 			/* release all notes that were held */
 			for (i = 0; i < 128; i++) {
-				if (chan->note[i] & SNDRV_MIDI_NOTE_SUSTENUTO) {
-					chan->note[i] &= ~SNDRV_MIDI_NOTE_SUSTENUTO;
+				if (chan->note[i] & SNDRV_MIDI_NOTE_SOSTENUTO) {
+					chan->note[i] &= ~SNDRV_MIDI_NOTE_SOSTENUTO;
 					if (chan->note[i] & SNDRV_MIDI_NOTE_RELEASED) {
 						chan->note[i] = SNDRV_MIDI_NOTE_OFF;
 						if (ops->note_off)
