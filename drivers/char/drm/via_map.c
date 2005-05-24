@@ -67,8 +67,10 @@ static int via_do_init_map(drm_device_t * dev, drm_via_init_t * init)
 
 	dev_priv->agpAddr = init->agpAddr;
 
-	for (i = 0; i < VIA_NR_XVMC_LOCKS; ++i)
+	for (i = 0; i < VIA_NR_XVMC_LOCKS; ++i) {
 		DRM_INIT_WAITQUEUE(&(dev_priv->decoder_queue[i]));
+		XVMCLOCKPTR(dev_priv->sarea_priv, i)->lock = 0;
+	}
 
 	dev->dev_private = (void *)dev_priv;
 
@@ -109,6 +111,7 @@ int via_map_init(DRM_IOCTL_ARGS)
 	return -EINVAL;
 }
 
+
 int via_decoder_futex(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
@@ -123,7 +126,7 @@ int via_decoder_futex(DRM_IOCTL_ARGS)
 	if (fx.lock > VIA_NR_XVMC_LOCKS)
 		return -EFAULT;
 
-	lock = XVMCLOCKPTR(sAPriv, fx.lock);
+	lock = (int *)XVMCLOCKPTR(sAPriv, fx.lock);
 
 	switch (fx.func) {
 	case VIA_FUTEX_WAIT:

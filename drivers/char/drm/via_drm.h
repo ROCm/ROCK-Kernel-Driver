@@ -31,18 +31,19 @@
 #ifndef _VIA_DEFINES_
 #define _VIA_DEFINES_
 
-#define VIA_DMA_BUF_ORDER		12
-#define VIA_DMA_BUF_SZ 		        (1 << VIA_DMA_BUF_ORDER)
-#define VIA_DMA_BUF_NR 			256
+#ifndef __KERNEL__
+#include "via_drmclient.h"
+#endif
+
 #define VIA_NR_SAREA_CLIPRECTS 		8
 #define VIA_NR_XVMC_PORTS               10
 #define VIA_NR_XVMC_LOCKS               5
 #define VIA_MAX_CACHELINE_SIZE          64
 #define XVMCLOCKPTR(saPriv,lockNo)					\
-        ((volatile int *)(((((unsigned long) (saPriv)->XvMCLockArea) +	\
-                            (VIA_MAX_CACHELINE_SIZE - 1)) &             \
-                           ~(VIA_MAX_CACHELINE_SIZE - 1)) +             \
-                          VIA_MAX_CACHELINE_SIZE*(lockNo)))
+	((volatile drm_hw_lock_t *)(((((unsigned long) (saPriv)->XvMCLockArea) + \
+				      (VIA_MAX_CACHELINE_SIZE - 1)) &	\
+				     ~(VIA_MAX_CACHELINE_SIZE - 1)) +	\
+				    VIA_MAX_CACHELINE_SIZE*(lockNo)))
 
 /* Each region is a minimum of 64k, and there are at most 64 of them.
  */

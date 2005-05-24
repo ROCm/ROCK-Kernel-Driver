@@ -179,13 +179,12 @@ int via_final_context(struct drm_device *dev, int context)
 	 */ 
 
 	for (i=0; i < VIA_NR_XVMC_LOCKS; ++i) {
-		lock = XVMCLOCKPTR(sAPriv, i);
-		if ( (_DRM_LOCKING_CONTEXT( *lock ) == i) && 
-		     (_DRM_LOCK_IS_HELD( *lock ))) {
-			if ( *lock & _DRM_LOCK_CONT) {
+	        lock = (int *) XVMCLOCKPTR(sAPriv, i);
+		if ( (_DRM_LOCKING_CONTEXT( *lock ) == context)) {
+			if (_DRM_LOCK_IS_HELD( *lock ) && (*lock & _DRM_LOCK_CONT)) {
 				DRM_WAKEUP( &(dev_priv->decoder_queue[i]));
 			}
-			*lock &= ~( _DRM_LOCK_HELD | _DRM_LOCK_CONT );
+			*lock = 0;
 		}
 	}
 			

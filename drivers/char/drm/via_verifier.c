@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * Author: Thomas Hellström 2004.
+ * Author: Thomas Hellstrï¿½ 2004.
  * This code was written using docs obtained under NDA from VIA Inc.
  *
  * Don't run this code directly on an AGP buffer. Due to cache problems it will

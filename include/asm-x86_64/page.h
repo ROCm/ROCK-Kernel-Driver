@@ -69,12 +69,12 @@ extern unsigned long vm_force_exec32;
 
 #define __START_KERNEL		0xffffffff80100000UL
 #define __START_KERNEL_map	0xffffffff80000000UL
-#define __PAGE_OFFSET           (0xffff810000000000UL - 4096)
+#define __PAGE_OFFSET           0xffff810000000000UL
 
 #else
 #define __START_KERNEL		0xffffffff80100000
 #define __START_KERNEL_map	0xffffffff80000000
-#define __PAGE_OFFSET           (0xffff810000000000 - PAGE_SIZE)
+#define __PAGE_OFFSET           0xffff810000000000
 #endif /* !__ASSEMBLY__ */
 
 /* to align the pointer to the (next) page boundary */
