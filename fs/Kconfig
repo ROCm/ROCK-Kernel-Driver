@@ -393,7 +393,7 @@ config DNOTIFY
 
 config SUBFS_FS
 	tristate "subfs file system support"
-	---help---
+	help
 	  If you don't know whether you need it, then you don't need it:
 	  answer N.
 

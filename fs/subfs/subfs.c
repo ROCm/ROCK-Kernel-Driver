@@ -16,6 +16,7 @@
 #include <linux/moduleparam.h>
 #include <linux/pagemap.h>
 #include <linux/fs.h>
+#include <linux/parser.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
 #include <linux/list.h>
@@ -89,7 +90,7 @@ static void subfs_send_signal(void)
 
 
 /* If the option "procuid" is chosen when subfs is mounted, the uid
- * and gid numbers for the current process will  be added to the mount
+ * and gid numbers for the current process will be added to the mount
  * option line.  Hence, non-unix filesystems will be mounted with
  * that ownership.
  */
@@ -127,7 +128,7 @@ static int mount_real_fs(struct subfs_mount *sfs_mnt, struct vfsmount *mnt, unsi
 	if (!path_buf)
 		return -ENOMEM;
 	argv[2] = d_path(mnt->mnt_mountpoint, mnt->mnt_parent,
-                         path_buf, PAGE_SIZE);
+			 path_buf, PAGE_SIZE);
 	argv[3] = sfs_mnt->req_fs;
 	if (!(argv[4] = kmalloc(17, GFP_KERNEL))) {
 		free_page((unsigned long) path_buf);
@@ -155,37 +156,38 @@ static struct vfsmount *get_child_mount (struct subfs_mount *sfs_mnt,
 {
 	struct vfsmount *child;
 	int result;
-        unsigned long flags = 0;
+	unsigned long flags = 0;
 
-        /* Lookup the child mount - if it's not mounted, mount it */
-        child = lookup_mnt (mnt, sfs_mnt->sb->s_root);
-        if (!child) {
-       		flags = sfs_mnt->sb->s_flags;
+	/* Lookup the child mount - if it's not mounted, mount it */
+	child = lookup_mnt (mnt, sfs_mnt->sb->s_root);
+	if (!child) {
+		flags = sfs_mnt->sb->s_flags;
 		if (mnt->mnt_flags & MNT_NOSUID) flags |= MS_NOSUID;
 		if (mnt->mnt_flags & MNT_NODEV) flags |= MS_NODEV;
 		if (mnt->mnt_flags & MNT_NOEXEC) flags |= MS_NOEXEC;
 
-                result = mount_real_fs (sfs_mnt, mnt, flags);
+		result = mount_real_fs (sfs_mnt, mnt, flags);
 		if (result) {
 			printk (KERN_ERR "subfs: unsuccessful attempt to "
-                                "mount media (%d)\n", result);
+				"mount media (%d)\n", result);
 			/* Workaround for call_usermodehelper return value bug. */
-			if(result < 0)
+			if (result < 0)
 				return ERR_PTR(result);
 			return ERR_PTR(-ENOMEDIUM);
 		}
 
-                child = lookup_mnt (mnt, sfs_mnt->sb->s_root);
+		child = lookup_mnt (mnt, sfs_mnt->sb->s_root);
 
-                /* The mount did succeed (error caught directly above), but
-                 * it was umounted already. Tell the process to retry. */
-                if (!child) {
-                    subfs_send_signal();
-                    return ERR_PTR(-ERESTARTSYS);
-                }
-        }
+		/* The mount did succeed (error caught directly above), but
+		 * it was umounted already. Tell the process to retry.
+		 */
+		if (!child) {
+			subfs_send_signal();
+			return ERR_PTR(-ERESTARTSYS);
+		}
+	}
 
-        return child;
+	return child;
 }
 
 
@@ -215,9 +217,9 @@ static struct dentry *subfs_lookup(struct inode *dir,
 	if (IS_ERR(child))
 		return (void *) child;
 	subfs_send_signal();
-        if (nd->mnt == current->fs->pwdmnt)
-                subfs_set_fs_pwd(current->fs, child, child->mnt_root);
-        mntput (child);
+	if (nd->mnt == current->fs->pwdmnt)
+		subfs_set_fs_pwd(current->fs, child, child->mnt_root);
+	mntput (child);
 	return ERR_PTR(-ERESTARTSYS);
 }
 
@@ -241,7 +243,7 @@ static int subfs_open(struct inode *inode, struct file *filp)
 	subfs_send_signal();
 	if (filp->f_vfsmnt == current->fs->pwdmnt)
 		subfs_set_fs_pwd(current->fs, child, child->mnt_root);
-        mntput (child);
+	mntput (child);
 	return -ERESTARTSYS;
 }
 
@@ -251,9 +253,10 @@ static int subfs_open(struct inode *inode, struct file *filp)
 static int subfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 #if 1
-/* disable stafs, so "df" and other tools do not trigger to mount
-   the media, which might cause error messages or hang, if the block
-   device driver hangs */
+	/* disable stafs, so "df" and other tools do not trigger to mount
+	 * the media, which might cause error messages or hang, if the block
+	 * device driver hangs.
+	 */
 	return 0;
 #else
 	struct subfs_mount *sfs_mnt = sb->s_fs_info;
@@ -265,7 +268,7 @@ static int subfs_statfs(struct super_block *sb, struct kstatfs *buf)
 	if (IS_ERR(child))
 		return PTR_ERR(child);
 	subfs_send_signal();
-        mntput (child);
+	mntput (child);
 	return -ERESTARTSYS;
 #endif
 }
@@ -329,54 +332,73 @@ static int subfs_fill_super(struct super_block *sb, void *data, int silent)
 	return -ENOMEM;
 }
 
+enum {
+	Opt_program, Opt_fs, Opt_procuid, Opt_other
+};
+
+static match_table_t tokens = {
+	{Opt_program, "program=%s"},
+	{Opt_fs, "fs=%s"},
+	{Opt_procuid, "procuid"},
+	{Opt_other, NULL}
+};
 
 /* Parse the options string and remove submount specific options
  * and store the appropriate data.
  */
 static int proc_opts(struct subfs_mount *sfs_mnt, void *data)
 {
-	char *opts = data, *opt, *ptr, *fs = NULL, *prog;
-	int len;
+	char *opts = data, *opt, *fs, *prog, *nopts = NULL;
+	substring_t args[MAX_OPT_ARGS];
+	int len, err = -ENOMEM;
 
 	if (!opts) {
-		if (!(data = opts = kmalloc(PAGE_SIZE, GFP_KERNEL)))
-			return -EINVAL;
-		strcat(opts, "fs=auto");
+		if (!(nopts = opts = kmalloc(8, GFP_KERNEL)))
+			goto out;
+		strcpy(opts, "fs=auto");
 	}
 	len = strnlen(opts, PAGE_SIZE - 1) + 1;
-	if (strstr(opts, "procuid"))
-		sfs_mnt->procuid = 1;
 	if (!(sfs_mnt->options = kmalloc(len, GFP_KERNEL)))
-		return -ENOMEM;
+		goto out;
 	sfs_mnt->options[0] = '\0';
 	while ((opt = strsep(&opts, ","))) {
-        	if ((ptr = strstr(opt, "program="))) {
-                	if (!(prog = kmalloc((strlen(ptr) - 7), GFP_KERNEL)))
-                        	return -ENOMEM;
-			strcpy(prog, (ptr + 8));
-                        kfree(sfs_mnt->helper_prog);
-                        sfs_mnt->helper_prog = prog;
-		}
-		else if ((ptr = strstr(opt, "fs="))) {
-			if (!(fs = kmalloc((strlen(ptr) - 2), GFP_KERNEL)))
-				return -ENOMEM;
-			strcpy(fs, (ptr + 3));
+		int token;
+		if (!*opt)
+			continue;
+
+		token = match_token(opt, tokens, args);
+		switch (token) {
+		case Opt_program:
+			if (!(prog = match_strdup(&args[0])))
+				goto out;
+			kfree(sfs_mnt->helper_prog);
+			sfs_mnt->helper_prog = prog;
+			break;
+		case Opt_fs:
+			if (!(fs = match_strdup(&args[0])))
+				goto out;
+			kfree(sfs_mnt->req_fs);
 			sfs_mnt->req_fs = fs;
-		}
-		else if ((ptr = strstr(opt, "procuid"))) {
-		} else {
-			strncat(sfs_mnt->options, opt, 32);
-			strcat(sfs_mnt->options, ",");
+			break;
+		case Opt_procuid:
+			sfs_mnt->procuid = 1;
+			break;
+		default:
+			if (sfs_mnt->options[0])
+				strlcat(sfs_mnt->options, ",", len);
+			strlcat(sfs_mnt->options, opt, len);
+			break;
 		}
 	}
-	if((len = strlen(sfs_mnt->options)) && (sfs_mnt->options[len-1] == ','))
-		sfs_mnt->options[len-1] = '\0';
-	if ( !sfs_mnt->req_fs ){
+	if (!sfs_mnt->req_fs) {
 		if (!(sfs_mnt->req_fs = kmalloc(5, GFP_KERNEL)))
-			return -ENOMEM;	/* 64 bits on some platforms */
-		strcpy(sfs_mnt->req_fs, "auto" );
+			goto out;
+		strcpy(sfs_mnt->req_fs, "auto");
 	}
-	return 0;
+	err = 0;
+ out:
+	kfree(nopts);
+	return err;
 }
 
 
@@ -406,9 +428,9 @@ static struct super_block *subfs_get_super(struct file_system_type *fst,
 		return ERR_PTR(-ENOMEM);
 	strcpy(device, devname);
 	newmount->device = device;
-        if (!(newmount->helper_prog =
-        		kmalloc(sizeof(SUBMOUNTD_PATH), GFP_KERNEL)))
-        	return ERR_PTR(-ENOMEM);
+	if (!(newmount->helper_prog =
+			kmalloc(sizeof(SUBMOUNTD_PATH), GFP_KERNEL)))
+		return ERR_PTR(-ENOMEM);
 	strcpy(newmount->helper_prog, SUBMOUNTD_PATH);
 	if ((ret = proc_opts(newmount, data)))
 		return ERR_PTR(ret);
@@ -427,17 +449,13 @@ static void subfs_kill_super(struct super_block *sb)
 {
 	struct subfs_mount *sfs_mnt = sb->s_fs_info;
 
-        if(sfs_mnt) {
-		if (sfs_mnt->device)
-			kfree(sfs_mnt->device);
-		if (sfs_mnt->options)
-			kfree(sfs_mnt->options);
-		if (sfs_mnt->req_fs)
-			kfree(sfs_mnt->req_fs);
-		if (sfs_mnt->helper_prog)
-                	kfree(sfs_mnt->helper_prog);
+	if (sfs_mnt) {
+		kfree(sfs_mnt->device);
+		kfree(sfs_mnt->options);
+		kfree(sfs_mnt->req_fs);
+		kfree(sfs_mnt->helper_prog);
 		kfree(sfs_mnt);
-        	sb->s_fs_info = NULL;
+		sb->s_fs_info = NULL;
 	}
 	kill_litter_super(sb);
 	return;
