@@ -845,7 +845,7 @@ int snd_timer_dev_register(snd_device_t *dev)
 	return 0;
 }
 
-int snd_timer_unregister(snd_timer_t *timer)
+static int snd_timer_unregister(snd_timer_t *timer)
 {
 	struct list_head *p, *n;
 	snd_timer_instance_t *ti;
@@ -945,11 +945,6 @@ struct snd_timer_system_private {
 	unsigned long last_jiffies;
 	unsigned long correction;
 };
-
-unsigned int snd_timer_system_resolution(void)
-{
-	return 1000000000L / HZ;
-}
 
 static void snd_timer_s_function(unsigned long data)
 {
@@ -1474,14 +1469,10 @@ static int snd_timer_user_tselect(struct file *file, snd_timer_select_t __user *
 	if ((err = snd_timer_open(&tu->timeri, str, &tselect.id, current->pid)) < 0)
 		goto __err;
 
-	if (tu->queue) {
-		kfree(tu->queue);
-		tu->queue = NULL;
-	}
-	if (tu->tqueue) {
-		kfree(tu->tqueue);
-		tu->tqueue = NULL;
-	}
+	kfree(tu->queue);
+	tu->queue = NULL;
+	kfree(tu->tqueue);
+	tu->tqueue = NULL;
 	if (tu->tread) {
 		tu->tqueue = (snd_timer_tread_t *)kmalloc(tu->queue_size * sizeof(snd_timer_tread_t), GFP_KERNEL);
 		if (tu->tqueue == NULL)
@@ -1938,4 +1929,3 @@ EXPORT_SYMBOL(snd_timer_global_free);
 EXPORT_SYMBOL(snd_timer_global_register);
 EXPORT_SYMBOL(snd_timer_global_unregister);
 EXPORT_SYMBOL(snd_timer_interrupt);
-EXPORT_SYMBOL(snd_timer_system_resolution);

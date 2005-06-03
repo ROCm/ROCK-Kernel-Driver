@@ -287,7 +287,7 @@ static int send_bulk_static_data(snd_usb_midi_out_endpoint_t* ep,
 	memcpy(buf, data, len);
 	dump_urb("sending", buf, len);
 	err = usb_bulk_msg(ep->umidi->chip->dev, ep->urb->pipe, buf, len,
-			   NULL, 1000);
+			   NULL, 250);
 	kfree(buf);
 	return err;
 }

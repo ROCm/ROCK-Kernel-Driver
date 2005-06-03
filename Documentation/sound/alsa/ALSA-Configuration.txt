@@ -671,7 +671,19 @@ Prior to version 0.9.0rc4 options had a 'snd_' prefix. This was removed.
           module did formerly.  It will allocate the buffers in advance
           when any HDSP cards are found.  To make the buffer
           allocation sure, load snd-page-alloc module in the early
-          stage of boot sequence.
+          stage of boot sequence.  See "Early Buffer Allocation"
+	  section.
+
+  Module snd-hdspm
+  ----------------
+
+    Module for RME HDSP MADI board.
+
+    precise_ptr		- Enable precise pointer, or disable.
+    line_outs_monitor	- Send playback streams to analog outs by default.
+    enable_monitor	- Enable Analog Out on Channel 63/64 by default.
+
+    See hdspm.txt for details.
 
   Module snd-ice1712
   ------------------
@@ -688,15 +700,19 @@ Prior to version 0.9.0rc4 options had a 'snd_' prefix. This was removed.
                         * TerraTec EWS 88D
                         * TerraTec EWX 24/96
                         * TerraTec DMX 6Fire
+			* TerraTec Phase 88
                         * Hoontech SoundTrack DSP 24
                         * Hoontech SoundTrack DSP 24 Value
                         * Hoontech SoundTrack DSP 24 Media 7.1
+			* Event Electronics, EZ8
                         * Digigram VX442
+			* Lionstracs, Mediastaton
 
     model       - Use the given board model, one of the following:
 		  delta1010, dio2496, delta66, delta44, audiophile, delta410,
 		  delta1010lt, vx442, ewx2496, ews88mt, ews88mt_new, ews88d,
-		  dmx6fire, dsp24, dsp24_value, dsp24_71, ez8
+		  dmx6fire, dsp24, dsp24_value, dsp24_71, ez8,
+		  phase88, mediastation
     omni	- Omni I/O support for MidiMan M-Audio Delta44/66
     cs8427_timeout - reset timeout for the CS8427 chip (S/PDIF transciever)
                      in msec resolution, default value is 500 (0.5 sec)
@@ -705,19 +721,45 @@ Prior to version 0.9.0rc4 options had a 'snd_' prefix. This was removed.
     is not used with all Envy24 based cards (for example in the MidiMan Delta
     serie).
 
+    Note: The supported board is detected by reading EEPROM or PCI
+	  SSID (if EEPROM isn't available).  You can override the
+	  model by passing "model" module option in case that the
+	  driver isn't configured properly or you want to try another
+	  type for testing.
+
   Module snd-ice1724
   ------------------
 
-    Module for Envy24HT (VT/ICE1724) based PCI sound cards.
+    Module for Envy24HT (VT/ICE1724), Envy24PT (VT1720) based PCI sound cards.
 			* MidiMan M Audio Revolution 7.1
 			* AMP Ltd AUDIO2000
-			* TerraTec Aureon Sky-5.1, Space-7.1
+			* TerraTec Aureon 5.1 Sky
+			* TerraTec Aureon 7.1 Space
+			* TerraTec Aureon 7.1 Universe
+			* TerraTec Phase 22
+			* TerraTec Phase 28
+			* AudioTrak Prodigy 7.1
+			* AudioTrak Prodigy 192
+			* Pontis MS300
+			* Albatron K8X800 Pro II 
+			* Chaintech ZNF3-150
+			* Chaintech ZNF3-250
+			* Chaintech 9CJS
+			* Chaintech AV-710
+			* Shuttle SN25P
 
     model       - Use the given board model, one of the following:
-		  revo71, amp2000, prodigy71, aureon51, aureon71,
-		  k8x800
+		  revo71, amp2000, prodigy71, prodigy192, aureon51,
+		  aureon71, universe, k8x800, phase22, phase28, ms300,
+		  av710
 
     Module supports up to 8 cards and autoprobe.
+
+    Note: The supported board is detected by reading EEPROM or PCI
+	  SSID (if EEPROM isn't available).  You can override the
+	  model by passing "model" module option in case that the
+	  driver isn't configured properly or you want to try another
+	  type for testing.
 
   Module snd-intel8x0
   -------------------
@@ -1037,7 +1079,8 @@ Prior to version 0.9.0rc4 options had a 'snd_' prefix. This was removed.
           module did formerly.  It will allocate the buffers in advance
           when any RME9652 cards are found.  To make the buffer
           allocation sure, load snd-page-alloc module in the early
-          stage of boot sequence.
+          stage of boot sequence.  See "Early Buffer Allocation"
+	  section.
 
   Module snd-sa11xx-uda1341 (on arm only)
   ---------------------------------------
@@ -1258,8 +1301,10 @@ Prior to version 0.9.0rc4 options had a 'snd_' prefix. This was removed.
 	  sample rates (e.g. 44.1kHz of mp3 playback), please let us
 	  know the PCI subsystem vendor/device id's (output of
 	  "lspci -nv").
-	  If dxs_support=5 does not work, try dxs_support=1; if it
-	  doesn't work too, try dxs_support=4.  If it still doesn't
+	  If dxs_support=5 does not work, try dxs_support=4; if it
+	  doesn't work too, try dxs_support=1.  (dxs_support=1 is
+	  usually for old motherboards.  The correct implementated
+	  board should work with 4 or 5.)  If it still doesn't
 	  work and the default setting is ok, dxs_support=3 is the
 	  right choice.  If the default setting doesn't work at all,
 	  try dxs_support=2 to disable the DXS channels.
@@ -1511,6 +1556,36 @@ Proc interfaces (/proc/asound)
   Example: echo "x11amp 128 16384" > /proc/asound/card0/pcm0p/oss
            echo "squake 0 0 disable" > /proc/asound/card0/pcm0c/oss
 	   echo "rvplayer 0 0 block" > /proc/asound/card0/pcm0p/oss
+
+
+Early Buffer Allocation
+=======================
+
+Some drivers (e.g. hdsp) require the large contiguous buffers, and
+sometimes it's too late to find such spaces when the driver module is
+actually loaded due to memory fragmentation.  You can pre-allocate the
+PCM buffers by loading snd-page-alloc module and write commands to its
+proc file in prior, for example, in the early boot stage like
+/etc/init.d/*.local scripts.
+
+Reading the proc file /proc/drivers/snd-page-alloc shows the current
+usage of page allocation.  In writing, you can send the following
+commands to the snd-page-alloc driver:
+
+  - add VENDOR DEVICE MASK SIZE BUFFERS
+
+    VENDOR and DEVICE are PCI vendor and device IDs.  They take
+    integer numbers (0x prefix is needed for the hex).
+    MASK is the PCI DMA mask.  Pass 0 if not restricted.
+    SIZE is the size of each buffer to allocate.  You can pass
+    k and m suffix for KB and MB.  The max number is 16MB.
+    BUFFERS is the number of buffers to allocate.  It must be greater
+    than 0.  The max number is 4.
+
+  - erase
+
+    This will erase the all pre-allocated buffers which are not in
+    use.
 
 
 Links

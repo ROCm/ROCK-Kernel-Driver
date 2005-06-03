@@ -1604,8 +1604,8 @@ static void ad1985_update_jacks(ac97_t *ac97)
 	/* shared Mic */
 	snd_ac97_update_bits(ac97, AC97_AD_MISC, 1 << 11,
 			     is_shared_micin(ac97) ? 0 : 1 << 11);
-	snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 9 << 11,
-			     is_shared_micin(ac97) ? 0 : 9 << 11);
+	snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 1 << 9,
+			     is_shared_micin(ac97) ? 0 : 1 << 9);
 }
 
 static int patch_ad1985_specific(ac97_t *ac97)
@@ -2459,12 +2459,29 @@ int patch_it2646(ac97_t * ac97)
 	return 0;
 }
 
-/* Si3036/8 specific registers */
+/*
+ * Si3036 codec
+ */
+
 #define AC97_SI3036_CHIP_ID     0x5a
+#define AC97_SI3036_LINE_CFG    0x5c
+
+static const snd_kcontrol_new_t snd_ac97_controls_si3036[] = {
+AC97_DOUBLE("Modem Speaker Volume", 0x5c, 14, 12, 3, 1)
+};
+
+static int patch_si3036_specific(ac97_t * ac97)
+{
+	return patch_build_controls(ac97, snd_ac97_controls_si3036, ARRAY_SIZE(snd_ac97_controls_si3036));
+}
+
+static struct snd_ac97_build_ops patch_si3036_ops = {
+	.build_specific	= patch_si3036_specific,
+};
 
 int mpatch_si3036(ac97_t * ac97)
 {
-	//printk("mpatch_si3036: chip id = %x\n", snd_ac97_read(ac97, 0x5a));
+	ac97->build_ops = &patch_si3036_ops;
 	snd_ac97_write_cache(ac97, 0x5c, 0xf210 );
 	snd_ac97_write_cache(ac97, 0x68, 0);
 	return 0;
