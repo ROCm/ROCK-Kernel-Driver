@@ -29,6 +29,10 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 
+#ifdef CONFIG_PPC64
+#include <asm/pci-bridge.h>
+#endif
+
 #ifdef CONFIG_PPC32
 #include <asm/bootx.h>
 #endif
@@ -322,7 +326,8 @@ static void __init offb_init_nodriver(struct device_node *dp)
 	int *pp, i;
 	unsigned int len;
 	int width = 640, height = 480, depth = 8, pitch;
-	unsigned *up, address;
+	unsigned *up;
+	unsigned long address;
 
 	if ((pp = (int *) get_property(dp, "depth", &len)) != NULL
 	    && len == sizeof(int))
@@ -356,6 +361,10 @@ static void __init offb_init_nodriver(struct device_node *dp)
 		}
 
 		address = (u_long) dp->addrs[i].address;
+
+#ifdef CONFIG_PPC64
+		address += dp->phb->pci_mem_offset;
+#endif
 
 		/* kludge for valkyrie */
 		if (strcmp(dp->name, "valkyrie") == 0)
