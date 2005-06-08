@@ -88,6 +88,7 @@ macio_find(struct device_node* child, int type)
 	}
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(macio_find);
 
 static const char* macio_names[] __pmacdata =
 {
