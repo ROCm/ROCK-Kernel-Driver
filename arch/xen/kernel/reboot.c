@@ -52,7 +52,6 @@ EXPORT_SYMBOL(machine_power_off);
 
 /* Ignore multiple shutdown requests. */
 static int shutting_down = -1;
-static int pending_sysrq = -1;
 
 static void __do_suspend(void)
 {
@@ -80,7 +79,7 @@ static void __do_suspend(void)
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
-    extern unsigned long *pfn_to_mfn_frame_list;
+    extern unsigned int *pfn_to_mfn_frame_list;
 
     suspend_record = (suspend_record_t *)__get_free_page(GFP_KERNEL);
     if ( suspend_record == NULL )
@@ -103,7 +102,8 @@ static void __do_suspend(void)
     HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
     clear_fixmap(FIX_SHARED_INFO);
 
-    memcpy(&suspend_record->resume_info, &xen_start_info, sizeof(xen_start_info));
+    memcpy(&suspend_record->resume_info, &xen_start_info,
+	   sizeof(xen_start_info));
 
     HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
 
@@ -116,7 +116,8 @@ static void __do_suspend(void)
 
     shutting_down = -1; 
 
-    memcpy(&xen_start_info, &suspend_record->resume_info, sizeof(xen_start_info));
+    memcpy(&xen_start_info, &suspend_record->resume_info,
+	   sizeof(xen_start_info));
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info);
@@ -214,36 +215,29 @@ static void __shutdown_handler(void *unused)
     }
 }
 
-static void __sysrq_handler(void *unused)
-{
-#ifdef CONFIG_MAGIC_SYSRQ
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-    handle_sysrq(pending_sysrq, NULL, NULL);
-#else
-    handle_sysrq(pending_sysrq, NULL, NULL, NULL);
-#endif
-#endif
-    pending_sysrq = -1;
-}
-
 static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
 {
     static DECLARE_WORK(shutdown_work, __shutdown_handler, NULL);
-    static DECLARE_WORK(sysrq_work, __sysrq_handler, NULL);
 
-    if ( (shutting_down == -1) &&
+    if ( msg->subtype == CMSG_SHUTDOWN_SYSRQ )
+    {
+	int sysrq = ((shutdown_sysrq_t *)&msg->msg[0])->key;
+	
+#ifdef CONFIG_MAGIC_SYSRQ
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+	handle_sysrq(sysrq, NULL, NULL);
+#else
+	handle_sysrq(sysrq, NULL, NULL, NULL);
+#endif
+#endif
+    }
+    else if ( (shutting_down == -1) &&
          ((msg->subtype == CMSG_SHUTDOWN_POWEROFF) ||
           (msg->subtype == CMSG_SHUTDOWN_REBOOT) ||
           (msg->subtype == CMSG_SHUTDOWN_SUSPEND)) )
     {
         shutting_down = msg->subtype;
         schedule_work(&shutdown_work);
-    }
-    else if ( (pending_sysrq == -1) && 
-              (msg->subtype == CMSG_SHUTDOWN_SYSRQ) )
-    {
-        pending_sysrq = ((shutdown_sysrq_t *)&msg->msg[0])->key;
-        schedule_work(&sysrq_work);
     }
     else
     {

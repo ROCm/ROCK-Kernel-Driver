@@ -107,6 +107,7 @@ static void __init check_fpu(void)
 		"fninit"
 		: "=m" (*&boot_cpu_data.fdiv_bug)
 		: "m" (*&x), "m" (*&y));
+	stts();
 	if (boot_cpu_data.fdiv_bug)
 		printk("Hmm, FPU with FDIV bug.\n");
 }

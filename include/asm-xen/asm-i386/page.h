@@ -58,9 +58,9 @@
 #define copy_user_page(to, from, vaddr, pg)	copy_page(to, from)
 
 /**** MACHINE <-> PHYSICAL CONVERSION MACROS ****/
-extern unsigned long *phys_to_machine_mapping;
-#define pfn_to_mfn(_pfn) (phys_to_machine_mapping[(_pfn)])
-#define mfn_to_pfn(_mfn) (machine_to_phys_mapping[(_mfn)])
+extern unsigned int *phys_to_machine_mapping;
+#define pfn_to_mfn(_pfn) ((unsigned long)(phys_to_machine_mapping[(_pfn)]))
+#define mfn_to_pfn(_mfn) ((unsigned long)(machine_to_phys_mapping[(_mfn)]))
 static inline unsigned long phys_to_machine(unsigned long phys)
 {
 	unsigned long machine = pfn_to_mfn(phys >> PAGE_SHIFT);
@@ -116,17 +116,11 @@ static inline unsigned long pgd_val(pgd_t x)
 }
 #define pgprot_val(x)	((x).pgprot)
 
-static inline pte_t __pte(unsigned long x)
-{
-	if (x & 1) x = phys_to_machine(x);
-	return ((pte_t) { (x) });
-}
+#define __pte(x) ({ unsigned long _x = (x); \
+    (((_x)&1) ? ((pte_t) {phys_to_machine(_x)}) : ((pte_t) {(_x)})); })
 #define __pte_ma(x)	((pte_t) { (x) } )
-static inline pgd_t __pgd(unsigned long x)
-{
-	if ((x & 1)) x = phys_to_machine(x);
-	return ((pgd_t) { (x) });
-}
+#define __pgd(x) ({ unsigned long _x = (x); \
+    (((_x)&1) ? ((pgd_t) {phys_to_machine(_x)}) : ((pgd_t) {(_x)})); })
 #define __pgprot(x)	((pgprot_t) { (x) } )
 
 #endif /* !__ASSEMBLY__ */
@@ -182,7 +176,7 @@ extern int sysctl_legacy_va_layout;
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
 #define VMALLOC_RESERVE		((unsigned long)__VMALLOC_RESERVE)
-#define MAXMEM			(-__PAGE_OFFSET-__VMALLOC_RESERVE)
+#define MAXMEM			(HYPERVISOR_VIRT_START-__PAGE_OFFSET-__VMALLOC_RESERVE)
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
 #define pfn_to_kaddr(pfn)      __va((pfn) << PAGE_SHIFT)

@@ -242,8 +242,11 @@ static void rcu_start_batch(struct rcu_ctrlblk *rcp, struct rcu_state *rsp,
  */
 static void cpu_quiet(int cpu, struct rcu_ctrlblk *rcp, struct rcu_state *rsp)
 {
+	cpumask_t mask;
+
 	cpu_clear(cpu, rsp->cpumask);
-	if (cpus_empty(rsp->cpumask)) {
+	cpus_andnot(mask, rsp->cpumask, nohz_cpu_mask);
+	if (cpus_empty(mask)) {
 		/* batch completed ! */
 		rcp->completed = rcp->cur;
 		rcu_start_batch(rcp, rsp, 0);
