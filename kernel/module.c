@@ -1538,17 +1538,16 @@ static struct module *load_module(void __user *umod,
 	}
 	if (!supported) {
 		if (unsupported == 0) {
-			printk(KERN_WARNING "%s: unsupported module, refusing "
-			       "to load. To override, echo "
-			       "1 > /proc/sys/kernel/unsupported\n",
-			       mod->name);
+			printk(KERN_WARNING "%s: module not supported by "
+			       "Novell, refusing to load. To override, echo "
+			       "1 > /proc/sys/kernel/unsupported\n", mod->name);
 			err = -ENOEXEC;
 			goto free_hdr;
 		}
 		tainted |= TAINT_NO_SUPPORT;
 		if (unsupported == 1) {
-			printk(KERN_WARNING "%s: unsupported module, tainting "
-			       "kernel.\n", mod->name);
+			printk(KERN_WARNING "%s: module not supported by "
+			       "Novell, setting U taint flag.\n", mod->name);
 		}
 	}
 
