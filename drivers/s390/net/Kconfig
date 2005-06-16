@@ -50,6 +50,15 @@ config SMSGIUCV
 	  Select this option if you want to be able to receive SMSG messages
 	  from other VM guest systems.
 
+config CLAW
+	tristate "CLAW device support"
+	depends on NETDEVICES
+	help
+	  This driver supports channel attached CLAW devices.
+	  CLAW is Common Link Access for Workstation.  Common devices
+          that use CLAW are RS/6000s, Cisco Routers (CIP) and 3172 devices.
+	  To compile as a module choose M here:  The module will be called
+	  claw.ko to compile into the kernel choose Y
 
 config QETH
 	tristate "Gigabit Ethernet device support"

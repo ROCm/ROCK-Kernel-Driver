@@ -9,6 +9,8 @@
 #ifndef _S390_CPUTIME_H
 #define _S390_CPUTIME_H
 
+#include <asm/div64.h>
+
 /* We want to use micro-second resolution. */
 
 typedef unsigned long long cputime_t;
@@ -40,6 +42,12 @@ __div(unsigned long long n, unsigned int base)
 #define cputime_max			((~0UL >> 1) - 1)
 #define cputime_add(__a, __b)		((__a) +  (__b))
 #define cputime_sub(__a, __b)		((__a) -  (__b))
+#define cputime_div(__a, __n) ({		\
+	unsigned long long __div = (__a);	\
+	do_div(__div,__n);			\
+	__div;					\
+})
+#define cputime_halve(__a)		((__a) >> 1)
 #define cputime_eq(__a, __b)		((__a) == (__b))
 #define cputime_gt(__a, __b)		((__a) >  (__b))
 #define cputime_ge(__a, __b)		((__a) >= (__b))

@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.68 $
+ * $Revision: 1.71 $
  */
 
 #include <linux/config.h>
@@ -56,6 +56,7 @@ static struct dasd_discipline dasd_eckd_discipline;
 struct dasd_eckd_private {
 	struct dasd_eckd_characteristics rdc_data;
 	struct dasd_eckd_confdata conf_data;
+	struct dasd_eckd_path path_data;
 	struct eckd_count count_area[5];
 	int init_cqr_status;
 	int uses_cdl;
@@ -447,12 +448,72 @@ dasd_eckd_cdl_reclen(int recid)
 }
 
 static int
+dasd_eckd_read_conf(struct dasd_device *device)
+{
+	void *conf_data;
+	int conf_len, conf_data_saved;
+	int rc;
+	__u8 lpm;
+	struct dasd_eckd_private *private;
+	struct dasd_eckd_path *path_data;
+
+	private = (struct dasd_eckd_private *) device->private;
+	path_data = (struct dasd_eckd_path *) &private->path_data;
+	path_data->opm = ccw_device_get_path_mask(device->cdev);
+	lpm = 0x80;
+	conf_data_saved = 0;
+
+	/* get configuration data per operational path */
+	for (lpm = 0x80; lpm; lpm>>= 1) {
+		if (lpm & path_data->opm){
+			rc = read_conf_data_lpm(device->cdev, &conf_data,
+						&conf_len, lpm);
+			if (rc && rc != -EOPNOTSUPP) {	/* -EOPNOTSUPP is ok */
+				MESSAGE(KERN_WARNING,
+					"Read configuration data returned "
+					"error %d", rc);
+				return rc;
+			}
+			if (conf_data == NULL) {
+				MESSAGE(KERN_WARNING, "%s", "No configuration "
+					"data retrieved");
+				continue;	/* no errror */
+			}
+			if (conf_len != sizeof (struct dasd_eckd_confdata)) {
+				MESSAGE(KERN_WARNING,
+					"sizes of configuration data mismatch"
+					"%d (read) vs %ld (expected)",
+					conf_len,
+					sizeof (struct dasd_eckd_confdata));
+				kfree(conf_data);
+				continue;	/* no errror */
+			}
+			/* save first valid configuration data */
+			if (!conf_data_saved){
+				memcpy(&private->conf_data, conf_data,
+				       sizeof (struct dasd_eckd_confdata));
+				conf_data_saved++;
+			}
+			switch (((char *)conf_data)[242] & 0x07){
+			case 0x02:
+				path_data->npm |= lpm;
+				break;
+			case 0x03:
+				path_data->ppm |= lpm;
+				break;
+			}
+			kfree(conf_data);
+		}
+	}
+	return 0;
+}
+
+
+static int
 dasd_eckd_check_characteristics(struct dasd_device *device)
 {
 	struct dasd_eckd_private *private;
 	void *rdc_data;
-	void *conf_data;
-	int conf_len;
 	int rc;
 
 	private = (struct dasd_eckd_private *) device->private;
@@ -465,6 +526,7 @@ dasd_eckd_check_characteristics(struct dasd_device *device)
 				    "data");
 			return -ENOMEM;
 		}
+		memset(private, 0, sizeof(struct dasd_eckd_private));
 		device->private = (void *) private;
 	}
 	/* Invalidate status of initial analysis. */
@@ -494,30 +556,9 @@ dasd_eckd_check_characteristics(struct dasd_device *device)
 		    private->rdc_data.sec_per_trk);
 
 	/* Read Configuration Data */
-	rc = read_conf_data(device->cdev, &conf_data, &conf_len);
-	if (rc && rc != -EOPNOTSUPP) {	/* -EOPNOTSUPP is ok */
-		DEV_MESSAGE(KERN_WARNING, device,
-			    "Read configuration data returned error %d", rc);
-		return rc;
-	}
-	if (conf_data == NULL) {
-		DEV_MESSAGE(KERN_WARNING, device, "%s",
-			    "No configuration data retrieved");
-		return 0;	/* no errror */
-	}
-	if (conf_len != sizeof (struct dasd_eckd_confdata)) {
-		DEV_MESSAGE(KERN_WARNING, device,
-			    "sizes of configuration data mismatch"
-			    "%d (read) vs %ld (expected)",
-			    conf_len, sizeof (struct dasd_eckd_confdata));
+	rc = dasd_eckd_read_conf (device);
+	return rc;
 
-		kfree(conf_data); /* allocated by read_conf_data() */
-		return 0;	/* no errror */
-	}
-	memcpy(&private->conf_data, conf_data,
-	       sizeof (struct dasd_eckd_confdata));
-	kfree(conf_data); /* allocated by read_conf_data() */
-	return 0;
 }
 
 static struct dasd_ccw_req *
@@ -1060,7 +1101,8 @@ dasd_eckd_build_cp(struct dasd_device * device, struct request *req)
 				if (dasd_eckd_cdl_special(blk_per_trk, recid)){
 					rcmd |= 0x8;
 					count = dasd_eckd_cdl_reclen(recid);
-					if (count < blksize)
+					if (count < blksize &&
+					    rq_data_dir(req) == READ)
 						memset(dst + count, 0xe5,
 						       blksize - count);
 				}
@@ -1096,7 +1138,7 @@ dasd_eckd_build_cp(struct dasd_device * device, struct request *req)
 	}
 	cqr->device = device;
 	cqr->expires = 5 * 60 * HZ;	/* 5 minutes */
-	cqr->lpm = LPM_ANYPATH;
+	cqr->lpm = private->path_data.ppm;
 	cqr->retries = 256;
 	cqr->buildclk = get_clock();
 	cqr->status = DASD_CQR_FILLED;

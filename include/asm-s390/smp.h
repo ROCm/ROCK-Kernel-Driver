@@ -18,6 +18,7 @@
 #if defined(__KERNEL__) && defined(CONFIG_SMP) && !defined(__ASSEMBLY__)
 
 #include <asm/lowcore.h>
+#include <asm/sigp.h>
 
 /*
   s390 specific smp.c headers
@@ -57,6 +58,30 @@ extern __inline__ __u16 hard_smp_processor_id(void)
  
         __asm__ ("stap %0\n" : "=m" (cpu_address));
         return cpu_address;
+}
+
+/*
+ * returns 1 if cpu is in stopped/check stopped state or not operational
+ * returns 0 otherwise
+ */
+static inline int
+smp_cpu_not_running(int cpu)
+{
+	__u32 status;
+
+	switch (signal_processor_ps(&status, 0, cpu, sigp_sense)) {
+	case sigp_order_code_accepted:
+	case sigp_status_stored:
+		/* Check for stopped and check stop state */
+		if (status & 0x50)
+			return 1;
+		break;
+	case sigp_not_operational:
+		return 1;
+	default:
+		break;
+	}
+	return 0;
 }
 
 #define cpu_logical_map(cpu) (cpu)

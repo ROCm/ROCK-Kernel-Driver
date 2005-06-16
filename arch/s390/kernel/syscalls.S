@@ -275,7 +275,7 @@ NI_SYSCALL							/* reserved for vserver */
 SYSCALL(s390_fadvise64_64,sys_ni_syscall,sys32_fadvise64_64_wrapper)
 SYSCALL(sys_statfs64,sys_statfs64,compat_sys_statfs64_wrapper)
 SYSCALL(sys_fstatfs64,sys_fstatfs64,compat_sys_fstatfs64_wrapper)
-NI_SYSCALL							/* 267 new sys_remap_file_pages */
+SYSCALL(sys_remap_file_pages,sys_remap_file_pages,sys32_remap_file_pages_wrapper)
 NI_SYSCALL							/* 268 sys_mbind */
 NI_SYSCALL							/* 269 sys_get_mempolicy */
 NI_SYSCALL							/* 270 sys_set_mempolicy */
@@ -286,3 +286,7 @@ SYSCALL(sys_mq_timedreceive,sys_mq_timedreceive,compat_sys_mq_timedreceive_wrapp
 SYSCALL(sys_mq_notify,sys_mq_notify,compat_sys_mq_notify_wrapper) /* 275 */
 SYSCALL(sys_mq_getsetattr,sys_mq_getsetattr,compat_sys_mq_getsetattr_wrapper)
 NI_SYSCALL							/* reserved for kexec */
+SYSCALL(sys_add_key,sys_add_key,compat_sys_add_key_wrapper)
+SYSCALL(sys_request_key,sys_request_key,compat_sys_request_key_wrapper)
+SYSCALL(sys_keyctl,sys_keyctl,compat_sys_keyctl)		/* 280 */
+SYSCALL(sys_waitid,sys_waitid,compat_sys_waitid_wrapper)

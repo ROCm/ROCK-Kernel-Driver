@@ -1,16 +1,15 @@
 
 menu "Profiling support"
-	depends on EXPERIMENTAL
 
 config PROFILING
-	bool "Profiling support (EXPERIMENTAL)"
+	bool "Profiling support"
 	help
 	  Say Y here to enable profiling support mechanisms used by
 	  profilers such as readprofile or OProfile.
 
 
 config OPROFILE
-	tristate "OProfile system profiling (EXPERIMENTAL)"
+	tristate "OProfile system profiling"
 	depends on PROFILING
 	help
 	  OProfile is a profiling system capable of profiling the

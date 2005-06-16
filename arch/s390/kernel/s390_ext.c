@@ -114,6 +114,10 @@ void do_extint(struct pt_regs *regs, unsigned short code)
 	irq_enter();
 	asm volatile ("mc 0,0");
 	if (S390_lowcore.int_clock >= S390_lowcore.jiffy_timer)
+		/**
+		 * Make sure that the i/o interrupt did not "overtake"
+		 * the last HZ timer interrupt.
+		 */
 		account_ticks(regs);
 	kstat_cpu(smp_processor_id()).irqs[EXTERNAL_INTERRUPT]++;
         index = code & 0xff;

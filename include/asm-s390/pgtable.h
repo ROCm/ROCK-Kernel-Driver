@@ -95,13 +95,13 @@ extern char empty_zero_page[PAGE_SIZE];
 # define USER_PTRS_PER_PGD  512
 # define USER_PGD_PTRS      512
 # define KERNEL_PGD_PTRS    512
-# define FIRST_USER_PGD_NR  0
 #else /* __s390x__ */
 # define USER_PTRS_PER_PGD  2048
 # define USER_PGD_PTRS      2048
 # define KERNEL_PGD_PTRS    2048
-# define FIRST_USER_PGD_NR  0
 #endif /* __s390x__ */
+
+#define FIRST_USER_ADDRESS  0
 
 #define pte_ERROR(e) \
 	printk("%s:%d: bad pte %p.\n", __FILE__, __LINE__, (void *) pte_val(e))
@@ -322,6 +322,7 @@ extern inline void set_pte(pte_t *pteptr, pte_t pteval)
 {
 	*pteptr = pteval;
 }
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
 
 /*
  * pgd/pmd/pte query functions
@@ -457,7 +458,7 @@ extern inline void pmd_clear(pmd_t * pmdp)
 
 #endif /* __s390x__ */
 
-extern inline void pte_clear(pte_t *ptep)
+extern inline void pte_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	pte_val(*ptep) = _PAGE_INVALID_EMPTY;
 }
@@ -521,7 +522,7 @@ extern inline pte_t pte_mkyoung(pte_t pte)
 	return pte;
 }
 
-static inline int ptep_test_and_clear_young(pte_t *ptep)
+static inline int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
 {
 	return 0;
 }
@@ -531,10 +532,10 @@ ptep_clear_flush_young(struct vm_area_struct *vma,
 			unsigned long address, pte_t *ptep)
 {
 	/* No need to flush TLB; bits are in storage key */
-	return ptep_test_and_clear_young(ptep);
+	return ptep_test_and_clear_young(vma, address, ptep);
 }
 
-static inline int ptep_test_and_clear_dirty(pte_t *ptep)
+static inline int ptep_test_and_clear_dirty(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
 {
 	return 0;
 }
@@ -544,13 +545,13 @@ ptep_clear_flush_dirty(struct vm_area_struct *vma,
 			unsigned long address, pte_t *ptep)
 {
 	/* No need to flush TLB; bits are in storage key */
-	return ptep_test_and_clear_dirty(ptep);
+	return ptep_test_and_clear_dirty(vma, address, ptep);
 }
 
-static inline pte_t ptep_get_and_clear(pte_t *ptep)
+static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	pte_t pte = *ptep;
-	pte_clear(ptep);
+	pte_clear(mm, addr, ptep);
 	return pte;
 }
 
@@ -573,19 +574,14 @@ ptep_clear_flush(struct vm_area_struct *vma,
 				      : "=m" (*ptep) : "m" (*ptep),
 				        "a" (ptep), "a" (address) );
 #endif /* __s390x__ */
-	pte_clear(ptep);
+	pte_val(*ptep) = _PAGE_INVALID_EMPTY;
 	return pte;
 }
 
-static inline void ptep_set_wrprotect(pte_t *ptep)
+static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	pte_t old_pte = *ptep;
-	set_pte(ptep, pte_wrprotect(old_pte));
-}
-
-static inline void ptep_mkdirty(pte_t *ptep)
-{
-	pte_mkdirty(*ptep);
+	set_pte_at(mm, addr, ptep, pte_wrprotect(old_pte));
 }
 
 static inline void
@@ -756,11 +752,17 @@ extern inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
  *  0000000000111111111122222222223333333333444444444455 5555 5 55566 66
  *  0123456789012345678901234567890123456789012345678901 2345 6 78901 23
  */
+#ifndef __s390x__
+#define __SWP_OFFSET_MASK (~0UL >> 12)
+#else
+#define __SWP_OFFSET_MASK (~0UL >> 11)
+#endif
 extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 {
 	pte_t pte;
+	offset &= __SWP_OFFSET_MASK;
 	pte_val(pte) = _PAGE_INVALID_SWAP | ((type & 0x1f) << 2) |
-		((offset & 1) << 7) | ((offset & 0xffffe) << 11);
+		((offset & 1UL) << 7) | ((offset & ~1UL) << 11);
 	return pte;
 }
 
@@ -802,7 +804,6 @@ extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
 #define __HAVE_ARCH_PTEP_CLEAR_FLUSH
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
-#define __HAVE_ARCH_PTEP_MKDIRTY
 #define __HAVE_ARCH_PTE_SAME
 #define __HAVE_ARCH_PAGE_TEST_AND_CLEAR_DIRTY
 #define __HAVE_ARCH_PAGE_TEST_AND_CLEAR_YOUNG

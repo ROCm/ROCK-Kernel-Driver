@@ -236,6 +236,14 @@ qeth_perf_procfile_seq_show(struct seq_file *s, void *it)
 		   card->perf_stats.skbs_sent_pack,
 		   card->perf_stats.bufs_sent_pack
 		  );
+	seq_printf(s, "  Skbs sent in SG mode                   : %i\n"
+		      "  Skb fragments sent in SG mode          : %i\n\n",
+		      card->perf_stats.sg_skbs_sent,
+		      card->perf_stats.sg_frags_sent);
+	seq_printf(s, "  large_send tx (in Kbytes)              : %i\n"
+		      "  large_send count                       : %i\n\n",
+		      card->perf_stats.large_send_bytes >> 10,
+		      card->perf_stats.large_send_cnt);
 	seq_printf(s, "  Packing state changes no pkg.->packing : %i/%i\n"
 		      "  Watermarks L/H                         : %i/%i\n"
 		      "  Current buffer usage (outbound q's)    : "
@@ -262,7 +270,7 @@ qeth_perf_procfile_seq_show(struct seq_file *s, void *it)
 		      "  Outbound time (in us, incl QDIO)       : %i\n"
 		      "  Outbound count                         : %i\n"
 		      "  Outbound do_QDIO time (in us)          : %i\n"
-		      "  Outbound do_QDIO count                 : %i\n",
+		      "  Outbound do_QDIO count                 : %i\n\n",
 		        card->perf_stats.inbound_time,
 			card->perf_stats.inbound_cnt,
 		        card->perf_stats.inbound_do_qdio_time,
@@ -274,7 +282,6 @@ qeth_perf_procfile_seq_show(struct seq_file *s, void *it)
 		        card->perf_stats.outbound_do_qdio_time,
 			card->perf_stats.outbound_do_qdio_cnt
 		  );
-
 	return 0;
 }
 

@@ -32,11 +32,11 @@ static k_handler_fn K_HANDLERS;
 static k_handler_fn *k_handler[16] = { K_HANDLERS };
 
 /* maximum values each key_handler can handle */
-static const int max_vals[] = {
+static const int kbd_max_vals[] = {
 	255, ARRAY_SIZE(func_table) - 1, NR_FN_HANDLER - 1, 0,
 	NR_DEAD - 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
-static const int NR_TYPES = ARRAY_SIZE(max_vals);
+static const int KBD_NR_TYPES = ARRAY_SIZE(kbd_max_vals);
 
 static unsigned char ret_diacr[NR_DEAD] = {
 	'`', '\'', '^', '~', '"', ','
@@ -360,7 +360,7 @@ do_kdsk_ioctl(struct kbd_data *kbd, struct kbentry __user *user_kbe,
 		key_map = kbd->key_maps[tmp.kb_table];
 		if (key_map) {
 		    val = U(key_map[tmp.kb_index]);
-		    if (KTYP(val) >= NR_TYPES)
+		    if (KTYP(val) >= KBD_NR_TYPES)
 			val = K_HOLE;
 		} else
 		    val = (tmp.kb_index ? K_HOLE : K_NOSUCHMAP);
@@ -378,9 +378,9 @@ do_kdsk_ioctl(struct kbd_data *kbd, struct kbentry __user *user_kbe,
 			break;
 		}
 
-		if (KTYP(tmp.kb_value) >= NR_TYPES)
+		if (KTYP(tmp.kb_value) >= KBD_NR_TYPES)
 			return -EINVAL;
-		if (KVAL(tmp.kb_value) > max_vals[KTYP(tmp.kb_value)])
+		if (KVAL(tmp.kb_value) > kbd_max_vals[KTYP(tmp.kb_value)])
 			return -EINVAL;
 
 		if (!(key_map = kbd->key_maps[tmp.kb_table])) {

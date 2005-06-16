@@ -116,7 +116,7 @@ sys_sigaction(int sig, const struct old_sigaction __user *act,
 
 	if (act) {
 		old_sigset_t mask;
-		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		if (!access_ok(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_restorer, &act->sa_restorer))
 			return -EFAULT;
@@ -128,7 +128,7 @@ sys_sigaction(int sig, const struct old_sigaction __user *act,
 	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
 
 	if (!ret && oact) {
-		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		if (!access_ok(VERIFY_WRITE, oact, sizeof(*oact)) ||
 		    __put_user(old_ka.sa.sa_handler, &oact->sa_handler) ||
 		    __put_user(old_ka.sa.sa_restorer, &oact->sa_restorer))
 			return -EFAULT;
@@ -214,7 +214,7 @@ asmlinkage long sys_sigreturn(struct pt_regs *regs)
 	sigframe __user *frame = (sigframe __user *)regs->gprs[15];
 	sigset_t set;
 
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 	if (__copy_from_user(&set.sig, &frame->sc.oldmask, _SIGMASK_COPY_SIZE))
 		goto badframe;
@@ -240,7 +240,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
 	rt_sigframe __user *frame = (rt_sigframe __user *)regs->gprs[15];
 	sigset_t set;
 
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 	if (__copy_from_user(&set.sig, &frame->uc.uc_sigmask, sizeof(set)))
 		goto badframe;
@@ -282,7 +282,7 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 
 	/* This is the X/Open sanctioned signal stack switching.  */
 	if (ka->sa.sa_flags & SA_ONSTACK) {
-		if (! on_sig_stack(sp))
+		if (! sas_ss_flags(sp))
 			sp = current->sas_ss_sp + current->sas_ss_size;
 	}
 

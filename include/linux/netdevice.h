@@ -470,7 +470,6 @@ struct net_device
 						     unsigned char *haddr);
 	int			(*neigh_setup)(struct net_device *dev, struct neigh_parms *);
 	int			(*accept_fastpath)(struct net_device *, struct dst_entry*);
-	int                     (*generate_eui64)(u8 *eui, struct net_device *dev);
 #ifdef CONFIG_NETPOLL
 	int			netpoll_rx;
 #endif

@@ -335,19 +335,23 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
         __asm__ __volatile__("lpswe 0(%0)" : : "a" (&psw), "m" (psw) : "cc" );
 
 #define __ctl_load(array, low, high) ({ \
+	typedef struct { char _[sizeof(array)]; } addrtype; \
 	__asm__ __volatile__ ( \
 		"   bras  1,0f\n" \
                 "   lctlg 0,0,0(%0)\n" \
 		"0: ex    %1,0(1)" \
-		: : "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
+		: : "a" (&array), "a" (((low)<<4)+(high)), \
+		    "m" (*(addrtype *)(array)) : "1" ); \
 	})
 
 #define __ctl_store(array, low, high) ({ \
+	typedef struct { char _[sizeof(array)]; } addrtype; \
 	__asm__ __volatile__ ( \
 		"   bras  1,0f\n" \
 		"   stctg 0,0,0(%1)\n" \
 		"0: ex    %2,0(1)" \
-		: "=m" (array) : "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
+		: "=m" (*(addrtype *)(array)) \
+		: "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
 	})
 
 #define __ctl_set_bit(cr, bit) ({ \
@@ -390,19 +394,23 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
 	__asm__ __volatile__("lpsw 0(%0)" : : "a" (&psw) : "cc" );
 
 #define __ctl_load(array, low, high) ({ \
+	typedef struct { char _[sizeof(array)]; } addrtype; \
 	__asm__ __volatile__ ( \
 		"   bras  1,0f\n" \
                 "   lctl 0,0,0(%0)\n" \
 		"0: ex    %1,0(1)" \
-		: : "a" (&array), "a" (((low)<<4)+(high)) : "1" ); \
+		: : "a" (&array), "a" (((low)<<4)+(high)), \
+		    "m" (*(addrtype *)(array)) : "1" ); \
 	})
 
 #define __ctl_store(array, low, high) ({ \
+	typedef struct { char _[sizeof(array)]; } addrtype; \
 	__asm__ __volatile__ ( \
 		"   bras  1,0f\n" \
 		"   stctl 0,0,0(%1)\n" \
 		"0: ex    %2,0(1)" \
-		: "=m" (array) : "a" (&array), "a" (((low)<<4)+(high)): "1" ); \
+		: "=m" (*(addrtype *)(array)) \
+		: "a" (&array), "a" (((low)<<4)+(high)): "1" ); \
 	})
 
 #define __ctl_set_bit(cr, bit) ({ \
@@ -460,6 +468,8 @@ extern void smp_ctl_clear_bit(int cr, int bit);
 extern void (*_machine_restart)(char *command);
 extern void (*_machine_halt)(void);
 extern void (*_machine_power_off)(void);
+
+#define arch_align_stack(x) (x)
 
 #endif /* __KERNEL__ */
 

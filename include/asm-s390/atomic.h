@@ -61,6 +61,10 @@ static __inline__ void atomic_sub(int i, atomic_t * v)
 {
 	       __CS_LOOP(v, i, "sr");
 }
+static __inline__ int atomic_sub_return(int i, atomic_t * v)
+{
+	return __CS_LOOP(v, i, "sr");
+}
 static __inline__ void atomic_inc(volatile atomic_t * v)
 {
 	       __CS_LOOP(v, 1, "ar");

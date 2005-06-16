@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.13 $
+ * $Revision: 1.14 $
  */
 
 #include <linux/config.h>
@@ -95,6 +95,7 @@ dasd_default_erp_action(struct dasd_ccw_req * cqr)
                 DEV_MESSAGE (KERN_DEBUG, device, 
                              "default ERP called (%i retries left)",
                              cqr->retries);
+		cqr->lpm    = LPM_ANYPATH;
 		cqr->status = DASD_CQR_QUEUED;
         } else {
                 DEV_MESSAGE (KERN_WARNING, device, "%s",

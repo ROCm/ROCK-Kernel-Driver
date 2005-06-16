@@ -12,13 +12,23 @@ struct chsc_header {
 	u16 code;
 };
 
+struct channel_path_desc {
+	u8 flags;
+	u8 lsn;
+	u8 desc;
+	u8 chpid;
+	u8 swla;
+	u8 zeroes;
+	u8 chla;
+	u8 chpp;
+};
+
 struct channel_path {
 	int id;
 	int state;
+	struct channel_path_desc desc;
 	struct device dev;
 };
-
-extern struct channel_path *chps[];
 
 extern void s390_process_css( void );
 extern void chsc_validate_chpids(struct subchannel *);
@@ -51,4 +61,6 @@ extern struct css_chsc_char css_chsc_characteristics;
 
 extern int chsc_determine_css_characteristics(void);
 extern int css_characteristics_avail;
+
+extern void *chsc_get_chp_desc(struct subchannel*, int);
 #endif

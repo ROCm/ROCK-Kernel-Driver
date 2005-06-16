@@ -84,6 +84,7 @@ struct ccw_device_private {
 		unsigned int doverify:1;    /* delayed path verification */
 		unsigned int donotify:1;    /* call notify function */
 		unsigned int recog_done:1;  /* dev. recog. complete */
+		unsigned int fake_irb:1;    /* deliver faked irb */
 	} __attribute__((packed)) flags;
 	unsigned long intparm;	/* user interruption parameter */
 	struct qdio_irq *qdio_data;
@@ -136,6 +137,7 @@ void device_set_disconnected(struct subchannel *);
 void device_trigger_reprobe(struct subchannel *);
 
 /* Helper functions for vary on/off. */
+int device_is_online(struct subchannel *);
 void device_set_waiting(struct subchannel *);
 
 /* Machine check helper function. */

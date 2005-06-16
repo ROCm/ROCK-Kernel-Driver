@@ -5,7 +5,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.9 $
+ * $Revision: 1.10 $
  */
 
 #ifndef DASD_ECKD_H
@@ -325,6 +325,12 @@ struct dasd_eckd_confdata {
 		unsigned char reserved2[12];
 	} __attribute__ ((packed)) neq;
 } __attribute__ ((packed));
+
+struct dasd_eckd_path {
+	__u8 opm;
+	__u8 ppm;
+	__u8 npm;
+};
 
 /*
  * Perform Subsystem Function - Prepare for Read Subsystem Data	 

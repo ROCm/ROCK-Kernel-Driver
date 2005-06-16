@@ -101,6 +101,7 @@ extern unsigned long _end;
 extern unsigned long __init_begin;
 extern unsigned long __init_end;
 
+extern unsigned long __initdata zholes_size[];
 /*
  * paging_init() sets up the page tables
  */
@@ -145,7 +146,7 @@ void __init paging_init(void)
                 for (tmp = 0 ; tmp < PTRS_PER_PTE ; tmp++,pg_table++) {
                         pte = pfn_pte(pfn, PAGE_KERNEL);
                         if (pfn >= max_low_pfn)
-                                pte_clear(&pte);
+                                pte_clear(&init_mm, 0, &pte);
                         set_pte(pg_table, pte);
                         pfn++;
                 }
@@ -163,10 +164,13 @@ void __init paging_init(void)
         local_flush_tlb();
 
 	{
-		unsigned long zones_size[MAX_NR_ZONES] = { 0, 0, 0};
+		unsigned long zones_size[MAX_NR_ZONES];
 
+		memset(zones_size, 0, sizeof(zones_size));
 		zones_size[ZONE_DMA] = max_low_pfn;
-		free_area_init(zones_size);
+		free_area_init_node(0, &contig_page_data, zones_size,
+				    __pa(PAGE_OFFSET) >> PAGE_SHIFT,
+				    zholes_size);
 	}
         return;
 }
@@ -184,9 +188,10 @@ void __init paging_init(void)
           _KERN_REGION_TABLE;
 	static const int ssm_mask = 0x04000000L;
 
-	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
+	unsigned long zones_size[MAX_NR_ZONES];
 	unsigned long dma_pfn, high_pfn;
 
+	memset(zones_size, 0, sizeof(zones_size));
 	dma_pfn = MAX_DMA_ADDRESS >> PAGE_SHIFT;
 	high_pfn = max_low_pfn;
 
@@ -198,8 +203,8 @@ void __init paging_init(void)
 	}
 
 	/* Initialize mem_map[].  */
-	free_area_init(zones_size);
-
+	free_area_init_node(0, &contig_page_data, zones_size,
+			    __pa(PAGE_OFFSET) >> PAGE_SHIFT, zholes_size);
 
 	/*
 	 * map whole physical memory to virtual memory (identity mapping) 
@@ -229,7 +234,7 @@ void __init paging_init(void)
                         for (k = 0 ; k < PTRS_PER_PTE ; k++,pt_dir++) {
                                 pte = pfn_pte(pfn, PAGE_KERNEL);
                                 if (pfn >= max_low_pfn) {
-                                        pte_clear(&pte); 
+                                        pte_clear(&init_mm, 0, &pte); 
                                         continue;
                                 }
                                 set_pte(pt_dir, pte);

@@ -30,31 +30,16 @@ do_load_quiesce_psw(void * __unused)
 {
 	static atomic_t cpuid = ATOMIC_INIT(-1);
 	psw_t quiesce_psw;
-	__u32 status;
-	int i;
+	int cpu;
 
 	if (atomic_compare_and_swap(-1, smp_processor_id(), &cpuid))
 		signal_processor(smp_processor_id(), sigp_stop);
 	/* Wait for all other cpus to enter stopped state */
-	i = 1;
-	while (i < NR_CPUS) {
-		if (!cpu_online(i)) {
-			i++;
+	for_each_online_cpu(cpu) {
+		if (cpu == smp_processor_id())
 			continue;
-		}
-		switch (signal_processor_ps(&status, 0, i, sigp_sense)) {
-		case sigp_order_code_accepted:
-		case sigp_status_stored:
-			/* Check for stopped and check stop state */
-			if (status & 0x50)
-				i++;
-			break;
-		case sigp_busy:
-			break;
-		case sigp_not_operational:
-			i++;
-			break;
-		}
+		while(!smp_cpu_not_running(cpu))
+			cpu_relax();
 	}
 	/* Quiesce the last cpu with the special psw */
 	quiesce_psw.mask = PSW_BASE_BITS | PSW_MASK_WAIT;

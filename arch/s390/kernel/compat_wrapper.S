@@ -1406,3 +1406,38 @@ compat_sys_mq_getsetattr_wrapper:
 	llgtr	%r3,%r3			# struct compat_mq_attr *
 	llgtr	%r4,%r4			# struct compat_mq_attr *
 	jg	compat_sys_mq_getsetattr
+
+	.globl	compat_sys_add_key_wrapper
+compat_sys_add_key_wrapper:
+	llgtr	%r2,%r2			# const char *
+	llgtr	%r3,%r3			# const char *
+	llgtr	%r4,%r4			# const void *
+	llgfr	%r5,%r5			# size_t
+	llgfr	%r6,%r6			# (key_serial_t) u32
+	jg	sys_add_key
+
+	.globl	compat_sys_request_key_wrapper
+compat_sys_request_key_wrapper:
+	llgtr	%r2,%r2			# const char *
+	llgtr	%r3,%r3			# const char *
+	llgtr	%r4,%r4			# const void *
+	llgfr	%r5,%r5			# (key_serial_t) u32
+	jg	sys_request_key
+
+	.globl	sys32_remap_file_pages_wrapper
+sys32_remap_file_pages_wrapper:
+	llgfr	%r2,%r2			# unsigned long
+	llgfr	%r3,%r3			# unsigned long
+	llgfr	%r4,%r4			# unsigned long
+	llgfr	%r5,%r5			# unsigned long
+	llgfr	%r6,%r6			# unsigned long
+	jg	sys_remap_file_pages
+
+	.globl	compat_sys_waitid_wrapper
+compat_sys_waitid_wrapper:
+	lgfr	%r2,%r2			# int
+	lgfr	%r3,%r3			# pid_t
+	llgtr	%r4,%r4			# siginfo_emu31_t *
+	lgfr	%r5,%r5			# int
+	llgtr	%r6,%r6			# struct rusage_emu31 *
+	jg	compat_sys_waitid

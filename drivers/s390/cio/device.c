@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.129 $
+ *   $Revision: 1.131 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -293,6 +293,14 @@ ccw_device_set_offline(struct ccw_device *cdev)
 	cdev->online = 0;
 	spin_lock_irq(cdev->ccwlock);
 	ret = ccw_device_offline(cdev);
+	if (ret == -ENODEV) {
+		if (cdev->private->state != DEV_STATE_NOT_OPER) {
+			cdev->private->state = DEV_STATE_OFFLINE;
+			dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
+		}
+		spin_unlock_irq(cdev->ccwlock);
+		return ret;
+	}
 	spin_unlock_irq(cdev->ccwlock);
 	if (ret == 0)
 		wait_event(cdev->private->wait_q, dev_fsm_final_state(cdev));

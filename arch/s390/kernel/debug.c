@@ -931,11 +931,15 @@ int debug_register_view(debug_info_t * id, struct debug_view *view)
 	int rc = 0;
 	int i;
 	unsigned long flags;
-	mode_t mode = S_IFREG | S_IRUSR | S_IWUSR;
+	mode_t mode = S_IFREG;
 	struct proc_dir_entry *pde;
 
 	if (!id)
 		goto out;
+	if (view->prolog_proc || view->format_proc || view->header_proc)
+		mode |= S_IRUSR;
+	if (view->input_proc)
+		mode |= S_IWUSR;
 	pde = create_proc_entry(view->name, mode, id->proc_root_entry);
 	if (!pde){
 		printk(KERN_WARNING "debug: create_proc_entry() failed! Cannot register view %s/%s\n", id->name,view->name);
@@ -958,10 +962,6 @@ int debug_register_view(debug_info_t * id, struct debug_view *view)
 	}
 	else {
 		id->views[i] = view;
-		if (view->prolog_proc || view->format_proc || view->header_proc)
-			mode |= S_IRUSR;
-		if (view->input_proc)
-			mode |= S_IWUSR;
 		pde->proc_fops = &debug_file_ops;
 		id->proc_entries[i] = pde;
 	}

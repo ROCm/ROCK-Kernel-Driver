@@ -62,8 +62,7 @@ extern struct task_struct *last_task_used_math;
 #ifndef __s390x__
 
 # define TASK_SIZE		(0x80000000UL)
-# define TASK_UNMAPPED_BASE (current->map_base)
-# define __TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
+# define TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
 # define DEFAULT_TASK_SIZE	(0x80000000UL)
 
 #else /* __s390x__ */
@@ -74,8 +73,6 @@ extern struct task_struct *last_task_used_math;
 # define DEFAULT_TASK_SIZE	(0x40000000000UL)
 
 #endif /* __s390x__ */
-
-#define MM_VM_SIZE(mm)		DEFAULT_TASK_SIZE
 
 #define HAVE_ARCH_PICK_MMAP_LAYOUT
 
@@ -248,7 +245,7 @@ static inline void enabled_wait(void)
 	psw_t wait_psw;
 
 	wait_psw.mask = PSW_BASE_BITS | PSW_MASK_IO | PSW_MASK_EXT |
-		PSW_MASK_MCHECK | PSW_MASK_WAIT;
+		PSW_MASK_MCHECK | PSW_MASK_WAIT | PSW_DEFAULT_KEY;
 #ifndef __s390x__
 	asm volatile (
 		"    basr %0,0\n"

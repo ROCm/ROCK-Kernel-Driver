@@ -14,7 +14,7 @@
 
 #include <asm/qeth.h>
 
-#define VERSION_QETH_MPC_H "$Revision: 1.38 $"
+#define VERSION_QETH_MPC_H "$Revision: 1.43 $"
 
 extern const char *VERSION_QETH_MPC_C;
 
@@ -182,6 +182,9 @@ enum qeth_ipa_funcs {
 	IPA_FULL_VLAN           = 0x00004000L,
 	IPA_SOURCE_MAC          = 0x00010000L,
 	IPA_OSA_MC_ROUTER       = 0x00020000L,
+	IPA_QUERY_ARP_ASSIST	= 0x00040000L,
+	IPA_INBOUND_TSO         = 0x00080000L,
+	IPA_OUTBOUND_TSO        = 0x00100000L,
 };
 
 /* SETIP/DELIP IPA Command: ***************************************************/

@@ -164,6 +164,8 @@ extern int ccw_device_clear(struct ccw_device *, unsigned long);
 
 extern int read_dev_chars(struct ccw_device *cdev, void **buffer, int length);
 extern int read_conf_data(struct ccw_device *cdev, void **buffer, int *length);
+extern int read_conf_data_lpm(struct ccw_device *cdev, void **buffer,
+			      int *length, __u8 lpm);
 
 extern int ccw_device_set_online(struct ccw_device *cdev);
 extern int ccw_device_set_offline(struct ccw_device *cdev);
@@ -186,4 +188,5 @@ extern int _ccw_device_get_subchannel_number(struct ccw_device *);
 extern struct device *s390_root_dev_register(const char *);
 extern void s390_root_dev_unregister(struct device *);
 
+extern void *ccw_device_get_chp_desc(struct ccw_device *, int);
 #endif /* _S390_CCWDEV_H_ */

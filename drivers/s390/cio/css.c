@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.84 $
+ *   $Revision: 1.85 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -180,6 +180,7 @@ css_evaluate_subchannel(int irq, int slow)
 {
 	int event, ret, disc;
 	struct subchannel *sch;
+	unsigned long flags;
 
 	sch = get_subchannel_by_schid(irq);
 	disc = sch ? device_is_disconnected(sch) : 0;
@@ -221,7 +222,9 @@ css_evaluate_subchannel(int irq, int slow)
 			 * coming operational again. It won't do harm in real
 			 * no path situations.
 			 */
+			spin_lock_irqsave(&sch->lock, flags);
 			device_trigger_reprobe(sch);
+			spin_unlock_irqrestore(&sch->lock, flags);
 			ret = 0;
 			break;
 		}
@@ -262,14 +265,19 @@ css_evaluate_subchannel(int irq, int slow)
 			 * We can't immediately deregister the disconnected
 			 * device since it might block.
 			 */
+			spin_lock_irqsave(&sch->lock, flags);
 			device_trigger_reprobe(sch);
+			spin_unlock_irqrestore(&sch->lock, flags);
 			ret = 0;
 		}
 		break;
 	case CIO_OPER:
-		if (disc)
+		if (disc) {
+			spin_lock_irqsave(&sch->lock, flags);
 			/* Get device operational again. */
 			device_trigger_reprobe(sch);
+			spin_unlock_irqrestore(&sch->lock, flags);
+		}
 		ret = sch ? 0 : css_probe_device(irq);
 		break;
 	default:

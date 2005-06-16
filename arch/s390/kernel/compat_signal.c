@@ -231,7 +231,7 @@ sys32_sigaction(int sig, const struct old_sigaction32 __user *act,
 
         if (act) {
 		compat_old_sigset_t mask;
-		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		if (!access_ok(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user(sa_handler, &act->sa_handler) ||
 		    __get_user(sa_restorer, &act->sa_restorer))
 			return -EFAULT;
@@ -247,7 +247,7 @@ sys32_sigaction(int sig, const struct old_sigaction32 __user *act,
 	if (!ret && oact) {
 		sa_handler = (unsigned long) old_ka.sa.sa_handler;
 		sa_restorer = (unsigned long) old_ka.sa.sa_restorer;
-		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		if (!access_ok(VERIFY_WRITE, oact, sizeof(*oact)) ||
 		    __put_user(sa_handler, &oact->sa_handler) ||
 		    __put_user(sa_restorer, &oact->sa_restorer))
 			return -EFAULT;
@@ -416,7 +416,7 @@ asmlinkage long sys32_sigreturn(struct pt_regs *regs)
 	sigframe32 __user *frame = (sigframe32 __user *)regs->gprs[15];
 	sigset_t set;
 
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 	if (__copy_from_user(&set.sig, &frame->sc.oldmask, _SIGMASK_COPY_SIZE32))
 		goto badframe;
@@ -446,7 +446,7 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs *regs)
 	int err;
 	mm_segment_t old_fs = get_fs();
 
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
 		goto badframe;

@@ -316,6 +316,7 @@ ccw_device_sense_id_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	if (ccw_device_accumulate_and_sense(cdev, irb) != 0)
 		return;
 	ret = ccw_device_check_sense_id(cdev);
+	memset(&cdev->private->irb, 0, sizeof(struct irb));
 	switch (ret) {
 	/* 0, -ETIME, -EOPNOTSUPP, -EAGAIN or -EACCES */
 	case 0:			/* Sense id succeeded. */

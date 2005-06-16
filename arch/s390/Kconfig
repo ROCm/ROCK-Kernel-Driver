@@ -84,12 +84,12 @@ config NR_CPUS
 	  approximately sixteen kilobytes to the kernel image.
 
 config HOTPLUG_CPU
-	bool "Support for hot-pluggable CPUs (EXPERIMENTAL)"
-	depends on SMP && EXPERIMENTAL
+	bool "Support for hot-pluggable CPUs"
+	depends on SMP
 	select HOTPLUG
 	default n
 	help
-	  Say Y here to experiment with turning CPUs off and on.  CPUs
+	  Say Y here to be able to turn CPUs off and on. CPUs
 	  can be controlled through /sys/devices/system/cpu/cpu#.
 	  Say N if you want to disable CPU hotplug.
 

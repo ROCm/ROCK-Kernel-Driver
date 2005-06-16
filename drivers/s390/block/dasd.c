@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.156 $
+ * $Revision: 1.164 $
  */
 
 #include <linux/config.h>
@@ -757,6 +757,17 @@ dasd_start_IO(struct dasd_ccw_req * cqr)
 		DBF_DEV_EVENT(DBF_ERR, device, "%s",
 			      "start_IO: request timeout, retry later");
 		break;
+	case -EACCES:
+		/* -EACCES indicates that the request used only a
+		 * subset of the available pathes and all these
+		 * pathes are gone.
+		 * Do a retry with all available pathes.
+		 */
+		cqr->lpm = LPM_ANYPATH;
+		DBF_DEV_EVENT(DBF_ERR, device, "%s",
+			      "start_IO: selected pathes gone,"
+			      " retry on all pathes");
+		break;
 	case -ENODEV:
 	case -EIO:
 		DBF_DEV_EVENT(DBF_ERR, device, "%s",
@@ -1120,11 +1131,15 @@ __dasd_process_blk_queue(struct dasd_device * device)
 	request_queue_t *queue;
 	struct request *req;
 	struct dasd_ccw_req *cqr;
-	int nr_queued;
+	int nr_queued, feature_ro;
 
 	queue = device->request_queue;
 	/* No queue ? Then there is nothing to do. */
 	if (queue == NULL)
+		return;
+
+	feature_ro = dasd_get_feature(device->cdev, DASD_FEATURE_READONLY);
+	if (feature_ro < 0) 	/* no devmap */
 		return;
 
 	/*
@@ -1146,8 +1161,8 @@ __dasd_process_blk_queue(struct dasd_device * device)
 	       elv_next_request(queue) &&
 		nr_queued < DASD_CHANQ_MAX_SIZE) {
 		req = elv_next_request(queue);
-		if (test_bit(DASD_FLAG_RO, &device->flags) &&
-		    rq_data_dir(req) == WRITE) {
+
+		if (feature_ro && rq_data_dir(req) == WRITE) {
 			DBF_DEV_EVENT(DBF_ERR, device,
 				      "Rejecting write request %p",
 				      req);
@@ -1222,7 +1237,9 @@ __dasd_start_head(struct dasd_device * device)
 		rc = device->discipline->start_IO(cqr);
 		if (rc == 0)
 			dasd_set_timer(device, cqr->expires);
-		else
+		else if (rc == -EACCES) {
+			dasd_schedule_bh(device);
+		} else
 			/* Hmpf, try again in 1/2 sec */
 			dasd_set_timer(device, 50);
 	}
@@ -1618,6 +1635,7 @@ dasd_setup_queue(struct dasd_device * device)
 	blk_queue_max_hw_segments(device->request_queue, -1L);
 	blk_queue_max_segment_size(device->request_queue, -1L);
 	blk_queue_segment_boundary(device->request_queue, -1L);
+	blk_queue_ordered(device->request_queue, 1);
 }
 
 /*
@@ -1748,9 +1766,9 @@ dasd_generic_probe (struct ccw_device *cdev,
 		printk(KERN_WARNING
 		       "dasd_generic_probe: could not add sysfs entries "
 		       "for %s\n", cdev->dev.bus_id);
+	} else {
+		cdev->handler = &dasd_int_handler;
 	}
-
-	cdev->handler = &dasd_int_handler;
 
 	return ret;
 }
@@ -1761,6 +1779,8 @@ void
 dasd_generic_remove (struct ccw_device *cdev)
 {
 	struct dasd_device *device;
+
+	cdev->handler = NULL;
 
 	dasd_remove_sysfs_files(cdev);
 	device = dasd_device_from_cdev(cdev);
@@ -1790,13 +1810,17 @@ dasd_generic_set_online (struct ccw_device *cdev,
 
 {
 	struct dasd_device *device;
-	int rc;
+	int feature_diag, rc;
 
 	device = dasd_create_device(cdev);
 	if (IS_ERR(device))
 		return PTR_ERR(device);
 
-	if (test_bit(DASD_FLAG_USE_DIAG, &device->flags)) {
+	feature_diag = dasd_get_feature(cdev, DASD_FEATURE_USEDIAG);
+	if (feature_diag < 0)
+		return feature_diag;
+
+	if (feature_diag) {
 	  	if (!dasd_diag_discipline_pointer) {
 		        printk (KERN_WARNING
 				"dasd_generic couldn't online device %s "
@@ -1813,8 +1837,8 @@ dasd_generic_set_online (struct ccw_device *cdev,
 	if (rc) {
 		printk (KERN_WARNING
 			"dasd_generic couldn't online device %s "
-			"with discipline %s\n", 
-			cdev->dev.bus_id, discipline->name);
+			"with discipline %s rc=%i\n",
+			cdev->dev.bus_id, discipline->name, rc);
 		dasd_delete_device(device);
 		return rc;
 	}
