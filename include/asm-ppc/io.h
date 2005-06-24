@@ -546,6 +546,10 @@ struct pci_dev;
 extern void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long max);
 extern void pci_iounmap(struct pci_dev *dev, void __iomem *);
 
+#define NO_PC_LEGACY_SERIAL_8250_CONSOLE 1
+extern int do_not_try_pc_legacy_8250_console;
+
+
 #endif /* _PPC_IO_H */
 
 #ifdef CONFIG_8260_PCI9

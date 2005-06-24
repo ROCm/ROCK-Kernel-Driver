@@ -441,6 +441,8 @@ out:
 /* Check of existence of legacy devices */
 extern int check_legacy_ioport(unsigned long base_port);
 
+#define NO_PC_LEGACY_SERIAL_8250_CONSOLE 1
+extern int do_not_try_pc_legacy_8250_console;
 
 /*
  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
