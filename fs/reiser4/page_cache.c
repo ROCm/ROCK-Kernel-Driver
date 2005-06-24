@@ -536,8 +536,8 @@ int set_page_dirty_internal (struct page * page, int tag_as_moved)
 			read_lock_irq(&mapping->tree_lock);
 			if (page->mapping) {	/* Race with truncate? */
 				BUG_ON(page->mapping != mapping);
-				if (!mapping->backing_dev_info->memory_backed)
-					inc_page_state(nr_dirty);
+/*				if (!mapping->backing_dev_info->memory_backed)
+					inc_page_state(nr_dirty); */
 				radix_tree_tag_set(&mapping->page_tree,
 					page->index, PAGECACHE_TAG_DIRTY);
 				if (tag_as_moved) {

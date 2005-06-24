@@ -85,8 +85,8 @@ reiser4_clear_page_dirty(struct page *page)
 				     PAGECACHE_TAG_REISER4_MOVED);
 
 		read_unlock_irqrestore(&mapping->tree_lock, flags);
-		if (!mapping->backing_dev_info->memory_backed)
-			dec_page_state(nr_dirty);
+/*		if (!mapping->backing_dev_info->memory_backed)
+			dec_page_state(nr_dirty);  */
 		return;
 	}
 	read_unlock_irqrestore(&mapping->tree_lock, flags);
@@ -118,8 +118,8 @@ static int reiser4_set_page_dirty(struct page *page /* page to mark dirty */)
 			/* check for race with truncate */
 			if (page->mapping) {
 				assert("vs-1652", page->mapping == mapping);
-				if (!mapping->backing_dev_info->memory_backed)
-					inc_page_state(nr_dirty);
+/*				if (!mapping->backing_dev_info->memory_backed)
+					inc_page_state(nr_dirty); */
 				radix_tree_tag_clear(&mapping->page_tree,
 						   page->index, PAGECACHE_TAG_DIRTY);
 				/* FIXME: if would be nice to not set this tag on pages which are captured already */
@@ -149,8 +149,8 @@ int reiser4_set_page_dirty2(struct page *page /* page to mark dirty */)
 			/* check for race with truncate */
 			if (page->mapping) {
 				assert("vs-1652", page->mapping == mapping);
-				if (!mapping->backing_dev_info->memory_backed)
-					inc_page_state(nr_dirty);
+/*				if (!mapping->backing_dev_info->memory_backed)
+					inc_page_state(nr_dirty); */
 			}
 			read_unlock_irq(&mapping->tree_lock);
 			__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);

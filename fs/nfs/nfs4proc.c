@@ -2746,7 +2746,6 @@ struct nfs4_state_recovery_ops nfs4_network_partition_recovery_ops = {
 struct nfs_rpc_ops	nfs_v4_clientops = {
 	.version	= 4,			/* protocol version */
 	.dentry_ops	= &nfs4_dentry_operations,
-	.file_inode_ops	= &nfs_file_inode_operations,
 	.dir_inode_ops	= &nfs4_dir_inode_operations,
 	.getroot	= nfs4_proc_get_root,
 	.getattr	= nfs4_proc_getattr,
