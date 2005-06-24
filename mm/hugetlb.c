@@ -220,6 +220,23 @@ int hugetlb_report_node_meminfo(int nid, char *buf)
 		nid, free_huge_pages_node[nid]);
 }
 
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#include <linux/kdbprivate.h>
+/* Like hugetlb_report_meminfo() but using kdb_printf() */
+void
+kdb_hugetlb_report_meminfo(void)
+{
+	kdb_printf(
+		"HugePages_Total: %5lu\n"
+		"HugePages_Free:  %5lu\n"
+		"Hugepagesize:    %5lu kB\n",
+		nr_huge_pages,
+		free_huge_pages,
+		HPAGE_SIZE/1024);
+}
+#endif	/* CONFIG_KDB */
+
 int is_hugepage_mem_enough(size_t size)
 {
 	return (size + ~HPAGE_MASK)/HPAGE_SIZE <= free_huge_pages;

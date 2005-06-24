@@ -29,6 +29,7 @@
 #define FIRST_EXTERNAL_VECTOR	0x20
 
 #define SYSCALL_VECTOR		0x80
+#define KDBENTER_VECTOR		0x81
 
 /*
  * Vectors 0x20-0x2f are used for ISA interrupts.
@@ -48,6 +49,7 @@
 #define INVALIDATE_TLB_VECTOR	0xfd
 #define RESCHEDULE_VECTOR	0xfc
 #define CALL_FUNCTION_VECTOR	0xfb
+#define KDB_VECTOR		0xf9
 
 #define THERMAL_APIC_VECTOR	0xf0
 /*

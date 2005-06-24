@@ -1,0 +1,1382 @@
+#! /opt/cpg/bin/do-mgp
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%deffont "standard" tfont "comic.ttf"
+%deffont "thick" tfont "arialb.ttf"
+%deffont "typewriter" xfont "courier new-bold-r"
+%deffont "type2writer" xfont "arial narrow-bold-r"
+%%
+%% Default settings per each line numbers.
+%%
+#%default 1 leftfill, size 2, fore "black", back "LemonChiffon2", font "thick"
+%default 1 leftfill, size 2, fore "black", back "white", font "thick"
+%default 2 size 10, vgap 10, prefix " ", center
+%default 3 size 2, bar "gray70", vgap 10
+%default 4 size 6, fore "black", vgap 30, prefix " ", font "standard", left
+%%
+%% Default settings that are applied to TAB-indented lines.
+%%
+%tab 1 size 4, vgap 35, prefix "  ", icon arc "red" 40
+%tab 2 size 4, vgap 20, prefix "      ", icon delta3 "blue" 40
+%tab 3 size 4, vgap 20, prefix "            ", icon delta3 "green" 40
+%%
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+KDB - Kernel Debugger
+
+
+
+%size 7,center, font "thick"
+Introduction
+
+And
+
+Demonstration
+
+
+%size 3
+
+February 5, 2002                                   IBM Linux Technology Center                                   Paul Dorwin
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+IBM Legal
+
+
+	IBM Legal requires this information:
+
+%size 3
+
+        THE INFORMATION IN THE FOLLOWING PRESENTATION IS PREPARED
+        SOLELY FOR THE INFORMATION OF THE READER, AND COMES "AS IS"
+        AND WITHOUT WARRANTY OR REPRESENATION OF ANY KIND.
+
+        ANY PARTY USING THE MATERIALS IN THIS PRESENTATION DOES SO
+        AT ITS OWN RISK LIABILITY AND THE PROVIDER OF THE MATERIALS
+        ACCEPTS NO RISK OR LIABILITY FOR SUCH USE OR RESULTING FROM
+        DISSEMINATION TO OR USE BY ANY OTHER PARTY
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Agenda
+
+%size 5
+
+        Installing and Configuring KDB
+
+        KDB Commands
+
+        Scull Demo
+
+                Setting Breakpoints
+
+                Displaying Data Structures
+
+        Kernel Data structures
+
+                Take a walk through an IO operation
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Installing Configuring KDB
+
+
+	Install KDB patch.
+		Start with a clean source tree
+		Apply architecture specific patches
+		Obtain patch for your kernel version
+			see http://oss.sgi.com/projects/kdb/
+		Apply the kdb patch
+			patch -p 1 -N -u -i /path/to/patch
+		Apply any other patches
+		Build and reboot on your kdb enabled kernel
+		Man pages can be found at Documentation/kdb
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Configuring KDB
+
+
+	Config kernel with the following options:
+		These are documented in Documentation/Configure.help
+
+		CONFIG_KDB=y
+			Enable compilation of KDB in the kernel..
+			Setting this also sets CONFIG_KALLSYMS=y.
+		CONFIG_KDB_MODULES=n
+			KDB may be extended, compiling kdb/modules.
+		CONFIG_KDB_OFF=n
+			y = KDB is disabled  by default.
+			boot with kdb=on to enable at boot.
+			/proc/sys/kernel/kdb to enable/disable when system is up.
+		CONFIG_KALLSYMS=y
+			This causes all symbols to be exported.
+		CONFIG_FRAME_POINTER=y
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Invoking KDB
+
+
+	KDB can be invoked in the following ways:
+
+		Early init with "kdb=early" lilo flag
+			Hits breakpoint prior to fork_init() (init/main.c)
+
+		Serial console with CNTRL-A
+
+		Console with PAUSE key
+
+		When a pre-set breakpoint is hit
+
+		On panic
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+KDB Commands
+
+
+	KDB environment
+		env				Show environment variables
+		set				Set environment variables
+		help			Display Help Message
+		?				Display Help Message
+
+	System related
+		sections			List kernel and module sections
+		lsmod			List loaded kernel modules
+		reboot			Reboot the machine immediately
+		cpu		<cpunum>	Switch to new cpu
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+KDB Commands
+
+
+	Memory Manipulation
+		md		<vaddr>		Display Memory Contents
+		mdr	<vaddr> <bytes>	Display Raw Memory
+		mds	<vaddr>		Display Symbolically
+		mm	<vaddr> <value>	Modify Memory Contents
+		id		<vaddr>		Display Instructions
+
+	Register Manipulation
+		rd				Display Registers
+		rm		<reg> <value> 	Modify Registers
+		ef		 <vaddr>		Display exception frame
+
+	Stack
+		bt		[<vaddr>]	Stack traceback
+		btp		 <pid>		Display stack for <pid>
+		bta				Display all stacks
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+KDB Commands
+
+
+	Breakpoint
+		bc		 <bpnum>	Clear Breakpoint
+		bd		 <bpnum>	Disable Breakpoint
+		be		 <bpnum>	Enable Breakpoint
+		bl		[<vaddr>]	Display breakpoints
+		bp		[<vaddr>]	Set/Display breakpoints
+		bpa		[<vaddr>]	Set/Display global breakpoints
+		bph	[<vaddr>]	Set hardware breakpoint
+		bpha	[<vaddr>]	Set global hardware breakpoint
+		bp* modifiers:
+			instruction - break on instruction fetch (default)
+			datar - break on read  at vaddr
+			dataw - break on write at vaddr
+			IO - break on in or out op at vaddress
+
+	Execution control
+		go		  [<vaddr>]	Continue Execution
+		ss  		  [<#steps>]	Single Step
+		ssb				Single step to branch/call
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+KDB Commands
+
+
+	Kernel structures
+		ll <vaddr> <offset> <command>	Traverse list and execute command
+		ps				Display active task list
+		vm		<vaddr>		Display vm_area_struct
+		dentry	<dentry>		Display interesting dentry stuff
+		filp		<filp>		Display interesting filp stuff
+		sh		<vaddr>		Show scsi_host
+		sd		<vaddr>		Show scsi_device
+		sc		<vaddr>		Show scsi_cmnd
+		kiobuf	<vaddr>		Display kiobuf
+		page	<vaddr>		Display page
+		inode	<vaddr>		Display inode
+		bh		<vaddr>		Display buffer head
+		inode_pages	<inode *>	Display pages in an inode
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Scull Demo
+
+
+	Objective
+		Find and display the data associated with a scull device
+
+	The sequence of events
+		Populate the scull device with data
+		Identify the breakpoints
+		Set breakpoint in the device read function
+		Identify the data structure elements
+		Identify device structures used to track data
+		Display data structures containing the data
+		Show the usage of the filp command
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Scull Demo: Populate Device
+
+
+	Obtain the code
+		Surf to http://examples.oreilly.com/linuxdrive2/
+		Download the tarball
+		Untar it to /usr/src
+
+	Build and install the module
+		cd /usr/src/ldd2-samples-1.0.1/scull
+		make
+		./scull.init start
+
+	Populate the scull device
+		cat main.c > /dev/scull0
+		cat /dev/scull0
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Scull Demo: Driver Details
+
+
+	cat /dev/scull0
+		fd =
+%fore "blue", cont
+open
+%fore "black", cont
+("/dev/scull0", O_RDONLY);
+			Kernel finds the file_operations structure
+			Kernel then invokes the open function
+%fore "blue"
+		read
+%fore "black", cont
+(fd, buf, size);
+			Kernel finds the file_operations structure
+			Kernel then invokes the read function
+
+	Scull device file operations structure
+
+%font "typewriter", size 3
+    struct file_operations scull_fops = {
+        llseek:     scull_llseek,
+%fore "blue"
+        read:       scull_read,
+%fore "black"
+        write:      scull_write,
+        ioctl:      scull_ioctl,
+%fore "blue"
+        open:       scull_open,
+%fore "black"
+        release:    scull_release,
+    };
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Scull Demo: Driver Details
+
+%font "typewriter", size 3
+	scull_open code
+%font "typewriter", size 3
+    int
+%fore "blue", cont
+scull_open
+%fore "black", cont
+(struct inode *inode, struct file *filp)
+    {
+        Scull_Dev *dev; /* device information */
+        int num = NUM(inode->i_rdev);
+
+        <snip>
+
+        dev = (Scull_Dev *)filp->private_data;
+        if (!dev) {
+            if (num >= scull_nr_devs) return -ENODEV;
+%fore "blue"
+            dev = &scull_devices[num];
+            filp->private_data = dev;
+%fore "black"
+        }
+
+        <snip>
+
+    }
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Scull Demo: Driver Details
+
+%font "typewriter", size 3
+	scull_read code
+%font "typewriter", size 3
+    ssize_t
+%fore "blue", cont
+scull_read
+%fore "black", cont
+(struct file *filp, char *buf, size_t count,
+            loff_t *f_pos)
+    {
+
+%fore "blue", cont
+        Scull_Dev *dev = filp->private_data;
+%fore "black", cont
+ /* the first listitem */
+%fore "blue"
+        Scull_Dev *dptr;
+%fore "black"
+        int quantum = dev->quantum;
+        int qset = dev->qset;
+        int itemsize = quantum * qset;
+        if (down_interruptible(&dev->sem))
+                return -ERESTARTSYS;
+        if (*f_pos + count > dev->size)
+            count = dev->size - *f_pos;
+
+        /* find listitem, qset index, and offset in the quantum */
+        item = (long)*f_pos / itemsize;
+        rest = (long)*f_pos % itemsize;
+        s_pos = rest / quantum; q_pos = rest % quantum;
+
+        /* follow the list up to the right position */
+%fore "blue"
+        dptr = scull_follow(dev, item);
+%fore "black"
+
+        <snip>
+
+    }
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Scull Demo: Breakpoints
+
+
+%font "typewriter", size 3
+	Determine where to set breakpoint
+%font "typewriter", size 3
+%fore "blue"
+        dptr = scull_follow(dev, item);
+%fore "black"
+
+%font "typewriter", size 3
+	Disassemble scull_read
+%font "typewriter", size 3
+    [0]kdb>
+%fore "blue", cont
+id scull_read
+%fore "black"
+    0xf8c083b4 scull_read:  push   %ebp
+    0xf8c083b5 scull_read+0x1:mov    %esp,%ebp
+    0xf8c083b7 scull_read+0x3:push   %edi
+            <snip>
+    0xf8c08465 scull_read+0xb1:sub    $0x8,%esp
+%fore "blue"
+    0xf8c08468 scull_read+0xb4:push   %ecx
+    0xf8c08469 scull_read+0xb5:push   %esi
+    0xf8c0846a scull_read+0xb6:call   0xf8c08364 scull_follow:
+%fore "black"
+    0xf8c0846f scull_read+0xbb:mov    %eax,
+%fore "blue", cont
+ %edx
+%fore "black"
+    0xf8c08471
+%fore "blue", cont
+scull_read+0xbd
+%fore "black", cont
+:add    $0x10,%esp
+            <snip>
+
+	Set breakpoint in driver read
+%font "typewriter", size 3
+    [0]kdb>
+%fore "blue",cont
+bp scull_read+0xbd
+%fore "black"
+    Instruction(i) BP #0 at 0xf8c08471 ([scull]scull_read+0xbd)
+        is enabled globally adjust 1
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Scull Demo: Breakpoints
+
+
+%font "typewriter", size 3
+	Restart the system
+%font "typewriter", size 3
+    [0]kdb>
+%fore "blue", cont
+go
+%fore "black"
+
+	Hit the Breakpoint
+%font "typewriter", size 3
+    [root@elm3b77 root]#
+%fore "blue", cont
+cat /dev/scull0
+%fore "black"
+    Instruction(i) breakpoint #0 at 0xf8c08471 (adjusted)
+    0xf8c08471 scull_read+0xbd:int3
+    Entering kdb (current=0xf73ec000, pid 1249) on processor 2
+                  due to Breakpoint @ 0xf8c08471
+
+	Display the registers
+%font "typewriter", size 3
+    [2]kdb>
+%fore "blue", cont
+rd
+%fore "black"
+    eax = 0xf77d7b60 ebx = 0x00000000 ecx = 0x00000000 edx =
+%fore "blue", cont
+0xf77d7b60
+%fore "black"
+    esi =
+%fore "blue", cont
+0xf77d7b60
+%fore "black", cont
+ edi = 0x00001000 esp = 0xf7415f40 eip = 0xf8c08471
+    ebp = 0xf7415f78 xss = 0x00000018 xcs = 0x00000010 eflags = 0x00000246
+    xds = 0xf7590018 xes = 0x00000018 origeax = 0xffffffff &regs = 0xf7415f0c
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Scull Demo: Data Structures
+
+%font "typewriter", size 3
+	Display the Scull_Dev structure
+%font "typewriter", size 3
+    [2]kdb>
+%fore "blue", cont
+md 0xf77d7b60 2
+%fore "black"
+    0xf77d7b60
+%fore "blue", cont
+f7400000
+%fore "black", cont
+ 00000000 00000fa0 000003e8   ..@w.... ...h...
+    0xf77d7b70 0000534e 00000000 00000000 00000000   NS..............
+
+	Scull Device Structure
+%font "typewriter", size 3
+    typedef struct Scull_Dev {
+%fore "blue"
+       void **data;
+%fore "black"
+       struct Scull_Dev *next;   /* next listitem */
+       int quantum;              /* the current quantum size */
+       int qset;                 /* the current array size */
+       unsigned long size;
+       devfs_handle_t handle;    /* only used if devfs is there */
+       unsigned int access_key;  /* used by sculluid and scullpriv */
+       struct semaphore sem;     /* mutual exclusion semaphore     */
+    } Scull_Dev;
+%size 6
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Scull Demo: Data Structures
+
+
+%font "typewriter", size 3
+	Display the quantum set (dev->data)
+%font "typewriter", size 3
+    [2]kdb>
+%fore "blue", cont
+md f7400000 2
+%fore "black"
+    0xf7400000
+%fore "blue", cont
+f73ea000
+%fore "black", cont
+ f73f1000 f740c000 f7ab4000   . >w..?w.@@w.@+w
+    0xf7400010 f73ef000 f755b000 00000000 00000000   .p>w.0Uw........
+
+	Display the first quantum (dev->data[0])
+%font "typewriter", size 3
+    [2]kdb>
+%fore "blue", cont
+md f73ea000
+%fore "black"
+    0xf73ea000 200a2a2f 616d202a 632e6e69 202d2d20   /*. * main.c --
+    0xf73ea010 20656874 65726162 75637320 63206c6c   the bare scull c
+    0xf73ea020 20726168 75646f6d 200a656c 2a200a2a   har module. *. *
+    0xf73ea030 706f4320 67697279 28207468 32202943    Copyright (C) 2
+    0xf73ea040 20313030 73656c41 646e6173 52206f72   001 Alessandro R
+    0xf73ea050 6e696275 6e612069 6f4a2064 6874616e   ubini and Jonath
+    0xf73ea060 43206e61 6562726f 2a200a74 706f4320   an Corbet. * Cop
+    0xf73ea070 67697279 28207468 32202943 20313030   yright (C) 2001
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Scull Demo: filp command
+
+
+%font "typewriter", size 3
+	Show filp usage - here is the scull_read prototype
+%font "typewriter", size 3
+    ssize_t scull_read(
+%fore "blue", cont
+struct file *filp
+%fore "black", cont
+, char *buf,
+                       size_t count, loff_t *f_pos);
+	Show the stack trace:
+%font "typewriter", size 3
+[2]kdb>
+%fore "blue", cont
+bt
+%fore "black"
+    EBP       EIP         Function(args)
+    0xee9dbf78 0xf8c08471 [scull]scull_read+0xbd (
+%fore "blue", cont
+0xeaf6c0c0
+%fore "black", cont
+, 0x804e128,
+                                          0x1000, 0xeaf6c0e0, 0x804f000)
+                     scull .text 0xf8c08060 0xf8c083b4 0xf8c084dc
+    0xee9dbfbc 0xc0136278 sys_read+0x98 (0x3, 0x804e128, 0x1000, ...
+                     kernel .text 0xc0100000 0xc01361e0 0xc01362b0
+               0xc010702b system_call+0x33
+                     kernel .text 0xc0100000 0xc0106ff8 0xc0107030
+	And show the filp output
+%font "typewriter", size 3
+    [2]kdb>
+%fore "blue", cont
+filp 0xeaf6c0c0
+%fore "black"
+    name.name 0xe93889fc  name.len  6
+    File Pointer at 0xeaf6c0c0
+     f_list.nxt = 0xe42deca0 f_list.prv = 0xf7e69070
+%fore "blue"
+     f_dentry = 0xe93889a0
+%fore "black", cont
+ f_op = 0xf8c0a200
+     f_count = 2 f_flags = 0x8000 f_mode = 0x1
+     f_pos = 0 f_reada = 0 f_ramax = 0
+     f_raend = 0 f_ralen = 0 f_rawin = 0
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Scull Demo: filp command
+
+
+%font "typewriter", size 3
+	filp output - continued
+%font "typewriter", size 3
+%fore "blue"
+    Directory Entry at 0xe93889a0
+%fore "black"
+     d_name.len = 6
+%fore "orange", cont
+d_name.name = 0xe93889fc
+%fore "black", cont
+>
+     d_count = 1 d_flags = 0x0
+%fore "blue", cont
+d_inode = 0xe827b680
+%fore "black"
+     d_hash.nxt = 0xc215aec8 d_hash.prv = 0xc215aec8
+     d_lru.nxt = 0xe93889b8 d_lru.prv = 0xe93889b8
+     d_child.nxt = 0xe89e1e80 d_child.prv = 0xe9388940
+     d_subdirs.nxt = 0xe93889c8 d_subdirs.prv = 0xe93889c8
+     d_alias.nxt = 0xe827b690 d_alias.prv = 0xe827b690
+     d_op = 0x00000000 d_sb = 0xf7e69000
+
+%fore "blue"
+    Inode Entry at 0xe827b680
+%fore "black"
+     i_mode = 0x21a4  i_nlink = 1  i_rdev = 0xfe00
+     i_ino = 37182 i_count = 1 i_dev = 0x821
+     i_hash.nxt = 0xc20e6be8 i_hash.prv = 0xc20e6be8
+     i_list.nxt = 0xe827b2c8 i_list.prv = 0xe827b868
+     i_dentry.nxt = 0xe93889d0 i_dentry.prv = 0xe93889d0
+
+	Check the filename (display d_name.name)
+%font "typewriter", size 3
+    [2]kdb>
+%fore "orange", cont
+md 0xe93889fc 1
+%fore "black"
+    0xe93889fc 6c756373 0000306c 00000000 00000000   scull0..........
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Kernel Structures
+
+
+	Objective
+		Show output from various kernel related kdb commands
+
+	Sequence of events
+		Simple Program
+			Write a simple program which allocates memory and hangs
+			Show usage of the ps, vm, and ll commands
+		Walk an IO operation
+			Hit a breakpoint in qlogic driver (isp1020_queuecommand)
+			Show usage of scsi related commands (sc, sh, and sd)
+			Show usage of vm related commands (bh, page, inode, inode_pages)
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Simple program
+
+%font "typewriter", size 3
+	simple.c - simple program which allocates memory
+%font "typewriter", size 3
+%fore "blue"
+    int foo_global[8192];
+%fore "black"
+    main()
+    {
+        int *
+%fore "blue", cont
+foo_malloc;
+%fore "black"
+        int i;
+        foo_malloc = (int *)malloc(0x8192);
+        for(i = 0; i < 0x100; i++) {
+            foo_global[i] = 0xdead0000 | i;
+            foo_malloc[i] = 0xbeef0000 | i;
+        }
+        printf("foo_global at %x\n", (int)foo_global);
+        printf("foo_malloc at %x\n", (int)foo_malloc);
+        printf("sleep forever\n");
+        sleep(2000000);
+    }
+
+	simple output
+%font "typewriter", size 3
+    [root@elm3b77 scull]# cc -o simple simple.c
+    [root@elm3b77 scull]# ./simple
+    foo_global at
+%fore "blue", cont
+8049780
+%fore "black"
+    foo_malloc at
+%fore "blue", cont
+8051788
+%fore "black"
+    sleep forever
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Simple Program
+
+%font "typewriter", size 3
+	Show the output of the ps command
+%font "typewriter", size 3
+    Entering kdb (current=0xc2010000, pid 0) on processor 3 due to
+                                             Keyboard Entry
+    [3]kdb>
+%fore "blue", cont
+ps
+%fore "black"
+    Task Addr  Pid      Parent   [*] cpu  State Thread     Command
+    0xf7efe000 00000001 00000000  0  003  stop  0xf7efe370 init
+    0xf7ef0000 00000002 00000001  0  001  stop  0xf7ef0370 keventd
+    0xf7eec000 00000003 00000000  0  000  stop  0xf7eec370 ksoftirqd_CPU0
+    0xf7eea000 00000004 00000000  0  001  stop  0xf7eea370 ksoftirqd_CPU1
+    0xf7ee8000 00000005 00000000  0  002  stop  0xf7ee8370 ksoftirqd_CPU2
+    0xf7ee6000 00000006 00000000  0  003  stop  0xf7ee6370 ksoftirqd_CPU3
+
+                         <snip>
+
+    0xf7b46000 00001006 00000737  0  003  stop  0xf7b46370 sshd
+    0xf7ace000 00001007 00001006  0  000  stop  0xf7ace370 bash
+    0xef06a000 00001066 00001007  0  003  stop  0xef06a370 su
+    0xeef88000 00001067 00001066  0  000  stop  0xeef88370 bash
+    0xeef64000 00001119 00000770  0  001  stop  0xeef64370 in.ftpd
+%fore "blue"
+    0xeeeac000
+%fore "black", cont
+ 00001138 00001067  0  001  stop  0xeeeac370
+%fore "blue", cont
+simple
+%fore "black"
+    [3]kdb>
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Simple Program
+
+%font "typewriter", size 3
+	Display the task struct
+%font "typewriter", size 3
+    [3]kdb>
+%fore "blue", cont
+md 0xeeeac000
+%fore "black"
+    0xeeeac000 00000001 00000000 00000000 c0000000   ................
+    0xeeeac010 c0339880 00000000 00000000 ffffffff   ................
+    0xeeeac020 0000000a 00000000 00000000
+%fore "blue", cont
+f7e10f00
+%fore "black", cont
+   ..............aw
+    0xeeeac030 00000001 ffffffff ffffffff 00000000   ................
+
+%font "typewriter", size 3
+	Determine offset of mm_struct ptr in task_struct
+%font "typewriter", size 3
+    struct task_struct {
+      [0]   volatile long state;
+      [4]   unsigned long flags;
+      [8]   int sigpending;
+      [c]   mm_segment_t addr_limit;
+      [10]  struct exec_domain *exec_domain;
+      [14]  volatile long need_resched;
+      [18]  unsigned long ptrace;
+      [1c]  int lock_depth;
+      [20]  long counter;
+      [24]  long nice;
+      [28]  unsigned long policy;
+%fore "blue"
+      [2c]  struct mm_struct *mm;
+%fore "black"
+      [30]  int processor;
+      [34]  unsigned long cpus_runnable, cpus_allowed;
+	<snip>
+    };
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Simple Program
+
+
+%font "typewriter", size 3
+	Display the mm_struct associated with simple process
+%font "typewriter", size 3
+    [3]kdb>
+%fore "blue", cont
+md f7e10f00
+%fore "black"
+    0xf7e10f00
+%fore "blue", cont
+e8357a80
+%fore "black", cont
+ e8357978 f7ac77e0 eb15eac0   .z5hxy5h`w,w@j.k
+    0xf7e10f10 00000001 00000002 0000000b 00000000   ................
+    0xf7e10f20 00000001 f7e10f24 f7e10f24 00000001   ................
+    0xf7e10f30 f7e35e70 eea7e8f0 08048000 0804862b   ................
+    0xf7e10f40 0804962c 08049744 08051780 0805a000   ................
+    0xf7e10f50 bffffd10 bffffe00 bffffe09 bffffe09   ................
+    0xf7e10f60 bffffff3 0000005a 00000168 00000000   ................
+    0xf7e10f70 00000000 00000002 00000000 00000001   ................
+
+%font "typewriter", size 3
+	Determine offset of the first vma in the process
+%font "typewriter", size 3
+    struct mm_struct {
+%fore "blue"
+            struct vm_area_struct * mmap;
+%fore "black"
+            rb_root_t mm_rb;
+            struct vm_area_struct * mmap_cache;
+            <snip>
+    };
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Simple Program
+
+%font "typewriter", size 3
+	Display the first vma using md
+%font "typewriter", size 3
+    [3]kdb>
+%fore "blue", cont
+md  e8357a80
+%fore "black"
+    0xe8357a80 f7e10f00 08048000 08049000
+%fore "blue", cont
+e8727e00
+%fore "black",cont
+   ..aw.........~rh
+    0xe8357a90 00000025 00001875 e8727e18 00000001   %...u....~rh....
+
+	Display the first vma using vma
+%font "typewriter", size 3
+    [3]kdb>
+%fore "blue", cont
+vma e8357a80
+%fore "black"
+    struct vm_area_struct at 0xe8357a80 for 68 bytes
+    vm_start = 0x8048000   vm_end = 0x8049000
+    page_prot = 0x25
+    flags:  READ EXEC MAYREAD MAYWRITE MAYEXEC DENYWRITE EXECUTABLE
+%font "typewriter", size 3
+
+	Determine the offset to the vma list
+%font "typewriter", size 3
+    struct vm_area_struct {
+      [0]   struct mm_struct * vm_mm;
+      [4]   unsigned long vm_start;
+      [8]   unsigned long vm_end;
+%fore "blue"
+      [c]   struct vm_area_struct *vm_next;
+%fore "black"
+            <snip>
+    };
+	Display the next vma
+%font "typewriter", size 3
+    [3]kdb> vma e8727e00
+    struct vm_area_struct at 0xe8727e00 for 68 bytes
+    vm_start = 0x8049000   vm_end = 0x804a000
+    page_prot = 0x25
+    flags:  READ WRITE MAYREAD MAYWRITE MAYEXEC DENYWRITE EXECUTABLE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Simple Program
+
+%font "typewriter", size 3
+	Use the ll command to display the list of vma's
+%font "typewriter", size 3
+        [3]kdb> ll e8357a80 0xc vma
+.
+        struct vm_area_struct at 0xe8357a80 for 68 bytes
+        vm_start = 0x8048000   vm_end = 0x8049000
+        page_prot = 0x25
+        flags:  READ EXEC MAYREAD MAYWRITE MAYEXEC DENYWRITE EXECUTABLE
+.
+        struct vm_area_struct at 0xe8727e00 for 68 bytes
+        vm_start =
+%fore "orange", cont
+0x8049000
+%fore "black", cont
+   vm_end =
+%fore "orange", cont
+0x804a000
+%fore "black"
+        page_prot = 0x25
+        flags:  READ WRITE MAYREAD MAYWRITE MAYEXEC DENYWRITE EXECUTABLE
+.
+        struct vm_area_struct at 0xe8727c80 for 68 bytes
+        vm_start =
+%fore "blue", cont
+0x804a000
+%fore "black", cont
+   vm_end =
+%fore "blue", cont
+0x805a000
+%fore "black"
+        page_prot = 0x25
+        flags:  READ WRITE EXEC MAYREAD MAYWRITE MAYEXEC
+        <snip>
+        struct vm_area_struct at 0xe8357900 for 68 bytes
+        vm_start = 0xbfffe000   vm_end = 0xc0000000
+        page_prot = 0x25
+        flags:  READ WRITE EXEC MAYREAD MAYWRITE MAYEXEC GROWSDOWN
+
+	Match the vma to the displayed addresses
+%font "typewriter", size 3
+        foo_global  at
+%fore "orange", cont
+8049780
+%fore "black"
+        foo_malloc at
+%fore "blue", cont
+8051788
+%fore "black"
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+	Objective
+		Show usage of various scsi and vm related kdb commands
+
+	Sequence:
+		Set a breakpoint in the scsi driver
+			Stops when queueing a command to the controller
+		Cause IO on an idle disk
+		Show various IO stack traces
+		Display the IO data structures
+		Display vm information about the data
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Set the breakpoint
+
+%font "typewriter", size 3
+    [3]kdb>
+%fore "blue", cont
+bp isp1020_queuecommand
+%fore "black"
+    Instruction(i) BP #0 at 0xc01ecfe0 (isp1020_queuecommand)
+        is enabled globally adjust 1
+
+%font "typewriter", size 3
+	Create some activity on a previously unused disk
+
+%font "typewriter", size 3
+    [3]kdb>
+%fore "blue", cont
+go
+%fore "black"
+    [root@elm3b77 root]#
+%fore "blue", cont
+ls /rh62
+%fore "black"
+
+    Instruction(i) breakpoint #0 at 0xc01ecfe0 (adjusted)
+    0xc01ecfe0 isp1020_queuecommand:int3
+
+    Entering kdb (current=0xf75ba000, pid 1181) on processor 3 due to
+                                                Breakpoint @ 0xc01ecfe0
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Show the stack.
+	This is a read of the /rh62 directory
+
+%font "typewriter", size 3
+    [1]kdb>
+%fore "blue", cont
+bt
+%fore "black"
+        EBP       EIP         Function(args)
+    0xf75bbdf4 0xc01ecfe0 isp1020_queuecommand
+               0xc01e2c77 scsi_dispatch_cmd+0x1f7
+    0xf75bbe24 0xc01e99b1 scsi_request_fn+0x2f1
+    0xf75bbe34 0xc01c84fd generic_unplug_device+0x2d
+    0xf75bbe50 0xc011b3af __run_task_queue+0x5f
+    0xf75bbe6c 0xc013a63c block_sync_page+0x1c
+    0xf75bbe98 0xc0128127 __lock_page+0x77
+    0xf75bbea4 0xc0128178 lock_page+0x18
+    0xf75bbec8 0xc012a4b3 read_cache_page+0xc3
+    0xf75bbef4 0xc0168e23 ext2_get_page+0x23
+    0xf75bbf48 0xc0168fdd ext2_readdir+0xfd
+    0xf75bbf68 0xc0143d2e vfs_readdir+0x7e
+    0xf75bbfbc 0xc01442ed
+%fore "blue", cont
+sys_getdents64+0x4d
+%fore "black"
+               0xc010702b system_call+0x33
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Allow the operation to complete
+
+%font "typewriter", size 3
+    [3]kdb>
+%fore "blue", cont
+go
+%fore "black"
+    bench  build  etc   lib         mnt   oldsys  rh72  spv   usr
+    bin    data   h     linux       mnt1  opt     root  test  var
+    boot   dev    home  lost+found  mnt2  proc    sbin  tmp
+
+%font "typewriter", size 3
+	Force some more activity
+
+%font "typewriter", size 3
+    [root@elm3b77 root]#
+%fore "blue", cont
+cd /rh62/tmp
+%fore "black"
+    Instruction(i) breakpoint #0 at 0xc01ecfe0 (adjusted)
+    0xc01ecfe0 isp1020_queuecommand:int3
+
+    Entering kdb (current=0xf768a000, pid 981) on processor 3 due to
+                                               Breakpoint @ 0xc01ecfe0
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Show the stack.
+	This is an inode read for /rh62/tmp
+
+%font "typewriter", size 3
+    [3]kdb>
+%fore "blue", cont
+bt
+%fore "black"
+        EBP       EIP         Function(args)
+    0xf768bd68 0xc01ecfe0 isp1020_queuecommand
+               0xc01e2c77 scsi_dispatch_cmd+0x1f7
+    0xf768bd98 0xc01e99b1 scsi_request_fn+0x2f1
+    0xf768bda8 0xc01c84fd generic_unplug_device+0x2d
+    0xf768bdc4 0xc011b3af __run_task_queue+0x5f
+    0xf768bdfc 0xc0137216 __wait_on_buffer+0x56
+    0xf768be1c 0xc0138600 bread+0x50
+    0xf768be5c 0xc016b684 ext2_read_inode+0x114
+    0xf768bf0c 0xc013fbec real_lookup+0x7c
+    0xf768bf78 0xc014035d link_path_walk+0x5ad
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Create a new file, causing yet more disk activity
+
+%font "typewriter", size 3
+    [3]kdb>
+%fore "blue", cont
+go
+%fore "black"
+
+    [root@elm3b77 tmp]#
+%fore "blue", cont
+echo "Hello linux reading group" > j1;sync
+%fore "black"
+
+    Instruction(i) breakpoint #0 at 0xc01ecfe0 (adjusted)
+    0xc01ecfe0 isp1020_queuecommand:int3
+
+    Entering kdb (current=0xf768a000, pid 981) on processor 3 due to
+                                               Breakpoint @ 0xc01ecfe0
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Show the stack
+	This is an inode read in response to the open
+%font "typewriter", size 3
+    [3]kdb>
+%fore "blue", cont
+bt
+%fore "black"
+        EBP       EIP         Function(args)
+    0xf768bd78 0xc01ecfe0 isp1020_queuecommand
+               0xc01e2c77 scsi_dispatch_cmd+0x1f7
+    0xf768bda8 0xc01e99b1 scsi_request_fn+0x2f1
+    0xf768bdb8 0xc01c84fd generic_unplug_device+0x2d
+    0xf768bdd4 0xc011b3af __run_task_queue+0x5f
+    0xf768bdf0 0xc013a63c block_sync_page+0x1c
+    0xf768be1c 0xc0128127 __lock_page+0x77
+    0xf768be28 0xc0128178 lock_page+0x18
+    0xf768be4c 0xc012a4b3 read_cache_page+0xc3
+    0xf768be78 0xc0168e23 ext2_get_page+0x23
+    0xf768beb8 0xc01691ed ext2_find_entry+0x8d
+    0xf768bed4 0xc016933a ext2_inode_by_name+0x1a
+    0xf768befc 0xc016c077 ext2_lookup+0x27
+    0xf768bf1c 0xc014094a lookup_hash+0x9a
+    0xf768bf64 0xc0140c4d open_namei+0xfd
+    0xf768bfa0 0xc0135907 filp_open+0x37
+    0xf768bfbc 0xc0135c64 sys_open+0x34
+               0xc010702b system_call+0x33
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Let the operation continue
+%font "typewriter", size 3
+    [3]kdb>
+%fore "blue", cont
+go
+%fore "black"
+    Instruction(i) breakpoint #0 at 0xc01ecfe0 (adjusted)
+    0xc01ecfe0 isp1020_queuecommand: int3
+    Entering kdb (current=0xc0352000, pid 0) on processor 0 due to
+                                               Breakpoint @ 0xc01ecfe0
+	Show the stack
+	This is an io completion queuing the next request
+%font "typewriter", size 3
+    [0]kdb>
+%fore "blue", cont
+bt
+%fore "black"
+        EBP       EIP         Function(args)
+    0xc0353df4 0xc01ecfe0 isp1020_queuecommand(
+%fore "blue", cont
+0xf7e63a00
+%fore "black", cont
+,0xc01e7fc0...
+               0xc01e2c77 scsi_dispatch_cmd+0x1f7
+    0xc0353e24 0xc01e99b1 scsi_request_fn+0x2f1
+    0xc0353e40 0xc01e8f6a
+%fore "blue", cont
+scsi_queue_next_request+0x4a
+%fore "black"
+    0xc0353e5c 0xc01e9166 __scsi_end_request+0x116
+    0xc0353ea8 0xc01e93e0
+%fore "blue", cont
+scsi_io_completion+0x170
+%fore "black"
+    0xc0353ecc 0xc01f658e rw_intr+0x14e
+    0xc0353ef8 0xc01e8668 scsi_old_done+0x6a8
+    0xc0353fd4 0xc01052c2 cpu_idle+0x52
+	Function prototype
+%font "typewriter", size 3
+        int isp1020_queuecommand(
+%fore "blue", cont
+Scsi_Cmnd *Cmnd,
+%fore "black"
+                                 void (*done)(Scsi_Cmnd *))
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Show the command being queued
+%font "typewriter", size 3
+    [0]kdb>
+%fore "blue", cont
+sc 0xf7e63a00
+%fore "black"
+    scsi_cmnd at 0xf7e63a00
+%fore "blue"
+    host = 0xf7e91400
+%fore "black", cont
+  state = 4099  owner = 258
+%fore "blue", cont
+device = 0xf7ed5d80
+%fore "black"
+    bnext = 0x00000000  reset_chain = 0x00000000  eh_state = 0
+                                                  done = 0xc01f6440
+    serial_number = 3402  serial_num_at_to = 0 retries = 0 timeout = 0
+    id/lun/cmnd = [0/0/0]  cmd_len = 10  old_cmd_len = 10
+    cmnd = [2a/00/00/28/00/3f/00/00/10/00/ef/f7]
+    data_cmnd = [2a/00/00/28/00/3f/00/00/10/00/ef/f7]
+    request_buffer = 0xc03fd000  bh_next = 0x00000000
+                                 request_bufflen = 8192
+    use_sg = 2  old_use_sg = 2 sglist_len = 512 abore_reason = 0
+    bufflen = 8192  buffer = 0xc03fd000  underflow = 8192
+                                         transfersize = 512
+    tag = 0 pid = 3401
+    request struct
+    rq_status = RQ_ACTIVE  rq_dev = [8/1]  errors = 1  cmd = 0
+    sector = 2621440  nr_sectors = 16  current_nr_sectors = 8
+    buffer = 0xf7599000
+%fore "blue", cont
+bh = 0xf75ca300
+%fore "black", cont
+ bhtail = 0xf75ca3c0
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Display the host adapter
+%font "typewriter", size 3
+    [0]kdb>
+%fore "blue", cont
+sh 0xf7e91400
+%fore "black"
+    Scsi_Host at 0xf7e91400
+    next = 0x00000000
+%fore "blue", cont
+host_queue = 0xf7ed5d80
+%fore "black"
+    ehandler = 0x00000000 eh_wait = 0x00000000  en_notify = 0x00000000
+                                                eh_action = 0x00000000
+    h_active = 0x0 host_wait = 0xc0353ac4 hostt = 0xc034bce0
+                                          host_busy = 1
+    host_failed = 0  extra_bytes = 524  host_no = 0 resetting = 0
+    max id/lun/channel = [16/8/0]  this_id = 7
+    can_queue = 64 cmd_per_lun = 1  sg_tablesize = 427 u_isa_dma = 0
+    host_blocked = 0  reverse_ordering = 0
+
+%font "typewriter", size 3
+	Display the scsi device
+%font "typewriter", size 3
+    [0]kdb>
+%fore "blue", cont
+sd 0xf7ed5d80
+%fore "black"
+    scsi_device at 0xf7ed5d80
+    next = 0xf7ed5c80   prev = 0x00000000  host = 0xf7e91400
+    device_busy = 1
+%fore "blue", cont
+device_queue 0xf7e63a00
+%fore "black"
+    id/lun/chan = [0/0/0]  single_lun = 0  device_blocked = 0
+    queue_depth = 1 current_tag = 0  scsi_level = 4
+    IBM      DGHS18X          0360
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Display the Buffer header associated with the command
+%font "typewriter", size 3
+    [0]kdb>
+%fore "blue", cont
+bh 0xf75ca300
+%fore "black"
+    buffer_head at 0xf75ca300
+      next 0x00000000 bno 327680 rsec 2621440 size 4096
+                                      dev 0x801 rdev 0x801
+      count 2 state 0x1d [Uptodate Lock Req Mapped] ftime 0x7695e
+                    b_list 1 b_reqnext 0xf75ca3c0 b_data 0xf7599000
+%fore "blue"
+      b_page 0xc1dd6640
+%fore "black", cont
+ b_this_page 0xf75ca300 b_private 0x00000000
+
+	Display the associated page structure
+%font "typewriter", size 3
+    [0]kdb>
+%fore "blue", cont
+page 0xc1dd6640
+%fore "black"
+    struct page at 0xc1dd6640
+      next 0xc1dd7300 prev 0xc1dd6240
+%fore "blue", cont
+addr space 0xf7af04d0
+%fore "black"
+                                      index 327680 (offset 0x50000000)
+      count 2 flags PG_referenced PG_lru virtual 0xf7599000
+      buffers 0xf75ca300
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Display the Address space associated with the page
+%font "typewriter", size 3
+    [0]kdb>
+%fore "blue", cont
+md 0xf7af04d0
+%fore "black"
+    0xf7af04d0 c1dd6240 c1dea740 f7af04d8 f7af04d8   @b]A@'^AX./wX./w
+    0xf7af04e0 f7af04e0 f7af04e0 00000007 c033b700   `./w`./w.....73@
+    0xf7af04f0
+%fore "blue", cont
+f7af0420
+%fore "black", cont
+ 00000000 00000000 00000001    ./w............
+    0xf7af0500 000001d0 00000000 00000000 f7af050c   P............./w
+    0xf7af0510 f7af050c 00000000 f7a8afa0 00000000   ../w.... /(w....
+
+	The structure looks like:
+%size 3
+    struct address_space {
+        struct list_head    clean_pages; /* list of clean pages */
+        struct list_head    dirty_pages; /* list of dirty pages */
+        struct list_head    locked_pages;/* list of locked pages */
+        unsigned long       nrpages;     /* number of total pages */
+        spinlock_t          page_lock;   /* spinlock protecting them*/
+        struct address_space_operations *a_ops;    /* methods */
+%fore "blue"
+        struct inode        *host;       /* owner: inode, block_dev */
+%fore "black"
+    <snip>
+    };
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Display the inode associated with the address space
+	I think htis is the inode for the block device.
+
+%font "typewriter", size 3
+    [1]kdb>
+%fore "blue", cont
+inode f7af0420
+%fore "black"
+    struct inode at  0xf7af0420
+     i_ino = 289 i_count = 1 i_dev = 0x801 i_size 4301789184
+     i_mode = 0x8000  i_nlink = 1  i_rdev = 0x801
+     i_hash.nxt = 0xf7af0420 i_hash.prv = 0xf7af0420
+     i_list.nxt = 0xf7af0608 i_list.prv = 0xf7af0068
+     i_dentry.nxt = 0xf7af0430 i_dentry.prv = 0xf7af0430
+     i_dirty_buffers.nxt = 0xf7af0438 i_dirty_buffers.prv = 0xf7af0438
+     i_sb = 0xc201f200 i_op = 0xc03cfdc0 i_data = 0xf7af04d0 nrpages = 6
+     i_mapping = 0xf7af04d0
+     i_flags 0x0 i_state 0x0 []  fs specific info @ 0xf7af0540
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%page
+
+Walking IO structures
+
+
+%font "typewriter", size 3
+	Display the page list associated with the inode
+%font "typewriter", size 3
+    [0]kdb>
+%fore "blue", cont
+inode_pages f7af0420
+%fore "black"
+CLEAN  page_struct   index  cnt  flags
+   0xc1dd6240    327735        2    0x44 bh 0xf75caae0 bno   327735
+                                            [Lock Req Mapped]
+%fore "blue"
+   0xc1dd6640    327680        2    0x44 bh 0xf75ca300 bno   327680
+                                            [Uptodate Lock Req Mapped]
+%fore "black"
+   0xc1dd7300    327681        2    0x44 bh 0xf75ca3c0 bno   327681
+                                            [Uptodate Lock Req Mapped]
+   0xc1dd6e00    327684        2    0x44 bh 0xf75ca420 bno   327684
+                                            [Uptodate Req Mapped]
+   0xc1de8fc0         4        2    0xc0 bh 0xf7b5ade0 bno        4
+                                            [Uptodate Req Mapped]
+   0xc1dea700         1        2    0x44 bh 0xf7e02740 bno        1
+                                            [Uptodate Req Mapped]
+   0xc1dea740         0        2    0x44 bh 0xf7e028c0 bno        0
+                                            [Uptodate Req Mapped]
+DIRTY  page_struct   index  cnt  flags
+LOCKED page_struct   index  cnt  flags

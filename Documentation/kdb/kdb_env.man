@@ -1,0 +1,46 @@
+.TH ENV 1 "24 September 2000"
+.SH NAME
+env, set \- Environment manipulation commands
+.SH SYNOPSIS
+env
+.LP
+set \fIenvironment-variable\fP=\fIvalue\fP
+.SH DESCRIPTION
+The kernel debugger contains an environment which contains a series
+of name-value pairs.  Some environment variables are known to the
+various kernel debugger commands and have specific meaning to the
+command; such are enumerated on the respective reference material.
+.P
+Arbitrary environment variables may be created and used with
+many commands (those which require an \fIaddress-expression\fP).
+.P
+The
+.B env
+command is used to display the current environment.
+.P
+The
+.B set
+command is used to alter an existing environment variable or
+establish a new environment variable.
+.SH LIMITATIONS
+There is a compile-time limit of 33 environment variables.
+.P
+There is a compile-time limit of 512 bytes (\fBKDB_ENVBUFSIZE\fP)
+of heap space available for new environment variables and for
+environment variables changed from their compile-time values.
+.SH ENVIRONMENT
+These commands explicitly manipulate the environment.
+.SH SMP CONSIDERATIONS
+None.
+.SH USER SETTINGS
+You can include "set" commands in kdb/kdb_cmds (see kdb.mm) to define
+your environment variables at kernel startup.
+.SH EXAMPLES
+.TP 8
+env
+Display current environment settings.
+
+.TP 8
+set IDCOUNT=100
+Set the number of lines to display for the \fBid\fP command
+to the value \fI100\fP.

@@ -1,0 +1,197 @@
+.TH BD 1 "July 12, 2004"
+.SH NAME
+bp, bpa, bph, bpha, bd, bc, be, bl \- breakpoint commands
+.SH SYNOPSIS
+bp \fIaddress-expression\fP
+.LP
+bpa \fIaddress-expression\fP
+.LP
+bph \fIaddress-expression\fP [\f(CWDATAR|DATAW|DATAA|IO\fP [\fIlength\fP]]
+.LP
+bpha \fIaddress-expression\fP [\f(CWDATAR|DATAW|DATAA|IO\fP [\fIlength\fP]]
+.LP
+bd \fIbreakpoint-number\fP
+.LP
+bc \fIbreakpoint-number\fP
+.LP
+be \fIbreakpoint-number\fP
+.LP
+bl
+.SH DESCRIPTION
+.hy 0
+The
+.B bp
+family of commands are used to establish a breakpoint.
+The \fIaddress-expression\fP may be a numeric value (decimal or
+hexidecimal), a symbol name, a register name preceeded by a
+percent symbol '%', or a simple expression consisting of a
+symbol name, an addition or subtraction character and a numeric
+value (decimal or hexidecimal).
+.P
+\fBbph\fP and \fBbpha\fP will force the use of a hardware register, provided
+the processor architecture supports them.
+.P
+The \fIaddress-expression\fP may also consist of a single
+asterisk '*' symbol which indicates that the command should
+operate on all existing breakpoints (valid only for \fBbc\fP,
+\fBbd\fP and \fBbe\fP).
+.P
+Four different types of
+breakpoints may be set:
+
+.TP 8
+Instruction
+Causes the kernel debugger to be invoked from the debug exception
+path when an instruction is fetched from the specified address.  This
+is the default if no other type of breakpoint is requested or when
+the \fBbp\fP command is used.
+
+.TP 8
+DATAR
+Causes the kernel debugger to be entered when data of length
+\fIlength\fP is read from or written to the specified address.
+This type of breakpoint must use a processor debug register which
+places an architecture dependent limit on the number of data and I/O
+breakpoints that may be established. On arm mode XScale platform
+(thumb mode is not supported yet),
+debugger is triggered by reading from the specified address.
+The \fBbph\fP or \fBbpha\fP commands must be used.
+
+.TP 8
+DATAW
+Enters the kernel debugger when data of length \fIlength\fP
+is written to the specified address.  \fIlength\fP defaults
+to four bytes if it is not explicitly specified.
+Note that the processor may have already overwritten the prior data at
+the breakpoint location before the kernel debugger is invoked.
+The prior data should be saved before establishing the breakpoint, if
+required. On arm mode XScale platform, the debugger is triggered
+after having overwritten the specified address.
+The \fBbph\fP or \fBbpha\fP commands must be used.
+
+.TP 8
+IO
+Enters the kernel debugger when an \fBin\fP or \fBout\fP instruction
+targets the specified I/O address.  The \fBbph\fP or \fBbpha\fP
+commands must be used. This type of breakpoint is not valid in
+arm mode XScale platform. This option is not valid in arm
+mode XScale platform.
+
+.TP 8
+DATAA
+Enters the kernel debugger after the data in specified address has
+been accessed (read or write), this option is only used in arm
+mode XScale platform.
+
+.P
+The
+.B bpha
+command will establish a breakpoint on all processors in an
+SMP system.   This command is not available in an uniprocessor
+kernel.
+.P
+The
+.B bd
+command will disable a breakpoint without removing it from the kernel
+debugger's breakpoint table.
+This can be used to keep breakpoints in the table without exceeding the
+architecture limit on breakpoint registers.
+A breakpoint-number of \fI*\fR will disable all break points.
+.P
+The
+.B be
+command will re-enable a disabled breakpoint.
+A breakpoint-number of \fI*\fR will enable all break points.
+.P
+The
+.B bc
+command will clear a breakpoint from the breakpoint table.
+A breakpoint-number of \fI*\fR will clear all break points.
+.P
+The
+.B bl
+command will list the existing set of breakpoints.
+.SH LIMITATIONS
+There is a compile time limit of sixteen entries in the
+breakpoint table at any one time.
+.P
+There are architecture dependent limits on the number of hardware
+breakpoints that can be set.
+.IP ix86 8
+Four.
+.PD 0
+.IP xscale 8
+Two for insruction breakpoints and another two for data breakpoint.
+.PD 0
+.IP ia64 8
+?
+.PD 0
+.IP sparc64 8
+None.
+.PD 1
+When issuing the "go" command after entering the debugger due to
+a breakpoint, kdb will silently perform a single step in order to
+reapply the breakpoint. The sparc64 port has some limitations on
+single stepping, which may limit where a breakpoint may be safely
+set. Please read the man page for \fBss\fP for more information.
+.SH ENVIRONMENT
+The breakpoint subsystem does not currently use any environment
+variables.
+.SH SMP CONSIDERATIONS
+Using
+.B bc
+is risky on SMP systems.
+If you clear a breakpoint when another cpu has hit that breakpoint but
+has not been processed then it may not be recognised as a kdb
+breakpoint, usually resulting in incorrect program counters and kernel
+panics.
+It is safer to disable the breakpoint with
+.BR bd ,
+then
+.B go
+to let any other processors that are waiting on the breakpoint to
+clear.
+After all processors are clear of the disabled breakpoint then it is
+safe to clear it using
+.BR bc .
+.P
+Breakpoints which use the processor breakpoint registers
+are only established on the processor which is
+currently active.  If you wish breakpoints to be universal
+use the
+.B bpa
+or
+.B bpha
+commands.
+.SH EXAMPLES
+.TP 8
+bp schedule
+Sets an instruction breakpoint at the begining of the
+function \fBschedule\fP.
+
+.TP 8
+bp schedule+0x12e
+Sets an instruction breakpoint at the instruction located
+at \fBschedule\fP+\fI0x12e\fP.
+
+.TP 8
+bph ttybuffer+0x24 dataw
+Sets a data write breakpoint at the location referenced by
+\fBttybuffer\fP+\fI0x24\fP for a length of four bytes.
+
+.TP 8
+bph 0xc0254010 datar 1
+Establishes a data reference breakpoint at address \fB0xc0254010\fP
+for a length of one byte.
+
+.TP 8
+bp
+List current breakpoint table.
+
+.TP 8
+bd 0
+Disable breakpoint #0.
+
+.TP 8
+bc *
+Clear all breakpoints

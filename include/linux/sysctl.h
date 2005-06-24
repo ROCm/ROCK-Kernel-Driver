@@ -136,10 +136,11 @@ enum
 	KERN_UNKNOWN_NMI_PANIC=66, /* int: unknown nmi panic flag */
 	KERN_BOOTLOADER_TYPE=67, /* int: boot loader type */
 	KERN_RANDOMIZE=68, /* int: randomize virtual address space */
-	KERN_DEFTIMESLICE=69,	/* int: nice   0 def timeslice */
-	KERN_MINTIMESLICE=70,	/* int: nice +19 min timeslice */
-	KERN_HZ=71,		/* unsigned long: internal kernel HZ */
-	KERN_UNSUPPORTED=72,	/* int: allow loading of unsupported modules */
+	KERN_KDB=69,		/* int: kdb on/off */
+	KERN_DEFTIMESLICE=70,	/* int: nice   0 def timeslice */
+	KERN_MINTIMESLICE=71,	/* int: nice +19 min timeslice */
+	KERN_HZ=72,		/* unsigned long: internal kernel HZ */
+	KERN_UNSUPPORTED=73,	/* int: allow loading of unsupported modules */
 };
 
 
