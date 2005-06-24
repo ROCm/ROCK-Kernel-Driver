@@ -45,7 +45,7 @@
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
 #include <acpi/acdispat.h>
-
+#include <acpi/actables.h>
 
 #define _COMPONENT          ACPI_NAMESPACE
 	 ACPI_MODULE_NAME    ("nsload")
@@ -72,7 +72,8 @@ acpi_ns_load_table (
 	struct acpi_namespace_node      *node)
 {
 	acpi_status                     status;
-
+	struct acpi_table_desc          *table_desc_loaded;
+	int                             count;
 
 	ACPI_FUNCTION_TRACE ("ns_load_table");
 
@@ -101,6 +102,19 @@ acpi_ns_load_table (
 		ACPI_REPORT_WARNING (("Zero-length AML block in table [%4.4s]\n",
 			table_desc->pointer->signature));
 		return_ACPI_STATUS (AE_OK);
+	}
+
+	/*
+	 * Check whether the table already exists -> then deny loading it again
+
+	for (count = 0;count < acpi_gbl_table_lists[table_desc->type].count; count++){
+		table_desc_loaded = acpi_gbl_table_lists[table_desc->type].next;
+		if (table_desc_loaded->loaded_into_namespace &&
+		    !memcmp(table_desc_loaded->pointer->oem_table_id, table_desc->pointer->oem_table_id, 8)){
+			ACPI_REPORT_WARNING (("Table %s has already been loaded (not bad)\n", 
+					      table_desc->pointer->oem_table_id));
+			return (AE_ALREADY_EXISTS);
+		}
 	}
 
 	/*
