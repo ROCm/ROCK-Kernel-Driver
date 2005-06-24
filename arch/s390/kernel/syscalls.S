@@ -289,4 +289,3 @@ NI_SYSCALL							/* reserved for kexec */
 SYSCALL(sys_add_key,sys_add_key,compat_sys_add_key_wrapper)
 SYSCALL(sys_request_key,sys_request_key,compat_sys_request_key_wrapper)
 SYSCALL(sys_keyctl,sys_keyctl,compat_sys_keyctl)		/* 280 */
-SYSCALL(sys_waitid,sys_waitid,compat_sys_waitid_wrapper)

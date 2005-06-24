@@ -14,6 +14,7 @@
 #define _S390_PGALLOC_H
 
 #include <linux/config.h>
+#include <asm/processor.h>
 #include <linux/threads.h>
 #include <linux/gfp.h>
 #include <linux/mm.h>
@@ -129,10 +130,8 @@ pte_alloc_one_kernel(struct mm_struct *mm, unsigned long vmaddr)
 
 	pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 	if (pte != NULL) {
-		for (i=0; i < PTRS_PER_PTE; i++) {
-			pte_clear(mm, vmaddr, pte+i);
-			vmaddr += PAGE_SIZE;
-		}
+		for (i=0; i < PTRS_PER_PTE; i++)
+			pte_clear(pte+i);
 	}
 	return pte;
 }

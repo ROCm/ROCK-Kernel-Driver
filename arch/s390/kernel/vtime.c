@@ -19,7 +19,6 @@
 #include <linux/notifier.h>
 #include <linux/kernel_stat.h>
 #include <linux/rcupdate.h>
-#include <linux/posix-timers.h>
 
 #include <asm/s390_ext.h>
 #include <asm/timer.h>
@@ -70,7 +69,6 @@ void account_user_vtime(struct task_struct *tsk)
 	if (rcu_pending(smp_processor_id()))
 		rcu_check_callbacks(smp_processor_id(), rcu_user_flag);
 	scheduler_tick();
- 	run_posix_cpu_timers(tsk);
 }
 
 /*

@@ -15,7 +15,7 @@
 #ifdef __KERNEL__
 
 /* erp debugging in dasd.c and dasd_3990_erp.c */
-#define ERP_DEBUG
+/* #define ERP_DEBUG */
 
 
 /* we keep old device allocation scheme; IOW, minors are still in 0..255 */

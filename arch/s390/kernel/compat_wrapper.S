@@ -1432,12 +1432,3 @@ sys32_remap_file_pages_wrapper:
 	llgfr	%r5,%r5			# unsigned long
 	llgfr	%r6,%r6			# unsigned long
 	jg	sys_remap_file_pages
-
-	.globl	compat_sys_waitid_wrapper
-compat_sys_waitid_wrapper:
-	lgfr	%r2,%r2			# int
-	lgfr	%r3,%r3			# pid_t
-	llgtr	%r4,%r4			# siginfo_emu31_t *
-	lgfr	%r5,%r5			# int
-	llgtr	%r6,%r6			# struct rusage_emu31 *
-	jg	compat_sys_waitid
