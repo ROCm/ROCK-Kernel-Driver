@@ -36,36 +36,6 @@
 #include <linux/vmalloc.h>
 #include "drmP.h"
 
-#ifdef _LP64
-static __inline__ unsigned int HandleID(unsigned long lhandle, drm_device_t *dev) 
-{
-    unsigned int hash;
-    struct list_head *list;
-    drm_map_list_t *r_list = NULL;
-   
-    hash = (unsigned int)(((lhandle >> 32) 
-			   + (lhandle >> 16 & 0xffff0000) 
-			   + lhandle) & PAGE_MASK);
-    while (1) {
-	if (hash == 0) hash = (1 << 16);
-	list = &dev->maplist->head;
-	list_for_each(list, &dev->maplist->head) {
-	    r_list = list_entry(list, drm_map_list_t, head);
-
-	    if (r_list->map && r_list->map->pub_handle
-		&& r_list->map->pub_handle == hash)
-		break;
-	}
-
-	if(list == (&dev->maplist->head))
-	    return hash;
-	hash += (1 << 16);
-    }
-}
-#else
-# define HandleID(x,dev) (unsigned int)(x)
-#endif
-
 /**
  * Compute size order.  Returns the exponent of the smaller power of two which
  * is greater or equal to given number.
@@ -107,10 +77,9 @@ int drm_addmap( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	drm_map_t *map;
-	drm_pub_map_t __user *argp = (void __user *)arg;
-	drm_pub_map_t tmp_map;
+	drm_map_t __user *argp = (void __user *)arg;
 	drm_map_list_t *list;
 
 	if ( !(filp->f_mode & 3) ) return -EACCES; /* Require read/write */
@@ -119,14 +88,10 @@ int drm_addmap( struct inode *inode, struct file *filp,
 	if ( !map )
 		return -ENOMEM;
 
-	if ( copy_from_user( &tmp_map, argp, sizeof(tmp_map) ) ) {
+	if ( copy_from_user( map, argp, sizeof(*map) ) ) {
 		drm_free( map, sizeof(*map), DRM_MEM_MAPS );
 		return -EFAULT;
 	}
-	map->offset = tmp_map.offset;
-	map->size = tmp_map.size;
-	map->type = tmp_map.type;
-	map->flags = tmp_map.flags;
 
 	/* Only allow shared memory to be removable since we only keep enough
 	 * book keeping information about shared memory to allow for removal
@@ -171,7 +136,7 @@ int drm_addmap( struct inode *inode, struct file *filp,
 		break;
 
 	case _DRM_SHM:
-		map->handle = vmalloc(map->size);
+		map->handle = vmalloc_32(map->size);
 		DRM_DEBUG( "%lu %d %p\n",
 			   map->size, drm_order( map->size ), map->handle );
 		if ( !map->handle ) {
@@ -204,7 +169,7 @@ int drm_addmap( struct inode *inode, struct file *filp,
 			drm_free(map, sizeof(*map), DRM_MEM_MAPS);
 			return -EINVAL;
 		}
-		map->offset += (unsigned long) dev->sg->virtual;
+		map->offset += dev->sg->handle;
 		break;
 
 	default:
@@ -221,20 +186,17 @@ int drm_addmap( struct inode *inode, struct file *filp,
 	list->map = map;
 
 	down(&dev->struct_sem);
-	map->pub_handle =
-	    (map->type == _DRM_SHM 
-			? HandleID((unsigned long)map->handle,dev) 
-			: HandleID(map->offset,dev));
 	list_add(&list->head, &dev->maplist->head);
  	up(&dev->struct_sem);
-	
-	DRM_DEBUG("HandleID = 0x%lx addr = %p offset = 0x%lx\n",
-		   map->pub_handle,map->handle,map->offset);
 
-	tmp_map.handle = map->pub_handle;
-	if ( copy_to_user( argp, &tmp_map, sizeof(tmp_map) ) )
+	if ( copy_to_user( argp, map, sizeof(*map) ) )
 		return -EFAULT;
-
+	if ( map->type != _DRM_SHM ) {
+		if ( copy_to_user( &argp->handle,
+				   &map->offset,
+				   sizeof(map->offset) ) )
+			return -EFAULT;
+	}
 	return 0;
 }
 
@@ -259,15 +221,15 @@ int drm_rmmap(struct inode *inode, struct file *filp,
 	       unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	*priv	= filp->private_data;
-	drm_device_t	*dev	= priv->dev;
+	drm_device_t	*dev	= priv->head->dev;
 	struct list_head *list;
 	drm_map_list_t *r_list = NULL;
 	drm_vma_entry_t *pt, *prev;
 	drm_map_t *map;
-	drm_pub_map_t request;
+	drm_map_t request;
 	int found_maps = 0;
 
-	if (copy_from_user(&request, (drm_pub_map_t __user *)arg,
+	if (copy_from_user(&request, (drm_map_t __user *)arg,
 			   sizeof(request))) {
 		return -EFAULT;
 	}
@@ -278,7 +240,7 @@ int drm_rmmap(struct inode *inode, struct file *filp,
 		r_list = list_entry(list, drm_map_list_t, head);
 
 		if(r_list->map &&
-		   r_list->map->pub_handle == request.handle &&
+		   r_list->map->handle == request.handle &&
 		   r_list->map->flags & _DRM_REMOVABLE) break;
 	}
 
@@ -387,7 +349,7 @@ int drm_addbufs_agp( struct inode *inode, struct file *filp,
 		      unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_desc_t request;
 	drm_buf_entry_t *entry;
@@ -552,7 +514,7 @@ int drm_addbufs_pci( struct inode *inode, struct file *filp,
 		      unsigned int cmd, unsigned long arg )
 {
    	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_desc_t request;
 	int count;
@@ -782,7 +744,7 @@ int drm_addbufs_sg( struct inode *inode, struct file *filp,
                      unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_desc_t __user *argp = (void __user *)arg;
 	drm_buf_desc_t request;
@@ -875,8 +837,7 @@ int drm_addbufs_sg( struct inode *inode, struct file *filp,
 
 		buf->offset  = (dma->byte_count + offset);
 		buf->bus_address = agp_offset + offset;
-		buf->address = (void *)(agp_offset + offset 
-					+ (unsigned long) dev->sg->virtual);
+		buf->address = (void *)(agp_offset + offset + dev->sg->handle);
 		buf->next    = NULL;
 		buf->waiting = 0;
 		buf->pending = 0;
@@ -964,7 +925,7 @@ int drm_addbufs( struct inode *inode, struct file *filp,
 {
 	drm_buf_desc_t request;
 	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	
 	if (!drm_core_check_feature(dev, DRIVER_HAVE_DMA))
 		return -EINVAL;
@@ -1006,7 +967,7 @@ int drm_infobufs( struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_info_t request;
 	drm_buf_info_t __user *argp = (void __user *)arg;
@@ -1091,7 +1052,7 @@ int drm_markbufs( struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_desc_t request;
 	int order;
@@ -1140,7 +1101,7 @@ int drm_freebufs( struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_free_t request;
 	int i;
@@ -1197,7 +1158,7 @@ int drm_mapbufs( struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_map_t __user *argp = (void __user *)arg;
 	int retcode = 0;
@@ -1241,7 +1202,7 @@ int drm_mapbufs( struct inode *inode, struct file *filp,
 			virtual = do_mmap( filp, 0, map->size,
 					   PROT_READ | PROT_WRITE,
 					   MAP_SHARED,
-					   (unsigned long)map->pub_handle );
+					   (unsigned long)map->offset );
 #if LINUX_VERSION_CODE <= 0x020402
 			up( &current->mm->mmap_sem );
 #else

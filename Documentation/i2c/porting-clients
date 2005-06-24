@@ -49,9 +49,8 @@ Technical changes:
   static void lm75_update_client(struct i2c_client *client);
 
 * [Sysctl] All sysctl stuff is of course gone (defines, ctl_table
-  and functions). Instead, right after the static id definition
-  line, you have to define show and set functions for each sysfs
-  file. Only define set for writable values. Take a look at an
+  and functions). Instead, you have to define show and set functions for
+  each sysfs file. Only define set for writable values. Take a look at an
   existing 2.6 driver for details (lm78 for example). Don't forget
   to define the attributes for each file (this is that step that
   links callback functions). Use the file names specified in
@@ -86,6 +85,7 @@ Technical changes:
   Replace the sysctl directory registration by calls to
   device_create_file. Move the driver initialization before any
   sysfs file creation.
+  Drop client->id.
 
 * [Init] Limits must not be set by the driver (can be done later in
   user-space). Chip should not be reset default (although a module

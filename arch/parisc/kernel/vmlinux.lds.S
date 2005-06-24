@@ -29,7 +29,7 @@
 #include <asm/page.h>
 	
 /* ld script to make hppa Linux kernel */
-#ifndef CONFIG_PARISC64
+#ifndef CONFIG_64BIT
 OUTPUT_FORMAT("elf32-hppa-linux")
 OUTPUT_ARCH(hppa)
 #else
@@ -38,7 +38,7 @@ OUTPUT_ARCH(hppa:hppa2.0w)
 #endif
 
 ENTRY(_stext)
-#ifndef CONFIG_PARISC64
+#ifndef CONFIG_64BIT
 jiffies = jiffies_64 + 4;
 #else
 jiffies = jiffies_64;
@@ -84,6 +84,9 @@ SECTIONS
  
   .data : {			/* Data */
 	*(.data)
+	*(.data.vm0.pmd)
+	*(.data.vm0.pgd)
+	*(.data.vm0.pte)
 	CONSTRUCTORS
 	}
 
@@ -112,7 +115,7 @@ SECTIONS
   . = ALIGN(16384);	
   init_istack : { *(init_istack) }
 
-#ifdef CONFIG_PARISC64
+#ifdef CONFIG_64BIT
   . = ALIGN(16);               /* Linkage tables */
   .opd : { *(.opd) } PROVIDE (__gp = .); 
   .plt : { *(.plt) } 
@@ -180,7 +183,7 @@ SECTIONS
   /* Sections to be discarded */
   /DISCARD/ : {
 	*(.exitcall.exit)
-#ifdef CONFIG_PARISC64
+#ifdef CONFIG_64BIT
 	/* temporary hack until binutils is fixed to not emit these
 	 for static binaries */
 	*(.interp)

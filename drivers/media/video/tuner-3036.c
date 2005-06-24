@@ -192,7 +192,6 @@ i2c_driver_tuner =
 
 static struct i2c_client client_template =
 {
-        .id 		= -1,
         .driver		= &i2c_driver_tuner,
 	.name		= "SAB3036",
 };

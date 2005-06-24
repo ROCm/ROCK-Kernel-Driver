@@ -19,17 +19,10 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/slab.h>
-#include <linux/ctype.h>
-#include <linux/sysctl.h>
-#include <linux/init.h>
-#include <linux/ioport.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
-#include <asm/uaccess.h>
 
 static unsigned short empty[] = {I2C_CLIENT_END};
 static unsigned int empty_isa[] = {I2C_CLIENT_ISA_END};

@@ -589,7 +589,7 @@ xfs_rename(
 	 * rename transaction goes to disk before returning to
 	 * the user.
 	 */
-	if (mp->m_flags & XFS_MOUNT_WSYNC) {
+	if (mp->m_flags & (XFS_MOUNT_WSYNC|XFS_MOUNT_DIRSYNC)) {
 		xfs_trans_set_sync(tp);
 	}
 

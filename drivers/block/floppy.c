@@ -3345,7 +3345,7 @@ static inline int set_geometry(unsigned int cmd, struct floppy_struct *g,
 			struct block_device *bdev = opened_bdev[cnt];
 			if (!bdev || ITYPE(drive_state[cnt].fd_device) != type)
 				continue;
-			__invalidate_device(bdev, 0);
+			__invalidate_device(bdev);
 		}
 		up(&open_lock);
 	} else {
@@ -4217,7 +4217,7 @@ static struct kobject *floppy_find(dev_t dev, int *part, void *data)
 	return get_disk(disks[drive]);
 }
 
-int __init floppy_init(void)
+static int __init floppy_init(void)
 {
 	int i, unit, drive;
 	int err, dr;
@@ -4551,7 +4551,7 @@ static void floppy_release_irq_and_dma(void)
 
 #ifdef MODULE
 
-char *floppy;
+static char *floppy;
 
 static void unregister_devfs_entries(int drive)
 {

@@ -275,6 +275,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 			/* Now find a suitable dgram socket */
 			sk = ax25_get_socket(&dest, &src, SOCK_DGRAM);
 			if (sk != NULL) {
+				bh_lock_sock(sk);
 				if (atomic_read(&sk->sk_rmem_alloc) >=
 				    sk->sk_rcvbuf) {
 					kfree_skb(skb);
@@ -286,7 +287,8 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 					if (sock_queue_rcv_skb(sk, skb) != 0)
 						kfree_skb(skb);
 				}
-				release_sock(sk);
+				bh_unlock_sock(sk);
+				sock_put(sk);
 			} else {
 				kfree_skb(skb);
 			}
@@ -356,7 +358,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	if (sk != NULL) {
 		bh_lock_sock(sk);
-		if (sk->sk_ack_backlog == sk->sk_max_ack_backlog ||
+		if (sk_acceptq_is_full(sk) ||
 		    (make = ax25_make_new(sk, ax25_dev)) == NULL) {
 			if (mine)
 				ax25_return_dm(dev, &src, &dest, &dp);

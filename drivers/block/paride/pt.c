@@ -149,26 +149,6 @@ static int (*drives[4])[6] = {&drive0, &drive1, &drive2, &drive3};
 
 #include <asm/uaccess.h>
 
-#ifndef MODULE
-
-#include "setup.h"
-
-static STT pt_stt[5] = {
-	{"drive0", 6, drive0},
-	{"drive1", 6, drive1},
-	{"drive2", 6, drive2},
-	{"drive3", 6, drive3},
-	{"disable", 1, &disable}
-};
-
-void
-pt_setup(char *str, int *ints)
-{
-	generic_setup(pt_stt, 5, str);
-}
-
-#endif
-
 module_param(verbose, bool, 0);
 module_param(major, int, 0);
 module_param(name, charp, 0);
@@ -246,7 +226,7 @@ struct pt_unit {
 
 static int pt_identify(struct pt_unit *tape);
 
-struct pt_unit pt[PT_UNITS];
+static struct pt_unit pt[PT_UNITS];
 
 static char pt_scratch[512];	/* scratch block buffer */
 

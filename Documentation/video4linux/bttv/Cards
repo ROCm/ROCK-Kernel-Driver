@@ -1,9 +1,9 @@
 
 Gunther Mayer's bttv card gallery (graphical version of this text file :-)
-is available at: http://mayerg.gmxhome.de/bttv/bttv-gallery.html
+is available at: http://www.bttv-gallery.de/
 
 
-Suppported cards:
+Supported cards:
 Bt848/Bt848a/Bt849/Bt878/Bt879 cards
 ------------------------------------
 
@@ -166,6 +166,9 @@ Lifeview Flyvideo Series:
 	        or Flyvideo 3000 (SAA7134) w/Stereo TV
 		   These exist in variations w/FM and w/Remote sometimes denoted
 		   by suffixes "FM" and "R".
+  3) You have a laptop (miniPCI card):
+      Product    = FlyTV Platinum Mini
+      Model/Chip = LR212/saa7135
 
       Lifeview.com.tw states (Feb. 2002):
       "The FlyVideo2000 and FlyVideo2000s product name have renamed to FlyVideo98."

@@ -47,26 +47,6 @@ void flush_hash_entry(struct mm_struct *mm, pte_t *ptep, unsigned long addr)
 }
 
 /*
- * Called by ptep_test_and_clear_young()
- */
-void flush_hash_one_pte(pte_t *ptep)
-{
-	struct page *ptepage;
-	struct mm_struct *mm;
-	unsigned long ptephys;
-	unsigned long addr;
-
-	if (Hash == 0)
-		return;
-	
-	ptepage = virt_to_page(ptep);
-	mm = (struct mm_struct *) ptepage->mapping;
-	ptephys = __pa(ptep) & PAGE_MASK;
-	addr = ptepage->index + (((unsigned long)ptep & ~PAGE_MASK) << 10);
-	flush_hash_pages(mm->context, addr, ptephys, 1);
-}
-
-/*
  * Called by ptep_set_access_flags, must flush on CPUs for which the
  * DSI handler can't just "fixup" the TLB on a write fault
  */

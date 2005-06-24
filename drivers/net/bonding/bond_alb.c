@@ -54,6 +54,7 @@
 #include <linux/if_ether.h>
 #include <linux/if_bonding.h>
 #include <linux/if_vlan.h>
+#include <linux/in.h>
 #include <net/ipx.h>
 #include <net/arp.h>
 #include <asm/byteorder.h>
@@ -275,7 +276,7 @@ static struct slave *tlb_get_least_loaded_slave(struct bonding *bond)
 }
 
 /* Caller must hold bond lock for read */
-struct slave *tlb_choose_channel(struct bonding *bond, u32 hash_index, u32 skb_len)
+static struct slave *tlb_choose_channel(struct bonding *bond, u32 hash_index, u32 skb_len)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct tlb_client_info *hash_table;
@@ -627,7 +628,7 @@ static void rlb_req_update_subnet_clients(struct bonding *bond, u32 src_ip)
 }
 
 /* Caller must hold both bond and ptr locks for read */
-struct slave *rlb_choose_channel(struct sk_buff *skb, struct bonding *bond)
+static struct slave *rlb_choose_channel(struct sk_buff *skb, struct bonding *bond)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct arp_pkt *arp = (struct arp_pkt *)skb->nh.raw;
@@ -954,9 +955,9 @@ static int alb_set_slave_mac_addr(struct slave *slave, u8 addr[], int hw)
 	/* each slave will receive packets destined to a different mac */
 	memcpy(s_addr.sa_data, addr, dev->addr_len);
 	s_addr.sa_family = dev->type;
-	if (dev->set_mac_address(dev, &s_addr)) {
+	if (dev_set_mac_address(dev, &s_addr)) {
 		printk(KERN_ERR DRV_NAME
-		       ": Error: dev->set_mac_address of dev %s failed! ALB "
+		       ": Error: dev_set_mac_address of dev %s failed! ALB "
 		       "mode requires that the base driver support setting "
 		       "the hw address also when the network device's "
 		       "interface is open\n",
@@ -1209,7 +1210,7 @@ static int alb_set_mac_address(struct bonding *bond, void *addr)
 		/* save net_device's current hw address */
 		memcpy(tmp_addr, slave->dev->dev_addr, ETH_ALEN);
 
-		res = slave->dev->set_mac_address(slave->dev, addr);
+		res = dev_set_mac_address(slave->dev, addr);
 
 		/* restore net_device's hw address */
 		memcpy(slave->dev->dev_addr, tmp_addr, ETH_ALEN);
@@ -1229,7 +1230,7 @@ unwind:
 	stop_at = slave;
 	bond_for_each_slave_from_to(bond, slave, i, bond->first_slave, stop_at) {
 		memcpy(tmp_addr, slave->dev->dev_addr, ETH_ALEN);
-		slave->dev->set_mac_address(slave->dev, &sa);
+		dev_set_mac_address(slave->dev, &sa);
 		memcpy(slave->dev->dev_addr, tmp_addr, ETH_ALEN);
 	}
 
@@ -1300,7 +1301,8 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 	switch (ntohs(skb->protocol)) {
 	case ETH_P_IP:
 		if ((memcmp(eth_data->h_dest, mac_bcast, ETH_ALEN) == 0) ||
-		    (skb->nh.iph->daddr == ip_bcast)) {
+		    (skb->nh.iph->daddr == ip_bcast) ||
+		    (skb->nh.iph->protocol == IPPROTO_IGMP)) {
 			do_tx_balance = 0;
 			break;
 		}

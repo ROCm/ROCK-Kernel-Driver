@@ -78,7 +78,6 @@ static void openpic_mapirq(u_int irq, cpumask_t cpumask, cpumask_t keepmask);
  */
 #ifdef notused
 static void openpic_enable_8259_pass_through(void);
-static u_int openpic_get_priority(void);
 static u_int openpic_get_spurious(void);
 static void openpic_set_sense(u_int irq, int sense);
 #endif /* notused */
@@ -276,7 +275,7 @@ static void __init openpic_enable_sie(void)
 }
 #endif
 
-#if defined(CONFIG_EPIC_SERIAL_MODE) || defined(CONFIG_PM)
+#if defined(CONFIG_EPIC_SERIAL_MODE)
 static void openpic_reset(void)
 {
 	openpic_setfield(&OpenPIC->Global.Global_Configuration0,
@@ -465,8 +464,7 @@ void openpic_eoi(void)
 	(void)openpic_read(&OpenPIC->THIS_CPU.EOI);
 }
 
-#ifdef notused
-static u_int openpic_get_priority(void)
+u_int openpic_get_priority(void)
 {
 	DECL_THIS_CPU;
 
@@ -474,7 +472,6 @@ static u_int openpic_get_priority(void)
 	return openpic_readfield(&OpenPIC->THIS_CPU.Current_Task_Priority,
 				 OPENPIC_CURRENT_TASK_PRIORITY_MASK);
 }
-#endif /* notused */
 
 void openpic_set_priority(u_int pri)
 {
@@ -560,12 +557,10 @@ static void __init openpic_initipi(u_int ipi, u_int pri, u_int vec)
  */
 void openpic_cause_IPI(u_int ipi, cpumask_t cpumask)
 {
-	cpumask_t phys;
 	DECL_THIS_CPU;
 
 	CHECK_THIS_CPU;
 	check_arg_ipi(ipi);
-	phys = physmask(cpumask);
 	openpic_write(&OpenPIC->THIS_CPU.IPI_Dispatch(ipi),
 		      cpus_addr(physmask(cpumask))[0]);
 }
@@ -997,8 +992,6 @@ int openpic_resume(struct sys_device *sysdev)
 		spin_unlock_irqrestore(&openpic_setup_lock, flags);
 		return 0;
 	}
-
-	openpic_reset();
 
 	/* OpenPIC sometimes seem to need some time to be fully back up... */
 	do {

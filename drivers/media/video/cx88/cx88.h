@@ -1,5 +1,5 @@
 /*
- * $Id: cx88.h,v 1.49 2005/01/20 12:54:46 kraxel Exp $
+ * $Id: cx88.h,v 1.56 2005/03/04 09:12:23 kraxel Exp $
  *
  * v4l2 device driver for cx2388x based TV cards
  *
@@ -159,6 +159,9 @@ extern struct sram_channel cx88_sram_channels[];
 #define CX88_BOARD_DVICO_FUSIONHDTV_DVB_T_PLUS 21
 #define CX88_BOARD_PCHDTV_HD3000           22
 #define CX88_BOARD_DNTV_LIVE_DVB_T         23
+#define CX88_BOARD_HAUPPAUGE_ROSLYN        24
+#define CX88_BOARD_DIGITALLOGIC_MEC	       25
+#define CX88_BOARD_IODATA_GVBCTV7E         26
 
 enum cx88_itype {
 	CX88_VMUX_COMPOSITE1 = 1,
@@ -258,13 +261,13 @@ struct cx88_core {
 	/* config info -- dvb */
 	struct dvb_pll_desc        *pll_desc;
 	unsigned int               pll_addr;
-	unsigned int               demod_addr;
 
 	/* state info */
 	struct task_struct         *kthread;
 	struct cx88_tvnorm         *tvnorm;
 	u32                        tvaudio;
-	u32                        audiomode;
+	u32                        audiomode_manual;
+	u32                        audiomode_current;
 	u32                        input;
 	u32                        astat;
 
@@ -386,6 +389,9 @@ struct cx8802_dev {
 	struct videobuf_dvb        dvb;
 	void*                      fe_handle;
 	int                        (*fe_release)(void *handle);
+
+	/* for switching modulation types */
+	unsigned char              ts_gen_cntrl;
 };
 
 /* ----------------------------------------------------------- */
@@ -414,7 +420,6 @@ struct cx8802_dev {
 /* ----------------------------------------------------------- */
 /* cx88-core.c                                                 */
 
-extern char *cx88_pci_irqs[32];
 extern char *cx88_vid_irqs[32];
 extern char *cx88_mpeg_irqs[32];
 extern void cx88_print_irqbits(char *name, char *tag, char **strings,
@@ -466,9 +471,6 @@ extern void cx88_core_put(struct cx88_core *core,
 /* cx88-vbi.c                                                  */
 
 void cx8800_vbi_fmt(struct cx8800_dev *dev, struct v4l2_format *f);
-int cx8800_start_vbi_dma(struct cx8800_dev    *dev,
-			 struct cx88_dmaqueue *q,
-			 struct cx88_buffer   *buf);
 int cx8800_stop_vbi_dma(struct cx8800_dev *dev);
 int cx8800_restart_vbi_queue(struct cx8800_dev    *dev,
 			     struct cx88_dmaqueue *q);
@@ -513,6 +515,7 @@ extern void cx88_card_setup(struct cx88_core *core);
 #define WW_FM		12
 
 void cx88_set_tvaudio(struct cx88_core *core);
+void cx88_newstation(struct cx88_core *core);
 void cx88_get_stereo(struct cx88_core *core, struct v4l2_tuner *t);
 void cx88_set_stereo(struct cx88_core *core, u32 mode, int manual);
 int cx88_audio_thread(void *data);
@@ -534,7 +537,7 @@ void cx8802_cancel_buffers(struct cx8802_dev *dev);
 int cx8802_init_common(struct cx8802_dev *dev);
 void cx8802_fini_common(struct cx8802_dev *dev);
 
-int cx8802_suspend_common(struct pci_dev *pci_dev, u32 state);
+int cx8802_suspend_common(struct pci_dev *pci_dev, pm_message_t state);
 int cx8802_resume_common(struct pci_dev *pci_dev);
 
 /*

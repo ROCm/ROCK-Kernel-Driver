@@ -106,6 +106,19 @@
 /* TXX9 type number */
 #define PORT_TXX9       64
 
+/* NEC VR4100 series SIU/DSIU */
+#define PORT_VR41XX_SIU		65
+#define PORT_VR41XX_DSIU	66
+
+/* Samsung S3C2400 SoC */
+#define PORT_S3C2400	67
+
+/* M32R SIO */
+#define PORT_M32R_SIO	68
+
+/*Digi jsm */
+#define PORT_JSM        65
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>
@@ -350,6 +363,7 @@ void uart_unregister_port(struct uart_driver *reg, int line);
 int uart_register_port(struct uart_driver *reg, struct uart_port *port);
 int uart_add_one_port(struct uart_driver *reg, struct uart_port *port);
 int uart_remove_one_port(struct uart_driver *reg, struct uart_port *port);
+int uart_match_port(struct uart_port *port1, struct uart_port *port2);
 
 /*
  * Power Management
@@ -463,6 +477,25 @@ uart_handle_cts_change(struct uart_port *port, unsigned int status)
 			}
 		}
 	}
+}
+
+#include <linux/tty_flip.h>
+
+static inline void
+uart_insert_char(struct uart_port *port, unsigned int status,
+		 unsigned int overrun, unsigned int ch, unsigned int flag)
+{
+	struct tty_struct *tty = port->info->tty;
+
+	if ((status & port->ignore_status_mask & ~overrun) == 0)
+		tty_insert_flip_char(tty, ch, flag);
+
+	/*
+	 * Overrun is special.  Since it's reported immediately,
+	 * it doesn't affect the current character.
+	 */
+	if (status & ~port->ignore_status_mask & overrun)
+		tty_insert_flip_char(tty, 0, TTY_OVERRUN);
 }
 
 /*

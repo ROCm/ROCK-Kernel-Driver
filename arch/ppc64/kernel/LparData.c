@@ -45,7 +45,7 @@ struct HvReleaseData hvReleaseData = {
 	.xSize = sizeof(struct HvReleaseData),
 	.xVpdAreasPtrOffset = offsetof(struct naca_struct, xItVpdAreas),
 	.xSlicNacaAddr = &naca,		/* 64-bit Naca address */
-	.xMsNucDataOffset = 0x6000,	/* offset of LparMap within loadarea (see head.S) */
+	.xMsNucDataOffset = 0x4800,	/* offset of LparMap within loadarea (see head.S) */
 	.xTagsMode = 1,			/* tags inactive       */
 	.xAddressSize = 0,		/* 64 bit              */
 	.xNoSharedProcs = 0,		/* shared processors   */
@@ -224,6 +224,7 @@ struct ItVpdAreas itVpdAreas = {
 };
 
 struct msChunks msChunks;
+EXPORT_SYMBOL(msChunks);
 
 /* Depending on whether this is called from iSeries or pSeries setup
  * code, the location of the msChunks struct may or may not have

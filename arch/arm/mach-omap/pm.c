@@ -45,6 +45,7 @@
 #include <asm/arch/omap16xx.h>
 #include <asm/arch/pm.h>
 #include <asm/arch/mux.h>
+#include <asm/arch/tc.h>
 #include <asm/arch/tps65010.h>
 
 #include "clock.h"

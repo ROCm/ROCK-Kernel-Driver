@@ -65,7 +65,7 @@ struct saa7146_vv;
 /* saa7146 page table */
 struct saa7146_pgtable {
 	unsigned int	size;
-	u32 		*cpu;
+	u32		*cpu;
 	dma_addr_t	dma;
 	/* used for offsets for u,v planes for planar capture modes */
 	unsigned long	offset;
@@ -93,20 +93,20 @@ struct saa7146_extension
 #define SAA7146_USE_I2C_IRQ	0x1
 #define SAA7146_I2C_SHORT_DELAY	0x2
 	int	flags;
-	
+
 	/* pairs of subvendor and subdevice ids for
 	   supported devices, last entry 0xffff, 0xfff */
 	struct module *module;
 	struct pci_driver driver;
 	struct pci_device_id *pci_tbl;
-	
+
 	/* extension functions */
 	int (*probe)(struct saa7146_dev *);
 	int (*attach)(struct saa7146_dev *, struct saa7146_pci_extension_data *);
 	int (*detach)(struct saa7146_dev*);
 
 	u32	irq_mask;	/* mask to indicate, which irq-events are handled by the extension */
-	void 	(*irq_func)(struct saa7146_dev*, u32* irq_mask);
+	void	(*irq_func)(struct saa7146_dev*, u32* irq_mask);
 };
 
 struct saa7146_dma
@@ -122,18 +122,18 @@ struct saa7146_dev
 	struct list_head		item;
 
 	/* different device locks */
-       	spinlock_t                 	slock;
-        struct semaphore           	lock;
+	spinlock_t			slock;
+        struct semaphore		lock;
 
-	unsigned char			__iomem *mem;	/* pointer to mapped IO memory */
+	unsigned char			__iomem *mem;		/* pointer to mapped IO memory */
 	int				revision;	/* chip revision; needed for bug-workarounds*/
 
 	/* pci-device & irq stuff*/
 	char				name[32];
 	struct pci_dev			*pci;
 	u32				int_todo;
-       	spinlock_t			int_slock;
-	
+	spinlock_t			int_slock;
+
 	/* extension handling */
 	struct saa7146_extension	*ext;		/* indicates if handled by extension */
 	void				*ext_priv;	/* pointer for extension private use (most likely some private data) */
@@ -149,7 +149,7 @@ struct saa7146_dev
 	struct saa7146_dma	d_i2c;	/* pointer to i2c memory */
 	wait_queue_head_t	i2c_wq;
 	int			i2c_op;
-	
+
 	/* memories */
 	struct saa7146_dma	d_rps0;
 	struct saa7146_dma	d_rps1;
@@ -157,7 +157,7 @@ struct saa7146_dev
 
 /* from saa7146_i2c.c */
 int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c_adapter, u32 bitrate);
-int saa7146_i2c_transfer(struct saa7146_dev *saa, const struct i2c_msg *msgs, int num,  int retries);
+int saa7146_i2c_transfer(struct saa7146_dev *saa, const struct i2c_msg *msgs, int num, int retries);
 
 /* from saa7146_core.c */
 extern struct list_head saa7146_devices;
@@ -178,8 +178,8 @@ int saa7146_wait_for_debi_done(struct saa7146_dev *dev, int nobusyloop);
 
 /* some i2c constants */
 #define SAA7146_I2C_TIMEOUT	100	/* i2c-timeout-value in ms */
-#define SAA7146_I2C_RETRIES 	3	/* how many times shall we retry an i2c-operation? */
-#define SAA7146_I2C_DELAY 	5	/* time we wait after certain i2c-operations */
+#define SAA7146_I2C_RETRIES	3	/* how many times shall we retry an i2c-operation? */
+#define SAA7146_I2C_DELAY	5	/* time we wait after certain i2c-operations */
 
 /* unsorted defines */
 #define ME1    0x0000000800
@@ -272,7 +272,7 @@ int saa7146_wait_for_debi_done(struct saa7146_dev *dev, int nobusyloop);
 #define MASK_W1   0xffff0000    /* Mask value for word 1 */
 
 #define MASK_PA   0xfffffffc    /* Mask value for physical address */
-#define MASK_PR   0xfffffffe 	/* Mask value for protection register */
+#define MASK_PR   0xfffffffe	/* Mask value for protection register */
 #define MASK_ER   0xffffffff    /* Mask value for the entire register */
 
 #define MASK_NONE 0x00000000    /* No mask */
@@ -295,7 +295,7 @@ int saa7146_wait_for_debi_done(struct saa7146_dev *dev, int nobusyloop);
 #define BASE_ODD3         0x30  /* Video DMA 3 registers */
 #define BASE_EVEN3        0x34
 #define PROT_ADDR3        0x38
-#define PITCH3            0x3C         
+#define PITCH3            0x3C
 #define BASE_PAGE3        0x40  /* Video DMA 3 base page */
 #define NUM_LINE_BYTE3    0x44
 
@@ -323,15 +323,15 @@ int saa7146_wait_for_debi_done(struct saa7146_dev *dev, int nobusyloop);
 #define DEBI_CONFIG       0x7C
 #define DEBI_COMMAND      0x80
 #define DEBI_PAGE         0x84
-#define DEBI_AD           0x88	
+#define DEBI_AD           0x88
 
-#define I2C_TRANSFER      0x8C	
-#define I2C_STATUS        0x90	
+#define I2C_TRANSFER      0x8C
+#define I2C_STATUS        0x90
 
 #define BASE_A1_IN        0x94	/* Audio 1 input DMA */
 #define PROT_A1_IN        0x98
 #define PAGE_A1_IN        0x9C
-  
+
 #define BASE_A1_OUT       0xA0  /* Audio 1 output DMA */
 #define PROT_A1_OUT       0xA4
 #define PAGE_A1_OUT       0xA8
@@ -371,12 +371,12 @@ int saa7146_wait_for_debi_done(struct saa7146_dev *dev, int nobusyloop);
 #define RPS_ADDR0         0x104  /* RPS task 0 address register */
 #define RPS_ADDR1         0x108  /* RPS task 1 address register */
 
-#define ISR               0x10C  /* Interrupt status register */                                                             
+#define ISR               0x10C  /* Interrupt status register */
 #define PSR               0x110  /* Primary status register */
 #define SSR               0x114  /* Secondary status register */
 
 #define EC1R              0x118  /* Event counter set 1 register */
-#define EC2R              0x11C  /* Event counter set 2 register */         
+#define EC2R              0x11C  /* Event counter set 2 register */
 
 #define PCI_VDP1          0x120  /* Video DMA pointer of FIFO 1 */
 #define PCI_VDP2          0x124  /* Video DMA pointer of FIFO 2 */
@@ -450,4 +450,3 @@ int saa7146_wait_for_debi_done(struct saa7146_dev *dev, int nobusyloop);
 #define SAA7146_I2C_BUS_BIT_RATE_60	(0x300)
 
 #endif
-

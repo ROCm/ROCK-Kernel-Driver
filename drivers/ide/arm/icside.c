@@ -713,7 +713,7 @@ static int __devinit
 icside_probe(struct expansion_card *ec, const struct ecard_id *id)
 {
 	struct icside_state *state;
-	void *idmem;
+	void __iomem *idmem;
 	int ret;
 
 	ret = ecard_request_resources(ec);

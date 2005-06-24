@@ -558,7 +558,7 @@ static ssize_t btaudio_dsp_read(struct file *file, char __user *buffer,
 			__s16 __user *dst = (__s16 __user *)(buffer + ret);
 			__s16 avg;
 			int n = ndst>>1;
-			if (0 != verify_area(VERIFY_WRITE,dst,ndst)) {
+			if (!access_ok(VERIFY_WRITE, dst, ndst)) {
 				if (0 == ret)
 					ret = -EFAULT;
 				break;
@@ -574,7 +574,7 @@ static ssize_t btaudio_dsp_read(struct file *file, char __user *buffer,
 			__u8 *src = bta->buf_cpu + bta->read_offset;
 			__u8 __user *dst = buffer + ret;
 			int n = ndst;
-			if (0 != verify_area(VERIFY_WRITE,dst,ndst)) {
+			if (!access_ok(VERIFY_WRITE, dst, ndst)) {
 				if (0 == ret)
 					ret = -EFAULT;
 				break;
@@ -587,7 +587,7 @@ static ssize_t btaudio_dsp_read(struct file *file, char __user *buffer,
 			__u16 *src = (__u16*)(bta->buf_cpu + bta->read_offset);
 			__u16 __user *dst = (__u16 __user *)(buffer + ret);
 			int n = ndst>>1;
-			if (0 != verify_area(VERIFY_WRITE,dst,ndst)) {
+			if (!access_ok(VERIFY_WRITE,dst,ndst)) {
 				if (0 == ret)
 					ret = -EFAULT;
 				break;

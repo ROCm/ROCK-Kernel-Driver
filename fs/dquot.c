@@ -505,14 +505,12 @@ static void prune_dqcache(int count)
 
 static int shrink_dqcache_memory(int nr, unsigned int gfp_mask)
 {
-	int ret;
-
-	spin_lock(&dq_list_lock);
-	if (nr)
+	if (nr) {
+		spin_lock(&dq_list_lock);
 		prune_dqcache(nr);
-	ret = dqstats.allocated_dquots;
-	spin_unlock(&dq_list_lock);
-	return ret;
+		spin_unlock(&dq_list_lock);
+	}
+	return (dqstats.free_dquots / 100) * sysctl_vfs_cache_pressure;
 }
 
 /*
@@ -1092,7 +1090,7 @@ warn_put_all:
 }
 
 /*
- * This is a non-blocking operation.
+ * This operation can block, but only after everything is updated
  */
 int dquot_free_space(struct inode *inode, qsize_t number)
 {
@@ -1128,7 +1126,7 @@ out_sub:
 }
 
 /*
- * This is a non-blocking operation.
+ * This operation can block, but only after everything is updated
  */
 int dquot_free_inode(const struct inode *inode, unsigned long number)
 {
@@ -1163,6 +1161,7 @@ int dquot_free_inode(const struct inode *inode, unsigned long number)
  * Transfer the number of inode and blocks from one diskquota to an other.
  *
  * This operation can block, but only after everything is updated
+ * A transaction must be started when entering this function.
  */
 int dquot_transfer(struct inode *inode, struct iattr *iattr)
 {
@@ -1444,6 +1443,7 @@ static int vfs_quota_on_inode(struct inode *inode, int type, int format_id)
 	oldflags = inode->i_flags & (S_NOATIME | S_IMMUTABLE | S_NOQUOTA);
 	inode->i_flags |= S_NOQUOTA | S_NOATIME | S_IMMUTABLE;
 	up_write(&dqopt->dqptr_sem);
+	sb->dq_op->drop(inode);
 
 	error = -EIO;
 	dqopt->files[type] = igrab(inode);

@@ -246,9 +246,9 @@ static match_table_t tokens = {
 	{Opt_err, NULL},
 };
 
-int parse_opts(char *opts, uid_t *uid, gid_t *gid, umode_t *umask,
-	       int *lowercase, int *conv, int *eas, int *chk, int *errs,
-	       int *chkdsk, int *timeshift)
+static int parse_opts(char *opts, uid_t *uid, gid_t *gid, umode_t *umask,
+		      int *lowercase, int *conv, int *eas, int *chk, int *errs,
+		      int *chkdsk, int *timeshift)
 {
 	char *p;
 	int option;

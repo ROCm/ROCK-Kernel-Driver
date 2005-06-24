@@ -179,7 +179,7 @@ static int mxser_numports[] = {
 
 #define UART_TYPE_NUM	2
 
-unsigned int Gmoxa_uart_id[UART_TYPE_NUM] = {
+static const unsigned int Gmoxa_uart_id[UART_TYPE_NUM] = {
 	MOXA_MUST_MU150_HWID,
 	MOXA_MUST_MU860_HWID
 };
@@ -197,7 +197,7 @@ struct mxpciuart_info {
 	long max_baud;
 };
 
-struct mxpciuart_info Gpci_uart_info[UART_INFO_NUM] = {
+static const struct mxpciuart_info Gpci_uart_info[UART_INFO_NUM] = {
 	{MOXA_OTHER_UART, 16, 16, 16, 14, 14, 1, 921600L},
 	{MOXA_MUST_MU150_HWID, 64, 64, 64, 48, 48, 16, 230400L},
 	{MOXA_MUST_MU860_HWID, 128, 128, 128, 96, 96, 32, 921600L}
@@ -548,7 +548,6 @@ static void process_txrx_fifo(struct mxser_struct *info)
 static int mxser_initbrd(int board, struct mxser_hwconf *hwconf)
 {
 	struct mxser_struct *info;
-	unsigned long flags;
 	int retval;
 	int i, n;
 
@@ -1996,9 +1995,6 @@ static void mxser_receive_chars(struct mxser_struct *info, int *status)
 	unsigned char ch, gdl;
 	int ignored = 0;
 	int cnt = 0;
-	unsigned char *cp;
-	char *fp;
-	int count;
 	int recv_room;
 	int max = 256;
 	unsigned long flags;
@@ -2011,10 +2007,6 @@ static void mxser_receive_chars(struct mxser_struct *info, int *status)
 		mxser_stoprx(tty);
 		//return;
 	}
-
-	cp = tty->flip.char_buf;
-	fp = tty->flip.flag_buf;
-	count = 0;
 
 	// following add by Victor Yu. 09-02-2002
 	if (info->IsMoxaMustChipFlag != MOXA_OTHER_UART) {
@@ -2042,12 +2034,10 @@ static void mxser_receive_chars(struct mxser_struct *info, int *status)
 		}
 		while (gdl--) {
 			ch = inb(info->base + UART_RX);
-			count++;
-			*cp++ = ch;
-			*fp++ = 0;
+			tty_insert_flip_char(tty, ch, 0);
 			cnt++;
 			/*
-			   if((count>=HI_WATER) && (info->stop_rx==0)){
+			   if((cnt>=HI_WATER) && (info->stop_rx==0)){
 			   mxser_stoprx(tty);
 			   info->stop_rx=1;
 			   break;
@@ -2062,7 +2052,7 @@ intr_old:
 		if (max-- < 0)
 			break;
 		/*
-		   if((count>=HI_WATER) && (info->stop_rx==0)){
+		   if((cnt>=HI_WATER) && (info->stop_rx==0)){
 		   mxser_stoprx(tty);
 		   info->stop_rx=1;
 		   break;
@@ -2079,36 +2069,33 @@ intr_old:
 			if (++ignored > 100)
 				break;
 		} else {
-			count++;
+			char flag = 0;
 			if (*status & UART_LSR_SPECIAL) {
 				if (*status & UART_LSR_BI) {
-					*fp++ = TTY_BREAK;
+					flag = TTY_BREAK;
 /* added by casper 1/11/2000 */
 					info->icount.brk++;
-
 /* */
 					if (info->flags & ASYNC_SAK)
 						do_SAK(tty);
 				} else if (*status & UART_LSR_PE) {
-					*fp++ = TTY_PARITY;
+					flag = TTY_PARITY;
 /* added by casper 1/11/2000 */
 					info->icount.parity++;
 /* */
 				} else if (*status & UART_LSR_FE) {
-					*fp++ = TTY_FRAME;
+					flag = TTY_FRAME;
 /* added by casper 1/11/2000 */
 					info->icount.frame++;
 /* */
 				} else if (*status & UART_LSR_OE) {
-					*fp++ = TTY_OVERRUN;
+					flag = TTY_OVERRUN;
 /* added by casper 1/11/2000 */
 					info->icount.overrun++;
 /* */
-				} else
-					*fp++ = 0;
-			} else
-				*fp++ = 0;
-			*cp++ = ch;
+				}
+			}
+			tty_insert_flip_char(tty, ch, flag);
 			cnt++;
 			if (cnt >= recv_room) {
 				if (!info->ldisc_stop_rx) {
@@ -2133,13 +2120,13 @@ intr_old:
 		// above add by Victor Yu. 09-02-2002
 	} while (*status & UART_LSR_DR);
 
-      end_intr:		// add by Victor Yu. 09-02-2002
+end_intr:		// add by Victor Yu. 09-02-2002
 
 	mxvar_log.rxcnt[info->port] += cnt;
 	info->mon_data.rxcnt += cnt;
 	info->mon_data.up_rxcnt += cnt;
 	spin_unlock_irqrestore(&info->slock, flags);
-	
+
 	tty_flip_buffer_push(tty);
 }
 
@@ -3165,23 +3152,6 @@ static void mxser_normal_mode(int port)
 			(void) inb(port);
 	}
 	outb(0x00, port + 4);
-}
-
-// added by James 03-05-2004.
-// for secure device server:
-// stat = 1, the port8 DTR is set to ON.
-// stat = 0, the port8 DTR is set to OFF.
-void SDS_PORT8_DTR(int stat)
-{
-	int _sds_oldmcr;
-	_sds_oldmcr = inb(mxvar_table[7].base + UART_MCR);	// get old MCR
-	if (stat == 1) {
-		outb(_sds_oldmcr | 0x01, mxvar_table[7].base + UART_MCR);	// set DTR ON
-	}
-	if (stat == 0) {
-		outb(_sds_oldmcr & 0xfe, mxvar_table[7].base + UART_MCR);	// set DTR OFF
-	}
-	return;
 }
 
 module_init(mxser_module_init);

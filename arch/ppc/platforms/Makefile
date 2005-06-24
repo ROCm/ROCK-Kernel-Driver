@@ -12,7 +12,8 @@ endif
 obj-$(CONFIG_PPC_PMAC)		+= pmac_pic.o pmac_setup.o pmac_time.o \
 					pmac_feature.o pmac_pci.o pmac_sleep.o \
 					pmac_low_i2c.o pmac_cache.o
-obj-$(CONFIG_PPC_CHRP)		+= chrp_setup.o chrp_time.o chrp_pci.o
+obj-$(CONFIG_PPC_CHRP)		+= chrp_setup.o chrp_time.o chrp_pci.o \
+					chrp_pegasos_eth.o
 ifeq ($(CONFIG_PPC_CHRP),y)
 obj-$(CONFIG_NVRAM)		+= chrp_nvram.o
 endif
@@ -33,6 +34,7 @@ obj-$(CONFIG_GEMINI)		+= gemini_pci.o gemini_setup.o gemini_prom.o
 obj-$(CONFIG_K2)		+= k2.o
 obj-$(CONFIG_LOPEC)		+= lopec.o
 obj-$(CONFIG_KATANA)		+= katana.o
+obj-$(CONFIG_HDPU)		+= hdpu.o
 obj-$(CONFIG_MCPN765)		+= mcpn765.o
 obj-$(CONFIG_MENF1)		+= menf1_setup.o menf1_pci.o
 obj-$(CONFIG_MVME5100)		+= mvme5100.o
@@ -42,10 +44,11 @@ obj-$(CONFIG_POWERPMC250)	+= powerpmc250.o
 obj-$(CONFIG_PPLUS)		+= pplus.o
 obj-$(CONFIG_PRPMC750)		+= prpmc750.o
 obj-$(CONFIG_PRPMC800)		+= prpmc800.o
+obj-$(CONFIG_RADSTONE_PPC7D)	+= radstone_ppc7d.o
 obj-$(CONFIG_SANDPOINT)		+= sandpoint.o
 obj-$(CONFIG_SBC82xx)		+= sbc82xx.o
 obj-$(CONFIG_SPRUCE)		+= spruce.o
-obj-$(CONFIG_LITE5200)		+= lite5200.o mpc5200.o
+obj-$(CONFIG_LITE5200)		+= lite5200.o
 
 ifeq ($(CONFIG_SMP),y)
 obj-$(CONFIG_PPC_PMAC)		+= pmac_smp.o

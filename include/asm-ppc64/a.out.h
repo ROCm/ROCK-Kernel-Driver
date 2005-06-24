@@ -1,8 +1,6 @@
 #ifndef __PPC64_A_OUT_H__
 #define __PPC64_A_OUT_H__
 
-#include <asm/ppcdebug.h>
-
 /*
  * c 2001 PPC 64 Team, IBM Corp
  *
@@ -30,14 +28,11 @@ struct exec
 
 #ifdef __KERNEL__
 
-#define STACK_TOP_USER64 (TASK_SIZE_USER64)
+#define STACK_TOP_USER64 TASK_SIZE_USER64
+#define STACK_TOP_USER32 TASK_SIZE_USER32
 
-/* Give 32-bit user space a full 4G address space to live in. */
-#define STACK_TOP_USER32 (TASK_SIZE_USER32)
-
-#define STACK_TOP ((test_thread_flag(TIF_32BIT) || \
-		(ppcdebugset(PPCDBG_BINFMT_32ADDR))) ? \
-		STACK_TOP_USER32 : STACK_TOP_USER64)
+#define STACK_TOP (test_thread_flag(TIF_32BIT) ? \
+		   STACK_TOP_USER32 : STACK_TOP_USER64)
 
 #endif /* __KERNEL__ */
 

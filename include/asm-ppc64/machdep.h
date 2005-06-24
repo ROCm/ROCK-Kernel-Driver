@@ -21,6 +21,7 @@ struct pci_bus;
 struct device_node;
 struct iommu_table;
 struct rtc_time;
+struct file;
 
 #ifdef CONFIG_SMP
 struct smp_ops_t {
@@ -30,8 +31,10 @@ struct smp_ops_t {
 	void  (*setup_cpu)(int nr);
 	void  (*take_timebase)(void);
 	void  (*give_timebase)(void);
+	int   (*cpu_enable)(unsigned int nr);
 	int   (*cpu_disable)(void);
 	void  (*cpu_die)(unsigned int nr);
+	int   (*cpu_bootable)(unsigned int nr);
 };
 #endif
 
@@ -129,10 +132,33 @@ struct machdep_calls {
 	/* Get legacy PCI/IDE interrupt mapping */ 
 	int		(*pci_get_legacy_ide_irq)(struct pci_dev *dev, int channel);
 	
+	/* Get access protection for /dev/mem */
+	pgprot_t	(*phys_mem_access_prot)(struct file *file,
+						unsigned long offset,
+						unsigned long size,
+						pgprot_t vma_prot);
+
 };
 
 extern struct machdep_calls ppc_md;
 extern char cmd_line[COMMAND_LINE_SIZE];
+
+#ifdef CONFIG_PPC_PMAC
+/*
+ * Power macintoshes have either a CUDA, PMU or SMU controlling
+ * system reset, power, NVRAM, RTC.
+ */
+typedef enum sys_ctrler_kind {
+	SYS_CTRLER_UNKNOWN = 0,
+	SYS_CTRLER_CUDA = 1,
+	SYS_CTRLER_PMU = 2,
+	SYS_CTRLER_SMU = 3,
+} sys_ctrler_t;
+extern sys_ctrler_t sys_ctrler;
+
+#endif /* CONFIG_PPC_PMAC */
+
+
 
 /* Functions to produce codes on the leds.
  * The SRC code should be unique for the message category and should

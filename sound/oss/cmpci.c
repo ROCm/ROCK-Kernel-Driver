@@ -2925,7 +2925,7 @@ static /*const*/ struct file_operations cm_audio_fops = {
 static struct initvol {
 	int mixch;
 	int vol;
-} initvol[] __initdata = {
+} initvol[] __devinitdata = {
 	{ SOUND_MIXER_WRITE_CD, 0x4f4f },
 	{ SOUND_MIXER_WRITE_LINE, 0x4f4f },
 	{ SOUND_MIXER_WRITE_MIC, 0x4f4f },

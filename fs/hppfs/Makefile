@@ -7,13 +7,3 @@ hppfs-objs := hppfs_kern.o
 
 obj-y =
 obj-$(CONFIG_HPPFS) += hppfs.o
-
-clean:
-
-modules:
-
-fastdep:
-
-dep:
-
-archmrproper: clean

@@ -49,22 +49,21 @@ static void hfs_ext_build_key(hfs_btree_key *key, u32 cnid, u16 block, u8 type)
  *   This function has no side-effects */
 int hfs_ext_keycmp(const btree_key *key1, const btree_key *key2)
 {
-	unsigned int tmp;
-	int retval;
+	__be32 fnum1, fnum2;
+	__be16 block1, block2;
 
-	tmp = be32_to_cpu(key1->ext.FNum) - be32_to_cpu(key2->ext.FNum);
-	if (tmp != 0) {
-		retval = (int)tmp;
-	} else {
-		tmp = (unsigned char)key1->ext.FkType - (unsigned char)key2->ext.FkType;
-		if (tmp != 0) {
-			retval = (int)tmp;
-		} else {
-			retval = (int)(be16_to_cpu(key1->ext.FABN)
-				       - be16_to_cpu(key2->ext.FABN));
-		}
-	}
-	return retval;
+	fnum1 = key1->ext.FNum;
+	fnum2 = key2->ext.FNum;
+	if (fnum1 != fnum2)
+		return be32_to_cpu(fnum1) < be32_to_cpu(fnum2) ? -1 : 1;
+	if (key1->ext.FkType != key2->ext.FkType)
+		return key1->ext.FkType < key2->ext.FkType ? -1 : 1;
+
+	block1 = key1->ext.FABN;
+	block2 = key2->ext.FABN;
+	if (block1 == block2)
+		return 0;
+	return be16_to_cpu(block1) < be16_to_cpu(block2) ? -1 : 1;
 }
 
 /*
@@ -231,8 +230,8 @@ static int hfs_add_extent(struct hfs_extent *extent, u16 offset,
 	return -EIO;
 }
 
-int hfs_free_extents(struct super_block *sb, struct hfs_extent *extent,
-		     u16 offset, u16 block_nr)
+static int hfs_free_extents(struct super_block *sb, struct hfs_extent *extent,
+			    u16 offset, u16 block_nr)
 {
 	u16 count, start;
 	int i;

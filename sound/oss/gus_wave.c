@@ -3126,8 +3126,7 @@ void __exit gus_wave_unload(struct address_info *hw_config)
 	if (hw_config->slots[5] != -1)
 		sound_unload_mixerdev(hw_config->slots[5]);
 	
-	if(samples)
-		vfree(samples);
+	vfree(samples);
 	samples=NULL;
 }
 /* called in interrupt context */

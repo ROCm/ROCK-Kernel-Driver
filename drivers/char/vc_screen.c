@@ -52,14 +52,17 @@ vcs_size(struct inode *inode)
 	int size;
 	int minor = iminor(inode);
 	int currcons = minor & 127;
+	struct vc_data *vc;
+
 	if (currcons == 0)
 		currcons = fg_console;
 	else
 		currcons--;
 	if (!vc_cons_allocated(currcons))
 		return -ENXIO;
+	vc = vc_cons[currcons].d;
 
-	size = vc_cons[currcons].d->vc_rows * vc_cons[currcons].d->vc_cols;
+	size = vc->vc_rows * vc->vc_cols;
 
 	if (minor & 128)
 		size = 2*size + HEADER_SIZE;
@@ -442,7 +445,7 @@ vcs_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 		buf += orig_count;
 		pos += orig_count;
 		if (org0)
-			update_region(currcons, (unsigned long)(org0), org-org0);
+			update_region(vc, (unsigned long)(org0), org - org0);
 	}
 	*ppos += written;
 	ret = written;
@@ -492,20 +495,11 @@ void vcs_remove_devfs(struct tty_struct *tty)
 	class_simple_device_remove(MKDEV(VCS_MAJOR, tty->index + 129));
 }
 
-static int
-vcs_no_hotplug(struct class_device *dev, char **envp, int num_envp, char *buffer, int buffer_size)
-{
-	return 1;
-}
-
 int __init vcs_init(void)
 {
 	if (register_chrdev(VCS_MAJOR, "vcs", &vcs_fops))
 		panic("unable to get major %d for vcs device", VCS_MAJOR);
 	vc_class = class_simple_create(THIS_MODULE, "vc");
-
-	/* Do not generate hotplug events for the vc device */
-	class_simple_set_hotplug(vc_class, vcs_no_hotplug);
 
 	devfs_mk_cdev(MKDEV(VCS_MAJOR, 0), S_IFCHR|S_IRUSR|S_IWUSR, "vcc/0");
 	devfs_mk_cdev(MKDEV(VCS_MAJOR, 128), S_IFCHR|S_IRUSR|S_IWUSR, "vcc/a0");

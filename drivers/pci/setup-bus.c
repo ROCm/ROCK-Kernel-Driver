@@ -29,9 +29,9 @@
 
 #define DEBUG_CONFIG 1
 #if DEBUG_CONFIG
-# define DBGC(args)     printk args
+#define DBG(x...)     printk(x)
 #else
-# define DBGC(args)
+#define DBG(x...)
 #endif
 
 #define ROUND_UP(x, a)		(((x) + (a) - 1) & ~((a) - 1))
@@ -151,8 +151,7 @@ pci_setup_bridge(struct pci_bus *bus)
 	struct pci_bus_region region;
 	u32 l, io_upper16;
 
-	DBGC((KERN_INFO "PCI: Bus %d, bridge: %s\n",
-			bus->number, pci_name(bridge)));
+	DBG(KERN_INFO "PCI: Bridge: %s\n", pci_name(bridge));
 
 	/* Set up the top and bottom of the PCI I/O segment for this bus. */
 	pcibios_resource_to_bus(bridge, &region, bus->resource[0]);
@@ -163,14 +162,14 @@ pci_setup_bridge(struct pci_bus *bus)
 		l |= region.end & 0xf000;
 		/* Set up upper 16 bits of I/O base/limit. */
 		io_upper16 = (region.end & 0xffff0000) | (region.start >> 16);
-		DBGC((KERN_INFO "  IO window: %04lx-%04lx\n",
-				region.start, region.end));
+		DBG(KERN_INFO "  IO window: %04lx-%04lx\n",
+				region.start, region.end);
 	}
 	else {
 		/* Clear upper 16 bits of I/O base/limit. */
 		io_upper16 = 0;
 		l = 0x00f0;
-		DBGC((KERN_INFO "  IO window: disabled.\n"));
+		DBG(KERN_INFO "  IO window: disabled.\n");
 	}
 	/* Temporarily disable the I/O range before updating PCI_IO_BASE. */
 	pci_write_config_dword(bridge, PCI_IO_BASE_UPPER16, 0x0000ffff);
@@ -185,12 +184,12 @@ pci_setup_bridge(struct pci_bus *bus)
 	if (bus->resource[1]->flags & IORESOURCE_MEM) {
 		l = (region.start >> 16) & 0xfff0;
 		l |= region.end & 0xfff00000;
-		DBGC((KERN_INFO "  MEM window: %08lx-%08lx\n",
-				region.start, region.end));
+		DBG(KERN_INFO "  MEM window: %08lx-%08lx\n",
+				region.start, region.end);
 	}
 	else {
 		l = 0x0000fff0;
-		DBGC((KERN_INFO "  MEM window: disabled.\n"));
+		DBG(KERN_INFO "  MEM window: disabled.\n");
 	}
 	pci_write_config_dword(bridge, PCI_MEMORY_BASE, l);
 
@@ -204,12 +203,12 @@ pci_setup_bridge(struct pci_bus *bus)
 	if (bus->resource[2]->flags & IORESOURCE_PREFETCH) {
 		l = (region.start >> 16) & 0xfff0;
 		l |= region.end & 0xfff00000;
-		DBGC((KERN_INFO "  PREFETCH window: %08lx-%08lx\n",
-				region.start, region.end));
+		DBG(KERN_INFO "  PREFETCH window: %08lx-%08lx\n",
+				region.start, region.end);
 	}
 	else {
 		l = 0x0000fff0;
-		DBGC((KERN_INFO "  PREFETCH window: disabled.\n"));
+		DBG(KERN_INFO "  PREFETCH window: disabled.\n");
 	}
 	pci_write_config_dword(bridge, PCI_PREF_MEMORY_BASE, l);
 

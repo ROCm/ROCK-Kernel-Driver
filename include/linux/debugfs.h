@@ -15,6 +15,12 @@
 #ifndef _DEBUGFS_H_
 #define _DEBUGFS_H_
 
+#include <linux/fs.h>
+
+#include <linux/types.h>
+
+struct file_operations;
+
 #if defined(CONFIG_DEBUG_FS)
 struct dentry *debugfs_create_file(const char *name, mode_t mode,
 				   struct dentry *parent, void *data,
@@ -34,6 +40,9 @@ struct dentry *debugfs_create_bool(const char *name, mode_t mode,
 				  struct dentry *parent, u32 *value);
 
 #else
+
+#include <linux/err.h>
+
 /* 
  * We do not return NULL from these functions if CONFIG_DEBUG_FS is not enabled
  * so users have a chance to detect if there was a real error or not.  We don't
@@ -66,21 +75,21 @@ static inline struct dentry *debugfs_create_u8(const char *name, mode_t mode,
 
 static inline struct dentry *debugfs_create_u16(const char *name, mode_t mode,
 						struct dentry *parent,
-						u8 *value)
+						u16 *value)
 {
 	return ERR_PTR(-ENODEV);
 }
 
 static inline struct dentry *debugfs_create_u32(const char *name, mode_t mode,
 						struct dentry *parent,
-						u8 *value)
+						u32 *value)
 {
 	return ERR_PTR(-ENODEV);
 }
 
 static inline struct dentry *debugfs_create_bool(const char *name, mode_t mode,
 						 struct dentry *parent,
-						 u8 *value)
+						 u32 *value)
 {
 	return ERR_PTR(-ENODEV);
 }

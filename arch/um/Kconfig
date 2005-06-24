@@ -3,7 +3,7 @@ config GENERIC_HARDIRQS
 	bool
 	default y
 
-config USERMODE
+config UML
 	bool
 	default y
 
@@ -96,13 +96,6 @@ config NET
 	recommended to read the NET-HOWTO, available from
 	<http://www.tldp.org/docs.html#howto>.
 
-source "drivers/input/Kconfig"
-source "drivers/char/Kconfig"
-source "drivers/video/Kconfig"
-
-config X11_FB
-	bool "X11 Framebuffer driver"
-	depends on FB && !MODE_TT && !STATIC_LINK
 
 source "fs/Kconfig.binfmt"
 
@@ -251,7 +244,7 @@ config KERNEL_HALF_GIGS
 
 config HIGHMEM
 	bool "Highmem support"
-	depends on BROKEN
+	depends on !64BIT
 
 config KERNEL_STACK_ORDER
 	int "Kernel stack size order"

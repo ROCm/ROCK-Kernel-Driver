@@ -5,16 +5,6 @@
 
 #ifdef _SK_MCA_DRIVER_
 
-/* version-dependent functions/structures */
-
-#define SKMCA_READB(addr) isa_readb(addr)
-#define SKMCA_READW(addr) isa_readw(addr)
-#define SKMCA_WRITEB(data, addr) isa_writeb(data, addr)
-#define SKMCA_WRITEW(data, addr) isa_writew(data, addr)
-#define SKMCA_TOIO(dest, src, len) isa_memcpy_toio(dest, src, len)
-#define SKMCA_FROMIO(dest, src, len) isa_memcpy_fromio(dest, src, len)
-#define SKMCA_SETIO(dest, val, len) isa_memset_io(dest, val, len)
-
 /* Adapter ID's */
 #define SKNET_MCA_ID 0x6afd
 #define SKNET_JUNIOR_MCA_ID 0x6be9
@@ -29,10 +19,11 @@ typedef enum { Media_10Base2, Media_10BaseT,
 /* private structure */
 typedef struct {
 	unsigned int slot;	/* MCA-Slot-#                       */
-	unsigned int macbase;	/* base address of MAC address PROM */
-	unsigned int ioregaddr;	/* address of I/O-register (Lo)     */
-	unsigned int ctrladdr;	/* address of control/stat register */
-	unsigned int cmdaddr;	/* address of I/O-command register  */
+	void __iomem *base;
+	void __iomem *macbase;	/* base address of MAC address PROM */
+	void __iomem *ioregaddr;/* address of I/O-register (Lo)     */
+	void __iomem *ctrladdr;	/* address of control/stat register */
+	void __iomem *cmdaddr;	/* address of I/O-command register  */
 	int nextrx;		/* index of next RX descriptor to
 				   be read                          */
 	int nexttxput;		/* index of next free TX descriptor */

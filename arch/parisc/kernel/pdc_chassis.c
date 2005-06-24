@@ -2,7 +2,7 @@
  *    interfaces to log Chassis Codes via PDC (firmware)
  *
  *    Copyright (C) 2002 Laurent Canet <canetl@esiee.fr>
- *    Copyright (C) 2002-2004 Thibaut VARENE <varenet@esiee.fr>
+ *    Copyright (C) 2002-2004 Thibaut VARENE <varenet@parisc-linux.org>
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -182,7 +182,7 @@ int pdc_chassis_send_status(int message)
 
 		DPRINTK(KERN_DEBUG "%s: pdc_chassis_send_status(%d)\n", __FILE__, message);
 
-#ifdef CONFIG_PARISC64
+#ifdef CONFIG_64BIT
 		if (is_pdc_pat()) {
 			switch(message) {
 				case PDC_CHASSIS_DIRECT_BSTART:
@@ -238,7 +238,7 @@ int pdc_chassis_send_status(int message)
 					retval = -1;
 			}
 		} else retval = -1;
-#endif /* CONFIG_PARISC64 */
+#endif /* CONFIG_64BIT */
 	}	/* if (pdc_chassis_enabled) */
 #endif /* CONFIG_PDC_CHASSIS */
 	return retval;

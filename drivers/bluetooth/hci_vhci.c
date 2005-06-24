@@ -157,7 +157,7 @@ static ssize_t hci_vhci_chr_write(struct file * file, const char __user * buf,
 {
 	struct hci_vhci_struct *hci_vhci = (struct hci_vhci_struct *) file->private_data;
 
-	if (verify_area(VERIFY_READ, buf, count))
+	if (!access_ok(VERIFY_READ, buf, count))
 		return -EFAULT;
 
 	return hci_vhci_get_user(hci_vhci, buf, count);
@@ -222,7 +222,7 @@ static ssize_t hci_vhci_chr_read(struct file * file, char __user * buf, size_t c
 			continue;
 		}
 
-		if (!verify_area(VERIFY_WRITE, buf, count))
+		if (access_ok(VERIFY_WRITE, buf, count))
 			ret = hci_vhci_put_user(hci_vhci, skb, buf, count);
 		else
 			ret = -EFAULT;
@@ -308,12 +308,13 @@ static int hci_vhci_chr_open(struct inode *inode, struct file * file)
 static int hci_vhci_chr_close(struct inode *inode, struct file *file)
 {
 	struct hci_vhci_struct *hci_vhci = (struct hci_vhci_struct *) file->private_data;
+	struct hci_dev *hdev = hci_vhci->hdev;
 
-	if (hci_unregister_dev(hci_vhci->hdev) < 0) {
-		BT_ERR("Can't unregister HCI device %s", hci_vhci->hdev->name);
+	if (hci_unregister_dev(hdev) < 0) {
+		BT_ERR("Can't unregister HCI device %s", hdev->name);
 	}
 
-	hci_free_dev(hci_vhci->hdev);
+	hci_free_dev(hdev);
 
 	file->private_data = NULL;
 	return 0;

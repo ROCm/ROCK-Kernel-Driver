@@ -103,61 +103,14 @@ config SBPCD
 	  To compile this driver as a module, choose M here: the
 	  module will be called sbpcd.
 
-config MCD
-	tristate "Mitsumi (standard) [no XA/Multisession] CDROM support"
-	depends on CD_NO_IDESCSI && BROKEN
-	---help---
-	  This is the older of the two drivers for the older Mitsumi models
-	  LU-005, FX-001 and FX-001D. This is not the right driver for the
-	  FX-001DE and the triple or quad speed models (all these are
-	  IDE/ATAPI models). Please also the file
-	  <file:Documentation/cdrom/mcd>.
-
-	  With the old LU-005 model, the whole drive chassis slides out for cd
-	  insertion. The FX-xxx models use a motorized tray type mechanism.
-	  Note that this driver does not support XA or MultiSession CDs
-	  (PhotoCDs). There is a new driver (next question) which can do
-	  this. If you want that one, say N here.
-
-	  If you say Y here, you should also say Y or M to "ISO 9660 CD-ROM
-	  file system support" below, because that's the file system used on
-	  CD-ROMs.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called mcd.
-
-config MCD_IRQ
-	int "MCD IRQ"
-	depends on MCD
-	default "11"
-	help
-	  This allows you to specify the default value of the IRQ used by the
-	  driver. This setting can be overridden by passing the "mcd="
-	  parameter to the kernel at boot time (or at module load time if you
-	  said M to "Standard Mitsumi CD-ROM support").
-
-config MCD_BASE
-	hex "MCD I/O base"
-	depends on MCD
-	default "300"
-	help
-	  This allows you to specify the default value of the I/O base address
-	  used by the driver. This setting can be overridden by passing the
-	  "mcd=" parameter to the kernel at boot time (or at module load time
-	  if you said M to "Standard Mitsumi CD-ROM support").
-
 config MCDX
-	tristate "Mitsumi [XA/MultiSession] CDROM support"
+	tristate "Mitsumi CDROM support"
 	depends on CD_NO_IDESCSI
-	depends on BROKEN
 	---help---
-	  Use this driver if you want to be able to read XA or MultiSession
-	  CDs (PhotoCDs) as well as ordinary CDs with your Mitsumi LU-005,
-	  FX-001 or FX-001D CD-ROM drive. In addition, this driver uses much
-	  less kernel memory than the old one, if that is a concern. This
-	  driver is able to support more than one drive, but each drive needs
-	  a separate interface card. Please read the file
-	  <file:Documentation/cdrom/mcdx>.
+	  Use this driver if you want to be able to use your Mitsumi LU-005,
+	  FX-001 or FX-001D CD-ROM drive.
+
+	  Please read the file <file:Documentation/cdrom/mcdx>.
 
 	  If you say Y here, you should also say Y or M to "ISO 9660 CD-ROM
 	  file system support" below, because that's the file system used on
@@ -213,6 +166,7 @@ config SJCD
 config ISP16_CDI
 	tristate "ISP16/MAD16/Mozart soft configurable cdrom interface support"
 	depends on CD_NO_IDESCSI
+	depends on BROKEN
 	---help---
 	  These are sound cards with built-in cdrom interfaces using the OPTi
 	  82C928 or 82C929 chips. Say Y here to have them detected and

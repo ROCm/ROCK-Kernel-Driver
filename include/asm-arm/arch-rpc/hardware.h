@@ -14,6 +14,12 @@
 
 #include <asm/arch/memory.h>
 
+#ifndef __ASSEMBLY__
+#define IOMEM(x) ((void __iomem *)(x))
+#else
+#define IOMEM(x) x
+#endif /* __ASSEMBLY__ */
+
 /*
  * What hardware must be present
  */
@@ -34,7 +40,7 @@
 
 #define IO_START		0x03000000	/* I/O */
 #define IO_SIZE			0x01000000
-#define IO_BASE			0xe0000000
+#define IO_BASE			IOMEM(0xe0000000)
 
 #define SCREEN_START		0x02000000	/* VRAM */
 #define SCREEN_END		0xdfc00000
@@ -46,12 +52,12 @@
 /*
  * IO Addresses
  */
-#define VIDC_BASE		0xe0400000
+#define VIDC_BASE		(void __iomem *)0xe0400000
 #define EXPMASK_BASE		0xe0360000
-#define IOMD_BASE		0xe0200000
-#define IOC_BASE		0xe0200000
-#define PCIO_BASE		0xe0010000
-#define FLOPPYDMA_BASE		0xe002a000
+#define IOMD_BASE		IOMEM(0xe0200000)
+#define IOC_BASE		IOMEM(0xe0200000)
+#define PCIO_BASE		IOMEM(0xe0010000)
+#define FLOPPYDMA_BASE		IOMEM(0xe002a000)
 
 #define FLUSH_BASE_PHYS		0x00000000	/* ROM */
 

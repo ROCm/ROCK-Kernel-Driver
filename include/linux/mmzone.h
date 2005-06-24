@@ -11,6 +11,7 @@
 #include <linux/cache.h>
 #include <linux/threads.h>
 #include <linux/numa.h>
+#include <linux/init.h>
 #include <asm/atomic.h>
 
 /* Free memory management - zoned buddy allocator.  */
@@ -277,6 +278,16 @@ void build_all_zonelists(void);
 void wakeup_kswapd(struct zone *zone, int order);
 int zone_watermark_ok(struct zone *z, int order, unsigned long mark,
 		int alloc_type, int can_try_harder, int gfp_high);
+
+#ifdef CONFIG_HAVE_MEMORY_PRESENT
+void memory_present(int nid, unsigned long start, unsigned long end);
+#else
+static inline void memory_present(int nid, unsigned long start, unsigned long end) {}
+#endif
+
+#ifdef CONFIG_NEED_NODE_MEMMAP_SIZE
+unsigned long __init node_memmap_size_bytes(int, unsigned long, unsigned long);
+#endif
 
 /*
  * zone_idx() returns 0 for the ZONE_DMA zone, 1 for the ZONE_NORMAL zone, etc.

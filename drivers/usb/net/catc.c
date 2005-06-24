@@ -457,7 +457,7 @@ static int catc_ctrl_msg(struct catc *catc, u8 dir, u8 request, u16 value, u16 i
 {
         int retval = usb_control_msg(catc->usbdev,
 		dir ? usb_rcvctrlpipe(catc->usbdev, 0) : usb_sndctrlpipe(catc->usbdev, 0),
-		 request, 0x40 | dir, value, index, buf, len, HZ);
+		 request, 0x40 | dir, value, index, buf, len, 1000);
         return retval < 0 ? retval : 0;
 }
 
@@ -664,7 +664,8 @@ static void catc_set_multicast_list(struct net_device *netdev)
 	}
 }
 
-void catc_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+static void catc_get_drvinfo(struct net_device *dev,
+			     struct ethtool_drvinfo *info)
 {
 	struct catc *catc = netdev_priv(dev);
 	strncpy(info->driver, driver_name, ETHTOOL_BUSINFO_LEN);

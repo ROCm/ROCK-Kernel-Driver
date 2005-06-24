@@ -24,7 +24,7 @@
 */
 
 static const char * cvsid = "$Id: osst.c,v 1.73 2005/01/01 21:13:34 wriede Exp $";
-const char * osst_version = "0.99.3";
+static const char * osst_version = "0.99.3";
 
 /* The "failure to reconnect" firmware bug */
 #define OSST_FW_NEED_POLL_MIN 10601 /*(107A)*/
@@ -170,7 +170,7 @@ static int osst_copy_from_buffer(struct osst_buffer *, unsigned char *);
 static int osst_probe(struct device *);
 static int osst_remove(struct device *);
 
-struct scsi_driver osst_template = {
+static struct scsi_driver osst_template = {
 	.owner			= THIS_MODULE,
 	.gendrv = {
 		.name		=  "osst",
@@ -4318,7 +4318,13 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 	int		      dev  = TAPE_NR(inode);
 	int		      mode = TAPE_MODE(inode);
 
-	nonseekable_open(inode, filp);
+	/*
+	 * We really want to do nonseekable_open(inode, filp); here, but some
+	 * versions of tar incorrectly call lseek on tapes and bail out if that
+	 * fails.  So we disallow pread() and pwrite(), but permit lseeks.
+	 */
+	filp->f_mode &= ~(FMODE_PREAD | FMODE_PWRITE);
+
 	write_lock(&os_scsi_tapes_lock);
 	if (dev >= osst_max_dev || os_scsi_tapes == NULL ||
 	    (STp = os_scsi_tapes[dev]) == NULL || !STp->device) {
@@ -4764,9 +4770,6 @@ static int os_scsi_tape_close(struct inode * inode, struct file * filp)
 {
 	int		      result = 0;
 	struct osst_tape    * STp    = filp->private_data;
-	struct scsi_request * SRpnt  = NULL;
-
-	if (SRpnt) scsi_release_request(SRpnt);
 
 	if (STp->door_locked == ST_LOCKED_AUTO)
 		do_door_lock(STp, 0);
@@ -5121,6 +5124,22 @@ out:
 	return retval;
 }
 
+#ifdef CONFIG_COMPAT
+static long osst_compat_ioctl(struct file * file, unsigned int cmd_in, unsigned long arg)
+{
+	struct osst_tape *STp = file->private_data;
+	struct scsi_device *sdev = STp->device;
+	int ret = -ENOIOCTLCMD;
+	if (sdev->host->hostt->compat_ioctl) {
+
+		ret = sdev->host->hostt->compat_ioctl(sdev, cmd_in, (void __user *)arg);
+
+	}
+	return ret;
+}
+#endif
+
+
 
 /* Memory handling routines */
 
@@ -5456,6 +5475,9 @@ static struct file_operations osst_fops = {
 	.read =         osst_read,
 	.write =        osst_write,
 	.ioctl =        osst_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = osst_compat_ioctl,
+#endif
 	.open =         os_scsi_tape_open,
 	.flush =        os_scsi_tape_flush,
 	.release =      os_scsi_tape_close,

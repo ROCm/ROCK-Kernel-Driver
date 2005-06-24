@@ -525,3 +525,4 @@ void __exit i2o_pci_exit(void)
 };
 
 EXPORT_SYMBOL(i2o_dma_realloc);
+MODULE_DEVICE_TABLE(pci, i2o_pci_ids);

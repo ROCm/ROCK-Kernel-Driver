@@ -90,7 +90,7 @@ static int ttpci_eeprom_read_encodedMAC(struct i2c_adapter *adapter, u8 * encode
 	u8 b0[] = { 0xcc };
 
 	struct i2c_msg msg[] = {
-		{.addr = 0x50,.flags = 0,.buf = b0,.len = 1},
+		{ .addr = 0x50, .flags = 0, .buf = b0, .len = 1 },
 		{ .addr = 0x50, .flags = I2C_M_RD, .buf = encodedMAC, .len = 20 }
 	};
 
@@ -144,4 +144,3 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Ralph Metzler, Marcus Metzler, others");
 MODULE_DESCRIPTION("Decode dvb_net MAC address from EEPROM of PCI DVB cards "
 		"made by Siemens, Technotrend, Hauppauge");
-

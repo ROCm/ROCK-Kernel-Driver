@@ -666,6 +666,17 @@ isa_memcpy_toio(unsigned long offset, const void *src, long n)
 #define writeq writeq
 #define readq readq
 
+/*
+ * Convert a physical pointer to a virtual kernel pointer for /dev/mem
+ * access
+ */
+#define xlate_dev_mem_ptr(p)	__va(p)
+
+/*
+ * Convert a virtual cached pointer to an uncached pointer
+ */
+#define xlate_dev_kmem_ptr(p)	p
+
 #endif /* __KERNEL__ */
 
 #endif /* __ALPHA_IO_H */

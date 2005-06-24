@@ -122,7 +122,7 @@ static int se401_sndctrl(int set, struct usb_se401 *se401, unsigned short req,
                 0,
                 cp,
                 size,
-                HZ
+                1000
         );
 }
 
@@ -142,7 +142,7 @@ static int se401_set_feature(struct usb_se401 *se401, unsigned short selector,
 		selector,
                 NULL,
                 0,
-                HZ
+                1000
         );
 }
 
@@ -162,7 +162,7 @@ static unsigned short se401_get_feature(struct usb_se401 *se401,
                 selector,
                 cp,
                 2,
-                HZ
+                1000
         );
 	return cp[0]+cp[1]*256;
 }
@@ -868,13 +868,14 @@ static void usb_se401_remove_disconnected (struct usb_se401 *se401)
 
         se401->dev = NULL;
 
-	for (i=0; i<SE401_NUMSBUF; i++) if (se401->urb[i]) {
-		usb_kill_urb(se401->urb[i]);
-		usb_free_urb(se401->urb[i]);
-		se401->urb[i] = NULL;
-		kfree(se401->sbuf[i].data);
-	}
-	for (i=0; i<SE401_NUMSCRATCH; i++) if (se401->scratch[i].data) {
+	for (i=0; i<SE401_NUMSBUF; i++)
+		if (se401->urb[i]) {
+			usb_kill_urb(se401->urb[i]);
+			usb_free_urb(se401->urb[i]);
+			se401->urb[i] = NULL;
+			kfree(se401->sbuf[i].data);
+		}
+	for (i=0; i<SE401_NUMSCRATCH; i++) {
 		kfree(se401->scratch[i].data);
 	}
 	if (se401->inturb) {

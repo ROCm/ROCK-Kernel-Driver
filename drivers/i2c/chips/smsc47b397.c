@@ -29,6 +29,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
+#include <linux/jiffies.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 #include <linux/init.h>
@@ -130,9 +131,7 @@ static struct smsc47b397_data *smsc47b397_update_device(struct device *dev)
 
 	down(&data->update_lock);
 
-	if (time_after(jiffies - data->last_updated, (unsigned long)HZ)
-		|| time_before(jiffies, data->last_updated) || !data->valid) {
-
+	if (time_after(jiffies, data->last_updated + HZ) || !data->valid) {
 		dev_dbg(&client->dev, "starting device update...\n");
 
 		/* 4 temperature inputs, 4 fan inputs */

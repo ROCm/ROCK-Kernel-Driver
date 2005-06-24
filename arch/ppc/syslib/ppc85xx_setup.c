@@ -132,6 +132,12 @@ mpc85xx_halt(void)
 }
 
 #ifdef CONFIG_PCI
+
+#if defined(CONFIG_MPC8555_CDS)
+extern void mpc85xx_cds_enable_via(struct pci_controller *hose);
+extern void mpc85xx_cds_fixup_via(struct pci_controller *hose);
+#endif
+
 static void __init
 mpc85xx_setup_pci1(struct pci_controller *hose)
 {
@@ -280,16 +286,14 @@ mpc85xx_setup_hose(void)
 	hose_a->io_space.end = MPC85XX_PCI1_UPPER_IO;
 	hose_a->io_base_phys = MPC85XX_PCI1_IO_BASE;
 #ifdef CONFIG_85xx_PCI2
-	isa_io_base =
-		(unsigned long) ioremap(MPC85XX_PCI1_IO_BASE,
+	hose_a->io_base_virt =  ioremap(MPC85XX_PCI1_IO_BASE,
 					MPC85XX_PCI1_IO_SIZE +
 					MPC85XX_PCI2_IO_SIZE);
 #else
-	isa_io_base =
-		(unsigned long) ioremap(MPC85XX_PCI1_IO_BASE,
+	hose_a->io_base_virt =  ioremap(MPC85XX_PCI1_IO_BASE,
 					MPC85XX_PCI1_IO_SIZE);
 #endif
-	hose_a->io_base_virt = (void *) isa_io_base;
+	isa_io_base = (unsigned long)hose_a->io_base_virt;
 
 	/* setup resources */
 	pci_init_resource(&hose_a->mem_resources[0],
@@ -304,7 +308,17 @@ mpc85xx_setup_hose(void)
 
 	ppc_md.pci_exclude_device = mpc85xx_exclude_device;
 
+#if defined(CONFIG_MPC8555_CDS)
+	/* Pre pciauto_bus_scan VIA init */
+	mpc85xx_cds_enable_via(hose_a);
+#endif
+
 	hose_a->last_busno = pciauto_bus_scan(hose_a, hose_a->first_busno);
+
+#if defined(CONFIG_MPC8555_CDS)
+	/* Post pciauto_bus_scan VIA fixup */
+	mpc85xx_cds_fixup_via(hose_a);
+#endif
 
 #ifdef CONFIG_85xx_PCI2
 	hose_b = pcibios_alloc_controller();
@@ -329,8 +343,8 @@ mpc85xx_setup_hose(void)
 	hose_b->io_space.start = MPC85XX_PCI2_LOWER_IO;
 	hose_b->io_space.end = MPC85XX_PCI2_UPPER_IO;
 	hose_b->io_base_phys = MPC85XX_PCI2_IO_BASE;
-	hose_b->io_base_virt = (void *) isa_io_base + MPC85XX_PCI1_IO_SIZE;
-
+	hose_b->io_base_virt = hose_a->io_base_virt + MPC85XX_PCI1_IO_SIZE;
+	
 	/* setup resources */
 	pci_init_resource(&hose_b->mem_resources[0],
 			MPC85XX_PCI2_LOWER_MEM,

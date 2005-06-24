@@ -12,8 +12,6 @@
 #include <linux/bootmem.h>
 
 
-int es7000_plat = 0;
-
 struct dmi_header
 {
 	u8	type;
@@ -487,4 +485,3 @@ char * dmi_get_system_info(int field)
 	return dmi_ident[field];
 }
 
-EXPORT_SYMBOL(dmi_get_system_info);

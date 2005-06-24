@@ -683,6 +683,9 @@ xfs_write(
 			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
 				mp->m_rtdev_targp : mp->m_ddev_targp;
 
+		if (ioflags & IO_ISAIO)
+			return XFS_ERROR(-ENOSYS);
+
 		if ((pos & target->pbr_smask) || (count & target->pbr_smask))
 			return XFS_ERROR(-EINVAL);
 
@@ -871,6 +874,7 @@ retry:
 			goto out_unlock_isem;
 		xfs_rwlock(bdp, locktype);
 		pos = xip->i_d.di_size;
+		ret = 0;
 		goto retry;
 	}
 

@@ -44,6 +44,7 @@ static inline int pgd_present(pgd_t pgd)	{ return 1; }
  * hook is made available.
  */
 #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
 #define set_pte_atomic(pteptr, pteval)	set_pte(pteptr, pteval)
 /*
  * (pmds are folded into pgds so this doesnt get actually called,
@@ -60,7 +61,7 @@ static inline pmd_t *pmd_offset(pgd_t * dir, unsigned long address)
 	return (pmd_t *) dir;
 }
 
-#define ptep_get_and_clear(xp)	__pte(xchg(&(xp)->pte, 0))
+#define ptep_get_and_clear(mm,addr,xp)	__pte(xchg(&(xp)->pte, 0))
 #define pte_same(a, b)		(pte_val(a) == pte_val(b))
 #define pte_page(x)		pfn_to_page(pte_pfn(x))
 #define pte_none(x)		(!pte_val(x))

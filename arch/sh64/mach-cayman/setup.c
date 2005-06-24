@@ -33,8 +33,6 @@
 #include <asm/irq.h>
 #include <asm/page.h>
 
-#define RES_COUNT(res) ((sizeof((res))/sizeof(struct resource)))
-
 /*
  * Platform Dependent Interrupt Priorities.
  */
@@ -86,10 +84,14 @@
 #define SMSC_DEVICE_ID_INDEX	0x20
 #define SMSC_DEVICE_REV_INDEX	0x21
 #define SMSC_ACTIVATE_INDEX	0x30
+#define SMSC_PRIMARY_BASE_INDEX  0x60
+#define SMSC_SECONDARY_BASE_INDEX 0x62
 #define SMSC_PRIMARY_INT_INDEX	0x70
 #define SMSC_SECONDARY_INT_INDEX 0x72
 
-#define SMSC_KEYBOARD_DEVICE 7
+#define SMSC_IDE1_DEVICE	1
+#define SMSC_KEYBOARD_DEVICE	7
+#define SMSC_CONFIG_REGISTERS	8
 
 #define SMSC_SUPERIO_READ_INDEXED(index) ({ \
 	outb((index), SMSC_INDEX_PORT_ADDR); \
@@ -97,6 +99,9 @@
 #define SMSC_SUPERIO_WRITE_INDEXED(val, index) ({ \
 	outb((index), SMSC_INDEX_PORT_ADDR); \
 	outb((val),   SMSC_DATA_PORT_ADDR); })
+
+#define IDE1_PRIMARY_BASE	0x01f0
+#define IDE1_SECONDARY_BASE	0x03f6
 
 unsigned long smsc_superio_virt;
 
@@ -125,13 +130,13 @@ struct sh64_platform platform_parms = {
 	.initial_root_dev =	0x0100,
 	.loader_type =		1,
 	.io_res_p =		io_resources,
-	.io_res_count =		RES_COUNT(io_resources),
+	.io_res_count =		ARRAY_SIZE(io_resources),
 	.kram_res_p =		kram_resources,
-	.kram_res_count =	RES_COUNT(kram_resources),
+	.kram_res_count =	ARRAY_SIZE(kram_resources),
 	.xram_res_p =		xram_resources,
-	.xram_res_count =	RES_COUNT(xram_resources),
+	.xram_res_count =	ARRAY_SIZE(xram_resources),
 	.rom_res_p =		rom_resources,
-	.rom_res_count =	RES_COUNT(rom_resources),
+	.rom_res_count =	ARRAY_SIZE(rom_resources),
 };
 
 int platform_int_priority[NR_INTC_IRQS] = {
@@ -174,6 +179,38 @@ static int __init smsc_superio_setup(void)
 	/* On a PC keyboard is IRQ1, mouse is IRQ12 */
 	SMSC_SUPERIO_WRITE_INDEXED(1, SMSC_PRIMARY_INT_INDEX);
 	SMSC_SUPERIO_WRITE_INDEXED(12, SMSC_SECONDARY_INT_INDEX);
+
+#ifdef CONFIG_IDE
+	/*
+	 * Only IDE1 exists on the Cayman
+	 */
+
+	/* Power it on */
+	SMSC_SUPERIO_WRITE_INDEXED(1 << SMSC_IDE1_DEVICE, 0x22);
+
+	SMSC_SUPERIO_WRITE_INDEXED(SMSC_IDE1_DEVICE, SMCS_LOGICAL_DEV_INDEX);
+	SMSC_SUPERIO_WRITE_INDEXED(1, SMSC_ACTIVATE_INDEX);
+
+	SMSC_SUPERIO_WRITE_INDEXED(IDE1_PRIMARY_BASE >> 8,
+				   SMSC_PRIMARY_BASE_INDEX + 0);
+	SMSC_SUPERIO_WRITE_INDEXED(IDE1_PRIMARY_BASE & 0xff,
+				   SMSC_PRIMARY_BASE_INDEX + 1);
+
+	SMSC_SUPERIO_WRITE_INDEXED(IDE1_SECONDARY_BASE >> 8,
+				   SMSC_SECONDARY_BASE_INDEX + 0);
+	SMSC_SUPERIO_WRITE_INDEXED(IDE1_SECONDARY_BASE & 0xff,
+				   SMSC_SECONDARY_BASE_INDEX + 1);
+
+	SMSC_SUPERIO_WRITE_INDEXED(14, SMSC_PRIMARY_INT_INDEX);
+
+	SMSC_SUPERIO_WRITE_INDEXED(SMSC_CONFIG_REGISTERS,
+				   SMCS_LOGICAL_DEV_INDEX);
+
+	SMSC_SUPERIO_WRITE_INDEXED(0x00, 0xc2); /* GP42 = nIDE1_OE */
+	SMSC_SUPERIO_WRITE_INDEXED(0x01, 0xc5); /* GP45 = IDE1_IRQ */
+	SMSC_SUPERIO_WRITE_INDEXED(0x00, 0xc6); /* GP46 = nIOROP */
+	SMSC_SUPERIO_WRITE_INDEXED(0x00, 0xc7); /* GP47 = nIOWOP */
+#endif
 
 	/* Exit the configuraton state */
 	outb(SMSC_EXIT_CONFIG_KEY, SMSC_CONFIG_PORT_ADDR);

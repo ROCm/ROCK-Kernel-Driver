@@ -312,7 +312,7 @@ irix_sigaction(int sig, const struct sigaction *act,
 #endif
 	if (act) {
 		sigset_t mask;
-		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		if (!access_ok(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_flags, &act->sa_flags))
 			return -EFAULT;
@@ -331,7 +331,7 @@ irix_sigaction(int sig, const struct sigaction *act,
 	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
 
 	if (!ret && oact) {
-		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		if (!access_ok(VERIFY_WRITE, oact, sizeof(*oact)) ||
 		    __put_user(old_ka.sa.sa_handler, &oact->sa_handler) ||
 		    __put_user(old_ka.sa.sa_flags, &oact->sa_flags))
 			return -EFAULT;
@@ -350,12 +350,10 @@ asmlinkage int irix_sigpending(irix_sigset_t *set)
 asmlinkage int irix_sigprocmask(int how, irix_sigset_t *new, irix_sigset_t *old)
 {
 	sigset_t oldbits, newbits;
-	int error;
 
 	if (new) {
-		error = verify_area(VERIFY_READ, new, sizeof(*new));
-		if (error)
-			return error;
+		if (!access_ok(VERIFY_READ, new, sizeof(*new)))
+			return -EFAULT;
 		__copy_from_user(&newbits, new, sizeof(unsigned long)*4);
 		sigdelsetmask(&newbits, ~_BLOCKABLE);
 
@@ -385,9 +383,8 @@ asmlinkage int irix_sigprocmask(int how, irix_sigset_t *new, irix_sigset_t *old)
 		spin_unlock_irq(&current->sighand->siglock);
 	}
 	if(old) {
-		error = verify_area(VERIFY_WRITE, old, sizeof(*old));
-		if(error)
-			return error;
+		if (!access_ok(VERIFY_WRITE, old, sizeof(*old)))
+			return -EFAULT;
 		__copy_to_user(old, &current->blocked, sizeof(unsigned long)*4);
 	}
 
@@ -469,12 +466,13 @@ asmlinkage int irix_sigpoll_sys(unsigned long *set, struct irix5_siginfo *info,
 #endif
 
 	/* Must always specify the signal set. */
-	if(!set)
+	if (!set)
 		return -EINVAL;
 
-	error = verify_area(VERIFY_READ, set, sizeof(kset));
-	if (error)
+	if (!access_ok(VERIFY_READ, set, sizeof(kset))) {
+		error = -EFAULT;
 		goto out;
+	}
 
 	__copy_from_user(&kset, set, sizeof(set));
 	if (error)
@@ -485,11 +483,10 @@ asmlinkage int irix_sigpoll_sys(unsigned long *set, struct irix5_siginfo *info,
 		goto out;
 	}
 
-	if(tp) {
-		error = verify_area(VERIFY_READ, tp, sizeof(*tp));
-		if(error)
-			return error;
-		if(!tp->tv_sec && !tp->tv_nsec) {
+	if (tp) {
+		if (!access_ok(VERIFY_READ, tp, sizeof(*tp)))
+			return -EFAULT;
+		if (!tp->tv_sec && !tp->tv_nsec) {
 			error = -EINVAL;
 			goto out;
 		}
@@ -564,13 +561,15 @@ asmlinkage int irix_waitsys(int type, int pid, struct irix5_siginfo *info,
 		retval = -EINVAL;
 		goto out;
 	}
-	retval = verify_area(VERIFY_WRITE, info, sizeof(*info));
-	if(retval)
+	if (!access_ok(VERIFY_WRITE, info, sizeof(*info))) {
+		retval = -EFAULT;
 		goto out;
+	}
 	if (ru) {
-		retval = verify_area(VERIFY_WRITE, ru, sizeof(*ru));
-		if(retval)
+		if (!access_ok(VERIFY_WRITE, ru, sizeof(*ru))) {
+			retval = -EFAULT;
 			goto out;
+		}
 	}
 	if (options & ~(W_MASK)) {
 		retval = -EINVAL;
@@ -690,7 +689,7 @@ struct irix5_context {
 
 asmlinkage int irix_getcontext(struct pt_regs *regs)
 {
-	int error, i, base = 0;
+	int i, base = 0;
 	struct irix5_context *ctx;
 	unsigned long flags;
 
@@ -703,9 +702,9 @@ asmlinkage int irix_getcontext(struct pt_regs *regs)
 	       current->comm, current->pid, ctx);
 #endif
 
-	error = verify_area(VERIFY_WRITE, ctx, sizeof(*ctx));
-	if(error)
-		goto out;
+	if (!access_ok(VERIFY_WRITE, ctx, sizeof(*ctx)))
+		return -EFAULT;
+
 	__put_user(current->thread.irix_oldctx, &ctx->link);
 
 	__copy_to_user(&ctx->sigmask, &current->blocked, sizeof(irix_sigset_t));
@@ -725,17 +724,15 @@ asmlinkage int irix_getcontext(struct pt_regs *regs)
 	__put_user(regs->cp0_epc, &ctx->regs[35]);
 
 	flags = 0x0f;
-	if(!used_math()) {
+	if (!used_math()) {
 		flags &= ~(0x08);
 	} else {
 		/* XXX wheee... */
 		printk("Wheee, no code for saving IRIX FPU context yet.\n");
 	}
 	__put_user(flags, &ctx->flags);
-	error = 0;
 
-out:
-	return error;
+	return 0;
 }
 
 asmlinkage unsigned long irix_setcontext(struct pt_regs *regs)
@@ -752,9 +749,10 @@ asmlinkage unsigned long irix_setcontext(struct pt_regs *regs)
 	       current->comm, current->pid, ctx);
 #endif
 
-	error = verify_area(VERIFY_READ, ctx, sizeof(*ctx));
-	if (error)
+	if (!access_ok(VERIFY_READ, ctx, sizeof(*ctx))) {
+		error = -EFAULT;
 		goto out;
+	}
 
 	if (ctx->flags & 0x02) {
 		/* XXX sigstack garbage, todo... */
@@ -787,21 +785,19 @@ struct irix_sigstack { unsigned long sp; int status; };
 
 asmlinkage int irix_sigstack(struct irix_sigstack *new, struct irix_sigstack *old)
 {
-	int error;
+	int error = -EFAULT;
 
 #ifdef DEBUG_SIG
 	printk("[%s:%d] irix_sigstack(%p,%p)\n",
 	       current->comm, current->pid, new, old);
 #endif
 	if(new) {
-		error = verify_area(VERIFY_READ, new, sizeof(*new));
-		if(error)
+		if (!access_ok(VERIFY_READ, new, sizeof(*new)))
 			goto out;
 	}
 
 	if(old) {
-		error = verify_area(VERIFY_WRITE, old, sizeof(*old));
-		if(error)
+		if (!access_ok(VERIFY_WRITE, old, sizeof(*old)))
 			goto out;
 	}
 	error = 0;
@@ -815,21 +811,19 @@ struct irix_sigaltstack { unsigned long sp; int size; int status; };
 asmlinkage int irix_sigaltstack(struct irix_sigaltstack *new,
 				struct irix_sigaltstack *old)
 {
-	int error;
+	int error = -EFAULT;
 
 #ifdef DEBUG_SIG
 	printk("[%s:%d] irix_sigaltstack(%p,%p)\n",
 	       current->comm, current->pid, new, old);
 #endif
 	if (new) {
-		error = verify_area(VERIFY_READ, new, sizeof(*new));
-		if(error)
+		if (!access_ok(VERIFY_READ, new, sizeof(*new)))
 			goto out;
 	}
 
 	if (old) {
-		error = verify_area(VERIFY_WRITE, old, sizeof(*old));
-		if(error)
+		if (!access_ok(VERIFY_WRITE, old, sizeof(*old)))
 			goto out;
 	}
 	error = 0;
@@ -846,19 +840,14 @@ struct irix_procset {
 
 asmlinkage int irix_sigsendset(struct irix_procset *pset, int sig)
 {
-	int error;
+	if (!access_ok(VERIFY_READ, pset, sizeof(*pset)))
+		return -EFAULT;
 
-	error = verify_area(VERIFY_READ, pset, sizeof(*pset));
-	if(error)
-		goto out;
 #ifdef DEBUG_SIG
 	printk("[%s:%d] irix_sigsendset([%d,%d,%d,%d,%d],%d)\n",
 	       current->comm, current->pid,
 	       pset->cmd, pset->ltype, pset->lid, pset->rtype, pset->rid,
 	       sig);
 #endif
-	error = -EINVAL;
-
-out:
-	return error;
+	return -EINVAL;
 }

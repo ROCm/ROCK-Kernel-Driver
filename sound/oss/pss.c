@@ -1149,7 +1149,7 @@ static int mss_irq __initdata	= -1;
 static int mss_dma __initdata	= -1;
 static int mpu_io __initdata	= -1;
 static int mpu_irq __initdata	= -1;
-static int pss_no_sound __initdata = 0;	/* Just configure non-sound components */
+static int pss_no_sound = 0;	/* Just configure non-sound components */
 static int pss_keep_settings  = 1;	/* Keep hardware settings at module exit */
 static char *pss_firmware = "/etc/sound/pss_synth";
 

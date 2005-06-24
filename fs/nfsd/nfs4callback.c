@@ -38,6 +38,7 @@
 #include <linux/list.h>
 #include <linux/inet.h>
 #include <linux/errno.h>
+#include <linux/delay.h>
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/clnt.h>
@@ -246,6 +247,7 @@ nfs4_xdr_enc_cb_recall(struct rpc_rqst *req, u32 *p, struct nfs4_cb_recall *args
 {
 	struct xdr_stream xdr;
 	struct nfs4_cb_compound_hdr hdr = {
+		.ident = args->cbr_ident,
 		.nops   = 1,
 	};
 
@@ -308,7 +310,7 @@ nfs4_xdr_dec_cb_recall(struct rpc_rqst *rqstp, u32 *p)
 	if (status)
 		goto out;
 	status = decode_cb_op_hdr(&xdr, OP_CB_RECALL);
-out	:
+out:
 	return status;
 }
 
@@ -351,10 +353,8 @@ nfsd4_lookupcred(struct nfs4_client *clp, int taskflags)
 {
         struct auth_cred acred;
 	struct rpc_clnt *clnt = clp->cl_callback.cb_client;
-        struct rpc_cred *ret = NULL;
+	struct rpc_cred *ret;
 
-	if (!clnt)
-		goto out;
         get_group_info(clp->cl_cred.cr_group_info);
         acred.uid = clp->cl_cred.cr_uid;
         acred.gid = clp->cl_cred.cr_gid;
@@ -364,7 +364,6 @@ nfsd4_lookupcred(struct nfs4_client *clp, int taskflags)
                 clnt->cl_auth->au_ops->au_name);
         ret = rpcauth_lookup_credcache(clnt->cl_auth, &acred, taskflags);
         put_group_info(clp->cl_cred.cr_group_info);
-out:
         return ret;
 }
 
@@ -401,12 +400,13 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 
 	/* Initialize timeout */
 	timeparms.to_initval = (NFSD_LEASE_TIME/4) * HZ;
-	timeparms.to_retries = 5;
+	timeparms.to_retries = 0;
 	timeparms.to_maxval = (NFSD_LEASE_TIME/2) * HZ;
 	timeparms.to_exponential = 1;
 
 	/* Create RPC transport */
-	if (!(xprt = xprt_create_proto(IPPROTO_TCP, &addr, &timeparms))) {
+	xprt = xprt_create_proto(IPPROTO_TCP, &addr, &timeparms);
+	if (IS_ERR(xprt)) {
 		dprintk("NFSD: couldn't create callback transport!\n");
 		goto out_err;
 	}
@@ -427,14 +427,14 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 	 * XXX AUTH_UNIX only - need AUTH_GSS....
 	 */
 	sprintf(hostname, "%u.%u.%u.%u", NIPQUAD(addr.sin_addr.s_addr));
-	if (!(clnt = rpc_create_client(xprt, hostname, program, 1, RPC_AUTH_UNIX))) {
+	clnt = rpc_create_client(xprt, hostname, program, 1, RPC_AUTH_UNIX);
+	if (IS_ERR(clnt)) {
 		dprintk("NFSD: couldn't create callback client\n");
 		goto out_xprt;
 	}
-	clnt->cl_intr = 1;
+	clnt->cl_intr = 0;
 	clnt->cl_softrtry = 1;
 	clnt->cl_chatty = 1;
-	cb->cb_client = clnt;
 
 	/* Kick rpciod, put the call on the wire. */
 
@@ -444,10 +444,14 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 	}
 
 	/* the task holds a reference to the nfs4_client struct */
+	cb->cb_client = clnt;
 	atomic_inc(&clp->cl_count);
 
 	msg.rpc_cred = nfsd4_lookupcred(clp,0);
+	if (IS_ERR(msg.rpc_cred))
+		goto out_rpciod;
 	status = rpc_call_async(clnt, &msg, RPC_TASK_ASYNC, nfs4_cb_null, NULL);
+	put_rpccred(msg.rpc_cred);
 
 	if (status != 0) {
 		dprintk("NFSD: asynchronous NFSPROC4_CB_NULL failed!\n");
@@ -456,6 +460,7 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 	return;
 
 out_rpciod:
+	atomic_dec(&clp->cl_count);
 	rpciod_down();
 out_clnt:
 	rpc_shutdown_client(clnt);
@@ -489,95 +494,56 @@ out:
 }
 
 /*
- *  Called with dp->dl_count incremented
- */
-static void
-nfs4_cb_recall_done(struct rpc_task *task)
-{
-	struct nfs4_cb_recall *cbr = (struct nfs4_cb_recall *)task->tk_calldata;
-	struct nfs4_delegation *dp = cbr->cbr_dp;
-	int status;
-
-	/* all is well... */
-	if (task->tk_status == 0)
-		goto out;
-
-	/* network partition, retry nfsd4_cb_recall once.  */
-	if (task->tk_status == -EIO) {
-		if (atomic_read(&dp->dl_recall_cnt) == 0)
-			goto retry;
-		else
-			/* callback channel no longer available */
-			atomic_set(&dp->dl_client->cl_callback.cb_set, 0);
-	}
-
-	/* Race: a recall occurred miliseconds after a delegation was granted.
-	* Client may have received recall prior to delegation. retry recall
-	* once.
-	*/
-	if ((task->tk_status == -EBADHANDLE) || (task->tk_status == -NFS4ERR_BAD_STATEID)){
-		if (atomic_read(&dp->dl_recall_cnt) == 0)
-			goto retry;
-	}
-	atomic_set(&dp->dl_state, NFS4_RECALL_COMPLETE);
-
-out:
-	if (atomic_dec_and_test(&dp->dl_count))
-		atomic_set(&dp->dl_state, NFS4_REAP_DELEG);
-	BUG_ON(atomic_read(&dp->dl_count) < 0);
-	dprintk("NFSD: nfs4_cb_recall_done: dp %p dl_flock %p dl_count %d\n",dp, dp->dl_flock, atomic_read(&dp->dl_count));
-	return;
-
-retry:
-	atomic_inc(&dp->dl_recall_cnt);
-	/* sleep 2 seconds before retrying recall */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(2*HZ);
-	status = nfsd4_cb_recall(dp);
-	dprintk("NFSD: nfs4_cb_recall_done: retry status: %d  dp %p dl_flock %p\n",status,dp, dp->dl_flock);
-}
-
-/*
  * called with dp->dl_count inc'ed.
  * nfs4_lock_state() may or may not have been called.
  */
-int
+void
 nfsd4_cb_recall(struct nfs4_delegation *dp)
 {
-	struct nfs4_client *clp;
-	struct rpc_clnt *clnt;
+	struct nfs4_client *clp = dp->dl_client;
+	struct rpc_clnt *clnt = clp->cl_callback.cb_client;
+	struct nfs4_cb_recall *cbr = &dp->dl_recall;
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_cb_procedures[NFSPROC4_CLNT_CB_RECALL],
+		.rpc_argp = cbr,
 	};
-	struct nfs4_cb_recall *cbr = &dp->dl_recall;
-	int status;
+	int retries = 1;
+	int status = 0;
 
-	dprintk("NFSD: nfsd4_cb_recall NFS4_enc_cb_recall_sz %d NFS4_dec_cb_recall_sz %d \n",NFS4_enc_cb_recall_sz,NFS4_dec_cb_recall_sz);
-
-	clp = dp->dl_client;
-	clnt = clp->cl_callback.cb_client;
-	status = EIO;
 	if ((!atomic_read(&clp->cl_callback.cb_set)) || !clnt)
-		goto out_free;
+		return;
 
-	msg.rpc_argp = cbr;
-	msg.rpc_resp = cbr;
-	msg.rpc_cred = nfsd4_lookupcred(clp,0);
+	msg.rpc_cred = nfsd4_lookupcred(clp, 0);
+	if (IS_ERR(msg.rpc_cred))
+		goto out;
 
 	cbr->cbr_trunc = 0; /* XXX need to implement truncate optimization */
 	cbr->cbr_dp = dp;
 
-	if ((status = rpc_call_async(clnt, &msg, RPC_TASK_SOFT,
-		nfs4_cb_recall_done, cbr ))) {
-		dprintk("NFSD: recall_delegation: rpc_call_async failed %d\n",
-			status);
-		goto out_fail;
+	status = rpc_call_sync(clnt, &msg, RPC_TASK_SOFT);
+	while (retries--) {
+		switch (status) {
+			case -EIO:
+				/* Network partition? */
+			case -EBADHANDLE:
+			case -NFS4ERR_BAD_STATEID:
+				/* Race: client probably got cb_recall
+				 * before open reply granting delegation */
+				break;
+			default:
+				goto out_put_cred;
+		}
+		ssleep(2);
+		status = rpc_call_sync(clnt, &msg, RPC_TASK_SOFT);
 	}
+out_put_cred:
+	put_rpccred(msg.rpc_cred);
 out:
-	return status;
-out_fail:
-	status = nfserrno(status);
-	out_free:
-	kfree(cbr);
-	goto out;
+	if (status == -EIO)
+		atomic_set(&clp->cl_callback.cb_set, 0);
+	/* Success or failure, now we're either waiting for lease expiration
+	 * or deleg_return. */
+	dprintk("NFSD: nfs4_cb_recall: dp %p dl_flock %p dl_count %d\n",dp, dp->dl_flock, atomic_read(&dp->dl_count));
+	nfs4_put_delegation(dp);
+	return;
 }

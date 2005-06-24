@@ -46,9 +46,6 @@ int __cpu_logical_map[NR_CPUS];		/* Map logical to physical */
 EXPORT_SYMBOL(phys_cpu_present_map);
 EXPORT_SYMBOL(cpu_online_map);
 
-cycles_t cacheflush_time;
-unsigned long cache_decay_ticks;
-
 static void smp_tune_scheduling (void)
 {
 	struct cache_desc *cd = &current_cpu_data.scache;
@@ -71,25 +68,10 @@ static void smp_tune_scheduling (void)
 	 *  L1 cache), on PIIs it's around 50-100 usecs, depending on
 	 *  the cache size)
 	 */
-	if (!cpu_khz) {
-		/*
-		 * This basically disables processor-affinity scheduling on SMP
-		 * without a cycle counter.  Currently all SMP capable MIPS
-		 * processors have a cycle counter.
-		 */
-		cacheflush_time = 0;
+	if (!cpu_khz)
 		return;
-	}
 
 	cachesize = cd->linesz * cd->sets * cd->ways;
-	cacheflush_time = (cpu_khz>>10) * (cachesize<<10) / bandwidth;
-	cache_decay_ticks = (long)cacheflush_time/cpu_khz * HZ / 1000;
-
-	printk("per-CPU timeslice cutoff: %ld.%02ld usecs.\n",
-		(long)cacheflush_time/(cpu_khz/1000),
-		((long)cacheflush_time*100/(cpu_khz/1000)) % 100);
-	printk("task migration cache decay timeout: %ld msecs.\n",
-		(cache_decay_ticks + 1) * 1000 / HZ);
 }
 
 extern void __init calibrate_delay(void);

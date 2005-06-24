@@ -48,16 +48,16 @@ strlen:
 	 add	%o0, 4, %o0
 
 	/* Check every byte. */
-	srl	%o5, 24, %g5
-	andcc	%g5, 0xff, %g0
+	srl	%o5, 24, %g7
+	andcc	%g7, 0xff, %g0
 	be,pn	%icc, 1f
 	 add	%o0, -4, %o4
-	srl	%o5, 16, %g5
-	andcc	%g5, 0xff, %g0
+	srl	%o5, 16, %g7
+	andcc	%g7, 0xff, %g0
 	be,pn	%icc, 1f
 	 add	%o4, 1, %o4
-	srl	%o5, 8, %g5
-	andcc	%g5, 0xff, %g0
+	srl	%o5, 8, %g7
+	andcc	%g7, 0xff, %g0
 	be,pn	%icc, 1f
 	 add	%o4, 1, %o4
 	andcc	%o5, 0xff, %g0

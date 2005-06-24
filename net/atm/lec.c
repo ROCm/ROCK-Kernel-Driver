@@ -37,11 +37,8 @@
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 #include <linux/if_bridge.h>
 #include "../bridge/br_private.h"
-static unsigned char bridge_ula_lec[] = {0x01, 0x80, 0xc2, 0x00, 0x00};
 
-extern struct net_bridge_fdb_entry *(*br_fdb_get_hook)(struct net_bridge *br,
-       unsigned char *addr);
-extern void (*br_fdb_put_hook)(struct net_bridge_fdb_entry *ent);
+static unsigned char bridge_ula_lec[] = {0x01, 0x80, 0xc2, 0x00, 0x00};
 #endif
 
 /* Modular too */
@@ -83,6 +80,29 @@ static int lane2_resolve(struct net_device *dev, u8 *dst_mac, int force,
 static int lane2_associate_req (struct net_device *dev, u8 *lan_dst,
                          u8 *tlvs, u32 sizeoftlvs);
 
+static int lec_addr_delete(struct lec_priv *priv, unsigned char *atm_addr, 
+			   unsigned long permanent);
+static void lec_arp_check_empties(struct lec_priv *priv,
+				  struct atm_vcc *vcc, struct sk_buff *skb);
+static void lec_arp_destroy(struct lec_priv *priv);
+static void lec_arp_init(struct lec_priv *priv);
+static struct atm_vcc* lec_arp_resolve(struct lec_priv *priv,
+				       unsigned char *mac_to_find,
+				       int is_rdesc,
+				       struct lec_arp_table **ret_entry);
+static void lec_arp_update(struct lec_priv *priv, unsigned char *mac_addr,
+			   unsigned char *atm_addr, unsigned long remoteflag,
+			   unsigned int targetless_le_arp);
+static void lec_flush_complete(struct lec_priv *priv, unsigned long tran_id);
+static int lec_mcast_make(struct lec_priv *priv, struct atm_vcc *vcc);
+static void lec_set_flush_tran_id(struct lec_priv *priv,
+				  unsigned char *atm_addr,
+				  unsigned long tran_id);
+static void lec_vcc_added(struct lec_priv *priv, struct atmlec_ioc *ioc_data,
+			  struct atm_vcc *vcc,
+			  void (*old_push)(struct atm_vcc *vcc, struct sk_buff *skb));
+static void lec_vcc_close(struct lec_priv *priv, struct atm_vcc *vcc);
+
 static struct lane2_ops lane2_ops = {
 	lane2_resolve,         /* resolve,             spec 3.1.3 */
 	lane2_associate_req,   /* associate_req,       spec 3.1.4 */
@@ -93,21 +113,6 @@ static unsigned char bus_mac[ETH_ALEN] = {0xff,0xff,0xff,0xff,0xff,0xff};
 
 /* Device structures */
 static struct net_device *dev_lec[MAX_LEC_ITF];
-
-/* This will be called from proc.c via function pointer */
-struct net_device *get_dev_lec(int itf)
-{
-	struct net_device *dev;
-
-	if (itf >= MAX_LEC_ITF)
-		return NULL;
-	rtnl_lock();
-	dev = dev_lec[itf];
-	if (dev)
-		dev_hold(dev);
-	rtnl_unlock();
-	return dev;
-}
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 static void lec_handle_bridge(struct sk_buff *skb, struct net_device *dev)
@@ -122,6 +127,7 @@ static void lec_handle_bridge(struct sk_buff *skb, struct net_device *dev)
         eth = (struct ethhdr *)skb->data;
         buff = skb->data + skb->dev->hard_header_len;
         if (*buff++ == 0x42 && *buff++ == 0x42 && *buff++ == 0x03) {
+		struct sock *sk;
                 struct sk_buff *skb2;
                 struct atmlec_msg *mesg;
 
@@ -135,8 +141,9 @@ static void lec_handle_bridge(struct sk_buff *skb, struct net_device *dev)
 
                 priv = (struct lec_priv *)dev->priv;
                 atm_force_charge(priv->lecd, skb2->truesize);
-                skb_queue_tail(&priv->lecd->sk->sk_receive_queue, skb2);
-                priv->lecd->sk->sk_data_ready(priv->lecd->sk, skb2->len);
+		sk = sk_atm(priv->lecd);
+                skb_queue_tail(&sk->sk_receive_queue, skb2);
+                sk->sk_data_ready(sk, skb2->len);
         }
 
         return;
@@ -153,7 +160,7 @@ static void lec_handle_bridge(struct sk_buff *skb, struct net_device *dev)
  * and returns NULL.
  */
 #ifdef CONFIG_TR
-unsigned char *get_tr_dst(unsigned char *packet, unsigned char *rdesc)
+static unsigned char *get_tr_dst(unsigned char *packet, unsigned char *rdesc)
 {
         struct trh_hdr *trh;
         int riflen, num_rdsc;
@@ -214,7 +221,7 @@ lec_send(struct atm_vcc *vcc, struct sk_buff *skb, struct lec_priv *priv)
 	ATM_SKB(skb)->vcc = vcc;
 	ATM_SKB(skb)->atm_options = vcc->atm_options;
 
-	atomic_add(skb->truesize, &vcc->sk->sk_wmem_alloc);
+	atomic_add(skb->truesize, &sk_atm(vcc)->sk_wmem_alloc);
 	if (vcc->send(vcc, skb) < 0) {
 		priv->stats.tx_dropped++;
 		return;
@@ -430,7 +437,7 @@ lec_atm_send(struct atm_vcc *vcc, struct sk_buff *skb)
         int i;
         char *tmp; /* FIXME */
 
-	atomic_sub(skb->truesize, &vcc->sk->sk_wmem_alloc);
+	atomic_sub(skb->truesize, &sk_atm(vcc)->sk_wmem_alloc);
         mesg = (struct atmlec_msg *)skb->data;
         tmp = skb->data;
         tmp += sizeof(struct atmlec_msg);
@@ -528,6 +535,7 @@ lec_atm_send(struct atm_vcc *vcc, struct sk_buff *skb)
                     f->dst->state == BR_STATE_FORWARDING) {
                                 /* hit from bridge table, send LE_ARP_RESPONSE */
                         struct sk_buff *skb2;
+			struct sock *sk;
 
                         DPRINTK("%s: entry found, responding to zeppelin\n", dev->name);
                         skb2 = alloc_skb(sizeof(struct atmlec_msg), GFP_ATOMIC);
@@ -538,8 +546,9 @@ lec_atm_send(struct atm_vcc *vcc, struct sk_buff *skb)
                         skb2->len = sizeof(struct atmlec_msg);
                         memcpy(skb2->data, mesg, sizeof(struct atmlec_msg));
                         atm_force_charge(priv->lecd, skb2->truesize);
-                        skb_queue_tail(&priv->lecd->sk->sk_receive_queue, skb2);
-                        priv->lecd->sk->sk_data_ready(priv->lecd->sk, skb2->len);
+			sk = sk_atm(priv->lecd);
+                        skb_queue_tail(&sk->sk_receive_queue, skb2);
+                        sk->sk_data_ready(sk, skb2->len);
                 }
                 if (f != NULL) br_fdb_put_hook(f);
 #endif /* defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE) */
@@ -567,10 +576,10 @@ lec_atm_close(struct atm_vcc *vcc)
         netif_stop_queue(dev);
         lec_arp_destroy(priv);
 
-        if (skb_peek(&vcc->sk->sk_receive_queue))
+        if (skb_peek(&sk_atm(vcc)->sk_receive_queue))
 		printk("%s lec_atm_close: closing with messages pending\n",
                        dev->name);
-        while ((skb = skb_dequeue(&vcc->sk->sk_receive_queue)) != NULL) {
+        while ((skb = skb_dequeue(&sk_atm(vcc)->sk_receive_queue)) != NULL) {
                 atm_return(vcc, skb->truesize);
 		dev_kfree_skb(skb);
         }
@@ -595,11 +604,12 @@ static struct atm_dev lecatm_dev = {
  * LANE2: new argument struct sk_buff *data contains
  * the LE_ARP based TLVs introduced in the LANE2 spec
  */
-int 
+static int 
 send_to_lecd(struct lec_priv *priv, atmlec_msg_type type, 
              unsigned char *mac_addr, unsigned char *atm_addr,
              struct sk_buff *data)
 {
+	struct sock *sk;
 	struct sk_buff *skb;
 	struct atmlec_msg *mesg;
 
@@ -623,14 +633,15 @@ send_to_lecd(struct lec_priv *priv, atmlec_msg_type type,
 		memcpy(&mesg->content.normal.atm_addr, atm_addr, ATM_ESA_LEN);
 
         atm_force_charge(priv->lecd, skb->truesize);
-	skb_queue_tail(&priv->lecd->sk->sk_receive_queue, skb);
-        priv->lecd->sk->sk_data_ready(priv->lecd->sk, skb->len);
+	sk = sk_atm(priv->lecd);
+	skb_queue_tail(&sk->sk_receive_queue, skb);
+        sk->sk_data_ready(sk, skb->len);
 
         if (data != NULL) {
                 DPRINTK("lec: about to send %d bytes of data\n", data->len);
                 atm_force_charge(priv->lecd, data->truesize);
-                skb_queue_tail(&priv->lecd->sk->sk_receive_queue, data);
-                priv->lecd->sk->sk_data_ready(priv->lecd->sk, skb->len);
+                skb_queue_tail(&sk->sk_receive_queue, data);
+                sk->sk_data_ready(sk, skb->len);
         }
 
         return 0;
@@ -675,7 +686,7 @@ static unsigned char lec_ctrl_magic[] = {
         0x01,
         0x01 };
 
-void 
+static void 
 lec_push(struct atm_vcc *vcc, struct sk_buff *skb)
 {
         struct net_device *dev = (struct net_device *)vcc->proto_data;
@@ -711,9 +722,11 @@ lec_push(struct atm_vcc *vcc, struct sk_buff *skb)
                 printk("%s...\n",buf);
 #endif /* DUMP_PACKETS > 0 */
         if (memcmp(skb->data, lec_ctrl_magic, 4) ==0) { /* Control frame, to daemon*/
+		struct sock *sk = sk_atm(vcc);
+
                 DPRINTK("%s: To daemon\n",dev->name);
-                skb_queue_tail(&vcc->sk->sk_receive_queue, skb);
-                vcc->sk->sk_data_ready(vcc->sk, skb->len);
+                skb_queue_tail(&sk->sk_receive_queue, skb);
+                sk->sk_data_ready(sk, skb->len);
         } else { /* Data frame, queue to protocol handlers */
                 unsigned char *dst;
 
@@ -756,7 +769,7 @@ lec_push(struct atm_vcc *vcc, struct sk_buff *skb)
         }
 }
 
-void
+static void
 lec_pop(struct atm_vcc *vcc, struct sk_buff *skb)
 {
 	struct lec_vcc_priv *vpriv = LEC_VCC_PRIV(vcc);
@@ -776,7 +789,7 @@ lec_pop(struct atm_vcc *vcc, struct sk_buff *skb)
 	}
 }
 
-int 
+static int 
 lec_vcc_attach(struct atm_vcc *vcc, void __user *arg)
 {
 	struct lec_vcc_priv *vpriv;
@@ -805,7 +818,7 @@ lec_vcc_attach(struct atm_vcc *vcc, void __user *arg)
         return 0;
 }
 
-int 
+static int 
 lec_mcast_attach(struct atm_vcc *vcc, int arg)
 {
         if (arg <0 || arg >= MAX_LEC_ITF || !dev_lec[arg])
@@ -815,7 +828,7 @@ lec_mcast_attach(struct atm_vcc *vcc, int arg)
 }
 
 /* Initialize device. */
-int 
+static int 
 lecd_attach(struct atm_vcc *vcc, int arg)
 {  
         int i;
@@ -866,7 +879,7 @@ lecd_attach(struct atm_vcc *vcc, int arg)
 	priv->itfnum = i;  /* LANE2 addition */
         priv->lecd = vcc;
         vcc->dev = &lecatm_dev;
-        vcc_insert_socket(vcc->sk);
+        vcc_insert_socket(sk_atm(vcc));
         
         vcc->proto_data = dev_lec[i];
 	set_bit(ATM_VF_META,&vcc->flags);
@@ -1375,7 +1388,6 @@ static void lane2_associate_ind (struct net_device *dev, u8 *mac_addr,
 
 static void lec_arp_check_expire(unsigned long data);
 static void lec_arp_expire_arp(unsigned long data);
-void dump_arp_table(struct lec_priv *priv);
 
 /* 
  * Arp table funcs
@@ -1386,7 +1398,7 @@ void dump_arp_table(struct lec_priv *priv);
 /*
  * Initialization of arp-cache
  */
-void 
+static void 
 lec_arp_init(struct lec_priv *priv)
 {
         unsigned short i;
@@ -1402,7 +1414,7 @@ lec_arp_init(struct lec_priv *priv)
         add_timer(&priv->lec_arp_timer);
 }
 
-void
+static void
 lec_arp_clear_vccs(struct lec_arp_table *entry)
 {
         if (entry->vcc) {
@@ -1531,7 +1543,7 @@ get_status_string(unsigned char st)
 }
 #endif
 
-void
+static void
 dump_arp_table(struct lec_priv *priv)
 {
 #if DEBUG_ARP_TABLE
@@ -1683,7 +1695,7 @@ dump_arp_table(struct lec_priv *priv)
 /*
  * Destruction of arp-cache
  */
-void
+static void
 lec_arp_destroy(struct lec_priv *priv)
 {
 	unsigned long flags;
@@ -1945,9 +1957,9 @@ lec_arp_check_expire(unsigned long data)
  * Try to find vcc where mac_address is attached.
  * 
  */
-struct atm_vcc*
-lec_arp_resolve(struct lec_priv *priv, unsigned char *mac_to_find, int is_rdesc,
-                struct lec_arp_table **ret_entry)
+static struct atm_vcc*
+lec_arp_resolve(struct lec_priv *priv, unsigned char *mac_to_find,
+		int is_rdesc, struct lec_arp_table **ret_entry)
 {
 	unsigned long flags;
         struct lec_arp_table *entry;
@@ -2026,7 +2038,7 @@ out:
 	return found;
 }
 
-int
+static int
 lec_addr_delete(struct lec_priv *priv, unsigned char *atm_addr, 
                 unsigned long permanent)
 {
@@ -2056,7 +2068,7 @@ lec_addr_delete(struct lec_priv *priv, unsigned char *atm_addr,
 /*
  * Notifies:  Response to arp_request (atm_addr != NULL) 
  */
-void
+static void
 lec_arp_update(struct lec_priv *priv, unsigned char *mac_addr,
                unsigned char *atm_addr, unsigned long remoteflag,
                unsigned int targetless_le_arp)
@@ -2168,7 +2180,7 @@ out:
 /*
  * Notifies: Vcc setup ready 
  */
-void
+static void
 lec_vcc_added(struct lec_priv *priv, struct atmlec_ioc *ioc_data,
               struct atm_vcc *vcc,
               void (*old_push)(struct atm_vcc *vcc, struct sk_buff *skb))
@@ -2312,7 +2324,7 @@ out:
 	spin_unlock_irqrestore(&priv->lec_arp_lock, flags);
 }
 
-void
+static void
 lec_flush_complete(struct lec_priv *priv, unsigned long tran_id)
 {
 	unsigned long flags;
@@ -2338,7 +2350,7 @@ lec_flush_complete(struct lec_priv *priv, unsigned long tran_id)
         dump_arp_table(priv);
 }
 
-void
+static void
 lec_set_flush_tran_id(struct lec_priv *priv,
                       unsigned char *atm_addr, unsigned long tran_id)
 {
@@ -2356,7 +2368,7 @@ lec_set_flush_tran_id(struct lec_priv *priv,
 	spin_unlock_irqrestore(&priv->lec_arp_lock, flags);
 }
 
-int 
+static int 
 lec_mcast_make(struct lec_priv *priv, struct atm_vcc *vcc)
 {
 	unsigned long flags;
@@ -2393,7 +2405,7 @@ out:
         return err;
 }
 
-void
+static void
 lec_vcc_close(struct lec_priv *priv, struct atm_vcc *vcc)
 {
 	unsigned long flags;
@@ -2468,7 +2480,7 @@ lec_vcc_close(struct lec_priv *priv, struct atm_vcc *vcc)
 	dump_arp_table(priv);
 }
 
-void
+static void
 lec_arp_check_empties(struct lec_priv *priv,
                       struct atm_vcc *vcc, struct sk_buff *skb)
 {

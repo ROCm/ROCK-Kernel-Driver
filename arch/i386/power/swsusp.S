@@ -29,8 +29,8 @@ ENTRY(swsusp_arch_suspend)
 	ret
 
 ENTRY(swsusp_arch_resume)
-	movl	$swsusp_pg_dir-__PAGE_OFFSET,%ecx
-	movl	%ecx,%cr3
+	movl	$swsusp_pg_dir-__PAGE_OFFSET, %ecx
+	movl	%ecx, %cr3
 
 	movl	pagedir_nosave, %edx
 	.p2align 4,,7
@@ -51,6 +51,15 @@ copy_loop:
 	.p2align 4,,7
 
 done:
+	/* Flush TLB, including "global" things (vmalloc) */
+	movl	mmu_cr4_features, %eax
+	movl	%eax, %edx
+	andl	$~(1<<7), %edx;  # PGE
+	movl	%edx, %cr4;  # turn off PGE
+	movl	%cr3, %ecx;  # flush TLB
+	movl	%ecx, %cr3
+	movl	%eax, %cr4;  # turn PGE back on
+
 	movl saved_context_esp, %esp
 	movl saved_context_ebp, %ebp
 	movl saved_context_ebx, %ebx
@@ -58,5 +67,7 @@ done:
 	movl saved_context_edi, %edi
 
 	pushl saved_context_eflags ; popfl
-	call swsusp_restore
+
+	xorl	%eax, %eax
+
 	ret

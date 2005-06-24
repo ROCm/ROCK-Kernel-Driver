@@ -638,6 +638,7 @@ cleanup_module(void)
 #define vdma_free(baz)
 #define sonic_chiptomem(bat) (bat)
 #define PHYSADDR(quux) (quux)
+#define CPHYSADDR(quux) (quux)
 
 #define sonic_request_irq       request_irq
 #define sonic_free_irq          free_irq

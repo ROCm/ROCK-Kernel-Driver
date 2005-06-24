@@ -47,8 +47,6 @@
 #define LOG_TEMP		0			/* continously log temperature */
 
 #define I2C_DRIVERID_G4FAN	0x9001			/* fixme */
-#define THERMOSTAT_CLIENT_ID	1
-#define FAN_CLIENT_ID		2
 
 static int 			do_probe( struct i2c_adapter *adapter, int addr, int kind);
 
@@ -372,7 +370,6 @@ attach_fan( struct i2c_client *cl )
 		goto out;
 	printk("ADM1030 fan controller [@%02x]\n", cl->addr );
 
-	cl->id = FAN_CLIENT_ID;
 	strlcpy( cl->name, "ADM1030 fan controller", sizeof(cl->name) );
 
 	if( !i2c_attach_client(cl) )
@@ -412,7 +409,6 @@ attach_thermostat( struct i2c_client *cl )
 	x.overheat_temp = os_temp;
 	x.overheat_hyst = hyst_temp;
 	
-	cl->id = THERMOSTAT_CLIENT_ID;
 	strlcpy( cl->name, "DS1775 thermostat", sizeof(cl->name) );
 
 	if( !i2c_attach_client(cl) )

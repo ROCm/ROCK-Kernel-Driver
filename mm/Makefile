@@ -19,4 +19,3 @@ obj-$(CONFIG_SHMEM) += shmem.o
 obj-$(CONFIG_TINY_SHMEM) += tiny-shmem.o
 obj-$(CONFIG_TMPFS_POSIX_ACL) += shmem_acl.o
 
-obj-$(CONFIG_PROC_MM)	+= proc_mm.o

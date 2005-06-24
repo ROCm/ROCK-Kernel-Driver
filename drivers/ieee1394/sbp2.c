@@ -906,9 +906,13 @@ alloc_fail:
 	 * connected to the sbp2 device being removed. That host would
 	 * have a certain amount of time to relogin before the sbp2 device
 	 * allows someone else to login instead. One second makes sense. */
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(HZ);
-
+	msleep_interruptible(1000);
+	if (signal_pending(current)) {
+		SBP2_WARN("aborting sbp2_start_device due to event");
+		sbp2_remove_device(scsi_id);
+		return -EINTR;
+	}
+	
 	/*
 	 * Login to the sbp-2 device
 	 */

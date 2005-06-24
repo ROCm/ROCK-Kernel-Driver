@@ -96,10 +96,6 @@
 
 #define FORE200E_NEXT_ENTRY(index, modulo)         (index = ++(index) % (modulo))
 
-
-#define MSECS(ms)  (((ms)*HZ/1000)+1)
-
-
 #if 1
 #define ASSERT(expr)     if (!(expr)) { \
 			     printk(FORE200E "assertion failed! %s[%d]: %s\n", \
@@ -114,7 +110,7 @@
 static const struct atmdev_ops   fore200e_ops;
 static const struct fore200e_bus fore200e_bus[];
 
-static struct fore200e* fore200e_boards = NULL;
+static LIST_HEAD(fore200e_boards);
 
 
 MODULE_AUTHOR("Christophe Lizzi - credits to Uwe Dannowski and Heikki Vatiainen");
@@ -246,7 +242,7 @@ fore200e_chunk_free(struct fore200e* fore200e, struct chunk* chunk)
 static void
 fore200e_spin(int msecs)
 {
-    unsigned long timeout = jiffies + MSECS(msecs);
+    unsigned long timeout = jiffies + msecs_to_jiffies(msecs);
     while (time_before(jiffies, timeout));
 }
 
@@ -254,7 +250,7 @@ fore200e_spin(int msecs)
 static int
 fore200e_poll(struct fore200e* fore200e, volatile u32* addr, u32 val, int msecs)
 {
-    unsigned long timeout = jiffies + MSECS(msecs);
+    unsigned long timeout = jiffies + msecs_to_jiffies(msecs);
     int           ok;
 
     mb();
@@ -278,7 +274,7 @@ fore200e_poll(struct fore200e* fore200e, volatile u32* addr, u32 val, int msecs)
 static int
 fore200e_io_poll(struct fore200e* fore200e, volatile u32 __iomem *addr, u32 val, int msecs)
 {
-    unsigned long timeout = jiffies + MSECS(msecs);
+    unsigned long timeout = jiffies + msecs_to_jiffies(msecs);
     int           ok;
 
     do {
@@ -387,8 +383,7 @@ fore200e_shutdown(struct fore200e* fore200e)
     switch(fore200e->state) {
 
     case FORE200E_STATE_COMPLETE:
-	if (fore200e->stats)
-	    kfree(fore200e->stats);
+	kfree(fore200e->stats);
 
     case FORE200E_STATE_IRQ:
 	free_irq(fore200e->irq, fore200e->atm_dev);
@@ -634,39 +629,6 @@ fore200e_pca_configure(struct fore200e* fore200e)
 
     fore200e->state = FORE200E_STATE_CONFIGURE;
     return 0;
-}
-
-
-static struct fore200e* __init
-fore200e_pca_detect(const struct fore200e_bus* bus, int index)
-{
-    struct fore200e* fore200e;
-    struct pci_dev*  pci_dev = NULL;
-    int              count = index;
-    
-    do {
-	pci_dev = pci_find_device(PCI_VENDOR_ID_FORE, PCI_DEVICE_ID_FORE_PCA200E, pci_dev);
-	if (pci_dev == NULL)
-	    return NULL;
-    } while (count--);
-
-    if (pci_enable_device(pci_dev))
-	return NULL;
-    
-    fore200e = fore200e_kmalloc(sizeof(struct fore200e), GFP_KERNEL);
-    if (fore200e == NULL)
-	return NULL;
-
-    fore200e->bus       = bus;
-    fore200e->bus_dev   = pci_dev;    
-    fore200e->irq       = pci_dev->irq;
-    fore200e->phys_base = pci_resource_start(pci_dev, 0);
-
-    sprintf(fore200e->name, "%s-%d", bus->model_name, index - 1);
-
-    pci_set_master(pci_dev);
-
-    return fore200e;
 }
 
 
@@ -1000,8 +962,7 @@ fore200e_tx_irq(struct fore200e* fore200e)
 		entry, txq->tail, entry->vc_map, entry->skb);
 
 	/* free copy of misaligned data */
-	if (entry->data)
-	    kfree(entry->data);
+	kfree(entry->data);
 	
 	/* remove DMA mapping */
 	fore200e->bus->dma_unmap(fore200e, entry->tpd->tsd[ 0 ].buffer, entry->tpd->tsd[ 0 ].length,
@@ -1027,7 +988,7 @@ fore200e_tx_irq(struct fore200e* fore200e)
 		/* when a vcc is closed, some PDUs may be still pending in the tx queue.
 		   if the same vcc is immediately re-opened, those pending PDUs must
 		   not be popped after the completion of their emission, as they refer
-		   to the prior incarnation of that vcc. otherwise, vcc->sk->sk_wmem_alloc
+		   to the prior incarnation of that vcc. otherwise, sk_atm(vcc)->sk_wmem_alloc
 		   would be decremented by the size of the (unrelated) skb, possibly
 		   leading to a negative sk->sk_wmem_alloc count, ultimately freezing the vcc.
 		   we thus bind the tx entry to the current incarnation of the vcc
@@ -1054,8 +1015,8 @@ fore200e_tx_irq(struct fore200e* fore200e)
 		}
 #if 1
 		/* race fixed by the above incarnation mechanism, but... */
-		if (atomic_read(&vcc->sk->sk_wmem_alloc) < 0) {
-		    atomic_set(&vcc->sk->sk_wmem_alloc, 0);
+		if (atomic_read(&sk_atm(vcc)->sk_wmem_alloc) < 0) {
+		    atomic_set(&sk_atm(vcc)->sk_wmem_alloc, 0);
 		}
 #endif
 		/* check error condition */
@@ -1258,12 +1219,12 @@ fore200e_push_rpd(struct fore200e* fore200e, struct atm_vcc* vcc, struct rpd* rp
 	return -ENOMEM;
     }
 
-    ASSERT(atomic_read(&vcc->sk->sk_wmem_alloc) >= 0);
+    ASSERT(atomic_read(&sk_atm(vcc)->sk_wmem_alloc) >= 0);
 
     vcc->push(vcc, skb);
     atomic_inc(&vcc->stats->rx);
 
-    ASSERT(atomic_read(&vcc->sk->sk_wmem_alloc) >= 0);
+    ASSERT(atomic_read(&sk_atm(vcc)->sk_wmem_alloc) >= 0);
 
     return 0;
 }
@@ -1700,7 +1661,7 @@ fore200e_send(struct atm_vcc *vcc, struct sk_buff *skb)
     unsigned long           flags;
 
     ASSERT(vcc);
-    ASSERT(atomic_read(&vcc->sk->sk_wmem_alloc) >= 0);
+    ASSERT(atomic_read(&sk_atm(vcc)->sk_wmem_alloc) >= 0);
     ASSERT(fore200e);
     ASSERT(fore200e_vcc);
 
@@ -2596,7 +2557,7 @@ static int __init
 fore200e_monitor_getc(struct fore200e* fore200e)
 {
     struct cp_monitor __iomem * monitor = fore200e->cp_monitor;
-    unsigned long      timeout = jiffies + MSECS(50);
+    unsigned long      timeout = jiffies + msecs_to_jiffies(50);
     int                c;
 
     while (time_before(jiffies, timeout)) {
@@ -2768,20 +2729,105 @@ fore200e_init(struct fore200e* fore200e)
     return 0;
 }
 
+
+static int __devinit
+fore200e_pca_detect(struct pci_dev *pci_dev, const struct pci_device_id *pci_ent)
+{
+    const struct fore200e_bus* bus = (struct fore200e_bus*) pci_ent->driver_data;
+    struct fore200e* fore200e;
+    int err = 0;
+    static int index = 0;
+
+    if (pci_enable_device(pci_dev)) {
+	err = -EINVAL;
+	goto out;
+    }
+    
+    fore200e = fore200e_kmalloc(sizeof(struct fore200e), GFP_KERNEL);
+    if (fore200e == NULL) {
+	err = -ENOMEM;
+	goto out_disable;
+    }
+
+    fore200e->bus       = bus;
+    fore200e->bus_dev   = pci_dev;    
+    fore200e->irq       = pci_dev->irq;
+    fore200e->phys_base = pci_resource_start(pci_dev, 0);
+
+    sprintf(fore200e->name, "%s-%d", bus->model_name, index - 1);
+
+    pci_set_master(pci_dev);
+
+    printk(FORE200E "device %s found at 0x%lx, IRQ %s\n",
+	   fore200e->bus->model_name, 
+	   fore200e->phys_base, fore200e_irq_itoa(fore200e->irq));
+
+    sprintf(fore200e->name, "%s-%d", bus->model_name, index);
+
+    err = fore200e_init(fore200e);
+    if (err < 0) {
+	fore200e_shutdown(fore200e);
+	goto out_free;
+    }
+
+    ++index;
+    pci_set_drvdata(pci_dev, fore200e);
+
+out:
+    return err;
+
+out_free:
+    kfree(fore200e);
+out_disable:
+    pci_disable_device(pci_dev);
+    goto out;
+}
+
+
+static void __devexit fore200e_pca_remove_one(struct pci_dev *pci_dev)
+{
+    struct fore200e *fore200e;
+
+    fore200e = pci_get_drvdata(pci_dev);
+
+    fore200e_shutdown(fore200e);
+    kfree(fore200e);
+    pci_disable_device(pci_dev);
+}
+
+
+#ifdef CONFIG_ATM_FORE200E_PCA
+static struct pci_device_id fore200e_pca_tbl[] = {
+    { PCI_VENDOR_ID_FORE, PCI_DEVICE_ID_FORE_PCA200E, PCI_ANY_ID, PCI_ANY_ID,
+      0, 0, (unsigned long) &fore200e_bus[0] },
+    { 0, }
+};
+
+MODULE_DEVICE_TABLE(pci, fore200e_pca_tbl);
+
+static struct pci_driver fore200e_pca_driver = {
+    .name =     "fore_200e",
+    .probe =    fore200e_pca_detect,
+    .remove =   __devexit_p(fore200e_pca_remove_one),
+    .id_table = fore200e_pca_tbl,
+};
+#endif
+
+
 static int __init
 fore200e_module_init(void)
 {
     const struct fore200e_bus* bus;
     struct       fore200e*     fore200e;
-    int                        index, link;
+    int                        index;
 
     printk(FORE200E "FORE Systems 200E-series ATM driver - version " FORE200E_VERSION "\n");
 
     /* for each configured bus interface */
-    for (link = 0, bus = fore200e_bus; bus->model_name; bus++) {
+    for (bus = fore200e_bus; bus->model_name; bus++) {
 
 	/* detect all boards present on that bus */
-	for (index = 0; (fore200e = bus->detect(bus, index)); index++) {
+	for (index = 0; bus->detect && (fore200e = bus->detect(bus, index)); index++) {
 	    
 	    printk(FORE200E "device %s found at 0x%lx, IRQ %s\n",
 		   fore200e->bus->model_name, 
@@ -2795,15 +2841,18 @@ fore200e_module_init(void)
 		break;
 	    }
 
-	    link++;
-
-	    fore200e->next  = fore200e_boards;
-	    fore200e_boards = fore200e;
+	    list_add(&fore200e->entry, &fore200e_boards);
 	}
     }
 
-    if (link)
-        return 0;
+#ifdef CONFIG_ATM_FORE200E_PCA
+    if (!pci_register_driver(&fore200e_pca_driver))
+	return 0;
+#endif
+
+    if (!list_empty(&fore200e_boards))
+	return 0;
+
     return -ENODEV;
 }
 
@@ -2811,11 +2860,14 @@ fore200e_module_init(void)
 static void __exit
 fore200e_module_cleanup(void)
 {
-    while (fore200e_boards) {
-        struct fore200e* fore200e = fore200e_boards;
+    struct fore200e *fore200e, *next;
 
+#ifdef CONFIG_ATM_FORE200E_PCA
+    pci_unregister_driver(&fore200e_pca_driver);
+#endif
+
+    list_for_each_entry_safe(fore200e, next, &fore200e_boards, entry) {
 	fore200e_shutdown(fore200e);
-	fore200e_boards = fore200e->next;
 	kfree(fore200e);
     }
     DPRINTK(1, "module being removed\n");
@@ -3150,7 +3202,7 @@ static const struct fore200e_bus fore200e_bus[] = {
       fore200e_pca_dma_sync_for_device,
       fore200e_pca_dma_chunk_alloc,
       fore200e_pca_dma_chunk_free,
-      fore200e_pca_detect,
+      NULL,
       fore200e_pca_configure,
       fore200e_pca_map,
       fore200e_pca_reset,

@@ -81,9 +81,6 @@ static cpumask_t cpu_callin_map;
 /* Per CPU bogomips and other parameters */
 struct cpuinfo_m32r cpu_data[NR_CPUS] __cacheline_aligned;
 
-/* Set when the idlers are all forked */
-int smp_threads_ready;
-
 static int cpucount;
 static cpumask_t smp_commenced_mask;
 
@@ -105,8 +102,6 @@ DEFINE_PER_CPU(int, prof_counter) = 1;
 spinlock_t ipi_lock[NR_IPIS];
 
 static unsigned int calibration_result;
-
-unsigned long cache_decay_ticks = HZ / 100;
 
 /*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*=*/
 /* Function Prototypes                                                       */

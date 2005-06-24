@@ -161,8 +161,7 @@ void snd_gf1_stop_voice(snd_gus_card_t * gus, unsigned short voice)
 #endif
 }
 
-static void snd_gf1_clear_voices(snd_gus_card_t * gus, unsigned short v_min,
-				 unsigned short v_max)
+void snd_gf1_clear_voices(snd_gus_card_t * gus, unsigned short v_min, unsigned short v_max)
 {
 	unsigned long flags;
 	unsigned int daddr;

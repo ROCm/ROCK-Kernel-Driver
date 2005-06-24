@@ -53,14 +53,6 @@
    #include <asm/uaccess.h>
    #include <asm/io.h>
 
-   /* Prototypes */
-   extern int ips_detect(Scsi_Host_Template *);
-   extern int ips_release(struct Scsi_Host *);
-   extern int ips_eh_abort(Scsi_Cmnd *);
-   extern int ips_eh_reset(Scsi_Cmnd *);
-   extern int ips_queue(Scsi_Cmnd *, void (*) (Scsi_Cmnd *));
-   extern const char * ips_info(struct Scsi_Host *);
-
    /*
     * Some handy macros
     */
@@ -457,10 +449,10 @@
    static void ips_select_queue_depth(struct Scsi_Host *, Scsi_Device *);
    static int ips_biosparam(Disk *disk, kdev_t dev, int geom[]);
 #else
-   int ips_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
+   static int ips_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
    static int ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 		sector_t capacity, int geom[]);
-   int ips_slave_configure(Scsi_Device *SDptr);
+   static int ips_slave_configure(Scsi_Device *SDptr);
 #endif
 
 /*

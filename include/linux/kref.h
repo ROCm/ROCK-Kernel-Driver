@@ -26,7 +26,7 @@ struct kref {
 
 void kref_init(struct kref *kref);
 void kref_get(struct kref *kref);
-void kref_put(struct kref *kref, void (*release) (struct kref *kref));
+int kref_put(struct kref *kref, void (*release) (struct kref *kref));
 
 #endif /* __KERNEL__ */
 #endif /* _KREF_H_ */

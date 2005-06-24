@@ -15,11 +15,15 @@
  *	ndisc options
  */
 
-#define ND_OPT_SOURCE_LL_ADDR		1
-#define ND_OPT_TARGET_LL_ADDR		2
-#define ND_OPT_PREFIX_INFO		3
-#define ND_OPT_REDIRECT_HDR		4
-#define ND_OPT_MTU			5
+enum {
+	__ND_OPT_PREFIX_INFO_END = 0,
+	ND_OPT_SOURCE_LL_ADDR = 1,	/* RFC2461 */
+	ND_OPT_TARGET_LL_ADDR = 2,	/* RFC2461 */
+	ND_OPT_PREFIX_INFO = 3,		/* RFC2461 */
+	ND_OPT_REDIRECT_HDR = 4,	/* RFC2461 */
+	ND_OPT_MTU = 5,			/* RFC2461 */
+	__ND_OPT_MAX
+};
 
 #define MAX_RTR_SOLICITATION_DELAY	HZ
 

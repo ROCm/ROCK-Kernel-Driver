@@ -1,4 +1,4 @@
-/* 
+/*
  * dmxdev.h
  *
  * Copyright (C) 2000 Ralph Metzler & Marcus Metzler

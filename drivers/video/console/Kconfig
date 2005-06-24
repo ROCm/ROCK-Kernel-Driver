@@ -43,7 +43,7 @@ config VIDEO_SELECT
 	  about the Video mode selection support. If unsure, say N.
 
 config MDA_CONSOLE
-	depends on !M68K && ISA
+	depends on !M68K && !PARISC && ISA
 	tristate "MDA text console (dual-headed) (EXPERIMENTAL)"
 	---help---
 	  Say Y here if you have an old MDA or monochrome Hercules graphics
@@ -65,30 +65,6 @@ config SGI_NEWPORT_CONSOLE
           card of your Indy.  Most people say Y here.
 
 #  bool 'IODC console' CONFIG_IODC_CONSOLE
-config STI_CONSOLE
-        tristate "STI text console" 
-        depends on PARISC && FRAMEBUFFER_CONSOLE
-        default y
-        help
-          The STI console is the builtin display/keyboard on HP-PARISC
-          machines.  Say Y here to build support for it into your kernel.
-          The alternative is to use your primary serial port as a console.
-
-config DUMMY_CONSOLE_COLUMNS
-        int "Initial number of console screen columns" if STI_CONSOLE
-        depends on PARISC
-        default "160"
-        help
-          The default value is 160, which should fit a 1280x1024 monitor.
-          Select 80 if you use a 640x480 resolution by default.
-
-config DUMMY_CONSOLE_ROWS
-        int "Initial number of console screen rows" if STI_CONSOLE
-        depends on PARISC
-        default "64"
-        help
-          The default value is 64, which should fit a 1280x1024 monitor.
-          Select 25 if you use a 640x480 resolution by default.
 
 config PROM_CONSOLE
 	bool "PROM console"
@@ -102,10 +78,35 @@ config DUMMY_CONSOLE
 	depends on PROM_CONSOLE!=y || VGA_CONSOLE!=y || SGI_NEWPORT_CONSOLE!=y 
 	default y
 
+config DUMMY_CONSOLE_COLUMNS
+        int "Initial number of console screen columns"
+        depends on PARISC && DUMMY_CONSOLE
+        default "160"
+        help
+          The default value is 160, which should fit a 1280x1024 monitor.
+          Select 80 if you use a 640x480 resolution by default.
+
+config DUMMY_CONSOLE_ROWS
+        int "Initial number of console screen rows"
+        depends on PARISC && DUMMY_CONSOLE
+        default "64"
+        help
+          The default value is 64, which should fit a 1280x1024 monitor.
+          Select 25 if you use a 640x480 resolution by default.
+
 config FRAMEBUFFER_CONSOLE
 	tristate "Framebuffer Console support"
 	depends on FB
 	select CRC32
+
+config STI_CONSOLE
+        tristate "STI text console" 
+        depends on PARISC
+        default y
+        help
+          The STI console is the builtin display/keyboard on HP-PARISC
+          machines.  Say Y here to build support for it into your kernel.
+          The alternative is to use your primary serial port as a console.
 
 config FONTS
 	bool "Select compiled-in fonts"

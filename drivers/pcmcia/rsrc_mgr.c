@@ -59,6 +59,7 @@ int pcmcia_adjust_resource_info(adjust_t *adj)
 {
 	struct pcmcia_socket *s;
 	int ret = CS_UNSUPPORTED_FUNCTION;
+	unsigned long flags;
 
 	down_read(&pcmcia_socket_list_rwsem);
 	list_for_each_entry(s, &pcmcia_socket_list, socket_list) {
@@ -66,8 +67,30 @@ int pcmcia_adjust_resource_info(adjust_t *adj)
 		if (adj->Resource == RES_IRQ)
 			ret = adjust_irq(s, adj);
 
-		else if (s->resource_ops->adjust_resource)
+		else if (s->resource_ops->adjust_resource) {
+
+			/* you can't use the old interface if the new
+			 * one was used before */
+			spin_lock_irqsave(&s->lock, flags);
+			if ((s->resource_setup_done) &&
+			    !(s->resource_setup_old)) {
+				spin_unlock_irqrestore(&s->lock, flags);
+				continue;
+			} else if (!(s->resource_setup_old))
+				s->resource_setup_old = 1;
+			spin_unlock_irqrestore(&s->lock, flags);
+
 			ret = s->resource_ops->adjust_resource(s, adj);
+			if (!ret) {
+				/* as there's no way we know this is the
+				 * last call to adjust_resource_info, we
+				 * always need to assume this is the latest
+				 * one... */
+				spin_lock_irqsave(&s->lock, flags);
+				s->resource_setup_done = 1;
+				spin_unlock_irqrestore(&s->lock, flags);
+			}
+		}
 	}
 	up_read(&pcmcia_socket_list_rwsem);
 
@@ -113,12 +136,28 @@ void release_resource_db(struct pcmcia_socket *s)
 }
 
 
+static int static_init(struct pcmcia_socket *s)
+{
+	unsigned long flags;
+
+	/* the good thing about SS_CAP_STATIC_MAP sockets is
+	 * that they don't need a resource database */
+
+	spin_lock_irqsave(&s->lock, flags);
+	s->resource_setup_done = 1;
+	spin_unlock_irqrestore(&s->lock, flags);
+
+	return 0;
+}
+
+
 struct pccard_resource_ops pccard_static_ops = {
 	.validate_mem = NULL,
 	.adjust_io_region = NULL,
 	.find_io = NULL,
 	.find_mem = NULL,
 	.adjust_resource = NULL,
+	.init = static_init,
 	.exit = NULL,
 };
 EXPORT_SYMBOL(pccard_static_ops);

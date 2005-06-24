@@ -6,7 +6,9 @@
 
 #ifndef _ROSE_H
 #define _ROSE_H 
+
 #include <linux/rose.h>
+#include <net/sock.h>
 
 #define	ROSE_ADDR_LEN			5
 
@@ -114,7 +116,8 @@ struct rose_route {
 	unsigned int		rand;
 };
 
-typedef struct {
+struct rose_sock {
+	struct sock		sock;
 	rose_address		source_addr,   dest_addr;
 	ax25_address		source_call,   dest_call;
 	unsigned char		source_ndigis, dest_ndigis;
@@ -135,10 +138,9 @@ typedef struct {
 	struct rose_facilities_struct facilities;
 	struct timer_list	timer;
 	struct timer_list	idletimer;
-	struct sock		*sk;		/* Backlink to socket */
-} rose_cb;
+};
 
-#define rose_sk(__sk) ((rose_cb *)(__sk)->sk_protinfo)
+#define rose_sk(sk) ((struct rose_sock *)(sk))
 
 /* af_rose.c */
 extern ax25_address rose_callsign;

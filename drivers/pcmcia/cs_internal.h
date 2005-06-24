@@ -159,6 +159,7 @@ int pccard_access_configuration_register(struct pcmcia_socket *s, unsigned int f
 struct pcmcia_callback{
 	struct module	*owner;
 	int		(*event) (struct pcmcia_socket *s, event_t event, int priority);
+	int		(*resources_done) (struct pcmcia_socket *s);
 };
 
 int pccard_register_pcmcia(struct pcmcia_socket *s, struct pcmcia_callback *c);

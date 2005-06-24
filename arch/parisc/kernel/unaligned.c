@@ -744,7 +744,7 @@ void handle_unaligned(struct pt_regs *regs)
 			si.si_signo = SIGSEGV;
 			si.si_errno = 0;
 			si.si_code = SEGV_MAPERR;
-			si.si_addr = (void *)regs->ior;
+			si.si_addr = (void __user *)regs->ior;
 			force_sig_info(SIGSEGV, &si, current);
 		}
 		else
@@ -754,7 +754,7 @@ force_sigbus:
 			si.si_signo = SIGBUS;
 			si.si_errno = 0;
 			si.si_code = BUS_ADRALN;
-			si.si_addr = (void *)regs->ior;
+			si.si_addr = (void __user *)regs->ior;
 			force_sig_info(SIGBUS, &si, current);
 		}
 		

@@ -139,7 +139,7 @@ void __init lasi_led_init(unsigned long lasi_hpa)
 		break;
 	}
 
-	register_led_driver(DISPLAY_MODEL_LASI, LED_CMD_REG_NONE, (char *)datareg);
+	register_led_driver(DISPLAY_MODEL_LASI, LED_CMD_REG_NONE, datareg);
 }
 #endif
 

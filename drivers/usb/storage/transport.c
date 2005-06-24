@@ -383,7 +383,8 @@ int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
  * This routine always uses us->recv_intr_pipe as the pipe and
  * us->ep_bInterval as the interrupt interval.
  */
-int usb_stor_intr_transfer(struct us_data *us, void *buf, unsigned int length)
+static int usb_stor_intr_transfer(struct us_data *us, void *buf,
+				  unsigned int length)
 {
 	int result;
 	unsigned int pipe = us->recv_intr_pipe;
@@ -436,7 +437,7 @@ int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
  * This function does basically the same thing as usb_stor_bulk_transfer_buf()
  * above, but it uses the usbcore scatter-gather library.
  */
-int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
+static int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 		struct scatterlist *sg, int num_sg, unsigned int length,
 		unsigned int *act_len)
 {
@@ -991,11 +992,11 @@ int usb_stor_Bulk_transport(struct scsi_cmnd *srb, struct us_data *us)
 	/* DATA STAGE */
 	/* send/receive data payload, if there is any */
 
-	/* Genesys Logic interface chips need a 100us delay between the
+	/* Some USB-IDE converter chips need a 100us delay between the
 	 * command phase and the data phase.  Some devices need a little
 	 * more than that, probably because of clock rate inaccuracies. */
-	if (le16_to_cpu(us->pusb_dev->descriptor.idVendor) == USB_VENDOR_ID_GENESYS)
-		udelay(usb_genesys_transport_delay);
+	if (unlikely(us->flags & US_FL_GO_SLOW))
+		udelay(125);
 
 	if (transfer_length) {
 		unsigned int pipe = srb->sc_data_direction == DMA_FROM_DEVICE ? 
@@ -1055,19 +1056,31 @@ int usb_stor_Bulk_transport(struct scsi_cmnd *srb, struct us_data *us)
 	US_DEBUGP("Bulk Status S 0x%x T 0x%x R %u Stat 0x%x\n",
 			le32_to_cpu(bcs->Signature), bcs->Tag, 
 			residue, bcs->Status);
-	if ((bcs->Signature != cpu_to_le32(US_BULK_CS_SIGN) &&
-		    bcs->Signature != cpu_to_le32(US_BULK_CS_OLYMPUS_SIGN)) ||
-			bcs->Tag != srb->serial_number || 
-			bcs->Status > US_BULK_STAT_PHASE) {
+	if (bcs->Tag != srb->serial_number || bcs->Status > US_BULK_STAT_PHASE) {
 		US_DEBUGP("Bulk logical error\n");
+		return USB_STOR_TRANSPORT_ERROR;
+	}
+
+	/* Some broken devices report odd signatures, so we do not check them
+	 * for validity against the spec. We store the first one we see,
+	 * and check subsequent transfers for validity against this signature.
+	 */
+	if (!us->bcs_signature) {
+		us->bcs_signature = bcs->Signature;
+		if (us->bcs_signature != cpu_to_le32(US_BULK_CS_SIGN))
+			US_DEBUGP("Learnt BCS signature 0x%08X\n",
+					le32_to_cpu(us->bcs_signature));
+	} else if (bcs->Signature != us->bcs_signature) {
+		US_DEBUGP("Signature mismatch: got %08X, expecting %08X\n",
+			  le32_to_cpu(bcs->Signature),
+			  le32_to_cpu(us->bcs_signature));
 		return USB_STOR_TRANSPORT_ERROR;
 	}
 
 	/* try to compute the actual residue, based on how much data
 	 * was really transferred and what the device tells us */
 	if (residue) {
-		if (!(us->flags & US_FL_IGNORE_RESIDUE) ||
-				srb->sc_data_direction == DMA_TO_DEVICE) {
+		if (!(us->flags & US_FL_IGNORE_RESIDUE)) {
 			residue = min(residue, transfer_length);
 			srb->resid = max(srb->resid, (int) residue);
 		}
@@ -1146,7 +1159,7 @@ static int usb_stor_reset_common(struct us_data *us,
 
  	/* Give the device some time to recover from the reset,
  	 * but don't delay disconnect processing. */
- 	wait_event_interruptible_timeout(us->dev_reset_wait,
+ 	wait_event_interruptible_timeout(us->delay_wait,
  			test_bit(US_FLIDX_DISCONNECTING, &us->flags),
  			HZ*6);
 	if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {

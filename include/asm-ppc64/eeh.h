@@ -104,17 +104,30 @@ int eeh_unregister_notifier(struct notifier_block *nb);
  */
 #define EEH_IO_ERROR_VALUE(size)	(~0U >> ((4 - (size)) * 8))
 
-#else
-#define eeh_init()
-#define eeh_check_failure(token, val) (val)
-#define eeh_dn_check_failure(dn, dev) (0)
-#define pci_addr_cache_build()
-#define eeh_add_device_early(dn)
-#define eeh_add_device_late(dev)
-#define eeh_remove_device(dev)
+#else /* !CONFIG_EEH */
+static inline void eeh_init(void) { }
+
+static inline unsigned long eeh_check_failure(const volatile void __iomem *token, unsigned long val)
+{
+	return val;
+}
+
+static inline int eeh_dn_check_failure(struct device_node *dn, struct pci_dev *dev)
+{
+	return 0;
+}
+
+static inline void pci_addr_cache_build(void) { }
+
+static inline void eeh_add_device_early(struct device_node *dn) { }
+
+static inline void eeh_add_device_late(struct pci_dev *dev) { }
+
+static inline void eeh_remove_device(struct pci_dev *dev) { }
+
 #define EEH_POSSIBLE_ERROR(val, type) (0)
 #define EEH_IO_ERROR_VALUE(size) (-1UL)
-#endif
+#endif /* CONFIG_EEH */
 
 /* 
  * MMIO read/write operations with EEH support.

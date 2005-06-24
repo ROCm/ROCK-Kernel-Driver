@@ -93,6 +93,8 @@ static void ipoib_mcast_free(struct ipoib_mcast *mcast)
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 	struct ipoib_neigh *neigh, *tmp;
 	unsigned long flags;
+	LIST_HEAD(ah_list);
+	struct ipoib_ah *ah, *tah;
 
 	ipoib_dbg_mcast(netdev_priv(dev),
 			"deleting multicast group " IPOIB_GID_FMT "\n",
@@ -101,13 +103,17 @@ static void ipoib_mcast_free(struct ipoib_mcast *mcast)
 	spin_lock_irqsave(&priv->lock, flags);
 
 	list_for_each_entry_safe(neigh, tmp, &mcast->neigh_list, list) {
-		ipoib_put_ah(neigh->ah);
+		if (neigh->ah)
+			list_add_tail(&neigh->ah->list, &ah_list);
 		*to_ipoib_neigh(neigh->neighbour) = NULL;
 		neigh->neighbour->ops->destructor = NULL;
 		kfree(neigh);
 	}
 
 	spin_unlock_irqrestore(&priv->lock, flags);
+
+	list_for_each_entry_safe(ah, tah, &ah_list, list)
+		ipoib_put_ah(ah);
 
 	if (mcast->ah)
 		ipoib_put_ah(mcast->ah);
@@ -252,13 +258,12 @@ static int ipoib_mcast_join_finish(struct ipoib_mcast *mcast,
 				.traffic_class = mcast->mcmember.traffic_class
 			}
 		};
+		int path_rate = ib_sa_rate_enum_to_int(mcast->mcmember.rate);
 
 		av.grh.dgid = mcast->mcmember.mgid;
 
-		if (ib_sa_rate_enum_to_int(mcast->mcmember.rate) > 0)
-			av.static_rate = (2 * priv->local_rate -
-					  ib_sa_rate_enum_to_int(mcast->mcmember.rate) - 1) /
-				(priv->local_rate ? priv->local_rate : 1);
+		if (path_rate > 0 && priv->local_rate > path_rate)
+			av.static_rate = (priv->local_rate - 1) / path_rate;
 
 		ipoib_dbg_mcast(priv, "static_rate %d for local port %dX, mcmember %dX\n",
 				av.static_rate, priv->local_rate,
@@ -790,7 +795,7 @@ void ipoib_mcast_dev_flush(struct net_device *dev)
 
 	spin_unlock_irqrestore(&priv->lock, flags);
 
-	list_for_each_entry(mcast, &remove_list, list) {
+	list_for_each_entry_safe(mcast, tmcast, &remove_list, list) {
 		ipoib_mcast_leave(dev, mcast);
 		ipoib_mcast_free(mcast);
 	}
@@ -902,7 +907,7 @@ void ipoib_mcast_restart_task(void *dev_ptr)
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	/* We have to cancel outside of the spinlock */
-	list_for_each_entry(mcast, &remove_list, list) {
+	list_for_each_entry_safe(mcast, tmcast, &remove_list, list) {
 		ipoib_mcast_leave(mcast->dev, mcast);
 		ipoib_mcast_free(mcast);
 	}

@@ -2,8 +2,8 @@
 # IP netfilter configuration
 #
 
-menu "IPv6: Netfilter Configuration"
-	depends on INET && IPV6 && NETFILTER
+menu "IPv6: Netfilter Configuration (EXPERIMENTAL)"
+	depends on INET && IPV6 && NETFILTER && EXPERIMENTAL
 
 #tristate 'Connection tracking (required for masq/NAT)' CONFIG_IP6_NF_CONNTRACK
 #if [ "$CONFIG_IP6_NF_CONNTRACK" != "n" ]; then
@@ -108,16 +108,6 @@ config IP6_NF_MATCH_OWNER
 	help
 	  Packet owner matching allows you to match locally-generated packets
 	  based on who created them: the user, group, process or session.
-
-	  To compile it as a module, choose M here.  If unsure, say N.
-
-config IP6_NF_MATCH_POLICY
-	tristate "IPsec policy match support"
-	depends on IP6_NF_IPTABLES && XFRM
-	help
-	  Policy matching allows you to match packets based on the
-	  IPsec policy that was used during decapsulation/will
-	  be used during encapsulation.
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 

@@ -18,8 +18,8 @@
  *
  */
 
-static int sg_version_num = 30532;	/* 2 digits for each component */
-#define SG_VERSION_STR "3.5.32"
+static int sg_version_num = 30533;	/* 2 digits for each component */
+#define SG_VERSION_STR "3.5.33"
 
 /*
  *  D. P. Gilbert (dgilbert@interlog.com, dougg@triode.net.au), notes:
@@ -51,6 +51,7 @@ static int sg_version_num = 30532;	/* 2 digits for each component */
 #include <linux/delay.h>
 
 #include "scsi.h"
+#include <scsi/scsi_dbg.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_ioctl.h>
@@ -60,7 +61,7 @@ static int sg_version_num = 30532;	/* 2 digits for each component */
 
 #ifdef CONFIG_SCSI_PROC_FS
 #include <linux/proc_fs.h>
-static char *sg_version_date = "20050117";
+static char *sg_version_date = "20050328";
 
 static int sg_proc_init(void);
 static void sg_proc_cleanup(void);
@@ -330,114 +331,153 @@ sg_release(struct inode *inode, struct file *filp)
 static ssize_t
 sg_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 {
-	int k, res;
 	Sg_device *sdp;
 	Sg_fd *sfp;
 	Sg_request *srp;
 	int req_pack_id = -1;
-	struct sg_header old_hdr;
-	sg_io_hdr_t new_hdr;
 	sg_io_hdr_t *hp;
+	struct sg_header *old_hdr = NULL;
+	int retval = 0;
 
 	if ((!(sfp = (Sg_fd *) filp->private_data)) || (!(sdp = sfp->parentdp)))
 		return -ENXIO;
 	SCSI_LOG_TIMEOUT(3, printk("sg_read: %s, count=%d\n",
 				   sdp->disk->disk_name, (int) count));
-	if ((k = verify_area(VERIFY_WRITE, buf, count)))
-		return k;
+	if (!access_ok(VERIFY_WRITE, buf, count))
+		return -EFAULT;
 	if (sfp->force_packid && (count >= SZ_SG_HEADER)) {
-		if (__copy_from_user(&old_hdr, buf, SZ_SG_HEADER))
-			return -EFAULT;
-		if (old_hdr.reply_len < 0) {
+		old_hdr = kmalloc(SZ_SG_HEADER, GFP_KERNEL);
+		if (!old_hdr)
+			return -ENOMEM;
+		if (__copy_from_user(old_hdr, buf, SZ_SG_HEADER)) {
+			retval = -EFAULT;
+			goto free_old_hdr;
+		}
+		if (old_hdr->reply_len < 0) {
 			if (count >= SZ_SG_IO_HDR) {
-				if (__copy_from_user
-				    (&new_hdr, buf, SZ_SG_IO_HDR))
-					return -EFAULT;
-				req_pack_id = new_hdr.pack_id;
+				sg_io_hdr_t *new_hdr;
+				new_hdr = kmalloc(SZ_SG_IO_HDR, GFP_KERNEL);
+				if (!new_hdr) {
+					retval = -ENOMEM;
+					goto free_old_hdr;
+				}
+				retval =__copy_from_user
+				    (new_hdr, buf, SZ_SG_IO_HDR);
+				req_pack_id = new_hdr->pack_id;
+				kfree(new_hdr);
+				if (retval) {
+					retval = -EFAULT;
+					goto free_old_hdr;
+				}
 			}
 		} else
-			req_pack_id = old_hdr.pack_id;
+			req_pack_id = old_hdr->pack_id;
 	}
 	srp = sg_get_rq_mark(sfp, req_pack_id);
 	if (!srp) {		/* now wait on packet to arrive */
-		if (sdp->detached)
-			return -ENODEV;
-		if (filp->f_flags & O_NONBLOCK)
-			return -EAGAIN;
+		if (sdp->detached) {
+			retval = -ENODEV;
+			goto free_old_hdr;
+		}
+		if (filp->f_flags & O_NONBLOCK) {
+			retval = -EAGAIN;
+			goto free_old_hdr;
+		}
 		while (1) {
-			res = 0;	/* following is a macro that beats race condition */
+			retval = 0; /* following macro beats race condition */
 			__wait_event_interruptible(sfp->read_wait,
-				(sdp->detached || (srp = sg_get_rq_mark(sfp, req_pack_id))), 
-						   res);
-			if (sdp->detached)
-				return -ENODEV;
-			if (0 == res)
+				(sdp->detached ||
+				(srp = sg_get_rq_mark(sfp, req_pack_id))), 
+				retval);
+			if (sdp->detached) {
+				retval = -ENODEV;
+				goto free_old_hdr;
+			}
+			if (0 == retval)
 				break;
-			return res;	/* -ERESTARTSYS because signal hit process */
+
+			/* -ERESTARTSYS as signal hit process */
+			goto free_old_hdr;
 		}
 	}
-	if (srp->header.interface_id != '\0')
-		return sg_new_read(sfp, buf, count, srp);
+	if (srp->header.interface_id != '\0') {
+		retval = sg_new_read(sfp, buf, count, srp);
+		goto free_old_hdr;
+	}
 
 	hp = &srp->header;
-	memset(&old_hdr, 0, SZ_SG_HEADER);
-	old_hdr.reply_len = (int) hp->timeout;
-	old_hdr.pack_len = old_hdr.reply_len; /* very old, strange behaviour */
-	old_hdr.pack_id = hp->pack_id;
-	old_hdr.twelve_byte =
+	if (old_hdr == NULL) {
+		old_hdr = kmalloc(SZ_SG_HEADER, GFP_KERNEL);
+		if (! old_hdr) {
+			retval = -ENOMEM;
+			goto free_old_hdr;
+		}
+	}
+	memset(old_hdr, 0, SZ_SG_HEADER);
+	old_hdr->reply_len = (int) hp->timeout;
+	old_hdr->pack_len = old_hdr->reply_len; /* old, strange behaviour */
+	old_hdr->pack_id = hp->pack_id;
+	old_hdr->twelve_byte =
 	    ((srp->data.cmd_opcode >= 0xc0) && (12 == hp->cmd_len)) ? 1 : 0;
-	old_hdr.target_status = hp->masked_status;
-	old_hdr.host_status = hp->host_status;
-	old_hdr.driver_status = hp->driver_status;
+	old_hdr->target_status = hp->masked_status;
+	old_hdr->host_status = hp->host_status;
+	old_hdr->driver_status = hp->driver_status;
 	if ((CHECK_CONDITION & hp->masked_status) ||
 	    (DRIVER_SENSE & hp->driver_status))
-		memcpy(old_hdr.sense_buffer, srp->sense_b,
-		       sizeof (old_hdr.sense_buffer));
+		memcpy(old_hdr->sense_buffer, srp->sense_b,
+		       sizeof (old_hdr->sense_buffer));
 	switch (hp->host_status) {
 	/* This setup of 'result' is for backward compatibility and is best
 	   ignored by the user who should use target, host + driver status */
 	case DID_OK:
 	case DID_PASSTHROUGH:
 	case DID_SOFT_ERROR:
-		old_hdr.result = 0;
+		old_hdr->result = 0;
 		break;
 	case DID_NO_CONNECT:
 	case DID_BUS_BUSY:
 	case DID_TIME_OUT:
-		old_hdr.result = EBUSY;
+		old_hdr->result = EBUSY;
 		break;
 	case DID_BAD_TARGET:
 	case DID_ABORT:
 	case DID_PARITY:
 	case DID_RESET:
 	case DID_BAD_INTR:
-		old_hdr.result = EIO;
+		old_hdr->result = EIO;
 		break;
 	case DID_ERROR:
-		old_hdr.result = (srp->sense_b[0] == 0 && 
+		old_hdr->result = (srp->sense_b[0] == 0 && 
 				  hp->masked_status == GOOD) ? 0 : EIO;
 		break;
 	default:
-		old_hdr.result = EIO;
+		old_hdr->result = EIO;
 		break;
 	}
 
 	/* Now copy the result back to the user buffer.  */
 	if (count >= SZ_SG_HEADER) {
-		if (__copy_to_user(buf, &old_hdr, SZ_SG_HEADER))
-			return -EFAULT;
+		if (__copy_to_user(buf, old_hdr, SZ_SG_HEADER)) {
+			retval = -EFAULT;
+			goto free_old_hdr;
+		}
 		buf += SZ_SG_HEADER;
-		if (count > old_hdr.reply_len)
-			count = old_hdr.reply_len;
+		if (count > old_hdr->reply_len)
+			count = old_hdr->reply_len;
 		if (count > SZ_SG_HEADER) {
-			if ((res =
-			     sg_read_oxfer(srp, buf, count - SZ_SG_HEADER)))
-				return -EFAULT;
+			if (sg_read_oxfer(srp, buf, count - SZ_SG_HEADER)) {
+				retval = -EFAULT;
+				goto free_old_hdr;
+			}
 		}
 	} else
-		count = (old_hdr.result == 0) ? 0 : -EIO;
+		count = (old_hdr->result == 0) ? 0 : -EIO;
 	sg_finish_rem_req(srp);
-	return count;
+	retval = count;
+free_old_hdr:
+	if (old_hdr)
+		kfree(old_hdr);
+	return retval;
 }
 
 static ssize_t
@@ -501,8 +541,8 @@ sg_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 	      scsi_block_when_processing_errors(sdp->device)))
 		return -ENXIO;
 
-	if ((k = verify_area(VERIFY_READ, buf, count)))
-		return k;	/* protects following copy_from_user()s + get_user()s */
+	if (!access_ok(VERIFY_READ, buf, count))
+		return -EFAULT;	/* protects following copy_from_user()s + get_user()s */
 	if (count < SZ_SG_HEADER)
 		return -EIO;
 	if (__copy_from_user(&old_hdr, buf, SZ_SG_HEADER))
@@ -594,8 +634,8 @@ sg_new_write(Sg_fd * sfp, const char __user *buf, size_t count,
 
 	if (count < SZ_SG_IO_HDR)
 		return -EINVAL;
-	if ((k = verify_area(VERIFY_READ, buf, count)))
-		return k; /* protects following copy_from_user()s + get_user()s */
+	if (!access_ok(VERIFY_READ, buf, count))
+		return -EFAULT; /* protects following copy_from_user()s + get_user()s */
 
 	sfp->cmd_q = 1;	/* when sg_io_hdr seen, set command queuing on */
 	if (!(srp = sg_add_request(sfp))) {
@@ -631,9 +671,9 @@ sg_new_write(Sg_fd * sfp, const char __user *buf, size_t count,
 		sg_remove_request(sfp, srp);
 		return -EMSGSIZE;
 	}
-	if ((k = verify_area(VERIFY_READ, hp->cmdp, hp->cmd_len))) {
+	if (!access_ok(VERIFY_READ, hp->cmdp, hp->cmd_len)) {
 		sg_remove_request(sfp, srp);
-		return k;	/* protects following copy_from_user()s + get_user()s */
+		return -EFAULT;	/* protects following copy_from_user()s + get_user()s */
 	}
 	if (__copy_from_user(cmnd, hp->cmdp, hp->cmd_len)) {
 		sg_remove_request(sfp, srp);
@@ -707,16 +747,16 @@ sg_common_write(Sg_fd * sfp, Sg_request * srp,
 	switch (hp->dxfer_direction) {
 	case SG_DXFER_TO_FROM_DEV:
 	case SG_DXFER_FROM_DEV:
-		SRpnt->sr_data_direction = SCSI_DATA_READ;
+		SRpnt->sr_data_direction = DMA_FROM_DEVICE;
 		break;
 	case SG_DXFER_TO_DEV:
-		SRpnt->sr_data_direction = SCSI_DATA_WRITE;
+		SRpnt->sr_data_direction = DMA_TO_DEVICE;
 		break;
 	case SG_DXFER_UNKNOWN:
-		SRpnt->sr_data_direction = SCSI_DATA_UNKNOWN;
+		SRpnt->sr_data_direction = DMA_BIDIRECTIONAL;
 		break;
 	default:
-		SRpnt->sr_data_direction = SCSI_DATA_NONE;
+		SRpnt->sr_data_direction = DMA_NONE;
 		break;
 	}
 	SRpnt->upper_private_data = srp;
@@ -724,7 +764,7 @@ sg_common_write(Sg_fd * sfp, Sg_request * srp,
 	srp->data.sglist_len = 0;
 	srp->data.bufflen = 0;
 	srp->data.buffer = NULL;
-	hp->duration = jiffies;	/* unit jiffies now, millisecs after done */
+	hp->duration = jiffies_to_msecs(jiffies);
 /* Now send everything of to mid-level. The next time we hear about this
    packet is when sg_cmd_done() is called (i.e. a callback). */
 	scsi_do_req(SRpnt, (void *) cmnd,
@@ -773,9 +813,8 @@ sg_ioctl(struct inode *inode, struct file *filp,
 				return -ENODEV;
 			if (!scsi_block_when_processing_errors(sdp->device))
 				return -ENXIO;
-			result = verify_area(VERIFY_WRITE, p, SZ_SG_IO_HDR);
-			if (result)
-				return result;
+			if (!access_ok(VERIFY_WRITE, p, SZ_SG_IO_HDR))
+				return -EFAULT;
 			result =
 			    sg_new_write(sfp, p, SZ_SG_IO_HDR,
 					 blocking, read_only, &srp);
@@ -837,10 +876,8 @@ sg_ioctl(struct inode *inode, struct file *filp,
 	case SG_GET_LOW_DMA:
 		return put_user((int) sfp->low_dma, ip);
 	case SG_GET_SCSI_ID:
-		result =
-		    verify_area(VERIFY_WRITE, p, sizeof (sg_scsi_id_t));
-		if (result)
-			return result;
+		if (!access_ok(VERIFY_WRITE, p, sizeof (sg_scsi_id_t)))
+			return -EFAULT;
 		else {
 			sg_scsi_id_t __user *sg_idp = p;
 
@@ -868,9 +905,8 @@ sg_ioctl(struct inode *inode, struct file *filp,
 		sfp->force_packid = val ? 1 : 0;
 		return 0;
 	case SG_GET_PACK_ID:
-		result = verify_area(VERIFY_WRITE, ip, sizeof (int));
-		if (result)
-			return result;
+		if (!access_ok(VERIFY_WRITE, ip, sizeof (int)))
+			return -EFAULT;
 		read_lock_irqsave(&sfp->rq_list_lock, iflags);
 		for (srp = sfp->headrp; srp; srp = srp->nextrp) {
 			if ((1 == srp->done) && (!srp->sg_io_owned)) {
@@ -938,13 +974,16 @@ sg_ioctl(struct inode *inode, struct file *filp,
 		val = (sdp->device ? 1 : 0);
 		return put_user(val, ip);
 	case SG_GET_REQUEST_TABLE:
-		result = verify_area(VERIFY_WRITE, p,
-				     SZ_SG_REQ_INFO * SG_MAX_QUEUE);
-		if (result)
-			return result;
+		if (!access_ok(VERIFY_WRITE, p, SZ_SG_REQ_INFO * SG_MAX_QUEUE))
+			return -EFAULT;
 		else {
-			sg_req_info_t rinfo[SG_MAX_QUEUE];
-			Sg_request *srp;
+			sg_req_info_t *rinfo;
+			unsigned int ms;
+
+			rinfo = kmalloc(SZ_SG_REQ_INFO * SG_MAX_QUEUE,
+								GFP_KERNEL);
+			if (!rinfo)
+				return -ENOMEM;
 			read_lock_irqsave(&sfp->rq_list_lock, iflags);
 			for (srp = sfp->headrp, val = 0; val < SG_MAX_QUEUE;
 			     ++val, srp = srp ? srp->nextrp : srp) {
@@ -955,19 +994,30 @@ sg_ioctl(struct inode *inode, struct file *filp,
 					    srp->header.masked_status & 
 					    srp->header.host_status & 
 					    srp->header.driver_status;
-					rinfo[val].duration =
-					    srp->done ? srp->header.duration :
-					    jiffies_to_msecs(
-						jiffies - srp->header.duration);
+					if (srp->done)
+						rinfo[val].duration =
+							srp->header.duration;
+					else {
+						ms = jiffies_to_msecs(jiffies);
+						rinfo[val].duration =
+						    (ms > srp->header.duration) ?
+						    (ms - srp->header.duration) : 0;
+					}
 					rinfo[val].orphan = srp->orphan;
-					rinfo[val].sg_io_owned = srp->sg_io_owned;
-					rinfo[val].pack_id = srp->header.pack_id;
-					rinfo[val].usr_ptr = srp->header.usr_ptr;
+					rinfo[val].sg_io_owned =
+							srp->sg_io_owned;
+					rinfo[val].pack_id =
+							srp->header.pack_id;
+					rinfo[val].usr_ptr =
+							srp->header.usr_ptr;
 				}
 			}
 			read_unlock_irqrestore(&sfp->rq_list_lock, iflags);
-			return (__copy_to_user(p, rinfo,
-			        SZ_SG_REQ_INFO * SG_MAX_QUEUE) ? -EFAULT : 0);
+			result = __copy_to_user(p, rinfo, 
+						SZ_SG_REQ_INFO * SG_MAX_QUEUE);
+			result = result ? -EFAULT : 0;
+			kfree(rinfo);
+			return result;
 		}
 	case SG_EMULATED_HOST:
 		if (sdp->detached)
@@ -1036,6 +1086,29 @@ sg_ioctl(struct inode *inode, struct file *filp,
 		return scsi_ioctl(sdp->device, cmd_in, p);
 	}
 }
+
+#ifdef CONFIG_COMPAT
+static long sg_compat_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
+{
+	Sg_device *sdp;
+	Sg_fd *sfp;
+	struct scsi_device *sdev;
+
+	if ((!(sfp = (Sg_fd *) filp->private_data)) || (!(sdp = sfp->parentdp)))
+		return -ENXIO;
+
+	sdev = sdp->device;
+	if (sdev->host->hostt->compat_ioctl) { 
+		int ret;
+
+		ret = sdev->host->hostt->compat_ioctl(sdev, cmd_in, (void __user *)arg);
+
+		return ret;
+	}
+	
+	return -ENOIOCTLCMD;
+}
+#endif
 
 static unsigned int
 sg_poll(struct file *filp, poll_table * wait)
@@ -1191,11 +1264,12 @@ static int
 sg_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	Sg_fd *sfp;
-	unsigned long req_sz = vma->vm_end - vma->vm_start;
+	unsigned long req_sz;
 	Sg_scatter_hold *rsv_schp;
 
 	if ((!filp) || (!vma) || (!(sfp = (Sg_fd *) filp->private_data)))
 		return -ENXIO;
+	req_sz = vma->vm_end - vma->vm_start;
 	SCSI_LOG_TIMEOUT(3, printk("sg_mmap starting, vm_start=%p, len=%d\n",
 				   (void *) vma->vm_start, (int) req_sz));
 	if (vma->vm_pgoff)
@@ -1242,6 +1316,7 @@ sg_cmd_done(Scsi_Cmnd * SCpnt)
 	Sg_fd *sfp;
 	Sg_request *srp = NULL;
 	unsigned long iflags;
+	unsigned int ms;
 
 	if (SCpnt && (SRpnt = SCpnt->sc_request))
 		srp = (Sg_request *) SRpnt->upper_private_data;
@@ -1278,9 +1353,9 @@ sg_cmd_done(Scsi_Cmnd * SCpnt)
 	SCSI_LOG_TIMEOUT(4, printk("sg_cmd_done: %s, pack_id=%d, res=0x%x\n",
 		sdp->disk->disk_name, srp->header.pack_id, (int) SRpnt->sr_result));
 	srp->header.resid = SCpnt->resid;
-	/* N.B. unit of duration changes here from jiffies to millisecs */
-	srp->header.duration =
-	    jiffies_to_msecs(jiffies - srp->header.duration);
+	ms = jiffies_to_msecs(jiffies);
+	srp->header.duration = (ms > srp->header.duration) ?
+				(ms - srp->header.duration) : 0;
 	if (0 != SRpnt->sr_result) {
 		struct scsi_sense_hdr sshdr;
 
@@ -1294,7 +1369,7 @@ sg_cmd_done(Scsi_Cmnd * SCpnt)
 		if ((sdp->sgdebug > 0) &&
 		    ((CHECK_CONDITION == srp->header.masked_status) ||
 		     (COMMAND_TERMINATED == srp->header.masked_status)))
-			print_req_sense("sg_cmd_done", SRpnt);
+			scsi_print_req_sense("sg_cmd_done", SRpnt);
 
 		/* Following if statement is a patch supplied by Eric Youngdale */
 		if (driver_byte(SRpnt->sr_result) != 0
@@ -1346,6 +1421,9 @@ static struct file_operations sg_fops = {
 	.write = sg_write,
 	.poll = sg_poll,
 	.ioctl = sg_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = sg_compat_ioctl,
+#endif
 	.open = sg_open,
 	.mmap = sg_mmap,
 	.release = sg_release,
@@ -1959,9 +2037,8 @@ sg_write_xfer(Sg_request * srp)
 			  num_xfer, iovec_count, schp->k_use_sg));
 	if (iovec_count) {
 		onum = iovec_count;
-		if ((k = verify_area(VERIFY_READ, hp->dxferp,
-				     SZ_SG_IOVEC * onum)))
-			return k;
+		if (!access_ok(VERIFY_READ, hp->dxferp, SZ_SG_IOVEC * onum))
+			return -EFAULT;
 	} else
 		onum = 1;
 
@@ -2031,7 +2108,7 @@ sg_u_iovec(sg_io_hdr_t * hp, int sg_num, int ind,
 {
 	int num_xfer = (int) hp->dxfer_len;
 	unsigned char __user *p = hp->dxferp;
-	int count, k;
+	int count;
 
 	if (0 == sg_num) {
 		if (wr_xf && ('\0' == hp->interface_id))
@@ -2045,8 +2122,8 @@ sg_u_iovec(sg_io_hdr_t * hp, int sg_num, int ind,
 		p = iovec.iov_base;
 		count = (int) iovec.iov_len;
 	}
-	if ((k = verify_area(wr_xf ? VERIFY_READ : VERIFY_WRITE, p, count)))
-		return k;
+	if (!access_ok(wr_xf ? VERIFY_READ : VERIFY_WRITE, p, count))
+		return -EFAULT;
 	if (up)
 		*up = p;
 	if (countp)
@@ -2113,9 +2190,8 @@ sg_read_xfer(Sg_request * srp)
 			  num_xfer, iovec_count, schp->k_use_sg));
 	if (iovec_count) {
 		onum = iovec_count;
-		if ((k = verify_area(VERIFY_READ, hp->dxferp,
-				     SZ_SG_IOVEC * onum)))
-			return k;
+		if (!access_ok(VERIFY_READ, hp->dxferp, SZ_SG_IOVEC * onum))
+			return -EFAULT;
 	} else
 		onum = 1;
 
@@ -2377,7 +2453,7 @@ sg_add_request(Sg_fd * sfp)
 	}
 	if (resp) {
 		resp->nextrp = NULL;
-		resp->header.duration = jiffies;
+		resp->header.duration = jiffies_to_msecs(jiffies);
 		resp->my_cmdp = NULL;
 	}
 	write_unlock_irqrestore(&sfp->rq_list_lock, iflags);
@@ -2972,6 +3048,7 @@ static void sg_proc_debug_helper(struct seq_file *s, Sg_device * sdp)
 	Sg_fd *fp;
 	const sg_io_hdr_t *hp;
 	const char * cp;
+	unsigned int ms;
 
 	for (k = 0; (fp = sg_get_nth_sfp(sdp, k)); ++k) {
 		seq_printf(s, "   FD(%d): timeout=%dms bufflen=%d "
@@ -3010,10 +3087,13 @@ static void sg_proc_debug_helper(struct seq_file *s, Sg_device * sdp)
 				   srp->header.pack_id, blen);
 			if (srp->done)
 				seq_printf(s, " dur=%d", hp->duration);
-			else
+			else {
+				ms = jiffies_to_msecs(jiffies);
 				seq_printf(s, " t_o/elap=%d/%d",
-				  new_interface ? hp->timeout : jiffies_to_msecs(fp->timeout),
-				  jiffies_to_msecs(hp->duration ? (jiffies - hp->duration) : 0));
+					(new_interface ? hp->timeout :
+						  jiffies_to_msecs(fp->timeout)),
+					(ms > hp->duration ? ms - hp->duration : 0));
+			}
 			seq_printf(s, "ms sgat=%d op=0x%02x\n", usg,
 				   (int) srp->data.cmd_opcode);
 		}

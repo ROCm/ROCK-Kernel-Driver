@@ -291,6 +291,7 @@ EXPORT_SYMBOL(__bitmap_weight);
 #define nbits_to_hold_value(val)	fls(val)
 #define roundup_power2(val,modulus)	(((val) + (modulus) - 1) & ~((modulus) - 1))
 #define unhex(c)			(isdigit(c) ? (c - '0') : (toupper(c) - 'A' + 10))
+#define BASEDEC 10		/* fancier cpuset lists input in decimal */
 
 /**
  * bitmap_scnprintf - convert bitmap to an ASCII hex string.
@@ -408,6 +409,108 @@ int bitmap_parse(const char __user *ubuf, unsigned int ubuflen,
 	return 0;
 }
 EXPORT_SYMBOL(bitmap_parse);
+
+/*
+ * bscnl_emit(buf, buflen, rbot, rtop, bp)
+ *
+ * Helper routine for bitmap_scnlistprintf().  Write decimal number
+ * or range to buf, suppressing output past buf+buflen, with optional
+ * comma-prefix.  Return len of what would be written to buf, if it
+ * all fit.
+ */
+static inline int bscnl_emit(char *buf, int buflen, int rbot, int rtop, int len)
+{
+	if (len > 0)
+		len += scnprintf(buf + len, buflen - len, ",");
+	if (rbot == rtop)
+		len += scnprintf(buf + len, buflen - len, "%d", rbot);
+	else
+		len += scnprintf(buf + len, buflen - len, "%d-%d", rbot, rtop);
+	return len;
+}
+
+/**
+ * bitmap_scnlistprintf - convert bitmap to list format ASCII string
+ * @buf: byte buffer into which string is placed
+ * @buflen: reserved size of @buf, in bytes
+ * @maskp: pointer to bitmap to convert
+ * @nmaskbits: size of bitmap, in bits
+ *
+ * Output format is a comma-separated list of decimal numbers and
+ * ranges.  Consecutively set bits are shown as two hyphen-separated
+ * decimal numbers, the smallest and largest bit numbers set in
+ * the range.  Output format is compatible with the format
+ * accepted as input by bitmap_parselist().
+ *
+ * The return value is the number of characters which would be
+ * generated for the given input, excluding the trailing '\0', as
+ * per ISO C99.
+ */
+int bitmap_scnlistprintf(char *buf, unsigned int buflen,
+	const unsigned long *maskp, int nmaskbits)
+{
+	int len = 0;
+	/* current bit is 'cur', most recently seen range is [rbot, rtop] */
+	int cur, rbot, rtop;
+
+	rbot = cur = find_first_bit(maskp, nmaskbits);
+	while (cur < nmaskbits) {
+		rtop = cur;
+		cur = find_next_bit(maskp, nmaskbits, cur+1);
+		if (cur >= nmaskbits || cur > rtop + 1) {
+			len = bscnl_emit(buf, buflen, rbot, rtop, len);
+			rbot = cur;
+		}
+	}
+	return len;
+}
+EXPORT_SYMBOL(bitmap_scnlistprintf);
+
+/**
+ * bitmap_parselist - convert list format ASCII string to bitmap
+ * @buf: read nul-terminated user string from this buffer
+ * @mask: write resulting mask here
+ * @nmaskbits: number of bits in mask to be written
+ *
+ * Input format is a comma-separated list of decimal numbers and
+ * ranges.  Consecutively set bits are shown as two hyphen-separated
+ * decimal numbers, the smallest and largest bit numbers set in
+ * the range.
+ *
+ * Returns 0 on success, -errno on invalid input strings:
+ *    -EINVAL:   second number in range smaller than first
+ *    -EINVAL:   invalid character in string
+ *    -ERANGE:   bit number specified too large for mask
+ */
+int bitmap_parselist(const char *bp, unsigned long *maskp, int nmaskbits)
+{
+	unsigned a, b;
+
+	bitmap_zero(maskp, nmaskbits);
+	do {
+		if (!isdigit(*bp))
+			return -EINVAL;
+		b = a = simple_strtoul(bp, (char **)&bp, BASEDEC);
+		if (*bp == '-') {
+			bp++;
+			if (!isdigit(*bp))
+				return -EINVAL;
+			b = simple_strtoul(bp, (char **)&bp, BASEDEC);
+		}
+		if (!(a <= b))
+			return -EINVAL;
+		if (b >= nmaskbits)
+			return -ERANGE;
+		while (a <= b) {
+			set_bit(a, maskp);
+			a++;
+		}
+		if (*bp == ',')
+			bp++;
+	} while (*bp != '\0' && *bp != '\n');
+	return 0;
+}
+EXPORT_SYMBOL(bitmap_parselist);
 
 /**
  *	bitmap_find_free_region - find a contiguous aligned mem region

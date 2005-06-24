@@ -31,7 +31,8 @@
 static kmem_cache_t *avtab_node_cachep;
 
 static struct avtab_node*
-avtab_insert_node(struct avtab *h, int hvalue, struct avtab_node * prev, struct avtab_node * cur,
+avtab_insert_node(struct avtab *h, int hvalue,
+		  struct avtab_node * prev, struct avtab_node * cur,
 		  struct avtab_key *key, struct avtab_datum *datum)
 {
 	struct avtab_node * newnode;
@@ -53,7 +54,7 @@ avtab_insert_node(struct avtab *h, int hvalue, struct avtab_node * prev, struct 
 	return newnode;
 }
 
-int avtab_insert(struct avtab *h, struct avtab_key *key, struct avtab_datum *datum)
+static int avtab_insert(struct avtab *h, struct avtab_key *key, struct avtab_datum *datum)
 {
 	int hvalue;
 	struct avtab_node *prev, *cur, *newnode;
@@ -236,30 +237,6 @@ void avtab_destroy(struct avtab *h)
 	h->htable = NULL;
 }
 
-
-int avtab_map(struct avtab *h,
-	      int (*apply) (struct avtab_key *k,
-			    struct avtab_datum *d,
-			    void *args),
-	      void *args)
-{
-	int i, ret;
-	struct avtab_node *cur;
-
-	if (!h)
-		return 0;
-
-	for (i = 0; i < AVTAB_SIZE; i++) {
-		cur = h->htable[i];
-		while (cur != NULL) {
-			ret = apply(&cur->key, &cur->datum, args);
-			if (ret)
-				return ret;
-			cur = cur->next;
-		}
-	}
-	return 0;
-}
 
 int avtab_init(struct avtab *h)
 {

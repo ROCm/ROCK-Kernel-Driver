@@ -40,8 +40,8 @@ struct scoop_config {
 	unsigned short io_dir;
 };
 
-void reset_scoop(void);
-unsigned short set_scoop_gpio(unsigned short bit);
-unsigned short reset_scoop_gpio(unsigned short bit);
-unsigned short read_scoop_reg(unsigned short reg);
-void write_scoop_reg(unsigned short reg, unsigned short data);
+void reset_scoop(struct device *dev);
+unsigned short set_scoop_gpio(struct device *dev, unsigned short bit);
+unsigned short reset_scoop_gpio(struct device *dev, unsigned short bit);
+unsigned short read_scoop_reg(struct device *dev, unsigned short reg);
+void write_scoop_reg(struct device *dev, unsigned short reg, unsigned short data);

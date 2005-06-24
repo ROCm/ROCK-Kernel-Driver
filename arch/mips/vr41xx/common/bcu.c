@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2002  MontaVista Software Inc.
  *    Author: Yoichi Yuasa <yyuasa@mvista.com, or source@mvista.com>
- *  Copyright (C) 2003-2004  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
+ *  Copyright (C) 2003-2005  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -28,20 +28,16 @@
  *  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *  - Added support for NEC VR4133.
  */
-#include <linux/init.h>
-#include <linux/ioport.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/smp.h>
 #include <linux/types.h>
 
 #include <asm/cpu.h>
 #include <asm/io.h>
 
-#define IO_MEM_RESOURCE_START	0UL
-#define IO_MEM_RESOURCE_END	0x1fffffffUL
-
-#define CLKSPEEDREG_TYPE1	KSEG1ADDR(0x0b000014)
-#define CLKSPEEDREG_TYPE2	KSEG1ADDR(0x0f000014)
+#define CLKSPEEDREG_TYPE1	(void __iomem *)KSEG1ADDR(0x0b000014)
+#define CLKSPEEDREG_TYPE2	(void __iomem *)KSEG1ADDR(0x0f000014)
  #define CLKSP(x)		((x) & 0x001f)
  #define CLKSP_VR4133(x)	((x) & 0x0007)
 
@@ -63,10 +59,14 @@ unsigned long vr41xx_get_vtclock_frequency(void)
 	return vr41xx_vtclock;
 }
 
+EXPORT_SYMBOL_GPL(vr41xx_get_vtclock_frequency);
+
 unsigned long vr41xx_get_tclock_frequency(void)
 {
 	return vr41xx_tclock;
 }
+
+EXPORT_SYMBOL_GPL(vr41xx_get_tclock_frequency);
 
 static inline uint16_t read_clkspeed(void)
 {
@@ -207,7 +207,7 @@ static inline unsigned long calculate_tclock(uint16_t clkspeed, unsigned long pc
 	return tclock;
 }
 
-static int __init vr41xx_bcu_init(void)
+void vr41xx_calculate_clock_frequency(void)
 {
 	unsigned long pclock;
 	uint16_t clkspeed;
@@ -217,11 +217,6 @@ static int __init vr41xx_bcu_init(void)
 	pclock = calculate_pclock(clkspeed);
 	vr41xx_vtclock = calculate_vtclock(clkspeed, pclock);
 	vr41xx_tclock = calculate_tclock(clkspeed, pclock, vr41xx_vtclock);
-
-	iomem_resource.start = IO_MEM_RESOURCE_START;
-	iomem_resource.end = IO_MEM_RESOURCE_END;
-
-	return 0;
 }
 
-early_initcall(vr41xx_bcu_init);
+EXPORT_SYMBOL_GPL(vr41xx_calculate_clock_frequency);

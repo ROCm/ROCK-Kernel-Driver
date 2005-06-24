@@ -12,7 +12,11 @@
  * Modifications:
  *      18-Aug-2004 BJD  Created initial version
  *	27-Aug-2004 BJD  Added timers 0 through 3
+ *	10-Feb-2005 BJD	 Added camera from guillaume.gourat@nexvision.tv
 */
+#include <linux/config.h>
+
+extern struct platform_device *s3c24xx_uart_devs[];
 
 extern struct platform_device s3c_device_usb;
 extern struct platform_device s3c_device_lcd;
@@ -34,3 +38,11 @@ extern struct platform_device s3c_device_timer2;
 extern struct platform_device s3c_device_timer3;
 
 extern struct platform_device s3c_device_usbgadget;
+
+/* s3c2440 specific devices */
+
+#ifdef CONFIG_CPU_S3C2440
+
+extern struct platform_device s3c_device_camif;
+
+#endif

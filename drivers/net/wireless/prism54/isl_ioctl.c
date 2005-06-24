@@ -36,6 +36,14 @@
 
 #include <net/iw_handler.h>	/* New driver API */
 
+
+static void prism54_wpa_ie_add(islpci_private *priv, u8 *bssid,
+				u8 *wpa_ie, size_t wpa_ie_len);
+static size_t prism54_wpa_ie_get(islpci_private *priv, u8 *bssid, u8 *wpa_ie);
+static int prism54_set_wpa(struct net_device *, struct iw_request_info *,
+				__u32 *, char *);
+
+
 /**
  * prism54_mib_mode_helper - MIB change mode helper function
  * @mib: the &struct islpci_mib object to modify
@@ -47,7 +55,7 @@
  *  Wireless API modes to Device firmware modes. It also checks for 
  *  correct valid Linux wireless modes. 
  */
-int
+static int
 prism54_mib_mode_helper(islpci_private *priv, u32 iw_mode)
 {
 	u32 config = INL_CONFIG_MANUALRUN;
@@ -647,7 +655,7 @@ prism54_translate_bss(struct net_device *ndev, char *current_ev,
 	return current_ev;
 }
 
-int
+static int
 prism54_get_scan(struct net_device *ndev, struct iw_request_info *info,
 		 struct iw_point *dwrq, char *extra)
 {
@@ -1586,7 +1594,7 @@ static u8 wpa_oid[4] = { 0x00, 0x50, 0xf2, 1 };
 #define MAC2STR(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5]
 #define MACSTR "%02x:%02x:%02x:%02x:%02x:%02x"
 
-void
+static void
 prism54_wpa_ie_add(islpci_private *priv, u8 *bssid,
 		   u8 *wpa_ie, size_t wpa_ie_len)
 {
@@ -1653,7 +1661,7 @@ prism54_wpa_ie_add(islpci_private *priv, u8 *bssid,
 	up(&priv->wpa_sem);
 }
 
-size_t
+static size_t
 prism54_wpa_ie_get(islpci_private *priv, u8 *bssid, u8 *wpa_ie)
 {
 	struct list_head *ptr;
@@ -1740,7 +1748,7 @@ handle_request(islpci_private *priv, struct obj_mlme *mlme, enum oid_num_t oid)
 	}
 }
 
-int
+static int
 prism54_process_trap_helper(islpci_private *priv, enum oid_num_t oid,
 			    char *data)
 {
@@ -1750,7 +1758,7 @@ prism54_process_trap_helper(islpci_private *priv, enum oid_num_t oid,
 	u8 wpa_ie[MAX_WPA_IE_LEN];
 	int wpa_ie_len;
 	size_t len = 0; /* u16, better? */
-	u8 *payload = 0, *pos = 0;
+	u8 *payload = NULL, *pos = NULL;
 	int ret;
 
 	/* I think all trapable objects are listed here.
@@ -2318,7 +2326,7 @@ prism54_hostapd(struct net_device *ndev, struct iw_point *p)
        return ret;
 }
 
-int
+static int
 prism54_set_wpa(struct net_device *ndev, struct iw_request_info *info,
 		__u32 * uwrq, char *extra)
 {
@@ -2362,7 +2370,7 @@ prism54_set_wpa(struct net_device *ndev, struct iw_request_info *info,
 	return 0;
 }
 
-int
+static int
 prism54_get_wpa(struct net_device *ndev, struct iw_request_info *info,
 		__u32 * uwrq, char *extra)
 {
@@ -2371,7 +2379,7 @@ prism54_get_wpa(struct net_device *ndev, struct iw_request_info *info,
 	return 0;
 }
 
-int
+static int
 prism54_set_prismhdr(struct net_device *ndev, struct iw_request_info *info,
 		     __u32 * uwrq, char *extra)
 {
@@ -2384,7 +2392,7 @@ prism54_set_prismhdr(struct net_device *ndev, struct iw_request_info *info,
 	return 0;
 }
 
-int
+static int
 prism54_get_prismhdr(struct net_device *ndev, struct iw_request_info *info,
 		     __u32 * uwrq, char *extra)
 {
@@ -2393,7 +2401,7 @@ prism54_get_prismhdr(struct net_device *ndev, struct iw_request_info *info,
 	return 0;
 }
 
-int
+static int
 prism54_debug_oid(struct net_device *ndev, struct iw_request_info *info,
 		  __u32 * uwrq, char *extra)
 {
@@ -2405,7 +2413,7 @@ prism54_debug_oid(struct net_device *ndev, struct iw_request_info *info,
 	return 0;
 }
 
-int
+static int
 prism54_debug_get_oid(struct net_device *ndev, struct iw_request_info *info,
 		      struct iw_point *data, char *extra)
 {
@@ -2441,7 +2449,7 @@ prism54_debug_get_oid(struct net_device *ndev, struct iw_request_info *info,
 	return ret;
 }
 
-int
+static int
 prism54_debug_set_oid(struct net_device *ndev, struct iw_request_info *info,
 		      struct iw_point *data, char *extra)
 {

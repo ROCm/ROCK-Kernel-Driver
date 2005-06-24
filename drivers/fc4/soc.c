@@ -106,8 +106,8 @@ static void soc_reset(fc_channel *fc)
 static inline void soc_solicited (struct soc *s)
 {
 	fc_hdr fchdr;
-	soc_rsp *hwrsp;
-	soc_cq *sw_cq;
+	soc_rsp __iomem *hwrsp;
+	soc_cq_rsp *sw_cq;
 	int token;
 	int status;
 	fc_channel *fc;
@@ -115,12 +115,12 @@ static inline void soc_solicited (struct soc *s)
 	sw_cq = &s->rsp[SOC_SOLICITED_RSP_Q];
 
 	if (sw_cq->pool == NULL)
-		sw_cq->pool = (soc_req *)
+		sw_cq->pool = (soc_req __iomem *)
 			(s->xram + xram_get_32low ((xram_p)&sw_cq->hw_cq->address));
 	sw_cq->in = xram_get_8 ((xram_p)&sw_cq->hw_cq->in);
 	SOD (("soc_solicited, %d pkts arrived\n", (sw_cq->in-sw_cq->out) & sw_cq->last))
 	for (;;) {
-		hwrsp = (soc_rsp *)sw_cq->pool + sw_cq->out;
+		hwrsp = (soc_rsp __iomem *)sw_cq->pool + sw_cq->out;
 		token = xram_get_32low ((xram_p)&hwrsp->shdr.token);
 		status = xram_get_32low ((xram_p)&hwrsp->status);
 		fc = (fc_channel *)(&s->port[(token >> 11) & 1]);
@@ -185,8 +185,8 @@ static inline void soc_request (struct soc *s, u32 cmd)
 
 static inline void soc_unsolicited (struct soc *s)
 {
-	soc_rsp *hwrsp, *hwrspc;
-	soc_cq *sw_cq;
+	soc_rsp __iomem *hwrsp, *hwrspc;
+	soc_cq_rsp *sw_cq;
 	int count;
 	int status;
 	int flags;
@@ -194,14 +194,14 @@ static inline void soc_unsolicited (struct soc *s)
 
 	sw_cq = &s->rsp[SOC_UNSOLICITED_RSP_Q];
 	if (sw_cq->pool == NULL)
-		sw_cq->pool = (soc_req *)
+		sw_cq->pool = (soc_req __iomem *)
 			(s->xram + (xram_get_32low ((xram_p)&sw_cq->hw_cq->address)));
 
 	sw_cq->in = xram_get_8 ((xram_p)&sw_cq->hw_cq->in);
 	SOD (("soc_unsolicited, %d packets arrived\n", (sw_cq->in - sw_cq->out) & sw_cq->last))
 	while (sw_cq->in != sw_cq->out) {
 		/* ...real work per entry here... */
-		hwrsp = (soc_rsp *)sw_cq->pool + sw_cq->out;
+		hwrsp = (soc_rsp __iomem *)sw_cq->pool + sw_cq->out;
 
 		hwrspc = NULL;
 		flags = xram_get_16 ((xram_p)&hwrsp->shdr.flags);
@@ -239,7 +239,7 @@ static inline void soc_unsolicited (struct soc *s)
 					return;
 			}
 			if (sw_cq->out == sw_cq->last)
-				hwrspc = (soc_rsp *)sw_cq->pool;
+				hwrspc = (soc_rsp __iomem *)sw_cq->pool;
 			else
 				hwrspc = hwrsp + 1;
 		}
@@ -359,7 +359,7 @@ static int soc_hw_enque (fc_channel *fc, fcp_cmnd *fcmd)
 	soc_port *port = (soc_port *)fc;
 	struct soc *s = port->s;
 	int qno;
-	soc_cq *sw_cq;
+	soc_cq_req *sw_cq;
 	int cq_next_in;
 	soc_req *request;
 	fc_hdr *fch;

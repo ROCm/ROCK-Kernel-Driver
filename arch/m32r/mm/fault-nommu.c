@@ -23,6 +23,7 @@
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/vt_kern.h>              /* For unblank_screen() */
 
 #include <asm/m32r.h>
 #include <asm/system.h>

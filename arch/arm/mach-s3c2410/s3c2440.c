@@ -109,7 +109,6 @@ static struct platform_device s3c_uart0 = {
 	.resource	  = s3c_uart0_resource,
 };
 
-
 static struct platform_device s3c_uart1 = {
 	.name		  = "s3c2440-uart",
 	.id		  = 1,
@@ -149,19 +148,6 @@ void __init s3c2440_init_uarts(struct s3c2410_uartcfg *cfg, int no)
 	s3c2440_uart_count = uart;
 }
 
-/* s3c2440 specific clock sources */
-
-static struct clk s3c2440_clk_cam = {
-	.name		= "camera",
-	.enable		= s3c24xx_clkcon_enable,
-	.ctrlbit	= S3C2440_CLKCON_CAMERA
-};
-
-static struct clk s3c2440_clk_ac97 = {
-	.name		= "ac97",
-	.enable		= s3c24xx_clkcon_enable,
-	.ctrlbit	= S3C2440_CLKCON_CAMERA
-};
 
 #ifdef CONFIG_PM
 
@@ -173,7 +159,7 @@ struct sleep_save s3c2440_sleep[] = {
 	SAVE_ITEM(S3C2440_GPJUP)
 };
 
-static int s3c2440_suspend(struct sys_device *dev, u32 state)
+static int s3c2440_suspend(struct sys_device *dev, pm_message_t state)
 {
 	s3c2410_pm_do_save(s3c2440_sleep, ARRAY_SIZE(s3c2440_sleep));
 	return 0;
@@ -190,7 +176,7 @@ static int s3c2440_resume(struct sys_device *dev)
 #define s3c2440_resume  NULL
 #endif
 
-static struct sysdev_class s3c2440_sysclass = {
+struct sysdev_class s3c2440_sysclass = {
 	set_kset_name("s3c2440-core"),
 	.suspend	= s3c2440_suspend,
 	.resume		= s3c2440_resume
@@ -206,22 +192,29 @@ void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 
 	iotable_init(s3c2440_iodesc, ARRAY_SIZE(s3c2440_iodesc));
 	iotable_init(mach_desc, size);
+
 	/* rename any peripherals used differing from the s3c2410 */
 
-	s3c_device_i2c.name = "s3c2440-i2c";
+	s3c_device_i2c.name  = "s3c2440-i2c";
+	s3c_device_nand.name = "s3c2440-nand";
+
+	/* change irq for watchdog */
+
+	s3c_device_wdt.resource[1].start = IRQ_S3C2440_WDT;
+	s3c_device_wdt.resource[1].end   = IRQ_S3C2440_WDT;
 }
 
 void __init s3c2440_init_clocks(int xtal)
 {
 	unsigned long clkdiv;
 	unsigned long camdiv;
-	int s3c2440_hdiv = 1;
+	unsigned long hclk, fclk, pclk;
+	int hdiv = 1;
 
 	/* now we've got our machine bits initialised, work out what
 	 * clocks we've got */
 
-	s3c24xx_fclk = s3c2410_get_pll(__raw_readl(S3C2410_MPLLCON),
-				       s3c24xx_xtal) * 2;
+	fclk = s3c2410_get_pll(__raw_readl(S3C2410_MPLLCON), xtal) * 2;
 
 	clkdiv = __raw_readl(S3C2410_CLKDIVN);
 	camdiv = __raw_readl(S3C2440_CAMDIVN);
@@ -230,48 +223,49 @@ void __init s3c2440_init_clocks(int xtal)
 
 	switch (clkdiv & S3C2440_CLKDIVN_HDIVN_MASK) {
 	case S3C2440_CLKDIVN_HDIVN_1:
-		s3c2440_hdiv = 1;
+		hdiv = 1;
 		break;
 
 	case S3C2440_CLKDIVN_HDIVN_2:
-		s3c2440_hdiv = 1;
+		hdiv = 2;
 		break;
 
 	case S3C2440_CLKDIVN_HDIVN_4_8:
-		s3c2440_hdiv = (camdiv & S3C2440_CAMDIVN_HCLK4_HALF) ? 8 : 4;
+		hdiv = (camdiv & S3C2440_CAMDIVN_HCLK4_HALF) ? 8 : 4;
 		break;
 
 	case S3C2440_CLKDIVN_HDIVN_3_6:
-		s3c2440_hdiv = (camdiv & S3C2440_CAMDIVN_HCLK3_HALF) ? 6 : 3;
+		hdiv = (camdiv & S3C2440_CAMDIVN_HCLK3_HALF) ? 6 : 3;
 		break;
 	}
 
-	s3c24xx_hclk = s3c24xx_fclk / s3c2440_hdiv;
-	s3c24xx_pclk = s3c24xx_hclk / ((clkdiv & S3C2440_CLKDIVN_PDIVN)? 2:1);
+	hclk = fclk / hdiv;
+	pclk = hclk / ((clkdiv & S3C2440_CLKDIVN_PDIVN)? 2:1);
 
 	/* print brief summary of clocks, etc */
 
 	printk("S3C2440: core %ld.%03ld MHz, memory %ld.%03ld MHz, peripheral %ld.%03ld MHz\n",
-	       print_mhz(s3c24xx_fclk), print_mhz(s3c24xx_hclk),
-	       print_mhz(s3c24xx_pclk));
+	       print_mhz(fclk), print_mhz(hclk), print_mhz(pclk));
 
 	/* initialise the clocks here, to allow other things like the
 	 * console to use them, and to add new ones after the initialisation
 	 */
 
-	s3c24xx_setup_clocks();
-
-	/* add s3c2440 specific clocks */
-
-	s3c2440_clk_cam.parent = clk_get(NULL, "hclk");
-	s3c2440_clk_ac97.parent = clk_get(NULL, "pclk");
-
-	s3c24xx_register_clock(&s3c2440_clk_ac97);
-	s3c24xx_register_clock(&s3c2440_clk_cam);
-
-	clk_disable(&s3c2440_clk_ac97);
-	clk_disable(&s3c2440_clk_cam);
+	s3c24xx_setup_clocks(xtal, fclk, hclk, pclk);
 }
+
+/* need to register class before we actually register the device, and
+ * we also need to ensure that it has been initialised before any of the
+ * drivers even try to use it (even if not on an s3c2440 based system)
+ * as a driver which may support both 2410 and 2440 may try and use it.
+*/
+
+int __init s3c2440_core_init(void)
+{
+	return sysdev_class_register(&s3c2440_sysclass);
+}
+
+core_initcall(s3c2440_core_init);
 
 int __init s3c2440_init(void)
 {
@@ -279,14 +273,10 @@ int __init s3c2440_init(void)
 
 	printk("S3C2440: Initialising architecture\n");
 
-	ret = sysdev_class_register(&s3c2440_sysclass);
-	if (ret == 0)
-		ret = sysdev_register(&s3c2440_sysdev);
-
+	ret = sysdev_register(&s3c2440_sysdev);
 	if (ret != 0)
 		printk(KERN_ERR "failed to register sysdev for s3c2440\n");
-
-	if (ret == 0)
+	else
 		ret = platform_add_devices(s3c24xx_uart_devs, s3c2440_uart_count);
 
 	return ret;

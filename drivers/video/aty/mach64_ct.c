@@ -359,7 +359,8 @@ void aty_set_pll_ct(const struct fb_info *info, const union aty_pll *pll)
 #endif
 }
 
-void __init aty_get_pll_ct(const struct fb_info *info, union aty_pll *pll)
+static void __init aty_get_pll_ct(const struct fb_info *info,
+				  union aty_pll *pll)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	u8 tmp, clock;
@@ -382,7 +383,9 @@ void __init aty_get_pll_ct(const struct fb_info *info, union aty_pll *pll)
 	}
 }
 
-int __init aty_init_pll_ct(const struct fb_info *info, union aty_pll *pll) {
+static int __init aty_init_pll_ct(const struct fb_info *info,
+				 union aty_pll *pll)
+{
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	u8 mpost_div, xpost_div, sclk_post_div_real, sclk_fb_div, spll_cntl2;
 	u32 q, i, memcntl, trp;

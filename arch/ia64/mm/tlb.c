@@ -127,7 +127,6 @@ local_flush_tlb_all (void)
 	local_irq_restore(flags);
 	ia64_srlz_i();			/* srlz.i implies srlz.d */
 }
-EXPORT_SYMBOL(local_flush_tlb_all);
 
 void
 flush_tlb_range (struct vm_area_struct *vma, unsigned long start, unsigned long end)

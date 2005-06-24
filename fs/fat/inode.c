@@ -33,6 +33,21 @@ static int fat_default_codepage = CONFIG_FAT_DEFAULT_CODEPAGE;
 static char fat_default_iocharset[] = CONFIG_FAT_DEFAULT_IOCHARSET;
 
 
+static int fat_add_cluster(struct inode *inode)
+{
+	int err, cluster;
+
+	err = fat_alloc_clusters(inode, &cluster, 1);
+	if (err)
+		return err;
+	/* FIXME: this cluster should be added after data of this
+	 * cluster is writed */
+	err = fat_chain_add(inode, cluster, 1);
+	if (err)
+		fat_free_clusters(inode, cluster);
+	return err;
+}
+
 static int fat_get_block(struct inode *inode, sector_t iblock,
 			 struct buffer_head *bh_result, int create)
 {
@@ -55,11 +70,9 @@ static int fat_get_block(struct inode *inode, sector_t iblock,
 		return -EIO;
 	}
 	if (!((unsigned long)iblock & (MSDOS_SB(sb)->sec_per_clus - 1))) {
-		int error;
-
-		error = fat_add_cluster(inode);
-		if (error < 0)
-			return error;
+		err = fat_add_cluster(inode);
+		if (err)
+			return err;
 	}
 	MSDOS_I(inode)->mmu_private += sb->s_blocksize;
 	err = fat_bmap(inode, iblock, &phys);
@@ -220,8 +233,7 @@ static int fat_calc_dir_size(struct inode *inode)
 /* doesn't deal with root inode */
 static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 {
-	struct super_block *sb = inode->i_sb;
-	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
 	int error;
 
 	MSDOS_I(inode)->i_pos = 0;
@@ -266,9 +278,10 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		inode->i_mapping->a_ops = &fat_aops;
 		MSDOS_I(inode)->mmu_private = inode->i_size;
 	}
-	if(de->attr & ATTR_SYS)
+	if (de->attr & ATTR_SYS) {
 		if (sbi->options.sys_immutable)
 			inode->i_flags |= S_IMMUTABLE;
+	}
 	MSDOS_I(inode)->i_attrs = de->attr & ATTR_UNUSED;
 	/* this is as close to the truth as we can get ... */
 	inode->i_blksize = sbi->cluster_size;
@@ -277,34 +290,39 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	inode->i_mtime.tv_sec = inode->i_atime.tv_sec =
 		date_dos2unix(le16_to_cpu(de->time), le16_to_cpu(de->date));
 	inode->i_mtime.tv_nsec = inode->i_atime.tv_nsec = 0;
-	inode->i_ctime.tv_sec =
-		MSDOS_SB(sb)->options.isvfat
-		? date_dos2unix(le16_to_cpu(de->ctime), le16_to_cpu(de->cdate))
-		: inode->i_mtime.tv_sec;
-	inode->i_ctime.tv_nsec = de->ctime_ms * 1000000;
-	MSDOS_I(inode)->i_ctime_ms = de->ctime_ms;
+	if (sbi->options.isvfat) {
+		int secs = de->ctime_cs / 100;
+		int csecs = de->ctime_cs % 100;
+		inode->i_ctime.tv_sec  =
+			date_dos2unix(le16_to_cpu(de->ctime),
+				      le16_to_cpu(de->cdate)) + secs;
+		inode->i_ctime.tv_nsec = csecs * 10000000;
+	} else
+		inode->i_ctime = inode->i_mtime;
 
 	return 0;
 }
 
 struct inode *fat_build_inode(struct super_block *sb,
-			struct msdos_dir_entry *de, loff_t i_pos, int *res)
+			struct msdos_dir_entry *de, loff_t i_pos)
 {
 	struct inode *inode;
-	*res = 0;
+	int err;
+
 	inode = fat_iget(sb, i_pos);
 	if (inode)
 		goto out;
 	inode = new_inode(sb);
-	*res = -ENOMEM;
-	if (!inode)
+	if (!inode) {
+		inode = ERR_PTR(-ENOMEM);
 		goto out;
+	}
 	inode->i_ino = iunique(sb, MSDOS_ROOT_INO);
 	inode->i_version = 1;
-	*res = fat_fill_inode(inode, de);
-	if (*res < 0) {
+	err = fat_fill_inode(inode, de);
+	if (err) {
 		iput(inode);
-		inode = NULL;
+		inode = ERR_PTR(err);
 		goto out;
 	}
 	fat_attach(inode, i_pos);
@@ -413,41 +431,27 @@ static void __exit fat_destroy_inodecache(void)
 
 static int fat_remount(struct super_block *sb, int *flags, char *data)
 {
-	*flags |= MS_NODIRATIME;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	*flags |= MS_NODIRATIME | (sbi->options.isvfat ? 0 : MS_NOATIME);
 	return 0;
 }
 
 static int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
-	int free, nr, ret;
 
-	if (sbi->free_clusters != -1)
-		free = sbi->free_clusters;
-	else {
-		lock_fat(sb);
-		if (sbi->free_clusters != -1)
-			free = sbi->free_clusters;
-		else {
-			free = 0;
-			for (nr = FAT_START_ENT; nr < sbi->max_cluster; nr++) {
-				ret = fat_access(sb, nr, -1);
-				if (ret < 0) {
-					unlock_fat(sb);
-					return ret;
-				} else if (ret == FAT_ENT_FREE)
-					free++;
-			}
-			sbi->free_clusters = free;
-		}
-		unlock_fat(sb);
+	/* If the count of free cluster is still unknown, counts it here. */
+	if (sbi->free_clusters == -1) {
+		int err = fat_count_free_clusters(sb);
+		if (err)
+			return err;
 	}
 
 	buf->f_type = sb->s_magic;
 	buf->f_bsize = sbi->cluster_size;
 	buf->f_blocks = sbi->max_cluster - FAT_START_ENT;
-	buf->f_bfree = free;
-	buf->f_bavail = free;
+	buf->f_bfree = sbi->free_clusters;
+	buf->f_bavail = sbi->free_clusters;
 	buf->f_namelen = sbi->options.isvfat ? 260 : 12;
 
 	return 0;
@@ -460,18 +464,20 @@ static int fat_write_inode(struct inode *inode, int wait)
 	struct buffer_head *bh;
 	struct msdos_dir_entry *raw_entry;
 	loff_t i_pos;
+	int err = 0;
 
 retry:
 	i_pos = MSDOS_I(inode)->i_pos;
-	if (inode->i_ino == MSDOS_ROOT_INO || !i_pos) {
+	if (inode->i_ino == MSDOS_ROOT_INO || !i_pos)
 		return 0;
-	}
+
 	lock_kernel();
-	if (!(bh = sb_bread(sb, i_pos >> sbi->dir_per_block_bits))) {
+	bh = sb_bread(sb, i_pos >> sbi->dir_per_block_bits);
+	if (!bh) {
 		printk(KERN_ERR "FAT: unable to read inode block "
 		       "for updating (i_pos %lld)\n", i_pos);
-		unlock_kernel();
-		return -EIO;
+		err = -EIO;
+		goto out;
 	}
 	spin_lock(&sbi->inode_hash_lock);
 	if (i_pos != MSDOS_I(inode)->i_pos) {
@@ -483,29 +489,35 @@ retry:
 
 	raw_entry = &((struct msdos_dir_entry *) (bh->b_data))
 	    [i_pos & (sbi->dir_per_block - 1)];
-	if (S_ISDIR(inode->i_mode)) {
-		raw_entry->attr = ATTR_DIR;
+	if (S_ISDIR(inode->i_mode))
 		raw_entry->size = 0;
-	}
-	else {
-		raw_entry->attr = ATTR_NONE;
+	else
 		raw_entry->size = cpu_to_le32(inode->i_size);
-	}
-	raw_entry->attr |= MSDOS_MKATTR(inode->i_mode) |
-	    MSDOS_I(inode)->i_attrs;
+	raw_entry->attr = fat_attr(inode);
 	raw_entry->start = cpu_to_le16(MSDOS_I(inode)->i_logstart);
 	raw_entry->starthi = cpu_to_le16(MSDOS_I(inode)->i_logstart >> 16);
 	fat_date_unix2dos(inode->i_mtime.tv_sec, &raw_entry->time, &raw_entry->date);
 	if (sbi->options.isvfat) {
 		fat_date_unix2dos(inode->i_ctime.tv_sec,&raw_entry->ctime,&raw_entry->cdate);
-		raw_entry->ctime_ms = MSDOS_I(inode)->i_ctime_ms; /* use i_ctime.tv_nsec? */
+		raw_entry->ctime_cs = (inode->i_ctime.tv_sec & 1) * 100 +
+			inode->i_ctime.tv_nsec / 10000000;
 	}
 	spin_unlock(&sbi->inode_hash_lock);
 	mark_buffer_dirty(bh);
+	if (wait)
+		err = sync_dirty_buffer(bh);
 	brelse(bh);
+out:
 	unlock_kernel();
-	return 0;
+	return err;
 }
+
+int fat_sync_inode(struct inode *inode)
+{
+	return fat_write_inode(inode, 1);
+}
+
+EXPORT_SYMBOL(fat_sync_inode);
 
 static int fat_show_options(struct seq_file *m, struct vfsmount *mnt);
 static struct super_operations fat_sops = {
@@ -636,39 +648,35 @@ fat_encode_fh(struct dentry *de, __u32 *fh, int *lenp, int connectable)
 
 static struct dentry *fat_get_parent(struct dentry *child)
 {
-	struct buffer_head *bh=NULL;
-	struct msdos_dir_entry *de = NULL;
-	struct dentry *parent = NULL;
-	int res;
-	loff_t i_pos = 0;
+	struct buffer_head *bh;
+	struct msdos_dir_entry *de;
+	loff_t i_pos;
+	struct dentry *parent;
 	struct inode *inode;
+	int err;
 
 	lock_kernel();
-	res = fat_scan(child->d_inode, MSDOS_DOTDOT, &bh, &de, &i_pos);
 
-	if (res < 0)
+	err = fat_get_dotdot_entry(child->d_inode, &bh, &de, &i_pos);
+	if (err) {
+		parent = ERR_PTR(err);
 		goto out;
-	inode = fat_build_inode(child->d_sb, de, i_pos, &res);
-	if (res)
-		goto out;
-	if (!inode)
-		res = -EACCES;
-	else {
-		parent = d_alloc_anon(inode);
-		if (!parent) {
-			iput(inode);
-			res = -ENOMEM;
-		}
 	}
-
- out:
-	if(bh)
-		brelse(bh);
+	inode = fat_build_inode(child->d_sb, de, i_pos);
+	brelse(bh);
+	if (IS_ERR(inode)) {
+		parent = ERR_PTR(PTR_ERR(inode));
+		goto out;
+	}
+	parent = d_alloc_anon(inode);
+	if (!parent) {
+		iput(inode);
+		parent = ERR_PTR(-ENOMEM);
+	}
+out:
 	unlock_kernel();
-	if (res)
-		return ERR_PTR(res);
-	else
-		return parent;
+
+	return parent;
 }
 
 static struct export_operations fat_export_ops = {
@@ -1026,10 +1034,9 @@ static int fat_read_root(struct inode *inode)
 	MSDOS_I(inode)->i_logstart = 0;
 	MSDOS_I(inode)->mmu_private = inode->i_size;
 
-	MSDOS_I(inode)->i_attrs = 0;
+	MSDOS_I(inode)->i_attrs = ATTR_NONE;
 	inode->i_mtime.tv_sec = inode->i_atime.tv_sec = inode->i_ctime.tv_sec = 0;
 	inode->i_mtime.tv_nsec = inode->i_atime.tv_nsec = inode->i_ctime.tv_nsec = 0;
-	MSDOS_I(inode)->i_ctime_ms = 0;
 	inode->i_nlink = fat_subdirs(inode)+2;
 
 	return 0;
@@ -1067,10 +1074,6 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	error = parse_options(data, isvfat, &debug, &sbi->options);
 	if (error)
 		goto out_fail;
-
-	/* set up enough so that it can read an inode */
-	fat_hash_init(sb);
-	init_MUTEX(&sbi->fat_lock);
 
 	error = -EIO;
 	sb_min_blocksize(sb, 512);
@@ -1161,7 +1164,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi->fat_length = le16_to_cpu(b->fat_length);
 	sbi->root_cluster = 0;
 	sbi->free_clusters = -1;	/* Don't know yet */
-	sbi->prev_free = -1;
+	sbi->prev_free = FAT_START_ENT;
 
 	if (!sbi->fat_length && b->fat32_length) {
 		struct fat_boot_fsinfo *fsinfo;
@@ -1245,8 +1248,16 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	/* check the free_clusters, it's not necessarily correct */
 	if (sbi->free_clusters != -1 && sbi->free_clusters > total_clusters)
 		sbi->free_clusters = -1;
+	/* check the prev_free, it's not necessarily correct */
+	sbi->prev_free %= sbi->max_cluster;
+	if (sbi->prev_free < FAT_START_ENT)
+		sbi->prev_free = FAT_START_ENT;
 
 	brelse(bh);
+
+	/* set up enough so that it can read an inode */
+	fat_hash_init(sb);
+	fat_ent_access_init(sb);
 
 	/*
 	 * The low byte of FAT's first entry must have same value with

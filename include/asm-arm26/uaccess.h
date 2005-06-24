@@ -40,7 +40,8 @@ extern int fixup_exception(struct pt_regs *regs);
 
 #define access_ok(type,addr,size)	(__range_ok(addr,size) == 0)
 
-static inline int verify_area(int type, const void * addr, unsigned long size)
+/* this function will go away soon - use access_ok() instead */
+static inline int __deprecated verify_area(int type, const void * addr, unsigned long size)
 {
 	return access_ok(type, addr, size) ? 0 : -EFAULT;
 }

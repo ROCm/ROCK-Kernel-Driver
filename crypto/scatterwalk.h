@@ -34,15 +34,27 @@ static inline struct scatterlist *sg_next(struct scatterlist *sg)
 }
 
 static inline int scatterwalk_samebuf(struct scatter_walk *walk_in,
-				      struct scatter_walk *walk_out,
-				      void *src_p, void *dst_p)
+				      struct scatter_walk *walk_out)
 {
 	return walk_in->page == walk_out->page &&
-	       walk_in->offset == walk_out->offset &&
-	       walk_in->data == src_p && walk_out->data == dst_p;
+	       walk_in->offset == walk_out->offset;
 }
 
-void *scatterwalk_whichbuf(struct scatter_walk *walk, unsigned int nbytes, void *scratch);
+static inline int scatterwalk_across_pages(struct scatter_walk *walk,
+					   unsigned int nbytes)
+{
+	return nbytes > walk->len_this_page;
+}
+
+static inline void scatterwalk_advance(struct scatter_walk *walk,
+				       unsigned int nbytes)
+{
+	walk->data += nbytes;
+	walk->offset += nbytes;
+	walk->len_this_page -= nbytes;
+	walk->len_this_segment -= nbytes;
+}
+
 void scatterwalk_start(struct scatter_walk *walk, struct scatterlist *sg);
 int scatterwalk_copychunks(void *buf, struct scatter_walk *walk, size_t nbytes, int out);
 void scatterwalk_map(struct scatter_walk *walk, int out);

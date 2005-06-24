@@ -198,10 +198,7 @@ static void ext2_clear_inode(struct inode *inode)
 		ei->i_default_acl = EXT2_ACL_NOT_CACHED;
 	}
 #endif
-	if (!is_bad_inode(inode))
-		ext2_discard_prealloc(inode);
 }
-
 
 #ifdef CONFIG_QUOTA
 static ssize_t ext2_quota_read(struct super_block *sb, int type, char *data, size_t len, loff_t off);
@@ -213,6 +210,7 @@ static struct super_operations ext2_sops = {
 	.destroy_inode	= ext2_destroy_inode,
 	.read_inode	= ext2_read_inode,
 	.write_inode	= ext2_write_inode,
+	.put_inode	= ext2_put_inode,
 	.delete_inode	= ext2_delete_inode,
 	.put_super	= ext2_put_super,
 	.write_super	= ext2_write_super,
@@ -518,12 +516,18 @@ static int ext2_check_descriptors (struct super_block * sb)
 static loff_t ext2_max_size(int bits)
 {
 	loff_t res = EXT2_NDIR_BLOCKS;
+	/* This constant is calculated to be the largest file size for a
+	 * dense, 4k-blocksize file such that the total number of
+	 * sectors in the file, including data and all indirect blocks,
+	 * does not exceed 2^32. */
+	const loff_t upper_limit = 0x1ff7fffd000LL;
+
 	res += 1LL << (bits-2);
 	res += 1LL << (2*(bits-2));
 	res += 1LL << (3*(bits-2));
 	res <<= bits;
-	if (res > (512LL << 32) - (1 << bits))
-		res = (512LL << 32) - (1 << bits);
+	if (res > upper_limit)
+		res = upper_limit;
 	return res;
 }
 

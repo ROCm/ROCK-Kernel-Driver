@@ -36,8 +36,7 @@ extern int seq_default_timer_resolution;
 
 #define SKEW_BASE	0x10000	/* 16bit shift */
 
-static void snd_seq_timer_set_tick_resolution(seq_timer_tick_t *tick,
-					      int tempo, int ppq, int nticks)
+void snd_seq_timer_set_tick_resolution(seq_timer_tick_t *tick, int tempo, int ppq, int nticks)
 {
 	if (tempo < 1000000)
 		tick->resolution = (tempo * 1000) / ppq;

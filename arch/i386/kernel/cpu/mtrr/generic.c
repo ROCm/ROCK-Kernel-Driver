@@ -19,18 +19,7 @@ struct mtrr_state {
 };
 
 static unsigned long smp_changes_mask;
-struct mtrr_state mtrr_state = {};
-
-/* Doesn't attempt to pass an error out to MTRR users
-   because it's quite complicated in some cases and probably not 
-   worth it because the best error handling is to ignore it. */
-void mtrr_wrmsr(unsigned msr, unsigned a, unsigned b) 
-{ 
-	if (wrmsr_safe(msr, a, b) < 0) 
-		printk(KERN_ERR 
-			"MTRR: CPU %u: Writing MSR %x to %x:%x failed\n",
-			smp_processor_id(), msr, a, b);
-} 
+static struct mtrr_state mtrr_state = {};
 
 /*  Get the MSR pair relating to a var range  */
 static void __init
@@ -103,6 +92,16 @@ void __init mtrr_state_warn(void)
 	printk(KERN_INFO "mtrr: corrected configuration.\n");
 }
 
+/* Doesn't attempt to pass an error out to MTRR users
+   because it's quite complicated in some cases and probably not
+   worth it because the best error handling is to ignore it. */
+void mtrr_wrmsr(unsigned msr, unsigned a, unsigned b)
+{
+	if (wrmsr_safe(msr, a, b) < 0)
+		printk(KERN_ERR
+			"MTRR: CPU %u: Writing MSR %x to %x:%x failed\n",
+			smp_processor_id(), msr, a, b);
+}
 
 int generic_get_free_region(unsigned long base, unsigned long size)
 /*  [SUMMARY] Get a free MTRR.
@@ -125,8 +124,8 @@ int generic_get_free_region(unsigned long base, unsigned long size)
 	return -ENOSPC;
 }
 
-void generic_get_mtrr(unsigned int reg, unsigned long *base,
-		      unsigned int *size, mtrr_type * type)
+static void generic_get_mtrr(unsigned int reg, unsigned long *base,
+			     unsigned int *size, mtrr_type * type)
 {
 	unsigned int mask_lo, mask_hi, base_lo, base_hi;
 
@@ -194,7 +193,8 @@ static int set_mtrr_var_ranges(unsigned int index, struct mtrr_var_range *vr)
 
 	rdmsr(MTRRphysBase_MSR(index), lo, hi);
 	if ((vr->base_lo & 0xfffff0ffUL) != (lo & 0xfffff0ffUL)
-	    || (vr->base_hi & 0xfUL) != (hi & 0xfUL)) {
+	    || (vr->base_hi & (size_and_mask >> (32 - PAGE_SHIFT))) !=
+		(hi & (size_and_mask >> (32 - PAGE_SHIFT)))) {
 		mtrr_wrmsr(MTRRphysBase_MSR(index), vr->base_lo, vr->base_hi);
 		changed = TRUE;
 	}
@@ -202,7 +202,8 @@ static int set_mtrr_var_ranges(unsigned int index, struct mtrr_var_range *vr)
 	rdmsr(MTRRphysMask_MSR(index), lo, hi);
 
 	if ((vr->mask_lo & 0xfffff800UL) != (lo & 0xfffff800UL)
-	    || (vr->mask_hi & 0xfUL) != (hi & 0xfUL)) {
+	    || (vr->mask_hi & (size_and_mask >> (32 - PAGE_SHIFT))) !=
+		(hi & (size_and_mask >> (32 - PAGE_SHIFT)))) {
 		mtrr_wrmsr(MTRRphysMask_MSR(index), vr->mask_lo, vr->mask_hi);
 		changed = TRUE;
 	}
@@ -393,7 +394,7 @@ int generic_validate_add_page(unsigned long base, unsigned long size, unsigned i
 }
 
 
-int generic_have_wrcomb(void)
+static int generic_have_wrcomb(void)
 {
 	unsigned long config, dummy;
 	rdmsr(MTRRcap_MSR, config, dummy);

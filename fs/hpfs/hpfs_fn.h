@@ -202,7 +202,6 @@ static inline unsigned tstbits(unsigned *bmp, unsigned b, unsigned n)
 
 int hpfs_chk_sectors(struct super_block *, secno, int, char *);
 secno hpfs_alloc_sector(struct super_block *, secno, unsigned, int, int);
-int hpfs_alloc_if_possible_nolock(struct super_block *, secno);
 int hpfs_alloc_if_possible(struct super_block *, secno);
 void hpfs_free_sectors(struct super_block *, secno, unsigned);
 int hpfs_check_free_dnodes(struct super_block *, int);
@@ -247,8 +246,6 @@ extern struct file_operations hpfs_dir_ops;
 void hpfs_add_pos(struct inode *, loff_t *);
 void hpfs_del_pos(struct inode *, loff_t *);
 struct hpfs_dirent *hpfs_add_de(struct super_block *, struct dnode *, unsigned char *, unsigned, secno);
-void hpfs_delete_de(struct super_block *, struct dnode *, struct hpfs_dirent *);
-int hpfs_add_to_dnode(struct inode *, dnode_secno, unsigned char *, unsigned, struct hpfs_dirent *, dnode_secno);
 int hpfs_add_dirent(struct inode *, unsigned char *, unsigned, struct hpfs_dirent *, int);
 int hpfs_remove_dirent(struct inode *, dnode_secno, struct hpfs_dirent *, struct quad_buffer_head *, int);
 void hpfs_count_dnodes(struct super_block *, dnode_secno, int *, int *, int *);
@@ -276,7 +273,6 @@ extern struct address_space_operations hpfs_aops;
 
 void hpfs_init_inode(struct inode *);
 void hpfs_read_inode(struct inode *);
-void hpfs_write_inode_ea(struct inode *, struct fnode *);
 void hpfs_write_inode(struct inode *);
 void hpfs_write_inode_nolock(struct inode *);
 int hpfs_notify_change(struct dentry *, struct iattr *);
@@ -329,13 +325,13 @@ unsigned hpfs_count_one_bitmap(struct super_block *, secno);
  * local time (HPFS) to GMT (Unix)
  */
 
-static inline time_t local_to_gmt(struct super_block *s, time_t t)
+static inline time_t local_to_gmt(struct super_block *s, time32_t t)
 {
 	extern struct timezone sys_tz;
 	return t + sys_tz.tz_minuteswest * 60 + hpfs_sb(s)->sb_timeshift;
 }
 
-static inline time_t gmt_to_local(struct super_block *s, time_t t)
+static inline time32_t gmt_to_local(struct super_block *s, time_t t)
 {
 	extern struct timezone sys_tz;
 	return t - sys_tz.tz_minuteswest * 60 - hpfs_sb(s)->sb_timeshift;

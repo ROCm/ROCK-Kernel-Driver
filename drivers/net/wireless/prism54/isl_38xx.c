@@ -125,11 +125,11 @@ isl38xx_trigger_device(int asleep, void __iomem *device_base)
 #if VERBOSE > SHOW_ERROR_MESSAGES
 		do_gettimeofday(&current_time);
 		DEBUG(SHOW_TRACING, "%08li.%08li Device wakeup triggered\n",
-		      current_time.tv_sec, current_time.tv_usec);
+		      current_time.tv_sec, (long)current_time.tv_usec);
 #endif
 
 		DEBUG(SHOW_TRACING, "%08li.%08li Device register read %08x\n",
-		      current_time.tv_sec, current_time.tv_usec,
+		      current_time.tv_sec, (long)current_time.tv_usec,
 		      readl(device_base + ISL38XX_CTRL_STAT_REG));
 		udelay(ISL38XX_WRITEIO_DELAY);
 
@@ -139,7 +139,7 @@ isl38xx_trigger_device(int asleep, void __iomem *device_base)
 			do_gettimeofday(&current_time);
 			DEBUG(SHOW_TRACING,
 			      "%08li.%08li Device register abadface\n",
-			      current_time.tv_sec, current_time.tv_usec);
+			      current_time.tv_sec, (long)current_time.tv_usec);
 #endif
 			/* read the Device Status Register until Sleepmode bit is set */
 			while (reg = readl(device_base + ISL38XX_CTRL_STAT_REG),
@@ -150,7 +150,7 @@ isl38xx_trigger_device(int asleep, void __iomem *device_base)
 
 			DEBUG(SHOW_TRACING,
 			      "%08li.%08li Device register read %08x\n",
-			      current_time.tv_sec, current_time.tv_usec,
+			      current_time.tv_sec, (long)current_time.tv_usec,
 			      readl(device_base + ISL38XX_CTRL_STAT_REG));
 			udelay(ISL38XX_WRITEIO_DELAY);
 
@@ -158,7 +158,7 @@ isl38xx_trigger_device(int asleep, void __iomem *device_base)
 			do_gettimeofday(&current_time);
 			DEBUG(SHOW_TRACING,
 			      "%08li.%08li Device asleep counter %i\n",
-			      current_time.tv_sec, current_time.tv_usec,
+			      current_time.tv_sec, (long)current_time.tv_usec,
 			      counter);
 #endif
 		}
@@ -174,7 +174,7 @@ isl38xx_trigger_device(int asleep, void __iomem *device_base)
 #if VERBOSE > SHOW_ERROR_MESSAGES
 		do_gettimeofday(&current_time);
 		DEBUG(SHOW_TRACING, "%08li.%08li Device register read %08x\n",
-		      current_time.tv_sec, current_time.tv_usec, reg);
+		      current_time.tv_sec, (long)current_time.tv_usec, reg);
 #endif
 	} else {
 		/* device is (still) awake  */

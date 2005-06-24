@@ -24,7 +24,7 @@
 
 /*
  * Note that since kernel addresses are in a separate address space on
- * parisc, we don't need to do anything for access_ok() or verify_area().
+ * parisc, we don't need to do anything for access_ok().
  * We just let the page fault handler do the right thing. This also means
  * that put_user is the same as __put_user, etc.
  */
@@ -34,8 +34,15 @@ extern int __get_user_bad(void);
 extern int __put_kernel_bad(void);
 extern int __put_user_bad(void);
 
-#define access_ok(type,addr,size)   (1)
-#define verify_area(type,addr,size) (0)
+static inline long access_ok(int type, const void __user * addr,
+		unsigned long size)
+{
+	return 1;
+}
+
+#define verify_area(type,addr,size) (0)	/* FIXME: all users should go away soon,
+                                         * and use access_ok instead, then this
+                                         * should be removed. */
 
 #define put_user __put_user
 #define get_user __get_user
@@ -142,22 +149,23 @@ struct exception_data {
 #define __put_user(x,ptr)                                       \
 ({								\
 	register long __pu_err __asm__ ("r8") = 0;      	\
+        __typeof__(*(ptr)) __x = (__typeof__(*(ptr)))(x);	\
 								\
 	if (segment_eq(get_fs(),KERNEL_DS)) {                   \
 	    switch (sizeof(*(ptr))) {                           \
-	    case 1: __put_kernel_asm("stb",x,ptr); break;       \
-	    case 2: __put_kernel_asm("sth",x,ptr); break;       \
-	    case 4: __put_kernel_asm("stw",x,ptr); break;       \
-	    case 8: STD_KERNEL(x,ptr); break;			\
+	    case 1: __put_kernel_asm("stb",__x,ptr); break;     \
+	    case 2: __put_kernel_asm("sth",__x,ptr); break;     \
+	    case 4: __put_kernel_asm("stw",__x,ptr); break;     \
+	    case 8: STD_KERNEL(__x,ptr); break;			\
 	    default: __put_kernel_bad(); break;			\
 	    }                                                   \
 	}                                                       \
 	else {                                                  \
 	    switch (sizeof(*(ptr))) {                           \
-	    case 1: __put_user_asm("stb",x,ptr); break;         \
-	    case 2: __put_user_asm("sth",x,ptr); break;         \
-	    case 4: __put_user_asm("stw",x,ptr); break;         \
-	    case 8: STD_USER(x,ptr); break;			\
+	    case 1: __put_user_asm("stb",__x,ptr); break;       \
+	    case 2: __put_user_asm("sth",__x,ptr); break;       \
+	    case 4: __put_user_asm("stw",__x,ptr); break;       \
+	    case 8: STD_USER(__x,ptr); break;			\
 	    default: __put_user_bad(); break;			\
 	    }                                                   \
 	}                                                       \

@@ -174,6 +174,7 @@ typedef enum {
 	M14_1510_GPIO2,
 
 	/* OMAP1610 GPIO */
+	P18_1610_GPIO3,
 	Y15_1610_GPIO17,
 
 	/* OMAP-1710 GPIO */
@@ -239,6 +240,7 @@ typedef enum {
 	V5_1610_GPIO24,
 	AA20_1610_GPIO_41,
 	W19_1610_GPIO48,
+	M7_1610_GPIO62,
 
 	/* OMAP-1610 uWire */
 	V19_1610_UWIRE_SCLK,
@@ -316,6 +318,12 @@ typedef enum {
 	R10_1610_MCLK_ON,
 	R10_1610_MCLK_OFF,
 
+	/* CompactFlash controller */
+	P11_1610_CF_CD2,
+	R11_1610_CF_IOIS16,
+	V10_1610_CF_IREQ,
+	W10_1610_CF_RESET,
+	W11_1610_CF_CD1,
 } reg_cfg_t;
 
 #if defined(__MUX_C__) && defined(CONFIG_OMAP_MUX)
@@ -355,7 +363,8 @@ MUX_CFG("PWL",		 	 6,    3,    1,	  0,  31,   1,	 NA,	 0,  0)
 /* USB internal master generic */
 MUX_CFG("R18_USB_VBUS",		 7,    9,    2,	  1,  11,   0,	 NA,	 0,  1)
 MUX_CFG("R18_1510_USB_GPIO0",	 7,    9,    0,	  1,  11,   1,	 NA,	 0,  1)
-MUX_CFG("W4_USB_PUEN",		 D,    3,    0,	  3,   5,   1,	 NA,	 0,  1)
+/* works around erratum:  W4_USB_PUEN and W4_USB_PUDIS are switched! */
+MUX_CFG("W4_USB_PUEN",		 D,    3,    3,	  3,   5,   1,	 NA,	 0,  1)
 MUX_CFG("W4_USB_CLKO",		 D,    3,    1,	  3,   5,   0,	 NA,	 0,  1)
 MUX_CFG("W4_USB_HIGHZ",		 D,    3,    4,	  3,   5,   0,	  3,	 0,  1)
 MUX_CFG("W4_GPIO58",		 D,    3,    7,	  3,   5,   0,	  3,	 0,  1)
@@ -388,6 +397,7 @@ MUX_CFG("R19_1510_GPIO1",	 7,    6,    0,   1,  10,   1,    0,     0,  1)
 MUX_CFG("M14_1510_GPIO2",	 7,    3,    0,   1,   9,   1,    0,     0,  1)
 
 /* OMAP1610 GPIO */
+MUX_CFG("P18_1610_GPIO3",	 7,    0,    0,   1,   8,   0,   NA,     0,  1)
 MUX_CFG("Y15_1610_GPIO17",	 A,    0,    7,   2,   6,   0,   NA,     0,  1)
 
 /* OMAP-1710 GPIO */
@@ -454,6 +464,7 @@ MUX_CFG("P10_1610_GPIO22",	 C,    0,    7,	  2,  26,   0,	  2,	 1,  1)
 MUX_CFG("V5_1610_GPIO24",	 B,   15,    7,	  2,  21,   0,	  2,	 1,  1)
 MUX_CFG("AA20_1610_GPIO_41",	 9,    9,    7,	  1,  31,   0,	  1,	 1,  1)
 MUX_CFG("W19_1610_GPIO48",	 8,   15,    7,   1,  23,   1,    1,     0,  1)
+MUX_CFG("M7_1610_GPIO62",	10,    0,    0,   4,  24,   0,    4,     0,  1)
 
 /* OMAP-1610 uWire */
 MUX_CFG("V19_1610_UWIRE_SCLK",	 8,    6,    0,	  1,  20,   0,	  1,	 1,  1)
@@ -528,6 +539,13 @@ MUX_CFG("V5_1710_MCLK_ON",	 B,   15,    0,	  NA,   0,   0,   NA,	 0,  0)
 MUX_CFG("V5_1710_MCLK_OFF",	 B,   15,    6,	  NA,   0,   0,   NA,	 0,  0)
 MUX_CFG("R10_1610_MCLK_ON",	 B,   18,    0,	  NA,  22,   0,	  NA,	 1,  0)
 MUX_CFG("R10_1610_MCLK_OFF",	 B,   18,    6,	  2,   22,   1,	  2,	 1,  1)
+
+/* CompactFlash controller, conflicts with MMC1 */
+MUX_CFG("P11_1610_CF_CD2",	 A,   27,    3,	  2,   15,   1,	  2,	 1,  1)
+MUX_CFG("R11_1610_CF_IOIS16",	 B,    0,    3,	  2,   16,   1,	  2,	 1,  1)
+MUX_CFG("V10_1610_CF_IREQ",	 A,   24,    3,	  2,   14,   0,	  2,	 0,  1)
+MUX_CFG("W10_1610_CF_RESET",	 A,   18,    3,	  2,   12,   1,	  2,	 1,  1)
+MUX_CFG("W11_1610_CF_CD1",	10,   15,    3,	  3,    8,   1,	  3,	 1,  1)
 };
 
 #endif	/* __MUX_C__ */

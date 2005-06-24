@@ -2559,7 +2559,6 @@ static struct ess_device_list pm_whitelist[] __devinitdata = {
 	{ TYPE_MAESTRO2E, 0x103c },
 	{ TYPE_MAESTRO2E, 0x1179 },
 	{ TYPE_MAESTRO2E, 0x14c0 },	/* HP omnibook 4150 */
-	{ TYPE_MAESTRO2E, 0x1558 },
 };
 
 static struct ess_device_list mpu_blacklist[] __devinitdata = {
@@ -2796,7 +2795,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_es1968_init(void)
 {
-	return pci_register_driver(&driver);
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_es1968_exit(void)

@@ -135,11 +135,11 @@ xfs_dir2_block_addname(
 	 */
 	bf = block->hdr.bestfree;
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
-	blp = XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, ARCH_CONVERT);
+	blp = XFS_DIR2_BLOCK_LEAF_P(btp);
 	/*
 	 * No stale entries?  Need space for entry and new leaf.
 	 */
-	if (INT_ISZERO(btp->stale, ARCH_CONVERT)) {
+	if (!btp->stale) {
 		/*
 		 * Tag just before the first leaf entry.
 		 */
@@ -327,7 +327,7 @@ xfs_dir2_block_addname(
 	/*
 	 * No stale entries, will use enddup space to hold new leaf.
 	 */
-	if (INT_ISZERO(btp->stale, ARCH_CONVERT)) {
+	if (!btp->stale) {
 		/*
 		 * Mark the space needed for the new leaf entry, now in use.
 		 */
@@ -494,7 +494,7 @@ xfs_dir2_block_getdents(
 	 */
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
 	ptr = (char *)block->u;
-	endptr = (char *)XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, ARCH_CONVERT);
+	endptr = (char *)XFS_DIR2_BLOCK_LEAF_P(btp);
 	p.dbp = dbp;
 	p.put = put;
 	p.uio = uio;
@@ -585,7 +585,7 @@ xfs_dir2_block_log_leaf(
 	mp = tp->t_mountp;
 	block = bp->data;
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
-	blp = XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, ARCH_CONVERT);
+	blp = XFS_DIR2_BLOCK_LEAF_P(btp);
 	xfs_da_log_buf(tp, bp, (uint)((char *)&blp[first] - (char *)block),
 		(uint)((char *)&blp[last + 1] - (char *)block - 1));
 }
@@ -639,7 +639,7 @@ xfs_dir2_block_lookup(
 	block = bp->data;
 	xfs_dir2_data_check(dp, bp);
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
-	blp = XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, ARCH_CONVERT);
+	blp = XFS_DIR2_BLOCK_LEAF_P(btp);
 	/*
 	 * Get the offset from the leaf entry, to point to the data.
 	 */
@@ -691,7 +691,7 @@ xfs_dir2_block_lookup_int(
 	block = bp->data;
 	xfs_dir2_data_check(dp, bp);
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
-	blp = XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, ARCH_CONVERT);
+	blp = XFS_DIR2_BLOCK_LEAF_P(btp);
 	/*
 	 * Loop doing a binary search for our hash value.
 	 * Find our entry, ENOENT if it's not there.
@@ -784,7 +784,7 @@ xfs_dir2_block_removename(
 	mp = dp->i_mount;
 	block = bp->data;
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
-	blp = XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, ARCH_CONVERT);
+	blp = XFS_DIR2_BLOCK_LEAF_P(btp);
 	/*
 	 * Point to the data entry using the leaf entry.
 	 */
@@ -860,7 +860,7 @@ xfs_dir2_block_replace(
 	mp = dp->i_mount;
 	block = bp->data;
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
-	blp = XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, ARCH_CONVERT);
+	blp = XFS_DIR2_BLOCK_LEAF_P(btp);
 	/*
 	 * Point to the data entry we need to change.
 	 */
@@ -936,7 +936,7 @@ xfs_dir2_leaf_to_block(
 	 * These will show up in the leaf bests table.
 	 */
 	while (dp->i_d.di_size > mp->m_dirblksize) {
-		bestsp = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT);
+		bestsp = XFS_DIR2_LEAF_BESTS_P(ltp);
 		if (INT_GET(bestsp[INT_GET(ltp->bestcount, ARCH_CONVERT) - 1], ARCH_CONVERT) ==
 		    mp->m_dirblksize - (uint)sizeof(block->hdr)) {
 			if ((error =
@@ -991,12 +991,12 @@ xfs_dir2_leaf_to_block(
 	 */
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
 	INT_SET(btp->count, ARCH_CONVERT, INT_GET(leaf->hdr.count, ARCH_CONVERT) - INT_GET(leaf->hdr.stale, ARCH_CONVERT));
-	INT_ZERO(btp->stale, ARCH_CONVERT);
+	btp->stale = 0;
 	xfs_dir2_block_log_tail(tp, dbp);
 	/*
 	 * Initialize the block leaf area.  We compact out stale entries.
 	 */
-	lep = XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, ARCH_CONVERT);
+	lep = XFS_DIR2_BLOCK_LEAF_P(btp);
 	for (from = to = 0; from < INT_GET(leaf->hdr.count, ARCH_CONVERT); from++) {
 		if (INT_GET(leaf->ents[from].address, ARCH_CONVERT) == XFS_DIR2_NULL_DATAPTR)
 			continue;
@@ -1137,8 +1137,8 @@ xfs_dir2_sf_to_block(
 	 */
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
 	INT_SET(btp->count, ARCH_CONVERT, INT_GET(sfp->hdr.count, ARCH_CONVERT) + 2);	/* ., .. */
-	INT_ZERO(btp->stale, ARCH_CONVERT);
-	blp = XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, ARCH_CONVERT);
+	btp->stale = 0;
+	blp = XFS_DIR2_BLOCK_LEAF_P(btp);
 	endoffset = (uint)((char *)blp - (char *)block);
 	/*
 	 * Remove the freespace, we'll manage it.
@@ -1164,7 +1164,7 @@ xfs_dir2_sf_to_block(
 	 */
 	dep = (xfs_dir2_data_entry_t *)
 		((char *)block + XFS_DIR2_DATA_DOTDOT_OFFSET);
-	INT_SET(dep->inumber, ARCH_CONVERT, XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, ARCH_CONVERT));
+	INT_SET(dep->inumber, ARCH_CONVERT, XFS_DIR2_SF_GET_INUMBER(sfp, &sfp->hdr.parent));
 	dep->namelen = 2;
 	dep->name[0] = dep->name[1] = '.';
 	tagp = XFS_DIR2_DATA_ENTRY_TAG_P(dep);
@@ -1191,7 +1191,7 @@ xfs_dir2_sf_to_block(
 		if (sfep == NULL)
 			newoffset = endoffset;
 		else
-			newoffset = XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, ARCH_CONVERT);
+			newoffset = XFS_DIR2_SF_GET_OFFSET(sfep);
 		/*
 		 * There should be a hole here, make one.
 		 */
@@ -1200,7 +1200,7 @@ xfs_dir2_sf_to_block(
 			      ((char *)block + offset);
 			INT_SET(dup->freetag, ARCH_CONVERT, XFS_DIR2_DATA_FREE_TAG);
 			INT_SET(dup->length, ARCH_CONVERT, newoffset - offset);
-			INT_SET(*XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(dup, ARCH_CONVERT), ARCH_CONVERT,
+			INT_SET(*XFS_DIR2_DATA_UNUSED_TAG_P(dup), ARCH_CONVERT,
 				(xfs_dir2_data_off_t)
 				((char *)dup - (char *)block));
 			xfs_dir2_data_log_unused(tp, bp, dup);
@@ -1213,8 +1213,8 @@ xfs_dir2_sf_to_block(
 		 * Copy a real entry.
 		 */
 		dep = (xfs_dir2_data_entry_t *)((char *)block + newoffset);
-		INT_SET(dep->inumber, ARCH_CONVERT, XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,
-				XFS_DIR2_SF_INUMBERP(sfep), ARCH_CONVERT));
+		INT_SET(dep->inumber, ARCH_CONVERT, XFS_DIR2_SF_GET_INUMBER(sfp,
+				XFS_DIR2_SF_INUMBERP(sfep)));
 		dep->namelen = sfep->namelen;
 		memcpy(dep->name, sfep->name, dep->namelen);
 		tagp = XFS_DIR2_DATA_ENTRY_TAG_P(dep);

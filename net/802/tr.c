@@ -47,12 +47,12 @@ static void rif_check_expire(unsigned long dummy);
  *	Each RIF entry we learn is kept this way
  */
  
-struct rif_cache_s {	
+struct rif_cache {
 	unsigned char addr[TR_ALEN];
 	int iface;
-	__u16 rcf;
-	__u16 rseg[8];
-	struct rif_cache_s *next;
+	__be16 rcf;
+	__be16 rseg[8];
+	struct rif_cache *next;
 	unsigned long last_used;
 	unsigned char local_ring;
 };
@@ -64,7 +64,7 @@ struct rif_cache_s {
  *	up a lot.
  */
  
-static struct rif_cache_s *rif_table[RIF_TABLE_SIZE];
+static struct rif_cache *rif_table[RIF_TABLE_SIZE];
 
 static DEFINE_SPINLOCK(rif_lock);
 
@@ -249,7 +249,7 @@ void tr_source_route(struct sk_buff *skb,struct trh_hdr *trh,struct net_device *
 {
 	int slack;
 	unsigned int hash;
-	struct rif_cache_s *entry;
+	struct rif_cache *entry;
 	unsigned char *olddata;
 	unsigned long flags;
 	static const unsigned char mcast_func_addr[] 
@@ -339,7 +339,7 @@ static void tr_add_rif_info(struct trh_hdr *trh, struct net_device *dev)
 {
 	unsigned int hash, rii_p = 0;
 	unsigned long flags;
-	struct rif_cache_s *entry;
+	struct rif_cache *entry;
 
 
 	spin_lock_irqsave(&rif_lock, flags);
@@ -375,7 +375,7 @@ printk("adding rif_entry: addr:%02X:%02X:%02X:%02X:%02X:%02X rcf:%04X\n",
 		 *	FIXME: We ought to keep some kind of cache size
 		 *	limiting and adjust the timers to suit.
 		 */
-		entry=kmalloc(sizeof(struct rif_cache_s),GFP_ATOMIC);
+		entry=kmalloc(sizeof(struct rif_cache),GFP_ATOMIC);
 
 		if(!entry) 
 		{
@@ -437,7 +437,7 @@ static void rif_check_expire(unsigned long dummy)
 	spin_lock_irqsave(&rif_lock, flags);
 	
 	for(i =0; i < RIF_TABLE_SIZE; i++) {
-		struct rif_cache_s *entry, **pentry;
+		struct rif_cache *entry, **pentry;
 		
 		pentry = rif_table+i;
 		while((entry=*pentry) != NULL) {
@@ -469,10 +469,10 @@ static void rif_check_expire(unsigned long dummy)
  
 #ifdef CONFIG_PROC_FS
 
-static struct rif_cache_s *rif_get_idx(loff_t pos)
+static struct rif_cache *rif_get_idx(loff_t pos)
 {
 	int i;
-	struct rif_cache_s *entry;
+	struct rif_cache *entry;
 	loff_t off = 0;
 
 	for(i = 0; i < RIF_TABLE_SIZE; i++) 
@@ -495,7 +495,7 @@ static void *rif_seq_start(struct seq_file *seq, loff_t *pos)
 static void *rif_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	int i;
-	struct rif_cache_s *ent = v;
+	struct rif_cache *ent = v;
 
 	++*pos;
 
@@ -524,7 +524,7 @@ static void rif_seq_stop(struct seq_file *seq, void *v)
 static int rif_seq_show(struct seq_file *seq, void *v)
 {
 	int j, rcf_len, segment, brdgnmb;
-	struct rif_cache_s *entry = v;
+	struct rif_cache *entry = v;
 
 	if (v == SEQ_START_TOKEN)
 		seq_puts(seq,

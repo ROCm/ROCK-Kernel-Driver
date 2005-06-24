@@ -21,8 +21,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * You should have received a copy of the  GNU General Public License along
- * with this program; if not, write  to the Free Software Foundation, Inc.,
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
@@ -30,9 +30,7 @@
 #define __ASM_ARCH_OMAP_OSK_H
 
 /* At OMAP5912 OSK the Ethernet is directly connected to CS1 */
-#define OMAP_OSK_ETHR_BASE		0xE8800000
-#define OMAP_OSK_ETHR_SIZE		SZ_4K
-#define OMAP_OSK_ETHR_START		0x04800000
+#define OMAP_OSK_ETHR_START		0x04800300
 
 /* Micron NOR flash at CS3 mapped to address 0x0 if BM bit is 1 */
 #define OMAP_OSK_NOR_FLASH_BASE		0xD8000000

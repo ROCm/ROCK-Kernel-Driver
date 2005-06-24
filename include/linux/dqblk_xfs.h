@@ -28,6 +28,12 @@
  */
 
 #define XQM_CMD(x)	(('X'<<8)+(x))	/* note: forms first QCMD argument */
+#define XQM_COMMAND(x)	(((x) & (0xff<<8)) == ('X'<<8))	/* test if for XFS */
+
+#define XQM_USRQUOTA	0	/* system call user quota type */
+#define XQM_GRPQUOTA	1	/* system call group quota type */
+#define XQM_MAXQUOTAS	2
+
 #define Q_XQUOTAON	XQM_CMD(1)	/* enable accounting/enforcement */
 #define Q_XQUOTAOFF	XQM_CMD(2)	/* disable accounting/enforcement */
 #define Q_XGETQUOTA	XQM_CMD(3)	/* get disk limits and usage */

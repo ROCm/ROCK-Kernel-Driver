@@ -355,7 +355,7 @@ static ssize_t gpio_write(struct file * file, const char * buf, size_t count,
 		return -EFAULT;
 	}
     
-	if (verify_area(VERIFY_READ, buf, count)) {
+	if (!access_ok(VERIFY_READ, buf, count)) {
 		return -EFAULT;
 	}
 	clk_mask = priv->clk_mask;

@@ -5,6 +5,18 @@
 #include <linux/completion.h>
 
 
+/* Descriptor for analyzed sense data */
+struct st_cmdstatus {
+	int midlevel_result;
+	struct scsi_sense_hdr sense_hdr;
+	int have_sense;
+	u64 uremainder64;
+	u8 flags;
+	u8 remainder_valid;
+	u8 fixed_format;
+	u8 deferred;
+};
+
 /* The tape buffer descriptor. */
 struct st_buffer {
 	unsigned char in_use;
@@ -15,9 +27,9 @@ struct st_buffer {
 	int buffer_bytes;
 	int read_pointer;
 	int writing;
-	int midlevel_result;
 	int syscall_result;
 	struct scsi_request *last_SRpnt;
+	struct st_cmdstatus cmdstat;
 	unsigned char *b_data;
 	unsigned short use_sg;	/* zero or max number of s/g segments for this adapter */
 	unsigned short sg_segs;		/* number of segments in s/g list */
@@ -191,5 +203,10 @@ struct scsi_tape {
 #define ST_YES         2
 
 #define EXTENDED_SENSE_START  18
+
+/* Masks for some conditions in the sense data */
+#define SENSE_FMK   0x80
+#define SENSE_EOM   0x40
+#define SENSE_ILI   0x20
 
 #endif

@@ -46,11 +46,11 @@ static int sh03_pci_lookup_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	/* now lookup the actual IRQ on a platform specific basis (pci-'platform'.c) */
 	irq = pcibios_map_platform_irq(slot, pin, dev);
 	if( irq < 0 ) {
-		pr_debug("PCI: Error mapping IRQ on device %s\n", dev->slot_name);
+		pr_debug("PCI: Error mapping IRQ on device %s\n", pci_name(dev));
 		return irq;
 	}
 
-	pr_debug("Setting IRQ for slot %s to %d\n", dev->slot_name, irq);
+	pr_debug("Setting IRQ for slot %s to %d\n", pci_name(dev), irq);
 
 	return irq;
 }

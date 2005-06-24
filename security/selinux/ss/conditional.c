@@ -208,7 +208,7 @@ int cond_index_bool(void *key, void *datum, void *datap)
 	return 0;
 }
 
-int bool_isvalid(struct cond_bool_datum *b)
+static int bool_isvalid(struct cond_bool_datum *b)
 {
 	if (!(b->state == 0 || b->state == 1))
 		return 0;

@@ -258,10 +258,16 @@ void flush_cache_mm(struct mm_struct *mm)
 	flush_cache_all();
 }
 
-static void __flush_cache_page(struct vm_area_struct *vma,
-			       unsigned long address,
-			       unsigned long phys)
+/*
+ * Write back and invalidate I/D-caches for the page.
+ *
+ * ADDR: Virtual Address (U0 address)
+ * PFN: Physical page number
+ */
+void flush_cache_page(struct vm_area_struct *vma, unsigned long address, unsigned long pfn)
 {
+	unsigned long phys = pfn << PAGE_SHIFT;
+
 	/* We only need to flush D-cache when we have alias */
 	if ((address^phys) & CACHE_ALIAS) {
 		/* Loop 4K of the D-cache */
@@ -342,32 +348,6 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
 }
 
 /*
- * Write back and invalidate I/D-caches for the page.
- *
- * ADDR: Virtual Address (U0 address)
- */
-void flush_cache_page(struct vm_area_struct *vma, unsigned long address)
-{
-	pgd_t *dir;
-	pmd_t *pmd;
-	pte_t *pte;
-	pte_t entry;
-	unsigned long phys;
-
-	dir = pgd_offset(vma->vm_mm, address);
-	pmd = pmd_offset(dir, address);
-	if (pmd_none(*pmd) || pmd_bad(*pmd))
-		return;
-	pte = pte_offset_kernel(pmd, address);
-	entry = *pte;
-	if (!(pte_val(entry) & _PAGE_PRESENT))
-		return;
-
-	phys = pte_val(entry)&PTE_PHYS_MASK;
-	__flush_cache_page(vma, address, phys);
-}
-
-/*
  * flush_icache_user_range
  * @vma: VMA of the process
  * @page: page
@@ -377,6 +357,6 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long address)
 void flush_icache_user_range(struct vm_area_struct *vma,
 			     struct page *page, unsigned long addr, int len)
 {
-	__flush_cache_page(vma, addr, PHYSADDR(page_address(page)));
+	flush_cache_page(vma, addr, page_to_pfn(page));
 }
 

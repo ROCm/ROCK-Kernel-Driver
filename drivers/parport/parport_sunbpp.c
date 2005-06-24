@@ -4,7 +4,7 @@
  * Author: Derrick J. Brashear <shadow@dementia.org>
  *
  * based on work by:
- *          Phil Blundell <Philip.Blundell@pobox.com>
+ *          Phil Blundell <philb@gnu.org>
  *          Tim Waugh <tim@cyberelk.demon.co.uk>
  *	    Jose Renau <renau@acm.org>
  *          David Campbell <campbell@tirian.che.curtin.edu.au>

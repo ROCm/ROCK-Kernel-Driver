@@ -216,10 +216,10 @@ _GLOBAL(low_choose_750fx_pll)
 	/* If switching to PLL1, disable HID0:BTIC */
 	cmplwi	cr0,r3,0
 	beq	1f
-	mfspr	r5,HID0
+	mfspr	r5,SPRN_HID0
 	rlwinm	r5,r5,0,27,25
 	sync
-	mtspr	HID0,r5
+	mtspr	SPRN_HID0,r5
 	isync
 	sync
 
@@ -241,10 +241,10 @@ _GLOBAL(low_choose_750fx_pll)
 	/* If switching to PLL0, enable HID0:BTIC */
 	cmplwi	cr0,r3,0
 	bne	1f
-	mfspr	r5,HID0
+	mfspr	r5,SPRN_HID0
 	ori	r5,r5,HID0_BTIC
 	sync
-	mtspr	HID0,r5
+	mtspr	SPRN_HID0,r5
 	isync
 	sync
 
@@ -579,7 +579,7 @@ _GLOBAL(flush_instruction_cache)
 #if defined(CONFIG_8xx)
 	isync
 	lis	r5, IDC_INVALL@h
-	mtspr	IC_CST, r5
+	mtspr	SPRN_IC_CST, r5
 #elif defined(CONFIG_4xx)
 #ifdef CONFIG_403GCX
 	li      r3, 512
@@ -597,14 +597,14 @@ _GLOBAL(flush_instruction_cache)
 	ori	r3,r3,L1CSR1_ICFI|L1CSR1_ICLFR
 	mtspr	SPRN_L1CSR1,r3
 #else
-	mfspr	r3,PVR
+	mfspr	r3,SPRN_PVR
 	rlwinm	r3,r3,16,16,31
 	cmpwi	0,r3,1
 	beqlr			/* for 601, do nothing */
 	/* 603/604 processor - use invalidate-all bit in HID0 */
-	mfspr	r3,HID0
+	mfspr	r3,SPRN_HID0
 	ori	r3,r3,HID0_ICFI
-	mtspr	HID0,r3
+	mtspr	SPRN_HID0,r3
 #endif /* CONFIG_8xx/4xx */
 	isync
 	blr
@@ -619,7 +619,7 @@ _GLOBAL(flush_instruction_cache)
 _GLOBAL(flush_icache_range)
 BEGIN_FTR_SECTION
 	blr				/* for 601, do nothing */
-END_FTR_SECTION_IFSET(PPC_FEATURE_UNIFIED_CACHE)
+END_FTR_SECTION_IFCLR(CPU_FTR_SPLIT_ID_CACHE)
 	li	r5,L1_CACHE_LINE_SIZE-1
 	andc	r3,r3,r5
 	subf	r4,r3,r4
@@ -736,7 +736,7 @@ _GLOBAL(flush_dcache_all)
 _GLOBAL(__flush_dcache_icache)
 BEGIN_FTR_SECTION
 	blr					/* for 601, do nothing */
-END_FTR_SECTION_IFSET(PPC_FEATURE_UNIFIED_CACHE)
+END_FTR_SECTION_IFCLR(CPU_FTR_SPLIT_ID_CACHE)
 	rlwinm	r3,r3,0,0,19			/* Get page base address */
 	li	r4,4096/L1_CACHE_LINE_SIZE	/* Number of lines in a page */
 	mtctr	r4
@@ -764,7 +764,7 @@ END_FTR_SECTION_IFSET(PPC_FEATURE_UNIFIED_CACHE)
 _GLOBAL(__flush_dcache_icache_phys)
 BEGIN_FTR_SECTION
 	blr					/* for 601, do nothing */
-END_FTR_SECTION_IFSET(PPC_FEATURE_UNIFIED_CACHE)
+END_FTR_SECTION_IFCLR(CPU_FTR_SPLIT_ID_CACHE)
 	mfmsr	r10
 	rlwinm	r0,r10,0,28,26			/* clear DR */
 	mtmsr	r0
@@ -1096,17 +1096,7 @@ _GLOBAL(_get_SP)
  * and exceptions as if the cpu had performed the load or store.
  */
 
-#if defined(CONFIG_4xx) || defined(CONFIG_E500)
-_GLOBAL(cvt_fd)
-	lfs	0,0(r3)
-	stfd	0,0(r4)
-	blr
-
-_GLOBAL(cvt_df)
-	lfd	0,0(r3)
-	stfs	0,0(r4)
-	blr
-#else
+#ifdef CONFIG_PPC_FPU
 _GLOBAL(cvt_fd)
 	lfd	0,-4(r5)	/* load up fpscr value */
 	mtfsf	0xff,0
@@ -1450,3 +1440,4 @@ _GLOBAL(sys_call_table)
 	.long sys_add_key
 	.long sys_request_key		/* 270 */
 	.long sys_keyctl
+	.long sys_waitid

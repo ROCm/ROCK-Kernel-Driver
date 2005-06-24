@@ -66,6 +66,11 @@ struct cpu_spec {
 extern struct cpu_spec		cpu_specs[];
 extern struct cpu_spec		*cur_cpu_spec;
 
+static inline unsigned long cpu_has_feature(unsigned long feature)
+{
+	return cur_cpu_spec->cpu_features & feature;
+}
+
 
 /* firmware feature bitmask values */
 #define FIRMWARE_MAX_FEATURES 63

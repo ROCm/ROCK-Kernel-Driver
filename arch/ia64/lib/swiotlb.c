@@ -444,7 +444,7 @@ swiotlb_map_single(struct device *hwdev, void *ptr, size_t size, int dir)
 
 /*
  * Since DMA is i-cache coherent, any (complete) pages that were written via
- * DMA can be marked as "clean" so that update_mmu_cache() doesn't have to
+ * DMA can be marked as "clean" so that lazy_mmu_prot_update() doesn't have to
  * flush them when they get mapped into an executable vm-area.
  */
 static void

@@ -189,7 +189,7 @@ static struct notifier_block cpuid_class_cpu_notifier =
 	.notifier_call = cpuid_class_cpu_callback,
 };
 
-int __init cpuid_init(void)
+static int __init cpuid_init(void)
 {
 	int i, err = 0;
 	i = 0;
@@ -227,7 +227,7 @@ out:
 	return err;
 }
 
-void __exit cpuid_exit(void)
+static void __exit cpuid_exit(void)
 {
 	int cpu = 0;
 

@@ -134,7 +134,7 @@ static void x25_seq_socket_stop(struct seq_file *seq, void *v)
 static int x25_seq_socket_show(struct seq_file *seq, void *v)
 {
 	struct sock *s;
-	struct x25_opt *x25;
+	struct x25_sock *x25;
 	struct net_device *dev;
 	const char *devname;
 

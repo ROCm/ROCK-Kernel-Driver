@@ -44,6 +44,7 @@
 #include <asm/system.h>
 #include <asm/rtas.h>
 #include <asm/plpar_wrappers.h>
+#include <asm/pSeries_reconfig.h>
 
 #include "mpic.h"
 
@@ -53,7 +54,15 @@
 #define DBG(fmt...)
 #endif
 
+/*
+ * The primary thread of each non-boot processor is recorded here before
+ * smp init.
+ */
+static cpumask_t of_spin_map;
+
 extern void pSeries_secondary_smp_init(unsigned long);
+
+#ifdef CONFIG_HOTPLUG_CPU
 
 /* Get state of physical CPU.
  * Return codes:
@@ -80,9 +89,6 @@ static int query_cpu_stopped(unsigned int pcpu)
 
 	return cpu_status;
 }
-
-
-#ifdef CONFIG_HOTPLUG_CPU
 
 int pSeries_cpu_disable(void)
 {
@@ -122,60 +128,134 @@ void pSeries_cpu_die(unsigned int cpu)
 	paca[cpu].cpu_start = 0;
 }
 
-/* Search all cpu device nodes for an offline logical cpu.  If a
- * device node has a "ibm,my-drc-index" property (meaning this is an
- * LPAR), paranoid-check whether we own the cpu.  For each "thread"
- * of a cpu, if it is offline and has the same hw index as before,
- * grab that in preference.
+/*
+ * Update cpu_present_map and paca(s) for a new cpu node.  The wrinkle
+ * here is that a cpu device node may represent up to two logical cpus
+ * in the SMT case.  We must honor the assumption in other code that
+ * the logical ids for sibling SMT threads x and y are adjacent, such
+ * that x^1 == y and y^1 == x.
  */
-static unsigned int find_physical_cpu_to_start(unsigned int old_hwindex)
+static int pSeries_add_processor(struct device_node *np)
 {
-	struct device_node *np = NULL;
-	unsigned int best = -1U;
+	unsigned int cpu;
+	cpumask_t candidate_map, tmp = CPU_MASK_NONE;
+	int err = -ENOSPC, len, nthreads, i;
+	u32 *intserv;
 
-	while ((np = of_find_node_by_type(np, "cpu"))) {
-		int nr_threads, len;
-		u32 *index = (u32 *)get_property(np, "ibm,my-drc-index", NULL);
-		u32 *tid = (u32 *)
-			get_property(np, "ibm,ppc-interrupt-server#s", &len);
+	intserv = (u32 *)get_property(np, "ibm,ppc-interrupt-server#s", &len);
+	if (!intserv)
+		return 0;
 
-		if (!tid)
-			tid = (u32 *)get_property(np, "reg", &len);
+	nthreads = len / sizeof(u32);
+	for (i = 0; i < nthreads; i++)
+		cpu_set(i, tmp);
 
-		if (!tid)
-			continue;
+	lock_cpu_hotplug();
 
-		/* If there is a drc-index, make sure that we own
-		 * the cpu.
+	BUG_ON(!cpus_subset(cpu_present_map, cpu_possible_map));
+
+	/* Get a bitmap of unoccupied slots. */
+	cpus_xor(candidate_map, cpu_possible_map, cpu_present_map);
+	if (cpus_empty(candidate_map)) {
+		/* If we get here, it most likely means that NR_CPUS is
+		 * less than the partition's max processors setting.
 		 */
-		if (index) {
-			int state;
-			int rc = rtas_get_sensor(9003, *index, &state);
-			if (rc != 0 || state != 1)
-				continue;
-		}
-
-		nr_threads = len / sizeof(u32);
-
-		while (nr_threads--) {
-			if (0 == query_cpu_stopped(tid[nr_threads])) {
-				best = tid[nr_threads];
-				if (best == old_hwindex)
-					goto out;
-			}
-		}
+		printk(KERN_ERR "Cannot add cpu %s; this system configuration"
+		       " supports %d logical cpus.\n", np->full_name,
+		       cpus_weight(cpu_possible_map));
+		goto out_unlock;
 	}
-out:
-	of_node_put(np);
-	return best;
+
+	while (!cpus_empty(tmp))
+		if (cpus_subset(tmp, candidate_map))
+			/* Found a range where we can insert the new cpu(s) */
+			break;
+		else
+			cpus_shift_left(tmp, tmp, nthreads);
+
+	if (cpus_empty(tmp)) {
+		printk(KERN_ERR "Unable to find space in cpu_present_map for"
+		       " processor %s with %d thread(s)\n", np->name,
+		       nthreads);
+		goto out_unlock;
+	}
+
+	for_each_cpu_mask(cpu, tmp) {
+		BUG_ON(cpu_isset(cpu, cpu_present_map));
+		cpu_set(cpu, cpu_present_map);
+		set_hard_smp_processor_id(cpu, *intserv++);
+	}
+	err = 0;
+out_unlock:
+	unlock_cpu_hotplug();
+	return err;
 }
+
+/*
+ * Update the present map for a cpu node which is going away, and set
+ * the hard id in the paca(s) to -1 to be consistent with boot time
+ * convention for non-present cpus.
+ */
+static void pSeries_remove_processor(struct device_node *np)
+{
+	unsigned int cpu;
+	int len, nthreads, i;
+	u32 *intserv;
+
+	intserv = (u32 *)get_property(np, "ibm,ppc-interrupt-server#s", &len);
+	if (!intserv)
+		return;
+
+	nthreads = len / sizeof(u32);
+
+	lock_cpu_hotplug();
+	for (i = 0; i < nthreads; i++) {
+		for_each_present_cpu(cpu) {
+			if (get_hard_smp_processor_id(cpu) != intserv[i])
+				continue;
+			BUG_ON(cpu_online(cpu));
+			cpu_clear(cpu, cpu_present_map);
+			set_hard_smp_processor_id(cpu, -1);
+			break;
+		}
+		if (cpu == NR_CPUS)
+			printk(KERN_WARNING "Could not find cpu to remove "
+			       "with physical id 0x%x\n", intserv[i]);
+	}
+	unlock_cpu_hotplug();
+}
+
+static int pSeries_smp_notifier(struct notifier_block *nb, unsigned long action, void *node)
+{
+	int err = NOTIFY_OK;
+
+	switch (action) {
+	case PSERIES_RECONFIG_ADD:
+		if (pSeries_add_processor(node))
+			err = NOTIFY_BAD;
+		break;
+	case PSERIES_RECONFIG_REMOVE:
+		pSeries_remove_processor(node);
+		break;
+	default:
+		err = NOTIFY_DONE;
+		break;
+	}
+	return err;
+}
+
+static struct notifier_block pSeries_smp_nb = {
+	.notifier_call = pSeries_smp_notifier,
+};
+
+#endif /* CONFIG_HOTPLUG_CPU */
 
 /**
  * smp_startup_cpu() - start the given cpu
  *
- * At boot time, there is nothing to do.  At run-time, call RTAS with
- * the appropriate start location, if the cpu is in the RTAS stopped
- * state.
+ * At boot time, there is nothing to do for primary threads which were
+ * started from Open Firmware.  For anything else, call RTAS with the
+ * appropriate start location.
  *
  * Returns:
  *	0	- failure
@@ -188,22 +268,14 @@ static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 					       pSeries_secondary_smp_init));
 	unsigned int pcpu;
 
-	/* At boot time the cpus are already spinning in hold
-	 * loops, so nothing to do. */
- 	if (system_state < SYSTEM_RUNNING)
+	if (cpu_isset(lcpu, of_spin_map))
+		/* Already started by OF and sitting in spin loop */
 		return 1;
 
-	pcpu = find_physical_cpu_to_start(get_hard_smp_processor_id(lcpu));
-	if (pcpu == -1U) {
-		printk(KERN_INFO "No more cpus available, failing\n");
-		return 0;
-	}
+	pcpu = get_hard_smp_processor_id(lcpu);
 
 	/* Fixup atomic count: it exited inside IRQ handler. */
 	paca[lcpu].__current->thread_info->preempt_count	= 0;
-
-	/* At boot this is done in prom.c. */
-	paca[lcpu].hw_cpu_id = pcpu;
 
 	status = rtas_call(rtas_token("start-cpu"), 3, 1, NULL,
 			   pcpu, start_here, lcpu);
@@ -213,12 +285,6 @@ static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 	}
 	return 1;
 }
-#else /* ... CONFIG_HOTPLUG_CPU */
-static inline int __devinit smp_startup_cpu(unsigned int lcpu)
-{
-	return 1;
-}
-#endif /* CONFIG_HOTPLUG_CPU */
 
 static inline void smp_xics_do_message(int cpu, int msg)
 {
@@ -258,13 +324,8 @@ static void __devinit smp_xics_setup_cpu(int cpu)
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR)
 		vpa_init(cpu);
 
-	/*
-	 * Put the calling processor into the GIQ.  This is really only
-	 * necessary from a secondary thread as the OF start-cpu interface
-	 * performs this function for us on primary threads.
-	 */
-	rtas_set_indicator(GLOBAL_INTERRUPT_QUEUE,
-		(1UL << interrupt_server_size) - 1 - default_distrib_server, 1);
+	cpu_clear(cpu, of_spin_map);
+
 }
 
 static DEFINE_SPINLOCK(timebase_lock);
@@ -307,6 +368,20 @@ static void __devinit smp_pSeries_kick_cpu(int nr)
 	paca[nr].cpu_start = 1;
 }
 
+static int smp_pSeries_cpu_bootable(unsigned int nr)
+{
+	/* Special case - we inhibit secondary thread startup
+	 * during boot if the user requests it.  Odd-numbered
+	 * cpus are assumed to be secondary threads.
+	 */
+	if (system_state < SYSTEM_RUNNING &&
+	    cur_cpu_spec->cpu_features & CPU_FTR_SMT &&
+	    !smt_enabled_at_boot && nr % 2 != 0)
+		return 0;
+
+	return 1;
+}
+
 static struct smp_ops_t pSeries_mpic_smp_ops = {
 	.message_pass	= smp_mpic_message_pass,
 	.probe		= smp_mpic_probe,
@@ -319,12 +394,13 @@ static struct smp_ops_t pSeries_xics_smp_ops = {
 	.probe		= smp_xics_probe,
 	.kick_cpu	= smp_pSeries_kick_cpu,
 	.setup_cpu	= smp_xics_setup_cpu,
+	.cpu_bootable	= smp_pSeries_cpu_bootable,
 };
 
 /* This is called very early */
 void __init smp_init_pSeries(void)
 {
-	int ret, i;
+	int i;
 
 	DBG(" -> smp_init_pSeries()\n");
 
@@ -336,22 +412,26 @@ void __init smp_init_pSeries(void)
 #ifdef CONFIG_HOTPLUG_CPU
 	smp_ops->cpu_disable = pSeries_cpu_disable;
 	smp_ops->cpu_die = pSeries_cpu_die;
+
+	/* Processors can be added/removed only on LPAR */
+	if (systemcfg->platform == PLATFORM_PSERIES_LPAR)
+		pSeries_reconfig_notifier_register(&pSeries_smp_nb);
 #endif
 
-	/* Start secondary threads on SMT systems; primary threads
-	 * are already in the running state.
-	 */
-	for_each_present_cpu(i) {
-		if (query_cpu_stopped(get_hard_smp_processor_id(i)) == 0) {
-			printk("%16.16x : starting thread\n", i);
-			DBG("%16.16x : starting thread\n", i);
-			rtas_call(rtas_token("start-cpu"), 3, 1, &ret,
-				  get_hard_smp_processor_id(i),
-				  __pa((u32)*((unsigned long *)
-					      pSeries_secondary_smp_init)),
-				  i);
+	/* Mark threads which are still spinning in hold loops. */
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+		for_each_present_cpu(i) {
+			if (i % 2 == 0)
+				/*
+				 * Even-numbered logical cpus correspond to
+				 * primary threads.
+				 */
+				cpu_set(i, of_spin_map);
 		}
-	}
+	else
+		of_spin_map = cpu_present_map;
+
+	cpu_clear(boot_cpuid, of_spin_map);
 
 	/* Non-lpar has additional take/give timebase */
 	if (rtas_token("freeze-time-base") != RTAS_UNKNOWN_SERVICE) {

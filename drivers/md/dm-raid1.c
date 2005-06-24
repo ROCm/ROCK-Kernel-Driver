@@ -122,7 +122,7 @@ static inline sector_t region_to_sector(struct region_hash *rh, region_t region)
 /* FIXME move this */
 static void queue_bio(struct mirror_set *ms, struct bio *bio, int rw);
 
-static void *region_alloc(int gfp_mask, void *pool_data)
+static void *region_alloc(unsigned int __nocast gfp_mask, void *pool_data)
 {
 	return kmalloc(sizeof(struct region), gfp_mask);
 }
@@ -1182,7 +1182,6 @@ static void mirror_resume(struct dm_target *ti)
 static int mirror_status(struct dm_target *ti, status_type_t type,
 			 char *result, unsigned int maxlen)
 {
-	char buffer[32];
 	unsigned int m, sz;
 	struct mirror_set *ms = (struct mirror_set *) ti->private;
 
@@ -1191,10 +1190,8 @@ static int mirror_status(struct dm_target *ti, status_type_t type,
 	switch (type) {
 	case STATUSTYPE_INFO:
 		DMEMIT("%d ", ms->nr_mirrors);
-		for (m = 0; m < ms->nr_mirrors; m++) {
-			format_dev_t(buffer, ms->mirror[m].dev->bdev->bd_dev);
-			DMEMIT("%s ", buffer);
-		}
+		for (m = 0; m < ms->nr_mirrors; m++)
+			DMEMIT("%s ", ms->mirror[m].dev->name);
 
 		DMEMIT(SECTOR_FORMAT "/" SECTOR_FORMAT,
 		       ms->rh.log->type->get_sync_count(ms->rh.log),
@@ -1203,11 +1200,9 @@ static int mirror_status(struct dm_target *ti, status_type_t type,
 
 	case STATUSTYPE_TABLE:
 		DMEMIT("%d ", ms->nr_mirrors);
-		for (m = 0; m < ms->nr_mirrors; m++) {
-			format_dev_t(buffer, ms->mirror[m].dev->bdev->bd_dev);
+		for (m = 0; m < ms->nr_mirrors; m++)
 			DMEMIT("%s " SECTOR_FORMAT " ",
-			       buffer, ms->mirror[m].offset);
-		}
+			       ms->mirror[m].dev->name, ms->mirror[m].offset);
 	}
 
 	return 0;

@@ -46,6 +46,9 @@
 #define INTEL_855_GMCH_GMS_STOLEN_16M	(0x4 << 4)
 #define INTEL_855_GMCH_GMS_STOLEN_32M	(0x5 << 4)
 
+#define INTEL_915G_GMCH_GMS_STOLEN_48M	(0x6 << 4)
+#define INTEL_915G_GMCH_GMS_STOLEN_64M	(0x7 << 4)
+
 /* HW registers */
 
 /* Fence registers */

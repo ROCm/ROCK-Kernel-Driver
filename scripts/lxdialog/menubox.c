@@ -327,7 +327,7 @@ dialog_menu (const char *title, const char *prompt, int height, int width,
                    ) {
 		    /* Scroll menu up */
 		    scrollok (menu, TRUE);
-                    scroll (menu);
+		    wscrl (menu, 1);
                     scrollok (menu, FALSE);
 
                     scroll++;
@@ -357,7 +357,7 @@ dialog_menu (const char *title, const char *prompt, int height, int width,
                 for (i=0; (i < max_choice); i++) {
                     if (scroll+max_choice < item_no) {
 			scrollok (menu, TRUE);
-			scroll(menu);
+			wscrl (menu, 1);
 			scrollok (menu, FALSE);
                 	scroll++;
                 	print_item (menu, items[(scroll+max_choice-1)*2+1],

@@ -34,15 +34,15 @@
 	.type	__strncpy_from_user,#function
 __strncpy_from_user:
 	/* %o0=dest, %o1=src, %o2=count */
-	sethi	%hi(0b), %o5		! IEU0	Group
-	andcc	%o1, 7, %g0		! IEU1
+	andcc	%o1, 7, %g0		! IEU1	Group
 	bne,pn	%icc, 30f		! CTI
-	 ldx	[%o5 + %lo(0b)], %o4	! Load	Group
-	add	%o0, %o2, %g3		! IEU0
+	 add	%o0, %o2, %g3		! IEU0
 60:	ldxa	[%o1] %asi, %g1		! Load	Group
 	brlez,pn %o2, 10f		! CTI
-	 sllx	%o4, 7, %o5		! IEU0	Group
-	mov	%o0, %o3		! IEU1
+	 mov	%o0, %o3		! IEU0
+50:	sethi	%hi(0b), %o4		! IEU0	Group
+	ldx	[%o4 + %lo(0b)], %o4	! Load
+	sllx	%o4, 7, %o5		! IEU1	Group
 1:	sub	%g1, %o4, %g2		! IEU0	Group
 	stx	%g1, [%o0]		! Store
 	add	%o0, 8, %o0		! IEU1
@@ -55,34 +55,34 @@ __strncpy_from_user:
 10:	retl				! CTI	Group
 	 mov	%o2, %o0		! IEU0
 5:	srlx	%g2, 32, %g7		! IEU0	Group
-	sethi	%hi(0xff00), %g5	! IEU1
+	sethi	%hi(0xff00), %o4	! IEU1
 	andcc	%g7, %o5, %g0		! IEU1	Group
 	be,pn	%icc, 2f		! CTI
-	 or	%g5, %lo(0xff00), %g5	! IEU0
+	 or	%o4, %lo(0xff00), %o4	! IEU0
 	srlx	%g1, 48, %g7		! IEU0	Group
-	andcc	%g7, %g5, %g0		! IEU1	Group
+	andcc	%g7, %o4, %g0		! IEU1	Group
 	be,pn	%icc, 50f		! CTI
 	 andcc	%g7, 0xff, %g0		! IEU1	Group
 	be,pn	%icc, 51f		! CTI
 	 srlx	%g1, 32, %g7		! IEU0
-	andcc	%g7, %g5, %g0		! IEU1	Group
+	andcc	%g7, %o4, %g0		! IEU1	Group
 	be,pn	%icc, 52f		! CTI
 	 andcc	%g7, 0xff, %g0		! IEU1	Group
 	be,pn	%icc, 53f		! CTI
 2:	 andcc	%g2, %o5, %g0		! IEU1	Group
 	be,pn	%icc, 2f		! CTI
 	 srl	%g1, 16, %g7		! IEU0
-	andcc	%g7, %g5, %g0		! IEU1	Group
+	andcc	%g7, %o4, %g0		! IEU1	Group
 	be,pn	%icc, 54f		! CTI
 	 andcc	%g7, 0xff, %g0		! IEU1	Group
 	be,pn	%icc, 55f		! CTI
-	 andcc	%g1, %g5, %g0		! IEU1	Group
+	 andcc	%g1, %o4, %g0		! IEU1	Group
 	be,pn	%icc, 56f		! CTI
 	 andcc	%g1, 0xff, %g0		! IEU1	Group
 	be,a,pn	%icc, 57f		! CTI
 	 sub	%o0, %o3, %o0		! IEU0
 2:	cmp	%o0, %g3		! IEU1	Group
-	bl,a,pt	%xcc, 1b		! CTI
+	bl,a,pt	%xcc, 50b		! CTI
 62:	 ldxa	[%o1] %asi, %g1		! Load
 	retl				! CTI	Group
 	 mov	%o2, %o0		! IEU0

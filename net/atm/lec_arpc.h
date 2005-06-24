@@ -89,28 +89,4 @@ struct tlv {                   /* LANE2: Template tlv struct for accessing */
 #define LEC_REMOTE_FLAG      0x0001
 #define LEC_PERMANENT_FLAG   0x0002
 
-/* Protos */
-void lec_arp_init(struct lec_priv *priv);
-int lec_mcast_make(struct lec_priv *priv, struct atm_vcc *vcc);
-void lec_arp_destroy(struct lec_priv *priv);
-void lec_vcc_close(struct lec_priv *priv, struct atm_vcc *vcc);
-
-struct atm_vcc *lec_arp_resolve(struct lec_priv *priv,
-                                unsigned char *mac_to_addr,
-                                int is_rdesc,
-                                struct lec_arp_table **ret_entry);
-void lec_vcc_added(struct lec_priv *dev,
-                   struct atmlec_ioc *ioc_data, struct atm_vcc *vcc,
-                   void (*old_push)(struct atm_vcc *vcc, struct sk_buff *skb));
-void lec_arp_check_empties(struct lec_priv *priv,
-                           struct atm_vcc *vcc, struct sk_buff *skb);
-int lec_addr_delete(struct lec_priv *priv,
-                    unsigned char *mac_addr, unsigned long permanent);
-void lec_flush_complete(struct lec_priv *priv, unsigned long tran_id);
-void lec_arp_update(struct lec_priv *priv,
-                    unsigned char *mac_addr, unsigned char *atm_addr,
-                    unsigned long remoteflag, unsigned int targetless_le_arp);
-void lec_set_flush_tran_id(struct lec_priv *priv,
-                           unsigned char *mac_addr, unsigned long tran_id);
-
 #endif

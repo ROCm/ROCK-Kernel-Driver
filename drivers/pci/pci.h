@@ -32,37 +32,16 @@ extern unsigned char pci_max_busnr(void);
 extern unsigned char pci_bus_max_busnr(struct pci_bus *bus);
 extern int pci_bus_find_capability (struct pci_bus *bus, unsigned int devfn, int cap);
 
-struct pci_dev_wrapped {
-	struct pci_dev	*dev;
-	void		*data;
-};
-
-struct pci_bus_wrapped {
-	struct pci_bus	*bus;
-	void		*data;
-};
-
-struct pci_visit {
-	int (* pre_visit_pci_bus)	(struct pci_bus_wrapped *,
-					 struct pci_dev_wrapped *);
-	int (* post_visit_pci_bus)	(struct pci_bus_wrapped *,
-					 struct pci_dev_wrapped *);
-
-	int (* pre_visit_pci_dev)	(struct pci_dev_wrapped *,
-					 struct pci_bus_wrapped *);
-	int (* visit_pci_dev)		(struct pci_dev_wrapped *,
-					 struct pci_bus_wrapped *);
-	int (* post_visit_pci_dev)	(struct pci_dev_wrapped *,
-					 struct pci_bus_wrapped *);
-};
-
-extern int pci_visit_dev(struct pci_visit *fn,
-			 struct pci_dev_wrapped *wrapped_dev,
-			 struct pci_bus_wrapped *wrapped_parent);
 extern void pci_remove_legacy_files(struct pci_bus *bus);
 
 /* Lock for read/write access to pci device and bus lists */
 extern spinlock_t pci_bus_lock;
+
+#ifdef CONFIG_X86_IO_APIC
+extern int pci_msi_quirk;
+#else
+#define pci_msi_quirk 0
+#endif
 
 extern int pcie_mch_quirk;
 extern struct device_attribute pci_dev_attrs[];

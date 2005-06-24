@@ -1884,7 +1884,7 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 			return(XFS_ERROR(EFSCORRUPTED));
 		}
 		error = xfs_attr_leaf_list_int(bp, context);
-		if (error || (INT_ISZERO(leaf->hdr.info.forw, ARCH_CONVERT)))
+		if (error || !leaf->hdr.info.forw)
 			break;	/* not really an error, buffer full or EOF */
 		cursor->blkno = INT_GET(leaf->hdr.info.forw, ARCH_CONVERT);
 		xfs_da_brelse(NULL, bp);

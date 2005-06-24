@@ -35,7 +35,7 @@ struct acpi_dlevel {
 };
 #define ACPI_DEBUG_INIT(v)	{ .name = #v, .value = v }
 
-const struct acpi_dlayer acpi_debug_layers[] =
+static const struct acpi_dlayer acpi_debug_layers[] =
 {
 	ACPI_DEBUG_INIT(ACPI_UTILITIES),
 	ACPI_DEBUG_INIT(ACPI_HARDWARE),
@@ -53,7 +53,7 @@ const struct acpi_dlayer acpi_debug_layers[] =
 	ACPI_DEBUG_INIT(ACPI_TOOLS),
 };
 
-const struct acpi_dlevel acpi_debug_levels[] =
+static const struct acpi_dlevel acpi_debug_levels[] =
 {
 	ACPI_DEBUG_INIT(ACPI_LV_ERROR),
 	ACPI_DEBUG_INIT(ACPI_LV_WARN),

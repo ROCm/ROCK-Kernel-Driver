@@ -551,7 +551,7 @@ static __u8 kaweth_new_code_fix[] =
 };
 
 
-const int len_kaweth_trigger_code = sizeof(kaweth_trigger_code);
-const int len_kaweth_trigger_code_fix = sizeof(kaweth_trigger_code_fix);
-const int len_kaweth_new_code = sizeof(kaweth_new_code);
-const int len_kaweth_new_code_fix = sizeof(kaweth_new_code_fix);
+static const int len_kaweth_trigger_code = sizeof(kaweth_trigger_code);
+static const int len_kaweth_trigger_code_fix = sizeof(kaweth_trigger_code_fix);
+static const int len_kaweth_new_code = sizeof(kaweth_new_code);
+static const int len_kaweth_new_code_fix = sizeof(kaweth_new_code_fix);

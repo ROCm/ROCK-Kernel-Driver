@@ -26,6 +26,9 @@
  * @History:
  * derived from linux/arch/arm/mach-s3c2410/mach-bast.c, written by
  * Ben Dooks <ben@simtec.co.uk>
+ *
+ * 10-Mar-2005 LCVR  Changed S3C2410_VA to S3C24XX_VA
+ *
  ***********************************************************************/
 
 #include <linux/kernel.h>
@@ -110,7 +113,7 @@ void __init smdk2410_init_irq(void)
 MACHINE_START(SMDK2410, "SMDK2410") /* @TODO: request a new identifier and switch
 				    * to SMDK2410 */
      MAINTAINER("Jonas Dietsche")
-     BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, S3C2410_VA_UART)
+     BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, (u32)S3C24XX_VA_UART)
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(smdk2410_map_io)
      INITIRQ(smdk2410_init_irq)

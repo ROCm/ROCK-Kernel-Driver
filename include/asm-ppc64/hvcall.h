@@ -1,6 +1,8 @@
 #ifndef _PPC64_HVCALL_H
 #define _PPC64_HVCALL_H
 
+#define HVSC			.long 0x44000022
+
 #define H_Success	0
 #define H_Busy		1	/* Hardware busy -- retry later */
 #define H_Constrained	4	/* Resource request constrained to max allowed */
@@ -41,7 +43,7 @@
 
 /* Flags */
 #define H_LARGE_PAGE		(1UL<<(63-16))
-#define H_EXACT		    (1UL<<(63-24))	/* Use exact PTE or return H_PTEG_FULL */
+#define H_EXACT			(1UL<<(63-24))	/* Use exact PTE or return H_PTEG_FULL */
 #define H_R_XLATE		(1UL<<(63-25))	/* include a valid logical page num in the pte if the valid bit is set */
 #define H_READ_4		(1UL<<(63-26))	/* Return 4 PTEs */
 #define H_AVPN			(1UL<<(63-32))	/* An avpn is provided as a sanity test */
@@ -53,8 +55,6 @@
 #define H_N			(1UL<<(63-61))
 #define H_PP1			(1UL<<(63-62))
 #define H_PP2			(1UL<<(63-63))
-
-
 
 /* pSeries hypervisor opcodes */
 #define H_REMOVE		0x04
@@ -108,6 +108,8 @@
 #define H_FREE_VTERM		0x158
 #define H_POLL_PENDING	        0x1D8
 
+#ifndef __ASSEMBLY__
+
 /* plpar_hcall() -- Generic call interface using above opcodes
  *
  * The actual call interface is a hypervisor call instruction with
@@ -124,8 +126,6 @@ long plpar_hcall(unsigned long opcode,
 		 unsigned long *out1,
 		 unsigned long *out2,
 		 unsigned long *out3);
-
-#define HVSC			".long 0x44000022\n"
 
 /* Same as plpar_hcall but for those opcodes that return no values
  * other than status.  Slightly more efficient.
@@ -147,9 +147,6 @@ long plpar_hcall_8arg_2ret(unsigned long opcode,
 			   unsigned long arg7,
 			   unsigned long arg8,
 			   unsigned long *out1);
-
-
- 
  
 /* plpar_hcall_4out()
  *
@@ -166,4 +163,5 @@ long plpar_hcall_4out(unsigned long opcode,
 		      unsigned long *out3,
 		      unsigned long *out4);
 
+#endif /* __ASSEMBLY__ */
 #endif /* _PPC64_HVCALL_H */

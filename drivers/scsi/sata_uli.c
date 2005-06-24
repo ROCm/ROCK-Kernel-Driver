@@ -82,6 +82,7 @@ static Scsi_Host_Template uli_sht = {
 	.dma_boundary		= ATA_DMA_BOUNDARY,
 	.slave_configure	= ata_scsi_slave_config,
 	.bios_param		= ata_std_bios_param,
+	.ordered_flush		= 1,
 };
 
 static struct ata_port_operations uli_ops = {
@@ -112,6 +113,7 @@ static struct ata_port_operations uli_ops = {
 
 	.port_start		= ata_port_start,
 	.port_stop		= ata_port_stop,
+	.host_stop		= ata_host_stop,
 };
 
 static struct ata_port_info uli_port_info = {

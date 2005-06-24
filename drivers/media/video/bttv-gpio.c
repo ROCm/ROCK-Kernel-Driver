@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-gpio.c,v 1.6 2004/11/03 09:04:50 kraxel Exp $
+    $Id: bttv-gpio.c,v 1.7 2005/02/16 12:14:10 kraxel Exp $
 
     bttv-gpio.c  --  gpio sub drivers
 
@@ -94,6 +94,7 @@ int bttv_sub_del_devices(struct bttv_core *core)
 
 	list_for_each_safe(item,save,&core->subs) {
 		sub = list_entry(item,struct bttv_sub_device,list);
+		list_del(&sub->list);
 		device_unregister(&sub->dev);
 	}
 	return 0;
@@ -110,20 +111,6 @@ void bttv_gpio_irq(struct bttv_core *core)
 		drv = to_bttv_sub_drv(dev->dev.driver);
 		if (drv && drv->gpio_irq)
 			drv->gpio_irq(dev);
-	}
-}
-
-void bttv_i2c_info(struct bttv_core *core, struct i2c_client *client, int attach)
-{
-	struct bttv_sub_driver *drv;
-	struct bttv_sub_device *dev;
-	struct list_head *item;
-
-	list_for_each(item,&core->subs) {
-		dev = list_entry(item,struct bttv_sub_device,list);
-		drv = to_bttv_sub_drv(dev->dev.driver);
-		if (drv && drv->i2c_info)
-			drv->i2c_info(dev,client,attach);
 	}
 }
 

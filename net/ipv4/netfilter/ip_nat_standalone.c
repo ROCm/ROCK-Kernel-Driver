@@ -172,47 +172,6 @@ ip_nat_in(unsigned int hooknum,
 	return ret;
 }
 
-struct nat_route_key
-{
-	u_int32_t addr;
-#ifdef CONFIG_XFRM
-	u_int16_t port;
-#endif
-};
-
-static inline void
-nat_route_key_get(struct sk_buff *skb, struct nat_route_key *key, int which)
-{
-	struct iphdr *iph = skb->nh.iph;
-
-	key->addr = which ? iph->daddr : iph->saddr;
-#ifdef CONFIG_XFRM
-	key->port = 0;
-	if (iph->protocol == IPPROTO_TCP || iph->protocol == IPPROTO_UDP) {
-		u_int16_t *ports = (u_int16_t *)(skb->nh.raw + iph->ihl*4);
-		key->port = ports[which];
-	}
-#endif
-}
-
-static inline int
-nat_route_key_compare(struct sk_buff *skb, struct nat_route_key *key, int which)
-{
-	struct iphdr *iph = skb->nh.iph;
-
-	if (key->addr != (which ? iph->daddr : iph->saddr))
-		return 1;
-#ifdef CONFIG_XFRM
-	if (iph->protocol == IPPROTO_TCP || iph->protocol == IPPROTO_UDP) {
-		u_int16_t *ports = (u_int16_t *)(skb->nh.raw + iph->ihl*4);
-		if (key->port != ports[which])
-			return 1;
-	}
-#endif
-
-	return 0;
-}
-
 static unsigned int
 ip_nat_out(unsigned int hooknum,
 	   struct sk_buff **pskb,
@@ -220,9 +179,6 @@ ip_nat_out(unsigned int hooknum,
 	   const struct net_device *out,
 	   int (*okfn)(struct sk_buff *))
 {
-	struct nat_route_key key;
-	unsigned int ret;
-
 	/* root is playing with raw sockets. */
 	if ((*pskb)->len < sizeof(struct iphdr)
 	    || (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr))
@@ -245,29 +201,7 @@ ip_nat_out(unsigned int hooknum,
 			return NF_STOLEN;
 	}
 
-	nat_route_key_get(*pskb, &key, 0);
-	ret = ip_nat_fn(hooknum, pskb, in, out, okfn);
-
-	if (ret != NF_DROP && ret != NF_STOLEN
-	    && nat_route_key_compare(*pskb, &key, 0)) {
-		if (ip_route_me_harder(pskb) != 0)
-			ret = NF_DROP;
-#ifdef CONFIG_XFRM
-		/*
-		 * POST_ROUTING hook is called with fixed outfn, we need
-		 * to manually confirm the packet and direct it to the
-		 * transformers if a policy matches.
-		 */
-		else if ((*pskb)->dst->xfrm != NULL) {
-			ret = ip_conntrack_confirm(pskb);
-			if (ret != NF_DROP) {
-				dst_output(*pskb);
-				ret = NF_STOLEN;
-			}
-		}
-#endif
-	}
-	return ret;
+	return ip_nat_fn(hooknum, pskb, in, out, okfn);
 }
 
 static unsigned int
@@ -277,7 +211,7 @@ ip_nat_local_fn(unsigned int hooknum,
 		const struct net_device *out,
 		int (*okfn)(struct sk_buff *))
 {
-	struct nat_route_key key;
+	u_int32_t saddr, daddr;
 	unsigned int ret;
 
 	/* root is playing with raw sockets. */
@@ -285,15 +219,34 @@ ip_nat_local_fn(unsigned int hooknum,
 	    || (*pskb)->nh.iph->ihl * 4 < sizeof(struct iphdr))
 		return NF_ACCEPT;
 
-	nat_route_key_get(*pskb, &key, 1);
-	ret = ip_nat_fn(hooknum, pskb, in, out, okfn);
+	saddr = (*pskb)->nh.iph->saddr;
+	daddr = (*pskb)->nh.iph->daddr;
 
+	ret = ip_nat_fn(hooknum, pskb, in, out, okfn);
 	if (ret != NF_DROP && ret != NF_STOLEN
-	    && nat_route_key_compare(*pskb, &key, 1)) {
-		if (ip_route_me_harder(pskb) != 0)
-			ret = NF_DROP;
-	}
+	    && ((*pskb)->nh.iph->saddr != saddr
+		|| (*pskb)->nh.iph->daddr != daddr))
+		return ip_route_me_harder(pskb) == 0 ? ret : NF_DROP;
 	return ret;
+}
+
+static unsigned int
+ip_nat_adjust(unsigned int hooknum,
+	      struct sk_buff **pskb,
+	      const struct net_device *in,
+	      const struct net_device *out,
+	      int (*okfn)(struct sk_buff *))
+{
+	struct ip_conntrack *ct;
+	enum ip_conntrack_info ctinfo;
+
+	ct = ip_conntrack_get(*pskb, &ctinfo);
+	if (ct && test_bit(IPS_SEQ_ADJUST_BIT, &ct->status)) {
+	        DEBUGP("ip_nat_standalone: adjusting sequence number\n");
+	        if (!ip_nat_seq_adjust(pskb, ct, ctinfo))
+	                return NF_DROP;
+	}
+	return NF_ACCEPT;
 }
 
 /* We must be after connection tracking and before packet filtering. */
@@ -316,6 +269,15 @@ static struct nf_hook_ops ip_nat_out_ops = {
 	.priority	= NF_IP_PRI_NAT_SRC,
 };
 
+/* After conntrack, adjust sequence number */
+static struct nf_hook_ops ip_nat_adjust_out_ops = {
+	.hook		= ip_nat_adjust,
+	.owner		= THIS_MODULE,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_POST_ROUTING,
+	.priority	= NF_IP_PRI_NAT_SEQ_ADJUST,
+};
+
 /* Before packet filtering, change destination */
 static struct nf_hook_ops ip_nat_local_out_ops = {
 	.hook		= ip_nat_local_fn,
@@ -333,6 +295,16 @@ static struct nf_hook_ops ip_nat_local_in_ops = {
 	.hooknum	= NF_IP_LOCAL_IN,
 	.priority	= NF_IP_PRI_NAT_SRC,
 };
+
+/* After conntrack, adjust sequence number */
+static struct nf_hook_ops ip_nat_adjust_in_ops = {
+	.hook		= ip_nat_adjust,
+	.owner		= THIS_MODULE,
+	.pf		= PF_INET,
+	.hooknum	= NF_IP_LOCAL_IN,
+	.priority	= NF_IP_PRI_NAT_SEQ_ADJUST,
+};
+
 
 static int init_or_cleanup(int init)
 {
@@ -362,10 +334,20 @@ static int init_or_cleanup(int init)
 		printk("ip_nat_init: can't register out hook.\n");
 		goto cleanup_inops;
 	}
+	ret = nf_register_hook(&ip_nat_adjust_in_ops);
+	if (ret < 0) {
+		printk("ip_nat_init: can't register adjust in hook.\n");
+		goto cleanup_outops;
+	}
+	ret = nf_register_hook(&ip_nat_adjust_out_ops);
+	if (ret < 0) {
+		printk("ip_nat_init: can't register adjust out hook.\n");
+		goto cleanup_adjustin_ops;
+	}
 	ret = nf_register_hook(&ip_nat_local_out_ops);
 	if (ret < 0) {
 		printk("ip_nat_init: can't register local out hook.\n");
-		goto cleanup_outops;
+		goto cleanup_adjustout_ops;;
 	}
 	ret = nf_register_hook(&ip_nat_local_in_ops);
 	if (ret < 0) {
@@ -378,6 +360,10 @@ static int init_or_cleanup(int init)
 	nf_unregister_hook(&ip_nat_local_in_ops);
  cleanup_localoutops:
 	nf_unregister_hook(&ip_nat_local_out_ops);
+ cleanup_adjustout_ops:
+	nf_unregister_hook(&ip_nat_adjust_out_ops);
+ cleanup_adjustin_ops:
+	nf_unregister_hook(&ip_nat_adjust_in_ops);
  cleanup_outops:
 	nf_unregister_hook(&ip_nat_out_ops);
  cleanup_inops:

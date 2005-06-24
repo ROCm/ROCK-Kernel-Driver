@@ -50,6 +50,7 @@
 #include <linux/fb.h>
 #include <linux/console.h>
 #include <linux/selection.h>
+#include <linux/smp_lock.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
 #include <linux/pci.h>
@@ -144,7 +145,7 @@ sisfb_setdefaultparms(void)
 #endif
 }
 
-static void __init
+static void __devinit
 sisfb_search_vesamode(unsigned int vesamode, BOOLEAN quiet)
 {
 	int i = 0, j = 0;
@@ -4761,7 +4762,8 @@ static void __devinit sisfb_post_sis315330(struct pci_dev *pdev)
 #endif
 
 
-int __devinit sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+static int __devinit sisfb_probe(struct pci_dev *pdev,
+				 const struct pci_device_id *ent)
 {
 	struct sisfb_chip_info 	*chipinfo = &sisfb_chip_info[ent->driver_data];
 	struct sis_video_info 	*ivideo = NULL;
@@ -5639,7 +5641,7 @@ static void __devexit sisfb_remove(struct pci_dev *pdev)
 	/* Unmap */
 	iounmap(ivideo->video_vbase);
 	iounmap(ivideo->mmio_vbase);
-	if(ivideo->bios_abase) vfree(ivideo->bios_abase);
+	vfree(ivideo->bios_abase);
 
 	/* Release mem regions */
 	release_mem_region(ivideo->video_base, ivideo->video_size);
@@ -5694,7 +5696,7 @@ SISINITSTATIC int __init sisfb_init(void)
 	sisfb_setup(options);
 #endif
 #endif
-	return(pci_module_init(&sisfb_driver));
+	return(pci_register_driver(&sisfb_driver));
 }
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,8)
@@ -5939,7 +5941,7 @@ MODULE_PARM_DESC(videoram,
 #endif
 #endif
 
-int __init sisfb_init_module(void)
+static int __devinit sisfb_init_module(void)
 {
 	sisfb_setdefaultparms();
 

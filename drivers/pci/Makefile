@@ -41,6 +41,10 @@ ifndef CONFIG_X86
 obj-y += syscall.o
 endif
 
+ifeq ($(CONFIG_PCI_DEBUG),y)
+EXTRA_CFLAGS += -DDEBUG
+endif
+
 hostprogs-y := gen-devlist
 
 # Dependencies on generated files need to be listed explicitly

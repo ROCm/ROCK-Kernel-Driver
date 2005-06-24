@@ -300,5 +300,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
  */
 #define NET_IP_ALIGN   0
 
+#define arch_align_stack(x) (x)
+
 #endif /* __KERNEL__ */
 #endif

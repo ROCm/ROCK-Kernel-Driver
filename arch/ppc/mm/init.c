@@ -179,6 +179,7 @@ void free_initmem(void)
 	if (!have_of)
 		FREESEC(openfirmware);
  	printk("\n");
+	ppc_md.progress = NULL;
 #undef FREESEC
 }
 
@@ -490,18 +491,6 @@ void __init mem_init(void)
 		printk(KERN_INFO "AGP special page: 0x%08lx\n", agp_special_page);
 #endif
 
-	/* Make sure all our pagetable pages have page->mapping
-	   and page->index set correctly. */
-	for (addr = KERNELBASE; addr != 0; addr += PGDIR_SIZE) {
-		struct page *pg;
-		pmd_t *pmd = pmd_offset(pgd_offset_k(addr), addr);
-		if (pmd_present(*pmd)) {
-			pg = pmd_page(*pmd);
-			pg->mapping = (void *) &init_mm;
-			pg->index = addr;
-		}
-	}
-
 	mem_init_done = 1;
 }
 
@@ -653,3 +642,27 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
 	}
 #endif
 }
+
+/*
+ * This is called by /dev/mem to know if a given address has to
+ * be mapped non-cacheable or not
+ */
+int page_is_ram(unsigned long pfn)
+{
+	unsigned long paddr = (pfn << PAGE_SHIFT);
+
+	return paddr < __pa(high_memory);
+}
+
+pgprot_t phys_mem_access_prot(struct file *file, unsigned long addr,
+			      unsigned long size, pgprot_t vma_prot)
+{
+	if (ppc_md.phys_mem_access_prot)
+		return ppc_md.phys_mem_access_prot(file, addr, size, vma_prot);
+
+	if (!page_is_ram(addr >> PAGE_SHIFT))
+		vma_prot = __pgprot(pgprot_val(vma_prot)
+				    | _PAGE_GUARDED | _PAGE_NO_CACHE);
+	return vma_prot;
+}
+EXPORT_SYMBOL(phys_mem_access_prot);

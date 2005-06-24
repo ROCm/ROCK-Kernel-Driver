@@ -43,6 +43,10 @@ config GENERIC_NVRAM
 	bool
 	default y
 
+config SCHED_NO_NO_OMIT_FRAME_POINTER
+	bool
+	default y
+
 source "init/Kconfig"
 
 menu "Processor"
@@ -52,17 +56,18 @@ choice
 	default 6xx
 
 config 6xx
-	bool "6xx/7xx/74xx/52xx/8260"
+	bool "6xx/7xx/74xx/52xx/82xx/83xx"
+	select PPC_FPU
 	help
 	  There are four types of PowerPC chips supported.  The more common
 	  types (601, 603, 604, 740, 750, 7400), the Motorola embedded
-	  versions (821, 823, 850, 855, 860, 52xx, 8260), the IBM embedded
+	  versions (821, 823, 850, 855, 860, 52xx, 82xx, 83xx), the IBM embedded
 	  versions (403 and 405) and the high end 64 bit Power processors
 	  (POWER 3, POWER4, and IBM 970 also known as G5)
 	  Unless you are building a kernel for one of the embedded processor
 	  systems, 64 bit IBM RS/6000 or an Apple G5, choose 6xx.
 	  Note that the kernel runs in 32-bit mode even on 64-bit chips.
-	  Also note that because the 52xx & 82xx family has a 603e core,
+	  Also note that because the 52xx, 82xx, & 83xx family has a 603e core,
 	  specific support for that chipset is asked later on.
 
 config 40x
@@ -72,9 +77,11 @@ config 44x
 	bool "44x"
 
 config POWER3
+	select PPC_FPU
 	bool "POWER3"
 
 config POWER4
+	select PPC_FPU
 	bool "POWER4 and 970 (G5)"
 
 config 8xx
@@ -85,6 +92,9 @@ config E500
 	bool "e500"
 
 endchoice
+
+config PPC_FPU
+	bool
 
 config BOOKE
 	bool
@@ -98,18 +108,24 @@ config FSL_BOOKE
 
 config PTE_64BIT
 	bool
-	depends on 44x
-	default y
+	depends on 44x || E500
+	default y if 44x
+	default y if E500 && PHYS_64BIT
 
 config PHYS_64BIT
-	bool
-	depends on 44x
-	default y
+	bool 'Large physical address support' if E500
+	depends on 44x || E500
+	default y if 44x
+	---help---
+	  This option enables kernel support for larger than 32-bit physical
+	  addresses.  This features is not be available on all e500 cores.
+
+	  If in doubt, say N here.
 
 config ALTIVEC
 	bool "AltiVec Support"
 	depends on 6xx || POWER4
-	depends on !8260
+	depends on !8260 && !83xx
 	---help---
 	  This option enables kernel support for the Altivec extensions to the
 	  PowerPC processor. The kernel currently supports saving and restoring
@@ -140,7 +156,7 @@ config SPE
 
 config TAU
 	bool "Thermal Management Support"
-	depends on 6xx && !8260
+	depends on 6xx && !8260 && !83xx
 	help
 	  G3 and G4 processors have an on-chip temperature sensor called the
 	  'Thermal Assist Unit (TAU)', which, in theory, can measure the on-die
@@ -203,15 +219,11 @@ source "drivers/cpufreq/Kconfig"
 config CPU_FREQ_PMAC
 	bool "Support for Apple PowerBooks"
 	depends on CPU_FREQ && ADB_PMU
+	select CPU_FREQ_TABLE
 	help
 	  This adds support for frequency switching on Apple PowerBooks,
 	  this currently includes some models of iBook & Titanium
 	  PowerBook.
-
-config CPU_FREQ_TABLE
-	bool
-	depends on CPU_FREQ_PMAC
-	default y
 
 config PPC601_SYNC_FIX
 	bool "Workarounds for PPC601 bugs"
@@ -538,6 +550,17 @@ config CHESTNUT
 config SPRUCE
 	bool "IBM-Spruce"
 
+config HDPU
+	bool "Sky-HDPU"
+	help
+	  Select HDPU if configuring a Sky Computers Compute Blade.
+
+config HDPU_FEATURES
+	depends HDPU
+	tristate "HDPU-Features"
+	help
+	  Select to enable HDPU enhanced features.
+
 config EV64260
 	bool "Marvell-EV64260BP"
 	help
@@ -567,6 +590,9 @@ config SANDPOINT
 	help
 	  Select SANDPOINT if configuring for a Motorola Sandpoint X3
 	  (any flavor).
+
+config RADSTONE_PPC7D
+	bool "Radstone Technology PPC7D board"
 
 config ADIR
 	bool "SBS-Adirondack"
@@ -638,6 +664,11 @@ config LITE5200
 	  much but it's only been tested on this board version. I think this
 	  board is also known as IceCube.
 
+config MPC834x_SYS
+	bool "Freescale MPC834x SYS"
+	help
+	  This option enables support for the MPC 834x SYS evaluation board.
+
 endchoice
 
 config PQ2ADS
@@ -675,6 +706,14 @@ config 8272
 	help
 	  The MPC8272 CPM has a different internal dpram setup than other CPM2
 	  devices
+
+config 83xx
+	bool
+	default y if MPC834x_SYS
+
+config MPC834x
+	bool
+	default y if MPC834x_SYS
 
 config CPM2
 	bool
@@ -715,7 +754,8 @@ config PPC_GEN550
 	bool
 	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS || PCORE || \
 		PRPMC750 || K2 || PRPMC800 || LOPEC || \
-		(EV64260 && !SERIAL_MPSC) || CHESTNUT
+		(EV64260 && !SERIAL_MPSC) || CHESTNUT || RADSTONE_PPC7D || \
+		83xx
 	default y
 
 config FORCE
@@ -728,15 +768,10 @@ config GT64260
 	depends on EV64260 || CPCI690
 	default y
 
-config MV64360
+config MV64360		# Really MV64360 & MV64460
 	bool
-	depends on KATANA
+	depends on CHESTNUT || KATANA || RADSTONE_PPC7D || HDPU
 	default y
-
-config MV64360
-	bool
-	depends on CHESTNUT
-  	default y
 
 config MV64X60
 	bool
@@ -793,7 +828,7 @@ config MPC10X_BRIDGE
 
 config FSL_OCP
 	bool
-	depends on MPC10X_BRIDGE || PPC_MPC52xx
+	depends on MPC10X_BRIDGE
 	default y
 
 config MPC10X_OPENPIC
@@ -1046,7 +1081,13 @@ config PROC_HARDWARE
 
 source "drivers/zorro/Kconfig"
 
+source kernel/power/Kconfig
+
 endmenu
+
+config ISA_DMA_API
+	bool
+	default y
 
 menu "Bus options"
 
@@ -1079,8 +1120,8 @@ config MCA
 	bool
 
 config PCI
-	bool "PCI support" if 40x || CPM2 || 85xx
-	default y if !40x && !CPM2 && !8xx && !APUS && !85xx
+	bool "PCI support" if 40x || CPM2 || 83xx || 85xx || PPC_MPC52xx
+	default y if !40x && !CPM2 && !8xx && !APUS && !83xx && !85xx
 	default PCI_PERMEDIA if !4xx && !CPM2 && !8xx && APUS
 	default PCI_QSPAN if !4xx && !CPM2 && 8xx
 	help
@@ -1102,12 +1143,12 @@ config PCI_QSPAN
 
 config PCI_8260
 	bool
-	depends on PCI && 8260 && !8272
+	depends on PCI && 8260
 	default y
 
 config 8260_PCI9
 	bool "  Enable workaround for MPC826x erratum PCI 9"
-	depends on PCI_8260
+	depends on PCI_8260 && !ADS8272
 	default y
 
 choice

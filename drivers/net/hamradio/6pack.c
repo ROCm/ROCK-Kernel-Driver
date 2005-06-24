@@ -394,13 +394,11 @@ static void sp_bump(struct sixpack *sp, char cmd)
 	if ((skb = dev_alloc_skb(count)) == NULL)
 		goto out_mem;
 
-	skb->dev = sp->dev;
 	ptr = skb_put(skb, count);
 	*ptr++ = cmd;	/* KISS command */
 
 	memcpy(ptr, sp->cooked_buf + 1, count);
-	skb->mac.raw = skb->data;
-	skb->protocol = htons(ETH_P_AX25);
+	skb->protocol = ax25_type_trans(skb, sp->dev);
 	netif_rx(skb);
 	sp->dev->last_rx = jiffies;
 	sp->stats.rx_packets++;
@@ -756,12 +754,12 @@ static int sixpack_ioctl(struct tty_struct *tty, struct file *file,
 
 	switch(cmd) {
 	case SIOCGIFNAME:
-		err = copy_to_user((void *) arg, dev->name,
+		err = copy_to_user((void __user *) arg, dev->name,
 		                   strlen(dev->name) + 1) ? -EFAULT : 0;
 		break;
 
 	case SIOCGIFENCAP:
-		err = put_user(0, (int __user *)arg);
+		err = put_user(0, (int __user *) arg);
 		break;
 
 	case SIOCSIFENCAP:

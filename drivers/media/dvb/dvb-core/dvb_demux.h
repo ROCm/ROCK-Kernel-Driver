@@ -1,4 +1,4 @@
-/* 
+/*
  * dvb_demux.h: DVB kernel demux API
  *
  * Copyright (C) 2000-2001 Marcus Metzler & Ralph Metzler
@@ -45,10 +45,10 @@
 
 struct dvb_demux_filter {
         struct dmx_section_filter filter;
-        u8 maskandmode    [DMX_MAX_FILTER_SIZE]; 
-        u8 maskandnotmode [DMX_MAX_FILTER_SIZE]; 
+        u8 maskandmode    [DMX_MAX_FILTER_SIZE];
+        u8 maskandnotmode [DMX_MAX_FILTER_SIZE];
 	int doneq;
-		
+
         struct dvb_demux_filter *next;
         struct dvb_demux_feed *feed;
         int index;
@@ -85,10 +85,10 @@ struct dvb_demux_feed {
         int buffer_size;
         int descramble;
 
-        struct timespec timeout; 
+        struct timespec timeout;
         struct dvb_demux_filter *filter;
         int cb_length;
-  
+
         int ts_type;
         enum dmx_ts_pes pes_type;
 
@@ -98,6 +98,7 @@ struct dvb_demux_feed {
         u16 peslen;
 
 	struct list_head list_head;
+		int index; /* a unique index for each feed (can be used as hardware pid filter index) */
 };
 
 struct dvb_demux {
@@ -113,7 +114,7 @@ struct dvb_demux {
 			    const u8 *buf, size_t len);
 	void (*memcopy) (struct dvb_demux_feed *feed, u8 *dst,
 			 const u8 *src, size_t len);
-  
+
         int users;
 #define MAX_DVB_DEMUX_USERS 10
         struct dvb_demux_filter *filter;
@@ -123,8 +124,8 @@ struct dvb_demux {
 
         struct dvb_demux_feed *pesfilter[DMX_TS_PES_OTHER];
         u16 pids[DMX_TS_PES_OTHER];
-        int playing; 
-        int recording; 
+        int playing;
+        int recording;
 
 #define DMX_MAX_PID 0x2000
 	struct list_head feed_list;
@@ -138,13 +139,8 @@ struct dvb_demux {
 
 int dvb_dmx_init(struct dvb_demux *dvbdemux);
 int dvb_dmx_release(struct dvb_demux *dvbdemux);
-void dvb_dmx_swfilter_packet(struct dvb_demux *dvbdmx, const u8 *buf);
 void dvb_dmx_swfilter_packets(struct dvb_demux *dvbdmx, const u8 *buf, size_t count);
 void dvb_dmx_swfilter(struct dvb_demux *demux, const u8 *buf, size_t count);
 void dvb_dmx_swfilter_204(struct dvb_demux *demux, const u8 *buf, size_t count);
 
-int dvbdmx_connect_frontend(struct dmx_demux *demux, struct dmx_frontend *frontend);
-int dvbdmx_disconnect_frontend(struct dmx_demux *demux);
-
 #endif /* _DVB_DEMUX_H_ */
-

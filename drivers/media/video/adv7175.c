@@ -452,7 +452,6 @@ static struct i2c_client_address_data addr_data = {
 	.force			= force
 };
 
-static int adv7175_i2c_id = 0;
 static struct i2c_driver i2c_driver_adv7175;
 
 static int
@@ -482,7 +481,6 @@ adv7175_detect_client (struct i2c_adapter *adapter,
 	client->adapter = adapter;
 	client->driver = &i2c_driver_adv7175;
 	client->flags = I2C_CLIENT_ALLOW_USE;
-	client->id = adv7175_i2c_id++;
 	if ((client->addr == I2C_ADV7175 >> 1) ||
 	    (client->addr == (I2C_ADV7175 >> 1) + 1)) {
 		dname = adv7175_name;
@@ -494,8 +492,7 @@ adv7175_detect_client (struct i2c_adapter *adapter,
 		kfree(client);
 		return 0;
 	}
-	snprintf(I2C_NAME(client), sizeof(I2C_NAME(client)) - 1,
-		"%s[%d]", dname, client->id);
+	strlcpy(I2C_NAME(client), dname, sizeof(I2C_NAME(client)));
 
 	encoder = kmalloc(sizeof(struct adv7175), GFP_KERNEL);
 	if (encoder == NULL) {

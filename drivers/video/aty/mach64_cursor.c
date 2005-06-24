@@ -71,7 +71,7 @@ static const u8 cursor_mask_lookup[16] = {
 	0xa8, 0x28, 0x88, 0x08, 0xa0, 0x20, 0x80, 0x00
 };
 
-int atyfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
+static int atyfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	u16 xoff, yoff;

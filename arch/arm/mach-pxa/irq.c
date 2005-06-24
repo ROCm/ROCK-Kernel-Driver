@@ -97,23 +97,23 @@ static int pxa_gpio_irq_type(unsigned int irq, unsigned int type)
 		type = __IRQT_RISEDGE | __IRQT_FALEDGE;
 	}
 
-	printk(KERN_DEBUG "IRQ%d (GPIO%d): ", irq, gpio);
+	/* printk(KERN_DEBUG "IRQ%d (GPIO%d): ", irq, gpio); */
 
 	pxa_gpio_mode(gpio | GPIO_IN);
 
 	if (type & __IRQT_RISEDGE) {
-		printk("rising ");
+		/* printk("rising "); */
 		__set_bit (gpio, GPIO_IRQ_rising_edge);
 	} else
 		__clear_bit (gpio, GPIO_IRQ_rising_edge);
 
 	if (type & __IRQT_FALEDGE) {
-		printk("falling ");
+		/* printk("falling "); */
 		__set_bit (gpio, GPIO_IRQ_falling_edge);
 	} else
 		__clear_bit (gpio, GPIO_IRQ_falling_edge);
 
-	printk("edges\n");
+	/* printk("edges\n"); */
 
 	GRER(gpio) = GPIO_IRQ_rising_edge[idx] & GPIO_IRQ_mask[idx];
 	GFER(gpio) = GPIO_IRQ_falling_edge[idx] & GPIO_IRQ_mask[idx];

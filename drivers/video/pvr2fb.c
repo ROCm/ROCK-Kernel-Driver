@@ -4,7 +4,7 @@
  * Dreamcast.
  *
  * Copyright (c) 2001 M. R. Brown <mrbrown@0xd6.org>
- * Copyright (c) 2001, 2002, 2003, 2004 Paul Mundt <lethal@linux-sh.org>
+ * Copyright (c) 2001, 2002, 2003, 2004, 2005 Paul Mundt <lethal@linux-sh.org>
  *
  * This file is part of the LinuxDC project (linuxdc.sourceforge.net).
  *
@@ -33,7 +33,7 @@
  *  Then, when it's time to convert back to hardware settings, the only
  *  constants are the borderstart_* offsets, all other values are derived from
  *  the fb video mode:
- *  
+ *
  *      // PAL
  *      borderstart_h = 116;
  *      borderstart_v = 44;
@@ -939,7 +939,8 @@ static int __devinit pvr2fb_pci_probe(struct pci_dev *pdev,
 
 	pvr2_fix.mmio_start	= pci_resource_start(pdev, 1);
 	pvr2_fix.mmio_len	= pci_resource_len(pdev, 1);
-	fbinfo->device = &pdev->dev;
+
+	fb_info->device		= &pdev->dev;
 
 	return pvr2fb_common_init();
 }
@@ -966,7 +967,7 @@ static struct pci_driver pvr2fb_pci_driver = {
 
 static int __init pvr2fb_pci_init(void)
 {
-	return pci_module_init(&pvr2fb_pci_driver);
+	return pci_register_driver(&pvr2fb_pci_driver);
 }
 
 static void pvr2fb_pci_exit(void)
@@ -1068,7 +1069,6 @@ int __init pvr2fb_init(void)
 	size = sizeof(struct fb_info) + sizeof(struct pvr2fb_par) + 16 * sizeof(u32);
 
 	fb_info = kmalloc(size, GFP_KERNEL);
-	
 	if (!fb_info) {
 		printk(KERN_ERR "Failed to allocate memory for fb_info\n");
 		return -ENOMEM;

@@ -45,6 +45,7 @@
 #define TMU_TOCR_INIT	0x00
 #define TMU0_TCR_INIT	0x0020
 #define TMU_TSTR_INIT	1
+#define TMU_TSTR_OFF	0
 
 /* RCR1 Bits */
 #define RCR1_CF		0x80	/* Carry Flag             */
@@ -424,7 +425,7 @@ static __init unsigned int get_cpu_hz(void)
 	*/
 	register unsigned long long  __rtc_irq_flag __asm__ ("r3");
 
-	sti();
+	local_irq_enable();
 	do {} while (ctrl_inb(R64CNT) != 0);
 	ctrl_outb(RCR1_CIE, RCR1); /* Enable carry interrupt */
 
@@ -443,7 +444,7 @@ static __init unsigned int get_cpu_hz(void)
 		     "getcon	" __CTC ", %0\n\t"
 		: "=r"(ctc_val), "=r" (__dummy), "=r" (__rtc_irq_flag)
 		: "0" (0));
-	cli();
+	local_irq_disable();
 	/*
 	 * SH-3:
 	 * CPU clock = 4 stages * loop
@@ -561,6 +562,7 @@ void __init time_init(void)
 	current_cpu_data.module_clock = module_clock;
 
 	/* Start TMU0 */
+	ctrl_outb(TMU_TSTR_OFF, TMU_TSTR);
 	ctrl_outb(TMU_TOCR_INIT, TMU_TOCR);
 	ctrl_outw(TMU0_TCR_INIT, TMU0_TCR);
 	ctrl_outl(interval, TMU0_TCOR);

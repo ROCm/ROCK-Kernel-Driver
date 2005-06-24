@@ -1,5 +1,5 @@
 /*
- * SiS AGPGART routines. 
+ * SiS AGPGART routines.
  */
 
 #include <linux/module.h>
@@ -70,7 +70,7 @@ static void sis_cleanup(void)
 			      (previous_size->size_value & ~(0x03)));
 }
 
-static void sis_delayed_enable(u32 mode)
+static void sis_delayed_enable(struct agp_bridge_data *bridge, u32 mode)
 {
 	struct pci_dev *device = NULL;
 	u32 command;
@@ -79,10 +79,10 @@ static void sis_delayed_enable(u32 mode)
 	printk(KERN_INFO PFX "Found an AGP %d.%d compliant device at %s.\n",
 		agp_bridge->major_version,
 		agp_bridge->minor_version,
-		agp_bridge->dev->slot_name);
+		pci_name(agp_bridge->dev));
 
 	pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx + PCI_AGP_STATUS, &command);
-	command = agp_collect_device_status(mode, command);
+	command = agp_collect_device_status(bridge, mode, command);
 	command |= AGPSTAT_AGP_ENABLE;
 	rate = (command & 0x7) << 2;
 
@@ -99,9 +99,9 @@ static void sis_delayed_enable(u32 mode)
 		/*
 		 * Weird: on some sis chipsets any rate change in the target
 		 * command register triggers a 5ms screwup during which the master
-		 * cannot be configured		 
+		 * cannot be configured
 		 */
-		if (device->device == agp_bridge->dev->device) {
+		if (device->device == bridge->dev->device) {
 			printk(KERN_INFO PFX "SiS delay workaround: giving bridge time to recover.\n");
 			msleep(10);
 		}
@@ -119,7 +119,7 @@ static struct aper_size_info_8 sis_generic_sizes[7] =
 	{4, 1024, 0, 3}
 };
 
-struct agp_bridge_driver sis_driver = {
+static struct agp_bridge_driver sis_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes 	= sis_generic_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -342,7 +342,7 @@ static int __init agp_sis_init(void)
 {
 	if (agp_off)
 		return -EINVAL;
-	return pci_module_init(&agp_sis_pci_driver);
+	return pci_register_driver(&agp_sis_pci_driver);
 }
 
 static void __exit agp_sis_cleanup(void)

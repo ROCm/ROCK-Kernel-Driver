@@ -2,13 +2,9 @@ menu "Kernel hacking"
 
 source "lib/Kconfig.debug"
 
-config FRAME_POINTER
-	bool
-	default y if DEBUG_INFO
-
 config PT_PROXY
 	bool "Enable ptrace proxy"
-	depends on XTERM_CHAN && DEBUG_INFO
+	depends on XTERM_CHAN && DEBUG_INFO && MODE_TT
 	help
 	This option enables a debugging interface which allows gdb to debug
 	the kernel without needing to actually attach to kernel threads.
@@ -16,7 +12,7 @@ config PT_PROXY
 
 config GPROF
 	bool "Enable gprof support"
-	depends on DEBUG_INFO
+	depends on DEBUG_INFO && MODE_SKAS && !MODE_TT
 	help
         This allows profiling of a User-Mode Linux kernel with the gprof
         utility.
@@ -29,7 +25,7 @@ config GPROF
 
 config GCOV
 	bool "Enable gcov support"
-	depends on DEBUG_INFO
+	depends on DEBUG_INFO && MODE_SKAS
 	help
         This option allows developers to retrieve coverage data from a UML
         session.
@@ -39,5 +35,15 @@ config GCOV
 
         If you're involved in UML kernel development and want to use gcov,
         say Y.  If you're unsure, say N.
+
+config SYSCALL_DEBUG
+	bool "Enable system call debugging"
+	default N
+	depends on DEBUG_INFO
+	help
+	This adds some system debugging to UML, including keeping a ring buffer
+	with recent system calls and some global and per-task statistics.
+
+	If unsure, say N
 
 endmenu

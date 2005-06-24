@@ -44,7 +44,7 @@ extern int dvb_dibusb_debug;
 
 /* Version information */
 #define DRIVER_VERSION "0.3"
-#define DRIVER_DESC "Driver for DiBcom based USB Budget DVB-T device"
+#define DRIVER_DESC "DiBcom based USB Budget DVB-T device"
 #define DRIVER_AUTHOR "Patrick Boettcher, patrick.boettcher@desy.de"
 
 #define deb_info(args...) dprintk(0x01,args)
@@ -55,9 +55,12 @@ extern int dvb_dibusb_debug;
 #define deb_rc(args...)   dprintk(0x20,args)
 
 /* generic log methods - taken from usb.h */
-#define err(format, arg...) printk(KERN_ERR "%s: " format "\n" , __FILE__ , ## arg)
-#define info(format, arg...) printk(KERN_INFO "%s: " format "\n" , __FILE__ , ## arg)
-#define warn(format, arg...) printk(KERN_WARNING "%s: " format "\n" , __FILE__ , ## arg)
+#undef err
+#define err(format, arg...)  printk(KERN_ERR     "dvb-dibusb: " format "\n" , ## arg)
+#undef info
+#define info(format, arg...) printk(KERN_INFO    "dvb-dibusb: " format "\n" , ## arg)
+#undef warn
+#define warn(format, arg...) printk(KERN_WARNING "dvb-dibusb: " format "\n" , ## arg)
 
 struct dibusb_usb_controller {
 	const char *name;       /* name of the usb controller */
@@ -69,6 +72,9 @@ typedef enum {
 	DIBUSB1_1_AN2235,
 	DIBUSB2_0,
 	UMT2_0,
+	DIBUSB2_0B,
+	NOVAT_USB2,
+	DTT200U,
 } dibusb_class_t;
 
 typedef enum {
@@ -82,11 +88,13 @@ typedef enum {
 	DIBUSB_DIB3000MB = 0,
 	DIBUSB_DIB3000MC,
 	DIBUSB_MT352,
+	DTT200U_FE,
 } dibusb_demodulator_t;
 
 typedef enum {
 	DIBUSB_RC_NO = 0,
-	DIBUSB_RC_NEC_PROTOCOL = 1,
+	DIBUSB_RC_NEC_PROTOCOL,
+	DIBUSB_RC_HAUPPAUGE_PROTO,
 } dibusb_remote_t;
 
 struct dibusb_tuner {
@@ -113,7 +121,7 @@ struct dibusb_device_class {
 
 	int pipe_cmd;                                 /* command pipe (read/write) */
 	int pipe_data;                                /* data pipe */
-	
+
 	int urb_count;                                /* number of data URBs to be submitted */
 	int urb_buffer_size;                          /* the size of the buffer for each URB */
 
@@ -149,11 +157,11 @@ struct usb_dibusb {
 #define DIBUSB_STATE_INIT       0x000
 #define DIBUSB_STATE_URB_LIST   0x001
 #define DIBUSB_STATE_URB_BUF    0x002
-#define DIBUSB_STATE_URB_SUBMIT 0x004 
+#define DIBUSB_STATE_URB_INIT	0x004
 #define DIBUSB_STATE_DVB        0x008
 #define DIBUSB_STATE_I2C        0x010
 #define DIBUSB_STATE_REMOTE		0x020
-#define DIBUSB_STATE_PIDLIST    0x040
+#define DIBUSB_STATE_URB_SUBMIT 0x040
 	int init_state;
 
 	int feedcount;
@@ -172,12 +180,8 @@ struct usb_dibusb {
 	struct semaphore usb_sem;
 	struct semaphore i2c_sem;
 
-	/* pid filtering */
-	spinlock_t pid_list_lock;
-	struct dibusb_pid *pid_list;
-	
 	/* dvb */
-	struct dvb_adapter *adapter;
+	struct dvb_adapter adapter;
 	struct dmxdev dmxdev;
 	struct dvb_demux demux;
 	struct dvb_net dvb_net;
@@ -189,7 +193,10 @@ struct usb_dibusb {
 	/* remote control */
 	struct input_dev rc_input_dev;
 	struct work_struct rc_query_work;
-	int rc_input_event;
+	int last_event;
+	int last_state; /* for Hauppauge RC protocol */
+	int repeat_key_count;
+	int rc_key_repeat_count; /* module parameter */
 
 	/* module parameters */
 	int pid_parse;
@@ -206,8 +213,6 @@ int dibusb_remote_exit(struct usb_dibusb *dib);
 int dibusb_remote_init(struct usb_dibusb *dib);
 
 /* dvb-dibusb-fe-i2c.c */
-int dibusb_i2c_msg(struct usb_dibusb *dib, u8 addr, 
-		u8 *wbuf, u16 wlen, u8 *rbuf, u16 rlen);
 int dibusb_fe_init(struct usb_dibusb* dib);
 int dibusb_fe_exit(struct usb_dibusb *dib);
 int dibusb_i2c_init(struct usb_dibusb *dib);
@@ -221,6 +226,7 @@ int dibusb_dvb_exit(struct usb_dibusb *dib);
 /* dvb-dibusb-usb.c */
 int dibusb_readwrite_usb(struct usb_dibusb *dib, u8 *wbuf, u16 wlen, u8 *rbuf,
 	u16 rlen);
+int dibusb_write_usb(struct usb_dibusb *dib, u8 *buf, u16 len);
 
 int dibusb_hw_wakeup(struct dvb_frontend *);
 int dibusb_hw_sleep(struct dvb_frontend *);
@@ -230,19 +236,17 @@ int dibusb_streaming(struct usb_dibusb *,int);
 int dibusb_urb_init(struct usb_dibusb *);
 int dibusb_urb_exit(struct usb_dibusb *);
 
-/* dvb-dibusb-pid.c */
-int dibusb_pid_list_init(struct usb_dibusb *dib);
-void dibusb_pid_list_exit(struct usb_dibusb *dib);
-int dibusb_ctrl_pid(struct usb_dibusb *dib, struct dvb_demux_feed *dvbdmxfeed , int onoff);
+/* dvb-fe-dtt200u.c */
+struct dvb_frontend* dtt200u_fe_attach(struct usb_dibusb *,struct dib_fe_xfer_ops *);
 
 /* i2c and transfer stuff */
-#define DIBUSB_I2C_TIMEOUT				HZ*5
+#define DIBUSB_I2C_TIMEOUT				5000
 
-/* 
+/*
  * protocol of all dibusb related devices
  */
 
-/* 
+/*
  * bulk msg to/from endpoint 0x01
  *
  * general structure:
@@ -252,23 +256,23 @@ int dibusb_ctrl_pid(struct usb_dibusb *dib, struct dvb_demux_feed *dvbdmxfeed , 
 #define DIBUSB_REQ_START_READ			0x00
 #define DIBUSB_REQ_START_DEMOD			0x01
 
-/* 
- * i2c read 
+/*
+ * i2c read
  * bulk write: 0x02 ((7bit i2c_addr << 1) & 0x01) register_bytes length_word
  * bulk read:  byte_buffer (length_word bytes)
  */
-#define DIBUSB_REQ_I2C_READ  			0x02
- 
+#define DIBUSB_REQ_I2C_READ			0x02
+
 /*
  * i2c write
  * bulk write: 0x03 (7bit i2c_addr << 1) register_bytes value_bytes
  */
-#define DIBUSB_REQ_I2C_WRITE 			0x03
+#define DIBUSB_REQ_I2C_WRITE			0x03
 
-/* 
- * polling the value of the remote control 
+/*
+ * polling the value of the remote control
  * bulk write: 0x04
- * bulk read:  byte_buffer (5 bytes) 
+ * bulk read:  byte_buffer (5 bytes)
  *
  * first byte of byte_buffer shows the status (0x00, 0x01, 0x02)
  */
@@ -278,27 +282,31 @@ int dibusb_ctrl_pid(struct usb_dibusb *dib, struct dvb_demux_feed *dvbdmxfeed , 
 #define DIBUSB_RC_NEC_KEY_PRESSED		0x01
 #define DIBUSB_RC_NEC_KEY_REPEATED		0x02
 
+/* additional status values for Hauppauge Remote Control Protocol */
+#define DIBUSB_RC_HAUPPAUGE_KEY_PRESSED	0x01
+#define DIBUSB_RC_HAUPPAUGE_KEY_EMPTY	0x03
+
 /* streaming mode:
- * bulk write: 0x05 mode_byte 
+ * bulk write: 0x05 mode_byte
  *
  * mode_byte is mostly 0x00
  */
 #define DIBUSB_REQ_SET_STREAMING_MODE	0x05
 
 /* interrupt the internal read loop, when blocking */
-#define DIBUSB_REQ_INTR_READ		   	0x06
+#define DIBUSB_REQ_INTR_READ			0x06
 
 /* io control
  * 0x07 cmd_byte param_bytes
  *
  * param_bytes can be up to 32 bytes
  *
- * cmd_byte function    parameter name 
+ * cmd_byte function    parameter name
  * 0x00     power mode
  *                      0x00      sleep
  *                      0x01      wakeup
  *
- * 0x01     enable streaming 
+ * 0x01     enable streaming
  * 0x02     disable streaming
  *
  *

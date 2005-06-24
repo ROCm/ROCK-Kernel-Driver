@@ -10,6 +10,8 @@ typedef unsigned long cputime_t;
 #define cputime_max			((~0UL >> 1) - 1)
 #define cputime_add(__a, __b)		((__a) +  (__b))
 #define cputime_sub(__a, __b)		((__a) -  (__b))
+#define cputime_div(__a, __n)		((__a) /  (__n))
+#define cputime_halve(__a)		((__a) >> 1)
 #define cputime_eq(__a, __b)		((__a) == (__b))
 #define cputime_gt(__a, __b)		((__a) >  (__b))
 #define cputime_ge(__a, __b)		((__a) >= (__b))

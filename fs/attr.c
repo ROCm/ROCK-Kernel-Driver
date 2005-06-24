@@ -135,13 +135,16 @@ int setattr_mask(unsigned int ia_valid)
 int notify_change(struct dentry * dentry, struct iattr * attr)
 {
 	struct inode *inode = dentry->d_inode;
-	mode_t mode = inode->i_mode;
+	mode_t mode;
 	int error;
-	struct timespec now = current_fs_time(inode->i_sb);
+	struct timespec now;
 	unsigned int ia_valid = attr->ia_valid;
 
 	if (!inode)
 		BUG();
+
+	mode = inode->i_mode;
+	now = current_fs_time(inode->i_sb);
 
 	attr->ia_ctime = now;
 	if (!(ia_valid & ATTR_ATIME_SET))

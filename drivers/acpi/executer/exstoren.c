@@ -206,7 +206,6 @@ acpi_ex_store_object_to_object (
 {
 	union acpi_operand_object       *actual_src_desc;
 	acpi_status                     status = AE_OK;
-	acpi_object_type                original_src_type;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_store_object_to_object", source_desc);
@@ -223,8 +222,7 @@ acpi_ex_store_object_to_object (
 		return_ACPI_STATUS (status);
 	}
 
-	original_src_type = ACPI_GET_OBJECT_TYPE (source_desc);
-	if (original_src_type != ACPI_GET_OBJECT_TYPE (dest_desc)) {
+	if (ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_GET_OBJECT_TYPE (dest_desc)) {
 		/*
 		 * The source type does not match the type of the destination.
 		 * Perform the "implicit conversion" of the source to the current type
@@ -275,8 +273,7 @@ acpi_ex_store_object_to_object (
 		 * Note: There is different store behavior depending on the original
 		 * source type
 		 */
-		status = acpi_ex_store_buffer_to_buffer (original_src_type, actual_src_desc,
-				 dest_desc);
+		status = acpi_ex_store_buffer_to_buffer (actual_src_desc, dest_desc);
 		break;
 
 	case ACPI_TYPE_PACKAGE:

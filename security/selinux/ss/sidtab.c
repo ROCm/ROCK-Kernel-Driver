@@ -87,42 +87,6 @@ out:
 	return rc;
 }
 
-int sidtab_remove(struct sidtab *s, u32 sid)
-{
-	int hvalue, rc = 0;
-	struct sidtab_node *cur, *last;
-
-	if (!s) {
-		rc = -ENOENT;
-		goto out;
-	}
-
-	hvalue = SIDTAB_HASH(sid);
-	last = NULL;
-	cur = s->htable[hvalue];
-	while (cur != NULL && sid > cur->sid) {
-		last = cur;
-		cur = cur->next;
-	}
-
-	if (cur == NULL || sid != cur->sid) {
-		rc = -ENOENT;
-		goto out;
-	}
-
-	if (last == NULL)
-		s->htable[hvalue] = cur->next;
-	else
-		last->next = cur->next;
-
-	context_destroy(&cur->context);
-
-	kfree(cur);
-	s->nel--;
-out:
-	return rc;
-}
-
 struct context *sidtab_search(struct sidtab *s, u32 sid)
 {
 	int hvalue;

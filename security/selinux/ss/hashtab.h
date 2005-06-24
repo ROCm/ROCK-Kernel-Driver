@@ -54,33 +54,6 @@ struct hashtab *hashtab_create(u32 (*hash_value)(struct hashtab *h, void *key),
 int hashtab_insert(struct hashtab *h, void *k, void *d);
 
 /*
- * Removes the entry with the specified key from the hash table.
- * Applies the specified destroy function to (key,datum,args) for
- * the entry.
- *
- * Returns -ENOENT if no entry has the specified key,
- * -EINVAL for general errors or
- *0 otherwise.
- */
-int hashtab_remove(struct hashtab *h, void *k,
-		   void (*destroy)(void *k, void *d, void *args),
-		   void *args);
-
-/*
- * Insert or replace the specified (key, datum) pair in the specified
- * hash table.  If an entry for the specified key already exists,
- * then the specified destroy function is applied to (key,datum,args)
- * for the entry prior to replacing the entry's contents.
- *
- * Returns -ENOMEM if insufficient space is available,
- * -EINVAL for general errors or
- * 0 otherwise.
- */
-int hashtab_replace(struct hashtab *h, void *k, void *d,
-		    void (*destroy)(void *k, void *d, void *args),
-		    void *args);
-
-/*
  * Searches for the entry with the specified key in the hash table.
  *
  * Returns NULL if no entry has the specified key or
@@ -107,17 +80,6 @@ void hashtab_destroy(struct hashtab *h);
 int hashtab_map(struct hashtab *h,
 		int (*apply)(void *k, void *d, void *args),
 		void *args);
-
-/*
- * Same as hashtab_map, except that if apply returns a non-zero status,
- * then the (key,datum) pair will be removed from the hashtab and the
- * destroy function will be applied to (key,datum,args).
- */
-void hashtab_map_remove_on_error(struct hashtab *h,
-                                 int (*apply)(void *k, void *d, void *args),
-                                 void (*destroy)(void *k, void *d, void *args),
-                                 void *args);
-
 
 /* Fill info with some hash table statistics */
 void hashtab_stat(struct hashtab *h, struct hashtab_info *info);

@@ -5,8 +5,7 @@
 
 #include <errno.h>
 #include <string.h>
-#include <sys/ptrace.h>
-#include "sysdep/ptrace.h"
+#include "ptrace_user.h"
 #include "uml-config.h"
 #include "skas_ptregs.h"
 #include "registers.h"

@@ -29,7 +29,7 @@ __init static int
 fill_mp_bus_to_cpumask(void)
 {
 	struct pci_dev *nb_dev = NULL;
-	int i, j;
+	int i, j, printed;
 	u32 ldtbus, nid;
 	static int lbnr[3] = {
 		LDT_BUS_NUMBER_REGISTER_0,
@@ -60,11 +60,15 @@ fill_mp_bus_to_cpumask(void)
 	}
 
 	/* quick sanity check */
+	printed = 0;
 	for (i = 0; i < 256; i++) {
 		if (cpus_empty(pci_bus_to_cpumask[i])) {
-			printk(KERN_ERR
-			       "k8-bus.c: bus %i has empty cpu mask\n", i);
 			pci_bus_to_cpumask[i] = CPU_MASK_ALL;
+			if (printed)
+				continue;
+			printk(KERN_ERR
+			       "k8-bus.c: some busses have empty cpu mask\n");
+			printed = 1;
 		}
 	}
 

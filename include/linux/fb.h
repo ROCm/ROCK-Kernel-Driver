@@ -103,7 +103,10 @@
 #define FB_ACCEL_SIS_GLAMOUR_2  40	/* SiS 315, 650, 740		*/
 #define FB_ACCEL_SIS_XABRE      41	/* SiS 330 ("Xabre")		*/
 #define FB_ACCEL_I830           42      /* Intel 830M/845G/85x/865G     */
-
+#define FB_ACCEL_NV_10          43      /* nVidia Arch 10               */
+#define FB_ACCEL_NV_20          44      /* nVidia Arch 20               */
+#define FB_ACCEL_NV_30          45      /* nVidia Arch 30               */
+#define FB_ACCEL_NV_40          46      /* nVidia Arch 40               */
 #define FB_ACCEL_NEOMAGIC_NM2070 90	/* NeoMagic NM2070              */
 #define FB_ACCEL_NEOMAGIC_NM2090 91	/* NeoMagic NM2090              */
 #define FB_ACCEL_NEOMAGIC_NM2093 92	/* NeoMagic NM2093              */
@@ -490,6 +493,8 @@ struct fb_cursor_user {
 #define FB_EVENT_SET_CONSOLE_MAP        0x07
 /*      A display blank is requested       */
 #define FB_EVENT_BLANK                  0x08
+/*      Private modelist is to be replaced */
+#define FB_EVENT_NEW_MODELIST           0x09
 
 struct fb_event {
 	struct fb_info *info;
@@ -558,6 +563,9 @@ struct fb_ops {
 	int (*fb_setcolreg)(unsigned regno, unsigned red, unsigned green,
 			    unsigned blue, unsigned transp, struct fb_info *info);
 
+	/* set color registers in batch */
+	int (*fb_setcmap)(struct fb_cmap *cmap, struct fb_info *info);
+
 	/* blank display */
 	int (*fb_blank)(int blank, struct fb_info *info);
 
@@ -585,7 +593,7 @@ struct fb_ops {
 			unsigned long arg, struct fb_info *info);
 
 	/* Handle 32bit compat ioctl (optional) */
-	int (*fb_compat_ioctl)(struct file *f, unsigned cmd, unsigned long arg,
+	long (*fb_compat_ioctl)(struct file *f, unsigned cmd, unsigned long arg,
 			       struct fb_info *info);
 
 	/* perform fb specific mmap */
@@ -697,9 +705,7 @@ struct fb_tile_ops {
 
 #define FBINFO_MISC_USEREVENT          0x10000 /* event request
 						  from userspace */
-#define FBINFO_MISC_MODESWITCH         0x20000 /* mode switch */
-#define FBINFO_MISC_MODESWITCHLATE     0x40000 /* init hardware later */
-#define FBINFO_MISC_TILEBLITTING       0x80000 /* use tile blitting */
+#define FBINFO_MISC_TILEBLITTING       0x20000 /* use tile blitting */
 
 struct fb_info {
 	int node;
@@ -712,8 +718,10 @@ struct fb_info {
 	struct fb_pixmap sprite;	/* Cursor hardware mapper */
 	struct fb_cmap cmap;		/* Current cmap */
 	struct list_head modelist;      /* mode list */
+	struct fb_videomode *mode;	/* current mode */
 	struct fb_ops *fbops;
 	struct device *device;
+	struct class_device *class_device; /* sysfs per device attrs */
 #ifdef CONFIG_FB_TILEBLITTING
 	struct fb_tile_ops *tileops;    /* Tile Blitting */
 #endif
@@ -726,14 +734,6 @@ struct fb_info {
 	void *fbcon_par;                /* fbcon use-only private area */
 	/* From here on everything is device dependent */
 	void *par;	
-#ifdef CONFIG_BOOTSPLASH
-	struct splash_data *splash_data;
-	unsigned char *splash_pic;
-	int splash_pic_size;
-	int splash_bytes;
-	char *silent_screen_base;	/* real screen base */
-	char fb_cursordata[64];
-#endif
 };
 
 #ifdef MODULE
@@ -829,8 +829,9 @@ extern void fb_sysmove_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
 				u8 *dst, u32 d_pitch, u8 *src, u32 s_pitch,
 				u32 height);
 extern void fb_set_suspend(struct fb_info *info, int state);
-extern int fb_get_color_depth(struct fb_info *info);
+extern int fb_get_color_depth(struct fb_var_screeninfo *var);
 extern int fb_get_options(char *name, char **option);
+extern int fb_new_modelist(struct fb_info *info);
 
 extern struct fb_info *registered_fb[FB_MAX];
 extern int num_registered_fb;
@@ -838,6 +839,8 @@ extern int num_registered_fb;
 /* drivers/video/fbsysfs.c */
 extern struct fb_info *framebuffer_alloc(size_t size, struct device *dev);
 extern void framebuffer_release(struct fb_info *info);
+extern int fb_init_class_device(struct fb_info *fb_info);
+extern void fb_cleanup_class_device(struct fb_info *head);
 
 /* drivers/video/fbmon.c */
 #define FB_MAXTIMINGS		0
@@ -862,10 +865,7 @@ extern int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var,
 extern int fb_validate_mode(const struct fb_var_screeninfo *var,
 			    struct fb_info *info);
 extern int fb_parse_edid(unsigned char *edid, struct fb_var_screeninfo *var);
-extern int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs);
 extern void fb_edid_to_monspecs(unsigned char *edid, struct fb_monspecs *specs);
-extern int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs);
-extern struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize);
 extern void fb_destroy_modedb(struct fb_videomode *modedb);
 
 /* drivers/video/modedb.c */
@@ -883,6 +883,8 @@ extern struct fb_videomode *fb_match_mode(struct fb_var_screeninfo *var,
 					  struct list_head *head);
 extern struct fb_videomode *fb_find_best_mode(struct fb_var_screeninfo *var,
 					      struct list_head *head);
+extern struct fb_videomode *fb_find_nearest_mode(struct fb_var_screeninfo *var,
+						 struct list_head *head);
 extern void fb_destroy_modelist(struct list_head *head);
 extern void fb_videomode_to_modelist(struct fb_videomode *modedb, int num,
 				     struct list_head *head);

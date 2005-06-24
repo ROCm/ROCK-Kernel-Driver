@@ -1033,9 +1033,9 @@ dump_hash_table_seg(unsigned seg, unsigned start, unsigned end)
 	extern unsigned long Hash_size;
 	unsigned *htab = Hash;
 	unsigned hsize = Hash_size;
-	unsigned v, hmask, va, last_va;
+	unsigned v, hmask, va, last_va = 0;
 	int found, last_found, i;
-	unsigned *hg, w1, last_w2, last_va0;
+	unsigned *hg, w1, last_w2 = 0, last_va0 = 0;
 
 	last_found = 0;
 	hmask = hsize / 64 - 1;
@@ -1492,7 +1492,7 @@ ppc_inst_dump(unsigned adr, int count)
 {
 	int nr, dotted;
 	unsigned first_adr;
-	unsigned long inst, last_inst;
+	unsigned long inst, last_inst = 0;
 	unsigned char val[4];
 
 	dotted = 0;
@@ -1959,7 +1959,7 @@ unsigned long
 xmon_symbol_to_addr(char* symbol)
 {
 	char *p, *cur;
-	char *match;
+	char *match = NULL;
 	int goodness = 0;
 	int result = 0;
 	

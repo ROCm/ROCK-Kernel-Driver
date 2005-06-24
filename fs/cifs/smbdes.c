@@ -45,6 +45,7 @@
    up with a different answer to the one above)
 */
 #include <linux/slab.h>
+#include "cifsencrypt.h"
 #define uchar unsigned char
 
 static uchar perm1[56] = { 57, 49, 41, 33, 25, 17, 9,
@@ -376,7 +377,9 @@ E_old_pw_hash(unsigned char *p14, unsigned char *in, unsigned char *out)
 	smbhash(out, in, p14, 1);
 	smbhash(out + 8, in + 8, p14 + 7, 1);
 }
-
+#if 0
+/* these routines are currently unneeded, but may be
+	needed later */
 void
 cred_hash1(unsigned char *out, unsigned char *in, unsigned char *key)
 {
@@ -406,3 +409,4 @@ cred_hash3(unsigned char *out, unsigned char *in, unsigned char *key, int forw)
 	key2[0] = key[7];
 	smbhash(out + 8, in + 8, key2, forw);
 }
+#endif /* unneeded routines */

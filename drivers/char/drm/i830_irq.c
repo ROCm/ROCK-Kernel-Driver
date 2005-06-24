@@ -123,7 +123,7 @@ int i830_irq_emit( struct inode *inode, struct file *filp, unsigned int cmd,
 		   unsigned long arg )
 {
 	drm_file_t	  *priv	    = filp->private_data;
-	drm_device_t	  *dev	    = priv->dev;
+	drm_device_t	  *dev	    = priv->head->dev;
 	drm_i830_private_t *dev_priv = dev->dev_private;
 	drm_i830_irq_emit_t emit;
 	int result;
@@ -155,7 +155,7 @@ int i830_irq_wait( struct inode *inode, struct file *filp, unsigned int cmd,
 		   unsigned long arg )
 {
 	drm_file_t	  *priv	    = filp->private_data;
-	drm_device_t	  *dev	    = priv->dev;
+	drm_device_t	  *dev	    = priv->head->dev;
 	drm_i830_private_t *dev_priv = dev->dev_private;
 	drm_i830_irq_wait_t irqwait;
 

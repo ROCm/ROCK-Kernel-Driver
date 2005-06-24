@@ -39,9 +39,6 @@
 #include <linux/vt_kern.h>
 #include <linux/sysrq.h>
 #include <linux/input.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 
 static void kbd_disconnect(struct input_handle *handle);
 extern void ctrl_alt_del(void);
@@ -144,7 +141,7 @@ static struct ledptr {
 /* Simple translation table for the SysRq keys */
 
 #ifdef CONFIG_MAGIC_SYSRQ
-unsigned char kbd_sysrq_xlate[KEY_MAX] =
+unsigned char kbd_sysrq_xlate[KEY_MAX + 1] =
         "\000\0331234567890-=\177\t"                    /* 0x00 - 0x0f */
         "qwertyuiop[]\r\000as"                          /* 0x10 - 0x1f */
         "dfghjkl;'`\000\\zxcv"                          /* 0x20 - 0x2f */
@@ -176,7 +173,7 @@ int getkeycode(unsigned int scancode)
 	if (!dev)
 		return -ENODEV;
 
-	if (scancode < 0 || scancode >= dev->keycodemax)
+	if (scancode >= dev->keycodemax)
 		return -EINVAL;
 
 	return INPUT_KEYCODE(dev, scancode);
@@ -186,7 +183,7 @@ int setkeycode(unsigned int scancode, unsigned int keycode)
 {
 	struct list_head * node;
 	struct input_dev *dev = NULL;
-	int i, oldkey;
+	unsigned int i, oldkey;
 
 	list_for_each(node,&kbd_handler.h_list) {
 		struct input_handle *handle = to_handle_h(node);
@@ -199,7 +196,9 @@ int setkeycode(unsigned int scancode, unsigned int keycode)
 	if (!dev)
 		return -ENODEV;
 
-	if (scancode < 0 || scancode >= dev->keycodemax)
+	if (scancode >= dev->keycodemax)
+		return -EINVAL;
+	if (keycode > KEY_MAX)
 		return -EINVAL;
 	if (keycode < 0 || keycode > KEY_MAX)
 		return -EINVAL;
@@ -358,7 +357,7 @@ static void to_utf8(struct vc_data *vc, ushort c)
  */
 void compute_shiftstate(void)
 {
-	int i, j, k, sym, val;
+	unsigned int i, j, k, sym, val;
 
 	shift_state = 0;
 	memset(shift_down, 0, sizeof(shift_down));
@@ -399,7 +398,7 @@ void compute_shiftstate(void)
 static unsigned char handle_diacr(struct vc_data *vc, unsigned char ch)
 {
 	int d = diacr;
-	int i;
+	unsigned int i;
 
 	diacr = 0;
 
@@ -539,12 +538,12 @@ static void fn_send_intr(struct vc_data *vc, struct pt_regs *regs)
 
 static void fn_scroll_forw(struct vc_data *vc, struct pt_regs *regs)
 {
-	scrollfront(0);
+	scrollfront(vc, 0);
 }
 
 static void fn_scroll_back(struct vc_data *vc, struct pt_regs *regs)
 {
-	scrollback(0);
+	scrollback(vc, 0);
 }
 
 static void fn_show_mem(struct vc_data *vc, struct pt_regs *regs)
@@ -584,7 +583,7 @@ static void fn_SAK(struct vc_data *vc, struct pt_regs *regs)
 	 */
 	if (tty)
 		do_SAK(tty);
-	reset_vc(fg_console);
+	reset_vc(vc);
 }
 
 static void fn_null(struct vc_data *vc, struct pt_regs *regs)
@@ -934,7 +933,7 @@ static void kbd_refresh_leds(struct input_handle *handle)
 #if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(CONFIG_ALPHA) ||\
     defined(CONFIG_MIPS) || defined(CONFIG_PPC) || defined(CONFIG_SPARC32) ||\
     defined(CONFIG_SPARC64) || defined(CONFIG_PARISC) || defined(CONFIG_SUPERH) ||\
-    (defined(CONFIG_ARM) && defined(CONFIG_KEYBOARD_ATKBD) && !defined(CONFIG_RPC))
+    (defined(CONFIG_ARM) && defined(CONFIG_KEYBOARD_ATKBD) && !defined(CONFIG_ARCH_RPC))
 
 #define HW_RAW(dev) (test_bit(EV_MSC, dev->evbit) && test_bit(MSC_RAW, dev->mscbit) &&\
 			((dev)->id.bustype == BUS_I8042) && ((dev)->id.vendor == 0x0001) && ((dev)->id.product == 0x0001))
@@ -1027,7 +1026,8 @@ static void kbd_rawcode(unsigned char data)
 		put_queue(vc, data);
 }
 
-void kbd_keycode(unsigned int keycode, int down, int hw_raw, struct pt_regs *regs)
+static void kbd_keycode(unsigned int keycode, int down,
+			int hw_raw, struct pt_regs *regs)
 {
 	struct vc_data *vc = vc_cons[fg_console].d;
 	unsigned short keysym, *key_map;
@@ -1062,22 +1062,6 @@ void kbd_keycode(unsigned int keycode, int down, int hw_raw, struct pt_regs *reg
 		if (emulate_raw(vc, keycode, !down << 7))
 			if (keycode < BTN_MISC)
 				printk(KERN_WARNING "keyboard.c: can't emulate rawmode for keycode %d\n", keycode);
-
-#ifdef	CONFIG_KDB
-	if (down && !rep && (keycode == KEY_PAUSE) && kdb_on) {
-		kdb(KDB_REASON_KEYBOARD, 0, regs);
-		return;
-	}
-#endif	/* CONFIG_KDB */
-
-#ifdef CONFIG_BOOTSPLASH
-	/* This code has to be redone for some non-x86 platforms */
-	if (down == 1 && (keycode == 0x3c || keycode == 0x01)) {        /* F2 and ESC on PC keyboard */
-		extern int splash_verbose(void);
-		if (splash_verbose())
-			return; 
-	}       
-#endif
 
 #ifdef CONFIG_MAGIC_SYSRQ	       /* Handle the SysRq Hack */
 	if (keycode == KEY_SYSRQ && (sysrq_down || (down == 1 && sysrq_alt))) {

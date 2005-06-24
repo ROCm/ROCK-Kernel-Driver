@@ -838,7 +838,7 @@ static 	struct pci_dev *dev_qs1000 __devinitdata = NULL;
 static 	struct pci_dev *dev_qs3000 __devinitdata = NULL;
 
 #ifdef __ISAPNP__
-static struct isapnp_device_id elsa_ids[] __initdata = {
+static struct isapnp_device_id elsa_ids[] __devinitdata = {
 	{ ISAPNP_VENDOR('E', 'L', 'S'), ISAPNP_FUNCTION(0x0133),
 	  ISAPNP_VENDOR('E', 'L', 'S'), ISAPNP_FUNCTION(0x0133), 
 	  (unsigned long) "Elsa QS1000" },
@@ -848,7 +848,7 @@ static struct isapnp_device_id elsa_ids[] __initdata = {
 	{ 0, }
 };
 
-static struct isapnp_device_id *ipid __initdata = &elsa_ids[0];
+static struct isapnp_device_id *ipid __devinitdata = &elsa_ids[0];
 static struct pnp_card *pnp_c __devinitdata = NULL;
 #endif
 

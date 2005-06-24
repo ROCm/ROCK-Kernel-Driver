@@ -18,7 +18,7 @@ static int  __devinit i810fb_init_pci (struct pci_dev *dev,
 				       const struct pci_device_id *entry);
 static void __exit i810fb_remove_pci(struct pci_dev *dev);
 static int i810fb_resume(struct pci_dev *dev);
-static int i810fb_suspend(struct pci_dev *dev, u32 state);
+static int i810fb_suspend(struct pci_dev *dev, pm_message_t state);
 
 /*
  * voffset - framebuffer offset in MiB from aperture start address.  In order for

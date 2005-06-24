@@ -1,5 +1,5 @@
 /*
- * $Id: bttv.h,v 1.14 2005/01/07 13:11:19 kraxel Exp $
+ * $Id: bttv.h,v 1.17 2005/02/22 14:06:32 kraxel Exp $
  *
  *  bttv - Bt848 frame grabber driver
  *
@@ -134,6 +134,7 @@
 #define BTTV_APAC_VIEWCOMP  0x7f
 #define BTTV_DVICO_DVBT_LITE  0x80
 #define BTTV_TIBET_CS16  0x83
+#define BTTV_KODICOM_4400R  0x84
 
 /* i2c address list */
 #define I2C_TSA5522        0xc2
@@ -302,8 +303,6 @@ struct bttv_sub_driver {
 	struct device_driver   drv;
 	char                   wanted[BUS_ID_SIZE];
 	void                   (*gpio_irq)(struct bttv_sub_device *sub);
-	void                   (*i2c_info)(struct bttv_sub_device *sub,
-					   struct i2c_client *client, int attach);
 };
 #define to_bttv_sub_drv(x) container_of((x), struct bttv_sub_driver, drv)
 

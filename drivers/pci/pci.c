@@ -9,20 +9,15 @@
  *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
  */
 
+#include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <asm/dma.h>	/* isa_dma_bridge_buggy */
+#include "pci.h"
 
-#undef DEBUG
-
-#ifdef DEBUG
-#define DBG(x...) printk(x)
-#else
-#define DBG(x...)
-#endif
 
 /**
  * pci_bus_max_busnr - returns maximum PCI bus number of given bus' children
@@ -271,7 +266,7 @@ pci_set_power_state(struct pci_dev *dev, pci_power_t state)
 	if ((pmc & PCI_PM_CAP_VER_MASK) > 2) {
 		printk(KERN_DEBUG
 		       "PCI: %s has unsupported PM cap regs version (%u)\n",
-		       dev->slot_name, pmc & PCI_PM_CAP_VER_MASK);
+		       pci_name(dev), pmc & PCI_PM_CAP_VER_MASK);
 		return -EIO;
 	}
 
@@ -312,22 +307,24 @@ pci_set_power_state(struct pci_dev *dev, pci_power_t state)
 /**
  * pci_choose_state - Choose the power state of a PCI device
  * @dev: PCI device to be suspended
- * @state: target sleep state for the whole system
+ * @state: target sleep state for the whole system. This is the value
+ *	that is passed to suspend() function.
  *
  * Returns PCI power state suitable for given device and given system
  * message.
  */
 
-pci_power_t pci_choose_state(struct pci_dev *dev, u32 state)
+pci_power_t pci_choose_state(struct pci_dev *dev, pm_message_t state)
 {
 	if (!pci_find_capability(dev, PCI_CAP_ID_PM))
 		return PCI_D0;
 
 	switch (state) {
-	case 0:	return PCI_D0;
-	case 2: return PCI_D2;
+	case 0: return PCI_D0;
 	case 3: return PCI_D3hot;
-	default: BUG();
+	default:
+		printk("They asked me for state %d\n", state);
+		BUG();
 	}
 	return PCI_D0;
 }
@@ -402,10 +399,10 @@ pci_enable_device(struct pci_dev *dev)
 {
 	int err;
 
-	dev->is_enabled = 1;
 	if ((err = pci_enable_device_bars(dev, (1 << PCI_NUM_RESOURCES) - 1)))
 		return err;
 	pci_fixup_device(pci_fixup_enable, dev);
+	dev->is_enabled = 1;
 	return 0;
 }
 
@@ -431,16 +428,15 @@ pci_disable_device(struct pci_dev *dev)
 {
 	u16 pci_command;
 	
-	dev->is_enabled = 0;
-	dev->is_busmaster = 0;
-
 	pci_read_config_word(dev, PCI_COMMAND, &pci_command);
 	if (pci_command & PCI_COMMAND_MASTER) {
 		pci_command &= ~PCI_COMMAND_MASTER;
 		pci_write_config_word(dev, PCI_COMMAND, pci_command);
 	}
+	dev->is_busmaster = 0;
 
 	pcibios_disable_device(dev);
+	dev->is_enabled = 0;
 }
 
 /**
@@ -633,7 +629,7 @@ pci_set_master(struct pci_dev *dev)
 
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 	if (! (cmd & PCI_COMMAND_MASTER)) {
-		DBG("PCI: Enabling bus mastering for device %s\n", pci_name(dev));
+		pr_debug("PCI: Enabling bus mastering for device %s\n", pci_name(dev));
 		cmd |= PCI_COMMAND_MASTER;
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
@@ -711,7 +707,7 @@ pci_set_mwi(struct pci_dev *dev)
 
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 	if (! (cmd & PCI_COMMAND_INVALIDATE)) {
-		DBG("PCI: Enabling Mem-Wr-Inval for device %s\n", pci_name(dev));
+		pr_debug("PCI: Enabling Mem-Wr-Inval for device %s\n", pci_name(dev));
 		cmd |= PCI_COMMAND_INVALIDATE;
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
@@ -752,17 +748,6 @@ pci_set_dma_mask(struct pci_dev *dev, u64 mask)
 	return 0;
 }
     
-int
-pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask)
-{
-	if (!pci_dac_dma_supported(dev, mask))
-		return -EIO;
-
-	dev->dma_mask = mask;
-
-	return 0;
-}
-
 int
 pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
 {
@@ -825,7 +810,6 @@ EXPORT_SYMBOL(pci_set_master);
 EXPORT_SYMBOL(pci_set_mwi);
 EXPORT_SYMBOL(pci_clear_mwi);
 EXPORT_SYMBOL(pci_set_dma_mask);
-EXPORT_SYMBOL(pci_dac_set_dma_mask);
 EXPORT_SYMBOL(pci_set_consistent_dma_mask);
 EXPORT_SYMBOL(pci_assign_resource);
 EXPORT_SYMBOL(pci_find_parent_resource);

@@ -36,7 +36,7 @@
 * for now (12/22/00) only enable the pm_register PM support.
 * allow these table entries to be null.
 */
-static int cs46xx_suspend_tbl(struct pci_dev *pcidev, u32 state);
+static int cs46xx_suspend_tbl(struct pci_dev *pcidev, pm_message_t state);
 static int cs46xx_resume_tbl(struct pci_dev *pcidev);
 #define cs_pm_register(a, b, c)  NULL
 #define cs_pm_unregister_all(a) 

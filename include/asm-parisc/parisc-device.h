@@ -6,6 +6,7 @@ struct parisc_device {
 	struct parisc_driver *driver;	/* Driver for this device */
 	char		name[80];	/* The hardware description */
 	int		irq;
+	int		aux_irq;	/* Some devices have a second IRQ */
 
 	char		hw_path;        /* The module number on this bus */
 	unsigned int	num_addrs;	/* some devices have additional address ranges. */

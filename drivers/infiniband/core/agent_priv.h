@@ -55,8 +55,7 @@ struct ib_agent_port_private {
 	struct list_head send_posted_list;
 	spinlock_t send_list_lock;
 	int port_num;
-	struct ib_mad_agent *dr_smp_agent;    /* DR SM class */
-	struct ib_mad_agent *lr_smp_agent;    /* LR SM class */
+	struct ib_mad_agent *smp_agent;	      /* SM class */
 	struct ib_mad_agent *perf_mgmt_agent; /* PerfMgmt class */
 	struct ib_mr *mr;
 };

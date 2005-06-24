@@ -1,23 +1,22 @@
+NOTE: ksymoops is useless on 2.6.  Please use the Oops in its original format
+(from dmesg, etc).  Ignore any references in this or other docs to "decoding
+the Oops" or "running it through ksymoops".  If you post an Oops fron 2.6 that
+has been run through ksymoops, people will just tell you to repost it.
+
 Quick Summary
 -------------
 
-Install ksymoops from
-ftp://ftp.<country>.kernel.org/pub/linux/utils/kernel/ksymoops
-Read the ksymoops man page.
-ksymoops < the_oops.txt
-
-and send the output the maintainer of the kernel area that seems to be
-involved with the problem, not to the ksymoops maintainer. Don't worry
-too much about getting the wrong person. If you are unsure send it to
-the person responsible for the code relevant to what you were doing.
-If it occurs repeatably try and describe how to recreate it. Thats
-worth even more than the oops
+Find the Oops and send it to the maintainer of the kernel area that seems to be
+involved with the problem.  Don't worry too much about getting the wrong person.
+If you are unsure send it to the person responsible for the code relevant to
+what you were doing.  If it occurs repeatably try and describe how to recreate
+it.  That's worth even more than the oops.
 
 If you are totally stumped as to whom to send the report, send it to 
 linux-kernel@vger.kernel.org. Thanks for your help in making Linux as
 stable as humanly possible.
 
-Where is the_oops.txt?
+Where is the Oops?
 ----------------------
 
 Normally the Oops text is read from the kernel buffers by klogd and
@@ -43,14 +42,13 @@ the disk is not available then you have three options :-
     them yourself.  Search kernel archives for kmsgdump, lkcd and
     oops+smram.
 
-No matter how you capture the log output, feed the resulting file to
-ksymoops along with /proc/ksyms and /proc/modules that applied at the
-time of the crash.  /var/log/ksymoops can be useful to capture the
-latter, man ksymoops for details.
-
 
 Full Information
 ----------------
+
+NOTE: the message from Linus below applies to 2.4 kernel.  I have preserved it
+for historical reasons, and because some of the information in it still
+applies.  Especially, please ignore any references to ksymoops. 
 
 From: Linus Torvalds <torvalds@osdl.org>
 

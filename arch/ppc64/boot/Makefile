@@ -20,17 +20,11 @@
 #	CROSS32_COMPILE is setup as a prefix just like CROSS_COMPILE
 #	in the toplevel makefile.
 
-CROSS32_COMPILE ?=
-#CROSS32_COMPILE = /usr/local/ppc/bin/powerpc-linux-
 
-BOOTCC		:= $(CROSS32_COMPILE)gcc
 HOSTCC		:= gcc
 BOOTCFLAGS	:= $(HOSTCFLAGS) $(LINUXINCLUDE) -fno-builtin 
-BOOTAS		:= $(CROSS32_COMPILE)as
 BOOTAFLAGS	:= -D__ASSEMBLY__ $(BOOTCFLAGS) -traditional
-BOOTLD		:= $(CROSS32_COMPILE)ld
 BOOTLFLAGS	:= -Ttext 0x00400000 -e _start -T $(srctree)/$(src)/zImage.lds
-BOOTOBJCOPY	:= $(CROSS32_COMPILE)objcopy
 OBJCOPYFLAGS    := contents,alloc,load,readonly,data
 
 src-boot := crt0.S string.S prom.c main.c zlib.c imagesize.c div64.S
@@ -38,10 +32,10 @@ src-boot := $(addprefix $(obj)/, $(src-boot))
 obj-boot := $(addsuffix .o, $(basename $(src-boot)))
 
 quiet_cmd_bootcc = BOOTCC  $@
-      cmd_bootcc = $(BOOTCC) -Wp,-MD,$(depfile) $(BOOTCFLAGS) -c -o $@ $<
+      cmd_bootcc = $(CROSS32CC) -Wp,-MD,$(depfile) $(BOOTCFLAGS) -c -o $@ $<
 
 quiet_cmd_bootas = BOOTAS  $@
-      cmd_bootas = $(BOOTCC) -Wp,-MD,$(depfile) $(BOOTAFLAGS) -c -o $@ $<
+      cmd_bootas = $(CROSS32CC) -Wp,-MD,$(depfile) $(BOOTAFLAGS) -c -o $@ $<
 
 $(patsubst %.c,%.o, $(filter %.c, $(src-boot))): %.o: %.c
 	$(call if_changed_dep,bootcc)
@@ -77,15 +71,15 @@ vmlinux.strip: vmlinux FORCE
 $(obj)/vmlinux.initrd: vmlinux.strip $(obj)/addRamDisk $(obj)/ramdisk.image.gz FORCE
 	$(call if_changed,ramdisk)
 
-addsection = $(BOOTOBJCOPY) $(1) \
+addsection = $(CROSS32OBJCOPY) $(1) \
 		--add-section=.kernel:$(strip $(patsubst $(obj)/kernel-%.o,%, $(1)))=$(patsubst %.o,%.gz, $(1)) \
 		--set-section-flags=.kernel:$(strip $(patsubst $(obj)/kernel-%.o,%, $(1)))=$(OBJCOPYFLAGS)
 
 quiet_cmd_addnote = ADDNOTE $@ 
-      cmd_addnote = $(BOOTLD) $(BOOTLFLAGS) -o $@ $(obj-boot) && $(obj)/addnote $@
+      cmd_addnote = $(CROSS32LD) $(BOOTLFLAGS) -o $@ $(obj-boot) && $(obj)/addnote $@
 
 quiet_cmd_piggy = PIGGY   $@
-      cmd_piggy = $(obj)/piggyback $(@:.o=) < $< | $(BOOTAS) -o $@
+      cmd_piggy = $(obj)/piggyback $(@:.o=) < $< | $(CROSS32AS) -o $@
 
 $(call gz-sec, $(required)): $(obj)/kernel-%.gz: % FORCE
 	$(call if_changed,gzip)
@@ -117,7 +111,7 @@ $(obj)/imagesize.c: vmlinux.strip
 	awk '{printf "unsigned long vmlinux_memsize = 0x%s;\n", substr($$1,8)}' \
 		>> $(obj)/imagesize.c
 
-install: $(CONFIGURE) $(obj)/$(BOOTIMAGE)
-	sh -x $(srctree)/$(src)/install.sh "$(KERNELRELEASE)" "$(obj)/$(BOOTIMAGE)" "$(INSTALL_PATH)"
+install: $(CONFIGURE) $(BOOTIMAGE)
+	sh -x $(srctree)/$(src)/install.sh "$(KERNELRELEASE)" vmlinux System.map "$(INSTALL_PATH)" "$(BOOTIMAGE)"
 
 clean-files := $(addprefix $(objtree)/, $(obj-boot) vmlinux.strip)

@@ -98,7 +98,6 @@ unsigned int nr_copy_pages __nosavedata = 0;
  */
 suspend_pagedir_t *pagedir_nosave __nosavedata = NULL;
 static suspend_pagedir_t *pagedir_save;
-static int pagedir_order __nosavedata = 0;
 
 #define SWSUSP_SIG	"S1SUSPEND"
 
@@ -605,7 +604,20 @@ static int calc_nr(int nr_copy)
 	return nr_copy;
 }
 
-static inline void free_pagedir(struct pbe *pblist);
+/**
+ *	free_pagedir - free pages allocated with alloc_pagedir()
+ */
+
+static inline void free_pagedir(struct pbe *pblist)
+{
+	struct pbe *pbe;
+
+	while (pblist) {
+		pbe = (pblist + PB_PAGE_SKIP)->next;
+		free_page((unsigned long)pblist);
+		pblist = pbe;
+	}
+}
 
 /**
  *	fill_pb_page - Create a list of PBEs on a given memory page
@@ -626,7 +638,7 @@ static inline void fill_pb_page(struct pbe *pbpage)
  *	create_pbe_list - Create a list of PBEs on top of a given chain
  *	of memory pages allocated with alloc_pagedir()
  */
- 
+
 static void create_pbe_list(struct pbe *pblist, unsigned nr_pages)
 {
 	struct pbe *pbpage, *p;
@@ -680,21 +692,6 @@ static struct pbe * alloc_pagedir(unsigned nr_pages)
 		pblist = NULL;
         }
 	return pblist;
-}
-
-/**
- *	free_pagedir - free pages allocated with alloc_pagedir()
- */
-
-static inline void free_pagedir(struct pbe *pblist)
-{
-	struct pbe *pbe;
-
-	while (pblist) {
-		pbe = (pblist + PB_PAGE_SKIP)->next;
-		free_page((unsigned long)pblist);
-		pblist = pbe;
-	}
 }
 
 /**
@@ -794,6 +791,8 @@ static int swsusp_alloc(void)
 	if (!enough_swap())
 		return -ENOSPC;
 
+	nr_copy_pages = calc_nr(nr_copy_pages);
+
 	if (!(pagedir_save = alloc_pagedir(nr_copy_pages))) {
 		printk(KERN_ERR "suspend: Allocating pagedir failed.\n");
 		return -ENOMEM;
@@ -823,7 +822,6 @@ static int suspend_prepare_image(void)
 
 	drain_local_pages();
 	count_data_pages();
-	nr_copy_pages = calc_nr(nr_copy_pages);
 	printk("swsusp: Need to copy %u pages\n", nr_copy_pages);
 
 	error = swsusp_alloc();
@@ -894,27 +892,21 @@ int swsusp_suspend(void)
 	 * at resume time, and evil weirdness ensues.
 	 */
 	if ((error = device_power_down(PMSG_FREEZE))) {
+		printk(KERN_ERR "Some devices failed to power down, aborting suspend\n");
 		local_irq_enable();
+		swsusp_free();
 		return error;
 	}
 	save_processor_state();
-	error = swsusp_arch_suspend();
+	if ((error = swsusp_arch_suspend()))
+		swsusp_free();
 	/* Restore control flow magically appears here */
 	restore_processor_state();
+	BUG_ON (nr_copy_pages_check != nr_copy_pages);
 	restore_highmem();
 	device_power_up();
 	local_irq_enable();
 	return error;
-}
-
-
-asmlinkage int swsusp_restore(void)
-{
-	BUG_ON (nr_copy_pages_check != nr_copy_pages);
-	
-	/* Even mappings of "global" things (vmalloc) need to be fixed */
-	__flush_tlb_global();
-	return 0;
 }
 
 int swsusp_resume(void)
@@ -967,7 +959,8 @@ static int does_collide_order(unsigned long addr, int order)
  */
 static void **eaten_memory = NULL;
 
-static inline void eat_page(void *page) {
+static inline void eat_page(void *page)
+{
 	void **c;
 
 	c = eaten_memory;
@@ -1106,7 +1099,7 @@ static struct pbe * swsusp_pagedir_relocate(struct pbe *pblist)
 	return pblist;
 }
 
-/**
+/*
  *	Using bio to read from swap.
  *	This code requires a bit more work than just using buffer heads
  *	but, it is the recommended way for 2.5/2.6.
@@ -1220,7 +1213,6 @@ static int check_header(void)
 		return -EPERM;
 	}
 	nr_copy_pages = swsusp_info.image_pages;
-	pagedir_order = get_bitmask_order(SUSPEND_PD_PAGES(nr_copy_pages));
 	return error;
 }
 

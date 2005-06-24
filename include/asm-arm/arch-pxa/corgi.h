@@ -100,39 +100,9 @@
 
 
 /*
- * Corgi Parameter Area Definitions
+ * Shared data structures
  */
-#define FLASH_MEM_BASE	0xa0000a00
-#define FLASH_MAGIC_CHG(a,b,c,d) ( ( d << 24 ) | ( c << 16 )  | ( b << 8 ) | a )
-
-#define FLASH_COMADJ_MAJIC	FLASH_MAGIC_CHG('C','M','A','D')
-#define	FLASH_COMADJ_MAGIC_ADR	0x00
-#define	FLASH_COMADJ_DATA_ADR	0x04
-
-#define FLASH_PHAD_MAJIC	FLASH_MAGIC_CHG('P','H','A','D')
-#define	FLASH_PHAD_MAGIC_ADR	0x38
-#define	FLASH_PHAD_DATA_ADR	0x3C
-
-struct sharpsl_flash_param_info {
-  unsigned int comadj_keyword;
-  unsigned int comadj;
-
-  unsigned int uuid_keyword;
-  unsigned char uuid[16];
-
-  unsigned int touch_keyword;
-  unsigned int touch1;
-  unsigned int touch2;
-  unsigned int touch3;
-  unsigned int touch4;
-
-  unsigned int adadj_keyword;
-  unsigned int adadj;
-
-  unsigned int phad_keyword;
-  unsigned int phadadj;
-};
-
+extern struct platform_device corgiscoop_device;
 
 /*
  * External Functions

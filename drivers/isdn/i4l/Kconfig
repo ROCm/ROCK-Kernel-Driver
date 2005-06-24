@@ -135,8 +135,6 @@ source "drivers/isdn/sc/Kconfig"
 
 source "drivers/isdn/act2000/Kconfig"
 
-source "drivers/isdn/tpam/Kconfig"
-
 source "drivers/isdn/hysdn/Kconfig"
 
 endmenu

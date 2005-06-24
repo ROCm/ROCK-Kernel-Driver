@@ -18,7 +18,6 @@
 
 static u32 STG_PIXEL_BUS_WIDTH = 128;	/* 128 bit bus width      */
 static u32 REF_CLOCK = 14318;
-STG4000REG __iomem *pSTGReg;
 
 int InitialiseRamdac(volatile STG4000REG __iomem * pSTGReg,
 		     u32 displayDepth,

@@ -174,7 +174,6 @@ static inline int acpi_irq_balance_set(char *str) { return 0; }
 
 /* routines for saving/restoring kernel state */
 extern int acpi_save_state_mem(void);
-extern int acpi_save_state_disk(void);
 extern void acpi_restore_state_mem(void);
 
 extern unsigned long acpi_wakeup_address;

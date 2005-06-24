@@ -1285,6 +1285,7 @@ static struct uart_driver sunsu_reg = {
 
 static int __init sunsu_kbd_ms_init(struct uart_sunsu_port *up, int channel)
 {
+	int quot, baud;
 #ifdef CONFIG_SERIO
 	struct serio *serio;
 #endif
@@ -1293,10 +1294,14 @@ static int __init sunsu_kbd_ms_init(struct uart_sunsu_port *up, int channel)
 	up->port.type = PORT_UNKNOWN;
 	up->port.uartclk = (SU_BASE_BAUD * 16);
 
-	if (up->su_type == SU_PORT_KBD)
+	if (up->su_type == SU_PORT_KBD) {
 		up->cflag = B1200 | CS8 | CLOCAL | CREAD;
-	else
+		baud = 1200;
+	} else {
 		up->cflag = B4800 | CS8 | CLOCAL | CREAD;
+		baud = 4800;
+	}
+	quot = up->port.uartclk / (16 * baud);
 
 	sunsu_autoconfig(up);
 	if (up->port.type == PORT_UNKNOWN)
@@ -1314,12 +1319,13 @@ static int __init sunsu_kbd_ms_init(struct uart_sunsu_port *up, int channel)
 
 		serio->port_data = up;
 
-		serio->type = SERIO_RS232;
+		serio->id.type = SERIO_RS232;
 		if (up->su_type == SU_PORT_KBD) {
-			serio->type |= SERIO_SUNKBD;
+			serio->id.proto = SERIO_SUNKBD;
 			strlcpy(serio->name, "sukbd", sizeof(serio->name));
 		} else {
-			serio->type |= (SERIO_SUN | (1 << 16));
+			serio->id.proto = SERIO_SUN;
+			serio->id.extra = 1;
 			strlcpy(serio->name, "sums", sizeof(serio->name));
 		}
 		strlcpy(serio->phys, (channel == 0 ? "su/serio0" : "su/serio1"),
@@ -1335,6 +1341,8 @@ static int __init sunsu_kbd_ms_init(struct uart_sunsu_port *up, int channel)
 			channel);
 	}
 #endif
+
+	sunsu_change_speed(&up->port, up->cflag, 0, quot);
 
 	sunsu_startup(&up->port);
 	return 0;

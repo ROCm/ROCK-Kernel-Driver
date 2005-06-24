@@ -56,7 +56,6 @@
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 #include <linux/skbuff.h>
-#include <linux/dp83840.h>
 #include <net/ip.h>
 
 #include <asm/byteorder.h>
@@ -463,6 +462,29 @@ static void ioc3_get_eaddr(struct ioc3_private *ip)
 	printk(".\n");
 }
 
+static void __ioc3_set_mac_address(struct net_device *dev)
+{
+	struct ioc3_private *ip = netdev_priv(dev);
+	struct ioc3 *ioc3 = ip->regs;
+
+	ioc3_w_emar_h((dev->dev_addr[5] <<  8) | dev->dev_addr[4]);
+	ioc3_w_emar_l((dev->dev_addr[3] << 24) | (dev->dev_addr[2] << 16) |
+	              (dev->dev_addr[1] <<  8) | dev->dev_addr[0]);
+}
+
+static int ioc3_set_mac_address(struct net_device *dev, void *addr)
+{
+	struct ioc3_private *ip = netdev_priv(dev);
+	struct sockaddr *sa = addr;
+
+	memcpy(dev->dev_addr, sa->sa_data, dev->addr_len);
+
+	spin_lock_irq(&ip->ioc3_lock);
+	__ioc3_set_mac_address(dev);
+	spin_unlock_irq(&ip->ioc3_lock);
+
+	return 0;
+}
 
 /*
  * Caller must hold the ioc3_lock ever for MII readers.  This is also
@@ -1014,9 +1036,7 @@ static void ioc3_init(struct net_device *dev)
 	(void) ioc3_r_etcdc();			/* Clear on read */
 	ioc3_w_ercsr(15);			/* RX low watermark  */
 	ioc3_w_ertr(0);				/* Interrupt immediately */
-	ioc3_w_emar_h((dev->dev_addr[5] <<  8) | dev->dev_addr[4]);
-	ioc3_w_emar_l((dev->dev_addr[3] << 24) | (dev->dev_addr[2] << 16) |
-	              (dev->dev_addr[1] <<  8) | dev->dev_addr[0]);
+	__ioc3_set_mac_address(dev);
 	ioc3_w_ehar_h(ip->ehar_h);
 	ioc3_w_ehar_l(ip->ehar_l);
 	ioc3_w_ersr(42);			/* XXX should be random */
@@ -1100,6 +1120,7 @@ static inline int ioc3_is_menet(struct pci_dev *pdev)
 	       && dev->device == PCI_DEVICE_ID_SGI_IOC3;
 }
 
+#ifdef CONFIG_SERIAL_8250
 /*
  * Note about serial ports and consoles:
  * For console output, everyone uses the IOC3 UARTA (offset 0x178)
@@ -1121,15 +1142,14 @@ static inline int ioc3_is_menet(struct pci_dev *pdev)
  * "device" routine referred to in this console structure
  * (ip27prom_console_dev).
  *
- * Also look in ip27-pci.c:pci_fixuop_ioc3() for some comments on working
+ * Also look in ip27-pci.c:pci_fixup_ioc3() for some comments on working
  * around ioc3 oddities in this respect.
  *
  * The IOC3 serials use a 22MHz clock rate with an additional divider by 3.
  * (IOC3_BAUD = (22000000 / (3*16)))
  */
 
-static inline void ioc3_serial_probe(struct pci_dev *pdev,
-				struct ioc3 *ioc3)
+static void __devinit ioc3_serial_probe(struct pci_dev *pdev, struct ioc3 *ioc3)
 {
 	struct serial_struct req;
 
@@ -1160,9 +1180,9 @@ static inline void ioc3_serial_probe(struct pci_dev *pdev,
 	req.iomem_base      = (unsigned char *) &ioc3->sregs.uartb;
 	register_serial(&req);
 }
+#endif
 
-static int __devinit ioc3_probe(struct pci_dev *pdev,
-	                        const struct pci_device_id *ent)
+static int ioc3_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	unsigned int sw_physid1, sw_physid2;
 	struct net_device *dev = NULL;
@@ -1170,11 +1190,39 @@ static int __devinit ioc3_probe(struct pci_dev *pdev,
 	struct ioc3 *ioc3;
 	unsigned long ioc3_base, ioc3_size;
 	u32 vendor, model, rev;
-	int err;
+	int err, pci_using_dac;
+
+	/* Configure DMA attributes. */
+	err = pci_set_dma_mask(pdev, 0xffffffffffffffffULL);
+	if (!err) {
+		pci_using_dac = 1;
+		err = pci_set_consistent_dma_mask(pdev, 0xffffffffffffffffULL);
+		if (err < 0) {
+			printk(KERN_ERR "%s: Unable to obtain 64 bit DMA "
+			       "for consistent allocations\n", pci_name(pdev));
+			goto out;
+		}
+	} else {
+		err = pci_set_dma_mask(pdev, 0xffffffffULL);
+		if (err) {
+			printk(KERN_ERR "%s: No usable DMA configuration, "
+			       "aborting.\n", pci_name(pdev));
+			goto out;
+		}
+		pci_using_dac = 0;
+	}
+
+	if (pci_enable_device(pdev))
+		return -ENODEV;
 
 	dev = alloc_etherdev(sizeof(struct ioc3_private));
-	if (!dev)
-		return -ENOMEM;
+	if (!dev) {
+		err = -ENOMEM;
+		goto out_disable;
+	}
+
+	if (pci_using_dac)
+		dev->features |= NETIF_F_HIGHDMA;
 
 	err = pci_request_regions(pdev, "ioc3");
 	if (err)
@@ -1237,6 +1285,7 @@ static int __devinit ioc3_probe(struct pci_dev *pdev,
 	dev->get_stats		= ioc3_get_stats;
 	dev->do_ioctl		= ioc3_ioctl;
 	dev->set_multicast_list	= ioc3_set_multicast_list;
+	dev->set_mac_address	= ioc3_set_mac_address;
 	dev->ethtool_ops	= &ioc3_ethtool_ops;
 #ifdef CONFIG_SGI_IOC3_ETH_HW_TX_CSUM
 	dev->features		= NETIF_F_IP_CSUM;
@@ -1269,6 +1318,12 @@ out_res:
 	pci_release_regions(pdev);
 out_free:
 	free_netdev(dev);
+out_disable:
+	/*
+	 * We should call pci_disable_device(pdev); here if the IOC3 wasn't
+	 * such a weird device ...
+	 */
+out:
 	return err;
 }
 
@@ -1282,6 +1337,10 @@ static void __devexit ioc3_remove_one (struct pci_dev *pdev)
 	iounmap(ioc3);
 	pci_release_regions(pdev);
 	free_netdev(dev);
+	/*
+	 * We should call pci_disable_device(pdev); here if the IOC3 wasn't
+	 * such a weird device ...
+	 */
 }
 
 static struct pci_device_id ioc3_pci_tbl[] = {

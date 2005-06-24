@@ -3,8 +3,8 @@
 #
 config PCI_MSI
 	bool "Message Signaled Interrupts (MSI and MSI-X)"
+	depends on PCI
 	depends on (X86_LOCAL_APIC && X86_IO_APIC) || IA64
-	default n
 	help
 	   This allows device drivers to enable MSI (Message Signaled
 	   Interrupts).  Message Signaled Interrupts enable a device to
@@ -46,4 +46,14 @@ config PCI_NAMES
 	  this feature and you'll get device ID numbers instead of names.
 
 	  When in doubt, say Y.
+
+config PCI_DEBUG
+	bool "PCI Debugging"
+	depends on PCI && DEBUG_KERNEL
+	help
+	  Say Y here if you want the PCI core to produce a bunch of debug
+	  messages to the system log.  Select this if you are having a
+	  problem with PCI support and want to see more of what is going on.
+
+	  When in doubt, say N.
 

@@ -49,14 +49,9 @@ struct serial8250_config {
 #define UART_CAP_EFR	(1 << 9)	/* UART has EFR */
 #define UART_CAP_SLEEP	(1 << 10)	/* UART has IER sleep */
 #define UART_CAP_AFE	(1 << 11)	/* MCR-based hw flow control */
-
-#undef SERIAL_DEBUG_PCI
+#define UART_CAP_UUE	(1 << 12)	/* UART needs IER bit 6 set (Xscale) */
 
 #if defined(__i386__) && (defined(CONFIG_M386) || defined(CONFIG_M486))
-#define SERIAL_INLINE
-#endif
-  
-#ifdef SERIAL_INLINE
 #define _INLINE_ inline
 #else
 #define _INLINE_
@@ -80,6 +75,13 @@ struct serial8250_config {
  * is cleared, the machine locks up with endless interrupts.
  */
 #define ALPHA_KLUDGE_MCR  (UART_MCR_OUT2 | UART_MCR_OUT1)
+#elif defined(CONFIG_SBC8560)
+/*
+ * WindRiver did something similarly broken on their SBC8560 board. The
+ * UART tristates its IRQ output while OUT2 is clear, but they pulled
+ * the interrupt line _up_ instead of down, so if we register the IRQ
+ * while the UART is in that state, we die in an IRQ storm. */
+#define ALPHA_KLUDGE_MCR (UART_MCR_OUT2)
 #else
 #define ALPHA_KLUDGE_MCR 0
 #endif

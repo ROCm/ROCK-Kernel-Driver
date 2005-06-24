@@ -223,7 +223,10 @@ static inline int pci_dma_mapping_error(dma_addr_t dma_addr)
 /* Return the index of the PCI controller for device PDEV. */
 
 extern int pci_domain_nr(struct pci_bus *bus);
-extern int pci_name_bus(char *name, struct pci_bus *bus);
+static inline int pci_proc_domain(struct pci_bus *bus)
+{
+	return 1;
+}
 
 /* Platform support for /proc/bus/pci/X/Y mmap()s. */
 

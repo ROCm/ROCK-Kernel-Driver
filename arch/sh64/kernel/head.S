@@ -96,8 +96,8 @@ empty_zero_page:
 	.long	0		/* RAMDISK_FLAGS */
 	.long	0x0200		/* ORIG_ROOT_DEV */
 	.long	1		/* LOADER_TYPE */
-	.long	0x00360000	/* INITRD_START */
-	.long	0x000a0000	/* INITRD_SIZE */
+	.long	0x00800000	/* INITRD_START */
+	.long	0x00800000	/* INITRD_SIZE */
 	.long	0
 
 	.text
@@ -310,7 +310,7 @@ hyperspace:			    /* ... that's the next instruction !  */
 	 */
 	movi fpu_in_use, r31	/* Temporary */
 
-#ifndef CONFIG_NOFPU_SUPPORT
+#ifdef CONFIG_SH_FPU
 	getcon	SR, r21
 	movi	SR_ENABLE_FPU, r22
 	and	r21, r22, r22

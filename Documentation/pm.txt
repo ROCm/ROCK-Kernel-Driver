@@ -222,23 +222,6 @@ communicate with drivers through the existing generic power
 management interface.
 
 /*
- * Send a request to a single device
- *
- * Parameters:
- *   dev - PM device previously returned from pm_register or pm_find
- *   rqst - request type
- *   data - data, if any, associated with the request
- *
- * Returns: 0 if the request is successful
- *          See "pm_callback" return for errors
- *
- * Details: Forward request to device callback and, if a suspend
- *          or resume request, update the pm_dev "state" field
- *          appropriately
- */
-int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data);
-
-/*
  * Send a request to all devices
  *
  * Parameters:

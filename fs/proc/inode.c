@@ -14,7 +14,6 @@
 #include <linux/limits.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/parser.h>
 #include <linux/smp_lock.h>
 
 #include <asm/system.h>
@@ -143,51 +142,6 @@ static struct super_operations proc_sops = {
 	.remount_fs	= proc_remount,
 };
 
-enum {
-	Opt_uid, Opt_gid, Opt_err
-};
-
-static match_table_t tokens = {
-	{Opt_uid, "uid=%u"},
-	{Opt_gid, "gid=%u"},
-	{Opt_err, NULL}
-};
-
-static int parse_options(char *options,uid_t *uid,gid_t *gid)
-{
-	char *p;
-	int option;
-
-	*uid = current->uid;
-	*gid = current->gid;
-	if (!options)
-		return 1;
-
-	while ((p = strsep(&options, ",")) != NULL) {
-		substring_t args[MAX_OPT_ARGS];
-		int token;
-		if (!*p)
-			continue;
-
-		token = match_token(p, tokens, args);
-		switch (token) {
-		case Opt_uid:
-			if (match_int(args, &option))
-				return 0;
-			*uid = option;
-			break;
-		case Opt_gid:
-			if (match_int(args, &option))
-				return 0;
-			*gid = option;
-			break;
-		default:
-			return 0;
-		}
-	}
-	return 1;
-}
-
 struct inode *proc_get_inode(struct super_block *sb, unsigned int ino,
 				struct proc_dir_entry *de)
 {
@@ -249,10 +203,11 @@ int proc_fill_super(struct super_block *s, void *data, int silent)
 	 * Fixup the root inode's nlink value
 	 */
 	root_inode->i_nlink += nr_processes();
+	root_inode->i_uid = 0;
+	root_inode->i_gid = 0;
 	s->s_root = d_alloc_root(root_inode);
 	if (!s->s_root)
 		goto out_no_root;
-	parse_options(data, &root_inode->i_uid, &root_inode->i_gid);
 	return 0;
 
 out_no_root:

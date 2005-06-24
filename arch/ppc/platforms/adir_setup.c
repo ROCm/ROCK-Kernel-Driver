@@ -60,7 +60,7 @@ adir_get_cpu_speed(void)
 	unsigned long hid1;
 	int cpu_speed;
 
-	hid1 = mfspr(HID1) >> 28;
+	hid1 = mfspr(SPRN_HID1) >> 28;
 
 	hid1 = cpu_750cx[hid1];
 
@@ -126,7 +126,7 @@ adir_setup_arch(void)
 	printk("SBS Adirondack port (C) 2001 SBS Technologies, Inc.\n");
 
 	/* Identify the CPU manufacturer */
-	cpu = mfspr(PVR);
+	cpu = mfspr(SPRN_PVR);
 	printk("CPU manufacturer: IBM [rev=%04x]\n", (cpu & 0xffff));
 }
 

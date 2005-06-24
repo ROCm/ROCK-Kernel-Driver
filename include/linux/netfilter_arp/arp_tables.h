@@ -154,7 +154,7 @@ struct arpt_entry
 #define ARPT_CONTINUE 0xFFFFFFFF
 
 /* For standard target */
-#define ARPT_RETURN (-NF_MAX_VERDICT - 1)
+#define ARPT_RETURN (-NF_REPEAT - 1)
 
 /* The argument to ARPT_SO_GET_INFO */
 struct arpt_getinfo

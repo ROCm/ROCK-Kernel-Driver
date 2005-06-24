@@ -4096,7 +4096,7 @@ static /*const */ struct file_operations cs4281_midi_fops = {
 static struct initvol {
 	int mixch;
 	int vol;
-} initvol[] __initdata = {
+} initvol[] __devinitdata = {
 
 	{
 	SOUND_MIXER_WRITE_VOLUME, 0x4040}, {

@@ -1,3 +1,69 @@
+Version 1.34
+------------
+Fix error mapping of the TOO_MANY_LINKS (hardlinks) case.
+Do not oops if root user kills cifs oplock kernel thread or
+kills the cifsd thread (NB: killing the cifs kernel threads is not
+recommended, unmount and rmmod cifs will kill them when they are
+no longer needed).  Fix readdir to ASCII servers (ie older servers
+which do not support Unicode) and also require asterik.
+Fix out of memory case in which data could be written one page
+off in the page cache.
+
+Version 1.33
+------------
+Fix caching problem, in which readdir of directory containing a file
+which was cached could cause the file's time stamp to be updated
+without invalidating the readahead data (so we could get stale
+file data on the client for that file even as the server copy changed).
+Cleanup response processing so cifsd can not loop when abnormally
+terminated.
+
+
+Version 1.32
+------------
+Fix oops in ls when Transact2 FindFirst (or FindNext) returns more than one
+transact response for an SMB request and search entry split across two frames.
+Add support for lsattr (getting ext2/ext3/reiserfs attr flags from the server)
+as new protocol extensions. Do not send Get/Set calls for POSIX ACLs
+unless server explicitly claims to support them in CIFS Unix extensions
+POSIX ACL capability bit. Fix packet signing when multiuser mounting with
+different users from the same client to the same server. Fix oops in
+cifs_close. Add mount option for remapping reserved characters in
+filenames (also allow recognizing files with created by SFU which have any
+of these seven reserved characters, except backslash, to be recognized).
+Fix invalid transact2 message (we were sometimes trying to interpret
+oplock breaks as SMB responses). Add ioctl for checking that the
+current uid matches the uid of the mounter (needed by umount.cifs).
+Reduce the number of large buffer allocations in cifs response processing
+(significantly reduces memory pressure under heavy stress with multiple
+processes accessing the same server at the same time).
+
+Version 1.31
+------------
+Fix updates of DOS attributes and time fields so that files on NT4 servers
+do not get marked delete on close. Display sizes of cifs buffer pools in
+cifs stats. Fix oops in unmount when cifsd thread being killed by 
+shutdown. Add generic readv/writev and aio support. Report inode numbers 
+consistently in readdir and lookup (when serverino mount option is
+specified use the inode number that the server reports - for both lookup
+and readdir, otherwise by default the locally generated inode number is used
+for inodes created in either path since servers are not always able to 
+provide unique inode numbers when exporting multiple volumes from under one
+sharename).
+
+Version 1.30
+------------
+Allow new nouser_xattr mount parm to disable xattr support for user namespace.
+Do not flag user_xattr mount parm in dmesg.  Retry failures setting file time  
+(mostly affects NT4 servers) by retry with handle based network operation. 
+Add new POSIX Query FS Info for returning statfs info more accurately.
+Handle passwords with multiple commas in them.
+
+Version 1.29
+------------
+Fix default mode in sysfs of cifs module parms.  Remove old readdir routine.
+Fix capabilities flags for large readx so as to allow reads larger than 64K.
+
 Version 1.28
 ------------
 Add module init parm for large SMB buffer size (to allow it to be changed
@@ -7,7 +73,8 @@ returning from mount when experimental ExtendedSecurity enabled and
 SpnegoNegotiated returning invalid error. Fix case to retry better when 
 peek returns from 1 to 3 bytes on socket which should have more data.
 Fixed path based calls (such as cifs lookup) to handle path names
-longer than 530 (now can handle PATH_MAX).
+longer than 530 (now can handle PATH_MAX). Fix pass through authentication
+from Samba server to DC (Samba required dummy LM password).
 
 Version 1.27
 ------------

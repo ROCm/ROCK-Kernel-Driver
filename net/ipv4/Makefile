@@ -20,9 +20,14 @@ obj-$(CONFIG_INET_ESP) += esp4.o
 obj-$(CONFIG_INET_IPCOMP) += ipcomp.o
 obj-$(CONFIG_INET_TUNNEL) += xfrm4_tunnel.o 
 obj-$(CONFIG_IP_PNP) += ipconfig.o
+obj-$(CONFIG_IP_ROUTE_MULTIPATH_RR) += multipath_rr.o
+obj-$(CONFIG_IP_ROUTE_MULTIPATH_RANDOM) += multipath_random.o
+obj-$(CONFIG_IP_ROUTE_MULTIPATH_WRANDOM) += multipath_wrandom.o
+obj-$(CONFIG_IP_ROUTE_MULTIPATH_DRR) += multipath_drr.o
 obj-$(CONFIG_NETFILTER)	+= netfilter/
 obj-$(CONFIG_IP_VS) += ipvs/
 obj-$(CONFIG_IP_TCPDIAG) += tcp_diag.o 
+obj-$(CONFIG_IP_ROUTE_MULTIPATH_CACHED) += multipath.o
 
 obj-$(CONFIG_XFRM) += xfrm4_policy.o xfrm4_state.o xfrm4_input.o \
 		      xfrm4_output.o

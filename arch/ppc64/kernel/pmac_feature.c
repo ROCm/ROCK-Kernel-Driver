@@ -64,8 +64,7 @@ static DEFINE_SPINLOCK(feature_lock  __pmacdata);
  */
 struct macio_chip macio_chips[MAX_MACIO_CHIPS]  __pmacdata;
 
-struct macio_chip* __pmac
-macio_find(struct device_node* child, int type)
+struct macio_chip* __pmac macio_find(struct device_node* child, int type)
 {
 	while(child) {
 		int	i;
@@ -78,6 +77,7 @@ macio_find(struct device_node* child, int type)
 	}
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(macio_find);
 
 static const char* macio_names[] __pmacdata =
 {
@@ -220,6 +220,60 @@ static long __pmac g5_mpic_enable(struct device_node* node, long param, long val
 	return 0;
 }
 
+static long __pmac g5_eth_phy_reset(struct device_node* node, long param, long value)
+{
+	struct macio_chip* macio = &macio_chips[0];
+	struct device_node *phy;
+	int need_reset;
+
+	/*
+	 * We must not reset the combo PHYs, only the BCM5221 found in
+	 * the iMac G5.
+	 */
+	phy = of_get_next_child(node, NULL);
+	if (!phy)
+		return -ENODEV;
+	need_reset = device_is_compatible(phy, "B5221");
+	of_node_put(phy);
+	if (!need_reset)
+		return 0;
+
+	/* PHY reset is GPIO 29, not in device-tree unfortunately */
+	MACIO_OUT8(K2_GPIO_EXTINT_0 + 29,
+		   KEYLARGO_GPIO_OUTPUT_ENABLE | KEYLARGO_GPIO_OUTOUT_DATA);
+	/* Thankfully, this is now always called at a time when we can
+	 * schedule by sungem.
+	 */
+	msleep(10);
+	MACIO_OUT8(K2_GPIO_EXTINT_0 + 29, 0);
+
+	return 0;
+}
+
+static long __pmac g5_i2s_enable(struct device_node *node, long param, long value)
+{
+	/* Very crude implementation for now */
+	struct macio_chip* macio = &macio_chips[0];
+	unsigned long flags;
+
+	if (value == 0)
+		return 0; /* don't disable yet */
+
+	LOCK(flags);
+	MACIO_BIS(KEYLARGO_FCR3, KL3_CLK45_ENABLE | KL3_CLK49_ENABLE |
+		  KL3_I2S0_CLK18_ENABLE);
+	udelay(10);
+	MACIO_BIS(KEYLARGO_FCR1, K2_FCR1_I2S0_CELL_ENABLE |
+		  K2_FCR1_I2S0_CLK_ENABLE_BIT | K2_FCR1_I2S0_ENABLE);
+	udelay(10);
+	MACIO_BIC(KEYLARGO_FCR1, K2_FCR1_I2S0_RESET);
+	UNLOCK(flags);
+	udelay(10);
+
+	return 0;
+}
+
+
 #ifdef CONFIG_SMP
 static long __pmac g5_reset_cpu(struct device_node* node, long param, long value)
 {
@@ -306,6 +360,8 @@ static struct feature_table_entry g5_features[]  __pmacdata = {
 	{ PMAC_FTR_ENABLE_MPIC,		g5_mpic_enable },
 	{ PMAC_FTR_READ_GPIO,		g5_read_gpio },
 	{ PMAC_FTR_WRITE_GPIO,		g5_write_gpio },
+	{ PMAC_FTR_GMAC_PHY_RESET,	g5_eth_phy_reset },
+	{ PMAC_FTR_SOUND_CHIP_ENABLE,	g5_i2s_enable },
 #ifdef CONFIG_SMP
 	{ PMAC_FTR_RESET_CPU,		g5_reset_cpu },
 #endif /* CONFIG_SMP */
@@ -321,12 +377,16 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		PMAC_TYPE_POWERMAC_G5,		g5_features,
 		0,
 	},
-	{	"PowerMac8,1",			"IMac G5",
-		PMAC_TYPE_POWERMAC_G5,		g5_features,
+	{	"PowerMac8,1",			"iMac G5",
+		PMAC_TYPE_IMAC_G5,		g5_features,
+		0,
+	},
+	{	"PowerMac9,1",			"PowerMac G5",
+		PMAC_TYPE_POWERMAC_G5_U3L,	g5_features,
 		0,
 	},
 	{       "RackMac3,1",                   "XServe G5",
-		PMAC_TYPE_POWERMAC_G5,          g5_features,
+		PMAC_TYPE_XSERVE_G5,		g5_features,
 		0,
 	},
 };
@@ -639,3 +699,67 @@ void __init pmac_check_ht_link(void)
 	dump_HT_speeds("PCI-X HT Downlink", cfg, freq);
 #endif
 }
+
+/*
+ * Early video resume hook
+ */
+
+static void (*pmac_early_vresume_proc)(void *data) __pmacdata;
+static void *pmac_early_vresume_data __pmacdata;
+
+void pmac_set_early_video_resume(void (*proc)(void *data), void *data)
+{
+	if (_machine != _MACH_Pmac)
+		return;
+	preempt_disable();
+	pmac_early_vresume_proc = proc;
+	pmac_early_vresume_data = data;
+	preempt_enable();
+}
+EXPORT_SYMBOL(pmac_set_early_video_resume);
+
+
+/*
+ * AGP related suspend/resume code
+ */
+
+static struct pci_dev *pmac_agp_bridge __pmacdata;
+static int (*pmac_agp_suspend)(struct pci_dev *bridge) __pmacdata;
+static int (*pmac_agp_resume)(struct pci_dev *bridge) __pmacdata;
+
+void __pmac pmac_register_agp_pm(struct pci_dev *bridge,
+				 int (*suspend)(struct pci_dev *bridge),
+				 int (*resume)(struct pci_dev *bridge))
+{
+	if (suspend || resume) {
+		pmac_agp_bridge = bridge;
+		pmac_agp_suspend = suspend;
+		pmac_agp_resume = resume;
+		return;
+	}
+	if (bridge != pmac_agp_bridge)
+		return;
+	pmac_agp_suspend = pmac_agp_resume = NULL;
+	return;
+}
+EXPORT_SYMBOL(pmac_register_agp_pm);
+
+void __pmac pmac_suspend_agp_for_card(struct pci_dev *dev)
+{
+	if (pmac_agp_bridge == NULL || pmac_agp_suspend == NULL)
+		return;
+	if (pmac_agp_bridge->bus != dev->bus)
+		return;
+	pmac_agp_suspend(pmac_agp_bridge);
+}
+EXPORT_SYMBOL(pmac_suspend_agp_for_card);
+
+void __pmac pmac_resume_agp_for_card(struct pci_dev *dev)
+{
+	if (pmac_agp_bridge == NULL || pmac_agp_resume == NULL)
+		return;
+	if (pmac_agp_bridge->bus != dev->bus)
+		return;
+	pmac_agp_resume(pmac_agp_bridge);
+}
+EXPORT_SYMBOL(pmac_resume_agp_for_card);

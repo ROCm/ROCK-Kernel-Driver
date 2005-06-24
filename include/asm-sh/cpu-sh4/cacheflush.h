@@ -28,7 +28,7 @@ extern void flush_cache_all(void);
 extern void flush_cache_mm(struct mm_struct *mm);
 extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
 			      unsigned long end);
-extern void flush_cache_page(struct vm_area_struct *vma, unsigned long addr);
+extern void flush_cache_page(struct vm_area_struct *vma, unsigned long addr, unsigned long pfn);
 extern void flush_dcache_page(struct page *pg);
 
 #define flush_dcache_mmap_lock(mapping)		do { } while (0)

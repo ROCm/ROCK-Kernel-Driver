@@ -222,10 +222,13 @@ static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 		int rover;
 
 		spin_lock(&tcp_portalloc_lock);
-		rover = tcp_port_rover;
+		if (tcp_port_rover < low)
+			rover = low;
+		else
+			rover = tcp_port_rover;
 		do {
 			rover++;
-			if (rover < low || rover > high)
+			if (rover > high)
 				rover = low;
 			head = &tcp_bhash[tcp_bhashfn(rover)];
 			spin_lock(&head->lock);
@@ -831,7 +834,6 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	/* OK, now commit destination to socket.  */
 	__sk_dst_set(sk, &rt->u.dst);
 	tcp_v4_setup_caps(sk, &rt->u.dst);
-	tp->ext2_header_len = rt->u.dst.header_len;
 
 	if (!tp->write_seq)
 		tp->write_seq = secure_tcp_sequence_number(inet->saddr,
@@ -941,10 +943,10 @@ static inline void do_pmtu_discovery(struct sock *sk, struct iphdr *iph,
 	/* Something is about to be wrong... Remember soft error
 	 * for the case, if this connection will not able to recover.
 	 */
-	if (mtu < dst_pmtu(dst) && ip_dont_fragment(sk, dst))
+	if (mtu < dst_mtu(dst) && ip_dont_fragment(sk, dst))
 		sk->sk_err_soft = EMSGSIZE;
 
-	mtu = dst_pmtu(dst);
+	mtu = dst_mtu(dst);
 
 	if (inet->pmtudisc != IP_PMTUDISC_DONT &&
 	    tp->pmtu_cookie > mtu) {
@@ -1578,10 +1580,9 @@ struct sock *tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	newtp->ext_header_len = 0;
 	if (newinet->opt)
 		newtp->ext_header_len = newinet->opt->optlen;
-	newtp->ext2_header_len = dst->header_len;
 	newinet->id = newtp->write_seq ^ jiffies;
 
-	tcp_sync_mss(newsk, dst_pmtu(dst));
+	tcp_sync_mss(newsk, dst_mtu(dst));
 	newtp->advmss = dst_metric(dst, RTAX_ADVMSS);
 	tcp_initialize_rcv_mss(newsk);
 
@@ -1771,7 +1772,6 @@ process:
 
 	if (!xfrm4_policy_check(sk, XFRM_POLICY_IN, skb))
 		goto discard_and_relse;
-	nf_reset(skb);
 
 	if (sk_filter(sk, skb, 0))
 		goto discard_and_relse;
@@ -1869,7 +1869,7 @@ static int tcp_v4_reselect_saddr(struct sock *sk)
 
 	/* Query new route. */
 	err = ip_route_connect(&rt, daddr, 0,
-			       RT_TOS(inet->tos) | sk->sk_localroute,
+			       RT_CONN_FLAGS(sk),
 			       sk->sk_bound_dev_if,
 			       IPPROTO_TCP,
 			       inet->sport, inet->dport, sk);
@@ -1878,7 +1878,6 @@ static int tcp_v4_reselect_saddr(struct sock *sk)
 
 	__sk_dst_set(sk, &rt->u.dst);
 	tcp_v4_setup_caps(sk, &rt->u.dst);
-	tcp_sk(sk)->ext2_header_len = rt->u.dst.header_len;
 
 	new_saddr = rt->rt_src;
 
@@ -1938,7 +1937,6 @@ int tcp_v4_rebuild_header(struct sock *sk)
 	if (!err) {
 		__sk_dst_set(sk, &rt->u.dst);
 		tcp_v4_setup_caps(sk, &rt->u.dst);
-		tcp_sk(sk)->ext2_header_len = rt->u.dst.header_len;
 		return 0;
 	}
 
@@ -2069,7 +2067,7 @@ static int tcp_v4_init_sock(struct sock *sk)
 	sk->sk_state = TCP_CLOSE;
 
 	sk->sk_write_space = sk_stream_write_space;
-	sk->sk_use_write_queue = 1;
+	sock_set_flag(sk, SOCK_USE_WRITE_QUEUE);
 
 	tp->af_specific = &ipv4_specific;
 
@@ -2619,7 +2617,7 @@ struct proto tcp_prot = {
 	.sysctl_wmem		= sysctl_tcp_wmem,
 	.sysctl_rmem		= sysctl_tcp_rmem,
 	.max_header		= MAX_TCP_HEADER,
-	.slab_obj_size		= sizeof(struct tcp_sock),
+	.obj_size		= sizeof(struct tcp_sock),
 };
 
 
@@ -2664,4 +2662,5 @@ EXPORT_SYMBOL(tcp_proc_unregister);
 EXPORT_SYMBOL(sysctl_local_port_range);
 EXPORT_SYMBOL(sysctl_max_syn_backlog);
 EXPORT_SYMBOL(sysctl_tcp_low_latency);
+EXPORT_SYMBOL(sysctl_tcp_tw_reuse);
 

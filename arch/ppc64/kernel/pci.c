@@ -63,13 +63,15 @@ unsigned int pcibios_assign_all_busses(void)
  * page is mapped and isa_io_limit prevents access to it.
  */
 unsigned long isa_io_base;	/* NULL if no ISA bus */
+EXPORT_SYMBOL(isa_io_base);
 unsigned long pci_io_base;
+EXPORT_SYMBOL(pci_io_base);
 
 void iSeries_pcibios_init(void);
 
 LIST_HEAD(hose_list);
 
-struct pci_dma_ops pci_dma_ops;
+struct dma_mapping_ops pci_dma_ops;
 EXPORT_SYMBOL(pci_dma_ops);
 
 int global_phb_number;		/* Global phb counter */
@@ -208,6 +210,11 @@ static int __init pcibios_init(void)
 	struct pci_controller *hose, *tmp;
 	struct pci_bus *bus;
 
+	/* For now, override phys_mem_access_prot. If we need it,
+	 * later, we may move that initialization to each ppc_md
+	 */
+	ppc_md.phys_mem_access_prot = pci_phys_mem_access_prot;
+
 #ifdef CONFIG_PPC_ISERIES
 	iSeries_pcibios_init(); 
 #endif
@@ -300,19 +307,15 @@ int pci_domain_nr(struct pci_bus *bus)
 
 EXPORT_SYMBOL(pci_domain_nr);
 
-/* Set the name of the bus as it appears in /proc/bus/pci */
-int pci_name_bus(char *name, struct pci_bus *bus)
+/* Decide whether to display the domain number in /proc */
+int pci_proc_domain(struct pci_bus *bus)
 {
-#ifndef CONFIG_PPC_ISERIES
-	struct pci_controller *hose = pci_bus_to_host(bus);
-
-	if (hose->buid)
-		sprintf(name, "%04x:%02x", pci_domain_nr(bus), bus->number);
-	else
-#endif
-		sprintf(name, "%02x", bus->number);
-
+#ifdef CONFIG_PPC_ISERIES
 	return 0;
+#else
+	struct pci_controller *hose = pci_bus_to_host(bus);
+	return hose->buid;
+#endif
 }
 
 /*
@@ -332,25 +335,24 @@ int pci_name_bus(char *name, struct pci_bus *bus)
  *
  * Returns negative error code on failure, zero on success.
  */
-static __inline__ int __pci_mmap_make_offset(struct pci_dev *dev,
-					     struct vm_area_struct *vma,
-					     enum pci_mmap_state mmap_state)
+static struct resource *__pci_mmap_make_offset(struct pci_dev *dev,
+					       unsigned long *offset,
+					       enum pci_mmap_state mmap_state)
 {
 	struct pci_controller *hose = pci_bus_to_host(dev->bus);
-	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 	unsigned long io_offset = 0;
 	int i, res_bit;
 
 	if (hose == 0)
-		return -EINVAL;		/* should never happen */
+		return NULL;		/* should never happen */
 
 	/* If memory, add on the PCI bridge address offset */
 	if (mmap_state == pci_mmap_mem) {
-		offset += hose->pci_mem_offset;
+		*offset += hose->pci_mem_offset;
 		res_bit = IORESOURCE_MEM;
 	} else {
 		io_offset = (unsigned long)hose->io_base_virt;
-		offset += io_offset;
+		*offset += io_offset;
 		res_bit = IORESOURCE_IO;
 	}
 
@@ -371,48 +373,104 @@ static __inline__ int __pci_mmap_make_offset(struct pci_dev *dev,
 			continue;
 
 		/* In the range of this resource? */
-		if (offset < (rp->start & PAGE_MASK) || offset > rp->end)
+		if (*offset < (rp->start & PAGE_MASK) || *offset > rp->end)
 			continue;
 
 		/* found it! construct the final physical address */
 		if (mmap_state == pci_mmap_io)
-			offset += hose->io_base_phys - io_offset;
-
-		vma->vm_pgoff = offset >> PAGE_SHIFT;
-		return 0;
+			*offset += hose->io_base_phys - io_offset;
+		return rp;
 	}
 
-	return -EINVAL;
-}
-
-/*
- * Set vm_flags of VMA, as appropriate for this architecture, for a pci device
- * mapping.
- */
-static __inline__ void __pci_mmap_set_flags(struct pci_dev *dev,
-					    struct vm_area_struct *vma,
-					    enum pci_mmap_state mmap_state)
-{
-	vma->vm_flags |= VM_SHM | VM_LOCKED | VM_IO;
+	return NULL;
 }
 
 /*
  * Set vm_page_prot of VMA, as appropriate for this architecture, for a pci
  * device mapping.
  */
-static __inline__ void __pci_mmap_set_pgprot(struct pci_dev *dev,
-					     struct vm_area_struct *vma,
-					     enum pci_mmap_state mmap_state,
-					     int write_combine)
+static pgprot_t __pci_mmap_set_pgprot(struct pci_dev *dev, struct resource *rp,
+				      pgprot_t protection,
+				      enum pci_mmap_state mmap_state,
+				      int write_combine)
 {
-	long prot = pgprot_val(vma->vm_page_prot);
+	unsigned long prot = pgprot_val(protection);
+
+	/* Write combine is always 0 on non-memory space mappings. On
+	 * memory space, if the user didn't pass 1, we check for a
+	 * "prefetchable" resource. This is a bit hackish, but we use
+	 * this to workaround the inability of /sysfs to provide a write
+	 * combine bit
+	 */
+	if (mmap_state != pci_mmap_mem)
+		write_combine = 0;
+	else if (write_combine == 0) {
+		if (rp->flags & IORESOURCE_PREFETCH)
+			write_combine = 1;
+	}
 
 	/* XXX would be nice to have a way to ask for write-through */
 	prot |= _PAGE_NO_CACHE;
-	if (!write_combine)
+	if (write_combine)
+		prot &= ~_PAGE_GUARDED;
+	else
 		prot |= _PAGE_GUARDED;
-	vma->vm_page_prot = __pgprot(prot);
+
+	printk("PCI map for %s:%lx, prot: %lx\n", pci_name(dev), rp->start,
+	       prot);
+
+	return __pgprot(prot);
 }
+
+/*
+ * This one is used by /dev/mem and fbdev who have no clue about the
+ * PCI device, it tries to find the PCI device first and calls the
+ * above routine
+ */
+pgprot_t pci_phys_mem_access_prot(struct file *file,
+				  unsigned long offset,
+				  unsigned long size,
+				  pgprot_t protection)
+{
+	struct pci_dev *pdev = NULL;
+	struct resource *found = NULL;
+	unsigned long prot = pgprot_val(protection);
+	int i;
+
+	if (page_is_ram(offset >> PAGE_SHIFT))
+		return __pgprot(prot);
+
+	prot |= _PAGE_NO_CACHE | _PAGE_GUARDED;
+
+	for_each_pci_dev(pdev) {
+		for (i = 0; i <= PCI_ROM_RESOURCE; i++) {
+			struct resource *rp = &pdev->resource[i];
+			int flags = rp->flags;
+
+			/* Active and same type? */
+			if ((flags & IORESOURCE_MEM) == 0)
+				continue;
+			/* In the range of this resource? */
+			if (offset < (rp->start & PAGE_MASK) ||
+			    offset > rp->end)
+				continue;
+			found = rp;
+			break;
+		}
+		if (found)
+			break;
+	}
+	if (found) {
+		if (found->flags & IORESOURCE_PREFETCH)
+			prot &= ~_PAGE_GUARDED;
+		pci_dev_put(pdev);
+	}
+
+	DBG("non-PCI map for %lx, prot: %lx\n", offset, prot);
+
+	return __pgprot(prot);
+}
+
 
 /*
  * Perform the actual remap of the pages for a PCI device mapping, as
@@ -428,14 +486,19 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 			enum pci_mmap_state mmap_state,
 			int write_combine)
 {
+	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
+	struct resource *rp;
 	int ret;
 
-	ret = __pci_mmap_make_offset(dev, vma, mmap_state);
-	if (ret < 0)
-		return ret;
+	rp = __pci_mmap_make_offset(dev, &offset, mmap_state);
+	if (rp == NULL)
+		return -EINVAL;
 
-	__pci_mmap_set_flags(dev, vma, mmap_state);
-	__pci_mmap_set_pgprot(dev, vma, mmap_state, write_combine);
+	vma->vm_pgoff = offset >> PAGE_SHIFT;
+	vma->vm_flags |= VM_SHM | VM_LOCKED | VM_IO;
+	vma->vm_page_prot = __pci_mmap_set_pgprot(dev, rp,
+						  vma->vm_page_prot,
+						  mmap_state, write_combine);
 
 	ret = remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
 			       vma->vm_end - vma->vm_start, vma->vm_page_prot);
@@ -484,8 +547,9 @@ static void __devinit pci_process_ISA_OF_ranges(struct device_node *isa_node,
 	if (range == NULL || (rlen < sizeof(struct isa_range))) {
 		printk(KERN_ERR "no ISA ranges or unexpected isa range size,"
 		       "mapping 64k\n");
-		__ioremap_explicit(phb_io_base_phys, (unsigned long)phb_io_base_virt, 
-				   0x10000, _PAGE_NO_CACHE);
+		__ioremap_explicit(phb_io_base_phys,
+				   (unsigned long)phb_io_base_virt,
+				   0x10000, _PAGE_NO_CACHE | _PAGE_GUARDED);
 		return;	
 	}
 	
@@ -513,7 +577,7 @@ static void __devinit pci_process_ISA_OF_ranges(struct device_node *isa_node,
 
 		__ioremap_explicit(phb_io_base_phys, 
 				   (unsigned long) phb_io_base_virt, 
-				   size, _PAGE_NO_CACHE);
+				   size, _PAGE_NO_CACHE | _PAGE_GUARDED);
 	}
 }
 
@@ -621,17 +685,21 @@ void __init pci_setup_phb_io(struct pci_controller *hose, int primary)
 	res->end += io_virt_offset;
 }
 
-void __devinit pci_setup_phb_io_dynamic(struct pci_controller *hose)
+void __devinit pci_setup_phb_io_dynamic(struct pci_controller *hose,
+					int primary)
 {
 	unsigned long size = hose->pci_io_size;
 	unsigned long io_virt_offset;
 	struct resource *res;
 
 	hose->io_base_virt = __ioremap(hose->io_base_phys, size,
-					_PAGE_NO_CACHE);
+					_PAGE_NO_CACHE | _PAGE_GUARDED);
 	DBG("phb%d io_base_phys 0x%lx io_base_virt 0x%lx\n",
 		hose->global_number, hose->io_base_phys,
 		(unsigned long) hose->io_base_virt);
+
+	if (primary)
+		pci_io_base = (unsigned long)hose->io_base_virt;
 
 	io_virt_offset = (unsigned long)hose->io_base_virt - pci_io_base;
 	res = &hose->io_resource;
@@ -713,7 +781,8 @@ int remap_bus_range(struct pci_bus *bus)
 	if (get_bus_io_range(bus, &start_phys, &start_virt, &size))
 		return 1;
 	printk("mapping IO %lx -> %lx, size: %lx\n", start_phys, start_virt, size);
-	if (__ioremap_explicit(start_phys, start_virt, size, _PAGE_NO_CACHE))
+	if (__ioremap_explicit(start_phys, start_virt, size,
+			       _PAGE_NO_CACHE | _PAGE_GUARDED))
 		return 1;
 
 	return 0;

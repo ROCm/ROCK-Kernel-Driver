@@ -114,6 +114,16 @@ int __init sh64_cache_init(void)
 	return 0;
 }
 
+#ifdef CONFIG_DCACHE_DISABLED
+#define sh64_dcache_purge_all()					do { } while (0)
+#define sh64_dcache_purge_coloured_phy_page(paddr, eaddr)	do { } while (0)
+#define sh64_dcache_purge_user_range(mm, start, end)		do { } while (0)
+#define sh64_dcache_purge_phy_page(paddr)			do { } while (0)
+#define sh64_dcache_purge_virt_page(mm, eaddr)			do { } while (0)
+#define sh64_dcache_purge_kernel_range(start, end)		do { } while (0)
+#define sh64_dcache_wback_current_user_range(start, end)	do { } while (0)
+#endif
+
 /*##########################################################################*/
 
 /* From here onwards, a rewrite of the implementation,
@@ -436,6 +446,7 @@ static void __inline__ sh64_dcache_purge_sets(int sets_to_purge_base, int n_sets
 		eaddr1 = eaddr0 + cpu_data->dcache.way_ofs * cpu_data->dcache.ways;
 		for (eaddr=eaddr0; eaddr<eaddr1; eaddr+=cpu_data->dcache.way_ofs) {
 			asm __volatile__ ("alloco %0, 0" : : "r" (eaddr));
+			asm __volatile__ ("synco"); /* TAKum03020 */
 		}
 
 		eaddr1 = eaddr0 + cpu_data->dcache.way_ofs * cpu_data->dcache.ways;
@@ -571,31 +582,6 @@ static void sh64_dcache_purge_phy_page(unsigned long paddr)
 		sh64_teardown_dtlb_cache_slot();
 		eaddr_start += PAGE_SIZE;
 	}
-}
-
-static void sh64_dcache_purge_virt_page(struct mm_struct *mm, unsigned long eaddr)
-{
-	unsigned long phys;
-	pgd_t *pgd;
-	pmd_t *pmd;
-	pte_t *pte;
-	pte_t entry;
-
-	pgd = pgd_offset(mm, eaddr);
-	pmd = pmd_offset(pgd, eaddr);
-
-	if (pmd_none(*pmd) || pmd_bad(*pmd))
-		return;
-
-	pte = pte_offset_kernel(pmd, eaddr);
-	entry = *pte;
-
-	if (pte_none(entry) || !pte_present(entry))
-		return;
-
-	phys = pte_val(entry) & PAGE_MASK;
-
-	sh64_dcache_purge_phy_page(phys);
 }
 
 static void sh64_dcache_purge_user_page(struct mm_struct *mm, unsigned long eaddr)
@@ -766,8 +752,6 @@ static void sh64_dcache_wback_current_user_range(unsigned long start, unsigned l
 	}
 }
 
-#endif /* !CONFIG_DCACHE_DISABLED */
-
 /****************************************************************************/
 
 /* These *MUST* lie in an area of virtual address space that's otherwise unused. */
@@ -829,6 +813,8 @@ static void sh64_clear_user_page_coloured(void *to, unsigned long address)
 
 	sh64_teardown_dtlb_cache_slot();
 }
+
+#endif /* !CONFIG_DCACHE_DISABLED */
 
 /****************************************************************************/
 
@@ -904,7 +890,7 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
 
 /****************************************************************************/
 
-void flush_cache_page(struct vm_area_struct *vma, unsigned long eaddr)
+void flush_cache_page(struct vm_area_struct *vma, unsigned long eaddr, unsigned long pfn)
 {
 	/* Invalidate any entries in either cache for the vma within the user
 	   address space vma->vm_mm for the page starting at virtual address
@@ -915,7 +901,7 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long eaddr)
 	   Note(1), this is called with mm->page_table_lock held.
 	   */
 
-	sh64_dcache_purge_virt_page(vma->vm_mm, eaddr);
+	sh64_dcache_purge_phy_page(pfn << PAGE_SHIFT);
 
 	if (vma->vm_flags & VM_EXEC) {
 		sh64_icache_inv_user_page(vma, eaddr);

@@ -41,7 +41,7 @@ extern struct export_operations export_op_default;
  * if not, require that we can walk up to exp->ex_dentry
  * doing some checks on the 'x' bits
  */
-int nfsd_acceptable(void *expv, struct dentry *dentry)
+static int nfsd_acceptable(void *expv, struct dentry *dentry)
 {
 	struct svc_export *exp = expv;
 	int rv;
@@ -280,8 +280,8 @@ out:
  * an inode.  In this case a call to fh_update should be made
  * before the fh goes out on the wire ...
  */
-inline int _fh_update(struct dentry *dentry, struct svc_export *exp,
-		      __u32 *datap, int *maxsize)
+static inline int _fh_update(struct dentry *dentry, struct svc_export *exp,
+			     __u32 *datap, int *maxsize)
 {
 	struct export_operations *nop = exp->ex_mnt->mnt_sb->s_export_op;
 	
@@ -297,8 +297,9 @@ inline int _fh_update(struct dentry *dentry, struct svc_export *exp,
 /*
  * for composing old style file handles
  */
-inline void _fh_update_old(struct dentry *dentry, struct svc_export *exp,
-			   struct knfsd_fh *fh)
+static inline void _fh_update_old(struct dentry *dentry,
+				  struct svc_export *exp,
+				  struct knfsd_fh *fh)
 {
 	fh->ofh_ino = ino_t_to_u32(dentry->d_inode->i_ino);
 	fh->ofh_generation = dentry->d_inode->i_generation;

@@ -78,8 +78,6 @@ static unsigned long hwrpb_cpu_present_mask __initdata = 0;
 
 int smp_num_probed;		/* Internal processor count */
 int smp_num_cpus = 1;		/* Number that came online.  */
-cycles_t cacheflush_time;
-unsigned long cache_decay_ticks;
 
 extern void calibrate_delay(void);
 
@@ -175,57 +173,6 @@ smp_callin(void)
 
 	/* Do nothing.  */
 	cpu_idle();
-}
-
-
-/*
- * Rough estimation for SMP scheduling, this is the number of cycles it
- * takes for a fully memory-limited process to flush the SMP-local cache.
- *
- * We are not told how much cache there is, so we have to guess.
- */
-static void __init
-smp_tune_scheduling (int cpuid)
-{
-	struct percpu_struct *cpu;
-	unsigned long on_chip_cache;	/* kB */
-	unsigned long freq;		/* Hz */
-	unsigned long bandwidth = 350;	/* MB/s */
-
-	cpu = (struct percpu_struct*)((char*)hwrpb + hwrpb->processor_offset
-				      + cpuid * hwrpb->processor_size);
-	switch (cpu->type)
-	{
-	case EV45_CPU:
-		on_chip_cache = 16 + 16;
-		break;
-
-	case EV5_CPU:
-	case EV56_CPU:
-		on_chip_cache = 8 + 8 + 96;
-		break;
-
-	case PCA56_CPU:
-		on_chip_cache = 16 + 8;
-		break;
-
-	case EV6_CPU:
-	case EV67_CPU:
-	default:
-		on_chip_cache = 64 + 64;
-		break;
-	}
-
-	freq = hwrpb->cycle_freq ? : est_cycle_freq;
-
-	cacheflush_time = (freq / 1000000) * (on_chip_cache << 10) / bandwidth;
-	cache_decay_ticks = cacheflush_time / (freq / 1000) * HZ / 1000;
-
-	printk("per-CPU timeslice cutoff: %ld.%02ld usecs.\n",
-	       cacheflush_time/(freq/1000000),
-	       (cacheflush_time*100/(freq/1000000)) % 100);
-	printk("task migration cache decay timeout: %ld msecs.\n",
-	       (cache_decay_ticks + 1) * 1000 / HZ);
 }
 
 /* Wait until hwrpb->txrdy is clear for cpu.  Return -1 on timeout.  */
@@ -528,7 +475,6 @@ smp_prepare_cpus(unsigned int max_cpus)
 	current_thread_info()->cpu = boot_cpuid;
 
 	smp_store_cpu_info(boot_cpuid);
-	smp_tune_scheduling(boot_cpuid);
 	smp_setup_percpu_timer(boot_cpuid);
 
 	/* Nothing to do on a UP box, or when told not to.  */

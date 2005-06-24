@@ -83,7 +83,6 @@ static struct map_desc intcp_io_desc[] __initdata = {
  { IO_ADDRESS(INTEGRATOR_UART1_BASE), INTEGRATOR_UART1_BASE, SZ_4K,  MT_DEVICE },
  { IO_ADDRESS(INTEGRATOR_DBG_BASE),   INTEGRATOR_DBG_BASE,   SZ_4K,  MT_DEVICE },
  { IO_ADDRESS(INTEGRATOR_GPIO_BASE),  INTEGRATOR_GPIO_BASE,  SZ_4K,  MT_DEVICE },
- { 0xfc900000, 0xc9000000, SZ_4K, MT_DEVICE },
  { 0xfca00000, 0xca000000, SZ_4K, MT_DEVICE },
  { 0xfcb00000, 0xcb000000, SZ_4K, MT_DEVICE },
 };
@@ -420,7 +419,22 @@ static struct clcd_panel vga = {
  */
 static void cp_clcd_enable(struct clcd_fb *fb)
 {
-	cm_control(CM_CTRL_LCDMUXSEL_MASK, CM_CTRL_LCDMUXSEL_VGA);
+	u32 val;
+
+	if (fb->fb.var.bits_per_pixel <= 8)
+		val = CM_CTRL_LCDMUXSEL_VGA_8421BPP;
+	else if (fb->fb.var.bits_per_pixel <= 16)
+		val = CM_CTRL_LCDMUXSEL_VGA_16BPP;
+	else
+		val = 0; /* no idea for this, don't trust the docs */
+
+	cm_control(CM_CTRL_LCDMUXSEL_MASK|
+		   CM_CTRL_LCDEN0|
+		   CM_CTRL_LCDEN1|
+		   CM_CTRL_STATIC1|
+		   CM_CTRL_STATIC2|
+		   CM_CTRL_STATIC|
+		   CM_CTRL_n24BITEN, val);
 }
 
 static unsigned long framesize = SZ_1M;

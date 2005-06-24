@@ -100,6 +100,21 @@ static inline int sctp_rcv_checksum(struct sk_buff *skb)
 	return 0;
 }
 
+/* The free routine for skbuffs that sctp receives */
+static void sctp_rfree(struct sk_buff *skb)
+{
+	atomic_sub(sizeof(struct sctp_chunk),&skb->sk->sk_rmem_alloc);
+	sock_rfree(skb);
+}
+
+/* The ownership wrapper routine to do receive buffer accounting */
+static void sctp_rcv_set_owner_r(struct sk_buff *skb, struct sock *sk)
+{
+	skb_set_owner_r(skb,sk);
+	skb->destructor = sctp_rfree;
+	atomic_add(sizeof(struct sctp_chunk),&sk->sk_rmem_alloc);
+}
+
 /*
  * This is the routine which IP calls when receiving an SCTP packet.
  */
@@ -163,6 +178,37 @@ int sctp_rcv(struct sk_buff *skb)
 
 	asoc = __sctp_rcv_lookup(skb, &src, &dest, &transport);
 
+	if (!asoc)
+		ep = __sctp_rcv_lookup_endpoint(&dest);
+
+	/* Retrieve the common input handling substructure. */
+	rcvr = asoc ? &asoc->base : &ep->base;
+	sk = rcvr->sk;
+
+	/*
+	 * If a frame arrives on an interface and the receiving socket is
+	 * bound to another interface, via SO_BINDTODEVICE, treat it as OOTB
+	 */
+	if (sk->sk_bound_dev_if && (sk->sk_bound_dev_if != af->skb_iif(skb)))
+	{
+		sock_put(sk);
+		if (asoc) {
+			sctp_association_put(asoc);
+			asoc = NULL;
+		} else {
+			sctp_endpoint_put(ep);
+			ep = NULL;
+		}
+		sk = sctp_get_ctl_sock();
+		ep = sctp_sk(sk)->ep;
+		sctp_endpoint_hold(ep);
+		sock_hold(sk);
+		rcvr = &ep->base;
+	}
+
+	if (atomic_read(&sk->sk_rmem_alloc) >= sk->sk_rcvbuf)
+		goto discard_release;
+
 	/*
 	 * RFC 2960, 8.4 - Handle "Out of the blue" Packets.
 	 * An SCTP packet is called an "out of the blue" (OOTB)
@@ -172,16 +218,11 @@ int sctp_rcv(struct sk_buff *skb)
 	 * packet belongs.
 	 */
 	if (!asoc) {
-		ep = __sctp_rcv_lookup_endpoint(&dest);
 		if (sctp_rcv_ootb(skb)) {
 			SCTP_INC_STATS_BH(SCTP_MIB_OUTOFBLUES);
 			goto discard_release;
 		}
 	}
-
-	/* Retrieve the common input handling substructure. */
-	rcvr = asoc ? &asoc->base : &ep->base;
-	sk = rcvr->sk;
 
 	/* SCTP seems to always need a timestamp right now (FIXME) */
 	if (skb->stamp.tv_sec == 0) {
@@ -202,6 +243,8 @@ int sctp_rcv(struct sk_buff *skb)
 		ret = -ENOMEM;
 		goto discard_release;
 	}
+
+	sctp_rcv_set_owner_r(skb,sk);
 
 	/* Remember what endpoint is to handle this packet. */
 	chunk->rcvr = rcvr;
@@ -243,13 +286,11 @@ discard_it:
 
 discard_release:
 	/* Release any structures we may be holding. */
-	if (asoc) {
-		sock_put(asoc->base.sk);
+	sock_put(sk);
+	if (asoc)
 		sctp_association_put(asoc);
-	} else {
-		sock_put(ep->base.sk);
+	else
 		sctp_endpoint_put(ep);
-	}
 
 	goto discard_it;
 }

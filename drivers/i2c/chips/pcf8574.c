@@ -56,7 +56,6 @@ SENSORS_INSMOD_2(pcf8574, pcf8574a);
 /* Each client has this additional data */
 struct pcf8574_data {
 	struct i2c_client client;
-	struct semaphore update_lock;
 
 	u8 read, write;			/* Register values */
 };
@@ -65,7 +64,6 @@ static int pcf8574_attach_adapter(struct i2c_adapter *adapter);
 static int pcf8574_detect(struct i2c_adapter *adapter, int address, int kind);
 static int pcf8574_detach_client(struct i2c_client *client);
 static void pcf8574_init_client(struct i2c_client *client);
-static struct pcf8574_data *pcf8574_update_client(struct device *dev);
 
 /* This is the driver that will be inserted */
 static struct i2c_driver pcf8574_driver = {
@@ -77,12 +75,12 @@ static struct i2c_driver pcf8574_driver = {
 	.detach_client	= pcf8574_detach_client,
 };
 
-static int pcf8574_id;
-
 /* following are the sysfs callback functions */
 static ssize_t show_read(struct device *dev, char *buf)
 {
-	struct pcf8574_data *data = pcf8574_update_client(dev);
+	struct i2c_client *client = to_i2c_client(dev);
+	struct pcf8574_data *data = i2c_get_clientdata(client);
+	data->read = i2c_smbus_read_byte(client); 
 	return sprintf(buf, "%u\n", data->read);
 }
 
@@ -99,7 +97,12 @@ static ssize_t set_write(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct pcf8574_data *data = i2c_get_clientdata(client);
-	data->write = simple_strtoul(buf, NULL, 10);
+	unsigned long val = simple_strtoul(buf, NULL, 10);
+
+	if (val > 0xff)
+		return -EINVAL;
+
+	data->write = val;
 	i2c_smbus_write_byte(client, data->write);
 	return count;
 }
@@ -160,9 +163,6 @@ int pcf8574_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* Fill in the remaining client fields and put it into the global list */
 	strlcpy(new_client->name, client_name, I2C_NAME_SIZE);
 
-	new_client->id = pcf8574_id++;
-	init_MUTEX(&data->update_lock);
-
 	/* Tell the I2C layer a new client has arrived */
 	if ((err = i2c_attach_client(new_client)))
 		goto exit_free;
@@ -204,19 +204,6 @@ static void pcf8574_init_client(struct i2c_client *client)
 	struct pcf8574_data *data = i2c_get_clientdata(client);
 	data->write = PCF8574_INIT;
 	i2c_smbus_write_byte(client, data->write);
-}
-
-static struct pcf8574_data *pcf8574_update_client(struct device *dev)
-{
-	struct i2c_client *client = to_i2c_client(dev);
-	struct pcf8574_data *data = i2c_get_clientdata(client);
-
-	down(&data->update_lock);
-	dev_dbg(&client->dev, "Starting pcf8574 update\n");
-	data->read = i2c_smbus_read_byte(client); 
-	up(&data->update_lock);
-	
-	return data;
 }
 
 static int __init pcf8574_init(void)

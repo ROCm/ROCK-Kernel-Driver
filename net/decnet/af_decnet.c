@@ -149,7 +149,6 @@ static void dn_keepalive(struct sock *sk);
 #define DN_SK_HASH_MASK (DN_SK_HASH_SIZE - 1)
 
 
-static kmem_cache_t *dn_sk_cachep;
 static struct proto_ops dn_proto_ops;
 static DEFINE_RWLOCK(dn_hash_lock);
 static struct hlist_head dn_sk_hash[DN_SK_HASH_SIZE];
@@ -447,21 +446,23 @@ static void dn_destruct(struct sock *sk)
 	dst_release(xchg(&sk->sk_dst_cache, NULL));
 }
 
+static struct proto dn_proto = {
+	.name	  = "DECNET",
+	.owner	  = THIS_MODULE,
+	.obj_size = sizeof(struct dn_sock),
+};
+
 static struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 {
 	struct dn_scp *scp;
-	struct sock *sk = sk_alloc(PF_DECnet, gfp, sizeof(struct dn_sock),
-				   dn_sk_cachep);
+	struct sock *sk = sk_alloc(PF_DECnet, gfp, &dn_proto, 1);
 
 	if  (!sk)
 		goto out;
 
-	sk->sk_protinfo = scp = (struct dn_scp *)(sk + 1);
-
 	if (sock)
 		sock->ops = &dn_proto_ops;
 	sock_init_data(sock, sk);
-	sk_set_owner(sk, THIS_MODULE);
 
 	sk->sk_backlog_rcv = dn_nsp_backlog_rcv;
 	sk->sk_destruct    = dn_destruct;
@@ -471,6 +472,7 @@ static struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 	sk->sk_allocation  = gfp;
 
 	/* Initialization of DECnet Session Control Port		*/
+	scp = DN_SK(sk);
 	scp->state	= DN_O;		/* Open			*/
 	scp->numdat	= 1;		/* Next data seg to tx	*/
 	scp->numoth	= 1;		/* Next oth data to tx  */
@@ -751,14 +753,13 @@ static int dn_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 
 	rv = -EINVAL;
 	lock_sock(sk);
-	if (sk->sk_zapped) {
+	if (sock_flag(sk, SOCK_ZAPPED)) {
 		memcpy(&scp->addr, saddr, addr_len);
-		sk->sk_zapped = 0;
+		sock_reset_flag(sk, SOCK_ZAPPED);
 
 		rv = dn_hash_sock(sk);
-		if (rv) {
-			sk->sk_zapped = 1;
-		}
+		if (rv)
+			sock_set_flag(sk, SOCK_ZAPPED);
 	}
 	release_sock(sk);
 
@@ -772,7 +773,7 @@ static int dn_auto_bind(struct socket *sock)
 	struct dn_scp *scp = DN_SK(sk);
 	int rv;
 
-	sk->sk_zapped = 0;
+	sock_reset_flag(sk, SOCK_ZAPPED);
 
 	scp->addr.sdn_flags  = 0;
 	scp->addr.sdn_objnum = 0;
@@ -796,9 +797,8 @@ static int dn_auto_bind(struct socket *sock)
 	rv = dn_dev_bind_default((dn_address *)scp->addr.sdn_add.a_addr);
 	if (rv == 0) {
 		rv = dn_hash_sock(sk);
-		if (rv) {
-			sk->sk_zapped = 1;
-		}
+		if (rv)
+			sock_set_flag(sk, SOCK_ZAPPED);
 	}
 
 	return rv;
@@ -814,7 +814,7 @@ static int dn_confirm_accept(struct sock *sk, long *timeo, int allocation)
 		return -EINVAL;
 
 	scp->state = DN_CC;
-	scp->segsize_loc = dst_path_metric(__sk_dst_get(sk), RTAX_ADVMSS);
+	scp->segsize_loc = dst_metric(__sk_dst_get(sk), RTAX_ADVMSS);
 	dn_send_conn_conf(sk, allocation);
 
 	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
@@ -923,7 +923,7 @@ static int __dn_connect(struct sock *sk, struct sockaddr_dn *addr, int addrlen, 
 	if (addr->sdn_flags & SDF_WILD)
 		goto out;
 
-	if (sk->sk_zapped) {
+	if (sock_flag(sk, SOCK_ZAPPED)) {
 		err = dn_auto_bind(sk->sk_socket);
 		if (err)
 			goto out;
@@ -943,7 +943,7 @@ static int __dn_connect(struct sock *sk, struct sockaddr_dn *addr, int addrlen, 
 	sk->sk_route_caps = sk->sk_dst_cache->dev->features;
 	sock->state = SS_CONNECTING;
 	scp->state = DN_CI;
-	scp->segsize_loc = dst_path_metric(sk->sk_dst_cache, RTAX_ADVMSS);
+	scp->segsize_loc = dst_metric(sk->sk_dst_cache, RTAX_ADVMSS);
 
 	dn_nsp_send_conninit(sk, NSP_CI);
 	err = -EINPROGRESS;
@@ -1142,7 +1142,7 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 	lock_sock(newsk);
 	err = dn_hash_sock(newsk);
 	if (err == 0) {
-		newsk->sk_zapped = 0;
+		sock_reset_flag(newsk, SOCK_ZAPPED);
 		dn_send_conn_ack(newsk);
 
 		/*
@@ -1260,7 +1260,7 @@ static int dn_listen(struct socket *sock, int backlog)
 
 	lock_sock(sk);
 
-	if (sk->sk_zapped)
+	if (sock_flag(sk, SOCK_ZAPPED))
 		goto out;
 
 	if ((DN_SK(sk)->state != DN_O) || (sk->sk_state == TCP_LISTEN))
@@ -1672,7 +1672,7 @@ static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
 
 	lock_sock(sk);
 
-	if (sk->sk_zapped) {
+	if (sock_flag(sk, SOCK_ZAPPED)) {
 		rv = -EADDRNOTAVAIL;
 		goto out;
 	}
@@ -1869,7 +1869,7 @@ static inline unsigned int dn_current_mss(struct sock *sk, int flags)
 
 	/* This works out the maximum size of segment we can send out */
 	if (dst) {
-		u32 mtu = dst_pmtu(dst);
+		u32 mtu = dst_mtu(dst);
 		mss_now = min_t(int, dn_mss_from_pmtu(dst->dev, mtu), mss_now);
 	}
 
@@ -2352,14 +2352,13 @@ static char banner[] __initdata = KERN_INFO "NET4: DECnet for Linux: V.2.5.68s (
 
 static int __init decnet_init(void)
 {
+	int rc;
+
         printk(banner);
 
-	dn_sk_cachep = kmem_cache_create("decnet_socket_cache",
-					 sizeof(struct dn_sock),
-					 0, SLAB_HWCACHE_ALIGN,
-					 NULL, NULL);
-	if (!dn_sk_cachep)
-		return -ENOMEM;
+	rc = proto_register(&dn_proto, 1);
+	if (rc != 0)
+		goto out;
 
 	dn_neigh_init();
 	dn_dev_init();
@@ -2372,8 +2371,8 @@ static int __init decnet_init(void)
 
 	proc_net_fops_create("decnet", S_IRUGO, &dn_socket_seq_fops);
 	dn_register_sysctl();
-
-	return 0;
+out:
+	return rc;
 
 }
 module_init(decnet_init);
@@ -2400,7 +2399,7 @@ static void __exit decnet_exit(void)
 
 	proc_net_remove("decnet");
 
-	kmem_cache_destroy(dn_sk_cachep);
+	proto_unregister(&dn_proto);
 }
 module_exit(decnet_exit);
 #endif

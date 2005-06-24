@@ -46,7 +46,7 @@ static void set_huge_pte(struct mm_struct *mm, struct vm_area_struct *vma, struc
 {
 	pte_t entry;
 
-	mm->rss += (HPAGE_SIZE / PAGE_SIZE);
+	add_mm_counter(mm, rss, HPAGE_SIZE / PAGE_SIZE);
 	if (write_access) {
 		entry =
 		    pte_mkwrite(pte_mkdirty(mk_pte(page, vma->vm_page_prot)));
@@ -86,7 +86,7 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 		ptepage = pte_page(entry);
 		get_page(ptepage);
 		set_pte(dst_pte, entry);
-		dst->rss += (HPAGE_SIZE / PAGE_SIZE);
+		add_mm_counter(dst, rss, HPAGE_SIZE / PAGE_SIZE);
 		addr += HPAGE_SIZE;
 	}
 	return 0;
@@ -209,20 +209,23 @@ void unmap_hugepage_range(struct vm_area_struct *vma,
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long address;
-	pte_t pte;
+	pte_t pte, *ptep;
 	struct page *page;
 
 	BUG_ON(start & (HPAGE_SIZE - 1));
 	BUG_ON(end & (HPAGE_SIZE - 1));
 
 	for (address = start; address < end; address += HPAGE_SIZE) {
-		pte = ptep_get_and_clear(huge_pte_offset(mm, address));
+		ptep = huge_pte_offset(mm, address);
+		if (!ptep)
+			continue;
+		pte = ptep_get_and_clear(mm, address, ptep);
 		if (pte_none(pte))
 			continue;
 		page = pte_page(pte);
 		put_page(page);
 	}
-	mm->rss -= (end - start) >> PAGE_SHIFT;
+	add_mm_counter(mm ,rss, -((end - start) >> PAGE_SHIFT));
 	flush_tlb_range(vma, start, end);
 }
 
@@ -246,15 +249,8 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 			goto out;
 		}
 
-		if (!pte_none(*pte)) {
-			pmd_t *pmd = (pmd_t *) pte;
-
-			page = pmd_page(*pmd);
-			pmd_clear(pmd);
-			mm->nr_ptes--;
-			dec_page_state(nr_page_table_pages);
-			page_cache_release(page);
-		}
+		if (!pte_none(*pte))
+			continue;
 
 		idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
 			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));

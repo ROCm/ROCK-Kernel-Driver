@@ -1,7 +1,7 @@
 /*
  *  setup.c, Setup for the TANBAC TB0229 (VR4131DIMM)
  *
- *  Copyright (C) 2002-2004  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
+ *  Copyright (C) 2002-2005  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
  *  Modified for TANBAC TB0229:
  *  Copyright (C) 2003  Megasolution Inc.  <matsu@megasolution.jp>
@@ -20,24 +20,8 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <linux/config.h>
-
-#include <asm/vr41xx/vr41xx.h>
 
 const char *get_system_type(void)
 {
 	return "TANBAC TB0229";
 }
-
-static int tanbac_tb0229_setup(void)
-{
-#ifdef CONFIG_SERIAL_8250
-	vr41xx_select_siu_interface(SIU_RS232C, IRDA_NONE);
-	vr41xx_siu_init();
-	vr41xx_dsiu_init();
-#endif
-
-	return 0;
-}
-
-early_initcall(tanbac_tb0229_setup);

@@ -11,6 +11,7 @@ config SA1100_ASSABET
 config ASSABET_NEPONSET
 	bool "Include support for Neponset"
 	depends on SA1100_ASSABET
+	select SA1111
 	help
 	  Say Y here if you are using the Intel(R) StrongARM(R) SA-1110
 	  Microprocessor Development Board (Assabet)  with the SA-1111
@@ -44,7 +45,9 @@ endchoice
 
 config SA1100_COLLIE
 	bool "Sharp Zaurus SL5500"
-	depends on ARCH_SA1100
+	select SHARP_LOCOMO
+	select SHARP_SCOOP
+	select SHARP_PARAM
 	help
 	  Say Y here to support the Sharp Zaurus SL5500 PDAs.
 
@@ -85,12 +88,14 @@ config SA1100_H3XXX
 
 config SA1100_BADGE4
 	bool "HP Labs BadgePAD 4"
+	select SA1111
 	help
 	  Say Y here if you want to build a kernel for the HP Laboratories
 	  BadgePAD 4.
 
 config SA1100_JORNADA720
 	bool "HP Jornada 720"
+	select SA1111
 	help
 	  Say Y here if you want to build a kernel for the HP Jornada 720
 	  handheld computer.  See <http://www.hp.com/jornada/products/720>
@@ -145,7 +150,7 @@ config SA1100_SSP
 
 config H3600_SLEEVE
 	tristate "Compaq iPAQ Handheld sleeve support"
-	depends on SA1100_H3600
+	depends on SA1100_H3100 || SA1100_H3600
 	help
 	  Choose this option to enable support for extension packs (sleeves)
 	  for the Compaq iPAQ H3XXX series of handheld computers.  This option

@@ -487,7 +487,7 @@ static struct trident_channel *ali_alloc_rec_pcm_channel(struct trident_card *ca
 static struct trident_channel *ali_alloc_pcm_channel(struct trident_card *card);
 static void ali_restore_regs(struct trident_card *card);
 static void ali_save_regs(struct trident_card *card);
-static int trident_suspend(struct pci_dev *dev, u32 unused);
+static int trident_suspend(struct pci_dev *dev, pm_message_t unused);
 static int trident_resume(struct pci_dev *dev);
 static void ali_free_pcm_channel(struct trident_card *card, unsigned int channel);
 static int ali_setup_multi_channels(struct trident_card *card, int chan_nums);
@@ -3723,7 +3723,7 @@ ali_restore_regs(struct trident_card *card)
 }
 
 static int
-trident_suspend(struct pci_dev *dev, u32 unused)
+trident_suspend(struct pci_dev *dev, pm_message_t unused)
 {
 	struct trident_card *card = pci_get_drvdata(dev);
 

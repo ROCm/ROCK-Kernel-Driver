@@ -184,7 +184,6 @@ m41t00_probe(struct i2c_adapter *adap, int addr, int kind)
 
 	memset(client, 0, sizeof(struct i2c_client));
 	strncpy(client->name, M41T00_DRV_NAME, I2C_NAME_SIZE);
-	client->id = m41t00_driver.id;
 	client->flags = I2C_DF_NOTIFY;
 	client->addr = addr;
 	client->adapter = adap;

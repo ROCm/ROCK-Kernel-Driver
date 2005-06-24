@@ -236,12 +236,12 @@ typedef struct {
 	/* driver information */
 	struct {
 		phase_t		phase;			/* current phase			*/
-		void		*io_base;		/* iomem base of FAS216			*/
-		unsigned int	io_port;		/* base address of FAS216		*/
+		void __iomem	*io_base;		/* iomem base of FAS216			*/
 		unsigned int	io_shift;		/* shift to adjust reg offsets by	*/
 		unsigned char	cfg[4];			/* configuration registers		*/
 		const char	*type;			/* chip type				*/
 		unsigned int	irq;			/* interrupt				*/
+		int		dma;			/* dma channel				*/
 
 		Scsi_Pointer	SCp;			/* current commands data pointer	*/
 

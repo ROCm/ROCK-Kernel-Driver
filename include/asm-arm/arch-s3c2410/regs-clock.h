@@ -10,18 +10,19 @@
  * S3C2410 clock register definitions
  *
  *  Changelog:
- *    18-Aug-2004 Ben Dooks      Added 2440 definitions
- *    08-Aug-2004 Herbert Pötzl  Added CLKCON definitions
- *    19-06-2003  Ben Dooks      Created file
- *    12-03-2004  Ben Dooks      Updated include protection
- *    29-Sep-2004 Ben Dooks	 Fixed usage for assembly inclusion
- *    10-Feb-2005 Ben Dooks	 Fixed CAMDIVN address (Guillaume Gourat)
+ *    18-Aug-2004 Ben Dooks         Added 2440 definitions
+ *    08-Aug-2004 Herbert Pötzl     Added CLKCON definitions
+ *    19-06-2003  Ben Dooks         Created file
+ *    12-03-2004  Ben Dooks         Updated include protection
+ *    29-Sep-2004 Ben Dooks	    Fixed usage for assembly inclusion
+ *    10-Feb-2005 Ben Dooks	    Fixed CAMDIVN address (Guillaume Gourat)
+ *    10-Mar-2005 Lucas Villa Real  Changed S3C2410_VA to S3C24XX_VA
  */
 
 #ifndef __ASM_ARM_REGS_CLOCK
 #define __ASM_ARM_REGS_CLOCK "$Id: clock.h,v 1.4 2003/04/30 14:50:51 ben Exp $"
 
-#define S3C2410_CLKREG(x) ((x) + S3C2410_VA_CLKPWR)
+#define S3C2410_CLKREG(x) ((x) + S3C24XX_VA_CLKPWR)
 
 #define S3C2410_PLLVAL(_m,_p,_s) ((_m) << 12 | ((_p) << 4) | ((_s)))
 

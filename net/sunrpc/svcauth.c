@@ -59,6 +59,11 @@ svc_authenticate(struct svc_rqst *rqstp, u32 *authp)
 	return aops->accept(rqstp, authp);
 }
 
+int svc_set_client(struct svc_rqst *rqstp)
+{
+	return rqstp->rq_authop->set_client(rqstp);
+}
+
 /* A request, which was authenticated, has now executed.
  * Time to finalise the the credentials and verifier
  * and release and resources

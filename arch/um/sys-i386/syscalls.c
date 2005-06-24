@@ -88,7 +88,7 @@ long sys_clone(unsigned long clone_flags, unsigned long newsp,
  * This is really horribly ugly.
  */
 long sys_ipc (uint call, int first, int second,
-	     int third, void *__user ptr, long fifth)
+	     int third, void __user *ptr, long fifth)
 {
 	int version, ret;
 
@@ -175,7 +175,7 @@ long sys_sigaction(int sig, const struct old_sigaction __user *act,
 
 	if (act) {
 		old_sigset_t mask;
-		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		if (!access_ok(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_restorer, &act->sa_restorer))
 			return -EFAULT;
@@ -187,7 +187,7 @@ long sys_sigaction(int sig, const struct old_sigaction __user *act,
 	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
 
 	if (!ret && oact) {
-		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		if (!access_ok(VERIFY_WRITE, oact, sizeof(*oact)) ||
 		    __put_user(old_ka.sa.sa_handler, &oact->sa_handler) ||
 		    __put_user(old_ka.sa.sa_restorer, &oact->sa_restorer))
 			return -EFAULT;

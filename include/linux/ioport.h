@@ -91,8 +91,6 @@ struct resource_list {
 extern struct resource ioport_resource;
 extern struct resource iomem_resource;
 
-extern int get_resource_list(struct resource *, char *buf, int size);
-
 extern int request_resource(struct resource *root, struct resource *new);
 extern struct resource * ____request_resource(struct resource *root, struct resource *new);
 extern int release_resource(struct resource *new);

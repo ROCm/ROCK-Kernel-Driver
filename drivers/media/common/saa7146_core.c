@@ -20,14 +20,12 @@
 
 #include <media/saa7146.h>
 
-/* global variables */
-struct list_head saa7146_devices;
-struct semaphore saa7146_devices_lock;
+LIST_HEAD(saa7146_devices);
+DECLARE_MUTEX(saa7146_devices_lock);
 
-static int initialized = 0;
-static int saa7146_num = 0;
+static int saa7146_num;
 
-unsigned int saa7146_debug = 0;
+unsigned int saa7146_debug;
 
 module_param(saa7146_debug, int, 0644);
 MODULE_PARM_DESC(saa7146_debug, "debug level (default: 0)");
@@ -48,21 +46,15 @@ static void dump_registers(struct saa7146_dev* dev)
  * gpio and debi helper functions
  ****************************************************************************/
 
-/* write "data" to the gpio-pin "pin" -- unused */
-void saa7146_set_gpio(struct saa7146_dev *dev, u8 pin, u8 data)
+void saa7146_setgpio(struct saa7146_dev *dev, int port, u32 data)
 {
 	u32 value = 0;
 
-	/* sanity check */
-	if(pin > 3)
-		return;
+	BUG_ON(port > 3);
 
-	/* read old register contents */
-	value = saa7146_read(dev, GPIO_CTRL );
-	
-	value &= ~(0xff << (8*pin));
-	value |= (data << (8*pin));
-
+	value = saa7146_read(dev, GPIO_CTRL);
+	value &= ~(0xff << (8*port));
+	value |= (data << (8*port));
 	saa7146_write(dev, GPIO_CTRL, value);
 }
 
@@ -105,7 +97,7 @@ int saa7146_wait_for_debi_done(struct saa7146_dev *dev, int nobusyloop)
  * general helper functions
  ****************************************************************************/
 
-/* this is videobuf_vmalloc_to_sg() from video-buf.c 
+/* this is videobuf_vmalloc_to_sg() from video-buf.c
    make sure virt has been allocated with vmalloc_32(), otherwise the BUG()
    may be triggered on highmem machines */
 static struct scatterlist* vmalloc_to_sg(unsigned char *virt, int nr_pages)
@@ -128,7 +120,7 @@ static struct scatterlist* vmalloc_to_sg(unsigned char *virt, int nr_pages)
 		sglist[i].length = PAGE_SIZE;
 	}
 	return sglist;
-	
+
  err:
 	kfree(sglist);
 	return NULL;
@@ -158,7 +150,7 @@ char *saa7146_vmalloc_build_pgtable(struct pci_dev *pci, long length, struct saa
 		vfree(mem);
 		return NULL;
 	}
-	
+
 	slen = pci_map_sg(pci,pt->slist,pages,PCI_DMA_FROMDEVICE);
 	if (0 != saa7146_pgtable_build_single(pci, pt, pt->slist, slen)) {
 		return NULL;
@@ -198,13 +190,13 @@ int saa7146_pgtable_alloc(struct pci_dev *pci, struct saa7146_pgtable *pt)
 int saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *pt,
 	struct scatterlist *list, int sglen  )
 {
-	u32   *ptr, fill;
+	u32 *ptr, fill;
 	int nr_pages = 0;
-	int   i,p;
+	int i,p;
 
-	BUG_ON( 0 == sglen);
+	BUG_ON(0 == sglen);
 	BUG_ON(list->offset > PAGE_SIZE);
-	
+
 	/* if we have a user buffer, the first page may not be
 	   aligned to a page boundary. */
 	pt->offset = list->offset;
@@ -235,19 +227,6 @@ int saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *pt
 	}
 */
 	return 0;
-}
-
-/********************************************************************************/
-/* gpio functions */
-
-void saa7146_setgpio(struct saa7146_dev *dev, int port, u32 data)
-{
-	u32 val = 0;
-
-        val=saa7146_read(dev,GPIO_CTRL);
-        val&=~(0xff << (8*(port)));
-        val|=(data)<<(8*(port));
-        saa7146_write(dev, GPIO_CTRL, val);
 }
 
 /********************************************************************************/
@@ -322,10 +301,10 @@ static irqreturn_t interrupt_hw(int irq, void *dev_id, struct pt_regs *regs)
 static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent)
 {
 	struct saa7146_pci_extension_data *pci_ext = (struct saa7146_pci_extension_data *)ent->driver_data;
-	struct saa7146_extension* ext = pci_ext->ext;
+	struct saa7146_extension *ext = pci_ext->ext;
 	struct saa7146_dev *dev;
 	int err = -ENOMEM;
-	
+
 	dev = kmalloc(sizeof(struct saa7146_dev), GFP_KERNEL);
 	if (!dev) {
 		ERR(("out of memory.\n"));
@@ -394,7 +373,7 @@ static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent
 		goto err_unmap;
 	}
 
-		err = -ENOMEM;
+	err = -ENOMEM;
 
 	/* get memory for various stuff */
 	dev->d_rps0.cpu_addr = pci_alloc_consistent(pci, SAA7146_RPS_MEM,
@@ -423,7 +402,7 @@ static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent
 	INFO(("found saa7146 @ mem %p (revision %d, irq %d) (0x%04x,0x%04x).\n", dev->mem, dev->revision, pci->irq, pci->subsystem_vendor, pci->subsystem_device));
 	dev->ext = ext;
 
-	pci_set_drvdata(pci,dev);
+	pci_set_drvdata(pci, dev);
 
         init_MUTEX(&dev->lock);
 	spin_lock_init(&dev->int_slock);
@@ -435,11 +414,11 @@ static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent
 	init_waitqueue_head(&dev->i2c_wq);
 
 	/* set some sane pci arbitrition values */
-	saa7146_write(dev, PCI_BT_V1, 0x1c00101f); 
+	saa7146_write(dev, PCI_BT_V1, 0x1c00101f);
 
 	/* TODO: use the status code of the callback */
 
-			err = -ENODEV;
+	err = -ENODEV;
 
 	if (ext->probe && ext->probe(dev)) {
 		DEB_D(("ext->probe() failed for %p. skipping device.\n",dev));
@@ -460,7 +439,7 @@ out:
 	return err;
 
 err_unprobe:
-	pci_set_drvdata(pci,NULL);
+	pci_set_drvdata(pci, NULL);
 err_free_i2c:
 	pci_free_consistent(pci, SAA7146_RPS_MEM, dev->d_i2c.cpu_addr,
 			    dev->d_i2c.dma_handle);
@@ -527,12 +506,6 @@ int saa7146_register_extension(struct saa7146_extension* ext)
 {
 	DEB_EE(("ext:%p\n",ext));
 
-	if( 0 == initialized ) {
-		INIT_LIST_HEAD(&saa7146_devices);
-		init_MUTEX(&saa7146_devices_lock);
-		initialized = 1;
-	}
-
 	ext->driver.name = ext->name;
 	ext->driver.id_table = ext->pci_tbl;
 	ext->driver.probe = saa7146_init_one;
@@ -549,23 +522,6 @@ int saa7146_unregister_extension(struct saa7146_extension* ext)
 	pci_unregister_driver(&ext->driver);
 	return 0;
 }
-
-static int __init saa7146_init_module(void)
-{
-	if( 0 == initialized ) {
-		INIT_LIST_HEAD(&saa7146_devices);
-		init_MUTEX(&saa7146_devices_lock);
-		initialized = 1;
-	}
-	return 0;
-}
-
-static void __exit saa7146_cleanup_module(void)
-{
-}
-
-module_init(saa7146_init_module);
-module_exit(saa7146_cleanup_module);
 
 EXPORT_SYMBOL_GPL(saa7146_register_extension);
 EXPORT_SYMBOL_GPL(saa7146_unregister_extension);

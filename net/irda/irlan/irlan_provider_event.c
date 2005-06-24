@@ -58,7 +58,7 @@ static int (*state[])(struct irlan_cb *self, IRLAN_EVENT event,
 void irlan_do_provider_event(struct irlan_cb *self, IRLAN_EVENT event, 
 			     struct sk_buff *skb) 
 {
-	ASSERT(*state[ self->provider.state] != NULL, return;);
+	IRDA_ASSERT(*state[ self->provider.state] != NULL, return;);
 
 	(*state[self->provider.state]) (self, event, skb);
 }
@@ -74,7 +74,7 @@ static int irlan_provider_state_idle(struct irlan_cb *self, IRLAN_EVENT event,
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
-	ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
 	
 	switch(event) {
 	case IRLAN_CONNECT_INDICATION:
@@ -103,7 +103,7 @@ static int irlan_provider_state_info(struct irlan_cb *self, IRLAN_EVENT event,
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
-	ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
 
 	switch(event) {
 	case IRLAN_GET_INFO_CMD:
@@ -168,7 +168,7 @@ static int irlan_provider_state_open(struct irlan_cb *self, IRLAN_EVENT event,
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
 
 	switch(event) {
 	case IRLAN_FILTER_CONFIG_CMD:
@@ -207,8 +207,8 @@ static int irlan_provider_state_data(struct irlan_cb *self, IRLAN_EVENT event,
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == IRLAN_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return -1;);
 
 	switch(event) {
 	case IRLAN_FILTER_CONFIG_CMD:

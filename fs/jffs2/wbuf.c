@@ -1087,7 +1087,7 @@ static struct nand_oobinfo jffs2_oobinfo_docecc = {
 };
 
 
-int jffs2_nand_set_oobinfo(struct jffs2_sb_info *c)
+static int jffs2_nand_set_oobinfo(struct jffs2_sb_info *c)
 {
 	struct nand_oobinfo *oinfo = &c->mtd->oobinfo;
 

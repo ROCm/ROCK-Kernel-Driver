@@ -37,7 +37,6 @@ struct tda10021_config
 };
 
 extern struct dvb_frontend* tda10021_attach(const struct tda10021_config* config,
-					    struct i2c_adapter* i2c,
-					    u8 pwm);
+					    struct i2c_adapter* i2c, u8 pwm);
 
 #endif // TDA10021_H

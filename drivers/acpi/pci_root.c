@@ -258,7 +258,7 @@ acpi_pci_root_add (
  	/* TBD: Locking */
  	list_add_tail(&root->node, &acpi_pci_roots);
 
-	printk(KERN_INFO PREFIX "%s [%s] (%02x:%02x)\n", 
+	printk(KERN_INFO PREFIX "%s [%s] (%04x:%02x)\n", 
 		acpi_device_name(device), acpi_device_bid(device),
 		root->id.segment, root->id.bus);
 
@@ -272,7 +272,7 @@ acpi_pci_root_add (
 	root->bus = pci_acpi_scan_root(device, root->id.segment, root->id.bus);
 	if (!root->bus) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
-			"Bus %02x:%02x not present in PCI namespace\n", 
+			"Bus %04x:%02x not present in PCI namespace\n", 
 			root->id.segment, root->id.bus));
 		result = -ENODEV;
 		goto end;

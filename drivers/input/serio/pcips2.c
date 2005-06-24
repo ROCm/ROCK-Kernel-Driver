@@ -217,7 +217,7 @@ static struct pci_driver pcips2_driver = {
 
 static int __init pcips2_init(void)
 {
-	return pci_module_init(&pcips2_driver);
+	return pci_register_driver(&pcips2_driver);
 }
 
 static void __exit pcips2_exit(void)

@@ -3261,7 +3261,7 @@ xfs_bmap_extents_to_btree(
 	 */
 	ablock = XFS_BUF_TO_BMBT_BLOCK(abp);
 	INT_SET(ablock->bb_magic, ARCH_CONVERT, XFS_BMAP_MAGIC);
-	INT_ZERO(ablock->bb_level, ARCH_CONVERT);
+	ablock->bb_level = 0;
 	INT_SET(ablock->bb_leftsib, ARCH_CONVERT, NULLDFSBNO);
 	INT_SET(ablock->bb_rightsib, ARCH_CONVERT, NULLDFSBNO);
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);

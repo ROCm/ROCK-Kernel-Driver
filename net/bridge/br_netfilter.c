@@ -829,8 +829,7 @@ static unsigned int ip_sabotage_in(unsigned int hook, struct sk_buff **pskb,
 {
 	if ((*pskb)->nf_bridge &&
 	    !((*pskb)->nf_bridge->mask & BRNF_NF_BRIDGE_PREROUTING)) {
-		okfn(*pskb);
-		return NF_STOLEN;
+		return NF_STOP;
 	}
 
 	return NF_ACCEPT;
@@ -891,8 +890,7 @@ static unsigned int ip_sabotage_out(unsigned int hook, struct sk_buff **pskb,
 		if (out->priv_flags & IFF_802_1Q_VLAN)
 			nf_bridge->netoutdev = (struct net_device *)out;
 #endif
-		okfn(skb);
-		return NF_STOLEN;
+		return NF_STOP;
 	}
 
 	return NF_ACCEPT;

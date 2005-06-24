@@ -32,6 +32,7 @@
 #include <asm/rtas.h>
 #include <asm/sstep.h>
 #include <asm/bug.h>
+#include <asm/hvcall.h>
 
 #include "nonstdio.h"
 #include "privinst.h"
@@ -725,7 +726,7 @@ static void insert_cpu_bpts(void)
 {
 	if (dabr.enabled)
 		set_controlled_dabr(dabr.address | (dabr.enabled & 7));
-	if (iabr && (cur_cpu_spec->cpu_features & CPU_FTR_IABR))
+	if (iabr && cpu_has_feature(CPU_FTR_IABR))
 		set_iabr(iabr->address
 			 | (iabr->enabled & (BP_IABR|BP_IABR_TE)));
 }
@@ -753,7 +754,7 @@ static void remove_bpts(void)
 static void remove_cpu_bpts(void)
 {
 	set_controlled_dabr(0);
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_IABR))
+	if (cpu_has_feature(CPU_FTR_IABR))
 		set_iabr(0);
 }
 
@@ -1100,7 +1101,7 @@ bpt_cmds(void)
 		break;
 
 	case 'i':	/* bi - hardware instr breakpoint */
-		if (!(cur_cpu_spec->cpu_features & CPU_FTR_IABR)) {
+		if (!cpu_has_feature(CPU_FTR_IABR)) {
 			printf("Hardware instruction breakpoint "
 			       "not supported on this cpu\n");
 			break;
@@ -2498,7 +2499,7 @@ void xmon_init(void)
 
 void dump_segments(void)
 {
-	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB)
+	if (cpu_has_feature(CPU_FTR_SLB))
 		dump_slb();
 	else
 		dump_stab();

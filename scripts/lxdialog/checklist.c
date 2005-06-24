@@ -269,7 +269,7 @@ dialog_checklist (const char *title, const char *prompt, int height, int width,
 				    status[scroll + max_choice - 1],
 				    max_choice - 1, FALSE);
 			scrollok (list, TRUE);
-			scroll (list);
+			wscrl (list, 1);
 			scrollok (list, FALSE);
 		    }
 		    scroll++;

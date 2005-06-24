@@ -178,6 +178,7 @@ acpi_rs_byte_stream_to_list (
 
 
 		case ACPI_RDESC_TYPE_QWORD_ADDRESS_SPACE:
+		case ACPI_RDESC_TYPE_EXTENDED_ADDRESS_SPACE:
 			/*
 			 * 64-Bit Address Resource
 			 */

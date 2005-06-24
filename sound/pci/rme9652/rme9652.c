@@ -303,22 +303,18 @@ static int snd_hammerfall_get_buffer(struct pci_dev *pci, struct snd_dma_buffer 
 {
 	dmab->dev.type = SNDRV_DMA_TYPE_DEV;
 	dmab->dev.dev = snd_dma_pci_data(pci);
-	if (snd_dma_get_reserved_buf(dmab, snd_dma_pci_buf_id(pci))) {
-		if (dmab->bytes >= size)
-			return 0;
+	if (! snd_dma_get_reserved_buf(dmab, snd_dma_pci_buf_id(pci))) {
+		if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
+					size, dmab) < 0)
+			return -ENOMEM;
 	}
-	if (snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(pci),
-				size, dmab) < 0)
-		return -ENOMEM;
 	return 0;
 }
 
 static void snd_hammerfall_free_buffer(struct snd_dma_buffer *dmab, struct pci_dev *pci)
 {
-	if (dmab->area) {
-		dmab->dev.dev = NULL; /* make it anonymous */
+	if (dmab->area)
 		snd_dma_reserve_buf(dmab, snd_dma_pci_buf_id(pci));
-	}
 }
 
 
@@ -2668,7 +2664,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_hammerfall_init(void)
 {
-	return pci_register_driver(&driver);
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_hammerfall_exit(void)

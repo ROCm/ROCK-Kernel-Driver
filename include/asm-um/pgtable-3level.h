@@ -31,7 +31,7 @@
 #define PTRS_PER_PMD 512
 #define USER_PTRS_PER_PGD ((TASK_SIZE + (PGDIR_SIZE - 1)) / PGDIR_SIZE)
 #define PTRS_PER_PGD 512
-#define FIRST_USER_PGD_NR       0
+#define FIRST_USER_ADDRESS	0
 
 #define pte_ERROR(e) \
         printk("%s:%d: bad pte %p(%016lx).\n", __FILE__, __LINE__, &(e), \
@@ -84,6 +84,7 @@ static inline void set_pte(pte_t *pteptr, pte_t pteval)
 	*pteptr = pte_mknewpage(*pteptr);
 	if(pte_present(*pteptr)) *pteptr = pte_mknewprot(*pteptr);
 }
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
 
 #define set_pmd(pmdptr, pmdval) set_64bit((phys_t *) (pmdptr), pmd_val(pmdval))
 
@@ -144,11 +145,11 @@ static inline pmd_t pfn_pmd(pfn_t page_nr, pgprot_t pgprot)
  */
 #define PTE_FILE_MAX_BITS	32
 
-#ifdef CONFIG_64_BIT
+#ifdef CONFIG_64BIT
 
 #define pte_to_pgoff(p) ((p).pte >> 32)
 
-#define pgoff_to_pte(off) ((pte_t) { ((off) < 32) | _PAGE_FILE })
+#define pgoff_to_pte(off) ((pte_t) { ((off) << 32) | _PAGE_FILE })
 
 #else
 

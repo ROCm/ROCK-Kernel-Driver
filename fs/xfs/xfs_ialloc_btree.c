@@ -1801,8 +1801,7 @@ xfs_inobt_get_rec(
 	xfs_agino_t		*ino,	/* output: starting inode of chunk */
 	__int32_t		*fcnt,	/* output: number of free inodes */
 	xfs_inofree_t		*free,	/* output: free inode mask */
-	int			*stat,	/* output: success/failure */
-	xfs_arch_t              arch)   /* input: architecture */
+	int			*stat)	/* output: success/failure */
 {
 	xfs_inobt_block_t	*block;	/* btree block */
 	xfs_buf_t		*bp;	/* buffer containing btree block */
@@ -1830,16 +1829,9 @@ xfs_inobt_get_rec(
 	 * Point to the record and extract its data.
 	 */
 	rec = XFS_INOBT_REC_ADDR(block, ptr, cur);
-	ASSERT(arch == ARCH_NOCONVERT || arch == ARCH_CONVERT);
-	if (arch == ARCH_NOCONVERT) {
-	    *ino = INT_GET(rec->ir_startino, ARCH_CONVERT);
-	    *fcnt = INT_GET(rec->ir_freecount, ARCH_CONVERT);
-	    *free = INT_GET(rec->ir_free, ARCH_CONVERT);
-	} else {
-	    INT_COPY(*ino, rec->ir_startino, ARCH_CONVERT);
-	    INT_COPY(*fcnt, rec->ir_freecount, ARCH_CONVERT);
-	    INT_COPY(*free, rec->ir_free, ARCH_CONVERT);
-	}
+	*ino = INT_GET(rec->ir_startino, ARCH_CONVERT);
+	*fcnt = INT_GET(rec->ir_freecount, ARCH_CONVERT);
+	*free = INT_GET(rec->ir_free, ARCH_CONVERT);
 	*stat = 1;
 	return 0;
 }

@@ -309,7 +309,7 @@ enum v4l2_mpeg_videotype {
 	V4L2_MPEG_VI_2,		/* MPEG-2 */
 };
 enum v4l2_mpeg_aspectratio {
-	V4L2_MPGE_ASPECT_SQUARE = 1,   /* square pixel */
+	V4L2_MPEG_ASPECT_SQUARE = 1,   /* square pixel */
 	V4L2_MPEG_ASPECT_4_3    = 2,   /*  4 : 3       */
 	V4L2_MPEG_ASPECT_16_9   = 3,   /* 16 : 9       */
 	V4L2_MPEG_ASPECT_1_221  = 4,   /*  1 : 2,21    */

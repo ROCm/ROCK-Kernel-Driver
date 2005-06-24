@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-input.c,v 1.4 2005/01/07 13:58:49 kraxel Exp $
+ * $Id: cx88-input.c,v 1.9 2005/03/04 09:12:23 kraxel Exp $
  *
  * Device driver for GPIO attached remote control interfaces
  * on Conexant 2388x based TV/DVB cards.
@@ -73,42 +73,54 @@ static IR_KEYTAB_TYPE ir_codes_dntv_live_dvb_t[IR_KEYTAB_SIZE] = {
 	[ 0x1f ] = KEY_VOLUMEDOWN,  // 'volume -'
 };
 
-/* Happauge: the newer, gray remote */
-static IR_KEYTAB_TYPE ir_codes_hauppauge_new[IR_KEYTAB_SIZE] = {
-	[ 0x00 ] = KEY_KP0,             // 0
-	[ 0x01 ] = KEY_KP1,             // 1
-	[ 0x02 ] = KEY_KP2,             // 2
-	[ 0x03 ] = KEY_KP3,             // 3
-	[ 0x04 ] = KEY_KP4,             // 4
-	[ 0x05 ] = KEY_KP5,             // 5
-	[ 0x06 ] = KEY_KP6,             // 6
-	[ 0x07 ] = KEY_KP7,             // 7
-	[ 0x08 ] = KEY_KP8,             // 8
-	[ 0x09 ] = KEY_KP9,             // 9
-	[ 0x0b ] = KEY_RED,             // red button 
-	[ 0x0c ] = KEY_OPTION,          // black key without text
-	[ 0x0d ] = KEY_MENU,            // menu
-	[ 0x0f ] = KEY_MUTE,            // mute
-	[ 0x10 ] = KEY_VOLUMEUP,        // volume +
-	[ 0x11 ] = KEY_VOLUMEDOWN,      // volume -
-	[ 0x1e ] = KEY_NEXT,            // skip >|
-	[ 0x1f ] = KEY_EXIT,            // back/exit
-	[ 0x20 ] = KEY_CHANNELUP,       // channel / program +
-	[ 0x21 ] = KEY_CHANNELDOWN,     // channel / program -
-	[ 0x24 ] = KEY_PREVIOUS,        // replay |<
-	[ 0x25 ] = KEY_ENTER,           // OK
-	[ 0x29 ] = KEY_BLUE,            // blue key
-	[ 0x2e ] = KEY_GREEN,           // green button
-	[ 0x30 ] = KEY_PAUSE,           // pause
-	[ 0x32 ] = KEY_REWIND,          // backward <<
-	[ 0x34 ] = KEY_FASTFORWARD,     // forward >>
-	[ 0x35 ] = KEY_PLAY,            // play
-	[ 0x36 ] = KEY_STOP,            // stop
-	[ 0x37 ] = KEY_RECORD,          // recording
-	[ 0x38 ] = KEY_YELLOW,          // yellow key
-	[ 0x3b ] = KEY_SELECT,          // top right button
-	[ 0x3c ] = KEY_ZOOM,            // full
-	[ 0x3d ] = KEY_POWER,           // system power (green button)
+/* ---------------------------------------------------------------------- */
+
+/* IO-DATA BCTV7E Remote */
+static IR_KEYTAB_TYPE ir_codes_iodata_bctv7e[IR_KEYTAB_SIZE] = {
+	[ 0x40 ] = KEY_TV,              // TV
+	[ 0x20 ] = KEY_RADIO,           // FM
+	[ 0x60 ] = KEY_EPG,             // EPG
+	[ 0x00 ] = KEY_POWER,           // power
+
+	[ 0x50 ] = KEY_KP1,             // 1
+	[ 0x30 ] = KEY_KP2,             // 2
+	[ 0x70 ] = KEY_KP3,             // 3
+	[ 0x10 ] = KEY_L,               // Live
+
+	[ 0x48 ] = KEY_KP4,             // 4
+	[ 0x28 ] = KEY_KP5,             // 5
+	[ 0x68 ] = KEY_KP6,             // 6
+	[ 0x08 ] = KEY_T,               // Time Shift
+
+	[ 0x58 ] = KEY_KP7,             // 7
+	[ 0x38 ] = KEY_KP8,             // 8
+	[ 0x78 ] = KEY_KP9,             // 9
+	[ 0x18 ] = KEY_PLAYPAUSE,       // Play
+
+	[ 0x44 ] = KEY_KP0,             // 10
+	[ 0x24 ] = KEY_ENTER,           // 11
+	[ 0x64 ] = KEY_ESC,             // 12
+	[ 0x04 ] = KEY_M,               // Multi
+
+	[ 0x54 ] = KEY_VIDEO,           // VIDEO
+	[ 0x34 ] = KEY_CHANNELUP,       // channel +
+	[ 0x74 ] = KEY_VOLUMEUP,        // volume +
+	[ 0x14 ] = KEY_MUTE,            // Mute
+
+	[ 0x4c ] = KEY_S,               // SVIDEO
+	[ 0x2c ] = KEY_CHANNELDOWN,     // channel -
+	[ 0x6c ] = KEY_VOLUMEDOWN,      // volume -
+	[ 0x0c ] = KEY_ZOOM,            // Zoom
+
+	[ 0x5c ] = KEY_PAUSE,           // pause
+	[ 0x3c ] = KEY_C,               // || (red)
+	[ 0x7c ] = KEY_RECORD,          // recording
+	[ 0x1c ] = KEY_STOP,            // stop
+
+	[ 0x41 ] = KEY_REWIND,          // backward <<
+	[ 0x21 ] = KEY_PLAY,            // play
+	[ 0x61 ] = KEY_FASTFORWARD,     // forward >>
+	[ 0x01 ] = KEY_NEXT,            // skip >|
 };
 
 /* ---------------------------------------------------------------------- */
@@ -184,7 +196,7 @@ static void cx88_ir_handle_key(struct cx88_IR *ir)
 		}
 
 	} else {
-		/* can't disturgissh keydown/up :-/ */
+		/* can't distinguish keydown/up :-/ */
 		ir_input_keydown(&ir->input,&ir->ir,data,data);
 		ir_input_nokey(&ir->input,&ir->ir);
 	}
@@ -234,6 +246,20 @@ int cx88_ir_init(struct cx88_core *core, struct pci_dev *pci)
 		ir_codes         = ir_codes_hauppauge_new;
 		ir_type          = IR_TYPE_RC5;
 		ir->sampling     = 1;
+		break;
+	case CX88_BOARD_WINFAST2000XP_EXPERT:
+		ir_codes         = ir_codes_winfast;
+		ir->gpio_addr    = MO_GP0_IO;
+		ir->mask_keycode = 0x8f8;
+		ir->mask_keyup   = 0x100;
+		ir->polling      = 1; // ms
+		break;
+	case CX88_BOARD_IODATA_GVBCTV7E:
+		ir_codes         = ir_codes_iodata_bctv7e;
+		ir->gpio_addr    = MO_GP0_IO;
+		ir->mask_keycode = 0xfd;
+		ir->mask_keydown = 0x02;
+		ir->polling      = 5; // ms
 		break;
 	}
 	if (NULL == ir_codes) {
@@ -307,68 +333,6 @@ int cx88_ir_fini(struct cx88_core *core)
 
 /* ---------------------------------------------------------------------- */
 
-static int inline getbit(u32 *samples, int bit)
-{
-	return (samples[bit/32] & (1 << (31-(bit%32)))) ? 1 : 0;
-}
-
-static int dump_samples(u32 *samples, int count)
-{
-	int i, bit, start;
-
-	printk(KERN_DEBUG "ir samples @ 4kHz: ");
-	start = 0;
-	for (i = 0; i < count * 32; i++) {
-		bit = getbit(samples,i);
-		if (bit)
-			start = 1;
-		if (0 == start)
-			continue;
-		printk("%s", bit ? "#" : "_");
-	}
-	printk("\n");
-}
-
-static int ir_decode_biphase(u32 *samples, int count, int low, int high)
-{
-	int i,last,bit,len,flips;
-	u32 value;
-
-	/* find start bit (1) */
-	for (i = 0; i < 32; i++) {
-		bit = getbit(samples,i);
-		if (bit)
-			break;
-	}
-
-	/* go decoding */
-	len   = 0;
-	flips = 0;
-	value = 1;
-	for (; i < count * 32; i++) {
-		if (len > high)
-			break;
-		if (flips > 1)
-			break;
-		last = bit;
-		bit  = getbit(samples,i);
-		if (last == bit) {
-			len++;
-			continue;
-		}
-		if (len < low) {
-			len++;
-			flips++;
-			continue;
-		}
-		value <<= 1;
-		value |= bit;
-		flips = 0;
-		len   = 1;
-	}
-	return value;
-}
-
 void cx88_ir_irq(struct cx88_core *core)
 {
 	struct cx88_IR *ir = core->ir;
@@ -400,7 +364,7 @@ void cx88_ir_irq(struct cx88_core *core)
 	for (i = 0; i < ir->scount; i++)
 		ir->samples[i] = ~ir->samples[i];
 	if (ir_debug)
-		dump_samples(ir->samples,ir->scount);
+		ir_dump_samples(ir->samples,ir->scount);
 
 	/* decode it */
 	switch (core->board) {

@@ -16,8 +16,6 @@
 #include <asm/io.h>
 #include <asm/hardware.h>
 
-extern void cpu_relax(void);
-
 #define SCIF_BASE_ADDR	0x01030000
 #define SCIF_ADDR_SH5	PHYS_PERIPHERAL_BLOCK+SCIF_BASE_ADDR
 

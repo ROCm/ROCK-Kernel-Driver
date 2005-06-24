@@ -12,9 +12,7 @@ Jeff Dike (jdike@karaya.com) : Modified for integration into uml
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/time.h>
-#include <sys/ptrace.h>
 #include <sys/wait.h>
-#include <asm/ptrace.h>
 
 #include "ptproxy.h"
 #include "debug.h"
@@ -127,7 +125,7 @@ long proxy_ptrace(struct debugger *debugger, int arg1, pid_t arg2,
 
 	case PTRACE_PEEKDATA:
 	case PTRACE_PEEKTEXT:
-	case PTRACE_PEEKUSER:
+	case PTRACE_PEEKUSR:
 		/* The value being read out could be -1, so we have to 
 		 * check errno to see if there's an error, and zero it
 		 * beforehand so we're not faked out by an old error
@@ -144,11 +142,11 @@ long proxy_ptrace(struct debugger *debugger, int arg1, pid_t arg2,
 
 	case PTRACE_POKEDATA:
 	case PTRACE_POKETEXT:
-	case PTRACE_POKEUSER:
+	case PTRACE_POKEUSR:
 		result = ptrace(arg1, child, arg3, arg4);
 		if(result == -1) return(-errno);
 
-		if(arg1 == PTRACE_POKEUSER) ptrace_pokeuser(arg3, arg4);
+		if(arg1 == PTRACE_POKEUSR) ptrace_pokeuser(arg3, arg4);
 		return(result);
 
 #ifdef UM_HAVE_SETFPREGS

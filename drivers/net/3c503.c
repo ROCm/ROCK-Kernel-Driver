@@ -103,8 +103,15 @@ static int __init do_el2_probe(struct net_device *dev)
 	return -ENXIO;
 
     for (addr = addrs; *addr; addr++) {
-	unsigned base_bits = isa_readb(*addr);
-	int i = ffs(base_bits) - 1;
+	void __iomem *p = ioremap(*addr, 1);
+	unsigned base_bits;
+	int i;
+
+	if (!p)
+		continue;
+	base_bits = readb(p);
+	iounmap(p);
+	i = ffs(base_bits) - 1;
 	if (i == -1 || base_bits != (1 << i))
 	    continue;
 	if (el2_probe1(dev, netcard_portlist[i]) == 0)
@@ -145,6 +152,8 @@ static void cleanup_card(struct net_device *dev)
 {
 	/* NB: el2_close() handles free_irq */
 	release_region(dev->base_addr, EL2_IO_EXTENT);
+	if (ei_status.mem)
+		iounmap(ei_status.mem);
 }
 
 #ifndef MODULE
@@ -262,42 +271,46 @@ el2_probe1(struct net_device *dev, int ioaddr)
     if ((membase_reg & 0xf0) == 0) {
 	dev->mem_start = 0;
 	ei_status.name = "3c503-PIO";
+	ei_status.mem = NULL;
     } else {
 	dev->mem_start = ((membase_reg & 0xc0) ? 0xD8000 : 0xC8000) +
 	    ((membase_reg & 0xA0) ? 0x4000 : 0);
-
 #define EL2_MEMSIZE (EL2_MB1_STOP_PG - EL2_MB1_START_PG)*256
+	ei_status.mem = ioremap(dev->mem_start, EL2_MEMSIZE);
+
 #ifdef EL2MEMTEST
 	/* This has never found an error, but someone might care.
 	   Note that it only tests the 2nd 8kB on 16kB 3c503/16
 	   cards between card addr. 0x2000 and 0x3fff. */
 	{			/* Check the card's memory. */
-	    unsigned long mem_base = dev->mem_start;
+	    void __iomem *mem_base = ei_status.mem;
 	    unsigned int test_val = 0xbbadf00d;
-	    isa_writel(0xba5eba5e, mem_base);
+	    writel(0xba5eba5e, mem_base);
 	    for (i = sizeof(test_val); i < EL2_MEMSIZE; i+=sizeof(test_val)) {
-		isa_writel(test_val, mem_base + i);
-		if (isa_readl(mem_base) != 0xba5eba5e
-		    || isa_readl(mem_base + i) != test_val) {
+		writel(test_val, mem_base + i);
+		if (readl(mem_base) != 0xba5eba5e
+		    || readl(mem_base + i) != test_val) {
 		    printk("3c503: memory failure or memory address conflict.\n");
 		    dev->mem_start = 0;
 		    ei_status.name = "3c503-PIO";
+		    iounmap(mem_base);
+		    ei_status.mem = NULL;
 		    break;
 		}
 		test_val += 0x55555555;
-		isa_writel(0, mem_base + i);
+		writel(0, mem_base + i);
 	    }
 	}
 #endif  /* EL2MEMTEST */
 
 	if (dev->mem_start)
-		dev->mem_end = ei_status.rmem_end = dev->mem_start + EL2_MEMSIZE;
+		dev->mem_end = dev->mem_start + EL2_MEMSIZE;
 
 	if (wordlength) {	/* No Tx pages to skip over to get to Rx */
-		ei_status.rmem_start = dev->mem_start;
+		ei_status.priv = 0;
 		ei_status.name = "3c503/16";
 	} else {
-		ei_status.rmem_start = TX_PAGES*256 + dev->mem_start;
+		ei_status.priv = TX_PAGES * 256;
 		ei_status.name = "3c503";
 	}
     }
@@ -471,16 +484,16 @@ el2_block_output(struct net_device *dev, int count,
     unsigned short int *wrd;
     int boguscount;		/* timeout counter */
     unsigned short word;	/* temporary for better machine code */
+    void __iomem *base = ei_status.mem;
 
     if (ei_status.word16)      /* Tx packets go into bank 0 on EL2/16 card */
 	outb(EGACFR_RSEL|EGACFR_TCM, E33G_GACFR);
     else
 	outb(EGACFR_NORM, E33G_GACFR);
 
-    if (dev->mem_start) {	/* Shared memory transfer */
-	unsigned long dest_addr = dev->mem_start +
-	    ((start_page - ei_status.tx_start_page) << 8);
-	isa_memcpy_toio(dest_addr, buf, count);
+    if (base) {	/* Shared memory transfer */
+	memcpy_toio(base + ((start_page - ei_status.tx_start_page) << 8),
+			buf, count);
 	outb(EGACFR_NORM, E33G_GACFR);	/* Back to bank1 in case on bank0 */
 	return;
     }
@@ -541,11 +554,12 @@ static void
 el2_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_page)
 {
     int boguscount;
-    unsigned long hdr_start = dev->mem_start + ((ring_page - EL2_MB1_START_PG)<<8);
+    void __iomem *base = ei_status.mem;
     unsigned short word;
 
-    if (dev->mem_start) {       /* Use the shared memory. */
-	isa_memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
+    if (base) {       /* Use the shared memory. */
+	void __iomem *hdr_start = base + ((ring_page - EL2_MB1_START_PG)<<8);
+	memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
 	hdr->count = le16_to_cpu(hdr->count);
 	return;
     }
@@ -581,23 +595,22 @@ static void
 el2_block_input(struct net_device *dev, int count, struct sk_buff *skb, int ring_offset)
 {
     int boguscount = 0;
+    void __iomem *base = ei_status.mem;
     unsigned short int *buf;
     unsigned short word;
 
-    int end_of_ring = ei_status.rmem_end;
-
     /* Maybe enable shared memory just be to be safe... nahh.*/
-    if (dev->mem_start) {	/* Use the shared memory. */
+    if (base) {	/* Use the shared memory. */
 	ring_offset -= (EL2_MB1_START_PG<<8);
-	if (dev->mem_start + ring_offset + count > end_of_ring) {
+	if (ring_offset + count > EL2_MEMSIZE) {
 	    /* We must wrap the input move. */
-	    int semi_count = end_of_ring - (dev->mem_start + ring_offset);
-	    isa_memcpy_fromio(skb->data, dev->mem_start + ring_offset, semi_count);
+	    int semi_count = EL2_MEMSIZE - ring_offset;
+	    memcpy_fromio(skb->data, base + ring_offset, semi_count);
 	    count -= semi_count;
-	    isa_memcpy_fromio(skb->data + semi_count, ei_status.rmem_start, count);
+	    memcpy_fromio(skb->data + semi_count, base + ei_status.priv, count);
 	} else {
 		/* Packet is in one chunk -- we can copy + cksum. */
-		isa_eth_io_copy_and_sum(skb, dev->mem_start + ring_offset, count, 0);
+		eth_io_copy_and_sum(skb, base + ring_offset, count, 0);
 	}
 	return;
     }

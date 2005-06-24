@@ -106,7 +106,7 @@ static void macio_device_shutdown(struct device *dev)
 		drv->shutdown(macio_dev);
 }
 
-static int macio_device_suspend(struct device *dev, u32 state)
+static int macio_device_suspend(struct device *dev, pm_message_t state)
 {
 	struct macio_dev * macio_dev = to_macio_device(dev);
 	struct macio_driver * drv = to_macio_driver(dev->driver);
@@ -617,7 +617,7 @@ static int __init macio_module_init (void)
 #ifdef CONFIG_PCI
 	int rc;
 
-	rc = pci_module_init(&macio_pci_driver);
+	rc = pci_register_driver(&macio_pci_driver);
 	if (rc)
 		return rc;
 #endif /* CONFIG_PCI */

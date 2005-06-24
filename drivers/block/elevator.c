@@ -92,7 +92,7 @@ inline int elv_try_last_merge(request_queue_t *q, struct bio *bio)
 }
 EXPORT_SYMBOL(elv_try_last_merge);
 
-struct elevator_type *elevator_find(const char *name)
+static struct elevator_type *elevator_find(const char *name)
 {
 	struct elevator_type *e = NULL;
 	struct list_head *entry;
@@ -159,12 +159,12 @@ static void elevator_setup_default(void)
 	if (chosen_elevator[0] && elevator_find(chosen_elevator))
 		return;
 
-#if defined(CONFIG_IOSCHED_CFQ)
-	strcpy(chosen_elevator, "cfq");
+#if defined(CONFIG_IOSCHED_AS)
+	strcpy(chosen_elevator, "anticipatory");
 #elif defined(CONFIG_IOSCHED_DEADLINE)
 	strcpy(chosen_elevator, "deadline");
-#elif defined(CONFIG_IOSCHED_AS)
-	strcpy(chosen_elevator, "anticipatory");
+#elif defined(CONFIG_IOSCHED_CFQ)
+	strcpy(chosen_elevator, "cfq");
 #elif defined(CONFIG_IOSCHED_NOOP)
 	strcpy(chosen_elevator, "noop");
 #else
@@ -220,11 +220,6 @@ void elevator_exit(elevator_t *e)
 	kfree(e);
 }
 
-int elevator_global_init(void)
-{
-	return 0;
-}
-
 int elv_merge(request_queue_t *q, struct request **req, struct bio *bio)
 {
 	elevator_t *e = q->elevator;
@@ -255,6 +250,12 @@ void elv_merge_requests(request_queue_t *q, struct request *rq,
 		e->ops->elevator_merge_req_fn(q, rq, next);
 }
 
+/*
+ * For careful internal use by the block layer. Essentially the same as
+ * a requeue in that it tells the io scheduler that this request is not
+ * active in the driver or hardware anymore, but we don't want the request
+ * added back to the scheduler. Function is not exported.
+ */
 void elv_deactivate_request(request_queue_t *q, struct request *rq)
 {
 	elevator_t *e = q->elevator;
@@ -316,7 +317,7 @@ void __elv_add_request(request_queue_t *q, struct request *rq, int where,
 			int nrq = q->rq.count[READ] + q->rq.count[WRITE]
 				  - q->in_flight;
 
-			if (nrq == q->unplug_thresh)
+			if (nrq >= q->unplug_thresh)
 				__generic_unplug_device(q);
 		}
 	} else
@@ -472,13 +473,12 @@ struct request *elv_former_request(request_queue_t *q, struct request *rq)
 	return NULL;
 }
 
-int elv_set_request(request_queue_t *q, struct request *rq, struct bio *bio,
-		    int gfp_mask)
+int elv_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 {
 	elevator_t *e = q->elevator;
 
 	if (e->ops->elevator_set_req_fn)
-		return e->ops->elevator_set_req_fn(q, rq, bio, gfp_mask);
+		return e->ops->elevator_set_req_fn(q, rq, gfp_mask);
 
 	rq->elevator_private = NULL;
 	return 0;
@@ -492,12 +492,12 @@ void elv_put_request(request_queue_t *q, struct request *rq)
 		e->ops->elevator_put_req_fn(q, rq);
 }
 
-int elv_may_queue(request_queue_t *q, int rw, struct bio *bio)
+int elv_may_queue(request_queue_t *q, int rw)
 {
 	elevator_t *e = q->elevator;
 
 	if (e->ops->elevator_may_queue_fn)
-		return e->ops->elevator_may_queue_fn(q, rw, bio);
+		return e->ops->elevator_may_queue_fn(q, rw);
 
 	return ELV_MQUEUE_MAY;
 }
@@ -686,8 +686,6 @@ ssize_t elv_iosched_show(request_queue_t *q, char *name)
 	len += sprintf(len+name, "\n");
 	return len;
 }
-
-module_init(elevator_global_init);
 
 EXPORT_SYMBOL(elv_add_request);
 EXPORT_SYMBOL(__elv_add_request);

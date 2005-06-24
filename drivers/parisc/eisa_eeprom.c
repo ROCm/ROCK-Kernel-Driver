@@ -19,7 +19,6 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -31,8 +30,6 @@
 #include <asm/eisa_eeprom.h>
 
 #define 	EISA_EEPROM_MINOR 241
-
-static unsigned long eeprom_addr;
 
 static loff_t eisa_eeprom_llseek(struct file *file, loff_t offset, int origin )
 {
@@ -64,7 +61,7 @@ static ssize_t eisa_eeprom_read(struct file * file,
 	tmp = kmalloc(count, GFP_KERNEL);
 	if (tmp) {
 		for (i = 0; i < count; i++)
-			tmp[i] = gsc_readb(eeprom_addr+(*ppos)++);
+			tmp[i] = readb(eisa_eeprom_addr+(*ppos)++);
 
 		if (copy_to_user (buf, tmp, count))
 			ret = -EFAULT;
@@ -86,7 +83,7 @@ static int eisa_eeprom_ioctl(struct inode *inode, struct file *file,
 
 static int eisa_eeprom_open(struct inode *inode, struct file *file)
 {
-	if (file->f_mode & 2 || eeprom_addr == 0)
+	if (file->f_mode & 2)
 		return -EINVAL;
    
 	return 0;
@@ -109,22 +106,18 @@ static struct file_operations eisa_eeprom_fops = {
 	.release =	eisa_eeprom_release,
 };
 
-static struct miscdevice eisa_eeprom_dev=
-{
+static struct miscdevice eisa_eeprom_dev = {
 	EISA_EEPROM_MINOR,
-	"eisa eeprom",
+	"eisa_eeprom",
 	&eisa_eeprom_fops
 };
 
-int __init eisa_eeprom_init(unsigned long addr)
+static int __init eisa_eeprom_init(void)
 {
 	int retval;
 
-	/* XXX why return success when we haven't done anything? */
-	if (!addr)
-		return 0;
-
-	eeprom_addr = addr;
+	if (!eisa_eeprom_addr)
+		return -ENODEV;
 
 	retval = misc_register(&eisa_eeprom_dev);
 	if (retval < 0) {
@@ -132,8 +125,10 @@ int __init eisa_eeprom_init(unsigned long addr)
 		return retval;
 	}
 
-	printk(KERN_INFO "EISA EEPROM at 0x%lx\n", eeprom_addr);
+	printk(KERN_INFO "EISA EEPROM at 0x%p\n", eisa_eeprom_addr);
 	return 0;
 }
 
 MODULE_LICENSE("GPL");
+
+module_init(eisa_eeprom_init);

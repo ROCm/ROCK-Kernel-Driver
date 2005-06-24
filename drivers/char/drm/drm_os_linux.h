@@ -35,7 +35,7 @@
 #define DRM_MEMORYBARRIER()		mb()
 /** DRM device local declaration */
 #define DRM_DEVICE	drm_file_t	*priv	= filp->private_data; \
-			drm_device_t	*dev	= priv->dev
+			drm_device_t	*dev	= priv->head->dev
 
 /** IRQ handler arguments and return type and values */
 #define DRM_IRQ_ARGS		int irq, void *arg, struct pt_regs *regs
@@ -89,7 +89,7 @@ static __inline__ int mtrr_del (int reg, unsigned long base,
 	copy_to_user(arg1, arg2, arg3)
 /* Macros for copyfrom user, but checking readability only once */
 #define DRM_VERIFYAREA_READ( uaddr, size ) 		\
-	verify_area( VERIFY_READ, uaddr, size )
+	(access_ok( VERIFY_READ, uaddr, size ) ? 0 : -EFAULT)
 #define DRM_COPY_FROM_USER_UNCHECKED(arg1, arg2, arg3) 	\
 	__copy_from_user(arg1, arg2, arg3)
 #define DRM_COPY_TO_USER_UNCHECKED(arg1, arg2, arg3)	\

@@ -37,6 +37,7 @@
 #include <linux/pagemap.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
+#include <linux/random.h>
 
 #include <asm/uaccess.h>
 #include <asm/param.h>
@@ -165,21 +166,14 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	if (k_platform) {
 		size_t len = strlen(k_platform) + 1;
 
-#ifdef CONFIG_X86_HT
 		/*
 		 * In some cases (e.g. Hyper-Threading), we want to avoid L1
 		 * evictions by the processes running on the same package. One
 		 * thing we can do is to shuffle the initial stack for them.
-		 *
-		 * The conditionals here are unneeded, but kept in to make the
-		 * code behaviour the same as pre change unless we have
-		 * hyperthreaded processors. This should be cleaned up
-		 * before 2.6
 		 */
 	 
-		if (smp_num_siblings > 1)
-			STACK_ALLOC(p, ((current->pid % 64) << 7));
-#endif
+		p = arch_align_stack(p);
+
 		u_platform = (elf_addr_t __user *)STACK_ALLOC(p, len);
 		if (__copy_to_user(u_platform, k_platform, len))
 			return -EFAULT;
@@ -501,6 +495,19 @@ out:
 #define INTERPRETER_ELF 2
 
 
+static unsigned long randomize_stack_top(unsigned long stack_top)
+{
+	unsigned int random_variable = 0;
+
+	if (current->flags & PF_RANDOMIZE)
+		random_variable = get_random_int() % (8*1024*1024);
+#ifdef CONFIG_STACK_GROWSUP
+	return PAGE_ALIGN(stack_top + random_variable);
+#else
+	return PAGE_ALIGN(stack_top - random_variable);
+#endif
+}
+
 static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 {
 	struct file *interpreter = NULL; /* to shut gcc up */
@@ -760,13 +767,16 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	if (elf_read_implies_exec(loc->elf_ex, executable_stack))
 		current->personality |= READ_IMPLIES_EXEC;
 
+	if ( !(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
+		current->flags |= PF_RANDOMIZE;
 	arch_pick_mmap_layout(current->mm);
 
 	/* Do this so that we can load the interpreter, if need be.  We will
 	   change some of these later */
-	current->mm->rss = 0;
+	set_mm_counter(current->mm, rss, 0);
 	current->mm->free_area_cache = current->mm->mmap_base;
-	retval = setup_arg_pages(bprm, STACK_TOP, executable_stack);
+	retval = setup_arg_pages(bprm, randomize_stack_top(STACK_TOP),
+				 executable_stack);
 	if (retval < 0) {
 		send_sig(SIGKILL, current, 0);
 		goto out_free_dentry;
@@ -930,6 +940,14 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		sys_close(elf_exec_fileno);
 
 	set_binfmt(&elf_format);
+
+#ifdef ARCH_HAS_SETUP_ADDITIONAL_PAGES
+	retval = arch_setup_additional_pages(bprm, executable_stack);
+	if (retval < 0) {
+		send_sig(SIGKILL, current, 0);
+		goto out;
+	}
+#endif /* ARCH_HAS_SETUP_ADDITIONAL_PAGES */
 
 	compute_creds(bprm);
 	current->flags &= ~PF_FORKNOEXEC;
@@ -1107,7 +1125,7 @@ static int dump_write(struct file *file, const void *addr, int nr)
 	return file->f_op->write(file, addr, nr, &file->f_pos) == nr;
 }
 
-static int dump_seek(struct file *file, off_t off)
+static int dump_seek(struct file *file, loff_t off)
 {
 	if (file->f_op->llseek) {
 		if (file->f_op->llseek(file, off, 0) != off)
@@ -1126,9 +1144,13 @@ static int dump_seek(struct file *file, off_t off)
  */
 static int maydump(struct vm_area_struct *vma)
 {
-	/* Do not dump I/O mapped devices, shared memory, or special mappings */
-	if (vma->vm_flags & (VM_IO | VM_SHARED | VM_RESERVED))
+	/* Do not dump I/O mapped devices or special mappings */
+	if (vma->vm_flags & (VM_IO | VM_RESERVED))
 		return 0;
+
+	/* Dump shared memory only if mapped from an anonymous file.  */
+	if (vma->vm_flags & VM_SHARED)
+		return vma->vm_file->f_dentry->d_inode->i_nlink == 0;
 
 	/* If it hasn't been written to, don't write it out */
 	if (!vma->anon_vma)
@@ -1589,7 +1611,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 					DUMP_SEEK (file->f_pos + PAGE_SIZE);
 				} else {
 					void *kaddr;
-					flush_cache_page(vma, addr);
+					flush_cache_page(vma, addr, page_to_pfn(page));
 					kaddr = kmap(page);
 					if ((size += PAGE_SIZE) > limit ||
 					    !dump_write(file, kaddr,

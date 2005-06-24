@@ -35,8 +35,8 @@ struct kfifo {
 };
 
 extern struct kfifo *kfifo_init(unsigned char *buffer, unsigned int size,
-				int gfp_mask, spinlock_t *lock);
-extern struct kfifo *kfifo_alloc(unsigned int size, int gfp_mask,
+				unsigned int __nocast gfp_mask, spinlock_t *lock);
+extern struct kfifo *kfifo_alloc(unsigned int size, unsigned int __nocast gfp_mask,
 				 spinlock_t *lock);
 extern void kfifo_free(struct kfifo *fifo);
 extern unsigned int __kfifo_put(struct kfifo *fifo,
@@ -44,7 +44,7 @@ extern unsigned int __kfifo_put(struct kfifo *fifo,
 extern unsigned int __kfifo_get(struct kfifo *fifo,
 				unsigned char *buffer, unsigned int len);
 
-/*
+/**
  * __kfifo_reset - removes the entire FIFO contents, no locking version
  * @fifo: the fifo to be emptied.
  */
@@ -53,7 +53,7 @@ static inline void __kfifo_reset(struct kfifo *fifo)
 	fifo->in = fifo->out = 0;
 }
 
-/*
+/**
  * kfifo_reset - removes the entire FIFO contents
  * @fifo: the fifo to be emptied.
  */
@@ -68,7 +68,7 @@ static inline void kfifo_reset(struct kfifo *fifo)
 	spin_unlock_irqrestore(fifo->lock, flags);
 }
 
-/*
+/**
  * kfifo_put - puts some data into the FIFO
  * @fifo: the fifo to be used.
  * @buffer: the data to be added.
@@ -93,7 +93,7 @@ static inline unsigned int kfifo_put(struct kfifo *fifo,
 	return ret;
 }
 
-/*
+/**
  * kfifo_get - gets some data from the FIFO
  * @fifo: the fifo to be used.
  * @buffer: where the data must be copied.
@@ -124,7 +124,7 @@ static inline unsigned int kfifo_get(struct kfifo *fifo,
 	return ret;
 }
 
-/*
+/**
  * __kfifo_len - returns the number of bytes available in the FIFO, no locking version
  * @fifo: the fifo to be used.
  */
@@ -133,7 +133,7 @@ static inline unsigned int __kfifo_len(struct kfifo *fifo)
 	return fifo->in - fifo->out;
 }
 
-/*
+/**
  * kfifo_len - returns the number of bytes available in the FIFO
  * @fifo: the fifo to be used.
  */

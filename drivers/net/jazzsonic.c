@@ -14,6 +14,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -28,6 +29,7 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/bitops.h>
+#include <linux/device.h>
 
 #include <asm/bootinfo.h>
 #include <asm/system.h>
@@ -37,7 +39,10 @@
 #include <asm/jazz.h>
 #include <asm/jazzdma.h>
 
-#define DRV_NAME "jazzsonic"
+static char jazz_sonic_string[] = "jazzsonic";
+static struct platform_device *jazz_sonic_device;
+
+#define SONIC_MEM_SIZE	0x100
 
 #define SREGS_PAD(n)    u16 n;
 
@@ -50,8 +55,8 @@
 
 #define SONIC_WRITE(reg,val)						\
 do {									\
-	*((volatile unsigned int *)base_addr+reg) = val;		\
-}
+	*((volatile unsigned int *)base_addr+(reg)) = (val);		\
+} while (0)
 
 
 /* use 0 for production, 1 for verification, >2 for debug */
@@ -80,70 +85,7 @@ static unsigned short known_revisions[] =
 	0xffff			/* end of list */
 };
 
-/* Index to functions, as function prototypes. */
-
-static int sonic_probe1(struct net_device *dev, unsigned int base_addr,
-                        unsigned int irq);
-
-
-/*
- * Probe for a SONIC ethernet controller on a Mips Jazz board.
- * Actually probing is superfluous but we're paranoid.
- */
-struct net_device * __init sonic_probe(int unit)
-{
-	struct net_device *dev;
-	struct sonic_local *lp;
-	unsigned int base_addr;
-	int err = 0;
-	int i;
-
-	/*
-	 * Don't probe if we're not running on a Jazz board.
-	 */
-	if (mips_machgroup != MACH_GROUP_JAZZ)
-		return ERR_PTR(-ENODEV);
-
-	dev = alloc_etherdev(0);
-	if (!dev)
-		return ERR_PTR(-ENOMEM);
-
-	sprintf(dev->name, "eth%d", unit);
-	netdev_boot_setup_check(dev);
-	base_addr = dev->base_addr;
-
-	if (base_addr >= KSEG0)	{ /* Check a single specified location. */
-		err = sonic_probe1(dev, base_addr, dev->irq);
-	} else if (base_addr != 0) { /* Don't probe at all. */
-		err = -ENXIO;
-	} else {
-		for (i = 0; sonic_portlist[i].port; i++) {
-			int io = sonic_portlist[i].port;
-			if (sonic_probe1(dev, io, sonic_portlist[i].irq) == 0)
-				break;
-		}
-		if (!sonic_portlist[i].port)
-			err = -ENODEV;
-	}
-	if (err)
-		goto out;
-	err = register_netdev(dev);
-	if (err)
-		goto out1;
-	return dev;
-out1:
-	lp = dev->priv;
-	vdma_free(lp->rba_laddr);
-	kfree(lp->rba);
-	vdma_free(lp->cda_laddr);
-	kfree(lp);
-	release_region(dev->base_addr, 0x100);
-out:
-	free_netdev(dev);
-	return ERR_PTR(err);
-}
-
-static int __init sonic_probe1(struct net_device *dev, unsigned int base_addr,
+static int __init sonic_probe1(struct net_device *dev, unsigned long base_addr,
                                unsigned int irq)
 {
 	static unsigned version_printed;
@@ -153,7 +95,7 @@ static int __init sonic_probe1(struct net_device *dev, unsigned int base_addr,
 	int err = -ENODEV;
 	int i;
 
-	if (!request_region(base_addr, 0x100, DRV_NAME))
+	if (!request_mem_region(base_addr, SONIC_MEM_SIZE, jazz_sonic_string))
 		return -EBUSY;
 	/*
 	 * get the Silicon Revision ID. If this is one of the known
@@ -233,7 +175,7 @@ static int __init sonic_probe1(struct net_device *dev, unsigned int base_addr,
 		memset(lp, 0, sizeof(struct sonic_local));
 
 		/* get the virtual dma address */
-		lp->cda_laddr = vdma_alloc(PHYSADDR(lp),sizeof(*lp));
+		lp->cda_laddr = vdma_alloc(CPHYSADDR(lp),sizeof(*lp));
 		if (lp->cda_laddr == ~0UL) {
 			printk("%s: couldn't get DMA page entry for "
 			       "descriptors\n", dev->name);
@@ -254,7 +196,7 @@ static int __init sonic_probe1(struct net_device *dev, unsigned int base_addr,
 		}
 
 		/* get virtual dma address */
-		lp->rba_laddr = vdma_alloc(PHYSADDR(lp->rba),
+		lp->rba_laddr = vdma_alloc(CPHYSADDR(lp->rba),
 		                           SONIC_NUM_RRS * SONIC_RBSIZE);
 		if (lp->rba_laddr == ~0UL) {
 			printk("%s: couldn't get DMA page entry for receive "
@@ -291,7 +233,66 @@ out2:
 out1:
 	kfree(lp);
 out:
-	release_region(base_addr, 0x100);
+	release_region(base_addr, SONIC_MEM_SIZE);
+	return err;
+}
+
+/*
+ * Probe for a SONIC ethernet controller on a Mips Jazz board.
+ * Actually probing is superfluous but we're paranoid.
+ */
+static int __init jazz_sonic_probe(struct device *device)
+{
+	struct net_device *dev;
+	struct sonic_local *lp;
+	unsigned long base_addr;
+	int err = 0;
+	int i;
+
+	/*
+	 * Don't probe if we're not running on a Jazz board.
+	 */
+	if (mips_machgroup != MACH_GROUP_JAZZ)
+		return -ENODEV;
+
+	dev = alloc_etherdev(0);
+	if (!dev)
+		return -ENOMEM;
+
+	netdev_boot_setup_check(dev);
+	base_addr = dev->base_addr;
+
+	if (base_addr >= KSEG0)	{ /* Check a single specified location. */
+		err = sonic_probe1(dev, base_addr, dev->irq);
+	} else if (base_addr != 0) { /* Don't probe at all. */
+		err = -ENXIO;
+	} else {
+		for (i = 0; sonic_portlist[i].port; i++) {
+			int io = sonic_portlist[i].port;
+			if (sonic_probe1(dev, io, sonic_portlist[i].irq) == 0)
+				break;
+		}
+		if (!sonic_portlist[i].port)
+			err = -ENODEV;
+	}
+	if (err)
+		goto out;
+	err = register_netdev(dev);
+	if (err)
+		goto out1;
+
+	return 0;
+
+out1:
+	lp = dev->priv;
+	vdma_free(lp->rba_laddr);
+	kfree(lp->rba);
+	vdma_free(lp->cda_laddr);
+	kfree(lp);
+	release_region(dev->base_addr, SONIC_MEM_SIZE);
+out:
+	free_netdev(dev);
+
 	return err;
 }
 
@@ -304,3 +305,77 @@ out:
 #define sonic_chiptomem(x)      KSEG1ADDR(vdma_log2phys(x))
 
 #include "sonic.c"
+
+static int __devexit jazz_sonic_device_remove (struct device *device)
+{
+	struct net_device *dev = device->driver_data;
+
+	unregister_netdev (dev);
+	release_region (dev->base_addr, SONIC_MEM_SIZE);
+	free_netdev (dev);
+
+	return 0;
+}
+
+static struct device_driver jazz_sonic_driver = {
+	.name	= jazz_sonic_string,
+	.bus	= &platform_bus_type,
+	.probe	= jazz_sonic_probe,
+	.remove	= __devexit_p(jazz_sonic_device_remove),
+};
+                                                                                
+static void jazz_sonic_platform_release (struct device *device)
+{
+	struct platform_device *pldev;
+
+	/* free device */
+	pldev = to_platform_device (device);
+	kfree (pldev);
+}
+
+static int __init jazz_sonic_init_module(void)
+{
+	struct platform_device *pldev;
+
+	if (driver_register(&jazz_sonic_driver)) {
+		printk(KERN_ERR "Driver registration failed\n");
+		return -ENOMEM;
+	}
+
+	jazz_sonic_device = NULL;
+
+	if (!(pldev = kmalloc (sizeof (*pldev), GFP_KERNEL))) {
+		goto out_unregister;
+	}
+
+	memset(pldev, 0, sizeof (*pldev));
+	pldev->name		= jazz_sonic_string;
+	pldev->id		= 0;
+	pldev->dev.release	= jazz_sonic_platform_release;
+	jazz_sonic_device	= pldev;
+
+	if (platform_device_register (pldev)) {
+		kfree(pldev);
+		jazz_sonic_device = NULL;
+	}
+
+	return 0;
+
+out_unregister:
+	platform_device_unregister(pldev);
+
+	return -ENOMEM;
+}
+
+static void __exit jazz_sonic_cleanup_module(void)
+{
+	driver_unregister(&jazz_sonic_driver);
+
+	if (jazz_sonic_device) {
+		platform_device_unregister(jazz_sonic_device);
+		jazz_sonic_device = NULL;
+	}
+}
+
+module_init(jazz_sonic_init_module);
+module_exit(jazz_sonic_cleanup_module);

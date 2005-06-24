@@ -446,13 +446,16 @@ static int dummy_file_ioctl (struct file *file, unsigned int command,
 	return 0;
 }
 
-static int dummy_file_mmap (struct file *file, unsigned long prot,
+static int dummy_file_mmap (struct file *file, unsigned long reqprot,
+			    unsigned long prot,
 			    unsigned long flags)
 {
 	return 0;
 }
 
-static int dummy_file_mprotect (struct vm_area_struct *vma, unsigned long prot)
+static int dummy_file_mprotect (struct vm_area_struct *vma,
+				unsigned long reqprot,
+				unsigned long prot)
 {
 	return 0;
 }

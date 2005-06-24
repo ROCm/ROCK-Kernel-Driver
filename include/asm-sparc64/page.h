@@ -6,7 +6,18 @@
 #include <linux/config.h>
 #include <asm/const.h>
 
+#if defined(CONFIG_SPARC64_PAGE_SIZE_8KB)
 #define PAGE_SHIFT   13
+#elif defined(CONFIG_SPARC64_PAGE_SIZE_64KB)
+#define PAGE_SHIFT   16
+#elif defined(CONFIG_SPARC64_PAGE_SIZE_512KB)
+#define PAGE_SHIFT   19
+#elif defined(CONFIG_SPARC64_PAGE_SIZE_4MB)
+#define PAGE_SHIFT   22
+#else
+#error No page size specified in kernel configuration
+#endif
+
 #define PAGE_SIZE    (_AC(1,UL) << PAGE_SHIFT)
 #define PAGE_MASK    (~(PAGE_SIZE-1))
 

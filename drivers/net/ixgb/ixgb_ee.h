@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2005 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -63,6 +63,7 @@
 
 #define EEPROM_ICW1_SIGNATURE_MASK  0xC000
 #define EEPROM_ICW1_SIGNATURE_VALID 0x4000
+#define EEPROM_ICW1_SIGNATURE_CLEAR 0x0000
 
 /* For checksumming, the sum of all words in the EEPROM should equal 0xBABA. */
 #define EEPROM_SUM 0xBABA

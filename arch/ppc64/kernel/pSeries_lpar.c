@@ -470,7 +470,7 @@ static void pSeries_lpar_hpte_updateboltedpp(unsigned long newpp,
 	slot = pSeries_lpar_hpte_find(vpn);
 	BUG_ON(slot == -1);
 
-	flags = newpp & 3;
+	flags = newpp & 7;
 	lpar_rc = plpar_pte_protect(flags, slot, 0);
 
 	BUG_ON(lpar_rc != H_Success);
@@ -505,7 +505,7 @@ void pSeries_lpar_flush_hash_range(unsigned long context, unsigned long number,
 	int i;
 	unsigned long flags = 0;
 	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
-	int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
+	int lock_tlbie = !cpu_has_feature(CPU_FTR_LOCKLESS_TLBIE);
 
 	if (lock_tlbie)
 		spin_lock_irqsave(&pSeries_lpar_tlbie_lock, flags);

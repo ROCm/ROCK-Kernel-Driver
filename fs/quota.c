@@ -16,8 +16,8 @@
 #include <linux/syscalls.h>
 #include <linux/buffer_head.h>
 
-/* Check validity of quotactl */
-static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t id)
+/* Check validity of generic quotactl commands */
+static int generic_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t id)
 {
 	if (type >= MAXQUOTAS)
 		return -EINVAL;
@@ -58,6 +58,48 @@ static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t
 			if (sb && !sb->s_qcop->quota_sync)
 				return -ENOSYS;
 			break;
+		default:
+			return -EINVAL;
+	}
+
+	/* Is quota turned on for commands which need it? */
+	switch (cmd) {
+		case Q_GETFMT:
+		case Q_GETINFO:
+		case Q_QUOTAOFF:
+		case Q_SETINFO:
+		case Q_SETQUOTA:
+		case Q_GETQUOTA:
+			/* This is just informative test so we are satisfied without a lock */
+			if (!sb_has_quota_enabled(sb, type))
+				return -ESRCH;
+	}
+
+	/* Check privileges */
+	if (cmd == Q_GETQUOTA) {
+		if (((type == USRQUOTA && current->euid != id) ||
+		     (type == GRPQUOTA && !in_egroup_p(id))) &&
+		    !capable(CAP_SYS_ADMIN))
+			return -EPERM;
+	}
+	else if (cmd != Q_GETFMT && cmd != Q_SYNC && cmd != Q_GETINFO)
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
+	return 0;
+}
+
+/* Check validity of XFS Quota Manager commands */
+static int xqm_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t id)
+{
+	if (type >= XQM_MAXQUOTAS)
+		return -EINVAL;
+	if (!sb)
+		return -ENODEV;
+	if (!sb->s_qcop)
+		return -ENOSYS;
+
+	switch (cmd) {
 		case Q_XQUOTAON:
 		case Q_XQUOTAOFF:
 		case Q_XQUOTARM:
@@ -80,30 +122,31 @@ static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t
 			return -EINVAL;
 	}
 
-	/* Is quota turned on for commands which need it? */
-	switch (cmd) {
-		case Q_GETFMT:
-		case Q_GETINFO:
-		case Q_QUOTAOFF:
-		case Q_SETINFO:
-		case Q_SETQUOTA:
-		case Q_GETQUOTA:
-			/* This is just informative test so we are satisfied without a lock */
-			if (!sb_has_quota_enabled(sb, type))
-				return -ESRCH;
-	}
 	/* Check privileges */
-	if (cmd == Q_GETQUOTA || cmd == Q_XGETQUOTA) {
-		if (((type == USRQUOTA && current->euid != id) ||
-		     (type == GRPQUOTA && !in_egroup_p(id))) &&
-		    !capable(CAP_SYS_ADMIN))
+	if (cmd == Q_XGETQUOTA) {
+		if (((type == XQM_USRQUOTA && current->euid != id) ||
+		     (type == XQM_GRPQUOTA && !in_egroup_p(id))) &&
+		     !capable(CAP_SYS_ADMIN))
 			return -EPERM;
-	}
-	else if (cmd != Q_GETFMT && cmd != Q_SYNC && cmd != Q_GETINFO && cmd != Q_XGETQSTAT)
+	} else if (cmd != Q_XGETQSTAT) {
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
+	}
 
-	return security_quotactl (cmd, type, id, sb);
+	return 0;
+}
+
+static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t id)
+{
+	int error;
+
+	if (XQM_COMMAND(cmd))
+		error = xqm_quotactl_valid(sb, type, cmd, id);
+	else
+		error = generic_quotactl_valid(sb, type, cmd, id);
+	if (!error)
+		error = security_quotactl(cmd, type, id, sb);
+	return error;
 }
 
 static struct super_block *get_super_to_sync(int type)

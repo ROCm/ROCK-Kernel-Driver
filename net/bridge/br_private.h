@@ -46,10 +46,8 @@ struct net_bridge_fdb_entry
 {
 	struct hlist_node		hlist;
 	struct net_bridge_port		*dst;
-	union {
-		struct list_head	age_list;
-		struct rcu_head		rcu;
-	} u;
+
+	struct rcu_head			rcu;
 	atomic_t			use_count;
 	unsigned long			ageing_timer;
 	mac_addr			addr;
@@ -148,8 +146,10 @@ extern int br_fdb_fillbuf(struct net_bridge *br, void *buf,
 			  unsigned long count, unsigned long off);
 extern int br_fdb_insert(struct net_bridge *br,
 			 struct net_bridge_port *source,
-			 const unsigned char *addr,
-			 int is_local);
+			 const unsigned char *addr);
+extern void br_fdb_update(struct net_bridge *br,
+			  struct net_bridge_port *source,
+			  const unsigned char *addr);
 
 /* br_forward.c */
 extern void br_deliver(const struct net_bridge_port *to,
@@ -174,6 +174,7 @@ extern int br_add_if(struct net_bridge *br,
 extern int br_del_if(struct net_bridge *br,
 	      struct net_device *dev);
 extern int br_min_mtu(const struct net_bridge *br);
+extern void br_features_recompute(struct net_bridge *br);
 
 /* br_input.c */
 extern int br_handle_frame_finish(struct sk_buff *skb);
@@ -215,6 +216,12 @@ extern int br_stp_handle_bpdu(struct sk_buff *skb);
 extern void br_stp_timer_init(struct net_bridge *br);
 extern void br_stp_port_timer_init(struct net_bridge_port *p);
 extern unsigned long br_timer_value(const struct timer_list *timer);
+
+/* br.c */
+extern struct net_bridge_fdb_entry *(*br_fdb_get_hook)(struct net_bridge *br,
+						       unsigned char *addr);
+extern void (*br_fdb_put_hook)(struct net_bridge_fdb_entry *ent);
+
 
 #ifdef CONFIG_SYSFS
 /* br_sysfs_if.c */

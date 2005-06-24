@@ -173,11 +173,7 @@ extern struct file_operations jffs2_file_operations;
 extern struct inode_operations jffs2_file_inode_operations;
 extern struct address_space_operations jffs2_file_address_operations;
 int jffs2_fsync(struct file *, struct dentry *, int);
-int jffs2_do_readpage_nolock (struct inode *inode, struct page *pg);
 int jffs2_do_readpage_unlock (struct inode *inode, struct page *pg);
-int jffs2_readpage (struct file *, struct page *);
-int jffs2_prepare_write (struct file *, struct page *, unsigned, unsigned);
-int jffs2_commit_write (struct file *, struct page *, unsigned, unsigned);
 
 /* ioctl.c */
 int jffs2_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
@@ -208,7 +204,6 @@ unsigned char *jffs2_gc_fetch_page(struct jffs2_sb_info *c,
 void jffs2_gc_release_page(struct jffs2_sb_info *c,
 			   unsigned char *pg,
 			   unsigned long *priv);
-int jffs2_flash_setup(struct jffs2_sb_info *c);
 void jffs2_flash_cleanup(struct jffs2_sb_info *c);
      
 

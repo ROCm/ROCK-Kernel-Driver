@@ -120,10 +120,10 @@ static unsigned long f_extend(unsigned long address)
 #ifdef __LP64__
 	if(unlikely(parisc_narrow_firmware)) {
 		if((address & 0xff000000) == 0xf0000000)
-			return 0xf0f0f0f000000000 | (u32)address;
+			return 0xf0f0f0f000000000UL | (u32)address;
 
 		if((address & 0xf0000000) == 0xf0000000)
-			return 0xffffffff00000000 | (u32)address;
+			return 0xffffffff00000000UL | (u32)address;
 	}
 #endif
 	return address;
@@ -782,6 +782,8 @@ int pdc_pci_irt(unsigned long num_entries, unsigned long hpa, void *tbl)
 {
 	int retval;
 
+	BUG_ON((unsigned long)tbl & 0x7);
+
 	spin_lock_irq(&pdc_lock);
 	pdc_result[0] = num_entries;
 	retval = mem_pdc_call(PDC_PCI_INDEX, PDC_PCI_GET_INT_TBL, 
@@ -912,7 +914,7 @@ int pdc_do_firm_test_reset(unsigned long ftc_bitmap)
  *
  * Reset the system.
  */
-int pdc_do_reset()
+int pdc_do_reset(void)
 {
         int retval;
 

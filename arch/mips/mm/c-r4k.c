@@ -426,8 +426,7 @@ static inline void local_r4k_flush_cache_page(void *args)
 	}
 }
 
-static void r4k_flush_cache_page(struct vm_area_struct *vma,
-	unsigned long page)
+static void r4k_flush_cache_page(struct vm_area_struct *vma, unsigned long page, unsigned long pfn)
 {
 	struct flush_cache_page_args args;
 

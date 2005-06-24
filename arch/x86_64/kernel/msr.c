@@ -255,7 +255,7 @@ static struct file_operations msr_fops = {
 	.open = msr_open,
 };
 
-int __init msr_init(void)
+static int __init msr_init(void)
 {
 	if (register_chrdev(MSR_MAJOR, "cpu/msr", &msr_fops)) {
 		printk(KERN_ERR "msr: unable to get major %d for msr\n",
@@ -266,7 +266,7 @@ int __init msr_init(void)
 	return 0;
 }
 
-void __exit msr_exit(void)
+static void __exit msr_exit(void)
 {
 	unregister_chrdev(MSR_MAJOR, "cpu/msr");
 }

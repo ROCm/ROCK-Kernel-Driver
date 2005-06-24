@@ -1,4 +1,4 @@
-/* 
+/*
     Driver for Zarlink MT312 Satellite Channel Decoder
 
     Copyright (C) 2003 Andreas Oberritter <obi@linuxtv.org>

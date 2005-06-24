@@ -72,7 +72,7 @@ static int pppox_ioctl(struct socket* sock, unsigned int cmd,
 		       unsigned long arg)
 {
 	struct sock *sk = sock->sk;
-	struct pppox_opt *po = pppox_sk(sk);
+	struct pppox_sock *po = pppox_sk(sk);
 	int rc = 0;
 
 	lock_sock(sk);

@@ -34,7 +34,7 @@
 static int nr_queue_rx_frame(struct sock *sk, struct sk_buff *skb, int more)
 {
 	struct sk_buff *skbo, *skbn = skb;
-	nr_cb *nr = nr_sk(sk);
+	struct nr_sock *nr = nr_sk(sk);
 
 	skb_pull(skb, NR_NETWORK_LEN + NR_TRANSPORT_LEN);
 
@@ -76,7 +76,7 @@ static int nr_state1_machine(struct sock *sk, struct sk_buff *skb,
 {
 	switch (frametype) {
 	case NR_CONNACK: {
-		nr_cb *nr = nr_sk(sk);
+		struct nr_sock *nr = nr_sk(sk);
 
 		nr_stop_t1timer(sk);
 		nr_start_idletimer(sk);
@@ -138,7 +138,7 @@ static int nr_state2_machine(struct sock *sk, struct sk_buff *skb,
  */
 static int nr_state3_machine(struct sock *sk, struct sk_buff *skb, int frametype)
 {
-	nr_cb *nrom = nr_sk(sk);
+	struct nr_sock *nrom = nr_sk(sk);
 	struct sk_buff_head temp_queue;
 	struct sk_buff *skbn;
 	unsigned short save_vr;
@@ -261,10 +261,10 @@ static int nr_state3_machine(struct sock *sk, struct sk_buff *skb, int frametype
 	return queued;
 }
 
-/* Higher level upcall for a LAPB frame */
+/* Higher level upcall for a LAPB frame - called with sk locked */
 int nr_process_rx_frame(struct sock *sk, struct sk_buff *skb)
 {
-	nr_cb *nr = nr_sk(sk);
+	struct nr_sock *nr = nr_sk(sk);
 	int queued = 0, frametype;
 
 	if (nr->state == NR_STATE_0)

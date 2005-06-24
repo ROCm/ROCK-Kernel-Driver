@@ -42,14 +42,21 @@ void kref_get(struct kref *kref)
  *	     in as this function.
  *
  * Decrement the refcount, and if 0, call release().
+ * Return 1 if the object was removed, otherwise return 0.  Beware, if this
+ * function returns 0, you still can not count on the kref from remaining in
+ * memory.  Only use the return value if you want to see if the kref is now
+ * gone, not present.
  */
-void kref_put(struct kref *kref, void (*release) (struct kref *kref))
+int kref_put(struct kref *kref, void (*release)(struct kref *kref))
 {
 	WARN_ON(release == NULL);
 	WARN_ON(release == (void (*)(struct kref *))kfree);
 
-	if (atomic_dec_and_test(&kref->refcount))
+	if (atomic_dec_and_test(&kref->refcount)) {
 		release(kref);
+		return 1;
+	}
+	return 0;
 }
 
 EXPORT_SYMBOL(kref_init);

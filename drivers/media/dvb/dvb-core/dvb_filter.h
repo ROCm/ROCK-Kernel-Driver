@@ -34,8 +34,8 @@ struct dvb_filter_pes2ts {
 	void *priv;
 };
 
-void dvb_filter_pes2ts_init(struct dvb_filter_pes2ts *p2ts, unsigned short pid, 
-		 	    dvb_filter_pes2ts_cb_t *cb, void *priv);
+void dvb_filter_pes2ts_init(struct dvb_filter_pes2ts *p2ts, unsigned short pid,
+			    dvb_filter_pes2ts_cb_t *cb, void *priv);
 
 int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes,
 		      int len, int payload_start);
@@ -70,8 +70,8 @@ int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes,
 #define QUANT_MATRIX_EXTENSION       0x03
 #define PICTURE_DISPLAY_EXTENSION    0x07
 
-#define I_FRAME 0x01 
-#define B_FRAME 0x02 
+#define I_FRAME 0x01
+#define B_FRAME 0x02
 #define P_FRAME 0x03
 
 /* Initialize sequence_data */
@@ -92,7 +92,7 @@ int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes,
 #define PES_CRC_FLAG     0x02
 #define PES_EXT_FLAG     0x01
 
-//pts_dts flags 
+//pts_dts flags
 #define PTS_ONLY         0x80
 #define PTS_DTS          0xC0
 
@@ -165,7 +165,7 @@ struct dvb_video_info {
         s16 vbv_delay;
 	u32 CSPF;
 	u32 off;
-};            
+};
 
 #define OFF_SIZE 4
 #define FIRST_FIELD 0
@@ -181,10 +181,10 @@ struct mpg_picture {
         int       low_delay;
         int       closed_gop;
         int       broken_link;
-        int       sequence_header_flag;      
-        int       gop_flag;              
+        int       sequence_header_flag;
+        int       gop_flag;
         int       sequence_end_flag;
-                                                                
+
         u8        profile_and_level;
         s32       picture_coding_parameter;
         u32       matrix[32];
@@ -211,26 +211,26 @@ struct mpg_picture {
         int       forward_bank;
         int       backward_bank;
         int       compress;
-        s16       frame_centre_horizontal_offset[OFF_SIZE];                   
+        s16       frame_centre_horizontal_offset[OFF_SIZE];
                   /* [0-2] 1st field, [3] 2nd field */
         s16       frame_centre_vertical_offset[OFF_SIZE];
                   /* [0-2] 1st field, [3] 2nd field */
-        s16       temporal_reference[2];                               
+        s16       temporal_reference[2];
                   /* [0] 1st field, [1] 2nd field */
 
         s8        picture_coding_type[2];
-                 /* [0] 1st field, [1] 2nd field */
+                  /* [0] 1st field, [1] 2nd field */
         s8        picture_structure[2];
-                 /* [0] 1st field, [1] 2nd field */
+                  /* [0] 1st field, [1] 2nd field */
         s8        picture_display_extension_flag[2];
-                 /* [0] 1st field, [1] 2nd field */
-                 /* picture_display_extenion() 0:no 1:exit*/
+                  /* [0] 1st field, [1] 2nd field */
+                  /* picture_display_extenion() 0:no 1:exit*/
         s8        pts_flag[2];
-                 /* [0] 1st field, [1] 2nd field */
+                  /* [0] 1st field, [1] 2nd field */
 };
 
 struct dvb_audio_info {
-	int layer               ;
+	int layer;
 	u32 bit_rate;
 	u32 frequency;
 	u32 mode;

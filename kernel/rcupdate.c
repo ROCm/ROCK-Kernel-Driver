@@ -72,10 +72,6 @@ DEFINE_PER_CPU(struct rcu_data, rcu_bh_data) = { 0L };
 static DEFINE_PER_CPU(struct tasklet_struct, rcu_tasklet) = {NULL};
 static int maxbatch = 10;
 
-static atomic_t rcu_barrier_cpu_count;
-static struct semaphore rcu_barrier_sema;
-static struct completion rcu_barrier_completion;
-
 /**
  * call_rcu - Queue an RCU callback for invocation after a grace period.
  * @head: structure to be used for queueing the RCU updates.
@@ -132,42 +128,6 @@ void fastcall call_rcu_bh(struct rcu_head *head,
 	rdp->nxttail = &head->next;
 	local_irq_restore(flags);
 }
-
-static void rcu_barrier_callback(struct rcu_head *notused)
-{
-	if (atomic_dec_and_test(&rcu_barrier_cpu_count))
-		complete(&rcu_barrier_completion);
-}
-
-/*
- * Called with preemption disabled, and from cross-cpu IRQ context.
- */
-static void rcu_barrier_func(void *notused)
-{
-	int cpu = smp_processor_id();
-	struct rcu_data *rdp = &per_cpu(rcu_data, cpu);
-	struct rcu_head *head;
-
-	head = &rdp->barrier;
-	atomic_inc(&rcu_barrier_cpu_count);
-	call_rcu(head, rcu_barrier_callback);
-}
-
-/**
- * rcu_barrier - Wait until all the in-flight RCUs are complete.
- */
-void rcu_barrier(void)
-{
-	BUG_ON(in_interrupt());
-	/* Take cpucontrol semaphore to protect against CPU hotplug */
-	down(&rcu_barrier_sema);
-	init_completion(&rcu_barrier_completion);
-	atomic_set(&rcu_barrier_cpu_count, 0);
-	on_each_cpu(rcu_barrier_func, NULL, 0, 1);
-	wait_for_completion(&rcu_barrier_completion);
-	up(&rcu_barrier_sema);
-}
-EXPORT_SYMBOL(rcu_barrier);
 
 /*
  * Invoke the completed RCU callbacks. They are expected to be in
@@ -466,7 +426,6 @@ static struct notifier_block __devinitdata rcu_nb = {
  */
 void __init rcu_init(void)
 {
-	sema_init(&rcu_barrier_sema, 1);
 	rcu_cpu_notify(&rcu_nb, CPU_UP_PREPARE,
 			(void *)(long)smp_processor_id());
 	/* Register notifier for non-boot CPUs */
@@ -488,15 +447,18 @@ static void wakeme_after_rcu(struct rcu_head  *head)
 }
 
 /**
- * synchronize_kernel - wait until a grace period has elapsed.
+ * synchronize_rcu - wait until a grace period has elapsed.
  *
  * Control will return to the caller some time after a full grace
  * period has elapsed, in other words after all currently executing RCU
  * read-side critical sections have completed.  RCU read-side critical
  * sections are delimited by rcu_read_lock() and rcu_read_unlock(),
  * and may be nested.
+ *
+ * If your read-side code is not protected by rcu_read_lock(), do -not-
+ * use synchronize_rcu().
  */
-void synchronize_kernel(void)
+void synchronize_rcu(void)
 {
 	struct rcu_synchronize rcu;
 
@@ -508,7 +470,16 @@ void synchronize_kernel(void)
 	wait_for_completion(&rcu.completion);
 }
 
+/*
+ * Deprecated, use synchronize_rcu() or synchronize_sched() instead.
+ */
+void synchronize_kernel(void)
+{
+	synchronize_rcu();
+}
+
 module_param(maxbatch, int, 0);
-EXPORT_SYMBOL(call_rcu);
-EXPORT_SYMBOL(call_rcu_bh);
-EXPORT_SYMBOL(synchronize_kernel);
+EXPORT_SYMBOL(call_rcu);  /* WARNING: GPL-only in April 2006. */
+EXPORT_SYMBOL(call_rcu_bh);  /* WARNING: GPL-only in April 2006. */
+EXPORT_SYMBOL_GPL(synchronize_rcu);
+EXPORT_SYMBOL(synchronize_kernel);  /* WARNING: GPL-only in April 2006. */

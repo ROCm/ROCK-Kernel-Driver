@@ -1211,8 +1211,7 @@ xfs_dqtest_cmp2(
 	if (INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT) &&
 	    INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT) >=
 	    INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT)) {
-		if (INT_ISZERO(dqp->q_core.d_btimer, ARCH_CONVERT) &&
-		    !INT_ISZERO(dqp->q_core.d_id, ARCH_CONVERT)) {
+		if (!dqp->q_core.d_btimer && dqp->q_core.d_id) {
 			cmn_err(CE_DEBUG,
 				"%d [%s] [0x%p] BLK TIMER NOT STARTED",
 				d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);
@@ -1222,8 +1221,7 @@ xfs_dqtest_cmp2(
 	if (INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT) &&
 	    INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) >=
 	    INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT)) {
-		if (INT_ISZERO(dqp->q_core.d_itimer, ARCH_CONVERT) &&
-		    !INT_ISZERO(dqp->q_core.d_id, ARCH_CONVERT)) {
+		if (!dqp->q_core.d_itimer && dqp->q_core.d_id) {
 			cmn_err(CE_DEBUG,
 				"%d [%s] [0x%p] INO TIMER NOT STARTED",
 				d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);

@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2005 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -110,7 +110,7 @@ struct ixgb_adapter;
 #define IXGB_TX_QUEUE_WAKE 16
 
 /* How many Rx Buffers do we bundle into one write to the hardware ? */
-#define IXGB_RX_BUFFER_WRITE	16	/* Must be power of 2 */
+#define IXGB_RX_BUFFER_WRITE	4	/* Must be power of 2 */
 
 /* only works for sizes that are powers of 2 */
 #define IXGB_ROUNDUP(i, size) ((i) = (((i) + (size) - 1) & ~((size) - 1)))
@@ -176,6 +176,7 @@ struct ixgb_adapter {
 	uint64_t hw_csum_tx_error;
 	uint32_t tx_int_delay;
 	boolean_t tx_int_delay_enable;
+	boolean_t detect_tx_hung;
 
 	/* RX */
 	struct ixgb_desc_ring rx_ring;

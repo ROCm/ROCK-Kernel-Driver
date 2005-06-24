@@ -169,7 +169,7 @@ typedef enum {	CLOSED,	OPEN } open_state;
 
 struct tok_info {
 	unsigned char irq;
-	void *mmio;
+	void __iomem *mmio;
 	unsigned char hw_address[32];
 	unsigned char adapter_type;
 	unsigned char data_rate;
@@ -192,12 +192,13 @@ struct tok_info {
 	/* Additions by Peter De Schrijver */
 	unsigned char page_mask;          /* mask to select RAM page to Map*/
 	unsigned char mapped_ram_size;    /* size of RAM page */
-	__u32 sram_virt;                  /* Shared memory base address */
-	__u32 init_srb;               /* Initial System Request Block address */
-	__u32 srb;                        /* System Request Block address */
-	__u32 ssb;                        /* System Status Block address */
-	__u32 arb;                        /* Adapter Request Block address */
-	__u32 asb;                        /* Adapter Status Block address */
+	__u32 sram_phys;          /* Shared memory base address */
+	void __iomem *sram_virt;          /* Shared memory base address */
+	void __iomem *init_srb;   /* Initial System Request Block address */
+	void __iomem *srb;                /* System Request Block address */
+	void __iomem *ssb;                /* System Status Block address */
+	void __iomem *arb;                /* Adapter Request Block address */
+	void __iomem *asb;                /* Adapter Status Block address */
         __u8  init_srb_page;
         __u8  srb_page;
         __u8  ssb_page;

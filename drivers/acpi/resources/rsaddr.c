@@ -110,13 +110,13 @@ acpi_rs_address16_resource (
 	buffer += 2;
 	temp8 = *buffer;
 
-	/* Values 0-2 are valid */
+	/* Values 0-2 and 0xC0-0xFF are valid */
 
-	if (temp8 > 2) {
+	if ((temp8 > 2) && (temp8 < 0xC0)) {
 		return_ACPI_STATUS (AE_AML_INVALID_RESOURCE_TYPE);
 	}
 
-	output_struct->data.address16.resource_type = temp8 & 0x03;
+	output_struct->data.address16.resource_type = temp8;
 
 	/*
 	 * Get the General Flags (Byte4)
@@ -496,12 +496,13 @@ acpi_rs_address32_resource (
 	buffer += 2;
 	temp8 = *buffer;
 
-	/* Values 0-2 are valid */
-	if(temp8 > 2) {
+	/* Values 0-2 and 0xC0-0xFF are valid */
+
+	if ((temp8 > 2) && (temp8 < 0xC0)) {
 		return_ACPI_STATUS (AE_AML_INVALID_RESOURCE_TYPE);
 	}
 
-	output_struct->data.address32.resource_type = temp8 & 0x03;
+	output_struct->data.address32.resource_type = temp8;
 
 	/*
 	 * Get the General Flags (Byte4)
@@ -850,6 +851,7 @@ acpi_rs_address64_resource (
 	struct acpi_resource            *output_struct = (void *) *output_buffer;
 	u16                             temp16;
 	u8                              temp8;
+	u8                              resource_type;
 	u8                              *temp_ptr;
 	acpi_size                       struct_size;
 	u32                             index;
@@ -860,6 +862,7 @@ acpi_rs_address64_resource (
 
 	buffer = byte_stream_buffer;
 	struct_size = ACPI_SIZEOF_RESOURCE (struct acpi_resource_address64);
+	resource_type = *buffer;
 
 	/*
 	 * Point past the Descriptor to get the number of bytes consumed
@@ -882,13 +885,13 @@ acpi_rs_address64_resource (
 	buffer += 2;
 	temp8 = *buffer;
 
-	/* Values 0-2 are valid */
+	/* Values 0-2 and 0xC0-0xFF are valid */
 
-	if(temp8 > 2) {
+	if ((temp8 > 2) && (temp8 < 0xC0)) {
 		return_ACPI_STATUS (AE_AML_INVALID_RESOURCE_TYPE);
 	}
 
-	output_struct->data.address64.resource_type = temp8 & 0x03;
+	output_struct->data.address64.resource_type = temp8;
 
 	/*
 	 * Get the General Flags (Byte4)
@@ -942,98 +945,113 @@ acpi_rs_address64_resource (
 		}
 	}
 
+	if (resource_type == ACPI_RDESC_TYPE_EXTENDED_ADDRESS_SPACE) {
+		/* Move past revision_id and Reserved byte */
+
+		buffer += 2;
+	}
+
 	/*
-	 * Get Granularity (Bytes 6-13)
+	 * Get Granularity (Bytes 6-13) or (Bytes 8-15)
 	 */
 	buffer += 1;
 	ACPI_MOVE_64_TO_64 (&output_struct->data.address64.granularity, buffer);
 
 	/*
-	 * Get min_address_range (Bytes 14-21)
+	 * Get min_address_range (Bytes 14-21) or (Bytes 16-23)
 	 */
 	buffer += 8;
 	ACPI_MOVE_64_TO_64 (&output_struct->data.address64.min_address_range, buffer);
 
 	/*
-	 * Get max_address_range (Bytes 22-29)
+	 * Get max_address_range (Bytes 22-29) or (Bytes 24-31)
 	 */
 	buffer += 8;
 	ACPI_MOVE_64_TO_64 (&output_struct->data.address64.max_address_range, buffer);
 
 	/*
-	 * Get address_translation_offset (Bytes 30-37)
+	 * Get address_translation_offset (Bytes 30-37) or (Bytes 32-39)
 	 */
 	buffer += 8;
 	ACPI_MOVE_64_TO_64 (&output_struct->data.address64.address_translation_offset, buffer);
 
 	/*
-	 * Get address_length (Bytes 38-45)
+	 * Get address_length (Bytes 38-45) or (Bytes 40-47)
 	 */
 	buffer += 8;
 	ACPI_MOVE_64_TO_64 (&output_struct->data.address64.address_length, buffer);
 
-	/*
-	 * Resource Source Index (if present)
-	 */
-	buffer += 8;
+	output_struct->data.address64.resource_source.index = 0x00;
+	output_struct->data.address64.resource_source.string_length = 0;
+	output_struct->data.address64.resource_source.string_ptr = NULL;
 
-	/*
-	 * This will leave us pointing to the Resource Source Index
-	 * If it is present, then save it off and calculate the
-	 * pointer to where the null terminated string goes:
-	 * Each Interrupt takes 32-bits + the 5 bytes of the
-	 * stream that are default.
-	 *
-	 * Note: Some resource descriptors will have an additional null, so
-	 * we add 1 to the length.
-	 */
-	if (*bytes_consumed > (46 + 1)) {
-		/* Dereference the Index */
+	if (resource_type == ACPI_RDESC_TYPE_EXTENDED_ADDRESS_SPACE) {
+		/* Get type_specific_attribute (Bytes 48-55) */
 
-		temp8 = *buffer;
-		output_struct->data.address64.resource_source.index =
-				(u32) temp8;
-
-		/* Point to the String */
-
-		buffer += 1;
-
-		/* Point the String pointer to the end of this structure */
-
-		output_struct->data.address64.resource_source.string_ptr =
-				(char *)((u8 *)output_struct + struct_size);
-
-		temp_ptr = (u8 *) output_struct->data.address64.resource_source.string_ptr;
-
-		/* Copy the string into the buffer */
-
-		index = 0;
-		while (0x00 != *buffer) {
-			*temp_ptr = *buffer;
-
-			temp_ptr += 1;
-			buffer += 1;
-			index += 1;
-		}
-
-		/*
-		 * Add the terminating null
-		 */
-		*temp_ptr = 0x00;
-		output_struct->data.address64.resource_source.string_length = index + 1;
-
-		/*
-		 * In order for the struct_size to fall on a 32-bit boundary,
-		 * calculate the length of the string and expand the
-		 * struct_size to the next 32-bit boundary.
-		 */
-		temp8 = (u8) (index + 1);
-		struct_size += ACPI_ROUND_UP_to_32_bITS (temp8);
+		buffer += 8;
+		ACPI_MOVE_64_TO_64 (&output_struct->data.address64.type_specific_attributes, buffer);
 	}
 	else {
-		output_struct->data.address64.resource_source.index = 0x00;
-		output_struct->data.address64.resource_source.string_length = 0;
-		output_struct->data.address64.resource_source.string_ptr = NULL;
+		output_struct->data.address64.type_specific_attributes = 0;
+
+		/*
+		 * Resource Source Index (if present)
+		 */
+		buffer += 8;
+
+		/*
+		 * This will leave us pointing to the Resource Source Index
+		 * If it is present, then save it off and calculate the
+		 * pointer to where the null terminated string goes:
+		 * Each Interrupt takes 32-bits + the 5 bytes of the
+		 * stream that are default.
+		 *
+		 * Note: Some resource descriptors will have an additional null, so
+		 * we add 1 to the length.
+		 */
+		if (*bytes_consumed > (46 + 1)) {
+			/* Dereference the Index */
+
+			temp8 = *buffer;
+			output_struct->data.address64.resource_source.index =
+					(u32) temp8;
+
+			/* Point to the String */
+
+			buffer += 1;
+
+			/* Point the String pointer to the end of this structure */
+
+			output_struct->data.address64.resource_source.string_ptr =
+					(char *)((u8 *)output_struct + struct_size);
+
+			temp_ptr = (u8 *) output_struct->data.address64.resource_source.string_ptr;
+
+			/* Copy the string into the buffer */
+
+			index = 0;
+			while (0x00 != *buffer) {
+				*temp_ptr = *buffer;
+
+				temp_ptr += 1;
+				buffer += 1;
+				index += 1;
+			}
+
+			/*
+			 * Add the terminating null
+			 */
+			*temp_ptr = 0x00;
+			output_struct->data.address64.resource_source.string_length = index + 1;
+
+			/*
+			 * In order for the struct_size to fall on a 32-bit boundary,
+			 * calculate the length of the string and expand the
+			 * struct_size to the next 32-bit boundary.
+			 */
+			temp8 = (u8) (index + 1);
+			struct_size += ACPI_ROUND_UP_to_32_bITS (temp8);
+		}
 	}
 
 	/*

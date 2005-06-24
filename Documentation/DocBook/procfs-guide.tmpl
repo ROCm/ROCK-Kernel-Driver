@@ -1,6 +1,7 @@
-<!-- -*- sgml -*- -->
-<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN"[
-<!ENTITY procfsexample SYSTEM "procfs_example.sgml">
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+	"http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" [
+<!ENTITY procfsexample SYSTEM "procfs_example.xml">
 ]>
 
 <book id="LKProcfsGuide">
@@ -205,7 +206,7 @@
         function will return a pointer to the freshly created
         <structname>struct proc_dir_entry</structname>; otherwise it
         will return <constant>NULL</constant>. <xref
-        linkend="userland"> describes how to do something useful with
+        linkend="userland"/> describes how to do something useful with
         regular files.
       </para>
 
@@ -221,7 +222,7 @@
     <para>
       If you only want to be able to read the file, the function
       <function>create_proc_read_entry</function> described in <xref
-      linkend="convenience"> may be used to create and initialise
+      linkend="convenience"/> may be used to create and initialise
       the procfs entry in one single call.
     </para>
     </sect1>
@@ -298,7 +299,7 @@
         the <structname>struct proc_dir_entry</structname> before
         <function>remove_proc_entry</function> is called (that is: if
         there was some <structfield>data</structfield> allocated, of
-        course). See <xref linkend="usingdata"> for more information
+        course). See <xref linkend="usingdata"/> for more information
         on using the <structfield>data</structfield> entry.
       </para>
     </sect1>
@@ -333,7 +334,7 @@ entry->write_proc = write_proc_foo;
       If you only want to use a the
       <structfield>read_proc</structfield>, the function
       <function>create_proc_read_entry</function> described in <xref
-      linkend="convenience"> may be used to create and initialise the
+      linkend="convenience"/> may be used to create and initialise the
       procfs entry in one single call.
     </para>
 
@@ -386,7 +387,7 @@ entry->write_proc = write_proc_foo;
         The parameter <parameter>start</parameter> doesn't seem to be
         used anywhere in the kernel. The <parameter>data</parameter>
         parameter can be used to create a single call back function for
-        several files, see <xref linkend="usingdata">.
+        several files, see <xref linkend="usingdata"/>.
       </para>
 
       <para>
@@ -395,7 +396,7 @@ entry->write_proc = write_proc_foo;
       </para>
 
       <para>
-        <xref linkend="example"> shows how to use a read call back
+        <xref linkend="example"/> shows how to use a read call back
         function.
       </para>
     </sect1>
@@ -429,12 +430,12 @@ entry->write_proc = write_proc_foo;
         kernel's memory space, so it should first be copied to kernel
         space with <function>copy_from_user</function>. The
         <parameter>file</parameter> parameter is usually
-        ignored. <xref linkend="usingdata"> shows how to use the
+        ignored. <xref linkend="usingdata"/> shows how to use the
         <parameter>data</parameter> parameter.
       </para>
 
       <para>
-        Again, <xref linkend="example"> shows how to use this call back
+        Again, <xref linkend="example"/> shows how to use this call back
         function.
       </para>
     </sect1>
@@ -525,10 +526,10 @@ int foo_read_func(char *page, char **start, off_t off,
       <para>
         This function creates a regular file in exactly the same way
         as <function>create_proc_entry</function> from <xref
-        linkend="regularfile"> does, but also allows to set the read
+        linkend="regularfile"/> does, but also allows to set the read
         function <parameter>read_proc</parameter> in one call. This
         function can set the <parameter>data</parameter> as well, like
-        explained in <xref linkend="usingdata">.
+        explained in <xref linkend="usingdata"/>.
       </para>
     </sect1>
 

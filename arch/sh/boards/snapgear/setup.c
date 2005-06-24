@@ -27,6 +27,7 @@
 #include <asm/mach/io.h>
 #include <asm/irq.h>
 #include <asm/io.h>
+#include <asm/cpu/timer.h>
 
 extern void (*board_time_init)(void);
 extern void secureedge5410_rtc_init(void);
@@ -111,11 +112,6 @@ static void __init init_snapgear_IRQ(void)
 #endif
 #define TMU_TSTR_INIT	1
 #define TMU1_TCR_CALIB	0x0000
-#define TMU_TOCR	0xffd80000	/* Byte access */
-#define TMU_TSTR	0xffd80004	/* Byte access */
-#define TMU1_TCOR	0xffd80014	/* Long access */
-#define TMU1_TCNT	0xffd80018	/* Long access */
-#define TMU1_TCR	0xffd8001c	/* Word access */
 
 
 #ifdef FAST_POLL_INTR

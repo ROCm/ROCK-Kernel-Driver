@@ -55,8 +55,6 @@ unsigned short snd_gf1_lvol_to_gvol_raw(unsigned int vol)
 	return (e << 8) | m;
 }
 
-#if 0
-
 unsigned int snd_gf1_gvol_to_lvol_raw(unsigned short gf1_vol)
 {
 	unsigned int rvol;
@@ -110,8 +108,6 @@ unsigned int snd_gf1_calc_ramp_rate(snd_gus_card_t * gus,
 	return (range << 6) | (increment & 0x3f);
 }
 
-#endif  /*  0  */
-
 unsigned short snd_gf1_translate_freq(snd_gus_card_t * gus, unsigned int freq16)
 {
 	freq16 >>= 3;
@@ -123,8 +119,6 @@ unsigned short snd_gf1_translate_freq(snd_gus_card_t * gus, unsigned int freq16)
 	}
 	return ((freq16 << 9) + (gus->gf1.playback_freq >> 1)) / gus->gf1.playback_freq;
 }
-
-#if 0
 
 short snd_gf1_compute_vibrato(short cents, unsigned short fc_register)
 {
@@ -214,5 +208,3 @@ unsigned short snd_gf1_compute_freq(unsigned int freq,
 	}
 	return (unsigned short) fc;
 }
-
-#endif  /*  0  */

@@ -41,14 +41,8 @@ EXPORT_SYMBOL(cpu_possible_map);
  */
 struct cpuinfo_um cpu_data[NR_CPUS];
 
-/* Set when the idlers are all forked */
-int smp_threads_ready = 0;
-
 /* A statistic, can be a little off */
 int num_reschedules_sent = 0;
-
-/* Small, random number, never changed */
-unsigned long cache_decay_ticks = 5;
 
 /* Not changed after boot */
 struct task_struct *idle_threads[NR_CPUS];

@@ -1215,6 +1215,9 @@ static int ray_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 #if WIRELESS_EXT > 7
     struct iwreq *wrq = (struct iwreq *) ifr;
 #endif	/* WIRELESS_EXT > 7 */
+#ifdef WIRELESS_SPY
+    struct sockaddr	address[IW_MAX_SPY];
+#endif	/* WIRELESS_SPY */
 
     if (!(link->state & DEV_PRESENT)) {
         DEBUG(2,"ray_dev_ioctl - device not present\n");
@@ -1511,7 +1514,6 @@ static int ray_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
       /* If there is some addresses to copy */
       if(local->spy_number > 0)
 	{
-	  struct sockaddr	address[IW_MAX_SPY];
 	  int			i;
 
 	  /* Copy addresses to the driver */
@@ -1551,7 +1553,6 @@ static int ray_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
       /* If the user want to have the addresses back... */
       if((local->spy_number > 0) && (wrq->u.data.pointer != (caddr_t) 0))
 	{
-	  struct sockaddr	address[IW_MAX_SPY];
 	  int			i;
 
 	  /* Copy addresses from the lp structure */

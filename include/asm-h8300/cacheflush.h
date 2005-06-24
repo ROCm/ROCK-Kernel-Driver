@@ -13,7 +13,7 @@
 #define flush_cache_all()
 #define	flush_cache_mm(mm)
 #define	flush_cache_range(vma,a,b)
-#define	flush_cache_page(vma,p)
+#define	flush_cache_page(vma,p,pfn)
 #define	flush_dcache_page(page)
 #define	flush_dcache_mmap_lock(mapping)
 #define	flush_dcache_mmap_unlock(mapping)

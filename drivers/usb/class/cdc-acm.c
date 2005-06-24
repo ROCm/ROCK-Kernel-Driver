@@ -60,6 +60,7 @@
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
+#include <linux/usb_cdc.h>
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
 
@@ -89,7 +90,7 @@ static int acm_ctrl_msg(struct acm *acm, int request, int value, void *buf, int 
 	int retval = usb_control_msg(acm->dev, usb_sndctrlpipe(acm->dev, 0),
 		request, USB_RT_ACM, value,
 		acm->control->altsetting[0].desc.bInterfaceNumber,
-		buf, len, HZ * 5);
+		buf, len, 5000);
 	dbg("acm_control_msg: rq: 0x%02x val: %#x len: %#x result: %d", request, value, len, retval);
 	return retval < 0 ? retval : 0;
 }
@@ -97,9 +98,12 @@ static int acm_ctrl_msg(struct acm *acm, int request, int value, void *buf, int 
 /* devices aren't required to support these requests.
  * the cdc acm descriptor tells whether they do...
  */
-#define acm_set_control(acm, control)	acm_ctrl_msg(acm, ACM_REQ_SET_CONTROL, control, NULL, 0)
-#define acm_set_line(acm, line)		acm_ctrl_msg(acm, ACM_REQ_SET_LINE, 0, line, sizeof(struct acm_line))
-#define acm_send_break(acm, ms)		acm_ctrl_msg(acm, ACM_REQ_SEND_BREAK, ms, NULL, 0)
+#define acm_set_control(acm, control) \
+	acm_ctrl_msg(acm, USB_CDC_REQ_SET_CONTROL_LINE_STATE, control, NULL, 0)
+#define acm_set_line(acm, line) \
+	acm_ctrl_msg(acm, USB_CDC_REQ_SET_LINE_CODING, 0, line, sizeof *(line))
+#define acm_send_break(acm, ms) \
+	acm_ctrl_msg(acm, USB_CDC_REQ_SEND_BREAK, ms, NULL, 0)
 
 /*
  * Interrupt handlers for various ACM device responses
@@ -109,7 +113,7 @@ static int acm_ctrl_msg(struct acm *acm, int request, int value, void *buf, int 
 static void acm_ctrl_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct acm *acm = urb->context;
-	struct usb_ctrlrequest *dr = urb->transfer_buffer;
+	struct usb_cdc_notification *dr = urb->transfer_buffer;
 	unsigned char *data;
 	int newctrl;
 	int status;
@@ -133,14 +137,14 @@ static void acm_ctrl_irq(struct urb *urb, struct pt_regs *regs)
 		goto exit;
 
 	data = (unsigned char *)(dr + 1);
-	switch (dr->bRequest) {
+	switch (dr->bNotificationType) {
 
-		case ACM_IRQ_NETWORK:
+		case USB_CDC_NOTIFY_NETWORK_CONNECTION:
 
 			dbg("%s network", dr->wValue ? "connected to" : "disconnected from");
 			break;
 
-		case ACM_IRQ_LINE_STATE:
+		case USB_CDC_NOTIFY_SERIAL_STATE:
 
 			newctrl = le16_to_cpu(get_unaligned((__le16 *) data));
 
@@ -160,8 +164,9 @@ static void acm_ctrl_irq(struct urb *urb, struct pt_regs *regs)
 			break;
 
 		default:
-			dbg("unknown control event received: request %d index %d len %d data0 %d data1 %d",
-				dr->bRequest, dr->wIndex, dr->wLength, data[0], data[1]);
+			dbg("unknown notification %d received: index %d len %d data0 %d data1 %d",
+				dr->bNotificationType, dr->wIndex,
+				dr->wLength, data[0], data[1]);
 			break;
 	}
 exit:
@@ -485,32 +490,34 @@ static void acm_tty_set_termios(struct tty_struct *tty, struct termios *termios_
 {
 	struct acm *acm = tty->driver_data;
 	struct termios *termios = tty->termios;
-	struct acm_line newline;
+	struct usb_cdc_line_coding newline;
 	int newctrl = acm->ctrlout;
 
 	if (!ACM_READY(acm))
 		return;
 
-	newline.speed = cpu_to_le32p(acm_tty_speed +
+	newline.dwDTERate = cpu_to_le32p(acm_tty_speed +
 		(termios->c_cflag & CBAUD & ~CBAUDEX) + (termios->c_cflag & CBAUDEX ? 15 : 0));
-	newline.stopbits = termios->c_cflag & CSTOPB ? 2 : 0;
-	newline.parity = termios->c_cflag & PARENB ?
+	newline.bCharFormat = termios->c_cflag & CSTOPB ? 2 : 0;
+	newline.bParityType = termios->c_cflag & PARENB ?
 		(termios->c_cflag & PARODD ? 1 : 2) + (termios->c_cflag & CMSPAR ? 2 : 0) : 0;
-	newline.databits = acm_tty_size[(termios->c_cflag & CSIZE) >> 4];
+	newline.bDataBits = acm_tty_size[(termios->c_cflag & CSIZE) >> 4];
 
 	acm->clocal = ((termios->c_cflag & CLOCAL) != 0);
 
-	if (!newline.speed) {
-		newline.speed = acm->line.speed;
+	if (!newline.dwDTERate) {
+		newline.dwDTERate = acm->line.dwDTERate;
 		newctrl &= ~ACM_CTRL_DTR;
 	} else  newctrl |=  ACM_CTRL_DTR;
 
 	if (newctrl != acm->ctrlout)
 		acm_set_control(acm, acm->ctrlout = newctrl);
 
-	if (memcmp(&acm->line, &newline, sizeof(struct acm_line))) {
-		memcpy(&acm->line, &newline, sizeof(struct acm_line));
-		dbg("set line: %d %d %d %d", newline.speed, newline.stopbits, newline.parity, newline.databits);
+	if (memcmp(&acm->line, &newline, sizeof newline)) {
+		memcpy(&acm->line, &newline, sizeof newline);
+		dbg("set line: %d %d %d %d", le32_to_cpu(newline.dwDTERate),
+			newline.bCharFormat, newline.bParityType,
+			newline.bDataBits);
 		acm_set_line(acm, &acm->line);
 	}
 }
@@ -522,7 +529,7 @@ static void acm_tty_set_termios(struct tty_struct *tty, struct termios *termios_
 static int acm_probe (struct usb_interface *intf,
 		      const struct usb_device_id *id)
 {
-	struct union_desc *union_header = NULL;
+	struct usb_cdc_union_desc *union_header = NULL;
 	char *buffer = intf->altsetting->extra;
 	int buflen = intf->altsetting->extralen;
 	struct usb_interface *control_interface;
@@ -573,21 +580,22 @@ static int acm_probe (struct usb_interface *intf,
 		}
 
 		switch (buffer [2]) {
-			case CDC_UNION_TYPE: /* we've found it */
+			case USB_CDC_UNION_TYPE: /* we've found it */
 				if (union_header) {
 					err("More than one union descriptor, skipping ...");
 					goto next_desc;
 				}
-				union_header = (struct union_desc *)buffer;
+				union_header = (struct usb_cdc_union_desc *)
+							buffer;
 				break;
-			case CDC_COUNTRY_TYPE: /* maybe somehow export */
+			case USB_CDC_COUNTRY_TYPE: /* maybe somehow export */
 				break; /* for now we ignore it */
-			case CDC_HEADER_TYPE: /* maybe check version */ 
+			case USB_CDC_HEADER_TYPE: /* maybe check version */ 
 				break; /* for now we ignore it */ 
-			case CDC_AC_MANAGEMENT_TYPE:
+			case USB_CDC_ACM_TYPE:
 				ac_management_function = buffer[3];
 				break;
-			case CDC_CALL_MANAGEMENT_TYPE:
+			case USB_CDC_CALL_MANAGEMENT_TYPE:
 				call_management_function = buffer[3];
 				call_interface_num = buffer[4];
 				if ((call_management_function & 3) != 3)
@@ -750,8 +758,8 @@ skip_normal_probe:
 
 	acm_set_control(acm, acm->ctrlout);
 
-	acm->line.speed = cpu_to_le32(9600);
-	acm->line.databits = 8;
+	acm->line.dwDTERate = cpu_to_le32(9600);
+	acm->line.bDataBits = 8;
 	acm_set_line(acm, &acm->line);
 
 	usb_driver_claim_interface(&acm_driver, data_interface, acm);
@@ -831,14 +839,20 @@ static struct usb_device_id acm_ids[] = {
 	.driver_info = NO_UNION_NORMAL, /* has no union descriptor */
 	},
 	/* control interfaces with various AT-command sets */
-	{ USB_INTERFACE_INFO(USB_CLASS_COMM, 2, 1) },
-	{ USB_INTERFACE_INFO(USB_CLASS_COMM, 2, 2) },
-	{ USB_INTERFACE_INFO(USB_CLASS_COMM, 2, 3) },
-	{ USB_INTERFACE_INFO(USB_CLASS_COMM, 2, 4) },
-	{ USB_INTERFACE_INFO(USB_CLASS_COMM, 2, 5) },
-	{ USB_INTERFACE_INFO(USB_CLASS_COMM, 2, 6) },
+	{ USB_INTERFACE_INFO(USB_CLASS_COMM, USB_CDC_SUBCLASS_ACM,
+		USB_CDC_ACM_PROTO_AT_V25TER) },
+	{ USB_INTERFACE_INFO(USB_CLASS_COMM, USB_CDC_SUBCLASS_ACM,
+		USB_CDC_ACM_PROTO_AT_PCCA101) },
+	{ USB_INTERFACE_INFO(USB_CLASS_COMM, USB_CDC_SUBCLASS_ACM,
+		USB_CDC_ACM_PROTO_AT_PCCA101_WAKE) },
+	{ USB_INTERFACE_INFO(USB_CLASS_COMM, USB_CDC_SUBCLASS_ACM,
+		USB_CDC_ACM_PROTO_AT_GSM) },
+	{ USB_INTERFACE_INFO(USB_CLASS_COMM, USB_CDC_SUBCLASS_ACM,
+		USB_CDC_ACM_PROTO_AT_3G	) },
+	{ USB_INTERFACE_INFO(USB_CLASS_COMM, USB_CDC_SUBCLASS_ACM,
+		USB_CDC_ACM_PROTO_AT_CDMA) },
 
-	/* NOTE:  COMM/2/0xff is likely MSFT RNDIS ... NOT a modem!! */
+	/* NOTE:  COMM/ACM/0xff is likely MSFT RNDIS ... NOT a modem!! */
 	{ }
 };
 

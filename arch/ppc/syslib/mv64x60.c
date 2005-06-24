@@ -314,15 +314,15 @@ static struct platform_device mpsc1_device = {
 static struct resource mv64x60_eth_shared_resources[] = {
 	[0] = {
 		.name	= "ethernet shared base",
-		.start	= MV64340_ETH_SHARED_REGS,
-		.end	= MV64340_ETH_SHARED_REGS +
-					MV64340_ETH_SHARED_REGS_SIZE - 1,
+		.start	= MV643XX_ETH_SHARED_REGS,
+		.end	= MV643XX_ETH_SHARED_REGS +
+					MV643XX_ETH_SHARED_REGS_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 };
 
 static struct platform_device mv64x60_eth_shared_device = {
-	.name		= MV64XXX_ETH_SHARED_NAME,
+	.name		= MV643XX_ETH_SHARED_NAME,
 	.id		= 0,
 	.num_resources	= ARRAY_SIZE(mv64x60_eth_shared_resources),
 	.resource	= mv64x60_eth_shared_resources,
@@ -338,10 +338,10 @@ static struct resource mv64x60_eth0_resources[] = {
 	},
 };
 
-static struct mv64xxx_eth_platform_data eth0_pd;
+static struct mv643xx_eth_platform_data eth0_pd;
 
 static struct platform_device eth0_device = {
-	.name		= MV64XXX_ETH_NAME,
+	.name		= MV643XX_ETH_NAME,
 	.id		= 0,
 	.num_resources	= ARRAY_SIZE(mv64x60_eth0_resources),
 	.resource	= mv64x60_eth0_resources,
@@ -361,10 +361,10 @@ static struct resource mv64x60_eth1_resources[] = {
 	},
 };
 
-static struct mv64xxx_eth_platform_data eth1_pd;
+static struct mv643xx_eth_platform_data eth1_pd;
 
 static struct platform_device eth1_device = {
-	.name		= MV64XXX_ETH_NAME,
+	.name		= MV643XX_ETH_NAME,
 	.id		= 1,
 	.num_resources	= ARRAY_SIZE(mv64x60_eth1_resources),
 	.resource	= mv64x60_eth1_resources,
@@ -384,10 +384,10 @@ static struct resource mv64x60_eth2_resources[] = {
 	},
 };
 
-static struct mv64xxx_eth_platform_data eth2_pd;
+static struct mv643xx_eth_platform_data eth2_pd;
 
 static struct platform_device eth2_device = {
-	.name		= MV64XXX_ETH_NAME,
+	.name		= MV643XX_ETH_NAME,
 	.id		= 2,
 	.num_resources	= ARRAY_SIZE(mv64x60_eth2_resources),
 	.resource	= mv64x60_eth2_resources,

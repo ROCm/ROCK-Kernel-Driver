@@ -53,11 +53,9 @@ static int ip_clear_mutable_options(struct iphdr *iph, u32 *daddr)
 	return 0;
 }
 
-static int ah_output(struct sk_buff *skb)
+static int ah_output(struct xfrm_state *x, struct sk_buff *skb)
 {
 	int err;
-	struct dst_entry *dst = skb->dst;
-	struct xfrm_state *x  = dst->xfrm;
 	struct iphdr *iph, *top_iph;
 	struct ip_auth_hdr *ah;
 	struct ah_data *ahp;
@@ -308,7 +306,6 @@ static struct net_protocol ah4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	ah4_err,
 	.no_policy	=	1,
-	.xfrm_prot	=	1,
 };
 
 static int __init ah4_init(void)

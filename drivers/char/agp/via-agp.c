@@ -1,5 +1,5 @@
 /*
- * VIA AGPGART routines. 
+ * VIA AGPGART routines.
  */
 
 #include <linux/types.h>
@@ -36,6 +36,7 @@ static int via_fetch_size(void)
 			return values[i].size;
 		}
 	}
+	printk(KERN_ERR PFX "Unknown aperture size from AGP bridge (0x%x)\n", temp);
 	return 0;
 }
 
@@ -78,12 +79,17 @@ static void via_cleanup(void)
 
 static void via_tlbflush(struct agp_memory *mem)
 {
-	pci_write_config_dword(agp_bridge->dev, VIA_GARTCTRL, 0x0000008f);
-	pci_write_config_dword(agp_bridge->dev, VIA_GARTCTRL, 0x0000000f);
+	u32 temp;
+
+	pci_read_config_dword(agp_bridge->dev, VIA_GARTCTRL, &temp);
+	temp |= (1<<7);
+	pci_write_config_dword(agp_bridge->dev, VIA_GARTCTRL, temp);
+	temp &= ~(1<<7);
+	pci_write_config_dword(agp_bridge->dev, VIA_GARTCTRL, temp);
 }
 
 
-static struct aper_size_info_8 via_generic_sizes[7] =
+static struct aper_size_info_8 via_generic_sizes[9] =
 {
 	{256, 65536, 6, 0},
 	{128, 32768, 5, 128},
@@ -91,7 +97,9 @@ static struct aper_size_info_8 via_generic_sizes[7] =
 	{32, 8192, 3, 224},
 	{16, 4096, 2, 240},
 	{8, 2048, 1, 248},
-	{4, 1024, 0, 252}
+	{4, 1024, 0, 252},
+	{2, 512, 0, 254},
+	{1, 256, 0, 255}
 };
 
 
@@ -121,7 +129,7 @@ static int via_configure_agp3(void)
 {
 	u32 temp;
 	struct aper_size_info_16 *current_size;
-    
+
 	current_size = A_SIZE_16(agp_bridge->current_size);
 
 	/* address to map too */
@@ -132,13 +140,13 @@ static int via_configure_agp3(void)
 	pci_write_config_dword(agp_bridge->dev, VIA_AGP3_ATTBASE,
 		agp_bridge->gatt_bus_addr & 0xfffff000);
 
-	/* 1. Enable GTLB in RX90<7>, all AGP aperture access needs to fetch 
+	/* 1. Enable GTLB in RX90<7>, all AGP aperture access needs to fetch
 	 *    translation table first.
 	 * 2. Enable AGP aperture in RX91<0>. This bit controls the enabling of the
 	 *    graphics AGP aperture for the AGP3.0 port.
 	 */
 	pci_read_config_dword(agp_bridge->dev, VIA_AGP3_GARTCTRL, &temp);
-	pci_write_config_dword(agp_bridge->dev, VIA_AGP3_GARTCTRL, temp | (3<<7));		
+	pci_write_config_dword(agp_bridge->dev, VIA_AGP3_GARTCTRL, temp | (3<<7));
 	return 0;
 }
 
@@ -162,7 +170,7 @@ static void via_tlbflush_agp3(struct agp_memory *mem)
 }
 
 
-struct agp_bridge_driver via_agp3_driver = {
+static struct agp_bridge_driver via_agp3_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= agp3_generic_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -185,11 +193,11 @@ struct agp_bridge_driver via_agp3_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-struct agp_bridge_driver via_driver = {
+static struct agp_bridge_driver via_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= via_generic_sizes,
 	.size_type		= U8_APER_SIZE,
-	.num_aperture_sizes	= 7,
+	.num_aperture_sizes	= 9,
 	.configure		= via_configure,
 	.fetch_size		= via_fetch_size,
 	.cleanup		= via_cleanup,
@@ -440,10 +448,10 @@ static void __devexit agp_via_remove(struct pci_dev *pdev)
 
 #ifdef CONFIG_PM
 
-static int agp_via_suspend(struct pci_dev *pdev, u32 state)
+static int agp_via_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	pci_save_state (pdev);
-	pci_set_power_state (pdev, 3);
+	pci_set_power_state (pdev, PCI_D3hot);
 
 	return 0;
 }
@@ -452,7 +460,7 @@ static int agp_via_resume(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 
-	pci_set_power_state (pdev, 0);
+	pci_set_power_state (pdev, PCI_D0);
 	pci_restore_state(pdev);
 
 	if (bridge->driver == &via_agp3_driver)
@@ -525,7 +533,7 @@ static int __init agp_via_init(void)
 {
 	if (agp_off)
 		return -EINVAL;
-	return pci_module_init(&agp_via_pci_driver);
+	return pci_register_driver(&agp_via_pci_driver);
 }
 
 static void __exit agp_via_cleanup(void)

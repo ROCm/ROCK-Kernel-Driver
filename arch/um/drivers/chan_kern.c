@@ -20,6 +20,14 @@
 #include "os.h"
 
 #ifdef CONFIG_NOCONFIG_CHAN
+
+/* The printk's here are wrong because we are complaining that there is no
+ * output device, but printk is printing to that output device.  The user will
+ * never see the error.  printf would be better, except it can't run on a
+ * kernel stack because it will overflow it.
+ * Use printk for now since that will avoid crashing.
+ */
+
 static void *not_configged_init(char *str, int device, struct chan_opts *opts)
 {
 	printk(KERN_ERR "Using a channel type which is configured out of "
@@ -73,7 +81,7 @@ static int not_configged_window_size(int fd, void *data, unsigned short *rows,
 
 static void not_configged_free(void *data)
 {
-	printk(KERN_ERR "Using a channel type which is configured out of "
+	printf(KERN_ERR "Using a channel type which is configured out of "
 	       "UML\n");
 }
 
@@ -218,7 +226,6 @@ void enable_chan(struct list_head *chans, struct tty_struct *tty)
 
 void close_chan(struct list_head *chans)
 {
-	struct list_head *ele;
 	struct chan *chan;
 
 	/* Close in reverse order as open in case more than one of them
@@ -226,8 +233,7 @@ void close_chan(struct list_head *chans)
 	 * state.  Then, the first one opened will have the original state,
 	 * so it must be the last closed.
 	 */
-        for(ele = chans->prev; ele != chans; ele = ele->prev){
-                chan = list_entry(ele, struct chan, list);
+	list_for_each_entry_reverse(chan, chans, list) {
 		if(!chan->opened) continue;
 		if(chan->ops->close != NULL)
 			(*chan->ops->close)(chan->fd, chan->data);
@@ -250,11 +256,8 @@ int write_chan(struct list_head *chans, const char *buf, int len,
 		n = chan->ops->write(chan->fd, buf, len, chan->data);
 		if (chan->primary) {
 			ret = n;
-			if ((ret == -EAGAIN) || ((ret >= 0) && (ret < len))){
+			if ((ret == -EAGAIN) || ((ret >= 0) && (ret < len)))
 				reactivate_fd(chan->fd, write_irq);
-				if (ret == -EAGAIN)
-					ret = 0;
-			}
 		}
 	}
 	return(ret);

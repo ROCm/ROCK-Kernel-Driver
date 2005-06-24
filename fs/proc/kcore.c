@@ -84,7 +84,7 @@ static size_t get_kcore_size(int *nphdr, size_t *elf_buflen)
 	}
 	*elf_buflen =	sizeof(struct elfhdr) + 
 			(*nphdr + 2)*sizeof(struct elf_phdr) + 
-			3 * sizeof(struct memelfnote) +
+			3 * (sizeof(struct elf_note) + 4) +
 			sizeof(struct elf_prstatus) +
 			sizeof(struct elf_prpsinfo) +
 			sizeof(struct task_struct);

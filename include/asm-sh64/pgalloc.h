@@ -14,7 +14,6 @@
  *
  */
 
-#include <asm/processor.h>
 #include <linux/threads.h>
 #include <linux/mm.h>
 

@@ -151,7 +151,7 @@
 #include <asm/timex.h>
 
 
-#define VERSION  "pktgen v2.58: Packet Generator for packet performance testing.\n"
+#define VERSION  "pktgen v2.61: Packet Generator for packet performance testing.\n"
 
 /* #define PG_DEBUG(a) a */
 #define PG_DEBUG(a) 
@@ -1419,7 +1419,6 @@ static int proc_thread_write(struct file *file, const char __user *user_buffer,
 	if (debug) 
 		printk("pktgen: t=%s, count=%lu\n", name, count);
         
-	thread_lock();
 
         t = (struct pktgen_thread*)(data);
 	if(!t) {
@@ -1441,14 +1440,18 @@ static int proc_thread_write(struct file *file, const char __user *user_buffer,
 		if( copy_from_user(f, &user_buffer[i], len) )
 			return -EFAULT;
 		i += len;
+		thread_lock();
                 pktgen_add_device(t, f);
+		thread_unlock();
                 ret = count;
                 sprintf(pg_result, "OK: add_device=%s", f);
 		goto out;
 	}
 
         if (!strcmp(name, "rem_device_all")) {
+		thread_lock();
 		t->control |= T_REMDEV;
+		thread_unlock();
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(HZ/8);  /* Propagate thread->control  */
 		ret = count;
@@ -1456,10 +1459,11 @@ static int proc_thread_write(struct file *file, const char __user *user_buffer,
 		goto out;
 	}
 
-
         if (!strcmp(name, "max_before_softirq")) {
                 len = num_arg(&user_buffer[i], 10, &value);
+		thread_lock();
                 t->max_before_softirq = value;
+		thread_unlock();
                 ret = count;
                 sprintf(pg_result, "OK: max_before_softirq=%lu", value);
 		goto out;
@@ -1467,7 +1471,6 @@ static int proc_thread_write(struct file *file, const char __user *user_buffer,
 
 	ret = -EINVAL;
  out:
-	thread_unlock();
 
 	return ret;
 }
@@ -1682,7 +1685,7 @@ static void pktgen_setup_inject(struct pktgen_dev *pkt_dev)
 					pkt_dev->saddr_min = in_dev->ifa_list->ifa_address;
 					pkt_dev->saddr_max = pkt_dev->saddr_min;
 				}
-				in_dev_put(in_dev);	
+				__in_dev_put(in_dev);	
 			}
 			rcu_read_unlock();
 		}
@@ -2587,7 +2590,7 @@ static void pktgen_rem_thread(struct pktgen_thread *t)
         thread_unlock();
 }
 
-__inline__ void pktgen_xmit(struct pktgen_dev *pkt_dev)
+static __inline__ void pktgen_xmit(struct pktgen_dev *pkt_dev)
 {
 	struct net_device *odev = NULL;
 	__u64 idle_start = 0;
@@ -2651,7 +2654,6 @@ __inline__ void pktgen_xmit(struct pktgen_dev *pkt_dev)
 	
 	spin_lock_bh(&odev->xmit_lock);
 	if (!netif_queue_stopped(odev)) {
-		u64 now;
 
 		atomic_inc(&(pkt_dev->skb->users));
 retry_now:
@@ -2675,23 +2677,17 @@ retry_now:
 			
 			pkt_dev->errors++;
 			pkt_dev->last_ok = 0;
-			pkt_dev->next_tx_us = getCurUs(); /* TODO */
-			pkt_dev->next_tx_ns = 0;
 		}
+
+		pkt_dev->next_tx_us = getCurUs();
+		pkt_dev->next_tx_ns = 0;
 
 		pkt_dev->next_tx_us += pkt_dev->delay_us;
 		pkt_dev->next_tx_ns += pkt_dev->delay_ns;
+
 		if (pkt_dev->next_tx_ns > 1000) {
 			pkt_dev->next_tx_us++;
 			pkt_dev->next_tx_ns -= 1000;
-		}
-
-		now = getCurUs();
-		if (now > pkt_dev->next_tx_us) {
-			/* TODO: this code is slightly wonky.  */
-			pkt_dev->errors++;
-			pkt_dev->next_tx_us = now - pkt_dev->delay_us;
-			pkt_dev->next_tx_ns = 0;
 		}
 	} 
 

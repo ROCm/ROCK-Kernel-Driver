@@ -65,7 +65,7 @@ static const u16 wMaxPacketSize[] = {1023, 959, 895, 831, 767, 703, 639, 575,
 #define W9968CF_PACKET_SIZE      1023 /* according to wMaxPacketSizes[] */
 #define W9968CF_MIN_PACKET_SIZE  63 /* minimum value */
 #define W9968CF_ISO_PACKETS      5 /* n.of packets for isochronous transfers */
-#define W9968CF_USB_CTRL_TIMEOUT HZ /* timeout for usb control commands */
+#define W9968CF_USB_CTRL_TIMEOUT 1000 /* timeout (ms) for usb control commands */
 #define W9968CF_URBS             2 /* n. of scheduled URBs for ISO transfer */
 
 #define W9968CF_I2C_BUS_DELAY    4 /* delay in us for I2C bit r/w operations */

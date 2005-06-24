@@ -432,6 +432,7 @@ void xics_cause_IPI(int cpu)
 {
 	ops->qirr_info(cpu, IPI_PRIORITY);
 }
+#endif /* CONFIG_SMP */
 
 void xics_setup_cpu(void)
 {
@@ -439,9 +440,17 @@ void xics_setup_cpu(void)
 
 	ops->cppr_info(cpu, 0xff);
 	iosync();
-}
 
-#endif /* CONFIG_SMP */
+	/*
+	 * Put the calling processor into the GIQ.  This is really only
+	 * necessary from a secondary thread as the OF start-cpu interface
+	 * performs this function for us on primary threads.
+	 *
+	 * XXX: undo of teardown on kexec needs this too, as may hotplug
+	 */
+	rtas_set_indicator(GLOBAL_INTERRUPT_QUEUE,
+		(1UL << interrupt_server_size) - 1 - default_distrib_server, 1);
+}
 
 void xics_init_IRQ(void)
 {
@@ -563,8 +572,7 @@ nextnode:
 	for (; i < NR_IRQS; ++i)
 		get_irq_desc(i)->handler = &xics_pic;
 
-	ops->cppr_info(boot_cpuid, 0xff);
-	iosync();
+	xics_setup_cpu();
 
 	ppc64_boot_msg(0x21, "XICS Done");
 }
@@ -654,7 +662,7 @@ void xics_migrate_irqs_away(void)
 	/* remove ourselves from the global interrupt queue */
 	status = rtas_set_indicator(GLOBAL_INTERRUPT_QUEUE,
 		(1UL << interrupt_server_size) - 1 - default_distrib_server, 0);
-	WARN_ON(status != 0);
+	WARN_ON(status < 0);
 
 	/* Allow IPIs again... */
 	ops->cppr_info(cpu, DEFAULT_PRIORITY);
@@ -704,15 +712,8 @@ void xics_migrate_irqs_away(void)
 		       virq, cpu);
 
 		/* Reset affinity to all cpus */
-		xics_status[0] = default_distrib_server;
-
-		status = rtas_call(ibm_set_xive, 3, 1, NULL, irq,
-				xics_status[0], xics_status[1]);
-		if (status)
-			printk(KERN_ERR "migrate_irqs_away: irq=%d "
-					"ibm,set-xive returns %d\n",
-					virq, status);
-
+		desc->handler->set_affinity(virq, CPU_MASK_ALL);
+		irq_affinity[virq] = CPU_MASK_ALL;
 unlock:
 		spin_unlock_irqrestore(&desc->lock, flags);
 	}

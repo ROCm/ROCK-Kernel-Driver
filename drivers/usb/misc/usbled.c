@@ -74,7 +74,7 @@ static void change_color(struct usb_led *led)
 				(0x00 * 0x100) + color,
 				buffer,	
 				8,
-				2 * HZ);
+				2000);
 	if (retval)
 		dev_dbg(&led->udev->dev, "retval = %d\n", retval);
 	kfree(buffer);

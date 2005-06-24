@@ -32,7 +32,7 @@
 #include <linux/smp_lock.h>
 #include <linux/syscalls.h>
 
-int sys_pipe(int *fildes)
+int sys_pipe(int __user *fildes)
 {
 	int fd[2];
 	int error;
@@ -161,21 +161,10 @@ asmlinkage unsigned long sys_mmap(unsigned long addr, unsigned long len,
 	}
 }
 
-long sys_shmat_wrapper(int shmid, char *shmaddr, int shmflag)
-{
-	unsigned long raddr;
-	int r;
-
-	r = do_shmat(shmid, shmaddr, shmflag, &raddr);
-	if (r < 0)
-		return r;
-	return raddr;
-}
-
 /* Fucking broken ABI */
 
-#ifdef CONFIG_PARISC64
-asmlinkage long parisc_truncate64(const char * path,
+#ifdef CONFIG_64BIT
+asmlinkage long parisc_truncate64(const char __user * path,
 					unsigned int high, unsigned int low)
 {
 	return sys_truncate(path, (long)high << 32 | low);
@@ -189,7 +178,7 @@ asmlinkage long parisc_ftruncate64(unsigned int fd,
 
 /* stubs for the benefit of the syscall_table since truncate64 and truncate 
  * are identical on LP64 */
-asmlinkage long sys_truncate64(const char * path, unsigned long length)
+asmlinkage long sys_truncate64(const char __user * path, unsigned long length)
 {
 	return sys_truncate(path, length);
 }
@@ -203,7 +192,7 @@ asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg
 }
 #else
 
-asmlinkage long parisc_truncate64(const char * path,
+asmlinkage long parisc_truncate64(const char __user * path,
 					unsigned int high, unsigned int low)
 {
 	return sys_truncate64(path, (loff_t)high << 32 | low);
@@ -216,13 +205,13 @@ asmlinkage long parisc_ftruncate64(unsigned int fd,
 }
 #endif
 
-asmlinkage ssize_t parisc_pread64(unsigned int fd, char *buf, size_t count,
+asmlinkage ssize_t parisc_pread64(unsigned int fd, char __user *buf, size_t count,
 					unsigned int high, unsigned int low)
 {
 	return sys_pread64(fd, buf, count, (loff_t)high << 32 | low);
 }
 
-asmlinkage ssize_t parisc_pwrite64(unsigned int fd, const char *buf,
+asmlinkage ssize_t parisc_pwrite64(unsigned int fd, const char __user *buf,
 			size_t count, unsigned int high, unsigned int low)
 {
 	return sys_pwrite64(fd, buf, count, (loff_t)high << 32 | low);

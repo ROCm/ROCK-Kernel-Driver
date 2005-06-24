@@ -144,8 +144,8 @@ static void irlap_slot_timer_expired(void *data)
 {
 	struct irlap_cb *self = (struct irlap_cb *) data;
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == LAP_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	irlap_do_event(self, SLOT_TIMER_EXPIRED, NULL, NULL);
 } 
@@ -160,8 +160,8 @@ static void irlap_query_timer_expired(void *data)
 {
 	struct irlap_cb *self = (struct irlap_cb *) data;
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == LAP_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	irlap_do_event(self, QUERY_TIMER_EXPIRED, NULL, NULL);
 } 
@@ -176,8 +176,8 @@ static void irlap_final_timer_expired(void *data)
 {
 	struct irlap_cb *self = (struct irlap_cb *) data;
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == LAP_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	irlap_do_event(self, FINAL_TIMER_EXPIRED, NULL, NULL);
 }
@@ -192,8 +192,8 @@ static void irlap_wd_timer_expired(void *data)
 {
 	struct irlap_cb *self = (struct irlap_cb *) data;
 	
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == LAP_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 	
 	irlap_do_event(self, WD_TIMER_EXPIRED, NULL, NULL);
 }
@@ -208,8 +208,8 @@ static void irlap_backoff_timer_expired(void *data)
 {
 	struct irlap_cb *self = (struct irlap_cb *) data;
 	
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == LAP_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 	
 	irlap_do_event(self, BACKOFF_TIMER_EXPIRED, NULL, NULL);
 }
@@ -224,7 +224,7 @@ void irlap_media_busy_expired(void* data)
 {
 	struct irlap_cb *self = (struct irlap_cb *) data;
 
-	ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self != NULL, return;);
 
 	irda_device_set_media_busy(self->netdev, FALSE);
 	/* Note : the LAP event will be send in irlap_stop_mbusy_timer(),

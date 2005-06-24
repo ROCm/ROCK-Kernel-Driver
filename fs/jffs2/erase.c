@@ -33,7 +33,8 @@ static void jffs2_erase_succeeded(struct jffs2_sb_info *c, struct jffs2_eraseblo
 static void jffs2_free_all_node_refs(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 static void jffs2_mark_erased_block(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 
-void jffs2_erase_block(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb)
+static void jffs2_erase_block(struct jffs2_sb_info *c,
+			      struct jffs2_eraseblock *jeb)
 {
 	int ret;
 	uint32_t bad_offset;

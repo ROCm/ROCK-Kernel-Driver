@@ -17,4 +17,13 @@ extern char _end[];
 #define __openfirmware
 #define __openfirmwaredata
 
+
+static inline int in_kernel_text(unsigned long addr)
+{
+	if (addr >= (unsigned long)_stext && addr < (unsigned long)__init_end)
+		return 1;
+
+	return 0;
+}
+
 #endif

@@ -165,25 +165,6 @@ enum {D_PRT, D_PRO, D_UNI, D_MOD, D_SLV, D_DLY};
 
 #include <asm/uaccess.h>
 
-#ifndef MODULE
-
-#include "setup.h"
-
-static STT pg_stt[5] = {
-	{"drive0", 6, drive0},
-	{"drive1", 6, drive1},
-	{"drive2", 6, drive2},
-	{"drive3", 6, drive3},
-	{"disable", 1, &disable}
-};
-
-void pg_setup(char *str, int *ints)
-{
-	generic_setup(pg_stt, 5, str);
-}
-
-#endif
-
 module_param(verbose, bool, 0644);
 module_param(major, int, 0);
 module_param(name, charp, 0);
@@ -235,7 +216,7 @@ struct pg {
 	char name[PG_NAMELEN];	/* pg0, pg1, ... */
 };
 
-struct pg devices[PG_UNITS];
+static struct pg devices[PG_UNITS];
 
 static int pg_identify(struct pg *dev, int log);
 

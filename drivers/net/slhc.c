@@ -693,33 +693,6 @@ slhc_toss(struct slcompress *comp)
 }
 
 
-void slhc_i_status(struct slcompress *comp)
-{
-	if (comp != NULLSLCOMPR) {
-		printk("\t%d Cmp, %d Uncmp, %d Bad, %d Tossed\n",
-			comp->sls_i_compressed,
-			comp->sls_i_uncompressed,
-			comp->sls_i_error,
-			comp->sls_i_tossed);
-	}
-}
-
-
-void slhc_o_status(struct slcompress *comp)
-{
-	if (comp != NULLSLCOMPR) {
-		printk("\t%d Cmp, %d Uncmp, %d AsIs, %d NotTCP\n",
-			comp->sls_o_compressed,
-			comp->sls_o_uncompressed,
-			comp->sls_o_tcp,
-			comp->sls_o_nontcp);
-		printk("\t%10d Searches, %10d Misses\n",
-			comp->sls_o_searches,
-			comp->sls_o_misses);
-	}
-}
-
-/* Should this be surrounded with "#ifdef CONFIG_MODULES" ? */
 /* VJ header compression */
 EXPORT_SYMBOL(slhc_init);
 EXPORT_SYMBOL(slhc_free);

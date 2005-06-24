@@ -124,28 +124,28 @@ static int idmouse_create_image(struct usb_idmouse *dev)
 	   means init..
 	*/
 	result = usb_control_msg (dev->udev, usb_sndctrlpipe (dev->udev, 0),
-				0x21, 0x42, 0x0001, 0x0002, NULL, 0, HZ);
+				0x21, 0x42, 0x0001, 0x0002, NULL, 0, 1000);
 	if (result < 0)
 		return result;
 	result = usb_control_msg (dev->udev, usb_sndctrlpipe (dev->udev, 0),
-				0x20, 0x42, 0x0001, 0x0002, NULL, 0, HZ);
+				0x20, 0x42, 0x0001, 0x0002, NULL, 0, 1000);
 	if (result < 0)
 		return result;
 	result = usb_control_msg (dev->udev, usb_sndctrlpipe (dev->udev, 0),
-				0x22, 0x42, 0x0000, 0x0002, NULL, 0, HZ);
+				0x22, 0x42, 0x0000, 0x0002, NULL, 0, 1000);
 	if (result < 0)
 		return result;
 
 	result = usb_control_msg (dev->udev, usb_sndctrlpipe (dev->udev, 0),
-				0x21, 0x42, 0x0001, 0x0002, NULL, 0, HZ);
+				0x21, 0x42, 0x0001, 0x0002, NULL, 0, 1000);
 	if (result < 0)
 		return result;
 	result = usb_control_msg (dev->udev, usb_sndctrlpipe (dev->udev, 0),
-				0x20, 0x42, 0x0001, 0x0002, NULL, 0, HZ);
+				0x20, 0x42, 0x0001, 0x0002, NULL, 0, 1000);
 	if (result < 0)
 		return result;
 	result = usb_control_msg (dev->udev, usb_sndctrlpipe (dev->udev, 0),
-				0x20, 0x42, 0x0000, 0x0002, NULL, 0, HZ);
+				0x20, 0x42, 0x0000, 0x0002, NULL, 0, 1000);
 	if (result < 0)
 		return result;
 
@@ -154,7 +154,7 @@ static int idmouse_create_image(struct usb_idmouse *dev)
 		result = usb_bulk_msg (dev->udev,
 				usb_rcvbulkpipe (dev->udev, dev->bulk_in_endpointAddr),
 				dev->bulk_in_buffer + bytes_read,
-				dev->bulk_in_size, &bulk_read, HZ * 5);
+				dev->bulk_in_size, &bulk_read, 5000);
 		if (result < 0)
 			return result;
 		if (signal_pending(current))
@@ -164,7 +164,7 @@ static int idmouse_create_image(struct usb_idmouse *dev)
 
 	/* reset the device */
 	result = usb_control_msg (dev->udev, usb_sndctrlpipe (dev->udev, 0),
-				0x22, 0x42, 0x0000, 0x0002, NULL, 0, HZ);
+				0x22, 0x42, 0x0000, 0x0002, NULL, 0, 1000);
 	if (result < 0)
 		return result;
 

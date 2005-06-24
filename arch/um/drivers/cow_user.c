@@ -1,6 +1,9 @@
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
+/* _XOPEN_SOURCE is needed for pread, but we define _GNU_SOURCE, which defines
+ * that.
+ */
 #include <unistd.h>
 #include <byteswap.h>
 #include <sys/time.h>

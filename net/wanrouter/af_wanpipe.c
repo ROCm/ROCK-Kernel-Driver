@@ -394,7 +394,7 @@ static int wanpipe_listen_rcv (struct sk_buff *skb,  struct sock *sk)
 	chan->lcn = mbox_ptr->cmd.lcn;
 	card->u.x.svc_to_dev_map[(chan->lcn%MAX_X25_LCN)] = dev;
 
-	newsk->sk_zapped = 0;
+	sock_reset_flag(newsk, SOCK_ZAPPED);
 	newwp->num = htons(X25_PROT);
 
 	if (wanpipe_do_bind(newsk, dev, newwp->num)) {
@@ -468,12 +468,25 @@ static struct sock *wanpipe_make_new(struct sock *osk)
 	wp_sk(sk)->num	= wp_sk(osk)->num;
 	sk->sk_rcvbuf	= osk->sk_rcvbuf;
 	sk->sk_sndbuf	= osk->sk_sndbuf;
-	sk->sk_debug	= osk->sk_debug;
 	sk->sk_state	= WANSOCK_CONNECTING;
 	sk->sk_sleep	= osk->sk_sleep;
 
+	if (sock_flag(osk, SOCK_DBG))
+		sock_set_flag(sk, SOCK_DBG);
+
 	return sk;
 }
+
+/* 
+ * FIXME: wanpipe_opt has to include a sock in its definition and stop using
+ * sk_protinfo, but this code is not even compilable now, so lets leave it for
+ * later.
+ */
+static struct proto wanpipe_proto = {
+	.name	  = "WANPIPE",
+	.owner	  = THIS_MODULE,
+	.obj_size = sizeof(struct sock),
+};
 
 /*============================================================
  * wanpipe_make_new
@@ -493,7 +506,7 @@ static struct sock *wanpipe_alloc_socket(void)
 	struct sock *sk;
 	struct wanpipe_opt *wan_opt;
 
-	if ((sk = sk_alloc(PF_WANPIPE, GFP_ATOMIC, 1, NULL)) == NULL)
+	if ((sk = sk_alloc(PF_WANPIPE, GFP_ATOMIC, &wanpipe_proto, 1)) == NULL)
 		return NULL;
 
 	if ((wan_opt = kmalloc(sizeof(struct wanpipe_opt), GFP_ATOMIC)) == NULL) {
@@ -546,7 +559,7 @@ static int wanpipe_sendmsg(struct kiocb *iocb, struct socket *sock,
 	int ifindex, err, reserve = 0;
 
 	
-	if (!sk->sk_zapped)
+	if (!sock_flag(sk, SOCK_ZAPPED))
 		return -ENETDOWN;
 
 	if (sk->sk_state != WANSOCK_CONNECTED)
@@ -672,7 +685,7 @@ static void wanpipe_delayed_transmit (unsigned long data)
 		return;
 	}
 	
-	if (sk->sk_state != WANSOCK_CONNECTED || !sk->sk_zapped) {
+	if (sk->sk_state != WANSOCK_CONNECTED || !sock_flag(sk, SOCK_ZAPPED)) {
 		clear_bit(0, &wp->timer);
 		DBG_PRINTK(KERN_INFO "wansock: Tx Timer, State not CONNECTED\n");
 		return;
@@ -865,7 +878,7 @@ static void wanpipe_unlink_driver (struct sock *sk)
 	struct net_device *dev;
 	wanpipe_common_t *chan=NULL;
 
-	sk->sk_zapped = 0;
+	sock_reset_flag(sk, SOCK_ZAPPED);
 	sk->sk_state = WANSOCK_DISCONNECTED;
 	wp_sk(sk)->dev = NULL;
 
@@ -914,7 +927,7 @@ static void wanpipe_link_driver(struct net_device *dev, struct sock *sk)
 	chan->mbox = wp->mbox;
 	chan->tx_timer = &wp->tx_timer;
 	wp->dev = dev;
-	sk->sk_zapped = 1;
+	sock_set_flag(sk, SOCK_ZAPPED);
 	clear_bit(0,&chan->common_critical);
 }
 
@@ -964,7 +977,7 @@ static int wanpipe_release(struct socket *sock)
 	 */
 
 	if (wp->num == htons(X25_PROT) &&
-	    sk->sk_state != WANSOCK_DISCONNECTED && sk->sk_zapped) {
+	    sk->sk_state != WANSOCK_DISCONNECTED && sock_flag(sk, SOCK_ZAPPED)) {
 		struct net_device *dev = dev_get_by_index(sk->sk_bound_dev_if);
 		wanpipe_common_t *chan;
 		if (dev){
@@ -1075,15 +1088,15 @@ static void release_driver(struct sock *sk)
 			}
 			kfree_skb(skb);
 		}
-		if (sk->sk_zapped)
+		if (sock_flag(sk, SOCK_ZAPPED))
 			wanpipe_unlink_card(sk);
 	}else{
-		if (sk->sk_zapped)
+		if (sock_flag(sk, SOCK_ZAPPED))
 			wanpipe_unlink_driver(sk);
 	}
 	sk->sk_state	    = WANSOCK_DISCONNECTED;
 	sk->sk_bound_dev_if = 0;
-	sk->sk_zapped	    = 0;
+	sock_reset_flag(sk, SOCK_ZAPPED);
 	wp = wp_sk(sk);
 
 	if (wp && wp->mbox) {
@@ -1261,7 +1274,7 @@ static int wanpipe_do_bind(struct sock *sk, struct net_device *dev,
 	wanpipe_common_t *chan=NULL;
 	int err=0;
 
-	if (sk->sk_zapped) {
+	if (sock_flag(sk, SOCK_ZAPPED)) {
 		err = -EALREADY;
 		goto bind_unlock_exit;
 	}
@@ -1515,7 +1528,7 @@ static int wanpipe_create(struct socket *sock, int protocol)
 	sock->ops = &wanpipe_ops;
 	sock_init_data(sock,sk);
 
-	sk->sk_zapped	    = 0;
+	sock_reset_flag(sk, SOCK_ZAPPED);
 	sk->sk_family	    = PF_WANPIPE;
 	wp_sk(sk)->num	    = protocol;
 	sk->sk_state	    = WANSOCK_DISCONNECTED;
@@ -1721,7 +1734,7 @@ static int wanpipe_notifier(struct notifier_block *this, unsigned long msg, void
 		case NETDEV_UNREGISTER:
 			if (dev->ifindex == sk->sk_bound_dev_if) {
 				printk(KERN_INFO "wansock: Device down %s\n",dev->name);
-				if (sk->sk_zapped) {
+				if (sock_flag(sk, SOCK_ZAPPED)) {
 					wanpipe_unlink_driver(sk);
 					sk->sk_err = ENETDOWN;
 					sk->sk_error_report(sk);
@@ -1737,7 +1750,7 @@ static int wanpipe_notifier(struct notifier_block *this, unsigned long msg, void
 			break;
 		case NETDEV_UP:
 			if (dev->ifindex == sk->sk_bound_dev_if &&
-			    po->num && !sk->sk_zapped) {
+			    po->num && !sock_flag(sk, SOCK_ZAPPED)) {
 				printk(KERN_INFO "wansock: Registering Device: %s\n",
 						dev->name);
 				wanpipe_link_driver(dev,sk);
@@ -2160,7 +2173,7 @@ static int wanpipe_link_card (struct sock *sk)
 
 	card->sk=sk;
 	card->func=wanpipe_listen_rcv;
-	sk->sk_zapped = 1;
+	sock_set_flag(sk, SOCK_ZAPPED);
  
 	return 0;
 }
@@ -2504,7 +2517,7 @@ static int wanpipe_connect(struct socket *sock, struct sockaddr *uaddr, int addr
 
 	dev_put(dev);
 	
-	if (!sk->sk_zapped) /* Must bind first - autobinding does not work */
+	if (!sock_flag(sk, SOCK_ZAPPED)) /* Must bind first - autobinding does not work */
 		return -EINVAL;
 
 	sock->state   = SS_CONNECTING;
@@ -2575,17 +2588,23 @@ void cleanup_module(void)
 	printk(KERN_INFO "wansock: Cleaning up \n");
 	unregister_netdevice_notifier(&wanpipe_netdev_notifier);
 	sock_unregister(PF_WANPIPE);
-	return;
+	proto_unregister(&wanpipe_proto);
 }
-
 
 int init_module(void)
 {
+	int rc;
 
 	printk(KERN_INFO "wansock: Registering Socket \n");
+
+	rc = proto_register(&wanpipe_proto, 0);
+	if (rc != 0)
+		goto out;
+
 	sock_register(&wanpipe_family_ops);
 	register_netdevice_notifier(&wanpipe_netdev_notifier);
-	return 0;
+out:
+	return rc;
 }
 #endif
 MODULE_LICENSE("GPL");

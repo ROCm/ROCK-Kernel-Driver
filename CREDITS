@@ -34,8 +34,9 @@ N: Dave Airlie
 E: airlied@linux.ie
 W: http://www.csn.ul.ie/~airlied
 D: NFS over TCP patches
-S: University of Limerick
-S: Ireland
+D: in-kernel DRM Maintainer
+S: Longford, Ireland
+S: Sydney, Australia
 
 N: Tigran A. Aivazian
 E: tigran@veritas.com
@@ -328,8 +329,6 @@ S: Brimson, MN  55602
 S: USA
 
 N: Hennus Bergman
-E: hennus@cybercomm.nl
-W: http://www.cybercomm.nl/~hennus/
 P: 1024/77D50909 76 99 FD 31 91 E1 96 1C  90 BB 22 80 62 F6 BD 63
 D: Author and maintainer of the QIC-02 tape driver
 S: The Netherlands
@@ -340,7 +339,7 @@ W: http://tomas.nocrew.org/
 D: dsp56k device driver
 
 N: Ross Biro
-E: bir7@leland.Stanford.Edu
+E: ross.biro@gmail.com
 D: Original author of the Linux networking code
 
 N: Anton Blanchard
@@ -841,6 +840,11 @@ E: cort@fsmlabs.com
 W: http://www.fsmlabs.com/linuxppcbk.html
 D: PowerPC
 
+N: Daniel Drake
+E: dsd@gentoo.org
+D: USBAT02 CompactFlash support in usb-storage
+S: UK
+
 N: Oleg Drokin
 E: green@ccssu.crimea.ua
 W: http://www.ccssu.crimea.ua/~green
@@ -878,13 +882,12 @@ S: Blacksburg, Virginia 24061
 S: USA
 
 N: Randy Dunlap
-E: rddunlap@osdl.org
+E: rdunlap@xenotime.net
 W: http://www.xenotime.net/linux/linux.html
 W: http://www.linux-usb.org
 D: Linux-USB subsystem, USB core/UHCI/printer/storage drivers
 D: x86 SMP, ACPI, bootflag hacking
-S: 12725 SW Millikan Way, Suite 400
-S: Beaverton, Oregon 97005
+S: (ask for current address)
 S: USA
 
 N: Bob Dunlop
@@ -1095,7 +1098,7 @@ S: Brazil
 
 N: Kumar Gala
 E: kumar.gala@freescale.com
-D: Embedded PowerPC 6xx/7xx/74xx/82xx/85xx support
+D: Embedded PowerPC 6xx/7xx/74xx/82xx/83xx/85xx support
 S: Austin, Texas 78729
 S: USA
 
@@ -1954,7 +1957,8 @@ S: Germany
 N: Colin Leroy
 E: colin@colino.net
 W: http://www.geekounet.org/
-D: PowerMac adt7467 fan driver
+D: PowerMac adt746x fan driver
+D: Random fixing of various drivers (macintosh, usb, sound)
 S: Toulouse
 S: France
 
@@ -2471,13 +2475,9 @@ S: Potsdam, New York 13676
 S: USA
 
 N: Dave Neuer
-E: dneuer@innovation-charter.com
-E: mr_fred_smoothie@yahoo.com
+E: dave.neuer@pobox.com
 D: Helped implement support for Compaq's H31xx series iPAQs
 D: Other mostly minor tweaks & bugfixes
-S: 325 E. Main St., Suite 3
-S: Carnegie, PA 15105
-S: USA
 
 N: Michael Neuffer
 E: mike@i-Connect.Net
@@ -3294,6 +3294,7 @@ D: Author of the new e2fsck
 D: Author of job control and system call restart code
 D: Author of ramdisk device driver
 D: Author of loopback device driver
+D: Author of /dev/random driver
 S: MIT Room E40-343
 S: 1 Amherst Street
 S: Cambridge, Massachusetts 02139
@@ -3351,10 +3352,11 @@ S: Santa Clara, CA 95054
 S: USA
 
 N: Matthias Urlichs
-E: urlichs@noris.de
-E: urlichs@smurf.sub.org
+E: smurf@smurf.noris.de
+E: smurf@debian.org
+E: matthias@urlichs.de
 D: Consultant, developer, kernel hacker
-D: Playing with Streams, ISDN, and BSD networking code for Linux
+D: In a previous life, worked on Streams/ISDN/BSD networking code for Linux
 S: Schleiermacherstrasse 12
 S: 90491 Nuernberg
 S: Germany

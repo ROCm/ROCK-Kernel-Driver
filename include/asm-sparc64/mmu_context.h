@@ -4,23 +4,6 @@
 
 /* Derived heavily from Linus's Alpha/AXP ASN code... */
 
-#include <asm/page.h>
-
-/*
- * For the 8k pagesize kernel, use only 10 hw context bits to optimize some shifts in
- * the fast tlbmiss handlers, instead of all 13 bits (specifically for vpte offset
- * calculation). For other pagesizes, this optimization in the tlbhandlers can not be 
- * done; but still, all 13 bits can not be used because the tlb handlers use "andcc"
- * instruction which sign extends 13 bit arguments.
- */
-#if PAGE_SHIFT == 13
-#define CTX_VERSION_SHIFT	10
-#define TAG_CONTEXT_BITS	0x3ff
-#else
-#define CTX_VERSION_SHIFT	12
-#define TAG_CONTEXT_BITS	0xfff
-#endif
-
 #ifndef __ASSEMBLY__
 
 #include <linux/spinlock.h>
@@ -35,19 +18,14 @@ extern spinlock_t ctx_alloc_lock;
 extern unsigned long tlb_context_cache;
 extern unsigned long mmu_context_bmap[];
 
-#define CTX_VERSION_MASK	((~0UL) << CTX_VERSION_SHIFT)
-#define CTX_FIRST_VERSION	((1UL << CTX_VERSION_SHIFT) + 1UL)
-#define CTX_VALID(__ctx)	\
-	 (!(((__ctx) ^ tlb_context_cache) & CTX_VERSION_MASK))
-#define CTX_HWBITS(__ctx)	((__ctx) & ~CTX_VERSION_MASK)
-
 extern void get_new_mmu_context(struct mm_struct *mm);
 
 /* Initialize a new mmu context.  This is invoked when a new
  * address space instance (unique or shared) is instantiated.
  * This just needs to set mm->context to an invalid context.
  */
-#define init_new_context(__tsk, __mm)	(((__mm)->context = 0UL), 0)
+#define init_new_context(__tsk, __mm)	\
+	(((__mm)->context.sparc64_ctx_val = 0UL), 0)
 
 /* Destroy a dead context.  This occurs when mmput drops the
  * mm_users count to zero, the mmaps have been released, and
@@ -59,7 +37,7 @@ extern void get_new_mmu_context(struct mm_struct *mm);
 #define destroy_context(__mm)					\
 do {	spin_lock(&ctx_alloc_lock);				\
 	if (CTX_VALID((__mm)->context)) {			\
-		unsigned long nr = CTX_HWBITS((__mm)->context);	\
+		unsigned long nr = CTX_NRBITS((__mm)->context);	\
 		mmu_context_bmap[nr>>6] &= ~(1UL << (nr & 63));	\
 	}							\
 	spin_unlock(&ctx_alloc_lock);				\
@@ -101,7 +79,7 @@ do { \
 			     "flush	%%g6" \
 			     : /* No outputs */ \
 			     : "r" (CTX_HWBITS((__mm)->context)), \
-			       "r" (0x10), "i" (ASI_DMMU))
+			       "r" (SECONDARY_CONTEXT), "i" (ASI_DMMU))
 
 extern void __flush_tlb_mm(unsigned long, unsigned long);
 
@@ -135,7 +113,8 @@ static inline void switch_mm(struct mm_struct *old_mm, struct mm_struct *mm, str
 		 */
 		if (!ctx_valid || !cpu_isset(cpu, mm->cpu_vm_mask)) {
 			cpu_set(cpu, mm->cpu_vm_mask);
-			__flush_tlb_mm(CTX_HWBITS(mm->context), SECONDARY_CONTEXT);
+			__flush_tlb_mm(CTX_HWBITS(mm->context),
+				       SECONDARY_CONTEXT);
 		}
 	}
 	spin_unlock(&mm->page_table_lock);

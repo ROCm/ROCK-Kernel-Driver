@@ -207,7 +207,6 @@ void savagefb_create_i2c_busses(struct fb_info *info)
 
 	savage_setup_i2c_bus(&par->chan, "SAVAGE DDC2");
 }
-EXPORT_SYMBOL(savagefb_create_i2c_busses);
 
 void savagefb_delete_i2c_busses(struct fb_info *info)
 {
@@ -222,7 +221,6 @@ void savagefb_delete_i2c_busses(struct fb_info *info)
 
 	par->chan.par = NULL;
 }
-EXPORT_SYMBOL(savagefb_delete_i2c_busses);
 
 static u8 *savage_do_probe_i2c_edid(struct savagefb_i2c_chan *chan)
 {
@@ -280,6 +278,5 @@ int savagefb_probe_i2c_connector(struct savagefb_par *par, u8 **out_edid)
 
 	return 0;
 }
-EXPORT_SYMBOL(savagefb_probe_i2c_connector);
 
 MODULE_LICENSE("GPL");

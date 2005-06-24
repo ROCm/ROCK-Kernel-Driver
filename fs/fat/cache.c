@@ -203,124 +203,6 @@ void fat_cache_inval_inode(struct inode *inode)
 	spin_unlock(&MSDOS_I(inode)->cache_lru_lock);
 }
 
-static int __fat_access(struct super_block *sb, int nr, int new_value)
-{
-	struct msdos_sb_info *sbi = MSDOS_SB(sb);
-	struct buffer_head *bh, *bh2, *c_bh, *c_bh2;
-	unsigned char *p_first, *p_last;
-	int copy, first, last, next, b;
-
-	if (sbi->fat_bits == 32) {
-		first = last = nr*4;
-	} else if (sbi->fat_bits == 16) {
-		first = last = nr*2;
-	} else {
-		first = nr*3/2;
-		last = first+1;
-	}
-	b = sbi->fat_start + (first >> sb->s_blocksize_bits);
-	if (!(bh = sb_bread(sb, b))) {
-		printk(KERN_ERR "FAT: bread(block %d) in"
-		       " fat_access failed\n", b);
-		return -EIO;
-	}
-	if ((first >> sb->s_blocksize_bits) == (last >> sb->s_blocksize_bits)) {
-		bh2 = bh;
-	} else {
-		if (!(bh2 = sb_bread(sb, b + 1))) {
-			brelse(bh);
-			printk(KERN_ERR "FAT: bread(block %d) in"
-			       " fat_access failed\n", b + 1);
-			return -EIO;
-		}
-	}
-	if (sbi->fat_bits == 32) {
-		p_first = p_last = NULL; /* GCC needs that stuff */
-		next = le32_to_cpu(((__le32 *) bh->b_data)[(first &
-		    (sb->s_blocksize - 1)) >> 2]);
-		/* Fscking Microsoft marketing department. Their "32" is 28. */
-		next &= 0x0fffffff;
-	} else if (sbi->fat_bits == 16) {
-		p_first = p_last = NULL; /* GCC needs that stuff */
-		next = le16_to_cpu(((__le16 *) bh->b_data)[(first &
-		    (sb->s_blocksize - 1)) >> 1]);
-	} else {
-		p_first = &((__u8 *)bh->b_data)[first & (sb->s_blocksize - 1)];
-		p_last = &((__u8 *)bh2->b_data)[(first + 1) & (sb->s_blocksize - 1)];
-		if (nr & 1)
-			next = ((*p_first >> 4) | (*p_last << 4)) & 0xfff;
-		else
-			next = (*p_first+(*p_last << 8)) & 0xfff;
-	}
-	if (new_value != -1) {
-		if (sbi->fat_bits == 32) {
-			((__le32 *)bh->b_data)[(first & (sb->s_blocksize - 1)) >> 2]
-				= cpu_to_le32(new_value);
-		} else if (sbi->fat_bits == 16) {
-			((__le16 *)bh->b_data)[(first & (sb->s_blocksize - 1)) >> 1]
-				= cpu_to_le16(new_value);
-		} else {
-			if (nr & 1) {
-				*p_first = (*p_first & 0xf) | (new_value << 4);
-				*p_last = new_value >> 4;
-			}
-			else {
-				*p_first = new_value & 0xff;
-				*p_last = (*p_last & 0xf0) | (new_value >> 8);
-			}
-			mark_buffer_dirty(bh2);
-		}
-		mark_buffer_dirty(bh);
-		for (copy = 1; copy < sbi->fats; copy++) {
-			b = sbi->fat_start + (first >> sb->s_blocksize_bits)
-				+ sbi->fat_length * copy;
-			if (!(c_bh = sb_bread(sb, b)))
-				break;
-			if (bh != bh2) {
-				if (!(c_bh2 = sb_bread(sb, b+1))) {
-					brelse(c_bh);
-					break;
-				}
-				memcpy(c_bh2->b_data, bh2->b_data, sb->s_blocksize);
-				mark_buffer_dirty(c_bh2);
-				brelse(c_bh2);
-			}
-			memcpy(c_bh->b_data, bh->b_data, sb->s_blocksize);
-			mark_buffer_dirty(c_bh);
-			brelse(c_bh);
-		}
-	}
-	brelse(bh);
-	if (bh != bh2)
-		brelse(bh2);
-	return next;
-}
-
-/*
- * Returns the this'th FAT entry, -1 if it is an end-of-file entry. If
- * new_value is != -1, that FAT entry is replaced by it.
- */
-int fat_access(struct super_block *sb, int nr, int new_value)
-{
-	int next;
-
-	next = -EIO;
-	if (nr < FAT_START_ENT || MSDOS_SB(sb)->max_cluster <= nr) {
-		fat_fs_panic(sb, "invalid access to FAT (entry 0x%08x)", nr);
-		goto out;
-	}
-	if (new_value == FAT_ENT_EOF)
-		new_value = EOF_FAT(sb);
-
-	next = __fat_access(sb, nr, new_value);
-	if (next < 0)
-		goto out;
-	if (next >= BAD_FAT(sb))
-		next = FAT_ENT_EOF;
-out:
-	return next;
-}
-
 static inline int cache_contiguous(struct fat_cache_id *cid, int dclus)
 {
 	cid->nr_contig++;
@@ -339,6 +221,7 @@ int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
 {
 	struct super_block *sb = inode->i_sb;
 	const int limit = sb->s_maxbytes >> MSDOS_SB(sb)->cluster_bits;
+	struct fat_entry fatent;
 	struct fat_cache_id cid;
 	int nr;
 
@@ -357,34 +240,40 @@ int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
 		cache_init(&cid, -1, -1);
 	}
 
+	fatent_init(&fatent);
 	while (*fclus < cluster) {
 		/* prevent the infinite loop of cluster chain */
 		if (*fclus > limit) {
 			fat_fs_panic(sb, "%s: detected the cluster chain loop"
 				     " (i_pos %lld)", __FUNCTION__,
 				     MSDOS_I(inode)->i_pos);
-			return -EIO;
+			nr = -EIO;
+			goto out;
 		}
 
-		nr = fat_access(sb, *dclus, -1);
+		nr = fat_ent_read(inode, &fatent, *dclus);
 		if (nr < 0)
-			return nr;
+			goto out;
 		else if (nr == FAT_ENT_FREE) {
 			fat_fs_panic(sb, "%s: invalid cluster chain"
 				     " (i_pos %lld)", __FUNCTION__,
 				     MSDOS_I(inode)->i_pos);
-			return -EIO;
+			nr = -EIO;
+			goto out;
 		} else if (nr == FAT_ENT_EOF) {
 			fat_cache_add(inode, &cid);
-			return FAT_ENT_EOF;
+			goto out;
 		}
 		(*fclus)++;
 		*dclus = nr;
 		if (!cache_contiguous(&cid, *dclus))
 			cache_init(&cid, *fclus, *dclus);
 	}
+	nr = 0;
 	fat_cache_add(inode, &cid);
-	return 0;
+out:
+	fatent_brelse(&fatent);
+	return nr;
 }
 
 static int fat_bmap_cluster(struct inode *inode, int cluster)
@@ -414,9 +303,7 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys)
 	int cluster, offset;
 
 	*phys = 0;
-	if ((sbi->fat_bits != 32) &&
-	    (inode->i_ino == MSDOS_ROOT_INO || (S_ISDIR(inode->i_mode) &&
-	     !MSDOS_I(inode)->i_start))) {
+	if ((sbi->fat_bits != 32) && (inode->i_ino == MSDOS_ROOT_INO)) {
 		if (sector < (sbi->dir_entries >> sbi->dir_per_block_bits))
 			*phys = sector + sbi->dir_start;
 		return 0;

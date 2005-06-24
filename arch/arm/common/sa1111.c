@@ -800,7 +800,7 @@ struct sa1111_save_data {
 
 #ifdef CONFIG_PM
 
-static int sa1111_suspend(struct device *dev, u32 state, u32 level)
+static int sa1111_suspend(struct device *dev, pm_message_t state, u32 level)
 {
 	struct sa1111 *sachip = dev_get_drvdata(dev);
 	struct sa1111_save_data *save;

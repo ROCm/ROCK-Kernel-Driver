@@ -577,10 +577,10 @@ cpqhp_set_attention_status(struct controller *ctrl, struct pci_func *func,
 {
 	u8 hp_slot;
 
-	hp_slot = func->device - ctrl->slot_device_offset;
-
 	if (func == NULL)
 		return(1);
+
+	hp_slot = func->device - ctrl->slot_device_offset;
 
 	// Wait for exclusive access to hardware
 	down(&ctrl->crit_sect);

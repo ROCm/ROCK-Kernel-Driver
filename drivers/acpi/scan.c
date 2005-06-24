@@ -27,6 +27,10 @@ static LIST_HEAD(acpi_device_list);
 DEFINE_SPINLOCK(acpi_device_lock);
 LIST_HEAD(acpi_wakeup_device_list);
 
+static int
+acpi_bus_trim(struct acpi_device	*start,
+		int rmdevice);
+
 static void acpi_device_release(struct kobject * kobj)
 {
 	struct acpi_device * dev = container_of(kobj,struct acpi_device,kobj);
@@ -81,12 +85,37 @@ static struct kobj_type ktype_acpi_ns = {
 	.release	= acpi_device_release,
 };
 
+static int namespace_hotplug(struct kset *kset, struct kobject *kobj,
+			     char **envp, int num_envp, char *buffer,
+			     int buffer_size)
+{
+	struct acpi_device *dev = to_acpi_device(kobj);
+	int i = 0;
+	int len = 0;
+
+	if (!dev->driver)
+		return 0;
+
+	if (add_hotplug_env_var(envp, num_envp, &i, buffer, buffer_size, &len,
+				"PHYSDEVDRIVER=%s", dev->driver->name))
+		return -ENOMEM;
+
+	envp[i] = NULL;
+
+	return 0;
+}
+
+static struct kset_hotplug_ops namespace_hotplug_ops = {
+	.hotplug = &namespace_hotplug,
+};
+
 static struct kset acpi_namespace_kset = {
 	.kobj		= { 
 		.name = "namespace",
 	},
 	.subsys = &acpi_subsys,
 	.ktype	= &ktype_acpi_ns,
+	.hotplug_ops = &namespace_hotplug_ops,
 };
 
 
@@ -350,15 +379,23 @@ ACPI_DEVICE_ATTR(eject, 0200, NULL, acpi_eject_store);
 
 /**
  * setup_sys_fs_device_files - sets up the device files under device namespace
- * @@dev:	acpi_device object
- * @@func:	function pointer to create or destroy the device file
+ * @dev:	acpi_device object
+ * @func:	function pointer to create or destroy the device file
  */
 static void
 setup_sys_fs_device_files (
 	struct acpi_device *dev,
 	acpi_device_sysfs_files *func)
 {
-	if (dev->flags.ejectable == 1)
+	acpi_status		status;
+	acpi_handle		temp = NULL;
+
+	/*
+	 * If device has _EJ0, 'eject' file is created that is used to trigger
+	 * hot-removal function from userland.
+	 */
+	status = acpi_get_handle(dev->handle, "_EJ0", &temp);
+	if (ACPI_SUCCESS(status))
 		(*(func))(&dev->kobj,&acpi_device_attr_eject.attr);
 }
 
@@ -857,7 +894,7 @@ static void acpi_device_set_id(struct acpi_device * device, struct acpi_device *
 	acpi_os_free(buffer.pointer);
 }
 
-int acpi_device_set_context(struct acpi_device * device, int type)
+static int acpi_device_set_context(struct acpi_device * device, int type)
 {
 	acpi_status status = AE_OK;
 	int result = 0;
@@ -882,7 +919,7 @@ int acpi_device_set_context(struct acpi_device * device, int type)
 	return result;
 }
 
-void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle, int type)
+static void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle, int type)
 {
 #ifdef CONFIG_ACPI_DEBUG_OUTPUT
 	char		*type_string = NULL;
@@ -925,7 +962,7 @@ void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle,
 }
 
 
-int
+static int
 acpi_bus_remove (
 	struct acpi_device *dev,
 	int rmdevice)
@@ -1223,7 +1260,7 @@ int acpi_bus_scan (struct acpi_device	*start)
 EXPORT_SYMBOL(acpi_bus_scan);
 
 
-int
+static int
 acpi_bus_trim(struct acpi_device	*start,
 		int rmdevice)
 {

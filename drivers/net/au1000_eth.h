@@ -1,9 +1,12 @@
 /*
- * Alchemy Semi Au1000 ethernet driver include file
+ *
+ * Alchemy Au1x00 ethernet driver include file
  *
  * Author: Pete Popov <ppopov@mvista.com>
  *
  * Copyright 2001 MontaVista Software Inc.
+ *
+ * ########################################################################
  *
  *  This program is free software; you can distribute it and/or modify it
  *  under the terms of the GNU General Public License (Version 2) as
@@ -17,14 +20,16 @@
  *  You should have received a copy of the GNU General Public License along
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+ *
+ * ########################################################################
+ *
+ * 
  */
-#include <linux/config.h>
 
 
-#define NUM_INTERFACES 2
 #define MAC_IOSIZE 0x10000
-#define NUM_RX_DMA 4       /* Au1000 has 4 rx hardware descriptors */
-#define NUM_TX_DMA 4       /* Au1000 has 4 tx hardware descriptors */
+#define NUM_RX_DMA 4       /* Au1x00 has 4 rx hardware descriptors */
+#define NUM_TX_DMA 4       /* Au1x00 has 4 tx hardware descriptors */
 
 #define NUM_RX_BUFFS 4
 #define NUM_TX_BUFFS 4
@@ -32,12 +37,6 @@
 
 #define ETH_TX_TIMEOUT HZ/4
 #define MAC_MIN_PKT_SIZE 64
-
-#if defined(CONFIG_MIPS_PB1000) || defined(CONFIG_MIPS_PB1500) || defined(CONFIG_MIPS_PB1100)
-#define PHY_ADDRESS              0
-#define PHY_CONTROL_DEFAULT 0x3000
-#define PHY_CONTROL_REG_ADDR     0
-#endif
 
 #define MULTICAST_FILTER_LIMIT 64
 
@@ -54,11 +53,13 @@
 #define MII_ANLPAR  0x0005
 #define MII_AEXP    0x0006
 #define MII_ANEXT   0x0007
-#define MII_LSI_CONFIG 0x0011
-#define MII_LSI_STAT   0x0012
-#define MII_AUX_CNTRL  0x0018
-#define MII_INT        0x001A
+#define MII_LSI_PHY_CONFIG 0x0011
+/* Status register */
+#define MII_LSI_PHY_STAT   0x0012
+#define MII_AMD_PHY_STAT   MII_LSI_PHY_STAT
+#define MII_INTEL_PHY_STAT 0x0011
 
+#define MII_AUX_CNTRL  0x0018
 /* mii registers specific to AMD 79C901 */
 #define	MII_STATUS_SUMMARY = 0x0018
 
@@ -121,23 +122,30 @@
 #define	MII_STSSUM_AUTO  0x0002
 #define MII_STSSUM_SPD   0x0001
 
-/* lsi status register */
+/* lsi phy status register */
+#define MII_LSI_PHY_STAT_FDX	0x0040
+#define MII_LSI_PHY_STAT_SPD	0x0080
 
-#define MII_LSI_STAT_FDX	0x0040
-#define MII_LSI_STAT_SPD	0x0080
+/* amd phy status register */
+#define MII_AMD_PHY_STAT_FDX	0x0800
+#define MII_AMD_PHY_STAT_SPD	0x0400
+
+/* intel phy status register */
+#define MII_INTEL_PHY_STAT_FDX	0x0200
+#define MII_INTEL_PHY_STAT_SPD	0x4000
 
 /* Auxilliary Control/Status Register */
 #define MII_AUX_FDX      0x0001
 #define MII_AUX_100      0x0002
 #define MII_AUX_F100     0x0004
 #define MII_AUX_ANEG     0x0008
-#define MII_FDX_LED	 0x8000
 
 typedef struct mii_phy {
 	struct mii_phy * next;
 	struct mii_chip_info * chip_info;
-	int phy_addr;
 	u16 status;
+	u32 *mii_control_reg;
+	u32 *mii_data_reg;
 } mii_phy_t;
 
 struct phy_ops {
@@ -197,7 +205,6 @@ struct au1000_private {
 	db_dest_t db[NUM_RX_BUFFS+NUM_TX_BUFFS];
 	volatile rx_dma_t *rx_dma_ring[NUM_RX_DMA];
 	volatile tx_dma_t *tx_dma_ring[NUM_TX_DMA];
-	int tx_len[NUM_TX_DMA];
 	db_dest_t *rx_db_inuse[NUM_RX_DMA];
 	db_dest_t *tx_db_inuse[NUM_TX_DMA];
 	u32 rx_head;
@@ -205,6 +212,7 @@ struct au1000_private {
 	u32 tx_tail;
 	u32 tx_full;
 
+	int mac_id;
 	mii_phy_t *mii;
 	struct phy_ops *phy_ops;
 	
@@ -218,9 +226,10 @@ struct au1000_private {
 	u8 *hash_table;
 	u32 hash_mode;
 	u32 intr_work_done; /* number of Rx and Tx pkts processed in the isr */
-	u32 phy_addr;          /* PHY address */
+	int phy_addr;          /* phy address */
 	u32 options;           /* User-settable misc. driver options. */
 	u32 drv_flags;
+	int want_autoneg;
 	struct net_device_stats stats;
 	struct timer_list timer;
 	spinlock_t lock;       /* Serialise access to device */

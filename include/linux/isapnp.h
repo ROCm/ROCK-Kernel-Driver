@@ -100,16 +100,7 @@ int isapnp_present(void);
 int isapnp_cfg_begin(int csn, int device);
 int isapnp_cfg_end(void);
 unsigned char isapnp_read_byte(unsigned char idx);
-unsigned short isapnp_read_word(unsigned char idx);
-unsigned int isapnp_read_dword(unsigned char idx);
 void isapnp_write_byte(unsigned char idx, unsigned char val);
-void isapnp_write_word(unsigned char idx, unsigned short val);
-void isapnp_write_dword(unsigned char idx, unsigned int val);
-void isapnp_wake(unsigned char csn);
-void isapnp_device(unsigned char device);
-void isapnp_activate(unsigned char device);
-void isapnp_deactivate(unsigned char device);
-void *isapnp_alloc(long size);
 
 #ifdef CONFIG_PROC_FS
 int isapnp_proc_init(void);
@@ -118,9 +109,6 @@ int isapnp_proc_done(void);
 static inline int isapnp_proc_init(void) { return 0; }
 static inline int isapnp_proc_done(void) { return 0; }
 #endif
-
-/* init/main.c */
-int isapnp_init(void);
 
 /* compat */
 struct pnp_card *pnp_find_card(unsigned short vendor,
@@ -138,15 +126,7 @@ static inline int isapnp_present(void) { return 0; }
 static inline int isapnp_cfg_begin(int csn, int device) { return -ENODEV; }
 static inline int isapnp_cfg_end(void) { return -ENODEV; }
 static inline unsigned char isapnp_read_byte(unsigned char idx) { return 0xff; }
-static inline unsigned short isapnp_read_word(unsigned char idx) { return 0xffff; }
-static inline unsigned int isapnp_read_dword(unsigned char idx) { return 0xffffffff; }
 static inline void isapnp_write_byte(unsigned char idx, unsigned char val) { ; }
-static inline void isapnp_write_word(unsigned char idx, unsigned short val) { ; }
-static inline void isapnp_write_dword(unsigned char idx, unsigned int val) { ; }
-static inline void isapnp_wake(unsigned char csn) { ; }
-static inline void isapnp_device(unsigned char device) { ; }
-static inline void isapnp_activate(unsigned char device) { ; }
-static inline void isapnp_deactivate(unsigned char device) { ; }
 
 static inline struct pnp_card *pnp_find_card(unsigned short vendor,
 					     unsigned short device,

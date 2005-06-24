@@ -64,11 +64,11 @@ static void enable_cayman_irq(unsigned int irq)
 	irq -= START_EXT_IRQS;
 	reg = EPLD_MASK_BASE + ((irq / 8) << 2);
 	bit = 1<<(irq % 8);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	mask = ctrl_inl(reg);
 	mask |= bit;
 	ctrl_outl(mask, reg);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 void disable_cayman_irq(unsigned int irq)
@@ -81,11 +81,11 @@ void disable_cayman_irq(unsigned int irq)
 	irq -= START_EXT_IRQS;
 	reg = EPLD_MASK_BASE + ((irq / 8) << 2);
 	bit = 1<<(irq % 8);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	mask = ctrl_inl(reg);
 	mask &= ~bit;
 	ctrl_outl(mask, reg);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void ack_cayman_irq(unsigned int irq)

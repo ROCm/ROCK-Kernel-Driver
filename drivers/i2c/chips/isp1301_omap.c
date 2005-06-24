@@ -1503,7 +1503,6 @@ static int isp1301_probe(struct i2c_adapter *bus, int address, int kind)
 	isp->client.addr = address;
 	i2c_set_clientdata(&isp->client, isp);
 	isp->client.adapter = bus;
-	isp->client.id = 1301;
 	isp->client.driver = &isp1301_driver;
 	strlcpy(isp->client.name, DRIVER_NAME, I2C_NAME_SIZE);
 	i2c = &isp->client;

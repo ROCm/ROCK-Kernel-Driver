@@ -25,20 +25,27 @@
 #include "gsc.h"
 
 #define WAX_GSC_IRQ	7	/* Hardcoded Interrupt for GSC */
-#define WAX_GSC_NMI_IRQ	29
 
 static void wax_choose_irq(struct parisc_device *dev, void *ctrl)
 {
 	int irq;
 
 	switch (dev->id.sversion) {
-		case 0x73:	irq =  1; break; /* HIL */
-		case 0x8c:	irq =  6; break; /* RS232 */
-		case 0x90:	irq = 10; break; /* WAX EISA BA */
+		case 0x73:	irq =  1; break; /* i8042 General */
+		case 0x8c:	irq =  6; break; /* Serial */
+		case 0x90:	irq = 10; break; /* EISA */
 		default:	return;		 /* Unknown */
 	}
 
 	gsc_asic_assign_irq(ctrl, irq, &dev->irq);
+
+	switch (dev->id.sversion) {
+		case 0x73:	irq =  2; break; /* i8042 High-priority */
+		case 0x90:	irq =  0; break; /* EISA NMI */
+		default:	return;		 /* No secondary IRQ */
+	}
+
+	gsc_asic_assign_irq(ctrl, irq, &dev->aux_irq);
 }
 
 static void __init
@@ -46,7 +53,7 @@ wax_init_irq(struct gsc_asic *wax)
 {
 	unsigned long base = wax->hpa;
 
-	/* Stop WAX barking for a bit */
+	/* Wax-off */
 	gsc_writel(0x00000000, base+OFFSET_IMR);
 
 	/* clear pending interrupts */
@@ -59,11 +66,6 @@ wax_init_irq(struct gsc_asic *wax)
 	/* Resets */
 //	gsc_writel(0xFFFFFFFF, base+0x1000); /* HIL */
 //	gsc_writel(0xFFFFFFFF, base+0x2000); /* RS232-B on Wax */
-	
-	/* Ok we hit it on the head with a hammer, our Dog is now
-	** comatose and muzzled.  Devices will now unmask WAX
-	** interrupts as they are registered as irq's in the WAX range.
-	*/
 }
 
 int __init
@@ -78,7 +80,7 @@ wax_init_chip(struct parisc_device *dev)
 	if (!wax)
 		return -ENOMEM;
 
-	wax->name = "Wax";
+	wax->name = "wax";
 	wax->hpa = dev->hpa;
 
 	wax->version = 0;   /* gsc_readb(wax->hpa+WAX_VER); */
@@ -132,7 +134,7 @@ static struct parisc_device_id wax_tbl[] = {
 MODULE_DEVICE_TABLE(parisc, wax_tbl);
 
 struct parisc_driver wax_driver = {
-	.name =		"Wax",
+	.name =		"wax",
 	.id_table =	wax_tbl,
 	.probe =	wax_init_chip,
 };

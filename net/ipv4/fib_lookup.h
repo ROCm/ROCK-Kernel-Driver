@@ -19,7 +19,8 @@ struct fib_alias {
 /* Exported by fib_semantics.c */
 extern int fib_semantic_match(struct list_head *head,
 			      const struct flowi *flp,
-			      struct fib_result *res, int prefixlen);
+			      struct fib_result *res, __u32 zone, __u32 mask,
+				int prefixlen);
 extern void fib_release_info(struct fib_info *);
 extern struct fib_info *fib_create_info(const struct rtmsg *r,
 					struct kern_rta *rta,

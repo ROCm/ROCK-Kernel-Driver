@@ -96,7 +96,7 @@ static kmem_cache_t *_crypt_io_pool;
 /*
  * Mempool alloc and free functions for the page
  */
-static void *mempool_alloc_page(int gfp_mask, void *data)
+static void *mempool_alloc_page(unsigned int __nocast gfp_mask, void *data)
 {
 	return alloc_page(gfp_mask);
 }
@@ -331,25 +331,19 @@ crypt_alloc_buffer(struct crypt_config *cc, unsigned int size,
 	struct bio *bio;
 	unsigned int nr_iovecs = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	int gfp_mask = GFP_NOIO | __GFP_HIGHMEM;
-	unsigned long flags = current->flags;
 	unsigned int i;
 
 	/*
-	 * Tell VM to act less aggressively and fail earlier.
-	 * This is not necessary but increases throughput.
+	 * Use __GFP_NOMEMALLOC to tell the VM to act less aggressively and
+	 * to fail earlier.  This is not necessary but increases throughput.
 	 * FIXME: Is this really intelligent?
 	 */
-	current->flags &= ~PF_MEMALLOC;
-
 	if (base_bio)
-		bio = bio_clone(base_bio, GFP_NOIO);
+		bio = bio_clone(base_bio, GFP_NOIO|__GFP_NOMEMALLOC);
 	else
-		bio = bio_alloc(GFP_NOIO, nr_iovecs);
-	if (!bio) {
-		if (flags & PF_MEMALLOC)
-			current->flags |= PF_MEMALLOC;
+		bio = bio_alloc(GFP_NOIO|__GFP_NOMEMALLOC, nr_iovecs);
+	if (!bio)
 		return NULL;
-	}
 
 	/* if the last bio was not complete, continue where that one ended */
 	bio->bi_idx = *bio_vec_idx;
@@ -385,9 +379,6 @@ crypt_alloc_buffer(struct crypt_config *cc, unsigned int size,
 		bio->bi_vcnt++;
 		size -= bv->bv_len;
 	}
-
-	if (flags & PF_MEMALLOC)
-		current->flags |= PF_MEMALLOC;
 
 	if (!bio->bi_size) {
 		bio_put(bio);
@@ -869,7 +860,6 @@ static int crypt_status(struct dm_target *ti, status_type_t type,
 			char *result, unsigned int maxlen)
 {
 	struct crypt_config *cc = (struct crypt_config *) ti->private;
-	char buffer[32];
 	const char *cipher;
 	const char *chainmode = NULL;
 	unsigned int sz = 0;
@@ -910,9 +900,8 @@ static int crypt_status(struct dm_target *ti, status_type_t type,
 			result[sz++] = '-';
 		}
 
-		format_dev_t(buffer, cc->dev->bdev->bd_dev);
 		DMEMIT(" " SECTOR_FORMAT " %s " SECTOR_FORMAT,
-		       cc->iv_offset, buffer, cc->start);
+		       cc->iv_offset, cc->dev->name, cc->start);
 		break;
 	}
 	return 0;

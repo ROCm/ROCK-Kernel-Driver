@@ -165,7 +165,6 @@ int ipoib_transport_dev_init(struct net_device *dev, struct ib_device *ca)
 			.max_recv_sge = 1
 		},
 		.sq_sig_type = IB_SIGNAL_ALL_WR,
-		.rq_sig_type = IB_SIGNAL_ALL_WR,
 		.qp_type     = IB_QPT_UD
 	};
 

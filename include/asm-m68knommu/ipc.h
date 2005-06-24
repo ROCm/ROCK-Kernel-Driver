@@ -1,1 +1,1 @@
-#include <asm-m68k/ipc.h>
+#include <asm-generic/ipc.h>

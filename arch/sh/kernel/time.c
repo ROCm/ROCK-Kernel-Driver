@@ -33,6 +33,7 @@
 #include <asm/machvec.h>
 #include <asm/rtc.h>
 #include <asm/freq.h>
+#include <asm/cpu/timer.h>
 #ifdef CONFIG_SH_KGDB
 #include <asm/kgdb.h>
 #endif
@@ -46,40 +47,10 @@
 
 #define TMU0_TCR_CALIB	0x0000
 
-#if defined(CONFIG_CPU_SH3)
-#if defined(CONFIG_CPU_SUBTYPE_SH7300)
-#define TMU_TSTR        0xA412FE92      /* Byte access */
-
-#define TMU0_TCOR       0xA412FE94      /* Long access */
-#define TMU0_TCNT       0xA412FE98      /* Long access */
-#define TMU0_TCR        0xA412FE9C      /* Word access */
-
-#define TMU1_TCOR	0xA412FEA0	/* Long access */
-#define TMU1_TCNT	0xA412FEA4	/* Long access */
-#define TMU1_TCR	0xA412FEA8	/* Word access */
-
-#define FRQCR           0xA415FF80
-#else
-#define TMU_TOCR	0xfffffe90	/* Byte access */
-#define TMU_TSTR	0xfffffe92	/* Byte access */
-
-#define TMU0_TCOR	0xfffffe94	/* Long access */
-#define TMU0_TCNT	0xfffffe98	/* Long access */
-#define TMU0_TCR	0xfffffe9c	/* Word access */
-#endif
-#elif defined(CONFIG_CPU_SH4)
-#define TMU_TOCR	0xffd80000	/* Byte access */
-#define TMU_TSTR	0xffd80004	/* Byte access */
-
-#define TMU0_TCOR	0xffd80008	/* Long access */
-#define TMU0_TCNT	0xffd8000c	/* Long access */
-#define TMU0_TCR	0xffd80010	/* Word access */
-
 #ifdef CONFIG_CPU_SUBTYPE_ST40STB1
 #define CLOCKGEN_MEMCLKCR 0xbb040038
 #define MEMCLKCR_RATIO_MASK 0x7
 #endif /* CONFIG_CPU_SUBTYPE_ST40STB1 */
-#endif /* CONFIG_CPU_SH3 or CONFIG_CPU_SH4 */
 
 extern unsigned long wall_jiffies;
 #define TICK_SIZE (tick_nsec / 1000)
@@ -272,7 +243,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 	profile_tick(CPU_PROFILING, regs);
 
 #ifdef CONFIG_HEARTBEAT
-	if (sh_mv.mv_heartbeat != NULL) 
+	if (sh_mv.mv_heartbeat != NULL)
 		sh_mv.mv_heartbeat();
 #endif
 

@@ -30,7 +30,6 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
-#include <linux/major.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/poll.h>
@@ -590,6 +589,12 @@ static struct proto_ops hci_sock_ops = {
 	.mmap		= sock_no_mmap
 };
 
+static struct proto hci_sk_proto = {
+	.name		= "HCI",
+	.owner		= THIS_MODULE,
+	.obj_size	= sizeof(struct hci_pinfo)
+};
+
 static int hci_sock_create(struct socket *sock, int protocol)
 {
 	struct sock *sk;
@@ -601,11 +606,15 @@ static int hci_sock_create(struct socket *sock, int protocol)
 
 	sock->ops = &hci_sock_ops;
 
-	sk = bt_sock_alloc(sock, protocol, sizeof(struct hci_pinfo), GFP_KERNEL);
+	sk = sk_alloc(PF_BLUETOOTH, GFP_KERNEL, &hci_sk_proto, 1);
 	if (!sk)
 		return -ENOMEM;
 
-	sk_set_owner(sk, THIS_MODULE);
+	sock_init_data(sock, sk);
+
+	sock_reset_flag(sk, SOCK_ZAPPED);
+
+	sk->sk_protocol = protocol;
 
 	sock->state = SS_UNCONNECTED;
 	sk->sk_state = BT_OPEN;
@@ -662,23 +671,36 @@ static struct notifier_block hci_sock_nblock = {
 
 int __init hci_sock_init(void)
 {
-	if (bt_sock_register(BTPROTO_HCI, &hci_sock_family_ops)) {
-		BT_ERR("HCI socket registration failed");
-		return -EPROTO;
-	}
+	int err;
+
+	err = proto_register(&hci_sk_proto, 0);
+	if (err < 0)
+		return err;
+
+	err = bt_sock_register(BTPROTO_HCI, &hci_sock_family_ops);
+	if (err < 0)
+		goto error;
 
 	hci_register_notifier(&hci_sock_nblock);
 
 	BT_INFO("HCI socket layer initialized");
 
 	return 0;
+
+error:
+	BT_ERR("HCI socket registration failed");
+	proto_unregister(&hci_sk_proto);
+	return err;
 }
 
 int __exit hci_sock_cleanup(void)
 {
-	if (bt_sock_unregister(BTPROTO_HCI))
+	if (bt_sock_unregister(BTPROTO_HCI) < 0)
 		BT_ERR("HCI socket unregistration failed");
 
 	hci_unregister_notifier(&hci_sock_nblock);
+
+	proto_unregister(&hci_sk_proto);
+
 	return 0;
 }

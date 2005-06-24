@@ -256,12 +256,12 @@ int rpaphp_get_drc_props(struct device_node *dn, int *drc_index,
 	my_index = (int *) get_property(dn, "ibm,my-drc-index", NULL);
 	if (!my_index) {
 		/* Node isn't DLPAR/hotplug capable */
-		return 1;
+		return -EINVAL;
 	}
 
 	rc = get_children_props(dn->parent, &indexes, &names, &types, &domains);
 	if (rc < 0) {
-		return 1;
+		return -EINVAL;
 	}
 
 	name_tmp = (char *) &names[1];
@@ -284,7 +284,7 @@ int rpaphp_get_drc_props(struct device_node *dn, int *drc_index,
 		type_tmp += (strlen(type_tmp) + 1);
 	}
 
-	return 1;
+	return -EINVAL;
 }
 
 static int is_php_type(char *drc_type)

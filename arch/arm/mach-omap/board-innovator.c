@@ -20,20 +20,84 @@
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/delay.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
 
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
 #include <asm/mach/map.h>
 
-#include <asm/arch/clocks.h>
-#include <asm/arch/gpio.h>
 #include <asm/arch/fpga.h>
+#include <asm/arch/gpio.h>
+#include <asm/arch/tc.h>
 #include <asm/arch/usb.h>
 
 #include "common.h"
 
 static int __initdata innovator_serial_ports[OMAP_MAX_NR_PORTS] = {1, 1, 1};
+
+static struct mtd_partition innovator_partitions[] = {
+	/* bootloader (U-Boot, etc) in first sector */
+	{
+	      .name		= "bootloader",
+	      .offset		= 0,
+	      .size		= SZ_128K,
+	      .mask_flags	= MTD_WRITEABLE, /* force read-only */
+	},
+	/* bootloader params in the next sector */
+	{
+	      .name		= "params",
+	      .offset		= MTDPART_OFS_APPEND,
+	      .size		= SZ_128K,
+	      .mask_flags	= 0,
+	},
+	/* kernel */
+	{
+	      .name		= "kernel",
+	      .offset		= MTDPART_OFS_APPEND,
+	      .size		= SZ_2M,
+	      .mask_flags	= 0
+	},
+	/* rest of flash1 is a file system */
+	{
+	      .name		= "rootfs",
+	      .offset		= MTDPART_OFS_APPEND,
+	      .size		= SZ_16M - SZ_2M - 2 * SZ_128K,
+	      .mask_flags	= 0
+	},
+	/* file system */
+	{
+	      .name		= "filesystem",
+	      .offset		= MTDPART_OFS_APPEND,
+	      .size		= MTDPART_SIZ_FULL,
+	      .mask_flags	= 0
+	}
+};
+
+static struct flash_platform_data innovator_flash_data = {
+	.map_name	= "cfi_probe",
+	.width		= 2,
+	.parts		= innovator_partitions,
+	.nr_parts	= ARRAY_SIZE(innovator_partitions),
+};
+
+static struct resource innovator_flash_resource = {
+	.start		= OMAP_CS0_PHYS,
+	.end		= OMAP_CS0_PHYS + SZ_32M - 1,
+	.flags		= IORESOURCE_MEM,
+};
+
+static struct platform_device innovator_flash_device = {
+	.name		= "omapflash",
+	.id		= 0,
+	.dev		= {
+		.platform_data	= &innovator_flash_data,
+	},
+	.num_resources	= 1,
+	.resource	= &innovator_flash_resource,
+};
 
 #ifdef CONFIG_ARCH_OMAP1510
 
@@ -46,7 +110,7 @@ static struct map_desc innovator1510_io_desc[] __initdata = {
 static struct resource innovator1510_smc91x_resources[] = {
 	[0] = {
 		.start	= OMAP1510_FPGA_ETHR_START,	/* Physical */
-		.end	= OMAP1510_FPGA_ETHR_START + 16,
+		.end	= OMAP1510_FPGA_ETHR_START + 0xf,
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
@@ -64,6 +128,7 @@ static struct platform_device innovator1510_smc91x_device = {
 };
 
 static struct platform_device *innovator1510_devices[] __initdata = {
+	&innovator_flash_device,
 	&innovator1510_smc91x_device,
 };
 
@@ -74,7 +139,7 @@ static struct platform_device *innovator1510_devices[] __initdata = {
 static struct resource innovator1610_smc91x_resources[] = {
 	[0] = {
 		.start	= INNOVATOR1610_ETHR_START,		/* Physical */
-		.end	= INNOVATOR1610_ETHR_START + SZ_4K,
+		.end	= INNOVATOR1610_ETHR_START + 0xf,
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
@@ -92,6 +157,7 @@ static struct platform_device innovator1610_smc91x_device = {
 };
 
 static struct platform_device *innovator1610_devices[] __initdata = {
+	&innovator_flash_device,
 	&innovator1610_smc91x_device,
 };
 

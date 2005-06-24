@@ -3,13 +3,12 @@
 #
 config PCIEPORTBUS
 	bool "PCI Express support"
-	default n
-
-	---help---
-	This automatically enables PCI Express Port Bus support. Users can
-	choose Native Hot-Plug support, Advanced Error Reporting support,
-	Power Management Event support and Virtual Channel support to run
-	on PCI Express Ports (Root or Switch).
+	depends on PCI
+	help
+	  This automatically enables PCI Express Port Bus support. Users can
+	  choose Native Hot-Plug support, Advanced Error Reporting support,
+	  Power Management Event support and Virtual Channel support to run
+	  on PCI Express Ports (Root or Switch).
 
 #
 # Include service Kconfig here

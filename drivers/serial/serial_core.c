@@ -2233,7 +2233,7 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *port)
 /*
  *	Are the two ports equivalent?
  */
-static int uart_match_port(struct uart_port *port1, struct uart_port *port2)
+int uart_match_port(struct uart_port *port1, struct uart_port *port2)
 {
 	if (port1->iotype != port2->iotype)
 		return 0;
@@ -2249,6 +2249,7 @@ static int uart_match_port(struct uart_port *port1, struct uart_port *port2)
 	}
 	return 0;
 }
+EXPORT_SYMBOL(uart_match_port);
 
 /*
  *	Try to find an unused uart_state slot for a port.

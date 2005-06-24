@@ -12,10 +12,10 @@ config DVB_STV0299
 
 config DVB_CX24110
 	tristate "Conexant CX24110 based"
- 	depends on DVB_CORE
- 	help
+	depends on DVB_CORE
+	help
 	  A DVB-S tuner module. Say Y when you want to support this frontend.
- 
+
 config DVB_TDA8083
 	tristate "Philips TDA8083 based"
 	depends on DVB_CORE
@@ -108,14 +108,14 @@ config DVB_MT352
 	  A DVB-T tuner module. Say Y when you want to support this frontend.
 
 config DVB_DIB3000MB
-	tristate "DiBcom 3000-MB"
+	tristate "DiBcom 3000M-B"
 	depends on DVB_CORE
 	help
 	  A DVB-T tuner module. Designed for mobile usage. Say Y when you want
 	  to support this frontend.
 
 config DVB_DIB3000MC
-	tristate "DiBcom 3000-MC/P"
+	tristate "DiBcom 3000P/M-C"
 	depends on DVB_CORE
 	help
 	  A DVB-T tuner module. Designed for mobile usage. Say Y when you want
@@ -127,8 +127,8 @@ comment "DVB-C (cable) frontends"
 config DVB_ATMEL_AT76C651
 	tristate "Atmel AT76C651 based"
 	depends on DVB_CORE
-        help
- 	  A DVB-C tuner module. Say Y when you want to support this frontend.
+	help
+	  A DVB-C tuner module. Say Y when you want to support this frontend.
 
 config DVB_VES1820
 	tristate "VLSI VES1820 based"
@@ -154,7 +154,23 @@ comment "ATSC (North American/Korean Terresterial DTV) frontends"
 config DVB_NXT2002
 	tristate "Nxt2002 based"
 	depends on DVB_CORE
+	select FW_LOADER
 	help
 	  An ATSC 8VSB tuner module. Say Y when you want to support this frontend.
+
+config DVB_OR51211
+	tristate "or51211 based (pcHDTV HD2000 card)"
+	depends on DVB_CORE
+	select FW_LOADER
+	help
+	  An ATSC 8VSB tuner module. Say Y when you want to support this frontend.
+
+config DVB_OR51132
+	tristate "OR51132 based (pcHDTV HD3000 card)"
+	depends on DVB_CORE
+	select FW_LOADER
+	help
+	  An ATSC 8VSB and QAM64/256 tuner module. Say Y when you want
+	  to support this frontend.
 
 endmenu

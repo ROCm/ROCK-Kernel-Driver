@@ -8,8 +8,8 @@
 #include <errno.h>
 #include <string.h>
 #include <signal.h>
-#include <sys/ptrace.h>
 #include <sys/types.h>
+#include "ptrace_user.h"
 #include "uml-config.h"
 #include "kern_constants.h"
 #include "chan_user.h"

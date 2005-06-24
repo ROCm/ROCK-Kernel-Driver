@@ -32,7 +32,10 @@
  *    Changed reset from standard USB dev reset to vendor reset
  *    Changed data sent to host from compensated to raw coordinates
  *    Eliminated vendor/product module params
- *    Performed multiple successfull tests with an EXII-5010UC
+ *    Performed multiple successful tests with an EXII-5010UC
+ *
+ *  1.5 02/27/2005 ddstreet@ieee.org
+ *    Added module parameter to select raw or hw-calibrated coordinate reporting
  *
  *****************************************************************************/
 
@@ -52,11 +55,13 @@
 #include <linux/usb.h>
 
 #define MTOUCHUSB_MIN_XC                0x0
-#define MTOUCHUSB_MAX_XC                0x4000
+#define MTOUCHUSB_MAX_RAW_XC            0x4000
+#define MTOUCHUSB_MAX_CALIB_XC          0xffff
 #define MTOUCHUSB_XC_FUZZ               0x0
 #define MTOUCHUSB_XC_FLAT               0x0
 #define MTOUCHUSB_MIN_YC                0x0
-#define MTOUCHUSB_MAX_YC                0x4000
+#define MTOUCHUSB_MAX_RAW_YC            0x4000
+#define MTOUCHUSB_MAX_CALIB_YC          0xffff
 #define MTOUCHUSB_YC_FUZZ               0x0
 #define MTOUCHUSB_YC_FLAT               0x0
 
@@ -65,14 +70,27 @@
 #define MTOUCHUSB_REPORT_DATA_SIZE      11
 #define MTOUCHUSB_REQ_CTRLLR_ID         10
 
-#define MTOUCHUSB_GET_XC(data)          (data[8]<<8 | data[7])
-#define MTOUCHUSB_GET_YC(data)          (data[10]<<8 | data[9])
+#define MTOUCHUSB_GET_RAW_XC(data)      (data[8]<<8 | data[7])
+#define MTOUCHUSB_GET_CALIB_XC(data)    (data[4]<<8 | data[3])
+#define MTOUCHUSB_GET_RAW_YC(data)      (data[10]<<8 | data[9])
+#define MTOUCHUSB_GET_CALIB_YC(data)    (data[6]<<8 | data[5])
+#define MTOUCHUSB_GET_XC(data)          (raw_coordinates ? \
+                                         MTOUCHUSB_GET_RAW_XC(data) : \
+                                         MTOUCHUSB_GET_CALIB_XC(data))
+#define MTOUCHUSB_GET_YC(data)          (raw_coordinates ? \
+                                         MTOUCHUSB_GET_RAW_YC(data) : \
+                                         MTOUCHUSB_GET_CALIB_YC(data))
 #define MTOUCHUSB_GET_TOUCHED(data)     ((data[2] & 0x40) ? 1:0)
 
-#define DRIVER_VERSION "v1.4"
+#define DRIVER_VERSION "v1.5"
 #define DRIVER_AUTHOR "Todd E. Johnson, tejohnson@yahoo.com"
 #define DRIVER_DESC "3M USB Touchscreen Driver"
 #define DRIVER_LICENSE "GPL"
+
+static int raw_coordinates = 1;
+
+module_param(raw_coordinates, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(raw_coordinates, "report raw coordinate values (y, default) or hardware-calibrated coordinate values (n)");
 
 struct mtouch_usb {
         unsigned char *data;
@@ -123,7 +141,8 @@ static void mtouchusb_irq(struct urb *urb, struct pt_regs *regs)
         input_report_abs(&mtouch->input, ABS_X,
                          MTOUCHUSB_GET_XC(mtouch->data));
         input_report_abs(&mtouch->input, ABS_Y,
-                         MTOUCHUSB_MAX_YC - MTOUCHUSB_GET_YC(mtouch->data));
+			 (raw_coordinates ? MTOUCHUSB_MAX_RAW_YC : MTOUCHUSB_MAX_CALIB_YC)
+                         - MTOUCHUSB_GET_YC(mtouch->data));
         input_sync(&mtouch->input);
 
 exit:
@@ -233,11 +252,13 @@ static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_i
 
         /* Used to Scale Compensated Data and Flip Y */
         mtouch->input.absmin[ABS_X] =  MTOUCHUSB_MIN_XC;
-        mtouch->input.absmax[ABS_X] =  MTOUCHUSB_MAX_XC;
+        mtouch->input.absmax[ABS_X] =  raw_coordinates ? \
+                                       MTOUCHUSB_MAX_RAW_XC : MTOUCHUSB_MAX_CALIB_XC;
         mtouch->input.absfuzz[ABS_X] = MTOUCHUSB_XC_FUZZ;
         mtouch->input.absflat[ABS_X] = MTOUCHUSB_XC_FLAT;
         mtouch->input.absmin[ABS_Y] =  MTOUCHUSB_MIN_YC;
-        mtouch->input.absmax[ABS_Y] =  MTOUCHUSB_MAX_YC;
+        mtouch->input.absmax[ABS_Y] =  raw_coordinates ? \
+                                       MTOUCHUSB_MAX_RAW_YC : MTOUCHUSB_MAX_CALIB_YC;
         mtouch->input.absfuzz[ABS_Y] = MTOUCHUSB_YC_FUZZ;
         mtouch->input.absflat[ABS_Y] = MTOUCHUSB_YC_FLAT;
 
@@ -258,7 +279,7 @@ static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_i
                                0,
                                NULL,
                                0,
-                               HZ * USB_CTRL_SET_TIMEOUT);
+                               USB_CTRL_SET_TIMEOUT);
         dbg("%s - usb_control_msg - MTOUCHUSB_RESET - bytes|err: %d",
             __FUNCTION__, nRet);
 
@@ -292,7 +313,7 @@ static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_i
                                1,
                                NULL,
                                0,
-                               HZ * USB_CTRL_SET_TIMEOUT);
+                               USB_CTRL_SET_TIMEOUT);
         dbg("%s - usb_control_msg - MTOUCHUSB_ASYNC_REPORT - bytes|err: %d",
             __FUNCTION__, nRet);
 

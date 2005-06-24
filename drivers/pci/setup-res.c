@@ -25,13 +25,6 @@
 #include <linux/slab.h>
 #include "pci.h"
 
-#define DEBUG_CONFIG 0
-#if DEBUG_CONFIG
-# define DBGC(args)     printk args
-#else
-# define DBGC(args)
-#endif
-
 
 static void
 pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
@@ -42,10 +35,9 @@ pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
 
 	pcibios_resource_to_bus(dev, &region, res);
 
-	DBGC((KERN_ERR "  got res [%lx:%lx] bus [%lx:%lx] flags %lx for "
-	      "BAR %d of %s\n", res->start, res->end,
-	      region.start, region.end, res->flags,
-	      resno, pci_name(dev)));
+	pr_debug("  got res [%lx:%lx] bus [%lx:%lx] flags %lx for "
+		 "BAR %d of %s\n", res->start, res->end,
+		 region.start, region.end, res->flags, resno, pci_name(dev));
 
 	new = region.start | (res->flags & PCI_REGION_FLAG_MASK);
 	if (res->flags & IORESOURCE_IO)
@@ -60,7 +52,7 @@ pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
 		reg = dev->rom_base_reg;
 	} else {
 		/* Hmm, non-standard resource. */
-		BUG();
+	
 		return;		/* kill uninitialised var warning */
 	}
 
@@ -85,9 +77,9 @@ pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
 		}
 	}
 	res->flags &= ~IORESOURCE_UNSET;
-	DBGC((KERN_INFO "PCI: moved device %s resource %d (%lx) to %x\n",
-		dev->slot_name, resno, res->flags,
-		new & ~PCI_REGION_FLAG_MASK));
+	pr_debug("PCI: moved device %s resource %d (%lx) to %x\n",
+		pci_name(dev), resno, res->flags,
+		new & ~PCI_REGION_FLAG_MASK);
 }
 
 int __devinit

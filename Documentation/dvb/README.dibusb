@@ -1,7 +1,7 @@
-Documentation for dib3000mb frontend driver and dibusb device driver
+Documentation for dib3000* frontend drivers and dibusb device driver
 ====================================================================
 
-Copyright (C) 2004 Patrick Boettcher (patrick.boettcher@desy.de),
+Copyright (C) 2004-5 Patrick Boettcher (patrick.boettcher@desy.de),
 
 dibusb and dib3000mb/mc drivers based on GPL code, which has
 
@@ -46,7 +46,7 @@ Produced and reselled by KWorld:
 
 Others:
 -------
-- Ultima Electronic/Artec T1 USB TVBOX (AN2135, AN2235, AN2235 with Panasonic Tuner) 
+- Ultima Electronic/Artec T1 USB TVBOX (AN2135, AN2235, AN2235 with Panasonic Tuner)
 	http://82.161.246.249/products-tvbox.html
 
 - Compro Videomate DVB-U2000 - DVB-T USB (2)
@@ -74,19 +74,27 @@ Supported devices USB2.0
 
 - Artec T1 USB TVBOX (FX2) (2)
 
+- Hauppauge WinTV NOVA-T USB2
+	http://www.hauppauge.com/
+
+- KWorld/ADSTech Instant DVB-T USB2.0 (DiB3000M-B)
+
 - DiBcom USB2.0 DVB-T reference device (non-public)
 
 1) It is working almost.
-2) No test reports received yet. 
+2) No test reports received yet.
 
 
 0. NEWS:
-  2004-01-13 - moved the mirrored pid_filter_table back to dvb-dibusb
+  2005-02-11 - added support for the KWorld/ADSTech Instant DVB-T USB2.0. Thanks a lot to Joachim von Caron
+  2005-02-02 - added support for the Hauppauge Win-TV Nova-T USB2
+  2005-01-31 - distorted streaming is finally gone for USB1.1 devices
+  2005-01-13 - moved the mirrored pid_filter_table back to dvb-dibusb
              - first almost working version for HanfTek UMT-010
-             - found out, that Yakumo/HAMA/Typhoon are predessors of the HanfTek
-  2004-01-10 - refactoring completed, now everything is very delightful
+             - found out, that Yakumo/HAMA/Typhoon are predessors of the HanfTek UMT-010
+  2005-01-10 - refactoring completed, now everything is very delightful
              - tuner quirks for some weird devices (Artec T1 AN2235 device has sometimes a
-               Panasonic Tuner assembled). Tunerprobing implemented. Thanks a lot to Gunnar Wittich. 
+               Panasonic Tuner assembled). Tunerprobing implemented. Thanks a lot to Gunnar Wittich.
   2004-12-29 - after several days of struggling around bug of no returning URBs fixed.
   2004-12-26 - refactored the dibusb-driver, splitted into separate files
              - i2c-probing enabled
@@ -106,7 +114,7 @@ Supported devices USB2.0
   2004-09-28 - added support for a new device (Unkown, vendor ID is Hyper-Paltek)
   2004-09-20 - added support for a new device (Compro DVB-U2000), thanks
                to Amaury Demol for reporting
-             - changed usb TS transfer method (several urbs, stopping transfer 
+             - changed usb TS transfer method (several urbs, stopping transfer
                before setting a new pid)
   2004-09-13 - added support for a new device (Artec T1 USB TVBOX), thanks
                to Christian Motschke for reporting
@@ -149,13 +157,20 @@ You can either use "get_dvb_firmware dibusb" to download the firmware or you
 can get it directly via
 
 for USB1.1 (AN2135)
-http://linuxtv.org/cgi-bin/cvsweb.cgi/dvb-kernel/firmware/dvb-dibusb-5.0.0.11.fw?rev=1.1&content-type=text/plain
+http://www.linuxtv.org/downloads/firmware/dvb-dibusb-5.0.0.11.fw
 
 for USB1.1 (AN2235) (a few Artec T1 devices)
-http://linuxtv.org/cgi-bin/cvsweb.cgi/dvb-kernel/firmware/dvb-dibusb-an2235-1.fw?rev=1.1&content-type=text/plain
+http://www.linuxtv.org/downloads/firmware/dvb-dibusb-an2235-1.fw
 
-for USB2.0 (FX2)
-http://linuxtv.org/cgi-bin/cvsweb.cgi/dvb-kernel/firmware/dvb-dibusb-6.0.0.5.fw?rev=1.1&content-type=text/plain
+for USB2.0 (FX2) Hauppauge, DiBcom
+http://www.linuxtv.org/downloads/firmware/dvb-dibusb-6.0.0.5.fw
+
+for USB2.0 ADSTech/Kworld USB2.0
+http://www.linuxtv.org/downloads/firmware/dvb-dibusb-adstech-usb2-1.fw
+
+for USB2.0 HanfTek
+http://www.linuxtv.org/downloads/firmware/dvb-dibusb-an2235-1.fw
+
 
 1.2. Compiling
 
@@ -191,13 +206,13 @@ turned on.
 
 At this point you should be able to start a dvb-capable application. For myself
 I used mplayer, dvbscan, tzap and kaxtv, they are working. Using the device
-in vdr (at least the USB2.0 one) is working. 
+in vdr is working now also.
 
 2. Known problems and bugs
 
-- none this time
+- Don't remove the USB device while running an DVB application, your system will die.
 
-2.1. Adding support for devices 
+2.1. Adding support for devices
 
 It is not possible to determine the range of devices based on the DiBcom
 reference designs. This is because the reference design of DiBcom can be sold
@@ -213,55 +228,50 @@ of the device. I will add it to this list in order to make this clear to
 others.
 
 If you are familar with C you can also add the VID and PID of the device to
-the dvb-dibusb.h-file and create a patch and send it over to me or to 
+the dvb-dibusb-core.c-file and create a patch and send it over to me or to
 the linux-dvb mailing list, _after_ you have tried compiling and modprobing
 it.
 
 2.2. USB1.1 Bandwidth limitation
 
-Most of the current supported devices are USB1.1 and thus they have a
+Most of the currently supported devices are USB1.1 and thus they have a
 maximum bandwidth of about 5-6 MBit/s when connected to a USB2.0 hub.
 This is not enough for receiving the complete transport stream of a
 DVB-T channel (which can be about 16 MBit/s). Normally this is not a
 problem, if you only want to watch TV (this does not apply for HDTV),
-but watching a channel while recording another channel on the same 
-frequency simply does not work. This applies to all USB1.1 DVB-T 
-devices, not only dibusb)
+but watching a channel while recording another channel on the same
+frequency simply does not work very well. This applies to all USB1.1
+DVB-T devices, not just dibusb)
 
-A special problem of the dibusb for the USB1.1 is, that the USB control
-IC has a problem with write accesses while having MPEG2-streaming
-enabled. When you set another pid while receiving MPEG2-TS it happens, that
-the stream is disturbed and probably data is lost (results in distortions of
-the video or strange beeps within the audio stream). DiBcom is preparing a
-firmware especially for Linux which perhaps solves the problem.
-
-Especially VDR users are victoms of this bug. VDR frequently requests new PIDs
-due the automatic scanning (introduced in 1.3.x, afaik) and epg-scan. Disabling
-these features is maybe a solution. Additionally this behaviour of VDR exceeds
-the USB1.1 bandwidth.
-
-Update:
-For the USB1.1 and VDR some work has been done (patches and comments are still 
-very welcome). Maybe the problem is solved in the meantime because I now use
-the dmx_sw_filter function instead of dmx_sw_filter_packet. I hope the
+Update: For the USB1.1 and VDR some work has been done (patches and comments
+are still very welcome). Maybe the problem is solved in the meantime because I
+now use the dmx_sw_filter function instead of dmx_sw_filter_packet. I hope the
 linux-dvb software filter is able to get the best of the garbled TS.
+
+The bug, where the TS is distorted by a heavy usage of the device is gone
+definitely. All dibusb-devices I was using (Twinhan, Kworld, DiBcom) are
+working like charm now with VDR. Sometimes I even was able to record a channel
+and watch another one.
 
 2.3. Comments
 
-Patches, comments and suggestions are very very welcome
+Patches, comments and suggestions are very very welcome.
 
 3. Acknowledgements
 	Amaury Demol (ademol@dibcom.fr) and Francois Kanounnikoff from DiBcom for
-    providing specs, code and help, on which the dvb-dibusb, dib3000mb and 
+    providing specs, code and help, on which the dvb-dibusb, dib3000mb and
     dib3000mc are based.
 
    David Matthews for identifying a new device type (Artec T1 with AN2235)
     and for extending dibusb with remote control event handling. Thank you.
 
    Alex Woods for frequently answering question about usb and dvb
-    stuff, a big thank you
+    stuff, a big thank you.
 
    Bernd Wagner for helping with huge bug reports and discussions.
+
+   Gunnar Wittich and Joachim von Caron for their trust for giving me
+    root-shells on their machines to implement support for new devices.
 
    Some guys on the linux-dvb mailing list for encouraging me
 

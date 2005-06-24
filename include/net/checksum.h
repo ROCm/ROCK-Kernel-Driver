@@ -30,7 +30,7 @@ static inline
 unsigned int csum_and_copy_from_user (const unsigned char __user *src, unsigned char *dst,
 				      int len, int sum, int *err_ptr)
 {
-	if (verify_area(VERIFY_READ, src, len) == 0)
+	if (access_ok(VERIFY_READ, src, len))
 		return csum_partial_copy_from_user(src, dst, len, sum, err_ptr);
 
 	if (len)

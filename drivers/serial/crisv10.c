@@ -3757,10 +3757,8 @@ rs_write(struct tty_struct * tty, int from_user,
 		e100_enable_rx_irq(info);
 #endif
 
-		if (info->rs485.delay_rts_before_send > 0) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout((info->rs485.delay_rts_before_send * HZ)/1000);
-		}
+		if (info->rs485.delay_rts_before_send > 0)
+			msleep(info->rs485.delay_rts_before_send);
 	}
 #endif /* CONFIG_ETRAX_RS485 */
 

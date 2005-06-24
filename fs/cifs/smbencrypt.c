@@ -32,6 +32,7 @@
 #include "cifspdu.h"
 #include "md5.h"
 #include "cifs_debug.h"
+#include "cifsencrypt.h"
 
 #ifndef FALSE
 #define FALSE 0
@@ -45,27 +46,12 @@
 #define SSVALX(buf,pos,val) (CVAL(buf,pos)=(val)&0xFF,CVAL(buf,pos+1)=(val)>>8)
 #define SSVAL(buf,pos,val) SSVALX((buf),(pos),((__u16)(val)))
 
-/*The following definitions come from  lib/md4.c  */
-
-void mdfour(unsigned char *out, unsigned char *in, int n);
-
-/*The following definitions come from  libsmb/smbdes.c  */
-
-void E_P16(unsigned char *p14, unsigned char *p16);
-void E_P24(unsigned char *p21, unsigned char *c8, unsigned char *p24);
-void D_P16(unsigned char *p14, unsigned char *in, unsigned char *out);
-void E_old_pw_hash(unsigned char *p14, unsigned char *in, unsigned char *out);
-void cred_hash1(unsigned char *out, unsigned char *in, unsigned char *key);
-void cred_hash2(unsigned char *out, unsigned char *in, unsigned char *key);
-void cred_hash3(unsigned char *out, unsigned char *in, unsigned char *key,
-		int forw);
-
 /*The following definitions come from  libsmb/smbencrypt.c  */
 
 void SMBencrypt(unsigned char *passwd, unsigned char *c8, unsigned char *p24);
 void E_md4hash(const unsigned char *passwd, unsigned char *p16);
 void nt_lm_owf_gen(char *pwd, unsigned char nt_p16[16], unsigned char p16[16]);
-void SMBOWFencrypt(unsigned char passwd[16], unsigned char *c8,
+static void SMBOWFencrypt(unsigned char passwd[16], unsigned char *c8,
 		   unsigned char p24[24]);
 void NTLMSSPOWFencrypt(unsigned char passwd[8],
 		       unsigned char *ntlmchalresp, unsigned char p24[24]);
@@ -186,7 +172,8 @@ nt_lm_owf_gen(char *pwd, unsigned char nt_p16[16], unsigned char p16[16])
 }
 
 /* Does the NTLMv2 owfs of a user's password */
-void
+#if 0  /* function not needed yet - but will be soon */
+static void
 ntv2_owf_gen(const unsigned char owf[16], const char *user_n,
 		const char *domain_n, unsigned char kr_buf[16],
 		const struct nls_table *nls_codepage)
@@ -219,9 +206,10 @@ ntv2_owf_gen(const unsigned char owf[16], const char *user_n,
 
 	kfree(user_u);
 }
+#endif 
 
 /* Does the des encryption from the NT or LM MD4 hash. */
-void
+static void
 SMBOWFencrypt(unsigned char passwd[16], unsigned char *c8,
 	      unsigned char p24[24])
 {
@@ -260,8 +248,11 @@ SMBNTencrypt(unsigned char *passwd, unsigned char *c8, unsigned char *p24)
 	SMBOWFencrypt(p21, c8, p24);
 }
 
+
 /* Does the md5 encryption from the NT hash for NTLMv2. */
-void
+/* These routines will be needed later */
+#if 0
+static void
 SMBOWFencrypt_ntv2(const unsigned char kr[16],
                    const struct data_blob * srv_chal,
                    const struct data_blob * cli_chal, unsigned char resp_buf[16])
@@ -274,7 +265,7 @@ SMBOWFencrypt_ntv2(const unsigned char kr[16],
         hmac_md5_final(resp_buf, &ctx);
 }
 
-void
+static void
 SMBsesskeygen_ntv2(const unsigned char kr[16],
 		   const unsigned char *nt_resp, __u8 sess_key[16])
 {
@@ -285,9 +276,10 @@ SMBsesskeygen_ntv2(const unsigned char kr[16],
 	hmac_md5_final((unsigned char *) sess_key, &ctx);
 }
 
-void
+static void
 SMBsesskeygen_ntv1(const unsigned char kr[16],
 		   const unsigned char *nt_resp, __u8 sess_key[16])
 {
 	mdfour((unsigned char *) sess_key, (unsigned char *) kr, 16);
 }
+#endif

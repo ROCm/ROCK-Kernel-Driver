@@ -31,6 +31,8 @@
 
 #include "8250.h"
 
+#undef SERIAL_DEBUG_PCI
+
 /*
  * Definitions for PCI support.
  */
@@ -577,6 +579,16 @@ static int __devinit pci_xircom_init(struct pci_dev *dev)
 	return 0;
 }
 
+static int __devinit pci_netmos_init(struct pci_dev *dev)
+{
+	/* subdevice 0x00PS means <P> parallel, <S> serial */
+	unsigned int num_serial = dev->subsystem_device & 0xf;
+
+	if (num_serial == 0)
+		return -ENODEV;
+	return num_serial;
+}
+
 static int
 pci_default_setup(struct pci_dev *dev, struct pci_board *board,
 		  struct uart_port *port, int idx)
@@ -934,6 +946,17 @@ static struct pci_serial_quirk pci_serial_quirks[] = {
 		.setup		= pci_default_setup,
 	},
 	/*
+	 * Netmos cards
+	 */
+	{
+		.vendor		= PCI_VENDOR_ID_NETMOS,
+		.device		= PCI_ANY_ID,
+		.subvendor	= PCI_ANY_ID,
+		.subdevice	= PCI_ANY_ID,
+		.init		= pci_netmos_init,
+		.setup		= pci_default_setup,
+	},
+	/*
 	 * Default "match everything" terminator entry
 	 */
 	{
@@ -985,6 +1008,8 @@ get_pci_irq(struct pci_dev *dev, struct pci_board *board, int idx)
  *  bt   = Index using PCI BARs
  *  n    = number of serial ports
  *  baud = baud rate
+ *
+ * This table is sorted by (in order): baud, bt, bn, n.
  *
  * Please note: in theory if n = 1, _bt infix should make no difference.
  * ie, pbn_b0_1_115200 is the same as pbn_b0_bt_1_115200
@@ -1759,7 +1784,7 @@ static void __devexit pciserial_remove_one(struct pci_dev *dev)
 	}
 }
 
-static int pciserial_suspend_one(struct pci_dev *dev, u32 state)
+static int pciserial_suspend_one(struct pci_dev *dev, pm_message_t state)
 {
 	struct serial_private *priv = pci_get_drvdata(dev);
 
@@ -1769,6 +1794,8 @@ static int pciserial_suspend_one(struct pci_dev *dev, u32 state)
 		for (i = 0; i < priv->nr; i++)
 			serial8250_suspend_port(priv->line[i]);
 	}
+	pci_save_state(dev);
+	pci_set_power_state(dev, pci_choose_state(dev, state));
 	return 0;
 }
 
@@ -1776,8 +1803,16 @@ static int pciserial_resume_one(struct pci_dev *dev)
 {
 	struct serial_private *priv = pci_get_drvdata(dev);
 
+	pci_set_power_state(dev, PCI_D0);
+	pci_restore_state(dev);
+
 	if (priv) {
 		int i;
+
+		/*
+		 * The device may have been disabled.  Re-enable it.
+		 */
+		pci_enable_device(dev);
 
 		/*
 		 * Ensure that the board is correctly configured.
@@ -1866,6 +1901,9 @@ static struct pci_device_id serial_pci_tbl[] = {
 		pbn_b2_bt_4_115200 },
 	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_COMM8,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+		pbn_b2_8_115200 },
+	{	PCI_VENDOR_ID_SEALEVEL, PCI_DEVICE_ID_SEALEVEL_UCOMM8,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b2_8_115200 },
 
 	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_GTEK_SERIAL2,
@@ -2174,6 +2212,9 @@ static struct pci_device_id serial_pci_tbl[] = {
 	/*
 	 * HP Diva card
 	 */
+	{	PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_DIVA,
+		PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_DIVA_RMP3, 0, 0,
+		pbn_b1_1_115200 },
 	{	PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_DIVA,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 		pbn_b0_5_115200 },

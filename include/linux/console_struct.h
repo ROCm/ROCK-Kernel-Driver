@@ -26,6 +26,7 @@ struct vc_data {
 	const struct consw *vc_sw;
 	unsigned short	*vc_screenbuf;		/* In-memory character/attribute buffer */
 	unsigned int	vc_screenbuf_size;
+	unsigned char	vc_mode;		/* KD_TEXT, ... */
 	/* attributes for all characters on screen */
 	unsigned char	vc_attr;		/* Current attributes */
 	unsigned char	vc_def_color;		/* Default colors */
@@ -48,6 +49,11 @@ struct vc_data {
 	unsigned int	vc_state;		/* Escape sequence parser state */
 	unsigned int	vc_npar,vc_par[NPAR];	/* Parameters of current escape sequence */
 	struct tty_struct *vc_tty;		/* TTY we are attached to */
+	/* data for manual vt switching */
+	struct vt_mode	vt_mode;
+	int		vt_pid;
+	int		vt_newvt;
+	wait_queue_head_t paste_wait;
 	/* mode flags */
 	unsigned int	vc_charset	: 1;	/* Character set G0 / G1 */
 	unsigned int	vc_s_charset	: 1;	/* Saved character set */
@@ -89,10 +95,6 @@ struct vc_data {
 	struct vc_data **vc_display_fg;		/* [!] Ptr to var holding fg console for this display */
 	unsigned long	vc_uni_pagedir;
 	unsigned long	*vc_uni_pagedir_loc;  /* [!] Location of uni_pagedir variable for this console */
-#ifdef CONFIG_BOOTSPLASH
-	struct splash_data *vc_splash_data;
-#endif
-	struct vt_struct *vc_vt;
 	/* additional information is in vt_kern.h */
 };
 

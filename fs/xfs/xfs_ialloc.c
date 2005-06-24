@@ -580,7 +580,7 @@ xfs_dialloc(
 	 * allocation groups upward, wrapping at the end.
 	 */
 	*alloc_done = B_FALSE;
-	while (INT_ISZERO(agi->agi_freecount, ARCH_CONVERT)) {
+	while (!agi->agi_freecount) {
 		/*
 		 * Don't do anything if we're not supposed to allocate
 		 * any blocks, just go on to the next ag.
@@ -662,7 +662,7 @@ nextag:
 		XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 		do {
 			if ((error = xfs_inobt_get_rec(cur, &rec.ir_startino,
-					&rec.ir_freecount, &rec.ir_free, &i, ARCH_NOCONVERT)))
+					&rec.ir_freecount, &rec.ir_free, &i)))
 				goto error0;
 			XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 			freecount += rec.ir_freecount;
@@ -682,7 +682,7 @@ nextag:
 			goto error0;
 		if (i != 0 &&
 		    (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
-			    &rec.ir_freecount, &rec.ir_free, &j, ARCH_NOCONVERT)) == 0 &&
+			    &rec.ir_freecount, &rec.ir_free, &j)) == 0 &&
 		    j == 1 &&
 		    rec.ir_freecount > 0) {
 			/*
@@ -717,7 +717,7 @@ nextag:
 				if ((error = xfs_inobt_get_rec(tcur,
 						&trec.ir_startino,
 						&trec.ir_freecount,
-						&trec.ir_free, &i, ARCH_NOCONVERT)))
+						&trec.ir_free, &i)))
 					goto error1;
 				XFS_WANT_CORRUPTED_GOTO(i == 1, error1);
 			}
@@ -731,7 +731,7 @@ nextag:
 				if ((error = xfs_inobt_get_rec(cur,
 						&rec.ir_startino,
 						&rec.ir_freecount,
-						&rec.ir_free, &i, ARCH_NOCONVERT)))
+						&rec.ir_free, &i)))
 					goto error1;
 				XFS_WANT_CORRUPTED_GOTO(i == 1, error1);
 			}
@@ -795,7 +795,7 @@ nextag:
 							    tcur,
 							    &trec.ir_startino,
 							    &trec.ir_freecount,
-							    &trec.ir_free, &i, ARCH_NOCONVERT)))
+							    &trec.ir_free, &i)))
 							goto error1;
 						XFS_WANT_CORRUPTED_GOTO(i == 1,
 							error1);
@@ -815,7 +815,7 @@ nextag:
 							    cur,
 							    &rec.ir_startino,
 							    &rec.ir_freecount,
-							    &rec.ir_free, &i, ARCH_NOCONVERT)))
+							    &rec.ir_free, &i)))
 							goto error1;
 						XFS_WANT_CORRUPTED_GOTO(i == 1,
 							error1);
@@ -835,7 +835,7 @@ nextag:
 			goto error0;
 		if (i == 1 &&
 		    (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
-			    &rec.ir_freecount, &rec.ir_free, &j, ARCH_NOCONVERT)) == 0 &&
+			    &rec.ir_freecount, &rec.ir_free, &j)) == 0 &&
 		    j == 1 &&
 		    rec.ir_freecount > 0) {
 			/*
@@ -856,7 +856,7 @@ nextag:
 				if ((error = xfs_inobt_get_rec(cur,
 						&rec.ir_startino,
 						&rec.ir_freecount, &rec.ir_free,
-						&i, ARCH_NOCONVERT)))
+						&i)))
 					goto error0;
 				XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 				if (rec.ir_freecount > 0)
@@ -873,7 +873,7 @@ nextag:
 	ASSERT((XFS_AGINO_TO_OFFSET(mp, rec.ir_startino) %
 				   XFS_INODES_PER_CHUNK) == 0);
 	ino = XFS_AGINO_TO_INO(mp, agno, rec.ir_startino + offset);
-	XFS_INOBT_CLR_FREE(&rec, offset, ARCH_NOCONVERT);
+	XFS_INOBT_CLR_FREE(&rec, offset);
 	rec.ir_freecount--;
 	if ((error = xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount,
 			rec.ir_free)))
@@ -891,7 +891,7 @@ nextag:
 			goto error0;
 		do {
 			if ((error = xfs_inobt_get_rec(cur, &rec.ir_startino,
-					&rec.ir_freecount, &rec.ir_free, &i, ARCH_NOCONVERT)))
+					&rec.ir_freecount, &rec.ir_free, &i)))
 				goto error0;
 			XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 			freecount += rec.ir_freecount;
@@ -998,7 +998,7 @@ xfs_difree(
 			goto error0;
 		do {
 			if ((error = xfs_inobt_get_rec(cur, &rec.ir_startino,
-					&rec.ir_freecount, &rec.ir_free, &i, ARCH_NOCONVERT)))
+					&rec.ir_freecount, &rec.ir_free, &i)))
 				goto error0;
 			if (i) {
 				freecount += rec.ir_freecount;
@@ -1021,7 +1021,7 @@ xfs_difree(
 	}
 	XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 	if ((error = xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount,
-			&rec.ir_free, &i, ARCH_NOCONVERT))) {
+			&rec.ir_free, &i))) {
 		cmn_err(CE_WARN,
 			"xfs_difree: xfs_inobt_get_rec()  returned an error %d on %s.  Returning error.",
 			error, mp->m_fsname);
@@ -1033,11 +1033,11 @@ xfs_difree(
 	 */
 	off = agino - rec.ir_startino;
 	ASSERT(off >= 0 && off < XFS_INODES_PER_CHUNK);
-	ASSERT(!XFS_INOBT_IS_FREE(&rec, off, ARCH_NOCONVERT));
+	ASSERT(!XFS_INOBT_IS_FREE(&rec, off));
 	/*
 	 * Mark the inode free & increment the count.
 	 */
-	XFS_INOBT_SET_FREE(&rec, off, ARCH_NOCONVERT);
+	XFS_INOBT_SET_FREE(&rec, off);
 	rec.ir_freecount++;
 
 	/*
@@ -1103,8 +1103,7 @@ xfs_difree(
 			if ((error = xfs_inobt_get_rec(cur,
 					&rec.ir_startino,
 					&rec.ir_freecount,
-					&rec.ir_free, &i,
-					ARCH_NOCONVERT)))
+					&rec.ir_free, &i)))
 				goto error0;
 			if (i) {
 				freecount += rec.ir_freecount;
@@ -1232,7 +1231,7 @@ xfs_dilocate(
 			goto error0;
 		}
 		if ((error = xfs_inobt_get_rec(cur, &chunk_agino, &chunk_cnt,
-				&chunk_free, &i, ARCH_NOCONVERT))) {
+				&chunk_free, &i))) {
 #ifdef DEBUG
 			xfs_fs_cmn_err(CE_ALERT, mp, "xfs_dilocate: "
 					"xfs_inobt_get_rec() failed");
@@ -1392,7 +1391,7 @@ xfs_ialloc_read_agi(
 		int	i;
 
 		for (i = 0; i < XFS_AGI_UNLINKED_BUCKETS; i++)
-			ASSERT(!INT_ISZERO(agi->agi_unlinked[i], ARCH_CONVERT));
+			ASSERT(agi->agi_unlinked[i]);
 	}
 #endif
 

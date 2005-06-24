@@ -35,6 +35,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/jiffies.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 #include <linux/i2c-vid.h>
@@ -103,6 +104,9 @@ superio_exit(void)
 
 /* Update battery voltage after every reading if true */
 static int update_vbat;
+
+/* Not all BIOSes properly configure the PWM registers */
+static int fix_pwm_polarity;
 
 /* Chip Type */
 
@@ -224,6 +228,7 @@ static int it87_read_value(struct i2c_client *client, u8 register);
 static int it87_write_value(struct i2c_client *client, u8 register,
 			u8 value);
 static struct it87_data *it87_update_device(struct device *dev);
+static int it87_check_pwm(struct i2c_client *client);
 static void it87_init_client(struct i2c_client *client, struct it87_data *data);
 
 
@@ -260,9 +265,12 @@ static ssize_t set_in_min(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	unsigned long val = simple_strtoul(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->in_min[nr] = IN_TO_REG(val);
 	it87_write_value(client, IT87_REG_VIN_MIN(nr), 
 			data->in_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t set_in_max(struct device *dev, const char *buf, 
@@ -271,9 +279,12 @@ static ssize_t set_in_max(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	unsigned long val = simple_strtoul(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->in_max[nr] = IN_TO_REG(val);
 	it87_write_value(client, IT87_REG_VIN_MAX(nr), 
 			data->in_max[nr]);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -351,8 +362,11 @@ static ssize_t set_temp_max(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->temp_high[nr] = TEMP_TO_REG(val);
 	it87_write_value(client, IT87_REG_TEMP_HIGH(nr), data->temp_high[nr]);
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t set_temp_min(struct device *dev, const char *buf, 
@@ -361,8 +375,11 @@ static ssize_t set_temp_min(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->temp_low[nr] = TEMP_TO_REG(val);
 	it87_write_value(client, IT87_REG_TEMP_LOW(nr), data->temp_low[nr]);
+	up(&data->update_lock);
 	return count;
 }
 #define show_temp_offset(offset)					\
@@ -403,9 +420,11 @@ show_temp_offset(3);
 static ssize_t show_sensor(struct device *dev, char *buf, int nr)
 {
 	struct it87_data *data = it87_update_device(dev);
-	if (data->sensor & (1 << nr))
+	u8 reg = data->sensor; /* In case the value is updated while we use it */
+	
+	if (reg & (1 << nr))
 		return sprintf(buf, "3\n");  /* thermal diode */
-	if (data->sensor & (8 << nr))
+	if (reg & (8 << nr))
 		return sprintf(buf, "2\n");  /* thermistor */
 	return sprintf(buf, "0\n");      /* disabled */
 }
@@ -416,6 +435,8 @@ static ssize_t set_sensor(struct device *dev, const char *buf,
 	struct it87_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
 
+	down(&data->update_lock);
+
 	data->sensor &= ~(1 << nr);
 	data->sensor &= ~(8 << nr);
 	/* 3 = thermal diode; 2 = thermistor; 0 = disabled */
@@ -423,9 +444,12 @@ static ssize_t set_sensor(struct device *dev, const char *buf,
 	    data->sensor |= 1 << nr;
 	else if (val == 2)
 	    data->sensor |= 8 << nr;
-	else if (val != 0)
+	else if (val != 0) {
+		up(&data->update_lock);
 		return -EINVAL;
+	}
 	it87_write_value(client, IT87_REG_TEMP_ENABLE, data->sensor);
+	up(&data->update_lock);
 	return count;
 }
 #define show_sensor_offset(offset)					\
@@ -479,8 +503,11 @@ static ssize_t set_fan_min(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->fan_min[nr] = FAN_TO_REG(val, DIV_FROM_REG(data->fan_div[nr]));
 	it87_write_value(client, IT87_REG_FAN_MIN(nr), data->fan_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t set_fan_div(struct device *dev, const char *buf, 
@@ -490,7 +517,10 @@ static ssize_t set_fan_div(struct device *dev, const char *buf,
 	struct it87_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
 	int i, min[3];
-	u8 old = it87_read_value(client, IT87_REG_FAN_DIV);
+	u8 old;
+
+	down(&data->update_lock);
+	old = it87_read_value(client, IT87_REG_FAN_DIV);
 
 	for (i = 0; i < 3; i++)
 		min[i] = FAN_FROM_REG(data->fan_min[i], DIV_FROM_REG(data->fan_div[i]));
@@ -517,6 +547,7 @@ static ssize_t set_fan_div(struct device *dev, const char *buf,
 		data->fan_min[i]=FAN_TO_REG(min[i], DIV_FROM_REG(data->fan_div[i]));
 		it87_write_value(client, IT87_REG_FAN_MIN(i), data->fan_min[i]);
 	}
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t set_pwm_enable(struct device *dev, const char *buf,
@@ -525,6 +556,8 @@ static ssize_t set_pwm_enable(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct it87_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 
 	if (val == 0) {
 		int tmp;
@@ -540,9 +573,12 @@ static ssize_t set_pwm_enable(struct device *dev, const char *buf,
 		it87_write_value(client, IT87_REG_FAN_MAIN_CTRL, data->fan_main_ctrl);
 		/* set saved pwm value, clear FAN_CTLX PWM mode bit */
 		it87_write_value(client, IT87_REG_PWM(nr), PWM_TO_REG(data->manual_pwm_ctl[nr]));
-	} else
+	} else {
+		up(&data->update_lock);
 		return -EINVAL;
+	}
 
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t set_pwm(struct device *dev, const char *buf,
@@ -555,10 +591,11 @@ static ssize_t set_pwm(struct device *dev, const char *buf,
 	if (val < 0 || val > 255)
 		return -EINVAL;
 
+	down(&data->update_lock);
 	data->manual_pwm_ctl[nr] = val;
 	if (data->fan_main_ctrl & (1 << nr))
 		it87_write_value(client, IT87_REG_PWM(nr), PWM_TO_REG(data->manual_pwm_ctl[nr]));
-
+	up(&data->update_lock);
 	return count;
 }
 
@@ -718,7 +755,6 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	const char *name = "";
 	int is_isa = i2c_is_isa_adapter(adapter);
 	int enable_pwm_interface;
-	int tmp;
 
 	if (!is_isa && 
 	    !i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
@@ -821,19 +857,11 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	if ((err = i2c_attach_client(new_client)))
 		goto ERROR2;
 
+	/* Check PWM configuration */
+	enable_pwm_interface = it87_check_pwm(new_client);
+
 	/* Initialize the IT87 chip */
 	it87_init_client(new_client, data);
-
-	/* Some BIOSes fail to correctly configure the IT87 fans. All fans off
-	 * and polarity set to active low is sign that this is the case so we
-	 * disable pwm control to protect the user. */
-	enable_pwm_interface = 1;
-	tmp = it87_read_value(new_client, IT87_REG_FAN_CTL);
-	if ((tmp & 0x87) == 0) {
-		enable_pwm_interface = 0;
-		dev_info(&new_client->dev,
-			"detected broken BIOS defaults, disabling pwm interface");
-	}
 
 	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_in0_input);
@@ -893,9 +921,9 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	if (data->type == it8712) {
+		data->vrm = i2c_which_vrm();
 		device_create_file_vrm(new_client);
 		device_create_file_vid(new_client);
-		data->vrm = i2c_which_vrm();
 	}
 
 	return 0;
@@ -963,6 +991,56 @@ static int it87_write_value(struct i2c_client *client, u8 reg, u8 value)
 		return 0;
 	} else
 		return i2c_smbus_write_byte_data(client, reg, value);
+}
+
+/* Return 1 if and only if the PWM interface is safe to use */
+static int it87_check_pwm(struct i2c_client *client)
+{
+	/* Some BIOSes fail to correctly configure the IT87 fans. All fans off
+	 * and polarity set to active low is sign that this is the case so we
+	 * disable pwm control to protect the user. */
+	int tmp = it87_read_value(client, IT87_REG_FAN_CTL);
+	if ((tmp & 0x87) == 0) {
+		if (fix_pwm_polarity) {
+			/* The user asks us to attempt a chip reconfiguration.
+			 * This means switching to active high polarity and
+			 * inverting all fan speed values. */
+			int i;
+			u8 pwm[3];
+
+			for (i = 0; i < 3; i++)
+				pwm[i] = it87_read_value(client,
+							 IT87_REG_PWM(i));
+
+			/* If any fan is in automatic pwm mode, the polarity
+			 * might be correct, as suspicious as it seems, so we
+			 * better don't change anything (but still disable the
+			 * PWM interface). */
+			if (!((pwm[0] | pwm[1] | pwm[2]) & 0x80)) {
+				dev_info(&client->dev, "Reconfiguring PWM to "
+					 "active high polarity\n");
+				it87_write_value(client, IT87_REG_FAN_CTL,
+						 tmp | 0x87);
+				for (i = 0; i < 3; i++)
+					it87_write_value(client,
+							 IT87_REG_PWM(i),
+							 0x7f & ~pwm[i]);
+				return 1;
+			}
+
+			dev_info(&client->dev, "PWM configuration is "
+				 "too broken to be fixed\n");
+		}
+
+		dev_info(&client->dev, "Detected broken BIOS "
+			 "defaults, disabling PWM interface\n");
+		return 0;
+	} else if (fix_pwm_polarity) {
+		dev_info(&client->dev, "PWM configuration looks "
+			 "sane, won't touch\n");
+	}
+
+	return 1;
 }
 
 /* Called when we have found a new IT87. */
@@ -1037,8 +1115,8 @@ static struct it87_data *it87_update_device(struct device *dev)
 
 	down(&data->update_lock);
 
-	if ((jiffies - data->last_updated > HZ + HZ / 2) ||
-	    (jiffies < data->last_updated) || !data->valid) {
+	if (time_after(jiffies, data->last_updated + HZ + HZ / 2)
+	    || !data->valid) {
 
 		if (update_vbat) {
 			/* Cleared after each update, so reenable.  Value
@@ -1075,9 +1153,6 @@ static struct it87_data *it87_update_device(struct device *dev)
 			data->temp_low[i] =
 			    it87_read_value(client, IT87_REG_TEMP_LOW(i));
 		}
-
-		/* The 8705 does not have VID capability */
-		data->vid = 0x1f;
 
 		i = it87_read_value(client, IT87_REG_FAN_DIV);
 		data->fan_div[0] = i & 0x07;
@@ -1125,6 +1200,8 @@ MODULE_AUTHOR("Chris Gauthron <chrisg@0-in.com>");
 MODULE_DESCRIPTION("IT8705F, IT8712F, Sis950 driver");
 module_param(update_vbat, bool, 0);
 MODULE_PARM_DESC(update_vbat, "Update vbat if set else return powerup value");
+module_param(fix_pwm_polarity, bool, 0);
+MODULE_PARM_DESC(fix_pwm_polarity, "Force PWM polarity to active high (DANGEROUS)");
 MODULE_LICENSE("GPL");
 
 module_init(sm_it87_init);

@@ -33,7 +33,7 @@ static inline void TCP_ECN_send_syn(struct sock *sk, struct tcp_sock *tp,
 	if (sysctl_tcp_ecn && !(sk->sk_route_caps & NETIF_F_TSO)) {
 		TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_ECE|TCPCB_FLAG_CWR;
 		tp->ecn_flags = TCP_ECN_OK;
-		sk->sk_no_largesend = 1;
+		sock_set_flag(sk, SOCK_NO_LARGESEND);
 	}
 }
 

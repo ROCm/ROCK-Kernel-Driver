@@ -4,7 +4,7 @@ dvb-dibusb-objs = dvb-dibusb-core.o \
 	dvb-dibusb-firmware.o \
 	dvb-dibusb-remote.o \
 	dvb-dibusb-usb.o \
-	dvb-dibusb-pid.o
+	dvb-fe-dtt200u.o
 
 obj-$(CONFIG_DVB_DIBUSB) += dvb-dibusb.o
 

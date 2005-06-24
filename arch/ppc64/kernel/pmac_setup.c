@@ -70,6 +70,7 @@
 #include <asm/time.h>
 #include <asm/of_device.h>
 #include <asm/lmb.h>
+#include <asm/smu.h>
 
 #include "pmac.h"
 #include "mpic.h"
@@ -80,22 +81,21 @@
 #define DBG(fmt...)
 #endif
 
-
 static int current_root_goodness = -1;
 #define DEFAULT_ROOT_DEVICE Root_SDA1	/* sda1 - slightly silly choice */
 
 extern  int powersave_nap;
 int sccdbg;
 
-extern void udbg_init_scc(struct device_node *np);
-#ifdef CONFIG_G5_SMU
-int __openfirmware smu_init (void);
-void __pmac smu_get_rtc_time (struct rtc_time *time);
-int  __pmac smu_set_rtc_time (struct rtc_time *time);
-void __init smu_get_boot_time (struct rtc_time *tm);
-void __pmac smu_shutdown (void);
-void __pmac smu_restart (char *cmd);
+sys_ctrler_t sys_ctrler;
+EXPORT_SYMBOL(sys_ctrler);
+
+#ifdef CONFIG_PMAC_SMU
+unsigned long smu_cmdbuf_abs;
+EXPORT_SYMBOL(smu_cmdbuf_abs);
 #endif
+
+extern void udbg_init_scc(struct device_node *np);
 
 void __pmac pmac_show_cpuinfo(struct seq_file *m)
 {
@@ -163,32 +163,13 @@ void __init pmac_setup_arch(void)
 	/* We can NAP */
 	powersave_nap = 1;
 
-#ifdef CONFIG_G5_SMU
-	/* Initialize the SMU */
-	if (smu_init() > 0) {
-		ppc_md.power_off = &smu_shutdown;
-		ppc_md.halt = &smu_shutdown;
-		ppc_md.restart = &smu_restart;
-		ppc_md.get_boot_time = &smu_get_boot_time;
-		ppc_md.set_rtc_time = &smu_set_rtc_time;
-		ppc_md.get_rtc_time = &smu_get_rtc_time;
-	} else 
-#endif
 #ifdef CONFIG_ADB_PMU
-	{
-	/* Initialize the PMU */
-		if (find_via_pmu() > 0) {
-			ppc_md.power_off = &pmu_shutdown;
-			ppc_md.halt = &pmu_shutdown;
-			ppc_md.restart = &pmu_restart;
-			ppc_md.get_boot_time = &pmac_get_boot_time;
-			ppc_md.set_rtc_time = &pmac_set_rtc_time;
-			ppc_md.get_rtc_time = &pmac_get_rtc_time;
-		}
-	}
-#else
-	{
-	}
+	/* Initialize the PMU if any */
+	find_via_pmu();
+#endif
+#ifdef CONFIG_PMAC_SMU
+	/* Initialize the SMU if any */
+	smu_init();
 #endif
 
 	/* Init NVRAM access */
@@ -247,6 +228,48 @@ void __pmac note_bootable_part(dev_t dev, int part, int goodness)
 	}
 }
 
+void __pmac pmac_restart(char *cmd)
+{
+	switch(sys_ctrler) {
+#ifdef CONFIG_ADB_PMU
+	case SYS_CTRLER_PMU:
+		pmu_restart();
+		break;
+#endif
+
+#ifdef CONFIG_PMAC_SMU
+	case SYS_CTRLER_SMU:
+		smu_restart();
+		break;
+#endif
+	default:
+		;
+	}
+}
+
+void __pmac pmac_power_off(void)
+{
+	switch(sys_ctrler) {
+#ifdef CONFIG_ADB_PMU
+	case SYS_CTRLER_PMU:
+		pmu_shutdown();
+		break;
+#endif
+#ifdef CONFIG_PMAC_SMU
+	case SYS_CTRLER_SMU:
+		smu_shutdown();
+		break;
+#endif
+	default:
+		;
+	}
+}
+
+void __pmac pmac_halt(void)
+{
+	pmac_power_off();
+}
+
 #ifdef CONFIG_BOOTX_TEXT
 static int dummy_getc_poll(void)
 {
@@ -262,7 +285,6 @@ static void btext_putc(unsigned char c)
 {
 	btext_drawchar(c);
 }
-#endif /* CONFIG_BOOTX_TEXT */
 
 static void __init init_boot_display(void)
 {
@@ -298,6 +320,7 @@ static void __init init_boot_display(void)
 			return;
 	}
 }
+#endif /* CONFIG_BOOTX_TEXT */
 
 /* 
  * Early initialization.
@@ -444,7 +467,6 @@ static int __init pmac_probe(int platform)
 {
 	if (platform != PLATFORM_POWERMAC)
 		return 0;
-
 	/*
 	 * On U3, the DART (iommu) must be allocated now since it
 	 * has an impact on htab_initialize (due to the large page it
@@ -453,10 +475,22 @@ static int __init pmac_probe(int platform)
 	 */
 	alloc_u3_dart_table();
 
+#ifdef CONFIG_PMAC_SMU
+	/*
+	 * SMU based G5s need some memory below 2Gb, at least the current
+	 * driver needs that. We have to allocate it now. We allocate 4k
+	 * (1 small page) for now.
+	 */
+	smu_cmdbuf_abs = lmb_alloc_base(4096, 4096, 0x80000000UL);
+#endif /* CONFIG_PMAC_SMU */
+
 	return 1;
 }
 
 struct machdep_calls __initdata pmac_md = {
+#ifdef CONFIG_HOTPLUG_CPU
+	.cpu_die		= generic_mach_cpu_die,
+#endif
 	.probe			= pmac_probe,
 	.setup_arch		= pmac_setup_arch,
 	.init_early		= pmac_init_early,
@@ -464,12 +498,12 @@ struct machdep_calls __initdata pmac_md = {
 	.init_IRQ		= pmac_init_IRQ,
 	.get_irq		= mpic_get_irq,
 	.pcibios_fixup		= pmac_pcibios_fixup,
-	.restart		= NULL,
-	.power_off		= NULL,
-	.halt			= NULL,
-       	.get_boot_time		= NULL,
-       	.set_rtc_time		= NULL,
-       	.get_rtc_time		= NULL,
+	.restart		= pmac_restart,
+	.power_off		= pmac_power_off,
+	.halt			= pmac_halt,
+       	.get_boot_time		= pmac_get_boot_time,
+       	.set_rtc_time		= pmac_set_rtc_time,
+       	.get_rtc_time		= pmac_get_rtc_time,
       	.calibrate_decr		= pmac_calibrate_decr,
 	.feature_call		= pmac_do_feature_call,
 	.progress		= pmac_progress,

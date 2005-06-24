@@ -83,8 +83,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2004 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"3.01.18"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.18"
+#define MPT_LINUX_VERSION_COMMON	"3.01.20"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-3.01.20"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \
@@ -215,7 +215,7 @@ struct mpt_pci_driver{
 	void (*shutdown) (struct device * dev);
 #ifdef CONFIG_PM
 	int  (*resume) (struct pci_dev *dev);
-	int  (*suspend) (struct pci_dev *dev, u32 state);
+	int  (*suspend) (struct pci_dev *dev, pm_message_t state);
 #endif
 };
 
@@ -420,7 +420,6 @@ do { \
 
 typedef struct _MPT_IOCTL {
 	struct _MPT_ADAPTER	*ioc;
-	struct timer_list	 timer;		/* timer function for this adapter */
 	u8			 ReplyFrame[MPT_DEFAULT_FRAME_SIZE];	/* reply frame data */
 	u8			 sense[MPT_SENSE_BUFFER_ALLOC];
 	int			 wait_done;	/* wake-up value for this ioc */
@@ -428,8 +427,6 @@ typedef struct _MPT_IOCTL {
 	u8			 status;	/* current command status */
 	u8			 reset;		/* 1 if bus reset allowed */
 	u8			 target;	/* target for reset */
-	void 			*tmPtr;
-	struct timer_list	 TMtimer;	/* timer function for this adapter */
 	struct semaphore	 sem_ioc;
 } MPT_IOCTL;
 
@@ -882,11 +879,9 @@ typedef struct _MPT_SCSI_HOST {
 	int			  port;
 	u32			  pad0;
 	struct scsi_cmnd	**ScsiLookup;
-	u32			  qtag_tick;
 	VirtDevice		**Targets;
 	MPT_LOCAL_REPLY		 *pLocal;		/* used for internal commands */
 	struct timer_list	  timer;
-	struct timer_list	  TMtimer;		/* Timer for TM commands ONLY */
 		/* Pool of memory for holding SCpnts before doing
 		 * OS callbacks. freeQ is the free pool.
 		 */
@@ -896,7 +891,6 @@ typedef struct _MPT_SCSI_HOST {
 	u8			  pad1;
 	u8                        tmState;
 	u8			  rsvd[2];
-	MPT_FRAME_HDR		 *tmPtr;		/* Ptr to TM request*/
 	MPT_FRAME_HDR		 *cmdPtr;		/* Ptr to nonOS request */
 	struct scsi_cmnd	 *abortSCpnt;
 	MPT_LOCAL_REPLY		  localReply;		/* internal cmd reply struct */

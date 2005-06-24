@@ -30,8 +30,8 @@ extern unsigned int csum_partial_copy_nocheck(const unsigned char *, unsigned ch
  * this is a new version of the above that records errors it finds in *errp,
  * but continues and zeros the rest of the buffer.
  */
-extern unsigned int csum_partial_copy_from_user(const unsigned char *src, unsigned char *dst,
-						int len, unsigned int sum, int *errp);
+extern unsigned int csum_partial_copy_from_user(const unsigned char __user *src,
+		unsigned char *dst, int len, unsigned int sum, int *errp);
 
 /*
  *	Optimized for IP headers, which always checksum on 4 octet boundaries.

@@ -30,6 +30,7 @@
 #include <linux/kallsyms.h>
 #include <linux/interrupt.h>
 #include <linux/sysctl.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -286,6 +287,8 @@ void dump_stack(void)
 {
 	show_task(NULL);
 }
+/* Needed by any user of WARN_ON in view of the defn in include/asm-sh/bug.h */
+EXPORT_SYMBOL(dump_stack);
 
 static void do_unhandled_exception(int trapnr, int signr, char *str, char *fn_name,
 		unsigned long error_code, struct pt_regs *regs, struct task_struct *tsk)

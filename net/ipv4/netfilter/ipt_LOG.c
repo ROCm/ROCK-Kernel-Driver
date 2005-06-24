@@ -198,16 +198,16 @@ static void dump_packet(const struct ipt_log_info *info,
 		static size_t required_len[NR_ICMP_TYPES+1]
 			= { [ICMP_ECHOREPLY] = 4,
 			    [ICMP_DEST_UNREACH]
-			    = 8 + sizeof(struct iphdr) + 8,
+			    = 8 + sizeof(struct iphdr),
 			    [ICMP_SOURCE_QUENCH]
-			    = 8 + sizeof(struct iphdr) + 8,
+			    = 8 + sizeof(struct iphdr),
 			    [ICMP_REDIRECT]
-			    = 8 + sizeof(struct iphdr) + 8,
+			    = 8 + sizeof(struct iphdr),
 			    [ICMP_ECHO] = 4,
 			    [ICMP_TIME_EXCEEDED]
-			    = 8 + sizeof(struct iphdr) + 8,
+			    = 8 + sizeof(struct iphdr),
 			    [ICMP_PARAMETERPROB]
-			    = 8 + sizeof(struct iphdr) + 8,
+			    = 8 + sizeof(struct iphdr),
 			    [ICMP_TIMESTAMP] = 20,
 			    [ICMP_TIMESTAMPREPLY] = 20,
 			    [ICMP_ADDRESS] = 12,

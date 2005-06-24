@@ -51,6 +51,7 @@
 #include <asm/cputable.h>
 #include <asm/sections.h>
 #include <asm/tlbflush.h>
+#include <asm/time.h>
 
 #ifndef CONFIG_SMP
 struct task_struct *last_task_used_math = NULL;
@@ -168,6 +169,8 @@ int dump_task_altivec(struct pt_regs *regs, elf_vrregset_t *vrregs)
 
 #endif /* CONFIG_ALTIVEC */
 
+DEFINE_PER_CPU(struct cpu_usage, cpu_usage_array);
+
 struct task_struct *__switch_to(struct task_struct *prev,
 				struct task_struct *new)
 {
@@ -205,6 +208,21 @@ struct task_struct *__switch_to(struct task_struct *prev,
 
 	new_thread = &new->thread;
 	old_thread = &current->thread;
+
+/* Collect purr utilization data per process and per processor wise */
+/* purr is nothing but processor time base                          */
+
+#if defined(CONFIG_PPC_PSERIES)
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
+		struct cpu_usage *cu = &__get_cpu_var(cpu_usage_array);
+		long unsigned start_tb, current_tb;
+		start_tb = old_thread->start_tb;
+		cu->current_tb = current_tb = mfspr(SPRN_PURR);
+		old_thread->accum_tb += (current_tb - start_tb);
+		new_thread->start_tb = current_tb;
+	}
+#endif
+
 
 	local_irq_save(flags);
 	last = _switch(old_thread, new_thread);
@@ -360,9 +378,6 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 		childregs->gpr[1] = sp + sizeof(struct pt_regs);
 		p->thread.regs = NULL;	/* no user register state */
 		clear_ti_thread_flag(p->thread_info, TIF_32BIT);
-#ifdef CONFIG_PPC_ISERIES
-		set_ti_thread_flag(p->thread_info, TIF_RUN_LIGHT);
-#endif
 	} else {
 		childregs->gpr[1] = usp;
 		p->thread.regs = childregs;
@@ -388,12 +403,12 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	kregs = (struct pt_regs *) sp;
 	sp -= STACK_FRAME_OVERHEAD;
 	p->thread.ksp = sp;
-	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
+	if (cpu_has_feature(CPU_FTR_SLB)) {
 		unsigned long sp_vsid = get_kernel_vsid(sp);
 
 		sp_vsid <<= SLB_VSID_SHIFT;
 		sp_vsid |= SLB_VSID_KERNEL;
-		if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
+		if (cpu_has_feature(CPU_FTR_16M_PAGE))
 			sp_vsid |= SLB_VSID_L;
 
 		p->thread.ksp_vsid = sp_vsid;
@@ -469,6 +484,7 @@ void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp)
 	current->thread.used_vr = 0;
 #endif /* CONFIG_ALTIVEC */
 }
+EXPORT_SYMBOL(start_thread);
 
 int set_fpexc_mode(struct task_struct *tsk, unsigned int val)
 {
@@ -607,6 +623,7 @@ unsigned long get_wchan(struct task_struct *p)
 	} while (count++ < 16);
 	return 0;
 }
+EXPORT_SYMBOL(get_wchan);
 
 void show_stack(struct task_struct *p, unsigned long *_sp)
 {

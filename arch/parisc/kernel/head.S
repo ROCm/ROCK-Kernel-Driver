@@ -71,47 +71,42 @@ $bss_loop:
 	stw,ma          %arg2,4(%r1)
 	stw,ma          %arg3,4(%r1)
 
-	/* Initialize startup VM. Just map first 8 MB of memory */
-	load32		PA(pg0),%r1
-
-#ifdef __LP64__
-	load32		PA(pmd0),%r5
-	shrd            %r5,PxD_VALUE_SHIFT,%r3	
-#else
-	shr		%r1,PxD_VALUE_SHIFT,%r3
-#endif
-        ldo             (PxD_FLAG_PRESENT+PxD_FLAG_VALID)(%r3),%r3	
-	
+	/* Initialize startup VM. Just map first 8/16 MB of memory */
 	load32		PA(swapper_pg_dir),%r4
 	mtctl		%r4,%cr24	/* Initialize kernel root pointer */
 	mtctl		%r4,%cr25	/* Initialize user root pointer */
 
 #ifdef __LP64__
+	/* Set pmd in pgd */
+	load32		PA(pmd0),%r5
+	shrd            %r5,PxD_VALUE_SHIFT,%r3	
+        ldo             (PxD_FLAG_PRESENT+PxD_FLAG_VALID)(%r3),%r3	
 	stw		%r3,ASM_PGD_ENTRY*ASM_PGD_ENTRY_SIZE(%r4)
-	shrd		%r1,PxD_VALUE_SHIFT,%r3
-	ldo		(PxD_FLAG_PRESENT+PxD_FLAG_VALID)(%r3),%r3
-	ldo		ASM_PMD_ENTRY*ASM_PMD_ENTRY_SIZE(%r5),%r5
+	ldo		ASM_PMD_ENTRY*ASM_PMD_ENTRY_SIZE(%r5),%r4
 #else
+	/* 2-level page table, so pmd == pgd */
         ldo             ASM_PGD_ENTRY*ASM_PGD_ENTRY_SIZE(%r4),%r4
 #endif
+
+	/* Fill in pmd with enough pte directories */
+	load32		PA(pg0),%r1
+	SHRREG		%r1,PxD_VALUE_SHIFT,%r3
+	ldo		(PxD_FLAG_PRESENT+PxD_FLAG_VALID)(%r3),%r3
+
 	ldi		ASM_PT_INITIAL,%r1
 
 1:
-#ifdef __LP64__
-	stw             %r3,0(%r5)
-#else
-	stw             %r3,0(%r4)
-#endif
-	
+	stw		%r3,0(%r4)
 	ldo		(ASM_PAGE_SIZE >> PxD_VALUE_SHIFT)(%r3),%r3
 	addib,>		-1,%r1,1b
-
 #ifdef __LP64__
-	ldo		ASM_PMD_ENTRY_SIZE(%r5),%r5
+	ldo             ASM_PMD_ENTRY_SIZE(%r4),%r4
 #else
-	ldo		ASM_PGD_ENTRY_SIZE(%r4),%r4
+	ldo             ASM_PGD_ENTRY_SIZE(%r4),%r4
 #endif
 
+
+	/* Now initialize the PTEs themselves */
 	ldo		_PAGE_KERNEL(%r0),%r3 /* Hardwired 0 phys addr start */
 	load32		PA(pg0),%r1
 
@@ -306,7 +301,7 @@ $rfi:
 	mtctl		%r11,%cr18	/* IIAOQ head */
 	ldo		4(%r11),%r11
 	mtctl		%r11,%cr18	/* IIAOQ tail */
-
+	
 	/* Jump to hyperspace */
 	rfi
 	nop

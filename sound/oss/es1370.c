@@ -2540,7 +2540,7 @@ MODULE_LICENSE("GPL");
 static struct initvol {
 	int mixch;
 	int vol;
-} initvol[] __initdata = {
+} initvol[] __devinitdata = {
 	{ SOUND_MIXER_WRITE_VOLUME, 0x4040 },
 	{ SOUND_MIXER_WRITE_PCM, 0x4040 },
 	{ SOUND_MIXER_WRITE_SYNTH, 0x4040 },

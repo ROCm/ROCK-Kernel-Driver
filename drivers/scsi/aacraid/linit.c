@@ -45,6 +45,7 @@
 #include <linux/syscalls.h>
 #include <linux/ioctl32.h>
 #include <linux/delay.h>
+#include <linux/smp_lock.h>
 #include <asm/semaphore.h>
 
 #include <scsi/scsi.h>
@@ -190,28 +191,6 @@ static struct aac_driver_ident aac_drivers[] = {
 	{ aac_rx_init, "aacraid",  "ADAPTEC ", "RAID            ", 2, AAC_QUIRK_31BIT | AAC_QUIRK_34SG }, /* Adaptec Catch All */
 	{ aac_rkt_init, "aacraid", "ADAPTEC ", "RAID            ", 2 } /* Adaptec Rocket Catch All */
 };
-
-#ifdef CONFIG_COMPAT
-/* 
- * Promote 32 bit apps that call get_next_adapter_fib_ioctl to 64 bit version 
- */
-static int aac_get_next_adapter_fib_ioctl(unsigned int fd, unsigned int cmd, 
-		unsigned long arg, struct file *file)
-{
-	struct fib_ioctl __user *f;
-
-	f = compat_alloc_user_space(sizeof(*f));
-	if (!access_ok(VERIFY_WRITE, f, sizeof(*f)))
-		return -EFAULT;
-
-	clear_user(f, sizeof(*f));
-	if (copy_in_user(f, (void __user *)arg, sizeof(struct fib_ioctl) - sizeof(u32)))
-		return -EFAULT;
-
-	return sys_ioctl(fd, cmd, (unsigned long)f);
-}
-#endif
-
 
 /**
  *	aac_queuecommand	-	queue a SCSI command
@@ -471,7 +450,7 @@ static int aac_cfg_open(struct inode *inode, struct file *file)
 		}
 	}
 
-	return 0;
+	return err;
 }
 
 /**
@@ -494,9 +473,65 @@ static int aac_cfg_ioctl(struct inode *inode,  struct file *file,
 	return aac_do_ioctl(file->private_data, cmd, (void __user *)arg);
 }
 
+#ifdef CONFIG_COMPAT
+static long aac_compat_do_ioctl(struct aac_dev *dev, unsigned cmd, unsigned long arg)
+{
+	long ret;
+	lock_kernel();
+	switch (cmd) { 
+	case FSACTL_MINIPORT_REV_CHECK:
+	case FSACTL_SENDFIB:
+	case FSACTL_OPEN_GET_ADAPTER_FIB:
+	case FSACTL_CLOSE_GET_ADAPTER_FIB:
+	case FSACTL_SEND_RAW_SRB:
+	case FSACTL_GET_PCI_INFO:
+	case FSACTL_QUERY_DISK:
+	case FSACTL_DELETE_DISK:
+	case FSACTL_FORCE_DELETE_DISK:
+	case FSACTL_GET_CONTAINERS: 
+		ret = aac_do_ioctl(dev, cmd, (void __user *)arg);
+		break;
+
+	case FSACTL_GET_NEXT_ADAPTER_FIB: {
+		struct fib_ioctl __user *f;
+		
+		f = compat_alloc_user_space(sizeof(*f));
+		ret = 0;
+		if (clear_user(f, sizeof(*f) != sizeof(*f)))
+			ret = -EFAULT;
+		if (copy_in_user(f, (void __user *)arg, sizeof(struct fib_ioctl) - sizeof(u32)))
+			ret = -EFAULT;
+		if (!ret)
+			ret = aac_do_ioctl(dev, cmd, (void __user *)arg);
+		break;
+	}
+
+	default:
+		ret = -ENOIOCTLCMD; 
+		break;
+	} 
+	unlock_kernel();
+	return ret;
+}
+
+static int aac_compat_ioctl(struct scsi_device *sdev, int cmd, void __user *arg)
+{
+	struct aac_dev *dev = (struct aac_dev *)sdev->host->hostdata;
+	return aac_compat_do_ioctl(dev, cmd, (unsigned long)arg);
+}
+
+static long aac_compat_cfg_ioctl(struct file *file, unsigned cmd, unsigned long arg)
+{
+	return aac_compat_do_ioctl((struct aac_dev *)file->private_data, cmd, arg);
+}
+#endif
+
 static struct file_operations aac_cfg_fops = {
 	.owner		= THIS_MODULE,
 	.ioctl		= aac_cfg_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl   = aac_compat_cfg_ioctl,
+#endif
 	.open		= aac_cfg_open,
 };
 
@@ -506,6 +541,9 @@ static struct scsi_host_template aac_driver_template = {
 	.proc_name			= "aacraid",
 	.info           		= aac_info,
 	.ioctl          		= aac_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl			= aac_compat_ioctl,
+#endif
 	.queuecommand   		= aac_queuecommand,
 	.bios_param     		= aac_biosparm,	
 	.slave_configure		= aac_slave_configure,
@@ -535,10 +573,9 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 	int unique_id = 0;
 
 	list_for_each_entry(aac, &aac_devices, entry) {
-		if (aac->id > unique_id) {
-			insert = &aac->entry;
+		if (aac->id > unique_id)
 			break;
-		}
+		insert = &aac->entry;
 		unique_id++;
 	}
 
@@ -699,39 +736,11 @@ static int __init aac_init(void)
 		printk(KERN_WARNING
 		       "aacraid: unable to register \"aac\" device.\n");
 	}
-#ifdef CONFIG_COMPAT
-	register_ioctl32_conversion(FSACTL_MINIPORT_REV_CHECK, NULL);
-	register_ioctl32_conversion(FSACTL_SENDFIB, NULL);
-	register_ioctl32_conversion(FSACTL_OPEN_GET_ADAPTER_FIB, NULL);
-	register_ioctl32_conversion(FSACTL_GET_NEXT_ADAPTER_FIB, 
-		aac_get_next_adapter_fib_ioctl);
-	register_ioctl32_conversion(FSACTL_CLOSE_GET_ADAPTER_FIB, NULL);
-	register_ioctl32_conversion(FSACTL_SEND_RAW_SRB, NULL);
-	register_ioctl32_conversion(FSACTL_GET_PCI_INFO, NULL);
-	register_ioctl32_conversion(FSACTL_QUERY_DISK, NULL);
-	register_ioctl32_conversion(FSACTL_DELETE_DISK, NULL);
-	register_ioctl32_conversion(FSACTL_FORCE_DELETE_DISK, NULL);
-	register_ioctl32_conversion(FSACTL_GET_CONTAINERS, NULL);
-#endif
-
 	return 0;
 }
 
 static void __exit aac_exit(void)
 {
-#ifdef CONFIG_COMPAT
-	unregister_ioctl32_conversion(FSACTL_MINIPORT_REV_CHECK);
-	unregister_ioctl32_conversion(FSACTL_SENDFIB);
-	unregister_ioctl32_conversion(FSACTL_OPEN_GET_ADAPTER_FIB);
-	unregister_ioctl32_conversion(FSACTL_GET_NEXT_ADAPTER_FIB);
-	unregister_ioctl32_conversion(FSACTL_CLOSE_GET_ADAPTER_FIB);
-	unregister_ioctl32_conversion(FSACTL_SEND_RAW_SRB);
-	unregister_ioctl32_conversion(FSACTL_GET_PCI_INFO);
-	unregister_ioctl32_conversion(FSACTL_QUERY_DISK);
-	unregister_ioctl32_conversion(FSACTL_DELETE_DISK);
-	unregister_ioctl32_conversion(FSACTL_FORCE_DELETE_DISK);
-	unregister_ioctl32_conversion(FSACTL_GET_CONTAINERS);
-#endif
 	unregister_chrdev(aac_cfg_major, "aac");
 	pci_unregister_driver(&aac_pci_driver);
 }

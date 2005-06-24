@@ -557,7 +557,7 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 		return 1;
 	}
 	sf = (xfs_dir_shortform_t *)(&dp->di_u.di_dirsf);
-	ino = XFS_GET_DIR_INO_ARCH(mp, sf->hdr.parent, ARCH_CONVERT);
+	ino = XFS_GET_DIR_INO8(sf->hdr.parent);
 	if (xfs_dir_ino_validate(mp, ino))
 		return 1;
 
@@ -575,7 +575,7 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 	namelen_sum = 0;
 	sfe = &sf->list[0];
 	for (i = sf->hdr.count - 1; i >= 0; i--) {
-		ino = XFS_GET_DIR_INO_ARCH(mp, sfe->inumber, ARCH_CONVERT);
+		ino = XFS_GET_DIR_INO8(sfe->inumber);
 		xfs_dir_ino_validate(mp, ino);
 		if (sfe->namelen >= XFS_LITINO(mp)) {
 			xfs_fs_cmn_err(CE_WARN, mp,
@@ -716,7 +716,7 @@ xfs_dir_leaf_replace(xfs_da_args_t *args)
 		entry = &leaf->entries[index];
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(entry->nameidx, ARCH_CONVERT));
 		/* XXX - replace assert? */
-		XFS_DIR_SF_PUT_DIRINO_ARCH(&inum, &namest->inumber, ARCH_CONVERT);
+		XFS_DIR_SF_PUT_DIRINO(&inum, &namest->inumber);
 		xfs_da_log_buf(args->trans, bp,
 		    XFS_DA_LOGRANGE(leaf, namest, sizeof(namest->inumber)));
 		xfs_da_buf_done(bp);
@@ -1065,7 +1065,7 @@ xfs_dir_node_replace(xfs_da_args_t *args)
 		entry = &leaf->entries[blk->index];
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(entry->nameidx, ARCH_CONVERT));
 		/* XXX - replace assert ? */
-		XFS_DIR_SF_PUT_DIRINO_ARCH(&inum, &namest->inumber, ARCH_CONVERT);
+		XFS_DIR_SF_PUT_DIRINO(&inum, &namest->inumber);
 		xfs_da_log_buf(args->trans, bp,
 		    XFS_DA_LOGRANGE(leaf, namest, sizeof(namest->inumber)));
 		xfs_da_buf_done(bp);

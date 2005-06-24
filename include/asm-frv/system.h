@@ -123,4 +123,6 @@ do {						\
 extern void die_if_kernel(const char *, ...) __attribute__((format(printf, 1, 2)));
 extern void free_initmem(void);
 
+#define arch_align_stack(x) (x)
+
 #endif /* _ASM_SYSTEM_H */

@@ -215,9 +215,7 @@ xmon_map_scc(void)
 	DLAB = 0x80;
 #endif /* platform */
 
-#ifdef CONFIG_MAGIC_SYSRQ
-	__sysrq_put_key_op('x', &sysrq_xmon_op);
-#endif
+	register_sysrq_key('x', &sysrq_xmon_op);
 }
 
 static int scc_initialized = 0;

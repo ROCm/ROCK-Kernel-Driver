@@ -257,4 +257,6 @@ extern void die_if_kernel(char *str, struct pt_regs *regs) __attribute__ ((noret
 
 #endif /* __ASSEMBLY__ */
 
+#define arch_align_stack(x) (x)
+
 #endif /* !(__SPARC_SYSTEM_H) */

@@ -10,6 +10,7 @@ config DVB_AV7110
 	select DVB_TDA8083
 	select DVB_SP8870
 	select DVB_STV0297
+	select DVB_L64781
 	help
 	  Support for SAA7146 and AV7110 based DVB cards as produced 
 	  by Fujitsu-Siemens, Technotrend, Hauppauge and others.

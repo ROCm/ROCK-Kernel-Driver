@@ -197,15 +197,12 @@ static int soc_common_pcmcia_sock_init(struct pcmcia_socket *sock)
 static int soc_common_pcmcia_suspend(struct pcmcia_socket *sock)
 {
 	struct soc_pcmcia_socket *skt = to_soc_pcmcia_socket(sock);
-	int ret;
 
 	debug(skt, 2, "suspending socket\n");
 
-	ret = soc_common_pcmcia_config_skt(skt, &dead_socket);
-	if (ret == 0)
-		skt->ops->socket_suspend(skt);
+	skt->ops->socket_suspend(skt);
 
-	return ret;
+	return 0;
 }
 
 static DEFINE_SPINLOCK(status_lock);

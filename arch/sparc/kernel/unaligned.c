@@ -428,40 +428,35 @@ static inline int ok_for_user(struct pt_regs *regs, unsigned int insn,
 			      enum direction dir)
 {
 	unsigned int reg;
-	int retval, check = (dir == load) ? VERIFY_READ : VERIFY_WRITE;
+	int check = (dir == load) ? VERIFY_READ : VERIFY_WRITE;
 	int size = ((insn >> 19) & 3) == 3 ? 8 : 4;
 
 	if ((regs->pc | regs->npc) & 3)
 		return 0;
 
-	/* Must verify_area() in all the necessary places. */
+	/* Must access_ok() in all the necessary places. */
 #define WINREG_ADDR(regnum) \
 	((void __user *)(((unsigned long *)regs->u_regs[UREG_FP])+(regnum)))
 
-	retval = 0;
 	reg = (insn >> 25) & 0x1f;
 	if (reg >= 16) {
-		retval = verify_area(check, WINREG_ADDR(reg - 16), size);
-		if (retval)
-			return retval;
+		if (!access_ok(check, WINREG_ADDR(reg - 16), size))
+			return -EFAULT;
 	}
 	reg = (insn >> 14) & 0x1f;
 	if (reg >= 16) {
-		retval = verify_area(check, WINREG_ADDR(reg - 16), size);
-		if (retval)
-			return retval;
+		if (!access_ok(check, WINREG_ADDR(reg - 16), size))
+			return -EFAULT;
 	}
 	if (!(insn & 0x2000)) {
 		reg = (insn & 0x1f);
 		if (reg >= 16) {
-			retval = verify_area(check, WINREG_ADDR(reg - 16),
-					     size);
-			if (retval)
-				return retval;
+			if (!access_ok(check, WINREG_ADDR(reg - 16), size))
+				return -EFAULT;
 		}
 	}
-	return retval;
 #undef WINREG_ADDR
+	return 0;
 }
 
 void user_mna_trap_fault(struct pt_regs *regs, unsigned int insn) __asm__ ("user_mna_trap_fault");

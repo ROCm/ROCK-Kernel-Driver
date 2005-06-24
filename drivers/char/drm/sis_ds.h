@@ -115,10 +115,6 @@ static __inline__ void mmMarkReserved(PMemBlock b)
  */
 memHeap_t *mmInit( int ofs, int size );
 
-memHeap_t *mmAddRange( memHeap_t *heap,
-		       int ofs,
-		       int size );
-
 /*
  * Allocate 'size' bytes with 2^align2 bytes alignment,
  * restrict the search to free memory after 'startSearch'
@@ -142,21 +138,6 @@ int mmBlockInHeap( PMemBlock heap, PMemBlock b );
  * return: 0 if OK, -1 if error
  */
 int mmFreeMem( PMemBlock b );
-
-/*
- * Reserve 'size' bytes block start at offset
- * This is used to prevent allocation of memory already used
- * by the X server for the front buffer, pixmaps, and cursor
- * input: size, offset
- * output: 0 if OK, -1 if error
- */
-int mmReserveMem( memHeap_t *heap, int offset,int size );
-int mmFreeReserved( memHeap_t *heap, int offset );
-
-/*
- * destroy MM
- */
-void mmDestroy( memHeap_t *mmInit );
 
 /* For debuging purpose. */
 void mmDumpMemInfo( memHeap_t *mmInit );

@@ -140,8 +140,7 @@ Additional Configurations
   NAPI
   ----
 
-  NAPI (Rx polling mode) is supported in the e100 driver. NAPI is enabled
-  or disabled based on the configuration of the kernel. 
+  NAPI (Rx polling mode) is supported in the e100 driver.
 
   See www.cyberus.ca/~hadi/usenix-paper.tgz for more information on NAPI.
 

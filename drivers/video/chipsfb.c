@@ -465,7 +465,7 @@ int __init chips_init(void)
 	if (fb_get_options("chipsfb", NULL))
 		return -ENODEV;
 
-	return pci_module_init(&chipsfb_driver);
+	return pci_register_driver(&chipsfb_driver);
 }
 
 module_init(chips_init);

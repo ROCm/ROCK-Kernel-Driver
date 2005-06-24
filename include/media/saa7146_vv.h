@@ -31,7 +31,7 @@ struct	saa7146_video_dma {
 
 struct saa7146_format {
 	char	*name;
-	u32   	pixelformat;
+	u32	pixelformat;
 	u32	trans;
 	u8	depth;
 	u8	flags;
@@ -45,10 +45,10 @@ struct saa7146_standard
 
 	int v_offset;	/* number of lines of vertical offset before processing */
 	int v_field;	/* number of lines in a field for HPS to process */
-	
+
 	int h_offset;	/* horizontal offset of processing window */
 	int h_pixels;	/* number of horizontal pixels to process */
-	
+
 	int v_max_out;
 	int h_max_out;
 };
@@ -90,7 +90,7 @@ struct saa7146_fh {
 
 	/* video overlay */
 	struct saa7146_overlay	ov;
-	
+
 	/* video capture */
 	struct videobuf_queue	video_q;
 	struct v4l2_pix_format	video_fmt;
@@ -139,11 +139,11 @@ struct saa7146_vv
 	   all opens? currently, we do the latter, like all other
 	   drivers do... */
 	struct saa7146_standard	*standard;
-	
+
 	int	vflip;
-	int 	hflip;
-	int 	current_hps_source;
-	int 	current_hps_sync;
+	int	hflip;
+	int	current_hps_source;
+	int	current_hps_sync;
 
 	struct saa7146_dma	d_clipping;	/* pointer to clipping memory */
 
@@ -157,7 +157,7 @@ struct saa7146_vv
 struct saa7146_extension_ioctls
 {
 	unsigned int	cmd;
-	int		flags;	
+	int		flags;
 };
 
 /* flags */
@@ -166,16 +166,16 @@ struct saa7146_extension_ioctls
 struct saa7146_ext_vv
 {
 	/* informations about the video capabilities of the device */
-	int	inputs;			
-	int	audios;			
+	int	inputs;
+	int	audios;
 	u32	capabilities;
-	int 	flags;
+	int	flags;
 
 	/* additionally supported transmission standards */
 	struct saa7146_standard *stds;
 	int num_stds;
 	int (*std_callback)(struct saa7146_dev*, struct saa7146_standard *);
-		
+
 	struct saa7146_extension_ioctls *ioctls;
 	int (*ioctl)(struct saa7146_fh*, unsigned int cmd, void *arg);
 };
@@ -268,7 +268,7 @@ void saa7146_res_free(struct saa7146_fh *fh, unsigned int bits);
 
 /* misc defines */
 #define SAA7146_NO_SWAP		(0x0)
-#define SAA7146_TWO_BYTE_SWAP 	(0x1)
+#define SAA7146_TWO_BYTE_SWAP	(0x1)
 #define SAA7146_FOUR_BYTE_SWAP	(0x2)
 
 #endif

@@ -27,10 +27,29 @@ struct ext3_reserve_window {
 
 struct ext3_reserve_window_node {
 	struct rb_node	 	rsv_node;
-	atomic_t		rsv_goal_size;
-	atomic_t		rsv_alloc_hit;
-	seqlock_t		rsv_seqlock;
+	__u32			rsv_goal_size;
+	__u32			rsv_alloc_hit;
 	struct ext3_reserve_window	rsv_window;
+};
+
+struct ext3_block_alloc_info {
+	/* information about reservation window */
+	struct ext3_reserve_window_node	rsv_window_node;
+	/*
+	 * was i_next_alloc_block in ext3_inode_info
+	 * is the logical (file-relative) number of the
+	 * most-recently-allocated block in this file.
+	 * We use this for detecting linearly ascending allocation requests.
+	 */
+	__u32                   last_alloc_logical_block;
+	/*
+	 * Was i_next_alloc_goal in ext3_inode_info
+	 * is the *physical* companion to i_next_alloc_block.
+	 * it the the physical block number of the block which was most-recentl
+	 * allocated to this file.  This give us the goal (target) for the next
+	 * allocation when we detect linearly ascending requests.
+	 */
+	__u32                   last_alloc_physical_block;
 };
 
 #define rsv_start rsv_window._rsv_start
@@ -61,22 +80,8 @@ struct ext3_inode_info {
 	__u32	i_block_group;
 	__u32	i_state;		/* Dynamic state flags for ext3 */
 
-	/*
-	 * i_next_alloc_block is the logical (file-relative) number of the
-	 * most-recently-allocated block in this file.  Yes, it is misnamed.
-	 * We use this for detecting linearly ascending allocation requests.
-	 */
-	__u32	i_next_alloc_block;
-
-	/*
-	 * i_next_alloc_goal is the *physical* companion to i_next_alloc_block.
-	 * it the the physical block number of the block which was most-recently
-	 * allocated to this file.  This give us the goal (target) for the next
-	 * allocation when we detect linearly ascending requests.
-	 */
-	__u32	i_next_alloc_goal;
-	/* block reservation window */
-	struct ext3_reserve_window_node i_rsv_window;
+	/* block reservation info */
+	struct ext3_block_alloc_info *i_block_alloc_info;
 
 	__u32	i_dir_start_lookup;
 #ifdef CONFIG_EXT3_FS_XATTR

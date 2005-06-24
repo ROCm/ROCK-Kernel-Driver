@@ -28,7 +28,7 @@
 #include <linux/interrupt.h>
 #include <net/rose.h>
 
-static int rose_create_facilities(unsigned char *buffer, rose_cb *rose);
+static int rose_create_facilities(unsigned char *buffer, struct rose_sock *rose);
 
 /*
  *	This routine purges all of the queues of frames.
@@ -47,7 +47,7 @@ void rose_clear_queues(struct sock *sk)
 void rose_frames_acked(struct sock *sk, unsigned short nr)
 {
 	struct sk_buff *skb;
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	/*
 	 * Remove all the ack-ed frames from the ack queue.
@@ -85,7 +85,7 @@ void rose_requeue_frames(struct sock *sk)
  */
 int rose_validate_nr(struct sock *sk, unsigned short nr)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 	unsigned short vc = rose->va;
 
 	while (vc != rose->vs) {
@@ -102,7 +102,7 @@ int rose_validate_nr(struct sock *sk, unsigned short nr)
  */
 void rose_write_internal(struct sock *sk, int frametype)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 	struct sk_buff *skb;
 	unsigned char  *dptr;
 	unsigned char  lci1, lci2;
@@ -396,7 +396,7 @@ int rose_parse_facilities(unsigned char *p,
 	return 1;
 }
 
-static int rose_create_facilities(unsigned char *buffer, rose_cb *rose)
+static int rose_create_facilities(unsigned char *buffer, struct rose_sock *rose)
 {
 	unsigned char *p = buffer + 1;
 	char *callsign;
@@ -492,7 +492,7 @@ static int rose_create_facilities(unsigned char *buffer, rose_cb *rose)
 
 void rose_disconnect(struct sock *sk, int reason, int cause, int diagnostic)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	rose_stop_timer(sk);
 	rose_stop_idletimer(sk);

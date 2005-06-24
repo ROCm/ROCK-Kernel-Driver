@@ -124,7 +124,6 @@ enum {
 	Opt_soft, Opt_hard, Opt_intr,
 	Opt_nointr, Opt_posix, Opt_noposix, Opt_cto, Opt_nocto, Opt_ac, 
 	Opt_noac, Opt_lock, Opt_nolock, Opt_v2, Opt_v3, Opt_udp, Opt_tcp,
-	Opt_broken_suid,
 	/* Error token */
 	Opt_err
 };
@@ -159,7 +158,6 @@ static match_table_t __initdata tokens = {
 	{Opt_udp, "udp"},
 	{Opt_tcp, "proto=tcp"},
 	{Opt_tcp, "tcp"},
-	{Opt_broken_suid, "broken_suid"},
 	{Opt_err, NULL}
 	
 };
@@ -268,9 +266,6 @@ static int __init root_nfs_parse(char *name, char *buf)
 			case Opt_tcp:
 				nfs_data.flags |= NFS_MOUNT_TCP;
 				break;
-			case Opt_broken_suid:
-				nfs_data.flags |= NFS_MOUNT_BROKEN_SUID;
-				break;
 			default : 
 				return 0;
 		}
@@ -351,7 +346,7 @@ static void __init root_nfs_print(void)
 #endif
 
 
-int __init root_nfs_init(void)
+static int __init root_nfs_init(void)
 {
 #ifdef NFSROOT_DEBUG
 	nfs_debug |= NFSDBG_ROOT;
@@ -379,15 +374,15 @@ int __init root_nfs_init(void)
  *  Parse NFS server and directory information passed on the kernel
  *  command line.
  */
-int __init nfs_root_setup(char *line)
+static int __init nfs_root_setup(char *line)
 {
 	ROOT_DEV = Root_NFS;
 	if (line[0] == '/' || line[0] == ',' || (line[0] >= '0' && line[0] <= '9')) {
 		strlcpy(nfs_root_name, line, sizeof(nfs_root_name));
 	} else {
-		int n = strlen(line) + strlen(NFS_ROOT);
+		int n = strlen(line) + sizeof(NFS_ROOT) - 1;
 		if (n >= sizeof(nfs_root_name))
-			line[sizeof(nfs_root_name) - strlen(NFS_ROOT) - 1] = '\0';
+			line[sizeof(nfs_root_name) - sizeof(NFS_ROOT) - 2] = '\0';
 		sprintf(nfs_root_name, NFS_ROOT, line);
 	}
 	root_server_addr = root_nfs_parse_addr(nfs_root_name);

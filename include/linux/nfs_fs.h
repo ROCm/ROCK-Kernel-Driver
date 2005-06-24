@@ -382,11 +382,6 @@ extern int nfs_instantiate(struct dentry *dentry, struct nfs_fh *fh, struct nfs_
 extern struct inode_operations nfs_symlink_inode_operations;
 
 /*
- * linux/fs/nfs/locks.c
- */
-extern int nfs_lock(struct file *, int, struct file_lock *);
-
-/*
  * linux/fs/nfs/unlink.c
  */
 extern int  nfs_async_unlink(struct dentry *);
@@ -410,11 +405,8 @@ extern void nfs_commit_done(struct rpc_task *);
  * return value!)
  */
 extern int  nfs_sync_inode(struct inode *, unsigned long, unsigned int, int);
-extern int  nfs_flush_inode(struct inode *, unsigned long, unsigned int, int);
-extern int  nfs_flush_list(struct list_head *, int, int);
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
 extern int  nfs_commit_inode(struct inode *, unsigned long, unsigned int, int);
-extern int  nfs_commit_list(struct list_head *, int);
 #else
 static inline int
 nfs_commit_inode(struct inode *inode, unsigned long idx_start, unsigned int npages, int how)
@@ -455,7 +447,6 @@ static inline int nfs_wb_page(struct inode *inode, struct page* page)
  * Allocate and free nfs_write_data structures
  */
 extern mempool_t *nfs_wdata_mempool;
-extern mempool_t *nfs_commit_mempool;
 
 static inline struct nfs_write_data *nfs_writedata_alloc(void)
 {
@@ -472,23 +463,6 @@ static inline void nfs_writedata_free(struct nfs_write_data *p)
 	mempool_free(p, nfs_wdata_mempool);
 }
 
-extern void  nfs_writedata_release(struct rpc_task *task);
-
-static inline struct nfs_write_data *nfs_commit_alloc(void)
-{
-	struct nfs_write_data *p = mempool_alloc(nfs_commit_mempool, SLAB_NOFS);
-	if (p) {
-		memset(p, 0, sizeof(*p));
-		INIT_LIST_HEAD(&p->pages);
-	}
-	return p;
-}
-
-static inline void nfs_commit_free(struct nfs_write_data *p)
-{
-	mempool_free(p, nfs_commit_mempool);
-}
-
 /* Hack for future NFS swap support */
 #ifndef IS_SWAPFILE
 # define IS_SWAPFILE(inode)	(0)
@@ -500,7 +474,6 @@ static inline void nfs_commit_free(struct nfs_write_data *p)
 extern int  nfs_readpage(struct file *, struct page *);
 extern int  nfs_readpages(struct file *, struct address_space *,
 		struct list_head *, unsigned);
-extern int  nfs_pagein_list(struct list_head *, int);
 extern void nfs_readpage_result(struct rpc_task *);
 
 /*
@@ -641,6 +614,9 @@ struct nfs4_client {
 	wait_queue_head_t	cl_waitq;
 	struct rpc_wait_queue	cl_rpcwaitq;
 
+	/* used for the setclientid verifier */
+	struct timespec		cl_boot_time;
+
 	/* idmapper */
 	struct idmap *		cl_idmap;
 
@@ -648,6 +624,7 @@ struct nfs4_client {
 	 * This is used to generate the clientid, and the callback address.
 	 */
 	char			cl_ipaddr[16];
+	unsigned char		cl_id_uniquifier;
 };
 
 /*
@@ -727,21 +704,26 @@ struct nfs4_exception {
 	int retry;
 };
 
+struct nfs4_state_recovery_ops {
+	int (*recover_open)(struct nfs4_state_owner *, struct nfs4_state *);
+	int (*recover_lock)(struct nfs4_state *, struct file_lock *);
+};
+
 extern struct dentry_operations nfs4_dentry_operations;
 extern struct inode_operations nfs4_dir_inode_operations;
 
 /* nfs4proc.c */
+extern int nfs4_map_errors(int err);
 extern int nfs4_proc_setclientid(struct nfs4_client *, u32, unsigned short);
 extern int nfs4_proc_setclientid_confirm(struct nfs4_client *);
-extern int nfs4_open_reclaim(struct nfs4_state_owner *, struct nfs4_state *);
 extern int nfs4_proc_async_renew(struct nfs4_client *);
 extern int nfs4_proc_renew(struct nfs4_client *);
 extern int nfs4_do_close(struct inode *inode, struct nfs4_state *state, mode_t mode);
-extern int nfs4_wait_clnt_recover(struct rpc_clnt *, struct nfs4_client *);
 extern struct inode *nfs4_atomic_open(struct inode *, struct dentry *, struct nameidata *);
 extern int nfs4_open_revalidate(struct inode *, struct dentry *, int);
-extern int nfs4_handle_exception(struct nfs_server *, int, struct nfs4_exception *);
-extern int nfs4_lock_reclaim(struct nfs4_state *state, struct file_lock *request);
+
+extern struct nfs4_state_recovery_ops nfs4_reboot_recovery_ops;
+extern struct nfs4_state_recovery_ops nfs4_network_partition_recovery_ops;
 
 /* nfs4renewd.c */
 extern void nfs4_schedule_state_renewal(struct nfs4_client *);
@@ -759,6 +741,7 @@ extern u32 nfs4_alloc_lockowner_id(struct nfs4_client *);
 
 extern struct nfs4_state_owner * nfs4_get_state_owner(struct nfs_server *, struct rpc_cred *);
 extern void nfs4_put_state_owner(struct nfs4_state_owner *);
+extern void nfs4_drop_state_owner(struct nfs4_state_owner *);
 extern struct nfs4_state * nfs4_get_open_state(struct inode *, struct nfs4_state_owner *);
 extern void nfs4_put_open_state(struct nfs4_state *);
 extern void nfs4_close_state(struct nfs4_state *, mode_t);

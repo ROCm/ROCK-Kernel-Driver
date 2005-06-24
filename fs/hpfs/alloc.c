@@ -8,6 +8,8 @@
 
 #include "hpfs_fn.h"
 
+static int hpfs_alloc_if_possible_nolock(struct super_block *s, secno sec);
+
 /*
  * Check if a sector is allocated in bitmap
  * This is really slow. Turned on only if chk==2
@@ -243,7 +245,7 @@ static secno alloc_in_dirband(struct super_block *s, secno near, int lock)
 
 /* Alloc sector if it's free */
 
-int hpfs_alloc_if_possible_nolock(struct super_block *s, secno sec)
+static int hpfs_alloc_if_possible_nolock(struct super_block *s, secno sec)
 {
 	struct quad_buffer_head qbh;
 	unsigned *bmp;

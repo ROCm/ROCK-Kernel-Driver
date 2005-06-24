@@ -241,7 +241,7 @@ static int __init t1pci_init(void)
 	} else
 		strcpy(rev, "1.0");
 
-	err = pci_module_init(&t1pci_pci_driver);
+	err = pci_register_driver(&t1pci_pci_driver);
 	if (!err) {
 		strlcpy(capi_driver_t1pci.revision, rev, 32);
 		register_capi_driver(&capi_driver_t1pci);

@@ -1,9 +1,6 @@
 #include <linux/module.h>
 #include <media/saa7146_vv.h>
 
-EXPORT_SYMBOL_GPL(saa7146_vbi_uops);
-EXPORT_SYMBOL_GPL(saa7146_video_uops);
-
 EXPORT_SYMBOL_GPL(saa7146_start_preview);
 EXPORT_SYMBOL_GPL(saa7146_stop_preview);
 

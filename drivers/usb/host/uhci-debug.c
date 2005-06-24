@@ -406,7 +406,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 	struct uhci_td *td;
 	struct list_head *tmp, *head;
 
-	spin_lock_irqsave(&uhci->schedule_lock, flags);
+	spin_lock_irqsave(&uhci->lock, flags);
 
 	out += sprintf(out, "HC status\n");
 	out += uhci_show_status(uhci, out, len - (out - buf));
@@ -492,7 +492,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 	if (debug > 2)
 		out += uhci_show_lists(uhci, out, len - (out - buf));
 
-	spin_unlock_irqrestore(&uhci->schedule_lock, flags);
+	spin_unlock_irqrestore(&uhci->lock, flags);
 
 	return out - buf;
 }

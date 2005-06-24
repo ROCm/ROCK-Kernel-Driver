@@ -40,6 +40,9 @@
 #define UDCCFR_AREN	(1 << 7)	/* ACK response enable (now) */
 #define UDCCFR_ACM	(1 << 2)	/* ACK control mode (wait for AREN) */
 
+/* latest pxa255 errata define new "must be one" bits in UDCCFR */
+#define	UDCCFR_MB1	(0xff & ~(UDCCFR_AREN|UDCCFR_ACM))
+
 /*-------------------------------------------------------------------------*/
 
 struct pxa2xx_udc;
@@ -120,7 +123,8 @@ struct pxa2xx_udc {
 	enum ep0_state				ep0state;
 	struct udc_stats			stats;
 	unsigned				got_irq : 1,
-						got_disc : 1,
+						vbus : 1,
+						pullup : 1,
 						has_cfr : 1,
 						req_pending : 1,
 						req_std : 1,
@@ -143,14 +147,7 @@ struct pxa2xx_udc {
 
 #ifdef DEBUG
 #define HEX_DISPLAY(n)	if (machine_is_lubbock()) { LUB_HEXLED = (n); }
-
-#define LED_CONNECTED_ON	if (machine_is_lubbock()) { \
-	DISCRETE_LED_ON(D26); }
-#define LED_CONNECTED_OFF	if(machine_is_lubbock()) { \
-	DISCRETE_LED_OFF(D26); LUB_HEXLED = 0; }
-#define LED_EP0_ON	if (machine_is_lubbock()) { DISCRETE_LED_ON(D25); }
-#define LED_EP0_OFF	if (machine_is_lubbock()) { DISCRETE_LED_OFF(D25); }
-#endif /* DEBUG */
+#endif
 
 #endif
 
@@ -161,13 +158,19 @@ struct pxa2xx_udc {
 #define HEX_DISPLAY(n)		do {} while(0)
 #endif
 
+#ifdef DEBUG
+#include <asm/leds.h>
+
+#define LED_CONNECTED_ON	leds_event(led_green_on)
+#define LED_CONNECTED_OFF	do { \
+					leds_event(led_green_off); \
+					HEX_DISPLAY(0); \
+				} while(0)
+#endif
+
 #ifndef LED_CONNECTED_ON
 #define LED_CONNECTED_ON	do {} while(0)
 #define LED_CONNECTED_OFF	do {} while(0)
-#endif
-#ifndef LED_EP0_ON
-#define LED_EP0_ON		do {} while (0)
-#define LED_EP0_OFF		do {} while (0)
 #endif
 
 /*-------------------------------------------------------------------------*/

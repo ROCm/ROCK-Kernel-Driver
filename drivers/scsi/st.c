@@ -9,7 +9,7 @@
    Steve Hirsch, Andreas Koppenh"ofer, Michael Leodolter, Eyal Lebedinsky,
    Michael Schaefer, J"org Weule, and Eric Youngdale.
 
-   Copyright 1992 - 2004 Kai Makisara
+   Copyright 1992 - 2005 Kai Makisara
    email Kai.Makisara@kolumbus.fi
 
    Some small formal changes - aeb, 950809
@@ -17,7 +17,7 @@
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20041025";
+static char *verstr = "20050312";
 
 #include <linux/module.h>
 
@@ -36,6 +36,8 @@ static char *verstr = "20041025";
 #include <linux/moduleparam.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/cdev.h>
+#include <linux/delay.h>
+
 #include <asm/uaccess.h>
 #include <asm/dma.h>
 #include <asm/system.h>
@@ -150,7 +152,7 @@ static char *st_formats[] = {
 #error "Buffer size should not exceed (2 << 24 - 1) bytes!"
 #endif
 
-DEB( static int debugging = DEBUG; )
+static int debugging = DEBUG;
 
 #define MAX_RETRIES 0
 #define MAX_WRITE_RETRIES 0
@@ -268,25 +270,57 @@ static inline char *tape_name(struct scsi_tape *tape)
 	return tape->disk->disk_name;
 }
 
+
+static void st_analyze_sense(struct scsi_request *SRpnt, struct st_cmdstatus *s)
+{
+	const u8 *ucp;
+	const u8 *sense = SRpnt->sr_sense_buffer;
+
+	s->have_sense = scsi_request_normalize_sense(SRpnt, &s->sense_hdr);
+	s->flags = 0;
+
+	if (s->have_sense) {
+		s->deferred = 0;
+		s->remainder_valid =
+			scsi_get_sense_info_fld(sense, SCSI_SENSE_BUFFERSIZE, &s->uremainder64);
+		switch (sense[0] & 0x7f) {
+		case 0x71:
+			s->deferred = 1;
+		case 0x70:
+			s->fixed_format = 1;
+			s->flags = sense[2] & 0xe0;
+			break;
+		case 0x73:
+			s->deferred = 1;
+		case 0x72:
+			s->fixed_format = 0;
+			ucp = scsi_sense_desc_find(sense, SCSI_SENSE_BUFFERSIZE, 4);
+			s->flags = ucp ? (ucp[3] & 0xe0) : 0;
+			break;
+		}
+	}
+}
+
+
 /* Convert the result to success code */
 static int st_chk_result(struct scsi_tape *STp, struct scsi_request * SRpnt)
 {
 	int result = SRpnt->sr_result;
-	unsigned char *sense = SRpnt->sr_sense_buffer, scode;
+	u8 scode;
 	DEB(const char *stp;)
 	char *name = tape_name(STp);
+	struct st_cmdstatus *cmdstatp;
 
-	if (!result) {
-		sense[0] = 0;	/* We don't have sense data if this byte is zero */
+	if (!result)
 		return 0;
-	}
 
-	if ((driver_byte(result) & DRIVER_MASK) == DRIVER_SENSE)
-		scode = sense[2] & 0x0f;
-	else {
-		sense[0] = 0;
+	cmdstatp = &STp->buffer->cmdstat;
+	st_analyze_sense(STp->buffer->last_SRpnt, cmdstatp);
+
+	if (cmdstatp->have_sense)
+		scode = STp->buffer->cmdstat.sense_hdr.sense_key;
+	else
 		scode = 0;
-	}
 
         DEB(
         if (debugging) {
@@ -295,29 +329,30 @@ static int st_chk_result(struct scsi_tape *STp, struct scsi_request * SRpnt)
 		       SRpnt->sr_cmnd[0], SRpnt->sr_cmnd[1], SRpnt->sr_cmnd[2],
 		       SRpnt->sr_cmnd[3], SRpnt->sr_cmnd[4], SRpnt->sr_cmnd[5],
 		       SRpnt->sr_bufflen);
-		if (driver_byte(result) & DRIVER_SENSE)
+		if (cmdstatp->have_sense)
 			scsi_print_req_sense("st", SRpnt);
-	} else ) /* end DEB */
-		if (!(driver_byte(result) & DRIVER_SENSE) ||
-		    ((sense[0] & 0x70) == 0x70 &&
-		     scode != NO_SENSE &&
-		     scode != RECOVERED_ERROR &&
-                     /* scode != UNIT_ATTENTION && */
-		     scode != BLANK_CHECK &&
-		     scode != VOLUME_OVERFLOW &&
-		     SRpnt->sr_cmnd[0] != MODE_SENSE &&
-		     SRpnt->sr_cmnd[0] != TEST_UNIT_READY)) {	/* Abnormal conditions for tape */
-		if (driver_byte(result) & DRIVER_SENSE) {
-			printk(KERN_WARNING "%s: Error with sense data: ", name);
-			scsi_print_req_sense("st", SRpnt);
-		} else
+	} ) /* end DEB */
+	if (!debugging) { /* Abnormal conditions for tape */
+		if (!cmdstatp->have_sense)
 			printk(KERN_WARNING
 			       "%s: Error %x (sugg. bt 0x%x, driver bt 0x%x, host bt 0x%x).\n",
 			       name, result, suggestion(result),
-                               driver_byte(result) & DRIVER_MASK, host_byte(result));
+			       driver_byte(result) & DRIVER_MASK, host_byte(result));
+		else if (cmdstatp->have_sense &&
+			 scode != NO_SENSE &&
+			 scode != RECOVERED_ERROR &&
+			 /* scode != UNIT_ATTENTION && */
+			 scode != BLANK_CHECK &&
+			 scode != VOLUME_OVERFLOW &&
+			 SRpnt->sr_cmnd[0] != MODE_SENSE &&
+			 SRpnt->sr_cmnd[0] != TEST_UNIT_READY) {
+				printk(KERN_WARNING "%s: Error with sense data: ", name);
+				scsi_print_req_sense("st", SRpnt);
+		}
 	}
 
-	if (STp->cln_mode >= EXTENDED_SENSE_START) {
+	if (cmdstatp->fixed_format &&
+	    STp->cln_mode >= EXTENDED_SENSE_START) {  /* Only fixed format sense */
 		if (STp->cln_sense_value)
 			STp->cleaning_req |= ((SRpnt->sr_sense_buffer[STp->cln_mode] &
 					       STp->cln_sense_mask) == STp->cln_sense_value);
@@ -325,12 +360,13 @@ static int st_chk_result(struct scsi_tape *STp, struct scsi_request * SRpnt)
 			STp->cleaning_req |= ((SRpnt->sr_sense_buffer[STp->cln_mode] &
 					       STp->cln_sense_mask) != 0);
 	}
-	if (sense[12] == 0 && sense[13] == 0x17) /* ASC and ASCQ => cleaning requested */
-		STp->cleaning_req = 1;
+	if (cmdstatp->have_sense &&
+	    cmdstatp->sense_hdr.asc == 0 && cmdstatp->sense_hdr.ascq == 0x17)
+		STp->cleaning_req = 1; /* ASC and ASCQ => cleaning requested */
 
 	STp->pos_unknown |= STp->device->was_reset;
 
-	if ((sense[0] & 0x70) == 0x70 &&
+	if (cmdstatp->have_sense &&
 	    scode == RECOVERED_ERROR
 #if ST_RECOVERED_WRITE_FATAL
 	    && SRpnt->sr_cmnd[0] != WRITE_6
@@ -352,7 +388,7 @@ static int st_chk_result(struct scsi_tape *STp, struct scsi_request * SRpnt)
 			       STp->recover_count);
 		} ) /* end DEB */
 
-		if ((sense[2] & 0xe0) == 0)
+		if (cmdstatp->flags == 0)
 			return 0;
 	}
 	return (-EIO);
@@ -362,28 +398,10 @@ static int st_chk_result(struct scsi_tape *STp, struct scsi_request * SRpnt)
 /* Wakeup from interrupt */
 static void st_sleep_done(struct scsi_cmnd * SCpnt)
 {
-	int remainder;
 	struct scsi_tape *STp = container_of(SCpnt->request->rq_disk->private_data,
 					     struct scsi_tape, driver);
 
-	if ((STp->buffer)->writing &&
-	    (SCpnt->sense_buffer[0] & 0x70) == 0x70 &&
-	    (SCpnt->sense_buffer[2] & 0x40)) {
-		/* EOM at write-behind, has all been written? */
-		if ((SCpnt->sense_buffer[0] & 0x80) != 0)
-			remainder = (SCpnt->sense_buffer[3] << 24) |
-				(SCpnt->sense_buffer[4] << 16) |
-				(SCpnt->sense_buffer[5] << 8) |
-				SCpnt->sense_buffer[6];
-		else
-			remainder = 0;
-		if ((SCpnt->sense_buffer[2] & 0x0f) == VOLUME_OVERFLOW ||
-		    remainder > 0)
-			(STp->buffer)->midlevel_result = SCpnt->result; /* Error */
-		else
-			(STp->buffer)->midlevel_result = INT_MAX;	/* OK */
-	} else
-		(STp->buffer)->midlevel_result = SCpnt->result;
+	(STp->buffer)->cmdstat.midlevel_result = SCpnt->result;
 	SCpnt->request->rq_status = RQ_SCSI_DONE;
 	(STp->buffer)->last_SRpnt = SCpnt->sc_request;
 	DEB( STp->write_pending = 0; )
@@ -427,6 +445,7 @@ st_do_scsi(struct scsi_request * SRpnt, struct scsi_tape * STp, unsigned char *c
 	SRpnt->sr_request->waiting = &(STp->wait);
 	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
 	SRpnt->sr_request->rq_disk = STp->disk;
+	STp->buffer->cmdstat.have_sense = 0;
 
 	scsi_do_req(SRpnt, (void *) cmd, bp, bytes,
 		    st_sleep_done, timeout, retries);
@@ -440,13 +459,20 @@ st_do_scsi(struct scsi_request * SRpnt, struct scsi_tape * STp, unsigned char *c
 }
 
 
-/* Handle the write-behind checking (downs the semaphore) */
-static void write_behind_check(struct scsi_tape * STp)
+/* Handle the write-behind checking (waits for completion). Returns -ENOSPC if
+   write has been correct but EOM early warning reached, -EIO if write ended in
+   error or zero if write successful. Asynchronous writes are used only in
+   variable block mode. */
+static int write_behind_check(struct scsi_tape * STp)
 {
+	int retval = 0;
 	struct st_buffer *STbuffer;
 	struct st_partstat *STps;
+	struct st_cmdstatus *cmdstatp;
 
 	STbuffer = STp->buffer;
+	if (!STbuffer->writing)
+		return 0;
 
         DEB(
 	if (STp->write_pending)
@@ -469,9 +495,29 @@ static void write_behind_check(struct scsi_tape * STp)
 		else
 			STps->drv_block += STbuffer->writing / STp->block_size;
 	}
+
+	cmdstatp = &STbuffer->cmdstat;
+	if (STbuffer->syscall_result) {
+		retval = -EIO;
+		if (cmdstatp->have_sense && !cmdstatp->deferred &&
+		    (cmdstatp->flags & SENSE_EOM) &&
+		    (cmdstatp->sense_hdr.sense_key == NO_SENSE ||
+		     cmdstatp->sense_hdr.sense_key == RECOVERED_ERROR)) {
+			/* EOM at write-behind, has all data been written? */
+			if (!cmdstatp->remainder_valid ||
+			    cmdstatp->uremainder64 == 0)
+				retval = -ENOSPC;
+		}
+		if (retval == -EIO)
+			STps->drv_block = -1;
+	}
 	STbuffer->writing = 0;
 
-	return;
+	DEB(if (debugging && retval)
+	    printk(ST_DEB_MSG "%s: Async write error %x, return value %d.\n",
+		   tape_name(STp), STbuffer->cmdstat.midlevel_result, retval);) /* end DEB */
+
+	return retval;
 }
 
 
@@ -502,7 +548,7 @@ static int cross_eof(struct scsi_tape * STp, int forward)
 	scsi_release_request(SRpnt);
 	SRpnt = NULL;
 
-	if ((STp->buffer)->midlevel_result != 0)
+	if ((STp->buffer)->cmdstat.midlevel_result != 0)
 		printk(KERN_ERR "%s: Stepping over filemark %s failed.\n",
 		   tape_name(STp), forward ? "forward" : "backward");
 
@@ -519,19 +565,9 @@ static int flush_write_buffer(struct scsi_tape * STp)
 	struct scsi_request *SRpnt;
 	struct st_partstat *STps;
 
-	if ((STp->buffer)->writing) {
-		write_behind_check(STp);
-		if ((STp->buffer)->syscall_result) {
-                        DEBC(printk(ST_DEB_MSG
-                                       "%s: Async write error (flush) %x.\n",
-				       tape_name(STp), (STp->buffer)->midlevel_result))
-			if ((STp->buffer)->midlevel_result == INT_MAX)
-				return (-ENOSPC);
-			return (-EIO);
-		}
-	}
-	if (STp->block_size == 0)
-		return 0;
+	result = write_behind_check(STp);
+	if (result)
+		return result;
 
 	result = 0;
 	if (STp->dirty == 1) {
@@ -559,18 +595,25 @@ static int flush_write_buffer(struct scsi_tape * STp)
 
 		STps = &(STp->ps[STp->partition]);
 		if ((STp->buffer)->syscall_result != 0) {
-			if ((SRpnt->sr_sense_buffer[0] & 0x70) == 0x70 &&
-			    (SRpnt->sr_sense_buffer[2] & 0x40) &&
-			    (SRpnt->sr_sense_buffer[2] & 0x0f) == NO_SENSE) {
+			struct st_cmdstatus *cmdstatp = &STp->buffer->cmdstat;
+
+			if (cmdstatp->have_sense && !cmdstatp->deferred &&
+			    (cmdstatp->flags & SENSE_EOM) &&
+			    (cmdstatp->sense_hdr.sense_key == NO_SENSE ||
+			     cmdstatp->sense_hdr.sense_key == RECOVERED_ERROR) &&
+			    (!cmdstatp->remainder_valid ||
+			     cmdstatp->uremainder64 == 0)) { /* All written at EOM early warning */
 				STp->dirty = 0;
 				(STp->buffer)->buffer_bytes = 0;
+				if (STps->drv_block >= 0)
+					STps->drv_block += blks;
 				result = (-ENOSPC);
 			} else {
 				printk(KERN_ERR "%s: Error on flush.\n",
                                        tape_name(STp));
+				STps->drv_block = (-1);
 				result = (-EIO);
 			}
-			STps->drv_block = (-1);
 		} else {
 			if (STps->drv_block >= 0)
 				STps->drv_block += blks;
@@ -734,6 +777,7 @@ static int test_ready(struct scsi_tape *STp, int do_wait)
 	int retval = CHKRES_READY, new_session = 0;
 	unsigned char cmd[MAX_COMMAND_SIZE];
 	struct scsi_request *SRpnt = NULL;
+	struct st_cmdstatus *cmdstatp = &STp->buffer->cmdstat;
 
 	max_wait = do_wait ? ST_BLOCK_SECONDS : 0;
 
@@ -748,9 +792,9 @@ static int test_ready(struct scsi_tape *STp, int do_wait)
 			break;
 		}
 
-		if ((SRpnt->sr_sense_buffer[0] & 0x70) == 0x70) {
+		if (cmdstatp->have_sense) {
 
-			scode = (SRpnt->sr_sense_buffer[2] & 0x0f);
+			scode = cmdstatp->sense_hdr.sense_key;
 
 			if (scode == UNIT_ATTENTION) { /* New media? */
 				new_session = 1;
@@ -766,9 +810,7 @@ static int test_ready(struct scsi_tape *STp, int do_wait)
 
 			if (scode == NOT_READY) {
 				if (waits < max_wait) {
-					set_current_state(TASK_INTERRUPTIBLE);
-					schedule_timeout(HZ);
-					if (signal_pending(current)) {
+					if (msleep_interruptible(1000)) {
 						retval = (-EINTR);
 						break;
 					}
@@ -777,7 +819,7 @@ static int test_ready(struct scsi_tape *STp, int do_wait)
 				}
 				else {
 					if ((STp->device)->scsi_level >= SCSI_2 &&
-					    SRpnt->sr_sense_buffer[12] == 0x3a)	/* Check ASC */
+					    cmdstatp->sense_hdr.asc == 0x3a)	/* Check ASC */
 						retval = CHKRES_NO_TAPE;
 					else
 						retval = CHKRES_NOT_READY;
@@ -883,7 +925,7 @@ static int check_tape(struct scsi_tape *STp, struct file *filp)
 			goto err_out;
 		}
 
-		if (!SRpnt->sr_result && !SRpnt->sr_sense_buffer[0]) {
+		if (!SRpnt->sr_result && !STp->buffer->cmdstat.have_sense) {
 			STp->max_block = ((STp->buffer)->b_data[1] << 16) |
 			    ((STp->buffer)->b_data[2] << 8) | (STp->buffer)->b_data[3];
 			STp->min_block = ((STp->buffer)->b_data[4] << 8) |
@@ -1010,7 +1052,13 @@ static int st_open(struct inode *inode, struct file *filp)
 	int dev = TAPE_NR(inode);
 	char *name;
 
-	nonseekable_open(inode, filp);
+	/*
+	 * We really want to do nonseekable_open(inode, filp); here, but some
+	 * versions of tar incorrectly call lseek on tapes and bail out if that
+	 * fails.  So we disallow pread() and pwrite(), but permit lseeks.
+	 */
+	filp->f_mode &= ~(FMODE_PREAD | FMODE_PWRITE);
+
 	write_lock(&st_dev_arr_lock);
 	if (dev >= st_dev_max || scsi_tapes == NULL ||
 	    ((STp = scsi_tapes[dev]) == NULL)) {
@@ -1115,10 +1163,9 @@ static int st_flush(struct file *filp)
 		       name, STp->nbr_requests, STp->nbr_dio, STp->nbr_pages, STp->nbr_combinable));
 
 	if (STps->rw == ST_WRITING && !STp->pos_unknown) {
+		struct st_cmdstatus *cmdstatp = &STp->buffer->cmdstat;
 
-                DEBC(printk(ST_DEB_MSG "%s: File length %lld bytes.\n",
-                            name, (long long)filp->f_pos);
-                     printk(ST_DEB_MSG "%s: Async write waits %d, finished %d.\n",
+                DEBC(printk(ST_DEB_MSG "%s: Async write waits %d, finished %d.\n",
                             name, STp->nbr_waits, STp->nbr_finished);
 		)
 
@@ -1133,20 +1180,13 @@ static int st_flush(struct file *filp)
 			goto out;
 		}
 
-		if ((STp->buffer)->syscall_result != 0 &&
-		    ((SRpnt->sr_sense_buffer[0] & 0x70) != 0x70 ||
-		     (SRpnt->sr_sense_buffer[2] & 0x4f) != 0x40 ||
-		     ((SRpnt->sr_sense_buffer[0] & 0x80) != 0 &&
-		      (SRpnt->sr_sense_buffer[3] | SRpnt->sr_sense_buffer[4] |
-		       SRpnt->sr_sense_buffer[5] |
-		       SRpnt->sr_sense_buffer[6]) != 0))) {
-			/* Filter out successful write at EOM */
-			scsi_release_request(SRpnt);
-			SRpnt = NULL;
-			printk(KERN_ERR "%s: Error on write filemark.\n", name);
-			if (result == 0)
-				result = (-EIO);
-		} else {
+		if (STp->buffer->syscall_result == 0 ||
+		    (cmdstatp->have_sense && !cmdstatp->deferred &&
+		     (cmdstatp->flags & SENSE_EOM) &&
+		     (cmdstatp->sense_hdr.sense_key == NO_SENSE ||
+		      cmdstatp->sense_hdr.sense_key == RECOVERED_ERROR) &&
+		     (!cmdstatp->remainder_valid || cmdstatp->uremainder64 == 0))) {
+			/* Write successful at EOM */
 			scsi_release_request(SRpnt);
 			SRpnt = NULL;
 			if (STps->drv_file >= 0)
@@ -1155,6 +1195,13 @@ static int st_flush(struct file *filp)
 			if (STp->two_fm)
 				cross_eof(STp, 0);
 			STps->eof = ST_FM;
+		}
+		else { /* Write error */
+			scsi_release_request(SRpnt);
+			SRpnt = NULL;
+			printk(KERN_ERR "%s: Error on write filemark.\n", name);
+			if (result == 0)
+				result = (-EIO);
 		}
 
                 DEBC(printk(ST_DEB_MSG "%s: Buffer flushed, %d EOF(s) written\n",
@@ -1417,16 +1464,12 @@ st_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 	}
 
 	STbp = STp->buffer;
-	if (STbp->writing) {
-		write_behind_check(STp);
-		if (STbp->syscall_result) {
-                        DEBC(printk(ST_DEB_MSG "%s: Async write error (write) %x.\n",
-                                    name, STbp->midlevel_result));
-			if (STbp->midlevel_result == INT_MAX)
-				STps->eof = ST_EOM_OK;
-			else
-				STps->eof = ST_EOM_ERROR;
-		}
+	i = write_behind_check(STp);
+	if (i) {
+		if (i == -ENOSPC)
+			STps->eof = ST_EOM_OK;
+		else
+			STps->eof = ST_EOM_ERROR;
 	}
 
 	if (STps->eof == ST_EOM_OK) {
@@ -1484,7 +1527,6 @@ st_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 			}
 		}
 		count -= do_count;
-		filp->f_pos += do_count;
 		b_point += do_count;
 
 		async_write = STp->block_size == 0 && !STbp->do_dio &&
@@ -1530,15 +1572,13 @@ st_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 		}
 
 		if (STbp->syscall_result != 0) {
+			struct st_cmdstatus *cmdstatp = &STp->buffer->cmdstat;
+
                         DEBC(printk(ST_DEB_MSG "%s: Error on write:\n", name));
-			if ((SRpnt->sr_sense_buffer[0] & 0x70) == 0x70 &&
-			    (SRpnt->sr_sense_buffer[2] & 0x40)) {
-				scode = SRpnt->sr_sense_buffer[2] & 0x0f;
-				if ((SRpnt->sr_sense_buffer[0] & 0x80) != 0)
-					undone = (SRpnt->sr_sense_buffer[3] << 24) |
-					    (SRpnt->sr_sense_buffer[4] << 16) |
-					    (SRpnt->sr_sense_buffer[5] << 8) |
-                                                SRpnt->sr_sense_buffer[6];
+			if (cmdstatp->have_sense && (cmdstatp->flags & SENSE_EOM)) {
+				scode = cmdstatp->sense_hdr.sense_key;
+				if (cmdstatp->remainder_valid)
+					undone = (int)cmdstatp->uremainder64;
 				else if (STp->block_size == 0 &&
 					 scode == VOLUME_OVERFLOW)
 					undone = transfer;
@@ -1546,7 +1586,6 @@ st_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 					undone = 0;
 				if (STp->block_size != 0)
 					undone *= STp->block_size;
-				filp->f_pos -= undone;
 				if (undone <= do_count) {
 					/* Only data from this write is not written */
 					count += undone;
@@ -1563,11 +1602,11 @@ st_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 						retval = (-ENOSPC); /* EOM within current request */
                                         DEBC(printk(ST_DEB_MSG
                                                        "%s: EOM with %d bytes unwritten.\n",
-						       name, count));
+						       name, (int)count));
 				} else {
 					/* EOT within data buffered earlier (possible only
 					   in fixed block mode without direct i/o) */
-					if (!retry_eot && (SRpnt->sr_sense_buffer[0] & 1) == 0 &&
+					if (!retry_eot && !cmdstatp->deferred &&
 					    (scode == NO_SENSE || scode == RECOVERED_ERROR)) {
 						move_buffer_data(STp->buffer, transfer - undone);
 						retry_eot = 1;
@@ -1595,7 +1634,6 @@ st_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 					}
 				}
 			} else {
-				filp->f_pos -= do_count;
 				count += do_count;
 				STps->drv_block = (-1);		/* Too cautious? */
 				retval = (-EIO);
@@ -1697,6 +1735,8 @@ static long read_tape(struct scsi_tape *STp, long count,
 
 	/* Something to check */
 	if (STbp->syscall_result) {
+		struct st_cmdstatus *cmdstatp = &STp->buffer->cmdstat;
+
 		retval = 1;
 		DEBC(printk(ST_DEB_MSG "%s: Sense: %2x %2x %2x %2x %2x %2x %2x %2x\n",
                             name,
@@ -1704,25 +1744,22 @@ static long read_tape(struct scsi_tape *STp, long count,
                             SRpnt->sr_sense_buffer[2], SRpnt->sr_sense_buffer[3],
                             SRpnt->sr_sense_buffer[4], SRpnt->sr_sense_buffer[5],
                             SRpnt->sr_sense_buffer[6], SRpnt->sr_sense_buffer[7]));
-		if ((SRpnt->sr_sense_buffer[0] & 0x70) == 0x70) {	/* extended sense */
+		if (cmdstatp->have_sense) {
 
-			if ((SRpnt->sr_sense_buffer[2] & 0x0f) == BLANK_CHECK)
-				SRpnt->sr_sense_buffer[2] &= 0xcf;	/* No need for EOM in this case */
+			if (cmdstatp->sense_hdr.sense_key == BLANK_CHECK)
+				cmdstatp->flags &= 0xcf;	/* No need for EOM in this case */
 
-			if ((SRpnt->sr_sense_buffer[2] & 0xe0) != 0) { /* EOF, EOM, or ILI */
+			if (cmdstatp->flags != 0) { /* EOF, EOM, or ILI */
 				/* Compute the residual count */
-				if ((SRpnt->sr_sense_buffer[0] & 0x80) != 0)
-					transfer = (SRpnt->sr_sense_buffer[3] << 24) |
-					    (SRpnt->sr_sense_buffer[4] << 16) |
-					    (SRpnt->sr_sense_buffer[5] << 8) |
-					    SRpnt->sr_sense_buffer[6];
+				if (cmdstatp->remainder_valid)
+					transfer = (int)cmdstatp->uremainder64;
 				else
 					transfer = 0;
 				if (STp->block_size == 0 &&
-				    (SRpnt->sr_sense_buffer[2] & 0x0f) == MEDIUM_ERROR)
+				    cmdstatp->sense_hdr.sense_key == MEDIUM_ERROR)
 					transfer = bytes;
 
-				if (SRpnt->sr_sense_buffer[2] & 0x20) {	/* ILI */
+				if (cmdstatp->flags & SENSE_ILI) {	/* ILI */
 					if (STp->block_size == 0) {
 						if (transfer <= 0) {
 							if (transfer < 0)
@@ -1756,7 +1793,7 @@ static long read_tape(struct scsi_tape *STp, long count,
 						if (st_int_ioctl(STp, MTBSR, 1))
 							return (-EIO);
 					}
-				} else if (SRpnt->sr_sense_buffer[2] & 0x80) {	/* FM overrides EOM */
+				} else if (cmdstatp->flags & SENSE_FMK) {	/* FM overrides EOM */
 					if (STps->eof != ST_FM_HIT)
 						STps->eof = ST_FM_HIT;
 					else
@@ -1769,7 +1806,7 @@ static long read_tape(struct scsi_tape *STp, long count,
                                         DEBC(printk(ST_DEB_MSG
                                                     "%s: EOF detected (%d bytes read).\n",
                                                     name, STbp->buffer_bytes));
-				} else if (SRpnt->sr_sense_buffer[2] & 0x40) {
+				} else if (cmdstatp->flags & SENSE_EOM) {
 					if (STps->eof == ST_FM)
 						STps->eof = ST_EOD_1;
 					else
@@ -1790,7 +1827,7 @@ static long read_tape(struct scsi_tape *STp, long count,
                                             "%s: Tape error while reading.\n", name));
 				STps->drv_block = (-1);
 				if (STps->eof == ST_FM &&
-				    (SRpnt->sr_sense_buffer[2] & 0x0f) == BLANK_CHECK) {
+				    cmdstatp->sense_hdr.sense_key == BLANK_CHECK) {
                                         DEBC(printk(ST_DEB_MSG
                                                     "%s: Zero returned for first BLANK CHECK after EOF.\n",
                                                     name));
@@ -1914,7 +1951,7 @@ st_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 				printk(ST_DEB_MSG
                                        "%s: EOF up (%d). Left %d, needed %d.\n", name,
 				       STps->eof, STbp->buffer_bytes,
-                                       count - total);
+                                       (int)(count - total));
                         ) /* end DEB */
 			transfer = STbp->buffer_bytes < count - total ?
 			    STbp->buffer_bytes : count - total;
@@ -1925,7 +1962,6 @@ st_read(struct file *filp, char __user *buf, size_t count, loff_t * ppos)
 					goto out;
 				}
 			}
-			filp->f_pos += transfer;
 			buf += transfer;
 			total += transfer;
 		}
@@ -2380,6 +2416,22 @@ static int do_load_unload(struct scsi_tape *STp, struct file *filp, int load_cod
 	return retval;
 }
 
+#if DEBUG
+#define ST_DEB_FORWARD  0
+#define ST_DEB_BACKWARD 1
+static void deb_space_print(char *name, int direction, char *units, unsigned char *cmd)
+{
+	s32 sc;
+
+	sc = cmd[2] & 0x80 ? 0xff000000 : 0;
+	sc |= (cmd[2] << 16) | (cmd[3] << 8) | cmd[4];
+	if (direction)
+		sc = -sc;
+	printk(ST_DEB_MSG "%s: Spacing tape %s over %d %s.\n", name,
+	       direction ? "backward" : "forward", sc, units);
+}
+#endif
+
 
 /* Internal ioctl function */
 static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned long arg)
@@ -2418,8 +2470,7 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 		cmd[2] = (arg >> 16);
 		cmd[3] = (arg >> 8);
 		cmd[4] = arg;
-                DEBC(printk(ST_DEB_MSG "%s: Spacing tape forward over %d filemarks.\n",
-			    name, cmd[2] * 65536 + cmd[3] * 256 + cmd[4]));
+                DEBC(deb_space_print(name, ST_DEB_FORWARD, "filemarks", cmd);)
 		if (fileno >= 0)
 			fileno += arg;
 		blkno = 0;
@@ -2434,14 +2485,7 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 		cmd[2] = (ltmp >> 16);
 		cmd[3] = (ltmp >> 8);
 		cmd[4] = ltmp;
-                DEBC(
-                     if (cmd[2] & 0x80)
-                     	ltmp = 0xff000000;
-                     ltmp = ltmp | (cmd[2] << 16) | (cmd[3] << 8) | cmd[4];
-                     printk(ST_DEB_MSG
-                            "%s: Spacing tape backward over %ld filemarks.\n",
-                            name, (-ltmp));
-		)
+                DEBC(deb_space_print(name, ST_DEB_BACKWARD, "filemarks", cmd);)
 		if (fileno >= 0)
 			fileno -= arg;
 		blkno = (-1);	/* We can't know the block number */
@@ -2453,8 +2497,7 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 		cmd[2] = (arg >> 16);
 		cmd[3] = (arg >> 8);
 		cmd[4] = arg;
-                DEBC(printk(ST_DEB_MSG "%s: Spacing tape forward %d blocks.\n", name,
-			       cmd[2] * 65536 + cmd[3] * 256 + cmd[4]));
+                DEBC(deb_space_print(name, ST_DEB_FORWARD, "blocks", cmd);)
 		if (blkno >= 0)
 			blkno += arg;
 		at_sm &= (arg == 0);
@@ -2466,13 +2509,7 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 		cmd[2] = (ltmp >> 16);
 		cmd[3] = (ltmp >> 8);
 		cmd[4] = ltmp;
-                DEBC(
-                     if (cmd[2] & 0x80)
-                          ltmp = 0xff000000;
-                     ltmp = ltmp | (cmd[2] << 16) | (cmd[3] << 8) | cmd[4];
-                     printk(ST_DEB_MSG
-                            "%s: Spacing tape backward %ld blocks.\n", name, (-ltmp));
-		)
+                DEBC(deb_space_print(name, ST_DEB_BACKWARD, "blocks", cmd);)
 		if (blkno >= 0)
 			blkno -= arg;
 		at_sm &= (arg == 0);
@@ -2483,8 +2520,7 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 		cmd[2] = (arg >> 16);
 		cmd[3] = (arg >> 8);
 		cmd[4] = arg;
-                DEBC(printk(ST_DEB_MSG "%s: Spacing tape forward %d setmarks.\n", name,
-                            cmd[2] * 65536 + cmd[3] * 256 + cmd[4]));
+                DEBC(deb_space_print(name, ST_DEB_FORWARD, "setmarks", cmd);)
 		if (arg != 0) {
 			blkno = fileno = (-1);
 			at_sm = 1;
@@ -2497,13 +2533,7 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 		cmd[2] = (ltmp >> 16);
 		cmd[3] = (ltmp >> 8);
 		cmd[4] = ltmp;
-                DEBC(
-                     if (cmd[2] & 0x80)
-				ltmp = 0xff000000;
-                     ltmp = ltmp | (cmd[2] << 16) | (cmd[3] << 8) | cmd[4];
-                     printk(ST_DEB_MSG "%s: Spacing tape backward %ld setmarks.\n",
-                            name, (-ltmp));
-		)
+                DEBC(deb_space_print(name, ST_DEB_BACKWARD, "setmarks", cmd);)
 		if (arg != 0) {
 			blkno = fileno = (-1);
 			at_sm = 1;
@@ -2573,7 +2603,7 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 		cmd[1] = 3;
                 DEBC(printk(ST_DEB_MSG "%s: Spacing to end of recorded medium.\n",
                             name));
-		blkno = 0;
+		blkno = -1;
 		at_sm = 0;
 		break;
 	case MTERASE:
@@ -2700,25 +2730,30 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 		else if (chg_eof)
 			STps->eof = ST_NOEOF;
 
+		if (cmd_in == MTWEOF)
+			STps->rw = ST_IDLE;
 	} else { /* SCSI command was not completely successful. Don't return
                     from this block without releasing the SCSI command block! */
+		struct st_cmdstatus *cmdstatp = &STp->buffer->cmdstat;
 
-		if (SRpnt->sr_sense_buffer[2] & 0x40) {
+		if (cmdstatp->flags & SENSE_EOM) {
 			if (cmd_in != MTBSF && cmd_in != MTBSFM &&
 			    cmd_in != MTBSR && cmd_in != MTBSS)
 				STps->eof = ST_EOM_OK;
 			STps->drv_block = 0;
 		}
 
-		undone = ((SRpnt->sr_sense_buffer[3] << 24) +
-			  (SRpnt->sr_sense_buffer[4] << 16) +
-			  (SRpnt->sr_sense_buffer[5] << 8) +
-			  SRpnt->sr_sense_buffer[6]);
+		if (cmdstatp->remainder_valid)
+			undone = (int)cmdstatp->uremainder64;
+		else
+			undone = 0;
 
 		if (cmd_in == MTWEOF &&
-		    (SRpnt->sr_sense_buffer[0] & 0x70) == 0x70 &&
-		    (SRpnt->sr_sense_buffer[2] & 0x4f) == 0x40 &&
-		 ((SRpnt->sr_sense_buffer[0] & 0x80) == 0 || undone == 0)) {
+		    cmdstatp->have_sense &&
+		    (cmdstatp->flags & SENSE_EOM) &&
+		    (cmdstatp->sense_hdr.sense_key == NO_SENSE ||
+		     cmdstatp->sense_hdr.sense_key == RECOVERED_ERROR) &&
+		    undone == 0) {
 			ioctl_result = 0;	/* EOF written succesfully at EOM */
 			if (fileno >= 0)
 				fileno++;
@@ -2729,7 +2764,7 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 				STps->drv_file = fileno - undone;
 			else
 				STps->drv_file = fileno;
-			STps->drv_block = 0;
+			STps->drv_block = -1;
 			STps->eof = ST_NOEOF;
 		} else if ((cmd_in == MTBSF) || (cmd_in == MTBSFM)) {
 			if (arg > 0 && undone < 0)  /* Some drives get this wrong */
@@ -2739,7 +2774,7 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 			STps->drv_block = 0;
 			STps->eof = ST_NOEOF;
 		} else if (cmd_in == MTFSR) {
-			if (SRpnt->sr_sense_buffer[2] & 0x80) {	/* Hit filemark */
+			if (cmdstatp->flags & SENSE_FMK) {	/* Hit filemark */
 				if (STps->drv_file >= 0)
 					STps->drv_file++;
 				STps->drv_block = 0;
@@ -2752,7 +2787,7 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 				STps->eof = ST_NOEOF;
 			}
 		} else if (cmd_in == MTBSR) {
-			if (SRpnt->sr_sense_buffer[2] & 0x80) {	/* Hit filemark */
+			if (cmdstatp->flags & SENSE_FMK) {	/* Hit filemark */
 				STps->drv_file--;
 				STps->drv_block = (-1);
 			} else {
@@ -2770,7 +2805,7 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 			   cmd_in == MTSETDENSITY ||
 			   cmd_in == MTSETDRVBUFFER ||
 			   cmd_in == SET_DENS_AND_BLK) {
-			if ((SRpnt->sr_sense_buffer[2] & 0x0f) == ILLEGAL_REQUEST &&
+			if (cmdstatp->sense_hdr.sense_key == ILLEGAL_REQUEST &&
 			    !(STp->use_pf & PF_TESTED)) {
 				/* Try the other possible state of Page Format if not
 				   already tried */
@@ -2782,7 +2817,7 @@ static int st_int_ioctl(struct scsi_tape *STp, unsigned int cmd_in, unsigned lon
 		} else if (chg_eof)
 			STps->eof = ST_NOEOF;
 
-		if ((SRpnt->sr_sense_buffer[2] & 0x0f) == BLANK_CHECK)
+		if (cmdstatp->sense_hdr.sense_key == BLANK_CHECK)
 			STps->eof = ST_EOD;
 
 		scsi_release_request(SRpnt);
@@ -3118,26 +3153,6 @@ static int st_ioctl(struct inode *inode, struct file *file,
 	char *name = tape_name(STp);
 	void __user *p = (void __user *)arg;
 
-	/* generic ioctls */
-	switch (cmd_in) {
-		case SCSI_IOCTL_GET_IDLUN:
-		case SCSI_IOCTL_GET_BUS_NUMBER:
-		case SCSI_IOCTL_PROBE_HOST:
-		case SCSI_IOCTL_SEND_COMMAND:
-		case SCSI_IOCTL_DOORLOCK:
-		case SCSI_IOCTL_DOORUNLOCK:
-		case SCSI_IOCTL_TEST_UNIT_READY:
-	        case SCSI_IOCTL_GET_PCI:
-		case SCSI_IOCTL_START_UNIT:
-		case SCSI_IOCTL_STOP_UNIT:
-			return scsi_ioctl(STp->device, cmd_in, (void *)arg);
-		default:
-			retval = scsi_cmd_ioctl(file, STp->disk, cmd_in, arg);
-			if (retval != -ENOTTY && retval != -ENXIO)
-				return retval;
-	}
-
-	/* tape specific ioctls */
 	if (down_interruptible(&STp->lock))
 		return -ERESTARTSYS;
 
@@ -3225,6 +3240,20 @@ static int st_ioctl(struct inode *inode, struct file *file,
 				retval = i;
 				goto out;
 			}
+			if (STps->rw == ST_WRITING &&
+			    (mtc.mt_op == MTREW || mtc.mt_op == MTOFFL ||
+			     mtc.mt_op == MTSEEK ||
+			     mtc.mt_op == MTBSF || mtc.mt_op == MTBSFM)) {
+				i = st_int_ioctl(STp, MTWEOF, 1);
+				if (i < 0) {
+					retval = i;
+					goto out;
+				}
+				if (mtc.mt_op == MTBSF || mtc.mt_op == MTBSFM)
+					mtc.mt_count++;
+				STps->rw = ST_IDLE;
+			     }
+
 		} else {
 			/*
 			 * If there was a bus reset, block further access
@@ -3435,11 +3464,45 @@ static int st_ioctl(struct inode *inode, struct file *file,
 			retval = (-EFAULT);
 		goto out;
 	}
+	up(&STp->lock);
+	switch (cmd_in) {
+		case SCSI_IOCTL_GET_IDLUN:
+		case SCSI_IOCTL_GET_BUS_NUMBER:
+			break;
+		default:
+			if (!capable(CAP_SYS_ADMIN))
+				i = -EPERM;
+			else
+				i = scsi_cmd_ioctl(file, STp->disk, cmd_in, p);
+			if (i != -ENOTTY)
+				return i;
+			break;
+	}
+	if (!capable(CAP_SYS_ADMIN) &&
+	    (cmd_in == SCSI_IOCTL_START_UNIT || cmd_in == SCSI_IOCTL_STOP_UNIT))
+		return -EPERM;
+	return scsi_ioctl(STp->device, cmd_in, p);
 
  out:
 	up(&STp->lock);
 	return retval;
 }
+
+#ifdef CONFIG_COMPAT
+static long st_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct scsi_tape *STp = file->private_data;
+	struct scsi_device *sdev = STp->device;
+	int ret = -ENOIOCTLCMD;
+	if (sdev->host->hostt->compat_ioctl) { 
+
+		ret = sdev->host->hostt->compat_ioctl(sdev, cmd, (void __user *)arg);
+
+	}
+	return ret;
+}
+#endif
+
 
 
 /* Try to allocate a new tape buffer. Calling function must not hold
@@ -3731,6 +3794,9 @@ static struct file_operations st_fops =
 	.read =		st_read,
 	.write =	st_write,
 	.ioctl =	st_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = st_compat_ioctl,
+#endif
 	.open =		st_open,
 	.flush =	st_flush,
 	.release =	st_release,

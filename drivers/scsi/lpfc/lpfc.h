@@ -19,28 +19,22 @@
  *******************************************************************/
 
 /*
- * $Id: lpfc.h 1.126 2004/10/18 17:54:38EDT sf_support Exp  $
+ * $Id: lpfc.h 1.167 2005/04/07 08:47:05EDT sf_support Exp  $
  */
-
-#ifndef _H_LPFC
-#define _H_LPFC
 
 struct lpfc_sli2_slim;
 
-#define LPFC_MAX_LUN                    32768	/* max nunber of LUNs
-						   supported */
-#define LPFC_MAX_TARGET                 256	/* max nunber of targets
-						   supported */
-#define LPFC_MAX_DISC_THREADS           64	/* max outstanding discovery els
-						   requests */
-#define LPFC_MAX_NS_RETRY               3	/* Try to get to the NameServer
-						   3 times and then give up. */
-#define LPFC_DFT_HBA_Q_DEPTH            2048	/* max cmds per hba */
-#define LPFC_LC_HBA_Q_DEPTH             1024	/* max cmds per low cost hba */
-#define LPFC_LP101_HBA_Q_DEPTH          128	/* max cmds per low cost hba */
+#define LPFC_MAX_TARGET         256	/* max targets supported */
+#define LPFC_MAX_DISC_THREADS	64	/* max outstanding discovery els req */
+#define LPFC_MAX_NS_RETRY       3	/* max NameServer retries */
 
-/* Define the SLIM2 page size. */
-#define LPFC_SLIM2_PAGE_AREA  8192
+#define LPFC_DFT_HBA_Q_DEPTH	2048	/* max cmds per hba */
+#define LPFC_LC_HBA_Q_DEPTH	1024	/* max cmds per low cost hba */
+#define LPFC_LP101_HBA_Q_DEPTH	128	/* max cmds per low cost hba */
+
+#define LPFC_CMD_PER_LUN	30	/* max outstanding cmds per lun */
+#define LPFC_SG_SEG_CNT		64	/* sg element count per scsi cmnd */
+#define LPFC_IOCB_LIST_CNT	2250	/* list of IOCBs for fast-path usage. */
 
 /* Define macros for 64 bit support */
 #define putPaddrLow(addr)    ((uint32_t) (0xffffffff & (u64)(addr)))
@@ -48,36 +42,28 @@ struct lpfc_sli2_slim;
 #define getPaddr(high, low)  ((dma_addr_t)( \
 			     (( (u64)(high)<<16 ) << 16)|( (u64)(low))))
 /* Provide maximum configuration definitions. */
-#define LPFC_DRVR_TIMEOUT  16		/* driver iocb timeout value in sec */
-#define MAX_FCP_TARGET     256		/* max num of FCP targets supported */
-#define FC_MAX_ADPTMSG     64
+#define LPFC_DRVR_TIMEOUT	16	/* driver iocb timeout value in sec */
+#define MAX_FCP_TARGET		256	/* max num of FCP targets supported */
+#define FC_MAX_ADPTMSG		64
 
-#define MAX_HBAEVT 32
+#define MAX_HBAEVT	32
 
-#if __LITTLE_ENDIAN
+/* Provide DMA memory definitions the driver uses per port instance. */
+struct lpfc_dmabuf {
+	struct list_head list;
+	void *virt;		/* virtual address ptr */
+	dma_addr_t phys;	/* mapped address */
+};
 
-#define putLunLow(lunlow, lun)              \
-   {                                        \
-   lunlow = 0;                              \
-   }
+struct lpfc_dma_pool {
+	struct lpfc_dmabuf   *elements;
+	uint32_t    max_count;
+	uint32_t    current_count;
+};
 
-#define putLunHigh(lunhigh, lun)            \
-   {                                        \
-   lunhigh = swab16(lun);                   \
-   }
+/* Priority bit.  Set value to exceed low water mark in lpfc_mem. */
+#define MEM_PRI		0x100
 
-#else				/* BIG_ENDIAN_HOST */
-
-#define putLunLow(lunlow, lun)              \
-   {                                        \
-   lunlow = 0;                              \
-   }
-
-#define putLunHigh(lunhigh, lun)            \
-   {                                        \
-   lunhigh = (uint32_t)(lun << 16);         \
-   }
-#endif
 
 /****************************************************************************/
 /*      Device VPD save area                                                */
@@ -108,13 +94,6 @@ typedef struct lpfc_vpd {
 
 struct lpfc_scsi_buf;
 
-struct lpfc_hba_event {
-	uint32_t fc_eventcode;
-	uint32_t fc_evdata1;
-	uint32_t fc_evdata2;
-	uint32_t fc_evdata3;
-	uint32_t fc_evdata4;
-};
 
 /*
  * lpfc stat counters
@@ -185,11 +164,11 @@ struct lpfc_sysfs_mbox {
 };
 
 struct lpfc_hba {
-	uint32_t intr_inited;		/* flag for interrupt registration */
 	struct list_head hba_list;	/* List of hbas/ports */
 	struct lpfc_sli sli;
 	struct lpfc_sli2_slim *slim2p;
 	dma_addr_t slim2p_mapping;
+	uint16_t pci_cfg_value;
 
 	uint32_t hba_state;
 
@@ -218,28 +197,9 @@ struct lpfc_hba {
 
 	uint32_t num_disc_nodes;	/*in addition to hba_state */
 
-	uint8_t fcp_mapping;	/* Map FCP devices based on WWNN WWPN or DID */
-#define FCP_SEED_WWNN   0x1
-#define FCP_SEED_WWPN   0x2
-#define FCP_SEED_DID    0x4
-#define FCP_SEED_MASK   0x7
-#define FCP_SEED_AUTO   0x8	/* binding was created by auto mapping */
-
 	struct timer_list fc_estabtmo;	/* link establishment timer */
 	struct timer_list fc_disctmo;	/* Discovery rescue timer */
 	struct timer_list fc_fdmitmo;	/* fdmi timer */
-
-
-	void *fc_evt_head;	/* waiting for event queue */
-	void *fc_evt_tail;	/* waiting for event queue */
-
-	uint16_t hba_event_put;	/* hbaevent event put word anchor */
-	uint16_t hba_event_get;	/* hbaevent event get word anchor */
-	uint32_t hba_event_missed;	/* hbaevent missed event word anchor */
-	uint32_t sid_cnt;	/* SCSI ID counter */
-
-	struct lpfc_hba_event hbaevt[MAX_HBAEVT];
-
 	/* These fields used to be binfo */
 	struct lpfc_name fc_nodename;	/* fc nodename */
 	struct lpfc_name fc_portname;	/* fc portname */
@@ -263,20 +223,24 @@ struct lpfc_hba {
 	uint32_t fc_nlp_cnt;	/* outstanding NODELIST requests */
 	uint32_t fc_rscn_id_cnt;	/* count of RSCNs payloads in list */
 	struct lpfc_dmabuf *fc_rscn_id_list[FC_MAX_HOLD_RSCN];
-
+	uint32_t lmt;
 	uint32_t fc_flag;	/* FC flags */
-#define FC_PT2PT                0x1 	/* pt2pt with no fabric */
-#define FC_PT2PT_PLOGI          0x2 	/* pt2pt initiate PLOGI */
-#define FC_DISC_TMO             0x4 	/* Discovery timer running */
+#define FC_PT2PT                0x1	/* pt2pt with no fabric */
+#define FC_PT2PT_PLOGI          0x2	/* pt2pt initiate PLOGI */
+#define FC_DISC_TMO             0x4	/* Discovery timer running */
 #define FC_PUBLIC_LOOP          0x8	/* Public loop */
-#define FC_LBIT                 0x10 	/* LOGIN bit in loopinit set */
-#define FC_RSCN_MODE            0x20 	/* RSCN cmd rcv'ed */
+#define FC_LBIT                 0x10	/* LOGIN bit in loopinit set */
+#define FC_RSCN_MODE            0x20	/* RSCN cmd rcv'ed */
 #define FC_NLP_MORE             0x40	/* More node to process in node tbl */
 #define FC_OFFLINE_MODE         0x80	/* Interface is offline for diag */
 #define FC_FABRIC               0x100	/* We are fabric attached */
 #define FC_ESTABLISH_LINK       0x200	/* Reestablish Link */
 #define FC_RSCN_DISCOVERY       0x400	/* Authenticate all devices after RSCN*/
-#define FC_2G_CAPABLE           0x800	/* HBA is 2 Gig capable */
+#define FC_LOADING		0x1000	/* HBA in process of loading drvr */
+#define FC_UNLOADING		0x2000	/* HBA in process of unloading drvr */
+#define FC_SCSI_SCAN_TMO        0x4000	/* scsi scan timer running */
+#define FC_ABORT_DISCOVERY      0x8000	/* we want to abort discovery */
+#define FC_NDISC_ACTIVE         0x10000	/* NPort discovery active */
 
 	uint32_t fc_topology;	/* link topology, from LINK INIT */
 
@@ -285,7 +249,6 @@ struct lpfc_hba {
 	/* These are the head/tail pointers for the bind, plogi, adisc, unmap,
 	 *  and map lists.  Their counters are immediately following.
 	 */
-	struct list_head fc_nlpbind_list;
 	struct list_head fc_plogi_list;
 	struct list_head fc_adisc_list;
 	struct list_head fc_reglogin_list;
@@ -296,7 +259,6 @@ struct lpfc_hba {
 	struct list_head fc_unused_list;
 
 	/* Keep counters for the number of entries in each list. */
-	uint16_t fc_bind_cnt;
 	uint16_t fc_plogi_cnt;
 	uint16_t fc_adisc_cnt;
 	uint16_t fc_reglogin_cnt;
@@ -308,7 +270,6 @@ struct lpfc_hba {
 	struct lpfc_nodelist fc_fcpnodev; /* nodelist entry for no device */
 	uint32_t nport_event_cnt;	/* timestamp for nlplist entry */
 
-	struct lpfc_target *device_queue_hash[MAX_FCP_TARGET];
 #define LPFC_RPI_HASH_SIZE     64
 #define LPFC_RPI_HASH_FUNC(x)  ((x) & (0x3f))
 	/* ptr to active D_ID / RPIs */
@@ -318,10 +279,8 @@ struct lpfc_hba {
 
 	uint32_t cfg_log_verbose;
 	uint32_t cfg_lun_queue_depth;
-	uint32_t cfg_linkdown_tmo;
 	uint32_t cfg_nodev_tmo;
 	uint32_t cfg_hba_queue_depth;
-	uint32_t cfg_automap;
 	uint32_t cfg_fcp_class;
 	uint32_t cfg_use_adisc;
 	uint32_t cfg_ack0;
@@ -333,51 +292,61 @@ struct lpfc_hba {
 	uint32_t cfg_fdmi_on;
 	uint32_t cfg_fcp_bind_method;
 	uint32_t cfg_discovery_threads;
+	uint32_t cfg_max_luns;
+	uint32_t cfg_sg_seg_cnt;
+	uint32_t cfg_sg_dma_buf_size;
 
 	lpfc_vpd_t vpd;		/* vital product data */
 
-#if defined(FC_TRANS_265_BLKPATCH)
-	/*
-	 * Provide a per-HBA timer for 2.6.5 kernels patched with the
-	 * block/unblock FC transport patch.
-	 */
-	struct timer_list dev_loss_timer;
-#endif
-
 	struct Scsi_Host *host;
 	struct pci_dev *pcidev;
-	struct list_head      dpc_disc;
+	struct list_head      work_list;
+	uint32_t              work_ha;      /* Host Attention Bits for WT */
+	uint32_t              work_ha_mask; /* HA Bits owned by WT        */
+	uint32_t              work_hs;      /* HS stored in case of ERRAT */
+	uint32_t              work_status[2]; /* Extra status from SLIM */
+	uint32_t              work_hba_events; /* Timeout to be handled  */
+#define WORKER_DISC_TMO                0x1	/* Discovery timeout */
+#define WORKER_ELS_TMO                 0x2	/* ELS timeout */
+#define WORKER_MBOX_TMO                0x4	/* MBOX timeout */
+#define WORKER_FDMI_TMO                0x8	/* FDMI timeout */
 
-	pid_t                 dpc_pid;
-	int                   dpc_kill;
-	struct completion     dpc_startup;
-	struct completion     dpc_exiting;
-	struct semaphore     *dpc_wait;
+	wait_queue_head_t    *work_wait;
+	struct task_struct   *worker_thread;
 
 	unsigned long pci_bar0_map;     /* Physical address for PCI BAR0 */
 	unsigned long pci_bar2_map;     /* Physical address for PCI BAR2 */
-	void *slim_memmap_p;	        /* Kernel memory mapped address for PCI
-					   BAR0 */
-	void *ctrl_regs_memmap_p;	/* Kernel memory mapped address for PCI
-					   BAR2 */
+	void __iomem *slim_memmap_p;	/* Kernel memory mapped address for
+					   PCI BAR0 */
+	void __iomem *ctrl_regs_memmap_p;/* Kernel memory mapped address for
+					    PCI BAR2 */
 
-	void *MBslimaddr;	/* virtual address for mbox cmds */
-	void *HAregaddr;	/* virtual address for host attn reg */
-	void *CAregaddr;	/* virtual address for chip attn reg */
-	void *HSregaddr;	/* virtual address for host status reg */
-	void *HCregaddr;	/* virtual address for host ctl reg */
-	wait_queue_head_t linkevtwq;
-	wait_queue_head_t rscnevtwq;
-	wait_queue_head_t ctevtwq;
+	void __iomem *MBslimaddr;	/* virtual address for mbox cmds */
+	void __iomem *HAregaddr;	/* virtual address for host attn reg */
+	void __iomem *CAregaddr;	/* virtual address for chip attn reg */
+	void __iomem *HSregaddr;	/* virtual address for host status
+					   reg */
+	void __iomem *HCregaddr;	/* virtual address for host ctl reg */
 
-	uint8_t brd_no;		/* FC board number */
+	int brd_no;			/* FC board number */
 
-	char SerialNumber[32];	/* adapter Serial Number */
+	char SerialNumber[32];		/* adapter Serial Number */
 	char OptionROMVersion[32];	/* adapter BIOS / Fcode version */
+	char ModelDesc[256];		/* Model Description */
+	char ModelName[80];		/* Model Name */
+	char ProgramType[256];		/* Program Type */
+	char Port[20];			/* Port No */
+	uint8_t vpd_flag;               /* VPD data flag */
+
+#define VPD_MODEL_DESC      0x1         /* valid vpd model description */
+#define VPD_MODEL_NAME      0x2         /* valid vpd model name */
+#define VPD_PROGRAM_TYPE    0x4         /* valid vpd program type */
+#define VPD_PORT            0x8         /* valid vpd port data */
+#define VPD_MASK            0xf         /* mask for any vpd data */
 
 	struct timer_list els_tmofunc;
 
-  	void *link_stats;
+	void *link_stats;
 
 	/*
 	 * stat  counters
@@ -387,72 +356,25 @@ struct lpfc_hba {
 	uint64_t fc4ControlRequests;
 
 	struct lpfc_sysfs_mbox sysfs_mbox;
-;
+
+	/* fastpath list. */
+	struct list_head lpfc_scsi_buf_list;
+	uint32_t total_scsi_bufs;
+	struct list_head lpfc_iocb_list;
+	uint32_t total_iocbq_bufs;
+
 	/* pci_mem_pools */
-	struct pci_pool *lpfc_scsi_dma_ext_pool;
+	struct pci_pool *lpfc_scsi_dma_buf_pool;
 	struct pci_pool *lpfc_mbuf_pool;
 	struct lpfc_dma_pool lpfc_mbuf_safety_pool;
-	mempool_t *scsibuf_mem_pool;
 
-	mempool_t *iocb_mem_pool;
 	mempool_t *mbox_mem_pool;
 	mempool_t *nlp_mem_pool;
-	mempool_t *bind_mem_pool;
 	struct list_head freebufList;
 	struct list_head ctrspbuflist;
 	struct list_head rnidrspbuflist;
 };
 
-/* event mask definitions */
-#define FC_REG_LINK_EVENT       0x1	/* Register for link up / down events */
-#define FC_REG_RSCN_EVENT       0x2	/* Register for RSCN events */
-#define FC_REG_CT_EVENT         0x4	/* Register for CT request events */
-
-#define FC_FSTYPE_ALL 0xffff	/* match on all fsTypes */
-
-typedef struct fcEVT {		/* Kernel level Event structure */
-	uint32_t evt_handle;
-	uint32_t evt_mask;
-	uint32_t evt_data0;
-	uint16_t evt_sleep;
-	uint16_t evt_flags;
-	void    *evt_type;
-	void    *evt_next;
-	void	*evt_data1;
-	uint32_t evt_data2;
-} fcEVT_t;
-
-typedef struct fcEVTHDR {	/* Kernel level Event Header */
-	uint32_t e_handle;
-	uint32_t e_mask;
-	uint16_t e_mode;
-#define E_SLEEPING_MODE     0x0001
-	uint16_t e_refcnt;
-	uint16_t e_flag;
-#define E_GET_EVENT_ACTIVE  0x0001
-	fcEVT_t *e_head;
-	fcEVT_t *e_tail;
-	void    *e_next_header;
-	void    *e_type;
-} fcEVTHDR_t;
-
-typedef struct tagPortStatistics {
-	long SecondsSinceLastReset;
-	long long TxFrames;
-	long long TxWords;
-	long long RxFrames;
-	long long RxWords;
-	long long LIPCount;
-	long long NOSCount;
-	long long ErrorFrames;
-	long long DumpedFrames;
-	long long LinkFailureCount;
-	long long LossOfSyncCount;
-	long long LossOfSignalCount;
-	long long PrimitiveSeqProtocolErrCount;
-	long long InvalidTxWordCount;
-	long long InvalidCRCCount;
-} portstatistics_t;
 
 struct rnidrsp {
 	void *buf;
@@ -460,5 +382,3 @@ struct rnidrsp {
 	struct list_head list;
 	uint32_t data;
 };
-
-#endif				/* _H_LPFC */

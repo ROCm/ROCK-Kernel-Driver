@@ -824,7 +824,7 @@ void eeh_add_device_early(struct device_node *dn)
 	struct pci_controller *phb;
 	struct eeh_early_enable_info info;
 
-	if (!dn || !eeh_subsystem_enabled)
+	if (!dn)
 		return;
 	phb = dn->phb;
 	if (NULL == phb || 0 == phb->buid) {

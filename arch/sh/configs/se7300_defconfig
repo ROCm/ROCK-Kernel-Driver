@@ -1,24 +1,28 @@
 #
 # Automatically generated make config: don't edit
+# Linux kernel version: 2.6.11-sh
+# Wed Mar  2 15:09:43 2005
 #
 CONFIG_SUPERH=y
 CONFIG_UID16=y
 CONFIG_RWSEM_GENERIC_SPINLOCK=y
+CONFIG_GENERIC_HARDIRQS=y
+CONFIG_GENERIC_IRQ_PROBE=y
+CONFIG_GENERIC_CALIBRATE_DELAY=y
 
 #
 # Code maturity level options
 #
 CONFIG_EXPERIMENTAL=y
 CONFIG_CLEAN_COMPILE=y
-CONFIG_STANDALONE=y
 CONFIG_BROKEN_ON_SMP=y
 
 #
 # General setup
 #
+CONFIG_LOCALVERSION=""
 # CONFIG_SWAP is not set
 # CONFIG_SYSVIPC is not set
-# CONFIG_POSIX_MQUEUE is not set
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
 # CONFIG_AUDIT is not set
@@ -29,11 +33,13 @@ CONFIG_EMBEDDED=y
 # CONFIG_KALLSYMS is not set
 # CONFIG_FUTEX is not set
 # CONFIG_EPOLL is not set
-CONFIG_IOSCHED_NOOP=y
-# CONFIG_IOSCHED_AS is not set
-# CONFIG_IOSCHED_DEADLINE is not set
-# CONFIG_IOSCHED_CFQ is not set
 # CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
+CONFIG_SHMEM=y
+CONFIG_CC_ALIGN_FUNCTIONS=0
+CONFIG_CC_ALIGN_LABELS=0
+CONFIG_CC_ALIGN_LOOPS=0
+CONFIG_CC_ALIGN_JUMPS=0
+# CONFIG_TINY_SHMEM is not set
 
 #
 # Loadable module support
@@ -46,6 +52,7 @@ CONFIG_IOSCHED_NOOP=y
 # CONFIG_SH_SOLUTION_ENGINE is not set
 # CONFIG_SH_7751_SOLUTION_ENGINE is not set
 CONFIG_SH_7300_SOLUTION_ENGINE=y
+# CONFIG_SH_73180_SOLUTION_ENGINE is not set
 # CONFIG_SH_7751_SYSTEMH is not set
 # CONFIG_SH_STB1_HARP is not set
 # CONFIG_SH_STB1_OVERDRIVE is not set
@@ -62,23 +69,29 @@ CONFIG_SH_7300_SOLUTION_ENGINE=y
 # CONFIG_SH_SH2000 is not set
 # CONFIG_SH_ADX is not set
 # CONFIG_SH_MPC1211 is not set
+# CONFIG_SH_SH03 is not set
 # CONFIG_SH_SECUREEDGE5410 is not set
 # CONFIG_SH_HS7751RVOIP is not set
 # CONFIG_SH_RTS7751R2D is not set
+# CONFIG_SH_EDOSK7705 is not set
+# CONFIG_SH_SH4202_MICRODEV is not set
 # CONFIG_SH_UNKNOWN is not set
 # CONFIG_CPU_SH2 is not set
 CONFIG_CPU_SH3=y
 # CONFIG_CPU_SH4 is not set
 # CONFIG_CPU_SUBTYPE_SH7604 is not set
 CONFIG_CPU_SUBTYPE_SH7300=y
+# CONFIG_CPU_SUBTYPE_SH7705 is not set
 # CONFIG_CPU_SUBTYPE_SH7707 is not set
 # CONFIG_CPU_SUBTYPE_SH7708 is not set
 # CONFIG_CPU_SUBTYPE_SH7709 is not set
 # CONFIG_CPU_SUBTYPE_SH7750 is not set
 # CONFIG_CPU_SUBTYPE_SH7751 is not set
 # CONFIG_CPU_SUBTYPE_SH7760 is not set
+# CONFIG_CPU_SUBTYPE_SH73180 is not set
 # CONFIG_CPU_SUBTYPE_ST40STB1 is not set
 # CONFIG_CPU_SUBTYPE_ST40GX1 is not set
+# CONFIG_CPU_SUBTYPE_SH4_202 is not set
 CONFIG_MMU=y
 CONFIG_CMDLINE_BOOL=y
 CONFIG_CMDLINE="console=ttySC0,38400 root=/dev/ram0"
@@ -120,6 +133,19 @@ CONFIG_HEARTBEAT=y
 # CONFIG_PCI is not set
 
 #
+# PCCARD (PCMCIA/CardBus) support
+#
+# CONFIG_PCCARD is not set
+
+#
+# PC-card bridges
+#
+
+#
+# PCI Hotplug Support
+#
+
+#
 # Executable file formats
 #
 CONFIG_BINFMT_ELF=y
@@ -139,6 +165,9 @@ CONFIG_EMBEDDED_RAMDISK_IMAGE="ramdisk.gz"
 #
 # Generic Driver Options
 #
+CONFIG_STANDALONE=y
+CONFIG_PREVENT_FIRMWARE_BUILD=y
+# CONFIG_FW_LOADER is not set
 
 #
 # Memory Technology Devices (MTD)
@@ -158,11 +187,23 @@ CONFIG_EMBEDDED_RAMDISK_IMAGE="ramdisk.gz"
 # Block devices
 #
 # CONFIG_BLK_DEV_FD is not set
+# CONFIG_BLK_DEV_COW_COMMON is not set
 # CONFIG_BLK_DEV_LOOP is not set
 CONFIG_BLK_DEV_RAM=y
+CONFIG_BLK_DEV_RAM_COUNT=16
 CONFIG_BLK_DEV_RAM_SIZE=4096
 CONFIG_BLK_DEV_INITRD=y
+CONFIG_INITRAMFS_SOURCE=""
 # CONFIG_LBD is not set
+# CONFIG_CDROM_PKTCDVD is not set
+
+#
+# IO Schedulers
+#
+CONFIG_IOSCHED_NOOP=y
+# CONFIG_IOSCHED_AS is not set
+# CONFIG_IOSCHED_DEADLINE is not set
+# CONFIG_IOSCHED_CFQ is not set
 
 #
 # ATA/ATAPI/MFM/RLL support
@@ -186,7 +227,6 @@ CONFIG_BLK_DEV_INITRD=y
 #
 # IEEE 1394 (FireWire) support
 #
-# CONFIG_IEEE1394 is not set
 
 #
 # I2O device support
@@ -234,6 +274,8 @@ CONFIG_SERIO=y
 # CONFIG_SERIO_I8042 is not set
 # CONFIG_SERIO_SERPORT is not set
 # CONFIG_SERIO_CT82C710 is not set
+# CONFIG_SERIO_LIBPS2 is not set
+# CONFIG_SERIO_RAW is not set
 
 #
 # Input Device Drivers
@@ -264,7 +306,6 @@ CONFIG_SERIAL_CORE=y
 CONFIG_SERIAL_CORE_CONSOLE=y
 # CONFIG_UNIX98_PTYS is not set
 # CONFIG_LEGACY_PTYS is not set
-# CONFIG_QIC02_TAPE is not set
 
 #
 # IPMI
@@ -274,6 +315,7 @@ CONFIG_IPMI_HANDLER=y
 CONFIG_IPMI_DEVICE_INTERFACE=y
 # CONFIG_IPMI_SI is not set
 CONFIG_IPMI_WATCHDOG=y
+# CONFIG_IPMI_POWEROFF is not set
 
 #
 # Watchdog Cards
@@ -290,13 +332,10 @@ CONFIG_SOFT_WATCHDOG=y
 # CONFIG_GEN_RTC is not set
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
-# CONFIG_APPLICOM is not set
 
 #
 # Ftape, the floppy tape device driver
 #
-# CONFIG_FTAPE is not set
-# CONFIG_AGP is not set
 # CONFIG_DRM is not set
 # CONFIG_RAW_DRIVER is not set
 
@@ -304,6 +343,11 @@ CONFIG_SOFT_WATCHDOG=y
 # I2C support
 #
 # CONFIG_I2C is not set
+
+#
+# Dallas's 1-wire bus
+#
+# CONFIG_W1 is not set
 
 #
 # Misc devices
@@ -331,11 +375,27 @@ CONFIG_SOFT_WATCHDOG=y
 #
 # USB support
 #
+# CONFIG_USB_ARCH_HAS_HCD is not set
+# CONFIG_USB_ARCH_HAS_OHCI is not set
+
+#
+# NOTE: USB_STORAGE enables SCSI, and 'SCSI disk support' may also be needed; see USB_STORAGE Help for more information
+#
 
 #
 # USB Gadget Support
 #
 # CONFIG_USB_GADGET is not set
+
+#
+# MMC/SD Card support
+#
+# CONFIG_MMC is not set
+
+#
+# InfiniBand support
+#
+# CONFIG_INFINIBAND is not set
 
 #
 # File systems
@@ -346,10 +406,15 @@ CONFIG_EXT2_FS=y
 # CONFIG_JBD is not set
 # CONFIG_REISERFS_FS is not set
 # CONFIG_JFS_FS is not set
+
+#
+# XFS support
+#
 # CONFIG_XFS_FS is not set
 # CONFIG_MINIX_FS is not set
 # CONFIG_ROMFS_FS is not set
 # CONFIG_QUOTA is not set
+CONFIG_DNOTIFY=y
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
 
@@ -362,7 +427,8 @@ CONFIG_EXT2_FS=y
 #
 # DOS/FAT/NT Filesystems
 #
-# CONFIG_FAT_FS is not set
+# CONFIG_MSDOS_FS is not set
+# CONFIG_VFAT_FS is not set
 # CONFIG_NTFS_FS is not set
 
 #
@@ -415,9 +481,8 @@ CONFIG_MSDOS_PARTITION=y
 #
 # Kernel hacking
 #
-# CONFIG_MAGIC_SYSRQ is not set
-# CONFIG_DEBUG_SPINLOCK is not set
-# CONFIG_DEBUG_INFO is not set
+# CONFIG_DEBUG_KERNEL is not set
+# CONFIG_FRAME_POINTER is not set
 CONFIG_SH_STANDARD_BIOS=y
 CONFIG_EARLY_PRINTK=y
 CONFIG_KGDB=y
@@ -442,11 +507,11 @@ CONFIG_KGDB_DEFPARITY_N=y
 # CONFIG_KGDB_DEFPARITY_O is not set
 CONFIG_KGDB_DEFBITS_8=y
 # CONFIG_KGDB_DEFBITS_7 is not set
-# CONFIG_FRAME_POINTER is not set
 
 #
 # Security options
 #
+# CONFIG_KEYS is not set
 # CONFIG_SECURITY is not set
 
 #
@@ -455,7 +520,12 @@ CONFIG_KGDB_DEFBITS_8=y
 # CONFIG_CRYPTO is not set
 
 #
+# Hardware crypto devices
+#
+
+#
 # Library routines
 #
+# CONFIG_CRC_CCITT is not set
 CONFIG_CRC32=y
 # CONFIG_LIBCRC32C is not set

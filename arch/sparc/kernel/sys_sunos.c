@@ -1131,7 +1131,7 @@ sunos_sigaction(int sig, const struct old_sigaction __user *act,
 	if (act) {
 		old_sigset_t mask;
 
-		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		if (!access_ok(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_flags, &act->sa_flags))
 			return -EFAULT;
@@ -1152,7 +1152,7 @@ sunos_sigaction(int sig, const struct old_sigaction __user *act,
 		 * But then again we don't support SunOS lwp's anyways ;-)
 		 */
 		old_ka.sa.sa_flags ^= SUNOS_SV_INTERRUPT;
-		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		if (!access_ok(VERIFY_WRITE, oact, sizeof(*oact)) ||
 		    __put_user(old_ka.sa.sa_handler, &oact->sa_handler) ||
 		    __put_user(old_ka.sa.sa_flags, &oact->sa_flags))
 			 return -EFAULT;

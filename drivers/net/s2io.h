@@ -1,6 +1,6 @@
 /************************************************************************
  * s2io.h: A Linux PCI-X Ethernet driver for S2IO 10GbE Server NIC
- * Copyright 2002 Raghavendra Koushik (raghavendra.koushik@s2io.com)
+ * Copyright(c) 2002-2005 Neterion Inc.
 
  * This software may be used and distributed according to the terms of
  * the GNU General Public License (GPL), incorporated herein by reference.
@@ -73,121 +73,6 @@ static int debug_level = ERR_DBG;	/* Default level. */
 
 /* The statistics block of Xena */
 typedef struct stat_block {
-#ifdef  __BIG_ENDIAN
-/* Tx MAC statistics counters. */
-	u32 tmac_frms;
-	u32 tmac_data_octets;
-	u64 tmac_drop_frms;
-	u32 tmac_mcst_frms;
-	u32 tmac_bcst_frms;
-	u64 tmac_pause_ctrl_frms;
-	u32 tmac_ttl_octets;
-	u32 tmac_ucst_frms;
-	u32 tmac_nucst_frms;
-	u32 tmac_any_err_frms;
-	u64 tmac_ttl_less_fb_octets;
-	u64 tmac_vld_ip_octets;
-	u32 tmac_vld_ip;
-	u32 tmac_drop_ip;
-	u32 tmac_icmp;
-	u32 tmac_rst_tcp;
-	u64 tmac_tcp;
-	u32 tmac_udp;
-	u32 reserved_0;
-
-/* Rx MAC Statistics counters. */
-	u32 rmac_vld_frms;
-	u32 rmac_data_octets;
-	u64 rmac_fcs_err_frms;
-	u64 rmac_drop_frms;
-	u32 rmac_vld_mcst_frms;
-	u32 rmac_vld_bcst_frms;
-	u32 rmac_in_rng_len_err_frms;
-	u32 rmac_out_rng_len_err_frms;
-	u64 rmac_long_frms;
-	u64 rmac_pause_ctrl_frms;
-	u64 rmac_unsup_ctrl_frms;
-	u32 rmac_ttl_octets;
-	u32 rmac_accepted_ucst_frms;
-	u32 rmac_accepted_nucst_frms;
-	u32 rmac_discarded_frms;
-	u32 rmac_drop_events;
-	u32 reserved_1;
-	u64 rmac_ttl_less_fb_octets;
-	u64 rmac_ttl_frms;
-	u64 reserved_2;
-	u32 reserved_3;
-	u32 rmac_usized_frms;
-	u32 rmac_osized_frms;
-	u32 rmac_frag_frms;
-	u32 rmac_jabber_frms;
-	u32 reserved_4;
-	u64 rmac_ttl_64_frms;
-	u64 rmac_ttl_65_127_frms;
-	u64 reserved_5;
-	u64 rmac_ttl_128_255_frms;
-	u64 rmac_ttl_256_511_frms;
-	u64 reserved_6;
-	u64 rmac_ttl_512_1023_frms;
-	u64 rmac_ttl_1024_1518_frms;
-	u32 reserved_7;
-	u32 rmac_ip;
-	u64 rmac_ip_octets;
-	u32 rmac_hdr_err_ip;
-	u32 rmac_drop_ip;
-	u32 rmac_icmp;
-	u32 reserved_8;
-	u64 rmac_tcp;
-	u32 rmac_udp;
-	u32 rmac_err_drp_udp;
-	u64 rmac_xgmii_err_sym;
-	u64 rmac_frms_q0;
-	u64 rmac_frms_q1;
-	u64 rmac_frms_q2;
-	u64 rmac_frms_q3;
-	u64 rmac_frms_q4;
-	u64 rmac_frms_q5;
-	u64 rmac_frms_q6;
-	u64 rmac_frms_q7;
-	u16 rmac_full_q0;
-	u16 rmac_full_q1;
-	u16 rmac_full_q2;
-	u16 rmac_full_q3;
-	u16 rmac_full_q4;
-	u16 rmac_full_q5;
-	u16 rmac_full_q6;
-	u16 rmac_full_q7;
-	u32 rmac_pause_cnt;
-	u32 reserved_9;
-	u64 rmac_xgmii_data_err_cnt;
-	u64 rmac_xgmii_ctrl_err_cnt;
-	u32 rmac_accepted_ip;
-	u32 rmac_err_tcp;
-
-/* PCI/PCI-X Read transaction statistics. */
-	u32 rd_req_cnt;
-	u32 new_rd_req_cnt;
-	u32 new_rd_req_rtry_cnt;
-	u32 rd_rtry_cnt;
-	u32 wr_rtry_rd_ack_cnt;
-
-/* PCI/PCI-X write transaction statistics. */
-	u32 wr_req_cnt;
-	u32 new_wr_req_cnt;
-	u32 new_wr_req_rtry_cnt;
-	u32 wr_rtry_cnt;
-	u32 wr_disc_cnt;
-	u32 rd_rtry_wr_ack_cnt;
-
-/*	DMA Transaction statistics. */
-	u32 txp_wr_cnt;
-	u32 txd_rd_cnt;
-	u32 txd_wr_cnt;
-	u32 rxd_rd_cnt;
-	u32 rxd_wr_cnt;
-	u32 txf_rd_cnt;
-	u32 rxf_wr_cnt;
-#else
 /* Tx MAC statistics counters. */
 	u32 tmac_data_octets;
 	u32 tmac_frms;
@@ -301,7 +186,6 @@ typedef struct stat_block {
 	u32 rxd_rd_cnt;
 	u32 rxf_wr_cnt;
 	u32 txf_rd_cnt;
-#endif
 } StatInfo_t;
 
 /* Structures representing different init time configuration
@@ -848,7 +732,7 @@ static void tx_intr_handler(struct s2io_nic *sp);
 static void alarm_intr_handler(struct s2io_nic *sp);
 
 static int s2io_starter(void);
-void s2io_closer(void);
+static void s2io_closer(void);
 static void s2io_tx_watchdog(struct net_device *dev);
 static void s2io_tasklet(unsigned long dev_addr);
 static void s2io_set_multicast(struct net_device *dev);
@@ -858,17 +742,18 @@ static int rx_osm_handler(nic_t * sp, u16 len, RxD_t * rxdp, int ring_no);
 static int rx_osm_handler(nic_t * sp, RxD_t * rxdp, int ring_no,
 			  buffAdd_t * ba);
 #endif
-void s2io_link(nic_t * sp, int link);
-void s2io_reset(nic_t * sp);
+static void s2io_link(nic_t * sp, int link);
+static void s2io_reset(nic_t * sp);
 #ifdef CONFIG_S2IO_NAPI
 static int s2io_poll(struct net_device *dev, int *budget);
 #endif
 static void s2io_init_pci(nic_t * sp);
-int s2io_set_mac_addr(struct net_device *dev, u8 * addr);
+static int s2io_set_mac_addr(struct net_device *dev, u8 * addr);
 static irqreturn_t s2io_isr(int irq, void *dev_id, struct pt_regs *regs);
 static int verify_xena_quiescence(u64 val64, int flag);
 static struct ethtool_ops netdev_ethtool_ops;
 static void s2io_set_link(unsigned long data);
+static int s2io_set_swapper(nic_t * sp);
 static void s2io_card_down(nic_t * nic);
 static int s2io_card_up(nic_t * nic);
 

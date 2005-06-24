@@ -379,8 +379,8 @@ void kernel_mna_trap_fault(struct pt_regs *regs, unsigned int insn)
                 	printk(KERN_ALERT "Unable to handle kernel paging request in mna handler");
 	        printk(KERN_ALERT " at virtual address %016lx\n",address);
 		printk(KERN_ALERT "current->{mm,active_mm}->context = %016lx\n",
-			(current->mm ? current->mm->context :
-			current->active_mm->context));
+			(current->mm ? CTX_HWBITS(current->mm->context) :
+			CTX_HWBITS(current->active_mm->context)));
 		printk(KERN_ALERT "current->{mm,active_mm}->pgd = %016lx\n",
 			(current->mm ? (unsigned long) current->mm->pgd :
 			(unsigned long) current->active_mm->pgd));
@@ -413,7 +413,7 @@ asmlinkage void kernel_unaligned_trap(struct pt_regs *regs, unsigned int insn, u
 		:
 		: "r" (regs), "r" (insn)
 		: "o0", "o1", "o2", "o3", "o4", "o5", "o7",
-		  "g1", "g2", "g3", "g4", "g5", "g7", "cc");
+		  "g1", "g2", "g3", "g4", "g7", "cc");
 	} else {
 		unsigned long addr = compute_effective_address(regs, insn, ((insn >> 25) & 0x1f));
 

@@ -1,7 +1,7 @@
 /* 
  *    Debugging versions of SMP locking primitives.
  *
- *    Copyright (C) 2004 Thibaut VARENE <varenet@esiee.fr>
+ *    Copyright (C) 2004 Thibaut VARENE <varenet@parisc-linux.org>
  *
  *    Some code stollen from alpha & sparc64 ;)
  *
@@ -239,8 +239,6 @@ int _dbg_write_trylock(rwlock_t *rw, const char *bfile, int bline)
 	if(rw->counter != 0) {
 		/* this basically never happens */
 		_raw_spin_unlock(&rw->lock);
-		
-		
 		return 0;
 	}
 
@@ -250,6 +248,7 @@ int _dbg_write_trylock(rwlock_t *rw, const char *bfile, int bline)
 	pdc_printf("%s:%d: try write_lock grabbed in %s at %p(%d)\n",
 		   bfile, bline, current->comm, inline_pc, cpu);
 #endif
+	return 1;
 }
 
 void _dbg_read_lock(rwlock_t * rw, const char *bfile, int bline)

@@ -13,6 +13,12 @@
 #include <asm/arch/memory.h>
 #include <asm/hardware/iomd.h>
 
+#ifdef __ASSEMBLY__
+#define IOMEM(x) x
+#else
+#define IOMEM(x) ((void __iomem *)(x))
+#endif
+
 /*
  * What hardware must be present
  */
@@ -27,7 +33,7 @@
 
 #define IO_START		0x03000000	/* I/O */
 #define IO_SIZE			0x01000000
-#define IO_BASE			0xe0000000
+#define IO_BASE			IOMEM(0xe0000000)
 
 #define ISA_START		0x0c000000	/* ISA */
 #define ISA_SIZE		0x00010000
@@ -49,11 +55,11 @@
 
 #define FLUSH_BASE		0xdf000000
 
-#define VIDC_BASE		0xe0400000
-#define IOMD_BASE		0xe0200000
-#define IOC_BASE		0xe0200000
-#define FLOPPYDMA_BASE		0xe002a000
-#define PCIO_BASE		0xe0010000
+#define VIDC_BASE		(void __iomem *)0xe0400000
+#define IOMD_BASE		IOMEM(0xe0200000)
+#define IOC_BASE		IOMEM(0xe0200000)
+#define FLOPPYDMA_BASE		IOMEM(0xe002a000)
+#define PCIO_BASE		IOMEM(0xe0010000)
 
 #define FLUSH_BASE_PHYS		0x00000000	/* ROM */
 
@@ -63,4 +69,3 @@
 #define ISASLOT_IO		0x80400000
 
 #endif
-

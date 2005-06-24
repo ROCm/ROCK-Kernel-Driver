@@ -162,8 +162,8 @@ static int qnx4_remount(struct super_block *sb, int *flags, char *data)
 	return 0;
 }
 
-struct buffer_head *qnx4_getblk(struct inode *inode, int nr,
-				 int create)
+static struct buffer_head *qnx4_getblk(struct inode *inode, int nr,
+				       int create)
 {
 	struct buffer_head *result = NULL;
 
@@ -212,7 +212,7 @@ struct buffer_head *qnx4_bread(struct inode *inode, int block, int create)
 	return NULL;
 }
 
-int qnx4_get_block( struct inode *inode, sector_t iblock, struct buffer_head *bh, int create )
+static int qnx4_get_block( struct inode *inode, sector_t iblock, struct buffer_head *bh, int create )
 {
 	unsigned long phys;
 
@@ -447,7 +447,7 @@ static sector_t qnx4_bmap(struct address_space *mapping, sector_t block)
 {
 	return generic_block_bmap(mapping,block,qnx4_get_block);
 }
-struct address_space_operations qnx4_aops = {
+static struct address_space_operations qnx4_aops = {
 	.readpage	= qnx4_readpage,
 	.writepage	= qnx4_writepage,
 	.sync_page	= block_sync_page,

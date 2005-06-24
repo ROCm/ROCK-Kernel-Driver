@@ -72,7 +72,7 @@ EXPORT_SYMBOL(hil_mlc_unregister);
 #define PREFIX "HIL MLC: "
 
 static LIST_HEAD(hil_mlcs);
-static rwlock_t			hil_mlcs_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(hil_mlcs_lock);
 static struct timer_list	hil_mlcs_kicker;
 static int			hil_mlcs_probe;
 
@@ -848,7 +848,7 @@ int hil_mlc_register(hil_mlc *mlc) {
 	mlc->istarted = 0;
         mlc->ostarted = 0;
 
-        mlc->lock = RW_LOCK_UNLOCKED;
+        rwlock_init(&mlc->lock);
         init_MUTEX(&(mlc->osem));
 
         init_MUTEX(&(mlc->isem));

@@ -39,12 +39,14 @@ enum {LAST_NORM, LAST_ROOT, LAST_DOT, LAST_DOTDOT, LAST_BIND};
  *  - ending slashes ok even for nonexistent files
  *  - internal "there are more path compnents" flag
  *  - locked when lookup done with dcache_lock held
+ *  - dentry cache is untrusted; force a real lookup
  */
 #define LOOKUP_FOLLOW		 1
 #define LOOKUP_DIRECTORY	 2
 #define LOOKUP_CONTINUE		 4
 #define LOOKUP_PARENT		16
 #define LOOKUP_NOALT		32
+#define LOOKUP_REVAL		64
 /*
  * Intent data
  */
@@ -64,11 +66,7 @@ extern void path_release(struct nameidata *);
 extern void path_release_on_umount(struct nameidata *);
 
 extern struct dentry * lookup_one_len(const char *, struct dentry *, int);
-extern struct dentry * __lookup_hash(struct qstr *, struct dentry *, struct nameidata *);
-static inline struct dentry * lookup_hash(struct qstr *name, struct dentry *base)
-{
-	return __lookup_hash(name, base, NULL);
-}
+extern struct dentry * lookup_hash(struct qstr *, struct dentry *);
 
 extern int follow_down(struct vfsmount **, struct dentry **);
 extern int follow_up(struct vfsmount **, struct dentry **);

@@ -74,7 +74,6 @@ unsigned int number_mfm_drives;
 
 struct processor processor;
 
-unsigned char aux_device_present;
 char elf_platform[ELF_PLATFORM_SIZE];
 
 unsigned long phys_initrd_start __initdata = 0;

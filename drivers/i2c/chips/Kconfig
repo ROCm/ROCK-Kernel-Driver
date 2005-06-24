@@ -63,7 +63,7 @@ config SENSORS_ASB100
 	  will be called asb100.
 
 config SENSORS_DS1621
-      	tristate "Dallas Semiconductor DS1621 and DS1625"
+	tristate "Dallas Semiconductor DS1621 and DS1625"
 	depends on I2C && EXPERIMENTAL
 	select I2C_SENSOR
 	help
@@ -233,8 +233,22 @@ config SENSORS_LM90
 	  LM86, LM89 and LM99, Analog Devices ADM1032 and Maxim MAX6657 and
 	  MAX6658 sensor chips.
 
+	  The Analog Devices ADT7461 sensor chip is also supported, but only
+	  if found in ADM1032 compatibility mode.
+
 	  This driver can also be built as a module.  If so, the module
 	  will be called lm90.
+
+config SENSORS_LM92
+	tristate "National Semiconductor LM92 and compatibles"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for National Semiconductor LM92
+	  and Maxim MAX6635 sensor chips.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called lm92.
 
 config SENSORS_MAX1619
 	tristate "Maxim MAX1619 sensor chip"
@@ -350,6 +364,7 @@ config SENSORS_W83627HF
 	tristate "Winbond W83627HF, W83627THF, W83637HF, W83697HF"
 	depends on I2C && EXPERIMENTAL
 	select I2C_SENSOR
+	select I2C_ISA
 	help
 	  If you say yes here you get support for the Winbond W836X7 series
 	  of sensor chips: the W83627HF, W83627THF, W83637HF, and the W83697HF
@@ -361,6 +376,17 @@ endmenu
 
 menu "Other I2C Chip support"
 	depends on I2C
+
+config SENSORS_DS1337
+	tristate "Dallas Semiconductor DS1337 Real Time Clock"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for Dallas Semiconductor
+	  DS1337 real-time clock chips. 
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called ds1337.
 
 config SENSORS_EEPROM
 	tristate "EEPROM reader"

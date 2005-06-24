@@ -43,20 +43,21 @@ static inline unsigned short
 ip_fast_csum(unsigned char *iph, unsigned int ihl)
 {
 	unsigned int sum = 0;
+	unsigned long tmp;
 
 	__asm__ ("subqw #1,%2\n"
 		 "1:\t"
-		 "movel %1@+,%/d0\n\t"
-		 "addxl %/d0,%0\n\t"
+		 "movel %1@+,%3\n\t"
+		 "addxl %3,%0\n\t"
 		 "dbra  %2,1b\n\t"
-		 "movel %0,%/d0\n\t"
-		 "swap  %/d0\n\t"
-		 "addxw %/d0,%0\n\t"
-		 "clrw  %/d0\n\t"
-		 "addxw %/d0,%0\n\t"
-		 : "=d" (sum), "=a" (iph), "=d" (ihl)
+		 "movel %0,%3\n\t"
+		 "swap  %3\n\t"
+		 "addxw %3,%0\n\t"
+		 "clrw  %3\n\t"
+		 "addxw %3,%0\n\t"
+		 : "=d" (sum), "=&a" (iph), "=&d" (ihl), "=&d" (tmp)
 		 : "0" (sum), "1" (iph), "2" (ihl)
-		 : "d0");
+		 : "memory");
 	return ~sum;
 }
 
@@ -72,8 +73,24 @@ static inline unsigned int csum_fold(unsigned int sum)
 		"clrw %1\n\t"
 		"addxw %1, %0"
 		: "=&d" (sum), "=&d" (tmp)
-		: "0" (sum), "1" (sum));
+		: "0" (sum), "1" (tmp));
 	return ~sum;
+}
+
+
+static inline unsigned int
+csum_tcpudp_nofold(unsigned long saddr, unsigned long daddr, unsigned short len,
+		  unsigned short proto, unsigned int sum)
+{
+	__asm__ ("addl  %2,%0\n\t"
+		 "addxl %3,%0\n\t"
+		 "addxl %4,%0\n\t"
+		 "clrl %1\n\t"
+		 "addxl %1,%0"
+		 : "=&d" (sum), "=d" (saddr)
+		 : "g" (daddr), "1" (saddr), "d" (len + proto),
+		   "0" (sum));
+	return sum;
 }
 
 
@@ -81,22 +98,6 @@ static inline unsigned int csum_fold(unsigned int sum)
  * computes the checksum of the TCP/UDP pseudo-header
  * returns a 16-bit checksum, already complemented
  */
-
-static inline unsigned int
-csum_tcpudp_nofold(unsigned long saddr, unsigned long daddr, unsigned short len,
-		  unsigned short proto, unsigned int sum)
-{
-	__asm__ ("addl  %1,%0\n\t"
-		 "addxl %4,%0\n\t"
-		 "addxl %5,%0\n\t"
-		 "clrl %1\n\t"
-		 "addxl %1,%0"
-		 : "=&d" (sum), "=&d" (saddr)
-		 : "0" (daddr), "1" (saddr), "d" (len + proto),
-		   "d"(sum));
-	return sum;
-}
-
 static inline unsigned short int
 csum_tcpudp_magic(unsigned long saddr, unsigned long daddr, unsigned short len,
 		  unsigned short proto, unsigned int sum)

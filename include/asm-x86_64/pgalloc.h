@@ -1,7 +1,6 @@
 #ifndef _X86_64_PGALLOC_H
 #define _X86_64_PGALLOC_H
 
-#include <asm/processor.h>
 #include <asm/fixmap.h>
 #include <asm/pda.h>
 #include <linux/threads.h>
@@ -99,7 +98,8 @@ extern inline void pte_free(struct page *pte)
 } 
 
 #define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
-#define __pmd_free_tlb(tlb,x)   pmd_free(x)
-#define __pud_free_tlb(tlb,x)   pud_free(x)
+
+#define __pmd_free_tlb(tlb,x)   tlb_remove_page((tlb),virt_to_page(x))
+#define __pud_free_tlb(tlb,x)   tlb_remove_page((tlb),virt_to_page(x))
 
 #endif /* _X86_64_PGALLOC_H */

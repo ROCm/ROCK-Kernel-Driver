@@ -54,7 +54,7 @@ int x25_output(struct sock *sk, struct sk_buff *skb)
 	unsigned char header[X25_EXT_MIN_LEN];
 	int err, frontlen, len;
 	int sent=0, noblock = X25_SKB_CB(skb)->flags & MSG_DONTWAIT;
-	struct x25_opt *x25 = x25_sk(sk);
+	struct x25_sock *x25 = x25_sk(sk);
 	int header_len = x25->neighbour->extended ? X25_EXT_MIN_LEN :
 						    X25_STD_MIN_LEN;
 	int max_len = x25_pacsize_to_bytes(x25->facilities.pacsize_out);
@@ -116,7 +116,7 @@ int x25_output(struct sock *sk, struct sk_buff *skb)
  */
 static void x25_send_iframe(struct sock *sk, struct sk_buff *skb)
 {
-	struct x25_opt *x25 = x25_sk(sk);
+	struct x25_sock *x25 = x25_sk(sk);
 
 	if (!skb)
 		return;
@@ -139,7 +139,7 @@ void x25_kick(struct sock *sk)
 	struct sk_buff *skb, *skbn;
 	unsigned short start, end;
 	int modulus;
-	struct x25_opt *x25 = x25_sk(sk);
+	struct x25_sock *x25 = x25_sk(sk);
 
 	if (x25->state != X25_STATE_3)
 		return;
@@ -212,7 +212,7 @@ void x25_kick(struct sock *sk)
 
 void x25_enquiry_response(struct sock *sk)
 {
-	struct x25_opt *x25 = x25_sk(sk);
+	struct x25_sock *x25 = x25_sk(sk);
 
 	if (x25->condition & X25_COND_OWN_RX_BUSY)
 		x25_write_internal(sk, X25_RNR);

@@ -27,7 +27,7 @@
 #include <linux/spinlock.h>
 
 static int cs4281_resume_null(struct pci_dev *pcidev) { return 0; }
-static int cs4281_suspend_null(struct pci_dev *pcidev, u32 state) { return 0; }
+static int cs4281_suspend_null(struct pci_dev *pcidev, pm_message_t state) { return 0; }
 
 #define free_dmabuf(state, dmabuf) \
 	pci_free_consistent(state->pcidev, \

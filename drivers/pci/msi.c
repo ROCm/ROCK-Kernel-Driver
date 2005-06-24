@@ -20,6 +20,7 @@
 #include <asm/io.h>
 #include <asm/smp.h>
 
+#include "pci.h"
 #include "msi.h"
 
 static DEFINE_SPINLOCK(msi_lock);
@@ -66,7 +67,7 @@ static void msi_set_mask_bit(unsigned int vector, int flag)
 		int		pos;
 		u32		mask_bits;
 
-		pos = (int)entry->mask_base;
+		pos = (long)entry->mask_base;
 		pci_read_config_dword(entry->dev, pos, &mask_bits);
 		mask_bits &= ~(1);
 		mask_bits |= flag;
@@ -372,6 +373,13 @@ static int msi_init(void)
 	if (!status)
 		return status;
 
+	if (pci_msi_quirk) {
+		pci_msi_enable = 0;
+		printk(KERN_WARNING "PCI: MSI quirk detected. MSI disabled.\n");
+		status = -EINVAL;
+		return status;
+	}
+
 	if ((status = msi_cache_init()) < 0) {
 		pci_msi_enable = 0;
 		printk(KERN_WARNING "PCI: MSI cache init failed\n");
@@ -514,7 +522,7 @@ void pci_scan_msi_device(struct pci_dev *dev)
  * msi_capability_init - configure device's MSI capability structure
  * @dev: pointer to the pci_dev data structure of MSI device function
  *
- * Setup the MSI capability structure of device funtion with a single
+ * Setup the MSI capability structure of device function with a single
  * MSI vector, regardless of device function is capable of handling
  * multiple messages. A return of zero indicates the successful setup
  * of an entry zero with the new MSI vector or non-zero for otherwise.
@@ -547,7 +555,7 @@ static int msi_capability_init(struct pci_dev *dev)
 	dev->irq = vector;
 	entry->dev = dev;
 	if (is_mask_bit_support(control)) {
-		entry->mask_base = (void __iomem *)msi_mask_bits_reg(pos,
+		entry->mask_base = (void __iomem *)(long)msi_mask_bits_reg(pos,
 				is_64bit_address(control));
 	}
 	/* Replace with MSI handler */
@@ -591,7 +599,7 @@ static int msi_capability_init(struct pci_dev *dev)
  * msix_capability_init - configure device's MSI-X capability
  * @dev: pointer to the pci_dev data structure of MSI-X device function
  *
- * Setup the MSI-X capability structure of device funtion with a
+ * Setup the MSI-X capability structure of device function with a
  * single MSI-X vector. A return of zero indicates the successful setup of
  * requested MSI-X entries with allocated vectors or non-zero for otherwise.
  **/
@@ -616,15 +624,10 @@ static int msix_capability_init(struct pci_dev *dev,
 	bir = (u8)(table_offset & PCI_MSIX_FLAGS_BIRMASK);
 	phys_addr = pci_resource_start (dev, bir);
 	phys_addr += (u32)(table_offset & ~PCI_MSIX_FLAGS_BIRMASK);
-	if (!request_mem_region(phys_addr,
-		nr_entries * PCI_MSIX_ENTRY_SIZE,
-		"MSI-X vector table"))
-		return -ENOMEM;
 	base = ioremap_nocache(phys_addr, nr_entries * PCI_MSIX_ENTRY_SIZE);
-	if (base == NULL) {
-		release_mem_region(phys_addr, nr_entries * PCI_MSIX_ENTRY_SIZE);
+	if (base == NULL)
 		return -ENOMEM;
-	}
+
 	/* MSI-X Table Initialization */
 	for (i = 0; i < nvec; i++) {
 		entry = alloc_msi_entry();
@@ -700,11 +703,13 @@ static int msix_capability_init(struct pci_dev *dev,
  **/
 int pci_enable_msi(struct pci_dev* dev)
 {
-	int pos, temp = dev->irq, status = -EINVAL;
+	int pos, temp, status = -EINVAL;
 	u16 control;
 
 	if (!pci_msi_enable || !dev)
  		return status;
+
+	temp = dev->irq;
 
 	if ((status = msi_init()) < 0)
 		return status;
@@ -859,8 +864,6 @@ static int msi_free_vector(struct pci_dev* dev, int vector, int reassign)
 			phys_addr += (u32)(table_offset &
 				~PCI_MSIX_FLAGS_BIRMASK);
 			iounmap(base);
-			release_mem_region(phys_addr,
-				nr_entries * PCI_MSIX_ENTRY_SIZE);
 		}
 	}
 
@@ -1071,7 +1074,7 @@ void pci_disable_msix(struct pci_dev* dev)
  * msi_remove_pci_irq_vectors - reclaim MSI(X) vectors to unused state
  * @dev: pointer to the pci_dev data structure of MSI(X) device function
  *
- * Being called during hotplug remove, from which the device funciton
+ * Being called during hotplug remove, from which the device function
  * is hot-removed. All previous assigned MSI/MSI-X vectors, if
  * allocated for this device function, are reclaimed to unused state,
  * which may be used later on.
@@ -1133,8 +1136,6 @@ void msi_remove_pci_irq_vectors(struct pci_dev* dev)
 			phys_addr += (u32)(table_offset &
 				~PCI_MSIX_FLAGS_BIRMASK);
 			iounmap(base);
-			release_mem_region(phys_addr, PCI_MSIX_ENTRY_SIZE *
-				multi_msix_capable(control));
 			printk(KERN_WARNING "PCI: %s: msi_remove_pci_irq_vectors() "
 			       "called without free_irq() on all MSI-X vectors\n",
 			       pci_name(dev));

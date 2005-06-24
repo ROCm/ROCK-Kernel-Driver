@@ -49,11 +49,15 @@
 
 
 /* mode bit translations: */
-#define NFS4_READ_MODE (NFS4_ACE_READ_DATA | NFS4_ACE_READ_NAMED_ATTRS)
-#define NFS4_WRITE_MODE (NFS4_ACE_WRITE_DATA | NFS4_ACE_WRITE_NAMED_ATTRS | NFS4_ACE_APPEND_DATA)
+#define NFS4_READ_MODE (NFS4_ACE_READ_DATA)
+#define NFS4_WRITE_MODE (NFS4_ACE_WRITE_DATA | NFS4_ACE_APPEND_DATA)
 #define NFS4_EXECUTE_MODE NFS4_ACE_EXECUTE
 #define NFS4_ANYONE_MODE (NFS4_ACE_READ_ATTRIBUTES | NFS4_ACE_READ_ACL | NFS4_ACE_SYNCHRONIZE)
 #define NFS4_OWNER_MODE (NFS4_ACE_WRITE_ATTRIBUTES | NFS4_ACE_WRITE_ACL)
+
+/* We don't support these bits; insist they be neither allowed nor denied */
+#define NFS4_MASK_UNSUPP (NFS4_ACE_DELETE | NFS4_ACE_WRITE_OWNER \
+		| NFS4_ACE_READ_NAMED_ATTRS | NFS4_ACE_WRITE_NAMED_ATTRS)
 
 /* flags used to simulate posix default ACLs */
 #define NFS4_INHERITANCE_FLAGS (NFS4_ACE_FILE_INHERIT_ACE \
@@ -83,11 +87,14 @@ mask_from_posix(unsigned short perm, unsigned int flags)
 static u32
 deny_mask(u32 allow_mask, unsigned int flags)
 {
-	u32 ret = ~allow_mask & ~NFS4_ACE_DELETE;
+	u32 ret = ~allow_mask & ~NFS4_MASK_UNSUPP;
 	if (!(flags & NFS4_ACL_DIR))
 		ret &= ~NFS4_ACE_DELETE_CHILD;
 	return ret;
 }
+
+/* XXX: modify functions to return NFS errors; they're only ever
+ * used by nfs code, after all.... */
 
 static int
 mode_from_nfs4(u32 perm, unsigned short *mode, unsigned int flags)
@@ -940,35 +947,8 @@ match_who(struct nfs4_ace *ace, uid_t owner, gid_t group, uid_t who)
 	}
 }
 
-/* 0 = granted, -EACCES = denied; mask is an nfsv4 mask, not mode bits */
-int
-nfs4_acl_permission(struct nfs4_acl *acl, uid_t owner, gid_t group,
-			uid_t who, u32 mask)
-{
-	struct nfs4_ace *ace;
-	u32 allowed = 0;
-
-	list_for_each_entry(ace, &acl->ace_head, l_ace) {
-		if (!match_who(ace, group, owner, who))
-			continue;
-		switch (ace->type) {
-			case NFS4_ACE_ACCESS_ALLOWED_ACE_TYPE:
-				allowed |= ace->access_mask;
-				if ((allowed & mask) == mask)
-					return 0;
-				break;
-			case NFS4_ACE_ACCESS_DENIED_ACE_TYPE:
-				if (ace->access_mask & mask)
-					return -EACCES;
-				break;
-		}
-	}
-	return -EACCES;
-}
-
 EXPORT_SYMBOL(nfs4_acl_new);
 EXPORT_SYMBOL(nfs4_acl_free);
 EXPORT_SYMBOL(nfs4_acl_add_ace);
 EXPORT_SYMBOL(nfs4_acl_get_whotype);
 EXPORT_SYMBOL(nfs4_acl_write_who);
-EXPORT_SYMBOL(nfs4_acl_permission);

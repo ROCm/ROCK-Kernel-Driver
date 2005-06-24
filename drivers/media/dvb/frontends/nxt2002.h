@@ -18,6 +18,6 @@ struct nxt2002_config
 };
 
 extern struct dvb_frontend* nxt2002_attach(const struct nxt2002_config* config,
-					  struct i2c_adapter* i2c);
+					   struct i2c_adapter* i2c);
 
 #endif // NXT2002_H

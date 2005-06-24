@@ -31,9 +31,6 @@
 
 #include "ptrace.h"
 
-extern void c_backtrace (unsigned long fp, int pmode);
-extern void show_pte(struct mm_struct *mm, unsigned long addr);
-
 const char *processor_modes[]=
 { "USER_26", "FIQ_26" , "IRQ_26" , "SVC_26" , "UK4_26" , "UK5_26" , "UK6_26" , "UK7_26" ,
   "UK8_26" , "UK9_26" , "UK10_26", "UK11_26", "UK12_26", "UK13_26", "UK14_26", "UK15_26",
@@ -216,13 +213,13 @@ NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
 
 	printk("Internal error: %s: %x [#%d]\n", str, err, ++die_counter);
 	print_modules();
-	printk("CPU: %d\n", smp_processor_id());
-	show_regs(regs);
+	__show_regs(regs);
 	printk("Process %s (pid: %d, stack limit = 0x%p)\n",
 		tsk->comm, tsk->pid, tsk->thread_info + 1);
 
 	if (!user_mode(regs) || in_interrupt()) {
-		dump_mem("Stack: ", regs->ARM_sp, 8192+(unsigned long)tsk->thread_info);
+		dump_mem("Stack: ", regs->ARM_sp,
+			 THREAD_SIZE + (unsigned long)tsk->thread_info);
 		dump_backtrace(regs, tsk);
 		dump_instr(regs);
 	}
@@ -238,6 +235,19 @@ void die_if_kernel(const char *str, struct pt_regs *regs, int err)
     		return;
 
     	die(str, regs, err);
+}
+
+static void notify_die(const char *str, struct pt_regs *regs, siginfo_t *info,
+		       unsigned long err, unsigned long trap)
+{
+	if (user_mode(regs)) {
+		current->thread.error_code = err;
+		current->thread.trap_no = trap;
+
+		force_sig_info(info->si_signo, info, current);
+	} else {
+		die(str, regs, err);
+	}
 }
 
 static LIST_HEAD(undef_hook);
@@ -299,17 +309,12 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
 	}
 #endif
 
-	current->thread.error_code = 0;
-	current->thread.trap_no = 6;
-
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code  = ILL_ILLOPC;
 	info.si_addr  = pc;
 
-	force_sig_info(SIGILL, &info, current);
-
-	die_if_kernel("Oops - undefined instruction", regs, 0);
+	notify_die("Oops - undefined instruction", regs, &info, 0, 6);
 }
 
 asmlinkage void do_unexp_fiq (struct pt_regs *regs)
@@ -362,8 +367,8 @@ static int bad_syscall(int n, struct pt_regs *regs)
 	info.si_addr  = (void __user *)instruction_pointer(regs) -
 			 (thumb_mode(regs) ? 2 : 4);
 
-	force_sig_info(SIGILL, &info, current);
-	die_if_kernel("Oops - bad syscall", regs, n);
+	notify_die("Oops - bad syscall", regs, &info, n, 0);
+
 	return regs->ARM_r0;
 }
 
@@ -406,9 +411,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		info.si_code  = SEGV_MAPERR;
 		info.si_addr  = NULL;
 
-		force_sig_info(SIGSEGV, &info, current);
-
-		die_if_kernel("branch through zero", regs, 0);
+		notify_die("branch through zero", regs, &info, 0, 0);
 		return 0;
 
 	case NR(breakpoint): /* SWI BREAK_POINT */
@@ -448,14 +451,67 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 
 	case NR(set_tls):
 		thread->tp_value = regs->ARM_r0;
+#if defined(CONFIG_HAS_TLS_REG)
+		asm ("mcr p15, 0, %0, c13, c0, 3" : : "r" (regs->ARM_r0) );
+#elif !defined(CONFIG_TLS_REG_EMUL)
 		/*
-		 * Our user accessible TLS ptr is located at 0xffff0ffc.
-		 * On SMP read access to this address must raise a fault
-		 * and be emulated from the data abort handler.
-		 * m
+		 * User space must never try to access this directly.
+		 * Expect your app to break eventually if you do so.
+		 * The user helper at 0xffff0fe0 must be used instead.
+		 * (see entry-armv.S for details)
 		 */
-		*((unsigned long *)0xffff0ffc) = thread->tp_value;
+		*((unsigned int *)0xffff0ff0) = regs->ARM_r0;
+#endif
 		return 0;
+
+#ifdef CONFIG_NEEDS_SYSCALL_FOR_CMPXCHG
+	/*
+	 * Atomically store r1 in *r2 if *r2 is equal to r0 for user space.
+	 * Return zero in r0 if *MEM was changed or non-zero if no exchange
+	 * happened.  Also set the user C flag accordingly.
+	 * If access permissions have to be fixed up then non-zero is
+	 * returned and the operation has to be re-attempted.
+	 *
+	 * *NOTE*: This is a ghost syscall private to the kernel.  Only the
+	 * __kuser_cmpxchg code in entry-armv.S should be aware of its
+	 * existence.  Don't ever use this from user code.
+	 */
+	case 0xfff0:
+	{
+		extern void do_DataAbort(unsigned long addr, unsigned int fsr,
+					 struct pt_regs *regs);
+		unsigned long val;
+		unsigned long addr = regs->ARM_r2;
+		struct mm_struct *mm = current->mm;
+		pgd_t *pgd; pmd_t *pmd; pte_t *pte;
+
+		regs->ARM_cpsr &= ~PSR_C_BIT;
+		spin_lock(&mm->page_table_lock);
+		pgd = pgd_offset(mm, addr);
+		if (!pgd_present(*pgd))
+			goto bad_access;
+		pmd = pmd_offset(pgd, addr);
+		if (!pmd_present(*pmd))
+			goto bad_access;
+		pte = pte_offset_map(pmd, addr);
+		if (!pte_present(*pte) || !pte_write(*pte))
+			goto bad_access;
+		val = *(unsigned long *)addr;
+		val -= regs->ARM_r0;
+		if (val == 0) {
+			*(unsigned long *)addr = regs->ARM_r1;
+			regs->ARM_cpsr |= PSR_C_BIT;
+		}
+		spin_unlock(&mm->page_table_lock);
+		return val;
+
+		bad_access:
+		spin_unlock(&mm->page_table_lock);
+		/* simulate a read access fault */
+		do_DataAbort(addr, 15 + (1 << 11), regs);
+		return -1;
+	}
+#endif
 
 	default:
 		/* Calls 9f00xx..9f07ff are defined to return -ENOSYS
@@ -476,7 +532,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		       current->pid, current->comm, no);
 		dump_instr(regs);
 		if (user_mode(regs)) {
-			show_regs(regs);
+			__show_regs(regs);
 			c_backtrace(regs->ARM_fp, processor_mode(regs));
 		}
 	}
@@ -487,10 +543,47 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 	info.si_addr  = (void __user *)instruction_pointer(regs) -
 			 (thumb_mode(regs) ? 2 : 4);
 
-	force_sig_info(SIGILL, &info, current);
-	die_if_kernel("Oops - bad syscall(2)", regs, no);
+	notify_die("Oops - bad syscall(2)", regs, &info, no, 0);
 	return 0;
 }
+
+#ifdef CONFIG_TLS_REG_EMUL
+
+/*
+ * We might be running on an ARMv6+ processor which should have the TLS
+ * register but for some reason we can't use it, or maybe an SMP system
+ * using a pre-ARMv6 processor (there are apparently a few prototypes like
+ * that in existence) and therefore access to that register must be
+ * emulated.
+ */
+
+static int get_tp_trap(struct pt_regs *regs, unsigned int instr)
+{
+	int reg = (instr >> 12) & 15;
+	if (reg == 15)
+		return 1;
+	regs->uregs[reg] = current_thread_info()->tp_value;
+	regs->ARM_pc += 4;
+	return 0;
+}
+
+static struct undef_hook arm_mrc_hook = {
+	.instr_mask	= 0x0fff0fff,
+	.instr_val	= 0x0e1d0f70,
+	.cpsr_mask	= PSR_T_BIT,
+	.cpsr_val	= 0,
+	.fn		= get_tp_trap,
+};
+
+static int __init arm_mrc_hook_init(void)
+{
+	register_undef_hook(&arm_mrc_hook);
+	return 0;
+}
+
+late_initcall(arm_mrc_hook_init);
+
+#endif
 
 void __bad_xchg(volatile void *ptr, int size)
 {
@@ -524,8 +617,7 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
 	info.si_code  = ILL_ILLOPC;
 	info.si_addr  = (void __user *)addr;
 
-	force_sig_info(SIGILL, &info, current);
-	die_if_kernel("unknown data abort code", regs, instr);
+	notify_die("unknown data abort code", regs, &info, instr, 0);
 }
 
 volatile void __bug(const char *file, int line, void *data)
@@ -578,9 +670,19 @@ EXPORT_SYMBOL(abort);
 
 void __init trap_init(void)
 {
-	extern void __trap_init(void);
+	extern char __stubs_start[], __stubs_end[];
+	extern char __vectors_start[], __vectors_end[];
+	extern char __kuser_helper_start[], __kuser_helper_end[];
+	int kuser_sz = __kuser_helper_end - __kuser_helper_start;
 
-	__trap_init();
+	/*
+	 * Copy the vectors, stubs and kuser helpers (in entry-armv.S)
+	 * into the vector page, mapped at 0xffff0000, and ensure these
+	 * are visible to the instruction stream.
+	 */
+	memcpy((void *)0xffff0000, __vectors_start, __vectors_end - __vectors_start);
+	memcpy((void *)0xffff0200, __stubs_start, __stubs_end - __stubs_start);
+	memcpy((void *)0xffff1000 - kuser_sz, __kuser_helper_start, kuser_sz);
 	flush_icache_range(0xffff0000, 0xffff0000 + PAGE_SIZE);
 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
 }

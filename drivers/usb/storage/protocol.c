@@ -55,39 +55,6 @@
 #include "transport.h"
 
 /***********************************************************************
- * Helper routines
- ***********************************************************************/
-
-/*
- * Fix-up the return data from a READ CAPACITY command. My Feiya reader
- * returns a value that is 1 too large.
- */
-static void fix_read_capacity(struct scsi_cmnd *srb)
-{
-	unsigned int index, offset;
-	__be32 c;
-	unsigned long capacity;
-
-	/* verify that it's a READ CAPACITY command */
-	if (srb->cmnd[0] != READ_CAPACITY)
-		return;
-
-	index = offset = 0;
-	if (usb_stor_access_xfer_buf((unsigned char *) &c, 4, srb,
-			&index, &offset, FROM_XFER_BUF) != 4)
-		return;
-
-	capacity = be32_to_cpu(c);
-	US_DEBUGP("US: Fixing capacity: from %ld to %ld\n",
-	       capacity+1, capacity);
-	c = cpu_to_be32(capacity - 1);
-
-	index = offset = 0;
-	usb_stor_access_xfer_buf((unsigned char *) &c, 4, srb,
-			&index, &offset, TO_XFER_BUF);
-}
-
-/***********************************************************************
  * Protocol routines
  ***********************************************************************/
 
@@ -175,12 +142,6 @@ void usb_stor_transparent_scsi_command(struct scsi_cmnd *srb,
 {
 	/* send the command to the transport layer */
 	usb_stor_invoke_transport(srb, us);
-
-	if (srb->result == SAM_STAT_GOOD) {
-		/* Fix the READ CAPACITY result if necessary */
-		if (us->flags & US_FL_FIX_CAPACITY)
-			fix_read_capacity(srb);
-	}
 }
 
 /***********************************************************************

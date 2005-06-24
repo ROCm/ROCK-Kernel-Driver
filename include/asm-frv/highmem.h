@@ -44,8 +44,6 @@ extern unsigned long highstart_pfn, highend_pfn;
 #define kmap_pte ______kmap_pte_in_TLB
 extern pte_t *pkmap_page_table;
 
-extern void kmap_init(void);
-
 #define flush_cache_kmaps()  do { } while (0)
 
 /*

@@ -1061,7 +1061,8 @@ tcp_state_change(struct sock *sk)
 	dprintk("RPC:      tcp_state_change client %p...\n", xprt);
 	dprintk("RPC:      state %x conn %d dead %d zapped %d\n",
 				sk->sk_state, xprt_connected(xprt),
-				sock_flag(sk, SOCK_DEAD), sk->sk_zapped);
+				sock_flag(sk, SOCK_DEAD),
+				sock_flag(sk, SOCK_ZAPPED));
 
 	switch (sk->sk_state) {
 	case TCP_ESTABLISHED:
@@ -1477,8 +1478,11 @@ xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 	if (xprt->stream) {
 		xprt->cwnd = RPC_MAXCWND(xprt);
 		xprt->nocong = 1;
-	} else
+		xprt->max_payload = (1U << 31) - 1;
+	} else {
 		xprt->cwnd = RPC_INITCWND;
+		xprt->max_payload = (1U << 16) - (MAX_HEADER << 3);
+	}
 	spin_lock_init(&xprt->sock_lock);
 	spin_lock_init(&xprt->xprt_lock);
 	init_waitqueue_head(&xprt->cong_wait);

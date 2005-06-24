@@ -33,8 +33,7 @@
 enum parport_pc_pci_cards {
 	titan_110l = 0,
 	titan_210l,
-	netmos_9735,
-	netmos_9835,
+	netmos_9xx5_combo,
 	avlab_1s1p,
 	avlab_1s1p_650,
 	avlab_1s1p_850,
@@ -51,9 +50,8 @@ enum parport_pc_pci_cards {
 	siig_2s1p_20x,
 };
 
-
 /* each element directly indexed from enum list, above */
-static struct parport_pc_pci {
+struct parport_pc_pci {
 	int numports;
 	struct { /* BAR (base address registers) numbers in the config
                     space header */
@@ -65,16 +63,30 @@ static struct parport_pc_pci {
 	/* If set, this is called immediately after pci_enable_device.
 	 * If it returns non-zero, no probing will take place and the
 	 * ports will not be used. */
-	int (*preinit_hook) (struct pci_dev *pdev, int autoirq, int autodma);
+	int (*preinit_hook) (struct pci_dev *pdev, struct parport_pc_pci *card,
+				int autoirq, int autodma);
 
 	/* If set, this is called after probing for ports.  If 'failed'
 	 * is non-zero we couldn't use any of the ports. */
-	void (*postinit_hook) (struct pci_dev *pdev, int failed);
-} cards[] __devinitdata = {
+	void (*postinit_hook) (struct pci_dev *pdev,
+				struct parport_pc_pci *card, int failed);
+};
+
+static int __devinit netmos_parallel_init(struct pci_dev *dev, struct parport_pc_pci *card, int autoirq, int autodma)
+{
+	/*
+	 * Netmos uses the subdevice ID to indicate the number of parallel
+	 * and serial ports.  The form is 0x00PS, where <P> is the number of
+	 * parallel ports and <S> is the number of serial ports.
+	 */
+	card->numports = (dev->subsystem_device & 0xf0) >> 4;
+	return 0;
+}
+
+static struct parport_pc_pci cards[] __devinitdata = {
 	/* titan_110l */		{ 1, { { 3, -1 }, } },
 	/* titan_210l */		{ 1, { { 3, -1 }, } },
-	/* netmos_9735 (not tested) */	{ 1, { { 2, -1 }, } },
-	/* netmos_9835 */		{ 1, { { 2, -1 }, } },
+	/* netmos_9xx5_combo */		{ 1, { { 2, -1 }, }, netmos_parallel_init },
 	/* avlab_1s1p     */		{ 1, { { 1, 2}, } },
 	/* avlab_1s1p_650 */		{ 1, { { 1, 2}, } },
 	/* avlab_1s1p_850 */		{ 1, { { 1, 2}, } },
@@ -98,9 +110,17 @@ static struct pci_device_id parport_serial_pci_tbl[] = {
 	{ PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_210L,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, titan_210l },
 	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9735,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9735 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9xx5_combo },
+	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9745,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9xx5_combo },
 	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9835,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9835 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9xx5_combo },
+	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9835,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9xx5_combo },
+	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9845,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9xx5_combo },
+	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9855,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9xx5_combo },
 	/* PCI_VENDOR_ID_AVLAB/Intek21 has another bunch of cards ...*/
 	{ 0x14db, 0x2110, PCI_ANY_ID, PCI_ANY_ID, 0, 0, avlab_1s1p},
 	{ 0x14db, 0x2111, PCI_ANY_ID, PCI_ANY_ID, 0, 0, avlab_1s1p_650},
@@ -167,6 +187,12 @@ static int __devinit siig20x_init_fn(struct pci_dev *dev, struct pci_board_no_id
 	return pci_siig20x_fn(dev, enable);
 }
 
+static int __devinit netmos_serial_init(struct pci_dev *dev, struct pci_board_no_ids *board, int enable)
+{
+	board->num_ports = dev->subsystem_device & 0xf;
+	return 0;
+}
+
 static struct pci_board_no_ids pci_boards[] __devinitdata = {
 	/*
 	 * PCI Flags, Number of Ports, Base (Maximum) Baud Rate,
@@ -180,8 +206,7 @@ static struct pci_board_no_ids pci_boards[] __devinitdata = {
 
 /* titan_110l */	{ SPCI_FL_BASE1 | SPCI_FL_BASE_TABLE, 1, 921600 },
 /* titan_210l */	{ SPCI_FL_BASE1 | SPCI_FL_BASE_TABLE, 2, 921600 },
-/* netmos_9735 (n/t)*/	{ SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 115200 },
-/* netmos_9835 */	{ SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 2, 115200 },
+/* netmos_9xx5_combo */	{ SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 1, 115200, 0, 0, netmos_serial_init },
 /* avlab_1s1p (n/t) */	{ SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 1, 115200 },
 /* avlab_1s1p_650 (nt)*/{ SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 1, 115200 },
 /* avlab_1s1p_850 (nt)*/{ SPCI_FL_BASE0 | SPCI_FL_BASE_TABLE, 1, 115200 },
@@ -204,6 +229,7 @@ struct parport_serial_private {
 	struct pci_board_no_ids ser;
 	int num_par;
 	struct parport *port[PARPORT_MAX];
+	struct parport_pc_pci par;
 };
 
 static int __devinit get_pci_port (struct pci_dev *dev,
@@ -271,14 +297,15 @@ static int __devinit get_pci_port (struct pci_dev *dev,
 static int __devinit serial_register (struct pci_dev *dev,
 				      const struct pci_device_id *id)
 {
-	struct pci_board_no_ids *board = &pci_boards[id->driver_data];
+	struct pci_board_no_ids *board;
 	struct parport_serial_private *priv = pci_get_drvdata (dev);
 	struct serial_struct serial_req;
 	int base_baud;
 	int k;
 	int success = 0;
 
-	priv->ser = *board;
+	priv->ser = pci_boards[id->driver_data];
+	board = &priv->ser;
 	if (board->init_fn && ((board->init_fn) (dev, board, 1) != 0))
 		return 1;
 
@@ -289,6 +316,15 @@ static int __devinit serial_register (struct pci_dev *dev,
 
 	for (k = 0; k < board->num_ports; k++) {
 		int line;
+
+		if (priv->num_ser == ARRAY_SIZE (priv->line)) {
+			printk (KERN_WARNING
+				"parport_serial: %s: only %u serial lines "
+				"supported (%d reported)\n", pci_name (dev),
+				ARRAY_SIZE (priv->line), board->num_ports);
+			break;
+		}
+
 		serial_req.irq = dev->irq;
 		if (get_pci_port (dev, board, &serial_req, k))
 			break;
@@ -311,19 +347,31 @@ static int __devinit serial_register (struct pci_dev *dev,
 static int __devinit parport_register (struct pci_dev *dev,
 				       const struct pci_device_id *id)
 {
+	struct parport_pc_pci *card;
 	struct parport_serial_private *priv = pci_get_drvdata (dev);
 	int i = id->driver_data, n;
 	int success = 0;
 
-	if (cards[i].preinit_hook &&
-	    cards[i].preinit_hook (dev, PARPORT_IRQ_NONE, PARPORT_DMA_NONE))
+	priv->par = cards[id->driver_data];
+	card = &priv->par;
+	if (card->preinit_hook &&
+	    card->preinit_hook (dev, card, PARPORT_IRQ_NONE, PARPORT_DMA_NONE))
 		return -ENODEV;
 
-	for (n = 0; n < cards[i].numports; n++) {
+	for (n = 0; n < card->numports; n++) {
 		struct parport *port;
-		int lo = cards[i].addr[n].lo;
-		int hi = cards[i].addr[n].hi;
+		int lo = card->addr[n].lo;
+		int hi = card->addr[n].hi;
 		unsigned long io_lo, io_hi;
+
+		if (priv->num_par == ARRAY_SIZE (priv->port)) {
+			printk (KERN_WARNING
+				"parport_serial: %s: only %u parallel ports "
+				"supported (%d reported)\n", pci_name (dev),
+				ARRAY_SIZE (priv->port), card->numports);
+			break;
+		}
+
 		io_lo = pci_resource_start (dev, lo);
 		io_hi = 0;
 		if ((hi >= 0) && (hi <= 6))
@@ -345,8 +393,8 @@ static int __devinit parport_register (struct pci_dev *dev,
 		}
 	}
 
-	if (cards[i].postinit_hook)
-		cards[i].postinit_hook (dev, !success);
+	if (card->postinit_hook)
+		card->postinit_hook (dev, card, !success);
 
 	return success ? 0 : 1;
 }

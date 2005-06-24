@@ -849,10 +849,10 @@ static __inline__ void pplus_set_bat(void)
 	mb();
 
 	/* setup DBATs */
-	mtspr(DBAT2U, 0x80001ffe);
-	mtspr(DBAT2L, 0x8000002a);
-	mtspr(DBAT3U, 0xf0001ffe);
-	mtspr(DBAT3L, 0xf000002a);
+	mtspr(SPRN_DBAT2U, 0x80001ffe);
+	mtspr(SPRN_DBAT2L, 0x8000002a);
+	mtspr(SPRN_DBAT3U, 0xf0001ffe);
+	mtspr(SPRN_DBAT3L, 0xf000002a);
 
 	/* wait for updates */
 	mb();

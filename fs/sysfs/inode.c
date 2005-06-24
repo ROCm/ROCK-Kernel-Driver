@@ -23,7 +23,7 @@ static struct address_space_operations sysfs_aops = {
 
 static struct backing_dev_info sysfs_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
-	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+	.capabilities	= BDI_CAP_NO_ACCT_DIRTY | BDI_CAP_NO_WRITEBACK,
 };
 
 struct inode * sysfs_new_inode(mode_t mode)
@@ -129,13 +129,17 @@ void sysfs_drop_dentry(struct sysfs_dirent * sd, struct dentry * parent)
 
 	if (dentry) {
 		spin_lock(&dcache_lock);
+		spin_lock(&dentry->d_lock);
 		if (!(d_unhashed(dentry) && dentry->d_inode)) {
 			dget_locked(dentry);
 			__d_drop(dentry);
+			spin_unlock(&dentry->d_lock);
 			spin_unlock(&dcache_lock);
 			simple_unlink(parent->d_inode, dentry);
-		} else
+		} else {
+			spin_unlock(&dentry->d_lock);
 			spin_unlock(&dcache_lock);
+		}
 	}
 }
 

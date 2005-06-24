@@ -33,5 +33,3 @@ union dst_gpio_packet {
 struct bt878;
 
 int bt878_device_control(struct bt878 *bt, unsigned int cmd, union dst_gpio_packet *mp);
-
-struct bt878 *bt878_find_by_i2c_adap(struct i2c_adapter *adap);

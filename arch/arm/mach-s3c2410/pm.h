@@ -48,7 +48,7 @@ extern unsigned long s3c2410_sleep_save_phys;
 /* sleep save info */
 
 struct sleep_save {
-	unsigned long	reg;
+	void __iomem	*reg;
 	unsigned long	val;
 };
 

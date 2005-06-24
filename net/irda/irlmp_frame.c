@@ -63,9 +63,9 @@ void irlmp_send_lcf_pdu(struct lap_cb *self, __u8 dlsap, __u8 slsap,
 	
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == LMP_LAP_MAGIC, return;);
-	ASSERT(skb != NULL, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
+	IRDA_ASSERT(skb != NULL, return;);
 	
 	frame = skb->data;
 	
@@ -98,9 +98,9 @@ void irlmp_link_data_indication(struct lap_cb *self, struct sk_buff *skb,
 	
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == LMP_LAP_MAGIC, return;);
-	ASSERT(skb->len > 2, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
+	IRDA_ASSERT(skb->len > 2, return;);
 
 	fp = skb->data;
 
@@ -209,9 +209,9 @@ void irlmp_link_unitdata_indication(struct lap_cb *self, struct sk_buff *skb)
 	
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == LMP_LAP_MAGIC, return;);
-	ASSERT(skb->len > 2, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
+	IRDA_ASSERT(skb->len > 2, return;);
 
 	fp = skb->data;
 
@@ -273,8 +273,8 @@ void irlmp_link_disconnect_indication(struct lap_cb *lap,
 {
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
-	ASSERT(lap != NULL, return;);
-	ASSERT(lap->magic == LMP_LAP_MAGIC, return;);
+	IRDA_ASSERT(lap != NULL, return;);
+	IRDA_ASSERT(lap->magic == LMP_LAP_MAGIC, return;);
 
 	lap->reason = reason;
 	lap->daddr = DEV_ADDR_ANY;
@@ -304,7 +304,7 @@ void irlmp_link_connect_indication(struct lap_cb *self, __u32 saddr,
 
 	/* Update destination device address */
 	self->daddr = daddr;
-	ASSERT(self->saddr == saddr, return;);
+	IRDA_ASSERT(self->saddr == saddr, return;);
 
 	irlmp_do_lap_event(self, LM_LAP_CONNECT_INDICATION, skb);
 }
@@ -320,9 +320,9 @@ void irlmp_link_connect_confirm(struct lap_cb *self, struct qos_info *qos,
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == LMP_LAP_MAGIC, return;);
-	ASSERT(qos != NULL, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
+	IRDA_ASSERT(qos != NULL, return;);
 
 	/* Don't need use the skb for now */
 
@@ -363,8 +363,8 @@ void irlmp_link_connect_confirm(struct lap_cb *self, struct qos_info *qos,
 void irlmp_link_discovery_indication(struct lap_cb *self, 
 				     discovery_t *discovery)
 {
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == LMP_LAP_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
 
 	/* Add to main log, cleanup */
 	irlmp_add_discovery(irlmp->cachelog, discovery);
@@ -386,8 +386,8 @@ void irlmp_link_discovery_confirm(struct lap_cb *self, hashbin_t *log)
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == LMP_LAP_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
 	
 	/* Add to main log, cleanup */
 	irlmp_add_discovery_log(irlmp->cachelog, log);

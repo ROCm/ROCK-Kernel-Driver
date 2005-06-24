@@ -823,10 +823,10 @@ static int translate_table(struct ebt_replace *repl,
 		/* this will get free'd in do_replace()/ebt_register_table()
 		   if an error occurs */
 		newinfo->chainstack = (struct ebt_chainstack **)
-		   vmalloc(NR_CPUS * sizeof(struct ebt_chainstack));
+		   vmalloc(num_possible_cpus() * sizeof(struct ebt_chainstack));
 		if (!newinfo->chainstack)
 			return -ENOMEM;
-		for (i = 0; i < NR_CPUS; i++) {
+		for (i = 0; i < num_possible_cpus(); i++) {
 			newinfo->chainstack[i] =
 			   vmalloc(udc_cnt * sizeof(struct ebt_chainstack));
 			if (!newinfo->chainstack[i]) {
@@ -899,7 +899,7 @@ static void get_counters(struct ebt_counter *oldcounters,
 	memcpy(counters, oldcounters,
 	   sizeof(struct ebt_counter) * nentries);
 	/* add other counters to those of cpu 0 */
-	for (cpu = 1; cpu < NR_CPUS; cpu++) {
+	for (cpu = 1; cpu < num_possible_cpus(); cpu++) {
 		counter_base = COUNTER_BASE(oldcounters, nentries, cpu);
 		for (i = 0; i < nentries; i++) {
 			counters[i].pcnt += counter_base[i].pcnt;
@@ -931,7 +931,7 @@ static int do_replace(void __user *user, unsigned int len)
 		BUGPRINT("Entries_size never zero\n");
 		return -EINVAL;
 	}
-	countersize = COUNTER_OFFSET(tmp.nentries) * NR_CPUS;
+	countersize = COUNTER_OFFSET(tmp.nentries) * num_possible_cpus();
 	newinfo = (struct ebt_table_info *)
 	   vmalloc(sizeof(struct ebt_table_info) + countersize);
 	if (!newinfo)
@@ -1024,7 +1024,7 @@ static int do_replace(void __user *user, unsigned int len)
 
 	vfree(table->entries);
 	if (table->chainstack) {
-		for (i = 0; i < NR_CPUS; i++)
+		for (i = 0; i < num_possible_cpus(); i++)
 			vfree(table->chainstack[i]);
 		vfree(table->chainstack);
 	}
@@ -1044,7 +1044,7 @@ free_counterstmp:
 		vfree(counterstmp);
 	/* can be initialized in translate_table() */
 	if (newinfo->chainstack) {
-		for (i = 0; i < NR_CPUS; i++)
+		for (i = 0; i < num_possible_cpus(); i++)
 			vfree(newinfo->chainstack[i]);
 		vfree(newinfo->chainstack);
 	}
@@ -1138,7 +1138,7 @@ int ebt_register_table(struct ebt_table *table)
 		return -EINVAL;
 	}
 
-	countersize = COUNTER_OFFSET(table->table->nentries) * NR_CPUS;
+	countersize = COUNTER_OFFSET(table->table->nentries) * num_possible_cpus();
 	newinfo = (struct ebt_table_info *)
 	   vmalloc(sizeof(struct ebt_table_info) + countersize);
 	ret = -ENOMEM;
@@ -1192,7 +1192,7 @@ free_unlock:
 	up(&ebt_mutex);
 free_chainstack:
 	if (newinfo->chainstack) {
-		for (i = 0; i < NR_CPUS; i++)
+		for (i = 0; i < num_possible_cpus(); i++)
 			vfree(newinfo->chainstack[i]);
 		vfree(newinfo->chainstack);
 	}
@@ -1216,7 +1216,7 @@ void ebt_unregister_table(struct ebt_table *table)
 	if (table->private->entries)
 		vfree(table->private->entries);
 	if (table->private->chainstack) {
-		for (i = 0; i < NR_CPUS; i++)
+		for (i = 0; i < num_possible_cpus(); i++)
 			vfree(table->private->chainstack[i]);
 		vfree(table->private->chainstack);
 	}

@@ -3,6 +3,7 @@
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
  */
 
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
@@ -20,6 +21,7 @@
 #include <linux/cache.h>
 #include <linux/jiffies.h>
 #include <linux/profile.h>
+#include <linux/bootmem.h>
 
 #include <asm/head.h>
 #include <asm/ptrace.h>
@@ -89,7 +91,6 @@ void __init smp_store_cpu_info(int id)
 	cpu_data(id).pgcache_size		= 0;
 	cpu_data(id).pte_cache[0]		= NULL;
 	cpu_data(id).pte_cache[1]		= NULL;
-	cpu_data(id).pgdcache_size		= 0;
 	cpu_data(id).pgd_cache			= NULL;
 	cpu_data(id).idle_volume		= 1;
 }
@@ -100,6 +101,16 @@ static volatile unsigned long callin_flag = 0;
 
 extern void inherit_locked_prom_mappings(int save_p);
 
+static inline void cpu_setup_percpu_base(unsigned long cpu_id)
+{
+	__asm__ __volatile__("mov	%0, %%g5\n\t"
+			     "stxa	%0, [%1] %2\n\t"
+			     "membar	#Sync"
+			     : /* no outputs */
+			     : "r" (__per_cpu_offset(cpu_id)),
+			       "r" (TSB_REG), "i" (ASI_IMMU));
+}
+
 void __init smp_callin(void)
 {
 	int cpuid = hard_smp_processor_id();
@@ -108,7 +119,12 @@ void __init smp_callin(void)
 
 	__flush_tlb_all();
 
+	cpu_setup_percpu_base(cpuid);
+
 	smp_setup_percpu_timer();
+
+	if (cheetah_pcache_forced_on)
+		cheetah_enable_pcache();
 
 	local_irq_enable();
 
@@ -627,7 +643,10 @@ extern unsigned long xcall_flush_tlb_all_spitfire;
 extern unsigned long xcall_flush_tlb_all_cheetah;
 extern unsigned long xcall_report_regs;
 extern unsigned long xcall_receive_signal;
+
+#ifdef DCACHE_ALIASING_POSSIBLE
 extern unsigned long xcall_flush_dcache_page_cheetah;
+#endif
 extern unsigned long xcall_flush_dcache_page_spitfire;
 
 #ifdef CONFIG_DEBUG_DCFLUSH
@@ -637,7 +656,7 @@ extern atomic_t dcpage_flushes_xcall;
 
 static __inline__ void __local_flush_dcache_page(struct page *page)
 {
-#if (L1DCACHE_SIZE > PAGE_SIZE)
+#ifdef DCACHE_ALIASING_POSSIBLE
 	__flush_dcache_page(page_address(page),
 			    ((tlb_type == spitfire) &&
 			     page_mapping(page) != NULL));
@@ -672,11 +691,13 @@ void smp_flush_dcache_page_impl(struct page *page, int cpu)
 					       (u64) pg_addr,
 					       mask);
 		} else {
+#ifdef DCACHE_ALIASING_POSSIBLE
 			data0 =
 				((u64)&xcall_flush_dcache_page_cheetah);
 			cheetah_xcall_deliver(data0,
 					      __pa(pg_addr),
 					      0, mask);
+#endif
 		}
 #ifdef CONFIG_DEBUG_DCFLUSH
 		atomic_inc(&dcpage_flushes_xcall);
@@ -709,10 +730,12 @@ void flush_dcache_page_all(struct mm_struct *mm, struct page *page)
 				       (u64) pg_addr,
 				       mask);
 	} else {
+#ifdef DCACHE_ALIASING_POSSIBLE
 		data0 = ((u64)&xcall_flush_dcache_page_cheetah);
 		cheetah_xcall_deliver(data0,
 				      __pa(pg_addr),
 				      0, mask);
+#endif
 	}
 #ifdef CONFIG_DEBUG_DCFLUSH
 	atomic_inc(&dcpage_flushes_xcall);
@@ -1055,95 +1078,6 @@ void __init smp_tick_init(void)
 	prof_counter(boot_cpu_id) = prof_multiplier(boot_cpu_id) = 1;
 }
 
-cycles_t cacheflush_time;
-unsigned long cache_decay_ticks;
-
-extern unsigned long cheetah_tune_scheduling(void);
-
-static void __init smp_tune_scheduling(void)
-{
-	unsigned long orig_flush_base, flush_base, flags, *p;
-	unsigned int ecache_size, order;
-	cycles_t tick1, tick2, raw;
-	int cpu_node;
-
-	/* Approximate heuristic for SMP scheduling.  It is an
-	 * estimation of the time it takes to flush the L2 cache
-	 * on the local processor.
-	 *
-	 * The ia32 chooses to use the L1 cache flush time instead,
-	 * and I consider this complete nonsense.  The Ultra can service
-	 * a miss to the L1 with a hit to the L2 in 7 or 8 cycles, and
-	 * L2 misses are what create extra bus traffic (ie. the "cost"
-	 * of moving a process from one cpu to another).
-	 */
-	printk("SMP: Calibrating ecache flush... ");
-	if (tlb_type == cheetah || tlb_type == cheetah_plus) {
-		cacheflush_time = cheetah_tune_scheduling();
-		goto report;
-	}
-
-	cpu_find_by_instance(0, &cpu_node, NULL);
-	ecache_size = prom_getintdefault(cpu_node,
-					 "ecache-size", (512 * 1024));
-	if (ecache_size > (4 * 1024 * 1024))
-		ecache_size = (4 * 1024 * 1024);
-	orig_flush_base = flush_base =
-		__get_free_pages(GFP_KERNEL, order = get_order(ecache_size));
-
-	if (flush_base != 0UL) {
-		local_irq_save(flags);
-
-		/* Scan twice the size once just to get the TLB entries
-		 * loaded and make sure the second scan measures pure misses.
-		 */
-		for (p = (unsigned long *)flush_base;
-		     ((unsigned long)p) < (flush_base + (ecache_size<<1));
-		     p += (64 / sizeof(unsigned long)))
-			*((volatile unsigned long *)p);
-
-		tick1 = tick_ops->get_tick();
-
-		__asm__ __volatile__("1:\n\t"
-				     "ldx	[%0 + 0x000], %%g1\n\t"
-				     "ldx	[%0 + 0x040], %%g2\n\t"
-				     "ldx	[%0 + 0x080], %%g3\n\t"
-				     "ldx	[%0 + 0x0c0], %%g5\n\t"
-				     "add	%0, 0x100, %0\n\t"
-				     "cmp	%0, %2\n\t"
-				     "bne,pt	%%xcc, 1b\n\t"
-				     " nop"
-				     : "=&r" (flush_base)
-				     : "0" (flush_base),
-				       "r" (flush_base + ecache_size)
-				     : "g1", "g2", "g3", "g5");
-
-		tick2 = tick_ops->get_tick();
-
-		local_irq_restore(flags);
-
-		raw = (tick2 - tick1);
-
-		/* Dampen it a little, considering two processes
-		 * sharing the cache and fitting.
-		 */
-		cacheflush_time = (raw - (raw >> 2));
-
-		free_pages(orig_flush_base, order);
-	} else {
-		cacheflush_time = ((ecache_size << 2) +
-				   (ecache_size << 1));
-	}
-report:
-	/* Convert ticks/sticks to jiffies. */
-	cache_decay_ticks = cacheflush_time / timer_tick_offset;
-	if (cache_decay_ticks < 1)
-		cache_decay_ticks = 1;
-
-	printk("Using heuristic of %ld cycles, %ld ticks.\n",
-	       cacheflush_time, cache_decay_ticks);
-}
-
 /* /proc/profile writes can call this, don't __init it please. */
 static DEFINE_SPINLOCK(prof_setup_lock);
 
@@ -1198,6 +1132,7 @@ void __devinit smp_prepare_boot_cpu(void)
 	}
 
 	current_thread_info()->cpu = hard_smp_processor_id();
+
 	cpu_set(smp_processor_id(), cpu_online_map);
 	cpu_set(smp_processor_id(), phys_cpu_present_map);
 }
@@ -1233,11 +1168,6 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	       (long) num_online_cpus(),
 	       bogosum/(500000/HZ),
 	       (bogosum/(5000/HZ))%100);
-
-	/* We want to run this with all the other cpus spinning
-	 * in the kernel.
-	 */
-	smp_tune_scheduling();
 }
 
 /* This needn't do anything as we do not sleep the cpu
@@ -1263,3 +1193,55 @@ void smp_send_stop(void)
 {
 }
 
+unsigned long __per_cpu_base;
+unsigned long __per_cpu_shift;
+
+EXPORT_SYMBOL(__per_cpu_base);
+EXPORT_SYMBOL(__per_cpu_shift);
+
+void __init setup_per_cpu_areas(void)
+{
+	unsigned long goal, size, i;
+	char *ptr;
+	/* Created by linker magic */
+	extern char __per_cpu_start[], __per_cpu_end[];
+
+	/* Copy section for each CPU (we discard the original) */
+	goal = ALIGN(__per_cpu_end - __per_cpu_start, PAGE_SIZE);
+
+#ifdef CONFIG_MODULES
+	if (goal < PERCPU_ENOUGH_ROOM)
+		goal = PERCPU_ENOUGH_ROOM;
+#endif
+	__per_cpu_shift = 0;
+	for (size = 1UL; size < goal; size <<= 1UL)
+		__per_cpu_shift++;
+
+	/* Make sure the resulting __per_cpu_base value
+	 * will fit in the 43-bit sign extended IMMU
+	 * TSB register.
+	 */
+	ptr = __alloc_bootmem(size * NR_CPUS, PAGE_SIZE,
+			      (unsigned long) __per_cpu_start);
+
+	__per_cpu_base = ptr - __per_cpu_start;
+
+	if ((__per_cpu_shift < PAGE_SHIFT) ||
+	    (__per_cpu_base & ~PAGE_MASK) ||
+	    (__per_cpu_base != (((long) __per_cpu_base << 20) >> 20))) {
+		prom_printf("PER_CPU: Invalid layout, "
+			    "ptr[%p] shift[%lx] base[%lx]\n",
+			    ptr, __per_cpu_shift, __per_cpu_base);
+		prom_halt();
+	}
+
+	for (i = 0; i < NR_CPUS; i++, ptr += size)
+		memcpy(ptr, __per_cpu_start, __per_cpu_end - __per_cpu_start);
+
+	/* Finally, load in the boot cpu's base value.
+	 * We abuse the IMMU TSB register for trap handler
+	 * entry and exit loading of %g5.  That is why it
+	 * has to be page aligned.
+	 */
+	cpu_setup_percpu_base(hard_smp_processor_id());
+}

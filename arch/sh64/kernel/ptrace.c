@@ -27,6 +27,7 @@
 #include <linux/errno.h>
 #include <linux/ptrace.h>
 #include <linux/user.h>
+#include <linux/signal.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -123,9 +124,26 @@ put_fpu_long(struct task_struct *task, unsigned long addr, unsigned long data)
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 {
 	struct task_struct *child;
+	extern void poke_real_address_q(unsigned long long addr, unsigned long long data);
+#define WPC_DBRMODE 0x0d104008
+	static int first_call = 1;
 	int ret;
 
 	lock_kernel();
+
+	if (first_call) {
+		/* Set WPC.DBRMODE to 0.  This makes all debug events get
+		 * delivered through RESVEC, i.e. into the handlers in entry.S.
+		 * (If the kernel was downloaded using a remote gdb, WPC.DBRMODE
+		 * would normally be left set to 1, which makes debug events get
+		 * delivered through DBRVEC, i.e. into the remote gdb's
+		 * handlers.  This prevents ptrace getting them, and confuses
+		 * the remote gdb.) */
+		printk("DBRMODE set to 0 to permit native debugging\n");
+		poke_real_address_q(WPC_DBRMODE, 0);
+		first_call = 0;
+	}
+
 	ret = -EPERM;
 	if (request == PTRACE_TRACEME) {
 		/* are we already being traced? */
@@ -238,7 +256,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	case PTRACE_SYSCALL: /* continue and stop at next (return from) syscall */
 	case PTRACE_CONT: { /* restart after signal. */
 		ret = -EIO;
-		if ((unsigned long) data > _NSIG)
+		if (!valid_signal(data))
 			break;
 		if (request == PTRACE_SYSCALL)
 			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
@@ -268,7 +286,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		struct pt_regs *regs;
 
 		ret = -EIO;
-		if ((unsigned long) data > _NSIG)
+		if (!valid_signal(data))
 			break;
 		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		if ((child->ptrace & PT_DTRACE) == 0) {

@@ -992,7 +992,7 @@ static struct midi_in_endpoint *alloc_midi_in_endpoint( struct usb_device *d, in
 	endPoint &= 0x0f; /* Silently force endPoint to lie in range 0 to 15. */
 
 	pipe =  usb_rcvbulkpipe( d, endPoint );
-	bufSize = usb_maxpacket( d, pipe, usb_pipein(pipe) );
+	bufSize = usb_maxpacket( d, pipe, 0 );
 	/* usb_pipein() = ! usb_pipeout() = true for an in Endpoint */
 
 	ep = (struct midi_in_endpoint *)kmalloc(sizeof(struct midi_in_endpoint), GFP_KERNEL);
@@ -1063,7 +1063,7 @@ static struct midi_out_endpoint *alloc_midi_out_endpoint( struct usb_device *d, 
 
 	endPoint &= 0x0f;
 	pipe =  usb_sndbulkpipe( d, endPoint );
-	bufSize = usb_maxpacket( d, pipe, usb_pipeout(pipe) );
+	bufSize = usb_maxpacket( d, pipe, 1 );
 
 	ep = (struct midi_out_endpoint *)kmalloc(sizeof(struct midi_out_endpoint), GFP_KERNEL);
 	if ( !ep ) {
@@ -1451,8 +1451,6 @@ static struct usb_midi_device *parse_descriptor( struct usb_device *d, unsigned 
 			} else {
 				if ( oep < 15 ) {
 					pins = oep+1;
-					if ( pins > 16 )
-						pins = 16;
 					u->out[oep].endpoint = p1[2];
 					u->out[oep].cableId = ( 1 << pins ) - 1;
 					if ( u->out[oep].cableId )

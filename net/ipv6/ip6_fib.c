@@ -119,36 +119,6 @@ static __inline__ u32 fib6_new_sernum(void)
  */
 
 /*
- *	compare "prefix length" bits of an address
- */
-
-static __inline__ int addr_match(void *token1, void *token2, int prefixlen)
-{
-	__u32 *a1 = token1;
-	__u32 *a2 = token2;
-	int pdw;
-	int pbi;
-
-	pdw = prefixlen >> 5;	  /* num of whole __u32 in prefix */
-	pbi = prefixlen &  0x1f;  /* num of bits in incomplete u32 in prefix */
-
-	if (pdw)
-		if (memcmp(a1, a2, pdw << 2))
-			return 0;
-
-	if (pbi) {
-		__u32 mask;
-
-		mask = htonl((0xffffffff) << (32 - pbi));
-
-		if ((a1[pdw] ^ a2[pdw]) & mask)
-			return 0;
-	}
-
-	return 1;
-}
-
-/*
  *	test bit
  */
 
@@ -263,7 +233,7 @@ static struct fib6_node * fib6_add_1(struct fib6_node *root, void *addr,
 		 *	Prefix match
 		 */
 		if (plen < fn->fn_bit ||
-		    !addr_match(&key->addr, addr, fn->fn_bit))
+		    !ipv6_prefix_equal(&key->addr, addr, fn->fn_bit))
 			goto insert_above;
 		
 		/*
@@ -708,7 +678,7 @@ static struct fib6_node * fib6_lookup_1(struct fib6_node *root,
 			key = (struct rt6key *) ((u8 *) fn->leaf +
 						 args->offset);
 
-			if (addr_match(&key->addr, args->addr, key->plen))
+			if (ipv6_prefix_equal(&key->addr, args->addr, key->plen))
 				return fn;
 		}
 
@@ -759,7 +729,7 @@ static struct fib6_node * fib6_locate_1(struct fib6_node *root,
 		 *	Prefix match
 		 */
 		if (plen < fn->fn_bit ||
-		    !addr_match(&key->addr, addr, fn->fn_bit))
+		    !ipv6_prefix_equal(&key->addr, addr, fn->fn_bit))
 			return NULL;
 
 		if (plen == fn->fn_bit)
@@ -1251,7 +1221,7 @@ void fib6_run_gc(unsigned long dummy)
 {
 	if (dummy != ~0UL) {
 		spin_lock_bh(&fib6_gc_lock);
-		gc_args.timeout = (int)dummy;
+		gc_args.timeout = dummy ? (int)dummy : ip6_rt_gc_interval;
 	} else {
 		local_bh_disable();
 		if (!spin_trylock(&fib6_gc_lock)) {
@@ -1288,7 +1258,7 @@ void __init fib6_init(void)
 		panic("cannot create fib6_nodes cache");
 }
 
-void __exit fib6_gc_cleanup(void)
+void fib6_gc_cleanup(void)
 {
 	del_timer(&ip6_fib_timer);
 	kmem_cache_destroy(fib6_node_kmem);

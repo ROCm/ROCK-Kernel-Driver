@@ -28,14 +28,3 @@ config USB_MICROTEK
 	  The scanner will appear as a scsi generic device to the rest
 	  of the system. Scsi support is required.
 	  This driver can be compiled as a module, called microtek.
-
-config USB_HPUSBSCSI
-	tristate "HP53xx USB scanner support"
-	depends on USB && SCSI && BROKEN
-	help
-	  Say Y here if you want support for the HP 53xx series of scanners
-	  and the Minolta Scan Dual.
-	  The scanner will be accessible as a SCSI device.
-	  Please note that recent versions of SANE use usbfs, not this driver.
-	  This can be compiled as a module, called hpusbscsi.
-

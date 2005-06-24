@@ -182,7 +182,7 @@ static ssize_t flash_write(struct file *file, const char __user *buf,
 	if (count > gbFlashSize - p)
 		count = gbFlashSize - p;
 			
-	if (verify_area(VERIFY_READ, buf, count))
+	if (!access_ok(VERIFY_READ, buf, count))
 		return -EFAULT;
 
 	/*

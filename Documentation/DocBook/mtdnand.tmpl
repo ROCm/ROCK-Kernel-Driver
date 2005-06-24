@@ -1,4 +1,6 @@
-<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN"[]>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+	"http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" []>
 
 <book id="MTD-NAND-Guide">
  <bookinfo>
@@ -238,9 +240,9 @@ static void board_hwcontrol(struct mtd_info *mtd, int cmd)
 	struct nand_chip *this = (struct nand_chip *) mtd->priv;
 	switch(cmd){
 		case NAND_CTL_SETCLE: this->IO_ADDR_W |= CLE_ADRR_BIT;  break;
-		case NAND_CTL_CLRCLE: this->IO_ADDR_W &= ~CLE_ADRR_BIT; break;
+		case NAND_CTL_CLRCLE: this->IO_ADDR_W &amp;= ~CLE_ADRR_BIT; break;
 		case NAND_CTL_SETALE: this->IO_ADDR_W |= ALE_ADRR_BIT;  break;
-		case NAND_CTL_CLRALE: this->IO_ADDR_W &= ~ALE_ADRR_BIT; break;
+		case NAND_CTL_CLRALE: this->IO_ADDR_W &amp;= ~ALE_ADRR_BIT; break;
 	}
 }
 		</programlisting>
@@ -391,7 +393,7 @@ static void board_select_chip (struct mtd_info *mtd, int chip)
 	/* Deselect all chips, set all nCE pins high */
 	GPIO(BOARD_NAND_NCE) |= 0xff;	
 	if (chip >= 0)
-		GPIO(BOARD_NAND_NCE) &= ~ (1 << chip);	
+		GPIO(BOARD_NAND_NCE) &amp;= ~ (1 &lt;&lt; chip);
 }
 		</programlisting>
 		<para>
@@ -405,8 +407,8 @@ static void board_select_chip (struct mtd_info *mtd, int chip)
 	struct nand_chip *this = (struct nand_chip *) mtd->priv;
 	
 	/* Deselect all chips */
-	this->IO_ADDR_R &= ~BOARD_NAND_ADDR_MASK;
-	this->IO_ADDR_W &= ~BOARD_NAND_ADDR_MASK;
+	this->IO_ADDR_R &amp;= ~BOARD_NAND_ADDR_MASK;
+	this->IO_ADDR_W &amp;= ~BOARD_NAND_ADDR_MASK;
 	switch (chip) {
 	case 0:
 		this->IO_ADDR_R |= BOARD_NAND_ADDR_CHIP0;

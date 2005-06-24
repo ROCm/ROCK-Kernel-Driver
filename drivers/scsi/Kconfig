@@ -278,7 +278,7 @@ config SCSI_3W_9XXX
 
 config SCSI_7000FASST
 	tristate "7000FASST SCSI support"
-	depends on ISA && SCSI
+	depends on ISA && SCSI && ISA_DMA_API
 	help
 	  This driver supports the Western Digital 7000 SCSI host adapter
 	  family.  Some information is in the source:
@@ -291,8 +291,8 @@ config SCSI_ACARD
 	tristate "ACARD SCSI support"
 	depends on PCI && SCSI
 	help
-	  This driver supports the ACARD 870U/W SCSI host adapter.
-
+	  This driver supports the ACARD SCSI host adapter.
+	  Support Chip <ATP870 ATP876 ATP880 ATP885>
 	  To compile this driver as a module, choose M here: the
 	  module will be called atp870u.
 
@@ -313,7 +313,7 @@ config SCSI_AHA152X
 
 config SCSI_AHA1542
 	tristate "Adaptec AHA1542 support"
-	depends on ISA && SCSI
+	depends on ISA && SCSI && ISA_DMA_API
 	---help---
 	  This is support for a SCSI host adapter.  It is explained in section
 	  3.4 of the SCSI-HOWTO, available from
@@ -432,19 +432,11 @@ config SCSI_SATA
 
 	  If unsure, say N.
 
-config SCSI_ATA_ADMA
-	tristate "ADMA ATA support"
-	depends on SCSI_SATA && PCI
-	help
-	  This option enables support for ADMA-standard ATA controllers.
-
-	  If unsure, say N.
-
 config SCSI_SATA_AHCI
 	tristate "AHCI SATA support"
 	depends on SCSI_SATA && PCI
 	help
-	  This option enables support for AHCI-standard Serial ATA.
+	  This option enables support for AHCI Serial ATA.
 
 	  If unsure, say N.
 
@@ -472,14 +464,6 @@ config SCSI_SATA_NV
 	depends on SCSI_SATA && PCI && EXPERIMENTAL
 	help
 	  This option enables support for NVIDIA Serial ATA.
-
-	  If unsure, say N.
-
-config SCSI_PATA_PDC2027X
-	tristate "Promise PATA 2027x support"
-	depends on SCSI_SATA && PCI
-	help
-	  This option enables support for Promise PATA pdc20268 to pdc20277 host adapters.
 
 	  If unsure, say N.
 
@@ -549,7 +533,7 @@ config SCSI_SATA_VITESSE
 
 config SCSI_BUSLOGIC
 	tristate "BusLogic SCSI support"
-	depends on (PCI || ISA || MCA) && SCSI && (BROKEN || !SPARC64)
+	depends on (PCI || ISA || MCA) && SCSI && ISA_DMA_API
 	---help---
 	  This is support for BusLogic MultiMaster and FlashPoint SCSI Host
 	  Adapters. Consult the SCSI-HOWTO, available from
@@ -605,7 +589,7 @@ config SCSI_DTC3280
 
 config SCSI_EATA
 	tristate "EATA ISA/EISA/PCI (DPT and generic EATA/DMA-compliant boards) support"
-	depends on (ISA || EISA || PCI) && SCSI && (BROKEN || !SPARC64)
+	depends on (ISA || EISA || PCI) && SCSI && ISA_DMA_API
 	---help---
 	  This driver supports all EATA/DMA-compliant SCSI host adapters.  DPT
 	  ISA and all EISA I/O addresses are probed looking for the "EATA"
@@ -653,7 +637,7 @@ config SCSI_EATA_MAX_TAGS
 
 config SCSI_EATA_PIO
 	tristate "EATA-PIO (old DPT PM2001, PM2012A) support"
-	depends on (ISA || EISA || PCI) && SCSI
+	depends on (ISA || EISA || PCI) && SCSI && BROKEN
 	---help---
 	  This driver supports all EATA-PIO protocol compliant SCSI Host
 	  Adapters like the DPT PM2001 and the PM2012A.  EATA-DMA compliant
@@ -699,7 +683,7 @@ config SCSI_FD_MCS
 
 config SCSI_GDTH
 	tristate "Intel/ICP (former GDT SCSI Disk Array) RAID Controller support"
-	depends on (ISA || EISA || PCI) && SCSI && (BROKEN || !SPARC64)
+	depends on (ISA || EISA || PCI) && SCSI && ISA_DMA_API
 	---help---
 	  Formerly called GDT SCSI Disk Array Controller Support.
 
@@ -976,11 +960,6 @@ config SCSI_NCR_D700
 	  Unless you have an NCR manufactured machine, the chances are that
 	  you do not have this SCSI card, so say N.
 
-config 53C700_IO_MAPPED
-	bool
-	depends on SCSI_NCR_D700
-	default y
-
 config SCSI_LASI700
 	tristate "HP Lasi SCSI support for 53c700/710"
 	depends on GSC && SCSI
@@ -989,11 +968,6 @@ config SCSI_LASI700
 	  This is a driver for the SCSI controller in the Lasi chip found in
 	  many PA-RISC workstations & servers.  If you do not know whether you
 	  have a Lasi chip, it is safe to say "Y" here.
-
-config 53C700_MEM_MAPPED
-	bool
-	depends on SCSI_LASI700
-	default y
 
 config 53C700_LE_ON_BE
 	bool
@@ -1269,13 +1243,6 @@ config SCSI_PSI240I
 	  To compile this driver as a module, choose M here: the
 	  module will be called psi240i.
 
-config SCSI_LPFC
-	tristate "Emulex LightPulse Fibre Channel Support"
-	depends on PCI && SCSI && SCSI_FC_ATTRS
-	help
-          This lpfc driver supports the Emulex LightPulse
-          Family of Fibre Channel PCI host adapters.
-
 config SCSI_QLOGIC_FAS
 	tristate "Qlogic FAS SCSI support"
 	depends on ISA && SCSI
@@ -1298,7 +1265,7 @@ config SCSI_QLOGIC_FAS
 
 config SCSI_QLOGIC_ISP
 	tristate "Qlogic ISP SCSI support (old driver)"
-	depends on PCI && SCSI
+	depends on PCI && SCSI && BROKEN
 	---help---
 	  This driver works for all QLogic PCI SCSI host adapters (IQ-PCI,
 	  IQ-PCI-10, IQ_PCI-D) except for the PCI-basic card.  (This latter
@@ -1365,7 +1332,13 @@ config SCSI_QLOGICPTI
 
 source "drivers/scsi/qla2xxx/Kconfig"
 
-source "drivers/scsi/qla4xxx/Kconfig"
+config SCSI_LPFC
+	tristate "Emulex LightPulse Fibre Channel Support"
+	depends on PCI && SCSI
+	select SCSI_FC_ATTRS
+	help
+          This lpfc driver supports the Emulex LightPulse
+          Family of Fibre Channel PCI host adapters.
 
 config SCSI_SEAGATE
 	tristate "Seagate ST-02 and Future Domain TMC-8xx SCSI support"
@@ -1461,7 +1434,7 @@ config SCSI_T128
 
 config SCSI_U14_34F
 	tristate "UltraStor 14F/34F support"
-	depends on ISA && SCSI
+	depends on ISA && SCSI && ISA_DMA_API
 	---help---
 	  This is support for the UltraStor 14F and 34F SCSI-2 host adapters.
 	  The source at <file:drivers/scsi/u14-34f.c> contains some
@@ -1797,7 +1770,7 @@ config SCSI_NCR53C7xx_FAST
 
 config SUN3_SCSI
 	tristate "Sun3 NCR5380 SCSI"
-	depends on SUN3 && SCSI
+	depends on SUN3 && SCSI && BROKEN
 	help
 	  This option will enable support for the OBIO (onboard io) NCR5380
 	  SCSI controller found in the Sun 3/50 and 3/60, as well as for

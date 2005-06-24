@@ -84,7 +84,11 @@ static inline void prepare_singlestep(struct kprobe *p, struct pt_regs *regs)
 {
 	regs->eflags |= TF_MASK;
 	regs->eflags &= ~IF_MASK;
-	regs->eip = (unsigned long)&p->ainsn.insn;
+	/*single step inline if the instruction is an int3*/
+	if (p->opcode == BREAKPOINT_INSTRUCTION)
+		regs->eip = (unsigned long)p->addr;
+	else
+		regs->eip = (unsigned long)&p->ainsn.insn;
 }
 
 /*
@@ -117,6 +121,12 @@ static int kprobe_handler(struct pt_regs *regs)
 		   Disarm the probe we just hit, and ignore it. */
 		p = get_kprobe(addr);
 		if (p) {
+			if (kprobe_status == KPROBE_HIT_SS) {
+				regs->eflags &= ~TF_MASK;
+				regs->eflags |= kprobe_saved_eflags;
+				unlock_kprobes();
+				goto no_kprobe;
+			}
 			disarm_kprobe(p, regs);
 			ret = 1;
 		} else {
@@ -159,17 +169,16 @@ static int kprobe_handler(struct pt_regs *regs)
 	if (is_IF_modifier(p->opcode))
 		kprobe_saved_eflags &= ~IF_MASK;
 
-	if (p->pre_handler(p, regs)) {
+	if (p->pre_handler && p->pre_handler(p, regs))
 		/* handler has already set things up, so skip ss setup */
 		return 1;
-	}
 
-      ss_probe:
+ss_probe:
 	prepare_singlestep(p, regs);
 	kprobe_status = KPROBE_HIT_SS;
 	return 1;
 
-      no_kprobe:
+no_kprobe:
 	preempt_enable_no_resched();
 	return ret;
 }
@@ -208,6 +217,13 @@ static void resume_execution(struct kprobe *p, struct pt_regs *regs)
 		*tos &= ~(TF_MASK | IF_MASK);
 		*tos |= kprobe_old_eflags;
 		break;
+	case 0xc3:		/* ret/lret */
+	case 0xcb:
+	case 0xc2:
+	case 0xca:
+		regs->eflags &= ~TF_MASK;
+		/* eip is already adjusted, no more changes required*/
+		return;
 	case 0xe8:		/* call relative - Fix return addr */
 		*tos = orig_eip + (*tos - copy_eip);
 		break;

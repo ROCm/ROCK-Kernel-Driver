@@ -2,7 +2,7 @@
  *
  *    The best reference for this stuff is probably the Processor-
  *    Specific ELF Supplement for PA-RISC:
- *        http://ftp.parisc-linux.org/docs/elf-pa-hp.pdf
+ *        http://ftp.parisc-linux.org/docs/arch/elf-pa-hp.pdf
  *
  *    Linux/PA-RISC Project (http://www.parisc-linux.org/)
  *    Copyright (C) 2003 Randolph Chung <tausq at debian . org>
@@ -21,6 +21,23 @@
  *    You should have received a copy of the GNU General Public License
  *    along with this program; if not, write to the Free Software
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *
+ *    Notes:
+ *    - SEGREL32 handling
+ *      We are not doing SEGREL32 handling correctly. According to the ABI, we
+ *      should do a value offset, like this:
+ *			if (is_init(me, (void *)val))
+ *				val -= (uint32_t)me->module_init;
+ *			else
+ *				val -= (uint32_t)me->module_core;
+ *	However, SEGREL32 is used only for PARISC unwind entries, and we want
+ *	those entries to have an absolute address, and not just an offset.
+ *
+ *	The unwind table mechanism has the ability to specify an offset for 
+ *	the unwind table; however, because we split off the init functions into
+ *	a different piece of memory, it is not possible to do this using a 
+ *	single offset. Instead, we use the above hack for now.
  */
 
 #include <linux/moduleloader.h>
@@ -29,6 +46,8 @@
 #include <linux/fs.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
+
+#include <asm/unwind.h>
 
 #if 0
 #define DEBUGP printk
@@ -247,6 +266,10 @@ int module_frob_arch_sections(CONST Elf_Ehdr *hdr,
 	for (i = 1; i < hdr->e_shnum; i++) {
 		const Elf_Rela *rels = (void *)hdr + sechdrs[i].sh_offset;
 		unsigned long nrels = sechdrs[i].sh_size / sizeof(*rels);
+
+		if (strncmp(secstrings + sechdrs[i].sh_name,
+			    ".PARISC.unwind", 14) == 0)
+			me->arch.unwind_section = i;
 
 		if (sechdrs[i].sh_type != SHT_RELA)
 			continue;
@@ -499,7 +522,9 @@ int apply_relocate_add(Elf_Shdr *sechdrs,
 			break;
 		case R_PARISC_SEGREL32:
 			/* 32-bit segment relative address */
-			val -= (uint32_t)me->module_core;
+			/* See note about special handling of SEGREL32 at
+			 * the beginning of this file.
+			 */
 			*loc = fsel(val, addend); 
 			break;
 		case R_PARISC_DPREL21L:
@@ -651,7 +676,9 @@ int apply_relocate_add(Elf_Shdr *sechdrs,
 			break;
 		case R_PARISC_SEGREL32:
 			/* 32-bit segment relative address */
-			val -= (uint64_t)me->module_core;
+			/* See note about special handling of SEGREL32 at
+			 * the beginning of this file.
+			 */
 			*loc = fsel(val, addend); 
 			break;
 		case R_PARISC_FPTR64:
@@ -682,6 +709,32 @@ int apply_relocate_add(Elf_Shdr *sechdrs,
 }
 #endif
 
+static void
+register_unwind_table(struct module *me,
+		      const Elf_Shdr *sechdrs)
+{
+	unsigned char *table, *end;
+	unsigned long gp;
+
+	if (!me->arch.unwind_section)
+		return;
+
+	table = (unsigned char *)sechdrs[me->arch.unwind_section].sh_addr;
+	end = table + sechdrs[me->arch.unwind_section].sh_size;
+	gp = (Elf_Addr)me->module_core + me->arch.got_offset;
+
+	DEBUGP("register_unwind_table(), sect = %d at 0x%p - 0x%p (gp=0x%lx)\n",
+	       me->arch.unwind_section, table, end, gp);
+	me->arch.unwind = unwind_table_add(me->name, 0, gp, table, end);
+}
+
+static void
+deregister_unwind_table(struct module *me)
+{
+	if (me->arch.unwind)
+		unwind_table_remove(me->arch.unwind);
+}
+
 int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
@@ -710,6 +763,8 @@ int module_finalize(const Elf_Ehdr *hdr,
 	       me->arch.got_count, me->arch.got_max,
 	       me->arch.fdesc_count, me->arch.fdesc_max);
 #endif
+
+	register_unwind_table(me, sechdrs);
 
 	/* haven't filled in me->symtab yet, so have to find it
 	 * ourselves */
@@ -763,4 +818,5 @@ int module_finalize(const Elf_Ehdr *hdr,
 
 void module_arch_cleanup(struct module *mod)
 {
+	deregister_unwind_table(mod);
 }

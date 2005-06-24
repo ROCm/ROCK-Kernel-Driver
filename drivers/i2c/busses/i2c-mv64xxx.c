@@ -525,6 +525,8 @@ mv64xxx_i2c_probe(struct device *dev)
 	drv_data->irq = platform_get_irq(pd, 0);
 	drv_data->adapter.id = I2C_ALGO_MV64XXX | I2C_HW_MV64XXX;
 	drv_data->adapter.algo = &mv64xxx_i2c_algo;
+	drv_data->adapter.owner = THIS_MODULE;
+	drv_data->adapter.class = I2C_CLASS_HWMON;
 	drv_data->adapter.timeout = pdata->timeout;
 	drv_data->adapter.retries = pdata->retries;
 	dev_set_drvdata(dev, drv_data);

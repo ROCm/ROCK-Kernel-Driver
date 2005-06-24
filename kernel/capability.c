@@ -20,10 +20,10 @@ EXPORT_SYMBOL(securebits);
 EXPORT_SYMBOL(cap_bset);
 
 /*
- * This global lock protects task->cap_* for all tasks including current.
+ * This lock protects task->cap_* for all tasks including current.
  * Locking rule: acquire this prior to tasklist_lock.
  */
-DEFINE_SPINLOCK(task_capability_lock);
+static DEFINE_SPINLOCK(task_capability_lock);
 
 /*
  * For sys_getproccap() and sys_setproccap(), any of the three

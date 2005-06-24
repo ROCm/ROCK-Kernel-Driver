@@ -282,8 +282,8 @@ static __inline__ void
 pcore_set_bat(void)
 {
 	mb();
-	mtspr(DBAT3U, 0xf0001ffe);
-	mtspr(DBAT3L, 0xfe80002a);
+	mtspr(SPRN_DBAT3U, 0xf0001ffe);
+	mtspr(SPRN_DBAT3L, 0xfe80002a);
 	mb();
 
 }

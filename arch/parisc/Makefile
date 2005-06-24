@@ -17,9 +17,12 @@
 # Mike Shaver, Helge Deller and Martin K. Petersen
 #
 NM		= sh $(srctree)/arch/parisc/nm
-ifdef CONFIG_PARISC64
+CHECKFLAGS	+= -D__hppa__=1
+
+ifdef CONFIG_64BIT
 CROSS_COMPILE	:= hppa64-linux-
 UTS_MACHINE	:= parisc64
+CHECKFLAGS	+= -D__LP64__=1 -m64
 else
 MACHINE := $(subst 64,,$(shell uname -m))
 ifneq ($(MACHINE),parisc)
@@ -65,8 +68,12 @@ libs-y	+= arch/parisc/lib/ `$(CC) -print-libgcc-file-name`
 
 drivers-$(CONFIG_OPROFILE)		+= arch/parisc/oprofile/
 
+PALO := $(shell if which palo; then : ; \
+	elif [ -x /sbin/palo ]; then echo /sbin/palo; \
+	fi)
+
 palo: vmlinux
-	@if [ $$(palo -f /dev/null >/dev/null 2>&1 ; echo $$?) != 2 ]; then \
+	@if [ -x $PALO ]; then \
 		echo 'ERROR: Please install palo first (apt-get install palo)';\
 		echo 'or build it from source and install it somewhere in your $$PATH';\
 		false; \
@@ -78,7 +85,7 @@ palo: vmlinux
 		echo 'WARNING: the "lifimage" file is now placed in this directory by default!'; \
 		false; \
 	fi
-	palo -f ./palo.conf
+	$(PALO) -f ./palo.conf
 
 oldpalo: vmlinux
 	export TOPDIR=`pwd`; \
@@ -101,8 +108,8 @@ arch/parisc/kernel/asm-offsets.s: include/asm include/linux/version.h \
 include/asm-parisc/offsets.h: arch/parisc/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
 
-CLEAN_FILES	+= lifimage
-MRPROPER_FILES	+= palo.conf include/asm-parisc/offsets.h
+CLEAN_FILES	+= lifimage include/asm-parisc/offsets.h
+MRPROPER_FILES	+= palo.conf
 
 define archhelp
 	@echo  '* vmlinux	- Uncompressed kernel image (./vmlinux)'

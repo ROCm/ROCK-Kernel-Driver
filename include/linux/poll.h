@@ -71,13 +71,9 @@ static inline
 int get_fd_set(unsigned long nr, void __user *ufdset, unsigned long *fdset)
 {
 	nr = FDS_BYTES(nr);
-	if (ufdset) {
-		int error;
-		error = verify_area(VERIFY_WRITE, ufdset, nr);
-		if (!error && __copy_from_user(fdset, ufdset, nr))
-			error = -EFAULT;
-		return error;
-	}
+	if (ufdset)
+		return copy_from_user(fdset, ufdset, nr) ? -EFAULT : 0;
+
 	memset(fdset, 0, nr);
 	return 0;
 }

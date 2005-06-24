@@ -62,21 +62,19 @@ void bust_spinlocks(int yes)
 static noinline int is_prefetch(struct pt_regs *regs, unsigned long addr,
 				unsigned long error_code)
 { 
-	unsigned char *instr = (unsigned char *)(regs->rip);
+	unsigned char *instr;
 	int scan_more = 1;
 	int prefetch = 0; 
-	unsigned char *max_instr = instr + 15;
+	unsigned char *max_instr;
 
 	/* If it was a exec fault ignore */
 	if (error_code & (1<<4))
 		return 0;
 	
-	/* Code segments in LDT could have a non zero base. Don't check
-	   when that's possible */
-	if (regs->cs & (1<<2))
-		return 0;
+	instr = (unsigned char *)convert_rip_to_linear(current, regs);
+	max_instr = instr + 15;
 
-	if ((regs->cs & 3) != 0 && regs->rip >= TASK_SIZE)
+	if ((regs->cs & 3) != 0 && instr >= (unsigned char *)TASK_SIZE)
 		return 0;
 
 	while (scan_more && instr < max_instr) { 
@@ -471,17 +469,6 @@ bad_area:
 	up_read(&mm->mmap_sem);
 
 bad_area_nosemaphore:
-
-#ifdef CONFIG_IA32_EMULATION
-	/* 32bit vsyscall. map on demand. */
-	if (test_thread_flag(TIF_IA32) &&
-	    address >= VSYSCALL32_BASE && address < VSYSCALL32_END) {
-		if (map_syscall32(mm, address) < 0)
-			goto out_of_memory2;
-		return;
-	}
-#endif
-
 	/* User mode accesses just cause a SIGSEGV */
 	if (error_code & 4) {
 		if (is_prefetch(regs, address, error_code))
@@ -563,7 +550,6 @@ no_context:
  */
 out_of_memory:
 	up_read(&mm->mmap_sem);
-out_of_memory2:
 	if (current->pid == 1) { 
 		yield();
 		goto again;

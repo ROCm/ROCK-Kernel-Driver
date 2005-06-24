@@ -446,14 +446,14 @@ found_middle:
  * disabling interrupts.
  */
 #ifdef __LP64__
-#define ext2_set_bit(nr, addr)		test_and_set_bit((nr) ^ 0x38, (unsigned long *)addr)
+#define ext2_set_bit(nr, addr)		__test_and_set_bit((nr) ^ 0x38, (unsigned long *)addr)
 #define ext2_set_bit_atomic(l,nr,addr)  test_and_set_bit((nr) ^ 0x38, (unsigned long *)addr)
-#define ext2_clear_bit(nr, addr)	test_and_clear_bit((nr) ^ 0x38, (unsigned long *)addr)
+#define ext2_clear_bit(nr, addr)	__test_and_clear_bit((nr) ^ 0x38, (unsigned long *)addr)
 #define ext2_clear_bit_atomic(l,nr,addr) test_and_clear_bit((nr) ^ 0x38, (unsigned long *)addr)
 #else
-#define ext2_set_bit(nr, addr)		test_and_set_bit((nr) ^ 0x18, (unsigned long *)addr)
+#define ext2_set_bit(nr, addr)		__test_and_set_bit((nr) ^ 0x18, (unsigned long *)addr)
 #define ext2_set_bit_atomic(l,nr,addr)  test_and_set_bit((nr) ^ 0x18, (unsigned long *)addr)
-#define ext2_clear_bit(nr, addr)	test_and_clear_bit((nr) ^ 0x18, (unsigned long *)addr)
+#define ext2_clear_bit(nr, addr)	__test_and_clear_bit((nr) ^ 0x18, (unsigned long *)addr)
 #define ext2_clear_bit_atomic(l,nr,addr) test_and_clear_bit((nr) ^ 0x18, (unsigned long *)addr)
 #endif
 

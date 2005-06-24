@@ -135,25 +135,11 @@ static struct irqaction cpm2_irqaction = {
 static void __init
 mpc8560_ads_init_IRQ(void)
 {
-	int i;
-	volatile cpm2_map_t *immap = cpm2_immr;
-
 	/* Setup OpenPIC */
 	mpc85xx_ads_init_IRQ();
 
-	/* disable all CPM interupts */
-	immap->im_intctl.ic_simrh = 0x0;
-	immap->im_intctl.ic_simrl = 0x0;
-
-	for (i = CPM_IRQ_OFFSET; i < (NR_CPM_INTS + CPM_IRQ_OFFSET); i++)
-		irq_desc[i].handler = &cpm2_pic;
-
-	/* Initialize the default interrupt mapping priorities,
-	 * in case the boot rom changed something on us.
-	 */
-	immap->im_intctl.ic_sicr = 0;
-	immap->im_intctl.ic_scprrh = 0x05309770;
-	immap->im_intctl.ic_scprrl = 0x05309770;
+	/* Setup CPM2 PIC */
+        cpm2_init_IRQ();
 
 	setup_irq(MPC85xx_IRQ_CPM, &cpm2_irqaction);
 
@@ -197,7 +183,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		strcpy(cmd_line, (char *) (r6 + KERNELBASE));
 	}
 
-	identify_ppc_sys_by_id(mfspr(SVR));
+	identify_ppc_sys_by_id(mfspr(SPRN_SVR));
 
 	/* setup the PowerPC module struct */
 	ppc_md.setup_arch = mpc8560ads_setup_arch;

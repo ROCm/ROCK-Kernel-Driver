@@ -12,7 +12,7 @@
  * 
  * based on parport_pc.c by 
  * 	    Grant Guenther <grant@torque.net>
- * 	    Phil Blundell <Philip.Blundell@pobox.com>
+ * 	    Phil Blundell <philb@gnu.org>
  *          Tim Waugh <tim@cyberelk.demon.co.uk>
  *	    Jose Renau <renau@acm.org>
  *          David Campbell <campbell@torque.net>
@@ -42,7 +42,7 @@
 #include <asm/pdc.h>
 #include <asm/parisc-device.h>
 #include <asm/hardware.h>
-#include <asm/parport_gsc.h>
+#include "parport_gsc.h"
 
 
 MODULE_AUTHOR("Helge Deller <deller@gmx.de>");
@@ -85,95 +85,6 @@ static irqreturn_t parport_gsc_interrupt(int irq, void *dev_id, struct pt_regs *
 {
 	parport_generic_irq(irq, (struct parport *) dev_id, regs);
 	return IRQ_HANDLED;
-}
-
-void parport_gsc_write_data(struct parport *p, unsigned char d)
-{
-	parport_writeb (d, DATA (p));
-}
-
-unsigned char parport_gsc_read_data(struct parport *p)
-{
-	unsigned char c = parport_readb (DATA (p));
-	return c;
-}
-
-void parport_gsc_write_control(struct parport *p, unsigned char d)
-{
-	const unsigned char wm = (PARPORT_CONTROL_STROBE |
-				  PARPORT_CONTROL_AUTOFD |
-				  PARPORT_CONTROL_INIT |
-				  PARPORT_CONTROL_SELECT);
-
-	/* Take this out when drivers have adapted to the newer interface. */
-	if (d & 0x20) {
-		pr_debug("%s (%s): use data_reverse for this!\n",
-			    p->name, p->cad->name);
-		parport_gsc_data_reverse (p);
-	}
-
-	__parport_gsc_frob_control (p, wm, d & wm);
-}
-
-unsigned char parport_gsc_read_control(struct parport *p)
-{
-	const unsigned char wm = (PARPORT_CONTROL_STROBE |
-				  PARPORT_CONTROL_AUTOFD |
-				  PARPORT_CONTROL_INIT |
-				  PARPORT_CONTROL_SELECT);
-	const struct parport_gsc_private *priv = p->physport->private_data;
-	return priv->ctr & wm; /* Use soft copy */
-}
-
-unsigned char parport_gsc_frob_control (struct parport *p, unsigned char mask,
-				       unsigned char val)
-{
-	const unsigned char wm = (PARPORT_CONTROL_STROBE |
-				  PARPORT_CONTROL_AUTOFD |
-				  PARPORT_CONTROL_INIT |
-				  PARPORT_CONTROL_SELECT);
-
-	/* Take this out when drivers have adapted to the newer interface. */
-	if (mask & 0x20) {
-		pr_debug("%s (%s): use data_%s for this!\n",
-			p->name, p->cad->name,
-			(val & 0x20) ? "reverse" : "forward");
-		if (val & 0x20)
-			parport_gsc_data_reverse (p);
-		else
-			parport_gsc_data_forward (p);
-	}
-
-	/* Restrict mask and val to control lines. */
-	mask &= wm;
-	val &= wm;
-
-	return __parport_gsc_frob_control (p, mask, val);
-}
-
-unsigned char parport_gsc_read_status(struct parport *p)
-{
-	return parport_readb (STATUS (p));
-}
-
-void parport_gsc_disable_irq(struct parport *p)
-{
-	__parport_gsc_frob_control (p, 0x10, 0);
-}
-
-void parport_gsc_enable_irq(struct parport *p)
-{
-	__parport_gsc_frob_control (p, 0x10, 0x10);
-}
-
-void parport_gsc_data_forward (struct parport *p)
-{
-	__parport_gsc_frob_control (p, 0x20, 0);
-}
-
-void parport_gsc_data_reverse (struct parport *p)
-{
-	__parport_gsc_frob_control (p, 0x20, 0x20);
 }
 
 void parport_gsc_init_state(struct pardevice *dev, struct parport_state *s)

@@ -399,7 +399,7 @@ sparc_sigaction (int sig, const struct old_sigaction __user *act,
 	if (act) {
 		unsigned long mask;
 
-		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		if (!access_ok(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_restorer, &act->sa_restorer))
 			return -EFAULT;
@@ -417,7 +417,7 @@ sparc_sigaction (int sig, const struct old_sigaction __user *act,
 		 * deadlock us if we held the signal lock on SMP.  So for
 		 * now I take the easy way out and do no locking.
 		 */
-		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		if (!access_ok(VERIFY_WRITE, oact, sizeof(*oact)) ||
 		    __put_user(old_ka.sa.sa_handler, &oact->sa_handler) ||
 		    __put_user(old_ka.sa.sa_restorer, &oact->sa_restorer))
 			return -EFAULT;

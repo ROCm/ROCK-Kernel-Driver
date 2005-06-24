@@ -32,6 +32,7 @@ prom_remap:	/* %o0 = physpage, %o1 = virtpage, %o2 = mmu_ihandle */
 	ldx	[%g2 + 0x08], %l0		! prom_cif_handler
 	mov	%g6, %i3
 	mov	%g4, %i4
+	mov	%g5, %i5
 	flushw
 
 	sethi	%hi(prom_remap - call_method), %g7
@@ -62,6 +63,7 @@ prom_remap:	/* %o0 = physpage, %o1 = virtpage, %o2 = mmu_ihandle */
 	/* Restore hard-coded globals. */
 	mov	%i3, %g6
 	mov	%i4, %g4
+	mov	%i5, %g5
 
 	/* Wheee.... we are done. */
 	ret

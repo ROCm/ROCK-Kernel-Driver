@@ -26,6 +26,7 @@
 #include "cifspdu.h"
 #include "cifsglob.h"
 #include "cifs_debug.h"
+#include "cifsproto.h"
 
 /*****************************************************************************
  *
@@ -77,8 +78,8 @@
 
 #define SPNEGO_OID_LEN 7
 #define NTLMSSP_OID_LEN  10
-unsigned long SPNEGO_OID[7] = { 1, 3, 6, 1, 5, 5, 2 };
-unsigned long NTLMSSP_OID[10] = { 1, 3, 6, 1, 4, 1, 311, 2, 2, 10 };
+static unsigned long SPNEGO_OID[7] = { 1, 3, 6, 1, 5, 5, 2 };
+static unsigned long NTLMSSP_OID[10] = { 1, 3, 6, 1, 4, 1, 311, 2, 2, 10 };
 
 /* 
  * ASN.1 context.
@@ -210,7 +211,7 @@ asn1_eoc_decode(struct asn1_ctx *ctx, unsigned char *eoc)
 {
 	unsigned char ch;
 
-	if (eoc == 0) {
+	if (eoc == NULL) {
 		if (!asn1_octet_decode(ctx, &ch))
 			return 0;
 

@@ -138,15 +138,15 @@ wlock_again:
 	}
 	/* Try once to increment the counter.  */
 	__asm__ __volatile__(
-"	ldx		[%0], %%g5\n"
-"	brlz,a,pn	%%g5, 2f\n"
+"	ldx		[%0], %%g1\n"
+"	brlz,a,pn	%%g1, 2f\n"
 "	 mov		1, %0\n"
-"	add		%%g5, 1, %%g7\n"
-"	casx		[%0], %%g5, %%g7\n"
-"	sub		%%g5, %%g7, %0\n"
+"	add		%%g1, 1, %%g7\n"
+"	casx		[%0], %%g1, %%g7\n"
+"	sub		%%g1, %%g7, %0\n"
 "2:"	: "=r" (val)
 	: "0" (&(rw->lock))
-	: "g5", "g7", "memory");
+	: "g1", "g7", "memory");
 	membar("#StoreLoad | #StoreStore");
 	if (val)
 		goto wlock_again;
@@ -173,14 +173,14 @@ runlock_again:
 	/* Spin trying to decrement the counter using casx.  */
 	__asm__ __volatile__(
 "	membar	#StoreLoad | #LoadLoad\n"
-"	ldx	[%0], %%g5\n"
-"	sub	%%g5, 1, %%g7\n"
-"	casx	[%0], %%g5, %%g7\n"
+"	ldx	[%0], %%g1\n"
+"	sub	%%g1, 1, %%g7\n"
+"	casx	[%0], %%g1, %%g7\n"
 "	membar	#StoreLoad | #StoreStore\n"
-"	sub	%%g5, %%g7, %0\n"
+"	sub	%%g1, %%g7, %0\n"
 	: "=r" (val)
 	: "0" (&(rw->lock))
-	: "g5", "g7", "memory");
+	: "g1", "g7", "memory");
 	if (val) {
 		if (!--stuck) {
 			if (shown++ <= 2)
@@ -216,17 +216,17 @@ wlock_again:
 	__asm__ __volatile__(
 "	mov	1, %%g3\n"
 "	sllx	%%g3, 63, %%g3\n"
-"	ldx	[%0], %%g5\n"
-"	brlz,pn	%%g5, 1f\n"
-"	 or	%%g5, %%g3, %%g7\n"
-"	casx	[%0], %%g5, %%g7\n"
+"	ldx	[%0], %%g1\n"
+"	brlz,pn	%%g1, 1f\n"
+"	 or	%%g1, %%g3, %%g7\n"
+"	casx	[%0], %%g1, %%g7\n"
 "	membar	#StoreLoad | #StoreStore\n"
 "	ba,pt	%%xcc, 2f\n"
-"	 sub	%%g5, %%g7, %0\n"
+"	 sub	%%g1, %%g7, %0\n"
 "1:	mov	1, %0\n"
 "2:"	: "=r" (val)
 	: "0" (&(rw->lock))
-	: "g3", "g5", "g7", "memory");
+	: "g3", "g1", "g7", "memory");
 	if (val) {
 		/* We couldn't get the write bit. */
 		if (!--stuck) {
@@ -248,15 +248,15 @@ wlock_again:
 		__asm__ __volatile__(
 "		mov	1, %%g3\n"
 "		sllx	%%g3, 63, %%g3\n"
-"1:		ldx	[%0], %%g5\n"
-"		andn	%%g5, %%g3, %%g7\n"
-"		casx	[%0], %%g5, %%g7\n"
-"		cmp	%%g5, %%g7\n"
+"1:		ldx	[%0], %%g1\n"
+"		andn	%%g1, %%g3, %%g7\n"
+"		casx	[%0], %%g1, %%g7\n"
+"		cmp	%%g1, %%g7\n"
 "		bne,pn	%%xcc, 1b\n"
 "		 membar	#StoreLoad | #StoreStore"
 		: /* no outputs */
 		: "r" (&(rw->lock))
-		: "g3", "g5", "g7", "cc", "memory");
+		: "g3", "g1", "g7", "cc", "memory");
 		while(rw->lock != 0) {
 			if (!--stuck) {
 				if (shown++ <= 2)
@@ -294,14 +294,14 @@ wlock_again:
 "	membar	#StoreLoad | #LoadLoad\n"
 "	mov	1, %%g3\n"
 "	sllx	%%g3, 63, %%g3\n"
-"	ldx	[%0], %%g5\n"
-"	andn	%%g5, %%g3, %%g7\n"
-"	casx	[%0], %%g5, %%g7\n"
+"	ldx	[%0], %%g1\n"
+"	andn	%%g1, %%g3, %%g7\n"
+"	casx	[%0], %%g1, %%g7\n"
 "	membar	#StoreLoad | #StoreStore\n"
-"	sub	%%g5, %%g7, %0\n"
+"	sub	%%g1, %%g7, %0\n"
 	: "=r" (val)
 	: "0" (&(rw->lock))
-	: "g3", "g5", "g7", "memory");
+	: "g3", "g1", "g7", "memory");
 	if (val) {
 		if (!--stuck) {
 			if (shown++ <= 2)
@@ -323,17 +323,17 @@ int _do_write_trylock (rwlock_t *rw, char *str)
 	__asm__ __volatile__(
 "	mov	1, %%g3\n"
 "	sllx	%%g3, 63, %%g3\n"
-"	ldx	[%0], %%g5\n"
-"	brlz,pn	%%g5, 1f\n"
-"	 or	%%g5, %%g3, %%g7\n"
-"	casx	[%0], %%g5, %%g7\n"
+"	ldx	[%0], %%g1\n"
+"	brlz,pn	%%g1, 1f\n"
+"	 or	%%g1, %%g3, %%g7\n"
+"	casx	[%0], %%g1, %%g7\n"
 "	membar	#StoreLoad | #StoreStore\n"
 "	ba,pt	%%xcc, 2f\n"
-"	 sub	%%g5, %%g7, %0\n"
+"	 sub	%%g1, %%g7, %0\n"
 "1:	mov	1, %0\n"
 "2:"	: "=r" (val)
 	: "0" (&(rw->lock))
-	: "g3", "g5", "g7", "memory");
+	: "g3", "g1", "g7", "memory");
 
 	if (val) {
 		put_cpu();
@@ -347,15 +347,15 @@ int _do_write_trylock (rwlock_t *rw, char *str)
 		__asm__ __volatile__(
 "		mov	1, %%g3\n"
 "		sllx	%%g3, 63, %%g3\n"
-"1:		ldx	[%0], %%g5\n"
-"		andn	%%g5, %%g3, %%g7\n"
-"		casx	[%0], %%g5, %%g7\n"
-"		cmp	%%g5, %%g7\n"
+"1:		ldx	[%0], %%g1\n"
+"		andn	%%g1, %%g3, %%g7\n"
+"		casx	[%0], %%g1, %%g7\n"
+"		cmp	%%g1, %%g7\n"
 "		bne,pn	%%xcc, 1b\n"
 "		 membar	#StoreLoad | #StoreStore"
 		: /* no outputs */
 		: "r" (&(rw->lock))
-		: "g3", "g5", "g7", "cc", "memory");
+		: "g3", "g1", "g7", "cc", "memory");
 
 		put_cpu();
 

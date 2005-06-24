@@ -79,9 +79,8 @@ extern unsigned long pci_bus_to_phys(unsigned int ba, int busnr);
 #define pci_domain_nr(bus) ((struct pci_controller *)(bus)->sysdata)->index
 
 /* Set the name of the bus as it appears in /proc/bus/pci */
-static inline int pci_name_bus(char *name, struct pci_bus *bus)
+static inline int pci_proc_domain(struct pci_bus *bus)
 {
-	sprintf(name, "%02x", bus->number);
 	return 0;
 }
 
@@ -97,6 +96,12 @@ pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 			struct resource *res);
 
 extern void pcibios_add_platform_entries(struct pci_dev *dev);
+
+struct file;
+extern pgprot_t	pci_phys_mem_access_prot(struct file *file,
+					 unsigned long offset,
+					 unsigned long size,
+					 pgprot_t prot);
 
 #endif	/* __KERNEL__ */
 

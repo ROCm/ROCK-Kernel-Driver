@@ -46,7 +46,6 @@ struct ves1820_config
 };
 
 extern struct dvb_frontend* ves1820_attach(const struct ves1820_config* config,
-					   struct i2c_adapter* i2c,
-					   u8 pwm);
+					   struct i2c_adapter* i2c, u8 pwm);
 
 #endif // VES1820_H

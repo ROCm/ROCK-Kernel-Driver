@@ -309,7 +309,7 @@ static struct pci_driver cs461x_pci_driver = {
 
 static int __init cs461x_init(void)
 {
-        return pci_module_init(&cs461x_pci_driver);
+        return pci_register_driver(&cs461x_pci_driver);
 }
 
 static void __exit cs461x_exit(void)

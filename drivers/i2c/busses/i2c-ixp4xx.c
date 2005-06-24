@@ -133,8 +133,8 @@ static int ixp4xx_i2c_probe(struct device *dev)
 	drv_data->algo_data.mdelay = 10;
 	drv_data->algo_data.timeout = 100;
 
-	drv_data->adapter.id = I2C_HW_B_IXP4XX,
-	drv_data->adapter.algo_data = &drv_data->algo_data,
+	drv_data->adapter.id = I2C_HW_B_IXP4XX;
+	drv_data->adapter.algo_data = &drv_data->algo_data;
 
 	drv_data->adapter.dev.parent = &plat_dev->dev;
 

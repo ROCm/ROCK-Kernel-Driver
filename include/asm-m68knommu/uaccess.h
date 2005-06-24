@@ -23,7 +23,8 @@ static inline int _access_ok(unsigned long addr, unsigned long size)
 		(is_in_rom(addr) && is_in_rom(addr+size)));
 }
 
-extern inline int verify_area(int type, const void * addr, unsigned long size)
+/* this function will go away soon - use access_ok() instead */
+extern inline int __deprecated verify_area(int type, const void * addr, unsigned long size)
 {
 	return access_ok(type,addr,size)?0:-EFAULT;
 }

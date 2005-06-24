@@ -249,13 +249,13 @@ sti_rom_copy(unsigned long base, unsigned long count, void *dest)
 	/* this still needs to be revisited (see arch/parisc/mm/init.c:246) ! */
 	while (count >= 4) {
 		count -= 4;
-		*(u32 *)dest = __raw_readl(base);
+		*(u32 *)dest = gsc_readl(base);
 		base += 4;
 		dest += 4;
 	}
 	while (count) {
 		count--;
-		*(u8 *)dest = __raw_readb(base);
+		*(u8 *)dest = gsc_readb(base);
 		base++;
 		dest++;
 	}
@@ -460,12 +460,20 @@ sti_init_glob_cfg(struct sti_struct *sti,
 		/* remap virtually */
 		/* FIXME: add BTLB support if btlb==1 */
 		len = sti->regions[i].region_desc.length * 4096;
-		
+
+/* XXX: Enabling IOREMAP debugging causes a crash, so we must be passing
+ * a virtual address to something expecting a physical address that doesn't
+ * go through a readX macro */
+#if 0
 		if (len)
 		   glob_cfg->region_ptrs[i] = (unsigned long) (
 			sti->regions[i].region_desc.cache ?
 			ioremap(sti->regions_phys[i], len) :
 			ioremap_nocache(sti->regions_phys[i], len) );
+#else
+		if (len)
+			glob_cfg->region_ptrs[i] = sti->regions_phys[i];
+#endif
 		
 		DPRINTK(("region #%d: phys %08lx, virt %08x, len=%lukB, "
 			 "btlb=%d, sysonly=%d, cache=%d, last=%d\n",
@@ -680,7 +688,7 @@ sti_bmode_rom_copy(unsigned long base, unsigned long count, void *dest)
 
 	while (count) {
 		count--;
-		*(u8 *)dest = __raw_readl(base);
+		*(u8 *)dest = gsc_readl(base);
 		base += 4;
 		dest++;
 	}
@@ -730,7 +738,7 @@ sti_get_wmode_rom (unsigned long address)
 	unsigned long size;
     
 	/* read the ROM size directly from the struct in ROM */ 
-	size = __raw_readl(address + offsetof(struct sti_rom,last_addr));
+	size = gsc_readl(address + offsetof(struct sti_rom,last_addr));
 
 	raw = kmalloc(size, GFP_KERNEL);
 	if(raw)
@@ -790,11 +798,8 @@ sti_read_rom(int wordmode, struct sti_struct *sti, unsigned long address)
 	return 1;
 
 out_err:
-	if(raw)
-		kfree(raw);
-	if(cooked)
-		kfree(cooked);
-
+	kfree(raw);
+	kfree(cooked);
 	return 0;
 }
 
@@ -825,13 +830,13 @@ test_rom:
 	if (pdc_add_valid(address))
 		goto out_err;
 
-	sig = __raw_readl(address);
+	sig = gsc_readl(address);
 
 	/* check for a PCI ROM structure */
 	if ((le32_to_cpu(sig)==0xaa55)) {
 		unsigned int i, rm_offset;
 		u32 *rm;
-		i = __raw_readl(address+0x04);
+		i = gsc_readl(address+0x04);
 		if (i != 1) {
 			/* The ROM could have multiple architecture 
 			 * dependent images (e.g. i386, parisc,...) */
@@ -842,17 +847,17 @@ test_rom:
 		
 		sti->pd = pd;
 
-		i = __raw_readl(address+0x0c);
+		i = gsc_readl(address+0x0c);
 		DPRINTK(("PCI ROM size (from header) = %d kB\n",
 			le16_to_cpu(i>>16)*512/1024));
 		rm_offset = le16_to_cpu(i & 0xffff);
 		if (rm_offset) { 
 			/* read 16 bytes from the pci region mapper array */
 			rm = (u32*) &sti->rm_entry;
-			*rm++ = __raw_readl(address+rm_offset+0x00);
-			*rm++ = __raw_readl(address+rm_offset+0x04);
-			*rm++ = __raw_readl(address+rm_offset+0x08);
-			*rm++ = __raw_readl(address+rm_offset+0x0c);
+			*rm++ = gsc_readl(address+rm_offset+0x00);
+			*rm++ = gsc_readl(address+rm_offset+0x04);
+			*rm++ = gsc_readl(address+rm_offset+0x08);
+			*rm++ = gsc_readl(address+rm_offset+0x0c);
 			DPRINTK(("PCI region Mapper offset = %08x: ",
 				rm_offset));
 			for (i=0; i<16; i++)
@@ -860,7 +865,7 @@ test_rom:
 			DPRINTK(("\n"));
 		}
 
-		address += le32_to_cpu(__raw_readl(address+8));
+		address += le32_to_cpu(gsc_readl(address+8));
 		DPRINTK(("sig %04x, PCI STI ROM at %08lx\n", sig, address));
 		goto test_rom;
 	}
@@ -1003,17 +1008,17 @@ static void __devexit sticore_pci_remove(struct pci_dev *pd)
 
 
 static struct pci_device_id sti_pci_tbl[] = {
-	{ PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_VISUALIZE_EG, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
-	{ PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_VISUALIZE_FX6, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
-	{ PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_VISUALIZE_FX4, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
-	{ PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_VISUALIZE_FX2, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
-	{ PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_VISUALIZE_FXE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ PCI_DEVICE(PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_VISUALIZE_EG) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_VISUALIZE_FX6) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_VISUALIZE_FX4) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_VISUALIZE_FX2) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_VISUALIZE_FXE) },
 	{ 0, } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, sti_pci_tbl);
 
 static struct pci_driver pci_sti_driver = {
-	.name		= "sti (pci)",
+	.name		= "sti",
 	.id_table	= sti_pci_tbl,
 	.probe		= sticore_pci_init,
 	.remove		= sticore_pci_remove,
@@ -1026,7 +1031,7 @@ static struct parisc_device_id sti_pa_tbl[] = {
 };
 
 static struct parisc_driver pa_sti_driver = {
-	.name		= "sti (native)",
+	.name		= "sti",
 	.id_table	= sti_pa_tbl,
 	.probe		= sticore_pa_init,
 };
@@ -1050,7 +1055,7 @@ static void __init sti_init_roms(void)
 
 	/* Register drivers for native & PCI cards */
 	register_parisc_driver(&pa_sti_driver);
-	pci_module_init(&pci_sti_driver);
+	pci_register_driver(&pci_sti_driver);
 
 	/* if we didn't find the given default sti, take the first one */
 	if (!default_sti)

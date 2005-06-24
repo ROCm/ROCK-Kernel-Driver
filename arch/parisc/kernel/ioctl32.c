@@ -563,7 +563,7 @@ static int drm32_res_ctx(unsigned int fd, unsigned int cmd, unsigned long arg)
 
 #endif
 
-#define HANDLE_IOCTL(cmd, handler) { cmd, (ioctl_trans_handler_t)handler, 0 },
+#define HANDLE_IOCTL(cmd, handler) { cmd, (ioctl_trans_handler_t)handler, NULL },
 #define COMPATIBLE_IOCTL(cmd) HANDLE_IOCTL(cmd, sys_ioctl) 
 
 #define IOCTL_TABLE_START  struct ioctl_trans ioctl_start[] = {

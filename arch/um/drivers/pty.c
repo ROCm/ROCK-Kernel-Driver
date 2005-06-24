@@ -22,7 +22,7 @@ struct pty_chan {
 	char dev_name[sizeof("/dev/pts/0123456\0")];
 };
 
-void *pty_chan_init(char *str, int device, struct chan_opts *opts)
+static void *pty_chan_init(char *str, int device, struct chan_opts *opts)
 {
 	struct pty_chan *data;
 
@@ -34,7 +34,8 @@ void *pty_chan_init(char *str, int device, struct chan_opts *opts)
 	return(data);
 }
 
-int pts_open(int input, int output, int primary, void *d, char **dev_out)
+static int pts_open(int input, int output, int primary, void *d,
+		    char **dev_out)
 {
 	struct pty_chan *data = d;
 	char *dev;
@@ -63,7 +64,7 @@ int pts_open(int input, int output, int primary, void *d, char **dev_out)
 	return(fd);
 }
 
-int getmaster(char *line)
+static int getmaster(char *line)
 {
 	char *pty, *bank, *cp;
 	int master, err;
@@ -92,7 +93,8 @@ int getmaster(char *line)
 	return(-1);
 }
 
-int pty_open(int input, int output, int primary, void *d, char **dev_out)
+static int pty_open(int input, int output, int primary, void *d,
+		    char **dev_out)
 {
 	struct pty_chan *data = d;
 	int fd, err;
@@ -115,7 +117,7 @@ int pty_open(int input, int output, int primary, void *d, char **dev_out)
 	return(fd);
 }
 
-int pty_console_write(int fd, const char *buf, int n, void *d)
+static int pty_console_write(int fd, const char *buf, int n, void *d)
 {
 	struct pty_chan *data = d;
 

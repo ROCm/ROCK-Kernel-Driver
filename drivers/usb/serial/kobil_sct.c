@@ -637,10 +637,9 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 
 	switch (cmd) {
 	case TCGETS:   // 0x5401
-		result = verify_area(VERIFY_WRITE, user_arg, sizeof(struct termios));
-		if (result) {
-			dbg("%s - port %d Error in verify_area", __FUNCTION__, port->number);
-			return(result);
+		if (!access_ok(VERIFY_WRITE, user_arg, sizeof(struct termios))) {
+			dbg("%s - port %d Error in access_ok", __FUNCTION__, port->number);
+			return -EFAULT;
 		}
 		if (kernel_termios_to_user_termios((struct termios __user *)arg,
 						   &priv->internal_termios))
@@ -652,10 +651,9 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 			dbg("%s - port %d Error: port->tty->termios is NULL", __FUNCTION__, port->number);
 			return -ENOTTY;
 		}
-		result = verify_area(VERIFY_READ, user_arg, sizeof(struct termios));
-		if (result) {
-			dbg("%s - port %d Error in verify_area", __FUNCTION__, port->number);
-			return result;
+		if (!access_ok(VERIFY_READ, user_arg, sizeof(struct termios))) {
+			dbg("%s - port %d Error in access_ok", __FUNCTION__, port->number);
+			return -EFAULT;
 		}
 		if (user_termios_to_kernel_termios(&priv->internal_termios,
 						   (struct termios __user *)arg))

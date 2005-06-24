@@ -308,7 +308,7 @@ end:
 	return_VALUE(0);
 }
 
-int acpi_processor_throttling_open_fs(struct inode *inode, struct file *file)
+static int acpi_processor_throttling_open_fs(struct inode *inode, struct file *file)
 {
 	return single_open(file, acpi_processor_throttling_seq_show,
 						PDE(inode)->data);

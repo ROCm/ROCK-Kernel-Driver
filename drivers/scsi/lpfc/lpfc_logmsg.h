@@ -19,11 +19,8 @@
  *******************************************************************/
 
 /*
- * $Id: lpfc_logmsg.h 1.31 2004/08/26 19:17:52EDT sf_support Exp  $
+ * $Id: lpfc_logmsg.h 1.32 2005/01/25 17:52:01EST sf_support Exp  $
  */
-
-#ifndef _H_LPFC_LOGMSG
-#define _H_LPFC_LOGMSG
 
 #define LOG_ELS                       0x1	/* ELS events */
 #define LOG_DISCOVERY                 0x2	/* Link discovery events */
@@ -42,5 +39,3 @@
 #define lpfc_printf_log(phba, level, mask, fmt, arg...) \
 	{ if (((mask) &(phba)->cfg_log_verbose) || (level[1] <= '3')) \
 		dev_printk(level, &((phba)->pcidev)->dev, fmt, ##arg); }
-#endif
-

@@ -32,6 +32,7 @@
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 #include <asm/cacheflush.h>
+#include <asm/offsets.h>
 
 #ifdef CONFIG_COMPAT
 #include <linux/compat.h>
@@ -69,7 +70,7 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs, int in_syscall);
 #endif
 
 asmlinkage int
-sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, struct pt_regs *regs)
+sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize, struct pt_regs *regs)
 {
 	sigset_t saveset, newset;
 #ifdef __LP64__
@@ -79,7 +80,7 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, struct pt_regs *regs)
 		/* XXX: Don't preclude handling different sized sigset_t's.  */
 		if (sigsetsize != sizeof(compat_sigset_t))
 			return -EINVAL;
-		if (copy_from_user(&newset32, (compat_sigset_t *)unewset, sizeof(newset32)))
+		if (copy_from_user(&newset32, (compat_sigset_t __user *)unewset, sizeof(newset32)))
 			return -EFAULT;
 		sigset_32to64(&newset,&newset32);
 		
@@ -125,7 +126,7 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, struct pt_regs *regs)
 #define INSN_DIE_HORRIBLY 0x68000ccc /* stw %r0,0x666(%sr0,%r0) */
 
 static long
-restore_sigcontext(struct sigcontext *sc, struct pt_regs *regs)
+restore_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs)
 {
 	long err = 0;
 
@@ -143,14 +144,14 @@ restore_sigcontext(struct sigcontext *sc, struct pt_regs *regs)
 void
 sys_rt_sigreturn(struct pt_regs *regs, int in_syscall)
 {
-	struct rt_sigframe *frame;
+	struct rt_sigframe __user *frame;
 	struct siginfo si;
 	sigset_t set;
 	unsigned long usp = (regs->gr[30] & ~(0x01UL));
 	unsigned long sigframe_size = PARISC_RT_SIGFRAME_SIZE;
 #ifdef __LP64__
 	compat_sigset_t compat_set;
-	struct compat_rt_sigframe * compat_frame;
+	struct compat_rt_sigframe __user * compat_frame;
 	
 	if(personality(current->personality) == PER_LINUX32)
 		sigframe_size = PARISC_RT_SIGFRAME_SIZE32;
@@ -158,12 +159,12 @@ sys_rt_sigreturn(struct pt_regs *regs, int in_syscall)
 
 
 	/* Unwind the user stack to get the rt_sigframe structure. */
-	frame = (struct rt_sigframe *)
+	frame = (struct rt_sigframe __user *)
 		(usp - sigframe_size);
 	DBG(2,"sys_rt_sigreturn: frame is %p\n", frame);
 
 #ifdef __LP64__
-	compat_frame = (struct compat_rt_sigframe *)frame;
+	compat_frame = (struct compat_rt_sigframe __user *)frame;
 	
 	if(personality(current->personality) == PER_LINUX32){
 		DBG(2,"sys_rt_sigreturn: ELF32 process.\n");
@@ -238,7 +239,7 @@ give_sigsegv:
  * Set up a signal frame.
  */
 
-static inline void *
+static inline void __user *
 get_sigframe(struct k_sigaction *ka, unsigned long sp, size_t frame_size)
 {
 	/*FIXME: ELF32 vs. ELF64 has different frame_size, but since we
@@ -251,11 +252,11 @@ get_sigframe(struct k_sigaction *ka, unsigned long sp, size_t frame_size)
 		sp = current->sas_ss_sp; /* Stacks grow up! */
 
 	DBG(1,"get_sigframe: Returning sp = %#lx\n", (unsigned long)sp);
-	return (void *) sp; /* Stacks grow up.  Fun. */
+	return (void __user *) sp; /* Stacks grow up.  Fun. */
 }
 
 static long
-setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs, int in_syscall)
+setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs, int in_syscall)
 		 
 {
 	unsigned long flags = 0;
@@ -292,14 +293,14 @@ static long
 setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	       sigset_t *set, struct pt_regs *regs, int in_syscall)
 {
-	struct rt_sigframe *frame;
+	struct rt_sigframe __user *frame;
 	unsigned long rp, usp;
 	unsigned long haddr, sigframe_size;
 	struct siginfo si;
 	int err = 0;
 #ifdef __LP64__
 	compat_int_t compat_val;
-	struct compat_rt_sigframe * compat_frame;
+	struct compat_rt_sigframe __user * compat_frame;
 	compat_sigset_t compat_set;
 #endif
 	
@@ -313,7 +314,7 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	
 #ifdef __LP64__
 
-	compat_frame = (struct compat_rt_sigframe *)frame;
+	compat_frame = (struct compat_rt_sigframe __user *)frame;
 	
 	if(personality(current->personality) == PER_LINUX32) {
 		DBG(1,"setup_rt_frame: frame->info = 0x%p\n", &compat_frame->info);
@@ -396,7 +397,7 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 #endif
 		if (haddr & PA_PLABEL_FDESC) {
 			Elf32_Fdesc fdesc;
-			Elf32_Fdesc *ufdesc = (Elf32_Fdesc *)A(haddr & ~3);
+			Elf32_Fdesc __user *ufdesc = (Elf32_Fdesc __user *)A(haddr & ~3);
 
 			err = __copy_from_user(&fdesc, ufdesc, sizeof(fdesc));
 
@@ -409,7 +410,7 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 #ifdef __LP64__
 	} else {
 		Elf64_Fdesc fdesc;
-		Elf64_Fdesc *ufdesc = (Elf64_Fdesc *)A(haddr & ~3);
+		Elf64_Fdesc __user *ufdesc = (Elf64_Fdesc __user *)A(haddr & ~3);
 		
 		err = __copy_from_user(&fdesc, ufdesc, sizeof(fdesc));
 		
@@ -442,6 +443,18 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		if(personality(current->personality) == PER_LINUX)
 			psw |= PSW_W;
 #endif
+
+		/* If we are singlestepping, arrange a trap to be delivered
+		   when we return to userspace. Note the semantics -- we
+		   should trap before the first insn in the handler is
+		   executed. Ref:
+			http://sources.redhat.com/ml/gdb/2004-11/msg00245.html
+		 */
+		if (pa_psw(current)->r) {
+			pa_psw(current)->r = 0;
+			psw |= PSW_R;
+			mtctl(-1, 0);
+		}
 
 		regs->gr[0] = psw;
 		regs->iaoq[0] = haddr | 3;

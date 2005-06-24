@@ -34,6 +34,8 @@ static int call_request_key(struct key *key,
 			    const char *callout_info)
 {
 	struct task_struct *tsk = current;
+	unsigned long flags;
+	key_serial_t prkey, sskey;
 	char *argv[10], *envp[3], uid_str[12], gid_str[12];
 	char key_str[12], keyring_str[3][12];
 	int i;
@@ -46,16 +48,25 @@ static int call_request_key(struct key *key,
 	sprintf(key_str, "%d", key->serial);
 
 	/* we specify the process's default keyrings */
-	task_lock(current);
 	sprintf(keyring_str[0], "%d",
 		tsk->thread_keyring ? tsk->thread_keyring->serial : 0);
-	sprintf(keyring_str[1], "%d",
-		tsk->process_keyring ? tsk->process_keyring->serial : 0);
-	sprintf(keyring_str[2], "%d",
-		(tsk->session_keyring ?
-		 tsk->session_keyring->serial :
-		 tsk->user->session_keyring->serial));
-	task_unlock(tsk);
+
+	prkey = 0;
+	if (tsk->signal->process_keyring)
+		prkey = tsk->signal->process_keyring->serial;
+
+	sskey = 0;
+	spin_lock_irqsave(&tsk->sighand->siglock, flags);
+	if (tsk->signal->session_keyring)
+		sskey = tsk->signal->session_keyring->serial;
+	spin_unlock_irqrestore(&tsk->sighand->siglock, flags);
+
+
+	if (!sskey)
+		sskey = tsk->user->session_keyring->serial;
+
+	sprintf(keyring_str[1], "%d", prkey);
+	sprintf(keyring_str[2], "%d", sskey);
 
 	/* set up a minimal environment */
 	i = 0;
@@ -166,8 +177,19 @@ static struct key *__request_key_construction(struct key_type *type,
 	now = current_kernel_time();
 	key->expiry = now.tv_sec + key_negative_timeout;
 
-	if (current->session_keyring)
-		key_link(current->session_keyring, key);
+	if (current->signal->session_keyring) {
+		unsigned long flags;
+		struct key *keyring;
+
+		spin_lock_irqsave(&current->sighand->siglock, flags);
+		keyring = current->signal->session_keyring;
+		atomic_inc(&keyring->usage);
+		spin_unlock_irqrestore(&current->sighand->siglock, flags);
+
+		key_link(keyring, key);
+		key_put(keyring);
+	}
+
 	key_put(key);
 
 	/* notify anyone who was waiting */
@@ -274,8 +296,8 @@ struct key *request_key(struct key_type *type,
 
 		/* - get hold of the user's construction queue */
 		user = key_user_lookup(current->fsuid);
-		if (IS_ERR(user)) {
-			key = ERR_PTR(PTR_ERR(user));
+		if (!user) {
+			key = ERR_PTR(-ENOMEM);
 			goto error;
 		}
 

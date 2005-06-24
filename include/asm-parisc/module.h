@@ -17,12 +17,16 @@
 #define Elf_Rela Elf32_Rela
 #endif
 
+struct unwind_table;
+
 struct mod_arch_specific
 {
 	unsigned long got_offset, got_count, got_max;
 	unsigned long fdesc_offset, fdesc_count, fdesc_max;
 	unsigned long stub_offset, stub_count, stub_max;
 	unsigned long init_stub_offset, init_stub_count, init_stub_max;
+	int unwind_section;
+	struct unwind_table *unwind;
 };
 
 #endif /* _ASM_PARISC_MODULE_H */

@@ -38,6 +38,7 @@ struct cpu_fp_info linux_sparc_fpu[] = {
   { 0x3e, 0x14, 0, "UltraSparc III integrated FPU"},
   { 0x3e, 0x15, 0, "UltraSparc III+ integrated FPU"},
   { 0x3e, 0x16, 0, "UltraSparc IIIi integrated FPU"},
+  { 0x3e, 0x18, 0, "UltraSparc IV integrated FPU"},
 };
 
 #define NSPARCFPU  (sizeof(linux_sparc_fpu)/sizeof(struct cpu_fp_info))
@@ -51,6 +52,7 @@ struct cpu_iu_info linux_sparc_chips[] = {
   { 0x3e, 0x14, "TI UltraSparc III (Cheetah)"},
   { 0x3e, 0x15, "TI UltraSparc III+ (Cheetah+)"},
   { 0x3e, 0x16, "TI UltraSparc IIIi (Jalapeno)"},
+  { 0x3e, 0x18, "TI UltraSparc IV (Jaguar)"},
 };
 
 #define NSPARCCHIPS  (sizeof(linux_sparc_chips)/sizeof(struct cpu_iu_info))

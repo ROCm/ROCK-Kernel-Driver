@@ -232,7 +232,7 @@ static int ipw_open(struct usb_serial_port *port, struct file *filp)
 				 0, /* index */
 				 NULL,
 				 0,
-				 100*HZ);
+				 100000);
 	if (result < 0)
 		dev_err(&port->dev, "Init of modem failed (error = %d)", result);
 
@@ -260,7 +260,7 @@ static int ipw_open(struct usb_serial_port *port, struct file *filp)
 				 0, /* index */
 				 NULL,
 				 0,
-				 100*HZ);
+				 100000);
 	if (result < 0) 
 		dev_err(&port->dev, "Enabling bulk RxRead failed (error = %d)", result);
 
@@ -273,7 +273,7 @@ static int ipw_open(struct usb_serial_port *port, struct file *filp)
 				 0,
 				 buf_flow_init,
 				 0x10,
-				 200*HZ);
+				 200000);
 	if (result < 0)
 		dev_err(&port->dev, "initial flowcontrol failed (error = %d)", result);
 
@@ -287,7 +287,7 @@ static int ipw_open(struct usb_serial_port *port, struct file *filp)
 				 0,
 				 NULL,
 				 0,
-				 200*HZ);
+				 200000);
 	if (result < 0)
 		dev_err(&port->dev, "setting dtr failed (error = %d)", result);
 
@@ -300,7 +300,7 @@ static int ipw_open(struct usb_serial_port *port, struct file *filp)
 				 0,
 				 NULL,
 				 0,
-				 200*HZ);
+				 200000);
 	if (result < 0)
 		dev_err(&port->dev, "setting dtr failed (error = %d)", result);
 	
@@ -327,7 +327,7 @@ static void ipw_close(struct usb_serial_port *port, struct file * filp)
 				 0,
 				 NULL,
 				 0,
-				 200*HZ);
+				 200000);
 	if (result < 0)
 		dev_err(&port->dev, "dropping dtr failed (error = %d)", result);
 
@@ -339,7 +339,7 @@ static void ipw_close(struct usb_serial_port *port, struct file * filp)
 				 0,
 				 NULL,
 				 0,
-				 200*HZ);
+				 200000);
 	if (result < 0)
 		dev_err(&port->dev, "dropping rts failed (error = %d)", result);
 
@@ -352,7 +352,7 @@ static void ipw_close(struct usb_serial_port *port, struct file * filp)
 				 0,
 				 NULL,
 				 0,
-				 200*HZ);
+				 200000);
 	if (result < 0)
 		dev_err(&port->dev, "purge failed (error = %d)", result);
 
@@ -365,7 +365,7 @@ static void ipw_close(struct usb_serial_port *port, struct file * filp)
 				 0, /* index */
 				 NULL,
 				 0,
-				 100*HZ);
+				 100000);
 
 	if (result < 0)
 		dev_err(&port->dev, "Disabling bulk RxRead failed (error = %d)", result);
@@ -457,7 +457,7 @@ static struct usb_serial_device_type ipw_device = {
 
 
 
-int usb_ipw_init(void)
+static int usb_ipw_init(void)
 {
 	int retval;
 
@@ -473,7 +473,7 @@ int usb_ipw_init(void)
 	return 0;
 }
 
-void usb_ipw_exit(void)
+static void usb_ipw_exit(void)
 {
 	usb_deregister(&usb_ipw_driver);
 	usb_serial_deregister(&ipw_device);

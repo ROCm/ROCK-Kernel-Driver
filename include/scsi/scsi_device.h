@@ -43,8 +43,9 @@ struct scsi_device {
 	struct list_head    siblings;   /* list of all devices on this host */
 	struct list_head    same_target_siblings; /* just the devices sharing same target id */
 
-	volatile unsigned short device_busy;	/* commands actually active on low-level */
-	spinlock_t sdev_lock;           /* also the request queue_lock */
+	/* this is now protected by the request_queue->queue_lock */
+	unsigned int device_busy;	/* commands actually active on
+					 * low-level. protected by queue_lock. */
 	spinlock_t list_lock;
 	struct list_head cmd_list;	/* queue of in use SCSI Command structures */
 	struct list_head starved_entry;
@@ -112,11 +113,16 @@ struct scsi_device {
 	unsigned no_uld_attach:1; /* disable connecting to upper level drivers */
 	unsigned select_no_atn:1;
 	unsigned fix_capacity:1;	/* READ_CAPACITY is too high by 1 */
+	unsigned retry_hwerror:1;	/* Retry HARDWARE_ERROR */
 
 	unsigned int device_blocked;	/* Device returned QUEUE_FULL. */
 
 	unsigned int max_device_blocked; /* what device_blocked counts down from  */
 #define SCSI_DEFAULT_DEVICE_BLOCKED	3
+
+	atomic_t iorequest_cnt;
+	atomic_t iodone_cnt;
+	atomic_t ioerr_cnt;
 
 	int timeout;
 
@@ -140,7 +146,10 @@ struct scsi_device {
  */
 struct scsi_target {
 	struct scsi_device	*starget_sdev_user;
+	struct list_head	siblings;
+	struct list_head	devices;
 	struct device		dev;
+	unsigned int		reap_ref; /* protected by the host lock */
 	unsigned int		channel;
 	unsigned int		id; /* target id ... replace
 				     * scsi_device.id eventually */
@@ -169,6 +178,10 @@ extern struct scsi_device *scsi_device_lookup(struct Scsi_Host *,
 					      uint, uint, uint);
 extern struct scsi_device *__scsi_device_lookup(struct Scsi_Host *,
 						uint, uint, uint);
+extern struct scsi_device *scsi_device_lookup_by_target(struct scsi_target *,
+							uint);
+extern struct scsi_device *__scsi_device_lookup_by_target(struct scsi_target *,
+							  uint);
 extern void starget_for_each_device(struct scsi_target *, void *,
 		     void (*fn)(struct scsi_device *, void *));
 
@@ -222,6 +235,12 @@ extern int scsi_device_quiesce(struct scsi_device *sdev);
 extern void scsi_device_resume(struct scsi_device *sdev);
 extern void scsi_target_quiesce(struct scsi_target *);
 extern void scsi_target_resume(struct scsi_target *);
+extern void scsi_scan_target(struct device *parent, unsigned int channel,
+			     unsigned int id, unsigned int lun, int rescan);
+extern void scsi_target_reap(struct scsi_target *);
+extern void scsi_target_block(struct device *);
+extern void scsi_target_unblock(struct device *);
+extern void scsi_remove_target(struct device *);
 extern const char *scsi_device_state_name(enum scsi_device_state);
 extern int scsi_is_sdev_device(const struct device *);
 extern int scsi_is_target_device(const struct device *);

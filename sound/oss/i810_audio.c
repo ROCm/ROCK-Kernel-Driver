@@ -3470,7 +3470,7 @@ static void __devexit i810_remove(struct pci_dev *pci_dev)
 }
 
 #ifdef CONFIG_PM
-static int i810_pm_suspend(struct pci_dev *dev, u32 pm_state)
+static int i810_pm_suspend(struct pci_dev *dev, pm_message_t pm_state)
 {
         struct i810_card *card = pci_get_drvdata(dev);
         struct i810_state *state;

@@ -1,6 +1,6 @@
 /* linux/drivers/i2c/busses/i2c-s3c2410.c
  *
- * Copyright (C) 2004 Simtec Electronics
+ * Copyright (C) 2004,2005 Simtec Electronics
  *	Ben Dooks <ben@simtec.co.uk>
  *
  * S3C2410 I2C Controller
@@ -188,6 +188,9 @@ static void s3c24xx_i2c_message_start(struct s3c24xx_i2c *i2c,
 	} else
 		stat |= S3C2410_IICSTAT_MASTER_TX;
 
+	if (msg->flags & I2C_M_REV_DIR_ADDR)
+		addr ^= 1;
+
 	// todo - check for wether ack wanted or not
 	s3c24xx_i2c_enable_ack(i2c);
 
@@ -287,7 +290,7 @@ static int i2s_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long iicstat)
 		    !(i2c->msg->flags & I2C_M_IGNORE_NAK)) {
 			/* ack was not received... */
 
-			dev_err(i2c->dev, "ack was not received\n" );
+			dev_dbg(i2c->dev, "ack was not received\n");
 			s3c24xx_i2c_stop(i2c, -EREMOTEIO);
 			goto out_ack;
 		}
@@ -555,11 +558,18 @@ static int s3c24xx_i2c_xfer(struct i2c_adapter *adap,
 	return -EREMOTEIO;
 }
 
+/* declare our i2c functionality */
+static u32 s3c24xx_i2c_func(struct i2c_adapter *adap)
+{
+	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_PROTOCOL_MANGLING;
+}
+
 /* i2c bus registration info */
 
 static struct i2c_algorithm s3c24xx_i2c_algorithm = {
 	.name			= "S3C2410-I2C-Algorithm",
 	.master_xfer		= s3c24xx_i2c_xfer,
+	.functionality		= s3c24xx_i2c_func,
 };
 
 static struct s3c24xx_i2c s3c24xx_i2c = {
@@ -567,8 +577,10 @@ static struct s3c24xx_i2c s3c24xx_i2c = {
 	.wait	= __WAIT_QUEUE_HEAD_INITIALIZER(s3c24xx_i2c.wait),
 	.adap	= {
 		.name			= "s3c2410-i2c",
+		.owner			= THIS_MODULE,
 		.algo			= &s3c24xx_i2c_algorithm,
 		.retries		= 2,
+		.class			= I2C_CLASS_HWMON,
 	},
 };
 

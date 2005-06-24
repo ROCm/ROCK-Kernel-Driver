@@ -784,11 +784,50 @@ static void sd_rescan(struct device *dev)
 	sd_revalidate_disk(sdkp->disk);
 }
 
+
+#ifdef CONFIG_COMPAT
+/* 
+ * This gets directly called from VFS. When the ioctl 
+ * is not recognized we go back to the other translation paths. 
+ */
+static long sd_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	struct block_device *bdev = file->f_dentry->d_inode->i_bdev;
+	struct gendisk *disk = bdev->bd_disk;
+	struct scsi_device *sdev = scsi_disk(disk)->device;
+
+	/*
+	 * If we are in the middle of error recovery, don't let anyone
+	 * else try and use this device.  Also, if error recovery fails, it
+	 * may try and take the device offline, in which case all further
+	 * access to the device is prohibited.
+	 */
+	if (!scsi_block_when_processing_errors(sdev))
+		return -ENODEV;
+	       
+	if (sdev->host->hostt->compat_ioctl) {
+		int ret;
+
+		ret = sdev->host->hostt->compat_ioctl(sdev, cmd, (void __user *)arg);
+
+		return ret;
+	}
+
+	/* 
+	 * Let the static ioctl translation table take care of it.
+	 */
+	return -ENOIOCTLCMD; 
+}
+#endif
+
 static struct block_device_operations sd_fops = {
 	.owner			= THIS_MODULE,
 	.open			= sd_open,
 	.release		= sd_release,
 	.ioctl			= sd_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl		= sd_compat_ioctl,
+#endif
 	.media_changed		= sd_media_changed,
 	.revalidate_disk	= sd_revalidate_disk,
 };

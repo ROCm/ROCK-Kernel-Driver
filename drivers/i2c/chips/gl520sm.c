@@ -301,6 +301,8 @@ static ssize_t set_in_min(struct i2c_client *client, struct gl520_data *data, co
 	long v = simple_strtol(buf, NULL, 10);
 	u8 r;
 
+	down(&data->update_lock);
+
 	if (n == 0)
 		r = VDD_TO_REG(v);
 	else
@@ -313,6 +315,7 @@ static ssize_t set_in_min(struct i2c_client *client, struct gl520_data *data, co
 	else
 		gl520_write_value(client, reg, r);
 
+	up(&data->update_lock);
 	return count;
 }
 
@@ -326,6 +329,8 @@ static ssize_t set_in_max(struct i2c_client *client, struct gl520_data *data, co
 	else
 		r = IN_TO_REG(v);
 
+	down(&data->update_lock);
+
 	data->in_max[n] = r;
 
 	if (n < 4)
@@ -333,6 +338,7 @@ static ssize_t set_in_max(struct i2c_client *client, struct gl520_data *data, co
 	else
 		gl520_write_value(client, reg, r);
 
+	up(&data->update_lock);
 	return count;
 }
 
@@ -363,8 +369,10 @@ static ssize_t get_fan_off(struct gl520_data *data, char *buf, int n)
 static ssize_t set_fan_min(struct i2c_client *client, struct gl520_data *data, const char *buf, size_t count, int n, int reg)
 {
 	unsigned long v = simple_strtoul(buf, NULL, 10);
-	u8 r = FAN_TO_REG(v, data->fan_div[n - 1]);
+	u8 r;
 
+	down(&data->update_lock);
+	r = FAN_TO_REG(v, data->fan_div[n - 1]);
 	data->fan_min[n - 1] = r;
 
 	if (n == 1)
@@ -380,6 +388,7 @@ static ssize_t set_fan_min(struct i2c_client *client, struct gl520_data *data, c
 	data->beep_mask &= data->alarm_mask;
 	gl520_write_value(client, GL520_REG_BEEP_MASK, data->beep_mask);
 
+	up(&data->update_lock);
 	return count;
 }
 
@@ -398,6 +407,7 @@ static ssize_t set_fan_div(struct i2c_client *client, struct gl520_data *data, c
 		return -EINVAL;
 	}
 
+	down(&data->update_lock);
 	data->fan_div[n - 1] = r;
 
 	if (n == 1)
@@ -405,6 +415,7 @@ static ssize_t set_fan_div(struct i2c_client *client, struct gl520_data *data, c
 	else
 		gl520_write_value(client, reg, (gl520_read_value(client, reg) & ~0x30) | (r << 4));
 
+	up(&data->update_lock);
 	return count;
 }
 
@@ -412,9 +423,10 @@ static ssize_t set_fan_off(struct i2c_client *client, struct gl520_data *data, c
 {
 	u8 r = simple_strtoul(buf, NULL, 10)?1:0;
 
+	down(&data->update_lock);
 	data->fan_off = r;
 	gl520_write_value(client, reg, (gl520_read_value(client, reg) & ~0x0c) | (r << 2));
-
+	up(&data->update_lock);
 	return count;
 }
 
@@ -439,22 +451,22 @@ static ssize_t get_temp_max_hyst(struct gl520_data *data, char *buf, int n)
 static ssize_t set_temp_max(struct i2c_client *client, struct gl520_data *data, const char *buf, size_t count, int n, int reg)
 {
 	long v = simple_strtol(buf, NULL, 10);
-	u8 r = TEMP_TO_REG(v);
 
-	data->temp_max[n - 1] = r;
-	gl520_write_value(client, reg, r);
-
+	down(&data->update_lock);
+	data->temp_max[n - 1] = TEMP_TO_REG(v);;
+	gl520_write_value(client, reg, data->temp_max[n - 1]);
+	up(&data->update_lock);
 	return count;
 }
 
 static ssize_t set_temp_max_hyst(struct i2c_client *client, struct gl520_data *data, const char *buf, size_t count, int n, int reg)
 {
 	long v = simple_strtol(buf, NULL, 10);
-	u8 r = TEMP_TO_REG(v);
 
-	data->temp_max_hyst[n - 1] = r;
-	gl520_write_value(client, reg, r);
-
+	down(&data->update_lock);
+	data->temp_max_hyst[n - 1] = TEMP_TO_REG(v);
+	gl520_write_value(client, reg, data->temp_max_hyst[n - 1]);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -477,19 +489,22 @@ static ssize_t set_beep_enable(struct i2c_client *client, struct gl520_data *dat
 {
 	u8 r = simple_strtoul(buf, NULL, 10)?0:1;
 
+	down(&data->update_lock);
 	data->beep_enable = !r;
 	gl520_write_value(client, reg, (gl520_read_value(client, reg) & ~0x04) | (r << 2));
-
+	up(&data->update_lock);
 	return count;
 }
 
 static ssize_t set_beep_mask(struct i2c_client *client, struct gl520_data *data, const char *buf, size_t count, int n, int reg)
 {
-	u8 r = simple_strtoul(buf, NULL, 10) & data->alarm_mask;
-
+	u8 r = simple_strtoul(buf, NULL, 10);
+	
+	down(&data->update_lock);
+	r &= data->alarm_mask;
 	data->beep_mask = r;
 	gl520_write_value(client, reg, r);
-
+	up(&data->update_lock);
 	return count;
 }
 

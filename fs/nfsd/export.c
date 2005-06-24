@@ -79,9 +79,9 @@ void expkey_put(struct cache_head *item, struct cache_detail *cd)
 	}
 }
 
-void expkey_request(struct cache_detail *cd,
-		    struct cache_head *h,
-		    char **bpp, int *blen)
+static void expkey_request(struct cache_detail *cd,
+			   struct cache_head *h,
+			   char **bpp, int *blen)
 {
 	/* client fsidtype \xfsid */
 	struct svc_expkey *ek = container_of(h, struct svc_expkey, h);
@@ -95,7 +95,7 @@ void expkey_request(struct cache_detail *cd,
 }
 
 static struct svc_expkey *svc_expkey_lookup(struct svc_expkey *, int);
-int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
+static int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 {
 	/* client fsidtype fsid [path] */
 	char *buf;
@@ -284,9 +284,9 @@ void svc_export_put(struct cache_head *item, struct cache_detail *cd)
 	}
 }
 
-void svc_export_request(struct cache_detail *cd,
-			struct cache_head *h,
-			char **bpp, int *blen)
+static void svc_export_request(struct cache_detail *cd,
+			       struct cache_head *h,
+			       char **bpp, int *blen)
 {
 	/*  client path */
 	struct svc_export *exp = container_of(h, struct svc_export, h);
@@ -340,7 +340,7 @@ static int check_export(struct inode *inode, int flags)
 
 }
 
-int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
+static int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 {
 	/* client path expiry [flags anonuid anongid fsid] */
 	char *buf;
@@ -510,8 +510,8 @@ exp_find_key(svc_client *clp, int fsid_type, u32 *fsidv, struct cache_req *reqp)
 	return ek;
 }
 
-int exp_set_key(svc_client *clp, int fsid_type, u32 *fsidv, 
-		struct svc_export *exp)
+static int exp_set_key(svc_client *clp, int fsid_type, u32 *fsidv,
+		       struct svc_export *exp)
 {
 	struct svc_expkey key, *ek;
 
@@ -999,7 +999,7 @@ static void e_stop(struct seq_file *m, void *p)
 	exp_readunlock();
 }
 
-struct flags {
+static struct flags {
 	int flag;
 	char *name[2];
 } expflags[] = {

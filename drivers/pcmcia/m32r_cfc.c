@@ -732,15 +732,8 @@ static int pcc_init(struct pcmcia_socket *s)
 	return 0;
 }
 
-static int pcc_suspend(struct pcmcia_socket *sock)
-{
-	debug(3, "m32r_cfc: pcc_suspend()\n");
-	return pcc_set_socket(sock, &dead_socket);
-}
-
 static struct pccard_operations pcc_operations = {
 	.init			= pcc_init,
-	.suspend		= pcc_suspend,
 	.get_status		= pcc_get_status,
 	.get_socket		= pcc_get_socket,
 	.set_socket		= pcc_set_socket,
@@ -750,7 +743,7 @@ static struct pccard_operations pcc_operations = {
 
 /*====================================================================*/
 
-static int m32r_pcc_suspend(struct device *dev, u32 state, u32 level)
+static int m32r_pcc_suspend(struct device *dev, pm_message_t state, u32 level)
 {
 	int ret = 0;
 	if (level == SUSPEND_SAVE_STATE)

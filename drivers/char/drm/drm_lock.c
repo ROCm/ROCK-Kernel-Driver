@@ -50,7 +50,7 @@ int drm_lock( struct inode *inode, struct file *filp,
 	       unsigned int cmd, unsigned long arg )
 {
         drm_file_t *priv = filp->private_data;
-        drm_device_t *dev = priv->dev;
+        drm_device_t *dev = priv->head->dev;
         DECLARE_WAITQUEUE( entry, current );
         drm_lock_t lock;
         int ret = 0;
@@ -145,7 +145,7 @@ int drm_unlock( struct inode *inode, struct file *filp,
 		 unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	drm_lock_t lock;
 
 	if ( copy_from_user( &lock, (drm_lock_t __user *)arg, sizeof(lock) ) )

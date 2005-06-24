@@ -45,12 +45,17 @@ static struct pt_regs jprobe_saved_regs;
 
 int arch_prepare_kprobe(struct kprobe *p)
 {
+	int ret = 0;
 	kprobe_opcode_t insn = *p->addr;
 
-	if (IS_MTMSRD(insn) || IS_RFID(insn))
-		/* cannot put bp on RFID/MTMSRD */
-		return 1;
-	return 0;
+	if ((unsigned long)p->addr & 0x03) {
+		printk("Attempt to register kprobe at an unaligned address\n");
+		ret = -EINVAL;
+	} else if (IS_MTMSRD(insn) || IS_RFID(insn)) {
+		printk("Cannot register a kprobe on rfid or mtmsrd\n");
+		ret = -EINVAL;
+	}
+	return ret;
 }
 
 void arch_copy_kprobe(struct kprobe *p)
@@ -71,7 +76,11 @@ static inline void disarm_kprobe(struct kprobe *p, struct pt_regs *regs)
 static inline void prepare_singlestep(struct kprobe *p, struct pt_regs *regs)
 {
 	regs->msr |= MSR_SE;
-	regs->nip = (unsigned long)&p->ainsn.insn;
+	/*single step inline if it a breakpoint instruction*/
+	if (p->opcode == BREAKPOINT_INSTRUCTION)
+		regs->nip = (unsigned long)p->addr;
+	else
+		regs->nip = (unsigned long)&p->ainsn.insn;
 }
 
 static inline int kprobe_handler(struct pt_regs *regs)
@@ -80,15 +89,18 @@ static inline int kprobe_handler(struct pt_regs *regs)
 	int ret = 0;
 	unsigned int *addr = (unsigned int *)regs->nip;
 
-	/* We're in an interrupt, but this is clear and BUG()-safe. */
-	preempt_disable();
-
 	/* Check we're not actually recursing */
 	if (kprobe_running()) {
 		/* We *are* holding lock here, so this is safe.
 		   Disarm the probe we just hit, and ignore it. */
 		p = get_kprobe(addr);
 		if (p) {
+			if (kprobe_status == KPROBE_HIT_SS) {
+				regs->msr &= ~MSR_SE;
+				regs->msr |= kprobe_saved_msr;
+				unlock_kprobes();
+				goto no_kprobe;
+			}
 			disarm_kprobe(p, regs);
 			ret = 1;
 		} else {
@@ -105,8 +117,16 @@ static inline int kprobe_handler(struct pt_regs *regs)
 	p = get_kprobe(addr);
 	if (!p) {
 		unlock_kprobes();
-#if 0
 		if (*addr != BREAKPOINT_INSTRUCTION) {
+			/*
+			 * PowerPC has multiple variants of the "trap"
+			 * instruction. If the current instruction is a
+			 * trap variant, it could belong to someone else
+			 */
+			kprobe_opcode_t cur_insn = *addr;
+			if (IS_TW(cur_insn) || IS_TD(cur_insn) ||
+					IS_TWI(cur_insn) || IS_TDI(cur_insn))
+		       		goto no_kprobe;
 			/*
 			 * The breakpoint instruction was removed right
 			 * after we hit it.  Another cpu has removed
@@ -116,7 +136,6 @@ static inline int kprobe_handler(struct pt_regs *regs)
 			 */
 			ret = 1;
 		}
-#endif
 		/* Not one of ours: let kernel handle it */
 		goto no_kprobe;
 	}
@@ -124,18 +143,21 @@ static inline int kprobe_handler(struct pt_regs *regs)
 	kprobe_status = KPROBE_HIT_ACTIVE;
 	current_kprobe = p;
 	kprobe_saved_msr = regs->msr;
-	if (p->pre_handler(p, regs)) {
+	if (p->pre_handler && p->pre_handler(p, regs))
 		/* handler has already set things up, so skip ss setup */
 		return 1;
-	}
 
 ss_probe:
 	prepare_singlestep(p, regs);
 	kprobe_status = KPROBE_HIT_SS;
+	/*
+	 * This preempt_disable() matches the preempt_enable_no_resched()
+	 * in post_kprobe_handler().
+	 */
+	preempt_disable();
 	return 1;
 
 no_kprobe:
-	preempt_enable_no_resched();
 	return ret;
 }
 
@@ -155,8 +177,6 @@ static void resume_execution(struct kprobe *p, struct pt_regs *regs)
 	ret = emulate_step(regs, p->ainsn.insn[0]);
 	if (ret == 0)
 		regs->nip = (unsigned long)p->addr + 4;
-
-	regs->msr &= ~MSR_SE;
 }
 
 static inline int post_kprobe_handler(struct pt_regs *regs)
@@ -193,6 +213,7 @@ static inline int kprobe_fault_handler(struct pt_regs *regs, int trapnr)
 
 	if (kprobe_status & KPROBE_HIT_SS) {
 		resume_execution(current_kprobe, regs);
+		regs->msr &= ~MSR_SE;
 		regs->msr |= kprobe_saved_msr;
 
 		unlock_kprobes();
@@ -208,27 +229,33 @@ int kprobe_exceptions_notify(struct notifier_block *self, unsigned long val,
 			     void *data)
 {
 	struct die_args *args = (struct die_args *)data;
+	int ret = NOTIFY_DONE;
+
+	/*
+	 * Interrupts are not disabled here.  We need to disable
+	 * preemption, because kprobe_running() uses smp_processor_id().
+	 */
+	preempt_disable();
 	switch (val) {
-	case DIE_IABR_MATCH:
-	case DIE_DABR_MATCH:
 	case DIE_BPT:
 		if (kprobe_handler(args->regs))
-			return NOTIFY_STOP;
+			ret = NOTIFY_STOP;
 		break;
 	case DIE_SSTEP:
 		if (post_kprobe_handler(args->regs))
-			return NOTIFY_STOP;
+			ret = NOTIFY_STOP;
 		break;
 	case DIE_GPF:
 	case DIE_PAGE_FAULT:
 		if (kprobe_running() &&
 		    kprobe_fault_handler(args->regs, args->trapnr))
-			return NOTIFY_STOP;
+			ret = NOTIFY_STOP;
 		break;
 	default:
 		break;
 	}
-	return NOTIFY_DONE;
+	preempt_enable();
+	return ret;
 }
 
 int setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
@@ -246,7 +273,6 @@ int setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
 
 void jprobe_return(void)
 {
-	preempt_enable_no_resched();
 	asm volatile("trap" ::: "memory");
 }
 

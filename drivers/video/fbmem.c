@@ -62,10 +62,8 @@ int num_registered_fb;
  * Helpers
  */
 
-int fb_get_color_depth(struct fb_info *info)
+int fb_get_color_depth(struct fb_var_screeninfo *var)
 {
-	struct fb_var_screeninfo *var = &info->var;
-
 	if (var->green.length == var->blue.length &&
 	    var->green.length == var->red.length &&
 	    !var->green.offset && !var->blue.offset &&
@@ -300,7 +298,7 @@ static void fb_set_logo(struct fb_info *info,
 	const u8 *src = logo->data;
 	u8 d, xor = (info->fix.visual == FB_VISUAL_MONO01) ? 0xff : 0;
 
-	if (fb_get_color_depth(info) == 3)
+	if (fb_get_color_depth(&info->var) == 3)
 		fg = 7;
 
 	switch (depth) {
@@ -365,7 +363,7 @@ static struct logo_data {
 
 int fb_prepare_logo(struct fb_info *info)
 {
-	int depth = fb_get_color_depth(info);
+	int depth = fb_get_color_depth(&info->var);
 
 	memset(&fb_logo, 0, sizeof(struct logo_data));
 
@@ -448,8 +446,7 @@ int fb_show_logo(struct fb_info *info)
 		logo_new = kmalloc(fb_logo.logo->width * fb_logo.logo->height, 
 				   GFP_KERNEL);
 		if (logo_new == NULL) {
-			if (palette)
-				kfree(palette);
+			kfree(palette);
 			if (saved_pseudo_palette)
 				info->pseudo_palette = saved_pseudo_palette;
 			return 0;
@@ -468,12 +465,10 @@ int fb_show_logo(struct fb_info *info)
 		info->fbops->fb_imageblit(info, &image);
 	}
 	
-	if (palette != NULL)
-		kfree(palette);
+	kfree(palette);
 	if (saved_pseudo_palette != NULL)
 		info->pseudo_palette = saved_pseudo_palette;
-	if (logo_new != NULL)
-		kfree(logo_new);
+	kfree(logo_new);
 	return fb_logo.logo->height;
 }
 #else
@@ -876,7 +871,8 @@ fb_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	int fbidx = iminor(file->f_dentry->d_inode);
 	struct fb_info *info = registered_fb[fbidx];
 	struct fb_ops *fb = info->fbops;
-	int ret;
+	long ret;
+
 	if (fb->fb_compat_ioctl == NULL)
 		return -ENOIOCTLCMD;
 	lock_kernel();
@@ -941,8 +937,8 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	/* This is an IO map - tell maydump to skip this VMA */
 	vma->vm_flags |= VM_IO | VM_RESERVED;
 #if defined(__sparc_v9__)
-	if (io_remap_page_range(vma, vma->vm_start, off,
-				vma->vm_end - vma->vm_start, vma->vm_page_prot, 0))
+	if (io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
+				vma->vm_end - vma->vm_start, vma->vm_page_prot))
 		return -EAGAIN;
 #else
 #if defined(__mc68000__)
@@ -958,7 +954,9 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	}
 #endif
 #elif defined(__powerpc__)
-	pgprot_val(vma->vm_page_prot) |= _PAGE_NO_CACHE|_PAGE_GUARDED;
+	vma->vm_page_prot = phys_mem_access_prot(file, off,
+						 vma->vm_end - vma->vm_start,
+						 vma->vm_page_prot);
 #elif defined(__alpha__)
 	/* Caching is off in the I/O space quadrant by design.  */
 #elif defined(__i386__) || defined(__x86_64__)
@@ -978,11 +976,9 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 #else
 #warning What do we have to do here??
 #endif
-#ifndef CONFIG_USERMODE
-	if (io_remap_page_range(vma, vma->vm_start, off,
+	if (io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
 			     vma->vm_end - vma->vm_start, vma->vm_page_prot))
 		return -EAGAIN;
-#endif
 #endif /* !__sparc_v9__ */
 	return 0;
 #endif /* !sparc32 */
@@ -1060,7 +1056,6 @@ int
 register_framebuffer(struct fb_info *fb_info)
 {
 	int i;
-	struct class_device *c;
 	struct fb_event event;
 
 	if (num_registered_fb == FB_MAX)
@@ -1071,13 +1066,15 @@ register_framebuffer(struct fb_info *fb_info)
 			break;
 	fb_info->node = i;
 
-	c = class_simple_device_add(fb_class, MKDEV(FB_MAJOR, i),
+	fb_info->class_device = class_simple_device_add(fb_class, MKDEV(FB_MAJOR, i),
 				    fb_info->device, "fb%d", i);
-	if (IS_ERR(c)) {
+	if (IS_ERR(fb_info->class_device)) {
 		/* Not fatal */
-		printk(KERN_WARNING "Unable to create class_device for framebuffer %d; errno = %ld\n", i, PTR_ERR(c));
-	}
-	
+		printk(KERN_WARNING "Unable to create class_device for framebuffer %d; errno = %ld\n", i, PTR_ERR(fb_info->class_device));
+		fb_info->class_device = NULL;
+	} else
+		fb_init_class_device(fb_info);
+
 	if (fb_info->pixmap.addr == NULL) {
 		fb_info->pixmap.addr = kmalloc(FBPIXMAPSIZE, GFP_KERNEL);
 		if (fb_info->pixmap.addr) {
@@ -1136,6 +1133,7 @@ unregister_framebuffer(struct fb_info *fb_info)
 	fb_destroy_modelist(&fb_info->modelist);
 	registered_fb[i]=NULL;
 	num_registered_fb--;
+	fb_cleanup_class_device(fb_info);
 	class_simple_device_remove(MKDEV(FB_MAJOR, i));
 	return 0;
 }
@@ -1190,7 +1188,7 @@ void fb_set_suspend(struct fb_info *info, int state)
  *
  */
 
-int __init
+static int __init
 fbmem_init(void)
 {
 	create_proc_read_entry("fb", 0, NULL, fbmem_read_proc, NULL);
@@ -1206,16 +1204,67 @@ fbmem_init(void)
 	}
 	return 0;
 }
+
+#ifdef MODULE
+module_init(fbmem_init);
+static void __exit
+fbmem_exit(void)
+{
+	class_simple_destroy(fb_class);
+}
+
+module_exit(fbmem_exit);
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Framebuffer base");
+#else
 subsys_initcall(fbmem_init);
+#endif
+
+int fb_new_modelist(struct fb_info *info)
+{
+	struct fb_event event;
+	struct fb_var_screeninfo var = info->var;
+	struct list_head *pos, *n;
+	struct fb_modelist *modelist;
+	struct fb_videomode *m, mode;
+	int err = 1;
+
+	list_for_each_safe(pos, n, &info->modelist) {
+		modelist = list_entry(pos, struct fb_modelist, list);
+		m = &modelist->mode;
+		fb_videomode_to_var(&var, m);
+		var.activate = FB_ACTIVATE_TEST;
+		err = fb_set_var(info, &var);
+		fb_var_to_videomode(&mode, &var);
+		if (err || !fb_mode_is_equal(m, &mode)) {
+			list_del(pos);
+			kfree(pos);
+		}
+	}
+
+	err = 1;
+
+	if (!list_empty(&info->modelist)) {
+		event.info = info;
+		err = notifier_call_chain(&fb_notifier_list,
+					   FB_EVENT_NEW_MODELIST,
+					   &event);
+	}
+
+	return err;
+}
 
 static char *video_options[FB_MAX];
 static int ofonly;
 
+extern const char *global_mode_option;
+
 /**
  * fb_get_options - get kernel boot parameters
- * @name - framebuffer name as it would appear in
- *         the boot parameter line
- *         (video=<name>:<options>)
+ * @name:   framebuffer name as it would appear in
+ *          the boot parameter line
+ *          (video=<name>:<options>)
+ * @option: the option will be stored here
  *
  * NOTE: Needed to maintain backwards compatibility
  */
@@ -1263,10 +1312,7 @@ int fb_get_options(char *name, char **option)
  *	Returns zero.
  *
  */
-
-extern const char *global_mode_option;
-
-int __init video_setup(char *options)
+static int __init video_setup(char *options)
 {
 	int i, global = 0;
 
@@ -1319,5 +1365,6 @@ EXPORT_SYMBOL(fb_set_suspend);
 EXPORT_SYMBOL(fb_register_client);
 EXPORT_SYMBOL(fb_unregister_client);
 EXPORT_SYMBOL(fb_get_options);
+EXPORT_SYMBOL(fb_new_modelist);
 
 MODULE_LICENSE("GPL");

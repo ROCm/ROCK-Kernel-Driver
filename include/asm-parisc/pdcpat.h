@@ -190,16 +190,16 @@
 #ifndef __ASSEMBLY__
 #include <linux/types.h>
 
-#ifdef CONFIG_PARISC64
+#ifdef CONFIG_64BIT
 #define is_pdc_pat()	(PDC_TYPE_PAT == pdc_type)
 extern int pdc_pat_get_irt_size(unsigned long *num_entries, unsigned long cell_num);
 extern int pdc_pat_get_irt(void *r_addr, unsigned long cell_num);
-#else	/* ! CONFIG_PARISC64 */
+#else	/* ! CONFIG_64BIT */
 /* No PAT support for 32-bit kernels...sorry */
 #define is_pdc_pat()	(0)
 #define pdc_pat_get_irt_size(num_entries, cell_numn)	PDC_BAD_PROC
 #define pdc_pat_get_irt(r_addr, cell_num)		PDC_BAD_PROC
-#endif	/* ! CONFIG_PARISC64 */
+#endif	/* ! CONFIG_64BIT */
 
 
 struct pdc_pat_cell_num {

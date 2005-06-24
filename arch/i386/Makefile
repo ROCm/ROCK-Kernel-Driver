@@ -14,6 +14,8 @@
 # 19990713  Artur Skawina <skawina@geocities.com>
 #           Added '-march' and '-mpreferred-stack-boundary' support
 #
+# 20050320  Kianusch Sayah Karadji <kianusch@sk-tech.net>
+#           Added support for GEODE CPU
 
 LDFLAGS		:= -m elf_i386
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
@@ -48,10 +50,12 @@ cflags-$(CONFIG_MWINCHIP2)	+= $(call cc-option,-march=winchip2,-march=i586)
 cflags-$(CONFIG_MWINCHIP3D)	+= $(call cc-option,-march=winchip2,-march=i586)
 cflags-$(CONFIG_MCYRIXIII)	+= $(call cc-option,-march=c3,-march=i486) $(align)-functions=0 $(align)-jumps=0 $(align)-loops=0
 cflags-$(CONFIG_MVIAC3_2)	+= $(call cc-option,-march=c3-2,-march=i686)
-cflags-$(CONFIG_KDB)		+= $(call cc-option,-fno-optimize-sibling-calls,) 
 
 # AMD Elan support
 cflags-$(CONFIG_X86_ELAN)	+= -march=i486
+
+# Geode GX1 support
+cflags-$(CONFIG_MGEODEGX1)		+= $(call cc-option,-march=pentium-mmx,-march=i486)
 
 # -mregparm=3 works ok on gcc-3.0 and later
 #
@@ -118,7 +122,6 @@ drivers-$(CONFIG_PCI)			+= arch/i386/pci/
 # must be linked after kernel/
 drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 drivers-$(CONFIG_PM)			+= arch/i386/power/
-drivers-$(CONFIG_KDB)			+= arch/i386/kdb/
 
 CFLAGS += $(mflags-y)
 AFLAGS += $(mflags-y)
@@ -126,7 +129,7 @@ AFLAGS += $(mflags-y)
 boot := arch/i386/boot
 
 .PHONY: zImage bzImage compressed zlilo bzlilo \
-	zdisk bzdisk fdimage fdimage144 fdimage288 install
+	zdisk bzdisk fdimage fdimage144 fdimage288 install kernel_install
 
 all: bzImage
 
@@ -145,8 +148,12 @@ zlilo bzlilo: vmlinux
 zdisk bzdisk: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) zdisk
 
-install fdimage fdimage144 fdimage288: vmlinux
+fdimage fdimage144 fdimage288: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) $@
+
+install: vmlinux
+install kernel_install:
+	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(KBUILD_IMAGE) install
 
 prepare: include/asm-$(ARCH)/asm_offsets.h
 CLEAN_FILES += include/asm-$(ARCH)/asm_offsets.h

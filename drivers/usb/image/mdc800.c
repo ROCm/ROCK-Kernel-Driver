@@ -23,7 +23,7 @@
  *
  *
  * The driver brings the USB functions of the MDC800 to Linux.
- * To use the Camera you must support the USB Protocoll of the camera
+ * To use the Camera you must support the USB Protocol of the camera
  * to the Kernel Node.
  * The Driver uses a misc device Node. Create it with :
  * mknod /dev/mustek c 180 32
@@ -95,6 +95,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/smp_lock.h>
+#include <linux/wait.h>
 
 #include <linux/usb.h>
 #include <linux/fs.h>
@@ -330,7 +331,7 @@ static void mdc800_usb_irq (struct urb *urb, struct pt_regs *res)
 	{
 		mdc800->camera_request_ready=0;
 		mdc800->irq_woken=1;
-		wake_up_interruptible (&mdc800->irq_wait);
+		wake_up (&mdc800->irq_wait);
 	}
 }
 
@@ -346,19 +347,9 @@ static void mdc800_usb_irq (struct urb *urb, struct pt_regs *res)
  */
 static int mdc800_usb_waitForIRQ (int mode, int msec)
 {
-        DECLARE_WAITQUEUE(wait, current);
-	long timeout;
-
 	mdc800->camera_request_ready=1+mode;
 
-	add_wait_queue(&mdc800->irq_wait, &wait);
-	timeout = msec*HZ/1000;
-	while (!mdc800->irq_woken && timeout)
-	{
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		timeout = schedule_timeout (timeout);
-	}
-        remove_wait_queue(&mdc800->irq_wait, &wait);
+	wait_event_timeout(mdc800->irq_wait, mdc800->irq_woken, msec*HZ/1000);
 	mdc800->irq_woken = 0;
 
 	if (mdc800->camera_request_ready>0)
@@ -395,7 +386,7 @@ static void mdc800_usb_write_notify (struct urb *urb, struct pt_regs *res)
 		mdc800->state=READY;
 	}
 	mdc800->written = 1;
-	wake_up_interruptible (&mdc800->write_wait);
+	wake_up (&mdc800->write_wait);
 }
 
 
@@ -423,7 +414,7 @@ static void mdc800_usb_download_notify (struct urb *urb, struct pt_regs *res)
 		err ("request bytes fails (status:%i)", urb->status);
 	}
 	mdc800->downloaded = 1;
-	wake_up_interruptible (&mdc800->download_wait);
+	wake_up (&mdc800->download_wait);
 }
 
 
@@ -704,8 +695,6 @@ static ssize_t mdc800_device_read (struct file *file, char __user *buf, size_t l
 {
 	size_t left=len, sts=len; /* single transfer size */
 	char __user *ptr = buf;
-	long timeout;
-	DECLARE_WAITQUEUE(wait, current);
 
 	down (&mdc800->io_lock);
 	if (mdc800->state == NOT_CONNECTED)
@@ -751,14 +740,8 @@ static ssize_t mdc800_device_read (struct file *file, char __user *buf, size_t l
 					up (&mdc800->io_lock);
 					return len-left;
 				}
-				add_wait_queue(&mdc800->download_wait, &wait);
-				timeout = TO_DOWNLOAD_GET_READY*HZ/1000;
-				while (!mdc800->downloaded && timeout)
-				{
-					set_current_state(TASK_UNINTERRUPTIBLE);
-					timeout = schedule_timeout (timeout);
-				}
-				remove_wait_queue(&mdc800->download_wait, &wait);
+				wait_event_timeout(mdc800->download_wait, mdc800->downloaded,
+										TO_DOWNLOAD_GET_READY*HZ/1000);
 				mdc800->downloaded = 0;
 				if (mdc800->download_urb->status != 0)
 				{
@@ -802,7 +785,6 @@ static ssize_t mdc800_device_read (struct file *file, char __user *buf, size_t l
 static ssize_t mdc800_device_write (struct file *file, const char __user *buf, size_t len, loff_t *pos)
 {
 	size_t i=0;
-	DECLARE_WAITQUEUE(wait, current);
 
 	down (&mdc800->io_lock);
 	if (mdc800->state != READY)
@@ -856,7 +838,6 @@ static ssize_t mdc800_device_write (struct file *file, const char __user *buf, s
 		if (mdc800->in_count == 8)
 		{
 			int answersize;
-			long timeout;
 
 			if (mdc800_usb_waitForIRQ (0,TO_GET_READY))
 			{
@@ -876,14 +857,7 @@ static ssize_t mdc800_device_write (struct file *file, const char __user *buf, s
 				up (&mdc800->io_lock);
 				return -EIO;
 			}
-			add_wait_queue(&mdc800->write_wait, &wait);
-			timeout = TO_WRITE_GET_READY*HZ/1000;
-			while (!mdc800->written && timeout)
-			{
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				timeout = schedule_timeout (timeout);
-			}
-			remove_wait_queue(&mdc800->write_wait, &wait);
+			wait_event_timeout(mdc800->write_wait, mdc800->written, TO_WRITE_GET_READY*HZ/1000);
 			mdc800->written = 0;
 			if (mdc800->state == WORKING)
 			{

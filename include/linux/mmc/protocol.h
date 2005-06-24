@@ -76,6 +76,16 @@
 #define MMC_APP_CMD              55   /* ac   [31:16] RCA        R1  */
 #define MMC_GEN_CMD              56   /* adtc [0] RD/WR          R1b */
 
+/* SD commands                           type  argument     response */
+  /* class 8 */
+/* This is basically the same command as for MMC with some quirks. */
+#define SD_SEND_RELATIVE_ADDR     3   /* ac                      R6  */
+
+  /* Application commands */
+#define SD_APP_SET_BUS_WIDTH      6   /* ac   [1:0] bus width    R1  */
+#define SD_APP_OP_COND           41   /* bcr  [31:0] OCR         R3  */
+#define SD_APP_SEND_SCR          51   /* adtc                    R1  */
+
 /*
   MMC status in R1
   Type
@@ -113,7 +123,7 @@
 #define R1_STATUS(x)            (x & 0xFFFFE000)
 #define R1_CURRENT_STATE(x)    	((x & 0x00001E00) >> 9)	/* sx, b (4 bits) */
 #define R1_READY_FOR_DATA	(1 << 8)	/* sx, a */
-#define R1_APP_CMD		(1 << 7)	/* sr, c */
+#define R1_APP_CMD		(1 << 5)	/* sr, c */
 
 /* These are unpacked versions of the actual responses */
 
@@ -185,6 +195,33 @@ struct _mmc_csd {
 #define MMC_VDD_35_36	0x00800000	/* VDD voltage 3.5 ~ 3.6 */
 #define MMC_CARD_BUSY	0x80000000	/* Card Power up status bit */
 
+/*
+ * Card Command Classes (CCC)
+ */
+#define CCC_BASIC		(1<<0)	/* (0) Basic protocol functions */
+					/* (CMD0,1,2,3,4,7,9,10,12,13,15) */
+#define CCC_STREAM_READ		(1<<1)	/* (1) Stream read commands */
+					/* (CMD11) */
+#define CCC_BLOCK_READ		(1<<2)	/* (2) Block read commands */
+					/* (CMD16,17,18) */
+#define CCC_STREAM_WRITE	(1<<3)	/* (3) Stream write commands */
+					/* (CMD20) */
+#define CCC_BLOCK_WRITE		(1<<4)	/* (4) Block write commands */
+					/* (CMD16,24,25,26,27) */
+#define CCC_ERASE		(1<<5)	/* (5) Ability to erase blocks */
+					/* (CMD32,33,34,35,36,37,38,39) */
+#define CCC_WRITE_PROT		(1<<6)	/* (6) Able to write protect blocks */
+					/* (CMD28,29,30) */
+#define CCC_LOCK_CARD		(1<<7)	/* (7) Able to lock down card */
+					/* (CMD16,CMD42) */
+#define CCC_APP_SPEC		(1<<8)	/* (8) Application specific */
+					/* (CMD55,56,57,ACMD*) */
+#define CCC_IO_MODE		(1<<9)	/* (9) I/O mode */
+					/* (CMD5,39,40,52,53) */
+#define CCC_SWITCH		(1<<10)	/* (10) High speed switch */
+					/* (CMD6,34,35,36,37,50) */
+					/* (11) Reserved */
+					/* (CMD?) */
 
 /*
  * CSD field definitions

@@ -99,8 +99,7 @@ static inline void flush_cache_range(struct vm_area_struct *vma,
 	        __flush_cache_030();
 }
 
-static inline void flush_cache_page(struct vm_area_struct *vma,
-				    unsigned long vmaddr)
+static inline void flush_cache_page(struct vm_area_struct *vma, unsigned long vmaddr, unsigned long pfn)
 {
 	if (vma->vm_mm == current->mm)
 	        __flush_cache_030();
@@ -134,15 +133,15 @@ static inline void __flush_page_to_ram(void *vaddr)
 #define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
 
 #define copy_to_user_page(vma, page, vaddr, dst, src, len) \
-	do {					\
-		flush_cache_page(vma, vaddr);	\
-		memcpy(dst, src, len);		\
+	do {							\
+		flush_cache_page(vma, vaddr, page_to_pfn(page));\
+		memcpy(dst, src, len);				\
 	} while (0)
 
 #define copy_from_user_page(vma, page, vaddr, dst, src, len) \
-	do {					\
-		flush_cache_page(vma, vaddr);	\
-		memcpy(dst, src, len);		\
+	do {							\
+		flush_cache_page(vma, vaddr, page_to_pfn(page));\
+		memcpy(dst, src, len);				\
 	} while (0)
 
 extern void flush_icache_range(unsigned long address, unsigned long endaddr);

@@ -188,36 +188,45 @@
 /*
  *  Common definitions for both bus space based and legacy IO methods.
  */
-#define INB(r)		INB_OFF(offsetof(struct sym_reg,r))
-#define INW(r)		INW_OFF(offsetof(struct sym_reg,r))
-#define INL(r)		INL_OFF(offsetof(struct sym_reg,r))
 
-#define OUTB(r, v)	OUTB_OFF(offsetof(struct sym_reg,r), (v))
-#define OUTW(r, v)	OUTW_OFF(offsetof(struct sym_reg,r), (v))
-#define OUTL(r, v)	OUTL_OFF(offsetof(struct sym_reg,r), (v))
+#define INB_OFF(np, o)		ioread8(np->s.ioaddr + (o))
+#define INW_OFF(np, o)		ioread16(np->s.ioaddr + (o))
+#define INL_OFF(np, o)		ioread32(np->s.ioaddr + (o))
 
-#define OUTONB(r, m)	OUTB(r, INB(r) | (m))
-#define OUTOFFB(r, m)	OUTB(r, INB(r) & ~(m))
-#define OUTONW(r, m)	OUTW(r, INW(r) | (m))
-#define OUTOFFW(r, m)	OUTW(r, INW(r) & ~(m))
-#define OUTONL(r, m)	OUTL(r, INL(r) | (m))
-#define OUTOFFL(r, m)	OUTL(r, INL(r) & ~(m))
+#define OUTB_OFF(np, o, val)	iowrite8((val), np->s.ioaddr + (o))
+#define OUTW_OFF(np, o, val)	iowrite16((val), np->s.ioaddr + (o))
+#define OUTL_OFF(np, o, val)	iowrite32((val), np->s.ioaddr + (o))
+
+#define INB(np, r)		INB_OFF(np, offsetof(struct sym_reg, r))
+#define INW(np, r)		INW_OFF(np, offsetof(struct sym_reg, r))
+#define INL(np, r)		INL_OFF(np, offsetof(struct sym_reg, r))
+
+#define OUTB(np, r, v)		OUTB_OFF(np, offsetof(struct sym_reg, r), (v))
+#define OUTW(np, r, v)		OUTW_OFF(np, offsetof(struct sym_reg, r), (v))
+#define OUTL(np, r, v)		OUTL_OFF(np, offsetof(struct sym_reg, r), (v))
+
+#define OUTONB(np, r, m)	OUTB(np, r, INB(np, r) | (m))
+#define OUTOFFB(np, r, m)	OUTB(np, r, INB(np, r) & ~(m))
+#define OUTONW(np, r, m)	OUTW(np, r, INW(np, r) | (m))
+#define OUTOFFW(np, r, m)	OUTW(np, r, INW(np, r) & ~(m))
+#define OUTONL(np, r, m)	OUTL(np, r, INL(np, r) | (m))
+#define OUTOFFL(np, r, m)	OUTL(np, r, INL(np, r) & ~(m))
 
 /*
  *  We normally want the chip to have a consistent view
  *  of driver internal data structures when we restart it.
  *  Thus these macros.
  */
-#define OUTL_DSP(v)				\
+#define OUTL_DSP(np, v)				\
 	do {					\
 		MEMORY_WRITE_BARRIER();		\
-		OUTL (nc_dsp, (v));		\
+		OUTL(np, nc_dsp, (v));		\
 	} while (0)
 
 #define OUTONB_STD()				\
 	do {					\
 		MEMORY_WRITE_BARRIER();		\
-		OUTONB (nc_dcntl, (STD|NOCOM));	\
+		OUTONB(np, nc_dcntl, (STD|NOCOM));	\
 	} while (0)
 
 /*
@@ -321,7 +330,6 @@
  *  Host adapter miscellaneous flags.
  */
 #define SYM_AVOID_BUS_RESET	(1)
-#define SYM_SCAN_TARGETS_HILO	(1<<1)
 
 /*
  *  Misc.
@@ -334,20 +342,13 @@
  *  Gather negotiable parameters value
  */
 struct sym_trans {
-	u8 scsi_version;
-	u8 spi_version;
 	u8 period;
 	u8 offset;
-	u8 width;
-	u8 options;	/* PPR options */
-};
-
-struct sym_tinfo {
-	struct sym_trans curr;
-	struct sym_trans goal;
-#ifdef	SYM_OPT_ANNOUNCE_TRANSFER_RATE
-	struct sym_trans prev;
-#endif
+	unsigned int width:1;
+	unsigned int iu:1;
+	unsigned int dt:1;
+	unsigned int qas:1;
+	unsigned int check_nego:1;
 };
 
 /*
@@ -398,9 +399,9 @@ struct sym_tcb {
 	/*
 	 *  LUN table used by the C code.
 	 */
-	lcb_p	lun0p;		/* LCB of LUN #0 (usual case)	*/
+	struct sym_lcb *lun0p;		/* LCB of LUN #0 (usual case)	*/
 #if SYM_CONF_MAX_LUN > 1
-	lcb_p	*lunmp;		/* Other LCBs [1..MAX_LUN]	*/
+	struct sym_lcb **lunmp;		/* Other LCBs [1..MAX_LUN]	*/
 #endif
 
 	/*
@@ -423,16 +424,14 @@ struct sym_tcb {
 	struct sym_stcb s;
 #endif
 
-	/*
-	 *  Transfer capabilities (SIP)
-	 */
-	struct sym_tinfo tinfo;
+	/* Transfer goal */
+	struct sym_trans tgoal;
 
 	/*
 	 * Keep track of the CCB used for the negotiation in order
 	 * to ensure that only 1 negotiation is queued at a time.
 	 */
-	ccb_p   nego_cp;	/* CCB used for the nego		*/
+	struct sym_ccb *  nego_cp;	/* CCB used for the nego		*/
 
 	/*
 	 *  Set when we want to reset the device.
@@ -520,10 +519,8 @@ struct sym_lcb {
 	 *  Optionnaly the driver can handle device queueing, 
 	 *  and requeues internally command to redo.
 	 */
-	SYM_QUEHEAD
-		waiting_ccbq;
-	SYM_QUEHEAD
-		started_ccbq;
+	SYM_QUEHEAD waiting_ccbq;
+	SYM_QUEHEAD started_ccbq;
 	int	num_sgood;
 	u_short	started_tags;
 	u_short	started_no_tag;
@@ -533,8 +530,8 @@ struct sym_lcb {
 
 #ifdef SYM_OPT_LIMIT_COMMAND_REORDERING
 	/*
-	 *  Optionnaly the driver can try to prevent SCSI 
-	 *  IOs from being too much reordering.
+	 *  Optionally the driver can try to prevent SCSI 
+	 *  IOs from being reordered too much.
 	 */
 	u_char		tags_si;	/* Current index to tags sum	*/
 	u_short		tags_sum[2];	/* Tags sum counters		*/
@@ -582,9 +579,9 @@ struct sym_pmc {
  *  LUN(s) > 0.
  */
 #if SYM_CONF_MAX_LUN <= 1
-#define sym_lp(np, tp, lun) (!lun) ? (tp)->lun0p : NULL
+#define sym_lp(tp, lun) (!lun) ? (tp)->lun0p : NULL
 #else
-#define sym_lp(np, tp, lun) \
+#define sym_lp(tp, lun) \
 	(!lun) ? (tp)->lun0p : (tp)->lunmp ? (tp)->lunmp[(lun)] : NULL
 #endif
 
@@ -749,12 +746,10 @@ struct sym_ccb {
 	/*
 	 *  Pointer to CAM ccb and related stuff.
 	 */
-	struct scsi_cmnd *cam_ccb;	/* CAM scsiio ccb		*/
+	struct scsi_cmnd *cmd;	/* CAM scsiio ccb		*/
 	u8	cdb_buf[16];	/* Copy of CDB			*/
-	u8	*sns_bbuf;	/* Bounce buffer for sense data	*/
-#ifndef	SYM_SNS_BBUF_LEN
-#define	SYM_SNS_BBUF_LEN (32)
-#endif	
+#define	SYM_SNS_BBUF_LEN 32
+	u8	sns_bbuf[SYM_SNS_BBUF_LEN]; /* Bounce buffer for sense data */
 	int	data_len;	/* Total data length		*/
 	int	segments;	/* Number of SG segments	*/
 
@@ -788,12 +783,6 @@ struct sym_ccb {
 	int	sv_resid;	/* Saved residual		*/
 
 	/*
-	 *  O/S specific data structure.
-	 */
-#ifdef	SYM_HAVE_SCCB
-	struct sym_sccb s;
-#endif
-	/*
 	 *  Other fields.
 	 */
 	u32	ccb_ba;		/* BUS address of this CCB	*/
@@ -801,9 +790,8 @@ struct sym_ccb {
 				/*  NO_TAG means no tag		*/
 	u_char	target;
 	u_char	lun;
-	ccb_p	link_ccbh;	/* Host adapter CCB hash chain	*/
-	SYM_QUEHEAD
-		link_ccbq;	/* Link to free/busy CCB queue	*/
+	struct sym_ccb *link_ccbh;	/* Host adapter CCB hash chain	*/
+	SYM_QUEHEAD link_ccbq;	/* Link to free/busy CCB queue	*/
 	u32	startp;		/* Initial data pointer		*/
 	u32	goalp;		/* Expected last data pointer	*/
 #ifdef	SYM_OPT_HANDLE_DIR_UNKNOWN
@@ -812,8 +800,7 @@ struct sym_ccb {
 	int	ext_sg;		/* Extreme data pointer, used	*/
 	int	ext_ofs;	/*  to calculate the residual.	*/
 #ifdef SYM_OPT_HANDLE_DEVICE_QUEUEING
-	SYM_QUEHEAD
-		link2_ccbq;	/* Link for device queueing	*/
+	SYM_QUEHEAD link2_ccbq;	/* Link for device queueing	*/
 	u_char	started;	/* CCB queued to the squeue	*/
 #endif
 	u_char	to_abort;	/* Want this IO to be aborted	*/
@@ -829,6 +816,8 @@ struct sym_ccb {
 #else
 #define	sym_goalp(cp) (cp->goalp)
 #endif
+
+typedef struct device *m_pool_ident_t;
 
 /*
  *  Host Control Block
@@ -1005,7 +994,7 @@ struct sym_hcb {
 	/*
 	 *  CCB lists and queue.
 	 */
-	ccb_p *ccbh;			/* CCBs hashed by DSA value	*/
+	struct sym_ccb **ccbh;			/* CCBs hashed by DSA value	*/
 					/* CCB_HASH_SIZE lists of CCBs	*/
 	SYM_QUEHEAD	free_ccbq;	/* Queue of available CCBs	*/
 	SYM_QUEHEAD	busy_ccbq;	/* Queue of busy CCBs		*/
@@ -1037,7 +1026,7 @@ struct sym_hcb {
 #ifdef SYM_CONF_IARB_SUPPORT
 	u_short		iarb_max;	/* Max. # consecutive IARB hints*/
 	u_short		iarb_count;	/* Actual # of these hints	*/
-	ccb_p		last_cp;
+	struct sym_ccb *	last_cp;
 #endif
 
 	/*
@@ -1068,41 +1057,31 @@ struct sym_hcb {
 /*
  *  FIRMWARES (sym_fw.c)
  */
-struct sym_fw * sym_find_firmware(struct sym_pci_chip *chip);
-void sym_fw_bind_script (struct sym_hcb *np, u32 *start, int len);
+struct sym_fw * sym_find_firmware(struct sym_chip *chip);
+void sym_fw_bind_script(struct sym_hcb *np, u32 *start, int len);
 
 /*
  *  Driver methods called from O/S specific code.
  */
 char *sym_driver_name(void);
-void sym_print_xerr(ccb_p cp, int x_status);
+void sym_print_xerr(struct scsi_cmnd *cmd, int x_status);
 int sym_reset_scsi_bus(struct sym_hcb *np, int enab_int);
-struct sym_pci_chip *
-sym_lookup_pci_chip_table (u_short device_id, u_char revision);
-void sym_put_start_queue(struct sym_hcb *np, ccb_p cp);
+struct sym_chip *sym_lookup_chip_table(u_short device_id, u_char revision);
+void sym_put_start_queue(struct sym_hcb *np, struct sym_ccb *cp);
 #ifdef SYM_OPT_HANDLE_DEVICE_QUEUEING
-void sym_start_next_ccbs(struct sym_hcb *np, lcb_p lp, int maxn);
+void sym_start_next_ccbs(struct sym_hcb *np, struct sym_lcb *lp, int maxn);
 #endif
-void sym_start_up (struct sym_hcb *np, int reason);
-void sym_interrupt (struct sym_hcb *np);
+void sym_start_up(struct sym_hcb *np, int reason);
+void sym_interrupt(struct sym_hcb *np);
 int sym_clear_tasks(struct sym_hcb *np, int cam_status, int target, int lun, int task);
-ccb_p sym_get_ccb (struct sym_hcb *np, u_char tn, u_char ln, u_char tag_order);
-void sym_free_ccb (struct sym_hcb *np, ccb_p cp);
-lcb_p sym_alloc_lcb (struct sym_hcb *np, u_char tn, u_char ln);
-int sym_queue_scsiio(struct sym_hcb *np, struct scsi_cmnd *csio, ccb_p cp);
+struct sym_ccb *sym_get_ccb(struct sym_hcb *np, struct scsi_cmnd *cmd, u_char tag_order);
+void sym_free_ccb(struct sym_hcb *np, struct sym_ccb *cp);
+struct sym_lcb *sym_alloc_lcb(struct sym_hcb *np, u_char tn, u_char ln);
+int sym_queue_scsiio(struct sym_hcb *np, struct scsi_cmnd *csio, struct sym_ccb *cp);
 int sym_abort_scsiio(struct sym_hcb *np, struct scsi_cmnd *ccb, int timed_out);
-int sym_abort_ccb(struct sym_hcb *np, ccb_p cp, int timed_out);
 int sym_reset_scsi_target(struct sym_hcb *np, int target);
 void sym_hcb_free(struct sym_hcb *np);
-int sym_hcb_attach(struct sym_hcb *np, struct sym_fw *fw, struct sym_nvram *nvram);
-
-/*
- *  Optionnaly, the driver may provide a function
- *  to announce transfer rate changes.
- */
-#ifdef	SYM_OPT_ANNOUNCE_TRANSFER_RATE
-void sym_announce_transfer_rate(struct sym_hcb *np, int target);
-#endif
+int sym_hcb_attach(struct Scsi_Host *shost, struct sym_fw *fw, struct sym_nvram *nvram);
 
 /*
  *  Build a scatter/gather entry.
@@ -1169,7 +1148,7 @@ static inline void sym_setup_data_pointers(struct sym_hcb *np,
 	case CAM_DIR_UNKNOWN:
 #endif
 	case CAM_DIR_OUT:
-		goalp = SCRIPTA_BA (np, data_out2) + 8;
+		goalp = SCRIPTA_BA(np, data_out2) + 8;
 		lastp = goalp - 8 - (cp->segments * (2*4));
 #ifdef	SYM_OPT_HANDLE_DIR_UNKNOWN
 		cp->wgoalp = cpu_to_scr(goalp);
@@ -1182,7 +1161,7 @@ static inline void sym_setup_data_pointers(struct sym_hcb *np,
 #endif
 	case CAM_DIR_IN:
 		cp->host_flags |= HF_DATA_IN;
-		goalp = SCRIPTA_BA (np, data_in2) + 8;
+		goalp = SCRIPTA_BA(np, data_in2) + 8;
 		lastp = goalp - 8 - (cp->segments * (2*4));
 		break;
 	case CAM_DIR_NONE:
@@ -1190,7 +1169,7 @@ static inline void sym_setup_data_pointers(struct sym_hcb *np,
 #ifdef	SYM_OPT_HANDLE_DIR_UNKNOWN
 		cp->host_flags |= HF_DATA_IN;
 #endif
-		lastp = goalp = SCRIPTB_BA (np, no_data);
+		lastp = goalp = SCRIPTB_BA(np, no_data);
 		break;
 	}
 
@@ -1207,13 +1186,24 @@ static inline void sym_setup_data_pointers(struct sym_hcb *np,
 	 *  If direction is unknown, start at data_io.
 	 */
 	if (dir == CAM_DIR_UNKNOWN)
-		cp->phys.head.savep = cpu_to_scr(SCRIPTB_BA (np, data_io));
+		cp->phys.head.savep = cpu_to_scr(SCRIPTB_BA(np, data_io));
 #endif
 }
 
 /*
  *  MEMORY ALLOCATOR.
  */
+
+#define SYM_MEM_PAGE_ORDER 0	/* 1 PAGE  maximum */
+#define SYM_MEM_CLUSTER_SHIFT	(PAGE_SHIFT+SYM_MEM_PAGE_ORDER)
+#define SYM_MEM_FREE_UNUSED	/* Free unused pages immediately */
+
+#define SYM_MEM_WARN	1	/* Warn on failed operations */
+
+#define sym_get_mem_cluster()	\
+	(void *) __get_free_pages(GFP_ATOMIC, SYM_MEM_PAGE_ORDER)
+#define sym_free_mem_cluster(p)	\
+	free_pages((unsigned long)p, SYM_MEM_PAGE_ORDER)
 
 /*
  *  Link between free memory chunks of a given size.
@@ -1228,11 +1218,8 @@ typedef struct sym_m_link {
  */
 typedef struct sym_m_vtob {	/* Virtual to Bus address translation */
 	struct sym_m_vtob *next;
-#ifdef	SYM_HAVE_M_SVTOB
-	struct sym_m_svtob s;	/* OS specific data structure */
-#endif
-	m_addr_t	vaddr;	/* Virtual address */
-	m_addr_t	baddr;	/* Bus physical address */
+	void *vaddr;		/* Virtual address */
+	dma_addr_t baddr;	/* Bus physical address */
 } *m_vtob_p;
 
 /* Hash this stuff a bit to speed up translations */
@@ -1240,7 +1227,7 @@ typedef struct sym_m_vtob {	/* Virtual to Bus address translation */
 #define VTOB_HASH_SIZE		(1UL << VTOB_HASH_SHIFT)
 #define VTOB_HASH_MASK		(VTOB_HASH_SIZE-1)
 #define VTOB_HASH_CODE(m)	\
-	((((m_addr_t) (m)) >> SYM_MEM_CLUSTER_SHIFT) & VTOB_HASH_MASK)
+	((((unsigned long)(m)) >> SYM_MEM_CLUSTER_SHIFT) & VTOB_HASH_MASK)
 
 /*
  *  Memory pool of a given kind.
@@ -1253,15 +1240,12 @@ typedef struct sym_m_vtob {	/* Virtual to Bus address translation */
  */
 typedef struct sym_m_pool {
 	m_pool_ident_t	dev_dmat;	/* Identifies the pool (see above) */
-	m_addr_t (*get_mem_cluster)(struct sym_m_pool *);
+	void * (*get_mem_cluster)(struct sym_m_pool *);
 #ifdef	SYM_MEM_FREE_UNUSED
-	void (*free_mem_cluster)(struct sym_m_pool *, m_addr_t);
+	void (*free_mem_cluster)(struct sym_m_pool *, void *);
 #endif
 #define M_GET_MEM_CLUSTER()		mp->get_mem_cluster(mp)
 #define M_FREE_MEM_CLUSTER(p)		mp->free_mem_cluster(mp, p)
-#ifdef	SYM_HAVE_M_SPOOL
-	struct sym_m_spool	s;	/* OS specific data structure */
-#endif
 	int nump;
 	m_vtob_p vtob[VTOB_HASH_SIZE];
 	struct sym_m_pool *next;
@@ -1269,19 +1253,12 @@ typedef struct sym_m_pool {
 } *m_pool_p;
 
 /*
- *  Alloc and free non DMAable memory.
- */
-void sym_mfree_unlocked(void *ptr, int size, char *name);
-void *sym_calloc_unlocked(int size, char *name);
-
-/*
  *  Alloc, free and translate addresses to bus physical 
  *  for DMAable memory.
  */
-void *__sym_calloc_dma_unlocked(m_pool_ident_t dev_dmat, int size, char *name);
-void 
-__sym_mfree_dma_unlocked(m_pool_ident_t dev_dmat, void *m,int size, char *name);
-u32 __vtobus_unlocked(m_pool_ident_t dev_dmat, void *m);
+void *__sym_calloc_dma(m_pool_ident_t dev_dmat, int size, char *name);
+void __sym_mfree_dma(m_pool_ident_t dev_dmat, void *m, int size, char *name);
+dma_addr_t __vtobus(m_pool_ident_t dev_dmat, void *m);
 
 /*
  * Verbs used by the driver code for DMAable memory handling.
@@ -1295,15 +1272,33 @@ u32 __vtobus_unlocked(m_pool_ident_t dev_dmat, void *m);
 			__sym_mfree_dma(np->bus_dmat, _uvptv_(p), l, n)
 #define sym_calloc_dma(l, n)		_sym_calloc_dma(np, l, n)
 #define sym_mfree_dma(p, l, n)		_sym_mfree_dma(np, p, l, n)
-#define _vtobus(np, p)			__vtobus(np->bus_dmat, _uvptv_(p))
-#define vtobus(p)			_vtobus(np, p)
+#define vtobus(p)			__vtobus(np->bus_dmat, _uvptv_(p))
 
 /*
- *  Override some function names.
+ *  We have to provide the driver memory allocator with methods for 
+ *  it to maintain virtual to bus physical address translations.
  */
-#define PRINT_ADDR	sym_print_addr
-#define PRINT_TARGET	sym_print_target
-#define PRINT_LUN	sym_print_lun
-#define UDELAY		sym_udelay
+
+#define sym_m_pool_match(mp_id1, mp_id2)	(mp_id1 == mp_id2)
+
+static __inline void *sym_m_get_dma_mem_cluster(m_pool_p mp, m_vtob_p vbp)
+{
+	void *vaddr = NULL;
+	dma_addr_t baddr = 0;
+
+	vaddr = dma_alloc_coherent(mp->dev_dmat, SYM_MEM_CLUSTER_SIZE, &baddr,
+			GFP_ATOMIC);
+	if (vaddr) {
+		vbp->vaddr = vaddr;
+		vbp->baddr = baddr;
+	}
+	return vaddr;
+}
+
+static __inline void sym_m_free_dma_mem_cluster(m_pool_p mp, m_vtob_p vbp)
+{
+	dma_free_coherent(mp->dev_dmat, SYM_MEM_CLUSTER_SIZE, vbp->vaddr,
+			vbp->baddr);
+}
 
 #endif /* SYM_HIPD_H */

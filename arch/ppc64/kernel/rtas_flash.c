@@ -218,13 +218,12 @@ static void get_flash_status_msg(int status, char *buf)
 }
 
 /* Reading the proc file will show status (not the firmware contents) */
-static ssize_t rtas_flash_read(struct file *file, char *buf,
+static ssize_t rtas_flash_read(struct file *file, char __user *buf,
 			       size_t count, loff_t *ppos)
 {
 	struct proc_dir_entry *dp = PDE(file->f_dentry->d_inode);
 	struct rtas_update_flash_t *uf;
 	char msg[RTAS_MSG_MAXLEN];
-	int error;
 	int msglen;
 
 	uf = (struct rtas_update_flash_t *) dp->data;
@@ -241,8 +240,7 @@ static ssize_t rtas_flash_read(struct file *file, char *buf,
 	if (ppos && *ppos != 0)
 		return 0;	/* be cheap */
 
-	error = verify_area(VERIFY_WRITE, buf, msglen);
-	if (error)
+	if (!access_ok(VERIFY_WRITE, buf, msglen))
 		return -EINVAL;
 
 	if (copy_to_user(buf, msg, msglen))
@@ -258,7 +256,7 @@ static ssize_t rtas_flash_read(struct file *file, char *buf,
  * count is.  If the system is low on memory it will be just as well
  * that we fail....
  */
-static ssize_t rtas_flash_write(struct file *file, const char *buffer,
+static ssize_t rtas_flash_write(struct file *file, const char __user *buffer,
 				size_t count, loff_t *off)
 {
 	struct proc_dir_entry *dp = PDE(file->f_dentry->d_inode);
@@ -358,14 +356,13 @@ static void manage_flash(struct rtas_manage_flash_t *args_buf)
 	args_buf->status = rc;
 }
 
-static ssize_t manage_flash_read(struct file *file, char *buf,
+static ssize_t manage_flash_read(struct file *file, char __user *buf,
 			       size_t count, loff_t *ppos)
 {
 	struct proc_dir_entry *dp = PDE(file->f_dentry->d_inode);
 	struct rtas_manage_flash_t *args_buf;
 	char msg[RTAS_MSG_MAXLEN];
 	int msglen;
-	int error;
 
 	args_buf = (struct rtas_manage_flash_t *) dp->data;
 	if (args_buf == NULL)
@@ -378,8 +375,7 @@ static ssize_t manage_flash_read(struct file *file, char *buf,
 	if (ppos && *ppos != 0)
 		return 0;	/* be cheap */
 
-	error = verify_area(VERIFY_WRITE, buf, msglen);
-	if (error)
+	if (!access_ok(VERIFY_WRITE, buf, msglen))
 		return -EINVAL;
 
 	if (copy_to_user(buf, msg, msglen))
@@ -390,7 +386,7 @@ static ssize_t manage_flash_read(struct file *file, char *buf,
 	return msglen;
 }
 
-static ssize_t manage_flash_write(struct file *file, const char *buf,
+static ssize_t manage_flash_write(struct file *file, const char __user *buf,
 				size_t count, loff_t *off)
 {
 	struct proc_dir_entry *dp = PDE(file->f_dentry->d_inode);
@@ -470,14 +466,13 @@ static int get_validate_flash_msg(struct rtas_validate_flash_t *args_buf,
 	return n;
 }
 
-static ssize_t validate_flash_read(struct file *file, char *buf,
+static ssize_t validate_flash_read(struct file *file, char __user *buf,
 			       size_t count, loff_t *ppos)
 {
 	struct proc_dir_entry *dp = PDE(file->f_dentry->d_inode);
 	struct rtas_validate_flash_t *args_buf;
 	char msg[RTAS_MSG_MAXLEN];
 	int msglen;
-	int error;
 
 	args_buf = (struct rtas_validate_flash_t *) dp->data;
 
@@ -488,8 +483,7 @@ static ssize_t validate_flash_read(struct file *file, char *buf,
 	if (msglen > count)
 		msglen = count;
 
-	error = verify_area(VERIFY_WRITE, buf, msglen);
-	if (error)
+	if (!access_ok(VERIFY_WRITE, buf, msglen))
 		return -EINVAL;
 
 	if (copy_to_user(buf, msg, msglen))
@@ -500,7 +494,7 @@ static ssize_t validate_flash_read(struct file *file, char *buf,
 	return msglen;
 }
 
-static ssize_t validate_flash_write(struct file *file, const char *buf,
+static ssize_t validate_flash_write(struct file *file, const char __user *buf,
 				    size_t count, loff_t *off)
 {
 	struct proc_dir_entry *dp = PDE(file->f_dentry->d_inode);
@@ -531,7 +525,7 @@ static ssize_t validate_flash_write(struct file *file, const char *buf,
 		args_buf->status = VALIDATE_INCOMPLETE;
 	}
 
-	if (verify_area(VERIFY_READ, buf, count)) {
+	if (!access_ok(VERIFY_READ, buf, count)) {
 		rc = -EFAULT;
 		goto done;
 	}

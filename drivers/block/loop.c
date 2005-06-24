@@ -39,6 +39,11 @@
  * Support up to 256 loop devices
  * Heinz Mauelshagen <mge@sistina.com>, Feb 2002
  *
+ * Support for falling back on the write file operation when the address space
+ * operations prepare_write and/or commit_write are not available on the
+ * backing filesystem.
+ * Anton Altaparmakov, 16 Feb 2005
+ *
  * Still To Fix:
  * - Advisory locking is ignored here.
  * - Should use an own CAP_* category instead of CAP_SYS_ADMIN
@@ -67,6 +72,8 @@
 #include <linux/writeback.h>
 #include <linux/buffer_head.h>		/* for invalidate_bdev() */
 #include <linux/completion.h>
+#include <linux/highmem.h>
+#include <linux/gfp.h>
 
 #include <asm/uaccess.h>
 
@@ -127,7 +134,7 @@ static int transfer_xor(struct loop_device *lo, int cmd,
 
 static int xor_init(struct loop_device *lo, const struct loop_info64 *info)
 {
-	if (info->lo_encrypt_key_size <= 0)
+	if (unlikely(info->lo_encrypt_key_size <= 0))
 		return -EINVAL;
 	return 0;
 }
@@ -173,7 +180,7 @@ figure_loop_size(struct loop_device *lo)
 	loff_t size = get_loop_size(lo, lo->lo_backing_file);
 	sector_t x = (sector_t)size;
 
-	if ((loff_t)x != size)
+	if (unlikely((loff_t)x != size))
 		return -EFBIG;
 
 	set_capacity(disks[lo->lo_number], x);
@@ -186,23 +193,27 @@ lo_do_transfer(struct loop_device *lo, int cmd,
 	       struct page *lpage, unsigned loffs,
 	       int size, sector_t rblock)
 {
-	if (!lo->transfer)
+	if (unlikely(!lo->transfer))
 		return 0;
 
 	return lo->transfer(lo, cmd, rpage, roffs, lpage, loffs, size, rblock);
 }
 
-static int
-do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
+/**
+ * do_lo_send_aops - helper for writing data to a loop device
+ *
+ * This is the fast version for backing filesystems which implement the address
+ * space operations prepare_write and commit_write.
+ */
+static int do_lo_send_aops(struct loop_device *lo, struct bio_vec *bvec,
+		int bsize, loff_t pos, struct page *page)
 {
 	struct file *file = lo->lo_backing_file; /* kudos to NFsckingS */
 	struct address_space *mapping = file->f_mapping;
 	struct address_space_operations *aops = mapping->a_ops;
-	struct page *page;
 	pgoff_t index;
-	unsigned size, offset, bv_offs;
-	int len;
-	int ret = 0;
+	unsigned offset, bv_offs;
+	int len, ret = 0;
 
 	down(&mapping->host->i_sem);
 	index = pos >> PAGE_CACHE_SHIFT;
@@ -211,23 +222,22 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 	len = bvec->bv_len;
 	while (len > 0) {
 		sector_t IV;
+		unsigned size;
 		int transfer_result;
 
 		IV = ((sector_t)index << (PAGE_CACHE_SHIFT - 9))+(offset >> 9);
-
 		size = PAGE_CACHE_SIZE - offset;
 		if (size > len)
 			size = len;
-
 		page = grab_cache_page(mapping, index);
-		if (!page)
+		if (unlikely(!page))
 			goto fail;
-		if (aops->prepare_write(file, page, offset, offset+size))
+		if (unlikely(aops->prepare_write(file, page, offset,
+				offset + size)))
 			goto unlock;
 		transfer_result = lo_do_transfer(lo, WRITE, page, offset,
-						 bvec->bv_page, bv_offs,
-						 size, IV);
-		if (transfer_result) {
+				bvec->bv_page, bv_offs, size, IV);
+		if (unlikely(transfer_result)) {
 			char *kaddr;
 
 			/*
@@ -241,9 +251,10 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 			kunmap_atomic(kaddr, KM_USER0);
 		}
 		flush_dcache_page(page);
-		if (aops->commit_write(file, page, offset, offset+size))
+		if (unlikely(aops->commit_write(file, page, offset,
+				offset + size)))
 			goto unlock;
-		if (transfer_result)
+		if (unlikely(transfer_result))
 			goto unlock;
 		bv_offs += size;
 		len -= size;
@@ -253,32 +264,125 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 		unlock_page(page);
 		page_cache_release(page);
 	}
-	up(&mapping->host->i_sem);
 out:
+	up(&mapping->host->i_sem);
 	return ret;
-
 unlock:
 	unlock_page(page);
 	page_cache_release(page);
 fail:
-	up(&mapping->host->i_sem);
 	ret = -1;
 	goto out;
 }
 
-static int
-lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
+/**
+ * __do_lo_send_write - helper for writing data to a loop device
+ *
+ * This helper just factors out common code between do_lo_send_direct_write()
+ * and do_lo_send_write().
+ */
+static inline int __do_lo_send_write(struct file *file,
+		u8 __user *buf, const int len, loff_t pos)
 {
+	ssize_t bw;
+	mm_segment_t old_fs = get_fs();
+
+	set_fs(get_ds());
+	bw = file->f_op->write(file, buf, len, &pos);
+	set_fs(old_fs);
+	if (likely(bw == len))
+		return 0;
+	printk(KERN_ERR "loop: Write error at byte offset %llu, length %i.\n",
+			(unsigned long long)pos, len);
+	if (bw >= 0)
+		bw = -EIO;
+	return bw;
+}
+
+/**
+ * do_lo_send_direct_write - helper for writing data to a loop device
+ *
+ * This is the fast, non-transforming version for backing filesystems which do
+ * not implement the address space operations prepare_write and commit_write.
+ * It uses the write file operation which should be present on all writeable
+ * filesystems.
+ */
+static int do_lo_send_direct_write(struct loop_device *lo,
+		struct bio_vec *bvec, int bsize, loff_t pos, struct page *page)
+{
+	ssize_t bw = __do_lo_send_write(lo->lo_backing_file,
+			(u8 __user *)kmap(bvec->bv_page) + bvec->bv_offset,
+			bvec->bv_len, pos);
+	kunmap(bvec->bv_page);
+	cond_resched();
+	return bw;
+}
+
+/**
+ * do_lo_send_write - helper for writing data to a loop device
+ *
+ * This is the slow, transforming version for filesystems which do not
+ * implement the address space operations prepare_write and commit_write.  It
+ * uses the write file operation which should be present on all writeable
+ * filesystems.
+ *
+ * Using fops->write is slower than using aops->{prepare,commit}_write in the
+ * transforming case because we need to double buffer the data as we cannot do
+ * the transformations in place as we do not have direct access to the
+ * destination pages of the backing file.
+ */
+static int do_lo_send_write(struct loop_device *lo, struct bio_vec *bvec,
+		int bsize, loff_t pos, struct page *page)
+{
+	int ret = lo_do_transfer(lo, WRITE, page, 0, bvec->bv_page,
+			bvec->bv_offset, bvec->bv_len, pos >> 9);
+	if (likely(!ret))
+		return __do_lo_send_write(lo->lo_backing_file,
+				(u8 __user *)page_address(page), bvec->bv_len,
+				pos);
+	printk(KERN_ERR "loop: Transfer error at byte offset %llu, "
+			"length %i.\n", (unsigned long long)pos, bvec->bv_len);
+	if (ret > 0)
+		ret = -EIO;
+	return ret;
+}
+
+static int lo_send(struct loop_device *lo, struct bio *bio, int bsize,
+		loff_t pos)
+{
+	int (*do_lo_send)(struct loop_device *, struct bio_vec *, int, loff_t,
+			struct page *page);
 	struct bio_vec *bvec;
+	struct page *page = NULL;
 	int i, ret = 0;
 
+	do_lo_send = do_lo_send_aops;
+	if (!(lo->lo_flags & LO_FLAGS_USE_AOPS)) {
+		do_lo_send = do_lo_send_direct_write;
+		if (lo->transfer != transfer_none) {
+			page = alloc_page(GFP_NOIO | __GFP_HIGHMEM);
+			if (unlikely(!page))
+				goto fail;
+			kmap(page);
+			do_lo_send = do_lo_send_write;
+		}
+	}
 	bio_for_each_segment(bvec, bio, i) {
-		ret = do_lo_send(lo, bvec, bsize, pos);
+		ret = do_lo_send(lo, bvec, bsize, pos, page);
 		if (ret < 0)
 			break;
 		pos += bvec->bv_len;
 	}
+	if (page) {
+		kunmap(page);
+		__free_page(page);
+	}
+out:
 	return ret;
+fail:
+	printk(KERN_ERR "loop: Failed to allocate temporary page for write.\n");
+	ret = -ENOMEM;
+	goto out;
 }
 
 struct lo_read_data {
@@ -584,7 +688,7 @@ static int loop_change_fd(struct loop_device *lo, struct file *lo_file,
 
 	/* the loop device has to be read-only */
 	error = -EINVAL;
-	if (lo->lo_flags != LO_FLAGS_READ_ONLY)
+	if (!(lo->lo_flags & LO_FLAGS_READ_ONLY))
 		goto out;
 
 	error = -EBADF;
@@ -683,8 +787,9 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		 */
 		if (!file->f_op->sendfile)
 			goto out_putf;
-
-		if (!aops->prepare_write || !aops->commit_write)
+		if (aops->prepare_write && aops->commit_write)
+			lo_flags |= LO_FLAGS_USE_AOPS;
+		if (!(lo_flags & LO_FLAGS_USE_AOPS) && !file->f_op->write)
 			lo_flags |= LO_FLAGS_READ_ONLY;
 
 		lo_blocksize = inode->i_blksize;
@@ -1137,7 +1242,7 @@ int loop_unregister_transfer(int number)
 EXPORT_SYMBOL(loop_register_transfer);
 EXPORT_SYMBOL(loop_unregister_transfer);
 
-int __init loop_init(void)
+static int __init loop_init(void)
 {
 	int	i;
 
@@ -1212,7 +1317,7 @@ out_mem1:
 	return -ENOMEM;
 }
 
-void loop_exit(void)
+static void loop_exit(void)
 {
 	int i;
 

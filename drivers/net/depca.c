@@ -342,14 +342,15 @@ static char depca_string[] = "depca";
 static int depca_device_remove (struct device *device);
 
 #ifdef CONFIG_EISA
-struct eisa_device_id depca_eisa_ids[] = {
+static struct eisa_device_id depca_eisa_ids[] = {
 	{ "DEC4220", de422 },
 	{ "" }
 };
+MODULE_DEVICE_TABLE(eisa, depca_eisa_ids);
 
 static int depca_eisa_probe  (struct device *device);
 
-struct eisa_driver depca_eisa_driver = {
+static struct eisa_driver depca_eisa_driver = {
 	.id_table = depca_eisa_ids,
 	.driver   = {
 		.name    = depca_string,
@@ -1826,7 +1827,7 @@ static int load_packet(struct net_device *dev, struct sk_buff *skb)
 
 		/* set up the buffer descriptors */
 		len = (skb->len < ETH_ZLEN) ? ETH_ZLEN : skb->len;
-		for (i = entry; i != end; i = (++i) & lp->txRingMask) {
+		for (i = entry; i != end; i = (i+1) & lp->txRingMask) {
 			/* clean out flags */
 			writel(readl(&lp->tx_ring[i].base) & ~T_FLAGS, &lp->tx_ring[i].base);
 			writew(0x0000, &lp->tx_ring[i].misc);	/* clears other error flags */

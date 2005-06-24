@@ -45,15 +45,6 @@ config PACKET_MMAP
 
 	  If unsure, say N.
 
-config NETLINK_DEV
-	tristate "Netlink device emulation"
-	help
-	  This option will be removed soon. Any programs that want to use
-	  character special nodes like /dev/tap0 or /dev/route (all with major
-	  number 36) need this option, and need to be rewritten soon to use
-	  the real netlink socket.
-	  This is a backward compatibility option, choose Y for now.
-
 config UNIX
 	tristate "Unix domain sockets"
 	---help---
@@ -107,27 +98,23 @@ source "net/ipv4/Kconfig"
 
 #   IPv6 as module will cause a CRASH if you try to unload it
 config IPV6
-	tristate "The IPv6 protocol (EXPERIMENTAL)"
-	depends on INET && EXPERIMENTAL
+	tristate "The IPv6 protocol"
+	depends on INET
+	default m
 	select CRYPTO if IPV6_PRIVACY
 	select CRYPTO_MD5 if IPV6_PRIVACY
 	---help---
-	  This is experimental support for the IP version 6 (formerly called
-	  IPng "IP next generation").  You will still be able to do
-	  regular IPv4 networking as well.
+	  This is complemental support for the IP version 6.
+	  You will still be able to do traditional IPv4 networking as well.
 
-	  Features of this new protocol include: expanded address space,
-	  authentication and privacy, and seamless interoperability with the
-	  current version of IP (IP version 4). For general information about
-	  IPv6, see <http://playground.sun.com/pub/ipng/html/ipng-main.html>;
-	  for specific information about IPv6 under Linux read the HOWTO at
-	  <http://www.bieringer.de/linux/IPv6/> and the file net/ipv6/README
-	  in the kernel source.
+	  For general information about IPv6, see
+	  <http://playground.sun.com/pub/ipng/html/ipng-main.html>.
+	  For Linux IPv6 development information, see <http://www.linux-ipv6.org>.
+	  For specific information about IPv6 under Linux, read the HOWTO at
+	  <http://www.bieringer.de/linux/IPv6/>.
 
 	  To compile this protocol support as a module, choose M here: the 
 	  module will be called ipv6.
-
-	  It is safe to say N here for now.
 
 source "net/ipv6/Kconfig"
 

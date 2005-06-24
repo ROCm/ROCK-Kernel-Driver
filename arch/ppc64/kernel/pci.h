@@ -16,8 +16,7 @@ extern unsigned long isa_io_base;
 
 extern void pci_setup_pci_controller(struct pci_controller *hose);
 extern void pci_setup_phb_io(struct pci_controller *hose, int primary);
-
-extern void pci_setup_phb_io_dynamic(struct pci_controller *hose);
+extern void pci_setup_phb_io_dynamic(struct pci_controller *hose, int primary);
 
 
 extern struct list_head hose_list;

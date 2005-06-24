@@ -1,6 +1,6 @@
 /*
  * at76c651.c
- * 
+ *
  * Atmel DVB-C Frontend Driver (at76c651/tua6010xs)
  *
  * Copyright (C) 2001 fnbrd <fnbrd@gmx.de>
@@ -150,7 +150,7 @@ static int at76c651_set_auto_config(struct at76c651_state *state)
 	if (state->revision == 0x11) {
 		at76c651_writereg(state, 0x2E, 0x38);
 		at76c651_writereg(state, 0x2F, 0x13);
-}
+	}
 
 	at76c651_disable_interrupts(state);
 
@@ -255,19 +255,11 @@ static int at76c651_set_inversion(struct at76c651_state* state, fe_spectral_inve
 	return at76c651_writereg(state, 0x60, feciqinv);
 }
 
-
-
-
-
-
-
-
-
 static int at76c651_set_parameters(struct dvb_frontend* fe,
-			struct dvb_frontend_parameters *p)
+				   struct dvb_frontend_parameters *p)
 {
 	int ret;
-	struct at76c651_state* state = (struct at76c651_state*) fe->demodulator_priv;
+	struct at76c651_state* state = fe->demodulator_priv;
 
 	at76c651_writereg(state, 0x0c, 0xc3);
 	state->config->pll_set(fe, p);
@@ -284,7 +276,7 @@ static int at76c651_set_parameters(struct dvb_frontend* fe,
 
 static int at76c651_set_defaults(struct dvb_frontend* fe)
 {
-	struct at76c651_state* state = (struct at76c651_state*) fe->demodulator_priv;
+	struct at76c651_state* state = fe->demodulator_priv;
 
 	at76c651_set_symbol_rate(state, 6900000);
 	at76c651_set_qam(state, QAM_64);
@@ -295,55 +287,51 @@ static int at76c651_set_defaults(struct dvb_frontend* fe)
 		at76c651_writereg(state, 0x0c, 0xc3);
 		state->config->pll_init(fe);
 		at76c651_writereg(state, 0x0c, 0xc2);
-}
+	}
 
 	return 0;
 }
 
 static int at76c651_read_status(struct dvb_frontend* fe, fe_status_t* status)
-		{
-	struct at76c651_state* state = (struct at76c651_state*) fe->demodulator_priv;
-			u8 sync;
+{
+	struct at76c651_state* state = fe->demodulator_priv;
+	u8 sync;
 
-			/*
-			 * Bits: FEC, CAR, EQU, TIM, AGC2, AGC1, ADC, PLL (PLL=0) 
-			 */
+	/*
+	 * Bits: FEC, CAR, EQU, TIM, AGC2, AGC1, ADC, PLL (PLL=0)
+	 */
 	sync = at76c651_readreg(state, 0x80);
-			*status = 0;
+	*status = 0;
 
-			if (sync & (0x04 | 0x10))	/* AGC1 || TIM */
-				*status |= FE_HAS_SIGNAL;
-
-			if (sync & 0x10)	/* TIM */
-				*status |= FE_HAS_CARRIER;
-
-			if (sync & 0x80)	/* FEC */
-				*status |= FE_HAS_VITERBI;
-
-			if (sync & 0x40)	/* CAR */
-				*status |= FE_HAS_SYNC;
-
-			if ((sync & 0xF0) == 0xF0)	/* TIM && EQU && CAR && FEC */
-				*status |= FE_HAS_LOCK;
+	if (sync & (0x04 | 0x10))	/* AGC1 || TIM */
+		*status |= FE_HAS_SIGNAL;
+	if (sync & 0x10)		/* TIM */
+		*status |= FE_HAS_CARRIER;
+	if (sync & 0x80)		/* FEC */
+		*status |= FE_HAS_VITERBI;
+	if (sync & 0x40)		/* CAR */
+		*status |= FE_HAS_SYNC;
+	if ((sync & 0xF0) == 0xF0)	/* TIM && EQU && CAR && FEC */
+		*status |= FE_HAS_LOCK;
 
 	return 0;
-		}
+}
 
 static int at76c651_read_ber(struct dvb_frontend* fe, u32* ber)
-		{
-	struct at76c651_state* state = (struct at76c651_state*) fe->demodulator_priv;
+{
+	struct at76c651_state* state = fe->demodulator_priv;
 
 	*ber = (at76c651_readreg(state, 0x81) & 0x0F) << 16;
 	*ber |= at76c651_readreg(state, 0x82) << 8;
 	*ber |= at76c651_readreg(state, 0x83);
-			*ber *= 10;
+	*ber *= 10;
 
 	return 0;
-		}
+}
 
 static int at76c651_read_signal_strength(struct dvb_frontend* fe, u16* strength)
-		{
-	struct at76c651_state* state = (struct at76c651_state*) fe->demodulator_priv;
+{
+	struct at76c651_state* state = fe->demodulator_priv;
 
 	u8 gain = ~at76c651_readreg(state, 0x91);
 	*strength = (gain << 8) | gain;
@@ -353,19 +341,18 @@ static int at76c651_read_signal_strength(struct dvb_frontend* fe, u16* strength)
 
 static int at76c651_read_snr(struct dvb_frontend* fe, u16* snr)
 {
-	struct at76c651_state* state = (struct at76c651_state*) fe->demodulator_priv;
+	struct at76c651_state* state = fe->demodulator_priv;
 
 	*snr = 0xFFFF -
 	    ((at76c651_readreg(state, 0x8F) << 8) |
 	     at76c651_readreg(state, 0x90));
 
-
 	return 0;
 }
 
 static int at76c651_read_ucblocks(struct dvb_frontend* fe, u32* ucblocks)
-	{
-	struct at76c651_state* state = (struct at76c651_state*) fe->demodulator_priv;
+{
+	struct at76c651_state* state = fe->demodulator_priv;
 
 	*ucblocks = at76c651_readreg(state, 0x82);
 
@@ -378,13 +365,13 @@ static int at76c651_get_tune_settings(struct dvb_frontend* fe, struct dvb_fronte
         fesettings->step_size = 0;
         fesettings->max_drift = 0;
 	return 0;
-	}
+}
 
 static void at76c651_release(struct dvb_frontend* fe)
 {
-	struct at76c651_state* state = (struct at76c651_state*) fe->demodulator_priv;
-		kfree(state);
-	}
+	struct at76c651_state* state = fe->demodulator_priv;
+	kfree(state);
+}
 
 static struct dvb_frontend_ops at76c651_ops;
 
@@ -394,7 +381,7 @@ struct dvb_frontend* at76c651_attach(const struct at76c651_config* config,
 	struct at76c651_state* state = NULL;
 
 	/* allocate memory for the internal state */
-	state = (struct at76c651_state*) kmalloc(sizeof(struct at76c651_state), GFP_KERNEL);
+	state = kmalloc(sizeof(struct at76c651_state), GFP_KERNEL);
 	if (state == NULL) goto error;
 
 	/* setup the state */
@@ -415,7 +402,7 @@ struct dvb_frontend* at76c651_attach(const struct at76c651_config* config,
 	return &state->frontend;
 
 error:
-	if (state) kfree(state);
+	kfree(state);
 	return NULL;
 }
 

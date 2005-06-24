@@ -172,7 +172,7 @@ nfsd3_proc_read(struct svc_rqst *rqstp, struct nfsd3_readargs *argp,
 	svc_reserve(rqstp, ((1 + NFS3_POST_OP_ATTR_WORDS + 3)<<2) + resp->count +4);
 
 	fh_copy(&resp->fh, &argp->fh);
-	nfserr = nfsd_read(rqstp, &resp->fh,
+	nfserr = nfsd_read(rqstp, &resp->fh, NULL,
 				  argp->offset,
 			   	  argp->vec, argp->vlen,
 				  &resp->count);
@@ -202,7 +202,7 @@ nfsd3_proc_write(struct svc_rqst *rqstp, struct nfsd3_writeargs *argp,
 
 	fh_copy(&resp->fh, &argp->fh);
 	resp->committed = argp->stable;
-	nfserr = nfsd_write(rqstp, &resp->fh,
+	nfserr = nfsd_write(rqstp, &resp->fh, NULL,
 				   argp->offset,
 				   argp->vec, argp->vlen,
 				   argp->len,

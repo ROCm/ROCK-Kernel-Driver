@@ -114,7 +114,7 @@ static void rs64_cpu_setup(void *unused)
 	/* reset MMCR1, MMCRA */
 	mtspr(SPRN_MMCR1, 0);
 
-	if (cur_cpu_spec->cpu_features & CPU_FTR_MMCRA)
+	if (cpu_has_feature(CPU_FTR_MMCRA))
 		mtspr(SPRN_MMCRA, 0);
 
 	mmcr0 |= MMCR0_FCM1|MMCR0_PMXE|MMCR0_FCECE;

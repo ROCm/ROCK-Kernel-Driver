@@ -64,23 +64,6 @@
 
 #define AES_BLOCK_SIZE		16
 
-static inline 
-u32 generic_rotr32 (const u32 x, const unsigned bits)
-{
-	const unsigned n = bits % 32;
-	return (x >> n) | (x << (32 - n));
-}
-
-static inline 
-u32 generic_rotl32 (const u32 x, const unsigned bits)
-{
-	const unsigned n = bits % 32;
-	return (x << n) | (x >> (32 - n));
-}
-
-#define rotl generic_rotl32
-#define rotr generic_rotr32
-
 /*
  * #define byte(x, nr) ((unsigned char)((x) >> (nr*8))) 
  */
@@ -191,26 +174,26 @@ gen_tabs (void)
 
 		t = p;
 		fl_tab[0][i] = t;
-		fl_tab[1][i] = rotl (t, 8);
-		fl_tab[2][i] = rotl (t, 16);
-		fl_tab[3][i] = rotl (t, 24);
+		fl_tab[1][i] = rol32(t, 8);
+		fl_tab[2][i] = rol32(t, 16);
+		fl_tab[3][i] = rol32(t, 24);
 
 		t = ((u32) ff_mult (2, p)) |
 		    ((u32) p << 8) |
 		    ((u32) p << 16) | ((u32) ff_mult (3, p) << 24);
 
 		ft_tab[0][i] = t;
-		ft_tab[1][i] = rotl (t, 8);
-		ft_tab[2][i] = rotl (t, 16);
-		ft_tab[3][i] = rotl (t, 24);
+		ft_tab[1][i] = rol32(t, 8);
+		ft_tab[2][i] = rol32(t, 16);
+		ft_tab[3][i] = rol32(t, 24);
 
 		p = isb_tab[i];
 
 		t = p;
 		il_tab[0][i] = t;
-		il_tab[1][i] = rotl (t, 8);
-		il_tab[2][i] = rotl (t, 16);
-		il_tab[3][i] = rotl (t, 24);
+		il_tab[1][i] = rol32(t, 8);
+		il_tab[2][i] = rol32(t, 16);
+		il_tab[3][i] = rol32(t, 24);
 
 		t = ((u32) ff_mult (14, p)) |
 		    ((u32) ff_mult (9, p) << 8) |
@@ -218,9 +201,9 @@ gen_tabs (void)
 		    ((u32) ff_mult (11, p) << 24);
 
 		it_tab[0][i] = t;
-		it_tab[1][i] = rotl (t, 8);
-		it_tab[2][i] = rotl (t, 16);
-		it_tab[3][i] = rotl (t, 24);
+		it_tab[1][i] = rol32(t, 8);
+		it_tab[2][i] = rol32(t, 16);
+		it_tab[3][i] = rol32(t, 24);
 	}
 }
 
@@ -232,14 +215,14 @@ gen_tabs (void)
     w   = star_x(v);        \
     t   = w ^ (x);          \
    (y)  = u ^ v ^ w;        \
-   (y) ^= rotr(u ^ t,  8) ^ \
-          rotr(v ^ t, 16) ^ \
-          rotr(t,24)
+   (y) ^= ror32(u ^ t,  8) ^ \
+          ror32(v ^ t, 16) ^ \
+          ror32(t,24)
 
 /* initialise the key schedule from the user supplied key */
 
 #define loop4(i)                                    \
-{   t = rotr(t,  8); t = ls_box(t) ^ rco_tab[i];    \
+{   t = ror32(t,  8); t = ls_box(t) ^ rco_tab[i];    \
     t ^= E_KEY[4 * i];     E_KEY[4 * i + 4] = t;    \
     t ^= E_KEY[4 * i + 1]; E_KEY[4 * i + 5] = t;    \
     t ^= E_KEY[4 * i + 2]; E_KEY[4 * i + 6] = t;    \
@@ -247,7 +230,7 @@ gen_tabs (void)
 }
 
 #define loop6(i)                                    \
-{   t = rotr(t,  8); t = ls_box(t) ^ rco_tab[i];    \
+{   t = ror32(t,  8); t = ls_box(t) ^ rco_tab[i];    \
     t ^= E_KEY[6 * i];     E_KEY[6 * i + 6] = t;    \
     t ^= E_KEY[6 * i + 1]; E_KEY[6 * i + 7] = t;    \
     t ^= E_KEY[6 * i + 2]; E_KEY[6 * i + 8] = t;    \
@@ -257,7 +240,7 @@ gen_tabs (void)
 }
 
 #define loop8(i)                                    \
-{   t = rotr(t,  8); ; t = ls_box(t) ^ rco_tab[i];  \
+{   t = ror32(t,  8); ; t = ls_box(t) ^ rco_tab[i];  \
     t ^= E_KEY[8 * i];     E_KEY[8 * i + 8] = t;    \
     t ^= E_KEY[8 * i + 1]; E_KEY[8 * i + 9] = t;    \
     t ^= E_KEY[8 * i + 2]; E_KEY[8 * i + 10] = t;   \

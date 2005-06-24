@@ -60,29 +60,36 @@ int mthca_create_ah(struct mthca_dev *dev,
 	u32 index = -1;
 	struct mthca_av *av = NULL;
 
-	ah->on_hca = 0;
+	ah->type = MTHCA_AH_PCI_POOL;
 
-	if (!atomic_read(&pd->sqp_count) &&
-	    !(dev->mthca_flags & MTHCA_FLAG_DDR_HIDDEN)) {
+	if (mthca_is_memfree(dev)) {
+		ah->av   = kmalloc(sizeof *ah->av, GFP_ATOMIC);
+		if (!ah->av)
+			return -ENOMEM;
+
+		ah->type = MTHCA_AH_KMALLOC;
+		av       = ah->av;
+	} else if (!atomic_read(&pd->sqp_count) &&
+		 !(dev->mthca_flags & MTHCA_FLAG_DDR_HIDDEN)) {
 		index = mthca_alloc(&dev->av_table.alloc);
 
 		/* fall back to allocate in host memory */
 		if (index == -1)
-			goto host_alloc;
+			goto on_hca_fail;
 
-		av = kmalloc(sizeof *av, GFP_KERNEL);
+		av = kmalloc(sizeof *av, GFP_ATOMIC);
 		if (!av)
-			goto host_alloc;
+			goto on_hca_fail;
 
-		ah->on_hca = 1;
+		ah->type = MTHCA_AH_ON_HCA;
 		ah->avdma  = dev->av_table.ddr_av_base +
 			index * MTHCA_AV_SIZE;
 	}
 
- host_alloc:
-	if (!ah->on_hca) {
+on_hca_fail:
+	if (ah->type == MTHCA_AH_PCI_POOL) {
 		ah->av = pci_pool_alloc(dev->av_table.pool,
-					SLAB_KERNEL, &ah->avdma);
+					SLAB_ATOMIC, &ah->avdma);
 		if (!ah->av)
 			return -ENOMEM;
 
@@ -123,7 +130,7 @@ int mthca_create_ah(struct mthca_dev *dev,
 			       j * 4, be32_to_cpu(((u32 *) av)[j]));
 	}
 
-	if (ah->on_hca) {
+	if (ah->type == MTHCA_AH_ON_HCA) {
 		memcpy_toio(dev->av_table.av_map + index * MTHCA_AV_SIZE,
 			    av, MTHCA_AV_SIZE);
 		kfree(av);
@@ -134,12 +141,21 @@ int mthca_create_ah(struct mthca_dev *dev,
 
 int mthca_destroy_ah(struct mthca_dev *dev, struct mthca_ah *ah)
 {
-	if (ah->on_hca)
+	switch (ah->type) {
+	case MTHCA_AH_ON_HCA:
 		mthca_free(&dev->av_table.alloc,
  			   (ah->avdma - dev->av_table.ddr_av_base) /
 			   MTHCA_AV_SIZE);
-	else
+		break;
+
+	case MTHCA_AH_PCI_POOL:
 		pci_pool_free(dev->av_table.pool, ah->av, ah->avdma);
+		break;
+
+	case MTHCA_AH_KMALLOC:
+		kfree(ah->av);
+		break;
+	}
 
 	return 0;
 }
@@ -147,7 +163,7 @@ int mthca_destroy_ah(struct mthca_dev *dev, struct mthca_ah *ah)
 int mthca_read_ah(struct mthca_dev *dev, struct mthca_ah *ah,
 		  struct ib_ud_header *header)
 {
-	if (ah->on_hca)
+	if (ah->type == MTHCA_AH_ON_HCA)
 		return -EINVAL;
 
 	header->lrh.service_level   = be32_to_cpu(ah->av->sl_tclass_flowlabel) >> 28;
@@ -175,6 +191,9 @@ int mthca_read_ah(struct mthca_dev *dev, struct mthca_ah *ah,
 int __devinit mthca_init_av_table(struct mthca_dev *dev)
 {
 	int err;
+
+	if (mthca_is_memfree(dev))
+		return 0;
 
 	err = mthca_alloc_init(&dev->av_table.alloc,
 			       dev->av_table.num_ddr_avs,
@@ -212,6 +231,9 @@ int __devinit mthca_init_av_table(struct mthca_dev *dev)
 
 void __devexit mthca_cleanup_av_table(struct mthca_dev *dev)
 {
+	if (mthca_is_memfree(dev))
+		return;
+
 	if (dev->av_table.av_map)
 		iounmap(dev->av_table.av_map);
 	pci_pool_destroy(dev->av_table.pool);

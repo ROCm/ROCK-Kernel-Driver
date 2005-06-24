@@ -25,22 +25,26 @@
  * SKB == NULL indicates that the link is being closed
  */
 
-void atm_push_raw(struct atm_vcc *vcc,struct sk_buff *skb)
+static void atm_push_raw(struct atm_vcc *vcc,struct sk_buff *skb)
 {
 	if (skb) {
-		skb_queue_tail(&vcc->sk->sk_receive_queue, skb);
-		vcc->sk->sk_data_ready(vcc->sk, skb->len);
+		struct sock *sk = sk_atm(vcc);
+
+		skb_queue_tail(&sk->sk_receive_queue, skb);
+		sk->sk_data_ready(sk, skb->len);
 	}
 }
 
 
 static void atm_pop_raw(struct atm_vcc *vcc,struct sk_buff *skb)
 {
-	DPRINTK("APopR (%d) %d -= %d\n", vcc->vci, vcc->sk->sk_wmem_alloc,
+	struct sock *sk = sk_atm(vcc);
+
+	DPRINTK("APopR (%d) %d -= %d\n", vcc->vci, sk->sk_wmem_alloc,
 		skb->truesize);
-	atomic_sub(skb->truesize, &vcc->sk->sk_wmem_alloc);
+	atomic_sub(skb->truesize, &sk->sk_wmem_alloc);
 	dev_kfree_skb_any(skb);
-	vcc->sk->sk_write_space(vcc->sk);
+	sk->sk_write_space(sk);
 }
 
 

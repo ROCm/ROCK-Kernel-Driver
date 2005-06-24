@@ -76,11 +76,12 @@ static void alpha_core_agp_tlbflush(struct agp_memory *mem)
 	alpha_mv.mv_pci_tbi(agp->hose, 0, -1);
 }
 
-static void alpha_core_agp_enable(u32 mode)
+static void alpha_core_agp_enable(struct agp_bridge_data *bridge, u32 mode)
 {
-	alpha_agp_info *agp = agp_bridge->dev_private_data;
+	alpha_agp_info *agp = bridge->dev_private_data;
 
-	agp->mode.lw = agp_collect_device_status(mode, agp->capability.lw);
+	agp->mode.lw = agp_collect_device_status(bridge, mode,
+					agp->capability.lw);
 
 	agp->mode.bits.enable = 1;
 	agp->ops->configure(agp);

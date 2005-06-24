@@ -178,8 +178,7 @@ static void tx39_flush_cache_range(struct vm_area_struct *vma,
 	}
 }
 
-static void tx39_flush_cache_page(struct vm_area_struct *vma,
-				   unsigned long page)
+static void tx39_flush_cache_page(struct vm_area_struct *vma, unsigned long page, unsigned long pfn)
 {
 	int exec = vma->vm_flags & VM_EXEC;
 	struct mm_struct *mm = vma->vm_mm;

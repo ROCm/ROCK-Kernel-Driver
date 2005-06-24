@@ -45,7 +45,7 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 	if (resource < 6) {
 		reg = PCI_BASE_ADDRESS_0 + 4*resource;
 	} else if (resource == PCI_ROM_RESOURCE) {
-		res->flags |= PCI_ROM_ADDRESS_ENABLE;
+		res->flags |= IORESOURCE_ROM_ENABLE;
 		new |= PCI_ROM_ADDRESS_ENABLE;
 		reg = dev->rom_base_reg;
 	} else {
@@ -57,7 +57,7 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 	pci_read_config_dword(dev, reg, &check);
 	if ((new ^ check) & ((new & PCI_BASE_ADDRESS_SPACE_IO) ? PCI_BASE_ADDRESS_IO_MASK : PCI_BASE_ADDRESS_MEM_MASK)) {
 		printk(KERN_ERR "PCI: Error while updating region "
-		       "%s/%d (%08x != %08x)\n", dev->slot_name, resource,
+		       "%s/%d (%08x != %08x)\n", pci_name(dev), resource,
 		       new, check);
 	}
 }
@@ -125,7 +125,7 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 			continue;
 		r = &dev->resource[idx];
 		if (!r->start && r->end) {
-			printk(KERN_ERR "PCI: Device %s not available because of resource collisions\n", dev->slot_name);
+			printk(KERN_ERR "PCI: Device %s not available because of resource collisions\n", pci_name(dev));
 			return -EINVAL;
 		}
 		if (r->flags & IORESOURCE_IO)

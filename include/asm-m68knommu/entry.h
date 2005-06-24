@@ -22,8 +22,9 @@
  *	24(sp) - orig_d0
  *	28(sp) - stack adjustment
  *	2C(sp) - [ sr              ] [ format & vector ]
- *	2E(sp) - [ pc              ] [ sr              ]
- *	30(sp) - [ format & vector ] [ pc              ]
+ *	2E(sp) - [ pc-hiword       ] [ sr              ]
+ *	30(sp) - [ pc-loword       ] [ pc-hiword       ]
+ *	32(sp) - [ format & vector ] [ pc-loword       ]
  *		  ^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^
  *			M68K		  COLDFIRE
  */
@@ -41,12 +42,6 @@ PF_DTRACE_OFF = 1
 PF_DTRACE_BIT = 5
 
 LENOSYS = 38
-
-LD0		= 0x20
-LORIG_D0	= 0x24
-LFORMATVEC	= 0x2c
-LSR		= 0x2e
-LPC		= 0x30
 
 #define SWITCH_STACK_SIZE (6*4+4)	/* Includes return address */
 
@@ -72,36 +67,36 @@ LPC		= 0x30
 	addql	#8,sw_usp		/* remove exception */
 	movel	sw_ksp,%sp		/* kernel sp */
 	subql	#8,%sp			/* room for exception */
-	clrl	%sp@-			/* stk_adj */
+	clrl	%sp@-			/* stkadj */
 	movel	%d0,%sp@-		/* orig d0 */
 	movel	%d0,%sp@-		/* d0 */
-	subl	#32,%sp			/* space for 8 regs */
+	lea	%sp@(-32),%sp		/* space for 8 regs */
 	moveml	%d1-%d5/%a0-%a2,%sp@
 	movel	sw_usp,%a0		/* get usp */
-	moveml	%a0@(-8),%d1-%d2	/* get exception */
-	moveml	%d1-%d2,%sp@(LFORMATVEC) /* copy exception */
+	movel	%a0@-,%sp@(PT_PC)	/* copy exception program counter */
+	movel	%a0@-,%sp@(PT_FORMATVEC)/* copy exception format/vector/sr */
 	bra	7f
 	6:
-	clrl	%sp@-			/* stk_adj */
+	clrl	%sp@-			/* stkadj */
 	movel	%d0,%sp@-		/* orig d0 */
 	movel	%d0,%sp@-		/* d0 */
-	subl	#32,%sp			/* space for 7 regs */
+	lea	%sp@(-32),%sp		/* space for 8 regs */
 	moveml	%d1-%d5/%a0-%a2,%sp@
 	7:
 .endm
 
 .macro RESTORE_ALL
-	btst	#5,%sp@(LSR)		/* going user? */
+	btst	#5,%sp@(PT_SR)		/* going user? */
 	bnes	8f			/* no, skip */
 	move	#0x2700,%sr		/* disable intrs */
 	movel	sw_usp,%a0		/* get usp */
-	moveml	%sp@(LFORMATVEC),%d1-%d2 /* copy exception */
-	moveml	%d1-%d2,%a0@(-8)
+	movel	%sp@(PT_PC),%a0@-	/* copy exception program counter */
+	movel	%sp@(PT_FORMATVEC),%a0@-/* copy exception format/vector/sr */
 	moveml	%sp@,%d1-%d5/%a0-%a2
-	addl	#32,%sp			/* space for 8 regs */
+	lea	%sp@(32),%sp		/* space for 8 regs */
 	movel	%sp@+,%d0
 	addql	#4,%sp			/* orig d0 */
-	addl	%sp@+,%sp		/* stk adj */
+	addl	%sp@+,%sp		/* stkadj */
 	addql	#8,%sp			/* remove exception */
 	movel	%sp,sw_ksp		/* save ksp */
 	subql	#8,sw_usp		/* set exception */
@@ -109,10 +104,10 @@ LPC		= 0x30
 	rte
 	8:
 	moveml	%sp@,%d1-%d5/%a0-%a2
-	addl	#32,%sp			/* space for 8 regs */
+	lea	%sp@(32),%sp		/* space for 8 regs */
 	movel	%sp@+,%d0
 	addql	#4,%sp			/* orig d0 */
-	addl	%sp@+,%sp		/* stk adj */
+	addl	%sp@+,%sp		/* stkadj */
 	rte
 .endm
 
@@ -121,30 +116,30 @@ LPC		= 0x30
  */
 .macro SAVE_LOCAL
 	move	#0x2700,%sr		/* disable intrs */
-	clrl	%sp@-			/* stk_adj */
+	clrl	%sp@-			/* stkadj */
 	movel	%d0,%sp@-		/* orig d0 */
 	movel	%d0,%sp@-		/* d0 */
-	subl	#32,%sp			/* space for 8 regs */
+	lea	%sp@(-32),%sp		/* space for 8 regs */
 	moveml	%d1-%d5/%a0-%a2,%sp@
 .endm
 
 .macro RESTORE_LOCAL
 	moveml	%sp@,%d1-%d5/%a0-%a2
-	addl	#32,%sp			/* space for 8 regs */
+	lea	%sp@(32),%sp		/* space for 8 regs */
 	movel	%sp@+,%d0
 	addql	#4,%sp			/* orig d0 */
-	addl	%sp@+,%sp		/* stk adj */
+	addl	%sp@+,%sp		/* stkadj */
 	rte
 .endm
 
 .macro SAVE_SWITCH_STACK
-	subl    #24,%sp			/* 6 regs */
+	lea	%sp@(-24),%sp		/* 6 regs */
 	moveml	%a3-%a6/%d6-%d7,%sp@
 .endm
 
 .macro RESTORE_SWITCH_STACK
 	moveml	%sp@,%a3-%a6/%d6-%d7
-	addl	#24,%sp			/* 6 regs */
+	lea	%sp@(24),%sp		/* 6 regs */
 .endm
 
 /*
@@ -161,7 +156,7 @@ LPC		= 0x30
  * Standard 68k interrupt entry and exit macros.
  */
 .macro SAVE_ALL
-	clrl	%sp@-			/* stk_adj */
+	clrl	%sp@-			/* stkadj */
 	movel	%d0,%sp@-		/* orig d0 */
 	movel	%d0,%sp@-		/* d0 */
 	moveml	%d1-%d5/%a0-%a2,%sp@-
@@ -171,7 +166,7 @@ LPC		= 0x30
 	moveml	%sp@+,%a0-%a2/%d1-%d5
 	movel	%sp@+,%d0
 	addql	#4,%sp			/* orig d0 */
-	addl	%sp@+,%sp		/* stk adj */
+	addl	%sp@+,%sp		/* stkadj */
 	rte
 .endm
 

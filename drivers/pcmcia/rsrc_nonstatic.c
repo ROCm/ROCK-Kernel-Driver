@@ -24,6 +24,8 @@
 #include <linux/ioport.h>
 #include <linux/timer.h>
 #include <linux/pci.h>
+#include <linux/device.h>
+
 #include <asm/irq.h>
 #include <asm/io.h>
 
@@ -472,8 +474,7 @@ static void validate_mem(struct pcmcia_socket *s, unsigned int probe_mask)
 
 
 /*
- * Locking note: this is the only place where we take
- * both rsrc_sem and skt_sem.
+ * Locking note: Must be called with skt_sem held!
  */
 static void pcmcia_nonstatic_validate_mem(struct pcmcia_socket *s)
 {
@@ -490,12 +491,8 @@ static void pcmcia_nonstatic_validate_mem(struct pcmcia_socket *s)
 		if (probe_mask & ~s_data->rsrc_mem_probe) {
 			s_data->rsrc_mem_probe |= probe_mask;
 
-			down(&s->skt_sem);
-
 			if (s->state & SOCKET_PRESENT)
 				validate_mem(s, probe_mask);
-
-			up(&s->skt_sem);
 		}
 
 		up(&rsrc_sem);
@@ -779,6 +776,7 @@ static int nonstatic_init(struct pcmcia_socket *s)
 	data = kmalloc(sizeof(struct socket_data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
+	memset(data, 0, sizeof(struct socket_data));
 
 	data->mem_db.next = &data->mem_db;
 	data->io_db.next = &data->io_db;
@@ -816,3 +814,172 @@ struct pccard_resource_ops pccard_nonstatic_ops = {
 	.exit = nonstatic_release_resource_db,
 };
 EXPORT_SYMBOL(pccard_nonstatic_ops);
+
+
+/* sysfs interface to the resource database */
+
+static ssize_t show_io_db(struct class_device *class_dev, char *buf)
+{
+	struct pcmcia_socket *s = class_get_devdata(class_dev);
+	struct socket_data *data;
+	struct resource_map *p;
+	ssize_t ret = 0;
+
+	down(&rsrc_sem);
+	data = s->resource_data;
+
+	for (p = data->io_db.next; p != &data->io_db; p = p->next) {
+		if (ret > (PAGE_SIZE - 10))
+			continue;
+		ret += snprintf (&buf[ret], (PAGE_SIZE - ret - 1),
+				 "0x%08lx - 0x%08lx\n",
+				 ((unsigned long) p->base),
+				 ((unsigned long) p->base + p->num - 1));
+	}
+
+	up(&rsrc_sem);
+	return (ret);
+}
+
+static ssize_t store_io_db(struct class_device *class_dev, const char *buf, size_t count)
+{
+	struct pcmcia_socket *s = class_get_devdata(class_dev);
+	unsigned long start_addr, end_addr;
+	unsigned int add = 1;
+	adjust_t adj;
+	ssize_t ret = 0;
+
+	ret = sscanf (buf, "+ 0x%lx - 0x%lx", &start_addr, &end_addr);
+	if (ret != 2) {
+		ret = sscanf (buf, "- 0x%lx - 0x%lx", &start_addr, &end_addr);
+		add = 0;
+		if (ret != 2) {
+			ret = sscanf (buf, "0x%lx - 0x%lx", &start_addr, &end_addr);
+			add = 1;
+			if (ret != 2)
+				return -EINVAL;
+		}
+	}
+	if (end_addr <= start_addr)
+		return -EINVAL;
+
+	adj.Action = add ? ADD_MANAGED_RESOURCE : REMOVE_MANAGED_RESOURCE;
+	adj.Resource = RES_IO_RANGE;
+	adj.resource.io.BasePort = start_addr;
+	adj.resource.io.NumPorts = end_addr - start_addr + 1;
+
+	ret = adjust_io(s, &adj);
+
+	return ret ? ret : count;
+}
+static CLASS_DEVICE_ATTR(available_resources_io, 0600, show_io_db, store_io_db);
+
+static ssize_t show_mem_db(struct class_device *class_dev, char *buf)
+{
+	struct pcmcia_socket *s = class_get_devdata(class_dev);
+	struct socket_data *data;
+	struct resource_map *p;
+	ssize_t ret = 0;
+
+	down(&rsrc_sem);
+	data = s->resource_data;
+
+	for (p = data->mem_db.next; p != &data->mem_db; p = p->next) {
+		if (ret > (PAGE_SIZE - 10))
+			continue;
+		ret += snprintf (&buf[ret], (PAGE_SIZE - ret - 1),
+				 "0x%08lx - 0x%08lx\n",
+				 ((unsigned long) p->base),
+				 ((unsigned long) p->base + p->num - 1));
+	}
+
+	up(&rsrc_sem);
+	return (ret);
+}
+
+static ssize_t store_mem_db(struct class_device *class_dev, const char *buf, size_t count)
+{
+	struct pcmcia_socket *s = class_get_devdata(class_dev);
+	unsigned long start_addr, end_addr;
+	unsigned int add = 1;
+	adjust_t adj;
+	ssize_t ret = 0;
+
+	ret = sscanf (buf, "+ 0x%lx - 0x%lx", &start_addr, &end_addr);
+	if (ret != 2) {
+		ret = sscanf (buf, "- 0x%lx - 0x%lx", &start_addr, &end_addr);
+		add = 0;
+		if (ret != 2) {
+			ret = sscanf (buf, "0x%lx - 0x%lx", &start_addr, &end_addr);
+			add = 1;
+			if (ret != 2)
+				return -EINVAL;
+		}
+	}
+	if (end_addr <= start_addr)
+		return -EINVAL;
+
+	adj.Action = add ? ADD_MANAGED_RESOURCE : REMOVE_MANAGED_RESOURCE;
+	adj.Resource = RES_MEMORY_RANGE;
+	adj.resource.memory.Base = start_addr;
+	adj.resource.memory.Size = end_addr - start_addr + 1;
+
+	ret = adjust_memory(s, &adj);
+
+	return ret ? ret : count;
+}
+static CLASS_DEVICE_ATTR(available_resources_mem, 0600, show_mem_db, store_mem_db);
+
+static struct class_device_attribute *pccard_rsrc_attributes[] = {
+	&class_device_attr_available_resources_io,
+	&class_device_attr_available_resources_mem,
+	NULL,
+};
+
+static int __devinit pccard_sysfs_add_rsrc(struct class_device *class_dev)
+{
+	struct pcmcia_socket *s = class_get_devdata(class_dev);
+	struct class_device_attribute **attr;
+	int ret = 0;
+	if (s->resource_ops != &pccard_nonstatic_ops)
+		return 0;
+
+	for (attr = pccard_rsrc_attributes; *attr; attr++) {
+		ret = class_device_create_file(class_dev, *attr);
+		if (ret)
+			break;
+	}
+
+	return ret;
+}
+
+static void __devexit pccard_sysfs_remove_rsrc(struct class_device *class_dev)
+{
+	struct pcmcia_socket *s = class_get_devdata(class_dev);
+	struct class_device_attribute **attr;
+
+	if (s->resource_ops != &pccard_nonstatic_ops)
+		return;
+
+	for (attr = pccard_rsrc_attributes; *attr; attr++)
+		class_device_remove_file(class_dev, *attr);
+}
+
+static struct class_interface pccard_rsrc_interface = {
+	.class = &pcmcia_socket_class,
+	.add = &pccard_sysfs_add_rsrc,
+	.remove = __devexit_p(&pccard_sysfs_remove_rsrc),
+};
+
+static int __init nonstatic_sysfs_init(void)
+{
+	return class_interface_register(&pccard_rsrc_interface);
+}
+
+static void __exit nonstatic_sysfs_exit(void)
+{
+	class_interface_unregister(&pccard_rsrc_interface);
+}
+
+module_init(nonstatic_sysfs_init);
+module_exit(nonstatic_sysfs_exit);

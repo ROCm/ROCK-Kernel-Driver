@@ -1019,7 +1019,7 @@ extern asmlinkage long
 sys_timer_create(clockid_t, struct sigevent *, timer_t *);
 
 asmlinkage long
-sys32_timer_create(clockid_t which_clock, struct sigevent32 *se32,
+sys32_timer_create(clockid_t which_clock, struct compat_sigevent *se32,
 		timer_t *timer_id)
 {
 	struct sigevent se;
@@ -1030,16 +1030,7 @@ sys32_timer_create(clockid_t which_clock, struct sigevent32 *se32,
 	if (se32 == NULL)
 		return sys_timer_create(which_clock, NULL, timer_id);
 
-	/* XXX: converting se32 to se is filthy because of the
-	 * two union members. For now it is ok, because the pointers
-	 * are not touched in kernel.
-	 */
-	memset(&se, 0, sizeof(se));
-	if (get_user(se.sigev_value.sival_int,  &se32->sigev_value.sival_int) ||
-	    get_user(se.sigev_signo, &se32->sigev_signo) ||
-	    get_user(se.sigev_notify, &se32->sigev_notify) ||
-	    copy_from_user(&se._sigev_un._pad, &se32->_sigev_un._pad,
-	    sizeof(se._sigev_un._pad)))
+	if (get_compat_sigevent(&se, se32))
 		return -EFAULT;
 
 	old_fs = get_fs();

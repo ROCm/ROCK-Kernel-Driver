@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-blackbird.c,v 1.23 2004/12/10 12:33:39 kraxel Exp $
+ * $Id: cx88-blackbird.c,v 1.26 2005/03/07 15:58:05 kraxel Exp $
  *
  *  Support for a cx23416 mpeg encoder via cx2388x host port.
  *  "blackbird" reference design.
@@ -695,7 +695,7 @@ static int mpeg_open(struct inode *inode, struct file *file)
 	/* FIXME: locking against other video device */
 	cx88_set_scale(dev->core, dev->width, dev->height,
 		       V4L2_FIELD_INTERLACED);
-	
+
 	videobuf_queue_init(&fh->mpegq, &blackbird_qops,
 			    dev->pci, &dev->slock,
 			    V4L2_BUF_TYPE_VIDEO_CAPTURE,
@@ -857,6 +857,8 @@ static void __devexit blackbird_remove(struct pci_dev *pci_dev)
 
 	/* common */
 	cx8802_fini_common(dev);
+	cx88_core_put(dev->core,dev->pci);
+	kfree(dev);
 }
 
 static struct pci_device_id cx8802_pci_tbl[] = {
@@ -890,7 +892,7 @@ static int blackbird_init(void)
 	printk(KERN_INFO "cx2388x: snapshot date %04d-%02d-%02d\n",
 	       SNAPSHOT/10000, (SNAPSHOT/100)%100, SNAPSHOT%100);
 #endif
-	return pci_module_init(&blackbird_pci_driver);
+	return pci_register_driver(&blackbird_pci_driver);
 }
 
 static void blackbird_fini(void)

@@ -90,9 +90,10 @@ struct cfb_info {
 	 */
 	u_char			ramdac_ctrl;
 	u_char			ramdac_powerdown;
+
+	u32			pseudo_palette[16];
 };
 
-static char default_font_storage[40];
 static char *default_font = "Acorn8x8";
 module_param(default_font, charp, 0);
 MODULE_PARM_DESC(default_font, "Default font name");
@@ -1224,9 +1225,7 @@ cyberpro_alloc_fb_info(unsigned int id, char *name)
 {
 	struct cfb_info *cfb;
 
-	cfb = kmalloc(sizeof(struct cfb_info) +
-		       sizeof(u32) * 16, GFP_KERNEL);
-
+	cfb = kmalloc(sizeof(struct cfb_info), GFP_KERNEL);
 	if (!cfb)
 		return NULL;
 
@@ -1282,7 +1281,7 @@ cyberpro_alloc_fb_info(unsigned int id, char *name)
 
 	cfb->fb.fbops		= &cyber2000fb_ops;
 	cfb->fb.flags		= FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
-	cfb->fb.pseudo_palette	= (void *)(cfb + 1);
+	cfb->fb.pseudo_palette	= cfb->pseudo_palette;
 
 	fb_alloc_cmap(&cfb->fb.cmap, NR_PALETTE, 0);
 
@@ -1306,7 +1305,8 @@ cyberpro_free_fb_info(struct cfb_info *cfb)
  * Parse Cyber2000fb options.  Usage:
  *  video=cyber2000:font:fontname
  */
-int
+#ifndef MODULE
+static int
 cyber2000fb_setup(char *options)
 {
 	char *opt;
@@ -1319,6 +1319,8 @@ cyber2000fb_setup(char *options)
 			continue;
 
 		if (strncmp(opt, "font:", 5) == 0) {
+			static char default_font_storage[40];
+
 			strlcpy(default_font_storage, opt + 5, sizeof(default_font_storage));
 			default_font = default_font_storage;
 			continue;
@@ -1328,6 +1330,7 @@ cyber2000fb_setup(char *options)
 	}
 	return 0;
 }
+#endif  /*  MODULE  */
 
 /*
  * The CyberPro chips can be placed on many different bus types.
@@ -1665,7 +1668,7 @@ static void __devexit cyberpro_pci_remove(struct pci_dev *dev)
 	}
 }
 
-static int cyberpro_pci_suspend(struct pci_dev *dev, u32 state)
+static int cyberpro_pci_suspend(struct pci_dev *dev, pm_message_t state)
 {
 	return 0;
 }
@@ -1717,7 +1720,7 @@ static struct pci_driver cyberpro_driver = {
  *
  * Tony: "module_init" is now required
  */
-int __init cyber2000fb_init(void)
+static int __init cyber2000fb_init(void)
 {
 	int ret = -1, err;
 
@@ -1737,7 +1740,7 @@ int __init cyber2000fb_init(void)
 	}
 #endif
 #ifdef CONFIG_PCI
-	err = pci_module_init(&cyberpro_driver);
+	err = pci_register_driver(&cyberpro_driver);
 	if (!err)
 		ret = 0;
 #endif

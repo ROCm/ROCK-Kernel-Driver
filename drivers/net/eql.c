@@ -499,8 +499,6 @@ static int eql_g_slave_cfg(struct net_device *dev, slave_config_t __user *scp)
 		return -ENODEV;
 
 	ret = -EINVAL;
-	if (!slave_dev)
-		return ret;
 
 	spin_lock_bh(&eql->queue.lock);
 	if (eql_is_slave(slave_dev)) {
@@ -536,8 +534,6 @@ static int eql_s_slave_cfg(struct net_device *dev, slave_config_t __user *scp)
 		return -ENODEV;
 
 	ret = -EINVAL;
-	if (!slave_dev)
-		return ret;
 
 	eql = netdev_priv(dev);
 	spin_lock_bh(&eql->queue.lock);

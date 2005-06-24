@@ -43,6 +43,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/device.h>
+#include <linux/sysdev.h>
 #include <linux/suspend.h>
 #include <linux/syscalls.h>
 #include <linux/cpu.h>
@@ -367,9 +368,7 @@ find_via_pmu(void)
 	printk(KERN_INFO "PMU driver %d initialized for %s, firmware: %02x\n",
 	       PMU_DRIVER_VERSION, pbook_type[pmu_kind], pmu_version);
 	       
-#ifndef CONFIG_PPC64
 	sys_ctrler = SYS_CTRLER_PMU;
-#endif
 	
 	return 1;
 }
@@ -1741,9 +1740,12 @@ pmu_enable_irled(int on)
 }
 
 void __pmac
-pmu_restart (char *cmd)
+pmu_restart(void)
 {
 	struct adb_request req;
+
+	if (via == NULL)
+		return;
 
 	local_irq_disable();
 
@@ -1766,6 +1768,9 @@ void __pmac
 pmu_shutdown(void)
 {
 	struct adb_request req;
+
+	if (via == NULL)
+		return;
 
 	local_irq_disable();
 
@@ -2326,7 +2331,7 @@ pmac_suspend_devices(void)
 	/* Sync the disks. */
 	/* XXX It would be nice to have some way to ensure that
 	 * nobody is dirtying any new buffers while we wait. That
-	 * could be acheived using the refrigerator for processes
+	 * could be achieved using the refrigerator for processes
 	 * that swsusp uses
 	 */
 	sys_sync();
@@ -2339,13 +2344,17 @@ pmac_suspend_devices(void)
 	}
 
 	/* Send suspend call to devices, hold the device core's dpm_sem */
-	ret = device_suspend(PM_SUSPEND_MEM);
+	ret = device_suspend(PMSG_SUSPEND);
 	if (ret) {
 		broadcast_wake();
 		printk(KERN_ERR "Driver sleep failed\n");
 		return -EBUSY;
 	}
 
+	/* Disable clock spreading on some machines */
+	pmac_tweak_clock_spreading(0);
+
+	/* Stop preemption */
 	preempt_disable();
 
 	/* Make sure the decrementer won't interrupt us */
@@ -2366,7 +2375,7 @@ pmac_suspend_devices(void)
 	 * use this but still... This will take care of sysdev's as well, so
 	 * we exit from here with local irqs disabled and PIC off.
 	 */
-	ret = device_power_down(PM_SUSPEND_MEM);
+	ret = device_power_down(PMSG_SUSPEND);
 	if (ret) {
 		wakeup_decrementer();
 		local_irq_enable();
@@ -2379,7 +2388,6 @@ pmac_suspend_devices(void)
 
 	/* Wait for completion of async backlight requests */
 	while (!bright_req_1.complete || !bright_req_2.complete ||
-
 			!batt_req.complete)
 		pmu_poll();
 
@@ -2389,7 +2397,7 @@ pmac_suspend_devices(void)
 	enable_kernel_fp();
 
 #ifdef CONFIG_ALTIVEC
-	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_ALTIVEC)
+	if (cpu_has_feature(CPU_FTR_ALTIVEC))
 		enable_kernel_altivec();
 #endif /* CONFIG_ALTIVEC */
 
@@ -2413,10 +2421,11 @@ pmac_wakeup_devices(void)
 
 	/* Re-enable local CPU interrupts */
 	local_irq_enable();
-
-	mdelay(100);
-
+	mdelay(10);
 	preempt_enable();
+
+	/* Re-enable clock spreading on some machines */
+	pmac_tweak_clock_spreading(1);
 
 	/* Resume devices */
 	device_resume();
@@ -2540,7 +2549,9 @@ powerbook_sleep_Core99(void)
 		return ret;
 	}
 
-	printk(KERN_DEBUG "HID1, before: %x\n", mfspr(SPRN_HID1));
+	/* Stop environment and ADB interrupts */
+	pmu_request(&req, NULL, 2, PMU_SET_INTR_MASK, 0);
+	pmu_wait_complete(&req);
 
 	/* Tell PMU what events will wake us up */
 	pmu_request(&req, NULL, 4, PMU_POWER_EVENTS, PMU_PWR_CLR_WAKEUP_EVENTS,
@@ -2582,6 +2593,9 @@ powerbook_sleep_Core99(void)
 	/* Restore VIA */
 	restore_via_state();
 
+	/* tweak LPJ before cpufreq is there */
+	loops_per_jiffy *= 2;
+
 	/* Restore video */
 	pmac_call_early_video_resume();
 
@@ -2602,7 +2616,8 @@ powerbook_sleep_Core99(void)
 	pmu_request(&req, NULL, 2, PMU_SET_INTR_MASK, pmu_intr_mask);
 	pmu_wait_complete(&req);
 
-	printk(KERN_DEBUG "HID1, after: %x\n", mfspr(SPRN_HID1));
+	/* Restore LPJ, cpufreq will adjust the cpu frequency */
+	loops_per_jiffy /= 2;
 
 	pmac_wakeup_devices();
 
@@ -2770,13 +2785,12 @@ pmu_read(struct file *file, char __user *buf,
 	struct pmu_private *pp = file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
-	int ret;
+	int ret = 0;
 
 	if (count < 1 || pp == 0)
 		return -EINVAL;
-	ret = verify_area(VERIFY_WRITE, buf, count);
-	if (ret)
-		return ret;
+	if (!access_ok(VERIFY_WRITE, buf, count))
+		return -EFAULT;
 
 	spin_lock_irqsave(&pp->lock, flags);
 	add_wait_queue(&pp->wait, &wait);
@@ -3039,6 +3053,88 @@ pmu_polled_request(struct adb_request *req)
 	return 0;
 }
 #endif /* DEBUG_SLEEP */
+
+
+/* FIXME: This is a temporary set of callbacks to enable us
+ * to do suspend-to-disk.
+ */
+
+#ifdef CONFIG_PM
+
+static int pmu_sys_suspended = 0;
+
+static int pmu_sys_suspend(struct sys_device *sysdev, pm_message_t state)
+{
+	if (state != PM_SUSPEND_DISK || pmu_sys_suspended)
+		return 0;
+
+	/* Suspend PMU event interrupts */
+	pmu_suspend();
+
+	pmu_sys_suspended = 1;
+	return 0;
+}
+
+static int pmu_sys_resume(struct sys_device *sysdev)
+{
+	struct adb_request req;
+
+	if (!pmu_sys_suspended)
+		return 0;
+
+	/* Tell PMU we are ready */
+	pmu_request(&req, NULL, 2, PMU_SYSTEM_READY, 2);
+	pmu_wait_complete(&req);
+
+	/* Resume PMU event interrupts */
+	pmu_resume();
+
+	pmu_sys_suspended = 0;
+
+	return 0;
+}
+
+#endif /* CONFIG_PM */
+
+static struct sysdev_class pmu_sysclass = {
+	set_kset_name("pmu"),
+};
+
+static struct sys_device device_pmu = {
+	.id		= 0,
+	.cls		= &pmu_sysclass,
+};
+
+static struct sysdev_driver driver_pmu = {
+#ifdef CONFIG_PM
+	.suspend	= &pmu_sys_suspend,
+	.resume		= &pmu_sys_resume,
+#endif /* CONFIG_PM */
+};
+
+static int __init init_pmu_sysfs(void)
+{
+	int rc;
+
+	rc = sysdev_class_register(&pmu_sysclass);
+	if (rc) {
+		printk(KERN_ERR "Failed registering PMU sys class\n");
+		return -ENODEV;
+	}
+	rc = sysdev_register(&device_pmu);
+	if (rc) {
+		printk(KERN_ERR "Failed registering PMU sys device\n");
+		return -ENODEV;
+	}
+	rc = sysdev_driver_register(&pmu_sysclass, &driver_pmu);
+	if (rc) {
+		printk(KERN_ERR "Failed registering PMU sys driver\n");
+		return -ENODEV;
+	}
+	return 0;
+}
+
+subsys_initcall(init_pmu_sysfs);
 
 EXPORT_SYMBOL(pmu_request);
 EXPORT_SYMBOL(pmu_poll);

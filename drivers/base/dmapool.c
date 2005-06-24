@@ -156,7 +156,7 @@ dma_pool_create (const char *name, struct device *dev,
 
 
 static struct dma_page *
-pool_alloc_page (struct dma_pool *pool, int mem_flags)
+pool_alloc_page (struct dma_pool *pool, unsigned int __nocast mem_flags)
 {
 	struct dma_page	*page;
 	int		mapsize;

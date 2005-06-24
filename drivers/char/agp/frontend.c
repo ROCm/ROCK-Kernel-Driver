@@ -1,5 +1,6 @@
 /*
  * AGPGART driver frontend
+ * Copyright (C) 2004 Silicon Graphics, Inc.
  * Copyright (C) 2002-2003 Dave Jones
  * Copyright (C) 1999 Jeff Hartmann
  * Copyright (C) 1999 Precision Insight, Inc.
@@ -18,9 +19,9 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * JEFF HARTMANN, OR ANY OTHER CONTRIBUTORS BE LIABLE FOR ANY CLAIM, 
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
- * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
+ * JEFF HARTMANN, OR ANY OTHER CONTRIBUTORS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
  * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  */
@@ -152,8 +153,8 @@ static void agp_add_seg_to_client(struct agp_client *client,
 
 /* Originally taken from linux/mm/mmap.c from the array
  * protection_map.
- * The original really should be exported to modules, or 
- * some routine which does the conversion for you 
+ * The original really should be exported to modules, or
+ * some routine which does the conversion for you
  */
 
 static const pgprot_t my_protect_map[16] =
@@ -234,7 +235,7 @@ static void agp_insert_into_pool(struct agp_memory * temp)
 
 /* File private list routines */
 
-struct agp_file_private *agp_find_private(pid_t pid)
+static struct agp_file_private *agp_find_private(pid_t pid)
 {
 	struct agp_file_private *curr;
 
@@ -249,7 +250,7 @@ struct agp_file_private *agp_find_private(pid_t pid)
 	return NULL;
 }
 
-void agp_insert_file_private(struct agp_file_private * priv)
+static void agp_insert_file_private(struct agp_file_private * priv)
 {
 	struct agp_file_private *prev;
 
@@ -261,7 +262,7 @@ void agp_insert_file_private(struct agp_file_private * priv)
 	agp_fe.file_priv_list = priv;
 }
 
-void agp_remove_file_private(struct agp_file_private * priv)
+static void agp_remove_file_private(struct agp_file_private * priv)
 {
 	struct agp_file_private *next;
 	struct agp_file_private *prev;
@@ -285,8 +286,8 @@ void agp_remove_file_private(struct agp_file_private * priv)
 
 /* End - File flag list routines */
 
-/* 
- * Wrappers for agp_free_memory & agp_allocate_memory 
+/*
+ * Wrappers for agp_free_memory & agp_allocate_memory
  * These make sure that internal lists are kept updated.
  */
 static void agp_free_memory_wrap(struct agp_memory *memory)
@@ -299,7 +300,7 @@ static struct agp_memory *agp_allocate_memory_wrap(size_t pg_count, u32 type)
 {
 	struct agp_memory *memory;
 
-	memory = agp_allocate_memory(pg_count, type);
+	memory = agp_allocate_memory(agp_bridge, pg_count, type);
 	if (memory == NULL)
 		return NULL;
 
@@ -420,7 +421,7 @@ static int agp_remove_controller(struct agp_controller *controller)
 	if (agp_fe.current_controller == controller) {
 		agp_fe.current_controller = NULL;
 		agp_fe.backend_acquired = FALSE;
-		agp_backend_release();
+		agp_backend_release(agp_bridge);
 	}
 	kfree(controller);
 	return 0;
@@ -468,10 +469,10 @@ static void agp_controller_release_current(struct agp_controller *controller,
 
 	agp_fe.current_controller = NULL;
 	agp_fe.used_by_controller = FALSE;
-	agp_backend_release();
+	agp_backend_release(agp_bridge);
 }
 
-/* 
+/*
  * Routines for managing client lists -
  * These routines are for managing the list of auth'ed clients.
  */
@@ -605,7 +606,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 	if (!(test_bit(AGP_FF_IS_VALID, &priv->access_flags)))
 		goto out_eperm;
 
-	agp_copy_info(&kerninfo);
+	agp_copy_info(agp_bridge, &kerninfo);
 	size = vma->vm_end - vma->vm_start;
 	current_size = kerninfo.aper_size;
 	current_size = current_size * 0x100000;
@@ -757,7 +758,7 @@ static int agpioc_info_wrap(struct agp_file_private *priv, void __user *arg)
 	struct agp_info userinfo;
 	struct agp_kern_info kerninfo;
 
-	agp_copy_info(&kerninfo);
+	agp_copy_info(agp_bridge, &kerninfo);
 
 	userinfo.version.major = kerninfo.version.major;
 	userinfo.version.minor = kerninfo.version.minor;
@@ -777,7 +778,6 @@ static int agpioc_info_wrap(struct agp_file_private *priv, void __user *arg)
 
 static int agpioc_acquire_wrap(struct agp_file_private *priv)
 {
-	int ret;
 	struct agp_controller *controller;
 
 	DBG("");
@@ -788,11 +788,15 @@ static int agpioc_acquire_wrap(struct agp_file_private *priv)
 	if (agp_fe.current_controller != NULL)
 		return -EBUSY;
 
-	ret = agp_backend_acquire();
-	if (ret == 0)
-		agp_fe.backend_acquired = TRUE;
-	else
-		return ret;
+	if(!agp_bridge)
+		return -ENODEV;
+
+        if (atomic_read(&agp_bridge->agp_in_use))
+                return -EBUSY;
+
+	atomic_inc(&agp_bridge->agp_in_use);
+
+	agp_fe.backend_acquired = TRUE;
 
 	controller = agp_find_controller_by_pid(priv->my_pid);
 
@@ -803,7 +807,7 @@ static int agpioc_acquire_wrap(struct agp_file_private *priv)
 
 		if (controller == NULL) {
 			agp_fe.backend_acquired = FALSE;
-			agp_backend_release();
+			agp_backend_release(agp_bridge);
 			return -ENOMEM;
 		}
 		agp_insert_controller(controller);
@@ -830,7 +834,7 @@ static int agpioc_setup_wrap(struct agp_file_private *priv, void __user *arg)
 	if (copy_from_user(&mode, arg, sizeof(struct agp_setup)))
 		return -EFAULT;
 
-	agp_enable(mode.agp_mode);
+	agp_enable(agp_bridge, mode.agp_mode);
 	return 0;
 }
 
@@ -993,24 +997,24 @@ static int agp_ioctl(struct inode *inode, struct file *file,
 	if ((agp_fe.current_controller == NULL) &&
 	    (cmd != AGPIOC_ACQUIRE)) {
 		ret_val = -EINVAL;
-	   	goto ioctl_out;
+		goto ioctl_out;
 	}
 	if ((agp_fe.backend_acquired != TRUE) &&
 	    (cmd != AGPIOC_ACQUIRE)) {
 		ret_val = -EBUSY;
-	   	goto ioctl_out;
+		goto ioctl_out;
 	}
 	if (cmd != AGPIOC_ACQUIRE) {
 		if (!(test_bit(AGP_FF_IS_CONTROLLER, &curr_priv->access_flags))) {
 			ret_val = -EPERM;
-		   	goto ioctl_out;
+			goto ioctl_out;
 		}
 		/* Use the original pid of the controller,
 		 * in case it's threaded */
 
 		if (agp_fe.current_controller->pid != curr_priv->my_pid) {
 			ret_val = -EBUSY;
-		   	goto ioctl_out;
+			goto ioctl_out;
 		}
 	}
 
@@ -1022,35 +1026,35 @@ static int agp_ioctl(struct inode *inode, struct file *file,
 	case AGPIOC_ACQUIRE:
 		ret_val = agpioc_acquire_wrap(curr_priv);
 		break;
-	   	
+
 	case AGPIOC_RELEASE:
 		ret_val = agpioc_release_wrap(curr_priv);
 		break;
-	   	
+
 	case AGPIOC_SETUP:
 		ret_val = agpioc_setup_wrap(curr_priv, (void __user *) arg);
 		break;
-	   	
+
 	case AGPIOC_RESERVE:
 		ret_val = agpioc_reserve_wrap(curr_priv, (void __user *) arg);
 		break;
-	   	
+
 	case AGPIOC_PROTECT:
 		ret_val = agpioc_protect_wrap(curr_priv);
 		break;
-	  	
+
 	case AGPIOC_ALLOCATE:
 		ret_val = agpioc_allocate_wrap(curr_priv, (void __user *) arg);
 		break;
-	   	
+
 	case AGPIOC_DEALLOCATE:
 		ret_val = agpioc_deallocate_wrap(curr_priv, (int) arg);
 		break;
-	   	
+
 	case AGPIOC_BIND:
 		ret_val = agpioc_bind_wrap(curr_priv, (void __user *) arg);
 		break;
-	   	
+
 	case AGPIOC_UNBIND:
 		ret_val = agpioc_unbind_wrap(curr_priv, (void __user *) arg);
 		break;

@@ -34,6 +34,16 @@
 #include "objsec.h"
 #include "conditional.h"
 
+unsigned int selinux_checkreqprot = CONFIG_SECURITY_SELINUX_CHECKREQPROT_VALUE;
+
+static int __init checkreqprot_setup(char *str)
+{
+	selinux_checkreqprot = simple_strtoul(str,NULL,0) ? 1 : 0;
+	return 1;
+}
+__setup("checkreqprot=", checkreqprot_setup);
+
+
 static DECLARE_MUTEX(sel_sem);
 
 /* global data for booleans */
@@ -44,8 +54,8 @@ static int *bool_pending_values = NULL;
 extern void selnl_notify_setenforce(int val);
 
 /* Check whether a task is allowed to use a security operation. */
-int task_has_security(struct task_struct *tsk,
-		      u32 perms)
+static int task_has_security(struct task_struct *tsk,
+			     u32 perms)
 {
 	struct task_security_struct *tsec;
 
@@ -72,6 +82,7 @@ enum sel_inos {
 	SEL_DISABLE,	/* disable SELinux until next reboot */
 	SEL_AVC,	/* AVC management directory */
 	SEL_MEMBER,	/* compute polyinstantiation membership decision */
+	SEL_CHECKREQPROT, /* check requested protection, not kernel-applied one */
 };
 
 #define TMPBUFLEN	12
@@ -300,6 +311,54 @@ static struct file_operations sel_context_ops = {
 	.write		= sel_write_context,
 };
 
+static ssize_t sel_read_checkreqprot(struct file *filp, char __user *buf,
+				     size_t count, loff_t *ppos)
+{
+	char tmpbuf[TMPBUFLEN];
+	ssize_t length;
+
+	length = scnprintf(tmpbuf, TMPBUFLEN, "%u", selinux_checkreqprot);
+	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
+}
+
+static ssize_t sel_write_checkreqprot(struct file * file, const char __user * buf,
+				      size_t count, loff_t *ppos)
+{
+	char *page;
+	ssize_t length;
+	unsigned int new_value;
+
+	length = task_has_security(current, SECURITY__SETCHECKREQPROT);
+	if (length)
+		return length;
+
+	if (count < 0 || count >= PAGE_SIZE)
+		return -ENOMEM;
+	if (*ppos != 0) {
+		/* No partial writes. */
+		return -EINVAL;
+	}
+	page = (char*)get_zeroed_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+	length = -EFAULT;
+	if (copy_from_user(page, buf, count))
+		goto out;
+
+	length = -EINVAL;
+	if (sscanf(page, "%u", &new_value) != 1)
+		goto out;
+
+	selinux_checkreqprot = new_value ? 1 : 0;
+	length = count;
+out:
+	free_page((unsigned long) page);
+	return length;
+}
+static struct file_operations sel_checkreqprot_ops = {
+	.read		= sel_read_checkreqprot,
+	.write		= sel_write_checkreqprot,
+};
 
 /*
  * Remaining nodes use transaction based IO methods like nfsd/nfsctl.c
@@ -1182,6 +1241,7 @@ static int sel_fill_super(struct super_block * sb, void * data, int silent)
 		[SEL_MLS] = {"mls", &sel_mls_ops, S_IRUGO},
 		[SEL_DISABLE] = {"disable", &sel_disable_ops, S_IWUSR},
 		[SEL_MEMBER] = {"member", &transaction_ops, S_IRUGO|S_IWUGO},
+		[SEL_CHECKREQPROT] = {"checkreqprot", &sel_checkreqprot_ops, S_IRUGO|S_IWUSR},
 		/* last one */ {""}
 	};
 	ret = simple_fill_super(sb, SELINUX_MAGIC, selinux_files);

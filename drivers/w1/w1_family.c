@@ -138,13 +138,13 @@ void w1_family_get(struct w1_family *f)
 
 void __w1_family_get(struct w1_family *f)
 {
+	smp_mb__before_atomic_inc();
 	atomic_inc(&f->refcnt);
+	smp_mb__after_atomic_inc();
 }
 
 EXPORT_SYMBOL(w1_family_get);
 EXPORT_SYMBOL(w1_family_put);
-EXPORT_SYMBOL(__w1_family_get);
-EXPORT_SYMBOL(__w1_family_put);
 EXPORT_SYMBOL(w1_family_registered);
 EXPORT_SYMBOL(w1_unregister_family);
 EXPORT_SYMBOL(w1_register_family);

@@ -514,7 +514,7 @@ out:
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
-struct proc_dir_entry		*acpi_ec_dir;
+static struct proc_dir_entry	*acpi_ec_dir;
 
 
 static int

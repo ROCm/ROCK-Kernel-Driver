@@ -888,7 +888,7 @@ static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 	isoc_ifnum = 1;
 
 #ifdef CONFIG_BT_HCIUSB_SCO
-	if (isoc && !(id->driver_info & HCI_BROKEN_ISOC))
+	if (isoc && !(id->driver_info & (HCI_BROKEN_ISOC | HCI_SNIFFER)))
 		isoc_iface = usb_ifnum_to_if(udev, isoc_ifnum);
 
 	if (isoc_iface) {

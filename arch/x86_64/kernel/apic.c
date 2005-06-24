@@ -33,6 +33,7 @@
 #include <asm/mpspec.h>
 #include <asm/pgalloc.h>
 #include <asm/mach_apic.h>
+#include <asm/nmi.h>
 
 int apic_verbosity;
 
@@ -457,7 +458,7 @@ static struct {
 	unsigned int apic_thmr;
 } apic_pm_state;
 
-static int lapic_suspend(struct sys_device *dev, u32 state)
+static int lapic_suspend(struct sys_device *dev, pm_message_t state)
 {
 	unsigned long flags;
 
@@ -650,7 +651,7 @@ void __init init_apic_mappings(void)
 
 #define APIC_DIVISOR 16
 
-void __setup_APIC_LVTT(unsigned int clocks)
+static void __setup_APIC_LVTT(unsigned int clocks)
 {
 	unsigned int lvtt_value, tmp_value, ver;
 
@@ -723,7 +724,7 @@ static void setup_APIC_timer(unsigned int clocks)
 
 #define TICK_COUNT 100000000
 
-int __init calibrate_APIC_clock(void)
+static int __init calibrate_APIC_clock(void)
 {
 	int apic, apic_start, tsc, tsc_start;
 	int result;
@@ -775,7 +776,9 @@ void __init setup_boot_APIC_clock (void)
 
 void __init setup_secondary_APIC_clock(void)
 {
+	local_irq_disable(); /* FIXME: Do we need this? --RR */
 	setup_APIC_timer(calibration_result);
+	local_irq_enable();
 }
 
 void __init disable_APIC_timer(void)
@@ -923,7 +926,7 @@ __init int oem_force_hpet_timer(void)
 	unsigned id;
 	DECLARE_BITMAP(clustermap, NUM_APIC_CLUSTERS);
 
-	bitmap_empty(clustermap, NUM_APIC_CLUSTERS);
+	bitmap_zero(clustermap, NUM_APIC_CLUSTERS);
 
 	for (i = 0; i < NR_CPUS; i++) {
 		id = bios_cpu_apicid[i];
@@ -1021,8 +1024,6 @@ asmlinkage void smp_error_interrupt(void)
 }
 
 int disable_apic; 
-/* just used to communicate with shared i386 code: */
-int enable_local_apic = 1; 
 
 /*
  * This initializes the IO-APIC and APIC hardware if this is
@@ -1036,7 +1037,6 @@ int __init APIC_init_uniprocessor (void)
 	}
 	if (!cpu_has_apic) { 
 		disable_apic = 1;
-		enable_local_apic = -1; 
 		printk(KERN_INFO "Apic disabled by BIOS\n");
 		return -1;
 	}
@@ -1057,20 +1057,18 @@ int __init APIC_init_uniprocessor (void)
 		nr_ioapics = 0;
 #endif
 	setup_boot_APIC_clock();
-
+	check_nmi_watchdog();
 	return 0;
 }
 
 static __init int setup_disableapic(char *str) 
 { 
-	enable_local_apic = -1;
 	disable_apic = 1;
 	return 0;
 } 
 
 static __init int setup_nolapic(char *str) 
 { 
-	enable_local_apic = -1;
 	disable_apic = 1;
 	return 0;
 } 

@@ -6,5 +6,3 @@ prism54-objs := islpci_eth.o islpci_mgt.o \
 
 obj-$(CONFIG_PRISM54) += prism54.o
 
-EXTRA_CFLAGS = -I$(PWD) #-DCONFIG_PRISM54_WDS
-

@@ -293,9 +293,10 @@ struct rfcomm_conninfo {
 #define RFCOMM_LM_RELIABLE	0x0010
 #define RFCOMM_LM_SECURE	0x0020
 
-#define rfcomm_pi(sk)   ((struct rfcomm_pinfo *)sk->sk_protinfo)
+#define rfcomm_pi(sk) ((struct rfcomm_pinfo *) sk)
 
 struct rfcomm_pinfo {
+	struct bt_sock bt;
 	struct rfcomm_dlc   *dlc;
 	u8     channel;
 	u32    link_mode;

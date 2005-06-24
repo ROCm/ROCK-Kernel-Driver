@@ -2,7 +2,7 @@
  *
  * Copyright 2000,2001,2002 Red Hat.
  *
- * Written by Benjamin LaHaise <bcrl@redhat.com>
+ * Written by Benjamin LaHaise <bcrl@kvack.org>
  *
  * Distribute under the terms of the GPLv2 (see ../../COPYING) or under 
  * the following terms.

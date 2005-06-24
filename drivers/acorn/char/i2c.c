@@ -313,7 +313,7 @@ static struct i2c_algo_bit_data ioc_data = {
 
 static int ioc_client_reg(struct i2c_client *client)
 {
-	if (client->id == I2C_DRIVERID_PCF8583 &&
+	if (client->driver->id == I2C_DRIVERID_PCF8583 &&
 	    client->addr == 0x50) {
 		struct rtc_tm rtctm;
 		unsigned int year;

@@ -35,6 +35,7 @@
 
 #define RADEON_FIFO_DEBUG	0
 
+static int radeon_do_cleanup_cp( drm_device_t *dev );
 
 /* CP microcode (from ATI) */
 static u32 R200_cp_microcode[][2] = {
@@ -815,7 +816,7 @@ static u32 R300_cp_microcode[][2] = {
 	{ 0000000000, 0000000000 },
 };
 
-int RADEON_READ_PLL(drm_device_t *dev, int addr)
+static int RADEON_READ_PLL(drm_device_t *dev, int addr)
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 
@@ -1134,11 +1135,10 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
        } else
 #endif
 		ring_start = (dev_priv->cp_ring->offset
-			      - (unsigned long)dev->sg->virtual
+			      - dev->sg->handle
 			      + dev_priv->gart_vm_start);
 
 	RADEON_WRITE( RADEON_CP_RB_BASE, ring_start );
-	RADEON_READ( RADEON_CP_RB_WPTR_DELAY ); /* read back to propagate */
 
 	/* Set the write pointer delay */
 	RADEON_WRITE( RADEON_CP_RB_WPTR_DELAY, 0 );
@@ -1161,15 +1161,14 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
 		drm_sg_mem_t *entry = dev->sg;
 		unsigned long tmp_ofs, page_ofs;
 
-		tmp_ofs = dev_priv->ring_rptr->offset 
-		    - (unsigned long)dev->sg->virtual;
+		tmp_ofs = dev_priv->ring_rptr->offset - dev->sg->handle;
 		page_ofs = tmp_ofs >> PAGE_SHIFT;
 
 		RADEON_WRITE( RADEON_CP_RB_RPTR_ADDR,
 			     entry->busaddr[page_ofs]);
 		DRM_DEBUG( "ring rptr: offset=0x%08lx handle=0x%08lx\n",
 			   (unsigned long) entry->busaddr[page_ofs],
-			   (unsigned long)entry->virtual + tmp_ofs );
+			   entry->handle + tmp_ofs );
 	}
 
 	/* Initialize the scratch register pointer.  This will cause
@@ -1488,7 +1487,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	else
 #endif
 		dev_priv->gart_buffers_offset = (dev->agp_buffer_map->offset
-						- (unsigned long)dev->sg->virtual
+						- dev->sg->handle
 						+ dev_priv->gart_vm_start);
 
 	DRM_DEBUG( "dev_priv->gart_size %d\n",
@@ -1540,7 +1539,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	return 0;
 }
 
-int radeon_do_cleanup_cp( drm_device_t *dev )
+static int radeon_do_cleanup_cp( drm_device_t *dev )
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	DRM_DEBUG( "\n" );

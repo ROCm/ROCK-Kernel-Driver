@@ -60,8 +60,7 @@ cpci690_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 
 		const long min_idsel = 20, max_idsel = 20, irqs_per_slot = 4;
 		return PCI_IRQ_TABLE_LOOKUP;
-	}
-	else {
+	} else {
 		static char pci_irq_table[][4] =
 		/*
 		 *	PCI IDSEL/INTPIN->INTLINE
@@ -79,18 +78,12 @@ cpci690_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 }
 
 static int
-cpci690_get_bus_speed(void)
-{
-	return 133333333;
-}
-
-static int
 cpci690_get_cpu_speed(void)
 {
 	unsigned long	hid1;
 
-	hid1 = mfspr(HID1) >> 28;
-	return cpci690_get_bus_speed() * cpu_7xx[hid1]/2;
+	hid1 = mfspr(SPRN_HID1) >> 28;
+	return CPCI690_BUS_FREQ * cpu_7xx[hid1]/2;
 }
 
 #define	KB	(1024UL)
@@ -226,8 +219,6 @@ cpci690_setup_bridge(void)
 	bh.hose_b->last_busno = 0xff;
 	bh.hose_b->last_busno = pciauto_bus_scan(bh.hose_b,
 		bh.hose_b->first_busno);
-
-	return;
 }
 
 static void __init
@@ -285,8 +276,6 @@ cpci690_setup_peripherals(void)
 	/* Route MPP interrupt inputs to GPP */
 	mv64x60_write(&bh, MV64x60_MPP_CNTL_2, 0x00000000);
 	mv64x60_write(&bh, MV64x60_MPP_CNTL_3, 0x00000000);
-
-	return;
 }
 
 static void __init
@@ -326,8 +315,6 @@ cpci690_setup_arch(void)
 
 	if (ppc_md.progress)
 		ppc_md.progress("cpci690_setup_arch: exit", 0);
-
-	return;
 }
 
 /* Platform device data fixup routines. */
@@ -340,11 +327,9 @@ cpci690_fixup_mpsc_pdata(struct platform_device *pdev)
 	pdata = (struct mpsc_pdata *)pdev->dev.platform_data;
 
 	pdata->max_idle = 40;
-	pdata->default_baud = 9600;
-	pdata->brg_clk_src = 8;
-	pdata->brg_clk_freq = 133000000;
-
-	return;
+	pdata->default_baud = CPCI690_MPSC_BAUD;
+	pdata->brg_clk_src = CPCI690_MPSC_CLK_SRC;
+	pdata->brg_clk_freq = CPCI690_BUS_FREQ;
 }
 
 static int __init
@@ -354,8 +339,8 @@ cpci690_platform_notify(struct device *dev)
 		char	*bus_id;
 		void	((*rtn)(struct platform_device *pdev));
 	} dev_map[] = {
-		{ MPSC_CTLR_NAME "0", cpci690_fixup_mpsc_pdata },
-		{ MPSC_CTLR_NAME "1", cpci690_fixup_mpsc_pdata },
+		{ MPSC_CTLR_NAME ".0", cpci690_fixup_mpsc_pdata },
+		{ MPSC_CTLR_NAME ".1", cpci690_fixup_mpsc_pdata },
 	};
 	struct platform_device	*pdev;
 	int	i;
@@ -412,7 +397,7 @@ cpci690_show_cpuinfo(struct seq_file *m)
 	seq_printf(m, "vendor\t\t: " BOARD_VENDOR "\n");
 	seq_printf(m, "machine\t\t: " BOARD_MACHINE "\n");
 	seq_printf(m, "cpu MHz\t\t: %d\n", cpci690_get_cpu_speed()/1000/1000);
-	seq_printf(m, "bus MHz\t\t: %d\n", cpci690_get_bus_speed()/1000/1000);
+	seq_printf(m, "bus MHz\t\t: %d\n", CPCI690_BUS_FREQ/1000/1000);
 
 	return 0;
 }
@@ -422,15 +407,13 @@ cpci690_calibrate_decr(void)
 {
 	ulong freq;
 
-	freq = cpci690_get_bus_speed()/4;
+	freq = CPCI690_BUS_FREQ / 4;
 
 	printk(KERN_INFO "time_init: decrementer frequency = %lu.%.6lu MHz\n",
 	       freq/1000000, freq%1000000);
 
 	tb_ticks_per_jiffy = freq / HZ;
 	tb_to_us = mulhwu_scale_factor(freq, 1000000);
-
-	return;
 }
 
 static __inline__ void
@@ -441,11 +424,9 @@ cpci690_set_bat(u32 addr, u32 size)
 	size = ((size >> 17) - 1) << 2;
 
 	mb();
-	mtspr(DBAT1U, addr | size | 0x2); /* Vs == 1; Vp == 0 */
-	mtspr(DBAT1L, addr | 0x2a); /* WIMG bits == 0101; PP == r/w access */
+	mtspr(SPRN_DBAT1U, addr | size | 0x2); /* Vs == 1; Vp == 0 */
+	mtspr(SPRN_DBAT1L, addr | 0x2a); /* WIMG bits == 0101; PP == r/w access */
 	mb();
-
-	return;
 }
 
 #if defined(CONFIG_SERIAL_TEXT_DEBUG) || defined(CONFIG_KGDB)
@@ -507,6 +488,4 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #if defined(CONFIG_SERIAL_MPSC)
 	platform_notify = cpci690_platform_notify;
 #endif
-
-	return;
 }

@@ -36,8 +36,8 @@ int dump_inventory_to_user (void *userbuf, int size)
 	inventory_t *user = userbuf;
 	int v;
 
-	if ((v = verify_area (VERIFY_WRITE, userbuf, size)))
-		return v;
+	if (!access_ok(VERIFY_WRITE, userbuf, size))
+		return -EFAULT;
 
 	for (v = 0; v < inventory_items; v++){
 		inv = &inventory [v];

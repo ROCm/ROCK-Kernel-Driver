@@ -83,10 +83,11 @@
 #define IRQ_P2INTC      (START_EXT_IRQS + (3*8) + 2)
 #define IRQ_P2INTD      (START_EXT_IRQS + (3*8) + 3)
 
-#define START_EXT_IRQS  64
-
 #define I8042_KBD_IRQ	(START_EXT_IRQS + 2)
 #define I8042_AUX_IRQ	(START_EXT_IRQS + 6)
+
+#define IRQ_CFCARD	(START_EXT_IRQS + 7)
+#define IRQ_PCMCIA	(0)
 
 #else
 #define NR_EXT_IRQS	0

@@ -7,7 +7,7 @@
  *
  * Version:	$Id: ip_output.c,v 1.100 2002/02/01 22:01:03 davem Exp $
  *
- * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
+ * Authors:	Ross Biro
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *		Donald Becker, <becker@super.org>
  *		Alan Cox, <Alan.Cox@linux.org>
@@ -111,6 +111,7 @@ static int ip_dev_loopback_xmit(struct sk_buff *newskb)
 #ifdef CONFIG_NETFILTER_DEBUG
 	nf_debug_ip_loopback_xmit(newskb);
 #endif
+	nf_reset(newskb);
 	netif_rx(newskb);
 	return 0;
 }
@@ -123,15 +124,6 @@ static inline int ip_select_ttl(struct inet_sock *inet, struct dst_entry *dst)
 		ttl = dst_metric(dst, RTAX_HOPLIMIT);
 	return ttl;
 }
-
-#ifdef CONFIG_NETFILTER
-/* out-of-line copy is only required with netfilter */
-int ip_dst_output(struct sk_buff *skb)
-{
-	return NF_HOOK_COND(PF_INET, NF_IP_POST_ROUTING, skb, NULL,
-	                    skb->dst->dev, dst_output, skb->dst->xfrm != NULL);
-}
-#endif
 
 /* 
  *		Add an ip header to a skbuff and send it out.
@@ -175,7 +167,7 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 
 	/* Send it out. */
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-		       ip_dst_output);
+		       dst_output);
 }
 
 static inline int ip_finish_output2(struct sk_buff *skb)
@@ -203,6 +195,8 @@ static inline int ip_finish_output2(struct sk_buff *skb)
 #ifdef CONFIG_NETFILTER_DEBUG
 	nf_debug_ip_finish_output2(skb);
 #endif /*CONFIG_NETFILTER_DEBUG*/
+
+	nf_reset(skb);
 
 	if (hh) {
 		int hh_alen;
@@ -287,17 +281,7 @@ int ip_mc_output(struct sk_buff *skb)
 				newskb->dev, ip_dev_loopback_xmit);
 	}
 
-	if (skb->len > dst_pmtu(&rt->u.dst))
-		return ip_fragment(skb, ip_finish_output);
-	else
-		return ip_finish_output(skb);
-}
-
-static inline int ip_output2(struct sk_buff *skb)
-{
-	IP_INC_STATS(IPSTATS_MIB_OUTREQUESTS);
-
-	if (skb->len > dst_pmtu(skb->dst) && !skb_shinfo(skb)->tso_size)
+	if (skb->len > dst_mtu(&rt->u.dst))
 		return ip_fragment(skb, ip_finish_output);
 	else
 		return ip_finish_output(skb);
@@ -305,12 +289,12 @@ static inline int ip_output2(struct sk_buff *skb)
 
 int ip_output(struct sk_buff *skb)
 {
-	int transformed = IPCB(skb)->flags & IPSKB_XFRM_TRANSFORMED;
+	IP_INC_STATS(IPSTATS_MIB_OUTREQUESTS);
 
-	if (transformed)
-		nf_reset(skb);
-	return NF_HOOK_COND(PF_INET, NF_IP_LOCAL_OUT, skb, NULL,
-	                    skb->dst->dev, ip_output2, transformed);
+	if (skb->len > dst_mtu(skb->dst) && !skb_shinfo(skb)->tso_size)
+		return ip_fragment(skb, ip_finish_output);
+	else
+		return ip_finish_output(skb);
 }
 
 int ip_queue_xmit(struct sk_buff *skb, int ipfragok)
@@ -393,7 +377,7 @@ packet_routed:
 	skb->priority = sk->sk_priority;
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-		       ip_dst_output);
+		       dst_output);
 
 no_route:
 	IP_INC_STATS(IPSTATS_MIB_OUTNOROUTES);
@@ -467,7 +451,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 
 	if (unlikely((iph->frag_off & htons(IP_DF)) && !skb->local_df)) {
 		icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED,
-			  htonl(dst_pmtu(&rt->u.dst)));
+			  htonl(dst_mtu(&rt->u.dst)));
 		kfree_skb(skb);
 		return -EMSGSIZE;
 	}
@@ -477,7 +461,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 	 */
 
 	hlen = iph->ihl * 4;
-	mtu = dst_pmtu(&rt->u.dst) - hlen;	/* Size of data space */
+	mtu = dst_mtu(&rt->u.dst) - hlen;	/* Size of data space */
 
 	/* When frag_list is given, use it. First, check its validity:
 	 * some transformers could create wrong frag_list or break existing
@@ -506,6 +490,14 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 			/* Partially cloned skb? */
 			if (skb_shared(frag))
 				goto slow_path;
+
+			BUG_ON(frag->sk);
+			if (skb->sk) {
+				sock_hold(skb->sk);
+				frag->sk = skb->sk;
+				frag->destructor = sock_wfree;
+				skb->truesize -= frag->truesize;
+			}
 		}
 
 		/* Everything is OK. Generate! */
@@ -517,7 +509,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 		skb->data_len = first_len - skb_headlen(skb);
 		skb->len = first_len;
 		iph->tot_len = htons(first_len);
-		iph->frag_off |= htons(IP_MF);
+		iph->frag_off = htons(IP_MF);
 		ip_send_check(iph);
 
 		for (;;) {
@@ -765,7 +757,7 @@ int ip_append_data(struct sock *sk,
 			inet->cork.addr = ipc->addr;
 		}
 		dst_hold(&rt->u.dst);
-		inet->cork.fragsize = mtu = dst_pmtu(&rt->u.dst);
+		inet->cork.fragsize = mtu = dst_mtu(rt->u.dst.path);
 		inet->cork.rt = rt;
 		inet->cork.length = 0;
 		sk->sk_sndmsg_page = NULL;
@@ -1171,7 +1163,8 @@ int ip_push_pending_frames(struct sock *sk)
 	 * If local_df is set too, we still allow to fragment this frame
 	 * locally. */
 	if (inet->pmtudisc == IP_PMTUDISC_DO ||
-	    (!skb_shinfo(skb)->frag_list && ip_dont_fragment(sk, &rt->u.dst)))
+	    (skb->len <= dst_mtu(&rt->u.dst) &&
+	     ip_dont_fragment(sk, &rt->u.dst)))
 		df = htons(IP_DF);
 
 	if (inet->cork.flags & IPCORK_OPT)
@@ -1208,7 +1201,7 @@ int ip_push_pending_frames(struct sock *sk)
 
 	/* Netfilter gets whole the not fragmented skb. */
 	err = NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, 
-		      skb->dst->dev, ip_dst_output);
+		      skb->dst->dev, dst_output);
 	if (err) {
 		if (err > 0)
 			err = inet->recverr ? net_xmit_errno(err) : 0;

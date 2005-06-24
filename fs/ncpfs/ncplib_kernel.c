@@ -933,7 +933,7 @@ int ncp_search_for_fileset(struct ncp_server *server,
 	return 0;
 }
 
-int
+static int
 ncp_RenameNSEntry(struct ncp_server *server,
 		  struct inode *old_dir, char *old_name, __le16 old_type,
 		  struct inode *new_dir, char *new_name)

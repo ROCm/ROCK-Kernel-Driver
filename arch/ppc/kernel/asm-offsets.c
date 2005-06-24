@@ -16,6 +16,7 @@
 #include <linux/string.h>
 #include <linux/types.h>
 #include <linux/ptrace.h>
+#include <linux/suspend.h>
 #include <linux/mman.h>
 #include <linux/mm.h>
 #include <asm/io.h>
@@ -135,6 +136,10 @@ main(void)
 	DEFINE(TI_LOCAL_FLAGS, offsetof(struct thread_info, local_flags));
 	DEFINE(TI_CPU, offsetof(struct thread_info, cpu));
 	DEFINE(TI_PREEMPT, offsetof(struct thread_info, preempt_count));
+
+	DEFINE(pbe_address, offsetof(struct pbe, address));
+	DEFINE(pbe_orig_address, offsetof(struct pbe, orig_address));
+	DEFINE(pbe_next, offsetof(struct pbe, next));
 
 	DEFINE(NUM_USER_SEGMENTS, TASK_SIZE>>28);
 	return 0;

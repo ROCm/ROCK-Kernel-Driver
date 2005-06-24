@@ -1,10 +1,12 @@
 /*
  * linux/arch/arm/mach-omap/ocpi.c
  *
- * Minimal OCP bus support for OMAP-1610 and OMAP-5912
+ * Minimal OCP bus support for omap16xx
  *
- * Copyright (C) 2003 - 2004 Nokia Corporation
+ * Copyright (C) 2003 - 2005 Nokia Corporation
  * Written by Tony Lindgren <tony@atomide.com>
+ *
+ * Modified for clock framework by Paul Mundt <paul.mundt@nokia.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,8 +31,10 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/err.h>
 
 #include <asm/io.h>
+#include <asm/hardware/clock.h>
 #include <asm/arch/hardware.h>
 
 #define OCPI_BASE		0xfffec320
@@ -42,12 +46,11 @@
 #define OCPI_PROT		(OCPI_BASE + 0x14)
 #define OCPI_SEC		(OCPI_BASE + 0x18)
 
-#define EN_OCPI_CK		(1 << 0)
-#define IDLOCPI_ARM		(1 << 1)
-
 /* USB OHCI OCPI access error registers */
 #define HOSTUEADDR	0xfffba0e0
 #define HOSTUESTATUS	0xfffba0e4
+
+static struct clk *ocpi_ck;
 
 /*
  * Enables device access to OMAP buses via the OCPI bridge
@@ -57,16 +60,12 @@ int ocpi_enable(void)
 {
 	unsigned int val;
 
-	/* Make sure there's clock for OCPI */
+	if (!cpu_is_omap16xx())
+		return -ENODEV;
 
-#if defined(CONFIG_ARCH_OMAP16XX)
-        if (cpu_is_omap1610() || cpu_is_omap1710()) {
-		val = omap_readl(OMAP16XX_ARM_IDLECT3);
-		val |= EN_OCPI_CK;
-		val &= ~IDLOCPI_ARM;
-		omap_writel(val, OMAP16XX_ARM_IDLECT3);
-        }
-#endif
+	/* Make sure there's clock for OCPI */
+	clk_enable(ocpi_ck);
+
 	/* Enable access for OHCI in OCPI */
 	val = omap_readl(OCPI_PROT);
 	val &= ~0xff;
@@ -81,19 +80,16 @@ int ocpi_enable(void)
 }
 EXPORT_SYMBOL(ocpi_enable);
 
-int ocpi_status(void)
-{
-	printk("OCPI: addr: 0x%08x cmd: 0x%08x\n"
-	       "      ohci-addr: 0x%08x ohci-status: 0x%08x\n",
-	       omap_readl(OCPI_FAULT), omap_readl(OCPI_CMD_FAULT),
-	       omap_readl(HOSTUEADDR), omap_readl(HOSTUESTATUS));
-
-	return 1;
-}
-EXPORT_SYMBOL(ocpi_status);
-
 static int __init omap_ocpi_init(void)
 {
+	if (!cpu_is_omap16xx())
+		return -ENODEV;
+
+	ocpi_ck = clk_get(NULL, "l3_ocpi_ck");
+	if (IS_ERR(ocpi_ck))
+		return PTR_ERR(ocpi_ck);
+
+	clk_use(ocpi_ck);
 	ocpi_enable();
 	printk("OMAP OCPI interconnect driver loaded\n");
 
@@ -102,7 +98,13 @@ static int __init omap_ocpi_init(void)
 
 static void __exit omap_ocpi_exit(void)
 {
-	/* FIXME: Disable OCPI */
+	/* REVISIT: Disable OCPI */
+
+	if (!cpu_is_omap16xx())
+		return;
+
+	clk_unuse(ocpi_ck);
+	clk_put(ocpi_ck);
 }
 
 MODULE_AUTHOR("Tony Lindgren <tony@atomide.com>");

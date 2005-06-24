@@ -46,6 +46,7 @@
 #include <acpi/acinterp.h>
 #include <acpi/acnamesp.h>
 #include <acpi/acevents.h>
+#include <acpi/amlcode.h>
 
 #define _COMPONENT          ACPI_UTILITIES
 	 ACPI_MODULE_NAME    ("utdelete")
@@ -562,8 +563,23 @@ acpi_ut_update_object_reference (
 			break;
 
 
-		case ACPI_TYPE_REGION:
 		case ACPI_TYPE_LOCAL_REFERENCE:
+
+			/*
+			 * The target of an Index (a package, string, or buffer) must track
+			 * changes to the ref count of the index.
+			 */
+			if (object->reference.opcode == AML_INDEX_OP) {
+				status = acpi_ut_create_update_state_and_push (
+						 object->reference.object, action, &state_list);
+				if (ACPI_FAILURE (status)) {
+					goto error_exit;
+				}
+			}
+			break;
+
+
+		case ACPI_TYPE_REGION:
 		default:
 
 			/* No subobjects */

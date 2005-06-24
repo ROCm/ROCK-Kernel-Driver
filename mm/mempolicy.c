@@ -67,6 +67,7 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/nodemask.h>
+#include <linux/cpuset.h>
 #include <linux/gfp.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -167,6 +168,10 @@ static int get_nodes(unsigned long *nodes, unsigned long __user *nmask,
 	if (copy_from_user(nodes, nmask, nlongs*sizeof(unsigned long)))
 		return -EFAULT;
 	nodes[nlongs-1] &= endmask;
+	/* Update current mems_allowed */
+	cpuset_update_current_mems_allowed();
+	/* Ignore nodes not set in current->mems_allowed */
+	cpuset_restrict_to_mems_allowed(nodes);
 	return mpol_check_policy(mode, nodes);
 }
 
@@ -643,7 +648,7 @@ get_vma_policy(struct vm_area_struct *vma, unsigned long addr)
 }
 
 /* Return a zonelist representing a mempolicy */
-static struct zonelist *zonelist_policy(unsigned gfp, struct mempolicy *policy)
+static struct zonelist *zonelist_policy(unsigned int __nocast gfp, struct mempolicy *policy)
 {
 	int nd;
 
@@ -655,8 +660,10 @@ static struct zonelist *zonelist_policy(unsigned gfp, struct mempolicy *policy)
 		break;
 	case MPOL_BIND:
 		/* Lower zones don't get a policy applied */
-		if (gfp >= policy_zone)
-			return policy->v.zonelist;
+		/* Careful: current->mems_allowed might have moved */
+		if ((gfp & GFP_ZONEMASK) >= policy_zone)
+			if (cpuset_zonelist_valid_mems_allowed(policy->v.zonelist))
+				return policy->v.zonelist;
 		/*FALL THROUGH*/
 	case MPOL_INTERLEAVE: /* should not happen */
 	case MPOL_DEFAULT:
@@ -705,7 +712,7 @@ static unsigned offset_il_node(struct mempolicy *pol,
 
 /* Allocate a page in interleaved policy.
    Own path because it needs to do special accounting. */
-static struct page *alloc_page_interleave(unsigned gfp, unsigned order, unsigned nid)
+static struct page *alloc_page_interleave(unsigned int __nocast gfp, unsigned order, unsigned nid)
 {
 	struct zonelist *zl;
 	struct page *page;
@@ -743,9 +750,11 @@ static struct page *alloc_page_interleave(unsigned gfp, unsigned order, unsigned
  *	Should be called with the mm_sem of the vma hold.
  */
 struct page *
-alloc_page_vma(unsigned gfp, struct vm_area_struct *vma, unsigned long addr)
+alloc_page_vma(unsigned int __nocast gfp, struct vm_area_struct *vma, unsigned long addr)
 {
 	struct mempolicy *pol = get_vma_policy(vma, addr);
+
+	cpuset_update_current_mems_allowed();
 
 	if (unlikely(pol->policy == MPOL_INTERLEAVE)) {
 		unsigned nid;
@@ -779,11 +788,17 @@ alloc_page_vma(unsigned gfp, struct vm_area_struct *vma, unsigned long addr)
  *	Allocate a page from the kernel page pool.  When not in
  *	interrupt context and apply the current process NUMA policy.
  *	Returns NULL when no page can be allocated.
+ *
+ *	Don't call cpuset_update_current_mems_allowed() unless
+ *	1) it's ok to take cpuset_sem (can WAIT), and
+ *	2) allocating for current task (not interrupt).
  */
-struct page *alloc_pages_current(unsigned gfp, unsigned order)
+struct page *alloc_pages_current(unsigned int __nocast gfp, unsigned order)
 {
 	struct mempolicy *pol = current->mempolicy;
 
+	if ((gfp & __GFP_WAIT) && !in_interrupt())
+		cpuset_update_current_mems_allowed();
 	if (!pol || in_interrupt())
 		pol = &default_policy;
 	if (pol->policy == MPOL_INTERLEAVE)

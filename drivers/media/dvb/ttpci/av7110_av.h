@@ -23,7 +23,7 @@ extern void av7110_p2t_write(u8 const *buf, long int length, u16 pid, struct av7
 extern int av7110_av_register(struct av7110 *av7110);
 extern void av7110_av_unregister(struct av7110 *av7110);
 extern int av7110_av_init(struct av7110 *av7110);
-extern int av7110_av_exit(struct av7110 *av7110);
+extern void av7110_av_exit(struct av7110 *av7110);
 
 
 #endif /* _AV7110_AV_H_ */

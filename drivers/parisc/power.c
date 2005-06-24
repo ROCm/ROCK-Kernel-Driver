@@ -47,7 +47,6 @@
 #include <linux/workqueue.h>
 
 #include <asm/pdc.h>
-#include <asm/irq.h>
 #include <asm/io.h>
 #include <asm/led.h>
 #include <asm/uaccess.h>
@@ -126,11 +125,11 @@ static void process_shutdown(void)
 	
 	/* wait until the button was pressed for 1 second */
 	if (shutdown_timer == HZ) {
+#if defined (DEBUG) || defined(CONFIG_CHASSIS_LCD_LED)
 		static char msg[] = "Shutting down...";
-		DPRINTK(KERN_INFO "%s\n", msg);
-#ifdef CONFIG_CHASSIS_LCD_LED
-		lcd_print(msg);
 #endif
+		DPRINTK(KERN_INFO "%s\n", msg);
+		lcd_print(msg);
 		poweroff();
 	}
 }

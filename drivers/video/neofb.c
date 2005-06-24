@@ -93,7 +93,7 @@ static int external;
 static int libretto;
 static int nostretch;
 static int nopciburst;
-static char *mode_option __initdata = NULL;
+static char *mode_option __devinitdata = NULL;
 
 #ifdef MODULE
 
@@ -400,21 +400,21 @@ static void neoUnlock(void)
  */
 static int paletteEnabled = 0;
 
-inline void VGAenablePalette(void)
+static inline void VGAenablePalette(void)
 {
 	vga_r(NULL, VGA_IS1_RC);
 	vga_w(NULL, VGA_ATT_W, 0x00);
 	paletteEnabled = 1;
 }
 
-inline void VGAdisablePalette(void)
+static inline void VGAdisablePalette(void)
 {
 	vga_r(NULL, VGA_IS1_RC);
 	vga_w(NULL, VGA_ATT_W, 0x20);
 	paletteEnabled = 0;
 }
 
-inline void VGAwATTR(u8 index, u8 value)
+static inline void VGAwATTR(u8 index, u8 value)
 {
 	if (paletteEnabled)
 		index &= ~0x20;
@@ -425,7 +425,7 @@ inline void VGAwATTR(u8 index, u8 value)
 	vga_wattr(NULL, index, value);
 }
 
-void vgaHWProtect(int on)
+static void vgaHWProtect(int on)
 {
 	unsigned char tmp;
 
@@ -1315,7 +1315,7 @@ static int neofb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 /*
  *    (Un)Blank the display.
  */
-int neofb_blank(int blank_mode, struct fb_info *info)
+static int neofb_blank(int blank_mode, struct fb_info *info)
 {
 	/*
 	 *  Blank the screen if blank_mode != 0, else unblank.
@@ -1691,7 +1691,27 @@ static int __devinit neo_map_mmio(struct fb_info *info,
 
 	DBG("neo_map_mmio");
 
-	info->fix.mmio_start = pci_resource_start(dev, 1);
+	switch (info->fix.accel) {
+		case FB_ACCEL_NEOMAGIC_NM2070:
+			info->fix.mmio_start = pci_resource_start(dev, 0)+
+				0x100000;
+			break;
+		case FB_ACCEL_NEOMAGIC_NM2090:
+		case FB_ACCEL_NEOMAGIC_NM2093:
+			info->fix.mmio_start = pci_resource_start(dev, 0)+
+				0x200000;
+			break;
+		case FB_ACCEL_NEOMAGIC_NM2160:
+		case FB_ACCEL_NEOMAGIC_NM2097:
+		case FB_ACCEL_NEOMAGIC_NM2200:
+		case FB_ACCEL_NEOMAGIC_NM2230:
+		case FB_ACCEL_NEOMAGIC_NM2360:
+		case FB_ACCEL_NEOMAGIC_NM2380:
+			info->fix.mmio_start = pci_resource_start(dev, 1);
+			break;
+		default:
+			info->fix.mmio_start = pci_resource_start(dev, 0);
+	}
 	info->fix.mmio_len = MMIO_SIZE;
 
 	if (!request_mem_region
@@ -2010,6 +2030,7 @@ static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const st
 
 	par->internal_display = internal;
 	par->external_display = external;
+	info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
 
 	switch (info->fix.accel) {
 	case FB_ACCEL_NEOMAGIC_NM2070:
@@ -2029,15 +2050,27 @@ static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const st
 		break;
 	case FB_ACCEL_NEOMAGIC_NM2200:
 		sprintf(info->fix.id, "MagicGraph 256AV");
+		info->flags |= FBINFO_HWACCEL_IMAGEBLIT |
+		               FBINFO_HWACCEL_COPYAREA |
+                	       FBINFO_HWACCEL_FILLRECT;
 		break;
 	case FB_ACCEL_NEOMAGIC_NM2230:
 		sprintf(info->fix.id, "MagicGraph 256AV+");
+		info->flags |= FBINFO_HWACCEL_IMAGEBLIT |
+		               FBINFO_HWACCEL_COPYAREA |
+                	       FBINFO_HWACCEL_FILLRECT;
 		break;
 	case FB_ACCEL_NEOMAGIC_NM2360:
 		sprintf(info->fix.id, "MagicGraph 256ZX");
+		info->flags |= FBINFO_HWACCEL_IMAGEBLIT |
+		               FBINFO_HWACCEL_COPYAREA |
+                	       FBINFO_HWACCEL_FILLRECT;
 		break;
 	case FB_ACCEL_NEOMAGIC_NM2380:
 		sprintf(info->fix.id, "MagicGraph 256XL+");
+		info->flags |= FBINFO_HWACCEL_IMAGEBLIT |
+		               FBINFO_HWACCEL_COPYAREA |
+                	       FBINFO_HWACCEL_FILLRECT;
 		break;
 	}
 
@@ -2049,9 +2082,6 @@ static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const st
 	info->fix.accel = id->driver_data;
 
 	info->fbops = &neofb_ops;
-	info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN |
-		FBINFO_HWACCEL_IMAGEBLIT | FBINFO_HWACCEL_COPYAREA |
-		FBINFO_HWACCEL_COPYAREA;
 	info->pseudo_palette = (void *) (par + 1);
 	return info;
 }
@@ -2230,7 +2260,8 @@ static struct pci_driver neofb_driver = {
 
 /* ************************* init in-kernel code ************************** */
 
-int __init neofb_setup(char *options)
+#ifndef MODULE
+static int __init neofb_setup(char *options)
 {
 	char *this_opt;
 
@@ -2258,8 +2289,9 @@ int __init neofb_setup(char *options)
 	}
 	return 0;
 }
+#endif  /*  MODULE  */
 
-int __init neofb_init(void)
+static int __init neofb_init(void)
 {
 #ifndef MODULE
 	char *option = NULL;

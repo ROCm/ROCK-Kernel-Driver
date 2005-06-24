@@ -14,47 +14,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ *
+ *
+ * This driver is designed for the Broadcom SiByte SOC built-in
+ * Ethernet controllers. Written by Mitch Lichtenberg at Broadcom Corp.
  */
-
-/*
-  This driver is designed for the Broadcom SiByte SOC built-in
-  Ethernet controllers.
-  
-  Written by Mitch Lichtenberg at Broadcom Corp.
-*/
-
-
-
-#define CONFIG_SBMAC_COALESCE
-
-/* A few user-configurable values.
-   These may be modified when a driver module is loaded. */
-
-static int debug = 1;			/* 1 normal messages, 0 quiet .. 7 verbose. */
-static int noisy_mii = 1;		/* mii status msgs */
-
-/* Used to pass the media type, etc.
-   Both 'options[]' and 'full_duplex[]' should exist for driver
-   interoperability.
-   The media type is usually passed in 'options[]'.
-*/
-
-#define MAX_UNITS 3		/* More are supported, limit only on options */
-#ifdef MODULE
-static int options[MAX_UNITS] = {-1, -1, -1};
-static int full_duplex[MAX_UNITS] = {-1, -1, -1};
-#endif
-
-#ifdef CONFIG_SBMAC_COALESCE
-static int int_pktcnt = 0;
-static int int_timeout = 0;
-#endif
-
-/* Operational parameters that usually are not changed. */
-
-/* Time in jiffies before concluding the transmitter is hung. */
-#define TX_TIMEOUT  (2*HZ)
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -89,16 +53,56 @@ static char version1[] __devinitdata =
 #endif
 
 
+/* Operational parameters that usually are not changed. */
+
+#define CONFIG_SBMAC_COALESCE
+
+#define MAX_UNITS 3		/* More are supported, limit only on options */
+
+/* Time in jiffies before concluding the transmitter is hung. */
+#define TX_TIMEOUT  (2*HZ)
+
 
 MODULE_AUTHOR("Mitch Lichtenberg (Broadcom Corp.)");
 MODULE_DESCRIPTION("Broadcom SiByte SOC GB Ethernet driver");
-MODULE_PARM(debug, "i");
-MODULE_PARM(noisy_mii, "i");
-MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
-MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
 
-MODULE_PARM(int_pktcnt, "i");
-MODULE_PARM(int_timeout, "i");
+/* A few user-configurable values which may be modified when a driver
+   module is loaded. */
+
+/* 1 normal messages, 0 quiet .. 7 verbose. */
+static int debug = 1;
+module_param(debug, int, S_IRUGO);
+MODULE_PARM_DESC(debug, "Debug messages");
+
+/* mii status msgs */
+static int noisy_mii = 1;
+module_param(noisy_mii, int, S_IRUGO);
+MODULE_PARM_DESC(noisy_mii, "MII status messages");
+
+/* Used to pass the media type, etc.
+   Both 'options[]' and 'full_duplex[]' should exist for driver
+   interoperability.
+   The media type is usually passed in 'options[]'.
+*/
+#ifdef MODULE
+static int options[MAX_UNITS] = {-1, -1, -1};
+module_param_array(options, int, NULL, S_IRUGO);
+MODULE_PARM_DESC(options, "1-" __MODULE_STRING(MAX_UNITS));
+
+static int full_duplex[MAX_UNITS] = {-1, -1, -1};
+module_param_array(full_duplex, int, NULL, S_IRUGO);
+MODULE_PARM_DESC(full_duplex, "1-" __MODULE_STRING(MAX_UNITS));
+#endif
+
+#ifdef CONFIG_SBMAC_COALESCE
+static int int_pktcnt = 0;
+module_param(int_pktcnt, int, S_IRUGO);
+MODULE_PARM_DESC(int_pktcnt, "Packet count");
+
+static int int_timeout = 0;
+module_param(int_timeout, int, S_IRUGO);
+MODULE_PARM_DESC(int_timeout, "Timeout value");
+#endif
 
 #include <asm/sibyte/sb1250.h>
 #include <asm/sibyte/sb1250_defs.h>
@@ -1811,8 +1815,6 @@ static void sbmac_set_iphdr_offset(struct sbmac_softc *sc)
 	
 	/* read system identification to determine revision */
 	if (periph_rev >= 2) {
-		printk(KERN_INFO "%s: enabling TCP rcv checksum\n",
-		       sc->sbm_dev->name);
 		sc->rx_hw_checksum = ENABLE;
 	} else {
 		sc->rx_hw_checksum = DISABLE;
@@ -2417,6 +2419,11 @@ static int sbmac_init(struct net_device *dev, int idx)
 	if (err)
 		goto out_uninit;
 
+	if (periph_rev >= 2) {
+		printk(KERN_INFO "%s: enabling TCP rcv checksum\n",
+			sc->sbm_dev->name);
+	}
+
 	/*
 	 * Display Ethernet address (this is called during the config
 	 * process so we need to finish off the config message that
@@ -2879,12 +2886,12 @@ sbmac_init_module(void)
 		dev->mem_end = 0;
 		if (sbmac_init(dev, idx)) {
 			port = A_MAC_CHANNEL_BASE(idx);
-			SBMAC_WRITECSR(KSEG1ADDR(port+R_MAC_ETHERNET_ADDR),
-					sbmac_orig_hwaddr[idx] );
+			SBMAC_WRITECSR(IOADDR(port+R_MAC_ETHERNET_ADDR),
+				       sbmac_orig_hwaddr[idx]);
 			free_netdev(dev);
 			continue;
 		}
-		dev_sbmac[idx++] = dev;
+		dev_sbmac[idx] = dev;
 	}
 	return 0;
 }

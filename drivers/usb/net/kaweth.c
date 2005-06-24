@@ -58,6 +58,7 @@
 #include <linux/ethtool.h>
 #include <linux/pci.h>
 #include <linux/dma-mapping.h>
+#include <linux/wait.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
@@ -519,7 +520,7 @@ static void int_callback(struct urb *u, struct pt_regs *regs)
 
 	/* we check the link state to report changes */
 	if (kaweth->linkstate != (act_state = ( kaweth->intbuffer[STATE_OFFSET] | STATE_MASK) >> STATE_SHIFT)) {
-		if (!act_state)
+		if (act_state)
 			netif_carrier_on(kaweth->net);
 		else
 			netif_carrier_off(kaweth->net);
@@ -593,7 +594,7 @@ static void kaweth_usb_receive(struct urb *urb, struct pt_regs *regs)
 
 	struct sk_buff *skb;
 
-	if(unlikely(urb->status == -ECONNRESET || urb->status == -ECONNABORTED || urb->status == -ESHUTDOWN))
+	if(unlikely(urb->status == -ECONNRESET || urb->status == -ESHUTDOWN))
 	/* we are killed - set a flag and wake the disconnect handler */
 	{
 		kaweth->end = 1;
@@ -1180,31 +1181,21 @@ static void usb_api_blocking_completion(struct urb *urb, struct pt_regs *regs)
 // Starts urb and waits for completion or timeout
 static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 {
-        DECLARE_WAITQUEUE(wait, current);
 	struct usb_api_data awd;
         int status;
 
         init_waitqueue_head(&awd.wqh);
         awd.done = 0;
 
-        add_wait_queue(&awd.wqh, &wait);
         urb->context = &awd;
         status = usb_submit_urb(urb, GFP_NOIO);
         if (status) {
                 // something went wrong
                 usb_free_urb(urb);
-                remove_wait_queue(&awd.wqh, &wait);
                 return status;
         }
 
-	while (timeout && !awd.done) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		timeout = schedule_timeout(timeout);
-	}
-
-        remove_wait_queue(&awd.wqh, &wait);
-
-        if (!timeout) {
+	if (!wait_event_timeout(awd.wqh, awd.done, timeout)) {
                 // timeout
                 kaweth_warn("usb_control/bulk_msg: timeout");
                 usb_kill_urb(urb);  // remove urb safely

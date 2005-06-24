@@ -37,7 +37,7 @@
  */
 
 #include <ib_smi.h>
-
+#include "smi.h"
 
 /*
  * Fixup a directed route SMP for sending

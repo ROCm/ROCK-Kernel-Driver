@@ -74,8 +74,8 @@ static void irlan_client_kick_timer_expired(void *data)
 	
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 	
 	/*  
 	 * If we are in peer mode, the client may not have got the discovery
@@ -107,8 +107,8 @@ void irlan_client_wakeup(struct irlan_cb *self, __u32 saddr, __u32 daddr)
 {
 	IRDA_DEBUG(1, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 
 	/* 
 	 * Check if we are already awake, or if we are a provider in direct
@@ -155,7 +155,7 @@ void irlan_client_discovery_indication(discinfo_t *discovery,
 	
 	IRDA_DEBUG(1, "%s()\n", __FUNCTION__ );
 
-	ASSERT(discovery != NULL, return;);
+	IRDA_ASSERT(discovery != NULL, return;);
 
 	/*
 	 * I didn't check it, but I bet that IrLAN suffer from the same
@@ -173,7 +173,7 @@ void irlan_client_discovery_indication(discinfo_t *discovery,
 	rcu_read_lock();
 	self = irlan_get_any();
 	if (self) {
-		ASSERT(self->magic == IRLAN_MAGIC, return;);
+		IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 
 		IRDA_DEBUG(1, "%s(), Found instance (%08x)!\n", __FUNCTION__ ,
 		      daddr);
@@ -198,9 +198,9 @@ static int irlan_client_ctrl_data_indication(void *instance, void *sap,
 	
 	self = (struct irlan_cb *) instance;
 	
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == IRLAN_MAGIC, return -1;);
-	ASSERT(skb != NULL, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return -1;);
+	IRDA_ASSERT(skb != NULL, return -1;);
 	
 	irlan_do_client_event(self, IRLAN_DATA_INDICATION, skb); 
 
@@ -227,12 +227,12 @@ static void irlan_client_ctrl_disconnect_indication(void *instance, void *sap,
 	self = (struct irlan_cb *) instance;
 	tsap = (struct tsap_cb *) sap;
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);	
-	ASSERT(tsap != NULL, return;);
-	ASSERT(tsap->magic == TTP_TSAP_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);	
+	IRDA_ASSERT(tsap != NULL, return;);
+	IRDA_ASSERT(tsap->magic == TTP_TSAP_MAGIC, return;);
 	
-	ASSERT(tsap == self->client.tsap_ctrl, return;);
+	IRDA_ASSERT(tsap == self->client.tsap_ctrl, return;);
 
        	/* Remove frames queued on the control channel */
 	while ((skb = skb_dequeue(&self->client.txq)) != NULL) {
@@ -256,8 +256,8 @@ static void irlan_client_open_ctrl_tsap(struct irlan_cb *self)
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 
 	/* Check if already open */
 	if (self->client.tsap_ctrl)
@@ -298,8 +298,8 @@ static void irlan_client_ctrl_connect_confirm(void *instance, void *sap,
 
 	self = (struct irlan_cb *) instance;
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 
 	self->client.max_sdu_size = max_sdu_size;
 	self->client.max_header_size = max_header_size;
@@ -322,34 +322,34 @@ static void print_ret_code(__u8 code)
 		printk(KERN_INFO "Success\n");
 		break;
 	case 1:
-		WARNING("IrLAN: Insufficient resources\n");
+		IRDA_WARNING("IrLAN: Insufficient resources\n");
 		break;
 	case 2:
-		WARNING("IrLAN: Invalid command format\n");
+		IRDA_WARNING("IrLAN: Invalid command format\n");
 		break;
 	case 3:
-		WARNING("IrLAN: Command not supported\n");
+		IRDA_WARNING("IrLAN: Command not supported\n");
 		break;
 	case 4:
-		WARNING("IrLAN: Parameter not supported\n");
+		IRDA_WARNING("IrLAN: Parameter not supported\n");
 		break;
 	case 5:
-		WARNING("IrLAN: Value not supported\n");
+		IRDA_WARNING("IrLAN: Value not supported\n");
 		break;
 	case 6:
-		WARNING("IrLAN: Not open\n");
+		IRDA_WARNING("IrLAN: Not open\n");
 		break;
 	case 7:
-		WARNING("IrLAN: Authentication required\n");
+		IRDA_WARNING("IrLAN: Authentication required\n");
 		break;
 	case 8:
-		WARNING("IrLAN: Invalid password\n");
+		IRDA_WARNING("IrLAN: Invalid password\n");
 		break;
 	case 9:
-		WARNING("IrLAN: Protocol error\n");
+		IRDA_WARNING("IrLAN: Protocol error\n");
 		break;
 	case 255:
-		WARNING("IrLAN: Asynchronous status\n");
+		IRDA_WARNING("IrLAN: Asynchronous status\n");
 		break;
 	}
 }
@@ -371,15 +371,15 @@ void irlan_client_parse_response(struct irlan_cb *self, struct sk_buff *skb)
         char *name;
         char *value;
 
-	ASSERT(skb != NULL, return;);	
+	IRDA_ASSERT(skb != NULL, return;);	
 	
 	IRDA_DEBUG(4, "%s() skb->len=%d\n", __FUNCTION__ , (int) skb->len);
 	
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 	
 	if (!skb) {
-		ERROR("%s(), Got NULL skb!\n", __FUNCTION__);
+		IRDA_ERROR("%s(), Got NULL skb!\n", __FUNCTION__);
 		return;
 	}
 	frame = skb->data;
@@ -438,8 +438,8 @@ static void irlan_check_response_param(struct irlan_cb *self, char *param,
 
 	IRDA_DEBUG(4, "%s(), parm=%s\n", __FUNCTION__ , param);
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 
 	/* Media type */
 	if (strcmp(param, "MEDIA") == 0) {
@@ -540,10 +540,10 @@ void irlan_client_get_value_confirm(int result, __u16 obj_id,
 	
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
-	ASSERT(priv != NULL, return;);
+	IRDA_ASSERT(priv != NULL, return;);
 
 	self = (struct irlan_cb *) priv;
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 
 	/* We probably don't need to make any more queries */
 	iriap_close(self->client.iriap);

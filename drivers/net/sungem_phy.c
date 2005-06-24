@@ -98,25 +98,15 @@ static int bcm5201_init(struct mii_phy* phy)
 	data &= ~MII_BCM5201_MULTIPHY_SUPERISOLATE;
 	phy_write(phy, MII_BCM5201_MULTIPHY, data);
 
+	phy_write(phy, MII_BCM5201_INTERRUPT, 0);
+
 	return 0;
 }
 
-static int bcm5201_suspend(struct mii_phy* phy, int wol_options)
+static int bcm5201_suspend(struct mii_phy* phy)
 {
-	if (!wol_options)
-		phy_write(phy, MII_BCM5201_INTERRUPT, 0);
-
-	/* Here's a strange hack used by both MacOS 9 and X */
-	phy_write(phy, MII_LPA, phy_read(phy, MII_LPA));
-	
-	if (!wol_options) {
-#if 0 /* Commented out in Darwin... someone has those dawn docs ? */
-		u16 val = phy_read(phy, MII_BCM5201_AUXMODE2)
-		phy_write(phy, MII_BCM5201_AUXMODE2,
-			  val & ~MII_BCM5201_AUXMODE2_LOWPOWER);
-#endif			
-		phy_write(phy, MII_BCM5201_MULTIPHY, MII_BCM5201_MULTIPHY_SUPERISOLATE);
-	}
+	phy_write(phy, MII_BCM5201_INTERRUPT, 0);
+	phy_write(phy, MII_BCM5201_MULTIPHY, MII_BCM5201_MULTIPHY_SUPERISOLATE);
 
 	return 0;
 }
@@ -140,6 +130,21 @@ static int bcm5221_init(struct mii_phy* phy)
 	data = phy_read(phy, MII_BCM5221_TEST);
 	phy_write(phy, MII_BCM5221_TEST,
 		data & ~MII_BCM5221_TEST_ENABLE_SHADOWS);
+
+	return 0;
+}
+
+static int bcm5221_suspend(struct mii_phy* phy)
+{
+	u16 data;
+
+	data = phy_read(phy, MII_BCM5221_TEST);
+	phy_write(phy, MII_BCM5221_TEST,
+		data | MII_BCM5221_TEST_ENABLE_SHADOWS);
+
+	data = phy_read(phy, MII_BCM5221_SHDOW_AUX_MODE4);
+	phy_write(phy, MII_BCM5221_SHDOW_AUX_MODE4,
+		  data | MII_BCM5221_SHDOW_AUX_MODE4_IDDQMODE);
 
 	return 0;
 }
@@ -173,7 +178,7 @@ static int bcm5400_init(struct mii_phy* phy)
 	return 0;
 }
 
-static int bcm5400_suspend(struct mii_phy* phy, int wol_options)
+static int bcm5400_suspend(struct mii_phy* phy)
 {
 #if 0 /* Commented out in Darwin... someone has those dawn docs ? */
 	phy_write(phy, MII_BMCR, BMCR_PDOWN);
@@ -229,7 +234,7 @@ static int bcm5401_init(struct mii_phy* phy)
 	return 0;
 }
 
-static int bcm5401_suspend(struct mii_phy* phy, int wol_options)
+static int bcm5401_suspend(struct mii_phy* phy)
 {
 #if 0 /* Commented out in Darwin... someone has those dawn docs ? */
 	phy_write(phy, MII_BMCR, BMCR_PDOWN);
@@ -266,7 +271,7 @@ static int bcm5411_init(struct mii_phy* phy)
 	return 0;
 }
 
-static int bcm5411_suspend(struct mii_phy* phy, int wol_options)
+static int bcm5411_suspend(struct mii_phy* phy)
 {
 	phy_write(phy, MII_BMCR, BMCR_PDOWN);
 
@@ -662,7 +667,7 @@ static struct mii_phy_def bcm5201_phy_def = {
 
 /* Broadcom BCM 5221 */
 static struct mii_phy_ops bcm5221_phy_ops = {
-	.suspend	= bcm5201_suspend,
+	.suspend	= bcm5221_suspend,
 	.init		= bcm5221_init,
 	.setup_aneg	= genmii_setup_aneg,
 	.setup_forced	= genmii_setup_forced,

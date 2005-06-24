@@ -365,11 +365,9 @@ svcauth_unix_set_client(struct svc_rqst *rqstp)
 static int
 svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 {
-	struct svc_program *prog = rqstp->rq_server->sv_program;
 	struct kvec	*argv = &rqstp->rq_arg.head[0];
 	struct kvec	*resv = &rqstp->rq_res.head[0];
 	struct svc_cred	*cred = &rqstp->rq_cred;
-	int		rv=0;
 
 	cred->cr_group_info = NULL;
 	rqstp->rq_client = NULL;
@@ -395,34 +393,11 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 	if (cred->cr_group_info == NULL)
 		return SVC_DROP; /* kmalloc failure - client must retry */
 
-	/* Find the program the client is going to use.
-	 * If there is none, the code in svc.c will later return
-	 * an error, so just pick the default program.
-	 */
-	while (prog && prog->pg_prog != rqstp->rq_prog)
-		prog = prog->pg_next;
-	if (prog == NULL)
-		prog = rqstp->rq_server->sv_program;
-
-	if (prog->pg_need_auth && !prog->pg_need_auth(rqstp)) {
-		rv = SVC_OK;
-		goto accepted;
-	}
-
-	rv = svcauth_unix_set_client(rqstp);
-	if (rv == SVC_DENIED)
-		goto badcred;
-
-accepted:
 	/* Put NULL verifier */
 	svc_putu32(resv, RPC_AUTH_NULL);
 	svc_putu32(resv, 0);
 
-	return rv;
-
-badcred:
-	*authp = rpc_autherr_badcred;
-	return SVC_DENIED;
+	return SVC_OK;
 }
 
 static int
@@ -445,19 +420,18 @@ struct auth_ops svcauth_null = {
 	.flavour	= RPC_AUTH_NULL,
 	.accept 	= svcauth_null_accept,
 	.release	= svcauth_null_release,
+	.set_client	= svcauth_unix_set_client,
 };
 
 
 static int
 svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 {
-	struct svc_program *prog = rqstp->rq_server->sv_program;
 	struct kvec	*argv = &rqstp->rq_arg.head[0];
 	struct kvec	*resv = &rqstp->rq_res.head[0];
 	struct svc_cred	*cred = &rqstp->rq_cred;
 	u32		slen, i;
 	int		len   = argv->iov_len;
-	int		rv=0;
 
 	cred->cr_group_info = NULL;
 	rqstp->rq_client = NULL;
@@ -489,30 +463,11 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 		return SVC_DENIED;
 	}
 
-	/* Find the program the client is going to use.
-	 * If there is none, the code in svc.c will later return
-	 * an error, so just pick the default program.
-	 */
-	while (prog && prog->pg_prog != rqstp->rq_prog)
-		prog = prog->pg_next;
-	if (prog == NULL)
-		prog = rqstp->rq_server->sv_program;
-
-	if (prog->pg_need_auth && !prog->pg_need_auth(rqstp)) {
-		rv = SVC_OK;
-		goto accepted;
-	}
-
-	rv = svcauth_unix_set_client(rqstp);
-	if (rv == SVC_DENIED)
-		goto badcred;
-
-accepted:
 	/* Put NULL verifier */
 	svc_putu32(resv, RPC_AUTH_NULL);
 	svc_putu32(resv, 0);
 
-	return rv;
+	return SVC_OK;
 
 badcred:
 	*authp = rpc_autherr_badcred;
@@ -542,5 +497,6 @@ struct auth_ops svcauth_unix = {
 	.accept 	= svcauth_unix_accept,
 	.release	= svcauth_unix_release,
 	.domain_release	= svcauth_unix_domain_release,
+	.set_client	= svcauth_unix_set_client,
 };
 

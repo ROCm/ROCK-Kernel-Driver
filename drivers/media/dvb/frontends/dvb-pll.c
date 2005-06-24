@@ -1,5 +1,5 @@
 /*
- * $Id: dvb-pll.c,v 1.3 2004/12/14 15:33:30 kraxel Exp $
+ * $Id: dvb-pll.c,v 1.7 2005/02/10 11:52:02 kraxel Exp $
  *
  * descriptions + helper functions for simple dvb plls.
  *
@@ -30,7 +30,7 @@
 /* descriptions                                                */
 
 struct dvb_pll_desc dvb_pll_thomson_dtt7579 = {
-	.name  = "Thomson ddt7579",
+	.name  = "Thomson dtt7579",
 	.min   = 177000000,
 	.max   = 858000000,
 	.count = 5,
@@ -44,6 +44,19 @@ struct dvb_pll_desc dvb_pll_thomson_dtt7579 = {
 };
 EXPORT_SYMBOL(dvb_pll_thomson_dtt7579);
 
+struct dvb_pll_desc dvb_pll_thomson_dtt7610 = {
+	.name  = "Thomson dtt7610",
+	.min   =  44000000,
+	.max   = 958000000,
+	.count = 3,
+	.entries = {
+		{ 157250000, 44000000, 62500, 0x8e, 0x39 },
+		{ 454000000, 44000000, 62500, 0x8e, 0x3a },
+		{ 999999999, 44000000, 62500, 0x8e, 0x3c },
+	},
+};
+EXPORT_SYMBOL(dvb_pll_thomson_dtt7610);
+
 static void thomson_dtt759x_bw(u8 *buf, int bandwidth)
 {
 	if (BANDWIDTH_7_MHZ == bandwidth)
@@ -51,7 +64,7 @@ static void thomson_dtt759x_bw(u8 *buf, int bandwidth)
 }
 
 struct dvb_pll_desc dvb_pll_thomson_dtt759x = {
-	.name  = "Thomson ddt759x",
+	.name  = "Thomson dtt759x",
 	.min   = 177000000,
 	.max   = 896000000,
 	.setbw = thomson_dtt759x_bw,
@@ -139,7 +152,7 @@ int dvb_pll_configure(struct dvb_pll_desc *desc, u8 *buf,
 	if (debug)
 		printk("pll: %s: div=%d | buf=0x%02x,0x%02x,0x%02x,0x%02x\n",
 		       desc->name, div, buf[0], buf[1], buf[2], buf[3]);
-	
+
 	return 0;
 }
 EXPORT_SYMBOL(dvb_pll_configure);
@@ -151,6 +164,5 @@ MODULE_LICENSE("GPL");
 /*
  * Local variables:
  * c-basic-offset: 8
- * compile-command: "make DVB=1"
  * End:
  */

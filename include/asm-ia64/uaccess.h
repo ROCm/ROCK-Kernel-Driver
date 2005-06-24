@@ -35,9 +35,12 @@
 #include <linux/compiler.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
+#include <linux/page-flags.h>
+#include <linux/mm.h>
 
 #include <asm/intrinsics.h>
 #include <asm/pgtable.h>
+#include <asm/io.h>
 
 /*
  * For historical reasons, the following macros are grossly misnamed:
@@ -69,7 +72,8 @@
 })
 #define access_ok(type, addr, size)	__access_ok((addr), (size), get_fs())
 
-static inline int
+/* this function will go away soon - use access_ok() instead */
+static inline int __deprecated
 verify_area (int type, const void __user *addr, unsigned long size)
 {
 	return access_ok(type, addr, size) ? 0 : -EFAULT;
@@ -365,6 +369,40 @@ ia64_done_with_exception (struct pt_regs *regs)
 		return 1;
 	}
 	return 0;
+}
+
+#define ARCH_HAS_TRANSLATE_MEM_PTR	1
+static __inline__ char *
+xlate_dev_mem_ptr (unsigned long p)
+{
+	struct page *page;
+	char * ptr;
+
+	page = pfn_to_page(p >> PAGE_SHIFT);
+	if (PageUncached(page))
+		ptr = (char *)p + __IA64_UNCACHED_OFFSET;
+	else
+		ptr = __va(p);
+
+	return ptr;
+}
+
+/*
+ * Convert a virtual cached kernel memory pointer to an uncached pointer
+ */
+static __inline__ char *
+xlate_dev_kmem_ptr (char * p)
+{
+	struct page *page;
+	char * ptr;
+
+	page = virt_to_page((unsigned long)p >> PAGE_SHIFT);
+	if (PageUncached(page))
+		ptr = (char *)__pa(p) + __IA64_UNCACHED_OFFSET;
+	else
+		ptr = p;
+
+	return ptr;
 }
 
 #endif /* _ASM_IA64_UACCESS_H */

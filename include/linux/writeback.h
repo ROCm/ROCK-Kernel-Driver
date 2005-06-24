@@ -14,12 +14,10 @@ extern struct list_head inode_unused;
  * Yes, writeback.h requires sched.h
  * No, sched.h is not included from here.
  */
-static inline int task_is_pdflush(struct task_struct *task)
+static inline int current_is_pdflush(void)
 {
-	return task->flags & PF_FLUSHER;
+	return current->flags & PF_FLUSHER;
 }
-
-#define current_is_pdflush()	task_is_pdflush(current)
 
 /*
  * fs/fs-writeback.c
@@ -88,6 +86,7 @@ static inline void wait_on_inode(struct inode *inode)
 int wakeup_bdflush(long nr_pages);
 void laptop_io_completion(void);
 void laptop_sync_completion(void);
+void throttle_vm_writeout(void);
 
 /* These are exported to sysctl. */
 extern int dirty_background_ratio;

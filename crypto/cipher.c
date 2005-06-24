@@ -11,18 +11,20 @@
  * any later version.
  *
  */
+#include <linux/compiler.h>
 #include <linux/kernel.h>
 #include <linux/crypto.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 #include <asm/scatterlist.h>
 #include "internal.h"
 #include "scatterwalk.h"
 
 typedef void (cryptfn_t)(void *, u8 *, const u8 *);
 typedef void (procfn_t)(struct crypto_tfm *, u8 *,
-                        u8*, cryptfn_t, int enc, void *, int);
+                        u8*, cryptfn_t, void *);
 
 static inline void xor_64(u8 *a, const u8 *b)
 {
@@ -37,7 +39,47 @@ static inline void xor_128(u8 *a, const u8 *b)
 	((u32 *)a)[2] ^= ((u32 *)b)[2];
 	((u32 *)a)[3] ^= ((u32 *)b)[3];
 }
+ 
+static inline void *prepare_src(struct scatter_walk *walk, int bsize,
+				void *tmp, int in_place)
+{
+	void *src = walk->data;
+	int n = bsize;
 
+	if (unlikely(scatterwalk_across_pages(walk, bsize))) {
+		src = tmp;
+		n = scatterwalk_copychunks(src, walk, bsize, 0);
+	}
+	scatterwalk_advance(walk, n);
+	return src;
+}
+
+static inline void *prepare_dst(struct scatter_walk *walk, int bsize,
+				void *tmp, int in_place)
+{
+	void *dst = walk->data;
+
+	if (unlikely(scatterwalk_across_pages(walk, bsize)) || in_place)
+		dst = tmp;
+	return dst;
+}
+
+static inline void complete_src(struct scatter_walk *walk, int bsize,
+				void *src, int in_place)
+{
+}
+
+static inline void complete_dst(struct scatter_walk *walk, int bsize,
+				void *dst, int in_place)
+{
+	int n = bsize;
+
+	if (unlikely(scatterwalk_across_pages(walk, bsize)))
+		n = scatterwalk_copychunks(dst, walk, bsize, 1);
+	else if (in_place)
+		memcpy(walk->data, dst, bsize);
+	scatterwalk_advance(walk, n);
+}
 
 /* 
  * Generic encrypt/decrypt wrapper for ciphers, handles operations across
@@ -48,7 +90,7 @@ static int crypt(struct crypto_tfm *tfm,
 		 struct scatterlist *dst,
 		 struct scatterlist *src,
                  unsigned int nbytes, cryptfn_t crfn,
-                 procfn_t prfn, int enc, void *info)
+                 procfn_t prfn, void *info)
 {
 	struct scatter_walk walk_in, walk_out;
 	const unsigned int bsize = crypto_tfm_alg_blocksize(tfm);
@@ -72,20 +114,26 @@ static int crypt(struct crypto_tfm *tfm,
 
 		scatterwalk_map(&walk_in, 0);
 		scatterwalk_map(&walk_out, 1);
-		src_p = scatterwalk_whichbuf(&walk_in, bsize, tmp_src);
-		dst_p = scatterwalk_whichbuf(&walk_out, bsize, tmp_dst);
-		in_place = scatterwalk_samebuf(&walk_in, &walk_out,
-					       src_p, dst_p);
 
-		nbytes -= bsize;
+		in_place = scatterwalk_samebuf(&walk_in, &walk_out);
 
-		scatterwalk_copychunks(src_p, &walk_in, bsize, 0);
+		do {
+			src_p = prepare_src(&walk_in, bsize, tmp_src,
+					    in_place);
+			dst_p = prepare_dst(&walk_out, bsize, tmp_dst,
+					    in_place);
 
-		prfn(tfm, dst_p, src_p, crfn, enc, info, in_place);
+			prfn(tfm, dst_p, src_p, crfn, info);
+
+			complete_src(&walk_in, bsize, src_p, in_place);
+			complete_dst(&walk_out, bsize, dst_p, in_place);
+
+			nbytes -= bsize;
+		} while (nbytes &&
+			 !scatterwalk_across_pages(&walk_in, bsize) &&
+			 !scatterwalk_across_pages(&walk_out, bsize));
 
 		scatterwalk_done(&walk_in, 0, nbytes);
-
-		scatterwalk_copychunks(dst_p, &walk_out, bsize, 1);
 		scatterwalk_done(&walk_out, 1, nbytes);
 
 		if (!nbytes)
@@ -95,33 +143,28 @@ static int crypt(struct crypto_tfm *tfm,
 	}
 }
 
-static void cbc_process(struct crypto_tfm *tfm, u8 *dst, u8 *src,
-			cryptfn_t fn, int enc, void *info, int in_place)
+static void cbc_process_encrypt(struct crypto_tfm *tfm, u8 *dst, u8 *src,
+				cryptfn_t fn, void *info)
 {
 	u8 *iv = info;
-	
-	/* Null encryption */
-	if (!iv)
-		return;
-		
-	if (enc) {
-		tfm->crt_u.cipher.cit_xor_block(iv, src);
-		fn(crypto_tfm_ctx(tfm), dst, iv);
-		memcpy(iv, dst, crypto_tfm_alg_blocksize(tfm));
-	} else {
-		u8 stack[in_place ? crypto_tfm_alg_blocksize(tfm) : 0];
-		u8 *buf = in_place ? stack : dst;
 
-		fn(crypto_tfm_ctx(tfm), buf, src);
-		tfm->crt_u.cipher.cit_xor_block(buf, iv);
-		memcpy(iv, src, crypto_tfm_alg_blocksize(tfm));
-		if (buf != dst)
-			memcpy(dst, buf, crypto_tfm_alg_blocksize(tfm));
-	}
+	tfm->crt_u.cipher.cit_xor_block(iv, src);
+	fn(crypto_tfm_ctx(tfm), dst, iv);
+	memcpy(iv, dst, crypto_tfm_alg_blocksize(tfm));
+}
+
+static void cbc_process_decrypt(struct crypto_tfm *tfm, u8 *dst, u8 *src,
+				cryptfn_t fn, void *info)
+{
+	u8 *iv = info;
+
+	fn(crypto_tfm_ctx(tfm), dst, src);
+	tfm->crt_u.cipher.cit_xor_block(dst, iv);
+	memcpy(iv, src, crypto_tfm_alg_blocksize(tfm));
 }
 
 static void ecb_process(struct crypto_tfm *tfm, u8 *dst, u8 *src,
-			cryptfn_t fn, int enc, void *info, int in_place)
+			cryptfn_t fn, void *info)
 {
 	fn(crypto_tfm_ctx(tfm), dst, src);
 }
@@ -144,7 +187,7 @@ static int ecb_encrypt(struct crypto_tfm *tfm,
 {
 	return crypt(tfm, dst, src, nbytes,
 	             tfm->__crt_alg->cra_cipher.cia_encrypt,
-	             ecb_process, 1, NULL);
+	             ecb_process, NULL);
 }
 
 static int ecb_decrypt(struct crypto_tfm *tfm,
@@ -154,7 +197,7 @@ static int ecb_decrypt(struct crypto_tfm *tfm,
 {
 	return crypt(tfm, dst, src, nbytes,
 	             tfm->__crt_alg->cra_cipher.cia_decrypt,
-	             ecb_process, 1, NULL);
+	             ecb_process, NULL);
 }
 
 static int cbc_encrypt(struct crypto_tfm *tfm,
@@ -164,7 +207,7 @@ static int cbc_encrypt(struct crypto_tfm *tfm,
 {
 	return crypt(tfm, dst, src, nbytes,
 	             tfm->__crt_alg->cra_cipher.cia_encrypt,
-	             cbc_process, 1, tfm->crt_cipher.cit_iv);
+	             cbc_process_encrypt, tfm->crt_cipher.cit_iv);
 }
 
 static int cbc_encrypt_iv(struct crypto_tfm *tfm,
@@ -174,7 +217,7 @@ static int cbc_encrypt_iv(struct crypto_tfm *tfm,
 {
 	return crypt(tfm, dst, src, nbytes,
 	             tfm->__crt_alg->cra_cipher.cia_encrypt,
-	             cbc_process, 1, iv);
+	             cbc_process_encrypt, iv);
 }
 
 static int cbc_decrypt(struct crypto_tfm *tfm,
@@ -184,7 +227,7 @@ static int cbc_decrypt(struct crypto_tfm *tfm,
 {
 	return crypt(tfm, dst, src, nbytes,
 	             tfm->__crt_alg->cra_cipher.cia_decrypt,
-	             cbc_process, 0, tfm->crt_cipher.cit_iv);
+	             cbc_process_decrypt, tfm->crt_cipher.cit_iv);
 }
 
 static int cbc_decrypt_iv(struct crypto_tfm *tfm,
@@ -194,7 +237,7 @@ static int cbc_decrypt_iv(struct crypto_tfm *tfm,
 {
 	return crypt(tfm, dst, src, nbytes,
 	             tfm->__crt_alg->cra_cipher.cia_decrypt,
-	             cbc_process, 0, iv);
+	             cbc_process_decrypt, iv);
 }
 
 static int nocrypt(struct crypto_tfm *tfm,

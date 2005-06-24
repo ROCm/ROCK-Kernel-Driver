@@ -61,9 +61,11 @@
 #include <asm/byteorder.h>
 #include <linux/spinlock.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/dma-mapping.h>
 
 /* -------------------- TUNABLE PARAMATERS: */
 
@@ -566,7 +568,7 @@ static int __init sram_test_word(
 	return -EIO;
 }
 
-static int __init sram_test_pass(const struct lanai_dev *lanai, u32 pattern)
+static int __devinit sram_test_pass(const struct lanai_dev *lanai, u32 pattern)
 {
 	int offset, result = 0;
 	for (offset = 0; offset < SRAM_BYTES && result == 0; offset += 4)
@@ -574,7 +576,7 @@ static int __init sram_test_pass(const struct lanai_dev *lanai, u32 pattern)
 	return result;
 }
 
-static int __init sram_test_and_clear(const struct lanai_dev *lanai)
+static int __devinit sram_test_and_clear(const struct lanai_dev *lanai)
 {
 #ifdef FULL_MEMORY_TEST
 	int result;
@@ -650,7 +652,7 @@ static inline u32 cardvcc_read(const struct lanai_vcc *lvcc,
 	enum lanai_vcc_offset offset)
 {
 	u32 val;
-	APRINTK(lvcc->vbase != 0, "cardvcc_read: unbound vcc!\n");
+	APRINTK(lvcc->vbase != NULL, "cardvcc_read: unbound vcc!\n");
 	val= readl(lvcc->vbase + offset);
 	RWDEBUG("VR vci=%04d 0x%02X = 0x%08X\n",
 	    lvcc->vci, (int) offset, val);
@@ -660,7 +662,7 @@ static inline u32 cardvcc_read(const struct lanai_vcc *lvcc,
 static inline void cardvcc_write(const struct lanai_vcc *lvcc,
 	u32 val, enum lanai_vcc_offset offset)
 {
-	APRINTK(lvcc->vbase != 0, "cardvcc_write: unbound vcc!\n");
+	APRINTK(lvcc->vbase != NULL, "cardvcc_write: unbound vcc!\n");
 	APRINTK((val & ~0xFFFF) == 0,
 	    "cardvcc_write: bad val 0x%X (vci=%d, addr=0x%02X)\n",
 	    (unsigned int) val, lvcc->vci, (unsigned int) offset);
@@ -748,7 +750,7 @@ static void host_vcc_start_tx(const struct lanai_vcc *lvcc)
 /* Shutdown receiving on card */
 static void lanai_shutdown_rx_vci(const struct lanai_vcc *lvcc)
 {
-	if (lvcc->vbase == 0)		/* We were never bound to a VCI */
+	if (lvcc->vbase == NULL)	/* We were never bound to a VCI */
 		return;
 	/* 15.1.1 - set to trashing, wait one cell time (15us) */
 	cardvcc_write(lvcc,
@@ -779,7 +781,7 @@ static void lanai_shutdown_tx_vci(struct lanai_dev *lanai,
 	int read, write, lastread = -1;
 	APRINTK(!in_interrupt(),
 	    "lanai_shutdown_tx_vci called w/o process context!\n");
-	if (lvcc->vbase == 0)		/* We were never bound to a VCI */
+	if (lvcc->vbase == NULL)	/* We were never bound to a VCI */
 		return;
 	/* 15.2.1 - wait for queue to drain */
 	while ((skb = skb_dequeue(&lvcc->tx.backlog)) != NULL)
@@ -860,7 +862,7 @@ static inline void aal0_buffer_free(struct lanai_dev *lanai)
 #ifndef READ_EEPROM
 
 /* Stub functions to use if EEPROM reading is disabled */
-static int __init eeprom_read(struct lanai_dev *lanai)
+static int __devinit eeprom_read(struct lanai_dev *lanai)
 {
 	printk(KERN_INFO DEV_LABEL "(itf %d): *NOT* reading EEPROM\n",
 	    lanai->number);
@@ -868,7 +870,7 @@ static int __init eeprom_read(struct lanai_dev *lanai)
 	return 0;
 }
 
-static int __init eeprom_validate(struct lanai_dev *lanai)
+static int __devinit eeprom_validate(struct lanai_dev *lanai)
 {
 	lanai->serialno = 0;
 	lanai->magicno = EEPROM_MAGIC_VALUE;
@@ -877,7 +879,7 @@ static int __init eeprom_validate(struct lanai_dev *lanai)
 
 #else /* READ_EEPROM */
 
-static int __init eeprom_read(struct lanai_dev *lanai)
+static int __devinit eeprom_read(struct lanai_dev *lanai)
 {
 	int i, address;
 	u8 data;
@@ -953,7 +955,7 @@ static inline u32 eeprom_be4(const struct lanai_dev *lanai, int address)
 }
 
 /* Checksum/validate EEPROM contents */
-static int __init eeprom_validate(struct lanai_dev *lanai)
+static int __devinit eeprom_validate(struct lanai_dev *lanai)
 {
 	int i, s;
 	u32 v;
@@ -1449,7 +1451,7 @@ static void vcc_rx_aal0(struct lanai_dev *lanai)
 #include <linux/vmalloc.h>
 #endif
 
-static int __init vcc_table_allocate(struct lanai_dev *lanai)
+static int __devinit vcc_table_allocate(struct lanai_dev *lanai)
 {
 #ifdef VCCTABLE_GETFREEPAGE
 	APRINTK((lanai->num_vci) * sizeof(struct lanai_vcc *) <= PAGE_SIZE,
@@ -1544,7 +1546,7 @@ static int lanai_setup_tx_vci(struct lanai_dev *lanai, struct lanai_vcc *lvcc,
 static inline void host_vcc_bind(struct lanai_dev *lanai,
 	struct lanai_vcc *lvcc, vci_t vci)
 {
-	if (lvcc->vbase != 0)
+	if (lvcc->vbase != NULL)
 		return;    /* We already were bound in the other direction */
 	DPRINTK("Binding vci %d\n", vci);
 #ifdef USE_POWERDOWN
@@ -1562,7 +1564,7 @@ static inline void host_vcc_bind(struct lanai_dev *lanai,
 static inline void host_vcc_unbind(struct lanai_dev *lanai,
 	struct lanai_vcc *lvcc)
 {
-	if (lvcc->vbase == 0)
+	if (lvcc->vbase == NULL)
 		return;	/* This vcc was never bound */
 	DPRINTK("Unbinding vci %d\n", lvcc->vci);
 	lvcc->vbase = NULL;
@@ -1596,7 +1598,7 @@ static void lanai_reset(struct lanai_dev *lanai)
 /*
  * Allocate service buffer and tell card about it
  */
-static int __init service_buffer_allocate(struct lanai_dev *lanai)
+static int __devinit service_buffer_allocate(struct lanai_dev *lanai)
 {
 	lanai_buf_allocate(&lanai->service, SERVICE_ENTRIES * 4, 8,
 	    lanai->pci);
@@ -1952,7 +1954,7 @@ static int check_board_id_and_rev(const char *name, u32 val, int *revp)
 
 /* -------------------- PCI INITIALIZATION/SHUTDOWN: */
 
-static int __init lanai_pci_start(struct lanai_dev *lanai)
+static int __devinit lanai_pci_start(struct lanai_dev *lanai)
 {
 	struct pci_dev *pci = lanai->pci;
 	int result;
@@ -1964,7 +1966,7 @@ static int __init lanai_pci_start(struct lanai_dev *lanai)
 		return -ENXIO;
 	}
 	pci_set_master(pci);
-	if (pci_set_dma_mask(pci, 0xFFFFFFFF) != 0) {
+	if (pci_set_dma_mask(pci, DMA_32BIT_MASK) != 0) {
 		printk(KERN_WARNING DEV_LABEL
 		    "(itf %d): No suitable DMA available.\n", lanai->number);
 		return -EBUSY;
@@ -2148,7 +2150,7 @@ static inline void lanai_cbr_shutdown(struct lanai_dev *lanai)
 /* -------------------- OPERATIONS: */
 
 /* setup a newly detected device */
-static int __init lanai_dev_open(struct atm_dev *atmdev)
+static int __devinit lanai_dev_open(struct atm_dev *atmdev)
 {
 	struct lanai_dev *lanai = (struct lanai_dev *) atmdev->dev_data;
 	unsigned long raw_base;
@@ -2179,7 +2181,7 @@ static int __init lanai_dev_open(struct atm_dev *atmdev)
 		goto error;
 	raw_base = lanai->pci->resource[0].start;
 	lanai->base = (bus_addr_t) ioremap(raw_base, LANAI_MAPPING_SIZE);
-	if (lanai->base == 0) {
+	if (lanai->base == NULL) {
 		printk(KERN_ERR DEV_LABEL ": couldn't remap I/O space\n");
 		goto error_pci;
 	}
@@ -2333,7 +2335,7 @@ static void lanai_close(struct atm_vcc *atmvcc)
 	}
 	if (lvcc->tx.atmvcc == atmvcc) {
 		if (atmvcc == lanai->cbrvcc) {
-			if (lvcc->vbase != 0)
+			if (lvcc->vbase != NULL)
 				lanai_cbr_shutdown(lanai);
 			lanai->cbrvcc = NULL;
 		}
@@ -2524,7 +2526,7 @@ static int lanai_send(struct atm_vcc *atmvcc, struct sk_buff *skb)
 	struct lanai_vcc *lvcc = (struct lanai_vcc *) atmvcc->dev_data;
 	struct lanai_dev *lanai = (struct lanai_dev *) atmvcc->dev->dev_data;
 	unsigned long flags;
-	if (unlikely(lvcc == NULL || lvcc->vbase == 0 ||
+	if (unlikely(lvcc == NULL || lvcc->vbase == NULL ||
 	      lvcc->tx.atmvcc != atmvcc))
 		goto einval;
 #ifdef DEBUG
@@ -2746,7 +2748,7 @@ static int __init lanai_module_init(void)
 {
 	int x;
 
-	x = pci_module_init(&lanai_driver);
+	x = pci_register_driver(&lanai_driver);
 	if (x != 0)
 		printk(KERN_ERR DEV_LABEL ": no adapter found\n");
 	return x;

@@ -11,6 +11,8 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
+ * Modifications:
+ *     10-Mar-2005 LCVR  Changed S3C2410_VA to S3C24XX_VA
 */
 
 #include <asm/arch/map.h>
@@ -24,7 +26,7 @@
 		mrc	p15, 0, \rx, c1, c0
 		tst	\rx, #1
 		ldreq	\rx, = S3C2410_PA_UART
-		ldrne	\rx, = S3C2410_VA_UART
+		ldrne	\rx, = S3C24XX_VA_UART
 #if CONFIG_DEBUG_S3C2410_UART != 0
 		add	\rx, \rx, #(S3C2410_UART1_OFF * CONFIG_DEBUG_S3C2410_UART)
 #endif
@@ -43,7 +45,7 @@
 		mrc	p15, 0, \rd, c1, c0
 		tst	\rd, #1
 		addeq	\rd, \rx, #(S3C2410_PA_GPIO - S3C2410_PA_UART)
-		addne	\rd, \rx, #(S3C2410_VA_GPIO - S3C2410_VA_UART)
+		addne	\rd, \rx, #(S3C24XX_VA_GPIO - S3C24XX_VA_UART)
 		bic	\rd, \rd, #0xff000
 		ldr	\rd, [ \rd, # S3C2410_GSTATUS1 - S3C2410_GPIOREG(0) ]
 		and	\rd, \rd, #0x00ff0000
@@ -74,7 +76,7 @@
 		mrc	p15, 0, \rd, c1, c0
 		tst	\rd, #1
 		addeq	\rd, \rx, #(S3C2410_PA_GPIO - S3C2410_PA_UART)
-		addne	\rd, \rx, #(S3C2410_VA_GPIO - S3C2410_VA_UART)
+		addne	\rd, \rx, #(S3C24XX_VA_GPIO - S3C24XX_VA_UART)
 		bic	\rd, \rd, #0xff000
 		ldr	\rd, [ \rd, # S3C2410_GSTATUS1 - S3C2410_GPIOREG(0) ]
 		and	\rd, \rd, #0x00ff0000

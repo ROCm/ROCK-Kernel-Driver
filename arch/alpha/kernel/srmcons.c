@@ -164,29 +164,22 @@ srmcons_get_private_struct(struct srmcons_private **ps)
 	unsigned long flags;
 	int retval = 0;
 
-	spin_lock_irqsave(&srmconsp_lock, flags);
-
-	do {
-		if (srmconsp != NULL) {
-			*ps = srmconsp;
-			break;
-		}
+	if (srmconsp == NULL) {
+		spin_lock_irqsave(&srmconsp_lock, flags);
 
 		srmconsp = kmalloc(sizeof(*srmconsp), GFP_KERNEL);
-		if (srmconsp == NULL) {
+		if (srmconsp == NULL)
 			retval = -ENOMEM;
-			break;
+		else {
+			srmconsp->tty = NULL;
+			spin_lock_init(&srmconsp->lock);
+			init_timer(&srmconsp->timer);
 		}
 
-		srmconsp->tty = NULL;
-		spin_lock_init(&srmconsp->lock);
-		init_timer(&srmconsp->timer);
+		spin_unlock_irqrestore(&srmconsp_lock, flags);
+	}
 
-		*ps = srmconsp;
-	} while(0);
-
-	spin_unlock_irqrestore(&srmconsp_lock, flags);
-
+	*ps = srmconsp;
 	return retval;
 }
 

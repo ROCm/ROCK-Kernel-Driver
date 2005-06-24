@@ -55,7 +55,7 @@ static ssize_t show_inquiry_cache(struct class_device *cdev, char *buf)
 				batostr(&bdaddr),
 				data->pscan_rep_mode, data->pscan_period_mode, data->pscan_mode,
 				data->dev_class[2], data->dev_class[1], data->dev_class[0],
-				data->clock_offset, data->rssi, e->timestamp);
+				__le16_to_cpu(data->clock_offset), data->rssi, e->timestamp);
 	}
 
 	hci_dev_unlock_bh(hdev);

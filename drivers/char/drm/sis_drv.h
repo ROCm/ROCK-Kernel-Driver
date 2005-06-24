@@ -46,13 +46,6 @@ typedef struct drm_sis_private {
 	memHeap_t *FBHeap;
 } drm_sis_private_t;
 
-extern int sis_fb_alloc( DRM_IOCTL_ARGS );
-extern int sis_fb_free( DRM_IOCTL_ARGS );
-extern int sis_ioctl_agp_init( DRM_IOCTL_ARGS );
-extern int sis_ioctl_agp_alloc( DRM_IOCTL_ARGS );
-extern int sis_ioctl_agp_free( DRM_IOCTL_ARGS );
-extern int sis_fb_init( DRM_IOCTL_ARGS );
-
 extern int sis_init_context(drm_device_t *dev, int context);
 extern int sis_final_context(drm_device_t *dev, int context);
 

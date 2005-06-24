@@ -10,7 +10,7 @@
  * Copyright (c) 2001 Matthew Wilcox for Hewlett Packard
  * Copyright (c) 2001 Helge Deller <deller@gmx.de>
  * Copyright (c) 2001,2002 Ryan Bradetich 
- * Copyright (c) 2004 Thibaut VARENE <varenet@parisc-linux.org>
+ * Copyright (c) 2004-2005 Thibaut VARENE <varenet@parisc-linux.org>
  * 
  * The file handles registering devices and drivers, then matching them.
  * It's the closest we get to a dating agency.
@@ -610,6 +610,24 @@ struct device *hwpath_to_device(struct hardware_path *modpath)
 		return parse_tree_node(parent, 6, modpath);
 }
 EXPORT_SYMBOL(hwpath_to_device);
+
+/**
+ * device_to_hwpath - Populates the hwpath corresponding to the given device.
+ * @param dev the target device
+ * @param path pointer to a previously allocated hwpath struct to be filled in
+ */
+void device_to_hwpath(struct device *dev, struct hardware_path *path)
+{
+	struct parisc_device *padev;
+	if (dev->bus == &parisc_bus_type) {
+		padev = to_parisc_device(dev);
+		get_node_path(dev->parent, path);
+		path->mod = padev->hw_path;
+	} else if (is_pci_dev(dev)) {
+		get_node_path(dev, path);
+	}
+}
+EXPORT_SYMBOL(device_to_hwpath);
 
 #define BC_PORT_MASK 0x8
 #define BC_LOWER_PORT 0x8

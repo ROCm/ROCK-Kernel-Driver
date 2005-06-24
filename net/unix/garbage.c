@@ -100,7 +100,7 @@ static struct sock *unix_get_socket(struct file *filp)
 	/*
 	 *	Socket ?
 	 */
-	if (inode->i_sock) {
+	if (S_ISSOCK(inode->i_mode)) {
 		struct socket * sock = SOCKET_I(inode);
 		struct sock * s = sock->sk;
 

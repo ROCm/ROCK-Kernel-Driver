@@ -48,7 +48,7 @@ Menu attributes
 A menu entry can have a number of attributes. Not all of them are
 applicable everywhere (see syntax).
 
-- type definition: "bool"/"tristate"/"string"/"hex"/"integer"
+- type definition: "bool"/"tristate"/"string"/"hex"/"int"
   Every config option must have a type. There are only two basic types:
   tristate and string, the other types are based on these two. The type
   definition optionally accepts an input prompt, so these two examples
@@ -100,7 +100,7 @@ applicable everywhere (see syntax).
   symbols.
 
 - numerical ranges: "range" <symbol> <symbol> ["if" <expr>]
-  This allows to limit the range of possible input values for integer
+  This allows to limit the range of possible input values for int
   and hex symbols. The user can only input a value which is larger than
   or equal to the first symbol and smaller than or equal to the second
   symbol.

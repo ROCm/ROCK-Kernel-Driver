@@ -32,20 +32,12 @@
 #ifndef	__XFS_LOG_H__
 #define __XFS_LOG_H__
 
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-#define LSN_FIELD_CYCLE(arch) (((arch)==ARCH_NOCONVERT)?1:0)
-#define LSN_FIELD_BLOCK(arch) (((arch)==ARCH_NOCONVERT)?0:1)
-#else
-#define LSN_FIELD_CYCLE(arch) (0)
-#define LSN_FIELD_BLOCK(arch) (1)
-#endif
-
 /* get lsn fields */
 
-#define CYCLE_LSN(lsn,arch) (INT_GET(((uint *)&(lsn))[LSN_FIELD_CYCLE(arch)], arch))
-#define BLOCK_LSN(lsn,arch) (INT_GET(((uint *)&(lsn))[LSN_FIELD_BLOCK(arch)], arch))
+#define CYCLE_LSN(lsn) ((uint)((lsn)>>32))
+#define BLOCK_LSN(lsn) ((uint)(lsn))
 /* this is used in a spot where we might otherwise double-endian-flip */
-#define CYCLE_LSN_NOCONV(lsn,arch) (((uint *)&(lsn))[LSN_FIELD_CYCLE(arch)])
+#define CYCLE_LSN_DISK(lsn) (((uint *)&(lsn))[0])
 
 #ifdef __KERNEL__
 /*
@@ -58,21 +50,18 @@ __attribute__((unused))	/* gcc 2.95, 2.96 miscompile this when inlined */
 #else
 __inline__
 #endif
-xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2, xfs_arch_t arch)
+xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2)
 {
-	if (CYCLE_LSN(lsn1, arch) != CYCLE_LSN(lsn2, arch))
-		return (CYCLE_LSN(lsn1, arch)<CYCLE_LSN(lsn2, arch))? -999 : 999;
+	if (CYCLE_LSN(lsn1) != CYCLE_LSN(lsn2))
+		return (CYCLE_LSN(lsn1)<CYCLE_LSN(lsn2))? -999 : 999;
 
-	if (BLOCK_LSN(lsn1, arch) != BLOCK_LSN(lsn2, arch))
-		return (BLOCK_LSN(lsn1, arch)<BLOCK_LSN(lsn2, arch))? -999 : 999;
+	if (BLOCK_LSN(lsn1) != BLOCK_LSN(lsn2))
+		return (BLOCK_LSN(lsn1)<BLOCK_LSN(lsn2))? -999 : 999;
 
 	return 0;
 }
 
-#define	XFS_LSN_CMP_ARCH(x,y,arch)	_lsn_cmp(x, y, arch)
-#define	XFS_LSN_CMP(x,y) XFS_LSN_CMP_ARCH(x,y,ARCH_NOCONVERT)
-#define	XFS_LSN_DIFF_ARCH(x,y,arch)	_lsn_cmp(x, y, arch)
-#define	XFS_LSN_DIFF(x,y) XFS_LSN_DIFF_ARCH(x,y,ARCH_NOCONVERT)
+#define	XFS_LSN_CMP(x,y) _lsn_cmp(x,y)
 
 /*
  * Macros, structures, prototypes for interface to the log manager.

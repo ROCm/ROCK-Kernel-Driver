@@ -44,9 +44,9 @@ extern void qla2x00_restart_queues(scsi_qla_host_t *, uint8_t);
 
 extern void qla2x00_rescan_fcports(scsi_qla_host_t *);
 
-extern void qla2x00_tgt_free(scsi_qla_host_t *ha, uint16_t t);
-
 extern int qla2x00_abort_isp(scsi_qla_host_t *);
+
+extern void qla2x00_reg_remote_port(scsi_qla_host_t *, fc_port_t *);
 
 /*
  * Global Data in qla_os.c source file.
@@ -74,24 +74,14 @@ extern int ql2xsuspendcount;
 #if defined(MODULE)
 extern char *ql2xopts;
 #endif
+extern void qla2x00_sp_compl(scsi_qla_host_t *, srb_t *);
 
 extern char *qla2x00_get_fw_version_str(struct scsi_qla_host *, char *);
 
 extern void qla2x00_cmd_timeout(srb_t *);
 
-extern int __qla2x00_suspend_lun(scsi_qla_host_t *, os_lun_t *, int, int, int);
-
-extern void qla2x00_done(scsi_qla_host_t *);
-extern void qla2x00_next(scsi_qla_host_t *);
-extern void qla2x00_flush_failover_q(scsi_qla_host_t *, os_lun_t *);
-extern void qla2x00_reset_lun_fo_counts(scsi_qla_host_t *, os_lun_t *);
-
-extern void qla2x00_extend_timeout(struct scsi_cmnd *, int);
-
 extern void qla2x00_mark_device_lost(scsi_qla_host_t *, fc_port_t *, int);
 extern void qla2x00_mark_all_devices_lost(scsi_qla_host_t *);
-
-extern void qla2x00_abort_queues(scsi_qla_host_t *, uint8_t);
 
 extern void qla2x00_blink_led(scsi_qla_host_t *);
 
@@ -150,7 +140,7 @@ qla2x00_abort_target(fc_port_t *fcport);
 #endif
 
 extern int
-qla2x00_target_reset(scsi_qla_host_t *, uint16_t, uint16_t);
+qla2x00_target_reset(scsi_qla_host_t *, struct fc_port *);
 
 extern int
 qla2x00_get_adapter_id(scsi_qla_host_t *, uint16_t *, uint8_t *, uint8_t *,
@@ -254,4 +244,14 @@ extern void qla2x00_cancel_io_descriptors(scsi_qla_host_t *);
 #define qla2x00_alloc_ioctl_mem(ha)		(0)
 #define qla2x00_free_ioctl_mem(ha)		do { } while (0)
 
+/*
+ * Global Function Prototypes in qla_attr.c source file.
+ */
+struct fc_function_template;
+extern struct fc_function_template qla2xxx_transport_functions;
+extern void qla2x00_alloc_sysfs_attr(scsi_qla_host_t *);
+extern void qla2x00_free_sysfs_attr(scsi_qla_host_t *);
+extern void qla2x00_init_host_attr(scsi_qla_host_t *);
+extern void qla2x00_alloc_sysfs_attr(scsi_qla_host_t *);
+extern void qla2x00_free_sysfs_attr(scsi_qla_host_t *);
 #endif /* _QLA_GBL_H */

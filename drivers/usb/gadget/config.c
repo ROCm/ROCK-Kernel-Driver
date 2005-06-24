@@ -25,6 +25,7 @@
 #include <linux/device.h>
 
 #include <linux/usb_ch9.h>
+#include <linux/usb_gadget.h>
 
 
 /**

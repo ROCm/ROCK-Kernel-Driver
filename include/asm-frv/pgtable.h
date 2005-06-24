@@ -141,7 +141,7 @@ extern unsigned long empty_zero_page;
 #define PTRS_PER_PTE		4096
 
 #define USER_PGDS_IN_LAST_PML4	(TASK_SIZE / PGDIR_SIZE)
-#define FIRST_USER_PGD_NR	0
+#define FIRST_USER_ADDRESS	0
 
 #define USER_PGD_PTRS		(PAGE_OFFSET >> PGDIR_SHIFT)
 #define KERNEL_PGD_PTRS		(PTRS_PER_PGD - USER_PGD_PTRS)
@@ -173,6 +173,7 @@ do {							\
 	*(pteptr) = (pteval);				\
 	asm volatile("dcf %M0" :: "U"(*pteptr));	\
 } while(0)
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
 
 #define set_pte_atomic(pteptr, pteval)		set_pte((pteptr), (pteval))
 
@@ -348,12 +349,12 @@ static inline pmd_t *pmd_offset(pud_t *dir, unsigned long address)
 
 /*
  * Define this to warn about kernel memory accesses that are
- * done without a 'verify_area(VERIFY_WRITE,..)'
+ * done without a 'access_ok(VERIFY_WRITE,..)'
  */
-#undef TEST_VERIFY_AREA
+#undef TEST_ACCESS_OK
 
 #define pte_present(x)	(pte_val(x) & _PAGE_PRESENT)
-#define pte_clear(xp)	do { set_pte(xp, __pte(0)); } while (0)
+#define pte_clear(mm,addr,xp)	do { set_pte_at(mm, addr, xp, __pte(0)); } while (0)
 
 #define pmd_none(x)	(!pmd_val(x))
 #define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
@@ -390,36 +391,30 @@ static inline pte_t pte_mkdirty(pte_t pte)	{ (pte).pte |= _PAGE_DIRTY; return pt
 static inline pte_t pte_mkyoung(pte_t pte)	{ (pte).pte |= _PAGE_ACCESSED; return pte; }
 static inline pte_t pte_mkwrite(pte_t pte)	{ (pte).pte &= ~_PAGE_WP; return pte; }
 
-static inline int ptep_test_and_clear_dirty(pte_t *ptep)
+static inline int ptep_test_and_clear_dirty(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
 {
 	int i = test_and_clear_bit(_PAGE_BIT_DIRTY, ptep);
 	asm volatile("dcf %M0" :: "U"(*ptep));
 	return i;
 }
 
-static inline int ptep_test_and_clear_young(pte_t *ptep)
+static inline int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
 {
 	int i = test_and_clear_bit(_PAGE_BIT_ACCESSED, ptep);
 	asm volatile("dcf %M0" :: "U"(*ptep));
 	return i;
 }
 
-static inline pte_t ptep_get_and_clear(pte_t *ptep)
+static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	unsigned long x = xchg(&ptep->pte, 0);
 	asm volatile("dcf %M0" :: "U"(*ptep));
 	return __pte(x);
 }
 
-static inline void ptep_set_wrprotect(pte_t *ptep)
+static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	set_bit(_PAGE_BIT_WP, ptep);
-	asm volatile("dcf %M0" :: "U"(*ptep));
-}
-
-static inline void ptep_mkdirty(pte_t *ptep)
-{
-	set_bit(_PAGE_BIT_DIRTY, ptep);
 	asm volatile("dcf %M0" :: "U"(*ptep));
 }
 
@@ -508,11 +503,17 @@ static inline int pte_file(pte_t pte)
 #define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
 		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
 
+#define io_remap_pfn_range(vma, vaddr, pfn, size, prot)		\
+		remap_pfn_range(vma, vaddr, pfn, size, prot)
+
+#define MK_IOSPACE_PFN(space, pfn)	(pfn)
+#define GET_IOSPACE(pfn)		0
+#define GET_PFN(pfn)			(pfn)
+
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
-#define __HAVE_ARCH_PTEP_MKDIRTY
 #define __HAVE_ARCH_PTE_SAME
 #include <asm-generic/pgtable.h>
 

@@ -283,4 +283,3 @@ asmlinkage int sys_uname(struct old_utsname * name)
 	up_read(&uts_sem);
 	return err?-EFAULT:0;
 }
-

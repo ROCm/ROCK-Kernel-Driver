@@ -197,7 +197,8 @@ static int count(char __user * __user * argv, int max)
  * memory to free pages in kernel mem. These are in a format ready
  * to be put directly into the top of new user memory.
  */
-int copy_strings(int argc,char __user * __user * argv, struct linux_binprm *bprm)
+static int copy_strings(int argc, char __user * __user * argv,
+			struct linux_binprm *bprm)
 {
 	struct page *kmapped_page = NULL;
 	char *kaddr = NULL;
@@ -326,9 +327,9 @@ void install_arg_page(struct vm_area_struct *vma,
 		pte_unmap(pte);
 		goto out;
 	}
-	mm->rss++;
+	inc_mm_counter(mm, rss);
 	lru_cache_add_active(page);
-	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(
+	set_pte_at(mm, address, pte, pte_mkdirty(pte_mkwrite(mk_pte(
 					page, vma->vm_page_prot))));
 	page_add_anon_rmap(page, vma, address);
 	pte_unmap(pte);
@@ -400,7 +401,8 @@ int setup_arg_pages(struct linux_binprm *bprm,
 	while (i < MAX_ARG_PAGES)
 		bprm->page[i++] = NULL;
 #else
-	stack_base = stack_top - MAX_ARG_PAGES * PAGE_SIZE;
+	stack_base = arch_align_stack(stack_top - MAX_ARG_PAGES*PAGE_SIZE);
+	stack_base = PAGE_ALIGN(stack_base);
 	bprm->p += stack_base;
 	mm->arg_start = bprm->p;
 	arg_size = stack_top - (PAGE_MASK & (unsigned long) mm->arg_start);
@@ -867,9 +869,11 @@ int flush_old_exec(struct linux_binprm * bprm)
 	if (current->euid == current->uid && current->egid == current->gid)
 		current->mm->dumpable = 1;
 	name = bprm->filename;
+
+	/* Copies the binary name from after last slash */
 	for (i=0; (ch = *(name++)) != '\0';) {
 		if (ch == '/')
-			i = 0;
+			i = 0; /* overwrite what we wrote */
 		else
 			if (i < (sizeof(tcomm) - 1))
 				tcomm[i++] = ch;
@@ -877,6 +881,7 @@ int flush_old_exec(struct linux_binprm * bprm)
 	tcomm[i] = '\0';
 	set_task_comm(current, tcomm);
 
+	current->flags &= ~PF_RANDOMIZE;
 	flush_thread();
 
 	if (bprm->e_uid != current->euid || bprm->e_gid != current->egid || 
@@ -1191,8 +1196,8 @@ int do_execve(char * filename,
 
 		/* execve success */
 		security_bprm_free(bprm);
-		acct_update_integrals();
-		update_mem_hiwater();
+		acct_update_integrals(current);
+		update_mem_hiwater(current);
 		kfree(bprm);
 		return retval;
 	}

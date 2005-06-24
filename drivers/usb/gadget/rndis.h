@@ -38,6 +38,7 @@
  */
 
 /* Message Set for Connectionless (802.3) Devices */
+#define REMOTE_NDIS_PACKET_MSG		0x00000001U
 #define REMOTE_NDIS_INITIALIZE_MSG	0x00000002U	/* Initialize device */
 #define REMOTE_NDIS_HALT_MSG		0x00000003U
 #define REMOTE_NDIS_QUERY_MSG		0x00000004U
@@ -154,139 +155,139 @@ static const u32 oid_supported_list [] =
 
 typedef struct rndis_init_msg_type 
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	RequestID;
-	u32	MajorVersion;
-	u32	MinorVersion;
-	u32	MaxTransferSize;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	RequestID;
+	__le32	MajorVersion;
+	__le32	MinorVersion;
+	__le32	MaxTransferSize;
 } rndis_init_msg_type;
 
 typedef struct rndis_init_cmplt_type
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	RequestID;
-	u32	Status;
-	u32	MajorVersion;
-	u32	MinorVersion;
-	u32	DeviceFlags;
-	u32	Medium;
-	u32	MaxPacketsPerTransfer;
-	u32	MaxTransferSize;
-	u32	PacketAlignmentFactor;
-	u32	AFListOffset;
-	u32	AFListSize;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	RequestID;
+	__le32	Status;
+	__le32	MajorVersion;
+	__le32	MinorVersion;
+	__le32	DeviceFlags;
+	__le32	Medium;
+	__le32	MaxPacketsPerTransfer;
+	__le32	MaxTransferSize;
+	__le32	PacketAlignmentFactor;
+	__le32	AFListOffset;
+	__le32	AFListSize;
 } rndis_init_cmplt_type;
 
 typedef struct rndis_halt_msg_type
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	RequestID;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	RequestID;
 } rndis_halt_msg_type;
 
 typedef struct rndis_query_msg_type
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	RequestID;
-	u32	OID;
-	u32	InformationBufferLength;
-	u32	InformationBufferOffset;
-	u32	DeviceVcHandle;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	RequestID;
+	__le32	OID;
+	__le32	InformationBufferLength;
+	__le32	InformationBufferOffset;
+	__le32	DeviceVcHandle;
 } rndis_query_msg_type;
 
 typedef struct rndis_query_cmplt_type
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	RequestID;
-	u32	Status;
-	u32	InformationBufferLength;
-	u32	InformationBufferOffset;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	RequestID;
+	__le32	Status;
+	__le32	InformationBufferLength;
+	__le32	InformationBufferOffset;
 } rndis_query_cmplt_type;
 
 typedef struct rndis_set_msg_type
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	RequestID;
-	u32	OID;
-	u32	InformationBufferLength;
-	u32	InformationBufferOffset;
-	u32	DeviceVcHandle;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	RequestID;
+	__le32	OID;
+	__le32	InformationBufferLength;
+	__le32	InformationBufferOffset;
+	__le32	DeviceVcHandle;
 } rndis_set_msg_type;
 
 typedef struct rndis_set_cmplt_type
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	RequestID;
-	u32	Status;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	RequestID;
+	__le32	Status;
 } rndis_set_cmplt_type;
 
 typedef struct rndis_reset_msg_type
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	Reserved;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	Reserved;
 } rndis_reset_msg_type;
 
 typedef struct rndis_reset_cmplt_type
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	Status;
-	u32	AddressingReset;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	Status;
+	__le32	AddressingReset;
 } rndis_reset_cmplt_type;
 
 typedef struct rndis_indicate_status_msg_type
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	Status;
-	u32	StatusBufferLength;
-	u32	StatusBufferOffset;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	Status;
+	__le32	StatusBufferLength;
+	__le32	StatusBufferOffset;
 } rndis_indicate_status_msg_type;
 
 typedef struct rndis_keepalive_msg_type
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	RequestID;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	RequestID;
 } rndis_keepalive_msg_type;
 
 typedef struct rndis_keepalive_cmplt_type
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	RequestID;
-	u32	Status;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	RequestID;
+	__le32	Status;
 } rndis_keepalive_cmplt_type;
 
 struct rndis_packet_msg_type
 {
-	u32	MessageType;
-	u32	MessageLength;
-	u32	DataOffset;
-	u32	DataLength;
-	u32	OOBDataOffset;
-	u32	OOBDataLength;
-	u32	NumOOBDataElements;
-	u32	PerPacketInfoOffset;
-	u32	PerPacketInfoLength;
-	u32	VcHandle;
-	u32	Reserved;
+	__le32	MessageType;
+	__le32	MessageLength;
+	__le32	DataOffset;
+	__le32	DataLength;
+	__le32	OOBDataOffset;
+	__le32	OOBDataLength;
+	__le32	NumOOBDataElements;
+	__le32	PerPacketInfoOffset;
+	__le32	PerPacketInfoLength;
+	__le32	VcHandle;
+	__le32	Reserved;
 };
 
 struct rndis_config_parameter
 {
-	u32	ParameterNameOffset;
-	u32	ParameterNameLength;
-	u32	ParameterType;
-	u32	ParameterValueOffset;
-	u32	ParameterValueLength;
+	__le32	ParameterNameOffset;
+	__le32	ParameterNameLength;
+	__le32	ParameterType;
+	__le32	ParameterValueOffset;
+	__le32	ParameterValueLength;
 };
 
 /* implementation specific */
@@ -333,7 +334,7 @@ int  rndis_set_param_vendor (u8 configNr, u32 vendorID,
 			    const char *vendorDescr);
 int  rndis_set_param_medium (u8 configNr, u32 medium, u32 speed);
 void rndis_add_hdr (struct sk_buff *skb);
-int  rndis_rm_hdr (u8 *buf, u32 *length);
+int rndis_rm_hdr (struct sk_buff *skb);
 u8   *rndis_get_next_response (int configNr, u32 *length);
 void rndis_free_response (int configNr, u8 *buf);
 

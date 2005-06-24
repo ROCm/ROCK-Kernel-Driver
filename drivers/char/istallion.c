@@ -41,6 +41,7 @@
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/device.h>
+#include <linux/wait.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -1068,11 +1069,10 @@ static int stli_open(struct tty_struct *tty, struct file *filp)
 	tty->driver_data = portp;
 	portp->refcount++;
 
-	while (test_bit(ST_INITIALIZING, &portp->state)) {
-		if (signal_pending(current))
-			return(-ERESTARTSYS);
-		interruptible_sleep_on(&portp->raw_wait);
-	}
+	wait_event_interruptible(portp->raw_wait,
+			!test_bit(ST_INITIALIZING, &portp->state));
+	if (signal_pending(current))
+		return(-ERESTARTSYS);
 
 	if ((portp->flags & ASYNC_INITIALIZED) == 0) {
 		set_bit(ST_INITIALIZING, &portp->state);
@@ -1275,12 +1275,11 @@ static int stli_rawopen(stlibrd_t *brdp, stliport_t *portp, unsigned long arg, i
  *	order of opens and closes may not be preserved across shared
  *	memory, so we must wait until it is complete.
  */
-	while (test_bit(ST_CLOSING, &portp->state)) {
-		if (signal_pending(current)) {
-			restore_flags(flags);
-			return(-ERESTARTSYS);
-		}
-		interruptible_sleep_on(&portp->raw_wait);
+	wait_event_interruptible(portp->raw_wait,
+			!test_bit(ST_CLOSING, &portp->state));
+	if (signal_pending(current)) {
+		restore_flags(flags);
+		return -ERESTARTSYS;
 	}
 
 /*
@@ -1309,13 +1308,10 @@ static int stli_rawopen(stlibrd_t *brdp, stliport_t *portp, unsigned long arg, i
  */
 	rc = 0;
 	set_bit(ST_OPENING, &portp->state);
-	while (test_bit(ST_OPENING, &portp->state)) {
-		if (signal_pending(current)) {
-			rc = -ERESTARTSYS;
-			break;
-		}
-		interruptible_sleep_on(&portp->raw_wait);
-	}
+	wait_event_interruptible(portp->raw_wait,
+			!test_bit(ST_OPENING, &portp->state));
+	if (signal_pending(current))
+		rc = -ERESTARTSYS;
 	restore_flags(flags);
 
 	if ((rc == 0) && (portp->rc != 0))
@@ -1352,12 +1348,11 @@ static int stli_rawclose(stlibrd_t *brdp, stliport_t *portp, unsigned long arg, 
  *	occurs on this port.
  */
 	if (wait) {
-		while (test_bit(ST_CLOSING, &portp->state)) {
-			if (signal_pending(current)) {
-				restore_flags(flags);
-				return(-ERESTARTSYS);
-			}
-			interruptible_sleep_on(&portp->raw_wait);
+		wait_event_interruptible(portp->raw_wait,
+				!test_bit(ST_CLOSING, &portp->state));
+		if (signal_pending(current)) {
+			restore_flags(flags);
+			return -ERESTARTSYS;
 		}
 	}
 
@@ -1385,13 +1380,10 @@ static int stli_rawclose(stlibrd_t *brdp, stliport_t *portp, unsigned long arg, 
  *	to come back.
  */
 	rc = 0;
-	while (test_bit(ST_CLOSING, &portp->state)) {
-		if (signal_pending(current)) {
-			rc = -ERESTARTSYS;
-			break;
-		}
-		interruptible_sleep_on(&portp->raw_wait);
-	}
+	wait_event_interruptible(portp->raw_wait,
+			!test_bit(ST_CLOSING, &portp->state));
+	if (signal_pending(current))
+		rc = -ERESTARTSYS;
 	restore_flags(flags);
 
 	if ((rc == 0) && (portp->rc != 0))
@@ -1420,22 +1412,20 @@ static int stli_cmdwait(stlibrd_t *brdp, stliport_t *portp, unsigned long cmd, v
 
 	save_flags(flags);
 	cli();
-	while (test_bit(ST_CMDING, &portp->state)) {
-		if (signal_pending(current)) {
-			restore_flags(flags);
-			return(-ERESTARTSYS);
-		}
-		interruptible_sleep_on(&portp->raw_wait);
+	wait_event_interruptible(portp->raw_wait,
+			!test_bit(ST_CMDING, &portp->state));
+	if (signal_pending(current)) {
+		restore_flags(flags);
+		return -ERESTARTSYS;
 	}
 
 	stli_sendcmd(brdp, portp, cmd, arg, size, copyback);
 
-	while (test_bit(ST_CMDING, &portp->state)) {
-		if (signal_pending(current)) {
-			restore_flags(flags);
-			return(-ERESTARTSYS);
-		}
-		interruptible_sleep_on(&portp->raw_wait);
+	wait_event_interruptible(portp->raw_wait,
+			!test_bit(ST_CMDING, &portp->state));
+	if (signal_pending(current)) {
+		restore_flags(flags);
+		return -ERESTARTSYS;
 	}
 	restore_flags(flags);
 

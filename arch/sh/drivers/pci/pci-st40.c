@@ -246,7 +246,7 @@ static void __init pci_fixup_ide_bases(struct pci_dev *d)
 	 */
 	if ((d->class >> 8) != PCI_CLASS_STORAGE_IDE)
 		return;
-	printk("PCI: IDE base address fixup for %s\n", d->slot_name);
+	printk("PCI: IDE base address fixup for %s\n", pci_name(d));
 	for(i=0; i<4; i++) {
 		struct resource *r = &d->resource[i];
 		if ((r->start & ~0x80) == 0x374) {

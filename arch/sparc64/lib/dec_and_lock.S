@@ -27,12 +27,12 @@
 
 	.globl	_atomic_dec_and_lock
 _atomic_dec_and_lock:	/* %o0 = counter, %o1 = lock */
-loop1:	lduw	[%o0], %g5
-	subcc	%g5, 1, %g7
+loop1:	lduw	[%o0], %g2
+	subcc	%g2, 1, %g7
 	be,pn	%icc, start_to_zero
 	 nop
-nzero:	cas	[%o0], %g5, %g7
-	cmp	%g5, %g7
+nzero:	cas	[%o0], %g2, %g7
+	cmp	%g2, %g7
 	bne,pn	%icc, loop1
 	 mov	0, %g1
 
@@ -50,13 +50,13 @@ to_zero:
 	ldstub	[%o1], %g3
 	brnz,pn	%g3, spin_on_lock
 	 membar	#StoreLoad | #StoreStore
-loop2:	cas	[%o0], %g5, %g7		/* ASSERT(g7 == 0) */
-	cmp	%g5, %g7
+loop2:	cas	[%o0], %g2, %g7		/* ASSERT(g7 == 0) */
+	cmp	%g2, %g7
 
 	be,pt	%icc, out
 	 mov	1, %g1
-	lduw	[%o0], %g5
-	subcc	%g5, 1, %g7
+	lduw	[%o0], %g2
+	subcc	%g2, 1, %g7
 	be,pn	%icc, loop2
 	 nop
 	membar	#StoreStore | #LoadStore

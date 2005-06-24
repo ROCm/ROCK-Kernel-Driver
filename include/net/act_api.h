@@ -81,7 +81,7 @@ extern struct tc_action *tcf_action_init_1(struct rtattr *rta, struct rtattr *es
 extern int tcf_action_dump(struct sk_buff *skb, struct tc_action *a, int, int);
 extern int tcf_action_dump_old(struct sk_buff *skb, struct tc_action *a, int, int);
 extern int tcf_action_dump_1(struct sk_buff *skb, struct tc_action *a, int, int);
-extern int tcf_action_copy_stats (struct sk_buff *,struct tc_action *);
+extern int tcf_action_copy_stats (struct sk_buff *,struct tc_action *, int);
 #endif /* CONFIG_NET_CLS_ACT */
 
 extern int tcf_police(struct sk_buff *skb, struct tcf_police *p);

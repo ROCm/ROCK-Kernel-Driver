@@ -285,12 +285,12 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 
 	size = (cmd & IOCSIZE_MASK) >> IOCSIZE_SHIFT;
 	if (cmd & IOC_IN) {
-		ret = verify_area(VERIFY_READ, argp, size);
-		if (ret) return ret;
+		if (!access_ok(VERIFY_READ, argp, size))
+			return -EFAULT;
 	}
 	if (cmd & IOC_OUT) {
-		ret = verify_area(VERIFY_WRITE, argp, size);
-		if (ret) return ret;
+		if (!access_ok(VERIFY_WRITE, argp, size))
+			return -EFAULT;
 	}
 	
 	switch (cmd) {
@@ -389,7 +389,8 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		if (!mtd->write_oob)
 			ret = -EOPNOTSUPP;
 		else
-			ret = verify_area(VERIFY_READ, buf.ptr, buf.length);
+			ret = access_ok(VERIFY_READ, buf.ptr,
+					buf.length) ? 0 : EFAULT;
 
 		if (ret)
 			return ret;
@@ -428,7 +429,8 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 		if (!mtd->read_oob)
 			ret = -EOPNOTSUPP;
 		else
-			ret = verify_area(VERIFY_WRITE, buf.ptr, buf.length);
+			ret = access_ok(VERIFY_WRITE, buf.ptr,
+					buf.length) ? 0 : -EFAULT;
 
 		if (ret)
 			return ret;

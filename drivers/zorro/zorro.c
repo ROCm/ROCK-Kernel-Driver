@@ -134,7 +134,7 @@ static int __init zorro_init(void)
     if (!MACH_IS_AMIGA || !AMIGAHW_PRESENT(ZORRO))
 	return 0;
 
-    printk("Zorro: Probing AutoConfig expansion devices: %d device%s\n",
+    pr_info("Zorro: Probing AutoConfig expansion devices: %d device%s\n",
 	   zorro_num_autocon, zorro_num_autocon == 1 ? "" : "s");
 
     /* Initialize the Zorro bus */

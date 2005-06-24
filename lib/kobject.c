@@ -140,9 +140,9 @@ void kobject_init(struct kobject * kobj)
 static void unlink(struct kobject * kobj)
 {
 	if (kobj->kset) {
-		down_write(&kobj->kset->subsys->rwsem);
+		spin_lock(&kobj->kset->list_lock);
 		list_del_init(&kobj->entry);
-		up_write(&kobj->kset->subsys->rwsem);
+		spin_unlock(&kobj->kset->list_lock);
 	}
 	kobject_put(kobj);
 }
@@ -168,13 +168,13 @@ int kobject_add(struct kobject * kobj)
 		 kobj->kset ? kobj->kset->kobj.name : "<NULL>" );
 
 	if (kobj->kset) {
-		down_write(&kobj->kset->subsys->rwsem);
+		spin_lock(&kobj->kset->list_lock);
 
 		if (!parent)
 			parent = kobject_get(&kobj->kset->kobj);
 
 		list_add_tail(&kobj->entry,&kobj->kset->list);
-		up_write(&kobj->kset->subsys->rwsem);
+		spin_unlock(&kobj->kset->list_lock);
 	}
 	kobj->parent = parent;
 
@@ -184,8 +184,6 @@ int kobject_add(struct kobject * kobj)
 		unlink(kobj);
 		if (parent)
 			kobject_put(parent);
-	} else {
-		kobject_hotplug(kobj, KOBJ_ADD);
 	}
 
 	return error;
@@ -207,7 +205,8 @@ int kobject_register(struct kobject * kobj)
 			printk("kobject_register failed for %s (%d)\n",
 			       kobject_name(kobj),error);
 			dump_stack();
-		}
+		} else
+			kobject_hotplug(kobj, KOBJ_ADD);
 	} else
 		error = -EINVAL;
 	return error;
@@ -217,13 +216,12 @@ int kobject_register(struct kobject * kobj)
 /**
  *	kobject_set_name - Set the name of an object
  *	@kobj:	object.
- *	@name:	name. 
+ *	@fmt:	format string used to build the name
  *
  *	If strlen(name) >= KOBJ_NAME_LEN, then use a dynamically allocated
  *	string that @kobj->k_name points to. Otherwise, use the static 
  *	@kobj->name array.
  */
-
 int kobject_set_name(struct kobject * kobj, const char * fmt, ...)
 {
 	int error = 0;
@@ -301,7 +299,6 @@ int kobject_rename(struct kobject * kobj, char *new_name)
 
 void kobject_del(struct kobject * kobj)
 {
-	kobject_hotplug(kobj, KOBJ_REMOVE);
 	sysfs_remove_dir(kobj);
 	unlink(kobj);
 }
@@ -314,6 +311,7 @@ void kobject_del(struct kobject * kobj)
 void kobject_unregister(struct kobject * kobj)
 {
 	pr_debug("kobject %s: unregistering\n",kobject_name(kobj));
+	kobject_hotplug(kobj, KOBJ_REMOVE);
 	kobject_del(kobj);
 	kobject_put(kobj);
 }
@@ -380,6 +378,7 @@ void kset_init(struct kset * k)
 {
 	kobject_init(&k->kobj);
 	INIT_LIST_HEAD(&k->list);
+	spin_lock_init(&k->list_lock);
 }
 
 
@@ -444,7 +443,7 @@ struct kobject * kset_find_obj(struct kset * kset, const char * name)
 	struct list_head * entry;
 	struct kobject * ret = NULL;
 
-	down_read(&kset->subsys->rwsem);
+	spin_lock(&kset->list_lock);
 	list_for_each(entry,&kset->list) {
 		struct kobject * k = to_kobj(entry);
 		if (kobject_name(k) && !strcmp(kobject_name(k),name)) {
@@ -452,7 +451,7 @@ struct kobject * kset_find_obj(struct kset * kset, const char * name)
 			break;
 		}
 	}
-	up_read(&kset->subsys->rwsem);
+	spin_unlock(&kset->list_lock);
 	return ret;
 }
 
@@ -524,7 +523,6 @@ void subsys_remove_file(struct subsystem * s, struct subsys_attribute * a)
 	}
 }
 
-EXPORT_SYMBOL(kobject_get_path);
 EXPORT_SYMBOL(kobject_init);
 EXPORT_SYMBOL(kobject_register);
 EXPORT_SYMBOL(kobject_unregister);
@@ -532,7 +530,6 @@ EXPORT_SYMBOL(kobject_get);
 EXPORT_SYMBOL(kobject_put);
 EXPORT_SYMBOL(kobject_add);
 EXPORT_SYMBOL(kobject_del);
-EXPORT_SYMBOL(kobject_rename);
 
 EXPORT_SYMBOL(kset_register);
 EXPORT_SYMBOL(kset_unregister);

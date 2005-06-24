@@ -175,10 +175,10 @@ static int drm_name_info(char *buf, char **start, off_t offset, int request,
 	*eof   = 0;
 
 	if (dev->unique) {
-		DRM_PROC_PRINT("%s 0x%lx %s\n",
-			       dev->driver->pci_driver.name, (long)old_encode_dev(dev->device), dev->unique);
+		DRM_PROC_PRINT("%s %s %s\n",
+			       dev->driver->pci_driver.name, pci_name(dev->pdev), dev->unique);
 	} else {
-		DRM_PROC_PRINT("%s 0x%lx\n", dev->driver->pci_driver.name, (long)old_encode_dev(dev->device));
+		DRM_PROC_PRINT("%s %s\n", dev->driver->pci_driver.name, pci_name(dev->pdev));
 	}
 
 	if (len > request + offset) return request;

@@ -44,19 +44,17 @@ config DUMMY
 config BONDING
 	tristate "Bonding driver support"
 	depends on NETDEVICES
+	depends on INET
 	---help---
 	  Say 'Y' or 'M' if you wish to be able to 'bond' multiple Ethernet
 	  Channels together. This is called 'Etherchannel' by Cisco,
-	  'Trunking' by Sun, and 'Bonding' in Linux.
+	  'Trunking' by Sun, 802.3ad by the IEEE, and 'Bonding' in Linux.
 
-	  If you have two Ethernet connections to some other computer, you can
-	  make them behave like one double speed connection using this driver.
-	  Naturally, this has to be supported at the other end as well, either
-	  with a similar Bonding Linux driver, a Cisco 5500 switch or a
-	  SunTrunking SunSoft driver.
+	  The driver supports multiple bonding modes to allow for both high
+	  perfomance and high availability operation.
 
-	  This is similar to the EQL driver, but it merges Ethernet segments
-	  instead of serial lines.
+	  Refer to <file:Documentation/networking/bonding.txt> for more
+	  information.
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called bonding.
@@ -105,29 +103,6 @@ config TUN
 
 	  If you don't know what to use this for, you don't need it.
 
-config ETHERTAP
-	tristate "Ethertap network tap"
-	depends on NETDEVICES && EXPERIMENTAL && NETLINK_DEV
-	---help---
-	  If you say Y here (and have said Y to "Kernel/User network link
-	  driver", above) and create a character special file /dev/tap0 with
-	  major number 36 and minor number 16 using mknod ("man mknod"), you
-	  will be able to have a user space program read and write raw
-	  Ethernet frames from/to that special file.  tap0 can be configured
-	  with ifconfig and route like any other Ethernet device but it is not
-	  connected to any physical LAN; everything written by the user to
-	  /dev/tap0 is treated by the kernel as if it had come in from a LAN
-	  to the device tap0; everything the kernel wants to send out over the
-	  device tap0 can instead be read by the user from /dev/tap0: the user
-	  mode program replaces the LAN that would be attached to an ordinary
-	  Ethernet device. Please read the file
-	  <file:Documentation/networking/ethertap.txt> for more information.
-
-	  To compile this driver as a module, choose M here: the module
-	  will be called ethertap.
-
-	  If you don't know what to use this for, you don't need it.
-
 config NET_SB1000
 	tristate "General Instruments Surfboard 1000"
 	depends on NETDEVICES && PNP
@@ -161,7 +136,7 @@ endif
 #
 
 menu "Ethernet (10 or 100Mbit)"
-	depends on NETDEVICES
+	depends on NETDEVICES && !UML
 
 config NET_ETHERNET
 	bool "Ethernet (10 or 100Mbit)"
@@ -445,7 +420,7 @@ config LASI_82596
 
 config MIPS_JAZZ_SONIC
 	tristate "MIPS JAZZ onboard SONIC Ethernet support"
-	depends on NET_ETHERNET && MIPS_JAZZ
+	depends on NET_ETHERNET && MACH_JAZZ
 	help
 	  This is the driver for the onboard card of MIPS Magnum 4000,
 	  Acer PICA, Olivetti M700-10 and a few other identical OEM systems.
@@ -470,7 +445,7 @@ config NET_SB1250_MAC
 
 config SGI_IOC3_ETH
 	bool "SGI IOC3 Ethernet"
-	depends on NET_ETHERNET && SGI_IP27
+	depends on NET_ETHERNET && PCI && SGI_IP27
 	select CRC32
 	select MII
 	help
@@ -614,7 +589,7 @@ config EL2
 
 config ELPLUS
 	tristate "3c505 \"EtherLink Plus\" support"
-	depends on NET_VENDOR_3COM && ISA
+	depends on NET_VENDOR_3COM && ISA && ISA_DMA_API
 	---help---
 	  Information about this network (Ethernet) card can be found in
 	  <file:Documentation/networking/3c505.txt>.  If you have a card of
@@ -638,7 +613,7 @@ config EL16
 	  will be called 3c507.
 
 config EL3
-	tristate "3c509/3c529 (MCA)/3c569B (98)/3c579 \"EtherLink III\" support"
+	tristate "3c509/3c529 (MCA)/3c579 \"EtherLink III\" support"
 	depends on NET_VENDOR_3COM && (ISA || EISA || MCA)
 	---help---
 	  If you have a network (Ethernet) card belonging to the 3Com
@@ -655,7 +630,7 @@ config EL3
 
 config 3C515
 	tristate "3c515 ISA \"Fast EtherLink\""
-	depends on NET_VENDOR_3COM && (ISA || EISA)
+	depends on NET_VENDOR_3COM && (ISA || EISA) && ISA_DMA_API
 	help
 	  If you have a 3Com ISA EtherLink XL "Corkscrew" 3c515 Fast Ethernet
 	  network card, say Y and read the Ethernet-HOWTO, available from
@@ -733,7 +708,7 @@ config TYPHOON
 
 config LANCE
 	tristate "AMD LANCE and PCnet (AT1500 and NE2100) support"
-	depends on NET_ETHERNET && ISA
+	depends on NET_ETHERNET && ISA && ISA_DMA_API
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -819,7 +794,7 @@ config SMC91X
 	tristate "SMC 91C9x/91C1xxx support"
 	select CRC32
 	select MII
-	depends on NET_ETHERNET && (ARM || REDWOOD_5 || REDWOOD_6 || M32R)
+	depends on NET_ETHERNET && (ARM || REDWOOD_5 || REDWOOD_6 || M32R || SUPERH)
 	help
 	  This is a driver for SMC's 91x series of Ethernet chipsets,
 	  including the SMC91C94 and the SMC91C111. Say Y if you want it
@@ -889,7 +864,7 @@ config NI52
 
 config NI65
 	tristate "NI6510 support"
-	depends on NET_VENDOR_RACAL && ISA
+	depends on NET_VENDOR_RACAL && ISA && ISA_DMA_API
 	help
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -902,7 +877,7 @@ config NI65
 source "drivers/net/tulip/Kconfig"
 
 config AT1700
-	tristate "AT1700/1720/RE1000Plus(C-Bus) support (EXPERIMENTAL)"
+	tristate "AT1700/1720 support (EXPERIMENTAL)"
 	depends on NET_ETHERNET && (ISA || MCA_LEGACY) && EXPERIMENTAL
 	select CRC32
 	---help---
@@ -1097,7 +1072,7 @@ config NE2000
 
 config ZNET
 	tristate "Zenith Z-Note support (EXPERIMENTAL)"
-	depends on NET_ISA && EXPERIMENTAL
+	depends on NET_ISA && EXPERIMENTAL && ISA_DMA_API
 	help
 	  The Zenith Z-Note notebook computer has a built-in network
 	  (Ethernet) card, and this is the Linux driver for it. Note that the
@@ -1428,23 +1403,6 @@ config E100
 	  <file:Documentation/networking/net-modules.txt>.  The module
 	  will be called e100.
 
-config E100_NAPI
-	bool "Use Rx Polling (NAPI)"
-	depends on E100
-	help
-	  NAPI is a new driver API designed to reduce CPU and interrupt load
-	  when the driver is receiving lots of packets from the card. It is
-	  still somewhat experimental and thus not yet enabled by default.
-
-	  If your estimated Rx load is 10kpps or more, or if the card will be
-	  deployed on potentially unfriendly networks (e.g. in a firewall),
-	  then say Y here.
-
-	  See <file:Documentation/networking/NAPI_HOWTO.txt> for more
-	  information.
-
-	  If in doubt, say N.
-
 config LNE390
 	tristate "Mylex EISA LNE390A/B support (EXPERIMENTAL)"
 	depends on NET_PCI && EISA && EXPERIMENTAL
@@ -1597,6 +1555,7 @@ config SIS900
 	tristate "SiS 900/7016 PCI Fast Ethernet Adapter support"
 	depends on NET_PCI && PCI
 	select CRC32
+	select MII
 	---help---
 	  This is a driver for the Fast Ethernet PCI network cards based on
 	  the SiS 900 and SiS 7016 chips. The SiS 900 core is also embedded in
@@ -1780,14 +1739,6 @@ config DECLANCE
 	  DEC (now Compaq) based on the AMD Lance chipset, including the
 	  DEPCA series.  (This chipset is better known via the NE2100 cards.)
 
-config BAGETLANCE
-	tristate "Baget AMD LANCE support"
-	depends on NET_ETHERNET && BAGET_MIPS
-	help
-	  Say Y to enable kernel support for AMD Lance Ethernet cards on the
-	  MIPS-32-based Baget embedded system.  This chipset is better known
-	  via the NE2100 cards.
-
 config 68360_ENET
 	bool "Motorola 68360 ethernet controller"
 	depends on M68360
@@ -1818,7 +1769,7 @@ endmenu
 #
 
 menu "Ethernet (1000 Mbit)"
-	depends on NETDEVICES
+	depends on NETDEVICES && !UML
 
 config ACENIC
 	tristate "Alteon AceNIC/3Com 3C985/NetGear GA620 Gigabit support"
@@ -2081,9 +2032,18 @@ config TIGON3
 	  To compile this driver as a module, choose M here: the module
 	  will be called tg3.  This is recommended.
 
+config BNX2
+	tristate "Broadcom NetXtremeII support"
+	depends on PCI
+	help
+	  This driver supports Broadcom NetXtremeII gigabit Ethernet cards.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called bnx2.  This is recommended.
+
 config GIANFAR
 	tristate "Gianfar Ethernet"
-	depends on 85xx
+	depends on 85xx || 83xx
 	help
 	  This driver supports the Gigabit TSEC on the MPC85xx 
 	  family of chips, and the FEC on the 8540
@@ -2094,10 +2054,11 @@ config GFAR_NAPI
 
 config MV643XX_ETH
 	tristate "MV-643XX Ethernet support"
-	depends on MOMENCO_OCELOT_C || MOMENCO_JAGUAR_ATX
+	depends on MOMENCO_OCELOT_C || MOMENCO_JAGUAR_ATX || MV64360 || MOMENCO_OCELOT_3 || PPC_MULTIPLATFORM
 	help
 	  This driver supports the gigabit Ethernet on the Marvell MV643XX
-	  chipset which is used in the Momenco Ocelot C and Jaguar ATX.
+	  chipset which is used in the Momenco Ocelot C and Jaguar ATX and
+	  Pegasos II, amongst other PPC and MIPS boards.
 
 config MV643XX_ETH_0
 	bool "MV-643XX Port 0"
@@ -2127,7 +2088,7 @@ endmenu
 #
 
 menu "Ethernet (10000 Mbit)"
-	depends on NETDEVICES
+	depends on NETDEVICES && !UML
 
 config IXGB
 	tristate "Intel(R) PRO/10GbE support"
@@ -2206,11 +2167,13 @@ config 2BUFF_MODE
 
 endmenu
 
+if !UML
 source "drivers/net/tokenring/Kconfig"
 
 source "drivers/net/wireless/Kconfig"
 
 source "drivers/net/pcmcia/Kconfig"
+endif
 
 source "drivers/net/wan/Kconfig"
 
@@ -2560,15 +2523,6 @@ config NET_FC
 	  adaptor card in your computer; say Y here and to the driver for your
 	  adaptor below. You also should have said Y to "SCSI support" and
 	  "SCSI generic support".
-
-config IPHASE5526
-	tristate "Interphase 5526 Tachyon chipset based adapter support"
-	depends on NET_FC && SCSI && PCI && BROKEN
-	help
-	  Say Y here if you have a Fibre Channel adaptor of this kind.
-
-	  To compile this driver as a module, choose M here: the module
-	  will be called iph5526.
 
 config SHAPER
 	tristate "Traffic Shaper (EXPERIMENTAL)"

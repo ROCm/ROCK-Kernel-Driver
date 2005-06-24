@@ -35,6 +35,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/jiffies.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 
@@ -112,12 +113,6 @@ struct w83l785ts_data {
 	/* registers values */
 	u8 temp, temp_over;
 };
-
-/*
- * Internal variables
- */
-
-static int w83l785ts_id = 0;
 
 /*
  * Sysfs stuff
@@ -229,7 +224,6 @@ static int w83l785ts_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* We can fill in the remaining client fields. */
 	strlcpy(new_client->name, "w83l785ts", I2C_NAME_SIZE);
-	new_client->id = w83l785ts_id++;
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);
 
@@ -301,9 +295,7 @@ static struct w83l785ts_data *w83l785ts_update_device(struct device *dev)
 
 	down(&data->update_lock);
 
-	if (!data->valid
-	 || (jiffies - data->last_updated > HZ * 2)
-	 || (jiffies < data->last_updated)) {
+	if (!data->valid || time_after(jiffies, data->last_updated + HZ * 2)) {
 		dev_dbg(&client->dev, "Updating w83l785ts data.\n");
 		data->temp = w83l785ts_read_value(client,
 			     W83L785TS_REG_TEMP, data->temp);

@@ -271,6 +271,7 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 	u32			dir, prog, vers, proc,
 				auth_stat, rpc_stat;
 	int			auth_res;
+	u32			*accept_statp;
 
 	rpc_stat = rpc_success;
 
@@ -306,6 +307,9 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 	if (vers != 2)		/* RPC version number */
 		goto err_bad_rpc;
 
+	/* Save position in case we later decide to reject: */
+	accept_statp = resv->iov_base + resv->iov_len;
+
 	svc_putu32(resv, xdr_zero);		/* ACCEPT */
 
 	rqstp->rq_prog = prog = ntohl(svc_getu32(argv));	/* program number */
@@ -318,10 +322,12 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 	 * We do this before anything else in order to get a decent
 	 * auth verifier.
 	 */
-	if (progp->pg_authenticate != NULL)
-		auth_res = progp->pg_authenticate(rqstp, &auth_stat);
-	else
-		auth_res = svc_authenticate(rqstp, &auth_stat);
+	auth_res = svc_authenticate(rqstp, &auth_stat);
+	/* Also give the program a chance to reject this call: */
+	if (auth_res == SVC_OK) {
+		auth_stat = rpc_autherr_badcred;
+		auth_res = progp->pg_authenticate(rqstp);
+	}
 	switch (auth_res) {
 	case SVC_OK:
 		break;
@@ -447,7 +453,8 @@ err_bad_rpc:
 err_bad_auth:
 	dprintk("svc: authentication failed (%d)\n", ntohl(auth_stat));
 	serv->sv_stats->rpcbadauth++;
-	resv->iov_len -= 4;
+	/* Restore write pointer to location of accept status: */
+	xdr_ressize_check(rqstp, accept_statp);
 	svc_putu32(resv, xdr_one);	/* REJECT */
 	svc_putu32(resv, xdr_one);	/* AUTH_ERROR */
 	svc_putu32(resv, auth_stat);	/* status */

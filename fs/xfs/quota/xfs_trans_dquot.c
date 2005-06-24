@@ -455,7 +455,7 @@ xfs_trans_apply_dquot_deltas(
 			 * Get any default limits in use.
 			 * Start/reset the timer(s) if needed.
 			 */
-			if (!INT_ISZERO(d->d_id, ARCH_CONVERT)) {
+			if (d->d_id) {
 				xfs_qm_adjust_dqlimits(tp->t_mountp, d);
 				xfs_qm_adjust_dqtimers(tp->t_mountp, d);
 			}
@@ -669,7 +669,7 @@ xfs_trans_dqresv(
 	error = 0;
 
 	if ((flags & XFS_QMOPT_FORCE_RES) == 0 &&
-	    !INT_ISZERO(dqp->q_core.d_id, ARCH_CONVERT) &&
+	    dqp->q_core.d_id &&
 	    XFS_IS_QUOTA_ENFORCED(dqp->q_mount)) {
 #ifdef QUOTADEBUG
 		cmn_err(CE_DEBUG, "BLK Res: nblks=%ld + resbcount=%Ld"
@@ -694,7 +694,7 @@ xfs_trans_dqresv(
 				 * return EDQUOT
 				 */
 				if ((btimer != 0 && get_seconds() > btimer) ||
-				    (!INT_ISZERO(dqp->q_core.d_bwarns, ARCH_CONVERT) &&
+				    (dqp->q_core.d_bwarns &&
 				     INT_GET(dqp->q_core.d_bwarns, ARCH_CONVERT) >=
 				     XFS_QI_BWARNLIMIT(dqp->q_mount))) {
 					error = EDQUOT;
@@ -719,9 +719,9 @@ xfs_trans_dqresv(
 				 * If timer or warnings has expired,
 				 * return EDQUOT
 				 */
-				if ((!INT_ISZERO(dqp->q_core.d_itimer, ARCH_CONVERT) &&
+				if ((dqp->q_core.d_itimer &&
 				     get_seconds() > INT_GET(dqp->q_core.d_itimer, ARCH_CONVERT)) ||
-				    (!INT_ISZERO(dqp->q_core.d_iwarns, ARCH_CONVERT) &&
+				    (dqp->q_core.d_iwarns &&
 				     INT_GET(dqp->q_core.d_iwarns, ARCH_CONVERT) >=
 				     XFS_QI_IWARNLIMIT(dqp->q_mount))) {
 					error = EDQUOT;

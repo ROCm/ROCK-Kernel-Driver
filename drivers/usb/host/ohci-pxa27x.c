@@ -152,8 +152,6 @@ static void pxa27x_stop_hc(struct platform_device *dev)
 
 /*-------------------------------------------------------------------------*/
 
-void usb_hcd_pxa27x_remove (struct usb_hcd *, struct platform_device *);
-
 /* configure so an HC device and id are always provided */
 /* always called with process context; sleeping is OK */
 
@@ -168,19 +166,33 @@ void usb_hcd_pxa27x_remove (struct usb_hcd *, struct platform_device *);
  *
  */
 int usb_hcd_pxa27x_probe (const struct hc_driver *driver,
-			  struct usb_hcd **hcd_out,
 			  struct platform_device *dev)
 {
 	int retval;
-	struct usb_hcd *hcd = 0;
+	struct usb_hcd *hcd;
 
-	unsigned int *addr = NULL;
+	if (dev->resource[1].flags != IORESOURCE_IRQ) {
+		pr_debug ("resource[1] is not IORESOURCE_IRQ");
+		return -ENOMEM;
+	}
 
-	if (!request_mem_region(dev->resource[0].start,
-				dev->resource[0].end
-				- dev->resource[0].start + 1, hcd_name)) {
+	hcd = usb_create_hcd (driver, &dev->dev, "pxa27x");
+	if (!hcd)
+		return -ENOMEM;
+	hcd->rsrc_start = dev->resource[0].start;
+	hcd->rsrc_len = dev->resource[0].end - dev->resource[0].start + 1;
+
+	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len, hcd_name)) {
 		pr_debug("request_mem_region failed");
-		return -EBUSY;
+		retval = -EBUSY;
+		goto err1;
+	}
+
+	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
+	if (!hcd->regs) {
+		pr_debug("ioremap failed");
+		retval = -ENOMEM;
+		goto err2;
 	}
 
 	pxa27x_start_hc(dev);
@@ -198,69 +210,18 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver,
 	if (pxa27x_ohci_clear_port_power(3) < 0)
 		printk(KERN_ERR "Setting port 3 power failed.\n");
 
-	addr = ioremap(dev->resource[0].start,
-		       dev->resource[0].end - dev->resource[0].start + 1);
-	if (!addr) {
-		pr_debug("ioremap failed");
-		retval = -ENOMEM;
-		goto err1;
-	}
-
-	if(dev->resource[1].flags != IORESOURCE_IRQ){
-		pr_debug ("resource[1] is not IORESOURCE_IRQ");
-		retval = -ENOMEM;
-		goto err1;
-	}
-
-	hcd = usb_create_hcd (driver);
-	if (hcd == NULL){
-		pr_debug ("hcd_alloc failed");
-		retval = -ENOMEM;
-		goto err1;
-	}
 	ohci_hcd_init(hcd_to_ohci(hcd));
 
-	hcd->irq = dev->resource[1].start;
-	hcd->regs = addr;
-	hcd->self.controller = &dev->dev;
-
-	retval = hcd_buffer_create (hcd);
-	if (retval != 0) {
-		pr_debug ("pool alloc fail");
-		goto err2;
-	}
-
-	retval = request_irq (hcd->irq, usb_hcd_irq, SA_INTERRUPT,
-			      hcd->driver->description, hcd);
-	if (retval != 0) {
-		pr_debug("request_irq(%d) failed with retval %d\n",hcd->irq,retval);
-		retval = -EBUSY;
-		goto err3;
-	}
-
-	pr_debug ("%s (pxa27x) at 0x%p, irq %d",
-		hcd->driver->description, hcd->regs, hcd->irq);
-
-	hcd->self.bus_name = "pxa27x";
-	usb_register_bus (&hcd->self);
-
-	if ((retval = driver->start (hcd)) < 0) {
-		usb_hcd_pxa27x_remove(hcd, dev);
+	retval = usb_add_hcd(hcd, dev->resource[1].start, SA_INTERRUPT);
+	if (retval == 0)
 		return retval;
-	}
 
-	*hcd_out = hcd;
-	return 0;
-
- err3:
-	hcd_buffer_destroy (hcd);
- err2:
-	usb_put_hcd(hcd);
- err1:
 	pxa27x_stop_hc(dev);
-	release_mem_region(dev->resource[0].start,
-				dev->resource[0].end
-			   - dev->resource[0].start + 1);
+	iounmap(hcd->regs);
+ err2:
+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+ err1:
+	usb_put_hcd(hcd);
 	return retval;
 }
 
@@ -280,27 +241,11 @@ int usb_hcd_pxa27x_probe (const struct hc_driver *driver,
  */
 void usb_hcd_pxa27x_remove (struct usb_hcd *hcd, struct platform_device *dev)
 {
-	pr_debug ("remove: %s, state %x", hcd->self.bus_name, hcd->state);
-
-	if (in_interrupt ())
-		BUG ();
-
-	hcd->state = USB_STATE_QUIESCING;
-
-	pr_debug ("%s: roothub graceful disconnect", hcd->self.bus_name);
-	usb_disconnect (&hcd->self.root_hub);
-
-	hcd->driver->stop (hcd);
-	hcd->state = USB_STATE_HALT;
-
-	free_irq (hcd->irq, hcd);
-	hcd_buffer_destroy (hcd);
-
-	usb_deregister_bus (&hcd->self);
-
+	usb_remove_hcd(hcd);
 	pxa27x_stop_hc(dev);
-	release_mem_region(dev->resource[0].start,
-			   dev->resource[0].end - dev->resource[0].start + 1);
+	iounmap(hcd->regs);
+	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+	usb_put_hcd(hcd);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -336,7 +281,7 @@ static const struct hc_driver ohci_pxa27x_hc_driver = {
 	 * generic hardware linkage
 	 */
 	.irq =			ohci_irq,
-	.flags =		HCD_USB11,
+	.flags =		HCD_USB11 | HCD_MEMORY,
 
 	/*
 	 * basic lifecycle operations
@@ -372,7 +317,6 @@ static const struct hc_driver ohci_pxa27x_hc_driver = {
 static int ohci_hcd_pxa27x_drv_probe(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
-	struct usb_hcd *hcd = NULL;
 	int ret;
 
 	pr_debug ("In ohci_hcd_pxa27x_drv_probe");
@@ -380,11 +324,7 @@ static int ohci_hcd_pxa27x_drv_probe(struct device *dev)
 	if (usb_disabled())
 		return -ENODEV;
 
-	ret = usb_hcd_pxa27x_probe(&ohci_pxa27x_hc_driver, &hcd, pdev);
-
-	if (ret == 0)
-		dev_set_drvdata(dev, hcd);
-
+	ret = usb_hcd_pxa27x_probe(&ohci_pxa27x_hc_driver, pdev);
 	return ret;
 }
 
@@ -394,11 +334,10 @@ static int ohci_hcd_pxa27x_drv_remove(struct device *dev)
 	struct usb_hcd *hcd = dev_get_drvdata(dev);
 
 	usb_hcd_pxa27x_remove(hcd, pdev);
-	dev_set_drvdata(dev, NULL);
 	return 0;
 }
 
-static int ohci_hcd_pxa27x_drv_suspend(struct device *dev, u32 state, u32 level)
+static int ohci_hcd_pxa27x_drv_suspend(struct device *dev, pm_message_t state, u32 level)
 {
 //	struct platform_device *pdev = to_platform_device(dev);
 //	struct usb_hcd *hcd = dev_get_drvdata(dev);
@@ -407,7 +346,7 @@ static int ohci_hcd_pxa27x_drv_suspend(struct device *dev, u32 state, u32 level)
 	return 0;
 }
 
-static int ohci_hcd_pxa27x_drv_resume(struct device *dev, u32 state)
+static int ohci_hcd_pxa27x_drv_resume(struct device *dev, u32 level)
 {
 //	struct platform_device *pdev = to_platform_device(dev);
 //	struct usb_hcd *hcd = dev_get_drvdata(dev);

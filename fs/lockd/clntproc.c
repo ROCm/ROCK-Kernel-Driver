@@ -312,6 +312,7 @@ static int nlm_wait_on_grace(wait_queue_head_t *queue)
 	prepare_to_wait(queue, &wait, TASK_INTERRUPTIBLE);
 	if (!signalled ()) {
 		schedule_timeout(NLMCLNT_GRACE_WAIT);
+		try_to_freeze(PF_FREEZE);
 		if (!signalled ())
 			status = 0;
 	}
@@ -322,14 +323,13 @@ static int nlm_wait_on_grace(wait_queue_head_t *queue)
 /*
  * Generic NLM call
  */
-int
+static int
 nlmclnt_call(struct nlm_rqst *req, u32 proc)
 {
 	struct nlm_host	*host = req->a_host;
 	struct rpc_clnt	*clnt;
 	struct nlm_args	*argp = &req->a_args;
 	struct nlm_res	*resp = &req->a_res;
-	struct file	*filp = argp->lock.fl.fl_file;
 	struct rpc_message msg = {
 		.rpc_argp	= argp,
 		.rpc_resp	= resp,
@@ -338,9 +338,6 @@ nlmclnt_call(struct nlm_rqst *req, u32 proc)
 
 	dprintk("lockd: call procedure %d on %s\n",
 			(int)proc, host->h_name);
-
-	if (filp)
-		msg.rpc_cred = nfs_file_cred(filp);
 
 	do {
 		if (host->h_reclaiming && !argp->reclaim)
@@ -428,14 +425,13 @@ nlmsvc_async_call(struct nlm_rqst *req, u32 proc, rpc_action callback)
 	return status;
 }
 
-int
+static int
 nlmclnt_async_call(struct nlm_rqst *req, u32 proc, rpc_action callback)
 {
 	struct nlm_host	*host = req->a_host;
 	struct rpc_clnt	*clnt;
 	struct nlm_args	*argp = &req->a_args;
 	struct nlm_res	*resp = &req->a_res;
-	struct file	*file = argp->lock.fl.fl_file;
 	struct rpc_message msg = {
 		.rpc_argp	= argp,
 		.rpc_resp	= resp,
@@ -450,11 +446,9 @@ nlmclnt_async_call(struct nlm_rqst *req, u32 proc, rpc_action callback)
 		return -ENOLCK;
 	msg.rpc_proc = &clnt->cl_procinfo[proc];
 
-        /* bootstrap and kick off the async RPC call */
-	if (file)
-		msg.rpc_cred = nfs_file_cred(file);
 	/* Increment host refcount */
 	nlm_get_host(host);
+        /* bootstrap and kick off the async RPC call */
         status = rpc_call_async(clnt, &msg, RPC_TASK_ASYNC, callback, req);
 	if (status < 0)
 		nlm_release_host(host);
@@ -516,6 +510,24 @@ static void nlmclnt_locks_init_private(struct file_lock *fl, struct nlm_host *ho
 	fl->fl_ops = &nlmclnt_lock_ops;
 }
 
+static void do_vfs_lock(struct file_lock *fl)
+{
+	int res = 0;
+	switch (fl->fl_flags & (FL_POSIX|FL_FLOCK)) {
+		case FL_POSIX:
+			res = posix_lock_file_wait(fl->fl_file, fl);
+			break;
+		case FL_FLOCK:
+			res = flock_lock_file_wait(fl->fl_file, fl);
+			break;
+		default:
+			BUG();
+	}
+	if (res < 0)
+		printk(KERN_WARNING "%s: VFS is out of sync with lock manager!\n",
+				__FUNCTION__);
+}
+
 /*
  * LOCK: Try to create a lock
  *
@@ -564,9 +576,7 @@ nlmclnt_lock(struct nlm_rqst *req, struct file_lock *fl)
 		fl->fl_u.nfs_fl.state = host->h_state;
 		fl->fl_u.nfs_fl.flags |= NFS_LCK_GRANTED;
 		fl->fl_flags |= FL_SLEEP;
-		if (posix_lock_file_wait(fl->fl_file, fl) < 0)
-				printk(KERN_WARNING "%s: VFS is out of sync with lock manager!\n",
-						__FUNCTION__);
+		do_vfs_lock(fl);
 	}
 	status = nlm_stat_to_errno(resp->status);
 out:
@@ -635,7 +645,7 @@ nlmclnt_unlock(struct nlm_rqst *req, struct file_lock *fl)
 					nlmclnt_unlock_callback);
 		/* Hrmf... Do the unlock early since locks_remove_posix()
 		 * really expects us to free the lock synchronously */
-		posix_lock_file(fl->fl_file, fl);
+		do_vfs_lock(fl);
 		if (status < 0) {
 			nlmclnt_release_lockargs(req);
 			kfree(req);
@@ -648,7 +658,7 @@ nlmclnt_unlock(struct nlm_rqst *req, struct file_lock *fl)
 	if (status < 0)
 		return status;
 
-	posix_lock_file(fl->fl_file, fl);
+	do_vfs_lock(fl);
 	if (resp->status == NLM_LCK_GRANTED)
 		return 0;
 

@@ -659,15 +659,17 @@ acpi_ut_copy_simple_object (
 			/* Create an actual buffer only if length > 0 */
 
 			if (source_desc->buffer.length) {
-				dest_desc->buffer.pointer = ACPI_MEM_ALLOCATE (source_desc->buffer.length);
+				dest_desc->buffer.pointer =
+					ACPI_MEM_ALLOCATE (source_desc->buffer.length);
 				if (!dest_desc->buffer.pointer) {
 					return (AE_NO_MEMORY);
 				}
 
 				/* Copy the actual buffer data */
 
-				ACPI_MEMCPY (dest_desc->buffer.pointer, source_desc->buffer.pointer,
-						  source_desc->buffer.length);
+				ACPI_MEMCPY (dest_desc->buffer.pointer,
+						source_desc->buffer.pointer,
+						source_desc->buffer.length);
 			}
 		}
 		break;
@@ -682,7 +684,8 @@ acpi_ut_copy_simple_object (
 		 */
 		if ((source_desc->string.pointer) &&
 			(!(source_desc->common.flags & AOPOBJ_STATIC_POINTER))) {
-			dest_desc->string.pointer = ACPI_MEM_ALLOCATE ((acpi_size) source_desc->string.length + 1);
+			dest_desc->string.pointer =
+				ACPI_MEM_ALLOCATE ((acpi_size) source_desc->string.length + 1);
 			if (!dest_desc->string.pointer) {
 				return (AE_NO_MEMORY);
 			}
@@ -690,6 +693,14 @@ acpi_ut_copy_simple_object (
 			ACPI_MEMCPY (dest_desc->string.pointer, source_desc->string.pointer,
 					  (acpi_size) source_desc->string.length + 1);
 		}
+		break;
+
+	case ACPI_TYPE_LOCAL_REFERENCE:
+		/*
+		 * We copied the reference object, so we now must add a reference
+		 * to the object pointed to by the reference
+		 */
+		acpi_ut_add_reference (source_desc->reference.object);
 		break;
 
 	default:

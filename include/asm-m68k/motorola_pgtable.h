@@ -129,7 +129,7 @@ static inline void pgd_set(pgd_t *pgdp, pmd_t *pmdp)
 
 #define pte_none(pte)		(!pte_val(pte))
 #define pte_present(pte)	(pte_val(pte) & (_PAGE_PRESENT | _PAGE_PROTNONE))
-#define pte_clear(ptep)		({ pte_val(*(ptep)) = 0; })
+#define pte_clear(mm,addr,ptep)		({ pte_val(*(ptep)) = 0; })
 
 #define pte_page(pte)		(mem_map + ((unsigned long)(__va(pte_val(pte)) - PAGE_OFFSET) >> PAGE_SHIFT))
 #define pte_pfn(pte)		(pte_val(pte) >> PAGE_SHIFT)

@@ -22,10 +22,11 @@ struct linux_fhc *fhc_list = NULL;
 
 #define IS_CENTRAL_FHC(__fhc)	((__fhc) == central_bus->child)
 
-static inline unsigned long long_align(unsigned long addr)
+static void central_probe_failure(int line)
 {
-	return ((addr + (sizeof(unsigned long) - 1)) &
-		~(sizeof(unsigned long) - 1));
+	prom_printf("CENTRAL: Critical device probe failure at central.c:%d\n",
+		    line);
+	prom_halt();
 }
 
 static void central_ranges_init(int cnode, struct linux_central *central)
@@ -65,7 +66,7 @@ static void adjust_regs(struct linux_prom_registers *regp, int nregs,
 			if (regp[regc].which_io == rangep[rngc].ot_child_space)
 				break; /* Fount it */
 		if (rngc == nranges) /* oops */
-			prom_printf("adjust_regs: Could not find range with matching bus type...\n");
+			central_probe_failure(__LINE__);
 		regp[regc].which_io = rangep[rngc].ot_parent_space;
 		regp[regc].phys_addr -= rangep[rngc].ot_child_base;
 		regp[regc].phys_addr += rangep[rngc].ot_parent_base;
@@ -102,6 +103,13 @@ void * __init central_alloc_bootmem(unsigned long size)
 	return ret;
 }
 
+static unsigned long prom_reg_to_paddr(struct linux_prom_registers *r)
+{
+	unsigned long ret = ((unsigned long) r->which_io) << 32;
+
+	return ret | (unsigned long) r->phys_addr;
+}
+
 static void probe_other_fhcs(void)
 {
 	struct linux_prom64_registers fpregs[6];
@@ -110,10 +118,8 @@ static void probe_other_fhcs(void)
 
 	node = prom_getchild(prom_root_node);
 	node = prom_searchsiblings(node, "fhc");
-	if (node == 0) {
-		prom_printf("FHC: Cannot find any toplevel firehose controllers.\n");
-		prom_halt();
-	}
+	if (node == 0)
+		central_probe_failure(__LINE__);
 	while (node) {
 		struct linux_fhc *fhc;
 		int board;
@@ -121,10 +127,8 @@ static void probe_other_fhcs(void)
 
 		fhc = (struct linux_fhc *)
 			central_alloc_bootmem(sizeof(struct linux_fhc));
-		if (fhc == NULL) {
-			prom_printf("probe_other_fhcs: Cannot alloc fhc.\n");
-			prom_halt();
-		}
+		if (fhc == NULL)
+			central_probe_failure(__LINE__);
 
 		/* Link it into the FHC chain. */
 		fhc->next = fhc_list;
@@ -140,10 +144,8 @@ static void probe_other_fhcs(void)
 
 		/* Non-central FHC's have 64-bit OBP format registers. */
 		if (prom_getproperty(node, "reg",
-				    (char *)&fpregs[0], sizeof(fpregs)) == -1) {
-			prom_printf("FHC: Fatal error, cannot get fhc regs.\n");
-			prom_halt();
-		}
+				    (char *)&fpregs[0], sizeof(fpregs)) == -1)
+			central_probe_failure(__LINE__);
 
 		/* Only central FHC needs special ranges applied. */
 		fhc->fhc_regs.pregs = fpregs[0].phys_addr;
@@ -196,28 +198,23 @@ static void probe_clock_board(struct linux_central *central,
 	int clknode, nslots, tmp, nregs;
 
 	clknode = prom_searchsiblings(prom_getchild(fnode), "clock-board");
-	if (clknode == 0 || clknode == -1) {
-		prom_printf("Critical error, central lacks clock-board.\n");
-		prom_halt();
-	}
+	if (clknode == 0 || clknode == -1)
+		central_probe_failure(__LINE__);
+
 	nregs = prom_getproperty(clknode, "reg", (char *)&cregs[0], sizeof(cregs));
-	if (nregs == -1) {
-		prom_printf("CENTRAL: Fatal error, cannot map clock-board regs.\n");
-		prom_halt();
-	}
+	if (nregs == -1)
+		central_probe_failure(__LINE__);
+
 	nregs /= sizeof(struct linux_prom_registers);
 	apply_fhc_ranges(fhc, &cregs[0], nregs);
 	apply_central_ranges(central, &cregs[0], nregs);
-	central->cfreg = ((((unsigned long)cregs[0].which_io) << 32UL) |
-			  ((unsigned long)cregs[0].phys_addr));
-	central->clkregs = ((((unsigned long)cregs[1].which_io) << 32UL) |
-			    ((unsigned long)cregs[1].phys_addr));
+	central->cfreg = prom_reg_to_paddr(&cregs[0]);
+	central->clkregs = prom_reg_to_paddr(&cregs[1]);
 
 	if (nregs == 2)
 		central->clkver = 0UL;
 	else
-		central->clkver = ((((unsigned long)cregs[2].which_io) << 32UL) |
-				   ((unsigned long)cregs[2].phys_addr));
+		central->clkver = prom_reg_to_paddr(&cregs[2]);
 
 	tmp = upa_readb(central->clkregs + CLOCK_STAT1);
 	tmp &= 0xc0;
@@ -247,6 +244,18 @@ static void probe_clock_board(struct linux_central *central,
 	       (central->clkver ? upa_readb(central->clkver) : 0x00));
 }
 
+static void ZAP(unsigned long iclr, unsigned long imap)
+{
+	u32 imap_tmp;
+
+	upa_writel(0, iclr);
+	upa_readl(iclr);
+	imap_tmp = upa_readl(imap);
+	imap_tmp &= ~(0x80000000);
+	upa_writel(imap_tmp, imap);
+	upa_readl(imap);
+}
+
 static void init_all_fhc_hw(void)
 {
 	struct linux_fhc *fhc;
@@ -257,16 +266,6 @@ static void init_all_fhc_hw(void)
 		/* Clear all of the interrupt mapping registers
 		 * just in case OBP left them in a foul state.
 		 */
-#define ZAP(ICLR, IMAP) \
-do {	u32 imap_tmp; \
-	upa_writel(0, (ICLR)); \
-	upa_readl(ICLR); \
-	imap_tmp = upa_readl(IMAP); \
-	imap_tmp &= ~(0x80000000); \
-	upa_writel(imap_tmp, (IMAP)); \
-	upa_readl(IMAP); \
-} while (0)
-
 		ZAP(fhc->fhc_regs.ffregs + FHC_FFREGS_ICLR,
 		    fhc->fhc_regs.ffregs + FHC_FFREGS_IMAP);
 		ZAP(fhc->fhc_regs.sregs + FHC_SREGS_ICLR,
@@ -275,8 +274,6 @@ do {	u32 imap_tmp; \
 		    fhc->fhc_regs.uregs + FHC_UREGS_IMAP);
 		ZAP(fhc->fhc_regs.tregs + FHC_TREGS_ICLR,
 		    fhc->fhc_regs.tregs + FHC_TREGS_IMAP);
-
-#undef ZAP
 
 		/* Setup FHC control register. */
 		tmp = upa_readl(fhc->fhc_regs.pregs + FHC_PREGS_CTRL);
@@ -288,7 +285,8 @@ do {	u32 imap_tmp; \
 		/* For all FHCs, clear the firmware synchronization
 		 * line and both low power mode enables.
 		 */
-		tmp &= ~(FHC_CONTROL_AOFF | FHC_CONTROL_BOFF | FHC_CONTROL_SLINE);
+		tmp &= ~(FHC_CONTROL_AOFF | FHC_CONTROL_BOFF |
+			 FHC_CONTROL_SLINE);
 
 		upa_writel(tmp, fhc->fhc_regs.pregs + FHC_PREGS_CTRL);
 		upa_readl(fhc->fhc_regs.pregs + FHC_PREGS_CTRL);
@@ -313,17 +311,13 @@ void central_probe(void)
 	/* Ok we got one, grab some memory for software state. */
 	central_bus = (struct linux_central *)
 		central_alloc_bootmem(sizeof(struct linux_central));
-	if (central_bus == NULL) {
-		prom_printf("central_probe: Cannot alloc central_bus.\n");
-		prom_halt();
-	}
+	if (central_bus == NULL)
+		central_probe_failure(__LINE__);
 
 	fhc = (struct linux_fhc *)
 		central_alloc_bootmem(sizeof(struct linux_fhc));
-	if (fhc == NULL) {
-		prom_printf("central_probe: Cannot alloc central fhc.\n");
-		prom_halt();
-	}
+	if (fhc == NULL)
+		central_probe_failure(__LINE__);
 
 	/* First init central. */
 	central_bus->child = fhc;
@@ -340,10 +334,9 @@ void central_probe(void)
 
 	fhc->parent = central_bus;
 	fnode = prom_searchsiblings(prom_getchild(cnode), "fhc");
-	if (fnode == 0 || fnode == -1) {
-		prom_printf("Critical error, central board lacks fhc.\n");
-		prom_halt();
-	}
+	if (fnode == 0 || fnode == -1)
+		central_probe_failure(__LINE__);
+
 	fhc->prom_node = fnode;
 	prom_getstring(fnode, "name", namebuf, sizeof(namebuf));
 	strcpy(fhc->prom_name, namebuf);
@@ -351,24 +344,17 @@ void central_probe(void)
 	fhc_ranges_init(fnode, fhc);
 
 	/* Now, map in FHC register set. */
-	if (prom_getproperty(fnode, "reg", (char *)&fpregs[0], sizeof(fpregs)) == -1) {
-		prom_printf("CENTRAL: Fatal error, cannot get fhc regs.\n");
-		prom_halt();
-	}
+	if (prom_getproperty(fnode, "reg", (char *)&fpregs[0], sizeof(fpregs)) == -1)
+		central_probe_failure(__LINE__);
+
 	apply_central_ranges(central_bus, &fpregs[0], 6);
 	
-	fhc->fhc_regs.pregs = ((((unsigned long)fpregs[0].which_io)<<32UL) |
-			       ((unsigned long)fpregs[0].phys_addr));
-	fhc->fhc_regs.ireg = ((((unsigned long)fpregs[1].which_io)<<32UL) |
-			      ((unsigned long)fpregs[1].phys_addr));
-	fhc->fhc_regs.ffregs = ((((unsigned long)fpregs[2].which_io)<<32UL) |
-				((unsigned long)fpregs[2].phys_addr));
-	fhc->fhc_regs.sregs = ((((unsigned long)fpregs[3].which_io)<<32UL) |
-			       ((unsigned long)fpregs[3].phys_addr));
-	fhc->fhc_regs.uregs = ((((unsigned long)fpregs[4].which_io)<<32UL) |
-			       ((unsigned long)fpregs[4].phys_addr));
-	fhc->fhc_regs.tregs = ((((unsigned long)fpregs[5].which_io)<<32UL) |
-			       ((unsigned long)fpregs[5].phys_addr));
+	fhc->fhc_regs.pregs = prom_reg_to_paddr(&fpregs[0]);
+	fhc->fhc_regs.ireg = prom_reg_to_paddr(&fpregs[1]);
+	fhc->fhc_regs.ffregs = prom_reg_to_paddr(&fpregs[2]);
+	fhc->fhc_regs.sregs = prom_reg_to_paddr(&fpregs[3]);
+	fhc->fhc_regs.uregs = prom_reg_to_paddr(&fpregs[4]);
+	fhc->fhc_regs.tregs = prom_reg_to_paddr(&fpregs[5]);
 
 	/* Obtain board number from board status register, Central's
 	 * FHC lacks "board#" property.

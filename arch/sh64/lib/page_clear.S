@@ -17,6 +17,8 @@
 
    Always clears 4096 bytes.
 
+   Note : alloco guarded by synco to avoid TAKum03020 erratum
+
 */
 
 	.section .text..SHmedia32,"ax"
@@ -34,6 +36,7 @@ sh64_page_clear:
 	add  r2, r63, r6
 1:
 	alloco r6, 0
+	synco	! TAKum03020
 	addi	r6, 32, r6
 	bgt/l	r7, r6, tr1
 

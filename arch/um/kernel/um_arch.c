@@ -14,7 +14,6 @@
 #include "linux/bootmem.h"
 #include "linux/spinlock.h"
 #include "linux/utsname.h"
-#include "linux/console.h"
 #include "linux/sysrq.h"
 #include "linux/seq_file.h"
 #include "linux/delay.h"
@@ -24,6 +23,7 @@
 #include "asm/ptrace.h"
 #include "asm/elf.h"
 #include "asm/user.h"
+#include "asm/setup.h"
 #include "ubd_user.h"
 #include "asm/current.h"
 #include "user_util.h"
@@ -40,6 +40,20 @@
 #include "mode.h"
 
 #define DEFAULT_COMMAND_LINE "root=98:0"
+
+/* Changed in linux_main and setup_arch, which run before SMP is started */
+static char command_line[COMMAND_LINE_SIZE] = { 0 };
+
+static void add_arg(char *arg)
+{
+	if (strlen(command_line) + strlen(arg) + 1 > COMMAND_LINE_SIZE) {
+		printf("add_arg: Too many command line arguments!\n");
+		exit(1);
+	}
+	if(strlen(command_line) > 0)
+		strcat(command_line, " ");
+	strcat(command_line, arg);
+}
 
 struct cpuinfo_um boot_cpu_data = { 
 	.loops_per_jiffy	= 0,
@@ -95,12 +109,6 @@ struct seq_operations cpuinfo_op = {
 	.stop	= c_stop,
 	.show	= show_cpuinfo,
 };
-
-pte_t * __bad_pagetable(void)
-{
-	panic("Someone should implement __bad_pagetable");
-	return(NULL);
-}
 
 /* Set in linux_main */
 unsigned long host_task_size;
@@ -315,9 +323,11 @@ int linux_main(int argc, char **argv)
 		if((i == 1) && (argv[i][0] == ' ')) continue;
 		add = 1;
 		uml_checksetup(argv[i], &add);
-		if(add) add_arg(saved_command_line, argv[i]);
+		if (add)
+			add_arg(argv[i]);
 	}
-	if(have_root == 0) add_arg(saved_command_line, DEFAULT_COMMAND_LINE);
+	if(have_root == 0)
+		add_arg(DEFAULT_COMMAND_LINE);
 
 	mode_tt = force_tt ? 1 : !can_do_skas();
 #ifndef CONFIG_MODE_TT
@@ -429,16 +439,13 @@ static struct notifier_block panic_exit_notifier = {
 	.priority 		= 0
 };
 
-extern int console_use_vt; /* FIXME */
-
 void __init setup_arch(char **cmdline_p)
 {
 	notifier_chain_register(&panic_notifier_list, &panic_exit_notifier);
 	paging_init();
- 	strcpy(command_line, saved_command_line);
+        strlcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);
  	*cmdline_p = command_line;
 	setup_hostinfo();
-	console_use_vt = 0;
 }
 
 void __init check_bugs(void)
@@ -452,14 +459,3 @@ void __init check_bugs(void)
 void apply_alternatives(void *start, void *end)
 {
 }
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-file-style: "linux"
- * End:
- */

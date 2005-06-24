@@ -19,8 +19,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * You should have received a copy of the  GNU General Public License along
- * with this program; if not, write  to the Free Software Foundation, Inc.,
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #ifndef __ASM_ARCH_OMAP_INNOVATOR_H
@@ -74,8 +74,7 @@ unsigned char fpga_read(int reg);
 #if defined (CONFIG_ARCH_OMAP16XX)
 
 /* At OMAP1610 Innovator the Ethernet is directly connected to CS1 */
-#define INNOVATOR1610_ETHR_START	0x04000000
-#define INNOVATOR1610_ETHR_SIZE		SZ_4K
+#define INNOVATOR1610_ETHR_START	0x04000300
 
 #endif /* CONFIG_ARCH_OMAP1610 */
 #endif /* __ASM_ARCH_OMAP_INNOVATOR_H */

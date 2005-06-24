@@ -49,7 +49,7 @@
 * (do not modify the CVS Makros $Revision: 4.34 $ and $Date: 2005/01/26 17:25:53 $ !)
 */
 static const char *hfcusb_revision =
-    "Revision: 4.34 Date: 2005/01/26 17:25:53";
+    "Revision: 4.34 $ Date: 2005/01/26 17:25:53 $ ";
 
 /* Hisax debug support
 * use "modprobe debug=x" where x is bitfield of USB_DBG & ISDN_DBG

@@ -35,7 +35,7 @@
 #define NTLMSSP_NEGOTIATE_SIGN        0x0010	// Request signature capability
 #define NTLMSSP_NEGOTIATE_SEAL        0x0020	// Request confidentiality
 #define NTLMSSP_NEGOTIATE_DGRAM       0x0040
-#define NTLMSSP_NEGOTIATE_LM_KEY      0x0080	// Use LM session key for sign/seal
+#define NTLMSSP_NEGOTIATE_LM_KEY      0x0080 // Use LM session key for sign/seal
 #define NTLMSSP_NEGOTIATE_NTLM        0x0200	// NTLM authentication
 #define NTLMSSP_NEGOTIATE_DOMAIN_SUPPLIED 0x1000
 #define NTLMSSP_NEGOTIATE_WORKSTATION_SUPPLIED 0x2000

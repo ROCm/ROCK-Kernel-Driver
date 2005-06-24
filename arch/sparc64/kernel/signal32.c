@@ -104,7 +104,7 @@ typedef struct compat_siginfo{
 		struct {
 			timer_t _tid;			/* timer id */
 			int _overrun;			/* overrun count */
-			sigval_t32 _sigval;		/* same as below */
+			compat_sigval_t _sigval;		/* same as below */
 			int _sys_private;		/* not to be passed to user */
 		} _timer;
 
@@ -112,7 +112,7 @@ typedef struct compat_siginfo{
 		struct {
 			compat_pid_t _pid;		/* sender's pid */
 			unsigned int _uid;		/* sender's uid */
-			sigval_t32 _sigval;
+			compat_sigval_t _sigval;
 		} _rt;
 
 		/* SIGCHLD */
@@ -354,7 +354,7 @@ void do_new_sigreturn32(struct pt_regs *regs)
 	sf = (struct new_signal_frame32 __user *) regs->u_regs[UREG_FP];
 
 	/* 1. Make sure we are not getting garbage from the user */
-	if (verify_area(VERIFY_READ, sf, sizeof(*sf))	||
+	if (!access_ok(VERIFY_READ, sf, sizeof(*sf)) ||
 	    (((unsigned long) sf) & 3))
 		goto segv;
 
@@ -439,7 +439,7 @@ asmlinkage void do_sigreturn32(struct pt_regs *regs)
 	scptr = (struct sigcontext32 __user *)
 		(regs->u_regs[UREG_I0] & 0x00000000ffffffffUL);
 	/* Check sanity of the user arg. */
-	if (verify_area(VERIFY_READ, scptr, sizeof(struct sigcontext32)) ||
+	if (!access_ok(VERIFY_READ, scptr, sizeof(struct sigcontext32)) ||
 	    (((unsigned long) scptr) & 3))
 		goto segv;
 
@@ -507,7 +507,7 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 	sf = (struct rt_signal_frame32 __user *) regs->u_regs[UREG_FP];
 
 	/* 1. Make sure we are not getting garbage from the user */
-	if (verify_area(VERIFY_READ, sf, sizeof(*sf))	||
+	if (!access_ok(VERIFY_READ, sf, sizeof(*sf)) ||
 	    (((unsigned long) sf) & 3))
 		goto segv;
 
@@ -1105,7 +1105,7 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 		goto sigsegv;
 	}
 
-	if (!__access_ok((unsigned long)c, sizeof(*c))) {
+	if (!__access_ok(c, sizeof(*c))) {
 		/* Miguel, add nice debugging msg _here_. ;-) */
 		goto sigsegv;
 	}

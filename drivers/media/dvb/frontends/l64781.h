@@ -1,9 +1,8 @@
 /*
     driver for LSI L64781 COFDM demodulator
 
-    Copyright (C) 2001 Holger Waechtler <holger@convergence.de>
-                       for Convergence Integrated Media GmbH
-                       Marko Kohtala <marko.kohtala@nokia.com>
+    Copyright (C) 2001 Holger Waechtler for Convergence Integrated Media GmbH
+                       Marko Kohtala <marko.kohtala@luukku.com>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

@@ -20,6 +20,7 @@
 #include <linux/types.h>
 #include <linux/list.h>
 #include <linux/sysfs.h>
+#include <linux/spinlock.h>
 #include <linux/rwsem.h>
 #include <linux/kref.h>
 #include <linux/kobject_uevent.h>
@@ -102,6 +103,7 @@ struct kset {
 	struct subsystem	* subsys;
 	struct kobj_type	* ktype;
 	struct list_head	list;
+	spinlock_t		list_lock;
 	struct kobject		kobj;
 	struct kset_hotplug_ops	* hotplug_ops;
 };

@@ -263,7 +263,7 @@ static int velocity_set_media_mode(struct velocity_info *vptr, u32 mii_status);
 
 #ifdef CONFIG_PM
 
-static int velocity_suspend(struct pci_dev *pdev, u32 state);
+static int velocity_suspend(struct pci_dev *pdev, pm_message_t state);
 static int velocity_resume(struct pci_dev *pdev);
 
 static int velocity_netdev_event(struct notifier_block *nb, unsigned long notification, void *ptr);
@@ -2898,7 +2898,7 @@ static void velocity_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo 
 	struct velocity_info *vptr = dev->priv;
 	strcpy(info->driver, VELOCITY_NAME);
 	strcpy(info->version, VELOCITY_VERSION);
-	strcpy(info->bus_info, vptr->pdev->slot_name);
+	strcpy(info->bus_info, pci_name(vptr->pdev));
 }
 
 static void velocity_ethtool_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
@@ -3096,7 +3096,7 @@ static void velocity_restore_context(struct velocity_info *vptr, struct velocity
  *	we are interested in.
  */
 
-u16 wol_calc_crc(int size, u8 * pattern, u8 *mask_pattern)
+static u16 wol_calc_crc(int size, u8 * pattern, u8 *mask_pattern)
 {
 	u16 crc = 0xFFFF;
 	u8 mask;
@@ -3210,10 +3210,10 @@ static int velocity_set_wol(struct velocity_info *vptr)
 	return 0;
 }
 
-static int velocity_suspend(struct pci_dev *pdev, u32 state)
+static int velocity_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct velocity_info *vptr = dev->priv;
+	struct velocity_info *vptr = netdev_priv(dev);
 	unsigned long flags;
 
 	if(!netif_running(vptr->dev))
@@ -3247,7 +3247,7 @@ static int velocity_suspend(struct pci_dev *pdev, u32 state)
 static int velocity_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct velocity_info *vptr = dev->priv;
+	struct velocity_info *vptr = netdev_priv(dev);
 	unsigned long flags;
 	int i;
 

@@ -182,12 +182,12 @@ END_FTR_SECTION_IFSET(CPU_FTR_SPEC7450)
 /*
  * Set the HID0 and MSR for sleep.
  */
-	mfspr	r2,HID0
+	mfspr	r2,SPRN_HID0
 	rlwinm	r2,r2,0,10,7	/* clear doze, nap */
 	oris	r2,r2,HID0_SLEEP@h
 	sync
 	isync
-	mtspr	HID0,r2
+	mtspr	SPRN_HID0,r2
 	sync
 
 /* This loop puts us back to sleep in case we have a spurrious
@@ -216,10 +216,10 @@ _GLOBAL(core99_wake_up)
 	/* Make sure HID0 no longer contains any sleep bit and that data cache
 	 * is disabled
 	 */
-	mfspr	r3,HID0
+	mfspr	r3,SPRN_HID0
 	rlwinm	r3,r3,0,11,7		/* clear SLEEP, NAP, DOZE bits */
 	rlwinm	3,r3,0,18,15		/* clear DCE, ICE */
-	mtspr	HID0,r3
+	mtspr	SPRN_HID0,r3
 	sync
 	isync
 
@@ -266,6 +266,10 @@ grackle_wake_up:
 
 	/* Restore various CPU config stuffs */
 	bl	__restore_cpu_setup
+
+	/* Make sure all FPRs have been initialized */
+	bl	reloc_offset
+	bl	__init_fpu_registers
 
 	/* Invalidate & enable L1 cache, we don't care about
 	 * whatever the ROM may have tried to write to memory

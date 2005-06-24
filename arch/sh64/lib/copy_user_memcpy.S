@@ -46,6 +46,11 @@
 
 */
 
+/* NOTE : Prefetches removed and allocos guarded by synco to avoid TAKum03020
+ * erratum.  The first two prefetches are nop-ed out to avoid upsetting the
+ * instruction counts used in the jump address calculation.
+ * */
+
 	.section .text..SHmedia32,"ax"
 	.little
 	.balign 32
@@ -58,7 +63,7 @@ copy_user_memcpy:
 #define LDUAL(P,O,D0,D1) ldlo.l P,O,D0; ldhi.l P,O+3,D1
 #define STUAL(P,O,D0,D1) stlo.l P,O,D0; sthi.l P,O+3,D1
 
-	ld.b r3,0,r63
+	nop ! ld.b r3,0,r63 ! TAKum03020
 	pta/l Large,tr0
 	movi 25,r0
 	bgeu/u r4,r0,tr0
@@ -108,7 +113,7 @@ L8_15:	/* 8..15 byte memcpy cntd. */
 
 	/* 2 or 3 byte memcpy */
 	ld.b r3,0,r0
-	ld.b r2,0,r63
+	nop ! ld.b r2,0,r63 ! TAKum03020
 	ld.b r3,1,r1
 	st.b r2,0,r0
 	pta/l L2_3,tr0
@@ -151,7 +156,7 @@ L8_15:	/* 8..15 byte memcpy cntd. */
 	blink tr1,r63
 
 Large:
-	ld.b r2, 0, r63
+	! ld.b r2, 0, r63 ! TAKum03020
 	pta/l  Loop_ua, tr1
 	ori r3, -8, r7
 	sub r2, r7, r22
@@ -173,8 +178,7 @@ Large:
 	addi r6, -8, r21
 
 Loop_line:
-	ldx.q r22, r36, r63
-	synco
+	! ldx.q r22, r36, r63 ! TAKum03020
 	alloco r22, 32
 	synco
 	addi r22, 32, r22

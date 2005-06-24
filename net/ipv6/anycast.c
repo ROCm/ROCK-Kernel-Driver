@@ -48,32 +48,6 @@ static int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr);
 /* Big ac list lock for all the sockets */
 static DEFINE_RWLOCK(ipv6_sk_ac_lock);
 
-/* XXX ip6_addr_match() and ip6_onlink() really belong in net/core.c */
-
-static int
-ip6_addr_match(struct in6_addr *addr1, struct in6_addr *addr2, int prefix)
-{
-	__u32	mask;
-	int	i;
-
-	if (prefix > 128 || prefix < 0)
-		return 0;
-	if (prefix == 0)
-		return 1;
-	for (i=0; i<4; ++i) {
-		if (prefix >= 32)
-			mask = ~0;
-		else
-			mask = htonl(~0 << (32 - prefix));
-		if ((addr1->s6_addr32[i] ^ addr2->s6_addr32[i]) & mask)
-			return 0;
-		prefix -= 32;
-		if (prefix <= 0)
-			break;
-	}
-	return 1;
-}
-
 static int
 ip6_onlink(struct in6_addr *addr, struct net_device *dev)
 {
@@ -87,8 +61,8 @@ ip6_onlink(struct in6_addr *addr, struct net_device *dev)
 	if (idev) {
 		read_lock_bh(&idev->lock);
 		for (ifa=idev->addr_list; ifa; ifa=ifa->if_next) {
-			onlink = ip6_addr_match(addr, &ifa->addr,
-					ifa->prefix_len);
+			onlink = ipv6_prefix_equal(addr, &ifa->addr,
+						   ifa->prefix_len);
 			if (onlink)
 				break;
 		}

@@ -2034,7 +2034,7 @@ static int __init firestream_init_module (void)
 	int error;
 
 	func_enter ();
-	error = pci_module_init(&firestream_driver);
+	error = pci_register_driver(&firestream_driver);
 	func_exit ();
 	return error;
 }

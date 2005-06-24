@@ -116,6 +116,8 @@ static int kafsasyncd(void *arg)
 		remove_wait_queue(&kafsasyncd_sleepq, &myself);
 		set_current_state(TASK_RUNNING);
 
+		try_to_freeze(PF_FREEZE);
+
 		/* discard pending signals */
 		afs_discard_my_signals();
 

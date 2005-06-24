@@ -3,7 +3,6 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
-#include <linux/device.h>
 #include <asm/scatterlist.h>
 #include <asm/io.h>
 

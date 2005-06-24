@@ -18,38 +18,12 @@
 
 #include <asm/io.h>
 
+#define FBCON_FLAGS_INIT 1
+
    /*
     *    This is the interface between the low-level console driver and the
     *    low-level frame buffer device
     */
-
-#ifdef CONFIG_BOOTSPLASH
-struct splash_data {
-    int splash_state;			/* show splash? */
-    int splash_color;			/* transparent color */
-    int splash_fg_color;		/* foreground color */
-    int splash_width;			/* width of image */
-    int splash_height;			/* height of image */
-    int splash_text_xo;			/* text area origin */
-    int splash_text_yo;
-    int splash_text_wi;			/* text area size */ 
-    int splash_text_he;
-    int splash_showtext;		/* silent/verbose mode */
-    int splash_boxcount;
-    int splash_percent;
-    int splash_overpaintok;		/* is it ok to overpaint boxes */
-    int splash_palcnt;
-    char *oldscreen_base;		/* pointer to top of virtual screen */
-    unsigned char *splash_boxes;
-    unsigned char *splash_jpeg;		/* jpeg */
-    unsigned char *splash_palette;	/* palette for 8-bit */
-
-    int splash_dosilent;		/* show silent jpeg */
-    unsigned char *splash_silentjpeg;
-    unsigned char *splash_sboxes;
-    int splash_sboxcount;
-};
-#endif
 
 struct display {
     /* Filled in by the frame buffer device */
@@ -69,6 +43,7 @@ struct display {
     u32 grayscale;
     u32 nonstd;
     u32 accel_flags;
+    u32 rotate;
     struct fb_bitfield red;
     struct fb_bitfield green;
     struct fb_bitfield blue;
@@ -95,6 +70,8 @@ struct fbcon_ops {
 	int    cursor_flash;
 	int    cursor_reset;
 	int    blank_state;
+	int    graphics;
+	int    flags;
 	char  *cursor_data;
 };
     /*
@@ -184,13 +161,10 @@ struct fbcon_ops {
 #define SCROLL_REDRAW	   0x004
 #define SCROLL_PAN_REDRAW  0x005
 
-extern int fb_console_init(void);
 #ifdef CONFIG_FB_TILEBLITTING
 extern void fbcon_set_tileops(struct vc_data *vc, struct fb_info *info,
 			      struct display *p, struct fbcon_ops *ops);
 #endif
 extern void fbcon_set_bitops(struct fbcon_ops *ops);
-
-extern const struct consw fb_con;
 
 #endif /* _VIDEO_FBCON_H */

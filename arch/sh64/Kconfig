@@ -98,7 +98,12 @@ config BIG_ENDIAN
 
 endchoice
 
+config SH_FPU
+	bool "FPU support"
+	default y
+
 config SH64_FPU_DENORM_FLUSH
+	depends on SH_FPU
 	bool "Flush floating point denorms to zero"
 
 choice
@@ -274,3 +279,15 @@ source "security/Kconfig"
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
+
+#
+# Use the generic interrupt handling code in kernel/irq/:
+#
+config GENERIC_HARDIRQS
+	bool
+	default y
+
+config GENERIC_IRQ_PROBE
+	bool
+	default y
+

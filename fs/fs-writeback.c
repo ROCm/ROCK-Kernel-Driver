@@ -315,7 +315,7 @@ generic_sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		struct backing_dev_info *bdi = mapping->backing_dev_info;
 		long pages_skipped;
 
-		if (bdi->memory_backed) {
+		if (!bdi_cap_writeback_dirty(bdi)) {
 			list_move(&inode->i_list, &sb->s_dirty);
 			if (sb == blockdev_superblock) {
 				/*
@@ -521,7 +521,8 @@ restart:
 }
 
 /**
- * sync_inodes
+ * sync_inodes - writes all inodes to disk
+ * @wait: wait for completion
  *
  * sync_inodes() goes through each super block's dirty inode list, writes the
  * inodes out, waits on the writeout and puts the inodes back on the normal
@@ -575,7 +576,7 @@ int write_inode_now(struct inode *inode, int sync)
 		.sync_mode = WB_SYNC_ALL,
 	};
 
-	if (inode->i_mapping->backing_dev_info->memory_backed)
+	if (!mapping_cap_writeback_dirty(inode->i_mapping))
 		return 0;
 
 	might_sleep();
@@ -613,6 +614,7 @@ EXPORT_SYMBOL(sync_inode);
 /**
  * generic_osync_inode - flush all dirty data for a given inode to disk
  * @inode: inode to write
+ * @mapping: the address_space that should be flushed
  * @what:  what to write and wait upon
  *
  * This can be called by file_write functions for files which have the

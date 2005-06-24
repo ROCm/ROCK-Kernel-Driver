@@ -1119,34 +1119,6 @@
 /* ***** pm3fb useful define and macro ***** */
 /* ***************************************** */
 
-/* kernel -specific definitions */
-/* what kernel is this ? */
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)))
-#define KERNEL_2_5
-#endif
-
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)))
-#define KERNEL_2_4
-#endif
-
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))) 
-#define KERNEL_2_2
-/* pci_resource_start, available in 2.2.18 */
-#include <linux/kcomp.h>
-#ifdef CONFIG_FB_OF
-#define SUPPORT_FB_OF
-#endif
-#endif
-
-#if (!defined(KERNEL_2_2)) && (!defined(KERNEL_2_4)) && (!defined(KERNEL_2_5))
-#error "Only kernel 2.2.x, kernel 2.4.y and kernel 2.5.z might work"
-#endif
-
-/* not sure if/why it's needed. doesn't work without on my PowerMac... */
-#ifdef __BIG_ENDIAN
-#define MUST_BYTESWAP
-#endif
-
 /* permedia3 -specific definitions */
 #define PM3_SCALE_TO_CLOCK(pr, fe, po) ((2 * PM3_REF_CLOCK * fe) / (pr * (1 << (po))))
 
@@ -1203,19 +1175,9 @@
 /* ******************************************** */
 /* ***** A bunch of register-access macro ***** */
 /* ******************************************** */
-#ifdef KERNEL_2_2
-#ifdef MUST_BYTESWAP /* we are writing big_endian to big_endian through a little_endian macro */
-#define PM3_READ_REG(r) __swab32(readl((l_fb_info->vIOBase + r)))
-#define PM3_WRITE_REG(r, v) writel(__swab32(v), (l_fb_info->vIOBase + r))
-#else /* MUST_BYTESWAP */
-#define PM3_WRITE_REG(r, v) writel(v, (l_fb_info->vIOBase + r))
-#define PM3_READ_REG(r) readl((l_fb_info->vIOBase + r))
-#endif /* MUST_BYTESWAP */
-#endif /* KERNEL_2_2 */
-#if (defined KERNEL_2_4) || (defined KERNEL_2_5) /* native-endian access */
+
 #define PM3_WRITE_REG(r, v) fb_writel(v, (l_fb_info->vIOBase + r))
 #define PM3_READ_REG(r) fb_readl((l_fb_info->vIOBase + r))
-#endif /* KERNEL_2_4 or KERNEL_2_5 */
 
 
 #define depth2bpp(d) ((d + 7L) & ~7L)

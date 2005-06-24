@@ -29,7 +29,7 @@
 #define RX_BUCKET_SIZE 256
 
 #undef BIT
-#define BIT(x)	(1 << (x))
+#define BIT(x)	(1UL << (x))
 
 /* For more detailed explanations of what each field menas,
    see Nick's great comments to #defines below (or docs, if

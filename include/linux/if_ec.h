@@ -47,8 +47,9 @@ struct ec_framehdr
   unsigned char port;
 };
 
-struct econet_opt
-{
+struct econet_sock {
+  /* struct sock has to be the first member of econet_sock */
+  struct sock	sk;
   unsigned char cb;
   unsigned char port;
   unsigned char station;
@@ -56,7 +57,10 @@ struct econet_opt
   unsigned short num;
 };
 
-#define ec_sk(__sk) ((struct econet_opt *)(__sk)->sk_protinfo)
+static inline struct econet_sock *ec_sk(const struct sock *sk)
+{
+	return (struct econet_sock *)sk;
+}
 
 struct ec_device
 {

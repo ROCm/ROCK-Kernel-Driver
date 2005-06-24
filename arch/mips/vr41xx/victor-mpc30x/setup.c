@@ -1,7 +1,7 @@
 /*
  *  setup.c, Setup for the Victor MP-C303/304.
  *
- *  Copyright (C) 2002-2004  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
+ *  Copyright (C) 2002-2005  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -17,23 +17,8 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <linux/config.h>
-
-#include <asm/vr41xx/vr41xx.h>
 
 const char *get_system_type(void)
 {
 	return "Victor MP-C303/304";
 }
-
-static int victor_mpc30x_setup(void)
-{
-#ifdef CONFIG_SERIAL_8250
-	vr41xx_select_siu_interface(SIU_RS232C, IRDA_NONE);
-	vr41xx_siu_init();
-#endif
-
-	return 0;
-}
-
-early_initcall(victor_mpc30x_setup);

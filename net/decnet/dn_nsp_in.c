@@ -324,7 +324,7 @@ err_out:
 
 static void dn_nsp_conn_init(struct sock *sk, struct sk_buff *skb)
 {
-	if (sk->sk_ack_backlog >= sk->sk_max_ack_backlog) {
+	if (sk_acceptq_is_full(sk)) {
 		kfree_skb(skb);
 		return;
 	}

@@ -6,6 +6,8 @@
 #ifndef __SYSDEP_I386_PTRACE_USER_H__
 #define __SYSDEP_I386_PTRACE_USER_H__
 
+#include <sys/ptrace.h>
+#include <linux/ptrace.h>
 #include <asm/ptrace.h>
 
 #define PT_OFFSET(r) ((r) * sizeof(long))
@@ -33,9 +35,6 @@
 #define FP_FRAME_SIZE (27)
 #define FPX_FRAME_SIZE (128)
 
-#define MAX_REG_OFFSET (FRAME_SIZE_OFFSET)
-#define MAX_REG_NR (FRAME_SIZE)
-
 #ifdef PTRACE_GETREGS
 #define UM_HAVE_GETREGS
 #endif
@@ -59,7 +58,5 @@
 #ifdef PTRACE_SETFPXREGS
 #define UM_HAVE_SETFPXREGS
 #endif
-
-extern void update_debugregs(int seq);
 
 #endif

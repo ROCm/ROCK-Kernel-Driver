@@ -10,7 +10,7 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  *
- * rw semaphores implemented November 1999 by Benjamin LaHaise <bcrl@redhat.com>
+ * rw semaphores implemented November 1999 by Benjamin LaHaise <bcrl@kvack.org>
  */
 #include <linux/config.h>
 #include <linux/sched.h>

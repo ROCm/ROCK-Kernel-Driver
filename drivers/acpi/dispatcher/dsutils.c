@@ -54,7 +54,117 @@
 	 ACPI_MODULE_NAME    ("dsutils")
 
 
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ds_clear_implicit_return
+ *
+ * PARAMETERS:  walk_state          - Current State
+ *
+ * RETURN:      None.
+ *
+ * DESCRIPTION: Clear and remove a reference on an implicit return value.  Used
+ *              to delete "stale" return values (if enabled, the return value
+ *              from every operator is saved at least momentarily, in case the
+ *              parent method exits.)
+ *
+ ******************************************************************************/
+
+void
+acpi_ds_clear_implicit_return (
+	struct acpi_walk_state          *walk_state)
+{
+	ACPI_FUNCTION_NAME ("ds_clear_implicit_return");
+
+
+	/*
+	 * Slack must be enabled for this feature
+	 */
+	if (!acpi_gbl_enable_interpreter_slack) {
+		return;
+	}
+
+	if (walk_state->implicit_return_obj) {
+		/*
+		 * Delete any "stale" implicit return. However, in
+		 * complex statements, the implicit return value can be
+		 * bubbled up several levels.
+		 */
+		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
+			"Removing reference on stale implicit return obj %p\n",
+			walk_state->implicit_return_obj));
+
+		acpi_ut_remove_reference (walk_state->implicit_return_obj);
+		walk_state->implicit_return_obj = NULL;
+	}
+}
+
+
 #ifndef ACPI_NO_METHOD_EXECUTION
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ds_do_implicit_return
+ *
+ * PARAMETERS:  return_desc         - The return value
+ *              walk_state          - Current State
+ *              add_reference       - True if a reference should be added to the
+ *                                    return object
+ *
+ * RETURN:      TRUE if implicit return enabled, FALSE otherwise
+ *
+ * DESCRIPTION: Implements the optional "implicit return".  We save the result
+ *              of every ASL operator and control method invocation in case the
+ *              parent method exit.  Before storing a new return value, we
+ *              delete the previous return value.
+ *
+ ******************************************************************************/
+
+u8
+acpi_ds_do_implicit_return (
+	union acpi_operand_object       *return_desc,
+	struct acpi_walk_state          *walk_state,
+	u8                              add_reference)
+{
+	ACPI_FUNCTION_NAME ("ds_do_implicit_return");
+
+
+	/*
+	 * Slack must be enabled for this feature, and we must
+	 * have a valid return object
+	 */
+	if ((!acpi_gbl_enable_interpreter_slack) ||
+		(!return_desc)) {
+		return (FALSE);
+	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
+			"Result %p will be implicitly returned; Prev=%p\n",
+			return_desc,
+			walk_state->implicit_return_obj));
+
+	/*
+	 * Delete any "stale" implicit return value first. However, in
+	 * complex statements, the implicit return value can be
+	 * bubbled up several levels, so we don't clear the value if it
+	 * is the same as the return_desc.
+	 */
+	if (walk_state->implicit_return_obj) {
+		if (walk_state->implicit_return_obj == return_desc) {
+			return (TRUE);
+		}
+		acpi_ds_clear_implicit_return (walk_state);
+	}
+
+	/* Save the implicit return value, add a reference if requested */
+
+	walk_state->implicit_return_obj = return_desc;
+	if (add_reference) {
+		acpi_ut_add_reference (return_desc);
+	}
+
+	return (TRUE);
+}
+
 
 /*******************************************************************************
  *
@@ -76,7 +186,6 @@ acpi_ds_is_result_used (
 {
 	const struct acpi_opcode_info   *parent_info;
 
-
 	ACPI_FUNCTION_TRACE_PTR ("ds_is_result_used", op);
 
 
@@ -88,6 +197,19 @@ acpi_ds_is_result_used (
 	}
 
 	/*
+	 * We know that this operator is not a
+	 * Return() operator (would not come here.) The following code is the
+	 * optional support for a so-called "implicit return". Some AML code
+	 * assumes that the last value of the method is "implicitly" returned
+	 * to the caller. Just save the last result as the return value.
+	 * NOTE: this is optional because the ASL language does not actually
+	 * support this behavior.
+	 */
+	acpi_ds_do_implicit_return (walk_state->result_obj, walk_state, TRUE);
+
+	/*
+	 * Now determine if the parent will use the result
+	 *
 	 * If there is no parent, or the parent is a scope_op, we are executing
 	 * at the method level. An executing method typically has no parent,
 	 * since each method is parsed separately.  A method invoked externally
@@ -95,29 +217,10 @@ acpi_ds_is_result_used (
 	 */
 	if ((!op->common.parent) ||
 		(op->common.parent->common.aml_opcode == AML_SCOPE_OP)) {
-		/*
-		 * If this is the last statement in the method, we know it is not a
-		 * Return() operator (would not come here.) The following code is the
-		 * optional support for a so-called "implicit return". Some AML code
-		 * assumes that the last value of the method is "implicitly" returned
-		 * to the caller. Just save the last result as the return value.
-		 * NOTE: this is optional because the ASL language does not actually
-		 * support this behavior.
-		 */
-		if ((acpi_gbl_enable_interpreter_slack) &&
-			(walk_state->parser_state.aml >= walk_state->parser_state.aml_end)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-					"Result of [%s] will be implicitly returned\n",
-					acpi_ps_get_opcode_name (op->common.aml_opcode)));
-
-			/* Use the top of the result stack as the implicit return value */
-
-			walk_state->return_desc = walk_state->results->results.obj_desc[0];
-			return_VALUE (TRUE);
-		}
-
 		/* No parent, the return value cannot possibly be used */
 
+		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "At Method level, result of [%s] not used\n",
+				acpi_ps_get_opcode_name (op->common.aml_opcode)));
 		return_VALUE (FALSE);
 	}
 
@@ -262,9 +365,8 @@ acpi_ds_delete_result_if_not_used (
 	}
 
 	if (!acpi_ds_is_result_used (op, walk_state)) {
-		/*
-		 * Must pop the result stack (obj_desc should be equal to result_obj)
-		 */
+		/* Must pop the result stack (obj_desc should be equal to result_obj) */
+
 		status = acpi_ds_result_pop (&obj_desc, walk_state);
 		if (ACPI_SUCCESS (status)) {
 			acpi_ut_remove_reference (result_obj);
@@ -338,9 +440,8 @@ acpi_ds_clear_operands (
 	ACPI_FUNCTION_TRACE_PTR ("ds_clear_operands", walk_state);
 
 
-	/*
-	 * Remove a reference on each operand on the stack
-	 */
+	/* Remove a reference on each operand on the stack */
+
 	for (i = 0; i < walk_state->num_operands; i++) {
 		/*
 		 * Remove a reference to all operands, including both
@@ -407,11 +508,7 @@ acpi_ds_create_operand (
 			return_ACPI_STATUS (status);
 		}
 
-		/*
-		 * All prefixes have been handled, and the name is
-		 * in name_string
-		 */
-
+		/* All prefixes have been handled, and the name is in name_string */
 
 		/*
 		 * Special handling for buffer_field declarations. This is a deferred
@@ -586,7 +683,8 @@ acpi_ds_create_operand (
  *
  * FUNCTION:    acpi_ds_create_operands
  *
- * PARAMETERS:  first_arg           - First argument of a parser argument tree
+ * PARAMETERS:  walk_state          - Current state
+ *              first_arg           - First argument of a parser argument tree
  *
  * RETURN:      Status
  *

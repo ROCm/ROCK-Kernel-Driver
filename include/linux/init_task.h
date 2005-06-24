@@ -51,6 +51,7 @@
 		.list = LIST_HEAD_INIT(sig.shared_pending.list),	\
 		.signal =  {{0}}}, \
 	.posix_timers	 = LIST_HEAD_INIT(sig.posix_timers),		\
+	.cpu_timers	= INIT_CPU_TIMERS(sig.cpu_timers),		\
 	.rlim		= INIT_RLIMITS,					\
 }
 
@@ -80,7 +81,6 @@ extern struct group_info init_groups;
 	.mm		= NULL,						\
 	.active_mm	= &init_mm,					\
 	.run_list	= LIST_HEAD_INIT(tsk.run_list),			\
-	.ioprio		= 0,						\
 	.time_slice	= HZ,						\
 	.tasks		= LIST_HEAD_INIT(tsk.tasks),			\
 	.ptrace_children= LIST_HEAD_INIT(tsk.ptrace_children),		\
@@ -90,9 +90,6 @@ extern struct group_info init_groups;
 	.children	= LIST_HEAD_INIT(tsk.children),			\
 	.sibling	= LIST_HEAD_INIT(tsk.sibling),			\
 	.group_leader	= &tsk,						\
-	.real_timer	= {						\
-		.function	= it_real_fn				\
-	},								\
 	.group_info	= &init_groups,					\
 	.cap_effective	= CAP_INIT_EFF_SET,				\
 	.cap_inheritable = CAP_INIT_INH_SET,				\
@@ -113,12 +110,16 @@ extern struct group_info init_groups;
 	.proc_lock	= SPIN_LOCK_UNLOCKED,				\
 	.switch_lock	= SPIN_LOCK_UNLOCKED,				\
 	.journal_info	= NULL,						\
- 	.map_base	= __TASK_UNMAPPED_BASE,				\
-	.private_pages	= LIST_HEAD_INIT(tsk.private_pages),		\
-	.private_pages_count = 0,					\
-	.fs_excl	= ATOMIC_INIT(0),				\
+	.cpu_timers	= INIT_CPU_TIMERS(tsk.cpu_timers),		\
 }
 
+
+#define INIT_CPU_TIMERS(cpu_timers)					\
+{									\
+	LIST_HEAD_INIT(cpu_timers[0]),					\
+	LIST_HEAD_INIT(cpu_timers[1]),					\
+	LIST_HEAD_INIT(cpu_timers[2]),					\
+}
 
 
 #endif

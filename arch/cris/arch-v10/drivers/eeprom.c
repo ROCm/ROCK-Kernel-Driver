@@ -599,7 +599,7 @@ static ssize_t eeprom_write(struct file * file, const char * buf, size_t count,
   int i, written, restart=1;
   unsigned long p;
 
-  if (verify_area(VERIFY_READ, buf, count))
+  if (!access_ok(VERIFY_READ, buf, count))
   {
     return -EFAULT;
   }

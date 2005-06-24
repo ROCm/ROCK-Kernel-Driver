@@ -41,10 +41,10 @@ endif
 
 ifneq ($(NEW_GCC),y)
   CFLAGS := $(CFLAGS) -pipe -mno-fpu -mtune=ultrasparc -mmedlow \
-	    -ffixed-g4 -fcall-used-g5 -fcall-used-g7 -Wno-sign-compare
+	    -ffixed-g4 -ffixed-g5 -fcall-used-g7 -Wno-sign-compare
 else
   CFLAGS := $(CFLAGS) -m64 -pipe -mno-fpu -mcpu=ultrasparc -mcmodel=medlow \
-	    -ffixed-g4 -fcall-used-g5 -fcall-used-g7 -Wno-sign-compare \
+	    -ffixed-g4 -ffixed-g5 -fcall-used-g7 -Wno-sign-compare \
 	    $(CC_UNDECL)
   AFLAGS += -m64 -mcpu=ultrasparc $(CC_UNDECL)
 endif

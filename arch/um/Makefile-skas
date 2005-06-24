@@ -3,10 +3,12 @@
 # Licensed under the GPL
 #
 
-PROFILE += -pg
+GPROF_OPT += -pg
+GCOV_OPT += -fprofile-arcs -ftest-coverage
 
-CFLAGS-$(CONFIG_GCOV) += -fprofile-arcs -ftest-coverage
-CFLAGS-$(CONFIG_GPROF) += $(PROFILE)
-LINK-$(CONFIG_GPROF) += $(PROFILE)
+CFLAGS-$(CONFIG_GCOV) += $(GCOV_OPT)
+CFLAGS-$(CONFIG_GPROF) += $(GPROF_OPT)
+LINK-$(CONFIG_GCOV) += $(GCOV_OPT)
+LINK-$(CONFIG_GPROF) += $(GPROF_OPT)
 
 GEN_HEADERS += $(ARCH_DIR)/include/skas_ptregs.h

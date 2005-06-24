@@ -170,7 +170,7 @@ out:
  *
  * NOTE: acct_globals.lock MUST be held on entry and exit.
  */
-void acct_file_reopen(struct file *file)
+static void acct_file_reopen(struct file *file)
 {
 	struct file *old_acct = NULL;
 
@@ -534,17 +534,15 @@ void acct_process(long exitcode)
  * acct_update_integrals
  *    -  update mm integral fields in task_struct
  */
-void acct_update_integrals(void)
+void acct_update_integrals(struct task_struct *tsk)
 {
-	struct task_struct *tsk = current;
-
 	if (likely(tsk->mm)) {
 		long delta = tsk->stime - tsk->acct_stimexpd;
 
 		if (delta == 0)
 			return;
 		tsk->acct_stimexpd = tsk->stime;
-		tsk->acct_rss_mem1 += delta * tsk->mm->rss;
+		tsk->acct_rss_mem1 += delta * get_mm_counter(tsk->mm, rss);
 		tsk->acct_vm_mem1 += delta * tsk->mm->total_vm;
 	}
 }

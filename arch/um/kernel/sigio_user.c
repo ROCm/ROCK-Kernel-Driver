@@ -108,12 +108,14 @@ static void tty_output(int master, int slave)
 		panic("check_sigio : write failed, errno = %d\n", errno);
 	while(((n = os_read_file(slave, buf, sizeof(buf))) > 0) && !got_sigio) ;
 
-	if(got_sigio){
+	if (got_sigio) {
 		printk("Yes\n");
 		pty_output_sigio = 1;
+	} else if (n == -EAGAIN) {
+		printk("No, enabling workaround\n");
+	} else {
+		panic("check_sigio : read failed, err = %d\n", n);
 	}
-	else if(n == -EAGAIN) printk("No, enabling workaround\n");
-	else panic("check_sigio : read failed, err = %d\n", n);
 }
 
 static void tty_close(int master, int slave)
@@ -180,6 +182,7 @@ static int write_sigio_thread(void *unused)
 	int i, n, respond_fd;
 	char c;
 
+        signal(SIGWINCH, SIG_IGN);
 	fds = &current_poll;
 	while(1){
 		n = poll(fds->poll, fds->used, -1);
@@ -235,6 +238,8 @@ static int need_poll(int n)
 	return(0);
 }
 
+/* Must be called with sigio_lock held, because it's needed by the marked
+ * critical section. */
 static void update_thread(void)
 {
 	unsigned long flags;
@@ -257,7 +262,7 @@ static void update_thread(void)
 	set_signals(flags);
 	return;
  fail:
-	sigio_lock();
+	/* Critical section start */
 	if(write_sigio_pid != -1) 
 		os_kill_process(write_sigio_pid, 1);
 	write_sigio_pid = -1;
@@ -265,7 +270,7 @@ static void update_thread(void)
 	os_close_file(sigio_private[1]);
 	os_close_file(write_sigio_fds[0]);
 	os_close_file(write_sigio_fds[1]);
-	sigio_unlock();
+	/* Critical section end */
 	set_signals(flags);
 }
 
@@ -418,19 +423,10 @@ int read_sigio_fd(int fd)
 
 static void sigio_cleanup(void)
 {
-	if(write_sigio_pid != -1)
+	if (write_sigio_pid != -1) {
 		os_kill_process(write_sigio_pid, 1);
+		write_sigio_pid = -1;
+	}
 }
 
 __uml_exitcall(sigio_cleanup);
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-file-style: "linux"
- * End:
- */

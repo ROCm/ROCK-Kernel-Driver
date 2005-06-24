@@ -1005,8 +1005,7 @@ static struct unit_directory *nodemgr_process_unit_directory
 	return ud;
 
 unit_directory_error:
-	if (ud != NULL)
-		kfree(ud);
+	kfree(ud);
 	return NULL;
 }
 
@@ -1284,7 +1283,7 @@ static void nodemgr_suspend_ne(struct node_entry *ne)
 
 		if (ud->device.driver &&
 		    (!ud->device.driver->suspend ||
-		      ud->device.driver->suspend(&ud->device, 0, 0)))
+		      ud->device.driver->suspend(&ud->device, PMSG_SUSPEND, 0)))
 			device_release_driver(&ud->device);
 	}
 	up_write(&ne->device.bus->subsys.rwsem);

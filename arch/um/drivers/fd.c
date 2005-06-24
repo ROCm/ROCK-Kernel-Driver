@@ -19,7 +19,7 @@ struct fd_chan {
 	char str[sizeof("1234567890\0")];
 };
 
-void *fd_init(char *str, int device, struct chan_opts *opts)
+static void *fd_init(char *str, int device, struct chan_opts *opts)
 {
 	struct fd_chan *data;
 	char *end;
@@ -43,7 +43,7 @@ void *fd_init(char *str, int device, struct chan_opts *opts)
 	return(data);
 }
 
-int fd_open(int input, int output, int primary, void *d, char **dev_out)
+static int fd_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct fd_chan *data = d;
 	int err;
@@ -62,7 +62,7 @@ int fd_open(int input, int output, int primary, void *d, char **dev_out)
 	return(data->fd);
 }
 
-void fd_close(int fd, void *d)
+static void fd_close(int fd, void *d)
 {
 	struct fd_chan *data = d;
 	int err;
@@ -76,7 +76,7 @@ void fd_close(int fd, void *d)
 	}
 }
 
-int fd_console_write(int fd, const char *buf, int n, void *d)
+static int fd_console_write(int fd, const char *buf, int n, void *d)
 {
 	struct fd_chan *data = d;
 

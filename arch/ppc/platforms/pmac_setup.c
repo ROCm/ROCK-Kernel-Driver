@@ -52,6 +52,7 @@
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 #include <linux/bitops.h>
+#include <linux/suspend.h>
 
 #include <asm/reg.h>
 #include <asm/sections.h>
@@ -70,6 +71,8 @@
 #include <asm/pmac_feature.h>
 #include <asm/time.h>
 #include <asm/of_device.h>
+#include <asm/mmu_context.h>
+
 #include "pmac_pic.h"
 #include "mem_pieces.h"
 
@@ -247,7 +250,7 @@ pmac_setup_arch(void)
 	int *fp;
 	unsigned long pvr;
 
-	pvr = PVR_VER(mfspr(PVR));
+	pvr = PVR_VER(mfspr(SPRN_PVR));
 
 	/* Set loops_per_jiffy to a half-way reasonable value,
 	   for use until calibrate_delay gets called. */
@@ -274,7 +277,7 @@ pmac_setup_arch(void)
 	pmac_find_bridges();
 
 	/* Checks "l2cr-value" property in the registry */
-	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR) {
+	if (cpu_has_feature(CPU_FTR_L2CR)) {
 		struct device_node *np = find_devices("cpus");
 		if (np == 0)
 			np = find_type_devices("cpu");
@@ -421,10 +424,62 @@ find_boot_device(void)
 }
 
 static int initializing = 1;
+/* TODO: Merge the suspend-to-ram with the common code !!!
+ * currently, this is a stub implementation for suspend-to-disk
+ * only
+ */
+
+#ifdef CONFIG_SOFTWARE_SUSPEND
+
+static int pmac_pm_prepare(suspend_state_t state)
+{
+	printk(KERN_DEBUG "%s(%d)\n", __FUNCTION__, state);
+
+	return 0;
+}
+
+static int pmac_pm_enter(suspend_state_t state)
+{
+	printk(KERN_DEBUG "%s(%d)\n", __FUNCTION__, state);
+
+	/* Giveup the lazy FPU & vec so we don't have to back them
+	 * up from the low level code
+	 */
+	enable_kernel_fp();
+
+#ifdef CONFIG_ALTIVEC
+	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_ALTIVEC)
+		enable_kernel_altivec();
+#endif /* CONFIG_ALTIVEC */
+
+	return 0;
+}
+
+static int pmac_pm_finish(suspend_state_t state)
+{
+	printk(KERN_DEBUG "%s(%d)\n", __FUNCTION__, state);
+
+	/* Restore userland MMU context */
+	set_context(current->active_mm->context, current->active_mm->pgd);
+
+	return 0;
+}
+
+static struct pm_ops pmac_pm_ops = {
+	.pm_disk_mode	= PM_DISK_SHUTDOWN,
+	.prepare	= pmac_pm_prepare,
+	.enter		= pmac_pm_enter,
+	.finish		= pmac_pm_finish,
+};
+
+#endif /* CONFIG_SOFTWARE_SUSPEND */
 
 static int pmac_late_init(void)
 {
 	initializing = 0;
+#ifdef CONFIG_SOFTWARE_SUSPEND
+	pm_set_ops(&pmac_pm_ops);
+#endif /* CONFIG_SOFTWARE_SUSPEND */
 	return 0;
 }
 
@@ -475,7 +530,7 @@ pmac_restart(char *cmd)
 #endif /* CONFIG_ADB_CUDA */
 #ifdef CONFIG_ADB_PMU
 	case SYS_CTRLER_PMU:
-		pmu_restart(cmd);
+		pmu_restart();
 		break;
 #endif /* CONFIG_ADB_PMU */
 	default: ;
@@ -614,6 +669,7 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.pcibios_fixup  = pmac_pcibios_fixup;
 	ppc_md.pcibios_enable_device_hook = pmac_pci_enable_device_hook;
 	ppc_md.pcibios_after_init = pmac_pcibios_after_init;
+	ppc_md.phys_mem_access_prot = pci_phys_mem_access_prot;
 
 	ppc_md.restart        = pmac_restart;
 	ppc_md.power_off      = pmac_power_off;

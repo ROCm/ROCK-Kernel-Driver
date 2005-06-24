@@ -166,7 +166,7 @@ struct mct_u232_private {
  * Handle vendor specific USB requests
  */
 
-#define WDR_TIMEOUT (HZ * 5 ) /* default urb timeout */
+#define WDR_TIMEOUT 5000 /* default urb timeout */
 
 /*
  * Later day 2.6.0-test kernels have new baud rates like B230400 which
@@ -195,16 +195,16 @@ static int mct_u232_calculate_baud_rate(struct usb_serial *serial, int value)
 		}
 	} else {
 		switch (value) {
-		case    B300: value =     300;
-		case    B600: value =     600;
-		case   B1200: value =    1200;
-		case   B2400: value =    2400;
-		case   B4800: value =    4800;
-		case   B9600: value =    9600;
-		case  B19200: value =   19200;
-		case  B38400: value =   38400;
-		case  B57600: value =   57600;
-		case B115200: value =  115200;
+		case    B300: value =     300; break;
+		case    B600: value =     600; break;
+		case   B1200: value =    1200; break;
+		case   B2400: value =    2400; break;
+		case   B4800: value =    4800; break;
+		case   B9600: value =    9600; break;
+		case  B19200: value =   19200; break;
+		case  B38400: value =   38400; break;
+		case  B57600: value =   57600; break;
+		case B115200: value =  115200; break;
 		default:
 			err("MCT USB-RS232: unsupported baudrate request 0x%x,"
 			    " using default of B9600", value);
@@ -646,7 +646,7 @@ static void mct_u232_set_termios (struct usb_serial_port *port,
 	else
 		new_state &= ~(TIOCM_DTR | TIOCM_RTS);
 	if (new_state != control_state) {
-		mct_u232_set_modem_ctrl(serial, control_state);
+		mct_u232_set_modem_ctrl(serial, new_state);
 		control_state = new_state;
 	}
 

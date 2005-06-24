@@ -92,9 +92,9 @@ int inet_peer_threshold = 65536 + 128;	/* start to throw entries more
 int inet_peer_minttl = 120 * HZ;	/* TTL under high load: 120 sec */
 int inet_peer_maxttl = 10 * 60 * HZ;	/* usual time to live: 10 min */
 
+static struct inet_peer *inet_peer_unused_head;
 /* Exported for inet_putpeer inline function.  */
-struct inet_peer *inet_peer_unused_head,
-		**inet_peer_unused_tailp = &inet_peer_unused_head;
+struct inet_peer **inet_peer_unused_tailp = &inet_peer_unused_head;
 DEFINE_SPINLOCK(inet_peer_unused_lock);
 #define PEER_MAX_CLEANUP_WORK 30
 

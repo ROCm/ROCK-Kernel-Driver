@@ -587,9 +587,9 @@ toshoboe_startchip (struct toshoboe_cb *self)
   /*Find out where the rings live */
   physaddr = virt_to_bus (self->ring);
 
-  ASSERT ((physaddr & 0x3ff) == 0,
-          printk (KERN_ERR DRIVER_NAME "ring not correctly aligned\n");
-          return;);
+  IRDA_ASSERT ((physaddr & 0x3ff) == 0,
+	       printk (KERN_ERR DRIVER_NAME "ring not correctly aligned\n");
+	       return;);
 
   OUTB ((physaddr >> 10) & 0xff, OBOE_RING_BASE0);
   OUTB ((physaddr >> 18) & 0xff, OBOE_RING_BASE1);
@@ -994,7 +994,7 @@ toshoboe_hard_xmit (struct sk_buff *skb, struct net_device *dev)
 
   self = (struct toshoboe_cb *) dev->priv;
 
-  ASSERT (self != NULL, return 0; );
+  IRDA_ASSERT (self != NULL, return 0; );
 
   IRDA_DEBUG (1, "%s.tx:%x(%x)%x\n", __FUNCTION__
       ,skb->len,self->txpending,INB (OBOE_ENABLEH));
@@ -1360,10 +1360,10 @@ toshoboe_net_open (struct net_device *dev)
 
   IRDA_DEBUG (4, "%s()\n", __FUNCTION__);
 
-  ASSERT (dev != NULL, return -1; );
+  IRDA_ASSERT (dev != NULL, return -1; );
   self = (struct toshoboe_cb *) dev->priv;
 
-  ASSERT (self != NULL, return 0; );
+  IRDA_ASSERT (self != NULL, return 0; );
 
   if (self->async)
     return -EBUSY;
@@ -1402,7 +1402,7 @@ toshoboe_net_close (struct net_device *dev)
 
   IRDA_DEBUG (4, "%s()\n", __FUNCTION__);
 
-  ASSERT (dev != NULL, return -1; );
+  IRDA_ASSERT (dev != NULL, return -1; );
   self = (struct toshoboe_cb *) dev->priv;
 
   /* Stop device */
@@ -1439,11 +1439,11 @@ toshoboe_net_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
   unsigned long flags;
   int ret = 0;
 
-  ASSERT (dev != NULL, return -1; );
+  IRDA_ASSERT (dev != NULL, return -1; );
 
   self = dev->priv;
 
-  ASSERT (self != NULL, return -1; );
+  IRDA_ASSERT (self != NULL, return -1; );
 
   IRDA_DEBUG (5, "%s(), %s, (cmd=0x%X)\n", __FUNCTION__, dev->name, cmd);
 
@@ -1509,7 +1509,7 @@ toshoboe_close (struct pci_dev *pci_dev)
 
   IRDA_DEBUG (4, "%s()\n", __FUNCTION__);
 
-  ASSERT (self != NULL, return; );
+  IRDA_ASSERT (self != NULL, return; );
 
   if (!self->stopped)
     {
@@ -1712,7 +1712,7 @@ freeself:
 }
 
 static int
-toshoboe_gotosleep (struct pci_dev *pci_dev, u32 crap)
+toshoboe_gotosleep (struct pci_dev *pci_dev, pm_message_t crap)
 {
   struct toshoboe_cb *self = (struct toshoboe_cb*)pci_get_drvdata(pci_dev);
   unsigned long flags;

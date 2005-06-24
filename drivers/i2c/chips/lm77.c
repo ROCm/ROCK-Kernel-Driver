@@ -29,6 +29,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/jiffies.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 
@@ -80,8 +81,6 @@ static struct i2c_driver lm77_driver = {
 	.attach_adapter = lm77_attach_adapter,
 	.detach_client	= lm77_detach_client,
 };
-
-static int lm77_id;
 
 /* straight from the datasheet */
 #define LM77_TEMP_MIN (-55000)
@@ -139,8 +138,12 @@ static ssize_t set_##value(struct device *dev, const char *buf, size_t count)	\
 {										\
 	struct i2c_client *client = to_i2c_client(dev);				\
 	struct lm77_data *data = i2c_get_clientdata(client);			\
-	data->value = simple_strtoul(buf, NULL, 10);				\
+	long val = simple_strtoul(buf, NULL, 10);				\
+										\
+	down(&data->update_lock);						\
+	data->value = val;				\
 	lm77_write_value(client, reg, LM77_TEMP_TO_REG(data->value));		\
+	up(&data->update_lock);							\
 	return count;								\
 }
 
@@ -153,9 +156,13 @@ static ssize_t set_temp_crit_hyst(struct device *dev, const char *buf, size_t co
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm77_data *data = i2c_get_clientdata(client);
-	data->temp_hyst = data->temp_crit - simple_strtoul(buf, NULL, 10);
+	unsigned long val = simple_strtoul(buf, NULL, 10);
+
+	down(&data->update_lock);
+	data->temp_hyst = data->temp_crit - val;
 	lm77_write_value(client, LM77_REG_TEMP_HYST,
 			 LM77_TEMP_TO_REG(data->temp_hyst));
+	up(&data->update_lock);
 	return count;
 }
 
@@ -164,13 +171,18 @@ static ssize_t set_temp_crit(struct device *dev, const char *buf, size_t count)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm77_data *data = i2c_get_clientdata(client);
-	int oldcrithyst = data->temp_crit - data->temp_hyst;
-	data->temp_crit = simple_strtoul(buf, NULL, 10);
+	long val = simple_strtoul(buf, NULL, 10);
+	int oldcrithyst;
+	
+	down(&data->update_lock);
+	oldcrithyst = data->temp_crit - data->temp_hyst;
+	data->temp_crit = val;
 	data->temp_hyst = data->temp_crit - oldcrithyst;
 	lm77_write_value(client, LM77_REG_TEMP_CRIT,
 			 LM77_TEMP_TO_REG(data->temp_crit));
 	lm77_write_value(client, LM77_REG_TEMP_HYST,
 			 LM77_TEMP_TO_REG(data->temp_hyst));
+	up(&data->update_lock);
 	return count;
 }
 
@@ -295,8 +307,6 @@ static int lm77_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* Fill in the remaining client fields and put it into the global list */
 	strlcpy(new_client->name, name, I2C_NAME_SIZE);
-
-	new_client->id = lm77_id++;
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);
 
@@ -364,8 +374,8 @@ static struct lm77_data *lm77_update_device(struct device *dev)
 
 	down(&data->update_lock);
 
-	if ((jiffies - data->last_updated > HZ + HZ / 2) ||
-	    (jiffies < data->last_updated) || !data->valid) {
+	if (time_after(jiffies, data->last_updated + HZ + HZ / 2)
+	    || !data->valid) {
 		dev_dbg(&client->dev, "Starting lm77 update\n");
 		data->temp_input =
 			LM77_TEMP_FROM_REG(lm77_read_value(client,

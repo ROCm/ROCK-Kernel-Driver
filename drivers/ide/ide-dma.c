@@ -176,7 +176,13 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 		if (!dma_stat) {
 			struct request *rq = HWGROUP(drive)->rq;
 
-			DRIVER(drive)->end_request(drive, 1, rq->nr_sectors);
+			if (rq->rq_disk) {
+				ide_driver_t *drv;
+
+				drv = *(ide_driver_t **)rq->rq_disk->private_data;;
+				drv->end_request(drive, 1, rq->nr_sectors);
+			} else
+				ide_end_request(drive, 1, rq->nr_sectors);
 			return ide_stopped;
 		}
 		printk(KERN_ERR "%s: dma_intr: bad DMA status (dma_stat=%x)\n", 

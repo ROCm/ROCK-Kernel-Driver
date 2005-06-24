@@ -268,12 +268,12 @@ config SC1200_WDT
 
 config SCx200_WDT
 	tristate "National Semiconductor SCx200 Watchdog"
-	depends on WATCHDOG && X86 && PCI
+	depends on WATCHDOG && SCx200 && PCI
 	help
 	  Enable the built-in watchdog timer support on the National
 	  Semiconductor SCx200 processors.
 
-	  If compiled as a module, it will be called scx200_watchdog.
+	  If compiled as a module, it will be called scx200_wdt.
 
 config 60XX_WDT
 	tristate "SBC-60XX Watchdog Timer"

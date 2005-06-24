@@ -63,7 +63,7 @@ MODULE_DEVICE_TABLE(usb, bfusb_table);
 
 #define BFUSB_MAX_BLOCK_SIZE	256
 
-#define BFUSB_BLOCK_TIMEOUT	(HZ * 3)
+#define BFUSB_BLOCK_TIMEOUT	3000
 
 #define BFUSB_TX_PROCESS	1
 #define BFUSB_TX_WAKEUP		2
@@ -582,7 +582,7 @@ static int bfusb_load_firmware(struct bfusb *bfusb, unsigned char *firmware, int
 	pipe = usb_sndctrlpipe(bfusb->udev, 0);
 
 	if (usb_control_msg(bfusb->udev, pipe, USB_REQ_SET_CONFIGURATION,
-				0, 1, 0, NULL, 0, HZ * USB_CTRL_SET_TIMEOUT) < 0) {
+				0, 1, 0, NULL, 0, USB_CTRL_SET_TIMEOUT) < 0) {
 		BT_ERR("Can't change to loading configuration");
 		return -EBUSY;
 	}
@@ -623,7 +623,7 @@ static int bfusb_load_firmware(struct bfusb *bfusb, unsigned char *firmware, int
 	pipe = usb_sndctrlpipe(bfusb->udev, 0);
 
         if ((err = usb_control_msg(bfusb->udev, pipe, USB_REQ_SET_CONFIGURATION,
-				0, 2, 0, NULL, 0, HZ * USB_CTRL_SET_TIMEOUT)) < 0) {
+				0, 2, 0, NULL, 0, USB_CTRL_SET_TIMEOUT)) < 0) {
 		BT_ERR("Can't change to running configuration");
 		goto error;
 	}
@@ -641,7 +641,7 @@ error:
 	pipe = usb_sndctrlpipe(bfusb->udev, 0);
 
 	usb_control_msg(bfusb->udev, pipe, USB_REQ_SET_CONFIGURATION,
-				0, 0, 0, NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
+				0, 0, 0, NULL, 0, USB_CTRL_SET_TIMEOUT);
 
 	return err;
 }

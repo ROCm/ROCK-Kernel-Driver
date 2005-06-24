@@ -20,15 +20,15 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#define DRIVER_AUTHOR		"Gareth Hughes, Leif Delgass, José Fonseca, Jon Smirl"
+#define CORE_AUTHOR		"Gareth Hughes, Leif Delgass, José Fonseca, Jon Smirl"
 
-#define DRIVER_NAME		"drm"
-#define DRIVER_DESC		"DRM shared core routines"
-#define DRIVER_DATE		"20040925"
+#define CORE_NAME		"drm"
+#define CORE_DESC		"DRM shared core routines"
+#define CORE_DATE		"20040925"
 
 #define DRM_IF_MAJOR	1
 #define DRM_IF_MINOR	2
 
-#define DRIVER_MAJOR	1
-#define DRIVER_MINOR	0
-#define DRIVER_PATCHLEVEL 0
+#define CORE_MAJOR	1
+#define CORE_MINOR	0
+#define CORE_PATCHLEVEL 0

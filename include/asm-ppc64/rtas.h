@@ -24,11 +24,8 @@
 
 /* RTAS return status codes */
 #define RTAS_BUSY		-2    /* RTAS Busy */
-#define RTAS_NO_SUCH_INDICATOR	-3    /* No such indicator implemented */
 #define RTAS_EXTENDED_DELAY_MIN	9900
 #define RTAS_EXTENDED_DELAY_MAX	9905
-
-#define RTAS_UNKNOWN_OP		-1099 /* Unknown RTAS Token */
 
 /*
  * In general to call RTAS use rtas_token("string") to lookup

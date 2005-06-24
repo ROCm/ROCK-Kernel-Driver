@@ -261,6 +261,7 @@
 #include <linux/spinlock.h>
 #include <linux/serial.h>
 #include <linux/ioctl.h>
+#include <linux/wait.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 #include "usb-serial.h"
@@ -950,9 +951,7 @@ static void edge_bulk_out_cmd_callback (struct urb *urb, struct pt_regs *regs)
 
 
 	/* clean up the transfer buffer */
-	if (urb->transfer_buffer != NULL) {
-		kfree(urb->transfer_buffer);
-	}
+	kfree(urb->transfer_buffer);
 
 	/* Free the command urb */
 	usb_free_urb (urb);
@@ -971,7 +970,7 @@ static void edge_bulk_out_cmd_callback (struct urb *urb, struct pt_regs *regs)
 
 	/* we have completed the command */
 	edge_port->commandPending = FALSE;
-	wake_up_interruptible(&edge_port->wait_command);
+	wake_up(&edge_port->wait_command);
 }
 
 
@@ -991,7 +990,6 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	struct usb_serial *serial;
 	struct edgeport_serial *edge_serial;
 	int response;
-	int timeout;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -1073,10 +1071,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	}
 
 	/* now wait for the port to be completely opened */
-	timeout = OPEN_TIMEOUT;
-	while (timeout && edge_port->openPending == TRUE) {
-		timeout = interruptible_sleep_on_timeout (&edge_port->wait_open, timeout);
-	}
+	wait_event_timeout(edge_port->wait_open, (edge_port->openPending != TRUE), OPEN_TIMEOUT);
 
 	if (edge_port->open == FALSE) {
 		/* open timed out */
@@ -1128,9 +1123,10 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
  ************************************************************************/
 static void block_until_chase_response(struct edgeport_port *edge_port)
 {
+	DEFINE_WAIT(wait);
 	__u16 lastCredits;
 	int timeout = 1*HZ;
-	int wait = 10;
+	int loop = 10;
 
 	while (1) {
 		// Save Last credits
@@ -1148,12 +1144,14 @@ static void block_until_chase_response(struct edgeport_port *edge_port)
 		}
 
 		// Block the thread for a while
-		interruptible_sleep_on_timeout (&edge_port->wait_chase, timeout);
+		prepare_to_wait(&edge_port->wait_chase, &wait, TASK_UNINTERRUPTIBLE);
+		schedule_timeout(timeout);
+		finish_wait(&edge_port->wait_chase, &wait);
 
 		if (lastCredits == edge_port->txCredits) {
 			// No activity.. count down.
-			wait--;
-			if (wait == 0) {
+			loop--;
+			if (loop == 0) {
 				edge_port->chaseResponsePending = FALSE;
 				dbg("%s - Chase TIMEOUT", __FUNCTION__);
 				return;
@@ -1161,7 +1159,7 @@ static void block_until_chase_response(struct edgeport_port *edge_port)
 		} else {
 			// Reset timout value back to 10 seconds
 			dbg("%s - Last %d, Current %d", __FUNCTION__, lastCredits, edge_port->txCredits);
-			wait = 10;
+			loop = 10;
 		}
 	}
 }
@@ -1179,10 +1177,11 @@ static void block_until_chase_response(struct edgeport_port *edge_port)
  ************************************************************************/
 static void block_until_tx_empty (struct edgeport_port *edge_port)
 {
+	DEFINE_WAIT(wait);
 	struct TxFifo *fifo = &edge_port->txfifo;
 	__u32 lastCount;
 	int timeout = HZ/10;
-	int wait = 30;
+	int loop = 30;
 
 	while (1) {
 		// Save Last count
@@ -1195,20 +1194,22 @@ static void block_until_tx_empty (struct edgeport_port *edge_port)
 		}
 
 		// Block the thread for a while
-		interruptible_sleep_on_timeout (&edge_port->wait_chase, timeout);
+		prepare_to_wait (&edge_port->wait_chase, &wait, TASK_UNINTERRUPTIBLE);
+		schedule_timeout(timeout);
+		finish_wait(&edge_port->wait_chase, &wait);
 
 		dbg("%s wait", __FUNCTION__);
 
 		if (lastCount == fifo->count) {
 			// No activity.. count down.
-			wait--;
-			if (wait == 0) {
+			loop--;
+			if (loop == 0) {
 				dbg("%s - TIMEOUT", __FUNCTION__);
 				return;
 			}
 		} else {
 			// Reset timout value back to seconds
-			wait = 30;
+			loop = 30;
 		}
 	}
 }
@@ -1263,16 +1264,12 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 
 	if (edge_port->write_urb) {
 		/* if this urb had a transfer buffer already (old transfer) free it */
-		if (edge_port->write_urb->transfer_buffer != NULL) {
-			kfree(edge_port->write_urb->transfer_buffer);
-		}
-		usb_free_urb   (edge_port->write_urb);
+		kfree(edge_port->write_urb->transfer_buffer);
+		usb_free_urb(edge_port->write_urb);
 		edge_port->write_urb = NULL;
 	}
-	if (edge_port->txfifo.fifo) {
-		kfree(edge_port->txfifo.fifo);
-		edge_port->txfifo.fifo = NULL;
-	}
+	kfree(edge_port->txfifo.fifo);
+	edge_port->txfifo.fifo = NULL;
 
 	dbg("%s exited", __FUNCTION__);
 }   
@@ -1416,11 +1413,9 @@ static void send_more_port_data(struct edgeport_serial *edge_serial, struct edge
 	// get a pointer to the write_urb
 	urb = edge_port->write_urb;
 
-	/* if this urb had a transfer buffer already (old transfer) free it */
-	if (urb->transfer_buffer != NULL) {
-		kfree(urb->transfer_buffer);
-		urb->transfer_buffer = NULL;
-	}
+	/* make sure transfer buffer is freed */
+	kfree(urb->transfer_buffer);
+	urb->transfer_buffer = NULL;
 
 	/* build the data header for the buffer and port that we are about to send out */
 	count = fifo->count;
@@ -1836,11 +1831,11 @@ static int get_serial_info(struct edgeport_port *edge_port, struct serial_struct
  *****************************************************************************/
 static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned int cmd, unsigned long arg)
 {
+	DEFINE_WAIT(wait);
 	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	struct async_icount cnow;
 	struct async_icount cprev;
 	struct serial_icounter_struct icount;
-
 
 	dbg("%s - port %d, cmd = 0x%x", __FUNCTION__, port->number, cmd);
 
@@ -1868,7 +1863,9 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 			dbg("%s (%d) TIOCMIWAIT", __FUNCTION__,  port->number);
 			cprev = edge_port->icount;
 			while (1) {
-				interruptible_sleep_on(&edge_port->delta_msr_wait);
+				prepare_to_wait(&edge_port->delta_msr_wait, &wait, TASK_INTERRUPTIBLE);
+				schedule();
+				finish_wait(&edge_port->delta_msr_wait, &wait);
 				/* see if a signal did it */
 				if (signal_pending(current))
 					return -ERESTARTSYS;
@@ -2108,7 +2105,7 @@ static void process_rcvd_status (struct edgeport_serial *edge_serial, __u8 byte2
 				// We could choose to do something else when Byte3 says Timeout on Chase from Edgeport,
 				// like wait longer in block_until_chase_response, but for now we don't. 
 				edge_port->chaseResponsePending = FALSE;
-				wake_up_interruptible (&edge_port->wait_chase);
+				wake_up (&edge_port->wait_chase);
 				return;
 
 			case IOSP_EXT_STATUS_RX_CHECK_RSP:
@@ -2131,7 +2128,7 @@ static void process_rcvd_status (struct edgeport_serial *edge_serial, __u8 byte2
 		/* we have completed the open */
 		edge_port->openPending = FALSE;
 		edge_port->open = TRUE;
-		wake_up_interruptible(&edge_port->wait_open);
+		wake_up(&edge_port->wait_open);
 		return;
 	}
 
@@ -2500,9 +2497,7 @@ static int write_cmd_usb (struct edgeport_port *edge_port, unsigned char *buffer
 	// wait for command to finish
 	timeout = COMMAND_TIMEOUT;
 #if 0
-	while (timeout && edge_port->commandPending == TRUE) {
-		timeout = interruptible_sleep_on_timeout (&edge_port->wait_command, timeout);
-	}
+	wait_event (&edge_port->wait_command, (edge_port->commandPending == FALSE));
 
 	if (edge_port->commandPending == TRUE) {
 		/* command timed out */
@@ -3107,4 +3102,4 @@ module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
 module_param(low_latency, bool, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(debug, "Low latency enabled or not");
+MODULE_PARM_DESC(low_latency, "Low latency enabled or not");

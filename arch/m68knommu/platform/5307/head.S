@@ -11,7 +11,7 @@
 #include <linux/config.h>
 #include <linux/sys.h>
 #include <linux/linkage.h>
-#include <asm/thread_info.h>
+#include <asm/asm-offsets.h>
 #include <asm/coldfire.h>
 #include <asm/mcfcache.h>
 #include <asm/mcfsim.h>
@@ -87,7 +87,7 @@
 .endm
 
 #elif defined(CONFIG_M5272)
-.macro GET_MEMORY_SIZE
+.macro GET_MEM_SIZE
 	movel	MCF_MBAR+MCFSIM_CSOR7,%d0 /* get SDRAM address mask */
 	andil	#0xfffff000,%d0		/* mask out chip select options */
 	negl	%d0			/* negate bits */

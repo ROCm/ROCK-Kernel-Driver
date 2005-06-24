@@ -87,7 +87,7 @@ static struct ip6_flowlabel * fl_lookup(u32 label)
 
 static void fl_free(struct ip6_flowlabel *fl)
 {
-	if (fl->opt)
+	if (fl)
 		kfree(fl->opt);
 	kfree(fl);
 }
@@ -351,8 +351,7 @@ fl_create(struct in6_flowlabel_req *freq, char __user *optval, int optlen, int *
 	return fl;
 
 done:
-	if (fl)
-		fl_free(fl);
+	fl_free(fl);
 	*err_p = err;
 	return NULL;
 }
@@ -536,10 +535,12 @@ release:
 		if (err)
 			goto done;
 
-		/* Do not check for fault */
-		if (!freq.flr_label)
-			copy_to_user(&((struct in6_flowlabel_req __user *) optval)->flr_label,
-				     &fl->label, sizeof(fl->label));
+		if (!freq.flr_label) {
+			if (copy_to_user(&((struct in6_flowlabel_req __user *) optval)->flr_label,
+					 &fl->label, sizeof(fl->label))) {
+				/* Intentionally ignore fault. */
+			}
+		}
 
 		sfl1->fl = fl;
 		sfl1->next = np->ipv6_fl_list;
@@ -551,10 +552,8 @@ release:
 	}
 
 done:
-	if (fl)
-		fl_free(fl);
-	if (sfl1)
-		kfree(sfl1);
+	fl_free(fl);
+	kfree(sfl1);
 	return err;
 }
 

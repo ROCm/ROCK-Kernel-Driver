@@ -29,11 +29,6 @@ struct old_sigaction32 {
        __u32			sa_restorer;	/* Another 32 bit pointer */
 };
  
-typedef union sigval32 {
-        int     sival_int;
-        __u32   sival_ptr;
-} sigval_t32;
-                 
 typedef struct compat_siginfo {
 	int	si_signo;
 	int	si_errno;
@@ -52,7 +47,7 @@ typedef struct compat_siginfo {
 		struct {
 			timer_t _tid;		/* timer id */
 			int _overrun;		/* overrun count */
-			sigval_t _sigval;	/* same as below */
+			compat_sigval_t _sigval;	/* same as below */
 			int _sys_private;       /* not to be passed to user */
 		} _timer;
 
@@ -60,7 +55,7 @@ typedef struct compat_siginfo {
 		struct {
 			pid_t			_pid;	/* sender's pid */
 			uid_t			_uid;	/* sender's uid */
-			sigval_t32		_sigval;
+			compat_sigval_t		_sigval;
 		} _rt;
 
 		/* SIGCHLD */
@@ -197,24 +192,6 @@ struct ucontext32 {
 	stack_t32		uc_stack;
 	_sigregs32		uc_mcontext;
 	compat_sigset_t		uc_sigmask;	/* mask last for extensibility */
-};
-
-#define SIGEV_PAD_SIZE32 ((SIGEV_MAX_SIZE/sizeof(int)) - 3)
-struct sigevent32 {
-	union {
-		int sival_int;
-		u32 sival_ptr;
-	} sigev_value;
-	int sigev_signo;
-	int sigev_notify;
-	union {
-		int _pad[SIGEV_PAD_SIZE32];
-		int _tid;
-		struct {
-			u32 *_function;
-			u32 *_attribute;
-		} _sigev_thread;
-	} _sigev_un;
 };
 
 #endif /* _ASM_S390X_S390_H */

@@ -563,7 +563,6 @@ __MODULE_PARM_TYPE(var, type);
 extern void __deprecated inter_module_register(const char *,
 		struct module *, const void *);
 extern void __deprecated inter_module_unregister(const char *);
-extern const void * __deprecated inter_module_get(const char *);
 extern const void * __deprecated inter_module_get_request(const char *,
 		const char *);
 extern void __deprecated inter_module_put(const char *);

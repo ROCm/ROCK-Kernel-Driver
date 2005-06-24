@@ -162,10 +162,10 @@ skpinv:	addi	r4,r4,1				/* Increment */
 
 	/* Force context change */
 	mfmsr	r0
-	mtspr	SRR1, r0
+	mtspr	SPRN_SRR1, r0
 	lis	r0,3f@h
 	ori	r0,r0,3f@l
-	mtspr	SRR0,r0
+	mtspr	SPRN_SRR0,r0
 	sync
 	rfi
 
@@ -238,7 +238,7 @@ skpinv:	addi	r4,r4,1				/* Increment */
 
 	/* ptr to current thread */
 	addi	r4,r2,THREAD	/* init task's THREAD */
-	mtspr	SPRG3,r4
+	mtspr	SPRN_SPRG3,r4
 
 	/* stack */
 	lis	r1,init_thread_union@h
@@ -274,8 +274,8 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	ori	r4,r4,start_kernel@l
 	lis	r3,MSR_KERNEL@h
 	ori	r3,r3,MSR_KERNEL@l
-	mtspr	SRR0,r4
-	mtspr	SRR1,r3
+	mtspr	SPRN_SRR0,r4
+	mtspr	SPRN_SRR1,r3
 	rfi			/* change context and jump to start_kernel */
 
 /*
@@ -308,12 +308,12 @@ interrupt_base:
 
 	/* Data Storage Interrupt */
 	START_EXCEPTION(DataStorage)
-	mtspr	SPRG0, r10		/* Save some working registers */
-	mtspr	SPRG1, r11
-	mtspr	SPRG4W, r12
-	mtspr	SPRG5W, r13
+	mtspr	SPRN_SPRG0, r10		/* Save some working registers */
+	mtspr	SPRN_SPRG1, r11
+	mtspr	SPRN_SPRG4W, r12
+	mtspr	SPRN_SPRG5W, r13
 	mfcr	r11
-	mtspr	SPRG7W, r11
+	mtspr	SPRN_SPRG7W, r11
 
 	/*
 	 * Check if it was a store fault, if not then bail
@@ -330,8 +330,9 @@ interrupt_base:
 	/* If we are faulting a kernel address, we have to use the
 	 * kernel page tables.
 	 */
-	andis.	r11, r10, 0x8000
-	beq	3f
+	lis	r11, TASK_SIZE@h
+	cmplw	r10, r11
+	blt+	3f
 	lis	r11, swapper_pg_dir@h
 	ori	r11, r11, swapper_pg_dir@l
 
@@ -342,7 +343,7 @@ interrupt_base:
 
 	/* Get the PGD for the current thread */
 3:
-	mfspr	r11,SPRG3
+	mfspr	r11,SPRN_SPRG3
 	lwz	r11,PGDIR(r11)
 
 	/* Load PID into MMUCR TID */
@@ -390,13 +391,13 @@ interrupt_base:
 
 	/* Done...restore registers and get out of here.
 	*/
-	mfspr	r11, SPRG7R
+	mfspr	r11, SPRN_SPRG7R
 	mtcr	r11
-	mfspr	r13, SPRG5R
-	mfspr	r12, SPRG4R
+	mfspr	r13, SPRN_SPRG5R
+	mfspr	r12, SPRN_SPRG4R
 
-	mfspr	r11, SPRG1
-	mfspr	r10, SPRG0
+	mfspr	r11, SPRN_SPRG1
+	mfspr	r10, SPRN_SPRG0
 	rfi			/* Force context change */
 
 2:
@@ -404,13 +405,13 @@ interrupt_base:
 	 * The bailout.  Restore registers to pre-exception conditions
 	 * and call the heavyweights to help us out.
 	 */
-	mfspr	r11, SPRG7R
+	mfspr	r11, SPRN_SPRG7R
 	mtcr	r11
-	mfspr	r13, SPRG5R
-	mfspr	r12, SPRG4R
+	mfspr	r13, SPRN_SPRG5R
+	mfspr	r12, SPRN_SPRG4R
 
-	mfspr	r11, SPRG1
-	mfspr	r10, SPRG0
+	mfspr	r11, SPRN_SPRG1
+	mfspr	r10, SPRN_SPRG0
 	b	data_access
 
 	/* Instruction Storage Interrupt */
@@ -426,7 +427,11 @@ interrupt_base:
 	PROGRAM_EXCEPTION
 
 	/* Floating Point Unavailable Interrupt */
+#ifdef CONFIG_PPC_FPU
+	FP_UNAVAILABLE_EXCEPTION
+#else
 	EXCEPTION(0x2010, FloatingPointUnavailable, UnknownException, EXC_XFER_EE)
+#endif
 
 	/* System Call Interrupt */
 	START_EXCEPTION(SystemCall)
@@ -449,19 +454,20 @@ interrupt_base:
 
 	/* Data TLB Error Interrupt */
 	START_EXCEPTION(DataTLBError)
-	mtspr	SPRG0, r10		/* Save some working registers */
-	mtspr	SPRG1, r11
-	mtspr	SPRG4W, r12
-	mtspr	SPRG5W, r13
+	mtspr	SPRN_SPRG0, r10		/* Save some working registers */
+	mtspr	SPRN_SPRG1, r11
+	mtspr	SPRN_SPRG4W, r12
+	mtspr	SPRN_SPRG5W, r13
 	mfcr	r11
-	mtspr	SPRG7W, r11
+	mtspr	SPRN_SPRG7W, r11
 	mfspr	r10, SPRN_DEAR		/* Get faulting address */
 
 	/* If we are faulting a kernel address, we have to use the
 	 * kernel page tables.
 	 */
-	andis.	r11, r10, 0x8000
-	beq	3f
+	lis	r11, TASK_SIZE@h
+	cmplw	r10, r11
+	blt+	3f
 	lis	r11, swapper_pg_dir@h
 	ori	r11, r11, swapper_pg_dir@l
 
@@ -472,7 +478,7 @@ interrupt_base:
 
 	/* Get the PGD for the current thread */
 3:
-	mfspr	r11,SPRG3
+	mfspr	r11,SPRN_SPRG3
 	lwz	r11,PGDIR(r11)
 
 	/* Load PID into MMUCR TID */
@@ -503,12 +509,12 @@ interrupt_base:
 	/* The bailout.  Restore registers to pre-exception conditions
 	 * and call the heavyweights to help us out.
 	 */
-	mfspr	r11, SPRG7R
+	mfspr	r11, SPRN_SPRG7R
 	mtcr	r11
-	mfspr	r13, SPRG5R
-	mfspr	r12, SPRG4R
-	mfspr	r11, SPRG1
-	mfspr	r10, SPRG0
+	mfspr	r13, SPRN_SPRG5R
+	mfspr	r12, SPRN_SPRG4R
+	mfspr	r11, SPRN_SPRG1
+	mfspr	r10, SPRN_SPRG0
 	b	data_access
 
 	/* Instruction TLB Error Interrupt */
@@ -518,19 +524,20 @@ interrupt_base:
 	 * to a different point.
 	 */
 	START_EXCEPTION(InstructionTLBError)
-	mtspr	SPRG0, r10		/* Save some working registers */
-	mtspr	SPRG1, r11
-	mtspr	SPRG4W, r12
-	mtspr	SPRG5W, r13
+	mtspr	SPRN_SPRG0, r10		/* Save some working registers */
+	mtspr	SPRN_SPRG1, r11
+	mtspr	SPRN_SPRG4W, r12
+	mtspr	SPRN_SPRG5W, r13
 	mfcr	r11
-	mtspr	SPRG7W, r11
-	mfspr	r10, SRR0		/* Get faulting address */
+	mtspr	SPRN_SPRG7W, r11
+	mfspr	r10, SPRN_SRR0		/* Get faulting address */
 
 	/* If we are faulting a kernel address, we have to use the
 	 * kernel page tables.
 	 */
-	andis.	r11, r10, 0x8000
-	beq	3f
+	lis	r11, TASK_SIZE@h
+	cmplw	r10, r11
+	blt+	3f
 	lis	r11, swapper_pg_dir@h
 	ori	r11, r11, swapper_pg_dir@l
 
@@ -541,7 +548,7 @@ interrupt_base:
 
 	/* Get the PGD for the current thread */
 3:
-	mfspr	r11,SPRG3
+	mfspr	r11,SPRN_SPRG3
 	lwz	r11,PGDIR(r11)
 
 	/* Load PID into MMUCR TID */
@@ -572,12 +579,12 @@ interrupt_base:
 	/* The bailout.  Restore registers to pre-exception conditions
 	 * and call the heavyweights to help us out.
 	 */
-	mfspr	r11, SPRG7R
+	mfspr	r11, SPRN_SPRG7R
 	mtcr	r11
-	mfspr	r13, SPRG5R
-	mfspr	r12, SPRG4R
-	mfspr	r11, SPRG1
-	mfspr	r10, SPRG0
+	mfspr	r13, SPRN_SPRG5R
+	mfspr	r12, SPRN_SPRG4R
+	mfspr	r11, SPRN_SPRG1
+	mfspr	r10, SPRN_SPRG0
 	b	InstructionStorage
 
 	/* Debug Interrupt */
@@ -661,12 +668,12 @@ finish_tlb_load:
 
 	/* Done...restore registers and get out of here.
 	*/
-	mfspr	r11, SPRG7R
+	mfspr	r11, SPRN_SPRG7R
 	mtcr	r11
-	mfspr	r13, SPRG5R
-	mfspr	r12, SPRG4R
-	mfspr	r11, SPRG1
-	mfspr	r10, SPRG0
+	mfspr	r13, SPRN_SPRG5R
+	mfspr	r12, SPRN_SPRG4R
+	mfspr	r11, SPRN_SPRG1
+	mfspr	r10, SPRN_SPRG0
 	rfi					/* Force context change */
 
 /*
@@ -686,8 +693,10 @@ _GLOBAL(giveup_altivec)
  *
  * The 44x core does not have an FPU.
  */
+#ifndef CONFIG_PPC_FPU
 _GLOBAL(giveup_fpu)
 	blr
+#endif
 
 /*
  * extern void abort(void)
@@ -728,78 +737,13 @@ _GLOBAL(empty_zero_page)
 _GLOBAL(swapper_pg_dir)
 	.space	8192
 
+/* Reserved 4k for the critical exception stack & 4k for the machine
+ * check stack per CPU for kernel mode exceptions */
 	.section .bss
-/* Stack for handling critical exceptions from kernel mode */
-critical_stack_bottom:
-	.space 4096
-critical_stack_top:
-	.previous
-
-/* Stack for handling machine check exceptions from kernel mode */
-mcheck_stack_bottom:
-	.space 4096
-mcheck_stack_top:
-	.previous
-
-/*
- * This area is used for temporarily saving registers during the
- * critical and machine check exception prologs. It must always
- * follow the page aligned allocations, so it starts on a page
- * boundary, ensuring that all crit_save areas are in a single
- * page.
- */
-
-/* crit_save */
-_GLOBAL(crit_save)
-	.space  4
-_GLOBAL(crit_r10)
-	.space	4
-_GLOBAL(crit_r11)
-	.space	4
-_GLOBAL(crit_sprg0)
-	.space	4
-_GLOBAL(crit_sprg1)
-	.space	4
-_GLOBAL(crit_sprg4)
-	.space	4
-_GLOBAL(crit_sprg5)
-	.space	4
-_GLOBAL(crit_sprg7)
-	.space	4
-_GLOBAL(crit_pid)
-	.space	4
-_GLOBAL(crit_srr0)
-	.space	4
-_GLOBAL(crit_srr1)
-	.space	4
-
-/* mcheck_save */
-_GLOBAL(mcheck_save)
-	.space  4
-_GLOBAL(mcheck_r10)
-	.space	4
-_GLOBAL(mcheck_r11)
-	.space	4
-_GLOBAL(mcheck_sprg0)
-	.space	4
-_GLOBAL(mcheck_sprg1)
-	.space	4
-_GLOBAL(mcheck_sprg4)
-	.space	4
-_GLOBAL(mcheck_sprg5)
-	.space	4
-_GLOBAL(mcheck_sprg7)
-	.space	4
-_GLOBAL(mcheck_pid)
-	.space	4
-_GLOBAL(mcheck_srr0)
-	.space	4
-_GLOBAL(mcheck_srr1)
-	.space	4
-_GLOBAL(mcheck_csrr0)
-	.space	4
-_GLOBAL(mcheck_csrr1)
-	.space	4
+        .align 12
+exception_stack_bottom:
+	.space	BOOKE_EXCEPTION_STACK_SIZE
+_GLOBAL(exception_stack_top)
 
 /*
  * This space gets a copy of optional info passed to us by the bootstrap

@@ -19,8 +19,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
-#include <asm/atomic.h>
-
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -32,6 +30,8 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
+
+#include <asm/atomic.h>
 
 #include "w1.h"
 #include "w1_io.h"
@@ -58,7 +58,6 @@ LIST_HEAD(w1_masters);
 static pid_t control_thread;
 static int control_needs_exit;
 static DECLARE_COMPLETION(w1_control_complete);
-static DECLARE_WAIT_QUEUE_HEAD(w1_control_wait);
 
 static int w1_master_match(struct device *dev, struct device_driver *drv)
 {
@@ -100,7 +99,7 @@ static ssize_t w1_default_read_bin(struct kobject *kobj, char *buf, loff_t off,
 	return sprintf(buf, "No family registered.\n");
 }
 
-struct bus_type w1_bus_type = {
+static struct bus_type w1_bus_type = {
 	.name = "w1",
 	.match = w1_master_match,
 };
@@ -138,7 +137,7 @@ static struct device_attribute w1_slave_attribute_val = {
 	.show = &w1_default_read_name,
 };
 
-ssize_t w1_master_attribute_show_name(struct device *dev, char *buf)
+static ssize_t w1_master_attribute_show_name(struct device *dev, char *buf)
 {
 	struct w1_master *md = container_of (dev, struct w1_master, dev);
 	ssize_t count;
@@ -153,7 +152,7 @@ ssize_t w1_master_attribute_show_name(struct device *dev, char *buf)
 	return count;
 }
 
-ssize_t w1_master_attribute_show_pointer(struct device *dev, char *buf)
+static ssize_t w1_master_attribute_show_pointer(struct device *dev, char *buf)
 {
 	struct w1_master *md = container_of(dev, struct w1_master, dev);
 	ssize_t count;
@@ -167,14 +166,14 @@ ssize_t w1_master_attribute_show_pointer(struct device *dev, char *buf)
 	return count;
 }
 
-ssize_t w1_master_attribute_show_timeout(struct device *dev, char *buf)
+static ssize_t w1_master_attribute_show_timeout(struct device *dev, char *buf)
 {
 	ssize_t count;
 	count = sprintf(buf, "%d\n", w1_timeout);
 	return count;
 }
 
-ssize_t w1_master_attribute_show_max_slave_count(struct device *dev, char *buf)
+static ssize_t w1_master_attribute_show_max_slave_count(struct device *dev, char *buf)
 {
 	struct w1_master *md = container_of(dev, struct w1_master, dev);
 	ssize_t count;
@@ -188,7 +187,7 @@ ssize_t w1_master_attribute_show_max_slave_count(struct device *dev, char *buf)
 	return count;
 }
 
-ssize_t w1_master_attribute_show_attempts(struct device *dev, char *buf)
+static ssize_t w1_master_attribute_show_attempts(struct device *dev, char *buf)
 {
 	struct w1_master *md = container_of(dev, struct w1_master, dev);
 	ssize_t count;
@@ -202,7 +201,7 @@ ssize_t w1_master_attribute_show_attempts(struct device *dev, char *buf)
 	return count;
 }
 
-ssize_t w1_master_attribute_show_slave_count(struct device *dev, char *buf)
+static ssize_t w1_master_attribute_show_slave_count(struct device *dev, char *buf)
 {
 	struct w1_master *md = container_of(dev, struct w1_master, dev);
 	ssize_t count;
@@ -216,7 +215,7 @@ ssize_t w1_master_attribute_show_slave_count(struct device *dev, char *buf)
 	return count;
 }
 
-ssize_t w1_master_attribute_show_slaves(struct device *dev, char *buf)
+static ssize_t w1_master_attribute_show_slaves(struct device *dev, char *buf)
 
 {
 	struct w1_master *md = container_of(dev, struct w1_master, dev);
@@ -413,7 +412,8 @@ static int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 	if (!f) {
 		spin_unlock(&w1_flock);
 		dev_info(&dev->dev, "Family %x for %02x.%012llx.%02x is not registered.\n",
-			  rn->family, rn->family, rn->id, rn->crc);
+			  rn->family, rn->family,
+			  (unsigned long long)rn->id, rn->crc);
 		kfree(sl);
 		return -ENODEV;
 	}
@@ -522,9 +522,11 @@ void w1_slave_found(unsigned long data, u64 rn)
 		slave_count++;
 	}
 
+	rn = cpu_to_le64(rn);
+
 	if (slave_count == dev->slave_count &&
-		rn && ((rn >> 56) & 0xff) == w1_calc_crc8((u8 *)&rn, 7)) {
-		w1_attach_slave_device(dev, (struct w1_reg_num *) &rn);
+		rn && ((le64_to_cpu(rn) >> 56) & 0xff) == w1_calc_crc8((u8 *)&rn, 7)) {
+		w1_attach_slave_device(dev, tmp);
 	}
 			
 	atomic_dec(&dev->refcnt);
@@ -649,7 +651,7 @@ int w1_control(void *data)
 	struct w1_slave *sl;
 	struct w1_master *dev;
 	struct list_head *ent, *ment, *n, *mn;
-	int err, have_to_wait = 0, timeout;
+	int err, have_to_wait = 0;
 
 	daemonize("w1_control");
 	allow_signal(SIGTERM);
@@ -657,11 +659,8 @@ int w1_control(void *data)
 	while (!control_needs_exit || have_to_wait) {
 		have_to_wait = 0;
 
-		timeout = w1_timeout*HZ;
-		do {
-			timeout = interruptible_sleep_on_timeout(&w1_control_wait, timeout);
-			try_to_freeze(PF_FREEZE);
-		} while (!signal_pending(current) && (timeout > 0));
+		try_to_freeze(PF_FREEZE);
+		msleep_interruptible(w1_timeout * 1000);
 
 		if (signal_pending(current))
 			flush_signals(current);
@@ -721,7 +720,6 @@ int w1_control(void *data)
 int w1_process(void *data)
 {
 	struct w1_master *dev = (struct w1_master *) data;
-	unsigned long timeout;
 	struct list_head *ent, *n;
 	struct w1_slave *sl;
 
@@ -729,11 +727,8 @@ int w1_process(void *data)
 	allow_signal(SIGTERM);
 
 	while (!dev->need_exit) {
-		timeout = w1_timeout*HZ;
-		do {
-			timeout = interruptible_sleep_on_timeout(&dev->kwait, timeout);
-			try_to_freeze(PF_FREEZE);
-		} while (!signal_pending(current) && (timeout > 0));
+		try_to_freeze(PF_FREEZE);
+		msleep_interruptible(w1_timeout * 1000);
 
 		if (signal_pending(current))
 			flush_signals(current);
@@ -839,6 +834,3 @@ void w1_fini(void)
 
 module_init(w1_init);
 module_exit(w1_fini);
-
-EXPORT_SYMBOL(w1_create_master_attributes);
-EXPORT_SYMBOL(w1_destroy_master_attributes);

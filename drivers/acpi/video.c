@@ -683,7 +683,7 @@ acpi_video_bus_check (
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
-struct proc_dir_entry		*acpi_video_dir;
+static struct proc_dir_entry	*acpi_video_dir;
 
 /* video devices */
 

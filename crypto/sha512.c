@@ -105,7 +105,7 @@ static const u64 sha512_K[80] = {
 
 static inline void LOAD_OP(int I, u64 *W, const u8 *input)
 {
-	W[I] = __be64_to_cpu( ((u64*)(input))[I] );
+	W[I] = __be64_to_cpu( ((__be64*)(input))[I] );
 }
 
 static inline void BLEND_OP(int I, u64 *W)

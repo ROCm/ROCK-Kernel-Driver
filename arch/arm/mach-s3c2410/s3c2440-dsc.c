@@ -37,7 +37,7 @@
 
 int s3c2440_set_dsc(unsigned int pin, unsigned int value)
 {
-	unsigned long base;
+	void __iomem *base;
 	unsigned long val;
 	unsigned long flags;
 	unsigned long mask;

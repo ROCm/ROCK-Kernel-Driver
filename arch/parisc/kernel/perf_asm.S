@@ -22,9 +22,9 @@
 #include <linux/config.h>
 #include <asm/assembly.h>
 
-#ifdef __LP64__
+#ifdef CONFIG_64BIT
 	.level		2.0w
-#endif /* __LP64__ */
+#endif /* CONFIG_64BIT */
 
 #define MTDIAG_1(gr)    .word 0x14201840 + gr*0x10000
 #define MTDIAG_2(gr)    .word 0x14401840 + gr*0x10000

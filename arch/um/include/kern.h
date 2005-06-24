@@ -26,6 +26,7 @@ extern void *malloc(int size);
 extern void perror(char *err);
 extern int kill(int pid, int sig);
 extern int getuid(void);
+extern int getgid(void);
 extern int pause(void);
 extern int write(int, const void *, int);
 extern int exit(int);

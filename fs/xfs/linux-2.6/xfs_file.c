@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2005 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -482,11 +482,82 @@ linvfs_mprotect(
 }
 #endif /* HAVE_VMOP_MPROTECT */
 
+#ifdef HAVE_FOP_OPEN_EXEC
+/* If the user is attempting to execute a file that is offline then
+ * we have to trigger a DMAPI READ event before the file is marked as busy
+ * otherwise the invisible I/O will not be able to write to the file to bring
+ * it back online.
+ */
+STATIC int
+linvfs_open_exec(
+	struct inode	*inode)
+{
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+	xfs_mount_t	*mp = XFS_VFSTOM(vp->v_vfsp);
+	int		error = 0;
+	bhv_desc_t	*bdp;
+	xfs_inode_t	*ip;
+
+	if (vp->v_vfsp->vfs_flag & VFS_DMI) {
+		bdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
+		if (!bdp) {
+			error = -EINVAL;
+			goto open_exec_out;
+		}
+		ip = XFS_BHVTOI(bdp);
+		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ)) {
+			error = -XFS_SEND_DATA(mp, DM_EVENT_READ, vp,
+					       0, 0, 0, NULL);
+		}
+	}
+open_exec_out:
+	return error;
+}
+#endif /* HAVE_FOP_OPEN_EXEC */
+
+/*
+ * Temporary workaround to the AIO direct IO write problem.
+ * This code can go and we can revert to do_sync_write once
+ * the writepage(s) rework is merged.
+ */
+STATIC ssize_t
+linvfs_write(
+	struct file	*filp,
+	const char	__user *buf,
+	size_t		len,
+	loff_t		*ppos)
+{
+	struct kiocb	kiocb;
+	ssize_t		ret;
+
+	init_sync_kiocb(&kiocb, filp);
+	kiocb.ki_pos = *ppos;
+	ret = __linvfs_write(&kiocb, buf, 0, len, kiocb.ki_pos);
+	*ppos = kiocb.ki_pos;
+	return ret;
+}
+STATIC ssize_t
+linvfs_write_invis(
+	struct file	*filp,
+	const char	__user *buf,
+	size_t		len,
+	loff_t		*ppos)
+{
+	struct kiocb	kiocb;
+	ssize_t		ret;
+
+	init_sync_kiocb(&kiocb, filp);
+	kiocb.ki_pos = *ppos;
+	ret = __linvfs_write(&kiocb, buf, IO_INVIS, len, kiocb.ki_pos);
+	*ppos = kiocb.ki_pos;
+	return ret;
+}
+
 
 struct file_operations linvfs_file_operations = {
 	.llseek		= generic_file_llseek,
 	.read		= do_sync_read,
-	.write		= do_sync_write,
+	.write		= linvfs_write,
 	.readv		= linvfs_readv,
 	.writev		= linvfs_writev,
 	.aio_read	= linvfs_aio_read,
@@ -494,18 +565,21 @@ struct file_operations linvfs_file_operations = {
 	.sendfile	= linvfs_sendfile,
 	.unlocked_ioctl	= linvfs_ioctl,
 #ifdef CONFIG_COMPAT
-	.compat_ioctl   = xfs_compat_ioctl,
+	.compat_ioctl	= linvfs_compat_ioctl,
 #endif
 	.mmap		= linvfs_file_mmap,
 	.open		= linvfs_open,
 	.release	= linvfs_release,
 	.fsync		= linvfs_fsync,
+#ifdef HAVE_FOP_OPEN_EXEC
+	.open_exec	= linvfs_open_exec,
+#endif
 };
 
 struct file_operations linvfs_invis_file_operations = {
 	.llseek		= generic_file_llseek,
 	.read		= do_sync_read,
-	.write		= do_sync_write,
+	.write		= linvfs_write_invis,
 	.readv		= linvfs_readv_invis,
 	.writev		= linvfs_writev_invis,
 	.aio_read	= linvfs_aio_read_invis,
@@ -513,7 +587,7 @@ struct file_operations linvfs_invis_file_operations = {
 	.sendfile	= linvfs_sendfile,
 	.unlocked_ioctl	= linvfs_ioctl_invis,
 #ifdef CONFIG_COMPAT
-	.compat_ioctl   = xfs_compat_invis_ioctl,
+	.compat_ioctl	= linvfs_compat_invis_ioctl,
 #endif
 	.mmap		= linvfs_file_mmap,
 	.open		= linvfs_open,
@@ -526,6 +600,9 @@ struct file_operations linvfs_dir_operations = {
 	.read		= generic_read_dir,
 	.readdir	= linvfs_readdir,
 	.unlocked_ioctl	= linvfs_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl	= linvfs_compat_ioctl,
+#endif
 	.fsync		= linvfs_fsync,
 };
 

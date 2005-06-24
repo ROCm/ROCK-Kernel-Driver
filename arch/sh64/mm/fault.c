@@ -148,7 +148,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 	mm = tsk->mm;
 
 	/* Not an IO address, so reenable interrupts */
-	sti();
+	local_irq_enable();
 
 	/*
 	 * If we're in an interrupt or have no user
@@ -203,17 +203,17 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
  * we can handle it..
  */
 good_area:
-	if (writeaccess) {
-		if (!(vma->vm_flags & VM_WRITE))
-			goto bad_area;
-	} else {
-		if (!(vma->vm_flags & (VM_READ | VM_EXEC)))
-			goto bad_area;
-	}
-
 	if (textaccess) {
 		if (!(vma->vm_flags & VM_EXEC))
 			goto bad_area;
+	} else {
+		if (writeaccess) {
+			if (!(vma->vm_flags & VM_WRITE))
+				goto bad_area;
+		} else {
+			if (!(vma->vm_flags & VM_READ))
+				goto bad_area;
+		}
 	}
 
 	/*
@@ -264,17 +264,28 @@ bad_area:
 	up_read(&mm->mmap_sem);
 
 	if (user_mode(regs)) {
-		printk("user mode bad_area address=%08lx pid=%d (%s) pc=%08lx opcode=%08lx\n",
-			address, current->pid, current->comm,
-			(unsigned long) regs->pc,
-			*(unsigned long *)(u32)(regs->pc & ~3));
-		show_regs(regs);
+		static int count=0;
+		siginfo_t info;
+		if (count < 4) {
+			/* This is really to help debug faults when starting
+			 * usermode, so only need a few */
+			count++;
+			printk("user mode bad_area address=%08lx pid=%d (%s) pc=%08lx\n",
+				address, current->pid, current->comm,
+				(unsigned long) regs->pc);
+#if 0
+			show_regs(regs);
+#endif
+		}
 		if (tsk->pid == 1) {
 			panic("INIT had user mode bad_area\n");
 		}
 		tsk->thread.address = address;
 		tsk->thread.error_code = writeaccess;
-		force_sig(SIGSEGV, tsk);
+		info.si_signo = SIGSEGV;
+		info.si_errno = 0;
+		info.si_addr = (void *) address;
+		force_sig_info(SIGSEGV, &info, tsk);
 		return;
 	}
 

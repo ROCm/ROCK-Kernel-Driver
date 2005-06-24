@@ -234,6 +234,9 @@ Whirlpool algorithm contributors:
 Anubis algorithm contributors:
   Aaron Grothe
 
+Tiger algorithm contributors:
+  Aaron Grothe
+
 Generic scatterwalk code by Adam J. Richter <adam@yggdrasil.com>
 
 Please send any credits updates or corrections to:

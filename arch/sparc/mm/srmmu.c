@@ -161,6 +161,9 @@ static inline int srmmu_pte_none(pte_t pte)
 static inline int srmmu_pte_present(pte_t pte)
 { return ((pte_val(pte) & SRMMU_ET_MASK) == SRMMU_ET_PTE); }
 
+static inline int srmmu_pte_read(pte_t pte)
+{ return !(pte_val(pte) & SRMMU_NOREAD); }
+
 static inline void srmmu_pte_clear(pte_t *ptep)
 { srmmu_set_pte(ptep, __pte(0)); }
 
@@ -1003,8 +1006,7 @@ extern void viking_flush_cache_all(void);
 extern void viking_flush_cache_mm(struct mm_struct *mm);
 extern void viking_flush_cache_range(struct vm_area_struct *vma, unsigned long start,
 				     unsigned long end);
-extern void viking_flush_cache_page(struct vm_area_struct *vma,
-				    unsigned long page);
+extern void viking_flush_cache_page(struct vm_area_struct *vma, unsigned long page);
 extern void viking_flush_page_to_ram(unsigned long page);
 extern void viking_flush_page_for_dma(unsigned long page);
 extern void viking_flush_sig_insns(struct mm_struct *mm, unsigned long addr);
@@ -1344,7 +1346,6 @@ void __init srmmu_paging_init(void)
 
 		free_area_init_node(0, &contig_page_data, zones_size,
 				    pfn_base, zholes_size);
-		mem_map = contig_page_data.node_mem_map;
 	}
 }
 
@@ -2168,6 +2169,7 @@ void __init ld_mmu_srmmu(void)
 
 	BTFIXUPSET_CALL(pte_present, srmmu_pte_present, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pte_clear, srmmu_pte_clear, BTFIXUPCALL_SWAPO0G0);
+	BTFIXUPSET_CALL(pte_read, srmmu_pte_read, BTFIXUPCALL_NORM);
 
 	BTFIXUPSET_CALL(pmd_bad, srmmu_pmd_bad, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pmd_present, srmmu_pmd_present, BTFIXUPCALL_NORM);
@@ -2198,7 +2200,6 @@ void __init ld_mmu_srmmu(void)
 	BTFIXUPSET_CALL(free_pgd_fast, srmmu_free_pgd_fast, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(get_pgd_fast, srmmu_get_pgd_fast, BTFIXUPCALL_NORM);
 
-	BTFIXUPSET_HALF(pte_readi, SRMMU_NOREAD);
 	BTFIXUPSET_HALF(pte_writei, SRMMU_WRITE);
 	BTFIXUPSET_HALF(pte_dirtyi, SRMMU_DIRTY);
 	BTFIXUPSET_HALF(pte_youngi, SRMMU_REF);

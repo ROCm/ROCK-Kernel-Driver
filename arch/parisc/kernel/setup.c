@@ -53,6 +53,15 @@ struct proc_dir_entry * proc_runway_root = NULL;
 struct proc_dir_entry * proc_gsc_root = NULL;
 struct proc_dir_entry * proc_mckinley_root = NULL;
 
+#if !defined(CONFIG_PA20) && (defined(CONFIG_IOMMU_CCIO) || defined(CONFIG_IOMMU_SBA))
+int parisc_bus_is_phys = 1;	/* Assume no IOMMU is present */
+EXPORT_SYMBOL(parisc_bus_is_phys);
+#endif
+
+/* This sets the vmerge boundary and size, it's here because it has to
+ * be available on all platforms (zero means no-virtual merging) */
+unsigned long parisc_vmerge_boundary = 0;
+unsigned long parisc_vmerge_max_size = 0;
 
 void __init setup_cmdline(char **cmdline_p)
 {
@@ -112,6 +121,10 @@ extern void collect_boot_cpu_data(void);
 
 void __init setup_arch(char **cmdline_p)
 {
+#ifdef __LP64__
+	extern int parisc_narrow_firmware;
+#endif
+
 	init_per_cpu(smp_processor_id());	/* Set Modes & Enable FP */
 
 #ifdef __LP64__
@@ -123,7 +136,6 @@ void __init setup_arch(char **cmdline_p)
 	pdc_console_init();
 
 #ifdef __LP64__
-	extern int parisc_narrow_firmware;
 	if(parisc_narrow_firmware) {
 		printk(KERN_INFO "Kernel is using PDC in 32-bit mode.\n");
 	}
@@ -199,7 +211,7 @@ static void __init parisc_proc_mkdir(void)
 	case pcxl2:
 		if (NULL == proc_gsc_root)
 		{
-			proc_gsc_root = proc_mkdir("bus/gsc", 0);
+			proc_gsc_root = proc_mkdir("bus/gsc", NULL);
 		}
 		break;
         case pcxt_:
@@ -210,13 +222,13 @@ static void __init parisc_proc_mkdir(void)
         case pcxw2:
                 if (NULL == proc_runway_root)
                 {
-                        proc_runway_root = proc_mkdir("bus/runway", 0);
+                        proc_runway_root = proc_mkdir("bus/runway", NULL);
                 }
                 break;
 	case mako:
                 if (NULL == proc_mckinley_root)
                 {
-                        proc_mckinley_root = proc_mkdir("bus/mckinley", 0);
+                        proc_mckinley_root = proc_mkdir("bus/mckinley", NULL);
                 }
                 break;
 	default:

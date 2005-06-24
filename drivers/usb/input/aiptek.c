@@ -386,7 +386,7 @@ static int aiptek_convert_from_2s_complement(unsigned char c)
  * convention above.) I therefore have taken over REL_MISC and ABS_MISC
  * (for relative and absolute reports, respectively) for communicating
  * Proximity. Why two events? I thought it interesting to know if the
- * Proximity event occured while the tablet was in absolute or relative
+ * Proximity event occurred while the tablet was in absolute or relative
  * mode.
  *
  * Other tablets use the notion of a certain minimum stylus pressure
@@ -794,7 +794,7 @@ exit:
  * manufacturing revisions. In any event, we consider these 
  * IDs to not be model-specific nor unique.
  */
-struct usb_device_id aiptek_ids[] = {
+static const struct usb_device_id aiptek_ids[] = {
 	{USB_DEVICE(USB_VENDOR_ID_AIPTEK, 0x01)},
 	{USB_DEVICE(USB_VENDOR_ID_AIPTEK, 0x10)},
 	{USB_DEVICE(USB_VENDOR_ID_AIPTEK, 0x20)},
@@ -853,7 +853,7 @@ aiptek_set_report(struct aiptek *aiptek,
 			       USB_REQ_SET_REPORT,
 			       USB_TYPE_CLASS | USB_RECIP_INTERFACE |
 			       USB_DIR_OUT, (report_type << 8) + report_id,
-			       aiptek->ifnum, buffer, size, 5 * HZ);
+			       aiptek->ifnum, buffer, size, 5000);
 }
 
 static int
@@ -866,7 +866,7 @@ aiptek_get_report(struct aiptek *aiptek,
 			       USB_REQ_GET_REPORT,
 			       USB_TYPE_CLASS | USB_RECIP_INTERFACE |
 			       USB_DIR_IN, (report_type << 8) + report_id,
-			       aiptek->ifnum, buffer, size, 5 * HZ);
+			       aiptek->ifnum, buffer, size, 5000);
 }
 
 /***********************************************************************
@@ -2138,6 +2138,7 @@ aiptek_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	aiptek->inputdev.id.vendor = le16_to_cpu(usbdev->descriptor.idVendor);
 	aiptek->inputdev.id.product = le16_to_cpu(usbdev->descriptor.idProduct);
 	aiptek->inputdev.id.version = le16_to_cpu(usbdev->descriptor.bcdDevice);
+	aiptek->inputdev.dev = &intf->dev;
 
 	aiptek->usbdev = usbdev;
 	aiptek->ifnum = intf->altsetting[0].desc.bInterfaceNumber;

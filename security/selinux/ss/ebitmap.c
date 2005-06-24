@@ -9,49 +9,6 @@
 #include "ebitmap.h"
 #include "policydb.h"
 
-int ebitmap_or(struct ebitmap *dst, struct ebitmap *e1, struct ebitmap *e2)
-{
-	struct ebitmap_node *n1, *n2, *new, *prev;
-
-	ebitmap_init(dst);
-
-	n1 = e1->node;
-	n2 = e2->node;
-	prev = NULL;
-	while (n1 || n2) {
-		new = kmalloc(sizeof(*new), GFP_ATOMIC);
-		if (!new) {
-			ebitmap_destroy(dst);
-			return -ENOMEM;
-		}
-		memset(new, 0, sizeof(*new));
-		if (n1 && n2 && n1->startbit == n2->startbit) {
-			new->startbit = n1->startbit;
-			new->map = n1->map | n2->map;
-			n1 = n1->next;
-			n2 = n2->next;
-		} else if (!n2 || (n1 && n1->startbit < n2->startbit)) {
-			new->startbit = n1->startbit;
-			new->map = n1->map;
-			n1 = n1->next;
-		} else {
-			new->startbit = n2->startbit;
-			new->map = n2->map;
-			n2 = n2->next;
-		}
-
-		new->next = NULL;
-		if (prev)
-			prev->next = new;
-		else
-			dst->node = new;
-		prev = new;
-	}
-
-	dst->highbit = (e1->highbit > e2->highbit) ? e1->highbit : e2->highbit;
-	return 0;
-}
-
 int ebitmap_cmp(struct ebitmap *e1, struct ebitmap *e2)
 {
 	struct ebitmap_node *n1, *n2;

@@ -96,13 +96,41 @@ typedef struct idescsi_pc_s {
  */
 #define IDESCSI_LOG_CMD			0	/* Log SCSI commands */
 
-typedef struct {
-	ide_drive_t *drive;
+typedef struct ide_scsi_obj {
+	ide_drive_t		*drive;
+	ide_driver_t		*driver;
+	struct gendisk		*disk;
+	struct Scsi_Host	*host;
+
 	idescsi_pc_t *pc;			/* Current packet command */
 	unsigned long flags;			/* Status/Action flags */
 	unsigned long transform;		/* SCSI cmd translation layer */
 	unsigned long log;			/* log flags */
 } idescsi_scsi_t;
+
+static DECLARE_MUTEX(idescsi_ref_sem);
+
+#define ide_scsi_g(disk) \
+	container_of((disk)->private_data, struct ide_scsi_obj, driver)
+
+static struct ide_scsi_obj *ide_scsi_get(struct gendisk *disk)
+{
+	struct ide_scsi_obj *scsi = NULL;
+
+	down(&idescsi_ref_sem);
+	scsi = ide_scsi_g(disk);
+	if (scsi)
+		scsi_host_get(scsi->host);
+	up(&idescsi_ref_sem);
+	return scsi;
+}
+
+static void ide_scsi_put(struct ide_scsi_obj *scsi)
+{
+	down(&idescsi_ref_sem);
+	scsi_host_put(scsi->host);
+	up(&idescsi_ref_sem);
+}
 
 static inline idescsi_scsi_t *scsihost_to_idescsi(struct Scsi_Host *host)
 {
@@ -151,8 +179,18 @@ static void idescsi_input_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsigne
 			return;
 		}
 		count = min(pc->sg->length - pc->b_count, bcount);
-		buf = page_address(pc->sg->page) + pc->sg->offset;
-		drive->hwif->atapi_input_bytes(drive, buf + pc->b_count, count);
+		if (PageHighMem(pc->sg->page)) {
+			unsigned long flags;
+
+			local_irq_save(flags);
+			buf = kmap_atomic(pc->sg->page, KM_IRQ0) + pc->sg->offset;
+			drive->hwif->atapi_input_bytes(drive, buf + pc->b_count, count);
+			kunmap_atomic(buf - pc->sg->offset, KM_IRQ0);
+			local_irq_restore(flags);
+		} else {
+			buf = page_address(pc->sg->page) + pc->sg->offset;
+			drive->hwif->atapi_input_bytes(drive, buf + pc->b_count, count);
+		}
 		bcount -= count; pc->b_count += count;
 		if (pc->b_count == pc->sg->length) {
 			pc->sg++;
@@ -173,8 +211,18 @@ static void idescsi_output_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsign
 			return;
 		}
 		count = min(pc->sg->length - pc->b_count, bcount);
-		buf = page_address(pc->sg->page) + pc->sg->offset;
-		drive->hwif->atapi_output_bytes(drive, buf + pc->b_count, count);
+		if (PageHighMem(pc->sg->page)) {
+			unsigned long flags;
+
+			local_irq_save(flags);
+			buf = kmap_atomic(pc->sg->page, KM_IRQ0) + pc->sg->offset;
+			drive->hwif->atapi_output_bytes(drive, buf + pc->b_count, count);
+			kunmap_atomic(buf - pc->sg->offset, KM_IRQ0);
+			local_irq_restore(flags);
+		} else {
+			buf = page_address(pc->sg->page) + pc->sg->offset;
+			drive->hwif->atapi_output_bytes(drive, buf + pc->b_count, count);
+		}
 		bcount -= count; pc->b_count += count;
 		if (pc->b_count == pc->sg->length) {
 			pc->sg++;
@@ -298,8 +346,11 @@ static int idescsi_check_condition(ide_drive_t *drive, struct request *failed_co
 		printk ("ide-scsi: %s: queue cmd = ", drive->name);
 		hexdump(pc->c, 6);
 	}
+	rq->rq_disk = scsi->disk;
 	return ide_do_drive_cmd(drive, rq, ide_preempt);
 }
+
+static int idescsi_end_request(ide_drive_t *, int, int);
 
 static ide_startstop_t
 idescsi_atapi_error(ide_drive_t *drive, struct request *rq, u8 stat, u8 err)
@@ -309,7 +360,9 @@ idescsi_atapi_error(ide_drive_t *drive, struct request *rq, u8 stat, u8 err)
 		HWIF(drive)->OUTB(WIN_IDLEIMMEDIATE,IDE_COMMAND_REG);
 
 	rq->errors++;
-	DRIVER(drive)->end_request(drive, 0, 0);
+
+	idescsi_end_request(drive, 0, 0);
+
 	return ide_stopped;
 }
 
@@ -321,7 +374,9 @@ idescsi_atapi_abort(ide_drive_t *drive, struct request *rq)
 			((idescsi_pc_t *) rq->special)->scsi_cmd->serial_number);
 #endif
 	rq->errors |= ERROR_MAX;
-	DRIVER(drive)->end_request(drive, 0, 0);
+
+	idescsi_end_request(drive, 0, 0);
+
 	return ide_stopped;
 }
 
@@ -678,8 +733,6 @@ static void idescsi_add_settings(ide_drive_t *drive)
  */
 static void idescsi_setup (ide_drive_t *drive, idescsi_scsi_t *scsi)
 {
-	DRIVER(drive)->busy++;
-	drive->ready_stat = 0;
 	if (drive->id && (drive->id->config & 0x0060) == 0x20)
 		set_bit (IDESCSI_DRQ_INTERRUPT, &scsi->flags);
 	set_bit(IDESCSI_TRANSFORM, &scsi->transform);
@@ -688,57 +741,84 @@ static void idescsi_setup (ide_drive_t *drive, idescsi_scsi_t *scsi)
 	set_bit(IDESCSI_LOG_CMD, &scsi->log);
 #endif /* IDESCSI_DEBUG_LOG */
 	idescsi_add_settings(drive);
-	DRIVER(drive)->busy--;
 }
 
-static int idescsi_cleanup (ide_drive_t *drive)
+static int ide_scsi_remove(struct device *dev)
 {
+	ide_drive_t *drive = to_ide_device(dev);
 	struct Scsi_Host *scsihost = drive->driver_data;
+	struct ide_scsi_obj *scsi = scsihost_to_idescsi(scsihost);
+	struct gendisk *g = scsi->disk;
 
-	if (ide_unregister_subdriver(drive))
-		return 1;
-	
-	/* FIXME?: Are these two statements necessary? */
+	ide_unregister_subdriver(drive, scsi->driver);
+
+	ide_unregister_region(g);
+
 	drive->driver_data = NULL;
-	drive->disk->fops = ide_fops;
+	g->private_data = NULL;
+	put_disk(g);
 
 	scsi_remove_host(scsihost);
-	scsi_host_put(scsihost);
+	ide_scsi_put(scsi);
+
 	return 0;
 }
 
-static int idescsi_attach(ide_drive_t *drive);
+static int ide_scsi_probe(struct device *);
 
-/*
- *	IDE subdriver functions, registered with ide.c
- */
+#ifdef CONFIG_PROC_FS
+static ide_proc_entry_t idescsi_proc[] = {
+	{ "capacity", S_IFREG|S_IRUGO, proc_ide_read_capacity, NULL },
+	{ NULL, 0, NULL, NULL }
+};
+#else
+# define idescsi_proc	NULL
+#endif
+
 static ide_driver_t idescsi_driver = {
 	.owner			= THIS_MODULE,
-	.name			= "ide-scsi",
+	.gen_driver = {
+		.name		= "ide-scsi",
+		.bus		= &ide_bus_type,
+		.probe		= ide_scsi_probe,
+		.remove		= ide_scsi_remove,
+	},
 	.version		= IDESCSI_VERSION,
 	.media			= ide_scsi,
-	.busy			= 0,
 	.supports_dsc_overlap	= 0,
-	.attach			= idescsi_attach,
-	.cleanup		= idescsi_cleanup,
+	.proc			= idescsi_proc,
 	.do_request		= idescsi_do_request,
 	.end_request		= idescsi_end_request,
 	.error                  = idescsi_atapi_error,
 	.abort                  = idescsi_atapi_abort,
-	.drives			= LIST_HEAD_INIT(idescsi_driver.drives),
 };
 
 static int idescsi_ide_open(struct inode *inode, struct file *filp)
 {
-	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct ide_scsi_obj *scsi;
+	ide_drive_t *drive;
+
+	if (!(scsi = ide_scsi_get(disk)))
+		return -ENXIO;
+
+	drive = scsi->drive;
+
 	drive->usage++;
+
 	return 0;
 }
 
 static int idescsi_ide_release(struct inode *inode, struct file *filp)
 {
-	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct ide_scsi_obj *scsi = ide_scsi_g(disk);
+	ide_drive_t *drive = scsi->drive;
+
 	drive->usage--;
+
+	ide_scsi_put(scsi);
+
 	return 0;
 }
 
@@ -746,7 +826,8 @@ static int idescsi_ide_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
 	struct block_device *bdev = inode->i_bdev;
-	return generic_ide_ioctl(file, bdev, cmd, arg);
+	struct ide_scsi_obj *scsi = ide_scsi_g(bdev->bd_disk);
+	return generic_ide_ioctl(scsi->drive, file, bdev, cmd, arg);
 }
 
 static struct block_device_operations idescsi_ops = {
@@ -755,8 +836,6 @@ static struct block_device_operations idescsi_ops = {
 	.release	= idescsi_ide_release,
 	.ioctl		= idescsi_ide_ioctl,
 };
-
-static int idescsi_attach(ide_drive_t *drive);
 
 static int idescsi_slave_configure(struct scsi_device * sdp)
 {
@@ -858,6 +937,7 @@ static int idescsi_queue (struct scsi_cmnd *cmd,
 	rq->special = (char *) pc;
 	rq->flags = REQ_SPECIAL;
 	spin_unlock_irq(host->host_lock);
+	rq->rq_disk = scsi->disk;
 	(void) ide_do_drive_cmd (drive, rq, ide_end);
 	spin_lock_irq(host->host_lock);
 	return 0;
@@ -1029,12 +1109,14 @@ static struct scsi_host_template idescsi_template = {
 	.proc_name		= "ide-scsi",
 };
 
-static int idescsi_attach(ide_drive_t *drive)
+static int ide_scsi_probe(struct device *dev)
 {
+	ide_drive_t *drive = to_ide_device(dev);
 	idescsi_scsi_t *idescsi;
 	struct Scsi_Host *host;
+	struct gendisk *g;
 	static int warned;
-	int err;
+	int err = -ENOMEM;
 
 	if (!warned && drive->media == ide_cdrom) {
 		printk(KERN_WARNING "ide-scsi is deprecated for cd burning! Use ide-cd and give dev=/dev/hdX as device\n");
@@ -1045,7 +1127,13 @@ static int idescsi_attach(ide_drive_t *drive)
 	    !drive->present ||
 	    drive->media == ide_disk ||
 	    !(host = scsi_host_alloc(&idescsi_template,sizeof(idescsi_scsi_t))))
-		return 1;
+		return -ENODEV;
+
+	g = alloc_disk(1 << PARTN_BITS);
+	if (!g)
+		goto out_host_put;
+
+	ide_init_disk(g, drive);
 
 	host->max_id = 1;
 
@@ -1061,31 +1149,38 @@ static int idescsi_attach(ide_drive_t *drive)
 	drive->driver_data = host;
 	idescsi = scsihost_to_idescsi(host);
 	idescsi->drive = drive;
-	err = ide_register_subdriver(drive, &idescsi_driver);
+	idescsi->driver = &idescsi_driver;
+	idescsi->host = host;
+	idescsi->disk = g;
+	g->private_data = &idescsi->driver;
+	ide_register_subdriver(drive, &idescsi_driver);
+	err = 0;
+	idescsi_setup(drive, idescsi);
+	g->fops = &idescsi_ops;
+	ide_register_region(g);
+	err = scsi_add_host(host, &drive->gendev);
 	if (!err) {
-		idescsi_setup (drive, idescsi);
-		drive->disk->fops = &idescsi_ops;
-		err = scsi_add_host(host, &drive->gendev);
-		if (!err) {
-			scsi_scan_host(host);
-			return 0;
-		}
-		/* fall through on error */
-		ide_unregister_subdriver(drive);
+		scsi_scan_host(host);
+		return 0;
 	}
+	/* fall through on error */
+	ide_unregister_region(g);
+	ide_unregister_subdriver(drive, &idescsi_driver);
 
+	put_disk(g);
+out_host_put:
 	scsi_host_put(host);
 	return err;
 }
 
 static int __init init_idescsi_module(void)
 {
-	return ide_register_driver(&idescsi_driver);
+	return driver_register(&idescsi_driver.gen_driver);
 }
 
 static void __exit exit_idescsi_module(void)
 {
-	ide_unregister_driver(&idescsi_driver);
+	driver_unregister(&idescsi_driver.gen_driver);
 }
 
 module_init(init_idescsi_module);

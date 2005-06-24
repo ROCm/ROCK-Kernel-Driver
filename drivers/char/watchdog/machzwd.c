@@ -488,7 +488,7 @@ out:
 }
 
 
-void __exit zf_exit(void)
+static void __exit zf_exit(void)
 {
 	zf_timer_off();
 

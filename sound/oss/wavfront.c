@@ -1518,45 +1518,56 @@ wavefront_load_gus_patch (int devno, int format, const char __user *addr,
 			  int offs, int count, int pmgr_flag)
 {
 	struct patch_info guspatch;
-	wavefront_patch_info samp, pat, prog;
+	wavefront_patch_info *samp, *pat, *prog;
 	wavefront_patch *patp;
 	wavefront_sample *sampp;
 	wavefront_program *progp;
 
 	int i,base_note;
 	long sizeof_patch;
+	int rc = -ENOMEM;
+
+	samp = kmalloc(3 * sizeof(wavefront_patch_info), GFP_KERNEL);
+	if (!samp)
+		goto free_fail;
+	pat = samp + 1;
+	prog = pat + 1;
 
 	/* Copy in the header of the GUS patch */
 
 	sizeof_patch = (long) &guspatch.data[0] - (long) &guspatch; 
 	if (copy_from_user(&((char *) &guspatch)[offs],
-			   &(addr)[offs], sizeof_patch - offs))
-		return -EFAULT;
+			   &(addr)[offs], sizeof_patch - offs)) {
+		rc = -EFAULT;
+		goto free_fail;
+	}
 
 	if ((i = wavefront_find_free_patch ()) == -1) {
-		return -EBUSY;
+		rc = -EBUSY;
+		goto free_fail;
 	}
-	pat.number = i;
-	pat.subkey = WF_ST_PATCH;
-	patp = &pat.hdr.p;
+	pat->number = i;
+	pat->subkey = WF_ST_PATCH;
+	patp = &pat->hdr.p;
 
 	if ((i = wavefront_find_free_sample ()) == -1) {
-		return -EBUSY;
+		rc = -EBUSY;
+		goto free_fail;
 	}
-	samp.number = i;
-	samp.subkey = WF_ST_SAMPLE;
-	samp.size = guspatch.len;
-	sampp = &samp.hdr.s;
+	samp->number = i;
+	samp->subkey = WF_ST_SAMPLE;
+	samp->size = guspatch.len;
+	sampp = &samp->hdr.s;
 
-	prog.number = guspatch.instr_no;
-	progp = &prog.hdr.pr;
+	prog->number = guspatch.instr_no;
+	progp = &prog->hdr.pr;
 
 	/* Setup the patch structure */
 
 	patp->amplitude_bias=guspatch.volume;
 	patp->portamento=0;
-	patp->sample_number= samp.number & 0xff;
-	patp->sample_msb= samp.number>>8;
+	patp->sample_number= samp->number & 0xff;
+	patp->sample_msb= samp->number >> 8;
 	patp->pitch_bend= /*12*/ 0;
 	patp->mono=1;
 	patp->retrigger=1;
@@ -1589,7 +1600,7 @@ wavefront_load_gus_patch (int devno, int format, const char __user *addr,
 
 	/* Program for this patch */
 
-	progp->layer[0].patch_number= pat.number; /* XXX is this right ? */
+	progp->layer[0].patch_number= pat->number; /* XXX is this right ? */
 	progp->layer[0].mute=1;
 	progp->layer[0].pan_or_mod=1;
 	progp->layer[0].pan=7;
@@ -1637,11 +1648,11 @@ wavefront_load_gus_patch (int devno, int format, const char __user *addr,
 
 	/* Now ship it down */
 
-	wavefront_send_sample (&samp, 
+	wavefront_send_sample (samp,
 			       (unsigned short __user *) &(addr)[sizeof_patch],
 			       (guspatch.mode & WAVE_UNSIGNED) ? 1:0);
-	wavefront_send_patch (&pat);
-	wavefront_send_program (&prog);
+	wavefront_send_patch (pat);
+	wavefront_send_program (prog);
 
 	/* Now pan as best we can ... use the slave/internal MIDI device
 	   number if it exists (since it talks to the WaveFront), or the
@@ -1653,8 +1664,11 @@ wavefront_load_gus_patch (int devno, int format, const char __user *addr,
 				       ((guspatch.panning << 4) > 127) ?
 				       127 : (guspatch.panning << 4));
 	}
+	rc = 0;
 
-	return(0);
+free_fail:
+	kfree(samp);
+	return rc;
 }
 
 static int

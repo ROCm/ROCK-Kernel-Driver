@@ -71,7 +71,25 @@
 #define pci64_dma_build(hi,lo) \
 	((dma_addr_t)(((u64)(lo))|(((u64)(hi))<<32)))
 
-#include "qlogicfc.h"
+/*
+ * With the qlogic interface, every queue slot can hold a SCSI
+ * command with up to 2 scatter/gather entries.  If we need more
+ * than 2 entries, continuation entries can be used that hold
+ * another 5 entries each.  Unlike for other drivers, this means
+ * that the maximum number of scatter/gather entries we can
+ * support at any given time is a function of the number of queue
+ * slots available.  That is, host->can_queue and host->sg_tablesize
+ * are dynamic and _not_ independent.  This all works fine because
+ * requests are queued serially and the scatter/gather limit is
+ * determined for each queue request anew.
+ */
+
+#define DATASEGS_PER_COMMAND 2
+#define DATASEGS_PER_CONT 5
+
+#define QLOGICFC_REQ_QUEUE_LEN 255     /* must be power of two - 1 */
+#define QLOGICFC_MAX_SG(ql)	(DATASEGS_PER_COMMAND + (((ql) > 0) ? DATASEGS_PER_CONT*((ql) - 1) : 0))
+#define QLOGICFC_CMD_PER_LUN    8
 
 /* Configuration section **************************************************** */
 
@@ -693,7 +711,7 @@ static inline void isp2x00_disable_irqs(struct Scsi_Host *host)
 }
 
 
-int isp2x00_detect(Scsi_Host_Template * tmpt)
+static int isp2x00_detect(Scsi_Host_Template * tmpt)
 {
 	int hosts = 0;
 	unsigned long wait_time;
@@ -1083,7 +1101,7 @@ int isp2x00_init_fabric(struct Scsi_Host *host, struct id_name_map *port_db, int
 #endif				/* ISP2x00_FABRIC */
 
 
-int isp2x00_release(struct Scsi_Host *host)
+static int isp2x00_release(struct Scsi_Host *host)
 {
 	struct isp2x00_hostdata *hostdata;
 	dma_addr_t busaddr;
@@ -1107,7 +1125,7 @@ int isp2x00_release(struct Scsi_Host *host)
 }
 
 
-const char *isp2x00_info(struct Scsi_Host *host)
+static const char *isp2x00_info(struct Scsi_Host *host)
 {
 	static char buf[80];
 	struct isp2x00_hostdata *hostdata;
@@ -1132,7 +1150,7 @@ const char *isp2x00_info(struct Scsi_Host *host)
  * interrupt handler may call this routine as part of
  * request-completion handling).
  */
-int isp2x00_queuecommand(Scsi_Cmnd * Cmnd, void (*done) (Scsi_Cmnd *))
+static int isp2x00_queuecommand(Scsi_Cmnd * Cmnd, void (*done) (Scsi_Cmnd *))
 {
 	int i, sg_count, n, num_free;
 	u_int in_ptr, out_ptr;
@@ -1243,7 +1261,7 @@ int isp2x00_queuecommand(Scsi_Cmnd * Cmnd, void (*done) (Scsi_Cmnd *))
 
 	if (Cmnd->use_sg) {
 		sg = (struct scatterlist *) Cmnd->request_buffer;
-		sg_count = pci_map_sg(hostdata->pci_dev, sg, Cmnd->use_sg, scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+		sg_count = pci_map_sg(hostdata->pci_dev, sg, Cmnd->use_sg, Cmnd->sc_data_direction);
 		cmd->segment_cnt = cpu_to_le16(sg_count);
 		ds = cmd->dataseg;
 		/* fill in first two sg entries: */
@@ -1289,7 +1307,7 @@ int isp2x00_queuecommand(Scsi_Cmnd * Cmnd, void (*done) (Scsi_Cmnd *))
 		dma_addr_t busaddr = pci_map_page(hostdata->pci_dev,
 						  page, offset,
 						  Cmnd->request_bufflen,
-						  scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+						  Cmnd->sc_data_direction);
 		Cmnd->SCp.dma_handle = busaddr;
 
 		cmd->dataseg[0].d_base = cpu_to_le32(pci64_dma_lo32(busaddr));
@@ -1302,7 +1320,7 @@ int isp2x00_queuecommand(Scsi_Cmnd * Cmnd, void (*done) (Scsi_Cmnd *))
 		cmd->segment_cnt = cpu_to_le16(1); /* Shouldn't this be 0? */
 	}
 
-	if (Cmnd->sc_data_direction == SCSI_DATA_WRITE)
+	if (Cmnd->sc_data_direction == DMA_TO_DEVICE)
 		cmd->control_flags = cpu_to_le16(CFLAG_WRITE);
 	else 
 		cmd->control_flags = cpu_to_le16(CFLAG_READ);
@@ -1387,13 +1405,13 @@ static void redo_port_db(unsigned long arg)
 						 pci_unmap_sg(hostdata->pci_dev,
 							      (struct scatterlist *)Cmnd->buffer,
 							      Cmnd->use_sg,
-							      scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+							      Cmnd->sc_data_direction);
 					 else if (Cmnd->request_bufflen &&
 						  Cmnd->sc_data_direction != PCI_DMA_NONE) {
 						 pci_unmap_page(hostdata->pci_dev,
 								Cmnd->SCp.dma_handle,
 								Cmnd->request_bufflen,
-								scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+								Cmnd->sc_data_direction);
 					 }
 
 					 hostdata->handle_ptrs[i]->result = DID_SOFT_ERROR << 16;
@@ -1497,13 +1515,13 @@ void isp2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 					pci_unmap_sg(hostdata->pci_dev,
 						     (struct scatterlist *)Cmnd->buffer,
 						     Cmnd->use_sg,
-						     scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+						     Cmnd->sc_data_direction);
 				else if (Cmnd->request_bufflen &&
 					 Cmnd->sc_data_direction != PCI_DMA_NONE)
 					pci_unmap_page(hostdata->pci_dev,
 						       Cmnd->SCp.dma_handle,
 						       Cmnd->request_bufflen,
-						       scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+						       Cmnd->sc_data_direction);
 				Cmnd->result = 0x0;
 				(*Cmnd->scsi_done) (Cmnd);
 			} else
@@ -1551,12 +1569,12 @@ void isp2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 				if (Cmnd->use_sg)
 					pci_unmap_sg(hostdata->pci_dev,
 						     (struct scatterlist *)Cmnd->buffer, Cmnd->use_sg,
-						     scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+						     Cmnd->sc_data_direction);
 				else if (Cmnd->request_bufflen && Cmnd->sc_data_direction != PCI_DMA_NONE)
 					pci_unmap_page(hostdata->pci_dev,
 						       Cmnd->SCp.dma_handle,
 						       Cmnd->request_bufflen,
-						       scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+						       Cmnd->sc_data_direction);
 
 				/* 
 				 * if any of the following are true we do not
@@ -1697,7 +1715,7 @@ static int isp2x00_return_status(Scsi_Cmnd *Cmnd, struct Status_Entry *sts)
 }
 
 
-int isp2x00_abort(Scsi_Cmnd * Cmnd)
+static int isp2x00_abort(Scsi_Cmnd * Cmnd)
 {
 	u_short param[8];
 	int i;
@@ -1755,37 +1773,7 @@ int isp2x00_abort(Scsi_Cmnd * Cmnd)
 }
 
 
-int isp2x00_reset(Scsi_Cmnd * Cmnd, unsigned int reset_flags)
-{
-	u_short param[8];
-	struct Scsi_Host *host;
-	struct isp2x00_hostdata *hostdata;
-	int return_status = SCSI_RESET_SUCCESS;
-
-	ENTER("isp2x00_reset");
-
-	host = Cmnd->device->host;
-	hostdata = (struct isp2x00_hostdata *) host->hostdata;
-	param[0] = MBOX_BUS_RESET;
-	param[1] = 3;
-
-	isp2x00_disable_irqs(host);
-
-	isp2x00_mbox_command(host, param);
-
-	if (param[0] != MBOX_COMMAND_COMPLETE) {
-		printk("qlogicfc%d : scsi bus reset failure: %x\n", hostdata->host_id, param[0]);
-		return_status = SCSI_RESET_ERROR;
-	}
-	isp2x00_enable_irqs(host);
-
-	LEAVE("isp2x00_reset");
-
-	return return_status;
-}
-
-
-int isp2x00_biosparam(struct scsi_device *sdev, struct block_device *n,
+static int isp2x00_biosparam(struct scsi_device *sdev, struct block_device *n,
 		sector_t capacity, int ip[])
 {
 	int size = capacity;

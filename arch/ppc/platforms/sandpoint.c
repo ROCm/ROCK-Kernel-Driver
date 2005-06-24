@@ -202,13 +202,6 @@ sandpoint_setup_winbond_83553(struct pci_controller *hose)
 				0x48, /* ISA-to-PCI Addr Decoder Control */
 				0xf0);
 
-	/* Enable RTC and Keyboard address locations.  */
-	early_write_config_byte(hose,
-				0,
-				devfn,
-				0x4d,	/* Chip Select Control Register */
-				0x00);
-
 	/* Enable Port 92.  */
 	early_write_config_byte(hose,
 				0,
@@ -319,10 +312,10 @@ sandpoint_setup_arch(void)
 	 * We will do this now with good known values.  Future versions
 	 * of DINK32 are supposed to get this correct.
 	 */
-	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_SPEC7450)
+	if (cpu_has_feature(CPU_FTR_SPEC7450))
 		/* 745x is different.  We only want to pass along enable. */
 		_set_L2CR(L2CR_L2E);
-	else if (cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR)
+	else if (cpu_has_feature(CPU_FTR_L2CR))
 		/* All modules have 1MB of L2.  We also assume that an
 		 * L2 divisor of 3 will work.
 		 */
@@ -330,7 +323,7 @@ sandpoint_setup_arch(void)
 				| L2CR_L2RAM_PIPE | L2CR_L2OH_1_0 | L2CR_L2DF);
 #if 0
 	/* Untested right now. */
-	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_L3CR) {
+	if (cpu_has_feature(CPU_FTR_L3CR)) {
 		/* Magic value. */
 		_set_L3CR(0x8f032000);
 	}

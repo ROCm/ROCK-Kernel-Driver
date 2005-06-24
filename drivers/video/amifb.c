@@ -3338,7 +3338,7 @@ static int ami_get_var_cursorinfo(struct fb_var_cursorinfo *var, u_char *data)
 	register short delta;
 	register u_char color;
 	short height, width, bits, words;
-	int i, size, alloc;
+	int size, alloc;
 
 	size = par->crsr.height*par->crsr.width;
 	alloc = var->height*var->width;
@@ -3348,8 +3348,8 @@ static int ami_get_var_cursorinfo(struct fb_var_cursorinfo *var, u_char *data)
 	var->yspot = par->crsr.spot_y;
 	if (size > var->height*var->width)
 		return -ENAMETOOLONG;
-	if ((i = verify_area(VERIFY_WRITE, (void *)data, size)))
-		return i;
+	if (!access_ok(VERIFY_WRITE, (void *)data, size))
+		return -EFAULT;
 	delta = 1<<par->crsr.fmode;
 	lspr = lofsprite + (delta<<1);
 	if (par->bplcon0 & BPC0_LACE)
@@ -3413,7 +3413,6 @@ static int ami_set_var_cursorinfo(struct fb_var_cursorinfo *var, u_char *data)
 	register short delta;
 	u_short fmode;
 	short height, width, bits, words;
-	int i;
 
 	if (!var->width)
 		return -EINVAL;
@@ -3429,8 +3428,8 @@ static int ami_set_var_cursorinfo(struct fb_var_cursorinfo *var, u_char *data)
 		return -EINVAL;
 	if (!var->height)
 		return -EINVAL;
-	if ((i = verify_area(VERIFY_READ, (void *)data, var->width*var->height)))
-		return i;
+	if (!access_ok(VERIFY_READ, (void *)data, var->width*var->height))
+		return -EFAULT;
 	delta = 1<<fmode;
 	lofsprite = shfsprite = (u_short *)spritememory;
 	lspr = lofsprite + (delta<<1);

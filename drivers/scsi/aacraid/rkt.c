@@ -63,7 +63,7 @@ static irqreturn_t aac_rkt_intr(int irq, void *dev_id, struct pt_regs *regs)
 	{
 		bellbits = rkt_readl(dev, OutboundDoorbellReg);
 		if (bellbits & DoorBellPrintfReady) {
-			aac_printf(dev, le32_to_cpu(rkt_readl (dev, IndexRegs.Mailbox[5])));
+			aac_printf(dev, rkt_readl(dev, IndexRegs.Mailbox[5]));
 			rkt_writel(dev, MUnit.ODR,DoorBellPrintfReady);
 			rkt_writel(dev, InboundDoorbellReg,DoorBellPrintfDone);
 		}
@@ -94,7 +94,7 @@ static irqreturn_t aac_rkt_intr(int irq, void *dev_id, struct pt_regs *regs)
  *	@p1: first parameter
  *	@ret: adapter status
  *
- *	This routine will send a synchronous comamnd to the adapter and wait 
+ *	This routine will send a synchronous command to the adapter and wait 
  *	for its	completion.
  */
 
@@ -105,11 +105,11 @@ static int rkt_sync_cmd(struct aac_dev *dev, u32 command, u32 p1, u32 *status)
 	/*
 	 *	Write the command into Mailbox 0
 	 */
-	rkt_writel(dev, InboundMailbox0, cpu_to_le32(command));
+	rkt_writel(dev, InboundMailbox0, command);
 	/*
 	 *	Write the parameters into Mailboxes 1 - 4
 	 */
-	rkt_writel(dev, InboundMailbox1, cpu_to_le32(p1));
+	rkt_writel(dev, InboundMailbox1, p1);
 	rkt_writel(dev, InboundMailbox2, 0);
 	rkt_writel(dev, InboundMailbox3, 0);
 	rkt_writel(dev, InboundMailbox4, 0);
@@ -168,7 +168,7 @@ static int rkt_sync_cmd(struct aac_dev *dev, u32 command, u32 p1, u32 *status)
 	 *	Pull the synch status from Mailbox 0.
 	 */
 	if (status)
-		*status = le32_to_cpu(rkt_readl(dev, IndexRegs.Mailbox[0]));
+		*status = rkt_readl(dev, IndexRegs.Mailbox[0]);
 	/*
 	 *	Clear the synch command doorbell.
 	 */
@@ -275,7 +275,7 @@ static void aac_rkt_start_adapter(struct aac_dev *dev)
  */
 static int aac_rkt_check_health(struct aac_dev *dev)
 {
-	u32 status = le32_to_cpu(rkt_readl(dev, MUnit.OMRx[0]));
+	u32 status = rkt_readl(dev, MUnit.OMRx[0]);
 
 	/*
 	 *	Check to see if the board failed any self tests.
@@ -307,9 +307,9 @@ static int aac_rkt_check_health(struct aac_dev *dev)
 			return ret;
 		}
                 memset(buffer, 0, 512);
-                post->Post_Command = cpu_to_le32(COMMAND_POST_RESULTS);
+		post->Post_Command = cpu_to_le32(COMMAND_POST_RESULTS);
                 post->Post_Address = cpu_to_le32(baddr);
-                rkt_writel(dev, MUnit.IMRx[0], cpu_to_le32(paddr));
+                rkt_writel(dev, MUnit.IMRx[0], paddr);
                 rkt_sync_cmd(dev, COMMAND_POST_RESULTS, baddr, &status);
 		pci_free_consistent(dev->pdev, sizeof(struct POSTSTATUS),
 		  post, paddr);
@@ -388,8 +388,9 @@ int aac_rkt_init(struct aac_dev *dev)
 	{
 		if(time_after(jiffies, start+180*HZ))
 		{
-			status = rkt_readl(dev, IndexRegs.Mailbox[7]) >> 16;
-			printk(KERN_ERR "%s%d: adapter kernel failed to start, init status = %ld.\n", dev->name, instance, status);
+			status = rkt_readl(dev, MUnit.OMRx[0]);
+			printk(KERN_ERR "%s%d: adapter kernel failed to start, init status = %lx.\n", 
+					dev->name, instance, status);
 			goto error_iounmap;
 		}
 		set_current_state(TASK_UNINTERRUPTIBLE);

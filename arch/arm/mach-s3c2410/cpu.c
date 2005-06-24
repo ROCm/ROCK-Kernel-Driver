@@ -1,7 +1,8 @@
 /* linux/arch/arm/mach-s3c2410/cpu.c
  *
- * Copyright (c) 2004 Simtec Electronics
- * Ben Dooks <ben@simtec.co.uk>
+ * Copyright (c) 2004-2005 Simtec Electronics
+ *	http://www.simtec.co.uk/products/SWLINUX/
+ *	Ben Dooks <ben@simtec.co.uk>
  *
  * S3C24XX CPU Support
  *
@@ -181,8 +182,8 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
 
 void __init s3c24xx_init_clocks(int xtal)
 {
-	if (xtal != 0)
-		s3c24xx_xtal = xtal;
+	if (xtal == 0)
+		xtal = 12*1000*1000;
 
 	if (cpu == NULL)
 		panic("s3c24xx_init_clocks: no cpu setup?\n");

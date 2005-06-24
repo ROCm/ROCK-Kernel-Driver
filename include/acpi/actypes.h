@@ -653,24 +653,26 @@ typedef u8                                      acpi_adr_space_type;
 #define ACPI_BITREG_SLEEP_BUTTON_STATUS         0x04
 #define ACPI_BITREG_RT_CLOCK_STATUS             0x05
 #define ACPI_BITREG_WAKE_STATUS                 0x06
+#define ACPI_BITREG_PCIEXP_WAKE_STATUS          0x07
 
-#define ACPI_BITREG_TIMER_ENABLE                0x07
-#define ACPI_BITREG_GLOBAL_LOCK_ENABLE          0x08
-#define ACPI_BITREG_POWER_BUTTON_ENABLE         0x09
-#define ACPI_BITREG_SLEEP_BUTTON_ENABLE         0x0A
-#define ACPI_BITREG_RT_CLOCK_ENABLE             0x0B
-#define ACPI_BITREG_WAKE_ENABLE                 0x0C
+#define ACPI_BITREG_TIMER_ENABLE                0x08
+#define ACPI_BITREG_GLOBAL_LOCK_ENABLE          0x09
+#define ACPI_BITREG_POWER_BUTTON_ENABLE         0x0A
+#define ACPI_BITREG_SLEEP_BUTTON_ENABLE         0x0B
+#define ACPI_BITREG_RT_CLOCK_ENABLE             0x0C
+#define ACPI_BITREG_WAKE_ENABLE                 0x0D
+#define ACPI_BITREG_PCIEXP_WAKE_DISABLE         0x0E
 
-#define ACPI_BITREG_SCI_ENABLE                  0x0D
-#define ACPI_BITREG_BUS_MASTER_RLD              0x0E
-#define ACPI_BITREG_GLOBAL_LOCK_RELEASE         0x0F
-#define ACPI_BITREG_SLEEP_TYPE_A                0x10
-#define ACPI_BITREG_SLEEP_TYPE_B                0x11
-#define ACPI_BITREG_SLEEP_ENABLE                0x12
+#define ACPI_BITREG_SCI_ENABLE                  0x0F
+#define ACPI_BITREG_BUS_MASTER_RLD              0x10
+#define ACPI_BITREG_GLOBAL_LOCK_RELEASE         0x11
+#define ACPI_BITREG_SLEEP_TYPE_A                0x12
+#define ACPI_BITREG_SLEEP_TYPE_B                0x13
+#define ACPI_BITREG_SLEEP_ENABLE                0x14
 
-#define ACPI_BITREG_ARB_DISABLE                 0x13
+#define ACPI_BITREG_ARB_DISABLE                 0x15
 
-#define ACPI_BITREG_MAX                         0x13
+#define ACPI_BITREG_MAX                         0x15
 #define ACPI_NUM_BITREG                         ACPI_BITREG_MAX + 1
 
 
@@ -1206,6 +1208,7 @@ struct acpi_resource_address64
 	u64                                 max_address_range;
 	u64                                 address_translation_offset;
 	u64                                 address_length;
+	u64                                 type_specific_attributes;
 	struct acpi_resource_source         resource_source;
 };
 

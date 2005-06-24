@@ -45,7 +45,7 @@ static ssize_t read_nvram(struct file *file, char __user *buf,
 	unsigned int i;
 	char __user *p = buf;
 
-	if (verify_area(VERIFY_WRITE, buf, count))
+	if (!access_ok(VERIFY_WRITE, buf, count))
 		return -EFAULT;
 	if (*ppos >= NVRAM_SIZE)
 		return 0;
@@ -63,7 +63,7 @@ static ssize_t write_nvram(struct file *file, const char __user *buf,
 	const char __user *p = buf;
 	char c;
 
-	if (verify_area(VERIFY_READ, buf, count))
+	if (!access_ok(VERIFY_READ, buf, count))
 		return -EFAULT;
 	if (*ppos >= NVRAM_SIZE)
 		return 0;

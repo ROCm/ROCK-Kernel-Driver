@@ -36,7 +36,6 @@ struct old_serial_port {
 	unsigned int port;
 	unsigned int irq;
 	unsigned int flags;
-	unsigned char hub6;
 	unsigned char io_type;
 	unsigned char *iomem_base;
 	unsigned short iomem_reg_shift;

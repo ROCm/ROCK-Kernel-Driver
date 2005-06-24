@@ -353,20 +353,6 @@ static int hs_init(struct pcmcia_socket *s)
 
 /*============================================================*/
 
-static int hs_suspend(struct pcmcia_socket *s)
-{
-#ifdef HD64465_DEBUG
-    	hs_socket_t *sp = container_of(s, struct hs_socket_t, socket);
-    	DPRINTK("hs_suspend(%d)\n", sp->number);
-#endif
-
-    	/* TODO */
-	
-	return 0;
-}
-
-/*============================================================*/
-
 
 static int hs_get_status(struct pcmcia_socket *s, u_int *value)
 {
@@ -763,7 +749,6 @@ static irqreturn_t hs_interrupt(int irq, void *dev, struct pt_regs *regs)
 
 static struct pccard_operations hs_operations = {
 	.init			= hs_init,
-	.suspend		= hs_suspend,
 	.get_status		= hs_get_status,
 	.get_socket		= hs_get_socket,
 	.set_socket		= hs_set_socket,
@@ -860,7 +845,7 @@ static void hs_exit_socket(hs_socket_t *sp)
 	local_irq_restore(flags);
 }
 
-static int hd64465_suspend(struct device *dev, u32 state, u32 level)
+static int hd64465_suspend(struct device *dev, pm_message_t state, u32 level)
 {
 	int ret = 0;
 	if (level == SUSPEND_SAVE_STATE)

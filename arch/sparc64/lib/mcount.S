@@ -38,22 +38,22 @@ _mcount:
 	 * Check whether %sp is dangerously low.
 	 */
 	ldub		[%g6 + TI_FPDEPTH], %g1
-	srl		%g1, 1, %g5
-	add		%g5, 1, %g5
-	sllx		%g5, 8, %g5			! each fpregs frame is 256b
-	add		%g5, 192, %g5
-	add		%g6, %g5, %g5			! where does task_struct+frame end?
-	sub		%g5, STACK_BIAS, %g5
-	cmp		%sp, %g5
+	srl		%g1, 1, %g3
+	add		%g3, 1, %g3
+	sllx		%g3, 8, %g3			! each fpregs frame is 256b
+	add		%g3, 192, %g3
+	add		%g6, %g3, %g3			! where does task_struct+frame end?
+	sub		%g3, STACK_BIAS, %g3
+	cmp		%sp, %g3
 	bg,pt		%xcc, 1f
-	 sethi		%hi(panicstring), %g5
+	 sethi		%hi(panicstring), %g3
 	sethi		%hi(ovstack), %g7		! cant move to panic stack fast enough
 	 or		%g7, %lo(ovstack), %g7
 	add		%g7, OVSTACKSIZE, %g7
 	sub		%g7, STACK_BIAS, %g7
 	mov		%g7, %sp
 	call		prom_printf
-	 or		%g5, %lo(panicstring), %o0
+	 or		%g3, %lo(panicstring), %o0
 	call		prom_halt
 	 nop
 #endif

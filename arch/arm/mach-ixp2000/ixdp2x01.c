@@ -3,7 +3,7 @@
  *
  * Code common to Intel IXDP2401 and IXDP2801 platforms
  *
- * Original Author: Andrzej Mialwoski <andrzej.mialwoski@intel.com>
+ * Original Author: Andrzej Mialkowski <andrzej.mialkowski@intel.com>
  * Maintainer: Deepak Saxena <dsaxena@plexity.net>
  *
  * Copyright (C) 2002-2003 Intel Corp.

@@ -225,13 +225,6 @@ struct stat64 {
 	unsigned int	st_ino_hi;
 };
 
-typedef union sigval32 {
-	int sival_int;
-	unsigned int sival_ptr;
-} sigval_t32;
-
-#define SIGEV_PAD_SIZE32 ((SIGEV_MAX_SIZE/sizeof(int)) - 3)
-
 typedef struct compat_siginfo {
 	int si_signo;
 	int si_errno;
@@ -251,7 +244,7 @@ typedef struct compat_siginfo {
 			timer_t _tid;		/* timer id */
 			int _overrun;		/* overrun count */
 			char _pad[sizeof(unsigned int) - sizeof(int)];
-			sigval_t32 _sigval;	/* same as below */
+			compat_sigval_t _sigval;	/* same as below */
 			int _sys_private;       /* not to be passed to user */
 		} _timer;
 
@@ -259,7 +252,7 @@ typedef struct compat_siginfo {
 		struct {
 			unsigned int _pid;	/* sender's pid */
 			unsigned int _uid;	/* sender's uid */
-			sigval_t32 _sigval;
+			compat_sigval_t _sigval;
 		} _rt;
 
 		/* SIGCHLD */
@@ -283,19 +276,6 @@ typedef struct compat_siginfo {
 		} _sigpoll;
 	} _sifields;
 } compat_siginfo_t;
-
-typedef struct sigevent32 {
-	sigval_t32 sigev_value;
-	int sigev_signo;
-	int sigev_notify;
-	union {
-		int _pad[SIGEV_PAD_SIZE32];
-		struct {
-			u32 _function;
-			u32 _attribute; /* really pthread_attr_t */
-		} _sigev_thread;
-	} _sigev_un;
-} sigevent_t32;
 
 struct old_linux32_dirent {
 	u32	d_ino;

@@ -26,7 +26,6 @@ int savagefb_sync(struct fb_info *info)
 	par->SavageWaitIdle(par);
 	return 0;
 }
-EXPORT_SYMBOL(savagefb_sync);
 
 void savagefb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
 {
@@ -61,7 +60,6 @@ void savagefb_copyarea(struct fb_info *info, const struct fb_copyarea *region)
 	BCI_SEND(BCI_X_Y(dx, dy));
 	BCI_SEND(BCI_W_H(region->width, region->height));
 }
-EXPORT_SYMBOL(savagefb_copyarea);
 
 void savagefb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
@@ -89,7 +87,6 @@ void savagefb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 	BCI_SEND( BCI_X_Y(rect->dx, rect->dy) );
 	BCI_SEND( BCI_W_H(rect->width, rect->height) );
 }
-EXPORT_SYMBOL(savagefb_fillrect);
 
 void savagefb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
@@ -135,6 +132,5 @@ void savagefb_imageblit(struct fb_info *info, const struct fb_image *image)
 	for (i = 0; i < size; i++)
 		BCI_SEND(src[i]);
 }
-EXPORT_SYMBOL(savagefb_imageblit);
 
 MODULE_LICENSE("GPL");

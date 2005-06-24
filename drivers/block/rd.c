@@ -86,7 +86,7 @@ int rd_size = CONFIG_BLK_DEV_RAM_SIZE;		/* Size of the RAM disks */
  * behaviour. The default is still BLOCK_SIZE (needed by rd_load_image that
  * supposes the filesystem in the image uses a BLOCK_SIZE blocksize).
  */
-int rd_blocksize = BLOCK_SIZE;			/* blocksize of the RAM disks */
+static int rd_blocksize = BLOCK_SIZE;		/* blocksize of the RAM disks */
 
 /*
  * Copyright (C) 2000 Linus Torvalds.
@@ -325,7 +325,7 @@ static int rd_ioctl(struct inode *inode, struct file *file,
  */
 static struct backing_dev_info rd_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
-	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+	.capabilities	= BDI_CAP_NO_ACCT_DIRTY | BDI_CAP_NO_WRITEBACK | BDI_CAP_MAP_COPY,
 	.unplug_io_fn	= default_unplug_io_fn,
 };
 
@@ -336,7 +336,7 @@ static struct backing_dev_info rd_backing_dev_info = {
  */
 static struct backing_dev_info rd_file_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
-	.memory_backed	= 0,	/* Does contribute to dirty memory */
+	.capabilities	= BDI_CAP_MAP_COPY,	/* Does contribute to dirty memory */
 	.unplug_io_fn	= default_unplug_io_fn,
 };
 

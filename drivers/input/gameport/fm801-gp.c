@@ -146,7 +146,7 @@ static struct pci_driver fm801_gp_driver = {
 
 static int __init fm801_gp_init(void)
 {
-	return pci_module_init(&fm801_gp_driver);
+	return pci_register_driver(&fm801_gp_driver);
 }
 
 static void __exit fm801_gp_exit(void)

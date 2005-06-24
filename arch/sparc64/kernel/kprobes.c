@@ -68,8 +68,14 @@ static inline void prepare_singlestep(struct kprobe *p, struct pt_regs *regs)
 	current_kprobe_orig_tstate_pil = (regs->tstate & TSTATE_PIL);
 	regs->tstate |= TSTATE_PIL;
 
-	regs->tpc = (unsigned long) &p->ainsn.insn[0];
-	regs->tnpc = (unsigned long) &p->ainsn.insn[1];
+	/*single step inline, if it a breakpoint instruction*/
+	if (p->opcode == BREAKPOINT_INSTRUCTION) {
+		regs->tpc = (unsigned long) p->addr;
+		regs->tnpc = current_kprobe_orig_tnpc;
+	} else {
+		regs->tpc = (unsigned long) &p->ainsn.insn[0];
+		regs->tnpc = (unsigned long) &p->ainsn.insn[1];
+	}
 }
 
 static inline void disarm_kprobe(struct kprobe *p, struct pt_regs *regs)
@@ -97,6 +103,12 @@ static int kprobe_handler(struct pt_regs *regs)
 		 */
 		p = get_kprobe(addr);
 		if (p) {
+			if (kprobe_status == KPROBE_HIT_SS) {
+				regs->tstate = ((regs->tstate & ~TSTATE_PIL) |
+					current_kprobe_orig_tstate_pil);
+				unlock_kprobes();
+				goto no_kprobe;
+			}
 			disarm_kprobe(p, regs);
 			ret = 1;
 		} else {
@@ -128,7 +140,7 @@ static int kprobe_handler(struct pt_regs *regs)
 
 	kprobe_status = KPROBE_HIT_ACTIVE;
 	current_kprobe = p;
-	if (p->pre_handler(p, regs))
+	if (p->pre_handler && p->pre_handler(p, regs))
 		return 1;
 
 ss_probe:

@@ -132,7 +132,7 @@ static int amd_create_gatt_pages(int nr_tables)
 #define GET_GATT(addr) (amd_irongate_private.gatt_pages[\
 	GET_PAGE_DIR_IDX(addr)]->remapped)
 
-static int amd_create_gatt_table(void)
+static int amd_create_gatt_table(struct agp_bridge_data *bridge)
 {
 	struct aper_size_info_lvl2 *value;
 	struct amd_page_map page_dir;
@@ -175,7 +175,7 @@ static int amd_create_gatt_table(void)
 	return 0;
 }
 
-static int amd_free_gatt_table(void)
+static int amd_free_gatt_table(struct agp_bridge_data *bridge)
 {
 	struct amd_page_map page_dir;
 
@@ -314,7 +314,8 @@ static int amd_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
-		writel(agp_generic_mask_memory(mem->memory[i], mem->type), cur_gatt+GET_GATT_OFF(addr));
+		writel(agp_generic_mask_memory(agp_bridge,
+			mem->memory[i], mem->type), cur_gatt+GET_GATT_OFF(addr));
 		readl(cur_gatt+GET_GATT_OFF(addr));	/* PCI Posting. */
 	}
 	amd_irongate_tlbflush(mem);
@@ -357,7 +358,7 @@ static struct gatt_mask amd_irongate_masks[] =
 	{.mask = 1, .type = 0}
 };
 
-struct agp_bridge_driver amd_irongate_driver = {
+static struct agp_bridge_driver amd_irongate_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= amd_irongate_sizes,
 	.size_type		= LVL2_APER_SIZE,
@@ -421,6 +422,53 @@ static int __devinit agp_amdk7_probe(struct pci_dev *pdev,
 	bridge->dev = pdev;
 	bridge->capndx = cap_ptr;
 
+	/* 751 Errata (22564_B-1.PDF)
+	   erratum 20: strobe glitch with Nvidia NV10 GeForce cards.
+	   system controller may experience noise due to strong drive strengths
+	 */
+	if (agp_bridge->dev->device == PCI_DEVICE_ID_AMD_FE_GATE_7006) {
+		u8 cap_ptr=0;
+		struct pci_dev *gfxcard=NULL;
+		while (!cap_ptr) {
+			gfxcard = pci_get_class(PCI_CLASS_DISPLAY_VGA<<8, gfxcard);
+			if (!gfxcard) {
+				printk (KERN_INFO PFX "Couldn't find an AGP VGA controller.\n");
+				return -ENODEV;
+			}
+			cap_ptr = pci_find_capability(gfxcard, PCI_CAP_ID_AGP);
+			if (!cap_ptr) {
+				pci_dev_put(gfxcard);
+				continue;
+			}
+		}
+
+		/* With so many variants of NVidia cards, it's simpler just
+		   to blacklist them all, and then whitelist them as needed
+		   (if necessary at all). */
+		if (gfxcard->vendor == PCI_VENDOR_ID_NVIDIA) {
+			agp_bridge->flags |= AGP_ERRATA_1X;
+			printk (KERN_INFO PFX "AMD 751 chipset with NVidia GeForce detected. Forcing to 1X due to errata.\n");
+		}
+		pci_dev_put(gfxcard);
+	}
+
+	/* 761 Errata (23613_F.pdf)
+	 * Revisions B0/B1 were a disaster.
+	 * erratum 44: SYSCLK/AGPCLK skew causes 2X failures -- Force mode to 1X
+	 * erratum 45: Timing problem prevents fast writes -- Disable fast write.
+	 * erratum 46: Setup violation on AGP SBA pins - Disable side band addressing.
+	 * With this lot disabled, we should prevent lockups. */
+	if (agp_bridge->dev->device == PCI_DEVICE_ID_AMD_FE_GATE_700E) {
+		u8 revision=0;
+		pci_read_config_byte(pdev, PCI_REVISION_ID, &revision);
+		if (revision == 0x10 || revision == 0x11) {
+			agp_bridge->flags = AGP_ERRATA_FASTWRITES;
+			agp_bridge->flags |= AGP_ERRATA_SBA;
+			agp_bridge->flags |= AGP_ERRATA_1X;
+			printk (KERN_INFO PFX "AMD 761 chipset with errata detected - disabling AGP fast writes & SBA and forcing to 1X.\n");
+		}
+	}
+
 	/* Fill in the mode register */
 	pci_read_config_dword(pdev,
 			bridge->capndx+PCI_AGP_STATUS,
@@ -480,7 +528,7 @@ static int __init agp_amdk7_init(void)
 {
 	if (agp_off)
 		return -EINVAL;
-	return pci_module_init(&agp_amdk7_pci_driver);
+	return pci_register_driver(&agp_amdk7_pci_driver);
 }
 
 static void __exit agp_amdk7_cleanup(void)

@@ -60,7 +60,8 @@
 #define access_ok(type,addr,size) (__range_ok(addr,size) == 0)
 #define __access_ok(addr,size) (__range_ok(addr,size) == 0)
 
-extern inline int verify_area(int type, const void __user * addr, unsigned long size)
+/* this function will go away soon - use access_ok() instead */
+extern inline int __deprecated verify_area(int type, const void __user * addr, unsigned long size)
 {
 	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }
@@ -312,6 +313,12 @@ struct exception_table_entry
    becomes BYTE_PER_WORD i.e. only 4 (since sizeof(long)==sizeof(void*)==4 on
    sh64 at the moment). */
 #define ARCH_KMALLOC_MINALIGN 8
+
+/*
+ * We want 8-byte alignment for the slab caches as well, otherwise we have
+ * the same BYTES_PER_WORD (sizeof(void *)) min align in kmem_cache_create().
+ */
+#define ARCH_SLAB_MINALIGN 8
 
 /* Returns 0 if exception not found and fixup.unit otherwise.  */
 extern unsigned long search_exception_table(unsigned long addr);

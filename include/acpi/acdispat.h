@@ -374,6 +374,16 @@ acpi_ds_create_node (
 
 /* dsutils - Parser/Interpreter interface utility routines */
 
+void
+acpi_ds_clear_implicit_return (
+	struct acpi_walk_state          *walk_state);
+
+u8
+acpi_ds_do_implicit_return (
+	union acpi_operand_object       *return_desc,
+	struct acpi_walk_state          *walk_state,
+	u8                              add_reference);
+
 u8
 acpi_ds_is_result_used (
 	union acpi_parse_object         *op,

@@ -74,9 +74,9 @@ static char banner[] __initdata = KERN_INFO PFX SC1200_MODULE_VER;
 static int timeout = 1;
 static int io = -1;
 static int io_len = 2;		/* for non plug and play */
-struct semaphore open_sem;
+static struct semaphore open_sem;
 static char expect_close;
-spinlock_t sc1200wdt_lock;	/* io port access serialisation */
+static spinlock_t sc1200wdt_lock;	/* io port access serialisation */
 
 #if defined CONFIG_PNP
 static int isapnp = 1;
@@ -335,7 +335,7 @@ static int __init sc1200wdt_probe(void)
 
 #if defined CONFIG_PNP
 
-struct pnp_device_id scl200wdt_pnp_devices[] = {
+static struct pnp_device_id scl200wdt_pnp_devices[] = {
 	/* National Semiconductor PC87307/PC97307 watchdog component */
 	{.id = "NSC0800", .driver_data = 0},
 	{.id = ""},

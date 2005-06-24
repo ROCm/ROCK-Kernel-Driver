@@ -34,7 +34,7 @@
  */
 void nr_clear_queues(struct sock *sk)
 {
-	nr_cb *nr = nr_sk(sk);
+	struct nr_sock *nr = nr_sk(sk);
 
 	skb_queue_purge(&sk->sk_write_queue);
 	skb_queue_purge(&nr->ack_queue);
@@ -49,7 +49,7 @@ void nr_clear_queues(struct sock *sk)
  */
 void nr_frames_acked(struct sock *sk, unsigned short nr)
 {
-	nr_cb *nrom = nr_sk(sk);
+	struct nr_sock *nrom = nr_sk(sk);
 	struct sk_buff *skb;
 
 	/*
@@ -88,7 +88,7 @@ void nr_requeue_frames(struct sock *sk)
  */
 int nr_validate_nr(struct sock *sk, unsigned short nr)
 {
-	nr_cb *nrom = nr_sk(sk);
+	struct nr_sock *nrom = nr_sk(sk);
 	unsigned short vc = nrom->va;
 
 	while (vc != nrom->vs) {
@@ -104,7 +104,7 @@ int nr_validate_nr(struct sock *sk, unsigned short nr)
  */
 int nr_in_rx_window(struct sock *sk, unsigned short ns)
 {
-	nr_cb *nr = nr_sk(sk);
+	struct nr_sock *nr = nr_sk(sk);
 	unsigned short vc = nr->vr;
 	unsigned short vt = (nr->vl + nr->window) % NR_MODULUS;
 
@@ -122,7 +122,7 @@ int nr_in_rx_window(struct sock *sk, unsigned short ns)
  */
 void nr_write_internal(struct sock *sk, int frametype)
 {
-	nr_cb *nr = nr_sk(sk);
+	struct nr_sock *nr = nr_sk(sk);
 	struct sk_buff *skb;
 	unsigned char  *dptr;
 	int len, timeout;

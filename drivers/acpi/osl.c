@@ -646,7 +646,7 @@ acpi_os_write_pci_configuration (struct acpi_pci_id *pci_id, u32 reg, acpi_integ
 }
 
 /* TODO: Change code to take advantage of driver model more */
-void
+static void
 acpi_os_derive_pci_id_2 (
 	acpi_handle		rhandle,        /* upper bound  */
 	acpi_handle		chandle,        /* current node */
@@ -1154,7 +1154,7 @@ acpi_os_signal (
 }
 EXPORT_SYMBOL(acpi_os_signal);
 
-int __init
+static int __init
 acpi_os_name_setup(char *str)
 {
 	char *p = acpi_os_name;
@@ -1184,7 +1184,7 @@ __setup("acpi_os_name=", acpi_os_name_setup);
  * empty string disables _OSI
  * TBD additional string adds to _OSI
  */
-int __init
+static int __init
 acpi_osi_setup(char *str)
 {
 	if (str == NULL || *str == '\0') {
@@ -1202,7 +1202,7 @@ acpi_osi_setup(char *str)
 __setup("acpi_osi=", acpi_osi_setup);
 
 /* enable serialization to combat AE_ALREADY_EXISTS errors */
-int __init
+static int __init
 acpi_serialize_setup(char *str)
 {
 	printk(KERN_INFO PREFIX "serialize enabled\n");
@@ -1223,7 +1223,7 @@ __setup("acpi_serialize", acpi_serialize_setup);
  * Run-time events on the same GPE this flag is available
  * to tell Linux to keep the wake-time GPEs enabled at run-time.
  */
-int __init
+static int __init
 acpi_wake_gpes_always_on_setup(char *str)
 {
 	printk(KERN_INFO PREFIX "wake GPEs not disabled\n");

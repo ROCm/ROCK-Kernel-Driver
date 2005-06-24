@@ -223,7 +223,7 @@ int __init TAU_init(void)
 	/* We assume in SMP that if one CPU has TAU support, they
 	 * all have it --BenH
 	 */
-	if (!(cur_cpu_spec[0]->cpu_features & CPU_FTR_TAU)) {
+	if (!cpu_has_feature(CPU_FTR_TAU)) {
 		printk("Thermal assist unit not available\n");
 		tau_initialized = 0;
 		return 1;

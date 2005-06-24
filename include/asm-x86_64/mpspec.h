@@ -156,7 +156,7 @@ struct mpc_config_lintsrc
  *	7	2 CPU MCA+PCI
  */
 
-#define MAX_MP_BUSSES 270
+#define MAX_MP_BUSSES 256
 #define MAX_IRQ_SOURCES 256
 enum mp_bustype {
 	MP_BUS_ISA = 1,
@@ -176,7 +176,6 @@ extern int apic_version [MAX_APICS];
 extern int mp_irq_entries;
 extern struct mpc_config_intsrc mp_irqs [MAX_IRQ_SOURCES];
 extern int mpc_default_type;
-extern int mp_current_pci_id;
 extern unsigned long mp_lapic_addr;
 extern int pic_mode;
 

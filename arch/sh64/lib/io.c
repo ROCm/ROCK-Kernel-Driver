@@ -9,14 +9,12 @@
  */
 
 #include <linux/config.h>
+#include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <asm/system.h>
 #include <asm/processor.h>
 #include <asm/io.h>
-#ifdef CONFIG_SH_CAYMAN
-#include <asm/cayman.h>
-#endif
 
 /*
  * readX/writeX() are used to access memory mapped devices. On some
@@ -24,71 +22,6 @@
  * differently. On the SuperH architecture, we just read/write the
  * memory location directly.
  */
-
-#define dprintk(x...)
-
-static int io_addr(int x) {
-	if (x < 0x400) {
-#ifdef CONFIG_SH_CAYMAN
-		return (x << 2) | smsc_superio_virt;
-#else
-		panic ("Illegal access to I/O port 0x%04x\n", x);
-		return 0;
-#endif
-	} else {
-#ifdef CONFIG_PCI
-		return (x + pciio_virt);
-#else
-		panic ("Illegal access to I/O port 0x%04x\n", x);
-		return 0;
-#endif
-	}
-}
-
-unsigned long inb(unsigned long port)
-{
-	unsigned long r;
-
-	r = ctrl_inb(io_addr(port));
-	dprintk("inb(0x%x)=0x%x (0x%x)\n", port, r, io_addr(port));
-	return r;
-}
-
-unsigned long inw(unsigned long port)
-{
-	unsigned long r;
-
-	r = ctrl_inw(io_addr(port));
-	dprintk("inw(0x%x)=0x%x (0x%x)\n", port, r, io_addr(port));
-	return r;
-}
-
-unsigned long inl(unsigned long port)
-{
-	unsigned long r;
-
-	r = ctrl_inl(io_addr(port));
-	dprintk("inl(0x%x)=0x%x (0x%x)\n", port, r, io_addr(port));
-	return r;
-}
-
-void outb(unsigned long value, unsigned long port)
-{
-	dprintk("outb(0x%x,0x%x) (0x%x)\n", value, port, io_addr(port));
-	ctrl_outb(value, io_addr(port));
-}
-
-void outw(unsigned long value, unsigned long port)
-{
-	dprintk("outw(0x%x,0x%x) (0x%x)\n", value, port, io_addr(port));
-	ctrl_outw(value, io_addr(port));
-}
-
-void outl(unsigned long value, unsigned long port)
-{
-	dprintk("outw(0x%x,0x%x) (0x%x)\n", value, port, io_addr(port));
-	ctrl_outl(value, io_addr(port));
-}
 
 /* This is horrible at the moment - needs more work to do something sensible */
 #define IO_DELAY()
@@ -185,7 +118,7 @@ void insl(unsigned long port, void *addr, unsigned long count)
 	}
 }
 
-void memcpy_toio(unsigned long to, const void *from, long count)
+void memcpy_toio(void __iomem *to, const void *from, long count)
 {
 	unsigned char *p = (unsigned char *) from;
 
@@ -195,7 +128,7 @@ void memcpy_toio(unsigned long to, const void *from, long count)
 	}
 }
 
-void memcpy_fromio(void *to, unsigned long from, long count)
+void memcpy_fromio(void *to, void __iomem *from, long count)
 {
 	int i;
 	unsigned char *p = (unsigned char *) to;

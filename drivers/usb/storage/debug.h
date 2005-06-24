@@ -47,8 +47,6 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 
-struct scsi_cmnd;
-
 #define USB_STORAGE "usb-storage: "
 
 #ifdef CONFIG_USB_STORAGE_DEBUG

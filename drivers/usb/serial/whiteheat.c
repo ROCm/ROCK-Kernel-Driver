@@ -254,6 +254,7 @@ static int firm_report_tx_done(struct usb_serial_port *port);
 
 #define COMMAND_PORT		4
 #define COMMAND_TIMEOUT		(2*HZ)	/* 2 second timeout for a command */
+#define	COMMAND_TIMEOUT_MS	2000
 #define CLOSING_DELAY		(30 * HZ)
 
 
@@ -379,7 +380,7 @@ static int whiteheat_attach (struct usb_serial *serial)
          * unlinking bug in disguise. Same for the call below.
          */
 	usb_clear_halt(serial->dev, pipe);
-	ret = usb_bulk_msg (serial->dev, pipe, command, 2, &alen, COMMAND_TIMEOUT);
+	ret = usb_bulk_msg (serial->dev, pipe, command, 2, &alen, COMMAND_TIMEOUT_MS);
 	if (ret) {
 		err("%s: Couldn't send command [%d]", serial->type->name, ret);
 		goto no_firmware;
@@ -391,7 +392,7 @@ static int whiteheat_attach (struct usb_serial *serial)
 	pipe = usb_rcvbulkpipe (serial->dev, command_port->bulk_in_endpointAddress);
 	/* See the comment on the usb_clear_halt() above */
 	usb_clear_halt(serial->dev, pipe);
-	ret = usb_bulk_msg (serial->dev, pipe, result, sizeof(*hw_info) + 1, &alen, COMMAND_TIMEOUT);
+	ret = usb_bulk_msg (serial->dev, pipe, result, sizeof(*hw_info) + 1, &alen, COMMAND_TIMEOUT_MS);
 	if (ret) {
 		err("%s: Couldn't get results [%d]", serial->type->name, ret);
 		goto no_firmware;

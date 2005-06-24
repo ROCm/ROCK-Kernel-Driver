@@ -7,7 +7,7 @@
  */
 
 #include <asm/pgtable.h>
-#include <asm/mmu_context.h>
+#include <asm/mmu.h>
 
 /* %g1	TLB_SFSR	(%g1 + %g1 == TLB_TAG_ACCESS)
  * %g2	(KERN_HIGHBITS | KERN_LOWBITS)
@@ -68,8 +68,8 @@
 /* DTLB ** ICACHE line 1: Quick user TLB misses		*/
 	ldxa		[%g1 + %g1] ASI_DMMU, %g4	! Get TAG_ACCESS
 	andcc		%g4, TAG_CONTEXT_BITS, %g0	! From Nucleus?
-	mov		1, %g5				! For TL==3 test
 from_tl1_trap:
+	rdpr		%tl, %g5			! For TL==3 test
 	CREATE_VPTE_OFFSET1(%g4, %g6)			! Create VPTE offset
 	be,pn		%xcc, 3f			! Yep, special processing
 	 CREATE_VPTE_OFFSET2(%g4, %g6)			! Create VPTE offset

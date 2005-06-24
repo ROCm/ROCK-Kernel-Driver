@@ -23,6 +23,9 @@
  *     04-Jan-2005 BJD  New uart init call
  *     10-Jan-2005 BJD  Removed include of s3c2410.h
  *     14-Jan-2005 BJD  Add support for muitlple NAND devices
+ *     03-Mar-2005 BJD  Ensured that bast-cpld.h is included
+ *     10-Mar-2005 LCVR Changed S3C2410_VA to S3C24XX_VA
+ *     14-Mar-2006 BJD  Updated for __iomem changes
 */
 
 #include <linux/kernel.h>
@@ -39,6 +42,7 @@
 
 #include <asm/arch/bast-map.h>
 #include <asm/arch/bast-irq.h>
+#include <asm/arch/bast-cpld.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -65,10 +69,10 @@
 #define COPYRIGHT ", (c) 2004-2005 Simtec Electronics"
 
 /* macros for virtual address mods for the io space entries */
-#define VA_C5(item) ((item) + BAST_VAM_CS5)
-#define VA_C4(item) ((item) + BAST_VAM_CS4)
-#define VA_C3(item) ((item) + BAST_VAM_CS3)
-#define VA_C2(item) ((item) + BAST_VAM_CS2)
+#define VA_C5(item) ((unsigned long)(item) + BAST_VAM_CS5)
+#define VA_C4(item) ((unsigned long)(item) + BAST_VAM_CS4)
+#define VA_C3(item) ((unsigned long)(item) + BAST_VAM_CS3)
+#define VA_C2(item) ((unsigned long)(item) + BAST_VAM_CS2)
 
 /* macros to modify the physical addresses for io space */
 
@@ -80,8 +84,8 @@
 static struct map_desc bast_iodesc[] __initdata = {
   /* ISA IO areas */
 
-  { S3C2410_VA_ISA_BYTE, PA_CS2(BAST_PA_ISAIO),	   SZ_16M, MT_DEVICE },
-  { S3C2410_VA_ISA_WORD, PA_CS3(BAST_PA_ISAIO),	   SZ_16M, MT_DEVICE },
+  { (u32)S3C24XX_VA_ISA_BYTE, PA_CS2(BAST_PA_ISAIO),   SZ_16M, MT_DEVICE },
+  { (u32)S3C24XX_VA_ISA_WORD, PA_CS3(BAST_PA_ISAIO),   SZ_16M, MT_DEVICE },
 
   /* we could possibly compress the next set down into a set of smaller tables
    * pagetables, but that would mean using an L2 section, and it still means
@@ -89,26 +93,15 @@ static struct map_desc bast_iodesc[] __initdata = {
    */
 
   /* bast CPLD control registers, and external interrupt controls */
-  { BAST_VA_CTRL1, BAST_PA_CTRL1,		   SZ_1M, MT_DEVICE },
-  { BAST_VA_CTRL2, BAST_PA_CTRL2,		   SZ_1M, MT_DEVICE },
-  { BAST_VA_CTRL3, BAST_PA_CTRL3,		   SZ_1M, MT_DEVICE },
-  { BAST_VA_CTRL4, BAST_PA_CTRL4,		   SZ_1M, MT_DEVICE },
+  { (u32)BAST_VA_CTRL1, BAST_PA_CTRL1,		   SZ_1M, MT_DEVICE },
+  { (u32)BAST_VA_CTRL2, BAST_PA_CTRL2,		   SZ_1M, MT_DEVICE },
+  { (u32)BAST_VA_CTRL3, BAST_PA_CTRL3,		   SZ_1M, MT_DEVICE },
+  { (u32)BAST_VA_CTRL4, BAST_PA_CTRL4,		   SZ_1M, MT_DEVICE },
 
   /* PC104 IRQ mux */
-  { BAST_VA_PC104_IRQREQ,  BAST_PA_PC104_IRQREQ,   SZ_1M, MT_DEVICE },
-  { BAST_VA_PC104_IRQRAW,  BAST_PA_PC104_IRQRAW,   SZ_1M, MT_DEVICE },
-  { BAST_VA_PC104_IRQMASK, BAST_PA_PC104_IRQMASK,  SZ_1M, MT_DEVICE },
-
-  /* onboard 8bit lcd port */
-
-  { BAST_VA_LCD_RCMD1,  BAST_PA_LCD_RCMD1,	   SZ_1M, MT_DEVICE },
-  { BAST_VA_LCD_WCMD1,  BAST_PA_LCD_WCMD1,	   SZ_1M, MT_DEVICE },
-  { BAST_VA_LCD_RDATA1, BAST_PA_LCD_RDATA1,	   SZ_1M, MT_DEVICE },
-  { BAST_VA_LCD_WDATA1, BAST_PA_LCD_WDATA1,	   SZ_1M, MT_DEVICE },
-  { BAST_VA_LCD_RCMD2,  BAST_PA_LCD_RCMD2,	   SZ_1M, MT_DEVICE },
-  { BAST_VA_LCD_WCMD2,  BAST_PA_LCD_WCMD2,	   SZ_1M, MT_DEVICE },
-  { BAST_VA_LCD_RDATA2, BAST_PA_LCD_RDATA2,	   SZ_1M, MT_DEVICE },
-  { BAST_VA_LCD_WDATA2, BAST_PA_LCD_WDATA2,	   SZ_1M, MT_DEVICE },
+  { (u32)BAST_VA_PC104_IRQREQ,  BAST_PA_PC104_IRQREQ,   SZ_1M, MT_DEVICE },
+  { (u32)BAST_VA_PC104_IRQRAW,  BAST_PA_PC104_IRQRAW,   SZ_1M, MT_DEVICE },
+  { (u32)BAST_VA_PC104_IRQMASK, BAST_PA_PC104_IRQMASK,  SZ_1M, MT_DEVICE },
 
   /* peripheral space... one for each of fast/slow/byte/16bit */
   /* note, ide is only decoded in word space, even though some registers
@@ -407,7 +400,7 @@ static __init void bast_init_machine(void)
 
 MACHINE_START(BAST, "Simtec-BAST")
      MAINTAINER("Ben Dooks <ben@simtec.co.uk>")
-     BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, S3C2410_VA_UART)
+     BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, (u32)S3C24XX_VA_UART)
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(bast_map_io)
      INITIRQ(bast_init_irq)

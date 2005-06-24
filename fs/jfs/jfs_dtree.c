@@ -212,7 +212,7 @@ static struct metapage *read_index_page(struct inode *inode, s64 blkno)
 	s32 xlen;
 
 	rc = xtLookup(inode, blkno, 1, &xflag, &xaddr, &xlen, 1);
-	if (rc || (xlen == 0))
+	if (rc || (xaddr == 0))
 		return NULL;
 
 	return read_metapage(inode, xaddr, PSIZE, 1);
@@ -231,7 +231,7 @@ static struct metapage *get_index_page(struct inode *inode, s64 blkno)
 	s32 xlen;
 
 	rc = xtLookup(inode, blkno, 1, &xflag, &xaddr, &xlen, 1);
-	if (rc || (xlen == 0))
+	if (rc || (xaddr == 0))
 		return NULL;
 
 	return get_metapage(inode, xaddr, PSIZE, 1);
@@ -268,7 +268,7 @@ static struct dir_table_slot *find_index(struct inode *ip, u32 index,
 		return NULL;
 	}
 
-	if (jfs_ip->next_index <= (MAX_INLINE_DIRTABLE_ENTRY + 1)) {
+	if (jfs_dirtable_inline(ip)) {
 		/*
 		 * Inline directory table
 		 */
@@ -2828,7 +2828,7 @@ void dtInitRoot(tid_t tid, struct inode *ip, u32 idotdot)
 	 * the old directory table.
 	 */
 	if (DO_INDEX(ip)) {
-		if (jfs_ip->next_index > (MAX_INLINE_DIRTABLE_ENTRY + 1)) {
+		if (!jfs_dirtable_inline(ip)) {
 			struct tblock *tblk = tid_to_tblock(tid);
 			/*
 			 * We're playing games with the tid's xflag.  If
@@ -3181,7 +3181,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			d = (struct ldtentry *) & p->slot[stbl[i]];
 
 			if (((long) jfs_dirent + d->namlen + 1) >
-			    (dirent_buf + PSIZE)) {
+			    (dirent_buf + PAGE_SIZE)) {
 				/* DBCS codepages could overrun dirent_buf */
 				index = i;
 				overflow = 1;

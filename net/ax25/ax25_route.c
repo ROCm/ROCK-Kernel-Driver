@@ -455,7 +455,7 @@ int ax25_rt_autobind(ax25_cb *ax25, ax25_address *addr)
 
 	if (ax25->sk != NULL) {
 		bh_lock_sock(ax25->sk);
-		ax25->sk->sk_zapped = 0;
+		sock_reset_flag(ax25->sk, SOCK_ZAPPED);
 		bh_unlock_sock(ax25->sk);
 	}
 

@@ -81,8 +81,7 @@ real32_call_asm:
 	rsm	PSW_SM_W, %r0		/* go narrow */
 #endif
 
-	ldil	L%PA(ric_ret), %r2
-	ldo	R%PA(ric_ret)(%r2), %r2
+	load32	PA(ric_ret), %r2
 	bv	0(%r31)
 	nop
 ric_ret:

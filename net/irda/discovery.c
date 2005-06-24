@@ -155,7 +155,7 @@ void irlmp_expire_discoveries(hashbin_t *log, __u32 saddr, int force)
 	int			n;		/* Size of the full log */
 	int			i = 0;		/* How many we expired */
 
-	ASSERT(log != NULL, return;);
+	IRDA_ASSERT(log != NULL, return;);
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	spin_lock_irqsave(&log->hb_spinlock, flags);
@@ -226,7 +226,7 @@ void irlmp_dump_discoveries(hashbin_t *log)
 {
 	discovery_t *discovery;
 
-	ASSERT(log != NULL, return;);
+	IRDA_ASSERT(log != NULL, return;);
 
 	discovery = (discovery_t *) hashbin_get_first(log);
 	while (discovery != NULL) {
@@ -270,8 +270,8 @@ struct irda_device_info *irlmp_copy_discoveries(hashbin_t *log, int *pn,
 	int			n;		/* Size of the full log */
 	int			i = 0;		/* How many we picked */
 
-	ASSERT(pn != NULL, return NULL;);
-	ASSERT(log != NULL, return NULL;);
+	IRDA_ASSERT(pn != NULL, return NULL;);
+	IRDA_ASSERT(log != NULL, return NULL;);
 
 	/* Save spin lock */
 	spin_lock_irqsave(&log->hb_spinlock, flags);
@@ -404,7 +404,7 @@ static struct seq_operations discovery_seq_ops = {
 
 static int discovery_seq_open(struct inode *inode, struct file *file)
 {
-	ASSERT(irlmp != NULL, return -EINVAL;);
+	IRDA_ASSERT(irlmp != NULL, return -EINVAL;);
 
 	return seq_open(file, &discovery_seq_ops);
 }

@@ -75,7 +75,7 @@ static inline void flush_HPTE(unsigned context, unsigned long va,
 			      unsigned long pdval)
 {
 	if ((Hash != 0) &&
-	    (cur_cpu_spec[0]->cpu_features & CPU_FTR_HPTE_TABLE))
+	    cpu_has_feature(CPU_FTR_HPTE_TABLE))
 		flush_hash_pages(0, va, pdval, 1);
 	else
 		_tlbie(va);

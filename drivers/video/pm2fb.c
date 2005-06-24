@@ -62,7 +62,7 @@
 /*
  * Driver data 
  */
-static char *mode __initdata = NULL;
+static char *mode __devinitdata = NULL;
 
 /*
  * The XFree GLINT driver will (I think to implement hardware cursor
@@ -73,8 +73,8 @@ static char *mode __initdata = NULL;
  * these flags allow the user to specify that requests for +ve sync
  * should be silently turned in -ve sync.
  */
-static int lowhsync __initdata = 0;
-static int lowvsync __initdata = 0;	
+static int lowhsync __devinitdata = 0;
+static int lowvsync __devinitdata = 0;
 
 /*
  * The hardware state of the graphics card that isn't part of the
@@ -97,7 +97,7 @@ struct pm2fb_par
  * Here we define the default structs fb_fix_screeninfo and fb_var_screeninfo
  * if we don't use modedb.
  */
-static struct fb_fix_screeninfo pm2fb_fix __initdata = {
+static struct fb_fix_screeninfo pm2fb_fix __devinitdata = {
 	.id =		"", 
 	.type =		FB_TYPE_PACKED_PIXELS,
 	.visual =	FB_VISUAL_PSEUDOCOLOR,
@@ -110,7 +110,7 @@ static struct fb_fix_screeninfo pm2fb_fix __initdata = {
 /*
  * Default video mode. In case the modedb doesn't work.
  */
-static struct fb_var_screeninfo pm2fb_var __initdata = {
+static struct fb_var_screeninfo pm2fb_var __devinitdata = {
 	/* "640x480, 8 bpp @ 60 Hz */
 	.xres =		640,
 	.yres =		480,
@@ -747,7 +747,7 @@ static int pm2fb_set_par(struct fb_info *info)
 	}
 	if ((info->var.vmode & FB_VMODE_MASK)==FB_VMODE_DOUBLE)
 		video |= PM2F_LINE_DOUBLE;
-	if (info->var.activate==FB_ACTIVATE_NOW)
+	if ((info->var.activate & FB_ACTIVATE_MASK)==FB_ACTIVATE_NOW)
 		video |= PM2F_VIDEO_ENABLE;
 	par->video = video;
 
@@ -1243,47 +1243,13 @@ static struct pci_driver pm2fb_driver = {
 MODULE_DEVICE_TABLE(pci, pm2fb_id_table);
 
 
-/*
- *  Initialization
- */
-
-int __init pm2fb_setup(char *options);
-
-int __init pm2fb_init(void)
-{
-#ifndef MODULE
-	char *option = NULL;
-
-	if (fb_get_options("pm2fb", &option))
-		return -ENODEV;
-	pm2fb_setup(option);
-#endif
-
-	return pci_module_init(&pm2fb_driver);
-}
-
-#ifdef MODULE
-/*
- *  Cleanup
- */
-
-static void __exit pm2fb_exit(void)
-{
-	pci_unregister_driver(&pm2fb_driver);
-}
-#endif
-
-/*
- *  Setup
- */
-
 #ifndef MODULE
 /**
  * Parse user speficied options.
  *
  * This is, comma-separated options following `video=pm2fb:'.
  */
-int __init pm2fb_setup(char *options)
+static int __init pm2fb_setup(char *options)
 {
 	char* this_opt;
 
@@ -1306,13 +1272,31 @@ int __init pm2fb_setup(char *options)
 #endif
 
 
-/* ------------------------------------------------------------------------- */
+static int __init pm2fb_init(void)
+{
+#ifndef MODULE
+	char *option = NULL;
 
-/* ------------------------------------------------------------------------- */
+	if (fb_get_options("pm2fb", &option))
+		return -ENODEV;
+	pm2fb_setup(option);
+#endif
 
-
+	return pci_register_driver(&pm2fb_driver);
+}
 
 module_init(pm2fb_init);
+
+#ifdef MODULE
+/*
+ *  Cleanup
+ */
+
+static void __exit pm2fb_exit(void)
+{
+	pci_unregister_driver(&pm2fb_driver);
+}
+#endif
 
 #ifdef MODULE
 module_exit(pm2fb_exit);

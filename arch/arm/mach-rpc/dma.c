@@ -254,7 +254,7 @@ static void floppy_enable_dma(dmach_t channel, dma_t *dma)
 
 	regs.ARM_r9  = dma->buf.length;
 	regs.ARM_r10 = (unsigned long)dma->buf.__address;
-	regs.ARM_fp  = FLOPPYDMA_BASE;
+	regs.ARM_fp  = (unsigned long)FLOPPYDMA_BASE;
 
 	if (claim_fiq(&fh)) {
 		printk("floppydma: couldn't claim FIQ.\n");

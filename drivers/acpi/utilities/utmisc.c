@@ -372,13 +372,17 @@ acpi_ut_strtoul64 (
 	u32                             base,
 	acpi_integer                    *ret_integer)
 {
-	u32                             this_digit;
+	u32                             this_digit = 0;
 	acpi_integer                    return_value = 0;
 	acpi_integer                    quotient;
 
 
 	ACPI_FUNCTION_TRACE ("ut_stroul64");
 
+
+	if ((!string) || !(*string)) {
+		goto error_exit;
+	}
 
 	switch (base) {
 	case ACPI_ANY_BASE:
@@ -394,7 +398,7 @@ acpi_ut_strtoul64 (
 	/* Skip over any white space in the buffer */
 
 	while (ACPI_IS_SPACE (*string) || *string == '\t') {
-		++string;
+		string++;
 	}
 
 	/*
@@ -403,9 +407,9 @@ acpi_ut_strtoul64 (
 	 */
 	if (base == 0) {
 		if ((*string == '0') &&
-			(ACPI_TOLOWER (*(++string)) == 'x')) {
+			(ACPI_TOLOWER (*(string + 1)) == 'x')) {
 			base = 16;
-			++string;
+			string += 2;
 		}
 		else {
 			base = 10;
@@ -416,10 +420,10 @@ acpi_ut_strtoul64 (
 	 * For hexadecimal base, skip over the leading
 	 * 0 or 0x, if they are present.
 	 */
-	if (base == 16 &&
-		*string == '0' &&
-		ACPI_TOLOWER (*(++string)) == 'x') {
-		string++;
+	if ((base == 16) &&
+		(*string == '0') &&
+		(ACPI_TOLOWER (*(string + 1)) == 'x')) {
+		string += 2;
 	}
 
 	/* Any string left? */
@@ -437,21 +441,25 @@ acpi_ut_strtoul64 (
 			this_digit = ((u8) *string) - '0';
 		}
 		else {
+			if (base == 10) {
+				/* Digit is out of range */
+
+				goto error_exit;
+			}
+
 			this_digit = (u8) ACPI_TOUPPER (*string);
-			if (ACPI_IS_UPPER ((char) this_digit)) {
+			if (ACPI_IS_XDIGIT ((char) this_digit)) {
 				/* Convert ASCII Hex char to value */
 
 				this_digit = this_digit - 'A' + 10;
 			}
 			else {
-				goto error_exit;
+				/*
+				 * We allow non-hex chars, just stop now, same as end-of-string.
+				 * See ACPI spec, string-to-integer conversion.
+				 */
+				break;
 			}
-		}
-
-		/* Check to see if digit is out of range */
-
-		if (this_digit >= base) {
-			goto error_exit;
 		}
 
 		/* Divide the digit into the correct position */
@@ -464,8 +472,10 @@ acpi_ut_strtoul64 (
 
 		return_value *= base;
 		return_value += this_digit;
-		++string;
+		string++;
 	}
+
+	/* All done, normal exit */
 
 	*ret_integer = return_value;
 	return_ACPI_STATUS (AE_OK);

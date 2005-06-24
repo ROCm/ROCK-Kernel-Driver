@@ -481,7 +481,7 @@ read_version(char* p)
 
 #define PROC_TOSHIBA		"toshiba"
 
-ProcItem proc_items[] =
+static ProcItem proc_items[] =
 {
 	{ "lcd"		, read_lcd	, write_lcd	},
 	{ "video"	, read_video	, write_video	},

@@ -80,7 +80,7 @@ static u32 r128_cce_microcode[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
-int R128_READ_PLL(drm_device_t *dev, int addr)
+static int R128_READ_PLL(drm_device_t *dev, int addr)
 {
 	drm_r128_private_t *dev_priv = dev->dev_private;
 
@@ -326,8 +326,7 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev,
 		ring_start = dev_priv->cce_ring->offset - dev->agp->base;
 	else
 #endif
-		ring_start = dev_priv->cce_ring->offset 
-		    - (unsigned long)dev->sg->virtual;
+		ring_start = dev_priv->cce_ring->offset - dev->sg->handle;
 
 	R128_WRITE( R128_PM4_BUFFER_OFFSET, ring_start | R128_AGP_OFFSET );
 
@@ -538,7 +537,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		dev_priv->cce_buffers_offset = dev->agp->base;
 	else
 #endif
-	dev_priv->cce_buffers_offset = (unsigned long)dev->sg->virtual;
+		dev_priv->cce_buffers_offset = dev->sg->handle;
 
 	dev_priv->ring.start = (u32 *)dev_priv->cce_ring->handle;
 	dev_priv->ring.end = ((u32 *)dev_priv->cce_ring->handle
@@ -809,7 +808,7 @@ static int r128_freelist_init( drm_device_t *dev )
 }
 #endif
 
-drm_buf_t *r128_freelist_get( drm_device_t *dev )
+static drm_buf_t *r128_freelist_get( drm_device_t *dev )
 {
 	drm_device_dma_t *dma = dev->dma;
 	drm_r128_private_t *dev_priv = dev->dev_private;

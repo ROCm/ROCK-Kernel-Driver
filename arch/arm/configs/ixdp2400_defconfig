@@ -1,10 +1,14 @@
 #
 # Automatically generated make config: don't edit
+# Linux kernel version: 2.6.12-rc1-bk2
+# Sun Mar 27 21:13:38 2005
 #
 CONFIG_ARM=y
 CONFIG_MMU=y
 CONFIG_UID16=y
 CONFIG_RWSEM_GENERIC_SPINLOCK=y
+CONFIG_GENERIC_CALIBRATE_DELAY=y
+CONFIG_GENERIC_IOMAP=y
 
 #
 # Code maturity level options
@@ -16,6 +20,7 @@ CONFIG_BROKEN_ON_SMP=y
 #
 # General setup
 #
+CONFIG_LOCALVERSION=""
 CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_POSIX_MQUEUE is not set
@@ -23,20 +28,24 @@ CONFIG_BSD_PROCESS_ACCT=y
 # CONFIG_BSD_PROCESS_ACCT_V3 is not set
 CONFIG_SYSCTL=y
 # CONFIG_AUDIT is not set
-CONFIG_LOG_BUF_SHIFT=14
 # CONFIG_HOTPLUG is not set
+CONFIG_KOBJECT_UEVENT=y
 # CONFIG_IKCONFIG is not set
 CONFIG_EMBEDDED=y
 CONFIG_KALLSYMS=y
 # CONFIG_KALLSYMS_ALL is not set
 # CONFIG_KALLSYMS_EXTRA_PASS is not set
+CONFIG_BASE_FULL=y
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
-CONFIG_IOSCHED_NOOP=y
-CONFIG_IOSCHED_AS=y
-CONFIG_IOSCHED_DEADLINE=y
-CONFIG_IOSCHED_CFQ=y
 CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+CONFIG_SHMEM=y
+CONFIG_CC_ALIGN_FUNCTIONS=0
+CONFIG_CC_ALIGN_LABELS=0
+CONFIG_CC_ALIGN_LOOPS=0
+CONFIG_CC_ALIGN_JUMPS=0
+# CONFIG_TINY_SHMEM is not set
+CONFIG_BASE_SMALL=0
 
 #
 # Loadable module support
@@ -64,7 +73,9 @@ CONFIG_ARCH_IXP2000=y
 # CONFIG_ARCH_SHARK is not set
 # CONFIG_ARCH_LH7A40X is not set
 # CONFIG_ARCH_OMAP is not set
-# CONFIG_ARCH_VERSATILE_PB is not set
+# CONFIG_ARCH_VERSATILE is not set
+# CONFIG_ARCH_IMX is not set
+# CONFIG_ARCH_H720X is not set
 CONFIG_ARCH_SUPPORTS_BIG_ENDIAN=y
 
 #
@@ -88,6 +99,7 @@ CONFIG_CPU_32=y
 CONFIG_CPU_XSCALE=y
 CONFIG_CPU_32v5=y
 CONFIG_CPU_ABRT_EV5T=y
+CONFIG_CPU_CACHE_VIVT=y
 CONFIG_CPU_TLB_V4WBI=y
 CONFIG_CPU_MINICACHE=y
 
@@ -99,51 +111,75 @@ CONFIG_CPU_BIG_ENDIAN=y
 CONFIG_XSCALE_PMU=y
 
 #
-# General setup
+# Bus support
 #
 CONFIG_PCI=y
-# CONFIG_ZBOOT_ROM is not set
-CONFIG_ZBOOT_ROM_TEXT=0x0
-CONFIG_ZBOOT_ROM_BSS=0x0
 CONFIG_PCI_LEGACY_PROC=y
 CONFIG_PCI_NAMES=y
 
 #
-# At least one math emulation must be selected
+# PCCARD (PCMCIA/CardBus) support
+#
+# CONFIG_PCCARD is not set
+
+#
+# Kernel Features
+#
+# CONFIG_PREEMPT is not set
+CONFIG_ALIGNMENT_TRAP=y
+
+#
+# Boot options
+#
+CONFIG_ZBOOT_ROM_TEXT=0x0
+CONFIG_ZBOOT_ROM_BSS=0x0
+CONFIG_CMDLINE="console=ttyS0,57600 root=/dev/nfs ip=bootp mem=64M@0x0 pci=firmware"
+# CONFIG_XIP_KERNEL is not set
+
+#
+# Floating point emulation
+#
+
+#
+# At least one emulation must be selected
 #
 CONFIG_FPE_NWFPE=y
-# CONFIG_FPE_NWFPE_XP is not set
 # CONFIG_FPE_FASTFPE is not set
-# CONFIG_VFP is not set
+
+#
+# Userspace binary formats
+#
 CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_AOUT is not set
 # CONFIG_BINFMT_MISC is not set
+# CONFIG_ARTHUR is not set
+
+#
+# Power management options
+#
+# CONFIG_PM is not set
+
+#
+# Device Drivers
+#
 
 #
 # Generic Driver Options
 #
 CONFIG_STANDALONE=y
 # CONFIG_PREVENT_FIRMWARE_BUILD is not set
+# CONFIG_FW_LOADER is not set
 # CONFIG_DEBUG_DRIVER is not set
-# CONFIG_PM is not set
-# CONFIG_PREEMPT is not set
-# CONFIG_ARTHUR is not set
-CONFIG_CMDLINE="console=ttyS0,57600 root=/dev/nfs ip=bootp mem=64M@0x0 pci=firmware"
-CONFIG_ALIGNMENT_TRAP=y
-
-#
-# Parallel port support
-#
-# CONFIG_PARPORT is not set
 
 #
 # Memory Technology Devices (MTD)
 #
 CONFIG_MTD=y
 # CONFIG_MTD_DEBUG is not set
-CONFIG_MTD_PARTITIONS=y
 # CONFIG_MTD_CONCAT is not set
+CONFIG_MTD_PARTITIONS=y
 CONFIG_MTD_REDBOOT_PARTS=y
+CONFIG_MTD_REDBOOT_DIRECTORY_BLOCK=-1
 CONFIG_MTD_REDBOOT_PARTS_UNALLOCATED=y
 CONFIG_MTD_REDBOOT_PARTS_READONLY=y
 # CONFIG_MTD_CMDLINE_PARTS is not set
@@ -182,6 +218,7 @@ CONFIG_MTD_CFI_UTIL=y
 # CONFIG_MTD_RAM is not set
 # CONFIG_MTD_ROM is not set
 # CONFIG_MTD_ABSENT is not set
+# CONFIG_MTD_XIP is not set
 
 #
 # Mapping drivers for chip access
@@ -201,6 +238,7 @@ CONFIG_MTD_IXP2000=y
 # CONFIG_MTD_PHRAM is not set
 # CONFIG_MTD_MTDRAM is not set
 # CONFIG_MTD_BLKMTD is not set
+# CONFIG_MTD_BLOCK2MTD is not set
 
 #
 # Disk-On-Chip Device Drivers
@@ -215,6 +253,11 @@ CONFIG_MTD_IXP2000=y
 # CONFIG_MTD_NAND is not set
 
 #
+# Parallel port support
+#
+# CONFIG_PARPORT is not set
+
+#
 # Plug and Play support
 #
 
@@ -226,18 +269,50 @@ CONFIG_MTD_IXP2000=y
 # CONFIG_BLK_CPQ_CISS_DA is not set
 # CONFIG_BLK_DEV_DAC960 is not set
 # CONFIG_BLK_DEV_UMEM is not set
+# CONFIG_BLK_DEV_COW_COMMON is not set
 CONFIG_BLK_DEV_LOOP=y
 # CONFIG_BLK_DEV_CRYPTOLOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
 # CONFIG_BLK_DEV_SX8 is not set
 CONFIG_BLK_DEV_RAM=y
+CONFIG_BLK_DEV_RAM_COUNT=16
 CONFIG_BLK_DEV_RAM_SIZE=8192
 CONFIG_BLK_DEV_INITRD=y
+CONFIG_INITRAMFS_SOURCE=""
+# CONFIG_CDROM_PKTCDVD is not set
+
+#
+# IO Schedulers
+#
+CONFIG_IOSCHED_NOOP=y
+CONFIG_IOSCHED_AS=y
+CONFIG_IOSCHED_DEADLINE=y
+CONFIG_IOSCHED_CFQ=y
+# CONFIG_ATA_OVER_ETH is not set
+
+#
+# SCSI device support
+#
+# CONFIG_SCSI is not set
 
 #
 # Multi-device support (RAID and LVM)
 #
 # CONFIG_MD is not set
+
+#
+# Fusion MPT device support
+#
+
+#
+# IEEE 1394 (FireWire) support
+#
+# CONFIG_IEEE1394 is not set
+
+#
+# I2O device support
+#
+# CONFIG_I2O is not set
 
 #
 # Networking support
@@ -266,6 +341,9 @@ CONFIG_SYN_COOKIES=y
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
 # CONFIG_INET_IPCOMP is not set
+# CONFIG_INET_TUNNEL is not set
+# CONFIG_IP_TCPDIAG is not set
+# CONFIG_IP_TCPDIAG_IPV6 is not set
 # CONFIG_IPV6 is not set
 # CONFIG_NETFILTER is not set
 
@@ -285,8 +363,6 @@ CONFIG_SYN_COOKIES=y
 # CONFIG_NET_DIVERT is not set
 # CONFIG_ECONET is not set
 # CONFIG_WAN_ROUTER is not set
-# CONFIG_NET_FASTROUTE is not set
-# CONFIG_NET_HW_FLOWCONTROL is not set
 
 #
 # QoS and/or fair queueing
@@ -337,7 +413,6 @@ CONFIG_NET_PCI=y
 # CONFIG_FORCEDETH is not set
 # CONFIG_DGRS is not set
 CONFIG_EEPRO100=y
-# CONFIG_EEPRO100_PIO is not set
 # CONFIG_E100 is not set
 # CONFIG_FEALNX is not set
 # CONFIG_NATSEMI is not set
@@ -349,7 +424,6 @@ CONFIG_EEPRO100=y
 # CONFIG_SUNDANCE is not set
 # CONFIG_TLAN is not set
 # CONFIG_VIA_RHINE is not set
-# CONFIG_VIA_VELOCITY is not set
 
 #
 # Ethernet (1000 Mbit)
@@ -362,6 +436,7 @@ CONFIG_EEPRO100=y
 # CONFIG_YELLOWFIN is not set
 # CONFIG_R8169 is not set
 # CONFIG_SK98LIN is not set
+# CONFIG_VIA_VELOCITY is not set
 # CONFIG_TIGON3 is not set
 
 #
@@ -411,25 +486,6 @@ CONFIG_DLCI_MAX=8
 # CONFIG_NETCONSOLE is not set
 
 #
-# SCSI device support
-#
-# CONFIG_SCSI is not set
-
-#
-# Fusion MPT device support
-#
-
-#
-# IEEE 1394 (FireWire) support
-#
-# CONFIG_IEEE1394 is not set
-
-#
-# I2O device support
-#
-# CONFIG_I2O is not set
-
-#
 # ISDN subsystem
 #
 # CONFIG_ISDN is not set
@@ -452,14 +508,6 @@ CONFIG_INPUT_MOUSEDEV_SCREEN_Y=768
 # CONFIG_INPUT_EVBUG is not set
 
 #
-# Input I/O drivers
-#
-# CONFIG_GAMEPORT is not set
-CONFIG_SOUND_GAMEPORT=y
-# CONFIG_SERIO is not set
-# CONFIG_SERIO_I8042 is not set
-
-#
 # Input Device Drivers
 #
 # CONFIG_INPUT_KEYBOARD is not set
@@ -467,6 +515,13 @@ CONFIG_SOUND_GAMEPORT=y
 # CONFIG_INPUT_JOYSTICK is not set
 # CONFIG_INPUT_TOUCHSCREEN is not set
 # CONFIG_INPUT_MISC is not set
+
+#
+# Hardware I/O ports
+#
+# CONFIG_SERIO is not set
+# CONFIG_GAMEPORT is not set
+CONFIG_SOUND_GAMEPORT=y
 
 #
 # Character devices
@@ -490,7 +545,6 @@ CONFIG_SERIAL_CORE_CONSOLE=y
 CONFIG_UNIX98_PTYS=y
 CONFIG_LEGACY_PTYS=y
 CONFIG_LEGACY_PTY_COUNT=256
-# CONFIG_QIC02_TAPE is not set
 
 #
 # IPMI
@@ -516,7 +570,6 @@ CONFIG_IXP2000_WATCHDOG=y
 # CONFIG_WDTPCI is not set
 # CONFIG_NVRAM is not set
 # CONFIG_RTC is not set
-# CONFIG_GEN_RTC is not set
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
 # CONFIG_APPLICOM is not set
@@ -524,9 +577,13 @@ CONFIG_IXP2000_WATCHDOG=y
 #
 # Ftape, the floppy tape device driver
 #
-# CONFIG_AGP is not set
 # CONFIG_DRM is not set
 # CONFIG_RAW_DRIVER is not set
+
+#
+# TPM devices
+#
+# CONFIG_TCG_TPM is not set
 
 #
 # I2C support
@@ -539,6 +596,7 @@ CONFIG_I2C_CHARDEV=y
 #
 CONFIG_I2C_ALGOBIT=y
 # CONFIG_I2C_ALGOPCF is not set
+# CONFIG_I2C_ALGOPCA is not set
 
 #
 # I2C Hardware Bus support
@@ -564,6 +622,7 @@ CONFIG_I2C_ALGOBIT=y
 # CONFIG_I2C_VIA is not set
 # CONFIG_I2C_VIAPRO is not set
 # CONFIG_I2C_VOODOO3 is not set
+# CONFIG_I2C_PCA_ISA is not set
 
 #
 # Hardware Sensors Chip support
@@ -571,20 +630,29 @@ CONFIG_I2C_ALGOBIT=y
 CONFIG_I2C_SENSOR=y
 # CONFIG_SENSORS_ADM1021 is not set
 # CONFIG_SENSORS_ADM1025 is not set
+# CONFIG_SENSORS_ADM1026 is not set
 # CONFIG_SENSORS_ADM1031 is not set
 # CONFIG_SENSORS_ASB100 is not set
 # CONFIG_SENSORS_DS1621 is not set
 # CONFIG_SENSORS_FSCHER is not set
+# CONFIG_SENSORS_FSCPOS is not set
 # CONFIG_SENSORS_GL518SM is not set
+# CONFIG_SENSORS_GL520SM is not set
 # CONFIG_SENSORS_IT87 is not set
+# CONFIG_SENSORS_LM63 is not set
 # CONFIG_SENSORS_LM75 is not set
 # CONFIG_SENSORS_LM77 is not set
 # CONFIG_SENSORS_LM78 is not set
 # CONFIG_SENSORS_LM80 is not set
 # CONFIG_SENSORS_LM83 is not set
 # CONFIG_SENSORS_LM85 is not set
+# CONFIG_SENSORS_LM87 is not set
 # CONFIG_SENSORS_LM90 is not set
 # CONFIG_SENSORS_MAX1619 is not set
+# CONFIG_SENSORS_PC87360 is not set
+# CONFIG_SENSORS_SMSC47B397 is not set
+# CONFIG_SENSORS_SIS5595 is not set
+# CONFIG_SENSORS_SMSC47M1 is not set
 # CONFIG_SENSORS_VIA686A is not set
 # CONFIG_SENSORS_W83781D is not set
 # CONFIG_SENSORS_W83L785TS is not set
@@ -603,6 +671,10 @@ CONFIG_SENSORS_EEPROM=y
 # CONFIG_I2C_DEBUG_CHIP is not set
 
 #
+# Misc devices
+#
+
+#
 # Multimedia devices
 #
 # CONFIG_VIDEO_DEV is not set
@@ -611,6 +683,33 @@ CONFIG_SENSORS_EEPROM=y
 # Digital Video Broadcasting Devices
 #
 # CONFIG_DVB is not set
+
+#
+# Graphics support
+#
+# CONFIG_FB is not set
+
+#
+# Sound
+#
+# CONFIG_SOUND is not set
+
+#
+# USB support
+#
+CONFIG_USB_ARCH_HAS_HCD=y
+CONFIG_USB_ARCH_HAS_OHCI=y
+# CONFIG_USB is not set
+
+#
+# USB Gadget Support
+#
+# CONFIG_USB_GADGET is not set
+
+#
+# MMC/SD Card support
+#
+# CONFIG_MMC is not set
 
 #
 # File systems
@@ -629,10 +728,15 @@ CONFIG_FS_MBCACHE=y
 # CONFIG_REISERFS_FS is not set
 # CONFIG_JFS_FS is not set
 CONFIG_FS_POSIX_ACL=y
+
+#
+# XFS support
+#
 # CONFIG_XFS_FS is not set
 # CONFIG_MINIX_FS is not set
 # CONFIG_ROMFS_FS is not set
 # CONFIG_QUOTA is not set
+CONFIG_DNOTIFY=y
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
 
@@ -657,6 +761,7 @@ CONFIG_SYSFS=y
 # CONFIG_DEVFS_FS is not set
 # CONFIG_DEVPTS_FS_XATTR is not set
 CONFIG_TMPFS=y
+# CONFIG_TMPFS_XATTR is not set
 # CONFIG_HUGETLB_PAGE is not set
 CONFIG_RAMFS=y
 
@@ -674,6 +779,7 @@ CONFIG_RAMFS=y
 CONFIG_JFFS2_FS=y
 CONFIG_JFFS2_FS_DEBUG=0
 # CONFIG_JFFS2_FS_NAND is not set
+# CONFIG_JFFS2_FS_NOR_ECC is not set
 # CONFIG_JFFS2_COMPRESSION_OPTIONS is not set
 CONFIG_JFFS2_ZLIB=y
 CONFIG_JFFS2_RTIME=y
@@ -696,9 +802,9 @@ CONFIG_NFS_V3=y
 CONFIG_ROOT_NFS=y
 CONFIG_LOCKD=y
 CONFIG_LOCKD_V4=y
-# CONFIG_EXPORTFS is not set
 CONFIG_SUNRPC=y
 # CONFIG_RPCSEC_GSS_KRB5 is not set
+# CONFIG_RPCSEC_GSS_SPKM3 is not set
 # CONFIG_SMB_FS is not set
 # CONFIG_CIFS is not set
 # CONFIG_NCP_FS is not set
@@ -736,55 +842,41 @@ CONFIG_MSDOS_PARTITION=y
 # CONFIG_PROFILING is not set
 
 #
-# Graphics support
-#
-# CONFIG_FB is not set
-
-#
-# Sound
-#
-# CONFIG_SOUND is not set
-
-#
-# Misc devices
-#
-
-#
-# USB support
-#
-# CONFIG_USB is not set
-
-#
-# USB Gadget Support
-#
-# CONFIG_USB_GADGET is not set
-
-#
 # Kernel hacking
 #
+# CONFIG_PRINTK_TIME is not set
+CONFIG_DEBUG_KERNEL=y
+CONFIG_MAGIC_SYSRQ=y
+CONFIG_LOG_BUF_SHIFT=14
+# CONFIG_SCHEDSTATS is not set
+# CONFIG_DEBUG_SLAB is not set
+# CONFIG_DEBUG_SPINLOCK is not set
+# CONFIG_DEBUG_SPINLOCK_SLEEP is not set
+# CONFIG_DEBUG_KOBJECT is not set
+CONFIG_DEBUG_BUGVERBOSE=y
+# CONFIG_DEBUG_INFO is not set
+# CONFIG_DEBUG_FS is not set
 CONFIG_FRAME_POINTER=y
 CONFIG_DEBUG_USER=y
-# CONFIG_DEBUG_INFO is not set
-CONFIG_DEBUG_KERNEL=y
-# CONFIG_DEBUG_SLAB is not set
-CONFIG_MAGIC_SYSRQ=y
-# CONFIG_DEBUG_SPINLOCK is not set
 # CONFIG_DEBUG_WAITQ is not set
-CONFIG_DEBUG_BUGVERBOSE=y
 CONFIG_DEBUG_ERRORS=y
 CONFIG_DEBUG_LL=y
 # CONFIG_DEBUG_ICEDCC is not set
-# CONFIG_DEBUG_BDI2000_XSCALE is not set
 
 #
 # Security options
 #
+# CONFIG_KEYS is not set
 # CONFIG_SECURITY is not set
 
 #
 # Cryptographic options
 #
 # CONFIG_CRYPTO is not set
+
+#
+# Hardware crypto devices
+#
 
 #
 # Library routines

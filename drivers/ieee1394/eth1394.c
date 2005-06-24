@@ -625,7 +625,7 @@ static void ether1394_add_host (struct hpsb_host *host)
 		goto out;
 	}
 
-	ETH1394_PRINT (KERN_ERR, dev->name, "IEEE-1394 IPv4 over 1394 Ethernet (fw-host%d)\n",
+	ETH1394_PRINT (KERN_INFO, dev->name, "IEEE-1394 IPv4 over 1394 Ethernet (fw-host%d)\n",
 		       host->id);
 
 	hi->host = host;

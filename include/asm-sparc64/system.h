@@ -182,7 +182,7 @@ do {	if (test_thread_flag(TIF_PERFCTR)) {				\
 	__asm__ __volatile__("wr %%g0, %0, %%asi"			\
 	: : "r" (__thread_flag_byte_ptr(next->thread_info)[TI_FLAG_BYTE_CURRENT_DS]));\
 	__asm__ __volatile__(						\
-	"mov	%%g4, %%g5\n\t"						\
+	"mov	%%g4, %%g7\n\t"						\
 	"wrpr	%%g0, 0x95, %%pstate\n\t"				\
 	"stx	%%i6, [%%sp + 2047 + 0x70]\n\t"				\
 	"stx	%%i7, [%%sp + 2047 + 0x78]\n\t"				\
@@ -207,7 +207,7 @@ do {	if (test_thread_flag(TIF_PERFCTR)) {				\
 	"wrpr	%%g0, 0x96, %%pstate\n\t"				\
 	"andcc	%%o7, %6, %%g0\n\t"					\
 	"beq,pt %%icc, 1f\n\t"						\
-	" mov	%%g5, %0\n\t"						\
+	" mov	%%g7, %0\n\t"						\
 	"b,a ret_from_syscall\n\t"					\
 	"1:\n\t"							\
 	: "=&r" (last)							\
@@ -215,7 +215,7 @@ do {	if (test_thread_flag(TIF_PERFCTR)) {				\
 	  "i" (TI_WSTATE), "i" (TI_KSP), "i" (TI_FLAGS), "i" (TI_CWP),	\
 	  "i" (_TIF_NEWCHILD), "i" (TI_TASK)				\
 	: "cc",								\
-	        "g1", "g2", "g3",       "g5",       "g7",		\
+	        "g1", "g2", "g3",                   "g7",		\
 	              "l2", "l3", "l4", "l5", "l6", "l7",		\
 	  "i0", "i1", "i2", "i3", "i4", "i5",				\
 	  "o0", "o1", "o2", "o3", "o4", "o5",       "o7" EXTRA_CLOBBER);\
@@ -226,37 +226,41 @@ do {	if (test_thread_flag(TIF_PERFCTR)) {				\
 	}								\
 } while(0)
 
-static __inline__ unsigned long xchg32(__volatile__ unsigned int *m, unsigned int val)
+static inline unsigned long xchg32(__volatile__ unsigned int *m, unsigned int val)
 {
+	unsigned long tmp1, tmp2;
+
 	__asm__ __volatile__(
 "	membar		#StoreLoad | #LoadLoad\n"
-"	mov		%0, %%g5\n"
-"1:	lduw		[%2], %%g7\n"
-"	cas		[%2], %%g7, %0\n"
-"	cmp		%%g7, %0\n"
+"	mov		%0, %1\n"
+"1:	lduw		[%4], %2\n"
+"	cas		[%4], %2, %0\n"
+"	cmp		%2, %0\n"
 "	bne,a,pn	%%icc, 1b\n"
-"	 mov		%%g5, %0\n"
+"	 mov		%1, %0\n"
 "	membar		#StoreLoad | #StoreStore\n"
-	: "=&r" (val)
+	: "=&r" (val), "=&r" (tmp1), "=&r" (tmp2)
 	: "0" (val), "r" (m)
-	: "g5", "g7", "cc", "memory");
+	: "cc", "memory");
 	return val;
 }
 
-static __inline__ unsigned long xchg64(__volatile__ unsigned long *m, unsigned long val)
+static inline unsigned long xchg64(__volatile__ unsigned long *m, unsigned long val)
 {
+	unsigned long tmp1, tmp2;
+
 	__asm__ __volatile__(
 "	membar		#StoreLoad | #LoadLoad\n"
-"	mov		%0, %%g5\n"
-"1:	ldx		[%2], %%g7\n"
-"	casx		[%2], %%g7, %0\n"
-"	cmp		%%g7, %0\n"
+"	mov		%0, %1\n"
+"1:	ldx		[%4], %2\n"
+"	casx		[%4], %2, %0\n"
+"	cmp		%2, %0\n"
 "	bne,a,pn	%%xcc, 1b\n"
-"	 mov		%%g5, %0\n"
+"	 mov		%1, %0\n"
 "	membar		#StoreLoad | #StoreStore\n"
-	: "=&r" (val)
+	: "=&r" (val), "=&r" (tmp1), "=&r" (tmp2)
 	: "0" (val), "r" (m)
-	: "g5", "g7", "cc", "memory");
+	: "cc", "memory");
 	return val;
 }
 
@@ -340,5 +344,7 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new, int size)
   })
 
 #endif /* !(__ASSEMBLY__) */
+
+#define arch_align_stack(x) (x)
 
 #endif /* !(__SPARC64_SYSTEM_H) */

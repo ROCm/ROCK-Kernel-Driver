@@ -32,6 +32,8 @@
  * $Id$
  */
 
+#include <linux/mm.h>
+
 #include "mthca_memfree.h"
 #include "mthca_dev.h"
 #include "mthca_cmd.h"
@@ -79,6 +81,7 @@ struct mthca_icm *mthca_alloc_icm(struct mthca_dev *dev, int npages,
 	if (!icm)
 		return icm;
 
+	icm->refcount = 0;
 	INIT_LIST_HEAD(&icm->chunk_list);
 
 	cur_order = get_order(MTHCA_ICM_ALLOC_SIZE);
@@ -138,9 +141,128 @@ fail:
 	return NULL;
 }
 
+int mthca_table_get(struct mthca_dev *dev, struct mthca_icm_table *table, int obj)
+{
+	int i = (obj & (table->num_obj - 1)) * table->obj_size / MTHCA_TABLE_CHUNK_SIZE;
+	int ret = 0;
+	u8 status;
+
+	down(&table->mutex);
+
+	if (table->icm[i]) {
+		++table->icm[i]->refcount;
+		goto out;
+	}
+
+	table->icm[i] = mthca_alloc_icm(dev, MTHCA_TABLE_CHUNK_SIZE >> PAGE_SHIFT,
+					(table->lowmem ? GFP_KERNEL : GFP_HIGHUSER) |
+					__GFP_NOWARN);
+	if (!table->icm[i]) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	if (mthca_MAP_ICM(dev, table->icm[i], table->virt + i * MTHCA_TABLE_CHUNK_SIZE,
+			  &status) || status) {
+		mthca_free_icm(dev, table->icm[i]);
+		table->icm[i] = NULL;
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	++table->icm[i]->refcount;
+
+out:
+	up(&table->mutex);
+	return ret;
+}
+
+void mthca_table_put(struct mthca_dev *dev, struct mthca_icm_table *table, int obj)
+{
+	int i = (obj & (table->num_obj - 1)) * table->obj_size / MTHCA_TABLE_CHUNK_SIZE;
+	u8 status;
+
+	down(&table->mutex);
+
+	if (--table->icm[i]->refcount == 0) {
+		mthca_UNMAP_ICM(dev, table->virt + i * MTHCA_TABLE_CHUNK_SIZE,
+				MTHCA_TABLE_CHUNK_SIZE >> 12, &status);
+		mthca_free_icm(dev, table->icm[i]);
+		table->icm[i] = NULL;
+	}
+
+	up(&table->mutex);
+}
+
+void *mthca_table_find(struct mthca_icm_table *table, int obj)
+{
+	int idx, offset, i;
+	struct mthca_icm_chunk *chunk;
+	struct mthca_icm *icm;
+	struct page *page = NULL;
+
+	if (!table->lowmem)
+		return NULL;
+
+	down(&table->mutex);
+
+	idx = (obj & (table->num_obj - 1)) * table->obj_size;
+	icm = table->icm[idx / MTHCA_TABLE_CHUNK_SIZE];
+	offset = idx % MTHCA_TABLE_CHUNK_SIZE;
+
+	if (!icm)
+		goto out;
+
+	list_for_each_entry(chunk, &icm->chunk_list, list) {
+		for (i = 0; i < chunk->npages; ++i) {
+			if (chunk->mem[i].length >= offset) {
+				page = chunk->mem[i].page;
+				break;
+			}
+			offset -= chunk->mem[i].length;
+		}
+	}
+
+out:
+	up(&table->mutex);
+	return page ? lowmem_page_address(page) + offset : NULL;
+}
+
+int mthca_table_get_range(struct mthca_dev *dev, struct mthca_icm_table *table,
+			  int start, int end)
+{
+	int inc = MTHCA_TABLE_CHUNK_SIZE / table->obj_size;
+	int i, err;
+
+	for (i = start; i <= end; i += inc) {
+		err = mthca_table_get(dev, table, i);
+		if (err)
+			goto fail;
+	}
+
+	return 0;
+
+fail:
+	while (i > start) {
+		i -= inc;
+		mthca_table_put(dev, table, i);
+	}
+
+	return err;
+}
+
+void mthca_table_put_range(struct mthca_dev *dev, struct mthca_icm_table *table,
+			   int start, int end)
+{
+	int i;
+
+	for (i = start; i <= end; i += MTHCA_TABLE_CHUNK_SIZE / table->obj_size)
+		mthca_table_put(dev, table, i);
+}
+
 struct mthca_icm_table *mthca_alloc_icm_table(struct mthca_dev *dev,
-					      u64 virt, unsigned size,
-					      unsigned reserved,
+					      u64 virt, int obj_size,
+					      int nobj, int reserved,
 					      int use_lowmem)
 {
 	struct mthca_icm_table *table;
@@ -148,20 +270,23 @@ struct mthca_icm_table *mthca_alloc_icm_table(struct mthca_dev *dev,
 	int i;
 	u8 status;
 
-	num_icm = size / MTHCA_TABLE_CHUNK_SIZE;
+	num_icm = obj_size * nobj / MTHCA_TABLE_CHUNK_SIZE;
 
 	table = kmalloc(sizeof *table + num_icm * sizeof *table->icm, GFP_KERNEL);
 	if (!table)
 		return NULL;
 
-	table->virt    = virt;
-	table->num_icm = num_icm;
-	init_MUTEX(&table->sem);
+	table->virt     = virt;
+	table->num_icm  = num_icm;
+	table->num_obj  = nobj;
+	table->obj_size = obj_size;
+	table->lowmem   = use_lowmem;
+	init_MUTEX(&table->mutex);
 
 	for (i = 0; i < num_icm; ++i)
 		table->icm[i] = NULL;
 
-	for (i = 0; i < (reserved + MTHCA_TABLE_CHUNK_SIZE - 1) / MTHCA_TABLE_CHUNK_SIZE; ++i) {
+	for (i = 0; i * MTHCA_TABLE_CHUNK_SIZE < reserved * obj_size; ++i) {
 		table->icm[i] = mthca_alloc_icm(dev, MTHCA_TABLE_CHUNK_SIZE >> PAGE_SHIFT,
 						(use_lowmem ? GFP_KERNEL : GFP_HIGHUSER) |
 						__GFP_NOWARN);
@@ -173,6 +298,12 @@ struct mthca_icm_table *mthca_alloc_icm_table(struct mthca_dev *dev,
 			table->icm[i] = NULL;
 			goto err;
 		}
+
+		/*
+		 * Add a reference to this ICM chunk so that it never
+		 * gets freed (since it contains reserved firmware objects).
+		 */
+		++table->icm[i]->refcount;
 	}
 
 	return table;
@@ -203,4 +334,201 @@ void mthca_free_icm_table(struct mthca_dev *dev, struct mthca_icm_table *table)
 		}
 
 	kfree(table);
+}
+
+static u64 mthca_uarc_virt(struct mthca_dev *dev, int page)
+{
+	return dev->uar_table.uarc_base +
+		dev->driver_uar.index * dev->uar_table.uarc_size +
+		page * 4096;
+}
+
+int mthca_alloc_db(struct mthca_dev *dev, int type, u32 qn, u32 **db)
+{
+	int group;
+	int start, end, dir;
+	int i, j;
+	struct mthca_db_page *page;
+	int ret = 0;
+	u8 status;
+
+	down(&dev->db_tab->mutex);
+
+	switch (type) {
+	case MTHCA_DB_TYPE_CQ_ARM:
+	case MTHCA_DB_TYPE_SQ:
+		group = 0;
+		start = 0;
+		end   = dev->db_tab->max_group1;
+		dir   = 1;
+		break;
+
+	case MTHCA_DB_TYPE_CQ_SET_CI:
+	case MTHCA_DB_TYPE_RQ:
+	case MTHCA_DB_TYPE_SRQ:
+		group = 1;
+		start = dev->db_tab->npages - 1;
+		end   = dev->db_tab->min_group2;
+		dir   = -1;
+		break;
+
+	default:
+		ret = -EINVAL;
+		goto out;
+	}
+
+	for (i = start; i != end; i += dir)
+		if (dev->db_tab->page[i].db_rec &&
+		    !bitmap_full(dev->db_tab->page[i].used,
+				 MTHCA_DB_REC_PER_PAGE)) {
+			page = dev->db_tab->page + i;
+			goto found;
+		}
+
+	if (dev->db_tab->max_group1 >= dev->db_tab->min_group2 - 1) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	page = dev->db_tab->page + end;
+	page->db_rec = dma_alloc_coherent(&dev->pdev->dev, 4096,
+					  &page->mapping, GFP_KERNEL);
+	if (!page->db_rec) {
+		ret = -ENOMEM;
+		goto out;
+	}
+	memset(page->db_rec, 0, 4096);
+
+	ret = mthca_MAP_ICM_page(dev, page->mapping, mthca_uarc_virt(dev, i), &status);
+	if (!ret && status)
+		ret = -EINVAL;
+	if (ret) {
+		dma_free_coherent(&dev->pdev->dev, 4096,
+				  page->db_rec, page->mapping);
+		goto out;
+	}
+
+	bitmap_zero(page->used, MTHCA_DB_REC_PER_PAGE);
+	if (group == 0)
+		++dev->db_tab->max_group1;
+	else
+		--dev->db_tab->min_group2;
+
+found:
+	j = find_first_zero_bit(page->used, MTHCA_DB_REC_PER_PAGE);
+	set_bit(j, page->used);
+
+	if (group == 1)
+		j = MTHCA_DB_REC_PER_PAGE - 1 - j;
+
+	ret = i * MTHCA_DB_REC_PER_PAGE + j;
+
+	page->db_rec[j] = cpu_to_be64((qn << 8) | (type << 5));
+
+	*db = (u32 *) &page->db_rec[j];
+
+out:
+	up(&dev->db_tab->mutex);
+
+	return ret;
+}
+
+void mthca_free_db(struct mthca_dev *dev, int type, int db_index)
+{
+	int i, j;
+	struct mthca_db_page *page;
+	u8 status;
+
+	i = db_index / MTHCA_DB_REC_PER_PAGE;
+	j = db_index % MTHCA_DB_REC_PER_PAGE;
+
+	page = dev->db_tab->page + i;
+
+	down(&dev->db_tab->mutex);
+
+	page->db_rec[j] = 0;
+	if (i >= dev->db_tab->min_group2)
+		j = MTHCA_DB_REC_PER_PAGE - 1 - j;
+	clear_bit(j, page->used);
+
+	if (bitmap_empty(page->used, MTHCA_DB_REC_PER_PAGE) &&
+	    i >= dev->db_tab->max_group1 - 1) {
+		mthca_UNMAP_ICM(dev, mthca_uarc_virt(dev, i), 1, &status);
+
+		dma_free_coherent(&dev->pdev->dev, 4096,
+				  page->db_rec, page->mapping);
+		page->db_rec = NULL;
+
+		if (i == dev->db_tab->max_group1) {
+			--dev->db_tab->max_group1;
+			/* XXX may be able to unmap more pages now */
+		}
+		if (i == dev->db_tab->min_group2)
+			++dev->db_tab->min_group2;
+	}
+
+	up(&dev->db_tab->mutex);
+}
+
+int mthca_init_db_tab(struct mthca_dev *dev)
+{
+	int i;
+
+	if (!mthca_is_memfree(dev))
+		return 0;
+
+	dev->db_tab = kmalloc(sizeof *dev->db_tab, GFP_KERNEL);
+	if (!dev->db_tab)
+		return -ENOMEM;
+
+	init_MUTEX(&dev->db_tab->mutex);
+
+	dev->db_tab->npages     = dev->uar_table.uarc_size / 4096;
+	dev->db_tab->max_group1 = 0;
+	dev->db_tab->min_group2 = dev->db_tab->npages - 1;
+
+	dev->db_tab->page = kmalloc(dev->db_tab->npages *
+				    sizeof *dev->db_tab->page,
+				    GFP_KERNEL);
+	if (!dev->db_tab->page) {
+		kfree(dev->db_tab);
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < dev->db_tab->npages; ++i)
+		dev->db_tab->page[i].db_rec = NULL;
+
+	return 0;
+}
+
+void mthca_cleanup_db_tab(struct mthca_dev *dev)
+{
+	int i;
+	u8 status;
+
+	if (!mthca_is_memfree(dev))
+		return;
+
+	/*
+	 * Because we don't always free our UARC pages when they
+	 * become empty to make mthca_free_db() simpler we need to
+	 * make a sweep through the doorbell pages and free any
+	 * leftover pages now.
+	 */
+	for (i = 0; i < dev->db_tab->npages; ++i) {
+		if (!dev->db_tab->page[i].db_rec)
+			continue;
+
+		if (!bitmap_empty(dev->db_tab->page[i].used, MTHCA_DB_REC_PER_PAGE))
+			mthca_warn(dev, "Kernel UARC page %d not empty\n", i);
+
+		mthca_UNMAP_ICM(dev, mthca_uarc_virt(dev, i), 1, &status);
+
+		dma_free_coherent(&dev->pdev->dev, 4096,
+				  dev->db_tab->page[i].db_rec,
+				  dev->db_tab->page[i].mapping);
+	}
+
+	kfree(dev->db_tab->page);
+	kfree(dev->db_tab);
 }

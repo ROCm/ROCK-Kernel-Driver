@@ -373,7 +373,7 @@ static int __init get_tcic_id(void)
 
 /*====================================================================*/
 
-static int tcic_drv_suspend(struct device *dev, u32 state, u32 level)
+static int tcic_drv_suspend(struct device *dev, pm_message_t state, u32 level)
 {
 	int ret = 0;
 	if (level == SUSPEND_SAVE_STATE)
@@ -888,14 +888,8 @@ static int tcic_init(struct pcmcia_socket *s)
 	return 0;
 }
 
-static int tcic_suspend(struct pcmcia_socket *sock)
-{
-	return tcic_set_socket(sock, &dead_socket);
-}
-
 static struct pccard_operations tcic_operations = {
 	.init		   = tcic_init,
-	.suspend	   = tcic_suspend,
 	.get_status	   = tcic_get_status,
 	.get_socket	   = tcic_get_socket,
 	.set_socket	   = tcic_set_socket,

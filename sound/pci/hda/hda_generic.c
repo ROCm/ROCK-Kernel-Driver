@@ -44,7 +44,7 @@ struct hda_gnode {
 	struct list_head list;
 };
 
-/* patch-specific record */
+/* pathc-specific record */
 struct hda_gspec {
 	struct hda_gnode *dac_node;	/* DAC node */
 	struct hda_gnode *out_pin_node;	/* Output pin (Line-Out) node */
@@ -426,7 +426,7 @@ static const char *get_input_type(struct hda_gnode *node, unsigned int *pinctl)
 		return "Line";
 	case AC_JACK_CD:
 		if (pinctl)
-			*pinctl |= AC_PINCTL_VREF_GRD;
+			*pinctl |= AC_PIN_VREF_GRD;
 		return "CD";
 	case AC_JACK_AUX:
 		if ((location & 0x0f) == AC_JACK_LOC_FRONT)

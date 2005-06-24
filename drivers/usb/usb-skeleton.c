@@ -112,6 +112,7 @@ static ssize_t skel_read(struct file *file, char *buffer, size_t count, loff_t *
 {
 	struct usb_skel *dev;
 	int retval = 0;
+	int bytes_read;
 
 	dev = (struct usb_skel *)file->private_data;
 	
@@ -120,14 +121,14 @@ static ssize_t skel_read(struct file *file, char *buffer, size_t count, loff_t *
 			      usb_rcvbulkpipe(dev->udev, dev->bulk_in_endpointAddr),
 			      dev->bulk_in_buffer,
 			      min(dev->bulk_in_size, count),
-			      &count, HZ*10);
+			      &bytes_read, 10000);
 
 	/* if the read was successful, copy the data to userspace */
 	if (!retval) {
-		if (copy_to_user(buffer, dev->bulk_in_buffer, count))
+		if (copy_to_user(buffer, dev->bulk_in_buffer, bytes_read))
 			retval = -EFAULT;
 		else
-			retval = count;
+			retval = bytes_read;
 	}
 
 	return retval;
@@ -271,7 +272,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 		}
 
 		if (!dev->bulk_out_endpointAddr &&
-		    !(endpoint->bEndpointAddress & USB_DIR_IN) &&
+		    !(endpoint->bEndpointAddress & USB_DIR_OUT) &&
 		    ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
 					== USB_ENDPOINT_XFER_BULK)) {
 			/* we found a bulk out endpoint */

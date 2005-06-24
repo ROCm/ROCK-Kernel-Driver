@@ -16,8 +16,6 @@
 #include <linux/init.h>
 #include <asm/prom.h>
 
-extern unsigned long reloc_offset(void);
-
 #define MAX_LMB_REGIONS 128
 
 #define LMB_ALLOC_ANYWHERE	0
@@ -53,6 +51,7 @@ extern unsigned long __init lmb_alloc_base(unsigned long, unsigned long,
 extern unsigned long __init lmb_phys_mem_size(void);
 extern unsigned long __init lmb_end_of_DRAM(void);
 extern unsigned long __init lmb_abs_to_phys(unsigned long);
+extern void __init lmb_enforce_memory_limit(void);
 
 extern void lmb_dump_all(void);
 

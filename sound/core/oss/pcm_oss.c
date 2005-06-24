@@ -125,26 +125,17 @@ int snd_pcm_plugin_append(snd_pcm_plugin_t *plugin)
 static long snd_pcm_oss_bytes(snd_pcm_substream_t *substream, long frames)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	long buffer_size = snd_pcm_lib_buffer_bytes(substream);
-	long bytes = frames_to_bytes(runtime, frames);
+	snd_pcm_uframes_t buffer_size = snd_pcm_lib_buffer_bytes(substream);
+	frames = frames_to_bytes(runtime, frames);
 	if (buffer_size == runtime->oss.buffer_bytes)
-		return bytes;
-#if BITS_PER_LONG >= 64
-	return runtime->oss.buffer_bytes * bytes / buffer_size;
-#else
-	{
-		u64 bsize = (u64)runtime->oss.buffer_bytes * (u64)bytes;
-		u32 rem;
-		div64_32(&bsize, buffer_size, &rem);
-		return (long)bsize;
-	}
-#endif
+		return frames;
+	return (runtime->oss.buffer_bytes * frames) / buffer_size;
 }
 
 static long snd_pcm_alsa_frames(snd_pcm_substream_t *substream, long bytes)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	long buffer_size = snd_pcm_lib_buffer_bytes(substream);
+	snd_pcm_uframes_t buffer_size = snd_pcm_lib_buffer_bytes(substream);
 	if (buffer_size == runtime->oss.buffer_bytes)
 		return bytes_to_frames(runtime, bytes);
 	return bytes_to_frames(runtime, (buffer_size * bytes) / runtime->oss.buffer_bytes);
@@ -473,8 +464,7 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 	sw_params->tstamp_mode = SNDRV_PCM_TSTAMP_NONE;
 	sw_params->period_step = 1;
 	sw_params->sleep_min = 0;
-	sw_params->avail_min = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
-		1 : runtime->period_size;
+	sw_params->avail_min = 1;
 	sw_params->xfer_align = 1;
 	if (atomic_read(&runtime->mmap_count) ||
 	    (substream->oss.setup && substream->oss.setup->nosilence)) {
@@ -1537,15 +1527,12 @@ static int snd_pcm_oss_get_ptr(snd_pcm_oss_file_t *pcm_oss_file, int stream, str
 			snd_pcm_oss_simulate_fill(substream, delay);
 		info.bytes = snd_pcm_oss_bytes(substream, runtime->status->hw_ptr) & INT_MAX;
 	} else {
-		delay = snd_pcm_oss_bytes(substream, delay);
-		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			info.blocks = (runtime->oss.buffer_bytes - delay - fixup) / runtime->oss.period_bytes;
+		delay = snd_pcm_oss_bytes(substream, delay) + fixup;
+		info.blocks = delay / runtime->oss.period_bytes;
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 			info.bytes = (runtime->oss.bytes - delay) & INT_MAX;
-		} else {
-			delay += fixup;
-			info.blocks = delay / runtime->oss.period_bytes;
+		else
 			info.bytes = (runtime->oss.bytes + delay) & INT_MAX;
-		}
 	}
 	if (copy_to_user(_info, &info, sizeof(info)))
 		return -EFAULT;

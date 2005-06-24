@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/kernel/calls.S
  *
- *  Copyright (C) 1995-2004 Russell King
+ *  Copyright (C) 1995-2005 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -10,7 +10,7 @@
  *  This file is included twice in entry-common.S
  */
 #ifndef NR_syscalls
-#define NR_syscalls 288
+#define NR_syscalls 320
 #else
 
 __syscall_start:
@@ -295,6 +295,38 @@ __syscall_start:
 		.long	sys_mq_notify
 		.long	sys_mq_getsetattr
 /* 280 */	.long	sys_waitid
+		.long	sys_socket
+		.long	sys_bind
+		.long	sys_connect
+		.long	sys_listen
+/* 285 */	.long	sys_accept
+		.long	sys_getsockname
+		.long	sys_getpeername
+		.long	sys_socketpair
+		.long	sys_send
+/* 290 */	.long	sys_sendto
+		.long	sys_recv
+		.long	sys_recvfrom
+		.long	sys_shutdown
+		.long	sys_setsockopt
+/* 295 */	.long	sys_getsockopt
+		.long	sys_sendmsg
+		.long	sys_recvmsg
+		.long	sys_semop
+		.long	sys_semget
+/* 300 */	.long	sys_semctl
+		.long	sys_msgsnd
+		.long	sys_msgrcv
+		.long	sys_msgget
+		.long	sys_msgctl
+/* 305 */	.long	sys_shmat
+		.long	sys_shmdt
+		.long	sys_shmget
+		.long	sys_shmctl
+		.long	sys_add_key
+/* 310 */	.long	sys_request_key
+		.long	sys_keyctl
+		.long	sys_semtimedop
 __syscall_end:
 
 		.rept	NR_syscalls - (__syscall_end - __syscall_start) / 4

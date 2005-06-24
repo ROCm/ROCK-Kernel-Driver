@@ -23,7 +23,7 @@ struct thread_info {
 	.flags		= 0,			\
 	.cpu		= 0,			\
 	.addr_limit	= KERNEL_DS,		\
-	.preempt_count	= 0,			\
+	.preempt_count	= 1,			\
   	.restart_block	= {			\
 		.fn = do_no_restart_syscall	\
 	}					\
@@ -52,7 +52,7 @@ struct thread_info {
 
 #endif /* !__ASSEMBLY */
 
-#define PREEMPT_ACTIVE          0x4000000
+#define PREEMPT_ACTIVE          0x10000000
 
 /*
  * thread information flags

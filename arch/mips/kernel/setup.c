@@ -86,8 +86,8 @@ EXPORT_SYMBOL(mips_io_port_base);
 unsigned long isa_slot_offset;
 EXPORT_SYMBOL(isa_slot_offset);
 
-static struct resource code_resource = { "Kernel code" };
-static struct resource data_resource = { "Kernel data" };
+static struct resource code_resource = { .name = "Kernel code", };
+static struct resource data_resource = { .name = "Kernel data", };
 
 void __init add_memory_region(phys_t start, phys_t size, long type)
 {

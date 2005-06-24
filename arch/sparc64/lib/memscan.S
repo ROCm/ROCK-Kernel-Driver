@@ -52,43 +52,43 @@ check_bytes:
 	 andcc		%o5, 0xff, %g0
 	add		%o0, -5, %g2
 	ba,pt		%xcc, 3f
-	 srlx		%o5, 32, %g5
+	 srlx		%o5, 32, %g7
 
-2:	srlx		%o5, 8, %g5
+2:	srlx		%o5, 8, %g7
 	be,pn		%icc, 1f
 	 add		%o0, -8, %g2
-	andcc		%g5, 0xff, %g0
-	srlx		%g5, 8, %g5
+	andcc		%g7, 0xff, %g0
+	srlx		%g7, 8, %g7
 	be,pn		%icc, 1f
 	 inc		%g2
-	andcc		%g5, 0xff, %g0
+	andcc		%g7, 0xff, %g0
 
-	srlx		%g5, 8, %g5
+	srlx		%g7, 8, %g7
 	be,pn		%icc, 1f
 	 inc		%g2
-	andcc		%g5, 0xff, %g0
-	srlx		%g5, 8, %g5
+	andcc		%g7, 0xff, %g0
+	srlx		%g7, 8, %g7
 	be,pn		%icc, 1f
 	 inc		%g2
 	andcc		%g3, %o3, %g0
 
 	be,a,pn		%icc, 2f
 	 mov		%o0, %g2
-3:	andcc		%g5, 0xff, %g0
-	srlx		%g5, 8, %g5
+3:	andcc		%g7, 0xff, %g0
+	srlx		%g7, 8, %g7
 	be,pn		%icc, 1f
 	 inc		%g2
-	andcc		%g5, 0xff, %g0
-	srlx		%g5, 8, %g5
+	andcc		%g7, 0xff, %g0
+	srlx		%g7, 8, %g7
 
 	be,pn		%icc, 1f
 	 inc		%g2
-	andcc		%g5, 0xff, %g0
-	srlx		%g5, 8, %g5
+	andcc		%g7, 0xff, %g0
+	srlx		%g7, 8, %g7
 	be,pn		%icc, 1f
 	 inc		%g2
-	andcc		%g5, 0xff, %g0
-	srlx		%g5, 8, %g5
+	andcc		%g7, 0xff, %g0
+	srlx		%g7, 8, %g7
 
 	be,pn		%icc, 1f
 	 inc		%g2

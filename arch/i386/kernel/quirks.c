@@ -7,7 +7,7 @@
 
 #if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_SMP) && defined(CONFIG_PCI)
 
-void __devinit quirk_intel_irqbalance(struct pci_dev *dev)
+static void __devinit quirk_intel_irqbalance(struct pci_dev *dev)
 {
 	u8 config, rev;
 	u32 word;
@@ -37,7 +37,9 @@ void __devinit quirk_intel_irqbalance(struct pci_dev *dev)
 		irqbalance_disable("");
 #endif
 		noirqdebug_setup("");
+#ifdef CONFIG_PROC_FS
 		no_irq_affinity = 1;
+#endif
 	}
 
 	config &= ~0x2;

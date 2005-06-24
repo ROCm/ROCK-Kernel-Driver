@@ -76,7 +76,6 @@ EXPORT_SYMBOL(smp_call_function);
 
 /* TLB flushing */
 EXPORT_SYMBOL(smp_flush_tlb_page);
-EXPORT_SYMBOL_GPL(smp_flush_tlb_all);
 #endif
 
 /* compiler generated symbol */

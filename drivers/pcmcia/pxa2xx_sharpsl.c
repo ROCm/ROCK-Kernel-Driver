@@ -38,7 +38,7 @@ static struct pcmcia_irqs irqs[] = {
 
 static void sharpsl_pcmcia_init_reset(void)
 {
-	reset_scoop();
+	reset_scoop(&corgiscoop_device.dev);
 	keep_vs = NO_KEEP_VS;
 	keep_rd = 0;
 }
@@ -79,8 +79,8 @@ static int sharpsl_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
 	}
 
 	/* Enable interrupt */
-	write_scoop_reg(SCOOP_IMR, 0x00C0);
-	write_scoop_reg(SCOOP_MCR, 0x0101);
+	write_scoop_reg(&corgiscoop_device.dev, SCOOP_IMR, 0x00C0);
+	write_scoop_reg(&corgiscoop_device.dev, SCOOP_MCR, 0x0101);
 	keep_vs = NO_KEEP_VS;
 
 	skt->irq = CORGI_IRQ_GPIO_CF_IRQ;
@@ -102,30 +102,30 @@ static void sharpsl_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
 {
 	unsigned short cpr, csr;
 
-	cpr = read_scoop_reg(SCOOP_CPR);
+	cpr = read_scoop_reg(&corgiscoop_device.dev, SCOOP_CPR);
 
-	write_scoop_reg(SCOOP_IRM, 0x00FF);
-	write_scoop_reg(SCOOP_ISR, 0x0000);
-	write_scoop_reg(SCOOP_IRM, 0x0000);
-	csr = read_scoop_reg(SCOOP_CSR);
+	write_scoop_reg(&corgiscoop_device.dev, SCOOP_IRM, 0x00FF);
+	write_scoop_reg(&corgiscoop_device.dev, SCOOP_ISR, 0x0000);
+	write_scoop_reg(&corgiscoop_device.dev, SCOOP_IRM, 0x0000);
+	csr = read_scoop_reg(&corgiscoop_device.dev, SCOOP_CSR);
 	if (csr & 0x0004) {
 		/* card eject */
-		write_scoop_reg(SCOOP_CDR, 0x0000);
+		write_scoop_reg(&corgiscoop_device.dev, SCOOP_CDR, 0x0000);
 		keep_vs = NO_KEEP_VS;
 	}
 	else if (!(keep_vs & NO_KEEP_VS)) {
 		/* keep vs1,vs2 */
-		write_scoop_reg(SCOOP_CDR, 0x0000);
+		write_scoop_reg(&corgiscoop_device.dev, SCOOP_CDR, 0x0000);
 		csr |= keep_vs;
 	}
 	else if (cpr & 0x0003) {
 		/* power on */
-		write_scoop_reg(SCOOP_CDR, 0x0000);
+		write_scoop_reg(&corgiscoop_device.dev, SCOOP_CDR, 0x0000);
 		keep_vs = (csr & 0x00C0);
 	}
 	else {
 		/* card detect */
-		write_scoop_reg(SCOOP_CDR, 0x0002);
+		write_scoop_reg(&corgiscoop_device.dev, SCOOP_CDR, 0x0002);
 	}
 
 	state->detect = (csr & 0x0004) ? 0 : 1;
@@ -166,10 +166,10 @@ static int sharpsl_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 
 	local_irq_save(flags);
 
-	nmcr = (mcr = read_scoop_reg(SCOOP_MCR)) & ~0x0010;
-	ncpr = (cpr = read_scoop_reg(SCOOP_CPR)) & ~0x0083;
-	nccr = (ccr = read_scoop_reg(SCOOP_CCR)) & ~0x0080;
-	nimr = (imr = read_scoop_reg(SCOOP_IMR)) & ~0x003E;
+	nmcr = (mcr = read_scoop_reg(&corgiscoop_device.dev, SCOOP_MCR)) & ~0x0010;
+	ncpr = (cpr = read_scoop_reg(&corgiscoop_device.dev, SCOOP_CPR)) & ~0x0083;
+	nccr = (ccr = read_scoop_reg(&corgiscoop_device.dev, SCOOP_CCR)) & ~0x0080;
+	nimr = (imr = read_scoop_reg(&corgiscoop_device.dev, SCOOP_IMR)) & ~0x003E;
 
 	ncpr |= (state->Vcc == 33) ? 0x0001 :
 				(state->Vcc == 50) ? 0x0002 : 0;
@@ -193,13 +193,13 @@ static int sharpsl_pcmcia_configure_socket(struct soc_pcmcia_socket *skt,
 	}
 
 	if (mcr != nmcr)
-		write_scoop_reg(SCOOP_MCR, nmcr);
+		write_scoop_reg(&corgiscoop_device.dev, SCOOP_MCR, nmcr);
 	if (cpr != ncpr)
-		write_scoop_reg(SCOOP_CPR, ncpr);
+		write_scoop_reg(&corgiscoop_device.dev, SCOOP_CPR, ncpr);
 	if (ccr != nccr)
-		write_scoop_reg(SCOOP_CCR, nccr);
+		write_scoop_reg(&corgiscoop_device.dev, SCOOP_CCR, nccr);
 	if (imr != nimr)
-		write_scoop_reg(SCOOP_IMR, nimr);
+		write_scoop_reg(&corgiscoop_device.dev, SCOOP_IMR, nimr);
 
 	local_irq_restore(flags);
 

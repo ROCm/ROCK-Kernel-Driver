@@ -391,8 +391,8 @@ int hashbin_delete( hashbin_t* hashbin, FREE_FUNC free_func)
 	unsigned long flags = 0;
 	int i;
 
-	ASSERT(hashbin != NULL, return -1;);
-	ASSERT(hashbin->magic == HB_MAGIC, return -1;);
+	IRDA_ASSERT(hashbin != NULL, return -1;);
+	IRDA_ASSERT(hashbin->magic == HB_MAGIC, return -1;);
 	
 	/* Synchronize */
 	if ( hashbin->hb_type & HB_LOCK ) {
@@ -447,8 +447,8 @@ void hashbin_insert(hashbin_t* hashbin, irda_queue_t* entry, long hashv,
 
 	IRDA_DEBUG( 4, "%s()\n", __FUNCTION__);
 
-	ASSERT( hashbin != NULL, return;);
-	ASSERT( hashbin->magic == HB_MAGIC, return;);
+	IRDA_ASSERT( hashbin != NULL, return;);
+	IRDA_ASSERT( hashbin->magic == HB_MAGIC, return;);
 
 	/*
 	 * Locate hashbin
@@ -560,8 +560,8 @@ void* hashbin_remove( hashbin_t* hashbin, long hashv, const char* name)
 
 	IRDA_DEBUG( 4, "%s()\n", __FUNCTION__);
 
-	ASSERT( hashbin != NULL, return NULL;);
-	ASSERT( hashbin->magic == HB_MAGIC, return NULL;);
+	IRDA_ASSERT( hashbin != NULL, return NULL;);
+	IRDA_ASSERT( hashbin->magic == HB_MAGIC, return NULL;);
 	
 	/*
 	 * Locate hashbin
@@ -653,9 +653,9 @@ void* hashbin_remove_this( hashbin_t* hashbin, irda_queue_t* entry)
 
 	IRDA_DEBUG( 4, "%s()\n", __FUNCTION__);
 
-	ASSERT( hashbin != NULL, return NULL;);
-	ASSERT( hashbin->magic == HB_MAGIC, return NULL;);
-	ASSERT( entry != NULL, return NULL;);
+	IRDA_ASSERT( hashbin != NULL, return NULL;);
+	IRDA_ASSERT( hashbin->magic == HB_MAGIC, return NULL;);
+	IRDA_ASSERT( entry != NULL, return NULL;);
 	
 	/* Synchronize */
 	if ( hashbin->hb_type & HB_LOCK ) {
@@ -714,8 +714,8 @@ void* hashbin_find( hashbin_t* hashbin, long hashv, const char* name )
 
 	IRDA_DEBUG( 4, "hashbin_find()\n");
 
-	ASSERT( hashbin != NULL, return NULL;);
-	ASSERT( hashbin->magic == HB_MAGIC, return NULL;);
+	IRDA_ASSERT( hashbin != NULL, return NULL;);
+	IRDA_ASSERT( hashbin->magic == HB_MAGIC, return NULL;);
 
 	/*
 	 * Locate hashbin
@@ -836,8 +836,8 @@ irda_queue_t *hashbin_get_first( hashbin_t* hashbin)
 	irda_queue_t *entry;
 	int i;
 
-	ASSERT( hashbin != NULL, return NULL;);
-	ASSERT( hashbin->magic == HB_MAGIC, return NULL;);
+	IRDA_ASSERT( hashbin != NULL, return NULL;);
+	IRDA_ASSERT( hashbin->magic == HB_MAGIC, return NULL;);
 
 	if ( hashbin == NULL)
 		return NULL;
@@ -872,11 +872,11 @@ irda_queue_t *hashbin_get_next( hashbin_t *hashbin)
 	int bin;
 	int i;
 
-	ASSERT( hashbin != NULL, return NULL;);
-	ASSERT( hashbin->magic == HB_MAGIC, return NULL;);
+	IRDA_ASSERT( hashbin != NULL, return NULL;);
+	IRDA_ASSERT( hashbin->magic == HB_MAGIC, return NULL;);
 
 	if ( hashbin->hb_current == NULL) {
-		ASSERT( hashbin->hb_current != NULL, return NULL;);
+		IRDA_ASSERT( hashbin->hb_current != NULL, return NULL;);
 		return NULL;
 	}	
 	entry = hashbin->hb_current->q_next;

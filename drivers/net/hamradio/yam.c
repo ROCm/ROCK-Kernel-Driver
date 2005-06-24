@@ -442,7 +442,7 @@ static int fpga_download(int iobase, int bitrate)
 
 static void yam_set_uart(struct net_device *dev)
 {
-	struct yam_port *yp = (struct yam_port *) dev->priv;
+	struct yam_port *yp = netdev_priv(dev);
 	int divisor = 115200 / yp->baudrate;
 
 	outb(0, IER(dev->base_addr));
@@ -522,12 +522,10 @@ static inline void yam_rx_flag(struct net_device *dev, struct yam_port *yp)
 				++yp->stats.rx_dropped;
 			} else {
 				unsigned char *cp;
-				skb->dev = dev;
 				cp = skb_put(skb, pkt_len);
 				*cp++ = 0;		/* KISS kludge */
 				memcpy(cp, yp->rx_buf, pkt_len - 1);
-				skb->protocol = htons(ETH_P_AX25);
-				skb->mac.raw = skb->data;
+				skb->protocol = ax25_type_trans(skb, dev);
 				netif_rx(skb);
 				dev->last_rx = jiffies;
 				++yp->stats.rx_packets;
@@ -565,7 +563,7 @@ static void ptt_off(struct net_device *dev)
 
 static int yam_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-	struct yam_port *yp = dev->priv;
+	struct yam_port *yp = netdev_priv(dev);
 
 	skb_queue_tail(&yp->send_queue, skb);
 	dev->trans_start = jiffies;
@@ -592,12 +590,11 @@ static inline unsigned short random_num(void)
 
 static void yam_arbitrate(struct net_device *dev)
 {
-	struct yam_port *yp = dev->priv;
+	struct yam_port *yp = netdev_priv(dev);
 
-	if (!yp || yp->magic != YAM_MAGIC
-		|| yp->tx_state != TX_OFF || skb_queue_empty(&yp->send_queue)) {
+	if (yp->magic != YAM_MAGIC || yp->tx_state != TX_OFF ||
+	    skb_queue_empty(&yp->send_queue))
 		return;
-	}
 	/* tx_state is TX_OFF and there is data to send */
 
 	if (yp->dupmode) {
@@ -725,7 +722,7 @@ static irqreturn_t yam_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	for (i = 0; i < NR_PORTS; i++) {
 		dev = yam_devs[i];
-		yp = dev->priv;
+		yp = netdev_priv(dev);
 
 		if (!netif_running(dev))
 			continue;
@@ -784,8 +781,8 @@ static void yam_seq_stop(struct seq_file *seq, void *v)
 
 static int yam_seq_show(struct seq_file *seq, void *v)
 {
-	const struct net_device *dev = v;
-	const struct yam_port *yp = dev->priv;
+	struct net_device *dev = v;
+	const struct yam_port *yp = netdev_priv(dev);
 
 	seq_printf(seq, "Device %s\n", dev->name);
 	seq_printf(seq, "  Up       %d\n", netif_running(dev));
@@ -838,10 +835,10 @@ static struct net_device_stats *yam_get_stats(struct net_device *dev)
 {
 	struct yam_port *yp;
 
-	if (!dev || !dev->priv)
+	if (!dev)
 		return NULL;
 
-	yp = (struct yam_port *) dev->priv;
+	yp = netdev_priv(dev);
 	if (yp->magic != YAM_MAGIC)
 		return NULL;
 
@@ -856,14 +853,14 @@ static struct net_device_stats *yam_get_stats(struct net_device *dev)
 
 static int yam_open(struct net_device *dev)
 {
-	struct yam_port *yp = (struct yam_port *) dev->priv;
+	struct yam_port *yp = netdev_priv(dev);
 	enum uart u;
 	int i;
 	int ret=0;
 
 	printk(KERN_INFO "Trying %s at iobase 0x%lx irq %u\n", dev->name, dev->base_addr, dev->irq);
 
-	if (!dev || !yp || !yp->bitrate)
+	if (!dev || !yp->bitrate)
 		return -ENXIO;
 	if (!dev->base_addr || dev->base_addr > 0x1000 - YAM_EXTENT ||
 		dev->irq < 2 || dev->irq > 15) {
@@ -900,7 +897,7 @@ static int yam_open(struct net_device *dev)
 	/* Reset overruns for all ports - FPGA programming makes overruns */
 	for (i = 0; i < NR_PORTS; i++) {
 		struct net_device *dev = yam_devs[i];
-		struct yam_port *yp = dev->priv;
+		struct yam_port *yp = netdev_priv(dev);
 		inb(LSR(dev->base_addr));
 		yp->stats.rx_fifo_errors = 0;
 	}
@@ -919,10 +916,11 @@ out_release_base:
 static int yam_close(struct net_device *dev)
 {
 	struct sk_buff *skb;
-	struct yam_port *yp = (struct yam_port *) dev->priv;
+	struct yam_port *yp = netdev_priv(dev);
 
-	if (!dev || !yp)
+	if (!dev)
 		return -EINVAL;
+
 	/*
 	 * disable interrupts
 	 */
@@ -944,7 +942,7 @@ static int yam_close(struct net_device *dev)
 
 static int yam_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	struct yam_port *yp = (struct yam_port *) dev->priv;
+	struct yam_port *yp = netdev_priv(dev);
 	struct yamdrv_ioctl_cfg yi;
 	struct yamdrv_ioctl_mcs *ym;
 	int ioctl_cmd;
@@ -952,7 +950,7 @@ static int yam_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	if (copy_from_user(&ioctl_cmd, ifr->ifr_data, sizeof(int)))
 		 return -EFAULT;
 
-	if (yp == NULL || yp->magic != YAM_MAGIC)
+	if (yp->magic != YAM_MAGIC)
 		return -EINVAL;
 
 	if (!capable(CAP_NET_ADMIN))
@@ -1091,7 +1089,7 @@ static int yam_set_mac_address(struct net_device *dev, void *addr)
 
 static void yam_setup(struct net_device *dev)
 {
-	struct yam_port *yp = dev->priv;
+	struct yam_port *yp = netdev_priv(dev);
 
 	yp->magic = YAM_MAGIC;
 	yp->bitrate = DEFAULT_BITRATE;

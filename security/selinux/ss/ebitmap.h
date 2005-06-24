@@ -38,7 +38,6 @@ static inline void ebitmap_init(struct ebitmap *e)
 }
 
 int ebitmap_cmp(struct ebitmap *e1, struct ebitmap *e2);
-int ebitmap_or(struct ebitmap *dst, struct ebitmap *e1, struct ebitmap *e2);
 int ebitmap_cpy(struct ebitmap *dst, struct ebitmap *src);
 int ebitmap_contains(struct ebitmap *e1, struct ebitmap *e2);
 int ebitmap_get_bit(struct ebitmap *e, unsigned long bit);

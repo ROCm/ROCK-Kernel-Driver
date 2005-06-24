@@ -184,8 +184,8 @@ static struct vm_operations_struct shmem_vm_ops;
 
 static struct backing_dev_info shmem_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
-	.memory_backed	= 1,	/* Does not contribute to dirty memory */
-	.unplug_io_fn = default_unplug_io_fn,
+	.capabilities	= BDI_CAP_NO_ACCT_DIRTY | BDI_CAP_NO_WRITEBACK,
+	.unplug_io_fn	= default_unplug_io_fn,
 };
 
 static LIST_HEAD(shmem_swaplist);
@@ -922,7 +922,7 @@ shmem_swapin(struct shmem_inode_info *info,swp_entry_t entry,unsigned long idx)
 }
 
 static inline struct page *
-shmem_alloc_page(unsigned long gfp,struct shmem_inode_info *info,
+shmem_alloc_page(unsigned int __nocast gfp,struct shmem_inode_info *info,
 				 unsigned long idx)
 {
 	return alloc_page(gfp | __GFP_ZERO);
@@ -2193,7 +2193,7 @@ static int shmem_xattr_security_set(struct inode *inode, const char *name, const
 	return security_inode_setsecurity(inode, name, value, size, flags);
 }
 
-struct xattr_handler shmem_xattr_security_handler = {
+static struct xattr_handler shmem_xattr_security_handler = {
 	.prefix	= XATTR_SECURITY_PREFIX,
 	.list	= shmem_xattr_security_list,
 	.get	= shmem_xattr_security_get,

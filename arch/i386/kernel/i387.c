@@ -24,7 +24,7 @@
 #define HAVE_HWFP 1
 #endif
 
-unsigned long mxcsr_feature_mask = 0xffffffff;
+static unsigned long mxcsr_feature_mask = 0xffffffff;
 
 void mxcsr_feature_mask_init(void)
 {
@@ -177,6 +177,7 @@ unsigned short get_fpu_swd( struct task_struct *tsk )
 	}
 }
 
+#if 0
 unsigned short get_fpu_twd( struct task_struct *tsk )
 {
 	if ( cpu_has_fxsr ) {
@@ -185,6 +186,7 @@ unsigned short get_fpu_twd( struct task_struct *tsk )
 		return (unsigned short)tsk->thread.i387.fsave.twd;
 	}
 }
+#endif  /*  0  */
 
 unsigned short get_fpu_mxcsr( struct task_struct *tsk )
 {
@@ -194,6 +196,8 @@ unsigned short get_fpu_mxcsr( struct task_struct *tsk )
 		return 0x1f80;
 	}
 }
+
+#if 0
 
 void set_fpu_cwd( struct task_struct *tsk, unsigned short cwd )
 {
@@ -221,6 +225,8 @@ void set_fpu_twd( struct task_struct *tsk, unsigned short twd )
 		tsk->thread.i387.fsave.twd = ((long)twd | 0xffff0000u);
 	}
 }
+
+#endif  /*  0  */
 
 /*
  * FXSR floating point environment conversions.

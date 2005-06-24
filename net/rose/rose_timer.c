@@ -46,7 +46,7 @@ void rose_start_heartbeat(struct sock *sk)
 
 void rose_start_t1timer(struct sock *sk)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	del_timer(&rose->timer);
 
@@ -59,7 +59,7 @@ void rose_start_t1timer(struct sock *sk)
 
 void rose_start_t2timer(struct sock *sk)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	del_timer(&rose->timer);
 
@@ -72,7 +72,7 @@ void rose_start_t2timer(struct sock *sk)
 
 void rose_start_t3timer(struct sock *sk)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	del_timer(&rose->timer);
 
@@ -85,7 +85,7 @@ void rose_start_t3timer(struct sock *sk)
 
 void rose_start_hbtimer(struct sock *sk)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	del_timer(&rose->timer);
 
@@ -98,7 +98,7 @@ void rose_start_hbtimer(struct sock *sk)
 
 void rose_start_idletimer(struct sock *sk)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	del_timer(&rose->idletimer);
 
@@ -129,7 +129,7 @@ void rose_stop_idletimer(struct sock *sk)
 static void rose_heartbeat_expiry(unsigned long param)
 {
 	struct sock *sk = (struct sock *)param;
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	bh_lock_sock(sk);
 	switch (rose->state) {
@@ -166,7 +166,7 @@ static void rose_heartbeat_expiry(unsigned long param)
 static void rose_timer_expiry(unsigned long param)
 {
 	struct sock *sk = (struct sock *)param;
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	bh_lock_sock(sk);
 	switch (rose->state) {

@@ -727,10 +727,11 @@ push_on_scq(struct idt77252_dev *card, struct vc_map *vc, struct sk_buff *skb)
 	spin_lock_irqsave(&vc->lock, flags);
 	if (vc->estimator) {
 		struct atm_vcc *vcc = vc->tx_vcc;
+		struct sock *sk = sk_atm(vcc);
 
 		vc->estimator->cells += (skb->len + 47) / 48;
-		if (atomic_read(&vcc->sk->sk_wmem_alloc) >
-		    (vcc->sk->sk_sndbuf >> 1)) {
+		if (atomic_read(&sk->sk_wmem_alloc) >
+		    (sk->sk_sndbuf >> 1)) {
 			u32 cps = vc->estimator->maxcps;
 
 			vc->estimator->cps = cps;
@@ -1325,7 +1326,7 @@ idt77252_rx_raw(struct idt77252_dev *card)
 			goto drop;
 		}
 
-		if ((vcc->sk != NULL) && !atm_charge(vcc, sb->truesize)) {
+		if (!atm_charge(vcc, sb->truesize)) {
 			RXPRINTK("%s: atm_charge() dropped AAL0 packets.\n",
 				 card->name);
 			dev_kfree_skb(sb);
@@ -2029,7 +2030,7 @@ idt77252_send_oam(struct atm_vcc *vcc, void *cell, int flags)
 		atomic_inc(&vcc->stats->tx_err);
 		return -ENOMEM;
 	}
-	atomic_add(skb->truesize, &vcc->sk->sk_wmem_alloc);
+	atomic_add(skb->truesize, &sk_atm(vcc)->sk_wmem_alloc);
 
 	memcpy(skb_put(skb, 52), cell, 52);
 

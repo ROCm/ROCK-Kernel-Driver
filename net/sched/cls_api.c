@@ -602,7 +602,7 @@ tcf_exts_dump_stats(struct sk_buff *skb, struct tcf_exts *exts,
 {
 #ifdef CONFIG_NET_CLS_ACT
 	if (exts->action)
-		if (tcf_action_copy_stats(skb, exts->action) < 0)
+		if (tcf_action_copy_stats(skb, exts->action, 1) < 0)
 			goto rtattr_failure;
 #elif defined CONFIG_NET_CLS_POLICE
 	if (exts->police)

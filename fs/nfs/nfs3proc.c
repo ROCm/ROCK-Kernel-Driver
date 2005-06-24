@@ -292,43 +292,11 @@ static int nfs3_proc_commit(struct nfs_write_data *cdata)
 	return status;
 }
 
-static int nfs3_set_default_acl(struct inode *dir, struct inode *inode,
-				mode_t mode)
-{
-#ifdef CONFIG_NFS_ACL
-	struct posix_acl *dfacl, *acl;
-	int error = 0;
-
-	dfacl = NFS_PROTO(dir)->getacl(dir, ACL_TYPE_DEFAULT);
-	if (IS_ERR(dfacl)) {
-		error = PTR_ERR(dfacl);
-		return (error == -EOPNOTSUPP) ? 0 : error;
-	}
-	if (!dfacl)
-		return 0;
-	acl = posix_acl_clone(dfacl, GFP_KERNEL);
-	error = -ENOMEM;
-	if (!acl)
-		goto out;
-	error = posix_acl_create_masq(acl, &mode);
-	if (error < 0)
-		goto out;
-	error = NFS_PROTO(inode)->setacls(inode, acl, S_ISDIR(inode->i_mode) ?
-						      dfacl : NULL);
-out:
-	posix_acl_release(acl);
-	posix_acl_release(dfacl);
-	return error;
-#else
-	return 0;
-#endif
-}
-
 /*
  * Create a regular file.
  * For now, we don't implement O_EXCL.
  */
-static struct inode *
+static int
 nfs3_proc_create(struct inode *dir, struct dentry *dentry, struct iattr *sattr,
 		 int flags)
 {
@@ -346,11 +314,7 @@ nfs3_proc_create(struct inode *dir, struct dentry *dentry, struct iattr *sattr,
 		.fh		= &fhandle,
 		.fattr		= &fattr
 	};
-	mode_t			mode;
 	int			status;
-
-	mode = sattr->ia_mode;
-	sattr->ia_mode &= ~current->fs->umask;
 
 	dprintk("NFS call  create %s\n", dentry->d_name.name);
 	arg.createmode = NFS3_CREATE_UNCHECKED;
@@ -379,28 +343,19 @@ again:
 				break;
 
 			case NFS3_CREATE_UNCHECKED:
-				goto exit;
+				goto out;
 		}
 		goto again;
 	}
 
-exit:
-	dprintk("NFS reply create: %d\n", status);
+	if (status == 0)
+		status = nfs_instantiate(dentry, &fhandle, &fattr);
 	if (status != 0)
 		goto out;
-	if (fhandle.size == 0 || !(fattr.valid & NFS_ATTR_FATTR)) {
-		status = nfs3_proc_lookup(dir, &dentry->d_name, &fhandle, &fattr);
-		if (status != 0)
-			goto out;
-	}
 
 	/* When we created the file with exclusive semantics, make
 	 * sure we set the attributes afterwards. */
 	if (arg.createmode == NFS3_CREATE_EXCLUSIVE) {
-		struct nfs3_sattrargs	arg = {
-			.fh		= &fhandle,
-			.sattr		= sattr,
-		};
 		dprintk("NFS call  setattr (post-create)\n");
 
 		if (!(sattr->ia_valid & ATTR_ATIME_SET))
@@ -411,24 +366,13 @@ exit:
 		/* Note: we could use a guarded setattr here, but I'm
 		 * not sure this buys us anything (and I'd have
 		 * to revamp the NFSv3 XDR code) */
-		fattr.valid = 0;
-		status = rpc_call(NFS_CLIENT(dir), NFS3PROC_SETATTR,
-						&arg, &fattr, 0);
+		status = nfs3_proc_setattr(dentry, &fattr, sattr);
+		nfs_refresh_inode(dentry->d_inode, &fattr);
 		dprintk("NFS reply setattr (post-create): %d\n", status);
 	}
-	if (status == 0) {
-		struct inode *inode;
-		inode = nfs_fhget(dir->i_sb, &fhandle, &fattr);
-		status = -ENOMEM;
-		if (!inode)
-			goto out;
-		status = nfs3_set_default_acl(dir, inode, mode);
-		if (status)
-			goto out;
-		return inode;
-	}
 out:
-	return ERR_PTR(status);
+	dprintk("NFS reply create: %d\n", status);
+	return status;
 }
 
 static int
@@ -582,8 +526,8 @@ nfs3_proc_symlink(struct inode *dir, struct qstr *name, struct qstr *path,
 static int
 nfs3_proc_mkdir(struct inode *dir, struct dentry *dentry, struct iattr *sattr)
 {
-	struct nfs_fattr	fattr, dir_attr;
-	struct nfs_fh fh;
+	struct nfs_fh fhandle;
+	struct nfs_fattr fattr, dir_attr;
 	struct nfs3_mkdirargs	arg = {
 		.fh		= NFS_FH(dir),
 		.name		= dentry->d_name.name,
@@ -592,25 +536,19 @@ nfs3_proc_mkdir(struct inode *dir, struct dentry *dentry, struct iattr *sattr)
 	};
 	struct nfs3_diropres	res = {
 		.dir_attr	= &dir_attr,
-		.fh		= &fh,
+		.fh		= &fhandle,
 		.fattr		= &fattr
 	};
-	mode_t mode;
-	int status;
-
-	mode = sattr->ia_mode;
-	sattr->ia_mode &= ~current->fs->umask;
+	int			status;
 
 	dprintk("NFS call  mkdir %s\n", dentry->d_name.name);
 	dir_attr.valid = 0;
 	fattr.valid = 0;
 	status = rpc_call(NFS_CLIENT(dir), NFS3PROC_MKDIR, &arg, &res, 0);
 	nfs_refresh_inode(dir, &dir_attr);
-	if (!status)
-		status = nfs_instantiate(dentry, &fh, &fattr);
+	if (status == 0)
+		status = nfs_instantiate(dentry, &fhandle, &fattr);
 	dprintk("NFS reply mkdir: %d\n", status);
-	if (!status)
-		status = nfs3_set_default_acl(dir, dentry->d_inode, mode);
 	return status;
 }
 
@@ -704,7 +642,6 @@ nfs3_proc_mknod(struct inode *dir, struct dentry *dentry, struct iattr *sattr,
 		.fh		= &fh,
 		.fattr		= &fattr
 	};
-	mode_t mode;
 	int status;
 
 	switch (sattr->ia_mode & S_IFMT) {
@@ -715,20 +652,15 @@ nfs3_proc_mknod(struct inode *dir, struct dentry *dentry, struct iattr *sattr,
 	default:	return -EINVAL;
 	}
 
-	mode = sattr->ia_mode;
-	sattr->ia_mode &= ~current->fs->umask;
-
 	dprintk("NFS call  mknod %s %u:%u\n", dentry->d_name.name,
 			MAJOR(rdev), MINOR(rdev));
 	dir_attr.valid = 0;
 	fattr.valid = 0;
 	status = rpc_call(NFS_CLIENT(dir), NFS3PROC_MKNOD, &arg, &res, 0);
 	nfs_refresh_inode(dir, &dir_attr);
-	if (!status)
+	if (status == 0)
 		status = nfs_instantiate(dentry, &fh, &fattr);
 	dprintk("NFS reply mknod: %d\n", status);
-	if (!status)
-		status = nfs3_set_default_acl(dir, dentry->d_inode, mode);
 	return status;
 }
 

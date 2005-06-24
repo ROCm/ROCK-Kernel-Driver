@@ -1,6 +1,6 @@
 /*
  * .h-files for the common use of the frontend drivers made by DiBcom
- * DiBcom 3000-MB/MC/P
+ * DiBcom 3000M-B/C, 3000P
  *
  * DiBcom (http://www.dibcom.fr/)
  *
@@ -30,9 +30,9 @@
 #include "dib3000.h"
 
 /* info and err, taken from usb.h, if there is anything available like by default. */
-#define err(format, arg...) printk(KERN_ERR "dib3000mX: " format "\n" , ## arg)
-#define info(format, arg...) printk(KERN_INFO "dib3000mX: " format "\n" , ## arg)
-#define warn(format, arg...) printk(KERN_WARNING "dib3000mX: " format "\n" , ## arg)
+#define err(format, arg...)  printk(KERN_ERR     "dib3000: " format "\n" , ## arg)
+#define info(format, arg...) printk(KERN_INFO    "dib3000: " format "\n" , ## arg)
+#define warn(format, arg...) printk(KERN_WARNING "dib3000: " format "\n" , ## arg)
 
 /* frontend state */
 struct dib3000_state {

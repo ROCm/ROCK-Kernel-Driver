@@ -322,4 +322,9 @@ struct smp_ops_t core99_smp_ops __pmacdata = {
 void __init pmac_setup_smp(void)
 {
 	smp_ops = &core99_smp_ops;
+#ifdef CONFIG_HOTPLUG_CPU
+	smp_ops->cpu_enable = generic_cpu_enable;
+	smp_ops->cpu_disable = generic_cpu_disable;
+	smp_ops->cpu_die = generic_cpu_die;
+#endif
 }

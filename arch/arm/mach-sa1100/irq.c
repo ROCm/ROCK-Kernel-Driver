@@ -218,7 +218,7 @@ static struct sa1100irq_state {
 	unsigned int	iccr;
 } sa1100irq_state;
 
-static int sa1100irq_suspend(struct sys_device *dev, u32 state)
+static int sa1100irq_suspend(struct sys_device *dev, pm_message_t state)
 {
 	struct sa1100irq_state *st = &sa1100irq_state;
 

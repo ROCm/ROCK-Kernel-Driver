@@ -104,6 +104,8 @@ prototypes:
 	void (*clear_inode) (struct inode *);
 	void (*umount_begin) (struct super_block *);
 	int (*show_options)(struct seq_file *, struct vfsmount *);
+	ssize_t (*quota_read)(struct super_block *, int, char *, size_t, loff_t);
+	ssize_t (*quota_write)(struct super_block *, int, const char *, size_t, loff_t);
 
 locking rules:
 	All may block.
@@ -126,10 +128,17 @@ remount_fs:		no	yes	maybe		(see below)
 clear_inode:		no
 umount_begin:		yes	no	no
 show_options:		no				(vfsmount->sem)
+quota_read:		no	no	no		(see below)
+quota_write:		no	no	no		(see below)
 
 ->read_inode() is not a method - it's a callback used in iget().
 ->remount_fs() will have the s_umount lock if it's already mounted.
 When called from get_sb_single, it does NOT have the s_umount lock.
+->quota_read() and ->quota_write() functions are both guaranteed to
+be the only ones operating on the quota file by the quota code (via
+dqio_sem) (unless an admin really wants to screw up something and
+writes to quota files with quotas on). For other details about locking
+see also dquot_operations section.
 
 --------------------------- file_system_type ---------------------------
 prototypes:
@@ -210,8 +219,12 @@ This may also be done to avoid internal deadlocks, but rarely.
 If the filesytem is called for sync then it must wait on any
 in-progress I/O and then start new I/O.
 
-The filesystem should unlock the page synchronously, before returning
-to the caller.
+The filesystem should unlock the page synchronously, before returning to the
+caller, unless ->writepage() returns special WRITEPAGE_ACTIVATE
+value. WRITEPAGE_ACTIVATE means that page cannot really be written out
+currently, and VM should stop calling ->writepage() on this page for some
+time. VM does this by moving page to the head of the active list, hence the
+name.
 
 Unless the filesystem is going to redirty_page_for_writepage(), unlock the page
 and return zero, writepage *must* run set_page_writeback() against the page,
@@ -442,23 +455,46 @@ in sys_read() and friends.
 
 --------------------------- dquot_operations -------------------------------
 prototypes:
-	void (*initialize) (struct inode *, short);
-	void (*drop) (struct inode *);
-	int (*alloc_block) (const struct inode *, unsigned long, char);
+	int (*initialize) (struct inode *, int);
+	int (*drop) (struct inode *);
+	int (*alloc_space) (struct inode *, qsize_t, int);
 	int (*alloc_inode) (const struct inode *, unsigned long);
-	void (*free_block) (const struct inode *, unsigned long);
-	void (*free_inode) (const struct inode *, unsigned long);
-	int (*transfer) (struct dentry *, struct iattr *);
+	int (*free_space) (struct inode *, qsize_t);
+	int (*free_inode) (const struct inode *, unsigned long);
+	int (*transfer) (struct inode *, struct iattr *);
+	int (*write_dquot) (struct dquot *);
+	int (*acquire_dquot) (struct dquot *);
+	int (*release_dquot) (struct dquot *);
+	int (*mark_dirty) (struct dquot *);
+	int (*write_info) (struct super_block *, int);
 
-locking rules:
-		BKL
-initialize:	no
-drop:		no
-alloc_block:	yes
-alloc_inode:	yes
-free_block:	yes
-free_inode:	yes
-transfer:	no
+These operations are intended to be more or less wrapping functions that ensure
+a proper locking wrt the filesystem and call the generic quota operations.
+
+What filesystem should expect from the generic quota functions:
+
+		FS recursion	Held locks when called
+initialize:	yes		maybe dqonoff_sem
+drop:		yes		-
+alloc_space:	->mark_dirty()	-
+alloc_inode:	->mark_dirty()	-
+free_space:	->mark_dirty()	-
+free_inode:	->mark_dirty()	-
+transfer:	yes		-
+write_dquot:	yes		dqonoff_sem or dqptr_sem
+acquire_dquot:	yes		dqonoff_sem or dqptr_sem
+release_dquot:	yes		dqonoff_sem or dqptr_sem
+mark_dirty:	no		-
+write_info:	yes		dqonoff_sem
+
+FS recursion means calling ->quota_read() and ->quota_write() from superblock
+operations.
+
+->alloc_space(), ->alloc_inode(), ->free_space(), ->free_inode() are called
+only directly by the filesystem and do not call any fs functions only
+the ->mark_dirty() operation.
+
+More details about quota locking can be found in fs/dquot.c.
 
 --------------------------- vm_operations_struct -----------------------------
 prototypes:

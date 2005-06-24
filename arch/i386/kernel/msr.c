@@ -291,7 +291,7 @@ static struct notifier_block msr_class_cpu_notifier =
 	.notifier_call = msr_class_cpu_callback,
 };
 
-int __init msr_init(void)
+static int __init msr_init(void)
 {
 	int i, err = 0;
 	i = 0;
@@ -328,7 +328,7 @@ out:
 	return err;
 }
 
-void __exit msr_exit(void)
+static void __exit msr_exit(void)
 {
 	int cpu = 0;
 	for_each_online_cpu(cpu)

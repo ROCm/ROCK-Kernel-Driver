@@ -61,8 +61,8 @@ static void __boot_ioremap(unsigned long phys_addr, unsigned long nrpages,
 /* the virtual space we're going to remap comes from this array */
 #define BOOT_IOREMAP_PAGES 4
 #define BOOT_IOREMAP_SIZE (BOOT_IOREMAP_PAGES*PAGE_SIZE)
-__initdata char boot_ioremap_space[BOOT_IOREMAP_SIZE] 
-		__attribute__ ((aligned (PAGE_SIZE)));
+static __initdata char boot_ioremap_space[BOOT_IOREMAP_SIZE]
+		       __attribute__ ((aligned (PAGE_SIZE)));
 
 /*
  * This only applies to things which need to ioremap before paging_init()

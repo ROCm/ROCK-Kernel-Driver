@@ -55,7 +55,7 @@ static int irq_installed = 0;
 static char **sound_buffers = NULL;
 static char **sound_read_buffers = NULL;
 
-static spinlock_t cs4218_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cs4218_lock);
 
 /* Local copies of things we put in the control register.  Output
  * volume, like most codecs is really attenuation.

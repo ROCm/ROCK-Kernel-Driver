@@ -30,7 +30,6 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
-#include <linux/major.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/poll.h>
@@ -264,9 +263,6 @@ static void l2cap_sock_destruct(struct sock *sk)
 
 	skb_queue_purge(&sk->sk_receive_queue);
 	skb_queue_purge(&sk->sk_write_queue);
-
-	if (sk->sk_protinfo)
-		kfree(sk->sk_protinfo);
 }
 
 static void l2cap_sock_cleanup_listen(struct sock *parent)
@@ -280,7 +276,7 @@ static void l2cap_sock_cleanup_listen(struct sock *parent)
 		l2cap_sock_close(sk);
 
 	parent->sk_state  = BT_CLOSED;
-	parent->sk_zapped = 1;
+	sock_set_flag(parent, SOCK_ZAPPED);
 }
 
 /* Kill socket (only if zapped and orphan)
@@ -288,7 +284,7 @@ static void l2cap_sock_cleanup_listen(struct sock *parent)
  */
 static void l2cap_sock_kill(struct sock *sk)
 {
-	if (!sk->sk_zapped || sk->sk_socket)
+	if (!sock_flag(sk, SOCK_ZAPPED) || sk->sk_socket)
 		return;
 
 	BT_DBG("sk %p state %d", sk, sk->sk_state);
@@ -333,7 +329,7 @@ static void __l2cap_sock_close(struct sock *sk, int reason)
 		break;
 
 	default:
-		sk->sk_zapped = 1;
+		sock_set_flag(sk, SOCK_ZAPPED);
 		break;
 	}
 }
@@ -370,18 +366,27 @@ static void l2cap_sock_init(struct sock *sk, struct sock *parent)
 	pi->flush_to = L2CAP_DEFAULT_FLUSH_TO;
 }
 
+static struct proto l2cap_proto = {
+	.name		= "L2CAP",
+	.owner		= THIS_MODULE,
+	.obj_size	= sizeof(struct l2cap_pinfo)
+};
+
 static struct sock *l2cap_sock_alloc(struct socket *sock, int proto, int prio)
 {
 	struct sock *sk;
 
-	sk = bt_sock_alloc(sock, proto, sizeof(struct l2cap_pinfo), prio);
+	sk = sk_alloc(PF_BLUETOOTH, prio, &l2cap_proto, 1);
 	if (!sk)
 		return NULL;
 
-	sk_set_owner(sk, THIS_MODULE);
+	sock_init_data(sock, sk);
+	INIT_LIST_HEAD(&bt_sk(sk)->accept_q);
 
 	sk->sk_destruct = l2cap_sock_destruct;
 	sk->sk_sndtimeo = L2CAP_CONN_TIMEOUT;
+
+	sock_reset_flag(sk, SOCK_ZAPPED);
 
 	sk->sk_protocol = proto;
 	sk->sk_state    = BT_OPEN;
@@ -1062,7 +1067,7 @@ static void l2cap_chan_del(struct sock *sk, int err)
 	}
 
 	sk->sk_state  = BT_CLOSED;
-	sk->sk_zapped = 1;
+	sock_set_flag(sk, SOCK_ZAPPED);
 
 	if (err)
 		sk->sk_err = err;
@@ -1410,7 +1415,7 @@ static inline int l2cap_connect_req(struct l2cap_conn *conn, struct l2cap_cmd_hd
 	result = L2CAP_CR_NO_MEM;
 
 	/* Check for backlog size */
-	if (parent->sk_ack_backlog > parent->sk_max_ack_backlog) {
+	if (sk_acceptq_is_full(parent)) {
 		BT_DBG("backlog full %d", parent->sk_ack_backlog); 
 		goto response;
 	}
@@ -1424,7 +1429,7 @@ static inline int l2cap_connect_req(struct l2cap_conn *conn, struct l2cap_cmd_hd
 	/* Check if we already have channel with that dcid */
 	if (__l2cap_get_chan_by_dcid(list, scid)) {
 		write_unlock(&list->lock);
-		sk->sk_zapped = 1;
+		sock_set_flag(sk, SOCK_ZAPPED);
 		l2cap_sock_kill(sk);
 		goto response;
 	}
@@ -2261,15 +2266,22 @@ static struct hci_proto l2cap_hci_proto = {
 static int __init l2cap_init(void)
 {
 	int err;
-
-	if ((err = bt_sock_register(BTPROTO_L2CAP, &l2cap_sock_family_ops))) {
-		BT_ERR("L2CAP socket registration failed");
+	
+	err = proto_register(&l2cap_proto, 0);
+	if (err < 0)
 		return err;
+
+	err = bt_sock_register(BTPROTO_L2CAP, &l2cap_sock_family_ops);
+	if (err < 0) {
+		BT_ERR("L2CAP socket registration failed");
+		goto error;
 	}
 
-	if ((err = hci_register_proto(&l2cap_hci_proto))) {
+	err = hci_register_proto(&l2cap_hci_proto);
+	if (err < 0) {
 		BT_ERR("L2CAP protocol registration failed");
-		return err;
+		bt_sock_unregister(BTPROTO_L2CAP);
+		goto error;
 	}
 
 	l2cap_proc_init();
@@ -2278,18 +2290,23 @@ static int __init l2cap_init(void)
 	BT_INFO("L2CAP socket layer initialized");
 
 	return 0;
+
+error:
+	proto_unregister(&l2cap_proto);
+	return err;
 }
 
 static void __exit l2cap_exit(void)
 {
 	l2cap_proc_cleanup();
 
-	/* Unregister socket and protocol */
-	if (bt_sock_unregister(BTPROTO_L2CAP))
+	if (bt_sock_unregister(BTPROTO_L2CAP) < 0)
 		BT_ERR("L2CAP socket unregistration failed");
 
-	if (hci_unregister_proto(&l2cap_hci_proto))
+	if (hci_unregister_proto(&l2cap_hci_proto) < 0)
 		BT_ERR("L2CAP protocol unregistration failed");
+
+	proto_unregister(&l2cap_proto);
 }
 
 void l2cap_load(void)

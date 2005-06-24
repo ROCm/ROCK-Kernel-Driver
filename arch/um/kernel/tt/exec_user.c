@@ -9,8 +9,6 @@
 #include <sched.h>
 #include <errno.h>
 #include <sys/wait.h>
-#include <sys/ptrace.h>
-#include <linux/ptrace.h>
 #include <signal.h>
 #include "user_util.h"
 #include "kern_util.h"

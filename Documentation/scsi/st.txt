@@ -2,7 +2,7 @@ This file contains brief information about the SCSI tape driver.
 The driver is currently maintained by Kai Mäkisara (email
 Kai.Makisara@kolumbus.fi)
 
-Last modified: Wed Feb 25 14:09:08 2004 by makisara
+Last modified: Mon Mar  7 21:14:44 2005 by kai.makisara
 
 
 BASICS
@@ -84,6 +84,9 @@ By default the driver writes one filemark when the device is closed after
 writing and the last operation has been a write. Two filemarks can be
 optionally written. In both cases end of data is signified by
 returning zero bytes for two consecutive reads.
+
+If rewind, offline, bsf, or seek is done and previous tape operation was
+write, a filemark is written before moving tape.
 
 The compile options are defined in the file linux/drivers/scsi/st_options.h.
 

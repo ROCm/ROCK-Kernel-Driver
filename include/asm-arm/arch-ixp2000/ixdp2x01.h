@@ -1,5 +1,5 @@
 /*
- * include/asm/arch/ixdp2x01.h
+ * include/asm-arm/arch-ixp2000/ixdp2x01.h
  *
  * Platform definitions for IXDP2X01 && IXDP2801 systems
  *
@@ -18,10 +18,10 @@
 #define __IXDP2X01_H__
 
 #define	IXDP2X01_PHYS_CPLD_BASE		0xc6024000
-#define	IXDP2X01_VIRT_CPLD_BASE		0xfefdd000
-#define	IXDP2X01_CPLD_REGION_SIZE	0x1000
+#define	IXDP2X01_VIRT_CPLD_BASE		0xfafff000
+#define	IXDP2X01_CPLD_REGION_SIZE	0x00001000
 
-#define IXDP2X01_CPLD_VIRT_REG(reg) (volatile u32*)(IXDP2X01_VIRT_CPLD_BASE | reg)
+#define IXDP2X01_CPLD_VIRT_REG(reg) (volatile unsigned long*)(IXDP2X01_VIRT_CPLD_BASE | reg)
 #define IXDP2X01_CPLD_PHYS_REG(reg) (volatile u32*)(IXDP2X01_PHYS_CPLD_BASE | reg)
 
 #define IXDP2X01_UART1_VIRT_BASE	IXDP2X01_CPLD_VIRT_REG(0x40)

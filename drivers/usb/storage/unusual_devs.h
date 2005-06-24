@@ -1,5 +1,5 @@
 /* Driver for USB Mass Storage compliant devices
- * Ununsual Devices File
+ * Unusual Devices File
  *
  * $Id: unusual_devs.h,v 1.32 2002/02/25 02:41:24 mdharm Exp $
  *
@@ -48,6 +48,14 @@
  * USB development list <linux-usb-devel@lists.sourceforge.net>.
  */
 
+/* patch submitted by Vivian Bregier <Vivian.Bregier@imag.fr>
+ */
+UNUSUAL_DEV(  0x03eb, 0x2002, 0x0100, 0x0100,
+                "ATMEL",
+                "SND1 Storage",
+                US_SC_DEVICE, US_PR_DEVICE, NULL,
+                US_FL_IGNORE_RESIDUE),
+
 UNUSUAL_DEV(  0x03ee, 0x6901, 0x0000, 0x0100,
 		"Mitsumi",
 		"USB FDD",
@@ -59,16 +67,16 @@ UNUSUAL_DEV(  0x03f0, 0x0107, 0x0200, 0x0200,
 		"CD-Writer+",
 		US_SC_8070, US_PR_CB, NULL, 0), 
 
-#ifdef CONFIG_USB_STORAGE_HP8200e
+#ifdef CONFIG_USB_STORAGE_USBAT
 UNUSUAL_DEV(  0x03f0, 0x0207, 0x0001, 0x0001, 
 		"HP",
 		"CD-Writer+ 8200e",
-		US_SC_8070, US_PR_SCM_ATAPI, init_8200e, 0), 
+		US_SC_8070, US_PR_SCM_ATAPI, init_usbat, 0), 
 
 UNUSUAL_DEV(  0x03f0, 0x0307, 0x0001, 0x0001, 
 		"HP",
 		"CD-Writer+ CD-4e",
-		US_SC_8070, US_PR_SCM_ATAPI, init_8200e, 0), 
+		US_SC_8070, US_PR_SCM_ATAPI, init_usbat, 0), 
 #endif
 
 /* Deduced by Jonathan Woithe <jwoithe@physics.adelaide.edu.au>
@@ -123,6 +131,22 @@ UNUSUAL_DEV(  0x04a4, 0x0004, 0x0001, 0x0001,
 		"DVD-CAM DZ-MV100A Camcorder",
 		US_SC_SCSI, US_PR_CB, NULL, US_FL_SINGLE_LUN),
 
+/* Reported by Andreas Bockhold <andreas@bockionline.de> */
+UNUSUAL_DEV(  0x04b0, 0x0405, 0x0100, 0x0100,
+		"NIKON",
+		"NIKON DSC D70",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY),
+
+/* BENQ DC5330
+ * Reported by Manuel Fombuena <mfombuena@ya.com> and
+ * Frank Copeland <fjc@thingy.apana.org.au> */
+UNUSUAL_DEV(  0x04a5, 0x3010, 0x0100, 0x0100,
+		"Tekom Technologies, Inc",
+		"300_CAMERA",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* Reported by Simon Levitt <simon@whattf.com>
  * This entry needs Sub and Proto fields */
 UNUSUAL_DEV(  0x04b8, 0x0601, 0x0100, 0x0100,
@@ -171,15 +195,12 @@ UNUSUAL_DEV(  0x04da, 0x0d05, 0x0000, 0x0000,
 		"CD-R/RW Drive",
 		US_SC_8070, US_PR_CB, NULL, 0),
 
-/* Reported by Adriaan Penning <a.penning@luon.net>
- * Note that these cameras report "Medium not present" after
- * ALLOW_MEDIUM_REMOVAL, so they also need to be marked
- * NOT_LOCKABLE in the SCSI blacklist (and the vendor is MATSHITA). */
+/* Reported by Adriaan Penning <a.penning@luon.net> */
 UNUSUAL_DEV(  0x04da, 0x2372, 0x0000, 0x9999,
 		"Panasonic",
 		"DMC-LCx Camera",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY ),
+		US_FL_FIX_CAPACITY | US_FL_NOT_LOCKABLE ),
 
 /* Most of the following entries were developed with the help of
  * Shuttle/SCM directly.
@@ -268,6 +289,14 @@ UNUSUAL_DEV(  0x04fc, 0x80c2, 0x0100, 0x0100,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_BULK32),
 
+#ifdef CONFIG_USB_STORAGE_USBAT
+UNUSUAL_DEV(  0x04e6, 0x1010, 0x0000, 0x9999,
+		"SCM",
+		"SCM USBAT-02",
+		US_SC_SCSI, US_PR_SCM_ATAPI, init_usbat,
+		US_FL_SINGLE_LUN),
+#endif
+
 /* Reported by Bob Sass <rls@vectordb.com> -- only rev 1.33 tested */
 UNUSUAL_DEV(  0x050d, 0x0115, 0x0133, 0x0133,
 		"Belkin",
@@ -324,12 +353,11 @@ UNUSUAL_DEV(  0x052b, 0x1911, 0x0100, 0x0100,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_IGNORE_RESIDUE ),
 
-/* This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0450, 
 		"Sony",
 		"DSC-S30/S70/S75/505V/F505/F707/F717/P8", 
 		US_SC_SCSI, US_PR_DEVICE, NULL,
-		US_FL_SINGLE_LUN ),
+		US_FL_SINGLE_LUN | US_FL_NOT_LOCKABLE | US_FL_NO_WP_DETECT ),
 
 /* This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x054c, 0x0010, 0x0500, 0x0500, 
@@ -497,32 +525,32 @@ UNUSUAL_DEV(  0x05ab, 0x5701, 0x0100, 0x0110,
 		0 ),
 #endif
 
-/* Submitted by Sven Anderson <sven-linux@anderson.de> 
- * Based on patch by Avi Kivity <avi@argo.co.il>
- * There are at least four product ids used for iPods. They just need the
- * US_FL_FIX_CAPACITY. As the bcdDevice appears to change with firmware
- * updates, the range is set to maximum.
+/* Submitted by Sven Anderson <sven-linux@anderson.de>
+ * There are at least four ProductIDs used for iPods, so I added 0x1202 and
+ * 0x1204. They just need the US_FL_FIX_CAPACITY. As the bcdDevice appears
+ * to change with firmware updates, I changed the range to maximum for all
+ * iPod entries.
  */
- 
-UNUSUAL_DEV( 0x05ac, 0x1202, 0x0000, 0xffff,
+UNUSUAL_DEV( 0x05ac, 0x1202, 0x0000, 0x9999,
 		"Apple",
 		"iPod",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY ),
 
-UNUSUAL_DEV( 0x05ac, 0x1203, 0x0000, 0xffff,
+/* Reported by Avi Kivity <avi@argo.co.il> */
+UNUSUAL_DEV( 0x05ac, 0x1203, 0x0000, 0x9999,
 		"Apple",
 		"iPod",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY ),
 
-UNUSUAL_DEV( 0x05ac, 0x1204, 0x0000, 0xffff,
+UNUSUAL_DEV( 0x05ac, 0x1204, 0x0000, 0x9999,
 		"Apple",
 		"iPod",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY ),
 
-UNUSUAL_DEV( 0x05ac, 0x1205, 0x0000, 0xffff,
+UNUSUAL_DEV( 0x05ac, 0x1205, 0x0000, 0x9999,
 		"Apple",
 		"iPod",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
@@ -542,6 +570,25 @@ UNUSUAL_DEV(  0x05dc, 0xb002, 0x0000, 0x0113,
 		"USB CF Reader",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
+
+/* The following two entries are for a Genesys USB to IDE
+ * converter chip, but it changes its ProductId depending
+ * on whether or not a disk or an optical device is enclosed
+ * They were originally reported by Alexander Oltu
+ * <alexander@all-2.com> and Peter Marks <peter.marks@turner.com>
+ * respectively.
+ */
+UNUSUAL_DEV(  0x05e3, 0x0701, 0x0000, 0xffff,
+		"Genesys Logic",
+		"USB to IDE Optical",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_GO_SLOW ),
+
+UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0xffff,
+		"Genesys Logic",
+		"USB to IDE Disk",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_GO_SLOW ),
 
 /* Reported by Hanno Boeck <hanno@gmx.de>
  * Taken from the Lycoris Kernel */
@@ -571,19 +618,19 @@ UNUSUAL_DEV( 0x066f, 0x8000, 0x0001, 0x0001,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY ),
 
-/* Reported by Alex Butcher <alex.butcher@assursys.co.uk> */
-UNUSUAL_DEV( 0x067b, 0x3507, 0x0001, 0x0001,
+/* Reported by Richard -=[]=- <micro_flyer@hotmail.com> */
+UNUSUAL_DEV( 0x067b, 0x2507, 0x0100, 0x0100,
 		"Prolific Technology Inc.",
-		"ATAPI-6 Bridge Controller",
+		"Mass Storage Device",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY ),
+		US_FL_FIX_CAPACITY | US_FL_GO_SLOW ),
 
 /* Reported by Alex Butcher <alex.butcher@assursys.co.uk> */
 UNUSUAL_DEV( 0x067b, 0x3507, 0x0001, 0x0001,
 		"Prolific Technology Inc.",
 		"ATAPI-6 Bridge Controller",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY ),
+		US_FL_FIX_CAPACITY | US_FL_GO_SLOW ),
 
 /* Submitted by Benny Sjostrand <benny@hostmobility.com> */
 UNUSUAL_DEV( 0x0686, 0x4011, 0x0001, 0x0001,
@@ -612,14 +659,6 @@ UNUSUAL_DEV(  0x0781, 0x0001, 0x0200, 0x0200,
 		"ImageMate SDDR-05a",
 		US_SC_SCSI, US_PR_CB, NULL,
 		US_FL_SINGLE_LUN ),
-
-#if !defined(CONFIG_BLK_DEV_UB) && !defined(CONFIG_BLK_DEV_UB_MODULE)
-UNUSUAL_DEV(  0x0781, 0x0002, 0x0009, 0x0009, 
-		"Sandisk",
-		"ImageMate SDDR-31",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_IGNORE_SER ),
-#endif
 
 UNUSUAL_DEV(  0x0781, 0x0100, 0x0100, 0x0100,
 		"Sandisk",
@@ -692,6 +731,13 @@ UNUSUAL_DEV( 0x07c4, 0xa001, 0x0000, 0xffff,
 		US_SC_SCSI, US_PR_DATAFAB, NULL,
 		0 ),
 
+/* Reported by Josef Reisinger <josef.reisinger@netcologne.de> */
+UNUSUAL_DEV( 0x07c4, 0xa002, 0x0000, 0xffff,
+		"Datafab/Unknown",
+		"MD2/MD3 Disk enclosure",
+		US_SC_SCSI, US_PR_DATAFAB, NULL,
+		US_FL_SINGLE_LUN ),
+
 UNUSUAL_DEV( 0x07c4, 0xa003, 0x0000, 0xffff,
 		"Datafab/Unknown",
 		"Datafab-based Reader",
@@ -741,6 +787,19 @@ UNUSUAL_DEV(  0x07c4, 0xa109, 0x0000, 0xffff,
 		"USB to CF + SM Combo (LC1)",
 		US_SC_SCSI, US_PR_SDDR55, NULL,
 		US_FL_SINGLE_LUN ),
+#endif
+
+#ifdef CONFIG_USB_STORAGE_DATAFAB
+/* Reported by Felix Moeller <felix@derklecks.de>
+ * in Germany this is sold by Hama with the productnumber 46952
+ * as "DualSlot CompactFlash(TM) & MStick Drive USB"
+ */
+UNUSUAL_DEV(  0x07c4, 0xa10b, 0x0000, 0xffff,
+                "DataFab Systems Inc.",
+                "USB CF+MS",
+                US_SC_SCSI, US_PR_DATAFAB, NULL,
+                0 ),
+
 #endif
 
 /* Datafab KECF-USB / Sagatek DCS-CF / Simpletech Flashlink UCF-100
@@ -802,6 +861,15 @@ UNUSUAL_DEV(  0x090a, 0x1001, 0x0100, 0x0100,
 		"t33520 USB Flash Card Controller",
 		US_SC_DEVICE, US_PR_BULK, NULL,
 		US_FL_NEED_OVERRIDE ),
+
+/* Reported by Filippo Bardelli <filibard@libero.it>
+ * The device reports a subclass of RBC, which is wrong.
+ */
+UNUSUAL_DEV(  0x090a, 0x1050, 0x0100, 0x0100,
+		"Trumpion Microelectronics, Inc.",
+		"33520 USB Digital Voice Recorder",
+		US_SC_UFI, US_PR_DEVICE, NULL,
+		0),
 
 /* Trumpion Microelectronics MP3 player (felipe_alfaro@linuxmail.org) */
 UNUSUAL_DEV( 0x090a, 0x1200, 0x0000, 0x9999,
@@ -897,6 +965,13 @@ UNUSUAL_DEV( 0x0dda, 0x0001, 0x0012, 0x0012,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_IGNORE_RESIDUE ),
 
+/* Reported by Ian McConnell <ian at emit.demon.co.uk> */
+UNUSUAL_DEV(  0x0dda, 0x0301, 0x0012, 0x0012,
+		"PNP_MP3",
+		"PNP_MP3 PLAYER",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* Submitted by Antoine Mairesse <antoine.mairesse@free.fr> */
 UNUSUAL_DEV( 0x0ed1, 0x6660, 0x0100, 0x0300,
 		"USB",
@@ -919,6 +994,13 @@ UNUSUAL_DEV(  0x0ea0, 0x6828, 0x0110, 0x0110,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_IGNORE_RESIDUE ),
 
+/* Reported by Michael Stattmann <michael@stattmann.com> */
+UNUSUAL_DEV(  0x0fce, 0xd008, 0x0000, 0x0000,
+		"Sony Ericsson",
+		"V800-Vodafone 802",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_NO_WP_DETECT ),
+
 /* Reported by Kevin Cernekee <kpc-usbdev@gelato.uiuc.edu>
  * Tested on hardware version 1.10.
  * Entry is needed only for the initializer function override.
@@ -929,12 +1011,26 @@ UNUSUAL_DEV(  0x1019, 0x0c55, 0x0000, 0x9999,
 		US_SC_DEVICE, US_PR_DEVICE, usb_stor_ucr61s2b_init,
 		0 ),
 
+/* Reported by Vilius Bilinkevicius <vilisas AT xxx DOT lt) */
+UNUSUAL_DEV(  0x132b, 0x000b, 0x0001, 0x0001,
+		"Minolta",
+		"Dimage Z10",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		0 ),
+
 /* Reported by Kotrla Vitezslav <kotrla@ceb.cz> */
 UNUSUAL_DEV(  0x1370, 0x6828, 0x0110, 0x0110,
 		"SWISSBIT",
 		"Black Silver",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_IGNORE_RESIDUE ),
+
+/* Reported by Radovan Garabik <garabik@kassiopeia.juls.savba.sk> */
+UNUSUAL_DEV(  0x2735, 0x100b, 0x0000, 0x9999,
+		"MPIO",
+		"HS200",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_GO_SLOW ),
 
 #ifdef CONFIG_USB_STORAGE_SDDR55
 UNUSUAL_DEV(  0x55aa, 0xa103, 0x0000, 0x9999, 

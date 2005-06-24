@@ -626,8 +626,10 @@ static int vfc_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_flags |=
 		(VM_SHM | VM_LOCKED | VM_IO | VM_MAYREAD | VM_MAYWRITE | VM_MAYSHARE);
 	map_offset = (unsigned int) (long)dev->phys_regs;
-	ret = io_remap_page_range(vma, vma->vm_start, map_offset, map_size, 
-				  vma->vm_page_prot, dev->which_io);
+	ret = io_remap_pfn_range(vma, vma->vm_start,
+				  MK_IOSPACE_PFN(dev->which_io,
+					map_offset >> PAGE_SHIFT),
+				  map_size, vma->vm_page_prot);
 
 	if(ret)
 		return -EAGAIN;

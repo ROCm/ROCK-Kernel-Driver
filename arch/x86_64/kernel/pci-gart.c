@@ -193,7 +193,7 @@ static void *dma_alloc_pages(struct device *dev, unsigned gfp, unsigned order)
 	int node;
 	if (dev->bus == &pci_bus_type) {
 		cpumask_t mask;
-		mask = pcibus_to_cpumask(to_pci_dev(dev)->bus->number);
+		mask = pcibus_to_cpumask(to_pci_dev(dev)->bus);
 		node = cpu_to_node(first_cpu(mask));
 	} else
 		node = numa_node_id();
@@ -720,6 +720,7 @@ static __init int init_k8_gatt(struct agp_kern_info *info)
 	unsigned aper_base, new_aper_base;
 	unsigned aper_size, gatt_size, new_aper_size;
 	
+	printk(KERN_INFO "PCI-DMA: Disabling AGP.\n");
 	aper_size = aper_base = info->aper_size = 0;
 	for_all_nb(dev) { 
 		new_aper_base = read_aperture(dev, &new_aper_size); 
@@ -789,7 +790,7 @@ static int __init pci_iommu_init(void)
 	/* Add other K8 AGP bridge drivers here */
 	no_agp = no_agp || 
 		(agp_amd64_init() < 0) || 
-		(agp_copy_info(&info) < 0); 
+		(agp_copy_info(agp_bridge, &info) < 0);
 #endif	
 
 	if (swiotlb) { 
@@ -798,25 +799,14 @@ static int __init pci_iommu_init(void)
 		return -1; 
 	} 
 	
-	if (no_iommu || (!force_iommu && end_pfn < 0xffffffff>>PAGE_SHIFT) || 
-	    !iommu_aperture) {
+	if (no_iommu ||
+	    (!force_iommu && end_pfn < 0xffffffff>>PAGE_SHIFT) ||
+	    !iommu_aperture ||
+	    (no_agp && init_k8_gatt(&info) < 0)) {
 		printk(KERN_INFO "PCI-DMA: Disabling IOMMU.\n"); 
 		no_iommu = 1;
 		return -1;
 	}
-
-	if (no_agp) { 
-		int err = -1;
-		printk(KERN_INFO "PCI-DMA: Disabling AGP.\n");
-		no_agp = 1;
-		if (force_iommu || end_pfn >= 0xffffffff>>PAGE_SHIFT)
-			err = init_k8_gatt(&info);
-		if (err < 0) { 
-			printk(KERN_INFO "PCI-DMA: Disabling IOMMU.\n"); 
-			no_iommu = 1;
-			return -1;
-		}
-	} 
 
 	aper_size = info.aper_size * 1024 * 1024;	
 	iommu_size = check_iommu_size(info.aper_base, aper_size); 

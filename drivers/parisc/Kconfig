@@ -110,6 +110,14 @@ config IOMMU_SBA
 #	help
 #	  Say Y here for V-class PCI, DMA/IOMMU, IRQ subsystem support.
 
+source "drivers/pcmcia/Kconfig"
+
+source "drivers/pci/hotplug/Kconfig"
+
+endmenu
+
+menu "PA-RISC specific drivers"
+
 config SUPERIO
 	bool "SuperIO (SuckyIO) support"
 	depends on PCI_LBA
@@ -144,9 +152,18 @@ config PDC_CHASSIS
 	  
 	  If unsure, say Y.
 
-source "drivers/pcmcia/Kconfig"
-
-source "drivers/pci/hotplug/Kconfig"
-
+config PDC_STABLE
+	tristate "PDC Stable Storage support"
+	depends on SYSFS
+	default y
+	help
+	  Say Y here if you want to enable support for accessing Stable Storage
+	  variables (PDC non volatile variables such as Primary Boot Path,
+	  Console Path, Autoboot, Autosearch, etc) through SysFS.
+	
+	  If unsure, say Y.
+	
+	  To compile this driver as a module, choose M here.
+	  The module will be called pdc_stable.
 
 endmenu

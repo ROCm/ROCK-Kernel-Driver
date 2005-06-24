@@ -495,7 +495,7 @@ static struct pci_driver superio_driver = {
 
 static int __init superio_modinit(void)
 {
-	return pci_module_init(&superio_driver);
+	return pci_register_driver(&superio_driver);
 }
 
 static void __exit superio_exit(void)

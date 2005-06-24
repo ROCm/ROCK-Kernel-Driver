@@ -99,7 +99,8 @@
 #define NV_MCP_SATA_CFG_20_SATA_SPACE_EN	0x04
 
 static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
-irqreturn_t nv_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t nv_interrupt (int irq, void *dev_instance,
+				 struct pt_regs *regs);
 static u32 nv_scr_read (struct ata_port *ap, unsigned int sc_reg);
 static void nv_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
 static void nv_host_stop (struct ata_host_set *host_set);
@@ -205,6 +206,7 @@ static Scsi_Host_Template nv_sht = {
 	.dma_boundary		= ATA_DMA_BOUNDARY,
 	.slave_configure	= ata_scsi_slave_config,
 	.bios_param		= ata_std_bios_param,
+	.ordered_flush		= 1,
 };
 
 static struct ata_port_operations nv_ops = {
@@ -257,7 +259,8 @@ MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, nv_pci_tbl);
 MODULE_VERSION(DRV_VERSION);
 
-irqreturn_t nv_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
+static irqreturn_t nv_interrupt (int irq, void *dev_instance,
+				 struct pt_regs *regs)
 {
 	struct ata_host_set *host_set = dev_instance;
 	struct nv_host *host = host_set->private_data;
@@ -326,6 +329,8 @@ static void nv_host_stop (struct ata_host_set *host_set)
 		host->host_desc->disable_hotplug(host_set);
 
 	kfree(host);
+
+	ata_host_stop(host_set);
 }
 
 static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)

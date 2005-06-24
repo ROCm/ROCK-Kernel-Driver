@@ -383,7 +383,10 @@ static int mmc_blk_probe(struct mmc_card *card)
 	struct mmc_blk_data *md;
 	int err;
 
-	if (card->csd.cmdclass & ~0x1ff)
+	/*
+	 * Check that the card supports the command class(es) we need.
+	 */
+	if (!(card->csd.cmdclass & CCC_BLOCK_READ))
 		return -ENODEV;
 
 	if (card->csd.read_blkbits < 9) {
@@ -437,7 +440,7 @@ static void mmc_blk_remove(struct mmc_card *card)
 }
 
 #ifdef CONFIG_PM
-static int mmc_blk_suspend(struct mmc_card *card, u32 state)
+static int mmc_blk_suspend(struct mmc_card *card, pm_message_t state)
 {
 	struct mmc_blk_data *md = mmc_get_drvdata(card);
 

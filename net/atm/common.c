@@ -12,7 +12,7 @@
 #include <linux/socket.h>	/* SOL_SOCKET */
 #include <linux/errno.h>	/* error codes */
 #include <linux/capability.h>
-#include <linux/mm.h>		/* verify_area */
+#include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/time.h>		/* struct timeval */
 #include <linux/skbuff.h>
@@ -41,7 +41,7 @@
 struct hlist_head vcc_hash[VCC_HTABLE_SIZE];
 DEFINE_RWLOCK(vcc_sklist_lock);
 
-void __vcc_insert_socket(struct sock *sk)
+static void __vcc_insert_socket(struct sock *sk)
 {
 	struct atm_vcc *vcc = atm_sk(sk);
 	struct hlist_head *head = &vcc_hash[vcc->vci &
@@ -68,17 +68,18 @@ static void vcc_remove_socket(struct sock *sk)
 static struct sk_buff *alloc_tx(struct atm_vcc *vcc,unsigned int size)
 {
 	struct sk_buff *skb;
+	struct sock *sk = sk_atm(vcc);
 
-	if (atomic_read(&vcc->sk->sk_wmem_alloc) && !atm_may_send(vcc, size)) {
+	if (atomic_read(&sk->sk_wmem_alloc) && !atm_may_send(vcc, size)) {
 		DPRINTK("Sorry: wmem_alloc = %d, size = %d, sndbuf = %d\n",
-			atomic_read(&vcc->sk->sk_wmem_alloc), size,
-			vcc->sk->sk_sndbuf);
+			atomic_read(&sk->sk_wmem_alloc), size,
+			sk->sk_sndbuf);
 		return NULL;
 	}
 	while (!(skb = alloc_skb(size,GFP_KERNEL))) schedule();
-	DPRINTK("AlTx %d += %d\n", atomic_read(&vcc->sk->sk_wmem_alloc),
+	DPRINTK("AlTx %d += %d\n", atomic_read(&sk->sk_wmem_alloc),
 		skb->truesize);
-	atomic_add(skb->truesize, &vcc->sk->sk_wmem_alloc);
+	atomic_add(skb->truesize, &sk->sk_wmem_alloc);
 	return skb;
 }
 
@@ -89,15 +90,11 @@ EXPORT_SYMBOL(vcc_insert_socket);
 
 static void vcc_sock_destruct(struct sock *sk)
 {
-	struct atm_vcc *vcc = atm_sk(sk);
-
-	if (atomic_read(&vcc->sk->sk_rmem_alloc))
+	if (atomic_read(&sk->sk_rmem_alloc))
 		printk(KERN_DEBUG "vcc_sock_destruct: rmem leakage (%d bytes) detected.\n", atomic_read(&sk->sk_rmem_alloc));
 
-	if (atomic_read(&vcc->sk->sk_wmem_alloc))
+	if (atomic_read(&sk->sk_wmem_alloc))
 		printk(KERN_DEBUG "vcc_sock_destruct: wmem leakage (%d bytes) detected.\n", atomic_read(&sk->sk_wmem_alloc));
-
-	kfree(sk->sk_protinfo);
 }
 
 static void vcc_def_wakeup(struct sock *sk)
@@ -130,6 +127,11 @@ static void vcc_write_space(struct sock *sk)
 	read_unlock(&sk->sk_callback_lock);
 }
 
+static struct proto vcc_proto = {
+	.name	  = "VCC",
+	.owner	  = THIS_MODULE,
+	.obj_size = sizeof(struct atm_vcc),
+};
  
 int vcc_create(struct socket *sock, int protocol, int family)
 {
@@ -139,35 +141,26 @@ int vcc_create(struct socket *sock, int protocol, int family)
 	sock->sk = NULL;
 	if (sock->type == SOCK_STREAM)
 		return -EINVAL;
-	sk = sk_alloc(family, GFP_KERNEL, 1, NULL);
+	sk = sk_alloc(family, GFP_KERNEL, &vcc_proto, 1);
 	if (!sk)
 		return -ENOMEM;
 	sock_init_data(sock, sk);
-	sk_set_owner(sk, THIS_MODULE);
 	sk->sk_state_change = vcc_def_wakeup;
 	sk->sk_write_space = vcc_write_space;
 
-	vcc = sk->sk_protinfo = kmalloc(sizeof(*vcc), GFP_KERNEL);
-	if (!vcc) {
-		sk_free(sk);
-		return -ENOMEM;
-	}
-
-	memset(vcc, 0, sizeof(*vcc));
-	vcc->sk = sk;
+	vcc = atm_sk(sk);
 	vcc->dev = NULL;
 	memset(&vcc->local,0,sizeof(struct sockaddr_atmsvc));
 	memset(&vcc->remote,0,sizeof(struct sockaddr_atmsvc));
 	vcc->qos.txtp.max_sdu = 1 << 16; /* for meta VCs */
-	atomic_set(&vcc->sk->sk_wmem_alloc, 0);
-	atomic_set(&vcc->sk->sk_rmem_alloc, 0);
+	atomic_set(&sk->sk_wmem_alloc, 0);
+	atomic_set(&sk->sk_rmem_alloc, 0);
 	vcc->push = NULL;
 	vcc->pop = NULL;
 	vcc->push_oam = NULL;
 	vcc->vpi = vcc->vci = 0; /* no VCI/VPI yet */
 	vcc->atm_options = vcc->aal_options = 0;
 	sk->sk_destruct = vcc_sock_destruct;
-	sock->sk = sk;
 	return 0;
 }
 
@@ -187,7 +180,7 @@ static void vcc_destroy_socket(struct sock *sk)
 
 		vcc_remove_socket(sk);	/* no more receive */
 
-		while ((skb = skb_dequeue(&vcc->sk->sk_receive_queue)) != NULL) {
+		while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
 			atm_return(vcc,skb->truesize);
 			kfree_skb(skb);
 		}
@@ -215,11 +208,13 @@ int vcc_release(struct socket *sock)
 
 void vcc_release_async(struct atm_vcc *vcc, int reply)
 {
+	struct sock *sk = sk_atm(vcc);
+
 	set_bit(ATM_VF_CLOSE, &vcc->flags);
-	vcc->sk->sk_shutdown |= RCV_SHUTDOWN;
-	vcc->sk->sk_err = -reply;
+	sk->sk_shutdown |= RCV_SHUTDOWN;
+	sk->sk_err = -reply;
 	clear_bit(ATM_VF_WAITING, &vcc->flags);
-	vcc->sk->sk_state_change(vcc->sk);
+	sk->sk_state_change(sk);
 }
 
 
@@ -328,6 +323,7 @@ static int find_ci(struct atm_vcc *vcc, short *vpi, int *vci)
 static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, short vpi,
 			 int vci)
 {
+	struct sock *sk = sk_atm(vcc);
 	int error;
 
 	if ((vpi != ATM_VPI_UNSPEC && vpi != ATM_VPI_ANY &&
@@ -347,7 +343,7 @@ static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, short vpi,
 	}
 	vcc->vpi = vpi;
 	vcc->vci = vci;
-	__vcc_insert_socket(vcc->sk);
+	__vcc_insert_socket(sk);
 	write_unlock_irq(&vcc_sklist_lock);
 	switch (vcc->qos.aal) {
 		case ATM_AAL0:
@@ -386,7 +382,7 @@ static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, short vpi,
 	return 0;
 
 fail:
-	vcc_remove_socket(vcc->sk);
+	vcc_remove_socket(sk);
 fail_module_put:
 	module_put(dev->ops->owner);
 	/* ensure we get dev module ref count correct */
@@ -495,7 +491,7 @@ int vcc_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
         if (error)
                 return error;
         sock_recv_timestamp(msg, sk, skb);
-        DPRINTK("RcvM %d -= %d\n", atomic_read(&vcc->sk->rmem_alloc), skb->truesize);
+        DPRINTK("RcvM %d -= %d\n", atomic_read(&sk->rmem_alloc), skb->truesize);
         atm_return(vcc, skb->truesize);
         skb_free_datagram(sk, skb);
         return copied;
@@ -544,7 +540,7 @@ int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 		error = -EMSGSIZE;
 		goto out;
 	}
-	/* verify_area is done by net/socket.c */
+
 	eff = (size+3) & ~3; /* align to word boundary */
 	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
 	error = 0;
@@ -615,7 +611,7 @@ unsigned int vcc_poll(struct file *file, struct socket *sock, poll_table *wait)
 		return mask;
 
 	if (vcc->qos.txtp.traffic_class != ATM_NONE &&
-	    vcc_writable(vcc->sk))
+	    vcc_writable(sk))
 		mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
 
 	return mask;
@@ -638,7 +634,7 @@ static int atm_change_qos(struct atm_vcc *vcc,struct atm_qos *qos)
 	if (!error) error = adjust_tp(&qos->rxtp,qos->aal);
 	if (error) return error;
 	if (!vcc->dev->ops->change_qos) return -EOPNOTSUPP;
-	if (vcc->sk->sk_family == AF_ATMPVC)
+	if (sk_atm(vcc)->sk_family == AF_ATMPVC)
 		return vcc->dev->ops->change_qos(vcc,qos,ATM_MF_SET);
 	return svc_change_qos(vcc,qos);
 }
@@ -762,43 +758,34 @@ int vcc_getsockopt(struct socket *sock, int level, int optname,
 	return vcc->dev->ops->getsockopt(vcc, level, optname, optval, len);
 }
 
-
-#if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-struct net_bridge;
-struct net_bridge_fdb_entry *(*br_fdb_get_hook)(struct net_bridge *br,
-						unsigned char *addr) = NULL;
-void (*br_fdb_put_hook)(struct net_bridge_fdb_entry *ent) = NULL;
-#if defined(CONFIG_ATM_LANE_MODULE) || defined(CONFIG_BRIDGE_MODULE)
-EXPORT_SYMBOL(br_fdb_get_hook);
-EXPORT_SYMBOL(br_fdb_put_hook);
-#endif /* defined(CONFIG_ATM_LANE_MODULE) || defined(CONFIG_BRIDGE_MODULE) */
-#endif /* defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE) */
-#endif /* defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE) */
-
-
 static int __init atm_init(void)
 {
 	int error;
 
+	if ((error = proto_register(&vcc_proto, 0)) < 0)
+		goto out;
+
 	if ((error = atmpvc_init()) < 0) {
 		printk(KERN_ERR "atmpvc_init() failed with %d\n", error);
-		goto failure;
+		goto out_unregister_vcc_proto;
 	}
 	if ((error = atmsvc_init()) < 0) {
 		printk(KERN_ERR "atmsvc_init() failed with %d\n", error);
-		goto failure;
+		goto out_atmpvc_exit;
 	}
         if ((error = atm_proc_init()) < 0) {
 		printk(KERN_ERR "atm_proc_init() failed with %d\n",error);
-		goto failure;
+		goto out_atmsvc_exit;
 	}
-	return 0;
-
-failure:
-	atmsvc_exit();
-	atmpvc_exit();
+out:
 	return error;
+out_atmsvc_exit:
+	atmsvc_exit();
+out_atmpvc_exit:
+	atmsvc_exit();
+out_unregister_vcc_proto:
+	proto_unregister(&vcc_proto);
+	goto out;
 }
 
 static void __exit atm_exit(void)
@@ -806,6 +793,7 @@ static void __exit atm_exit(void)
 	atm_proc_exit();
 	atmsvc_exit();
 	atmpvc_exit();
+	proto_unregister(&vcc_proto);
 }
 
 module_init(atm_init);

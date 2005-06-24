@@ -133,7 +133,7 @@ static int konicawc_ctrl_msg(struct uvd *uvd, u8 dir, u8 request, u16 value, u16
 {
         int retval = usb_control_msg(uvd->dev,
 		dir ? usb_rcvctrlpipe(uvd->dev, 0) : usb_sndctrlpipe(uvd->dev, 0),
-		    request, 0x40 | dir, value, index, buf, len, HZ);
+		    request, 0x40 | dir, value, index, buf, len, 1000);
         return retval < 0 ? retval : 0;
 }
 

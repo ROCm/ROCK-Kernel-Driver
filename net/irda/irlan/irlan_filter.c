@@ -36,8 +36,8 @@
  */
 void irlan_filter_request(struct irlan_cb *self, struct sk_buff *skb)
 {
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 
 	if ((self->provider.filter_type == IRLAN_DIRECTED) && 
 	    (self->provider.filter_operation == DYNAMIC))
@@ -148,8 +148,8 @@ void irlan_check_command_param(struct irlan_cb *self, char *param, char *value)
 
 	bytes = value;
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 
 	IRDA_DEBUG(4, "%s, %s\n", param, value);
 

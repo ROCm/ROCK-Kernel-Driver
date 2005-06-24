@@ -334,7 +334,7 @@ out:
 } /* jffs_notify_change()  */
 
 
-struct inode *
+static struct inode *
 jffs_new_inode(const struct inode * dir, struct jffs_raw_inode *raw_inode,
 	       int * err)
 {
@@ -376,7 +376,7 @@ jffs_new_inode(const struct inode * dir, struct jffs_raw_inode *raw_inode,
 }
 
 /* Get statistics of the file system.  */
-int
+static int
 jffs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	struct jffs_control *c = (struct jffs_control *) sb->s_fs_info;
@@ -410,7 +410,7 @@ jffs_statfs(struct super_block *sb, struct kstatfs *buf)
 
 
 /* Rename a file.  */
-int
+static int
 jffs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	    struct inode *new_dir, struct dentry *new_dentry)
 {
@@ -1739,7 +1739,7 @@ jffs_read_inode(struct inode *inode)
 }
 
 
-void
+static void
 jffs_delete_inode(struct inode *inode)
 {
 	struct jffs_file *f;
@@ -1762,7 +1762,7 @@ jffs_delete_inode(struct inode *inode)
 }
 
 
-void
+static void
 jffs_write_super(struct super_block *sb)
 {
 	struct jffs_control *c = (struct jffs_control *)sb->s_fs_info;

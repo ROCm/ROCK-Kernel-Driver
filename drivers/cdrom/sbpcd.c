@@ -4266,9 +4266,9 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 				   sizeof(struct cdrom_read_audio)))
 			RETURN_UP(-EFAULT);
 		if (read_audio.nframes < 0 || read_audio.nframes>current_drive->sbp_audsiz) RETURN_UP(-EINVAL);
-		i=verify_area(VERIFY_WRITE, read_audio.buf,
-			      read_audio.nframes*CD_FRAMESIZE_RAW);
-		if (i) RETURN_UP(i);
+		if (!access_ok(VERIFY_WRITE, read_audio.buf,
+			      read_audio.nframes*CD_FRAMESIZE_RAW))
+                	RETURN_UP(-EFAULT);
 		
 		if (read_audio.addr_format==CDROM_MSF) /* MSF-bin specification of where to start */
 			block=msf2lba(&read_audio.addr.msf.minute);
@@ -5895,7 +5895,7 @@ int __init sbpcd_init(void)
 }
 /*==========================================================================*/
 #ifdef MODULE
-void sbpcd_exit(void)
+static void sbpcd_exit(void)
 {
 	int j;
 	

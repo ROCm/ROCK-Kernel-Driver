@@ -11,9 +11,6 @@ current status
 video
 	- Basically works.
 	- Some minor image quality glitches.
-	- Red and blue are swapped sometimes for not-yet known
-	  reasons (seems to depend on the image size, try to resize
-	  your tv app window as workaround ...).
 	- For now only capture, overlay support isn't completed yet.
 
 audio

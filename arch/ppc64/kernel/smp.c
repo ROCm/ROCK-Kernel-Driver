@@ -30,6 +30,7 @@
 #include <linux/err.h>
 #include <linux/sysdev.h>
 #include <linux/cpu.h>
+#include <linux/notifier.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
@@ -52,8 +53,6 @@
 #else
 #define DBG(fmt...)
 #endif
-
-int smp_threads_ready;
 
 cpumask_t cpu_possible_map = CPU_MASK_NONE;
 cpumask_t cpu_online_map = CPU_MASK_NONE;
@@ -126,7 +125,7 @@ void __devinit smp_generic_kick_cpu(int nr)
 	 * the processor will continue on to secondary_start
 	 */
 	paca[nr].cpu_start = 1;
-	mb();
+	smp_mb();
 }
 
 #endif /* CONFIG_PPC_MULTIPLATFORM */
@@ -257,7 +256,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 	}
 
 	call_data = &data;
-	wmb();
+	smp_wmb();
 	/* Send a message to all other CPUs and wait for them to respond */
 	smp_ops->message_pass(MSG_ALL_BUT_SELF, PPC_MSG_CALL_FUNCTION);
 
@@ -335,7 +334,6 @@ void smp_call_function_interrupt(void)
 	}
 }
 
-extern unsigned long decr_overclock;
 extern struct gettimeofday_struct do_gtod;
 
 struct thread_info *current_set[NR_CPUS];
@@ -383,7 +381,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	 * For now we leave it which means the time can be some
 	 * number of msecs off until someone does a settimeofday()
 	 */
-	do_gtod.tb_orig_stamp = tb_last_stamp;
+	do_gtod.varp->tb_orig_stamp = tb_last_stamp;
 	systemcfg->tb_orig_stamp = tb_last_stamp;
 #endif
 
@@ -406,17 +404,95 @@ void __devinit smp_prepare_boot_cpu(void)
 	current_set[boot_cpuid] = current->thread_info;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+/* State of each CPU during hotplug phases */
+DEFINE_PER_CPU(int, cpu_state) = { 0 };
+
+int generic_cpu_disable(void)
+{
+	unsigned int cpu = smp_processor_id();
+
+	if (cpu == boot_cpuid)
+		return -EBUSY;
+
+	systemcfg->processorCount--;
+	cpu_clear(cpu, cpu_online_map);
+	fixup_irqs(cpu_online_map);
+	return 0;
+}
+
+int generic_cpu_enable(unsigned int cpu)
+{
+	/* Do the normal bootup if we haven't
+	 * already bootstrapped. */
+	if (system_state != SYSTEM_RUNNING)
+		return -ENOSYS;
+
+	/* get the target out of it's holding state */
+	per_cpu(cpu_state, cpu) = CPU_UP_PREPARE;
+	smp_wmb();
+
+	while (!cpu_online(cpu))
+		cpu_relax();
+
+	fixup_irqs(cpu_online_map);
+	/* counter the irq disable in fixup_irqs */
+	local_irq_enable();
+	return 0;
+}
+
+void generic_cpu_die(unsigned int cpu)
+{
+	int i;
+
+	for (i = 0; i < 100; i++) {
+		smp_rmb();
+		if (per_cpu(cpu_state, cpu) == CPU_DEAD)
+			return;
+		msleep(100);
+	}
+	printk(KERN_ERR "CPU%d didn't die...\n", cpu);
+}
+
+void generic_mach_cpu_die(void)
+{
+	unsigned int cpu;
+
+	local_irq_disable();
+	cpu = smp_processor_id();
+	printk(KERN_DEBUG "CPU%d offline\n", cpu);
+	__get_cpu_var(cpu_state) = CPU_DEAD;
+	smp_wmb();
+	while (__get_cpu_var(cpu_state) != CPU_UP_PREPARE)
+		cpu_relax();
+
+	flush_tlb_pending();
+	cpu_set(cpu, cpu_online_map);
+	local_irq_enable();
+}
+#endif
+
+static int __devinit cpu_enable(unsigned int cpu)
+{
+	if (smp_ops->cpu_enable)
+		return smp_ops->cpu_enable(cpu);
+
+	return -ENOSYS;
+}
+
 int __devinit __cpu_up(unsigned int cpu)
 {
 	int c;
 
-	/* At boot, don't bother with non-present cpus -JSCHOPP */
-	if (system_state < SYSTEM_RUNNING && !cpu_present(cpu))
-		return -ENOENT;
+	if (!cpu_enable(cpu))
+		return 0;
 
-	paca[cpu].default_decr = tb_ticks_per_jiffy / decr_overclock;
+	if (smp_ops->cpu_bootable && !smp_ops->cpu_bootable(cpu))
+		return -EINVAL;
 
-	if (!(cur_cpu_spec->cpu_features & CPU_FTR_SLB)) {
+	paca[cpu].default_decr = tb_ticks_per_jiffy;
+
+	if (!cpu_has_feature(CPU_FTR_SLB)) {
 		void *tmp;
 
 		/* maximum of 48 CPUs on machines with a segment table */
@@ -438,7 +514,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	 * be written out to main store before we release
 	 * the processor.
 	 */
-	mb();
+	smp_mb();
 
 	/* wake up cpus */
 	DBG("smp: kicking cpu %d\n", cpu);
@@ -526,14 +602,6 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	smp_ops->setup_cpu(boot_cpuid);
 
 	set_cpus_allowed(current, old_mask);
-
-	/*
-	 * We know at boot the maximum number of cpus we can add to
-	 * a partition and set cpu_possible_map accordingly. cpu_present_map
-	 * needs to match for the hotplug code to allow us to hot add
-	 * any offline cpus.
-	 */
-	cpu_present_map = cpu_possible_map;
 }
 
 #ifdef CONFIG_HOTPLUG_CPU

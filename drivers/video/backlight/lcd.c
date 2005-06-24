@@ -111,7 +111,7 @@ static void lcd_class_release(struct class_device *dev)
 	kfree(ld);
 }
 
-struct class lcd_class = {
+static struct class lcd_class = {
 	.name = "lcd",
 	.release = lcd_class_release,
 };

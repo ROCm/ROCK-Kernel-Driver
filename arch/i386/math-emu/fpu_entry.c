@@ -257,7 +257,7 @@ do_another_FPU_instruction:
     }
 
   RE_ENTRANT_CHECK_OFF;
-  FPU_code_verify_area(1);
+  FPU_code_access_ok(1);
   FPU_get_user(FPU_modrm, (u_char __user *) FPU_EIP);
   RE_ENTRANT_CHECK_ON;
   FPU_EIP++;
@@ -589,7 +589,7 @@ static int valid_prefix(u_char *Byte, u_char __user **fpu_eip,
   *override = (overrides) { 0, 0, PREFIX_DEFAULT };       /* defaults */
 
   RE_ENTRANT_CHECK_OFF;
-  FPU_code_verify_area(1);
+  FPU_code_access_ok(1);
   FPU_get_user(byte, ip);
   RE_ENTRANT_CHECK_ON;
 
@@ -635,7 +635,7 @@ static int valid_prefix(u_char *Byte, u_char __user **fpu_eip,
 	do_next_byte:
 	  ip++;
 	  RE_ENTRANT_CHECK_OFF;
-	  FPU_code_verify_area(1);
+	  FPU_code_access_ok(1);
 	  FPU_get_user(byte, ip);
 	  RE_ENTRANT_CHECK_ON;
 	  break;
@@ -686,7 +686,7 @@ int restore_i387_soft(void *s387, struct _fpstate __user *buf)
   int offset, other, i, tags, regnr, tag, newtop;
 
   RE_ENTRANT_CHECK_OFF;
-  FPU_verify_area(VERIFY_READ, d, 7*4 + 8*10);
+  FPU_access_ok(VERIFY_READ, d, 7*4 + 8*10);
   if (__copy_from_user(&S387->cwd, d, 7*4))
     return -1;
   RE_ENTRANT_CHECK_ON;
@@ -732,7 +732,7 @@ int save_i387_soft(void *s387, struct _fpstate __user * buf)
   int offset = (S387->ftop & 7) * 10, other = 80 - offset;
 
   RE_ENTRANT_CHECK_OFF;
-  FPU_verify_area(VERIFY_WRITE, d, 7*4 + 8*10);
+  FPU_access_ok(VERIFY_WRITE, d, 7*4 + 8*10);
 #ifdef PECULIAR_486
   S387->cwd &= ~0xe080;
   /* An 80486 sets nearly all of the reserved bits to 1. */

@@ -105,7 +105,7 @@ EXPORT_SYMBOL(mempool_create);
  * while this function is running. mempool_alloc() & mempool_free()
  * might be called (eg. from IRQ contexts) while this function executes.
  */
-int mempool_resize(mempool_t *pool, int new_min_nr, int gfp_mask)
+int mempool_resize(mempool_t *pool, int new_min_nr, unsigned int __nocast gfp_mask)
 {
 	void *element;
 	void **new_elements;
@@ -114,8 +114,8 @@ int mempool_resize(mempool_t *pool, int new_min_nr, int gfp_mask)
 	BUG_ON(new_min_nr <= 0);
 
 	spin_lock_irqsave(&pool->lock, flags);
-	if (new_min_nr < pool->min_nr) {
-		while (pool->curr_nr > new_min_nr) {
+	if (new_min_nr <= pool->min_nr) {
+		while (new_min_nr < pool->curr_nr) {
 			element = remove_element(pool);
 			spin_unlock_irqrestore(&pool->lock, flags);
 			pool->free(element, pool->pool_data);
@@ -132,6 +132,12 @@ int mempool_resize(mempool_t *pool, int new_min_nr, int gfp_mask)
 		return -ENOMEM;
 
 	spin_lock_irqsave(&pool->lock, flags);
+	if (unlikely(new_min_nr <= pool->min_nr)) {
+		/* Raced, other resize will do our work */
+		spin_unlock_irqrestore(&pool->lock, flags);
+		kfree(new_elements);
+		goto out;
+	}
 	memcpy(new_elements, pool->elements,
 			pool->curr_nr * sizeof(*new_elements));
 	kfree(pool->elements);
@@ -149,7 +155,7 @@ int mempool_resize(mempool_t *pool, int new_min_nr, int gfp_mask)
 		} else {
 			spin_unlock_irqrestore(&pool->lock, flags);
 			pool->free(element, pool->pool_data);	/* Raced */
-			spin_lock_irqsave(&pool->lock, flags);
+			goto out;
 		}
 	}
 out_unlock:
@@ -187,35 +193,26 @@ EXPORT_SYMBOL(mempool_destroy);
  * *never* fails when called from process contexts. (it might
  * fail if called from an IRQ context.)
  */
-void * mempool_alloc(mempool_t *pool, int gfp_mask)
+void * mempool_alloc(mempool_t *pool, unsigned int __nocast gfp_mask)
 {
 	void *element;
 	unsigned long flags;
 	DEFINE_WAIT(wait);
-	int gfp_nowait = gfp_mask & ~(__GFP_WAIT | __GFP_IO);
+	int gfp_temp;
 
 	might_sleep_if(gfp_mask & __GFP_WAIT);
+
+	gfp_mask |= __GFP_NOMEMALLOC;	/* don't allocate emergency reserves */
+	gfp_mask |= __GFP_NORETRY;	/* don't loop in __alloc_pages */
+	gfp_mask |= __GFP_NOWARN;	/* failures are OK */
+
+	gfp_temp = gfp_mask & ~(__GFP_WAIT|__GFP_IO);
+
 repeat_alloc:
-	element = pool->alloc(gfp_nowait|__GFP_NOWARN, pool->pool_data);
+
+	element = pool->alloc(gfp_temp, pool->pool_data);
 	if (likely(element != NULL))
 		return element;
-
-	/*
-	 * If the pool is less than 50% full and we can perform effective
-	 * page reclaim then try harder to allocate an element.
-	 */
-	mb();
-	if ((gfp_mask & __GFP_FS) && (gfp_mask != gfp_nowait) &&
-				(pool->curr_nr <= pool->min_nr/2)) {
-		element = pool->alloc(gfp_mask, pool->pool_data);
-		if (likely(element != NULL))
-			return element;
-	}
-
-	/*
-	 * Kick the VM at this point.
-	 */
-	wakeup_bdflush(0);
 
 	spin_lock_irqsave(&pool->lock, flags);
 	if (likely(pool->curr_nr)) {
@@ -229,8 +226,10 @@ repeat_alloc:
 	if (!(gfp_mask & __GFP_WAIT))
 		return NULL;
 
+	/* Now start performing page reclaim */
+	gfp_temp = gfp_mask;
 	prepare_to_wait(&pool->wait, &wait, TASK_UNINTERRUPTIBLE);
-	mb();
+	smp_mb();
 	if (!pool->curr_nr)
 		io_schedule();
 	finish_wait(&pool->wait, &wait);
@@ -251,7 +250,7 @@ void mempool_free(void *element, mempool_t *pool)
 {
 	unsigned long flags;
 
-	mb();
+	smp_mb();
 	if (pool->curr_nr < pool->min_nr) {
 		spin_lock_irqsave(&pool->lock, flags);
 		if (pool->curr_nr < pool->min_nr) {
@@ -269,7 +268,7 @@ EXPORT_SYMBOL(mempool_free);
 /*
  * A commonly used alloc and free fn.
  */
-void *mempool_alloc_slab(int gfp_mask, void *pool_data)
+void *mempool_alloc_slab(unsigned int __nocast gfp_mask, void *pool_data)
 {
 	kmem_cache_t *mem = (kmem_cache_t *) pool_data;
 	return kmem_cache_alloc(mem, gfp_mask);

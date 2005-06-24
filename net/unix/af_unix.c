@@ -85,7 +85,6 @@
 #include <linux/module.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/major.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
@@ -120,8 +119,6 @@
 #include <linux/security.h>
 
 int sysctl_unix_max_dgram_qlen = 10;
-
-static kmem_cache_t *unix_sk_cachep;
 
 struct hlist_head unix_socket_table[UNIX_HASH_SIZE + 1];
 DEFINE_RWLOCK(unix_table_lock);
@@ -188,6 +185,13 @@ static int unix_mkname(struct sockaddr_un * sunaddr, int len, unsigned *hashp)
 	if (!sunaddr || sunaddr->sun_family != AF_UNIX)
 		return -EINVAL;
 	if (sunaddr->sun_path[0]) {
+		/*
+		 * This may look like an off by one error but it is a bit more
+		 * subtle. 108 is the longest valid AF_UNIX path for a binding.
+		 * sun_path[108] doesnt as such exist.  However in kernel space
+		 * we are guaranteed that it is a valid memory location in our
+		 * kernel address buffer.
+		 */
 		((char *)sunaddr)[len]=0;
 		len = strlen(sunaddr->sun_path)+1+sizeof(short);
 		return len;
@@ -532,6 +536,12 @@ static struct proto_ops unix_seqpacket_ops = {
 	.sendpage =	sock_no_sendpage,
 };
 
+static struct proto unix_proto = {
+	.name	  = "UNIX",
+	.owner	  = THIS_MODULE,
+	.obj_size = sizeof(struct unix_sock),
+};
+
 static struct sock * unix_create1(struct socket *sock)
 {
 	struct sock *sk = NULL;
@@ -540,15 +550,13 @@ static struct sock * unix_create1(struct socket *sock)
 	if (atomic_read(&unix_nr_socks) >= 2*files_stat.max_files)
 		goto out;
 
-	sk = sk_alloc(PF_UNIX, GFP_KERNEL, sizeof(struct unix_sock),
-		      unix_sk_cachep);
+	sk = sk_alloc(PF_UNIX, GFP_KERNEL, &unix_proto, 1);
 	if (!sk)
 		goto out;
 
 	atomic_inc(&unix_nr_socks);
 
 	sock_init_data(sock,sk);
-	sk_set_owner(sk, THIS_MODULE);
 
 	sk->sk_write_space	= unix_write_space;
 	sk->sk_max_ack_backlog	= sysctl_unix_max_dgram_qlen;
@@ -762,33 +770,12 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		err = path_lookup(sunaddr->sun_path, LOOKUP_PARENT, &nd);
 		if (err)
 			goto out_mknod_parent;
-		/*
-		 * Yucky last component or no last component at all?
-		 * (foo/., foo/.., /////)
-		 */
-		err = -EEXIST;
-		if (nd.last_type != LAST_NORM)
-			goto out_mknod;
-		/*
-		 * Lock the directory.
-		 */
-		down(&nd.dentry->d_inode->i_sem);
-		/*
-		 * Do the final lookup.
-		 */
-		dentry = __lookup_hash(&nd.last, nd.dentry, &nd);
+
+		dentry = lookup_create(&nd, 0);
 		err = PTR_ERR(dentry);
 		if (IS_ERR(dentry))
 			goto out_mknod_unlock;
-		err = -ENOENT;
-		/*
-		 * Special case - lookup gave negative, but... we had foo/bar/
-		 * From the vfs_mknod() POV we just have a negative dentry -
-		 * all is fine. Let's be bastards - you had / on the end, you've
-		 * been asking for (non-existent) directory. -ENOENT for you.
-		 */
-		if (nd.last.name[nd.last.len] && !dentry->d_inode)
-			goto out_mknod_dput;
+
 		/*
 		 * All right, let's create it.
 		 */
@@ -837,7 +824,6 @@ out_mknod_dput:
 	dput(dentry);
 out_mknod_unlock:
 	up(&nd.dentry->d_inode->i_sem);
-out_mknod:
 	path_release(&nd);
 out_mknod_parent:
 	if (err==-EEXIST)
@@ -861,8 +847,8 @@ static int unix_dgram_connect(struct socket *sock, struct sockaddr *addr,
 			goto out;
 		alen = err;
 
-		if (sock->passcred && !unix_sk(sk)->addr &&
-		    (err = unix_autobind(sock)) != 0)
+		if (test_bit(SOCK_PASSCRED, &sock->flags) &&
+		    !unix_sk(sk)->addr && (err = unix_autobind(sock)) != 0)
 			goto out;
 
 		other=unix_find_other(sunaddr, alen, sock->type, hash, &err);
@@ -952,7 +938,8 @@ static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 		goto out;
 	addr_len = err;
 
-	if (sock->passcred && !u->addr && (err = unix_autobind(sock)) != 0)
+	if (test_bit(SOCK_PASSCRED, &sock->flags)
+		&& !u->addr && (err = unix_autobind(sock)) != 0)
 		goto out;
 
 	timeo = sock_sndtimeo(sk, flags & O_NONBLOCK);
@@ -1286,7 +1273,8 @@ static int unix_dgram_sendmsg(struct kiocb *kiocb, struct socket *sock,
 			goto out;
 	}
 
-	if (sock->passcred && !u->addr && (err = unix_autobind(sock)) != 0)
+	if (test_bit(SOCK_PASSCRED, &sock->flags)
+		&& !u->addr && (err = unix_autobind(sock)) != 0)
 		goto out;
 
 	err = -EMSGSIZE;
@@ -2048,26 +2036,28 @@ static inline void unix_sysctl_unregister(void) {}
 
 static int __init af_unix_init(void)
 {
+	int rc = -1;
 	struct sk_buff *dummy_skb;
 
 	if (sizeof(struct unix_skb_parms) > sizeof(dummy_skb->cb)) {
 		printk(KERN_CRIT "%s: panic\n", __FUNCTION__);
-		return -1;
+		goto out;
 	}
-        /* allocate our sock slab cache */
-        unix_sk_cachep = kmem_cache_create("unix_sock",
-					   sizeof(struct unix_sock), 0,
-					   SLAB_HWCACHE_ALIGN, NULL, NULL);
-        if (!unix_sk_cachep)
-                printk(KERN_CRIT
-                        "af_unix_init: Cannot create unix_sock SLAB cache!\n");
+
+	rc = proto_register(&unix_proto, 1);
+        if (rc != 0) {
+                printk(KERN_CRIT "%s: Cannot create unix_sock SLAB cache!\n",
+		       __FUNCTION__);
+		goto out;
+	}
 
 	sock_register(&unix_family_ops);
 #ifdef CONFIG_PROC_FS
 	proc_net_fops_create("unix", 0, &unix_seq_fops);
 #endif
 	unix_sysctl_register();
-	return 0;
+out:
+	return rc;
 }
 
 static void __exit af_unix_exit(void)
@@ -2075,7 +2065,7 @@ static void __exit af_unix_exit(void)
 	sock_unregister(PF_UNIX);
 	unix_sysctl_unregister();
 	proc_net_remove("unix");
-	kmem_cache_destroy(unix_sk_cachep);
+	proto_unregister(&unix_proto);
 }
 
 module_init(af_unix_init);

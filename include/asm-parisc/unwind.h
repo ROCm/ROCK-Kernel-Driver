@@ -1,6 +1,8 @@
 #ifndef _UNWIND_H_
 #define _UNWIND_H_
 
+#include <linux/list.h>
+
 /* From ABI specifications */
 struct unwind_table_entry {
 	unsigned int region_start;
@@ -39,7 +41,7 @@ struct unwind_table_entry {
 };
 
 struct unwind_table {
-	struct unwind_table *next;
+	struct list_head list;
 	const char *name;
 	unsigned long gp;
 	unsigned long base_addr;
@@ -55,15 +57,18 @@ struct unwind_frame_info {
 	   available; but for now we only try to get the sp and ip for each
 	   frame */
 	/* struct pt_regs regs; */
-	unsigned long sp, ip, rp;
+	unsigned long sp, ip, rp, r31;
 	unsigned long prev_sp, prev_ip;
 };
 
-void * unwind_table_add(const char *name, unsigned long base_addr, 
-		 unsigned long gp,
-                 void *start, void *end);
+struct unwind_table *
+unwind_table_add(const char *name, unsigned long base_addr, 
+		 unsigned long gp, void *start, void *end);
+void
+unwind_table_remove(struct unwind_table *table);
+
 void unwind_frame_init(struct unwind_frame_info *info, struct task_struct *t, 
-		       unsigned long sp, unsigned long ip, unsigned long rp);
+		       struct pt_regs *regs);
 void unwind_frame_init_from_blocked_task(struct unwind_frame_info *info, struct task_struct *t);
 void unwind_frame_init_running(struct unwind_frame_info *info, struct pt_regs *regs);
 int unwind_once(struct unwind_frame_info *info);

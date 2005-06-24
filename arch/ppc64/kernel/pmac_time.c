@@ -6,6 +6,8 @@
  *
  * Paul Mackerras	August 1996.
  * Copyright (C) 1996 Paul Mackerras.
+ * Copyright (C) 2003-2005 Benjamin Herrenschmidt.
+ *
  */
 #include <linux/config.h>
 #include <linux/errno.h>
@@ -28,6 +30,7 @@
 #include <asm/machdep.h>
 #include <asm/time.h>
 #include <asm/nvram.h>
+#include <asm/smu.h>
 
 #undef DEBUG
 
@@ -42,7 +45,6 @@ extern void setup_default_decr(void);
 extern unsigned long ppc_tb_freq;
 extern unsigned long ppc_proc_freq;
 
-#ifdef CONFIG_ADB_PMU
 /* Apparently the RTC stores seconds since 1 Jan 1904 */
 #define RTC_OFFSET	2082844800
 
@@ -56,54 +58,86 @@ extern void to_tm(int tim, struct rtc_time * tm);
 
 void __pmac pmac_get_rtc_time(struct rtc_time *tm)
 {
-	struct adb_request req;
-	unsigned int now;
+	switch(sys_ctrler) {
+#ifdef CONFIG_ADB_PMU
+	case SYS_CTRLER_PMU: {
+		/* TODO: Move that to a function in the PMU driver */
+		struct adb_request req;
+		unsigned int now;
 
-	/* Get the time from the RTC */
-	if (pmu_request(&req, NULL, 1, PMU_READ_RTC) < 0)
-		return;
-	while (!req.complete)
-		pmu_poll();
-	if (req.reply_len != 4)
-		printk(KERN_ERR "pmac_get_rtc_time: got %d byte reply\n",
-		       req.reply_len);
-	now = (req.reply[0] << 24) + (req.reply[1] << 16)
-		+ (req.reply[2] << 8) + req.reply[3];
-	DBG("get: %u -> %u\n", (int)now, (int)(now - RTC_OFFSET));
-	now -= RTC_OFFSET;
+		if (pmu_request(&req, NULL, 1, PMU_READ_RTC) < 0)
+			return;
+		pmu_wait_complete(&req);
+		if (req.reply_len != 4)
+			printk(KERN_ERR "pmac_get_rtc_time: PMU returned a %d"
+			       " bytes reply\n", req.reply_len);
+		now = (req.reply[0] << 24) + (req.reply[1] << 16)
+			+ (req.reply[2] << 8) + req.reply[3];
+		DBG("get: %u -> %u\n", (int)now, (int)(now - RTC_OFFSET));
+		now -= RTC_OFFSET;
 
-	to_tm(now, tm);
-	tm->tm_year -= 1900;
-	tm->tm_mon -= 1;
+		to_tm(now, tm);
+		tm->tm_year -= 1900;
+		tm->tm_mon -= 1;
 	
-	DBG("-> tm_mday: %d, tm_mon: %d, tm_year: %d, %d:%02d:%02d\n",
-	       tm->tm_mday, tm->tm_mon, tm->tm_year,
-	       tm->tm_hour, tm->tm_min, tm->tm_sec);
+		DBG("-> tm_mday: %d, tm_mon: %d, tm_year: %d, %d:%02d:%02d\n",
+		    tm->tm_mday, tm->tm_mon, tm->tm_year,
+		    tm->tm_hour, tm->tm_min, tm->tm_sec);
+		break;
+	}
+#endif /* CONFIG_ADB_PMU */
+
+#ifdef CONFIG_PMAC_SMU
+	case SYS_CTRLER_SMU:
+		smu_get_rtc_time(tm);
+		break;
+#endif /* CONFIG_PMAC_SMU */
+	default:
+		;
+	}
 }
 
 int __pmac pmac_set_rtc_time(struct rtc_time *tm)
 {
-	struct adb_request req;
-	unsigned int nowtime;
+	switch(sys_ctrler) {
+#ifdef CONFIG_ADB_PMU
+	case SYS_CTRLER_PMU: {
+		/* TODO: Move that to a function in the PMU driver */
+		struct adb_request req;
+		unsigned int nowtime;
 
-	DBG("set: tm_mday: %d, tm_mon: %d, tm_year: %d, %d:%02d:%02d\n",
-	       tm->tm_mday, tm->tm_mon, tm->tm_year,
-	       tm->tm_hour, tm->tm_min, tm->tm_sec);
+		DBG("set: tm_mday: %d, tm_mon: %d, tm_year: %d,"
+		    " %d:%02d:%02d\n",
+		    tm->tm_mday, tm->tm_mon, tm->tm_year,
+		    tm->tm_hour, tm->tm_min, tm->tm_sec);
 
-	nowtime = mktime(tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-			 tm->tm_hour, tm->tm_min, tm->tm_sec);
-	DBG("-> %u -> %u\n", (int)nowtime, (int)(nowtime + RTC_OFFSET));
-	nowtime += RTC_OFFSET;
+		nowtime = mktime(tm->tm_year + 1900, tm->tm_mon + 1,
+				 tm->tm_mday, tm->tm_hour, tm->tm_min,
+				 tm->tm_sec);
 
-	if (pmu_request(&req, NULL, 5, PMU_SET_RTC,
-			nowtime >> 24, nowtime >> 16, nowtime >> 8, nowtime) < 0)
+		DBG("-> %u -> %u\n", (int)nowtime,
+		    (int)(nowtime + RTC_OFFSET));
+		nowtime += RTC_OFFSET;
+
+		if (pmu_request(&req, NULL, 5, PMU_SET_RTC,
+				nowtime >> 24, nowtime >> 16,
+				nowtime >> 8, nowtime) < 0)
+			return -ENXIO;
+		pmu_wait_complete(&req);
+		if (req.reply_len != 0)
+			printk(KERN_ERR "pmac_set_rtc_time: PMU returned a %d"
+			       " bytes reply\n", req.reply_len);
 		return 0;
-	while (!req.complete)
-		pmu_poll();
-	if (req.reply_len != 0)
-		printk(KERN_ERR "pmac_set_rtc_time: got %d byte reply\n",
-		       req.reply_len);
-	return 1;
+	}
+#endif /* CONFIG_ADB_PMU */
+
+#ifdef CONFIG_PMAC_SMU
+	case SYS_CTRLER_SMU:
+		return smu_set_rtc_time(tm);
+#endif /* CONFIG_PMAC_SMU */
+	default:
+		return -ENODEV;
+	}
 }
 
 void __init pmac_get_boot_time(struct rtc_time *tm)
@@ -124,7 +158,6 @@ void __init pmac_get_boot_time(struct rtc_time *tm)
 		dst ? "on" : "off");
 #endif
 }
-#endif
 
 /*
  * Query the OF and get the decr frequency.

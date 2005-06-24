@@ -1107,9 +1107,27 @@ static void check_dma_crc(ide_drive_t *drive)
 #endif
 }
 
+static void ide_disk_pre_reset(ide_drive_t *drive)
+{
+	int legacy = (drive->id->cfs_enable_2 & 0x0400) ? 0 : 1;
+
+	drive->special.all = 0;
+	drive->special.b.set_geometry = legacy;
+	drive->special.b.recalibrate  = legacy;
+	if (OK_TO_RESET_CONTROLLER)
+		drive->mult_count = 0;
+	if (!drive->keep_settings && !drive->using_dma)
+		drive->mult_req = 0;
+	if (drive->mult_req != drive->mult_count)
+		drive->special.b.set_multmode = 1;
+}
+
 static void pre_reset(ide_drive_t *drive)
 {
-	DRIVER(drive)->pre_reset(drive);
+	if (drive->media == ide_disk)
+		ide_disk_pre_reset(drive);
+	else
+		drive->post_reset = 1;
 
 	if (!drive->keep_settings) {
 		if (drive->using_dma) {

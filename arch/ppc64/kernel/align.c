@@ -238,7 +238,7 @@ fix_alignment(struct pt_regs *regs)
 
 	dsisr = regs->dsisr;
 
-	if (cur_cpu_spec->cpu_features & CPU_FTR_NODSISRALIGN) {
+	if (cpu_has_feature(CPU_FTR_NODSISRALIGN)) {
 	    unsigned int real_instr;
 	    if (__get_user(real_instr, (unsigned int __user *)regs->nip))
 		return 0;
@@ -273,7 +273,7 @@ fix_alignment(struct pt_regs *regs)
 
 	/* Verify the address of the operand */
 	if (user_mode(regs)) {
-		if (verify_area((flags & ST? VERIFY_WRITE: VERIFY_READ), addr, nb))
+		if (!access_ok((flags & ST? VERIFY_WRITE: VERIFY_READ), addr, nb))
 			return -EFAULT;	/* bad address */
 	}
 

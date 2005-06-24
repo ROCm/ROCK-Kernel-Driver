@@ -42,7 +42,7 @@ config USE_MDIO
 choice
 	prompt "Type of PHY"
 	depends on 8260 && USE_MDIO
-	default FCC_LXT971
+	default FCC_GENERIC_PHY
 
 config FCC_LXT970
 	bool "LXT970"
@@ -53,6 +53,13 @@ config FCC_LXT971
 config FCC_QS6612
 	bool "QS6612"
 
+config FCC_DM9131
+	bool "DM9131"
+
+config FCC_DM9161
+	bool "DM9161"
+
+config FCC_GENERIC_PHY
+	bool "Generic"
 endchoice
 endmenu
-

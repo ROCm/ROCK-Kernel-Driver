@@ -221,7 +221,7 @@ static int rio_probe_addrs[]= {0xc0000, 0xd0000, 0xe0000};
 /* Set the mask to all-ones. This alas, only supports 32 interrupts. 
    Some architectures may need more. -- Changed to LONG to
    support up to 64 bits on 64bit architectures. -- REW 20/06/99 */
-long rio_irqmask = -1;
+static long rio_irqmask = -1;
 
 MODULE_AUTHOR("Rogier Wolff <R.E.Wolff@bitwizard.nl>, Patrick van de Lageweg <patrick@bitwizard.nl>");
 MODULE_DESCRIPTION("RIO driver");
@@ -681,8 +681,9 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
     }
     break;
   case TIOCGSERIAL:
-    if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
-                          sizeof(struct serial_struct))) == 0)
+    rc = -EFAULT;
+    if (access_ok(VERIFY_WRITE, (void *) arg,
+                          sizeof(struct serial_struct)))
       rc = gs_getserial(&PortP->gs, (struct serial_struct *) arg);
     break;
   case TCSBRK:
@@ -711,8 +712,9 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
     }
     break;
   case TIOCSSERIAL:
-    if ((rc = verify_area(VERIFY_READ, (void *) arg,
-                          sizeof(struct serial_struct))) == 0)
+    rc = -EFAULT;
+    if (access_ok(VERIFY_READ, (void *) arg,
+                          sizeof(struct serial_struct)))
       rc = gs_setserial(&PortP->gs, (struct serial_struct *) arg);
     break;
 #if 0
@@ -722,8 +724,10 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
    * #if 0 disablement predates this comment.
    */
   case TIOCMGET:
-    if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
-                          sizeof(unsigned int))) == 0) {
+    rc = -EFAULT;
+    if (access_ok(VERIFY_WRITE, (void *) arg,
+                          sizeof(unsigned int))) {
+      rc = 0;
       ival = rio_getsignals(port);
       put_user(ival, (unsigned int *) arg);
     }

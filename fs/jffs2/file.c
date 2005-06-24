@@ -25,6 +25,11 @@
 extern int generic_file_open(struct inode *, struct file *) __attribute__((weak));
 extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin) __attribute__((weak));
 
+static int jffs2_commit_write (struct file *filp, struct page *pg,
+			       unsigned start, unsigned end);
+static int jffs2_prepare_write (struct file *filp, struct page *pg,
+				unsigned start, unsigned end);
+static int jffs2_readpage (struct file *filp, struct page *pg);
 
 int jffs2_fsync(struct file *filp, struct dentry *dentry, int datasync)
 {
@@ -65,7 +70,7 @@ struct address_space_operations jffs2_file_address_operations =
 	.commit_write =	jffs2_commit_write
 };
 
-int jffs2_do_readpage_nolock (struct inode *inode, struct page *pg)
+static int jffs2_do_readpage_nolock (struct inode *inode, struct page *pg)
 {
 	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(inode->i_sb);
@@ -74,8 +79,7 @@ int jffs2_do_readpage_nolock (struct inode *inode, struct page *pg)
 
 	D2(printk(KERN_DEBUG "jffs2_do_readpage_nolock(): ino #%lu, page at offset 0x%lx\n", inode->i_ino, pg->index << PAGE_CACHE_SHIFT));
 
-	if (!PageLocked(pg))
-                PAGE_BUG(pg);
+	BUG_ON(!PageLocked(pg));
 
 	pg_buf = kmap(pg);
 	/* FIXME: Can kmap fail? */
@@ -105,7 +109,7 @@ int jffs2_do_readpage_unlock(struct inode *inode, struct page *pg)
 }
 
 
-int jffs2_readpage (struct file *filp, struct page *pg)
+static int jffs2_readpage (struct file *filp, struct page *pg)
 {
 	struct jffs2_inode_info *f = JFFS2_INODE_INFO(pg->mapping->host);
 	int ret;
@@ -116,7 +120,8 @@ int jffs2_readpage (struct file *filp, struct page *pg)
 	return ret;
 }
 
-int jffs2_prepare_write (struct file *filp, struct page *pg, unsigned start, unsigned end)
+static int jffs2_prepare_write (struct file *filp, struct page *pg,
+				unsigned start, unsigned end)
 {
 	struct inode *inode = pg->mapping->host;
 	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
@@ -198,7 +203,8 @@ int jffs2_prepare_write (struct file *filp, struct page *pg, unsigned start, uns
 	return ret;
 }
 
-int jffs2_commit_write (struct file *filp, struct page *pg, unsigned start, unsigned end)
+static int jffs2_commit_write (struct file *filp, struct page *pg,
+			       unsigned start, unsigned end)
 {
 	/* Actually commit the write from the page cache page we're looking at.
 	 * For now, we write the full page out each time. It sucks, but it's simple

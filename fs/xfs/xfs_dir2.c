@@ -165,7 +165,7 @@ xfs_dir2_isempty(
 	if (dp->i_d.di_size > XFS_IFORK_DSIZE(dp))
 		return 0;
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
-	return INT_ISZERO(sfp->hdr.count, ARCH_CONVERT);
+	return !sfp->hdr.count;
 }
 
 /*

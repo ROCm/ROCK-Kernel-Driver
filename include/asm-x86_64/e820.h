@@ -14,7 +14,7 @@
 #include <linux/mmzone.h>
 
 #define E820MAP	0x2d0		/* our map */
-#define E820MAX	32		/* number of entries in E820MAP */
+#define E820MAX	128		/* number of entries in E820MAP */
 #define E820NR	0x1e8		/* # entries in E820MAP */
 
 #define E820_RAM	1
@@ -50,6 +50,7 @@ extern void e820_print_map(char *who);
 extern int e820_mapped(unsigned long start, unsigned long end, unsigned type);
 
 extern void e820_bootmem_free(pg_data_t *pgdat, unsigned long start,unsigned long end);
+extern void e820_setup_gap(void);
 
 extern void __init parse_memopt(char *p, char **end);
 

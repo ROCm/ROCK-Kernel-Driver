@@ -19,7 +19,7 @@ static inline void arch_idle(void)
 
 static inline void arch_reset(char mode)
 {
-	cli();
+	local_irq_disable();
 
 	/*
 	 * Reset flash banking register so that we are pointing at

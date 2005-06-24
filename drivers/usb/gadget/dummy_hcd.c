@@ -4,7 +4,7 @@
  * Maintainer: Alan Stern <stern@rowland.harvard.edu>
  *
  * Copyright (C) 2003 David Brownell
- * Copyright (C) 2003, 2004 Alan Stern
+ * Copyright (C) 2003-2005 Alan Stern
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -167,7 +167,6 @@ struct dummy {
 	 */
 	struct timer_list		timer;
 	u32				port_status;
-	unsigned			started:1;
 	unsigned			resuming:1;
 	unsigned long			re_timeout;
 
@@ -1637,7 +1636,6 @@ static int dummy_start (struct usb_hcd *hcd)
 	 * just like more familiar pci-based HCDs.
 	 */
 	spin_lock_init (&dum->lock);
-
 	init_timer (&dum->timer);
 	dum->timer.function = dummy_timer;
 	dum->timer.data = (unsigned long) dum;
@@ -1649,30 +1647,30 @@ static int dummy_start (struct usb_hcd *hcd)
 		return -ENOMEM;
 
 	/* root hub enters addressed state... */
-	hcd->state = USB_STATE_RUNNING;
+	hcd->state = HC_STATE_RUNNING;
 	root->speed = USB_SPEED_HIGH;
 
 	/* ...then configured, so khubd sees us. */
-	if ((retval = hcd_register_root (root, hcd)) != 0) {
-		usb_put_dev (root);
-clean:
-		hcd->state = USB_STATE_QUIESCING;
-		return retval;
+	if ((retval = usb_hcd_register_root_hub (root, hcd)) != 0) {
+		goto err1;
 	}
 
 	/* only show a low-power port: just 8mA */
 	hub_set_power_budget (root, 8);
 
-	if ((retval = dummy_register_udc (dum)) != 0) {
-		usb_disconnect (&hcd->self.root_hub);
-		goto clean;
-	}
+	if ((retval = dummy_register_udc (dum)) != 0)
+		goto err2;
 
 	/* FIXME 'urbs' should be a per-device thing, maybe in usbcore */
 	device_create_file (dummy_dev(dum), &dev_attr_urbs);
-
-	dum->started = 1;
 	return 0;
+
+ err2:
+	usb_disconnect (&hcd->self.root_hub);
+ err1:
+	usb_put_dev (root);
+	hcd->state = HC_STATE_QUIESCING;
+	return retval;
 }
 
 static void dummy_stop (struct usb_hcd *hcd)
@@ -1680,9 +1678,6 @@ static void dummy_stop (struct usb_hcd *hcd)
 	struct dummy		*dum;
 
 	dum = hcd_to_dummy (hcd);
-	if (!dum->started)
-		return;
-	dum->started = 0;
 
 	device_remove_file (dummy_dev(dum), &dev_attr_urbs);
 
@@ -1718,71 +1713,33 @@ static const struct hc_driver dummy_hcd = {
 	.hub_control = 		dummy_hub_control,
 };
 
-static void dummy_remove (struct device *dev);
-
 static int dummy_probe (struct device *dev)
 {
 	struct usb_hcd		*hcd;
-	struct dummy		*dum;
 	int			retval;
 
 	dev_info (dev, "%s, driver " DRIVER_VERSION "\n", driver_desc);
 
-	hcd = usb_create_hcd (&dummy_hcd);
-	if (hcd == NULL) {
-		dev_dbg (dev, "hcd_alloc failed\n");
+	hcd = usb_create_hcd (&dummy_hcd, dev, dev->bus_id);
+	if (!hcd)
 		return -ENOMEM;
-	}
+	the_controller = hcd_to_dummy (hcd);
 
-	dev_set_drvdata (dev, hcd);
-	dum = hcd_to_dummy (hcd);
-	the_controller = dum;
-
-	hcd->self.controller = dev;
-
-	/* FIXME don't require the pci-based buffer/alloc impls;
-	 * the "generic dma" implementation still requires them,
-	 * it's not very generic yet.
-	 */
-	retval = hcd_buffer_create (hcd);
+	retval = usb_add_hcd(hcd, 0, 0);
 	if (retval != 0) {
-		dev_dbg (dev, "pool alloc failed\n");
-		goto err1;
+		usb_put_hcd (hcd);
+		the_controller = NULL;
 	}
-
-	hcd->self.bus_name = dev->bus_id;
-	usb_register_bus (&hcd->self);
-
-	if ((retval = dummy_start (hcd)) < 0) 
-		dummy_remove (dev);
-	return retval;
-
-err1:
-	usb_put_hcd (hcd);
-	dev_set_drvdata (dev, NULL);
 	return retval;
 }
 
 static void dummy_remove (struct device *dev)
 {
 	struct usb_hcd		*hcd;
-	struct dummy		*dum;
 
 	hcd = dev_get_drvdata (dev);
-	dum = hcd_to_dummy (hcd);
-
-	hcd->state = USB_STATE_QUIESCING;
-
-	dev_dbg (dev, "roothub graceful disconnect\n");
-	usb_disconnect (&hcd->self.root_hub);
-
-	hcd->driver->stop (hcd);
-	hcd->state = USB_STATE_HALT;
-
-	hcd_buffer_destroy (hcd);
-
-	dev_set_drvdata (dev, NULL);
-	usb_deregister_bus (&hcd->self);
+	usb_remove_hcd (hcd);
+	usb_put_hcd (hcd);
 	the_controller = NULL;
 }
 

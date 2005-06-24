@@ -419,7 +419,9 @@ void get_src_version(const char *modname, char sum[], unsigned sumlen)
 	*end = '\0';
 
 	md4_init(&md);
-	for (fname = strtok(sources, " "); fname; fname = strtok(NULL, " ")) {
+	while ((fname = strsep(&sources, " ")) != NULL) {
+		if (!*fname)
+			continue;
 		if (!parse_source_files(fname, &md))
 			goto release;
 	}

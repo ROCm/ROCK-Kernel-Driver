@@ -77,7 +77,7 @@ static int vendor_command(struct usb_device *dev, unsigned char request,
 			       USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_OTHER,
 			       value, 
 			       index, buf, size,
-			       HZ * USB_CTRL_GET_TIMEOUT);
+			       USB_CTRL_GET_TIMEOUT);
 }
 
 

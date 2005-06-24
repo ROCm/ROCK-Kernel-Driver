@@ -55,8 +55,8 @@ static void drm_sysfs_class_release(struct class *class)
 /* Display the version of drm_core. This doesn't work right in current design */
 static ssize_t version_show(struct class *dev, char *buf)
 {
-	return sprintf(buf, "%s %d.%d.%d %s\n", DRIVER_NAME, DRIVER_MAJOR,
-		       DRIVER_MINOR, DRIVER_PATCHLEVEL, DRIVER_DATE);
+	return sprintf(buf, "%s %d.%d.%d %s\n", CORE_NAME, CORE_MAJOR,
+		       CORE_MINOR, CORE_PATCHLEVEL, CORE_DATE);
 }
 
 static CLASS_ATTR(version, S_IRUGO, version_show, NULL);

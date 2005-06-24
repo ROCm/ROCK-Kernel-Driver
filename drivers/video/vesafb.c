@@ -19,9 +19,6 @@
 #include <linux/fb.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
-#ifdef __i386__
-#include <video/edid.h>
-#endif
 #include <asm/io.h>
 #include <asm/mtrr.h>
 
@@ -175,10 +172,7 @@ static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
     return 0;
 }
 
-#ifndef CONFIG_BOOTSPLASH
-static
-#endif
-struct fb_ops vesafb_ops = {
+static struct fb_ops vesafb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_setcolreg	= vesafb_setcolreg,
 	.fb_pan_display	= vesafb_pan_display,
@@ -188,7 +182,7 @@ struct fb_ops vesafb_ops = {
 	.fb_cursor	= soft_cursor,
 };
 
-int __init vesafb_setup(char *options)
+static int __init vesafb_setup(char *options)
 {
 	char *this_opt;
 	
@@ -263,9 +257,6 @@ static int __init vesafb_probe(struct device *device)
 	 *                 option to simply use size_total as that
 	 *                 wastes plenty of kernel address space. */
 	size_remap  = size_vmode * 2;
-#ifdef CONFIG_BOOTSPLASH
-	size_remap *= 2;	/* some more for the images */
-#endif
 	if (vram_remap)
 		size_remap = vram_remap * 1024 * 1024;
 	if (size_remap < size_vmode)
@@ -440,7 +431,7 @@ static struct platform_device vesafb_device = {
 	.name	= "vesafb",
 };
 
-int __init vesafb_init(void)
+static int __init vesafb_init(void)
 {
 	int ret;
 	char *option = NULL;
@@ -458,13 +449,5 @@ int __init vesafb_init(void)
 	return ret;
 }
 module_init(vesafb_init);
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-basic-offset: 8
- * End:
- */
 
 MODULE_LICENSE("GPL");

@@ -8,7 +8,16 @@
 
 #ifdef __KERNEL__
 
-#define MAX_SIGPENDING	1024
+/*
+ * These values of sa_flags are used only by the kernel as part of the
+ * irq handling routines.
+ *
+ * SA_INTERRUPT is also used by the irq handling routines.
+ * SA_SHIRQ is for shared interrupt support on PCI and EISA.
+ */
+#define SA_PROBE		SA_ONESHOT
+#define SA_SAMPLE_RANDOM	SA_RESTART
+#define SA_SHIRQ		0x04000000
 
 /*
  * Real Time signals may be queued.
@@ -211,14 +220,19 @@ static inline void init_sigpending(struct sigpending *sig)
 	INIT_LIST_HEAD(&sig->list);
 }
 
+/* Test if 'sig' is valid signal. Use this instead of testing _NSIG directly */
+static inline int valid_signal(unsigned long sig)
+{
+	return sig <= _NSIG ? 1 : 0;
+}
+
 extern int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p);
+extern int __group_send_sig_info(int, struct siginfo *, struct task_struct *);
 extern long do_sigpending(void __user *, unsigned long);
 extern int sigprocmask(int, sigset_t *, sigset_t *);
 
-#ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
 struct pt_regs;
 extern int get_signal_to_deliver(siginfo_t *info, struct k_sigaction *return_ka, struct pt_regs *regs, void *cookie);
-#endif
 
 #endif /* __KERNEL__ */
 

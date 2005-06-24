@@ -40,10 +40,12 @@ struct hw_interrupt_type;
 void no_ack_irq(unsigned int irq);
 void no_end_irq(unsigned int irq);
 
-extern int txn_alloc_irq(void);
+extern int txn_alloc_irq(unsigned int nbits);
 extern int txn_claim_irq(int);
-extern unsigned int txn_alloc_data(int, unsigned int);
-extern unsigned long txn_alloc_addr(int);
+extern unsigned int txn_alloc_data(unsigned int);
+extern unsigned long txn_alloc_addr(unsigned int);
+
+extern int cpu_claim_irq(unsigned int irq, struct hw_interrupt_type *, void *);
 
 extern int cpu_claim_irq(unsigned int irq, struct hw_interrupt_type *, void *);
 

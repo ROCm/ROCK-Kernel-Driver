@@ -42,6 +42,7 @@
 #include <net/tcp.h>
 #include <net/sock.h>
 #include <net/ip_fib.h>
+#include <net/ip_mp_alg.h>
 
 #include "fib_lookup.h"
 
@@ -649,6 +650,9 @@ fib_create_info(const struct rtmsg *r, struct kern_rta *rta,
 #else
 	const int nhs = 1;
 #endif
+#ifdef CONFIG_IP_ROUTE_MULTIPATH_CACHED
+	u32 mp_alg = IP_MP_ALG_NONE;
+#endif
 
 	/* Fast check to catch the most weird cases */
 	if (fib_props[r->rtm_type].scope > r->rtm_scope)
@@ -658,6 +662,15 @@ fib_create_info(const struct rtmsg *r, struct kern_rta *rta,
 	if (rta->rta_mp) {
 		nhs = fib_count_nexthops(rta->rta_mp);
 		if (nhs == 0)
+			goto err_inval;
+	}
+#endif
+#ifdef CONFIG_IP_ROUTE_MULTIPATH_CACHED
+	if (rta->rta_mp_alg) {
+		mp_alg = *rta->rta_mp_alg;
+
+		if (mp_alg < IP_MP_ALG_NONE ||
+		    mp_alg > IP_MP_ALG_MAX)
 			goto err_inval;
 	}
 #endif
@@ -752,6 +765,10 @@ fib_create_info(const struct rtmsg *r, struct kern_rta *rta,
 #endif
 	}
 
+#ifdef CONFIG_IP_ROUTE_MULTIPATH_CACHED
+	fi->fib_mp_alg = mp_alg;
+#endif
+
 	if (fib_props[r->rtm_type].error) {
 		if (rta->rta_gw || rta->rta_oif || rta->rta_mp)
 			goto err_inval;
@@ -831,7 +848,8 @@ failure:
 }
 
 int fib_semantic_match(struct list_head *head, const struct flowi *flp,
-		       struct fib_result *res, int prefixlen)
+		       struct fib_result *res, __u32 zone, __u32 mask, 
+			int prefixlen)
 {
 	struct fib_alias *fa;
 	int nh_sel = 0;
@@ -895,6 +913,11 @@ out_fill_res:
 	res->type = fa->fa_type;
 	res->scope = fa->fa_scope;
 	res->fi = fa->fa_info;
+#ifdef CONFIG_IP_ROUTE_MULTIPATH_CACHED
+	res->netmask = mask;
+	res->network = zone &
+		(0xFFFFFFFF >> (32 - prefixlen));
+#endif
 	atomic_inc(&res->fi->fib_clntref);
 	return 0;
 }

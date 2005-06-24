@@ -19,9 +19,9 @@ struct inet_peer
 {
 	struct inet_peer	*avl_left, *avl_right;
 	struct inet_peer	*unused_next, **unused_prevp;
-	atomic_t		refcnt;
 	unsigned long		dtime;		/* the time of last use of not
 						 * referenced entries */
+	atomic_t		refcnt;
 	__u32			v4daddr;	/* peer's address */
 	__u16			avl_height;
 	__u16			ip_id_count;	/* IP ID for the next packet */
@@ -35,7 +35,6 @@ void			inet_initpeers(void) __init;
 struct inet_peer	*inet_getpeer(__u32 daddr, int create);
 
 extern spinlock_t inet_peer_unused_lock;
-extern struct inet_peer *inet_peer_unused_head;
 extern struct inet_peer **inet_peer_unused_tailp;
 /* can be called from BH context or outside */
 static inline void	inet_putpeer(struct inet_peer *p)

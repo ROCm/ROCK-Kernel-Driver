@@ -651,7 +651,7 @@ int mthca_QUERY_FW(struct mthca_dev *dev, u8 *status)
 	mthca_dbg(dev, "FW version %012llx, max commands %d\n",
 		  (unsigned long long) dev->fw_ver, dev->cmd.max_cmds);
 
-	if (dev->hca_type == ARBEL_NATIVE) {
+	if (mthca_is_memfree(dev)) {
 		MTHCA_GET(dev->fw.arbel.fw_pages,       outbox, QUERY_FW_SIZE_OFFSET);
 		MTHCA_GET(dev->fw.arbel.clr_int_base,   outbox, QUERY_FW_CLR_INT_BASE_OFFSET);
 		MTHCA_GET(dev->fw.arbel.eq_arm_base,    outbox, QUERY_FW_EQ_ARM_BASE_OFFSET);
@@ -984,11 +984,11 @@ int mthca_QUERY_DEV_LIM(struct mthca_dev *dev,
 
 	mthca_dbg(dev, "Flags: %08x\n", dev_lim->flags);
 
-	if (dev->hca_type == ARBEL_NATIVE) {
+	if (mthca_is_memfree(dev)) {
 		MTHCA_GET(field, outbox, QUERY_DEV_LIM_RSZ_SRQ_OFFSET);
 		dev_lim->hca.arbel.resize_srq = field & 1;
-		MTHCA_GET(size, outbox, QUERY_DEV_LIM_MTT_ENTRY_SZ_OFFSET);
-		dev_lim->mtt_seg_sz = size;
+		MTHCA_GET(field, outbox, QUERY_DEV_LIM_MAX_SG_RQ_OFFSET);
+		dev_lim->max_sg = min_t(int, field, dev_lim->max_sg);
 		MTHCA_GET(size, outbox, QUERY_DEV_LIM_MPT_ENTRY_SZ_OFFSET);
 		dev_lim->mpt_entry_sz = size;
 		MTHCA_GET(field, outbox, QUERY_DEV_LIM_PBL_SZ_OFFSET);
@@ -1016,7 +1016,6 @@ int mthca_QUERY_DEV_LIM(struct mthca_dev *dev,
 	} else {
 		MTHCA_GET(field, outbox, QUERY_DEV_LIM_MAX_AV_OFFSET);
 		dev_lim->hca.tavor.max_avs = 1 << (field & 0x3f);
-		dev_lim->mtt_seg_sz   = MTHCA_MTT_SEG_SIZE;
 		dev_lim->mpt_entry_sz = MTHCA_MPT_ENTRY_SIZE;
 	}
 
@@ -1149,7 +1148,7 @@ int mthca_INIT_HCA(struct mthca_dev *dev,
 	/* TPT attributes */
 
 	MTHCA_PUT(inbox, param->mpt_base,   INIT_HCA_MPT_BASE_OFFSET);
-	if (dev->hca_type != ARBEL_NATIVE)
+	if (!mthca_is_memfree(dev))
 		MTHCA_PUT(inbox, param->mtt_seg_sz, INIT_HCA_MTT_SEG_SZ_OFFSET);
 	MTHCA_PUT(inbox, param->log_mpt_sz, INIT_HCA_LOG_MPT_SZ_OFFSET);
 	MTHCA_PUT(inbox, param->mtt_base,   INIT_HCA_MTT_BASE_OFFSET);
@@ -1162,7 +1161,7 @@ int mthca_INIT_HCA(struct mthca_dev *dev,
 
 	MTHCA_PUT(inbox, param->uar_scratch_base, INIT_HCA_UAR_SCATCH_BASE_OFFSET);
 
-	if (dev->hca_type == ARBEL_NATIVE) {
+	if (mthca_is_memfree(dev)) {
 		MTHCA_PUT(inbox, param->log_uarc_sz, INIT_HCA_UARC_SZ_OFFSET);
 		MTHCA_PUT(inbox, param->log_uar_sz,  INIT_HCA_LOG_UAR_SZ_OFFSET);
 		MTHCA_PUT(inbox, param->uarc_base,   INIT_HCA_UAR_CTX_BASE_OFFSET);
@@ -1290,21 +1289,24 @@ int mthca_MAP_ICM_page(struct mthca_dev *dev, u64 dma_addr, u64 virt, u8 *status
 		return -ENOMEM;
 
 	inbox[0] = cpu_to_be64(virt);
-	inbox[1] = cpu_to_be64(dma_addr | (PAGE_SHIFT - 12));
+	inbox[1] = cpu_to_be64(dma_addr);
 
 	err = mthca_cmd(dev, indma, 1, 0, CMD_MAP_ICM, CMD_TIME_CLASS_B, status);
 
 	pci_free_consistent(dev->pdev, 16, inbox, indma);
 
 	if (!err)
-		mthca_dbg(dev, "Mapped page at %llx for ICM.\n",
-			  (unsigned long long) virt);
+		mthca_dbg(dev, "Mapped page at %llx to %llx for ICM.\n",
+			  (unsigned long long) dma_addr, (unsigned long long) virt);
 
 	return err;
 }
 
 int mthca_UNMAP_ICM(struct mthca_dev *dev, u64 virt, u32 page_count, u8 *status)
 {
+	mthca_dbg(dev, "Unmapping %d pages at %llx from ICM.\n",
+		  page_count, (unsigned long long) virt);
+
 	return mthca_cmd(dev, virt, page_count, 0, CMD_UNMAP_ICM, CMD_TIME_CLASS_B, status);
 }
 
@@ -1399,6 +1401,11 @@ int mthca_WRITE_MTT(struct mthca_dev *dev, u64 *mtt_entry,
 	pci_unmap_single(dev->pdev, indma,
 			 (num_mtt + 2) * 8, PCI_DMA_TODEVICE);
 	return err;
+}
+
+int mthca_SYNC_TPT(struct mthca_dev *dev, u8 *status)
+{
+	return mthca_cmd(dev, 0, 0, 0, CMD_SYNC_TPT, CMD_TIME_CLASS_B, status);
 }
 
 int mthca_MAP_EQ(struct mthca_dev *dev, u64 event_mask, int unmap,
@@ -1538,10 +1545,10 @@ int mthca_MODIFY_QP(struct mthca_dev *dev, int trans, u32 num,
 		if (0) {
 			int i;
 			mthca_dbg(dev, "Dumping QP context:\n");
-			printk(" %08x\n", be32_to_cpup(qp_context));
+			printk("  opt param mask: %08x\n", be32_to_cpup(qp_context));
 			for (i = 0; i < 0x100 / 4; ++i) {
 				if (i % 8 == 0)
-					printk("[%02x] ", i * 4);
+					printk("  [%02x] ", i * 4);
 				printk(" %08x", be32_to_cpu(((u32 *) qp_context)[i + 2]));
 				if ((i + 1) % 8 == 0)
 					printk("\n");

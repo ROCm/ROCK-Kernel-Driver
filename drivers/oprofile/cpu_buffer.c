@@ -32,7 +32,7 @@ struct oprofile_cpu_buffer cpu_buffer[NR_CPUS] __cacheline_aligned;
 static void wq_sync_buffer(void *);
 
 #define DEFAULT_TIMER_EXPIRE (HZ / 10)
-int work_enabled;
+static int work_enabled;
 
 void free_cpu_buffers(void)
 {

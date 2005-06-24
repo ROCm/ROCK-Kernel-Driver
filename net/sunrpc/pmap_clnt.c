@@ -3,9 +3,6 @@
  *
  * Portmapper client.
  *
- * FIXME: In a secure environment, we may want to use an authentication
- * flavor other than AUTH_NULL.
- *
  * Copyright (C) 1996, Olaf Kirch <okir@monad.swb.de>
  */
 
@@ -212,7 +209,7 @@ pmap_create(char *hostname, struct sockaddr_in *srvaddr, int proto)
 	/* printk("pmap: create clnt\n"); */
 	clnt = rpc_create_client(xprt, hostname,
 				&pmap_program, RPC_PMAP_VERSION,
-				RPC_AUTH_NULL);
+				RPC_AUTH_UNIX);
 	if (IS_ERR(clnt)) {
 		xprt_destroy(xprt);
 	} else {

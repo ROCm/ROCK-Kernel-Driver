@@ -226,7 +226,7 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, struct iovec *iv,
 {
 	struct tun_pi pi = { 0, __constant_htons(ETH_P_IP) };
 	struct sk_buff *skb;
-	size_t len = count;
+	size_t len = count, align = 0;
 
 	if (!(tun->flags & TUN_NO_PI)) {
 		if ((len -= sizeof(pi)) > count)
@@ -235,13 +235,17 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, struct iovec *iv,
 		if(memcpy_fromiovec((void *)&pi, iv, sizeof(pi)))
 			return -EFAULT;
 	}
+
+	if ((tun->flags & TUN_TYPE_MASK) == TUN_TAP_DEV)
+		align = NET_IP_ALIGN;
  
-	if (!(skb = alloc_skb(len + 2, GFP_KERNEL))) {
+	if (!(skb = alloc_skb(len + align, GFP_KERNEL))) {
 		tun->stats.rx_dropped++;
 		return -ENOMEM;
 	}
 
-	skb_reserve(skb, 2);
+	if (align)
+		skb_reserve(skb, align);
 	if (memcpy_fromiovec(skb_put(skb, len), iv, len))
 		return -EFAULT;
 
@@ -843,7 +847,7 @@ static struct ethtool_ops tun_ethtool_ops = {
 	.set_rx_csum	= tun_set_rx_csum
 };
 
-int __init tun_init(void)
+static int __init tun_init(void)
 {
 	int ret = 0;
 
@@ -856,7 +860,7 @@ int __init tun_init(void)
 	return ret;
 }
 
-void tun_cleanup(void)
+static void tun_cleanup(void)
 {
 	struct tun_struct *tun, *nxt;
 

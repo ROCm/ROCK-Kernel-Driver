@@ -77,8 +77,8 @@ struct lcd_block {
 struct pdc_chassis_lcd_info_ret_block {
 	unsigned long model:16;		/* DISPLAY_MODEL_XXXX */
 	unsigned long lcd_width:16;	/* width of the LCD in chars (DISPLAY_MODEL_LCD only) */
-	char *lcd_cmd_reg_addr;		/* ptr to LCD cmd-register & data ptr for LED */
-	char *lcd_data_reg_addr;	/* ptr to LCD data-register (LCD only) */
+	unsigned long lcd_cmd_reg_addr;	/* ptr to LCD cmd-register & data ptr for LED */
+	unsigned long lcd_data_reg_addr; /* ptr to LCD data-register (LCD only) */
 	unsigned int min_cmd_delay;	/* delay in uS after cmd-write (LCD only) */
 	unsigned char reset_cmd1;	/* command #1 for writing LCD string (LCD only) */
 	unsigned char reset_cmd2;	/* command #2 for writing LCD string (LCD only) */
@@ -102,8 +102,8 @@ lcd_info __attribute__((aligned(8))) =
 {
 	.model =		DISPLAY_MODEL_LCD,
 	.lcd_width =		16,
-	.lcd_cmd_reg_addr =	(char *) KITTYHAWK_LCD_CMD,
-	.lcd_data_reg_addr =	(char *) KITTYHAWK_LCD_DATA,
+	.lcd_cmd_reg_addr =	KITTYHAWK_LCD_CMD,
+	.lcd_data_reg_addr =	KITTYHAWK_LCD_DATA,
 	.min_cmd_delay =	40,
 	.reset_cmd1 =		0x80,
 	.reset_cmd2 =		0xc0,
@@ -540,20 +540,20 @@ static int led_halt(struct notifier_block *nb, unsigned long event, void *buf)
    ** 
  */
 
-int __init register_led_driver(int model, char *cmd_reg, char *data_reg)
+int __init register_led_driver(int model, unsigned long cmd_reg, unsigned long data_reg)
 {
 	static int initialized;
 	
 	if (initialized || !data_reg)
-	    return 1;
+		return 1;
 	
 	lcd_info.model = model;		/* store the values */
-	LCD_CMD_REG = (cmd_reg == LED_CMD_REG_NONE) ? NULL : cmd_reg;
+	LCD_CMD_REG = (cmd_reg == LED_CMD_REG_NONE) ? 0 : cmd_reg;
 
 	switch (lcd_info.model) {
 	case DISPLAY_MODEL_LCD:
 		LCD_DATA_REG = data_reg;
-		printk(KERN_INFO "LCD display at %p,%p registered\n", 
+		printk(KERN_INFO "LCD display at %lx,%lx registered\n", 
 			LCD_CMD_REG , LCD_DATA_REG);
 		led_func_ptr = led_LCD_driver;
 		lcd_print( lcd_text_default );
@@ -563,14 +563,14 @@ int __init register_led_driver(int model, char *cmd_reg, char *data_reg)
 	case DISPLAY_MODEL_LASI:
 		LED_DATA_REG = data_reg;
 		led_func_ptr = led_LASI_driver;
-		printk(KERN_INFO "LED display at %p registered\n", LED_DATA_REG);
+		printk(KERN_INFO "LED display at %lx registered\n", LED_DATA_REG);
 		led_type = LED_NOLCD;
 		break;
 
 	case DISPLAY_MODEL_OLD_ASP:
 		LED_DATA_REG = data_reg;
 		led_func_ptr = led_ASP_driver;
-		printk(KERN_INFO "LED (ASP-style) display at %p registered\n", 
+		printk(KERN_INFO "LED (ASP-style) display at %lx registered\n", 
 		    LED_DATA_REG);
 		led_type = LED_NOLCD;
 		break;
@@ -695,7 +695,8 @@ int __init led_init(void)
 	lcd_info.model = DISPLAY_MODEL_NONE;
 	chassis_info.actcnt = chassis_info.maxcnt = 0;
 
-	if ((ret = pdc_chassis_info(&chassis_info, &lcd_info, sizeof(lcd_info))) == PDC_OK) {
+	ret = pdc_chassis_info(&chassis_info, &lcd_info, sizeof(lcd_info));
+	if (ret == PDC_OK) {
 		DPRINTK((KERN_INFO "%s: chassis info: model=%d (%s), "
 			 "lcd_width=%d, cmd_delay=%u,\n"
 			 "%s: sizecnt=%d, actcnt=%ld, maxcnt=%ld\n",

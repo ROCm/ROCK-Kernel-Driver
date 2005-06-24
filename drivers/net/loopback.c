@@ -7,7 +7,7 @@
  *
  * Version:	@(#)loopback.c	1.0.4b	08/16/93
  *
- * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
+ * Authors:	Ross Biro
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *		Donald Becker, <becker@scyld.com>
  *
@@ -184,7 +184,7 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 	return stats;
 }
 
-u32 loopback_get_link(struct net_device *dev)
+static u32 loopback_get_link(struct net_device *dev)
 {
 	return 1;
 }

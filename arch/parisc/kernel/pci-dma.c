@@ -32,18 +32,6 @@
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
 
-#ifdef DEBUG_PCI
-#undef ASSERT
-#define ASSERT(expr) \
-	if(!(expr)) { \
-		printk("\n%s:%d: Assertion " #expr " failed!\n", \
-				__FILE__, __LINE__); \
-		panic(#expr); \
-	}
-#else
-#define ASSERT(expr)
-#endif
-
 
 static struct proc_dir_entry * proc_gsc_root = NULL;
 static int pcxl_proc_info(char *buffer, char **start, off_t offset, int length);
@@ -180,7 +168,7 @@ static inline void unmap_uncached_pte(pmd_t * pmd, unsigned long vaddr,
 		end = PMD_SIZE;
 	do {
 		pte_t page = *pte;
-		pte_clear(pte);
+		pte_clear(&init_mm, vaddr, pte);
 		purge_tlb_start();
 		pdtlb_kernel(orig_vaddr);
 		purge_tlb_end();
@@ -259,10 +247,6 @@ pcxl_alloc_range(size_t size)
 	u_long mask, flags;
 	unsigned int pages_needed = size >> PAGE_SHIFT;
 
-	ASSERT(pages_needed);
-	ASSERT((pages_needed * PAGE_SIZE) < DMA_CHUNK_SIZE);
-	ASSERT(pages_needed < (BITS_PER_LONG - PAGE_SHIFT));
-
 	mask = (u_long) -1L;
  	mask >>= BITS_PER_LONG - pages_needed;
 
@@ -306,7 +290,7 @@ resource_found:
 
 #define PCXL_FREE_MAPPINGS(idx, m, size) \
 		u##size *res_ptr = (u##size *)&(pcxl_res_map[(idx) + (((size >> 3) - 1) & (~((size >> 3) - 1)))]); \
-		ASSERT((*res_ptr & m) == m); \
+		/* BUG_ON((*res_ptr & m) != m); */ \
 		*res_ptr &= ~m;
 
 /*
@@ -318,10 +302,6 @@ pcxl_free_range(unsigned long vaddr, size_t size)
 	u_long mask, flags;
 	unsigned int res_idx = (vaddr - pcxl_dma_start) >> (PAGE_SHIFT + 3);
 	unsigned int pages_mapped = size >> PAGE_SHIFT;
-
-	ASSERT(pages_mapped);
-	ASSERT((pages_mapped * PAGE_SIZE) < DMA_CHUNK_SIZE);
-	ASSERT(pages_mapped < (BITS_PER_LONG - PAGE_SHIFT));
 
 	mask = (u_long) -1L;
  	mask >>= BITS_PER_LONG - pages_mapped;

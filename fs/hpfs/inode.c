@@ -141,7 +141,7 @@ void hpfs_read_inode(struct inode *i)
 	brelse(bh);
 }
 
-void hpfs_write_inode_ea(struct inode *i, struct fnode *fnode)
+static void hpfs_write_inode_ea(struct inode *i, struct fnode *fnode)
 {
 	struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
 	/*if (fnode->acl_size_l || fnode->acl_size_s) {

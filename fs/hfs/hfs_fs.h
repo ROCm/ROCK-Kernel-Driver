@@ -174,22 +174,12 @@ extern void hfs_cat_build_key(btree_key *, u32, struct qstr *);
 extern struct file_operations hfs_dir_operations;
 extern struct inode_operations hfs_dir_inode_operations;
 
-extern int hfs_mkdir(struct inode *, struct dentry *, int);
-extern int hfs_unlink(struct inode *, struct dentry *);
-extern int hfs_rmdir(struct inode *, struct dentry *);
-extern int hfs_rename(struct inode *, struct dentry *,
-		      struct inode *, struct dentry *);
-
 /* extent.c */
 extern int hfs_ext_keycmp(const btree_key *, const btree_key *);
 extern int hfs_free_fork(struct super_block *, struct hfs_cat_file *, int);
 extern void hfs_ext_write_extent(struct inode *);
 extern int hfs_extend_file(struct inode *);
 extern void hfs_file_truncate(struct inode *);
-
-/* file.c */
-extern struct inode_operations hfs_file_inode_operations;
-extern struct file_operations hfs_file_operations;
 
 extern int hfs_get_block(struct inode *, sector_t, struct buffer_head *, int);
 

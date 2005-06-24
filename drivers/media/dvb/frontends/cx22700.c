@@ -230,19 +230,9 @@ static int cx22700_get_tps (struct cx22700_state* state, struct dvb_ofdm_paramet
 	return 0;
 }
 
-
-
-
-
-
-
-
-
-
-
 static int cx22700_init (struct dvb_frontend* fe)
 
-{	struct cx22700_state* state = (struct cx22700_state*) fe->demodulator_priv;
+{	struct cx22700_state* state = fe->demodulator_priv;
 	int i;
 
 	dprintk("cx22700_init: init chip\n");
@@ -268,7 +258,7 @@ static int cx22700_init (struct dvb_frontend* fe)
 
 static int cx22700_read_status(struct dvb_frontend* fe, fe_status_t* status)
 {
-	struct cx22700_state* state = (struct cx22700_state*) fe->demodulator_priv;
+	struct cx22700_state* state = fe->demodulator_priv;
 
 	u16 rs_ber = (cx22700_readreg (state, 0x0d) << 9)
 		   | (cx22700_readreg (state, 0x0e) << 1);
@@ -296,7 +286,7 @@ static int cx22700_read_status(struct dvb_frontend* fe, fe_status_t* status)
 
 static int cx22700_read_ber(struct dvb_frontend* fe, u32* ber)
 {
-	struct cx22700_state* state = (struct cx22700_state*) fe->demodulator_priv;
+	struct cx22700_state* state = fe->demodulator_priv;
 
 	*ber = cx22700_readreg (state, 0x0c) & 0x7f;
 	cx22700_writereg (state, 0x0c, 0x00);
@@ -306,7 +296,7 @@ static int cx22700_read_ber(struct dvb_frontend* fe, u32* ber)
 
 static int cx22700_read_signal_strength(struct dvb_frontend* fe, u16* signal_strength)
 {
-	struct cx22700_state* state = (struct cx22700_state*) fe->demodulator_priv;
+	struct cx22700_state* state = fe->demodulator_priv;
 
 	u16 rs_ber = (cx22700_readreg (state, 0x0d) << 9)
 		   | (cx22700_readreg (state, 0x0e) << 1);
@@ -317,7 +307,7 @@ static int cx22700_read_signal_strength(struct dvb_frontend* fe, u16* signal_str
 
 static int cx22700_read_snr(struct dvb_frontend* fe, u16* snr)
 {
-	struct cx22700_state* state = (struct cx22700_state*) fe->demodulator_priv;
+	struct cx22700_state* state = fe->demodulator_priv;
 
 	u16 rs_ber = (cx22700_readreg (state, 0x0d) << 9)
 		   | (cx22700_readreg (state, 0x0e) << 1);
@@ -328,7 +318,7 @@ static int cx22700_read_snr(struct dvb_frontend* fe, u16* snr)
 
 static int cx22700_read_ucblocks(struct dvb_frontend* fe, u32* ucblocks)
 {
-	struct cx22700_state* state = (struct cx22700_state*) fe->demodulator_priv;
+	struct cx22700_state* state = fe->demodulator_priv;
 
 	*ucblocks = cx22700_readreg (state, 0x0f);
 	cx22700_writereg (state, 0x0f, 0x00);
@@ -338,7 +328,7 @@ static int cx22700_read_ucblocks(struct dvb_frontend* fe, u32* ucblocks)
 
 static int cx22700_set_frontend(struct dvb_frontend* fe, struct dvb_frontend_parameters *p)
 {
-	struct cx22700_state* state = (struct cx22700_state*) fe->demodulator_priv;
+	struct cx22700_state* state = fe->demodulator_priv;
 
 	cx22700_writereg (state, 0x00, 0x02); /* XXX CHECKME: soft reset*/
 	cx22700_writereg (state, 0x00, 0x00);
@@ -356,7 +346,7 @@ static int cx22700_set_frontend(struct dvb_frontend* fe, struct dvb_frontend_par
 
 static int cx22700_get_frontend(struct dvb_frontend* fe, struct dvb_frontend_parameters *p)
 {
-	struct cx22700_state* state = (struct cx22700_state*) fe->demodulator_priv;
+	struct cx22700_state* state = fe->demodulator_priv;
 	u8 reg09 = cx22700_readreg (state, 0x09);
 
 	p->inversion = reg09 & 0x1 ? INVERSION_ON : INVERSION_OFF;
@@ -373,7 +363,7 @@ static int cx22700_get_tune_settings(struct dvb_frontend* fe, struct dvb_fronten
 
 static void cx22700_release(struct dvb_frontend* fe)
 {
-	struct cx22700_state* state = (struct cx22700_state*) fe->demodulator_priv;
+	struct cx22700_state* state = fe->demodulator_priv;
 	kfree(state);
 }
 
@@ -385,7 +375,7 @@ struct dvb_frontend* cx22700_attach(const struct cx22700_config* config,
 	struct cx22700_state* state = NULL;
 
 	/* allocate memory for the internal state */
-	state = (struct cx22700_state*) kmalloc(sizeof(struct cx22700_state), GFP_KERNEL);
+	state = kmalloc(sizeof(struct cx22700_state), GFP_KERNEL);
 	if (state == NULL) goto error;
 
 	/* setup the state */
@@ -402,18 +392,18 @@ struct dvb_frontend* cx22700_attach(const struct cx22700_config* config,
 	return &state->frontend;
 
 error:
-	if (state) kfree(state);
+	kfree(state);
 	return NULL;
 }
 
 static struct dvb_frontend_ops cx22700_ops = {
 
 	.info = {
-		.name 			= "Conexant CX22700 DVB-T",
-		.type 			= FE_OFDM,
-		.frequency_min 		= 470000000,
-		.frequency_max 		= 860000000,
-		.frequency_stepsize 	= 166667,
+		.name			= "Conexant CX22700 DVB-T",
+		.type			= FE_OFDM,
+		.frequency_min		= 470000000,
+		.frequency_max		= 860000000,
+		.frequency_stepsize	= 166667,
 		.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 		      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
 		      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 |

@@ -219,7 +219,7 @@ static int pkt_grow_pktlist(struct pktcdvd_device *pd, int nr_packets)
 	return 1;
 }
 
-static void *pkt_rb_alloc(int gfp_mask, void *data)
+static void *pkt_rb_alloc(unsigned int __nocast gfp_mask, void *data)
 {
 	return kmalloc(sizeof(struct pkt_rb_node), gfp_mask);
 }
@@ -375,6 +375,7 @@ static int pkt_generic_packet(struct pktcdvd_device *pd, struct packet_command *
 	rq->ref_count++;
 	rq->flags |= REQ_NOMERGE;
 	rq->waiting = &wait;
+	rq->end_io = blk_end_sync_rq;
 	elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
 	generic_unplug_device(q);
 	wait_for_completion(&wait);
@@ -913,8 +914,10 @@ static int pkt_handle_queue(struct pktcdvd_device *pd)
 		bio = node->bio;
 		zone = ZONE(bio->bi_sector, pd);
 		list_for_each_entry(p, &pd->cdrw.pkt_active_list, list) {
-			if (p->sector == zone)
+			if (p->sector == zone) {
+				bio = NULL;
 				goto try_next_bio;
+			}
 		}
 		break;
 try_next_bio:
@@ -1420,8 +1423,8 @@ static int pkt_set_write_settings(struct pktcdvd_device *pd)
 	char buffer[128];
 	int ret, size;
 
-	/* doesn't apply to DVD+RW */
-	if (pd->mmc3_profile == 0x1a)
+	/* doesn't apply to DVD+RW or DVD-RAM */
+	if ((pd->mmc3_profile == 0x1a) || (pd->mmc3_profile == 0x12))
 		return 0;
 
 	memset(buffer, 0, sizeof(buffer));
@@ -1535,6 +1538,7 @@ static int pkt_good_disc(struct pktcdvd_device *pd, disc_information *di)
 			break;
 		case 0x1a: /* DVD+RW */
 		case 0x13: /* DVD-RW */
+		case 0x12: /* DVD-RAM */
 			return 0;
 		default:
 			printk("pktcdvd: Wrong disc profile (%x)\n", pd->mmc3_profile);
@@ -1599,6 +1603,9 @@ static int pkt_probe_settings(struct pktcdvd_device *pd)
 			break;
 		case 0x13: /* DVD-RW */
 			printk("pktcdvd: inserted media is DVD-RW\n");
+			break;
+		case 0x12: /* DVD-RAM */
+			printk("pktcdvd: inserted media is DVD-RAM\n");
 			break;
 		default:
 			printk("pktcdvd: inserted media is CD-R%s\n", di.erasable ? "W" : "");
@@ -1892,6 +1899,7 @@ static int pkt_open_write(struct pktcdvd_device *pd)
 	switch (pd->mmc3_profile) {
 		case 0x13: /* DVD-RW */
 		case 0x1a: /* DVD+RW */
+		case 0x12: /* DVD-RAM */
 			DPRINTK("pktcdvd: write speed %ukB/s\n", write_speed);
 			break;
 		default:
@@ -2013,7 +2021,13 @@ static int pkt_open(struct inode *inode, struct file *file)
 	BUG_ON(pd->refcnt < 0);
 
 	pd->refcnt++;
-	if (pd->refcnt == 1) {
+	if (pd->refcnt > 1) {
+		if ((file->f_mode & FMODE_WRITE) &&
+		    !test_bit(PACKET_WRITABLE, &pd->flags)) {
+			ret = -EBUSY;
+			goto out_dec;
+		}
+	} else {
 		if (pkt_open_dev(pd, file->f_mode & FMODE_WRITE)) {
 			ret = -EIO;
 			goto out_dec;
@@ -2053,7 +2067,7 @@ static int pkt_close(struct inode *inode, struct file *file)
 }
 
 
-static void *psd_pool_alloc(int gfp_mask, void *data)
+static void *psd_pool_alloc(unsigned int __nocast gfp_mask, void *data)
 {
 	return kmalloc(sizeof(struct packet_stacked_data), gfp_mask);
 }
@@ -2623,7 +2637,7 @@ static struct miscdevice pkt_misc = {
 	.fops  		= &pkt_ctl_fops
 };
 
-static int pkt_init(void)
+static int __init pkt_init(void)
 {
 	int ret;
 
@@ -2659,7 +2673,7 @@ out2:
 	return ret;
 }
 
-static void pkt_exit(void)
+static void __exit pkt_exit(void)
 {
 	remove_proc_entry("pktcdvd", proc_root_driver);
 	misc_deregister(&pkt_misc);

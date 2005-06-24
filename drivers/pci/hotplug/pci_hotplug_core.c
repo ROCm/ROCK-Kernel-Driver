@@ -567,6 +567,11 @@ int pci_hp_register (struct hotplug_slot *slot)
 		return -ENODEV;
 	if ((slot->info == NULL) || (slot->ops == NULL))
 		return -EINVAL;
+	if (slot->release == NULL) {
+		dbg("Why are you trying to register a hotplug slot"
+		    "without a proper release function?\n");
+		return -EINVAL;
+	}
 
 	kobject_set_name(&slot->kobj, "%s", slot->name);
 	kobj_set_kset_s(slot, pci_hotplug_slots_subsys);

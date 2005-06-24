@@ -55,7 +55,7 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 	if (status == 0) {
 		if (timeout > 0) {
 			init_timer(&timer);
-			timer.expires = jiffies + timeout;
+			timer.expires = jiffies + msecs_to_jiffies(timeout);
 			timer.data = (unsigned long)urb;
 			timer.function = timeout_kill;
 			/* grr.  timeout _should_ include submit delays. */
@@ -90,8 +90,10 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 
 /*-------------------------------------------------------------------*/
 // returns status (negative) or length (positive)
-int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe, 
-			    struct usb_ctrlrequest *cmd,  void *data, int len, int timeout)
+static int usb_internal_control_msg(struct usb_device *usb_dev,
+				    unsigned int pipe, 
+				    struct usb_ctrlrequest *cmd,
+				    void *data, int len, int timeout)
 {
 	struct urb *urb;
 	int retv;
@@ -121,7 +123,7 @@ int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
  *	@index: USB message index value
  *	@data: pointer to the data to send
  *	@size: length in bytes of the data to send
- *	@timeout: time in jiffies to wait for the message to complete before
+ *	@timeout: time in msecs to wait for the message to complete before
  *		timing out (if 0 the wait is forever)
  *	Context: !in_interrupt ()
  *
@@ -169,7 +171,7 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request, __u
  *	@data: pointer to the data to send
  *	@len: length in bytes of the data to send
  *	@actual_length: pointer to a location to put the actual length transferred in bytes
- *	@timeout: time in jiffies to wait for the message to complete before
+ *	@timeout: time in msecs to wait for the message to complete before
  *		timing out (if 0 the wait is forever)
  *	Context: !in_interrupt ()
  *
@@ -202,7 +204,7 @@ int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 	usb_fill_bulk_urb(urb, usb_dev, pipe, data, len,
 			  usb_api_blocking_completion, NULL);
 
-	return usb_start_wait_urb(urb,timeout,actual_length);
+	return usb_start_wait_urb(urb, timeout, actual_length);
 }
 
 /*-------------------------------------------------------------------*/
@@ -429,7 +431,7 @@ nomem:
  * (2) error, where io->status is a negative errno value.  The number
  *     of io->bytes transferred before the error is usually less
  *     than requested, and can be nonzero.
- * (3) cancelation, a type of error with status -ECONNRESET that
+ * (3) cancellation, a type of error with status -ECONNRESET that
  *     is initiated by usb_sg_cancel().
  *
  * When this function returns, all memory allocated through usb_sg_init() or
@@ -585,7 +587,7 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char
 		result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 				USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 				(type << 8) + index, 0, buf, size,
-				HZ * USB_CTRL_GET_TIMEOUT);
+				USB_CTRL_GET_TIMEOUT);
 		if (result == 0 || result == -EPIPE)
 			continue;
 		if (result > 1 && ((u8 *)buf)[1] != type) {
@@ -630,7 +632,7 @@ int usb_get_string(struct usb_device *dev, unsigned short langid,
 		result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 			USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 			(USB_DT_STRING << 8) + index, langid, buf, size,
-			HZ * USB_CTRL_GET_TIMEOUT);
+			USB_CTRL_GET_TIMEOUT);
 		if (!(result == 0 || result == -EPIPE))
 			break;
 	}
@@ -840,7 +842,7 @@ int usb_get_status(struct usb_device *dev, int type, int target, void *data)
 
 	ret = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 		USB_REQ_GET_STATUS, USB_DIR_IN | type, 0, target, status,
-		sizeof(*status), HZ * USB_CTRL_GET_TIMEOUT);
+		sizeof(*status), USB_CTRL_GET_TIMEOUT);
 
 	*(u16 *)data = *status;
 	kfree(status);
@@ -885,7 +887,7 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
 	result = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 		USB_REQ_CLEAR_FEATURE, USB_RECIP_ENDPOINT,
 		USB_ENDPOINT_HALT, endp, NULL, 0,
-		HZ * USB_CTRL_SET_TIMEOUT);
+		USB_CTRL_SET_TIMEOUT);
 
 	/* don't un-halt or force to DATA0 except on success */
 	if (result < 0)
@@ -1041,8 +1043,8 @@ usb_enable_endpoint(struct usb_device *dev, struct usb_host_endpoint *ep)
  *
  * Enables all the endpoints for the interface's current altsetting.
  */
-void usb_enable_interface(struct usb_device *dev,
-		struct usb_interface *intf)
+static void usb_enable_interface(struct usb_device *dev,
+				 struct usb_interface *intf)
 {
 	struct usb_host_interface *alt = intf->cur_altsetting;
 	int i;
@@ -1109,7 +1111,7 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 
 	ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 				   USB_REQ_SET_INTERFACE, USB_RECIP_INTERFACE,
-				   alternate, interface, NULL, 0, HZ * 5);
+				   alternate, interface, NULL, 0, 5000);
 
 	/* 9.4.10 says devices don't need this and are free to STALL the
 	 * request if the interface only has one alternate setting.
@@ -1181,7 +1183,9 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
  *
  * Because this affects multiple interfaces, avoid using this with composite
  * (multi-interface) devices.  Instead, the driver for each interface may
- * use usb_set_interface() on the interfaces it claims.  Resetting the whole
+ * use usb_set_interface() on the interfaces it claims.  Be careful though;
+ * some devices don't support the SET_INTERFACE request, and others won't
+ * reset all the interface state (notably data toggles).  Resetting the whole
  * configuration would affect other drivers' interfaces.
  *
  * The caller must own the device lock.
@@ -1210,7 +1214,7 @@ int usb_reset_configuration(struct usb_device *dev)
 	retval = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			USB_REQ_SET_CONFIGURATION, 0,
 			config->desc.bConfigurationValue, 0,
-			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
+			NULL, 0, USB_CTRL_SET_TIMEOUT);
 	if (retval < 0) {
 		usb_set_device_state(dev, USB_STATE_ADDRESS);
 		return retval;
@@ -1278,7 +1282,7 @@ static void release_interface(struct device *dev)
  * bus rwsem; usb device driver probe() methods cannot use this routine.
  *
  * Returns zero on success, or else the status code returned by the
- * underlying call that failed.  On succesful completion, each interface
+ * underlying call that failed.  On successful completion, each interface
  * in the original device configuration has been destroyed, and each one
  * in the new configuration has been probed by all relevant usb device
  * drivers currently known to the kernel.
@@ -1345,7 +1349,7 @@ free_interfaces:
 
 	if ((ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			USB_REQ_SET_CONFIGURATION, 0, configuration, 0,
-			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT)) < 0)
+			NULL, 0, USB_CTRL_SET_TIMEOUT)) < 0)
 		goto free_interfaces;
 
 	dev->actconfig = cp;

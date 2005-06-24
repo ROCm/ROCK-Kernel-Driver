@@ -60,8 +60,6 @@ volatile struct task_struct *smp_init_current_idle_task;
 
 static volatile int cpu_now_booting = 0;	/* track which CPU is booting */
 
-unsigned long cache_decay_ticks;	/* declared by include/linux/sched.h */
-
 static int parisc_max_cpus = 1;
 
 /* online cpus are ones that we've managed to bring up completely
@@ -583,8 +581,6 @@ void __devinit smp_prepare_boot_cpu(void)
 
 	cpu_set(bootstrap_processor, cpu_online_map);
 	cpu_set(bootstrap_processor, cpu_present_map);
-
-	cache_decay_ticks = HZ/100;	/* FIXME very rough.  */
 }
 
 

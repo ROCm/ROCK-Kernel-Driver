@@ -1,34 +1,34 @@
 /*
  * budget-av.c: driver for the SAA7146 based Budget DVB cards
- *              with analog video in 
+ *              with analog video in
  *
- * Compiled from various sources by Michael Hunold <michael@mihu.de> 
+ * Compiled from various sources by Michael Hunold <michael@mihu.de>
  *
  * CI interface support (c) 2004 Olivier Gournet <ogournet@anevia.com> &
  *                               Andrew de Quincey <adq_dvb@lidskialf.net>
  *
  * Copyright (C) 2002 Ralph Metzler <rjkm@metzlerbros.de>
  *
- * Copyright (C) 1999-2002 Ralph  Metzler 
+ * Copyright (C) 1999-2002 Ralph  Metzler
  *                       & Marcus Metzler for convergence integrated media GmbH
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
- * 
+ *
  *
  * the project's page is at http://www.linuxtv.org/dvb/
  */
@@ -59,23 +59,26 @@ struct budget_av {
 	struct dvb_ca_en50221 ca;
 };
 
-int enable_ci = 0;
-
+/* GPIO CI Connections:
+ * 0 - Vcc/Reset (Reset is controlled by capacitor)
+ * 1 - Attribute Memory
+ * 2 - Card Enable (Active Low)
+ * 3 - Card Detect
+ */
 
 /****************************************************************************
  * INITIALIZATION
  ****************************************************************************/
 
-
-static u8 i2c_readreg (struct i2c_adapter *i2c, u8 id, u8 reg)
+static u8 i2c_readreg(struct i2c_adapter *i2c, u8 id, u8 reg)
 {
-	u8 mm1[] = {0x00};
-	u8 mm2[] = {0x00};
+	u8 mm1[] = { 0x00 };
+	u8 mm2[] = { 0x00 };
 	struct i2c_msg msgs[2];
 
 	msgs[0].flags = 0;
 	msgs[1].flags = I2C_M_RD;
-	msgs[0].addr = msgs[1].addr=id/2;
+	msgs[0].addr = msgs[1].addr = id / 2;
 	mm1[0] = reg;
 	msgs[0].len = 1;
 	msgs[1].len = 1;
@@ -87,31 +90,30 @@ static u8 i2c_readreg (struct i2c_adapter *i2c, u8 id, u8 reg)
 	return mm2[0];
 }
 
-static int i2c_readregs(struct i2c_adapter *i2c, u8 id, u8 reg, u8 *buf, u8 len)
+static int i2c_readregs(struct i2c_adapter *i2c, u8 id, u8 reg, u8 * buf, u8 len)
 {
-        u8 mm1[] = { reg };
-        struct i2c_msg msgs[2] = {
-		{ .addr = id/2, .flags = 0, .buf = mm1, .len = 1 },
-		{ .addr = id/2, .flags = I2C_M_RD, .buf = buf, .len = len }
+	u8 mm1[] = { reg };
+	struct i2c_msg msgs[2] = {
+		{.addr = id / 2,.flags = 0,.buf = mm1,.len = 1},
+		{.addr = id / 2,.flags = I2C_M_RD,.buf = buf,.len = len}
 	};
 
-        if (i2c_transfer(i2c, msgs, 2) != 2)
+	if (i2c_transfer(i2c, msgs, 2) != 2)
 		return -EIO;
 
 	return 0;
 }
 
-
-static int i2c_writereg (struct i2c_adapter *i2c, u8 id, u8 reg, u8 val)
+static int i2c_writereg(struct i2c_adapter *i2c, u8 id, u8 reg, u8 val)
 {
-        u8 msg[2]={ reg, val }; 
-        struct i2c_msg msgs;
+	u8 msg[2] = { reg, val };
+	struct i2c_msg msgs;
 
-        msgs.flags=0;
-        msgs.addr=id/2;
-        msgs.len=2;
-        msgs.buf=msg;
-        return i2c_transfer(i2c, &msgs, 1);
+	msgs.flags = 0;
+	msgs.addr = id / 2;
+	msgs.len = 2;
+	msgs.buf = msg;
+	return i2c_transfer(i2c, &msgs, 1);
 }
 
 static int ciintf_read_attribute_mem(struct dvb_ca_en50221 *ca, int slot, int address)
@@ -123,6 +125,8 @@ static int ciintf_read_attribute_mem(struct dvb_ca_en50221 *ca, int slot, int ad
 		return -EINVAL;
 
 	saa7146_setgpio(budget_av->budget.dev, 1, SAA7146_GPIO_OUTHI);
+	udelay(1);
+
 	result = ttpci_budget_debiread(&budget_av->budget, DEBICICAM, address & 0xfff, 1, 0, 0);
 
 	if (result == -ETIMEDOUT)
@@ -139,6 +143,8 @@ static int ciintf_write_attribute_mem(struct dvb_ca_en50221 *ca, int slot, int a
 		return -EINVAL;
 
 	saa7146_setgpio(budget_av->budget.dev, 1, SAA7146_GPIO_OUTHI);
+	udelay(1);
+
 	result = ttpci_budget_debiwrite(&budget_av->budget, DEBICICAM, address & 0xfff, 1, value, 0, 0);
 
 	if (result == -ETIMEDOUT)
@@ -155,6 +161,8 @@ static int ciintf_read_cam_control(struct dvb_ca_en50221 *ca, int slot, u8 addre
 		return -EINVAL;
 
 	saa7146_setgpio(budget_av->budget.dev, 1, SAA7146_GPIO_OUTLO);
+	udelay(1);
+
 	result = ttpci_budget_debiread(&budget_av->budget, DEBICICAM, address & 3, 1, 0, 0);
 
 	if (result == -ETIMEDOUT)
@@ -171,6 +179,8 @@ static int ciintf_write_cam_control(struct dvb_ca_en50221 *ca, int slot, u8 addr
 		return -EINVAL;
 
 	saa7146_setgpio(budget_av->budget.dev, 1, SAA7146_GPIO_OUTLO);
+	udelay(1);
+
 	result = ttpci_budget_debiwrite(&budget_av->budget, DEBICICAM, address & 3, 1, value, 0, 0);
 
 	if (result == -ETIMEDOUT)
@@ -182,19 +192,35 @@ static int ciintf_slot_reset(struct dvb_ca_en50221 *ca, int slot)
 {
 	struct budget_av *budget_av = (struct budget_av *) ca->data;
 	struct saa7146_dev *saa = budget_av->budget.dev;
+	int timeout = 50; // 5 seconds (4.4.6 Ready)
 
 	if (slot != 0)
 		return -EINVAL;
 
 	dprintk(1, "ciintf_slot_reset\n");
 
-	/* reset the card */
-	saa7146_setgpio(saa, 0, SAA7146_GPIO_OUTHI);
-	msleep(100);
-	saa7146_setgpio(saa, 0, SAA7146_GPIO_OUTLO);
-	msleep(2000);		/* horrendous I know, but its the only way to be absolutely sure without an IRQ line! */
+	saa7146_setgpio(saa, 2, SAA7146_GPIO_OUTHI); /* disable card */
 
-	ttpci_budget_set_video_port(saa, BUDGET_VIDEO_PORTB);
+	saa7146_setgpio(saa, 0, SAA7146_GPIO_OUTHI); /* Vcc off */
+	msleep(2);
+	saa7146_setgpio(saa, 0, SAA7146_GPIO_OUTLO); /* Vcc on */
+	msleep(20); /* 20 ms Vcc settling time */
+
+	saa7146_setgpio(saa, 2, SAA7146_GPIO_OUTLO); /* enable card */
+
+	/* This should have been based on pin 16 READY of the pcmcia port,
+	 * but AFAICS it is not routed to the saa7146 */
+	while (--timeout > 0 && ciintf_read_attribute_mem(ca, slot, 0) != 0x1d)
+		msleep(100);
+
+	if (timeout <= 0)
+	{
+		printk(KERN_ERR "budget-av: cam reset failed (timeout).\n");
+		saa7146_setgpio(saa, 2, SAA7146_GPIO_OUTHI); /* disable card */
+		saa7146_setgpio(saa, 0, SAA7146_GPIO_OUTHI); /* Vcc off */
+		return -ETIMEDOUT;
+	}
+
 	return 0;
 }
 
@@ -231,7 +257,6 @@ static int ciintf_poll_slot_status(struct dvb_ca_en50221 *ca, int slot, int open
 {
 	struct budget_av *budget_av = (struct budget_av *) ca->data;
 	struct saa7146_dev *saa = budget_av->budget.dev;
-	int cam = 0;
 
 	if (slot != 0)
 		return -EINVAL;
@@ -239,15 +264,21 @@ static int ciintf_poll_slot_status(struct dvb_ca_en50221 *ca, int slot, int open
 	if (!budget_av->slot_status) {
 		saa7146_setgpio(saa, 3, SAA7146_GPIO_INPUT);
 		udelay(1);
-		cam = saa7146_read(saa, PSR) & MASK_06;
-		saa7146_setgpio(saa, 3, SAA7146_GPIO_OUTLO);
-
-		if (cam)
+		if (saa7146_read(saa, PSR) & MASK_06)
+		{
+			printk(KERN_INFO "budget-av: cam inserted\n");
 			budget_av->slot_status = 1;
+		}
+		saa7146_setgpio(saa, 3, SAA7146_GPIO_OUTLO);
 	} else if (!open) {
 		saa7146_setgpio(budget_av->budget.dev, 1, SAA7146_GPIO_OUTLO);
 		if (ttpci_budget_debiread(&budget_av->budget, DEBICICAM, 0, 1, 0, 1) == -ETIMEDOUT)
+		{
+			printk(KERN_INFO "budget-av: cam ejected\n");
+			saa7146_setgpio(saa, 2, SAA7146_GPIO_OUTHI); /* disable card */
+			saa7146_setgpio(saa, 0, SAA7146_GPIO_OUTHI); /* Vcc off */
 			budget_av->slot_status = 0;
+		}
 	}
 
 	if (budget_av->slot_status == 1)
@@ -263,16 +294,10 @@ static int ciintf_init(struct budget_av *budget_av)
 
 	memset(&budget_av->ca, 0, sizeof(struct dvb_ca_en50221));
 
-	/* setup GPIOs */
-	saa7146_setgpio(saa, 1, SAA7146_GPIO_OUTHI);
+	saa7146_setgpio(saa, 0, SAA7146_GPIO_OUTLO);
+	saa7146_setgpio(saa, 1, SAA7146_GPIO_OUTLO);
 	saa7146_setgpio(saa, 2, SAA7146_GPIO_OUTLO);
 	saa7146_setgpio(saa, 3, SAA7146_GPIO_OUTLO);
-
-	/* Reset the card */
-	saa7146_setgpio(saa, 0, SAA7146_GPIO_OUTHI);
-	msleep(50);
-	saa7146_setgpio(saa, 0, SAA7146_GPIO_OUTLO);
-	msleep(100);
 
 	/* Enable DEBI pins */
 	saa7146_write(saa, MC1, saa7146_read(saa, MC1) | (0x800 << 16) | 0x800);
@@ -288,13 +313,14 @@ static int ciintf_init(struct budget_av *budget_av)
 	budget_av->ca.slot_ts_enable = ciintf_slot_ts_enable;
 	budget_av->ca.poll_slot_status = ciintf_poll_slot_status;
 	budget_av->ca.data = budget_av;
-	if ((result = dvb_ca_en50221_init(budget_av->budget.dvb_adapter,
+
+	if ((result = dvb_ca_en50221_init(&budget_av->budget.dvb_adapter,
 					  &budget_av->ca, 0, 1)) != 0) {
-		printk("budget_av: CI interface detected, but initialisation failed.\n");
+		printk(KERN_ERR "budget-av: ci initialisation failed.\n");
 		goto error;
 	}
-	// success!
-	printk("ciintf_init: CI interface initialised\n");
+
+	printk(KERN_INFO "budget-av: ci interface initialised.\n");
 	budget_av->budget.ci_present = 1;
 	return 0;
 
@@ -335,49 +361,51 @@ static const u8 saa7113_tab[] = {
 	0x0c, 0x40,
 	0x0d, 0x00,
 	0x0e, 0x01,
-        0x0f, 0x44,
+	0x0f, 0x44,
 
 	0x10, 0x08,
 	0x11, 0x0c,
 	0x12, 0x7b,
 	0x13, 0x00,
-        0x15, 0x00,  0x16, 0x00,  0x17, 0x00,
+	0x15, 0x00, 0x16, 0x00, 0x17, 0x00,
 
-        0x57, 0xff, 
-        0x40, 0x82,  0x58, 0x00,  0x59, 0x54,  0x5a, 0x07,
-        0x5b, 0x83,  0x5e, 0x00,
-        0xff
+	0x57, 0xff,
+	0x40, 0x82, 0x58, 0x00, 0x59, 0x54, 0x5a, 0x07,
+	0x5b, 0x83, 0x5e, 0x00,
+	0xff
 };
 
-
-static int saa7113_init (struct budget_av *budget_av)
+static int saa7113_init(struct budget_av *budget_av)
 {
 	struct budget *budget = &budget_av->budget;
+	struct saa7146_dev *saa = budget->dev;
 	const u8 *data = saa7113_tab;
 
-        if (i2c_writereg (&budget->i2c_adap, 0x4a, 0x01, 0x08) != 1) {
-                dprintk(1, "saa7113 not found on KNC card\n");
-                return -ENODEV;
-        }
+	saa7146_setgpio(saa, 0, SAA7146_GPIO_OUTHI);
+	msleep(200);
 
-        dprintk(1, "saa7113 detected and initializing\n");
+	if (i2c_writereg(&budget->i2c_adap, 0x4a, 0x01, 0x08) != 1) {
+		dprintk(1, "saa7113 not found on KNC card\n");
+		return -ENODEV;
+	}
+
+	dprintk(1, "saa7113 detected and initializing\n");
 
 	while (*data != 0xff) {
-                i2c_writereg(&budget->i2c_adap, 0x4a, *data, *(data+1));
-                data += 2;
-        }
+		i2c_writereg(&budget->i2c_adap, 0x4a, *data, *(data + 1));
+		data += 2;
+	}
 
 	dprintk(1, "saa7113  status=%02x\n", i2c_readreg(&budget->i2c_adap, 0x4a, 0x1f));
 
 	return 0;
 }
 
-
-static int saa7113_setinput (struct budget_av *budget_av, int input)
+static int saa7113_setinput(struct budget_av *budget_av, int input)
 {
 	struct budget *budget = &budget_av->budget;
 
-	if ( 1 != budget_av->has_saa7113 )
+	if (1 != budget_av->has_saa7113)
 		return -ENODEV;
 
 	if (input == 1) {
@@ -662,7 +690,7 @@ static int philips_tu1216_request_firmware(struct dvb_frontend *fe,
 	return request_firmware(fw, name, &budget->dev->pci->dev);
 }
 
-struct tda1004x_config philips_tu1216_config = {
+static struct tda1004x_config philips_tu1216_config = {
 
 	.demod_address = 0x8,
 	.invert = 1,
@@ -690,75 +718,90 @@ static u8 read_pwm(struct budget_av *budget_av)
 	return pwm;
 }
 
+#define SUBID_DVBS_KNC1		0x0010
+#define SUBID_DVBS_KNC1_PLUS	0x0011
+#define SUBID_DVBS_TYPHOON	0x4f56
+#define SUBID_DVBS_CINERGY1200	0x1154
+
+#define SUBID_DVBC_KNC1		0x0020
+#define SUBID_DVBC_KNC1_PLUS	0x0021
+#define SUBID_DVBC_CINERGY1200	0x1156
+
+#define SUBID_DVBT_KNC1_PLUS	0x0031
+#define SUBID_DVBT_KNC1		0x0030
+#define SUBID_DVBT_CINERGY1200	0x1157
 
 static void frontend_init(struct budget_av *budget_av)
 {
-	switch (budget_av->budget.dev->pci->subsystem_device) {
-	case 0x4f56:		// Typhoon/KNC1 DVB-S budget (stv0299/Philips SU1278(tsa5059))
-		budget_av->budget.dvb_frontend =
-			stv0299_attach(&typhoon_config, &budget_av->budget.i2c_adap);
-		if (budget_av->budget.dvb_frontend != NULL) {
+	struct saa7146_dev * saa = budget_av->budget.dev;
+	struct dvb_frontend * fe = NULL;
+
+	switch (saa->pci->subsystem_device) {
+		case SUBID_DVBS_KNC1_PLUS:
+		case SUBID_DVBC_KNC1_PLUS:
+		case SUBID_DVBT_KNC1_PLUS:
+			// Enable / PowerON Frontend
+			saa7146_setgpio(saa, 3, SAA7146_GPIO_OUTHI);
 			break;
-		}
+	}
+
+	switch (saa->pci->subsystem_device) {
+
+	case SUBID_DVBS_KNC1:
+	case SUBID_DVBS_KNC1_PLUS:
+	case SUBID_DVBS_TYPHOON:
+		fe = stv0299_attach(&typhoon_config,
+				    &budget_av->budget.i2c_adap);
 		break;
 
-	case 0x0020:		// KNC1 DVB-C budget (tda10021/Philips CU1216(tua6034))
-		budget_av->budget.dvb_frontend =
-			tda10021_attach(&philips_cu1216_config,
-					&budget_av->budget.i2c_adap, read_pwm(budget_av));
-		if (budget_av->budget.dvb_frontend != NULL) {
-			break;
-		}
+	case SUBID_DVBS_CINERGY1200:
+		fe = stv0299_attach(&cinergy_1200s_config,
+				    &budget_av->budget.i2c_adap);
 		break;
 
-	case 0x0030:		// KNC1 DVB-T budget (tda10046/Philips TU1216(tda6651tt))
-		budget_av->budget.dvb_frontend =
-			tda10046_attach(&philips_tu1216_config, &budget_av->budget.i2c_adap);
-		if (budget_av->budget.dvb_frontend != NULL) {
-			break;
-		}
+	case SUBID_DVBC_KNC1:
+	case SUBID_DVBC_KNC1_PLUS:
+		fe = tda10021_attach(&philips_cu1216_config,
+				     &budget_av->budget.i2c_adap,
+				     read_pwm(budget_av));
 		break;
 
-	case 0x1154:		// TerraTec Cinergy 1200 DVB-S (stv0299/Philips SU1278(tsa5059))
-		budget_av->budget.dvb_frontend =
-			stv0299_attach(&cinergy_1200s_config, &budget_av->budget.i2c_adap);
-		if (budget_av->budget.dvb_frontend != NULL) {
-			break;
-		}
+	case SUBID_DVBT_KNC1:
+	case SUBID_DVBT_KNC1_PLUS:
+		fe = tda10046_attach(&philips_tu1216_config,
+				     &budget_av->budget.i2c_adap);
 		break;
 
-	case 0x1156:		// Terratec Cinergy 1200 DVB-C (tda10021/Philips CU1216(tua6034))
-		budget_av->budget.dvb_frontend =
-			tda10021_attach(&philips_cu1216_config,
-					&budget_av->budget.i2c_adap, read_pwm(budget_av));
-		if (budget_av->budget.dvb_frontend) {
-			break;
-		}
+	case SUBID_DVBC_CINERGY1200:
+		fe = tda10021_attach(&philips_cu1216_config,
+				     &budget_av->budget.i2c_adap,
+				     read_pwm(budget_av));
 		break;
 
-	case 0x1157:		// Terratec Cinergy 1200 DVB-T (tda10046/Philips TU1216(tda6651tt))
-		budget_av->budget.dvb_frontend =
-			tda10046_attach(&philips_tu1216_config, &budget_av->budget.i2c_adap);
-		if (budget_av->budget.dvb_frontend) {
-			break;
-		}
+	case SUBID_DVBT_CINERGY1200:
+		fe = tda10046_attach(&philips_tu1216_config,
+				     &budget_av->budget.i2c_adap);
 		break;
 	}
 
-	if (budget_av->budget.dvb_frontend == NULL) {
-		printk("budget_av: A frontend driver was not found for device %04x/%04x subsystem %04x/%04x\n",
-		       budget_av->budget.dev->pci->vendor,
-		       budget_av->budget.dev->pci->device,
-		       budget_av->budget.dev->pci->subsystem_vendor,
-		       budget_av->budget.dev->pci->subsystem_device);
-	} else {
-		if (dvb_register_frontend
-		    (budget_av->budget.dvb_adapter, budget_av->budget.dvb_frontend)) {
-			printk("budget-av: Frontend registration failed!\n");
-			if (budget_av->budget.dvb_frontend->ops->release)
-				budget_av->budget.dvb_frontend->ops->release(budget_av->budget.dvb_frontend);
-			budget_av->budget.dvb_frontend = NULL;
-		}
+	if (fe == NULL) {
+		printk(KERN_ERR "budget-av: A frontend driver was not found "
+				"for device %04x/%04x subsystem %04x/%04x\n",
+		       saa->pci->vendor,
+		       saa->pci->device,
+		       saa->pci->subsystem_vendor,
+		       saa->pci->subsystem_device);
+		return;
+	}
+
+	budget_av->budget.dvb_frontend = fe;
+
+	if (dvb_register_frontend(&budget_av->budget.dvb_adapter,
+				  budget_av->budget.dvb_frontend)) {
+		printk(KERN_ERR "budget-av: Frontend registration failed!\n");
+		if (budget_av->budget.dvb_frontend->ops->release)
+			budget_av->budget.dvb_frontend->ops->release(budget_av->budget.dvb_frontend);
+		budget_av->budget.dvb_frontend = NULL;
 	}
 }
 
@@ -773,19 +816,19 @@ static void budget_av_irq(struct saa7146_dev *dev, u32 * isr)
 		ttpci_budget_irq10_handler(dev, isr);
 }
 
-static int budget_av_detach (struct saa7146_dev *dev)
+static int budget_av_detach(struct saa7146_dev *dev)
 {
-	struct budget_av *budget_av = (struct budget_av*) dev->ext_priv;
+	struct budget_av *budget_av = (struct budget_av *) dev->ext_priv;
 	int err;
 
 	dprintk(2, "dev: %p\n", dev);
 
-	if ( 1 == budget_av->has_saa7113 ) {
-	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTLO);
+	if (1 == budget_av->has_saa7113) {
+		saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTLO);
 
 		msleep(200);
 
-	saa7146_unregister_device (&budget_av->vd, dev);
+		saa7146_unregister_device(&budget_av->vd, dev);
 	}
 
 	if (budget_av->budget.ci_present)
@@ -793,9 +836,9 @@ static int budget_av_detach (struct saa7146_dev *dev)
 
 	if (budget_av->budget.dvb_frontend != NULL)
 		dvb_unregister_frontend(budget_av->budget.dvb_frontend);
-	err = ttpci_budget_deinit (&budget_av->budget);
+	err = ttpci_budget_deinit(&budget_av->budget);
 
-	kfree (budget_av);
+	kfree(budget_av);
 
 	return err;
 }
@@ -815,6 +858,7 @@ static int budget_av_attach(struct saa7146_dev *dev, struct saa7146_pci_extensio
 
 	memset(budget_av, 0, sizeof(struct budget_av));
 
+	budget_av->has_saa7113 = 0;
 	budget_av->budget.ci_present = 0;
 
 	dev->ext_priv = budget_av;
@@ -829,101 +873,91 @@ static int budget_av_attach(struct saa7146_dev *dev, struct saa7146_pci_extensio
 	saa7146_write(dev, DD1_INIT, 0x07000600);
 	saa7146_write(dev, MC2, MASK_09 | MASK_25 | MASK_10 | MASK_26);
 
-	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTHI);
-	msleep(500);
-
-	if ( 0 == saa7113_init(budget_av) ) {
+	if (saa7113_init(budget_av) == 0) {
 		budget_av->has_saa7113 = 1;
 
-	if ( 0 != saa7146_vv_init(dev,&vv_data)) {
-		/* fixme: proper cleanup here */
-		ERR(("cannot init vv subsystem.\n"));
-		return err;
-	}
+		if (0 != saa7146_vv_init(dev, &vv_data)) {
+			/* fixme: proper cleanup here */
+			ERR(("cannot init vv subsystem.\n"));
+			return err;
+		}
 
 		if ((err = saa7146_register_device(&budget_av->vd, dev, "knc1", VFL_TYPE_GRABBER))) {
-		/* fixme: proper cleanup here */
-		ERR(("cannot register capture v4l2 device.\n"));
-		return err;
-	}
+			/* fixme: proper cleanup here */
+			ERR(("cannot register capture v4l2 device.\n"));
+			return err;
+		}
 
-	/* beware: this modifies dev->vv ... */
-	saa7146_set_hps_source_and_sync(dev, SAA7146_HPS_SOURCE_PORT_A,
-					SAA7146_HPS_SYNC_PORT_A);
+		/* beware: this modifies dev->vv ... */
+		saa7146_set_hps_source_and_sync(dev, SAA7146_HPS_SOURCE_PORT_A,
+						SAA7146_HPS_SYNC_PORT_A);
 
-	saa7113_setinput (budget_av, 0);
+		saa7113_setinput(budget_av, 0);
 	} else {
-		budget_av->has_saa7113 = 0;
-
-	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTLO);
+		ciintf_init(budget_av);
 	}
 
 	/* fixme: find some sane values here... */
 	saa7146_write(dev, PCI_BT_V1, 0x1c00101f);
 
-	mac = budget_av->budget.dvb_adapter->proposed_mac;
+	mac = budget_av->budget.dvb_adapter.proposed_mac;
 	if (i2c_readregs(&budget_av->budget.i2c_adap, 0xa0, 0x30, mac, 6)) {
-		printk("KNC1-%d: Could not read MAC from KNC1 card\n",
-				budget_av->budget.dvb_adapter->num);
+		printk(KERN_ERR "KNC1-%d: Could not read MAC from KNC1 card\n",
+		       budget_av->budget.dvb_adapter.num);
 		memset(mac, 0, 6);
 	} else {
-		printk("KNC1-%d: MAC addr = %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
-				budget_av->budget.dvb_adapter->num,
-				mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-}
+		printk(KERN_INFO "KNC1-%d: MAC addr = %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
+		       budget_av->budget.dvb_adapter.num,
+		       mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+	}
 
-	budget_av->budget.dvb_adapter->priv = budget_av;
+	budget_av->budget.dvb_adapter.priv = budget_av;
 	frontend_init(budget_av);
-
-	if (enable_ci)
-		ciintf_init(budget_av);
 
 	return 0;
 }
 
 #define KNC1_INPUTS 2
 static struct v4l2_input knc1_inputs[KNC1_INPUTS] = {
-	{ 0,	"Composite", V4L2_INPUT_TYPE_TUNER,  1, 0, V4L2_STD_PAL_BG|V4L2_STD_NTSC_M, 0 }, 
-	{ 1,	"S-Video",   V4L2_INPUT_TYPE_CAMERA, 2, 0, V4L2_STD_PAL_BG|V4L2_STD_NTSC_M, 0 },
+	{0, "Composite", V4L2_INPUT_TYPE_TUNER, 1, 0, V4L2_STD_PAL_BG | V4L2_STD_NTSC_M, 0},
+	{1, "S-Video", V4L2_INPUT_TYPE_CAMERA, 2, 0, V4L2_STD_PAL_BG | V4L2_STD_NTSC_M, 0},
 };
-
 
 static struct saa7146_extension_ioctls ioctls[] = {
-	{ VIDIOC_ENUMINPUT, 	SAA7146_EXCLUSIVE },
-	{ VIDIOC_G_INPUT,	SAA7146_EXCLUSIVE },
-	{ VIDIOC_S_INPUT,	SAA7146_EXCLUSIVE },
-	{ 0,			0 }
+	{VIDIOC_ENUMINPUT, SAA7146_EXCLUSIVE},
+	{VIDIOC_G_INPUT, SAA7146_EXCLUSIVE},
+	{VIDIOC_S_INPUT, SAA7146_EXCLUSIVE},
+	{0, 0}
 };
 
-
-static int av_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg) 
+static int av_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 {
 	struct saa7146_dev *dev = fh->dev;
-	struct budget_av *budget_av = (struct budget_av*) dev->ext_priv;
+	struct budget_av *budget_av = (struct budget_av *) dev->ext_priv;
 
-	switch(cmd) {
+	switch (cmd) {
 	case VIDIOC_ENUMINPUT:{
 		struct v4l2_input *i = arg;
-		
+
 		dprintk(1, "VIDIOC_ENUMINPUT %d.\n", i->index);
-		if( i->index < 0 || i->index >= KNC1_INPUTS) {
+		if (i->index < 0 || i->index >= KNC1_INPUTS) {
 			return -EINVAL;
 		}
 		memcpy(i, &knc1_inputs[i->index], sizeof(struct v4l2_input));
 		return 0;
 	}
 	case VIDIOC_G_INPUT:{
-		int *input = (int *)arg;
+		int *input = (int *) arg;
 
 		*input = budget_av->cur_input;
 
 		dprintk(1, "VIDIOC_G_INPUT %d.\n", *input);
-		return 0;		
-	}	
+		return 0;
+	}
 	case VIDIOC_S_INPUT:{
-		int input = *(int *)arg;
+		int input = *(int *) arg;
 		dprintk(1, "VIDIOC_S_INPUT %d.\n", input);
-		return saa7113_setinput (budget_av, input);
+		return saa7113_setinput(budget_av, input);
 	}
 	default:
 		return -ENOIOCTLCMD;
@@ -933,24 +967,24 @@ static int av_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 
 static struct saa7146_standard standard[] = {
 	{.name = "PAL",.id = V4L2_STD_PAL,
-		.v_offset	= 0x17,	.v_field 	= 288,
-		.h_offset	= 0x14,	.h_pixels 	= 680,  	      
+	 .v_offset = 0x17,.v_field = 288,
+	 .h_offset = 0x14,.h_pixels = 680,
 	 .v_max_out = 576,.h_max_out = 768 },
 
 	{.name = "NTSC",.id = V4L2_STD_NTSC,
-		.v_offset	= 0x16,	.v_field 	= 240,
-		.h_offset	= 0x06,	.h_pixels 	= 708,
+	 .v_offset = 0x16,.v_field = 240,
+	 .h_offset = 0x06,.h_pixels = 708,
 	 .v_max_out = 480,.h_max_out = 640, },
 };
 
 static struct saa7146_ext_vv vv_data = {
-	.inputs		= 2,
-	.capabilities	= 0, // perhaps later: V4L2_CAP_VBI_CAPTURE, but that need tweaking with the saa7113
-	.flags		= 0,
-	.stds		= &standard[0],
-	.num_stds	= sizeof(standard)/sizeof(struct saa7146_standard),
-	.ioctls		= &ioctls[0],
-	.ioctl		= av_ioctl,
+	.inputs = 2,
+	.capabilities = 0,	// perhaps later: V4L2_CAP_VBI_CAPTURE, but that need tweaking with the saa7113
+	.flags = 0,
+	.stds = &standard[0],
+	.num_stds = sizeof(standard) / sizeof(struct saa7146_standard),
+	.ioctls = &ioctls[0],
+	.ioctl = av_ioctl,
 };
 
 static struct saa7146_extension budget_extension;
@@ -958,44 +992,51 @@ static struct saa7146_extension budget_extension;
 MAKE_BUDGET_INFO(knc1s, "KNC1 DVB-S", BUDGET_KNC1S);
 MAKE_BUDGET_INFO(knc1c, "KNC1 DVB-C", BUDGET_KNC1C);
 MAKE_BUDGET_INFO(knc1t, "KNC1 DVB-T", BUDGET_KNC1T);
+MAKE_BUDGET_INFO(knc1sp, "KNC1 DVB-S Plus", BUDGET_KNC1SP);
+MAKE_BUDGET_INFO(knc1cp, "KNC1 DVB-C Plus", BUDGET_KNC1CP);
+MAKE_BUDGET_INFO(knc1tp, "KNC1 DVB-T Plus", BUDGET_KNC1TP);
 MAKE_BUDGET_INFO(cin1200s, "TerraTec Cinergy 1200 DVB-S", BUDGET_CIN1200S);
 MAKE_BUDGET_INFO(cin1200c, "Terratec Cinergy 1200 DVB-C", BUDGET_CIN1200C);
 MAKE_BUDGET_INFO(cin1200t, "Terratec Cinergy 1200 DVB-T", BUDGET_CIN1200T);
 
-static struct pci_device_id pci_tbl [] = {
+static struct pci_device_id pci_tbl[] = {
 	MAKE_EXTENSION_PCI(knc1s, 0x1131, 0x4f56),
+	MAKE_EXTENSION_PCI(knc1s, 0x1131, 0x0010),
+	MAKE_EXTENSION_PCI(knc1sp, 0x1131, 0x0011),
 	MAKE_EXTENSION_PCI(knc1c, 0x1894, 0x0020),
+	MAKE_EXTENSION_PCI(knc1cp, 0x1894, 0x0021),
 	MAKE_EXTENSION_PCI(knc1t, 0x1894, 0x0030),
+	MAKE_EXTENSION_PCI(knc1tp, 0x1894, 0x0031),
 	MAKE_EXTENSION_PCI(cin1200s, 0x153b, 0x1154),
 	MAKE_EXTENSION_PCI(cin1200c, 0x153b, 0x1156),
 	MAKE_EXTENSION_PCI(cin1200t, 0x153b, 0x1157),
 	{
-		.vendor    = 0,
+	 .vendor = 0,
 	}
 };
 
 MODULE_DEVICE_TABLE(pci, pci_tbl);
 
 static struct saa7146_extension budget_extension = {
-	.name		= "budget dvb /w video in\0",
-	.pci_tbl	= pci_tbl,
+	.name = "budget dvb /w video in\0",
+	.pci_tbl = pci_tbl,
 
-	.module		= THIS_MODULE,
-	.attach		= budget_av_attach,
-	.detach		= budget_av_detach,
+	.module = THIS_MODULE,
+	.attach = budget_av_attach,
+	.detach = budget_av_detach,
 
-	.irq_mask	= MASK_10,
+	.irq_mask = MASK_10,
 	.irq_func = budget_av_irq,
-};	
+};
 
-static int __init budget_av_init(void) 
+static int __init budget_av_init(void)
 {
 	return saa7146_register_extension(&budget_extension);
 }
 
 static void __exit budget_av_exit(void)
 {
-	saa7146_unregister_extension(&budget_extension); 
+	saa7146_unregister_extension(&budget_extension);
 }
 
 module_init(budget_av_init);
@@ -1005,5 +1046,3 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Ralph Metzler, Marcus Metzler, Michael Hunold, others");
 MODULE_DESCRIPTION("driver for the SAA7146 based so-called "
 		   "budget PCI DVB w/ analog input and CI-module (e.g. the KNC cards)");
-module_param_named(enable_ci, enable_ci, int, 0644);
-MODULE_PARM_DESC(enable_ci, "Turn on/off CI module (default:off).");

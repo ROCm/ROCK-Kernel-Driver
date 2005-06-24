@@ -608,6 +608,12 @@ static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 	acpi_fadt.sci_int = fadt->sci_int;
 #endif
 
+#ifdef CONFIG_ACPI_BUS
+	/* initialize rev and apic_phys_dest_mode for x86_64 genapic */
+	acpi_fadt.revision = fadt->revision;
+	acpi_fadt.force_apic_physical_destination_mode = fadt->force_apic_physical_destination_mode;
+#endif
+
 #ifdef CONFIG_X86_PM_TIMER
 	/* detect the location of the ACPI PM Timer */
 	if (fadt->revision >= FADT2_REVISION_ID) {
@@ -644,7 +650,7 @@ acpi_find_rsdp (void)
 	 */
 	rsdp_phys = acpi_scan_rsdp (0, 0x400);
 	if (!rsdp_phys)
-		rsdp_phys = acpi_scan_rsdp (0xE0000, 0xFFFFF);
+		rsdp_phys = acpi_scan_rsdp (0xE0000, 0x20000);
 
 	return rsdp_phys;
 }
@@ -773,18 +779,6 @@ acpi_process_madt(void)
 {
 #ifdef CONFIG_X86_LOCAL_APIC
 	int count, error;
-
-	/* 
-	 * Warning, broken error handling here.
-	 * When X86_APIC_OFF is not set and the APIC initialization
-	 * later fails then the ACPI state will be all messed up.
-	 */
-#ifdef CONFIG_X86_APIC_OFF
-	if (enable_local_apic <= 0) { 
-		printk(KERN_INFO "ACPI: local apic disabled\n");
-		return;
-	}
-#endif	   
 
 	count = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
 	if (count >= 1) {

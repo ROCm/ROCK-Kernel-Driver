@@ -65,30 +65,25 @@ void up(struct semaphore *sem)
 	__asm__ __volatile__("\n"
 "	! up sem(%0)\n"
 "	membar	#StoreLoad | #LoadLoad\n"
-"1:	lduw	[%0], %%g5\n"
-"	add	%%g5, 1, %%g7\n"
-"	cas	[%0], %%g5, %%g7\n"
-"	cmp	%%g5, %%g7\n"
+"1:	lduw	[%0], %%g1\n"
+"	add	%%g1, 1, %%g7\n"
+"	cas	[%0], %%g1, %%g7\n"
+"	cmp	%%g1, %%g7\n"
 "	bne,pn	%%icc, 1b\n"
 "	 addcc	%%g7, 1, %%g0\n"
 "	ble,pn	%%icc, 3f\n"
 "	 membar	#StoreLoad | #StoreStore\n"
 "2:\n"
 "	.subsection 2\n"
-"3:	mov	%0, %%g5\n"
+"3:	mov	%0, %%g1\n"
 "	save	%%sp, -160, %%sp\n"
-"	mov	%%g1, %%l1\n"
-"	mov	%%g2, %%l2\n"
-"	mov	%%g3, %%l3\n"
 "	call	%1\n"
-"	 mov	%%g5, %%o0\n"
-"	mov	%%l1, %%g1\n"
-"	mov	%%l2, %%g2\n"
+"	 mov	%%g1, %%o0\n"
 "	ba,pt	%%xcc, 2b\n"
-"	 restore %%l3, %%g0, %%g3\n"
+"	 restore\n"
 "	.previous\n"
 	: : "r" (sem), "i" (__up)
-	: "g5", "g7", "memory", "cc");
+	: "g1", "g2", "g3", "g7", "memory", "cc");
 }
 
 static void __sched __down(struct semaphore * sem)
@@ -127,30 +122,25 @@ void __sched down(struct semaphore *sem)
 
 	__asm__ __volatile__("\n"
 "	! down sem(%0)\n"
-"1:	lduw	[%0], %%g5\n"
-"	sub	%%g5, 1, %%g7\n"
-"	cas	[%0], %%g5, %%g7\n"
-"	cmp	%%g5, %%g7\n"
+"1:	lduw	[%0], %%g1\n"
+"	sub	%%g1, 1, %%g7\n"
+"	cas	[%0], %%g1, %%g7\n"
+"	cmp	%%g1, %%g7\n"
 "	bne,pn	%%icc, 1b\n"
 "	 cmp	%%g7, 1\n"
 "	bl,pn	%%icc, 3f\n"
 "	 membar	#StoreLoad | #StoreStore\n"
 "2:\n"
 "	.subsection 2\n"
-"3:	mov	%0, %%g5\n"
+"3:	mov	%0, %%g1\n"
 "	save	%%sp, -160, %%sp\n"
-"	mov	%%g1, %%l1\n"
-"	mov	%%g2, %%l2\n"
-"	mov	%%g3, %%l3\n"
 "	call	%1\n"
-"	 mov	%%g5, %%o0\n"
-"	mov	%%l1, %%g1\n"
-"	mov	%%l2, %%g2\n"
+"	 mov	%%g1, %%o0\n"
 "	ba,pt	%%xcc, 2b\n"
-"	 restore %%l3, %%g0, %%g3\n"
+"	 restore\n"
 "	.previous\n"
 	: : "r" (sem), "i" (__down)
-	: "g5", "g7", "memory", "cc");
+	: "g1", "g2", "g3", "g7", "memory", "cc");
 }
 
 int down_trylock(struct semaphore *sem)
@@ -175,20 +165,20 @@ int down_trylock(struct semaphore *sem)
 
 	__asm__ __volatile__("\n"
 "	! down_trylock sem(%1) ret(%0)\n"
-"1:	lduw	[%1], %%g5\n"
-"	sub	%%g5, 1, %%g7\n"
-"	cmp	%%g5, 1\n"
+"1:	lduw	[%1], %%g1\n"
+"	sub	%%g1, 1, %%g7\n"
+"	cmp	%%g1, 1\n"
 "	bl,pn	%%icc, 2f\n"
 "	 mov	1, %0\n"
-"	cas	[%1], %%g5, %%g7\n"
-"	cmp	%%g5, %%g7\n"
+"	cas	[%1], %%g1, %%g7\n"
+"	cmp	%%g1, %%g7\n"
 "	bne,pn	%%icc, 1b\n"
 "	 mov	0, %0\n"
 "	membar	#StoreLoad | #StoreStore\n"
 "2:\n"
 	: "=&r" (ret)
 	: "r" (sem)
-	: "g5", "g7", "memory", "cc");
+	: "g1", "g7", "memory", "cc");
 
 	return ret;
 }
@@ -237,31 +227,25 @@ int __sched down_interruptible(struct semaphore *sem)
 
 	__asm__ __volatile__("\n"
 "	! down_interruptible sem(%2) ret(%0)\n"
-"1:	lduw	[%2], %%g5\n"
-"	sub	%%g5, 1, %%g7\n"
-"	cas	[%2], %%g5, %%g7\n"
-"	cmp	%%g5, %%g7\n"
+"1:	lduw	[%2], %%g1\n"
+"	sub	%%g1, 1, %%g7\n"
+"	cas	[%2], %%g1, %%g7\n"
+"	cmp	%%g1, %%g7\n"
 "	bne,pn	%%icc, 1b\n"
 "	 cmp	%%g7, 1\n"
 "	bl,pn	%%icc, 3f\n"
 "	 membar	#StoreLoad | #StoreStore\n"
 "2:\n"
 "	.subsection 2\n"
-"3:	mov	%2, %%g5\n"
+"3:	mov	%2, %%g1\n"
 "	save	%%sp, -160, %%sp\n"
-"	mov	%%g1, %%l1\n"
-"	mov	%%g2, %%l2\n"
-"	mov	%%g3, %%l3\n"
 "	call	%3\n"
-"	 mov	%%g5, %%o0\n"
-"	mov	%%l1, %%g1\n"
-"	mov	%%l2, %%g2\n"
-"	mov	%%l3, %%g3\n"
+"	 mov	%%g1, %%o0\n"
 "	ba,pt	%%xcc, 2b\n"
-"	 restore %%o0, %%g0, %0\n"
+"	 restore\n"
 "	.previous\n"
 	: "=r" (ret)
 	: "0" (ret), "r" (sem), "i" (__down_interruptible)
-	: "g5", "g7", "memory", "cc");
+	: "g1", "g2", "g3", "g7", "memory", "cc");
 	return ret;
 }

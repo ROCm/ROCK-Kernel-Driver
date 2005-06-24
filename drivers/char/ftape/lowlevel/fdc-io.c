@@ -387,7 +387,8 @@ int fdc_interrupt_wait(unsigned int time)
 
 	set_current_state(TASK_INTERRUPTIBLE);
 	add_wait_queue(&ftape_wait_intr, &wait);
-	while (!ft_interrupt_seen && (current->state == TASK_INTERRUPTIBLE)) {
+	while (!ft_interrupt_seen && timeout) {
+		set_current_state(TASK_INTERRUPTIBLE);
 		timeout = schedule_timeout(timeout);
         }
 

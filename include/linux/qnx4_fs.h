@@ -114,7 +114,6 @@ extern struct dentry *qnx4_lookup(struct inode *dir, struct dentry *dentry, stru
 extern unsigned long qnx4_count_free_blocks(struct super_block *sb);
 extern unsigned long qnx4_block_map(struct inode *inode, long iblock);
 
-extern struct buffer_head *qnx4_getblk(struct inode *, int, int);
 extern struct buffer_head *qnx4_bread(struct inode *, int, int);
 
 extern struct inode_operations qnx4_file_inode_operations;
@@ -130,7 +129,6 @@ extern int qnx4_unlink(struct inode *dir, struct dentry *dentry);
 extern int qnx4_rmdir(struct inode *dir, struct dentry *dentry);
 extern int qnx4_sync_file(struct file *file, struct dentry *dentry, int);
 extern int qnx4_sync_inode(struct inode *inode);
-extern int qnx4_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh, int create);
 
 static inline struct qnx4_sb_info *qnx4_sb(struct super_block *sb)
 {

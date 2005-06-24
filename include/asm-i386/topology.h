@@ -60,11 +60,12 @@ static inline int node_to_first_cpu(int node)
 	return first_cpu(mask);
 }
 
-/* Returns the number of the node containing PCI bus 'bus' */
-static inline cpumask_t pcibus_to_cpumask(int bus)
+/* Returns the number of the node containing PCI bus number 'busnr' */
+static inline cpumask_t __pcibus_to_cpumask(int busnr)
 {
-	return node_to_cpumask(mp_bus_id_to_node[bus]);
+	return node_to_cpumask(mp_bus_id_to_node[busnr]);
 }
+#define pcibus_to_cpumask(bus)	__pcibus_to_cpumask(bus->number)
 
 /* sched_domains SD_NODE_INIT for NUMAQ machines */
 #define SD_NODE_INIT (struct sched_domain) {		\
@@ -87,6 +88,12 @@ static inline cpumask_t pcibus_to_cpumask(int bus)
 	.balance_interval	= 1,			\
 	.nr_balance_failed	= 0,			\
 }
+
+extern unsigned long node_start_pfn[];
+extern unsigned long node_end_pfn[];
+extern unsigned long node_remap_size[];
+
+#define node_has_online_mem(nid) (node_start_pfn[nid] != node_end_pfn[nid])
 
 #else /* !CONFIG_NUMA */
 /*

@@ -353,9 +353,9 @@ static inline unsigned long hweight64(unsigned long w)
 	return __kernel_ctpop(w);
 }
 
-#define hweight32(x) hweight64((x) & 0xfffffffful)
-#define hweight16(x) hweight64((x) & 0xfffful)
-#define hweight8(x)  hweight64((x) & 0xfful)
+#define hweight32(x)	(unsigned int) hweight64((x) & 0xfffffffful)
+#define hweight16(x)	(unsigned int) hweight64((x) & 0xfffful)
+#define hweight8(x)	(unsigned int) hweight64((x) & 0xfful)
 #else
 static inline unsigned long hweight64(unsigned long w)
 {

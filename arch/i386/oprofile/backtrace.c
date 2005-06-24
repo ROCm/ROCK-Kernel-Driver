@@ -18,7 +18,6 @@ struct frame_head {
 	unsigned long ret;
 } __attribute__((packed));
 
-
 static struct frame_head *
 dump_backtrace(struct frame_head * head)
 {
@@ -27,21 +26,11 @@ dump_backtrace(struct frame_head * head)
 	/* frame pointers should strictly progress back up the stack
 	 * (towards higher addresses) */
 	if (head >= head->ebp)
-		return 0;
+		return NULL;
 
 	return head->ebp;
 }
 
-
-#ifdef CONFIG_X86_4G
-/* With a 4G kernel/user split, user pages are not directly
- * accessible from the kernel, so don't try
- */
-static int pages_present(struct frame_head * head)
-{
-	return 0;
-}
-#else
 /* check that the page(s) containing the frame head are present */
 static int pages_present(struct frame_head * head)
 {
@@ -53,8 +42,6 @@ static int pages_present(struct frame_head * head)
 
 	return check_user_page_readable(mm, (unsigned long)(head + 1));
 }
-#endif /* CONFIG_X86_4G */
-
 
 /*
  * |             | /\ Higher addresses

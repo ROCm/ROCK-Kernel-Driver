@@ -226,7 +226,7 @@ static  __inline__ void _raw_write_unlock(rwlock_t *rw)
 }
 
 #ifdef CONFIG_DEBUG_RWLOCK
-extern void _dbg_write_trylock(rwlock_t * rw, const char *bfile, int bline);
+extern int _dbg_write_trylock(rwlock_t * rw, const char *bfile, int bline);
 #define _raw_write_trylock(rw) _dbg_write_trylock(rw, __FILE__, __LINE__)
 #else
 static  __inline__ int _raw_write_trylock(rwlock_t *rw)

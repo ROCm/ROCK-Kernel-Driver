@@ -476,7 +476,7 @@ static inline void tulip_stop_rxtx(struct tulip_private *tp)
 
 		if (!i)
 			printk(KERN_DEBUG "%s: tulip_stop_rxtx() failed\n",
-					tp->pdev->slot_name);
+					pci_name(tp->pdev));
 	}
 }
 

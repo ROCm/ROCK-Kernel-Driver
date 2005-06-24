@@ -41,6 +41,8 @@ static inline void pgd_clear (pgd_t * pgdp) 	{ }
  * hook is made available.
  */
 #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
+
 /*
  * (pmds are folded into pgds so this doesn't get actually called,
  * but the define is needed for a generic inline function.)

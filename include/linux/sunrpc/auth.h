@@ -35,8 +35,7 @@ struct auth_cred {
  * Client user credentials
  */
 struct rpc_cred {
-	struct list_head	cr_hash;	/* hash chain */
-	struct rpc_auth *	cr_auth;
+	struct hlist_node	cr_hash;	/* hash chain */
 	struct rpc_credops *	cr_ops;
 	unsigned long		cr_expire;	/* when to gc */
 	atomic_t		cr_count;	/* ref count */
@@ -59,10 +58,13 @@ struct rpc_cred {
  */
 #define RPC_CREDCACHE_NR	8
 #define RPC_CREDCACHE_MASK	(RPC_CREDCACHE_NR - 1)
+struct rpc_cred_cache {
+	struct hlist_head	hashtable[RPC_CREDCACHE_NR];
+	unsigned long		nextgc;		/* next garbage collection */
+	unsigned long		expire;		/* cache expiry interval */
+};
+
 struct rpc_auth {
-	struct list_head	au_credcache[RPC_CREDCACHE_NR];
-	unsigned long		au_expire;	/* cache expiry interval */
-	unsigned long		au_nextgc;	/* next garbage collection */
 	unsigned int		au_cslack;	/* call cred size estimate */
 	unsigned int		au_rslack;	/* reply verf size guess */
 	unsigned int		au_flags;	/* various flags */
@@ -73,6 +75,7 @@ struct rpc_auth {
 						 * case) */
 	atomic_t		au_count;	/* Reference counter */
 
+	struct rpc_cred_cache *	au_credcache;
 	/* per-flavor data */
 };
 #define RPC_AUTH_PROC_CREDS	0x0010		/* process creds (including
@@ -91,14 +94,16 @@ struct rpc_authops {
 	struct rpc_auth *	(*create)(struct rpc_clnt *, rpc_authflavor_t);
 	void			(*destroy)(struct rpc_auth *);
 
+	struct rpc_cred *	(*lookup_cred)(struct rpc_auth *, struct auth_cred *, int);
 	struct rpc_cred *	(*crcreate)(struct rpc_auth*, struct auth_cred *, int);
 };
 
 struct rpc_credops {
+	const char *		cr_name;	/* Name of the auth flavour */
 	void			(*crdestroy)(struct rpc_cred *);
 
 	int			(*crmatch)(struct auth_cred *, struct rpc_cred *, int);
-	u32 *			(*crmarshal)(struct rpc_task *, u32 *, int);
+	u32 *			(*crmarshal)(struct rpc_task *, u32 *);
 	int			(*crrefresh)(struct rpc_task *);
 	u32 *			(*crvalidate)(struct rpc_task *, u32 *);
 	int			(*crwrap_req)(struct rpc_task *, kxdrproc_t,
@@ -130,7 +135,7 @@ int			rpcauth_unwrap_resp(struct rpc_task *task, kxdrproc_t decode, void *rqstp,
 int			rpcauth_refreshcred(struct rpc_task *);
 void			rpcauth_invalcred(struct rpc_task *);
 int			rpcauth_uptodatecred(struct rpc_task *);
-void			rpcauth_init_credcache(struct rpc_auth *);
+int			rpcauth_init_credcache(struct rpc_auth *, unsigned long);
 void			rpcauth_free_credcache(struct rpc_auth *);
 
 static inline

@@ -17,13 +17,14 @@
  * memory controller, PIC, UARTs, IIC, and Timers.
  */
 
-#ifndef	_ASMPPC_CPC700_H
-#define	_ASMPPC_CPC700_H
+#ifndef	__PPC_SYSLIB_CPC700_H__
+#define	__PPC_SYSLIB_CPC700_H__
 
 #include <linux/stddef.h>
 #include <linux/types.h>
 #include <linux/init.h>
 
+/* XXX no barriers? not even any volatiles?  -- paulus */
 #define CPC700_OUT_32(a,d)  (*(u_int *)a = d)
 #define CPC700_IN_32(a)     (*(u_int *)a)
 
@@ -33,21 +34,26 @@
 #define CPC700_PCI_CONFIG_ADDR          0xfec00000
 #define CPC700_PCI_CONFIG_DATA          0xfec00004
 
-#define CPC700_PMM0_LOCAL		0xff400000
-#define CPC700_PMM0_MASK_ATTR		0xff400004
-#define CPC700_PMM0_PCI_LOW		0xff400008
-#define CPC700_PMM0_PCI_HIGH		0xff40000c
+/* CPU -> PCI memory window 0 */
+#define CPC700_PMM0_LOCAL		0xff400000	/* CPU physical addr */
+#define CPC700_PMM0_MASK_ATTR		0xff400004	/* size and attrs */
+#define CPC700_PMM0_PCI_LOW		0xff400008	/* PCI addr, low word */
+#define CPC700_PMM0_PCI_HIGH		0xff40000c	/* PCI addr, high wd */
+/* CPU -> PCI memory window 1 */
 #define CPC700_PMM1_LOCAL		0xff400010
 #define CPC700_PMM1_MASK_ATTR		0xff400014
 #define CPC700_PMM1_PCI_LOW		0xff400018
 #define CPC700_PMM1_PCI_HIGH		0xff40001c
+/* CPU -> PCI memory window 2 */
 #define CPC700_PMM2_LOCAL		0xff400020
 #define CPC700_PMM2_MASK_ATTR		0xff400024
 #define CPC700_PMM2_PCI_LOW		0xff400028
 #define CPC700_PMM2_PCI_HIGH		0xff40002c
-#define CPC700_PTM1_MEMSIZE		0xff400030
-#define CPC700_PTM1_LOCAL		0xff400034
-#define CPC700_PTM2_MEMSIZE		0xff400038
+/* PCI memory -> CPU window 1 */
+#define CPC700_PTM1_MEMSIZE		0xff400030	/* window size */
+#define CPC700_PTM1_LOCAL		0xff400034	/* CPU phys addr */
+/* PCI memory -> CPU window 2 */
+#define CPC700_PTM2_MEMSIZE		0xff400038	/* size and enable */
 #define CPC700_PTM2_LOCAL		0xff40003c
 
 /*
@@ -89,4 +95,4 @@ extern unsigned int cpc700_irq_assigns[32][2];
 extern void __init cpc700_init_IRQ(void);
 extern int cpc700_get_irq(struct pt_regs *);
 
-#endif	/* _ASMPPC_CPC700_H */
+#endif	/* __PPC_SYSLIB_CPC700_H__ */

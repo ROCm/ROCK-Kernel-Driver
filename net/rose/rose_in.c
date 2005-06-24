@@ -41,7 +41,7 @@
  */
 static int rose_state1_machine(struct sock *sk, struct sk_buff *skb, int frametype)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	switch (frametype) {
 	case ROSE_CALL_ACCEPTED:
@@ -78,7 +78,7 @@ static int rose_state1_machine(struct sock *sk, struct sk_buff *skb, int framety
  */
 static int rose_state2_machine(struct sock *sk, struct sk_buff *skb, int frametype)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	switch (frametype) {
 	case ROSE_CLEAR_REQUEST:
@@ -106,7 +106,7 @@ static int rose_state2_machine(struct sock *sk, struct sk_buff *skb, int framety
  */
 static int rose_state3_machine(struct sock *sk, struct sk_buff *skb, int frametype, int ns, int nr, int q, int d, int m)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 	int queued = 0;
 
 	switch (frametype) {
@@ -216,7 +216,7 @@ static int rose_state3_machine(struct sock *sk, struct sk_buff *skb, int framety
  */
 static int rose_state4_machine(struct sock *sk, struct sk_buff *skb, int frametype)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	switch (frametype) {
 	case ROSE_RESET_REQUEST:
@@ -265,7 +265,7 @@ static int rose_state5_machine(struct sock *sk, struct sk_buff *skb, int framety
 /* Higher level upcall for a LAPB frame */
 int rose_process_rx_frame(struct sock *sk, struct sk_buff *skb)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 	int queued = 0, frametype, ns, nr, q, d, m;
 
 	if (rose->state == ROSE_STATE_0)

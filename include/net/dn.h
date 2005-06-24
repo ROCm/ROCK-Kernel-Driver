@@ -2,6 +2,7 @@
 #define _NET_DN_H
 
 #include <linux/dn.h>
+#include <net/sock.h>
 #include <asm/byteorder.h>
 
 typedef unsigned short dn_address;
@@ -133,7 +134,10 @@ struct dn_scp                                   /* Session Control Port */
 
 };
 
-#define DN_SK(__sk) ((struct dn_scp *)(__sk)->sk_protinfo)
+static inline struct dn_scp *DN_SK(struct sock *sk)
+{
+	return (struct dn_scp *)(sk + 1);
+}
 
 /*
  * src,dst : Source and Destination DECnet addresses

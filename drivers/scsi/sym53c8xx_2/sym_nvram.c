@@ -47,7 +47,7 @@ static u_char Tekram_boot_delay[7] = {3, 5, 10, 20, 30, 60, 120};
 /*
  *  Get host setup from NVRAM.
  */
-void sym_nvram_setup_host(struct sym_hcb *np, struct sym_nvram *nvram)
+void sym_nvram_setup_host(struct Scsi_Host *shost, struct sym_hcb *np, struct sym_nvram *nvram)
 {
 	/*
 	 *  Get parity checking, host ID, verbose mode 
@@ -61,7 +61,7 @@ void sym_nvram_setup_host(struct sym_hcb *np, struct sym_nvram *nvram)
 		if (nvram->data.Symbios.flags & SYMBIOS_VERBOSE_MSGS)
 			np->verbose += 1;
 		if (nvram->data.Symbios.flags1 & SYMBIOS_SCAN_HI_LO)
-			np->usrflags |= SYM_SCAN_TARGETS_HILO;
+			shost->reverse_ordering = 1;
 		if (nvram->data.Symbios.flags2 & SYMBIOS_AVOID_BUS_RESET)
 			np->usrflags |= SYM_AVOID_BUS_RESET;
 		break;
@@ -253,7 +253,7 @@ static void sym_display_Tekram_nvram(struct sym_device *np, Tekram_nvram *nvram)
 static void S24C16_set_bit(struct sym_device *np, u_char write_bit, u_char *gpreg, 
 			  int bit_mode)
 {
-	UDELAY (5);
+	udelay(5);
 	switch (bit_mode) {
 	case SET_BIT:
 		*gpreg |= write_bit;
@@ -269,8 +269,8 @@ static void S24C16_set_bit(struct sym_device *np, u_char write_bit, u_char *gpre
 		break;
 
 	}
-	OUTB (nc_gpreg, *gpreg);
-	UDELAY (5);
+	OUTB(np, nc_gpreg, *gpreg);
+	udelay(5);
 }
 
 /*
@@ -303,7 +303,7 @@ static void S24C16_do_bit(struct sym_device *np, u_char *read_bit, u_char write_
 	S24C16_set_bit(np, write_bit, gpreg, SET_BIT);
 	S24C16_set_bit(np, 0, gpreg, SET_CLK);
 	if (read_bit)
-		*read_bit = INB (nc_gpreg);
+		*read_bit = INB(np, nc_gpreg);
 	S24C16_set_bit(np, 0, gpreg, CLR_CLK);
 	S24C16_set_bit(np, 0, gpreg, CLR_BIT);
 }
@@ -315,9 +315,9 @@ static void S24C16_do_bit(struct sym_device *np, u_char *read_bit, u_char write_
 static void S24C16_write_ack(struct sym_device *np, u_char write_bit, u_char *gpreg, 
 			    u_char *gpcntl)
 {
-	OUTB (nc_gpcntl, *gpcntl & 0xfe);
+	OUTB(np, nc_gpcntl, *gpcntl & 0xfe);
 	S24C16_do_bit(np, NULL, write_bit, gpreg);
-	OUTB (nc_gpcntl, *gpcntl);
+	OUTB(np, nc_gpcntl, *gpcntl);
 }
 
 /*
@@ -327,9 +327,9 @@ static void S24C16_write_ack(struct sym_device *np, u_char write_bit, u_char *gp
 static void S24C16_read_ack(struct sym_device *np, u_char *read_bit, u_char *gpreg, 
 			   u_char *gpcntl)
 {
-	OUTB (nc_gpcntl, *gpcntl | 0x01);
+	OUTB(np, nc_gpcntl, *gpcntl | 0x01);
 	S24C16_do_bit(np, read_bit, 1, gpreg);
-	OUTB (nc_gpcntl, *gpcntl);
+	OUTB(np, nc_gpcntl, *gpcntl);
 }
 
 /*
@@ -379,13 +379,13 @@ static int sym_write_S24C16_nvram(struct sym_device *np, int offset,
 	int	x;
 
 	/* save current state of GPCNTL and GPREG */
-	old_gpreg	= INB (nc_gpreg);
-	old_gpcntl	= INB (nc_gpcntl);
+	old_gpreg	= INB(np, nc_gpreg);
+	old_gpcntl	= INB(np, nc_gpcntl);
 	gpcntl		= old_gpcntl & 0x1c;
 
 	/* set up GPREG & GPCNTL to set GPIO0 and GPIO1 in to known state */
-	OUTB (nc_gpreg,  old_gpreg);
-	OUTB (nc_gpcntl, gpcntl);
+	OUTB(np, nc_gpreg,  old_gpreg);
+	OUTB(np, nc_gpcntl, gpcntl);
 
 	/* this is to set NVRAM into a known state with GPIO0/1 both low */
 	gpreg = old_gpreg;
@@ -414,8 +414,8 @@ static int sym_write_S24C16_nvram(struct sym_device *np, int offset,
 	}
 
 	/* return GPIO0/1 to original states after having accessed NVRAM */
-	OUTB (nc_gpcntl, old_gpcntl);
-	OUTB (nc_gpreg,  old_gpreg);
+	OUTB(np, nc_gpcntl, old_gpcntl);
+	OUTB(np, nc_gpreg,  old_gpreg);
 
 	return 0;
 }
@@ -433,13 +433,13 @@ static int sym_read_S24C16_nvram(struct sym_device *np, int offset, u_char *data
 	int	x;
 
 	/* save current state of GPCNTL and GPREG */
-	old_gpreg	= INB (nc_gpreg);
-	old_gpcntl	= INB (nc_gpcntl);
+	old_gpreg	= INB(np, nc_gpreg);
+	old_gpcntl	= INB(np, nc_gpcntl);
 	gpcntl		= old_gpcntl & 0x1c;
 
 	/* set up GPREG & GPCNTL to set GPIO0 and GPIO1 in to known state */
-	OUTB (nc_gpreg,  old_gpreg);
-	OUTB (nc_gpcntl, gpcntl);
+	OUTB(np, nc_gpreg,  old_gpreg);
+	OUTB(np, nc_gpcntl, gpcntl);
 
 	/* this is to set NVRAM into a known state with GPIO0/1 both low */
 	gpreg = old_gpreg;
@@ -475,7 +475,7 @@ static int sym_read_S24C16_nvram(struct sym_device *np, int offset, u_char *data
 
 	/* now set up GPIO0 for inputting data */
 	gpcntl |= 0x01;
-	OUTB (nc_gpcntl, gpcntl);
+	OUTB(np, nc_gpcntl, gpcntl);
 		
 	/* input all requested data - only part of total NVRAM */
 	for (x = 0; x < len; x++) 
@@ -483,13 +483,13 @@ static int sym_read_S24C16_nvram(struct sym_device *np, int offset, u_char *data
 
 	/* finally put NVRAM back in inactive mode */
 	gpcntl &= 0xfe;
-	OUTB (nc_gpcntl, gpcntl);
+	OUTB(np, nc_gpcntl, gpcntl);
 	S24C16_stop(np, &gpreg);
 	retv = 0;
 out:
 	/* return GPIO0/1 to original states after having accessed NVRAM */
-	OUTB (nc_gpcntl, old_gpcntl);
-	OUTB (nc_gpreg,  old_gpreg);
+	OUTB(np, nc_gpcntl, old_gpcntl);
+	OUTB(np, nc_gpreg,  old_gpreg);
 
 	return retv;
 }
@@ -546,9 +546,9 @@ static int sym_read_Symbios_nvram(struct sym_device *np, Symbios_nvram *nvram)
  */
 static void T93C46_Clk(struct sym_device *np, u_char *gpreg)
 {
-	OUTB (nc_gpreg, *gpreg | 0x04);
-	UDELAY (2);
-	OUTB (nc_gpreg, *gpreg);
+	OUTB(np, nc_gpreg, *gpreg | 0x04);
+	udelay(2);
+	OUTB(np, nc_gpreg, *gpreg);
 }
 
 /* 
@@ -556,9 +556,9 @@ static void T93C46_Clk(struct sym_device *np, u_char *gpreg)
  */
 static void T93C46_Read_Bit(struct sym_device *np, u_char *read_bit, u_char *gpreg)
 {
-	UDELAY (2);
+	udelay(2);
 	T93C46_Clk(np, gpreg);
-	*read_bit = INB (nc_gpreg);
+	*read_bit = INB(np, nc_gpreg);
 }
 
 /*
@@ -573,8 +573,8 @@ static void T93C46_Write_Bit(struct sym_device *np, u_char write_bit, u_char *gp
 		
 	*gpreg |= 0x10;
 		
-	OUTB (nc_gpreg, *gpreg);
-	UDELAY (2);
+	OUTB(np, nc_gpreg, *gpreg);
+	udelay(2);
 
 	T93C46_Clk(np, gpreg);
 }
@@ -585,8 +585,8 @@ static void T93C46_Write_Bit(struct sym_device *np, u_char write_bit, u_char *gp
 static void T93C46_Stop(struct sym_device *np, u_char *gpreg)
 {
 	*gpreg &= 0xef;
-	OUTB (nc_gpreg, *gpreg);
-	UDELAY (2);
+	OUTB(np, nc_gpreg, *gpreg);
+	udelay(2);
 
 	T93C46_Clk(np, gpreg);
 }
@@ -603,7 +603,7 @@ static void T93C46_Send_Command(struct sym_device *np, u_short write_data,
 	for (x = 0; x < 9; x++)
 		T93C46_Write_Bit(np, (u_char) (write_data >> (8 - x)), gpreg);
 
-	*read_bit = INB (nc_gpreg);
+	*read_bit = INB(np, nc_gpreg);
 }
 
 /*
@@ -657,23 +657,23 @@ static int sym_read_T93C46_nvram(struct sym_device *np, Tekram_nvram *nvram)
 	int retv = 1;
 
 	/* save current state of GPCNTL and GPREG */
-	old_gpreg	= INB (nc_gpreg);
-	old_gpcntl	= INB (nc_gpcntl);
+	old_gpreg	= INB(np, nc_gpreg);
+	old_gpcntl	= INB(np, nc_gpcntl);
 
 	/* set up GPREG & GPCNTL to set GPIO0/1/2/4 in to known state, 0 in,
 	   1/2/4 out */
 	gpreg = old_gpreg & 0xe9;
-	OUTB (nc_gpreg, gpreg);
+	OUTB(np, nc_gpreg, gpreg);
 	gpcntl = (old_gpcntl & 0xe9) | 0x09;
-	OUTB (nc_gpcntl, gpcntl);
+	OUTB(np, nc_gpcntl, gpcntl);
 
 	/* input all of NVRAM, 64 words */
 	retv = T93C46_Read_Data(np, (u_short *) nvram,
 				sizeof(*nvram) / sizeof(short), &gpreg);
 	
 	/* return GPIO0/1/2/4 to original states after having accessed NVRAM */
-	OUTB (nc_gpcntl, old_gpcntl);
-	OUTB (nc_gpreg,  old_gpreg);
+	OUTB(np, nc_gpcntl, old_gpcntl);
+	OUTB(np, nc_gpreg,  old_gpreg);
 
 	return retv;
 }
@@ -754,4 +754,18 @@ int sym_read_nvram(struct sym_device *np, struct sym_nvram *nvp)
 		nvp->type = sym_read_parisc_pdc(np, &nvp->data.parisc);
 	}
 	return nvp->type;
+}
+
+char *sym_nvram_type(struct sym_nvram *nvp)
+{
+	switch (nvp->type) {
+	case SYM_SYMBIOS_NVRAM:
+		return "Symbios NVRAM";
+	case SYM_TEKRAM_NVRAM:
+		return "Tekram NVRAM";
+	case SYM_PARISC_PDC:
+		return "PA-RISC Firmware";
+	default:
+		return "No NVRAM";
+	}
 }

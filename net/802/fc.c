@@ -97,40 +97,6 @@ static int fc_rebuild_header(struct sk_buff *skb)
 #endif
 }
 
-unsigned short
-fc_type_trans(struct sk_buff *skb, struct net_device *dev)
-{
-	struct fch_hdr *fch = (struct fch_hdr *)skb->data;
-	struct fcllc *fcllc;
-
-	skb->mac.raw = skb->data;
-	fcllc = (struct fcllc *)(skb->data + sizeof (struct fch_hdr) + 2);
-	skb_pull(skb, sizeof (struct fch_hdr) + 2);
-
-	if (*fch->daddr & 1) {
-		if (!memcmp(fch->daddr, dev->broadcast, FC_ALEN))
-			skb->pkt_type = PACKET_BROADCAST;
-		else
-			skb->pkt_type = PACKET_MULTICAST;
-	} else if (dev->flags & IFF_PROMISC) {
-		if (memcmp(fch->daddr, dev->dev_addr, FC_ALEN))
-			skb->pkt_type = PACKET_OTHERHOST;
-	}
-
-	/*
-	 * Strip the SNAP header from ARP packets since we don't pass
-	 * them through to the 802.2/SNAP layers.
-	 */
-	if (fcllc->dsap == EXTENDED_SAP &&
-	    (fcllc->ethertype == ntohs(ETH_P_IP) ||
-	     fcllc->ethertype == ntohs(ETH_P_ARP))) {
-		skb_pull(skb, sizeof (struct fcllc));
-		return fcllc->ethertype;
-	}
-
-	return ntohs(ETH_P_802_2);
-}
-
 static void fc_setup(struct net_device *dev)
 {
 	dev->hard_header	= fc_header;

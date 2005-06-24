@@ -2181,12 +2181,9 @@ static void release_saa(void)
 		/* unmap and free memory */
 		saa->audhead = saa->audtail = saa->osdhead = 0;
 		saa->vidhead = saa->vidtail = saa->osdtail = 0;
-		if (saa->vidbuf)
-			vfree(saa->vidbuf);
-		if (saa->audbuf)
-			vfree(saa->audbuf);
-		if (saa->osdbuf)
-			vfree(saa->osdbuf);
+		vfree(saa->vidbuf);
+		vfree(saa->audbuf);
+		vfree(saa->osdbuf);
 		if (saa->dmavid2)
 			kfree((void *) saa->dmavid2);
 		saa->audbuf = saa->vidbuf = saa->osdbuf = NULL;

@@ -51,13 +51,6 @@ asmlinkage int sys_pipe(unsigned long __user *fildes)
 	return error;
 }
 
-/*
- * This is the lowest virtual address we can permit any user space
- * mapping to be mapped at.  This is particularly important for
- * non-high vector CPUs.
- */
-#define MIN_MAP_ADDR	(PAGE_SIZE)
-
 /* common code for old and new mmaps */
 inline long do_mmap2(
 	unsigned long addr, unsigned long len,
@@ -69,7 +62,7 @@ inline long do_mmap2(
 
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 
-	if (flags & MAP_FIXED && addr < MIN_MAP_ADDR)
+	if (flags & MAP_FIXED && addr < FIRST_USER_ADDRESS)
 		goto out;
 
 	error = -EBADF;
@@ -122,7 +115,7 @@ sys_arm_mremap(unsigned long addr, unsigned long old_len,
 {
 	unsigned long ret = -EINVAL;
 
-	if (flags & MREMAP_FIXED && new_addr < MIN_MAP_ADDR)
+	if (flags & MREMAP_FIXED && new_addr < FIRST_USER_ADDRESS)
 		goto out;
 
 	down_write(&current->mm->mmap_sem);
@@ -169,7 +162,11 @@ asmlinkage int sys_ipc(uint call, int first, int second, int third,
 
 	switch (call) {
 	case SEMOP:
-		return sys_semop(first, (struct sembuf __user *)ptr, second);
+		return sys_semtimedop (first, (struct sembuf __user *)ptr, second, NULL);
+	case SEMTIMEDOP:
+		return sys_semtimedop(first, (struct sembuf __user *)ptr, second,
+					(const struct timespec __user *)fifth);
+
 	case SEMGET:
 		return sys_semget (first, second, third);
 	case SEMCTL: {
@@ -305,7 +302,7 @@ long execve(const char *filename, char **argv, char **envp)
 		"b	ret_to_user"
 		:
 		: "r" (current_thread_info()),
-		  "Ir" (THREAD_SIZE - 8 - sizeof(regs)),
+		  "Ir" (THREAD_START_SP - sizeof(regs)),
 		  "r" (&regs),
 		  "Ir" (sizeof(regs))
 		: "r0", "r1", "r2", "r3", "ip", "memory");

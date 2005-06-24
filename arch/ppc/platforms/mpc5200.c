@@ -17,7 +17,7 @@
 #include <asm/mpc52xx.h>
 
 
-struct ocp_fs_i2c_data mpc5200_i2c_def = {
+static struct ocp_fs_i2c_data mpc5200_i2c_def = {
         .flags  = FS_I2C_CLOCK_5200,
 };
 

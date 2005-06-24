@@ -26,6 +26,7 @@
 #include <linux/moduleparam.h>
 #include <linux/device.h>
 #include <linux/types.h>
+#include <linux/delay.h>
 
 #include "w1.h"
 #include "w1_io.h"
@@ -103,6 +104,7 @@ static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, si
 	int i, max_trying = 10;
 
 	atomic_inc(&sl->refcnt);
+	smp_mb__after_atomic_inc();
 	if (down_interruptible(&sl->master->mutex)) {
 		count = 0;
 		goto out_dec;
@@ -128,7 +130,7 @@ static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, si
 		if (!w1_reset_bus (dev)) {
 			int count = 0;
 			u8 match[9] = {W1_MATCH_ROM, };
-			unsigned long tm;
+			unsigned int tm = 750;
 
 			memcpy(&match[1], (u64 *) & sl->reg_num, 8);
 			
@@ -136,11 +138,8 @@ static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, si
 
 			w1_write_8(dev, W1_CONVERT_TEMP);
 
-			tm = jiffies + msecs_to_jiffies(750);
-			while(time_before(jiffies, tm)) {
-				set_current_state(TASK_INTERRUPTIBLE);
-				schedule_timeout(tm-jiffies);
-
+			while (tm) {
+				tm = msleep_interruptible(tm);
 				if (signal_pending(current))
 					flush_signals(current);
 			}
@@ -181,6 +180,7 @@ static ssize_t w1_therm_read_bin(struct kobject *kobj, char *buf, loff_t off, si
 out:
 	up(&dev->mutex);
 out_dec:
+	smp_mb__before_atomic_inc();
 	atomic_dec(&sl->refcnt);
 
 	return count;

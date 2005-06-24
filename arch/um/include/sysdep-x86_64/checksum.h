@@ -9,8 +9,6 @@
 #include "linux/in6.h"
 #include "asm/uaccess.h"
 
-extern unsigned int csum_partial_copy_from(const char *src, char *dst, int len,
-					   int sum, int *err_ptr);
 extern unsigned csum_partial(const unsigned char *buff, unsigned len,
                              unsigned sum);
 
@@ -19,11 +17,11 @@ extern unsigned csum_partial(const unsigned char *buff, unsigned len,
  *	passed in an incorrect kernel address to one of these functions.
  *
  *	If you use these functions directly please don't forget the
- *	verify_area().
+ *	access_ok().
  */
 
 static __inline__
-unsigned int csum_partial_copy_nocheck(const char *src, char *dst,
+unsigned int csum_partial_copy_nocheck(const unsigned char *src, unsigned char *dst,
 				       int len, int sum)
 {
 	memcpy(dst, src, len);
@@ -31,10 +29,15 @@ unsigned int csum_partial_copy_nocheck(const char *src, char *dst,
 }
 
 static __inline__
-unsigned int csum_partial_copy_from_user(const char *src, char *dst,
-					 int len, int sum, int *err_ptr)
+unsigned int csum_partial_copy_from_user(const unsigned char *src,
+                                         unsigned char *dst, int len, int sum,
+                                         int *err_ptr)
 {
-	return csum_partial_copy_from(src, dst, len, sum, err_ptr);
+        if(copy_from_user(dst, src, len)){
+                *err_ptr = -EFAULT;
+                return(-1);
+        }
+        return csum_partial(dst, len, sum);
 }
 
 /**
@@ -137,15 +140,6 @@ static inline unsigned add32_with_carry(unsigned a, unsigned b)
         return a;
 }
 
-#endif
+extern unsigned short ip_compute_csum(unsigned char * buff, int len);
 
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-file-style: "linux"
- * End:
- */
+#endif

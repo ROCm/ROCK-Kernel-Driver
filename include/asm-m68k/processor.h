@@ -62,7 +62,8 @@ struct task_work {
 	char          need_resched;
 	unsigned char delayed_trace;	/* single step a syscall */
 	unsigned char syscall_trace;	/* count of syscall interceptors */
-	unsigned char pad[3];
+	unsigned char memdie;		/* task was selected to be killed */
+	unsigned char pad[2];
 };
 
 struct thread_struct {

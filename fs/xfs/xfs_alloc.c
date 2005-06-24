@@ -2009,7 +2009,7 @@ xfs_alloc_get_freelist(
 	/*
 	 * Freelist is empty, give up.
 	 */
-	if (INT_ISZERO(agf->agf_flcount, ARCH_CONVERT)) {
+	if (!agf->agf_flcount) {
 		*bnop = NULLAGBLOCK;
 		return 0;
 	}
@@ -2028,7 +2028,7 @@ xfs_alloc_get_freelist(
 	INT_MOD(agf->agf_flfirst, ARCH_CONVERT, 1);
 	xfs_trans_brelse(tp, agflbp);
 	if (INT_GET(agf->agf_flfirst, ARCH_CONVERT) == XFS_AGFL_SIZE(mp))
-		INT_ZERO(agf->agf_flfirst, ARCH_CONVERT);
+		agf->agf_flfirst = 0;
 	pag = &mp->m_perag[INT_GET(agf->agf_seqno, ARCH_CONVERT)];
 	INT_MOD(agf->agf_flcount, ARCH_CONVERT, -1);
 	xfs_trans_agflist_delta(tp, -1);
@@ -2128,7 +2128,7 @@ xfs_alloc_put_freelist(
 	agfl = XFS_BUF_TO_AGFL(agflbp);
 	INT_MOD(agf->agf_fllast, ARCH_CONVERT, 1);
 	if (INT_GET(agf->agf_fllast, ARCH_CONVERT) == XFS_AGFL_SIZE(mp))
-		INT_ZERO(agf->agf_fllast, ARCH_CONVERT);
+		agf->agf_fllast = 0;
 	pag = &mp->m_perag[INT_GET(agf->agf_seqno, ARCH_CONVERT)];
 	INT_MOD(agf->agf_flcount, ARCH_CONVERT, 1);
 	xfs_trans_agflist_delta(tp, 1);

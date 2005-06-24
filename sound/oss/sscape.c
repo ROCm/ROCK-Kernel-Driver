@@ -1393,7 +1393,7 @@ static struct address_info cfg;
 static struct address_info cfg_mpu;
 
 static int __initdata spea = -1;
-static int __initdata mss = 0;
+static int mss = 0;
 static int __initdata dma = -1;
 static int __initdata irq = -1;
 static int __initdata io = -1;

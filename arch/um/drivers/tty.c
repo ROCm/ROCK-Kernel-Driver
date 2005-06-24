@@ -18,7 +18,7 @@ struct tty_chan {
 	struct termios tt;
 };
 
-void *tty_chan_init(char *str, int device, struct chan_opts *opts)
+static void *tty_chan_init(char *str, int device, struct chan_opts *opts)
 {
 	struct tty_chan *data;
 
@@ -38,7 +38,8 @@ void *tty_chan_init(char *str, int device, struct chan_opts *opts)
 	return(data);
 }
 
-int tty_open(int input, int output, int primary, void *d, char **dev_out)
+static int tty_open(int input, int output, int primary, void *d,
+		    char **dev_out)
 {
 	struct tty_chan *data = d;
 	int fd, err;
@@ -59,7 +60,7 @@ int tty_open(int input, int output, int primary, void *d, char **dev_out)
 	return(fd);
 }
 
-int tty_console_write(int fd, const char *buf, int n, void *d)
+static int tty_console_write(int fd, const char *buf, int n, void *d)
 {
 	struct tty_chan *data = d;
 

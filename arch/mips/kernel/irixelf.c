@@ -692,7 +692,7 @@ static int load_irix_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	/* Do this so that we can load the interpreter, if need be.  We will
 	 * change some of these later.
 	 */
-	current->mm->rss = 0;
+	set_mm_counter(current->mm, rss, 0);
 	setup_arg_pages(bprm, STACK_TOP, EXSTACK_DEFAULT);
 	current->mm->start_stack = bprm->p;
 
@@ -887,12 +887,11 @@ unsigned long irix_mapelf(int fd, struct elf_phdr *user_phdrp, int cnt)
 
 	/* First get the verification out of the way. */
 	hp = user_phdrp;
-	retval = verify_area(VERIFY_READ, hp, (sizeof(struct elf_phdr) * cnt));
-	if(retval) {
+	if (!access_ok(VERIFY_READ, hp, (sizeof(struct elf_phdr) * cnt))) {
 #ifdef DEBUG_ELF
-		printk("irix_mapelf: verify_area fails!\n");
+		printk("irix_mapelf: access_ok fails!\n");
 #endif
-		return retval;
+		return -EFAULT;
 	}
 
 #ifdef DEBUG_ELF

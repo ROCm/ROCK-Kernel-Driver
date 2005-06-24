@@ -232,8 +232,11 @@ static ssize_t set_in_min(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct sis5595_data *data = i2c_get_clientdata(client);
 	unsigned long val = simple_strtoul(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->in_min[nr] = IN_TO_REG(val);
 	sis5595_write_value(client, SIS5595_REG_IN_MIN(nr), data->in_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -243,8 +246,11 @@ static ssize_t set_in_max(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct sis5595_data *data = i2c_get_clientdata(client);
 	unsigned long val = simple_strtoul(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->in_max[nr] = IN_TO_REG(val);
 	sis5595_write_value(client, SIS5595_REG_IN_MAX(nr), data->in_max[nr]);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -305,8 +311,11 @@ static ssize_t set_temp_over(struct device *dev, const char *buf, size_t count)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct sis5595_data *data = i2c_get_clientdata(client);
 	long val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->temp_over = TEMP_TO_REG(val);
 	sis5595_write_value(client, SIS5595_REG_TEMP_OVER, data->temp_over);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -321,8 +330,11 @@ static ssize_t set_temp_hyst(struct device *dev, const char *buf, size_t count)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct sis5595_data *data = i2c_get_clientdata(client);
 	long val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->temp_hyst = TEMP_TO_REG(val);
 	sis5595_write_value(client, SIS5595_REG_TEMP_HYST, data->temp_hyst);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -353,8 +365,11 @@ static ssize_t set_fan_min(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct sis5595_data *data = i2c_get_clientdata(client);
 	unsigned long val = simple_strtoul(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->fan_min[nr] = FAN_TO_REG(val, DIV_FROM_REG(data->fan_div[nr]));
 	sis5595_write_value(client, SIS5595_REG_FAN_MIN(nr), data->fan_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -373,10 +388,15 @@ static ssize_t set_fan_div(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct sis5595_data *data = i2c_get_clientdata(client);
-	unsigned long min = FAN_FROM_REG(data->fan_min[nr],
-			DIV_FROM_REG(data->fan_div[nr]));
+	unsigned long min;
 	unsigned long val = simple_strtoul(buf, NULL, 10);
-	int reg = sis5595_read_value(client, SIS5595_REG_FANDIV);
+	int reg;
+
+	down(&data->update_lock);
+	min = FAN_FROM_REG(data->fan_min[nr],
+			DIV_FROM_REG(data->fan_div[nr]));
+	reg = sis5595_read_value(client, SIS5595_REG_FANDIV);
+
 	switch (val) {
 	case 1: data->fan_div[nr] = 0; break;
 	case 2: data->fan_div[nr] = 1; break;
@@ -385,6 +405,7 @@ static ssize_t set_fan_div(struct device *dev, const char *buf,
 	default:
 		dev_err(&client->dev, "fan_div value %ld not "
 			"supported. Choose one of 1, 2, 4 or 8!\n", val);
+		up(&data->update_lock);
 		return -EINVAL;
 	}
 	
@@ -400,6 +421,7 @@ static ssize_t set_fan_div(struct device *dev, const char *buf,
 	data->fan_min[nr] =
 		FAN_TO_REG(min, DIV_FROM_REG(data->fan_div[nr]));
 	sis5595_write_value(client, SIS5595_REG_FAN_MIN(nr), data->fan_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 

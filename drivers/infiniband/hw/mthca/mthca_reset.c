@@ -50,7 +50,7 @@ int mthca_reset(struct mthca_dev *mdev)
 	struct pci_dev *bridge = NULL;
 
 #define MTHCA_RESET_OFFSET 0xf0010
-#define MTHCA_RESET_VALUE  cpu_to_be32(1)
+#define MTHCA_RESET_VALUE  swab32(1)
 
 	/*
 	 * Reset the chip.  This is somewhat ugly because we have to
@@ -63,7 +63,7 @@ int mthca_reset(struct mthca_dev *mdev)
 	 * header as well.
 	 */
 
-	if (mdev->hca_type == TAVOR) {
+	if (!(mdev->mthca_flags & MTHCA_FLAG_PCIE)) {
 		/* Look for the bridge -- its device ID will be 2 more
 		   than HCA's device ID. */
 		while ((bridge = pci_get_device(mdev->pdev->vendor,

@@ -54,38 +54,44 @@ tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 {
 	struct mm_struct *mm = tlb->mm;
 	unsigned long freed = tlb->freed;
-	int rss = mm->rss;
+	int rss = get_mm_counter(mm, rss);
 
 	if (rss < freed)
 		freed = rss;
-	mm->rss = rss - freed;
+	add_mm_counter(mm, rss, -freed);
 
-	if (freed) {
+	if (tlb->fullmm)
 		flush_tlb_mm(mm);
-		tlb->flushes++;
-	} else {
-		tlb->avoided_flushes++;
-	}
 
 	/* keep the page table cache within bounds */
 	check_pgt_cache();
 }
 
-static inline unsigned int
-tlb_is_full_mm(struct mmu_gather *tlb)
+static inline unsigned int tlb_is_full_mm(struct mmu_gather *tlb)
 {
-     return tlb->fullmm;
+	return tlb->fullmm;
 }
 
 #define tlb_remove_tlb_entry(tlb,ptep,address)	do { } while (0)
 
-#define tlb_start_vma(tlb,vma)						\
-	do {								\
-		if (!tlb->fullmm)					\
-			flush_cache_range(vma, vma->vm_start, vma->vm_end); \
-	} while (0)
+/*
+ * In the case of tlb vma handling, we can optimise these away in the
+ * case where we're doing a full MM flush.  When we're doing a munmap,
+ * the vmas are adjusted to only cover the region to be torn down.
+ */
+static inline void
+tlb_start_vma(struct mmu_gather *tlb, struct vm_area_struct *vma)
+{
+	if (!tlb->fullmm)
+		flush_cache_range(vma, vma->vm_start, vma->vm_end);
+}
 
-#define tlb_end_vma(tlb,vma)			do { } while (0)
+static inline void
+tlb_end_vma(struct mmu_gather *tlb, struct vm_area_struct *vma)
+{
+	if (!tlb->fullmm)
+		flush_tlb_range(vma, vma->vm_start, vma->vm_end);
+}
 
 #define tlb_remove_page(tlb,page)	free_page_and_swap_cache(page)
 #define pte_free_tlb(tlb,ptep)		pte_free(ptep)

@@ -246,8 +246,8 @@ static __inline__ void
 mvme5100_set_bat(void)
 {
 	mb();
-	mtspr(DBAT1U, 0xf0001ffe);
-	mtspr(DBAT1L, 0xf000002a);
+	mtspr(SPRN_DBAT1U, 0xf0001ffe);
+	mtspr(SPRN_DBAT1L, 0xf000002a);
 	mb();
 }
 

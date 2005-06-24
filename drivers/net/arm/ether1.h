@@ -19,22 +19,25 @@
 #define NET_DEBUG 0
 #endif
 
+#define priv(dev)	((struct ether1_priv *)netdev_priv(dev))
+
 /* Page register */
-#define REG_PAGE	(dev->base_addr + 0x00)
+#define REG_PAGE	(priv(dev)->base + 0x0000)
 
 /* Control register */
-#define REG_CONTROL	(dev->base_addr + 0x01)
+#define REG_CONTROL	(priv(dev)->base + 0x0004)
 #define CTRL_RST	0x01
 #define CTRL_LOOPBACK	0x02
 #define CTRL_CA		0x04
 #define CTRL_ACK	0x08
 
-#define ETHER1_RAM	(dev->base_addr + 0x800)
+#define ETHER1_RAM	(priv(dev)->base + 0x2000)
 
 /* HW address */
-#define IDPROM_ADDRESS	(dev->base_addr + 0x09)
+#define IDPROM_ADDRESS	(priv(dev)->base + 0x0024)
 
 struct ether1_priv {
+	void __iomem *base;
 	struct net_device_stats stats;
 	unsigned int tx_link;
 	unsigned int tx_head;

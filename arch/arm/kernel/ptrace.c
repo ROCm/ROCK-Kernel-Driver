@@ -9,6 +9,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
@@ -18,6 +19,7 @@
 #include <linux/user.h>
 #include <linux/security.h>
 #include <linux/init.h>
+#include <linux/signal.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -608,6 +610,44 @@ static int ptrace_setfpregs(struct task_struct *tsk, void __user *ufp)
 			      sizeof(struct user_fp)) ? -EFAULT : 0;
 }
 
+#ifdef CONFIG_IWMMXT
+
+/*
+ * Get the child iWMMXt state.
+ */
+static int ptrace_getwmmxregs(struct task_struct *tsk, void __user *ufp)
+{
+	struct thread_info *thread = tsk->thread_info;
+	void *ptr = &thread->fpstate;
+
+	if (!test_ti_thread_flag(thread, TIF_USING_IWMMXT))
+		return -ENODATA;
+	iwmmxt_task_disable(thread);  /* force it to ram */
+	/* The iWMMXt state is stored doubleword-aligned.  */
+	if (((long) ptr) & 4)
+		ptr += 4;
+	return copy_to_user(ufp, ptr, 0x98) ? -EFAULT : 0;
+}
+
+/*
+ * Set the child iWMMXt state.
+ */
+static int ptrace_setwmmxregs(struct task_struct *tsk, void __user *ufp)
+{
+	struct thread_info *thread = tsk->thread_info;
+	void *ptr = &thread->fpstate;
+
+	if (!test_ti_thread_flag(thread, TIF_USING_IWMMXT))
+		return -EACCES;
+	iwmmxt_task_release(thread);  /* force a reload */
+	/* The iWMMXt state is stored doubleword-aligned.  */
+	if (((long) ptr) & 4)
+		ptr += 4;
+	return copy_from_user(ptr, ufp, 0x98) ? -EFAULT : 0;
+}
+
+#endif
+
 static int do_ptrace(int request, struct task_struct *child, long addr, long data)
 {
 	unsigned long tmp;
@@ -654,7 +694,7 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 		case PTRACE_SYSCALL:
 		case PTRACE_CONT:
 			ret = -EIO;
-			if ((unsigned long) data > _NSIG)
+			if (!valid_signal(data))
 				break;
 			if (request == PTRACE_SYSCALL)
 				set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
@@ -689,7 +729,7 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 		 */
 		case PTRACE_SINGLESTEP:
 			ret = -EIO;
-			if ((unsigned long) data > _NSIG)
+			if (!valid_signal(data))
 				break;
 			child->ptrace |= PT_SINGLESTEP;
 			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
@@ -718,6 +758,16 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 		case PTRACE_SETFPREGS:
 			ret = ptrace_setfpregs(child, (void __user *)data);
 			break;
+
+#ifdef CONFIG_IWMMXT
+		case PTRACE_GETWMMXREGS:
+			ret = ptrace_getwmmxregs(child, (void __user *)data);
+			break;
+
+		case PTRACE_SETWMMXREGS:
+			ret = ptrace_setwmmxregs(child, (void __user *)data);
+			break;
+#endif
 
 		case PTRACE_GET_THREAD_AREA:
 			ret = put_user(child->thread_info->tp_value,

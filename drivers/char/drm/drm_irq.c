@@ -54,7 +54,7 @@ int drm_irq_by_busid(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg)
 {
 	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	drm_irq_busid_t __user *argp = (void __user *)arg;
 	drm_irq_busid_t p;
 
@@ -196,7 +196,7 @@ int drm_control( struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg )
 {
 	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	drm_control_t ctl;
 	
 	/* if we haven't irq we fallback for compatibility reasons - this used to be a separate function in drm_dma.h */
@@ -243,7 +243,7 @@ int drm_control( struct inode *inode, struct file *filp,
 int drm_wait_vblank( DRM_IOCTL_ARGS )
 {
 	drm_file_t *priv = filp->private_data;
-	drm_device_t *dev = priv->dev;
+	drm_device_t *dev = priv->head->dev;
 	drm_wait_vblank_t __user *argp = (void __user *)data;
 	drm_wait_vblank_t vblwait;
 	struct timeval now;

@@ -966,7 +966,7 @@ pagebuf_cond_lock(			/* lock buffer, if not locked	*/
 	return(locked ? 0 : -EBUSY);
 }
 
-#ifdef DEBUG
+#if defined(DEBUG) || defined(XFS_BLI_TRACE)
 /*
  *	pagebuf_lock_value
  *
@@ -1283,7 +1283,7 @@ STATIC void
 _pagebuf_ioapply(
 	xfs_buf_t		*pb)
 {
-	int			i, map_i, total_nr_pages, nr_pages;
+	int			i, rw, map_i, total_nr_pages, nr_pages;
 	struct bio		*bio;
 	int			offset = pb->pb_offset;
 	int			size = pb->pb_count_desired;
@@ -1293,6 +1293,13 @@ _pagebuf_ioapply(
 
 	total_nr_pages = pb->pb_page_count;
 	map_i = 0;
+
+	if (pb->pb_flags & _PBF_RUN_QUEUES) {
+		pb->pb_flags &= ~_PBF_RUN_QUEUES;
+		rw = (pb->pb_flags & PBF_READ) ? READ_SYNC : WRITE_SYNC;
+	} else {
+		rw = (pb->pb_flags & PBF_READ) ? READ : WRITE;
+	}
 
 	/* Special code path for reading a sub page size pagebuf in --
 	 * we populate up the whole page, and hence the other metadata
@@ -1365,18 +1372,12 @@ next_chunk:
 
 submit_io:
 	if (likely(bio->bi_size)) {
-		submit_bio((pb->pb_flags & PBF_READ) ? READ : WRITE, bio);
+		submit_bio(rw, bio);
 		if (size)
 			goto next_chunk;
 	} else {
 		bio_put(bio);
 		pagebuf_ioerror(pb, EIO);
-	}
-
-	if (pb->pb_flags & _PBF_RUN_QUEUES) {
-		pb->pb_flags &= ~_PBF_RUN_QUEUES;
-		if (atomic_read(&pb->pb_io_remaining) > 1)
-			blk_run_address_space(pb->pb_target->pbr_mapping);
 	}
 }
 
@@ -1745,13 +1746,15 @@ STATIC DECLARE_COMPLETION(pagebuf_daemon_done);
 STATIC struct task_struct *pagebuf_daemon_task;
 STATIC int pagebuf_daemon_active;
 STATIC int force_flush;
-
+STATIC int force_sleep;
 
 STATIC int
 pagebuf_daemon_wakeup(
 	int			priority,
 	unsigned int		mask)
 {
+	if (force_sleep)
+		return 0;
 	force_flush = 1;
 	barrier();
 	wake_up_process(pagebuf_daemon_task);
@@ -1777,7 +1780,12 @@ pagebuf_daemon(
 
 	INIT_LIST_HEAD(&tmp);
 	do {
-		try_to_freeze(PF_FREEZE);
+		if (unlikely(current->flags & PF_FREEZE)) {
+			force_sleep = 1;
+			refrigerator(PF_FREEZE);
+		} else {
+			force_sleep = 0;
+		}
 
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout((xfs_buf_timer_centisecs * HZ) / 100);

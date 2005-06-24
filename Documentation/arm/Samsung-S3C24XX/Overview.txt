@@ -7,8 +7,8 @@ Introduction
 ------------
 
   The Samsung S3C24XX range of ARM9 System-on-Chip CPUs are supported
-  by the 's3c2410' architecture of ARM Linux. Currently the S3C2410 is
-  the only supported CPU in this range.
+  by the 's3c2410' architecture of ARM Linux. Currently the S3C2410 and
+  the S3C2440 are supported CPUs.
 
 
 Configuration
@@ -36,6 +36,10 @@ Machines
 
     Samsung's own development board, geared for PDA work.
 
+  Samsung/Meritech SMDK2440
+
+    The S3C2440 compatible version of the SMDK2440
+
   Thorcom VR1000
 
     Custom embedded board
@@ -44,11 +48,40 @@ Machines
 
     Handheld (IPAQ), available in several varieties
 
-
   HP iPAQ rx3715
 
     S3C2440 based IPAQ, with a number of variations depending on
     features shipped.
+
+  Acer N30
+
+    A S3C2410 based PDA from Acer.  There is a Wiki page at
+    http://handhelds.org/moin/moin.cgi/AcerN30Documentation .
+
+
+Adding New Machines
+-------------------
+
+  The archicture has been designed to support as many machines as can
+  be configured for it in one kernel build, and any future additions
+  should keep this in mind before altering items outside of their own
+  machine files.
+
+  Machine definitions should be kept in linux/arch/arm/mach-s3c2410,
+  and there are a number of examples that can be looked at.
+
+  Read the kernel patch submission policies as well as the
+  Documentation/arm directory before submitting patches. The
+  ARM kernel series is managed by Russell King, and has a patch system
+  located at http://www.arm.linux.org.uk/developer/patches/
+  as well as mailing lists that can be found from the same site.
+
+  As a courtesy, please notify <ben-linux@fluff.org> of any new
+  machines or other modifications.
+
+  Any large scale modifications, or new drivers should be discussed
+  on the ARM kernel mailing list (linux-arm-kernel) before being
+  attempted.
 
 
 NAND
@@ -98,6 +131,9 @@ Port Contributors
   Klaus Fetscher
   Dimitry Andric
   Shannon Holland
+  Guillaume Gourat (NexVision)
+  Christer Weinigel (wingel) (Acer N30)
+  Lucas Correia Villa Real (S3C2400 port)
 
 
 Document Changes
@@ -108,6 +144,11 @@ Document Changes
   25 Oct 2004 - BJD - Added Dimitry Andric to list of contributors
   25 Oct 2004 - BJD - Updated the MTD from the 2.6.9 merge
   21 Jan 2005 - BJD - Added rx3715, added Shannon to contributors
+  10 Feb 2005 - BJD - Added Guillaume Gourat to contributors
+  02 Mar 2005 - BJD - Added SMDK2440 to list of machines
+  06 Mar 2005 - BJD - Added Christer Weinigel
+  08 Mar 2005 - BJD - Added LCVR to list of people, updated introduction
+  08 Mar 2005 - BJD - Added section on adding machines
 
 Document Author
 ---------------

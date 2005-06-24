@@ -1,5 +1,6 @@
 #ifndef __LINUX_ATALK_H__
 #define __LINUX_ATALK_H__
+
 /*
  * AppleTalk networking structures
  *
@@ -36,6 +37,10 @@ struct atalk_netrange {
 	__u16	nr_lastnet;
 };
 
+#ifdef __KERNEL__
+
+#include <net/sock.h>
+
 struct atalk_route {
 	struct net_device  *dev;
 	struct atalk_addr  target;
@@ -63,6 +68,8 @@ struct atalk_iface {
 };
 	
 struct atalk_sock {
+	/* struct sock has to be the first member of atalk_sock */
+	struct sock	sk;
 	unsigned short	dest_net;
 	unsigned short	src_net;
 	unsigned char	dest_node;
@@ -71,7 +78,10 @@ struct atalk_sock {
 	unsigned char	src_port;
 };
 
-#ifdef __KERNEL__
+static inline struct atalk_sock *at_sk(struct sock *sk)
+{
+	return (struct atalk_sock *)sk;
+}
 
 #include <asm/byteorder.h>
 
@@ -196,8 +206,6 @@ extern void		 aarp_proxy_remove(struct net_device *dev,
 					   struct atalk_addr *sa);
 
 extern void		aarp_cleanup_module(void);
-
-#define at_sk(__sk) ((struct atalk_sock *)(__sk)->sk_protinfo)
 
 extern struct hlist_head atalk_sockets;
 extern rwlock_t atalk_sockets_lock;

@@ -6,7 +6,7 @@
  * arch/sh64/kernel/entry.S
  *
  * Copyright (C) 2000, 2001  Paolo Alberelli
- * Copyright (C) 2004  Paul Mundt
+ * Copyright (C) 2004, 2005  Paul Mundt
  * Copyright (C) 2003, 2004 Richard Curnow
  *
  */
@@ -155,7 +155,7 @@ trap_jtable:
 	.long	tlb_miss_store				/* 0x0C0 */
 	.long	do_address_error_load	/* 0x0E0 */
 	.long	do_address_error_store	/* 0x100 */
-#ifndef CONFIG_NOFPU_SUPPORT
+#ifdef CONFIG_SH_FPU
 	.long	do_fpu_error		/* 0x120 */
 #else
 	.long	do_exception_error		/* 0x120 */
@@ -237,6 +237,7 @@ LVBR_block:
 	.space	256, 0			/* Power-on class handler, */
 					/* not required here       */
 not_a_tlb_miss:
+	synco	/* TAKum03020 (but probably a good idea anyway.) */
 	/* Save original stack pointer into KCR1 */
 	putcon	SP, KCR1
 
@@ -278,6 +279,7 @@ not_a_tlb_miss:
 	 * block making sure the final alignment is correct.
 	 */
 tlb_miss:
+	synco	/* TAKum03020 (but probably a good idea anyway.) */
 	putcon	SP, KCR1
 	movi	reg_save_area, SP
 	/* SP is guaranteed 32-byte aligned. */
@@ -393,6 +395,7 @@ fixup_to_invoke_general_handler:
 	/* VBR + 0x600 */
 
 interrupt:
+	synco	/* TAKum03020 (but probably a good idea anyway.) */
 	/* Save original stack pointer into KCR1 */
 	putcon	SP, KCR1
 
@@ -429,6 +432,7 @@ LRESVEC_block:
 	 *			(this may need to be extended...)
 	 */
 reset_or_panic:
+	synco	/* TAKum03020 (but probably a good idea anyway.) */
 	putcon	SP, DCR
 	/* First save r0-1 and tr0, as we need to use these */
 	movi	resvec_save_area-CONFIG_CACHED_MEMORY_OFFSET, SP
@@ -481,6 +485,7 @@ single_step_panic:
 
 	.balign	256
 debug_exception:
+	synco	/* TAKum03020 (but probably a good idea anyway.) */
 	/*
 	 * Single step/software_break_point first level handler.
 	 * Called with MMU off, so the first thing we do is enable it
@@ -788,9 +793,7 @@ no_underflow:
 	! exceptions
 	add	SP, ZERO, r14
 
-#define POOR_MANS_STRACE 0
-
-#if POOR_MANS_STRACE
+#ifdef CONFIG_POOR_MANS_STRACE
 	/* We've pushed all the registers now, so only r2-r4 hold anything
 	 * useful. Move them into callee save registers */
 	or	r2, ZERO, r28
@@ -810,7 +813,6 @@ no_underflow:
 	or	r29, ZERO, r3
 	or	r30, ZERO, r4
 #endif
-
 
 	/* For syscall and debug race condition, get TRA now */
 	getcon	TRA, r5
@@ -866,7 +868,7 @@ no_underflow:
  */
 	.global ret_from_irq
 ret_from_irq:
-#if POOR_MANS_STRACE
+#ifdef CONFIG_POOR_MANS_STRACE
 	pta	evt_debug_ret_from_irq, tr0
 	ori	SP, 0, r2
 	blink	tr0, LINK
@@ -884,7 +886,7 @@ ret_from_irq:
 ret_from_exception:
 	preempt_stop()
 
-#if POOR_MANS_STRACE
+#ifdef CONFIG_POOR_MANS_STRACE
 	pta	evt_debug_ret_from_exc, tr0
 	ori	SP, 0, r2
 	blink	tr0, LINK
@@ -1141,7 +1143,7 @@ call_do_page_fault:
 fpu_error_or_IRQA:
 	pta	its_IRQ, tr0
 	beqi/l	r4, EVENT_INTERRUPT, tr0
-#ifndef CONFIG_NOFPU_SUPPORT
+#ifdef CONFIG_SH_FPU
 	movi	do_fpu_state_restore, r6
 #else
 	movi	do_exception_error, r6
@@ -1152,7 +1154,7 @@ fpu_error_or_IRQA:
 fpu_error_or_IRQB:
 	pta	its_IRQ, tr0
 	beqi/l	r4, EVENT_INTERRUPT, tr0
-#ifndef CONFIG_NOFPU_SUPPORT
+#ifdef CONFIG_SH_FPU
 	movi	do_fpu_state_restore, r6
 #else
 	movi	do_exception_error, r6
@@ -1223,7 +1225,7 @@ syscall_bad:
 syscall_ret:
 	st.q	SP, FRAME_R(9), r2	/* Expecting SP back to BASIC frame */
 
-#if POOR_MANS_STRACE
+#ifdef CONFIG_POOR_MANS_STRACE
 	/* nothing useful in registers at this point */
 
 	movi	evt_debug2, r5
@@ -1254,7 +1256,7 @@ ret_from_fork:
 	ptabs	r5, tr0
 	blink	tr0, LINK
 
-#if POOR_MANS_STRACE
+#ifdef CONFIG_POOR_MANS_STRACE
 	/* nothing useful in registers at this point */
 
 	movi	evt_debug2, r5

@@ -1,5 +1,5 @@
 /*
- * $Id: saa7134-core.c,v 1.23 2004/12/17 14:18:49 kraxel Exp $
+ * $Id: saa7134-core.c,v 1.28 2005/02/22 09:56:29 kraxel Exp $
  *
  * device driver for philips saa7134 based TV cards
  * driver core
@@ -1212,8 +1212,10 @@ static int saa7134_init(void)
 
 static void saa7134_fini(void)
 {
+#ifdef CONFIG_MODULES
 	if (pending_registered)
 		unregister_module_notifier(&pending_notifier);
+#endif
 	pci_unregister_driver(&saa7134_pci_driver);
 }
 

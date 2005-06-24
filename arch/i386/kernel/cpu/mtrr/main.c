@@ -57,10 +57,6 @@ static struct mtrr_ops * mtrr_ops[X86_VENDOR_NUM] = {};
 
 struct mtrr_ops * mtrr_if = NULL;
 
-__initdata char *mtrr_if_name[] = {
-    "none", "Intel", "AMD K6", "Cyrix ARR", "Centaur MCR"
-};
-
 static void set_mtrr(unsigned int reg, unsigned long base,
 		     unsigned long size, mtrr_type type);
 
@@ -76,17 +72,21 @@ void set_mtrr_ops(struct mtrr_ops * ops)
 static int have_wrcomb(void)
 {
 	struct pci_dev *dev;
+	u8 rev;
 	
 	if ((dev = pci_get_class(PCI_CLASS_BRIDGE_HOST << 8, NULL)) != NULL) {
-		/* ServerWorks LE chipsets have problems with write-combining 
+		/* ServerWorks LE chipsets < rev 6 have problems with write-combining
 		   Don't allow it and leave room for other chipsets to be tagged */
 		if (dev->vendor == PCI_VENDOR_ID_SERVERWORKS &&
 		    dev->device == PCI_DEVICE_ID_SERVERWORKS_LE) {
-			printk(KERN_INFO "mtrr: Serverworks LE detected. Write-combining disabled.\n");
-			pci_dev_put(dev);
-			return 0;
+			pci_read_config_byte(dev, PCI_CLASS_REVISION, &rev);
+			if (rev <= 5) {
+				printk(KERN_INFO "mtrr: Serverworks LE rev < 6 detected. Write-combining disabled.\n");
+				pci_dev_put(dev);
+				return 0;
+			}
 		}
-		/* Intel 450NX errata # 23. Non ascending cachline evictions to
+		/* Intel 450NX errata # 23. Non ascending cacheline evictions to
 		   write combining memory may resulting in data corruption */
 		if (dev->vendor == PCI_VENDOR_ID_INTEL &&
 		    dev->device == PCI_DEVICE_ID_INTEL_82451NX) {
@@ -100,7 +100,7 @@ static int have_wrcomb(void)
 }
 
 /*  This function returns the number of variable MTRRs  */
-void __init set_num_var_ranges(void)
+static void __init set_num_var_ranges(void)
 {
 	unsigned long config = 0, dummy;
 
@@ -618,40 +618,21 @@ static int __init mtrr_init(void)
 		mtrr_if = &generic_mtrr_ops;
 		size_or_mask = 0xff000000;	/* 36 bits */
 		size_and_mask = 0x00f00000;
-			
-		switch (boot_cpu_data.x86_vendor) {
-		case X86_VENDOR_AMD:
-			/* The original Athlon docs said that
-			   total addressable memory is 44 bits wide.
-			   It was not really clear whether its MTRRs
-			   follow this or not. (Read: 44 or 36 bits).
-			   However, "x86-64_overview.pdf" explicitly
-			   states that "previous implementations support
-			   36 bit MTRRs" and also provides a way to
-			   query the width (in bits) of the physical
-			   addressable memory on the Hammer family.
-			 */
-			if (boot_cpu_data.x86 == 15
-			    && (cpuid_eax(0x80000000) >= 0x80000008)) {
-				u32 phys_addr;
-				phys_addr = cpuid_eax(0x80000008) & 0xff;
-				size_or_mask =
-				    ~((1 << (phys_addr - PAGE_SHIFT)) - 1);
-				size_and_mask = ~size_or_mask & 0xfff00000;
-			}
-			/* Athlon MTRRs use an Intel-compatible interface for 
-			 * getting and setting */
-			break;
-		case X86_VENDOR_CENTAUR:
-			if (boot_cpu_data.x86 == 6) {
-				/* VIA Cyrix family have Intel style MTRRs, but don't support PAE */
-				size_or_mask = 0xfff00000;	/* 32 bits */
-				size_and_mask = 0;
-			}
-			break;
-		
-		default:
-			break;
+
+		/* This is an AMD specific MSR, but we assume(hope?) that
+		   Intel will implement it to when they extend the address
+		   bus of the Xeon. */
+		if (cpuid_eax(0x80000000) >= 0x80000008) {
+			u32 phys_addr;
+			phys_addr = cpuid_eax(0x80000008) & 0xff;
+			size_or_mask = ~((1 << (phys_addr - PAGE_SHIFT)) - 1);
+			size_and_mask = ~size_or_mask & 0xfff00000;
+		} else if (boot_cpu_data.x86_vendor == X86_VENDOR_CENTAUR &&
+			   boot_cpu_data.x86 == 6) {
+			/* VIA C* family have Intel style MTRRs, but
+			   don't support PAE */
+			size_or_mask = 0xfff00000;	/* 32 bits */
+			size_and_mask = 0;
 		}
 	} else {
 		switch (boot_cpu_data.x86_vendor) {

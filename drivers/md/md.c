@@ -332,7 +332,7 @@ static int bi_complete(struct bio *bio, unsigned int bytes_done, int error)
 static int sync_page_io(struct block_device *bdev, sector_t sector, int size,
 		   struct page *page, int rw)
 {
-	struct bio *bio = bio_alloc(GFP_KERNEL, 1);
+	struct bio *bio = bio_alloc(GFP_NOIO, 1);
 	struct completion event;
 	int ret;
 
@@ -527,7 +527,7 @@ static int super_90_load(mdk_rdev_t *rdev, mdk_rdev_t *refdev, int minor_version
 	rdev->preferred_minor = sb->md_minor;
 	rdev->data_offset = 0;
 
-	if (sb->level == MULTIPATH)
+	if (sb->level == LEVEL_MULTIPATH)
 		rdev->desc_nr = -1;
 	else
 		rdev->desc_nr = sb->this_disk.number;
@@ -940,7 +940,7 @@ static void super_1_sync(mddev_t *mddev, mdk_rdev_t *rdev)
 	
 	sb->max_dev = cpu_to_le32(max_dev);
 	for (i=0; i<max_dev;i++)
-		sb->dev_roles[max_dev] = cpu_to_le16(0xfffe);
+		sb->dev_roles[i] = cpu_to_le16(0xfffe);
 	
 	ITERATE_RDEV(mddev,rdev2,tmp) {
 		i = rdev2->desc_nr;
@@ -957,7 +957,7 @@ static void super_1_sync(mddev_t *mddev, mdk_rdev_t *rdev)
 }
 
 
-struct super_type super_types[] = {
+static struct super_type super_types[] = {
 	[0] = {
 		.name	= "0.90.0",
 		.owner	= THIS_MODULE,
@@ -1387,7 +1387,7 @@ abort_free:
  */
 
 
-static int analyze_sbs(mddev_t * mddev)
+static void analyze_sbs(mddev_t * mddev)
 {
 	int i;
 	struct list_head *tmp;
@@ -1435,14 +1435,12 @@ static int analyze_sbs(mddev_t * mddev)
 
 
 
-	if ((mddev->recovery_cp != MaxSector) &&
-	    ((mddev->level == 1) ||
-	     ((mddev->level >= 4) && (mddev->level <= 6))))
+	if (mddev->recovery_cp != MaxSector &&
+	    mddev->level >= 1)
 		printk(KERN_ERR "md: %s: raid array is not clean"
 		       " -- starting background reconstruction\n",
 		       mdname(mddev));
 
-	return 0;
 }
 
 int mdp_major = 0;
@@ -1509,10 +1507,9 @@ static int do_md_run(mddev_t * mddev)
 	struct gendisk *disk;
 	char b[BDEVNAME_SIZE];
 
-	if (list_empty(&mddev->disks)) {
-		MD_BUG();
+	if (list_empty(&mddev->disks))
+		/* cannot run an array with no devices.. */
 		return -EINVAL;
-	}
 
 	if (mddev->pers)
 		return -EBUSY;
@@ -1520,10 +1517,8 @@ static int do_md_run(mddev_t * mddev)
 	/*
 	 * Analyze all RAID superblock(s)
 	 */
-	if (!mddev->raid_disks && analyze_sbs(mddev)) {
-		MD_BUG();
-		return -EINVAL;
-	}
+	if (!mddev->raid_disks)
+		analyze_sbs(mddev);
 
 	chunk_size = mddev->chunk_size;
 	pnum = level_to_pers(mddev->level);
@@ -1549,7 +1544,7 @@ static int do_md_run(mddev_t * mddev)
 		 * chunk-size has to be a power of 2 and multiples of PAGE_SIZE
 		 */
 		if ( (1 << ffz(~chunk_size)) != chunk_size) {
-			MD_BUG();
+			printk(KERN_ERR "chunk_size of %d not valid\n", chunk_size);
 			return -EINVAL;
 		}
 		if (chunk_size < PAGE_SIZE) {
@@ -1572,11 +1567,6 @@ static int do_md_run(mddev_t * mddev)
 				return -EINVAL;
 			}
 		}
-	}
-
-	if (pnum >= MAX_PERSONALITY) {
-		MD_BUG();
-		return -EINVAL;
 	}
 
 #ifdef CONFIG_KMOD
@@ -1763,10 +1753,8 @@ static void autorun_array(mddev_t *mddev)
 	struct list_head *tmp;
 	int err;
 
-	if (list_empty(&mddev->disks)) {
-		MD_BUG();
+	if (list_empty(&mddev->disks))
 		return;
-	}
 
 	printk(KERN_INFO "md: running: ");
 
@@ -2752,7 +2740,7 @@ static struct block_device_operations md_fops =
 	.revalidate_disk= md_revalidate,
 };
 
-int md_thread(void * arg)
+static int md_thread(void * arg)
 {
 	mdk_thread_t *thread = arg;
 
@@ -2841,16 +2829,6 @@ mdk_thread_t *md_register_thread(void (*run) (mddev_t *), mddev_t *mddev,
 	return thread;
 }
 
-static void md_interrupt_thread(mdk_thread_t *thread)
-{
-	if (!thread->tsk) {
-		MD_BUG();
-		return;
-	}
-	dprintk("interrupting MD-thread pid %d\n", thread->tsk->pid);
-	send_sig(SIGKILL, thread->tsk, 1);
-}
-
 void md_unregister_thread(mdk_thread_t *thread)
 {
 	struct completion event;
@@ -2858,9 +2836,15 @@ void md_unregister_thread(mdk_thread_t *thread)
 	init_completion(&event);
 
 	thread->event = &event;
+
+	/* As soon as ->run is set to NULL, the task could disappear,
+	 * so we need to hold tasklist_lock until we have sent the signal
+	 */
+	dprintk("interrupting MD-thread pid %d\n", thread->tsk->pid);
+	read_lock(&tasklist_lock);
 	thread->run = NULL;
-	thread->name = NULL;
-	md_interrupt_thread(thread);
+	send_sig(SIGKILL, thread->tsk, 1);
+	read_unlock(&tasklist_lock);
 	wait_for_completion(&event);
 	kfree(thread);
 }
@@ -3133,7 +3117,6 @@ int register_md_personality(int pnum, mdk_personality_t *p)
 	spin_lock(&pers_lock);
 	if (pers[pnum]) {
 		spin_unlock(&pers_lock);
-		MD_BUG();
 		return -EBUSY;
 	}
 
@@ -3145,10 +3128,8 @@ int register_md_personality(int pnum, mdk_personality_t *p)
 
 int unregister_md_personality(int pnum)
 {
-	if (pnum >= MAX_PERSONALITY) {
-		MD_BUG();
+	if (pnum >= MAX_PERSONALITY)
 		return -EINVAL;
-	}
 
 	printk(KERN_INFO "md: %s personality unregistered\n", pers[pnum]->name);
 	spin_lock(&pers_lock);
@@ -3251,7 +3232,7 @@ void md_handle_safemode(mddev_t *mddev)
 }
 
 
-DECLARE_WAIT_QUEUE_HEAD(resync_wait);
+static DECLARE_WAIT_QUEUE_HEAD(resync_wait);
 
 #define SYNC_MARKS	10
 #define	SYNC_MARK_STEP	(3*HZ)
@@ -3545,18 +3526,18 @@ void md_check_recovery(mddev_t *mddev)
 
 		/* no recovery is running.
 		 * remove any failed drives, then
-		 * add spares if possible
+		 * add spares if possible.
+		 * Spare are also removed and re-added, to allow
+		 * the personality to fail the re-add.
 		 */
-		ITERATE_RDEV(mddev,rdev,rtmp) {
+		ITERATE_RDEV(mddev,rdev,rtmp)
 			if (rdev->raid_disk >= 0 &&
-			    rdev->faulty &&
+			    (rdev->faulty || ! rdev->in_sync) &&
 			    atomic_read(&rdev->nr_pending)==0) {
 				if (mddev->pers->hot_remove_disk(mddev, rdev->raid_disk)==0)
 					rdev->raid_disk = -1;
 			}
-			if (!rdev->faulty && rdev->raid_disk >= 0 && !rdev->in_sync)
-				spares++;
-		}
+
 		if (mddev->degraded) {
 			ITERATE_RDEV(mddev,rdev,rtmp)
 				if (rdev->raid_disk < 0
@@ -3594,8 +3575,8 @@ void md_check_recovery(mddev_t *mddev)
 	}
 }
 
-int md_notify_reboot(struct notifier_block *this,
-					unsigned long code, void *x)
+static int md_notify_reboot(struct notifier_block *this,
+			    unsigned long code, void *x)
 {
 	struct list_head *tmp;
 	mddev_t *mddev;
@@ -3618,7 +3599,7 @@ int md_notify_reboot(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
-struct notifier_block md_notifier = {
+static struct notifier_block md_notifier = {
 	.notifier_call	= md_notify_reboot,
 	.next		= NULL,
 	.priority	= INT_MAX, /* before any real devices */
@@ -3635,7 +3616,7 @@ static void md_geninit(void)
 		p->proc_fops = &md_seq_fops;
 }
 
-int __init md_init(void)
+static int __init md_init(void)
 {
 	int minor;
 

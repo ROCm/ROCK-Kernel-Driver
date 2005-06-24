@@ -2938,7 +2938,7 @@ static int __init hrz_module_init (void) {
   hrz_check_args();
   
   // get the juice
-  return pci_module_init(&hrz_driver);
+  return pci_register_driver(&hrz_driver);
 }
 
 /********** module exit **********/

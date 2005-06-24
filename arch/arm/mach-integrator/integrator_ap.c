@@ -137,7 +137,7 @@ static void __init ap_init_irq(void)
 #ifdef CONFIG_PM
 static unsigned long ic_irq_enable;
 
-static int irq_suspend(struct sys_device *dev, u32 state)
+static int irq_suspend(struct sys_device *dev, pm_message_t state)
 {
 	ic_irq_enable = readl(VA_IC_BASE + IRQ_ENABLE);
 	return 0;

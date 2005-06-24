@@ -390,7 +390,7 @@ enum backoff_bits {
 
 #ifdef USE_MMIO
 /* Registers we check that mmio and reg are the same. */
-int mmio_verify_registers[] = {
+static const int mmio_verify_registers[] = {
 	RxConfig, TxConfig, IntrEnable, ConfigA, ConfigB, ConfigC, ConfigD,
 	0
 };
@@ -1942,7 +1942,7 @@ static void rhine_shutdown (struct device *gendev)
 }
 
 #ifdef CONFIG_PM
-static int rhine_suspend(struct pci_dev *pdev, u32 state)
+static int rhine_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct rhine_private *rp = netdev_priv(dev);

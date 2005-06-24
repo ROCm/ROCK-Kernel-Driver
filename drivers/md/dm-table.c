@@ -242,7 +242,7 @@ static void free_devices(struct list_head *devices)
 	}
 }
 
-void table_destroy(struct dm_table *t)
+static void table_destroy(struct dm_table *t)
 {
 	unsigned int i;
 
@@ -454,6 +454,8 @@ static int __table_get_device(struct dm_table *t, struct dm_target *ti,
 			kfree(dd);
 			return r;
 		}
+
+		format_dev_t(dd->name, dev);
 
 		atomic_set(&dd->count, 0);
 		list_add(&dd->list, &t->devices);

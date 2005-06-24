@@ -34,11 +34,33 @@
 
 #include <asm/hardware/locomo.h>
 
+/* M62332 output channel selection */
+#define M62332_EVR_CH	1	/* M62332 volume channel number  */
+				/*   0 : CH.1 , 1 : CH. 2        */
+/* DAC send data */
+#define	M62332_SLAVE_ADDR	0x4e	/* Slave address  */
+#define	M62332_W_BIT		0x00	/* W bit (0 only) */
+#define	M62332_SUB_ADDR		0x00	/* Sub address    */
+#define	M62332_A_BIT		0x00	/* A bit (0 only) */
+
+/* DAC setup and hold times (expressed in us) */
+#define DAC_BUS_FREE_TIME	5	/*   4.7 us */
+#define DAC_START_SETUP_TIME	5	/*   4.7 us */
+#define DAC_STOP_SETUP_TIME	4	/*   4.0 us */
+#define DAC_START_HOLD_TIME	5	/*   4.7 us */
+#define DAC_SCL_LOW_HOLD_TIME	5	/*   4.7 us */
+#define DAC_SCL_HIGH_HOLD_TIME	4	/*   4.0 us */
+#define DAC_DATA_SETUP_TIME	1	/*   250 ns */
+#define DAC_DATA_HOLD_TIME	1	/*   300 ns */
+#define DAC_LOW_SETUP_TIME	1	/*   300 ns */
+#define DAC_HIGH_SETUP_TIME	1	/*  1000 ns */
+
 /* the following is the overall data for the locomo chip */
 struct locomo {
 	struct device *dev;
 	unsigned long phys;
 	unsigned int irq;
+	spinlock_t lock;
 	void *base;
 };
 
@@ -50,7 +72,57 @@ struct locomo_dev_info {
 	const char *	name;
 };
 
+/* All the locomo devices.  If offset is non-zero, the mapbase for the
+ * locomo_dev will be set to the chip base plus offset.  If offset is
+ * zero, then the mapbase for the locomo_dev will be set to zero.  An
+ * offset of zero means the device only uses GPIOs or other helper
+ * functions inside this file */
 static struct locomo_dev_info locomo_devices[] = {
+	{
+		.devid 		= LOCOMO_DEVID_KEYBOARD,
+		.irq = {
+			IRQ_LOCOMO_KEY,
+		},
+		.name		= "locomo-keyboard",
+		.offset		= LOCOMO_KEYBOARD,
+		.length		= 16,
+	},
+	{
+		.devid		= LOCOMO_DEVID_FRONTLIGHT,
+		.irq		= {},
+		.name		= "locomo-frontlight",
+		.offset		= LOCOMO_FRONTLIGHT,
+		.length		= 8,
+
+	},
+	{
+		.devid		= LOCOMO_DEVID_BACKLIGHT,
+		.irq		= {},
+		.name		= "locomo-backlight",
+		.offset		= LOCOMO_BACKLIGHT,
+		.length		= 8,
+	},
+	{
+		.devid		= LOCOMO_DEVID_AUDIO,
+		.irq		= {},
+		.name		= "locomo-audio",
+		.offset		= LOCOMO_AUDIO,
+		.length		= 4,
+	},
+	{
+		.devid		= LOCOMO_DEVID_LED,
+		.irq 		= {},
+		.name		= "locomo-led",
+		.offset		= LOCOMO_LED,
+		.length		= 8,
+	},
+	{
+		.devid		= LOCOMO_DEVID_UART,
+		.irq		= {},
+		.name		= "locomo-uart",
+		.offset		= 0,
+		.length		= 0,
+	},
 };
 
 
@@ -146,7 +218,7 @@ static void locomo_key_handler(unsigned int irq, struct irqdesc *desc,
 	struct irqdesc *d;
 	void *mapbase = get_irq_chipdata(irq);
 
-	if (locomo_readl(mapbase + LOCOMO_KIC) & 0x0001) {
+	if (locomo_readl(mapbase + LOCOMO_KEYBOARD + LOCOMO_KIC) & 0x0001) {
 		d = irq_desc + LOCOMO_IRQ_KEY_START;
 		d->handle(LOCOMO_IRQ_KEY_START, d, regs);
 	}
@@ -156,27 +228,27 @@ static void locomo_key_ack_irq(unsigned int irq)
 {
 	void *mapbase = get_irq_chipdata(irq);
 	unsigned int r;
-	r = locomo_readl(mapbase + LOCOMO_KIC);
+	r = locomo_readl(mapbase + LOCOMO_KEYBOARD + LOCOMO_KIC);
 	r &= ~(0x0100 << (irq - LOCOMO_IRQ_KEY_START));
-	locomo_writel(r, mapbase + LOCOMO_KIC);
+	locomo_writel(r, mapbase + LOCOMO_KEYBOARD + LOCOMO_KIC);
 }
 
 static void locomo_key_mask_irq(unsigned int irq)
 {
 	void *mapbase = get_irq_chipdata(irq);
 	unsigned int r;
-	r = locomo_readl(mapbase + LOCOMO_KIC);
+	r = locomo_readl(mapbase + LOCOMO_KEYBOARD + LOCOMO_KIC);
 	r &= ~(0x0010 << (irq - LOCOMO_IRQ_KEY_START));
-	locomo_writel(r, mapbase + LOCOMO_KIC);
+	locomo_writel(r, mapbase + LOCOMO_KEYBOARD + LOCOMO_KIC);
 }
 
 static void locomo_key_unmask_irq(unsigned int irq)
 {
 	void *mapbase = get_irq_chipdata(irq);
 	unsigned int r;
-	r = locomo_readl(mapbase + LOCOMO_KIC);
+	r = locomo_readl(mapbase + LOCOMO_KEYBOARD + LOCOMO_KIC);
 	r |= (0x0010 << (irq - LOCOMO_IRQ_KEY_START));
-	locomo_writel(r, mapbase + LOCOMO_KIC);
+	locomo_writel(r, mapbase + LOCOMO_KEYBOARD + LOCOMO_KIC);
 }
 
 static struct irqchip locomo_key_chip = {
@@ -421,13 +493,11 @@ static void locomo_dev_release(struct device *_dev)
 {
 	struct locomo_dev *dev = LOCOMO_DEV(_dev);
 
-	release_resource(&dev->res);
 	kfree(dev);
 }
 
 static int
-locomo_init_one_child(struct locomo *lchip, struct resource *parent,
-		      struct locomo_dev_info *info)
+locomo_init_one_child(struct locomo *lchip, struct locomo_dev_info *info)
 {
 	struct locomo_dev *dev;
 	int ret;
@@ -454,25 +524,17 @@ locomo_init_one_child(struct locomo *lchip, struct resource *parent,
 	dev->dev.bus     = &locomo_bus_type;
 	dev->dev.release = locomo_dev_release;
 	dev->dev.coherent_dma_mask = lchip->dev->coherent_dma_mask;
-	dev->res.start   = lchip->phys + info->offset;
-	dev->res.end     = dev->res.start + info->length;
-	dev->res.name    = dev->dev.bus_id;
-	dev->res.flags   = IORESOURCE_MEM;
-	dev->mapbase     = lchip->base + info->offset;
-	memmove(dev->irq, info->irq, sizeof(dev->irq));
 
-	if (info->length) {
-		ret = request_resource(parent, &dev->res);
-		if (ret) {
-			printk("LoCoMo: failed to allocate resource for %s\n",
-				dev->res.name);
-			goto out;
-		}
-	}
+	if (info->offset)
+		dev->mapbase = lchip->base + info->offset;
+	else
+		dev->mapbase = 0;
+	dev->length = info->length;
+
+	memmove(dev->irq, info->irq, sizeof(dev->irq));
 
 	ret = device_register(&dev->dev);
 	if (ret) {
-		release_resource(&dev->res);
  out:
 		kfree(dev);
 	}
@@ -504,6 +566,8 @@ __locomo_probe(struct device *me, struct resource *mem, int irq)
 
 	memset(lchip, 0, sizeof(struct locomo));
 
+	spin_lock_init(&lchip->lock);
+
 	lchip->dev = me;
 	dev_set_drvdata(lchip->dev, lchip);
 
@@ -523,7 +587,7 @@ __locomo_probe(struct device *me, struct resource *mem, int irq)
 	/* locomo initialize */
 	locomo_writel(0, lchip->base + LOCOMO_ICR);
 	/* KEYBOARD */
-	locomo_writel(0, lchip->base + LOCOMO_KIC);
+	locomo_writel(0, lchip->base + LOCOMO_KEYBOARD + LOCOMO_KIC);
 
 	/* GPIO */
 	locomo_writel(0, lchip->base + LOCOMO_GPO);
@@ -534,8 +598,8 @@ __locomo_probe(struct device *me, struct resource *mem, int irq)
 	locomo_writel(0, lchip->base + LOCOMO_GIE);
 
 	/* FrontLight */
-	locomo_writel(0, lchip->base + LOCOMO_ALS);
-	locomo_writel(0, lchip->base + LOCOMO_ALD);
+	locomo_writel(0, lchip->base + LOCOMO_FRONTLIGHT + LOCOMO_ALS);
+	locomo_writel(0, lchip->base + LOCOMO_FRONTLIGHT + LOCOMO_ALD);
 	/* Longtime timer */
 	locomo_writel(0, lchip->base + LOCOMO_LTINT);
 	/* SPI */
@@ -578,7 +642,7 @@ __locomo_probe(struct device *me, struct resource *mem, int irq)
 		locomo_setup_irq(lchip);
 
 	for (i = 0; i < ARRAY_SIZE(locomo_devices); i++)
-		locomo_init_one_child(lchip, mem, &locomo_devices[i]);
+		locomo_init_one_child(lchip, &locomo_devices[i]);
 
 	return 0;
 
@@ -652,6 +716,238 @@ static struct device_driver locomo_device_driver = {
 static inline struct locomo *locomo_chip_driver(struct locomo_dev *ldev)
 {
 	return (struct locomo *)dev_get_drvdata(ldev->dev.parent);
+}
+
+void locomo_gpio_set_dir(struct locomo_dev *ldev, unsigned int bits, unsigned int dir)
+{
+	struct locomo *lchip = locomo_chip_driver(ldev);
+	unsigned long flags;
+	unsigned int r;
+
+	spin_lock_irqsave(&lchip->lock, flags);
+
+	r = locomo_readl(lchip->base + LOCOMO_GPD);
+	r &= ~bits;
+	locomo_writel(r, lchip->base + LOCOMO_GPD);
+
+	r = locomo_readl(lchip->base + LOCOMO_GPE);
+	if (dir)
+		r |= bits;
+	else
+		r &= ~bits;
+	locomo_writel(r, lchip->base + LOCOMO_GPE);
+
+	spin_unlock_irqrestore(&lchip->lock, flags);
+}
+
+unsigned int locomo_gpio_read_level(struct locomo_dev *ldev, unsigned int bits)
+{
+	struct locomo *lchip = locomo_chip_driver(ldev);
+	unsigned long flags;
+	unsigned int ret;
+
+	spin_lock_irqsave(&lchip->lock, flags);
+	ret = locomo_readl(lchip->base + LOCOMO_GPL);
+	spin_unlock_irqrestore(&lchip->lock, flags);
+
+	ret &= bits;
+	return ret;
+}
+
+unsigned int locomo_gpio_read_output(struct locomo_dev *ldev, unsigned int bits)
+{
+	struct locomo *lchip = locomo_chip_driver(ldev);
+	unsigned long flags;
+	unsigned int ret;
+
+	spin_lock_irqsave(&lchip->lock, flags);
+	ret = locomo_readl(lchip->base + LOCOMO_GPO);
+	spin_unlock_irqrestore(&lchip->lock, flags);
+
+	ret &= bits;
+	return ret;
+}
+
+void locomo_gpio_write(struct locomo_dev *ldev, unsigned int bits, unsigned int set)
+{
+	struct locomo *lchip = locomo_chip_driver(ldev);
+	unsigned long flags;
+	unsigned int r;
+
+	spin_lock_irqsave(&lchip->lock, flags);
+
+	r = locomo_readl(lchip->base + LOCOMO_GPO);
+	if (set)
+		r |= bits;
+	else
+		r &= ~bits;
+	locomo_writel(r, lchip->base + LOCOMO_GPO);
+
+	spin_unlock_irqrestore(&lchip->lock, flags);
+}
+
+static void locomo_m62332_sendbit(void *mapbase, int bit)
+{
+	unsigned int r;
+
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r &=  ~(LOCOMO_DAC_SCLOEB);
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+	udelay(DAC_DATA_HOLD_TIME);	/* 300 nsec */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r &=  ~(LOCOMO_DAC_SCLOEB);
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+
+	if (bit & 1) {
+		r = locomo_readl(mapbase + LOCOMO_DAC);
+		r |=  LOCOMO_DAC_SDAOEB;
+		locomo_writel(r, mapbase + LOCOMO_DAC);
+		udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+	} else {
+		r = locomo_readl(mapbase + LOCOMO_DAC);
+		r &=  ~(LOCOMO_DAC_SDAOEB);
+		locomo_writel(r, mapbase + LOCOMO_DAC);
+		udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+	}
+
+	udelay(DAC_DATA_SETUP_TIME);	/* 250 nsec */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r |=  LOCOMO_DAC_SCLOEB;
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+	udelay(DAC_SCL_HIGH_HOLD_TIME);	/*  4.0 usec */
+}
+
+void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int channel)
+{
+	struct locomo *lchip = locomo_chip_driver(ldev);
+	int i;
+	unsigned char data;
+	unsigned int r;
+	void *mapbase = lchip->base;
+	unsigned long flags;
+
+	spin_lock_irqsave(&lchip->lock, flags);
+
+	/* Start */
+	udelay(DAC_BUS_FREE_TIME);	/* 5.0 usec */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r |=  LOCOMO_DAC_SCLOEB | LOCOMO_DAC_SDAOEB;
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.0 usec */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r &=  ~(LOCOMO_DAC_SDAOEB);
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_START_HOLD_TIME);	/* 5.0 usec */
+	udelay(DAC_DATA_HOLD_TIME);	/* 300 nsec */
+
+	/* Send slave address and W bit (LSB is W bit) */
+	data = (M62332_SLAVE_ADDR << 1) | M62332_W_BIT;
+	for (i = 1; i <= 8; i++) {
+		locomo_m62332_sendbit(mapbase, data >> (8 - i));
+	}
+
+	/* Check A bit */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r &=  ~(LOCOMO_DAC_SCLOEB);
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r &=  ~(LOCOMO_DAC_SDAOEB);
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r |=  LOCOMO_DAC_SCLOEB;
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.7 usec */
+	if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {	/* High is error */
+		printk(KERN_WARNING "locomo: m62332_senddata Error 1\n");
+		return;
+	}
+
+	/* Send Sub address (LSB is channel select) */
+	/*    channel = 0 : ch1 select              */
+	/*            = 1 : ch2 select              */
+	data = M62332_SUB_ADDR + channel;
+	for (i = 1; i <= 8; i++) {
+		locomo_m62332_sendbit(mapbase, data >> (8 - i));
+	}
+
+	/* Check A bit */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r &=  ~(LOCOMO_DAC_SCLOEB);
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r &=  ~(LOCOMO_DAC_SDAOEB);
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r |=  LOCOMO_DAC_SCLOEB;
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.7 usec */
+	if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {	/* High is error */
+		printk(KERN_WARNING "locomo: m62332_senddata Error 2\n");
+		return;
+	}
+
+	/* Send DAC data */
+	for (i = 1; i <= 8; i++) {
+		locomo_m62332_sendbit(mapbase, dac_data >> (8 - i));
+	}
+
+	/* Check A bit */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r &=  ~(LOCOMO_DAC_SCLOEB);
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r &=  ~(LOCOMO_DAC_SDAOEB);
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r |=  LOCOMO_DAC_SCLOEB;
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.7 usec */
+	if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {	/* High is error */
+		printk(KERN_WARNING "locomo: m62332_senddata Error 3\n");
+		return;
+	}
+
+	/* stop */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r &=  ~(LOCOMO_DAC_SCLOEB);
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r |=  LOCOMO_DAC_SCLOEB;
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4 usec */
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r |=  LOCOMO_DAC_SDAOEB;
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4 usec */
+
+	r = locomo_readl(mapbase + LOCOMO_DAC);
+	r |=  LOCOMO_DAC_SCLOEB | LOCOMO_DAC_SDAOEB;
+	locomo_writel(r, mapbase + LOCOMO_DAC);
+	udelay(DAC_LOW_SETUP_TIME);	/* 1000 nsec */
+	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+
+	spin_unlock_irqrestore(&lchip->lock, flags);
 }
 
 /*
@@ -755,3 +1051,8 @@ MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
 
 EXPORT_SYMBOL(locomo_driver_register);
 EXPORT_SYMBOL(locomo_driver_unregister);
+EXPORT_SYMBOL(locomo_gpio_set_dir);
+EXPORT_SYMBOL(locomo_gpio_read_level);
+EXPORT_SYMBOL(locomo_gpio_read_output);
+EXPORT_SYMBOL(locomo_gpio_write);
+EXPORT_SYMBOL(locomo_m62332_senddata);

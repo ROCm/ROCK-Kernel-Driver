@@ -92,26 +92,17 @@ void innovator_fpga_IRQ_demux(unsigned int irq, struct irqdesc *desc,
 	u32 stat;
 	int fpga_irq;
 
-	/*
-	 * Acknowledge the parent IRQ.
-	 */
-	desc->chip->ack(irq);
+	stat = get_fpga_unmasked_irqs();
 
-	for (;;) {
-		stat = get_fpga_unmasked_irqs();
+	if (!stat)
+		return;
 
-		if (!stat) {
-			break;
-		}
-
-		for (fpga_irq = OMAP1510_IH_FPGA_BASE;
-			(fpga_irq < (OMAP1510_IH_FPGA_BASE + NR_FPGA_IRQS)) && stat;
-			fpga_irq++, stat >>= 1) {
-			if (stat & 1) {
-				d = irq_desc + fpga_irq;
-				d->handle(fpga_irq, d, regs);
-				desc->chip->unmask(irq);
-			}
+	for (fpga_irq = OMAP1510_IH_FPGA_BASE;
+	     (fpga_irq < (OMAP1510_IH_FPGA_BASE + NR_FPGA_IRQS)) && stat;
+	     fpga_irq++, stat >>= 1) {
+		if (stat & 1) {
+			d = irq_desc + fpga_irq;
+			d->handle(fpga_irq, d, regs);
 		}
 	}
 }
@@ -177,7 +168,7 @@ void omap1510_fpga_init_irq(void)
 			set_irq_chip(i, &omap_fpga_irq);
 		}
 
-		set_irq_handler(i, do_level_IRQ);
+		set_irq_handler(i, do_edge_IRQ);
 		set_irq_flags(i, IRQF_VALID);
 	}
 

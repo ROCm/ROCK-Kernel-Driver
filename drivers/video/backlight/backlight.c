@@ -111,7 +111,7 @@ static void backlight_class_release(struct class_device *dev)
 	kfree(bd);
 }
 
-struct class backlight_class = {
+static struct class backlight_class = {
 	.name = "backlight",
 	.release = backlight_class_release,
 };

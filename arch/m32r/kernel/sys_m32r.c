@@ -171,9 +171,9 @@ asmlinkage int sys_ipc(uint call, int first, int second,
 	case SHMAT: {
 		ulong raddr;
 
-		if ((ret = verify_area(VERIFY_WRITE, (ulong __user *) third,
-				      sizeof(ulong))))
-			return ret;
+		if (!access_ok(VERIFY_WRITE, (ulong __user *) third,
+				      sizeof(ulong)))
+			return -EFAULT;
 		ret = do_shmat (first, (char __user *) ptr, second, &raddr);
 		if (ret)
 			return ret;

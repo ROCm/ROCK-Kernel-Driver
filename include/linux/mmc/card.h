@@ -75,7 +75,7 @@ struct mmc_driver {
 	struct device_driver drv;
 	int (*probe)(struct mmc_card *);
 	void (*remove)(struct mmc_card *);
-	int (*suspend)(struct mmc_card *, u32);
+	int (*suspend)(struct mmc_card *, pm_message_t);
 	int (*resume)(struct mmc_card *);
 };
 

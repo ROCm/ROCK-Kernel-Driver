@@ -1380,6 +1380,10 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 	 *		- ldX.spill
 	 *		- stX.spill
 	 *	Reason: RNATs are based on addresses
+	 *		- ld16
+	 *		- st16
+	 *	Reason: ld16 and st16 are supposed to occur in a single
+	 *		memory op
 	 *
 	 *	synchronization:
 	 *		- cmpxchg
@@ -1401,6 +1405,10 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 	switch (opcode) {
 	      case LDS_OP:
 	      case LDSA_OP:
+		if (u.insn.x)
+			/* oops, really a semaphore op (cmpxchg, etc) */
+			goto failure;
+		/* no break */
 	      case LDS_IMM_OP:
 	      case LDSA_IMM_OP:
 	      case LDFS_OP:
@@ -1425,6 +1433,10 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 	      case LDCCLR_OP:
 	      case LDCNC_OP:
 	      case LDCCLRACQ_OP:
+		if (u.insn.x)
+			/* oops, really a semaphore op (cmpxchg, etc) */
+			goto failure;
+		/* no break */
 	      case LD_IMM_OP:
 	      case LDA_IMM_OP:
 	      case LDBIAS_IMM_OP:
@@ -1437,6 +1449,10 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 
 	      case ST_OP:
 	      case STREL_OP:
+		if (u.insn.x)
+			/* oops, really a semaphore op (cmpxchg, etc) */
+			goto failure;
+		/* no break */
 	      case ST_IMM_OP:
 	      case STREL_IMM_OP:
 		ret = emulate_store_int(ifa, u.insn, regs);

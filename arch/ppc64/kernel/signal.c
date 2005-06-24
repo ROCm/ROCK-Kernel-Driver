@@ -27,6 +27,8 @@
 #include <linux/stddef.h>
 #include <linux/elf.h>
 #include <linux/ptrace.h>
+#include <linux/module.h>
+
 #include <asm/sigcontext.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
@@ -34,16 +36,13 @@
 #include <asm/ppcdebug.h>
 #include <asm/unistd.h>
 #include <asm/cacheflush.h>
+#include <asm/vdso.h>
 
 #define DEBUG_SIG 0
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-#ifndef MIN
-#define MIN(a,b) (((a) < (b)) ? (a) : (b))
-#endif
-
-#define GP_REGS_SIZE	MIN(sizeof(elf_gregset_t), sizeof(struct pt_regs))
+#define GP_REGS_SIZE	min(sizeof(elf_gregset_t), sizeof(struct pt_regs))
 #define FP_REGS_SIZE	sizeof(elf_fpregset_t)
 
 #define TRAMP_TRACEBACK	3
@@ -313,7 +312,7 @@ int sys_swapcontext(struct ucontext __user *old_ctx,
 		return -EINVAL;
 
 	if (old_ctx != NULL) {
-		if (verify_area(VERIFY_WRITE, old_ctx, sizeof(*old_ctx))
+		if (!access_ok(VERIFY_WRITE, old_ctx, sizeof(*old_ctx))
 		    || setup_sigcontext(&old_ctx->uc_mcontext, regs, 0, NULL, 0)
 		    || __copy_to_user(&old_ctx->uc_sigmask,
 				      &current->blocked, sizeof(sigset_t)))
@@ -321,7 +320,7 @@ int sys_swapcontext(struct ucontext __user *old_ctx,
 	}
 	if (new_ctx == NULL)
 		return 0;
-	if (verify_area(VERIFY_READ, new_ctx, sizeof(*new_ctx))
+	if (!access_ok(VERIFY_READ, new_ctx, sizeof(*new_ctx))
 	    || __get_user(tmp, (u8 __user *) new_ctx)
 	    || __get_user(tmp, (u8 __user *) (new_ctx + 1) - 1))
 		return -EFAULT;
@@ -331,7 +330,7 @@ int sys_swapcontext(struct ucontext __user *old_ctx,
 	 * image of the user's registers, we can't just return -EFAULT
 	 * because the user's registers will be corrupted.  For instance
 	 * the NIP value may have been updated but not some of the
-	 * other registers.  Given that we have done the verify_area
+	 * other registers.  Given that we have done the access_ok
 	 * and successfully read the first and last bytes of the region
 	 * above, this should only happen in an out-of-memory situation
 	 * or if another thread unmaps the region containing the context.
@@ -363,7 +362,7 @@ int sys_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	/* Always make any pending restarted system calls return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
-	if (verify_area(VERIFY_READ, uc, sizeof(*uc)))
+	if (!access_ok(VERIFY_READ, uc, sizeof(*uc)))
 		goto badframe;
 
 	if (__copy_from_user(&set, &uc->uc_sigmask, sizeof(set)))
@@ -403,7 +402,7 @@ static int setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
 
-	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto badframe;
 
 	err |= __put_user(&frame->info, &frame->pinfo);
@@ -426,10 +425,14 @@ static int setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 		goto badframe;
 
 	/* Set up to return from userspace. */
-	err |= setup_trampoline(__NR_rt_sigreturn, &frame->tramp[0]);
-	if (err)
-		goto badframe;
-
+	if (vdso64_rt_sigtramp && current->thread.vdso_base) {
+		regs->link = current->thread.vdso_base + vdso64_rt_sigtramp;
+	} else {
+		err |= setup_trampoline(__NR_rt_sigreturn, &frame->tramp[0]);
+		if (err)
+			goto badframe;
+		regs->link = (unsigned long) &frame->tramp[0];
+	}
 	funct_desc_ptr = (func_descr_t __user *) ka->sa.sa_handler;
 
 	/* Allocate a dummy caller frame for the signal handler. */
@@ -438,7 +441,6 @@ static int setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
 
 	/* Set up "regs" so we "return" to the signal handler. */
 	err |= get_user(regs->nip, &funct_desc_ptr->entry);
-	regs->link = (unsigned long) &frame->tramp[0];
 	regs->gpr[1] = newsp;
 	err |= get_user(regs->gpr[2], &funct_desc_ptr->toc);
 	regs->gpr[3] = signr;
@@ -566,6 +568,4 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 
 	return 0;
 }
-
-
-
+EXPORT_SYMBOL(do_signal);

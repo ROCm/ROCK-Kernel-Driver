@@ -40,7 +40,7 @@ config COMPAT
 	bool
 	default y
 
-config FRAME_POINTER
+config SCHED_NO_NO_OMIT_FRAME_POINTER
 	bool
 	default y
 
@@ -193,7 +193,10 @@ config NR_CPUS
 
 config HMT
 	bool "Hardware multithreading"
-	depends on SMP && PPC_PSERIES
+	depends on SMP && PPC_PSERIES && BROKEN
+	help
+	  This option enables hardware multithreading on RS64 cpus.
+	  pSeries systems p620 and p660 have such a cpu type.
 
 config DISCONTIGMEM
 	bool "Discontiguous Memory Support"
@@ -252,16 +255,22 @@ config MSCHUNKS
 
 
 config PPC_RTAS
-	bool "Proc interface to RTAS"
+	bool
 	depends on PPC_PSERIES
+	default y
+
+config RTAS_PROC
+	bool "Proc interface to RTAS"
+	depends on PPC_RTAS
+	default y
 
 config RTAS_FLASH
 	tristate "Firmware flash interface"
-	depends on PPC_RTAS
+	depends on RTAS_PROC
 
 config SCANLOG
 	tristate "Scanlog dump interface"
-	depends on PPC_RTAS
+	depends on RTAS_PROC && PPC_PSERIES
 
 config LPARCFG
 	tristate "LPAR Configuration Data"
@@ -270,8 +279,28 @@ config LPARCFG
 	Provide system capacity information via human readable
 	<key word>=<value> pairs through a /proc/ppc64/lparcfg interface.
 
+config SECCOMP
+	bool "Enable seccomp to safely compute untrusted bytecode"
+	depends on PROC_FS
+	default y
+	help
+	  This kernel feature is useful for number crunching applications
+	  that may need to compute untrusted bytecode during their
+	  execution. By using pipes or other transports made available to
+	  the process as file descriptors supporting the read/write
+	  syscalls, it's possible to isolate those applications in
+	  their own address space using seccomp. Once seccomp is
+	  enabled via /proc/<pid>/seccomp, it cannot be disabled
+	  and the task is only allowed to execute a few safe syscalls
+	  defined by each seccomp mode.
+
+	  If unsure, say Y. Only embedded should say N here.
+
 endmenu
 
+config ISA_DMA_API
+	bool
+	default y
 
 menu "General setup"
 
@@ -312,7 +341,7 @@ source "drivers/pci/Kconfig"
 
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs"
-	depends on SMP && EXPERIMENTAL && PPC_PSERIES
+	depends on SMP && EXPERIMENTAL && (PPC_PSERIES || PPC_PMAC)
 	select HOTPLUG
 	---help---
 	  Say Y here to be able to turn CPUs off and on.

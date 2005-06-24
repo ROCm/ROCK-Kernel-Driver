@@ -56,9 +56,10 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_device.h>
+#include <scsi/scsi_transport_spi.h>
 #include <scsi/scsi_host.h>
 
-#include "sym_conf.h"
+#include "sym53c8xx.h"
 #include "sym_defs.h"
 #include "sym_misc.h"
 
@@ -70,7 +71,6 @@
 #define SYM_OPT_HANDLE_DIR_UNKNOWN
 #define SYM_OPT_HANDLE_DEVICE_QUEUEING
 #define SYM_OPT_LIMIT_COMMAND_REORDERING
-#define	SYM_OPT_ANNOUNCE_TRANSFER_RATE
 
 /*
  *  Print a message with severity.
@@ -84,11 +84,6 @@
 #define	printf_info(args...)	printk(KERN_INFO args)
 #define	printf_debug(args...)	printk(KERN_DEBUG args)
 #define	printf(args...)		printk(args)
-
-/*
- *  Insert a delay in micro-seconds
- */
-#define sym_udelay(us)	udelay(us)
 
 /*
  *  A 'read barrier' flushes any data that have been prefetched 
@@ -111,34 +106,18 @@
 #define MEMORY_WRITE_BARRIER()	wmb()
 
 /*
- *  Let the compiler know about driver data structure names.
- */
-typedef struct sym_tcb *tcb_p;
-typedef struct sym_lcb *lcb_p;
-typedef struct sym_ccb *ccb_p;
-
-/*
  *  IO functions definition for big/little endian CPU support.
  *  For now, PCI chips are only supported in little endian addressing mode, 
  */
 
 #ifdef	__BIG_ENDIAN
 
-#define	inw_l2b		inw
-#define	inl_l2b		inl
-#define	outw_b2l	outw
-#define	outl_b2l	outl
 #define	readw_l2b	readw
 #define	readl_l2b	readl
 #define	writew_b2l	writew
 #define	writel_b2l	writel
 
 #else	/* little endian */
-
-#define	inw_raw		inw
-#define	inl_raw		inl
-#define	outw_raw	outw
-#define	outl_raw	outl
 
 #define	readw_raw	readw
 #define	readl_raw	readl
@@ -151,27 +130,6 @@ typedef struct sym_ccb *ccb_p;
 #error	"Chips in BIG ENDIAN addressing mode are not (yet) supported"
 #endif
 
-
-/*
- *  If the chip uses big endian addressing mode over the 
- *  PCI, actual io register addresses for byte and word 
- *  accesses must be changed according to lane routing.
- *  Btw, sym_offb() and sym_offw() macros only apply to 
- *  constants and so donnot generate bloated code.
- */
-
-#if	defined(SYM_CONF_CHIP_BIG_ENDIAN)
-
-#define sym_offb(o)	(((o)&~3)+((~((o)&3))&3))
-#define sym_offw(o)	(((o)&~3)+((~((o)&3))&2))
-
-#else
-
-#define sym_offb(o)	(o)
-#define sym_offw(o)	(o)
-
-#endif
-
 /*
  *  If the CPU and the chip use same endian-ness addressing,
  *  no byte reordering is needed for script patching.
@@ -180,116 +138,8 @@ typedef struct sym_ccb *ccb_p;
  *  from the script.
  */
 
-#if	defined(__BIG_ENDIAN) && !defined(SYM_CONF_CHIP_BIG_ENDIAN)
-
 #define cpu_to_scr(dw)	cpu_to_le32(dw)
 #define scr_to_cpu(dw)	le32_to_cpu(dw)
-
-#elif	defined(__LITTLE_ENDIAN) && defined(SYM_CONF_CHIP_BIG_ENDIAN)
-
-#define cpu_to_scr(dw)	cpu_to_be32(dw)
-#define scr_to_cpu(dw)	be32_to_cpu(dw)
-
-#else
-
-#define cpu_to_scr(dw)	(dw)
-#define scr_to_cpu(dw)	(dw)
-
-#endif
-
-/*
- *  Access to the controller chip.
- *
- *  If SYM_CONF_IOMAPPED is defined, the driver will use 
- *  normal IOs instead of the MEMORY MAPPED IO method  
- *  recommended by PCI specifications.
- *  If all PCI bridges, host brigdes and architectures 
- *  would have been correctly designed for PCI, this 
- *  option would be useless.
- *
- *  If the CPU and the chip use same endian-ness addressing,
- *  no byte reordering is needed for accessing chip io 
- *  registers. Functions suffixed by '_raw' are assumed 
- *  to access the chip over the PCI without doing byte 
- *  reordering. Functions suffixed by '_l2b' are 
- *  assumed to perform little-endian to big-endian byte 
- *  reordering, those suffixed by '_b2l' blah, blah,
- *  blah, ...
- */
-
-#if defined(SYM_CONF_IOMAPPED)
-
-/*
- *  IO mapped only input / ouput
- */
-
-#define	INB_OFF(o)        inb (np->s.io_port + sym_offb(o))
-#define	OUTB_OFF(o, val)  outb ((val), np->s.io_port + sym_offb(o))
-
-#if	defined(__BIG_ENDIAN) && !defined(SYM_CONF_CHIP_BIG_ENDIAN)
-
-#define	INW_OFF(o)        inw_l2b (np->s.io_port + sym_offw(o))
-#define	INL_OFF(o)        inl_l2b (np->s.io_port + (o))
-
-#define	OUTW_OFF(o, val)  outw_b2l ((val), np->s.io_port + sym_offw(o))
-#define	OUTL_OFF(o, val)  outl_b2l ((val), np->s.io_port + (o))
-
-#elif	defined(__LITTLE_ENDIAN) && defined(SYM_CONF_CHIP_BIG_ENDIAN)
-
-#define	INW_OFF(o)        inw_b2l (np->s.io_port + sym_offw(o))
-#define	INL_OFF(o)        inl_b2l (np->s.io_port + (o))
-
-#define	OUTW_OFF(o, val)  outw_l2b ((val), np->s.io_port + sym_offw(o))
-#define	OUTL_OFF(o, val)  outl_l2b ((val), np->s.io_port + (o))
-
-#else
-
-#define	INW_OFF(o)        inw_raw (np->s.io_port + sym_offw(o))
-#define	INL_OFF(o)        inl_raw (np->s.io_port + (o))
-
-#define	OUTW_OFF(o, val)  outw_raw ((val), np->s.io_port + sym_offw(o))
-#define	OUTL_OFF(o, val)  outl_raw ((val), np->s.io_port + (o))
-
-#endif	/* ENDIANs */
-
-#else	/* defined SYM_CONF_IOMAPPED */
-
-/*
- *  MEMORY mapped IO input / output
- */
-
-#define INB_OFF(o)        readb(np->s.mmio_va + sym_offb(o))
-#define OUTB_OFF(o, val)  writeb((val), np->s.mmio_va + sym_offb(o))
-
-#if	defined(__BIG_ENDIAN) && !defined(SYM_CONF_CHIP_BIG_ENDIAN)
-
-#define INW_OFF(o)        readw_l2b(np->s.mmio_va + sym_offw(o))
-#define INL_OFF(o)        readl_l2b(np->s.mmio_va + (o))
-
-#define OUTW_OFF(o, val)  writew_b2l((val), np->s.mmio_va + sym_offw(o))
-#define OUTL_OFF(o, val)  writel_b2l((val), np->s.mmio_va + (o))
-
-#elif	defined(__LITTLE_ENDIAN) && defined(SYM_CONF_CHIP_BIG_ENDIAN)
-
-#define INW_OFF(o)        readw_b2l(np->s.mmio_va + sym_offw(o))
-#define INL_OFF(o)        readl_b2l(np->s.mmio_va + (o))
-
-#define OUTW_OFF(o, val)  writew_l2b((val), np->s.mmio_va + sym_offw(o))
-#define OUTL_OFF(o, val)  writel_l2b((val), np->s.mmio_va + (o))
-
-#else
-
-#define INW_OFF(o)        readw_raw(np->s.mmio_va + sym_offw(o))
-#define INL_OFF(o)        readl_raw(np->s.mmio_va + (o))
-
-#define OUTW_OFF(o, val)  writew_raw((val), np->s.mmio_va + sym_offw(o))
-#define OUTL_OFF(o, val)  writel_raw((val), np->s.mmio_va + (o))
-
-#endif
-
-#endif	/* defined SYM_CONF_IOMAPPED */
-
-#define OUTRAM_OFF(o, a, l) memcpy_toio(np->s.ram_va + (o), (a), (l))
 
 /*
  *  Remap some status field values.
@@ -360,9 +210,8 @@ struct sym_shcb {
 
 	struct Scsi_Host *host;
 
-	void __iomem *	mmio_va;	/* MMIO kernel virtual address	*/
-	void __iomem *	ram_va;		/* RAM  kernel virtual address	*/
-	u_long		io_port;	/* IO port address cookie	*/
+	void __iomem *	ioaddr;		/* MMIO kernel io address	*/
+	void __iomem *	ramaddr;	/* RAM  kernel io address	*/
 	u_short		io_ws;		/* IO window size		*/
 	int		irq;		/* IRQ number			*/
 
@@ -377,29 +226,20 @@ struct sym_shcb {
  */
 #define sym_name(np) (np)->s.inst_name
 
-/*
- *  Data structure used as input for the NVRAM reading.
- *  Must resolve the IO macros and sym_name(), when  
- *  used as sub-field 's' of another structure.
- */
-struct sym_slot {
-	u_long	base;
-	u_long	base_2;
-	u_long	base_c;
-	u_long	base_2_c;
-	int	irq;
-/* port and address fields to fit INB, OUTB macros */
-	u_long	io_port;
-	void __iomem *	mmio_va;
-	char	inst_name[16];
-};
-
 struct sym_nvram;
 
+/*
+ * The IO macros require a struct called 's' and are abused in sym_nvram.c
+ */
 struct sym_device {
 	struct pci_dev *pdev;
-	struct sym_slot  s;
-	struct sym_pci_chip chip;
+	unsigned long mmio_base;
+	unsigned long ram_base;
+	struct {
+		void __iomem *ioaddr;
+		void __iomem *ramaddr;
+	} s;
+	struct sym_chip chip;
 	struct sym_nvram *nvram;
 	u_short device_id;
 	u_char host_id;
@@ -412,133 +252,48 @@ struct host_data {
 	struct sym_hcb *ncb;
 };
 
-/*
- *  The driver definitions (sym_hipd.h) must know about a 
- *  couple of things related to the memory allocator.
- */
-typedef u_long m_addr_t;	/* Enough bits to represent any address */
-#define SYM_MEM_PAGE_ORDER 0	/* 1 PAGE  maximum */
-#define SYM_MEM_CLUSTER_SHIFT	(PAGE_SHIFT+SYM_MEM_PAGE_ORDER)
-#ifdef	MODULE
-#define SYM_MEM_FREE_UNUSED	/* Free unused pages immediately */
-#endif
-typedef struct pci_dev *m_pool_ident_t;
+static inline struct sym_hcb * sym_get_hcb(struct Scsi_Host *host)
+{
+	return ((struct host_data *)host->hostdata)->ncb;
+}
 
-/*
- *  Include driver soft definitions.
- */
 #include "sym_fw.h"
 #include "sym_hipd.h"
-
-/*
- *  Memory allocator related stuff.
- */
-
-#define SYM_MEM_GFP_FLAGS	GFP_ATOMIC
-#define SYM_MEM_WARN	1	/* Warn on failed operations */
-
-#define sym_get_mem_cluster()	\
-	__get_free_pages(SYM_MEM_GFP_FLAGS, SYM_MEM_PAGE_ORDER)
-#define sym_free_mem_cluster(p)	\
-	free_pages(p, SYM_MEM_PAGE_ORDER)
-
-void *sym_calloc(int size, char *name);
-void sym_mfree(void *m, int size, char *name);
-
-/*
- *  We have to provide the driver memory allocator with methods for 
- *  it to maintain virtual to bus physical address translations.
- */
-
-#define sym_m_pool_match(mp_id1, mp_id2)	(mp_id1 == mp_id2)
-
-static __inline m_addr_t sym_m_get_dma_mem_cluster(m_pool_p mp, m_vtob_p vbp)
-{
-	void *vaddr = NULL;
-	dma_addr_t baddr = 0;
-
-	vaddr = pci_alloc_consistent(mp->dev_dmat,SYM_MEM_CLUSTER_SIZE, &baddr);
-	if (vaddr) {
-		vbp->vaddr = (m_addr_t) vaddr;
-		vbp->baddr = (m_addr_t) baddr;
-	}
-	return (m_addr_t) vaddr;
-}
-
-static __inline void sym_m_free_dma_mem_cluster(m_pool_p mp, m_vtob_p vbp)
-{
-	pci_free_consistent(mp->dev_dmat, SYM_MEM_CLUSTER_SIZE,
-	                    (void *)vbp->vaddr, (dma_addr_t)vbp->baddr);
-}
-
-#define sym_m_create_dma_mem_tag(mp)	(0)
-#define sym_m_delete_dma_mem_tag(mp)	do { ; } while (0)
-
-void *__sym_calloc_dma(m_pool_ident_t dev_dmat, int size, char *name);
-void __sym_mfree_dma(m_pool_ident_t dev_dmat, void *m, int size, char *name);
-m_addr_t __vtobus(m_pool_ident_t dev_dmat, void *m);
 
 /*
  *  Set the status field of a CAM CCB.
  */
 static __inline void 
-sym_set_cam_status(struct scsi_cmnd *ccb, int status)
+sym_set_cam_status(struct scsi_cmnd *cmd, int status)
 {
-	ccb->result &= ~(0xff  << 16);
-	ccb->result |= (status << 16);
+	cmd->result &= ~(0xff  << 16);
+	cmd->result |= (status << 16);
 }
 
 /*
  *  Get the status field of a CAM CCB.
  */
 static __inline int 
-sym_get_cam_status(struct scsi_cmnd *ccb)
+sym_get_cam_status(struct scsi_cmnd *cmd)
 {
-	return ((ccb->result >> 16) & 0xff);
+	return host_byte(cmd->result);
 }
-
-/*
- *  The dma mapping is mostly handled by the 
- *  SCSI layer and the driver glue under Linux.
- */
-#define sym_data_dmamap_create(np, cp)		(0)
-#define sym_data_dmamap_destroy(np, cp)		do { ; } while (0)
-#define sym_data_dmamap_unload(np, cp)		do { ; } while (0)
-#define sym_data_dmamap_presync(np, cp)		do { ; } while (0)
-#define sym_data_dmamap_postsync(np, cp)	do { ; } while (0)
-
-/*
- *  Async handler for negotiations.
- */
-void sym_xpt_async_nego_wide(struct sym_hcb *np, int target);
-#define sym_xpt_async_nego_sync(np, target)	\
-	sym_announce_transfer_rate(np, target)
-#define sym_xpt_async_nego_ppr(np, target)	\
-	sym_announce_transfer_rate(np, target)
 
 /*
  *  Build CAM result for a successful IO and for a failed IO.
  */
-static __inline void sym_set_cam_result_ok(struct sym_hcb *np, ccb_p cp, int resid)
+static __inline void sym_set_cam_result_ok(struct sym_ccb *cp, struct scsi_cmnd *cmd, int resid)
 {
-	struct scsi_cmnd *cmd = cp->cam_ccb;
-
 	cmd->resid = resid;
 	cmd->result = (((DID_OK) << 16) + ((cp->ssss_status) & 0x7f));
 }
-void sym_set_cam_result_error(struct sym_hcb *np, ccb_p cp, int resid);
+void sym_set_cam_result_error(struct sym_hcb *np, struct sym_ccb *cp, int resid);
 
-/*
- *  Other O/S specific methods.
- */
-#define sym_cam_target_id(ccb)	(ccb)->target
-#define sym_cam_target_lun(ccb)	(ccb)->lun
-#define	sym_freeze_cam_ccb(ccb)	do { ; } while (0)
 void sym_xpt_done(struct sym_hcb *np, struct scsi_cmnd *ccb);
-void sym_print_addr (ccb_p cp);
+#define sym_print_addr(cmd, arg...) dev_info(&cmd->device->sdev_gendev , ## arg)
 void sym_xpt_async_bus_reset(struct sym_hcb *np);
 void sym_xpt_async_sent_bdr(struct sym_hcb *np, int target);
-int  sym_setup_data_and_start (struct sym_hcb *np, struct scsi_cmnd *csio, ccb_p cp);
+int  sym_setup_data_and_start (struct sym_hcb *np, struct scsi_cmnd *csio, struct sym_ccb *cp);
 void sym_log_bus_error(struct sym_hcb *np);
 void sym_sniff_inquiry(struct sym_hcb *np, struct scsi_cmnd *cmd, int resid);
 

@@ -54,7 +54,7 @@ int postinit( struct drm_device *dev, unsigned long flags )
 		DRIVER_MINOR,
 		DRIVER_PATCHLEVEL,
 		DRIVER_DATE,
-		dev->minor,
+		dev->primary.minor,
 		pci_pretty_name(dev->pdev)
 		);
 	return 0;
@@ -87,6 +87,7 @@ static struct drm_driver driver = {
 #endif
 	.dev_priv_size = sizeof(drm_i830_buf_priv_t),
 	.pretakedown = i830_driver_pretakedown,
+	.prerelease = i830_driver_prerelease,
 	.release = i830_driver_release,
 	.dma_quiescent = i830_driver_dma_quiescent,
 	.reclaim_buffers = i830_reclaim_buffers,

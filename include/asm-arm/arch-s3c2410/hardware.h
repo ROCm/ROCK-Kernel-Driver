@@ -97,11 +97,7 @@ extern unsigned int s3c2410_modify_misccr(unsigned int clr, unsigned int chg);
 #include <asm/sizes.h>
 #include <asm/arch/map.h>
 
-/* machine specific includes, such as the BAST */
-
-#if defined(CONFIG_ARCH_BAST)
-#include <asm/arch/bast-cpld.h>
-#endif
+/* machine specific hardware definitions should go after this */
 
 /* currently here until moved into config (todo) */
 #define CONFIG_NO_MULTIWORD_IO

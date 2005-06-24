@@ -33,6 +33,7 @@
 #include <linux/irq.h>
 #include <linux/ptrace.h>
 #include <linux/utsname.h>
+#include <linux/random.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -52,7 +53,7 @@ asmlinkage extern void ret_from_fork(void);
 
 unsigned long kernel_thread_flags = CLONE_VM | CLONE_UNTRACED;
 
-atomic_t hlt_counter = ATOMIC_INIT(0);
+static atomic_t hlt_counter = ATOMIC_INIT(0);
 
 unsigned long boot_option_idle_override = 0;
 EXPORT_SYMBOL(boot_option_idle_override);
@@ -61,7 +62,7 @@ EXPORT_SYMBOL(boot_option_idle_override);
  * Powermanagement idle function, if any..
  */
 void (*pm_idle)(void);
-static cpumask_t cpu_idle_map;
+static DEFINE_PER_CPU(unsigned int, cpu_idle_state);
 
 void disable_hlt(void)
 {
@@ -124,20 +125,31 @@ static void poll_idle (void)
 	}
 }
 
-
 void cpu_idle_wait(void)
 {
-        int cpu;
-        cpumask_t map;
+	unsigned int cpu, this_cpu = get_cpu();
+	cpumask_t map;
 
-        for_each_online_cpu(cpu)
-                cpu_set(cpu, cpu_idle_map);
+	set_cpus_allowed(current, cpumask_of_cpu(this_cpu));
+	put_cpu();
 
-        wmb();
-        do {
-                ssleep(1);
-                cpus_and(map, cpu_idle_map, cpu_online_map);
-        } while (!cpus_empty(map));
+	cpus_clear(map);
+	for_each_online_cpu(cpu) {
+		per_cpu(cpu_idle_state, cpu) = 1;
+		cpu_set(cpu, map);
+	}
+
+	__get_cpu_var(cpu_idle_state) = 0;
+
+	wmb();
+	do {
+		ssleep(1);
+		for_each_online_cpu(cpu) {
+			if (cpu_isset(cpu, map) && !per_cpu(cpu_idle_state, cpu))
+				cpu_clear(cpu, map);
+		}
+		cpus_and(map, map, cpu_online_map);
+	} while (!cpus_empty(map));
 }
 EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
@@ -149,21 +161,21 @@ EXPORT_SYMBOL_GPL(cpu_idle_wait);
  */
 void cpu_idle (void)
 {
-	int cpu = smp_processor_id();
-
 	/* endless idle loop with no priority at all */
 	while (1) {
 		while (!need_resched()) {
 			void (*idle)(void);
 
-			if (cpu_isset(cpu, cpu_idle_map))
-				cpu_clear(cpu, cpu_idle_map);
+			if (__get_cpu_var(cpu_idle_state))
+				__get_cpu_var(cpu_idle_state) = 0;
+
 			rmb();
 			idle = pm_idle;
 			if (!idle)
 				idle = default_idle;
 			idle();
 		}
+
 		schedule();
 	}
 }
@@ -390,10 +402,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	p->thread.fs = me->thread.fs;
 	p->thread.gs = me->thread.gs;
 
-	savesegment(gs,p->thread.gsindex);
-	savesegment(fs,p->thread.fsindex);
-	savesegment(es,p->thread.es);
-	savesegment(ds,p->thread.ds);
+	asm("mov %%gs,%0" : "=m" (p->thread.gsindex));
+	asm("mov %%fs,%0" : "=m" (p->thread.fsindex));
+	asm("mov %%es,%0" : "=m" (p->thread.es));
+	asm("mov %%ds,%0" : "=m" (p->thread.ds));
 
 	if (unlikely(me->thread.io_bitmap_ptr != NULL)) { 
 		p->thread.io_bitmap_ptr = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
@@ -456,11 +468,11 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 	 * Switch DS and ES.
 	 * This won't pick up thread selector changes, but I guess that is ok.
 	 */
-	savesegment(es,prev->es);
+	asm volatile("mov %%es,%0" : "=m" (prev->es));
 	if (unlikely(next->es | prev->es))
 		loadsegment(es, next->es); 
-
-	savesegment(ds,prev->ds);
+	
+	asm volatile ("mov %%ds,%0" : "=m" (prev->ds));
 	if (unlikely(next->ds | prev->ds))
 		loadsegment(ds, next->ds);
 
@@ -471,7 +483,7 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 	 */
 	{ 
 		unsigned fsindex;
-		asm volatile("movl %%fs,%0" : "=g" (fsindex)); 
+		asm volatile("movl %%fs,%0" : "=r" (fsindex)); 
 		/* segment register != 0 always requires a reload. 
 		   also reload when it has changed. 
 		   when prev process used 64bit base always reload
@@ -492,7 +504,7 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 	}
 	{ 
 		unsigned gsindex;
-		asm volatile("movl %%gs,%0" : "=g" (gsindex)); 
+		asm volatile("movl %%gs,%0" : "=r" (gsindex)); 
 		if (unlikely(gsindex | next->gsindex | prev->gs)) {
 			load_gs_index(next->gsindex);
 			if (gsindex)
@@ -748,4 +760,11 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 	elf_core_copy_regs(regs, &ptregs);
  
 	return 1;
+}
+
+unsigned long arch_align_stack(unsigned long sp)
+{
+	if (randomize_va_space)
+		sp -= get_random_int() % 8192;
+	return sp & ~0xf;
 }

@@ -33,6 +33,10 @@
 #define CM_CSR	(1)
 #define CM_RST	(2)
 
+/* CDS NVRAM/RTC */
+#define CDS_RTC_ADDR	(0xf8000000)
+#define CDS_RTC_SIZE	(8 * 1024)
+
 /* PCI config */
 #define PCI1_CFG_ADDR_OFFSET	(0x8000)
 #define PCI1_CFG_DATA_OFFSET	(0x8004)
@@ -72,5 +76,8 @@
 #define MPC85XX_PCI2_MEM_OFFSET      0x00000000
 
 #define MPC85XX_PCI2_IO_SIZE         0x01000000
+
+#define NR_8259_INTS		     16
+#define CPM_IRQ_OFFSET		     NR_8259_INTS
 
 #endif /* __MACH_MPC85XX_CDS_H__ */

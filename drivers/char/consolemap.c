@@ -208,9 +208,9 @@ static void set_inverse_transl(struct vc_data *conp, struct uni_pagedir *p, int 
 	}
 }
 
-unsigned short *set_translate(int m,int currcons)
+unsigned short *set_translate(int m, struct vc_data *vc)
 {
-	inv_translate[currcons] = m;
+	inv_translate[vc->vc_num] = m;
 	return translations[m];
 }
 
@@ -262,9 +262,8 @@ int con_set_trans_old(unsigned char __user * arg)
 	int i;
 	unsigned short *p = translations[USER_MAP];
 
-	i = verify_area(VERIFY_READ, arg, E_TABSZ);
-	if (i)
-		return i;
+	if (!access_ok(VERIFY_READ, arg, E_TABSZ))
+		return -EFAULT;
 
 	for (i=0; i<E_TABSZ ; i++) {
 		unsigned char uc;
@@ -281,9 +280,8 @@ int con_get_trans_old(unsigned char __user * arg)
 	int i, ch;
 	unsigned short *p = translations[USER_MAP];
 
-	i = verify_area(VERIFY_WRITE, arg, E_TABSZ);
-	if (i)
-		return i;
+	if (!access_ok(VERIFY_WRITE, arg, E_TABSZ))
+		return -EFAULT;
 
 	for (i=0; i<E_TABSZ ; i++)
 	  {
@@ -298,9 +296,8 @@ int con_set_trans_new(ushort __user * arg)
 	int i;
 	unsigned short *p = translations[USER_MAP];
 
-	i = verify_area(VERIFY_READ, arg, E_TABSZ*sizeof(unsigned short));
-	if (i)
-		return i;
+	if (!access_ok(VERIFY_READ, arg, E_TABSZ*sizeof(unsigned short)))
+		return -EFAULT;
 
 	for (i=0; i<E_TABSZ ; i++) {
 		unsigned short us;
@@ -317,9 +314,8 @@ int con_get_trans_new(ushort __user * arg)
 	int i;
 	unsigned short *p = translations[USER_MAP];
 
-	i = verify_area(VERIFY_WRITE, arg, E_TABSZ*sizeof(unsigned short));
-	if (i)
-		return i;
+	if (!access_ok(VERIFY_WRITE, arg, E_TABSZ*sizeof(unsigned short)))
+		return -EFAULT;
 
 	for (i=0; i<E_TABSZ ; i++)
 	  __put_user(p[i], arg+i);
@@ -362,15 +358,16 @@ static void con_release_unimap(struct uni_pagedir *p)
 		}
 }
 
-void con_free_unimap(int con)
+void con_free_unimap(struct vc_data *vc)
 {
 	struct uni_pagedir *p;
-	struct vc_data *conp = vc_cons[con].d;
-	
-	p = (struct uni_pagedir *)*conp->vc_uni_pagedir_loc;
-	if (!p) return;
-	*conp->vc_uni_pagedir_loc = 0;
-	if (--p->refcount) return;
+
+	p = (struct uni_pagedir *)*vc->vc_uni_pagedir_loc;
+	if (!p)
+		return;
+	*vc->vc_uni_pagedir_loc = 0;
+	if (--p->refcount)
+		return;
 	con_release_unimap(p);
 	kfree(p);
 }
@@ -442,12 +439,11 @@ con_insert_unipair(struct uni_pagedir *p, u_short unicode, u_short fontpos)
 }
 
 /* ui is a leftover from using a hashtable, but might be used again */
-int con_clear_unimap(int con, struct unimapinit *ui)
+int con_clear_unimap(struct vc_data *vc, struct unimapinit *ui)
 {
 	struct uni_pagedir *p, *q;
-	struct vc_data *conp = vc_cons[con].d;
   
-	p = (struct uni_pagedir *)*conp->vc_uni_pagedir_loc;
+	p = (struct uni_pagedir *)*vc->vc_uni_pagedir_loc;
 	if (p && p->readonly) return -EIO;
 	if (!p || --p->refcount) {
 		q = (struct uni_pagedir *)kmalloc(sizeof(*p), GFP_KERNEL);
@@ -457,7 +453,7 @@ int con_clear_unimap(int con, struct unimapinit *ui)
 		}
 		memset(q, 0, sizeof(*q));
 		q->refcount=1;
-		*conp->vc_uni_pagedir_loc = (unsigned long)q;
+		*vc->vc_uni_pagedir_loc = (unsigned long)q;
 	} else {
 		if (p == dflt) dflt = NULL;
 		p->refcount++;
@@ -467,14 +463,12 @@ int con_clear_unimap(int con, struct unimapinit *ui)
 	return 0;
 }
 
-int
-con_set_unimap(int con, ushort ct, struct unipair __user *list)
+int con_set_unimap(struct vc_data *vc, ushort ct, struct unipair __user *list)
 {
 	int err = 0, err1, i;
 	struct uni_pagedir *p, *q;
-	struct vc_data *conp = vc_cons[con].d;
 
-	p = (struct uni_pagedir *)*conp->vc_uni_pagedir_loc;
+	p = (struct uni_pagedir *)*vc->vc_uni_pagedir_loc;
 	if (p->readonly) return -EIO;
 	
 	if (!ct) return 0;
@@ -483,10 +477,10 @@ con_set_unimap(int con, ushort ct, struct unipair __user *list)
 		int j, k;
 		u16 **p1, *p2, l;
 		
-		err1 = con_clear_unimap(con, NULL);
+		err1 = con_clear_unimap(vc, NULL);
 		if (err1) return err1;
 		
-		q = (struct uni_pagedir *)*conp->vc_uni_pagedir_loc;
+		q = (struct uni_pagedir *)*vc->vc_uni_pagedir_loc;
 		for (i = 0, l = 0; i < 32; i++)
 		if ((p1 = p->uni_pgdir[i]))
 			for (j = 0; j < 32; j++)
@@ -496,7 +490,7 @@ con_set_unimap(int con, ushort ct, struct unipair __user *list)
 					err1 = con_insert_unipair(q, l, p2[k]);
 					if (err1) {
 						p->refcount++;
-						*conp->vc_uni_pagedir_loc = (unsigned long)p;
+						*vc->vc_uni_pagedir_loc = (unsigned long)p;
 						con_release_unimap(q);
 						kfree(q);
 						return err1; 
@@ -515,11 +509,11 @@ con_set_unimap(int con, ushort ct, struct unipair __user *list)
 			list++;
 	}
 	
-	if (con_unify_unimap(conp, p))
+	if (con_unify_unimap(vc, p))
 		return err;
 
 	for (i = 0; i <= 3; i++)
-		set_inverse_transl(conp, p, i); /* Update all inverse translations */
+		set_inverse_transl(vc, p, i); /* Update all inverse translations */
   
 	return err;
 }
@@ -529,20 +523,18 @@ con_set_unimap(int con, ushort ct, struct unipair __user *list)
    with.  This routine is executed at sys_setup time, and when the
    PIO_FONTRESET ioctl is called. */
 
-int
-con_set_default_unimap(int con)
+int con_set_default_unimap(struct vc_data *vc)
 {
 	int i, j, err = 0, err1;
 	u16 *q;
 	struct uni_pagedir *p;
-	struct vc_data *conp = vc_cons[con].d;
-	
+
 	if (dflt) {
-		p = (struct uni_pagedir *)*conp->vc_uni_pagedir_loc;
+		p = (struct uni_pagedir *)*vc->vc_uni_pagedir_loc;
 		if (p == dflt)
 			return 0;
 		dflt->refcount++;
-		*conp->vc_uni_pagedir_loc = (unsigned long)dflt;
+		*vc->vc_uni_pagedir_loc = (unsigned long)dflt;
 		if (p && --p->refcount) {
 			con_release_unimap(p);
 			kfree(p);
@@ -552,10 +544,10 @@ con_set_default_unimap(int con)
 	
 	/* The default font is always 256 characters */
 
-	err = con_clear_unimap(con,NULL);
+	err = con_clear_unimap(vc, NULL);
 	if (err) return err;
     
-	p = (struct uni_pagedir *)*conp->vc_uni_pagedir_loc;
+	p = (struct uni_pagedir *)*vc->vc_uni_pagedir_loc;
 	q = dfont_unitable;
 	
 	for (i = 0; i < 256; i++)
@@ -565,47 +557,42 @@ con_set_default_unimap(int con)
 				err = err1;
 		}
 			
-	if (con_unify_unimap(conp, p)) {
-		dflt = (struct uni_pagedir *)*conp->vc_uni_pagedir_loc;
+	if (con_unify_unimap(vc, p)) {
+		dflt = (struct uni_pagedir *)*vc->vc_uni_pagedir_loc;
 		return err;
 	}
 
 	for (i = 0; i <= 3; i++)
-		set_inverse_transl(conp, p, i);	/* Update all inverse translations */
+		set_inverse_transl(vc, p, i);	/* Update all inverse translations */
 	dflt = p;
 	return err;
 }
 EXPORT_SYMBOL(con_set_default_unimap);
 
-int
-con_copy_unimap(int dstcon, int srccon)
+int con_copy_unimap(struct vc_data *dst_vc, struct vc_data *src_vc)
 {
-	struct vc_data *sconp = vc_cons[srccon].d;
-	struct vc_data *dconp = vc_cons[dstcon].d;
 	struct uni_pagedir *q;
-	
-	if (!vc_cons_allocated(srccon) || !*sconp->vc_uni_pagedir_loc)
+
+	if (!*src_vc->vc_uni_pagedir_loc)
 		return -EINVAL;
-	if (*dconp->vc_uni_pagedir_loc == *sconp->vc_uni_pagedir_loc)
+	if (*dst_vc->vc_uni_pagedir_loc == *src_vc->vc_uni_pagedir_loc)
 		return 0;
-	con_free_unimap(dstcon);
-	q = (struct uni_pagedir *)*sconp->vc_uni_pagedir_loc;
+	con_free_unimap(dst_vc);
+	q = (struct uni_pagedir *)*src_vc->vc_uni_pagedir_loc;
 	q->refcount++;
-	*dconp->vc_uni_pagedir_loc = (long)q;
+	*dst_vc->vc_uni_pagedir_loc = (long)q;
 	return 0;
 }
 
-int
-con_get_unimap(int con, ushort ct, ushort __user *uct, struct unipair __user *list)
+int con_get_unimap(struct vc_data *vc, ushort ct, ushort __user *uct, struct unipair __user *list)
 {
 	int i, j, k, ect;
 	u16 **p1, *p2;
 	struct uni_pagedir *p;
-	struct vc_data *conp = vc_cons[con].d;
 
 	ect = 0;
-	if (*conp->vc_uni_pagedir_loc) {
-		p = (struct uni_pagedir *)*conp->vc_uni_pagedir_loc;
+	if (*vc->vc_uni_pagedir_loc) {
+		p = (struct uni_pagedir *)*vc->vc_uni_pagedir_loc;
 		for (i = 0; i < 32; i++)
 		if ((p1 = p->uni_pgdir[i]))
 			for (j = 0; j < 32; j++)
@@ -625,12 +612,12 @@ con_get_unimap(int con, ushort ct, ushort __user *uct, struct unipair __user *li
 	return ((ect <= ct) ? 0 : -ENOMEM);
 }
 
-void con_protect_unimap(int con, int rdonly)
+void con_protect_unimap(struct vc_data *vc, int rdonly)
 {
-	struct uni_pagedir *p = (struct uni_pagedir *)
-		*vc_cons[con].d->vc_uni_pagedir_loc;
+	struct uni_pagedir *p = (struct uni_pagedir *)*vc->vc_uni_pagedir_loc;
 	
-	if (p) p->readonly = rdonly;
+	if (p)
+		p->readonly = rdonly;
 }
 
 int
@@ -679,7 +666,7 @@ console_map_init(void)
 	
 	for (i = 0; i < MAX_NR_CONSOLES; i++)
 		if (vc_cons_allocated(i) && !*vc_cons[i].d->vc_uni_pagedir_loc)
-			con_set_default_unimap(i);
+			con_set_default_unimap(vc_cons[i].d);
 }
 
 EXPORT_SYMBOL(con_copy_unimap);

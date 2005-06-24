@@ -25,7 +25,7 @@
 #include <linux/err.h>
 #include <linux/kfifo.h>
 
-/*
+/**
  * kfifo_init - allocates a new FIFO using a preallocated buffer
  * @buffer: the preallocated buffer to be used.
  * @size: the size of the internal buffer, this have to be a power of 2.
@@ -36,7 +36,7 @@
  * struct kfifo with kfree().
  */
 struct kfifo *kfifo_init(unsigned char *buffer, unsigned int size,
-			 int gfp_mask, spinlock_t *lock)
+			 unsigned int __nocast gfp_mask, spinlock_t *lock)
 {
 	struct kfifo *fifo;
 
@@ -56,7 +56,7 @@ struct kfifo *kfifo_init(unsigned char *buffer, unsigned int size,
 }
 EXPORT_SYMBOL(kfifo_init);
 
-/*
+/**
  * kfifo_alloc - allocates a new FIFO and its internal buffer
  * @size: the size of the internal buffer to be allocated.
  * @gfp_mask: get_free_pages mask, passed to kmalloc()
@@ -64,7 +64,7 @@ EXPORT_SYMBOL(kfifo_init);
  *
  * The size will be rounded-up to a power of 2.
  */
-struct kfifo *kfifo_alloc(unsigned int size, int gfp_mask, spinlock_t *lock)
+struct kfifo *kfifo_alloc(unsigned int size, unsigned int __nocast gfp_mask, spinlock_t *lock)
 {
 	unsigned char *buffer;
 	struct kfifo *ret;
@@ -91,7 +91,7 @@ struct kfifo *kfifo_alloc(unsigned int size, int gfp_mask, spinlock_t *lock)
 }
 EXPORT_SYMBOL(kfifo_alloc);
 
-/*
+/**
  * kfifo_free - frees the FIFO
  * @fifo: the fifo to be freed.
  */
@@ -102,7 +102,7 @@ void kfifo_free(struct kfifo *fifo)
 }
 EXPORT_SYMBOL(kfifo_free);
 
-/*
+/**
  * __kfifo_put - puts some data into the FIFO, no locking version
  * @fifo: the fifo to be used.
  * @buffer: the data to be added.
@@ -135,7 +135,7 @@ unsigned int __kfifo_put(struct kfifo *fifo,
 }
 EXPORT_SYMBOL(__kfifo_put);
 
-/*
+/**
  * __kfifo_get - gets some data from the FIFO, no locking version
  * @fifo: the fifo to be used.
  * @buffer: where the data must be copied.

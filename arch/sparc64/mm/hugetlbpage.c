@@ -20,6 +20,7 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 #include <asm/cacheflush.h>
+#include <asm/mmu_context.h>
 
 static pte_t *huge_pte_alloc(struct mm_struct *mm, unsigned long addr)
 {
@@ -62,12 +63,13 @@ static pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
 #define mk_pte_huge(entry) do { pte_val(entry) |= _PAGE_SZHUGE; } while (0)
 
 static void set_huge_pte(struct mm_struct *mm, struct vm_area_struct *vma,
+			 unsigned long addr,
 			 struct page *page, pte_t * page_table, int write_access)
 {
 	unsigned long i;
 	pte_t entry;
 
-	mm->rss += (HPAGE_SIZE / PAGE_SIZE);
+	add_mm_counter(mm, rss, HPAGE_SIZE / PAGE_SIZE);
 
 	if (write_access)
 		entry = pte_mkwrite(pte_mkdirty(mk_pte(page,
@@ -78,8 +80,9 @@ static void set_huge_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 	mk_pte_huge(entry);
 
 	for (i = 0; i < (1 << HUGETLB_PAGE_ORDER); i++) {
-		set_pte(page_table, entry);
+		set_pte_at(mm, addr, page_table, entry);
 		page_table++;
+		addr += PAGE_SIZE;
 
 		pte_val(entry) += PAGE_SIZE;
 	}
@@ -116,12 +119,12 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 		ptepage = pte_page(entry);
 		get_page(ptepage);
 		for (i = 0; i < (1 << HUGETLB_PAGE_ORDER); i++) {
-			set_pte(dst_pte, entry);
+			set_pte_at(dst, addr, dst_pte, entry);
 			pte_val(entry) += PAGE_SIZE;
 			dst_pte++;
+			addr += PAGE_SIZE;
 		}
-		dst->rss += (HPAGE_SIZE / PAGE_SIZE);
-		addr += HPAGE_SIZE;
+		add_mm_counter(dst, rss, HPAGE_SIZE / PAGE_SIZE);
 	}
 	return 0;
 
@@ -207,12 +210,20 @@ void unmap_hugepage_range(struct vm_area_struct *vma,
 		page = pte_page(*pte);
 		put_page(page);
 		for (i = 0; i < (1 << HUGETLB_PAGE_ORDER); i++) {
-			pte_clear(pte);
+			pte_clear(mm, address+(i*PAGE_SIZE), pte);
 			pte++;
 		}
 	}
-	mm->rss -= (end - start) >> PAGE_SHIFT;
+	add_mm_counter(mm, rss, -((end - start) >> PAGE_SHIFT));
 	flush_tlb_range(vma, start, end);
+}
+
+static void context_reload(void *__data)
+{
+	struct mm_struct *mm = __data;
+
+	if (mm == current->mm)
+		load_secondary_context(mm);
 }
 
 int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
@@ -220,6 +231,36 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 	struct mm_struct *mm = current->mm;
 	unsigned long addr;
 	int ret = 0;
+
+	/* On UltraSPARC-III+ and later, configure the second half of
+	 * the Data-TLB for huge pages.
+	 */
+	if (tlb_type == cheetah_plus) {
+		unsigned long ctx;
+
+		spin_lock(&ctx_alloc_lock);
+		ctx = mm->context.sparc64_ctx_val;
+		ctx &= ~CTX_PGSZ_MASK;
+		ctx |= CTX_PGSZ_BASE << CTX_PGSZ0_SHIFT;
+		ctx |= CTX_PGSZ_HUGE << CTX_PGSZ1_SHIFT;
+
+		if (ctx != mm->context.sparc64_ctx_val) {
+			/* When changing the page size fields, we
+			 * must perform a context flush so that no
+			 * stale entries match.  This flush must
+			 * occur with the original context register
+			 * settings.
+			 */
+			do_flush_tlb_mm(mm);
+
+			/* Reload the context register of all processors
+			 * also executing in this address space.
+			 */
+			mm->context.sparc64_ctx_val = ctx;
+			on_each_cpu(context_reload, mm, 0, 0);
+		}
+		spin_unlock(&ctx_alloc_lock);
+	}
 
 	BUG_ON(vma->vm_start & ~HPAGE_MASK);
 	BUG_ON(vma->vm_end & ~HPAGE_MASK);
@@ -261,7 +302,7 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 				goto out;
 			}
 		}
-		set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
+		set_huge_pte(mm, vma, addr, page, pte, vma->vm_flags & VM_WRITE);
 	}
 out:
 	spin_unlock(&mm->page_table_lock);

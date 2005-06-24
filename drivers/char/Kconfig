@@ -59,7 +59,7 @@ config VT_CONSOLE
 
 config HW_CONSOLE
 	bool
-	depends on VT && !S390
+	depends on VT && !S390 && !UML
 	default y
 
 config ECC
@@ -151,29 +151,12 @@ config DIGIEPCA
 	  you have a card like this, say Y here and read the file
 	  <file:Documentation/digiepca.txt>.
 
-	  NOTE: There is another, separate driver for the Digiboard PC boards:
-	  "Digiboard PC/Xx Support" below. You should (and can) only select
-	  one of the two drivers.
-
 	  To compile this driver as a module, choose M here: the
 	  module will be called epca.
 
-config DIGI
-	tristate "Digiboard PC/Xx Support"
-	depends on SERIAL_NONSTANDARD && DIGIEPCA=n && BROKEN_ON_SMP
-	help
-	  This is a driver for the Digiboard PC/Xe, PC/Xi, and PC/Xeve cards
-	  that give you many serial ports. You would need something like this
-	  to connect more than two modems to your Linux box, for instance in
-	  order to become a dial-in server. If you have a card like that, say
-	  Y here and read the file <file:Documentation/digiboard.txt>.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called pcxx.
-
 config ESPSERIAL
 	tristate "Hayes ESP serial port support"
-	depends on SERIAL_NONSTANDARD && ISA && BROKEN_ON_SMP
+	depends on SERIAL_NONSTANDARD && ISA && BROKEN_ON_SMP && ISA_DMA_API
 	help
 	  This is a driver which supports Hayes ESP serial ports.  Both single
 	  port cards and multiport cards are supported.  Make sure to read
@@ -215,7 +198,7 @@ config ISI
 
 config SYNCLINK
 	tristate "Microgate SyncLink card support"
-	depends on SERIAL_NONSTANDARD && PCI
+	depends on SERIAL_NONSTANDARD && PCI && ISA_DMA_API
 	help
 	  Provides support for the SyncLink ISA and PCI multiprotocol serial
 	  adapters. These adapters support asynchronous and HDLC bit
@@ -267,7 +250,7 @@ config RISCOM8
 
 config SPECIALIX
 	tristate "Specialix IO8+ card support"
-	depends on SERIAL_NONSTANDARD && BROKEN_ON_SMP
+	depends on SERIAL_NONSTANDARD
 	help
 	  This is a driver for the Specialix IO8+ multiport card (both the
 	  ISA and the PCI version) which gives you many serial ports. You
@@ -291,7 +274,7 @@ config SPECIALIX_RTSCTS
 
 config SX
 	tristate "Specialix SX (and SI) card support"
-	depends on SERIAL_NONSTANDARD && BROKEN_ON_SMP
+	depends on SERIAL_NONSTANDARD
 	help
 	  This is a driver for the SX and SI multiport serial cards.
 	  Please read the file <file:Documentation/sx.txt> for details.
@@ -418,6 +401,20 @@ config SGI_SNSC
 	  If you have an SGI Altix and you want to enable system
 	  controller communication from user space (you want this!),
 	  say Y.  Otherwise, say N.
+
+config SGI_TIOCX
+       bool "SGI TIO CX driver support"
+       depends on (IA64_SGI_SN2 || IA64_GENERIC)
+       help
+         If you have an SGI Altix and you have fpga devices attached
+         to your TIO, say Y here, otherwise say N.
+
+config SGI_MBCS
+       tristate "SGI FPGA Core Services driver support"
+       depends on SGI_TIOCX
+       help
+         If you have an SGI Altix with an attached SABrick
+         say Y or M here, otherwise say N.
 
 source "drivers/serial/Kconfig"
 
@@ -785,6 +782,10 @@ config S3C2410_RTC
 	  Samsung S3C2410. This can provide periodic interrupt rates
 	  from 1Hz to 64Hz for user programs, and wakeup from Alarm.
 
+config RTC_VR41XX
+	tristate "NEC VR4100 series Real Time Clock Support"
+	depends on CPU_VR41XX
+
 config COBALT_LCD
 	bool "Support for Cobalt LCD"
 	depends on MIPS_COBALT
@@ -841,6 +842,10 @@ config SONYPI
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called sonypi.
+
+config TANBAC_TB0219
+	tristate "TANBAC TB0219 base board support"
+	depends TANBAC_TB0229
 
 
 menu "Ftape, the floppy tape device driver"
@@ -980,7 +985,7 @@ config MAX_RAW_DEVS
 
 config HANGCHECK_TIMER
 	tristate "Hangcheck timer"
-	depends on X86_64 || X86
+	depends on X86_64 || X86 || IA64 || PPC64 || ARCH_S390
 	help
 	  The hangcheck-timer module detects when the system has gone
 	  out to lunch past a certain margin.  It can reboot the system
@@ -993,6 +998,8 @@ config MMTIMER
 	help
 	  The mmtimer device allows direct userspace access to the
 	  Altix system timer.
+
+source "drivers/char/tpm/Kconfig"
 
 endmenu
 

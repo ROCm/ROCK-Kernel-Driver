@@ -220,9 +220,9 @@ xfs_growfs_data_private(
 			XFS_CNT_BLOCK(mp));
 		INT_SET(agf->agf_levels[XFS_BTNUM_BNOi], ARCH_CONVERT, 1);
 		INT_SET(agf->agf_levels[XFS_BTNUM_CNTi], ARCH_CONVERT, 1);
-		INT_ZERO(agf->agf_flfirst, ARCH_CONVERT);
+		agf->agf_flfirst = 0;
 		INT_SET(agf->agf_fllast, ARCH_CONVERT, XFS_AGFL_SIZE(mp) - 1);
-		INT_ZERO(agf->agf_flcount, ARCH_CONVERT);
+		agf->agf_flcount = 0;
 		tmpsize = agsize - XFS_PREALLOC_BLOCKS(mp);
 		INT_SET(agf->agf_freeblks, ARCH_CONVERT, tmpsize);
 		INT_SET(agf->agf_longest, ARCH_CONVERT, tmpsize);
@@ -242,10 +242,10 @@ xfs_growfs_data_private(
 		INT_SET(agi->agi_versionnum, ARCH_CONVERT, XFS_AGI_VERSION);
 		INT_SET(agi->agi_seqno, ARCH_CONVERT, agno);
 		INT_SET(agi->agi_length, ARCH_CONVERT, agsize);
-		INT_ZERO(agi->agi_count, ARCH_CONVERT);
+		agi->agi_count = 0;
 		INT_SET(agi->agi_root, ARCH_CONVERT, XFS_IBT_BLOCK(mp));
 		INT_SET(agi->agi_level, ARCH_CONVERT, 1);
-		INT_ZERO(agi->agi_freecount, ARCH_CONVERT);
+		agi->agi_freecount = 0;
 		INT_SET(agi->agi_newino, ARCH_CONVERT, NULLAGINO);
 		INT_SET(agi->agi_dirino, ARCH_CONVERT, NULLAGINO);
 		for (bucket = 0; bucket < XFS_AGI_UNLINKED_BUCKETS; bucket++)
@@ -264,7 +264,7 @@ xfs_growfs_data_private(
 		block = XFS_BUF_TO_SBLOCK(bp);
 		memset(block, 0, mp->m_sb.sb_blocksize);
 		INT_SET(block->bb_magic, ARCH_CONVERT, XFS_ABTB_MAGIC);
-		INT_ZERO(block->bb_level, ARCH_CONVERT);
+		block->bb_level = 0;
 		INT_SET(block->bb_numrecs, ARCH_CONVERT, 1);
 		INT_SET(block->bb_leftsib, ARCH_CONVERT, NULLAGBLOCK);
 		INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
@@ -287,7 +287,7 @@ xfs_growfs_data_private(
 		block = XFS_BUF_TO_SBLOCK(bp);
 		memset(block, 0, mp->m_sb.sb_blocksize);
 		INT_SET(block->bb_magic, ARCH_CONVERT, XFS_ABTC_MAGIC);
-		INT_ZERO(block->bb_level, ARCH_CONVERT);
+		block->bb_level = 0;
 		INT_SET(block->bb_numrecs, ARCH_CONVERT, 1);
 		INT_SET(block->bb_leftsib, ARCH_CONVERT, NULLAGBLOCK);
 		INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
@@ -311,8 +311,8 @@ xfs_growfs_data_private(
 		block = XFS_BUF_TO_SBLOCK(bp);
 		memset(block, 0, mp->m_sb.sb_blocksize);
 		INT_SET(block->bb_magic, ARCH_CONVERT, XFS_IBT_MAGIC);
-		INT_ZERO(block->bb_level, ARCH_CONVERT);
-		INT_ZERO(block->bb_numrecs, ARCH_CONVERT);
+		block->bb_level = 0;
+		block->bb_numrecs = 0;
 		INT_SET(block->bb_leftsib, ARCH_CONVERT, NULLAGBLOCK);
 		INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
 		error = xfs_bwrite(mp, bp);
@@ -393,7 +393,7 @@ xfs_growfs_data_private(
 			break;
 		}
 		sbp = XFS_BUF_TO_SBP(bp);
-		xfs_xlatesb(sbp, &mp->m_sb, -1, ARCH_CONVERT, XFS_SB_ALL_BITS);
+		xfs_xlatesb(sbp, &mp->m_sb, -1, XFS_SB_ALL_BITS);
 		/*
 		 * If we get an error writing out the alternate superblocks,
 		 * just issue a warning and continue.  The real work is

@@ -41,6 +41,7 @@
 #define MGA_DEFAULT_USEC_TIMEOUT	10000
 #define MGA_FREELIST_DEBUG		0
 
+static int mga_do_cleanup_dma( drm_device_t *dev );
 
 /* ================================================================
  * Engine control
@@ -68,25 +69,7 @@ int mga_do_wait_for_idle( drm_mga_private_t *dev_priv )
 	return DRM_ERR(EBUSY);
 }
 
-int mga_do_dma_idle( drm_mga_private_t *dev_priv )
-{
-	u32 status = 0;
-	int i;
-	DRM_DEBUG( "\n" );
-
-	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
-		status = MGA_READ( MGA_STATUS ) & MGA_DMA_IDLE_MASK;
-		if ( status == MGA_ENDPRDMASTS ) return 0;
-		DRM_UDELAY( 1 );
-	}
-
-#if MGA_DMA_DEBUG
-	DRM_ERROR( "failed! status=0x%08x\n", status );
-#endif
-	return DRM_ERR(EBUSY);
-}
-
-int mga_do_dma_reset( drm_mga_private_t *dev_priv )
+static int mga_do_dma_reset( drm_mga_private_t *dev_priv )
 {
 	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_mga_primary_buffer_t *primary = &dev_priv->prim;
@@ -109,44 +92,6 @@ int mga_do_dma_reset( drm_mga_private_t *dev_priv )
 
 	return 0;
 }
-
-int mga_do_engine_reset( drm_mga_private_t *dev_priv )
-{
-	DRM_DEBUG( "\n" );
-
-	/* Okay, so we've completely screwed up and locked the engine.
-	 * How about we clean up after ourselves?
-	 */
-	MGA_WRITE( MGA_RST, MGA_SOFTRESET );
-	DRM_UDELAY( 15 );				/* Wait at least 10 usecs */
-	MGA_WRITE( MGA_RST, 0 );
-
-	/* Initialize the registers that get clobbered by the soft
-	 * reset.  Many of the core register values survive a reset,
-	 * but the drawing registers are basically all gone.
-	 *
-	 * 3D clients should probably die after calling this.  The X
-	 * server should reset the engine state to known values.
-	 */
-#if 0
-	MGA_WRITE( MGA_PRIMPTR,
-		   virt_to_bus((void *)dev_priv->prim.status_page) |
-		   MGA_PRIMPTREN0 |
-		   MGA_PRIMPTREN1 );
-#endif
-
-	MGA_WRITE( MGA_ICLEAR, MGA_SOFTRAPICLR );
-	MGA_WRITE( MGA_IEN,    MGA_SOFTRAPIEN );
-
-	/* The primary DMA stream should look like new right about now.
-	 */
-	mga_do_dma_reset( dev_priv );
-
-	/* This bad boy will never fail.
-	 */
-	return 0;
-}
-
 
 /* ================================================================
  * Primary DMA stream
@@ -625,7 +570,7 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 	return 0;
 }
 
-int mga_do_cleanup_dma( drm_device_t *dev )
+static int mga_do_cleanup_dma( drm_device_t *dev )
 {
 	DRM_DEBUG( "\n" );
 

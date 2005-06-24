@@ -91,12 +91,4 @@
 #define MPTSCSIH_MIN_SYNC               0x08
 #define MPTSCSIH_SAF_TE                 0
 
-struct mptscsih_driver_setup
-{
-        u8      dv;
-        u8      max_width;
-        u8      min_sync_factor;
-        u8      saf_te;
-};
-
 #endif

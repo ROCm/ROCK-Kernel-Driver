@@ -123,7 +123,10 @@ static inline void pgd_set(pgd_t *pgdp, pmd_t *pmdp)
 
 static inline int pte_none (pte_t pte) { return !pte_val (pte); }
 static inline int pte_present (pte_t pte) { return pte_val (pte) & SUN3_PAGE_VALID; }
-static inline void pte_clear (pte_t *ptep) { pte_val (*ptep) = 0; }
+static inline void pte_clear (struct mm_struct *mm, unsigned long addr, pte_t *ptep)
+{
+	pte_val (*ptep) = 0;
+}
 
 #define pte_pfn(pte)            (pte_val(pte) & SUN3_PAGE_PGNUM_MASK)
 #define pfn_pte(pfn, pgprot) \

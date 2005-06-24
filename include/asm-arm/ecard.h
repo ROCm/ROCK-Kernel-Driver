@@ -155,8 +155,8 @@ struct expansion_card {
 	struct resource		resource[ECARD_NUM_RESOURCES];
 
 	/* Public data */
-	volatile unsigned char *irqaddr;	/* address of IRQ register	*/
-	volatile unsigned char *fiqaddr;	/* address of FIQ register	*/
+	void __iomem		*irqaddr;	/* address of IRQ register	*/
+	void __iomem		*fiqaddr;	/* address of FIQ register	*/
 	unsigned char		irqmask;	/* IRQ mask			*/
 	unsigned char		fiqmask;	/* FIQ mask			*/
 	unsigned char  		claimed;	/* Card claimed?		*/
@@ -207,9 +207,16 @@ struct in_chunk_dir {
 extern int ecard_readchunk (struct in_chunk_dir *cd, struct expansion_card *ec, int id, int num);
 
 /*
- * Obtain the address of a card
+ * Obtain the address of a card.  This returns the "old style" address
+ * and should no longer be used.
  */
-extern __deprecated unsigned int ecard_address (struct expansion_card *ec, card_type_t card_type, card_speed_t speed);
+static inline unsigned int __deprecated
+ecard_address(struct expansion_card *ec, card_type_t type, card_speed_t speed)
+{
+	extern unsigned int __ecard_address(struct expansion_card *,
+					    card_type_t, card_speed_t);
+	return __ecard_address(ec, type, speed);
+}
 
 /*
  * Request and release ecard resources

@@ -105,7 +105,7 @@ static struct acpi_driver acpi_processor_driver = {
 #define UNINSTALL_NOTIFY_HANDLER	2
 
 
-struct file_operations acpi_processor_info_fops = {
+static struct file_operations acpi_processor_info_fops = {
 	.open 		= acpi_processor_info_open_fs,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
@@ -121,7 +121,7 @@ struct acpi_processor_errata errata;
                                 Errata Handling
    -------------------------------------------------------------------------- */
 
-int
+static int
 acpi_processor_errata_piix4 (
 	struct pci_dev		*dev)
 {
@@ -259,7 +259,7 @@ acpi_processor_errata (
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
-struct proc_dir_entry		*acpi_processor_dir = NULL;
+static struct proc_dir_entry	*acpi_processor_dir = NULL;
 
 static int acpi_processor_info_seq_show(struct seq_file *seq, void *offset)
 {

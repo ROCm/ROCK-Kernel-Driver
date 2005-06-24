@@ -16,7 +16,6 @@
  */
 #include <linux/config.h>
 #include <linux/init.h>
-#include <linux/console.h>
 #include <linux/ide.h>
 #include <linux/ioport.h>
 
@@ -55,15 +54,6 @@ static struct mtd_partition cmbvr4133_mtd_parts[] = {
 #define number_partitions (sizeof(cmbvr4133_mtd_parts)/sizeof(struct mtd_partition))
 #endif
 
-extern void (*late_time_init)(void);
-
-static void __init vr4133_serial_init(void)
-{
-	vr41xx_select_siu_interface(SIU_RS232C, IRDA_NONE);
-	vr41xx_siu_init();
-	vr41xx_dsiu_init();
-}
-
 extern void i8259_init(void);
 
 static int __init nec_cmbvr4133_setup(void)
@@ -77,8 +67,6 @@ static int __init nec_cmbvr4133_setup(void)
 
 	mips_machgroup = MACH_GROUP_NEC_VR41XX;
 	mips_machtype = MACH_NEC_CMBVR4133;
-
-	late_time_init = vr4133_serial_init;
 
 #ifdef CONFIG_PCI
 #ifdef CONFIG_ROCKHOPPER

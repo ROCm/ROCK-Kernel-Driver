@@ -717,7 +717,7 @@ static int translate_table(const char *name,
 	}
 
 	/* And one copy for every other CPU */
-	for (i = 1; i < NR_CPUS; i++) {
+	for (i = 1; i < num_possible_cpus(); i++) {
 		memcpy(newinfo->entries + SMP_ALIGN(newinfo->size)*i,
 		       newinfo->entries,
 		       SMP_ALIGN(newinfo->size));
@@ -768,7 +768,7 @@ static void get_counters(const struct arpt_table_info *t,
 	unsigned int cpu;
 	unsigned int i;
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+	for (cpu = 0; cpu < num_possible_cpus(); cpu++) {
 		i = 0;
 		ARPT_ENTRY_ITERATE(t->entries + TABLE_OFFSET(t, cpu),
 				   t->size,
@@ -886,7 +886,7 @@ static int do_replace(void __user *user, unsigned int len)
 		return -ENOMEM;
 
 	newinfo = vmalloc(sizeof(struct arpt_table_info)
-			  + SMP_ALIGN(tmp.size) * NR_CPUS);
+			  + SMP_ALIGN(tmp.size) * num_possible_cpus());
 	if (!newinfo)
 		return -ENOMEM;
 
@@ -1159,7 +1159,7 @@ int arpt_register_table(struct arpt_table *table,
 		= { 0, 0, 0, { 0 }, { 0 }, { } };
 
 	newinfo = vmalloc(sizeof(struct arpt_table_info)
-			  + SMP_ALIGN(repl->size) * NR_CPUS);
+			  + SMP_ALIGN(repl->size) * num_possible_cpus());
 	if (!newinfo) {
 		ret = -ENOMEM;
 		return ret;

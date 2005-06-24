@@ -68,6 +68,7 @@ typedef struct pmac_ide_hwif {
 	struct device_node*		node;
 	struct macio_dev		*mdev;
 	u32				timings[4];
+	volatile u32 __iomem *		*kauai_fcr;
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	/* Those fields are duplicating what is in hwif. We currently
 	 * can't use the hwif ones because of some assumptions that are
@@ -220,6 +221,13 @@ static const char* model_name[] = {
 #define IDE_INTR_DMA			0x80000000
 #define IDE_INTR_DEVICE			0x40000000
 
+/*
+ * FCR Register on Kauai. Not sure what bit 0x4 is  ...
+ */
+#define KAUAI_FCR_UATA_MAGIC		0x00000004
+#define KAUAI_FCR_UATA_RESET_N		0x00000002
+#define KAUAI_FCR_UATA_ENABLE		0x00000001
+
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 
 /* Rounded Multiword DMA timings
@@ -364,8 +372,8 @@ static struct kauai_timing	shasta_mdma_timings[] __pmacdata =
 
 static struct kauai_timing	shasta_udma133_timings[] __pmacdata =
 {
-        { 120   , 0x00035901, },
-        { 90    , 0x000348b1, },
+	{ 120   , 0x00035901, },
+	{ 90    , 0x000348b1, },
 	{ 60    , 0x00033881, },
 	{ 45    , 0x00033861, },
 	{ 30    , 0x00033841, },
@@ -1196,12 +1204,22 @@ pmac_ide_do_suspend(ide_hwif_t *hwif)
 	}
 #endif /* CONFIG_BLK_DEV_IDE_PMAC_BLINK */
 
+	disable_irq(pmif->irq);
+
 	/* The media bay will handle itself just fine */
 	if (pmif->mediabay)
 		return 0;
 	
-	/* Disable the bus */
-	ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, pmif->node, pmif->aapl_bus_id, 0);
+	/* Kauai has bus control FCRs directly here */
+	if (pmif->kauai_fcr) {
+		u32 fcr = readl(pmif->kauai_fcr);
+		fcr &= ~(KAUAI_FCR_UATA_RESET_N | KAUAI_FCR_UATA_ENABLE);
+		writel(fcr, pmif->kauai_fcr);
+	}
+
+	/* Disable the bus on older machines and the cell on kauai */
+	ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, pmif->node, pmif->aapl_bus_id,
+			    0);
 
 	return 0;
 }
@@ -1220,11 +1238,21 @@ pmac_ide_do_resume(ide_hwif_t *hwif)
 		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, pmif->node, pmif->aapl_bus_id, 1);
 		msleep(10);
 		ppc_md.feature_call(PMAC_FTR_IDE_RESET, pmif->node, pmif->aapl_bus_id, 0);
+
+		/* Kauai has it different */
+		if (pmif->kauai_fcr) {
+			u32 fcr = readl(pmif->kauai_fcr);
+			fcr |= KAUAI_FCR_UATA_RESET_N | KAUAI_FCR_UATA_ENABLE;
+			writel(fcr, pmif->kauai_fcr);
+		}
+
 		msleep(jiffies_to_msecs(IDE_WAKEUP_DELAY));
 	}
 
 	/* Sanitize drive timings */
 	sanitize_timings(pmif);
+
+	enable_irq(pmif->irq);
 
 	return 0;
 }
@@ -1273,6 +1301,19 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 		if (cable && !strncmp(cable, "80-", 3))
 			pmif->cable_80 = 1;
 	}
+	/* G5's seem to have incorrect cable type in device-tree. Let's assume
+	 * they have a 80 conductor cable, this seem to be always the case unless
+	 * the user mucked around
+	 */
+	if (device_is_compatible(np, "K2-UATA") ||
+	    device_is_compatible(np, "shasta-ata"))
+		pmif->cable_80 = 1;
+
+	/* On Kauai-type controllers, we make sure the FCR is correct */
+	if (pmif->kauai_fcr)
+		writel(KAUAI_FCR_UATA_MAGIC |
+		       KAUAI_FCR_UATA_RESET_N |
+		       KAUAI_FCR_UATA_ENABLE, pmif->kauai_fcr);
 
 	pmif->mediabay = 0;
 	
@@ -1434,6 +1475,7 @@ pmac_ide_macio_attach(struct macio_dev *mdev, const struct of_match *match)
 	pmif->node = mdev->ofdev.node;
 	pmif->regbase = regbase;
 	pmif->irq = irq;
+	pmif->kauai_fcr = NULL;
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	if (macio_resource_count(mdev) >= 2) {
 		if (macio_request_resource(mdev, 1, "ide-pmac (dma)"))
@@ -1547,9 +1589,9 @@ pmac_ide_pci_attach(struct pci_dev *pdev, const struct pci_device_id *id)
 	pmif->regbase = (unsigned long) base + 0x2000;
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	pmif->dma_regs = base + 0x1000;
-#endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */	
-
-		pmif->irq = pdev->irq;
+#endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
+	pmif->kauai_fcr = base;
+	pmif->irq = pdev->irq;
 
 	pci_set_drvdata(pdev, hwif);
 
@@ -1644,6 +1686,7 @@ static struct pci_driver pmac_ide_pci_driver = {
 	.suspend	= pmac_ide_pci_suspend,
 	.resume		= pmac_ide_pci_resume,
 };
+MODULE_DEVICE_TABLE(pci, pmac_ide_pci_match);
 
 void __init
 pmac_ide_probe(void)

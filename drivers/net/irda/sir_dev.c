@@ -15,6 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <linux/delay.h>
 
 #include <net/irda/irda.h>
 #include <net/irda/wrapper.h>
@@ -73,8 +74,7 @@ int sirdev_raw_write(struct sir_dev *dev, const char *buf, int len)
 	spin_lock_irqsave(&dev->tx_lock, flags);	/* serialize with other tx operations */
 	while (dev->tx_buff.len > 0) {			/* wait until tx idle */
 		spin_unlock_irqrestore(&dev->tx_lock, flags);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(msecs_to_jiffies(10));
+		msleep(10);
 		spin_lock_irqsave(&dev->tx_lock, flags);
 	}
 
@@ -154,7 +154,8 @@ void sirdev_write_complete(struct sir_dev *dev)
 		}
 		else if (unlikely(actual<0)) {
 			/* could be dropped later when we have tx_timeout to recover */
-			ERROR("%s: drv->do_write failed (%d)\n", __FUNCTION__, actual);
+			IRDA_ERROR("%s: drv->do_write failed (%d)\n",
+				   __FUNCTION__, actual);
 			if ((skb=dev->tx_skb) != NULL) {
 				dev->tx_skb = NULL;
 				dev_kfree_skb_any(skb);
@@ -208,7 +209,8 @@ void sirdev_write_complete(struct sir_dev *dev)
 			/* should never happen
 			 * forget the speed change and hope the stack recovers
 			 */
-			ERROR("%s - schedule speed change failed: %d\n", __FUNCTION__, err);
+			IRDA_ERROR("%s - schedule speed change failed: %d\n",
+				   __FUNCTION__, err);
 			netif_wake_queue(dev->netdev);
 		}
 		/* else: success
@@ -234,13 +236,13 @@ done:
 int sirdev_receive(struct sir_dev *dev, const unsigned char *cp, size_t count) 
 {
 	if (!dev || !dev->netdev) {
-		WARNING("%s(), not ready yet!\n", __FUNCTION__);
+		IRDA_WARNING("%s(), not ready yet!\n", __FUNCTION__);
 		return -1;
 	}
 
 	if (!dev->irlap) {
-		WARNING("%s - too early: %p / %zd!\n",
-			__FUNCTION__, cp, count);
+		IRDA_WARNING("%s - too early: %p / %zd!\n",
+			     __FUNCTION__, cp, count);
 		return -1;
 	}
 
@@ -297,7 +299,7 @@ static int sirdev_hard_xmit(struct sk_buff *skb, struct net_device *ndev)
 	int err;
 	s32 speed;
 
-	ASSERT(dev != NULL, return 0;);
+	IRDA_ASSERT(dev != NULL, return 0;);
 
 	netif_stop_queue(ndev);
 
@@ -366,7 +368,8 @@ static int sirdev_hard_xmit(struct sk_buff *skb, struct net_device *ndev)
 	}
 	else if (unlikely(actual < 0)) {
 		/* could be dropped later when we have tx_timeout to recover */
-		ERROR("%s: drv->do_write failed (%d)\n", __FUNCTION__, actual);
+		IRDA_ERROR("%s: drv->do_write failed (%d)\n",
+			   __FUNCTION__, actual);
 		dev_kfree_skb_any(skb);
 		dev->stats.tx_errors++;		      
 		dev->stats.tx_dropped++;		      
@@ -385,7 +388,7 @@ static int sirdev_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 	struct sir_dev *dev = ndev->priv;
 	int ret = 0;
 
-	ASSERT(dev != NULL, return -1;);
+	IRDA_ASSERT(dev != NULL, return -1;);
 
 	IRDA_DEBUG(3, "%s(), %s, (cmd=0x%X)\n", __FUNCTION__, ndev->name, cmd);
 	
@@ -593,7 +596,7 @@ struct sir_dev * sirdev_get_instance(const struct sir_driver *drv, const char *n
 	 */
 	ndev = alloc_irdadev(sizeof(*dev));
 	if (ndev == NULL) {
-		ERROR("%s - Can't allocate memory for IrDA control block!\n", __FUNCTION__);
+		IRDA_ERROR("%s - Can't allocate memory for IrDA control block!\n", __FUNCTION__);
 		goto out;
 	}
 	dev = ndev->priv;
@@ -628,7 +631,7 @@ struct sir_dev * sirdev_get_instance(const struct sir_driver *drv, const char *n
 	ndev->do_ioctl = sirdev_ioctl;
 
 	if (register_netdev(ndev)) {
-		ERROR("%s(), register_netdev() failed!\n", __FUNCTION__);
+		IRDA_ERROR("%s(), register_netdev() failed!\n", __FUNCTION__);
 		goto out_freenetdev;
 	}
 
@@ -654,7 +657,7 @@ int sirdev_put_instance(struct sir_dev *dev)
 	if (dev->dongle_drv)
 		err = sirdev_schedule_dongle_close(dev);
 	if (err)
-		ERROR("%s - error %d\n", __FUNCTION__, err);
+		IRDA_ERROR("%s - error %d\n", __FUNCTION__, err);
 
 	sirdev_close(dev->netdev);
 

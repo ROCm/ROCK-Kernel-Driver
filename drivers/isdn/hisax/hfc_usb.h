@@ -1,7 +1,7 @@
 /*
 * hfc_usb.h
 *
-* $Id: hfc_usb.h,v 4.1 2005/01/26 17:25:53 martinb1 Exp $ 
+* $Id: hfc_usb.h,v 4.1 2005/01/26 17:25:53 martinb1 Exp $
 */
 
 #ifndef __HFC_USB_H__

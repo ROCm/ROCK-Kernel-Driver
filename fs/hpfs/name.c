@@ -8,12 +8,12 @@
 
 #include "hpfs_fn.h"
 
-char *text_postfix[]={
+static char *text_postfix[]={
 ".ASM", ".BAS", ".BAT", ".C", ".CC", ".CFG", ".CMD", ".CON", ".CPP", ".DEF",
 ".DOC", ".DPR", ".ERX", ".H", ".HPP", ".HTM", ".HTML", ".JAVA", ".LOG", ".PAS",
 ".RC", ".TEX", ".TXT", ".Y", ""};
 
-char *text_prefix[]={
+static char *text_prefix[]={
 "AUTOEXEC.", "CHANGES", "COPYING", "CONFIG.", "CREDITS", "FAQ", "FILE_ID.DIZ",
 "MAKEFILE", "READ.ME", "README", "TERMCAP", ""};
 

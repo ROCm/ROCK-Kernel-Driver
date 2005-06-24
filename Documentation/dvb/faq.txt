@@ -35,7 +35,7 @@ Some very frequently asked questions about linuxtv-dvb
 	Note: Only very recent versions of Mplayer and xine can decode.
 	MPEG2 transport streams (TS) directly. Then, run
 	'[sct]zap channelname -r' in one xterm, and keep it running,
-	and start 'mplayer - < /dev/dvb/adapter0/dvr0' or 
+	and start 'mplayer - < /dev/dvb/adapter0/dvr0' or
 	'xine stdin://mpeg2 < /dev/dvb/adapter0/dvr0' in a second xterm.
 	That's all far from perfect, but it seems no one has written
 	a nice DVB application which includes a builtin software MPEG

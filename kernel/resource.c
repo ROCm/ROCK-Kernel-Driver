@@ -91,7 +91,7 @@ static int r_show(struct seq_file *m, void *v)
 	return 0;
 }
 
-struct seq_operations resource_op = {
+static struct seq_operations resource_op = {
 	.start	= r_start,
 	.next	= r_next,
 	.stop	= r_stop,
@@ -266,7 +266,7 @@ static int find_resource(struct resource *root, struct resource *new,
 		new->start = (new->start + align - 1) & ~(align - 1);
 		if (alignf)
 			alignf(alignf_data, new, size, align);
-		if (new->start < new->end && new->end - new->start + 1 >= size) {
+		if (new->start < new->end && new->end - new->start >= size - 1) {
 			new->end = new->start + size - 1;
 			return 0;
 		}

@@ -283,7 +283,7 @@ static struct sock *llc_lookup_dgram(struct llc_sap *sap,
 
 	read_lock_bh(&sap->sk_list.lock);
 	sk_for_each(rc, node, &sap->sk_list.list) {
-		struct llc_opt *llc = llc_sk(rc);
+		struct llc_sock *llc = llc_sk(rc);
 
 		if (rc->sk_type == SOCK_DGRAM &&
 		    llc->laddr.lsap == laddr->lsap &&

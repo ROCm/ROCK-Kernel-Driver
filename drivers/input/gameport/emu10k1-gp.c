@@ -120,7 +120,7 @@ static struct pci_driver emu_driver = {
 
 static int __init emu_init(void)
 {
-	return pci_module_init(&emu_driver);
+	return pci_register_driver(&emu_driver);
 }
 
 static void __exit emu_exit(void)

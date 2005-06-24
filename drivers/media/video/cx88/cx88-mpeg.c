@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-mpeg.c,v 1.18 2005/01/04 13:34:11 kraxel Exp $
+ * $Id: cx88-mpeg.c,v 1.25 2005/03/07 14:18:00 kraxel Exp $
  *
  *  Support for the mpeg transport stream transfers
  *  PCI function #2 of the cx2388x.
@@ -69,8 +69,14 @@ static int cx8802_start_dma(struct cx8802_dev    *dev,
 	 * also: move to cx88-blackbird + cx88-dvb source files? */
 
 	if (cx88_boards[core->board].dvb) {
-		/* Setup TS portion of chip */
-		cx_write(TS_GEN_CNTRL, 0x0c);
+		/* negedge driven & software reset */
+		cx_write(TS_GEN_CNTRL, 0x40);
+		udelay(100);
+		cx_write(MO_PINMUX_IO, 0x00);
+		cx_write(TS_HW_SOP_CNTRL,47<<16|188<<4|0x00);
+		cx_write(TS_SOP_STAT,0x00);
+		cx_write(TS_GEN_CNTRL, dev->ts_gen_cntrl);
+		udelay(100);
 	}
 
 	if (cx88_boards[core->board].blackbird) {
@@ -355,11 +361,6 @@ int cx8802_init_common(struct cx8802_dev *dev)
 	cx88_risc_stopper(dev->pci,&dev->mpegq.stopper,
 			  MO_TS_DMACNTRL,0x11,0x00);
 
-#if 0 /* FIXME */
-	/* initialize hardware */
-	cx8802_reset(dev);
-#endif
-
 	/* get irq */
 	err = request_irq(dev->pci->irq, cx8802_irq,
 			  SA_SHIRQ | SA_INTERRUPT, dev->core->name, dev);
@@ -369,11 +370,6 @@ int cx8802_init_common(struct cx8802_dev *dev)
 		return err;
 	}
 	cx_set(MO_PCI_INTMSK, core->pci_irqmask);
-
-#if 0 /* FIXME */
-	/* register i2c bus + load i2c helpers */
-	cx88_card_setup(dev);
-#endif
 
 	/* everything worked */
 	pci_set_drvdata(dev->pci,dev);
@@ -395,7 +391,7 @@ void cx8802_fini_common(struct cx8802_dev *dev)
 
 /* ----------------------------------------------------------- */
 
-int cx8802_suspend_common(struct pci_dev *pci_dev, u32 state)
+int cx8802_suspend_common(struct pci_dev *pci_dev, pm_message_t state)
 {
         struct cx8802_dev *dev = pci_get_drvdata(pci_dev);
 	struct cx88_core *core = dev->core;
@@ -415,7 +411,7 @@ int cx8802_suspend_common(struct pci_dev *pci_dev, u32 state)
 #endif
 
 	pci_save_state(pci_dev);
-	if (0 != pci_set_power_state(pci_dev, state)) {
+	if (0 != pci_set_power_state(pci_dev, pci_choose_state(pci_dev, state))) {
 		pci_disable_device(pci_dev);
 		dev->state.disabled = 1;
 	}
@@ -431,7 +427,7 @@ int cx8802_resume_common(struct pci_dev *pci_dev)
 		pci_enable_device(pci_dev);
 		dev->state.disabled = 0;
 	}
-	pci_set_power_state(pci_dev, 0);
+	pci_set_power_state(pci_dev, PCI_D0);
 	pci_restore_state(pci_dev);
 
 #if 1

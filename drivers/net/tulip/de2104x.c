@@ -1927,7 +1927,7 @@ bad_srom:
 	goto fill_defaults;
 }
 
-static int __devinit de_init_one (struct pci_dev *pdev,
+static int __init de_init_one (struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
 	struct net_device *dev;
@@ -2102,7 +2102,7 @@ static void __exit de_remove_one (struct pci_dev *pdev)
 
 #ifdef CONFIG_PM
 
-static int de_suspend (struct pci_dev *pdev, u32 state)
+static int de_suspend (struct pci_dev *pdev, pm_message_t state)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
 	struct de_private *de = dev->priv;

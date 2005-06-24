@@ -88,12 +88,6 @@
 				COMMAND_SIZE((cmd)->cmnd[0]) : (cmd)->cmd_len)
 
 /*
- * Data declarations.
- */
-unsigned long scsi_pid;
-static unsigned long serial_number;
-
-/*
  * Note - the initial logging level can be set here to log events at boot time.
  * After the system is up, you may enable logging via the /proc interface.
  */
@@ -138,11 +132,7 @@ struct scsi_request *scsi_allocate_request(struct scsi_device *sdev,
 	const int offset = ALIGN(sizeof(struct scsi_request), 4);
 	const int size = offset + sizeof(struct request);
 	struct scsi_request *sreq;
-
-
-	if (!get_device(&sdev->sdev_gendev))
-		return NULL;
-
+  
 	sreq = kmalloc(size, gfp_mask);
 	if (likely(sreq != NULL)) {
 		memset(sreq, 0, size);
@@ -151,8 +141,7 @@ struct scsi_request *scsi_allocate_request(struct scsi_device *sdev,
 		sreq->sr_host = sdev->host;
 		sreq->sr_magic = SCSI_REQ_MAGIC;
 		sreq->sr_data_direction = DMA_BIDIRECTIONAL;
-	} else
-		put_device(&sdev->sdev_gendev);
+	}
 
 	return sreq;
 }
@@ -195,10 +184,6 @@ void __scsi_release_request(struct scsi_request *sreq)
 void scsi_release_request(struct scsi_request *sreq)
 {
 	__scsi_release_request(sreq);
-
-	if (sreq->sr_device)
-		put_device(&sreq->sr_device->sdev_gendev);
-
 	kfree(sreq);
 }
 EXPORT_SYMBOL(scsi_release_request);
@@ -504,7 +489,7 @@ void scsi_log_completion(struct scsi_cmnd *cmd, int disposition)
 			scsi_print_command(cmd);
 			if (status_byte(cmd->result) & CHECK_CONDITION) {
 				/*
-				 * XXX The print_sense formatting/prefix
+				 * XXX The scsi_print_sense formatting/prefix
 				 * doesn't match this function.
 				 */
 				scsi_print_sense("", cmd);
@@ -518,6 +503,21 @@ void scsi_log_completion(struct scsi_cmnd *cmd, int disposition)
 	}
 }
 #endif
+
+/* 
+ * Assign a serial number and pid to the request for error recovery
+ * and debugging purposes.  Protected by the Host_Lock of host.
+ */
+static inline void scsi_cmd_get_serial(struct Scsi_Host *host, struct scsi_cmnd *cmd)
+{
+	cmd->serial_number = host->cmd_serial_number++;
+	if (cmd->serial_number == 0) 
+		cmd->serial_number = host->cmd_serial_number++;
+	
+	cmd->pid = host->cmd_pid++;
+	if (cmd->pid == 0)
+		cmd->pid = host->cmd_pid++;
+}
 
 /*
  * Function:    scsi_dispatch_command
@@ -541,7 +541,8 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 		 * returns an immediate error upwards, and signals
 		 * that the device is no longer present */
 		cmd->result = DID_NO_CONNECT << 16;
-		scsi_done(cmd);
+		atomic_inc(&cmd->device->iorequest_cnt);
+		__scsi_done(cmd);
 		/* return 0 (because the command has been processed) */
 		goto out;
 	}
@@ -564,13 +565,6 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 		 */
 		goto out;
 	}
-
-	/* Assign a unique nonzero serial_number. */
-	/* XXX(hch): this is racy */
-	if (++serial_number == 0)
-		serial_number = 1;
-	cmd->serial_number = serial_number;
-	cmd->pid = scsi_pid++;
 
 	/* 
 	 * If SCSI-2 or lower, store the LUN value in cmnd.
@@ -602,6 +596,10 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 		host->resetting = 0;
 	}
 
+	/* 
+	 * AK: unlikely race here: for some reason the timer could
+	 * expire before the serial number is set up below.
+	 */
 	scsi_add_timer(cmd, cmd->timeout_per_command, scsi_times_out);
 
 	scsi_log_send(cmd);
@@ -613,6 +611,8 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 
 	cmd->state = SCSI_STATE_QUEUED;
 	cmd->owner = SCSI_OWNER_LOWLEVEL;
+
+	atomic_inc(&cmd->device->iorequest_cnt);
 
 	/*
 	 * Before we queue this command, check if the command
@@ -628,6 +628,8 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 	}
 
 	spin_lock_irqsave(host->host_lock, flags);
+	scsi_cmd_get_serial(host, cmd); 
+
 	if (unlikely(test_bit(SHOST_CANCEL, &host->shost_state))) {
 		cmd->result = (DID_NO_CONNECT << 16);
 		scsi_done(cmd);
@@ -636,6 +638,7 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 	}
 	spin_unlock_irqrestore(host->host_lock, flags);
 	if (rtn) {
+		atomic_inc(&cmd->device->iodone_cnt);
 		scsi_queue_insert(cmd,
 				(rtn == SCSI_MLQUEUE_DEVICE_BUSY) ?
 				 rtn : SCSI_MLQUEUE_HOST_BUSY);
@@ -683,7 +686,6 @@ void scsi_init_cmd_from_req(struct scsi_cmnd *cmd, struct scsi_request *sreq)
 	cmd->request = sreq->sr_request;
 	memcpy(cmd->data_cmnd, sreq->sr_cmnd, sizeof(cmd->data_cmnd));
 	cmd->serial_number = 0;
-	cmd->serial_number_at_timeout = 0;
 	cmd->bufflen = sreq->sr_bufflen;
 	cmd->buffer = sreq->sr_buffer;
 	cmd->retries = 0;
@@ -713,7 +715,6 @@ void scsi_init_cmd_from_req(struct scsi_cmnd *cmd, struct scsi_request *sreq)
 	/*
 	 * Start the timer ticking.
 	 */
-	cmd->internal_timeout = NORMAL_TIMEOUT;
 	cmd->abort_reason = 0;
 	cmd->result = 0;
 
@@ -763,9 +764,12 @@ void __scsi_done(struct scsi_cmnd *cmd)
 	 * Set the serial numbers back to zero
 	 */
 	cmd->serial_number = 0;
-	cmd->serial_number_at_timeout = 0;
 	cmd->state = SCSI_STATE_BHQUEUE;
 	cmd->owner = SCSI_OWNER_BH_HANDLER;
+
+	atomic_inc(&cmd->device->iodone_cnt);
+	if (cmd->result)
+		atomic_inc(&cmd->device->ioerr_cnt);
 
 	/*
 	 * Next, enqueue the command into the done queue.
@@ -929,12 +933,9 @@ EXPORT_SYMBOL(scsi_finish_command);
  * 		the right thing depending on whether or not the device is
  * 		currently active and whether or not it even has the
  * 		command blocks built yet.
- *
- * XXX(hch):	What exactly is device_request_lock trying to protect?
  */
 void scsi_adjust_queue_depth(struct scsi_device *sdev, int tagged, int tags)
 {
-	static DEFINE_SPINLOCK(device_request_lock);
 	unsigned long flags;
 
 	/*
@@ -943,8 +944,7 @@ void scsi_adjust_queue_depth(struct scsi_device *sdev, int tagged, int tags)
 	if (tags <= 0)
 		return;
 
-	spin_lock_irqsave(&device_request_lock, flags);
-	spin_lock(sdev->request_queue->queue_lock);
+	spin_lock_irqsave(sdev->request_queue->queue_lock, flags);
 
 	/* Check to see if the queue is managed by the block layer
 	 * if it is, and we fail to adjust the depth, exit */
@@ -973,8 +973,7 @@ void scsi_adjust_queue_depth(struct scsi_device *sdev, int tagged, int tags)
 			break;
 	}
  out:
-	spin_unlock(sdev->request_queue->queue_lock);
-	spin_unlock_irqrestore(&device_request_lock, flags);
+	spin_unlock_irqrestore(sdev->request_queue->queue_lock, flags);
 }
 EXPORT_SYMBOL(scsi_adjust_queue_depth);
 
@@ -1112,6 +1111,60 @@ void starget_for_each_device(struct scsi_target *starget, void * data,
 	}
 }
 EXPORT_SYMBOL(starget_for_each_device);
+
+/**
+ * __scsi_device_lookup_by_target - find a device given the target (UNLOCKED)
+ * @starget:	SCSI target pointer
+ * @lun:	SCSI Logical Unit Number
+ *
+ * Looks up the scsi_device with the specified @lun for a give
+ * @starget. The returned scsi_device does not have an additional
+ * reference.  You must hold the host's host_lock over this call and
+ * any access to the returned scsi_device.
+ *
+ * Note:  The only reason why drivers would want to use this is because
+ * they're need to access the device list in irq context.  Otherwise you
+ * really want to use scsi_device_lookup_by_target instead.
+ **/
+struct scsi_device *__scsi_device_lookup_by_target(struct scsi_target *starget,
+						   uint lun)
+{
+	struct scsi_device *sdev;
+
+	list_for_each_entry(sdev, &starget->devices, same_target_siblings) {
+		if (sdev->lun ==lun)
+			return sdev;
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL(__scsi_device_lookup_by_target);
+
+/**
+ * scsi_device_lookup_by_target - find a device given the target
+ * @starget:	SCSI target pointer
+ * @lun:	SCSI Logical Unit Number
+ *
+ * Looks up the scsi_device with the specified @channel, @id, @lun for a
+ * give host.  The returned scsi_device has an additional reference that
+ * needs to be release with scsi_host_put once you're done with it.
+ **/
+struct scsi_device *scsi_device_lookup_by_target(struct scsi_target *starget,
+						 uint lun)
+{
+	struct scsi_device *sdev;
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	unsigned long flags;
+
+	spin_lock_irqsave(shost->host_lock, flags);
+	sdev = __scsi_device_lookup_by_target(starget, lun);
+	if (sdev && scsi_device_get(sdev))
+		sdev = NULL;
+	spin_unlock_irqrestore(shost->host_lock, flags);
+
+	return sdev;
+}
+EXPORT_SYMBOL(scsi_device_lookup_by_target);
 
 /**
  * scsi_device_lookup - find a device given the host (UNLOCKED)

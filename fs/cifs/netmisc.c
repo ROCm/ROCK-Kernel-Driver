@@ -43,7 +43,7 @@ struct smb_to_posix_error {
 	int posix_code;
 };
 
-const struct smb_to_posix_error mapping_table_ERRDOS[] = {
+static const struct smb_to_posix_error mapping_table_ERRDOS[] = {
 	{ERRbadfunc, -EINVAL},
 	{ERRbadfile, -ENOENT},
 	{ERRbadpath, -ENOTDIR},
@@ -78,10 +78,11 @@ const struct smb_to_posix_error mapping_table_ERRDOS[] = {
 	{ErrQuota, -EDQUOT},
 	{ErrNotALink, -ENOLINK},
 	{ERRnetlogonNotStarted,-ENOPROTOOPT},
+	{ErrTooManyLinks,-EMLINK},
 	{0, 0}
 };
 
-const struct smb_to_posix_error mapping_table_ERRSRV[] = {
+static const struct smb_to_posix_error mapping_table_ERRSRV[] = {
 	{ERRerror, -EIO},
 	{ERRbadpw, -EPERM},
 	{ERRbadtype, -EREMOTE},
@@ -120,7 +121,7 @@ const struct smb_to_posix_error mapping_table_ERRSRV[] = {
 	{0, 0}
 };
 
-const struct smb_to_posix_error mapping_table_ERRHRD[] = {
+static const struct smb_to_posix_error mapping_table_ERRHRD[] = {
 	{0, 0}
 };
 
@@ -206,7 +207,7 @@ static const struct {
 	{
 	ERRDOS, ERRgeneral, NT_STATUS_UNSUCCESSFUL}, {
 	ERRDOS, ERRbadfunc, NT_STATUS_NOT_IMPLEMENTED}, {
-	ERRDOS, 87, NT_STATUS_INVALID_INFO_CLASS}, {
+	ERRDOS, ERRinvlevel, NT_STATUS_INVALID_INFO_CLASS}, {
 	ERRDOS, 24, NT_STATUS_INFO_LENGTH_MISMATCH}, {
 	ERRHRD, ERRgeneral, NT_STATUS_ACCESS_VIOLATION}, {
 	ERRHRD, ERRgeneral, NT_STATUS_IN_PAGE_ERROR}, {
@@ -742,7 +743,7 @@ static const struct {
 	ERRDOS, 182, NT_STATUS_DRIVER_ORDINAL_NOT_FOUND}, {
 	ERRDOS, 127, NT_STATUS_DRIVER_ENTRYPOINT_NOT_FOUND}, {
 	ERRDOS, 288, NT_STATUS_RESOURCE_NOT_OWNED}, {
-	ERRHRD, ERRgeneral, NT_STATUS_TOO_MANY_LINKS}, {
+	ERRDOS, ErrTooManyLinks, NT_STATUS_TOO_MANY_LINKS}, {
 	ERRHRD, ERRgeneral, NT_STATUS_QUOTA_LIST_INCONSISTENT}, {
 	ERRHRD, ERRgeneral, NT_STATUS_FILE_IS_OFFLINE}, {
 	ERRDOS, 21, 0xc000026e}, {

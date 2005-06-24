@@ -616,7 +616,7 @@ static struct isapnp_device_id id_table[] __devinitdata = {
 
 MODULE_DEVICE_TABLE(isapnp, id_table);
 
-void sym53c416_probe(void)
+static void sym53c416_probe(void)
 {
 	int *base = probeaddrs;
 	int ints[2];
@@ -809,7 +809,7 @@ static int sym53c416_host_reset(Scsi_Cmnd *SCpnt)
 	/* printk("sym53c416_reset\n"); */
 	base = SCpnt->device->host->io_port;
 	/* search scsi_id - fixme, we shouldnt need to iterate for this! */
-	for(i = 0; i < host_index && scsi_id != -1; i++)
+	for(i = 0; i < host_index && scsi_id == -1; i++)
 		if(hosts[i].base == base)
 			scsi_id = hosts[i].scsi_id;
 	outb(RESET_CHIP, base + COMMAND_REG);

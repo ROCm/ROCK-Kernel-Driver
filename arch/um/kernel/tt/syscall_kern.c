@@ -22,8 +22,10 @@ long execute_syscall_tt(void *r)
 	long res;
 	int syscall;
 
+#ifdef CONFIG_SYSCALL_DEBUG
 	current->thread.nsyscalls++;
 	nsyscalls++;
+#endif
 	syscall = UPT_SYSCALL_NR(&regs->regs);
 
 	if((syscall >= NR_syscalls) || (syscall < 0))

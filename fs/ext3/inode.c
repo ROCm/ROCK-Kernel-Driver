@@ -455,34 +455,24 @@ static unsigned long ext3_find_near(struct inode *inode, Indirect *ind)
  *	@goal:	place to store the result.
  *
  *	Normally this function find the prefered place for block allocation,
- *	stores it in *@goal and returns zero. If the branch had been changed
- *	under us we return -EAGAIN.
+ *	stores it in *@goal and returns zero.
  */
 
-static int ext3_find_goal(struct inode *inode, long block, Indirect chain[4],
-			  Indirect *partial, unsigned long *goal)
+static unsigned long ext3_find_goal(struct inode *inode, long block,
+		Indirect chain[4], Indirect *partial)
 {
-	struct ext3_inode_info *ei = EXT3_I(inode);
-	/* Writer: ->i_next_alloc* */
-	if ((block == ei->i_next_alloc_block + 1)&& ei->i_next_alloc_goal) {
-		ei->i_next_alloc_block++;
-		ei->i_next_alloc_goal++;
+	struct ext3_block_alloc_info *block_i =  EXT3_I(inode)->i_block_alloc_info;
+
+	/*
+	 * try the heuristic for sequential allocation,
+	 * failing that at least try to get decent locality.
+	 */
+	if (block_i && (block == block_i->last_alloc_logical_block + 1)
+		&& (block_i->last_alloc_physical_block != 0)) {
+		return block_i->last_alloc_physical_block + 1;
 	}
-	/* Writer: end */
-	/* Reader: pointers, ->i_next_alloc* */
-	if (verify_chain(chain, partial)) {
-		/*
-		 * try the heuristic for sequential allocation,
-		 * failing that at least try to get decent locality.
-		 */
-		if (block == ei->i_next_alloc_block)
-			*goal = ei->i_next_alloc_goal;
-		if (!*goal)
-			*goal = ext3_find_near(inode, partial);
-		return 0;
-	}
-	/* Reader: end */
-	return -EAGAIN;
+
+	return ext3_find_near(inode, partial);
 }
 
 /**
@@ -586,12 +576,9 @@ static int ext3_alloc_branch(handle_t *handle, struct inode *inode,
  *	@where: location of missing link
  *	@num:   number of blocks we are adding
  *
- *	This function verifies that chain (up to the missing link) had not
- *	changed, fills the missing link and does all housekeeping needed in
+ *	This function fills the missing link and does all housekeeping needed in
  *	inode (->i_blocks, etc.). In case of success we end up with the full
- *	chain to new block and return 0. Otherwise (== chain had been changed)
- *	we free the new blocks (forgetting their buffer_heads, indeed) and
- *	return -EAGAIN.
+ *	chain to new block and return 0.
  */
 
 static int ext3_splice_branch(handle_t *handle, struct inode *inode, long block,
@@ -599,7 +586,7 @@ static int ext3_splice_branch(handle_t *handle, struct inode *inode, long block,
 {
 	int i;
 	int err = 0;
-	struct ext3_inode_info *ei = EXT3_I(inode);
+	struct ext3_block_alloc_info *block_i = EXT3_I(inode)->i_block_alloc_info;
 
 	/*
 	 * If we're splicing into a [td]indirect block (as opposed to the
@@ -612,19 +599,19 @@ static int ext3_splice_branch(handle_t *handle, struct inode *inode, long block,
 		if (err)
 			goto err_out;
 	}
-	/* Verify that place we are splicing to is still there and vacant */
-
-	/* Writer: pointers, ->i_next_alloc* */
-	if (!verify_chain(chain, where-1) || *where->p)
-		/* Writer: end */
-		goto changed;
-
 	/* That's it */
 
 	*where->p = where->key;
-	ei->i_next_alloc_block = block;
-	ei->i_next_alloc_goal = le32_to_cpu(where[num-1].key);
-	/* Writer: end */
+
+	/*
+	 * update the most recently allocated logical & physical block
+	 * in i_block_alloc_info, to assist find the proper goal block for next
+	 * allocation
+	 */
+	if (block_i) {
+		block_i->last_alloc_logical_block = block;
+		block_i->last_alloc_physical_block = le32_to_cpu(where[num-1].key);
+	}
 
 	/* We are done with atomic stuff, now do the rest of housekeeping */
 
@@ -655,26 +642,11 @@ static int ext3_splice_branch(handle_t *handle, struct inode *inode, long block,
 	}
 	return err;
 
-changed:
-	/*
-	 * AKPM: if where[i].bh isn't part of the current updating
-	 * transaction then we explode nastily.  Test this code path.
-	 */
-	jbd_debug(1, "the chain changed: try again\n");
-	err = -EAGAIN;
-
 err_out:
 	for (i = 1; i < num; i++) {
 		BUFFER_TRACE(where[i].bh, "call journal_forget");
 		ext3_journal_forget(handle, where[i].bh);
 	}
-	/* For the normal collision cleanup case, we free up the blocks.
-	 * On genuine filesystem errors we don't even think about doing
-	 * that. */
-	if (err == -EAGAIN)
-		for (i = 0; i < num; i++)
-			ext3_free_blocks(handle, inode, 
-					 le32_to_cpu(where[i].key), 1);
 	return err;
 }
 
@@ -706,7 +678,7 @@ ext3_get_block_handle(handle_t *handle, struct inode *inode, sector_t iblock,
 	unsigned long goal;
 	int left;
 	int boundary = 0;
-	int depth = ext3_block_to_path(inode, iblock, offsets, &boundary);
+	const int depth = ext3_block_to_path(inode, iblock, offsets, &boundary);
 	struct ext3_inode_info *ei = EXT3_I(inode);
 
 	J_ASSERT(handle != NULL || create == 0);
@@ -714,48 +686,55 @@ ext3_get_block_handle(handle_t *handle, struct inode *inode, sector_t iblock,
 	if (depth == 0)
 		goto out;
 
-reread:
 	partial = ext3_get_branch(inode, depth, offsets, chain, &err);
 
 	/* Simplest case - block found, no allocation needed */
 	if (!partial) {
 		clear_buffer_new(bh_result);
-got_it:
-		map_bh(bh_result, inode->i_sb, le32_to_cpu(chain[depth-1].key));
-		if (boundary)
-			set_buffer_boundary(bh_result);
-		/* Clean up and exit */
-		partial = chain+depth-1; /* the whole chain */
-		goto cleanup;
+		goto got_it;
 	}
 
 	/* Next simple case - plain lookup or failed read of indirect block */
-	if (!create || err == -EIO) {
-cleanup:
+	if (!create || err == -EIO)
+		goto cleanup;
+
+	down(&ei->truncate_sem);
+
+	/*
+	 * If the indirect block is missing while we are reading
+	 * the chain(ext3_get_branch() returns -EAGAIN err), or
+	 * if the chain has been changed after we grab the semaphore,
+	 * (either because another process truncated this branch, or
+	 * another get_block allocated this branch) re-grab the chain to see if
+	 * the request block has been allocated or not.
+	 *
+	 * Since we already block the truncate/other get_block
+	 * at this point, we will have the current copy of the chain when we
+	 * splice the branch into the tree.
+	 */
+	if (err == -EAGAIN || !verify_chain(chain, partial)) {
 		while (partial > chain) {
-			BUFFER_TRACE(partial->bh, "call brelse");
 			brelse(partial->bh);
 			partial--;
 		}
-		BUFFER_TRACE(bh_result, "returned");
-out:
-		return err;
+		partial = ext3_get_branch(inode, depth, offsets, chain, &err);
+		if (!partial) {
+			up(&ei->truncate_sem);
+			if (err)
+				goto cleanup;
+			clear_buffer_new(bh_result);
+			goto got_it;
+		}
 	}
 
 	/*
-	 * Indirect block might be removed by truncate while we were
-	 * reading it. Handling of that case (forget what we've got and
-	 * reread) is taken out of the main path.
-	 */
-	if (err == -EAGAIN)
-		goto changed;
+	 * Okay, we need to do block allocation.  Lazily initialize the block
+	 * allocation info here if necessary
+	*/
+	if (S_ISREG(inode->i_mode) && (!ei->i_block_alloc_info))
+		ext3_init_block_alloc_info(inode);
 
-	goal = 0;
-	down(&ei->truncate_sem);
-	if (ext3_find_goal(inode, iblock, chain, partial, &goal) < 0) {
-		up(&ei->truncate_sem);
-		goto changed;
-	}
+	goal = ext3_find_goal(inode, iblock, chain, partial);
 
 	left = (chain + depth) - partial;
 
@@ -763,38 +742,45 @@ out:
 	 * Block out ext3_truncate while we alter the tree
 	 */
 	err = ext3_alloc_branch(handle, inode, left, goal,
-					offsets+(partial-chain), partial);
+				offsets + (partial - chain), partial);
 
-	/* The ext3_splice_branch call will free and forget any buffers
+	/*
+	 * The ext3_splice_branch call will free and forget any buffers
 	 * on the new chain if there is a failure, but that risks using
 	 * up transaction credits, especially for bitmaps where the
 	 * credits cannot be returned.  Can we handle this somehow?  We
-	 * may need to return -EAGAIN upwards in the worst case.  --sct */
+	 * may need to return -EAGAIN upwards in the worst case.  --sct
+	 */
 	if (!err)
 		err = ext3_splice_branch(handle, inode, iblock, chain,
 					 partial, left);
-	/* i_disksize growing is protected by truncate_sem
-	 * don't forget to protect it if you're about to implement
-	 * concurrent ext3_get_block() -bzzz */
+	/*
+	 * i_disksize growing is protected by truncate_sem.  Don't forget to
+	 * protect it if you're about to implement concurrent
+	 * ext3_get_block() -bzzz
+	*/
 	if (!err && extend_disksize && inode->i_size > ei->i_disksize)
 		ei->i_disksize = inode->i_size;
 	up(&ei->truncate_sem);
-	if (err == -EAGAIN)
-		goto changed;
 	if (err)
 		goto cleanup;
 
 	set_buffer_new(bh_result);
-	goto got_it;
-
-changed:
+got_it:
+	map_bh(bh_result, inode->i_sb, le32_to_cpu(chain[depth-1].key));
+	if (boundary)
+		set_buffer_boundary(bh_result);
+	/* Clean up and exit */
+	partial = chain + depth - 1;	/* the whole chain */
+cleanup:
 	while (partial > chain) {
-		jbd_debug(1, "buffer chain changed, retrying\n");
-		BUFFER_TRACE(partial->bh, "brelsing");
+		BUFFER_TRACE(partial->bh, "call brelse");
 		brelse(partial->bh);
 		partial--;
 	}
-	goto reread;
+	BUFFER_TRACE(bh_result, "returned");
+out:
+	return err;
 }
 
 static int ext3_get_block(struct inode *inode, sector_t iblock,
@@ -1010,7 +996,10 @@ retry:
 		ret = PTR_ERR(handle);
 		goto out;
 	}
-	ret = block_prepare_write(page, from, to, ext3_get_block);
+	if (test_opt(inode->i_sb, NOBH))
+		ret = nobh_prepare_write(page, from, to, ext3_get_block);
+	else
+		ret = block_prepare_write(page, from, to, ext3_get_block);
 	if (ret)
 		goto prepare_write_failed;
 
@@ -1094,7 +1083,12 @@ static int ext3_writeback_commit_write(struct file *file, struct page *page,
 	new_i_size = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
 	if (new_i_size > EXT3_I(inode)->i_disksize)
 		EXT3_I(inode)->i_disksize = new_i_size;
-	ret = generic_commit_write(file, page, from, to);
+
+	if (test_opt(inode->i_sb, NOBH))
+		ret = nobh_commit_write(file, page, from, to);
+	else
+		ret = generic_commit_write(file, page, from, to);
+
 	ret2 = ext3_journal_stop(handle);
 	if (!ret)
 		ret = ret2;
@@ -1340,7 +1334,11 @@ static int ext3_writeback_writepage(struct page *page,
 		goto out_fail;
 	}
 
-	ret = block_write_full_page(page, ext3_get_block, wbc);
+	if (test_opt(inode->i_sb, NOBH))
+		ret = nobh_writepage(page, ext3_get_block, wbc);
+	else
+		ret = block_write_full_page(page, ext3_get_block, wbc);
+
 	err = ext3_journal_stop(handle);
 	if (!ret)
 		ret = err;
@@ -1439,6 +1437,8 @@ static int ext3_releasepage(struct page *page, int wait)
 	journal_t *journal = EXT3_JOURNAL(page->mapping->host);
 
 	WARN_ON(PageChecked(page));
+	if (!page_has_buffers(page))
+		return 0;
 	return journal_try_to_free_buffers(journal, page, wait);
 }
 
@@ -1600,12 +1600,27 @@ static int ext3_block_truncate_page(handle_t *handle, struct page *page,
 	unsigned blocksize, iblock, length, pos;
 	struct inode *inode = mapping->host;
 	struct buffer_head *bh;
-	int err;
+	int err = 0;
 	void *kaddr;
 
 	blocksize = inode->i_sb->s_blocksize;
 	length = blocksize - (offset & (blocksize - 1));
 	iblock = index << (PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits);
+
+	/*
+	 * For "nobh" option,  we can only work if we don't need to
+	 * read-in the page - otherwise we create buffers to do the IO.
+	 */
+	if (!page_has_buffers(page) && test_opt(inode->i_sb, NOBH)) {
+		if (PageUptodate(page)) {
+			kaddr = kmap_atomic(page, KM_USER0);
+			memset(kaddr + offset, 0, length);
+			flush_dcache_page(page);
+			kunmap_atomic(kaddr, KM_USER0);
+			set_page_dirty(page);
+			goto unlock;
+		}
+	}
 
 	if (!page_has_buffers(page))
 		create_empty_buffers(page, blocksize, 0);
@@ -2074,8 +2089,6 @@ void ext3_truncate(struct inode * inode)
 	if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
 		return;
 
-	ext3_discard_reservation(inode);
-
 	/*
 	 * We have to lock the EOF page here, because lock_page() nests
 	 * outside journal_start().
@@ -2200,6 +2213,9 @@ do_indirects:
 		case EXT3_TIND_BLOCK:
 			;
 	}
+
+	ext3_discard_reservation(inode);
+
 	up(&ei->truncate_sem);
 	inode->i_mtime = inode->i_ctime = CURRENT_TIME_SEC;
 	ext3_mark_inode_dirty(handle, inode);
@@ -2419,7 +2435,7 @@ void ext3_read_inode(struct inode * inode)
 	ei->i_acl = EXT3_ACL_NOT_CACHED;
 	ei->i_default_acl = EXT3_ACL_NOT_CACHED;
 #endif
-	ei->i_rsv_window.rsv_end = EXT3_RESERVE_WINDOW_NOT_ALLOCATED;
+	ei->i_block_alloc_info = NULL;
 
 	if (__ext3_get_inode_loc(inode, &iloc, 0))
 		goto bad_inode;
@@ -2440,8 +2456,6 @@ void ext3_read_inode(struct inode * inode)
 	inode->i_atime.tv_nsec = inode->i_ctime.tv_nsec = inode->i_mtime.tv_nsec = 0;
 
 	ei->i_state = 0;
-	ei->i_next_alloc_block = 0;
-	ei->i_next_alloc_goal = 0;
 	ei->i_dir_start_lookup = 0;
 	ei->i_dtime = le32_to_cpu(raw_inode->i_dtime);
 	/* We now have enough fields to check if the inode was active or not.
@@ -2481,10 +2495,6 @@ void ext3_read_inode(struct inode * inode)
 	ei->i_disksize = inode->i_size;
 	inode->i_generation = le32_to_cpu(raw_inode->i_generation);
 	ei->i_block_group = iloc.block_group;
-	ei->i_rsv_window.rsv_start = 0;
-	ei->i_rsv_window.rsv_end= 0;
-	atomic_set(&ei->i_rsv_window.rsv_goal_size, EXT3_DEFAULT_RESERVE_BLOCKS);
-	seqlock_init(&ei->i_rsv_window.rsv_seqlock);
 	/*
 	 * NOTE! The in-memory inode i_data array is in little-endian order
 	 * even on big-endian machines: we do NOT byteswap the block numbers!

@@ -6,22 +6,13 @@ menu "CPU Frequency scaling"
 
 source "drivers/cpufreq/Kconfig"
 
-config CPU_FREQ_TABLE
-       tristate "CPU frequency table helpers"
-       depends on CPU_FREQ
-       default y
-       help
-         Many CPUFreq drivers use these helpers, so only say N here if
-	 the CPUFreq driver of your choice doesn't need these helpers.
-
-	 If in doubt, say Y.
+if CPU_FREQ
 
 comment "CPUFreq processor drivers"
-       depends on CPU_FREQ
 
 config X86_POWERNOW_K8
 	tristate "AMD Opteron/Athlon64 PowerNow!"
-	depends on CPU_FREQ_TABLE
+	select CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for mobile AMD Opteron/Athlon64 processors.
 
@@ -31,12 +22,14 @@ config X86_POWERNOW_K8
 
 config X86_POWERNOW_K8_ACPI
 	bool
-	depends on ((X86_POWERNOW_K8 = "m" && ACPI_PROCESSOR) || (X86_POWERNOW_K8 = "y" && ACPI_PROCESSOR = "y"))
+	depends on X86_POWERNOW_K8 && ACPI_PROCESSOR
+	depends on !(X86_POWERNOW_K8 = y && ACPI_PROCESSOR = m)
 	default y
 
 config X86_SPEEDSTEP_CENTRINO
 	tristate "Intel Enhanced SpeedStep"
-	depends on CPU_FREQ_TABLE && ACPI_PROCESSOR
+	select CPU_FREQ_TABLE
+	depends on ACPI_PROCESSOR
 	help
 	  This adds the CPUFreq driver for Enhanced SpeedStep enabled
 	  mobile CPUs.  This means Intel Pentium M (Centrino) CPUs
@@ -53,7 +46,7 @@ config X86_SPEEDSTEP_CENTRINO_ACPI
 
 config X86_ACPI_CPUFREQ
 	tristate "ACPI Processor P-States driver"
-	depends on CPU_FREQ_TABLE && ACPI_PROCESSOR
+	depends on ACPI_PROCESSOR
 	help
 	  This driver adds a CPUFreq driver which utilizes the ACPI
 	  Processor Performance States.
@@ -63,7 +56,6 @@ config X86_ACPI_CPUFREQ
 	  If in doubt, say N.
 
 comment "shared options"
-	depends on CPU_FREQ
 
 config X86_ACPI_CPUFREQ_PROC_INTF
         bool "/proc/acpi/processor/../performance interface (deprecated)"
@@ -78,7 +70,7 @@ config X86_ACPI_CPUFREQ_PROC_INTF
 
 config X86_P4_CLOCKMOD
 	tristate "Intel Pentium 4 clock modulation"
-	depends on CPU_FREQ_TABLE && EMBEDDED
+	depends on EMBEDDED
 	help
 	  This adds the clock modulation driver for Intel Pentium 4 / XEON
 	  processors.  When enabled it will lower CPU temperature by skipping
@@ -96,9 +88,9 @@ config X86_P4_CLOCKMOD
 
 config X86_SPEEDSTEP_LIB
         tristate
-        depends on (X86_P4_CLOCKMOD)
-        default (X86_P4_CLOCKMOD)
+        default X86_P4_CLOCKMOD
 
+endif
 
 endmenu
 

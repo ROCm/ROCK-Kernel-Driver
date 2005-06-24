@@ -4,7 +4,7 @@
  *  This driver will also support the older SI, and XIO cards.
  *
  *
- *   (C) 1998 - 2000  R.E.Wolff@BitWizard.nl
+ *   (C) 1998 - 2004  R.E.Wolff@BitWizard.nl
  *
  *  Simon Allen (simonallen@cix.compulink.co.uk) wrote a previous
  *  version of this driver. Some fragments may have been copied. (none
@@ -354,13 +354,13 @@ static int si1_probe_addrs[]= { 0xd0000};
    Some architectures may need more. */
 static int sx_irqmask = -1;
 
-MODULE_PARM(sx_probe_addrs, "i");
-MODULE_PARM(si_probe_addrs, "i");
-MODULE_PARM(sx_poll, "i");
-MODULE_PARM(sx_slowpoll, "i");
-MODULE_PARM(sx_maxints, "i");
-MODULE_PARM(sx_debug, "i");
-MODULE_PARM(sx_irqmask, "i");
+module_param_array(sx_probe_addrs, int, NULL, 0);
+module_param_array(si_probe_addrs, int, NULL, 0);
+module_param(sx_poll, int, 0);
+module_param(sx_slowpoll, int, 0);
+module_param(sx_maxints, int, 0);
+module_param(sx_debug, int, 0);
+module_param(sx_irqmask, int, 0);
 
 MODULE_LICENSE("GPL");
 
@@ -396,7 +396,7 @@ static struct real_driver sx_real_driver = {
 
 
 
-#define func_enter() sx_dprintk (SX_DEBUG_FLOW, "sx: enter %s\b",__FUNCTION__)
+#define func_enter() sx_dprintk (SX_DEBUG_FLOW, "sx: enter %s\n",__FUNCTION__)
 #define func_exit()  sx_dprintk (SX_DEBUG_FLOW, "sx: exit  %s\n", __FUNCTION__)
 
 #define func_enter2() sx_dprintk (SX_DEBUG_FLOW, "sx: enter %s (port %d)\n", \
@@ -1158,7 +1158,6 @@ static inline void sx_check_modem_signals (struct sx_port *port)
 	if (hi_state & ST_BREAK) {
 		hi_state &= ~ST_BREAK;
 		sx_dprintk (SX_DEBUG_MODEMSIGNALS, "got a break.\n");
-
 		sx_write_channel_byte (port, hi_state, hi_state);
 		gs_got_break (&port->gs);
 	}
@@ -1206,7 +1205,7 @@ static irqreturn_t sx_interrupt (int irq, void *ptr, struct pt_regs *regs)
 	struct sx_port *port;
 	int i;
 
-	/*   func_enter ();  */
+	func_enter ();
 	sx_dprintk (SX_DEBUG_FLOW, "sx: enter sx_interrupt (%d/%d)\n", irq, board->irq); 
 
 	/* AAargh! The order in which to do these things is essential and
@@ -1297,7 +1296,7 @@ static irqreturn_t sx_interrupt (int irq, void *ptr, struct pt_regs *regs)
 	clear_bit (SX_BOARD_INTR_LOCK, &board->locks);
 
 	sx_dprintk (SX_DEBUG_FLOW, "sx: exit sx_interrupt (%d/%d)\n", irq, board->irq); 
-	/*  func_exit ();  */
+        func_exit ();
 	return IRQ_HANDLED;
 }
 
@@ -1428,6 +1427,7 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 {
 	struct sx_port *port;
 	int retval, line;
+	unsigned long flags;
 
 	func_enter();
 
@@ -1449,9 +1449,12 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 
 	sx_dprintk (SX_DEBUG_OPEN, "port = %p c_dcd = %d\n", port, port->c_dcd);
 
+	spin_lock_irqsave(&port->gs.driver_lock, flags);
+
 	tty->driver_data = port;
 	port->gs.tty = tty;
 	port->gs.count++;
+	spin_unlock_irqrestore(&port->gs.driver_lock, flags);
 
 	sx_dprintk (SX_DEBUG_OPEN, "starting port\n");
 
@@ -1466,7 +1469,8 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 	}
 
 	port->gs.flags |= GS_ACTIVE;
-	sx_setsignals (port, 1,1);
+	if (port->gs.count <= 1)
+		sx_setsignals (port, 1,1);
 
 #if 0
 	if (sx_debug & SX_DEBUG_OPEN)
@@ -1476,10 +1480,14 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 		my_hd_io (port->board->base + port->ch_base, sizeof (*port));
 #endif
 
-	if (sx_send_command (port, HS_LOPEN, -1, HS_IDLE_OPEN) != 1) {
-		printk (KERN_ERR "sx: Card didn't respond to LOPEN command.\n");
-		port->gs.count--;
-		return -EIO;
+	if (port->gs.count <= 1) {
+		if (sx_send_command (port, HS_LOPEN, -1, HS_IDLE_OPEN) != 1) {
+			printk (KERN_ERR "sx: Card didn't respond to LOPEN command.\n");
+			spin_lock_irqsave(&port->gs.driver_lock, flags);
+			port->gs.count--;
+			spin_unlock_irqrestore(&port->gs.driver_lock, flags);
+			return -EIO;
+		}
 	}
 
 	retval = gs_block_til_ready(port, filp);
@@ -1497,6 +1505,7 @@ static int sx_open  (struct tty_struct * tty, struct file * filp)
 
 	port->c_dcd = sx_get_CD (port);
 	sx_dprintk (SX_DEBUG_OPEN, "at open: cd=%d\n", port->c_dcd);
+
 	func_exit();
 	return 0;
 
@@ -1515,13 +1524,9 @@ static void sx_close (void *ptr)
 	sx_reconfigure_port(port);	
 	sx_send_command (port, HS_CLOSE, 0, 0);
 
-	while (to-- && (sx_read_channel_byte (port, hi_hstat) != HS_IDLE_CLOSED)) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout (1);
-		if (signal_pending (current))
-				break;
-	}
-	current->state = TASK_RUNNING;
+	while (to-- && (sx_read_channel_byte (port, hi_hstat) != HS_IDLE_CLOSED))
+		if (msleep_interruptible(10))
+			break;
 	if (sx_read_channel_byte (port, hi_hstat) != HS_IDLE_CLOSED) {
 		if (sx_send_command (port, HS_FORCE_CLOSED, -1, HS_IDLE_CLOSED) != 1) {
 			printk (KERN_ERR 
@@ -1535,7 +1540,8 @@ static void sx_close (void *ptr)
 
 	if(port->gs.count) {
 		sx_dprintk(SX_DEBUG_CLOSE, "WARNING port count:%d\n", port->gs.count);
-		port->gs.count = 0;
+		//printk ("%s SETTING port count to zero: %p count: %d\n", __FUNCTION__, port, port->gs.count);
+		//port->gs.count = 0;
 	}
 
 	func_exit ();
@@ -1751,12 +1757,16 @@ static void sx_break (struct tty_struct * tty, int flag)
 	struct sx_port *port = tty->driver_data;
 	int rv;
 
+	func_enter ();
+
 	if (flag) 
 		rv = sx_send_command (port, HS_START, -1, HS_IDLE_BREAK);
 	else 
 		rv = sx_send_command (port, HS_STOP, -1, HS_IDLE_OPEN);
 	if (rv != 1) printk (KERN_ERR "sx: couldn't send break (%x).\n",
 			read_sx_byte (port->board, CHAN_OFFSET (port, hi_hstat)));
+
+	func_exit ();
 }
 
 
@@ -2105,7 +2115,7 @@ static int probe_sx (struct sx_board *board)
 		}
 
 		if (((vpdp.uniqid >> 24) & SX_UNIQUEID_MASK) == SX_ISA_UNIQUEID1) {
-			if (board->hw_base & 0x8000) {
+			if (((unsigned long)board->hw_base) & 0x8000) {
 				printk (KERN_WARNING "sx: Warning: There may be hardware problems with the card at %lx.\n", board->hw_base);
 				printk (KERN_WARNING "sx: Read sx.txt for more info.\n");
 			}
@@ -2154,6 +2164,7 @@ static int probe_si (struct sx_board *board)
 	    }
 		for (i=0;i<8;i++) {
 			if ((read_sx_byte (board, SI2_ISA_ID_BASE+7-i) & 7) != i) {
+				func_exit ();
 				return 0;
 			}
 		}
@@ -2168,11 +2179,13 @@ static int probe_si (struct sx_board *board)
 		/* This should be an SI1 board, which has this
 		   location writable... */
 		if (read_sx_byte (board, SI2_ISA_ID_BASE) != 0x10)
+			func_exit ();
 			return 0; 
 	} else {
 		/* This should be an SI2 board, which has the bottom
 		   3 bits non-writable... */
 		if (read_sx_byte (board, SI2_ISA_ID_BASE) == 0x10)
+			func_exit ();
 			return 0; 
 	}
 
@@ -2185,11 +2198,13 @@ static int probe_si (struct sx_board *board)
 		/* This should be an SI1 board, which has this
 		   location writable... */
 		if (read_sx_byte (board, SI2_ISA_ID_BASE) != 0x10)
+			func_exit();
 			return 0; 
 	} else {
 		/* This should be an SI2 board, which has the bottom
 		   3 bits non-writable... */
 		if (read_sx_byte (board, SI2_ISA_ID_BASE) == 0x10)
+			func_exit ();
 			return 0; 
 	}
 
@@ -2306,6 +2321,7 @@ static int sx_init_portstructs (int nboards, int nports)
 #ifdef NEW_WRITE_LOCKING
 			port->gs.port_write_sem = MUTEX;
 #endif
+			port->gs.driver_lock = SPIN_LOCK_UNLOCKED;
 			/*
 			 * Initializing wait queue
 			 */
@@ -2477,7 +2493,7 @@ static int __init sx_init(void)
 			found++;
 			fix_sx_pci (pdev, board);
 		} else 
-			iounmap(board->base);
+			iounmap(board->base2);
 	}
 #endif
 

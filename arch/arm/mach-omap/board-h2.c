@@ -23,14 +23,17 @@
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/delay.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
 
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
 #include <asm/mach/map.h>
 
-#include <asm/arch/clocks.h>
 #include <asm/arch/gpio.h>
+#include <asm/arch/tc.h>
 #include <asm/arch/usb.h>
 
 #include "common.h"
@@ -39,10 +42,64 @@ extern int omap_gpio_init(void);
 
 static int __initdata h2_serial_ports[OMAP_MAX_NR_PORTS] = {1, 1, 1};
 
+static struct mtd_partition h2_partitions[] = {
+	/* bootloader (U-Boot, etc) in first sector */
+	{
+	      .name		= "bootloader",
+	      .offset		= 0,
+	      .size		= SZ_128K,
+	      .mask_flags	= MTD_WRITEABLE, /* force read-only */
+	},
+	/* bootloader params in the next sector */
+	{
+	      .name		= "params",
+	      .offset		= MTDPART_OFS_APPEND,
+	      .size		= SZ_128K,
+	      .mask_flags	= 0,
+	},
+	/* kernel */
+	{
+	      .name		= "kernel",
+	      .offset		= MTDPART_OFS_APPEND,
+	      .size		= SZ_2M,
+	      .mask_flags	= 0
+	},
+	/* file system */
+	{
+	      .name		= "filesystem",
+	      .offset		= MTDPART_OFS_APPEND,
+	      .size		= MTDPART_SIZ_FULL,
+	      .mask_flags	= 0
+	}
+};
+
+static struct flash_platform_data h2_flash_data = {
+	.map_name	= "cfi_probe",
+	.width		= 2,
+	.parts		= h2_partitions,
+	.nr_parts	= ARRAY_SIZE(h2_partitions),
+};
+
+static struct resource h2_flash_resource = {
+	.start		= OMAP_CS2B_PHYS,
+	.end		= OMAP_CS2B_PHYS + OMAP_CS2B_SIZE - 1,
+	.flags		= IORESOURCE_MEM,
+};
+
+static struct platform_device h2_flash_device = {
+	.name		= "omapflash",
+	.id		= 0,
+	.dev		= {
+		.platform_data	= &h2_flash_data,
+	},
+	.num_resources	= 1,
+	.resource	= &h2_flash_resource,
+};
+
 static struct resource h2_smc91x_resources[] = {
 	[0] = {
 		.start	= OMAP1610_ETHR_START,		/* Physical */
-		.end	= OMAP1610_ETHR_START + SZ_4K,
+		.end	= OMAP1610_ETHR_START + 0xf,
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
@@ -60,6 +117,7 @@ static struct platform_device h2_smc91x_device = {
 };
 
 static struct platform_device *h2_devices[] __initdata = {
+	&h2_flash_device,
 	&h2_smc91x_device,
 };
 

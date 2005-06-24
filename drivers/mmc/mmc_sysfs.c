@@ -21,6 +21,41 @@
 #define dev_to_mmc_card(d)	container_of(d, struct mmc_card, dev)
 #define to_mmc_driver(d)	container_of(d, struct mmc_driver, drv)
 
+#define MMC_ATTR(name, fmt, args...)					\
+static ssize_t mmc_##name##_show (struct device *dev, char *buf)	\
+{									\
+	struct mmc_card *card = dev_to_mmc_card(dev);			\
+	return sprintf(buf, fmt, args);					\
+}
+
+MMC_ATTR(cid, "%08x%08x%08x%08x\n", card->raw_cid[0], card->raw_cid[1],
+	card->raw_cid[2], card->raw_cid[3]);
+MMC_ATTR(csd, "%08x%08x%08x%08x\n", card->raw_csd[0], card->raw_csd[1],
+	card->raw_csd[2], card->raw_csd[3]);
+MMC_ATTR(date, "%02d/%04d\n", card->cid.month, card->cid.year);
+MMC_ATTR(fwrev, "0x%x\n", card->cid.fwrev);
+MMC_ATTR(hwrev, "0x%x\n", card->cid.hwrev);
+MMC_ATTR(manfid, "0x%06x\n", card->cid.manfid);
+MMC_ATTR(name, "%s\n", card->cid.prod_name);
+MMC_ATTR(oemid, "0x%04x\n", card->cid.oemid);
+MMC_ATTR(serial, "0x%08x\n", card->cid.serial);
+
+#define MMC_ATTR_RO(name) __ATTR(name, S_IRUGO, mmc_##name##_show, NULL)
+
+static struct device_attribute mmc_dev_attrs[] = {
+	MMC_ATTR_RO(cid),
+	MMC_ATTR_RO(csd),
+	MMC_ATTR_RO(date),
+	MMC_ATTR_RO(fwrev),
+	MMC_ATTR_RO(hwrev),
+	MMC_ATTR_RO(manfid),
+	MMC_ATTR_RO(name),
+	MMC_ATTR_RO(oemid),
+	MMC_ATTR_RO(serial),
+	__ATTR_NULL
+};
+
+
 static void mmc_release_card(struct device *dev)
 {
 	struct mmc_card *card = dev_to_mmc_card(dev);
@@ -74,7 +109,7 @@ mmc_bus_hotplug(struct device *dev, char **envp, int num_envp, char *buf,
 	return 0;
 }
 
-static int mmc_bus_suspend(struct device *dev, u32 state)
+static int mmc_bus_suspend(struct device *dev, pm_message_t state)
 {
 	struct mmc_driver *drv = to_mmc_driver(dev->driver);
 	struct mmc_card *card = dev_to_mmc_card(dev);
@@ -98,6 +133,7 @@ static int mmc_bus_resume(struct device *dev)
 
 static struct bus_type mmc_bus_type = {
 	.name		= "mmc",
+	.dev_attrs	= mmc_dev_attrs,
 	.match		= mmc_bus_match,
 	.hotplug	= mmc_bus_hotplug,
 	.suspend	= mmc_bus_suspend,
@@ -151,38 +187,6 @@ void mmc_unregister_driver(struct mmc_driver *drv)
 EXPORT_SYMBOL(mmc_unregister_driver);
 
 
-#define MMC_ATTR(name, fmt, args...)					\
-static ssize_t mmc_dev_show_##name (struct device *dev, char *buf)	\
-{									\
-	struct mmc_card *card = dev_to_mmc_card(dev);			\
-	return sprintf(buf, fmt, args);					\
-}									\
-static DEVICE_ATTR(name, S_IRUGO, mmc_dev_show_##name, NULL)
-
-MMC_ATTR(cid, "%08x%08x%08x%08x\n", card->raw_cid[0], card->raw_cid[1],
-	card->raw_cid[2], card->raw_cid[3]);
-MMC_ATTR(csd, "%08x%08x%08x%08x\n", card->raw_csd[0], card->raw_csd[1],
-	card->raw_csd[2], card->raw_csd[3]);
-MMC_ATTR(date, "%02d/%04d\n", card->cid.month, card->cid.year);
-MMC_ATTR(fwrev, "0x%x\n", card->cid.fwrev);
-MMC_ATTR(hwrev, "0x%x\n", card->cid.hwrev);
-MMC_ATTR(manfid, "0x%06x\n", card->cid.manfid);
-MMC_ATTR(name, "%s\n", card->cid.prod_name);
-MMC_ATTR(oemid, "0x%04x\n", card->cid.oemid);
-MMC_ATTR(serial, "0x%08x\n", card->cid.serial);
-
-static struct device_attribute *mmc_dev_attributes[] = {
-	&dev_attr_cid,
-	&dev_attr_csd,
-	&dev_attr_date,
-	&dev_attr_fwrev,
-	&dev_attr_hwrev,
-	&dev_attr_manfid,
-	&dev_attr_name,
-	&dev_attr_oemid,
-	&dev_attr_serial,
-};
-
 /*
  * Internal function.  Initialise a MMC card structure.
  */
@@ -201,17 +205,10 @@ void mmc_init_card(struct mmc_card *card, struct mmc_host *host)
  */
 int mmc_register_card(struct mmc_card *card)
 {
-	int ret, i;
-
 	snprintf(card->dev.bus_id, sizeof(card->dev.bus_id),
 		 "%s:%04x", card->host->host_name, card->rca);
 
-	ret = device_add(&card->dev);
-	if (ret == 0)
-		for (i = 0; i < ARRAY_SIZE(mmc_dev_attributes); i++)
-			device_create_file(&card->dev, mmc_dev_attributes[i]);
-
-	return ret;
+	return device_add(&card->dev);
 }
 
 /*

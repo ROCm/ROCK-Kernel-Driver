@@ -31,8 +31,8 @@
 #define XTEA_ROUNDS		32
 #define XTEA_DELTA		0x9e3779b9
 
-#define u32_in(x) le32_to_cpu(*(const u32 *)(x))
-#define u32_out(to, from) (*(u32 *)(to) = cpu_to_le32(from))
+#define u32_in(x) le32_to_cpu(*(const __le32 *)(x))
+#define u32_out(to, from) (*(__le32 *)(to) = cpu_to_le32(from))
 
 struct tea_ctx {
 	u32 KEY[4];

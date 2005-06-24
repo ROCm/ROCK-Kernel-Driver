@@ -22,13 +22,14 @@ struct clk {
 	struct clk		*parent;
 	unsigned long		rate;
 	__s8			usecount;
-	__u8			flags;
+	__u16			flags;
 	__u32			enable_reg;
 	__u8			enable_bit;
 	__u8			rate_offset;
 	void			(*recalc)(struct clk *);
-	int			(*set_rate)(unsigned long);
-	long			(*round_rate)(unsigned long);
+	int			(*set_rate)(struct clk *, unsigned long);
+	long			(*round_rate)(struct clk *, unsigned long);
+	void			(*init)(struct clk *);
 };
 
 
@@ -50,6 +51,7 @@ struct mpu_rate {
 #define ENABLE_REG_32BIT	32
 #define CLOCK_IN_OMAP16XX	64
 #define CLOCK_IN_OMAP1510	128
+#define CLOCK_IN_OMAP730	256
 
 /* ARM_CKCTL bit shifts */
 #define CKCTL_PERDIV_OFFSET	0
@@ -95,8 +97,12 @@ struct mpu_rate {
 #define EN_TC2_CK	4
 
 /* Various register defines for clock controls scattered around OMAP chip */
-#define USB_MCLK_EN		4	/* In ULPD_CLKC_CTRL */
+#define USB_MCLK_EN_BIT		4	/* In ULPD_CLKC_CTRL */
 #define USB_HOST_HHC_UHOST_EN	9	/* In MOD_CONF_CTRL_0 */
+#define SWD_ULPD_PLL_CLK_REQ	1	/* In SWD_CLK_DIV_CTRL_SEL */
+#define COM_ULPD_PLL_CLK_REQ	1	/* In COM_CLK_DIV_CTRL_SEL */
+#define SWD_CLK_DIV_CTRL_SEL	0xfffe0874
+#define COM_CLK_DIV_CTRL_SEL	0xfffe0878
 
 
 int clk_register(struct clk *clk);

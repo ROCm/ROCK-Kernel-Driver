@@ -62,6 +62,14 @@ generates aligned writes.
 	# mount /dev/pktcdvd/dev_name /cdrom -t udf -o rw,noatime
 
 
+Packet writing for DVD-RAM media
+--------------------------------
+
+DVD-RAM discs are random writable, so using the pktcdvd driver is not
+necessary. However, using the pktcdvd driver can improve performance
+in the same way it does for DVD+RW media.
+
+
 Notes
 -----
 

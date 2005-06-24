@@ -145,7 +145,7 @@ static struct task_struct * select_bad_process(void)
 	do_posix_clock_monotonic_gettime(&uptime);
 	do_each_thread(g, p)
 		/* skip the init task with pid == 1 */
-		if (p->pid > 1) {
+		if (p->pid > 1 && p->oomkilladj != OOM_DISABLE) {
 			unsigned long points;
 
 			/*
@@ -253,7 +253,7 @@ static struct mm_struct *oom_kill_process(struct task_struct *p)
  * OR try to be smart about which process to kill. Note that we
  * don't have to be perfect here, we just have to be good.
  */
-void out_of_memory(int gfp_mask)
+void out_of_memory(unsigned int __nocast gfp_mask)
 {
 	struct mm_struct *mm = NULL;
 	task_t * p;

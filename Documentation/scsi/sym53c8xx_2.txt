@@ -440,7 +440,7 @@ lilo: linux root=/dev/sda2 sym53c8xx.cmd_per_lun=4 sym53c8xx.sync=10 sym53c8xx.d
 The following command will install the driver module with the same
 options as above.
 
-    modprobe sym53c8xx cmd_per_lun=4 sync=10 debug=0x200"
+    modprobe sym53c8xx cmd_per_lun=4 sync=10 debug=0x200
 
 10.2 Available arguments
 

@@ -226,6 +226,7 @@
  */
 
 #define ACPI_STRSTR(s1,s2)      strstr((s1), (s2))
+#define ACPI_STRCHR(s1,c)       strchr((s1), (c))
 
 #ifdef ACPI_FUTURE_USAGE
 #define ACPI_STRUPR(s)          (void) acpi_ut_strupr ((s))
@@ -294,6 +295,7 @@ typedef char *va_list;
 
 
 #define ACPI_STRSTR(s1,s2)      acpi_ut_strstr ((s1), (s2))
+#define ACPI_STRCHR(s1,c)       acpi_ut_strchr ((s1), (c))
 
 #ifdef ACPI_FUTURE_USAGE
 #define ACPI_STRUPR(s)          (void) acpi_ut_strupr ((s))

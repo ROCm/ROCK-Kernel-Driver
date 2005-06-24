@@ -34,6 +34,7 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
+#include <linux/ioc4_common.h>
 #include <asm/io.h>
 
 #include <linux/ide.h>
@@ -684,23 +685,14 @@ pci_init_sgiioc4(struct pci_dev *dev, ide_pci_device_t * d)
 	unsigned int class_rev;
 	int ret;
 
-	ret = pci_enable_device(dev);
-	if (ret < 0) {
-		printk(KERN_ERR
-		       "Failed to enable device %s at slot %s\n",
-		       d->name, dev->slot_name);
-		goto out;
-	}
-	pci_set_master(dev);
-
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
 	class_rev &= 0xff;
 	printk(KERN_INFO "%s: IDE controller at PCI slot %s, revision %d\n",
-			d->name, dev->slot_name, class_rev);
+			d->name, pci_name(dev), class_rev);
 	if (class_rev < IOC4_SUPPORTED_FIRMWARE_REV) {
 		printk(KERN_ERR "Skipping %s IDE controller in slot %s: "
 			"firmware is obsolete - please upgrade to revision"
-			"46 or higher\n", d->name, dev->slot_name);
+			"46 or higher\n", d->name, pci_name(dev));
 		ret = -EAGAIN;
 		goto out;
 	}
@@ -722,34 +714,15 @@ static ide_pci_device_t sgiioc4_chipsets[] __devinitdata = {
 	}
 };
 
-static int __devinit
-sgiioc4_init_one(struct pci_dev *dev, const struct pci_device_id *id)
+int
+ioc4_ide_attach_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	pci_init_sgiioc4(dev, &sgiioc4_chipsets[id->driver_data]);
-	return 0;
+	return pci_init_sgiioc4(dev, &sgiioc4_chipsets[id->driver_data]);
 }
 
-static struct pci_device_id sgiioc4_pci_tbl[] = {
-	{PCI_VENDOR_ID_SGI, PCI_DEVICE_ID_SGI_IOC4, PCI_ANY_ID,
-	 PCI_ANY_ID, 0x0b4000, 0xFFFFFF, 0},
-	{0}
-};
-MODULE_DEVICE_TABLE(pci, sgiioc4_pci_tbl);
-
-static struct pci_driver __devinitdata driver = {
-	.name = "SGI-IOC4_IDE",
-	.id_table = sgiioc4_pci_tbl,
-	.probe = sgiioc4_init_one,
-};
-
-static int __devinit
-sgiioc4_ide_init(void)
-{
-	return ide_pci_register_driver(&driver);
-}
-
-module_init(sgiioc4_ide_init);
 
 MODULE_AUTHOR("Aniket Malatpure - Silicon Graphics Inc. (SGI)");
-MODULE_DESCRIPTION("PCI driver module for SGI IOC4 Base-IO Card");
+MODULE_DESCRIPTION("IDE PCI driver module for SGI IOC4 Base-IO Card");
 MODULE_LICENSE("GPL");
+
+EXPORT_SYMBOL(ioc4_ide_attach_one);

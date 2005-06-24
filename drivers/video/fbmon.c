@@ -34,7 +34,6 @@
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
 #endif
-#include <video/edid.h>
 #include "edid.h"
 
 /* 
@@ -74,10 +73,9 @@ static struct broken_edid brokendb[] = {
 	},
 };
 
-const unsigned char edid_v1_header[] = { 0x00, 0xff, 0xff, 0xff,
+static const unsigned char edid_v1_header[] = { 0x00, 0xff, 0xff, 0xff,
 	0xff, 0xff, 0xff, 0x00
 };
-const unsigned char edid_v1_descriptor_flag[] = { 0x00, 0x00 };
 
 static void copy_string(unsigned char *c, unsigned char *s)
 {
@@ -518,7 +516,7 @@ static void get_detailed_timing(unsigned char *block,
  * This function builds a mode database using the contents of the EDID
  * data
  */
-struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize)
+static struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize)
 {
 	struct fb_videomode *mode, *m;
 	unsigned char *block;
@@ -589,11 +587,10 @@ struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize)
  */
 void fb_destroy_modedb(struct fb_videomode *modedb)
 {
-	if (modedb)
-		kfree(modedb);
+	kfree(modedb);
 }
 
-int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs)
+static int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs)
 {
 	int i, retval = 1;
 	unsigned char *block;
@@ -870,18 +867,6 @@ void fb_edid_to_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 
 	specs->modedb = fb_create_modedb(edid, &specs->modedb_len);
 	DPRINTK("========================================\n");
-}
-
-char *get_EDID_from_firmware(struct device *dev)
-{
-	unsigned char *pedid = NULL;
-
-#if defined(CONFIG_EDID_FIRMWARE) && defined(CONFIG_X86)
-	pedid = edid_info.dummy;
-	if (!pedid)
-		return NULL;
-#endif
-	return pedid;
 }
 
 /* 
@@ -1193,20 +1178,8 @@ void fb_edid_to_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 {
 	specs = NULL;
 }
-char *get_EDID_from_firmware(struct device *dev)
-{
-	return NULL;
-}
-struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize)
-{
-	return NULL;
-}
 void fb_destroy_modedb(struct fb_videomode *modedb)
 {
-}
-int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs)
-{
-	return 1;
 }
 int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var,
 		struct fb_info *info)
@@ -1278,10 +1251,7 @@ int fb_validate_mode(const struct fb_var_screeninfo *var, struct fb_info *info)
 
 EXPORT_SYMBOL(fb_parse_edid);
 EXPORT_SYMBOL(fb_edid_to_monspecs);
-EXPORT_SYMBOL(get_EDID_from_firmware);
 
 EXPORT_SYMBOL(fb_get_mode);
 EXPORT_SYMBOL(fb_validate_mode);
-EXPORT_SYMBOL(fb_create_modedb);
 EXPORT_SYMBOL(fb_destroy_modedb);
-EXPORT_SYMBOL(fb_get_monitor_limits);

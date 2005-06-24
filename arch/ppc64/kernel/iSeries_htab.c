@@ -144,6 +144,10 @@ static long iSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
 
 	HvCallHpt_get(&hpte, slot);
 	if ((hpte.dw0.dw0.avpn == avpn) && (hpte.dw0.dw0.v)) {
+		/*
+		 * Hypervisor expects bits as NPPP, which is
+		 * different from how they are mapped in our PP.
+		 */
 		HvCallHpt_setPp(slot, (newpp & 0x3) | ((newpp & 0x4) << 1));
 		iSeries_hunlock(slot);
 		return 0;

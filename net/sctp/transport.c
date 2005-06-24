@@ -227,7 +227,7 @@ void sctp_transport_pmtu(struct sctp_transport *transport)
 	dst = transport->af_specific->get_dst(NULL, &transport->ipaddr, NULL);
 
 	if (dst) {
-		transport->pmtu = dst_pmtu(dst);
+		transport->pmtu = dst_mtu(dst);
 		dst_release(dst);
 	} else
 		transport->pmtu = SCTP_DEFAULT_MAXSEGMENT;
@@ -253,7 +253,7 @@ void sctp_transport_route(struct sctp_transport *transport,
 
 	transport->dst = dst;
 	if (dst) {
-		transport->pmtu = dst_pmtu(dst);
+		transport->pmtu = dst_mtu(dst);
 
 		/* Initialize sk->sk_rcv_saddr, if the transport is the
 		 * association's active path for getsockname().

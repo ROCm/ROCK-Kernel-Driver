@@ -35,6 +35,7 @@
 #include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
+#include <linux/jiffies.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 #include <linux/init.h>
@@ -362,9 +363,12 @@ static ssize_t set_in_min(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
 	unsigned long val = simple_strtoul(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->in_min[nr] = IN_TO_REG(val,nr);
 	via686a_write_value(client, VIA686A_REG_IN_MIN(nr), 
 			data->in_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t set_in_max(struct device *dev, const char *buf, 
@@ -372,9 +376,12 @@ static ssize_t set_in_max(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
 	unsigned long val = simple_strtoul(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->in_max[nr] = IN_TO_REG(val,nr);
 	via686a_write_value(client, VIA686A_REG_IN_MAX(nr), 
 			data->in_max[nr]);
+	up(&data->update_lock);
 	return count;
 }
 #define show_in_offset(offset)					\
@@ -433,8 +440,11 @@ static ssize_t set_temp_over(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->temp_over[nr] = TEMP_TO_REG(val);
 	via686a_write_value(client, VIA686A_REG_TEMP_OVER(nr), data->temp_over[nr]);
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t set_temp_hyst(struct device *dev, const char *buf, 
@@ -442,8 +452,11 @@ static ssize_t set_temp_hyst(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->temp_hyst[nr] = TEMP_TO_REG(val);
 	via686a_write_value(client, VIA686A_REG_TEMP_HYST(nr), data->temp_hyst[nr]);
+	up(&data->update_lock);
 	return count;
 }
 #define show_temp_offset(offset)					\
@@ -501,8 +514,11 @@ static ssize_t set_fan_min(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->fan_min[nr] = FAN_TO_REG(val, DIV_FROM_REG(data->fan_div[nr]));
 	via686a_write_value(client, VIA686A_REG_FAN_MIN(nr+1), data->fan_min[nr]);
+	up(&data->update_lock);
 	return count;
 }
 static ssize_t set_fan_div(struct device *dev, const char *buf, 
@@ -510,10 +526,14 @@ static ssize_t set_fan_div(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
 	int val = simple_strtol(buf, NULL, 10);
-	int old = via686a_read_value(client, VIA686A_REG_FANDIV);
+	int old;
+
+	down(&data->update_lock);
+	old = via686a_read_value(client, VIA686A_REG_FANDIV);
 	data->fan_div[nr] = DIV_TO_REG(val);
 	old = (old & 0x0f) | (data->fan_div[1] << 6) | (data->fan_div[0] << 4);
 	via686a_write_value(client, VIA686A_REG_FANDIV, old);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -631,10 +651,9 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 	new_client->adapter = adapter;
 	new_client->driver = &via686a_driver;
 	new_client->flags = 0;
-	new_client->dev.parent = &adapter->dev;
 
 	/* Fill in the remaining client fields and put into the global list */
-	snprintf(new_client->name, I2C_NAME_SIZE, client_name);
+	strlcpy(new_client->name, client_name, I2C_NAME_SIZE);
 
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);
@@ -726,9 +745,8 @@ static struct via686a_data *via686a_update_device(struct device *dev)
 
 	down(&data->update_lock);
 
-       if ((jiffies - data->last_updated > HZ + HZ / 2) ||
-           (jiffies < data->last_updated) || !data->valid) {
-
+	if (time_after(jiffies, data->last_updated + HZ + HZ / 2)
+	    || !data->valid) {
 		for (i = 0; i <= 4; i++) {
 			data->in[i] =
 			    via686a_read_value(client, VIA686A_REG_IN(i));

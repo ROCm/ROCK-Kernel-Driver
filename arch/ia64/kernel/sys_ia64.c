@@ -93,20 +93,6 @@ sys_getpagesize (void)
 }
 
 asmlinkage unsigned long
-ia64_shmat (int shmid, void __user *shmaddr, int shmflg)
-{
-	unsigned long raddr;
-	int retval;
-
-	retval = do_shmat(shmid, shmaddr, shmflg, &raddr);
-	if (retval < 0)
-		return retval;
-
-	force_successful_syscall_return();
-	return raddr;
-}
-
-asmlinkage unsigned long
 ia64_brk (unsigned long brk)
 {
 	unsigned long rlim, retval, newbrk, oldbrk;
@@ -195,13 +181,6 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 			goto out;
 		}
 	}
-
-	/*
-	 * A zero mmap always succeeds in Linux, independent of whether or not the
-	 * remaining arguments are valid.
-	 */
-	if (len == 0)
-		goto out;
 
 	/* Careful about overflows.. */
 	len = PAGE_ALIGN(len);

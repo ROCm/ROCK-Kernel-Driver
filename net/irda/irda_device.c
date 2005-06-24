@@ -77,14 +77,14 @@ int __init irda_device_init( void)
 {
 	dongles = hashbin_new(HB_NOLOCK);
 	if (dongles == NULL) {
-		printk(KERN_WARNING "IrDA: Can't allocate dongles hashbin!\n");
+		IRDA_WARNING("IrDA: Can't allocate dongles hashbin!\n");
 		return -ENOMEM;
 	}
 	spin_lock_init(&dongles->hb_spinlock);
 
 	tasks = hashbin_new(HB_LOCK);
 	if (tasks == NULL) {
-		printk(KERN_WARNING "IrDA: Can't allocate tasks hashbin!\n");
+		IRDA_WARNING("IrDA: Can't allocate tasks hashbin!\n");
 		hashbin_delete(dongles, NULL);
 		return -ENOMEM;
 	}
@@ -98,8 +98,8 @@ int __init irda_device_init( void)
 static void __exit leftover_dongle(void *arg)
 {
 	struct dongle_reg *reg = arg;
-	printk(KERN_WARNING "IrDA: Dongle type %x not unregistered\n",
-	       reg->type);
+	IRDA_WARNING("IrDA: Dongle type %x not unregistered\n",
+		     reg->type);
 }
 
 void __exit irda_device_cleanup(void)
@@ -125,8 +125,15 @@ void irda_device_set_media_busy(struct net_device *dev, int status)
 
 	self = (struct irlap_cb *) dev->atalk_ptr;
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == LAP_MAGIC, return;);
+	/* Some drivers may enable the receive interrupt before calling
+	 * irlap_open(), or they may disable the receive interrupt
+	 * after calling irlap_close().
+	 * The IrDA stack is protected from this in irlap_driver_rcv().
+	 * However, the driver calls directly the wrapper, that calls
+	 * us directly. Make sure we protect ourselves.
+	 * Jean II */
+	if (!self || self->magic != LAP_MAGIC)
+		return;
 
 	if (status) {
 		self->media_busy = TRUE;
@@ -157,8 +164,8 @@ int irda_device_is_receiving(struct net_device *dev)
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	if (!dev->do_ioctl) {
-		ERROR("%s: do_ioctl not impl. by device driver\n",
-				__FUNCTION__);
+		IRDA_ERROR("%s: do_ioctl not impl. by device driver\n",
+			   __FUNCTION__);
 		return -1;
 	}
 
@@ -209,21 +216,22 @@ static int irda_task_kick(struct irda_task *task)
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
-	ASSERT(task != NULL, return -1;);
-	ASSERT(task->magic == IRDA_TASK_MAGIC, return -1;);
+	IRDA_ASSERT(task != NULL, return -1;);
+	IRDA_ASSERT(task->magic == IRDA_TASK_MAGIC, return -1;);
 
 	/* Execute task until it's finished, or askes for a timeout */
 	do {
 		timeout = task->function(task);
 		if (count++ > 100) {
-			ERROR("%s: error in task handler!\n", __FUNCTION__);
+			IRDA_ERROR("%s: error in task handler!\n",
+				   __FUNCTION__);
 			irda_task_delete(task);
 			return TRUE;
 		}
 	} while ((timeout == 0) && (task->state != IRDA_TASK_DONE));
 
 	if (timeout < 0) {
-		ERROR("%s: Error executing task!\n", __FUNCTION__);
+		IRDA_ERROR("%s: Error executing task!\n", __FUNCTION__);
 		irda_task_delete(task);
 		return TRUE;
 	}
@@ -387,7 +395,8 @@ dongle_t *irda_device_dongle_init(struct net_device *dev, int type)
 #endif
 
 	if (!reg || !try_module_get(reg->owner) ) {
-		ERROR("IrDA: Unable to find requested dongle type %x\n", type);
+		IRDA_ERROR("IrDA: Unable to find requested dongle type %x\n",
+			   type);
 		goto out;
 	}
 
@@ -413,7 +422,7 @@ EXPORT_SYMBOL(irda_device_dongle_init);
  */
 int irda_device_dongle_cleanup(dongle_t *dongle)
 {
-	ASSERT(dongle != NULL, return -1;);
+	IRDA_ASSERT(dongle != NULL, return -1;);
 
 	dongle->issue->close(dongle);
 	module_put(dongle->issue->owner);
@@ -431,8 +440,8 @@ int irda_device_register_dongle(struct dongle_reg *new)
 	spin_lock(&dongles->hb_spinlock);
 	/* Check if this dongle has been registered before */
 	if (hashbin_find(dongles, new->type, NULL)) {
-		MESSAGE("%s: Dongle type %x already registered\n", 
-			__FUNCTION__, new->type);
+		IRDA_MESSAGE("%s: Dongle type %x already registered\n", 
+			     __FUNCTION__, new->type);
         } else {
 		/* Insert IrDA dongle into hashbin */
 		hashbin_insert(dongles, (irda_queue_t *) new, new->type, NULL);
@@ -456,16 +465,16 @@ void irda_device_unregister_dongle(struct dongle_reg *dongle)
 	spin_lock(&dongles->hb_spinlock);
 	node = hashbin_remove(dongles, dongle->type, NULL);
 	if (!node) 
-		ERROR("%s: dongle not found!\n", __FUNCTION__);
+		IRDA_ERROR("%s: dongle not found!\n", __FUNCTION__);
 	spin_unlock(&dongles->hb_spinlock);
 }
 EXPORT_SYMBOL(irda_device_unregister_dongle);
 
-#ifdef CONFIG_ISA
+#ifdef CONFIG_ISA_DMA_API
 /*
  * Function setup_dma (idev, buffer, count, mode)
  *
- *    Setup the DMA channel. Commonly used by ISA FIR drivers
+ *    Setup the DMA channel. Commonly used by LPC FIR drivers
  *
  */
 void irda_setup_dma(int channel, dma_addr_t buffer, int count, int mode)

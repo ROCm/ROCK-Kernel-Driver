@@ -15,6 +15,12 @@
 
 #include <asm/types.h>
 
+#ifndef	__ARMEB__
+#define	REG_OFFSET	0
+#else
+#define	REG_OFFSET	3
+#endif
+
 /*
  * Expansion bus memory regions
  */

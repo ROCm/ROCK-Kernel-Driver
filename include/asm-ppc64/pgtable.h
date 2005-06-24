@@ -1,8 +1,6 @@
 #ifndef _PPC64_PGTABLE_H
 #define _PPC64_PGTABLE_H
 
-#include <asm-generic/4level-fixup.h>
-
 /*
  * This file contains the functions and defines necessary to modify and use
  * the ppc64 hashed page table.
@@ -17,15 +15,7 @@
 #include <asm/tlbflush.h>
 #endif /* __ASSEMBLY__ */
 
-/* PMD_SHIFT determines what a second-level page table entry can map */
-#define PMD_SHIFT	(PAGE_SHIFT + PAGE_SHIFT - 3)
-#define PMD_SIZE	(1UL << PMD_SHIFT)
-#define PMD_MASK	(~(PMD_SIZE-1))
-
-/* PGDIR_SHIFT determines what a third-level page table entry can map */
-#define PGDIR_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT - 3) + (PAGE_SHIFT - 2))
-#define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
-#define PGDIR_MASK	(~(PGDIR_SIZE-1))
+#include <asm-generic/pgtable-nopud.h>
 
 /*
  * Entries per page directory level.  The PTE level must use a 64b record
@@ -40,40 +30,30 @@
 #define PTRS_PER_PMD	(1 << PMD_INDEX_SIZE)
 #define PTRS_PER_PGD	(1 << PGD_INDEX_SIZE)
 
-#define USER_PTRS_PER_PGD	(1024)
-#define FIRST_USER_PGD_NR	0
+/* PMD_SHIFT determines what a second-level page table entry can map */
+#define PMD_SHIFT	(PAGE_SHIFT + PTE_INDEX_SIZE)
+#define PMD_SIZE	(1UL << PMD_SHIFT)
+#define PMD_MASK	(~(PMD_SIZE-1))
 
-#define EADDR_SIZE (PTE_INDEX_SIZE + PMD_INDEX_SIZE + \
-                    PGD_INDEX_SIZE + PAGE_SHIFT) 
+/* PGDIR_SHIFT determines what a third-level page table entry can map */
+#define PGDIR_SHIFT	(PMD_SHIFT + PMD_INDEX_SIZE)
+#define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
+#define PGDIR_MASK	(~(PGDIR_SIZE-1))
+
+#define FIRST_USER_ADDRESS	0
 
 /*
  * Size of EA range mapped by our pagetables.
  */
-#define PGTABLE_EA_BITS	41
-#define PGTABLE_EA_MASK	((1UL<<PGTABLE_EA_BITS)-1)
+#define EADDR_SIZE (PTE_INDEX_SIZE + PMD_INDEX_SIZE + \
+                    PGD_INDEX_SIZE + PAGE_SHIFT)
+#define EADDR_MASK ((1UL << EADDR_SIZE) - 1)
 
 /*
  * Define the address range of the vmalloc VM area.
  */
 #define VMALLOC_START (0xD000000000000000ul)
-#define VMALLOC_END   (VMALLOC_START + PGTABLE_EA_MASK)
-
-/*
- * Define the address range of the imalloc VM area.
- * (used for ioremap)
- */
-#define IMALLOC_START     (ioremap_bot)
-#define IMALLOC_VMADDR(x) ((unsigned long)(x))
-#define PHBS_IO_BASE  	  (0xE000000000000000ul)	/* Reserve 2 gigs for PHBs */
-#define IMALLOC_BASE      (0xE000000080000000ul)  
-#define IMALLOC_END       (IMALLOC_BASE + PGTABLE_EA_MASK)
-
-/*
- * Define the user address range
- */
-#define USER_START (0UL)
-#define USER_END   (USER_START + PGTABLE_EA_MASK)
-
+#define VMALLOC_END   (VMALLOC_START + EADDR_MASK)
 
 /*
  * Bits in a linux-style PTE.  These match the bits in the
@@ -82,14 +62,14 @@
 #define _PAGE_PRESENT	0x0001 /* software: pte contains a translation */
 #define _PAGE_USER	0x0002 /* matches one of the PP bits */
 #define _PAGE_FILE	0x0002 /* (!present only) software: pte holds file offset */
-#define _PAGE_RW	0x0004 /* software: user write access allowed */
+#define _PAGE_EXEC	0x0004 /* No execute on POWER4 and newer (we invert) */
 #define _PAGE_GUARDED	0x0008
 #define _PAGE_COHERENT	0x0010 /* M: enforce memory coherence (SMP systems) */
 #define _PAGE_NO_CACHE	0x0020 /* I: cache inhibit */
 #define _PAGE_WRITETHRU	0x0040 /* W: cache write-through */
 #define _PAGE_DIRTY	0x0080 /* C: page changed */
 #define _PAGE_ACCESSED	0x0100 /* R: page referenced */
-#define _PAGE_EXEC	0x0200 /* software: i-cache coherence required */
+#define _PAGE_RW	0x0200 /* software: user write access allowed */
 #define _PAGE_HASHPTE	0x0400 /* software: pte has an associated HPTE */
 #define _PAGE_BUSY	0x0800 /* software: PTE & hash are busy */ 
 #define _PAGE_SECONDARY 0x8000 /* software: HPTE is in secondary group */
@@ -118,29 +98,41 @@
 #define PAGE_KERNEL	__pgprot(_PAGE_BASE | _PAGE_WRENABLE)
 #define PAGE_KERNEL_CI	__pgprot(_PAGE_PRESENT | _PAGE_ACCESSED | \
 			       _PAGE_WRENABLE | _PAGE_NO_CACHE | _PAGE_GUARDED)
+#define PAGE_KERNEL_EXEC __pgprot(_PAGE_BASE | _PAGE_WRENABLE | _PAGE_EXEC)
+
+#define PAGE_AGP	__pgprot(_PAGE_BASE | _PAGE_WRENABLE | _PAGE_NO_CACHE)
+#define HAVE_PAGE_AGP
 
 /*
- * The PowerPC can only do execute protection on a segment (256MB) basis,
- * not on a page basis.  So we consider execute permission the same as read.
+ * This bit in a hardware PTE indicates that the page is *not* executable.
+ */
+#define HW_NO_EXEC	_PAGE_EXEC
+
+/*
+ * POWER4 and newer have per page execute protection, older chips can only
+ * do this on a segment (256MB) basis.
+ *
  * Also, write permissions imply read permissions.
  * This is the closest we can get..
+ *
+ * Note due to the way vm flags are laid out, the bits are XWR
  */
 #define __P000	PAGE_NONE
-#define __P001	PAGE_READONLY_X
+#define __P001	PAGE_READONLY
 #define __P010	PAGE_COPY
-#define __P011	PAGE_COPY_X
-#define __P100	PAGE_READONLY
+#define __P011	PAGE_COPY
+#define __P100	PAGE_READONLY_X
 #define __P101	PAGE_READONLY_X
-#define __P110	PAGE_COPY
+#define __P110	PAGE_COPY_X
 #define __P111	PAGE_COPY_X
 
 #define __S000	PAGE_NONE
-#define __S001	PAGE_READONLY_X
+#define __S001	PAGE_READONLY
 #define __S010	PAGE_SHARED
-#define __S011	PAGE_SHARED_X
-#define __S100	PAGE_READONLY
+#define __S011	PAGE_SHARED
+#define __S100	PAGE_READONLY_X
 #define __S101	PAGE_READONLY_X
-#define __S110	PAGE_SHARED
+#define __S110	PAGE_SHARED_X
 #define __S111	PAGE_SHARED_X
 
 #ifndef __ASSEMBLY__
@@ -155,10 +147,6 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 
 /* shift to put page number into pte */
 #define PTE_SHIFT (17)
-
-/* We allow 2^41 bytes of real memory, so we need 29 bits in the PMD
- * to give the PTE page number.  The bottom two bits are for flags. */
-#define PMD_TO_PTEPAGE_SHIFT (2)
 
 #ifdef CONFIG_HUGETLB_PAGE
 
@@ -188,13 +176,14 @@ void hugetlb_mm_free_pgd(struct mm_struct *mm);
  */
 #define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
 
-#define pfn_pte(pfn,pgprot)						\
-({									\
-	pte_t pte;							\
-	pte_val(pte) = ((unsigned long)(pfn) << PTE_SHIFT) |   		\
-                        pgprot_val(pgprot);				\
-	pte;								\
-})
+static inline pte_t pfn_pte(unsigned long pfn, pgprot_t pgprot)
+{
+	pte_t pte;
+
+
+	pte_val(pte) = (pfn << PTE_SHIFT) | pgprot_val(pgprot);
+	return pte;
+}
 
 #define pte_modify(_pte, newprot) \
   (__pte((pte_val(_pte) & _PAGE_CHG_MASK) | pgprot_val(newprot)))
@@ -208,20 +197,20 @@ void hugetlb_mm_free_pgd(struct mm_struct *mm);
 #define pte_page(x)		pfn_to_page(pte_pfn(x))
 
 #define pmd_set(pmdp, ptep) 	\
-	(pmd_val(*(pmdp)) = (__ba_to_bpn(ptep) << PMD_TO_PTEPAGE_SHIFT))
+	(pmd_val(*(pmdp)) = __ba_to_bpn(ptep))
 #define pmd_none(pmd)		(!pmd_val(pmd))
 #define	pmd_bad(pmd)		(pmd_val(pmd) == 0)
 #define	pmd_present(pmd)	(pmd_val(pmd) != 0)
 #define	pmd_clear(pmdp)		(pmd_val(*(pmdp)) = 0)
-#define pmd_page_kernel(pmd)	\
-	(__bpn_to_ba(pmd_val(pmd) >> PMD_TO_PTEPAGE_SHIFT))
+#define pmd_page_kernel(pmd)	(__bpn_to_ba(pmd_val(pmd)))
 #define pmd_page(pmd)		virt_to_page(pmd_page_kernel(pmd))
-#define pgd_set(pgdp, pmdp)	(pgd_val(*(pgdp)) = (__ba_to_bpn(pmdp)))
-#define pgd_none(pgd)		(!pgd_val(pgd))
-#define pgd_bad(pgd)		((pgd_val(pgd)) == 0)
-#define pgd_present(pgd)	(pgd_val(pgd) != 0UL)
-#define pgd_clear(pgdp)		(pgd_val(*(pgdp)) = 0UL)
-#define pgd_page(pgd)		(__bpn_to_ba(pgd_val(pgd))) 
+
+#define pud_set(pudp, pmdp)	(pud_val(*(pudp)) = (__ba_to_bpn(pmdp)))
+#define pud_none(pud)		(!pud_val(pud))
+#define pud_bad(pud)		((pud_val(pud)) == 0UL)
+#define pud_present(pud)	(pud_val(pud) != 0UL)
+#define pud_clear(pudp)		(pud_val(*(pudp)) = 0UL)
+#define pud_page(pud)		(__bpn_to_ba(pud_val(pud)))
 
 /* 
  * Find an entry in a page-table-directory.  We combine the address region 
@@ -233,12 +222,13 @@ void hugetlb_mm_free_pgd(struct mm_struct *mm);
 #define pgd_offset(mm, address)	 ((mm)->pgd + pgd_index(address))
 
 /* Find an entry in the second-level page table.. */
-#define pmd_offset(dir,addr) \
-  ((pmd_t *) pgd_page(*(dir)) + (((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1)))
+#define pmd_offset(pudp,addr) \
+  ((pmd_t *) pud_page(*(pudp)) + (((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1)))
 
 /* Find an entry in the third-level page table.. */
 #define pte_offset_kernel(dir,addr) \
-  ((pte_t *) pmd_page_kernel(*(dir)) + (((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
+  ((pte_t *) pmd_page_kernel(*(dir)) \
+ + (((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
 
 #define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
 #define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
@@ -251,8 +241,6 @@ void hugetlb_mm_free_pgd(struct mm_struct *mm);
 
 /* to find an entry in the ioremap page-table-directory */
 #define pgd_offset_i(address) (ioremap_pgd + pgd_index(address))
-
-#define pages_to_mb(x)		((x) >> (20-PAGE_SHIFT))
 
 /*
  * The following only work if pte_present() is true.
@@ -315,9 +303,10 @@ static inline unsigned long pte_update(pte_t *p, unsigned long clr)
  * batch, doesn't actually triggers the hash flush immediately,
  * you need to call flush_tlb_pending() to do that.
  */
-extern void hpte_update(pte_t *ptep, unsigned long pte, int wrprot);
+extern void hpte_update(struct mm_struct *mm, unsigned long addr, unsigned long pte,
+			int wrprot);
 
-static inline int ptep_test_and_clear_young(pte_t *ptep)
+static inline int __ptep_test_and_clear_young(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	unsigned long old;
 
@@ -325,18 +314,25 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 		return 0;
 	old = pte_update(ptep, _PAGE_ACCESSED);
 	if (old & _PAGE_HASHPTE) {
-		hpte_update(ptep, old, 0);
+		hpte_update(mm, addr, old, 0);
 		flush_tlb_pending();
 	}
 	return (old & _PAGE_ACCESSED) != 0;
 }
+#define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
+#define ptep_test_and_clear_young(__vma, __addr, __ptep)		   \
+({									   \
+	int __r;							   \
+	__r = __ptep_test_and_clear_young((__vma)->vm_mm, __addr, __ptep); \
+	__r;								   \
+})
 
 /*
  * On RW/DIRTY bit transitions we can avoid flushing the hpte. For the
  * moment we always flush but we need to fix hpte_update and test if the
  * optimisation is worth it.
  */
-static inline int ptep_test_and_clear_dirty(pte_t *ptep)
+static inline int __ptep_test_and_clear_dirty(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	unsigned long old;
 
@@ -344,11 +340,19 @@ static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 		return 0;
 	old = pte_update(ptep, _PAGE_DIRTY);
 	if (old & _PAGE_HASHPTE)
-		hpte_update(ptep, old, 0);
+		hpte_update(mm, addr, old, 0);
 	return (old & _PAGE_DIRTY) != 0;
 }
+#define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
+#define ptep_test_and_clear_dirty(__vma, __addr, __ptep)		   \
+({									   \
+	int __r;							   \
+	__r = __ptep_test_and_clear_dirty((__vma)->vm_mm, __addr, __ptep); \
+	__r;								   \
+})
 
-static inline void ptep_set_wrprotect(pte_t *ptep)
+#define __HAVE_ARCH_PTEP_SET_WRPROTECT
+static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	unsigned long old;
 
@@ -356,7 +360,7 @@ static inline void ptep_set_wrprotect(pte_t *ptep)
        		return;
 	old = pte_update(ptep, _PAGE_RW);
 	if (old & _PAGE_HASHPTE)
-		hpte_update(ptep, old, 0);
+		hpte_update(mm, addr, old, 0);
 }
 
 /*
@@ -370,45 +374,49 @@ static inline void ptep_set_wrprotect(pte_t *ptep)
 #define __HAVE_ARCH_PTEP_CLEAR_YOUNG_FLUSH
 #define ptep_clear_flush_young(__vma, __address, __ptep)		\
 ({									\
-	int __young = ptep_test_and_clear_young(__ptep);		\
+	int __young = __ptep_test_and_clear_young((__vma)->vm_mm, __address, \
+						  __ptep);		\
 	__young;							\
 })
 
 #define __HAVE_ARCH_PTEP_CLEAR_DIRTY_FLUSH
 #define ptep_clear_flush_dirty(__vma, __address, __ptep)		\
 ({									\
-	int __dirty = ptep_test_and_clear_dirty(__ptep);		\
+	int __dirty = __ptep_test_and_clear_dirty((__vma)->vm_mm, __address, \
+						  __ptep); 		\
 	flush_tlb_page(__vma, __address);				\
 	__dirty;							\
 })
 
-static inline pte_t ptep_get_and_clear(pte_t *ptep)
+#define __HAVE_ARCH_PTEP_GET_AND_CLEAR
+static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	unsigned long old = pte_update(ptep, ~0UL);
 
 	if (old & _PAGE_HASHPTE)
-		hpte_update(ptep, old, 0);
+		hpte_update(mm, addr, old, 0);
 	return __pte(old);
 }
 
-static inline void pte_clear(pte_t * ptep)
+static inline void pte_clear(struct mm_struct *mm, unsigned long addr, pte_t * ptep)
 {
 	unsigned long old = pte_update(ptep, ~0UL);
 
 	if (old & _PAGE_HASHPTE)
-		hpte_update(ptep, old, 0);
+		hpte_update(mm, addr, old, 0);
 }
 
 /*
  * set_pte stores a linux PTE into the linux page table.
  */
-static inline void set_pte(pte_t *ptep, pte_t pte)
+static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+			      pte_t *ptep, pte_t pte)
 {
 	if (pte_present(*ptep)) {
-		pte_clear(ptep);
+		pte_clear(mm, addr, ptep);
 		flush_tlb_pending();
 	}
-	*ptep = __pte(pte_val(pte)) & ~_PAGE_HPTEFLAGS;
+	*ptep = __pte(pte_val(pte) & ~_PAGE_HPTEFLAGS);
 }
 
 /* Set the dirty and/or accessed bits atomically in a linux PTE, this
@@ -418,7 +426,7 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 static inline void __ptep_set_access_flags(pte_t *ptep, pte_t entry, int dirty)
 {
 	unsigned long bits = pte_val(entry) &
-		(_PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_RW);
+		(_PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_RW | _PAGE_EXEC);
 	unsigned long old, tmp;
 
 	__asm__ __volatile__(
@@ -443,28 +451,35 @@ static inline void __ptep_set_access_flags(pte_t *ptep, pte_t entry, int dirty)
  */
 #define pgprot_noncached(prot)	(__pgprot(pgprot_val(prot) | _PAGE_NO_CACHE | _PAGE_GUARDED))
 
+struct file;
+extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long addr,
+				     unsigned long size, pgprot_t vma_prot);
+#define __HAVE_PHYS_MEM_ACCESS_PROT
+
+#define __HAVE_ARCH_PTE_SAME
 #define pte_same(A,B)	(((pte_val(A) ^ pte_val(B)) & ~_PAGE_HPTEFLAGS) == 0)
 
 extern unsigned long ioremap_bot, ioremap_base;
 
-#define USER_PGD_PTRS (PAGE_OFFSET >> PGDIR_SHIFT)
-#define KERNEL_PGD_PTRS (PTRS_PER_PGD-USER_PGD_PTRS)
-
-#define pte_ERROR(e) \
-	printk("%s:%d: bad pte %016lx.\n", __FILE__, __LINE__, pte_val(e))
 #define pmd_ERROR(e) \
 	printk("%s:%d: bad pmd %08x.\n", __FILE__, __LINE__, pmd_val(e))
 #define pgd_ERROR(e) \
 	printk("%s:%d: bad pgd %08x.\n", __FILE__, __LINE__, pgd_val(e))
 
-extern pgd_t swapper_pg_dir[1024];
-extern pgd_t ioremap_dir[1024];
+extern pgd_t swapper_pg_dir[];
+extern pgd_t ioremap_dir[];
 
 extern void paging_init(void);
 
-struct mmu_gather;
-void hugetlb_free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
-			   unsigned long start, unsigned long end);
+/*
+ * Because the huge pgtables are only 2 level, they can take
+ * at most around 4M, much less than one hugepage which the
+ * process is presumably entitled to use.  So we don't bother
+ * freeing up the pagetables on unmap, and wait until
+ * destroy_context() to clean up the lot.
+ */
+#define hugetlb_free_pgd_range(tlb, addr, end, floor, ceiling) \
+						do { } while (0)
 
 /*
  * This gets called at the end of handling a page fault, when
@@ -494,35 +509,10 @@ extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
  */
 #define kern_addr_valid(addr)	(1)
 
-#define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
-		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
+#define io_remap_pfn_range(vma, vaddr, pfn, size, prot)		\
+		remap_pfn_range(vma, vaddr, pfn, size, prot)
 
 void pgtable_cache_init(void);
-
-extern void hpte_init_native(void);
-extern void hpte_init_lpar(void);
-extern void hpte_init_iSeries(void);
-
-/* imalloc region types */
-#define IM_REGION_UNUSED	0x1
-#define IM_REGION_SUBSET	0x2
-#define IM_REGION_EXISTS	0x4
-#define IM_REGION_OVERLAP	0x8
-#define IM_REGION_SUPERSET	0x10
-
-extern struct vm_struct * im_get_free_area(unsigned long size);
-extern struct vm_struct * im_get_area(unsigned long v_addr, unsigned long size,
-			int region_type);
-unsigned long im_free(void *addr);
-
-extern long pSeries_lpar_hpte_insert(unsigned long hpte_group,
-				     unsigned long va, unsigned long prpn,
-				     int secondary, unsigned long hpteflags,
-				     int bolted, int large);
-
-extern long native_hpte_insert(unsigned long hpte_group, unsigned long va,
-			       unsigned long prpn, int secondary,
-			       unsigned long hpteflags, int bolted, int large);
 
 /*
  * find_linux_pte returns the address of a linux pte for a given 
@@ -531,33 +521,30 @@ extern long native_hpte_insert(unsigned long hpte_group, unsigned long va,
 static inline pte_t *find_linux_pte(pgd_t *pgdir, unsigned long ea)
 {
 	pgd_t *pg;
+	pud_t *pu;
 	pmd_t *pm;
 	pte_t *pt = NULL;
 	pte_t pte;
 
 	pg = pgdir + pgd_index(ea);
 	if (!pgd_none(*pg)) {
-
-		pm = pmd_offset(pg, ea);
-		if (pmd_present(*pm)) { 
-			pt = pte_offset_kernel(pm, ea);
-			pte = *pt;
-			if (!pte_present(pte))
-				pt = NULL;
+		pu = pud_offset(pg, ea);
+		if (!pud_none(*pu)) {
+			pm = pmd_offset(pu, ea);
+			if (pmd_present(*pm)) {
+				pt = pte_offset_kernel(pm, ea);
+				pte = *pt;
+				if (!pte_present(pte))
+					pt = NULL;
+			}
 		}
 	}
 
 	return pt;
 }
 
-#endif /* __ASSEMBLY__ */
-
-#define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
-#define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
-#define __HAVE_ARCH_PTEP_GET_AND_CLEAR
-#define __HAVE_ARCH_PTEP_SET_WRPROTECT
-#define __HAVE_ARCH_PTEP_MKDIRTY
-#define __HAVE_ARCH_PTE_SAME
 #include <asm-generic/pgtable.h>
+
+#endif /* __ASSEMBLY__ */
 
 #endif /* _PPC64_PGTABLE_H */

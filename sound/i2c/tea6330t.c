@@ -266,7 +266,8 @@ TEA6330T_TREBLE("Tone Control - Treble", 0)
 
 static void snd_tea6330_free(snd_i2c_device_t *device)
 {
-	kfree(device->private_data);
+	tea6330t_t *tea = device->private_data;
+	kfree(tea);
 }
                                         
 int snd_tea6330t_update_mixer(snd_card_t * card,

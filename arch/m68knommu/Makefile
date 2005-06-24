@@ -43,7 +43,6 @@ BOARD := $(board-y)
 
 model-$(CONFIG_RAMKERNEL)	:= ram
 model-$(CONFIG_ROMKERNEL)	:= rom
-model-$(CONFIG_HIMEMKERNEL)	:= himem
 MODEL := $(model-y)
 
 #
@@ -58,12 +57,15 @@ cpuclass-$(CONFIG_M5249)	:= 5307
 cpuclass-$(CONFIG_M527x)	:= 5307
 cpuclass-$(CONFIG_M5272)	:= 5307
 cpuclass-$(CONFIG_M528x)	:= 5307
+cpuclass-$(CONFIG_M5307)	:= 5307
 cpuclass-$(CONFIG_M5407)	:= 5307
+cpuclass-$(CONFIG_M68328)	:= 68328
 cpuclass-$(CONFIG_M68EZ328)	:= 68328
 cpuclass-$(CONFIG_M68VZ328)	:= 68328
+cpuclass-$(CONFIG_M68360)	:= 68360
 CPUCLASS := $(cpuclass-y)
 
-ifneq ($(CPUCLASS),)
+ifneq ($(CPUCLASS),$(PLATFORM))
 CLASSDIR := arch/m68knommu/platform/$(cpuclass-y)/
 endif
 
@@ -93,7 +95,7 @@ CFLAGS += -O1 -g
 CFLAGS += -D__linux__
 CFLAGS += -DUTS_SYSNAME=\"uClinux\"
 
-head-y := arch/m68knommu/platform/$(platform-y)/$(board-y)/crt0_$(model-y).o
+head-y := arch/m68knommu/platform/$(cpuclass-y)/head.o
 
 CLEAN_FILES := include/asm-$(ARCH)/asm-offsets.h \
 	       arch/$(ARCH)/kernel/asm-offsets.s

@@ -63,7 +63,7 @@ BTFIXUPDEF_INT(page_kernel)
 #define PTRS_PER_PMD    	BTFIXUP_SIMM13(ptrs_per_pmd)
 #define PTRS_PER_PGD    	BTFIXUP_SIMM13(ptrs_per_pgd)
 #define USER_PTRS_PER_PGD	BTFIXUP_SIMM13(user_ptrs_per_pgd)
-#define FIRST_USER_PGD_NR	0
+#define FIRST_USER_ADDRESS	0
 #define PTE_SIZE		(PTRS_PER_PTE*4)
 
 #define PAGE_NONE      __pgprot(BTFIXUP_INT(page_none))
@@ -150,6 +150,7 @@ BTFIXUPDEF_CALL_CONST(unsigned long, pgd_page, pgd_t)
 BTFIXUPDEF_SETHI(none_mask)
 BTFIXUPDEF_CALL_CONST(int, pte_present, pte_t)
 BTFIXUPDEF_CALL(void, pte_clear, pte_t *)
+BTFIXUPDEF_CALL(int, pte_read, pte_t)
 
 extern __inline__ int pte_none(pte_t pte)
 {
@@ -157,7 +158,8 @@ extern __inline__ int pte_none(pte_t pte)
 }
 
 #define pte_present(pte) BTFIXUP_CALL(pte_present)(pte)
-#define pte_clear(pte) BTFIXUP_CALL(pte_clear)(pte)
+#define pte_clear(mm,addr,pte) BTFIXUP_CALL(pte_clear)(pte)
+#define pte_read(pte) BTFIXUP_CALL(pte_read)(pte)
 
 BTFIXUPDEF_CALL_CONST(int, pmd_bad, pmd_t)
 BTFIXUPDEF_CALL_CONST(int, pmd_present, pmd_t)
@@ -186,30 +188,9 @@ BTFIXUPDEF_CALL(void, pgd_clear, pgd_t *)
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
-BTFIXUPDEF_HALF(pte_readi)
 BTFIXUPDEF_HALF(pte_writei)
 BTFIXUPDEF_HALF(pte_dirtyi)
 BTFIXUPDEF_HALF(pte_youngi)
-
-extern int pte_read(pte_t pte) __attribute_const__;
-extern __inline__ int pte_read(pte_t pte)
-{
-	switch (sparc_cpu_model){
-	case sun4:
-	case sun4c:
-		return pte_val(pte) & BTFIXUP_HALF(pte_readi);
-	case sun4d:
-	case sun4e:
-	case sun4m:
-		return !(pte_val(pte) & BTFIXUP_HALF(pte_readi));
-	/* pacify gcc warnings */
-	case sun4u:
-	case sun_unknown:
-	case ap1000:
-	default:
-		return 0;
-	}
-}
 
 extern int pte_write(pte_t pte) __attribute_const__;
 extern __inline__ int pte_write(pte_t pte)
@@ -339,6 +320,7 @@ extern unsigned int pg_iobits;
 BTFIXUPDEF_CALL(void, set_pte, pte_t *, pte_t)
 
 #define set_pte(ptep,pteval) BTFIXUP_CALL(set_pte)(ptep,pteval)
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
 
 struct seq_file;
 BTFIXUPDEF_CALL(void, mmu_info, struct seq_file *)
@@ -453,8 +435,20 @@ extern unsigned long *sparc_valid_addr_bitmap;
 #define kern_addr_valid(addr) \
 	(test_bit(__pa((unsigned long)(addr))>>20, sparc_valid_addr_bitmap))
 
-extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long to,
+extern int io_remap_page_range(struct vm_area_struct *vma,
+			       unsigned long from, unsigned long to,
 			       unsigned long size, pgprot_t prot, int space);
+extern int io_remap_pfn_range(struct vm_area_struct *vma,
+			      unsigned long from, unsigned long pfn,
+			      unsigned long size, pgprot_t prot);
+
+/*
+ * For sparc32&64, the pfn in io_remap_pfn_range() carries <iospace> in
+ * its high 4 bits.  These macros/functions put it there or get it from there.
+ */
+#define MK_IOSPACE_PFN(space, pfn)	(pfn | (space << (BITS_PER_LONG - 4)))
+#define GET_IOSPACE(pfn)		(pfn >> (BITS_PER_LONG - 4))
+#define GET_PFN(pfn)			(pfn & 0x0fffffffUL)
 
 #include <asm-generic/pgtable.h>
 

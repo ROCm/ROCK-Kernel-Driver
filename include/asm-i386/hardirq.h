@@ -12,8 +12,13 @@ typedef struct {
 	unsigned int apic_timer_irqs;	/* arch dependent */
 } ____cacheline_aligned irq_cpustat_t;
 
-#include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
+DECLARE_PER_CPU(irq_cpustat_t, irq_stat);
+extern irq_cpustat_t irq_stat[];
+
+#define __ARCH_IRQ_STAT
+#define __IRQ_STAT(cpu, member) (per_cpu(irq_stat, cpu).member)
 
 void ack_bad_irq(unsigned int irq);
+#include <linux/irq_cpustat.h>
 
 #endif /* __ASM_HARDIRQ_H */

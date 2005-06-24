@@ -606,9 +606,11 @@ static inline void n_tty_receive_overrun(struct tty_struct *tty)
 	char buf[64];
 
 	tty->num_overrun++;
-	if (time_before(tty->overrun_time, jiffies - HZ)) {
-		printk(KERN_WARNING "%s: %d input overrun(s)\n", tty_name(tty, buf),
-		       tty->num_overrun);
+	if (time_before(tty->overrun_time, jiffies - HZ) ||
+			time_after(tty->overrun_time, jiffies)) {
+		printk(KERN_WARNING "%s: %d input overrun(s)\n",
+			tty_name(tty, buf),
+			tty->num_overrun);
 		tty->overrun_time = jiffies;
 		tty->num_overrun = 0;
 	}
@@ -1297,15 +1299,6 @@ do_it_again:
 			tty->minimum_to_wake = (minimum - (b - buf));
 		
 		if (!input_available_p(tty, 0)) {
-#ifdef CONFIG_BOOTSPLASH
-			if (file->f_dentry->d_inode->i_rdev == MKDEV(TTY_MAJOR,0) ||
-			    file->f_dentry->d_inode->i_rdev == MKDEV(TTY_MAJOR,1) ||
-			    file->f_dentry->d_inode->i_rdev == MKDEV(TTYAUX_MAJOR,0) ||
-			    file->f_dentry->d_inode->i_rdev == MKDEV(TTYAUX_MAJOR,1)) {
-				extern int splash_verbose(void);
-				(void)splash_verbose();
-			}
-#endif
 			if (test_bit(TTY_OTHER_CLOSED, &tty->flags)) {
 				retval = -EIO;
 				break;

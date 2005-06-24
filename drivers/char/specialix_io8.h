@@ -93,9 +93,11 @@ struct specialix_board {
 	unsigned long   flags;
 	unsigned short	base;
 	unsigned char 	irq;
-	signed   char	count;
+	//signed   char	count;
+	int count;
 	unsigned char	DTR;
         int reg;
+	spinlock_t lock;
 };
 
 #define SX_BOARD_PRESENT	0x00000001
@@ -129,12 +131,9 @@ struct specialix_port {
 	unsigned char		IER;
 	unsigned char		MSVR;
 	unsigned char		COR2;
-#ifdef SX_REPORT_OVERRUN
 	unsigned long		overrun;
-#endif	
-#ifdef SX_REPORT_FIFO
 	unsigned long		hits[10];
-#endif
+	spinlock_t lock;
 };
 
 #endif /* __KERNEL__ */

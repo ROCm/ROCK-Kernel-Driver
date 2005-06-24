@@ -187,7 +187,7 @@ static u16 dib3000mc_reg_agc_bandwidth_general[] = { 50,51,52,53,54 };
 static u16 dib3000mc_agc_bandwidth_general[] =
 	{ 0x8000, 0x91ca, 0x01ba, 0x0087, 0x0087 };
 
-#define DIB3000MC_REG_IMP_NOISE_55 		(    55)
+#define DIB3000MC_REG_IMP_NOISE_55		(    55)
 #define DIB3000MC_IMP_NEW_ALGO(w)		(w | (1<<10))
 
 /* Impulse noise params */
@@ -209,14 +209,14 @@ static u16 dib3000mc_fft_modes[][29] = {
 	{	0x38, 0x6d9, 0x3f28, 0x7a7, 0x3a74, 0x196, 0x32a, 0x48c,
 		0x3ffe, 0x7f3, 0x2d94, 0x76, 0x53d,
 		0x3ff8, 0x7e3, 0x3320, 0x76, 0x5b3,
-	  	0x3feb, 0x7d2, 0x365e, 0x76, 0x48c,
-	  	0x3ffe, 0x5b3, 0x3feb, 0x76,   0x0, 0xd
+		0x3feb, 0x7d2, 0x365e, 0x76, 0x48c,
+		0x3ffe, 0x5b3, 0x3feb, 0x76,   0x0, 0xd
 	}, /* fft mode 0 */
 	{	0x3b, 0x6d9, 0x3f28, 0x7a7, 0x3a74, 0x196, 0x32a, 0x48c,
 		0x3ffe, 0x7f3, 0x2d94, 0x76, 0x53d,
 		0x3ff8, 0x7e3, 0x3320, 0x76, 0x5b3,
-	  	0x3feb, 0x7d2, 0x365e, 0x76, 0x48c,
-	  	0x3ffe, 0x5b3, 0x3feb, 0x0,  0x8200, 0xd
+		0x3feb, 0x7d2, 0x365e, 0x76, 0x48c,
+		0x3ffe, 0x5b3, 0x3feb, 0x0,  0x8200, 0xd
 	}, /* fft mode 1 */
 };
 
@@ -299,7 +299,7 @@ static u16 dib3000mc_mobile_mode[][5] = {
  *              |||| +---- fifo_ctrl (1 = inhibit (flushed), 0 = active (unflushed))
  *              |||+------ pid_parse (1 = enabled, 0 = disabled)
  *              ||+------- outp_188  (1 = TS packet size 188, 0 = packet size 204)
- *              |+-------- unk 
+ *              |+-------- unk
  *              +--------- unk
  */
 
@@ -320,7 +320,7 @@ static u16 dib3000mc_mobile_mode[][5] = {
  * pidfilter
  * it is not a hardware pidfilter but a filter which drops all pids
  * except the ones set. When connected to USB1.1 bandwidth this is important.
- * DiB3000-MC/P can filter up to 32 PIDs
+ * DiB3000P/M-C can filter up to 32 PIDs
  */
 #define DIB3000MC_REG_FIRST_PID			(   212)
 #define DIB3000MC_NUM_PIDS				(    32)

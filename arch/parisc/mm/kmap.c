@@ -49,10 +49,10 @@ typedef void (*pte_iterator_t) (pte_t * pte, unsigned long arg);
  * unmap_uncached_page() and save a little code space but I didn't
  * do that since I'm not certain whether this is the right path. -PB
  */
-static void unmap_cached_pte(pte_t * pte, unsigned long arg)
+static void unmap_cached_pte(pte_t * pte, unsigned long addr, unsigned long arg)
 {
 	pte_t page = *pte;
-	pte_clear(pte);
+	pte_clear(&init_mm, addr, pte);
 	if (!pte_none(page)) {
 		if (pte_present(page)) {
 			unsigned long map_nr = pte_pagenr(page);

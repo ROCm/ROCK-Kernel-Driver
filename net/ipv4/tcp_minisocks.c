@@ -7,7 +7,7 @@
  *
  * Version:	$Id: tcp_minisocks.c,v 1.15 2002/02/01 22:01:04 davem Exp $
  *
- * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
+ * Authors:	Ross Biro
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *		Mark Evans, <evansmp@uhura.aston.ac.uk>
  *		Corey Minyard <wf-rch!minyard@relay.EU.net>
@@ -688,8 +688,8 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 {
 	/* allocate the newsk from the same slab of the master sock,
 	 * if not, at sk_free time we'll try to free it from the wrong
-	 * slabcache (i.e. is it TCPv4 or v6?) -acme */
-	struct sock *newsk = sk_alloc(PF_INET, GFP_ATOMIC, 0, sk->sk_prot->slab);
+	 * slabcache (i.e. is it TCPv4 or v6?), this is handled thru sk->sk_prot -acme */
+	struct sock *newsk = sk_alloc(PF_INET, GFP_ATOMIC, sk->sk_prot, 0);
 
 	if(newsk != NULL) {
 		struct tcp_sock *newtp;
@@ -807,7 +807,6 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 						  keepalive_time_when(newtp));
 		newsk->sk_socket = NULL;
 		newsk->sk_sleep = NULL;
-		newsk->sk_owner = NULL;
 
 		newtp->rx_opt.tstamp_ok = req->tstamp_ok;
 		if((newtp->rx_opt.sack_ok = req->sack_ok) != 0) {
@@ -841,7 +840,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		newtp->rx_opt.mss_clamp = req->mss;
 		TCP_ECN_openreq_child(newtp, req);
 		if (newtp->ecn_flags&TCP_ECN_OK)
-			newsk->sk_no_largesend = 1;
+			sock_set_flag(newsk, SOCK_NO_LARGESEND);
 
 		tcp_ca_init(newtp);
 
@@ -1019,7 +1018,6 @@ struct sock *tcp_check_req(struct sock *sk,struct sk_buff *skb,
 		if (child == NULL)
 			goto listen_overflow;
 
-		sk_set_owner(child, sk->sk_owner);
 		tcp_synq_unlink(tp, req, prev);
 		tcp_synq_removed(sk, req);
 

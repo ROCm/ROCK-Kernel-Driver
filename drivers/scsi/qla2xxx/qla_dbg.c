@@ -1050,10 +1050,8 @@ qla2x00_print_scsi_cmd(struct scsi_cmnd * cmd)
 	for (i = 0; i < cmd->cmd_len; i++) {
 		printk("0x%02x ", cmd->cmnd[i]);
 	}
-	printk("\n  seg_cnt=%d, allowed=%d, retries=%d, "
-	    "serial_number_at_timeout=0x%lx\n",
-	    cmd->use_sg, cmd->allowed, cmd->retries,
-	    cmd->serial_number_at_timeout);
+	printk("\n  seg_cnt=%d, allowed=%d, retries=%d\n",
+	    cmd->use_sg, cmd->allowed, cmd->retries);
 	printk("  request buffer=0x%p, request buffer len=0x%x\n",
 	    cmd->request_buffer, cmd->request_bufflen);
 	printk("  tag=%d, transfersize=0x%x\n",
@@ -1067,11 +1065,6 @@ qla2x00_print_scsi_cmd(struct scsi_cmnd * cmd)
 	printk("  sp flags=0x%x\n", sp->flags);
 	printk("  r_start=0x%lx, u_start=0x%lx, f_start=0x%lx, state=%d\n",
 	    sp->r_start, sp->u_start, sp->f_start, sp->state);
-
-	printk(" e_start= 0x%lx, ext_history=%d, fo retry=%d, loopid=%x, "
-	    "port path=%d\n", sp->e_start, sp->ext_history, sp->fo_retry_cnt,
-	    sp->lun_queue->fclun->fcport->loop_id,
-	    sp->lun_queue->fclun->fcport->cur_path);
 }
 
 #if defined(QL_DEBUG_ROUTINES)

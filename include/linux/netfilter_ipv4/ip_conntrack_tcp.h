@@ -23,13 +23,16 @@ enum tcp_conntrack {
 /* SACK is permitted by the sender */
 #define IP_CT_TCP_FLAG_SACK_PERM		0x02
 
+/* This sender sent FIN first */
+#define IP_CT_TCP_FLAG_CLOSE_INIT		0x03
+
 struct ip_ct_tcp_state {
 	u_int32_t	td_end;		/* max of seq + len */
 	u_int32_t	td_maxend;	/* max of ack + max(win, 1) */
 	u_int32_t	td_maxwin;	/* max(win) */
 	u_int8_t	td_scale;	/* window scale factor */
 	u_int8_t	loose;		/* used when connection picked up from the middle */
-	u_int8_t	flags;		/* per direction state flags */
+	u_int8_t	flags;		/* per direction options */
 };
 
 struct ip_ct_tcp

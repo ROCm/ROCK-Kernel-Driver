@@ -111,9 +111,6 @@ extern u16 hfs_brec_lenoff(struct hfs_bnode *, u16, u16 *);
 extern u16 hfs_brec_keylen(struct hfs_bnode *, u16);
 extern int hfs_brec_insert(struct hfs_find_data *, void *, int);
 extern int hfs_brec_remove(struct hfs_find_data *);
-extern struct hfs_bnode *hfs_bnode_split(struct hfs_find_data *);
-extern int hfs_brec_update_parent(struct hfs_find_data *);
-extern int hfs_btree_inc_height(struct hfs_btree *);
 
 /* bfind.c */
 extern int hfs_find_init(struct hfs_btree *, struct hfs_find_data *);

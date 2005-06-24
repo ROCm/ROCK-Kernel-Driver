@@ -30,8 +30,6 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
-extern unsigned char boot_cpu_id;
-
 extern cpumask_t phys_cpu_present_map;
 #define cpu_possible_map phys_cpu_present_map
 

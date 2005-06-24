@@ -21,6 +21,8 @@
 */
 #include <linux/module.h>
 #include <linux/fs.h>
+#include "cifsencrypt.h"
+
 /* NOTE: This code makes no attempt to be fast! */
 
 static __u32

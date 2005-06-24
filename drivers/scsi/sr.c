@@ -511,13 +511,17 @@ static int sr_block_media_changed(struct gendisk *disk)
 	return cdrom_media_changed(&cd->cdi);
 }
 
-struct block_device_operations sr_bdops =
+static struct block_device_operations sr_bdops =
 {
 	.owner		= THIS_MODULE,
 	.open		= sr_block_open,
 	.release	= sr_block_release,
 	.ioctl		= sr_block_ioctl,
 	.media_changed	= sr_block_media_changed,
+	/* 
+	 * No compat_ioctl for now because sr_block_ioctl never
+	 * seems to pass arbitary ioctls down to host drivers.
+	 */
 };
 
 static int sr_open(struct cdrom_device_info *cdi, int purpose)

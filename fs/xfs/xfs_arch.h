@@ -72,68 +72,17 @@
     ((sizeof(type) == 2) ? INT_SWAP16(type,var) : \
     (var))))
 
-#define INT_SWAP_UNALIGNED_32(from,to) \
-    { \
-	((__u8*)(to))[0] = ((__u8*)(from))[3]; \
-	((__u8*)(to))[1] = ((__u8*)(from))[2]; \
-	((__u8*)(to))[2] = ((__u8*)(from))[1]; \
-	((__u8*)(to))[3] = ((__u8*)(from))[0]; \
-    }
-
-#define INT_SWAP_UNALIGNED_64(from,to) \
-    { \
-	INT_SWAP_UNALIGNED_32( ((__u8*)(from)) + 4, ((__u8*)(to))); \
-	INT_SWAP_UNALIGNED_32( ((__u8*)(from)), ((__u8*)(to)) + 4); \
-    }
-
 /*
  * get and set integers from potentially unaligned locations
  */
 
-#define INT_GET_UNALIGNED_16_LE(pointer) \
-   ((__u16)((((__u8*)(pointer))[0]	) | (((__u8*)(pointer))[1] << 8 )))
 #define INT_GET_UNALIGNED_16_BE(pointer) \
    ((__u16)((((__u8*)(pointer))[0] << 8) | (((__u8*)(pointer))[1])))
-#define INT_SET_UNALIGNED_16_LE(pointer,value) \
-    { \
-	((__u8*)(pointer))[0] = (((value)     ) & 0xff); \
-	((__u8*)(pointer))[1] = (((value) >> 8) & 0xff); \
-    }
 #define INT_SET_UNALIGNED_16_BE(pointer,value) \
     { \
 	((__u8*)(pointer))[0] = (((value) >> 8) & 0xff); \
 	((__u8*)(pointer))[1] = (((value)     ) & 0xff); \
     }
-
-#define INT_GET_UNALIGNED_32_LE(pointer) \
-   ((__u32)((((__u8*)(pointer))[0]	) | (((__u8*)(pointer))[1] << 8 ) \
-	   |(((__u8*)(pointer))[2] << 16) | (((__u8*)(pointer))[3] << 24)))
-#define INT_GET_UNALIGNED_32_BE(pointer) \
-   ((__u32)((((__u8*)(pointer))[0] << 24) | (((__u8*)(pointer))[1] << 16) \
-	   |(((__u8*)(pointer))[2] << 8)  | (((__u8*)(pointer))[3]	)))
-
-#define INT_GET_UNALIGNED_64_LE(pointer) \
-   (((__u64)(INT_GET_UNALIGNED_32_LE(((__u8*)(pointer))+4)) << 32 ) \
-   |((__u64)(INT_GET_UNALIGNED_32_LE(((__u8*)(pointer))	 ))	  ))
-#define INT_GET_UNALIGNED_64_BE(pointer) \
-   (((__u64)(INT_GET_UNALIGNED_32_BE(((__u8*)(pointer))	 )) << 32  ) \
-   |((__u64)(INT_GET_UNALIGNED_32_BE(((__u8*)(pointer))+4))	   ))
-
-/*
- * now pick the right ones for our MACHINE ARCHITECTURE
- */
-
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-#define INT_GET_UNALIGNED_16(pointer)	    INT_GET_UNALIGNED_16_LE(pointer)
-#define INT_SET_UNALIGNED_16(pointer,value) INT_SET_UNALIGNED_16_LE(pointer,value)
-#define INT_GET_UNALIGNED_32(pointer)	    INT_GET_UNALIGNED_32_LE(pointer)
-#define INT_GET_UNALIGNED_64(pointer)	    INT_GET_UNALIGNED_64_LE(pointer)
-#else
-#define INT_GET_UNALIGNED_16(pointer)	    INT_GET_UNALIGNED_16_BE(pointer)
-#define INT_SET_UNALIGNED_16(pointer,value) INT_SET_UNALIGNED_16_BE(pointer,value)
-#define INT_GET_UNALIGNED_32(pointer)	    INT_GET_UNALIGNED_32_BE(pointer)
-#define INT_GET_UNALIGNED_64(pointer)	    INT_GET_UNALIGNED_64_BE(pointer)
-#endif
 
 /* define generic INT_ macros */
 
@@ -213,64 +162,52 @@
     } \
 }
 
-#define INT_ISZERO(reference,arch) \
-    ((reference) == 0)
+/*
+ * In directories inode numbers are stored as unaligned arrays of unsigned
+ * 8bit integers on disk.
+ *
+ * For v1 directories or v2 directories that contain inode numbers that
+ * do not fit into 32bit the array has eight members, but the first member
+ * is always zero:
+ *
+ *  |unused|48-55|40-47|32-39|24-31|16-23| 8-15| 0- 7|
+ *
+ * For v2 directories that only contain entries with inode numbers that fit
+ * into 32bits a four-member array is used:
+ *
+ *  |24-31|16-23| 8-15| 0- 7|
+ */ 
 
-#define INT_ZERO(reference,arch) \
-    ((reference) = 0)
+#define XFS_GET_DIR_INO4(di) \
+	(((u32)(di).i[0] << 24) | ((di).i[1] << 16) | ((di).i[2] << 8) | ((di).i[3]))
 
-#define INT_GET_UNALIGNED_16_ARCH(pointer,arch) \
-    ( ((arch) == ARCH_NOCONVERT) \
-	? \
-	    (INT_GET_UNALIGNED_16(pointer)) \
-	: \
-	    (INT_GET_UNALIGNED_16_BE(pointer)) \
-    )
-#define INT_SET_UNALIGNED_16_ARCH(pointer,value,arch) \
-    if ((arch) == ARCH_NOCONVERT) { \
-	INT_SET_UNALIGNED_16(pointer,value); \
-    } else { \
-	INT_SET_UNALIGNED_16_BE(pointer,value); \
-    }
+#define XFS_PUT_DIR_INO4(from, di) \
+do { \
+	(di).i[0] = (((from) & 0xff000000ULL) >> 24); \
+	(di).i[1] = (((from) & 0x00ff0000ULL) >> 16); \
+	(di).i[2] = (((from) & 0x0000ff00ULL) >> 8); \
+	(di).i[3] = ((from) & 0x000000ffULL); \
+} while (0)
 
-#define DIRINO4_GET_ARCH(pointer,arch) \
-    ( ((arch) == ARCH_NOCONVERT) \
-	? \
-	    (INT_GET_UNALIGNED_32(pointer)) \
-	: \
-	    (INT_GET_UNALIGNED_32_BE(pointer)) \
-    )
+#define XFS_DI_HI(di) \
+	(((u32)(di).i[1] << 16) | ((di).i[2] << 8) | ((di).i[3]))
+#define XFS_DI_LO(di) \
+	(((u32)(di).i[4] << 24) | ((di).i[5] << 16) | ((di).i[6] << 8) | ((di).i[7]))
 
-#if XFS_BIG_INUMS
-#define DIRINO_GET_ARCH(pointer,arch) \
-    ( ((arch) == ARCH_NOCONVERT) \
-	? \
-	    (INT_GET_UNALIGNED_64(pointer)) \
-	: \
-	    (INT_GET_UNALIGNED_64_BE(pointer)) \
-    )
-#else
-/* MACHINE ARCHITECTURE dependent */
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-#define DIRINO_GET_ARCH(pointer,arch) \
-    DIRINO4_GET_ARCH((((__u8*)pointer)+4),arch)
-#else
-#define DIRINO_GET_ARCH(pointer,arch) \
-    DIRINO4_GET_ARCH(pointer,arch)
-#endif
-#endif
+#define XFS_GET_DIR_INO8(di)        \
+	(((xfs_ino_t)XFS_DI_LO(di) & 0xffffffffULL) | \
+	 ((xfs_ino_t)XFS_DI_HI(di) << 32))
 
-#define DIRINO_COPY_ARCH(from,to,arch) \
-    if ((arch) == ARCH_NOCONVERT) { \
-	memcpy(to,from,sizeof(xfs_ino_t)); \
-    } else { \
-	INT_SWAP_UNALIGNED_64(from,to); \
-    }
-#define DIRINO4_COPY_ARCH(from,to,arch) \
-    if ((arch) == ARCH_NOCONVERT) { \
-	memcpy(to,(((__u8*)from+4)),sizeof(xfs_dir2_ino4_t)); \
-    } else { \
-	INT_SWAP_UNALIGNED_32(from,to); \
-    }
-
+#define XFS_PUT_DIR_INO8(from, di) \
+do { \
+	(di).i[0] = 0; \
+	(di).i[1] = (((from) & 0x00ff000000000000ULL) >> 48); \
+	(di).i[2] = (((from) & 0x0000ff0000000000ULL) >> 40); \
+	(di).i[3] = (((from) & 0x000000ff00000000ULL) >> 32); \
+	(di).i[4] = (((from) & 0x00000000ff000000ULL) >> 24); \
+	(di).i[5] = (((from) & 0x0000000000ff0000ULL) >> 16); \
+	(di).i[6] = (((from) & 0x000000000000ff00ULL) >> 8); \
+	(di).i[7] = ((from) & 0x00000000000000ffULL); \
+} while (0)
+	
 #endif	/* __XFS_ARCH_H__ */

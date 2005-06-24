@@ -1338,8 +1338,8 @@ static void  __devexit sst_shutdown(struct fb_info *info)
 /*
  * Interface to the world
  */
-
-int  __init sstfb_setup(char *options)
+#ifndef MODULE
+static int  __init sstfb_setup(char *options)
 {
 	char *this_opt;
 
@@ -1372,6 +1372,7 @@ int  __init sstfb_setup(char *options)
 	}
 	return 0;
 }
+#endif
 
 static struct fb_ops sstfb_ops = {
 	.owner		= THIS_MODULE,
@@ -1565,7 +1566,7 @@ static struct pci_driver sstfb_driver = {
 };
 
 
-int __devinit sstfb_init(void)
+static int __devinit sstfb_init(void)
 {
 #ifndef MODULE
 	char *option = NULL;
@@ -1574,13 +1575,15 @@ int __devinit sstfb_init(void)
 		return -ENODEV;
 	sstfb_setup(option);
 #endif
-	return pci_module_init(&sstfb_driver);
+	return pci_register_driver(&sstfb_driver);
 }
 
-void __devexit sstfb_exit(void)
+#ifdef MODULE
+static void __devexit sstfb_exit(void)
 {
 	pci_unregister_driver(&sstfb_driver);
 }
+#endif
 
 
 /*

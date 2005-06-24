@@ -23,6 +23,7 @@
  *     04-Jan-2005 BJD  Updated uart init call
  *     10-Jan-2005 BJD  Removed include of s3c2410.h
  *     14-Jan-2005 BJD  Added clock init
+ *     10-Mar-2005 LCVR Changed S3C2410_VA to S3C24XX_VA
 */
 
 #include <linux/kernel.h>
@@ -117,7 +118,7 @@ void __init h1940_init_irq(void)
 
 MACHINE_START(H1940, "IPAQ-H1940")
      MAINTAINER("Ben Dooks <ben@fluff.org>")
-     BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, S3C2410_VA_UART)
+     BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, (u32)S3C24XX_VA_UART)
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(h1940_map_io)
      INITIRQ(h1940_init_irq)

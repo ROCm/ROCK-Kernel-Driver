@@ -65,10 +65,6 @@
 
 struct screen_info screen_info;
 
-/* On a PC this would be initialised as a result of the BIOS detecting the
- * mouse. */
-unsigned char aux_device_present = 0xaa;
-
 #ifdef CONFIG_BLK_DEV_RAM
 extern int rd_doload;		/* 1 = load ramdisk, 0 = don't load */
 extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */

@@ -11,7 +11,31 @@
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/parser.h>
+#include <linux/nls.h>
 #include "hfsplus_fs.h"
+
+enum {
+	opt_creator, opt_type,
+	opt_umask, opt_uid, opt_gid,
+	opt_part, opt_session, opt_nls,
+	opt_nodecompose, opt_decompose,
+	opt_err
+};
+
+static match_table_t tokens = {
+	{ opt_creator, "creator=%s" },
+	{ opt_type, "type=%s" },
+	{ opt_umask, "umask=%o" },
+	{ opt_uid, "uid=%u" },
+	{ opt_gid, "gid=%u" },
+	{ opt_part, "part=%u" },
+	{ opt_session, "session=%u" },
+	{ opt_nls, "nls=%s" },
+	{ opt_decompose, "decompose" },
+	{ opt_nodecompose, "nodecompose" },
+	{ opt_err, NULL }
+};
 
 /* Initialize an options object to reasonable defaults */
 void fill_defaults(struct hfsplus_sb_info *opts)
@@ -29,98 +53,109 @@ void fill_defaults(struct hfsplus_sb_info *opts)
 }
 
 /* convert a "four byte character" to a 32 bit int with error checks */
-static int fill_fourchar(u32 *result, char *input)
+static inline int match_fourchar(substring_t *arg, u32 *result)
 {
-	u32 out;
-	int i;
-
-	if (!result || !input || !*input || (strlen(input) != 4))
-		return 0;
-
-	for (out = 0, i = 0; i < 4; i++) {
-		out <<= 8;
-		out |= ((int)(input[i])) & 0xFF;
-	}
-	*result = out;
-	return 1;
-}
-
-/* convert a string to int with error checks */
-static int fill_int(int *result, char *input, int base)
-{
-	char *tmp = input;
-	int intval;
-
-	if (!result || !input || !*input)
-		return 0;
-
-	intval = simple_strtoul(tmp, &tmp, base);
-	if (*tmp)
-		return 0;
-
-	*result = intval;
-	return 1;
+	if (arg->to - arg->from != 4)
+		return -EINVAL;
+	memcpy(result, arg->from, 4);
+	return 0;
 }
 
 /* Parse options from mount. Returns 0 on failure */
 /* input is the options passed to mount() as a string */
-int parse_options(char *input, struct hfsplus_sb_info *results)
+int parse_options(char *input, struct hfsplus_sb_info *sbi)
 {
-	char *curropt, *value;
-	int tmp;
+	char *p;
+	substring_t args[MAX_OPT_ARGS];
+	int tmp, token;
 
 	if (!input)
-		return 1;
+		goto done;
 
-	while ((curropt = strsep(&input,",")) != NULL) {
-		if (!*curropt)
+	while ((p = strsep(&input, ",")) != NULL) {
+		if (!*p)
 			continue;
 
-		if ((value = strchr(curropt, '=')) != NULL)
-			*value++ = '\0';
-
-		if (!strcmp(curropt, "creator")) {
-			if (!fill_fourchar(&(results->creator), value)) {
+		token = match_token(p, tokens, args);
+		switch (token) {
+		case opt_creator:
+			if (match_fourchar(&args[0], &sbi->creator)) {
 				printk("HFS+-fs: creator requires a 4 character value\n");
 				return 0;
 			}
-		} else if (!strcmp(curropt, "type")) {
-			if (!fill_fourchar(&(results->type), value)) {
+			break;
+		case opt_type:
+			if (match_fourchar(&args[0], &sbi->type)) {
 				printk("HFS+-fs: type requires a 4 character value\n");
 				return 0;
 			}
-		} else if (!strcmp(curropt, "umask")) {
-			if (!fill_int(&tmp, value, 8)) {
+			break;
+		case opt_umask:
+			if (match_octal(&args[0], &tmp)) {
 				printk("HFS+-fs: umask requires a value\n");
 				return 0;
 			}
-			results->umask = (umode_t)tmp;
-		} else if (!strcmp(curropt, "uid")) {
-			if (!fill_int(&tmp, value, 0)) {
+			sbi->umask = (umode_t)tmp;
+			break;
+		case opt_uid:
+			if (match_int(&args[0], &tmp)) {
 				printk("HFS+-fs: uid requires an argument\n");
 				return 0;
 			}
-			results->uid = (uid_t)tmp;
-		} else if (!strcmp(curropt, "gid")) {
-			if (!fill_int(&tmp, value, 0)) {
+			sbi->uid = (uid_t)tmp;
+			break;
+		case opt_gid:
+			if (match_int(&args[0], &tmp)) {
 				printk("HFS+-fs: gid requires an argument\n");
 				return 0;
 			}
-			results->gid = (gid_t)tmp;
-		} else if (!strcmp(curropt, "part")) {
-			if (!fill_int(&results->part, value, 0)) {
+			sbi->gid = (gid_t)tmp;
+			break;
+		case opt_part:
+			if (match_int(&args[0], &sbi->part)) {
 				printk("HFS+-fs: part requires an argument\n");
 				return 0;
 			}
-		} else if (!strcmp(curropt, "session")) {
-			if (!fill_int(&results->session, value, 0)) {
+			break;
+		case opt_session:
+			if (match_int(&args[0], &sbi->session)) {
 				printk("HFS+-fs: session requires an argument\n");
 				return 0;
 			}
-		} else {
-			printk("HFS+-fs: unknown option %s\n", curropt);
+			break;
+		case opt_nls:
+			if (sbi->nls) {
+				printk("HFS+-fs: unable to change nls mapping\n");
+				return 0;
+			}
+			p = match_strdup(&args[0]);
+			sbi->nls = load_nls(p);
+			if (!sbi->nls) {
+				printk("HFS+-fs: unable to load nls mapping \"%s\"\n", p);
+				kfree(p);
+				return 0;
+			}
+			kfree(p);
+			break;
+		case opt_decompose:
+			sbi->flags &= ~HFSPLUS_SB_NODECOMPOSE;
+			break;
+		case opt_nodecompose:
+			sbi->flags |= HFSPLUS_SB_NODECOMPOSE;
+			break;
+		default:
 			return 0;
 		}
+	}
+
+done:
+	if (!sbi->nls) {
+		/* try utf8 first, as this is the old default behaviour */
+		sbi->nls = load_nls("utf8");
+		if (!sbi->nls)
+			sbi->nls = load_nls_default();
+		if (!sbi->nls)
+			return 0;
 	}
 
 	return 1;

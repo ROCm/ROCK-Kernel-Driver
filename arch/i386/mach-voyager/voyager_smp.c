@@ -37,10 +37,6 @@ DEFINE_PER_CPU(struct tlb_state, cpu_tlbstate) ____cacheline_aligned = { &init_m
 /* CPU IRQ affinity -- set to all ones initially */
 static unsigned long cpu_irq_affinity[NR_CPUS] __cacheline_aligned = { [0 ... NR_CPUS-1]  = ~0UL };
 
-/* Set when the idlers are all forked - Set in main.c but not actually
- * used by any other parts of the kernel */
-int smp_threads_ready = 0;
-
 /* per CPU data structure (for /proc/cpuinfo et al), visible externally
  * indexed physically */
 struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
@@ -81,14 +77,6 @@ cpumask_t cpu_online_map = CPU_MASK_NONE;
  * by scheduler but indexed physically */
 cpumask_t phys_cpu_present_map = CPU_MASK_NONE;
 
-/* estimate of time used to flush the SMP-local cache - used in
- * processor affinity calculations */
-cycles_t cacheflush_time = 0;
-
-/* cache decay ticks for scheduler---a fairly useless quantity for the
-   voyager system with its odd affinity and huge L3 cache */
-unsigned long cache_decay_ticks = 20;
-
 
 /* The internal functions */
 static void send_CPI(__u32 cpuset, __u8 cpi);
@@ -109,7 +97,6 @@ static void ack_vic_irq(unsigned int irq);
 static void vic_enable_cpi(void);
 static void do_boot_cpu(__u8 cpuid);
 static void do_quad_bootstrap(void);
-static inline void wrapper_smp_local_timer_interrupt(struct pt_regs *);
 
 int hard_smp_processor_id(void);
 
@@ -135,6 +122,14 @@ send_QIC_CPI(__u32 cpuset, __u8 cpi)
 			send_one_QIC_CPI(cpu, cpi - QIC_CPI_OFFSET);
 		}
 	}
+}
+
+static inline void
+wrapper_smp_local_timer_interrupt(struct pt_regs *regs)
+{
+	irq_enter();
+	smp_local_timer_interrupt(regs);
+	irq_exit();
 }
 
 static inline void
@@ -210,14 +205,14 @@ ack_CPI(__u8 cpi)
  * 8259 IRQs except that masks and things must be kept per processor
  */
 static struct hw_interrupt_type vic_irq_type = {
-	"VIC-level",
-	startup_vic_irq,	/* startup */
-	disable_vic_irq,	/* shutdown */
-	enable_vic_irq,		/* enable */
-	disable_vic_irq,	/* disable */
-	before_handle_vic_irq,	/* ack */
-	after_handle_vic_irq,	/* end */
-	set_vic_irq_affinity,	/* affinity */
+	.typename = "VIC-level",
+	.startup = startup_vic_irq,
+	.shutdown = disable_vic_irq,
+	.enable = enable_vic_irq,
+	.disable = disable_vic_irq,
+	.ack = before_handle_vic_irq,
+	.end = after_handle_vic_irq,
+	.set_affinity = set_vic_irq_affinity,
 };
 
 /* used to count up as CPUs are brought on line (starts at 0) */
@@ -1259,14 +1254,6 @@ smp_vic_timer_interrupt(struct pt_regs *regs)
 {
 	send_CPI_allbutself(VIC_TIMER_CPI);
 	smp_local_timer_interrupt(regs);
-}
-
-static inline void
-wrapper_smp_local_timer_interrupt(struct pt_regs *regs)
-{
-	irq_enter();
-	smp_local_timer_interrupt(regs);
-	irq_exit();
 }
 
 /* local (per CPU) timer interrupt.  It does both profiling and

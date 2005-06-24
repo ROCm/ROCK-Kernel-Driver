@@ -10,7 +10,6 @@
 
 /* XXX Maybe do something better at some point... -DaveM */
 typedef unsigned long cycles_t;
-extern cycles_t cacheflush_time;
 #define get_cycles()	(0)
 
 #endif

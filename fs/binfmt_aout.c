@@ -148,14 +148,14 @@ static int aout_core_dump(long signr, struct pt_regs * regs, struct file *file)
 /* make sure we actually have a data and stack area to dump */
 	set_fs(USER_DS);
 #ifdef __sparc__
-	if (verify_area(VERIFY_READ, (void __user *)START_DATA(dump), dump.u_dsize))
+	if (!access_ok(VERIFY_READ, (void __user *)START_DATA(dump), dump.u_dsize))
 		dump.u_dsize = 0;
-	if (verify_area(VERIFY_READ, (void __user *)START_STACK(dump), dump.u_ssize))
+	if (!access_ok(VERIFY_READ, (void __user *)START_STACK(dump), dump.u_ssize))
 		dump.u_ssize = 0;
 #else
-	if (verify_area(VERIFY_READ, (void __user *)START_DATA(dump), dump.u_dsize << PAGE_SHIFT))
+	if (!access_ok(VERIFY_READ, (void __user *)START_DATA(dump), dump.u_dsize << PAGE_SHIFT))
 		dump.u_dsize = 0;
-	if (verify_area(VERIFY_READ, (void __user *)START_STACK(dump), dump.u_ssize << PAGE_SHIFT))
+	if (!access_ok(VERIFY_READ, (void __user *)START_STACK(dump), dump.u_ssize << PAGE_SHIFT))
 		dump.u_ssize = 0;
 #endif
 
@@ -317,7 +317,7 @@ static int load_aout_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		(current->mm->start_brk = N_BSSADDR(ex));
 	current->mm->free_area_cache = current->mm->mmap_base;
 
-	current->mm->rss = 0;
+	set_mm_counter(current->mm, rss, 0);
 	current->mm->mmap = NULL;
 	compute_creds(bprm);
  	current->flags &= ~PF_FORKNOEXEC;

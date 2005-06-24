@@ -65,7 +65,7 @@ static void *llc_seq_start(struct seq_file *seq, loff_t *pos)
 static void *llc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct sock* sk, *next;
-	struct llc_opt *llc;
+	struct llc_sock *llc;
 	struct llc_sap *sap;
 
 	++*pos;
@@ -102,7 +102,7 @@ static void llc_seq_stop(struct seq_file *seq, void *v)
 {
 	if (v && v != SEQ_START_TOKEN) {
 		struct sock *sk = v;
-		struct llc_opt *llc = llc_sk(sk);
+		struct llc_sock *llc = llc_sk(sk);
 		struct llc_sap *sap = llc->sap;
 
 		read_unlock_bh(&sap->sk_list.lock);
@@ -113,7 +113,7 @@ static void llc_seq_stop(struct seq_file *seq, void *v)
 static int llc_seq_socket_show(struct seq_file *seq, void *v)
 {
 	struct sock* sk;
-	struct llc_opt *llc;
+	struct llc_sock *llc;
 
 	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "SKt Mc local_mac_sap        remote_mac_sap   "
@@ -160,7 +160,7 @@ static char *llc_conn_state_names[] = {
 static int llc_seq_core_show(struct seq_file *seq, void *v)
 {
 	struct sock* sk;
-	struct llc_opt *llc;
+	struct llc_sock *llc;
 
 	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "Connection list:\n"

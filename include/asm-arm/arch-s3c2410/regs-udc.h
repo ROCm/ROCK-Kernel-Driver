@@ -11,13 +11,14 @@
  *    01-08-2004	Initial creation
  *    12-09-2004	Cleanup for submission
  *    24-10-2004	Fixed S3C2410_UDC_MAXP_REG definition
+ *    10-03-2005	Changed S3C2410_VA to S3C24XX_VA
  */
 
 #ifndef __ASM_ARCH_REGS_UDC_H
 #define __ASM_ARCH_REGS_UDC_H
 
 
-#define S3C2410_USBDREG(x) ((x) + S3C2410_VA_USBDEV)
+#define S3C2410_USBDREG(x) ((x) + S3C24XX_VA_USBDEV)
 
 #define S3C2410_UDC_FUNC_ADDR_REG	S3C2410_USBDREG(0x0140)
 #define S3C2410_UDC_PWR_REG		S3C2410_USBDREG(0x0144)

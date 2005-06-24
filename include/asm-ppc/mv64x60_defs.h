@@ -36,6 +36,8 @@
 #define GT64260_WINDOW_SIZE_MIN			0x00100000
 #define MV64360_WINDOW_SIZE_MIN			0x00010000
 
+#define	MV64x60_TCLK_FREQ_MAX			133333333U
+
 /* IRQ's for embedded controllers */
 #define	MV64x60_IRQ_DEV				1
 #define	MV64x60_IRQ_CPU_ERR			3
@@ -43,6 +45,11 @@
 #define	MV64x60_IRQ_TIMER_2_3			9
 #define	MV64x60_IRQ_TIMER_4_5			10
 #define	MV64x60_IRQ_TIMER_6_7			11
+#define	MV64x60_IRQ_P1_GPP_0_7			24
+#define	MV64x60_IRQ_P1_GPP_8_15			25
+#define	MV64x60_IRQ_P1_GPP_16_23		26
+#define	MV64x60_IRQ_P1_GPP_24_31		27
+#define	MV64x60_IRQ_DOORBELL			28
 #define	MV64x60_IRQ_ETH_0			32
 #define	MV64x60_IRQ_ETH_1			33
 #define	MV64x60_IRQ_ETH_2			34
@@ -52,11 +59,48 @@
 #define	MV64x60_IRQ_MPSC_0			40
 #define	MV64x60_IRQ_MPSC_1			42
 #define	MV64x60_IRQ_COMM			43
+#define	MV64x60_IRQ_P0_GPP_0_7			56
+#define	MV64x60_IRQ_P0_GPP_8_15			57
+#define	MV64x60_IRQ_P0_GPP_16_23		58
+#define	MV64x60_IRQ_P0_GPP_24_31		59
 
 #define	MV64360_IRQ_PCI0			12
 #define	MV64360_IRQ_SRAM_PAR_ERR		13
 #define	MV64360_IRQ_PCI1			16
 #define	MV64360_IRQ_SDMA_1			38
+
+#define	MV64x60_IRQ_GPP0			64
+#define	MV64x60_IRQ_GPP1			65
+#define	MV64x60_IRQ_GPP2			66
+#define	MV64x60_IRQ_GPP3			67
+#define	MV64x60_IRQ_GPP4			68
+#define	MV64x60_IRQ_GPP5			69
+#define	MV64x60_IRQ_GPP6			70
+#define	MV64x60_IRQ_GPP7			71
+#define	MV64x60_IRQ_GPP8			72
+#define	MV64x60_IRQ_GPP9			73
+#define	MV64x60_IRQ_GPP10			74
+#define	MV64x60_IRQ_GPP11			75
+#define	MV64x60_IRQ_GPP12			76
+#define	MV64x60_IRQ_GPP13			77
+#define	MV64x60_IRQ_GPP14			78
+#define	MV64x60_IRQ_GPP15			79
+#define	MV64x60_IRQ_GPP16			80
+#define	MV64x60_IRQ_GPP17			81
+#define	MV64x60_IRQ_GPP18			82
+#define	MV64x60_IRQ_GPP19			83
+#define	MV64x60_IRQ_GPP20			84
+#define	MV64x60_IRQ_GPP21			85
+#define	MV64x60_IRQ_GPP22			86
+#define	MV64x60_IRQ_GPP23			87
+#define	MV64x60_IRQ_GPP24			88
+#define	MV64x60_IRQ_GPP25			89
+#define	MV64x60_IRQ_GPP26			90
+#define	MV64x60_IRQ_GPP27			91
+#define	MV64x60_IRQ_GPP28			92
+#define	MV64x60_IRQ_GPP29			93
+#define	MV64x60_IRQ_GPP30			94
+#define	MV64x60_IRQ_GPP31			95
 
 /* Offsets for register blocks */
 #define	GT64260_ENET_PHY_ADDR			0x2000
@@ -303,7 +347,7 @@
 #define	MV64360_SRAM_ERR_DATA_HI		0x03a0
 #define	MV64360_SRAM_ERR_PARITY			0x03a8
 
-#define	MV64360_SRAM_SIZE			0x00040000 /* 256 KB of SRAM */
+#define	MV64360_SRAM_SIZE			0x00040000 /* 2Mb/256KB SRAM */
 
 /*
  *****************************************************************************

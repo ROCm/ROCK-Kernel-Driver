@@ -876,7 +876,7 @@ static int allocate_buffers(struct strip *strip_info, int mtu)
  */
 static int strip_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct strip *strip_info = dev->priv;
+	struct strip *strip_info = netdev_priv(dev);
 	int old_mtu = strip_info->mtu;
 	unsigned char *orbuff = strip_info->rx_buff;
 	unsigned char *osbuff = strip_info->sx_buff;
@@ -1563,7 +1563,7 @@ static void strip_send(struct strip *strip_info, struct sk_buff *skb)
 /* Encapsulate a datagram and kick it into a TTY queue. */
 static int strip_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct strip *strip_info = (struct strip *) (dev->priv);
+	struct strip *strip_info = netdev_priv(dev);
 
 	if (!netif_running(dev)) {
 		printk(KERN_ERR "%s: xmit call when iface is down\n",
@@ -1639,7 +1639,7 @@ static int strip_header(struct sk_buff *skb, struct net_device *dev,
 			unsigned short type, void *daddr, void *saddr,
 			unsigned len)
 {
-	struct strip *strip_info = (struct strip *) (dev->priv);
+	struct strip *strip_info = netdev_priv(dev);
 	STRIP_Header *header = (STRIP_Header *) skb_push(skb, sizeof(STRIP_Header));
 
 	/*printk(KERN_INFO "%s: strip_header 0x%04X %s\n", dev->name, type,
@@ -1648,7 +1648,7 @@ static int strip_header(struct sk_buff *skb, struct net_device *dev,
 	header->src_addr = strip_info->true_dev_addr;
 	header->protocol = htons(type);
 
-	/*HexDump("strip_header", (struct strip *)(dev->priv), skb->data, skb->data + skb->len); */
+	/*HexDump("strip_header", netdev_priv(dev), skb->data, skb->data + skb->len); */
 
 	if (!daddr)
 		return (-dev->hard_header_len);
@@ -2400,7 +2400,7 @@ static int set_mac_address(struct strip *strip_info,
 
 static int strip_set_mac_address(struct net_device *dev, void *addr)
 {
-	struct strip *strip_info = (struct strip *) (dev->priv);
+	struct strip *strip_info = netdev_priv(dev);
 	struct sockaddr *sa = addr;
 	printk(KERN_INFO "%s: strip_set_dev_mac_address called\n", dev->name);
 	set_mac_address(strip_info, (MetricomAddress *) sa->sa_data);
@@ -2409,8 +2409,8 @@ static int strip_set_mac_address(struct net_device *dev, void *addr)
 
 static struct net_device_stats *strip_get_stats(struct net_device *dev)
 {
+	struct strip *strip_info = netdev_priv(dev);
 	static struct net_device_stats stats;
-	struct strip *strip_info = (struct strip *) (dev->priv);
 
 	memset(&stats, 0, sizeof(struct net_device_stats));
 
@@ -2454,7 +2454,7 @@ static struct net_device_stats *strip_get_stats(struct net_device *dev)
 
 static int strip_open_low(struct net_device *dev)
 {
-	struct strip *strip_info = (struct strip *) (dev->priv);
+	struct strip *strip_info = netdev_priv(dev);
 
 	if (strip_info->tty == NULL)
 		return (-ENODEV);
@@ -2487,7 +2487,7 @@ static int strip_open_low(struct net_device *dev)
 
 static int strip_close_low(struct net_device *dev)
 {
-	struct strip *strip_info = (struct strip *) (dev->priv);
+	struct strip *strip_info = netdev_priv(dev);
 
 	if (strip_info->tty == NULL)
 		return -EBUSY;

@@ -695,6 +695,9 @@ do_test(void)
 		test_hash("wp512", wp512_tv_template, WP512_TEST_VECTORS);
 		test_hash("wp384", wp384_tv_template, WP384_TEST_VECTORS);
 		test_hash("wp256", wp256_tv_template, WP256_TEST_VECTORS);
+		test_hash("tgr192", tgr192_tv_template, TGR192_TEST_VECTORS);
+		test_hash("tgr160", tgr160_tv_template, TGR160_TEST_VECTORS);
+		test_hash("tgr128", tgr128_tv_template, TGR128_TEST_VECTORS);
 		test_deflate();
 		test_crc32c();
 #ifdef CONFIG_CRYPTO_HMAC
@@ -830,6 +833,19 @@ do_test(void)
 		test_cipher ("anubis", MODE_ECB, DECRYPT, anubis_dec_tv_template, ANUBIS_DEC_TEST_VECTORS);
 		test_cipher ("anubis", MODE_CBC, ENCRYPT, anubis_cbc_enc_tv_template, ANUBIS_CBC_ENC_TEST_VECTORS);
 		test_cipher ("anubis", MODE_CBC, DECRYPT, anubis_cbc_dec_tv_template, ANUBIS_CBC_ENC_TEST_VECTORS);
+		break;
+
+	case 27:
+		test_hash("tgr192", tgr192_tv_template, TGR192_TEST_VECTORS);
+		break;
+
+	case 28:
+
+		test_hash("tgr160", tgr160_tv_template, TGR160_TEST_VECTORS);
+		break;
+
+	case 29:
+		test_hash("tgr128", tgr128_tv_template, TGR128_TEST_VECTORS);
 		break;
 
 #ifdef CONFIG_CRYPTO_HMAC

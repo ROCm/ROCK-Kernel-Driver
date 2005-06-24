@@ -20,10 +20,12 @@
 #include <linux/device.h>
 #include <linux/key.h>
 #include <linux/times.h>
+#include <linux/posix-timers.h>
 #include <linux/security.h>
 #include <linux/dcookies.h>
 #include <linux/suspend.h>
 #include <linux/tty.h>
+#include <linux/signal.h>
 
 #include <linux/compat.h>
 #include <linux/syscalls.h>
@@ -89,7 +91,7 @@ int cad_pid = 1;
  */
 
 static struct notifier_block *reboot_notifier_list;
-DEFINE_RWLOCK(notifier_lock);
+static DEFINE_RWLOCK(notifier_lock);
 
 /**
  *	notifier_chain_register	- Add notifier to a notifier chain
@@ -216,12 +218,13 @@ int unregister_reboot_notifier(struct notifier_block * nb)
 }
 
 EXPORT_SYMBOL(unregister_reboot_notifier);
+
 static int set_one_prio(struct task_struct *p, int niceval, int error)
 {
 	int no_nice;
 
 	if (p->uid != current->euid &&
-		p->uid != current->uid && !capable(CAP_SYS_NICE)) {
+		p->euid != current->euid && !capable(CAP_SYS_NICE)) {
 		error = -EPERM;
 		goto out;
 	}
@@ -523,7 +526,7 @@ asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
 	if (new_egid != old_egid)
 	{
 		current->mm->dumpable = 0;
-		wmb();
+		smp_wmb();
 	}
 	if (rgid != (gid_t) -1 ||
 	    (egid != (gid_t) -1 && egid != old_rgid))
@@ -554,7 +557,7 @@ asmlinkage long sys_setgid(gid_t gid)
 		if(old_egid != gid)
 		{
 			current->mm->dumpable=0;
-			wmb();
+			smp_wmb();
 		}
 		current->gid = current->egid = current->sgid = current->fsgid = gid;
 	}
@@ -563,7 +566,7 @@ asmlinkage long sys_setgid(gid_t gid)
 		if(old_egid != gid)
 		{
 			current->mm->dumpable=0;
-			wmb();
+			smp_wmb();
 		}
 		current->egid = current->fsgid = gid;
 	}
@@ -594,7 +597,7 @@ static int set_user(uid_t new_ruid, int dumpclear)
 	if(dumpclear)
 	{
 		current->mm->dumpable = 0;
-		wmb();
+		smp_wmb();
 	}
 	current->uid = new_ruid;
 	return 0;
@@ -651,7 +654,7 @@ asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
 	if (new_euid != old_euid)
 	{
 		current->mm->dumpable=0;
-		wmb();
+		smp_wmb();
 	}
 	current->fsuid = current->euid = new_euid;
 	if (ruid != (uid_t) -1 ||
@@ -701,7 +704,7 @@ asmlinkage long sys_setuid(uid_t uid)
 	if (old_euid != uid)
 	{
 		current->mm->dumpable = 0;
-		wmb();
+		smp_wmb();
 	}
 	current->fsuid = current->euid = uid;
 	current->suid = new_suid;
@@ -746,7 +749,7 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 		if (euid != current->euid)
 		{
 			current->mm->dumpable = 0;
-			wmb();
+			smp_wmb();
 		}
 		current->euid = euid;
 	}
@@ -796,7 +799,7 @@ asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 		if (egid != current->egid)
 		{
 			current->mm->dumpable = 0;
-			wmb();
+			smp_wmb();
 		}
 		current->egid = egid;
 	}
@@ -843,7 +846,7 @@ asmlinkage long sys_setfsuid(uid_t uid)
 		if (uid != old_fsuid)
 		{
 			current->mm->dumpable = 0;
-			wmb();
+			smp_wmb();
 		}
 		current->fsuid = uid;
 	}
@@ -873,7 +876,7 @@ asmlinkage long sys_setfsgid(gid_t gid)
 		if (gid != old_fsgid)
 		{
 			current->mm->dumpable = 0;
-			wmb();
+			smp_wmb();
 		}
 		current->fsgid = gid;
 		key_fsgid_changed(current);
@@ -1192,7 +1195,7 @@ static int groups_from_user(struct group_info *group_info,
 	return 0;
 }
 
-/* a simple shell-metzner sort */
+/* a simple Shell sort */
 static void groups_sort(struct group_info *group_info)
 {
 	int base, max, stride;
@@ -1501,6 +1504,20 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
 	task_lock(current->group_leader);
 	*old_rlim = new_rlim;
 	task_unlock(current->group_leader);
+
+	if (resource == RLIMIT_CPU && new_rlim.rlim_cur != RLIM_INFINITY &&
+	    (cputime_eq(current->signal->it_prof_expires, cputime_zero) ||
+	     new_rlim.rlim_cur <= cputime_to_secs(
+		     current->signal->it_prof_expires))) {
+		cputime_t cputime = secs_to_cputime(new_rlim.rlim_cur);
+		read_lock(&tasklist_lock);
+		spin_lock_irq(&current->sighand->siglock);
+		set_process_cpu_timer(current, CPUCLOCK_PROF,
+				      &cputime, NULL);
+		spin_unlock_irq(&current->sighand->siglock);
+		read_unlock(&tasklist_lock);
+	}
+
 	return 0;
 }
 
@@ -1524,7 +1541,7 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
  * given child after it's reaped, or none so this sample is before reaping.
  */
 
-void k_getrusage(struct task_struct *p, int who, struct rusage *r)
+static void k_getrusage(struct task_struct *p, int who, struct rusage *r)
 {
 	struct task_struct *t;
 	unsigned long flags;
@@ -1621,7 +1638,7 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 	switch (option) {
 		case PR_SET_PDEATHSIG:
 			sig = arg2;
-			if (sig < 0 || sig > _NSIG) {
+			if (!valid_signal(sig)) {
 				error = -EINVAL;
 				break;
 			}

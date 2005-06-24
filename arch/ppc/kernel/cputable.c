@@ -560,6 +560,18 @@ struct cpu_spec	cpu_specs[] = {
 		.dcache_bsize		= 32,
 		.cpu_setup		= __setup_cpu_603
 	},
+	{	/* e300 (a 603e core, plus some) on 83xx */
+		.pvr_mask		= 0x7fff0000,
+		.pvr_value		= 0x00830000,
+		.cpu_name		= "e300",
+		.cpu_features		= CPU_FTR_SPLIT_ID_CACHE |
+			CPU_FTR_MAYBE_CAN_DOZE | CPU_FTR_USE_TB |
+			CPU_FTR_MAYBE_CAN_NAP | CPU_FTR_HAS_HIGH_BATS,
+		.cpu_user_features	= COMMON_PPC,
+		.icache_bsize		= 32,
+		.dcache_bsize		= 32,
+		.cpu_setup		= __setup_cpu_603
+	},
 	{	/* default match, we assume split I/D cache & TB (non-601)... */
 		.pvr_mask		= 0x00000000,
 		.pvr_value		= 0x00000000,
@@ -819,6 +831,17 @@ struct cpu_spec	cpu_specs[] = {
 		.pvr_mask		= 0xffff0000,
 		.pvr_value		= 0x20010000,
 		.cpu_name		= "Virtex-II Pro",
+		.cpu_features		= CPU_FTR_SPLIT_ID_CACHE |
+			CPU_FTR_USE_TB,
+		.cpu_user_features	= PPC_FEATURE_32 |
+			PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
+		.icache_bsize		= 32,
+		.dcache_bsize		= 32,
+	},
+	{	/* 405EP */
+		.pvr_mask		= 0xffff0000,
+		.pvr_value		= 0x51210000,
+		.cpu_name		= "405EP",
 		.cpu_features		= CPU_FTR_SPLIT_ID_CACHE |
 			CPU_FTR_USE_TB,
 		.cpu_user_features	= PPC_FEATURE_32 |

@@ -520,7 +520,7 @@ isdn_v110_stat_callback(int idx, isdn_ctrl * c)
 {
 	isdn_v110_stream *v = NULL;
 	int i;
-	int ret = 0;
+	int ret;
 
 	if (idx < 0)
 		return 0;

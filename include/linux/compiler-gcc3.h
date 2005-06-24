@@ -10,7 +10,7 @@
 #endif
 
 #if __GNUC_MINOR__ > 0
-# define __deprecated	__attribute__((deprecated))
+# define __deprecated		__attribute__((deprecated))
 #endif
 
 #if __GNUC_MINOR__ >= 3
@@ -23,12 +23,10 @@
 #define __attribute_const__	__attribute__((__const__))
 
 #if __GNUC_MINOR__ >= 1
-#define  noinline __attribute__((noinline))
-#endif
-#if __GNUC_MINOR__ >= 4
-#define __must_check __attribute__((warn_unused_result))
+#define  noinline		__attribute__((noinline))
 #endif
 
-#if __GNUC_MINOR__ >= 5
-#define __compiler_offsetof(a,b) __builtin_offsetof(a,b)
+#if __GNUC_MINOR__ >= 4
+#define __must_check		__attribute__((warn_unused_result))
 #endif
+

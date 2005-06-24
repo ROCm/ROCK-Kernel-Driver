@@ -172,7 +172,7 @@ pl010_rx_chars(struct uart_port *port)
 		 * out of the main execution path
 		 */
 		rsr = UART_GET_RSR(port) | UART_DUMMY_RSR_RX;
-		if (rsr & UART01x_RSR_ANY) {
+		if (unlikely(rsr & UART01x_RSR_ANY)) {
 			if (rsr & UART01x_RSR_BE) {
 				rsr &= ~(UART01x_RSR_FE | UART01x_RSR_PE);
 				port->icount.brk++;
@@ -198,18 +198,8 @@ pl010_rx_chars(struct uart_port *port)
 		if (uart_handle_sysrq_char(port, ch, regs))
 			goto ignore_char;
 
-		if ((rsr & port->ignore_status_mask) == 0) {
-			tty_insert_flip_char(tty, ch, flag);
-		}
-		if ((rsr & UART01x_RSR_OE) &&
-		    tty->flip.count < TTY_FLIPBUF_SIZE) {
-			/*
-			 * Overrun is special, since it's reported
-			 * immediately, and doesn't affect the current
-			 * character
-			 */
-			tty_insert_flip_char(tty, 0, TTY_OVERRUN);
-		}
+		uart_insert_char(port, rsr, UART01x_RSR_OE, ch, flag);
+
 	ignore_char:
 		status = UART_GET_FR(port);
 	}
@@ -772,7 +762,7 @@ static int pl010_remove(struct amba_device *dev)
 	return 0;
 }
 
-static int pl010_suspend(struct amba_device *dev, u32 state)
+static int pl010_suspend(struct amba_device *dev, pm_message_t state)
 {
 	struct uart_amba_port *uap = amba_get_drvdata(dev);
 

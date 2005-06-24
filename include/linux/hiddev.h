@@ -201,8 +201,8 @@ struct hiddev_usage_ref_multi {
  *		ioctl(fd, HIDIOCGUSAGE, &uref);
  *          }
  *	}
- *	uref.report_id |= HID_REPORT_ID_NEXT;
- *	ret = ioctl(fd, HIDIOCGREPORTINFO, &uref);
+ *	rinfo.report_id |= HID_REPORT_ID_NEXT;
+ *	ret = ioctl(fd, HIDIOCGREPORTINFO, &rinfo);
  *  }
  */
 

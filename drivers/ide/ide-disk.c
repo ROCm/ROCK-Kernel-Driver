@@ -71,6 +71,41 @@
 #include <asm/io.h>
 #include <asm/div64.h>
 
+struct ide_disk_obj {
+	ide_drive_t	*drive;
+	ide_driver_t	*driver;
+	struct gendisk	*disk;
+	struct kref	kref;
+};
+
+static DECLARE_MUTEX(idedisk_ref_sem);
+
+#define to_ide_disk(obj) container_of(obj, struct ide_disk_obj, kref)
+
+#define ide_disk_g(disk) \
+	container_of((disk)->private_data, struct ide_disk_obj, driver)
+
+static struct ide_disk_obj *ide_disk_get(struct gendisk *disk)
+{
+	struct ide_disk_obj *idkp = NULL;
+
+	down(&idedisk_ref_sem);
+	idkp = ide_disk_g(disk);
+	if (idkp)
+		kref_get(&idkp->kref);
+	up(&idedisk_ref_sem);
+	return idkp;
+}
+
+static void ide_disk_release(struct kref *);
+
+static void ide_disk_put(struct ide_disk_obj *idkp)
+{
+	down(&idedisk_ref_sem);
+	kref_put(&idkp->kref, ide_disk_release);
+	up(&idedisk_ref_sem);
+}
+
 /*
  * lba_capacity_is_ok() performs a sanity check on the claimed "lba_capacity"
  * value for this drive (from its reported identification information).
@@ -516,75 +551,6 @@ static sector_t idedisk_capacity (ide_drive_t *drive)
 	return drive->capacity64 - drive->sect0;
 }
 
-#define IS_PDC4030_DRIVE	0
-
-static ide_startstop_t idedisk_special (ide_drive_t *drive)
-{
-	special_t *s = &drive->special;
-
-	if (s->b.set_geometry) {
-		s->b.set_geometry	= 0;
-		if (!IS_PDC4030_DRIVE) {
-			ide_task_t args;
-			memset(&args, 0, sizeof(ide_task_t));
-			args.tfRegister[IDE_NSECTOR_OFFSET] = drive->sect;
-			args.tfRegister[IDE_SECTOR_OFFSET]  = drive->sect;
-			args.tfRegister[IDE_LCYL_OFFSET]    = drive->cyl;
-			args.tfRegister[IDE_HCYL_OFFSET]    = drive->cyl>>8;
-			args.tfRegister[IDE_SELECT_OFFSET]  = ((drive->head-1)|drive->select.all)&0xBF;
-			args.tfRegister[IDE_COMMAND_OFFSET] = WIN_SPECIFY;
-			args.command_type = IDE_DRIVE_TASK_NO_DATA;
-			args.handler	  = &set_geometry_intr;
-			do_rw_taskfile(drive, &args);
-		}
-	} else if (s->b.recalibrate) {
-		s->b.recalibrate = 0;
-		if (!IS_PDC4030_DRIVE) {
-			ide_task_t args;
-			memset(&args, 0, sizeof(ide_task_t));
-			args.tfRegister[IDE_NSECTOR_OFFSET] = drive->sect;
-			args.tfRegister[IDE_COMMAND_OFFSET] = WIN_RESTORE;
-			args.command_type = IDE_DRIVE_TASK_NO_DATA;
-			args.handler	  = &recal_intr;
-			do_rw_taskfile(drive, &args);
-		}
-	} else if (s->b.set_multmode) {
-		s->b.set_multmode = 0;
-		if (drive->mult_req > drive->id->max_multsect)
-			drive->mult_req = drive->id->max_multsect;
-		if (!IS_PDC4030_DRIVE) {
-			ide_task_t args;
-			memset(&args, 0, sizeof(ide_task_t));
-			args.tfRegister[IDE_NSECTOR_OFFSET] = drive->mult_req;
-			args.tfRegister[IDE_COMMAND_OFFSET] = WIN_SETMULT;
-			args.command_type = IDE_DRIVE_TASK_NO_DATA;
-			args.handler	  = &set_multmode_intr;
-			do_rw_taskfile(drive, &args);
-		}
-	} else if (s->all) {
-		int special = s->all;
-		s->all = 0;
-		printk(KERN_ERR "%s: bad special flag: 0x%02x\n", drive->name, special);
-		return ide_stopped;
-	}
-	return IS_PDC4030_DRIVE ? ide_stopped : ide_started;
-}
-
-static void idedisk_pre_reset (ide_drive_t *drive)
-{
-	int legacy = (drive->id->cfs_enable_2 & 0x0400) ? 0 : 1;
-
-	drive->special.all = 0;
-	drive->special.b.set_geometry = legacy;
-	drive->special.b.recalibrate  = legacy;
-	if (OK_TO_RESET_CONTROLLER)
-		drive->mult_count = 0;
-	if (!drive->keep_settings && !drive->using_dma)
-		drive->mult_req = 0;
-	if (drive->mult_req != drive->mult_count)
-		drive->special.b.set_multmode = 1;
-}
-
 #ifdef CONFIG_PROC_FS
 
 static int smart_enable(ide_drive_t *drive)
@@ -648,6 +614,16 @@ static int proc_idedisk_read_cache
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
+static int proc_idedisk_read_capacity
+	(char *page, char **start, off_t off, int count, int *eof, void *data)
+{
+	ide_drive_t*drive = (ide_drive_t *)data;
+	int len;
+
+	len = sprintf(page,"%llu\n", (long long)idedisk_capacity(drive));
+	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
+}
+
 static int proc_idedisk_read_smart_thresholds
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
@@ -688,6 +664,7 @@ static int proc_idedisk_read_smart_values
 
 static ide_proc_entry_t idedisk_proc[] = {
 	{ "cache",		S_IFREG|S_IRUGO,	proc_idedisk_read_cache,		NULL },
+	{ "capacity",		S_IFREG|S_IRUGO,	proc_idedisk_read_capacity,		NULL },
 	{ "geometry",		S_IFREG|S_IRUGO,	proc_ide_read_geometry,			NULL },
 	{ "smart_values",	S_IFREG|S_IRUSR,	proc_idedisk_read_smart_values,		NULL },
 	{ "smart_thresholds",	S_IFREG|S_IRUSR,	proc_idedisk_read_smart_thresholds,	NULL },
@@ -903,90 +880,6 @@ static void idedisk_add_settings(ide_drive_t *drive)
  	ide_add_setting(drive,	"max_failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->max_failures,		NULL);
 }
 
-/*
- * Power Management state machine. This one is rather trivial for now,
- * we should probably add more, like switching back to PIO on suspend
- * to help some BIOSes, re-do the door locking on resume, etc...
- */
-
-enum {
-	idedisk_pm_flush_cache	= ide_pm_state_start_suspend,
-	idedisk_pm_standby,
-
-	idedisk_pm_idle		= ide_pm_state_start_resume,
-	idedisk_pm_restore_dma,
-};
-
-static void idedisk_complete_power_step (ide_drive_t *drive, struct request *rq, u8 stat, u8 error)
-{
-	switch (rq->pm->pm_step) {
-	case idedisk_pm_flush_cache:	/* Suspend step 1 (flush cache) complete */
-		if (rq->pm->pm_state == 4)
-			rq->pm->pm_step = ide_pm_state_completed;
-		else
-			rq->pm->pm_step = idedisk_pm_standby;
-		break;
-	case idedisk_pm_standby:	/* Suspend step 2 (standby) complete */
-		rq->pm->pm_step = ide_pm_state_completed;
-		break;
-	case idedisk_pm_idle:		/* Resume step 1 (idle) complete */
-		rq->pm->pm_step = idedisk_pm_restore_dma;
-		break;
-	}
-}
-
-static ide_startstop_t idedisk_start_power_step (ide_drive_t *drive, struct request *rq)
-{
-	ide_task_t *args = rq->special;
-
-	memset(args, 0, sizeof(*args));
-
-	switch (rq->pm->pm_step) {
-	case idedisk_pm_flush_cache:	/* Suspend step 1 (flush cache) */
-		/* Not supported? Switch to next step now. */
-		if (!drive->wcache || !ide_id_has_flush_cache(drive->id)) {
-			idedisk_complete_power_step(drive, rq, 0, 0);
-			return ide_stopped;
-		}
-		if (ide_id_has_flush_cache_ext(drive->id))
-			args->tfRegister[IDE_COMMAND_OFFSET] = WIN_FLUSH_CACHE_EXT;
-		else
-			args->tfRegister[IDE_COMMAND_OFFSET] = WIN_FLUSH_CACHE;
-		args->command_type = IDE_DRIVE_TASK_NO_DATA;
-		args->handler	   = &task_no_data_intr;
-		return do_rw_taskfile(drive, args);
-
-	case idedisk_pm_standby:	/* Suspend step 2 (standby) */
-		args->tfRegister[IDE_COMMAND_OFFSET] = WIN_STANDBYNOW1;
-		args->command_type = IDE_DRIVE_TASK_NO_DATA;
-		args->handler	   = &task_no_data_intr;
-		return do_rw_taskfile(drive, args);
-
-	case idedisk_pm_idle:		/* Resume step 1 (idle) */
-		args->tfRegister[IDE_COMMAND_OFFSET] = WIN_IDLEIMMEDIATE;
-		args->command_type = IDE_DRIVE_TASK_NO_DATA;
-		args->handler = task_no_data_intr;
-		return do_rw_taskfile(drive, args);
-
-	case idedisk_pm_restore_dma:	/* Resume step 2 (restore DMA) */
-		/*
-		 * Right now, all we do is call hwif->ide_dma_check(drive),
-		 * we could be smarter and check for current xfer_speed
-		 * in struct drive etc...
-		 * Also, this step could be implemented as a generic helper
-		 * as most subdrivers will use it
-		 */
-		if ((drive->id->capability & 1) == 0)
-			break;
-		if (HWIF(drive)->ide_dma_check == NULL)
-			break;
-		HWIF(drive)->ide_dma_check(drive);
-		break;
-	}
-	rq->pm->pm_step = ide_pm_state_completed;
-	return ide_stopped;
-}
-
 static void idedisk_setup (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
@@ -1024,28 +917,6 @@ static void idedisk_setup (ide_drive_t *drive)
 	}
 
 	printk(KERN_INFO "%s: max request size: %dKiB\n", drive->name, drive->queue->max_sectors / 2);
-
-	/* Extract geometry if we did not already have one for the drive */
-	if (!drive->cyl || !drive->head || !drive->sect) {
-		drive->cyl     = drive->bios_cyl  = id->cyls;
-		drive->head    = drive->bios_head = id->heads;
-		drive->sect    = drive->bios_sect = id->sectors;
-	}
-
-	/* Handle logical geometry translation by the drive */
-	if ((id->field_valid & 1) && id->cur_cyls &&
-	    id->cur_heads && (id->cur_heads <= 16) && id->cur_sectors) {
-		drive->cyl  = id->cur_cyls;
-		drive->head = id->cur_heads;
-		drive->sect = id->cur_sectors;
-	}
-
-	/* Use physical geometry if what we have still makes no sense */
-	if (drive->head > 16 && id->heads && id->heads <= 16) {
-		drive->cyl  = id->cyls;
-		drive->head = id->heads;
-		drive->sect = id->sectors;
-	}
 
 	/* calculate drive capacity, and select LBA if possible */
 	init_idedisk_capacity (drive);
@@ -1110,21 +981,6 @@ static void idedisk_setup (ide_drive_t *drive)
 		ide_dma_verbose(drive);
 	printk("\n");
 
-	drive->mult_count = 0;
-	if (id->max_multsect) {
-#ifdef CONFIG_IDEDISK_MULTI_MODE
-		id->multsect = ((id->max_multsect/2) > 1) ? id->max_multsect : 0;
-		id->multsect_valid = id->multsect ? 1 : 0;
-		drive->mult_req = id->multsect_valid ? id->max_multsect : INITIAL_MULT_COUNT;
-		drive->special.b.set_multmode = drive->mult_req ? 1 : 0;
-#else	/* original, pre IDE-NFG, per request of AC */
-		drive->mult_req = INITIAL_MULT_COUNT;
-		if (drive->mult_req > id->max_multsect)
-			drive->mult_req = id->max_multsect;
-		if (drive->mult_req || ((id->multsect_valid & 1) && id->multsect))
-			drive->special.b.set_multmode = 1;
-#endif	/* CONFIG_IDEDISK_MULTI_MODE */
-	}
 	drive->no_io_32bit = id->dword_io ? 1 : 0;
 
 	/* write cache enabled? */
@@ -1168,19 +1024,37 @@ static void ide_cacheflush_p(ide_drive_t *drive)
 		printk(KERN_INFO "%s: wcache flush failed!\n", drive->name);
 }
 
-static int idedisk_cleanup (ide_drive_t *drive)
+static int ide_disk_remove(struct device *dev)
 {
-	struct gendisk *g = drive->disk;
+	ide_drive_t *drive = to_ide_device(dev);
+	struct ide_disk_obj *idkp = drive->driver_data;
+	struct gendisk *g = idkp->disk;
+
 	ide_cacheflush_p(drive);
-	if (ide_unregister_subdriver(drive))
-		return 1;
+
+	ide_unregister_subdriver(drive, idkp->driver);
+
 	del_gendisk(g);
-	drive->devfs_name[0] = '\0';
-	g->fops = ide_fops;
+
+	ide_disk_put(idkp);
+
 	return 0;
 }
 
-static int idedisk_attach(ide_drive_t *drive);
+static void ide_disk_release(struct kref *kref)
+{
+	struct ide_disk_obj *idkp = to_ide_disk(kref);
+	ide_drive_t *drive = idkp->drive;
+	struct gendisk *g = idkp->disk;
+
+	drive->driver_data = NULL;
+	drive->devfs_name[0] = '\0';
+	g->private_data = NULL;
+	put_disk(g);
+	kfree(idkp);
+}
+
+static int ide_disk_probe(struct device *dev);
 
 static void ide_device_shutdown(struct device *dev)
 {
@@ -1207,37 +1081,39 @@ static void ide_device_shutdown(struct device *dev)
 	}
 
 	printk("Shutdown: %s\n", drive->name);
-	dev->bus->suspend(dev, PM_SUSPEND_STANDBY);
+	dev->bus->suspend(dev, PMSG_SUSPEND);
 }
 
-/*
- *      IDE subdriver functions, registered with ide.c
- */
 static ide_driver_t idedisk_driver = {
 	.owner			= THIS_MODULE,
 	.gen_driver = {
+		.name		= "ide-disk",
+		.bus		= &ide_bus_type,
+		.probe		= ide_disk_probe,
+		.remove		= ide_disk_remove,
 		.shutdown	= ide_device_shutdown,
 	},
-	.name			= "ide-disk",
 	.version		= IDEDISK_VERSION,
 	.media			= ide_disk,
-	.busy			= 0,
 	.supports_dsc_overlap	= 0,
-	.cleanup		= idedisk_cleanup,
 	.do_request		= ide_do_rw_disk,
-	.pre_reset		= idedisk_pre_reset,
-	.capacity		= idedisk_capacity,
-	.special		= idedisk_special,
+	.end_request		= ide_end_request,
+	.error			= __ide_error,
+	.abort			= __ide_abort,
 	.proc			= idedisk_proc,
-	.attach			= idedisk_attach,
-	.drives			= LIST_HEAD_INIT(idedisk_driver.drives),
-	.start_power_step	= idedisk_start_power_step,
-	.complete_power_step	= idedisk_complete_power_step,
 };
 
 static int idedisk_open(struct inode *inode, struct file *filp)
 {
-	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct ide_disk_obj *idkp;
+	ide_drive_t *drive;
+
+	if (!(idkp = ide_disk_get(disk)))
+		return -ENXIO;
+
+	drive = idkp->drive;
+
 	drive->usage++;
 	if (drive->removable && drive->usage == 1) {
 		ide_task_t args;
@@ -1259,7 +1135,10 @@ static int idedisk_open(struct inode *inode, struct file *filp)
 
 static int idedisk_release(struct inode *inode, struct file *filp)
 {
-	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct ide_disk_obj *idkp = ide_disk_g(disk);
+	ide_drive_t *drive = idkp->drive;
+
 	if (drive->usage == 1)
 		ide_cacheflush_p(drive);
 	if (drive->removable && drive->usage == 1) {
@@ -1272,6 +1151,9 @@ static int idedisk_release(struct inode *inode, struct file *filp)
 			drive->doorlocking = 0;
 	}
 	drive->usage--;
+
+	ide_disk_put(idkp);
+
 	return 0;
 }
 
@@ -1279,12 +1161,14 @@ static int idedisk_ioctl(struct inode *inode, struct file *file,
 			unsigned int cmd, unsigned long arg)
 {
 	struct block_device *bdev = inode->i_bdev;
-	return generic_ide_ioctl(file, bdev, cmd, arg);
+	struct ide_disk_obj *idkp = ide_disk_g(bdev->bd_disk);
+	return generic_ide_ioctl(idkp->drive, file, bdev, cmd, arg);
 }
 
 static int idedisk_media_changed(struct gendisk *disk)
 {
-	ide_drive_t *drive = disk->private_data;
+	struct ide_disk_obj *idkp = ide_disk_g(disk);
+	ide_drive_t *drive = idkp->drive;
 
 	/* do not scan partitions twice if this is a removable device */
 	if (drive->attach) {
@@ -1301,8 +1185,8 @@ static int idedisk_media_changed(struct gendisk *disk)
 
 static int idedisk_revalidate_disk(struct gendisk *disk)
 {
-	ide_drive_t *drive = disk->private_data;
-	set_capacity(disk, idedisk_capacity(drive));
+	struct ide_disk_obj *idkp = ide_disk_g(disk);
+	set_capacity(disk, idedisk_capacity(idkp->drive));
 	return 0;
 }
 
@@ -1317,9 +1201,11 @@ static struct block_device_operations idedisk_ops = {
 
 MODULE_DESCRIPTION("ATA DISK Driver");
 
-static int idedisk_attach(ide_drive_t *drive)
+static int ide_disk_probe(struct device *dev)
 {
-	struct gendisk *g = drive->disk;
+	ide_drive_t *drive = to_ide_device(dev);
+	struct ide_disk_obj *idkp;
+	struct gendisk *g;
 
 	/* strstr("foo", "") is non-NULL */
 	if (!strstr("ide-disk", drive->driver_req))
@@ -1329,11 +1215,30 @@ static int idedisk_attach(ide_drive_t *drive)
 	if (drive->media != ide_disk)
 		goto failed;
 
-	if (ide_register_subdriver(drive, &idedisk_driver)) {
-		printk (KERN_ERR "ide-disk: %s: Failed to register the driver with ide.c\n", drive->name);
+	idkp = kmalloc(sizeof(*idkp), GFP_KERNEL);
+	if (!idkp)
 		goto failed;
-	}
-	DRIVER(drive)->busy++;
+
+	g = alloc_disk(1 << PARTN_BITS);
+	if (!g)
+		goto out_free_idkp;
+
+	ide_init_disk(g, drive);
+
+	ide_register_subdriver(drive, &idedisk_driver);
+
+	memset(idkp, 0, sizeof(*idkp));
+
+	kref_init(&idkp->kref);
+
+	idkp->drive = drive;
+	idkp->driver = &idedisk_driver;
+	idkp->disk = g;
+
+	g->private_data = &idkp->driver;
+
+	drive->driver_data = idkp;
+
 	idedisk_setup(drive);
 	if ((!drive->head || drive->head > 16) && !drive->select.b.lba) {
 		printk(KERN_ERR "%s: INVALID GEOMETRY: %d PHYSICAL HEADS?\n",
@@ -1341,7 +1246,7 @@ static int idedisk_attach(ide_drive_t *drive)
 		drive->attach = 0;
 	} else
 		drive->attach = 1;
-	DRIVER(drive)->busy--;
+
 	g->minors = 1 << PARTN_BITS;
 	strcpy(g->devfs_name, drive->devfs_name);
 	g->driverfs_dev = &drive->gendev;
@@ -1350,18 +1255,21 @@ static int idedisk_attach(ide_drive_t *drive)
 	g->fops = &idedisk_ops;
 	add_disk(g);
 	return 0;
+
+out_free_idkp:
+	kfree(idkp);
 failed:
-	return 1;
+	return -ENODEV;
 }
 
 static void __exit idedisk_exit (void)
 {
-	ide_unregister_driver(&idedisk_driver);
+	driver_unregister(&idedisk_driver.gen_driver);
 }
 
 static int idedisk_init (void)
 {
-	return ide_register_driver(&idedisk_driver);
+	return driver_register(&idedisk_driver.gen_driver);
 }
 
 module_init(idedisk_init);

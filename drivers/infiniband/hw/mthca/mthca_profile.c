@@ -95,7 +95,7 @@ u64 mthca_make_profile(struct mthca_dev *dev,
 	profile[MTHCA_RES_RDB].size  = MTHCA_RDB_ENTRY_SIZE;
 	profile[MTHCA_RES_MCG].size  = MTHCA_MGM_ENTRY_SIZE;
 	profile[MTHCA_RES_MPT].size  = dev_lim->mpt_entry_sz;
-	profile[MTHCA_RES_MTT].size  = dev_lim->mtt_seg_sz;
+	profile[MTHCA_RES_MTT].size  = MTHCA_MTT_SEG_SIZE;
 	profile[MTHCA_RES_UAR].size  = dev_lim->uar_scratch_entry_sz;
 	profile[MTHCA_RES_UDAV].size = MTHCA_AV_SIZE;
 	profile[MTHCA_RES_UARC].size = request->uarc_size;
@@ -116,11 +116,11 @@ u64 mthca_make_profile(struct mthca_dev *dev,
 		profile[i].type     = i;
 		profile[i].log_num  = max(ffs(profile[i].num) - 1, 0);
 		profile[i].size    *= profile[i].num;
-		if (dev->hca_type == ARBEL_NATIVE)
+		if (mthca_is_memfree(dev))
 			profile[i].size = max(profile[i].size, (u64) PAGE_SIZE);
 	}
 
-	if (dev->hca_type == ARBEL_NATIVE) {
+	if (mthca_is_memfree(dev)) {
 		mem_base  = 0;
 		mem_avail = dev_lim->hca.arbel.max_icm_sz;
 	} else {
@@ -165,7 +165,7 @@ u64 mthca_make_profile(struct mthca_dev *dev,
 				  (unsigned long long) profile[i].size);
 	}
 
-	if (dev->hca_type == ARBEL_NATIVE)
+	if (mthca_is_memfree(dev))
 		mthca_dbg(dev, "HCA context memory: reserving %d KB\n",
 			  (int) (total_size >> 10));
 	else
@@ -208,8 +208,7 @@ u64 mthca_make_profile(struct mthca_dev *dev,
 			break;
 		case MTHCA_RES_RDB:
 			for (dev->qp_table.rdb_shift = 0;
-			     profile[MTHCA_RES_QP].num << dev->qp_table.rdb_shift <
-				     profile[i].num;
+			     request->num_qp << dev->qp_table.rdb_shift < profile[i].num;
 			     ++dev->qp_table.rdb_shift)
 				; /* nothing */
 			dev->qp_table.rdb_base    = (u32) profile[i].start;
@@ -224,27 +223,32 @@ u64 mthca_make_profile(struct mthca_dev *dev,
 			init_hca->mc_hash_sz      = 1 << (profile[i].log_num - 1);
 			break;
 		case MTHCA_RES_MPT:
-			dev->limits.num_mpts = profile[i].num;
-			init_hca->mpt_base   = profile[i].start;
-			init_hca->log_mpt_sz = profile[i].log_num;
+			dev->limits.num_mpts   = profile[i].num;
+			dev->mr_table.mpt_base = profile[i].start;
+			init_hca->mpt_base     = profile[i].start;
+			init_hca->log_mpt_sz   = profile[i].log_num;
 			break;
 		case MTHCA_RES_MTT:
 			dev->limits.num_mtt_segs = profile[i].num;
-			dev->limits.mtt_seg_size = dev_lim->mtt_seg_sz;
 			dev->mr_table.mtt_base   = profile[i].start;
 			init_hca->mtt_base       = profile[i].start;
-			init_hca->mtt_seg_sz     = ffs(dev_lim->mtt_seg_sz) - 7;
+			init_hca->mtt_seg_sz     = ffs(MTHCA_MTT_SEG_SIZE) - 7;
 			break;
 		case MTHCA_RES_UAR:
+			dev->limits.num_uars       = profile[i].num;
 			init_hca->uar_scratch_base = profile[i].start;
 			break;
 		case MTHCA_RES_UDAV:
 			dev->av_table.ddr_av_base = profile[i].start;
 			dev->av_table.num_ddr_avs = profile[i].num;
+			break;
 		case MTHCA_RES_UARC:
-			init_hca->uarc_base   = profile[i].start;
-			init_hca->log_uarc_sz = ffs(request->uarc_size) - 13;
-			init_hca->log_uar_sz  = ffs(request->num_uar) - 1;
+			dev->uar_table.uarc_size = request->uarc_size;
+			dev->uar_table.uarc_base = profile[i].start;
+			init_hca->uarc_base   	 = profile[i].start;
+			init_hca->log_uarc_sz 	 = ffs(request->uarc_size) - 13;
+			init_hca->log_uar_sz  	 = ffs(request->num_uar) - 1;
+			break;
 		default:
 			break;
 		}
@@ -255,6 +259,18 @@ u64 mthca_make_profile(struct mthca_dev *dev,
 	 * of the HCA profile anyway.
 	 */
 	dev->limits.num_pds = MTHCA_NUM_PDS;
+
+	/*
+	 * For Tavor, FMRs use ioremapped PCI memory. For 32 bit
+	 * systems it may use too much vmalloc space to map all MTT
+	 * memory, so we reserve some MTTs for FMR access, taking them
+	 * out of the MR pool. They don't use additional memory, but
+	 * we assign them as part of the HCA profile anyway.
+	 */
+	if (mthca_is_memfree(dev))
+		dev->limits.fmr_reserved_mtts = 0;
+	else
+		dev->limits.fmr_reserved_mtts = request->fmr_reserved_mtts;
 
 	kfree(profile);
 	return total_size;

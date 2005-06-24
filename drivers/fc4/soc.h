@@ -261,18 +261,27 @@ typedef struct {
 
 typedef struct {
 	soc_hw_cq		__iomem *hw_cq;	/* Related XRAM cq */
+	soc_req			__iomem *pool;
+	u8			in;
+	u8			out;
+	u8			last;
+	u8			seqno;
+} soc_cq_rsp;
+
+typedef struct {
+	soc_hw_cq		__iomem *hw_cq;	/* Related XRAM cq */
 	soc_req			*pool;
 	u8			in;
 	u8			out;
 	u8			last;
 	u8			seqno;
-} soc_cq;
+} soc_cq_req;
 
 struct soc {
 	spinlock_t		lock;
 	soc_port		port[2]; /* Every SOC has one or two FC ports */
-	soc_cq			req[2]; /* Request CQs */
-	soc_cq			rsp[2]; /* Response CQs */
+	soc_cq_req		req[2]; /* Request CQs */
+	soc_cq_rsp		rsp[2]; /* Response CQs */
 	int			soc_no;
 	void __iomem		*regs;
 	xram_p			xram;

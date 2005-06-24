@@ -116,9 +116,6 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 /* values for service action in */
 #define	SAI_READ_CAPACITY_16  0x10
 
-/* Values for T10/04-262r7 */
-#define	ATA_16		      0x85	/* 16-byte pass-thru */
-#define	ATA_12		      0xa1	/* 12-byte pass-thru */
 
 /*
  *  SCSI Architecture Model (SAM) Status codes. Taken from SAM-3 draft
@@ -301,6 +298,8 @@ struct scsi_lun {
 #define DID_PASSTHROUGH 0x0a	/* Force command past mid-layer            */
 #define DID_SOFT_ERROR  0x0b	/* The low level driver just wish a retry  */
 #define DID_IMM_RETRY   0x0c	/* Retry without decrementing retry count  */
+#define DID_REQUEUE	0x0d	/* Requeue command (no immediate retry) also
+				 * without decrementing the retry count	   */
 #define DRIVER_OK       0x00	/* Driver status                           */
 
 /*
@@ -368,12 +367,13 @@ struct scsi_lun {
 
 /*
  * default timeouts
- */
-#define FORMAT_UNIT_TIMEOUT		(12 * 60 * 60 * HZ)
+*/
+#define FORMAT_UNIT_TIMEOUT		(2 * 60 * 60 * HZ)
 #define START_STOP_TIMEOUT		(60 * HZ)
 #define MOVE_MEDIUM_TIMEOUT		(5 * 60 * HZ)
 #define READ_ELEMENT_STATUS_TIMEOUT	(5 * 60 * HZ)
 #define READ_DEFECT_DATA_TIMEOUT	(60 * HZ )
+
 
 #define IDENTIFY_BASE       0x80
 #define IDENTIFY(can_disconnect, lun)   (IDENTIFY_BASE |\

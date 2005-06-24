@@ -310,7 +310,7 @@ static int harmony_detect_rate(int *freq)
 	case 32000:	newrate = HARMONY_SR_32KHZ;	break; 
 	case 48000:	newrate = HARMONY_SR_48KHZ;	break; 
 	case 9600:	newrate = HARMONY_SR_9KHZ;	break; 
-	case 5125:	newrate = HARMONY_SR_5KHZ;	break; 
+	case 5512:	newrate = HARMONY_SR_5KHZ;	break; 
 	case 11025:	newrate = HARMONY_SR_11KHZ;	break; 
 	case 18900:	newrate = HARMONY_SR_18KHZ;	break; 
 	case 22050:	newrate = HARMONY_SR_22KHZ;	break; 

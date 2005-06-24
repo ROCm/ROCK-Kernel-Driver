@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2004 Helge Deller <deller@gmx.de>
  * Copyright (c) 2002 Laurent Canet <canetl@esiee.fr>
- * Copyright (c) 2002 Thibaut Varene <varenet@esiee.fr>
+ * Copyright (c) 2002 Thibaut Varene <varenet@parisc-linux.org>
  * Copyright (c) 2000 Xavier Debacker <debackex@esiee.fr>
  *
  * HP PS/2 AT-compatible Keyboard, found in PA/RISC Workstations & Laptops

@@ -91,8 +91,9 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 	struct mm_struct *mm = current->mm;
 	siginfo_t info;
 	unsigned long code = SEGV_MAPERR;
-	unsigned long is_write = error_code & 0x02000000;
+	unsigned long is_write = error_code & DSISR_ISSTORE;
 	unsigned long trap = TRAP(regs);
+ 	unsigned long is_exec = trap == 0x400;
 
 	BUG_ON((trap == 0x380) || (trap == 0x480));
 
@@ -109,7 +110,7 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 	if (!user_mode(regs) && (address >= TASK_SIZE))
 		return SIGSEGV;
 
-	if (error_code & 0x00400000) {
+	if (error_code & DSISR_DABRMATCH) {
 		if (notify_die(DIE_DABR_MATCH, "dabr_match", regs, error_code,
 					11, SIGSEGV) == NOTIFY_STOP)
 			return 0;
@@ -200,16 +201,19 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 good_area:
 	code = SEGV_ACCERR;
 
+	if (is_exec) {
+		/* protection fault */
+		if (error_code & DSISR_PROTFAULT)
+			goto bad_area;
+		if (!(vma->vm_flags & VM_EXEC))
+			goto bad_area;
 	/* a write */
-	if (is_write) {
+	} else if (is_write) {
 		if (!(vma->vm_flags & VM_WRITE))
 			goto bad_area;
 	/* a read */
 	} else {
-		/* protection fault */
-		if (error_code & 0x08000000)
-			goto bad_area;
-		if (!(vma->vm_flags & (VM_READ | VM_EXEC)))
+		if (!(vma->vm_flags & VM_READ))
 			goto bad_area;
 	}
 
@@ -251,6 +255,12 @@ bad_area_nosemaphore:
 		force_sig_info(SIGSEGV, &info, current);
 		return 0;
 	}
+
+	if (trap == 0x400 && (error_code & DSISR_PROTFAULT)
+	    && printk_ratelimit())
+		printk(KERN_CRIT "kernel tried to execute NX-protected"
+		       " page (%lx) - exploit attempt? (uid: %d)\n",
+		       address, current->uid);
 
 	return SIGSEGV;
 

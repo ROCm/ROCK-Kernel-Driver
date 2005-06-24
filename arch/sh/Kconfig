@@ -25,6 +25,14 @@ config RWSEM_GENERIC_SPINLOCK
 config RWSEM_XCHGADD_ALGORITHM
 	bool
 
+config GENERIC_HARDIRQS
+	bool
+	default y
+
+config GENERIC_IRQ_PROBE
+	bool
+	default y
+
 config GENERIC_CALIBRATE_DELAY
 	bool
 	default y
@@ -651,19 +659,10 @@ menu "CPU Frequency scaling"
 
 source "drivers/cpufreq/Kconfig"
 
-config CPU_FREQ_TABLE
-	tristate "CPU frequency table helpers"
-	depends on CPU_FREQ
-	default y
-	help
-	  Many cpufreq drivers use these helpers, so only say N here if
-	  the cpufreq driver of your choice doesn't need these helpers.
-
-	  If unsure, say Y.
-
 config SH_CPU_FREQ
 	tristate "SuperH CPU Frequency driver"
 	depends on CPU_FREQ
+	select CPU_FREQ_TABLE
 	help
 	  This adds the cpufreq driver for SuperH. At present, only
 	  the SH-4 is supported.
@@ -694,6 +693,10 @@ config RTC_9701JE
 
 endmenu
 
+config ISA_DMA_API
+	bool
+	depends on MPC1211
+	default y
 
 menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
 
@@ -754,7 +757,6 @@ source "drivers/pcmcia/Kconfig"
 source "drivers/pci/hotplug/Kconfig"
 
 endmenu
-
 
 menu "Executable file formats"
 

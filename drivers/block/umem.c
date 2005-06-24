@@ -1181,7 +1181,7 @@ static struct pci_driver mm_pci_driver = {
 -----------------------------------------------------------------------------------
 */
 
-int __init mm_init(void)
+static int __init mm_init(void)
 {
 	int retval, i;
 	int err;
@@ -1232,7 +1232,7 @@ out:
 --                             mm_cleanup
 -----------------------------------------------------------------------------------
 */
-void __exit mm_cleanup(void)
+static void __exit mm_cleanup(void)
 {
 	int i;
 

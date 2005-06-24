@@ -15,15 +15,13 @@
 #include <linux/errno.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
+#include <asm/pmc.h>
 
 #include "op_impl.h"
 
 extern struct op_ppc64_model op_model_rs64;
 extern struct op_ppc64_model op_model_power4;
 static struct op_ppc64_model *model;
-
-extern void (*perf_irq)(struct pt_regs *);
-static void (*save_perf_irq)(struct pt_regs *);
 
 static struct op_counter_config ctr[OP_MAX_COUNTER];
 static struct op_system_config sys;
@@ -35,11 +33,12 @@ static void op_handle_interrupt(struct pt_regs *regs)
 
 static int op_ppc64_setup(void)
 {
-	/* Install our interrupt handler into the existing hook.  */
-	save_perf_irq = perf_irq;
-	perf_irq = op_handle_interrupt;
+	int err;
 
-	mb();
+	/* Grab the hardware */
+	err = reserve_pmc_hardware(op_handle_interrupt);
+	if (err)
+		return err;
 
 	/* Pre-compute the values to stuff in the hardware registers.  */
 	model->reg_setup(ctr, &sys, model->num_counters);
@@ -52,10 +51,7 @@ static int op_ppc64_setup(void)
 
 static void op_ppc64_shutdown(void)
 {
-	mb();
-
-	/* Remove our interrupt handler. We may be removing this module. */
-	perf_irq = save_perf_irq;
+	release_pmc_hardware();
 }
 
 static void op_ppc64_cpu_start(void *dummy)

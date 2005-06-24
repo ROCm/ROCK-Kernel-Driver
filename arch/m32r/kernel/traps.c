@@ -95,8 +95,10 @@ void	set_eit_vector_entries(void)
 	eit_vector[31] = 0xff000000UL;
 	eit_vector[32] = BRA_INSN(ei_handler, 32);
 	eit_vector[64] = BRA_INSN(pie_handler, 64);
+#ifdef CONFIG_MMU
 	eit_vector[68] = BRA_INSN(ace_handler, 68);
 	eit_vector[72] = BRA_INSN(tme_handler, 72);
+#endif /* CONFIG_MMU */
 #ifdef CONFIG_SMP
 	eit_vector[184] = (unsigned long)smp_reschedule_interrupt;
 	eit_vector[185] = (unsigned long)smp_invalidate_interrupt;

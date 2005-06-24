@@ -44,10 +44,6 @@
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-static int proc_do_kdb(ctl_table *table, int write, struct file *filp, void *buffer, size_t *lenp, loff_t *ppos);
-#endif	/* CONFIG_KDB */
 
 #ifdef CONFIG_ROOT_NFS
 #include <linux/nfs_fs.h>
@@ -127,6 +123,8 @@ extern int sysctl_hz_timer;
 #ifdef CONFIG_BSD_PROCESS_ACCT
 extern int acct_parm[];
 #endif
+
+int randomize_va_space = 1;
 
 static int parse_table(int __user *, int, void __user *, size_t __user *, void __user *, size_t,
 		       ctl_table *, void **);
@@ -504,16 +502,6 @@ static ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
-#ifdef	CONFIG_KDB
-	{
-		.ctl_name	= KERN_KDB,
-		.procname	= "kdb",
-		.data		= &kdb_on,
-		.maxlen		= sizeof(kdb_on),
-		.mode		= 0644,
-		.proc_handler	= &proc_do_kdb,
-	},
-#endif	/* CONFIG_KDB */
 	{
 		.ctl_name	= KERN_CADPID,
 		.procname	= "cad_pid",
@@ -664,29 +652,14 @@ static ctl_table kern_table[] = {
 	},
 #endif
 	{
-		.ctl_name	= KERN_DEFTIMESLICE, 
-		.procname	= "def-timeslice",
-		.data		=  &def_timeslice,
+		.ctl_name	= KERN_RANDOMIZE,
+		.procname	= "randomize_va_space",
+		.data		= &randomize_va_space,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
-	{
-		.ctl_name	= KERN_MINTIMESLICE, 
-		.procname	= "min-timeslice",
-		.data		= &min_timeslice,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_HZ, 
-		.procname	= "HZ",
-		.data		= &__HZ,
-		.maxlen		= sizeof(int),
-		.mode		= 0444,
-		.proc_handler	= &proc_dointvec,
-	},
+
 	{ .ctl_name = 0 }
 };
 
@@ -1002,6 +975,30 @@ static ctl_table fs_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
+	{
+		.ctl_name	= KERN_DEFTIMESLICE, 
+		.procname	= "def-timeslice",
+		.data		=  &def_timeslice,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_MINTIMESLICE, 
+		.procname	= "min-timeslice",
+		.data		= &min_timeslice,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_HZ, 
+		.procname	= "HZ",
+		.data		= &__HZ,
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
+		.proc_handler	= &proc_dointvec,
+	},
 	{ .ctl_name = 0 }
 };
 
@@ -1429,6 +1426,7 @@ static ssize_t proc_writesys(struct file * file, const char __user * buf,
  * @filp: the file structure
  * @buffer: the user buffer
  * @lenp: the size of the user buffer
+ * @ppos: file position
  *
  * Reads/writes a string from/to the user buffer. If the kernel
  * buffer provided is not large enough to hold the string, the
@@ -1645,6 +1643,7 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
  * @filp: the file structure
  * @buffer: the user buffer
  * @lenp: the size of the user buffer
+ * @ppos: file position
  *
  * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
  * values from/to the user buffer, treated as an ASCII string. 
@@ -1749,6 +1748,7 @@ static int do_proc_dointvec_minmax_conv(int *negp, unsigned long *lvalp,
  * @filp: the file structure
  * @buffer: the user buffer
  * @lenp: the size of the user buffer
+ * @ppos: file position
  *
  * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
  * values from/to the user buffer, treated as an ASCII string.
@@ -1881,6 +1881,7 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
  * @filp: the file structure
  * @buffer: the user buffer
  * @lenp: the size of the user buffer
+ * @ppos: file position
  *
  * Reads/writes up to table->maxlen/sizeof(unsigned long) unsigned long
  * values from/to the user buffer, treated as an ASCII string.
@@ -1903,6 +1904,7 @@ int proc_doulongvec_minmax(ctl_table *table, int write, struct file *filp,
  * @filp: the file structure
  * @buffer: the user buffer
  * @lenp: the size of the user buffer
+ * @ppos: file position
  *
  * Reads/writes up to table->maxlen/sizeof(unsigned long) unsigned long
  * values from/to the user buffer, treated as an ASCII string. The values
@@ -1993,6 +1995,7 @@ static int do_proc_dointvec_ms_jiffies_conv(int *negp, unsigned long *lvalp,
  * @filp: the file structure
  * @buffer: the user buffer
  * @lenp: the size of the user buffer
+ * @ppos: file position
  *
  * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
  * values from/to the user buffer, treated as an ASCII string. 
@@ -2037,6 +2040,8 @@ int proc_dointvec_userhz_jiffies(ctl_table *table, int write, struct file *filp,
  * @filp: the file structure
  * @buffer: the user buffer
  * @lenp: the size of the user buffer
+ * @ppos: file position
+ * @ppos: the current position in the file
  *
  * Reads/writes up to table->maxlen/sizeof(unsigned int) integer
  * values from/to the user buffer, treated as an ASCII string. 
@@ -2362,22 +2367,6 @@ void unregister_sysctl_table(struct ctl_table_header * table)
 }
 
 #endif /* CONFIG_SYSCTL */
-
-#ifdef	CONFIG_KDB
-static int proc_do_kdb(ctl_table *table, int write, struct file *filp,
-		       void *buffer, size_t *lenp, loff_t *ppos)
-{
-#ifdef	CONFIG_SYSCTL
-	if (KDB_FLAG(NO_CONSOLE) && write) {
-		printk(KERN_ERR "kdb has no working console and has switched itself off\n");
-		return -EINVAL;
-	}
-	return proc_dointvec(table, write, filp, buffer, lenp, ppos);
-#else	/* !CONFIG_SYSCTL */
-	return -ENOSYS;
-#endif	/* CONFIG_SYSCTL */
-}
-#endif	/* CONFIG_KDB */
 
 /*
  * No sense putting this after each symbol definition, twice,

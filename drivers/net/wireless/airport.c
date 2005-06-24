@@ -28,7 +28,6 @@
 #include <linux/if_arp.h>
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
-#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -45,13 +44,13 @@
 
 struct airport {
 	struct macio_dev *mdev;
-	void *vaddr;
+	void __iomem *vaddr;
 	int irq_requested;
 	int ndev_registered;
 };
 
 static int
-airport_suspend(struct macio_dev *mdev, u32 state)
+airport_suspend(struct macio_dev *mdev, pm_message_t state)
 {
 	struct net_device *dev = dev_get_drvdata(&mdev->ofdev.dev);
 	struct orinoco_private *priv = netdev_priv(dev);
@@ -150,7 +149,7 @@ airport_detach(struct macio_dev *mdev)
 	ssleep(1);
 
 	macio_set_drvdata(mdev, NULL);
-	free_netdev(dev);
+	free_orinocodev(dev);
 
 	return 0;
 }
@@ -194,14 +193,14 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 	hermes_t *hw;
 
 	if (macio_resource_count(mdev) < 1 || macio_irq_count(mdev) < 1) {
-		printk(KERN_ERR PFX "wrong interrupt/addresses in OF tree\n");
+		printk(KERN_ERR PFX "Wrong interrupt/addresses in OF tree\n");
 		return -ENODEV;
 	}
 
 	/* Allocate space for private device-specific data */
 	dev = alloc_orinocodev(sizeof(*card), airport_hard_reset);
 	if (! dev) {
-		printk(KERN_ERR PFX "can't allocate device datas\n");
+		printk(KERN_ERR PFX "Cannot allocate network device\n");
 		return -ENODEV;
 	}
 	priv = netdev_priv(dev);
@@ -212,7 +211,7 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 
 	if (macio_request_resource(mdev, 0, "airport")) {
 		printk(KERN_ERR PFX "can't request IO resource !\n");
-		free_netdev(dev);
+		free_orinocodev(dev);
 		return -EBUSY;
 	}
 
@@ -224,16 +223,15 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 	/* Setup interrupts & base address */
 	dev->irq = macio_irq(mdev, 0);
 	phys_addr = macio_resource_start(mdev, 0);  /* Physical address */
-	printk(KERN_DEBUG PFX "Airport at physical address %lx\n", phys_addr);
+	printk(KERN_DEBUG PFX "Physical address %lx\n", phys_addr);
 	dev->base_addr = phys_addr;
 	card->vaddr = ioremap(phys_addr, AIRPORT_IO_LEN);
 	if (!card->vaddr) {
-		printk(PFX "ioremap() failed\n");
+		printk(KERN_ERR PFX "ioremap() failed\n");
 		goto failed;
 	}
 
-	hermes_struct_init(hw, (ulong)card->vaddr,
-			HERMES_MEM, HERMES_16BIT_REGSPACING);
+	hermes_struct_init(hw, card->vaddr, HERMES_16BIT_REGSPACING);
 		
 	/* Power up card */
 	pmac_call_feature(PMAC_FTR_AIRPORT_ENABLE, macio_get_of_node(mdev), 0, 1);
@@ -242,7 +240,7 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 	/* Reset it before we get the interrupt */
 	hermes_init(hw);
 
-	if (request_irq(dev->irq, orinoco_interrupt, 0, "Airport", dev)) {
+	if (request_irq(dev->irq, orinoco_interrupt, 0, dev->name, dev)) {
 		printk(KERN_ERR PFX "Couldn't get IRQ %d\n", dev->irq);
 		goto failed;
 	}
@@ -253,7 +251,7 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 		printk(KERN_ERR PFX "register_netdev() failed\n");
 		goto failed;
 	}
-	printk(KERN_DEBUG PFX "card registered for interface %s\n", dev->name);
+	printk(KERN_DEBUG PFX "Card registered for interface %s\n", dev->name);
 	card->ndev_registered = 1;
 	return 0;
  failed:

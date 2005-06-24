@@ -89,7 +89,7 @@ static ssize_t dev_nvram_read(struct file *file, char __user *buf,
 		return -ENODEV;
 	size = ppc_md.nvram_size();
 
-	if (verify_area(VERIFY_WRITE, buf, count))
+	if (!access_ok(VERIFY_WRITE, buf, count))
 		return -EFAULT;
 	if (*ppos >= size)
 		return 0;
@@ -129,7 +129,7 @@ static ssize_t dev_nvram_write(struct file *file, const char __user *buf,
 		return -ENODEV;
 	size = ppc_md.nvram_size();
 
-	if (verify_area(VERIFY_READ, buf, count))
+	if (!access_ok(VERIFY_READ, buf, count))
 		return -EFAULT;
 	if (*ppos >= size)
 		return 0;
@@ -339,9 +339,9 @@ static int nvram_remove_os_partition(void)
 static int nvram_create_os_partition(void)
 {
 	struct list_head * p;
-	struct nvram_partition * part;
-	struct nvram_partition * new_part = NULL;
-	struct nvram_partition * free_part = NULL;
+	struct nvram_partition *part = NULL;
+	struct nvram_partition *new_part = NULL;
+	struct nvram_partition *free_part = NULL;
 	int seq_init[2] = { 0, 0 };
 	loff_t tmp_index;
 	long size = 0;
@@ -364,13 +364,11 @@ static int nvram_create_os_partition(void)
 			free_part = part;
 		}
 	}
-	if (!size) {
+	if (!size)
 		return -ENOSPC;
-	}
 	
 	/* Create our OS partition */
-	new_part = (struct nvram_partition *)
-		kmalloc(sizeof(struct nvram_partition), GFP_KERNEL);
+	new_part = kmalloc(sizeof(*new_part), GFP_KERNEL);
 	if (!new_part) {
 		printk(KERN_ERR "nvram_create_os_partition: kmalloc failed\n");
 		return -ENOMEM;
@@ -379,7 +377,7 @@ static int nvram_create_os_partition(void)
 	new_part->index = free_part->index;
 	new_part->header.signature = NVRAM_SIG_OS;
 	new_part->header.length = size;
-	sprintf(new_part->header.name, "ppc64,linux");
+	strcpy(new_part->header.name, "ppc64,linux");
 	new_part->header.checksum = nvram_checksum(&new_part->header);
 
 	rc = nvram_write_header(new_part);
@@ -394,7 +392,8 @@ static int nvram_create_os_partition(void)
 	tmp_index = new_part->index + NVRAM_HEADER_LEN;
 	rc = ppc_md.nvram_write((char *)&seq_init, sizeof(seq_init), &tmp_index);
 	if (rc <= 0) {
-		printk(KERN_ERR "nvram_create_os_partition: nvram_write failed (%d)\n", rc);
+		printk(KERN_ERR "nvram_create_os_partition: nvram_write "
+				"failed (%d)\n", rc);
 		return rc;
 	}
 	
@@ -507,8 +506,8 @@ static int nvram_scan_partitions(void)
 	struct nvram_partition * tmp_part;
 	unsigned char c_sum;
 	char * header;
-	long size;
 	int total_size;
+	int err;
 
 	if (ppc_md.nvram_size == NULL)
 		return -ENODEV;
@@ -522,29 +521,37 @@ static int nvram_scan_partitions(void)
 
 	while (cur_index < total_size) {
 
-		size = ppc_md.nvram_read(header, NVRAM_HEADER_LEN, &cur_index);
-		if (size != NVRAM_HEADER_LEN) {
+		err = ppc_md.nvram_read(header, NVRAM_HEADER_LEN, &cur_index);
+		if (err != NVRAM_HEADER_LEN) {
 			printk(KERN_ERR "nvram_scan_partitions: Error parsing "
 			       "nvram partitions\n");
-			kfree(header);
-			return size;
+			goto out;
 		}
 
 		cur_index -= NVRAM_HEADER_LEN; /* nvram_read will advance us */
 
 		memcpy(&phead, header, NVRAM_HEADER_LEN);
 
+		err = 0;
 		c_sum = nvram_checksum(&phead);
-		if (c_sum != phead.checksum)
-			printk(KERN_WARNING "WARNING: nvram partition checksum "
-			       "was %02x, should be %02x!\n", phead.checksum, c_sum);
-		
+		if (c_sum != phead.checksum) {
+			printk(KERN_WARNING "WARNING: nvram partition checksum"
+			       " was %02x, should be %02x!\n",
+			       phead.checksum, c_sum);
+			printk(KERN_WARNING "Terminating nvram partition scan\n");
+			goto out;
+		}
+		if (!phead.length) {
+			printk(KERN_WARNING "WARNING: nvram corruption "
+			       "detected: 0-length partition\n");
+			goto out;
+		}
 		tmp_part = (struct nvram_partition *)
 			kmalloc(sizeof(struct nvram_partition), GFP_KERNEL);
+		err = -ENOMEM;
 		if (!tmp_part) {
 			printk(KERN_ERR "nvram_scan_partitions: kmalloc failed\n");
-			kfree(header);
-			return -ENOMEM;
+			goto out;
 		}
 		
 		memcpy(&tmp_part->header, &phead, NVRAM_HEADER_LEN);
@@ -553,9 +560,11 @@ static int nvram_scan_partitions(void)
 		
 		cur_index += phead.length * NVRAM_BLOCK_LEN;
 	}
+	err = 0;
 
+ out:
 	kfree(header);
-	return 0;
+	return err;
 }
 
 static int __init nvram_init(void)

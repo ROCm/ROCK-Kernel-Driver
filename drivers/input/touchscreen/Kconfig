@@ -60,6 +60,17 @@ config TOUCHSCREEN_ELO
 	  To compile this driver as a module, choose M here: the
 	  module will be called gunze.
 
+config TOUCHSCREEN_MTOUCH
+	tristate "MicroTouch serial touchscreens"
+	select SERIO
+	help
+	  Say Y here if you have a MicroTouch (3M) serial touchscreen connected to
+	  your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mtouch.
 
 config TOUCHSCREEN_MK712
 	tristate "ICS MicroClock MK712 touchscreen"
@@ -71,5 +82,17 @@ config TOUCHSCREEN_MK712
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called mk712.
+
+config TOUCHSCREEN_HP600
+	tristate "HP Jornada 680/690 touchscreen"
+	depends on SH_HP600 && SH_ADC
+	help
+	  Say Y here if you have a HP Jornada 680 or 690 and want to
+          support the built-in touchscreen.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called hp680_ts_input.
 
 endif

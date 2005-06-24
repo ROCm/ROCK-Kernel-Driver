@@ -255,29 +255,59 @@ rtas_extended_busy_delay_time(int status)
 	return ms; 
 }
 
-int
-rtas_get_power_level(int powerdomain, int *level)
+int rtas_error_rc(int rtas_rc)
+{
+	int rc;
+
+	switch (rtas_rc) {
+		case -1: 		/* Hardware Error */
+			rc = -EIO;
+			break;
+		case -3:		/* Bad indicator/domain/etc */
+			rc = -EINVAL;
+			break;
+		case -9000:		/* Isolation error */
+			rc = -EFAULT;
+			break;
+		case -9001:		/* Outstanding TCE/PTE */
+			rc = -EEXIST;
+			break;
+		case -9002:		/* No usable slot */
+			rc = -ENODEV;
+			break;
+		default:
+			printk(KERN_ERR "%s: unexpected RTAS error %d\n",
+					__FUNCTION__, rtas_rc);
+			rc = -ERANGE;
+			break;
+	}
+	return rc;
+}
+
+int rtas_get_power_level(int powerdomain, int *level)
 {
 	int token = rtas_token("get-power-level");
 	int rc;
 
 	if (token == RTAS_UNKNOWN_SERVICE)
-		return RTAS_UNKNOWN_OP;
+		return -ENOENT;
 
 	while ((rc = rtas_call(token, 1, 2, level, powerdomain)) == RTAS_BUSY)
 		udelay(1);
+
+	if (rc < 0)
+		return rtas_error_rc(rc);
 	return rc;
 }
 
-int
-rtas_set_power_level(int powerdomain, int level, int *setlevel)
+int rtas_set_power_level(int powerdomain, int level, int *setlevel)
 {
 	int token = rtas_token("set-power-level");
 	unsigned int wait_time;
 	int rc;
 
 	if (token == RTAS_UNKNOWN_SERVICE)
-		return RTAS_UNKNOWN_OP;
+		return -ENOENT;
 
 	while (1) {
 		rc = rtas_call(token, 2, 2, setlevel, powerdomain, level);
@@ -289,18 +319,20 @@ rtas_set_power_level(int powerdomain, int level, int *setlevel)
 		} else
 			break;
 	}
+
+	if (rc < 0)
+		return rtas_error_rc(rc);
 	return rc;
 }
 
-int
-rtas_get_sensor(int sensor, int index, int *state)
+int rtas_get_sensor(int sensor, int index, int *state)
 {
 	int token = rtas_token("get-sensor-state");
 	unsigned int wait_time;
 	int rc;
 
 	if (token == RTAS_UNKNOWN_SERVICE)
-		return RTAS_UNKNOWN_OP;
+		return -ENOENT;
 
 	while (1) {
 		rc = rtas_call(token, 2, 2, state, sensor, index);
@@ -312,18 +344,20 @@ rtas_get_sensor(int sensor, int index, int *state)
 		} else
 			break;
 	}
+
+	if (rc < 0)
+		return rtas_error_rc(rc);
 	return rc;
 }
 
-int
-rtas_set_indicator(int indicator, int index, int new_value)
+int rtas_set_indicator(int indicator, int index, int new_value)
 {
 	int token = rtas_token("set-indicator");
 	unsigned int wait_time;
 	int rc;
 
 	if (token == RTAS_UNKNOWN_SERVICE)
-		return RTAS_UNKNOWN_OP;
+		return -ENOENT;
 
 	while (1) {
 		rc = rtas_call(token, 3, 1, NULL, indicator, index, new_value);
@@ -337,6 +371,8 @@ rtas_set_indicator(int indicator, int index, int new_value)
 			break;
 	}
 
+	if (rc < 0)
+		return rtas_error_rc(rc);
 	return rc;
 }
 

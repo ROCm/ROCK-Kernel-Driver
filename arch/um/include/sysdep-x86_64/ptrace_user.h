@@ -8,6 +8,8 @@
 #define __SYSDEP_X86_64_PTRACE_USER_H__
 
 #define __FRAME_OFFSETS
+#include <sys/ptrace.h>
+#include <linux/ptrace.h>
 #include <asm/ptrace.h>
 #undef __FRAME_OFFSETS
 
@@ -44,9 +46,6 @@
 
 #define PT_ORIG_RAX_OFFSET (ORIG_RAX)
 #define PT_ORIG_RAX(regs) ((regs)[PT_INDEX(ORIG_RAX)])
-
-#define MAX_REG_OFFSET (FRAME_SIZE)
-#define MAX_REG_NR ((MAX_REG_OFFSET) / sizeof(unsigned long))
 
 /* x86_64 FC3 doesn't define this in /usr/include/linux/ptrace.h even though
  * it's defined in the kernel's include/linux/ptrace.h. Additionally, use the

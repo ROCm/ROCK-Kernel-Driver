@@ -262,8 +262,6 @@ struct ioc {
 	struct resource mmio_region[2]; /* The "routed" MMIO regions */
 };
 
-/* Ratio of Host MEM to IOV Space size */
-static unsigned long ccio_mem_ratio = 4;
 static struct ioc *ioc_list;
 static int ioc_count;
 
@@ -559,7 +557,7 @@ void CCIO_INLINE
 ccio_io_pdir_entry(u64 *pdir_ptr, space_t sid, unsigned long vba,
 		   unsigned long hints)
 {
-	register unsigned long pa = (volatile unsigned long) vba;
+	register unsigned long pa;
 	register unsigned long ci; /* coherent index */
 
 	/* We currently only support kernel addresses */
@@ -1243,6 +1241,21 @@ ccio_get_iotlb_size(struct parisc_device *dev)
 #define CCIO_CHAINID_MASK	0xff
 #endif /* 0 */
 
+/* We *can't* support JAVA (T600). Venture there at your own risk. */
+static struct parisc_device_id ccio_tbl[] = {
+	{ HPHW_IOA, HVERSION_REV_ANY_ID, U2_IOA_RUNWAY, 0xb }, /* U2 */
+	{ HPHW_IOA, HVERSION_REV_ANY_ID, UTURN_IOA_RUNWAY, 0xb }, /* UTurn */
+	{ 0, }
+};
+
+static int ccio_probe(struct parisc_device *dev);
+
+static struct parisc_driver ccio_driver = {
+	.name =		"U2:Uturn",
+	.id_table =	ccio_tbl,
+	.probe =	ccio_probe,
+};
+
 /**
  * ccio_ioc_init - Initalize the I/O Controller
  * @ioc: The I/O Controller.
@@ -1254,9 +1267,9 @@ ccio_get_iotlb_size(struct parisc_device *dev)
 static void
 ccio_ioc_init(struct ioc *ioc)
 {
-	int i, iov_order;
+	int i;
+	unsigned int iov_order;
 	u32 iova_space_size;
-	unsigned long physmem;
 
 	/*
 	** Determine IOVA Space size from memory size.
@@ -1269,17 +1282,16 @@ ccio_ioc_init(struct ioc *ioc)
 	** Hot-Plug/Removal of PCI cards. (aka PCI OLARD).
 	*/
 
+	iova_space_size = (u32) (num_physpages / count_parisc_driver(&ccio_driver));
+
 	/* limit IOVA space size to 1MB-1GB */
 
-	physmem = num_physpages << PAGE_SHIFT;
-	if(physmem < (ccio_mem_ratio * 1024 * 1024)) {
-		iova_space_size = 1024 * 1024;
+	if (iova_space_size < (1 << (20 - PAGE_SHIFT))) {
+		iova_space_size =  1 << (20 - PAGE_SHIFT);
 #ifdef __LP64__
-	} else if(physmem > (ccio_mem_ratio * 512 * 1024 * 1024)) {
-		iova_space_size = 512 * 1024 * 1024;
+	} else if (iova_space_size > (1 << (30 - PAGE_SHIFT))) {
+		iova_space_size =  1 << (30 - PAGE_SHIFT);
 #endif
-	} else {
-		iova_space_size = (u32)(physmem / ccio_mem_ratio);
 	}
 
 	/*
@@ -1295,10 +1307,10 @@ ccio_ioc_init(struct ioc *ioc)
 	**   this is the case under linux."
 	*/
 
-	iov_order = get_order(iova_space_size) >> (IOVP_SHIFT - PAGE_SHIFT);
-	BUG_ON(iov_order > (30 - IOVP_SHIFT));   /* iova_space_size <= 1GB */
-	BUG_ON(iov_order < (20 - IOVP_SHIFT));   /* iova_space_size >= 1MB */
-	iova_space_size = 1 << (iov_order + IOVP_SHIFT);
+	iov_order = get_order(iova_space_size << PAGE_SHIFT);
+
+	/* iova_space_size is now bytes, not pages */
+	iova_space_size = 1 << (iov_order + PAGE_SHIFT);
 
 	ioc->pdir_size = (iova_space_size / IOVP_SIZE) * sizeof(u64);
 
@@ -1307,9 +1319,12 @@ ccio_ioc_init(struct ioc *ioc)
 	/* Verify it's a power of two */
 	BUG_ON((1 << get_order(ioc->pdir_size)) != (ioc->pdir_size >> PAGE_SHIFT));
 
-	DBG_INIT("%s() hpa 0x%p mem %luMB IOV %dMB (%d bits) PDIR size 0x%0x",
-		__FUNCTION__, ioc->ioc_hpa, physmem>>20, iova_space_size>>20,
-		 iov_order + PAGE_SHIFT, ioc->pdir_size);
+	DBG_INIT("%s() hpa 0x%lx mem %luMB IOV %dMB (%d bits)\n",
+			__FUNCTION__,
+			ioc->ioc_hpa,
+			(unsigned long) num_physpages >> (20 - PAGE_SHIFT),
+			iova_space_size>>20,
+			iov_order + PAGE_SHIFT);
 
 	ioc->pdir_base = (u64 *)__get_free_pages(GFP_KERNEL, 
 						 get_order(ioc->pdir_size));
@@ -1565,19 +1580,6 @@ static int ccio_probe(struct parisc_device *dev)
 	parisc_has_iommu();
 	return 0;
 }
-
-/* We *can't* support JAVA (T600). Venture there at your own risk. */
-static struct parisc_device_id ccio_tbl[] = {
-	{ HPHW_IOA, HVERSION_REV_ANY_ID, U2_IOA_RUNWAY, 0xb }, /* U2 */
-	{ HPHW_IOA, HVERSION_REV_ANY_ID, UTURN_IOA_RUNWAY, 0xb }, /* UTurn */
-	{ 0, }
-};
-
-static struct parisc_driver ccio_driver = {
-	.name =		"U2:Uturn",
-	.id_table =	ccio_tbl,
-	.probe =	ccio_probe,
-};
 
 /**
  * ccio_init - ccio initalization procedure.

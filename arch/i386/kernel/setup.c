@@ -40,6 +40,7 @@
 #include <linux/efi.h>
 #include <linux/init.h>
 #include <linux/edd.h>
+#include <linux/nodemask.h>
 #include <video/edid.h>
 #include <asm/e820.h>
 #include <asm/mpspec.h>
@@ -49,7 +50,6 @@
 #include <asm/io_apic.h>
 #include <asm/ist.h>
 #include <asm/io.h>
-#include <asm/apic.h>
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
@@ -75,7 +75,6 @@ struct cpuinfo_x86 new_cpu_data __initdata = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 
 unsigned long mmu_cr4_features;
-EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
 #ifdef	CONFIG_ACPI_INTERPRETER
 	int acpi_disabled = 0;
@@ -117,8 +116,6 @@ struct sys_desc_table_struct {
 struct edid_info edid_info;
 struct ist_info ist_info;
 struct e820map e820;
-
-unsigned char aux_device_present;
 
 extern void early_cpu_init(void);
 extern void dmi_scan_machine(void);
@@ -428,10 +425,10 @@ struct change_member {
 	struct e820entry *pbios; /* pointer to original bios entry */
 	unsigned long long addr; /* address for this change point */
 };
-struct change_member change_point_list[2*E820MAX] __initdata;
-struct change_member *change_point[2*E820MAX] __initdata;
-struct e820entry *overlap_list[E820MAX] __initdata;
-struct e820entry new_bios[E820MAX] __initdata;
+static struct change_member change_point_list[2*E820MAX] __initdata;
+static struct change_member *change_point[2*E820MAX] __initdata;
+static struct e820entry *overlap_list[E820MAX] __initdata;
+static struct e820entry new_bios[E820MAX] __initdata;
 
 static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 {
@@ -812,14 +809,8 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 
 #ifdef CONFIG_X86_LOCAL_APIC
 		/* disable IO-APIC */
-		else if (c == ' ' && !memcmp(from, "noapic", 6))
+		else if (!memcmp(from, "noapic", 6))
 			disable_ioapic_setup();
-		else if (c == ' ' && !memcmp(from, "apic", 4))
-		        lapic_enable(from+4);
-		else if (c == ' ' && !memcmp(from, "lapic", 5))
-		        lapic_enable(from+7);
-		else if (c == ' ' && !memcmp(from, "nolapic", 7))
-		        lapic_disable(from+7);
 #endif /* CONFIG_X86_LOCAL_APIC */
 #endif /* CONFIG_ACPI_BOOT */
 
@@ -958,8 +949,6 @@ unsigned long __init find_max_low_pfn(void)
 	return max_low_pfn;
 }
 
-#ifndef CONFIG_DISCONTIGMEM
-
 /*
  * Free all available memory for boot time allocation.  Used
  * as a callback function by efi_memory_walk()
@@ -1033,15 +1022,15 @@ static void __init reserve_ebda_region(void)
 		reserve_bootmem(addr, PAGE_SIZE);	
 }
 
+#ifndef CONFIG_DISCONTIGMEM
+void __init setup_bootmem_allocator(void);
 static unsigned long __init setup_memory(void)
 {
-	unsigned long bootmap_size, start_pfn, max_low_pfn;
-
 	/*
 	 * partially used pages are not usable - thus
 	 * we are rounding upwards:
 	 */
-	start_pfn = PFN_UP(init_pg_tables_end);
+	min_low_pfn = PFN_UP(init_pg_tables_end);
 
 	find_max_pfn();
 
@@ -1057,10 +1046,43 @@ static unsigned long __init setup_memory(void)
 #endif
 	printk(KERN_NOTICE "%ldMB LOWMEM available.\n",
 			pages_to_mb(max_low_pfn));
+
+	setup_bootmem_allocator();
+
+	return max_low_pfn;
+}
+
+void __init zone_sizes_init(void)
+{
+	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
+	unsigned int max_dma, low;
+
+	max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
+	low = max_low_pfn;
+
+	if (low < max_dma)
+		zones_size[ZONE_DMA] = low;
+	else {
+		zones_size[ZONE_DMA] = max_dma;
+		zones_size[ZONE_NORMAL] = low - max_dma;
+#ifdef CONFIG_HIGHMEM
+		zones_size[ZONE_HIGHMEM] = highend_pfn - low;
+#endif
+	}
+	free_area_init(zones_size);
+}
+#else
+extern unsigned long setup_memory(void);
+extern void zone_sizes_init(void);
+#endif /* !CONFIG_DISCONTIGMEM */
+
+void __init setup_bootmem_allocator(void)
+{
+	unsigned long bootmap_size;
 	/*
 	 * Initialize the boot-time allocator (with low memory only):
 	 */
-	bootmap_size = init_bootmem(start_pfn, max_low_pfn);
+	bootmap_size = init_bootmem(min_low_pfn, max_low_pfn);
 
 	register_bootmem_low_pages(max_low_pfn);
 
@@ -1070,7 +1092,7 @@ static unsigned long __init setup_memory(void)
 	 * the (very unlikely) case of us accidentally initializing the
 	 * bootmem allocator with an invalid RAM area.
 	 */
-	reserve_bootmem(HIGH_MEMORY, (PFN_PHYS(start_pfn) +
+	reserve_bootmem(HIGH_MEMORY, (PFN_PHYS(min_low_pfn) +
 			 bootmap_size + PAGE_SIZE-1) - (HIGH_MEMORY));
 
 	/*
@@ -1127,11 +1149,25 @@ static unsigned long __init setup_memory(void)
 		}
 	}
 #endif
-	return max_low_pfn;
 }
-#else
-extern unsigned long setup_memory(void);
-#endif /* !CONFIG_DISCONTIGMEM */
+
+/*
+ * The node 0 pgdat is initialized before all of these because
+ * it's needed for bootmem.  node>0 pgdats have their virtual
+ * space allocated before the pagetables are in place to access
+ * them, so they can't be cleared then.
+ *
+ * This should all compile down to nothing when NUMA is off.
+ */
+void __init remapped_pgdat_init(void)
+{
+	int nid;
+
+	for_each_online_node(nid) {
+		if (nid != 0)
+			memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
+	}
+}
 
 /*
  * Request address space for all standard RAM and ROM resources
@@ -1391,7 +1427,6 @@ void __init setup_arch(char **cmdline_p)
 		machine_submodel_id = SYS_DESC_TABLE.table[1];
 		BIOS_revision = SYS_DESC_TABLE.table[2];
 	}
-	aux_device_present = AUX_DEVICE_INFO;
 	bootloader_type = LOADER_TYPE;
 
 #ifdef CONFIG_BLK_DEV_RAM
@@ -1439,6 +1474,8 @@ void __init setup_arch(char **cmdline_p)
 	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
 #endif
 	paging_init();
+	remapped_pgdat_init();
+	zone_sizes_init();
 
 	/*
 	 * NOTE: at this point the bootmem allocator is fully available.
@@ -1465,11 +1502,13 @@ void __init setup_arch(char **cmdline_p)
 	if (efi_enabled)
 		efi_map_memmap();
 
+#ifdef CONFIG_ACPI_BOOT
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
 	acpi_boot_table_init();
 	acpi_boot_init();
+#endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
 	if (smp_found_config)

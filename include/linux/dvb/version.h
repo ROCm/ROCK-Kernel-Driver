@@ -27,4 +27,3 @@
 #define DVB_API_VERSION_MINOR 1
 
 #endif /*_DVBVERSION_H_*/
-

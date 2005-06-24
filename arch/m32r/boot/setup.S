@@ -75,6 +75,11 @@ ENTRY(boot)
 	ldi	r1, #0x73		; cache on (with invalidation)
 ;	ldi	r1, #0x00		; cache off
 	st	r1, @r0
+#elif defined(CONFIG_CHIP_M32102)
+	ldi	r0, #-4              ;LDIMM	(r0, M32R_MCCR)
+	ldi	r1, #0x101		; cache on (with invalidation)
+;	ldi	r1, #0x00		; cache off
+	st	r1, @r0
 #else
 #error unknown chip configuration
 #endif

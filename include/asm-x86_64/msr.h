@@ -80,6 +80,18 @@ extern inline void cpuid(int op, unsigned int *eax, unsigned int *ebx,
 		: "0" (op));
 }
 
+/* Some CPUID calls want 'count' to be placed in ecx */
+static inline void cpuid_count(int op, int count, int *eax, int *ebx, int *ecx,
+	       	int *edx)
+{
+	__asm__("cpuid"
+		: "=a" (*eax),
+		  "=b" (*ebx),
+		  "=c" (*ecx),
+		  "=d" (*edx)
+		: "0" (op), "c" (count));
+}
+
 /*
  * CPUID functions returning a single datum
  */
@@ -151,6 +163,7 @@ extern inline unsigned int cpuid_edx(unsigned int op)
 #define EFER_NX (1<<_EFER_NX)
 
 /* Intel MSRs. Some also available on other CPUs */
+#define MSR_IA32_TSC		0x10
 #define MSR_IA32_PLATFORM_ID	0x17
 
 #define MSR_IA32_PERFCTR0      0xc1

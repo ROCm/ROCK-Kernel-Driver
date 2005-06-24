@@ -370,7 +370,7 @@ out_bad:
 	return -ENOMEM;
 }
 
-int
+static int
 nfs_pagein_list(struct list_head *head, int rpages)
 {
 	LIST_HEAD(one_request);

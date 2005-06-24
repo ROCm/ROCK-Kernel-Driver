@@ -2402,12 +2402,11 @@ sys32_epoll_ctl(int epfd, int op, int fd, struct epoll_event32 __user *event)
 {
 	mm_segment_t old_fs = get_fs();
 	struct epoll_event event64;
-	int error = -EFAULT;
+	int error;
 	u32 data_halfword;
 
-	if ((error = verify_area(VERIFY_READ, event,
-				 sizeof(struct epoll_event32))))
-		return error;
+	if (!access_ok(VERIFY_READ, event, sizeof(struct epoll_event32)))
+		return -EFAULT;
 
 	__get_user(event64.events, &event->events);
 	__get_user(data_halfword, &event->data[0]);
@@ -2428,7 +2427,7 @@ sys32_epoll_wait(int epfd, struct epoll_event32 __user * events, int maxevents,
 {
 	struct epoll_event *events64 = NULL;
 	mm_segment_t old_fs = get_fs();
-	int error, numevents, size;
+	int numevents, size;
 	int evt_idx;
 	int do_free_pages = 0;
 
@@ -2437,9 +2436,8 @@ sys32_epoll_wait(int epfd, struct epoll_event32 __user * events, int maxevents,
 	}
 
 	/* Verify that the area passed by the user is writeable */
-	if ((error = verify_area(VERIFY_WRITE, events,
-				 maxevents * sizeof(struct epoll_event32))))
-		return error;
+	if (!access_ok(VERIFY_WRITE, events, maxevents * sizeof(struct epoll_event32)))
+		return -EFAULT;
 
 	/*
  	 * Allocate space for the intermediate copy.  If the space needed
@@ -2592,7 +2590,7 @@ sys32_get_thread_area (struct ia32_user_desc __user *u_info)
 }
 
 asmlinkage long
-sys32_timer_create(u32 clock, struct sigevent32 __user *se32, timer_t __user *timer_id)
+sys32_timer_create(u32 clock, struct compat_sigevent __user *se32, timer_t __user *timer_id)
 {
 	struct sigevent se;
 	mm_segment_t oldfs;
@@ -2602,12 +2600,7 @@ sys32_timer_create(u32 clock, struct sigevent32 __user *se32, timer_t __user *ti
 	if (se32 == NULL)
 		return sys_timer_create(clock, NULL, timer_id);
 
-	memset(&se, 0, sizeof(struct sigevent));
-	if (get_user(se.sigev_value.sival_int,	&se32->sigev_value.sival_int) ||
-	    __get_user(se.sigev_signo, &se32->sigev_signo) ||
-	    __get_user(se.sigev_notify, &se32->sigev_notify) ||
-	    __copy_from_user(&se._sigev_un._pad, &se32->_sigev_un._pad,
-	    sizeof(se._sigev_un._pad)))
+	if (get_compat_sigevent(&se, se32))
 		return -EFAULT;
 
 	if (!access_ok(VERIFY_WRITE,timer_id,sizeof(timer_t)))
@@ -2632,32 +2625,6 @@ long sys32_fadvise64_64(int fd, __u32 offset_low, __u32 offset_high,
 			       (((u64)len_high)<<32) | len_low,
 			       advice); 
 } 
-
-asmlinkage long sys32_waitid(int which, compat_pid_t pid,
-			     compat_siginfo_t __user *uinfo, int options,
-			     struct compat_rusage __user *uru)
-{
-	siginfo_t info;
-	struct rusage ru;
-	long ret;
-	mm_segment_t old_fs = get_fs();
-
-	info.si_signo = 0;
-	set_fs (KERNEL_DS);
-	ret = sys_waitid(which, pid, (siginfo_t __user *) &info, options,
-			 uru ? (struct rusage __user *) &ru : NULL);
-	set_fs (old_fs);
-
-	if (ret < 0 || info.si_signo == 0)
-		return ret;
-
-	if (uru && (ret = put_compat_rusage(&ru, uru)))
-		return ret;
-
-	BUG_ON(info.si_code & __SI_MASK);
-	info.si_code |= __SI_CHLD;
-	return copy_siginfo_to_user32(uinfo, &info);
-}
 
 #ifdef	NOTYET  /* UNTESTED FOR IA64 FROM HERE DOWN */
 

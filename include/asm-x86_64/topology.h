@@ -35,8 +35,7 @@ static inline cpumask_t __pcibus_to_cpumask(int bus)
 	cpus_and(res, busmask, online);
 	return res;
 }
-/* broken generic file uses #ifndef later on this */
-#define pcibus_to_cpumask(bus) __pcibus_to_cpumask(bus)
+#define pcibus_to_cpumask(bus) __pcibus_to_cpumask(bus->number)
 
 #ifdef CONFIG_NUMA
 /* sched_domains SD_NODE_INIT for x86_64 machines */

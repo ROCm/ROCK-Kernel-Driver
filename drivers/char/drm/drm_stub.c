@@ -40,16 +40,16 @@ unsigned int drm_cards_limit = 16;	/* Enough for one machine */
 unsigned int drm_debug = 0;		/* 1 to enable debug output */
 EXPORT_SYMBOL(drm_debug);
 
-MODULE_AUTHOR( DRIVER_AUTHOR );
-MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_AUTHOR( CORE_AUTHOR );
+MODULE_DESCRIPTION( CORE_DESC );
 MODULE_LICENSE("GPL and additional rights");
-MODULE_PARM_DESC(drm_cards_limit, "Maximum number of graphics cards");
-MODULE_PARM_DESC(drm_debug, "Enable debug output");
+MODULE_PARM_DESC(cards_limit, "Maximum number of graphics cards");
+MODULE_PARM_DESC(debug, "Enable debug output");
 
 module_param_named(cards_limit, drm_cards_limit, int, 0444);
 module_param_named(debug, drm_debug, int, 0666);
 
-drm_minor_t *drm_minors;
+drm_head_t **drm_heads;
 struct drm_sysfs_class *drm_class;
 struct proc_dir_entry *drm_proc_root;
 
@@ -91,7 +91,7 @@ static int drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev, const struct
 			goto error_out_unreg;
 
 	if (drm_core_has_AGP(dev)) {
-		dev->agp = drm_agp_init();
+		dev->agp = drm_agp_init(dev);
 		if (drm_core_check_feature(dev, DRIVER_REQUIRE_AGP) && (dev->agp == NULL)) {
 			DRM_ERROR( "Cannot initialize the agpgart module.\n" );
 			retcode = -EINVAL;
@@ -111,12 +111,6 @@ static int drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev, const struct
 		DRM_ERROR( "Cannot allocate memory for context bitmap.\n" );
 		goto error_out_unreg;
 	}
-
-	dev->device = MKDEV(DRM_MAJOR, dev->minor );
-
-	/* postinit is a required function to display the signon banner */
-	if ((retcode = dev->driver->postinit(dev, ent->driver_data)))
-		goto error_out_unreg;
 
 	return 0;
 	
@@ -146,8 +140,10 @@ int drm_stub_open(struct inode *inode, struct file *filp)
 	if (!((minor >= 0) && (minor < drm_cards_limit)))
 		return -ENODEV;
 
-	dev = drm_minors[minor].dev;
-	if (!dev)
+	if (!drm_heads[minor])
+		return -ENODEV;
+	
+	if (!(dev = drm_heads[minor]->dev))
 		return -ENODEV;
 
 	old_fops = filp->f_op;
@@ -161,10 +157,11 @@ int drm_stub_open(struct inode *inode, struct file *filp)
 	return err;
 }
 
+
 /**
- * Get a device minor number.
+ * Register.
  *
- * \param pdev PCI device structure
+ * \param pdev - PCI device structure
  * \param ent entry from the PCI ID table with device type flags
  * \return zero on success or a negative number on failure.
  *
@@ -172,50 +169,86 @@ int drm_stub_open(struct inode *inode, struct file *filp)
  * then register the character device and inter module information.
  * Try and register, if we fail to register, backout previous work.
  */
-int drm_probe(struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_driver *driver)
+int drm_get_dev(struct pci_dev *pdev, const struct pci_device_id *ent,
+	      struct drm_driver *driver)
 {
-	struct class_device *dev_class;
 	drm_device_t *dev;
 	int ret;
-	int minor;
-	drm_minor_t *minors = &drm_minors[0];
 
 	DRM_DEBUG("\n");
 
-	for (minor = 0; minor < drm_cards_limit; minor++, minors++) {
-		if (minors->type == DRM_MINOR_FREE) {
+	dev = drm_calloc(1, sizeof(*dev), DRM_MEM_STUB);
+	if (!dev)
+		return -ENOMEM;
 
-			DRM_DEBUG("assigning minor %d\n", minor);
-			dev = drm_calloc(1, sizeof(*dev), DRM_MEM_STUB);
-			if (!dev)
-				return -ENOMEM;
+	pci_enable_device(pdev);
 
-			*minors = (drm_minor_t){.dev = dev, .type=DRM_MINOR_PRIMARY};
-			dev->minor = minor;
+	if ((ret = drm_fill_in_dev(dev, pdev, ent, driver))) {
+		printk(KERN_ERR "DRM: Fill_in_dev failed.\n");
+		goto err_g1;
+	}
+	if ((ret = drm_get_head(dev, &dev->primary)))
+		goto err_g1;
 
-			pci_enable_device(pdev);
+	/* postinit is a required function to display the signon banner */
+	/* drivers add secondary heads here if needed */
+	if ((ret = dev->driver->postinit(dev, ent->driver_data)))
+		goto err_g1;
 
-			if ((ret=drm_fill_in_dev(dev, pdev, ent, driver))) {
-				printk(KERN_ERR "DRM: Fill_in_dev failed.\n");
-				goto err_g1;
-			}
-			if ((ret = drm_proc_init(dev, minor, drm_proc_root, &minors->dev_root))) {
+	return 0;
+
+err_g1:
+	drm_free(dev, sizeof(*dev), DRM_MEM_STUB);
+	return ret;
+}
+EXPORT_SYMBOL(drm_get_dev);
+
+/**
+ * Get a secondary minor number.
+ *
+ * \param dev device data structure
+ * \param sec-minor structure to hold the assigned minor
+ * \return negative number on failure.
+ *
+ * Search an empty entry and initialize it to the given parameters, and
+ * create the proc init entry via proc_init(). This routines assigns
+ * minor numbers to secondary heads of multi-headed cards
+ */
+int drm_get_head(drm_device_t *dev, drm_head_t *head)
+{
+	drm_head_t **heads = drm_heads;
+	int ret;
+	int minor;
+
+	DRM_DEBUG("\n");
+
+	for (minor = 0; minor < drm_cards_limit; minor++, heads++) {
+		if (!*heads) {
+			
+			*head = (drm_head_t) {
+				.dev = dev,
+				.device = MKDEV(DRM_MAJOR, minor),
+				.minor = minor,
+			};
+			
+			if ((ret = drm_proc_init(dev, minor, drm_proc_root, &head->dev_root))) {
 				printk (KERN_ERR "DRM: Failed to initialize /proc/dri.\n");
 				goto err_g1;
 			}
 
 			
-			dev_class = drm_sysfs_device_add(drm_class,
-							 MKDEV(DRM_MAJOR,
-							       minor),
-							 &pdev->dev,
-							 "card%d", minor);
-			if (IS_ERR(dev_class)) {
+			head->dev_class = drm_sysfs_device_add(drm_class,
+							       MKDEV(DRM_MAJOR,
+								     minor),
+							       &dev->pdev->dev,
+							       "card%d", minor);
+			if (IS_ERR(head->dev_class)) {
 				printk(KERN_ERR "DRM: Error sysfs_device_add.\n");
-				ret = PTR_ERR(dev_class);
+				ret = PTR_ERR(head->dev_class);
 				goto err_g2;
 			}
-			
+			*heads = head;
+
 			DRM_DEBUG("new minor assigned %d\n", minor);
 			return 0;
 		}
@@ -223,36 +256,63 @@ int drm_probe(struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_
 	DRM_ERROR("out of minors\n");
 	return -ENOMEM;
 err_g2:
-	drm_proc_cleanup(minor, drm_proc_root, minors->dev_root);
+	drm_proc_cleanup(minor, drm_proc_root, head->dev_root);
 err_g1:
-	*minors = (drm_minor_t){.dev = NULL, .type = DRM_MINOR_FREE};
-	drm_free(dev, sizeof(*dev), DRM_MEM_STUB);
+	*head = (drm_head_t) {.dev = NULL};
 	return ret;
 }
-EXPORT_SYMBOL(drm_probe);
 		
 
 /**
  * Put a device minor number.
  *
- * \param minor minor number.
- * \return always zero.
+ * \param dev device data structure
+ * \return always zero
  *
- * Cleans up the proc resources. If a minor is zero then release the foreign
- * "drm" data, otherwise unregisters the "drm" data, frees the stub list and
- * unregisters the character device. 
+ * Cleans up the proc resources. If it is the last minor then release the foreign
+ * "drm" data, otherwise unregisters the "drm" data, frees the dev list and
+ * unregisters the character device.
  */
-int drm_put_minor(drm_device_t *dev)
+int drm_put_dev(drm_device_t * dev)
 {
-	drm_minor_t *minors = &drm_minors[dev->minor];
-	
-	DRM_DEBUG("release minor %d\n", dev->minor);
-	
-	drm_proc_cleanup(dev->minor, drm_proc_root, minors->dev_root);
-	drm_sysfs_device_remove(MKDEV(DRM_MAJOR, dev->minor));
-	
-	*minors = (drm_minor_t){.dev = NULL, .type = DRM_MINOR_FREE};
+	DRM_DEBUG("release primary %s\n", dev->driver->pci_driver.name);
+
+	if (dev->unique) {
+		drm_free(dev->unique, strlen(dev->unique) + 1, DRM_MEM_DRIVER);
+		dev->unique = NULL;
+		dev->unique_len = 0;
+	}
+	if (dev->devname) {
+		drm_free(dev->devname, strlen(dev->devname) + 1,
+			 DRM_MEM_DRIVER);
+		dev->devname = NULL;
+	}
 	drm_free(dev, sizeof(*dev), DRM_MEM_STUB);
+	return 0;
+}
+
+/**
+ * Put a secondary minor number.
+ *
+ * \param sec_minor - structure to be released
+ * \return always zero
+ *
+ * Cleans up the proc resources. Not legal for this to be the
+ * last minor released.
+ *
+ */
+int drm_put_head(drm_head_t *head)
+{
+	int minor = head->minor;
+	
+	DRM_DEBUG("release secondary minor %d\n", minor);
+	
+	drm_proc_cleanup(minor, drm_proc_root, head->dev_root);
+	drm_sysfs_device_remove(MKDEV(DRM_MAJOR, head->minor));
+	
+	*head = (drm_head_t){.dev = NULL};
+
+	drm_heads[minor] = NULL;
 	
 	return 0;
 }

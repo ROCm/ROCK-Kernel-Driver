@@ -2,6 +2,7 @@
  * TTUSB DEC Driver
  *
  * Copyright (C) 2003-2004 Alex Woods <linux-dvb@giblets.org>
+ * IR support by Peter Beutner <p.beutner@gmx.net>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,6 +33,7 @@
 #include <linux/firmware.h>
 #include <linux/crc32.h>
 #include <linux/init.h>
+#include <linux/input.h>
 
 #include "dmxdev.h"
 #include "dvb_demux.h"
@@ -42,27 +44,32 @@
 
 static int debug;
 static int output_pva;
+static int enable_rc;
 
 module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug, "Turn on/off debugging (default:off).");
 module_param(output_pva, int, 0444);
 MODULE_PARM_DESC(output_pva, "Output PVA from dvr device (default:off)");
+module_param(enable_rc, int, 0644);
+MODULE_PARM_DESC(enable_rc, "Turn on/off IR remote control(default: off)");
 
 #define dprintk	if (debug) printk
 
 #define DRIVER_NAME		"TechnoTrend/Hauppauge DEC USB"
 
 #define COMMAND_PIPE		0x03
-#define RESULT_PIPE		0x84
-#define IN_PIPE			0x88
+#define RESULT_PIPE		0x04
+#define IN_PIPE			0x08
 #define OUT_PIPE		0x07
+#define IRQ_PIPE		0x0A
 
 #define COMMAND_PACKET_SIZE	0x3c
 #define ARM_PACKET_SIZE		0x1000
+#define IRQ_PACKET_SIZE		0x8
 
 #define ISO_BUF_COUNT		0x04
 #define FRAMES_PER_ISO_BUF	0x04
-#define ISO_FRAME_SIZE		0x03FF
+#define ISO_FRAME_SIZE		0x0380
 
 #define	MAX_PVA_LENGTH		6144
 
@@ -91,7 +98,7 @@ struct ttusb_dec {
 	int				can_playback;
 
 	/* DVB bits */
-	struct dvb_adapter		*adapter;
+	struct dvb_adapter		adapter;
 	struct dmxdev			dmxdev;
 	struct dvb_demux		demux;
 	struct dmx_frontend		frontend;
@@ -101,15 +108,19 @@ struct ttusb_dec {
 	u16			pid[DMX_PES_OTHER];
 
 	/* USB bits */
-	struct usb_device	*udev;
-	u8			trans_count;
-	unsigned int		command_pipe;
-	unsigned int		result_pipe;
+	struct usb_device		*udev;
+	u8				trans_count;
+	unsigned int			command_pipe;
+	unsigned int			result_pipe;
 	unsigned int			in_pipe;
 	unsigned int			out_pipe;
+	unsigned int			irq_pipe;
 	enum ttusb_dec_interface	interface;
-	struct semaphore	usb_sem;
+	struct semaphore		usb_sem;
 
+	void			*irq_buffer;
+	struct urb		*irq_urb;
+	dma_addr_t		irq_dma_handle;
 	void			*iso_buffer;
 	dma_addr_t		iso_dma_handle;
 	struct urb		*iso_urb[ISO_BUF_COUNT];
@@ -142,6 +153,8 @@ struct ttusb_dec {
 	struct list_head	filter_info_list;
 	spinlock_t		filter_info_list_lock;
 
+	struct input_dev	rc_input_dev;
+
 	int			active; /* Loaded successfully */
 };
 
@@ -157,8 +170,82 @@ struct filter_info {
 	struct list_head	filter_info_list;
 };
 
+static u16 rc_keys[] = {
+	KEY_POWER,
+	KEY_MUTE,
+	KEY_1,
+	KEY_2,
+	KEY_3,
+	KEY_4,
+	KEY_5,
+	KEY_6,
+	KEY_7,
+	KEY_8,
+	KEY_9,
+	KEY_0,
+	KEY_CHANNELUP,
+	KEY_VOLUMEDOWN,
+	KEY_OK,
+	KEY_VOLUMEUP,
+	KEY_CHANNELDOWN,
+	KEY_PREVIOUS,
+	KEY_ESC,
+	KEY_RED,
+	KEY_GREEN,
+	KEY_YELLOW,
+	KEY_BLUE,
+	KEY_OPTION,
+	KEY_M,
+	KEY_RADIO
+};
+
 static void ttusb_dec_set_model(struct ttusb_dec *dec,
 				enum ttusb_dec_model model);
+
+static void ttusb_dec_handle_irq( struct urb *urb, struct pt_regs *regs)
+{
+	struct ttusb_dec * dec = urb->context;
+	char *buffer = dec->irq_buffer;
+	int retval;
+
+	switch(urb->status) {
+		case 0: /*success*/
+			break;
+		case -ECONNRESET:
+		case -ENOENT:
+		case -ESHUTDOWN:
+		case -ETIMEDOUT:
+			/* this urb is dead, cleanup */
+			dprintk("%s:urb shutting down with status: %d\n",
+					__FUNCTION__, urb->status);
+			return;
+		default:
+			dprintk("%s:nonzero status received: %d\n",
+					__FUNCTION__,urb->status);
+			goto exit;
+	}
+
+	if( (buffer[0] == 0x1) && (buffer[2] == 0x15) )  {
+		/* IR - Event */
+		/* this is an fact a bit too simple implementation;
+		 * the box also reports a keyrepeat signal
+		 * (with buffer[3] == 0x40) in an intervall of ~100ms.
+		 * But to handle this correctly we had to imlemenent some
+		 * kind of timer which signals a 'key up' event if no
+		 * keyrepeat signal is recieved for lets say 200ms.
+		 * this should/could be added later ...
+		 * for now lets report each signal as a key down and up*/
+		dprintk("%s:rc signal:%d\n", __FUNCTION__, buffer[4]);
+		input_report_key(&dec->rc_input_dev,rc_keys[buffer[4]-1],1);
+		input_report_key(&dec->rc_input_dev,rc_keys[buffer[4]-1],0);
+		input_sync(&dec->rc_input_dev);
+	}
+
+exit:	retval = usb_submit_urb(urb, GFP_ATOMIC);
+	if(retval)
+		printk("%s - usb_commit_urb failed with result: %d\n",
+			__FUNCTION__, retval);
+}
 
 static u16 crc16(u16 crc, const u8 *buf, size_t len)
 {
@@ -181,7 +268,7 @@ static int ttusb_dec_send_command(struct ttusb_dec *dec, const u8 command,
 	u8 *b;
 
 	dprintk("%s\n", __FUNCTION__);
-	
+
 	b = kmalloc(COMMAND_PACKET_SIZE + 4, GFP_KERNEL);
 	if (!b)
 		return -ENOMEM;
@@ -208,7 +295,7 @@ static int ttusb_dec_send_command(struct ttusb_dec *dec, const u8 command,
 	}
 
 	result = usb_bulk_msg(dec->udev, dec->command_pipe, b,
-			      COMMAND_PACKET_SIZE + 4, &actual_len, HZ);
+			      COMMAND_PACKET_SIZE + 4, &actual_len, 1000);
 
 	if (result) {
 		printk("%s: command bulk message failed: error %d\n",
@@ -219,7 +306,7 @@ static int ttusb_dec_send_command(struct ttusb_dec *dec, const u8 command,
 	}
 
 	result = usb_bulk_msg(dec->udev, dec->result_pipe, b,
-			      COMMAND_PACKET_SIZE + 4, &actual_len, HZ);
+			      COMMAND_PACKET_SIZE + 4, &actual_len, 1000);
 
 	if (result) {
 		printk("%s: result bulk message failed: error %d\n",
@@ -320,9 +407,9 @@ static void ttusb_dec_set_pids(struct ttusb_dec *dec)
 
 	ttusb_dec_send_command(dec, 0x50, sizeof(b), b, NULL, NULL);
 
-		dvb_filter_pes2ts_init(&dec->a_pes2ts, dec->pid[DMX_PES_AUDIO],
+	dvb_filter_pes2ts_init(&dec->a_pes2ts, dec->pid[DMX_PES_AUDIO],
 			       ttusb_dec_audio_pes2ts_cb, dec);
-		dvb_filter_pes2ts_init(&dec->v_pes2ts, dec->pid[DMX_PES_VIDEO],
+	dvb_filter_pes2ts_init(&dec->v_pes2ts, dec->pid[DMX_PES_VIDEO],
 			       ttusb_dec_video_pes2ts_cb, dec);
 	dec->v_pes_length = 0;
 	dec->v_pes_postbytes = 0;
@@ -345,7 +432,7 @@ static void ttusb_dec_process_pva(struct ttusb_dec *dec, u8 *pva, int length)
 	case 0x01: {		/* VideoStream */
 		int prebytes = pva[5] & 0x03;
 		int postbytes = (pva[5] & 0x0c) >> 2;
-			u16 v_pes_payload_length;
+		u16 v_pes_payload_length;
 
 		if (output_pva) {
 			dec->video_filter->feed->cb.ts(pva, length, NULL, 0,
@@ -353,23 +440,23 @@ static void ttusb_dec_process_pva(struct ttusb_dec *dec, u8 *pva, int length)
 			return;
 		}
 
-			if (dec->v_pes_postbytes > 0 &&
-			    dec->v_pes_postbytes == prebytes) {
-				memcpy(&dec->v_pes[dec->v_pes_length],
+		if (dec->v_pes_postbytes > 0 &&
+		    dec->v_pes_postbytes == prebytes) {
+			memcpy(&dec->v_pes[dec->v_pes_length],
 			       &pva[12], prebytes);
 
-				dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
+			dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
 					  dec->v_pes_length + prebytes, 1);
-			}
+		}
 
 		if (pva[5] & 0x10) {
-				dec->v_pes[7] = 0x80;
-				dec->v_pes[8] = 0x05;
+			dec->v_pes[7] = 0x80;
+			dec->v_pes[8] = 0x05;
 
 			dec->v_pes[9] = 0x21 | ((pva[8] & 0xc0) >> 5);
 			dec->v_pes[10] = ((pva[8] & 0x3f) << 2) |
 					 ((pva[9] & 0xc0) >> 6);
-				dec->v_pes[11] = 0x01 |
+			dec->v_pes[11] = 0x01 |
 					 ((pva[9] & 0x3f) << 2) |
 					 ((pva[10] & 0x80) >> 6);
 			dec->v_pes[12] = ((pva[10] & 0x7f) << 1) |
@@ -379,33 +466,33 @@ static void ttusb_dec_process_pva(struct ttusb_dec *dec, u8 *pva, int length)
 			memcpy(&dec->v_pes[14], &pva[12 + prebytes],
 			       length - 12 - prebytes);
 			dec->v_pes_length = 14 + length - 12 - prebytes;
-			} else {
-				dec->v_pes[7] = 0x00;
-				dec->v_pes[8] = 0x00;
+		} else {
+			dec->v_pes[7] = 0x00;
+			dec->v_pes[8] = 0x00;
 
 			memcpy(&dec->v_pes[9], &pva[8], length - 8);
 			dec->v_pes_length = 9 + length - 8;
-			}
-
-			dec->v_pes_postbytes = postbytes;
-
-			if (dec->v_pes[9 + dec->v_pes[8]] == 0x00 &&
-			    dec->v_pes[10 + dec->v_pes[8]] == 0x00 &&
-			    dec->v_pes[11 + dec->v_pes[8]] == 0x01)
-				dec->v_pes[6] = 0x84;
-			else
-				dec->v_pes[6] = 0x80;
-
-			v_pes_payload_length = htons(dec->v_pes_length - 6 +
-						     postbytes);
-			memcpy(&dec->v_pes[4], &v_pes_payload_length, 2);
-
-			if (postbytes == 0)
-				dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
-						  dec->v_pes_length, 1);
-
-			break;
 		}
+
+		dec->v_pes_postbytes = postbytes;
+
+		if (dec->v_pes[9 + dec->v_pes[8]] == 0x00 &&
+		    dec->v_pes[10 + dec->v_pes[8]] == 0x00 &&
+		    dec->v_pes[11 + dec->v_pes[8]] == 0x01)
+			dec->v_pes[6] = 0x84;
+		else
+			dec->v_pes[6] = 0x80;
+
+		v_pes_payload_length = htons(dec->v_pes_length - 6 +
+					     postbytes);
+		memcpy(&dec->v_pes[4], &v_pes_payload_length, 2);
+
+		if (postbytes == 0)
+			dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
+					  dec->v_pes_length, 1);
+
+		break;
+	}
 
 	case 0x02:		/* MainAudioStream */
 		if (output_pva) {
@@ -487,7 +574,7 @@ static void ttusb_dec_process_packet(struct ttusb_dec *dec)
 	case TTUSB_DEC_PACKET_PVA:
 		if (dec->pva_stream_count)
 			ttusb_dec_process_pva(dec, dec->packet,
-						 dec->packet_payload_length);
+					      dec->packet_payload_length);
 		break;
 
 	case TTUSB_DEC_PACKET_SECTION:
@@ -513,7 +600,7 @@ static void swap_bytes(u8 *b, int length)
 	}
 }
 
-static void ttusb_dec_process_urb_frame(struct ttusb_dec * dec, u8 * b,
+static void ttusb_dec_process_urb_frame(struct ttusb_dec *dec, u8 *b,
 					int length)
 {
 	swap_bytes(b, length);
@@ -562,7 +649,7 @@ static void ttusb_dec_process_urb_frame(struct ttusb_dec * dec, u8 * b,
 						TTUSB_DEC_PACKET_EMPTY;
 					dec->packet_payload_length = 2;
 					dec->packet_state = 7;
-			} else {
+				} else {
 					printk("%s: unknown packet type: "
 					       "%02x%02x\n", __FUNCTION__,
 					       dec->packet[0], dec->packet[1]);
@@ -598,22 +685,22 @@ static void ttusb_dec_process_urb_frame(struct ttusb_dec * dec, u8 * b,
 			int remainder = dec->packet_payload_length -
 					dec->packet_length;
 
-				if (length >= remainder) {
+			if (length >= remainder) {
 				memcpy(dec->packet + dec->packet_length,
-					       b, remainder);
+				       b, remainder);
 				dec->packet_length += remainder;
-					b += remainder;
-					length -= remainder;
+				b += remainder;
+				length -= remainder;
 				dec->packet_state++;
-				} else {
+			} else {
 				memcpy(&dec->packet[dec->packet_length],
-					       b, length);
+				       b, length);
 				dec->packet_length += length;
-					length = 0;
-				}
-
-				break;
+				length = 0;
 			}
+
+			break;
+		}
 
 		case 7: {
 			int tail = 4;
@@ -676,7 +763,6 @@ static void ttusb_dec_process_urb(struct urb *urb, struct pt_regs *ptregs)
 
 		for (i = 0; i < FRAMES_PER_ISO_BUF; i++) {
 			struct usb_iso_packet_descriptor *d;
-
 			u8 *b;
 			int length;
 			struct urb_frame *frame;
@@ -782,7 +868,7 @@ static int ttusb_dec_set_interface(struct ttusb_dec *dec,
 							b, NULL, NULL);
 			if (result)
 				return result;
-			result = usb_set_interface(dec->udev, 0, 7);
+			result = usb_set_interface(dec->udev, 0, 8);
 			break;
 		case TTUSB_DEC_INTERFACE_OUT:
 			result = usb_set_interface(dec->udev, 0, 1);
@@ -1067,7 +1153,7 @@ static int ttusb_dec_alloc_iso_urbs(struct ttusb_dec *dec)
 					       ISO_FRAME_SIZE *
 					       (FRAMES_PER_ISO_BUF *
 						ISO_BUF_COUNT),
-				 	       &dec->iso_dma_handle);
+					       &dec->iso_dma_handle);
 
 	memset(dec->iso_buffer, 0,
 	       ISO_FRAME_SIZE * (FRAMES_PER_ISO_BUF * ISO_BUF_COUNT));
@@ -1096,6 +1182,31 @@ static void ttusb_dec_init_tasklet(struct ttusb_dec *dec)
 		     (unsigned long)dec);
 }
 
+static void ttusb_init_rc( struct ttusb_dec *dec)
+{
+	u8 b[] = { 0x00, 0x01 };
+	int i;
+
+	init_input_dev(&dec->rc_input_dev);
+
+	dec->rc_input_dev.name = "ttusb_dec remote control";
+	dec->rc_input_dev.evbit[0] = BIT(EV_KEY);
+	dec->rc_input_dev.keycodesize = sizeof(u16);
+	dec->rc_input_dev.keycodemax = 0x1a;
+	dec->rc_input_dev.keycode = rc_keys;
+
+	 for (i = 0; i < sizeof(rc_keys)/sizeof(rc_keys[0]); i++)
+                set_bit(rc_keys[i], dec->rc_input_dev.keybit);
+
+	input_register_device(&dec->rc_input_dev);
+
+	if(usb_submit_urb(dec->irq_urb,GFP_KERNEL)) {
+		printk("%s: usb_submit_urb failed\n",__FUNCTION__);
+	}
+	/* enable irq pipe */
+	ttusb_dec_send_command(dec,0xb0,sizeof(b),b,NULL,NULL);
+}
+
 static void ttusb_dec_init_v_pes(struct ttusb_dec *dec)
 {
 	dprintk("%s\n", __FUNCTION__);
@@ -1106,7 +1217,7 @@ static void ttusb_dec_init_v_pes(struct ttusb_dec *dec)
 	dec->v_pes[3] = 0xe0;
 }
 
-static void ttusb_dec_init_usb(struct ttusb_dec *dec)
+static int ttusb_dec_init_usb(struct ttusb_dec *dec)
 {
 	dprintk("%s\n", __FUNCTION__);
 
@@ -1117,8 +1228,26 @@ static void ttusb_dec_init_usb(struct ttusb_dec *dec)
 	dec->result_pipe = usb_rcvbulkpipe(dec->udev, RESULT_PIPE);
 	dec->in_pipe = usb_rcvisocpipe(dec->udev, IN_PIPE);
 	dec->out_pipe = usb_sndisocpipe(dec->udev, OUT_PIPE);
+	dec->irq_pipe = usb_rcvintpipe(dec->udev, IRQ_PIPE);
 
-	ttusb_dec_alloc_iso_urbs(dec);
+	if(enable_rc) {
+		dec->irq_urb = usb_alloc_urb(0, GFP_KERNEL);
+		if(!dec->irq_urb) {
+			return -ENOMEM;
+		}
+		dec->irq_buffer = usb_buffer_alloc(dec->udev,IRQ_PACKET_SIZE,
+					SLAB_ATOMIC, &dec->irq_dma_handle);
+		if(!dec->irq_buffer) {
+			return -ENOMEM;
+		}
+		usb_fill_int_urb(dec->irq_urb, dec->udev,dec->irq_pipe,
+				 dec->irq_buffer, IRQ_PACKET_SIZE,
+				 ttusb_dec_handle_irq, dec, 1);
+		dec->irq_urb->transfer_dma = dec->irq_dma_handle;
+		dec->irq_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+	}
+
+	return ttusb_dec_alloc_iso_urbs(dec);
 }
 
 static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
@@ -1205,12 +1334,12 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 		if (j >= ARM_PACKET_SIZE) {
 			result = usb_bulk_msg(dec->udev, dec->command_pipe, b,
 					      ARM_PACKET_SIZE, &actual_len,
-					      HZ / 10);
+					      100);
 			j = 0;
 		} else if (size < COMMAND_PACKET_SIZE) {
 			result = usb_bulk_msg(dec->udev, dec->command_pipe, b,
 					      j - COMMAND_PACKET_SIZE + size,
-					      &actual_len, HZ / 10);
+					      &actual_len, 100);
 		}
 	}
 
@@ -1244,7 +1373,7 @@ static int ttusb_dec_init_stb(struct ttusb_dec *dec)
 			result = ttusb_dec_boot_dsp(dec);
 			if (result)
 				return result;
-		else
+			else
 				return 1;
 		} else {
 			/* We can't trust the USB IDs that some firmwares
@@ -1273,7 +1402,7 @@ static int ttusb_dec_init_stb(struct ttusb_dec *dec)
 				dec->can_playback = 1;
 
 			return 0;
-	}
+		}
 	}
 	else
 		return result;
@@ -1306,7 +1435,7 @@ static int ttusb_dec_init_dvb(struct ttusb_dec *dec)
 		printk("%s: dvb_dmx_init failed: error %d\n", __FUNCTION__,
 		       result);
 
-		dvb_unregister_adapter(dec->adapter);
+		dvb_unregister_adapter(&dec->adapter);
 
 		return result;
 	}
@@ -1315,12 +1444,12 @@ static int ttusb_dec_init_dvb(struct ttusb_dec *dec)
 	dec->dmxdev.demux = &dec->demux.dmx;
 	dec->dmxdev.capabilities = 0;
 
-	if ((result = dvb_dmxdev_init(&dec->dmxdev, dec->adapter)) < 0) {
+	if ((result = dvb_dmxdev_init(&dec->dmxdev, &dec->adapter)) < 0) {
 		printk("%s: dvb_dmxdev_init failed: error %d\n",
 		       __FUNCTION__, result);
 
 		dvb_dmx_release(&dec->demux);
-		dvb_unregister_adapter(dec->adapter);
+		dvb_unregister_adapter(&dec->adapter);
 
 		return result;
 	}
@@ -1334,7 +1463,7 @@ static int ttusb_dec_init_dvb(struct ttusb_dec *dec)
 
 		dvb_dmxdev_release(&dec->dmxdev);
 		dvb_dmx_release(&dec->demux);
-		dvb_unregister_adapter(dec->adapter);
+		dvb_unregister_adapter(&dec->adapter);
 
 		return result;
 	}
@@ -1347,12 +1476,12 @@ static int ttusb_dec_init_dvb(struct ttusb_dec *dec)
 		dec->demux.dmx.remove_frontend(&dec->demux.dmx, &dec->frontend);
 		dvb_dmxdev_release(&dec->dmxdev);
 		dvb_dmx_release(&dec->demux);
-		dvb_unregister_adapter(dec->adapter);
+		dvb_unregister_adapter(&dec->adapter);
 
 		return result;
 	}
 
-	dvb_net_init(dec->adapter, &dec->dvb_net, &dec->demux.dmx);
+	dvb_net_init(&dec->adapter, &dec->dvb_net, &dec->demux.dmx);
 
 	return 0;
 }
@@ -1367,8 +1496,28 @@ static void ttusb_dec_exit_dvb(struct ttusb_dec *dec)
 	dvb_dmxdev_release(&dec->dmxdev);
 	dvb_dmx_release(&dec->demux);
 	if (dec->fe) dvb_unregister_frontend(dec->fe);
-	dvb_unregister_adapter(dec->adapter);
+	dvb_unregister_adapter(&dec->adapter);
 }
+
+static void ttusb_dec_exit_rc(struct ttusb_dec *dec)
+{
+
+	dprintk("%s\n", __FUNCTION__);
+	/* we have to check whether the irq URB is already submitted.
+	  * As the irq is submitted after the interface is changed,
+	  * this is the best method i figured out.
+	  * Any others?*/
+	if(dec->interface == TTUSB_DEC_INTERFACE_IN)
+		usb_kill_urb(dec->irq_urb);
+
+	usb_free_urb(dec->irq_urb);
+
+	usb_buffer_free(dec->udev,IRQ_PACKET_SIZE,
+		           dec->irq_buffer, dec->irq_dma_handle);
+
+	input_unregister_device(&dec->rc_input_dev);
+}
+
 
 static void ttusb_dec_exit_usb(struct ttusb_dec *dec)
 {
@@ -1416,15 +1565,15 @@ static void ttusb_dec_exit_filters(struct ttusb_dec *dec)
 	}
 }
 
-int fe_send_command(struct dvb_frontend* fe, const u8 command,
-		    int param_length, const u8 params[],
-		    int *result_length, u8 cmd_result[])
+static int fe_send_command(struct dvb_frontend* fe, const u8 command,
+			   int param_length, const u8 params[],
+			   int *result_length, u8 cmd_result[])
 {
 	struct ttusb_dec* dec = (struct ttusb_dec*) fe->dvb->priv;
 	return ttusb_dec_send_command(dec, command, param_length, params, result_length, cmd_result);
 }
 
-struct ttusbdecfe_config fe_config = {
+static struct ttusbdecfe_config fe_config = {
 	.send_command = fe_send_command
 };
 
@@ -1448,29 +1597,30 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 	memset(dec, 0, sizeof(struct ttusb_dec));
 
 	switch (le16_to_cpu(id->idProduct)) {
-		case 0x1006:
+	case 0x1006:
 		ttusb_dec_set_model(dec, TTUSB_DEC3000S);
-			break;
+		break;
 
-		case 0x1008:
+	case 0x1008:
 		ttusb_dec_set_model(dec, TTUSB_DEC2000T);
 		break;
 
 	case 0x1009:
 		ttusb_dec_set_model(dec, TTUSB_DEC2540T);
-			break;
+		break;
 	}
 
 	dec->udev = udev;
 
-	ttusb_dec_init_usb(dec);
+	if (ttusb_dec_init_usb(dec))
+		return 0;
 	if (ttusb_dec_init_stb(dec)) {
 		ttusb_dec_exit_usb(dec);
 		return 0;
 	}
 	ttusb_dec_init_dvb(dec);
 
-	dec->adapter->priv = dec;
+	dec->adapter.priv = dec;
 	switch (le16_to_cpu(id->idProduct)) {
 	case 0x1006:
 		dec->fe = ttusbdecfe_dvbs_attach(&fe_config);
@@ -1487,7 +1637,7 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 		       le16_to_cpu(dec->udev->descriptor.idVendor),
 		       le16_to_cpu(dec->udev->descriptor.idProduct));
 	} else {
-		if (dvb_register_frontend(dec->adapter, dec->fe)) {
+		if (dvb_register_frontend(&dec->adapter, dec->fe)) {
 			printk("budget-ci: Frontend registration failed!\n");
 			if (dec->fe->ops->release)
 				dec->fe->ops->release(dec->fe);
@@ -1503,6 +1653,9 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 
 	ttusb_dec_set_interface(dec, TTUSB_DEC_INTERFACE_IN);
 
+	if(enable_rc)
+		ttusb_init_rc(dec);
+
 	return 0;
 }
 
@@ -1515,10 +1668,12 @@ static void ttusb_dec_disconnect(struct usb_interface *intf)
 	dprintk("%s\n", __FUNCTION__);
 
 	if (dec->active) {
-	ttusb_dec_exit_tasklet(dec);
+		ttusb_dec_exit_tasklet(dec);
 		ttusb_dec_exit_filters(dec);
-	ttusb_dec_exit_usb(dec);
-	ttusb_dec_exit_dvb(dec);
+		if(enable_rc)
+			ttusb_dec_exit_rc(dec);
+		ttusb_dec_exit_usb(dec);
+		ttusb_dec_exit_dvb(dec);
 	}
 
 	kfree(dec);
@@ -1557,9 +1712,9 @@ static struct usb_device_id ttusb_dec_table[] = {
 
 static struct usb_driver ttusb_dec_driver = {
 	.name		= "ttusb-dec",
-      .probe		= ttusb_dec_probe,
-      .disconnect	= ttusb_dec_disconnect,
-      .id_table		= ttusb_dec_table,
+	.probe		= ttusb_dec_probe,
+	.disconnect	= ttusb_dec_disconnect,
+	.id_table	= ttusb_dec_table,
 };
 
 static int __init ttusb_dec_init(void)
@@ -1587,4 +1742,3 @@ MODULE_AUTHOR("Alex Woods <linux-dvb@giblets.org>");
 MODULE_DESCRIPTION(DRIVER_NAME);
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(usb, ttusb_dec_table);
-

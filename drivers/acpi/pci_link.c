@@ -522,9 +522,11 @@ acpi_irq_penalty_init(void)
 
 static int acpi_irq_balance;	/* 0: static, 1: balance */
 
-static int acpi_pci_link_allocate(struct acpi_pci_link* link) {
-	int irq;
-	int i;
+static int acpi_pci_link_allocate(
+	struct acpi_pci_link	*link)
+{
+	int			irq;
+	int			i;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_link_allocate");
 
@@ -597,8 +599,9 @@ int
 acpi_pci_link_get_irq (
 	acpi_handle		handle,
 	int			index,
-	int*			edge_level,
-	int*			active_high_low)
+	int			*edge_level,
+	int			*active_high_low,
+	char			**name)
 {
 	int                     result = 0;
 	struct acpi_device	*device = NULL;
@@ -634,6 +637,7 @@ acpi_pci_link_get_irq (
 
 	if (edge_level) *edge_level = link->irq.edge_level;
 	if (active_high_low) *active_high_low = link->irq.active_high_low;
+	if (name) *name = acpi_device_bid(link->device);
 	return_VALUE(link->irq.active);
 }
 

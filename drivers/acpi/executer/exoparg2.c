@@ -442,6 +442,12 @@ acpi_ex_opcode_2A_1T_1R (
 			return_desc->reference.object    = operand[0];
 		}
 
+		/*
+		 * Add a reference to the target package/buffer/string for the life
+		 * of the index.
+		 */
+		acpi_ut_add_reference (operand[0]);
+
 		/* Complete the Index reference object */
 
 		return_desc->reference.opcode    = AML_INDEX_OP;

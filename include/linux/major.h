@@ -25,7 +25,6 @@
 #define MISC_MAJOR		10
 #define SCSI_CDROM_MAJOR	11
 #define MUX_MAJOR		11	/* PA-RISC only */
-#define QIC02_TAPE_MAJOR	12
 #define XT_DISK_MAJOR		13
 #define INPUT_MAJOR		13
 #define SOUND_MAJOR		14

@@ -361,7 +361,7 @@ static struct sym_fw sym_fw2 = SYM_FW_ENTRY(sym_fw2, "LOAD/STORE-based");
  *  Find the most appropriate firmware for a chip.
  */
 struct sym_fw * 
-sym_find_firmware(struct sym_pci_chip *chip)
+sym_find_firmware(struct sym_chip *chip)
 {
 	if (chip->features & FE_LDSTR)
 		return &sym_fw2;

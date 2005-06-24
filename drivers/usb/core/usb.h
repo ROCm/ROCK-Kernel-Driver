@@ -4,8 +4,6 @@ extern void usb_create_sysfs_dev_files (struct usb_device *dev);
 extern void usb_remove_sysfs_dev_files (struct usb_device *dev);
 extern void usb_create_sysfs_intf_files (struct usb_interface *intf);
 extern void usb_remove_sysfs_intf_files (struct usb_interface *intf);
-extern int usb_probe_interface (struct device *dev);
-extern int usb_unbind_interface (struct device *dev);
 
 extern void usb_disable_endpoint (struct usb_device *dev, unsigned int epaddr);
 extern void usb_disable_interface (struct usb_device *dev,
@@ -13,15 +11,22 @@ extern void usb_disable_interface (struct usb_device *dev,
 extern void usb_release_interface_cache(struct kref *ref);
 extern void usb_disable_device (struct usb_device *dev, int skip_ep0);
 
-extern void usb_enable_interface (struct usb_device *dev,
-		struct usb_interface *intf);
-
 extern int usb_get_device_descriptor(struct usb_device *dev,
 		unsigned int size);
 extern int usb_set_configuration(struct usb_device *dev, int configuration);
 
 extern void usb_lock_all_devices(void);
 extern void usb_unlock_all_devices(void);
+
+extern void usb_kick_khubd(struct usb_device *dev);
+extern void usb_resume_root_hub(struct usb_device *dev);
+
+extern int  usb_hub_init(void);
+extern void usb_hub_cleanup(void);
+extern int usb_major_init(void);
+extern void usb_major_cleanup(void);
+extern int usb_host_init(void);
+extern void usb_host_cleanup(void);
 
 /* for labeling diagnostics */
 extern const char *usbcore_name;
@@ -31,6 +36,7 @@ extern struct usb_driver usbfs_driver;
 extern struct file_operations usbfs_devices_fops;
 extern struct file_operations usbfs_device_file_operations;
 extern void usbfs_conn_disc_event(void);
+
 
 struct dev_state {
 	struct list_head list;      /* state list */

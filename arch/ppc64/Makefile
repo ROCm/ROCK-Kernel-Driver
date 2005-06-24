@@ -15,17 +15,38 @@
 
 KERNELLOAD	:= 0xc000000000000000
 
+# Set default 32 bits cross compilers for vdso and boot wrapper
+CROSS32_COMPILE ?=
+
+CROSS32CC		:= $(CROSS32_COMPILE)gcc
+CROSS32AS		:= $(CROSS32_COMPILE)as
+CROSS32LD		:= $(CROSS32_COMPILE)ld
+CROSS32OBJCOPY		:= $(CROSS32_COMPILE)objcopy
+
+# If we have a biarch compiler, use it for 32 bits cross compile if
+# CROSS32_COMPILE wasn't explicitely defined, and add proper explicit
+# target type to target compilers
+
 HAS_BIARCH      := $(call cc-option-yn, -m64)
 ifeq ($(HAS_BIARCH),y)
+ifeq ($(CROSS32_COMPILE),)
+CROSS32CC	:= $(CC) -m32
+CROSS32AS	:= $(AS) -a32
+CROSS32LD	:= $(LD) -m elf32ppc
+CROSS32OBJCOPY	:= $(OBJCOPY)
+endif
 AS              := $(AS) -a64
 LD              := $(LD) -m elf64ppc
 CC		:= $(CC) -m64
 endif
 
+export CROSS32CC CROSS32AS CROSS32LD CROSS32OBJCOPY
+
 new_nm := $(shell if $(NM) --help 2>&1 | grep -- '--synthetic' > /dev/null; then echo y; else echo n; fi)
 
 ifeq ($(new_nm),y)
 NM		:= $(NM) --synthetic
+
 endif
 
 CHECKFLAGS	+= -m64 -D__powerpc__
@@ -35,9 +56,16 @@ LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 CFLAGS		+= -msoft-float -pipe -mminimal-toc -mtraceback=none \
 		   -mcall-aixdesc
 
+GCC_VERSION     := $(call cc-version)
+GCC_BROKEN_VEC	:= $(shell if [ $(GCC_VERSION) -lt 0400 ] ; then echo "y"; fi ;)
+
 ifeq ($(CONFIG_POWER4_ONLY),y)
 ifeq ($(CONFIG_ALTIVEC),y)
+ifeq ($(GCC_BROKEN_VEC),y)
 	CFLAGS += $(call cc-option,-mcpu=970)
+else
+	CFLAGS += $(call cc-option,-mcpu=power4)
+endif
 else
 	CFLAGS += $(call cc-option,-mcpu=power4)
 endif
@@ -65,14 +93,20 @@ boottarget-$(CONFIG_PPC_ISERIES) := vmlinux.sminitrd vmlinux.initrd vmlinux.sm
 $(boottarget-y): vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
-bootimage-$(CONFIG_PPC_PSERIES) := zImage
-bootimage-$(CONFIG_PPC_MAPLE) := zImage
+bootimage-$(CONFIG_PPC_PSERIES) := $(boot)/zImage
+bootimage-$(CONFIG_PPC_PMAC) := vmlinux
+bootimage-$(CONFIG_PPC_MAPLE) := $(boot)/zImage
 bootimage-$(CONFIG_PPC_ISERIES) := vmlinux
 BOOTIMAGE := $(bootimage-y)
 install: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
 
-all: $(BOOTIMAGE)
+defaultimage-$(CONFIG_PPC_PSERIES) := zImage
+defaultimage-$(CONFIG_PPC_PMAC) := vmlinux
+defaultimage-$(CONFIG_PPC_MAPLE) := zImage
+defaultimage-$(CONFIG_PPC_ISERIES) := vmlinux
+KBUILD_IMAGE := $(defaultimage-y)
+all: $(KBUILD_IMAGE)
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
@@ -92,4 +126,4 @@ define archhelp
   echo  '		   (arch/$(ARCH)/boot/zImage.initrd)'
 endef
 
-MRPROPER_FILES += include/asm-ppc64/offsets.h
+CLEAN_FILES += include/asm-ppc64/offsets.h

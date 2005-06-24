@@ -1264,10 +1264,14 @@ static void snd_vx_pcm_free(snd_pcm_t *pcm)
 {
 	vx_core_t *chip = pcm->private_data;
 	chip->pcm[pcm->device] = NULL;
-	kfree(chip->playback_pipes);
-	chip->playback_pipes = NULL;
-	kfree(chip->capture_pipes);
-	chip->capture_pipes = NULL;
+	if (chip->playback_pipes) {
+		kfree(chip->playback_pipes);
+		chip->playback_pipes = NULL;
+	}
+	if (chip->capture_pipes) {
+		kfree(chip->capture_pipes);
+		chip->capture_pipes = NULL;
+	}
 }
 
 /*

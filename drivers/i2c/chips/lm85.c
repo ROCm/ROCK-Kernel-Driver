@@ -27,6 +27,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/jiffies.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 #include <linux/i2c-vid.h>
@@ -36,7 +37,7 @@ static unsigned short normal_i2c[] = { 0x2c, 0x2d, 0x2e, I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
-SENSORS_INSMOD_5(lm85b, lm85c, adm1027, adt7463, emc6d100);
+SENSORS_INSMOD_6(lm85b, lm85c, adm1027, adt7463, emc6d100, emc6d102);
 
 /* The LM85 registers */
 
@@ -73,8 +74,10 @@ SENSORS_INSMOD_5(lm85b, lm85c, adm1027, adt7463, emc6d100);
 #define	LM85_VERSTEP_LM85B		0x62
 #define	LM85_VERSTEP_ADM1027		0x60
 #define	LM85_VERSTEP_ADT7463		0x62
+#define	LM85_VERSTEP_ADT7463C		0x6A
 #define	LM85_VERSTEP_EMC6D100_A0        0x60
 #define	LM85_VERSTEP_EMC6D100_A1        0x61
+#define	LM85_VERSTEP_EMC6D102		0x65
 
 #define	LM85_REG_CONFIG			0x40
 
@@ -111,9 +114,13 @@ SENSORS_INSMOD_5(lm85b, lm85c, adm1027, adt7463, emc6d100);
 
 #define EMC6D100_REG_ALARM3             0x7d
 /* IN5, IN6 and IN7 */
-#define EMC6D100_REG_IN(nr)             (0x70 + ((nr)-5))
-#define EMC6D100_REG_IN_MIN(nr)         (0x73 + ((nr)-5) * 2)
-#define EMC6D100_REG_IN_MAX(nr)         (0x74 + ((nr)-5) * 2)
+#define	EMC6D100_REG_IN(nr)             (0x70 + ((nr)-5))
+#define	EMC6D100_REG_IN_MIN(nr)         (0x73 + ((nr)-5) * 2)
+#define	EMC6D100_REG_IN_MAX(nr)         (0x74 + ((nr)-5) * 2)
+#define	EMC6D102_REG_EXTEND_ADC1	0x85
+#define	EMC6D102_REG_EXTEND_ADC2	0x86
+#define	EMC6D102_REG_EXTEND_ADC3	0x87
+#define	EMC6D102_REG_EXTEND_ADC4	0x88
 
 #define	LM85_ALARM_IN0			0x0001
 #define	LM85_ALARM_IN1			0x0002
@@ -138,35 +145,36 @@ SENSORS_INSMOD_5(lm85b, lm85c, adm1027, adt7463, emc6d100);
    these macros are called: arguments may be evaluated more than once.
  */
 
-/* IN are scaled 1.000 == 0xc0, mag = 3 */
-#define IN_TO_REG(val)		(SENSORS_LIMIT((((val)*0xc0+500)/1000),0,255))
-#define INEXT_FROM_REG(val,ext) (((val)*1000 + (ext)*250 + 96)/0xc0)
-#define IN_FROM_REG(val)	(INEXT_FROM_REG(val,0))
-
 /* IN are scaled acording to built-in resistors */
 static int lm85_scaling[] = {  /* .001 Volts */
 		2500, 2250, 3300, 5000, 12000,
 		3300, 1500, 1800 /*EMC6D100*/
 	};
 #define SCALE(val,from,to)		(((val)*(to) + ((from)/2))/(from))
-#define INS_TO_REG(n,val)		(SENSORS_LIMIT(SCALE(val,lm85_scaling[n],192),0,255))
-#define INSEXT_FROM_REG(n,val,ext)	(SCALE((val)*4 + (ext),192*4,lm85_scaling[n]))
-#define INS_FROM_REG(n,val)		(INSEXT_FROM_REG(n,val,0))
+
+#define INS_TO_REG(n,val)	\
+		SENSORS_LIMIT(SCALE(val,lm85_scaling[n],192),0,255)
+
+#define INSEXT_FROM_REG(n,val,ext,scale)	\
+		SCALE((val)*(scale) + (ext),192*(scale),lm85_scaling[n])
+
+#define INS_FROM_REG(n,val)   INSEXT_FROM_REG(n,val,0,1)
 
 /* FAN speed is measured using 90kHz clock */
 #define FAN_TO_REG(val)		(SENSORS_LIMIT( (val)<=0?0: 5400000/(val),0,65534))
 #define FAN_FROM_REG(val)	((val)==0?-1:(val)==0xffff?0:5400000/(val))
 
 /* Temperature is reported in .001 degC increments */
-#define TEMP_TO_REG(val)		(SENSORS_LIMIT(((val)+500)/1000,-127,127))
-#define TEMPEXT_FROM_REG(val,ext)	((val)*1000 + (ext)*250)
-#define TEMP_FROM_REG(val)		(TEMPEXT_FROM_REG(val,0))
-#define EXTTEMP_TO_REG(val)		(SENSORS_LIMIT((val)/250,-127,127))
+#define TEMP_TO_REG(val)	\
+		SENSORS_LIMIT(SCALE(val,1000,1),-127,127)
+#define TEMPEXT_FROM_REG(val,ext,scale)	\
+		SCALE((val)*scale + (ext),scale,1000)
+#define TEMP_FROM_REG(val)	\
+		TEMPEXT_FROM_REG(val,0,1)
 
 #define PWM_TO_REG(val)			(SENSORS_LIMIT(val,0,255))
 #define PWM_FROM_REG(val)		(val)
 
-#define EXT_FROM_REG(val,sensor)	(((val)>>(sensor * 2))&0x03)
 
 /* ZONEs have the following parameters:
  *    Limit (low) temp,           1. degC
@@ -354,7 +362,9 @@ struct lm85_data {
 	u8 pwm[3];		/* Register value */
 	u8 spinup_ctl;		/* Register encoding, combined */
 	u8 tach_mode;		/* Register encoding, combined */
-	u16 extend_adc;		/* Register value */
+	u8 temp_ext[3];		/* Decoded values */
+	u8 in_ext[8];		/* Decoded values */
+	u8 adc_scale;		/* ADC Extended bits scaling factor */
 	u8 fan_ppr;		/* Register value */
 	u8 smooth[3];		/* Register encoding */
 	u8 vid;			/* Register value */
@@ -389,9 +399,6 @@ static struct i2c_driver lm85_driver = {
 	.detach_client  = lm85_detach_client,
 };
 
-/* Unique ID assigned to each LM85 detected */
-static int lm85_id;
-
 
 /* 4 Fans */
 static ssize_t show_fan(struct device *dev, char *buf, int nr)
@@ -409,10 +416,9 @@ static ssize_t set_fan_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int	val;
+	long val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->fan_min[nr] = FAN_TO_REG(val);
 	lm85_write_value(client, LM85_REG_FAN_MIN(nr), data->fan_min[nr]);
 	up(&data->update_lock);
@@ -492,10 +498,9 @@ static ssize_t set_pwm(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int	val;
+	long val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->pwm[nr] = PWM_TO_REG(val);
 	lm85_write_value(client, LM85_REG_PWM(nr), data->pwm[nr]);
 	up(&data->update_lock);
@@ -538,7 +543,10 @@ show_pwm_reg(3);
 static ssize_t show_in(struct device *dev, char *buf, int nr)
 {
 	struct lm85_data *data = lm85_update_device(dev);
-	return sprintf(buf,"%d\n", INS_FROM_REG(nr, data->in[nr]) );
+	return sprintf(	buf, "%d\n", INSEXT_FROM_REG(nr,
+						     data->in[nr],
+						     data->in_ext[nr],
+						     data->adc_scale) );
 }
 static ssize_t show_in_min(struct device *dev, char *buf, int nr)
 {
@@ -550,10 +558,9 @@ static ssize_t set_in_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int	val;
+	long val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->in_min[nr] = INS_TO_REG(nr, val);
 	lm85_write_value(client, LM85_REG_IN_MIN(nr), data->in_min[nr]);
 	up(&data->update_lock);
@@ -569,10 +576,9 @@ static ssize_t set_in_max(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int	val;
+	long val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->in_max[nr] = INS_TO_REG(nr, val);
 	lm85_write_value(client, LM85_REG_IN_MAX(nr), data->in_max[nr]);
 	up(&data->update_lock);
@@ -619,7 +625,9 @@ show_in_reg(4);
 static ssize_t show_temp(struct device *dev, char *buf, int nr)
 {
 	struct lm85_data *data = lm85_update_device(dev);
-	return sprintf(buf,"%d\n", TEMP_FROM_REG(data->temp[nr]) );
+	return sprintf(buf,"%d\n", TEMPEXT_FROM_REG(data->temp[nr],
+						    data->temp_ext[nr],
+						    data->adc_scale) );
 }
 static ssize_t show_temp_min(struct device *dev, char *buf, int nr)
 {
@@ -631,10 +639,9 @@ static ssize_t set_temp_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int	val;
+	long val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->temp_min[nr] = TEMP_TO_REG(val);
 	lm85_write_value(client, LM85_REG_TEMP_MIN(nr), data->temp_min[nr]);
 	up(&data->update_lock);
@@ -650,10 +657,9 @@ static ssize_t set_temp_max(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int	val;
+	long val = simple_strtol(buf, NULL, 10);	
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->temp_max[nr] = TEMP_TO_REG(val);
 	lm85_write_value(client, LM85_REG_TEMP_MAX(nr), data->temp_max[nr]);
 	up(&data->update_lock);
@@ -706,10 +712,9 @@ static ssize_t set_pwm_auto_channels(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int     val;
+	long val = simple_strtol(buf, NULL, 10);   
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->autofan[nr].config = (data->autofan[nr].config & (~0xe0))
 		| ZONE_TO_REG(val) ;
 	lm85_write_value(client, LM85_REG_AFAN_CONFIG(nr),
@@ -727,10 +732,9 @@ static ssize_t set_pwm_auto_pwm_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int     val;
+	long val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->autofan[nr].min_pwm = PWM_TO_REG(val);
 	lm85_write_value(client, LM85_REG_AFAN_MINPWM(nr),
 		data->autofan[nr].min_pwm);
@@ -747,10 +751,9 @@ static ssize_t set_pwm_auto_pwm_minctl(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int     val;
+	long val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->autofan[nr].min_off = val;
 	lm85_write_value(client, LM85_REG_AFAN_SPIKE1, data->smooth[0]
 		| data->syncpwm3
@@ -771,10 +774,9 @@ static ssize_t set_pwm_auto_pwm_freq(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int     val;
+	long val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->autofan[nr].freq = FREQ_TO_REG(val);
 	lm85_write_value(client, LM85_REG_AFAN_RANGE(nr),
 		(data->zone[nr].range << 4)
@@ -853,10 +855,10 @@ static ssize_t set_temp_auto_temp_off(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int    min, val;
+	int min;
+	long val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	min = TEMP_FROM_REG(data->zone[nr].limit);
 	data->zone[nr].off_desired = TEMP_TO_REG(val);
 	data->zone[nr].hyst = HYST_TO_REG(min - val);
@@ -883,10 +885,9 @@ static ssize_t set_temp_auto_temp_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int    val;
+	long val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->zone[nr].limit = TEMP_TO_REG(val);
 	lm85_write_value(client, LM85_REG_AFAN_LIMIT(nr),
 		data->zone[nr].limit);
@@ -927,11 +928,11 @@ static ssize_t set_temp_auto_temp_max(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int    min, val;
+	int min;
+	long val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
 	min = TEMP_FROM_REG(data->zone[nr].limit);
-	val = simple_strtol(buf, NULL, 10);
 	data->zone[nr].max_desired = TEMP_TO_REG(val);
 	data->zone[nr].range = RANGE_TO_REG(
 		val - min);
@@ -951,10 +952,9 @@ static ssize_t set_temp_auto_temp_crit(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm85_data *data = i2c_get_clientdata(client);
-	int     val;
+	long val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->zone[nr].critical = TEMP_TO_REG(val);
 	lm85_write_value(client, LM85_REG_AFAN_CRITICAL(nr),
 		data->zone[nr].critical);
@@ -1091,7 +1091,8 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 		    && verstep == LM85_VERSTEP_ADM1027 ) {
 			kind = adm1027 ;
 		} else if( company == LM85_COMPANY_ANALOG_DEV
-		    && verstep == LM85_VERSTEP_ADT7463 ) {
+		    && (verstep == LM85_VERSTEP_ADT7463
+			 || verstep == LM85_VERSTEP_ADT7463C) ) {
 			kind = adt7463 ;
 		} else if( company == LM85_COMPANY_ANALOG_DEV
 		    && (verstep & LM85_VERSTEP_VMASK) == LM85_VERSTEP_GENERIC ) {
@@ -1108,6 +1109,9 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 			 * inputs read 0, then it's a '101.
 			 */
 			kind = emc6d100 ;
+		} else if( company == LM85_COMPANY_SMSC
+		    && verstep == LM85_VERSTEP_EMC6D102) {
+			kind = emc6d102 ;
 		} else if( company == LM85_COMPANY_SMSC
 		    && (verstep & LM85_VERSTEP_VMASK) == LM85_VERSTEP_GENERIC) {
 			dev_err(&adapter->dev, "lm85: Detected SMSC chip\n");
@@ -1144,19 +1148,15 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 		type_name = "adt7463";
 	} else if ( kind == emc6d100){
 		type_name = "emc6d100";
+	} else if ( kind == emc6d102 ) {
+		type_name = "emc6d102";
 	}
 	strlcpy(new_client->name, type_name, I2C_NAME_SIZE);
 
 	/* Fill in the remaining client fields */
-	new_client->id = lm85_id++;
 	data->type = kind;
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);
-
-	dev_dbg(&adapter->dev, "Assigning ID %d to %s at %d,0x%02x\n",
-		new_client->id, new_client->name,
-		i2c_adapter_id(new_client->adapter),
-		new_client->addr);
 
 	/* Tell the I2C layer a new client has arrived */
 	if ((err = i2c_attach_client(new_client)))
@@ -1267,7 +1267,6 @@ int lm85_read_value(struct i2c_client *client, u8 reg)
 	case LM85_REG_FAN_MIN(2) :
 	case LM85_REG_FAN_MIN(3) :
 	case LM85_REG_ALARM1 :	/* Read both bytes at once */
-	case ADM1027_REG_EXTEND_ADC1 :  /* Read two bytes at once */
 		res = i2c_smbus_read_byte_data(client, reg) & 0xff ;
 		res |= i2c_smbus_read_byte_data(client, reg+1) << 8 ;
 		break ;
@@ -1363,7 +1362,7 @@ static struct lm85_data *lm85_update_device(struct device *dev)
 	down(&data->update_lock);
 
 	if ( !data->valid ||
-	     (jiffies - data->last_reading > LM85_DATA_INTERVAL ) ) {
+	     time_after(jiffies, data->last_reading + LM85_DATA_INTERVAL) ) {
 		/* Things that change quickly */
 		dev_dbg(&client->dev, "Reading sensor values\n");
 		
@@ -1371,9 +1370,24 @@ static struct lm85_data *lm85_update_device(struct device *dev)
 		 * more significant bits that are read later.
 		 */
 		if ( (data->type == adm1027) || (data->type == adt7463) ) {
-			data->extend_adc =
-			    lm85_read_value(client, ADM1027_REG_EXTEND_ADC1);
+			int ext1 = lm85_read_value(client,
+						   ADM1027_REG_EXTEND_ADC1);
+			int ext2 =  lm85_read_value(client,
+						    ADM1027_REG_EXTEND_ADC2);
+			int val = (ext1 << 8) + ext2;
+
+			for(i = 0; i <= 4; i++)
+				data->in_ext[i] = (val>>(i * 2))&0x03;
+
+			for(i = 0; i <= 2; i++)
+				data->temp_ext[i] = (val>>((i + 5) * 2))&0x03;
 		}
+
+		/* adc_scale is 2^(number of LSBs). There are 4 extra bits in
+		   the emc6d102 and 2 in the adt7463 and adm1027. In all
+		   other chips ext is always 0 and the value of scale is
+		   irrelevant. So it is left in 4*/
+		data->adc_scale = (data->type == emc6d102 ) ? 16 : 4;
 
 		for (i = 0; i <= 4; ++i) {
 			data->in[i] =
@@ -1411,13 +1425,35 @@ static struct lm85_data *lm85_update_device(struct device *dev)
 			/* More alarm bits */
 			data->alarms |=
 				lm85_read_value(client, EMC6D100_REG_ALARM3) << 16;
+		} else if (data->type == emc6d102 ) {
+			/* Have to read LSB bits after the MSB ones because
+			   the reading of the MSB bits has frozen the
+			   LSBs (backward from the ADM1027).
+			 */
+			int ext1 = lm85_read_value(client,
+						   EMC6D102_REG_EXTEND_ADC1);
+			int ext2 = lm85_read_value(client,
+						   EMC6D102_REG_EXTEND_ADC2);
+			int ext3 = lm85_read_value(client,
+						   EMC6D102_REG_EXTEND_ADC3);
+			int ext4 = lm85_read_value(client,
+						   EMC6D102_REG_EXTEND_ADC4);
+			data->in_ext[0] = ext3 & 0x0f;
+			data->in_ext[1] = ext4 & 0x0f;
+			data->in_ext[2] = (ext4 >> 4) & 0x0f;
+			data->in_ext[3] = (ext3 >> 4) & 0x0f;
+			data->in_ext[4] = (ext2 >> 4) & 0x0f;
+
+			data->temp_ext[0] = ext1 & 0x0f;
+			data->temp_ext[1] = ext2 & 0x0f;
+			data->temp_ext[2] = (ext1 >> 4) & 0x0f;
 		}
 
 		data->last_reading = jiffies ;
 	};  /* last_reading */
 
 	if ( !data->valid ||
-	     (jiffies - data->last_config > LM85_CONFIG_INTERVAL) ) {
+	     time_after(jiffies, data->last_config + LM85_CONFIG_INTERVAL) ) {
 		/* Things that don't change often */
 		dev_dbg(&client->dev, "Reading config values\n");
 

@@ -38,16 +38,6 @@ config DEBUG_ERRORS
 	  you are concerned with the code size or don't want to see these
 	  messages.
 
-config DEBUG_INFO
-	bool "Include GDB debugging information in kernel binary"
-	help
-	  Say Y here to include source-level debugging information in the
-	  `vmlinux' binary image. This is handy if you want to use gdb or
-	  addr2line to debug the kernel. It has no impact on the in-memory
-	  footprint of the running kernel but it can increase the amount of
-	  time and disk space needed for compilation of the kernel. If in
-	  doubt say N.
-
 # These options are only for real kernel hackers who want to get their hands dirty.
 config DEBUG_LL
 	bool "Kernel low-level debugging functions"

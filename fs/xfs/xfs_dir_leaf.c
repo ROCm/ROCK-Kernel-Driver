@@ -160,9 +160,9 @@ xfs_dir_shortform_create(xfs_da_args_t *args, xfs_ino_t parent)
 	ASSERT(dp->i_df.if_bytes == 0);
 	xfs_idata_realloc(dp, sizeof(*hdr), XFS_DATA_FORK);
 	hdr = (xfs_dir_sf_hdr_t *)dp->i_df.if_u1.if_data;
-	XFS_DIR_SF_PUT_DIRINO_ARCH(&parent, &hdr->parent, ARCH_CONVERT);
+	XFS_DIR_SF_PUT_DIRINO(&parent, &hdr->parent);
 
-	INT_ZERO(hdr->count, ARCH_CONVERT);
+	hdr->count = 0;
 	dp->i_d.di_size = sizeof(*hdr);
 	xfs_trans_log_inode(args->trans, dp, XFS_ILOG_CORE | XFS_ILOG_DDATA);
 	return(0);
@@ -208,7 +208,7 @@ xfs_dir_shortform_addname(xfs_da_args_t *args)
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	sfe = (xfs_dir_sf_entry_t *)((char *)sf + offset);
 
-	XFS_DIR_SF_PUT_DIRINO_ARCH(&args->inumber, &sfe->inumber, ARCH_CONVERT);
+	XFS_DIR_SF_PUT_DIRINO(&args->inumber, &sfe->inumber);
 	sfe->namelen = args->namelen;
 	memcpy(sfe->name, args->name, sfe->namelen);
 	INT_MOD(sf->hdr.count, ARCH_CONVERT, +1);
@@ -298,7 +298,7 @@ xfs_dir_shortform_lookup(xfs_da_args_t *args)
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	if (args->namelen == 2 &&
 	    args->name[0] == '.' && args->name[1] == '.') {
-		XFS_DIR_SF_GET_DIRINO_ARCH(&sf->hdr.parent, &args->inumber, ARCH_CONVERT);
+		XFS_DIR_SF_GET_DIRINO(&sf->hdr.parent, &args->inumber);
 		return(XFS_ERROR(EEXIST));
 	}
 	if (args->namelen == 1 && args->name[0] == '.') {
@@ -310,7 +310,7 @@ xfs_dir_shortform_lookup(xfs_da_args_t *args)
 		if (sfe->namelen == args->namelen &&
 		    sfe->name[0] == args->name[0] &&
 		    memcmp(args->name, sfe->name, args->namelen) == 0) {
-			XFS_DIR_SF_GET_DIRINO_ARCH(&sfe->inumber, &args->inumber, ARCH_CONVERT);
+			XFS_DIR_SF_GET_DIRINO(&sfe->inumber, &args->inumber);
 			return(XFS_ERROR(EEXIST));
 		}
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
@@ -353,7 +353,7 @@ xfs_dir_shortform_to_leaf(xfs_da_args_t *iargs)
 	memcpy(tmpbuffer, dp->i_df.if_u1.if_data, size);
 
 	sf = (xfs_dir_shortform_t *)tmpbuffer;
-	XFS_DIR_SF_GET_DIRINO_ARCH(&sf->hdr.parent, &inumber, ARCH_CONVERT);
+	XFS_DIR_SF_GET_DIRINO(&sf->hdr.parent, &inumber);
 
 	xfs_idata_realloc(dp, -size, XFS_DATA_FORK);
 	dp->i_d.di_size = 0;
@@ -398,7 +398,7 @@ xfs_dir_shortform_to_leaf(xfs_da_args_t *iargs)
 		args.namelen = sfe->namelen;
 		args.hashval = xfs_da_hashname((char *)(sfe->name),
 					       sfe->namelen);
-		XFS_DIR_SF_GET_DIRINO_ARCH(&sfe->inumber, &args.inumber, ARCH_CONVERT);
+		XFS_DIR_SF_GET_DIRINO(&sfe->inumber, &args.inumber);
 		retval = xfs_dir_leaf_addname(&args);
 		if (retval)
 			goto out;
@@ -470,7 +470,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 	sbp->entno = 1;
 	sbp->seqno = 0;
 	sbp->hash = xfs_dir_hash_dotdot;
-	sbp->ino = XFS_GET_DIR_INO_ARCH(mp, sf->hdr.parent, ARCH_CONVERT);
+	sbp->ino = XFS_GET_DIR_INO8(sf->hdr.parent);
 	sbp->name = "..";
 	sbp->namelen = 2;
 	sbp++;
@@ -494,7 +494,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 		sbp->entno = i + 2;
 		sbp->seqno = 0;
 		sbp->hash = xfs_da_hashname((char *)sfe->name, sfe->namelen);
-		sbp->ino = XFS_GET_DIR_INO_ARCH(mp, sfe->inumber, ARCH_CONVERT);
+		sbp->ino = XFS_GET_DIR_INO8(sfe->inumber);
 		sbp->name = (char *)sfe->name;
 		sbp->namelen = sfe->namelen;
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
@@ -612,7 +612,7 @@ xfs_dir_shortform_replace(xfs_da_args_t *args)
 	if (args->namelen == 2 &&
 	    args->name[0] == '.' && args->name[1] == '.') {
 		/* XXX - replace assert? */
-		XFS_DIR_SF_PUT_DIRINO_ARCH(&args->inumber, &sf->hdr.parent, ARCH_CONVERT);
+		XFS_DIR_SF_PUT_DIRINO(&args->inumber, &sf->hdr.parent);
 		xfs_trans_log_inode(args->trans, dp, XFS_ILOG_DDATA);
 		return(0);
 	}
@@ -624,7 +624,7 @@ xfs_dir_shortform_replace(xfs_da_args_t *args)
 		    memcmp(args->name, sfe->name, args->namelen) == 0) {
 			ASSERT(memcmp((char *)&args->inumber,
 				(char *)&sfe->inumber, sizeof(xfs_ino_t)));
-			XFS_DIR_SF_PUT_DIRINO_ARCH(&args->inumber, &sfe->inumber, ARCH_CONVERT);
+			XFS_DIR_SF_PUT_DIRINO(&args->inumber, &sfe->inumber);
 			xfs_trans_log_inode(args->trans, dp, XFS_ILOG_DDATA);
 			return(0);
 		}
@@ -675,10 +675,10 @@ xfs_dir_leaf_to_shortform(xfs_da_args_t *iargs)
 		if ((entry->namelen == 2) &&
 		    (namest->name[0] == '.') &&
 		    (namest->name[1] == '.')) {
-			XFS_DIR_SF_GET_DIRINO_ARCH(&namest->inumber, &parent, ARCH_CONVERT);
-			INT_ZERO(entry->nameidx, ARCH_CONVERT);
+			XFS_DIR_SF_GET_DIRINO(&namest->inumber, &parent);
+			entry->nameidx = 0;
 		} else if ((entry->namelen == 1) && (namest->name[0] == '.')) {
-			INT_ZERO(entry->nameidx, ARCH_CONVERT);
+			entry->nameidx = 0;
 		}
 	}
 	retval = xfs_da_shrink_inode(iargs, 0, bp);
@@ -701,13 +701,13 @@ xfs_dir_leaf_to_shortform(xfs_da_args_t *iargs)
 	args.justcheck = 0;
 	args.addname = args.oknoent = 1;
 	for (i = 0; i < INT_GET(hdr->count, ARCH_CONVERT); entry++, i++) {
-		if (INT_ISZERO(entry->nameidx, ARCH_CONVERT))
+		if (!entry->nameidx)
 			continue;
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(entry->nameidx, ARCH_CONVERT));
 		args.name = (char *)(namest->name);
 		args.namelen = entry->namelen;
 		args.hashval = INT_GET(entry->hashval, ARCH_CONVERT);
-		XFS_DIR_SF_GET_DIRINO_ARCH(&namest->inumber, &args.inumber, ARCH_CONVERT);
+		XFS_DIR_SF_GET_DIRINO(&namest->inumber, &args.inumber);
 		xfs_dir_shortform_addname(&args);
 	}
 
@@ -801,7 +801,7 @@ xfs_dir_leaf_create(xfs_da_args_t *args, xfs_dablk_t blkno, xfs_dabuf_t **bpp)
 	hdr = &leaf->hdr;
 	INT_SET(hdr->info.magic, ARCH_CONVERT, XFS_DIR_LEAF_MAGIC);
 	INT_SET(hdr->firstused, ARCH_CONVERT, XFS_LBSIZE(dp->i_mount));
-	if (INT_ISZERO(hdr->firstused, ARCH_CONVERT))
+	if (!hdr->firstused)
 		INT_SET(hdr->firstused, ARCH_CONVERT, XFS_LBSIZE(dp->i_mount) - 1);
 	INT_SET(hdr->freemap[0].base, ARCH_CONVERT, sizeof(xfs_dir_leaf_hdr_t));
 	INT_SET(hdr->freemap[0].size, ARCH_CONVERT, INT_GET(hdr->firstused, ARCH_CONVERT) - INT_GET(hdr->freemap[0].base, ARCH_CONVERT));
@@ -895,7 +895,7 @@ xfs_dir_leaf_add(xfs_dabuf_t *bp, xfs_da_args_t *args, int index)
 			sum += INT_GET(map->size, ARCH_CONVERT);
 			continue;
 		}
-		if (INT_ISZERO(map->size, ARCH_CONVERT))
+		if (!map->size)
 			continue;	/* no space in this map */
 		tmp = entsize;
 		if (INT_GET(map->base, ARCH_CONVERT) < INT_GET(hdr->firstused, ARCH_CONVERT))
@@ -995,7 +995,7 @@ xfs_dir_leaf_add_work(xfs_dabuf_t *bp, xfs_da_args_t *args, int index,
 	 * Copy the string and inode number into the new space.
 	 */
 	namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(entry->nameidx, ARCH_CONVERT));
-	XFS_DIR_SF_PUT_DIRINO_ARCH(&args->inumber, &namest->inumber, ARCH_CONVERT);
+	XFS_DIR_SF_PUT_DIRINO(&args->inumber, &namest->inumber);
 	memcpy(namest->name, args->name, args->namelen);
 	xfs_da_log_buf(args->trans, bp,
 	    XFS_DA_LOGRANGE(leaf, namest, XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry)));
@@ -1060,10 +1060,10 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp, int musthave,
 	hdr_d = &leaf_d->hdr;
 	hdr_d->info = hdr_s->info;	/* struct copy */
 	INT_SET(hdr_d->firstused, ARCH_CONVERT, lbsize);
-	if (INT_ISZERO(hdr_d->firstused, ARCH_CONVERT))
+	if (!hdr_d->firstused)
 		INT_SET(hdr_d->firstused, ARCH_CONVERT, lbsize - 1);
-	INT_ZERO(hdr_d->namebytes, ARCH_CONVERT);
-	INT_ZERO(hdr_d->count, ARCH_CONVERT);
+	hdr_d->namebytes = 0;
+	hdr_d->count = 0;
 	hdr_d->holes = 0;
 	INT_SET(hdr_d->freemap[0].base, ARCH_CONVERT, sizeof(xfs_dir_leaf_hdr_t));
 	INT_SET(hdr_d->freemap[0].size, ARCH_CONVERT, INT_GET(hdr_d->firstused, ARCH_CONVERT) - INT_GET(hdr_d->freemap[0].base, ARCH_CONVERT));
@@ -1366,7 +1366,7 @@ xfs_dir_leaf_toosmall(xfs_da_state_t *state, int *action)
 		 * Make altpath point to the block we want to keep and
 		 * path point to the block we want to drop (this one).
 		 */
-		forward = !INT_ISZERO(info->forw, ARCH_CONVERT);
+		forward = info->forw;
 		memcpy(&state->altpath, &state->path, sizeof(state->path));
 		error = xfs_da_path_shift(state, &state->altpath, forward,
 						 0, &retval);
@@ -1515,8 +1515,8 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, xfs_dabuf_t *bp, int index)
 			map = &hdr->freemap[before];
 			INT_MOD(map->size, ARCH_CONVERT, entsize);
 			INT_MOD(map->size, ARCH_CONVERT, INT_GET(hdr->freemap[after].size, ARCH_CONVERT));
-			INT_ZERO(hdr->freemap[after].base, ARCH_CONVERT);
-			INT_ZERO(hdr->freemap[after].size, ARCH_CONVERT);
+			hdr->freemap[after].base = 0;
+			hdr->freemap[after].size = 0;
 		} else if (before >= 0) {
 			map = &hdr->freemap[before];
 			INT_MOD(map->size, ARCH_CONVERT, entsize);
@@ -1576,7 +1576,7 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, xfs_dabuf_t *bp, int index)
 				tmp = INT_GET(entry->nameidx, ARCH_CONVERT);
 		}
 		INT_SET(hdr->firstused, ARCH_CONVERT, tmp);
-		if (INT_ISZERO(hdr->firstused, ARCH_CONVERT))
+		if (!hdr->firstused)
 			INT_SET(hdr->firstused, ARCH_CONVERT, tmp - 1);
 	} else {
 		hdr->holes = 1;		/* mark as needing compaction */
@@ -1656,11 +1656,11 @@ xfs_dir_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 		tmp_leaf = (xfs_dir_leafblock_t *)tmpbuffer;
 		tmp_hdr = &tmp_leaf->hdr;
 		tmp_hdr->info = save_hdr->info;	/* struct copy */
-		INT_ZERO(tmp_hdr->count, ARCH_CONVERT);
+		tmp_hdr->count = 0;
 		INT_SET(tmp_hdr->firstused, ARCH_CONVERT, state->blocksize);
-		if (INT_ISZERO(tmp_hdr->firstused, ARCH_CONVERT))
+		if (!tmp_hdr->firstused)
 			INT_SET(tmp_hdr->firstused, ARCH_CONVERT, state->blocksize - 1);
-		INT_ZERO(tmp_hdr->namebytes, ARCH_CONVERT);
+		tmp_hdr->namebytes = 0;
 		if (xfs_dir_leaf_order(save_blk->bp, drop_blk->bp)) {
 			xfs_dir_leaf_moveents(drop_leaf, 0, tmp_leaf, 0,
 						 (int)INT_GET(drop_hdr->count, ARCH_CONVERT), mp);
@@ -1732,7 +1732,7 @@ xfs_dir_leaf_lookup_int(xfs_dabuf_t *bp, xfs_da_args_t *args, int *index)
 			break;
 	}
 	ASSERT((probe >= 0) && \
-	       ((INT_ISZERO(leaf->hdr.count, ARCH_CONVERT)) || (probe < INT_GET(leaf->hdr.count, ARCH_CONVERT))));
+	       ((!leaf->hdr.count) || (probe < INT_GET(leaf->hdr.count, ARCH_CONVERT))));
 	ASSERT((span <= 4) || (INT_GET(entry->hashval, ARCH_CONVERT) == hashval));
 
 	/*
@@ -1761,7 +1761,7 @@ xfs_dir_leaf_lookup_int(xfs_dabuf_t *bp, xfs_da_args_t *args, int *index)
 		if (entry->namelen == args->namelen &&
 		    namest->name[0] == args->name[0] &&
 		    memcmp(args->name, namest->name, args->namelen) == 0) {
-			XFS_DIR_SF_GET_DIRINO_ARCH(&namest->inumber, &args->inumber, ARCH_CONVERT);
+			XFS_DIR_SF_GET_DIRINO(&namest->inumber, &args->inumber);
 			*index = probe;
 			return(XFS_ERROR(EEXIST));
 		}
@@ -1886,8 +1886,8 @@ xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 	INT_SET(hdr_d->freemap[0].base, ARCH_CONVERT, (uint)sizeof(xfs_dir_leaf_hdr_t));
 	INT_MOD(hdr_d->freemap[0].base, ARCH_CONVERT, INT_GET(hdr_d->count, ARCH_CONVERT) * (uint)sizeof(xfs_dir_leaf_entry_t));
 	INT_SET(hdr_d->freemap[0].size, ARCH_CONVERT, INT_GET(hdr_d->firstused, ARCH_CONVERT) - INT_GET(hdr_d->freemap[0].base, ARCH_CONVERT));
-	INT_SET(hdr_d->freemap[1].base, ARCH_CONVERT, INT_ZERO(hdr_d->freemap[2].base, ARCH_CONVERT));
-	INT_SET(hdr_d->freemap[1].size, ARCH_CONVERT, INT_ZERO(hdr_d->freemap[2].size, ARCH_CONVERT));
+	INT_SET(hdr_d->freemap[1].base, ARCH_CONVERT, (hdr_d->freemap[2].base = 0));
+	INT_SET(hdr_d->freemap[1].size, ARCH_CONVERT, (hdr_d->freemap[2].size = 0));
 	hdr_s->holes = 1;	/* leaf may not be compact */
 }
 
@@ -1925,7 +1925,7 @@ xfs_dir_leaf_lasthash(xfs_dabuf_t *bp, int *count)
 	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR_LEAF_MAGIC);
 	if (count)
 		*count = INT_GET(leaf->hdr.count, ARCH_CONVERT);
-	if (INT_ISZERO(leaf->hdr.count, ARCH_CONVERT))
+	if (!leaf->hdr.count)
 		return(0);
 	return(INT_GET(leaf->entries[ INT_GET(leaf->hdr.count, ARCH_CONVERT)-1 ].hashval, ARCH_CONVERT));
 }
@@ -2140,7 +2140,7 @@ xfs_dir_leaf_getdents_int(
 		 * then restore the UIO to the first entry in the current
 		 * run of equal-hashval entries (probably one 1 entry long).
 		 */
-		p.ino = XFS_GET_DIR_INO_ARCH(mp, namest->inumber, ARCH_CONVERT);
+		p.ino = XFS_GET_DIR_INO8(namest->inumber);
 #if XFS_BIG_INUMS
 		p.ino += mp->m_inoadd;
 #endif

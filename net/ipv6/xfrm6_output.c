@@ -69,7 +69,7 @@ static void xfrm6_encap(struct sk_buff *skb)
 		dsfield &= ~INET_ECN_MASK;
 	ipv6_change_dsfield(top_iph, 0, dsfield);
 	top_iph->nexthdr = IPPROTO_IPV6; 
-	top_iph->hop_limit = dst_path_metric(dst, RTAX_HOPLIMIT);
+	top_iph->hop_limit = dst_metric(dst->child, RTAX_HOPLIMIT);
 	ipv6_addr_copy(&top_iph->saddr, (struct in6_addr *)&x->props.saddr);
 	ipv6_addr_copy(&top_iph->daddr, (struct in6_addr *)&x->id.daddr);
 }
@@ -79,11 +79,12 @@ static int xfrm6_tunnel_check_size(struct sk_buff *skb)
 	int mtu, ret = 0;
 	struct dst_entry *dst = skb->dst;
 
-	mtu = dst_pmtu(dst) - dst->header_len - dst->trailer_len;
+	mtu = dst_mtu(dst);
 	if (mtu < IPV6_MIN_MTU)
 		mtu = IPV6_MIN_MTU;
 
 	if (skb->len > mtu) {
+		skb->dev = dst->dev;
 		icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, skb->dev);
 		ret = -EMSGSIZE;
 	}
@@ -116,7 +117,7 @@ int xfrm6_output(struct sk_buff *skb)
 
 	xfrm6_encap(skb);
 
-	err = x->type->output(skb);
+	err = x->type->output(x, skb);
 	if (err)
 		goto error;
 

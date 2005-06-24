@@ -49,14 +49,16 @@ head-y				:= arch/ppc/kernel/head.o
 head-$(CONFIG_8xx)		:= arch/ppc/kernel/head_8xx.o
 head-$(CONFIG_4xx)		:= arch/ppc/kernel/head_4xx.o
 head-$(CONFIG_44x)		:= arch/ppc/kernel/head_44x.o
-head-$(CONFIG_E500)		:= arch/ppc/kernel/head_e500.o
+head-$(CONFIG_FSL_BOOKE)	:= arch/ppc/kernel/head_fsl_booke.o
 
 head-$(CONFIG_6xx)		+= arch/ppc/kernel/idle_6xx.o
 head-$(CONFIG_POWER4)		+= arch/ppc/kernel/idle_power4.o
+head-$(CONFIG_PPC_FPU)		+= arch/ppc/kernel/fpu.o
 
 core-y				+= arch/ppc/kernel/ arch/ppc/platforms/ \
 				   arch/ppc/mm/ arch/ppc/lib/ arch/ppc/syslib/
 core-$(CONFIG_4xx)		+= arch/ppc/platforms/4xx/
+core-$(CONFIG_83xx)		+= arch/ppc/platforms/83xx/
 core-$(CONFIG_85xx)		+= arch/ppc/platforms/85xx/
 core-$(CONFIG_MATH_EMULATION)	+= arch/ppc/math-emu/
 core-$(CONFIG_XMON)		+= arch/ppc/xmon/
@@ -112,28 +114,26 @@ include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 TOUT	:= .tmp_gas_check
 # Ensure this is binutils 2.12.1 (or 2.12.90.0.7) or later for altivec
 # instructions.
-AS_ALTIVEC	:= $(shell echo dssall | $(AS) -many -o $(TOUT) >/dev/null 2>&1 ; echo $$?)
 # gcc-3.4 and binutils-2.14 are a fatal combination.
 GCC_VERSION	:= $(call cc-version)
-BAD_GCC_AS	:= $(shell echo mftb 5 | $(AS) -mppc -many -o $(TOUT) >/dev/null 2>&1 && echo 0 || echo 1)
 
 checkbin:
-ifeq ($(GCC_VERSION)$(BAD_GCC_AS),03041)
-	@echo -n '*** ${VERSION}.${PATCHLEVEL} kernels no longer build '
-	@echo 'correctly with gcc-3.4 and your version of binutils.'
-	@echo '*** Please upgrade your binutils or downgrade your gcc'
-	@false
-endif
-ifneq ($(AS_ALTIVEC),0)
-	echo $(AS_ALTIVEC)
-	@echo -n '*** ${VERSION}.${PATCHLEVEL} kernels no longer build '
-	@echo 'correctly with old versions of binutils.'
-	@echo '*** Please upgrade your binutils to 2.12.1 or newer'
-	@false
-endif
-	@true
+	@if test "$(GCC_VERSION)" = "0304" ; then \
+		if ! /bin/echo mftb 5 | $(AS) -v -mppc -many -o $(TOUT) >/dev/null 2>&1 ; then \
+			echo -n '*** ${VERSION}.${PATCHLEVEL} kernels no longer build '; \
+			echo 'correctly with gcc-3.4 and your version of binutils.'; \
+			echo '*** Please upgrade your binutils or downgrade your gcc'; \
+			false; \
+		fi ; \
+	fi
+	@if ! /bin/echo dssall | $(AS) -many -o $(TOUT) >/dev/null 2>&1 ; then \
+		echo -n '*** ${VERSION}.${PATCHLEVEL} kernels no longer build ' ; \
+		echo 'correctly with old versions of binutils.' ; \
+		echo '*** Please upgrade your binutils to 2.12.1 or newer' ; \
+		false ; \
+	fi
 
-CLEAN_FILES += arch/$(ARCH)/kernel/asm-offsets.s \
+CLEAN_FILES +=	include/asm-$(ARCH)/offsets.h \
+		arch/$(ARCH)/kernel/asm-offsets.s \
 		$(TOUT)
-MRPROPER_FILES += include/asm-$(ARCH)/offsets.h
 

@@ -120,51 +120,16 @@ typedef struct drm_i830_private {
 
 } drm_i830_private_t;
 
-				/* i830_dma.c */
-extern int  i830_dma_schedule(drm_device_t *dev, int locked);
-extern int  i830_getbuf(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-extern int  i830_dma_init(struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg);
-extern int  i830_dma_cleanup(drm_device_t *dev);
-extern int  i830_flush_ioctl(struct inode *inode, struct file *filp,
-			     unsigned int cmd, unsigned long arg);
+/* i830_dma.c */
 extern void i830_reclaim_buffers(drm_device_t *dev, struct file *filp);
-extern int  i830_getage(struct inode *inode, struct file *filp, unsigned int cmd,
-			unsigned long arg);
+
 extern int i830_mmap_buffers(struct file *filp, struct vm_area_struct *vma);
-extern int i830_copybuf(struct inode *inode, struct file *filp, 
-			unsigned int cmd, unsigned long arg);
-extern int i830_docopy(struct inode *inode, struct file *filp, 
-		       unsigned int cmd, unsigned long arg);
-
-extern void i830_dma_quiescent(drm_device_t *dev);
-
-extern int i830_dma_vertex(struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg);
-
-extern int i830_swap_bufs(struct inode *inode, struct file *filp,
-			 unsigned int cmd, unsigned long arg);
-
-extern int i830_clear_bufs(struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg);
-
-extern int i830_flip_bufs(struct inode *inode, struct file *filp,
-			 unsigned int cmd, unsigned long arg);
-
-extern int i830_getparam( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
-
-extern int i830_setparam( struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg );
 
 /* i830_irq.c */
 extern int i830_irq_emit( struct inode *inode, struct file *filp, 
 			  unsigned int cmd, unsigned long arg );
 extern int i830_irq_wait( struct inode *inode, struct file *filp,
 			  unsigned int cmd, unsigned long arg );
-extern int i830_wait_irq(drm_device_t *dev, int irq_nr);
-extern int i830_emit_irq(drm_device_t *dev);
 
 extern irqreturn_t i830_driver_irq_handler( DRM_IRQ_ARGS );
 extern void i830_driver_irq_preinstall( drm_device_t *dev );
@@ -173,6 +138,7 @@ extern void i830_driver_irq_uninstall( drm_device_t *dev );
 extern void i830_driver_pretakedown(drm_device_t *dev);
 extern void i830_driver_release(drm_device_t *dev, struct file *filp);
 extern int i830_driver_dma_quiescent(drm_device_t *dev);
+extern void i830_driver_prerelease(drm_device_t *dev, DRMFILE filp);
 
 #define I830_BASE(reg)		((unsigned long) \
 				dev_priv->mmio_map->handle)

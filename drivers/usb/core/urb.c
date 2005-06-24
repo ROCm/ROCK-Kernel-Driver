@@ -121,7 +121,7 @@ struct urb * usb_get_urb(struct urb *urb)
  * describing that request to the USB subsystem.  Request completion will
  * be indicated later, asynchronously, by calling the completion handler.
  * The three types of completion are success, error, and unlink
- * (a software-induced fault, also called "request cancelation").  
+ * (a software-induced fault, also called "request cancellation").  
  *
  * URBs may be submitted in interrupt context.
  *
@@ -170,7 +170,7 @@ struct urb * usb_get_urb(struct urb *urb)
  * As of Linux 2.6, all USB endpoint transfer queues support depths greater
  * than one.  This was previously a HCD-specific behavior, except for ISO
  * transfers.  Non-isochronous endpoint queues are inactive during cleanup
- * after faults (transfer errors or cancelation).
+ * after faults (transfer errors or cancellation).
  *
  * Reserved Bandwidth Transfers:
  *
@@ -395,7 +395,7 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
  *
  * This routine cancels an in-progress request.  URBs complete only
  * once per submission, and may be canceled only once per submission.
- * Successful cancelation means the requests's completion handler will
+ * Successful cancellation means the requests's completion handler will
  * be called with a status code indicating that the request has been
  * canceled (rather than any other code) and will quickly be removed
  * from host controller data structures.
@@ -420,12 +420,16 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
  *
  * Host Controller Drivers (HCDs) place all the URBs for a particular
  * endpoint in a queue.  Normally the queue advances as the controller
- * hardware processes each request.  But when an URB terminates with any
- * fault (such as an error, or being unlinked) its queue stops, at least
- * until that URB's completion routine returns.  It is guaranteed that
- * the queue will not restart until all its unlinked URBs have been fully
- * retired, with their completion routines run, even if that's not until
- * some time after the original completion handler returns.
+ * hardware processes each request.  But when an URB terminates with an
+ * error its queue stops, at least until that URB's completion routine
+ * returns.  It is guaranteed that the queue will not restart until all
+ * its unlinked URBs have been fully retired, with their completion
+ * routines run, even if that's not until some time after the original
+ * completion handler returns.  Normally the same behavior and guarantees
+ * apply when an URB terminates because it was unlinked; however if an
+ * URB is unlinked before the hardware has started to execute it, then
+ * its queue is not guaranteed to stop until all the preceding URBs have
+ * completed.
  *
  * This means that USB device drivers can safely build deep queues for
  * large or complex transfers, and clean them up reliably after any sort

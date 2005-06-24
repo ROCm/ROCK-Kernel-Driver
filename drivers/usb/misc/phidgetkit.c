@@ -107,7 +107,7 @@ static int change_outputs(struct phidget_interfacekit *kit, int output_num, int 
 
 	retval = usb_control_msg(kit->udev,
 			 usb_sndctrlpipe(kit->udev, 0),
-			 0x09, 0x21, 0x0200, 0x0000, buffer, 4, 2 * HZ);
+			 0x09, 0x21, 0x0200, 0x0000, buffer, 4, 2000);
 
 	if (retval != 4)
 		dev_err(&kit->udev->dev, "usb_control_msg returned %d\n", 
@@ -159,7 +159,7 @@ static int change_string(struct phidget_interfacekit *kit, const char *display, 
 
 		retval = usb_control_msg(kit->udev,
 				 usb_sndctrlpipe(kit->udev, 0),
-				 0x09, 0x21, 0x0200, 0x0000, buffer, 8, 2 * HZ);
+				 0x09, 0x21, 0x0200, 0x0000, buffer, 8, 2000);
 		if (retval < 0)
 			goto exit;
 	}
@@ -211,7 +211,7 @@ static ssize_t set_backlight(struct device *dev, const char *buf, size_t count)
 	
 	retval = usb_control_msg(kit->udev,
 			 usb_sndctrlpipe(kit->udev, 0),
-			 0x09, 0x21, 0x0200, 0x0000, buffer, 8, 2 * HZ);
+			 0x09, 0x21, 0x0200, 0x0000, buffer, 8, 2000);
 	if (retval < 0)
 		goto exit;
 

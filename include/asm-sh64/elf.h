@@ -53,6 +53,12 @@ typedef struct user_fpu_struct elf_fpregset_t;
 
 #define ELF_ET_DYN_BASE         (2 * TASK_SIZE / 3)
 
+#define	R_SH_DIR32		1
+#define	R_SH_REL32		2
+#define	R_SH_IMM_LOW16		246
+#define	R_SH_IMM_LOW16_PCREL	247
+#define	R_SH_IMM_MEDLOW16	248
+#define	R_SH_IMM_MEDLOW16_PCREL	249
 
 #define ELF_CORE_COPY_REGS(_dest,_regs)				\
 	memcpy((char *) &_dest, (char *) _regs,			\

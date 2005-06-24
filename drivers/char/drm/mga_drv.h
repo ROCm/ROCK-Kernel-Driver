@@ -112,10 +112,6 @@ typedef struct drm_mga_private {
 	drm_local_map_t *agp_textures;
 } drm_mga_private_t;
 
-                               /* mga_ioctl32.c */
-extern int mga_register_ioctl32( void );
-extern void mga_unregister_ioctl32( void );
-
 				/* mga_dma.c */
 extern int mga_dma_init( DRM_IOCTL_ARGS );
 extern int mga_dma_flush( DRM_IOCTL_ARGS );
@@ -125,25 +121,12 @@ extern void mga_driver_pretakedown(drm_device_t *dev);
 extern int mga_driver_dma_quiescent(drm_device_t *dev);
 
 extern int mga_do_wait_for_idle( drm_mga_private_t *dev_priv );
-extern int mga_do_dma_idle( drm_mga_private_t *dev_priv );
-extern int mga_do_dma_reset( drm_mga_private_t *dev_priv );
-extern int mga_do_engine_reset( drm_mga_private_t *dev_priv );
-extern int mga_do_cleanup_dma( drm_device_t *dev );
 
 extern void mga_do_dma_flush( drm_mga_private_t *dev_priv );
 extern void mga_do_dma_wrap_start( drm_mga_private_t *dev_priv );
 extern void mga_do_dma_wrap_end( drm_mga_private_t *dev_priv );
 
 extern int mga_freelist_put( drm_device_t *dev, drm_buf_t *buf );
-
-				/* mga_state.c */
-extern int  mga_dma_clear( DRM_IOCTL_ARGS );
-extern int  mga_dma_swap( DRM_IOCTL_ARGS );
-extern int  mga_dma_vertex( DRM_IOCTL_ARGS );
-extern int  mga_dma_indices( DRM_IOCTL_ARGS );
-extern int  mga_dma_iload( DRM_IOCTL_ARGS );
-extern int  mga_dma_blit( DRM_IOCTL_ARGS );
-extern int  mga_getparam( DRM_IOCTL_ARGS );
 
 				/* mga_warp.c */
 extern int mga_warp_install_microcode( drm_mga_private_t *dev_priv );

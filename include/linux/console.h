@@ -59,7 +59,6 @@ struct consw {
 extern const struct consw *conswitchp;
 
 extern const struct consw dummy_con;	/* dummy console buffer */
-extern const struct consw fb_con;	/* frame buffer based console */
 extern const struct consw vga_con;	/* VGA text console */
 extern const struct consw newport_con;	/* SGI Newport console  */
 extern const struct consw prom_con;	/* SPARC PROM console */
@@ -77,13 +76,17 @@ void give_up_console(const struct consw *sw);
 #define CM_MOVE     (3)
 
 /*
- *	The interface for a console, or any other device that
- *	wants to capture console messages (printer driver?)
+ * The interface for a console, or any other device that wants to capture
+ * console messages (printer driver?)
+ *
+ * If a console driver is marked CON_BOOT then it will be auto-unregistered
+ * when the first real console is registered.  This is for early-printk drivers.
  */
 
 #define CON_PRINTBUFFER	(1)
 #define CON_CONSDEV	(2) /* Last on the command line */
 #define CON_ENABLED	(4)
+#define CON_BOOT	(8)
 
 struct console
 {
@@ -116,12 +119,7 @@ extern int is_console_locked(void);
 
 /* Some debug stub to catch some of the obvious races in the VT code */
 #if 1
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#define WARN_CONSOLE_UNLOCKED()	WARN_ON(!is_console_locked() && !oops_in_progress && !atomic_read(&kdb_event))
-#else	/* !CONFIG_KDB */
 #define WARN_CONSOLE_UNLOCKED()	WARN_ON(!is_console_locked() && !oops_in_progress)
-#endif	/* CONFIG_KDB */
 #else
 #define WARN_CONSOLE_UNLOCKED()
 #endif

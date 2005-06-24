@@ -18,7 +18,8 @@
 #define NF_STOLEN 2
 #define NF_QUEUE 3
 #define NF_REPEAT 4
-#define NF_MAX_VERDICT NF_REPEAT
+#define NF_STOP 5
+#define NF_MAX_VERDICT NF_STOP
 
 /* Generic cache responses from hook functions.
    <= 0x2000 is used for protocol-flags. */
@@ -138,25 +139,32 @@ void nf_log_packet(int pf,
 /* This is gross, but inline doesn't cut it for avoiding the function
    call in fast path: gcc doesn't inline (needs value tracking?). --RR */
 #ifdef CONFIG_NETFILTER_DEBUG
-#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond)		\
-(!(cond)								\
- ? (okfn)(skb) 								\
- : nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), INT_MIN))
-#define NF_HOOK_THRESH nf_hook_slow
+#define NF_HOOK(pf, hook, skb, indev, outdev, okfn)			       \
+({int __ret;								       \
+if ((__ret=nf_hook_slow(pf, hook, &(skb), indev, outdev, okfn, INT_MIN)) == 1) \
+	__ret = (okfn)(skb);						       \
+__ret;})
+#define NF_HOOK_THRESH(pf, hook, skb, indev, outdev, okfn, thresh)	       \
+({int __ret;								       \
+if ((__ret=nf_hook_slow(pf, hook, &(skb), indev, outdev, okfn, thresh)) == 1)  \
+	__ret = (okfn)(skb);						       \
+__ret;})
 #else
-#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond)		\
-(!(cond) || list_empty(&nf_hooks[(pf)][(hook)])				\
- ? (okfn)(skb)								\
- : nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), INT_MIN))
-#define NF_HOOK_THRESH(pf, hook, skb, indev, outdev, okfn, thresh)	\
-(list_empty(&nf_hooks[(pf)][(hook)])					\
- ? (okfn)(skb)								\
- : nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), (thresh)))
+#define NF_HOOK(pf, hook, skb, indev, outdev, okfn)			       \
+({int __ret;								       \
+if (list_empty(&nf_hooks[pf][hook]) ||					       \
+    (__ret=nf_hook_slow(pf, hook, &(skb), indev, outdev, okfn, INT_MIN)) == 1) \
+	__ret = (okfn)(skb);						       \
+__ret;})
+#define NF_HOOK_THRESH(pf, hook, skb, indev, outdev, okfn, thresh)	       \
+({int __ret;								       \
+if (list_empty(&nf_hooks[pf][hook]) ||					       \
+    (__ret=nf_hook_slow(pf, hook, &(skb), indev, outdev, okfn, thresh)) == 1)  \
+	__ret = (okfn)(skb);						       \
+__ret;})
 #endif
-#define NF_HOOK(pf, hook, skb, indev, outdev, okfn)			\
- NF_HOOK_COND((pf), (hook), (skb), (indev), (outdev), (okfn), 1)
 
-int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
+int nf_hook_slow(int pf, unsigned int hook, struct sk_buff **pskb,
 		 struct net_device *indev, struct net_device *outdev,
 		 int (*okfn)(struct sk_buff *), int thresh);
 
@@ -184,25 +192,8 @@ extern void nf_invalidate_cache(int pf);
 
 #else /* !CONFIG_NETFILTER */
 #define NF_HOOK(pf, hook, skb, indev, outdev, okfn) (okfn)(skb)
-#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond) (okfn)(skb)
 static inline void nf_ct_attach(struct sk_buff *new, struct sk_buff *skb) {}
 #endif /*CONFIG_NETFILTER*/
-
-#ifdef CONFIG_XFRM
-#ifdef CONFIG_IP_NF_NAT_NEEDED
-struct flowi;
-extern void nf_nat_decode_session4(struct sk_buff *skb, struct flowi *fl);
-
-static inline void
-nf_nat_decode_session(struct sk_buff *skb, struct flowi *fl, int family)
-{
-	if (family == AF_INET)
-		nf_nat_decode_session4(skb, fl);
-}
-#else /* CONFIG_IP_NF_NAT_NEEDED */
-#define nf_nat_decode_session(skb,fl,family)
-#endif /* CONFIG_IP_NF_NAT_NEEDED */
-#endif /* CONFIG_XFRM */
 
 #endif /*__KERNEL__*/
 #endif /*__LINUX_NETFILTER_H*/

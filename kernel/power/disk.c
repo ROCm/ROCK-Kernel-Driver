@@ -9,8 +9,6 @@
  *
  */
 
-#define DEBUG
-
 #include <linux/suspend.h>
 #include <linux/syscalls.h>
 #include <linux/reboot.h>
@@ -18,7 +16,6 @@
 #include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
-#include <linux/device.h>
 #include "power.h"
 
 
@@ -266,7 +263,6 @@ static int software_resume(void)
 	if ((error = prepare_devices()))
 		goto Free;
 
-	barrier();
 	mb();
 
 	pr_debug("PM: Restoring saved image.\n");

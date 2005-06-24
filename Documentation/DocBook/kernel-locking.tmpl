@@ -1,4 +1,6 @@
-<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN"[]>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+	"http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" []>
 
 <book id="LKLockingGuide">
  <bookinfo>
@@ -236,12 +238,12 @@
      your task will put itself on the queue, and be woken up when the
      semaphore is released.  This means the CPU will do something
      else while you are waiting, but there are many cases when you
-     simply can't sleep (see <xref linkend="sleeping-things">), and so
+     simply can't sleep (see <xref linkend="sleeping-things"/>), and so
      have to use a spinlock instead.
    </para>
    <para>
      Neither type of lock is recursive: see
-     <xref linkend="deadlock">.
+     <xref linkend="deadlock"/>.
    </para>
    </sect1>
  
@@ -326,7 +328,7 @@
     <para>
       Note that you can also use <function>spin_lock_irq()</function>
       or <function>spin_lock_irqsave()</function> here, which stop
-      hardware interrupts as well: see <xref linkend="hardirq-context">.
+      hardware interrupts as well: see <xref linkend="hardirq-context"/>.
     </para>
 
     <para>
@@ -403,7 +405,7 @@
 
      <para>
        The same softirq can run on the other CPUs: you can use a
-       per-CPU array (see <xref linkend="per-cpu">) for better
+       per-CPU array (see <xref linkend="per-cpu"/>) for better
        performance.  If you're going so far as to use a softirq,
        you probably care about scalable performance enough
        to justify the extra complexity.
@@ -545,120 +547,120 @@
    </para>
    <table>
 <title>Table of Locking Requirements</title>
-<TGROUP COLS="11">
-<TBODY>
-<ROW>
-<ENTRY></ENTRY>
-<ENTRY>IRQ Handler A</ENTRY>
-<ENTRY>IRQ Handler B</ENTRY>
-<ENTRY>Softirq A</ENTRY>
-<ENTRY>Softirq B</ENTRY>
-<ENTRY>Tasklet A</ENTRY>
-<ENTRY>Tasklet B</ENTRY>
-<ENTRY>Timer A</ENTRY>
-<ENTRY>Timer B</ENTRY>
-<ENTRY>User Context A</ENTRY>
-<ENTRY>User Context B</ENTRY>
-</ROW>
+<tgroup cols="11">
+<tbody>
+<row>
+<entry></entry>
+<entry>IRQ Handler A</entry>
+<entry>IRQ Handler B</entry>
+<entry>Softirq A</entry>
+<entry>Softirq B</entry>
+<entry>Tasklet A</entry>
+<entry>Tasklet B</entry>
+<entry>Timer A</entry>
+<entry>Timer B</entry>
+<entry>User Context A</entry>
+<entry>User Context B</entry>
+</row>
 
-<ROW>
-<ENTRY>IRQ Handler A</ENTRY>
-<ENTRY>None</ENTRY>
-</ROW>
+<row>
+<entry>IRQ Handler A</entry>
+<entry>None</entry>
+</row>
 
-<ROW>
-<ENTRY>IRQ Handler B</ENTRY>
-<ENTRY>spin_lock_irqsave</ENTRY>
-<ENTRY>None</ENTRY>
-</ROW>
+<row>
+<entry>IRQ Handler B</entry>
+<entry>spin_lock_irqsave</entry>
+<entry>None</entry>
+</row>
 
-<ROW>
-<ENTRY>Softirq A</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-</ROW>
+<row>
+<entry>Softirq A</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock</entry>
+</row>
 
-<ROW>
-<ENTRY>Softirq B</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-</ROW>
+<row>
+<entry>Softirq B</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock</entry>
+<entry>spin_lock</entry>
+</row>
 
-<ROW>
-<ENTRY>Tasklet A</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>None</ENTRY>
-</ROW>
+<row>
+<entry>Tasklet A</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock</entry>
+<entry>spin_lock</entry>
+<entry>None</entry>
+</row>
 
-<ROW>
-<ENTRY>Tasklet B</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>None</ENTRY>
-</ROW>
+<row>
+<entry>Tasklet B</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock</entry>
+<entry>spin_lock</entry>
+<entry>spin_lock</entry>
+<entry>None</entry>
+</row>
 
-<ROW>
-<ENTRY>Timer A</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>None</ENTRY>
-</ROW>
+<row>
+<entry>Timer A</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock</entry>
+<entry>spin_lock</entry>
+<entry>spin_lock</entry>
+<entry>spin_lock</entry>
+<entry>None</entry>
+</row>
 
-<ROW>
-<ENTRY>Timer B</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>spin_lock</ENTRY>
-<ENTRY>None</ENTRY>
-</ROW>
+<row>
+<entry>Timer B</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock</entry>
+<entry>spin_lock</entry>
+<entry>spin_lock</entry>
+<entry>spin_lock</entry>
+<entry>spin_lock</entry>
+<entry>None</entry>
+</row>
 
-<ROW>
-<ENTRY>User Context A</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock_bh</ENTRY>
-<ENTRY>spin_lock_bh</ENTRY>
-<ENTRY>spin_lock_bh</ENTRY>
-<ENTRY>spin_lock_bh</ENTRY>
-<ENTRY>spin_lock_bh</ENTRY>
-<ENTRY>spin_lock_bh</ENTRY>
-<ENTRY>None</ENTRY>
-</ROW>
+<row>
+<entry>User Context A</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock_bh</entry>
+<entry>spin_lock_bh</entry>
+<entry>spin_lock_bh</entry>
+<entry>spin_lock_bh</entry>
+<entry>spin_lock_bh</entry>
+<entry>spin_lock_bh</entry>
+<entry>None</entry>
+</row>
 
-<ROW>
-<ENTRY>User Context B</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock_irq</ENTRY>
-<ENTRY>spin_lock_bh</ENTRY>
-<ENTRY>spin_lock_bh</ENTRY>
-<ENTRY>spin_lock_bh</ENTRY>
-<ENTRY>spin_lock_bh</ENTRY>
-<ENTRY>spin_lock_bh</ENTRY>
-<ENTRY>spin_lock_bh</ENTRY>
-<ENTRY>down_interruptible</ENTRY>
-<ENTRY>None</ENTRY>
-</ROW>
+<row>
+<entry>User Context B</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock_irq</entry>
+<entry>spin_lock_bh</entry>
+<entry>spin_lock_bh</entry>
+<entry>spin_lock_bh</entry>
+<entry>spin_lock_bh</entry>
+<entry>spin_lock_bh</entry>
+<entry>spin_lock_bh</entry>
+<entry>down_interruptible</entry>
+<entry>None</entry>
+</row>
 
-</TBODY>
-</TGROUP>
-</TABLE>
+</tbody>
+</tgroup>
+</table>
 </sect1>
 </chapter>
 

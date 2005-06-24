@@ -121,7 +121,8 @@ static inline int access_ok(int type, const void *addr, unsigned long size)
 #endif /* CONFIG_MMU */
 
 /**
- * verify_area: - Obsolete, use access_ok()
+ * verify_area: - Obsolete/deprecated and will go away soon,
+ * use access_ok() instead.
  * @type: Type of access: %VERIFY_READ or %VERIFY_WRITE
  * @addr: User space pointer to start of block to check
  * @size: Size of block to check
@@ -137,7 +138,7 @@ static inline int access_ok(int type, const void *addr, unsigned long size)
  *
  * See access_ok() for more details.
  */
-static inline int verify_area(int type, const void __user *addr,
+static inline int __deprecated verify_area(int type, const void __user *addr,
 			      unsigned long size)
 {
 	return access_ok(type, addr, size) ? 0 : -EFAULT;

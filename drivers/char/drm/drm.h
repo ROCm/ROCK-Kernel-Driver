@@ -227,7 +227,7 @@ typedef enum drm_map_flags {
 
 typedef struct drm_ctx_priv_map {
 	unsigned int	ctx_id;  /**< Context requesting private mapping */
-	unsigned long	handle; /**< Handle of map */
+	void		*handle; /**< Handle of map */
 } drm_ctx_priv_map_t;
 
 
@@ -237,28 +237,17 @@ typedef struct drm_ctx_priv_map {
  *
  * \sa drmAddMap().
  */
-typedef struct drm_pub_map {
-	unsigned long	offset;	 /**< Requested physical address (0 for SAREA)*/
-	unsigned long	size;	 /**< Requested physical size (bytes) */
-	drm_map_type_t	type;	 /**< Type of memory to map */
-	drm_map_flags_t flags;	 /**< Flags */
-	unsigned long	handle; /**< User-space: "Handle" to pass to mmap() */
-				 /**< Kernel-space: kernel-virtual address */
-	int		mtrr;	 /**< MTRR slot used */
-				 /*   Private data */
-} drm_pub_map_t;
-
 typedef struct drm_map {
 	unsigned long	offset;	 /**< Requested physical address (0 for SAREA)*/
 	unsigned long	size;	 /**< Requested physical size (bytes) */
 	drm_map_type_t	type;	 /**< Type of memory to map */
 	drm_map_flags_t flags;	 /**< Flags */
-	unsigned long	pub_handle; /**< User-space: "Handle" to pass to mmap() */
+	void		*handle; /**< User-space: "Handle" to pass to mmap() */
 				 /**< Kernel-space: kernel-virtual address */
 	int		mtrr;	 /**< MTRR slot used */
 				 /*   Private data */
-	void		*handle;
 } drm_map_t;
+
 
 /**
  * DRM_IOCTL_GET_CLIENT ioctl argument type.

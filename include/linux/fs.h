@@ -212,9 +212,7 @@ extern int dir_notify_enable;
 #include <linux/list.h>
 #include <linux/radix-tree.h>
 #include <linux/prio_tree.h>
-#include <linux/audit.h>
 #include <linux/init.h>
-#include <linux/sched.h>
 
 #include <asm/atomic.h>
 #include <asm/semaphore.h>
@@ -448,7 +446,6 @@ struct inode {
 	unsigned long		i_version;
 	unsigned long		i_blocks;
 	unsigned short          i_bytes;
-	unsigned char		i_sock;
 	spinlock_t		i_lock;	/* i_blocks, i_bytes, maybe i_size */
 	struct semaphore	i_sem;
 	struct rw_semaphore	i_alloc_sem;
@@ -651,6 +648,8 @@ struct lock_manager_operations {
 	void (*fl_copy_lock)(struct file_lock *, struct file_lock *);
 	void (*fl_release_private)(struct file_lock *);
 	void (*fl_break)(struct file_lock *);
+	int (*fl_mylease)(struct file_lock *, struct file_lock *);
+	int (*fl_change)(struct file_lock **, int);
 };
 
 /* that will die - we need it for nfs_lock_info */
@@ -717,7 +716,7 @@ extern int flock_lock_file_wait(struct file *filp, struct file_lock *fl);
 extern int __break_lease(struct inode *inode, unsigned int flags);
 extern void lease_get_mtime(struct inode *, struct timespec *time);
 extern int setlease(struct file *, long, struct file_lock **);
-extern void remove_lease(struct file_lock *);
+extern int lease_modify(struct file_lock **, int);
 extern int lock_may_read(struct inode *, loff_t start, unsigned long count);
 extern int lock_may_write(struct inode *, loff_t start, unsigned long count);
 extern void steal_locks(fl_owner_t from);
@@ -822,34 +821,16 @@ enum {
 #define vfs_check_frozen(sb, level) \
 	wait_event((sb)->s_wait_unfrozen, ((sb)->s_frozen < (level)))
 
-static inline void get_fs_excl(void)
-{
-	atomic_inc(&current->fs_excl);
-}
-
-static inline void put_fs_excl(void)
-{
-	atomic_dec(&current->fs_excl);
-}
-
-static inline int has_fs_excl(void)
-{
-	return atomic_read(&current->fs_excl);
-}
-
-
 /*
  * Superblock locking.
  */
 static inline void lock_super(struct super_block * sb)
 {
-	get_fs_excl();
 	down(&sb->s_lock);
 }
 
 static inline void unlock_super(struct super_block * sb)
 {
-	put_fs_excl();
 	up(&sb->s_lock);
 }
 
@@ -1075,83 +1056,87 @@ static inline void file_accessed(struct file *file)
 int sync_inode(struct inode *inode, struct writeback_control *wbc);
 
 /**
- * &export_operations - for nfsd to communicate with file systems
- * decode_fh:      decode a file handle fragment and return a &struct dentry
- * encode_fh:      encode a file handle fragment from a dentry
- * get_name:       find the name for a given inode in a given directory
- * get_parent:     find the parent of a given directory
- * get_dentry:     find a dentry for the inode given a file handle sub-fragment
+ * struct export_operations - for nfsd to communicate with file systems
+ * @decode_fh:      decode a file handle fragment and return a &struct dentry
+ * @encode_fh:      encode a file handle fragment from a dentry
+ * @get_name:       find the name for a given inode in a given directory
+ * @get_parent:     find the parent of a given directory
+ * @get_dentry:     find a dentry for the inode given a file handle sub-fragment
  *
  * Description:
  *    The export_operations structure provides a means for nfsd to communicate
  *    with a particular exported file system  - particularly enabling nfsd and
  *    the filesystem to co-operate when dealing with file handles.
  *
- *    export_operations contains two basic operation for dealing with file handles,
- *    decode_fh() and encode_fh(), and allows for some other operations to be defined
- *    which standard helper routines use to get specific information from the
- *    filesystem.
+ *    export_operations contains two basic operation for dealing with file
+ *    handles, decode_fh() and encode_fh(), and allows for some other
+ *    operations to be defined which standard helper routines use to get
+ *    specific information from the filesystem.
  *
  *    nfsd encodes information use to determine which filesystem a filehandle
- *    applies to in the initial part of the file handle.  The remainder, termed a
- *    file handle fragment, is controlled completely by the filesystem.
- *    The standard helper routines assume that this fragment will contain one or two
- *    sub-fragments, one which identifies the file, and one which may be used to
- *    identify the (a) directory containing the file.
+ *    applies to in the initial part of the file handle.  The remainder, termed
+ *    a file handle fragment, is controlled completely by the filesystem.  The
+ *    standard helper routines assume that this fragment will contain one or
+ *    two sub-fragments, one which identifies the file, and one which may be
+ *    used to identify the (a) directory containing the file.
  *
  *    In some situations, nfsd needs to get a dentry which is connected into a
- *    specific part of the file tree.  To allow for this, it passes the function
- *    acceptable() together with a @context which can be used to see if the dentry
- *    is acceptable.  As there can be multiple dentrys for a given file, the filesystem
- *    should check each one for acceptability before looking for the next.  As soon
- *    as an acceptable one is found, it should be returned.
+ *    specific part of the file tree.  To allow for this, it passes the
+ *    function acceptable() together with a @context which can be used to see
+ *    if the dentry is acceptable.  As there can be multiple dentrys for a
+ *    given file, the filesystem should check each one for acceptability before
+ *    looking for the next.  As soon as an acceptable one is found, it should
+ *    be returned.
  *
  * decode_fh:
- *    @decode_fh is given a &struct super_block (@sb), a file handle fragment (@fh, @fh_len)
- *    and an acceptability testing function (@acceptable, @context).  It should return
- *    a &struct dentry which refers to the same file that the file handle fragment refers
- *    to,  and which passes the acceptability test.  If it cannot, it should return
- *    a %NULL pointer if the file was found but no acceptable &dentries were available, or
- *    a %ERR_PTR error code indicating why it couldn't be found (e.g. %ENOENT or %ENOMEM).
+ *    @decode_fh is given a &struct super_block (@sb), a file handle fragment
+ *    (@fh, @fh_len) and an acceptability testing function (@acceptable,
+ *    @context).  It should return a &struct dentry which refers to the same
+ *    file that the file handle fragment refers to,  and which passes the
+ *    acceptability test.  If it cannot, it should return a %NULL pointer if
+ *    the file was found but no acceptable &dentries were available, or a
+ *    %ERR_PTR error code indicating why it couldn't be found (e.g. %ENOENT or
+ *    %ENOMEM).
  *
  * encode_fh:
- *    @encode_fh should store in the file handle fragment @fh (using at most @max_len bytes)
- *    information that can be used by @decode_fh to recover the file refered to by the
- *    &struct dentry @de.  If the @connectable flag is set, the encode_fh() should store
- *    sufficient information so that a good attempt can be made to find not only
- *    the file but also it's place in the filesystem.   This typically means storing
- *    a reference to de->d_parent in the filehandle fragment.
- *    encode_fh() should return the number of bytes stored or a negative error code
- *    such as %-ENOSPC
+ *    @encode_fh should store in the file handle fragment @fh (using at most
+ *    @max_len bytes) information that can be used by @decode_fh to recover the
+ *    file refered to by the &struct dentry @de.  If the @connectable flag is
+ *    set, the encode_fh() should store sufficient information so that a good
+ *    attempt can be made to find not only the file but also it's place in the
+ *    filesystem.   This typically means storing a reference to de->d_parent in
+ *    the filehandle fragment.  encode_fh() should return the number of bytes
+ *    stored or a negative error code such as %-ENOSPC
  *
  * get_name:
- *    @get_name should find a name for the given @child in the given @parent directory.
- *    The name should be stored in the @name (with the understanding that it is already
- *    pointing to a a %NAME_MAX+1 sized buffer.   get_name() should return %0 on success,
- *    a negative error code or error.
- *    @get_name will be called without @parent->i_sem held.
+ *    @get_name should find a name for the given @child in the given @parent
+ *    directory.  The name should be stored in the @name (with the
+ *    understanding that it is already pointing to a a %NAME_MAX+1 sized
+ *    buffer.   get_name() should return %0 on success, a negative error code
+ *    or error.  @get_name will be called without @parent->i_sem held.
  *
  * get_parent:
- *    @get_parent should find the parent directory for the given @child which is also
- *    a directory.  In the event that it cannot be found, or storage space cannot be
- *    allocated, a %ERR_PTR should be returned.
+ *    @get_parent should find the parent directory for the given @child which
+ *    is also a directory.  In the event that it cannot be found, or storage
+ *    space cannot be allocated, a %ERR_PTR should be returned.
  *
  * get_dentry:
- *    Given a &super_block (@sb) and a pointer to a file-system specific inode identifier,
- *    possibly an inode number, (@inump) get_dentry() should find the identified inode and
- *    return a dentry for that inode.
- *    Any suitable dentry can be returned including, if necessary, a new dentry created
- *    with d_alloc_root.  The caller can then find any other extant dentrys by following the
- *    d_alias links.  If a new dentry was created using d_alloc_root, DCACHE_NFSD_DISCONNECTED
- *    should be set, and the dentry should be d_rehash()ed.
+ *    Given a &super_block (@sb) and a pointer to a file-system specific inode
+ *    identifier, possibly an inode number, (@inump) get_dentry() should find
+ *    the identified inode and return a dentry for that inode.  Any suitable
+ *    dentry can be returned including, if necessary, a new dentry created with
+ *    d_alloc_root.  The caller can then find any other extant dentrys by
+ *    following the d_alias links.  If a new dentry was created using
+ *    d_alloc_root, DCACHE_NFSD_DISCONNECTED should be set, and the dentry
+ *    should be d_rehash()ed.
  *
- *    If the inode cannot be found, either a %NULL pointer or an %ERR_PTR code can be returned.
- *    The @inump will be whatever was passed to nfsd_find_fh_dentry() in either the
- *    @obj or @parent parameters.
+ *    If the inode cannot be found, either a %NULL pointer or an %ERR_PTR code
+ *    can be returned.  The @inump will be whatever was passed to
+ *    nfsd_find_fh_dentry() in either the @obj or @parent parameters.
  *
  * Locking rules:
- *  get_parent is called with child->d_inode->i_sem down
- *  get_name is not (which is possibly inconsistent)
+ *    get_parent is called with child->d_inode->i_sem down
+ *    get_name is not (which is possibly inconsistent)
  */
 
 struct export_operations {
@@ -1294,13 +1279,7 @@ extern void __init vfs_caches_init(unsigned long);
 #ifndef CONFIG_AUDITSYSCALL
 #define putname(name)   __putname(name)
 #else
-#define putname(name)							\
-	do {								\
-		if (unlikely(current->audit_context))			\
-			audit_putname(name);				\
-		else							\
-			__putname(name);				\
-	} while (0)
+extern void putname(const char *name);
 #endif
 
 extern int register_blkdev(unsigned int, const char *);
@@ -1367,7 +1346,7 @@ extern int fs_may_remount_ro(struct super_block *);
 
 extern int check_disk_change(struct block_device *);
 extern int invalidate_inodes(struct super_block *);
-extern int __invalidate_device(struct block_device *, int);
+extern int __invalidate_device(struct block_device *);
 extern int invalidate_partition(struct gendisk *, int);
 unsigned long invalidate_mapping_pages(struct address_space *mapping,
 					pgoff_t start, pgoff_t end);
@@ -1379,11 +1358,15 @@ static inline void invalidate_remote_inode(struct inode *inode)
 		invalidate_inode_pages(inode->i_mapping);
 }
 extern int invalidate_inode_pages2(struct address_space *mapping);
+extern int invalidate_inode_pages2_range(struct address_space *mapping,
+					 pgoff_t start, pgoff_t end);
 extern int write_inode_now(struct inode *, int);
 extern int filemap_fdatawrite(struct address_space *);
 extern int filemap_flush(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
 extern int filemap_write_and_wait(struct address_space *mapping);
+extern int filemap_write_and_wait_range(struct address_space *mapping,
+				        loff_t lstart, loff_t lend);
 extern void sync_supers(void);
 extern void sync_filesystems(int wait);
 extern void emergency_sync(void);

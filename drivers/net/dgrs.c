@@ -454,7 +454,7 @@ do_plx_dma(
  *	up some state variables to let the host CPU continue doing
  *	other things until a DMA completion interrupt comes along.
  */
-void
+static void
 dgrs_rcv_frame(
 	struct net_device	*dev0,
 	DGRS_PRIV	*priv0,
@@ -1150,7 +1150,7 @@ dgrs_download(struct net_device *dev0)
 /*
  *	Probe (init) a board
  */
-int __init 
+static int __init 
 dgrs_probe1(struct net_device *dev)
 {
 	DGRS_PRIV	*priv = (DGRS_PRIV *) dev->priv;
@@ -1228,7 +1228,7 @@ err_out:
        	return rc;
 }
 
-int __init 
+static int __init 
 dgrs_initclone(struct net_device *dev)
 {
 	DGRS_PRIV	*priv = (DGRS_PRIV *) dev->priv;

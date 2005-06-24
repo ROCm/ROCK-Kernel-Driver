@@ -1210,9 +1210,11 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 				}
 				/* Yup, this is a documentation bug.  It cost me *hours*. */
 				iowrite16 (0, ioaddr + TxStatus);
-				tx_status = ioread16 (ioaddr + TxStatus);
-				if (tx_cnt < 0)
+				if (tx_cnt < 0) {
+					iowrite32(5000, ioaddr + DownCounter);
 					break;
+				}
+				tx_status = ioread16 (ioaddr + TxStatus);
 			}
 			hw_frame_id = (tx_status >> 8) & 0xff;
 		} else 	{
@@ -1278,7 +1280,6 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 	if (netif_msg_intr(np))
 		printk(KERN_DEBUG "%s: exiting interrupt, status=%#4.4x.\n",
 			   dev->name, ioread16(ioaddr + IntrStatus));
-	iowrite32(5000, ioaddr + DownCounter);
 	return IRQ_RETVAL(handled);
 }
 

@@ -1169,10 +1169,8 @@ static int usbvideo_v4l_open(struct inode *inode, struct file *file)
 			}
 			RingQueue_Free(&uvd->dp);
 			for (i=0; i < USBVIDEO_NUMSBUF; i++) {
-				if (uvd->sbuf[i].data != NULL) {
-					kfree (uvd->sbuf[i].data);
-					uvd->sbuf[i].data = NULL;
-				}
+				kfree(uvd->sbuf[i].data);
+				uvd->sbuf[i].data = NULL;
 			}
 		}
 	}
@@ -1814,11 +1812,11 @@ static void usbvideo_StopDataPump(struct uvd *uvd)
 {
 	int i, j;
 
-	if (uvd->debug > 1)
-		info("%s($%p)", __FUNCTION__, uvd);
-
 	if ((uvd == NULL) || (!uvd->streaming) || (uvd->dev == NULL))
 		return;
+
+	if (uvd->debug > 1)
+		info("%s($%p)", __FUNCTION__, uvd);
 
 	/* Unschedule all of the iso td's */
 	for (i=0; i < USBVIDEO_NUMSBUF; i++) {

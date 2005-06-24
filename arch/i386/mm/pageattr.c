@@ -189,7 +189,7 @@ int change_page_attr(struct page *page, int numpages, pgprot_t prot)
 void global_flush_tlb(void)
 { 
 	LIST_HEAD(l);
-	struct list_head* n;
+	struct page *pg, *next;
 
 	BUG_ON(irqs_disabled());
 
@@ -197,12 +197,8 @@ void global_flush_tlb(void)
 	list_splice_init(&df_list, &l);
 	spin_unlock_irq(&cpa_lock);
 	flush_map();
-	n = l.next;
-	while (n != &l) {
-		struct page *pg = list_entry(n, struct page, lru);
-		n = n->next;
+	list_for_each_entry_safe(pg, next, &l, lru)
 		__free_page(pg);
-	}
 } 
 
 #ifdef CONFIG_DEBUG_PAGEALLOC

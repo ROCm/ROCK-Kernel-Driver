@@ -116,6 +116,7 @@ nfs4_alloc_client(struct in_addr *addr)
 	INIT_LIST_HEAD(&clp->cl_superblocks);
 	init_waitqueue_head(&clp->cl_waitq);
 	rpc_init_wait_queue(&clp->cl_rpcwaitq, "NFS4 client");
+	clp->cl_boot_time = CURRENT_TIME;
 	clp->cl_state = 1 << NFS4CLNT_OK;
 	return clp;
 }
@@ -205,7 +206,7 @@ nfs4_put_client(struct nfs4_client *clp)
 	nfs4_free_client(clp);
 }
 
-int nfs4_init_client(struct nfs4_client *clp)
+static int __nfs4_init_client(struct nfs4_client *clp)
 {
 	int status = nfs4_proc_setclientid(clp, NFS4_CALLBACK, nfs_callback_tcpport);
 	if (status == 0)
@@ -213,6 +214,11 @@ int nfs4_init_client(struct nfs4_client *clp)
 	if (status == 0)
 		nfs4_schedule_state_renewal(clp);
 	return status;
+}
+
+int nfs4_init_client(struct nfs4_client *clp)
+{
+	return nfs4_map_errors(__nfs4_init_client(clp));
 }
 
 u32
@@ -274,8 +280,8 @@ nfs4_alloc_state_owner(void)
 	return sp;
 }
 
-static void
-nfs4_unhash_state_owner(struct nfs4_state_owner *sp)
+void
+nfs4_drop_state_owner(struct nfs4_state_owner *sp)
 {
 	struct nfs4_client *clp = sp->so_client;
 	spin_lock(&clp->cl_lock);
@@ -441,7 +447,9 @@ nfs4_get_open_state(struct inode *inode, struct nfs4_state_owner *owner)
 	if (state == NULL && new != NULL) {
 		state = new;
 		/* Caller *must* be holding owner->so_sem */
-		list_add(&state->open_states, &owner->so_states);
+		/* Note: The reclaim code dictates that we add stateless
+		 * and read-only stateids to the end of the list */
+		list_add_tail(&state->open_states, &owner->so_states);
 		state->owner = owner;
 		atomic_inc(&owner->so_count);
 		list_add(&state->inode_states, &nfsi->open_states);
@@ -497,8 +505,12 @@ void nfs4_close_state(struct nfs4_state *state, mode_t mode)
 		state->nreaders--;
 	if (mode & FMODE_WRITE)
 		state->nwriters--;
-	if (state->nwriters == 0 && state->nreaders == 0)
-		list_del_init(&state->inode_states);
+	if (state->nwriters == 0) {
+		if (state->nreaders == 0)
+			list_del_init(&state->inode_states);
+		/* See reclaim code */
+		list_move_tail(&state->open_states, &owner->so_states);
+	}
 	spin_unlock(&inode->i_lock);
 	newstate = 0;
 	if (state->state != 0) {
@@ -708,7 +720,7 @@ void nfs4_increment_seqid(int status, struct nfs4_state_owner *sp)
 		sp->so_seqid++;
 	/* If the server returns BAD_SEQID, unhash state_owner here */
 	if (status == -NFS4ERR_BAD_SEQID)
-		nfs4_unhash_state_owner(sp);
+		nfs4_drop_state_owner(sp);
 }
 
 static int reclaimer(void *);
@@ -753,7 +765,7 @@ nfs4_schedule_state_recovery(struct nfs4_client *clp)
 		schedule_work(&clp->cl_recoverd);
 }
 
-static int nfs4_reclaim_locks(struct nfs4_state *state)
+static int nfs4_reclaim_locks(struct nfs4_state_recovery_ops *ops, struct nfs4_state *state)
 {
 	struct inode *inode = state->inode;
 	struct file_lock *fl;
@@ -764,7 +776,7 @@ static int nfs4_reclaim_locks(struct nfs4_state *state)
 			continue;
 		if (((struct nfs_open_context *)fl->fl_file->private_data)->state != state)
 			continue;
-		status = nfs4_lock_reclaim(state, fl);
+		status = ops->recover_lock(state, fl);
 		if (status >= 0)
 			continue;
 		switch (status) {
@@ -786,20 +798,28 @@ out_err:
 	return status;
 }
 
-static int nfs4_reclaim_open_state(struct nfs4_state_owner *sp)
+static int nfs4_reclaim_open_state(struct nfs4_state_recovery_ops *ops, struct nfs4_state_owner *sp)
 {
 	struct nfs4_state *state;
 	struct nfs4_lock_state *lock;
 	int status = 0;
 
+	/* Note: we rely on the sp->so_states list being ordered 
+	 * so that we always reclaim open(O_RDWR) and/or open(O_WRITE)
+	 * states first.
+	 * This is needed to ensure that the server won't give us any
+	 * read delegations that we have to return if, say, we are
+	 * recovering after a network partition or a reboot from a
+	 * server that doesn't support a grace period.
+	 */
 	list_for_each_entry(state, &sp->so_states, open_states) {
 		if (state->state == 0)
 			continue;
-		status = nfs4_open_reclaim(sp, state);
+		status = ops->recover_open(sp, state);
 		list_for_each_entry(lock, &state->lock_states, ls_locks)
 			lock->ls_flags &= ~NFS_LOCK_INITIALIZED;
 		if (status >= 0) {
-			status = nfs4_reclaim_locks(state);
+			status = nfs4_reclaim_locks(ops, state);
 			if (status < 0)
 				goto out_err;
 			list_for_each_entry(lock, &state->lock_states, ls_locks) {
@@ -813,8 +833,7 @@ static int nfs4_reclaim_open_state(struct nfs4_state_owner *sp)
 			default:
 				printk(KERN_ERR "%s: unhandled error %d. Zeroing state\n",
 						__FUNCTION__, status);
-			case -NFS4ERR_EXPIRED:
-			case -NFS4ERR_NO_GRACE:
+			case -ENOENT:
 			case -NFS4ERR_RECLAIM_BAD:
 			case -NFS4ERR_RECLAIM_CONFLICT:
 				/*
@@ -826,6 +845,8 @@ static int nfs4_reclaim_open_state(struct nfs4_state_owner *sp)
 				/* Mark the file as being 'closed' */
 				state->state = 0;
 				break;
+			case -NFS4ERR_EXPIRED:
+			case -NFS4ERR_NO_GRACE:
 			case -NFS4ERR_STALE_CLIENTID:
 				goto out_err;
 		}
@@ -840,6 +861,7 @@ static int reclaimer(void *ptr)
 	struct reclaimer_args *args = (struct reclaimer_args *)ptr;
 	struct nfs4_client *clp = args->clp;
 	struct nfs4_state_owner *sp;
+	struct nfs4_state_recovery_ops *ops;
 	int status = 0;
 
 	daemonize("%u.%u.%u.%u-reclaim", NIPQUAD(clp->cl_addr));
@@ -856,20 +878,34 @@ static int reclaimer(void *ptr)
 		goto out;
 restart_loop:
 	status = nfs4_proc_renew(clp);
-	if (status == 0 || status == -NFS4ERR_CB_PATH_DOWN)
-		goto out;
-	status = nfs4_init_client(clp);
+	switch (status) {
+		case 0:
+		case -NFS4ERR_CB_PATH_DOWN:
+			goto out;
+		case -NFS4ERR_STALE_CLIENTID:
+		case -NFS4ERR_LEASE_MOVED:
+			ops = &nfs4_reboot_recovery_ops;
+			break;
+		default:
+			ops = &nfs4_network_partition_recovery_ops;
+	};
+	status = __nfs4_init_client(clp);
 	if (status)
 		goto out_error;
-	/* Mark all delagations for reclaim */
+	/* Mark all delegations for reclaim */
 	nfs_delegation_mark_reclaim(clp);
 	/* Note: list is protected by exclusive lock on cl->cl_sem */
 	list_for_each_entry(sp, &clp->cl_state_owners, so_list) {
-		status = nfs4_reclaim_open_state(sp);
+		status = nfs4_reclaim_open_state(ops, sp);
 		if (status < 0) {
+			if (status == -NFS4ERR_NO_GRACE) {
+				ops = &nfs4_network_partition_recovery_ops;
+				status = nfs4_reclaim_open_state(ops, sp);
+			}
 			if (status == -NFS4ERR_STALE_CLIENTID)
 				goto restart_loop;
-			goto out_error;
+			if (status == -NFS4ERR_EXPIRED)
+				goto restart_loop;
 		}
 	}
 	nfs_delegation_reap_unclaimed(clp);

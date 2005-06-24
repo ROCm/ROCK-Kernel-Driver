@@ -74,10 +74,12 @@ int sbusfb_mmap_helper(struct sbus_mmap_map *map,
 		}
 		if (page + map_size > size)
 			map_size = size - page;
-		r = io_remap_page_range(vma,
+		r = io_remap_pfn_range(vma,
 					vma->vm_start + page,
-					map_offset, map_size,
-					vma->vm_page_prot, iospace);
+					MK_IOSPACE_PFN(iospace,
+						map_offset >> PAGE_SHIFT),
+					map_size,
+					vma->vm_page_prot);
 		if (r)
 			return -EAGAIN;
 		page += map_size;

@@ -25,6 +25,8 @@
  *		interface to access function arguments.
  * 2004-Oct	Jim Keniston <kenistoj@us.ibm.com> and Prasanna S Panchamukhi
  *		<prasanna@in.ibm.com> adapted for x86_64
+ * 2005-Mar	Roland McGrath <roland@redhat.com>
+ *		Fixed to handle %rip-relative addressing mode correctly.
  */
 
 #include <linux/config.h>
@@ -34,7 +36,7 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/preempt.h>
-#include <linux/vmalloc.h>
+#include <linux/moduleloader.h>
 
 #include <asm/pgtable.h>
 #include <asm/kdebug.h>
@@ -86,9 +88,132 @@ int arch_prepare_kprobe(struct kprobe *p)
 	return 0;
 }
 
+/*
+ * Determine if the instruction uses the %rip-relative addressing mode.
+ * If it does, return the address of the 32-bit displacement word.
+ * If not, return null.
+ */
+static inline s32 *is_riprel(u8 *insn)
+{
+#define W(row,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,ba,bb,bc,bd,be,bf)		      \
+	(((b0##UL << 0x0)|(b1##UL << 0x1)|(b2##UL << 0x2)|(b3##UL << 0x3) |   \
+	  (b4##UL << 0x4)|(b5##UL << 0x5)|(b6##UL << 0x6)|(b7##UL << 0x7) |   \
+	  (b8##UL << 0x8)|(b9##UL << 0x9)|(ba##UL << 0xa)|(bb##UL << 0xb) |   \
+	  (bc##UL << 0xc)|(bd##UL << 0xd)|(be##UL << 0xe)|(bf##UL << 0xf))    \
+	 << (row % 64))
+	static const u64 onebyte_has_modrm[256 / 64] = {
+		/*      0 1 2 3 4 5 6 7 8 9 a b c d e f         */
+		/*      -------------------------------         */
+		W(0x00, 1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,0)| /* 00 */
+		W(0x10, 1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,0)| /* 10 */
+		W(0x20, 1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,0)| /* 20 */
+		W(0x30, 1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,0), /* 30 */
+		W(0x40, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)| /* 40 */
+		W(0x50, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)| /* 50 */
+		W(0x60, 0,0,1,1,0,0,0,0,0,1,0,1,0,0,0,0)| /* 60 */
+		W(0x70, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0), /* 70 */
+		W(0x80, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)| /* 80 */
+		W(0x90, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)| /* 90 */
+		W(0xa0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)| /* a0 */
+		W(0xb0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0), /* b0 */
+		W(0xc0, 1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,0)| /* c0 */
+		W(0xd0, 1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1)| /* d0 */
+		W(0xe0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)| /* e0 */
+		W(0xf0, 0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1)  /* f0 */
+		/*      -------------------------------         */
+		/*      0 1 2 3 4 5 6 7 8 9 a b c d e f         */
+	};
+	static const u64 twobyte_has_modrm[256 / 64] = {
+		/*      0 1 2 3 4 5 6 7 8 9 a b c d e f         */
+		/*      -------------------------------         */
+		W(0x00, 1,1,1,1,0,0,0,0,0,0,0,0,0,1,0,1)| /* 0f */
+		W(0x10, 1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0)| /* 1f */
+		W(0x20, 1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,1)| /* 2f */
+		W(0x30, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0), /* 3f */
+		W(0x40, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)| /* 4f */
+		W(0x50, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)| /* 5f */
+		W(0x60, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)| /* 6f */
+		W(0x70, 1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1), /* 7f */
+		W(0x80, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)| /* 8f */
+		W(0x90, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)| /* 9f */
+		W(0xa0, 0,0,0,1,1,1,1,1,0,0,0,1,1,1,1,1)| /* af */
+		W(0xb0, 1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1), /* bf */
+		W(0xc0, 1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0)| /* cf */
+		W(0xd0, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)| /* df */
+		W(0xe0, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)| /* ef */
+		W(0xf0, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0)  /* ff */
+		/*      -------------------------------         */
+		/*      0 1 2 3 4 5 6 7 8 9 a b c d e f         */
+	};
+#undef	W
+	int need_modrm;
+
+	/* Skip legacy instruction prefixes.  */
+	while (1) {
+		switch (*insn) {
+		case 0x66:
+		case 0x67:
+		case 0x2e:
+		case 0x3e:
+		case 0x26:
+		case 0x64:
+		case 0x65:
+		case 0x36:
+		case 0xf0:
+		case 0xf3:
+		case 0xf2:
+			++insn;
+			continue;
+		}
+		break;
+	}
+
+	/* Skip REX instruction prefix.  */
+	if ((*insn & 0xf0) == 0x40)
+		++insn;
+
+	if (*insn == 0x0f) {	/* Two-byte opcode.  */
+		++insn;
+		need_modrm = test_bit(*insn, twobyte_has_modrm);
+	} else {		/* One-byte opcode.  */
+		need_modrm = test_bit(*insn, onebyte_has_modrm);
+	}
+
+	if (need_modrm) {
+		u8 modrm = *++insn;
+		if ((modrm & 0xc7) == 0x05) { /* %rip+disp32 addressing mode */
+			/* Displacement follows ModRM byte.  */
+			return (s32 *) ++insn;
+		}
+	}
+
+	/* No %rip-relative addressing mode here.  */
+	return NULL;
+}
+
 void arch_copy_kprobe(struct kprobe *p)
 {
+	s32 *ripdisp;
 	memcpy(p->ainsn.insn, p->addr, MAX_INSN_SIZE);
+	ripdisp = is_riprel(p->ainsn.insn);
+	if (ripdisp) {
+		/*
+		 * The copied instruction uses the %rip-relative
+		 * addressing mode.  Adjust the displacement for the
+		 * difference between the original location of this
+		 * instruction and the location of the copy that will
+		 * actually be run.  The tricky bit here is making sure
+		 * that the sign extension happens correctly in this
+		 * calculation, since we need a signed 32-bit result to
+		 * be sign-extended to 64 bits when it's added to the
+		 * %rip value and yield the same 64-bit result that the
+		 * sign-extension of the original signed 32-bit
+		 * displacement would have given.
+		 */
+		s64 disp = (u8 *) p->addr + *ripdisp - (u8 *) p->ainsn.insn;
+		BUG_ON((s64) (s32) disp != disp); /* Sanity check.  */
+		*ripdisp = disp;
+	}
 }
 
 void arch_remove_kprobe(struct kprobe *p)
@@ -108,8 +233,11 @@ static void prepare_singlestep(struct kprobe *p, struct pt_regs *regs)
 {
 	regs->eflags |= TF_MASK;
 	regs->eflags &= ~IF_MASK;
-
-	regs->rip = (unsigned long)p->ainsn.insn;
+	/*single step inline if the instruction is an int3*/
+	if (p->opcode == BREAKPOINT_INSTRUCTION)
+		regs->rip = (unsigned long)p->addr;
+	else
+		regs->rip = (unsigned long)p->ainsn.insn;
 }
 
 /*
@@ -131,6 +259,12 @@ int kprobe_handler(struct pt_regs *regs)
 		   Disarm the probe we just hit, and ignore it. */
 		p = get_kprobe(addr);
 		if (p) {
+			if (kprobe_status == KPROBE_HIT_SS) {
+				regs->eflags &= ~TF_MASK;
+				regs->eflags |= kprobe_saved_rflags;
+				unlock_kprobes();
+				goto no_kprobe;
+			}
 			disarm_kprobe(p, regs);
 			ret = 1;
 		} else {
@@ -168,17 +302,16 @@ int kprobe_handler(struct pt_regs *regs)
 	if (is_IF_modifier(p->ainsn.insn))
 		kprobe_saved_rflags &= ~IF_MASK;
 
-	if (p->pre_handler(p, regs)) {
+	if (p->pre_handler && p->pre_handler(p, regs))
 		/* handler has already set things up, so skip ss setup */
 		return 1;
-	}
 
-      ss_probe:
+ss_probe:
 	prepare_singlestep(p, regs);
 	kprobe_status = KPROBE_HIT_SS;
 	return 1;
 
-      no_kprobe:
+no_kprobe:
 	preempt_enable_no_resched();
 	return ret;
 }
@@ -222,6 +355,13 @@ static void resume_execution(struct kprobe *p, struct pt_regs *regs)
 		*tos &= ~(TF_MASK | IF_MASK);
 		*tos |= kprobe_old_rflags;
 		break;
+	case 0xc3:		/* ret/lret */
+	case 0xcb:
+	case 0xc2:
+	case 0xca:
+		regs->eflags &= ~TF_MASK;
+		/* rip is already adjusted, no more changes required*/
+		return;
 	case 0xe8:		/* call relative - Fix return addr */
 		*tos = orig_rip + (*tos - copy_rip);
 		break;
@@ -439,8 +579,15 @@ static kprobe_opcode_t *get_insn_slot(void)
 	if (!kip) {
 		return NULL;
 	}
-	kip->insns = (kprobe_opcode_t*) __vmalloc(PAGE_SIZE,
-		GFP_KERNEL|__GFP_HIGHMEM, __pgprot(__PAGE_KERNEL_EXEC));
+
+	/*
+	 * For the %rip-relative displacement fixups to be doable, we
+	 * need our instruction copy to be within +/- 2GB of any data it
+	 * might access via %rip.  That is, within 2GB of where the
+	 * kernel image and loaded module images reside.  So we allocate
+	 * a page in the module loading area.
+	 */
+	kip->insns = module_alloc(PAGE_SIZE);
 	if (!kip->insns) {
 		kfree(kip);
 		return NULL;
@@ -481,7 +628,7 @@ static void free_insn_slot(kprobe_opcode_t *slot)
 					hlist_add_head(&kip->hlist,
 						&kprobe_insn_pages);
 				} else {
-					vfree(kip->insns);
+					module_free(NULL, kip->insns);
 					kfree(kip);
 				}
 			}

@@ -111,8 +111,6 @@ struct alpha_machine_vector alpha_mv;
 int alpha_using_srm;
 #endif
 
-unsigned char aux_device_present = 0xaa;
-
 #define N(a) (sizeof(a)/sizeof(a[0]))
 
 static struct alpha_machine_vector *get_sysvec(unsigned long, unsigned long,

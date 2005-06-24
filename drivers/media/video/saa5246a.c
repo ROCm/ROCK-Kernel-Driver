@@ -65,18 +65,7 @@ static struct video_device saa_template;	/* Declared near bottom */
 /* Addresses to scan */
 static unsigned short normal_i2c[]	 = { I2C_ADDRESS, I2C_CLIENT_END };
 static unsigned short normal_i2c_range[] = { I2C_CLIENT_END };
-static unsigned short probe[2]		 = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short probe_range[2]	 = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short ignore[2]		 = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short ignore_range[2]	 = { I2C_CLIENT_END, I2C_CLIENT_END };
-static unsigned short force[2]		 = { I2C_CLIENT_END, I2C_CLIENT_END };
-
-static struct i2c_client_address_data addr_data = {
-	normal_i2c, normal_i2c_range,
-	probe, probe_range,
-	ignore, ignore_range,
-	force
-};
+I2C_CLIENT_INSMOD;
 
 static struct i2c_client client_template;
 
@@ -185,7 +174,6 @@ static struct i2c_driver i2c_driver_videotext =
 };
 
 static struct i2c_client client_template = {
-	.id 		= -1,
 	.driver		= &i2c_driver_videotext,
 	.name		= "(unset)",
 };

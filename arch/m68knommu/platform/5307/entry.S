@@ -5,6 +5,7 @@
  *  Copyright (C) 1998  D. Jeff Dionne <jeff@lineo.ca>,
  *                      Kenneth Albanowski <kjahds@kjahds.com>,
  *  Copyright (C) 2000  Lineo Inc. (www.lineo.com) 
+ *  Copyright (C) 2004  Macq Electronique SA. (www.macqel.com)
  *
  * Based on:
  *
@@ -22,6 +23,7 @@
  * ColdFire support by Greg Ungerer (gerg@snapgear.com)
  * 5307 fixes by David W. Miller
  * linux 2.4 support David McCullough <davidm@snapgear.com>
+ * Bug, speed and maintainability fixes by Philippe De Muyter <phdm@macqel.be>
  */
 
 #include <linux/config.h>
@@ -35,7 +37,7 @@
 #include <asm/asm-offsets.h>
 #include <asm/entry.h>
 
-.data
+.bss
 
 sw_ksp:
 .long	0
@@ -59,7 +61,7 @@ ENTRY(system_call)
 	move	#0x2000,%sr		/* enable intrs again */
 
 	movel	#-LENOSYS,%d2
-	movel	%d2,LD0(%sp)		/* default return value in d0 */
+	movel	%d2,PT_D0(%sp)		/* default return value in d0 */
 					/* original D0 is in orig_d0 */
 	movel	%d0,%d2
 
@@ -77,14 +79,14 @@ ENTRY(system_call)
 	lsrl	#2,%d2
 
 	movel	%sp,%d2			/* get thread_info pointer */
-	andl	#0xffffe000,%d2		/* at start of 8k kernel stack */
+	andl	#-THREAD_SIZE,%d2	/* at start of kernel stack */
 	movel	%d2,%a0
 	btst	#TIF_SYSCALL_TRACE,%a0@(TI_FLAGS)
 	bnes	1f
 
 	movel	%d3,%a0
 	jbsr	%a0@
-	movel	%d0,%sp@(LD0)		/* save the return value */
+	movel	%d0,%sp@(PT_D0)		/* save the return value */
 	jra	ret_from_exception
 1:
 	subql	#4,%sp
@@ -94,7 +96,7 @@ ENTRY(system_call)
 	addql	#4,%sp
 	movel	%d3,%a0
 	jbsr	%a0@
-	movel	%d0,%sp@(LD0)		/* save the return value */
+	movel	%d0,%sp@(PT_D0)		/* save the return value */
 	subql	#4,%sp			/* dummy return address */
 	SAVE_SWITCH_STACK
 	jbsr	syscall_trace
@@ -104,20 +106,20 @@ ret_from_signal:
 	addql	#4,%sp
 
 ret_from_exception:
-	btst	#5,%sp@(LSR)		/* check if returning to kernel */
+	btst	#5,%sp@(PT_SR)		/* check if returning to kernel */
 	jeq	Luser_return		/* if so, skip resched, signals */
 
 Lkernel_return:
-	moveml  %sp@,%d1-%d5/%a0-%a2
-	addl    #32,%sp			/* space for 8 regs */
-	movel   %sp@+,%d0
-	addql   #4,%sp			/* orig d0 */
-	addl    %sp@+,%sp		/* stk adj */
+	moveml	%sp@,%d1-%d5/%a0-%a2
+	lea	%sp@(32),%sp		/* space for 8 regs */
+	movel	%sp@+,%d0
+	addql	#4,%sp			/* orig d0 */
+	addl	%sp@+,%sp		/* stk adj */
 	rte
 
 Luser_return:
 	movel	%sp,%d1			/* get thread_info pointer */
-	andl	#0xffffe000,%d1		/* at base of 8k kernel stack */
+	andl	#-THREAD_SIZE,%d1	/* at base of kernel stack */
 	movel	%d1,%a0
 	movel	%a0@(TI_FLAGS),%d1	/* get thread_info->flags */
 	andl	#_TIF_WORK_MASK,%d1
@@ -126,27 +128,17 @@ Luser_return:
 Lreturn:
 	move    #0x2700,%sr		/* disable intrs */
 	movel   sw_usp,%a0		/* get usp */
-	moveml  %sp@(LFORMATVEC),%d1-%d2 /* copy exception */
-	moveml  %d1-%d2,%a0@(-8)
-	bclr    #5,%a0@(-8)		/* clear format byte, bit 5 to make
-					 * stack appear modulo 4 which it WILL
-					 * be when we do the rte because it was
-					 * generated in setup_frame
-					 */
-	bclr    #4,%a0@(-8)		/* clear format byte, bit 4 to make 
-					 * stack appear modulo 4 which it WILL
-					 * be when we do the rte because it was
-					 * generated in setup_frame
-					 */
-	moveml  %sp@,%d1-%d5/%a0-%a2
-	addl    #32,%sp			/* space for 8 regs */
-	movel   %sp@+,%d0                  
-	addql   #4,%sp			/* orig d0 */
-	addl    %sp@+,%sp		/* stk adj */
-	addql   #8,%sp			/* remove exception */
-	movel   %sp,sw_ksp		/* save ksp */
-	movel   sw_usp,%sp		/* restore usp */
-	subql   #8,%sp			/* set exception */
+	movel	%sp@(PT_PC),%a0@-	/* copy exception program counter */
+	movel	%sp@(PT_FORMATVEC),%a0@-/* copy exception format/vector/sr */
+	moveml	%sp@,%d1-%d5/%a0-%a2
+	lea	%sp@(32),%sp		/* space for 8 regs */
+	movel	%sp@+,%d0
+	addql	#4,%sp			/* orig d0 */
+	addl	%sp@+,%sp		/* stk adj */
+	addql	#8,%sp			/* remove exception */
+	movel	%sp,sw_ksp		/* save ksp */
+	subql	#8,sw_usp		/* set exception */
+	movel	sw_usp,%sp		/* restore usp */
 	rte
 
 Lwork_to_do:
@@ -160,8 +152,7 @@ Lsignal_return:
 	subql	#4,%sp			/* dummy return address */
 	SAVE_SWITCH_STACK
 	pea	%sp@(SWITCH_STACK_SIZE)
-	clr	%d1
-	movel	%d1,%sp@-
+	clrl	%sp@-
 	jsr	do_signal
 	addql	#8,%sp
 	RESTORE_SWITCH_STACK
@@ -176,10 +167,10 @@ Lsignal_return:
 ENTRY(inthandler)
 	SAVE_ALL
 	moveq	#-1,%d0
-	movel	%d0,%sp@(LORIG_D0)
+	movel	%d0,%sp@(PT_ORIG_D0)
 	addql	#1,local_irq_count
 
-	movew   %sp@(LFORMATVEC),%d0	/* put exception # in d0 */
+	movew   %sp@(PT_FORMATVEC),%d0	/* put exception # in d0 */
 	andl	#0x03fc,%d0		/* mask out vector only */
 
 	leal	per_cpu__kstat+STAT_IRQ,%a0
@@ -197,7 +188,7 @@ ENTRY(inthandler)
 
 	movel	%a0@,%a0		/* get function to call */
 	jbsr	%a0@			/* call vector handler */
-	addl	#12,%sp			/* pop parameters off stack */
+	lea	%sp@(12),%sp		/* pop parameters off stack */
 
 	bra	ret_from_interrupt	/* this was fallthrough */
 
@@ -210,15 +201,14 @@ ENTRY(inthandler)
 ENTRY(fasthandler)
 	SAVE_LOCAL
 
-	movew   %sp@(LFORMATVEC),%d0
+	movew   %sp@(PT_FORMATVEC),%d0
 	andl	#0x03fc,%d0		/* mask out vector only */
 
 	leal	per_cpu__kstat+STAT_IRQ,%a0
 	addql	#1,%a0@(%d0)
 
 	movel	%sp,%sp@-		/* push regs arg onto stack */
-	clrl	%d1
-	movel	%d1,%sp@- 		/* push devid arg */
+	clrl	%sp@-			/* push devid arg */
 	lsrl	#2,%d0			/* calculate real vector # */
 	movel	%d0,%sp@- 		/* push vector # on stack */
 
@@ -226,7 +216,7 @@ ENTRY(fasthandler)
 	lea	irq_list,%a0
 	movel	%a0@(%d0),%a0		/* get function to call */
 	jbsr	%a0@			/* call vector handler */
-	addl	#12,%sp			/* pop parameters off stack */
+	lea	%sp@(12),%sp		/* pop parameters off stack */
 
 	RESTORE_LOCAL
 
@@ -236,7 +226,7 @@ ENTRY(ret_from_interrupt)
 1:
 	RESTORE_ALL
 2:
-	moveb	%sp@(LSR),%d0
+	moveb	%sp@(PT_SR),%d0
 	andl	#0x7,%d0
 	jhi	1b
 

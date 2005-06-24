@@ -7,7 +7,7 @@
  * Support for 8-bit mode by Zoltan Szilagyi <zoltans@cs.arizona.edu>
  *
  * Many modifications, and currently maintained, by
- *  Philip Blundell <Philip.Blundell@pobox.com>
+ *  Philip Blundell <philb@gnu.org>
  * Added the Compaq LTE  Alan Cox <alan@redhat.com>
  * Added MCA support Adam Fritzler <mid@auk.cx>
  *

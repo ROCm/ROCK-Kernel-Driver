@@ -138,18 +138,6 @@ extern int	magic_sysrq_key(int ch);
 
 
 /*
- * tmp_buf is used as a temporary buffer by serial_write.  We need to
- * lock it in case the copy_from_user blocks while swapping in a page,
- * and some other program tries to do a serial write at the same time.
- * Since the lock will only come under contention when the system is
- * swapping and available memory is low, it makes sense to share one
- * buffer across all the serial ports, since it significantly saves
- * memory if large numbers of serial ports are open.
- */
-static unsigned char mcfrs_tmp_buf[4096]; /* This is cheating */
-static DECLARE_MUTEX(mcfrs_tmp_buf_sem);
-
-/*
  *	Forware declarations...
  */
 static void	mcfrs_change_speed(struct mcf_serial *info);
@@ -1092,23 +1080,19 @@ static int mcfrs_ioctl(struct tty_struct *tty, struct file * file,
 				 (arg ? CLOCAL : 0));
 			return 0;
 		case TIOCGSERIAL:
-			error = verify_area(VERIFY_WRITE, (void *) arg,
-						sizeof(struct serial_struct));
-			if (error)
-				return error;
-			return get_serial_info(info,
+			if (access_ok(VERIFY_WRITE, (void *) arg,
+						sizeof(struct serial_struct)))
+				return get_serial_info(info,
 					       (struct serial_struct *) arg);
+			return -EFAULT;
 		case TIOCSSERIAL:
 			return set_serial_info(info,
 					       (struct serial_struct *) arg);
 		case TIOCSERGETLSR: /* Get line status register */
-			error = verify_area(VERIFY_WRITE, (void *) arg,
-				sizeof(unsigned int));
-			if (error)
-				return error;
-			else
-			    return get_lsr_info(info, (unsigned int *) arg);
-
+			if (access_ok(VERIFY_WRITE, (void *) arg,
+						sizeof(unsigned int)))
+				return get_lsr_info(info, (unsigned int *) arg);
+			return -EFAULT;
 		case TIOCSERGSTRUCT:
 			error = copy_to_user((struct mcf_serial *) arg,
 				    info, sizeof(struct mcf_serial));

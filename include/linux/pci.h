@@ -501,6 +501,7 @@ typedef int __bitwise pci_power_t;
 #define PCI_D2	((pci_power_t __force) 2)
 #define PCI_D3hot	((pci_power_t __force) 3)
 #define PCI_D3cold	((pci_power_t __force) 4)
+#define PCI_POWER_ERROR	((pci_power_t __force) -1)
 
 /*
  * The pci_dev structure is used to describe PCI devices.
@@ -549,8 +550,6 @@ struct pci_dev {
 	unsigned int	irq;
 	struct resource resource[DEVICE_COUNT_RESOURCE]; /* I/O and memory regions + expansion ROMs */
 
-	char *		slot_name;	/* pointer to dev.bus_id */
-
 	/* These fields are used by common fixups */
 	unsigned int	transparent:1;	/* Transparent PCI bridge */
 	unsigned int	multifunction:1;/* Part of multi-function device */
@@ -563,7 +562,7 @@ struct pci_dev {
 	int rom_attr_enabled;		/* has display of the rom attribute been enabled? */
 	struct bin_attribute *res_attr[DEVICE_COUNT_RESOURCE]; /* sysfs file for resources */
 #ifdef CONFIG_PCI_NAMES
-#define PCI_NAME_SIZE	96
+#define PCI_NAME_SIZE	255
 #define PCI_NAME_HALF	__stringify(43)	/* less than half to handle slop */
 	char		pretty_name[PCI_NAME_SIZE];	/* pretty name for users to see */
 #endif
@@ -671,7 +670,8 @@ struct pci_driver {
 	void (*remove) (struct pci_dev *dev);	/* Device removed (NULL if not a hot-plug capable driver) */
 	int  (*suspend) (struct pci_dev *dev, pm_message_t state);	/* Device suspended */
 	int  (*resume) (struct pci_dev *dev);	                /* Device woken up */
-	int  (*enable_wake) (struct pci_dev *dev, u32 state, int enable);   /* Enable wake event */
+	int  (*enable_wake) (struct pci_dev *dev, pci_power_t state, int enable);   /* Enable wake event */
+	void (*shutdown) (struct pci_dev *dev);
 
 	struct device_driver	driver;
 	struct pci_dynids dynids;
@@ -811,7 +811,6 @@ void pci_set_master(struct pci_dev *dev);
 int pci_set_mwi(struct pci_dev *dev);
 void pci_clear_mwi(struct pci_dev *dev);
 int pci_set_dma_mask(struct pci_dev *dev, u64 mask);
-int pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask);
 int pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask);
 int pci_assign_resource(struct pci_dev *dev, int i);
 
@@ -942,7 +941,6 @@ static inline void pci_set_master(struct pci_dev *dev) { }
 static inline int pci_enable_device(struct pci_dev *dev) { return -EIO; }
 static inline void pci_disable_device(struct pci_dev *dev) { }
 static inline int pci_set_dma_mask(struct pci_dev *dev, u64 mask) { return -EIO; }
-static inline int pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask) { return -EIO; }
 static inline int pci_assign_resource(struct pci_dev *dev, int i) { return -EBUSY;}
 static inline int pci_register_driver(struct pci_driver *drv) { return 0;}
 static inline void pci_unregister_driver(struct pci_driver *drv) { }
@@ -954,7 +952,7 @@ static inline const struct pci_device_id *pci_match_device(const struct pci_devi
 static inline int pci_save_state(struct pci_dev *dev) { return 0; }
 static inline int pci_restore_state(struct pci_dev *dev) { return 0; }
 static inline int pci_set_power_state(struct pci_dev *dev, pci_power_t state) { return 0; }
-static inline pci_power_t pci_choose_state(struct pci_dev *dev, u32 state) { return PCI_D0; }
+static inline pci_power_t pci_choose_state(struct pci_dev *dev, pm_message_t state) { return PCI_D0; }
 static inline int pci_enable_wake(struct pci_dev *dev, pci_power_t state, int enable) { return 0; }
 
 #define	isa_bridge	((struct pci_dev *)NULL)
@@ -968,9 +966,8 @@ static inline int pci_enable_wake(struct pci_dev *dev, pci_power_t state, int en
  */
 #ifndef CONFIG_PCI_DOMAINS
 static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
-static inline int pci_name_bus(char *name, struct pci_bus *bus)
+static inline int pci_proc_domain(struct pci_bus *bus)
 {
-	sprintf(name, "%02x", bus->number);
 	return 0;
 }
 #endif

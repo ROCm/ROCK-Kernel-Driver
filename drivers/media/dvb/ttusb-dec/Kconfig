@@ -10,7 +10,7 @@ config DVB_TTUSB_DEC
 
           Even if these devices have a MPEG decoder built in, they transmit
 	  only compressed MPEG data over the USB bus, so you need
-	  an external software decoder to watch TV on your computer.	  
+	  an external software decoder to watch TV on your computer.
 
           This driver needs external firmware. Please use the commands
           "<kerneldir>/Documentation/dvb/get_dvb_firmware dec2000t",

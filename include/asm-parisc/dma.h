@@ -38,9 +38,11 @@
 ** won't compile :-(
 */
 #define MAX_DMA_CHANNELS 8
-#define DMA_MODE_READ    1
-#define DMA_MODE_WRITE   2
-#define DMA_AUTOINIT     0x10
+#define DMA_MODE_READ	0x44	/* I/O to memory, no autoinit, increment, single mode */
+#define DMA_MODE_WRITE	0x48	/* memory to I/O, no autoinit, increment, single mode */
+#define DMA_MODE_CASCADE 0xC0	/* pass thru DREQ->HRQ, DACK<-HLDA only */
+
+#define DMA_AUTOINIT	0x10
 
 /* 8237 DMA controllers */
 #define IO_DMA1_BASE	0x00	/* 8 bit slave DMA, channels 0..3 */

@@ -197,8 +197,7 @@ ext3_get_acl(struct inode *inode, int type)
 		acl = NULL;
 	else
 		acl = ERR_PTR(retval);
-	if (value)
-		kfree(value);
+	kfree(value);
 
 	if (!IS_ERR(acl)) {
 		switch(type) {
@@ -267,8 +266,7 @@ ext3_set_acl(handle_t *handle, struct inode *inode, int type,
 	error = ext3_xattr_set_handle(handle, inode, name_index, "",
 				      value, size, 0);
 
-	if (value)
-		kfree(value);
+	kfree(value);
 	if (!error) {
 		switch(type) {
 			case ACL_TYPE_ACCESS:
@@ -288,6 +286,8 @@ ext3_check_acl(struct inode *inode, int mask)
 {
 	struct posix_acl *acl = ext3_get_acl(inode, ACL_TYPE_ACCESS);
 
+	if (IS_ERR(acl))
+		return PTR_ERR(acl);
 	if (acl) {
 		int error = posix_acl_permission(inode, acl, mask);
 		posix_acl_release(acl);

@@ -31,6 +31,13 @@ cflags-$(CONFIG_MORE_COMPILE_OPTIONS)	+= \
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -R .stab -R .stabstr -S
 
 #
+# arch/sh/defconfig doesn't reflect any real hardware, and as such should
+# never be used by anyone. Use a board-specific defconfig that has a
+# reasonable chance of being current instead.
+#
+KBUILD_DEFCONFIG := rts7751r2d_defconfig
+
+#
 # Choosing incompatible machines durings configuration will result in
 # error messages during linking.
 #

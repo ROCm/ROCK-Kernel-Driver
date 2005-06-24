@@ -24,6 +24,7 @@
 #include <asm/unaligned.h>
 #include <asm/byteorder.h>
 #include <linux/input.h>
+#include <linux/wait.h>
 
 #undef DEBUG
 #undef DEBUG_DATA
@@ -557,8 +558,7 @@ static void hid_free_device(struct hid_device *device)
 		}
 	}
 
-	if (device->rdesc)
-		kfree(device->rdesc);
+	kfree(device->rdesc);
 	kfree(device);
 }
 
@@ -765,7 +765,7 @@ static __inline__ __u32 s32ton(__s32 value, unsigned n)
 static __inline__ __u32 extract(__u8 *report, unsigned offset, unsigned n)
 {
 	report += (offset >> 5) << 2; offset &= 31;
-	return (le64_to_cpu(get_unaligned((__le64*)report)) >> offset) & ((1ULL << n) - 1);
+	return (le64_to_cpu(get_unaligned((__le64*)report)) >> offset) & ((1 << n) - 1);
 }
 
 static __inline__ void implement(__u8 *report, unsigned offset, unsigned n, __u32 value)
@@ -1223,22 +1223,9 @@ void hid_submit_report(struct hid_device *hid, struct hid_report *report, unsign
 
 int hid_wait_io(struct hid_device *hid)
 {
-	DECLARE_WAITQUEUE(wait, current);
-	int timeout = 10*HZ;
-
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	add_wait_queue(&hid->wait, &wait);
-
-	while (timeout && (test_bit(HID_CTRL_RUNNING, &hid->iofl) ||
-			   test_bit(HID_OUT_RUNNING, &hid->iofl))) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		timeout = schedule_timeout(timeout);
-	}
-
-	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&hid->wait, &wait);
-
-	if (!timeout) {
+	if (!wait_event_timeout(hid->wait, (!test_bit(HID_CTRL_RUNNING, &hid->iofl) &&
+					!test_bit(HID_OUT_RUNNING, &hid->iofl)),
+					10*HZ)) {
 		dbg("timeout waiting for ctrl or out queue to clear");
 		return -1;
 	}
@@ -1256,7 +1243,7 @@ static int hid_get_class_descriptor(struct usb_device *dev, int ifnum,
 	do {
 		result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 				USB_REQ_GET_DESCRIPTOR, USB_RECIP_INTERFACE | USB_DIR_IN,
-				(type << 8), ifnum, buf, size, HZ * USB_CTRL_GET_TIMEOUT);
+				(type << 8), ifnum, buf, size, USB_CTRL_GET_TIMEOUT);
 		retries--;
 	} while (result < size && retries);
 	return result;
@@ -1317,7 +1304,7 @@ void hid_init_reports(struct hid_device *hid)
 
 	usb_control_msg(hid->dev, usb_sndctrlpipe(hid->dev, 0),
 		HID_REQ_SET_IDLE, USB_TYPE_CLASS | USB_RECIP_INTERFACE, 0,
-		hid->ifnum, NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
+		hid->ifnum, NULL, 0, USB_CTRL_SET_TIMEOUT);
 }
 
 #define USB_VENDOR_ID_WACOM		0x056a
@@ -1328,6 +1315,8 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_DEVICE_ID_WACOM_INTUOS2	0x0040
 #define USB_DEVICE_ID_WACOM_VOLITO	0x0060
 #define USB_DEVICE_ID_WACOM_PTU		0x0003
+#define USB_DEVICE_ID_WACOM_INTUOS3	0x00B0
+#define USB_DEVICE_ID_WACOM_CINTIQ	0x003F
 
 #define USB_VENDOR_ID_KBGEAR		0x084e
 #define USB_DEVICE_ID_KBGEAR_JAMSTUDIO	0x1001
@@ -1414,6 +1403,7 @@ void hid_init_reports(struct hid_device *hid)
 
 #define USB_VENDOR_ID_DELORME		0x1163
 #define USB_DEVICE_ID_DELORME_EARTHMATE 0x0100
+#define USB_DEVICE_ID_DELORME_EM_LT20	0x0200
 
 #define USB_VENDOR_ID_MCC		0x09db
 #define USB_DEVICE_ID_MCC_PMD1024LS	0x0076
@@ -1424,6 +1414,12 @@ void hid_init_reports(struct hid_device *hid)
 
 #define USB_VENDOR_ID_BTC		0x046e
 #define USB_DEVICE_ID_BTC_KEYBOARD	0x5303
+
+#define USB_VENDOR_ID_VERNIER		0x08f7
+#define USB_DEVICE_ID_VERNIER_LABPRO	0x0001
+#define USB_DEVICE_ID_VERNIER_GOTEMP	0x0002
+#define USB_DEVICE_ID_VERNIER_SKIP	0x0003
+#define USB_DEVICE_ID_VERNIER_CYCLOPS	0x0004
 
 
 /*
@@ -1450,6 +1446,7 @@ static struct hid_blacklist {
 	{ USB_VENDOR_ID_CODEMERCS, USB_DEVICE_ID_CODEMERCS_IOW28, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_CYPRESS, USB_DEVICE_ID_CYPRESS_HIDCOM, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_DELORME, USB_DEVICE_ID_DELORME_EARTHMATE, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_DELORME, USB_DEVICE_ID_DELORME_EM_LT20, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_ESSENTIAL_REALITY, USB_DEVICE_ID_ESSENTIAL_REALITY_P5, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_GLAB, USB_DEVICE_ID_4_PHIDGETSERVO_30, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_GLAB, USB_DEVICE_ID_1_PHIDGETSERVO_30, HID_QUIRK_IGNORE },
@@ -1469,6 +1466,10 @@ static struct hid_blacklist {
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 300, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 400, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_ONTRAK, USB_DEVICE_ID_ONTRAK_ADU100 + 500, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_VERNIER, USB_DEVICE_ID_VERNIER_LABPRO, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_VERNIER, USB_DEVICE_ID_VERNIER_GOTEMP, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_VERNIER, USB_DEVICE_ID_VERNIER_SKIP, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_VERNIER, USB_DEVICE_ID_VERNIER_CYCLOPS, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_PENPARTNER, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_GRAPHIRE, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_GRAPHIRE + 1, HID_QUIRK_IGNORE },
@@ -1494,6 +1495,10 @@ static struct hid_blacklist {
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS2 + 7, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_VOLITO, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_PTU, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS3, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS3 + 1, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_INTUOS3 + 2, HID_QUIRK_IGNORE },
+	{ USB_VENDOR_ID_WACOM, USB_DEVICE_ID_WACOM_CINTIQ, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WISEGROUP, USB_DEVICE_ID_4_PHIDGETSERVO_20, HID_QUIRK_IGNORE },
 	{ USB_VENDOR_ID_WISEGROUP, USB_DEVICE_ID_1_PHIDGETSERVO_20, HID_QUIRK_IGNORE },
 
@@ -1802,12 +1807,12 @@ static int hid_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	return 0;
 }
 
-static int hid_suspend(struct usb_interface *intf, u32 state)
+static int hid_suspend(struct usb_interface *intf, pm_message_t message)
 {
 	struct hid_device *hid = usb_get_intfdata (intf);
 
 	usb_kill_urb(hid->urbin);
-	intf->dev.power.power_state = state;
+	intf->dev.power.power_state = PMSG_SUSPEND;
 	dev_dbg(&intf->dev, "suspend\n");
 	return 0;
 }
@@ -1817,7 +1822,7 @@ static int hid_resume(struct usb_interface *intf)
 	struct hid_device *hid = usb_get_intfdata (intf);
 	int status;
 
-	intf->dev.power.power_state = PM_SUSPEND_ON;
+	intf->dev.power.power_state = PMSG_ON;
 	if (hid->open)
 		status = usb_submit_urb(hid->urbin, GFP_NOIO);
 	else

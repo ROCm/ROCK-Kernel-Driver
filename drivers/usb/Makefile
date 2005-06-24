@@ -6,6 +6,8 @@
 
 obj-$(CONFIG_USB)		+= core/
 
+obj-$(CONFIG_USB_MON)		+= mon/
+
 obj-$(CONFIG_USB_EHCI_HCD)	+= host/
 obj-$(CONFIG_USB_OHCI_HCD)	+= host/
 obj-$(CONFIG_USB_UHCI_HCD)	+= host/
@@ -42,15 +44,14 @@ obj-$(CONFIG_USB_SN9C102)	+= media/
 obj-$(CONFIG_USB_STV680)	+= media/
 obj-$(CONFIG_USB_VICAM)		+= media/
 obj-$(CONFIG_USB_W9968CF)	+= media/
-obj-$(CONFIG_USB_QC)		+= media/
 
 obj-$(CONFIG_USB_CATC)		+= net/
 obj-$(CONFIG_USB_KAWETH)	+= net/
 obj-$(CONFIG_USB_PEGASUS)	+= net/
 obj-$(CONFIG_USB_RTL8150)	+= net/
 obj-$(CONFIG_USB_USBNET)	+= net/
+obj-$(CONFIG_USB_ZD1201)	+= net/
 
-obj-$(CONFIG_USB_HPUSBSCSI)	+= image/
 obj-$(CONFIG_USB_MDC800)	+= image/
 obj-$(CONFIG_USB_MICROTEK)	+= image/
 

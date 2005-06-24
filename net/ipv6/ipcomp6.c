@@ -139,11 +139,9 @@ error_out:
 	return err;
 }
 
-static int ipcomp6_output(struct sk_buff *skb)
+static int ipcomp6_output(struct xfrm_state *x, struct sk_buff *skb)
 {
 	int err;
-	struct dst_entry *dst = skb->dst;
-	struct xfrm_state *x = dst->xfrm;
 	struct ipv6hdr *top_iph;
 	int hdr_len;
 	struct ipv6_comp_hdr *ipch;
@@ -162,8 +160,7 @@ static int ipcomp6_output(struct sk_buff *skb)
 
 	if ((skb_is_nonlinear(skb) || skb_cloned(skb)) &&
 		skb_linearize(skb, GFP_ATOMIC) != 0) {
-		err = -ENOMEM;
-		goto error;
+		goto out_ok;
 	}
 
 	/* compression */
@@ -176,11 +173,7 @@ static int ipcomp6_output(struct sk_buff *skb)
 	tfm = *per_cpu_ptr(ipcd->tfms, cpu);
 
 	err = crypto_comp_compress(tfm, start, plen, scratch, &dlen);
-	if (err) {
-		put_cpu();
-		goto error;
-	}
-	if ((dlen + sizeof(struct ipv6_comp_hdr)) >= plen) {
+	if (err || (dlen + sizeof(struct ipv6_comp_hdr)) >= plen) {
 		put_cpu();
 		goto out_ok;
 	}
@@ -200,10 +193,7 @@ static int ipcomp6_output(struct sk_buff *skb)
 	*skb->nh.raw = IPPROTO_COMP;
 
 out_ok:
-	err = 0;
-
-error:
-	return err;
+	return 0;
 }
 
 static void ipcomp6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,

@@ -48,7 +48,7 @@
 #define SN9C102_ISO_PACKETS       7
 #define SN9C102_ALTERNATE_SETTING 8
 #define SN9C102_URB_TIMEOUT       msecs_to_jiffies(2 * SN9C102_ISO_PACKETS)
-#define SN9C102_CTRL_TIMEOUT      msecs_to_jiffies(300)
+#define SN9C102_CTRL_TIMEOUT      300
 
 /*****************************************************************************/
 

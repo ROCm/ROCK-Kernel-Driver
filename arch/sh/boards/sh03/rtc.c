@@ -115,8 +115,6 @@ static int set_rtc_mmss(unsigned long nowtime)
 	real_minutes %= 60;
 
 	if (abs(real_minutes - cmos_minutes) < 30) {
-		BIN_TO_BCD(real_seconds);
-		BIN_TO_BCD(real_minutes);
 		ctrl_outb(real_seconds % 10, RTC_SEC1);
 		ctrl_outb(real_seconds / 10, RTC_SEC10);
 		ctrl_outb(real_minutes % 10, RTC_MIN1);

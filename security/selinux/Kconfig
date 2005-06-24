@@ -1,6 +1,6 @@
 config SECURITY_SELINUX
 	bool "NSA SELinux Support"
-	depends on SECURITY && NET
+	depends on SECURITY && NET && INET
 	default n
 	help
 	  This selects NSA Security-Enhanced Linux (SELinux).
@@ -76,12 +76,22 @@ config SECURITY_SELINUX_AVC_STATS
 	  /selinux/avc/cache_stats, which may be monitored via
 	  tools such as avcstat.
 
-config SECURITY_SELINUX_MLS
-	bool "NSA SELinux MLS policy (EXPERIMENTAL)"
-	depends on SECURITY_SELINUX && EXPERIMENTAL
-	default n
+config SECURITY_SELINUX_CHECKREQPROT_VALUE
+	int "NSA SELinux checkreqprot default value"
+	depends on SECURITY_SELINUX
+	range 0 1
+	default 1
 	help
-	  This enables the NSA SELinux Multi-Level Security (MLS) policy in
-	  addition to the default RBAC/TE policy.  This policy is
-	  experimental and has not been configured for use.  Unless you
-	  specifically want to experiment with MLS, say N.
+	  This option sets the default value for the 'checkreqprot' flag
+	  that determines whether SELinux checks the protection requested
+	  by the application or the protection that will be applied by the
+	  kernel (including any implied execute for read-implies-exec) for
+	  mmap and mprotect calls.  If this option is set to 0 (zero),
+	  SELinux will default to checking the protection that will be applied
+	  by the kernel.  If this option is set to 1 (one), SELinux will
+	  default to checking the protection requested by the application.
+	  The checkreqprot flag may be changed from the default via the
+	  'checkreqprot=' boot parameter.  It may also be changed at runtime
+	  via /selinux/checkreqprot if authorized by policy.
+
+	  If you are unsure how to answer this question, answer 1.

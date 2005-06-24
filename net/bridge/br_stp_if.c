@@ -49,6 +49,8 @@ void br_stp_enable_bridge(struct net_bridge *br)
 
 	spin_lock_bh(&br->lock);
 	mod_timer(&br->hello_timer, jiffies + br->hello_time);
+	mod_timer(&br->gc_timer, jiffies + HZ/10);
+	
 	br_config_bpdu_generation(br);
 
 	list_for_each_entry(p, &br->port_list, list) {
@@ -78,6 +80,7 @@ void br_stp_disable_bridge(struct net_bridge *br)
 	del_timer_sync(&br->hello_timer);
 	del_timer_sync(&br->topology_change_timer);
 	del_timer_sync(&br->tcn_timer);
+	del_timer_sync(&br->gc_timer);
 }
 
 /* called under bridge lock */

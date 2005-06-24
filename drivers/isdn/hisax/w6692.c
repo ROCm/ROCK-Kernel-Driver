@@ -49,7 +49,7 @@ static char *W6692Ver[] __initdata =
 {"W6692 V00", "W6692 V01", "W6692 V10",
  "W6692 V11"};
 
-static void
+static void __init
 W6692Version(struct IsdnCardState *cs, char *s)
 {
 	int val;

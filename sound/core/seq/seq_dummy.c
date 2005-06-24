@@ -140,7 +140,10 @@ dummy_input(snd_seq_event_t *ev, int direct, void *private_data, int atomic, int
 static void
 dummy_free(void *private_data)
 {
-	kfree(private_data);
+	snd_seq_dummy_port_t *p;
+
+	p = private_data;
+	kfree(p);
 }
 
 /*

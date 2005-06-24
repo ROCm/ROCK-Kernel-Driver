@@ -381,7 +381,7 @@ static struct file_operations ISILoad_fops = {
 	.ioctl		= ISILoad_ioctl,
 };
 
-struct miscdevice isiloader_device = {
+static struct miscdevice isiloader_device = {
 	ISILOAD_MISC_MINOR, "isictl", &ISILoad_fops
 };
 
@@ -1271,7 +1271,7 @@ static void isicom_shutdown_port(struct isi_port * port)
 	}	
 	port->flags &= ~ASYNC_INITIALIZED;
 	/* 3rd October 2000 : Vinayak P Risbud */
-	port->tty = 0;
+	port->tty = NULL;
 	spin_unlock_irqrestore(&card->card_lock, flags);
 	
 	/*Fix done by Anil .S on 30-04-2001

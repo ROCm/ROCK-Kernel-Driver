@@ -36,9 +36,10 @@
 /* #define DCACHE_DEBUG 1 */
 
 int sysctl_vfs_cache_pressure = 100;
+EXPORT_SYMBOL_GPL(sysctl_vfs_cache_pressure);
 
  __cacheline_aligned_in_smp DEFINE_SPINLOCK(dcache_lock);
-seqlock_t rename_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
+static seqlock_t rename_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
 
 EXPORT_SYMBOL(dcache_lock);
 
@@ -340,13 +341,16 @@ restart:
 	tmp = head;
 	while ((tmp = tmp->next) != head) {
 		struct dentry *dentry = list_entry(tmp, struct dentry, d_alias);
+		spin_lock(&dentry->d_lock);
 		if (!atomic_read(&dentry->d_count)) {
 			__dget_locked(dentry);
 			__d_drop(dentry);
+			spin_unlock(&dentry->d_lock);
 			spin_unlock(&dcache_lock);
 			dput(dentry);
 			goto restart;
 		}
+		spin_unlock(&dentry->d_lock);
 	}
 	spin_unlock(&dcache_lock);
 }
@@ -1529,7 +1533,6 @@ int is_subdir(struct dentry * new_dentry, struct dentry * old_dentry)
 	struct dentry * saved = new_dentry;
 	unsigned long seq;
 
-	result = 0;
 	/* need rcu_readlock to protect against the d_parent trashing due to
 	 * d_move
 	 */
@@ -1537,6 +1540,7 @@ int is_subdir(struct dentry * new_dentry, struct dentry * old_dentry)
         do {
 		/* for restarting inner loop in case of seq retry */
 		new_dentry = saved;
+		result = 0;
 		seq = read_seqbegin(&rename_lock);
 		for (;;) {
 			if (new_dentry != old_dentry) {

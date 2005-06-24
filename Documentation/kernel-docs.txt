@@ -39,6 +39,13 @@
    
      ON-LINE DOCS:
        
+     * Title: "Linux Device Drivers, Third Edition"
+       Author: Jonathan Corbet, Alessandro Rubini, Greg Kroah-Hartman
+       URL: http://lwn.net/Kernel/LDD3/
+       Description: A 600-page book covering the (2.6.10) driver
+       programming API and kernel hacking in general.  Available under the
+       Creative Commons Attribution-ShareAlike 2.0 license.
+
      * Title: "The Linux Kernel"
        Author: David A. Rusling.
        URL: http://www.tldp.org/LDP/tlk/tlk.html

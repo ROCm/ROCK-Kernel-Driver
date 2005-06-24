@@ -178,7 +178,7 @@ static ssize_t leds_store(struct sys_device *dev, const char *buf, size_t size)
 
 static SYSDEV_ATTR(event, 0200, NULL, leds_store);
 
-static int leds_suspend(struct sys_device *dev, u32 state)
+static int leds_suspend(struct sys_device *dev, pm_message_t state)
 {
 	leds_event(led_stop);
 	return 0;
@@ -351,7 +351,7 @@ void timer_tick(struct pt_regs *regs)
 }
 
 #ifdef CONFIG_PM
-static int timer_suspend(struct sys_device *dev, u32 state)
+static int timer_suspend(struct sys_device *dev, pm_message_t state)
 {
 	struct sys_timer *timer = container_of(dev, struct sys_timer, dev);
 

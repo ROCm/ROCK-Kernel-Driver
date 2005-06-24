@@ -45,7 +45,7 @@ MAILING LISTS REGARDING THE INTEL SDK.
 
 4. Usage Notes
 
-- The IXP2000 platforms ususally have rather complex PCI bus topologies
+- The IXP2000 platforms usually have rather complex PCI bus topologies
   with large memory space requirements. In addition, b/c of the way the
   Intel SDK is designed, devices are enumerated in a very specific
   way. B/c of this this, we use "pci=firmware" option in the kernel

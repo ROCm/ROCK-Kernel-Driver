@@ -46,6 +46,7 @@ EXPORT_SYMBOL(deregister_atm_ioctl);
 
 int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
+	struct sock *sk = sock->sk;
 	struct atm_vcc *vcc;
 	int error;
 	struct list_head * pos;
@@ -59,8 +60,8 @@ int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 				error =  -EINVAL;
 				goto done;
 			}
-			error = put_user(vcc->sk->sk_sndbuf -
-					 atomic_read(&vcc->sk->sk_wmem_alloc),
+			error = put_user(sk->sk_sndbuf -
+					 atomic_read(&sk->sk_wmem_alloc),
 					 (int __user *) argp) ? -EFAULT : 0;
 			goto done;
 		case SIOCINQ:
@@ -71,13 +72,13 @@ int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 					error = -EINVAL;
 					goto done;
 				}
-				skb = skb_peek(&vcc->sk->sk_receive_queue);
+				skb = skb_peek(&sk->sk_receive_queue);
 				error = put_user(skb ? skb->len : 0,
 					 	 (int __user *)argp) ? -EFAULT : 0;
 				goto done;
 			}
 		case SIOCGSTAMP: /* borrowed from IP */
-			error = sock_get_timestamp(vcc->sk, argp);
+			error = sock_get_timestamp(sk, argp);
 			goto done;
 		case ATM_SETSC:
 			printk(KERN_WARNING "ATM_SETSC is obsolete\n");

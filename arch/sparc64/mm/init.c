@@ -61,7 +61,7 @@ static unsigned long bootmap_base;
 /* get_new_mmu_context() uses "cache + 1".  */
 DEFINE_SPINLOCK(ctx_alloc_lock);
 unsigned long tlb_context_cache = CTX_FIRST_VERSION - 1;
-#define CTX_BMAP_SLOTS (1UL << (CTX_VERSION_SHIFT - 6))
+#define CTX_BMAP_SLOTS (1UL << (CTX_NR_BITS - 6))
 unsigned long mmu_context_bmap[CTX_BMAP_SLOTS];
 
 /* References to special section boundaries */
@@ -85,40 +85,14 @@ void check_pgt_cache(void)
 	preempt_disable();
 	if (pgtable_cache_size > PGT_CACHE_HIGH) {
 		do {
-#ifdef CONFIG_SMP
 			if (pgd_quicklist)
 				free_pgd_slow(get_pgd_fast());
-#endif
 			if (pte_quicklist[0])
 				free_pte_slow(pte_alloc_one_fast(NULL, 0));
 			if (pte_quicklist[1])
 				free_pte_slow(pte_alloc_one_fast(NULL, 1 << (PAGE_SHIFT + 10)));
 		} while (pgtable_cache_size > PGT_CACHE_LOW);
 	}
-#ifndef CONFIG_SMP
-        if (pgd_cache_size > PGT_CACHE_HIGH / 4) {
-		struct page *page, *page2;
-                for (page2 = NULL, page = (struct page *)pgd_quicklist; page;) {
-                        if ((unsigned long)page->lru.prev == 3) {
-                                if (page2)
-                                        page2->lru.next = page->lru.next;
-                                else
-                                        pgd_quicklist = (void *) page->lru.next;
-                                pgd_cache_size -= 2;
-                                __free_page(page);
-                                if (page2)
-                                        page = (struct page *)page2->lru.next;
-                                else
-                                        page = (struct page *)pgd_quicklist;
-                                if (pgd_cache_size <= PGT_CACHE_LOW / 4)
-                                        break;
-                                continue;
-                        }
-                        page2 = page;
-                        page = (struct page *)page->lru.next;
-                }
-        }
-#endif
 	preempt_enable();
 }
 
@@ -135,7 +109,7 @@ __inline__ void flush_dcache_page_impl(struct page *page)
 	atomic_inc(&dcpage_flushes);
 #endif
 
-#if (L1DCACHE_SIZE > PAGE_SIZE)
+#ifdef DCACHE_ALIASING_POSSIBLE
 	__flush_dcache_page(page_address(page),
 			    ((tlb_type == spitfire) &&
 			     page_mapping(page) != NULL));
@@ -158,15 +132,15 @@ static __inline__ void set_dcache_dirty(struct page *page, int this_cpu)
 	mask = (mask << 24) | (1UL << PG_dcache_dirty);
 	__asm__ __volatile__("1:\n\t"
 			     "ldx	[%2], %%g7\n\t"
-			     "and	%%g7, %1, %%g5\n\t"
-			     "or	%%g5, %0, %%g5\n\t"
-			     "casx	[%2], %%g7, %%g5\n\t"
-			     "cmp	%%g7, %%g5\n\t"
+			     "and	%%g7, %1, %%g1\n\t"
+			     "or	%%g1, %0, %%g1\n\t"
+			     "casx	[%2], %%g7, %%g1\n\t"
+			     "cmp	%%g7, %%g1\n\t"
 			     "bne,pn	%%xcc, 1b\n\t"
 			     " membar	#StoreLoad | #StoreStore"
 			     : /* no outputs */
 			     : "r" (mask), "r" (non_cpu_bits), "r" (&page->flags)
-			     : "g5", "g7");
+			     : "g1", "g7");
 }
 
 static __inline__ void clear_dcache_dirty_cpu(struct page *page, unsigned long cpu)
@@ -176,20 +150,20 @@ static __inline__ void clear_dcache_dirty_cpu(struct page *page, unsigned long c
 	__asm__ __volatile__("! test_and_clear_dcache_dirty\n"
 			     "1:\n\t"
 			     "ldx	[%2], %%g7\n\t"
-			     "srlx	%%g7, 24, %%g5\n\t"
-			     "and	%%g5, %3, %%g5\n\t"
-			     "cmp	%%g5, %0\n\t"
+			     "srlx	%%g7, 24, %%g1\n\t"
+			     "and	%%g1, %3, %%g1\n\t"
+			     "cmp	%%g1, %0\n\t"
 			     "bne,pn	%%icc, 2f\n\t"
-			     " andn	%%g7, %1, %%g5\n\t"
-			     "casx	[%2], %%g7, %%g5\n\t"
-			     "cmp	%%g7, %%g5\n\t"
+			     " andn	%%g7, %1, %%g1\n\t"
+			     "casx	[%2], %%g7, %%g1\n\t"
+			     "cmp	%%g7, %%g1\n\t"
 			     "bne,pn	%%xcc, 1b\n\t"
 			     " membar	#StoreLoad | #StoreStore\n"
 			     "2:"
 			     : /* no outputs */
 			     : "r" (cpu), "r" (mask), "r" (&page->flags),
 			       "i" (NR_CPUS - 1UL)
-			     : "g5", "g7");
+			     : "g1", "g7");
 }
 
 extern void __update_mmu_cache(unsigned long mmu_context_hw, unsigned long address, pte_t pte, int code);
@@ -219,20 +193,32 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t p
 
 		put_cpu();
 	}
+
 	if (get_thread_fault_code())
-		__update_mmu_cache(vma->vm_mm->context & TAG_CONTEXT_BITS,
+		__update_mmu_cache(CTX_NRBITS(vma->vm_mm->context),
 				   address, pte, get_thread_fault_code());
 }
 
 void flush_dcache_page(struct page *page)
 {
-	struct address_space *mapping = page_mapping(page);
-	int dirty = test_bit(PG_dcache_dirty, &page->flags);
-	int dirty_cpu = dcache_dirty_cpu(page);
-	int this_cpu = get_cpu();
+	struct address_space *mapping;
+	int this_cpu;
 
+	/* Do not bother with the expensive D-cache flush if it
+	 * is merely the zero page.  The 'bigcore' testcase in GDB
+	 * causes this case to run millions of times.
+	 */
+	if (page == ZERO_PAGE(0))
+		return;
+
+	this_cpu = get_cpu();
+
+	mapping = page_mapping(page);
 	if (mapping && !mapping_mapped(mapping)) {
+		int dirty = test_bit(PG_dcache_dirty, &page->flags);
 		if (dirty) {
+			int dirty_cpu = dcache_dirty_cpu(page);
+
 			if (dirty_cpu == this_cpu)
 				goto out;
 			smp_flush_dcache_page_impl(page, dirty_cpu);
@@ -281,9 +267,6 @@ void show_mem(void)
 	printk("%ld pages of RAM\n", num_physpages);
 	printk("%d free pages\n", nr_free_pages());
 	printk("%d pages in page table cache\n",pgtable_cache_size);
-#ifndef CONFIG_SMP
-	printk("%d entries in page dir cache\n",pgd_cache_size);
-#endif	
 }
 
 void mmu_info(struct seq_file *m)
@@ -392,10 +375,10 @@ static void inherit_prom_mappings(void)
 	n = n / sizeof(*trans);
 
 	/*
-	 * The obp translations are saved based on 8k pagesize, since obp can use
-	 * a mixture of pagesizes. Misses to the 0xf0000000 - 0x100000000, ie obp 
-	 * range, are handled in entry.S and do not use the vpte scheme (see rant
-	 * in inherit_locked_prom_mappings()).
+	 * The obp translations are saved based on 8k pagesize, since obp can
+	 * use a mixture of pagesizes. Misses to the 0xf0000000 - 0x100000000,
+	 * ie obp range, are handled in entry.S and do not use the vpte scheme
+	 * (see rant in inherit_locked_prom_mappings()).
 	 */
 #define OBP_PMD_SIZE 2048
 	prompmd = __alloc_bootmem(OBP_PMD_SIZE, OBP_PMD_SIZE, bootmap_base);
@@ -431,7 +414,8 @@ static void inherit_prom_mappings(void)
 				if (tlb_type == spitfire)
 					val &= ~0x0003fe0000000000UL;
 
-				set_pte (ptep, __pte(val | _PAGE_MODIFIED));
+				set_pte_at(&init_mm, vaddr,
+					   ptep, __pte(val | _PAGE_MODIFIED));
 				trans[i].data += BASE_PAGE_SIZE;
 			}
 		}
@@ -448,11 +432,15 @@ static void inherit_prom_mappings(void)
 	prom_printf("Remapping the kernel... ");
 
 	/* Spitfire Errata #32 workaround */
+	/* NOTE: Using plain zero for the context value is
+	 *       correct here, we are not using the Linux trap
+	 *       tables yet so we should not use the special
+	 *       UltraSPARC-III+ page size encodings yet.
+	 */
 	__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
 			     "flush	%%g6"
 			     : /* No outputs */
-			     : "r" (0),
-			     "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
+			     : "r" (0), "r" (PRIMARY_CONTEXT), "i" (ASI_DMMU));
 
 	switch (tlb_type) {
 	default:
@@ -512,6 +500,11 @@ static void inherit_prom_mappings(void)
 	tte_vaddr = (unsigned long) KERNBASE;
 
 	/* Spitfire Errata #32 workaround */
+	/* NOTE: Using plain zero for the context value is
+	 *       correct here, we are not using the Linux trap
+	 *       tables yet so we should not use the special
+	 *       UltraSPARC-III+ page size encodings yet.
+	 */
 	__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
 			     "flush	%%g6"
 			     : /* No outputs */
@@ -530,6 +523,11 @@ static void inherit_prom_mappings(void)
 
 
 	/* Spitfire Errata #32 workaround */
+	/* NOTE: Using plain zero for the context value is
+	 *       correct here, we are not using the Linux trap
+	 *       tables yet so we should not use the special
+	 *       UltraSPARC-III+ page size encodings yet.
+	 */
 	__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
 			     "flush	%%g6"
 			     : /* No outputs */
@@ -616,6 +614,9 @@ static void __flush_nucleus_vptes(void)
 			unsigned long tag;
 
 			/* Spitfire Errata #32 workaround */
+			/* NOTE: Always runs on spitfire, so no cheetah+
+			 *       page size encodings.
+			 */
 			__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
 					     "flush	%%g6"
 					     : /* No outputs */
@@ -782,6 +783,9 @@ void inherit_locked_prom_mappings(int save_p)
 			unsigned long data;
 
 			/* Spitfire Errata #32 workaround */
+			/* NOTE: Always runs on spitfire, so no cheetah+
+			 *       page size encodings.
+			 */
 			__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
 					     "flush	%%g6"
 					     : /* No outputs */
@@ -793,6 +797,9 @@ void inherit_locked_prom_mappings(int save_p)
 				unsigned long tag;
 
 				/* Spitfire Errata #32 workaround */
+				/* NOTE: Always runs on spitfire, so no
+				 *       cheetah+ page size encodings.
+				 */
 				__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
 						     "flush	%%g6"
 						     : /* No outputs */
@@ -820,6 +827,9 @@ void inherit_locked_prom_mappings(int save_p)
 			unsigned long data;
 
 			/* Spitfire Errata #32 workaround */
+			/* NOTE: Always runs on spitfire, so no
+			 *       cheetah+ page size encodings.
+			 */
 			__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
 					     "flush	%%g6"
 					     : /* No outputs */
@@ -831,6 +841,9 @@ void inherit_locked_prom_mappings(int save_p)
 				unsigned long tag;
 
 				/* Spitfire Errata #32 workaround */
+				/* NOTE: Always runs on spitfire, so no
+				 *       cheetah+ page size encodings.
+				 */
 				__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
 						     "flush	%%g6"
 						     : /* No outputs */
@@ -946,6 +959,7 @@ void prom_reload_locked(void)
 	}
 }
 
+#ifdef DCACHE_ALIASING_POSSIBLE
 void __flush_dcache_range(unsigned long start, unsigned long end)
 {
 	unsigned long va;
@@ -969,6 +983,7 @@ void __flush_dcache_range(unsigned long start, unsigned long end)
 					       "i" (ASI_DCACHE_INVALIDATE));
 	}
 }
+#endif /* DCACHE_ALIASING_POSSIBLE */
 
 /* If not locked, zap it. */
 void __flush_tlb_all(void)
@@ -984,6 +999,9 @@ void __flush_tlb_all(void)
 	if (tlb_type == spitfire) {
 		for (i = 0; i < 64; i++) {
 			/* Spitfire Errata #32 workaround */
+			/* NOTE: Always runs on spitfire, so no
+			 *       cheetah+ page size encodings.
+			 */
 			__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
 					     "flush	%%g6"
 					     : /* No outputs */
@@ -999,6 +1017,9 @@ void __flush_tlb_all(void)
 			}
 
 			/* Spitfire Errata #32 workaround */
+			/* NOTE: Always runs on spitfire, so no
+			 *       cheetah+ page size encodings.
+			 */
 			__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
 					     "flush	%%g6"
 					     : /* No outputs */
@@ -1032,11 +1053,14 @@ void __flush_tlb_all(void)
 void get_new_mmu_context(struct mm_struct *mm)
 {
 	unsigned long ctx, new_ctx;
+	unsigned long orig_pgsz_bits;
 	
+
 	spin_lock(&ctx_alloc_lock);
-	ctx = CTX_HWBITS(tlb_context_cache + 1);
-	new_ctx = find_next_zero_bit(mmu_context_bmap, 1UL << CTX_VERSION_SHIFT, ctx);
-	if (new_ctx >= (1UL << CTX_VERSION_SHIFT)) {
+	orig_pgsz_bits = (mm->context.sparc64_ctx_val & CTX_PGSZ_MASK);
+	ctx = (tlb_context_cache + 1) & CTX_NR_MASK;
+	new_ctx = find_next_zero_bit(mmu_context_bmap, 1 << CTX_NR_BITS, ctx);
+	if (new_ctx >= (1 << CTX_NR_BITS)) {
 		new_ctx = find_next_zero_bit(mmu_context_bmap, ctx, 1);
 		if (new_ctx >= ctx) {
 			int i;
@@ -1065,9 +1089,8 @@ void get_new_mmu_context(struct mm_struct *mm)
 	new_ctx |= (tlb_context_cache & CTX_VERSION_MASK);
 out:
 	tlb_context_cache = new_ctx;
+	mm->context.sparc64_ctx_val = new_ctx | orig_pgsz_bits;
 	spin_unlock(&ctx_alloc_lock);
-
-	mm->context = new_ctx;
 }
 
 #ifndef CONFIG_SMP
@@ -1086,12 +1109,12 @@ struct pgtable_cache_struct pgt_quicklists;
  * using the later address range, accesses with the first address
  * range will see the newly initialized data rather than the garbage.
  */
-#if (L1DCACHE_SIZE > PAGE_SIZE)			/* is there D$ aliasing problem */
+#ifdef DCACHE_ALIASING_POSSIBLE
 #define DC_ALIAS_SHIFT	1
 #else
 #define DC_ALIAS_SHIFT	0
 #endif
-pte_t *__pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
+pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
 	struct page *page;
 	unsigned long color;
@@ -1110,7 +1133,7 @@ pte_t *__pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 		unsigned long paddr;
 		pte_t *pte;
 
-#if (L1DCACHE_SIZE > PAGE_SIZE)			/* is there D$ aliasing problem */
+#ifdef DCACHE_ALIASING_POSSIBLE
 		set_page_count(page, 1);
 		ClearPageCompound(page);
 
@@ -1128,7 +1151,7 @@ pte_t *__pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 			to_free = (unsigned long *) paddr;
 		}
 
-#if (L1DCACHE_SIZE > PAGE_SIZE)			/* is there D$ aliasing problem */
+#ifdef DCACHE_ALIASING_POSSIBLE
 		/* Now free the other one up, adjust cache size. */
 		preempt_disable();
 		*to_free = (unsigned long) pte_quicklist[color ^ 0x1];
@@ -1512,7 +1535,6 @@ void __init paging_init(void)
 
 		free_area_init_node(0, &contig_page_data, zones_size,
 				    phys_base >> PAGE_SHIFT, zholes_size);
-		mem_map = contig_page_data.node_mem_map;
 	}
 
 	device_scan();
@@ -1701,22 +1723,6 @@ void __init mem_init(void)
 	datapages = PAGE_ALIGN(datapages) >> PAGE_SHIFT;
 	initpages = (((unsigned long) __init_end) - ((unsigned long) __init_begin));
 	initpages = PAGE_ALIGN(initpages) >> PAGE_SHIFT;
-
-#ifndef CONFIG_SMP
-	{
-		/* Put empty_pg_dir on pgd_quicklist */
-		extern pgd_t empty_pg_dir[1024];
-		unsigned long addr = (unsigned long)empty_pg_dir;
-		unsigned long alias_base = kern_base + PAGE_OFFSET -
-			(long)(KERNBASE);
-		
-		memset(empty_pg_dir, 0, sizeof(empty_pg_dir));
-		addr += alias_base;
-		free_pgd_fast((pgd_t *)addr);
-		num_physpages++;
-		totalram_pages++;
-	}
-#endif
 
 	printk("Memory: %uk available (%ldk kernel code, %ldk data, %ldk init) [%016lx,%016lx]\n",
 	       nr_free_pages() << (PAGE_SHIFT-10),

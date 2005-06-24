@@ -186,6 +186,7 @@ static int pca_xfer(struct i2c_adapter *i2c_adap,
         int curmsg;
 	int numbytes = 0;
 	int state;
+	int ret;
 
 	state = pca_status(adap);
 	if ( state != 0xF8 ) {
@@ -218,6 +219,7 @@ static int pca_xfer(struct i2c_adapter *i2c_adap,
 	}
 
 	curmsg = 0;
+	ret = -EREMOTEIO;
 	while (curmsg < num) {
 		state = pca_status(adap);
 
@@ -251,7 +253,7 @@ static int pca_xfer(struct i2c_adapter *i2c_adap,
 		case 0x20: /* SLA+W has been transmitted; NOT ACK has been received */
 			DEB2("NOT ACK received after SLA+W\n");
 			pca_stop(adap);
-			return -EREMOTEIO;
+			goto out;
 
 		case 0x40: /* SLA+R has been transmitted; ACK has been received */
 			pca_rx_ack(adap, msg->len > 1);
@@ -263,7 +265,7 @@ static int pca_xfer(struct i2c_adapter *i2c_adap,
 				numbytes++;
 				pca_rx_ack(adap, numbytes < msg->len - 1);
 				break;
-			} 
+			}
 			curmsg++; numbytes = 0;
 			if (curmsg == num)
 				pca_stop(adap);
@@ -274,15 +276,15 @@ static int pca_xfer(struct i2c_adapter *i2c_adap,
 		case 0x48: /* SLA+R has been transmitted; NOT ACK has been received */
 			DEB2("NOT ACK received after SLA+R\n");
 			pca_stop(adap);
-			return -EREMOTEIO;
+			goto out;
 
 		case 0x30: /* Data byte in I2CDAT has been transmitted; NOT ACK has been received */
 			DEB2("NOT ACK received after data byte\n");
-			return -EREMOTEIO;
+			goto out;
 
 		case 0x38: /* Arbitration lost during SLA+W, SLA+R or data bytes */
 			DEB2("Arbitration lost\n");
-			return -EREMOTEIO;
+			goto out;
 			
 		case 0x58: /* Data byte has been received; NOT ACK has been returned */
 			if ( numbytes == msg->len - 1 ) {
@@ -297,21 +299,21 @@ static int pca_xfer(struct i2c_adapter *i2c_adap,
 				     "Not final byte. numbytes %d. len %d\n",
 				     numbytes, msg->len);
 				pca_stop(adap);
-				return -EREMOTEIO;
+				goto out;
 			}
 			break;
 		case 0x70: /* Bus error - SDA stuck low */
 			DEB2("BUS ERROR - SDA Stuck low\n");
 			pca_reset(adap);
-			return -EREMOTEIO;
+			goto out;
 		case 0x90: /* Bus error - SCL stuck low */
 			DEB2("BUS ERROR - SCL Stuck low\n");
 			pca_reset(adap);
-			return -EREMOTEIO;
+			goto out;
 		case 0x00: /* Bus error during master or slave mode due to illegal START or STOP condition */
 			DEB2("BUS ERROR - Illegal START or STOP\n");
 			pca_reset(adap);
-			return -EREMOTEIO;
+			goto out;
 		default:
 			printk(KERN_ERR DRIVER ": unhandled SIO state 0x%02x\n", state);
 			break;
@@ -319,11 +321,13 @@ static int pca_xfer(struct i2c_adapter *i2c_adap,
 		
 	}
 
-	DEB1(KERN_CRIT "}}} transfered %d messages. "
+	ret = curmsg;
+ out:
+	DEB1(KERN_CRIT "}}} transfered %d/%d messages. "
 	     "status is %#04x. control is %#04x\n", 
-	     num, pca_status(adap),
+	     curmsg, num, pca_status(adap),
 	     pca_get_con(adap));
-	return curmsg;
+	return ret;
 }
 
 static u32 pca_func(struct i2c_adapter *adap)

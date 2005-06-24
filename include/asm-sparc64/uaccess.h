@@ -49,12 +49,18 @@ do {										\
 	__asm__ __volatile__ ("wr %%g0, %0, %%asi" : : "r" ((val).seg));	\
 } while(0)
 
-#define __user_ok(addr,size) ((void)(addr), (void)(size), 1)
-#define __kernel_ok (segment_eq(get_fs(), KERNEL_DS))
-#define __access_ok(addr,size) ((void)(addr), (void)(size), 1)
-#define access_ok(type,addr,size) ((void)(type), (void)(addr), (void)(size), 1)
+static inline int __access_ok(const void __user * addr, unsigned long size)
+{
+	return 1;
+}
 
-static inline int verify_area(int type, const void __user * addr, unsigned long size)
+static inline int access_ok(int type, const void __user * addr, unsigned long size)
+{
+	return 1;
+}
+
+/* this function will go away soon - use access_ok() instead */
+static inline int __deprecated verify_area(int type, const void __user * addr, unsigned long size)
 {
 	return 0;
 }

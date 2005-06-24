@@ -166,7 +166,7 @@ struct ipt_entry
 #define IPT_CONTINUE 0xFFFFFFFF
 
 /* For standard target */
-#define IPT_RETURN (-NF_MAX_VERDICT - 1)
+#define IPT_RETURN (-NF_REPEAT - 1)
 
 /* TCP matching stuff */
 struct ipt_tcp

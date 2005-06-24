@@ -1,7 +1,7 @@
 /*
- *  Generic fillrect for frame buffers with packed pixels of any depth. 
+ *  Generic fillrect for frame buffers with packed pixels of any depth.
  *
- *      Copyright (C)  2000 James Simmons (jsimmons@linux-fbdev.org) 
+ *      Copyright (C)  2000 James Simmons (jsimmons@linux-fbdev.org)
  *
  *  This file is subject to the terms and conditions of the GNU General Public
  *  License.  See the file COPYING in the main directory of this archive for
@@ -9,8 +9,8 @@
  *
  * NOTES:
  *
- *  The code for depths like 24 that don't have integer number of pixels per 
- *  long is broken and needs to be fixed. For now I turned these types of 
+ *  The code for depths like 24 that don't have integer number of pixels per
+ *  long is broken and needs to be fixed. For now I turned these types of
  *  mode off.
  *
  *  Also need to add code to deal with cards endians that are different than
@@ -24,149 +24,129 @@
 #include <asm/types.h>
 
 #if BITS_PER_LONG == 32
-#define FB_WRITEL fb_writel
-#define FB_READL  fb_readl
-#define BYTES_PER_LONG 4
-#define SHIFT_PER_LONG 5
+#  define FB_WRITEL fb_writel
+#  define FB_READL  fb_readl
 #else
-#define FB_WRITEL fb_writeq
-#define FB_READL  fb_readq
-#define BYTES_PER_LONG 8
-#define SHIFT_PER_LONG 6
+#  define FB_WRITEL fb_writeq
+#  define FB_READL  fb_readq
 #endif
-
-#define EXP1(x)		0xffffffffU*x
-#define EXP2(x)		0x55555555U*x
-#define EXP4(x)		0x11111111U*0x ## x
-
-typedef u32 pixel_t;
-
-static const u32 bpp1tab[2] = {
-    EXP1(0), EXP1(1)
-};
-
-static const u32 bpp2tab[4] = {
-    EXP2(0), EXP2(1), EXP2(2), EXP2(3)
-};
-
-static const u32 bpp4tab[16] = {
-    EXP4(0), EXP4(1), EXP4(2), EXP4(3), EXP4(4), EXP4(5), EXP4(6), EXP4(7),
-    EXP4(8), EXP4(9), EXP4(a), EXP4(b), EXP4(c), EXP4(d), EXP4(e), EXP4(f)
-};
 
     /*
      *  Compose two values, using a bitmask as decision value
      *  This is equivalent to (a & mask) | (b & ~mask)
      */
 
-static inline unsigned long comp(unsigned long a, unsigned long b,
-				 unsigned long mask)
+static inline unsigned long
+comp(unsigned long a, unsigned long b, unsigned long mask)
 {
     return ((a ^ b) & mask) ^ b;
 }
 
-static inline u32 pixel_to_pat32(const struct fb_info *p, pixel_t pixel)
-{
-    u32 pat = pixel;
+    /*
+     *  Create a pattern with the given pixel's color
+     */
 
-    switch (p->var.bits_per_pixel) {
+#if BITS_PER_LONG == 64
+static inline unsigned long
+pixel_to_pat( u32 bpp, u32 pixel)
+{
+	switch (bpp) {
 	case 1:
-	    pat = bpp1tab[pat];
-	    break;
-
+		return 0xfffffffffffffffful*pixel;
 	case 2:
-	    pat = bpp2tab[pat];
-	    break;
-
+		return 0x5555555555555555ul*pixel;
 	case 4:
-	    pat = bpp4tab[pat];
-	    break;
-
+		return 0x1111111111111111ul*pixel;
 	case 8:
-	    pat |= pat << 8;
-	    // Fall through
+		return 0x0101010101010101ul*pixel;
+	case 12:
+		return 0x0001001001001001ul*pixel;
 	case 16:
-	    pat |= pat << 16;
-	    // Fall through
+		return 0x0001000100010001ul*pixel;
+	case 24:
+		return 0x0000000001000001ul*pixel;
 	case 32:
-	    break;
+		return 0x0000000100000001ul*pixel;
+	default:
+		panic("pixel_to_pat(): unsupported pixelformat\n");
     }
-    return pat;
 }
+#else
+static inline unsigned long
+pixel_to_pat( u32 bpp, u32 pixel)
+{
+	switch (bpp) {
+	case 1:
+		return 0xfffffffful*pixel;
+	case 2:
+		return 0x55555555ul*pixel;
+	case 4:
+		return 0x11111111ul*pixel;
+	case 8:
+		return 0x01010101ul*pixel;
+	case 12:
+		return 0x00001001ul*pixel;
+	case 16:
+		return 0x00010001ul*pixel;
+	case 24:
+		return 0x00000001ul*pixel;
+	case 32:
+		return 0x00000001ul*pixel;
+	default:
+		panic("pixel_to_pat(): unsupported pixelformat\n");
+    }
+}
+#endif
 
     /*
-     *  Expand a pixel value to a generic 32/64-bit pattern and rotate it to
-     *  the correct start position
+     *  Aligned pattern fill using 32/64-bit memory accesses
      */
 
-static inline unsigned long pixel_to_pat(const struct fb_info *p, 
-					 pixel_t pixel, int left)
+static void
+bitfill_aligned(unsigned long __iomem *dst, int dst_idx, unsigned long pat, unsigned n, int bits)
 {
-    unsigned long pat = pixel;
-    u32 bpp = p->var.bits_per_pixel;
-    int i;
-
-    /* expand pixel value */
-    for (i = bpp; i < BITS_PER_LONG; i *= 2)
-	pat |= pat << i;
-
-    /* rotate pattern to correct start position */
-    pat = pat << left | pat >> (bpp-left);
-    return pat;
-}
-
-    /*
-     *  Unaligned 32-bit pattern fill using 32/64-bit memory accesses
-     */
-
-void bitfill32(unsigned long __iomem *dst, int dst_idx, u32 pat, u32 n)
-{
-	unsigned long val = pat;
 	unsigned long first, last;
-	
+
 	if (!n)
 		return;
-	
-#if BITS_PER_LONG == 64
-	val |= val << 32;
-#endif
-	
+
 	first = ~0UL >> dst_idx;
-	last = ~(~0UL >> ((dst_idx+n) % BITS_PER_LONG));
-	
-	if (dst_idx+n <= BITS_PER_LONG) {
+	last = ~(~0UL >> ((dst_idx+n) % bits));
+
+	if (dst_idx+n <= bits) {
 		// Single word
 		if (last)
 			first &= last;
-		FB_WRITEL(comp(val, FB_READL(dst), first), dst);
+		FB_WRITEL(comp(pat, FB_READL(dst), first), dst);
 	} else {
 		// Multiple destination words
+
 		// Leading bits
-		if (first) {
-			FB_WRITEL(comp(val, FB_READL(dst), first), dst);
+		if (first!= ~0UL) {
+			FB_WRITEL(comp(pat, FB_READL(dst), first), dst);
 			dst++;
-			n -= BITS_PER_LONG-dst_idx;
+			n -= bits - dst_idx;
 		}
-		
+
 		// Main chunk
-		n /= BITS_PER_LONG;
+		n /= bits;
 		while (n >= 8) {
-			FB_WRITEL(val, dst++);
-			FB_WRITEL(val, dst++);
-			FB_WRITEL(val, dst++);
-			FB_WRITEL(val, dst++);
-			FB_WRITEL(val, dst++);
-			FB_WRITEL(val, dst++);
-			FB_WRITEL(val, dst++);
-			FB_WRITEL(val, dst++);
+			FB_WRITEL(pat, dst++);
+			FB_WRITEL(pat, dst++);
+			FB_WRITEL(pat, dst++);
+			FB_WRITEL(pat, dst++);
+			FB_WRITEL(pat, dst++);
+			FB_WRITEL(pat, dst++);
+			FB_WRITEL(pat, dst++);
+			FB_WRITEL(pat, dst++);
 			n -= 8;
 		}
 		while (n--)
-			FB_WRITEL(val, dst++);
-		
+			FB_WRITEL(pat, dst++);
+
 		// Trailing bits
 		if (last)
-			FB_WRITEL(comp(val, FB_READL(dst), first), dst);
+			FB_WRITEL(comp(pat, FB_READL(dst), last), dst);
 	}
 }
 
@@ -178,18 +158,19 @@ void bitfill32(unsigned long __iomem *dst, int dst_idx, u32 pat, u32 n)
      *  used for the next 32/64-bit word
      */
 
-void bitfill(unsigned long __iomem *dst, int dst_idx, unsigned long pat, int left,
-	     int right, u32 n)
+static void
+bitfill_unaligned(unsigned long __iomem *dst, int dst_idx, unsigned long pat,
+			int left, int right, unsigned n, int bits)
 {
 	unsigned long first, last;
 
 	if (!n)
 		return;
-	
+
 	first = ~0UL >> dst_idx;
-	last = ~(~0UL >> ((dst_idx+n) % BITS_PER_LONG));
-	
-	if (dst_idx+n <= BITS_PER_LONG) {
+	last = ~(~0UL >> ((dst_idx+n) % bits));
+
+	if (dst_idx+n <= bits) {
 		// Single word
 		if (last)
 			first &= last;
@@ -201,11 +182,11 @@ void bitfill(unsigned long __iomem *dst, int dst_idx, unsigned long pat, int lef
 			FB_WRITEL(comp(pat, FB_READL(dst), first), dst);
 			dst++;
 			pat = pat << left | pat >> right;
-			n -= BITS_PER_LONG-dst_idx;
+			n -= bits - dst_idx;
 		}
-		
+
 		// Main chunk
-		n /= BITS_PER_LONG;
+		n /= bits;
 		while (n >= 4) {
 			FB_WRITEL(pat, dst++);
 			pat = pat << left | pat >> right;
@@ -221,29 +202,29 @@ void bitfill(unsigned long __iomem *dst, int dst_idx, unsigned long pat, int lef
 			FB_WRITEL(pat, dst++);
 			pat = pat << left | pat >> right;
 		}
-		
+
 		// Trailing bits
 		if (last)
 			FB_WRITEL(comp(pat, FB_READL(dst), first), dst);
 	}
 }
 
-void bitfill32_rev(unsigned long __iomem *dst, int dst_idx, u32 pat, u32 n)
+    /*
+     *  Aligned pattern invert using 32/64-bit memory accesses
+     */
+static void
+bitfill_aligned_rev(unsigned long __iomem *dst, int dst_idx, unsigned long pat, unsigned n, int bits)
 {
 	unsigned long val = pat, dat;
 	unsigned long first, last;
-	
+
 	if (!n)
 		return;
-	
-#if BITS_PER_LONG == 64
-	val |= val << 32;
-#endif
-	
+
 	first = ~0UL >> dst_idx;
-	last = ~(~0UL >> ((dst_idx+n) % BITS_PER_LONG));
-	
-	if (dst_idx+n <= BITS_PER_LONG) {
+	last = ~(~0UL >> ((dst_idx+n) % bits));
+
+	if (dst_idx+n <= bits) {
 		// Single word
 		if (last)
 			first &= last;
@@ -252,15 +233,15 @@ void bitfill32_rev(unsigned long __iomem *dst, int dst_idx, u32 pat, u32 n)
 	} else {
 		// Multiple destination words
 		// Leading bits
-		if (first) {
+		if (first!=0UL) {
 			dat = FB_READL(dst);
 			FB_WRITEL(comp(dat ^ val, dat, first), dst);
 			dst++;
-			n -= BITS_PER_LONG-dst_idx;
+			n -= bits - dst_idx;
 		}
-		
+
 		// Main chunk
-		n /= BITS_PER_LONG;
+		n /= bits;
 		while (n >= 8) {
 			FB_WRITEL(FB_READL(dst) ^ val, dst);
 			dst++;
@@ -283,35 +264,36 @@ void bitfill32_rev(unsigned long __iomem *dst, int dst_idx, u32 pat, u32 n)
 		while (n--) {
 			FB_WRITEL(FB_READL(dst) ^ val, dst);
 			dst++;
-		}		
+		}
 		// Trailing bits
 		if (last) {
 			dat = FB_READL(dst);
-			FB_WRITEL(comp(dat ^ val, dat, first), dst);
+			FB_WRITEL(comp(dat ^ val, dat, last), dst);
 		}
 	}
 }
 
 
     /*
-     *  Unaligned generic pattern fill using 32/64-bit memory accesses
+     *  Unaligned generic pattern invert using 32/64-bit memory accesses
      *  The pattern must have been expanded to a full 32/64-bit value
      *  Left/right are the appropriate shifts to convert to the pattern to be
      *  used for the next 32/64-bit word
      */
 
-void bitfill_rev(unsigned long __iomem *dst, int dst_idx, unsigned long pat, int left,
-	     int right, u32 n)
+static void
+bitfill_unaligned_rev(unsigned long __iomem *dst, int dst_idx, unsigned long pat,
+			int left, int right, unsigned n, int bits)
 {
 	unsigned long first, last, dat;
 
 	if (!n)
 		return;
-	
+
 	first = ~0UL >> dst_idx;
-	last = ~(~0UL >> ((dst_idx+n) % BITS_PER_LONG));
-	
-	if (dst_idx+n <= BITS_PER_LONG) {
+	last = ~(~0UL >> ((dst_idx+n) % bits));
+
+	if (dst_idx+n <= bits) {
 		// Single word
 		if (last)
 			first &= last;
@@ -319,17 +301,18 @@ void bitfill_rev(unsigned long __iomem *dst, int dst_idx, unsigned long pat, int
 		FB_WRITEL(comp(dat ^ pat, dat, first), dst);
 	} else {
 		// Multiple destination words
+
 		// Leading bits
-		if (first) {
+		if (first != 0UL) {
 			dat = FB_READL(dst);
 			FB_WRITEL(comp(dat ^ pat, dat, first), dst);
 			dst++;
 			pat = pat << left | pat >> right;
-			n -= BITS_PER_LONG-dst_idx;
+			n -= bits - dst_idx;
 		}
-		
+
 		// Main chunk
-		n /= BITS_PER_LONG;
+		n /= bits;
 		while (n >= 4) {
 			FB_WRITEL(FB_READL(dst) ^ pat, dst);
 			dst++;
@@ -350,20 +333,20 @@ void bitfill_rev(unsigned long __iomem *dst, int dst_idx, unsigned long pat, int
 			dst++;
 			pat = pat << left | pat >> right;
 		}
-		
+
 		// Trailing bits
 		if (last) {
 			dat = FB_READL(dst);
-			FB_WRITEL(comp(dat ^ pat, dat, first), dst);
+			FB_WRITEL(comp(dat ^ pat, dat, last), dst);
 		}
 	}
 }
 
 void cfb_fillrect(struct fb_info *p, const struct fb_fillrect *rect)
 {
+	unsigned long x2, y2, vxres, vyres, height, width, pat, fg;
+	int bits = BITS_PER_LONG, bytes = bits >> 3;
 	u32 bpp = p->var.bits_per_pixel;
-	unsigned long x2, y2, vxres, vyres;
-	unsigned long height, width, fg;
 	unsigned long __iomem *dst;
 	int dst_idx, left;
 
@@ -372,81 +355,91 @@ void cfb_fillrect(struct fb_info *p, const struct fb_fillrect *rect)
 
 	/* We want rotation but lack hardware to do it for us. */
 	if (!p->fbops->fb_rotate && p->var.rotate) {
-	}	
-	
+	}
+
 	vxres = p->var.xres_virtual;
 	vyres = p->var.yres_virtual;
 
-	if (!rect->width || !rect->height || 
+	if (!rect->width || !rect->height ||
 	    rect->dx > vxres || rect->dy > vyres)
 		return;
 
 	/* We could use hardware clipping but on many cards you get around
 	 * hardware clipping by writing to framebuffer directly. */
-	
+
 	x2 = rect->dx + rect->width;
 	y2 = rect->dy + rect->height;
 	x2 = x2 < vxres ? x2 : vxres;
 	y2 = y2 < vyres ? y2 : vyres;
 	width = x2 - rect->dx;
 	height = y2 - rect->dy;
-	
+
 	if (p->fix.visual == FB_VISUAL_TRUECOLOR ||
 	    p->fix.visual == FB_VISUAL_DIRECTCOLOR )
 		fg = ((u32 *) (p->pseudo_palette))[rect->color];
 	else
 		fg = rect->color;
-	
-	dst = (unsigned long __iomem *)((unsigned long)p->screen_base & 
-				~(BYTES_PER_LONG-1));
-	dst_idx = ((unsigned long)p->screen_base & (BYTES_PER_LONG-1))*8;
+
+	pat = pixel_to_pat( bpp, fg);
+
+	dst = (unsigned long __iomem *)((unsigned long)p->screen_base & ~(bytes-1));
+	dst_idx = ((unsigned long)p->screen_base & (bytes - 1))*8;
 	dst_idx += rect->dy*p->fix.line_length*8+rect->dx*bpp;
 	/* FIXME For now we support 1-32 bpp only */
-	left = BITS_PER_LONG % bpp;
+	left = bits % bpp;
 	if (p->fbops->fb_sync)
 		p->fbops->fb_sync(p);
 	if (!left) {
-		u32 pat = pixel_to_pat32(p, fg);
-		void (*fill_op32)(unsigned long __iomem *dst, int dst_idx, u32 pat, 
-				  u32 n) = NULL;
-		
+		void (*fill_op32)(unsigned long __iomem *dst, int dst_idx,
+		                  unsigned long pat, unsigned n, int bits) = NULL;
+
 		switch (rect->rop) {
 		case ROP_XOR:
-			fill_op32 = bitfill32_rev;
+			fill_op32 = bitfill_aligned_rev;
 			break;
 		case ROP_COPY:
+			fill_op32 = bitfill_aligned;
+			break;
 		default:
-			fill_op32 = bitfill32;
+			printk( KERN_ERR "cfb_fillrect(): unknown rop, defaulting to ROP_COPY\n");
+			fill_op32 = bitfill_aligned;
 			break;
 		}
 		while (height--) {
-			dst += dst_idx >> SHIFT_PER_LONG;
-			dst_idx &= (BITS_PER_LONG-1);
-			fill_op32(dst, dst_idx, pat, width*bpp);
+			dst += dst_idx >> (ffs(bits) - 1);
+			dst_idx &= (bits - 1);
+			fill_op32(dst, dst_idx, pat, width*bpp, bits);
 			dst_idx += p->fix.line_length*8;
 		}
 	} else {
-		unsigned long pat = pixel_to_pat(p, fg, (left-dst_idx) % bpp);
-		int right = bpp-left;
+		int right;
 		int r;
-		void (*fill_op)(unsigned long __iomem *dst, int dst_idx, 
-				unsigned long pat, int left, int right, 
-				u32 n) = NULL;
-		
+		int rot = (left-dst_idx) % bpp;
+		void (*fill_op)(unsigned long __iomem *dst, int dst_idx,
+		                unsigned long pat, int left, int right,
+		                unsigned n, int bits) = NULL;
+
+		/* rotate pattern to correct start position */
+		pat = pat << rot | pat >> (bpp-rot);
+
+		right = bpp-left;
 		switch (rect->rop) {
 		case ROP_XOR:
-			fill_op = bitfill_rev;
+			fill_op = bitfill_unaligned_rev;
 			break;
 		case ROP_COPY:
+			fill_op = bitfill_unaligned;
+			break;
 		default:
-			fill_op = bitfill;
+			printk( KERN_ERR "cfb_fillrect(): unknown rop, defaulting to ROP_COPY\n");
+			fill_op = bitfill_unaligned;
 			break;
 		}
 		while (height--) {
-			dst += dst_idx >> SHIFT_PER_LONG;
-			dst_idx &= (BITS_PER_LONG-1);
-			fill_op(dst, dst_idx, pat, left, right, 
-				width*bpp);
+			dst += dst_idx >> (ffs(bits) - 1);
+			dst_idx &= (bits - 1);
+			fill_op(dst, dst_idx, pat, left, right,
+				width*bpp, bits);
 			r = (p->fix.line_length*8) % bpp;
 			pat = pat << (bpp-r) | pat >> r;
 			dst_idx += p->fix.line_length*8;

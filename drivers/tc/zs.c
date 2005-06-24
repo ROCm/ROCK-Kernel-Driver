@@ -1240,28 +1240,24 @@ static int rs_ioctl(struct tty_struct *tty, struct file * file,
 
 	switch (cmd) {
 	case TIOCGSERIAL:
-		error = verify_area(VERIFY_WRITE, (void *)arg,
-				    sizeof(struct serial_struct));
-		if (error)
-			return error;
+		if (!access_ok(VERIFY_WRITE, (void *)arg,
+			       sizeof(struct serial_struct)))
+			return -EFAULT;
 		return get_serial_info(info, (struct serial_struct *)arg);
 
 	case TIOCSSERIAL:
 		return set_serial_info(info, (struct serial_struct *)arg);
 
 	case TIOCSERGETLSR:			/* Get line status register */
-		error = verify_area(VERIFY_WRITE, (void *)arg,
-				    sizeof(unsigned int));
-		if (error)
-			return error;
-		else
-			return get_lsr_info(info, (unsigned int *)arg);
+		if (!access_ok(VERIFY_WRITE, (void *)arg,
+			       sizeof(unsigned int)))
+			return -EFAULT;
+		return get_lsr_info(info, (unsigned int *)arg);
 
 	case TIOCSERGSTRUCT:
-		error = verify_area(VERIFY_WRITE, (void *)arg,
-				    sizeof(struct dec_serial));
-		if (error)
-			return error;
+		if (!access_ok(VERIFY_WRITE, (void *)arg,
+			       sizeof(struct dec_serial)))
+			return -EFAULT;
 		copy_from_user((struct dec_serial *)arg, info,
 			       sizeof(struct dec_serial));
 		return 0;
@@ -1368,8 +1364,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	info->tty = 0;
 	if (info->blocked_open) {
 		if (info->close_delay) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(info->close_delay);
+			msleep_interruptible(jiffies_to_msecs(info->close_delay));
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
@@ -1403,8 +1398,7 @@ static void rs_wait_until_sent(struct tty_struct *tty, int timeout)
 	if (timeout)
 		char_time = min(char_time, timeout);
 	while ((read_zsreg(info->zs_channel, 1) & Tx_BUF_EMP) == 0) {
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(char_time);
+		msleep_interruptible(jiffies_to_msecs(char_time));
 		if (signal_pending(current))
 			break;
 		if (timeout && time_after(jiffies, orig_jiffies + timeout))

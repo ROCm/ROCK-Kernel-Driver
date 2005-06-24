@@ -208,7 +208,6 @@ struct jffs_flash_status
 #define JFFS_MEMORY_DEBUG 0
 
 extern long no_jffs_node;
-extern long no_jffs_file;
 #if defined(JFFS_MEMORY_DEBUG) && JFFS_MEMORY_DEBUG
 extern long no_jffs_control;
 extern long no_jffs_raw_inode;

@@ -29,18 +29,9 @@
 
 struct rxrpc_transport *afs_transport;
 
-static int afs_init(void);
-static void afs_exit(void);
 static int afs_adding_peer(struct rxrpc_peer *peer);
 static void afs_discarding_peer(struct rxrpc_peer *peer);
 
-/* XXX late_initcall is kludgy, but the only alternative seems to create
- * a transport upon the first mount, which is worse. Or is it?
- */
-/* module_init(afs_init); */
-late_initcall(afs_init);	/* must be called after net/ to create socket */
-
-module_exit(afs_exit);
 
 MODULE_DESCRIPTION("AFS Client File System");
 MODULE_AUTHOR("Red Hat, Inc.");
@@ -76,7 +67,7 @@ struct cachefs_netfs afs_cache_netfs = {
 /*
  * initialise the AFS client FS module
  */
-static int afs_init(void)
+static int __init afs_init(void)
 {
 	int loop, ret;
 
@@ -156,6 +147,10 @@ static int afs_init(void)
 	return ret;
 } /* end afs_init() */
 
+/* XXX late_initcall is kludgy, but the only alternative seems to create
+ * a transport upon the first mount, which is worse. Or is it?
+ */
+late_initcall(afs_init);	/* must be called after net/ to create socket */
 /*****************************************************************************/
 /*
  * clean up on module removal
@@ -178,6 +173,8 @@ static void __exit afs_exit(void)
 	afs_proc_cleanup();
 
 } /* end afs_exit() */
+
+module_exit(afs_exit);
 
 /*****************************************************************************/
 /*

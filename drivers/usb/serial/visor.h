@@ -30,6 +30,7 @@
 #define PALM_M125_ID			0x0040
 #define PALM_M130_ID			0x0050
 #define PALM_TUNGSTEN_T_ID		0x0060
+#define PALM_TREO_650			0x0061
 #define PALM_TUNGSTEN_Z_ID		0x0031
 #define PALM_ZIRE31_ID			0x0061
 #define PALM_ZIRE_ID			0x0070
@@ -49,6 +50,9 @@
 #define SAMSUNG_SCH_I330_ID		0x8001
 #define SAMSUNG_SPH_I500_ID		0x6601
 
+#define TAPWAVE_VENDOR_ID		0x12EF
+#define TAPWAVE_ZODIAC_ID		0x0100
+
 #define GARMIN_VENDOR_ID		0x091E
 #define GARMIN_IQUE_3600_ID		0x0004
 
@@ -57,6 +61,9 @@
 
 #define KYOCERA_VENDOR_ID		0x0C88
 #define KYOCERA_7135_ID			0x0021 
+
+#define FOSSIL_VENDOR_ID		0x0E67
+#define FOSSIL_ABACUS_ID		0x0002
 
 /****************************************************************************
  * Handspring Visor Vendor specific request codes (bRequest values)

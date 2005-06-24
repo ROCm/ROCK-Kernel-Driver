@@ -17,7 +17,7 @@
  * Something like this really should be in generic code, but isn't.
  */
 static ide_hwif_t *
-rapide_locate_hwif(void __iomem *base, void *ctrl, unsigned int sz, int irq)
+rapide_locate_hwif(void __iomem *base, void __iomem *ctrl, unsigned int sz, int irq)
 {
 	unsigned long port = (unsigned long)base;
 	ide_hwif_t *hwif;

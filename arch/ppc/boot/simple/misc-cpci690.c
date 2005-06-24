@@ -12,4 +12,16 @@
  */
 
 #include <linux/types.h>
-long	mv64x60_mpsc_clk_freq = 133000000;
+#include <platforms/cpci690.h>
+
+extern u32 mv64x60_console_baud;
+extern u32 mv64x60_mpsc_clk_src;
+extern u32 mv64x60_mpsc_clk_freq;
+
+void
+mv64x60_board_init(void __iomem *old_base, void __iomem *new_base)
+{
+	mv64x60_console_baud = CPCI690_MPSC_BAUD;
+	mv64x60_mpsc_clk_src = CPCI690_MPSC_CLK_SRC;
+	mv64x60_mpsc_clk_freq = CPCI690_BUS_FREQ;
+}

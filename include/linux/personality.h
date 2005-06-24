@@ -18,6 +18,7 @@ extern int		__set_personality(unsigned long);
  * These occupy the top three bytes.
  */
 enum {
+	ADDR_NO_RANDOMIZE = 	0x0040000,	/* disable randomization of VA space */
 	FDPIC_FUNCPTRS =	0x0080000,	/* userspace function ptrs point to descriptors
 						 * (signal handling)
 						 */
@@ -35,7 +36,7 @@ enum {
  * Security-relevant compatibility flags that must be
  * cleared upon setuid or setgid exec:
  */
-#define PER_CLEAR_ON_SETID (READ_IMPLIES_EXEC)
+#define PER_CLEAR_ON_SETID (READ_IMPLIES_EXEC|ADDR_NO_RANDOMIZE)
 
 /*
  * Personality types.

@@ -65,8 +65,6 @@ STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
 STATIC int	xfs_uuid_mount(xfs_mount_t *);
 STATIC void	xfs_uuid_unmount(xfs_mount_t *mp);
 
-void xfs_xlatesb(void *, xfs_sb_t *, int, xfs_arch_t, __int64_t);
-
 static struct {
     short offset;
     short type;     /* 0 = integer
@@ -303,6 +301,15 @@ xfs_mount_validate_sb(
 	}
 
 	/*
+	 * Version 1 directory format has never worked on Linux.
+	 */
+	if (unlikely(!XFS_SB_VERSION_HASDIRV2(sbp))) {
+		cmn_err(CE_WARN,
+	"XFS: Attempted to mount file system using version 1 directory format");
+		return XFS_ERROR(ENOSYS);
+	}
+
+	/*
 	 * Until this is fixed only page-sized or smaller data blocks work.
 	 */
 	if (unlikely(sbp->sb_blocksize > PAGE_SIZE)) {
@@ -387,7 +394,6 @@ xfs_initialize_perag(xfs_mount_t *mp, xfs_agnumber_t agcount)
  *     sb         - a superblock
  *     dir        - conversion direction: <0 - convert sb to buf
  *                                        >0 - convert buf to sb
- *     arch       - architecture to read/write from/to buf
  *     fields     - which fields to copy (bitmask)
  */
 void
@@ -395,7 +401,6 @@ xfs_xlatesb(
 	void		*data,
 	xfs_sb_t	*sb,
 	int		dir,
-	xfs_arch_t	arch,
 	__int64_t	fields)
 {
 	xfs_caddr_t	buf_ptr;
@@ -420,9 +425,7 @@ xfs_xlatesb(
 
 		ASSERT(xfs_sb_info[f].type == 0 || xfs_sb_info[f].type == 1);
 
-		if (arch == ARCH_NOCONVERT ||
-		    size == 1 ||
-		    xfs_sb_info[f].type == 1) {
+		if (size == 1 || xfs_sb_info[f].type == 1) {
 			if (dir > 0) {
 				memcpy(mem_ptr + first, buf_ptr + first, size);
 			} else {
@@ -433,16 +436,16 @@ xfs_xlatesb(
 			case 2:
 				INT_XLATE(*(__uint16_t*)(buf_ptr+first),
 					  *(__uint16_t*)(mem_ptr+first),
-					  dir, arch);
+					  dir, ARCH_CONVERT);
 				break;
 			case 4:
 				INT_XLATE(*(__uint32_t*)(buf_ptr+first),
 					  *(__uint32_t*)(mem_ptr+first),
-					  dir, arch);
+					  dir, ARCH_CONVERT);
 				break;
 			case 8:
 				INT_XLATE(*(__uint64_t*)(buf_ptr+first),
-					  *(__uint64_t*)(mem_ptr+first), dir, arch);
+					  *(__uint64_t*)(mem_ptr+first), dir, ARCH_CONVERT);
 				break;
 			default:
 				ASSERT(0);
@@ -493,8 +496,7 @@ xfs_readsb(xfs_mount_t *mp)
 	 * But first do some basic consistency checking.
 	 */
 	sbp = XFS_BUF_TO_SBP(bp);
-	xfs_xlatesb(XFS_BUF_PTR(bp), &(mp->m_sb), 1,
-				ARCH_CONVERT, XFS_SB_ALL_BITS);
+	xfs_xlatesb(XFS_BUF_PTR(bp), &(mp->m_sb), 1, XFS_SB_ALL_BITS);
 
 	error = xfs_mount_validate_sb(mp, &(mp->m_sb));
 	if (error) {
@@ -1227,7 +1229,7 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 
 	/* translate/copy */
 
-	xfs_xlatesb(XFS_BUF_PTR(bp), &(mp->m_sb), -1, ARCH_CONVERT, fields);
+	xfs_xlatesb(XFS_BUF_PTR(bp), &(mp->m_sb), -1, fields);
 
 	/* find modified range */
 

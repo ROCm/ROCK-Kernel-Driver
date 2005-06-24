@@ -225,8 +225,16 @@ void __ext3_std_error (struct super_block * sb, const char * function,
 		       int errno)
 {
 	char nbuf[16];
-	const char *errstr = ext3_decode_error(sb, errno, nbuf);
+	const char *errstr;
 
+	/* Special case: if the error is EROFS, and we're not already
+	 * inside a transaction, then there's really no point in logging
+	 * an error. */
+	if (errno == -EROFS && journal_current_handle() == NULL &&
+	    (sb->s_flags & MS_RDONLY))
+		return;
+
+	errstr = ext3_decode_error(sb, errno, nbuf);
 	printk (KERN_CRIT "EXT3-fs error (device %s) in %s: %s\n",
 		sb->s_id, function, errstr);
 
@@ -395,10 +403,8 @@ static void ext3_put_super (struct super_block * sb)
 	percpu_counter_destroy(&sbi->s_dirs_counter);
 	brelse(sbi->s_sbh);
 #ifdef CONFIG_QUOTA
-	for (i = 0; i < MAXQUOTAS; i++) {
-		if (sbi->s_qf_names[i])
-			kfree(sbi->s_qf_names[i]);
-	}
+	for (i = 0; i < MAXQUOTAS; i++)
+		kfree(sbi->s_qf_names[i]);
 #endif
 
 	/* Debugging code just in case the in-memory inode orphan list
@@ -441,7 +447,7 @@ static struct inode *ext3_alloc_inode(struct super_block *sb)
 	ei->i_acl = EXT3_ACL_NOT_CACHED;
 	ei->i_default_acl = EXT3_ACL_NOT_CACHED;
 #endif
-	ei->i_rsv_window.rsv_end = EXT3_RESERVE_WINDOW_NOT_ALLOCATED;
+	ei->i_block_alloc_info = NULL;
 	ei->vfs_inode.i_version = 1;
 	return &ei->vfs_inode;
 }
@@ -485,6 +491,7 @@ static void destroy_inodecache(void)
 
 static void ext3_clear_inode(struct inode *inode)
 {
+	struct ext3_block_alloc_info *rsv = EXT3_I(inode)->i_block_alloc_info;
 #ifdef CONFIG_EXT3_FS_POSIX_ACL
        if (EXT3_I(inode)->i_acl &&
            EXT3_I(inode)->i_acl != EXT3_ACL_NOT_CACHED) {
@@ -498,6 +505,8 @@ static void ext3_clear_inode(struct inode *inode)
        }
 #endif
 	ext3_discard_reservation(inode);
+	EXT3_I(inode)->i_block_alloc_info = NULL;
+	kfree(rsv);
 }
 
 #ifdef CONFIG_QUOTA
@@ -576,7 +585,7 @@ enum {
 	Opt_resgid, Opt_resuid, Opt_sb, Opt_err_cont, Opt_err_panic, Opt_err_ro,
 	Opt_nouid32, Opt_check, Opt_nocheck, Opt_debug, Opt_oldalloc, Opt_orlov,
 	Opt_user_xattr, Opt_nouser_xattr, Opt_acl, Opt_noacl,
-	Opt_reservation, Opt_noreservation, Opt_noload,
+	Opt_reservation, Opt_noreservation, Opt_noload, Opt_nobh,
 	Opt_commit, Opt_journal_update, Opt_journal_inum,
 	Opt_abort, Opt_data_journal, Opt_data_ordered, Opt_data_writeback,
 	Opt_usrjquota, Opt_grpjquota, Opt_offusrjquota, Opt_offgrpjquota,
@@ -611,6 +620,7 @@ static match_table_t tokens = {
 	{Opt_reservation, "reservation"},
 	{Opt_noreservation, "noreservation"},
 	{Opt_noload, "noload"},
+	{Opt_nobh, "nobh"},
 	{Opt_commit, "commit=%u"},
 	{Opt_journal_update, "journal=update"},
 	{Opt_journal_inum, "journal=%u"},
@@ -879,10 +889,8 @@ clear_qf_name:
 					"quota turned on.\n");
 				return 0;
 			}
-			if (sbi->s_qf_names[qtype]) {
-				kfree(sbi->s_qf_names[qtype]);
-				sbi->s_qf_names[qtype] = NULL;
-			}
+			kfree(sbi->s_qf_names[qtype]);
+			sbi->s_qf_names[qtype] = NULL;
 			break;
 		case Opt_jqfmt_vfsold:
 			sbi->s_jquota_fmt = QFMT_VFS_OLD;
@@ -923,6 +931,9 @@ clear_qf_name:
 			}
 			match_int(&args[0], &option);
 			*n_blocks_count = option;
+			break;
+		case Opt_nobh:
+			set_opt(sbi->s_mount_opt, NOBH);
 			break;
 		default:
 			printk (KERN_ERR
@@ -1193,12 +1204,18 @@ static void ext3_orphan_cleanup (struct super_block * sb,
 static loff_t ext3_max_size(int bits)
 {
 	loff_t res = EXT3_NDIR_BLOCKS;
+	/* This constant is calculated to be the largest file size for a
+	 * dense, 4k-blocksize file such that the total number of
+	 * sectors in the file, including data and all indirect blocks,
+	 * does not exceed 2^32. */
+	const loff_t upper_limit = 0x1ff7fffd000LL;
+
 	res += 1LL << (bits-2);
 	res += 1LL << (2*(bits-2));
 	res += 1LL << (3*(bits-2));
 	res <<= bits;
-	if (res > (512LL << 32) - (1 << bits))
-		res = (512LL << 32) - (1 << bits);
+	if (res > upper_limit)
+		res = upper_limit;
 	return res;
 }
 
@@ -1498,8 +1515,8 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	 * _much_ simpler. */
 	sbi->s_rsv_window_head.rsv_start = EXT3_RESERVE_WINDOW_NOT_ALLOCATED;
 	sbi->s_rsv_window_head.rsv_end = EXT3_RESERVE_WINDOW_NOT_ALLOCATED;
-	atomic_set(&sbi->s_rsv_window_head.rsv_alloc_hit, 0);
-	atomic_set(&sbi->s_rsv_window_head.rsv_goal_size, 0);
+	sbi->s_rsv_window_head.rsv_alloc_hit = 0;
+	sbi->s_rsv_window_head.rsv_goal_size = 0;
 	ext3_rsv_window_add(sb, &sbi->s_rsv_window_head);
 
 	/*
@@ -1565,6 +1582,19 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		break;
 	}
 
+	if (test_opt(sb, NOBH)) {
+		if (sb->s_blocksize_bits != PAGE_CACHE_SHIFT) {
+			printk(KERN_WARNING "EXT3-fs: Ignoring nobh option "
+				"since filesystem blocksize doesn't match "
+				"pagesize\n");
+			clear_opt(sbi->s_mount_opt, NOBH);
+		}
+		if (!(test_opt(sb, DATA_FLAGS) == EXT3_MOUNT_WRITEBACK_DATA)) {
+			printk(KERN_WARNING "EXT3-fs: Ignoring nobh option - "
+				"its supported only with writeback mode\n");
+			clear_opt(sbi->s_mount_opt, NOBH);
+		}
+	}
 	/*
 	 * The journal_load will have done any necessary log recovery,
 	 * so we can safely mount the rest of the filesystem now.

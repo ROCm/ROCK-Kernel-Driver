@@ -100,10 +100,11 @@ imx_free_dma(int dma_ch)
 static irqreturn_t
 dma_err_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
-	int i;
+	int i, disr = DISR;
 	struct dma_channel *channel;
 	unsigned int err_mask = DBTOSR | DRTOSR | DSESR | DBOSR;
 
+	DISR = disr;
 	for (i = 0; i < 11; i++) {
 		channel = &dma_channels[i];
 
@@ -136,7 +137,6 @@ dma_err_handler(int irq, void *dev_id, struct pt_regs *regs)
 			       i, channel->name);
 			DBOSR |= (1 << i);
 		}
-		DISR = (1 << i);
 	}
 	return IRQ_HANDLED;
 }
@@ -146,6 +146,7 @@ dma_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int i, disr = DISR;
 
+	DISR = disr;
 	for (i = 0; i < 11; i++) {
 		if (disr & (1 << i)) {
 			struct dma_channel *channel = &dma_channels[i];
@@ -161,7 +162,6 @@ dma_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 			}
 		}
 	}
-	DISR = disr;
 	return IRQ_HANDLED;
 }
 

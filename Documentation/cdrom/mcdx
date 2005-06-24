@@ -1,16 +1,3 @@
-This is a first attempt to create an `improved' driver for the Mitsumi drives.
-It is able to "live together" with mcd.c, if you have at least two Mitsumi
-drives: each driver can use its own drive.
-
-To allow this "coexistence" as long as mcdx.c is not a superset of mcd.c,
-this driver has to use its own device files. We use MAJOR 20 for it. So,
-you have to do
-
- # mknod /dev/mcdx0 b 20 0
- # mknod /dev/mcdx1 b 20 1
-
-and so on, one entry for each drive to support, once.
-
 If you are using the driver as a module, you can specify your ports and IRQs
 like
 
@@ -25,9 +12,7 @@ This driver:
         ordinary CDs;
     o   supports up to 5 drives (of course, you'll need free 
         IRQs, i/o ports and slots);
-    o   uses much less kernel memory than the standard mcd driver
-        (no extra driver internal buffers!).
-    o   plays audio (like the `old' driver, I hope)
+    o   plays audio
 
 This version doesn't support yet:
 

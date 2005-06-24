@@ -13,8 +13,7 @@ EXTRA_CFLAGS				+= -Idrivers/ide
 
 obj-$(CONFIG_BLK_DEV_IDE)		+= pci/
 
-ide-core-y += ide.o ide-default.o ide-io.o ide-iops.o ide-lib.o ide-probe.o \
-	ide-taskfile.o
+ide-core-y += ide.o ide-io.o ide-iops.o ide-lib.o ide-probe.o ide-taskfile.o
 
 ide-core-$(CONFIG_BLK_DEV_CMD640)	+= pci/cmd640.o
 

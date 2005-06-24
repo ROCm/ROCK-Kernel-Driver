@@ -27,8 +27,6 @@
 #include <linux/icmp.h>
 #include <net/sock.h>
 #include <net/route.h>
-#include <net/xfrm.h>
-#include <net/ip.h>
 #include <linux/ip.h>
 
 /* In this code, we can be waiting indefinitely for userspace to
@@ -219,21 +217,10 @@ void nf_debug_ip_local_deliver(struct sk_buff *skb)
 	 * NF_IP_RAW_INPUT and NF_IP_PRE_ROUTING.  */
 	if (!skb->dev) {
 		printk("ip_local_deliver: skb->dev is NULL.\n");
-	}
-	else if (strcmp(skb->dev->name, "lo") == 0) {
-		if (skb->nf_debug != ((1 << NF_IP_LOCAL_OUT)
-				      | (1 << NF_IP_POST_ROUTING)
-				      | (1 << NF_IP_PRE_ROUTING)
-				      | (1 << NF_IP_LOCAL_IN))) {
-			printk("ip_local_deliver: bad loopback skb: ");
-			debug_print_hooks_ip(skb->nf_debug);
-			nf_dump_skb(PF_INET, skb);
-		}
-	}
-	else {
+	} else {
 		if (skb->nf_debug != ((1<<NF_IP_PRE_ROUTING)
 				      | (1<<NF_IP_LOCAL_IN))) {
-			printk("ip_local_deliver: bad non-lo skb: ");
+			printk("ip_local_deliver: bad skb: ");
 			debug_print_hooks_ip(skb->nf_debug);
 			nf_dump_skb(PF_INET, skb);
 		}
@@ -249,8 +236,6 @@ void nf_debug_ip_loopback_xmit(struct sk_buff *newskb)
 		debug_print_hooks_ip(newskb->nf_debug);
 		nf_dump_skb(PF_INET, newskb);
 	}
-	/* Clear to avoid confusing input check */
-	newskb->nf_debug = 0;
 }
 
 void nf_debug_ip_finish_output2(struct sk_buff *skb)
@@ -351,6 +336,8 @@ static unsigned int nf_iterate(struct list_head *head,
 			       int (*okfn)(struct sk_buff *),
 			       int hook_thresh)
 {
+	unsigned int verdict;
+
 	/*
 	 * The caller must not block between calls to this
 	 * function because of risk of continuing from deleted element.
@@ -363,28 +350,18 @@ static unsigned int nf_iterate(struct list_head *head,
 
 		/* Optimization: we don't need to hold module
                    reference here, since function can't sleep. --RR */
-		switch (elem->hook(hook, skb, indev, outdev, okfn)) {
-		case NF_QUEUE:
-			return NF_QUEUE;
-
-		case NF_STOLEN:
-			return NF_STOLEN;
-
-		case NF_DROP:
-			return NF_DROP;
-
-		case NF_REPEAT:
-			*i = (*i)->prev;
-			break;
-
+		verdict = elem->hook(hook, skb, indev, outdev, okfn);
+		if (verdict != NF_ACCEPT) {
 #ifdef CONFIG_NETFILTER_DEBUG
-		case NF_ACCEPT:
-			break;
-
-		default:
-			NFDEBUG("Evil return from %p(%u).\n", 
-				elem->hook, hook);
+			if (unlikely(verdict > NF_MAX_VERDICT)) {
+				NFDEBUG("Evil return from %p(%u).\n",
+				        elem->hook, hook);
+				continue;
+			}
 #endif
+			if (verdict != NF_REPEAT)
+				return verdict;
+			*i = (*i)->prev;
 		}
 	}
 	return NF_ACCEPT;
@@ -496,7 +473,9 @@ static int nf_queue(struct sk_buff *skb,
 	return 1;
 }
 
-int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
+/* Returns 1 if okfn() needs to be executed by the caller,
+ * -EPERM for NF_DROP, 0 otherwise. */
+int nf_hook_slow(int pf, unsigned int hook, struct sk_buff **pskb,
 		 struct net_device *indev,
 		 struct net_device *outdev,
 		 int (*okfn)(struct sk_buff *),
@@ -510,34 +489,29 @@ int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 	rcu_read_lock();
 
 #ifdef CONFIG_NETFILTER_DEBUG
-	if (skb->nf_debug & (1 << hook)) {
+	if (unlikely((*pskb)->nf_debug & (1 << hook))) {
 		printk("nf_hook: hook %i already set.\n", hook);
-		nf_dump_skb(pf, skb);
+		nf_dump_skb(pf, *pskb);
 	}
-	skb->nf_debug |= (1 << hook);
+	(*pskb)->nf_debug |= (1 << hook);
 #endif
 
 	elem = &nf_hooks[pf][hook];
- next_hook:
-	verdict = nf_iterate(&nf_hooks[pf][hook], &skb, hook, indev,
+next_hook:
+	verdict = nf_iterate(&nf_hooks[pf][hook], pskb, hook, indev,
 			     outdev, &elem, okfn, hook_thresh);
-	if (verdict == NF_QUEUE) {
+	if (verdict == NF_ACCEPT || verdict == NF_STOP) {
+		ret = 1;
+		goto unlock;
+	} else if (verdict == NF_DROP) {
+		kfree_skb(*pskb);
+		ret = -EPERM;
+	} else if (verdict == NF_QUEUE) {
 		NFDEBUG("nf_hook: Verdict = QUEUE.\n");
-		if (!nf_queue(skb, elem, pf, hook, indev, outdev, okfn))
+		if (!nf_queue(*pskb, elem, pf, hook, indev, outdev, okfn))
 			goto next_hook;
 	}
-
-	switch (verdict) {
-	case NF_ACCEPT:
-		ret = okfn(skb);
-		break;
-
-	case NF_DROP:
-		kfree_skb(skb);
-		ret = -EPERM;
-		break;
-	}
-
+unlock:
 	rcu_read_unlock();
 	return ret;
 }
@@ -632,6 +606,7 @@ int ip_route_me_harder(struct sk_buff **pskb)
 #ifdef CONFIG_IP_ROUTE_FWMARK
 		fl.nl_u.ip4_u.fwmark = (*pskb)->nfmark;
 #endif
+		fl.proto = iph->protocol;
 		if (ip_route_output_key(&rt, &fl) != 0)
 			return -1;
 
@@ -658,20 +633,6 @@ int ip_route_me_harder(struct sk_buff **pskb)
 	if ((*pskb)->dst->error)
 		return -1;
 
-#ifdef CONFIG_XFRM
-	if (!(IPCB(*pskb)->flags & IPSKB_XFRM_TRANSFORMED)) {
-		struct xfrm_policy_afinfo *afinfo;
-
-		afinfo = xfrm_policy_get_afinfo(AF_INET);
-		if (afinfo != NULL) {
-			afinfo->decode_session(*pskb, &fl);
-			xfrm_policy_put_afinfo(afinfo);
-			if (xfrm_lookup(&(*pskb)->dst, &fl, (*pskb)->sk, 0) != 0)
-				return -1;
-		}
-	}
-#endif
-
 	/* Change in oif may mean change in hh_len. */
 	hh_len = (*pskb)->dst->dev->hard_header_len;
 	if (skb_headroom(*pskb) < hh_len) {
@@ -690,72 +651,9 @@ int ip_route_me_harder(struct sk_buff **pskb)
 }
 EXPORT_SYMBOL(ip_route_me_harder);
 
-#ifdef CONFIG_XFRM
-inline int nf_rcv_postxfrm_nonlocal(struct sk_buff *skb)
-{
-	skb->sp->decap_done = 1;
-	dst_release(skb->dst);
-	skb->dst = NULL;
-	nf_reset(skb);
-	return netif_rx(skb);
-}
-
-int nf_rcv_postxfrm_local(struct sk_buff *skb)
-{
-	__skb_push(skb, skb->data - skb->nh.raw);
-	/* Fix header len and checksum if last xfrm was transport mode */
-	if (!skb->sp->x[skb->sp->len - 1].xvec->props.mode) {
-		skb->nh.iph->tot_len = htons(skb->len);
-		ip_send_check(skb->nh.iph);
-	}
-	return nf_rcv_postxfrm_nonlocal(skb);
-}
- 
-#ifdef CONFIG_IP_NF_NAT_NEEDED
-#include <linux/netfilter_ipv4/ip_conntrack.h>
-#include <linux/netfilter_ipv4/ip_nat.h>
-
-void nf_nat_decode_session4(struct sk_buff *skb, struct flowi *fl)
-{
-	struct ip_conntrack *ct;
-	struct ip_conntrack_tuple *t;
-	enum ip_conntrack_info ctinfo;
-	enum ip_conntrack_dir dir;
-	int known_proto;
-	int statusbit;
-
-	ct = ip_conntrack_get(skb, &ctinfo);
-	if (ct == NULL || !(ct->status & IPS_NAT_MASK))
-		return;
-
-	dir = CTINFO2DIR(ctinfo);
-	t = &ct->tuplehash[dir].tuple;
-	known_proto = t->dst.protonum == IPPROTO_TCP ||
-	              t->dst.protonum == IPPROTO_UDP;
-
-	statusbit = ct->status;
-	if (dir == IP_CT_DIR_REPLY)
-		statusbit ^= IPS_NAT_MASK;
-
-	if (statusbit & IPS_DST_NAT) {
-		fl->fl4_dst = t->dst.ip;
-		if (known_proto)
-			fl->fl_ip_dport = t->dst.u.tcp.port;
-	}
-
-	if (statusbit & IPS_SRC_NAT) {
-		fl->fl4_src = t->src.ip;
-		if (known_proto)
-			fl->fl_ip_sport = t->src.u.tcp.port;
-	}
-}
-#endif /* CONFIG_IP_NF_NAT_NEEDED */
-#endif
-
 int skb_ip_make_writable(struct sk_buff **pskb, unsigned int writable_len)
 {
 	struct sk_buff *nskb;
-	unsigned int iplen;
 
 	if (writable_len > (*pskb)->len)
 		return 0;
@@ -764,35 +662,7 @@ int skb_ip_make_writable(struct sk_buff **pskb, unsigned int writable_len)
 	if (skb_shared(*pskb) || skb_cloned(*pskb))
 		goto copy_skb;
 
-	/* Alexey says IP hdr is always modifiable and linear, so ok. */
-	if (writable_len <= (*pskb)->nh.iph->ihl*4)
-		return 1;
-
-	iplen = writable_len - (*pskb)->nh.iph->ihl*4;
-
-	/* DaveM says protocol headers are also modifiable. */
-	switch ((*pskb)->nh.iph->protocol) {
-	case IPPROTO_TCP: {
-		struct tcphdr _hdr, *hp;
-		hp = skb_header_pointer(*pskb, (*pskb)->nh.iph->ihl*4,
-					sizeof(_hdr), &_hdr);
-		if (hp == NULL)
-			goto copy_skb;
-		if (writable_len <= (*pskb)->nh.iph->ihl*4 + hp->doff*4)
-			goto pull_skb;
-		goto copy_skb;
-	}
-	case IPPROTO_UDP:
-		if (writable_len<=(*pskb)->nh.iph->ihl*4+sizeof(struct udphdr))
-			goto pull_skb;
-		goto copy_skb;
-	case IPPROTO_ICMP:
-		if (writable_len
-		    <= (*pskb)->nh.iph->ihl*4 + sizeof(struct icmphdr))
-			goto pull_skb;
-		goto copy_skb;
-	/* Insert other cases here as desired */
-	}
+	return pskb_may_pull(*pskb, writable_len);
 
 copy_skb:
 	nskb = skb_copy(*pskb, GFP_ATOMIC);
@@ -807,9 +677,6 @@ copy_skb:
 	kfree_skb(*pskb);
 	*pskb = nskb;
 	return 1;
-
-pull_skb:
-	return pskb_may_pull(*pskb, writable_len);
 }
 EXPORT_SYMBOL(skb_ip_make_writable);
 #endif /*CONFIG_INET*/
@@ -917,4 +784,3 @@ EXPORT_SYMBOL(nf_setsockopt);
 EXPORT_SYMBOL(nf_unregister_hook);
 EXPORT_SYMBOL(nf_unregister_queue_handler);
 EXPORT_SYMBOL(nf_unregister_sockopt);
-EXPORT_SYMBOL(nf_rcv_postxfrm_local);

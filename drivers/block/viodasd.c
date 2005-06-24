@@ -250,7 +250,6 @@ static int viodasd_release(struct inode *ino, struct file *fil)
 static int viodasd_ioctl(struct inode *ino, struct file *fil,
 			 unsigned int cmd, unsigned long arg)
 {
-	int err;
 	unsigned char sectors;
 	unsigned char heads;
 	unsigned short cylinders;
@@ -263,9 +262,8 @@ static int viodasd_ioctl(struct inode *ino, struct file *fil,
 		geo = (struct hd_geometry *)arg;
 		if (geo == NULL)
 			return -EINVAL;
-		err = verify_area(VERIFY_WRITE, geo, sizeof(*geo));
-		if (err)
-			return err;
+		if (!access_ok(VERIFY_WRITE, geo, sizeof(*geo)))
+			return -EFAULT;
 		gendisk = ino->i_bdev->bd_disk;
 		d = gendisk->private_data;
 		sectors = d->sectors;

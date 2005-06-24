@@ -31,11 +31,9 @@
 #define SERPENT_BLOCK_SIZE		 16
 
 #define PHI 0x9e3779b9UL
-#define ROL(x,r) ((x) = ((x) << (r)) | ((x) >> (32-(r))))
-#define ROR(x,r) ((x) = ((x) >> (r)) | ((x) << (32-(r))))
 
 #define keyiter(a,b,c,d,i,j) \
-        b ^= d; b ^= c; b ^= a; b ^= PHI ^ i; ROL(b,11); k[j] = b;
+        b ^= d; b ^= c; b ^= a; b ^= PHI ^ i; b = rol32(b,11); k[j] = b;
 
 #define loadkeys(x0,x1,x2,x3,i) \
 	x0=k[i]; x1=k[i+1]; x2=k[i+2]; x3=k[i+3];
@@ -48,24 +46,24 @@
 	x1 ^= k[4*(i)+1];        x0 ^= k[4*(i)+0];
 
 #define LK(x0,x1,x2,x3,x4,i)				\
-					ROL(x0,13);	\
-	ROL(x2,3);	x1 ^= x0;	x4  = x0 << 3;	\
+					x0=rol32(x0,13);\
+	x2=rol32(x2,3);	x1 ^= x0;	x4  = x0 << 3;	\
 	x3 ^= x2;	x1 ^= x2;			\
-	ROL(x1,1);	x3 ^= x4;			\
-	ROL(x3,7);	x4  = x1;			\
+	x1=rol32(x1,1);	x3 ^= x4;			\
+	x3=rol32(x3,7);	x4  = x1;			\
 	x0 ^= x1;	x4 <<= 7;	x2 ^= x3;	\
 	x0 ^= x3;	x2 ^= x4;	x3 ^= k[4*i+3];	\
-	x1 ^= k[4*i+1];	ROL(x0,5);	ROL(x2,22);	\
+	x1 ^= k[4*i+1];	x0=rol32(x0,5);	x2=rol32(x2,22);\
 	x0 ^= k[4*i+0];	x2 ^= k[4*i+2];
 
 #define KL(x0,x1,x2,x3,x4,i)				\
 	x0 ^= k[4*i+0];	x1 ^= k[4*i+1];	x2 ^= k[4*i+2];	\
-	x3 ^= k[4*i+3];	ROR(x0,5);	ROR(x2,22);	\
+	x3 ^= k[4*i+3];	x0=ror32(x0,5);	x2=ror32(x2,22);\
 	x4 =  x1;	x2 ^= x3;	x0 ^= x3;	\
-	x4 <<= 7;	x0 ^= x1;	ROR(x1,1);	\
-	x2 ^= x4;	ROR(x3,7);	x4 = x0 << 3;	\
-	x1 ^= x0;	x3 ^= x4;	ROR(x0,13);	\
-	x1 ^= x2;	x3 ^= x2;	ROR(x2,3);
+	x4 <<= 7;	x0 ^= x1;	x1=ror32(x1,1);	\
+	x2 ^= x4;	x3=ror32(x3,7);	x4 = x0 << 3;	\
+	x1 ^= x0;	x3 ^= x4;	x0=ror32(x0,13);\
+	x1 ^= x2;	x3 ^= x2;	x2=ror32(x2,3);
 
 #define S0(x0,x1,x2,x3,x4)				\
 					x4  = x3;	\

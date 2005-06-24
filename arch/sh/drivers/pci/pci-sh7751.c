@@ -169,7 +169,7 @@ static void __init pci_fixup_ide_bases(struct pci_dev *d)
 	 */
 	if ((d->class >> 8) != PCI_CLASS_STORAGE_IDE)
 		return;
-	pr_debug("PCI: IDE base address fixup for %s\n", d->slot_name);
+	pr_debug("PCI: IDE base address fixup for %s\n", pci_name(d));
 	for(i=0; i<4; i++) {
 		struct resource *r = &d->resource[i];
 		if ((r->start & ~0x80) == 0x374) {
@@ -178,8 +178,8 @@ static void __init pci_fixup_ide_bases(struct pci_dev *d)
 		}
 	}
 }
+
 DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, pci_fixup_ide_bases);
-#endif
 
 /*
  *  Called after each bus is probed, but before its children
@@ -401,11 +401,11 @@ static int sh7751_pci_lookup_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	/* now lookup the actual IRQ on a platform specific basis (pci-'platform'.c) */
 	irq = pcibios_map_platform_irq(slot,pin);
 	if( irq < 0 ) {
-		pr_debug("PCI: Error mapping IRQ on device %s\n", dev->slot_name);
+		pr_debug("PCI: Error mapping IRQ on device %s\n", pci_name(dev));
 		return irq;
 	}
-	
-	pr_debug("Setting IRQ for slot %s to %d\n", dev->slot_name, irq);
+
+	pr_debug("Setting IRQ for slot %s to %d\n", pci_name(dev), irq);
 
 	return irq;
 }

@@ -521,11 +521,11 @@ pcibios_allocate_resources(int pass)
 		if (pass)
 			continue;
 		r = &dev->resource[PCI_ROM_RESOURCE];
-		if (r->flags & PCI_ROM_ADDRESS_ENABLE) {
+		if (r->flags & IORESOURCE_ROM_ENABLE) {
 			/* Turn the ROM off, leave the resource region, but keep it unregistered. */
 			u32 reg;
 			DBG("PCI: Switching off ROM of %s\n", pci_name(dev));
-			r->flags &= ~PCI_ROM_ADDRESS_ENABLE;
+			r->flags &= ~IORESOURCE_ROM_ENABLE;
 			pci_read_config_dword(dev, dev->rom_base_reg, &reg);
 			pci_write_config_dword(dev, dev->rom_base_reg,
 					       reg & ~PCI_ROM_ADDRESS_ENABLE);
@@ -1058,7 +1058,7 @@ do_update_p2p_io_resource(struct pci_bus *bus, int enable_vga)
 		return;
  	res = *(bus->resource[0]);
 
-	DBG("Remapping Bus %d, bridge: %s\n", bus->number, bridge->slot_name);
+	DBG("Remapping Bus %d, bridge: %s\n", bus->number, pci_name(bridge));
 	res.start -= ((unsigned long) hose->io_base_virt - isa_io_base);
 	res.end -= ((unsigned long) hose->io_base_virt - isa_io_base);
 	DBG("  IO window: %08lx-%08lx\n", res.start, res.end);
@@ -1432,7 +1432,7 @@ pci_bus_to_hose(int bus)
 	return NULL;
 }
 
-void*
+void __iomem *
 pci_bus_io_base(unsigned int bus)
 {
 	struct pci_controller *hose;
@@ -1478,95 +1478,143 @@ pci_resource_to_bus(struct pci_dev *pdev, struct resource *res)
 	return res->start;
 }
 
-/*
- * Platform support for /proc/bus/pci/X/Y mmap()s,
- * modelled on the sparc64 implementation by Dave Miller.
- *  -- paulus.
- */
 
-/*
- * Adjust vm_pgoff of VMA such that it is the physical page offset
- * corresponding to the 32-bit pci bus offset for DEV requested by the user.
- *
- * Basically, the user finds the base address for his device which he wishes
- * to mmap.  They read the 32-bit value from the config space base register,
- * add whatever PAGE_SIZE multiple offset they wish, and feed this into the
- * offset parameter of mmap on /proc/bus/pci/XXX for that device.
- *
- * Returns negative error code on failure, zero on success.
- */
-static __inline__ int
-__pci_mmap_make_offset(struct pci_dev *dev, struct vm_area_struct *vma,
-		       enum pci_mmap_state mmap_state)
+static struct resource *__pci_mmap_make_offset(struct pci_dev *dev,
+					       unsigned long *offset,
+					       enum pci_mmap_state mmap_state)
 {
-	struct pci_controller *hose = (struct pci_controller *) dev->sysdata;
-	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
-	unsigned long size = vma->vm_end - vma->vm_start;
-	unsigned long base;
-	struct resource *res;
-	int i;
-	int ret = -EINVAL;
+	struct pci_controller *hose = pci_bus_to_hose(dev->bus->number);
+	unsigned long io_offset = 0;
+	int i, res_bit;
 
 	if (hose == 0)
-		return -EINVAL;		/* should never happen */
-	if (offset + size <= offset)
-		return -EINVAL;
+		return NULL;		/* should never happen */
 
+	/* If memory, add on the PCI bridge address offset */
 	if (mmap_state == pci_mmap_mem) {
-		/* PCI memory space */
-		base = hose->pci_mem_offset;
-		for (i = 0; i < 3; ++i) {
-			res = &hose->mem_resources[i];
-			if (res->flags == 0)
-				continue;
-			if (offset >= res->start - base
-			    && offset + size - 1 <= res->end - base) {
-				ret = 0;
-				break;
-			}
-		}
-		offset += hose->pci_mem_offset;
+		*offset += hose->pci_mem_offset;
+		res_bit = IORESOURCE_MEM;
 	} else {
-		/* PCI I/O space */
-		base = (unsigned long)hose->io_base_virt - isa_io_base;
-		res = &hose->io_resource;
-		if (offset >= res->start - base
-		    && offset + size - 1 <= res->end - base)
-			ret = 0;
-		offset += hose->io_base_phys;
+		io_offset = (unsigned long)hose->io_base_virt;
+		*offset += io_offset;
+		res_bit = IORESOURCE_IO;
 	}
 
-	vma->vm_pgoff = offset >> PAGE_SHIFT;
-	return ret;
-}
+	/*
+	 * Check that the offset requested corresponds to one of the
+	 * resources of the device.
+	 */
+	for (i = 0; i <= PCI_ROM_RESOURCE; i++) {
+		struct resource *rp = &dev->resource[i];
+		int flags = rp->flags;
 
-/*
- * Set vm_flags of VMA, as appropriate for this architecture, for a pci device
- * mapping.
- */
-static __inline__ void
-__pci_mmap_set_flags(struct pci_dev *dev, struct vm_area_struct *vma,
-		     enum pci_mmap_state mmap_state)
-{
-	vma->vm_flags |= VM_SHM | VM_LOCKED | VM_IO;
+		/* treat ROM as memory (should be already) */
+		if (i == PCI_ROM_RESOURCE)
+			flags |= IORESOURCE_MEM;
+
+		/* Active and same type? */
+		if ((flags & res_bit) == 0)
+			continue;
+
+		/* In the range of this resource? */
+		if (*offset < (rp->start & PAGE_MASK) || *offset > rp->end)
+			continue;
+
+		/* found it! construct the final physical address */
+		if (mmap_state == pci_mmap_io)
+			*offset += hose->io_base_phys - _IO_BASE;
+		return rp;
+	}
+
+	return NULL;
 }
 
 /*
  * Set vm_page_prot of VMA, as appropriate for this architecture, for a pci
  * device mapping.
  */
-static __inline__ void
-__pci_mmap_set_pgprot(struct pci_dev *dev, struct vm_area_struct *vma,
-		      enum pci_mmap_state mmap_state, int write_combine)
+static pgprot_t __pci_mmap_set_pgprot(struct pci_dev *dev, struct resource *rp,
+				      pgprot_t protection,
+				      enum pci_mmap_state mmap_state,
+				      int write_combine)
 {
-	int prot = pgprot_val(vma->vm_page_prot);
+	unsigned long prot = pgprot_val(protection);
+
+	/* Write combine is always 0 on non-memory space mappings. On
+	 * memory space, if the user didn't pass 1, we check for a
+	 * "prefetchable" resource. This is a bit hackish, but we use
+	 * this to workaround the inability of /sysfs to provide a write
+	 * combine bit
+	 */
+	if (mmap_state != pci_mmap_mem)
+		write_combine = 0;
+	else if (write_combine == 0) {
+		if (rp->flags & IORESOURCE_PREFETCH)
+			write_combine = 1;
+	}
 
 	/* XXX would be nice to have a way to ask for write-through */
 	prot |= _PAGE_NO_CACHE;
-	if (!write_combine)
+	if (write_combine)
+		prot &= ~_PAGE_GUARDED;
+	else
 		prot |= _PAGE_GUARDED;
-	vma->vm_page_prot = __pgprot(prot);
+
+	printk("PCI map for %s:%lx, prot: %lx\n", pci_name(dev), rp->start,
+	       prot);
+
+	return __pgprot(prot);
 }
+
+/*
+ * This one is used by /dev/mem and fbdev who have no clue about the
+ * PCI device, it tries to find the PCI device first and calls the
+ * above routine
+ */
+pgprot_t pci_phys_mem_access_prot(struct file *file,
+				  unsigned long offset,
+				  unsigned long size,
+				  pgprot_t protection)
+{
+	struct pci_dev *pdev = NULL;
+	struct resource *found = NULL;
+	unsigned long prot = pgprot_val(protection);
+	int i;
+
+	if (page_is_ram(offset >> PAGE_SHIFT))
+		return prot;
+
+	prot |= _PAGE_NO_CACHE | _PAGE_GUARDED;
+
+	for_each_pci_dev(pdev) {
+		for (i = 0; i <= PCI_ROM_RESOURCE; i++) {
+			struct resource *rp = &pdev->resource[i];
+			int flags = rp->flags;
+
+			/* Active and same type? */
+			if ((flags & IORESOURCE_MEM) == 0)
+				continue;
+			/* In the range of this resource? */
+			if (offset < (rp->start & PAGE_MASK) ||
+			    offset > rp->end)
+				continue;
+			found = rp;
+			break;
+		}
+		if (found)
+			break;
+	}
+	if (found) {
+		if (found->flags & IORESOURCE_PREFETCH)
+			prot &= ~_PAGE_GUARDED;
+		pci_dev_put(pdev);
+	}
+
+	DBG("non-PCI map for %lx, prot: %lx\n", offset, prot);
+
+	return __pgprot(prot);
+}
+
 
 /*
  * Perform the actual remap of the pages for a PCI device mapping, as
@@ -1582,14 +1630,19 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 			enum pci_mmap_state mmap_state,
 			int write_combine)
 {
+	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
+	struct resource *rp;
 	int ret;
 
-	ret = __pci_mmap_make_offset(dev, vma, mmap_state);
-	if (ret < 0)
-		return ret;
+	rp = __pci_mmap_make_offset(dev, &offset, mmap_state);
+	if (rp == NULL)
+		return -EINVAL;
 
-	__pci_mmap_set_flags(dev, vma, mmap_state);
-	__pci_mmap_set_pgprot(dev, vma, mmap_state, write_combine);
+	vma->vm_pgoff = offset >> PAGE_SHIFT;
+	vma->vm_flags |= VM_SHM | VM_LOCKED | VM_IO;
+	vma->vm_page_prot = __pci_mmap_set_pgprot(dev, rp,
+						  vma->vm_page_prot,
+						  mmap_state, write_combine);
 
 	ret = remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
 			       vma->vm_end - vma->vm_start, vma->vm_page_prot);

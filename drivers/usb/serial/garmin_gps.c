@@ -614,8 +614,8 @@ static int gsp_receive(struct garmin_data * garmin_data_p,
  *
  * return <0 on error, 0 if packet is incomplete or > 0 if packet was sent
  */
-int gsp_send(struct garmin_data * garmin_data_p, const unsigned char *buf,
-              int count)
+static int gsp_send(struct garmin_data * garmin_data_p,
+		    const unsigned char *buf, int count)
 {
 	const unsigned char *src;
 	unsigned char *dst;

@@ -9,7 +9,7 @@
  *		2 of the License, or (at your option) any later version.
  *
  *	Derived from the IP parts of dev.c 1.0.19
- * 		Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
+ * 		Authors:	Ross Biro
  *				Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *				Mark Evans, <evansmp@uhura.aston.ac.uk>
  *
@@ -153,7 +153,7 @@ struct in_device *inetdev_init(struct net_device *dev)
 	dev_hold(dev);
 #ifdef CONFIG_SYSCTL
 	neigh_sysctl_register(dev, in_dev->arp_parms, NET_IPV4,
-			      NET_IPV4_NEIGH, "ipv4", NULL);
+			      NET_IPV4_NEIGH, "ipv4", NULL, NULL);
 #endif
 
 	/* Account for reference dev->ip_ptr */
@@ -187,6 +187,10 @@ static void inetdev_destroy(struct in_device *in_dev)
 
 	ASSERT_RTNL();
 
+	dev = in_dev->dev;
+	if (dev == &loopback_dev)
+		return;
+
 	in_dev->dead = 1;
 
 	ip_mc_destroy_dev(in_dev);
@@ -200,7 +204,6 @@ static void inetdev_destroy(struct in_device *in_dev)
 	devinet_sysctl_unregister(&in_dev->cnf);
 #endif
 
-	dev = in_dev->dev;
 	dev->ip_ptr = NULL;
 
 #ifdef CONFIG_SYSCTL
@@ -230,11 +233,14 @@ int inet_addr_onlink(struct in_device *in_dev, u32 a, u32 b)
 static void inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 			 int destroy)
 {
+	struct in_ifaddr *promote = NULL;
 	struct in_ifaddr *ifa1 = *ifap;
 
 	ASSERT_RTNL();
 
-	/* 1. Deleting primary ifaddr forces deletion all secondaries */
+	/* 1. Deleting primary ifaddr forces deletion all secondaries 
+	 * unless alias promotion is set
+	 **/
 
 	if (!(ifa1->ifa_flags & IFA_F_SECONDARY)) {
 		struct in_ifaddr *ifa;
@@ -248,11 +254,16 @@ static void inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 				continue;
 			}
 
-			*ifap1 = ifa->ifa_next;
+			if (!IN_DEV_PROMOTE_SECONDARIES(in_dev)) {
+				*ifap1 = ifa->ifa_next;
 
-			rtmsg_ifa(RTM_DELADDR, ifa);
-			notifier_call_chain(&inetaddr_chain, NETDEV_DOWN, ifa);
-			inet_free_ifa(ifa);
+				rtmsg_ifa(RTM_DELADDR, ifa);
+				notifier_call_chain(&inetaddr_chain, NETDEV_DOWN, ifa);
+				inet_free_ifa(ifa);
+			} else {
+				promote = ifa;
+				break;
+			}
 		}
 	}
 
@@ -277,6 +288,13 @@ static void inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 
 		if (!in_dev->ifa_list)
 			inetdev_destroy(in_dev);
+	}
+
+	if (promote && IN_DEV_PROMOTE_SECONDARIES(in_dev)) {
+		/* not sure if we should send a delete notify first? */
+		promote->ifa_flags &= ~IFA_F_SECONDARY;
+		rtmsg_ifa(RTM_NEWADDR, promote);
+		notifier_call_chain(&inetaddr_chain, NETDEV_UP, promote);
 	}
 }
 
@@ -943,8 +961,16 @@ static int inetdev_event(struct notifier_block *this, unsigned long event,
 
 	ASSERT_RTNL();
 
-	if (!in_dev)
+	if (!in_dev) {
+		if (event == NETDEV_REGISTER && dev == &loopback_dev) {
+			in_dev = inetdev_init(dev);
+			if (!in_dev)
+				panic("devinet: Failed to create loopback\n");
+			in_dev->cnf.no_xfrm = 1;
+			in_dev->cnf.no_policy = 1;
+		}
 		goto out;
+	}
 
 	switch (event) {
 	case NETDEV_REGISTER:
@@ -967,8 +993,6 @@ static int inetdev_event(struct notifier_block *this, unsigned long event,
 				memcpy(ifa->ifa_label, dev->name, IFNAMSIZ);
 				inet_insert_ifa(ifa);
 			}
-			in_dev->cnf.no_xfrm = 1;
-			in_dev->cnf.no_policy = 1;
 		}
 		ip_mc_up(in_dev);
 		break;
@@ -992,7 +1016,7 @@ static int inetdev_event(struct notifier_block *this, unsigned long event,
 		devinet_sysctl_unregister(&in_dev->cnf);
 		neigh_sysctl_unregister(in_dev->arp_parms);
 		neigh_sysctl_register(dev, in_dev->arp_parms, NET_IPV4,
-				      NET_IPV4_NEIGH, "ipv4", NULL);
+				      NET_IPV4_NEIGH, "ipv4", NULL, NULL);
 		devinet_sysctl_register(in_dev, &in_dev->cnf);
 #endif
 		break;
@@ -1098,17 +1122,18 @@ static void rtmsg_ifa(int event, struct in_ifaddr* ifa)
 	}
 }
 
-static struct rtnetlink_link inet_rtnetlink_table[RTM_MAX - RTM_BASE + 1] = {
-	 [4] = { .doit	 = inet_rtm_newaddr,  },
-	 [5] = { .doit	 = inet_rtm_deladdr,  },
-	 [6] = { .dumpit = inet_dump_ifaddr,  },
-	 [8] = { .doit	 = inet_rtm_newroute, },
-	 [9] = { .doit	 = inet_rtm_delroute, },
-	[10] = { .doit	 = inet_rtm_getroute, .dumpit = inet_dump_fib, },
+static struct rtnetlink_link inet_rtnetlink_table[RTM_NR_MSGTYPES] = {
+	[RTM_NEWADDR  - RTM_BASE] = { .doit	= inet_rtm_newaddr,	},
+	[RTM_DELADDR  - RTM_BASE] = { .doit	= inet_rtm_deladdr,	},
+	[RTM_GETADDR  - RTM_BASE] = { .dumpit	= inet_dump_ifaddr,	},
+	[RTM_NEWROUTE - RTM_BASE] = { .doit	= inet_rtm_newroute,	},
+	[RTM_DELROUTE - RTM_BASE] = { .doit	= inet_rtm_delroute,	},
+	[RTM_GETROUTE - RTM_BASE] = { .doit	= inet_rtm_getroute,
+				      .dumpit	= inet_dump_fib,	},
 #ifdef CONFIG_IP_MULTIPLE_TABLES
-	[16] = { .doit	 = inet_rtm_newrule, },
-	[17] = { .doit	 = inet_rtm_delrule, },
-	[18] = { .dumpit = inet_dump_rules,  },
+	[RTM_NEWRULE  - RTM_BASE] = { .doit	= inet_rtm_newrule,	},
+	[RTM_DELRULE  - RTM_BASE] = { .doit	= inet_rtm_delrule,	},
+	[RTM_GETRULE  - RTM_BASE] = { .dumpit	= inet_dump_rules,	},
 #endif
 };
 
@@ -1212,7 +1237,7 @@ int ipv4_doint_and_flush_strategy(ctl_table *table, int __user *name, int nlen,
 
 static struct devinet_sysctl_table {
 	struct ctl_table_header *sysctl_header;
-	ctl_table		devinet_vars[20];
+	ctl_table		devinet_vars[__NET_IPV4_CONF_MAX];
 	ctl_table		devinet_dev[2];
 	ctl_table		devinet_conf_dir[2];
 	ctl_table		devinet_proto_dir[2];
@@ -1369,6 +1394,15 @@ static struct devinet_sysctl_table {
 			.ctl_name	= NET_IPV4_CONF_FORCE_IGMP_VERSION,
 			.procname	= "force_igmp_version",
 			.data		= &ipv4_devconf.force_igmp_version,
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &ipv4_doint_and_flush,
+			.strategy	= &ipv4_doint_and_flush_strategy,
+		},
+		{
+			.ctl_name	= NET_IPV4_CONF_PROMOTE_SECONDARIES,
+			.procname	= "promote_secondaries",
+			.data		= &ipv4_devconf.promote_secondaries,
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.proc_handler	= &ipv4_doint_and_flush,

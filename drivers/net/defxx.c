@@ -420,7 +420,7 @@ static int __devinit dfx_init_one_pci_or_eisa(struct pci_dev *pdev, long ioaddr)
 	}
 
 	if (pdev != NULL)
-		print_name = pdev->slot_name;
+		print_name = pci_name(pdev);
 
 	dev = alloc_fddidev(sizeof(*bp));
 	if (!dev) {

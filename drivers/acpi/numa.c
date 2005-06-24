@@ -170,7 +170,7 @@ acpi_table_parse_srat (
 
 
 int __init
-acpi_numa_init()
+acpi_numa_init(void)
 {
 	int			result;
 

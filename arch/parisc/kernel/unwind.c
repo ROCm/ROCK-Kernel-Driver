@@ -36,8 +36,7 @@ static spinlock_t unwind_lock;
  * possible (before the slab allocator is initialized)
  */
 static struct unwind_table kernel_unwind_table;
-static struct unwind_table *unwind_tables, *unwind_tables_end;
-
+static LIST_HEAD(unwind_tables);
 
 static inline const struct unwind_table_entry *
 find_unwind_entry_in_table(const struct unwind_table *table, unsigned long addr)
@@ -65,14 +64,14 @@ find_unwind_entry_in_table(const struct unwind_table *table, unsigned long addr)
 static const struct unwind_table_entry *
 find_unwind_entry(unsigned long addr)
 {
-	struct unwind_table *table = unwind_tables;
+	struct unwind_table *table;
 	const struct unwind_table_entry *e = NULL;
 
 	if (addr >= kernel_unwind_table.start && 
 	    addr <= kernel_unwind_table.end)
 		e = find_unwind_entry_in_table(&kernel_unwind_table, addr);
-	else
-		for (; table; table = table->next) {
+	else 
+		list_for_each_entry(table, &unwind_tables, list) {
 			if (addr >= table->start && 
 			    addr <= table->end)
 				e = find_unwind_entry_in_table(table, addr);
@@ -99,7 +98,7 @@ unwind_table_init(struct unwind_table *table, const char *name,
 	table->end = base_addr + end->region_end;
 	table->table = (struct unwind_table_entry *)table_start;
 	table->length = end - start + 1;
-	table->next = NULL;
+	INIT_LIST_HEAD(&table->list);
 
 	for (; start <= end; start++) {
 		if (start < end && 
@@ -112,31 +111,58 @@ unwind_table_init(struct unwind_table *table, const char *name,
 	}
 }
 
-void *
+static void
+unwind_table_sort(struct unwind_table_entry *start,
+		  struct unwind_table_entry *finish)
+{
+	struct unwind_table_entry el, *p, *q;
+
+	for (p = start + 1; p < finish; ++p) {
+		if (p[0].region_start < p[-1].region_start) {
+			el = *p;
+			q = p;
+			do {
+				q[0] = q[-1];
+				--q;
+			} while (q > start && 
+				 el.region_start < q[-1].region_start);
+			*q = el;
+		}
+	}
+}
+
+struct unwind_table *
 unwind_table_add(const char *name, unsigned long base_addr, 
 		 unsigned long gp,
                  void *start, void *end)
 {
 	struct unwind_table *table;
 	unsigned long flags;
+	struct unwind_table_entry *s = (struct unwind_table_entry *)start;
+	struct unwind_table_entry *e = (struct unwind_table_entry *)end;
+
+	unwind_table_sort(s, e);
 
 	table = kmalloc(sizeof(struct unwind_table), GFP_USER);
 	if (table == NULL)
 		return NULL;
 	unwind_table_init(table, name, base_addr, gp, start, end);
 	spin_lock_irqsave(&unwind_lock, flags);
-	if (unwind_tables)
-	{
-		unwind_tables_end->next = table;
-		unwind_tables_end = table;
-	}
-	else
-	{
-		unwind_tables = unwind_tables_end = table;
-	}
+	list_add_tail(&table->list, &unwind_tables);
 	spin_unlock_irqrestore(&unwind_lock, flags);
 
 	return table;
+}
+
+void unwind_table_remove(struct unwind_table *table)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&unwind_lock, flags);
+	list_del(&table->list);
+	spin_unlock_irqrestore(&unwind_lock, flags);
+
+	kfree(table);
 }
 
 /* Called from setup_arch to import the kernel unwind info */
@@ -147,6 +173,8 @@ static int unwind_init(void)
 
 	start = (long)&__start___unwind[0];
 	stop = (long)&__stop___unwind[0];
+
+	spin_lock_init(&unwind_lock);
 
 	printk("unwind_init: start = 0x%lx, end = 0x%lx, entries = %lu\n", 
 	    start, stop,
@@ -239,9 +267,9 @@ static void unwind_frame_regs(struct unwind_frame_info *info)
 		    info->prev_sp, info->prev_ip);
 	} else {
 		dbg("e->start = 0x%x, e->end = 0x%x, Save_SP = %d, "
-		    "Save_RP = %d size = %u\n", e->region_start, 
-		    e->region_end, e->Save_SP, e->Save_RP, 
-		    e->Total_frame_size);
+		    "Save_RP = %d, Millicode = %d size = %u\n", 
+		    e->region_start, e->region_end, e->Save_SP, e->Save_RP, 
+		    e->Millicode, e->Total_frame_size);
 
 		looking_for_rp = e->Save_RP;
 
@@ -284,7 +312,9 @@ static void unwind_frame_regs(struct unwind_frame_info *info)
 		}
 
 		info->prev_sp = info->sp - frame_size;
-		if (rpoffset)
+		if (e->Millicode)
+			info->rp = info->r31;
+		else if (rpoffset)
 			info->rp = *(unsigned long *)(info->prev_sp - rpoffset);
 		info->prev_ip = info->rp;
 		info->rp = 0;
@@ -296,13 +326,14 @@ static void unwind_frame_regs(struct unwind_frame_info *info)
 }
 
 void unwind_frame_init(struct unwind_frame_info *info, struct task_struct *t, 
-		       unsigned long sp, unsigned long ip, unsigned long rp)
+		       struct pt_regs *regs)
 {
 	memset(info, 0, sizeof(struct unwind_frame_info));
 	info->t = t;
-	info->sp = sp;
-	info->ip = ip;
-	info->rp = rp;
+	info->sp = regs->gr[30];
+	info->ip = regs->iaoq[0];
+	info->rp = regs->gr[2];
+	info->r31 = regs->gr[31];
 
 	dbg("(%d) Start unwind from sp=%08lx ip=%08lx\n", 
 	    t ? (int)t->pid : -1, info->sp, info->ip);
@@ -310,14 +341,22 @@ void unwind_frame_init(struct unwind_frame_info *info, struct task_struct *t,
 
 void unwind_frame_init_from_blocked_task(struct unwind_frame_info *info, struct task_struct *t)
 {
-	struct pt_regs *regs = &t->thread.regs;
-	unwind_frame_init(info, t, regs->ksp, regs->kpc, 0);
+	struct pt_regs *r = &t->thread.regs;
+	struct pt_regs *r2;
+
+	r2 = (struct pt_regs *)kmalloc(sizeof(struct pt_regs), GFP_KERNEL);
+	if (!r2)
+		return;
+	*r2 = *r;
+	r2->gr[30] = r->ksp;
+	r2->iaoq[0] = r->kpc;
+	unwind_frame_init(info, t, r2);
+	kfree(r2);
 }
 
 void unwind_frame_init_running(struct unwind_frame_info *info, struct pt_regs *regs)
 {
-	unwind_frame_init(info, current, regs->gr[30], regs->iaoq[0],
-			  regs->gr[2]);
+	unwind_frame_init(info, current, regs);
 }
 
 int unwind_once(struct unwind_frame_info *next_frame)

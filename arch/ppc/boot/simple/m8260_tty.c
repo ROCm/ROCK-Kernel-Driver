@@ -159,7 +159,7 @@ serial_init(int ignored, bd_t *bd)
 	sccp->scc_sccm = 0;
 	sccp->scc_scce = 0xffff;
 	sccp->scc_dsr = 0x7e7e;
-	sccp->scc_pmsr = 0x3000;
+	sccp->scc_psmr = 0x3000;
 
 	/* Wire BRG1 to SCC1.  The console driver will take care of
 	 * others.

@@ -26,9 +26,7 @@
 #ifndef __ASSEMBLY__
 # define __REG(x)	(*((volatile u32 *)IO_ADDRESS(x)))
 
-# define __REG2(x,y)	\
-	( __builtin_constant_p(y) ? (__REG((x) + (y))) \
-			  : (*(volatile u32 *)((u32)&__REG(x) + (y))) )
+# define __REG2(x,y)        (*(volatile u32 *)((u32)&__REG(x) + (y)))
 #endif
 
 /*

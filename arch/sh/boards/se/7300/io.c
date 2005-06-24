@@ -1,12 +1,16 @@
 /*
- * linux/arch/sh/boards/se/7300/io.c
+ * arch/sh/boards/se/7300/io.c
  *
  * Copyright (C) 2003 YOSHII Takashi <yoshii-takashi@hitachi-ul.co.jp>
+ * Based on arch/sh/kernel/io_shmse.c
+ *
+ * I/O routine for SH-Mobile3 73180 SolutionEngine.
+ *
  */
 
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <asm/se7300/se7300.h>
+#include <asm/mach/se7300.h>
 #include <asm/io.h>
 
 #define badio(fn, a) panic("bad i/o operation %s for %08lx.", #fn, a)

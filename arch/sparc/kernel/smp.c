@@ -36,15 +36,12 @@
 
 volatile int smp_processors_ready = 0;
 int smp_num_cpus = 1;
-int smp_threads_ready=0;
 volatile unsigned long cpu_callin_map[NR_CPUS] __initdata = {0,};
 unsigned char boot_cpu_id = 0;
 unsigned char boot_cpu_id4 = 0; /* boot_cpu_id << 2 */
 int smp_activated = 0;
 volatile int __cpu_number_map[NR_CPUS];
 volatile int __cpu_logical_map[NR_CPUS];
-cycles_t cacheflush_time = 0; /* XXX */
-unsigned long cache_decay_ticks = 100;
 
 cpumask_t cpu_online_map = CPU_MASK_NONE;
 cpumask_t phys_cpu_present_map = CPU_MASK_NONE;

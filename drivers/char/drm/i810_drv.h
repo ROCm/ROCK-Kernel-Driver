@@ -114,57 +114,13 @@ typedef struct drm_i810_private {
 } drm_i810_private_t;
 
 				/* i810_dma.c */
-extern int  i810_dma_schedule(drm_device_t *dev, int locked);
-extern int  i810_getbuf(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-extern int  i810_dma_init(struct inode *inode, struct file *filp,
-			  unsigned int cmd, unsigned long arg);
-extern int  i810_dma_cleanup(drm_device_t *dev);
-extern int  i810_flush_ioctl(struct inode *inode, struct file *filp,
-			     unsigned int cmd, unsigned long arg);
 extern void i810_reclaim_buffers(drm_device_t *dev, struct file *filp);
-extern int  i810_getage(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
 extern int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma);
-
-/* Obsolete:
- */
-extern int i810_copybuf(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-/* Obsolete:
- */
-extern int i810_docopy(struct inode *inode, struct file *filp,
-		       unsigned int cmd, unsigned long arg);
-
-extern int i810_rstatus(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-extern int i810_ov0_info(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-extern int i810_fstatus(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-extern int i810_ov0_flip(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-extern int i810_dma_mc(struct inode *inode, struct file *filp,
-			unsigned int cmd, unsigned long arg);
-
-
-extern void i810_dma_quiescent(drm_device_t *dev);
-
-extern int i810_dma_vertex(struct inode *inode, struct file *filp,
-		    unsigned int cmd, unsigned long arg);
-
-extern int i810_swap_bufs(struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg);
-
-extern int i810_clear_bufs(struct inode *inode, struct file *filp,
-		    unsigned int cmd, unsigned long arg);
-
-extern int i810_flip_bufs(struct inode *inode, struct file *filp,
-		   unsigned int cmd, unsigned long arg);
 
 extern int i810_driver_dma_quiescent(drm_device_t *dev);
 extern void i810_driver_release(drm_device_t *dev, struct file *filp);
 extern void i810_driver_pretakedown(drm_device_t *dev);
+extern void i810_driver_prerelease(drm_device_t *dev, DRMFILE filp);
 
 #define I810_BASE(reg)		((unsigned long) \
 				dev_priv->mmio_map->handle)

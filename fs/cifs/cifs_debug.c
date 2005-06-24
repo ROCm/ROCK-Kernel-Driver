@@ -1,7 +1,7 @@
 /*
  *   fs/cifs_debug.c
  *
- *   Copyright (C) International Business Machines  Corp., 2000,2003
+ *   Copyright (C) International Business Machines  Corp., 2000,2005
  *
  *   Modified by Steve French (sfrench@us.ibm.com)
  *
@@ -29,6 +29,7 @@
 #include "cifsglob.h"
 #include "cifsproto.h"
 #include "cifs_debug.h"
+#include "cifsfs.h"
 
 void
 cifs_dump_mem(char *label, void *data, int length)
@@ -57,7 +58,7 @@ cifs_dump_mem(char *label, void *data, int length)
 }
 
 #ifdef CONFIG_PROC_FS
-int
+static int
 cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		     int count, int *eof, void *data)
 {
@@ -78,8 +79,9 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 		    "Display Internal CIFS Data Structures for Debugging\n"
 		    "---------------------------------------------------\n");
 	buf += length;
-
-	length = sprintf(buf, "Servers:\n");
+	length = sprintf(buf,"CIFS Version %s\n",CIFS_VERSION);
+	buf += length;
+	length = sprintf(buf, "Servers:");
 	buf += length;
 
 	i = 0;
@@ -87,19 +89,29 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 	list_for_each(tmp, &GlobalSMBSessionList) {
 		i++;
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
-		length =
-		    sprintf(buf,
-			    "\n%d) Name: %s  Domain: %s Mounts: %d ServerOS: %s  \n\tServerNOS: %s\tCapabilities: 0x%x\n\tSMB session status: %d\tTCP status: %d",
-				i, ses->serverName, ses->serverDomain, atomic_read(&ses->inUse),
-				ses->serverOS, ses->serverNOS, ses->capabilities,ses->status,ses->server->tcpStatus);
-		buf += length;
+		if((ses->serverDomain == NULL) || (ses->serverOS == NULL) ||
+		   (ses->serverNOS == NULL)) {
+			buf += sprintf("\nentry for %s not fully displayed\n\t",
+					ses->serverName);
+			
+		} else {
+			length =
+			    sprintf(buf,
+				    "\n%d) Name: %s  Domain: %s Mounts: %d ServerOS: %s  \n\tServerNOS: %s\tCapabilities: 0x%x\n\tSMB session status: %d\t",
+				i, ses->serverName, ses->serverDomain,
+				atomic_read(&ses->inUse),
+				ses->serverOS, ses->serverNOS,
+				ses->capabilities,ses->status);
+			buf += length;
+		}
 		if(ses->server) {
-			buf += sprintf(buf, "\n\tLocal Users To Server: %d SecMode: 0x%x Req Active: %d",
+			buf += sprintf(buf, "TCP status: %d\n\tLocal Users To Server: %d SecMode: 0x%x Req Active: %d",
+				ses->server->tcpStatus,
 				atomic_read(&ses->server->socketUseCount),
 				ses->server->secMode,
 				atomic_read(&ses->server->inFlight));
 			
-			length = sprintf(buf, "\nMIDs: \n");
+			length = sprintf(buf, "\nMIDs:\n");
 			buf += length;
 
 			spin_lock(&GlobalMid_Lock);
@@ -108,7 +120,12 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 					mid_q_entry,
 					qhead);
 				if(mid_entry) {
-					length = sprintf(buf,"State: %d com: %d pid: %d tsk: %p mid %d\n",mid_entry->midState,mid_entry->command,mid_entry->pid,mid_entry->tsk,mid_entry->mid);
+					length = sprintf(buf,"State: %d com: %d pid: %d tsk: %p mid %d\n",
+						mid_entry->midState,
+						(int)mid_entry->command,
+						mid_entry->pid,
+						mid_entry->tsk,
+						mid_entry->mid);
 					buf += length;
 				}
 			}
@@ -120,7 +137,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 	sprintf(buf, "\n");
 	buf++;
 
-	length = sprintf(buf, "\nShares:\n");
+	length = sprintf(buf, "Shares:");
 	buf += length;
 
 	i = 0;
@@ -178,7 +195,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 }
 
 #ifdef CONFIG_CIFS_STATS
-int
+static int
 cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 		  int count, int *eof, void *data)
 {
@@ -198,13 +215,14 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 	length += item_length;
 	buf += item_length;      
 	item_length = 
-		sprintf(buf,"SMB Request/Response Buffer: %d\n",
-			bufAllocCount.counter);
+		sprintf(buf,"SMB Request/Response Buffer: %d Pool size: %d\n",
+			bufAllocCount.counter,
+			cifs_min_rcv + tcpSesAllocCount.counter);
 	length += item_length;
 	buf += item_length;
 	item_length = 
-		sprintf(buf,"SMB Small Req/Resp Buffer: %d\n",
-			smBufAllocCount.counter);
+		sprintf(buf,"SMB Small Req/Resp Buffer: %d Pool size: %d\n",
+			smBufAllocCount.counter,cifs_min_small);
 	length += item_length;
 	buf += item_length;
 	item_length = 
@@ -286,7 +304,7 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 }
 #endif
 
-struct proc_dir_entry *proc_fs_cifs;
+static struct proc_dir_entry *proc_fs_cifs;
 read_proc_t cifs_txanchor_read;
 static read_proc_t cifsFYI_read;
 static write_proc_t cifsFYI_write;

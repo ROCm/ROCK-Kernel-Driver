@@ -110,46 +110,19 @@
 	.global ia64_os_mca_dispatch_end
 	.global ia64_sal_to_os_handoff_state
 	.global	ia64_os_to_sal_handoff_state
+	.global ia64_do_tlb_purge
 
 	.text
 	.align 16
 
-ia64_os_mca_dispatch:
+/*
+ * Just the TLB purge part is moved to a separate function
+ * so we can re-use the code for cpu hotplug code as well
+ * Caller should now setup b1, so we can branch once the
+ * tlb flush is complete.
+ */
 
-	// Serialize all MCA processing
-	mov	r3=1;;
-	LOAD_PHYSICAL(p0,r2,ia64_mca_serialize);;
-ia64_os_mca_spin:
-	xchg8	r4=[r2],r3;;
-	cmp.ne	p6,p0=r4,r0
-(p6)	br ia64_os_mca_spin
-
-	// Save the SAL to OS MCA handoff state as defined
-	// by SAL SPEC 3.0
-	// NOTE : The order in which the state gets saved
-	//	  is dependent on the way the C-structure
-	//	  for ia64_mca_sal_to_os_state_t has been
-	//	  defined in include/asm/mca.h
-	SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(r2)
-	;;
-
-	// LOG PROCESSOR STATE INFO FROM HERE ON..
-begin_os_mca_dump:
-	br	ia64_os_mca_proc_state_dump;;
-
-ia64_os_mca_done_dump:
-
-	LOAD_PHYSICAL(p0,r16,ia64_sal_to_os_handoff_state+56)
-	;;
-	ld8 r18=[r16]		// Get processor state parameter on existing PALE_CHECK.
-	;;
-	tbit.nz p6,p7=r18,60
-(p7)	br.spnt done_tlb_purge_and_reload
-
-	// The following code purges TC and TR entries. Then reload all TC entries.
-	// Purge percpu data TC entries.
-begin_tlb_purge_and_reload:
-
+ia64_do_tlb_purge:
 #define O(member)	IA64_CPUINFO_##member##_OFFSET
 
 	GET_THIS_PADDR(r2, cpu_info)	// load phys addr of cpu_info into r2
@@ -230,6 +203,51 @@ begin_tlb_purge_and_reload:
 	;;
 	srlz.i
 	;;
+	// Now branch away to caller.
+	br.sptk.many b1
+	;;
+
+ia64_os_mca_dispatch:
+
+	// Serialize all MCA processing
+	mov	r3=1;;
+	LOAD_PHYSICAL(p0,r2,ia64_mca_serialize);;
+ia64_os_mca_spin:
+	xchg8	r4=[r2],r3;;
+	cmp.ne	p6,p0=r4,r0
+(p6)	br ia64_os_mca_spin
+
+	// Save the SAL to OS MCA handoff state as defined
+	// by SAL SPEC 3.0
+	// NOTE : The order in which the state gets saved
+	//	  is dependent on the way the C-structure
+	//	  for ia64_mca_sal_to_os_state_t has been
+	//	  defined in include/asm/mca.h
+	SAL_TO_OS_MCA_HANDOFF_STATE_SAVE(r2)
+	;;
+
+	// LOG PROCESSOR STATE INFO FROM HERE ON..
+begin_os_mca_dump:
+	br	ia64_os_mca_proc_state_dump;;
+
+ia64_os_mca_done_dump:
+
+	LOAD_PHYSICAL(p0,r16,ia64_sal_to_os_handoff_state+56)
+	;;
+	ld8 r18=[r16]		// Get processor state parameter on existing PALE_CHECK.
+	;;
+	tbit.nz p6,p7=r18,60
+(p7)	br.spnt done_tlb_purge_and_reload
+
+	// The following code purges TC and TR entries. Then reload all TC entries.
+	// Purge percpu data TC entries.
+begin_tlb_purge_and_reload:
+	movl r18=ia64_reload_tr;;
+	LOAD_PHYSICAL(p0,r18,ia64_reload_tr);;
+	mov b1=r18;;
+	br.sptk.many ia64_do_tlb_purge;;
+
+ia64_reload_tr:
 	// Finally reload the TR registers.
 	// 1. Reload DTR/ITR registers for kernel.
 	mov r18=KERNEL_TR_PAGE_SHIFT<<2
@@ -924,88 +942,5 @@ END(ia64_monarch_init_handler)
 //
 
 GLOBAL_ENTRY(ia64_slave_init_handler)
-#ifdef	CONFIG_KDB
-//
-// When we get here, the following registers have been
-// set by the SAL for our use
-//
-//		1. GR1 = OS INIT GP (physical)
-//		2. GR8 = PAL_PROC physical address
-//		3. GR9 = SAL_PROC physical address
-//		4. GR10 = SAL GP (physical)
-//		5. GR11 = Init Reason
-//			0 = Received INIT for event other than crash dump switch
-//			1 = Received INIT signal on this processor during machine check rendezvous
-//			2 = Received INIT due to CrashDump switch assertion
-//		6. GR12 = Return address to location within SAL_INIT procedure
-//
-// KDB never returns from INIT interrupts, so we do not save any state.  INIT
-// slave handlers in KDB use a single shared stack to save space.  The first 8
-// bytes of that stack are a lock to single thread slave events through the
-// stack.  The lock is released in kdba_mca_init_handler2() after saving the
-// state of the interrupted code and just prior to entering kdb(), at which
-// point the shared stack is available for reuse.
-//
-	.global ia64_init_slave_stack
-	LOAD_PHYSICAL(p0,r3,ia64_init_slave_stack)
-
-	mov r13=IA64_KR(CURRENT)		// current (virtual)
-	cover
-	;;
-	invala
-	dep r1=-1,r1,61,3			// convert gp to virtual
-	;;
-	mov r4=r3				// copy slave stack (physical)
-	;;
-	mov ar.rsc=0
-	dep r4=-1,r4,61,3			// slave stack (virtual)
-1:						// lock the slave stack
-	mov ar.ccv=0
-	ld8 r2=[r3]
-	;;
-	cmp.ne p15,p0=r2,r0
-(p15)   br 1b
-	;;
-	cmpxchg8.acq r2=[r3],r13,ar.ccv
-	;;
-	cmp.ne p15,p0=r2,r0
-(p15)   br 1b
-	;;
-	addl r2=IA64_RBS_OFFSET,r3		// base of rbs (physical)
-	;;
-	addl r12=KERNEL_STACK_SIZE-16,r3	// scratch pad at top of stack (physical)
-	dep r2=-1,r2,61,3			// base of rbs (virtual)
-	;;
-	dep r12=-1,r12,61,3			// top of stack (virtual)
-	mov ar.bspstore=r2
-	;;
-	mov ar.rsc=3
-
-// We need to switch to Virtual mode before hitting the C functions.
-	movl	r2=IA64_PSR_IT|IA64_PSR_IC|IA64_PSR_DT|IA64_PSR_RT|IA64_PSR_DFH|IA64_PSR_BN
-	mov	r3=psr				// get the current psr, minimum enabled at this point
-	;;
-	or	r2=r2,r3
-	;;
-	movl	r3=2f
-	;;
-	mov	cr.iip=r3			// short return to set the appropriate bits
-	mov	cr.ipsr=r2			// need to do an rfi to set appropriate bits
-	;;
-	rfi
-	;;
-
-2:
-	alloc r14=ar.pfs,0,0,1,0
-	;;
-	mov out0=r11				// pass INIT reason to C code
-	;;
-	br.call.sptk.many rp=ia64_init_slave_handler
-	;;
-	mov ar.rsc=0				// back to lazy mode if we ever return
-	;;
-	st8 [r4]=r0				// drop shared stack on return
-#endif	/* CONFIG_KDB */
-
 1:	br.sptk 1b
 END(ia64_slave_init_handler)

@@ -3,6 +3,11 @@
  *
  * Copyright 2003 by Texas Instruments Incorporated
  *
+ * There are 16 LEDs on the debug board (all green); four may be used
+ * for logical 'green', 'amber', 'red', and 'blue' (after "claiming").
+ *
+ * The "surfer" expansion board and H2 sample board also have two-color
+ * green+red LEDs (in parallel), used here for timer and idle indicators.
  */
 #include <linux/config.h>
 #include <linux/init.h>
@@ -16,78 +21,111 @@
 #include <asm/system.h>
 
 #include <asm/arch/fpga.h>
+#include <asm/arch/gpio.h>
 
 #include "leds.h"
+
+
+#define GPIO_LED_RED		3
+#define GPIO_LED_GREEN		OMAP_MPUIO(4)
+
+
+#define LED_STATE_ENABLED	0x01
+#define LED_STATE_CLAIMED	0x02
+#define LED_TIMER_ON		0x04
+
+#define GPIO_IDLE		GPIO_LED_GREEN
+#define GPIO_TIMER		GPIO_LED_RED
+
 
 void h2p2_dbg_leds_event(led_event_t evt)
 {
 	unsigned long flags;
-	static unsigned long hw_led_state = 0;
+
+	static struct h2p2_dbg_fpga __iomem *fpga;
+	static u16 led_state, hw_led_state;
 
 	local_irq_save(flags);
 
+	if (!(led_state & LED_STATE_ENABLED) && evt != led_start)
+		goto done;
+
 	switch (evt) {
 	case led_start:
-		hw_led_state |= H2P2_DBG_FPGA_LED_STARTSTOP;
+		if (!fpga)
+			fpga = ioremap(H2P2_DBG_FPGA_START,
+						H2P2_DBG_FPGA_SIZE);
+		if (fpga) {
+			led_state |= LED_STATE_ENABLED;
+			__raw_writew(~0, &fpga->leds);
+		}
 		break;
 
 	case led_stop:
-		hw_led_state &= ~H2P2_DBG_FPGA_LED_STARTSTOP;
-		break;
+	case led_halted:
+		/* all leds off during suspend or shutdown */
+		omap_set_gpio_dataout(GPIO_TIMER, 0);
+		omap_set_gpio_dataout(GPIO_IDLE, 0);
+		__raw_writew(~0, &fpga->leds);
+		led_state &= ~LED_STATE_ENABLED;
+		if (evt == led_halted) {
+			iounmap(fpga);
+			fpga = NULL;
+		}
+		goto done;
 
 	case led_claim:
-		hw_led_state |= H2P2_DBG_FPGA_LED_CLAIMRELEASE;
+		led_state |= LED_STATE_CLAIMED;
+		hw_led_state = 0;
 		break;
 
 	case led_release:
-		hw_led_state &= ~H2P2_DBG_FPGA_LED_CLAIMRELEASE;
+		led_state &= ~LED_STATE_CLAIMED;
 		break;
 
 #ifdef CONFIG_LEDS_TIMER
 	case led_timer:
-		/*
-		 * Toggle Timer LED
-		 */
-		if (hw_led_state & H2P2_DBG_FPGA_LED_TIMER)
-			hw_led_state &= ~H2P2_DBG_FPGA_LED_TIMER;
-		else
-			hw_led_state |= H2P2_DBG_FPGA_LED_TIMER;
-		break;
+		led_state ^= LED_TIMER_ON;
+		omap_set_gpio_dataout(GPIO_TIMER, led_state & LED_TIMER_ON);
+		goto done;
 #endif
 
 #ifdef CONFIG_LEDS_CPU
 	case led_idle_start:
-		hw_led_state |= H2P2_DBG_FPGA_LED_IDLE;
-		break;
+		omap_set_gpio_dataout(GPIO_IDLE, 1);
+		goto done;
 
 	case led_idle_end:
-		hw_led_state &= ~H2P2_DBG_FPGA_LED_IDLE;
-		break;
+		omap_set_gpio_dataout(GPIO_IDLE, 0);
+		goto done;
 #endif
 
-	case led_halted:
-		if (hw_led_state & H2P2_DBG_FPGA_LED_HALTED)
-			hw_led_state &= ~H2P2_DBG_FPGA_LED_HALTED;
-		else
-			hw_led_state |= H2P2_DBG_FPGA_LED_HALTED;
-		break;
-
 	case led_green_on:
+		hw_led_state |= H2P2_DBG_FPGA_LED_GREEN;
 		break;
-
 	case led_green_off:
+		hw_led_state &= ~H2P2_DBG_FPGA_LED_GREEN;
 		break;
 
 	case led_amber_on:
+		hw_led_state |= H2P2_DBG_FPGA_LED_AMBER;
 		break;
-
 	case led_amber_off:
+		hw_led_state &= ~H2P2_DBG_FPGA_LED_AMBER;
 		break;
 
 	case led_red_on:
+		hw_led_state |= H2P2_DBG_FPGA_LED_RED;
+		break;
+	case led_red_off:
+		hw_led_state &= ~H2P2_DBG_FPGA_LED_RED;
 		break;
 
-	case led_red_off:
+	case led_blue_on:
+		hw_led_state |= H2P2_DBG_FPGA_LED_BLUE;
+		break;
+	case led_blue_off:
+		hw_led_state &= ~H2P2_DBG_FPGA_LED_BLUE;
 		break;
 
 	default:
@@ -98,7 +136,9 @@ void h2p2_dbg_leds_event(led_event_t evt)
 	/*
 	 *  Actually burn the LEDs
 	 */
-	__raw_writew(~hw_led_state & 0xffff, H2P2_DBG_FPGA_LEDS);
+	if (led_state & LED_STATE_CLAIMED)
+		__raw_writew(~hw_led_state, &fpga->leds);
 
+done:
 	local_irq_restore(flags);
 }

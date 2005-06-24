@@ -15,7 +15,6 @@
 #include <linux/ioport.h>
 #include <linux/kobject.h>
 #include <linux/list.h>
-#include <linux/spinlock.h>
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/pm.h>
@@ -102,7 +101,7 @@ struct device_driver {
 	char			* name;
 	struct bus_type		* bus;
 
-	struct semaphore	unload_sem;
+	struct completion	unloaded;
 	struct kobject		kobj;
 	struct list_head	devices;
 
@@ -111,7 +110,7 @@ struct device_driver {
 	int	(*probe)	(struct device * dev);
 	int 	(*remove)	(struct device * dev);
 	void	(*shutdown)	(struct device * dev);
-	int	(*suspend)	(struct device * dev, u32 state, u32 level);
+	int	(*suspend)	(struct device * dev, pm_message_t state, u32 level);
 	int	(*resume)	(struct device * dev, u32 level);
 };
 
@@ -148,6 +147,7 @@ struct class {
 	struct subsystem	subsys;
 	struct list_head	children;
 	struct list_head	interfaces;
+	struct semaphore	sem;	/* locks both the children and interfaces lists */
 
 	struct class_attribute		* class_attrs;
 	struct class_device_attribute	* class_dev_attrs;
@@ -272,9 +272,6 @@ struct device {
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
 					   BIOS data relevant to device) */
 	struct dev_pm_info	power;
-
-	u32		detach_state;	/* State to enter when device is
-					   detached from its driver. */
 
 	u64		*dma_mask;	/* dma mask (if dma'able device) */
 	u64		coherent_dma_mask;/* Like dma_mask, but for

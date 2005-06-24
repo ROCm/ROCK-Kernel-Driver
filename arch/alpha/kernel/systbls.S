@@ -227,7 +227,7 @@ sys_call_table:
 	.quad sys_semop
 	.quad osf_utsname
 	.quad sys_lchown
-	.quad osf_shmat
+	.quad sys_shmat
 	.quad sys_shmctl			/* 210 */
 	.quad sys_shmdt
 	.quad sys_shmget
@@ -458,6 +458,9 @@ sys_call_table:
 	.quad sys_mq_notify
 	.quad sys_mq_getsetattr
 	.quad sys_waitid
+	.quad sys_add_key
+	.quad sys_request_key			/* 440 */
+	.quad sys_keyctl
 
 	.size sys_call_table, . - sys_call_table
 	.type sys_call_table, @object

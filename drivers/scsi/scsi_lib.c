@@ -252,6 +252,16 @@ static void scsi_wait_done(struct scsi_cmnd *cmd)
 		complete(req->waiting);
 }
 
+/* This is the end routine we get to if a command was never attached
+ * to the request.  Simply complete the request without changing
+ * rq_status; this will cause a DRIVER_ERROR. */
+static void scsi_wait_req_end_io(struct request *req)
+{
+	BUG_ON(!req->waiting);
+
+	complete(req->waiting);
+}
+
 void scsi_wait_req(struct scsi_request *sreq, const void *cmnd, void *buffer,
 		   unsigned bufflen, int timeout, int retries)
 {
@@ -259,6 +269,7 @@ void scsi_wait_req(struct scsi_request *sreq, const void *cmnd, void *buffer,
 	
 	sreq->sr_request->waiting = &wait;
 	sreq->sr_request->rq_status = RQ_SCSI_BUSY;
+	sreq->sr_request->end_io = scsi_wait_req_end_io;
 	scsi_do_req(sreq, cmnd, buffer, bufflen, scsi_wait_done,
 			timeout, retries);
 	wait_for_completion(&wait);
@@ -287,7 +298,6 @@ static int scsi_init_cmd_errh(struct scsi_cmnd *cmd)
 {
 	cmd->owner = SCSI_OWNER_MIDLEVEL;
 	cmd->serial_number = 0;
-	cmd->serial_number_at_timeout = 0;
 	cmd->abort_reason = 0;
 
 	memset(cmd->sense_buffer, 0, sizeof cmd->sense_buffer);
@@ -309,7 +319,6 @@ static int scsi_init_cmd_errh(struct scsi_cmnd *cmd)
 	memcpy(cmd->data_cmnd, cmd->cmnd, sizeof(cmd->cmnd));
 	cmd->buffer = cmd->request_buffer;
 	cmd->bufflen = cmd->request_bufflen;
-	cmd->internal_timeout = NORMAL_TIMEOUT;
 	cmd->abort_reason = 0;
 
 	return 1;
@@ -365,10 +374,11 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 {
 	struct Scsi_Host *shost = current_sdev->host;
 	struct scsi_device *sdev, *tmp;
+	struct scsi_target *starget = scsi_target(current_sdev);
 	unsigned long flags;
 
 	spin_lock_irqsave(shost->host_lock, flags);
-	scsi_target(current_sdev)->starget_sdev_user = NULL;
+	starget->starget_sdev_user = NULL;
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
 	/*
@@ -380,10 +390,12 @@ static void scsi_single_lun_run(struct scsi_device *current_sdev)
 	blk_run_queue(current_sdev->request_queue);
 
 	spin_lock_irqsave(shost->host_lock, flags);
-	if (scsi_target(current_sdev)->starget_sdev_user)
+	if (starget->starget_sdev_user)
 		goto out;
-	list_for_each_entry_safe(sdev, tmp, &current_sdev->same_target_siblings,
+	list_for_each_entry_safe(sdev, tmp, &starget->devices,
 			same_target_siblings) {
+		if (sdev == current_sdev)
+			continue;
 		if (scsi_device_get(sdev))
 			continue;
 
@@ -1955,3 +1967,55 @@ scsi_internal_device_unblock(struct scsi_device *sdev)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(scsi_internal_device_unblock);
+
+static void
+device_block(struct scsi_device *sdev, void *data)
+{
+	scsi_internal_device_block(sdev);
+}
+
+static int
+target_block(struct device *dev, void *data)
+{
+	if (scsi_is_target_device(dev))
+		starget_for_each_device(to_scsi_target(dev), NULL,
+					device_block);
+	return 0;
+}
+
+void
+scsi_target_block(struct device *dev)
+{
+	if (scsi_is_target_device(dev))
+		starget_for_each_device(to_scsi_target(dev), NULL,
+					device_block);
+	else
+		device_for_each_child(dev, NULL, target_block);
+}
+EXPORT_SYMBOL_GPL(scsi_target_block);
+
+static void
+device_unblock(struct scsi_device *sdev, void *data)
+{
+	scsi_internal_device_unblock(sdev);
+}
+
+static int
+target_unblock(struct device *dev, void *data)
+{
+	if (scsi_is_target_device(dev))
+		starget_for_each_device(to_scsi_target(dev), NULL,
+					device_unblock);
+	return 0;
+}
+
+void
+scsi_target_unblock(struct device *dev)
+{
+	if (scsi_is_target_device(dev))
+		starget_for_each_device(to_scsi_target(dev), NULL,
+					device_unblock);
+	else
+		device_for_each_child(dev, NULL, target_unblock);
+}
+EXPORT_SYMBOL_GPL(scsi_target_unblock);

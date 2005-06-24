@@ -236,6 +236,12 @@ int radeon_probe_i2c_connector(struct radeonfb_info *rinfo, int conn, u8 **out_e
 		if (edid)
 			break;
 	}
+	/* Release the DDC lines when done or the Apple Cinema HD display
+	 * will switch off
+	 */
+	OUTREG(reg, INREG(reg) & ~(VGA_DDC_CLK_OUT_EN | VGA_DDC_DATA_OUT_EN));
+	(void)INREG(reg);
+
 	if (out_edid)
 		*out_edid = edid;
 	if (!edid) {

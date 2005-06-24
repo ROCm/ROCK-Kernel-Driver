@@ -184,7 +184,7 @@ static int econet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len
 {
 	struct sockaddr_ec *sec = (struct sockaddr_ec *)uaddr;
 	struct sock *sk=sock->sk;
-	struct econet_opt *eo = ec_sk(sk);
+	struct econet_sock *eo = ec_sk(sk);
 	
 	/*
 	 *	Check legality
@@ -284,7 +284,7 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 	 */
 	 
 	if (saddr == NULL) {
-		struct econet_opt *eo = ec_sk(sk);
+		struct econet_sock *eo = ec_sk(sk);
 
 		addr.station = eo->station;
 		addr.net     = eo->net;
@@ -437,8 +437,8 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 		void __user *base = msg->msg_iov[i].iov_base;
 		size_t len = msg->msg_iov[i].iov_len;
 		/* Check it now since we switch to KERNEL_DS later. */
-		if ((err = verify_area(VERIFY_READ, base, len)) < 0)
-			return err;
+		if (!access_ok(VERIFY_READ, base, len))
+			return -EFAULT;
 		iov[i+1].iov_base = base;
 		iov[i+1].iov_len = len;
 		size += len;
@@ -485,7 +485,7 @@ static int econet_getname(struct socket *sock, struct sockaddr *uaddr,
 			  int *uaddr_len, int peer)
 {
 	struct sock *sk = sock->sk;
-	struct econet_opt *eo = ec_sk(sk);
+	struct econet_sock *eo = ec_sk(sk);
 	struct sockaddr_ec *sec = (struct sockaddr_ec *)uaddr;
 
 	if (peer)
@@ -555,6 +555,12 @@ static int econet_release(struct socket *sock)
 	return 0;
 }
 
+static struct proto econet_proto = {
+	.name	  = "ECONET",
+	.owner	  = THIS_MODULE,
+	.obj_size = sizeof(struct econet_sock),
+};
+
 /*
  *	Create an Econet socket
  */
@@ -562,7 +568,7 @@ static int econet_release(struct socket *sock)
 static int econet_create(struct socket *sock, int protocol)
 {
 	struct sock *sk;
-	struct econet_opt *eo;
+	struct econet_sock *eo;
 	int err;
 
 	/* Econet only provides datagram services. */
@@ -572,28 +578,21 @@ static int econet_create(struct socket *sock, int protocol)
 	sock->state = SS_UNCONNECTED;
 
 	err = -ENOBUFS;
-	sk = sk_alloc(PF_ECONET, GFP_KERNEL, 1, NULL);
+	sk = sk_alloc(PF_ECONET, GFP_KERNEL, &econet_proto, 1);
 	if (sk == NULL)
 		goto out;
 
 	sk->sk_reuse = 1;
 	sock->ops = &econet_ops;
-	sock_init_data(sock,sk);
-	sk_set_owner(sk, THIS_MODULE);
+	sock_init_data(sock, sk);
 
-	eo = sk->sk_protinfo = kmalloc(sizeof(*eo), GFP_KERNEL);
-	if (!eo)
-		goto out_free;
-	memset(eo, 0, sizeof(*eo));
-	sk->sk_zapped = 0;
+	eo = ec_sk(sk);
+	sock_reset_flag(sk, SOCK_ZAPPED);
 	sk->sk_family = PF_ECONET;
 	eo->num = protocol;
 
 	econet_insert_socket(&econet_sklist, sk);
 	return(0);
-
-out_free:
-	sk_free(sk);
 out:
 	return err;
 }
@@ -735,7 +734,7 @@ static struct sock *ec_listening_socket(unsigned char port, unsigned char
 	struct hlist_node *node;
 
 	sk_for_each(sk, node, &econet_sklist) {
-		struct econet_opt *opt = ec_sk(sk);
+		struct econet_sock *opt = ec_sk(sk);
 		if ((opt->port == port || opt->port == 0) && 
 		    (opt->station == station || opt->station == 0) &&
 		    (opt->net == net || opt->net == 0))
@@ -1101,10 +1100,15 @@ static void __exit econet_proto_exit(void)
 #endif
 	unregister_netdevice_notifier(&econet_netdev_notifier);
 	sock_unregister(econet_family_ops.family);
+	proto_unregister(&econet_proto);
 }
 
 static int __init econet_proto_init(void)
 {
+	int err = proto_register(&econet_proto, 0);
+
+	if (err != 0)
+		goto out;
 	sock_register(&econet_family_ops);
 #ifdef CONFIG_ECONET_AUNUDP
 	spin_lock_init(&aun_queue_lock);
@@ -1114,7 +1118,8 @@ static int __init econet_proto_init(void)
 	econet_hw_initialise();
 #endif
 	register_netdevice_notifier(&econet_netdev_notifier);
-	return 0;
+out:
+	return err;
 }
 
 module_init(econet_proto_init);

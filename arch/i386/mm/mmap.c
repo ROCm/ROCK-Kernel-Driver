@@ -26,6 +26,7 @@
 
 #include <linux/personality.h>
 #include <linux/mm.h>
+#include <linux/random.h>
 
 /*
  * Top of mmap area (just below the process stack).
@@ -38,13 +39,17 @@
 static inline unsigned long mmap_base(struct mm_struct *mm)
 {
 	unsigned long gap = current->signal->rlim[RLIMIT_STACK].rlim_cur;
+	unsigned long random_factor = 0;
+
+	if (current->flags & PF_RANDOMIZE)
+		random_factor = get_random_int() % (1024*1024);
 
 	if (gap < MIN_GAP)
 		gap = MIN_GAP;
 	else if (gap > MAX_GAP)
 		gap = MAX_GAP;
 
-	return TASK_SIZE - (gap & PAGE_MASK);
+	return PAGE_ALIGN(TASK_SIZE - gap - random_factor);
 }
 
 /*

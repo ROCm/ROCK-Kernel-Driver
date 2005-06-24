@@ -254,8 +254,7 @@ static void r3k_flush_cache_range(struct vm_area_struct *vma,
 {
 }
 
-static void r3k_flush_cache_page(struct vm_area_struct *vma,
-	unsigned long page)
+static void r3k_flush_cache_page(struct vm_area_struct *vma, unsigned long page, unsigned long pfn)
 {
 }
 

@@ -69,4 +69,6 @@ extern inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
   return x;
 }
 
+#define arch_align_stack(x) (x)
+
 #endif

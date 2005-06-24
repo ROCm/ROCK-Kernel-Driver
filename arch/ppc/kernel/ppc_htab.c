@@ -108,7 +108,7 @@ static int ppc_htab_show(struct seq_file *m, void *v)
 	PTE *ptr;
 #endif /* CONFIG_PPC_STD_MMU */
 
-	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
+	if (cpu_has_feature(CPU_FTR_604_PERF_MON)) {
 		mmcr0 = mfspr(SPRN_MMCR0);
 		pmc1 = mfspr(SPRN_PMC1);
 		pmc2 = mfspr(SPRN_PMC2);
@@ -209,7 +209,7 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 
 	if ( !strncmp( buffer, "reset", 5) )
 	{
-		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
+		if (cpu_has_feature(CPU_FTR_604_PERF_MON)) {
 			/* reset PMC1 and PMC2 */
 			mtspr(SPRN_PMC1, 0);
 			mtspr(SPRN_PMC2, 0);
@@ -221,7 +221,7 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 	}
 
 	/* Everything below here requires the performance monitor feature. */
-	if ( !cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON )
+	if (!cpu_has_feature(CPU_FTR_604_PERF_MON))
 		return count;
 
 	/* turn off performance monitoring */
@@ -339,7 +339,7 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 		"0.5", "1.0", "(reserved2)", "(reserved3)"
 	};
 
-	if (!(cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR))
+	if (!cpu_has_feature(CPU_FTR_L2CR))
 		return -EFAULT;
 
 	if ( /*!table->maxlen ||*/ (*ppos && !write)) {

@@ -294,7 +294,7 @@ static void __init pci_fixup_umc_ide(struct pci_dev *d)
 	 */
 	int i;
 
-	printk("PCI: Fixing base address flags for device %s\n", d->slot_name);
+	printk("PCI: Fixing base address flags for device %s\n", pci_name(d));
 	for(i=0; i<4; i++)
 		d->resource[i].flags |= PCI_BASE_ADDRESS_SPACE_IO;
 }
@@ -308,7 +308,7 @@ static void __init pci_fixup_ide_bases(struct pci_dev *d)
 	 */
 	if ((d->class >> 8) != PCI_CLASS_STORAGE_IDE)
 		return;
-	printk("PCI: IDE base address fixup for %s\n", d->slot_name);
+	printk("PCI: IDE base address fixup for %s\n", pci_name(d));
 	for(i=0; i<4; i++) {
 		struct resource *r = &d->resource[i];
 		if ((r->start & ~0x80) == 0x374) {
@@ -326,7 +326,7 @@ static void __init pci_fixup_ide_trash(struct pci_dev *d)
 	 * There exist PCI IDE controllers which have utter garbage
 	 * in first four base registers. Ignore that.
 	 */
-	printk("PCI: IDE base address trash cleared for %s\n", d->slot_name);
+	printk("PCI: IDE base address trash cleared for %s\n", pci_name(d));
 	for(i=0; i<4; i++)
 		d->resource[i].start = d->resource[i].end = d->resource[i].flags = 0;
 }

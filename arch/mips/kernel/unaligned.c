@@ -143,7 +143,7 @@ static inline int emulate_load_store_insn(struct pt_regs *regs,
 	 * The remaining opcodes are the ones that are really of interest.
 	 */
 	case lh_op:
-		if (verify_area(VERIFY_READ, addr, 2))
+		if (!access_ok(VERIFY_READ, addr, 2))
 			goto sigbus;
 
 		__asm__ __volatile__ (".set\tnoat\n"
@@ -176,7 +176,7 @@ static inline int emulate_load_store_insn(struct pt_regs *regs,
 		break;
 
 	case lw_op:
-		if (verify_area(VERIFY_READ, addr, 4))
+		if (!access_ok(VERIFY_READ, addr, 4))
 			goto sigbus;
 
 		__asm__ __volatile__ (
@@ -206,7 +206,7 @@ static inline int emulate_load_store_insn(struct pt_regs *regs,
 		break;
 
 	case lhu_op:
-		if (verify_area(VERIFY_READ, addr, 2))
+		if (!access_ok(VERIFY_READ, addr, 2))
 			goto sigbus;
 
 		__asm__ __volatile__ (
@@ -248,7 +248,7 @@ static inline int emulate_load_store_insn(struct pt_regs *regs,
 		 * would blow up, so for now we don't handle unaligned 64-bit
 		 * instructions on 32-bit kernels.
 		 */
-		if (verify_area(VERIFY_READ, addr, 4))
+		if (!access_ok(VERIFY_READ, addr, 4))
 			goto sigbus;
 
 		__asm__ __volatile__ (
@@ -292,7 +292,7 @@ static inline int emulate_load_store_insn(struct pt_regs *regs,
 		 * would blow up, so for now we don't handle unaligned 64-bit
 		 * instructions on 32-bit kernels.
 		 */
-		if (verify_area(VERIFY_READ, addr, 8))
+		if (!access_ok(VERIFY_READ, addr, 8))
 			goto sigbus;
 
 		__asm__ __volatile__ (
@@ -326,7 +326,7 @@ static inline int emulate_load_store_insn(struct pt_regs *regs,
 		goto sigill;
 
 	case sh_op:
-		if (verify_area(VERIFY_WRITE, addr, 2))
+		if (!access_ok(VERIFY_WRITE, addr, 2))
 			goto sigbus;
 
 		value = regs->regs[insn.i_format.rt];
@@ -362,7 +362,7 @@ static inline int emulate_load_store_insn(struct pt_regs *regs,
 		break;
 
 	case sw_op:
-		if (verify_area(VERIFY_WRITE, addr, 4))
+		if (!access_ok(VERIFY_WRITE, addr, 4))
 			goto sigbus;
 
 		value = regs->regs[insn.i_format.rt];
@@ -400,7 +400,7 @@ static inline int emulate_load_store_insn(struct pt_regs *regs,
 		 * would blow up, so for now we don't handle unaligned 64-bit
 		 * instructions on 32-bit kernels.
 		 */
-		if (verify_area(VERIFY_WRITE, addr, 8))
+		if (!access_ok(VERIFY_WRITE, addr, 8))
 			goto sigbus;
 
 		value = regs->regs[insn.i_format.rt];

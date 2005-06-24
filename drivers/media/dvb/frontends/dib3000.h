@@ -1,6 +1,6 @@
 /*
  * public header file of the frontend drivers for mobile DVB-T demodulators
- * DiBcom 3000-MB and DiBcom 3000-MC/P (http://www.dibcom.fr/)
+ * DiBcom 3000M-B and DiBcom 3000P/M-C (http://www.dibcom.fr/)
  *
  * Copyright (C) 2004-5 Patrick Boettcher (patrick.boettcher@desy.de)
  *

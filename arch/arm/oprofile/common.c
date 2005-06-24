@@ -26,7 +26,7 @@ static void pmu_stop(void);
 static int pmu_create_files(struct super_block *, struct dentry *);
 
 #ifdef CONFIG_PM
-static int pmu_suspend(struct sys_device *dev, u32 state)
+static int pmu_suspend(struct sys_device *dev, pm_message_t state)
 {
 	if (pmu_enabled)
 		pmu_stop();

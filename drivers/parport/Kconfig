@@ -34,7 +34,7 @@ config PARPORT
 
 config PARPORT_PC
 	tristate "PC-style hardware"
-	depends on PARPORT && (!SPARC64 || PCI) && (!SPARC32 || BROKEN)
+	depends on PARPORT && (!SPARC64 || PCI) && !SPARC32
 	---help---
 	  You should say Y here if you have a PC-style parallel port. All
 	  IBM PC compatible computers and some Alphas have PC-style
@@ -46,15 +46,9 @@ config PARPORT_PC
 
 	  If unsure, say Y.
 
-config PARPORT_PC_CML1
-	tristate
-	depends on PARPORT!=n && PARPORT_PC!=n
-	default PARPORT_PC if SERIAL_8250=y
-	default m if SERIAL_8250=m
-
 config PARPORT_SERIAL
 	tristate "Multi-IO cards (parallel and serial)"
-	depends on SERIAL_8250!=n && PARPORT_PC_CML1 && PCI
+	depends on SERIAL_8250 && PARPORT_PC && PCI
 	help
 	  This adds support for multi-IO PCI cards that have parallel and
 	  serial ports.  You should say Y or M here.  If you say M, the module
@@ -88,13 +82,18 @@ config PARPORT_PC_PCMCIA
 	  Say Y here if you need PCMCIA support for your PC-style parallel
 	  ports. If unsure, say N.
 
+config PARPORT_NOT_PC
+	bool
+
 config PARPORT_ARC
 	tristate "Archimedes hardware"
 	depends on ARM && PARPORT
+	select PARPORT_NOT_PC
 
 config PARPORT_AMIGA
 	tristate "Amiga builtin port"
 	depends on AMIGA && PARPORT
+	select PARPORT_NOT_PC
 	help
 	  Say Y here if you need support for the parallel port hardware on
 	  Amiga machines. This code is also available as a module (say M),
@@ -103,6 +102,7 @@ config PARPORT_AMIGA
 config PARPORT_MFC3
 	tristate "Multiface III parallel port"
 	depends on ZORRO && PARPORT
+	select PARPORT_NOT_PC
 	help
 	  Say Y here if you need parallel port support for the MFC3 card.
 	  This code is also available as a module (say M), called
@@ -111,6 +111,7 @@ config PARPORT_MFC3
 config PARPORT_ATARI
 	tristate "Atari hardware"
 	depends on ATARI && PARPORT
+	select PARPORT_NOT_PC
 	help
 	  Say Y here if you need support for the parallel port hardware on
 	  Atari machines. This code is also available as a module (say M),
@@ -118,26 +119,17 @@ config PARPORT_ATARI
 
 config PARPORT_GSC
 	tristate
-	depends on GSC
-	default PARPORT
+	default GSC
+	depends on PARPORT
 
 config PARPORT_SUNBPP
 	tristate "Sparc hardware (EXPERIMENTAL)"
-	depends on SBUS && EXPERIMENTAL && PARPORT
+	depends on SBUS && PARPORT && EXPERIMENTAL
+	select PARPORT_NOT_PC
 	help
 	  This driver provides support for the bidirectional parallel port
 	  found on many Sun machines. Note that many of the newer Ultras
 	  actually have pc style hardware instead.
-
-# If exactly one hardware type is selected then parport will optimise away
-# support for loading any others.  Defeat this if the user is keen.
-config PARPORT_OTHER
-	bool "Support foreign hardware"
-	depends on PARPORT
-	help
-	  Say Y here if you want to be able to load driver modules to support
-	  other non-standard types of parallel ports. This causes a
-	  performance loss, so most people say N.
 
 config PARPORT_1284
 	bool "IEEE 1284 transfer modes"

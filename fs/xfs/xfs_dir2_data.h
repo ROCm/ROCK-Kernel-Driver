@@ -163,14 +163,13 @@ xfs_dir2_data_off_t *xfs_dir2_data_entry_tag_p(xfs_dir2_data_entry_t *dep);
  * Pointer to a freespace's tag word.
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_DATA_UNUSED_TAG_P)
-xfs_dir2_data_off_t *xfs_dir2_data_unused_tag_p_arch(
-	xfs_dir2_data_unused_t *dup, xfs_arch_t arch);
-#define	XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(dup,arch) \
-	xfs_dir2_data_unused_tag_p_arch(dup,arch)
+xfs_dir2_data_off_t *xfs_dir2_data_unused_tag_p(xfs_dir2_data_unused_t *dup);
+#define	XFS_DIR2_DATA_UNUSED_TAG_P(dup) \
+	xfs_dir2_data_unused_tag_p(dup)
 #else
-#define	XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(dup,arch)	\
+#define	XFS_DIR2_DATA_UNUSED_TAG_P(dup)	\
 	((xfs_dir2_data_off_t *)\
-	 ((char *)(dup) + INT_GET((dup)->length, arch) \
+	 ((char *)(dup) + INT_GET((dup)->length, ARCH_CONVERT) \
 			- (uint)sizeof(xfs_dir2_data_off_t)))
 #endif
 

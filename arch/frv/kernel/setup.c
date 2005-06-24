@@ -65,9 +65,6 @@ static void __init setup_uclinux_memory(void);
 
 #ifdef CONFIG_CONSOLE
 extern struct consw *conswitchp;
-#ifdef CONFIG_FRAMEBUFFER
-extern struct consw fb_con;
-#endif
 #endif
 
 #ifdef CONFIG_MB93090_MB00

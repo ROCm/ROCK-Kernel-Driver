@@ -130,7 +130,7 @@ sys_sigaction(int sig, const struct old_sigaction *act,
 
 	if (act) {
 		old_sigset_t mask;
-		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		if (!access_ok(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_restorer, &act->sa_restorer))
 			return -EFAULT;
@@ -142,7 +142,7 @@ sys_sigaction(int sig, const struct old_sigaction *act,
 	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
 
 	if (!ret && oact) {
-		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		if (!access_ok(VERIFY_WRITE, oact, sizeof(*oact)) ||
 		    __put_user(old_ka.sa.sa_handler, &oact->sa_handler) ||
 		    __put_user(old_ka.sa.sa_restorer, &oact->sa_restorer))
 			return -EFAULT;
@@ -510,7 +510,7 @@ asmlinkage int do_sigreturn(unsigned long __unused)
 	sigset_t set;
 	int d0;
 
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 	if (__get_user(set.sig[0], &frame->sc.sc_mask) ||
 	    (_NSIG_WORDS > 1 &&
@@ -540,7 +540,7 @@ asmlinkage int do_rt_sigreturn(unsigned long __unused)
 	sigset_t set;
 	int d0;
 
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
 		goto badframe;
@@ -951,6 +951,21 @@ handle_restart(struct pt_regs *regs, struct k_sigaction *ka, int has_handler)
 	}
 }
 
+void ptrace_signal_deliver(struct pt_regs *regs, void *cookie)
+{
+	if (regs->orig_d0 < 0)
+		return;
+	switch (regs->d0) {
+	case -ERESTARTNOHAND:
+	case -ERESTARTSYS:
+	case -ERESTARTNOINTR:
+		regs->d0 = regs->orig_d0;
+		regs->orig_d0 = -1;
+		regs->pc -= 2;
+		break;
+	}
+}
+
 /*
  * OK, we're invoking a handler
  */
@@ -982,133 +997,22 @@ handle_signal(int sig, struct k_sigaction *ka, siginfo_t *info,
  * Note that 'init' is a special process: it doesn't get signals it doesn't
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
  * mistake.
- *
- * Note that we go through the signals twice: once to check the signals
- * that the kernel can handle, and then we build all the user-level signal
- * handling stack-frames in one go after that.
  */
 asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 {
 	siginfo_t info;
-	struct k_sigaction *ka;
+	struct k_sigaction ka;
+	int signr;
 
 	current->thread.esp0 = (unsigned long) regs;
 
 	if (!oldset)
 		oldset = &current->blocked;
 
-	for (;;) {
-		int signr;
-
-		signr = dequeue_signal(current, &current->blocked, &info);
-
-		if (!signr)
-			break;
-
-		if ((current->ptrace & PT_PTRACED) && signr != SIGKILL) {
-			current->exit_code = signr;
-			current->state = TASK_STOPPED;
-			regs->sr &= ~PS_T;
-
-			/* Did we come from a system call? */
-			if (regs->orig_d0 >= 0) {
-				/* Restart the system call the same way as
-				   if the process were not traced.  */
-				struct k_sigaction *ka =
-					&current->sighand->action[signr-1];
-				int has_handler =
-					(ka->sa.sa_handler != SIG_IGN &&
-					 ka->sa.sa_handler != SIG_DFL);
-				handle_restart(regs, ka, has_handler);
-			}
-			notify_parent(current, SIGCHLD);
-			schedule();
-
-			/* We're back.  Did the debugger cancel the sig?  */
-			if (!(signr = current->exit_code)) {
-			discard_frame:
-			    /* Make sure that a faulted bus cycle isn't
-			       restarted (only needed on the 680[23]0).  */
-			    if (regs->format == 10 || regs->format == 11)
-				regs->stkadj = frame_extra_sizes[regs->format];
-			    continue;
-			}
-			current->exit_code = 0;
-
-			/* The debugger continued.  Ignore SIGSTOP.  */
-			if (signr == SIGSTOP)
-				goto discard_frame;
-
-			/* Update the siginfo structure.  Is this good?  */
-			if (signr != info.si_signo) {
-				info.si_signo = signr;
-				info.si_errno = 0;
-				info.si_code = SI_USER;
-				info.si_pid = current->parent->pid;
-				info.si_uid = current->parent->uid;
-				info.si_uid16 = high2lowuid(current->parent->uid);
-			}
-
-			/* If the (new) signal is now blocked, requeue it.  */
-			if (sigismember(&current->blocked, signr)) {
-				send_sig_info(signr, &info, current);
-				continue;
-			}
-		}
-
-		ka = &current->sighand->action[signr-1];
-		if (ka->sa.sa_handler == SIG_IGN) {
-			if (signr != SIGCHLD)
-				continue;
-			/* Check for SIGCHLD: it's special.  */
-			while (sys_wait4(-1, NULL, WNOHANG, NULL) > 0)
-				/* nothing */;
-			continue;
-		}
-
-		if (ka->sa.sa_handler == SIG_DFL) {
-			int exit_code = signr;
-
-			if (current->pid == 1)
-				continue;
-
-			switch (signr) {
-			case SIGCONT: case SIGCHLD:
-			case SIGWINCH: case SIGURG:
-				continue;
-
-			case SIGTSTP: case SIGTTIN: case SIGTTOU:
-				if (is_orphaned_pgrp(process_group(current)))
-					continue;
-				/* FALLTHRU */
-
-			case SIGSTOP: {
-				struct sighand_struct *sighand;
-				current->state = TASK_STOPPED;
-				current->exit_code = signr;
-				sighand = current->parent->sighand;
-				if (sighand && !(sighand->action[SIGCHLD-1].sa.sa_flags
-					     & SA_NOCLDSTOP))
-					notify_parent(current, SIGCHLD);
-				schedule();
-				continue;
-			}
-
-			case SIGQUIT: case SIGILL: case SIGTRAP:
-			case SIGIOT: case SIGFPE: case SIGSEGV:
-			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
-				if (do_coredump(signr, exit_code, regs))
-					exit_code |= 0x80;
-				/* FALLTHRU */
-
-			default:
-				do_group_exit(signr);
-				/* NOTREACHED */
-			}
-		}
-
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
+	if (signr > 0) {
 		/* Whee!  Actually deliver the signal.  */
-		handle_signal(signr, ka, &info, oldset, regs);
+		handle_signal(signr, &ka, &info, oldset, regs);
 		return 1;
 	}
 
@@ -1117,18 +1021,5 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 		/* Restart the system call - no handlers present */
 		handle_restart(regs, NULL, 0);
 
-	/* If we are about to discard some frame stuff we must copy
-	   over the remaining frame. */
-	if (regs->stkadj) {
-		struct pt_regs *tregs =
-		  (struct pt_regs *) ((ulong) regs + regs->stkadj);
-
-		/* This must be copied with decreasing addresses to
-		   handle overlaps.  */
-		tregs->vector = 0;
-		tregs->format = 0;
-		tregs->pc = regs->pc;
-		tregs->sr = regs->sr;
-	}
 	return 0;
 }

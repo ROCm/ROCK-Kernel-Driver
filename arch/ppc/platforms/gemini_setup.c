@@ -202,8 +202,8 @@ gemini_get_clock_speed(void)
 	unsigned long hid1, pvr;
 	int clock;
 
-	pvr = mfspr(PVR);
-	hid1 = (mfspr(HID1) >> 28) & 0xf;
+	pvr = mfspr(SPRN_PVR);
+	hid1 = (mfspr(SPRN_HID1) >> 28) & 0xf;
 	if (PVR_VER(pvr) == 8 ||
 	    PVR_VER(pvr) == 12)
 		hid1 = cpu_7xx[hid1];
@@ -238,7 +238,7 @@ void __init gemini_init_l2(void)
         reg = readb(GEMINI_L2CFG);
         brev = readb(GEMINI_BREV);
         fam = readb(GEMINI_FEAT);
-        pvr = mfspr(PVR);
+        pvr = mfspr(SPRN_PVR);
 
         switch(PVR_VER(pvr)) {
 
@@ -433,9 +433,6 @@ gemini_set_rtc_time( unsigned long now )
 	/* done writing */
 	gemini_rtc_write(reg, M48T35_RTC_CONTROL);
 
-	if ((time_state == TIME_ERROR) || (time_state == TIME_BAD))
-		time_state = TIME_OK;
-
 	return 0;
 }
 
@@ -537,8 +534,8 @@ void __init platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	int i;
 
 	/* Restore BATs for now */
-	mtspr(DBAT3U, 0xf0001fff);
-	mtspr(DBAT3L, 0xf000002a);
+	mtspr(SPRN_DBAT3U, 0xf0001fff);
+	mtspr(SPRN_DBAT3L, 0xf000002a);
 
 	parse_bootinfo(find_bootinfo());
 

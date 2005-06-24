@@ -78,7 +78,7 @@ static u16 llc_util_nr_inside_tx_window(struct sock *sk, u8 nr)
 	u8 nr1, nr2;
 	struct sk_buff *skb;
 	struct llc_pdu_sn *pdu;
-	struct llc_opt *llc = llc_sk(sk);
+	struct llc_sock *llc = llc_sk(sk);
 	int rc = 0;
 
 	if (llc->dev->flags & IFF_LOOPBACK)

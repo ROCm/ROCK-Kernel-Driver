@@ -47,7 +47,7 @@
 
 static void unplug_slaves(mddev_t *mddev);
 
-static void * r10bio_pool_alloc(int gfp_flags, void *data)
+static void * r10bio_pool_alloc(unsigned int __nocast gfp_flags, void *data)
 {
 	conf_t *conf = data;
 	r10bio_t *r10_bio;
@@ -81,7 +81,7 @@ static void r10bio_pool_free(void *r10_bio, void *data)
  * one for write (we recover only one drive per r10buf)
  *
  */
-static void * r10buf_pool_alloc(int gfp_flags, void *data)
+static void * r10buf_pool_alloc(unsigned int __nocast gfp_flags, void *data)
 {
 	conf_t *conf = data;
 	struct page *page;
@@ -977,7 +977,7 @@ static int raid10_remove_disk(mddev_t *mddev, int number)
 			goto abort;
 		}
 		p->rdev = NULL;
-		synchronize_kernel();
+		synchronize_rcu();
 		if (atomic_read(&rdev->nr_pending)) {
 			/* lost the race, try later */
 			err = -EBUSY;
@@ -1639,9 +1639,6 @@ static int run(mddev_t *mddev)
 			mdname(mddev));
 		goto out_free_conf;
 	}
-	mddev->queue->unplug_fn = raid10_unplug;
-
-	mddev->queue->issue_flush_fn = raid10_issue_flush;
 
 	ITERATE_RDEV(mddev, rdev, tmp) {
 		disk_idx = rdev->raid_disk;
@@ -1712,6 +1709,9 @@ static int run(mddev_t *mddev)
 	sector_div(size, conf->near_copies);
 	mddev->array_size = size/2;
 	mddev->resync_max_sectors = size;
+
+	mddev->queue->unplug_fn = raid10_unplug;
+	mddev->queue->issue_flush_fn = raid10_issue_flush;
 
 	/* Calculate max read-ahead size.
 	 * We need to readahead at least twice a whole stripe....

@@ -54,11 +54,11 @@ static void _sparc_free_io(struct resource *res);
 
 /* This points to the next to use virtual memory for DVMA mappings */
 static struct resource _sparc_dvma = {
-	"sparc_dvma", DVMA_VADDR, DVMA_END - 1
+	.name = "sparc_dvma", .start = DVMA_VADDR, .end = DVMA_END - 1
 };
 /* This points to the start of I/O mappings, cluable from outside. */
 /*ext*/ struct resource sparc_iomap = {
-	"sparc_iomap", IOBASE_VADDR, IOBASE_END - 1
+	.name = "sparc_iomap", .start = IOBASE_VADDR, .end = IOBASE_END - 1
 };
 
 /*

@@ -123,7 +123,8 @@ static int girbil_change_speed(struct irda_task *task)
 		}
 		break;
 	case IRDA_TASK_CHILD_WAIT:
-		WARNING("%s(), resetting dongle timed out!\n", __FUNCTION__);
+		IRDA_WARNING("%s(), resetting dongle timed out!\n",
+			     __FUNCTION__);
 		ret = -1;
 		break;
 	case IRDA_TASK_CHILD_DONE:
@@ -162,7 +163,8 @@ static int girbil_change_speed(struct irda_task *task)
 		self->speed_task = NULL;
 		break;
 	default:
-		ERROR("%s(), unknown state %d\n", __FUNCTION__, task->state);
+		IRDA_ERROR("%s(), unknown state %d\n",
+			   __FUNCTION__, task->state);
 		irda_task_next_state(task, IRDA_TASK_DONE);
 		self->speed_task = NULL;
 		ret = -1;
@@ -215,7 +217,8 @@ static int girbil_reset(struct irda_task *task)
 		self->reset_task = NULL;
 		break;
 	default:
-		ERROR("%s(), unknown state %d\n", __FUNCTION__, task->state);
+		IRDA_ERROR("%s(), unknown state %d\n",
+			   __FUNCTION__, task->state);
 		irda_task_next_state(task, IRDA_TASK_DONE);
 		self->reset_task = NULL;
 		ret = -1;

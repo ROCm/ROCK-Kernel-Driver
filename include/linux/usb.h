@@ -289,6 +289,10 @@ struct usb_bus {
 
 	struct class_device class_dev;	/* class device for this bus */
 	void (*release)(struct usb_bus *bus);	/* function to destroy this bus's memory */
+#if defined(CONFIG_USB_MON) || defined(CONFIG_USB_MON_MODULE)
+	struct mon_bus *mon_bus;	/* non-null when associated */
+	int monitored;			/* non-zero when monitored */
+#endif
 };
 #define	to_usb_bus(d) container_of(d, struct usb_bus, class_dev)
 
@@ -554,7 +558,7 @@ struct usb_driver {
 
 	int (*ioctl) (struct usb_interface *intf, unsigned int code, void *buf);
 
-	int (*suspend) (struct usb_interface *intf, u32 state);
+	int (*suspend) (struct usb_interface *intf, pm_message_t message);
 	int (*resume) (struct usb_interface *intf);
 
 	const struct usb_device_id *id_table;
@@ -792,6 +796,10 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * of the iso_frame_desc array, and the number of errors is reported in
  * error_count.  Completion callbacks for ISO transfers will normally
  * (re)submit URBs to ensure a constant transfer rate.
+ *
+ * Note that even fields marked "public" should not be touched by the driver
+ * when the urb is owned by the hcd, that is, since the call to
+ * usb_submit_urb() till the entry into the completion routine.
  */
 struct urb
 {
@@ -799,12 +807,12 @@ struct urb
 	struct kref kref;		/* reference count of the URB */
 	spinlock_t lock;		/* lock for the URB */
 	void *hcpriv;			/* private data for host controller */
-	struct list_head urb_list;	/* list pointer to all active urbs */
 	int bandwidth;			/* bandwidth for INT/ISO request */
 	atomic_t use_count;		/* concurrent submissions counter */
 	u8 reject;			/* submissions will fail */
 
 	/* public, documented fields in the urb that can be used by drivers */
+	struct list_head urb_list;	/* list head for use by the urb owner */
 	struct usb_device *dev; 	/* (in) pointer to associated device */
 	unsigned int pipe;		/* (in) pipe information */
 	int status;			/* (return) non-ISO status */
@@ -945,11 +953,11 @@ void *usb_buffer_alloc (struct usb_device *dev, size_t size,
 void usb_buffer_free (struct usb_device *dev, size_t size,
 	void *addr, dma_addr_t dma);
 
-struct urb *usb_buffer_map (struct urb *urb);
 #if 0
+struct urb *usb_buffer_map (struct urb *urb);
 void usb_buffer_dmasync (struct urb *urb);
-#endif
 void usb_buffer_unmap (struct urb *urb);
+#endif
 
 struct scatterlist;
 int usb_buffer_map_sg (struct usb_device *dev, unsigned pipe,
@@ -973,7 +981,7 @@ extern int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 	int timeout);
 
 /* selective suspend/resume */
-extern int usb_suspend_device(struct usb_device *dev, u32 state);
+extern int usb_suspend_device(struct usb_device *dev, pm_message_t message);
 extern int usb_resume_device(struct usb_device *dev);
 
 
@@ -993,13 +1001,13 @@ extern int usb_reset_configuration(struct usb_device *dev);
 extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
 
 /*
- * timeouts, in seconds, used for sending/receiving control messages
+ * timeouts, in milliseconds, used for sending/receiving control messages
  * they typically complete within a few frames (msec) after they're issued
  * USB identifies 5 second timeouts, maybe more in a few cases, and a few
  * slow devices (like some MGE Ellipse UPSes) actually push that limit.
  */
-#define USB_CTRL_GET_TIMEOUT	5
-#define USB_CTRL_SET_TIMEOUT	5
+#define USB_CTRL_GET_TIMEOUT	5000
+#define USB_CTRL_SET_TIMEOUT	5000
 
 
 /**

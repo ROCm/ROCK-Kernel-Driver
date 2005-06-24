@@ -308,11 +308,11 @@ static inline void ipoib_unregister_debugfs(void) { }
 
 
 #ifdef CONFIG_INFINIBAND_IPOIB_DEBUG
-extern int debug_level;
+extern int ipoib_debug_level;
 
 #define ipoib_dbg(priv, format, arg...)			\
 	do {					        \
-		if (debug_level > 0)			\
+		if (ipoib_debug_level > 0)			\
 			ipoib_printk(KERN_DEBUG, priv, format , ## arg); \
 	} while (0)
 #define ipoib_dbg_mcast(priv, format, arg...)		\

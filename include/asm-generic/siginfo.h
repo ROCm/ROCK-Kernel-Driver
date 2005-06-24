@@ -3,7 +3,6 @@
 
 #include <linux/compiler.h>
 #include <linux/types.h>
-#include <linux/resource.h>
 
 typedef union sigval {
 	int sival_int;
@@ -237,10 +236,17 @@ typedef struct siginfo {
 #define SIGEV_THREAD	2	/* deliver via thread creation */
 #define SIGEV_THREAD_ID 4	/* deliver to thread */
 
-#define SIGEV_MAX_SIZE	64
-#ifndef SIGEV_PAD_SIZE
-#define SIGEV_PAD_SIZE	((SIGEV_MAX_SIZE/sizeof(int)) - 3)
+/*
+ * This works because the alignment is ok on all current architectures
+ * but we leave open this being overridden in the future
+ */
+#ifndef __ARCH_SIGEV_PREAMBLE_SIZE
+#define __ARCH_SIGEV_PREAMBLE_SIZE	(sizeof(int) * 2 + sizeof(sigval_t))
 #endif
+
+#define SIGEV_MAX_SIZE	64
+#define SIGEV_PAD_SIZE	((SIGEV_MAX_SIZE - __ARCH_SIGEV_PREAMBLE_SIZE) \
+		/ sizeof(int))
 
 typedef struct sigevent {
 	sigval_t sigev_value;

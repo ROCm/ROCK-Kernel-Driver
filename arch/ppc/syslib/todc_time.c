@@ -287,6 +287,7 @@ todc_get_rtc_time(void)
 		limit = 1;
 
 		switch (todc_info->rtc_type) {
+			case TODC_TYPE_DS1553:
 			case TODC_TYPE_DS1557:
 			case TODC_TYPE_DS1743:
 			case TODC_TYPE_DS1746:	/* XXXX BAD HACK -> FIX */
@@ -322,6 +323,7 @@ todc_get_rtc_time(void)
 
 	if (todc_info->rtc_type != TODC_TYPE_MC146818) {
 		switch (todc_info->rtc_type) {
+			case TODC_TYPE_DS1553:
 			case TODC_TYPE_DS1557:
 			case TODC_TYPE_DS1743:
 			case TODC_TYPE_DS1746:	/* XXXX BAD HACK -> FIX */
@@ -418,6 +420,7 @@ static unsigned char __init todc_read_timereg(int addr)
 	unsigned char save_control = 0, val;
 
 	switch (todc_info->rtc_type) {
+		case TODC_TYPE_DS1553:
 		case TODC_TYPE_DS1557:
 		case TODC_TYPE_DS1746:	/* XXXX BAD HACK -> FIX */
 		case TODC_TYPE_DS1747:
@@ -432,6 +435,7 @@ static unsigned char __init todc_read_timereg(int addr)
 	val = todc_read_val(addr);
 
 	switch (todc_info->rtc_type) {
+		case TODC_TYPE_DS1553:
 		case TODC_TYPE_DS1557:
 		case TODC_TYPE_DS1746:	/* XXXX BAD HACK -> FIX */
 		case TODC_TYPE_DS1747:

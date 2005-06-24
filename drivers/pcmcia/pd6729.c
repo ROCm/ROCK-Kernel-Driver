@@ -615,11 +615,6 @@ static int pd6729_set_mem_map(struct pcmcia_socket *sock,
 	return 0;
 }
 
-static int pd6729_suspend(struct pcmcia_socket *sock)
-{
-	return pd6729_set_socket(sock, &dead_socket);
-}
-
 static int pd6729_init(struct pcmcia_socket *sock)
 {
 	int i;
@@ -644,7 +639,6 @@ static int pd6729_init(struct pcmcia_socket *sock)
 /* the pccard structure and its functions */
 static struct pccard_operations pd6729_operations = {
 	.init 			= pd6729_init,
-	.suspend		= pd6729_suspend,
 	.get_status		= pd6729_get_status,
 	.get_socket		= pd6729_get_socket,
 	.set_socket		= pd6729_set_socket,
@@ -750,7 +744,7 @@ static int __devinit pd6729_pci_probe(struct pci_dev *dev,
 
 	for (i = 0; i < MAX_SOCKETS; i++) {
 		socket[i].io_base = pci_resource_start(dev, 0);
-		socket[i].socket.features |= SS_CAP_PCCARD;
+		socket[i].socket.features |= SS_CAP_PAGE_REGS | SS_CAP_PCCARD;
 		socket[i].socket.map_size = 0x1000;
 		socket[i].socket.irq_mask = mask;
 		socket[i].socket.pci_irq  = dev->irq;
@@ -833,7 +827,7 @@ static void __devexit pd6729_pci_remove(struct pci_dev *dev)
 	kfree(socket);
 }
 
-static int pd6729_socket_suspend(struct pci_dev *dev, u32 state)
+static int pd6729_socket_suspend(struct pci_dev *dev, pm_message_t state)
 {
 	return pcmcia_socket_dev_suspend(&dev->dev, state);
 }
@@ -865,7 +859,7 @@ static struct pci_driver pd6729_pci_drv = {
 
 static int pd6729_module_init(void)
 {
-	return pci_module_init(&pd6729_pci_drv);
+	return pci_register_driver(&pd6729_pci_drv);
 }
 
 static void pd6729_module_exit(void)

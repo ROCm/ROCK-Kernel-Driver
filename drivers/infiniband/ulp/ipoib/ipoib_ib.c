@@ -40,7 +40,7 @@
 #include "ipoib.h"
 
 #ifdef CONFIG_INFINIBAND_IPOIB_DEBUG_DATA
-int data_debug_level;
+static int data_debug_level;
 
 module_param(data_debug_level, int, 0644);
 MODULE_PARM_DESC(data_debug_level,
@@ -105,7 +105,6 @@ static inline int ipoib_ib_receive(struct ipoib_dev_priv *priv,
 		.wr_id 	    = wr_id | IPOIB_OP_RECV,
 		.sg_list    = &list,
 		.num_sge    = 1,
-		.recv_flags = IB_RECV_SIGNALED
 	};
 	struct ib_recv_wr *bad_wr;
 
@@ -137,6 +136,9 @@ static int ipoib_ib_post_receive(struct net_device *dev, int id)
 	if (ret) {
 		ipoib_warn(priv, "ipoib_ib_receive failed for buf %d (%d)\n",
 			   id, ret);
+		dma_unmap_single(priv->ca->dma_device, addr,
+				 IPOIB_BUF_SIZE, DMA_FROM_DEVICE);
+		dev_kfree_skb_any(skb);
 		priv->rx_ring[id].skb = NULL;
 	}
 
@@ -199,7 +201,7 @@ static void ipoib_ib_handle_wc(struct net_device *dev,
 			if (wc->slid != priv->local_lid ||
 			    wc->src_qp != priv->qp->qp_num) {
 				skb->protocol = ((struct ipoib_header *) skb->data)->proto;
-
+				skb->mac.raw = skb->data;
 				skb_pull(skb, IPOIB_ENCAP_LEN);
 
 				dev->last_rx = jiffies;

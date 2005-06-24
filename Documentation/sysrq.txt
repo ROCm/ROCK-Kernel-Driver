@@ -92,6 +92,8 @@ On all -  write a character to /proc/sysrq-trigger.  eg:
           it so that only emergency messages like PANICs or OOPSes would
           make it to your console.)
 
+'f'	- Will call oom_kill to kill a memory hog process
+
 'e'     - Send a SIGTERM to all processes, except for init.
 
 'i'     - Send a SIGKILL to all processes, except for init.

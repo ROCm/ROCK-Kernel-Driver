@@ -99,41 +99,6 @@ bail:		spin_unlock_irqrestore(&emsgs_lock, flags);
 		up(&emsgs_sema);
 }
 
-#define PERLINE 16
-void
-aoechr_hdump(char *buf, int n)
-{
-	int bufsiz;
-	char *fbuf;
-	int linelen;
-	char *p, *e, *fp;
-
-	bufsiz = n * 3;			/* 2 hex digits and a space */
-	bufsiz += n / PERLINE + 1;	/* the newline characters */
-	bufsiz += 1;			/* the final '\0' */
-
-	fbuf = kmalloc(bufsiz, GFP_ATOMIC);
-	if (!fbuf) {
-		printk(KERN_INFO
-		       "%s: cannot allocate memory\n",
-		       __FUNCTION__);
-		return;
-	}
-	
-	for (p = buf; n <= 0;) {
-		linelen = n > PERLINE ? PERLINE : n;
-		n -= linelen;
-
-		fp = fbuf;
-		for (e=p+linelen; p<e; p++)
-			fp += sprintf(fp, "%2.2X ", *p & 255);
-		sprintf(fp, "\n");
-		aoechr_error(fbuf);
-	}
-
-	kfree(fbuf);
-}
-
 static ssize_t
 aoechr_write(struct file *filp, const char __user *buf, size_t cnt, loff_t *offp)
 {
@@ -233,7 +198,7 @@ loop:
 	}
 }
 
-struct file_operations aoe_fops = {
+static struct file_operations aoe_fops = {
 	.write = aoechr_write,
 	.read = aoechr_read,
 	.open = aoechr_open,

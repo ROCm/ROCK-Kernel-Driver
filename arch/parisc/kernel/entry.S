@@ -76,13 +76,11 @@
 	mtsp	%r0, %sr5
 	mtsp	%r0, %sr6
 	mtsp	%r0, %sr7
-	ldil	L%KERNEL_PSW, %r1
-	ldo	R%KERNEL_PSW(%r1), %r1
+	load32	KERNEL_PSW, %r1
 	mtctl	%r1, %cr22
 	mtctl	%r0, %cr17	/* Clear IIASQ tail */
 	mtctl	%r0, %cr17	/* Clear IIASQ head */
-	ldil	L%4f, %r1
-	ldo	R%4f(%r1), %r1
+	load32	4f, %r1
 	mtctl	%r1, %cr18	/* Set IIAOQ tail */
 	ldo	4(%r1), %r1
 	mtctl	%r1, %cr18	/* Set IIAOQ head */
@@ -197,8 +195,7 @@
 	/* HPMC handler */
 	.macro	hpmc code
 	nop			/* must be a NOP, will be patched later */
-	ldil	L%PA(os_hpmc), %r3
-	ldo	R%PA(os_hpmc)(%r3), %r3
+	load32	PA(os_hpmc), %r3
 	bv,n	0(%r3)
 	nop
 	.word	0		/* checksum (will be patched) */
@@ -860,8 +857,7 @@ _switch_to:
 
 	callee_save
 
-	ldil	L%_switch_to_ret, %r2
-	ldo	R%_switch_to_ret(%r2), %r2
+	load32	_switch_to_ret, %r2
 
 	STREG	%r2, TASK_PT_KPC(%r26)
 	LDREG	TASK_PT_KPC(%r25), %r2
@@ -914,16 +910,13 @@ syscall_exit_rfi:
 	depi	3,31,2,%r19
 	STREG	%r19,PT_IAOQ1(%r16)
 	LDREG   PT_PSW(%r16),%r19
-	ldil    L%USER_PSW_MASK,%r1
-	ldo     R%USER_PSW_MASK(%r1),%r1
+	load32	USER_PSW_MASK,%r1
 #ifdef __LP64__
-	ldil    L%USER_PSW_HI_MASK,%r20
-	ldo     R%USER_PSW_HI_MASK(%r20),%r20
+	load32	USER_PSW_HI_MASK,%r20
 	depd    %r20,31,32,%r1
 #endif
 	and     %r19,%r1,%r19 /* Mask out bits that user shouldn't play with */
-	ldil    L%USER_PSW,%r1
-	ldo     R%USER_PSW(%r1),%r1
+	load32	USER_PSW,%r1
 	or      %r19,%r1,%r19 /* Make sure default USER_PSW bits are set */
 	STREG   %r19,PT_PSW(%r16)
 
@@ -955,8 +948,7 @@ intr_return:
 
 	.import irq_stat,data
 
-	ldil	L%irq_stat,%r19
-	ldo	R%irq_stat(%r19),%r19
+	load32	irq_stat,%r19
 #ifdef CONFIG_SMP
 	mfctl   %cr30,%r1
 	ldw	TI_CPU(%r1),%r1 /* get cpu # - int */
@@ -1079,7 +1071,7 @@ intr_do_signal:
 	BL	do_signal,%r2
 	copy	%r0, %r26			/* sigset_t *oldset = NULL */
 
-	b	intr_restore
+	b	intr_check_sig
 	nop
 
 	/*
@@ -1607,8 +1599,7 @@ dbit_trap_20w:
 
 #ifdef CONFIG_SMP
 	CMPIB=,n        0,spc,dbit_nolock_20w
-	ldil            L%PA(pa_dbit_lock),t0
-	ldo             R%PA(pa_dbit_lock)(t0),t0
+	load32		PA(pa_dbit_lock),t0
 
 dbit_spin_20w:
 	ldcw            0(t0),t1
@@ -1644,8 +1635,7 @@ dbit_trap_11:
 
 #ifdef CONFIG_SMP
 	CMPIB=,n        0,spc,dbit_nolock_11
-	ldil            L%PA(pa_dbit_lock),t0
-	ldo             R%PA(pa_dbit_lock)(t0),t0
+	load32		PA(pa_dbit_lock),t0
 
 dbit_spin_11:
 	ldcw            0(t0),t1
@@ -1685,8 +1675,7 @@ dbit_trap_20:
 
 #ifdef CONFIG_SMP
 	CMPIB=,n        0,spc,dbit_nolock_20
-	ldil            L%PA(pa_dbit_lock),t0
-	ldo             R%PA(pa_dbit_lock)(t0),t0
+	load32		PA(pa_dbit_lock),t0
 
 dbit_spin_20:
 	ldcw            0(t0),t1
@@ -2082,8 +2071,7 @@ syscall_check_bh:
 
 	.import irq_stat,data
 
-	ldil    L%irq_stat,%r19
-	ldo     R%irq_stat(%r19),%r19
+	load32	irq_stat,%r19
 
 #ifdef CONFIG_SMP
 	/* sched.h: int processor */
@@ -2282,7 +2270,7 @@ syscall_do_signal:
 	ldo	TASK_REGS(%r1), %r20		/* reload pt_regs */
 	reg_restore %r20
 
-	b,n     syscall_restore
+	b,n     syscall_check_sig
 
 	/*
 	 * get_register is used by the non access tlb miss handlers to

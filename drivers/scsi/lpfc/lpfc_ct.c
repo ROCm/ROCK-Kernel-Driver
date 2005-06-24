@@ -19,34 +19,36 @@
  *******************************************************************/
 
 /*
- * $Id: lpfc_ct.c 1.138 2004/10/18 13:48:15EDT sf_support Exp  $
+ * $Id: lpfc_ct.c 1.161 2005/04/13 11:59:01EDT sf_support Exp  $
  *
  * Fibre Channel SCSI LAN Device Driver CT support
  */
 
-#include <linux/version.h>
 #include <linux/blkdev.h>
-#include <linux/dma-mapping.h>
 #include <linux/pci.h>
-#include <linux/spinlock.h>
+#include <linux/interrupt.h>
 #include <linux/utsname.h>
+
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
+
+#include "lpfc_hw.h"
 #include "lpfc_sli.h"
 #include "lpfc_disc.h"
 #include "lpfc_scsi.h"
 #include "lpfc.h"
-#include "lpfc_crtn.h"
-#include "lpfc_hw.h"
 #include "lpfc_logmsg.h"
-#include "lpfc_mem.h"
+#include "lpfc_crtn.h"
 #include "lpfc_version.h"
 
-
-#define HBA_PORTSPEED_1GBIT                 1   /* 1 GBit/sec */
-#define HBA_PORTSPEED_2GBIT                 2   /* 2 GBit/sec */
+#define HBA_PORTSPEED_UNKNOWN               0	/* Unknown - transceiver
+						 * incapable of reporting */
+#define HBA_PORTSPEED_1GBIT                 1	/* 1 GBit/sec */
+#define HBA_PORTSPEED_2GBIT                 2	/* 2 GBit/sec */
 #define HBA_PORTSPEED_4GBIT                 8   /* 4 GBit/sec */
-#define HBA_PORTSPEED_10GBIT                4   /* 10 GBit/sec */
+#define HBA_PORTSPEED_8GBIT                16   /* 8 GBit/sec */
+#define HBA_PORTSPEED_10GBIT                4	/* 10 GBit/sec */
+#define HBA_PORTSPEED_NOT_NEGOTIATED        5	/* Speed not established */
 
 #define FOURBYTES	4
 
@@ -64,30 +66,33 @@ lpfc_ct_unsol_event(struct lpfc_hba * phba,
 	struct lpfc_iocbq *next_piocbq;
 	struct lpfc_dmabuf *pmbuf = NULL;
 	struct lpfc_dmabuf *matp, *next_matp;
-	uint32_t ctx = 0, count = 0;
+	uint32_t ctx = 0, size = 0, cnt = 0;
 	IOCB_t *icmd = &piocbq->iocb;
-	int i, status, go_exit = 0;
+	IOCB_t *save_icmd = icmd;
+	int i, go_exit = 0;
 	struct list_head head;
 
-	if (icmd->ulpStatus)
+	if ((icmd->ulpStatus == IOSTAT_LOCAL_REJECT) &&
+		((icmd->un.ulpWord[4] & 0xff) == IOERR_RCV_BUFFER_WAITING)) {
+		/* Not enough posted buffers; Try posting more buffers */
+		phba->fc_stat.NoRcvBuf++;
+		lpfc_post_buffer(phba, pring, 0, 1);
+		return;
+	}
+
+	/* If there are no BDEs associated with this IOCB,
+	 * there is nothing to do.
+	 */
+	if (icmd->ulpBdeCount == 0)
 		return;
 
+	INIT_LIST_HEAD(&head);
 	list_add_tail(&head, &piocbq->list);
+
 	list_for_each_entry_safe(piocbq, next_piocbq, &head, list) {
 		icmd = &piocbq->iocb;
 		if (ctx == 0)
 			ctx = (uint32_t) (icmd->ulpContext);
-		if (icmd->ulpStatus) {
-			if ((icmd->ulpStatus == IOSTAT_LOCAL_REJECT) &&
-				((icmd->un.ulpWord[4] & 0xff)
-				 == IOERR_RCV_BUFFER_WAITING)) {
-				phba->fc_stat.NoRcvBuf++;
-				lpfc_post_buffer(phba, pring, 0, 1);
-			}
-			go_exit = 1;
-			goto ct_unsol_event_exit_piocbq;
-		}
-
 		if (icmd->ulpBdeCount == 0)
 			continue;
 
@@ -101,6 +106,7 @@ lpfc_ct_unsol_event(struct lpfc_hba * phba,
 								 addrLow));
 			if (!matp) {
 				/* Insert lpfc log message here */
+				lpfc_post_buffer(phba, pring, cnt, 1);
 				go_exit = 1;
 				goto ct_unsol_event_exit_piocbq;
 			}
@@ -112,25 +118,19 @@ lpfc_ct_unsol_event(struct lpfc_hba * phba,
 			} else
 				list_add_tail(&matp->list, &pmbuf->list);
 
-			count += icmd->un.cont64[i].tus.f.bdeSize;
+			size += icmd->un.cont64[i].tus.f.bdeSize;
+			cnt++;
 		}
 
-		lpfc_post_buffer(phba, pring, i, 1);
 		icmd->ulpBdeCount = 0;
 	}
-ct_unsol_event_exit_piocbq:
-	list_del(&head);
-	/*
-	 * if not early-exiting and there is pmbuf,
-	 * then do  FC_REG_CT_EVENT for libdfc
-	 */
-	if (!go_exit  &&  pmbuf) {
-		status = lpfc_put_event(phba, FC_REG_CT_EVENT, ctx,
-				       (void *)pmbuf, count, 0);
-		if (status)
-			/* Need to free IOCB buffer ? */
-			return;
+
+	lpfc_post_buffer(phba, pring, cnt, 1);
+	if (save_icmd->ulpStatus) {
+		go_exit = 1;
 	}
+
+ct_unsol_event_exit_piocbq:
 	if (pmbuf) {
 		list_for_each_entry_safe(matp, next_matp, &pmbuf->list, list) {
 			lpfc_mbuf_free(phba, matp->virt, matp->phys);
@@ -171,7 +171,7 @@ lpfc_alloc_ct_rsp(struct lpfc_hba * phba, int cmdcode, struct ulp_bde64 * bpl,
 
 	while (size) {
 		/* Allocate buffer for rsp payload */
-		mp = kmalloc(sizeof(struct lpfc_dmabuf), GFP_ATOMIC);
+		mp = kmalloc(sizeof(struct lpfc_dmabuf), GFP_KERNEL);
 		if (!mp) {
 			if (mlist)
 				lpfc_free_ct_rsp(phba, mlist);
@@ -224,17 +224,20 @@ lpfc_gen_req(struct lpfc_hba *phba, struct lpfc_dmabuf *bmp,
 
 	struct lpfc_sli *psli = &phba->sli;
 	struct lpfc_sli_ring *pring = &psli->ring[LPFC_ELS_RING];
+	struct list_head *lpfc_iocb_list = &phba->lpfc_iocb_list;
 	IOCB_t *icmd;
-	struct lpfc_iocbq *geniocb;
+	struct lpfc_iocbq *geniocb = NULL;
 
 	/* Allocate buffer for  command iocb */
-	geniocb = mempool_alloc(phba->iocb_mem_pool, GFP_ATOMIC);
-	if (!geniocb) {
-		return 1;
-	}
-	memset(geniocb, 0, sizeof (struct lpfc_iocbq));
-	icmd = &geniocb->iocb;
+	spin_lock_irq(phba->host->host_lock);
+	list_remove_head(lpfc_iocb_list, geniocb, struct lpfc_iocbq, list);
+	spin_unlock_irq(phba->host->host_lock);
 
+	if (geniocb == NULL)
+		return 1;
+	memset(geniocb, 0, sizeof (struct lpfc_iocbq));
+
+	icmd = &geniocb->iocb;
 	icmd->un.genreq64.bdl.ulpIoTag32 = 0;
 	icmd->un.genreq64.bdl.addrHigh = putPaddrHigh(bmp->phys);
 	icmd->un.genreq64.bdl.addrLow = putPaddrLow(bmp->phys);
@@ -252,11 +255,6 @@ lpfc_gen_req(struct lpfc_hba *phba, struct lpfc_dmabuf *bmp,
 
 	/* Fill in payload, bp points to frame payload */
 	icmd->ulpCommand = CMD_GEN_REQUEST64_CR;
-
-	pci_dma_sync_single_for_device(phba->pcidev, bmp->phys,
-		LPFC_BPL_SIZE, PCI_DMA_TODEVICE);
-
-	icmd->ulpIoTag = lpfc_sli_next_iotag(phba, pring);
 
 	/* Fill in rest of iocb */
 	icmd->un.genreq64.w5.hcsw.Fctl = (SI | LA);
@@ -279,10 +277,13 @@ lpfc_gen_req(struct lpfc_hba *phba, struct lpfc_dmabuf *bmp,
 			icmd->ulpIoTag, phba->hba_state);
 	geniocb->iocb_cmpl = cmpl;
 	geniocb->drvrTimeout = icmd->ulpTimeout + LPFC_DRVR_TIMEOUT;
+	spin_lock_irq(phba->host->host_lock);
 	if (lpfc_sli_issue_iocb(phba, pring, geniocb, 0) == IOCB_ERROR) {
-		mempool_free( geniocb, phba->iocb_mem_pool);
+		list_add_tail(&geniocb->list, lpfc_iocb_list);
+		spin_unlock_irq(phba->host->host_lock);
 		return 1;
 	}
+	spin_unlock_irq(phba->host->host_lock);
 
 	return 0;
 }
@@ -336,8 +337,6 @@ lpfc_ns_rsp(struct lpfc_hba * phba, struct lpfc_dmabuf * mp, uint32_t Size)
 	list_add_tail(&head, &mp->list);
 	list_for_each_entry_safe(mp, next_mp, &head, list) {
 		mlast = mp;
-		pci_dma_sync_single_for_cpu(phba->pcidev, mp->phys,
-			LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 		Size -= Cnt;
 
@@ -395,7 +394,9 @@ nsout1:
 	/* Here we are finished in the case RSCN */
 	if (phba->hba_state == LPFC_HBA_READY) {
 		lpfc_els_flush_rscn(phba);
+		spin_lock_irq(phba->host->host_lock);
 		phba->fc_flag |= FC_RSCN_MODE; /* we are still in RSCN mode */
+		spin_unlock_irq(phba->host->host_lock);
 	}
 	return 0;
 }
@@ -425,10 +426,12 @@ lpfc_cmpl_ct_cmd_gid_ft(struct lpfc_hba * phba, struct lpfc_iocbq * cmdiocb,
 
 	irsp = &rspiocb->iocb;
 	if (irsp->ulpStatus) {
-		if((irsp->ulpStatus == IOSTAT_LOCAL_REJECT) &&
-			(irsp->un.ulpWord[4] == IOERR_SLI_DOWN)) {
+		if ((irsp->ulpStatus == IOSTAT_LOCAL_REJECT) &&
+			((irsp->un.ulpWord[4] == IOERR_SLI_DOWN) ||
+			 (irsp->un.ulpWord[4] == IOERR_SLI_ABORTED))) {
 			goto out;
 		}
+
 		/* Check for retry */
 		if (phba->fc_ns_retry < LPFC_MAX_NS_RETRY) {
 			phba->fc_ns_retry++;
@@ -483,7 +486,9 @@ out:
 	lpfc_mbuf_free(phba, bmp->virt, bmp->phys);
 	kfree(inp);
 	kfree(bmp);
-	mempool_free( cmdiocb, phba->iocb_mem_pool);
+	spin_lock_irq(phba->host->host_lock);
+	list_add_tail(&cmdiocb->list, &phba->lpfc_iocb_list);
+	spin_unlock_irq(phba->host->host_lock);
 	return;
 }
 
@@ -520,7 +525,9 @@ lpfc_cmpl_ct_cmd_rft_id(struct lpfc_hba * phba, struct lpfc_iocbq * cmdiocb,
 	lpfc_mbuf_free(phba, bmp->virt, bmp->phys);
 	kfree(inp);
 	kfree(bmp);
-	mempool_free( cmdiocb, phba->iocb_mem_pool);
+	spin_lock_irq(phba->host->host_lock);
+	list_add_tail(&cmdiocb->list, &phba->lpfc_iocb_list);
+	spin_unlock_irq(phba->host->host_lock);
 	return;
 }
 
@@ -543,12 +550,17 @@ lpfc_cmpl_ct_cmd_rsnn_nn(struct lpfc_hba * phba, struct lpfc_iocbq * cmdiocb,
 void
 lpfc_get_hba_sym_node_name(struct lpfc_hba * phba, uint8_t * symbp)
 {
-	uint8_t buf[16];
 	char fwrev[16];
 
 	lpfc_decode_firmware_rev(phba, fwrev, 0);
-	lpfc_get_hba_model_desc(phba, buf, NULL);
-	sprintf(symbp, "Emulex %s FV%s DV%s", buf, fwrev, lpfc_release_version);
+
+	if (phba->Port[0]) {
+		sprintf(symbp, "Emulex %s Port %s FV%s DV%s", phba->ModelName,
+			phba->Port, fwrev, lpfc_release_version);
+	} else {
+		sprintf(symbp, "Emulex %s FV%s DV%s", phba->ModelName,
+			fwrev, lpfc_release_version);
+	}
 }
 
 /*
@@ -570,7 +582,7 @@ lpfc_ns_cmd(struct lpfc_hba * phba, struct lpfc_nodelist * ndlp, int cmdcode)
 
 	/* fill in BDEs for command */
 	/* Allocate buffer for command payload */
-	mp = kmalloc(sizeof (struct lpfc_dmabuf), GFP_ATOMIC);
+	mp = kmalloc(sizeof (struct lpfc_dmabuf), GFP_KERNEL);
 	if (!mp)
 		goto ns_cmd_exit;
 
@@ -580,7 +592,7 @@ lpfc_ns_cmd(struct lpfc_hba * phba, struct lpfc_nodelist * ndlp, int cmdcode)
 		goto ns_cmd_free_mp;
 
 	/* Allocate buffer for Buffer ptr list */
-	bmp = kmalloc(sizeof (struct lpfc_dmabuf), GFP_ATOMIC);
+	bmp = kmalloc(sizeof (struct lpfc_dmabuf), GFP_KERNEL);
 	if (!bmp)
 		goto ns_cmd_free_mpvirt;
 
@@ -722,7 +734,9 @@ lpfc_cmpl_ct_cmd_fdmi(struct lpfc_hba * phba,
 	lpfc_mbuf_free(phba, bmp->virt, bmp->phys);
 	kfree(inp);
 	kfree(bmp);
-	mempool_free(cmdiocb, phba->iocb_mem_pool);
+	spin_lock_irq(phba->host->host_lock);
+	list_add_tail(&cmdiocb->list, &phba->lpfc_iocb_list);
+	spin_unlock_irq(phba->host->host_lock);
 	return;
 }
 int
@@ -743,7 +757,7 @@ lpfc_fdmi_cmd(struct lpfc_hba * phba, struct lpfc_nodelist * ndlp, int cmdcode)
 
 	/* fill in BDEs for command */
 	/* Allocate buffer for command payload */
-	mp = kmalloc(sizeof (struct lpfc_dmabuf), GFP_ATOMIC);
+	mp = kmalloc(sizeof (struct lpfc_dmabuf), GFP_KERNEL);
 	if (!mp)
 		goto fdmi_cmd_exit;
 
@@ -752,7 +766,7 @@ lpfc_fdmi_cmd(struct lpfc_hba * phba, struct lpfc_nodelist * ndlp, int cmdcode)
 		goto fdmi_cmd_free_mp;
 
 	/* Allocate buffer for Buffer ptr list */
-	bmp = kmalloc(sizeof (struct lpfc_dmabuf), GFP_ATOMIC);
+	bmp = kmalloc(sizeof (struct lpfc_dmabuf), GFP_KERNEL);
 	if (!bmp)
 		goto fdmi_cmd_free_mpvirt;
 
@@ -840,7 +854,7 @@ lpfc_fdmi_cmd(struct lpfc_hba * phba, struct lpfc_nodelist * ndlp, int cmdcode)
 			/* #4 HBA attribute entry */
 			ae = (ATTRIBUTE_ENTRY *) ((uint8_t *) rh + size);
 			ae->ad.bits.AttrType = be16_to_cpu(MODEL);
-			lpfc_get_hba_model_desc(phba, ae->un.Model, NULL);
+			strcpy(ae->un.Model, phba->ModelName);
 			len = strlen(ae->un.Model);
 			len += (len & 3) ? (4 - (len & 3)) : 4;
 			ae->ad.bits.AttrLen = be16_to_cpu(FOURBYTES + len);
@@ -850,8 +864,7 @@ lpfc_fdmi_cmd(struct lpfc_hba * phba, struct lpfc_nodelist * ndlp, int cmdcode)
 			/* #5 HBA attribute entry */
 			ae = (ATTRIBUTE_ENTRY *) ((uint8_t *) rh + size);
 			ae->ad.bits.AttrType = be16_to_cpu(MODEL_DESCRIPTION);
-			lpfc_get_hba_model_desc(phba, NULL,
-				 ae->un.ModelDescription);
+			strcpy(ae->un.ModelDescription, phba->ModelDesc);
 			len = strlen(ae->un.ModelDescription);
 			len += (len & 3) ? (4 - (len & 3)) : 4;
 			ae->ad.bits.AttrLen = be16_to_cpu(FOURBYTES + len);
@@ -987,10 +1000,21 @@ lpfc_fdmi_cmd(struct lpfc_hba * phba, struct lpfc_nodelist * ndlp, int cmdcode)
 			ae = (ATTRIBUTE_ENTRY *) ((uint8_t *) pab + size);
 			ae->ad.bits.AttrType = be16_to_cpu(PORT_SPEED);
 			ae->ad.bits.AttrLen = be16_to_cpu(FOURBYTES + 4);
-			if (phba->fc_linkspeed == LA_2GHZ_LINK)
-				ae->un.PortSpeed = HBA_PORTSPEED_2GBIT;
-			else
-				ae->un.PortSpeed = HBA_PORTSPEED_1GBIT;
+			switch(phba->fc_linkspeed) {
+				case LA_1GHZ_LINK:
+					ae->un.PortSpeed = HBA_PORTSPEED_1GBIT;
+				break;
+				case LA_2GHZ_LINK:
+					ae->un.PortSpeed = HBA_PORTSPEED_2GBIT;
+				break;
+				case LA_4GHZ_LINK:
+					ae->un.PortSpeed = HBA_PORTSPEED_4GBIT;
+				break;
+				default:
+					ae->un.PortSpeed =
+						HBA_PORTSPEED_UNKNOWN;
+				break;
+			}
 			pab->ab.EntryCnt++;
 			size += FOURBYTES + 4;
 
@@ -1088,24 +1112,40 @@ fdmi_cmd_exit:
 	return 1;
 }
 
-
 void
 lpfc_fdmi_tmo(unsigned long ptr)
 {
-	struct lpfc_hba *phba = (struct lpfc_hba*)ptr;
-	struct lpfc_nodelist *ndlp;
+	struct lpfc_hba *phba = (struct lpfc_hba *)ptr;
 	unsigned long iflag;
 
 	spin_lock_irqsave(phba->host->host_lock, iflag);
+	if (!(phba->work_hba_events & WORKER_FDMI_TMO)) {
+		phba->work_hba_events |= WORKER_FDMI_TMO;
+		if (phba->work_wait)
+			wake_up(phba->work_wait);
+	}
+	spin_unlock_irqrestore(phba->host->host_lock,iflag);
+}
+
+void
+lpfc_fdmi_tmo_handler(struct lpfc_hba *phba)
+{
+	struct lpfc_nodelist *ndlp;
+
+	spin_lock_irq(phba->host->host_lock);
+	if (!(phba->work_hba_events & WORKER_FDMI_TMO)) {
+		spin_unlock_irq(phba->host->host_lock);
+		return;
+	}
 	ndlp = lpfc_findnode_did(phba, NLP_SEARCH_ALL, FDMI_DID);
 	if (ndlp) {
 		if (system_utsname.nodename[0] != '\0') {
 			lpfc_fdmi_cmd(phba, ndlp, SLI_MGMT_DHBA);
 		} else {
- 			mod_timer(&phba->fc_fdmitmo, jiffies + HZ * 60);
+			mod_timer(&phba->fc_fdmitmo, jiffies + HZ * 60);
 		}
 	}
-	spin_unlock_irqrestore(phba->host->host_lock, iflag);
+	spin_unlock_irq(phba->host->host_lock);
 	return;
 }
 
@@ -1121,7 +1161,7 @@ lpfc_decode_firmware_rev(struct lpfc_hba * phba, char *fwrevision, int flag)
 	uint8_t *fwname;
 
 	if (vp->rev.rBit) {
-		if (psli->sliinit.sli_flag & LPFC_SLI2_ACTIVE)
+		if (psli->sli_flag & LPFC_SLI2_ACTIVE)
 			rev = vp->rev.sli2FwRev;
 		else
 			rev = vp->rev.sli1FwRev;
@@ -1147,13 +1187,13 @@ lpfc_decode_firmware_rev(struct lpfc_hba * phba, char *fwrevision, int flag)
 		}
 		b4 = (rev & 0x0000000f);
 
-		if (psli->sliinit.sli_flag & LPFC_SLI2_ACTIVE)
+		if (psli->sli_flag & LPFC_SLI2_ACTIVE)
 			fwname = vp->rev.sli2FwName;
 		else
 			fwname = vp->rev.sli1FwName;
 
 		for (i = 0; i < 16; i++)
-			if(fwname[i] == 0x20)
+			if (fwname[i] == 0x20)
 				fwname[i] = 0;
 
 		ptr = (uint32_t*)fwname;
@@ -1195,71 +1235,3 @@ lpfc_decode_firmware_rev(struct lpfc_hba * phba, char *fwrevision, int flag)
 	}
 	return;
 }
-
-void
-lpfc_get_hba_model_desc(struct lpfc_hba * phba, uint8_t * mdp, uint8_t * descp)
-{
-	lpfc_vpd_t *vp;
-	uint32_t id;
-	char str[16];
-
-	vp = &phba->vpd;
-	pci_read_config_dword(phba->pcidev, PCI_VENDOR_ID, &id);
-
-	switch ((id >> 16) & 0xffff) {
-	case PCI_DEVICE_ID_SUPERFLY:
-		if (vp->rev.biuRev >= 1 && vp->rev.biuRev <= 3)
-			strcpy(str, "LP7000 1");
-		else
-			strcpy(str, "LP7000E 1");
-		break;
-	case PCI_DEVICE_ID_DRAGONFLY:
-		strcpy(str, "LP8000 1");
-		break;
-	case PCI_DEVICE_ID_CENTAUR:
-		if (FC_JEDEC_ID(vp->rev.biuRev) == CENTAUR_2G_JEDEC_ID)
-			strcpy(str, "LP9002 2");
-		else
-			strcpy(str, "LP9000 1");
-		break;
-	case PCI_DEVICE_ID_RFLY:
-		strcpy(str, "LP952 2");
-		break;
-	case PCI_DEVICE_ID_PEGASUS:
-		strcpy(str, "LP9802 2");
-		break;
-	case PCI_DEVICE_ID_THOR:
-		strcpy(str, "LP10000 2");
-		break;
-	case PCI_DEVICE_ID_VIPER:
-		strcpy(str, "LPX1000 10");
-		break;
-	case PCI_DEVICE_ID_PFLY:
-		strcpy(str, "LP982 2");
-		break;
-	case PCI_DEVICE_ID_TFLY:
-		strcpy(str, "LP1050 2");
-		break;
-	case PCI_DEVICE_ID_HELIOS:
-		strcpy(str, "LP11000 4");
-		break;
-	case PCI_DEVICE_ID_JFLY:
-		strcpy(str, "LP1150 4");
-		break;
-	case PCI_DEVICE_ID_ZEPHYR:
-		strcpy(str, "LP11000e 4");
-		break;
-	case PCI_DEVICE_ID_ZFLY:
-		strcpy(str, "LP1150e 4");
-		break;
-	case PCI_DEVICE_ID_LP101:
-		strcpy(str, "LP101 2");
-		break;
-	}
-	if (mdp)
-		sscanf(str, "%s", mdp);
-	if (descp)
-		sprintf(descp, "Emulex LightPulse %s Gigabit PCI Fibre "
-			"Channel Adapter", str);
-}
-

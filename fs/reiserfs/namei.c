@@ -608,7 +608,7 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode,
         goto out_failed;
     }
 
-    retval = reiserfs_new_inode (&th, dir, mode, 0, 0/*i_size*/, dentry, inode);
+    retval = reiserfs_new_inode (&th, dir, mode, NULL, 0/*i_size*/, dentry, inode);
     if (retval)
         goto out_failed;
 	
@@ -1255,7 +1255,6 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
         return retval;
     }
 
-
     /* add new entry (or find the existing one) */
     retval = reiserfs_add_entry (&th, new_dir, new_dentry->d_name.name, new_dentry->d_name.len, 
 				 old_inode, 0);
@@ -1283,8 +1282,13 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 
     while (1) {
 	// look for old name using corresponding entry key (found by reiserfs_find_entry)
-	if (search_by_entry_key (new_dir->i_sb, &old_de.de_entry_key, &old_entry_path, &old_de) != NAME_FOUND)
-	    BUG ();
+	if ((retval = search_by_entry_key (new_dir->i_sb, &old_de.de_entry_key,
+					   &old_entry_path, &old_de)) != NAME_FOUND) {
+	    pathrelse(&old_entry_path);
+	    journal_end(&th, old_dir->i_sb, jbegin_count);
+	    reiserfs_write_unlock(old_dir->i_sb);
+	    return -EIO;
+	}
 
 	copy_item_head(&old_entry_ih, get_ih(&old_entry_path)) ;
 
@@ -1296,16 +1300,28 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 				      &new_entry_path, &new_de);
 	// reiserfs_add_entry should not return IO_ERROR, because it is called with essentially same parameters from
         // reiserfs_add_entry above, and we'll catch any i/o errors before we get here.
-	if (retval != NAME_FOUND_INVISIBLE && retval != NAME_FOUND)
-	    BUG ();
+	if (retval != NAME_FOUND_INVISIBLE && retval != NAME_FOUND) {
+	    pathrelse(&new_entry_path);
+	    pathrelse(&old_entry_path);
+	    journal_end(&th, old_dir->i_sb, jbegin_count);
+	    reiserfs_write_unlock(old_dir->i_sb);
+	    return -EIO;
+	}
 
 	copy_item_head(&new_entry_ih, get_ih(&new_entry_path)) ;
 
 	reiserfs_prepare_for_journal(old_inode->i_sb, new_de.de_bh, 1) ;
 
 	if (S_ISDIR(old_inode->i_mode)) {
-	    if (search_by_entry_key (new_dir->i_sb, &dot_dot_de.de_entry_key, &dot_dot_entry_path, &dot_dot_de) != NAME_FOUND)
-		BUG ();
+	    if ((retval = search_by_entry_key (new_dir->i_sb, &dot_dot_de.de_entry_key,
+					       &dot_dot_entry_path, &dot_dot_de)) != NAME_FOUND) {
+		pathrelse(&dot_dot_entry_path);
+		pathrelse(&new_entry_path);
+		pathrelse(&old_entry_path);
+		journal_end(&th, old_dir->i_sb, jbegin_count);
+		reiserfs_write_unlock(old_dir->i_sb);
+		return -EIO;
+	    }
 	    copy_item_head(&dot_dot_ih, get_ih(&dot_dot_entry_path)) ;
 	    // node containing ".." gets into transaction
 	    reiserfs_prepare_for_journal(old_inode->i_sb, dot_dot_de.de_bh, 1) ;

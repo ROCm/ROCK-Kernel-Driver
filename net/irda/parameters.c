@@ -160,7 +160,8 @@ static int irda_insert_integer(void *self, __u8 *buf, int len, __u8 pi,
 	}
 	/* Check if buffer is long enough for insertion */
 	if (len < (2+p.pl)) {
-		WARNING("%s: buffer to short for insertion!\n", __FUNCTION__);
+		IRDA_WARNING("%s: buffer to short for insertion!\n",
+			     __FUNCTION__);
 		return -1;
 	}
 	IRDA_DEBUG(2, "%s(), pi=%#x, pl=%d, pi=%d\n", __FUNCTION__,
@@ -185,7 +186,8 @@ static int irda_insert_integer(void *self, __u8 *buf, int len, __u8 pi,
 
 		break;
 	default:
-		WARNING("%s: length %d not supported\n", __FUNCTION__, p.pl);
+		IRDA_WARNING("%s: length %d not supported\n",
+			     __FUNCTION__, p.pl);
 		/* Skip parameter */
 		return -1;
 	}
@@ -214,9 +216,9 @@ static int irda_extract_integer(void *self, __u8 *buf, int len, __u8 pi,
 
 	/* Check if buffer is long enough for parsing */
 	if (len < (2+p.pl)) {
-		WARNING("%s: buffer to short for parsing! "
-			"Need %d bytes, but len is only %d\n",
-			__FUNCTION__, p.pl, len);
+		IRDA_WARNING("%s: buffer to short for parsing! "
+			     "Need %d bytes, but len is only %d\n",
+			     __FUNCTION__, p.pl, len);
 		return -1;
 	}
 
@@ -226,9 +228,9 @@ static int irda_extract_integer(void *self, __u8 *buf, int len, __u8 pi,
 	 * PV_INTEGER means that the handler is flexible.
 	 */
 	if (((type & PV_MASK) != PV_INTEGER) && ((type & PV_MASK) != p.pl)) {
-		ERROR("%s: invalid parameter length! "
-		      "Expected %d bytes, but value had %d bytes!\n",
-		      __FUNCTION__, type & PV_MASK, p.pl);
+		IRDA_ERROR("%s: invalid parameter length! "
+			   "Expected %d bytes, but value had %d bytes!\n",
+			   __FUNCTION__, type & PV_MASK, p.pl);
 
 		/* Most parameters are bit/byte fields or little endian,
 		 * so it's ok to only extract a subset of it (the subset
@@ -265,7 +267,8 @@ static int irda_extract_integer(void *self, __u8 *buf, int len, __u8 pi,
 			le32_to_cpus(&p.pv.i);
 		break;
 	default:
-		WARNING("%s: length %d not supported\n", __FUNCTION__, p.pl);
+		IRDA_WARNING("%s: length %d not supported\n",
+			     __FUNCTION__, p.pl);
 
 		/* Skip parameter */
 		return p.pl+2;
@@ -301,9 +304,9 @@ static int irda_extract_string(void *self, __u8 *buf, int len, __u8 pi,
 
 	/* Check if buffer is long enough for parsing */
 	if (len < (2+p.pl)) {
-		WARNING("%s: buffer to short for parsing! "
-			"Need %d bytes, but len is only %d\n",
-			__FUNCTION__, p.pl, len);
+		IRDA_WARNING("%s: buffer to short for parsing! "
+			     "Need %d bytes, but len is only %d\n",
+			     __FUNCTION__, p.pl, len);
 		return -1;
 	}
 
@@ -340,9 +343,9 @@ static int irda_extract_octseq(void *self, __u8 *buf, int len, __u8 pi,
 
 	/* Check if buffer is long enough for parsing */
 	if (len < (2+p.pl)) {
-		WARNING("%s: buffer to short for parsing! "
-			"Need %d bytes, but len is only %d\n",
-			__FUNCTION__, p.pl, len);
+		IRDA_WARNING("%s: buffer to short for parsing! "
+			     "Need %d bytes, but len is only %d\n",
+			     __FUNCTION__, p.pl, len);
 		return -1;
 	}
 
@@ -459,8 +462,8 @@ int irda_param_insert(void *self, __u8 pi, __u8 *buf, int len,
 	int ret = -1;
 	int n = 0;
 
-	ASSERT(buf != NULL, return ret;);
-	ASSERT(info != 0, return ret;);
+	IRDA_ASSERT(buf != NULL, return ret;);
+	IRDA_ASSERT(info != 0, return ret;);
 
 	pi_minor = pi & info->pi_mask;
 	pi_major = pi >> info->pi_major_offset;
@@ -484,7 +487,7 @@ int irda_param_insert(void *self, __u8 pi, __u8 *buf, int len,
 
 	/*  Check if handler has been implemented */
 	if (!pi_minor_info->func) {
-		MESSAGE("%s: no handler for pi=%#x\n", __FUNCTION__, pi);
+		IRDA_MESSAGE("%s: no handler for pi=%#x\n", __FUNCTION__, pi);
 		/* Skip this parameter */
 		return -1;
 	}
@@ -513,8 +516,8 @@ static int irda_param_extract(void *self, __u8 *buf, int len,
 	int ret = -1;
 	int n = 0;
 
-	ASSERT(buf != NULL, return ret;);
-	ASSERT(info != 0, return ret;);
+	IRDA_ASSERT(buf != NULL, return ret;);
+	IRDA_ASSERT(info != 0, return ret;);
 
 	pi_minor = buf[n] & info->pi_mask;
 	pi_major = buf[n] >> info->pi_major_offset;
@@ -541,7 +544,8 @@ static int irda_param_extract(void *self, __u8 *buf, int len,
 
 	/*  Check if handler has been implemented */
 	if (!pi_minor_info->func) {
-		MESSAGE("%s: no handler for pi=%#x\n", __FUNCTION__, buf[n]);
+		IRDA_MESSAGE("%s: no handler for pi=%#x\n",
+			     __FUNCTION__, buf[n]);
 		/* Skip this parameter */
 		return 2 + buf[n + 1]; /* Continue */
 	}
@@ -565,8 +569,8 @@ int irda_param_extract_all(void *self, __u8 *buf, int len,
 	int ret = -1;
 	int n = 0;
 
-	ASSERT(buf != NULL, return ret;);
-	ASSERT(info != 0, return ret;);
+	IRDA_ASSERT(buf != NULL, return ret;);
+	IRDA_ASSERT(info != 0, return ret;);
 
 	/*
 	 * Parse all parameters. Each parameter must be at least two bytes

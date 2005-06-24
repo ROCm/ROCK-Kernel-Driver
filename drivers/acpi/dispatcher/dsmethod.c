@@ -448,7 +448,16 @@ acpi_ds_restart_control_method (
 			 */
 			walk_state->return_desc = return_desc;
 		}
-		else {
+
+		/*
+		 * The following code is the
+		 * optional support for a so-called "implicit return". Some AML code
+		 * assumes that the last value of the method is "implicitly" returned
+		 * to the caller. Just save the last result as the return value.
+		 * NOTE: this is optional because the ASL language does not actually
+		 * support this behavior.
+		 */
+		else if (!acpi_ds_do_implicit_return (return_desc, walk_state, FALSE)) {
 			/*
 			 * Delete the return value if it will not be used by the
 			 * calling method

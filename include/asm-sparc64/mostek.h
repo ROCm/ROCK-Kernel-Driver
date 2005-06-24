@@ -38,7 +38,7 @@
  *
  * We now deal with physical addresses for I/O to the chip. -DaveM
  */
-static __inline__ u8 mostek_read(unsigned long addr)
+static __inline__ u8 mostek_read(void __iomem *addr)
 {
 	u8 ret;
 
@@ -48,7 +48,7 @@ static __inline__ u8 mostek_read(unsigned long addr)
 	return ret;
 }
 
-static __inline__ void mostek_write(unsigned long addr, u8 val)
+static __inline__ void mostek_write(void __iomem *addr, u8 val)
 {
 	__asm__ __volatile__("stba	%0, [%1] %2"
 			     : /* no outputs */
@@ -67,7 +67,7 @@ static __inline__ void mostek_write(unsigned long addr, u8 val)
 #define MOSTEK_YEAR		0x07ffUL
 
 extern spinlock_t mostek_lock;
-extern unsigned long mstk48t02_regs;
+extern void __iomem *mstk48t02_regs;
 
 /* Control register values. */
 #define	MSTK_CREG_WRITE	0x80	/* Must set this before placing values. */
@@ -134,13 +134,11 @@ do {	u8 __val = mostek_read(regs + MOSTEK_ ## name); \
  */
 #define MOSTEK_48T08_OFFSET	0x0000UL	/* Lower NVRAM portions */
 #define MOSTEK_48T08_48T02	0x1800UL	/* Offset to 48T02 chip */
-extern unsigned long mstk48t08_regs;
 
 /* SUN5 systems usually have 48t59 model clock chipsets.  But we keep the older
  * clock chip definitions around just in case.
  */
 #define MOSTEK_48T59_OFFSET	0x0000UL	/* Lower NVRAM portions */
 #define MOSTEK_48T59_48T02	0x1800UL	/* Offset to 48T02 chip */
-extern unsigned long mstk48t59_regs;
 
 #endif /* !(_SPARC64_MOSTEK_H) */

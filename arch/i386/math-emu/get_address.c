@@ -81,7 +81,7 @@ static int sib(int mod, unsigned long *fpu_eip)
   long offset;
 
   RE_ENTRANT_CHECK_OFF;
-  FPU_code_verify_area(1);
+  FPU_code_access_ok(1);
   FPU_get_user(base, (u_char __user *) (*fpu_eip));   /* The SIB byte */
   RE_ENTRANT_CHECK_ON;
   (*fpu_eip)++;
@@ -111,7 +111,7 @@ static int sib(int mod, unsigned long *fpu_eip)
       /* 8 bit signed displacement */
       long displacement;
       RE_ENTRANT_CHECK_OFF;
-      FPU_code_verify_area(1);
+      FPU_code_access_ok(1);
       FPU_get_user(displacement, (signed char __user *) (*fpu_eip));
       offset += displacement;
       RE_ENTRANT_CHECK_ON;
@@ -122,7 +122,7 @@ static int sib(int mod, unsigned long *fpu_eip)
       /* 32 bit displacement */
       long displacement;
       RE_ENTRANT_CHECK_OFF;
-      FPU_code_verify_area(4);
+      FPU_code_access_ok(4);
       FPU_get_user(displacement, (long __user *) (*fpu_eip));
       offset += displacement;
       RE_ENTRANT_CHECK_ON;
@@ -276,7 +276,7 @@ void __user *FPU_get_address(u_char FPU_modrm, unsigned long *fpu_eip,
 	    {
 	      /* Special case: disp32 */
 	      RE_ENTRANT_CHECK_OFF;
-	      FPU_code_verify_area(4);
+	      FPU_code_access_ok(4);
 	      FPU_get_user(address, (unsigned long __user *) (*fpu_eip));
 	      (*fpu_eip) += 4;
 	      RE_ENTRANT_CHECK_ON;
@@ -293,7 +293,7 @@ void __user *FPU_get_address(u_char FPU_modrm, unsigned long *fpu_eip,
 	case 1:
 	  /* 8 bit signed displacement */
 	  RE_ENTRANT_CHECK_OFF;
-	  FPU_code_verify_area(1);
+	  FPU_code_access_ok(1);
 	  FPU_get_user(address, (signed char __user *) (*fpu_eip));
 	  RE_ENTRANT_CHECK_ON;
 	  (*fpu_eip)++;
@@ -301,7 +301,7 @@ void __user *FPU_get_address(u_char FPU_modrm, unsigned long *fpu_eip,
 	case 2:
 	  /* 32 bit displacement */
 	  RE_ENTRANT_CHECK_OFF;
-	  FPU_code_verify_area(4);
+	  FPU_code_access_ok(4);
 	  FPU_get_user(address, (long __user *) (*fpu_eip));
 	  (*fpu_eip) += 4;
 	  RE_ENTRANT_CHECK_ON;
@@ -362,7 +362,7 @@ void __user *FPU_get_address_16(u_char FPU_modrm, unsigned long *fpu_eip,
 	{
 	  /* Special case: disp16 */
 	  RE_ENTRANT_CHECK_OFF;
-	  FPU_code_verify_area(2);
+	  FPU_code_access_ok(2);
 	  FPU_get_user(address, (unsigned short __user *) (*fpu_eip));
 	  (*fpu_eip) += 2;
 	  RE_ENTRANT_CHECK_ON;
@@ -372,7 +372,7 @@ void __user *FPU_get_address_16(u_char FPU_modrm, unsigned long *fpu_eip,
     case 1:
       /* 8 bit signed displacement */
       RE_ENTRANT_CHECK_OFF;
-      FPU_code_verify_area(1);
+      FPU_code_access_ok(1);
       FPU_get_user(address, (signed char __user *) (*fpu_eip));
       RE_ENTRANT_CHECK_ON;
       (*fpu_eip)++;
@@ -380,7 +380,7 @@ void __user *FPU_get_address_16(u_char FPU_modrm, unsigned long *fpu_eip,
     case 2:
       /* 16 bit displacement */
       RE_ENTRANT_CHECK_OFF;
-      FPU_code_verify_area(2);
+      FPU_code_access_ok(2);
       FPU_get_user(address, (unsigned short __user *) (*fpu_eip));
       (*fpu_eip) += 2;
       RE_ENTRANT_CHECK_ON;

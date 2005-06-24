@@ -61,7 +61,7 @@ anslcd_write( struct file * file, const char __user * buf,
 	printk(KERN_DEBUG "LCD: write\n");
 #endif
 
-	if ( verify_area(VERIFY_READ, buf, count) )
+	if (!access_ok(VERIFY_READ, buf, count))
 		return -EFAULT;
 	for ( i = *ppos; count > 0; ++i, ++p, --count ) 
 	{

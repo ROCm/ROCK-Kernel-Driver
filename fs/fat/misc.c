@@ -33,15 +33,7 @@ void fat_fs_panic(struct super_block *s, const char *fmt, ...)
 	}
 }
 
-void lock_fat(struct super_block *sb)
-{
-	down(&(MSDOS_SB(sb)->fat_lock));
-}
-
-void unlock_fat(struct super_block *sb)
-{
-	up(&(MSDOS_SB(sb)->fat_lock));
-}
+EXPORT_SYMBOL(fat_fs_panic);
 
 /* Flushes the number of free clusters on FAT32 */
 /* XXX: Need to write one per FSINFO block.  Currently only writes 1 */
@@ -56,7 +48,7 @@ void fat_clusters_flush(struct super_block *sb)
 
 	bh = sb_bread(sb, sbi->fsinfo_sector);
 	if (bh == NULL) {
-		printk(KERN_ERR "FAT bread failed in fat_clusters_flush\n");
+		printk(KERN_ERR "FAT: bread failed in fat_clusters_flush\n");
 		return;
 	}
 
@@ -75,31 +67,29 @@ void fat_clusters_flush(struct super_block *sb)
 		if (sbi->prev_free != -1)
 			fsinfo->next_cluster = cpu_to_le32(sbi->prev_free);
 		mark_buffer_dirty(bh);
+		if (sb->s_flags & MS_SYNCHRONOUS)
+			sync_dirty_buffer(bh);
 	}
 	brelse(bh);
 }
 
 /*
- * fat_add_cluster tries to allocate a new cluster and adds it to the
- * file represented by inode.
+ * fat_chain_add() adds a new cluster to the chain of clusters represented
+ * by inode.
  */
-int fat_add_cluster(struct inode *inode)
+int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 {
 	struct super_block *sb = inode->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
-	int ret, count, limit, new_dclus, new_fclus, last;
-	int cluster_bits = sbi->cluster_bits;
+	int ret, new_fclus, last;
 
 	/*
 	 * We must locate the last cluster of the file to add this new
 	 * one (new_dclus) to the end of the link list (the FAT).
-	 *
-	 * In order to confirm that the cluster chain is valid, we
-	 * find out EOF first.
 	 */
 	last = new_fclus = 0;
 	if (MSDOS_I(inode)->i_start) {
-		int ret, fclus, dclus;
+		int fclus, dclus;
 
 		ret = fat_get_cluster(inode, FAT_ENT_EOF, &fclus, &dclus);
 		if (ret < 0)
@@ -108,66 +98,42 @@ int fat_add_cluster(struct inode *inode)
 		last = dclus;
 	}
 
-	/* find free FAT entry */
-	lock_fat(sb);
-
-	if (sbi->free_clusters == 0) {
-		unlock_fat(sb);
-		return -ENOSPC;
-	}
-
-	limit = sbi->max_cluster;
-	new_dclus = sbi->prev_free + 1;
-	for (count = FAT_START_ENT; count < limit; count++, new_dclus++) {
-		new_dclus = new_dclus % limit;
-		if (new_dclus < FAT_START_ENT)
-			new_dclus = FAT_START_ENT;
-
-		ret = fat_access(sb, new_dclus, -1);
-		if (ret < 0) {
-			unlock_fat(sb);
-			return ret;
-		} else if (ret == FAT_ENT_FREE)
-			break;
-	}
-	if (count >= limit) {
-		sbi->free_clusters = 0;
-		unlock_fat(sb);
-		return -ENOSPC;
-	}
-
-	ret = fat_access(sb, new_dclus, FAT_ENT_EOF);
-	if (ret < 0) {
-		unlock_fat(sb);
-		return ret;
-	}
-
-	sbi->prev_free = new_dclus;
-	if (sbi->free_clusters != -1)
-		sbi->free_clusters--;
-	fat_clusters_flush(sb);
-
-	unlock_fat(sb);
-
 	/* add new one to the last of the cluster chain */
 	if (last) {
-		ret = fat_access(sb, last, new_dclus);
+		struct fat_entry fatent;
+
+		fatent_init(&fatent);
+		ret = fat_ent_read(inode, &fatent, last);
+		if (ret >= 0) {
+			int wait = inode_needs_sync(inode);
+			ret = fat_ent_write(inode, &fatent, new_dclus, wait);
+			fatent_brelse(&fatent);
+		}
 		if (ret < 0)
 			return ret;
 //		fat_cache_add(inode, new_fclus, new_dclus);
 	} else {
 		MSDOS_I(inode)->i_start = new_dclus;
 		MSDOS_I(inode)->i_logstart = new_dclus;
-		mark_inode_dirty(inode);
+		/*
+		 * Since generic_osync_inode() synchronize later if
+		 * this is not directory, we don't here.
+		 */
+		if (S_ISDIR(inode->i_mode) && IS_DIRSYNC(inode)) {
+			ret = fat_sync_inode(inode);
+			if (ret)
+				return ret;
+		} else
+			mark_inode_dirty(inode);
 	}
-	if (new_fclus != (inode->i_blocks >> (cluster_bits - 9))) {
+	if (new_fclus != (inode->i_blocks >> (sbi->cluster_bits - 9))) {
 		fat_fs_panic(sb, "clusters badly computed (%d != %lu)",
-			new_fclus, inode->i_blocks >> (cluster_bits - 9));
+			new_fclus, inode->i_blocks >> (sbi->cluster_bits - 9));
 		fat_cache_inval_inode(inode);
 	}
-	inode->i_blocks += sbi->cluster_size >> 9;
+	inode->i_blocks += nr_cluster << (sbi->cluster_bits - 9);
 
-	return new_dclus;
+	return 0;
 }
 
 extern struct timezone sys_tz;
@@ -230,52 +196,30 @@ void fat_date_unix2dos(int unix_date, __le16 *time, __le16 *date)
 
 EXPORT_SYMBOL(fat_date_unix2dos);
 
-/* Returns the inode number of the directory entry at offset pos. If bh is
-   non-NULL, it is brelse'd before. Pos is incremented. The buffer header is
-   returned in bh.
-   AV. Most often we do it item-by-item. Makes sense to optimize.
-   AV. OK, there we go: if both bh and de are non-NULL we assume that we just
-   AV. want the next entry (took one explicit de=NULL in vfat/namei.c).
-   AV. It's done in fat_get_entry() (inlined), here the slow case lives.
-   AV. Additionally, when we return -1 (i.e. reached the end of directory)
-   AV. we make bh NULL.
- */
-
-int fat__get_entry(struct inode *dir, loff_t *pos, struct buffer_head **bh,
-		   struct msdos_dir_entry **de, loff_t *i_pos)
+int fat_sync_bhs(struct buffer_head **bhs, int nr_bhs)
 {
-	struct super_block *sb = dir->i_sb;
-	struct msdos_sb_info *sbi = MSDOS_SB(sb);
-	sector_t phys, iblock;
-	loff_t offset;
-	int err;
+	int i, e, err = 0;
 
-next:
-	offset = *pos;
-	if (*bh)
-		brelse(*bh);
-
-	*bh = NULL;
-	iblock = *pos >> sb->s_blocksize_bits;
-	err = fat_bmap(dir, iblock, &phys);
-	if (err || !phys)
-		return -1;	/* beyond EOF or error */
-
-	*bh = sb_bread(sb, phys);
-	if (*bh == NULL) {
-		printk(KERN_ERR "FAT: Directory bread(block %llu) failed\n",
-		       (unsigned long long)phys);
-		/* skip this block */
-		*pos = (iblock + 1) << sb->s_blocksize_bits;
-		goto next;
+	for (i = 0; i < nr_bhs; i++) {
+		lock_buffer(bhs[i]);
+		if (test_clear_buffer_dirty(bhs[i])) {
+			get_bh(bhs[i]);
+			bhs[i]->b_end_io = end_buffer_write_sync;
+			e = submit_bh(WRITE, bhs[i]);
+			if (!err && e)
+				err = e;
+		} else
+			unlock_buffer(bhs[i]);
 	}
-
-	offset &= sb->s_blocksize - 1;
-	*pos += sizeof(struct msdos_dir_entry);
-	*de = (struct msdos_dir_entry *)((*bh)->b_data + offset);
-	*i_pos = ((loff_t)phys << sbi->dir_per_block_bits) + (offset >> MSDOS_DIR_BITS);
-
-	return 0;
+	for (i = 0; i < nr_bhs; i++) {
+		wait_on_buffer(bhs[i]);
+		if (buffer_eopnotsupp(bhs[i])) {
+			clear_buffer_eopnotsupp(bhs[i]);
+			err = -EOPNOTSUPP;
+		} else if (!err && !buffer_uptodate(bhs[i]))
+			err = -EIO;
+	}
+	return err;
 }
 
-EXPORT_SYMBOL(fat__get_entry);
+EXPORT_SYMBOL(fat_sync_bhs);

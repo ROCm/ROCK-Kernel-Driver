@@ -536,8 +536,7 @@ int __init igafb_init(void)
 	if (!iga_init(info, par)) {
 		iounmap((void *)par->io_base);
 		iounmap(info->screen_base);
-		if (par->mmap_map)
-			kfree(par->mmap_map);
+		kfree(par->mmap_map);
 		kfree(info);
         }
 

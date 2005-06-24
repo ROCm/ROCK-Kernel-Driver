@@ -35,14 +35,10 @@
 
 
 struct tda10021_state {
-
 	struct i2c_adapter* i2c;
-
 	struct dvb_frontend_ops ops;
-
 	/* configuration settings */
 	const struct tda10021_config* config;
-
 	struct dvb_frontend frontend;
 
 	u8 pwm;
@@ -65,12 +61,12 @@ static int verbose;
 
 #define FIN (XIN >> 4)
 
-int tda10021_inittab_size = 0x40;
+static int tda10021_inittab_size = 0x40;
 static u8 tda10021_inittab[0x40]=
 {
 	0x73, 0x6a, 0x23, 0x0a, 0x02, 0x37, 0x77, 0x1a,
 	0x37, 0x6a, 0x17, 0x8a, 0x1e, 0x86, 0x43, 0x40,
-	0xb8, 0x3f, 0xa1, 0x00, 0xcd, 0x01, 0x00, 0xff,
+	0xb8, 0x3f, 0xa0, 0x00, 0xcd, 0x01, 0x00, 0xff,
 	0x11, 0x00, 0x7c, 0x31, 0x30, 0x20, 0x00, 0x00,
 	0x02, 0x00, 0x00, 0x7d, 0x00, 0x00, 0x00, 0x00,
 	0x07, 0x00, 0x33, 0x11, 0x0d, 0x95, 0x08, 0x58,
@@ -93,7 +89,6 @@ static int tda10021_writereg (struct tda10021_state* state, u8 reg, u8 data)
 	msleep(10);
 	return (ret != 1) ? -EREMOTEIO : 0;
 }
-
 
 static u8 tda10021_readreg (struct tda10021_state* state, u8 reg)
 {
@@ -208,18 +203,9 @@ static int tda10021_set_symbolrate (struct tda10021_state* state, u32 symbolrate
 	return 0;
 }
 
-
-
-
-
-
-
-
-
-
 static int tda10021_init (struct dvb_frontend *fe)
 {
-	struct tda10021_state* state = (struct tda10021_state*) fe->demodulator_priv;
+	struct tda10021_state* state = fe->demodulator_priv;
 	int i;
 
 	dprintk("DVB: TDA10021(%d): init chip\n", fe->adapter->num);
@@ -252,7 +238,7 @@ static int tda10021_init (struct dvb_frontend *fe)
 static int tda10021_set_parameters (struct dvb_frontend *fe,
 			    struct dvb_frontend_parameters *p)
 {
-	struct tda10021_state* state = (struct tda10021_state*) fe->demodulator_priv;
+	struct tda10021_state* state = fe->demodulator_priv;
 
 	//table for QAM4-QAM256 ready  QAM4  QAM16 QAM32 QAM64 QAM128 QAM256
 	//CONF
@@ -292,7 +278,7 @@ static int tda10021_set_parameters (struct dvb_frontend *fe,
 
 static int tda10021_read_status(struct dvb_frontend* fe, fe_status_t* status)
 {
-	struct tda10021_state* state = (struct tda10021_state*) fe->demodulator_priv;
+	struct tda10021_state* state = fe->demodulator_priv;
 	int sync;
 
 	*status = 0;
@@ -317,11 +303,11 @@ static int tda10021_read_status(struct dvb_frontend* fe, fe_status_t* status)
 
 static int tda10021_read_ber(struct dvb_frontend* fe, u32* ber)
 {
-	struct tda10021_state* state = (struct tda10021_state*) fe->demodulator_priv;
+	struct tda10021_state* state = fe->demodulator_priv;
 
 	u32 _ber = tda10021_readreg(state, 0x14) |
-     		  (tda10021_readreg(state, 0x15) << 8) |
-		 ((tda10021_readreg(state, 0x16) & 0x0f) << 16);
+		(tda10021_readreg(state, 0x15) << 8) |
+		((tda10021_readreg(state, 0x16) & 0x0f) << 16);
 	*ber = 10 * _ber;
 
 	return 0;
@@ -329,7 +315,7 @@ static int tda10021_read_ber(struct dvb_frontend* fe, u32* ber)
 
 static int tda10021_read_signal_strength(struct dvb_frontend* fe, u16* strength)
 {
-	struct tda10021_state* state = (struct tda10021_state*) fe->demodulator_priv;
+	struct tda10021_state* state = fe->demodulator_priv;
 
 	u8 gain = tda10021_readreg(state, 0x17);
 	*strength = (gain << 8) | gain;
@@ -339,7 +325,7 @@ static int tda10021_read_signal_strength(struct dvb_frontend* fe, u16* strength)
 
 static int tda10021_read_snr(struct dvb_frontend* fe, u16* snr)
 {
-	struct tda10021_state* state = (struct tda10021_state*) fe->demodulator_priv;
+	struct tda10021_state* state = fe->demodulator_priv;
 
 	u8 quality = ~tda10021_readreg(state, 0x18);
 	*snr = (quality << 8) | quality;
@@ -349,7 +335,7 @@ static int tda10021_read_snr(struct dvb_frontend* fe, u16* snr)
 
 static int tda10021_read_ucblocks(struct dvb_frontend* fe, u32* ucblocks)
 {
-	struct tda10021_state* state = (struct tda10021_state*) fe->demodulator_priv;
+	struct tda10021_state* state = fe->demodulator_priv;
 
 	*ucblocks = tda10021_readreg (state, 0x13) & 0x7f;
 	if (*ucblocks == 0x7f)
@@ -364,7 +350,7 @@ static int tda10021_read_ucblocks(struct dvb_frontend* fe, u32* ucblocks)
 
 static int tda10021_get_frontend(struct dvb_frontend* fe, struct dvb_frontend_parameters *p)
 {
-	struct tda10021_state* state = (struct tda10021_state*) fe->demodulator_priv;
+	struct tda10021_state* state = fe->demodulator_priv;
 	int sync;
 	s8 afc = 0;
 
@@ -392,7 +378,7 @@ static int tda10021_get_frontend(struct dvb_frontend* fe, struct dvb_frontend_pa
 
 static int tda10021_sleep(struct dvb_frontend* fe)
 {
-	struct tda10021_state* state = (struct tda10021_state*) fe->demodulator_priv;
+	struct tda10021_state* state = fe->demodulator_priv;
 
 	tda10021_writereg (state, 0x1b, 0x02);  /* pdown ADC */
 	tda10021_writereg (state, 0x00, 0x80);  /* standby */
@@ -402,7 +388,7 @@ static int tda10021_sleep(struct dvb_frontend* fe)
 
 static void tda10021_release(struct dvb_frontend* fe)
 {
-	struct tda10021_state* state = (struct tda10021_state*) fe->demodulator_priv;
+	struct tda10021_state* state = fe->demodulator_priv;
 	kfree(state);
 }
 
@@ -415,7 +401,7 @@ struct dvb_frontend* tda10021_attach(const struct tda10021_config* config,
 	struct tda10021_state* state = NULL;
 
 	/* allocate memory for the internal state */
-	state = (struct tda10021_state*) kmalloc(sizeof(struct tda10021_state), GFP_KERNEL);
+	state = kmalloc(sizeof(struct tda10021_state), GFP_KERNEL);
 	if (state == NULL) goto error;
 
 	/* setup the state */
@@ -434,7 +420,7 @@ struct dvb_frontend* tda10021_attach(const struct tda10021_config* config,
 	return &state->frontend;
 
 error:
-	if (state) kfree(state);
+	kfree(state);
 	return NULL;
 }
 

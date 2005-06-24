@@ -8,9 +8,9 @@
 #include <errno.h>
 #include <signal.h>
 #include <linux/unistd.h>
-#include <sys/ptrace.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
+#include "ptrace_user.h"
 #include "os.h"
 #include "user.h"
 #include "user_util.h"
@@ -121,6 +121,11 @@ inline _syscall0(pid_t, getpid)
 int os_getpid(void)
 {
 	return(getpid());
+}
+
+int os_getpgrp(void)
+{
+	return getpgrp();
 }
 
 int os_map_memory(void *virt, int fd, unsigned long long off, unsigned long len,

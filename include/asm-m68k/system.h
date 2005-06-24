@@ -194,6 +194,8 @@ static inline unsigned long __cmpxchg(volatile void *p, unsigned long old,
 					(unsigned long)(n),sizeof(*(ptr))))
 #endif
 
+#define arch_align_stack(x) (x)
+
 #endif /* __KERNEL__ */
 
 #endif /* _M68K_SYSTEM_H */

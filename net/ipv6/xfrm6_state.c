@@ -27,9 +27,9 @@ __xfrm6_init_tempsel(struct xfrm_state *x, struct flowi *fl,
 	 * to current session. */
 	ipv6_addr_copy((struct in6_addr *)&x->sel.daddr, &fl->fl6_dst);
 	ipv6_addr_copy((struct in6_addr *)&x->sel.saddr, &fl->fl6_src);
-	x->sel.dport = fl->fl_ip_dport;
+	x->sel.dport = xfrm_flowi_dport(fl);
 	x->sel.dport_mask = ~0;
-	x->sel.sport = fl->fl_ip_sport;
+	x->sel.sport = xfrm_flowi_sport(fl);
 	x->sel.sport_mask = ~0;
 	x->sel.prefixlen_d = 128;
 	x->sel.prefixlen_s = 128;
@@ -129,7 +129,7 @@ void __init xfrm6_state_init(void)
 	xfrm_state_register_afinfo(&xfrm6_state_afinfo);
 }
 
-void __exit xfrm6_state_fini(void)
+void xfrm6_state_fini(void)
 {
 	xfrm_state_unregister_afinfo(&xfrm6_state_afinfo);
 }

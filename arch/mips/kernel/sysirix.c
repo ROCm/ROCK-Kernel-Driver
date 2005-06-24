@@ -289,9 +289,10 @@ asmlinkage int irix_syssgi(struct pt_regs *regs)
 		struct task_struct *p;
 		char tcomm[sizeof(current->comm)];
 
-		retval = verify_area(VERIFY_WRITE, buf, sizeof(tcomm));
-		if (retval)
+		if (!access_ok(VERIFY_WRITE, buf, sizeof(tcomm))) {
+			retval = -EFAULT;
 			break;
+		}
 		read_lock(&tasklist_lock);
 		p = find_task_by_pid(pid);
 		if (!p) {
@@ -313,9 +314,10 @@ asmlinkage int irix_syssgi(struct pt_regs *regs)
 		char *buf = (char *) regs->regs[base+6];
 		char *value;
 		return -EINVAL;	/* til I fix it */
-		retval = verify_area(VERIFY_WRITE, buf, 128);
-		if (retval)
+		if (!access_ok(VERIFY_WRITE, buf, 128)) {
+			retval = -EFAULT;
 			break;
+		}
 		value = prom_getenv(name);	/* PROM lock?  */
 		if (!value) {
 			retval = -EINVAL;
@@ -472,9 +474,8 @@ asmlinkage int irix_syssgi(struct pt_regs *regs)
 		pmd_t *pmdp;
 		pte_t *ptep;
 
-		retval = verify_area(VERIFY_WRITE, pageno, sizeof(int));
-		if (retval)
-			return retval;
+		if (!access_ok(VERIFY_WRITE, pageno, sizeof(int)))
+			return -EFAULT;
 
 		down_read(&mm->mmap_sem);
 		pgdp = pgd_offset(mm, addr);
@@ -727,9 +728,10 @@ asmlinkage int irix_statfs(const char *path, struct irix_statfs *buf,
 		error = -EINVAL;
 		goto out;
 	}
-	error = verify_area(VERIFY_WRITE, buf, sizeof(struct irix_statfs));
-	if (error)
+	if (!access_ok(VERIFY_WRITE, buf, sizeof(struct irix_statfs))) {
+		error = -EFAULT;
 		goto out;
+	}
 	error = user_path_walk(path, &nd);
 	if (error)
 		goto out;
@@ -763,9 +765,10 @@ asmlinkage int irix_fstatfs(unsigned int fd, struct irix_statfs *buf)
 	struct file *file;
 	int error, i;
 
-	error = verify_area(VERIFY_WRITE, buf, sizeof(struct irix_statfs));
-	if (error)
+	if (!access_ok(VERIFY_WRITE, buf, sizeof(struct irix_statfs))) {
+		error = -EFAULT;
 		goto out;
+	}
 	if (!(file = fget(fd))) {
 		error = -EBADF;
 		goto out;
@@ -816,9 +819,8 @@ asmlinkage int irix_times(struct tms * tbuf)
 	int err = 0;
 
 	if (tbuf) {
-		err = verify_area(VERIFY_WRITE,tbuf,sizeof *tbuf);
-		if (err)
-			return err;
+		if (!access_ok(VERIFY_WRITE,tbuf,sizeof *tbuf))
+			return -EFAULT;
 		err |= __put_user(current->utime, &tbuf->tms_utime);
 		err |= __put_user(current->stime, &tbuf->tms_stime);
 		err |= __put_user(current->signal->cutime, &tbuf->tms_cutime);
@@ -919,9 +921,8 @@ asmlinkage int irix_getdomainname(char *name, int len)
 {
 	int error;
 
-	error = verify_area(VERIFY_WRITE, name, len);
-	if (error)
-		return error;
+	if (!access_ok(VERIFY_WRITE, name, len))
+		return -EFAULT;
 
 	down_read(&uts_sem);
 	if (len > __NEW_UTS_LEN)
@@ -1050,7 +1051,7 @@ asmlinkage int irix_gettimeofday(struct timeval *tv)
 	long nsec, seq;
 	int err;
 
-	if (verify_area(VERIFY_WRITE, tv, sizeof(struct timeval)))
+	if (!access_ok(VERIFY_WRITE, tv, sizeof(struct timeval)))
 		return -EFAULT;
 
 	do {
@@ -1396,9 +1397,10 @@ asmlinkage int irix_statvfs(char *fname, struct irix_statvfs *buf)
 
 	printk("[%s:%d] Wheee.. irix_statvfs(%s,%p)\n",
 	       current->comm, current->pid, fname, buf);
-	error = verify_area(VERIFY_WRITE, buf, sizeof(struct irix_statvfs));
-	if (error)
+	if (!access_ok(VERIFY_WRITE, buf, sizeof(struct irix_statvfs))) {
+		error = -EFAULT;
 		goto out;
+	}
 	error = user_path_walk(fname, &nd);
 	if (error)
 		goto out;
@@ -1443,9 +1445,10 @@ asmlinkage int irix_fstatvfs(int fd, struct irix_statvfs *buf)
 	printk("[%s:%d] Wheee.. irix_fstatvfs(%d,%p)\n",
 	       current->comm, current->pid, fd, buf);
 
-	error = verify_area(VERIFY_WRITE, buf, sizeof(struct irix_statvfs));
-	if (error)
+	if (!access_ok(VERIFY_WRITE, buf, sizeof(struct irix_statvfs))) {
+		error = -EFAULT;
 		goto out;
+	}
 	if (!(file = fget(fd))) {
 		error = -EBADF;
 		goto out;
@@ -1537,16 +1540,18 @@ asmlinkage int irix_mmap64(struct pt_regs *regs)
 	prot = regs->regs[base + 6];
 	if (!base) {
 		flags = regs->regs[base + 7];
-		error = verify_area(VERIFY_READ, sp, (4 * sizeof(unsigned long)));
-		if(error)
+		if (!access_ok(VERIFY_READ, sp, (4 * sizeof(unsigned long)))) {
+			error = -EFAULT;
 			goto out;
+		}
 		fd = sp[0];
 		__get_user(off1, &sp[1]);
 		__get_user(off2, &sp[2]);
 	} else {
-		error = verify_area(VERIFY_READ, sp, (5 * sizeof(unsigned long)));
-		if(error)
+		if (!access_ok(VERIFY_READ, sp, (5 * sizeof(unsigned long)))) {
+			error = -EFAULT;
 			goto out;
+		}
 		__get_user(flags, &sp[0]);
 		__get_user(fd, &sp[1]);
 		__get_user(off1, &sp[2]);
@@ -1650,9 +1655,10 @@ asmlinkage int irix_statvfs64(char *fname, struct irix_statvfs64 *buf)
 
 	printk("[%s:%d] Wheee.. irix_statvfs64(%s,%p)\n",
 	       current->comm, current->pid, fname, buf);
-	error = verify_area(VERIFY_WRITE, buf, sizeof(struct irix_statvfs64));
-	if(error)
+	if (!access_ok(VERIFY_WRITE, buf, sizeof(struct irix_statvfs64))) {
+		error = -EFAULT;
 		goto out;
+	}
 	error = user_path_walk(fname, &nd);
 	if (error)
 		goto out;
@@ -1697,9 +1703,10 @@ asmlinkage int irix_fstatvfs64(int fd, struct irix_statvfs *buf)
 	printk("[%s:%d] Wheee.. irix_fstatvfs64(%d,%p)\n",
 	       current->comm, current->pid, fd, buf);
 
-	error = verify_area(VERIFY_WRITE, buf, sizeof(struct irix_statvfs));
-	if (error)
+	if (!access_ok(VERIFY_WRITE, buf, sizeof(struct irix_statvfs))) {
+		error = -EFAULT;
 		goto out;
+	}
 	if (!(file = fget(fd))) {
 		error = -EBADF;
 		goto out;
@@ -1735,13 +1742,12 @@ out:
 
 asmlinkage int irix_getmountid(char *fname, unsigned long *midbuf)
 {
-	int err;
+	int err = 0;
 
 	printk("[%s:%d] irix_getmountid(%s, %p)\n",
 	       current->comm, current->pid, fname, midbuf);
-	err = verify_area(VERIFY_WRITE, midbuf, (sizeof(unsigned long) * 4));
-	if (err)
-		return err;
+	if (!access_ok(VERIFY_WRITE, midbuf, (sizeof(unsigned long) * 4)))
+		return -EFAULT;
 
 	/*
 	 * The idea with this system call is that when trying to determine

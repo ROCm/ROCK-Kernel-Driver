@@ -1,7 +1,7 @@
 Linux* Base Driver for the Intel(R) PRO/10GbE Family of Adapters
 ================================================================
 
-September 13, 2004
+November 17, 2004
 
 
 Contents
@@ -18,8 +18,7 @@ In This Release
 ===============
 
 This file describes the Linux* Base Driver for the Intel(R) PRO/10GbE Family 
-of Adapters, version 1.0.x.  This driver includes support for Itanium(TM)2 and
-EM64T systems.
+of Adapters, version 1.0.x.  
 
 For questions related to hardware requirements, refer to the documentation 
 supplied with your Intel PRO/10GbE adapter. All hardware requirements listed 
@@ -71,8 +70,8 @@ Default: Read from the EEPROM
     Ethernet PAUSE frames.
 
 RxDescriptors
-Valid Range: 64-4096
-Default Value: 1024
+Valid Range: 64-512
+Default Value: 512
     This value is the number of receive descriptors allocated by the driver. 
     Increasing this value allows the driver to buffer more incoming packets. 
     Each descriptor is 16 bytes.  A receive buffer is also allocated for 

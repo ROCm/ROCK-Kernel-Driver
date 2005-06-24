@@ -125,12 +125,6 @@ kmem_zone_destroy(kmem_zone_t *zone)
 		BUG();
 }
 
-static __inline int
-kmem_zone_shrink(kmem_zone_t *zone)
-{
-	return kmem_cache_shrink(zone);
-}
-
 extern void	    *kmem_zone_zalloc(kmem_zone_t *, int);
 extern void	    *kmem_zone_alloc(kmem_zone_t *, int);
 

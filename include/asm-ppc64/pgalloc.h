@@ -5,9 +5,6 @@
 #include <linux/slab.h>
 #include <linux/cpumask.h>
 #include <linux/percpu.h>
-#include <asm/processor.h>
-#include <asm/tlb.h>
-#include <asm/page.h>
 
 extern kmem_cache_t *zero_cache;
 
@@ -30,7 +27,7 @@ pgd_free(pgd_t *pgd)
 	kmem_cache_free(zero_cache, pgd);
 }
 
-#define pgd_populate(MM, PGD, PMD)	pgd_set(PGD, PMD)
+#define pud_populate(MM, PUD, PMD)	pud_set(PUD, PMD)
 
 static inline pmd_t *
 pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
@@ -48,42 +45,26 @@ pmd_free(pmd_t *pmd)
 #define pmd_populate(mm, pmd, pte_page) \
 	pmd_populate_kernel(mm, pmd, page_address(pte_page))
 
-static inline pte_t *
-pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
+static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
-	pte_t *pte;
-	pte = kmem_cache_alloc(zero_cache, GFP_KERNEL|__GFP_REPEAT);
-	if (pte) {
-		struct page *ptepage = virt_to_page(pte);
-		ptepage->mapping = (void *) mm;
-		ptepage->index = address & PMD_MASK;
-	}
-	return pte;
+	return kmem_cache_alloc(zero_cache, GFP_KERNEL|__GFP_REPEAT);
 }
 
-static inline struct page *
-pte_alloc_one(struct mm_struct *mm, unsigned long address)
+static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	pte_t *pte;
-	pte = kmem_cache_alloc(zero_cache, GFP_KERNEL|__GFP_REPEAT);
-	if (pte) {
-		struct page *ptepage = virt_to_page(pte);
-		ptepage->mapping = (void *) mm;
-		ptepage->index = address & PMD_MASK;
-		return ptepage;
-	}
+	pte_t *pte = kmem_cache_alloc(zero_cache, GFP_KERNEL|__GFP_REPEAT);
+	if (pte)
+		return virt_to_page(pte);
 	return NULL;
 }
 		
 static inline void pte_free_kernel(pte_t *pte)
 {
-	virt_to_page(pte)->mapping = NULL;
 	kmem_cache_free(zero_cache, pte);
 }
 
 static inline void pte_free(struct page *ptepage)
 {
-	ptepage->mapping = NULL;
 	kmem_cache_free(zero_cache, page_address(ptepage));
 }
 

@@ -51,7 +51,6 @@ EXPORT_SYMBOL(strncat);
 #ifdef CONFIG_PCI
 EXPORT_SYMBOL(pci_alloc_consistent);
 EXPORT_SYMBOL(pci_free_consistent);
-EXPORT_SYMBOL(pcibios_penalize_isa_irq);
 #endif
 
 /* mem exports */
@@ -65,13 +64,6 @@ EXPORT_SYMBOL(memmove);
 EXPORT_SYMBOL(memcmp);
 EXPORT_SYMBOL(memscan);
 EXPORT_SYMBOL(__copy_user);
-
-#ifdef CONFIG_VT
-/* XXX: MRB-remove - what was screen_info changed to?
-EXPORT_SYMBOL(screen_info);
-*/
-#endif
-
 EXPORT_SYMBOL(boot_cpu_data);
 
 #ifdef CONFIG_MMU

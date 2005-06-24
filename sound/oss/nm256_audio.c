@@ -1047,7 +1047,7 @@ nm256_peek_for_sig (struct nm256_info *card)
  * VERSTR is a human-readable version string.
  */
 
-static int __init
+static int __devinit
 nm256_install(struct pci_dev *pcidev, enum nm256rev rev, char *verstr)
 {
     struct nm256_info *card;

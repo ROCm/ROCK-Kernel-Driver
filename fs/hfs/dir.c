@@ -17,8 +17,8 @@
 /*
  * hfs_lookup()
  */
-struct dentry *hfs_lookup(struct inode *dir, struct dentry *dentry,
-			  struct nameidata *nd)
+static struct dentry *hfs_lookup(struct inode *dir, struct dentry *dentry,
+				 struct nameidata *nd)
 {
 	hfs_cat_rec rec;
 	struct hfs_find_data fd;
@@ -51,7 +51,7 @@ done:
 /*
  * hfs_readdir
  */
-int hfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
+static int hfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	struct super_block *sb = inode->i_sb;
@@ -177,8 +177,8 @@ static int hfs_dir_release(struct inode *inode, struct file *file)
  * a directory and return a corresponding inode, given the inode for
  * the directory and the name (and its length) of the new file.
  */
-int hfs_create(struct inode *dir, struct dentry *dentry, int mode,
-	       struct nameidata *nd)
+static int hfs_create(struct inode *dir, struct dentry *dentry, int mode,
+		      struct nameidata *nd)
 {
 	struct inode *inode;
 	int res;
@@ -207,7 +207,7 @@ int hfs_create(struct inode *dir, struct dentry *dentry, int mode,
  * in a directory, given the inode for the parent directory and the
  * name (and its length) of the new directory.
  */
-int hfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+static int hfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
 	struct inode *inode;
 	int res;
@@ -236,7 +236,7 @@ int hfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
  * file, given the inode for the parent directory and the name
  * (and its length) of the existing file.
  */
-int hfs_unlink(struct inode *dir, struct dentry *dentry)
+static int hfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode;
 	int res;
@@ -262,7 +262,7 @@ int hfs_unlink(struct inode *dir, struct dentry *dentry)
  * directory, given the inode for the parent directory and the name
  * (and its length) of the existing directory.
  */
-int hfs_rmdir(struct inode *dir, struct dentry *dentry)
+static int hfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode;
 	int res;
@@ -291,8 +291,8 @@ int hfs_rmdir(struct inode *dir, struct dentry *dentry)
  * new file/directory.
  * XXX: how do you handle must_be dir?
  */
-int hfs_rename(struct inode *old_dir, struct dentry *old_dentry,
-	       struct inode *new_dir, struct dentry *new_dentry)
+static int hfs_rename(struct inode *old_dir, struct dentry *old_dentry,
+		      struct inode *new_dir, struct dentry *new_dentry)
 {
 	int res;
 

@@ -26,7 +26,6 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
-#include <linux/major.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/poll.h>
@@ -164,6 +163,12 @@ static struct proto_ops hidp_sock_ops = {
 	.mmap		= sock_no_mmap
 };
 
+static struct proto hidp_proto = {
+	.name		= "HIDP",
+	.owner		= THIS_MODULE,
+	.obj_size	= sizeof(struct bt_sock)
+};
+
 static int hidp_sock_create(struct socket *sock, int protocol)
 {
 	struct sock *sk;
@@ -173,17 +178,20 @@ static int hidp_sock_create(struct socket *sock, int protocol)
 	if (sock->type != SOCK_RAW)
 		return -ESOCKTNOSUPPORT;
 
-	if (!(sk = bt_sock_alloc(sock, PF_BLUETOOTH, 0, GFP_KERNEL)))
+	sk = sk_alloc(PF_BLUETOOTH, GFP_KERNEL, &hidp_proto, 1);
+	if (!sk)
 		return -ENOMEM;
 
-	sk_set_owner(sk, THIS_MODULE);
+	sock_init_data(sock, sk);
 
 	sock->ops = &hidp_sock_ops;
 
 	sock->state = SS_UNCONNECTED;
 
-	sk->sk_destruct = NULL;
+	sock_reset_flag(sk, SOCK_ZAPPED);
+
 	sk->sk_protocol = protocol;
+	sk->sk_state	= BT_OPEN;
 
 	return 0;
 }
@@ -198,10 +206,19 @@ int __init hidp_init_sockets(void)
 {
 	int err;
 
+	err = proto_register(&hidp_proto, 0);
+	if (err < 0)
+		return err;
+
 	err = bt_sock_register(BTPROTO_HIDP, &hidp_sock_family_ops);
 	if (err < 0)
-		BT_ERR("Can't register HIDP socket");
+		goto error;
 
+	return 0;
+
+error:
+	BT_ERR("Can't register HIDP socket");
+	proto_unregister(&hidp_proto);
 	return err;
 }
 
@@ -209,4 +226,6 @@ void __exit hidp_cleanup_sockets(void)
 {
 	if (bt_sock_unregister(BTPROTO_HIDP) < 0)
 		BT_ERR("Can't unregister HIDP socket");
+
+	proto_unregister(&hidp_proto);
 }

@@ -176,7 +176,6 @@ EXPORT_SYMBOL(up);
 
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(synchronize_irq);
-EXPORT_SYMBOL(flush_tlb_all);
 EXPORT_SYMBOL(flush_tlb_mm);
 EXPORT_SYMBOL(flush_tlb_range);
 EXPORT_SYMBOL(flush_tlb_page);

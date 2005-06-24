@@ -216,6 +216,14 @@ long pps_stbcnt;		/* stability limit exceeded */
 /* hook for a loadable hardpps kernel module */
 void (*hardpps_ptr)(struct timeval *);
 
+/* we call this to notify the arch when the clock is being
+ * controlled.  If no such arch routine, do nothing.
+ */
+void __attribute__ ((weak)) notify_arch_cmos_timer(void)
+{
+	return;
+}
+
 /* adjtimex mainly allows reading (and writing, if superuser) of
  * kernel time-keeping variables. used by xntpd.
  */
@@ -399,6 +407,7 @@ leave:	if ((time_status & (STA_UNSYNC|STA_CLOCKERR)) != 0
 	txc->stbcnt	   = pps_stbcnt;
 	write_sequnlock_irq(&xtime_lock);
 	do_gettimeofday(&txc->time);
+	notify_arch_cmos_timer();
 	return(result);
 }
 
@@ -507,14 +516,6 @@ int do_settimeofday (struct timespec *tv)
 
 	write_seqlock_irq(&xtime_lock);
 	{
-		/*
-		 * This is revolting. We need to set "xtime" correctly. However, the value
-		 * in this location is the value at the most recent update of wall time.
-		 * Discover what correction gettimeofday would have done, and then undo
-		 * it!
-		 */
-		nsec -= time_interpolator_get_offset();
-
 		wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
 		wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
 

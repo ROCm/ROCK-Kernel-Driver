@@ -85,9 +85,8 @@ static unsigned long first_settimeofday = 1;
 
 unsigned long tb_ticks_per_jiffy;
 unsigned long tb_ticks_per_usec = 100; /* sane default */
+EXPORT_SYMBOL(tb_ticks_per_usec);
 unsigned long tb_ticks_per_sec;
-unsigned long next_xtime_sync_tb;
-unsigned long xtime_sync_interval;
 unsigned long tb_to_xs;
 unsigned      tb_to_us;
 unsigned long processor_freq;
@@ -158,8 +157,8 @@ static inline void __do_gettimeofday(struct timeval *tv, unsigned long tb_val)
 	 * The conversion to microseconds at the end is done
 	 * without a divide (and in fact, without a multiply)
 	 */
-	tb_ticks = tb_val - do_gtod.tb_orig_stamp;
 	temp_varp = do_gtod.varp;
+	tb_ticks = tb_val - temp_varp->tb_orig_stamp;
 	temp_tb_to_xs = temp_varp->tb_to_xs;
 	temp_stamp_xsec = temp_varp->stamp_xsec;
 	tb_xsec = mulhdu( tb_ticks, temp_tb_to_xs );
@@ -185,15 +184,53 @@ static inline void timer_sync_xtime(unsigned long cur_tb)
 {
 	struct timeval my_tv;
 
-	if (cur_tb > next_xtime_sync_tb) {
-		next_xtime_sync_tb = cur_tb + xtime_sync_interval;
-		__do_gettimeofday(&my_tv, cur_tb);
+	__do_gettimeofday(&my_tv, cur_tb);
 
-		if (xtime.tv_sec <= my_tv.tv_sec) {
-			xtime.tv_sec = my_tv.tv_sec;
-			xtime.tv_nsec = my_tv.tv_usec * 1000;
-		}
+	if (xtime.tv_sec <= my_tv.tv_sec) {
+		xtime.tv_sec = my_tv.tv_sec;
+		xtime.tv_nsec = my_tv.tv_usec * 1000;
 	}
+}
+
+/*
+ * When the timebase - tb_orig_stamp gets too big, we do a manipulation
+ * between tb_orig_stamp and stamp_xsec. The goal here is to keep the
+ * difference tb - tb_orig_stamp small enough to always fit inside a
+ * 32 bits number. This is a requirement of our fast 32 bits userland
+ * implementation in the vdso. If we "miss" a call to this function
+ * (interrupt latency, CPU locked in a spinlock, ...) and we end up
+ * with a too big difference, then the vdso will fallback to calling
+ * the syscall
+ */
+static __inline__ void timer_recalc_offset(unsigned long cur_tb)
+{
+	struct gettimeofday_vars * temp_varp;
+	unsigned temp_idx;
+	unsigned long offset, new_stamp_xsec, new_tb_orig_stamp;
+
+	if (((cur_tb - do_gtod.varp->tb_orig_stamp) & 0x80000000u) == 0)
+		return;
+
+	temp_idx = (do_gtod.var_idx == 0);
+	temp_varp = &do_gtod.vars[temp_idx];
+
+	new_tb_orig_stamp = cur_tb;
+	offset = new_tb_orig_stamp - do_gtod.varp->tb_orig_stamp;
+	new_stamp_xsec = do_gtod.varp->stamp_xsec + mulhdu(offset, do_gtod.varp->tb_to_xs);
+
+	temp_varp->tb_to_xs = do_gtod.varp->tb_to_xs;
+	temp_varp->tb_orig_stamp = new_tb_orig_stamp;
+	temp_varp->stamp_xsec = new_stamp_xsec;
+	smp_mb();
+	do_gtod.varp = temp_varp;
+	do_gtod.var_idx = temp_idx;
+
+	++(systemcfg->tb_update_count);
+	smp_wmb();
+	systemcfg->tb_orig_stamp = new_tb_orig_stamp;
+	systemcfg->stamp_xsec = new_stamp_xsec;
+	smp_wmb();
+	++(systemcfg->tb_update_count);
 }
 
 #ifdef CONFIG_SMP
@@ -288,9 +325,7 @@ int timer_interrupt(struct pt_regs * regs)
 
 	irq_enter();
 
-#ifndef CONFIG_PPC_ISERIES
 	profile_tick(CPU_PROFILING, regs);
-#endif
 
 	lpaca->lppaca.int_dword.fields.decr_int = 0;
 
@@ -311,6 +346,7 @@ int timer_interrupt(struct pt_regs * regs)
 		if (cpu == boot_cpuid) {
 			write_seqlock(&xtime_lock);
 			tb_last_stamp = lpaca->next_jiffy_update_tb;
+			timer_recalc_offset(lpaca->next_jiffy_update_tb);
 			do_timer(regs);
 			timer_sync_xtime(lpaca->next_jiffy_update_tb);
 			timer_check_rtc();
@@ -331,6 +367,14 @@ int timer_interrupt(struct pt_regs * regs)
 		struct ItLpQueue *lpq = lpaca->lpqueue_ptr;
 		if (lpq && ItLpQueue_isLpIntPending(lpq))
 			lpevent_count += ItLpQueue_process(lpq, regs);
+	}
+#endif
+
+/* collect purr register values often, for accurate calculations */
+#if defined(CONFIG_PPC_PSERIES)
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
+		struct cpu_usage *cu = &__get_cpu_var(cpu_usage_array);
+		cu->current_tb = mfspr(SPRN_PURR);
 	}
 #endif
 
@@ -398,7 +442,9 @@ int do_settimeofday(struct timespec *tv)
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 
-	delta_xsec = mulhdu( (tb_last_stamp-do_gtod.tb_orig_stamp), do_gtod.varp->tb_to_xs );
+	delta_xsec = mulhdu( (tb_last_stamp-do_gtod.varp->tb_orig_stamp),
+			     do_gtod.varp->tb_to_xs );
+
 	new_xsec = (new_nsec * XSEC_PER_SEC) / NSEC_PER_SEC;
 	new_xsec += new_sec * XSEC_PER_SEC;
 	if ( new_xsec > delta_xsec ) {
@@ -411,7 +457,7 @@ int do_settimeofday(struct timespec *tv)
 		 * before 1970 ... eg. we booted ten days ago, and we are setting
 		 * the time to Jan 5, 1970 */
 		do_gtod.varp->stamp_xsec = new_xsec;
-		do_gtod.tb_orig_stamp = tb_last_stamp;
+		do_gtod.varp->tb_orig_stamp = tb_last_stamp;
 		systemcfg->stamp_xsec = new_xsec;
 		systemcfg->tb_orig_stamp = tb_last_stamp;
 	}
@@ -464,9 +510,10 @@ void __init time_init(void)
 	xtime.tv_sec = mktime(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			      tm.tm_hour, tm.tm_min, tm.tm_sec);
 	tb_last_stamp = get_tb();
-	do_gtod.tb_orig_stamp = tb_last_stamp;
 	do_gtod.varp = &do_gtod.vars[0];
 	do_gtod.var_idx = 0;
+	do_gtod.varp->tb_orig_stamp = tb_last_stamp;
+	get_paca()->next_jiffy_update_tb = tb_last_stamp + tb_ticks_per_jiffy;
 	do_gtod.varp->stamp_xsec = xtime.tv_sec * XSEC_PER_SEC;
 	do_gtod.tb_ticks_per_sec = tb_ticks_per_sec;
 	do_gtod.varp->tb_to_xs = tb_to_xs;
@@ -476,9 +523,6 @@ void __init time_init(void)
 	systemcfg->tb_ticks_per_sec = tb_ticks_per_sec;
 	systemcfg->stamp_xsec = xtime.tv_sec * XSEC_PER_SEC;
 	systemcfg->tb_to_xs = tb_to_xs;
-
-	xtime_sync_interval = tb_ticks_per_sec - (tb_ticks_per_sec/8);
-	next_xtime_sync_tb = tb_last_stamp + xtime_sync_interval;
 
 	time_freq = 0;
 
@@ -584,12 +628,12 @@ void ppc_adjtimex(void)
 	   stamp_xsec which is the time (in 1/2^20 second units) corresponding to tb_orig_stamp.  This 
 	   new value of stamp_xsec compensates for the change in frequency (implied by the new tb_to_xs)
 	   which guarantees that the current time remains the same */ 
-	tb_ticks = get_tb() - do_gtod.tb_orig_stamp;
+	write_seqlock_irqsave( &xtime_lock, flags );
+	tb_ticks = get_tb() - do_gtod.varp->tb_orig_stamp;
 	div128_by_32( 1024*1024, 0, new_tb_ticks_per_sec, &divres );
 	new_tb_to_xs = divres.result_low;
 	new_xsec = mulhdu( tb_ticks, new_tb_to_xs );
 
-	write_seqlock_irqsave( &xtime_lock, flags );
 	old_xsec = mulhdu( tb_ticks, do_gtod.varp->tb_to_xs );
 	new_stamp_xsec = do_gtod.varp->stamp_xsec + old_xsec - new_xsec;
 
@@ -597,17 +641,13 @@ void ppc_adjtimex(void)
 	   values in do_gettimeofday.  We alternate the copies and as long as a reasonable time elapses between
 	   changes, there will never be inconsistent values.  ntpd has a minimum of one minute between updates */
 
-	if (do_gtod.var_idx == 0) {
-		temp_varp = &do_gtod.vars[1];
-		temp_idx  = 1;
-	}
-	else {
-		temp_varp = &do_gtod.vars[0];
-		temp_idx  = 0;
-	}
+	temp_idx = (do_gtod.var_idx == 0);
+	temp_varp = &do_gtod.vars[temp_idx];
+
 	temp_varp->tb_to_xs = new_tb_to_xs;
 	temp_varp->stamp_xsec = new_stamp_xsec;
-	mb();
+	temp_varp->tb_orig_stamp = do_gtod.varp->tb_orig_stamp;
+	smp_mb();
 	do_gtod.varp = temp_varp;
 	do_gtod.var_idx = temp_idx;
 
@@ -621,10 +661,10 @@ void ppc_adjtimex(void)
 	 * loops back and reads them again until this criteria is met.
 	 */
 	++(systemcfg->tb_update_count);
-	wmb();
+	smp_wmb();
 	systemcfg->tb_to_xs = new_tb_to_xs;
 	systemcfg->stamp_xsec = new_stamp_xsec;
-	wmb();
+	smp_wmb();
 	++(systemcfg->tb_update_count);
 
 	write_sequnlock_irqrestore( &xtime_lock, flags );

@@ -65,7 +65,6 @@
 #include <asm/types.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
-#include <asm/ipc.h>
 #include <asm/atomic.h>
 #include <asm/ldt.h>
 
@@ -85,7 +84,7 @@ int cp_compat_stat(struct kstat *kbuf, struct compat_stat __user *ubuf)
 		return -EOVERFLOW;
 	if (kbuf->size >= 0x7fffffff)
 		return -EOVERFLOW;
-	if (verify_area(VERIFY_WRITE, ubuf, sizeof(struct compat_stat)) ||
+	if (!access_ok(VERIFY_WRITE, ubuf, sizeof(struct compat_stat)) ||
 	    __put_user (old_encode_dev(kbuf->dev), &ubuf->st_dev) ||
 	    __put_user (kbuf->ino, &ubuf->st_ino) ||
 	    __put_user (kbuf->mode, &ubuf->st_mode) ||
@@ -128,7 +127,7 @@ cp_stat64(struct stat64 __user *ubuf, struct kstat *stat)
 	typeof(ubuf->st_gid) gid = 0;
 	SET_UID(uid, stat->uid);
 	SET_GID(gid, stat->gid);
-	if (verify_area(VERIFY_WRITE, ubuf, sizeof(struct stat64)) ||
+	if (!access_ok(VERIFY_WRITE, ubuf, sizeof(struct stat64)) ||
 	    __put_user(huge_encode_dev(stat->dev), &ubuf->st_dev) ||
 	    __put_user (stat->ino, &ubuf->__st_ino) ||
 	    __put_user (stat->ino, &ubuf->st_ino) ||
@@ -262,7 +261,7 @@ sys32_rt_sigaction(int sig, struct sigaction32 __user *act,
 	if (act) {
 		compat_uptr_t handler, restorer;
 
-		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		if (!access_ok(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user(handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_flags, &act->sa_flags) ||
 		    __get_user(restorer, &act->sa_restorer)||
@@ -301,7 +300,7 @@ sys32_rt_sigaction(int sig, struct sigaction32 __user *act,
 			set32.sig[1] = (old_ka.sa.sa_mask.sig[0] >> 32);
 			set32.sig[0] = old_ka.sa.sa_mask.sig[0];
 		}
-		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		if (!access_ok(VERIFY_WRITE, oact, sizeof(*oact)) ||
 		    __put_user(ptr_to_compat(old_ka.sa.sa_handler), &oact->sa_handler) ||
 		    __put_user(ptr_to_compat(old_ka.sa.sa_restorer), &oact->sa_restorer) ||
 		    __put_user(old_ka.sa.sa_flags, &oact->sa_flags) ||
@@ -322,7 +321,7 @@ sys32_sigaction (int sig, struct old_sigaction32 __user *act, struct old_sigacti
 		compat_old_sigset_t mask;
 		compat_uptr_t handler, restorer;
 
-		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		if (!access_ok(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user(handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_flags, &act->sa_flags) ||
 		    __get_user(restorer, &act->sa_restorer) ||
@@ -338,7 +337,7 @@ sys32_sigaction (int sig, struct old_sigaction32 __user *act, struct old_sigacti
         ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
 
 	if (!ret && oact) {
-		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		if (!access_ok(VERIFY_WRITE, oact, sizeof(*oact)) ||
 		    __put_user(ptr_to_compat(old_ka.sa.sa_handler), &oact->sa_handler) ||
 		    __put_user(ptr_to_compat(old_ka.sa.sa_restorer), &oact->sa_restorer) ||
 		    __put_user(old_ka.sa.sa_flags, &oact->sa_flags) ||
@@ -567,7 +566,7 @@ sys32_sysinfo(struct sysinfo32 __user *info)
 		s.freehigh >>= bitcount;
 	}
 
-	if (verify_area(VERIFY_WRITE, info, sizeof(struct sysinfo32)) ||
+	if (!access_ok(VERIFY_WRITE, info, sizeof(struct sysinfo32)) ||
 	    __put_user (s.uptime, &info->uptime) ||
 	    __put_user (s.loads[0], &info->loads[0]) ||
 	    __put_user (s.loads[1], &info->loads[1]) ||
@@ -782,7 +781,7 @@ sys32_adjtimex(struct timex32 __user *utp)
 
 	memset(&txc, 0, sizeof(struct timex));
 
-	if(verify_area(VERIFY_READ, utp, sizeof(struct timex32)) ||
+	if (!access_ok(VERIFY_READ, utp, sizeof(struct timex32)) ||
 	   __get_user(txc.modes, &utp->modes) ||
 	   __get_user(txc.offset, &utp->offset) ||
 	   __get_user(txc.freq, &utp->freq) ||
@@ -807,7 +806,7 @@ sys32_adjtimex(struct timex32 __user *utp)
 
 	ret = do_adjtimex(&txc);
 
-	if(verify_area(VERIFY_WRITE, utp, sizeof(struct timex32)) ||
+	if (!access_ok(VERIFY_WRITE, utp, sizeof(struct timex32)) ||
 	   __put_user(txc.modes, &utp->modes) ||
 	   __put_user(txc.offset, &utp->offset) ||
 	   __put_user(txc.freq, &utp->freq) ||
@@ -955,32 +954,6 @@ asmlinkage long sys32_clone(unsigned int clone_flags, unsigned int newsp,
         return do_fork(clone_flags, newsp, regs, 0, parent_tid, child_tid);
 }
 
-asmlinkage long sys32_waitid(int which, compat_pid_t pid,
-			     compat_siginfo_t __user *uinfo, int options,
-			     struct compat_rusage __user *uru)
-{
-	siginfo_t info;
-	struct rusage ru;
-	long ret;
-	mm_segment_t old_fs = get_fs();
-
-	info.si_signo = 0;
-	set_fs (KERNEL_DS);
-	ret = sys_waitid(which, pid, (siginfo_t __user *) &info, options,
-			 uru ? &ru : NULL);
-	set_fs (old_fs);
-
-	if (ret < 0 || info.si_signo == 0)
-		return ret;
-
-	if (uru && (ret = put_compat_rusage(&ru, uru)))
-		return ret;
-
-	BUG_ON(info.si_code & __SI_MASK);
-	info.si_code |= __SI_CHLD;
-	return copy_siginfo_to_user32(uinfo, &info);
-}
-
 /*
  * Some system calls that need sign extended arguments. This could be done by a generic wrapper.
  */ 
@@ -1019,31 +992,19 @@ asmlinkage long sys32_open(const char __user * filename, int flags, int mode)
 	return fd;
 }
 
-struct sigevent32 { 
-	u32 sigev_value;
-	u32 sigev_signo; 
-	u32 sigev_notify; 
-	u32 payload[(64 / 4) - 3]; 
-}; 
-
 extern asmlinkage long
 sys_timer_create(clockid_t which_clock,
 		 struct sigevent __user *timer_event_spec,
 		 timer_t __user * created_timer_id);
 
 long
-sys32_timer_create(u32 clock, struct sigevent32 __user *se32, timer_t __user *timer_id)
+sys32_timer_create(u32 clock, struct compat_sigevent __user *se32, timer_t __user *timer_id)
 {
 	struct sigevent __user *p = NULL;
 	if (se32) { 
 		struct sigevent se;
 		p = compat_alloc_user_space(sizeof(struct sigevent));
-		memset(&se, 0, sizeof(struct sigevent)); 
-		if (get_user(se.sigev_value.sival_int,  &se32->sigev_value) ||
-		    __get_user(se.sigev_signo, &se32->sigev_signo) ||
-		    __get_user(se.sigev_notify, &se32->sigev_notify) ||
-		    __copy_from_user(&se._sigev_un._pad, &se32->payload, 
-				     sizeof(se32->payload)) ||
+		if (get_compat_sigevent(&se, se32) ||
 		    copy_to_user(p, &se, sizeof(se)))
 			return -EFAULT;
 	} 

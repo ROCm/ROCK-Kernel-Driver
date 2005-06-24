@@ -1,4 +1,6 @@
-<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN"[]>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+	"http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" []>
 
 <book id="V4LGuide">
  <bookinfo>
@@ -180,23 +182,23 @@ int __init myradio_init(struct video_init *v)
    <tgroup cols="3" align="left">
    <tbody>
    <row>
-        <entry>VFL_TYPE_RADIO</><entry>/dev/radio{n}</><entry>
+        <entry>VFL_TYPE_RADIO</entry><entry>/dev/radio{n}</entry><entry>
 
         Radio devices are assigned in this block. As with all of these
         selections the actual number assignment is done by the video layer
         accordijng to what is free.</entry>
 	</row><row>
-        <entry>VFL_TYPE_GRABBER</><entry>/dev/video{n}</><entry>
+        <entry>VFL_TYPE_GRABBER</entry><entry>/dev/video{n}</entry><entry>
         Video capture devices and also -- counter-intuitively for the name --
         hardware video playback devices such as MPEG2 cards.</entry>
 	</row><row>
-        <entry>VFL_TYPE_VBI</><entry>/dev/vbi{n}</><entry>
+        <entry>VFL_TYPE_VBI</entry><entry>/dev/vbi{n}</entry><entry>
         The VBI devices capture the hidden lines on a television picture
         that carry further information like closed caption data, teletext
         (primarily in Europe) and now Intercast and the ATVEC internet
         television encodings.</entry>
 	</row><row>
-        <entry>VFL_TYPE_VTX</><entry>/dev/vtx[n}</><entry>
+        <entry>VFL_TYPE_VTX</entry><entry>/dev/vtx[n}</entry><entry>
         VTX is 'Videotext' also known as 'Teletext'. This is a system for
         sending numbered, 40x25, mostly textual page images over the hidden
         lines. Unlike the /dev/vbi interfaces, this is for 'smart' decoder 
@@ -301,25 +303,25 @@ static int radio_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
    <tgroup cols="2" align="left">
    <tbody>
    <row>
-        <entry>name</><entry>The device text name. This is intended for the user.</>
+        <entry>name</entry><entry>The device text name. This is intended for the user.</entry>
 	</row><row>
-        <entry>channels</><entry>The number of different channels you can tune on
+        <entry>channels</entry><entry>The number of different channels you can tune on
                         this card. It could even by zero for a card that has
                         no tuning capability. For our simple FM radio it is 1. 
                         An AM/FM radio would report 2.</entry>
 	</row><row>
-        <entry>audios</><entry>The number of audio inputs on this device. For our
+        <entry>audios</entry><entry>The number of audio inputs on this device. For our
                         radio there is only one audio input.</entry>
 	</row><row>
-        <entry>minwidth,minheight</><entry>The smallest size the card is capable of capturing
+        <entry>minwidth,minheight</entry><entry>The smallest size the card is capable of capturing
 		        images in. We set these to zero. Radios do not
                         capture pictures</entry>
 	</row><row>
-        <entry>maxwidth,maxheight</><entry>The largest image size the card is capable of
+        <entry>maxwidth,maxheight</entry><entry>The largest image size the card is capable of
                                       capturing. For our radio we report 0.
 				</entry>
 	</row><row>
-        <entry>type</><entry>This reports the capabilities of the device, and
+        <entry>type</entry><entry>This reports the capabilities of the device, and
                         matches the field we filled in in the struct
                         video_device when registering.</entry>
     </row>
@@ -375,26 +377,26 @@ static int radio_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
    <tgroup cols="2" align="left">
    <tbody>
    <row>
-        <entry>int tuner</><entry>The number of the tuner in question</entry>
+        <entry>int tuner</entry><entry>The number of the tuner in question</entry>
    </row><row>
-        <entry>char name[32]</><entry>A text description of this tuner. "FM" will do fine.
+        <entry>char name[32]</entry><entry>A text description of this tuner. "FM" will do fine.
                         This is intended for the application.</entry>
    </row><row>
-        <entry>u32 flags</>
+        <entry>u32 flags</entry>
         <entry>Tuner capability flags</entry>
    </row>
    <row>
-        <entry>u16 mode</><entry>The current reception mode</entry>
+        <entry>u16 mode</entry><entry>The current reception mode</entry>
 
    </row><row>
-        <entry>u16 signal</><entry>The signal strength scaled between 0 and 65535. If
+        <entry>u16 signal</entry><entry>The signal strength scaled between 0 and 65535. If
                         a device cannot tell the signal strength it should
                         report 65535. Many simple cards contain only a 
                         signal/no signal bit. Such cards will report either
                         0 or 65535.</entry>
 
    </row><row>
-        <entry>u32 rangelow, rangehigh</><entry>
+        <entry>u32 rangelow, rangehigh</entry><entry>
                         The range of frequencies supported by the radio
                         or TV. It is scaled according to the VIDEO_TUNER_LOW
                         flag.</entry>
@@ -408,20 +410,20 @@ static int radio_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
    <tgroup cols="2" align="left">
    <tbody>
    <row>
-	<entry>VIDEO_TUNER_PAL</><entry>A PAL TV tuner</entry>
+	<entry>VIDEO_TUNER_PAL</entry><entry>A PAL TV tuner</entry>
 	</row><row>
-        <entry>VIDEO_TUNER_NTSC</><entry>An NTSC (US) TV tuner</entry>
+        <entry>VIDEO_TUNER_NTSC</entry><entry>An NTSC (US) TV tuner</entry>
 	</row><row>
-        <entry>VIDEO_TUNER_SECAM</><entry>A SECAM (French) TV tuner</entry>
+        <entry>VIDEO_TUNER_SECAM</entry><entry>A SECAM (French) TV tuner</entry>
 	</row><row>
-        <entry>VIDEO_TUNER_LOW</><entry>
+        <entry>VIDEO_TUNER_LOW</entry><entry>
              The tuner frequency is scaled in 1/16th of a KHz
              steps. If not it is in 1/16th of a MHz steps
 	</entry>
 	</row><row>
-        <entry>VIDEO_TUNER_NORM</><entry>The tuner can set its format</entry>
+        <entry>VIDEO_TUNER_NORM</entry><entry>The tuner can set its format</entry>
 	</row><row>
-        <entry>VIDEO_TUNER_STEREO_ON</><entry>The tuner is currently receiving a stereo signal</entry>
+        <entry>VIDEO_TUNER_STEREO_ON</entry><entry>The tuner is currently receiving a stereo signal</entry>
         </row>
     </tbody>
     </tgroup>
@@ -431,13 +433,13 @@ static int radio_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
    <tgroup cols="2" align="left">
    <tbody>
    <row>
-                <entry>VIDEO_MODE_PAL</><entry>PAL Format</entry>
+                <entry>VIDEO_MODE_PAL</entry><entry>PAL Format</entry>
    </row><row>
-                <entry>VIDEO_MODE_NTSC</><entry>NTSC Format (USA)</entry>
+                <entry>VIDEO_MODE_NTSC</entry><entry>NTSC Format (USA)</entry>
    </row><row>
-                <entry>VIDEO_MODE_SECAM</><entry>French Format</entry>
+                <entry>VIDEO_MODE_SECAM</entry><entry>French Format</entry>
    </row><row>
-                <entry>VIDEO_MODE_AUTO</><entry>A device that does not need to do
+                <entry>VIDEO_MODE_AUTO</entry><entry>A device that does not need to do
                                         TV format switching</entry>
    </row>
     </tbody>
@@ -521,7 +523,7 @@ static unsigned long current_freq;
                         if(copy_from_user(arg, &amp;freq, 
                                 sizeof(unsigned long))!=0)
                                 return -EFAULT;
-                        if(hardware_set_freq(freq)<0)
+                        if(hardware_set_freq(freq)&lt;0)
                                 return -EINVAL;
                         current_freq = freq;
                         return 0;
@@ -582,32 +584,32 @@ static int current_volume=0;
    <tgroup cols="2" align="left">
    <tbody>
    <row>
-   <entry>audio</><entry>The input the user wishes to query</>
+   <entry>audio</entry><entry>The input the user wishes to query</entry>
    </row><row>
-   <entry>volume</><entry>The volume setting on a scale of 0-65535</>
+   <entry>volume</entry><entry>The volume setting on a scale of 0-65535</entry>
    </row><row>
-   <entry>base</><entry>The base level on a scale of 0-65535</>
+   <entry>base</entry><entry>The base level on a scale of 0-65535</entry>
    </row><row>
-   <entry>treble</><entry>The treble level on a scale of 0-65535</>
+   <entry>treble</entry><entry>The treble level on a scale of 0-65535</entry>
    </row><row>
-   <entry>flags</><entry>The features this audio device supports
+   <entry>flags</entry><entry>The features this audio device supports
    </entry>
    </row><row>
-   <entry>name</><entry>A text name to display to the user. We picked 
-                        "Radio" as it explains things quite nicely.</>
+   <entry>name</entry><entry>A text name to display to the user. We picked
+                        "Radio" as it explains things quite nicely.</entry>
    </row><row>
-   <entry>mode</><entry>The current reception mode for the audio
+   <entry>mode</entry><entry>The current reception mode for the audio
 
                 We report MONO because our card is too stupid to know if it is in
                 mono or stereo. 
    </entry>
    </row><row>
-   <entry>balance</><entry>The stereo balance on a scale of 0-65535, 32768 is
-                        middle.</>
+   <entry>balance</entry><entry>The stereo balance on a scale of 0-65535, 32768 is
+                        middle.</entry>
    </row><row>
-   <entry>step</><entry>The step by which the volume control jumps. This is
+   <entry>step</entry><entry>The step by which the volume control jumps. This is
                         used to help make it easy for applications to set 
-                        slider behaviour.</>   
+                        slider behaviour.</entry>
    </row>
    </tbody>
    </tgroup>
@@ -617,15 +619,15 @@ static int current_volume=0;
    <tgroup cols="2" align="left">
    <tbody>
    <row>
-                <entry>VIDEO_AUDIO_MUTE</><entry>The audio is currently muted. We
+                <entry>VIDEO_AUDIO_MUTE</entry><entry>The audio is currently muted. We
                                         could fake this in our driver but we
                                         choose not to bother.</entry>
    </row><row>
-                <entry>VIDEO_AUDIO_MUTABLE</><entry>The input has a mute option</entry>
+                <entry>VIDEO_AUDIO_MUTABLE</entry><entry>The input has a mute option</entry>
    </row><row>
-                <entry>VIDEO_AUDIO_TREBLE</><entry>The  input has a treble control</entry>
+                <entry>VIDEO_AUDIO_TREBLE</entry><entry>The  input has a treble control</entry>
    </row><row>
-                <entry>VIDEO_AUDIO_BASS</><entry>The input has a base control</entry>
+                <entry>VIDEO_AUDIO_BASS</entry><entry>The input has a base control</entry>
    </row>
    </tbody>
    </tgroup>
@@ -635,13 +637,13 @@ static int current_volume=0;
    <tgroup cols="2" align="left">
    <tbody>
    <row>
-                <entry>VIDEO_SOUND_MONO</><entry>Mono sound</entry>
+                <entry>VIDEO_SOUND_MONO</entry><entry>Mono sound</entry>
    </row><row>
-                <entry>VIDEO_SOUND_STEREO</><entry>Stereo sound</entry>
+                <entry>VIDEO_SOUND_STEREO</entry><entry>Stereo sound</entry>
    </row><row>
-                <entry>VIDEO_SOUND_LANG1</><entry>Alternative language 1 (TV specific)</entry>
+                <entry>VIDEO_SOUND_LANG1</entry><entry>Alternative language 1 (TV specific)</entry>
    </row><row>
-                <entry>VIDEO_SOUND_LANG2</><entry>Alternative language 2 (TV specific)</entry>
+                <entry>VIDEO_SOUND_LANG2</entry><entry>Alternative language 2 (TV specific)</entry>
    </row>
    </tbody>
    </tgroup>
@@ -866,37 +868,37 @@ static struct video_device my_camera
    <tgroup cols="2" align="left">
    <tbody>
    <row>
-<entry>VID_TYPE_CAPTURE</><entry>We support image capture</>
+<entry>VID_TYPE_CAPTURE</entry><entry>We support image capture</entry>
 </row><row>
-<entry>VID_TYPE_TELETEXT</><entry>A teletext capture device (vbi{n])</>
+<entry>VID_TYPE_TELETEXT</entry><entry>A teletext capture device (vbi{n])</entry>
 </row><row>
-<entry>VID_TYPE_OVERLAY</><entry>The image can be directly overlaid onto the
-                                frame buffer</>
+<entry>VID_TYPE_OVERLAY</entry><entry>The image can be directly overlaid onto the
+                                frame buffer</entry>
 </row><row>
-<entry>VID_TYPE_CHROMAKEY</><entry>Chromakey can be used to select which parts
-                                of the image to display</>
+<entry>VID_TYPE_CHROMAKEY</entry><entry>Chromakey can be used to select which parts
+                                of the image to display</entry>
 </row><row>
-<entry>VID_TYPE_CLIPPING</><entry>It is possible to give the board a list of
-                                rectangles to draw around. </>
+<entry>VID_TYPE_CLIPPING</entry><entry>It is possible to give the board a list of
+                                rectangles to draw around. </entry>
 </row><row>
-<entry>VID_TYPE_FRAMERAM</><entry>The video capture goes into the video memory
+<entry>VID_TYPE_FRAMERAM</entry><entry>The video capture goes into the video memory
                                 and actually changes it. Applications need
                                 to know this so they can clean up after the
-                                card</>
+                                card</entry>
 </row><row>
-<entry>VID_TYPE_SCALES</><entry>The image can be scaled to various sizes,
-                                rather than being a single fixed size.</>
+<entry>VID_TYPE_SCALES</entry><entry>The image can be scaled to various sizes,
+                                rather than being a single fixed size.</entry>
 </row><row>
-<entry>VID_TYPE_MONOCHROME</><entry>The capture will be monochrome. This isn't a 
+<entry>VID_TYPE_MONOCHROME</entry><entry>The capture will be monochrome. This isn't a
                                 complete answer to the question since a mono
                                 camera on a colour capture card will still
-                                produce mono output.</>
+                                produce mono output.</entry>
 </row><row>
-<entry>VID_TYPE_SUBCAPTURE</><entry>The card allows only part of its field of
+<entry>VID_TYPE_SUBCAPTURE</entry><entry>The card allows only part of its field of
                                 view to be captured. This enables
                                 applications to avoid copying all of a large
                                 image into memory when only some section is
-                                relevant.</>
+                                relevant.</entry>
     </row>
     </tbody>
     </tgroup>
@@ -1207,18 +1209,18 @@ static int camera_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
    <tbody>
    <row>
 
-   <entry>channel</><entry>The channel number we are selecting</entry>
+   <entry>channel</entry><entry>The channel number we are selecting</entry>
    </row><row>
-   <entry>name</><entry>The name for this channel. This is intended
+   <entry>name</entry><entry>The name for this channel. This is intended
                    to describe the port to the user.
                    Appropriate names are therefore things like
                    "Camera" "SCART input"</entry>
    </row><row>
-   <entry>flags</><entry>Channel properties</entry>
+   <entry>flags</entry><entry>Channel properties</entry>
    </row><row>
-   <entry>type</><entry>Input type</entry>
+   <entry>type</entry><entry>Input type</entry>
    </row><row>
-   <entry>norm</><entry>The current television encoding being used
+   <entry>norm</entry><entry>The current television encoding being used
                    if relevant for this channel.
     </entry>
     </row>
@@ -1229,9 +1231,9 @@ static int camera_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
     <tgroup cols="2" align="left">
     <tbody>
     <row>
-        <entry>VIDEO_VC_TUNER</><entry>Channel has a tuner.</entry>
+        <entry>VIDEO_VC_TUNER</entry><entry>Channel has a tuner.</entry>
    </row><row>
-        <entry>VIDEO_VC_AUDIO</><entry>Channel has audio.</entry>
+        <entry>VIDEO_VC_AUDIO</entry><entry>Channel has audio.</entry>
     </row>
     </tbody>
     </tgroup>
@@ -1240,11 +1242,11 @@ static int camera_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
     <tgroup cols="2" align="left">
     <tbody>
     <row>
-        <entry>VIDEO_TYPE_TV</><entry>Television input.</entry>
+        <entry>VIDEO_TYPE_TV</entry><entry>Television input.</entry>
    </row><row>
-        <entry>VIDEO_TYPE_CAMERA</><entry>Fixed camera input.</entry>
+        <entry>VIDEO_TYPE_CAMERA</entry><entry>Fixed camera input.</entry>
    </row><row>
-	<entry>0</><entry>Type is unknown.</entry>
+	<entry>0</entry><entry>Type is unknown.</entry>
     </row>
     </tbody>
     </tgroup>
@@ -1253,13 +1255,13 @@ static int camera_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
     <tgroup cols="2" align="left">
     <tbody>
     <row>
-        <entry>VIDEO_MODE_PAL</><entry>PAL encoded Television</entry>
+        <entry>VIDEO_MODE_PAL</entry><entry>PAL encoded Television</entry>
    </row><row>
-        <entry>VIDEO_MODE_NTSC</><entry>NTSC (US) encoded Television</entry>
+        <entry>VIDEO_MODE_NTSC</entry><entry>NTSC (US) encoded Television</entry>
    </row><row>
-        <entry>VIDEO_MODE_SECAM</><entry>SECAM (French) Television </entry>
+        <entry>VIDEO_MODE_SECAM</entry><entry>SECAM (French) Television </entry>
    </row><row>
-        <entry>VIDEO_MODE_AUTO</><entry>Automatic switching, or format does not
+        <entry>VIDEO_MODE_AUTO</entry><entry>Automatic switching, or format does not
                                 matter</entry>
     </row>
     </tbody>
@@ -1339,14 +1341,14 @@ static int camera_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
    <tgroup cols="2" align="left">
    <tbody>
    <row>
-   <entry>GREY</><entry>Linear greyscale. This is for simple cameras and the
-                        like</>
+   <entry>GREY</entry><entry>Linear greyscale. This is for simple cameras and the
+                        like</entry>
    </row><row>
-   <entry>RGB565</><entry>The top 5 bits hold 32 red levels, the next six bits 
-                        hold green and the low 5 bits hold blue. </>
+   <entry>RGB565</entry><entry>The top 5 bits hold 32 red levels, the next six bits
+                        hold green and the low 5 bits hold blue. </entry>
    </row><row>
-   <entry>RGB555</><entry>The top bit is clear. The red green and blue levels
-                        each occupy five bits.</>
+   <entry>RGB555</entry><entry>The top bit is clear. The red green and blue levels
+                        each occupy five bits.</entry>
     </row>
     </tbody>
     </tgroup>
@@ -1477,32 +1479,32 @@ static struct video_buffer capture_fb;
    <tgroup cols="2" align="left">
    <tbody>
    <row>
-        <entry>width</><entry>The width in pixels of the desired image. The card
-                        may use a smaller size if this size is not available</>
+        <entry>width</entry><entry>The width in pixels of the desired image. The card
+                        may use a smaller size if this size is not available</entry>
 	</row><row>
-        <entry>height</><entry>The height of the image. The card may use a smaller
-                        size if this size is not available.</>
+        <entry>height</entry><entry>The height of the image. The card may use a smaller
+                        size if this size is not available.</entry>
 	</row><row>
-        <entry>x</><entry>   The X position of the top left of the window. This
+        <entry>x</entry><entry>   The X position of the top left of the window. This
                         is in pixels relative to the left hand edge of the
                         picture. Not all cards can display images aligned on
                         any pixel boundary. If the position is unsuitable
                         the card adjusts the image right and reduces the
-                        width.</>
+                        width.</entry>
 	</row><row>
-        <entry>y</><entry>   The Y position of the top left of the window. This
+        <entry>y</entry><entry>   The Y position of the top left of the window. This
                         is counted in pixels relative to the top edge of the
                         picture. As with the width if the card cannot
                         display  starting on this line it will adjust the
-                        values.</>
+                        values.</entry>
 	</row><row>
-        <entry>chromakey</><entry>The colour (expressed in RGB32 format) for the
-                        chromakey colour if chroma keying is being used. </>
+        <entry>chromakey</entry><entry>The colour (expressed in RGB32 format) for the
+                        chromakey colour if chroma keying is being used. </entry>
 	</row><row>
-        <entry>clips</><entry>An array of rectangles that must not be drawn
-			over.</>
+        <entry>clips</entry><entry>An array of rectangles that must not be drawn
+			over.</entry>
 	</row><row>
-        <entry>clipcount</><entry>The number of clips in this array.</>
+        <entry>clipcount</entry><entry>The number of clips in this array.</entry>
     </row>
     </tbody>
     </tgroup>
@@ -1514,11 +1516,11 @@ static struct video_buffer capture_fb;
    <tgroup cols="2" align="left">
    <tbody>
    <row>
-        <entry>x, y</><entry>Co-ordinates relative to the display</>
+        <entry>x, y</entry><entry>Co-ordinates relative to the display</entry>
 	</row><row>
-        <entry>width, height</><entry>Width and height in pixels</>
+        <entry>width, height</entry><entry>Width and height in pixels</entry>
 	</row><row>
-        <entry>next</><entry>A spare field for the application to use</>
+        <entry>next</entry><entry>A spare field for the application to use</entry>
     </row>
     </tbody>
     </tgroup>
@@ -1550,9 +1552,9 @@ static struct video_buffer capture_fb;
                         struct video_window v;
                         if(copy_from_user(&amp;v, arg, sizeof(v)))
                                 return -EFAULT;
-                        if(v.width > 640 || v.height > 480)
+                        if(v.width &gt; 640 || v.height &gt; 480)
                                 return -EINVAL;
-                        if(v.width < 16 || v.height < 16)
+                        if(v.width &lt; 16 || v.height &lt; 16)
                                 return -EINVAL;
                         hardware_set_key(v.chromakey);
                         hardware_set_window(v);

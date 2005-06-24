@@ -91,6 +91,7 @@ acpi_ds_get_predicate_value (
 	union acpi_operand_object       *result_obj) {
 	acpi_status                     status = AE_OK;
 	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       *local_obj_desc = NULL;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_get_predicate_value", walk_state);
@@ -130,12 +131,17 @@ acpi_ds_get_predicate_value (
 	}
 
 	/*
-	 * Result of predicate evaluation currently must
-	 * be a number
+	 * Result of predicate evaluation must be an Integer
+	 * object. Implicitly convert the argument if necessary.
 	 */
-	if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_INTEGER) {
+	status = acpi_ex_convert_to_integer (obj_desc, &local_obj_desc, 16);
+	if (ACPI_FAILURE (status)) {
+		goto cleanup;
+	}
+
+	if (ACPI_GET_OBJECT_TYPE (local_obj_desc) != ACPI_TYPE_INTEGER) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Bad predicate (not a number) obj_desc=%p State=%p Type=%X\n",
+			"Bad predicate (not an integer) obj_desc=%p State=%p Type=%X\n",
 			obj_desc, walk_state, ACPI_GET_OBJECT_TYPE (obj_desc)));
 
 		status = AE_AML_OPERAND_TYPE;
@@ -144,13 +150,13 @@ acpi_ds_get_predicate_value (
 
 	/* Truncate the predicate to 32-bits if necessary */
 
-	acpi_ex_truncate_for32bit_table (obj_desc);
+	acpi_ex_truncate_for32bit_table (local_obj_desc);
 
 	/*
 	 * Save the result of the predicate evaluation on
 	 * the control stack
 	 */
-	if (obj_desc->integer.value) {
+	if (local_obj_desc->integer.value) {
 		walk_state->control_state->common.value = TRUE;
 	}
 	else {
@@ -170,12 +176,15 @@ cleanup:
 
 	 /* Break to debugger to display result */
 
-	ACPI_DEBUGGER_EXEC (acpi_db_display_result_object (obj_desc, walk_state));
+	ACPI_DEBUGGER_EXEC (acpi_db_display_result_object (local_obj_desc, walk_state));
 
 	/*
 	 * Delete the predicate result object (we know that
 	 * we don't need it anymore)
 	 */
+	if (local_obj_desc != obj_desc) {
+		acpi_ut_remove_reference (local_obj_desc);
+	}
 	acpi_ut_remove_reference (obj_desc);
 
 	walk_state->control_state->common.state = ACPI_CONTROL_NORMAL;
@@ -306,9 +315,10 @@ acpi_ds_exec_begin_op (
 	case AML_CLASS_EXECUTE:
 	case AML_CLASS_CREATE:
 
-		/* most operators with arguments */
-		/* Start a new result/operand state */
-
+		/*
+		 * Most operators with arguments.
+		 * Start a new result/operand state
+		 */
 		status = acpi_ds_result_stack_push (walk_state);
 		break;
 
@@ -471,20 +481,41 @@ acpi_ds_exec_end_op (
 			/* 1 Operand, 0 external_result, 0 internal_result */
 
 			status = acpi_ds_exec_end_control_op (walk_state, op);
-			if (ACPI_FAILURE (status)) {
-				break;
-			}
 
-			status = acpi_ds_result_stack_pop (walk_state);
+			/* Make sure to properly pop the result stack */
+
+			if (ACPI_SUCCESS (status)) {
+				status = acpi_ds_result_stack_pop (walk_state);
+			}
+			else if (status == AE_CTRL_PENDING) {
+				status = acpi_ds_result_stack_pop (walk_state);
+				if (ACPI_SUCCESS (status)) {
+					status = AE_CTRL_PENDING;
+				}
+			}
 			break;
 
 
 		case AML_TYPE_METHOD_CALL:
 
+			/*
+			 * If the method is referenced from within a package
+			 * declaration, it is not a invocation of the method, just
+			 * a reference to it.
+			 */
+			if ((op->asl.parent) &&
+			   ((op->asl.parent->asl.aml_opcode == AML_PACKAGE_OP) ||
+				(op->asl.parent->asl.aml_opcode == AML_VAR_PACKAGE_OP))) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Method Reference in a Package, Op=%p\n", op));
+				op->common.node = (struct acpi_namespace_node *) op->asl.value.arg->asl.node->object;
+				acpi_ut_add_reference (op->asl.value.arg->asl.node->object);
+				return_ACPI_STATUS (AE_OK);
+			}
+
 			ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Method invocation, Op=%p\n", op));
 
 			/*
-			 * (AML_METHODCALL) Op->Value->Arg->Node contains
+			 * (AML_METHODCALL) Op->Asl.Value.Arg->Asl.Node contains
 			 * the method Node pointer
 			 */
 			/* next_op points to the op that holds the method name */

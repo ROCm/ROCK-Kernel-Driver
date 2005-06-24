@@ -1,5 +1,5 @@
 /*
-    $Id: cx88-i2c.c,v 1.19 2004/12/10 12:33:39 kraxel Exp $
+    $Id: cx88-i2c.c,v 1.20 2005/02/15 15:59:35 kraxel Exp $
 
     cx88-i2c.c  --  all the i2c code is here
 
@@ -45,7 +45,7 @@ MODULE_PARM_DESC(i2c_scan,"scan i2c bus at insmod time");
 
 /* ----------------------------------------------------------------------- */
 
-void cx8800_bit_setscl(void *data, int state)
+static void cx8800_bit_setscl(void *data, int state)
 {
 	struct cx88_core *core = data;
 
@@ -57,7 +57,7 @@ void cx8800_bit_setscl(void *data, int state)
 	cx_read(MO_I2C);
 }
 
-void cx8800_bit_setsda(void *data, int state)
+static void cx8800_bit_setsda(void *data, int state)
 {
 	struct cx88_core *core = data;
 
@@ -142,7 +142,6 @@ static struct i2c_adapter cx8800_i2c_adap_template = {
 
 static struct i2c_client cx8800_i2c_client_template = {
         I2C_DEVNAME("cx88xx internal"),
-        .id   = -1,
 };
 
 static char *i2c_devs[128] = {

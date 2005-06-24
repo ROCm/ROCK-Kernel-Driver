@@ -31,7 +31,7 @@ typedef struct {
 } dma_info_t;
 
 static dma_info_t dma_info[MAX_DMA_CHANNELS];
-extern spinlock_t dma_spin_lock;
+static DEFINE_SPINLOCK(dma_spin_lock);
 
 /* arch/sh64/kernel/irq_intc.c */
 extern void make_intc_irq(unsigned int irq);

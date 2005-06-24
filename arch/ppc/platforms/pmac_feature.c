@@ -74,8 +74,7 @@ static DEFINE_SPINLOCK(feature_lock  __pmacdata);
  */
 struct macio_chip macio_chips[MAX_MACIO_CHIPS]  __pmacdata;
 
-struct macio_chip* __pmac
-macio_find(struct device_node* child, int type)
+struct macio_chip* __pmac macio_find(struct device_node* child, int type)
 {
 	while(child) {
 		int	i;
@@ -1591,6 +1590,114 @@ intrepid_shutdown(struct macio_chip* macio, int sleep_mode)
 	mdelay(10);
 }
 
+
+void __pmac pmac_tweak_clock_spreading(int enable)
+{
+	struct macio_chip* macio = &macio_chips[0];
+
+	/* Hack for doing clock spreading on some machines PowerBooks and
+	 * iBooks. This implements the "platform-do-clockspreading" OF
+	 * property as decoded manually on various models. For safety, we also
+	 * check the product ID in the device-tree in cases we'll whack the i2c
+	 * chip to make reasonably sure we won't set wrong values in there
+	 *
+	 * Of course, ultimately, we have to implement a real parser for
+	 * the platform-do-* stuff...
+	 */
+
+	if (macio->type == macio_intrepid) {
+		if (enable)
+			UN_OUT(UNI_N_CLOCK_SPREADING, 2);
+		else
+			UN_OUT(UNI_N_CLOCK_SPREADING, 0);
+		mdelay(40);
+	}
+
+	while (machine_is_compatible("PowerBook5,2") ||
+	       machine_is_compatible("PowerBook5,3") ||
+	       machine_is_compatible("PowerBook6,2") ||
+	       machine_is_compatible("PowerBook6,3")) {
+		struct device_node *ui2c = of_find_node_by_type(NULL, "i2c");
+		struct device_node *dt = of_find_node_by_name(NULL, "device-tree");
+		u8 buffer[9];
+		u32 *productID;
+		int i, rc, changed = 0;
+
+		if (dt == NULL)
+			break;
+		productID = (u32 *)get_property(dt, "pid#", NULL);
+		if (productID == NULL)
+			break;
+		while(ui2c) {
+			struct device_node *p = of_get_parent(ui2c);
+			if (p && !strcmp(p->name, "uni-n"))
+				break;
+			ui2c = of_find_node_by_type(ui2c, "i2c");
+		}
+		if (ui2c == NULL)
+			break;
+		DBG("Trying to bump clock speed for PID: %08x...\n", *productID);
+		rc = pmac_low_i2c_open(ui2c, 1);
+		if (rc != 0)
+			break;
+		pmac_low_i2c_setmode(ui2c, pmac_low_i2c_mode_combined);
+		rc = pmac_low_i2c_xfer(ui2c, 0xd2 | pmac_low_i2c_read, 0x80, buffer, 9);
+		DBG("read result: %d,", rc);
+		if (rc != 0) {
+			pmac_low_i2c_close(ui2c);
+			break;
+		}
+		for (i=0; i<9; i++)
+			DBG(" %02x", buffer[i]);
+		DBG("\n");
+
+		switch(*productID) {
+		case 0x1182:	/* AlBook 12" rev 2 */
+		case 0x1183:	/* iBook G4 12" */
+			buffer[0] = (buffer[0] & 0x8f) | 0x70;
+			buffer[2] = (buffer[2] & 0x7f) | 0x00;
+			buffer[5] = (buffer[5] & 0x80) | 0x31;
+			buffer[6] = (buffer[6] & 0x40) | 0xb0;
+			buffer[7] = (buffer[7] & 0x00) | (enable ? 0xc0 : 0xba);
+			buffer[8] = (buffer[8] & 0x00) | 0x30;
+			changed = 1;
+			break;
+		case 0x3142:	/* AlBook 15" (ATI M10) */
+		case 0x3143:	/* AlBook 17" (ATI M10) */
+			buffer[0] = (buffer[0] & 0xaf) | 0x50;
+			buffer[2] = (buffer[2] & 0x7f) | 0x00;
+			buffer[5] = (buffer[5] & 0x80) | 0x31;
+			buffer[6] = (buffer[6] & 0x40) | 0xb0;
+			buffer[7] = (buffer[7] & 0x00) | (enable ? 0xd0 : 0xc0);
+			buffer[8] = (buffer[8] & 0x00) | 0x30;
+			changed = 1;
+			break;
+		default:
+			DBG("i2c-hwclock: Machine model not handled\n");
+			break;
+		}
+		if (!changed) {
+			pmac_low_i2c_close(ui2c);
+			break;
+		}
+		pmac_low_i2c_setmode(ui2c, pmac_low_i2c_mode_stdsub);
+		rc = pmac_low_i2c_xfer(ui2c, 0xd2 | pmac_low_i2c_write, 0x80, buffer, 9);
+		DBG("write result: %d,", rc);
+		pmac_low_i2c_setmode(ui2c, pmac_low_i2c_mode_combined);
+		rc = pmac_low_i2c_xfer(ui2c, 0xd2 | pmac_low_i2c_read, 0x80, buffer, 9);
+		DBG("read result: %d,", rc);
+		if (rc != 0) {
+			pmac_low_i2c_close(ui2c);
+			break;
+		}
+		for (i=0; i<9; i++)
+			DBG(" %02x", buffer[i]);
+		pmac_low_i2c_close(ui2c);
+		break;
+	}
+}
+
+
 static int __pmac
 core99_sleep(void)
 {
@@ -1601,12 +1708,6 @@ core99_sleep(void)
 	if (macio->type != macio_keylargo && macio->type != macio_pangea &&
 	    macio->type != macio_intrepid)
 		return -ENODEV;
-
-	/* The device-tree contains that in the hwclock node */
-	if (macio->type == macio_intrepid) {
-		UN_OUT(UNI_N_CLOCK_SPREADING, 0);
-		mdelay(40);
-	}
 
 	/* We power off the wireless slot in case it was not done
 	 * by the driver. We don't power it on automatically however
@@ -1750,12 +1851,6 @@ core99_wake_up(void)
 	UN_OUT(UNI_N_CLOCK_CNTL, save_unin_clock_ctl);
 	udelay(100);
 
-	/* Restore clock spreading */
-	if (macio->type == macio_intrepid) {
-		UN_OUT(UNI_N_CLOCK_SPREADING, 2);
-		mdelay(40);
-	}
-
 	return 0;
 }
 
@@ -1779,32 +1874,6 @@ core99_sleep_state(struct device_node* node, long param, long value)
 	}
 	if ((pmac_mb.board_flags & PMAC_MB_CAN_SLEEP) == 0)
 		return -EPERM;
-
-#ifdef CONFIG_CPU_FREQ_PMAC
-	/* XXX should be elsewhere */
-	if (machine_is_compatible("PowerBook6,5") ||
-	    machine_is_compatible("PowerBook6,4") ||
-	    machine_is_compatible("PowerBook5,5") ||
-	    machine_is_compatible("PowerBook5,4")) {
-		struct device_node *volt_gpio_np;
-		u32 *reg = NULL;
-
-		volt_gpio_np = of_find_node_by_name(NULL, "cpu-vcore-select");
-		if (volt_gpio_np != NULL)
-			reg = (u32 *)get_property(volt_gpio_np, "reg", NULL);
-		if (reg != NULL) {
-			/* Set the CPU voltage high if sleeping */
-			if (value == 1) {
-				pmac_call_feature(PMAC_FTR_WRITE_GPIO, NULL,
-						  *reg, 0x05);
-			} else if (value == 0 && (mfspr(HID1) & HID1_DFS)) {
-				pmac_call_feature(PMAC_FTR_WRITE_GPIO, NULL,
-						  *reg, 0x04);
-			}
-			mdelay(2);
-		}
-	}
-#endif /* CONFIG_CPU_FREQ_PMAC */
 
 	if (value == 1)
 		return core99_sleep();
@@ -2023,10 +2092,11 @@ static struct feature_table_entry g5_features[]  __pmacdata = {
 #endif /* CONFIG_POWER4 */
 
 static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
-	/* Warning: ordering is important as some models may claim
-	 * beeing compatible with several types
-	 */
 #ifndef CONFIG_POWER4
+	/*
+	 * Desktops
+	 */
+
 	{	"AAPL,8500",			"PowerMac 8500/8600",
 		PMAC_TYPE_PSURGE,		NULL,
 		0
@@ -2059,14 +2129,6 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		PMAC_TYPE_GAZELLE,		NULL,
 		0
 	},
-	{	"AAPL,3400/2400",		"PowerBook 3400",
-		PMAC_TYPE_HOOPER,		ohare_features,
-		PMAC_MB_CAN_SLEEP | PMAC_MB_MOBILE
-	},
-	{	"AAPL,3500",			"PowerBook 3500",
-		PMAC_TYPE_KANGA,		ohare_features,
-		PMAC_MB_CAN_SLEEP | PMAC_MB_MOBILE
-	},
 	{	"AAPL,Gossamer",		"PowerMac G3 (Gossamer)",
 		PMAC_TYPE_GOSSAMER,		heathrow_desktop_features,
 		0
@@ -2074,42 +2136,6 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 	{	"AAPL,PowerMac G3",		"PowerMac G3 (Silk)",
 		PMAC_TYPE_SILK,			heathrow_desktop_features,
 		0
-	},
-	{	"AAPL,PowerBook1998",		"PowerBook Wallstreet",
-		PMAC_TYPE_WALLSTREET,		heathrow_laptop_features,
-		PMAC_MB_CAN_SLEEP | PMAC_MB_MOBILE
-	},
-	{	"PowerBook1,1",			"PowerBook 101 (Lombard)",
-		PMAC_TYPE_101_PBOOK,		paddington_features,
-		PMAC_MB_MAY_SLEEP | PMAC_MB_MOBILE
-	},
-	{	"iMac,1",			"iMac (first generation)",
-		PMAC_TYPE_ORIG_IMAC,		paddington_features,
-		0
-	},
-	{	"PowerMac4,1",			"iMac \"Flower Power\"",
-		PMAC_TYPE_PANGEA_IMAC,		pangea_features,
-		PMAC_MB_MAY_SLEEP
-	},
-	{	"PowerBook4,3",			"iBook 2 rev. 2",
-		PMAC_TYPE_IBOOK2,		pangea_features,
-		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE
-	},
-	{	"PowerBook4,2",			"iBook 2",
-		PMAC_TYPE_IBOOK2,		pangea_features,
-		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE
-	},
-	{	"PowerBook4,1",			"iBook 2",
-		PMAC_TYPE_IBOOK2,		pangea_features,
-		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE
-	},
-	{	"PowerMac4,4",			"eMac",
-		PMAC_TYPE_EMAC,			core99_features,
-		PMAC_MB_MAY_SLEEP
-	},
-	{	"PowerMac4,2",			"Flat panel iMac",
-		PMAC_TYPE_FLAT_PANEL_IMAC,	pangea_features,
-		PMAC_MB_CAN_SLEEP
 	},
 	{	"PowerMac1,1",			"Blue&White G3",
 		PMAC_TYPE_YOSEMITE,		paddington_features,
@@ -2119,9 +2145,13 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		PMAC_TYPE_YIKES,		paddington_features,
 		0
 	},
-	{	"PowerBook2,1",			"iBook (first generation)",
-		PMAC_TYPE_ORIG_IBOOK,		core99_features,
-		PMAC_MB_CAN_SLEEP | PMAC_MB_OLD_CORE99 | PMAC_MB_MOBILE
+	{	"PowerMac2,1",			"iMac FireWire",
+		PMAC_TYPE_FW_IMAC,		core99_features,
+		PMAC_MB_MAY_SLEEP | PMAC_MB_OLD_CORE99
+	},
+	{	"PowerMac2,2",			"iMac FireWire",
+		PMAC_TYPE_FW_IMAC,		core99_features,
+		PMAC_MB_MAY_SLEEP | PMAC_MB_OLD_CORE99
 	},
 	{	"PowerMac3,1",			"PowerMac G4 AGP Graphics",
 		PMAC_TYPE_SAWTOOTH,		core99_features,
@@ -2135,23 +2165,6 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		PMAC_TYPE_SAWTOOTH,		core99_features,
 		PMAC_MB_MAY_SLEEP | PMAC_MB_OLD_CORE99
 	},
-	{	"PowerMac2,1",			"iMac FireWire",
-		PMAC_TYPE_FW_IMAC,		core99_features,
-		PMAC_MB_MAY_SLEEP | PMAC_MB_OLD_CORE99
-	},
-	{	"PowerMac2,2",			"iMac FireWire",
-		PMAC_TYPE_FW_IMAC,		core99_features,
-		PMAC_MB_MAY_SLEEP | PMAC_MB_OLD_CORE99
-	},
-	{	"PowerBook2,2",			"iBook FireWire",
-		PMAC_TYPE_FW_IBOOK,		core99_features,
-		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER |
-		PMAC_MB_OLD_CORE99 | PMAC_MB_MOBILE
-	},
-	{	"PowerMac5,1",			"PowerMac G4 Cube",
-		PMAC_TYPE_CUBE,			core99_features,
-		PMAC_MB_MAY_SLEEP | PMAC_MB_OLD_CORE99
-	},
 	{	"PowerMac3,4",			"PowerMac G4 Silver",
 		PMAC_TYPE_QUICKSILVER,		core99_features,
 		PMAC_MB_MAY_SLEEP
@@ -2159,6 +2172,89 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 	{	"PowerMac3,5",			"PowerMac G4 Silver",
 		PMAC_TYPE_QUICKSILVER,		core99_features,
 		PMAC_MB_MAY_SLEEP
+	},
+	{	"PowerMac3,6",			"PowerMac G4 Windtunnel",
+		PMAC_TYPE_WINDTUNNEL,		core99_features,
+		PMAC_MB_MAY_SLEEP,
+	},
+	{	"PowerMac4,1",			"iMac \"Flower Power\"",
+		PMAC_TYPE_PANGEA_IMAC,		pangea_features,
+		PMAC_MB_MAY_SLEEP
+	},
+	{	"PowerMac4,2",			"Flat panel iMac",
+		PMAC_TYPE_FLAT_PANEL_IMAC,	pangea_features,
+		PMAC_MB_CAN_SLEEP
+	},
+	{	"PowerMac4,4",			"eMac",
+		PMAC_TYPE_EMAC,			core99_features,
+		PMAC_MB_MAY_SLEEP
+	},
+	{	"PowerMac5,1",			"PowerMac G4 Cube",
+		PMAC_TYPE_CUBE,			core99_features,
+		PMAC_MB_MAY_SLEEP | PMAC_MB_OLD_CORE99
+	},
+	{	"PowerMac6,1",			"Flat panel iMac",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_MAY_SLEEP,
+	},
+	{	"PowerMac6,3",			"Flat panel iMac",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_MAY_SLEEP,
+	},
+	{	"PowerMac6,4",			"eMac",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_MAY_SLEEP,
+	},
+	{	"PowerMac10,1",			"Mac mini",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER,
+	},
+	{	"iMac,1",			"iMac (first generation)",
+		PMAC_TYPE_ORIG_IMAC,		paddington_features,
+		0
+	},
+
+	/*
+	 * Xserve's
+	 */
+
+	{	"RackMac1,1",			"XServe",
+		PMAC_TYPE_RACKMAC,		rackmac_features,
+		0,
+	},
+	{	"RackMac1,2",			"XServe rev. 2",
+		PMAC_TYPE_RACKMAC,		rackmac_features,
+		0,
+	},
+
+	/*
+	 * Laptops
+	 */
+
+	{	"AAPL,3400/2400",		"PowerBook 3400",
+		PMAC_TYPE_HOOPER,		ohare_features,
+		PMAC_MB_CAN_SLEEP | PMAC_MB_MOBILE
+	},
+	{	"AAPL,3500",			"PowerBook 3500",
+		PMAC_TYPE_KANGA,		ohare_features,
+		PMAC_MB_CAN_SLEEP | PMAC_MB_MOBILE
+	},
+	{	"AAPL,PowerBook1998",		"PowerBook Wallstreet",
+		PMAC_TYPE_WALLSTREET,		heathrow_laptop_features,
+		PMAC_MB_CAN_SLEEP | PMAC_MB_MOBILE
+	},
+	{	"PowerBook1,1",			"PowerBook 101 (Lombard)",
+		PMAC_TYPE_101_PBOOK,		paddington_features,
+		PMAC_MB_CAN_SLEEP | PMAC_MB_MOBILE
+	},
+	{	"PowerBook2,1",			"iBook (first generation)",
+		PMAC_TYPE_ORIG_IBOOK,		core99_features,
+		PMAC_MB_CAN_SLEEP | PMAC_MB_OLD_CORE99 | PMAC_MB_MOBILE
+	},
+	{	"PowerBook2,2",			"iBook FireWire",
+		PMAC_TYPE_FW_IBOOK,		core99_features,
+		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER |
+		PMAC_MB_OLD_CORE99 | PMAC_MB_MOBILE
 	},
 	{	"PowerBook3,1",			"PowerBook Pismo",
 		PMAC_TYPE_PISMO,		core99_features,
@@ -2181,17 +2277,17 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		PMAC_TYPE_TITANIUM4,		core99_features,
 		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE
 	},
-	{	"RackMac1,1",			"XServe",
-		PMAC_TYPE_RACKMAC,		rackmac_features,
-		0,
+	{	"PowerBook4,1",			"iBook 2",
+		PMAC_TYPE_IBOOK2,		pangea_features,
+		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE
 	},
-	{	"RackMac1,2",			"XServe rev. 2",
-		PMAC_TYPE_RACKMAC,		rackmac_features,
-		0,
+	{	"PowerBook4,2",			"iBook 2",
+		PMAC_TYPE_IBOOK2,		pangea_features,
+		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE
 	},
-	{	"PowerMac3,6",			"PowerMac G4 Windtunnel",
-		PMAC_TYPE_WINDTUNNEL,		core99_features,
-		PMAC_MB_MAY_SLEEP,
+	{	"PowerBook4,3",			"iBook 2 rev. 2",
+		PMAC_TYPE_IBOOK2,		pangea_features,
+		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE
 	},
 	{	"PowerBook5,1",			"PowerBook G4 17\"",
 		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
@@ -2213,6 +2309,14 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
 		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
 	},
+	{	"PowerBook5,6",			"PowerBook G4 15\"",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
+	},
+	{	"PowerBook5,7",			"PowerBook G4 17\"",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
+	},
 	{	"PowerBook6,1",			"PowerBook G4 12\"",
 		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
 		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
@@ -2230,6 +2334,10 @@ static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
 	},
 	{	"PowerBook6,5",			"iBook G4",
+		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
+		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
+	},
+	{	"PowerBook6,8",			"PowerBook G4 12\"",
 		PMAC_TYPE_UNKNOWN_INTREPID,	intrepid_features,
 		PMAC_MB_MAY_SLEEP | PMAC_MB_HAS_FW_POWER | PMAC_MB_MOBILE,
 	},
@@ -2706,97 +2814,11 @@ set_initial_features(void)
 		MACIO_BIC(HEATHROW_FCR, HRW_SOUND_POWER_N);
 	}
 
-	/* Hack for bumping clock speed on the new PowerBooks and the
-	 * iBook G4. This implements the "platform-do-clockspreading" OF
-	 * property. For safety, we also check the product ID in the
-	 * device-tree to make reasonably sure we won't set wrong values
-	 * in the clock chip.
-	 *
-	 * Of course, ultimately, we have to implement a real parser for
-	 * the platform-do-* stuff...
+	/* Some machine models need the clock chip to be properly setup for
+	 * clock spreading now. This should be a platform function but we
+	 * don't do these at the moment
 	 */
-	while (machine_is_compatible("PowerBook5,2") ||
-	       machine_is_compatible("PowerBook5,3") ||
-	       machine_is_compatible("PowerBook6,2") ||
-	       machine_is_compatible("PowerBook6,3")) {
-		struct device_node *ui2c = of_find_node_by_type(NULL, "i2c");
-		struct device_node *dt = of_find_node_by_name(NULL, "device-tree");
-		u8 buffer[9];
-		u32 *productID;
-		int i, rc, changed = 0;
-		
-		if (dt == NULL)
-			break;
-		productID = (u32 *)get_property(dt, "pid#", NULL);
-		if (productID == NULL)
-			break;
-		while(ui2c) {
-			struct device_node *p = of_get_parent(ui2c);
-			if (p && !strcmp(p->name, "uni-n"))
-				break;
-			ui2c = of_find_node_by_type(ui2c, "i2c");
-		}
-		if (ui2c == NULL)
-			break;
-		DBG("Trying to bump clock speed for PID: %08x...\n", *productID);
-		rc = pmac_low_i2c_open(ui2c, 1);
-		if (rc != 0)
-			break;
-		pmac_low_i2c_setmode(ui2c, pmac_low_i2c_mode_combined);
-		rc = pmac_low_i2c_xfer(ui2c, 0xd2 | pmac_low_i2c_read, 0x80, buffer, 9);
-		DBG("read result: %d,", rc);
-		if (rc != 0) {
-			pmac_low_i2c_close(ui2c);
-			break;
-		}
-		for (i=0; i<9; i++)
-			DBG(" %02x", buffer[i]);
-		DBG("\n");
-		
-		switch(*productID) {
-		case 0x1182:	/* AlBook 12" rev 2 */
-		case 0x1183:	/* iBook G4 12" */
-			buffer[0] = (buffer[0] & 0x8f) | 0x70;
-			buffer[2] = (buffer[2] & 0x7f) | 0x00;
-			buffer[5] = (buffer[5] & 0x80) | 0x31;
-			buffer[6] = (buffer[6] & 0x40) | 0xb0;
-			buffer[7] = (buffer[7] & 0x00) | 0xc0;
-			buffer[8] = (buffer[8] & 0x00) | 0x30;
-			changed = 1;
-			break;
-		case 0x3142:	/* AlBook 15" (ATI M10) */
-		case 0x3143:	/* AlBook 17" (ATI M10) */
-			buffer[0] = (buffer[0] & 0xaf) | 0x50;
-			buffer[2] = (buffer[2] & 0x7f) | 0x00;
-			buffer[5] = (buffer[5] & 0x80) | 0x31;
-			buffer[6] = (buffer[6] & 0x40) | 0xb0;
-			buffer[7] = (buffer[7] & 0x00) | 0xd0;
-			buffer[8] = (buffer[8] & 0x00) | 0x30;
-			changed = 1;
-			break;
-		default:
-			DBG("i2c-hwclock: Machine model not handled\n");
-			break;
-		}
-		if (!changed) {
-			pmac_low_i2c_close(ui2c);
-			break;
-		}
-		pmac_low_i2c_setmode(ui2c, pmac_low_i2c_mode_stdsub);
-		rc = pmac_low_i2c_xfer(ui2c, 0xd2 | pmac_low_i2c_write, 0x80, buffer, 9);
-		DBG("write result: %d,", rc);
-		pmac_low_i2c_setmode(ui2c, pmac_low_i2c_mode_combined);
-		rc = pmac_low_i2c_xfer(ui2c, 0xd2 | pmac_low_i2c_read, 0x80, buffer, 9);
-		DBG("read result: %d,", rc);
-		if (rc != 0) {
-			pmac_low_i2c_close(ui2c);
-			break;
-		}
-		for (i=0; i<9; i++)
-			DBG(" %02x", buffer[i]);
-		pmac_low_i2c_close(ui2c);
-		break;
-	}
+	pmac_tweak_clock_spreading(1);
 
 #endif /* CONFIG_POWER4 */
 
@@ -2932,3 +2954,48 @@ void __pmac pmac_call_early_video_resume(void)
 	if (pmac_early_vresume_proc)
 		pmac_early_vresume_proc(pmac_early_vresume_data);
 }
+
+/*
+ * AGP related suspend/resume code
+ */
+
+static struct pci_dev *pmac_agp_bridge __pmacdata;
+static int (*pmac_agp_suspend)(struct pci_dev *bridge) __pmacdata;
+static int (*pmac_agp_resume)(struct pci_dev *bridge) __pmacdata;
+
+void __pmac pmac_register_agp_pm(struct pci_dev *bridge,
+				 int (*suspend)(struct pci_dev *bridge),
+				 int (*resume)(struct pci_dev *bridge))
+{
+	if (suspend || resume) {
+		pmac_agp_bridge = bridge;
+		pmac_agp_suspend = suspend;
+		pmac_agp_resume = resume;
+		return;
+	}
+	if (bridge != pmac_agp_bridge)
+		return;
+	pmac_agp_suspend = pmac_agp_resume = NULL;
+	return;
+}
+EXPORT_SYMBOL(pmac_register_agp_pm);
+
+void __pmac pmac_suspend_agp_for_card(struct pci_dev *dev)
+{
+	if (pmac_agp_bridge == NULL || pmac_agp_suspend == NULL)
+		return;
+	if (pmac_agp_bridge->bus != dev->bus)
+		return;
+	pmac_agp_suspend(pmac_agp_bridge);
+}
+EXPORT_SYMBOL(pmac_suspend_agp_for_card);
+
+void __pmac pmac_resume_agp_for_card(struct pci_dev *dev)
+{
+	if (pmac_agp_bridge == NULL || pmac_agp_resume == NULL)
+		return;
+	if (pmac_agp_bridge->bus != dev->bus)
+		return;
+	pmac_agp_resume(pmac_agp_bridge);
+}
+EXPORT_SYMBOL(pmac_resume_agp_for_card);

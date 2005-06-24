@@ -1746,6 +1746,11 @@ static int sun4c_pte_present(pte_t pte)
 }
 static void sun4c_pte_clear(pte_t *ptep)	{ *ptep = __pte(0); }
 
+static int sun4c_pte_read(pte_t pte)
+{
+	return (pte_val(pte) & _SUN4C_PAGE_READ);
+}
+
 static int sun4c_pmd_bad(pmd_t pmd)
 {
 	return (((pmd_val(pmd) & ~PAGE_MASK) != PGD_TABLE) ||
@@ -2117,7 +2122,6 @@ void __init sun4c_paging_init(void)
 
 		free_area_init_node(0, &contig_page_data, zones_size,
 				    pfn_base, zholes_size);
-		mem_map = contig_page_data.node_mem_map;
 	}
 
 	cnt = 0;
@@ -2200,6 +2204,7 @@ void __init ld_mmu_sun4c(void)
 
 	BTFIXUPSET_CALL(pte_present, sun4c_pte_present, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pte_clear, sun4c_pte_clear, BTFIXUPCALL_STG0O0);
+	BTFIXUPSET_CALL(pte_read, sun4c_pte_read, BTFIXUPCALL_NORM);
 
 	BTFIXUPSET_CALL(pmd_bad, sun4c_pmd_bad, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pmd_present, sun4c_pmd_present, BTFIXUPCALL_NORM);
@@ -2226,7 +2231,6 @@ void __init ld_mmu_sun4c(void)
 	BTFIXUPSET_CALL(free_pgd_fast, sun4c_free_pgd_fast, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(get_pgd_fast, sun4c_get_pgd_fast, BTFIXUPCALL_NORM);
 
-	BTFIXUPSET_HALF(pte_readi, _SUN4C_PAGE_READ);
 	BTFIXUPSET_HALF(pte_writei, _SUN4C_PAGE_WRITE);
 	BTFIXUPSET_HALF(pte_dirtyi, _SUN4C_PAGE_MODIFIED);
 	BTFIXUPSET_HALF(pte_youngi, _SUN4C_PAGE_ACCESSED);

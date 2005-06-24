@@ -172,14 +172,14 @@ xfs_dir2_leaf_to_node(
 	 * Initialize the freespace block header.
 	 */
 	INT_SET(free->hdr.magic, ARCH_CONVERT, XFS_DIR2_FREE_MAGIC);
-	INT_ZERO(free->hdr.firstdb, ARCH_CONVERT);
+	free->hdr.firstdb = 0;
 	ASSERT(INT_GET(ltp->bestcount, ARCH_CONVERT) <= (uint)dp->i_d.di_size / mp->m_dirblksize);
 	INT_COPY(free->hdr.nvalid, ltp->bestcount, ARCH_CONVERT);
 	/*
 	 * Copy freespace entries from the leaf block to the new block.
 	 * Count active entries.
 	 */
-	for (i = n = 0, from = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT), to = free->bests;
+	for (i = n = 0, from = XFS_DIR2_LEAF_BESTS_P(ltp), to = free->bests;
 	     i < INT_GET(ltp->bestcount, ARCH_CONVERT); i++, from++, to++) {
 		if ((off = INT_GET(*from, ARCH_CONVERT)) != NULLDATAOFF)
 			n++;
@@ -240,7 +240,7 @@ xfs_dir2_leafn_add(
 	 */
 
 	if (INT_GET(leaf->hdr.count, ARCH_CONVERT) == XFS_DIR2_MAX_LEAF_ENTS(mp)) {
-		if (INT_ISZERO(leaf->hdr.stale, ARCH_CONVERT))
+		if (!leaf->hdr.stale)
 			return XFS_ERROR(ENOSPC);
 		compact = INT_GET(leaf->hdr.stale, ARCH_CONVERT) > 1;
 	} else
@@ -263,14 +263,14 @@ xfs_dir2_leafn_add(
 	/*
 	 * Set impossible logging indices for this case.
 	 */
-	else if (!INT_ISZERO(leaf->hdr.stale, ARCH_CONVERT)) {
+	else if (leaf->hdr.stale) {
 		lfloglow = INT_GET(leaf->hdr.count, ARCH_CONVERT);
 		lfloghigh = -1;
 	}
 	/*
 	 * No stale entries, just insert a space for the new entry.
 	 */
-	if (INT_ISZERO(leaf->hdr.stale, ARCH_CONVERT)) {
+	if (!leaf->hdr.stale) {
 		lep = &leaf->ents[index];
 		if (index < INT_GET(leaf->hdr.count, ARCH_CONVERT))
 			memmove(lep + 1, lep,
@@ -403,7 +403,7 @@ xfs_dir2_leafn_lasthash(
 	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAFN_MAGIC);
 	if (count)
 		*count = INT_GET(leaf->hdr.count, ARCH_CONVERT);
-	if (INT_ISZERO(leaf->hdr.count, ARCH_CONVERT))
+	if (!leaf->hdr.count)
 		return 0;
 	return INT_GET(leaf->ents[INT_GET(leaf->hdr.count, ARCH_CONVERT) - 1].hashval, ARCH_CONVERT);
 }
@@ -690,7 +690,7 @@ xfs_dir2_leafn_moveents(
 	 * If the source has stale leaves, count the ones in the copy range
 	 * so we can update the header correctly.
 	 */
-	if (!INT_ISZERO(leaf_s->hdr.stale, ARCH_CONVERT)) {
+	if (leaf_s->hdr.stale) {
 		int	i;			/* temp leaf index */
 
 		for (i = start_s, stale = 0; i < start_s + count; i++) {
@@ -1020,7 +1020,7 @@ xfs_dir2_leafn_remove(
 			 * If there are no useful entries left in the block,
 			 * get rid of the block if we can.
 			 */
-			if (INT_ISZERO(free->hdr.nused, ARCH_CONVERT)) {
+			if (!free->hdr.nused) {
 				error = xfs_dir2_shrink_inode(args, fdb, fbp);
 				if (error == 0) {
 					fbp = NULL;
@@ -1182,7 +1182,7 @@ xfs_dir2_leafn_toosmall(
 		 * Make altpath point to the block we want to keep and
 		 * path point to the block we want to drop (this one).
 		 */
-		forward = !INT_ISZERO(info->forw, ARCH_CONVERT);
+		forward = info->forw;
 		memcpy(&state->altpath, &state->path, sizeof(state->path));
 		error = xfs_da_path_shift(state, &state->altpath, forward, 0,
 			&rval);
@@ -1634,8 +1634,8 @@ xfs_dir2_node_addname_int(
 			INT_SET(free->hdr.firstdb, ARCH_CONVERT,
 				(fbno - XFS_DIR2_FREE_FIRSTDB(mp)) *
 				XFS_DIR2_MAX_FREE_BESTS(mp));
-			INT_ZERO(free->hdr.nvalid, ARCH_CONVERT);
-			INT_ZERO(free->hdr.nused, ARCH_CONVERT);
+			free->hdr.nvalid = 0;
+			free->hdr.nused = 0;
 		} else {
 			free = fbp->data;
 			ASSERT(INT_GET(free->hdr.magic, ARCH_CONVERT) == XFS_DIR2_FREE_MAGIC);

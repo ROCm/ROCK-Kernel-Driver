@@ -85,11 +85,14 @@ _GLOBAL(__hash_page)
 	bne-	htab_wrong_access
 	/* Check if PTE is busy */
 	andi.	r0,r31,_PAGE_BUSY
-	bne-	1b
+	/* If so, just bail out and refault if needed. Someone else
+	 * is changing this PTE anyway and might hash it.
+	 */
+	bne-	bail_ok
 	/* Prepare new PTE value (turn access RW into DIRTY, then
 	 * add BUSY,HASHPTE and ACCESSED)
 	 */
-	rlwinm	r30,r4,5,24,24	/* _PAGE_RW -> _PAGE_DIRTY */
+	rlwinm	r30,r4,32-9+7,31-7,31-7	/* _PAGE_RW -> _PAGE_DIRTY */
 	or	r30,r30,r31
 	ori	r30,r30,_PAGE_BUSY | _PAGE_ACCESSED | _PAGE_HASHPTE
 	/* Write the linux PTE atomically (setting busy) */
@@ -112,11 +115,11 @@ _GLOBAL(__hash_page)
 	rldicl	r5,r5,0,25		/* vsid & 0x0000007fffffffff */
 	rldicl	r0,r3,64-12,48		/* (ea >> 12) & 0xffff */
 	xor	r28,r5,r0
-	
-	/* Convert linux PTE bits into HW equivalents
-	 */
-	andi.	r3,r30,0x1fa		/* Get basic set of flags */
-	rlwinm	r0,r30,32-2+1,30,30	/* _PAGE_RW -> _PAGE_USER (r0) */
+
+	/* Convert linux PTE bits into HW equivalents */
+	andi.	r3,r30,0x1fe		/* Get basic set of flags */
+	xori	r3,r3,HW_NO_EXEC	/* _PAGE_EXEC -> NOEXEC */
+	rlwinm	r0,r30,32-9+1,30,30	/* _PAGE_RW -> _PAGE_USER (r0) */
 	rlwinm	r4,r30,32-7+1,30,30	/* _PAGE_DIRTY -> _PAGE_USER (r4) */
 	and	r0,r0,r4		/* _PAGE_RW & _PAGE_DIRTY -> r0 bit 30 */
 	andc	r0,r30,r0		/* r0 = pte & ~r0 */
@@ -214,6 +217,10 @@ _GLOBAL(htab_call_hpte_remove)
 
 	/* Try all again */
 	b	htab_insert_pte	
+
+bail_ok:
+	li	r3,0
+	b	bail
 
 htab_pte_insert_ok:
 	/* Insert slot number & secondary bit in PTE */

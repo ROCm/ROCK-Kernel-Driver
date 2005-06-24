@@ -225,7 +225,7 @@ NCR_Q720_probe(struct device *dev)
 
 	/* The first 1k of the memory buffer is a memory map of the registers
 	 */
-	mem_base = (__u32)dma_mark_declared_memory_occupied(dev, base_addr,
+	mem_base = dma_mark_declared_memory_occupied(dev, base_addr,
 							    1024);
 	if (IS_ERR(mem_base)) {
 		printk("NCR_Q720 failed to reserve memory mapped region\n");

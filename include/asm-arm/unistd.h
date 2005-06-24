@@ -1,7 +1,7 @@
 /*
  *  linux/include/asm-arm/unistd.h
  *
- *  Copyright (C) 2001-2003 Russell King
+ *  Copyright (C) 2001-2005 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -307,6 +307,50 @@
 #define __NR_mq_getsetattr		(__NR_SYSCALL_BASE+279)
 #define __NR_waitid			(__NR_SYSCALL_BASE+280)
 
+#if 0 /* reserve these for un-muxing socketcall */
+#define __NR_socket			(__NR_SYSCALL_BASE+281)
+#define __NR_bind			(__NR_SYSCALL_BASE+282)
+#define __NR_connect			(__NR_SYSCALL_BASE+283)
+#define __NR_listen			(__NR_SYSCALL_BASE+284)
+#define __NR_accept			(__NR_SYSCALL_BASE+285)
+#define __NR_getsockname		(__NR_SYSCALL_BASE+286)
+#define __NR_getpeername		(__NR_SYSCALL_BASE+287)
+#define __NR_socketpair			(__NR_SYSCALL_BASE+288)
+#define __NR_send			(__NR_SYSCALL_BASE+289)
+#define __NR_sendto			(__NR_SYSCALL_BASE+290)
+#define __NR_recv			(__NR_SYSCALL_BASE+291)
+#define __NR_recvfrom			(__NR_SYSCALL_BASE+292)
+#define __NR_shutdown			(__NR_SYSCALL_BASE+293)
+#define __NR_setsockopt			(__NR_SYSCALL_BASE+294)
+#define __NR_getsockopt			(__NR_SYSCALL_BASE+295)
+#define __NR_sendmsg			(__NR_SYSCALL_BASE+296)
+#define __NR_recvmsg			(__NR_SYSCALL_BASE+297)
+#endif
+
+#if 0 /* reserve these for un-muxing ipc */
+#define __NR_semop			(__NR_SYSCALL_BASE+298)
+#define __NR_semget			(__NR_SYSCALL_BASE+299)
+#define __NR_semctl			(__NR_SYSCALL_BASE+300)
+#define __NR_msgsnd			(__NR_SYSCALL_BASE+301)
+#define __NR_msgrcv			(__NR_SYSCALL_BASE+302)
+#define __NR_msgget			(__NR_SYSCALL_BASE+303)
+#define __NR_msgctl			(__NR_SYSCALL_BASE+304)
+#define __NR_shmat			(__NR_SYSCALL_BASE+305)
+#define __NR_shmdt			(__NR_SYSCALL_BASE+306)
+#define __NR_shmget			(__NR_SYSCALL_BASE+307)
+#define __NR_shmctl			(__NR_SYSCALL_BASE+308)
+#endif
+
+#define __NR_add_key			(__NR_SYSCALL_BASE+309)
+#define __NR_request_key		(__NR_SYSCALL_BASE+310)
+#define __NR_keyctl			(__NR_SYSCALL_BASE+311)
+
+#if 0 /* reserved for un-muxing ipc */
+#define __NR_semtimedop			(__NR_SYSCALL_BASE+312)
+#endif
+
+#define __NR_vserver			(__NR_SYSCALL_BASE+313)
+
 /*
  * The following SWIs are ARM private.
  */
@@ -315,8 +359,7 @@
 #define __ARM_NR_cacheflush		(__ARM_NR_BASE+2)
 #define __ARM_NR_usr26			(__ARM_NR_BASE+3)
 #define __ARM_NR_usr32			(__ARM_NR_BASE+4)
-
-#define __ARM_NR_set_tls		(__ARM_NR_BASE+0x800)
+#define __ARM_NR_set_tls		(__ARM_NR_BASE+5)
 
 #define __sys2(x) #x
 #define __sys1(x) __sys2(x)
@@ -335,7 +378,7 @@
 
 #define __syscall_return(type, res)					\
 do {									\
-	if ((unsigned long)(res) >= (unsigned long)(-125)) {		\
+	if ((unsigned long)(res) >= (unsigned long)(-129)) {		\
 		errno = -(res);						\
 		res = -1;						\
 	}								\
@@ -509,6 +552,6 @@ asmlinkage long sys_rt_sigaction(int sig,
  * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
  * but it doesn't work on all toolchains, so we just do it by hand
  */
-#define cond_syscall(x) asm(".weak\t" #x "\n\t.set\t" #x ",sys_ni_syscall");
+#define cond_syscall(x) asm(".weak\t" #x "\n\t.set\t" #x ",sys_ni_syscall")
 
 #endif /* __ASM_ARM_UNISTD_H */

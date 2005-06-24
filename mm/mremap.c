@@ -16,7 +16,6 @@
 #include <linux/fs.h>
 #include <linux/highmem.h>
 #include <linux/security.h>
-#include <linux/acct.h>
 #include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
@@ -31,26 +30,16 @@ static pte_t *get_one_pte_map_nested(struct mm_struct *mm, unsigned long addr)
 	pte_t *pte = NULL;
 
 	pgd = pgd_offset(mm, addr);
-	if (pgd_none(*pgd))
+	if (pgd_none_or_clear_bad(pgd))
 		goto end;
 
 	pud = pud_offset(pgd, addr);
-	if (pud_none(*pud))
+	if (pud_none_or_clear_bad(pud))
 		goto end;
-	if (pud_bad(*pud)) {
-		pud_ERROR(*pud);
-		pud_clear(pud);
-		goto end;
-	}
 
 	pmd = pmd_offset(pud, addr);
-	if (pmd_none(*pmd))
+	if (pmd_none_or_clear_bad(pmd))
 		goto end;
-	if (pmd_bad(*pmd)) {
-		pmd_ERROR(*pmd);
-		pmd_clear(pmd);
-		goto end;
-	}
 
 	pte = pte_offset_map_nested(pmd, addr);
 	if (pte_none(*pte)) {
@@ -68,15 +57,17 @@ static pte_t *get_one_pte_map(struct mm_struct *mm, unsigned long addr)
 	pmd_t *pmd;
 
 	pgd = pgd_offset(mm, addr);
-	if (pgd_none(*pgd))
+	if (pgd_none_or_clear_bad(pgd))
 		return NULL;
 
 	pud = pud_offset(pgd, addr);
-	if (pud_none(*pud))
+	if (pud_none_or_clear_bad(pud))
 		return NULL;
+
 	pmd = pmd_offset(pud, addr);
-	if (!pmd_present(*pmd))
+	if (pmd_none_or_clear_bad(pmd))
 		return NULL;
+
 	return pte_offset_map(pmd, addr);
 }
 
@@ -150,7 +141,7 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 			if (dst) {
 				pte_t pte;
 				pte = ptep_clear_flush(vma, old_addr, src);
-				set_pte(dst, pte);
+				set_pte_at(mm, new_addr, dst, pte);
 			} else
 				error = -ENOMEM;
 			pte_unmap_nested(src);
@@ -233,6 +224,12 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 			split = 1;
 	}
 
+	/*
+	 * if we failed to move page tables we still do total_vm increment
+	 * since do_munmap() will decrement it by old_len == new_len
+	 */
+	mm->total_vm += new_len >> PAGE_SHIFT;
+
 	if (do_munmap(mm, old_addr, old_len) < 0) {
 		/* OOM: unable to split vma, just get accounts right */
 		vm_unacct_memory(excess >> PAGE_SHIFT);
@@ -246,7 +243,6 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 			vma->vm_next->vm_flags |= VM_ACCOUNT;
 	}
 
-	mm->total_vm += new_len >> PAGE_SHIFT;
 	__vm_stat_account(mm, vma->vm_flags, vma->vm_file, new_len>>PAGE_SHIFT);
 	if (vm_flags & VM_LOCKED) {
 		mm->locked_vm += new_len >> PAGE_SHIFT;
@@ -254,9 +250,6 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 			make_pages_present(new_addr + old_len,
 					   new_addr + new_len);
 	}
-
-	acct_update_integrals();
-	update_mem_hiwater();
 
 	return new_addr;
 }
@@ -359,10 +352,10 @@ unsigned long do_mremap(unsigned long addr,
 		if (locked > lock_limit && !capable(CAP_IPC_LOCK))
 			goto out;
 	}
-	ret = -ENOMEM;
-	if ((current->mm->total_vm << PAGE_SHIFT) + (new_len - old_len)
-	    > current->signal->rlim[RLIMIT_AS].rlim_cur)
+	if (!may_expand_vm(current->mm, (new_len - old_len) >> PAGE_SHIFT)) {
+		ret = -ENOMEM;
 		goto out;
+	}
 
 	if (vma->vm_flags & VM_ACCOUNT) {
 		charged = (new_len - old_len) >> PAGE_SHIFT;
@@ -394,8 +387,6 @@ unsigned long do_mremap(unsigned long addr,
 				make_pages_present(addr + old_len,
 						   addr + new_len);
 			}
-			acct_update_integrals();
-			update_mem_hiwater();
 			ret = addr;
 			goto out;
 		}

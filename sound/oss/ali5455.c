@@ -3528,7 +3528,7 @@ static void __devexit ali_remove(struct pci_dev *pci_dev)
 }
 
 #ifdef CONFIG_PM
-static int ali_pm_suspend(struct pci_dev *dev, u32 pm_state)
+static int ali_pm_suspend(struct pci_dev *dev, pm_message_t pm_state)
 {
 	struct ali_card *card = pci_get_drvdata(dev);
 	struct ali_state *state;

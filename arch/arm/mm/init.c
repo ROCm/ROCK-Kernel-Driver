@@ -223,6 +223,9 @@ find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 	 * This doesn't seem to be used by the Linux memory
 	 * manager any more.  If we can get rid of it, we
 	 * also get rid of some of the stuff above as well.
+	 *
+	 * Note: max_low_pfn and max_pfn reflect the number
+	 * of _pages_ in the system, not the maximum PFN.
 	 */
 	max_low_pfn = memend_pfn - O_PFN_DOWN(PHYS_OFFSET);
 	max_pfn = memend_pfn - O_PFN_DOWN(PHYS_OFFSET);
@@ -500,10 +503,6 @@ void __init paging_init(struct meminfo *mi, struct machine_desc *mdesc)
 		free_area_init_node(node, pgdat, zone_size,
 				bdata->node_boot_start >> PAGE_SHIFT, zhole_size);
 	}
-
-#ifndef CONFIG_DISCONTIGMEM
-	mem_map = contig_page_data.node_mem_map;
-#endif
 
 	/*
 	 * finish off the bad pages once

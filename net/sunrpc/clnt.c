@@ -23,6 +23,7 @@
 
 #include <asm/system.h>
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -429,12 +430,11 @@ rpc_call_async(struct rpc_clnt *clnt, struct rpc_message *msg, int flags,
 	rpc_call_setup(task, msg, 0);
 
 	/* Set up the call info struct and execute the task */
-	if (task->tk_status == 0)
-		status = rpc_execute(task);
-	else {
-		status = task->tk_status;
+	status = task->tk_status;
+	if (status == 0)
+		rpc_execute(task);
+	else
 		rpc_release_task(task);
-	}
 
 out:
 	rpc_clnt_sigunmask(clnt, &oldset);		
@@ -449,9 +449,9 @@ rpc_call_setup(struct rpc_task *task, struct rpc_message *msg, int flags)
 	task->tk_msg   = *msg;
 	task->tk_flags |= flags;
 	/* Bind the user cred */
-	if (task->tk_msg.rpc_cred != NULL) {
+	if (task->tk_msg.rpc_cred != NULL)
 		rpcauth_holdcred(task);
-	} else
+	else
 		rpcauth_bindcred(task);
 
 	if (task->tk_status == 0)
@@ -474,6 +474,20 @@ rpc_setbufsize(struct rpc_clnt *clnt, unsigned int sndsize, unsigned int rcvsize
 	if (xprt_connected(xprt))
 		xprt_sock_setbufsize(xprt);
 }
+
+/*
+ * Return size of largest payload RPC client can support, in bytes
+ *
+ * For stream transports, this is one RPC record fragment (see RFC
+ * 1831), as we don't support multi-record requests yet.  For datagram
+ * transports, this is the size of an IP packet minus the IP, UDP, and
+ * RPC header sizes.
+ */
+size_t rpc_max_payload(struct rpc_clnt *clnt)
+{
+	return clnt->cl_xprt->max_payload;
+}
+EXPORT_SYMBOL(rpc_max_payload);
 
 /*
  * Restart an (async) RPC call. Usually called from within the
@@ -892,21 +906,6 @@ call_decode(struct rpc_task *task)
 		if (task->tk_action == NULL)
 			return;
 		goto out_retry;
-	}
-
-	/*
-	 * The following is an NFS-specific hack to cater for setuid
-	 * processes whose uid is mapped to nobody on the server.
-	 */
-	if (task->tk_client->cl_droppriv && 
-            (ntohl(*p) == NFSERR_ACCES || ntohl(*p) == NFSERR_PERM)) {
-		if (RPC_IS_SETUID(task) && task->tk_suid_retry) {
-			dprintk("RPC: %4d retry squashed uid\n", task->tk_pid);
-			task->tk_flags ^= RPC_CALL_REALUID;
-			task->tk_action = call_bind;
-			task->tk_suid_retry--;
-			goto out_retry;
-		}
 	}
 
 	task->tk_action = NULL;

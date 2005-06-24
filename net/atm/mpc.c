@@ -522,7 +522,7 @@ static int send_via_shortcut(struct sk_buff *skb, struct mpoa_client *mpc)
 		memcpy(skb->data, &llc_snap_mpoa_data, sizeof(struct llc_snap_hdr));
 	}
 
-	atomic_add(skb->truesize, &entry->shortcut->sk->sk_wmem_alloc);
+	atomic_add(skb->truesize, &sk_atm(entry->shortcut)->sk_wmem_alloc);
 	ATM_SKB(skb)->atm_options = entry->shortcut->atm_options;
 	entry->shortcut->send(entry->shortcut, skb);
 	entry->packets_fwded++;
@@ -564,7 +564,7 @@ static int mpc_send_packet(struct sk_buff *skb, struct net_device *dev)
 	return retval;
 }
 
-int atm_mpoa_vcc_attach(struct atm_vcc *vcc, void __user *arg)
+static int atm_mpoa_vcc_attach(struct atm_vcc *vcc, void __user *arg)
 {
 	int bytes_left;
 	struct mpoa_client *mpc;
@@ -665,10 +665,12 @@ static void mpc_push(struct atm_vcc *vcc, struct sk_buff *skb)
 	
 	skb->dev = dev;
 	if (memcmp(skb->data, &llc_snap_mpoa_ctrl, sizeof(struct llc_snap_hdr)) == 0) {
+		struct sock *sk = sk_atm(vcc);
+
 		dprintk("mpoa: (%s) mpc_push: control packet arrived\n", dev->name);
 		/* Pass control packets to daemon */
-		skb_queue_tail(&vcc->sk->sk_receive_queue, skb);
-		vcc->sk->sk_data_ready(vcc->sk, skb->len);
+		skb_queue_tail(&sk->sk_receive_queue, skb);
+		sk->sk_data_ready(sk, skb->len);
 		return;
 	}
 
@@ -751,7 +753,7 @@ static struct atm_dev mpc_dev = {
 	/* members not explicitly initialised will be 0 */
 };
 
-int atm_mpoa_mpoad_attach (struct atm_vcc *vcc, int arg)
+static int atm_mpoa_mpoad_attach (struct atm_vcc *vcc, int arg)
 {
 	struct mpoa_client *mpc;
 	struct lec_priv *priv;
@@ -794,7 +796,7 @@ int atm_mpoa_mpoad_attach (struct atm_vcc *vcc, int arg)
 
 	mpc->mpoad_vcc = vcc;
 	vcc->dev = &mpc_dev;
-	vcc_insert_socket(vcc->sk);
+	vcc_insert_socket(sk_atm(vcc));
 	set_bit(ATM_VF_META,&vcc->flags);
 	set_bit(ATM_VF_READY,&vcc->flags);
 
@@ -853,7 +855,7 @@ static void mpoad_close(struct atm_vcc *vcc)
 	mpc->in_ops->destroy_cache(mpc);
 	mpc->eg_ops->destroy_cache(mpc);
 
-	while ((skb = skb_dequeue(&vcc->sk->sk_receive_queue))) {
+	while ((skb = skb_dequeue(&sk_atm(vcc)->sk_receive_queue))) {
 		atm_return(vcc, skb->truesize);
 		kfree_skb(skb);
 	}
@@ -873,7 +875,7 @@ static int msg_from_mpoad(struct atm_vcc *vcc, struct sk_buff *skb)
 	
 	struct mpoa_client *mpc = find_mpc_by_vcc(vcc);
 	struct k_message *mesg = (struct k_message*)skb->data;
-	atomic_sub(skb->truesize, &vcc->sk->sk_wmem_alloc);
+	atomic_sub(skb->truesize, &sk_atm(vcc)->sk_wmem_alloc);
 	
 	if (mpc == NULL) {
 		printk("mpoa: msg_from_mpoad: no mpc found\n");
@@ -938,6 +940,7 @@ static int msg_from_mpoad(struct atm_vcc *vcc, struct sk_buff *skb)
 int msg_to_mpoad(struct k_message *mesg, struct mpoa_client *mpc)
 {
 	struct sk_buff *skb;
+	struct sock *sk;
 
 	if (mpc == NULL || !mpc->mpoad_vcc) {
 		printk("mpoa: msg_to_mpoad: mesg %d to a non-existent mpoad\n", mesg->type);
@@ -950,8 +953,10 @@ int msg_to_mpoad(struct k_message *mesg, struct mpoa_client *mpc)
 	skb_put(skb, sizeof(struct k_message));
 	memcpy(skb->data, mesg, sizeof(struct k_message));
 	atm_force_charge(mpc->mpoad_vcc, skb->truesize);
-	skb_queue_tail(&mpc->mpoad_vcc->sk->sk_receive_queue, skb);
-	mpc->mpoad_vcc->sk->sk_data_ready(mpc->mpoad_vcc->sk, skb->len);
+	
+	sk = sk_atm(mpc->mpoad_vcc);
+	skb_queue_tail(&sk->sk_receive_queue, skb);
+	sk->sk_data_ready(sk, skb->len);
 
 	return 0;
 }
@@ -1206,6 +1211,7 @@ static void egress_purge_rcvd(struct k_message *msg, struct mpoa_client *mpc)
 
 static void purge_egress_shortcut(struct atm_vcc *vcc, eg_cache_entry *entry)
 {
+	struct sock *sk;
 	struct k_message *purge_msg;
 	struct sk_buff *skb;
 
@@ -1229,8 +1235,10 @@ static void purge_egress_shortcut(struct atm_vcc *vcc, eg_cache_entry *entry)
 		purge_msg->content.eg_info = entry->ctrl_info;
 
 	atm_force_charge(vcc, skb->truesize);
-	skb_queue_tail(&vcc->sk->sk_receive_queue, skb);
-	vcc->sk->sk_data_ready(vcc->sk, skb->len);
+
+	sk = sk_atm(vcc);
+	skb_queue_tail(&sk->sk_receive_queue, skb);
+	sk->sk_data_ready(sk, skb->len);
 	dprintk("mpoa: purge_egress_shortcut: exiting:\n");
 
 	return;
@@ -1452,7 +1460,7 @@ static __init int atm_mpoa_init(void)
 	return 0;
 }
 
-void __exit atm_mpoa_cleanup(void)
+static void __exit atm_mpoa_cleanup(void)
 {
 	struct mpoa_client *mpc, *tmp;
 	struct atm_mpoa_qos *qos, *nextqos;

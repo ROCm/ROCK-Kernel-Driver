@@ -137,7 +137,7 @@ nfsd_proc_read(struct svc_rqst *rqstp, struct nfsd_readargs *argp,
 	svc_reserve(rqstp, (19<<2) + argp->count + 4);
 
 	resp->count = argp->count;
-	nfserr = nfsd_read(rqstp, fh_copy(&resp->fh, &argp->fh),
+	nfserr = nfsd_read(rqstp, fh_copy(&resp->fh, &argp->fh), NULL,
 				  argp->offset,
 			   	  argp->vec, argp->vlen,
 				  &resp->count);
@@ -160,7 +160,7 @@ nfsd_proc_write(struct svc_rqst *rqstp, struct nfsd_writeargs *argp,
 		SVCFH_fmt(&argp->fh),
 		argp->len, argp->offset);
 
-	nfserr = nfsd_write(rqstp, fh_copy(&resp->fh, &argp->fh),
+	nfserr = nfsd_write(rqstp, fh_copy(&resp->fh, &argp->fh), NULL,
 				   argp->offset,
 				   argp->vec, argp->vlen,
 				   argp->len,
@@ -590,7 +590,7 @@ nfserrno (int errno)
 		{ nfserr_dropit, -EAGAIN },
 		{ nfserr_dropit, -ENOMEM },
 		{ nfserr_badname, -ESRCH },
-		{ nfserr_notsupp, -EOPNOTSUPP },
+		{ nfserr_io, -ETXTBSY },
 		{ -1, -EIO }
 	};
 	int	i;

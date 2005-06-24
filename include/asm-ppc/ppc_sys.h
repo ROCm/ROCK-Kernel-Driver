@@ -21,8 +21,12 @@
 #include <linux/device.h>
 #include <linux/types.h>
 
-#if defined(CONFIG_85xx)
+#if defined(CONFIG_83xx)
+#include <asm/mpc83xx.h>
+#elif defined(CONFIG_85xx)
 #include <asm/mpc85xx.h>
+#elif defined(CONFIG_PPC_MPC52xx)
+#include <asm/mpc52xx.h>
 #else
 #error "need definition of ppc_sys_devices"
 #endif

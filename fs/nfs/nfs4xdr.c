@@ -1010,8 +1010,13 @@ static int encode_readdir(struct xdr_stream *xdr, const struct nfs4_readdir_arg 
 	WRITE32(readdir->count >> 1);  /* We're not doing readdirplus */
 	WRITE32(readdir->count);
 	WRITE32(2);
-	WRITE32(FATTR4_WORD0_FILEID);
-	WRITE32(0);
+	if (readdir->bitmask[1] & FATTR4_WORD1_MOUNTED_ON_FILEID) {
+		WRITE32(0);
+		WRITE32(FATTR4_WORD1_MOUNTED_ON_FILEID);
+	} else {
+		WRITE32(FATTR4_WORD0_FILEID);
+		WRITE32(0);
+	}
 
 	/* set up reply kvec
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
@@ -3175,7 +3180,7 @@ static int decode_setclientid(struct xdr_stream *xdr, struct nfs4_client *clp)
 		READ_BUF(4);
 		READ32(len);
 		READ_BUF(len);
-		return -EEXIST;
+		return -NFSERR_CLID_INUSE;
 	} else
 		return -nfs_stat_to_errno(nfserr);
 
@@ -3857,7 +3862,7 @@ static int nfs4_xdr_dec_delegreturn(struct rpc_rqst *rqstp, uint32_t *p, void *d
 
 uint32_t *nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 {
-	uint32_t bitmap[1] = {0};
+	uint32_t bitmap[2] = {0};
 	uint32_t len;
 
 	if (!*p++) {
@@ -3881,13 +3886,18 @@ uint32_t *nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 	entry->ino = 1;
 
 	len = ntohl(*p++);		/* bitmap length */
-	if (len > 0) {
-		bitmap[0] = ntohl(*p);
-		p += len;
+	if (len-- > 0) {
+		bitmap[0] = ntohl(*p++);
+		if (len-- > 0) {
+			bitmap[1] = ntohl(*p++);
+			p += len;
+		}
 	}
 	len = XDR_QUADLEN(ntohl(*p++));	/* attribute buffer length */
 	if (len > 0) {
-		if (bitmap[0] == FATTR4_WORD0_FILEID)
+		if (bitmap[0] == 0 && bitmap[1] == FATTR4_WORD1_MOUNTED_ON_FILEID)
+			xdr_decode_hyper(p, &entry->ino);
+		else if (bitmap[0] == FATTR4_WORD0_FILEID)
 			xdr_decode_hyper(p, &entry->ino);
 		p += len;
 	}

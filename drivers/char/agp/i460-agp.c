@@ -233,7 +233,7 @@ static int i460_configure (void)
 	return 0;
 }
 
-static int i460_create_gatt_table (void)
+static int i460_create_gatt_table (struct agp_bridge_data *bridge)
 {
 	int page_order, num_entries, i;
 	void *temp;
@@ -258,7 +258,7 @@ static int i460_create_gatt_table (void)
 	return 0;
 }
 
-static int i460_free_gatt_table (void)
+static int i460_free_gatt_table (struct agp_bridge_data *bridge)
 {
 	int num_entries, i;
 	void *temp;
@@ -314,7 +314,8 @@ static int i460_insert_memory_small_io_page (struct agp_memory *mem,
 	for (i = 0, j = io_pg_start; i < mem->page_count; i++) {
 		paddr = mem->memory[i];
 		for (k = 0; k < I460_IOPAGES_PER_KPAGE; k++, j++, paddr += io_page_size)
-			WR_GATT(j, agp_bridge->driver->mask_memory(paddr, mem->type));
+			WR_GATT(j, agp_bridge->driver->mask_memory(agp_bridge,
+				paddr, mem->type));
 	}
 	WR_FLUSH_GATT(j - 1);
 	return 0;
@@ -427,7 +428,8 @@ static int i460_insert_memory_large_io_page (struct agp_memory *mem,
 			if (i460_alloc_large_page(lp) < 0)
 				return -ENOMEM;
 			pg = lp - i460.lp_desc;
-			WR_GATT(pg, agp_bridge->driver->mask_memory(lp->paddr, 0));
+			WR_GATT(pg, agp_bridge->driver->mask_memory(agp_bridge,
+				lp->paddr, 0));
 			WR_FLUSH_GATT(pg);
 		}
 
@@ -508,12 +510,12 @@ static int i460_remove_memory (struct agp_memory *mem,
  * Let's just hope nobody counts on the allocated AGP memory being there before bind time
  * (I don't think current drivers do)...
  */
-static void *i460_alloc_page (void)
+static void *i460_alloc_page (struct agp_bridge_data *bridge)
 {
 	void *page;
 
 	if (I460_IO_PAGE_SHIFT <= PAGE_SHIFT)
-		page = agp_generic_alloc_page();
+		page = agp_generic_alloc_page(agp_bridge);
 	else
 		/* Returning NULL would cause problems */
 		/* AK: really dubious code. */
@@ -529,10 +531,11 @@ static void i460_destroy_page (void *page)
 
 #endif /* I460_LARGE_IO_PAGES */
 
-static unsigned long i460_mask_memory (unsigned long addr, int type)
+static unsigned long i460_mask_memory (struct agp_bridge_data *bridge,
+	unsigned long addr, int type)
 {
 	/* Make sure the returned address is a valid GATT entry */
-	return agp_bridge->driver->masks[0].mask
+	return bridge->driver->masks[0].mask
 		| (((addr & ~((1 << I460_IO_PAGE_SHIFT) - 1)) & 0xffffff000) >> 12);
 }
 
@@ -624,7 +627,7 @@ static int __init agp_intel_i460_init(void)
 {
 	if (agp_off)
 		return -EINVAL;
-	return pci_module_init(&agp_intel_i460_pci_driver);
+	return pci_register_driver(&agp_intel_i460_pci_driver);
 }
 
 static void __exit agp_intel_i460_cleanup(void)

@@ -19,6 +19,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/security.h>
+#include <linux/signal.h>
 
 #include <asm/asi.h>
 #include <asm/pgtable.h>
@@ -101,6 +102,55 @@ char *pt_rq [] = {
 void ptrace_disable(struct task_struct *child)
 {
 	/* nothing to do */
+}
+
+/* To get the necessary page struct, access_process_vm() first calls
+ * get_user_pages().  This has done a flush_dcache_page() on the
+ * accessed page.  Then our caller (copy_{to,from}_user_page()) did
+ * to memcpy to read/write the data from that page.
+ *
+ * Now, the only thing we have to do is:
+ * 1) flush the D-cache if it's possible than an illegal alias
+ *    has been created
+ * 2) flush the I-cache if this is pre-cheetah and we did a write
+ */
+void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+			 unsigned long uaddr, void *kaddr,
+			 unsigned long len, int write)
+{
+	BUG_ON(len > PAGE_SIZE);
+
+#ifdef DCACHE_ALIASING_POSSIBLE
+	/* If bit 13 of the kernel address we used to access the
+	 * user page is the same as the virtual address that page
+	 * is mapped to in the user's address space, we can skip the
+	 * D-cache flush.
+	 */
+	if ((uaddr ^ kaddr) & (1UL << 13)) {
+		unsigned long start = __pa(kaddr);
+		unsigned long end = start + len;
+
+		if (tlb_type == spitfire) {
+			for (; start < end; start += 32)
+				spitfire_put_dcache_tag(va & 0x3fe0, 0x0);
+		} else {
+			for (; start < end; start += 32)
+				__asm__ __volatile__(
+					"stxa %%g0, [%0] %1\n\t"
+					"membar #Sync"
+					: /* no outputs */
+					: "r" (va),
+					"i" (ASI_DCACHE_INVALIDATE));
+		}
+	}
+#endif
+	if (write && tlb_type == spitfire) {
+		unsigned long start = (unsigned long) kaddr;
+		unsigned long end = start + len;
+
+		for (; start < end; start += 32)
+			flushi(start);
+	}
 }
 
 asmlinkage void do_ptrace(struct pt_regs *regs)
@@ -227,7 +277,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 			pt_error_return(regs, -res);
 		else
 			pt_os_succ_return(regs, tmp64, (void __user *) data);
-		goto flush_and_out;
+		goto out_tsk;
 	}
 
 	case PTRACE_POKETEXT: /* write the word at location addr. */
@@ -253,7 +303,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 			pt_error_return(regs, -res);
 		else
 			pt_succ_return(regs, res);
-		goto flush_and_out;
+		goto out_tsk;
 	}
 
 	case PTRACE_GETREGS: {
@@ -485,12 +535,12 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 					  (char __user *)addr2, data);
 		if (res == data) {
 			pt_succ_return(regs, 0);
-			goto flush_and_out;
+			goto out_tsk;
 		}
 		if (res >= 0)
 			res = -EIO;
 		pt_error_return(regs, -res);
-		goto flush_and_out;
+		goto out_tsk;
 	}
 
 	case PTRACE_WRITETEXT:
@@ -499,18 +549,18 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 					   addr, data);
 		if (res == data) {
 			pt_succ_return(regs, 0);
-			goto flush_and_out;
+			goto out_tsk;
 		}
 		if (res >= 0)
 			res = -EIO;
 		pt_error_return(regs, -res);
-		goto flush_and_out;
+		goto out_tsk;
 	}
 	case PTRACE_SYSCALL: /* continue and stop at (return from) syscall */
 		addr = 1;
 
 	case PTRACE_CONT: { /* restart after signal. */
-		if (data > _NSIG) {
+		if (!valid_signal(data)) {
 			pt_error_return(regs, EIO);
 			goto out_tsk;
 		}
@@ -570,27 +620,6 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 			pt_succ_return(regs, 0);
 		goto out_tsk;
 	}
-	}
-flush_and_out:
-	{
-		unsigned long va;
-
-		if (tlb_type == cheetah || tlb_type == cheetah_plus) {
-			for (va = 0; va < (1 << 16); va += (1 << 5))
-				spitfire_put_dcache_tag(va, 0x0);
-			/* No need to mess with I-cache on Cheetah. */
-		} else {
-			for (va =  0; va < L1DCACHE_SIZE; va += 32)
-				spitfire_put_dcache_tag(va, 0x0);
-			if (request == PTRACE_PEEKTEXT ||
-			    request == PTRACE_POKETEXT ||
-			    request == PTRACE_READTEXT ||
-			    request == PTRACE_WRITETEXT) {
-				for (va =  0; va < (PAGE_SIZE << 1); va += 32)
-					spitfire_put_icache_tag(va, 0x0);
-				__asm__ __volatile__("flush %g6");
-			}
-		}
 	}
 out_tsk:
 	if (child)

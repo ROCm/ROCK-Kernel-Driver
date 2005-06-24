@@ -185,7 +185,7 @@ config NET_SCH_GRED
 	depends on NET_SCHED
 	help
 	  Say Y here if you want to use the Generic Random Early Detection
-	  (RED) packet scheduling algorithm for some of your network devices
+	  (GRED) packet scheduling algorithm for some of your network devices
 	  (see the top of <file:net/sched/sch_red.c> for details and
 	  references about the algorithm).
 
@@ -268,6 +268,16 @@ config NET_CLS
 	  Resource Reservation Protocol (RSVP) on your Linux router.
 	  Documentation and software is at
 	  <http://diffserv.sourceforge.net/>.
+
+config NET_CLS_BASIC
+	tristate "Basic classifier"
+	depends on NET_CLS
+	---help---
+	  Say Y here if you want to be able to classify packets using
+	  only extended matches and actions.
+
+	  To compile this code as a module, choose M here: the
+	  module will be called cls_basic.
 
 config NET_CLS_TCINDEX
 	tristate "TC index classifier"
@@ -375,6 +385,70 @@ config NET_CLS_RSVP6
 	  To compile this code as a module, choose M here: the
 	  module will be called cls_rsvp6.
 
+config NET_EMATCH
+	bool "Extended Matches"
+	depends on NET_CLS
+	---help---
+	  Say Y here if you want to use extended matches on top of classifiers
+	  and select the extended matches below.
+
+	  Extended matches are small classification helpers not worth writing
+	  a separate classifier.
+
+	  You must have a recent version of the iproute2 tools in order to use
+	  extended matches.
+
+config NET_EMATCH_STACK
+	int "Stack size"
+	depends on NET_EMATCH
+	default "32"
+	---help---
+	  Size of the local stack variable used while evaluating the tree of
+	  ematches. Limits the depth of the tree, i.e. the number of
+	  encapsulated precedences. Every level requires 4 bytes of additional
+	  stack space.
+
+config NET_EMATCH_CMP
+	tristate "Simple packet data comparison"
+	depends on NET_EMATCH
+	---help---
+	  Say Y here if you want to be able to classify packets based on
+	  simple packet data comparisons for 8, 16, and 32bit values.
+
+	  To compile this code as a module, choose M here: the
+	  module will be called em_cmp.
+
+config NET_EMATCH_NBYTE
+	tristate "Multi byte comparison"
+	depends on NET_EMATCH
+	---help---
+	  Say Y here if you want to be able to classify packets based on
+	  multiple byte comparisons mainly useful for IPv6 address comparisons.
+
+	  To compile this code as a module, choose M here: the
+	  module will be called em_nbyte.
+
+config NET_EMATCH_U32
+	tristate "U32 hashing key"
+	depends on NET_EMATCH
+	---help---
+	  Say Y here if you want to be able to classify packets using
+	  the famous u32 key in combination with logic relations.
+
+	  To compile this code as a module, choose M here: the
+	  module will be called em_u32.
+
+config NET_EMATCH_META
+	tristate "Metadata"
+	depends on NET_EMATCH
+	---help---
+	  Say Y here if you want to be ablt to classify packets based on
+	  metadata such as load average, netfilter attributes, socket
+	  attributes and routing decisions.
+
+	  To compile this code as a module, choose M here: the
+	  module will be called em_meta.
+
 config NET_CLS_ACT
 	bool "Packet ACTION"
 	depends on EXPERIMENTAL && NET_CLS && NET_QOS
@@ -431,4 +505,14 @@ config NET_CLS_POLICE
 	help
 	  Say Y to support traffic policing (bandwidth limits).  Needed for
 	  ingress and egress rate limiting.
+
+config NET_ACT_SIMP
+        tristate "Simple action"
+        depends on NET_CLS_ACT
+        ---help---
+        You must have new iproute2 to use this feature.
+        This adds a very simple action for demonstration purposes
+	The idea is to give action authors a basic example to look at.
+	All this action will do is print on the console the configured
+	policy string followed by _ then packet count.
 

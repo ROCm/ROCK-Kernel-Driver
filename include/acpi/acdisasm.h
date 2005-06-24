@@ -75,6 +75,11 @@ extern const char                       *acpi_gbl_SHRdecode[2];
 extern const char                       *acpi_gbl_TYPdecode[4];
 extern const char                       *acpi_gbl_BMdecode[2];
 extern const char                       *acpi_gbl_SIZdecode[4];
+extern const char                       *acpi_gbl_TTPdecode[2];
+extern const char                       *acpi_gbl_MTPdecode[4];
+extern const char                       *acpi_gbl_TRSdecode[2];
+
+
 extern const char                       *acpi_gbl_lock_rule[ACPI_NUM_LOCK_RULES];
 extern const char                       *acpi_gbl_access_types[ACPI_NUM_ACCESS_TYPES];
 extern const char                       *acpi_gbl_update_rules[ACPI_NUM_UPDATE_RULES];

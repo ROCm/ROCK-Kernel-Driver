@@ -403,38 +403,6 @@ xfs_acl_allow_set(
 }
 
 /*
- * Look for any effective exec access, to allow CAP_DAC_OVERRIDE for exec.
- * Ignore checking for exec in USER_OBJ when there is no mask, because
- * in this "minimal acl" case we don't have any actual acls, and we
- * won't even be here.
- */
-STATIC int
-xfs_acl_find_any_exec(
-	xfs_acl_t	*fap)
-{
-	int		i;
-	int		masked_aces = 0;
-	int		mask = 0;
-
-	for (i = 0; i < fap->acl_cnt; i++) {
-		if (fap->acl_entry[i].ae_perm & ACL_EXECUTE) {
-			if (fap->acl_entry[i].ae_tag & (ACL_USER_OBJ|ACL_OTHER))
-				return 1;
-
-			if (fap->acl_entry[i].ae_tag == ACL_MASK)
-				mask = fap->acl_entry[i].ae_perm;
-			else
-				masked_aces |= fap->acl_entry[i].ae_perm;
-
-			if ((mask & masked_aces) & ACL_EXECUTE)
-				return 1;
-		}
-	}
-
-	return 0;
-}
-
-/*
  * The access control process to determine the access permission:
  *	if uid == file owner id, use the file owner bits.
  *	if gid == file owner group id, use the file group bits.
@@ -443,24 +411,19 @@ xfs_acl_find_any_exec(
  *	until all acl entries are exhausted. The final permission produced
  *	by matching acl entry or entries needs to be & with group permission.
  *	if not owner, owning group, or matching entry in ACL, use file
- *	other bits.  Don't allow CAP_DAC_OVERRIDE on exec access unless
- *	there is some effective exec access somewhere.
+ *	other bits.  
  */
 STATIC int
 xfs_acl_capability_check(
 	mode_t		mode,
-	cred_t		*cr,
-	xfs_acl_t	*fap)
+	cred_t		*cr)
 {
 	if ((mode & ACL_READ) && !capable_cred(cr, CAP_DAC_READ_SEARCH))
 		return EACCES;
 	if ((mode & ACL_WRITE) && !capable_cred(cr, CAP_DAC_OVERRIDE))
 		return EACCES;
-	if ((mode & ACL_EXECUTE) &&
-	    (!capable_cred(cr, CAP_DAC_OVERRIDE) ||
-	     !xfs_acl_find_any_exec(fap))) {
+	if ((mode & ACL_EXECUTE) && !capable_cred(cr, CAP_DAC_OVERRIDE))
 		return EACCES;
-	}
 
 	return 0;
 }
@@ -567,7 +530,7 @@ xfs_acl_access(
 		break;
 	}
 
-	return xfs_acl_capability_check(md, cr, fap);
+	return xfs_acl_capability_check(md, cr);
 }
 
 /*

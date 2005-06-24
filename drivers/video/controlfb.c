@@ -315,7 +315,7 @@ static int controlfb_mmap(struct fb_info *info, struct file *file,
        		return -EINVAL;
        off += start;
        vma->vm_pgoff = off >> PAGE_SHIFT;
-       if (io_remap_page_range(vma, vma->vm_start, off,
+       if (io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
            vma->vm_end - vma->vm_start, vma->vm_page_prot))
                return -EAGAIN;
 

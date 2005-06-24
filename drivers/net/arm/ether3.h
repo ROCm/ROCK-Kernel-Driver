@@ -22,8 +22,10 @@
 #define NET_DEBUG 	0
 #endif
 
+#define priv(dev)	((struct dev_priv *)netdev_priv(dev))
+
 /* Command register definitions & bits */
-#define REG_COMMAND		(dev->base_addr + 0x00)
+#define REG_COMMAND		(priv(dev)->seeq + 0x0000)
 #define CMD_ENINTDMA		0x0001
 #define CMD_ENINTRX		0x0002
 #define CMD_ENINTTX		0x0004
@@ -42,7 +44,7 @@
 #define CMD_FIFOWRITE		0x8000
 
 /* status register */
-#define REG_STATUS		(dev->base_addr + 0x00)
+#define REG_STATUS		(priv(dev)->seeq + 0x0000)
 #define STAT_ENINTSTAT		0x0001
 #define STAT_ENINTRX		0x0002
 #define STAT_ENINTTX		0x0004
@@ -59,7 +61,7 @@
 #define STAT_FIFODIR		0x8000
 
 /* configuration register 1 */
-#define REG_CONFIG1		(dev->base_addr + 0x10)
+#define REG_CONFIG1		(priv(dev)->seeq + 0x0040)
 #define CFG1_BUFSELSTAT0	0x0000
 #define CFG1_BUFSELSTAT1	0x0001
 #define CFG1_BUFSELSTAT2	0x0002
@@ -92,7 +94,7 @@
 #define CFG1_RECVCOMPSTAT5	0x2000
 
 /* configuration register 2 */
-#define REG_CONFIG2		(dev->base_addr + 0x20)
+#define REG_CONFIG2		(priv(dev)->seeq + 0x0080)
 #define CFG2_BYTESWAP		0x0001
 #define CFG2_ERRENCRC		0x0008
 #define CFG2_ERRENDRIBBLE	0x0010
@@ -106,15 +108,15 @@
 #define CFG2_CTRLO		0x1000
 #define CFG2_RESET		0x8000
 
-#define REG_RECVEND		(dev->base_addr + 0x30)
+#define REG_RECVEND		(priv(dev)->seeq + 0x00c0)
 
-#define REG_BUFWIN		(dev->base_addr + 0x40)
+#define REG_BUFWIN		(priv(dev)->seeq + 0x0100)
 
-#define REG_RECVPTR		(dev->base_addr + 0x50)
+#define REG_RECVPTR		(priv(dev)->seeq + 0x0140)
 
-#define REG_TRANSMITPTR		(dev->base_addr + 0x60)
+#define REG_TRANSMITPTR		(priv(dev)->seeq + 0x0180)
 
-#define REG_DMAADDR		(dev->base_addr + 0x70)
+#define REG_DMAADDR		(priv(dev)->seeq + 0x01c0)
 
 /*
  * Cards transmit/receive headers
@@ -152,6 +154,8 @@
 #define MAX_TX_BUFFERED	10
 
 struct dev_priv {
+    void __iomem *base;
+    void __iomem *seeq;
     struct {
 	unsigned int command;
 	unsigned int config1;
@@ -163,6 +167,11 @@ struct dev_priv {
     struct net_device_stats stats;
     struct timer_list timer;
     int broken;				/* 0 = ok, 1 = something went wrong	 */
+};
+
+struct ether3_data {
+	const char name[8];
+	unsigned long base_offset;
 };
 
 #endif

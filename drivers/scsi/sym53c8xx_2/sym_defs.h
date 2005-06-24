@@ -40,13 +40,13 @@
 #ifndef SYM_DEFS_H
 #define SYM_DEFS_H
 
-#define SYM_VERSION "2.1.18n"
+#define SYM_VERSION "2.2.0"
 #define SYM_DRIVER_NAME	"sym-" SYM_VERSION
 
 /*
  *	SYM53C8XX device features descriptor.
  */
-struct sym_pci_chip {
+struct sym_chip {
 	u_short	device_id;
 	u_short	revision_id;
 	char	*name;

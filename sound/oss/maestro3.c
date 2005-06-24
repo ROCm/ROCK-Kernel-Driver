@@ -375,7 +375,7 @@ static struct m3_card *devs;
  * I'm not very good at laying out functions in a file :)
  */
 static int m3_notifier(struct notifier_block *nb, unsigned long event, void *buf);
-static int m3_suspend(struct pci_dev *pci_dev, u32 state);
+static int m3_suspend(struct pci_dev *pci_dev, pm_message_t state);
 static void check_suspend(struct m3_card *card);
 
 static struct notifier_block m3_reboot_nb = {
@@ -2777,12 +2777,12 @@ static int m3_notifier(struct notifier_block *nb, unsigned long event, void *buf
 
     for(card = devs; card != NULL; card = card->next) {
         if(!card->in_suspend)
-            m3_suspend(card->pcidev, 3); /* XXX legal? */
+            m3_suspend(card->pcidev, PMSG_SUSPEND); /* XXX legal? */
     }
     return 0;
 }
 
-static int m3_suspend(struct pci_dev *pci_dev, u32 state)
+static int m3_suspend(struct pci_dev *pci_dev, pm_message_t state)
 {
     unsigned long flags;
     int i;

@@ -41,9 +41,6 @@
 #ifndef _PROTOCOL_H_
 #define _PROTOCOL_H_
 
-struct scsi_cmnd;
-struct us_data;
-
 /* Sub Classes */
 
 #define US_SC_RBC	0x01		/* Typically, flash devices */

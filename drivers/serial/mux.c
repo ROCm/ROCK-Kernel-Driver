@@ -404,7 +404,7 @@ static struct console mux_console = {
 	.write =	mux_console_write,
 	.device =	mux_console_device,
 	.setup =	mux_console_setup,
-	.flags =	CON_BOOT|CON_PRINTBUFFER|CON_ENABLED,
+	.flags =	CON_ENABLED | CON_PRINTBUFFER,
 	.index =	0,
 };
 

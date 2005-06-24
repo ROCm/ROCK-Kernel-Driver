@@ -31,7 +31,7 @@
 
 static struct rpc_clnt *	mnt_create(char *, struct sockaddr_in *,
 								int, int);
-struct rpc_program		mnt_program;
+static struct rpc_program	mnt_program;
 
 struct mnt_fhstatus {
 	unsigned int		status;
@@ -174,7 +174,7 @@ static struct rpc_version *	mnt_version[] = {
 
 static struct rpc_stat		mnt_stats;
 
-struct rpc_program	mnt_program = {
+static struct rpc_program	mnt_program = {
 	.name		= "mount",
 	.number		= NFS_MNT_PROGRAM,
 	.nrvers		= sizeof(mnt_version)/sizeof(mnt_version[0]),

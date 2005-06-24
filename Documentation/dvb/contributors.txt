@@ -72,5 +72,8 @@ Kenneth Aafløy <ke-aa@frisurf.no>
 Ernst Peinlich <e.peinlich@inode.at>
   for tuning/DiSEqC support for the DEC 3000-s
 
+Peter Beutner <p.beutner@gmx.net>
+  for the IR code for the ttusb-dec driver
+
 (If you think you should be in this list, but you are not, drop a
  line to the DVB mailing list)

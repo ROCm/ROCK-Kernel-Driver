@@ -89,7 +89,7 @@ static int rtc8564_read(struct i2c_client *client, unsigned char adr,
 
 	_DBG(1, "client=%p, adr=%d, buf=%p, len=%d", client, adr, buf, len);
 
-	if (!buf || !client) {
+	if (!buf) {
 		ret = -EINVAL;
 		goto done;
 	}
@@ -111,7 +111,7 @@ static int rtc8564_write(struct i2c_client *client, unsigned char adr,
 	struct i2c_msg wr;
 	int i;
 
-	if (!client || !data || len > 15) {
+	if (!data || len > 15) {
 		ret = -EINVAL;
 		goto done;
 	}
@@ -163,14 +163,12 @@ static int rtc8564_attach(struct i2c_adapter *adap, int addr, int kind)
 
 	strlcpy(new_client->name, "RTC8564", I2C_NAME_SIZE);
 	i2c_set_clientdata(new_client, d);
-	new_client->id = rtc8564_driver.id;
 	new_client->flags = I2C_CLIENT_ALLOW_USE | I2C_DF_NOTIFY;
 	new_client->addr = addr;
 	new_client->adapter = adap;
 	new_client->driver = &rtc8564_driver;
 
 	_DBG(1, "client=%p", new_client);
-	_DBG(1, "client.id=%d", new_client->id);
 
 	/* init ctrl1 reg */
 	data[0] = 0;
@@ -222,7 +220,7 @@ static int rtc8564_get_datetime(struct i2c_client *client, struct rtc_tm *dt)
 
 	_DBG(1, "client=%p, dt=%p", client, dt);
 
-	if (!dt || !client)
+	if (!dt)
 		return -EINVAL;
 
 	memset(buf, 0, sizeof(buf));
@@ -256,7 +254,7 @@ rtc8564_set_datetime(struct i2c_client *client, struct rtc_tm *dt, int datetoo)
 
 	_DBG(1, "client=%p, dt=%p", client, dt);
 
-	if (!dt || !client)
+	if (!dt)
 		return -EINVAL;
 
 	_DBGRTCTM(2, *dt);
@@ -295,7 +293,7 @@ static int rtc8564_get_ctrl(struct i2c_client *client, unsigned int *ctrl)
 {
 	struct rtc8564_data *data = i2c_get_clientdata(client);
 
-	if (!ctrl || !client)
+	if (!ctrl)
 		return -1;
 
 	*ctrl = data->ctrl;
@@ -307,7 +305,7 @@ static int rtc8564_set_ctrl(struct i2c_client *client, unsigned int *ctrl)
 	struct rtc8564_data *data = i2c_get_clientdata(client);
 	unsigned char buf[2];
 
-	if (!ctrl || !client)
+	if (!ctrl)
 		return -1;
 
 	buf[0] = *ctrl & 0xff;
@@ -320,7 +318,7 @@ static int rtc8564_set_ctrl(struct i2c_client *client, unsigned int *ctrl)
 static int rtc8564_read_mem(struct i2c_client *client, struct mem *mem)
 {
 
-	if (!mem || !client)
+	if (!mem)
 		return -EINVAL;
 
 	return rtc8564_read(client, mem->loc, mem->data, mem->nr);
@@ -329,7 +327,7 @@ static int rtc8564_read_mem(struct i2c_client *client, struct mem *mem)
 static int rtc8564_write_mem(struct i2c_client *client, struct mem *mem)
 {
 
-	if (!mem || !client)
+	if (!mem)
 		return -EINVAL;
 
 	return rtc8564_write(client, mem->loc, mem->data, mem->nr);

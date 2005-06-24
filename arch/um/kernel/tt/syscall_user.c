@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <signal.h>
 #include <errno.h>
-#include <sys/ptrace.h>
 #include <asm/unistd.h>
 #include "sysdep/ptrace.h"
 #include "sigcontext.h"
@@ -22,15 +21,20 @@ void syscall_handler_tt(int sig, union uml_pt_regs *regs)
 {
 	void *sc;
 	long result;
-	int index, syscall;
+	int syscall;
+#ifdef UML_CONFIG_DEBUG_SYSCALL
+	int index;
+#endif
 
 	syscall = UPT_SYSCALL_NR(regs);
 	sc = UPT_SC(regs);
 	SC_START_SYSCALL(sc);
 
-	index = record_syscall_start(syscall);
+#ifdef UML_CONFIG_DEBUG_SYSCALL
+  	index = record_syscall_start(syscall);
+#endif
 	syscall_trace(regs, 0);
-	result = execute_syscall(regs);
+	result = execute_syscall_tt(regs);
 
 	/* regs->sc may have changed while the system call ran (there may
 	 * have been an interrupt or segfault), so it needs to be refreshed.
@@ -40,7 +44,9 @@ void syscall_handler_tt(int sig, union uml_pt_regs *regs)
 	SC_SET_SYSCALL_RETURN(sc, result);
 
 	syscall_trace(regs, 1);
-	record_syscall_end(index, result);
+#ifdef UML_CONFIG_DEBUG_SYSCALL
+  	record_syscall_end(index, result);
+#endif
 }
 
 void do_sigtrap(void *task)
@@ -57,6 +63,10 @@ void do_syscall(void *task, int pid, int local_using_sysemu)
 
 	UPT_SYSCALL_NR(TASK_REGS(task)) = PT_SYSCALL_NR(proc_regs);
 
+#ifdef UPT_ORIGGPR2
+        UPT_ORIGGPR2(TASK_REGS(task)) = REGS_ORIGGPR2(proc_regs);
+#endif
+
 	if(((unsigned long *) PT_IP(proc_regs) >= &_stext) &&
 	   ((unsigned long *) PT_IP(proc_regs) <= &_etext))
 		tracer_panic("I'm tracing myself and I can't get out");
@@ -66,7 +76,7 @@ void do_syscall(void *task, int pid, int local_using_sysemu)
 		return;
 
 	/* syscall number -1 in sysemu skips syscall restarting in host */
-	if(ptrace(PTRACE_POKEUSER, pid, PT_SYSCALL_NR_OFFSET, 
+	if(ptrace(PTRACE_POKEUSR, pid, PT_SYSCALL_NR_OFFSET,
 		  local_using_sysemu ? -1 : __NR_getpid) < 0)
 		tracer_panic("do_syscall : Nullifying syscall failed, "
 			     "errno = %d", errno);

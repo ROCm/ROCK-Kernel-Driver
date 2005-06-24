@@ -472,7 +472,7 @@ static int get_altsetting (struct usbtest_dev *dev)
 	retval = usb_control_msg (udev, usb_rcvctrlpipe (udev, 0),
 			USB_REQ_GET_INTERFACE, USB_DIR_IN|USB_RECIP_INTERFACE,
 			0, iface->altsetting [0].desc.bInterfaceNumber,
-			dev->buf, 1, HZ * USB_CTRL_GET_TIMEOUT);
+			dev->buf, 1, USB_CTRL_GET_TIMEOUT);
 	switch (retval) {
 	case 1:
 		return dev->buf [0];
@@ -602,7 +602,7 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 		retval = usb_control_msg (udev, usb_rcvctrlpipe (udev, 0),
 				USB_REQ_GET_CONFIGURATION,
 				USB_DIR_IN | USB_RECIP_DEVICE,
-				0, 0, dev->buf, 1, HZ * USB_CTRL_GET_TIMEOUT);
+				0, 0, dev->buf, 1, USB_CTRL_GET_TIMEOUT);
 		if (retval != 1 || dev->buf [0] != expected) {
 			dev_dbg (&iface->dev,
 				"get config --> %d (%d)\n", retval,
@@ -851,7 +851,7 @@ test_ctrl_queue (struct usbtest_dev *dev, struct usbtest_param *param)
 	 */
 	urb = kmalloc (param->sglen * sizeof (struct urb *), SLAB_KERNEL);
 	if (!urb)
-		goto cleanup;
+		return -ENOMEM;
 	memset (urb, 0, param->sglen * sizeof (struct urb *));
 	for (i = 0; i < param->sglen; i++) {
 		int			pipe = usb_rcvctrlpipe (udev, 0);
@@ -1173,7 +1173,7 @@ static int test_halt (int ep, struct urb *urb)
 	retval = usb_control_msg (urb->dev, usb_sndctrlpipe (urb->dev, 0),
 			USB_REQ_SET_FEATURE, USB_RECIP_ENDPOINT,
 			USB_ENDPOINT_HALT, ep,
-			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
+			NULL, 0, USB_CTRL_SET_TIMEOUT);
 	if (retval < 0) {
 		dbg ("ep %02x couldn't set halt, %d", ep, retval);
 		return retval;
@@ -1263,7 +1263,7 @@ static int ctrl_out (struct usbtest_dev *dev,
 			buf [j] = i + j;
 		retval = usb_control_msg (udev, usb_sndctrlpipe (udev,0),
 				0x5b, USB_DIR_OUT|USB_TYPE_VENDOR,
-				0, 0, buf, len, HZ * USB_CTRL_SET_TIMEOUT);
+				0, 0, buf, len, USB_CTRL_SET_TIMEOUT);
 		if (retval != len) {
 			what = "write";
 			break;
@@ -1272,7 +1272,7 @@ static int ctrl_out (struct usbtest_dev *dev,
 		/* read it back -- assuming nothing intervened!!  */
 		retval = usb_control_msg (udev, usb_rcvctrlpipe (udev,0),
 				0x5c, USB_DIR_IN|USB_TYPE_VENDOR,
-				0, 0, buf, len, HZ * USB_CTRL_GET_TIMEOUT);
+				0, 0, buf, len, USB_CTRL_GET_TIMEOUT);
 		if (retval != len) {
 			what = "read";
 			break;

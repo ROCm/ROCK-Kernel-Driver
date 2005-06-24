@@ -460,6 +460,10 @@ struct atapi_changer_info {
 
 /* Extra per-device info for cdrom drives. */
 struct cdrom_info {
+	ide_drive_t	*drive;
+	ide_driver_t	*driver;
+	struct gendisk	*disk;
+	struct kref	kref;
 
 	/* Buffer for table of contents.  NULL if we haven't allocated
 	   a TOC buffer for this device yet. */

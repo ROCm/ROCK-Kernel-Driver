@@ -16,7 +16,7 @@
 
 #define NR_SHIFT	9
 
-#define NR_KEYS		255
+#define NR_KEYS		256
 #define MAX_NR_KEYMAPS	256
 /* This means 128Kb if all keymaps are allocated. Only the superuser
 	may increase the number of keymaps beyond MAX_NR_OF_USER_KEYMAPS. */
@@ -27,7 +27,6 @@ extern const int NR_TYPES;
 extern const int max_vals[];
 extern unsigned short *key_maps[MAX_NR_KEYMAPS];
 extern unsigned short plain_map[NR_KEYS];
-extern unsigned char keyboard_type;
 #endif
 
 #define MAX_NR_FUNC	256	/* max nr of strings assigned to keys */

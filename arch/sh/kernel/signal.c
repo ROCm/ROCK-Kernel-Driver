@@ -1,5 +1,4 @@
-/* $Id: signal.c,v 1.21 2004/06/28 13:18:44 doyu Exp $
- *
+/*
  *  linux/arch/sh/kernel/signal.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -100,7 +99,7 @@ sys_sigaction(int sig, const struct old_sigaction __user *act,
 
 	if (act) {
 		old_sigset_t mask;
-		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		if (!access_ok(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_restorer, &act->sa_restorer))
 			return -EFAULT;
@@ -112,7 +111,7 @@ sys_sigaction(int sig, const struct old_sigaction __user *act,
 	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
 
 	if (!ret && oact) {
-		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		if (!access_ok(VERIFY_WRITE, oact, sizeof(*oact)) ||
 		    __put_user(old_ka.sa.sa_handler, &oact->sa_handler) ||
 		    __put_user(old_ka.sa.sa_restorer, &oact->sa_restorer))
 			return -EFAULT;
@@ -239,7 +238,7 @@ asmlinkage int sys_sigreturn(unsigned long r4, unsigned long r5,
 	sigset_t set;
 	int r0;
 
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 
 	if (__get_user(set.sig[0], &frame->sc.oldmask)
@@ -273,7 +272,7 @@ asmlinkage int sys_rt_sigreturn(unsigned long r4, unsigned long r5,
 	stack_t st;
 	int r0;
 
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 
 	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
@@ -341,8 +340,10 @@ setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs,
 static inline void __user *
 get_sigframe(struct k_sigaction *ka, unsigned long sp, size_t frame_size)
 {
-	if ((ka->sa.sa_flags & SA_ONSTACK) != 0 && ! on_sig_stack(sp))
-		sp = current->sas_ss_sp + current->sas_ss_size;
+	if (ka->sa.sa_flags & SA_ONSTACK) {
+		if (sas_ss_flags(sp) == 0)
+			sp = current->sas_ss_sp + current->sas_ss_size;
+	}
 
 	return (void __user *)((sp - frame_size) & -8ul);
 }

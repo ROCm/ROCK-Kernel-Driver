@@ -26,7 +26,7 @@ unsigned int tulip_max_interrupt_work;
 #define MIT_SIZE 15
 #define MIT_TABLE 15 /* We use 0 or max */
 
-unsigned int mit_table[MIT_SIZE+1] =
+static unsigned int mit_table[MIT_SIZE+1] =
 {
         /*  CRS11 21143 hardware Mitigation Control Interrupt
             We use only RX mitigation we other techniques for

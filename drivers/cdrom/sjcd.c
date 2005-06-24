@@ -831,8 +831,8 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 			printk("SJCD: ioctl: playmsf\n");
 #endif
 			if ((s =
-			     verify_area(VERIFY_READ, argp,
-					 sizeof(sjcd_msf))) == 0) {
+			     access_ok(VERIFY_READ, argp, sizeof(sjcd_msf))
+			     		? 0 : -EFAULT) == 0) {
 				if (sjcd_audio_status == CDROM_AUDIO_PLAY) {
 					sjcd_send_cmd(SCMD_PAUSE);
 					(void) sjcd_receive_status();
@@ -888,8 +888,8 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 			printk("SJCD: ioctl: readtocentry\n");
 #endif
 			if ((s =
-			     verify_area(VERIFY_WRITE, argp,
-					 sizeof(toc_entry))) == 0) {
+			     access_ok(VERIFY_WRITE, argp, sizeof(toc_entry))
+			     		? 0 : -EFAULT) == 0) {
 				struct sjcd_hw_disk_info *tp;
 
 				if (copy_from_user(&toc_entry, argp,
@@ -943,8 +943,8 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 			printk("SJCD: ioctl: subchnl\n");
 #endif
 			if ((s =
-			     verify_area(VERIFY_WRITE, argp,
-					 sizeof(subchnl))) == 0) {
+			     access_ok(VERIFY_WRITE, argp, sizeof(subchnl))
+			     		? 0 : -EFAULT) == 0) {
 				struct sjcd_hw_qinfo q_info;
 
 				if (copy_from_user(&subchnl, argp,
@@ -1002,8 +1002,8 @@ static int sjcd_ioctl(struct inode *ip, struct file *fp,
 			printk("SJCD: ioctl: volctrl\n");
 #endif
 			if ((s =
-			     verify_area(VERIFY_READ, argp,
-					 sizeof(vol_ctrl))) == 0) {
+			     access_ok(VERIFY_READ, argp, sizeof(vol_ctrl))
+			     		? 0 : -EFAULT) == 0) {
 				unsigned char dummy[4];
 
 				if (copy_from_user(&vol_ctrl, argp,

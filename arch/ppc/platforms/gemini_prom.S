@@ -40,29 +40,29 @@ _GLOBAL(gemini_prom_init)
 	/* zero out the bats now that the MMU is off */
 prom_no_mmu:	
 	li	r3,0
-        mtspr   IBAT0U,r3
-        mtspr   IBAT0L,r3
-        mtspr   IBAT1U,r3
-        mtspr   IBAT1L,r3
-        mtspr   IBAT2U,r3
-        mtspr   IBAT2L,r3
-        mtspr   IBAT3U,r3
-        mtspr   IBAT3L,r3
+        mtspr   SPRN_IBAT0U,r3
+        mtspr   SPRN_IBAT0L,r3
+        mtspr   SPRN_IBAT1U,r3
+        mtspr   SPRN_IBAT1L,r3
+        mtspr   SPRN_IBAT2U,r3
+        mtspr   SPRN_IBAT2L,r3
+        mtspr   SPRN_IBAT3U,r3
+        mtspr   SPRN_IBAT3L,r3
 
-        mtspr   DBAT0U,r3
-        mtspr   DBAT0L,r3
-        mtspr   DBAT1U,r3
-        mtspr   DBAT1L,r3
-        mtspr   DBAT2U,r3
-	mtspr   DBAT2L,r3
-        mtspr   DBAT3U,r3
-        mtspr   DBAT3L,r3
+        mtspr   SPRN_DBAT0U,r3
+        mtspr   SPRN_DBAT0L,r3
+        mtspr   SPRN_DBAT1U,r3
+        mtspr   SPRN_DBAT1L,r3
+        mtspr   SPRN_DBAT2U,r3
+	mtspr   SPRN_DBAT2L,r3
+        mtspr   SPRN_DBAT3U,r3
+        mtspr   SPRN_DBAT3L,r3
 #endif
 
 	/* the bootloader (as far as I'm currently aware) doesn't mess with page
 	   tables, but since we're already here, might as well zap these, too */
 	li	r4,0
-	mtspr	SDR1,r4
+	mtspr	SPRN_SDR1,r4
 
 	li	r4,16
 	mtctr	r4
@@ -75,9 +75,9 @@ prom_no_mmu:
 #ifdef CONFIG_SMP
 	/* The 750 book (and Mot/IBM support) says that this will "assist" snooping
 	   when in SMP.  Not sure yet whether this should stay or leave... */
-	mfspr	r4,HID0
+	mfspr	r4,SPRN_HID0
 	ori	r4,r4,HID0_ABE
-	mtspr	HID0,r4
+	mtspr	SPRN_HID0,r4
 	sync
 #endif /* CONFIG_SMP */
 	blr
@@ -88,6 +88,6 @@ _GLOBAL(_gemini_reboot)
 	lis	r5,GEMINI_BOOT_INIT@h
 	ori	r5,r5,GEMINI_BOOT_INIT@l
 	li	r6,MSR_IP
-	mtspr	SRR0,r5
-	mtspr	SRR1,r6
+	mtspr	SPRN_SRR0,r5
+	mtspr	SPRN_SRR1,r6
 	rfi

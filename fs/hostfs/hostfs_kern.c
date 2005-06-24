@@ -23,7 +23,6 @@
 #include "kern_util.h"
 #include "kern.h"
 #include "user_util.h"
-#include "2_5compat.h"
 #include "init.h"
 
 struct hostfs_inode_info {
@@ -521,7 +520,7 @@ int hostfs_commit_write(struct file *file, struct page *page, unsigned from,
 static struct address_space_operations hostfs_aops = {
 	.writepage 	= hostfs_writepage,
 	.readpage	= hostfs_readpage,
-/* 	.set_page_dirty = __set_page_dirty_nobuffers, */
+	.set_page_dirty = __set_page_dirty_nobuffers,
 	.prepare_write	= hostfs_prepare_write,
 	.commit_write	= hostfs_commit_write
 };
@@ -806,15 +805,21 @@ int hostfs_permission(struct inode *ino, int desired, struct nameidata *nd)
 	char *name;
 	int r = 0, w = 0, x = 0, err;
 
-	if(desired & MAY_READ) r = 1;
-	if(desired & MAY_WRITE) w = 1;
-	if(desired & MAY_EXEC) x = 1;
+	if (desired & MAY_READ) r = 1;
+	if (desired & MAY_WRITE) w = 1;
+	if (desired & MAY_EXEC) x = 1;
 	name = inode_name(ino, 0);
-	if(name == NULL) return(-ENOMEM);
-	err = access_file(name, r, w, x);
+	if (name == NULL) return(-ENOMEM);
+
+	if (S_ISCHR(ino->i_mode) || S_ISBLK(ino->i_mode) ||
+			S_ISFIFO(ino->i_mode) || S_ISSOCK(ino->i_mode))
+		err = 0;
+	else
+		err = access_file(name, r, w, x);
 	kfree(name);
-	if(!err) err = generic_permission(ino, desired, NULL);
-	return(err);
+	if(!err)
+		err = generic_permission(ino, desired, NULL);
+	return err;
 }
 
 int hostfs_setattr(struct dentry *dentry, struct iattr *attr)
@@ -845,7 +850,7 @@ int hostfs_setattr(struct dentry *dentry, struct iattr *attr)
 	if(attr->ia_valid & ATTR_GID){
 		if((dentry->d_inode->i_sb->s_dev == ROOT_DEV) &&
 		   (attr->ia_gid == 0))
-			attr->ia_gid = getuid();
+			attr->ia_gid = getgid();
 		attrs.ia_valid |= HOSTFS_ATTR_GID;
 		attrs.ia_gid = attr->ia_gid;
 	}
@@ -985,13 +990,17 @@ static int hostfs_fill_sb_common(struct super_block *sb, void *d, int silent)
 		goto out_put;
 
 	err = read_inode(root_inode);
-	if(err)
-		goto out_put;
+	if(err){
+                /* No iput in this case because the dput does that for us */
+                dput(sb->s_root);
+                sb->s_root = NULL;
+		goto out_free;
+        }
 
 	return(0);
 
  out_put:
-	iput(root_inode);
+        iput(root_inode);
  out_free:
 	kfree(name);
  out:

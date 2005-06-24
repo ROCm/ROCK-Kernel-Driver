@@ -206,11 +206,13 @@ static ssize_t set_fan_ripple(struct i2c_client *client, struct fscpos_data
 		return -EINVAL;
 	}
 	
+	down(&data->update_lock);
 	/* bits 2..7 reserved => mask with 0x03 */
 	data->fan_ripple[nr - 1] &= ~0x03;
 	data->fan_ripple[nr - 1] |= v;
 	
 	fscpos_write_value(client, reg, data->fan_ripple[nr - 1]);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -228,8 +230,10 @@ static ssize_t set_pwm(struct i2c_client *client, struct fscpos_data *data,
 	if (v < 0) v = 0;
 	if (v > 255) v = 255;
 
+	down(&data->update_lock);
 	data->pwm[nr - 1] = v;
 	fscpos_write_value(client, reg, data->pwm[nr - 1]);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -271,10 +275,12 @@ static ssize_t set_wdog_control(struct i2c_client *client, struct fscpos_data
 {
 	/* bits 0..3 reserved => mask with 0xf0 */
 	unsigned long v = simple_strtoul(buf, NULL, 10) & 0xf0;
+
+	down(&data->update_lock);
 	data->wdog_control &= ~0xf0;
 	data->wdog_control |= v;
-	
 	fscpos_write_value(client, reg, data->wdog_control);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -296,9 +302,10 @@ static ssize_t set_wdog_state(struct i2c_client *client, struct fscpos_data
 		return -EINVAL;
 	}
 
+	down(&data->update_lock);
 	data->wdog_state &= ~v;
-	
 	fscpos_write_value(client, reg, v);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -310,9 +317,12 @@ static ssize_t show_wdog_preset(struct fscpos_data *data, char *buf)
 static ssize_t set_wdog_preset(struct i2c_client *client, struct fscpos_data
 				*data, const char *buf,	size_t count, int reg)
 {
-	data->wdog_preset = simple_strtoul(buf, NULL, 10) & 0xff;
-	
+	unsigned long v = simple_strtoul(buf, NULL, 10) & 0xff;
+
+	down(&data->update_lock);
+	data->wdog_preset = v;
 	fscpos_write_value(client, reg, data->wdog_preset);
+	up(&data->update_lock);
 	return count;
 }
 

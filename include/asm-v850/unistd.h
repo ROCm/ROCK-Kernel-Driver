@@ -466,7 +466,7 @@ asmlinkage long sys_rt_sigaction(int sig,
  */
 #define cond_syscall(name)						      \
   asm (".weak\t" C_SYMBOL_STRING(name) ";"				      \
-       ".set\t" C_SYMBOL_STRING(name) "," C_SYMBOL_STRING(sys_ni_syscall));
+       ".set\t" C_SYMBOL_STRING(name) "," C_SYMBOL_STRING(sys_ni_syscall))
 #if 0
 /* This doesn't work if there's a function prototype for NAME visible,
    because the argument types probably won't match.  */

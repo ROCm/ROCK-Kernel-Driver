@@ -98,8 +98,6 @@ static struct i2c_driver pcf8591_driver = {
 	.detach_client	= pcf8591_detach_client,
 };
 
-static int pcf8591_id;
-
 /* following are the sysfs callback functions */
 #define show_in_channel(channel)					\
 static ssize_t show_in##channel##_input(struct device *dev, char *buf)	\
@@ -146,11 +144,15 @@ static ssize_t set_out0_enable(struct device *dev, const char *buf, size_t count
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct pcf8591_data *data = i2c_get_clientdata(client);
-	if (simple_strtoul(buf, NULL, 10))
+	unsigned long val = simple_strtoul(buf, NULL, 10);
+
+	down(&data->update_lock);
+	if (val)
 		data->control |= PCF8591_CONTROL_AOEF;
 	else
 		data->control &= ~PCF8591_CONTROL_AOEF;
 	i2c_smbus_write_byte(client, data->control);
+	up(&data->update_lock);
 	return count;
 }
 
@@ -201,8 +203,6 @@ int pcf8591_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* Fill in the remaining client fields and put it into the global 
 	   list */
 	strlcpy(new_client->name, "pcf8591", I2C_NAME_SIZE);
-
-	new_client->id = pcf8591_id++;
 	init_MUTEX(&data->update_lock);
 
 	/* Tell the I2C layer a new client has arrived */

@@ -37,7 +37,21 @@
 #include <asm/byteorder.h>
 #include "scsi.h"
 #include <scsi/scsi_host.h>
-#include "qlogicisp.h"
+
+/*
+ * With the qlogic interface, every queue slot can hold a SCSI
+ * command with up to 4 scatter/gather entries.  If we need more
+ * than 4 entries, continuation entries can be used that hold
+ * another 7 entries each.  Unlike for other drivers, this means
+ * that the maximum number of scatter/gather entries we can
+ * support at any given time is a function of the number of queue
+ * slots available.  That is, host->can_queue and host->sg_tablesize
+ * are dynamic and _not_ independent.  This all works fine because
+ * requests are queued serially and the scatter/gather limit is
+ * determined for each queue request anew.
+ */
+#define QLOGICISP_REQ_QUEUE_LEN	63	/* must be power of two - 1 */
+#define QLOGICISP_MAX_SG(ql)	(4 + ((ql) > 0) ? 7*((ql) - 1) : 0)
 
 /* Configuration section *****************************************************/
 
@@ -655,7 +669,7 @@ static inline void isp1020_disable_irqs(struct Scsi_Host *host)
 }
 
 
-int isp1020_detect(Scsi_Host_Template *tmpt)
+static int isp1020_detect(Scsi_Host_Template *tmpt)
 {
 	int hosts = 0;
 	struct Scsi_Host *host;
@@ -736,7 +750,7 @@ int isp1020_detect(Scsi_Host_Template *tmpt)
 }
 
 
-int isp1020_release(struct Scsi_Host *host)
+static int isp1020_release(struct Scsi_Host *host)
 {
 	struct isp1020_hostdata *hostdata;
 
@@ -757,7 +771,7 @@ int isp1020_release(struct Scsi_Host *host)
 }
 
 
-const char *isp1020_info(struct Scsi_Host *host)
+static const char *isp1020_info(struct Scsi_Host *host)
 {
 	static char buf[80];
 	struct isp1020_hostdata *hostdata;
@@ -783,7 +797,7 @@ const char *isp1020_info(struct Scsi_Host *host)
  * interrupt handler may call this routine as part of
  * request-completion handling).
  */
-int isp1020_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
+static int isp1020_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
 {
 	int i, n, num_free;
 	u_int in_ptr, out_ptr;
@@ -863,7 +877,7 @@ int isp1020_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
 		ds = cmd->dataseg;
 
 		sg_count = pci_map_sg(hostdata->pci_dev, sg, Cmnd->use_sg,
-				      scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+				      Cmnd->sc_data_direction);
 
 		cmd->segment_cnt = cpu_to_le16(sg_count);
 
@@ -920,7 +934,7 @@ int isp1020_queuecommand(Scsi_Cmnd *Cmnd, void (*done)(Scsi_Cmnd *))
 		dma_addr = pci_map_single(hostdata->pci_dev,
 				       Cmnd->request_buffer,
 				       Cmnd->request_bufflen,
-				       scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+				       Cmnd->sc_data_direction);
 		Cmnd->SCp.ptr = (char *)(unsigned long) dma_addr;
 
 		cmd->dataseg[0].d_base =
@@ -1053,7 +1067,7 @@ void isp1020_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 			pci_unmap_sg(hostdata->pci_dev,
 				     (struct scatterlist *)Cmnd->buffer,
 				     Cmnd->use_sg,
-				     scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+				     Cmnd->sc_data_direction);
 		else if (Cmnd->request_bufflen)
 			pci_unmap_single(hostdata->pci_dev,
 #ifdef CONFIG_QL_ISP_A64
@@ -1062,7 +1076,7 @@ void isp1020_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 					 (u32)((long)Cmnd->SCp.ptr),
 #endif
 					 Cmnd->request_bufflen,
-					 scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+					 Cmnd->sc_data_direction);
 
 		isp_outw(out_ptr, host, MBOX5);
 		(*Cmnd->scsi_done)(Cmnd);
@@ -1161,80 +1175,7 @@ static int isp1020_return_status(struct Status_Entry *sts)
 }
 
 
-int isp1020_abort(Scsi_Cmnd *Cmnd)
-{
-	u_short param[6];
-	struct Scsi_Host *host;
-	struct isp1020_hostdata *hostdata;
-	int return_status = SCSI_ABORT_SUCCESS;
-	u_int cmd_cookie;
-	int i;
-
-	ENTER("isp1020_abort");
-
-	host = Cmnd->device->host;
-	hostdata = (struct isp1020_hostdata *) host->hostdata;
-
-	for (i = 0; i < QLOGICISP_REQ_QUEUE_LEN + 1; i++)
-		if (hostdata->cmd_slots[i] == Cmnd)
-			break;
-	cmd_cookie = i;
-
-	isp1020_disable_irqs(host);
-
-	param[0] = MBOX_ABORT;
-	param[1] = (((u_short) Cmnd->device->id) << 8) | Cmnd->device->lun;
-	param[2] = cmd_cookie >> 16;
-	param[3] = cmd_cookie & 0xffff;
-
-	isp1020_mbox_command(host, param);
-
-	if (param[0] != MBOX_COMMAND_COMPLETE) {
-		printk("qlogicisp : scsi abort failure: %x\n", param[0]);
-		return_status = SCSI_ABORT_ERROR;
-	}
-
-	isp1020_enable_irqs(host);
-
-	LEAVE("isp1020_abort");
-
-	return return_status;
-}
-
-
-int isp1020_reset(Scsi_Cmnd *Cmnd)
-{
-	u_short param[6];
-	struct Scsi_Host *host;
-	struct isp1020_hostdata *hostdata;
-	int return_status = SCSI_RESET_SUCCESS;
-
-	ENTER("isp1020_reset");
-
-	host = Cmnd->device->host;
-	hostdata = (struct isp1020_hostdata *) host->hostdata;
-
-	param[0] = MBOX_BUS_RESET;
-	param[1] = hostdata->host_param.bus_reset_delay;
-
-	isp1020_disable_irqs(host);
-
-	isp1020_mbox_command(host, param);
-
-	if (param[0] != MBOX_COMMAND_COMPLETE) {
-		printk("qlogicisp : scsi bus reset failure: %x\n", param[0]);
-		return_status = SCSI_RESET_ERROR;
-	}
-
-	isp1020_enable_irqs(host);
-
-	LEAVE("isp1020_reset");
-
-	return return_status;
-}
-
-
-int isp1020_biosparam(struct scsi_device *sdev, struct block_device *n,
+static int isp1020_biosparam(struct scsi_device *sdev, struct block_device *n,
 		sector_t capacity, int ip[])
 {
 	int size = capacity;
@@ -1984,8 +1925,6 @@ static Scsi_Host_Template driver_template = {
 	.release		= isp1020_release,
 	.info			= isp1020_info,	
 	.queuecommand		= isp1020_queuecommand,
-	.eh_abort_handler	= isp1020_abort,
-	.eh_bus_reset_handler	= isp1020_reset,
 	.bios_param		= isp1020_biosparam,
 	.can_queue		= QLOGICISP_REQ_QUEUE_LEN,
 	.this_id		= -1,

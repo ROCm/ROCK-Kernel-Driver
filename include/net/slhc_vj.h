@@ -185,7 +185,4 @@ int slhc_remember __ARGS((struct slcompress *comp, unsigned char *icp,
 			  int isize));
 int slhc_toss __ARGS((struct slcompress *comp));
 
-void slhc_i_status __ARGS((struct slcompress *comp));
-void slhc_o_status __ARGS((struct slcompress *comp));
-
 #endif	/* _SLHC_H */

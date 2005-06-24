@@ -108,7 +108,7 @@ struct facs_descriptor_rev2
 
 
 /*
- * ACPI 2.0 Generic Address Structure (GAS)
+ * ACPI 2.0+ Generic Address Structure (GAS)
  */
 struct acpi_generic_address
 {
@@ -159,7 +159,7 @@ struct acpi_generic_address
 	u16                             iapc_boot_arch;     /* IA-PC Boot Architecture Flags. See Table 5-10 for description*/
 
 /*
- * ACPI 2.0 Fixed ACPI Description Table (FADT)
+ * ACPI 2.0+ Fixed ACPI Description Table (FADT)
  */
 struct fadt_descriptor_rev2
 {
@@ -174,17 +174,25 @@ struct fadt_descriptor_rev2
 	u32                             sleep_button : 1;   /* Sleep button is handled as a generic feature, or not present */
 	u32                             fixed_rTC   : 1;    /* RTC wakeup stat not in fixed register space */
 	u32                             rtcs4       : 1;    /* RTC wakeup stat not possible from S4 */
-	u32                             tmr_val_ext : 1;    /* Indicates tmr_val is 32 bits 0=24-bits*/
+	u32                             tmr_val_ext : 1;    /* Indicates tmr_val is 32 bits 0=24-bits */
 	u32                             dock_cap    : 1;    /* Supports Docking */
-	u32                             reset_reg_sup : 1;  /* Indicates system supports system reset via the FADT RESET_REG*/
-	u32                             sealed_case : 1;    /* Indicates system has no internal expansion capabilities and case is sealed. */
-	u32                             headless    : 1;    /* Indicates system does not have local video capabilities or local input devices.*/
+	u32                             reset_reg_sup : 1;  /* Indicates system supports system reset via the FADT RESET_REG */
+	u32                             sealed_case : 1;    /* Indicates system has no internal expansion capabilities and case is sealed */
+	u32                             headless    : 1;    /* Indicates system does not have local video capabilities or local input devices */
 	u32                             cpu_sw_sleep : 1;   /* Indicates to OSPM that a processor native instruction */
-			   /* Must be executed after writing the SLP_TYPx register. */
-	u32                             reserved6   : 18;   /* Reserved - must be zero */
+			   /* must be executed after writing the SLP_TYPx register */
+	/* ACPI 3.0 flag bits */
+
+	u32                             pci_exp_wak                         : 1; /* System supports PCIEXP_WAKE (STS/EN) bits */
+	u32                             use_platform_clock                  : 1; /* OSPM should use platform-provided timer */
+	u32                             S4rtc_sts_valid                     : 1; /* Contents of RTC_STS valid after S4 wake */
+	u32                             remote_power_on_capable             : 1; /* System is compatible with remote power on */
+	u32                             force_apic_cluster_model            : 1; /* All local APICs must use cluster model */
+	u32                             force_apic_physical_destination_mode : 1; /* all local x_aPICs must use physical dest mode */
+	u32                             reserved6                           : 12;/* Reserved - must be zero */
 
 	struct acpi_generic_address     reset_register;     /* Reset register address in GAS format */
-	u8                              reset_value;        /* Value to write to the reset_register port to reset the system. */
+	u8                              reset_value;        /* Value to write to the reset_register port to reset the system */
 	u8                              reserved7[3];       /* These three bytes must be zero */
 	u64                             xfirmware_ctrl;     /* 64-bit physical address of FACS */
 	u64                             Xdsdt;              /* 64-bit physical address of DSDT */
@@ -199,7 +207,7 @@ struct fadt_descriptor_rev2
 };
 
 
-/* "Downrevved" ACPI 2.0 FADT descriptor */
+/* "Down-revved" ACPI 2.0 FADT descriptor */
 
 struct fadt_descriptor_rev2_minus
 {
@@ -213,7 +221,7 @@ struct fadt_descriptor_rev2_minus
 };
 
 
-/* Embedded Controller */
+/* ECDT - Embedded Controller Boot Resources Table */
 
 struct ec_boot_resources
 {
@@ -223,6 +231,55 @@ struct ec_boot_resources
 	u32                             uid;                /* Unique ID - must be same as the EC _UID method */
 	u8                              gpe_bit;            /* The GPE for the EC */
 	u8                              ec_id[1];           /* Full namepath of the EC in the ACPI namespace */
+};
+
+
+/* SRAT - System Resource Affinity Table */
+
+struct static_resource_alloc
+{
+	u8                              type;
+	u8                              length;
+	u8                              proximity_domain_lo;
+	u8                              apic_id;
+	u32                             enabled         :1;
+	u32                             reserved3       :31;
+	u8                              local_sapic_eid;
+	u8                              proximity_domain_hi[3];
+	u32                             reserved4;
+};
+
+struct memory_affinity
+{
+	u8                              type;
+	u8                              length;
+	u32                             proximity_domain;
+	u16                             reserved3;
+	u64                             base_address;
+	u64                             address_length;
+	u32                             reserved4;
+	u32                             enabled         :1;
+	u32                             hot_pluggable   :1;
+	u32                             non_volatile    :1;
+	u32                             reserved5       :29;
+	u64                             reserved6;
+};
+
+struct system_resource_affinity
+{
+	ACPI_TABLE_HEADER_DEF
+	u32                             reserved1;          /* Must be value '1' */
+	u64                             reserved2;
+};
+
+
+/* SLIT - System Locality Distance Information Table */
+
+struct system_locality_info
+{
+	ACPI_TABLE_HEADER_DEF
+	u64                             locality_count;
+	u8                              entry[1][1];
 };
 
 

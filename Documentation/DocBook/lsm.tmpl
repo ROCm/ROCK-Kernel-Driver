@@ -1,6 +1,9 @@
-<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook V3.1//EN"[]>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE article PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+	"http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" []>
+
 <article class="whitepaper" id="LinuxSecurityModule" lang="en">
- <artheader>
+ <articleinfo>
  <title>Linux Security Modules:  General Security Hooks for Linux</title>
  <authorgroup>
  <author>
@@ -28,7 +31,7 @@
  </affiliation>
  </author>
  </authorgroup>
- </artheader>
+ </articleinfo>
 
 <sect1><title>Introduction</title>
 
@@ -84,7 +87,7 @@ security; it merely provides the infrastructure to support security
 modules.  The LSM kernel patch also moves most of the capabilities
 logic into an optional security module, with the system defaulting
 to the traditional superuser logic.  This capabilities module
-is discussed further in <XRef LinkEnd="cap">.
+is discussed further in <xref linkend="cap"/>.
 </para>
 
 <para>

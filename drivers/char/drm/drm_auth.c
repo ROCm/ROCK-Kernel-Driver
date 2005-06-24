@@ -176,7 +176,7 @@ int drm_getmagic(struct inode *inode, struct file *filp,
 	static drm_magic_t sequence = 0;
 	static DEFINE_SPINLOCK(lock);
 	drm_file_t	   *priv    = filp->private_data;
-	drm_device_t	   *dev	    = priv->dev;
+	drm_device_t	   *dev	    = priv->head->dev;
 	drm_auth_t	   auth;
 
 				/* Find unique magic */
@@ -214,7 +214,7 @@ int drm_authmagic(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	   *priv    = filp->private_data;
-	drm_device_t	   *dev	    = priv->dev;
+	drm_device_t	   *dev	    = priv->head->dev;
 	drm_auth_t	   auth;
 	drm_file_t	   *file;
 

@@ -22,12 +22,12 @@ static u32 ac3_frames[3][32] =
      {69,87,104,121,139,174,208,243,278,348,417,487,557,696,835,975,1114,
       1253,1393,0,0,0,0,0,0,0,0,0,0,0,0,0},
      {96,120,144,168,192,240,288,336,384,480,576,672,768,960,1152,1344,
-      1536,1728,1920,0,0,0,0,0,0,0,0,0,0,0,0,0}}; 
+      1536,1728,1920,0,0,0,0,0,0,0,0,0,0,0,0,0}};
 
 
 
 #if 0
-static void setup_ts2pes(ipack *pa, ipack *pv, u16 *pida, u16 *pidv, 
+static void setup_ts2pes(ipack *pa, ipack *pv, u16 *pida, u16 *pidv,
 		  void (*pes_write)(u8 *buf, int count, void *data),
 		  void *priv)
 {
@@ -72,7 +72,7 @@ static int read_picture_header(u8 *headr, struct mpg_picture *pic, int field, in
 	u8 pct;
 
 	if (pr) printk( "Pic header: ");
-        pic->temporal_reference[field] = (( headr[0] << 2 ) | 
+        pic->temporal_reference[field] = (( headr[0] << 2 ) |
 					  (headr[1] & 0x03) )& 0x03ff;
 	if (pr) printk( " temp ref: 0x%04x", pic->temporal_reference[field]);
 
@@ -93,31 +93,31 @@ static int read_picture_header(u8 *headr, struct mpg_picture *pic, int field, in
 	}
 
 
-        pic->vinfo.vbv_delay  = (( headr[1] >> 5 ) | ( headr[2] << 3) | 
+        pic->vinfo.vbv_delay  = (( headr[1] >> 5 ) | ( headr[2] << 3) |
 				 ( (headr[3] & 0x1F) << 11) ) & 0xffff;
 
 	if (pr) printk( " vbv delay: 0x%04x", pic->vinfo.vbv_delay);
 
-        pic->picture_header_parameter = ( headr[3] & 0xe0 ) | 
+        pic->picture_header_parameter = ( headr[3] & 0xe0 ) |
 		((headr[4] & 0x80) >> 3);
 
         if ( pct == B_FRAME ){
                 pic->picture_header_parameter |= ( headr[4] >> 3 ) & 0x0f;
         }
-	if (pr) printk( " pic head param: 0x%x", 
+	if (pr) printk( " pic head param: 0x%x",
 			pic->picture_header_parameter);
 
 	return pct;
-} 
+}
 #endif
 
 #if 0
 /* needs 4 byte input */
 static int read_gop_header(u8 *headr, struct mpg_picture *pic, int pr)
 {
-	if (pr) printk("GOP header: "); 
+	if (pr) printk("GOP header: ");
 
-	pic->time_code  = (( headr[0] << 17 ) | ( headr[1] << 9) | 
+	pic->time_code  = (( headr[0] << 17 ) | ( headr[1] << 9) |
 			   ( headr[2] << 1 ) | (headr[3] &0x01)) & 0x1ffffff;
 
 	if (pr) printk(" time: %d:%d.%d ", (headr[0]>>2)& 0x1F,
@@ -129,14 +129,14 @@ static int read_gop_header(u8 *headr, struct mpg_picture *pic, int pr)
         } else {
                 pic->closed_gop = 0;
         }
-	if (pr) printk("closed: %d", pic->closed_gop); 
+	if (pr) printk("closed: %d", pic->closed_gop);
 
         if ( ( headr[3] & 0x20 ) != 0 ){
                 pic->broken_link = 1;
         } else {
                 pic->broken_link = 0;
         }
-	if (pr) printk(" broken: %d\n", pic->broken_link); 
+	if (pr) printk(" broken: %d\n", pic->broken_link);
 
 	return 0;
 }
@@ -153,39 +153,39 @@ static int read_sequence_header(u8 *headr, struct dvb_video_info *vi, int pr)
 
 	vi->horizontal_size	= ((headr[1] &0xF0) >> 4) | (headr[0] << 4);
 	vi->vertical_size	= ((headr[1] &0x0F) << 8) | (headr[2]);
-    
+
         sw = (int)((headr[3]&0xF0) >> 4) ;
 
         switch( sw ){
 	case 1:
 		if (pr)
 			printk("Videostream: ASPECT: 1:1");
-		vi->aspect_ratio = 100;        
+		vi->aspect_ratio = 100;
 		break;
 	case 2:
 		if (pr)
 			printk("Videostream: ASPECT: 4:3");
-                vi->aspect_ratio = 133;        
+                vi->aspect_ratio = 133;
 		break;
 	case 3:
 		if (pr)
 			printk("Videostream: ASPECT: 16:9");
-                vi->aspect_ratio = 177;        
+                vi->aspect_ratio = 177;
 		break;
 	case 4:
 		if (pr)
 			printk("Videostream: ASPECT: 2.21:1");
-                vi->aspect_ratio = 221;        
+                vi->aspect_ratio = 221;
 		break;
 
         case 5 ... 15:
 		if (pr)
 			printk("Videostream: ASPECT: reserved");
-                vi->aspect_ratio = 0;        
+                vi->aspect_ratio = 0;
 		break;
 
         default:
-                vi->aspect_ratio = 0;        
+                vi->aspect_ratio = 0;
                 return -1;
 	}
 
@@ -240,7 +240,7 @@ static int read_sequence_header(u8 *headr, struct dvb_video_info *vi, int pr)
 	}
 
 	vi->bit_rate = (headr[4] << 10) | (headr[5] << 2) | (headr[6] & 0x03);
-	
+
         vi->vbv_buffer_size
                 = (( headr[6] & 0xF8) >> 3 ) | (( headr[7] & 0x1F )<< 5);
 
@@ -303,7 +303,7 @@ static int get_ainfo(u8 *mbuf, int count, struct dvb_audio_info *ai, int pr)
 		else {
 			c++;
 		}
-	}	
+	}
 
 	if (!found) return -1;
 
@@ -333,8 +333,8 @@ static int get_ainfo(u8 *mbuf, int count, struct dvb_audio_info *ai, int pr)
 		if (ai->frequency == 3)
 			printk("  Freq: reserved\n");
 		else
-			printk("  Freq: %d kHz\n",ai->frequency); 
-			       
+			printk("  Freq: %d kHz\n",ai->frequency);
+
 	}
 	ai->off = c;
 	return 0;
@@ -349,7 +349,7 @@ int dvb_filter_get_ac3info(u8 *mbuf, int count, struct dvb_audio_info *ai, int p
 	int c = 0;
 	u8 frame = 0;
 	int fr = 0;
-	
+
 	while ( !found  && c < count){
 		u8 *b = mbuf+c;
 
@@ -358,7 +358,7 @@ int dvb_filter_get_ac3info(u8 *mbuf, int count, struct dvb_audio_info *ai, int p
 		else {
 			c++;
 		}
-	}	
+	}
 
 	if (!found) return -1;
 	if (pr)
@@ -402,7 +402,7 @@ static u8 *skip_pes_header(u8 **bufp)
         int skip = 0;
 
 	static const int mpeg1_skip_table[16] = {
-        	1, 0xffff,      5,     10, 0xffff, 0xffff, 0xffff, 0xffff,
+		1, 0xffff,      5,     10, 0xffff, 0xffff, 0xffff, 0xffff,
 	        0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff
 	};
 
@@ -479,9 +479,9 @@ static void initialize_mpg_picture(struct mpg_picture *pic)
 
         pic->picture_display_extension_flag[0] = 0;
         pic->picture_display_extension_flag[1] = 0;
-        pic->sequence_header_flag = 0;      
-	pic->gop_flag = 0;              
-        pic->sequence_end_flag = 0;	
+        pic->sequence_header_flag = 0;
+	pic->gop_flag = 0;
+        pic->sequence_end_flag = 0;
 }
 #endif
 
@@ -553,7 +553,7 @@ static void init_mpg_picture( struct mpg_picture *pic, int chan, int32_t field_t
 }
 #endif
 
-void dvb_filter_pes2ts_init(struct dvb_filter_pes2ts *p2ts, unsigned short pid, 
+void dvb_filter_pes2ts_init(struct dvb_filter_pes2ts *p2ts, unsigned short pid,
 			    dvb_filter_pes2ts_cb_t *cb, void *priv)
 {
 	unsigned char *buf=p2ts->buf;
@@ -572,11 +572,11 @@ int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes,
 {
 	unsigned char *buf=p2ts->buf;
 	int ret=0, rest;
-	
+
 	//len=6+((pes[4]<<8)|pes[5]);
 
 	if (payload_start)
-	buf[1]|=0x40;
+		buf[1]|=0x40;
 	else
 		buf[1]&=~0x40;
 	while (len>=184) {
@@ -601,4 +601,3 @@ int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes,
 	return p2ts->cb(p2ts->priv, buf);
 }
 EXPORT_SYMBOL(dvb_filter_pes2ts);
-

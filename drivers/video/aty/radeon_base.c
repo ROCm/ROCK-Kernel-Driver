@@ -1,4 +1,3 @@
-
 /*
  *	drivers/video/aty/radeon_base.c
  *
@@ -531,6 +530,7 @@ static int __devinit radeon_probe_pll_params(struct radeonfb_info *rinfo)
 	}
 
 	ppll_div_sel = INREG8(CLOCK_CNTL_INDEX + 1) & 0x3;
+	radeon_pll_errata_after_index(rinfo);
 
 	n = (INPLL(PPLL_DIV_0 + ppll_div_sel) & 0x7ff);
 	m = (INPLL(PPLL_REF_DIV) & 0x3ff);
@@ -913,7 +913,7 @@ static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int 
 
 			OUTREG(CRTC_EXT_CNTL, tmp);
 
-			break;
+			return 0;
 		case FBIO_RADEON_GET_MIRROR:
 			if (!rinfo->is_mobility)
 				return -EINVAL;
@@ -1057,13 +1057,14 @@ static int radeonfb_blank (int blank, struct fb_info *info)
 	return radeon_screen_blank(rinfo, blank, 0);
 }
 
-static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
-                             unsigned blue, unsigned transp, struct fb_info *info)
+static int radeon_setcolreg (unsigned regno, unsigned red, unsigned green,
+                             unsigned blue, unsigned transp,
+			     struct radeonfb_info *rinfo)
 {
-        struct radeonfb_info *rinfo = info->par;
 	u32 pindex;
 	unsigned int i;
-	
+
+
 	if (regno > 255)
 		return 1;
 
@@ -1078,20 +1079,7 @@ static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
         pindex = regno;
 
         if (!rinfo->asleep) {
-        	u32 dac_cntl2, vclk_cntl = 0;
-        	
 		radeon_fifo_wait(9);
-		if (rinfo->is_mobility) {
-			vclk_cntl = INPLL(VCLK_ECP_CNTL);
-			OUTPLL(VCLK_ECP_CNTL, vclk_cntl & ~PIXCLK_DAC_ALWAYS_ONb);
-		}
-
-		/* Make sure we are on first palette */
-		if (rinfo->has_CRTC2) {
-			dac_cntl2 = INREG(DAC_CNTL2);
-			dac_cntl2 &= ~DAC2_PALETTE_ACCESS_CNTL;
-			OUTREG(DAC_CNTL2, dac_cntl2);
-		}
 
 		if (rinfo->bpp == 16) {
 			pindex = regno * 8;
@@ -1101,24 +1089,27 @@ static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
 			if (rinfo->depth == 15 && regno > 31)
 				return 1;
 
-			/* For 565, the green component is mixed one order below */
+			/* For 565, the green component is mixed one order
+			 * below
+			 */
 			if (rinfo->depth == 16) {
 		                OUTREG(PALETTE_INDEX, pindex>>1);
-	       	         	OUTREG(PALETTE_DATA, (rinfo->palette[regno>>1].red << 16) |
-	                        	(green << 8) | (rinfo->palette[regno>>1].blue));
+	       	         	OUTREG(PALETTE_DATA,
+				       (rinfo->palette[regno>>1].red << 16) |
+	                        	(green << 8) |
+				       (rinfo->palette[regno>>1].blue));
 	                	green = rinfo->palette[regno<<1].green;
 	        	}
 		}
 
 		if (rinfo->depth != 16 || regno < 32) {
 			OUTREG(PALETTE_INDEX, pindex);
-			OUTREG(PALETTE_DATA, (red << 16) | (green << 8) | blue);
+			OUTREG(PALETTE_DATA, (red << 16) |
+			       (green << 8) | blue);
 		}
-		if (rinfo->is_mobility)
-			OUTPLL(VCLK_ECP_CNTL, vclk_cntl);
 	}
  	if (regno < 16) {
-		u32 *pal = info->pseudo_palette;
+		u32 *pal = rinfo->info->pseudo_palette;
         	switch (rinfo->depth) {
 		case 15:
 			pal[regno] = (regno << 10) | (regno << 5) | regno;
@@ -1138,8 +1129,87 @@ static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
 	return 0;
 }
 
+static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+			       unsigned blue, unsigned transp,
+			       struct fb_info *info)
+{
+        struct radeonfb_info *rinfo = info->par;
+	u32 dac_cntl2, vclk_cntl = 0;
+	int rc;
 
-void radeon_save_state (struct radeonfb_info *rinfo, struct radeon_regs *save)
+        if (!rinfo->asleep) {
+		if (rinfo->is_mobility) {
+			vclk_cntl = INPLL(VCLK_ECP_CNTL);
+			OUTPLL(VCLK_ECP_CNTL,
+			       vclk_cntl & ~PIXCLK_DAC_ALWAYS_ONb);
+		}
+
+		/* Make sure we are on first palette */
+		if (rinfo->has_CRTC2) {
+			dac_cntl2 = INREG(DAC_CNTL2);
+			dac_cntl2 &= ~DAC2_PALETTE_ACCESS_CNTL;
+			OUTREG(DAC_CNTL2, dac_cntl2);
+		}
+	}
+
+	rc = radeon_setcolreg (regno, red, green, blue, transp, rinfo);
+
+	if (!rinfo->asleep && rinfo->is_mobility)
+		OUTPLL(VCLK_ECP_CNTL, vclk_cntl);
+
+	return rc;
+}
+
+static int radeonfb_setcmap(struct fb_cmap *cmap, struct fb_info *info)
+{
+        struct radeonfb_info *rinfo = info->par;
+	u16 *red, *green, *blue, *transp;
+	u32 dac_cntl2, vclk_cntl = 0;
+	int i, start, rc = 0;
+
+        if (!rinfo->asleep) {
+		if (rinfo->is_mobility) {
+			vclk_cntl = INPLL(VCLK_ECP_CNTL);
+			OUTPLL(VCLK_ECP_CNTL,
+			       vclk_cntl & ~PIXCLK_DAC_ALWAYS_ONb);
+		}
+
+		/* Make sure we are on first palette */
+		if (rinfo->has_CRTC2) {
+			dac_cntl2 = INREG(DAC_CNTL2);
+			dac_cntl2 &= ~DAC2_PALETTE_ACCESS_CNTL;
+			OUTREG(DAC_CNTL2, dac_cntl2);
+		}
+	}
+
+	red = cmap->red;
+	green = cmap->green;
+	blue = cmap->blue;
+	transp = cmap->transp;
+	start = cmap->start;
+
+	for (i = 0; i < cmap->len; i++) {
+		u_int hred, hgreen, hblue, htransp = 0xffff;
+
+		hred = *red++;
+		hgreen = *green++;
+		hblue = *blue++;
+		if (transp)
+			htransp = *transp++;
+		rc = radeon_setcolreg (start++, hred, hgreen, hblue, htransp,
+				       rinfo);
+		if (rc)
+			break;
+	}
+
+	if (!rinfo->asleep && rinfo->is_mobility)
+		OUTPLL(VCLK_ECP_CNTL, vclk_cntl);
+
+	return rc;
+}
+
+static void radeon_save_state (struct radeonfb_info *rinfo,
+			       struct radeon_regs *save)
 {
 	/* CRTC regs */
 	save->crtc_gen_cntl = INREG(CRTC_GEN_CNTL);
@@ -1169,6 +1239,7 @@ void radeon_save_state (struct radeonfb_info *rinfo, struct radeon_regs *save)
 
 	/* PLL regs */
 	save->clk_cntl_index = INREG(CLOCK_CNTL_INDEX) & ~0x3f;
+	radeon_pll_errata_after_index(rinfo);
 	save->ppll_div_3 = INPLL(PPLL_DIV_3);
 	save->ppll_ref_div = INPLL(PPLL_REF_DIV);
 }
@@ -1198,6 +1269,8 @@ static void radeon_write_pll_regs(struct radeonfb_info *rinfo, struct radeon_reg
 			OUTREGP(CLOCK_CNTL_INDEX,
 				mode->clk_cntl_index & PPLL_DIV_SEL_MASK,
 				~PPLL_DIV_SEL_MASK);
+			radeon_pll_errata_after_index(rinfo);
+			radeon_pll_errata_after_data(rinfo);
             		return;
 		}
 	}
@@ -1214,6 +1287,8 @@ static void radeon_write_pll_regs(struct radeonfb_info *rinfo, struct radeon_reg
 	OUTREGP(CLOCK_CNTL_INDEX,
 		mode->clk_cntl_index & PPLL_DIV_SEL_MASK,
 		~PPLL_DIV_SEL_MASK);
+	radeon_pll_errata_after_index(rinfo);
+	radeon_pll_errata_after_data(rinfo);
 
 	/* Set PPLL ref. div */
 	if (rinfo->family == CHIP_FAMILY_R300 ||
@@ -1737,8 +1812,7 @@ static int radeonfb_set_par(struct fb_info *info)
 		} else {
 			/* DFP */
 			newmode->fp_gen_cntl |= (FP_FPON | FP_TMDS_EN);
-			newmode->tmds_transmitter_cntl = (TMDS_RAN_PAT_RST | TMDS_ICHCSEL) &
-							 ~(TMDS_PLLRST);
+			newmode->tmds_transmitter_cntl &= ~(TMDS_PLLRST);
 			/* TMDS_PLL_EN bit is reversed on RV (and mobility) chips */
 			if (IS_R300_VARIANT(rinfo) ||
 			    (rinfo->family == CHIP_FAMILY_R200) || !rinfo->has_CRTC2)
@@ -1791,6 +1865,7 @@ static struct fb_ops radeonfb_ops = {
 	.fb_check_var		= radeonfb_check_var,
 	.fb_set_par		= radeonfb_set_par,
 	.fb_setcolreg		= radeonfb_setcolreg,
+	.fb_setcmap		= radeonfb_setcmap,
 	.fb_pan_display 	= radeonfb_pan_display,
 	.fb_blank		= radeonfb_blank,
 	.fb_ioctl		= radeonfb_ioctl,
@@ -2231,7 +2306,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	rinfo->has_CRTC2 = (ent->driver_data & CHIP_HAS_CRTC2) != 0;
 	rinfo->is_mobility = (ent->driver_data & CHIP_IS_MOBILITY) != 0;
 	rinfo->is_IGP = (ent->driver_data & CHIP_IS_IGP) != 0;
-		
+
 	/* Set base addrs */
 	rinfo->fb_base_phys = pci_resource_start (pdev, 0);
 	rinfo->mmio_base_phys = pci_resource_start (pdev, 2);
@@ -2253,6 +2328,24 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	}
 
 	rinfo->fb_local_base = INREG(MC_FB_LOCATION) << 16;
+
+	/*
+	 * Check for errata
+	 */
+	rinfo->errata = 0;
+	if (rinfo->family == CHIP_FAMILY_R300 &&
+	    (INREG(CONFIG_CNTL) & CFG_ATI_REV_ID_MASK)
+	    == CFG_ATI_REV_A11)
+		rinfo->errata |= CHIP_ERRATA_R300_CG;
+
+	if (rinfo->family == CHIP_FAMILY_RV200 ||
+	    rinfo->family == CHIP_FAMILY_RS200)
+		rinfo->errata |= CHIP_ERRATA_PLL_DUMMYREADS;
+
+	if (rinfo->family == CHIP_FAMILY_RV100 ||
+	    rinfo->family == CHIP_FAMILY_RS100 ||
+	    rinfo->family == CHIP_FAMILY_RS200)
+		rinfo->errata |= CHIP_ERRATA_PLL_DELAY;
 
 #ifdef CONFIG_PPC_OF
 	/* On PPC, we obtain the OF device-node pointer to the firmware
@@ -2281,23 +2374,15 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	} while (   rinfo->fb_base == 0 &&
 		  ((rinfo->mapped_vram /=2) >= MIN_MAPPED_VRAM) );
 
-	if (rinfo->fb_base)
-		memset_io(rinfo->fb_base, 0, rinfo->mapped_vram);
-	else {
-		printk (KERN_ERR "radeonfb (%s): cannot map FB\n", pci_name(rinfo->pdev));
+	if (rinfo->fb_base == NULL) {
+		printk (KERN_ERR "radeonfb (%s): cannot map FB\n",
+			pci_name(rinfo->pdev));
 		ret = -EIO;
 		goto err_unmap_rom;
 	}
 
 	RTRACE("radeonfb (%s): mapped %ldk videoram\n", pci_name(rinfo->pdev),
 	       rinfo->mapped_vram/1024);
-
-	/*
-	 * Check for required workaround for PLL accesses
-	 */
-	rinfo->R300_cg_workaround = (rinfo->family == CHIP_FAMILY_R300 &&
-				     (INREG(CONFIG_CNTL) & CFG_ATI_REV_ID_MASK)
-				     == CFG_ATI_REV_A11);
 
 	/*
 	 * Map the BIOS ROM if any and retreive PLL parameters from
@@ -2359,6 +2444,15 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	radeon_save_state (rinfo, &rinfo->init_state);
 	memcpy(&rinfo->state, &rinfo->init_state, sizeof(struct radeon_regs));
 
+	/* Setup Power Management capabilities */
+	if (default_dynclk < -1) {
+		/* -2 is special: means  ON on mobility chips and do not
+		 * change on others
+		 */
+		radeonfb_pm_init(rinfo, rinfo->is_mobility ? 1 : -1);
+	} else
+		radeonfb_pm_init(rinfo, default_dynclk);
+
 	pci_set_drvdata(pdev, info);
 
 	/* Register with fbdev layer */
@@ -2368,13 +2462,6 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 			pci_name(rinfo->pdev));
 		goto err_unmap_fb;
 	}
-
-	/* Setup Power Management capabilities */
-	if (default_dynclk < -1) {
-		/* -2 is special: means  ON on mobility chips and do not change on others */
-		radeonfb_pm_init(rinfo, rinfo->is_mobility ? 1 : -1);
-	} else
-		radeonfb_pm_init(rinfo, default_dynclk);
 
 #ifdef CONFIG_MTRR
 	rinfo->mtrr_hdl = nomtrr ? -1 : mtrr_add(rinfo->fb_base_phys,
@@ -2401,10 +2488,8 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 err_unmap_fb:
 	iounmap(rinfo->fb_base);
 err_unmap_rom:
-	if (rinfo->mon1_EDID)
-	    kfree(rinfo->mon1_EDID);
-	if (rinfo->mon2_EDID)
-	    kfree(rinfo->mon2_EDID);
+	kfree(rinfo->mon1_EDID);
+	kfree(rinfo->mon2_EDID);
 	if (rinfo->mon1_modedb)
 		fb_destroy_modedb(rinfo->mon1_modedb);
 	fb_dealloc_cmap(&info->cmap);
@@ -2460,10 +2545,8 @@ static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
  
  	pci_release_regions(pdev);
 
-	if (rinfo->mon1_EDID)
-		kfree(rinfo->mon1_EDID);
-	if (rinfo->mon2_EDID)
-		kfree(rinfo->mon2_EDID);
+	kfree(rinfo->mon1_EDID);
+	kfree(rinfo->mon2_EDID);
 	if (rinfo->mon1_modedb)
 		fb_destroy_modedb(rinfo->mon1_modedb);
 #ifdef CONFIG_FB_RADEON_I2C
@@ -2486,27 +2569,8 @@ static struct pci_driver radeonfb_driver = {
 #endif /* CONFIG_PM */
 };
 
-int __init radeonfb_setup (char *options);
-
-int __init radeonfb_init (void)
-{
 #ifndef MODULE
-	char *option = NULL;
-
-	if (fb_get_options("radeonfb", &option))
-		return -ENODEV;
-	radeonfb_setup(option);
-#endif
-	return pci_module_init (&radeonfb_driver);
-}
-
-
-void __exit radeonfb_exit (void)
-{
-	pci_unregister_driver (&radeonfb_driver);
-}
-
-int __init radeonfb_setup (char *options)
+static int __init radeonfb_setup (char *options)
 {
 	char *this_opt;
 
@@ -2540,12 +2604,28 @@ int __init radeonfb_setup (char *options)
 	}
 	return 0;
 }
+#endif  /*  MODULE  */
+
+static int __init radeonfb_init (void)
+{
+#ifndef MODULE
+	char *option = NULL;
+
+	if (fb_get_options("radeonfb", &option))
+		return -ENODEV;
+	radeonfb_setup(option);
+#endif
+	return pci_register_driver (&radeonfb_driver);
+}
+
+
+static void __exit radeonfb_exit (void)
+{
+	pci_unregister_driver (&radeonfb_driver);
+}
 
 module_init(radeonfb_init);
-
-#ifdef MODULE
 module_exit(radeonfb_exit);
-#endif
 
 MODULE_AUTHOR("Ani Joshi");
 MODULE_DESCRIPTION("framebuffer driver for ATI Radeon chipset");

@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2005 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -63,6 +63,7 @@ static struct ixgb_stats ixgb_gstrings_stats[] = {
 	{"tx_dropped", IXGB_STAT(net_stats.tx_dropped)},
 	{"multicast", IXGB_STAT(net_stats.multicast)},
 	{"collisions", IXGB_STAT(net_stats.collisions)},
+
 /*	{ "rx_length_errors", IXGB_STAT(net_stats.rx_length_errors) },	*/
 	{"rx_over_errors", IXGB_STAT(net_stats.rx_over_errors)},
 	{"rx_crc_errors", IXGB_STAT(net_stats.rx_crc_errors)},
@@ -98,6 +99,7 @@ static int
 ixgb_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 {
 	struct ixgb_adapter *adapter = netdev->priv;
+
 	ecmd->supported = (SUPPORTED_10000baseT_Full | SUPPORTED_FIBRE);
 	ecmd->advertising = (SUPPORTED_10000baseT_Full | SUPPORTED_FIBRE);
 	ecmd->port = PORT_FIBRE;
@@ -119,6 +121,7 @@ static int
 ixgb_set_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 {
 	struct ixgb_adapter *adapter = netdev->priv;
+
 	if(ecmd->autoneg == AUTONEG_ENABLE ||
 	   ecmd->speed + ecmd->duplex != SPEED_10000 + DUPLEX_FULL)
 		return -EINVAL;
@@ -249,7 +252,9 @@ ixgb_get_regs(struct net_device *netdev,
 	uint32_t *reg_start = reg;
 	uint8_t i;
 
-	regs->version = (adapter->hw.device_id << 16) | adapter->hw.subsystem_id;
+	/* the 1 (one) below indicates an attempt at versioning, if the
+	 * interface in ethtool or the driver this 1 should be incremented */
+	regs->version = (1<<24) | hw->revision_id << 16 | hw->device_id;
 
 	/* General Registers */
 	*reg++ = IXGB_READ_REG(hw, CTRL0);	/*   0 */

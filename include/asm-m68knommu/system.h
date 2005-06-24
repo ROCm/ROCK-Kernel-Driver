@@ -281,5 +281,6 @@ cmpxchg(volatile int *p, int old, int new)
 })
 #endif
 #endif
+#define arch_align_stack(x) (x)
 
 #endif /* _M68KNOMMU_SYSTEM_H */

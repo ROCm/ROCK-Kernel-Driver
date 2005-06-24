@@ -42,7 +42,6 @@
  *  on every box. 
  */
 
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/miscdevice.h>
@@ -157,16 +156,16 @@ static struct rdr_tbl_ent perf_rdr_tbl_U[] = {
  * this array.
  */
 static uint64_t perf_bitmasks[] = {
-	0x0000000000000000,     /* first dbl word must be zero */
-	0xfdffe00000000000,     /* RDR0 bitmask */
-	0x003f000000000000,     /* RDR1 bitmask */
-	0x00ffffffffffffff,     /* RDR20-RDR21 bitmask (152 bits) */
-	0xffffffffffffffff,
-	0xfffffffc00000000,
-	0xffffffffffffffff,     /* RDR22-RDR23 bitmask (233 bits) */
-	0xffffffffffffffff,
-	0xfffffffffffffffc,
-	0xff00000000000000
+	0x0000000000000000ul,     /* first dbl word must be zero */
+	0xfdffe00000000000ul,     /* RDR0 bitmask */
+	0x003f000000000000ul,     /* RDR1 bitmask */
+	0x00fffffffffffffful,     /* RDR20-RDR21 bitmask (152 bits) */
+	0xfffffffffffffffful,
+	0xfffffffc00000000ul,
+	0xfffffffffffffffful,     /* RDR22-RDR23 bitmask (233 bits) */
+	0xfffffffffffffffful,
+	0xfffffffffffffffcul,
+	0xff00000000000000ul
 };
 
 /*
@@ -174,16 +173,16 @@ static uint64_t perf_bitmasks[] = {
  * somethings have changed slightly.
  */
 static uint64_t perf_bitmasks_piranha[] = {
-	0x0000000000000000,     /* first dbl word must be zero */
-	0xfdffe00000000000,     /* RDR0 bitmask */
-	0x003f000000000000,     /* RDR1 bitmask */
-	0x00ffffffffffffff,     /* RDR20-RDR21 bitmask (158 bits) */
-	0xffffffffffffffff,
-	0xfffffffc00000000,
-	0xffffffffffffffff,     /* RDR22-RDR23 bitmask (210 bits) */
-	0xffffffffffffffff,
-	0xffffffffffffffff,
-	0xfffc000000000000
+	0x0000000000000000ul,     /* first dbl word must be zero */
+	0xfdffe00000000000ul,     /* RDR0 bitmask */
+	0x003f000000000000ul,     /* RDR1 bitmask */
+	0x00fffffffffffffful,     /* RDR20-RDR21 bitmask (158 bits) */
+	0xfffffffffffffffful,
+	0xfffffffc00000000ul,
+	0xfffffffffffffffful,     /* RDR22-RDR23 bitmask (210 bits) */
+	0xfffffffffffffffful,
+	0xfffffffffffffffful,
+	0xfffc000000000000ul
 };
 
 static uint64_t *bitmask_array;   /* array of bitmasks to use */
@@ -194,8 +193,8 @@ static uint64_t *bitmask_array;   /* array of bitmasks to use */
 static int perf_config(uint32_t *image_ptr);
 static int perf_release(struct inode *inode, struct file *file);
 static int perf_open(struct inode *inode, struct file *file);
-static ssize_t perf_read(struct file *file, char *buf, size_t cnt, loff_t *ppos);
-static ssize_t perf_write(struct file *file, const char *buf, size_t count, 
+static ssize_t perf_read(struct file *file, char __user *buf, size_t cnt, loff_t *ppos);
+static ssize_t perf_write(struct file *file, const char __user *buf, size_t count, 
 	loff_t *ppos);
 static int perf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg);
@@ -287,7 +286,7 @@ static int perf_release(struct inode *inode, struct file *file)
 /*
  * Read does nothing for this driver
  */
-static ssize_t perf_read(struct file *file, char *buf, size_t cnt, loff_t *ppos)
+static ssize_t perf_read(struct file *file, char __user *buf, size_t cnt, loff_t *ppos)
 {
 	return 0;
 }
@@ -299,7 +298,7 @@ static ssize_t perf_read(struct file *file, char *buf, size_t cnt, loff_t *ppos)
  * called on the processor that the download should happen
  * on.
  */
-static ssize_t perf_write(struct file *file, const char *buf, size_t count, 
+static ssize_t perf_write(struct file *file, const char __user *buf, size_t count, 
 	loff_t *ppos)
 {
 	int err;
@@ -460,7 +459,7 @@ static int perf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			}
 
 			/* copy out the Counters */
-			if (copy_to_user((void *)arg, raddr, 
+			if (copy_to_user((void __user *)arg, raddr, 
 					sizeof (raddr)) != 0) {
 				return -EFAULT;
 			}
@@ -607,7 +606,7 @@ static int perf_stop_counters(uint32_t *raddr)
 		 * all of dword 22 and 58 bits (plus 6 don't care bits) of
 		 * dword 23.
 		 */
-		userbuf[21] &= 0xfffffffffffffc00;	/* 0 to last 10 bits */
+		userbuf[21] &= 0xfffffffffffffc00ul;	/* 0 to last 10 bits */
 		userbuf[22] = 0;
 		userbuf[23] = 0;
 
@@ -802,8 +801,8 @@ static int perf_write_image(uint64_t *memaddr)
 	proc_hpa = cpu_device->hpa;
 
 	/* Merge intrigue bits into Runway STATUS 0 */
-	tmp64 = __raw_readq(proc_hpa + RUNWAY_STATUS) & 0xffecffffffffffff;
-	__raw_writeq(tmp64 | (*memaddr++ & 0x0013000000000000), proc_hpa + RUNWAY_STATUS);
+	tmp64 = __raw_readq(proc_hpa + RUNWAY_STATUS) & 0xffecfffffffffffful;
+	__raw_writeq(tmp64 | (*memaddr++ & 0x0013000000000000ul), proc_hpa + RUNWAY_STATUS);
 	
 	/* Write RUNWAY DEBUG registers */
 	for (i = 0; i < 8; i++) {

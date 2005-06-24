@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2005 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -112,6 +112,8 @@ struct e1000_adapter;
 #define E1000_MAX_82544_RXD               4096
 
 /* Supported Rx Buffer Sizes */
+#define E1000_RXBUFFER_128   128    /* Used for packet split */
+#define E1000_RXBUFFER_256   256    /* Used for packet split */
 #define E1000_RXBUFFER_2048  2048
 #define E1000_RXBUFFER_4096  4096
 #define E1000_RXBUFFER_8192  8192
@@ -137,13 +139,18 @@ struct e1000_adapter;
 /* How many Rx Buffers do we bundle into one write to the hardware ? */
 #define E1000_RX_BUFFER_WRITE	16	/* Must be power of 2 */
 
-#define AUTO_ALL_MODES       0
-#define E1000_EEPROM_APME    0x0400
+#define AUTO_ALL_MODES            0
+#define E1000_EEPROM_82544_APM    0x0400
+#define E1000_EEPROM_APME         0x0400
 
 #ifndef E1000_MASTER_SLAVE
 /* Switch to override PHY master/slave setting */
 #define E1000_MASTER_SLAVE	e1000_ms_hw_default
 #endif
+
+#define E1000_MNG_VLAN_NONE -1
+/* Number of packet split data buffers (not including the header buffer) */
+#define PS_PAGE_BUFFERS MAX_PS_BUFFERS-1
 
 /* only works for sizes that are powers of 2 */
 #define E1000_ROUNDUP(i, size) ((i) = (((i) + (size) - 1) & ~((size) - 1)))
@@ -157,6 +164,9 @@ struct e1000_buffer {
 	uint16_t length;
 	uint16_t next_to_watch;
 };
+
+struct e1000_ps_page { struct page *ps_page[MAX_PS_BUFFERS]; };
+struct e1000_ps_page_dma { uint64_t ps_page_dma[MAX_PS_BUFFERS]; };
 
 struct e1000_desc_ring {
 	/* pointer to the descriptor ring memory */
@@ -173,12 +183,19 @@ struct e1000_desc_ring {
 	unsigned int next_to_clean;
 	/* array of buffer information structs */
 	struct e1000_buffer *buffer_info;
+	/* arrays of page information for packet split */
+	struct e1000_ps_page *ps_page;
+	struct e1000_ps_page_dma *ps_page_dma;
 };
 
 #define E1000_DESC_UNUSED(R) \
 	((((R)->next_to_clean > (R)->next_to_use) ? 0 : (R)->count) + \
 	(R)->next_to_clean - (R)->next_to_use - 1)
 
+#define E1000_RX_DESC_PS(R, i)	    \
+	(&(((union e1000_rx_desc_packet_split *)((R).desc))[i]))
+#define E1000_RX_DESC_EXT(R, i)	    \
+	(&(((union e1000_rx_desc_extended *)((R).desc))[i]))
 #define E1000_GET_DESC(R, i, type)	(&(((struct type *)((R).desc))[i]))
 #define E1000_RX_DESC(R, i)		E1000_GET_DESC(R, i, e1000_rx_desc)
 #define E1000_TX_DESC(R, i)		E1000_GET_DESC(R, i, e1000_tx_desc)
@@ -191,6 +208,7 @@ struct e1000_adapter {
 	struct timer_list watchdog_timer;
 	struct timer_list phy_info_timer;
 	struct vlan_group *vlgrp;
+    	uint16_t mng_vlan_id;
 	uint32_t bd_number;
 	uint32_t rx_buffer_len;
 	uint32_t part_num;
@@ -202,6 +220,7 @@ struct e1000_adapter {
 	spinlock_t stats_lock;
 	atomic_t irq_sem;
 	struct work_struct tx_timeout_task;
+	struct work_struct watchdog_task;
 	uint8_t fc_autoneg;
 
 	struct timer_list blink_timer;
@@ -209,6 +228,7 @@ struct e1000_adapter {
 
 	/* TX */
 	struct e1000_desc_ring tx_ring;
+	struct e1000_buffer previous_buffer_info;
 	spinlock_t tx_lock;
 	uint32_t txd_cmd;
 	uint32_t tx_int_delay;
@@ -222,16 +242,26 @@ struct e1000_adapter {
 	uint32_t tx_fifo_size;
 	atomic_t tx_fifo_stall;
 	boolean_t pcix_82544;
+	boolean_t detect_tx_hung;
 
 	/* RX */
+#ifdef CONFIG_E1000_NAPI
+	boolean_t (*clean_rx) (struct e1000_adapter *adapter, int *work_done,
+			  int work_to_do);
+#else
+	boolean_t (*clean_rx) (struct e1000_adapter *adapter);
+#endif
+	void (*alloc_rx_buf) (struct e1000_adapter *adapter);
 	struct e1000_desc_ring rx_ring;
 	uint64_t hw_csum_err;
 	uint64_t hw_csum_good;
 	uint32_t rx_int_delay;
 	uint32_t rx_abs_int_delay;
 	boolean_t rx_csum;
+	boolean_t rx_ps;
 	uint32_t gorcl;
 	uint64_t gorcl_old;
+	uint16_t rx_ps_bsize0;
 
 	/* Interrupt Throttle Rate */
 	uint32_t itr;
@@ -253,5 +283,8 @@ struct e1000_adapter {
 
 
 	int msg_enable;
+#ifdef CONFIG_PCI_MSI
+	boolean_t have_msi;
+#endif
 };
 #endif /* _E1000_H_ */

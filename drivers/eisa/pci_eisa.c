@@ -59,7 +59,8 @@ static struct pci_driver pci_eisa_driver = {
 
 static int __init pci_eisa_init_module (void)
 {
-	return pci_module_init (&pci_eisa_driver);
+	return pci_register_driver (&pci_eisa_driver);
 }
 
 device_initcall(pci_eisa_init_module);
+MODULE_DEVICE_TABLE(pci, pci_eisa_pci_tbl);

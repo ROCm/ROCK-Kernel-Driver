@@ -2,20 +2,14 @@
  * probe.c - PCI detection and setup code
  */
 
+#include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/cpumask.h>
-
-#undef DEBUG
-
-#ifdef DEBUG
-#define DBG(x...) printk(x)
-#else
-#define DBG(x...)
-#endif
+#include "pci.h"
 
 #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
 #define CARDBUS_RESERVE_BUSNR	3
@@ -80,7 +74,7 @@ void pci_remove_legacy_files(struct pci_bus *bus) { return; }
  */
 static ssize_t pci_bus_show_cpuaffinity(struct class_device *class_dev, char *buf)
 {
-	cpumask_t cpumask = pcibus_to_cpumask((to_pci_bus(class_dev))->number);
+	cpumask_t cpumask = pcibus_to_cpumask(to_pci_bus(class_dev));
 	int ret;
 
 	ret = cpumask_scnprintf(buf, PAGE_SIZE, cpumask);
@@ -169,7 +163,7 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 		if (l == 0xffffffff)
 			l = 0;
 		if ((l & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_MEMORY) {
-                       sz = pci_size(l, sz, (u32)PCI_BASE_ADDRESS_MEM_MASK);
+			sz = pci_size(l, sz, PCI_BASE_ADDRESS_MEM_MASK);
 			if (!sz)
 				continue;
 			res->start = l & PCI_BASE_ADDRESS_MEM_MASK;
@@ -219,7 +213,7 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 		if (l == 0xffffffff)
 			l = 0;
 		if (sz && sz != 0xffffffff) {
-                       sz = pci_size(l, sz, (u32)PCI_ROM_ADDRESS_MASK);
+			sz = pci_size(l, sz, PCI_ROM_ADDRESS_MASK);
 			if (sz) {
 				res->flags = (l & IORESOURCE_ROM_ENABLE) |
 				  IORESOURCE_MEM | IORESOURCE_PREFETCH |
@@ -432,8 +426,8 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 
 	pci_read_config_dword(dev, PCI_PRIMARY_BUS, &buses);
 
-	DBG("Scanning behind PCI bridge %s, config %06x, pass %d\n",
-	    pci_name(dev), buses & 0xffffff, pass);
+	pr_debug("PCI: Scanning behind PCI bridge %s, config %06x, pass %d\n",
+		 pci_name(dev), buses & 0xffffff, pass);
 
 	/* Disable MasterAbortMode during probing to avoid reporting
 	   of bus errors (in some architectures) */ 
@@ -568,7 +562,6 @@ static int pci_setup_device(struct pci_dev * dev)
 {
 	u32 class;
 
-	dev->slot_name = dev->dev.bus_id;
 	sprintf(pci_name(dev), "%04x:%02x:%02x.%d", pci_domain_nr(dev->bus),
 		dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
 
@@ -577,8 +570,8 @@ static int pci_setup_device(struct pci_dev * dev)
 	dev->class = class;
 	class >>= 8;
 
-	DBG("Found %02x:%02x [%04x/%04x] %06x %02x\n", dev->bus->number,
-	    dev->devfn, dev->vendor, dev->device, class, dev->hdr_type);
+	pr_debug("PCI: Found %s [%04x/%04x] %06x %02x\n", pci_name(dev),
+		 dev->vendor, dev->device, class, dev->hdr_type);
 
 	/* "Unknown power state" */
 	dev->current_state = 4;
@@ -833,7 +826,7 @@ unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus)
 	unsigned int devfn, pass, max = bus->secondary;
 	struct pci_dev *dev;
 
-	DBG("Scanning bus %02x\n", bus->number);
+	pr_debug("PCI: Scanning bus %04x:%02x\n", pci_domain_nr(bus), bus->number);
 
 	/* Go find them, Rover! */
 	for (devfn = 0; devfn < 0x100; devfn += 8)
@@ -843,7 +836,7 @@ unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus)
 	 * After performing arch-dependent fixup of the bus, look behind
 	 * all PCI-to-PCI bridges on this bus.
 	 */
-	DBG("Fixups for bus %02x\n", bus->number);
+	pr_debug("PCI: Fixups for bus %04x:%02x\n", pci_domain_nr(bus), bus->number);
 	pcibios_fixup_bus(bus);
 	for (pass=0; pass < 2; pass++)
 		list_for_each_entry(dev, &bus->devices, bus_list) {
@@ -859,7 +852,8 @@ unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus)
 	 *
 	 * Return how far we've got finding sub-buses.
 	 */
-	DBG("Bus scan for %02x returning with max=%02x\n", bus->number, max);
+	pr_debug("PCI: Bus scan for %04x:%02x returning with max=%02x\n",
+		pci_domain_nr(bus), bus->number, max);
 	return max;
 }
 
@@ -898,7 +892,7 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 
 	if (pci_find_bus(pci_domain_nr(b), bus)) {
 		/* If we already got to this bus through a different bridge, ignore it */
-		DBG("PCI: Bus %04x:%02x already known\n", pci_domain_nr(b), bus);
+		pr_debug("PCI: Bus %04x:%02x already known\n", pci_domain_nr(b), bus);
 		goto err_out;
 	}
 	list_add_tail(&b->node, &pci_root_buses);

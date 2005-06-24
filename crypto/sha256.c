@@ -42,15 +42,10 @@ static inline u32 Maj(u32 x, u32 y, u32 z)
 	return (x & y) | (z & (x | y));
 }
 
-static inline u32 RORu32(u32 x, u32 y)
-{
-	return (x >> y) | (x << (32 - y));
-}
-
-#define e0(x)       (RORu32(x, 2) ^ RORu32(x,13) ^ RORu32(x,22))
-#define e1(x)       (RORu32(x, 6) ^ RORu32(x,11) ^ RORu32(x,25))
-#define s0(x)       (RORu32(x, 7) ^ RORu32(x,18) ^ (x >> 3))
-#define s1(x)       (RORu32(x,17) ^ RORu32(x,19) ^ (x >> 10))
+#define e0(x)       (ror32(x, 2) ^ ror32(x,13) ^ ror32(x,22))
+#define e1(x)       (ror32(x, 6) ^ ror32(x,11) ^ ror32(x,25))
+#define s0(x)       (ror32(x, 7) ^ ror32(x,18) ^ (x >> 3))
+#define s1(x)       (ror32(x,17) ^ ror32(x,19) ^ (x >> 10))
 
 #define H0         0x6a09e667
 #define H1         0xbb67ae85
@@ -63,7 +58,7 @@ static inline u32 RORu32(u32 x, u32 y)
 
 static inline void LOAD_OP(int I, u32 *W, const u8 *input)
 {
-	W[I] = __be32_to_cpu( ((u32*)(input))[I] );
+	W[I] = __be32_to_cpu( ((__be32*)(input))[I] );
 }
 
 static inline void BLEND_OP(int I, u32 *W)

@@ -1,7 +1,7 @@
 /* linux/arch/arm/mach-s3c2410/gpio.c
  *
- * Copyright (c) 2004 Simtec Electronics
- * Ben Dooks <ben@simtec.co.uk>
+ * Copyright (c) 2004-2005 Simtec Electronics
+ *	Ben Dooks <ben@simtec.co.uk>
  *
  * S3C2410 GPIO support
  *
@@ -29,9 +29,11 @@
  *	01-Oct-2004  BJD  Added getirq() to turn pin into irqno
  *	04-Oct-2004  BJD  Added irq filter controls for GPIO
  *	05-Nov-2004  BJD  EXPORT_SYMBOL() added for all code
+ *	13-Mar-2005  BJD  Updates for __iomem
  */
 
 
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
@@ -45,7 +47,7 @@
 
 void s3c2410_gpio_cfgpin(unsigned int pin, unsigned int function)
 {
-	unsigned long base = S3C2410_GPIO_BASE(pin);
+	void __iomem *base = S3C2410_GPIO_BASE(pin);
 	unsigned long mask;
 	unsigned long con;
 	unsigned long flags;
@@ -71,7 +73,7 @@ EXPORT_SYMBOL(s3c2410_gpio_cfgpin);
 
 unsigned int s3c2410_gpio_getcfg(unsigned int pin)
 {
-	unsigned long base = S3C2410_GPIO_BASE(pin);
+	void __iomem *base = S3C2410_GPIO_BASE(pin);
 	unsigned long mask;
 
 	if (pin < S3C2410_GPIO_BANKB) {
@@ -87,7 +89,7 @@ EXPORT_SYMBOL(s3c2410_gpio_getcfg);
 
 void s3c2410_gpio_pullup(unsigned int pin, unsigned int to)
 {
-	unsigned long base = S3C2410_GPIO_BASE(pin);
+	void __iomem *base = S3C2410_GPIO_BASE(pin);
 	unsigned long offs = S3C2410_GPIO_OFFSET(pin);
 	unsigned long flags;
 	unsigned long up;
@@ -109,7 +111,7 @@ EXPORT_SYMBOL(s3c2410_gpio_pullup);
 
 void s3c2410_gpio_setpin(unsigned int pin, unsigned int to)
 {
-	unsigned long base = S3C2410_GPIO_BASE(pin);
+	void __iomem *base = S3C2410_GPIO_BASE(pin);
 	unsigned long offs = S3C2410_GPIO_OFFSET(pin);
 	unsigned long flags;
 	unsigned long dat;
@@ -128,7 +130,7 @@ EXPORT_SYMBOL(s3c2410_gpio_setpin);
 
 unsigned int s3c2410_gpio_getpin(unsigned int pin)
 {
-	unsigned long base = S3C2410_GPIO_BASE(pin);
+	void __iomem *base = S3C2410_GPIO_BASE(pin);
 	unsigned long offs = S3C2410_GPIO_OFFSET(pin);
 
 	return __raw_readl(base + 0x04) & (1<< offs);
@@ -175,7 +177,7 @@ EXPORT_SYMBOL(s3c2410_gpio_getirq);
 int s3c2410_gpio_irqfilter(unsigned int pin, unsigned int on,
 			   unsigned int config)
 {
-	unsigned long reg = S3C2410_EINFLT0;
+	void __iomem *reg = S3C2410_EINFLT0;
 	unsigned long flags;
 	unsigned long val;
 

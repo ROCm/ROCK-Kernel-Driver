@@ -11,6 +11,7 @@
 #include <linux/bootmem.h>
 #include <linux/mmzone.h>
 #include <linux/initrd.h>
+#include <linux/nodemask.h>
 
 #include <asm/setup.h>
 

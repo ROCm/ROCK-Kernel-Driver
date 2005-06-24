@@ -88,7 +88,7 @@ int tulip_mdio_read(struct net_device *dev, int phy_id, int location)
 		value = ioread32(ioaddr + CSR9);
 		iowrite32(value & 0xFFEFFFFF, ioaddr + CSR9);
 		
-		value = (phy_id << 21) | (location << 16) | 0x80000000;
+		value = (phy_id << 21) | (location << 16) | 0x08000000;
 		iowrite32(value, ioaddr + CSR10);
 		
 		while(--i > 0) {
@@ -166,7 +166,7 @@ void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int val)
 		value = ioread32(ioaddr + CSR9);
 		iowrite32(value & 0xFFEFFFFF, ioaddr + CSR9);
 		
-		value = (phy_id << 21) | (location << 16) | 0x40000000 | (val & 0xFFFF);
+		value = (phy_id << 21) | (location << 16) | 0x04000000 | (val & 0xFFFF);
 		iowrite32(value, ioaddr + CSR10);
 		
 		while(--i > 0) {
@@ -174,6 +174,7 @@ void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int val)
 				break;
 		}
 		spin_unlock_irqrestore(&tp->mii_lock, flags);
+		return;
 	}
 		
 	/* Establish sync by sending 32 logic ones. */

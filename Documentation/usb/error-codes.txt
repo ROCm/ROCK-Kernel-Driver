@@ -23,6 +23,9 @@ USB-specific:
 
 -ENODEV		specified USB-device or bus doesn't exist
 
+-ENOENT		specified interface or endpoint does not exist or
+		is not enabled
+
 -ENXIO		host controller driver does not support queuing of this type
 		of urb.  (treat as a host controller bug.)
 
@@ -88,13 +91,19 @@ one or more packets could finish before an error stops further endpoint I/O.
 			   prescribed bus turn-around time
 			c) unknown USB error 
 
-			In cases b) and c) either -EPROTO or -EILSEQ
-			may be returned.  Note that often the controller
-			hardware does not distinguish among cases a),
-			b), and c), so a driver cannot tell whether
-			there was a protocol error, a failure to respond
-			(often caused by device disconnect), or some
-			other fault.
+			Note that often the controller hardware does not
+			distinguish among cases a), b), and c), so a
+			driver cannot tell whether there was a protocol
+			error, a failure to respond (often caused by
+			device disconnect), or some other fault.
+
+-ETIMEDOUT (**)		No response packet received within the prescribed
+			bus turn-around time.  This error may instead be
+			reported as -EPROTO or -EILSEQ.
+
+			Note that the synchronous USB message functions
+			also use this code to indicate timeout expired
+			before the transfer completed.
 
 -EPIPE (**)		Endpoint stalled.  For non-control endpoints,
 			reset this status with usb_clear_halt().
@@ -152,4 +161,7 @@ usb_register():
 usb_get_*/usb_set_*():
 usb_control_msg():
 usb_bulk_msg():
--ETIMEDOUT		timeout expired before the transfer completed
+-ETIMEDOUT		Timeout expired before the transfer completed.
+			In the future this code may change to -ETIME,
+			whose definition is a closer match to this sort
+			of error.

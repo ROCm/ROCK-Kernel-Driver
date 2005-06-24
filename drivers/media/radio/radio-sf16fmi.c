@@ -326,13 +326,3 @@ static void __exit fmi_cleanup_module(void)
 
 module_init(fmi_init);
 module_exit(fmi_cleanup_module);
-
-#ifndef MODULE
-static int __init fmi_setup_io(char *str)
-{
-	get_option(&str, &io);
-	return 1;
-}
-
-__setup("sf16fm=", fmi_setup_io);
-#endif

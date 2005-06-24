@@ -102,20 +102,21 @@ int nmi_active;
 	(P4_CCCR_OVF_PMI0|P4_CCCR_THRESHOLD(15)|P4_CCCR_COMPLEMENT|	\
 	 P4_CCCR_COMPARE|P4_CCCR_REQUIRED|P4_CCCR_ESCR_SELECT(4)|P4_CCCR_ENABLE)
 
-int __init check_nmi_watchdog (void)
+static int __init check_nmi_watchdog(void)
 {
 	unsigned int prev_nmi_count[NR_CPUS];
 	int cpu;
 
-	printk(KERN_INFO "testing NMI watchdog ... ");
+	if (nmi_watchdog == NMI_NONE)
+		return 0;
+
+	printk(KERN_INFO "Testing NMI watchdog ... ");
 
 	for (cpu = 0; cpu < NR_CPUS; cpu++)
-		prev_nmi_count[cpu] = irq_stat[cpu].__nmi_count;
+		prev_nmi_count[cpu] = per_cpu(irq_stat, cpu).__nmi_count;
 	local_irq_enable();
 	mdelay((10*1000)/nmi_hz); // wait 10 ticks
 
-	/* FIXME: Only boot CPU is online at this stage.  Check CPUs
-           as they come up. */
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 #ifdef CONFIG_SMP
 		/* Check cpu_callin_map here because that is set
@@ -139,6 +140,8 @@ int __init check_nmi_watchdog (void)
 
 	return 0;
 }
+/* This needs to happen later in boot so counters are working */
+late_initcall(check_nmi_watchdog);
 
 static int __init setup_nmi_watchdog(char *str)
 {
@@ -265,7 +268,7 @@ void enable_timer_nmi_watchdog(void)
 
 static int nmi_pm_active; /* nmi_active before suspend */
 
-static int lapic_nmi_suspend(struct sys_device *dev, u32 state)
+static int lapic_nmi_suspend(struct sys_device *dev, pm_message_t state)
 {
 	nmi_pm_active = nmi_active;
 	disable_lapic_nmi_watchdog();
@@ -483,7 +486,7 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 	 */
 	int sum, cpu = smp_processor_id();
 
-	sum = irq_stat[cpu].apic_timer_irqs;
+	sum = per_cpu(irq_stat, cpu).apic_timer_irqs;
 
 	if (last_irq_sums[cpu] == sum) {
 		/*

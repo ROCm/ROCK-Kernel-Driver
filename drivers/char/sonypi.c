@@ -1021,11 +1021,11 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EIO;
 			break;
 		}
-		if (copy_to_user((u8 *)arg, &val8, sizeof(val8)))
+		if (copy_to_user(argp, &val8, sizeof(val8)))
 			ret = -EFAULT;
 		break;
 	case SONYPI_IOCSFAN:
-		if (copy_from_user(&val8, (u8 *)arg, sizeof(val8))) {
+		if (copy_from_user(&val8, argp, sizeof(val8))) {
 			ret = -EFAULT;
 			break;
 		}
@@ -1038,7 +1038,7 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 			ret = -EIO;
 			break;
 		}
-		if (copy_to_user((u8 *)arg, &val8, sizeof(val8)))
+		if (copy_to_user(argp, &val8, sizeof(val8)))
 			ret = -EFAULT;
 		break;
 	default:
@@ -1103,7 +1103,7 @@ static int sonypi_disable(void)
 #ifdef CONFIG_PM
 static int old_camera_power;
 
-static int sonypi_suspend(struct device *dev, u32 state, u32 level)
+static int sonypi_suspend(struct device *dev, pm_message_t state, u32 level)
 {
 	if (level == SUSPEND_DISABLE) {
 		old_camera_power = sonypi_device.camera_power;

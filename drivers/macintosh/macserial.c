@@ -155,7 +155,7 @@ static void dbdma_flush(volatile struct dbdma_regs *dma);
 static irqreturn_t rs_txdma_irq(int irq, void *dev_id, struct pt_regs *regs);
 static irqreturn_t rs_rxdma_irq(int irq, void *dev_id, struct pt_regs *regs);
 static void dma_init(struct mac_serial * info);
-static void rxdma_start(struct mac_serial * info, int current);
+static void rxdma_start(struct mac_serial * info, int curr);
 static void rxdma_to_tty(struct mac_serial * info);
 
 /*
@@ -762,10 +762,10 @@ static int startup(struct mac_serial * info)
 	return 0;
 }
 
-static _INLINE_ void rxdma_start(struct mac_serial * info, int current)
+static _INLINE_ void rxdma_start(struct mac_serial * info, int curr)
 {
 	volatile struct dbdma_regs *rd = &info->rx->dma;
-	volatile struct dbdma_cmd *cd = info->rx_cmds[current];
+	volatile struct dbdma_cmd *cd = info->rx_cmds[curr];
 
 //printk(KERN_DEBUG "SCC: rxdma_start\n");
 

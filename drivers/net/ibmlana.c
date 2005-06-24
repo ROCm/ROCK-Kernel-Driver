@@ -133,13 +133,14 @@ static void dumpregs(struct net_device *dev)
 
 static void dumpmem(struct net_device *dev, u32 start, u32 len)
 {
+	ibmlana_priv *priv = netdev_priv(dev);
 	int z;
 
 	printk("Address %04x:\n", start);
 	for (z = 0; z < len; z++) {
 		if ((z & 15) == 0)
 			printk("%04x:", z);
-		printk(" %02x", isa_readb(dev->mem_start + start + z));
+		printk(" %02x", readb(priv->base + start + z));
 		if ((z & 15) == 15)
 			printk("\n");
 	}
@@ -231,7 +232,7 @@ static void ResetBoard(struct net_device *dev)
 
 static void InitDscrs(struct net_device *dev)
 {
-	ibmlana_priv *priv = (ibmlana_priv *) dev->priv;
+	ibmlana_priv *priv = netdev_priv(dev);
 	u32 addr, baddr, raddr;
 	int z;
 	tda_t tda;
@@ -240,8 +241,8 @@ static void InitDscrs(struct net_device *dev)
 
 	/* initialize RAM */
 
-	isa_memset_io(dev->mem_start, 0xaa,
-		      dev->mem_start - dev->mem_start);
+	memset_io(priv->base, 0xaa,
+		      dev->mem_start - dev->mem_start);	/* XXX: typo? */
 
 	/* setup n TX descriptors - independent of RAM size */
 
@@ -260,7 +261,7 @@ static void InitDscrs(struct net_device *dev)
 		else
 			tda.link = addr + sizeof(tda_t);
 		tda.link |= 1;
-		isa_memcpy_toio(dev->mem_start + addr, &tda, sizeof(tda_t));
+		memcpy_toio(priv->base + addr, &tda, sizeof(tda_t));
 		addr += sizeof(tda_t);
 		baddr += PKTSIZE;
 	}
@@ -280,7 +281,7 @@ static void InitDscrs(struct net_device *dev)
 		rra.starthi = 0;
 		rra.cntlo = PKTSIZE >> 1;
 		rra.cnthi = 0;
-		isa_memcpy_toio(dev->mem_start + raddr, &rra, sizeof(rra_t));
+		memcpy_toio(priv->base + raddr, &rra, sizeof(rra_t));
 
 		rda.status = 0;
 		rda.length = 0;
@@ -292,7 +293,7 @@ static void InitDscrs(struct net_device *dev)
 		else
 			rda.link = 1;
 		rda.inuse = 1;
-		isa_memcpy_toio(dev->mem_start + addr, &rda, sizeof(rda_t));
+		memcpy_toio(priv->base + addr, &rda, sizeof(rda_t));
 
 		baddr += PKTSIZE;
 		raddr += sizeof(rra_t);
@@ -313,7 +314,7 @@ static void InitDscrs(struct net_device *dev)
 
 static int InitSONIC(struct net_device *dev)
 {
-	ibmlana_priv *priv = (ibmlana_priv *) dev->priv;
+	ibmlana_priv *priv = netdev_priv(dev);
 
 	/* set up start & end of resource area */
 
@@ -379,6 +380,7 @@ static void putcam(camentry_t * cams, int *camcnt, char *addr)
 
 static void InitBoard(struct net_device *dev)
 {
+	ibmlana_priv *priv = netdev_priv(dev);
 	int camcnt;
 	camentry_t cams[16];
 	u32 cammask;
@@ -429,8 +431,8 @@ static void InitBoard(struct net_device *dev)
 
 	/* feed CDA into SONIC, initialize RCR value (always get broadcasts) */
 
-	isa_memcpy_toio(dev->mem_start, cams, sizeof(camentry_t) * camcnt);
-	isa_memcpy_toio(dev->mem_start + (sizeof(camentry_t) * camcnt), &cammask, sizeof(cammask));
+	memcpy_toio(priv->base, cams, sizeof(camentry_t) * camcnt);
+	memcpy_toio(priv->base + (sizeof(camentry_t) * camcnt), &cammask, sizeof(cammask));
 
 #ifdef DEBUG
 	printk("CAM setup:\n");
@@ -520,7 +522,7 @@ static void InitBoard(struct net_device *dev)
 
 static void StartTx(struct net_device *dev, int descr)
 {
-	ibmlana_priv *priv = (ibmlana_priv *) dev->priv;
+	ibmlana_priv *priv = netdev_priv(dev);
 	int addr;
 
 	addr = priv->tdastart + (descr * sizeof(tda_t));
@@ -543,7 +545,7 @@ static void StartTx(struct net_device *dev, int descr)
 
 static void irqrbe_handler(struct net_device *dev)
 {
-	ibmlana_priv *priv = (ibmlana_priv *) dev->priv;
+	ibmlana_priv *priv = netdev_priv(dev);
 
 	/* point the SONIC back to the RRA start */
 
@@ -555,7 +557,7 @@ static void irqrbe_handler(struct net_device *dev)
 
 static void irqrx_handler(struct net_device *dev)
 {
-	ibmlana_priv *priv = (ibmlana_priv *) dev->priv;
+	ibmlana_priv *priv = netdev_priv(dev);
 	rda_t rda;
 	u32 rdaaddr, lrdaaddr;
 
@@ -566,7 +568,7 @@ static void irqrx_handler(struct net_device *dev)
 
 		rdaaddr = priv->rdastart + (priv->nextrxdescr * sizeof(rda_t));
 		lrdaaddr = priv->rdastart + (priv->lastrxdescr * sizeof(rda_t));
-		isa_memcpy_fromio(&rda, dev->mem_start + rdaaddr, sizeof(rda_t));
+		memcpy_fromio(&rda, priv->base + rdaaddr, sizeof(rda_t));
 
 		/* iron out upper word halves of fields we use - SONIC will duplicate 
 		   bits 0..15 to 16..31 */
@@ -593,8 +595,8 @@ static void irqrx_handler(struct net_device *dev)
 			else {
 				/* copy out data */
 
-				isa_memcpy_fromio(skb_put(skb, rda.length),
-					       dev->mem_start +
+				memcpy_fromio(skb_put(skb, rda.length),
+					       priv->base +
 					       rda.startlo, rda.length);
 
 				/* set up skb fields */
@@ -627,14 +629,14 @@ static void irqrx_handler(struct net_device *dev)
 
 		rda.link = 1;
 		rda.inuse = 1;
-		isa_memcpy_toio(dev->mem_start + rdaaddr, &rda,
+		memcpy_toio(priv->base + rdaaddr, &rda,
 			     sizeof(rda_t));
 
 		/* set up link and EOL = 0 in currently last descriptor. Only write
 		   the link field since the SONIC may currently already access the
 		   other fields. */
 
-		isa_memcpy_toio(dev->mem_start + lrdaaddr + 20, &rdaaddr, 4);
+		memcpy_toio(priv->base + lrdaaddr + 20, &rdaaddr, 4);
 
 		/* advance indices */
 
@@ -648,11 +650,11 @@ static void irqrx_handler(struct net_device *dev)
 
 static void irqtx_handler(struct net_device *dev)
 {
-	ibmlana_priv *priv = (ibmlana_priv *) dev->priv;
+	ibmlana_priv *priv = netdev_priv(dev);
 	tda_t tda;
 
 	/* fetch descriptor (we forgot the size ;-) */
-	isa_memcpy_fromio(&tda, dev->mem_start + priv->tdastart + (priv->currtxdescr * sizeof(tda_t)), sizeof(tda_t));
+	memcpy_fromio(&tda, priv->base + priv->tdastart + (priv->currtxdescr * sizeof(tda_t)), sizeof(tda_t));
 
 	/* update statistics */
 	priv->stat.tx_packets++;
@@ -672,11 +674,11 @@ static void irqtx_handler(struct net_device *dev)
 
 static void irqtxerr_handler(struct net_device *dev)
 {
-	ibmlana_priv *priv = (ibmlana_priv *) dev->priv;
+	ibmlana_priv *priv = netdev_priv(dev);
 	tda_t tda;
 
 	/* fetch descriptor to check status */
-	isa_memcpy_fromio(&tda, dev->mem_start + priv->tdastart + (priv->currtxdescr * sizeof(tda_t)), sizeof(tda_t));
+	memcpy_fromio(&tda, priv->base + priv->tdastart + (priv->currtxdescr * sizeof(tda_t)), sizeof(tda_t));
 
 	/* update statistics */
 	priv->stat.tx_errors++;
@@ -753,9 +755,7 @@ static int ibmlana_getinfo(char *buf, int slot, void *d)
 
 	if (dev == NULL)
 		return len;
-	if (dev->priv == NULL)
-		return len;
-	priv = (ibmlana_priv *) dev->priv;
+	priv = netdev_priv(dev);
 
 	/* print info */
 
@@ -778,7 +778,7 @@ static int ibmlana_getinfo(char *buf, int slot, void *d)
 static int ibmlana_open(struct net_device *dev)
 {
 	int result;
-	ibmlana_priv *priv = (ibmlana_priv *) dev->priv;
+	ibmlana_priv *priv = netdev_priv(dev);
 
 	/* register resources - only necessary for IRQ */
 
@@ -814,7 +814,7 @@ static int ibmlana_close(struct net_device *dev)
 
 static int ibmlana_tx(struct sk_buff *skb, struct net_device *dev)
 {
-	ibmlana_priv *priv = (ibmlana_priv *) dev->priv;
+	ibmlana_priv *priv = netdev_priv(dev);
 	int retval = 0, tmplen, addr;
 	unsigned long flags;
 	tda_t tda;
@@ -834,7 +834,7 @@ static int ibmlana_tx(struct sk_buff *skb, struct net_device *dev)
 	if (tmplen < 60)
 		tmplen = 60;
 	baddr = priv->txbufstart + (priv->nexttxdescr * PKTSIZE);
-	isa_memcpy_toio(dev->mem_start + baddr, skb->data, skb->len);
+	memcpy_toio(priv->base + baddr, skb->data, skb->len);
 
 	/* copy filler into RAM - in case we're filling up... 
 	   we're filling a bit more than necessary, but that doesn't harm
@@ -846,16 +846,16 @@ static int ibmlana_tx(struct sk_buff *skb, struct net_device *dev)
 		unsigned int destoffs = skb->len, l = strlen(fill);
 
 		while (destoffs < tmplen) {
-			isa_memcpy_toio(dev->mem_start + baddr + destoffs, fill, l);
+			memcpy_toio(priv->base + baddr + destoffs, fill, l);
 			destoffs += l;
 		}
 	}
 
 	/* set up the new frame descriptor */
 	addr = priv->tdastart + (priv->nexttxdescr * sizeof(tda_t));
-	isa_memcpy_fromio(&tda, dev->mem_start + addr, sizeof(tda_t));
+	memcpy_fromio(&tda, priv->base + addr, sizeof(tda_t));
 	tda.length = tda.fraglength = tmplen;
-	isa_memcpy_toio(dev->mem_start + addr, &tda, sizeof(tda_t));
+	memcpy_toio(priv->base + addr, &tda, sizeof(tda_t));
 
 	/* if there were no active descriptors, trigger the SONIC */
 	spin_lock_irqsave(&priv->lock, flags);
@@ -881,7 +881,7 @@ tx_done:
 
 static struct net_device_stats *ibmlana_stats(struct net_device *dev)
 {
-	ibmlana_priv *priv = (ibmlana_priv *) dev->priv;
+	ibmlana_priv *priv = netdev_priv(dev);
 	return &priv->stat;
 }
 
@@ -903,7 +903,6 @@ static int startslot;		/* counts through slots when probing multiple devices */
 
 static int ibmlana_probe(struct net_device *dev)
 {
-	int force_detect = 0;
 	int slot, z;
 	int base = 0, irq = 0, iobase = 0, memlen = 0;
 	ibmlana_priv *priv;
@@ -914,10 +913,6 @@ static int ibmlana_probe(struct net_device *dev)
 	/* can't work without an MCA bus ;-) */
 	if (MCA_bus == 0)
 		return -ENODEV;
-
-	/* start address of 1 --> forced detection */
-	if (dev->mem_start == 1)
-		force_detect = 1;
 
 	base = dev->mem_start;
 	irq = dev->irq;
@@ -952,18 +947,12 @@ static int ibmlana_probe(struct net_device *dev)
 		return -EBUSY;
 	}
 
-	/* make procfs entries */
-	mca_set_adapter_name(slot, "IBM LAN Adapter/A");
-	mca_set_adapter_procfn(slot, (MCA_ProcFn) ibmlana_getinfo, dev);
-
-	mca_mark_as_used(slot);
-
-	/* allocate structure */
-	priv = dev->priv;
+	priv = netdev_priv(dev);
 	priv->slot = slot;
 	priv->realirq = irq;
 	priv->medium = medium;
 	spin_lock_init(&priv->lock);
+		
 
 	/* set base + irq for this device (irq not allocated so far) */
 
@@ -971,6 +960,20 @@ static int ibmlana_probe(struct net_device *dev)
 	dev->mem_start = base;
 	dev->mem_end = base + memlen;
 	dev->base_addr = iobase;
+
+	priv->base = ioremap(base, memlen);
+	if (!priv->base) {
+		printk(KERN_ERR "%s: cannot remap memory!\n", DRV_NAME);
+		startslot = slot + 1;
+		release_region(iobase, IBM_LANA_IORANGE);
+		return -EBUSY;
+	}
+
+	/* make procfs entries */
+	mca_set_adapter_name(slot, "IBM LAN Adapter/A");
+	mca_set_adapter_procfn(slot, (MCA_ProcFn) ibmlana_getinfo, dev);
+
+	mca_mark_as_used(slot);
 
 	/* set methods */
 
@@ -1042,11 +1045,12 @@ int init_module(void)
 			break;
 		}
 		if (register_netdev(dev)) {
-			ibmlana_priv *priv = dev->priv;
+			ibmlana_priv *priv = netdev_priv(dev);
 			release_region(dev->base_addr, IBM_LANA_IORANGE);
 			mca_mark_as_unused(priv->slot);
 			mca_set_adapter_name(priv->slot, "");
 			mca_set_adapter_procfn(priv->slot, NULL, NULL);
+			iounmap(priv->base);
 			free_netdev(dev);
 			break;
 		}
@@ -1061,13 +1065,14 @@ void cleanup_module(void)
 	for (z = 0; z < DEVMAX; z++) {
 		struct net_device *dev = moddevs[z];
 		if (dev) {
-			ibmlana_priv *priv = (ibmlana_priv *) dev->priv;
+			ibmlana_priv *priv = netdev_priv(dev);
 			unregister_netdev(dev);
 			/*DeinitBoard(dev); */
 			release_region(dev->base_addr, IBM_LANA_IORANGE);
 			mca_mark_as_unused(priv->slot);
 			mca_set_adapter_name(priv->slot, "");
 			mca_set_adapter_procfn(priv->slot, NULL, NULL);
+			iounmap(priv->base);
 			free_netdev(dev);
 		}
 	}

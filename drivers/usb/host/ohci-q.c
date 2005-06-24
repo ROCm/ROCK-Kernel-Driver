@@ -172,7 +172,7 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 {	 
 	int	branch;
 
-	if (ohci_to_hcd(ohci)->state == USB_STATE_QUIESCING)
+	if (ohci_to_hcd(ohci)->state == HC_STATE_QUIESCING)
 		return -EAGAIN;
 
 	ed->state = ED_OPER;
@@ -547,7 +547,8 @@ td_fill (struct ohci_hcd *ohci, u32 info,
 	td->hwINFO = cpu_to_hc32 (ohci, info);
 	if (is_iso) {
 		td->hwCBP = cpu_to_hc32 (ohci, data & 0xFFFFF000);
-		td->hwPSW [0] = cpu_to_hc16 (ohci, (data & 0x0FFF) | 0xE000);
+		*ohci_hwPSWp(ohci, td, 0) = cpu_to_hc16 (ohci,
+						(data & 0x0FFF) | 0xE000);
 		td->ed->last_iso = info & 0xffff;
 	} else {
 		td->hwCBP = cpu_to_hc32 (ohci, data); 
@@ -662,7 +663,7 @@ static void td_submit_urb (
 			/* NOTE:  mishandles transfers >8K, some >4K */
 			td_fill (ohci, info, data, data_len, urb, cnt++);
 		}
-		info = is_out
+		info = (is_out || data_len == 0)
 			? TD_CC | TD_DP_IN | TD_T_DATA1
 			: TD_CC | TD_DP_OUT | TD_T_DATA1;
 		td_fill (ohci, info, data, 0, urb, cnt++);
@@ -719,10 +720,12 @@ static void td_done (struct ohci_hcd *ohci, struct urb *urb, struct td *td)
 
 	/* ISO ... drivers see per-TD length/status */
   	if (tdINFO & TD_ISO) {
- 		u16	tdPSW = hc16_to_cpu (ohci, td->hwPSW [0]);
+ 		u16	tdPSW = ohci_hwPSW (ohci, td, 0);
 		int	dlen = 0;
 
-		/* NOTE:  assumes FC in tdINFO == 0 (and MAXPSW == 1) */
+		/* NOTE:  assumes FC in tdINFO == 0, and that
+		 * only the first of 0..MAXPSW psws is used.
+		 */
 
  		cc = (tdPSW >> 12) & 0xF;
   		if (tdINFO & TD_CC)	/* hc didn't touch? */
@@ -920,7 +923,7 @@ rescan_all:
 		/* only take off EDs that the HC isn't using, accounting for
 		 * frame counter wraps and EDs with partially retired TDs
 		 */
-		if (likely (regs && HCD_IS_RUNNING(ohci_to_hcd(ohci)->state))) {
+		if (likely (regs && HC_IS_RUNNING(ohci_to_hcd(ohci)->state))) {
 			if (tick_before (tick, ed->tick)) {
 skip_ed:
 				last = &ed->ed_next;
@@ -1002,7 +1005,7 @@ rescan_this:
 
 		/* but if there's work queued, reschedule */
 		if (!list_empty (&ed->td_list)) {
-			if (HCD_IS_RUNNING(ohci_to_hcd(ohci)->state))
+			if (HC_IS_RUNNING(ohci_to_hcd(ohci)->state))
 				ed_schedule (ohci, ed);
 		}
 
@@ -1011,13 +1014,15 @@ rescan_this:
    	}
 
 	/* maybe reenable control and bulk lists */ 
-	if (HCD_IS_RUNNING(ohci_to_hcd(ohci)->state)
-			&& ohci_to_hcd(ohci)->state != USB_STATE_QUIESCING
+	if (HC_IS_RUNNING(ohci_to_hcd(ohci)->state)
+			&& ohci_to_hcd(ohci)->state != HC_STATE_QUIESCING
 			&& !ohci->ed_rm_list) {
 		u32	command = 0, control = 0;
 
 		if (ohci->ed_controltail) {
 			command |= OHCI_CLF;
+			if (ohci->flags & OHCI_QUIRK_ZFMICRO)
+				mdelay(1);
 			if (!(ohci->hc_control & OHCI_CTRL_CLE)) {
 				control |= OHCI_CTRL_CLE;
 				ohci_writel (ohci, 0,
@@ -1026,6 +1031,8 @@ rescan_this:
 		}
 		if (ohci->ed_bulktail) {
 			command |= OHCI_BLF;
+			if (ohci->flags & OHCI_QUIRK_ZFMICRO)
+				mdelay(1);
 			if (!(ohci->hc_control & OHCI_CTRL_BLE)) {
 				control |= OHCI_CTRL_BLE;
 				ohci_writel (ohci, 0,
@@ -1036,12 +1043,17 @@ rescan_this:
 		/* CLE/BLE to enable, CLF/BLF to (maybe) kickstart */
 		if (control) {
 			ohci->hc_control |= control;
+			if (ohci->flags & OHCI_QUIRK_ZFMICRO)
+				mdelay(1);
  			ohci_writel (ohci, ohci->hc_control,
 					&ohci->regs->control);   
  		}
-		if (command)
+		if (command) {
+			if (ohci->flags & OHCI_QUIRK_ZFMICRO)
+				mdelay(1);
 			ohci_writel (ohci, command, &ohci->regs->cmdstatus);   
- 	}
+	 	}
+	}
 }
 
 

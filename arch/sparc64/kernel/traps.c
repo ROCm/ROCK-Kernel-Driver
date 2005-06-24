@@ -421,6 +421,25 @@ asmlinkage void cee_log(unsigned long ce_status,
 	}
 }
 
+int cheetah_pcache_forced_on;
+
+void cheetah_enable_pcache(void)
+{
+	unsigned long dcr;
+
+	printk("CHEETAH: Enabling P-Cache on cpu %d.\n",
+	       smp_processor_id());
+
+	__asm__ __volatile__("ldxa [%%g0] %1, %0"
+			     : "=r" (dcr)
+			     : "i" (ASI_DCU_CONTROL_REG));
+	dcr |= (DCU_PE | DCU_HPE | DCU_SPE | DCU_SL);
+	__asm__ __volatile__("stxa %0, [%%g0] %1\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "r" (dcr), "i" (ASI_DCU_CONTROL_REG));
+}
+
 /* Cheetah error trap handling. */
 static unsigned long ecache_flush_physbase;
 static unsigned long ecache_flush_linesize;
@@ -805,48 +824,6 @@ static void cheetah_flush_ecache_line(unsigned long physaddr)
 			     : "r" (physaddr), "r" (alias),
 			       "i" (ASI_PHYS_USE_EC));
 }
-
-#ifdef CONFIG_SMP
-unsigned long __init cheetah_tune_scheduling(void)
-{
-	unsigned long tick1, tick2, raw;
-	unsigned long flush_base = ecache_flush_physbase;
-	unsigned long flush_linesize = ecache_flush_linesize;
-	unsigned long flush_size = ecache_flush_size;
-
-	/* Run through the whole cache to guarantee the timed loop
-	 * is really displacing cache lines.
-	 */
-	__asm__ __volatile__("1: subcc	%0, %4, %0\n\t"
-			     "   bne,pt	%%xcc, 1b\n\t"
-			     "    ldxa	[%2 + %0] %3, %%g0\n\t"
-			     : "=&r" (flush_size)
-			     : "0" (flush_size), "r" (flush_base),
-			       "i" (ASI_PHYS_USE_EC), "r" (flush_linesize));
-
-	/* The flush area is 2 X Ecache-size, so cut this in half for
-	 * the timed loop.
-	 */
-	flush_base = ecache_flush_physbase;
-	flush_linesize = ecache_flush_linesize;
-	flush_size = ecache_flush_size >> 1;
-
-	tick1 = tick_ops->get_tick();
-
-	__asm__ __volatile__("1: subcc	%0, %4, %0\n\t"
-			     "   bne,pt	%%xcc, 1b\n\t"
-			     "    ldxa	[%2 + %0] %3, %%g0\n\t"
-			     : "=&r" (flush_size)
-			     : "0" (flush_size), "r" (flush_base),
-			       "i" (ASI_PHYS_USE_EC), "r" (flush_linesize));
-
-	tick2 = tick_ops->get_tick();
-
-	raw = (tick2 - tick1);
-
-	return (raw - (raw >> 2));
-}
-#endif
 
 /* Unfortunately, the diagnostic access to the I-cache tags we need to
  * use to clear the thing interferes with I-cache coherency transactions.

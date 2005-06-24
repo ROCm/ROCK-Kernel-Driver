@@ -15,7 +15,7 @@
 
 static DEFINE_SPINLOCK(swap_token_lock);
 static unsigned long swap_token_timeout;
-unsigned long swap_token_check;
+static unsigned long swap_token_check;
 struct mm_struct * swap_token_mm = &init_mm;
 
 #define SWAP_TOKEN_CHECK_INTERVAL (HZ * 2)

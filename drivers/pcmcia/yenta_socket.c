@@ -506,8 +506,6 @@ static int yenta_sock_suspend(struct pcmcia_socket *sock)
 {
 	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
 
-	yenta_set_socket(sock, &dead_socket);
-
 	/* Disable CSC interrupts */
 	cb_writel(socket, CB_SOCKET_MASK, 0x0);
 
@@ -963,7 +961,7 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 	 * the irq stuff...
 	 */
 	printk(KERN_INFO "Yenta: CardBus bridge found at %s [%04x:%04x]\n",
-		dev->slot_name, dev->subsystem_vendor, dev->subsystem_device);
+		pci_name(dev), dev->subsystem_vendor, dev->subsystem_device);
 
 	yenta_config_init(socket);
 
@@ -1019,7 +1017,7 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 }
 
 
-static int yenta_dev_suspend (struct pci_dev *dev, u32 state)
+static int yenta_dev_suspend (struct pci_dev *dev, pm_message_t state)
 {
 	struct yenta_socket *socket = pci_get_drvdata(dev);
 	int ret;
@@ -1105,6 +1103,7 @@ static struct pci_device_id yenta_table [] = {
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4410, TI12XX),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4450, TI12XX),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4451, TI12XX),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4510, TI12XX),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4520, TI12XX),
 
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1250, TI1250),

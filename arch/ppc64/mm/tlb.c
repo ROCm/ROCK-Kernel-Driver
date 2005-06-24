@@ -74,23 +74,12 @@ void __pte_free_tlb(struct mmu_gather *tlb, struct page *ptepage)
  * change the existing HPTE to read-only rather than removing it
  * (if we remove it we should clear the _PTE_HPTEFLAGS bits).
  */
-void hpte_update(pte_t *ptep, unsigned long pte, int wrprot)
+void hpte_update(struct mm_struct *mm, unsigned long addr,
+		 unsigned long pte, int wrprot)
 {
-	struct page *ptepage;
-	struct mm_struct *mm;
-	unsigned long addr;
 	int i;
 	unsigned long context = 0;
 	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
-
-	ptepage = virt_to_page(ptep);
-	mm = (struct mm_struct *) ptepage->mapping;
-	addr = ptepage->index;
-	if (pte_huge(pte))
-		addr +=  ((unsigned long)ptep & ~PAGE_MASK)
-			/ sizeof(*ptep) * HPAGE_SIZE;
-	else
-		addr += ((unsigned long)ptep & ~PAGE_MASK) * PTRS_PER_PTE;
 
 	if (REGION_ID(addr) == USER_REGION_ID)
 		context = mm->context.id;

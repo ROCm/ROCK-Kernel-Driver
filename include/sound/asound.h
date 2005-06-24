@@ -113,10 +113,9 @@ enum sndrv_hwdep_iface {
 	SNDRV_HWDEP_IFACE_BLUETOOTH,	/* Bluetooth audio */
 	SNDRV_HWDEP_IFACE_USX2Y_PCM,	/* Tascam US122, US224 & US428 rawusb pcm */
 	SNDRV_HWDEP_IFACE_PCXHR,	/* Digigram PCXHR */
-	SNDRV_HWDEP_IFACE_SB_RC,	/* SB Extigy/Audigy2NX remote control */
 
 	/* Don't forget to change the following: */
-	SNDRV_HWDEP_IFACE_LAST = SNDRV_HWDEP_IFACE_SB_RC
+	SNDRV_HWDEP_IFACE_LAST = SNDRV_HWDEP_IFACE_PCXHR
 };
 
 struct sndrv_hwdep_info {
@@ -345,7 +344,7 @@ enum sndrv_pcm_hw_param {
 	SNDRV_PCM_HW_PARAM_LAST_INTERVAL = SNDRV_PCM_HW_PARAM_TICK_TIME
 };
 
-#define SNDRV_PCM_HW_PARAMS_NORESAMPLE		(1<<0)	/* avoid rate resampling */
+#define SNDRV_PCM_HW_PARAMS_RUNTIME		(1<<0)
 
 struct sndrv_interval {
 	unsigned int min, max;
@@ -560,7 +559,7 @@ enum {
  *  Timer section - /dev/snd/timer
  */
 
-#define SNDRV_TIMER_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 4)
+#define SNDRV_TIMER_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 2)
 
 enum sndrv_timer_class {
 	SNDRV_TIMER_CLASS_NONE = -1,
@@ -673,11 +672,10 @@ enum {
 	SNDRV_TIMER_IOCTL_INFO = _IOR('T', 0x11, struct sndrv_timer_info),
 	SNDRV_TIMER_IOCTL_PARAMS = _IOW('T', 0x12, struct sndrv_timer_params),
 	SNDRV_TIMER_IOCTL_STATUS = _IOR('T', 0x14, struct sndrv_timer_status),
-	/* The following four ioctls are changed since 1.0.9 due to confliction */
-	SNDRV_TIMER_IOCTL_START = _IO('T', 0xa0),
-	SNDRV_TIMER_IOCTL_STOP = _IO('T', 0xa1),
-	SNDRV_TIMER_IOCTL_CONTINUE = _IO('T', 0xa2),
-	SNDRV_TIMER_IOCTL_PAUSE = _IO('T', 0xa3),
+	SNDRV_TIMER_IOCTL_START = _IO('T', 0x20),
+	SNDRV_TIMER_IOCTL_STOP = _IO('T', 0x21),
+	SNDRV_TIMER_IOCTL_CONTINUE = _IO('T', 0x22),
+	SNDRV_TIMER_IOCTL_PAUSE = _IO('T', 0x23),
 };
 
 struct sndrv_timer_read {

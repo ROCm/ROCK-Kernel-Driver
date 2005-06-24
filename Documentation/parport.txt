@@ -264,5 +264,5 @@ the DMA channel, and try with:
     io=0x378 irq=7 dma=none (for PIO)
     io=0x378 irq=7 dma=3 (for DMA)
 --
-Philip.Blundell@pobox.com
+philb@gnu.org
 tim@cyberelk.net

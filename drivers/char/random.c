@@ -1,7 +1,7 @@
 /*
  * random.c -- A strong random number generator
  *
- * Version 1.89, last modified 19-Sep-99
+ * Copyright Matt Mackall <mpm@selenic.com>, 2003, 2004, 2005
  *
  * Copyright Theodore Ts'o, 1994, 1995, 1996, 1997, 1998, 1999.  All
  * rights reserved.
@@ -218,13 +218,6 @@
  * Any flaws in the design are solely my responsibility, and should
  * not be attributed to the Phil, Colin, or any of authors of PGP.
  *
- * The code for SHA transform was taken from Peter Gutmann's
- * implementation, which has been placed in the public domain.
- * The code for MD5 transform was taken from Colin Plumb's
- * implementation, which has been placed in the public domain.
- * The MD5 cryptographic checksum was devised by Ronald Rivest, and is
- * documented in RFC 1321, "The MD5 Message Digest Algorithm".
- *
  * Further background information on this topic may be obtained from
  * RFC 1750, "Randomness Recommendations for Security", by Donald
  * Eastlake, Steve Crocker, and Jeff Schiller.
@@ -242,11 +235,11 @@
 #include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/fs.h>
-#include <linux/workqueue.h>
 #include <linux/genhd.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/percpu.h>
+#include <linux/cryptohash.h>
 
 #include <asm/processor.h>
 #include <asm/uaccess.h>
@@ -256,10 +249,9 @@
 /*
  * Configuration information
  */
-#define DEFAULT_POOL_SIZE 512
-#define SECONDARY_POOL_SIZE 128
-#define BATCH_ENTROPY_SIZE 256
-#define USE_SHA
+#define INPUT_POOL_WORDS 128
+#define OUTPUT_POOL_WORDS 32
+#define SEC_XFER_SIZE 512
 
 /*
  * The minimum number of bits of entropy before we wake up a read on
@@ -279,7 +271,7 @@ static int random_write_wakeup_thresh = 128;
  * samples to avoid wasting CPU time and reduce lock contention.
  */
 
-static int trickle_thresh = DEFAULT_POOL_SIZE * 7;
+static int trickle_thresh = INPUT_POOL_WORDS * 28;
 
 DEFINE_PER_CPU(int, trickle_count) = 0;
 
@@ -295,42 +287,37 @@ static struct poolinfo {
 	int poolwords;
 	int tap1, tap2, tap3, tap4, tap5;
 } poolinfo_table[] = {
+	/* x^128 + x^103 + x^76 + x^51 +x^25 + x + 1 -- 105 */
+	{ 128,	103,	76,	51,	25,	1 },
+	/* x^32 + x^26 + x^20 + x^14 + x^7 + x + 1 -- 15 */
+	{ 32,	26,	20,	14,	7,	1 },
+#if 0
 	/* x^2048 + x^1638 + x^1231 + x^819 + x^411 + x + 1  -- 115 */
 	{ 2048,	1638,	1231,	819,	411,	1 },
 
 	/* x^1024 + x^817 + x^615 + x^412 + x^204 + x + 1 -- 290 */
 	{ 1024,	817,	615,	412,	204,	1 },
-#if 0				/* Alternate polynomial */
+
 	/* x^1024 + x^819 + x^616 + x^410 + x^207 + x^2 + 1 -- 115 */
 	{ 1024,	819,	616,	410,	207,	2 },
-#endif
 
 	/* x^512 + x^411 + x^308 + x^208 + x^104 + x + 1 -- 225 */
 	{ 512,	411,	308,	208,	104,	1 },
-#if 0				/* Alternates */
+
 	/* x^512 + x^409 + x^307 + x^206 + x^102 + x^2 + 1 -- 95 */
 	{ 512,	409,	307,	206,	102,	2 },
 	/* x^512 + x^409 + x^309 + x^205 + x^103 + x^2 + 1 -- 95 */
 	{ 512,	409,	309,	205,	103,	2 },
-#endif
 
 	/* x^256 + x^205 + x^155 + x^101 + x^52 + x + 1 -- 125 */
 	{ 256,	205,	155,	101,	52,	1 },
 
-	/* x^128 + x^103 + x^76 + x^51 +x^25 + x + 1 -- 105 */
-	{ 128,	103,	76,	51,	25,	1 },
-#if 0	/* Alternate polynomial */
 	/* x^128 + x^103 + x^78 + x^51 + x^27 + x^2 + 1 -- 70 */
 	{ 128,	103,	78,	51,	27,	2 },
-#endif
 
 	/* x^64 + x^52 + x^39 + x^26 + x^14 + x + 1 -- 15 */
 	{ 64,	52,	39,	26,	14,	1 },
-
-	/* x^32 + x^26 + x^20 + x^14 + x^7 + x + 1 -- 15 */
-	{ 32,	26,	20,	14,	7,	1 },
-
-	{ 0,	0,	0,	0,	0,	0 },
+#endif
 };
 
 #define POOLBITS	poolwords*32
@@ -380,94 +367,10 @@ static struct poolinfo {
  */
 
 /*
- * Linux 2.2 compatibility
- */
-#ifndef DECLARE_WAITQUEUE
-#define DECLARE_WAITQUEUE(WAIT, PTR) struct wait_queue WAIT = { PTR, NULL }
-#endif
-#ifndef DECLARE_WAIT_QUEUE_HEAD
-#define DECLARE_WAIT_QUEUE_HEAD(WAIT) struct wait_queue *WAIT
-#endif
-
-/*
  * Static global variables
  */
-static struct entropy_store *random_state; /* The default global store */
-static struct entropy_store *sec_random_state; /* secondary store */
-static struct entropy_store *urandom_state; /* For urandom */
 static DECLARE_WAIT_QUEUE_HEAD(random_read_wait);
 static DECLARE_WAIT_QUEUE_HEAD(random_write_wait);
-
-/*
- * Forward procedure declarations
- */
-#ifdef CONFIG_SYSCTL
-static void sysctl_init_random(struct entropy_store *random_state);
-#endif
-
-/*****************************************************************
- *
- * Utility functions, with some ASM defined functions for speed
- * purposes
- *
- *****************************************************************/
-
-/*
- * Unfortunately, while the GCC optimizer for the i386 understands how
- * to optimize a static rotate left of x bits, it doesn't know how to
- * deal with a variable rotate of x bits.  So we use a bit of asm magic.
- */
-#if (!defined (__i386__))
-static inline __u32 rotate_left(int i, __u32 word)
-{
-	return (word << i) | (word >> (32 - i));
-}
-#else
-static inline __u32 rotate_left(int i, __u32 word)
-{
-	__asm__("roll %%cl,%0"
-		:"=r" (word)
-		:"0" (word),"c" (i));
-	return word;
-}
-#endif
-
-/*
- * More asm magic....
- *
- * For entropy estimation, we need to do an integral base 2
- * logarithm.
- *
- * Note the "12bits" suffix - this is used for numbers between
- * 0 and 4095 only.  This allows a few shortcuts.
- */
-#if 0	/* Slow but clear version */
-static inline __u32 int_ln_12bits(__u32 word)
-{
-	__u32 nbits = 0;
-
-	while (word >>= 1)
-		nbits++;
-	return nbits;
-}
-#else	/* Faster (more clever) version, courtesy Colin Plumb */
-static inline __u32 int_ln_12bits(__u32 word)
-{
-	/* Smear msbit right to make an n-bit mask */
-	word |= word >> 8;
-	word |= word >> 4;
-	word |= word >> 2;
-	word |= word >> 1;
-	/* Remove one bit to make this a logarithm */
-	word >>= 1;
-	/* Count the bits set in the word */
-	word -= (word >> 1) & 0x555;
-	word = (word & 0x333) + ((word >> 2) & 0x333);
-	word += (word >> 4);
-	word += (word >> 8);
-	return word & 15;
-}
-#endif
 
 #if 0
 static int debug = 0;
@@ -475,9 +378,9 @@ module_param(debug, bool, 0644);
 #define DEBUG_ENT(fmt, arg...) do { if (debug) \
 	printk(KERN_DEBUG "random %04d %04d %04d: " \
 	fmt,\
-	random_state->entropy_count,\
-	sec_random_state->entropy_count,\
-	urandom_state->entropy_count,\
+	input_pool.entropy_count,\
+	blocking_pool.entropy_count,\
+	nonblocking_pool.entropy_count,\
 	## arg); } while (0)
 #else
 #define DEBUG_ENT(fmt, arg...) do {} while (0)
@@ -490,11 +393,14 @@ module_param(debug, bool, 0644);
  *
  **********************************************************************/
 
+struct entropy_store;
 struct entropy_store {
 	/* mostly-read data: */
-	struct poolinfo poolinfo;
+	struct poolinfo *poolinfo;
 	__u32 *pool;
 	const char *name;
+	int limit;
+	struct entropy_store *pull;
 
 	/* read-write data: */
 	spinlock_t lock ____cacheline_aligned_in_smp;
@@ -503,57 +409,34 @@ struct entropy_store {
 	int input_rotate;
 };
 
-/*
- * Initialize the entropy store.  The input argument is the size of
- * the random pool.
- *
- * Returns an negative error if there is a problem.
- */
-static int create_entropy_store(int size, const char *name,
-				struct entropy_store **ret_bucket)
-{
-	struct entropy_store *r;
-	struct poolinfo *p;
-	int poolwords;
+static __u32 input_pool_data[INPUT_POOL_WORDS];
+static __u32 blocking_pool_data[OUTPUT_POOL_WORDS];
+static __u32 nonblocking_pool_data[OUTPUT_POOL_WORDS];
 
-	poolwords = (size + 3) / 4; /* Convert bytes->words */
-	/* The pool size must be a multiple of 16 32-bit words */
-	poolwords = ((poolwords + 15) / 16) * 16;
+static struct entropy_store input_pool = {
+	.poolinfo = &poolinfo_table[0],
+	.name = "input",
+	.limit = 1,
+	.lock = SPIN_LOCK_UNLOCKED,
+	.pool = input_pool_data
+};
 
-	for (p = poolinfo_table; p->poolwords; p++) {
-		if (poolwords == p->poolwords)
-			break;
-	}
-	if (p->poolwords == 0)
-		return -EINVAL;
+static struct entropy_store blocking_pool = {
+	.poolinfo = &poolinfo_table[1],
+	.name = "blocking",
+	.limit = 1,
+	.pull = &input_pool,
+	.lock = SPIN_LOCK_UNLOCKED,
+	.pool = blocking_pool_data
+};
 
-	r = kmalloc(sizeof(struct entropy_store), GFP_KERNEL);
-	if (!r)
-		return -ENOMEM;
-
-	memset (r, 0, sizeof(struct entropy_store));
-	r->poolinfo = *p;
-
-	r->pool = kmalloc(POOLBYTES, GFP_KERNEL);
-	if (!r->pool) {
-		kfree(r);
-		return -ENOMEM;
-	}
-	memset(r->pool, 0, POOLBYTES);
-	spin_lock_init(&r->lock);
-	r->name = name;
-	*ret_bucket = r;
-	return 0;
-}
-
-/* Clear the entropy pool and associated counters. */
-static void clear_entropy_store(struct entropy_store *r)
-{
-	r->add_ptr = 0;
-	r->entropy_count = 0;
-	r->input_rotate = 0;
-	memset(r->pool, 0, r->poolinfo.POOLBYTES);
-}
+static struct entropy_store nonblocking_pool = {
+	.poolinfo = &poolinfo_table[1],
+	.name = "nonblocking",
+	.pull = &input_pool,
+	.lock = SPIN_LOCK_UNLOCKED,
+	.pool = nonblocking_pool_data
+};
 
 /*
  * This function adds a byte into the entropy "pool".  It does not
@@ -573,16 +456,16 @@ static void __add_entropy_words(struct entropy_store *r, const __u32 *in,
 		0xedb88320, 0xd6d6a3e8, 0x9b64c2b0, 0xa00ae278 };
 	unsigned long i, add_ptr, tap1, tap2, tap3, tap4, tap5;
 	int new_rotate, input_rotate;
-	int wordmask = r->poolinfo.poolwords - 1;
+	int wordmask = r->poolinfo->poolwords - 1;
 	__u32 w, next_w;
 	unsigned long flags;
 
 	/* Taps are constant, so we can load them without holding r->lock.  */
-	tap1 = r->poolinfo.tap1;
-	tap2 = r->poolinfo.tap2;
-	tap3 = r->poolinfo.tap3;
-	tap4 = r->poolinfo.tap4;
-	tap5 = r->poolinfo.tap5;
+	tap1 = r->poolinfo->tap1;
+	tap2 = r->poolinfo->tap2;
+	tap3 = r->poolinfo->tap3;
+	tap4 = r->poolinfo->tap4;
+	tap5 = r->poolinfo->tap5;
 	next_w = *in++;
 
 	spin_lock_irqsave(&r->lock, flags);
@@ -591,7 +474,7 @@ static void __add_entropy_words(struct entropy_store *r, const __u32 *in,
 	add_ptr = r->add_ptr;
 
 	while (nwords--) {
-		w = rotate_left(input_rotate, next_w);
+		w = rol32(next_w, input_rotate);
 		if (nwords > 0)
 			next_w = *in++;
 		i = add_ptr = (add_ptr - 1) & wordmask;
@@ -648,8 +531,8 @@ static void credit_entropy_store(struct entropy_store *r, int nbits)
 		DEBUG_ENT("negative entropy/overflow (%d+%d)\n",
 			  r->entropy_count, nbits);
 		r->entropy_count = 0;
-	} else if (r->entropy_count + nbits > r->poolinfo.POOLBITS) {
-		r->entropy_count = r->poolinfo.POOLBITS;
+	} else if (r->entropy_count + nbits > r->poolinfo->POOLBITS) {
+		r->entropy_count = r->poolinfo->POOLBITS;
 	} else {
 		r->entropy_count += nbits;
 		if (nbits)
@@ -658,118 +541,6 @@ static void credit_entropy_store(struct entropy_store *r, int nbits)
 	}
 
 	spin_unlock_irqrestore(&r->lock, flags);
-}
-
-/**********************************************************************
- *
- * Entropy batch input management
- *
- * We batch entropy to be added to avoid increasing interrupt latency
- *
- **********************************************************************/
-
-struct sample {
-	__u32 data[2];
-	int credit;
-};
-
-static struct sample *batch_entropy_pool, *batch_entropy_copy;
-static int batch_head, batch_tail;
-static DEFINE_SPINLOCK(batch_lock);
-
-static int batch_max;
-static void batch_entropy_process(void *private_);
-static DECLARE_WORK(batch_work, batch_entropy_process, NULL);
-
-/* note: the size must be a power of 2 */
-static int __init batch_entropy_init(int size, struct entropy_store *r)
-{
-	batch_entropy_pool = kmalloc(size*sizeof(struct sample), GFP_KERNEL);
-	if (!batch_entropy_pool)
-		return -1;
-	batch_entropy_copy = kmalloc(size*sizeof(struct sample), GFP_KERNEL);
-	if (!batch_entropy_copy) {
-		kfree(batch_entropy_pool);
-		return -1;
-	}
-	batch_head = batch_tail = 0;
-	batch_work.data = r;
-	batch_max = size;
-	return 0;
-}
-
-/*
- * Changes to the entropy data is put into a queue rather than being added to
- * the entropy counts directly.  This is presumably to avoid doing heavy
- * hashing calculations during an interrupt in add_timer_randomness().
- * Instead, the entropy is only added to the pool by keventd.
- */
-static void batch_entropy_store(u32 a, u32 b, int num)
-{
-	int new;
-	unsigned long flags;
-
-	if (!batch_max)
-		return;
-
-	spin_lock_irqsave(&batch_lock, flags);
-
-	batch_entropy_pool[batch_head].data[0] = a;
-	batch_entropy_pool[batch_head].data[1] = b;
-	batch_entropy_pool[batch_head].credit = num;
-
-	if (((batch_head - batch_tail) & (batch_max - 1)) >= (batch_max / 2))
-		schedule_delayed_work(&batch_work, 1);
-
-	new = (batch_head + 1) & (batch_max - 1);
-	if (new == batch_tail)
-		DEBUG_ENT("batch entropy buffer full\n");
-	else
-		batch_head = new;
-
-	spin_unlock_irqrestore(&batch_lock, flags);
-}
-
-/*
- * Flush out the accumulated entropy operations, adding entropy to the passed
- * store (normally random_state).  If that store has enough entropy, alternate
- * between randomizing the data of the primary and secondary stores.
- */
-static void batch_entropy_process(void *private_)
-{
-	struct entropy_store *r	= (struct entropy_store *) private_, *p;
-	int max_entropy = r->poolinfo.POOLBITS;
-	unsigned head, tail;
-
-	/* Mixing into the pool is expensive, so copy over the batch
-	 * data and release the batch lock. The pool is at least half
-	 * full, so don't worry too much about copying only the used
-	 * part.
-	 */
-	spin_lock_irq(&batch_lock);
-
-	memcpy(batch_entropy_copy, batch_entropy_pool,
-	       batch_max * sizeof(struct sample));
-
-	head = batch_head;
-	tail = batch_tail;
-	batch_tail = batch_head;
-
-	spin_unlock_irq(&batch_lock);
-
-	p = r;
-	while (head != tail) {
-		if (r->entropy_count >= max_entropy) {
-			r = (r == sec_random_state) ? random_state :
-				sec_random_state;
-			max_entropy = r->poolinfo.POOLBITS;
-		}
-		add_entropy_words(r, batch_entropy_copy[tail].data, 2);
-		credit_entropy_store(r, batch_entropy_copy[tail].credit);
-		tail = (tail + 1) & (batch_max - 1);
-	}
-	if (p->entropy_count >= random_read_wakeup_thresh)
-		wake_up_interruptible(&random_read_wait);
 }
 
 /*********************************************************************
@@ -786,7 +557,6 @@ struct timer_rand_state {
 };
 
 static struct timer_rand_state input_timer_state;
-static struct timer_rand_state extract_timer_state;
 static struct timer_rand_state *irq_timer_state[NR_IRQS];
 
 /*
@@ -801,26 +571,33 @@ static struct timer_rand_state *irq_timer_state[NR_IRQS];
  */
 static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 {
-	cycles_t data;
-	long delta, delta2, delta3, time;
-	int entropy = 0;
+	struct {
+		cycles_t cycles;
+		long jiffies;
+		unsigned num;
+	} sample;
+	long delta, delta2, delta3;
 
 	preempt_disable();
 	/* if over the trickle threshold, use only 1 in 4096 samples */
-	if (random_state->entropy_count > trickle_thresh &&
+	if (input_pool.entropy_count > trickle_thresh &&
 	    (__get_cpu_var(trickle_count)++ & 0xfff))
 		goto out;
+
+	sample.jiffies = jiffies;
+	sample.cycles = get_cycles();
+	sample.num = num;
+	add_entropy_words(&input_pool, (u32 *)&sample, sizeof(sample)/4);
 
 	/*
 	 * Calculate number of bits of randomness we probably added.
 	 * We take into account the first, second and third-order deltas
 	 * in order to make our estimate.
 	 */
-	time = jiffies;
 
 	if (!state->dont_count_entropy) {
-		delta = time - state->last_time;
-		state->last_time = time;
+		delta = sample.jiffies - state->last_time;
+		state->last_time = sample.jiffies;
 
 		delta2 = delta - state->last_delta;
 		state->last_delta = delta;
@@ -844,23 +621,13 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 		 * Round down by 1 bit on general principles,
 		 * and limit entropy entimate to 12 bits.
 		 */
-		delta >>= 1;
-		delta &= (1 << 12) - 1;
-
-		entropy = int_ln_12bits(delta);
+		credit_entropy_store(&input_pool,
+				     min_t(int, fls(delta>>1), 11));
 	}
 
-	/*
-	 * Use get_cycles() if implemented, otherwise fall back to
-	 * jiffies.
-	 */
-	data = get_cycles();
-	if (data)
-		num ^= (u32)((data >> 31) >> 1);
-	else
-		data = time;
+	if(input_pool.entropy_count >= random_read_wakeup_thresh)
+		wake_up_interruptible(&random_read_wait);
 
-	batch_entropy_store(num, data, entropy);
 out:
 	preempt_enable();
 }
@@ -902,391 +669,7 @@ void add_disk_randomness(struct gendisk *disk)
 
 EXPORT_SYMBOL(add_disk_randomness);
 
-/******************************************************************
- *
- * Hash function definition
- *
- *******************************************************************/
-
-/*
- * This chunk of code defines a function
- * void HASH_TRANSFORM(__u32 digest[HASH_BUFFER_SIZE + HASH_EXTRA_SIZE],
- * 		__u32 const data[16])
- *
- * The function hashes the input data to produce a digest in the first
- * HASH_BUFFER_SIZE words of the digest[] array, and uses HASH_EXTRA_SIZE
- * more words for internal purposes.  (This buffer is exported so the
- * caller can wipe it once rather than this code doing it each call,
- * and tacking it onto the end of the digest[] array is the quick and
- * dirty way of doing it.)
- *
- * It so happens that MD5 and SHA share most of the initial vector
- * used to initialize the digest[] array before the first call:
- * 1) 0x67452301
- * 2) 0xefcdab89
- * 3) 0x98badcfe
- * 4) 0x10325476
- * 5) 0xc3d2e1f0 (SHA only)
- *
- * For /dev/random purposes, the length of the data being hashed is
- * fixed in length, so appending a bit count in the usual way is not
- * cryptographically necessary.
- */
-
-#ifdef USE_SHA
-
-#define HASH_BUFFER_SIZE 5
-#define HASH_EXTRA_SIZE 80
-#define HASH_TRANSFORM SHATransform
-
-/* Various size/speed tradeoffs are available.  Choose 0..3. */
-#define SHA_CODE_SIZE 0
-
-/*
- * SHA transform algorithm, taken from code written by Peter Gutmann,
- * and placed in the public domain.
- */
-
-/* The SHA f()-functions.  */
-
-#define f1(x,y,z)   (z ^ (x & (y ^ z)))		/* Rounds  0-19: x ? y : z */
-#define f2(x,y,z)   (x ^ y ^ z)			/* Rounds 20-39: XOR */
-#define f3(x,y,z)   ((x & y) + (z & (x ^ y)))	/* Rounds 40-59: majority */
-#define f4(x,y,z)   (x ^ y ^ z)			/* Rounds 60-79: XOR */
-
-/* The SHA Mysterious Constants */
-
-#define K1  0x5A827999L			/* Rounds  0-19: sqrt(2) * 2^30 */
-#define K2  0x6ED9EBA1L			/* Rounds 20-39: sqrt(3) * 2^30 */
-#define K3  0x8F1BBCDCL			/* Rounds 40-59: sqrt(5) * 2^30 */
-#define K4  0xCA62C1D6L			/* Rounds 60-79: sqrt(10) * 2^30 */
-
-#define ROTL(n,X)  (((X) << n ) | ((X) >> (32 - n)))
-
-#define subRound(a, b, c, d, e, f, k, data) \
-    (e += ROTL(5, a) + f(b, c, d) + k + data, b = ROTL(30, b))
-
-static void SHATransform(__u32 digest[85], __u32 const data[16])
-{
-	__u32 A, B, C, D, E;     /* Local vars */
-	__u32 TEMP;
-	int i;
-#define W (digest + HASH_BUFFER_SIZE)	/* Expanded data array */
-
-	/*
-	 * Do the preliminary expansion of 16 to 80 words.  Doing it
-	 * out-of-line line this is faster than doing it in-line on
-	 * register-starved machines like the x86, and not really any
-	 * slower on real processors.
-	 */
-	memcpy(W, data, 16*sizeof(__u32));
-	for (i = 0; i < 64; i++) {
-		TEMP = W[i] ^ W[i+2] ^ W[i+8] ^ W[i+13];
-		W[i+16] = ROTL(1, TEMP);
-	}
-
-	/* Set up first buffer and local data buffer */
-	A = digest[ 0 ];
-	B = digest[ 1 ];
-	C = digest[ 2 ];
-	D = digest[ 3 ];
-	E = digest[ 4 ];
-
-	/* Heavy mangling, in 4 sub-rounds of 20 iterations each. */
-#if SHA_CODE_SIZE == 0
-	/*
-	 * Approximately 50% of the speed of the largest version, but
-	 * takes up 1/16 the space.  Saves about 6k on an i386 kernel.
-	 */
-	for (i = 0; i < 80; i++) {
-		if (i < 40) {
-			if (i < 20)
-				TEMP = f1(B, C, D) + K1;
-			else
-				TEMP = f2(B, C, D) + K2;
-		} else {
-			if (i < 60)
-				TEMP = f3(B, C, D) + K3;
-			else
-				TEMP = f4(B, C, D) + K4;
-		}
-		TEMP += ROTL(5, A) + E + W[i];
-		E = D; D = C; C = ROTL(30, B); B = A; A = TEMP;
-	}
-#elif SHA_CODE_SIZE == 1
-	for (i = 0; i < 20; i++) {
-		TEMP = f1(B, C, D) + K1 + ROTL(5, A) + E + W[i];
-		E = D; D = C; C = ROTL(30, B); B = A; A = TEMP;
-	}
-	for (; i < 40; i++) {
-		TEMP = f2(B, C, D) + K2 + ROTL(5, A) + E + W[i];
-		E = D; D = C; C = ROTL(30, B); B = A; A = TEMP;
-	}
-	for (; i < 60; i++) {
-		TEMP = f3(B, C, D) + K3 + ROTL(5, A) + E + W[i];
-		E = D; D = C; C = ROTL(30, B); B = A; A = TEMP;
-	}
-	for (; i < 80; i++) {
-		TEMP = f4(B, C, D) + K4 + ROTL(5, A) + E + W[i];
-		E = D; D = C; C = ROTL(30, B); B = A; A = TEMP;
-	}
-#elif SHA_CODE_SIZE == 2
-	for (i = 0; i < 20; i += 5) {
-		subRound(A, B, C, D, E, f1, K1, W[i  ]);
-		subRound(E, A, B, C, D, f1, K1, W[i+1]);
-		subRound(D, E, A, B, C, f1, K1, W[i+2]);
-		subRound(C, D, E, A, B, f1, K1, W[i+3]);
-		subRound(B, C, D, E, A, f1, K1, W[i+4]);
-	}
-	for (; i < 40; i += 5) {
-		subRound(A, B, C, D, E, f2, K2, W[i  ]);
-		subRound(E, A, B, C, D, f2, K2, W[i+1]);
-		subRound(D, E, A, B, C, f2, K2, W[i+2]);
-		subRound(C, D, E, A, B, f2, K2, W[i+3]);
-		subRound(B, C, D, E, A, f2, K2, W[i+4]);
-	}
-	for (; i < 60; i += 5) {
-		subRound(A, B, C, D, E, f3, K3, W[i  ]);
-		subRound(E, A, B, C, D, f3, K3, W[i+1]);
-		subRound(D, E, A, B, C, f3, K3, W[i+2]);
-		subRound(C, D, E, A, B, f3, K3, W[i+3]);
-		subRound(B, C, D, E, A, f3, K3, W[i+4]);
-	}
-	for (; i < 80; i += 5) {
-		subRound(A, B, C, D, E, f4, K4, W[i  ]);
-		subRound(E, A, B, C, D, f4, K4, W[i+1]);
-		subRound(D, E, A, B, C, f4, K4, W[i+2]);
-		subRound(C, D, E, A, B, f4, K4, W[i+3]);
-		subRound(B, C, D, E, A, f4, K4, W[i+4]);
-	}
-#elif SHA_CODE_SIZE == 3 /* Really large version */
-	subRound(A, B, C, D, E, f1, K1, W[ 0]);
-	subRound(E, A, B, C, D, f1, K1, W[ 1]);
-	subRound(D, E, A, B, C, f1, K1, W[ 2]);
-	subRound(C, D, E, A, B, f1, K1, W[ 3]);
-	subRound(B, C, D, E, A, f1, K1, W[ 4]);
-	subRound(A, B, C, D, E, f1, K1, W[ 5]);
-	subRound(E, A, B, C, D, f1, K1, W[ 6]);
-	subRound(D, E, A, B, C, f1, K1, W[ 7]);
-	subRound(C, D, E, A, B, f1, K1, W[ 8]);
-	subRound(B, C, D, E, A, f1, K1, W[ 9]);
-	subRound(A, B, C, D, E, f1, K1, W[10]);
-	subRound(E, A, B, C, D, f1, K1, W[11]);
-	subRound(D, E, A, B, C, f1, K1, W[12]);
-	subRound(C, D, E, A, B, f1, K1, W[13]);
-	subRound(B, C, D, E, A, f1, K1, W[14]);
-	subRound(A, B, C, D, E, f1, K1, W[15]);
-	subRound(E, A, B, C, D, f1, K1, W[16]);
-	subRound(D, E, A, B, C, f1, K1, W[17]);
-	subRound(C, D, E, A, B, f1, K1, W[18]);
-	subRound(B, C, D, E, A, f1, K1, W[19]);
-
-	subRound(A, B, C, D, E, f2, K2, W[20]);
-	subRound(E, A, B, C, D, f2, K2, W[21]);
-	subRound(D, E, A, B, C, f2, K2, W[22]);
-	subRound(C, D, E, A, B, f2, K2, W[23]);
-	subRound(B, C, D, E, A, f2, K2, W[24]);
-	subRound(A, B, C, D, E, f2, K2, W[25]);
-	subRound(E, A, B, C, D, f2, K2, W[26]);
-	subRound(D, E, A, B, C, f2, K2, W[27]);
-	subRound(C, D, E, A, B, f2, K2, W[28]);
-	subRound(B, C, D, E, A, f2, K2, W[29]);
-	subRound(A, B, C, D, E, f2, K2, W[30]);
-	subRound(E, A, B, C, D, f2, K2, W[31]);
-	subRound(D, E, A, B, C, f2, K2, W[32]);
-	subRound(C, D, E, A, B, f2, K2, W[33]);
-	subRound(B, C, D, E, A, f2, K2, W[34]);
-	subRound(A, B, C, D, E, f2, K2, W[35]);
-	subRound(E, A, B, C, D, f2, K2, W[36]);
-	subRound(D, E, A, B, C, f2, K2, W[37]);
-	subRound(C, D, E, A, B, f2, K2, W[38]);
-	subRound(B, C, D, E, A, f2, K2, W[39]);
-
-	subRound(A, B, C, D, E, f3, K3, W[40]);
-	subRound(E, A, B, C, D, f3, K3, W[41]);
-	subRound(D, E, A, B, C, f3, K3, W[42]);
-	subRound(C, D, E, A, B, f3, K3, W[43]);
-	subRound(B, C, D, E, A, f3, K3, W[44]);
-	subRound(A, B, C, D, E, f3, K3, W[45]);
-	subRound(E, A, B, C, D, f3, K3, W[46]);
-	subRound(D, E, A, B, C, f3, K3, W[47]);
-	subRound(C, D, E, A, B, f3, K3, W[48]);
-	subRound(B, C, D, E, A, f3, K3, W[49]);
-	subRound(A, B, C, D, E, f3, K3, W[50]);
-	subRound(E, A, B, C, D, f3, K3, W[51]);
-	subRound(D, E, A, B, C, f3, K3, W[52]);
-	subRound(C, D, E, A, B, f3, K3, W[53]);
-	subRound(B, C, D, E, A, f3, K3, W[54]);
-	subRound(A, B, C, D, E, f3, K3, W[55]);
-	subRound(E, A, B, C, D, f3, K3, W[56]);
-	subRound(D, E, A, B, C, f3, K3, W[57]);
-	subRound(C, D, E, A, B, f3, K3, W[58]);
-	subRound(B, C, D, E, A, f3, K3, W[59]);
-
-	subRound(A, B, C, D, E, f4, K4, W[60]);
-	subRound(E, A, B, C, D, f4, K4, W[61]);
-	subRound(D, E, A, B, C, f4, K4, W[62]);
-	subRound(C, D, E, A, B, f4, K4, W[63]);
-	subRound(B, C, D, E, A, f4, K4, W[64]);
-	subRound(A, B, C, D, E, f4, K4, W[65]);
-	subRound(E, A, B, C, D, f4, K4, W[66]);
-	subRound(D, E, A, B, C, f4, K4, W[67]);
-	subRound(C, D, E, A, B, f4, K4, W[68]);
-	subRound(B, C, D, E, A, f4, K4, W[69]);
-	subRound(A, B, C, D, E, f4, K4, W[70]);
-	subRound(E, A, B, C, D, f4, K4, W[71]);
-	subRound(D, E, A, B, C, f4, K4, W[72]);
-	subRound(C, D, E, A, B, f4, K4, W[73]);
-	subRound(B, C, D, E, A, f4, K4, W[74]);
-	subRound(A, B, C, D, E, f4, K4, W[75]);
-	subRound(E, A, B, C, D, f4, K4, W[76]);
-	subRound(D, E, A, B, C, f4, K4, W[77]);
-	subRound(C, D, E, A, B, f4, K4, W[78]);
-	subRound(B, C, D, E, A, f4, K4, W[79]);
-#else
-#error Illegal SHA_CODE_SIZE
-#endif
-
-	/* Build message digest */
-	digest[0] += A;
-	digest[1] += B;
-	digest[2] += C;
-	digest[3] += D;
-	digest[4] += E;
-
-	/* W is wiped by the caller */
-#undef W
-}
-
-#undef ROTL
-#undef f1
-#undef f2
-#undef f3
-#undef f4
-#undef K1
-#undef K2
-#undef K3
-#undef K4
-#undef subRound
-
-#else /* !USE_SHA - Use MD5 */
-
-#define HASH_BUFFER_SIZE 4
-#define HASH_EXTRA_SIZE 0
-#define HASH_TRANSFORM MD5Transform
-
-/*
- * MD5 transform algorithm, taken from code written by Colin Plumb,
- * and put into the public domain
- */
-
-/* The four core functions - F1 is optimized somewhat */
-
-/* #define F1(x, y, z) (x & y | ~x & z) */
-#define F1(x, y, z) (z ^ (x & (y ^ z)))
-#define F2(x, y, z) F1(z, x, y)
-#define F3(x, y, z) (x ^ y ^ z)
-#define F4(x, y, z) (y ^ (x | ~z))
-
-/* This is the central step in the MD5 algorithm. */
-#define MD5STEP(f, w, x, y, z, data, s) \
-	(w += f(x, y, z) + data,  w = w << s | w >> (32 - s),  w += x )
-
-/*
- * The core of the MD5 algorithm, this alters an existing MD5 hash to
- * reflect the addition of 16 longwords of new data.  MD5Update blocks
- * the data and converts bytes into longwords for this routine.
- */
-static void MD5Transform(__u32 buf[HASH_BUFFER_SIZE], __u32 const in[16])
-{
-	__u32 a, b, c, d;
-
-	a = buf[0];
-	b = buf[1];
-	c = buf[2];
-	d = buf[3];
-
-	MD5STEP(F1, a, b, c, d, in[ 0]+0xd76aa478,  7);
-	MD5STEP(F1, d, a, b, c, in[ 1]+0xe8c7b756, 12);
-	MD5STEP(F1, c, d, a, b, in[ 2]+0x242070db, 17);
-	MD5STEP(F1, b, c, d, a, in[ 3]+0xc1bdceee, 22);
-	MD5STEP(F1, a, b, c, d, in[ 4]+0xf57c0faf,  7);
-	MD5STEP(F1, d, a, b, c, in[ 5]+0x4787c62a, 12);
-	MD5STEP(F1, c, d, a, b, in[ 6]+0xa8304613, 17);
-	MD5STEP(F1, b, c, d, a, in[ 7]+0xfd469501, 22);
-	MD5STEP(F1, a, b, c, d, in[ 8]+0x698098d8,  7);
-	MD5STEP(F1, d, a, b, c, in[ 9]+0x8b44f7af, 12);
-	MD5STEP(F1, c, d, a, b, in[10]+0xffff5bb1, 17);
-	MD5STEP(F1, b, c, d, a, in[11]+0x895cd7be, 22);
-	MD5STEP(F1, a, b, c, d, in[12]+0x6b901122,  7);
-	MD5STEP(F1, d, a, b, c, in[13]+0xfd987193, 12);
-	MD5STEP(F1, c, d, a, b, in[14]+0xa679438e, 17);
-	MD5STEP(F1, b, c, d, a, in[15]+0x49b40821, 22);
-
-	MD5STEP(F2, a, b, c, d, in[ 1]+0xf61e2562,  5);
-	MD5STEP(F2, d, a, b, c, in[ 6]+0xc040b340,  9);
-	MD5STEP(F2, c, d, a, b, in[11]+0x265e5a51, 14);
-	MD5STEP(F2, b, c, d, a, in[ 0]+0xe9b6c7aa, 20);
-	MD5STEP(F2, a, b, c, d, in[ 5]+0xd62f105d,  5);
-	MD5STEP(F2, d, a, b, c, in[10]+0x02441453,  9);
-	MD5STEP(F2, c, d, a, b, in[15]+0xd8a1e681, 14);
-	MD5STEP(F2, b, c, d, a, in[ 4]+0xe7d3fbc8, 20);
-	MD5STEP(F2, a, b, c, d, in[ 9]+0x21e1cde6,  5);
-	MD5STEP(F2, d, a, b, c, in[14]+0xc33707d6,  9);
-	MD5STEP(F2, c, d, a, b, in[ 3]+0xf4d50d87, 14);
-	MD5STEP(F2, b, c, d, a, in[ 8]+0x455a14ed, 20);
-	MD5STEP(F2, a, b, c, d, in[13]+0xa9e3e905,  5);
-	MD5STEP(F2, d, a, b, c, in[ 2]+0xfcefa3f8,  9);
-	MD5STEP(F2, c, d, a, b, in[ 7]+0x676f02d9, 14);
-	MD5STEP(F2, b, c, d, a, in[12]+0x8d2a4c8a, 20);
-
-	MD5STEP(F3, a, b, c, d, in[ 5]+0xfffa3942,  4);
-	MD5STEP(F3, d, a, b, c, in[ 8]+0x8771f681, 11);
-	MD5STEP(F3, c, d, a, b, in[11]+0x6d9d6122, 16);
-	MD5STEP(F3, b, c, d, a, in[14]+0xfde5380c, 23);
-	MD5STEP(F3, a, b, c, d, in[ 1]+0xa4beea44,  4);
-	MD5STEP(F3, d, a, b, c, in[ 4]+0x4bdecfa9, 11);
-	MD5STEP(F3, c, d, a, b, in[ 7]+0xf6bb4b60, 16);
-	MD5STEP(F3, b, c, d, a, in[10]+0xbebfbc70, 23);
-	MD5STEP(F3, a, b, c, d, in[13]+0x289b7ec6,  4);
-	MD5STEP(F3, d, a, b, c, in[ 0]+0xeaa127fa, 11);
-	MD5STEP(F3, c, d, a, b, in[ 3]+0xd4ef3085, 16);
-	MD5STEP(F3, b, c, d, a, in[ 6]+0x04881d05, 23);
-	MD5STEP(F3, a, b, c, d, in[ 9]+0xd9d4d039,  4);
-	MD5STEP(F3, d, a, b, c, in[12]+0xe6db99e5, 11);
-	MD5STEP(F3, c, d, a, b, in[15]+0x1fa27cf8, 16);
-	MD5STEP(F3, b, c, d, a, in[ 2]+0xc4ac5665, 23);
-
-	MD5STEP(F4, a, b, c, d, in[ 0]+0xf4292244,  6);
-	MD5STEP(F4, d, a, b, c, in[ 7]+0x432aff97, 10);
-	MD5STEP(F4, c, d, a, b, in[14]+0xab9423a7, 15);
-	MD5STEP(F4, b, c, d, a, in[ 5]+0xfc93a039, 21);
-	MD5STEP(F4, a, b, c, d, in[12]+0x655b59c3,  6);
-	MD5STEP(F4, d, a, b, c, in[ 3]+0x8f0ccc92, 10);
-	MD5STEP(F4, c, d, a, b, in[10]+0xffeff47d, 15);
-	MD5STEP(F4, b, c, d, a, in[ 1]+0x85845dd1, 21);
-	MD5STEP(F4, a, b, c, d, in[ 8]+0x6fa87e4f,  6);
-	MD5STEP(F4, d, a, b, c, in[15]+0xfe2ce6e0, 10);
-	MD5STEP(F4, c, d, a, b, in[ 6]+0xa3014314, 15);
-	MD5STEP(F4, b, c, d, a, in[13]+0x4e0811a1, 21);
-	MD5STEP(F4, a, b, c, d, in[ 4]+0xf7537e82,  6);
-	MD5STEP(F4, d, a, b, c, in[11]+0xbd3af235, 10);
-	MD5STEP(F4, c, d, a, b, in[ 2]+0x2ad7d2bb, 15);
-	MD5STEP(F4, b, c, d, a, in[ 9]+0xeb86d391, 21);
-
-	buf[0] += a;
-	buf[1] += b;
-	buf[2] += c;
-	buf[3] += d;
-}
-
-#undef F1
-#undef F2
-#undef F3
-#undef F4
-#undef MD5STEP
-
-#endif /* !USE_SHA */
+#define EXTRACT_SIZE 10
 
 /*********************************************************************
  *
@@ -1294,156 +677,173 @@ static void MD5Transform(__u32 buf[HASH_BUFFER_SIZE], __u32 const in[16])
  *
  *********************************************************************/
 
-#define EXTRACT_ENTROPY_USER		1
-#define EXTRACT_ENTROPY_SECONDARY	2
-#define EXTRACT_ENTROPY_LIMIT		4
-#define TMP_BUF_SIZE			(HASH_BUFFER_SIZE + HASH_EXTRA_SIZE)
-#define SEC_XFER_SIZE			(TMP_BUF_SIZE*4)
-
 static ssize_t extract_entropy(struct entropy_store *r, void * buf,
-			       size_t nbytes, int flags);
+			       size_t nbytes, int min, int rsvd);
 
 /*
  * This utility inline function is responsible for transfering entropy
  * from the primary pool to the secondary extraction pool. We make
  * sure we pull enough for a 'catastrophic reseed'.
  */
-static inline void xfer_secondary_pool(struct entropy_store *r,
-				       size_t nbytes, __u32 *tmp)
+static void xfer_secondary_pool(struct entropy_store *r, size_t nbytes)
 {
-	if (r->entropy_count < nbytes * 8 &&
-	    r->entropy_count < r->poolinfo.POOLBITS) {
+	__u32 tmp[OUTPUT_POOL_WORDS];
+
+	if (r->pull && r->entropy_count < nbytes * 8 &&
+	    r->entropy_count < r->poolinfo->POOLBITS) {
 		int bytes = max_t(int, random_read_wakeup_thresh / 8,
-				min_t(int, nbytes, TMP_BUF_SIZE));
+				min_t(int, nbytes, sizeof(tmp)));
+		int rsvd = r->limit ? 0 : random_read_wakeup_thresh/4;
 
 		DEBUG_ENT("going to reseed %s with %d bits "
 			  "(%d of %d requested)\n",
 			  r->name, bytes * 8, nbytes * 8, r->entropy_count);
 
-		bytes=extract_entropy(random_state, tmp, bytes,
-				      EXTRACT_ENTROPY_LIMIT);
+		bytes=extract_entropy(r->pull, tmp, bytes,
+				      random_read_wakeup_thresh / 8, rsvd);
 		add_entropy_words(r, tmp, (bytes + 3) / 4);
 		credit_entropy_store(r, bytes*8);
 	}
 }
 
 /*
- * This function extracts randomness from the "entropy pool", and
- * returns it in a buffer.  This function computes how many remaining
- * bits of entropy are left in the pool, but it does not restrict the
- * number of bytes that are actually obtained.  If the EXTRACT_ENTROPY_USER
- * flag is given, then the buf pointer is assumed to be in user space.
+ * These functions extracts randomness from the "entropy pool", and
+ * returns it in a buffer.
  *
- * If the EXTRACT_ENTROPY_SECONDARY flag is given, then we are actually
- * extracting entropy from the secondary pool, and can refill from the
- * primary pool if needed.
+ * The min parameter specifies the minimum amount we can pull before
+ * failing to avoid races that defeat catastrophic reseeding while the
+ * reserved parameter indicates how much entropy we must leave in the
+ * pool after each pull to avoid starving other readers.
  *
  * Note: extract_entropy() assumes that .poolwords is a multiple of 16 words.
  */
-static ssize_t extract_entropy(struct entropy_store *r, void * buf,
-			       size_t nbytes, int flags)
+
+static size_t account(struct entropy_store *r, size_t nbytes, int min,
+		      int reserved)
 {
-	ssize_t ret, i;
-	__u32 tmp[TMP_BUF_SIZE], data[16];
-	__u32 x;
-	unsigned long cpuflags;
+	unsigned long flags;
 
-	/* Redundant, but just in case... */
-	if (r->entropy_count > r->poolinfo.POOLBITS)
-		r->entropy_count = r->poolinfo.POOLBITS;
-
-	if (flags & EXTRACT_ENTROPY_SECONDARY)
-		xfer_secondary_pool(r, nbytes, tmp);
+	BUG_ON(r->entropy_count > r->poolinfo->POOLBITS);
 
 	/* Hold lock while accounting */
-	spin_lock_irqsave(&r->lock, cpuflags);
+	spin_lock_irqsave(&r->lock, flags);
 
 	DEBUG_ENT("trying to extract %d bits from %s\n",
 		  nbytes * 8, r->name);
 
-	if (flags & EXTRACT_ENTROPY_LIMIT && nbytes >= r->entropy_count / 8)
-		nbytes = r->entropy_count / 8;
+	/* Can we pull enough? */
+	if (r->entropy_count / 8 < min + reserved) {
+		nbytes = 0;
+	} else {
+		/* If limited, never pull more than available */
+		if (r->limit && nbytes + reserved >= r->entropy_count / 8)
+			nbytes = r->entropy_count/8 - reserved;
 
-	if (r->entropy_count / 8 >= nbytes)
-		r->entropy_count -= nbytes*8;
-	else
-		r->entropy_count = 0;
+		if(r->entropy_count / 8 >= nbytes + reserved)
+			r->entropy_count -= nbytes*8;
+		else
+			r->entropy_count = reserved;
 
-	if (r->entropy_count < random_write_wakeup_thresh)
-		wake_up_interruptible(&random_write_wait);
+		if (r->entropy_count < random_write_wakeup_thresh)
+			wake_up_interruptible(&random_write_wait);
+	}
 
 	DEBUG_ENT("debiting %d entropy credits from %s%s\n",
-		  nbytes * 8, r->name,
-		  flags & EXTRACT_ENTROPY_LIMIT ? "" : " (unlimited)");
+		  nbytes * 8, r->name, r->limit ? "" : " (unlimited)");
 
-	spin_unlock_irqrestore(&r->lock, cpuflags);
+	spin_unlock_irqrestore(&r->lock, flags);
 
-	ret = 0;
+	return nbytes;
+}
+
+static void extract_buf(struct entropy_store *r, __u8 *out)
+{
+	int i, x;
+	__u32 data[16], buf[5 + SHA_WORKSPACE_WORDS];
+
+	sha_init(buf);
+	/*
+	 * As we hash the pool, we mix intermediate values of
+	 * the hash back into the pool.  This eliminates
+	 * backtracking attacks (where the attacker knows
+	 * the state of the pool plus the current outputs, and
+	 * attempts to find previous ouputs), unless the hash
+	 * function can be inverted.
+	 */
+	for (i = 0, x = 0; i < r->poolinfo->poolwords; i += 16, x+=2) {
+		sha_transform(buf, (__u8 *)r->pool+i, buf + 5);
+		add_entropy_words(r, &buf[x % 5], 1);
+	}
+
+	/*
+	 * To avoid duplicates, we atomically extract a
+	 * portion of the pool while mixing, and hash one
+	 * final time.
+	 */
+	__add_entropy_words(r, &buf[x % 5], 1, data);
+	sha_transform(buf, (__u8 *)data, buf + 5);
+
+	/*
+	 * In case the hash function has some recognizable
+	 * output pattern, we fold it in half.
+	 */
+
+	buf[0] ^= buf[3];
+	buf[1] ^= buf[4];
+	buf[0] ^= rol32(buf[3], 16);
+	memcpy(out, buf, EXTRACT_SIZE);
+	memset(buf, 0, sizeof(buf));
+}
+
+static ssize_t extract_entropy(struct entropy_store *r, void * buf,
+			       size_t nbytes, int min, int reserved)
+{
+	ssize_t ret = 0, i;
+	__u8 tmp[EXTRACT_SIZE];
+
+	xfer_secondary_pool(r, nbytes);
+	nbytes = account(r, nbytes, min, reserved);
+
 	while (nbytes) {
-		/*
-		 * Check if we need to break out or reschedule....
-		 */
-		if ((flags & EXTRACT_ENTROPY_USER) && need_resched()) {
+		extract_buf(r, tmp);
+		i = min_t(int, nbytes, EXTRACT_SIZE);
+		memcpy(buf, tmp, i);
+		nbytes -= i;
+		buf += i;
+		ret += i;
+	}
+
+	/* Wipe data just returned from memory */
+	memset(tmp, 0, sizeof(tmp));
+
+	return ret;
+}
+
+static ssize_t extract_entropy_user(struct entropy_store *r, void __user *buf,
+				    size_t nbytes)
+{
+	ssize_t ret = 0, i;
+	__u8 tmp[EXTRACT_SIZE];
+
+	xfer_secondary_pool(r, nbytes);
+	nbytes = account(r, nbytes, 0, 0);
+
+	while (nbytes) {
+		if (need_resched()) {
 			if (signal_pending(current)) {
 				if (ret == 0)
 					ret = -ERESTARTSYS;
 				break;
 			}
-
 			schedule();
 		}
 
-		/* Hash the pool to get the output */
-		tmp[0] = 0x67452301;
-		tmp[1] = 0xefcdab89;
-		tmp[2] = 0x98badcfe;
-		tmp[3] = 0x10325476;
-#ifdef USE_SHA
-		tmp[4] = 0xc3d2e1f0;
-#endif
-		/*
-		 * As we hash the pool, we mix intermediate values of
-		 * the hash back into the pool.  This eliminates
-		 * backtracking attacks (where the attacker knows
-		 * the state of the pool plus the current outputs, and
-		 * attempts to find previous ouputs), unless the hash
-		 * function can be inverted.
-		 */
-		for (i = 0, x = 0; i < r->poolinfo.poolwords; i += 16, x+=2) {
-			HASH_TRANSFORM(tmp, r->pool+i);
-			add_entropy_words(r, &tmp[x%HASH_BUFFER_SIZE], 1);
+		extract_buf(r, tmp);
+		i = min_t(int, nbytes, EXTRACT_SIZE);
+		if (copy_to_user(buf, tmp, i)) {
+			ret = -EFAULT;
+			break;
 		}
-
-		/*
-		 * To avoid duplicates, we atomically extract a
-		 * portion of the pool while mixing, and hash one
-		 * final time.
-		 */
-		__add_entropy_words(r, &tmp[x%HASH_BUFFER_SIZE], 1, data);
-		HASH_TRANSFORM(tmp, data);
-
-		/*
-		 * In case the hash function has some recognizable
-		 * output pattern, we fold it in half.
-		 */
-		for (i = 0; i <  HASH_BUFFER_SIZE/2; i++)
-			tmp[i] ^= tmp[i + (HASH_BUFFER_SIZE+1)/2];
-#if HASH_BUFFER_SIZE & 1	/* There's a middle word to deal with */
-		x = tmp[HASH_BUFFER_SIZE/2];
-		x ^= (x >> 16);		/* Fold it in half */
-		((__u16 *)tmp)[HASH_BUFFER_SIZE-1] = (__u16)x;
-#endif
-
-		/* Copy data to destination buffer */
-		i = min(nbytes, HASH_BUFFER_SIZE*sizeof(__u32)/2);
-		if (flags & EXTRACT_ENTROPY_USER) {
-			i -= copy_to_user(buf, (__u8 const *)tmp, i);
-			if (!i) {
-				ret = -EFAULT;
-				break;
-			}
-		} else
-			memcpy(buf, (__u8 const *)tmp, i);
 
 		nbytes -= i;
 		buf += i;
@@ -1463,91 +863,41 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
  */
 void get_random_bytes(void *buf, int nbytes)
 {
-	struct entropy_store *r = urandom_state;
-	int flags = EXTRACT_ENTROPY_SECONDARY;
-
-	if (!r)
-		r = sec_random_state;
-	if (!r) {
-		r = random_state;
-		flags = 0;
-	}
-	if (!r) {
-		printk(KERN_NOTICE "get_random_bytes called before "
-				   "random driver initialization\n");
-		return;
-	}
-	extract_entropy(r, (char *) buf, nbytes, flags);
+	extract_entropy(&nonblocking_pool, buf, nbytes, 0, 0);
 }
 
 EXPORT_SYMBOL(get_random_bytes);
 
-/*********************************************************************
- *
- * Functions to interface with Linux
- *
- *********************************************************************/
-
 /*
- * Initialize the random pool with standard stuff.
+ * init_std_data - initialize pool with system data
  *
- * NOTE: This is an OS-dependent function.
+ * @r: pool to initialize
+ *
+ * This function clears the pool's entropy count and mixes some system
+ * data into the pool to prepare it for use. The pool is not cleared
+ * as that can only decrease the entropy in the pool.
  */
 static void init_std_data(struct entropy_store *r)
 {
 	struct timeval tv;
-	__u32 words[2];
-	char *p;
-	int i;
+	unsigned long flags;
+
+	spin_lock_irqsave(&r->lock, flags);
+	r->entropy_count = 0;
+	spin_unlock_irqrestore(&r->lock, flags);
 
 	do_gettimeofday(&tv);
-	words[0] = tv.tv_sec;
-	words[1] = tv.tv_usec;
-	add_entropy_words(r, words, 2);
-
-	/*
-	 *	This doesn't lock system.utsname. However, we are generating
-	 *	entropy so a race with a name set here is fine.
-	 */
-	p = (char *) &system_utsname;
-	for (i = sizeof(system_utsname) / sizeof(words); i; i--) {
-		memcpy(words, p, sizeof(words));
-		add_entropy_words(r, words, sizeof(words)/4);
-		p += sizeof(words);
-	}
+	add_entropy_words(r, (__u32 *)&tv, sizeof(tv)/4);
+	add_entropy_words(r, (__u32 *)&system_utsname,
+			  sizeof(system_utsname)/4);
 }
 
 static int __init rand_initialize(void)
 {
-	int i;
-
-	if (create_entropy_store(DEFAULT_POOL_SIZE, "primary", &random_state))
-		goto err;
-	if (batch_entropy_init(BATCH_ENTROPY_SIZE, random_state))
-		goto err;
-	if (create_entropy_store(SECONDARY_POOL_SIZE, "secondary",
-				 &sec_random_state))
-		goto err;
-	if (create_entropy_store(SECONDARY_POOL_SIZE, "urandom",
-				 &urandom_state))
-		goto err;
-	clear_entropy_store(random_state);
-	clear_entropy_store(sec_random_state);
-	clear_entropy_store(urandom_state);
-	init_std_data(random_state);
-	init_std_data(sec_random_state);
-	init_std_data(urandom_state);
-#ifdef CONFIG_SYSCTL
-	sysctl_init_random(random_state);
-#endif
-	for (i = 0; i < NR_IRQS; i++)
-		irq_timer_state[i] = NULL;
-	memset(&input_timer_state, 0, sizeof(struct timer_rand_state));
-	memset(&extract_timer_state, 0, sizeof(struct timer_rand_state));
-	extract_timer_state.dont_count_entropy = 1;
+	init_std_data(&input_pool);
+	init_std_data(&blocking_pool);
+	init_std_data(&nonblocking_pool);
 	return 0;
-err:
-	return -1;
 }
 module_init(rand_initialize);
 
@@ -1587,7 +937,6 @@ void rand_initialize_disk(struct gendisk *disk)
 static ssize_t
 random_read(struct file * file, char __user * buf, size_t nbytes, loff_t *ppos)
 {
-	DECLARE_WAITQUEUE(wait, current);
 	ssize_t n, retval = 0, count = 0;
 
 	if (nbytes == 0)
@@ -1600,10 +949,7 @@ random_read(struct file * file, char __user * buf, size_t nbytes, loff_t *ppos)
 
 		DEBUG_ENT("reading %d bits\n", n*8);
 
-		n = extract_entropy(sec_random_state, buf, n,
-				    EXTRACT_ENTROPY_USER |
-				    EXTRACT_ENTROPY_LIMIT |
-				    EXTRACT_ENTROPY_SECONDARY);
+		n = extract_entropy_user(&blocking_pool, buf, n);
 
 		DEBUG_ENT("read got %d bits (%d still needed)\n",
 			  n*8, (nbytes-n)*8);
@@ -1613,19 +959,19 @@ random_read(struct file * file, char __user * buf, size_t nbytes, loff_t *ppos)
 				retval = -EAGAIN;
 				break;
 			}
+
+			DEBUG_ENT("sleeping?\n");
+
+			wait_event_interruptible(random_read_wait,
+				input_pool.entropy_count >=
+						 random_read_wakeup_thresh);
+
+			DEBUG_ENT("awake\n");
+
 			if (signal_pending(current)) {
 				retval = -ERESTARTSYS;
 				break;
 			}
-
-			set_current_state(TASK_INTERRUPTIBLE);
-			add_wait_queue(&random_read_wait, &wait);
-
-			if (sec_random_state->entropy_count / 8 == 0)
-				schedule();
-
-			set_current_state(TASK_RUNNING);
-			remove_wait_queue(&random_read_wait, &wait);
 
 			continue;
 		}
@@ -1654,15 +1000,7 @@ static ssize_t
 urandom_read(struct file * file, char __user * buf,
 		      size_t nbytes, loff_t *ppos)
 {
-	int flags = EXTRACT_ENTROPY_USER;
-	unsigned long cpuflags;
-
-	spin_lock_irqsave(&random_state->lock, cpuflags);
-	if (random_state->entropy_count > random_state->poolinfo.POOLBITS)
-		flags |= EXTRACT_ENTROPY_SECONDARY;
-	spin_unlock_irqrestore(&random_state->lock, cpuflags);
-
-	return extract_entropy(urandom_state, buf, nbytes, flags);
+	return extract_entropy_user(&nonblocking_pool, buf, nbytes);
 }
 
 static unsigned int
@@ -1673,9 +1011,9 @@ random_poll(struct file *file, poll_table * wait)
 	poll_wait(file, &random_read_wait, wait);
 	poll_wait(file, &random_write_wait, wait);
 	mask = 0;
-	if (random_state->entropy_count >= random_read_wakeup_thresh)
+	if (input_pool.entropy_count >= random_read_wakeup_thresh)
 		mask |= POLLIN | POLLRDNORM;
-	if (random_state->entropy_count < random_write_wakeup_thresh)
+	if (input_pool.entropy_count < random_write_wakeup_thresh)
 		mask |= POLLOUT | POLLWRNORM;
 	return mask;
 }
@@ -1701,7 +1039,7 @@ random_write(struct file * file, const char __user * buffer,
 		c -= bytes;
 		p += bytes;
 
-		add_entropy_words(random_state, buf, (bytes + 3) / 4);
+		add_entropy_words(&input_pool, buf, (bytes + 3) / 4);
 	}
 	if (p == buffer) {
 		return (ssize_t)ret;
@@ -1723,7 +1061,7 @@ random_ioctl(struct inode * inode, struct file * file,
 
 	switch (cmd) {
 	case RNDGETENTCNT:
-		ent_count = random_state->entropy_count;
+		ent_count = input_pool.entropy_count;
 		if (put_user(ent_count, p))
 			return -EFAULT;
 		return 0;
@@ -1732,12 +1070,12 @@ random_ioctl(struct inode * inode, struct file * file,
 			return -EPERM;
 		if (get_user(ent_count, p))
 			return -EFAULT;
-		credit_entropy_store(random_state, ent_count);
+		credit_entropy_store(&input_pool, ent_count);
 		/*
 		 * Wake up waiting processes if we have enough
 		 * entropy.
 		 */
-		if (random_state->entropy_count >= random_read_wakeup_thresh)
+		if (input_pool.entropy_count >= random_read_wakeup_thresh)
 			wake_up_interruptible(&random_read_wait);
 		return 0;
 	case RNDADDENTROPY:
@@ -1753,25 +1091,22 @@ random_ioctl(struct inode * inode, struct file * file,
 				      size, &file->f_pos);
 		if (retval < 0)
 			return retval;
-		credit_entropy_store(random_state, ent_count);
+		credit_entropy_store(&input_pool, ent_count);
 		/*
 		 * Wake up waiting processes if we have enough
 		 * entropy.
 		 */
-		if (random_state->entropy_count >= random_read_wakeup_thresh)
+		if (input_pool.entropy_count >= random_read_wakeup_thresh)
 			wake_up_interruptible(&random_read_wait);
 		return 0;
 	case RNDZAPENTCNT:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EPERM;
-		random_state->entropy_count = 0;
-		return 0;
 	case RNDCLEARPOOL:
-		/* Clear the entropy pool and associated counters. */
+		/* Clear the entropy pool counters. */
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
-		clear_entropy_store(random_state);
-		init_std_data(random_state);
+		init_std_data(&input_pool);
+		init_std_data(&blocking_pool);
+		init_std_data(&nonblocking_pool);
 		return 0;
 	default:
 		return -EINVAL;
@@ -1822,8 +1157,9 @@ EXPORT_SYMBOL(generate_random_uuid);
 
 #include <linux/sysctl.h>
 
-static int min_read_thresh, max_read_thresh;
-static int min_write_thresh, max_write_thresh;
+static int min_read_thresh = 8, min_write_thresh;
+static int max_read_thresh = INPUT_POOL_WORDS * 32;
+static int max_write_thresh = INPUT_POOL_WORDS * 32;
 static char sysctl_bootid[16];
 
 /*
@@ -1891,7 +1227,7 @@ static int uuid_strategy(ctl_table *table, int __user *name, int nlen,
 	return 1;
 }
 
-static int sysctl_poolsize = DEFAULT_POOL_SIZE;
+static int sysctl_poolsize = INPUT_POOL_WORDS * 32;
 ctl_table random_table[] = {
 	{
 		.ctl_name 	= RANDOM_POOLSIZE,
@@ -1907,6 +1243,7 @@ ctl_table random_table[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0444,
 		.proc_handler	= &proc_dointvec,
+		.data		= &input_pool.entropy_count,
 	},
 	{
 		.ctl_name	= RANDOM_READ_THRESH,
@@ -1949,14 +1286,6 @@ ctl_table random_table[] = {
 	},
 	{ .ctl_name = 0 }
 };
-
-static void sysctl_init_random(struct entropy_store *random_state)
-{
-	min_read_thresh = 8;
-	min_write_thresh = 0;
-	max_read_thresh = max_write_thresh = random_state->poolinfo.POOLBITS;
-	random_table[1].data = &random_state->entropy_count;
-}
 #endif 	/* CONFIG_SYSCTL */
 
 /********************************************************************
@@ -1965,7 +1294,6 @@ static void sysctl_init_random(struct entropy_store *random_state)
  *
  ********************************************************************/
 
-#ifdef CONFIG_INET
 /*
  * TCP initial sequence number picking.  This uses the random number
  * generator to pick an initial secret value.  This value is hashed
@@ -1995,47 +1323,6 @@ static void sysctl_init_random(struct entropy_store *random_state)
 #define K1 0
 #define K2 013240474631UL
 #define K3 015666365641UL
-
-/*
- * Basic cut-down MD4 transform.  Returns only 32 bits of result.
- */
-static __u32 halfMD4Transform (__u32 const buf[4], __u32 const in[8])
-{
-	__u32 a = buf[0], b = buf[1], c = buf[2], d = buf[3];
-
-	/* Round 1 */
-	ROUND(F, a, b, c, d, in[0] + K1,  3);
-	ROUND(F, d, a, b, c, in[1] + K1,  7);
-	ROUND(F, c, d, a, b, in[2] + K1, 11);
-	ROUND(F, b, c, d, a, in[3] + K1, 19);
-	ROUND(F, a, b, c, d, in[4] + K1,  3);
-	ROUND(F, d, a, b, c, in[5] + K1,  7);
-	ROUND(F, c, d, a, b, in[6] + K1, 11);
-	ROUND(F, b, c, d, a, in[7] + K1, 19);
-
-	/* Round 2 */
-	ROUND(G, a, b, c, d, in[1] + K2,  3);
-	ROUND(G, d, a, b, c, in[3] + K2,  5);
-	ROUND(G, c, d, a, b, in[5] + K2,  9);
-	ROUND(G, b, c, d, a, in[7] + K2, 13);
-	ROUND(G, a, b, c, d, in[0] + K2,  3);
-	ROUND(G, d, a, b, c, in[2] + K2,  5);
-	ROUND(G, c, d, a, b, in[4] + K2,  9);
-	ROUND(G, b, c, d, a, in[6] + K2, 13);
-
-	/* Round 3 */
-	ROUND(H, a, b, c, d, in[3] + K3,  3);
-	ROUND(H, d, a, b, c, in[7] + K3,  9);
-	ROUND(H, c, d, a, b, in[2] + K3, 11);
-	ROUND(H, b, c, d, a, in[6] + K3, 15);
-	ROUND(H, a, b, c, d, in[1] + K3,  3);
-	ROUND(H, d, a, b, c, in[5] + K3,  9);
-	ROUND(H, c, d, a, b, in[0] + K3, 11);
-	ROUND(H, b, c, d, a, in[4] + K3, 15);
-
-	return buf[1] + b;	/* "most hashed" word */
-	/* Alternative: return sum of all words? */
-}
 
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 
@@ -2202,46 +1489,6 @@ __u32 secure_tcpv6_sequence_number(__u32 *saddr, __u32 *daddr,
 EXPORT_SYMBOL(secure_tcpv6_sequence_number);
 #endif
 
-__u32 secure_tcp_sequence_number(__u32 saddr, __u32 daddr,
-				 __u16 sport, __u16 dport)
-{
-	struct timeval tv;
-	__u32 seq;
-	__u32 hash[4];
-	struct keydata *keyptr = get_keyptr();
-
-	/*
-	 *  Pick a unique starting offset for each TCP connection endpoints
-	 *  (saddr, daddr, sport, dport).
-	 *  Note that the words are placed into the starting vector, which is
-	 *  then mixed with a partial MD4 over random data.
-	 */
-	hash[0]=saddr;
-	hash[1]=daddr;
-	hash[2]=(sport << 16) + dport;
-	hash[3]=keyptr->secret[11];
-
-	seq = halfMD4Transform(hash, keyptr->secret) & HASH_MASK;
-	seq += keyptr->count;
-	/*
-	 *	As close as possible to RFC 793, which
-	 *	suggests using a 250 kHz clock.
-	 *	Further reading shows this assumes 2 Mb/s networks.
-	 *	For 10 Mb/s Ethernet, a 1 MHz clock is appropriate.
-	 *	That's funny, Linux has one built in!  Use it!
-	 *	(Networks are faster now - should this be increased?)
-	 */
-	do_gettimeofday(&tv);
-	seq += tv.tv_usec + tv.tv_sec * 1000000;
-#if 0
-	printk("init_seq(%lx, %lx, %d, %d) = %d\n",
-	       saddr, daddr, sport, dport, seq);
-#endif
-	return seq;
-}
-
-EXPORT_SYMBOL(secure_tcp_sequence_number);
-
 /*  The code below is shamelessly stolen from secure_tcp_sequence_number().
  *  All blames to Andrey V. Savochkin <saw@msu.ru>.
  */
@@ -2262,8 +1509,52 @@ __u32 secure_ip_id(__u32 daddr)
 	hash[2] = keyptr->secret[10];
 	hash[3] = keyptr->secret[11];
 
-	return halfMD4Transform(hash, keyptr->secret);
+	return half_md4_transform(hash, keyptr->secret);
 }
+
+#ifdef CONFIG_INET
+
+__u32 secure_tcp_sequence_number(__u32 saddr, __u32 daddr,
+				 __u16 sport, __u16 dport)
+{
+	struct timeval tv;
+	__u32 seq;
+	__u32 hash[4];
+	struct keydata *keyptr = get_keyptr();
+
+	/*
+	 *  Pick a unique starting offset for each TCP connection endpoints
+	 *  (saddr, daddr, sport, dport).
+	 *  Note that the words are placed into the starting vector, which is
+	 *  then mixed with a partial MD4 over random data.
+	 */
+	hash[0]=saddr;
+	hash[1]=daddr;
+	hash[2]=(sport << 16) + dport;
+	hash[3]=keyptr->secret[11];
+
+	seq = half_md4_transform(hash, keyptr->secret) & HASH_MASK;
+	seq += keyptr->count;
+	/*
+	 *	As close as possible to RFC 793, which
+	 *	suggests using a 250 kHz clock.
+	 *	Further reading shows this assumes 2 Mb/s networks.
+	 *	For 10 Mb/s Ethernet, a 1 MHz clock is appropriate.
+	 *	That's funny, Linux has one built in!  Use it!
+	 *	(Networks are faster now - should this be increased?)
+	 */
+	do_gettimeofday(&tv);
+	seq += tv.tv_usec + tv.tv_sec * 1000000;
+#if 0
+	printk("init_seq(%lx, %lx, %d, %d) = %d\n",
+	       saddr, daddr, sport, dport, seq);
+#endif
+	return seq;
+}
+
+EXPORT_SYMBOL(secure_tcp_sequence_number);
+
+
 
 /* Generate secure starting point for ephemeral TCP port search */
 u32 secure_tcp_port_ephemeral(__u32 saddr, __u32 daddr, __u16 dport)
@@ -2280,106 +1571,59 @@ u32 secure_tcp_port_ephemeral(__u32 saddr, __u32 daddr, __u16 dport)
 	hash[2] = dport ^ keyptr->secret[10];
 	hash[3] = keyptr->secret[11];
 
-	return halfMD4Transform(hash, keyptr->secret);
+	return half_md4_transform(hash, keyptr->secret);
 }
 
-#ifdef CONFIG_SYN_COOKIES
-/*
- * Secure SYN cookie computation. This is the algorithm worked out by
- * Dan Bernstein and Eric Schenk.
- *
- * For linux I implement the 1 minute counter by looking at the jiffies clock.
- * The count is passed in as a parameter, so this code doesn't much care.
- */
-
-#define COOKIEBITS 24	/* Upper bits store count */
-#define COOKIEMASK (((__u32)1 << COOKIEBITS) - 1)
-
-static int syncookie_init;
-static __u32 syncookie_secret[2][16-3+HASH_BUFFER_SIZE];
-
-__u32 secure_tcp_syn_cookie(__u32 saddr, __u32 daddr, __u16 sport,
-		__u16 dport, __u32 sseq, __u32 count, __u32 data)
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+u32 secure_tcpv6_port_ephemeral(const __u32 *saddr, const __u32 *daddr, __u16 dport)
 {
-	__u32 tmp[16 + HASH_BUFFER_SIZE + HASH_EXTRA_SIZE];
-	__u32 seq;
+	struct keydata *keyptr = get_keyptr();
+	u32 hash[12];
 
-	/*
-	 * Pick two random secrets the first time we need a cookie.
-	 */
-	if (syncookie_init == 0) {
-		get_random_bytes(syncookie_secret, sizeof(syncookie_secret));
-		syncookie_init = 1;
-	}
+	memcpy(hash, saddr, 16);
+	hash[4] = dport;
+	memcpy(&hash[5],keyptr->secret,sizeof(__u32) * 7);
 
-	/*
-	 * Compute the secure sequence number.
-	 * The output should be:
-   	 *   HASH(sec1,saddr,sport,daddr,dport,sec1) + sseq + (count * 2^24)
-	 *      + (HASH(sec2,saddr,sport,daddr,dport,count,sec2) % 2^24).
-	 * Where sseq is their sequence number and count increases every
-	 * minute by 1.
-	 * As an extra hack, we add a small "data" value that encodes the
-	 * MSS into the second hash value.
-	 */
-
-	memcpy(tmp + 3, syncookie_secret[0], sizeof(syncookie_secret[0]));
-	tmp[0]=saddr;
-	tmp[1]=daddr;
-	tmp[2]=(sport << 16) + dport;
-	HASH_TRANSFORM(tmp+16, tmp);
-	seq = tmp[17] + sseq + (count << COOKIEBITS);
-
-	memcpy(tmp + 3, syncookie_secret[1], sizeof(syncookie_secret[1]));
-	tmp[0]=saddr;
-	tmp[1]=daddr;
-	tmp[2]=(sport << 16) + dport;
-	tmp[3] = count;	/* minute counter */
-	HASH_TRANSFORM(tmp + 16, tmp);
-
-	/* Add in the second hash and the data */
-	return seq + ((tmp[17] + data) & COOKIEMASK);
+	return twothirdsMD4Transform(daddr, hash);
 }
-
-/*
- * This retrieves the small "data" value from the syncookie.
- * If the syncookie is bad, the data returned will be out of
- * range.  This must be checked by the caller.
- *
- * The count value used to generate the cookie must be within
- * "maxdiff" if the current (passed-in) "count".  The return value
- * is (__u32)-1 if this test fails.
- */
-__u32 check_tcp_syn_cookie(__u32 cookie, __u32 saddr, __u32 daddr, __u16 sport,
-		__u16 dport, __u32 sseq, __u32 count, __u32 maxdiff)
-{
-	__u32 tmp[16 + HASH_BUFFER_SIZE + HASH_EXTRA_SIZE];
-	__u32 diff;
-
-	if (syncookie_init == 0)
-		return (__u32)-1; /* Well, duh! */
-
-	/* Strip away the layers from the cookie */
-	memcpy(tmp + 3, syncookie_secret[0], sizeof(syncookie_secret[0]));
-	tmp[0]=saddr;
-	tmp[1]=daddr;
-	tmp[2]=(sport << 16) + dport;
-	HASH_TRANSFORM(tmp + 16, tmp);
-	cookie -= tmp[17] + sseq;
-	/* Cookie is now reduced to (count * 2^24) ^ (hash % 2^24) */
-
-	diff = (count - (cookie >> COOKIEBITS)) & ((__u32)-1 >> COOKIEBITS);
-	if (diff >= maxdiff)
-		return (__u32)-1;
-
-	memcpy(tmp+3, syncookie_secret[1], sizeof(syncookie_secret[1]));
-	tmp[0] = saddr;
-	tmp[1] = daddr;
-	tmp[2] = (sport << 16) + dport;
-	tmp[3] = count - diff;	/* minute counter */
-	HASH_TRANSFORM(tmp + 16, tmp);
-
-	return (cookie - tmp[17]) & COOKIEMASK;	/* Leaving the data behind */
-}
+EXPORT_SYMBOL(secure_tcpv6_port_ephemeral);
 #endif
+
 #endif /* CONFIG_INET */
+
+
+/*
+ * Get a random word for internal kernel use only. Similar to urandom but
+ * with the goal of minimal entropy pool depletion. As a result, the random
+ * value is not cryptographically secure but for several uses the cost of
+ * depleting entropy is too high
+ */
+unsigned int get_random_int(void)
+{
+	/*
+	 * Use IP's RNG. It suits our purpose perfectly: it re-keys itself
+	 * every second, from the entropy pool (and thus creates a limited
+	 * drain on it), and uses halfMD4Transform within the second. We
+	 * also mix it with jiffies and the PID:
+	 */
+	return secure_ip_id(current->pid + jiffies);
+}
+
+/*
+ * randomize_range() returns a start address such that
+ *
+ *    [...... <range> .....]
+ *  start                  end
+ *
+ * a <range> with size "len" starting at the return value is inside in the
+ * area defined by [start, end], but is otherwise randomized.
+ */
+unsigned long
+randomize_range(unsigned long start, unsigned long end, unsigned long len)
+{
+	unsigned long range = end - len - start;
+
+	if (end <= start + len)
+		return 0;
+	return PAGE_ALIGN(get_random_int() % range + start);
+}

@@ -1,21 +1,3 @@
-# Host-side USB depends on having a host controller
-# NOTE:  dummy_hcd is always an option, but it's ignored here ...
-# NOTE:  SL-811 option should be board-specific ...
-config USB_ARCH_HAS_HCD
-	boolean
-	default y if USB_ARCH_HAS_OHCI
-	default y if ARM				# SL-811
-	default PCI
-
-# many non-PCI hcds implement OHCI
-config USB_ARCH_HAS_OHCI
-	boolean
-	default y if SA1111
-	default y if ARCH_OMAP
-	default y if ARCH_LH7A404
-	default y if PXA27x
-	default PCI
-
 #
 # USB Host Controller Drivers
 #
@@ -65,7 +47,7 @@ config USB_EHCI_ROOT_HUB_TT
 	  controller is needed.  It's safe to say "y" even if your
 	  controller doesn't support this feature.
 
-	  This supports the EHCI implementation from ARC International.
+	  This supports the EHCI implementation from TransDimension Inc.
 
 config USB_OHCI_HCD
 	tristate "OHCI HCD support"
@@ -83,6 +65,35 @@ config USB_OHCI_HCD
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ohci-hcd.
+
+config USB_OHCI_HCD_PPC_SOC
+	bool "OHCI support for on-chip PPC USB controller"
+	depends on USB_OHCI_HCD && (STB03xxx || PPC_MPC52xx)
+	default y
+	select USB_OHCI_BIG_ENDIAN
+	---help---
+	  Enables support for the USB controller on the MPC52xx or
+	  STB03xxx processor chip.  If unsure, say Y.
+
+config USB_OHCI_HCD_PCI
+	bool "OHCI support for PCI-bus USB controllers"
+	depends on USB_OHCI_HCD && PCI && (STB03xxx || PPC_MPC52xx)
+	default y
+	select USB_OHCI_LITTLE_ENDIAN
+	---help---
+	  Enables support for PCI-bus plug-in USB controller cards.
+	  If unsure, say Y.
+
+config USB_OHCI_BIG_ENDIAN
+	bool
+	depends on USB_OHCI_HCD
+	default n
+
+config USB_OHCI_LITTLE_ENDIAN
+	bool
+	depends on USB_OHCI_HCD
+	default n if STB03xxx || PPC_MPC52xx
+	default y
 
 config USB_UHCI_HCD
 	tristate "UHCI HCD (most Intel and VIA) support"
@@ -112,4 +123,15 @@ config USB_SL811_HCD
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called sl811-hcd.
+
+config USB_SL811_CS
+	tristate "CF/PCMCIA support for SL811HS HCD"
+	depends on USB_SL811_HCD && PCMCIA
+	default N
+	help
+	  Wraps a PCMCIA driver around the SL811HS HCD, supporting the RATOC
+	  REX-CFU1U CF card (often used with PDAs).  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called "sl811_cs".
 

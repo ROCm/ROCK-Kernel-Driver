@@ -1189,8 +1189,8 @@ acpi_ps_parse_aml (
 
 		previous_walk_state = walk_state;
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "return_value=%p, State=%p\n",
-			walk_state->return_desc, walk_state));
+		ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "return_value=%p, implicit_value=%p State=%p\n",
+			walk_state->return_desc, walk_state->implicit_return_obj, walk_state));
 
 		/* Check if we have restarted a preempted walk */
 
@@ -1202,8 +1202,20 @@ acpi_ps_parse_aml (
 				 * If the method return value is not used by the parent,
 				 * The object is deleted
 				 */
-				status = acpi_ds_restart_control_method (walk_state,
-						 previous_walk_state->return_desc);
+				if (!previous_walk_state->return_desc) {
+					status = acpi_ds_restart_control_method (walk_state,
+							 previous_walk_state->implicit_return_obj);
+				}
+				else {
+					/*
+					 * We have a valid return value, delete any implicit
+					 * return value.
+					 */
+					acpi_ds_clear_implicit_return (previous_walk_state);
+
+					status = acpi_ds_restart_control_method (walk_state,
+							 previous_walk_state->return_desc);
+				}
 				if (ACPI_SUCCESS (status)) {
 					walk_state->walk_type |= ACPI_WALK_METHOD_RESTART;
 				}
@@ -1220,12 +1232,26 @@ acpi_ps_parse_aml (
 		 * value (if any)
 		 */
 		else if (previous_walk_state->caller_return_desc) {
-			*(previous_walk_state->caller_return_desc) = previous_walk_state->return_desc; /* NULL if no return value */
-		}
-		else if (previous_walk_state->return_desc) {
-			/* Caller doesn't want it, must delete it */
+			if (previous_walk_state->implicit_return_obj) {
+				*(previous_walk_state->caller_return_desc) = previous_walk_state->implicit_return_obj;
+			}
+			else {
+				 /* NULL if no return value */
 
-			acpi_ut_remove_reference (previous_walk_state->return_desc);
+				*(previous_walk_state->caller_return_desc) = previous_walk_state->return_desc;
+			}
+		}
+		else {
+			if (previous_walk_state->return_desc) {
+				/* Caller doesn't want it, must delete it */
+
+				acpi_ut_remove_reference (previous_walk_state->return_desc);
+			}
+			if (previous_walk_state->implicit_return_obj) {
+				/* Caller doesn't want it, must delete it */
+
+				acpi_ut_remove_reference (previous_walk_state->implicit_return_obj);
+			}
 		}
 
 		acpi_ds_delete_walk_state (previous_walk_state);

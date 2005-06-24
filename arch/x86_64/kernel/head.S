@@ -26,6 +26,7 @@
 
 	.text
 	.code32
+	.globl startup_32
 /* %bx:	 1 if coming from smp trampoline on secondary cpu */ 
 startup_32:
 	
@@ -37,11 +38,13 @@ startup_32:
  	 * There is no stack until we set one up.
 	 */
 
-	movl %ebx,%ebp	/* Save trampoline flag */
-	
+	/* Initialize the %ds segment register */
 	movl $__KERNEL_DS,%eax
 	movl %eax,%ds
-	
+
+	/* Load new GDT with the 64bit segments using 32bit descriptor */
+	lgdt	pGDT32 - __START_KERNEL_map
+
 	/* If the CPU doesn't support CPUID this will double fault.
 	 * Unfortunately it is hard to check for CPUID without a stack. 
 	 */
@@ -57,16 +60,13 @@ startup_32:
 	btl	$29, %edx
 	jnc	no_long_mode
 
-	movl	%edx,%edi
-	
 	/*
 	 * Prepare for entering 64bits mode
 	 */
 
-	/* Enable PAE mode and PGE */
+	/* Enable PAE mode */
 	xorl	%eax, %eax
 	btsl	$5, %eax
-	btsl	$7, %eax
 	movl	%eax, %cr4
 
 	/* Setup early boot stage 4 level pagetables */
@@ -79,14 +79,6 @@ startup_32:
 
 	/* Enable Long Mode */
 	btsl	$_EFER_LME, %eax
-	/* Enable System Call */
-	btsl	$_EFER_SCE, %eax
-
-	/* No Execute supported? */	
-	btl	$20,%edi
-	jnc     1f
-	btsl	$_EFER_NX, %eax
-1:	
 				
 	/* Make changes effective */
 	wrmsr
@@ -94,38 +86,69 @@ startup_32:
 	xorl	%eax, %eax
 	btsl	$31, %eax			/* Enable paging and in turn activate Long Mode */
 	btsl	$0, %eax			/* Enable protected mode */
-	btsl	$1, %eax			/* Enable MP */
-	btsl	$4, %eax			/* Enable ET */
-	btsl	$5, %eax			/* Enable NE */
-	btsl	$16, %eax			/* Enable WP */
-	btsl	$18, %eax			/* Enable AM */
 	/* Make changes effective */
 	movl	%eax, %cr0
-	jmp	reach_compatibility_mode
-reach_compatibility_mode:
-	
 	/*
 	 * At this point we're in long mode but in 32bit compatibility mode
 	 * with EFER.LME = 1, CS.L = 0, CS.D = 1 (and in turn
-	 * EFER.LMA = 1). Now we want to jump in 64bit mode, to do that we load
+	 * EFER.LMA = 1). Now we want to jump in 64bit mode, to do that we use
 	 * the new gdt/idt that has __KERNEL_CS with CS.L = 1.
 	 */
-
-	testw %bp,%bp	/* secondary CPU? */ 
-	jnz   second	
-	
-	/* Load new GDT with the 64bit segment using 32bit descriptor */
-	movl	$(pGDT32 - __START_KERNEL_map), %eax
-	lgdt	(%eax)
-
-second:	
-	movl    $(ljumpvector - __START_KERNEL_map), %eax
-	/* Finally jump in 64bit mode */
-	ljmp	*(%eax)
+	ljmp	$__KERNEL_CS, $(startup_64 - __START_KERNEL_map)
 
 	.code64
 	.org 0x100	
-reach_long64:
+	.globl startup_64
+startup_64:
+	/* We come here either from startup_32
+	 * or directly from a 64bit bootloader.
+	 * Since we may have come directly from a bootloader we
+	 * reload the page tables here.
+	 */
+
+	/* Enable PAE mode and PGE */
+	xorq	%rax, %rax
+	btsq	$5, %rax
+	btsq	$7, %rax
+	movq	%rax, %cr4
+
+	/* Setup early boot stage 4 level pagetables. */
+	movq	$(init_level4_pgt - __START_KERNEL_map), %rax
+	movq	%rax, %cr3
+
+	/* Check if nx is implemented */
+	movl	$0x80000001, %eax
+	cpuid
+	movl	%edx,%edi
+
+	/* Setup EFER (Extended Feature Enable Register) */
+	movl	$MSR_EFER, %ecx
+	rdmsr
+
+	/* Enable System Call */
+	btsl	$_EFER_SCE, %eax
+
+	/* No Execute supported? */
+	btl	$20,%edi
+	jnc     1f
+	btsl	$_EFER_NX, %eax
+1:
+	/* Make changes effective */
+	wrmsr
+
+	/* Setup cr0 */
+	xorq	%rax, %rax
+	btsq	$31, %rax			/* Enable paging */
+	btsq	$0, %rax			/* Enable protected mode */
+	btsq	$1, %rax			/* Enable MP */
+	btsq	$4, %rax			/* Enable ET */
+	btsq	$5, %rax			/* Enable NE */
+	btsq	$16, %rax			/* Enable WP */
+	btsq	$18, %rax			/* Enable AM */
+	/* Make changes effective */
+	movq	%rax, %cr0
+
+	/* Setup a boot time stack */
 	movq init_rsp(%rip),%rsp
 
 	/* zero EFLAGS after setting rsp */
@@ -177,14 +200,22 @@ init_rsp:
 	.quad  init_thread_union+THREAD_SIZE-8
 
 ENTRY(early_idt_handler)
+	cmpl $2,early_recursion_flag(%rip)
+	jz  1f
+	incl early_recursion_flag(%rip)
 	xorl %eax,%eax
 	movq 8(%rsp),%rsi	# get rip
 	movq (%rsp),%rdx
 	movq %cr2,%rcx
 	leaq early_idt_msg(%rip),%rdi
 	call early_printk
+	cmpl $2,early_recursion_flag(%rip)
+	jz  1f
+	call dump_stack
 1:	hlt
 	jmp 1b
+early_recursion_flag:
+	.long 0
 
 early_idt_msg:
 	.asciz "PANIC: early exception rip %lx error %lx cr2 %lx\n"
@@ -198,12 +229,12 @@ ENTRY(no_long_mode)
 .org 0xf00
 	.globl pGDT32
 pGDT32:
-	.word	gdt32_end-gdt_table32
-	.long	gdt_table32-__START_KERNEL_map
+	.word	gdt_end-cpu_gdt_table
+	.long	cpu_gdt_table-__START_KERNEL_map
 
 .org 0xf10	
 ljumpvector:
-	.long	reach_long64-__START_KERNEL_map
+	.long	startup_64-__START_KERNEL_map
 	.word	__KERNEL_CS
 
 ENTRY(stext)
@@ -334,12 +365,6 @@ gdt:
 	.endr
 #endif
 
-ENTRY(gdt_table32)
-	.quad	0x0000000000000000	/* This one is magic */
-	.quad	0x0000000000000000	/* unused */
-	.quad	0x00af9a000000ffff	/* __KERNEL_CS */
-gdt32_end:	
-	
 /* We need valid kernel segments for data and code in long mode too
  * IRET will check the segment types  kkeil 2000/10/28
  * Also sysret mandates a special GDT layout 
@@ -360,9 +385,8 @@ ENTRY(cpu_gdt_table)
 	.quad	0x00affa000000ffff	/* __USER_CS */
 	.quad	0x00cf9a000000ffff	/* __KERNEL32_CS */
 	.quad	0,0			/* TSS */
-	.quad	0			/* LDT */
+	.quad	0,0			/* LDT */
 	.quad   0,0,0			/* three TLS descriptors */ 
-	.quad	0			/* unused now */
 	.quad	0x00009a000000ffff	/* __KERNEL16_CS - 16bit PM for S3 wakeup. */
 					/* base must be patched for real base address. */
 gdt_end:	

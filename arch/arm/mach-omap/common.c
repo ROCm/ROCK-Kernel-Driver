@@ -263,9 +263,6 @@ static void __init _omap_map_io(void)
 	iotable_init(omap_io_desc, ARRAY_SIZE(omap_io_desc));
 	omap_check_revision();
 
-	/* clear BM to canonicalize CS0 (not CS3) at 0000:0000 */
-	omap_writel(omap_readl(EMIFS_CONFIG) & 0x0d, EMIFS_CONFIG);
-
 #ifdef CONFIG_ARCH_OMAP730
 	if (cpu_is_omap730()) {
 		iotable_init(omap730_io_desc, ARRAY_SIZE(omap730_io_desc));
@@ -436,6 +433,9 @@ void __init omap_serial_init(int ports[OMAP_MAX_NR_PORTS])
 				omap_cfg_reg(UART3_TX);
 				omap_cfg_reg(UART3_RX);
 			}
+			if (cpu_is_omap1710()) {
+				clk_enable(clk_get(0, "uart3_ck"));
+			}
 			break;
 		}
 		omap_serial_reset(&serial_platform_data[i]);
@@ -475,6 +475,12 @@ static const void *get_config(u16 tag, size_t len, int skip, size_t *len_out)
 			skip--;
 		}
 
+		if ((info->len & 0x03) != 0) {
+			/* We bail out to avoid an alignment fault */
+			printk(KERN_ERR "OMAP peripheral config: Length (%d) not word-aligned (tag %04x)\n",
+			       info->len, info->tag);
+			return NULL;
+		}
 		next = (u8 *) info + sizeof(*info) + info->len;
 		if (next >= omap_bootloader_tag + omap_bootloader_tag_len)
 			info = NULL;
@@ -484,10 +490,15 @@ static const void *get_config(u16 tag, size_t len, int skip, size_t *len_out)
 	if (info != NULL) {
 		/* Check the length as a lame attempt to check for
 		 * binary inconsistancy. */
-		if (len != NO_LENGTH_CHECK && info->len != len) {
-			printk(KERN_ERR "OMAP peripheral config: Length mismatch with tag %x (want %d, got %d)\n",
-			       tag, len, info->len);
-			return NULL;
+		if (len != NO_LENGTH_CHECK) {
+			/* Word-align len */
+			if (len & 0x03)
+				len = (len + 3) & ~0x03;
+			if (info->len != len) {
+				printk(KERN_ERR "OMAP peripheral config: Length mismatch with tag %x (want %d, got %d)\n",
+				       tag, len, info->len);
+				return NULL;
+			}
 		}
 		if (len_out != NULL)
 			*len_out = info->len;

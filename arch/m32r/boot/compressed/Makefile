@@ -30,7 +30,12 @@ $(obj)/vmlinux.bin.gz: $(obj)/vmlinux.bin FORCE
 
 CFLAGS_misc.o += -fpic
 
+ifdef CONFIG_MMU
 LDFLAGS_piggy.o := -r --format binary --oformat elf32-m32r-linux -T
+else
+LDFLAGS_piggy.o := -r --format binary --oformat elf32-m32r -T
+endif
+
 OBJCOPYFLAGS += -R .empty_zero_page
 
 $(obj)/piggy.o: $(obj)/vmlinux.scr $(obj)/vmlinux.bin.gz FORCE

@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-s3c2410/time.c
  *
- * Copyright (C) 2003,2004 Simtec Electronics
+ * Copyright (C) 2003-2005 Simtec Electronics
  *	Ben Dooks, <ben@simtec.co.uk>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -23,6 +23,8 @@
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/err.h>
+
 #include <asm/system.h>
 #include <asm/leds.h>
 #include <asm/mach-types.h>
@@ -33,6 +35,7 @@
 #include <asm/arch/regs-timer.h>
 #include <asm/arch/regs-irq.h>
 #include <asm/mach/time.h>
+#include <asm/hardware/clock.h>
 
 #include "clock.h"
 
@@ -169,6 +172,9 @@ static void s3c2410_timer_setup (void)
 		tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
 		tcfg1 |= S3C2410_TCFG1_MUX4_TCLK1;
 	} else {
+		unsigned long pclk;
+		struct clk *clk;
+
 		/* for the h1940 (and others), we use the pclk from the core
 		 * to generate the timer values. since values around 50 to
 		 * 70MHz are not values we can directly generate the timer
@@ -180,7 +186,18 @@ static void s3c2410_timer_setup (void)
 
 		/* this is used as default if no other timer can be found */
 
-		timer_usec_ticks = timer_mask_usec_ticks(6, s3c24xx_pclk);
+		clk = clk_get(NULL, "timers");
+		if (IS_ERR(clk))
+			panic("failed to get clock for system timer");
+
+		clk_use(clk);
+		clk_enable(clk);
+
+		pclk = clk_get_rate(clk);
+
+		/* configure clock tick */
+
+		timer_usec_ticks = timer_mask_usec_ticks(6, pclk);
 
 		tcfg1 &= ~S3C2410_TCFG1_MUX4_MASK;
 		tcfg1 |= S3C2410_TCFG1_MUX4_DIV2;
@@ -188,7 +205,7 @@ static void s3c2410_timer_setup (void)
 		tcfg0 &= ~S3C2410_TCFG_PRESCALER1_MASK;
 		tcfg0 |= ((6 - 1) / 2) << S3C2410_TCFG_PRESCALER1_SHIFT;
 
-		tcnt = (s3c24xx_pclk / 6) / HZ;
+		tcnt = (pclk / 6) / HZ;
 	}
 
 	/* timers reload after counting zero, so reduce the count by 1 */

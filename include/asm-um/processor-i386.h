@@ -9,15 +9,28 @@
 extern int host_has_xmm;
 extern int host_has_cmov;
 
+/* include faultinfo structure */
+#include "sysdep/faultinfo.h"
+
 struct arch_thread {
 	unsigned long debugregs[8];
 	int debugregs_seq;
+	struct faultinfo faultinfo;
 };
 
 #define INIT_ARCH_THREAD { .debugregs  		= { [ 0 ... 7 ] = 0 }, \
-                           .debugregs_seq	= 0 }
+                           .debugregs_seq	= 0, \
+                           .faultinfo		= { 0, 0, 0 } }
 
 #include "asm/arch/user.h"
+
+/* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
+static inline void rep_nop(void)
+{
+	__asm__ __volatile__("rep;nop": : :"memory");
+}
+
+#define cpu_relax()	rep_nop()
 
 /*
  * Default implementation of macro that returns current

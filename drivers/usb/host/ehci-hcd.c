@@ -191,17 +191,38 @@ static int ehci_halt (struct ehci_hcd *ehci)
 	return handshake (&ehci->regs->status, STS_HALT, STS_HALT, 16 * 125);
 }
 
+/* put TDI/ARC silicon into EHCI mode */
+static void tdi_reset (struct ehci_hcd *ehci)
+{
+	u32 __iomem	*reg_ptr;
+	u32		tmp;
+
+	reg_ptr = (u32 __iomem *)(((u8 __iomem *)ehci->regs) + 0x68);
+	tmp = readl (reg_ptr);
+	tmp |= 0x3;
+	writel (tmp, reg_ptr);
+}
+
 /* reset a non-running (STS_HALT == 1) controller */
 static int ehci_reset (struct ehci_hcd *ehci)
 {
+	int	retval;
 	u32	command = readl (&ehci->regs->command);
 
 	command |= CMD_RESET;
 	dbg_cmd (ehci, "reset", command);
 	writel (command, &ehci->regs->command);
-	ehci_to_hcd(ehci)->state = USB_STATE_HALT;
+	ehci_to_hcd(ehci)->state = HC_STATE_HALT;
 	ehci->next_statechange = jiffies;
-	return handshake (&ehci->regs->command, CMD_RESET, 0, 250 * 1000);
+	retval = handshake (&ehci->regs->command, CMD_RESET, 0, 250 * 1000);
+
+	if (retval)
+		return retval;
+
+	if (ehci_is_TDI(ehci))
+		tdi_reset (ehci);
+
+	return retval;
 }
 
 /* idle the controller (from running) */
@@ -210,7 +231,7 @@ static void ehci_quiesce (struct ehci_hcd *ehci)
 	u32	temp;
 
 #ifdef DEBUG
-	if (!HCD_IS_RUNNING (ehci_to_hcd(ehci)->state))
+	if (!HC_IS_RUNNING (ehci_to_hcd(ehci)->state))
 		BUG ();
 #endif
 
@@ -219,7 +240,7 @@ static void ehci_quiesce (struct ehci_hcd *ehci)
 	temp &= STS_ASS | STS_PSS;
 	if (handshake (&ehci->regs->status, STS_ASS | STS_PSS,
 				temp, 16 * 125) != 0) {
-		ehci_to_hcd(ehci)->state = USB_STATE_HALT;
+		ehci_to_hcd(ehci)->state = HC_STATE_HALT;
 		return;
 	}
 
@@ -231,7 +252,7 @@ static void ehci_quiesce (struct ehci_hcd *ehci)
 	/* hardware can take 16 microframes to turn off ... */
 	if (handshake (&ehci->regs->status, STS_ASS | STS_PSS,
 				0, 16 * 125) != 0) {
-		ehci_to_hcd(ehci)->state = USB_STATE_HALT;
+		ehci_to_hcd(ehci)->state = HC_STATE_HALT;
 		return;
 	}
 }
@@ -325,6 +346,22 @@ ehci_reboot (struct notifier_block *self, unsigned long code, void *null)
 	return 0;
 }
 
+static void ehci_port_power (struct ehci_hcd *ehci, int is_on)
+{
+	unsigned port;
+
+	if (!HCS_PPC (ehci->hcs_params))
+		return;
+
+	ehci_dbg (ehci, "...power%s ports...\n", is_on ? "up" : "down");
+	for (port = HCS_N_PORTS (ehci->hcs_params); port > 0; )
+		(void) ehci_hub_control(ehci_to_hcd(ehci),
+				is_on ? SetPortFeature : ClearPortFeature,
+				USB_PORT_FEAT_POWER,
+				port--, NULL, 0);
+	msleep(20);
+}
+
 
 /* called by khubd or root hub init threads */
 
@@ -341,21 +378,53 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 	dbg_hcs_params (ehci, "reset");
 	dbg_hcc_params (ehci, "reset");
 
+	/* cache this readonly data; minimize chip reads */
+	ehci->hcs_params = readl (&ehci->caps->hcs_params);
+
 #ifdef	CONFIG_PCI
-	/* EHCI 0.96 and later may have "extended capabilities" */
 	if (hcd->self.controller->bus == &pci_bus_type) {
 		struct pci_dev	*pdev = to_pci_dev(hcd->self.controller);
 
-		/* AMD8111 EHCI doesn't work, according to AMD errata */
-		if ((pdev->vendor == PCI_VENDOR_ID_AMD)
-				&& (pdev->device == 0x7463)) {
-			ehci_info (ehci, "ignoring AMD8111 (errata)\n");
-			return -EIO;
+		switch (pdev->vendor) {
+		case PCI_VENDOR_ID_TDI:
+			if (pdev->device == PCI_DEVICE_ID_TDI_EHCI) {
+				ehci->is_tdi_rh_tt = 1;
+				tdi_reset (ehci);
+			}
+			break;
+		case PCI_VENDOR_ID_AMD:
+			/* AMD8111 EHCI doesn't work, according to AMD errata */
+			if (pdev->device == 0x7463) {
+				ehci_info (ehci, "ignoring AMD8111 (errata)\n");
+				return -EIO;
+			}
+			break;
+		}
+
+		/* optional debug port, normally in the first BAR */
+		temp = pci_find_capability (pdev, 0x0a);
+		if (temp) {
+			pci_read_config_dword(pdev, temp, &temp);
+			temp >>= 16;
+			if ((temp & (3 << 13)) == (1 << 13)) {
+				temp &= 0x1fff;
+				ehci->debug = hcd->regs + temp;
+				temp = readl (&ehci->debug->control);
+				ehci_info (ehci, "debug port %d%s\n",
+					HCS_DEBUG_PORT(ehci->hcs_params),
+					(temp & DBGP_ENABLED)
+						? " IN USE"
+						: "");
+				if (!(temp & DBGP_ENABLED))
+					ehci->debug = NULL;
+			}
 		}
 
 		temp = HCC_EXT_CAPS (readl (&ehci->caps->hcc_params));
 	} else
 		temp = 0;
+
+	/* EHCI 0.96 and later may have "extended capabilities" */
 	while (temp && count--) {
 		u32		cap;
 
@@ -380,10 +449,11 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 		ehci_err (ehci, "bogus capabilities ... PCI problems!\n");
 		return -EIO;
 	}
+	if (ehci_is_TDI(ehci))
+		ehci_reset (ehci);
 #endif
 
-	/* cache this readonly data; minimize PCI reads */
-	ehci->hcs_params = readl (&ehci->caps->hcs_params);
+	ehci_port_power (ehci, 0);
 
 	/* at least the Genesys GL880S needs fixup here */
 	temp = HCS_N_CC(ehci->hcs_params) * HCS_N_PCC(ehci->hcs_params);
@@ -481,15 +551,6 @@ static int ehci_start (struct usb_hcd *hcd)
 
 		/* help hc dma work well with cachelines */
 		pci_set_mwi (pdev);
-
-		/* chip-specific init */
-		switch (pdev->vendor) {
-		case PCI_VENDOR_ID_ARC:
-			if (pdev->device == PCI_DEVICE_ID_ARC_EHCI)
-				ehci->is_arc_rh_tt = 1;
-			break;
-		}
-
 	}
 #endif
 
@@ -592,7 +653,7 @@ done2:
 		register_reboot_notifier (&ehci->reboot_notifier);
 	}
 
-	hcd->state = USB_STATE_RUNNING;
+	hcd->state = HC_STATE_RUNNING;
 	writel (FLAG_CF, &ehci->regs->configured_flag);
 	readl (&ehci->regs->command);	/* unblock posted write */
 
@@ -612,8 +673,8 @@ done2:
 	 * Before this point the HC was idle/ready.  After, khubd
 	 * and device drivers may start it running.
 	 */
-	if (first && hcd_register_root (udev, hcd) != 0) {
-		if (hcd->state == USB_STATE_RUNNING)
+	if (first && usb_hcd_register_root_hub (udev, hcd) != 0) {
+		if (hcd->state == HC_STATE_RUNNING)
 			ehci_quiesce (ehci);
 		ehci_reset (ehci);
 		usb_put_dev (udev); 
@@ -634,22 +695,17 @@ done2:
 static void ehci_stop (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
-	u8			rh_ports, port;
 
 	ehci_dbg (ehci, "stop\n");
 
 	/* Turn off port power on all root hub ports. */
-	rh_ports = HCS_N_PORTS (ehci->hcs_params);
-	for (port = 1; port <= rh_ports; port++)
-		(void) ehci_hub_control(hcd,
-			ClearPortFeature, USB_PORT_FEAT_POWER,
-			port, NULL, 0);
+	ehci_port_power (ehci, 0);
 
 	/* no more interrupts ... */
 	del_timer_sync (&ehci->watchdog);
 
 	spin_lock_irq(&ehci->lock);
-	if (HCD_IS_RUNNING (hcd->state))
+	if (HC_IS_RUNNING (hcd->state))
 		ehci_quiesce (ehci);
 
 	ehci_reset (ehci);
@@ -698,7 +754,7 @@ static int ehci_get_frame (struct usb_hcd *hcd)
  * the right sort of wakeup.  
  */
 
-static int ehci_suspend (struct usb_hcd *hcd, u32 state)
+static int ehci_suspend (struct usb_hcd *hcd, pm_message_t message)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 
@@ -706,7 +762,7 @@ static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 		msleep (100);
 
 #ifdef	CONFIG_USB_SUSPEND
-	(void) usb_suspend_device (hcd->self.root_hub, state);
+	(void) usb_suspend_device (hcd->self.root_hub, message);
 #else
 	usb_lock_device (hcd->self.root_hub);
 	(void) ehci_hub_suspend (hcd);
@@ -725,7 +781,6 @@ static int ehci_resume (struct usb_hcd *hcd)
 	unsigned		port;
 	struct usb_device	*root = hcd->self.root_hub;
 	int			retval = -EINVAL;
-	int			powerup = 0;
 
 	// maybe restore (PCI) FLADJ
 
@@ -743,8 +798,6 @@ static int ehci_resume (struct usb_hcd *hcd)
 			up (&hcd->self.root_hub->serialize);
 			break;
 		}
-		if ((status & PORT_POWER) == 0)
-			powerup = 1;
 		if (!root->children [port])
 			continue;
 		dbg_port (ehci, __FUNCTION__, port + 1, status);
@@ -771,16 +824,9 @@ static int ehci_resume (struct usb_hcd *hcd)
 		retval = ehci_start (hcd);
 
 		/* here we "know" root ports should always stay powered;
-		 * but some controllers may lost all power.
+		 * but some controllers may lose all power.
 		 */
-		if (powerup) {
-			ehci_dbg (ehci, "...powerup ports...\n");
-			for (port = HCS_N_PORTS (ehci->hcs_params); port > 0; )
-				(void) ehci_hub_control(hcd,
-					SetPortFeature, USB_PORT_FEAT_POWER,
-						port--, NULL, 0);
-			msleep(20);
-		}
+		ehci_port_power (ehci, 1);
 	}
 
 	return retval;
@@ -816,7 +862,7 @@ static void ehci_work (struct ehci_hcd *ehci, struct pt_regs *regs)
 	 * misplace IRQs, and should let us run completely without IRQs.
 	 * such lossage has been observed on both VT6202 and VT8235. 
 	 */
-	if (HCD_IS_RUNNING (ehci_to_hcd(ehci)->state) &&
+	if (HC_IS_RUNNING (ehci_to_hcd(ehci)->state) &&
 			(ehci->async->qh_next.ptr != NULL ||
 			 ehci->periodic_sched != 0))
 		timer_action (ehci, TIMER_IO_WATCHDOG);
@@ -977,7 +1023,7 @@ static void unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	/* if we need to use IAA and it's busy, defer */
 	if (qh->qh_state == QH_STATE_LINKED
 			&& ehci->reclaim
-			&& HCD_IS_RUNNING (ehci_to_hcd(ehci)->state)) {
+			&& HC_IS_RUNNING (ehci_to_hcd(ehci)->state)) {
 		struct ehci_qh		*last;
 
 		for (last = ehci->reclaim;
@@ -988,7 +1034,7 @@ static void unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		last->reclaim = qh;
 
 	/* bypass IAA if the hc can't care */
-	} else if (!HCD_IS_RUNNING (ehci_to_hcd(ehci)->state) && ehci->reclaim)
+	} else if (!HC_IS_RUNNING (ehci_to_hcd(ehci)->state) && ehci->reclaim)
 		end_unlink_async (ehci, NULL);
 
 	/* something else might have unlinked the qh by now */
@@ -1036,7 +1082,7 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 
 		/* reschedule QH iff another request is queued */
 		if (!list_empty (&qh->qtd_list)
-				&& HCD_IS_RUNNING (hcd->state)) {
+				&& HC_IS_RUNNING (hcd->state)) {
 			int status;
 
 			status = qh_schedule (ehci, qh);
@@ -1092,7 +1138,7 @@ rescan:
 		goto idle_timeout;
 	}
 
-	if (!HCD_IS_RUNNING (hcd->state))
+	if (!HC_IS_RUNNING (hcd->state))
 		qh->qh_state = QH_STATE_IDLE;
 	switch (qh->qh_state) {
 	case QH_STATE_LINKED:

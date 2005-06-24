@@ -250,4 +250,8 @@ int omap_mcbsp_recv_buffer(unsigned int id, dma_addr_t buffer, unsigned int leng
 /* SPI specific API */
 void omap_mcbsp_set_spi_mode(unsigned int id, const struct omap_mcbsp_spi_cfg * spi_cfg);
 
+/* Polled read/write functions */
+int omap_mcbsp_pollread(unsigned int id, u16 * buf);
+int omap_mcbsp_pollwrite(unsigned int id, u16 buf);
+
 #endif

@@ -99,23 +99,22 @@ xfs_inofree_t xfs_inobt_mask(int i);
 #define	XFS_INOBT_MASK(i)		((xfs_inofree_t)1 << (i))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_INOBT_IS_FREE)
-int xfs_inobt_is_free(xfs_inobt_rec_t *rp, int i, xfs_arch_t arch);
-#define	XFS_INOBT_IS_FREE(rp,i,arch)	xfs_inobt_is_free(rp,i,arch)
+int xfs_inobt_is_free(xfs_inobt_rec_t *rp, int i);
+#define	XFS_INOBT_IS_FREE(rp,i)	xfs_inobt_is_free(rp,i)
 #else
-#define	XFS_INOBT_IS_FREE(rp,i,arch)	((INT_GET((rp)->ir_free, arch) \
-					 & XFS_INOBT_MASK(i)) != 0)
+#define	XFS_INOBT_IS_FREE(rp,i)	(((rp)->ir_free & XFS_INOBT_MASK(i)) != 0)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_INOBT_SET_FREE)
-void xfs_inobt_set_free(xfs_inobt_rec_t *rp, int i, xfs_arch_t arch);
-#define	XFS_INOBT_SET_FREE(rp,i,arch)	xfs_inobt_set_free(rp,i,arch)
+void xfs_inobt_set_free(xfs_inobt_rec_t *rp, int i);
+#define	XFS_INOBT_SET_FREE(rp,i)	xfs_inobt_set_free(rp,i)
 #else
-#define	XFS_INOBT_SET_FREE(rp,i,arch)	(INT_MOD_EXPR((rp)->ir_free, arch, |= XFS_INOBT_MASK(i)))
+#define	XFS_INOBT_SET_FREE(rp,i)	((rp)->ir_free |= XFS_INOBT_MASK(i))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_INOBT_CLR_FREE)
-void xfs_inobt_clr_free(xfs_inobt_rec_t *rp, int i, xfs_arch_t arch);
-#define	XFS_INOBT_CLR_FREE(rp,i,arch)	xfs_inobt_clr_free(rp,i,arch)
+void xfs_inobt_clr_free(xfs_inobt_rec_t *rp, int i);
+#define	XFS_INOBT_CLR_FREE(rp,i)	xfs_inobt_clr_free(rp,i)
 #else
-#define	XFS_INOBT_CLR_FREE(rp,i,arch)	(INT_MOD_EXPR((rp)->ir_free, arch, &= ~XFS_INOBT_MASK(i)))
+#define	XFS_INOBT_CLR_FREE(rp,i)	((rp)->ir_free &= ~XFS_INOBT_MASK(i))
 #endif
 
 /*
@@ -244,8 +243,7 @@ xfs_inobt_get_rec(
 	xfs_agino_t		*ino,	/* output: starting inode of chunk */
 	__int32_t		*fcnt,	/* output: number of free inodes */
 	xfs_inofree_t		*free,	/* output: free inode mask */
-	int			*stat,	/* output: success/failure */
-	xfs_arch_t		arch);	/* output: architecture */
+	int			*stat);	/* output: success/failure */
 
 /*
  * Increment cursor by one record at the level.

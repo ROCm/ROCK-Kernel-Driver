@@ -67,7 +67,7 @@ static inline void i8042_write_command(int val)
 
 #include <linux/dmi.h>
 
-static struct dmi_system_id __initdata i8042_dmi_table[] = {
+static struct dmi_system_id __initdata i8042_dmi_noloop_table[] = {
 	{
 		.ident = "Compaq Proliant 8500",
 		.matches = {
@@ -86,6 +86,62 @@ static struct dmi_system_id __initdata i8042_dmi_table[] = {
 	},
 	{ }
 };
+
+/*
+ * Some Fujitsu notebooks are having trouble with touchpads if
+ * active multiplexing mode is activated. Luckily they don't have
+ * external PS/2 ports so we can safely disable it.
+ * ... apparently some Toshibas don't like MUX mode either and
+ * die horrible death on reboot.
+ */
+static struct dmi_system_id __initdata i8042_dmi_nomux_table[] = {
+	{
+		.ident = "Fujitsu Lifebook P7010/P7010D",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "FUJITSU"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "P7010"),
+		},
+	},
+	{
+		.ident = "Fujitsu Lifebook P5020D",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "FUJITSU"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "LifeBook P Series"),
+		},
+	},
+	{
+		.ident = "Fujitsu Lifebook S2000",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "FUJITSU"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "LifeBook S Series"),
+		},
+	},
+	{
+		.ident = "Fujitsu Lifebook S6230",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "FUJITSU"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "LifeBook S6230"),
+		},
+	},
+	{
+		.ident = "Fujitsu T70H",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "FUJITSU"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "FMVLT70H"),
+		},
+	},
+	{
+		.ident = "Toshiba P10",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Satellite P10"),
+		},
+	},
+	{ }
+};
+
+
+
 #endif
 
 
@@ -119,7 +175,7 @@ static int i8042_pnp_kbd_probe(struct pnp_dev *dev, const struct pnp_device_id *
 		strncat(i8042_pnp_kbd_name, ":", sizeof(i8042_pnp_kbd_name));
 		strncat(i8042_pnp_kbd_name, pnp_dev_name(dev), sizeof(i8042_pnp_kbd_name));
 	}
-	
+
 	return 0;
 }
 
@@ -205,7 +261,7 @@ static int i8042_pnp_init(void)
 #if defined(__ia64__)
 		return -ENODEV;
 #else
-		printk(KERN_WARNING "PNP: No PS/2 controller found. Probing ports directly.\n");
+		printk(KERN_INFO "PNP: No PS/2 controller found. Probing ports directly.\n");
 		return 0;
 #endif
 	}
@@ -233,7 +289,7 @@ static int i8042_pnp_init(void)
 		printk(KERN_WARNING "PNP: PS/2 controller doesn't have AUX irq; using default %#x\n", i8042_aux_irq);
 		i8042_pnp_aux_irq = i8042_aux_irq;
 	}
-	
+
 #if defined(__ia64__)
 	if (result_aux <= 0)
 		i8042_noaux = 1;
@@ -277,8 +333,11 @@ static inline int i8042_platform_init(void)
 #endif
 
 #if defined(__i386__)
-	if (dmi_check_system(i8042_dmi_table))
+	if (dmi_check_system(i8042_dmi_noloop_table))
 		i8042_noloop = 1;
+
+	if (dmi_check_system(i8042_dmi_nomux_table))
+		i8042_nomux = 1;
 #endif
 
 	return 0;

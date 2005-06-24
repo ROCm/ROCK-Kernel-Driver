@@ -15,8 +15,7 @@
 
 		mov	\irqnr, #0x0              @clear out irqnr as default
                 mov	\base, #0xfe000000
-		orr	\base, \base, #0x00ff0000
-		orr	\base, \base, #0x0000a000
+		orr	\base, \base, #0x00e00000
 		orr	\base, \base, #0x08
 		ldr	\irqstat, [\base]         @ get interrupts
 
@@ -35,8 +34,8 @@
 		bne	1001f
 
 		mov	\base, #0xfe000000
-		orr	\base, \base, #0x00fd0000
-		orr	\base, \base, #0x0000e100
+		orr	\base, \base, #0x00c00000
+		orr	\base, \base, #0x00000100
 		orr	\base, \base, #0x00000058
 		ldr	\irqstat, [\base]
 

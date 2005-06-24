@@ -335,7 +335,7 @@ static int mts_scsi_abort (Scsi_Cmnd *srb)
 
 	mts_urb_abort(desc);
 
-	return SCSI_ABORT_PENDING;
+	return FAILED;
 }
 
 static int mts_scsi_host_reset (Scsi_Cmnd *srb)
@@ -703,6 +703,7 @@ static int mts_usb_probe(struct usb_interface *intf,
 	int ep_in_set[3]; /* this will break if we have more than three endpoints
 			   which is why we check */
 	int *ep_in_current = ep_in_set;
+	int err_retval = -ENOMEM;
 
 	struct mts_desc * new_desc;
 	struct vendor_product const* p;
@@ -809,7 +810,10 @@ static int mts_usb_probe(struct usb_interface *intf,
 		goto out_free_urb;
 
 	new_desc->host->hostdata[0] = (unsigned long)new_desc;
-	scsi_add_host(new_desc->host, NULL); /* XXX handle failure */
+	if (scsi_add_host(new_desc->host, NULL)) {
+		err_retval = -EIO;
+		goto out_free_urb;
+	}
 	scsi_scan_host(new_desc->host);
 
 	usb_set_intfdata(intf, new_desc);
@@ -820,7 +824,7 @@ static int mts_usb_probe(struct usb_interface *intf,
  out_kfree:
 	kfree(new_desc);
  out:
-	return -ENOMEM;
+	return err_retval;
 }
 
 static void mts_usb_disconnect (struct usb_interface *intf)

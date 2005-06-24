@@ -45,7 +45,6 @@ extern void calibrate_delay(void);
 extern volatile int smp_processors_ready;
 extern int smp_num_cpus;
 static int smp_highest_cpu;
-extern int smp_threads_ready;
 extern volatile unsigned long cpu_callin_map[NR_CPUS];
 extern struct cpuinfo_sparc cpu_data[NR_CPUS];
 extern unsigned char boot_cpu_id;

@@ -2175,7 +2175,7 @@ out:
  * received frames (loopback). Since only the payload is given to this
  * function, it check for loopback.
  */
-void bond_3ad_rx_indication(struct lacpdu *lacpdu, struct slave *slave, u16 length)
+static void bond_3ad_rx_indication(struct lacpdu *lacpdu, struct slave *slave, u16 length)
 {
 	struct port *port;
 

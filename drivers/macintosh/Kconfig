@@ -78,11 +78,13 @@ config ADB_PMU
 	  this device; you should do so if your machine is one of those
 	  mentioned above.
 
-config G5_SMU
+config PMAC_SMU
 	bool "Support for SMU  based PowerMacs"
 	depends on PPC_PMAC64
 	help
-	  * TODO *
+	  This option adds support for the newer G5 iMacs and PowerMacs based
+	  on the "SMU" system control chip which replaces the old PMU.
+	  If you don't know, say Y.
 
 config PMAC_PBOOK
 	bool "Power management support for PowerBooks"

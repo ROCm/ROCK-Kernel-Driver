@@ -43,7 +43,6 @@ extern void * __rd_start, * __rd_end;
  */
 struct sh_cpuinfo boot_cpu_data = { CPU_SH_NONE, 0, 10000000, };
 struct screen_info screen_info;
-unsigned char aux_device_present = 0xaa;
 
 #if defined(CONFIG_SH_UNKNOWN)
 struct sh_machine_vector sh_mv;

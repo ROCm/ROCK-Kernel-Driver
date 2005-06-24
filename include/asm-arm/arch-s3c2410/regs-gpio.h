@@ -18,6 +18,8 @@
  *    17-10-2004     BJD     Added GSTATUS1 register definitions
  *    18-11-2004     BJD     Fixed definitions of GPE3, GPE4, GPE5 and GPE6
  *    18-11-2004     BJD     Added S3C2440 AC97 controls
+ *    10-Mar-2005    LCVR    Changed S3C2410_VA to S3C24XX_VA
+ *    28-Mar-2005    LCVR    Fixed definition of GPB10
 */
 
 
@@ -35,7 +37,7 @@
 #define S3C2410_GPIO_BANKG   (32*6)
 #define S3C2410_GPIO_BANKH   (32*7)
 
-#define S3C2410_GPIO_BASE(pin)   ((((pin) & ~31) >> 1) + S3C2410_VA_GPIO)
+#define S3C2410_GPIO_BASE(pin)   ((((pin) & ~31) >> 1) + S3C24XX_VA_GPIO)
 #define S3C2410_GPIO_OFFSET(pin) ((pin) & 31)
 
 /* general configuration options */
@@ -44,7 +46,7 @@
 
 /* configure GPIO ports A..G */
 
-#define S3C2410_GPIOREG(x) ((x) + S3C2410_VA_GPIO)
+#define S3C2410_GPIOREG(x) ((x) + S3C24XX_VA_GPIO)
 
 /* port A - 22bits, zero in bit X makes pin X output
  * 1 makes port special function, this is default
@@ -211,9 +213,9 @@
 #define S3C2410_GPB9_nXDACK0 (0x02 << 18)
 
 #define S3C2410_GPB10        S3C2410_GPIONO(S3C2410_GPIO_BANKB, 10)
-#define S3C2410_GPB10_INP    (0x00 << 18)
-#define S3C2410_GPB10_OUTP   (0x01 << 18)
-#define S3C2410_GPB10_nXDRE0 (0x02 << 18)
+#define S3C2410_GPB10_INP    (0x00 << 20)
+#define S3C2410_GPB10_OUTP   (0x01 << 20)
+#define S3C2410_GPB10_nXDRE0 (0x02 << 20)
 
 /* Port C consits of 16 GPIO/Special function
  *

@@ -1199,7 +1199,7 @@ set_multicast (struct net_device *dev)
 static void rio_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	struct netdev_private *np = netdev_priv(dev);
-	strcpy(info->driver, "DL2K");
+	strcpy(info->driver, "dl2k");
 	strcpy(info->version, DRV_VERSION);
 	strcpy(info->bus_info, pci_name(np->pdev));
 }	

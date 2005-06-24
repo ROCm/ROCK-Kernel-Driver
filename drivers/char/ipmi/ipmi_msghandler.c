@@ -612,6 +612,7 @@ int ipmi_create_user(unsigned int          if_num,
 	unsigned long flags;
 	ipmi_user_t   new_user;
 	int           rv = 0;
+	ipmi_smi_t    intf;
 
 	/* There is no module usecount here, because it's not
            required.  Since this can only be used by and called from
@@ -646,19 +647,29 @@ int ipmi_create_user(unsigned int          if_num,
 		goto out_unlock;
 	}
 
+	intf = ipmi_interfaces[if_num];
+
 	new_user->handler = handler;
 	new_user->handler_data = handler_data;
-	new_user->intf = ipmi_interfaces[if_num];
+	new_user->intf = intf;
 	new_user->gets_events = 0;
 
-	if (!try_module_get(new_user->intf->handlers->owner)) {
+	if (!try_module_get(intf->handlers->owner)) {
 		rv = -ENODEV;
 		goto out_unlock;
 	}
 
-	write_lock_irqsave(&new_user->intf->users_lock, flags);
-	list_add_tail(&new_user->link, &new_user->intf->users);
-	write_unlock_irqrestore(&new_user->intf->users_lock, flags);
+	if (intf->handlers->inc_usecount) {
+		rv = intf->handlers->inc_usecount(intf->send_info);
+		if (rv) {
+			module_put(intf->handlers->owner);
+			goto out_unlock;
+		}
+	}
+
+	write_lock_irqsave(&intf->users_lock, flags);
+	list_add_tail(&new_user->link, &intf->users);
+	write_unlock_irqrestore(&intf->users_lock, flags);
 
  out_unlock:	
 	if (rv) {
@@ -729,8 +740,11 @@ int ipmi_destroy_user(ipmi_user_t user)
 	down_read(&interfaces_sem);
 	write_lock_irqsave(&intf->users_lock, flags);
 	rv = ipmi_destroy_user_nolock(user);
-	if (!rv)
+	if (!rv) {
 		module_put(intf->handlers->owner);
+		if (intf->handlers->dec_usecount)
+			intf->handlers->dec_usecount(intf->send_info);
+	}
 		
 	write_unlock_irqrestore(&intf->users_lock, flags);
 	up_read(&interfaces_sem);
@@ -1629,6 +1643,7 @@ int ipmi_register_smi(struct ipmi_smi_handlers *handlers,
 		      void		       *send_info,
 		      unsigned char            version_major,
 		      unsigned char            version_minor,
+		      unsigned char            slave_addr,
 		      ipmi_smi_t               *intf)
 {
 	int              i, j;
@@ -1664,7 +1679,10 @@ int ipmi_register_smi(struct ipmi_smi_handlers *handlers,
 			new_intf->intf_num = i;
 			new_intf->version_major = version_major;
 			new_intf->version_minor = version_minor;
-			new_intf->my_address = IPMI_BMC_SLAVE_ADDR;
+			if (slave_addr == 0)
+				new_intf->my_address = IPMI_BMC_SLAVE_ADDR;
+			else
+				new_intf->my_address = slave_addr;
 			new_intf->my_lun = 2;  /* the SMS LUN. */
 			rwlock_init(&(new_intf->users_lock));
 			INIT_LIST_HEAD(&(new_intf->users));
@@ -2570,28 +2588,20 @@ handle_msg_timeout(struct ipmi_recv_msg *msg)
 	deliver_response(msg);
 }
 
-static void
-send_from_recv_msg(ipmi_smi_t intf, struct ipmi_recv_msg *recv_msg,
-		   struct ipmi_smi_msg *smi_msg,
-		   unsigned char seq, long seqid)
+static struct ipmi_smi_msg *
+smi_from_recv_msg(ipmi_smi_t intf, struct ipmi_recv_msg *recv_msg,
+		  unsigned char seq, long seqid)
 {
-	if (!smi_msg)
-		smi_msg = ipmi_alloc_smi_msg();
+	struct ipmi_smi_msg *smi_msg = ipmi_alloc_smi_msg();
 	if (!smi_msg)
 		/* If we can't allocate the message, then just return, we
 		   get 4 retries, so this should be ok. */
-		return;
+		return NULL;
 
 	memcpy(smi_msg->data, recv_msg->msg.data, recv_msg->msg.data_len);
 	smi_msg->data_size = recv_msg->msg.data_len;
 	smi_msg->msgid = STORE_SEQ_IN_MSGID(seq, seqid);
 		
-	/* Send the new message.  We send with a zero priority.  It
-	   timed out, I doubt time is that critical now, and high
-	   priority messages are really only for messages to the local
-	   MC, which don't get resent. */
-	intf->handlers->sender(intf->send_info, smi_msg, 0);
-
 #ifdef DEBUG_MSGING
 	{
 		int m;
@@ -2601,6 +2611,7 @@ send_from_recv_msg(ipmi_smi_t intf, struct ipmi_recv_msg *recv_msg,
 		printk("\n");
 	}
 #endif
+	return smi_msg;
 }
 
 static void
@@ -2665,14 +2676,13 @@ ipmi_timeout_handler(long timeout_period)
 					intf->timed_out_ipmb_commands++;
 				spin_unlock(&intf->counter_lock);
 			} else {
+				struct ipmi_smi_msg *smi_msg;
 				/* More retries, send again. */
 
 				/* Start with the max timer, set to normal
 				   timer after the message is sent. */
 				ent->timeout = MAX_MSG_TIMEOUT;
 				ent->retries_left--;
-				send_from_recv_msg(intf, ent->recv_msg, NULL,
-						   j, ent->seqid);
 				spin_lock(&intf->counter_lock);
 				if (ent->recv_msg->addr.addr_type
 				    == IPMI_LAN_ADDR_TYPE)
@@ -2680,6 +2690,20 @@ ipmi_timeout_handler(long timeout_period)
 				else
 					intf->retransmitted_ipmb_commands++;
 				spin_unlock(&intf->counter_lock);
+				smi_msg = smi_from_recv_msg(intf,
+						ent->recv_msg, j, ent->seqid);
+				if(!smi_msg)
+					continue;
+
+				spin_unlock_irqrestore(&(intf->seq_lock),flags);
+				/* Send the new message.  We send with a zero
+				 * priority.  It timed out, I doubt time is
+				 * that critical now, and high priority
+				 * messages are really only for messages to the
+				 * local MC, which don't get resent. */
+				intf->handlers->sender(intf->send_info,
+							smi_msg, 0);
+				spin_lock_irqsave(&(intf->seq_lock), flags);
 			}
 		}
 		spin_unlock_irqrestore(&(intf->seq_lock), flags);

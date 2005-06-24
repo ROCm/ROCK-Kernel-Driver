@@ -2,7 +2,7 @@
  * omap_udc.c -- for OMAP full speed udc; most chips support OTG.
  *
  * Copyright (C) 2004 Texas Instruments, Inc.
- * Copyright (C) 2004 David Brownell
+ * Copyright (C) 2004-2005 David Brownell
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -2046,7 +2046,10 @@ int usb_gadget_register_driver (struct usb_gadget_driver *driver)
 			pullup_disable (udc);
 	}
 
-	if (machine_is_omap_innovator())
+	/* boards that don't have VBUS sensing can't autogate 48MHz;
+	 * can't enter deep sleep while a gadget driver is active.
+	 */
+	if (machine_is_omap_innovator() || machine_is_omap_osk())
 		omap_vbus_session(&udc->gadget, 1);
 
 done:
@@ -2064,7 +2067,7 @@ int usb_gadget_unregister_driver (struct usb_gadget_driver *driver)
 	if (!driver || driver != udc->driver)
 		return -EINVAL;
 
-	if (machine_is_omap_innovator())
+	if (machine_is_omap_innovator() || machine_is_omap_osk())
 		omap_vbus_session(&udc->gadget, 0);
 
 	if (udc->transceiver)
@@ -2157,13 +2160,13 @@ static void proc_ep_show(struct seq_file *s, struct omap_ep *ep)
 		}
 }
 
-static char *trx_mode(unsigned m)
+static char *trx_mode(unsigned m, int enabled)
 {
 	switch (m) {
-	case 3:
-	case 0:		return "6wire";
+	case 0:		return enabled ? "*6wire" : "unused";
 	case 1:		return "4wire";
 	case 2:		return "3wire";
+	case 3: 	return "6wire";
 	default:	return "unknown";
 	}
 }
@@ -2171,17 +2174,20 @@ static char *trx_mode(unsigned m)
 static int proc_otg_show(struct seq_file *s)
 {
 	u32		tmp;
+	u32		trans;
 
 	tmp = OTG_REV_REG;
-	seq_printf(s, "OTG rev %d.%d, transceiver_ctrl %08x\n",
-		tmp >> 4, tmp & 0xf,
-		USB_TRANSCEIVER_CTRL_REG);
+	trans = USB_TRANSCEIVER_CTRL_REG;
+	seq_printf(s, "OTG rev %d.%d, transceiver_ctrl %03x\n",
+		tmp >> 4, tmp & 0xf, trans);
 	tmp = OTG_SYSCON_1_REG;
 	seq_printf(s, "otg_syscon1 %08x usb2 %s, usb1 %s, usb0 %s,"
 			FOURBITS "\n", tmp,
-		trx_mode(USB2_TRX_MODE(tmp)),
-		trx_mode(USB1_TRX_MODE(tmp)),
-		trx_mode(USB0_TRX_MODE(tmp)),
+		trx_mode(USB2_TRX_MODE(tmp), trans & CONF_USB2_UNI_R),
+		trx_mode(USB1_TRX_MODE(tmp), trans & CONF_USB1_UNI_R),
+		(USB0_TRX_MODE(tmp) == 0)
+			? "internal"
+			: trx_mode(USB0_TRX_MODE(tmp), 1),
 		(tmp & OTG_IDLE_EN) ? " !otg" : "",
 		(tmp & HST_IDLE_EN) ? " !host" : "",
 		(tmp & DEV_IDLE_EN) ? " !dev" : "",
@@ -2803,17 +2809,15 @@ static int __exit omap_udc_remove(struct device *dev)
 	return 0;
 }
 
-/* suspend/resume/wakeup from sysfs (echo > power/state) */
-
-static int omap_udc_suspend(struct device *dev, u32 state, u32 level)
+static int omap_udc_suspend(struct device *dev, pm_message_t state, u32 level)
 {
 	if (level != 0)
 		return 0;
 
 	DBG("suspend, state %d\n", state);
 	omap_pullup(&udc->gadget, 0);
-	udc->gadget.dev.power.power_state = 3;
-	udc->gadget.dev.parent->power.power_state = 3;
+	udc->gadget.dev.power.power_state = PMSG_SUSPEND;
+	udc->gadget.dev.parent->power.power_state = PMSG_SUSPEND;
 	return 0;
 }
 
@@ -2823,8 +2827,8 @@ static int omap_udc_resume(struct device *dev, u32 level)
 		return 0;
 
 	DBG("resume + wakeup/SRP\n");
-	udc->gadget.dev.parent->power.power_state = 0;
-	udc->gadget.dev.power.power_state = 0;
+	udc->gadget.dev.parent->power.power_state = PMSG_ON;
+	udc->gadget.dev.power.power_state = PMSG_ON;
 	omap_pullup(&udc->gadget, 1);
 
 	/* maybe the host would enumerate us if we nudged it */

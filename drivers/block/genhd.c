@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/kmod.h>
 #include <linux/kobj_map.h>
+#include <linux/buffer_head.h>
 
 #define MAX_PROBE_HASH 255	/* random */
 
@@ -302,7 +303,7 @@ static struct kobject *base_probe(dev_t dev, int *part, void *data)
 
 static int __init genhd_device_init(void)
 {
-	bdev_map = kobj_map_init(base_probe, &block_subsys);
+	bdev_map = kobj_map_init(base_probe, &block_subsys_sem);
 	blk_dev_init();
 	subsystem_register(&block_subsys);
 	return 0;
@@ -676,7 +677,8 @@ int invalidate_partition(struct gendisk *disk, int index)
 	int res = 0;
 	struct block_device *bdev = bdget_disk(disk, index);
 	if (bdev) {
-		res = __invalidate_device(bdev, 1);
+		fsync_bdev(bdev);
+		res = __invalidate_device(bdev);
 		bdput(bdev);
 	}
 	return res;

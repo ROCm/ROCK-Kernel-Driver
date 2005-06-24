@@ -137,6 +137,8 @@ static inline void* ___va(unsigned long p)
 #define ___va(paddr) ((paddr)+PPC_MEMOFFSET)
 #endif
 
+extern int page_is_ram(unsigned long pfn);
+
 #define __pa(x) ___pa((unsigned long)(x))
 #define __va(x) ((void *)(___va((unsigned long)(x))))
 

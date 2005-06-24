@@ -22,12 +22,6 @@
 #include <rxrpc/message.h>
 #include "internal.h"
 
-static int rxrpc_initialise(void);
-static void rxrpc_cleanup(void);
-
-module_init(rxrpc_initialise);
-module_exit(rxrpc_cleanup);
-
 MODULE_DESCRIPTION("Rx RPC implementation");
 MODULE_AUTHOR("Red Hat, Inc.");
 MODULE_LICENSE("GPL");
@@ -38,7 +32,7 @@ __be32 rxrpc_epoch;
 /*
  * initialise the Rx module
  */
-static int rxrpc_initialise(void)
+static int __init rxrpc_initialise(void)
 {
 	int ret;
 
@@ -93,6 +87,8 @@ static int rxrpc_initialise(void)
 	return ret;
 } /* end rxrpc_initialise() */
 
+module_init(rxrpc_initialise);
+
 /*****************************************************************************/
 /*
  * clean up the Rx module
@@ -135,6 +131,8 @@ static void __exit rxrpc_cleanup(void)
 
 	kleave("");
 } /* end rxrpc_cleanup() */
+
+module_exit(rxrpc_cleanup);
 
 /*****************************************************************************/
 /*

@@ -63,7 +63,7 @@ struct nfsd_list {
 	struct list_head 	list;
 	struct task_struct	*task;
 };
-struct list_head nfsd_list = LIST_HEAD_INIT(nfsd_list);
+static struct list_head nfsd_list = LIST_HEAD_INIT(nfsd_list);
 
 /*
  * Maximum number of nfsd processes
@@ -95,7 +95,9 @@ nfsd_svc(unsigned short port, int nrservs)
 	
 	/* Readahead param cache - will no-op if it already exists */
 	error =	nfsd_racache_init(2*nrservs);
-	nfs4_state_init();
+	if (error<0)
+		goto out;
+	error = nfs4_state_init();
 	if (error<0)
 		goto out;
 	if (!nfsd_serv) {
@@ -259,6 +261,8 @@ nfsd(struct svc_rqst *rqstp)
 				break;
 		err = signo;
 	}
+	/* Clear signals before calling lockd_down() and svc_exit_thread() */
+	flush_signals(current);
 
 	lock_kernel();
 
@@ -361,14 +365,6 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 	return 1;
 }
 
-static int
-nfsd_rqst_needs_auth(struct svc_rqst *rqstp)
-{
-	if (rqstp->rq_proc == 0)
-		return 0;
-	return 1;
-}
-
 extern struct svc_version nfsd_version2, nfsd_version3, nfsd_version4;
 
 static struct svc_version *	nfsd_version[] = {
@@ -410,6 +406,6 @@ struct svc_program		nfsd_program = {
 	.pg_name		= "nfsd",		/* program name */
 	.pg_class		= "nfsd",		/* authentication class */
 	.pg_stats		= &nfsd_svcstats,	/* version table */
+	.pg_authenticate	= &svc_set_client,	/* export authentication */
 
-	.pg_need_auth		= nfsd_rqst_needs_auth,
 };

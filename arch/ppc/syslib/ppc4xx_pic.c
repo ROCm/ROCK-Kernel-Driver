@@ -4,7 +4,7 @@
  * Interrupt controller driver for PowerPC 4xx-based processors.
  *
  * Eugene Surovegin <eugene.surovegin@zultys.com> or <ebs@ebshome.net>
- * Copyright (c) 2004 Zultys Technologies
+ * Copyright (c) 2004, 2005 Zultys Technologies
  *
  * Based on original code by
  *    Copyright (c) 1999 Grant Erickson <grant@lcse.umn.edu>
@@ -29,8 +29,9 @@
 /* See comment in include/arch-ppc/ppc4xx_pic.h
  * for more info about these two variables
  */
-extern struct ppc4xx_uic_settings ppc4xx_core_uic_cfg[NR_UICS] __attribute__((weak));
-extern unsigned char ppc4xx_uic_ext_irq_cfg[] __attribute__((weak));
+extern struct ppc4xx_uic_settings ppc4xx_core_uic_cfg[NR_UICS]
+    __attribute__ ((weak));
+extern unsigned char ppc4xx_uic_ext_irq_cfg[] __attribute__ ((weak));
 
 #define IRQ_MASK_UIC0(irq)		(1 << (31 - (irq)))
 #define IRQ_MASK_UICx(irq)		(1 << (31 - ((irq) & 0x1f)))
@@ -40,7 +41,10 @@ extern unsigned char ppc4xx_uic_ext_irq_cfg[] __attribute__((weak));
 #define UIC_HANDLERS(n)							\
 static void ppc4xx_uic##n##_enable(unsigned int irq)			\
 {									\
-	ppc_cached_irq_mask[n] |= IRQ_MASK_UIC##n(irq);			\
+	u32 mask = IRQ_MASK_UIC##n(irq);				\
+	if (irq_desc[irq].status & IRQ_LEVEL)				\
+		mtdcr(DCRN_UIC_SR(UIC##n), mask);			\
+	ppc_cached_irq_mask[n] |= mask;					\
 	mtdcr(DCRN_UIC_ER(UIC##n), ppc_cached_irq_mask[n]);		\
 }									\
 									\
@@ -48,6 +52,7 @@ static void ppc4xx_uic##n##_disable(unsigned int irq)			\
 {									\
 	ppc_cached_irq_mask[n] &= ~IRQ_MASK_UIC##n(irq);		\
 	mtdcr(DCRN_UIC_ER(UIC##n), ppc_cached_irq_mask[n]);		\
+	ACK_UIC##n##_PARENT						\
 }									\
 									\
 static void ppc4xx_uic##n##_ack(unsigned int irq)			\
@@ -63,11 +68,11 @@ static void ppc4xx_uic##n##_end(unsigned int irq)			\
 {									\
 	unsigned int status = irq_desc[irq].status;			\
 	u32 mask = IRQ_MASK_UIC##n(irq);				\
-	if (status & IRQ_LEVEL){					\
+	if (status & IRQ_LEVEL) {					\
 		mtdcr(DCRN_UIC_SR(UIC##n), mask);			\
 		ACK_UIC##n##_PARENT					\
 	}								\
-	if (!(status & (IRQ_DISABLED | IRQ_INPROGRESS))){		\
+	if (!(status & (IRQ_DISABLED | IRQ_INPROGRESS))) {		\
 		ppc_cached_irq_mask[n] |= mask;				\
 		mtdcr(DCRN_UIC_ER(UIC##n), ppc_cached_irq_mask[n]);	\
 	}								\
@@ -86,7 +91,9 @@ static void ppc4xx_uic##n##_end(unsigned int irq)			\
 #define ACK_UIC0_PARENT	mtdcr(DCRN_UIC_SR(UICB), UICB_UIC0NC);
 #define ACK_UIC1_PARENT	mtdcr(DCRN_UIC_SR(UICB), UICB_UIC1NC);
 #define ACK_UIC2_PARENT	mtdcr(DCRN_UIC_SR(UICB), UICB_UIC2NC);
-UIC_HANDLERS(0); UIC_HANDLERS(1); UIC_HANDLERS(2);
+UIC_HANDLERS(0);
+UIC_HANDLERS(1);
+UIC_HANDLERS(2);
 
 static int ppc4xx_pic_get_irq(struct pt_regs *regs)
 {
@@ -114,7 +121,8 @@ static void __init ppc4xx_pic_impl_init(void)
 #elif NR_UICS == 2
 #define ACK_UIC0_PARENT
 #define ACK_UIC1_PARENT	mtdcr(DCRN_UIC_SR(UIC0), UIC0_UIC1NC);
-UIC_HANDLERS(0); UIC_HANDLERS(1);
+UIC_HANDLERS(0);
+UIC_HANDLERS(1);
 
 static int ppc4xx_pic_get_irq(struct pt_regs *regs)
 {
@@ -143,18 +151,20 @@ static int ppc4xx_pic_get_irq(struct pt_regs *regs)
 	return uic0 ? 32 - ffs(uic0) : -1;
 }
 
-static inline void ppc4xx_pic_impl_init(void){}
+static inline void ppc4xx_pic_impl_init(void)
+{
+}
 #endif
 
 static struct ppc4xx_uic_impl {
 	struct hw_interrupt_type decl;
-	int			 base;		/* Base DCR number */
+	int base;			/* Base DCR number */
 } __uic[] = {
-    { .decl = DECLARE_UIC(0), .base = UIC0 },
+	{ .decl = DECLARE_UIC(0), .base = UIC0 },
 #if NR_UICS > 1
-    { .decl = DECLARE_UIC(1), .base = UIC1 },
+	{ .decl = DECLARE_UIC(1), .base = UIC1 },
 #if NR_UICS > 2
-    { .decl = DECLARE_UIC(2), .base = UIC2 },
+	{ .decl = DECLARE_UIC(2), .base = UIC2 },
 #endif
 #endif
 };
@@ -168,9 +178,9 @@ static inline int is_level_sensitive(int irq)
 void __init ppc4xx_pic_init(void)
 {
 	int i;
-	unsigned char* eirqs = ppc4xx_uic_ext_irq_cfg;
+	unsigned char *eirqs = ppc4xx_uic_ext_irq_cfg;
 
-	for (i = 0; i < NR_UICS; ++i){
+	for (i = 0; i < NR_UICS; ++i) {
 		int base = __uic[i].base;
 
 		/* Disable everything by default */
@@ -181,23 +191,23 @@ void __init ppc4xx_pic_init(void)
 		mtdcr(DCRN_UIC_CR(base), 0);
 
 		/* Configure polarity and triggering */
-		if (ppc4xx_core_uic_cfg){
-			struct ppc4xx_uic_settings* p = ppc4xx_core_uic_cfg + i;
+		if (ppc4xx_core_uic_cfg) {
+			struct ppc4xx_uic_settings *p = ppc4xx_core_uic_cfg + i;
 			u32 mask = p->ext_irq_mask;
 			u32 pr = mfdcr(DCRN_UIC_PR(base)) & mask;
 			u32 tr = mfdcr(DCRN_UIC_TR(base)) & mask;
 
 			/* "Fixed" interrupts (on-chip devices) */
-			pr |= p->polarity   & ~mask;
+			pr |= p->polarity & ~mask;
 			tr |= p->triggering & ~mask;
 
 			/* Merge external IRQs settings if board port
 			 * provided them
 			 */
-			if (eirqs && mask){
+			if (eirqs && mask) {
 				pr &= ~mask;
 				tr &= ~mask;
-				while (mask){
+				while (mask) {
 					/* Extract current external IRQ mask */
 					u32 eirq_mask = 1 << __ilog2(mask);
 
@@ -227,8 +237,8 @@ void __init ppc4xx_pic_init(void)
 	ppc4xx_pic_impl_init();
 
 	/* Attach low-level handlers */
-	for (i = 0; i < (NR_UICS << 5); ++i){
-    		irq_desc[i].handler = &__uic[i >> 5].decl;
+	for (i = 0; i < (NR_UICS << 5); ++i) {
+		irq_desc[i].handler = &__uic[i >> 5].decl;
 		if (is_level_sensitive(i))
 			irq_desc[i].status |= IRQ_LEVEL;
 	}

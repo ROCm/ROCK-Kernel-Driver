@@ -32,6 +32,13 @@ struct journal_head {
 	unsigned b_jlist;
 
 	/*
+	 * This flag signals the buffer has been modified by
+	 * the currently running transaction
+	 * [jbd_lock_bh_state()]
+	 */
+	unsigned b_modified;
+
+	/*
 	 * Copy of the buffer data frozen for writing to the log.
 	 * [jbd_lock_bh_state()]
 	 */

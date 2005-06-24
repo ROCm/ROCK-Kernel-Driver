@@ -18,15 +18,16 @@ struct rtc_ops {
 	void		(*release)(void);
 	int		(*ioctl)(unsigned int, unsigned long);
 
-	void		(*read_time)(struct rtc_time *);
+	int		(*read_time)(struct rtc_time *);
 	int		(*set_time)(struct rtc_time *);
-	void		(*read_alarm)(struct rtc_wkalrm *);
+	int		(*read_alarm)(struct rtc_wkalrm *);
 	int		(*set_alarm)(struct rtc_wkalrm *);
 	int		(*proc)(char *buf);
 };
 
 void rtc_time_to_tm(unsigned long, struct rtc_time *);
 int rtc_tm_to_time(struct rtc_time *, unsigned long *);
+int rtc_valid_tm(struct rtc_time *);
 void rtc_next_alarm_time(struct rtc_time *, struct rtc_time *, struct rtc_time *);
 void rtc_update(unsigned long, unsigned long);
 int register_rtc(struct rtc_ops *);

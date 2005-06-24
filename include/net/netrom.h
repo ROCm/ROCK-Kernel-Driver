@@ -8,6 +8,7 @@
 #define _NETROM_H 
 #include <linux/netrom.h>
 #include <linux/list.h>
+#include <net/sock.h>
 
 #define	NR_NETWORK_LEN			15
 #define	NR_TRANSPORT_LEN		5
@@ -55,7 +56,8 @@ enum {
 #define NR_MAX_WINDOW_SIZE		127			/* Maximum Window Allowable - 127 */
 #define	NR_MAX_PACKET_SIZE		236			/* Maximum Packet Length - 236 */
 
-typedef struct {
+struct nr_sock {
+	struct sock		sock;
 	ax25_address		user_addr, source_addr, dest_addr;
 	struct net_device		*device;
 	unsigned char		my_index,   my_id;
@@ -72,10 +74,9 @@ typedef struct {
 	struct sk_buff_head	ack_queue;
 	struct sk_buff_head	reseq_queue;
 	struct sk_buff_head	frag_queue;
-	struct sock		*sk;		/* Backlink to socket */
-} nr_cb;
+};
 
-#define nr_sk(__sk) ((nr_cb *)(__sk)->sk_protinfo)
+#define nr_sk(sk) ((struct nr_sock *)(sk))
 
 struct nr_neigh {
 	struct hlist_node	neigh_node;
@@ -221,6 +222,7 @@ extern void nr_transmit_refusal(struct sk_buff *, int);
 extern void nr_disconnect(struct sock *, int);
 
 /* nr_timer.c */
+extern void nr_init_timers(struct sock *sk);
 extern void nr_start_heartbeat(struct sock *);
 extern void nr_start_t1timer(struct sock *);
 extern void nr_start_t2timer(struct sock *);

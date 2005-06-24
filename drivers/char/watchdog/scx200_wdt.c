@@ -4,7 +4,7 @@
 
    Copyright (c) 2001,2002 Christer Weinigel <wingel@nano-system.com>
 
-   Som code taken from:
+   Some code taken from:
    National Semiconductor PC87307/PC97307 (ala SC1200) WDT driver
    (c) Copyright 2002 Zwane Mwaikambo <zwane@commfireservices.com>
 
@@ -64,7 +64,7 @@ static char expect_close;
 
 static void scx200_wdt_ping(void)
 {
-	outw(wdto_restart, SCx200_CB_BASE + SCx200_WDT_WDTO);
+	outw(wdto_restart, scx200_cb_base + SCx200_WDT_WDTO);
 }
 
 static void scx200_wdt_update_margin(void)
@@ -78,9 +78,9 @@ static void scx200_wdt_enable(void)
 	printk(KERN_DEBUG NAME ": enabling watchdog timer, wdto_restart = %d\n",
 	       wdto_restart);
 
-	outw(0, SCx200_CB_BASE + SCx200_WDT_WDTO);
-	outb(SCx200_WDT_WDSTS_WDOVF, SCx200_CB_BASE + SCx200_WDT_WDSTS);
-	outw(W_ENABLE, SCx200_CB_BASE + SCx200_WDT_WDCNFG);
+	outw(0, scx200_cb_base + SCx200_WDT_WDTO);
+	outb(SCx200_WDT_WDSTS_WDOVF, scx200_cb_base + SCx200_WDT_WDSTS);
+	outw(W_ENABLE, scx200_cb_base + SCx200_WDT_WDCNFG);
 
 	scx200_wdt_ping();
 }
@@ -89,9 +89,9 @@ static void scx200_wdt_disable(void)
 {
 	printk(KERN_DEBUG NAME ": disabling watchdog timer\n");
 
-	outw(0, SCx200_CB_BASE + SCx200_WDT_WDTO);
-	outb(SCx200_WDT_WDSTS_WDOVF, SCx200_CB_BASE + SCx200_WDT_WDSTS);
-	outw(W_DISABLE, SCx200_CB_BASE + SCx200_WDT_WDCNFG);
+	outw(0, scx200_cb_base + SCx200_WDT_WDTO);
+	outb(SCx200_WDT_WDSTS_WDOVF, scx200_cb_base + SCx200_WDT_WDSTS);
+	outw(W_DISABLE, scx200_cb_base + SCx200_WDT_WDCNFG);
 }
 
 static int scx200_wdt_open(struct inode *inode, struct file *file)
@@ -217,28 +217,14 @@ static struct miscdevice scx200_wdt_miscdev = {
 static int __init scx200_wdt_init(void)
 {
 	int r;
-	static struct pci_device_id ns_sc[] = {
-		{ PCI_DEVICE(PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_SCx200_BRIDGE) },
-		{ PCI_DEVICE(PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_SC1100_BRIDGE) },
-		{ },
-	};
 
 	printk(KERN_DEBUG NAME ": NatSemi SCx200 Watchdog Driver\n");
 
-	/*
-	 * First check that this really is a NatSemi SCx200 CPU or a Geode
-	 * SC1100 processor
-	 */
-	if (!pci_dev_present(ns_sc))
+	/* check that we have found the configuration block */
+	if (!scx200_cb_present())
 		return -ENODEV;
 
-	/* More sanity checks, verify that the configuration block is there */
-	if (!scx200_cb_probe(SCx200_CB_BASE)) {
-		printk(KERN_WARNING NAME ": no configuration block found\n");
-		return -ENODEV;
-	}
-
-	if (!request_region(SCx200_CB_BASE + SCx200_WDT_OFFSET,
+	if (!request_region(scx200_cb_base + SCx200_WDT_OFFSET,
 			    SCx200_WDT_SIZE,
 			    "NatSemi SCx200 Watchdog")) {
 		printk(KERN_WARNING NAME ": watchdog I/O region busy\n");
@@ -252,7 +238,7 @@ static int __init scx200_wdt_init(void)
 
 	r = misc_register(&scx200_wdt_miscdev);
 	if (r) {
-		release_region(SCx200_CB_BASE + SCx200_WDT_OFFSET,
+		release_region(scx200_cb_base + SCx200_WDT_OFFSET,
 				SCx200_WDT_SIZE);
 		return r;
 	}
@@ -261,7 +247,7 @@ static int __init scx200_wdt_init(void)
 	if (r) {
 		printk(KERN_ERR NAME ": unable to register reboot notifier");
 		misc_deregister(&scx200_wdt_miscdev);
-		release_region(SCx200_CB_BASE + SCx200_WDT_OFFSET,
+		release_region(scx200_cb_base + SCx200_WDT_OFFSET,
 				SCx200_WDT_SIZE);
 		return r;
 	}
@@ -273,7 +259,7 @@ static void __exit scx200_wdt_cleanup(void)
 {
 	unregister_reboot_notifier(&scx200_wdt_notifier);
 	misc_deregister(&scx200_wdt_miscdev);
-	release_region(SCx200_CB_BASE + SCx200_WDT_OFFSET,
+	release_region(scx200_cb_base + SCx200_WDT_OFFSET,
 		       SCx200_WDT_SIZE);
 }
 

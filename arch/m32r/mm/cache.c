@@ -4,8 +4,6 @@
  *  Copyright (C) 2002  Hirokazu Takata
  */
 
-/* $Id$ */
-
 #include <linux/config.h>
 #include <asm/pgtable.h>
 
@@ -25,8 +23,8 @@
 #define MCCR_DCACHE_CBINV	(MCCR_CC|MCCR_DIV|MCCR_DCB)
 #define CHECK_MCCR(mccr)	(mccr = *MCCR)
 #elif defined(CONFIG_CHIP_M32102)
-#define MCCR		((volatile unsigned long*)0xfffffffc)
-#define MCCR_IIV	(1UL << 8)	/* I-cache invalidate */
+#define MCCR		((volatile unsigned char*)0xfffffffe)
+#define MCCR_IIV	(1UL << 0)	/* I-cache invalidate */
 #define MCCR_ICACHE_INV		MCCR_IIV
 #endif /* CONFIG_CHIP_XNUX2 || CONFIG_CHIP_M32700 */
 
@@ -65,4 +63,3 @@ void _flush_cache_copyback_all(void)
 
 #endif
 }
-

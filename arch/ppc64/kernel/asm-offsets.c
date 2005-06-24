@@ -22,6 +22,7 @@
 #include <linux/types.h>
 #include <linux/mman.h>
 #include <linux/mm.h>
+#include <linux/time.h>
 #include <linux/hardirq.h>
 #include <asm/io.h>
 #include <asm/page.h>
@@ -35,6 +36,8 @@
 #include <asm/rtas.h>
 #include <asm/cputable.h>
 #include <asm/cache.h>
+#include <asm/systemcfg.h>
+#include <asm/compat.h>
 
 #define DEFINE(sym, val) \
 	asm volatile("\n->" #sym " %0 " #val : : "i" (val))
@@ -166,6 +169,25 @@ int main(void)
 	DEFINE(CPU_SPEC_PVR_VALUE, offsetof(struct cpu_spec, pvr_value));
 	DEFINE(CPU_SPEC_FEATURES, offsetof(struct cpu_spec, cpu_features));
 	DEFINE(CPU_SPEC_SETUP, offsetof(struct cpu_spec, cpu_setup));
+
+	/* systemcfg offsets for use by vdso */
+	DEFINE(CFG_TB_ORIG_STAMP, offsetof(struct systemcfg, tb_orig_stamp));
+	DEFINE(CFG_TB_TICKS_PER_SEC, offsetof(struct systemcfg, tb_ticks_per_sec));
+	DEFINE(CFG_TB_TO_XS, offsetof(struct systemcfg, tb_to_xs));
+	DEFINE(CFG_STAMP_XSEC, offsetof(struct systemcfg, stamp_xsec));
+	DEFINE(CFG_TB_UPDATE_COUNT, offsetof(struct systemcfg, tb_update_count));
+	DEFINE(CFG_TZ_MINUTEWEST, offsetof(struct systemcfg, tz_minuteswest));
+	DEFINE(CFG_TZ_DSTTIME, offsetof(struct systemcfg, tz_dsttime));
+	DEFINE(CFG_SYSCALL_MAP32, offsetof(struct systemcfg, syscall_map_32));
+	DEFINE(CFG_SYSCALL_MAP64, offsetof(struct systemcfg, syscall_map_64));
+
+	/* timeval/timezone offsets for use by vdso */
+	DEFINE(TVAL64_TV_SEC, offsetof(struct timeval, tv_sec));
+	DEFINE(TVAL64_TV_USEC, offsetof(struct timeval, tv_usec));
+	DEFINE(TVAL32_TV_SEC, offsetof(struct compat_timeval, tv_sec));
+	DEFINE(TVAL32_TV_USEC, offsetof(struct compat_timeval, tv_usec));
+	DEFINE(TZONE_TZ_MINWEST, offsetof(struct timezone, tz_minuteswest));
+	DEFINE(TZONE_TZ_DSTTIME, offsetof(struct timezone, tz_dsttime));
 
 	return 0;
 }

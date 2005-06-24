@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2004 Helge Deller <deller@gmx.de>
  * Copyright (c) 2002 Laurent Canet <canetl@esiee.fr>
- * Copyright (c) 2002 Thibaut Varene <varenet@esiee.fr>
+ * Copyright (c) 2002 Thibaut Varene <varenet@parisc-linux.org>
  *
  * Pieces of code based on linux-2.4's hp_mouse.c & hp_keyb.c
  * 	Copyright (c) 1999 Alex deVries <alex@onefishtwo.ca>
@@ -37,7 +37,7 @@
 #include <asm/io.h>
 #include <asm/parisc-device.h>
 
-MODULE_AUTHOR("Laurent Canet <canetl@esiee.fr>, Thibaut Varene <varenet@esiee.fr>, Helge Deller <deller@gmx.de>");
+MODULE_AUTHOR("Laurent Canet <canetl@esiee.fr>, Thibaut Varene <varenet@parisc-linux.org>, Helge Deller <deller@gmx.de>");
 MODULE_DESCRIPTION("HP GSC PS2 port driver");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(parisc, gscps2_device_tbl);

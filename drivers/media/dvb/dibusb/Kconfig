@@ -13,7 +13,7 @@ config DVB_DIBUSB
 
 	    TwinhanDTV USB-Ter (VP7041)
 		TwinhanDTV Magic Box (VP7041e)
-	    KWorld V-Stream XPERT DTV - DVB-T USB
+	    KWorld/JetWay/ADSTech V-Stream XPERT DTV - DVB-T USB1.1 and USB2.0
 	    Hama DVB-T USB-Box
 	    DiBcom reference devices (non-public)
 	    Ultima Electronic/Artec T1 USB TVBOX
@@ -23,6 +23,7 @@ config DVB_DIBUSB
 	    Artec T1 USB1.1 and USB2.0 boxes
 	    Yakumo/Typhoon DVB-T USB2.0
 	    Hanftek UMT-010 USB2.0
+	    Hauppauge WinTV NOVA-T USB2
 
 	  The VP7041 seems to be identical to "CTS Portable" (Chinese
 	  Television System).

@@ -50,17 +50,10 @@
 #include "hcd.h"
 #include "usb.h"
 
-extern int  usb_hub_init(void);
-extern void usb_hub_cleanup(void);
-extern int usb_major_init(void);
-extern void usb_major_cleanup(void);
-extern int usb_host_init(void);
-extern void usb_host_cleanup(void);
-
 
 const char *usbcore_name = "usbcore";
 
-int nousb;		/* Disable USB when built into kernel image */
+static int nousb;	/* Disable USB when built into kernel image */
 			/* Not honored on modular build */
 
 static DECLARE_RWSEM(usb_all_devices_rwsem);
@@ -86,7 +79,7 @@ static struct device_driver usb_generic_driver = {
 static int usb_generic_driver_data;
 
 /* called from driver core with usb_bus_type.subsys writelock */
-int usb_probe_interface(struct device *dev)
+static int usb_probe_interface(struct device *dev)
 {
 	struct usb_interface * intf = to_usb_interface(dev);
 	struct usb_driver * driver = to_usb_driver(dev->driver);
@@ -114,7 +107,7 @@ int usb_probe_interface(struct device *dev)
 }
 
 /* called from driver core with usb_bus_type.subsys writelock */
-int usb_unbind_interface(struct device *dev)
+static int usb_unbind_interface(struct device *dev)
 {
 	struct usb_interface *intf = to_usb_interface(dev);
 	struct usb_driver *driver = to_usb_driver(intf->dev.driver);
@@ -614,6 +607,31 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 					alt->desc.bInterfaceClass,
 					alt->desc.bInterfaceSubClass,
 					alt->desc.bInterfaceProtocol))
+			return -ENOMEM;
+
+		if (add_hotplug_env_var(envp, num_envp, &i,
+					buffer, buffer_size, &length,
+					"MODALIAS=usb:v%04Xp%04Xd%04Xdc%02Xdsc%02Xdp%02Xic%02Xisc%02Xip%02X",
+					le16_to_cpu(usb_dev->descriptor.idVendor),
+					le16_to_cpu(usb_dev->descriptor.idProduct),
+					le16_to_cpu(usb_dev->descriptor.bcdDevice),
+					usb_dev->descriptor.bDeviceClass,
+					usb_dev->descriptor.bDeviceSubClass,
+					usb_dev->descriptor.bDeviceProtocol,
+					alt->desc.bInterfaceClass,
+					alt->desc.bInterfaceSubClass,
+					alt->desc.bInterfaceProtocol))
+			return -ENOMEM;
+ 	} else {
+		if (add_hotplug_env_var(envp, num_envp, &i,
+					buffer, buffer_size, &length,
+					"MODALIAS=usb:v%04Xp%04Xd%04Xdc%02Xdsc%02Xdp%02Xic*isc*ip*",
+					le16_to_cpu(usb_dev->descriptor.idVendor),
+					le16_to_cpu(usb_dev->descriptor.idProduct),
+					le16_to_cpu(usb_dev->descriptor.bcdDevice),
+					usb_dev->descriptor.bDeviceClass,
+					usb_dev->descriptor.bDeviceSubClass,
+					usb_dev->descriptor.bDeviceProtocol))
 			return -ENOMEM;
 	}
 
@@ -1148,6 +1166,7 @@ void usb_buffer_free (
  *
  * Reverse the effect of this call with usb_buffer_unmap().
  */
+#if 0
 struct urb *usb_buffer_map (struct urb *urb)
 {
 	struct usb_bus		*bus;
@@ -1177,6 +1196,7 @@ struct urb *usb_buffer_map (struct urb *urb)
 				| URB_NO_SETUP_DMA_MAP);
 	return urb;
 }
+#endif  /*  0  */
 
 /* XXX DISABLED, no users currently.  If you wish to re-enable this
  * XXX please determine whether the sync is to transfer ownership of
@@ -1221,6 +1241,7 @@ void usb_buffer_dmasync (struct urb *urb)
  *
  * Reverses the effect of usb_buffer_map().
  */
+#if 0
 void usb_buffer_unmap (struct urb *urb)
 {
 	struct usb_bus		*bus;
@@ -1247,6 +1268,7 @@ void usb_buffer_unmap (struct urb *urb)
 	urb->transfer_flags &= ~(URB_NO_TRANSFER_DMA_MAP
 				| URB_NO_SETUP_DMA_MAP);
 }
+#endif  /*  0  */
 
 /**
  * usb_buffer_map_sg - create scatterlist DMA mapping(s) for an endpoint
@@ -1351,13 +1373,13 @@ void usb_buffer_unmap_sg (struct usb_device *dev, unsigned pipe,
 			usb_pipein (pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
-static int usb_generic_suspend(struct device *dev, u32 state)
+static int usb_generic_suspend(struct device *dev, pm_message_t message)
 {
 	struct usb_interface *intf;
 	struct usb_driver *driver;
 
 	if (dev->driver == &usb_generic_driver)
-		return usb_suspend_device (to_usb_device(dev), state);
+		return usb_suspend_device (to_usb_device(dev), message);
 
 	if ((dev->driver == NULL) ||
 	    (dev->driver_data == &usb_generic_driver_data))
@@ -1371,7 +1393,7 @@ static int usb_generic_suspend(struct device *dev, u32 state)
 		return 0;
 
 	if (driver->suspend)
-		return driver->suspend(intf, state);
+		return driver->suspend(intf, message);
 	return 0;
 }
 
@@ -1527,11 +1549,11 @@ EXPORT_SYMBOL(usb_get_current_frame_number);
 EXPORT_SYMBOL (usb_buffer_alloc);
 EXPORT_SYMBOL (usb_buffer_free);
 
-EXPORT_SYMBOL (usb_buffer_map);
 #if 0
+EXPORT_SYMBOL (usb_buffer_map);
 EXPORT_SYMBOL (usb_buffer_dmasync);
-#endif
 EXPORT_SYMBOL (usb_buffer_unmap);
+#endif
 
 EXPORT_SYMBOL (usb_buffer_map_sg);
 #if 0

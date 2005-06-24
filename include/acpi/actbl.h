@@ -261,6 +261,8 @@ struct madt_local_sapic
 	u8                              local_sapic_eid;        /* SAPIC EID */
 	u8                              reserved [3];           /* Reserved - must be zero */
 	LOCAL_APIC_FLAGS
+	u32                             processor_uID;          /* Numeric UID - ACPI 3.0 */
+	char                            processor_uIDstring[1]; /* String UID  - ACPI 3.0 */
 };
 
 struct madt_interrupt_source
@@ -272,7 +274,7 @@ struct madt_interrupt_source
 	u8                              processor_eid;          /* Processor EID */
 	u8                              io_sapic_vector;        /* Vector value for PMI interrupts */
 	u32                             interrupt;              /* Global system interrupt */
-	u32                             reserved;               /* Reserved - must be zero */
+	u32                             flags;                  /* Interrupt Source Flags */
 };
 
 

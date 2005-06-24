@@ -87,15 +87,6 @@ int acpi_save_state_mem (void)
 	return 0;
 }
 
-/**
- * acpi_save_state_disk - save kernel state to disk
- *
- */
-int acpi_save_state_disk (void)
-{
-	return 1;
-}
-
 /*
  * acpi_restore_state
  */

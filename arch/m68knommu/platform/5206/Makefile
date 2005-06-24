@@ -18,4 +18,3 @@ endif
 
 obj-y := config.o
 
-extra-y := $(BOARD)/crt0_$(MODEL).o

@@ -543,7 +543,7 @@ static int cosa_probe(int base, int irq, int dma)
 		 * FIXME: When this code is not used as module, we should
 		 * probably call udelay() instead of the interruptible sleep.
 		 */
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		cosa_putstatus(cosa, SR_TX_INT_ENA);
 		schedule_timeout(30);
 		irq = probe_irq_off(irqs);
@@ -1564,8 +1564,7 @@ static int cosa_reset_and_read_id(struct cosa_data *cosa, char *idstring)
 	cosa_getdata8(cosa);
 	cosa_putstatus(cosa, SR_RST);
 #ifdef MODULE
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(HZ/2);
+	msleep(500);
 #else
 	udelay(5*100000);
 #endif
@@ -1618,7 +1617,7 @@ static int get_wait_data(struct cosa_data *cosa)
 			return r;
 		}
 		/* sleep if not ready to read */
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(1);
 	}
 	printk(KERN_INFO "cosa: timeout in get_wait_data (status 0x%x)\n",

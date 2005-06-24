@@ -7,6 +7,10 @@
 
 /* Interesting stuff for the National Semiconductor SCx200 CPU */
 
+extern unsigned scx200_cb_base;
+
+#define scx200_cb_present() (scx200_cb_base!=0)
+
 /* F0 PCI Header/Bridge Configuration Registers */
 #define SCx200_DOCCS_BASE 0x78	/* DOCCS Base Address Register */
 #define SCx200_DOCCS_CTRL 0x7c	/* DOCCS Control Register */
@@ -15,7 +19,7 @@
 #define SCx200_GPIO_SIZE 0x2c	/* Size of GPIO register block */
 
 /* General Configuration Block */
-#define SCx200_CB_BASE 0x9000	/* Base fixed at 0x9000 according to errata */
+#define SCx200_CB_BASE_FIXED 0x9000	/* Base fixed at 0x9000 according to errata? */
 
 /* Watchdog Timer */
 #define SCx200_WDT_OFFSET 0x00	/* offset within configuration block */
@@ -44,9 +48,7 @@
 #define SCx200_IID 0x3c		/* IA On a Chip Identification Number Reg */
 #define SCx200_REV 0x3d		/* Revision Register */
 #define SCx200_CBA 0x3e		/* Configuration Base Address Register */
-
-/* Verify that the configuration block really is there */
-#define scx200_cb_probe(base) (inw((base) + SCx200_CBA) == (base))
+#define SCx200_CBA_SCRATCH 0x64	/* Configuration Base Address Scratchpad */
 
 /*
     Local variables:

@@ -1,9 +1,9 @@
-/* 
+/*
  * audio.h
  *
  * Copyright (C) 2000 Ralph  Metzler <ralph@convergence.de>
  *                  & Marcus Metzler <marcus@convergence.de>
-                      for convergence integrated media GmbH
+ *                    for convergence integrated media GmbH
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Lesser Public License
@@ -32,35 +32,35 @@
 
 
 typedef enum {
-        AUDIO_SOURCE_DEMUX, /* Select the demux as the main source */ 
-	AUDIO_SOURCE_MEMORY /* Select internal memory as the main source */ 
+        AUDIO_SOURCE_DEMUX, /* Select the demux as the main source */
+	AUDIO_SOURCE_MEMORY /* Select internal memory as the main source */
 } audio_stream_source_t;
 
 
-typedef enum { 
-	AUDIO_STOPPED,      /* Device is stopped */ 
-        AUDIO_PLAYING,      /* Device is currently playing */ 
-	AUDIO_PAUSED        /* Device is paused */ 
+typedef enum {
+	AUDIO_STOPPED,      /* Device is stopped */
+        AUDIO_PLAYING,      /* Device is currently playing */
+	AUDIO_PAUSED        /* Device is paused */
 } audio_play_state_t;
 
 
 typedef enum {
         AUDIO_STEREO,
-        AUDIO_MONO_LEFT, 
-	AUDIO_MONO_RIGHT 
+        AUDIO_MONO_LEFT,
+	AUDIO_MONO_RIGHT
 } audio_channel_select_t;
 
 
-typedef struct audio_mixer { 
+typedef struct audio_mixer {
         unsigned int volume_left;
         unsigned int volume_right;
   // what else do we need? bass, pass-through, ...
 } audio_mixer_t;
 
 
-typedef struct audio_status { 
+typedef struct audio_status {
         int                    AV_sync_state;  /* sync audio and video? */
-        int                    mute_state;     /* audio is muted */ 
+        int                    mute_state;     /* audio is muted */
         audio_play_state_t     play_state;     /* current playback state */
         audio_stream_source_t  stream_source;  /* current stream source */
         audio_channel_select_t channel_select; /* currently selected channel */
@@ -88,7 +88,7 @@ typedef uint16_t audio_attributes_t;
 /*    7- 6 Quantization / DRC (mpeg audio: 1=DRC exists)(lpcm: 0=16bit,  */
 /*    5- 4 Sample frequency fs (0=48kHz, 1=96kHz) */
 /*    2- 0 number of audio channels (n+1 channels) */
- 
+
 
 /* for GET_CAPABILITIES and SET_FORMAT, the latter should only set one bit */
 #define AUDIO_CAP_DTS    1
@@ -101,7 +101,7 @@ typedef uint16_t audio_attributes_t;
 #define AUDIO_CAP_SDDS 128
 #define AUDIO_CAP_AC3  256
 
-#define AUDIO_STOP                 _IO('o', 1) 
+#define AUDIO_STOP                 _IO('o', 1)
 #define AUDIO_PLAY                 _IO('o', 2)
 #define AUDIO_PAUSE                _IO('o', 3)
 #define AUDIO_CONTINUE             _IO('o', 4)
@@ -122,4 +122,3 @@ typedef uint16_t audio_attributes_t;
 #define AUDIO_SET_KARAOKE          _IOW('o', 18, audio_karaoke_t)
 
 #endif /* _DVBAUDIO_H_ */
-

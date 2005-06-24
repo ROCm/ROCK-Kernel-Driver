@@ -873,7 +873,7 @@ xlog_find_tail(
 
 	/* find blk_no of tail of log */
 	rhead = (xlog_rec_header_t *)offset;
-	*tail_blk = BLOCK_LSN(rhead->h_tail_lsn, ARCH_CONVERT);
+	*tail_blk = BLOCK_LSN(INT_GET(rhead->h_tail_lsn, ARCH_CONVERT));
 
 	/*
 	 * Reset log values according to the state of the log when we
@@ -940,10 +940,10 @@ xlog_find_tail(
 			 * log records will point recovery to after the
 			 * current unmount record.
 			 */
-			ASSIGN_ANY_LSN(log->l_tail_lsn, log->l_curr_cycle,
-					after_umount_blk, ARCH_NOCONVERT);
-			ASSIGN_ANY_LSN(log->l_last_sync_lsn, log->l_curr_cycle,
-					after_umount_blk, ARCH_NOCONVERT);
+			ASSIGN_ANY_LSN_HOST(log->l_tail_lsn, log->l_curr_cycle,
+					after_umount_blk);
+			ASSIGN_ANY_LSN_HOST(log->l_last_sync_lsn, log->l_curr_cycle,
+					after_umount_blk);
 			*tail_blk = after_umount_blk;
 		}
 	}
@@ -1110,8 +1110,8 @@ xlog_add_record(
 	INT_SET(recp->h_cycle, ARCH_CONVERT, cycle);
 	INT_SET(recp->h_version, ARCH_CONVERT,
 			XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb) ? 2 : 1);
-	ASSIGN_ANY_LSN(recp->h_lsn, cycle, block, ARCH_CONVERT);
-	ASSIGN_ANY_LSN(recp->h_tail_lsn, tail_cycle, tail_block, ARCH_CONVERT);
+	ASSIGN_ANY_LSN_DISK(recp->h_lsn, cycle, block);
+	ASSIGN_ANY_LSN_DISK(recp->h_tail_lsn, tail_cycle, tail_block);
 	INT_SET(recp->h_fmt, ARCH_CONVERT, XLOG_FMT);
 	memcpy(&recp->h_fs_uuid, &log->l_mp->m_sb.sb_uuid, sizeof(uuid_t));
 }
@@ -1217,8 +1217,8 @@ xlog_clear_stale_blocks(
 	int		distance;
 	int		error;
 
-	tail_cycle = CYCLE_LSN(tail_lsn, ARCH_NOCONVERT);
-	tail_block = BLOCK_LSN(tail_lsn, ARCH_NOCONVERT);
+	tail_cycle = CYCLE_LSN(tail_lsn);
+	tail_block = BLOCK_LSN(tail_lsn);
 	head_cycle = log->l_curr_cycle;
 	head_block = log->l_curr_block;
 
@@ -2047,11 +2047,11 @@ xfs_qm_dqcheck(
 		errs++;
 	}
 
-	if (! errs && !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
+	if (!errs && ddq->d_id) {
 		if (INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT) &&
 		    INT_GET(ddq->d_bcount, ARCH_CONVERT) >=
 				INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT)) {
-			if (INT_ISZERO(ddq->d_btimer, ARCH_CONVERT)) {
+			if (!ddq->d_btimer) {
 				if (flags & XFS_QMOPT_DOWARN)
 					cmn_err(CE_ALERT,
 					"%s : Dquot ID 0x%x (0x%p) "
@@ -2064,7 +2064,7 @@ xfs_qm_dqcheck(
 		if (INT_GET(ddq->d_ino_softlimit, ARCH_CONVERT) &&
 		    INT_GET(ddq->d_icount, ARCH_CONVERT) >=
 				INT_GET(ddq->d_ino_softlimit, ARCH_CONVERT)) {
-			if (INT_ISZERO(ddq->d_itimer, ARCH_CONVERT)) {
+			if (!ddq->d_itimer) {
 				if (flags & XFS_QMOPT_DOWARN)
 					cmn_err(CE_ALERT,
 					"%s : Dquot ID 0x%x (0x%p) "
@@ -2077,7 +2077,7 @@ xfs_qm_dqcheck(
 		if (INT_GET(ddq->d_rtb_softlimit, ARCH_CONVERT) &&
 		    INT_GET(ddq->d_rtbcount, ARCH_CONVERT) >=
 				INT_GET(ddq->d_rtb_softlimit, ARCH_CONVERT)) {
-			if (INT_ISZERO(ddq->d_rtbtimer, ARCH_CONVERT)) {
+			if (!ddq->d_rtbtimer) {
 				if (flags & XFS_QMOPT_DOWARN)
 					cmn_err(CE_ALERT,
 					"%s : Dquot ID 0x%x (0x%p) "
@@ -2452,8 +2452,8 @@ xlog_recover_do_inode_trans(
 
 	/* The core is in in-core format */
 	xfs_xlate_dinode_core((xfs_caddr_t)&dip->di_core,
-			      (xfs_dinode_core_t*)item->ri_buf[1].i_addr,
-			      -1, ARCH_CONVERT);
+			      (xfs_dinode_core_t*)item->ri_buf[1].i_addr, -1);
+
 	/* the rest is in on-disk format */
 	if (item->ri_buf[1].i_len > sizeof(xfs_dinode_core_t)) {
 		memcpy((xfs_caddr_t) dip + sizeof(xfs_dinode_core_t),
@@ -3395,7 +3395,7 @@ xlog_pack_data(
 
 	xlog_pack_data_checksum(log, iclog, size);
 
-	cycle_lsn = CYCLE_LSN_NOCONV(iclog->ic_header.h_lsn, ARCH_CONVERT);
+	cycle_lsn = CYCLE_LSN_DISK(iclog->ic_header.h_lsn);
 
 	dp = iclog->ic_datap;
 	for (i = 0; i < BTOBB(size) &&
@@ -3438,7 +3438,7 @@ xlog_unpack_data_checksum(
 		up++;
 	}
 	if (chksum != INT_GET(rhead->h_chksum, ARCH_CONVERT)) {
-	    if (!INT_ISZERO(rhead->h_chksum, ARCH_CONVERT) ||
+	    if (rhead->h_chksum ||
 		((log->l_flags & XLOG_CHKSUM_MISMATCH) == 0)) {
 		    cmn_err(CE_DEBUG,
 			"XFS: LogR chksum mismatch: was (0x%x) is (0x%x)",
@@ -3501,7 +3501,7 @@ xlog_valid_rec_header(
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	if (unlikely(
-	    (INT_ISZERO(rhead->h_version, ARCH_CONVERT) ||
+	    (!rhead->h_version ||
 	    (INT_GET(rhead->h_version, ARCH_CONVERT) &
 			(~XLOG_VERSION_OKBITS)) != 0))) {
 		xlog_warn("XFS: %s: unrecognised log version (%d).",
@@ -3894,7 +3894,7 @@ xlog_do_recover(
 
 	/* Convert superblock from on-disk format */
 	sbp = &log->l_mp->m_sb;
-	xfs_xlatesb(XFS_BUF_TO_SBP(bp), sbp, 1, ARCH_CONVERT, XFS_SB_ALL_BITS);
+	xfs_xlatesb(XFS_BUF_TO_SBP(bp), sbp, 1, XFS_SB_ALL_BITS);
 	ASSERT(sbp->sb_magicnum == XFS_SB_MAGIC);
 	ASSERT(XFS_SB_GOOD_VERSION(sbp));
 	xfs_buf_relse(bp);
@@ -4073,7 +4073,7 @@ xlog_recover_check_summary(
 	sbbp = xfs_getsb(mp, 0);
 #ifdef XFS_LOUD_RECOVERY
 	sbp = &mp->m_sb;
-	xfs_xlatesb(XFS_BUF_TO_SBP(sbbp), sbp, 1, ARCH_CONVERT, XFS_SB_ALL_BITS);
+	xfs_xlatesb(XFS_BUF_TO_SBP(sbbp), sbp, 1, XFS_SB_ALL_BITS);
 	cmn_err(CE_NOTE,
 		"xlog_recover_check_summary: sb_icount %Lu itotal %Lu",
 		sbp->sb_icount, itotal);

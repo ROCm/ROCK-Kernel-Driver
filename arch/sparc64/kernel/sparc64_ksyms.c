@@ -59,6 +59,7 @@
 #include <asm/ns87303.h>
 #include <asm/timer.h>
 #include <asm/cpudata.h>
+#include <asm/rwsem.h>
 
 struct poll {
 	int fd;
@@ -87,7 +88,10 @@ extern int svr4_setcontext(svr4_ucontext_t *uc, struct pt_regs *regs);
 extern int compat_sys_ioctl(unsigned int fd, unsigned int cmd, u32 arg);
 extern int (*handle_mathemu)(struct pt_regs *, struct fpustate *);
 extern long sparc32_open(const char __user * filename, int flags, int mode);
-extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long offset, unsigned long size, pgprot_t prot, int space);
+extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from,
+	unsigned long offset, unsigned long size, pgprot_t prot, int space);
+extern int io_remap_pfn_range(struct vm_area_struct *vma, unsigned long from,
+	unsigned long pfn, unsigned long size, pgprot_t prot);
 extern void (*prom_palette)(int);
 
 extern int __ashrdi3(int, int);
@@ -171,6 +175,15 @@ EXPORT_SYMBOL(down_trylock);
 EXPORT_SYMBOL(down_interruptible);
 EXPORT_SYMBOL(up);
 
+/* RW semaphores */
+EXPORT_SYMBOL(__down_read);
+EXPORT_SYMBOL(__down_read_trylock);
+EXPORT_SYMBOL(__down_write);
+EXPORT_SYMBOL(__down_write_trylock);
+EXPORT_SYMBOL(__up_read);
+EXPORT_SYMBOL(__up_write);
+EXPORT_SYMBOL(__downgrade_write);
+
 /* Atomic counter implementation. */
 EXPORT_SYMBOL(atomic_add);
 EXPORT_SYMBOL(atomic_add_ret);
@@ -206,8 +219,11 @@ EXPORT_SYMBOL(__flushw_user);
 EXPORT_SYMBOL(tlb_type);
 EXPORT_SYMBOL(get_fb_unmapped_area);
 EXPORT_SYMBOL(flush_icache_range);
+
 EXPORT_SYMBOL(flush_dcache_page);
+#ifdef DCACHE_ALIASING_POSSIBLE
 EXPORT_SYMBOL(__flush_dcache_range);
+#endif
 
 EXPORT_SYMBOL(mostek_lock);
 EXPORT_SYMBOL(mstk48t02_regs);
@@ -254,6 +270,7 @@ EXPORT_SYMBOL(pci_dma_supported);
 
 /* I/O device mmaping on Sparc64. */
 EXPORT_SYMBOL(io_remap_page_range);
+EXPORT_SYMBOL(io_remap_pfn_range);
 
 /* Solaris/SunOS binary compatibility */
 EXPORT_SYMBOL(_sigpause_common);
@@ -261,7 +278,7 @@ EXPORT_SYMBOL(verify_compat_iovec);
 
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);
-EXPORT_SYMBOL(__pte_alloc_one_kernel);
+EXPORT_SYMBOL(pte_alloc_one_kernel);
 #ifndef CONFIG_SMP
 EXPORT_SYMBOL(pgt_quicklists);
 #endif
@@ -346,7 +363,9 @@ EXPORT_SYMBOL(__memset);
 EXPORT_SYMBOL(memchr);
 
 EXPORT_SYMBOL(csum_partial);
-EXPORT_SYMBOL(csum_partial_copy_sparc64);
+EXPORT_SYMBOL(csum_partial_copy_nocheck);
+EXPORT_SYMBOL(__csum_partial_copy_from_user);
+EXPORT_SYMBOL(__csum_partial_copy_to_user);
 EXPORT_SYMBOL(ip_fast_csum);
 
 /* Moving data to/from/in userspace. */

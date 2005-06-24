@@ -209,8 +209,8 @@ struct ipv6_pinfo {
 
 	__u32			flow_label;
 	__u32			frag_size;
-	int			hop_limit;
-	int			mcast_hops;
+	__s16			hop_limit;
+	__s16			mcast_hops;
 	int			mcast_oif;
 
 	/* pktoption flags */
@@ -233,10 +233,11 @@ struct ipv6_pinfo {
 				pmtudisc:2,
 				ipv6only:1;
 
+	__u32			dst_cookie;
+
 	struct ipv6_mc_socklist	*ipv6_mc_list;
 	struct ipv6_ac_socklist	*ipv6_ac_list;
 	struct ipv6_fl_socklist *ipv6_fl_list;
-	__u32			dst_cookie;
 
 	struct ipv6_txoptions	*opt;
 	struct sk_buff		*pktoptions;

@@ -1,3 +1,29 @@
+UPDATE March 21 2005 Amit Gud <gud@eth.net>
+
+Macros SPIN_LOCK_UNLOCKED and RW_LOCK_UNLOCKED are deprecated and will be
+removed soon. So for any new code dynamic initialization should be used:
+
+   spinlock_t xxx_lock;
+   rwlock_t xxx_rw_lock;
+
+   static int __init xxx_init(void)
+   {
+   	spin_lock_init(&xxx_lock);
+	rw_lock_init(&xxx_rw_lock);
+	...
+   }
+
+   module_init(xxx_init);
+
+Reasons for deprecation
+  - it hurts automatic lock validators
+  - it becomes intrusive for the realtime preemption patches
+
+Following discussion is still valid, however, with the dynamic initialization
+of spinlocks instead of static.
+
+-----------------------
+
 On Fri, 2 Jan 1998, Doug Ledford wrote:
 > 
 > I'm working on making the aic7xxx driver more SMP friendly (as well as

@@ -189,32 +189,6 @@ void radeonfb_engine_reset(struct radeonfb_info *rinfo)
 
 	radeon_engine_flush (rinfo);
 
-    	/* Some ASICs have bugs with dynamic-on feature, which are  
-     	 * ASIC-version dependent, so we force all blocks on for now
-     	 * -- from XFree86
-     	 * We don't do that on macs, things just work here with dynamic
-     	 * clocking... --BenH
-	 */
-#ifdef CONFIG_ALL_PPC
-	if (_machine != _MACH_Pmac && rinfo->hasCRTC2)
-#else
-	if (rinfo->has_CRTC2)
-#endif	
-	{
-		u32 tmp;
-
-		tmp = INPLL(SCLK_CNTL);
-		OUTPLL(SCLK_CNTL, ((tmp & ~DYN_STOP_LAT_MASK) |
-				   CP_MAX_DYN_STOP_LAT |
-				   SCLK_FORCEON_MASK));
-
-		if (rinfo->family == CHIP_FAMILY_RV200)
-		{
-			tmp = INPLL(SCLK_MORE_CNTL);
-			OUTPLL(SCLK_MORE_CNTL, tmp | SCLK_MORE_FORCEON);
-		}
-	}
-
 	clock_cntl_index = INREG(CLOCK_CNTL_INDEX);
 	mclk_cntl = INPLL(MCLK_CNTL);
 
@@ -274,8 +248,6 @@ void radeonfb_engine_reset(struct radeonfb_info *rinfo)
 
 	OUTREG(CLOCK_CNTL_INDEX, clock_cntl_index);
 	OUTPLL(MCLK_CNTL, mclk_cntl);
-	if (rinfo->R300_cg_workaround)
-		R300_cg_workardound(rinfo);
 }
 
 void radeonfb_engine_init (struct radeonfb_info *rinfo)

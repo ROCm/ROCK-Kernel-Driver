@@ -610,6 +610,10 @@ static int iSeries_pci_read_config(struct pci_bus *bus, unsigned int devfn,
 
 	if (node == NULL)
 		return PCIBIOS_DEVICE_NOT_FOUND;
+	if (offset > 255) {
+		*val = ~0;
+		return PCIBIOS_BAD_REGISTER_NUMBER;
+	}
 
 	fn = hv_cfg_read_func[(size - 1) & 3];
 	HvCall3Ret16(fn, &ret, node->DsaAddr.DsaAddr, offset, 0);
@@ -636,6 +640,8 @@ static int iSeries_pci_write_config(struct pci_bus *bus, unsigned int devfn,
 
 	if (node == NULL)
 		return PCIBIOS_DEVICE_NOT_FOUND;
+	if (offset > 255)
+		return PCIBIOS_BAD_REGISTER_NUMBER;
 
 	fn = hv_cfg_write_func[(size - 1) & 3];
 	ret = HvCall4(fn, node->DsaAddr.DsaAddr, offset, val, 0);

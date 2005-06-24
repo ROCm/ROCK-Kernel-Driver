@@ -1,6 +1,6 @@
 /* linux/include/asm-arm/arch-s3c2410/irqs.h
  *
- * Copyright (c) 2003 Simtec Electronics
+ * Copyright (c) 2003-2005 Simtec Electronics
  *   Ben Dooks <ben@simtec.co.uk>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -11,6 +11,8 @@
  *  12-May-2003 BJD  Created file
  *  08-Jan-2003 BJD  Linux 2.6.0 version, moved BAST bits out
  *  12-Mar-2004 BJD  Fixed bug in header protection
+ *  10-Feb-2005 BJD  Added camera IRQ from guillaume.gourat@nexvision.tv
+ *  28-Feb-2005 BJD  Updated s3c2440 IRQs
  */
 
 
@@ -35,7 +37,8 @@
 #define IRQ_EINT3      S3C2410_IRQ(3)
 #define IRQ_EINT4t7    S3C2410_IRQ(4)	    /* 20 */
 #define IRQ_EINT8t23   S3C2410_IRQ(5)
-#define IRQ_RESERVED6  S3C2410_IRQ(6)
+#define IRQ_RESERVED6  S3C2410_IRQ(6)	    /* for s3c2410 */
+#define IRQ_CAM        S3C2410_IRQ(6)	    /* for s3c2440 */
 #define IRQ_BATT_FLT   S3C2410_IRQ(7)
 #define IRQ_TICK       S3C2410_IRQ(8)	    /* 24 */
 #define IRQ_WDT	       S3C2410_IRQ(9)
@@ -54,6 +57,7 @@
 #define IRQ_SPI0       S3C2410_IRQ(22)
 #define IRQ_UART1      S3C2410_IRQ(23)
 #define IRQ_RESERVED24 S3C2410_IRQ(24)	    /* 40 */
+#define IRQ_NFCON      S3C2410_IRQ(24)	    /* for s3c2440 */
 #define IRQ_USBD       S3C2410_IRQ(25)
 #define IRQ_USBH       S3C2410_IRQ(26)
 #define IRQ_IIC	       S3C2410_IRQ(27)
@@ -109,7 +113,14 @@
 #define IRQ_TC		 S3C2410_IRQ(63)
 #define IRQ_ADC		 S3C2410_IRQ(64)
 
-#define NR_IRQS (IRQ_ADC+1)
+/* extra irqs for s3c2440 */
+
+#define IRQ_S3C2440_CAM_C	S3C2410_IRQ(65)
+#define IRQ_S3C2440_CAM_P	S3C2410_IRQ(66)
+#define IRQ_S3C2440_WDT		S3C2410_IRQ(67)
+#define IRQ_S3C2440_AC97	S3C2410_IRQ(68)
+
+#define NR_IRQS (IRQ_S3C2440_AC97+1)
 
 
 #endif /* __ASM_ARCH_IRQ_H */

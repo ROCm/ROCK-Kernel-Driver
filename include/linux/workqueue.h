@@ -70,6 +70,9 @@ extern int current_is_keventd(void);
 extern int keventd_up(void);
 
 extern void init_workqueues(void);
+void cancel_rearming_delayed_work(struct work_struct *work);
+void cancel_rearming_delayed_workqueue(struct workqueue_struct *,
+				       struct work_struct *);
 
 /*
  * Kill off a pending schedule_delayed_work().  Note that the work callback

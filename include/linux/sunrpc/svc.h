@@ -274,10 +274,7 @@ struct svc_program {
 	char *			pg_name;	/* service name */
 	char *			pg_class;	/* class name: services sharing authentication */
 	struct svc_stat *	pg_stats;	/* rpc statistics */
-	/* Override authentication. NULL means use default */
-	int			(*pg_authenticate)(struct svc_rqst *, u32 *);
-	/* Simpler */
-	int			(*pg_need_auth)(struct svc_rqst *);
+	int			(*pg_authenticate)(struct svc_rqst *);
 };
 
 /*

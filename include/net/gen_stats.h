@@ -15,7 +15,8 @@ struct gnet_dump
 	/* Backward compatability */
 	int               compat_tc_stats;
 	int               compat_xstats;
-	struct rtattr *   xstats;
+	void *            xstats;
+	int               xstats_len;
 	struct tc_stats   tc_stats;
 };
 

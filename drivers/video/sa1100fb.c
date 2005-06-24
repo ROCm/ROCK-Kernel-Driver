@@ -836,7 +836,7 @@ static int sa1100fb_mmap(struct fb_info *info, struct file *file,
 	vma->vm_pgoff = off >> PAGE_SHIFT;
 	vma->vm_flags |= VM_IO;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-	return io_remap_page_range(vma, vma->vm_start, off,
+	return io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
 				   vma->vm_end - vma->vm_start,
 				   vma->vm_page_prot);
 }
@@ -1307,7 +1307,7 @@ sa1100fb_freq_policy(struct notifier_block *nb, unsigned long val,
  * Power management hooks.  Note that we won't be called from IRQ context,
  * unlike the blank functions above, so we may sleep.
  */
-static int sa1100fb_suspend(struct device *dev, u32 state, u32 level)
+static int sa1100fb_suspend(struct device *dev, pm_message_t state, u32 level)
 {
 	struct sa1100fb_info *fbi = dev_get_drvdata(dev);
 
@@ -1507,8 +1507,7 @@ static int __init sa1100fb_probe(struct device *dev)
 
 failed:
 	dev_set_drvdata(dev, NULL);
-	if (fbi)
-		kfree(fbi);
+	kfree(fbi);
 	release_mem_region(0xb0100000, 0x10000);
 	return ret;
 }

@@ -1186,6 +1186,7 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 	arg->len = (pages-1)*PAGE_SIZE;
 	arg->tail[0].iov_len = 0;
 	
+	try_to_freeze(PF_FREEZE);
 	if (signalled())
 		return -EINTR;
 

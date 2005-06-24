@@ -43,11 +43,11 @@
  *
  */
 struct ppc4xx_uic_settings {
-	u32 	polarity;
-	u32 	triggering;
-	u32	ext_irq_mask;
+	u32 polarity;
+	u32 triggering;
+	u32 ext_irq_mask;
 };
 
 extern void ppc4xx_pic_init(void);
 
-#endif	/* __PPC4XX_PIC_H__ */
+#endif				/* __PPC4XX_PIC_H__ */

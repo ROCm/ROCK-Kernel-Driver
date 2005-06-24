@@ -4,7 +4,7 @@
  * Version:	@(#)socket.c	1.1.93	18/02/95
  *
  * Authors:	Orest Zborowski, <obz@Kodak.COM>
- *		Ross Biro, <bir7@leland.Stanford.Edu>
+ *		Ross Biro
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *
  * Fixes:
@@ -287,7 +287,7 @@ static struct inode *sock_alloc_inode(struct super_block *sb)
 	ei->socket.ops = NULL;
 	ei->socket.sk = NULL;
 	ei->socket.file = NULL;
-	ei->socket.passcred = 0;
+	ei->socket.flags = 0;
 
 	return &ei->vfs_inode;
 }
@@ -437,13 +437,13 @@ struct socket *sockfd_lookup(int fd, int *err)
 	}
 
 	inode = file->f_dentry->d_inode;
-	if (!inode->i_sock || !(sock = SOCKET_I(inode)))
-	{
+	if (!S_ISSOCK(inode->i_mode)) {
 		*err = -ENOTSOCK;
 		fput(file);
 		return NULL;
 	}
 
+	sock = SOCKET_I(inode);
 	if (sock->file != file) {
 		printk(KERN_ERR "socki_lookup: socket file changed!\n");
 		sock->file = file;
@@ -471,7 +471,6 @@ static struct socket *sock_alloc(void)
 	sock = SOCKET_I(inode);
 
 	inode->i_mode = S_IFSOCK|S_IRWXUGO;
-	inode->i_sock = 1;
 	inode->i_uid = current->fsuid;
 	inode->i_gid = current->fsgid;
 
@@ -993,8 +992,7 @@ static int sock_fasync(int fd, struct file *filp, int on)
 	sock = SOCKET_I(filp->f_dentry->d_inode);
 
 	if ((sk=sock->sk) == NULL) {
-		if (fna)
-			kfree(fna);
+		kfree(fna);
 		return -EINVAL;
 	}
 

@@ -30,6 +30,7 @@ extern void do_syscall(void *task, int pid, int local_using_sysemu);
 extern void do_sigtrap(void *task);
 extern int is_valid_pid(int pid);
 extern void remap_data(void *segment_start, void *segment_end, int w);
+extern long execute_syscall_tt(void *r);
 
 #endif
 

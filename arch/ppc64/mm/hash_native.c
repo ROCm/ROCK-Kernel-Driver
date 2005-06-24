@@ -217,10 +217,10 @@ static long native_hpte_updatepp(unsigned long slot, unsigned long newpp,
 	}
 
 	/* Ensure it is out of the tlb too */
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
+	if (cpu_has_feature(CPU_FTR_TLBIEL) && !large && local) {
 		tlbiel(va);
 	} else {
-		int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
+		int lock_tlbie = !cpu_has_feature(CPU_FTR_LOCKLESS_TLBIE);
 
 		if (lock_tlbie)
 			spin_lock(&native_tlbie_lock);
@@ -245,7 +245,7 @@ static void native_hpte_updateboltedpp(unsigned long newpp, unsigned long ea)
 	unsigned long vsid, va, vpn, flags = 0;
 	long slot;
 	HPTE *hptep;
-	int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
+	int lock_tlbie = !cpu_has_feature(CPU_FTR_LOCKLESS_TLBIE);
 
 	vsid = get_kernel_vsid(ea);
 	va = (vsid << 28) | (ea & 0x0fffffff);
@@ -273,7 +273,7 @@ static void native_hpte_invalidate(unsigned long slot, unsigned long va,
 	Hpte_dword0 dw0;
 	unsigned long avpn = va >> 23;
 	unsigned long flags;
-	int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
+	int lock_tlbie = !cpu_has_feature(CPU_FTR_LOCKLESS_TLBIE);
 
 	if (large)
 		avpn &= ~0x1UL;
@@ -292,7 +292,7 @@ static void native_hpte_invalidate(unsigned long slot, unsigned long va,
 	}
 
 	/* Invalidate the tlb */
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
+	if (cpu_has_feature(CPU_FTR_TLBIEL) && !large && local) {
 		tlbiel(va);
 	} else {
 		if (lock_tlbie)
@@ -320,8 +320,7 @@ static void native_flush_hash_range(unsigned long context,
 
 	j = 0;
 	for (i = 0; i < number; i++) {
-		if ((batch->addr[i] >= USER_START) &&
-		    (batch->addr[i] <= USER_END))
+		if (batch->addr[i] < KERNELBASE)
 			vsid = get_vsid(context, batch->addr[i]);
 		else
 			vsid = get_kernel_vsid(batch->addr[i]);
@@ -360,7 +359,7 @@ static void native_flush_hash_range(unsigned long context,
 		j++;
 	}
 
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_TLBIEL) && !large && local) {
+	if (cpu_has_feature(CPU_FTR_TLBIEL) && !large && local) {
 		asm volatile("ptesync":::"memory");
 
 		for (i = 0; i < j; i++)
@@ -368,7 +367,7 @@ static void native_flush_hash_range(unsigned long context,
 
 		asm volatile("ptesync":::"memory");
 	} else {
-		int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
+		int lock_tlbie = !cpu_has_feature(CPU_FTR_LOCKLESS_TLBIE);
 
 		if (lock_tlbie)
 			spin_lock(&native_tlbie_lock);

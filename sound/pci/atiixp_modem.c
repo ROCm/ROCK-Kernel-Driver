@@ -463,11 +463,6 @@ static unsigned short snd_atiixp_ac97_read(ac97_t *ac97, unsigned short reg)
 static void snd_atiixp_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short val)
 {
 	atiixp_t *chip = ac97->private_data;
-	if (reg == AC97_GPIO_STATUS) {
-		atiixp_write(chip, MODEM_OUT_GPIO,
-			(val << ATI_REG_MODEM_OUT_GPIO_DATA_SHIFT) | ATI_REG_MODEM_OUT_GPIO_EN);
-		return;
-	}
 	snd_atiixp_codec_write(chip, ac97->num, reg, val);
 }
 
@@ -668,33 +663,44 @@ static int snd_atiixp_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 {
 	atiixp_t *chip = snd_pcm_substream_chip(substream);
 	atiixp_dma_t *dma = (atiixp_dma_t *)substream->runtime->private_data;
-	int err = 0;
+	unsigned int reg = 0;
+	int i;
 
 	snd_assert(dma->ops->enable_transfer && dma->ops->flush_dma, return -EINVAL);
 
+	if (cmd != SNDRV_PCM_TRIGGER_START && cmd != SNDRV_PCM_TRIGGER_STOP)
+		return -EINVAL;
+
 	spin_lock(&chip->reg_lock);
-	switch(cmd) {
-	case SNDRV_PCM_TRIGGER_START:
+
+	/* hook off/on: via GPIO_OUT */
+	for (i = 0; i < NUM_ATI_CODECS; i++) {
+		if (chip->ac97[i]) {
+			reg = snd_ac97_read(chip->ac97[i], AC97_GPIO_STATUS);
+			break;
+	}
+	}
+	if(cmd == SNDRV_PCM_TRIGGER_START)
+		reg |= AC97_GPIO_LINE1_OH;
+	else
+		reg &= ~AC97_GPIO_LINE1_OH;
+	reg = (reg << ATI_REG_MODEM_OUT_GPIO_DATA_SHIFT) | ATI_REG_MODEM_OUT_GPIO_EN ;
+	atiixp_write(chip, MODEM_OUT_GPIO, reg);
+
+	if (cmd == SNDRV_PCM_TRIGGER_START) {
 		dma->ops->enable_transfer(chip, 1);
 		dma->running = 1;
-		break;
-	case SNDRV_PCM_TRIGGER_STOP:
+	} else {
 		dma->ops->enable_transfer(chip, 0);
 		dma->running = 0;
-		break;
-	default:
-		err = -EINVAL;
-		break;
 	}
-	if (! err) {
 	snd_atiixp_check_bus_busy(chip);
 	if (cmd == SNDRV_PCM_TRIGGER_STOP) {
 		dma->ops->flush_dma(chip);
 		snd_atiixp_check_bus_busy(chip);
 	}
-	}
 	spin_unlock(&chip->reg_lock);
-	return err;
+	return 0;
 }
 
 
@@ -1326,7 +1332,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_atiixp_init(void)
 {
-	return pci_register_driver(&driver);
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_atiixp_exit(void)

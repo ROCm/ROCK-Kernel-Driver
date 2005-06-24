@@ -838,7 +838,6 @@ static struct i2c_client_address_data addr_data = {
 	.force			= force
 };
 
-static int saa7114_i2c_id = 0;
 static struct i2c_driver i2c_driver_saa7114;
 
 static int
@@ -871,9 +870,7 @@ saa7114_detect_client (struct i2c_adapter *adapter,
 	client->adapter = adapter;
 	client->driver = &i2c_driver_saa7114;
 	client->flags = I2C_CLIENT_ALLOW_USE;
-	client->id = saa7114_i2c_id++;
-	snprintf(I2C_NAME(client), sizeof(I2C_NAME(client)) - 1,
-		"saa7114[%d]", client->id);
+	strlcpy(I2C_NAME(client), "saa7114", sizeof(I2C_NAME(client)));
 
 	decoder = kmalloc(sizeof(struct saa7114), GFP_KERNEL);
 	if (decoder == NULL) {

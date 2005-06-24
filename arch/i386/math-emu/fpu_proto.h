@@ -2,7 +2,6 @@
 #define _FPU_PROTO_H
 
 /* errors.c */
-extern void Un_impl(void);
 extern void FPU_illegal(void);
 extern void FPU_printall(void);
 asmlinkage void FPU_exception(int n);
@@ -41,7 +40,6 @@ extern void fsubp_(void);
 extern void fdivrp(void);
 extern void fdivp_(void);
 /* fpu_aux.c */
-extern void fclex(void);
 extern void finit(void);
 extern void finit_(void);
 extern void fstsw_(void);

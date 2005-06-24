@@ -1075,7 +1075,7 @@ static int dvb_video_ioctl(struct inode *inode, struct file *file,
 		}
 		if (ret < 0)
 			break;
-		av7110->videostate.video_format = format;
+		av7110->videostate.display_format = format;
 		ret = av7110_fw_cmd(av7110, COMTYPE_ENCODER, SetPanScanType,
 				    1, (u16) val);
 		break;
@@ -1230,14 +1230,20 @@ static int dvb_audio_ioctl(struct inode *inode, struct file *file,
 		switch(av7110->audiostate.channel_select) {
 		case AUDIO_STEREO:
 			audcom(av7110, AUDIO_CMD_STEREO);
+			if (av7110->adac_type == DVB_ADAC_CRYSTAL)
+				i2c_writereg(av7110, 0x20, 0x02, 0x49);
 			break;
 
 		case AUDIO_MONO_LEFT:
 			audcom(av7110, AUDIO_CMD_MONO_L);
+			if (av7110->adac_type == DVB_ADAC_CRYSTAL)
+				i2c_writereg(av7110, 0x20, 0x02, 0x4a);
 			break;
 
 		case AUDIO_MONO_RIGHT:
 			audcom(av7110, AUDIO_CMD_MONO_R);
+			if (av7110->adac_type == DVB_ADAC_CRYSTAL)
+				i2c_writereg(av7110, 0x20, 0x02, 0x45);
 			break;
 
 		default:
@@ -1409,10 +1415,10 @@ int av7110_av_register(struct av7110 *av7110)
 	av7110->video_events.overflow = 0;
 	memset(&av7110->video_size, 0, sizeof (video_size_t));
 
-	dvb_register_device(av7110->dvb_adapter, &av7110->video_dev,
+	dvb_register_device(&av7110->dvb_adapter, &av7110->video_dev,
 			    &dvbdev_video, av7110, DVB_DEVICE_VIDEO);
 
-	dvb_register_device(av7110->dvb_adapter, &av7110->audio_dev,
+	dvb_register_device(&av7110->dvb_adapter, &av7110->audio_dev,
 			    &dvbdev_audio, av7110, DVB_DEVICE_AUDIO);
 
 	return 0;
@@ -1426,25 +1432,34 @@ void av7110_av_unregister(struct av7110 *av7110)
 
 int av7110_av_init(struct av7110 *av7110)
 {
+	void (*play[])(u8 *, int, void *) = { play_audio_cb, play_video_cb };
+	int i, ret;
+
 	av7110->vidmode = VIDEO_MODE_PAL;
 
-	av7110_ipack_init(&av7110->ipack[0], IPACKS, play_audio_cb);
-	av7110->ipack[0].data = (void *) av7110;
-	av7110_ipack_init(&av7110->ipack[1], IPACKS, play_video_cb);
-	av7110->ipack[1].data = (void *) av7110;
+	for (i = 0; i < 2; i++) {
+		struct ipack *ipack = av7110->ipack + i;
+
+		ret = av7110_ipack_init(ipack, IPACKS, play[i]);
+		if (ret < 0) {
+			if (i)
+				av7110_ipack_free(--ipack);
+			goto out;
+		}
+		ipack->data = av7110;
+	}
 
 	dvb_ringbuffer_init(&av7110->avout, av7110->iobuf, AVOUTLEN);
 	dvb_ringbuffer_init(&av7110->aout, av7110->iobuf + AVOUTLEN, AOUTLEN);
 
 	av7110->kbuf[0] = (u8 *)(av7110->iobuf + AVOUTLEN + AOUTLEN + BMPLEN);
 	av7110->kbuf[1] = av7110->kbuf[0] + 2 * IPACKS;
-
-	return 0;
+out:
+	return ret;
 }
 
-int av7110_av_exit(struct av7110 *av7110)
+void av7110_av_exit(struct av7110 *av7110)
 {
 	av7110_ipack_free(&av7110->ipack[0]);
 	av7110_ipack_free(&av7110->ipack[1]);
-	return 0;
 }

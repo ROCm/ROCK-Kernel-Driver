@@ -7,7 +7,7 @@
  *
  * Version:	@(#)ip.h	1.0.2	05/07/93
  *
- * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
+ * Authors:	Ross Biro
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *		Alan Cox, <gw4pts@gw4pts.ampr.org>
  *
@@ -30,8 +30,6 @@
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
 #include <linux/in_route.h>
-#include <linux/netfilter.h>
-#include <linux/netfilter_ipv4.h>
 #include <net/route.h>
 #include <net/arp.h>
 #include <net/snmp.h>
@@ -47,7 +45,6 @@ struct inet_skb_parm
 #define IPSKB_TRANSLATED	2
 #define IPSKB_FORWARDED		4
 #define IPSKB_XFRM_TUNNEL_SIZE	8
-#define IPSKB_XFRM_TRANSFORMED	16
 };
 
 struct ipcm_cookie
@@ -166,6 +163,7 @@ DECLARE_SNMP_STAT(struct linux_mib, net_statistics);
 
 extern int sysctl_local_port_range[2];
 extern int sysctl_ip_default_ttl;
+extern int sysctl_ip_nonlocal_bind;
 
 #ifdef CONFIG_INET
 /* The function in 2.2 was invalid, producing wrong result for
@@ -214,16 +212,6 @@ static inline void ip_select_ident_more(struct iphdr *iph, struct dst_entry *dst
 	} else
 		__ip_select_ident(iph, dst, more);
 }
-
-#ifdef CONFIG_NETFILTER
-extern int ip_dst_output(struct sk_buff *skb);
-#else
-static inline int ip_dst_output(struct sk_buff *skb)
-{
-	return NF_HOOK_COND(PF_INET, NF_IP_POST_ROUTING, skb, NULL,
-	                    skb->dst->dev, dst_output, skb->dst->xfrm != NULL);
-}
-#endif
 
 /*
  *	Map a multicast IP onto multicast MAC for type ethernet.

@@ -38,11 +38,20 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_sil"
-#define DRV_VERSION	"0.8"
+#define DRV_VERSION	"0.9"
 
 enum {
 	sil_3112		= 0,
 	sil_3114		= 1,
+
+	SIL_FIFO_R0		= 0x40,
+	SIL_FIFO_W0		= 0x41,
+	SIL_FIFO_R1		= 0x44,
+	SIL_FIFO_W1		= 0x45,
+	SIL_FIFO_R2		= 0x240,
+	SIL_FIFO_W2		= 0x241,
+	SIL_FIFO_R3		= 0x244,
+	SIL_FIFO_W3		= 0x245,
 
 	SIL_SYSCFG		= 0x48,
 	SIL_MASK_IDE0_INT	= (1 << 22),
@@ -73,12 +82,13 @@ static struct pci_device_id sil_pci_tbl[] = {
 	{ 0x1095, 0x3114, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sil_3114 },
 	{ 0x1002, 0x436e, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sil_3112 },
 	{ 0x1002, 0x4379, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sil_3112 },
+	{ 0x1002, 0x437a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sil_3112 },
 	{ }	/* terminate list */
 };
 
 
 /* TODO firmware versions should be added - eric */
-struct sil_drivelist {
+static const struct sil_drivelist {
 	const char * product;
 	unsigned int quirk;
 } sil_blacklist [] = {
@@ -125,6 +135,7 @@ static Scsi_Host_Template sil_sht = {
 	.dma_boundary		= ATA_DMA_BOUNDARY,
 	.slave_configure	= ata_scsi_slave_config,
 	.bios_param		= ata_std_bios_param,
+	.ordered_flush		= 1,
 };
 
 static struct ata_port_operations sil_ops = {
@@ -150,6 +161,7 @@ static struct ata_port_operations sil_ops = {
 	.scr_write		= sil_scr_write,
 	.port_start		= ata_port_start,
 	.port_stop		= ata_port_stop,
+	.host_stop		= ata_host_stop,
 };
 
 static struct ata_port_info sil_port_info[] = {
@@ -197,6 +209,13 @@ MODULE_DESCRIPTION("low-level driver for Silicon Image SATA controller");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, sil_pci_tbl);
 MODULE_VERSION(DRV_VERSION);
+
+static unsigned char sil_get_device_cache_line(struct pci_dev *pdev)
+{
+	u8 cache_line = 0;
+	pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE, &cache_line);
+	return cache_line;
+}
 
 static void sil_post_set_mode (struct ata_port *ap)
 {
@@ -340,6 +359,7 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	unsigned int i;
 	int pci_dev_busy = 0;
 	u32 tmp, irq_mask;
+	u8 cls;
 
 	if (!printed_version++)
 		printk(KERN_DEBUG DRV_NAME " version " DRV_VERSION "\n");
@@ -403,6 +423,25 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		probe_ent->port[i].scr_addr = base + sil_port[i].scr;
 		ata_std_ports(&probe_ent->port[i]);
 	}
+
+	/* Initialize FIFO PCI bus arbitration */
+	cls = sil_get_device_cache_line(pdev);
+	if (cls) {
+		cls >>= 3;
+		cls++;  /* cls = (line_size/8)+1 */
+		writeb(cls, mmio_base + SIL_FIFO_R0);
+		writeb(cls, mmio_base + SIL_FIFO_W0);
+		writeb(cls, mmio_base + SIL_FIFO_R1);
+		writeb(cls, mmio_base + SIL_FIFO_W1);
+		if (ent->driver_data == sil_3114) {
+			writeb(cls, mmio_base + SIL_FIFO_R2);
+			writeb(cls, mmio_base + SIL_FIFO_W2);
+			writeb(cls, mmio_base + SIL_FIFO_R3);
+			writeb(cls, mmio_base + SIL_FIFO_W3);
+		}
+	} else
+		printk(KERN_WARNING DRV_NAME "(%s): cache line size not set.  Driver may not function\n",
+			pci_name(pdev));
 
 	if (ent->driver_data == sil_3114) {
 		irq_mask = SIL_MASK_4PORT;

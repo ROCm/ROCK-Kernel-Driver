@@ -1003,7 +1003,7 @@ ip_vs_in(unsigned int hooknum, struct sk_buff **pskb,
 
 	/* Check the server status */
 	if (cp->dest && !(cp->dest->flags & IP_VS_DEST_F_AVAILABLE)) {
-		/* the destination server is not availabe */
+		/* the destination server is not available */
 
 		if (sysctl_ip_vs_expire_nodest_conn) {
 			/* try to expire the connection immediately */

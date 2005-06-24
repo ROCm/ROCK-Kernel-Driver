@@ -39,6 +39,9 @@
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
+DEFINE_PER_CPU(unsigned long *, __pgtable_quicklist);
+DEFINE_PER_CPU(long, __pgtable_quicklist_size);
+
 extern void ia64_tlb_init (void);
 
 unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
@@ -50,33 +53,59 @@ struct page *vmem_map;
 EXPORT_SYMBOL(vmem_map);
 #endif
 
-static int pgt_cache_water[2] = { 25, 50 };
-
-struct page *zero_page_memmap_ptr;		/* map entry for zero page */
+struct page *zero_page_memmap_ptr;	/* map entry for zero page */
 EXPORT_SYMBOL(zero_page_memmap_ptr);
 
-void
-check_pgt_cache (void)
-{
-	int low, high;
+#define MIN_PGT_PAGES			25UL
+#define MAX_PGT_FREES_PER_PASS		16L
+#define PGT_FRACTION_OF_NODE_MEM	16
 
-	low = pgt_cache_water[0];
-	high = pgt_cache_water[1];
+static inline long
+max_pgt_pages(void)
+{
+	u64 node_free_pages, max_pgt_pages;
+
+#ifndef	CONFIG_NUMA
+	node_free_pages = nr_free_pages();
+#else
+	node_free_pages = nr_free_pages_pgdat(NODE_DATA(numa_node_id()));
+#endif
+	max_pgt_pages = node_free_pages / PGT_FRACTION_OF_NODE_MEM;
+	max_pgt_pages = max(max_pgt_pages, MIN_PGT_PAGES);
+	return max_pgt_pages;
+}
+
+static inline long
+min_pages_to_free(void)
+{
+	long pages_to_free;
+
+	pages_to_free = pgtable_quicklist_size - max_pgt_pages();
+	pages_to_free = min(pages_to_free, MAX_PGT_FREES_PER_PASS);
+	return pages_to_free;
+}
+
+void
+check_pgt_cache(void)
+{
+	long pages_to_free;
+
+	if (unlikely(pgtable_quicklist_size <= MIN_PGT_PAGES))
+		return;
 
 	preempt_disable();
-	if (pgtable_cache_size > (u64) high) {
-		do {
-			if (pgd_quicklist)
-				free_page((unsigned long)pgd_alloc_one_fast(NULL));
-			if (pmd_quicklist)
-				free_page((unsigned long)pmd_alloc_one_fast(NULL, 0));
-		} while (pgtable_cache_size > (u64) low);
+	while (unlikely((pages_to_free = min_pages_to_free()) > 0)) {
+		while (pages_to_free--) {
+			free_page((unsigned long)pgtable_quicklist_alloc());
+		}
+		preempt_enable();
+		preempt_disable();
 	}
 	preempt_enable();
 }
 
 void
-update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
+lazy_mmu_prot_update (pte_t pte)
 {
 	unsigned long addr;
 	struct page *page;
@@ -85,7 +114,6 @@ update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
 		return;				/* not an executable page... */
 
 	page = pte_page(pte);
-	/* don't use VADDR: it may not be mapped on this CPU (or may have just been flushed): */
 	addr = (unsigned long) page_address(page);
 
 	if (test_bit(PG_arch_1, &page->flags))
@@ -277,8 +305,9 @@ setup_gate (void)
 	struct page *page;
 
 	/*
-	 * Map the gate page twice: once read-only to export the ELF headers etc. and once
-	 * execute-only page to enable privilege-promotion via "epc":
+	 * Map the gate page twice: once read-only to export the ELF
+	 * headers etc. and once execute-only page to enable
+	 * privilege-promotion via "epc":
 	 */
 	page = virt_to_page(ia64_imva(__start_gate_section));
 	put_kernel_page(page, GATE_ADDR, PAGE_READONLY);
@@ -287,6 +316,20 @@ setup_gate (void)
 	put_kernel_page(page, GATE_ADDR + PAGE_SIZE, PAGE_GATE);
 #else
 	put_kernel_page(page, GATE_ADDR + PERCPU_PAGE_SIZE, PAGE_GATE);
+	/* Fill in the holes (if any) with read-only zero pages: */
+	{
+		unsigned long addr;
+
+		for (addr = GATE_ADDR + PAGE_SIZE;
+		     addr < GATE_ADDR + PERCPU_PAGE_SIZE;
+		     addr += PAGE_SIZE)
+		{
+			put_kernel_page(ZERO_PAGE(0), addr,
+					PAGE_READONLY);
+			put_kernel_page(ZERO_PAGE(0), addr + PERCPU_PAGE_SIZE,
+					PAGE_READONLY);
+		}
+	}
 #endif
 	ia64_patch_gate();
 }
@@ -524,10 +567,13 @@ void
 mem_init (void)
 {
 	long reserved_pages, codesize, datasize, initsize;
-	unsigned long num_pgt_pages;
 	pg_data_t *pgdat;
 	int i;
 	static struct kcore_list kcore_mem, kcore_vmem, kcore_kernel;
+
+	BUG_ON(PTRS_PER_PGD * sizeof(pgd_t) != PAGE_SIZE);
+	BUG_ON(PTRS_PER_PMD * sizeof(pmd_t) != PAGE_SIZE);
+	BUG_ON(PTRS_PER_PTE * sizeof(pte_t) != PAGE_SIZE);
 
 #ifdef CONFIG_PCI
 	/*
@@ -565,18 +611,6 @@ mem_init (void)
 	       num_physpages << (PAGE_SHIFT - 10), codesize >> 10,
 	       reserved_pages << (PAGE_SHIFT - 10), datasize >> 10, initsize >> 10);
 
-	/*
-	 * Allow for enough (cached) page table pages so that we can map the entire memory
-	 * at least once.  Each task also needs a couple of page tables pages, so add in a
-	 * fudge factor for that (don't use "threads-max" here; that would be wrong!).
-	 * Don't allow the cache to be more than 10% of total memory, though.
-	 */
-#	define NUM_TASKS	500	/* typical number of tasks */
-	num_pgt_pages = nr_free_pages() / PTRS_PER_PGD + NUM_TASKS;
-	if (num_pgt_pages > nr_free_pages() / 10)
-		num_pgt_pages = nr_free_pages() / 10;
-	if (num_pgt_pages > (u64) pgt_cache_water[1])
-		pgt_cache_water[1] = num_pgt_pages;
 
 	/*
 	 * For fsyscall entrpoints with no light-weight handler, use the ordinary

@@ -564,7 +564,7 @@ static int sisusb_send_packet(struct sisusb_usb_data *sisusb, int len,
 						struct sisusb_packet *packet)
 {
 	int ret;
-	int bytes_transferred = 0;
+	ssize_t bytes_transferred = 0;
 	__le32 tmp;
 
 	if (len == 6)
@@ -601,7 +601,7 @@ static int sisusb_send_bridge_packet(struct sisusb_usb_data *sisusb, int len,
 					unsigned int tflags)
 {
 	int ret;
-	int bytes_transferred = 0;
+	ssize_t bytes_transferred = 0;
 	__le32 tmp;
 
 	if (len == 6)
@@ -983,7 +983,7 @@ static int sisusb_write_mem_bulk(struct sisusb_usb_data *sisusb, u32 addr,
 				msgcount++;
 				if (msgcount < 500)
 					printk(KERN_ERR
-						"sisusbvga[%d]: Wrote %d of "
+						"sisusbvga[%d]: Wrote %zd of "
 						"%d bytes, error %d\n",
 						sisusb->minor, *bytes_written,
 						length, ret);
@@ -1381,7 +1381,8 @@ sisusb_read_pci_config(struct sisusb_usb_data *sisusb, int regnum, u32 *data)
 static int
 sisusb_clear_vram(struct sisusb_usb_data *sisusb, u32 address, int length)
 {
-	int ret, i, j;
+	int ret, i;
+	ssize_t j;
 
 	if (address < sisusb->vrambase)
 		return 1;
@@ -2271,7 +2272,7 @@ sisusb_init_gfxdevice(struct sisusb_usb_data *sisusb, int initscreen)
 
 /* fops */
 
-int
+static int
 sisusb_open(struct inode *inode, struct file *file)
 {
 	struct sisusb_usb_data *sisusb;
@@ -2361,7 +2362,7 @@ sisusb_delete(struct kref *kref)
 	kfree(sisusb);
 }
 
-int
+static int
 sisusb_release(struct inode *inode, struct file *file)
 {
 	struct sisusb_usb_data *sisusb;
@@ -2399,7 +2400,7 @@ sisusb_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-ssize_t
+static ssize_t
 sisusb_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct sisusb_usb_data *sisusb;
@@ -2540,7 +2541,7 @@ sisusb_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 	return errno ? errno : bytes_read;
 }
 
-ssize_t
+static ssize_t
 sisusb_write(struct file *file, const char __user *buffer, size_t count,
 								loff_t *ppos)
 {
@@ -3103,6 +3104,8 @@ static void sisusb_disconnect(struct usb_interface *intf)
 
 static struct usb_device_id sisusb_table [] = {
 	{ USB_DEVICE(0x0711, 0x0900) },
+	{ USB_DEVICE(0x182d, 0x021c) },
+	{ USB_DEVICE(0x182d, 0x0269) },
 	{ }
 };
 
@@ -3113,7 +3116,7 @@ static struct usb_driver sisusb_driver = {
 	.name =		"sisusb",
 	.probe =	sisusb_probe,
 	.disconnect =	sisusb_disconnect,
-	.id_table =	sisusb_table
+	.id_table =	sisusb_table,
 };
 
 static int __init usb_sisusb_init(void)

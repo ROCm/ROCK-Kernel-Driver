@@ -1493,6 +1493,15 @@ static int sync_request (mddev_t *mddev, sector_t sector_nr, int go_faster)
 		unplug_slaves(mddev);
 		return 0;
 	}
+	/* if there is 1 or more failed drives and we are trying
+	 * to resync, then assert that we are finished, because there is
+	 * nothing we can do.
+	 */
+	if (mddev->degraded >= 1 && test_bit(MD_RECOVERY_SYNC, &mddev->recovery)) {
+		int rv = (mddev->size << 1) - sector_nr;
+		md_done_sync(mddev, rv, 1);
+		return rv;
+	}
 
 	x = sector_nr;
 	chunk_offset = sector_div(x, sectors_per_chunk);
@@ -1611,9 +1620,6 @@ static int run (mddev_t *mddev)
 	atomic_set(&conf->active_stripes, 0);
 	atomic_set(&conf->preread_active_stripes, 0);
 
-	mddev->queue->unplug_fn = raid5_unplug_device;
-	mddev->queue->issue_flush_fn = raid5_issue_flush;
-
 	PRINTK("raid5: run(%s) called.\n", mdname(mddev));
 
 	ITERATE_RDEV(mddev,rdev,tmp) {
@@ -1719,6 +1725,10 @@ memory = conf->max_nr_stripes * (sizeof(struct stripe_head) +
 	}
 
 	/* Ok, everything is just fine now */
+
+	mddev->queue->unplug_fn = raid5_unplug_device;
+	mddev->queue->issue_flush_fn = raid5_issue_flush;
+
 	mddev->array_size =  mddev->size * (mddev->raid_disks - 1);
 	return 0;
 abort:
@@ -1864,7 +1874,7 @@ static int raid5_remove_disk(mddev_t *mddev, int number)
 			goto abort;
 		}
 		p->rdev = NULL;
-		synchronize_kernel();
+		synchronize_rcu();
 		if (atomic_read(&rdev->nr_pending)) {
 			/* lost the race, try later */
 			err = -EBUSY;
@@ -1883,6 +1893,10 @@ static int raid5_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	int found = 0;
 	int disk;
 	struct disk_info *p;
+
+	if (mddev->degraded > 1)
+		/* no point adding a device */
+		return 0;
 
 	/*
 	 * find the disk ...

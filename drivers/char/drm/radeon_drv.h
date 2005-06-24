@@ -38,7 +38,7 @@
 
 #define DRIVER_NAME		"radeon"
 #define DRIVER_DESC		"ATI Radeon"
-#define DRIVER_DATE		"20050125"
+#define DRIVER_DATE		"20050311"
 
 /* Interface history:
  *
@@ -78,9 +78,13 @@
  *     - Add hyperz support, add hyperz flags to clear ioctl.
  * 1.14- Add support for color tiling
  *     - Add R100/R200 surface allocation/free support
+ * 1.15- Add support for texture micro tiling
+ *     - Add support for r100 cube maps
+ * 1.16- Add R200_EMIT_PP_TRI_PERF_CNTL packet to support brilinear
+ *       texture filtering on r200
  */
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		14
+#define DRIVER_MINOR		16
 #define DRIVER_PATCHLEVEL	0
 
 #define GET_RING_HEAD(dev_priv)		DRM_READ32(  (dev_priv)->ring_rptr, 0 )
@@ -267,11 +271,6 @@ typedef struct drm_radeon_buf_priv {
 	u32 age;
 } drm_radeon_buf_priv_t;
 
-                               /* radeon_ioctl32.c */
-extern int radeon_register_ioctl32( void );
-extern void radeon_unregister_ioctl32( void );
-
-
 				/* radeon_cp.c */
 extern int radeon_cp_init( DRM_IOCTL_ARGS );
 extern int radeon_cp_start( DRM_IOCTL_ARGS );
@@ -289,41 +288,19 @@ extern drm_buf_t *radeon_freelist_get( drm_device_t *dev );
 extern int radeon_wait_ring( drm_radeon_private_t *dev_priv, int n );
 
 extern int radeon_do_cp_idle( drm_radeon_private_t *dev_priv );
-extern int radeon_do_cleanup_cp( drm_device_t *dev );
-extern int radeon_do_cleanup_pageflip( drm_device_t *dev );
 
 extern int radeon_driver_preinit(struct drm_device *dev, unsigned long flags);
 extern int radeon_driver_postcleanup(struct drm_device *dev);
-
-				/* radeon_state.c */
-extern int radeon_cp_clear( DRM_IOCTL_ARGS );
-extern int radeon_cp_swap( DRM_IOCTL_ARGS );
-extern int radeon_cp_vertex( DRM_IOCTL_ARGS );
-extern int radeon_cp_indices( DRM_IOCTL_ARGS );
-extern int radeon_cp_texture( DRM_IOCTL_ARGS );
-extern int radeon_cp_stipple( DRM_IOCTL_ARGS );
-extern int radeon_cp_indirect( DRM_IOCTL_ARGS );
-extern int radeon_cp_vertex2( DRM_IOCTL_ARGS );
-extern int radeon_cp_cmdbuf( DRM_IOCTL_ARGS );
-extern int radeon_cp_getparam( DRM_IOCTL_ARGS );
-extern int radeon_cp_setparam( DRM_IOCTL_ARGS );
-extern int radeon_cp_flip( DRM_IOCTL_ARGS );
 
 extern int radeon_mem_alloc( DRM_IOCTL_ARGS );
 extern int radeon_mem_free( DRM_IOCTL_ARGS );
 extern int radeon_mem_init_heap( DRM_IOCTL_ARGS );
 extern void radeon_mem_takedown( struct mem_block **heap );
 extern void radeon_mem_release( DRMFILE filp, struct mem_block *heap );
-extern int radeon_surface_alloc(DRM_IOCTL_ARGS);
-extern int radeon_surface_free(DRM_IOCTL_ARGS);
 
 				/* radeon_irq.c */
 extern int radeon_irq_emit( DRM_IOCTL_ARGS );
 extern int radeon_irq_wait( DRM_IOCTL_ARGS );
-
-extern int radeon_emit_and_wait_irq(drm_device_t *dev);
-extern int radeon_wait_irq(drm_device_t *dev, int swi_nr);
-extern int radeon_emit_irq(drm_device_t *dev);
 
 extern void radeon_do_release(drm_device_t *dev);
 extern int radeon_driver_vblank_wait(drm_device_t *dev, unsigned int *sequence);
@@ -677,6 +654,8 @@ extern int radeon_postcleanup( struct drm_device *dev );
 #	define RADEON_3D_DRAW_IMMD		0x00002900
 #	define RADEON_3D_DRAW_INDX		0x00002A00
 #	define RADEON_3D_LOAD_VBPNTR		0x00002F00
+#	define RADEON_MPEG_IDCT_MACROBLOCK	0x00003000
+#	define RADEON_MPEG_IDCT_MACROBLOCK_REV	0x00003100
 #	define RADEON_3D_CLEAR_ZMASK		0x00003200
 #	define RADEON_3D_CLEAR_HIZ		0x00003700
 #	define RADEON_CNTL_HOSTDATA_BLT		0x00009400
@@ -822,6 +801,12 @@ extern int radeon_postcleanup( struct drm_device *dev );
 #define RADEON_PP_TEX_SIZE_1                0x1d0c
 #define RADEON_PP_TEX_SIZE_2                0x1d14
 
+#define RADEON_PP_CUBIC_FACES_0             0x1d24
+#define RADEON_PP_CUBIC_FACES_1             0x1d28
+#define RADEON_PP_CUBIC_FACES_2             0x1d2c
+#define RADEON_PP_CUBIC_OFFSET_T0_0         0x1dd0	/* bits [31:5] */
+#define RADEON_PP_CUBIC_OFFSET_T1_0         0x1e00
+#define RADEON_PP_CUBIC_OFFSET_T2_0         0x1e14
 
 #define SE_VAP_CNTL__TCL_ENA_MASK                          0x00000001
 #define SE_VAP_CNTL__FORCE_W_TO_ONE_MASK                   0x00010000
@@ -838,6 +823,8 @@ extern int radeon_postcleanup( struct drm_device *dev );
 #define R200_RB3D_BLENDCOLOR              0x3218
 
 #define R200_SE_TCL_POINT_SPRITE_CNTL     0x22c4
+
+#define R200_PP_TRI_PERF 0x2cf8
 
 /* Constants */
 #define RADEON_MAX_USEC_TIMEOUT		100000	/* 100 ms */
@@ -864,9 +851,6 @@ do {									\
 		       ((addr) & 0x1f) | RADEON_PLL_WR_EN );		\
 	RADEON_WRITE( RADEON_CLOCK_CNTL_DATA, (val) );			\
 } while (0)
-
-extern int RADEON_READ_PLL( drm_device_t *dev, int addr );
-
 
 #define CP_PACKET0( reg, n )						\
 	(RADEON_CP_PACKET0 | ((n) << 16) | ((reg) >> 2))

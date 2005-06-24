@@ -294,4 +294,6 @@ static __inline__ unsigned long __xchg(unsigned long x, volatile void * ptr,
 #define set_mb(var, value) do { xchg(&var, value); } while (0)
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
+#define arch_align_stack(x) (x)
+
 #endif  /* _ASM_M32R_SYSTEM_H */

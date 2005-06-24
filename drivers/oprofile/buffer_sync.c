@@ -34,9 +34,9 @@
  
 static LIST_HEAD(dying_tasks);
 static LIST_HEAD(dead_tasks);
-cpumask_t marked_cpus = CPU_MASK_NONE;
+static cpumask_t marked_cpus = CPU_MASK_NONE;
 static DEFINE_SPINLOCK(task_mortuary);
-void process_task_mortuary(void);
+static void process_task_mortuary(void);
 
 
 /* Take ownership of the task struct and place it on the
@@ -422,7 +422,7 @@ static void increment_tail(struct oprofile_cpu_buffer * b)
  * and to have reached the list, it must have gone through
  * one full sync already.
  */
-void process_task_mortuary(void)
+static void process_task_mortuary(void)
 {
 	struct list_head * pos;
 	struct list_head * pos2;

@@ -3,7 +3,7 @@
  *
  * cpufreq driver for the SuperH processors.
  *
- * Copyright (C) 2002, 2003 Paul Mundt
+ * Copyright (C) 2002, 2003, 2004, 2005 Paul Mundt
  * Copyright (C) 2002 M. R. Brown
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/cpumask.h>
 #include <linux/smp.h>
 
 #include <asm/processor.h>
@@ -46,9 +47,8 @@ struct clock_set {
 #endif
 };
 
-#define NR_CLOCK_SETS	(sizeof(clock_sets) / sizeof(struct clock_set))
 #define MIN_CLOCK_SET	0
-#define MAX_CLOCK_SET	(NR_CLOCK_SETS - 1)
+#define MAX_CLOCK_SET	(ARRAY_SIZE(clock_sets) - 1)
 
 /*
  * For the time being, we only support two frequencies, which in turn are
@@ -83,18 +83,16 @@ static void sh_cpufreq_update_clocks(unsigned int set)
 static int sh_cpufreq_setstate(unsigned int cpu, unsigned int set)
 {
 	unsigned short frqcr = ctrl_inw(FRQCR);
-	unsigned long cpus_allowed;
+	cpumask_t cpus_allowed;
 	struct cpufreq_freqs freqs;
-	int allowable_cpu_map;
 
 	if (!cpu_online(cpu))
 		return -ENODEV;
 
 	cpus_allowed = current->cpus_allowed;
-	allowable_cpu_map = 1 << cpu;
-	set_cpus_allowed(current, allowable_cpu_map);
-	
-	BUG_ON(!(allowable_cpu_map & (1 << smp_processor_id())));
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+
+	BUG_ON(smp_processor_id() != cpu);
 
 	freqs.cpu = cpu;
 	freqs.old = current_cpu_data.cpu_clock / 1000;
@@ -134,7 +132,7 @@ static int sh_cpufreq_setstate(unsigned int cpu, unsigned int set)
 
 	set_cpus_allowed(current, cpus_allowed);
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-	
+
 	return 0;
 }
 

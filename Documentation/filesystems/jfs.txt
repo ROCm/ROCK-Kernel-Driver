@@ -1,13 +1,6 @@
 IBM's Journaled File System (JFS) for Linux
 
-JFS Homepage:  http://oss.software.ibm.com/jfs/
-
-Team members
-------------
-Dave Kleikamp      shaggy@austin.ibm.com  
-Dave Blaschke      blaschke@us.ibm.com
-Steve Best         sbest@us.ibm.com
-Barry Arndt        barndt@us.ibm.com
+JFS Homepage:  http://jfs.sourceforge.net/
 
 The following mount options are supported:
 
@@ -15,6 +8,7 @@ iocharset=name	Character set to use for converting from Unicode to
 		ASCII.  The default is to do no conversion.  Use
 		iocharset=utf8 for UTF8 translations.  This requires
 		CONFIG_NLS_UTF8 to be set in the kernel .config file.
+		iocharset=none specifies the default behavior explicitly.
 
 resize=value	Resize the volume to <value> blocks.  JFS only supports
 		growing a volume, not shrinking it.  This option is only
@@ -38,4 +32,4 @@ errors=panic		Panic and halt the machine if an error occurs.
 Please send bugs, comments, cards and letters to shaggy@austin.ibm.com.
 
 The JFS mailing list can be subscribed to by using the link labeled
-"Mail list Subscribe" at our web page http://oss.software.ibm.com/jfs/.
+"Mail list Subscribe" at our web page http://jfs.sourceforge.net/

@@ -92,7 +92,8 @@ static int ircomm_lmp_connect_response(struct ircomm_cb *self,
 		 *  Check that the client has reserved enough space for 
 		 *  headers
 		 */
-		ASSERT(skb_headroom(userdata) >= LMP_MAX_HEADER, return -1;);
+		IRDA_ASSERT(skb_headroom(userdata) >= LMP_MAX_HEADER,
+			    return -1;);
 
 		/* Don't forget to refcount it - should be NULL anyway */
 		skb_get(userdata);
@@ -144,7 +145,7 @@ static void ircomm_lmp_flow_control(struct sk_buff *skb)
 	struct ircomm_cb *self;
 	int line;
 
-	ASSERT(skb != NULL, return;);
+	IRDA_ASSERT(skb != NULL, return;);
 
 	cb = (struct irda_skb_cb *) skb->cb;
 
@@ -158,8 +159,8 @@ static void ircomm_lmp_flow_control(struct sk_buff *skb)
                 return;
 	}
 
-        ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRCOMM_MAGIC, return;);
+        IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRCOMM_MAGIC, return;);
 
 	self->pkt_count--;
 
@@ -185,7 +186,7 @@ static int ircomm_lmp_data_request(struct ircomm_cb *self,
 	struct irda_skb_cb *cb;
 	int ret;
 
-	ASSERT(skb != NULL, return -1;);
+	IRDA_ASSERT(skb != NULL, return -1;);
 
 	cb = (struct irda_skb_cb *) skb->cb;
 	
@@ -207,7 +208,7 @@ static int ircomm_lmp_data_request(struct ircomm_cb *self,
         }
 	ret = irlmp_data_request(self->lsap, skb);
 	if (ret) {
-		ERROR("%s(), failed\n", __FUNCTION__);
+		IRDA_ERROR("%s(), failed\n", __FUNCTION__);
 		/* irlmp_data_request already free the packet */
 	}
 
@@ -227,9 +228,9 @@ static int ircomm_lmp_data_indication(void *instance, void *sap,
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == IRCOMM_MAGIC, return -1;);
-	ASSERT(skb != NULL, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == IRCOMM_MAGIC, return -1;);
+	IRDA_ASSERT(skb != NULL, return -1;);
 	
 	ircomm_do_event(self, IRCOMM_LMP_DATA_INDICATION, skb, NULL);
 
@@ -257,10 +258,10 @@ static void ircomm_lmp_connect_confirm(void *instance, void *sap,
 
 	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRCOMM_MAGIC, return;);
-	ASSERT(skb != NULL, return;);
-	ASSERT(qos != NULL, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRCOMM_MAGIC, return;);
+	IRDA_ASSERT(skb != NULL, return;);
+	IRDA_ASSERT(qos != NULL, return;);
 
 	info.max_data_size = max_seg_size;
 	info.max_header_size = max_header_size;
@@ -290,10 +291,10 @@ static void ircomm_lmp_connect_indication(void *instance, void *sap,
 
 	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRCOMM_MAGIC, return;);
-	ASSERT(skb != NULL, return;);
-	ASSERT(qos != NULL, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRCOMM_MAGIC, return;);
+	IRDA_ASSERT(skb != NULL, return;);
+	IRDA_ASSERT(qos != NULL, return;);
 
 	info.max_data_size = max_seg_size;
 	info.max_header_size = max_header_size;
@@ -320,8 +321,8 @@ static void ircomm_lmp_disconnect_indication(void *instance, void *sap,
 
 	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRCOMM_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRCOMM_MAGIC, return;);
 
 	info.reason = reason;
 

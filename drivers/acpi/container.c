@@ -177,13 +177,18 @@ container_notify_cb(acpi_handle handle, u32 type, void *context)
 		printk("Container driver received %s event\n",
 			(type == ACPI_NOTIFY_BUS_CHECK)?
 			"ACPI_NOTIFY_BUS_CHECK":"ACPI_NOTIFY_DEVICE_CHECK");
+		status = acpi_bus_get_device(handle, &device);
 		if (present) {
-			status = acpi_bus_get_device(handle, &device);
 			if (ACPI_FAILURE(status) || !device) {
 				result = container_device_add(&device, handle);
 				if (!result)
-					kobject_hotplug(&device->kobj, KOBJ_ONLINE);
-			} else {
+					kobject_hotplug(&device->kobj,
+							KOBJ_ONLINE);
+				else
+					printk("Failed to add container\n");
+			}
+		} else {
+			if (ACPI_SUCCESS(status)) {
 				/* device exist and this is a remove request */
 				kobject_hotplug(&device->kobj, KOBJ_OFFLINE);
 			}
@@ -255,7 +260,7 @@ end:
 }
 
 
-int __init
+static int __init
 acpi_container_init(void)
 {
 	int	result = 0;
@@ -276,7 +281,7 @@ acpi_container_init(void)
 	return(0);
 }
 
-void __exit
+static void __exit
 acpi_container_exit(void)
 {
 	int			action = UNINSTALL_NOTIFY_HANDLER;

@@ -286,6 +286,7 @@ static int chip_thread(void *data)
 			schedule();
 		}
 		remove_wait_queue(&chip->wq, &wait);
+		try_to_freeze(PF_FREEZE);
 		if (chip->done || signal_pending(current))
 			break;
 		dprintk("%s: thread wakeup\n", i2c_clientname(&chip->c));
@@ -990,7 +991,7 @@ static int tda9874a_initialize(struct CHIPSTATE *chip)
 {
 	if (tda9874a_SIF > 2)
 		tda9874a_SIF = 1;
-	if (tda9874a_STD >= 8)
+	if (tda9874a_STD > 8)
 		tda9874a_STD = 0;
 	if(tda9874a_AMSEL > 1)
 		tda9874a_AMSEL = 0;

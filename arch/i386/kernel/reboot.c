@@ -3,10 +3,6 @@
  */
 
 #include <linux/mm.h>
-#include <linux/config.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -17,6 +13,7 @@
 #include <asm/uaccess.h>
 #include <asm/apic.h>
 #include "mach_reboot.h"
+#include <linux/reboot_fixups.h>
 
 /*
  * Power off function, if any
@@ -334,14 +331,6 @@ void machine_restart(char * __unused)
 	 * Stop all CPUs and turn off local APICs and the IO-APIC, so
 	 * other OSs see a clean IRQ state.
 	 */
-#ifdef	CONFIG_KDB
-	/*
-	 * If this restart is occuring while kdb is running (e.g. reboot
-	 * command), the other CPU's are already stopped.  Don't try to
-	 * stop them yet again.
-	 */
-	if (!KDB_IS_RUNNING())
-#endif	/* CONFIG_KDB */
 	smp_send_stop();
 #endif /* CONFIG_SMP */
 
@@ -360,6 +349,7 @@ void machine_restart(char * __unused)
 		/* rebooting needs to touch the page at absolute addr 0 */
 		*((unsigned short *)__va(0x472)) = reboot_mode;
 		for (;;) {
+			mach_reboot_fixups(); /* for board specific fixups */
 			mach_reboot();
 			/* That didn't work - force a triple fault.. */
 			__asm__ __volatile__("lidt %0": :"m" (no_idt));

@@ -22,7 +22,7 @@
 #define flush_cache_all()		do { } while (0)
 #define flush_cache_mm(mm)		do { } while (0)
 #define flush_cache_range(vma, a, b)	do { } while (0)
-#define flush_cache_page(vma, p)	do { } while (0)
+#define flush_cache_page(vma, p, pfn)	do { } while (0)
 #define flush_icache_page(vma, page)	do { } while (0)
 #define flush_cache_vmap(start, end)	do { } while (0)
 #define flush_cache_vunmap(start, end)	do { } while (0)

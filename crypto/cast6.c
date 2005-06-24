@@ -33,13 +33,11 @@ struct cast6_ctx {
 	u8 Kr[12][4];
 };
 
-#define rol(n,x) ( ((x) << (n)) | ((x) >> (32-(n))) )
-
-#define F1(D,r,m)  (  (I = ((m) + (D))), (I=rol((r),I)),   \
+#define F1(D,r,m)  (  (I = ((m) + (D))), (I=rol32(I,(r))),   \
     (((s1[I >> 24] ^ s2[(I>>16)&0xff]) - s3[(I>>8)&0xff]) + s4[I&0xff]) )
-#define F2(D,r,m)  (  (I = ((m) ^ (D))), (I=rol((r),I)),   \
+#define F2(D,r,m)  (  (I = ((m) ^ (D))), (I=rol32(I,(r))),   \
     (((s1[I >> 24] - s2[(I>>16)&0xff]) + s3[(I>>8)&0xff]) ^ s4[I&0xff]) )
-#define F3(D,r,m)  (  (I = ((m) - (D))), (I=rol((r),I)),   \
+#define F3(D,r,m)  (  (I = ((m) - (D))), (I=rol32(I,(r))),   \
     (((s1[I >> 24] + s2[(I>>16)&0xff]) ^ s3[(I>>8)&0xff]) - s4[I&0xff]) )
 
 static const u32 s1[256] = {

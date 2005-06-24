@@ -14,6 +14,7 @@
 #include <asm/spitfire.h>
 #include <asm/head.h>
 #include <asm/processor.h>
+#include <asm/mmu.h>
 
 #define		TASK_REGOFF		(THREAD_SIZE-TRACEREG_SZ-STACKFRAME_SZ)
 #define		ETRAP_PSTATE1		(PSTATE_RMO | PSTATE_PRIV)
@@ -67,7 +68,13 @@ etrap_irq:
 
 		wrpr	%g3, 0, %otherwin
 		wrpr	%g2, 0, %wstate
-		stxa	%g0, [%l4] ASI_DMMU
+cplus_etrap_insn_1:
+		sethi	%hi(0), %g3
+		sllx	%g3, 32, %g3
+cplus_etrap_insn_2:
+		sethi	%hi(0), %g2
+		or	%g3, %g2, %g3
+		stxa	%g3, [%l4] ASI_DMMU
 		flush	%l6
 		wr	%g0, ASI_AIUS, %asi
 2:		wrpr	%g0, 0x0, %tl
@@ -95,11 +102,12 @@ etrap_irq:
 		stx	%i7, [%sp + PTREGS_OFF + PT_V9_I7]
 		wrpr	%g0, ETRAP_PSTATE2, %pstate
 		mov	%l6, %g6
+#ifdef CONFIG_SMP
+		mov	TSB_REG, %g3
+		ldxa	[%g3] ASI_IMMU, %g5
+#endif
 		jmpl	%l2 + 0x4, %g0
 		 ldx	[%g6 + TI_TASK], %g4
-		nop
-		nop
-		nop
 
 3:		ldub	[%l6 + TI_FPDEPTH], %l5
 		add	%l6, TI_FPSAVED + 1, %l4
@@ -207,7 +215,13 @@ scetrap:	rdpr	%pil, %g2
 		mov	PRIMARY_CONTEXT, %l4
 		wrpr	%g3, 0, %otherwin
 		wrpr	%g2, 0, %wstate
-		stxa	%g0, [%l4] ASI_DMMU
+cplus_etrap_insn_3:
+		sethi	%hi(0), %g3
+		sllx	%g3, 32, %g3
+cplus_etrap_insn_4:
+		sethi	%hi(0), %g2
+		or	%g3, %g2, %g3
+		stxa	%g3, [%l4] ASI_DMMU
 		flush	%l6
 
 		mov	ASI_AIUS, %l7
@@ -241,11 +255,47 @@ scetrap:	rdpr	%pil, %g2
 		stx	%i6, [%sp + PTREGS_OFF + PT_V9_I6]
 		mov	%l6, %g6
 		stx	%i7, [%sp + PTREGS_OFF + PT_V9_I7]
+#ifdef CONFIG_SMP
+		mov	TSB_REG, %g3
+		ldxa	[%g3] ASI_IMMU, %g5
+#endif
 		ldx	[%g6 + TI_TASK], %g4
 		done
-		nop
-		nop
 
 #undef TASK_REGOFF
 #undef ETRAP_PSTATE1
-#undef ETRAP_PSTATE2
+
+cplus_einsn_1:
+		sethi			%uhi(CTX_CHEETAH_PLUS_NUC), %g3
+cplus_einsn_2:
+		sethi			%hi(CTX_CHEETAH_PLUS_CTX0), %g2
+
+		.globl			cheetah_plus_patch_etrap
+cheetah_plus_patch_etrap:
+		/* We configure the dTLB512_0 for 4MB pages and the
+		 * dTLB512_1 for 8K pages when in context zero.
+		 */
+		sethi			%hi(cplus_einsn_1), %o0
+		sethi			%hi(cplus_etrap_insn_1), %o2
+		lduw			[%o0 + %lo(cplus_einsn_1)], %o1
+		or			%o2, %lo(cplus_etrap_insn_1), %o2
+		stw			%o1, [%o2]
+		flush			%o2
+		sethi			%hi(cplus_etrap_insn_3), %o2
+		or			%o2, %lo(cplus_etrap_insn_3), %o2
+		stw			%o1, [%o2]
+		flush			%o2
+
+		sethi			%hi(cplus_einsn_2), %o0
+		sethi			%hi(cplus_etrap_insn_2), %o2
+		lduw			[%o0 + %lo(cplus_einsn_2)], %o1
+		or			%o2, %lo(cplus_etrap_insn_2), %o2
+		stw			%o1, [%o2]
+		flush			%o2
+		sethi			%hi(cplus_etrap_insn_4), %o2
+		or			%o2, %lo(cplus_etrap_insn_4), %o2
+		stw			%o1, [%o2]
+		flush			%o2
+
+		retl
+		 nop

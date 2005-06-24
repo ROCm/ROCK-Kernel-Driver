@@ -1154,7 +1154,7 @@ static int meye_do_ioctl(struct inode *inode, struct file *file,
 		memset(cap, 0, sizeof(*cap));
 		strcpy(cap->driver, "meye");
 		strcpy(cap->card, "meye");
-		sprintf(cap->bus_info, "PCI:%s", meye.mchip_dev->slot_name);
+		sprintf(cap->bus_info, "PCI:%s", pci_name(meye.mchip_dev));
 		cap->version = (MEYE_DRIVER_MAJORVERSION << 8) +
 			       MEYE_DRIVER_MINORVERSION;
 		cap->capabilities = V4L2_CAP_VIDEO_CAPTURE |
@@ -1768,7 +1768,7 @@ static struct video_device meye_template = {
 };
 
 #ifdef CONFIG_PM
-static int meye_suspend(struct pci_dev *pdev, u32 state)
+static int meye_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	pci_save_state(pdev);
 	meye.pm_mchip_mode = meye.mchip_mode;

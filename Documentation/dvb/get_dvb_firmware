@@ -22,14 +22,15 @@ use File::Temp qw/ tempdir /;
 use IO::Handle;
 
 @components = ( "sp8870", "sp887x", "tda10045", "tda10046", "av7110", "dec2000t",
-		"dec2540t", "dec3000s", "vp7041", "dibusb", "nxt2002" );
+		"dec2540t", "dec3000s", "vp7041", "dibusb", "nxt2002",
+		"or51211", "or51132_qam", "or51132_vsb");
 
 # Check args
 syntax() if (scalar(@ARGV) != 1);
 $cid = $ARGV[0];
 
 # Do it!
-for($i=0; $i < scalar(@components); $i++) {
+for ($i=0; $i < scalar(@components); $i++) {
     if ($cid eq $components[$i]) {
 	$outfile = eval($cid);
 	die $@ if $@;
@@ -79,8 +80,8 @@ sub sp887x {
     wgetfile($sourcefile, $url);
     unzip($sourcefile, $tmpdir);
     unshield("$tmpdir/$cabfile", $tmpdir);
-    verify("$tmpdir/sc_main.mc", $hash);
-    copy("$tmpdir/sc_main.mc", $outfile);
+    verify("$tmpdir/ZEnglish/sc_main.mc", $hash);
+    copy("$tmpdir/ZEnglish/sc_main.mc", $outfile);
 
     $outfile;
 }
@@ -106,7 +107,7 @@ sub tda10045 {
 sub tda10046 {
     my $sourcefile = "tt_budget_217g.zip";
     my $url = "http://www.technotrend.de/new/217g/$sourcefile";
-    my $hash = "a25b579e37109af60f4a36c37893957c";
+    my $hash = "6a7e1e2f2644b162ff0502367553c72d";
     my $outfile = "dvb-fe-tda10046.fw";
     my $tmpdir = tempdir(DIR => "/tmp", CLEANUP => 1);
 
@@ -114,7 +115,7 @@ sub tda10046 {
 
     wgetfile($sourcefile, $url);
     unzip($sourcefile, $tmpdir);
-    extract("$tmpdir/software/OEM/PCI/App/ttlcdacc.dll", 0x3f731, 24479, "$tmpdir/fwtmp");
+    extract("$tmpdir/software/OEM/PCI/App/ttlcdacc.dll", 0x3f731, 24478, "$tmpdir/fwtmp");
     verify("$tmpdir/fwtmp", $hash);
     copy("$tmpdir/fwtmp", $outfile);
 
@@ -122,9 +123,9 @@ sub tda10046 {
 }
 
 sub av7110 {
-    my $sourcefile = "dvb-ttpci-01.fw-261c";
-    my $url = "http://www.linuxtv.org/download/dvb/firmware/$sourcefile";
-    my $hash = "7b263de6b0b92d2347319c65adc7d4fb";
+    my $sourcefile = "dvb-ttpci-01.fw-261d";
+    my $url = "http://www.linuxtv.org/downloads/firmware/$sourcefile";
+    my $hash = "603431b6259715a8e88f376a53b64e2f";
     my $outfile = "dvb-ttpci-01.fw";
 
     checkstandard();
@@ -222,7 +223,7 @@ sub vp7041 {
 }
 
 sub dibusb {
-	my $url = "http://linuxtv.org/cgi-bin/cvsweb.cgi/dvb-kernel/firmware/dvb-dibusb-5.0.0.11.fw?rev=1.1&content-type=text/plain";
+	my $url = "http://www.linuxtv.org/downloads/firmware/dvb-dibusb-5.0.0.11.fw";
 	my $outfile = "dvb-dibusb-5.0.0.11.fw";
 	my $hash = "fa490295a527360ca16dcdf3224ca243";
 
@@ -249,6 +250,45 @@ sub nxt2002 {
     extract("$tmpdir/SkyNETU.sys", 375832, 5908, $outfile);
 
     $outfile;
+}
+
+sub or51211 {
+    my $fwfile = "dvb-fe-or51211.fw";
+    my $url = "http://linuxtv.org/downloads/firmware/$fwfile";
+    my $hash = "d830949c771a289505bf9eafc225d491";
+
+    checkstandard();
+
+    wgetfile($fwfile, $url);
+    verify($fwfile, $hash);
+
+    $fwfile;
+}
+
+sub or51132_qam {
+    my $fwfile = "dvb-fe-or51132-qam.fw";
+    my $url = "http://linuxtv.org/downloads/firmware/$fwfile";
+    my $hash = "7702e8938612de46ccadfe9b413cb3b5";
+
+    checkstandard();
+
+    wgetfile($fwfile, $url);
+    verify($fwfile, $hash);
+
+    $fwfile;
+}
+
+sub or51132_vsb {
+    my $fwfile = "dvb-fe-or51132-vsb.fw";
+    my $url = "http://linuxtv.org/downloads/firmware/$fwfile";
+    my $hash = "c16208e02f36fc439a557ad4c613364a";
+
+    checkstandard();
+
+    wgetfile($fwfile, $url);
+    verify($fwfile, $hash);
+
+    $fwfile;
 }
 
 # ---------------------------------------------------------------
@@ -292,7 +332,7 @@ sub unzip {
 sub unshield {
     my ($sourcefile, $todir) = @_;
 
-    system("unshield -d \"$todir\" \"$sourcefile\" > /dev/null" ) and die ("unshield failed - unable to extract firmware");
+    system("unshield x -d \"$todir\" \"$sourcefile\" > /dev/null" ) and die ("unshield failed - unable to extract firmware");
 }
 
 sub verify {

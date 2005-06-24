@@ -7,7 +7,7 @@
  *
  * Version:	$Id: tcp_output.c,v 1.146 2002/02/01 22:01:04 davem Exp $
  *
- * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
+ * Authors:	Ross Biro
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *		Mark Evans, <evansmp@uhura.aston.ac.uk>
  *		Corey Minyard <wf-rch!minyard@relay.EU.net>
@@ -400,6 +400,7 @@ static void tcp_queue_skb(struct sock *sk, struct sk_buff *skb)
 
 	/* Advance write_seq and place onto the write_queue. */
 	tp->write_seq = TCP_SKB_CB(skb)->end_seq;
+	skb_header_release(skb);
 	__skb_queue_tail(&sk->sk_write_queue, skb);
 	sk_charge_skb(sk, skb);
 
@@ -426,7 +427,7 @@ void tcp_push_one(struct sock *sk, unsigned cur_mss)
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct sk_buff *skb = sk->sk_send_head;
 
-	if (tcp_snd_test(tp, skb, cur_mss, TCP_NAGLE_PUSH)) {
+	if (tcp_snd_test(sk, skb, cur_mss, TCP_NAGLE_PUSH)) {
 		/* Send it out now. */
 		TCP_SKB_CB(skb)->when = tcp_time_stamp;
 		tcp_tso_set_push(skb);
@@ -439,9 +440,12 @@ void tcp_push_one(struct sock *sk, unsigned cur_mss)
 	}
 }
 
-void tcp_set_skb_tso_segs(struct sk_buff *skb, unsigned int mss_std)
+void tcp_set_skb_tso_segs(struct sock *sk, struct sk_buff *skb)
 {
-	if (skb->len <= mss_std) {
+	struct tcp_sock *tp = tcp_sk(sk);
+
+	if (skb->len <= tp->mss_cache_std ||
+	    !(sk->sk_route_caps & NETIF_F_TSO)) {
 		/* Avoid the costly divide in the normal
 		 * non-TSO case.
 		 */
@@ -450,10 +454,10 @@ void tcp_set_skb_tso_segs(struct sk_buff *skb, unsigned int mss_std)
 	} else {
 		unsigned int factor;
 
-		factor = skb->len + (mss_std - 1);
-		factor /= mss_std;
+		factor = skb->len + (tp->mss_cache_std - 1);
+		factor /= tp->mss_cache_std;
 		skb_shinfo(skb)->tso_segs = factor;
-		skb_shinfo(skb)->tso_size = mss_std;
+		skb_shinfo(skb)->tso_size = tp->mss_cache_std;
 	}
 }
 
@@ -524,8 +528,8 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	}
 
 	/* Fix up tso_factor for both original and new SKB.  */
-	tcp_set_skb_tso_segs(skb, tp->mss_cache_std);
-	tcp_set_skb_tso_segs(buff, tp->mss_cache_std);
+	tcp_set_skb_tso_segs(sk, skb);
+	tcp_set_skb_tso_segs(sk, buff);
 
 	if (TCP_SKB_CB(skb)->sacked & TCPCB_LOST) {
 		tp->lost_out += tcp_skb_pcount(skb);
@@ -592,15 +596,15 @@ int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 	skb->ip_summed = CHECKSUM_HW;
 
 	skb->truesize	     -= len;
-	sk->sk_queue_shrunk   = 1;
 	sk->sk_wmem_queued   -= len;
 	sk->sk_forward_alloc += len;
+	sock_set_flag(sk, SOCK_QUEUE_SHRUNK);
 
 	/* Any change of skb->len requires recalculation of tso
 	 * factor and mss.
 	 */
 	if (tcp_skb_pcount(skb) > 1)
-		tcp_set_skb_tso_segs(skb, tcp_skb_mss(skb));
+		tcp_set_skb_tso_segs(sk, skb);
 
 	return 0;
 }
@@ -631,11 +635,7 @@ int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 unsigned int tcp_sync_mss(struct sock *sk, u32 pmtu)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
-	struct dst_entry *dst = __sk_dst_get(sk);
 	int mss_now;
-
-	if (dst && dst->ops->get_mss)
-		pmtu = dst->ops->get_mss(dst, pmtu);
 
 	/* Calculate base mss without TCP options:
 	   It is MMS_S - sizeof(tcphdr) of rfc1122
@@ -647,7 +647,7 @@ unsigned int tcp_sync_mss(struct sock *sk, u32 pmtu)
 		mss_now = tp->rx_opt.mss_clamp;
 
 	/* Now subtract optional transport overhead */
-	mss_now -= tp->ext_header_len + tp->ext2_header_len;
+	mss_now -= tp->ext_header_len;
 
 	/* Then reserve room for full set of TCP options and 8 bytes of data */
 	if (mss_now < 48)
@@ -683,9 +683,8 @@ unsigned int tcp_current_mss(struct sock *sk, int large)
 
 	mss_now = tp->mss_cache_std;
 	if (dst) {
-		u32 mtu = dst_pmtu(dst);
-		if (mtu != tp->pmtu_cookie ||
-		    tp->ext2_header_len != dst->header_len)
+		u32 mtu = dst_mtu(dst);
+		if (mtu != tp->pmtu_cookie)
 			mss_now = tcp_sync_mss(sk, mtu);
 	}
 
@@ -697,8 +696,7 @@ unsigned int tcp_current_mss(struct sock *sk, int large)
 		unsigned int large_mss, factor, limit;
 
 		large_mss = 65535 - tp->af_specific->net_header_len -
-			tp->ext_header_len - tp->ext2_header_len -
-			tp->tcp_header_len;
+			tp->ext_header_len - tp->tcp_header_len;
 
 		if (tp->max_window && large_mss > (tp->max_window>>1))
 			large_mss = max((tp->max_window>>1),
@@ -757,7 +755,7 @@ int tcp_write_xmit(struct sock *sk, int nonagle)
 		mss_now = tcp_current_mss(sk, 1);
 
 		while ((skb = sk->sk_send_head) &&
-		       tcp_snd_test(tp, skb, mss_now,
+		       tcp_snd_test(sk, skb, mss_now,
 			       	    tcp_skb_is_last(sk, skb) ? nonagle :
 				    			       TCP_NAGLE_PUSH)) {
 			if (skb->len > mss_now) {
@@ -1045,7 +1043,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 
 		if (sk->sk_route_caps & NETIF_F_TSO) {
 			sk->sk_route_caps &= ~NETIF_F_TSO;
-			sk->sk_no_largesend = 1;
+			sock_set_flag(sk, SOCK_NO_LARGESEND);
 			tp->mss_cache = tp->mss_cache_std;
 		}
 
@@ -1340,6 +1338,7 @@ int tcp_send_synack(struct sock *sk)
 			if (nskb == NULL)
 				return -ENOMEM;
 			__skb_unlink(skb, &sk->sk_write_queue);
+			skb_header_release(nskb);
 			__skb_queue_head(&sk->sk_write_queue, nskb);
 			sk_stream_free_skb(sk, skb);
 			sk_charge_skb(sk, nskb);
@@ -1431,6 +1430,7 @@ static inline void tcp_connect_init(struct sock *sk)
 {
 	struct dst_entry *dst = __sk_dst_get(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
+	__u8 rcv_wscale;
 
 	/* We'll fix this up when we get a response from the other end.
 	 * See tcp_input.c:tcp_rcv_state_process case TCP_SYN_SENT.
@@ -1442,7 +1442,7 @@ static inline void tcp_connect_init(struct sock *sk)
 	if (tp->rx_opt.user_mss)
 		tp->rx_opt.mss_clamp = tp->rx_opt.user_mss;
 	tp->max_window = 0;
-	tcp_sync_mss(sk, dst_pmtu(dst));
+	tcp_sync_mss(sk, dst_mtu(dst));
 
 	if (!tp->window_clamp)
 		tp->window_clamp = dst_metric(dst, RTAX_WINDOW);
@@ -1455,8 +1455,9 @@ static inline void tcp_connect_init(struct sock *sk)
 				  &tp->rcv_wnd,
 				  &tp->window_clamp,
 				  sysctl_tcp_window_scaling,
-				  &tp->rx_opt.rcv_wscale);
+				  &rcv_wscale);
 
+	tp->rx_opt.rcv_wscale = rcv_wscale;
 	tp->rcv_ssthresh = tp->rcv_wnd;
 
 	sk->sk_err = 0;
@@ -1506,6 +1507,7 @@ int tcp_connect(struct sock *sk)
 	/* Send it off. */
 	TCP_SKB_CB(buff)->when = tcp_time_stamp;
 	tp->retrans_stamp = TCP_SKB_CB(buff)->when;
+	skb_header_release(buff);
 	__skb_queue_tail(&sk->sk_write_queue, buff);
 	sk_charge_skb(sk, buff);
 	tp->packets_out += tcp_skb_pcount(buff);
@@ -1672,12 +1674,12 @@ int tcp_write_wakeup(struct sock *sk)
 				/* SWS override triggered forced fragmentation.
 				 * Disable TSO, the connection is too sick. */
 				if (sk->sk_route_caps & NETIF_F_TSO) {
-					sk->sk_no_largesend = 1;
+					sock_set_flag(sk, SOCK_NO_LARGESEND);
 					sk->sk_route_caps &= ~NETIF_F_TSO;
 					tp->mss_cache = tp->mss_cache_std;
 				}
 			} else if (!tcp_skb_pcount(skb))
-				tcp_set_skb_tso_segs(skb, tp->mss_cache_std);
+				tcp_set_skb_tso_segs(sk, skb);
 
 			TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
 			TCP_SKB_CB(skb)->when = tcp_time_stamp;

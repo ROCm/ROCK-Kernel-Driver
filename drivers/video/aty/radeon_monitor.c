@@ -618,11 +618,9 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
 		}
 	}
 	if (ignore_edid) {
-		if (rinfo->mon1_EDID)
-			kfree(rinfo->mon1_EDID);
+		kfree(rinfo->mon1_EDID);
 		rinfo->mon1_EDID = NULL;
-		if (rinfo->mon2_EDID)
-			kfree(rinfo->mon2_EDID);
+		kfree(rinfo->mon2_EDID);
 		rinfo->mon2_EDID = NULL;
 	}
 
@@ -655,8 +653,11 @@ static void radeon_fixup_panel_info(struct radeonfb_info *rinfo)
 	 */
 	if (!rinfo->panel_info.use_bios_dividers && rinfo->mon1_type == MT_LCD
 	    && rinfo->is_mobility) {
-		int ppll_div_sel = INREG8(CLOCK_CNTL_INDEX + 1) & 0x3;
-		u32 ppll_divn = INPLL(PPLL_DIV_0 + ppll_div_sel);
+		int ppll_div_sel;
+		u32 ppll_divn;
+		ppll_div_sel = INREG8(CLOCK_CNTL_INDEX + 1) & 0x3;
+		radeon_pll_errata_after_index(rinfo);
+		ppll_divn = INPLL(PPLL_DIV_0 + ppll_div_sel);
 		rinfo->panel_info.ref_divider = rinfo->pll.ref_div;
 		rinfo->panel_info.fbk_divider = ppll_divn & 0x7ff;
 		rinfo->panel_info.post_divider = (ppll_divn >> 16) & 0x7;
@@ -900,7 +901,7 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
  */
 
 /*
- * This is used when looking for modes. We assign a "goodness" value
+ * This is used when looking for modes. We assign a "distance" value
  * to a mode in the modedb depending how "close" it is from what we
  * are looking for.
  * Currently, we don't compare that much, we could do better but
@@ -909,13 +910,11 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 static int radeon_compare_modes(const struct fb_var_screeninfo *var,
 				const struct fb_videomode *mode)
 {
-	int goodness = 0;
+	int distance = 0;
 
-	if (var->yres == mode->yres)
-		goodness += 10;
-	if (var->xres == mode->xres)
-		goodness += 9;
-	return goodness;
+	distance = mode->yres - var->yres;
+	distance += (mode->xres - var->xres)/2;
+	return distance;
 }
 
 /*
@@ -937,7 +936,7 @@ int  radeon_match_mode(struct radeonfb_info *rinfo,
 	const struct fb_videomode	*db = vesa_modes;
 	int				i, dbsize = 34;
 	int				has_rmx, native_db = 0;
-	int				goodness = 0;
+	int				distance = INT_MAX;
 	const struct fb_videomode	*candidate = NULL;
 
 	/* Start with a copy of the requested mode */
@@ -973,19 +972,19 @@ int  radeon_match_mode(struct radeonfb_info *rinfo,
 	/* Now look for a mode in the database */
 	while (db) {
 		for (i = 0; i < dbsize; i++) {
-			int g;
+			int d;
 
 			if (db[i].yres < src->yres)
 				continue;	
 			if (db[i].xres < src->xres)
 				continue;
-			g = radeon_compare_modes(src, &db[i]);
+			d = radeon_compare_modes(src, &db[i]);
 			/* If the new mode is at least as good as the previous one,
 			 * then it's our new candidate
 			 */
-			if (g >= goodness) {
+			if (d < distance) {
 				candidate = &db[i];
-				goodness = g;
+				distance = d;
 			}
 		}
 		db = NULL;

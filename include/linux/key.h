@@ -58,6 +58,7 @@ struct key;
 
 struct seq_file;
 struct user_struct;
+struct signal_struct;
 
 struct key_type;
 struct key_owner;
@@ -258,7 +259,9 @@ extern struct key root_user_keyring, root_session_keyring;
 extern int alloc_uid_keyring(struct user_struct *user);
 extern void switch_uid_keyring(struct user_struct *new_user);
 extern int copy_keys(unsigned long clone_flags, struct task_struct *tsk);
+extern int copy_thread_group_keys(struct task_struct *tsk);
 extern void exit_keys(struct task_struct *tsk);
+extern void exit_thread_group_keys(struct signal_struct *tg);
 extern int suid_keys(struct task_struct *tsk);
 extern int exec_keys(struct task_struct *tsk);
 extern void key_fsuid_changed(struct task_struct *tsk);
@@ -274,7 +277,9 @@ extern void key_init(void);
 #define alloc_uid_keyring(u)		0
 #define switch_uid_keyring(u)		do { } while(0)
 #define copy_keys(f,t)			0
+#define copy_thread_group_keys(t)	0
 #define exit_keys(t)			do { } while(0)
+#define exit_thread_group_keys(tg)	do { } while(0)
 #define suid_keys(t)			do { } while(0)
 #define exec_keys(t)			do { } while(0)
 #define key_fsuid_changed(t)		do { } while(0)

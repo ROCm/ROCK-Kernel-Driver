@@ -617,7 +617,6 @@ acpi_ex_store_object_to_object (
 
 acpi_status
 acpi_ex_store_buffer_to_buffer (
-	acpi_object_type                original_src_type,
 	union acpi_operand_object       *source_desc,
 	union acpi_operand_object       *target_desc);
 

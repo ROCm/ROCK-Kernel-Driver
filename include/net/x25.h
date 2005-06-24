@@ -10,6 +10,7 @@
 #ifndef _X25_H
 #define _X25_H 
 #include <linux/x25.h>
+#include <net/sock.h>
 
 #define	X25_ADDR_LEN			16
 
@@ -129,7 +130,8 @@ struct x25_neigh {
 	atomic_t		refcnt;
 };
 
-struct x25_opt {
+struct x25_sock {
+	struct sock		sk;
 	struct x25_address	source_addr, dest_addr;
 	struct x25_neigh	*neighbour;
 	unsigned int		lci;
@@ -141,7 +143,6 @@ struct x25_opt {
 	struct sk_buff_head	fragment_queue;
 	struct sk_buff_head	interrupt_in_queue;
 	struct sk_buff_head	interrupt_out_queue;
-	struct sock		*sk;		/* Backlink to socket */
 	struct timer_list	timer;
 	struct x25_causediag	causediag;
 	struct x25_facilities	facilities;
@@ -149,7 +150,10 @@ struct x25_opt {
 	unsigned long 		vc_facil_mask;	/* inc_call facilities mask */
 };
 
-#define x25_sk(__sk) ((struct x25_opt *)(__sk)->sk_protinfo)
+static inline struct x25_sock *x25_sk(const struct sock *sk)
+{
+	return (struct x25_sock *)sk;
+}
 
 /* af_x25.c */
 extern int  sysctl_x25_restart_request_timeout;

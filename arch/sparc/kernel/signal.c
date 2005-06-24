@@ -205,7 +205,7 @@ restore_fpu_state(struct pt_regs *regs, __siginfo_fpu_t __user *fpu)
 	set_used_math();
 	clear_tsk_thread_flag(current, TIF_USEDFPU);
 
-	if (verify_area(VERIFY_READ, fpu, sizeof(*fpu)))
+	if (!access_ok(VERIFY_READ, fpu, sizeof(*fpu)))
 		return -EFAULT;
 
 	err = __copy_from_user(&current->thread.float_regs[0], &fpu->si_float_regs[0],
@@ -231,7 +231,7 @@ static inline void do_new_sigreturn (struct pt_regs *regs)
 	sf = (struct new_signal_frame __user *) regs->u_regs[UREG_FP];
 
 	/* 1. Make sure we are not getting garbage from the user */
-	if (verify_area(VERIFY_READ, sf, sizeof(*sf)))
+	if (!access_ok(VERIFY_READ, sf, sizeof(*sf)))
 		goto segv_and_exit;
 
 	if (((unsigned long) sf) & 3)
@@ -297,7 +297,7 @@ asmlinkage void do_sigreturn(struct pt_regs *regs)
 	scptr = (struct sigcontext __user *) regs->u_regs[UREG_I0];
 
 	/* Check sanity of the user arg. */
-	if (verify_area(VERIFY_READ, scptr, sizeof(struct sigcontext)) ||
+	if (!access_ok(VERIFY_READ, scptr, sizeof(struct sigcontext)) ||
 	    (((unsigned long) scptr) & 3))
 		goto segv_and_exit;
 
@@ -356,7 +356,7 @@ asmlinkage void do_rt_sigreturn(struct pt_regs *regs)
 
 	synchronize_user_stack();
 	sf = (struct rt_signal_frame __user *) regs->u_regs[UREG_FP];
-	if (verify_area(VERIFY_READ, sf, sizeof(*sf)) ||
+	if (!access_ok(VERIFY_READ, sf, sizeof(*sf)) ||
 	    (((unsigned long) sf) & 0x03))
 		goto segv;
 

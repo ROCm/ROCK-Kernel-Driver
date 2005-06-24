@@ -170,14 +170,14 @@ my %highlights_html = ( $type_constant, "<i>\$1</i>",
 			$type_param, "<tt><b>\$1</b></tt>" );
 my $blankline_html = "<p>";
 
-# sgml, docbook format
-my %highlights_sgml = ( "([^=])\\\"([^\\\"<]+)\\\"", "\$1<quote>\$2</quote>",
+# XML, docbook format
+my %highlights_xml = ( "([^=])\\\"([^\\\"<]+)\\\"", "\$1<quote>\$2</quote>",
 			$type_constant, "<constant>\$1</constant>",
 			$type_func, "<function>\$1</function>",
 			$type_struct, "<structname>\$1</structname>",
 			$type_env, "<envar>\$1</envar>",
 			$type_param, "<parameter>\$1</parameter>" );
-my $blankline_sgml = "</para><para>\n";
+my $blankline_xml = "</para><para>\n";
 
 # gnome, docbook format
 my %highlights_gnome = ( $type_constant, "<replaceable class=\"option\">\$1</replaceable>",
@@ -297,14 +297,14 @@ while ($ARGV[0] =~ m/^-(.*)/) {
 	%highlights = %highlights_text;
 	$blankline = $blankline_text;
     } elsif ($cmd eq "-docbook") {
-	$output_mode = "sgml";
-	%highlights = %highlights_sgml;
-	$blankline = $blankline_sgml;
+	$output_mode = "xml";
+	%highlights = %highlights_xml;
+	$blankline = $blankline_xml;
     } elsif ($cmd eq "-gnome") {
 	$output_mode = "gnome";
 	%highlights = %highlights_gnome;
 	$blankline = $blankline_gnome;
-    } elsif ($cmd eq "-module") { # not needed for sgml, inherits from calling document
+    } elsif ($cmd eq "-module") { # not needed for XML, inherits from calling document
 	$modulename = shift @ARGV;
     } elsif ($cmd eq "-function") { # to only output specific functions
 	$function_only = 1;
@@ -547,26 +547,31 @@ sub output_intro_html(%) {
     print "<hr>\n";
 }
 
-sub output_section_sgml(%) {
+sub output_section_xml(%) {
     my %args = %{$_[0]};
     my $section;    
     # print out each section
     $lineprefix="   ";
     foreach $section (@{$args{'sectionlist'}}) {
-	print "<refsect1>\n <title>$section</title>\n <para>\n";
+	print "<refsect1>\n";
+	print "<title>$section</title>\n";
 	if ($section =~ m/EXAMPLE/i) {
-	    print "<example><para>\n";
+	    print "<informalexample><programlisting>\n";
+	} else {
+	    print "<para>\n";
 	}
 	output_highlight($args{'sections'}{$section});
 	if ($section =~ m/EXAMPLE/i) {
-	    print "</para></example>\n";
+	    print "</programlisting></informalexample>\n";
+	} else {
+	    print "</para>\n";
 	}
-	print " </para>\n</refsect1>\n";
+	print "</refsect1>\n";
     }
 }
 
-# output function in sgml DocBook
-sub output_function_sgml(%) {
+# output function in XML DocBook
+sub output_function_xml(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
@@ -576,8 +581,14 @@ sub output_function_sgml(%) {
     $id =~ s/[^A-Za-z0-9]/-/g;
 
     print "<refentry>\n";
+    print "<refentryinfo>\n";
+    print " <title>LINUX</title>\n";
+    print " <productname>Kernel Hackers Manual</productname>\n";
+    print " <date>$man_date</date>\n";
+    print "</refentryinfo>\n";
     print "<refmeta>\n";
-    print "<refentrytitle><phrase id=\"$id\">".$args{'function'}."</phrase></refentrytitle>\n";
+    print " <refentrytitle><phrase id=\"$id\">".$args{'function'}."</phrase></refentrytitle>\n";
+    print " <manvolnum>9</manvolnum>\n";
     print "</refmeta>\n";
     print "<refnamediv>\n";
     print " <refname>".$args{'function'}."</refname>\n";
@@ -607,7 +618,7 @@ sub output_function_sgml(%) {
 	    }
 	}
     } else {
-	print "  <void>\n";
+	print "  <void/>\n";
     }
     print "  </funcprototype></funcsynopsis>\n";
     print "</refsynopsisdiv>\n";
@@ -632,12 +643,12 @@ sub output_function_sgml(%) {
     }
     print "</refsect1>\n";
 
-    output_section_sgml(@_);
+    output_section_xml(@_);
     print "</refentry>\n\n";
 }
 
-# output struct in sgml DocBook
-sub output_struct_sgml(%) {
+# output struct in XML DocBook
+sub output_struct_xml(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $id;
@@ -646,8 +657,14 @@ sub output_struct_sgml(%) {
     $id =~ s/[^A-Za-z0-9]/-/g;
 
     print "<refentry>\n";
+    print "<refentryinfo>\n";
+    print " <title>LINUX</title>\n";
+    print " <productname>Kernel Hackers Manual</productname>\n";
+    print " <date>$man_date</date>\n";
+    print "</refentryinfo>\n";
     print "<refmeta>\n";
-    print "<refentrytitle><phrase id=\"$id\">".$args{'type'}." ".$args{'struct'}."</phrase></refentrytitle>\n";
+    print " <refentrytitle><phrase id=\"$id\">".$args{'type'}." ".$args{'struct'}."</phrase></refentrytitle>\n";
+    print " <manvolnum>9</manvolnum>\n";
     print "</refmeta>\n";
     print "<refnamediv>\n";
     print " <refname>".$args{'type'}." ".$args{'struct'}."</refname>\n";
@@ -708,13 +725,13 @@ sub output_struct_sgml(%) {
     print "  </variablelist>\n";
     print " </refsect1>\n";
 
-    output_section_sgml(@_);
+    output_section_xml(@_);
 
     print "</refentry>\n\n";
 }
 
-# output enum in sgml DocBook
-sub output_enum_sgml(%) {
+# output enum in XML DocBook
+sub output_enum_xml(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
@@ -724,8 +741,14 @@ sub output_enum_sgml(%) {
     $id =~ s/[^A-Za-z0-9]/-/g;
 
     print "<refentry>\n";
+    print "<refentryinfo>\n";
+    print " <title>LINUX</title>\n";
+    print " <productname>Kernel Hackers Manual</productname>\n";
+    print " <date>$man_date</date>\n";
+    print "</refentryinfo>\n";
     print "<refmeta>\n";
-    print "<refentrytitle><phrase id=\"$id\">enum ".$args{'enum'}."</phrase></refentrytitle>\n";
+    print " <refentrytitle><phrase id=\"$id\">enum ".$args{'enum'}."</phrase></refentrytitle>\n";
+    print " <manvolnum>9</manvolnum>\n";
     print "</refmeta>\n";
     print "<refnamediv>\n";
     print " <refname>enum ".$args{'enum'}."</refname>\n";
@@ -769,13 +792,13 @@ sub output_enum_sgml(%) {
     print "  </variablelist>\n";
     print "</refsect1>\n";
 
-    output_section_sgml(@_);
+    output_section_xml(@_);
 
     print "</refentry>\n\n";
 }
 
-# output typedef in sgml DocBook
-sub output_typedef_sgml(%) {
+# output typedef in XML DocBook
+sub output_typedef_xml(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $id;
@@ -784,8 +807,14 @@ sub output_typedef_sgml(%) {
     $id =~ s/[^A-Za-z0-9]/-/g;
 
     print "<refentry>\n";
+    print "<refentryinfo>\n";
+    print " <title>LINUX</title>\n";
+    print " <productname>Kernel Hackers Manual</productname>\n";
+    print " <date>$man_date</date>\n";
+    print "</refentryinfo>\n";
     print "<refmeta>\n";
-    print "<refentrytitle><phrase id=\"$id\">typedef ".$args{'typedef'}."</phrase></refentrytitle>\n";
+    print " <refentrytitle><phrase id=\"$id\">typedef ".$args{'typedef'}."</phrase></refentrytitle>\n";
+    print " <manvolnum>9</manvolnum>\n";
     print "</refmeta>\n";
     print "<refnamediv>\n";
     print " <refname>typedef ".$args{'typedef'}."</refname>\n";
@@ -800,13 +829,13 @@ sub output_typedef_sgml(%) {
     print "  <synopsis>typedef ".$args{'typedef'}.";</synopsis>\n";
     print "</refsynopsisdiv>\n";
 
-    output_section_sgml(@_);
+    output_section_xml(@_);
 
     print "</refentry>\n\n";
 }
 
-# output in sgml DocBook
-sub output_intro_sgml(%) {
+# output in XML DocBook
+sub output_intro_xml(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
@@ -831,7 +860,7 @@ sub output_intro_sgml(%) {
     print "\n\n";
 }
 
-# output in sgml DocBook
+# output in XML DocBook
 sub output_function_gnome {
     my %args = %{$_[0]};
     my ($parameter, $section);
@@ -1465,6 +1494,8 @@ sub dump_function($$) {
 
     $prototype =~ s/^static +//;
     $prototype =~ s/^extern +//;
+    $prototype =~ s/^fastcall +//;
+    $prototype =~ s/^asmlinkage +//;
     $prototype =~ s/^inline +//;
     $prototype =~ s/^__inline__ +//;
     $prototype =~ s/^#define +//; #ak added
@@ -1578,13 +1609,13 @@ sub process_state3_function($$) {
     my $x = shift;
     my $file = shift;
 
-    if ($x =~ m#\s*/\*\s+MACDOC\s*#io) {
+    if ($x =~ m#\s*/\*\s+MACDOC\s*#io || ($x =~ /^#/ && $x !~ /^#define/)) {
 	# do nothing
     }
     elsif ($x =~ /([^\{]*)/) {
         $prototype .= $1;
     }
-    if (($x =~ /\{/) || ($x =~ /\#/) || ($x =~ /;/)) {
+    if (($x =~ /\{/) || ($x =~ /\#define/) || ($x =~ /;/)) {
         $prototype =~ s@/\*.*?\*/@@gos;	# strip comments.
 	$prototype =~ s@[\r\n]+@ @gos; # strip newlines/cr's.
 	$prototype =~ s@^\s+@@gos; # strip leading spaces
@@ -1622,6 +1653,15 @@ sub process_state3_type($$) {
 	    last;
 	}
     }
+}
+
+# replace <, >, and &
+sub xml_escape($) {
+	my $text = shift;
+	$text =~ s/\&/\\\\\\amp;/g;
+	$text =~ s/\</\\\\\\lt;/g;
+	$text =~ s/\>/\\\\\\gt;/g;
+	return $text;
 }
 
 sub process_file($) {
@@ -1664,7 +1704,7 @@ sub process_file($) {
 
 		$state = 2;
 		if (/-(.*)/) {
-		    $declaration_purpose = $1;
+		    $declaration_purpose = xml_escape($1);
 		} else {
 		    $declaration_purpose = "";
 		}
@@ -1695,10 +1735,7 @@ sub process_file($) {
 		$newcontents = $2;
 
 		if ($contents ne "") {
-		    $contents =~ s/\&/\\\\\\amp;/g;
-		    $contents =~ s/\</\\\\\\lt;/g;
-		    $contents =~ s/\>/\\\\\\gt;/g;
-		    dump_section($section, $contents);
+		    dump_section($section, xml_escape($contents));
 		    $section = $section_default;
 		}
 
@@ -1710,10 +1747,7 @@ sub process_file($) {
 	    } elsif (/$doc_end/) {
 
 		if ($contents ne "") {
-		    $contents =~ s/\&/\\\\\\amp;/g;
-		    $contents =~ s/\</\\\\\\lt;/g;
-		    $contents =~ s/\>/\\\\\\gt;/g;
-		    dump_section($section, $contents);
+		    dump_section($section, xml_escape($contents));
 		    $section = $section_default;
 		    $contents = "";
 		}
@@ -1727,10 +1761,7 @@ sub process_file($) {
 		# @parameter line to signify start of description
 		if ($1 eq "" && 
 			($section =~ m/^@/ || $section eq $section_context)) {
-		    $contents =~ s/\&/\\\\\\amp;/g;
-		    $contents =~ s/\</\\\\\\lt;/g;
-		    $contents =~ s/\>/\\\\\\gt;/g;
-		    dump_section($section, $contents);
+		    dump_section($section, xml_escape($contents));
 		    $section = $section_default;
 		    $contents = "";
 		} else {
@@ -1799,7 +1830,7 @@ sub process_file($) {
     }
     if ($initial_section_counter == $section_counter) {
 	print STDERR "Warning(${file}): no structured comments found\n";
-	if ($output_mode eq "sgml") {
+	if ($output_mode eq "xml") {
 	    # The template wants at least one RefEntry here; make one.
 	    print "<refentry>\n";
 	    print " <refnamediv>\n";

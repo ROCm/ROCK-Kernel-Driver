@@ -29,10 +29,10 @@
 	.globl	atomic_add
 	.type	atomic_add,#function
 atomic_add: /* %o0 = increment, %o1 = atomic_ptr */
-1:	lduw	[%o1], %g5
-	add	%g5, %o0, %g7
-	cas	[%o1], %g5, %g7
-	cmp	%g5, %g7
+1:	lduw	[%o1], %g1
+	add	%g1, %o0, %g7
+	cas	[%o1], %g1, %g7
+	cmp	%g1, %g7
 	bne,pn	%icc, 1b
 	 nop
 	retl
@@ -42,10 +42,10 @@ atomic_add: /* %o0 = increment, %o1 = atomic_ptr */
 	.globl	atomic_sub
 	.type	atomic_sub,#function
 atomic_sub: /* %o0 = decrement, %o1 = atomic_ptr */
-1:	lduw	[%o1], %g5
-	sub	%g5, %o0, %g7
-	cas	[%o1], %g5, %g7
-	cmp	%g5, %g7
+1:	lduw	[%o1], %g1
+	sub	%g1, %o0, %g7
+	cas	[%o1], %g1, %g7
+	cmp	%g1, %g7
 	bne,pn	%icc, 1b
 	 nop
 	retl
@@ -56,10 +56,10 @@ atomic_sub: /* %o0 = decrement, %o1 = atomic_ptr */
 	.type	atomic_add_ret,#function
 atomic_add_ret: /* %o0 = increment, %o1 = atomic_ptr */
 	ATOMIC_PRE_BARRIER
-1:	lduw	[%o1], %g5
-	add	%g5, %o0, %g7
-	cas	[%o1], %g5, %g7
-	cmp	%g5, %g7
+1:	lduw	[%o1], %g1
+	add	%g1, %o0, %g7
+	cas	[%o1], %g1, %g7
+	cmp	%g1, %g7
 	bne,pn	%icc, 1b
 	 add	%g7, %o0, %g7
 	ATOMIC_POST_BARRIER
@@ -71,10 +71,10 @@ atomic_add_ret: /* %o0 = increment, %o1 = atomic_ptr */
 	.type	atomic_sub_ret,#function
 atomic_sub_ret: /* %o0 = decrement, %o1 = atomic_ptr */
 	ATOMIC_PRE_BARRIER
-1:	lduw	[%o1], %g5
-	sub	%g5, %o0, %g7
-	cas	[%o1], %g5, %g7
-	cmp	%g5, %g7
+1:	lduw	[%o1], %g1
+	sub	%g1, %o0, %g7
+	cas	[%o1], %g1, %g7
+	cmp	%g1, %g7
 	bne,pn	%icc, 1b
 	 sub	%g7, %o0, %g7
 	ATOMIC_POST_BARRIER
@@ -85,10 +85,10 @@ atomic_sub_ret: /* %o0 = decrement, %o1 = atomic_ptr */
 	.globl	atomic64_add
 	.type	atomic64_add,#function
 atomic64_add: /* %o0 = increment, %o1 = atomic_ptr */
-1:	ldx	[%o1], %g5
-	add	%g5, %o0, %g7
-	casx	[%o1], %g5, %g7
-	cmp	%g5, %g7
+1:	ldx	[%o1], %g1
+	add	%g1, %o0, %g7
+	casx	[%o1], %g1, %g7
+	cmp	%g1, %g7
 	bne,pn	%xcc, 1b
 	 nop
 	retl
@@ -98,10 +98,10 @@ atomic64_add: /* %o0 = increment, %o1 = atomic_ptr */
 	.globl	atomic64_sub
 	.type	atomic64_sub,#function
 atomic64_sub: /* %o0 = decrement, %o1 = atomic_ptr */
-1:	ldx	[%o1], %g5
-	sub	%g5, %o0, %g7
-	casx	[%o1], %g5, %g7
-	cmp	%g5, %g7
+1:	ldx	[%o1], %g1
+	sub	%g1, %o0, %g7
+	casx	[%o1], %g1, %g7
+	cmp	%g1, %g7
 	bne,pn	%xcc, 1b
 	 nop
 	retl
@@ -112,10 +112,10 @@ atomic64_sub: /* %o0 = decrement, %o1 = atomic_ptr */
 	.type	atomic64_add_ret,#function
 atomic64_add_ret: /* %o0 = increment, %o1 = atomic_ptr */
 	ATOMIC_PRE_BARRIER
-1:	ldx	[%o1], %g5
-	add	%g5, %o0, %g7
-	casx	[%o1], %g5, %g7
-	cmp	%g5, %g7
+1:	ldx	[%o1], %g1
+	add	%g1, %o0, %g7
+	casx	[%o1], %g1, %g7
+	cmp	%g1, %g7
 	bne,pn	%xcc, 1b
 	 add	%g7, %o0, %g7
 	ATOMIC_POST_BARRIER
@@ -127,10 +127,10 @@ atomic64_add_ret: /* %o0 = increment, %o1 = atomic_ptr */
 	.type	atomic64_sub_ret,#function
 atomic64_sub_ret: /* %o0 = decrement, %o1 = atomic_ptr */
 	ATOMIC_PRE_BARRIER
-1:	ldx	[%o1], %g5
-	sub	%g5, %o0, %g7
-	casx	[%o1], %g5, %g7
-	cmp	%g5, %g7
+1:	ldx	[%o1], %g1
+	sub	%g1, %o0, %g7
+	casx	[%o1], %g1, %g7
+	cmp	%g1, %g7
 	bne,pn	%xcc, 1b
 	 sub	%g7, %o0, %g7
 	ATOMIC_POST_BARRIER

@@ -1,5 +1,5 @@
 /*
- * $Id: saa7134-empress.c,v 1.9 2004/12/10 12:33:39 kraxel Exp $
+ * $Id: saa7134-empress.c,v 1.10 2005/02/03 10:24:33 kraxel Exp $
  *
  * (c) 2004 Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]
  *
@@ -87,17 +87,19 @@ static int ts_open(struct inode *inode, struct file *file)
 		return -ENODEV;
 
 	dprintk("open minor=%d\n",minor);
-	down(&dev->empress_tsq.lock);
 	err = -EBUSY;
-	if (dev->empress_users)
+	if (down_trylock(&dev->empress_tsq.lock))
 		goto done;
+	if (dev->empress_users)
+		goto done_up;
 
 	dev->empress_users++;
 	file->private_data = dev;
 	err = 0;
 
- done:
+done_up:
 	up(&dev->empress_tsq.lock);
+done:
 	return err;
 }
 
@@ -231,10 +233,7 @@ static int ts_do_ioctl(struct inode *inode, struct file *file,
 		memset(f,0,sizeof(*f));
 		f->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
-		/* FIXME: translate subsampling type EMPRESS into
-		 *        width/height: */
-		f->fmt.pix.width        = 720; /* D1 */
-		f->fmt.pix.height       = 576;
+		saa7134_i2c_call_clients(dev, cmd, arg);
 		f->fmt.pix.pixelformat  = V4L2_PIX_FMT_MPEG;
 		f->fmt.pix.sizeimage    = TS_PACKET_SIZE * dev->ts.nr_packets;
 		return 0;
@@ -247,20 +246,7 @@ static int ts_do_ioctl(struct inode *inode, struct file *file,
 		if (f->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
 		    return -EINVAL;
 
-		/*
-		  FIXME: translate and round width/height into EMPRESS
-		  subsample type:
-
-		          type  |   PAL   |  NTSC
-			---------------------------
-			  SIF   | 352x288 | 352x240
-			 1/2 D1 | 352x576 | 352x480
-			 2/3 D1 | 480x576 | 480x480
-			  D1    | 720x576 | 720x480
-		*/
-
-		f->fmt.pix.width        = 720; /* D1 */
-		f->fmt.pix.height       = 576;
+		saa7134_i2c_call_clients(dev, cmd, arg);
 		f->fmt.pix.pixelformat  = V4L2_PIX_FMT_MPEG;
 		f->fmt.pix.sizeimage    = TS_PACKET_SIZE* dev->ts.nr_packets;
 		return 0;

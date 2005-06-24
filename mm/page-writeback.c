@@ -255,7 +255,7 @@ static void balance_dirty_pages(struct address_space *mapping)
 
 /**
  * balance_dirty_pages_ratelimited - balance dirty memory state
- * @mapping - address_space which was dirtied
+ * @mapping: address_space which was dirtied
  *
  * Processes which are dirtying memory should call in here once for each page
  * which was newly dirtied.  The function will periodically check the system's
@@ -288,6 +288,28 @@ void balance_dirty_pages_ratelimited(struct address_space *mapping)
 	put_cpu_var(ratelimits);
 }
 EXPORT_SYMBOL(balance_dirty_pages_ratelimited);
+
+void throttle_vm_writeout(void)
+{
+	struct writeback_state wbs;
+	long background_thresh;
+	long dirty_thresh;
+
+        for ( ; ; ) {
+		get_dirty_limits(&wbs, &background_thresh, &dirty_thresh, NULL);
+
+                /*
+                 * Boost the allowable dirty threshold a bit for page
+                 * allocators so they don't get DoS'ed by heavy writers
+                 */
+                dirty_thresh += dirty_thresh / 10;      /* wheeee... */
+
+                if (wbs.nr_unstable + wbs.nr_writeback <= dirty_thresh)
+                        break;
+                blk_congestion_wait(WRITE, HZ/10);
+        }
+}
+
 
 /*
  * writeback at least _min_pages, and keep writing until the amount of dirty
@@ -540,8 +562,8 @@ int do_writepages(struct address_space *mapping, struct writeback_control *wbc)
 /**
  * write_one_page - write out a single page and optionally wait on I/O
  *
- * @page - the page to write
- * @wait - if true, wait on writeout
+ * @page: the page to write
+ * @wait: if true, wait on writeout
  *
  * The page must be locked by the caller and will be unlocked upon return.
  *
@@ -605,7 +627,7 @@ int __set_page_dirty_nobuffers(struct page *page)
 			mapping2 = page_mapping(page);
 			if (mapping2) { /* Race with truncate? */
 				BUG_ON(mapping2 != mapping);
-				if (!mapping->backing_dev_info->memory_backed)
+				if (mapping_cap_account_dirty(mapping))
 					inc_page_state(nr_dirty);
 				radix_tree_tag_set(&mapping->page_tree,
 					page_index(page), PAGECACHE_TAG_DIRTY);
@@ -691,7 +713,7 @@ int test_clear_page_dirty(struct page *page)
 						page_index(page),
 						PAGECACHE_TAG_DIRTY);
 			write_unlock_irqrestore(&mapping->tree_lock, flags);
-			if (!mapping->backing_dev_info->memory_backed)
+			if (mapping_cap_account_dirty(mapping))
 				dec_page_state(nr_dirty);
 			return 1;
 		}
@@ -722,7 +744,7 @@ int clear_page_dirty_for_io(struct page *page)
 
 	if (mapping) {
 		if (TestClearPageDirty(page)) {
-			if (!mapping->backing_dev_info->memory_backed)
+			if (mapping_cap_account_dirty(mapping))
 				dec_page_state(nr_dirty);
 			return 1;
 		}
@@ -731,30 +753,6 @@ int clear_page_dirty_for_io(struct page *page)
 	return TestClearPageDirty(page);
 }
 EXPORT_SYMBOL(clear_page_dirty_for_io);
-
-/*
- * Clear a page's dirty flag while ignoring dirty memory accounting
- */
-int __clear_page_dirty(struct page *page)
-{
-	struct address_space *mapping = page_mapping(page);
-
-	if (mapping) {
-		unsigned long flags;
-
-		write_lock_irqsave(&mapping->tree_lock, flags);
-		if (TestClearPageDirty(page)) {
-			radix_tree_tag_clear(&mapping->page_tree,
-						page_index(page),
-						PAGECACHE_TAG_DIRTY);
-			write_unlock_irqrestore(&mapping->tree_lock, flags);
-			return 1;
-		}
-		write_unlock_irqrestore(&mapping->tree_lock, flags);
-		return 0;
-	}
-	return TestClearPageDirty(page);
-}
 
 int test_clear_page_writeback(struct page *page)
 {

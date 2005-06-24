@@ -78,7 +78,7 @@ static void for_all_poss(struct inode *inode, void (*f)(loff_t *, loff_t, loff_t
 	return;
 }
 
-void hpfs_pos_subst(loff_t *p, loff_t f, loff_t t)
+static void hpfs_pos_subst(loff_t *p, loff_t f, loff_t t)
 {
 	if (*p == f) *p = t;
 }
@@ -88,7 +88,7 @@ void hpfs_pos_subst(loff_t *p, loff_t f, loff_t t)
 	if ((*p & ~0x3f) == (f & ~0x3f)) *p = (t & ~0x3f) | (*p & 0x3f);
 }*/
 
-void hpfs_pos_ins(loff_t *p, loff_t d, loff_t c)
+static void hpfs_pos_ins(loff_t *p, loff_t d, loff_t c)
 {
 	if ((*p & ~0x3f) == (d & ~0x3f) && (*p & 0x3f) >= (d & 0x3f)) {
 		int n = (*p & 0x3f) + c;
@@ -97,7 +97,7 @@ void hpfs_pos_ins(loff_t *p, loff_t d, loff_t c)
 	}
 }
 
-void hpfs_pos_del(loff_t *p, loff_t d, loff_t c)
+static void hpfs_pos_del(loff_t *p, loff_t d, loff_t c)
 {
 	if ((*p & ~0x3f) == (d & ~0x3f) && (*p & 0x3f) >= (d & 0x3f)) {
 		int n = (*p & 0x3f) - c;
@@ -189,7 +189,8 @@ struct hpfs_dirent *hpfs_add_de(struct super_block *s, struct dnode *d, unsigned
 
 /* Delete dirent and don't care about its subtree */
 
-void hpfs_delete_de(struct super_block *s, struct dnode *d, struct hpfs_dirent *de)
+static void hpfs_delete_de(struct super_block *s, struct dnode *d,
+			   struct hpfs_dirent *de)
 {
 	if (de->last) {
 		hpfs_error(s, "attempt to delete last dirent in dnode %08x", d->self);
@@ -221,8 +222,9 @@ static void fix_up_ptrs(struct super_block *s, struct dnode *d)
 
 /* Add an entry to dnode and do dnode splitting if required */
 
-int hpfs_add_to_dnode(struct inode *i, dnode_secno dno, unsigned char *name, unsigned namelen,
-		      struct hpfs_dirent *new_de, dnode_secno down_ptr)
+static int hpfs_add_to_dnode(struct inode *i, dnode_secno dno,
+			     unsigned char *name, unsigned namelen,
+			     struct hpfs_dirent *new_de, dnode_secno down_ptr)
 {
 	struct quad_buffer_head qbh, qbh1, qbh2;
 	struct dnode *d, *ad, *rd, *nd = NULL;

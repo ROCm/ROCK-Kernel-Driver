@@ -37,6 +37,7 @@ struct mmc_command {
 #define MMC_RSP_R1B	(MMC_RSP_SHORT|MMC_RSP_CRC|MMC_RSP_BUSY)
 #define MMC_RSP_R2	(MMC_RSP_LONG|MMC_RSP_CRC)
 #define MMC_RSP_R3	(MMC_RSP_SHORT)
+#define MMC_RSP_R6	(MMC_RSP_SHORT|MMC_RSP_CRC)
 
 	unsigned int		retries;	/* max number of retries */
 	unsigned int		error;		/* command error */

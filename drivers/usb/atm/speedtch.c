@@ -58,8 +58,8 @@ static const char speedtch_driver_name[] = "speedtch";
 #define SPEEDTOUCH_PRODUCTID		0x4061
 
 /* Timeout in jiffies */
-#define CTRL_TIMEOUT (2*HZ)
-#define DATA_TIMEOUT (2*HZ)
+#define CTRL_TIMEOUT 2000
+#define DATA_TIMEOUT 2000
 
 #define OFFSET_7  0		/* size 1 */
 #define OFFSET_b  1		/* size 8 */
@@ -386,6 +386,8 @@ static void speedtch_poll_status(struct speedtch_instance_data *instance)
 		if (instance->u.atm_dev->signal != ATM_PHY_SIG_LOST) {
 			instance->u.atm_dev->signal = ATM_PHY_SIG_LOST;
 			printk(KERN_NOTICE "ADSL line is down\n");
+			/* It'll never resync again unless we ask it to... */
+			speedtch_start_synchro(instance);
 		}
 		break;
 
@@ -474,7 +476,7 @@ static void speedtch_upload_firmware(struct speedtch_instance_data *instance,
 	/* URB 7 */
 	if (dl_512_first) {	/* some modems need a read before writing the firmware */
 		ret = usb_bulk_msg(usb_dev, usb_rcvbulkpipe(usb_dev, SPEEDTCH_ENDPOINT_FIRMWARE),
-				   buffer, 0x200, &actual_length, 2 * HZ);
+				   buffer, 0x200, &actual_length, 2000);
 
 		if (ret < 0 && ret != -ETIMEDOUT)
 			dbg("speedtch_upload_firmware: read BLOCK0 from modem failed (%d)!", ret);
@@ -766,7 +768,7 @@ static int speedtch_usb_probe(struct usb_interface *intf,
 
 	/* First check whether the modem already seems to be alive */
 	ret = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-			      0x12, 0xc0, 0x07, 0x00, buf7, SIZE_7, HZ / 2);
+			      0x12, 0xc0, 0x07, 0x00, buf7, SIZE_7, 500);
 
 	if (ret == SIZE_7) {
 		dbg("firmware appears to be already loaded");

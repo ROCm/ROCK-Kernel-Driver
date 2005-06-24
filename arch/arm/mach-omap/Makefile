@@ -16,6 +16,8 @@ obj-$(CONFIG_MACH_OMAP_GENERIC) += board-generic.o
 obj-$(CONFIG_MACH_OMAP_PERSEUS2) += board-perseus2.o
 obj-$(CONFIG_MACH_OMAP_OSK) += board-osk.o
 obj-$(CONFIG_MACH_OMAP_H3) += board-h3.o
+obj-$(CONFIG_MACH_VOICEBLUE) += board-voiceblue.o
+obj-$(CONFIG_MACH_NETSTAR) += board-netstar.o
 
 # OCPI interconnect support for 1710, 1610 and 5912
 obj-$(CONFIG_ARCH_OMAP16XX) += ocpi.o

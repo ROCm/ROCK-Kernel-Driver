@@ -1010,6 +1010,10 @@ acpi_ds_exec_end_control_op (
 		 * has been bubbled up the tree
 		 */
 		if (op->common.value.arg) {
+			/* Since we have a real Return(), delete any implicit return */
+
+			acpi_ds_clear_implicit_return (walk_state);
+
 			/* Return statement has an immediate operand */
 
 			status = acpi_ds_create_operands (walk_state, op->common.value.arg);
@@ -1036,6 +1040,10 @@ acpi_ds_exec_end_control_op (
 		}
 		else if ((walk_state->results) &&
 				 (walk_state->results->results.num_results > 0)) {
+			/* Since we have a real Return(), delete any implicit return */
+
+			acpi_ds_clear_implicit_return (walk_state);
+
 			/*
 			 * The return value has come from a previous calculation.
 			 *

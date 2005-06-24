@@ -94,7 +94,7 @@ void free_event_buffer(void)
 }
 
  
-int event_buffer_open(struct inode * inode, struct file * file)
+static int event_buffer_open(struct inode * inode, struct file * file)
 {
 	int err = -EPERM;
 
@@ -130,7 +130,7 @@ out:
 }
 
 
-int event_buffer_release(struct inode * inode, struct file * file)
+static int event_buffer_release(struct inode * inode, struct file * file)
 {
 	oprofile_stop();
 	oprofile_shutdown();
@@ -142,7 +142,8 @@ int event_buffer_release(struct inode * inode, struct file * file)
 }
 
 
-ssize_t event_buffer_read(struct file * file, char __user * buf, size_t count, loff_t * offset)
+static ssize_t event_buffer_read(struct file * file, char __user * buf,
+				 size_t count, loff_t * offset)
 {
 	int retval = -EINVAL;
 	size_t const max = buffer_size * sizeof(unsigned long);

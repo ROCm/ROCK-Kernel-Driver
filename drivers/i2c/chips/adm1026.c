@@ -27,6 +27,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/jiffies.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 #include <linux/i2c-vid.h>
@@ -313,8 +314,6 @@ static struct i2c_driver adm1026_driver = {
 	.detach_client  = adm1026_detach_client,
 };
 
-static int adm1026_id;
-
 int adm1026_attach_adapter(struct i2c_adapter *adapter)
 {
 	if (!(adapter->class & I2C_CLASS_HWMON)) {
@@ -363,49 +362,47 @@ void adm1026_init_client(struct i2c_client *client)
 	int value, i;
 	struct adm1026_data *data = i2c_get_clientdata(client);
 
-        dev_dbg(&client->dev,"(%d): Initializing device\n", client->id);
+        dev_dbg(&client->dev, "Initializing device\n");
 	/* Read chip config */
 	data->config1 = adm1026_read_value(client, ADM1026_REG_CONFIG1);
 	data->config2 = adm1026_read_value(client, ADM1026_REG_CONFIG2);
 	data->config3 = adm1026_read_value(client, ADM1026_REG_CONFIG3);
 
 	/* Inform user of chip config */
-	dev_dbg(&client->dev, "(%d): ADM1026_REG_CONFIG1 is: 0x%02x\n",
-		client->id, data->config1);
+	dev_dbg(&client->dev, "ADM1026_REG_CONFIG1 is: 0x%02x\n",
+		data->config1);
 	if ((data->config1 & CFG1_MONITOR) == 0) {
-		dev_dbg(&client->dev, "(%d): Monitoring not currently "
-			"enabled.\n", client->id);
+		dev_dbg(&client->dev, "Monitoring not currently "
+			"enabled.\n");
 	}
 	if (data->config1 & CFG1_INT_ENABLE) {
-		dev_dbg(&client->dev, "(%d): SMBALERT interrupts are "
-			"enabled.\n", client->id);
+		dev_dbg(&client->dev, "SMBALERT interrupts are "
+			"enabled.\n");
 	}
 	if (data->config1 & CFG1_AIN8_9) {
-		dev_dbg(&client->dev, "(%d): in8 and in9 enabled. "
-			"temp3 disabled.\n", client->id);
+		dev_dbg(&client->dev, "in8 and in9 enabled. "
+			"temp3 disabled.\n");
 	} else {
-		dev_dbg(&client->dev, "(%d): temp3 enabled.  in8 and "
-			"in9 disabled.\n", client->id);
+		dev_dbg(&client->dev, "temp3 enabled.  in8 and "
+			"in9 disabled.\n");
 	}
 	if (data->config1 & CFG1_THERM_HOT) {
-		dev_dbg(&client->dev, "(%d): Automatic THERM, PWM, "
-			"and temp limits enabled.\n", client->id);
+		dev_dbg(&client->dev, "Automatic THERM, PWM, "
+			"and temp limits enabled.\n");
 	}
 
 	value = data->config3;
 	if (data->config3 & CFG3_GPIO16_ENABLE) {
-		dev_dbg(&client->dev, "(%d): GPIO16 enabled.  THERM"
-			"pin disabled.\n", client->id);
+		dev_dbg(&client->dev, "GPIO16 enabled.  THERM"
+			"pin disabled.\n");
 	} else {
-		dev_dbg(&client->dev, "(%d): THERM pin enabled.  "
-			"GPIO16 disabled.\n", client->id);
+		dev_dbg(&client->dev, "THERM pin enabled.  "
+			"GPIO16 disabled.\n");
 	}
 	if (data->config3 & CFG3_VREF_250) {
-		dev_dbg(&client->dev, "(%d): Vref is 2.50 Volts.\n",
-			client->id);
+		dev_dbg(&client->dev, "Vref is 2.50 Volts.\n");
 	} else {
-		dev_dbg(&client->dev, "(%d): Vref is 1.82 Volts.\n",
-			client->id);
+		dev_dbg(&client->dev, "Vref is 1.82 Volts.\n");
 	}
 	/* Read and pick apart the existing GPIO configuration */
 	value = 0;
@@ -423,12 +420,11 @@ void adm1026_init_client(struct i2c_client *client)
 	adm1026_print_gpio(client);
 
 	/* If the user asks us to reprogram the GPIO config, then
-	 *   do it now.  But only if this is the first ADM1026.
+	 * do it now.
 	 */
-	if (client->id == 0
-	    && (gpio_input[0] != -1 || gpio_output[0] != -1
+	if (gpio_input[0] != -1 || gpio_output[0] != -1
 		|| gpio_inverted[0] != -1 || gpio_normal[0] != -1
-		|| gpio_fan[0] != -1)) {
+		|| gpio_fan[0] != -1) {
 		adm1026_fixup_gpio(client);
 	}
 
@@ -448,8 +444,7 @@ void adm1026_init_client(struct i2c_client *client)
 	value = adm1026_read_value(client, ADM1026_REG_CONFIG1);
 	/* Set MONITOR, clear interrupt acknowledge and s/w reset */
 	value = (value | CFG1_MONITOR) & (~CFG1_INT_CLEAR & ~CFG1_RESET);
-	dev_dbg(&client->dev, "(%d): Setting CONFIG to: 0x%02x\n",
-		client->id, value);
+	dev_dbg(&client->dev, "Setting CONFIG to: 0x%02x\n", value);
 	data->config1 = value;
 	adm1026_write_value(client, ADM1026_REG_CONFIG1, value);
 
@@ -467,31 +462,30 @@ void adm1026_print_gpio(struct i2c_client *client)
 	struct adm1026_data *data = i2c_get_clientdata(client);
 	int  i;
 
-	dev_dbg(&client->dev, "(%d): GPIO config is:", client->id);
+	dev_dbg(&client->dev, "GPIO config is:");
 	for (i = 0;i <= 7;++i) {
 		if (data->config2 & (1 << i)) {
-			dev_dbg(&client->dev, "\t(%d): %sGP%s%d\n", client->id,
+			dev_dbg(&client->dev, "\t%sGP%s%d\n",
 				data->gpio_config[i] & 0x02 ? "" : "!",
 				data->gpio_config[i] & 0x01 ? "OUT" : "IN",
 				i);
 		} else {
-			dev_dbg(&client->dev, "\t(%d): FAN%d\n",
-				client->id, i);
+			dev_dbg(&client->dev, "\tFAN%d\n", i);
 		}
 	}
 	for (i = 8;i <= 15;++i) {
-		dev_dbg(&client->dev, "\t(%d): %sGP%s%d\n", client->id,
+		dev_dbg(&client->dev, "\t%sGP%s%d\n",
 			data->gpio_config[i] & 0x02 ? "" : "!",
 			data->gpio_config[i] & 0x01 ? "OUT" : "IN",
 			i);
 	}
 	if (data->config3 & CFG3_GPIO16_ENABLE) {
-		dev_dbg(&client->dev, "\t(%d): %sGP%s16\n", client->id,
+		dev_dbg(&client->dev, "\t%sGP%s16\n",
 			data->gpio_config[16] & 0x02 ? "" : "!",
 			data->gpio_config[16] & 0x01 ? "OUT" : "IN");
 	} else {
 		/* GPIO16 is THERM  */
-		dev_dbg(&client->dev, "\t(%d): THERM\n", client->id);
+		dev_dbg(&client->dev, "\tTHERM\n");
 	}
 }
 
@@ -580,10 +574,9 @@ static struct adm1026_data *adm1026_update_device(struct device *dev)
 
 	down(&data->update_lock);
 	if (!data->valid
-	    || (jiffies - data->last_reading > ADM1026_DATA_INTERVAL)) {
+	    || time_after(jiffies, data->last_reading + ADM1026_DATA_INTERVAL)) {
 		/* Things that change quickly */
-		dev_dbg(&client->dev,"(%d): Reading sensor values\n", 
-			client->id);
+		dev_dbg(&client->dev,"Reading sensor values\n");
 		for (i = 0;i <= 16;++i) {
 			data->in[i] =
 			    adm1026_read_value(client, ADM1026_REG_IN[i]);
@@ -628,11 +621,10 @@ static struct adm1026_data *adm1026_update_device(struct device *dev)
 		data->last_reading = jiffies;
 	};  /* last_reading */
 
-	if (!data->valid || (jiffies - data->last_config > 
-		ADM1026_CONFIG_INTERVAL)) {
+	if (!data->valid ||
+	    time_after(jiffies, data->last_config + ADM1026_CONFIG_INTERVAL)) {
 		/* Things that don't change often */
-		dev_dbg(&client->dev, "(%d): Reading config values\n", 
-			client->id);
+		dev_dbg(&client->dev, "Reading config values\n");
 		for (i = 0;i <= 16;++i) {
 			data->in_min[i] = adm1026_read_value(client, 
 				ADM1026_REG_IN_MIN[i]);
@@ -712,8 +704,7 @@ static struct adm1026_data *adm1026_update_device(struct device *dev)
 		data->last_config = jiffies;
 	};  /* last_config */
 
-	dev_dbg(&client->dev, "(%d): Setting VID from GPIO11-15.\n", 
-		client->id);
+	dev_dbg(&client->dev, "Setting VID from GPIO11-15.\n");
 	data->vid = (data->gpio >> 11) & 0x1f;
 	data->valid = 1;
 	up(&data->update_lock);
@@ -735,10 +726,9 @@ static ssize_t set_in_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->in_min[nr] = INS_TO_REG(nr, val);
 	adm1026_write_value(client, ADM1026_REG_IN_MIN[nr], data->in_min[nr]);
 	up(&data->update_lock);
@@ -754,10 +744,9 @@ static ssize_t set_in_max(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->in_max[nr] = INS_TO_REG(nr, val);
 	adm1026_write_value(client, ADM1026_REG_IN_MAX[nr], data->in_max[nr]);
 	up(&data->update_lock);
@@ -827,10 +816,9 @@ static ssize_t set_in16_min(struct device *dev, const char *buf, size_t count)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->in_min[16] = INS_TO_REG(16, val + NEG12_OFFSET);
 	adm1026_write_value(client, ADM1026_REG_IN_MIN[16], data->in_min[16]);
 	up(&data->update_lock);
@@ -846,10 +834,9 @@ static ssize_t set_in16_max(struct device *dev, const char *buf, size_t count)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->in_max[16] = INS_TO_REG(16, val+NEG12_OFFSET);
 	adm1026_write_value(client, ADM1026_REG_IN_MAX[16], data->in_max[16]);
 	up(&data->update_lock);
@@ -882,10 +869,9 @@ static ssize_t set_fan_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->fan_min[nr] = FAN_TO_REG(val, data->fan_div[nr]);
 	adm1026_write_value(client, ADM1026_REG_FAN_MIN(nr),
 		data->fan_min[nr]);
@@ -1018,10 +1004,9 @@ static ssize_t set_temp_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->temp_min[nr] = TEMP_TO_REG(val);
 	adm1026_write_value(client, ADM1026_REG_TEMP_MIN[nr],
 		data->temp_min[nr]);
@@ -1038,10 +1023,9 @@ static ssize_t set_temp_max(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->temp_max[nr] = TEMP_TO_REG(val);
 	adm1026_write_value(client, ADM1026_REG_TEMP_MAX[nr],
 		data->temp_max[nr]);
@@ -1092,10 +1076,9 @@ static ssize_t set_temp_offset(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->temp_offset[nr] = TEMP_TO_REG(val);
 	adm1026_write_value(client, ADM1026_REG_TEMP_OFFSET[nr],
 		data->temp_offset[nr]);
@@ -1145,10 +1128,9 @@ static ssize_t set_temp_auto_point1_temp(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->temp_tmin[nr] = TEMP_TO_REG(val);
 	adm1026_write_value(client, ADM1026_REG_TEMP_TMIN[nr],
 		data->temp_tmin[nr]);
@@ -1199,9 +1181,8 @@ static ssize_t set_temp_crit_enable(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
-	val = simple_strtol(buf, NULL, 10);
 	if ((val == 1) || (val==0)) {
 		down(&data->update_lock);
 		data->config1 = (data->config1 & ~CFG1_THERM_HOT) | (val << 4);
@@ -1232,10 +1213,9 @@ static ssize_t set_temp_crit(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->temp_crit[nr] = TEMP_TO_REG(val);
 	adm1026_write_value(client, ADM1026_REG_TEMP_THERM[nr],
 		data->temp_crit[nr]);
@@ -1270,10 +1250,9 @@ static ssize_t set_analog_out_reg(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->analog_out = DAC_TO_REG(val);
 	adm1026_write_value(client, ADM1026_REG_DAC, data->analog_out);
 	up(&data->update_lock);
@@ -1326,11 +1305,10 @@ static ssize_t set_alarm_mask(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 	unsigned long mask;
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->alarm_mask = val & 0x7fffffff;
 	mask = data->alarm_mask
 		| (data->gpio_mask & 0x10000 ? 0x80000000 : 0);
@@ -1363,11 +1341,10 @@ static ssize_t set_gpio(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 	long   gpio;
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->gpio = val & 0x1ffff;
 	gpio = data->gpio;
 	adm1026_write_value(client, ADM1026_REG_GPIO_STATUS_0_7,gpio & 0xff);
@@ -1392,11 +1369,10 @@ static ssize_t set_gpio_mask(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 	long   mask;
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->gpio_mask = val & 0x1ffff;
 	mask = data->gpio_mask;
 	adm1026_write_value(client, ADM1026_REG_GPIO_MASK_0_7,mask & 0xff);
@@ -1420,11 +1396,11 @@ static ssize_t set_pwm_reg(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
 
 	if (data->pwm1.enable == 1) {
+		int val = simple_strtol(buf, NULL, 10);
+
 		down(&data->update_lock);
-		val = simple_strtol(buf, NULL, 10);
 		data->pwm1.pwm = PWM_TO_REG(val);
 		adm1026_write_value(client, ADM1026_REG_PWM, data->pwm1.pwm);
 		up(&data->update_lock);
@@ -1441,10 +1417,9 @@ static ssize_t set_auto_pwm_min(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->pwm1.auto_pwm_min = SENSORS_LIMIT(val,0,255);
 	if (data->pwm1.enable == 2) { /* apply immediately */
 		data->pwm1.pwm = PWM_TO_REG((data->pwm1.pwm & 0x0f) |
@@ -1468,10 +1443,9 @@ static ssize_t set_pwm_enable(struct device *dev, const char *buf,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1026_data *data = i2c_get_clientdata(client);
-	int     val;
+	int val = simple_strtol(buf, NULL, 10);
 	int     old_enable;
 
-	val = simple_strtol(buf, NULL, 10);
 	if ((val >= 0) && (val < 3)) {
 		down(&data->update_lock);
 		old_enable = data->pwm1.enable;
@@ -1608,15 +1582,9 @@ int adm1026_detect(struct i2c_adapter *adapter, int address,
 	strlcpy(new_client->name, type_name, I2C_NAME_SIZE);
 
 	/* Fill in the remaining client fields */
-	new_client->id = adm1026_id++;
 	data->type = kind;
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);
-
-	dev_dbg(&new_client->dev, "(%d): Assigning ID %d to %s at %d,0x%02x\n",
-		new_client->id, new_client->id, new_client->name,
-		i2c_adapter_id(new_client->adapter),
-		new_client->addr);
 
 	/* Tell the I2C layer a new client has arrived */
 	if ((err = i2c_attach_client(new_client)))

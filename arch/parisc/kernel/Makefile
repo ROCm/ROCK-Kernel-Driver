@@ -19,6 +19,6 @@ obj-$(CONFIG_SMP)	+= smp.o
 obj-$(CONFIG_PA11)	+= pci-dma.o
 obj-$(CONFIG_PCI)	+= pci.o
 obj-$(CONFIG_MODULES)	+= module.o
-obj-$(CONFIG_PARISC64)	+= binfmt_elf32.o sys_parisc32.o ioctl32.o signal32.o
+obj-$(CONFIG_64BIT)	+= binfmt_elf32.o sys_parisc32.o ioctl32.o signal32.o
 # only supported for PCX-W/U in 64-bit mode at the moment
-obj-$(CONFIG_PARISC64)	+= perf.o perf_asm.o
+obj-$(CONFIG_64BIT)	+= perf.o perf_asm.o

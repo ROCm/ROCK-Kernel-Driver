@@ -899,7 +899,8 @@ int rose_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 	 */
 	if ((sk = rose_find_socket(lci, rose_neigh)) != NULL) {
 		if (frametype == ROSE_CALL_REQUEST) {
-			rose_cb *rose = rose_sk(sk);
+			struct rose_sock *rose = rose_sk(sk);
+
 			/* Remove an existing unused socket */
 			rose_clear_queues(sk);
 			rose->cause	 = ROSE_NETWORK_CONGESTION;

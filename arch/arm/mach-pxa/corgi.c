@@ -37,6 +37,7 @@
 #include <asm/arch/udc.h>
 #include <asm/arch/corgi.h>
 
+#include <asm/mach/sharpsl_param.h>
 #include <asm/hardware/scoop.h>
 #include <video/w100fb.h>
 
@@ -59,7 +60,7 @@ static struct scoop_config corgi_scoop_setup = {
 	.io_out		= CORGI_SCOOP_IO_OUT,
 };
 
-static struct platform_device corgiscoop_device = {
+struct platform_device corgiscoop_device = {
 	.name		= "sharp-scoop",
 	.id		= -1,
 	.dev		= {
@@ -231,28 +232,10 @@ static struct platform_device *devices[] __initdata = {
 	&corgibl_device,
 };
 
-static struct sharpsl_flash_param_info sharpsl_flash_param;
-
-static void corgi_get_param(void)
-{
-	sharpsl_flash_param.comadj_keyword = readl(FLASH_MEM_BASE + FLASH_COMADJ_MAGIC_ADR);
-	sharpsl_flash_param.comadj = readl(FLASH_MEM_BASE + FLASH_COMADJ_DATA_ADR);
-
-	sharpsl_flash_param.phad_keyword = readl(FLASH_MEM_BASE + FLASH_PHAD_MAGIC_ADR);
-	sharpsl_flash_param.phadadj = readl(FLASH_MEM_BASE + FLASH_PHAD_DATA_ADR);
-}
-
 static void __init corgi_init(void)
 {
-	if (sharpsl_flash_param.comadj_keyword == FLASH_COMADJ_MAJIC)
-		corgi_fb_info.comadj=sharpsl_flash_param.comadj;
-	else
-		corgi_fb_info.comadj=-1;
-
-	if (sharpsl_flash_param.phad_keyword == FLASH_PHAD_MAJIC)
-		corgi_fb_info.phadadj=sharpsl_flash_param.phadadj;
-	else
-		corgi_fb_info.phadadj=-1;
+	corgi_fb_info.comadj=sharpsl_param.comadj;
+	corgi_fb_info.phadadj=sharpsl_param.phadadj;
 
 	pxa_gpio_mode(CORGI_GPIO_USB_PULLUP | GPIO_OUT);
  	pxa_set_udc_info(&udc_info);
@@ -264,7 +247,7 @@ static void __init corgi_init(void)
 static void __init fixup_corgi(struct machine_desc *desc,
 		struct tag *tags, char **cmdline, struct meminfo *mi)
 {
-	corgi_get_param();
+	sharpsl_save_param();
 	mi->nr_banks=1;
 	mi->bank[0].start = 0xa0000000;
 	mi->bank[0].node = 0;

@@ -7,7 +7,6 @@
 #include <asm/processor.h>
 #include <asm/fixmap.h>
 
-#include <asm/pgtable.h>
 #include <asm/cache.h>
 
 /* Allocate the top level pgd (page directory)

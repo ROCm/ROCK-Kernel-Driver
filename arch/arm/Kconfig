@@ -71,6 +71,9 @@ config GENERIC_IOMAP
 	bool
 	default y
 
+config FIQ
+	bool
+
 source "init/Kconfig"
 
 menu "System Type"
@@ -81,6 +84,8 @@ choice
 
 config ARCH_CLPS7500
 	bool "Cirrus-CL-PS7500FE"
+	select TIMER_ACORN
+	select ISA
 
 config ARCH_CLPS711X
 	bool "CLPS711x/EP721x-based"
@@ -92,6 +97,7 @@ config ARCH_CO285
 
 config ARCH_EBSA110
 	bool "EBSA-110"
+	select ISA
 	help
 	  This is an evaluation board for the StrongARM processor available
 	  from Digital. It has limited hardware on-board, including an onboard
@@ -111,18 +117,25 @@ config ARCH_FOOTBRIDGE
 
 config ARCH_INTEGRATOR
 	bool "Integrator"
+	select ARM_AMBA
+	select ICST525
 
 config ARCH_IOP3XX
 	bool "IOP3xx-based"
+	select PCI
 
 config ARCH_IXP4XX
 	bool "IXP4xx-based"
+	select DMABOUNCE
+	select PCI
 
 config ARCH_IXP2000
 	bool "IXP2400/2800-based"
+	select PCI
 
 config ARCH_L7200
 	bool "LinkUp-L7200"
+	select FIQ
 	help
 	  Say Y here if you intend to run this kernel on a LinkUp Systems
 	  L7200 Software Development Board which uses an ARM720T processor.
@@ -138,12 +151,17 @@ config ARCH_PXA
 
 config ARCH_RPC
 	bool "RiscPC"
+	select ARCH_ACORN
+	select FIQ
+	select TIMER_ACORN
 	help
 	  On the Acorn Risc-PC, Linux can support the internal IDE disk and
 	  CD-ROM interface, serial and parallel port, and the floppy drive.
 
 config ARCH_SA1100
 	bool "SA1100-based"
+	select ISA
+	select DISCONTIGMEM
 
 config ARCH_S3C2410
 	bool "Samsung S3C2410"
@@ -154,6 +172,9 @@ config ARCH_S3C2410
 
 config ARCH_SHARK
 	bool "Shark"
+	select ISA
+	select ISA_DMA
+	select PCI
 
 config ARCH_LH7A40X
 	bool "Sharp LH7A40X"
@@ -168,6 +189,8 @@ config ARCH_OMAP
 
 config ARCH_VERSATILE
 	bool "Versatile"
+	select ARM_AMBA
+	select ICST307
 	help
 	  This enables support for ARM Ltd Versatile board.
 
@@ -214,40 +237,6 @@ source "arch/arm/mach-versatile/Kconfig"
 # Definitions to make life easier
 config ARCH_ACORN
 	bool
-	depends on ARCH_RPC
-	default y
-
-config TIMER_ACORN
-	bool
-	depends on ARCH_ACORN || ARCH_CLPS7500
-	default y
-
-#####################################################################
-# SA1111 support
-config SA1111
-	bool
-	depends on ASSABET_NEPONSET || SA1100_ADSBITSY || SA1100_BADGE4 || SA1100_CONSUS || SA1100_GRAPHICSMASTER || SA1100_JORNADA720 || ARCH_LUBBOCK || SA1100_PFS168 || SA1100_PT_SYSTEM3 || SA1100_XP860
-	default y
-
-config SHARP_LOCOMO
-	bool
-	depends on SA1100_COLLIE
-	default y
-
-config SHARP_SCOOP
-	bool
-	depends on PXA_SHARPSL || SA1100_COLLIE
-	default y
-
-config FORCE_MAX_ZONEORDER
-	int
-	depends on SA1111
-	default "9"
-
-config DMABOUNCE
-	bool
-	depends on SA1111 || ARCH_IXP4XX
-	default y
 
 source arch/arm/mm/Kconfig
 
@@ -259,13 +248,64 @@ config XSCALE_PMU
 
 endmenu
 
-menu "General setup"
+source "arch/arm/common/Kconfig"
 
-# Select various configuration options depending on the machine type
+config FORCE_MAX_ZONEORDER
+	int
+	depends on SA1111
+	default "9"
+
+menu "Bus support"
+
+config ARM_AMBA
+	bool
+
+config ISA
+	bool
+	help
+	  Find out whether you have ISA slots on your motherboard.  ISA is the
+	  name of a bus system, i.e. the way the CPU talks to the other stuff
+	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
+	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
+	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+config ISA_DMA
+	bool
+
+config ISA_DMA_API
+	bool
+	default y
+
+config PCI
+	bool "PCI support" if ARCH_INTEGRATOR_AP
+	help
+	  Find out whether you have a PCI motherboard. PCI is the name of a
+	  bus system, i.e. the way the CPU talks to the other stuff inside
+	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+	  VESA. If you have PCI, say Y, otherwise N.
+
+	  The PCI-HOWTO, available from
+	  <http://www.tldp.org/docs.html#howto>, contains valuable
+	  information about which PCI hardware does work under Linux and which
+	  doesn't.
+
+# Select the host bridge type
+config PCI_HOST_VIA82C505
+	bool
+	depends on PCI && ARCH_SHARK
+	default y
+
+source "drivers/pci/Kconfig"
+
+source "drivers/pcmcia/Kconfig"
+
+endmenu
+
+menu "Kernel Features"
 
 config SMP
 	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && n
+	depends on EXPERIMENTAL #&& n
 	help
 	  This enables support for systems with more than one CPU. If you have
 	  a system with only one CPU, like most personal computers, say N. If
@@ -286,75 +326,94 @@ config SMP
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-32)"
+	range 2 32
 	depends on SMP
 	default "4"
 
+config PREEMPT
+	bool "Preemptible Kernel (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  This option reduces the latency of the kernel when reacting to
+	  real-time or interactive events by allowing a low priority process to
+	  be preempted even if it is in kernel mode executing a system call.
+	  This allows applications to run more reliably even when the system is
+	  under load.
+
+	  Say Y here if you are building a kernel for a desktop, embedded
+	  or real-time system.  Say N if you are unsure.
+
 config DISCONTIGMEM
 	bool
-	depends on ARCH_EDB7211 || ARCH_SA1100 || (ARCH_LH7A40X && !LH7A40X_CONTIGMEM)
-	default y
+	default (ARCH_LH7A40X && !LH7A40X_CONTIGMEM)
 	help
 	  Say Y to support efficient handling of discontiguous physical memory,
 	  for architectures which are either NUMA (Non-Uniform Memory Access)
 	  or have huge holes in the physical address space for other reasons.
 	  See <file:Documentation/vm/numa> for more.
 
-# Now handle the bus types
-config PCI
-	bool "PCI support" if ARCH_INTEGRATOR_AP
-	default y if ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX || ARCH_IXP4XX || ARCH_IXP2000
+config LEDS
+	bool "Timer and CPU usage LEDs"
+	depends on ARCH_CDB89712 || ARCH_CO285 || ARCH_EBSA110 || \
+		   ARCH_EBSA285 || ARCH_IMX || ARCH_INTEGRATOR || \
+		   ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_NETWINDER || \
+		   ARCH_OMAP || ARCH_P720T || ARCH_PXA_IDP || \
+		   ARCH_SA1100 || ARCH_SHARK || ARCH_VERSATILE
 	help
-	  Find out whether you have a PCI motherboard. PCI is the name of a
-	  bus system, i.e. the way the CPU talks to the other stuff inside
-	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
-	  VESA. If you have PCI, say Y, otherwise N.
+	  If you say Y here, the LEDs on your machine will be used
+	  to provide useful information about your current system status.
 
-	  The PCI-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>, contains valuable
-	  information about which PCI hardware does work under Linux and which
-	  doesn't.
+	  If you are compiling a kernel for a NetWinder or EBSA-285, you will
+	  be able to select which LEDs are active using the options below. If
+	  you are compiling a kernel for the EBSA-110 or the LART however, the
+	  red LED will simply flash regularly to indicate that the system is
+	  still functional. It is safe to say Y here if you have a CATS
+	  system, but the driver will do nothing.
 
-# Select the host bridge type
-config PCI_HOST_VIA82C505
-	bool
-	depends on PCI && ARCH_SHARK
-	default y
-
-config ICST525
-	bool
-	depends on ARCH_INTEGRATOR
-	default y
-
-config ICST307
-	bool
-	depends on ARCH_VERSATILE
-	default y
-
-config ARM_AMBA
-	bool
-	depends on ARCH_INTEGRATOR || ARCH_VERSATILE
-	default y
-
-config ISA
-	bool
-	depends on FOOTBRIDGE_HOST || ARCH_SHARK || ARCH_CLPS7500 || ARCH_EBSA110 || ARCH_CDB89712 || ARCH_EDB7211 || ARCH_SA1100 || ARCH_MX1ADS
-	default y
+config LEDS_TIMER
+	bool "Timer LED" if (!ARCH_CDB89712 && !ARCH_OMAP) || \
+			    MACH_OMAP_H2 || MACH_OMAP_PERSEUS2
+	depends on LEDS
+	default y if ARCH_EBSA110
 	help
-	  Find out whether you have ISA slots on your motherboard.  ISA is the
-	  name of a bus system, i.e. the way the CPU talks to the other stuff
-	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
-	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
-	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+	  If you say Y here, one of the system LEDs (the green one on the
+	  NetWinder, the amber one on the EBSA285, or the red one on the LART)
+	  will flash regularly to indicate that the system is still
+	  operational. This is mainly useful to kernel hackers who are
+	  debugging unstable kernels.
 
-config ISA_DMA
-	bool
-	depends on FOOTBRIDGE_HOST || ARCH_SHARK
-	default y
+	  The LART uses the same LED for both Timer LED and CPU usage LED
+	  functions. You may choose to use both, but the Timer LED function
+	  will overrule the CPU usage LED.
 
-config FIQ
+config LEDS_CPU
+	bool "CPU usage LED" if (!ARCH_CDB89712 && !ARCH_EBSA110 && \
+			!ARCH_OMAP) || MACH_OMAP_H2 || MACH_OMAP_PERSEUS2
+	depends on LEDS
+	help
+	  If you say Y here, the red LED will be used to give a good real
+	  time indication of CPU usage, by lighting whenever the idle task
+	  is not currently executing.
+
+	  The LART uses the same LED for both Timer LED and CPU usage LED
+	  functions. You may choose to use both, but the Timer LED function
+	  will overrule the CPU usage LED.
+
+config ALIGNMENT_TRAP
 	bool
-	depends on ARCH_ACORN || ARCH_L7200
-	default y
+	default y if !ARCH_EBSA110
+	help
+	  ARM processors can not fetch/store information which is not
+	  naturally aligned on the bus, i.e., a 4 byte fetch must start at an
+	  address divisible by 4. On 32-bit ARM processors, these non-aligned
+	  fetch/store instructions will be emulated in software if you say
+	  here, which has a severe performance impact. This is necessary for
+	  correct operation of some network protocols. With an IP-only
+	  configuration it is safe to say N, otherwise say Y.
+
+endmenu
+
+menu "Boot options"
 
 # Compressed boot loader in ROM.  Yes, we really want to ask about
 # TEXT and BSS so we preserve their values in the config files.
@@ -388,6 +447,16 @@ config ZBOOT_ROM
 	  Say Y here if you intend to execute your compressed kernel image
 	  (zImage) directly from ROM or flash.  If unsure, say N.
 
+config CMDLINE
+	string "Default kernel command string"
+	default ""
+	help
+	  On some architectures (EBSA110 and CATS), there is currently no way
+	  for the boot loader to pass arguments to the kernel. For these
+	  architectures, you should supply some command-line options at build
+	  time by entering them here. As a minimum, you should specify the
+	  memory size and the root device (e.g., mem=64M root=/dev/nfs).
+
 config XIP_KERNEL
 	bool "Kernel Execute-In-Place from ROM"
 	depends on !ZBOOT_ROM
@@ -418,13 +487,17 @@ config XIP_PHYS_ADDR
 	  be linked for and stored to.  This address is dependent on your
 	  own flash usage.
 
+endmenu
+
 if (ARCH_SA1100 || ARCH_INTEGRATOR)
+
+menu "CPU Frequency scaling"
 
 source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_SA1100
 	bool
-	depends on CPU_FREQ && (SA1100_LART || SA1100_PLEB)
+	depends on CPU_FREQ && (SA1100_H3100 || SA1100_H3600 || SA1100_H3800 || SA1100_LART || SA1100_PLEB || SA1100_BADGE4 || SA1100_HACKKIT)
 	default y
 
 config CPU_FREQ_SA1110
@@ -434,7 +507,7 @@ config CPU_FREQ_SA1110
 
 config CPU_FREQ_INTEGRATOR
 	tristate "CPUfreq driver for ARM Integrator CPUs"
-	depends on ARCH_INTEGRATOR && ICST525 && CPU_FREQ
+	depends on ARCH_INTEGRATOR && CPU_FREQ
 	default y
 	help
 	  This enables the CPUfreq driver for ARM Integrator CPUs.
@@ -443,13 +516,13 @@ config CPU_FREQ_INTEGRATOR
 
 	  If in doubt, say Y.
 
+endmenu
+
 endif
 
-source "drivers/pci/Kconfig"
+menu "Floating point emulation"
 
-source "drivers/pcmcia/Kconfig"
-
-comment "At least one math emulation must be selected"
+comment "At least one emulation must be selected"
 
 config FPE_NWFPE
 	bool "NWFPE math emulation"
@@ -500,9 +573,24 @@ config VFP
 
 	  Say N if your target does not have VFP hardware.
 
+endmenu
+
+menu "Userspace binary formats"
+
 source "fs/Kconfig.binfmt"
 
-source "drivers/base/Kconfig"
+config ARTHUR
+	tristate "RISC OS personality"
+	help
+	  Say Y here to include the kernel code necessary if you want to run
+	  Acorn RISC OS/Arthur binaries under Linux. This code is still very
+	  experimental; if this sounds frightening, say N and sleep in peace.
+	  You can also say M here to compile this support as a module (which
+	  will be called arthur).
+
+endmenu
+
+menu "Power management options"
 
 config PM
 	bool "Power Management support"
@@ -523,19 +611,6 @@ config PM
 	  Note that, even if you say N here, Linux on the x86 architecture
 	  will issue the hlt instruction if nothing is to be done, thereby
 	  sending the processor to sleep and saving power.
-
-config PREEMPT
-	bool "Preemptible Kernel (EXPERIMENTAL)"
-	depends on CPU_32 && EXPERIMENTAL
-	help
-	  This option reduces the latency of the kernel when reacting to
-	  real-time or interactive events by allowing a low priority process to
-	  be preempted even if it is in kernel mode executing a system call.
-	  This allows applications to run more reliably even when the system is
-	  under load.
-
-	  Say Y here if you are building a kernel for a desktop, embedded
-	  or real-time system.  Say N if you are unsure.
 
 config APM
 	tristate "Advanced Power Management Emulation"
@@ -596,103 +671,33 @@ config APM
 	  To compile this driver as a module, choose M here: the
 	  module will be called apm.
 
-config ARTHUR
-	tristate "RISC OS personality"
-	depends on CPU_32
-	help
-	  Say Y here to include the kernel code necessary if you want to run
-	  Acorn RISC OS/Arthur binaries under Linux. This code is still very
-	  experimental; if this sounds frightening, say N and sleep in peace.
-	  You can also say M here to compile this support as a module (which
-	  will be called arthur).
-
-config CMDLINE
-	string "Default kernel command string"
-	default ""
-	help
-	  On some architectures (EBSA110 and CATS), there is currently no way
-	  for the boot loader to pass arguments to the kernel. For these
-	  architectures, you should supply some command-line options at build
-	  time by entering them here. As a minimum, you should specify the
-	  memory size and the root device (e.g., mem=64M root=/dev/nfs).
-
-config LEDS
-	bool "Timer and CPU usage LEDs"
-	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE || ARCH_IMX
-	help
-	  If you say Y here, the LEDs on your machine will be used
-	  to provide useful information about your current system status.
-
-	  If you are compiling a kernel for a NetWinder or EBSA-285, you will
-	  be able to select which LEDs are active using the options below. If
-	  you are compiling a kernel for the EBSA-110 or the LART however, the
-	  red LED will simply flash regularly to indicate that the system is
-	  still functional. It is safe to say Y here if you have a CATS
-	  system, but the driver will do nothing.
-
-config LEDS_TIMER
-	bool "Timer LED" if LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || MACH_MAINSTONE || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE || ARCH_IMX || MACH_OMAP_H2 || MACH_OMAP_PERSEUS2)
-	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE || ARCH_IMX
-	default y if ARCH_EBSA110
-	help
-	  If you say Y here, one of the system LEDs (the green one on the
-	  NetWinder, the amber one on the EBSA285, or the red one on the LART)
-	  will flash regularly to indicate that the system is still
-	  operational. This is mainly useful to kernel hackers who are
-	  debugging unstable kernels.
-
-	  The LART uses the same LED for both Timer LED and CPU usage LED
-	  functions. You may choose to use both, but the Timer LED function
-	  will overrule the CPU usage LED.
-
-config LEDS_CPU
-	bool "CPU usage LED"
-	depends on LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE || ARCH_IMX || MACH_OMAP_H2 || MACH_OMAP_PERSEUS2)
-	help
-	  If you say Y here, the red LED will be used to give a good real
-	  time indication of CPU usage, by lighting whenever the idle task
-	  is not currently executing.
-
-	  The LART uses the same LED for both Timer LED and CPU usage LED
-	  functions. You may choose to use both, but the Timer LED function
-	  will overrule the CPU usage LED.
-
-config ALIGNMENT_TRAP
-	bool
-	depends on CPU_32
-	default y if !ARCH_EBSA110
-	help
-	  ARM processors can not fetch/store information which is not
-	  naturally aligned on the bus, i.e., a 4 byte fetch must start at an
-	  address divisible by 4. On 32-bit ARM processors, these non-aligned
-	  fetch/store instructions will be emulated in software if you say
-	  here, which has a severe performance impact. This is necessary for
-	  correct operation of some network protocols. With an IP-only
-	  configuration it is safe to say N, otherwise say Y.
-
 endmenu
 
-source "drivers/parport/Kconfig"
+menu "Device Drivers"
+
+source "drivers/base/Kconfig"
 
 if ALIGNMENT_TRAP
 source "drivers/mtd/Kconfig"
 endif
 
+source "drivers/parport/Kconfig"
+
 source "drivers/pnp/Kconfig"
 
 source "drivers/block/Kconfig"
 
-source "drivers/md/Kconfig"
-
 source "drivers/acorn/block/Kconfig"
 
-source "net/Kconfig"
-
-if ARCH_CLPS7500 || ARCH_IOP3XX || ARCH_IXP4XX || ARCH_L7200 || ARCH_LH7A40X || ARCH_PXA || ARCH_RPC || ARCH_S3C2410 || ARCH_SA1100 || ARCH_SHARK || FOOTBRIDGE
+if PCMCIA || ARCH_CLPS7500 || ARCH_IOP3XX || ARCH_IXP4XX \
+	|| ARCH_L7200 || ARCH_LH7A40X || ARCH_PXA || ARCH_RPC \
+	|| ARCH_S3C2410 || ARCH_SA1100 || ARCH_SHARK || FOOTBRIDGE
 source "drivers/ide/Kconfig"
 endif
 
 source "drivers/scsi/Kconfig"
+
+source "drivers/md/Kconfig"
 
 source "drivers/message/fusion/Kconfig"
 
@@ -700,11 +705,12 @@ source "drivers/ieee1394/Kconfig"
 
 source "drivers/message/i2o/Kconfig"
 
+source "net/Kconfig"
+
 source "drivers/isdn/Kconfig"
 
-#
 # input before char - char/joystick depends on it. As does USB.
-#
+
 source "drivers/input/Kconfig"
 
 source "drivers/char/Kconfig"
@@ -713,21 +719,23 @@ source "drivers/i2c/Kconfig"
 
 #source "drivers/l3/Kconfig"
 
+source "drivers/misc/Kconfig"
+
 source "drivers/media/Kconfig"
-
-source "fs/Kconfig"
-
-source "arch/arm/oprofile/Kconfig"
 
 source "drivers/video/Kconfig"
 
 source "sound/Kconfig"
 
-source "drivers/misc/Kconfig"
-
 source "drivers/usb/Kconfig"
 
 source "drivers/mmc/Kconfig"
+
+endmenu
+
+source "fs/Kconfig"
+
+source "arch/arm/oprofile/Kconfig"
 
 source "arch/arm/Kconfig.debug"
 

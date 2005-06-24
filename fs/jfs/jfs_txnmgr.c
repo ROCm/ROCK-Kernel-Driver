@@ -1,5 +1,5 @@
 /*
- *   Copyright (C) International Business Machines Corp., 2000-2004
+ *   Copyright (C) International Business Machines Corp., 2000-2005
  *   Portions Copyright (C) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
@@ -93,15 +93,15 @@ static struct {
 } TxStat;
 #endif
 
-static int nTxBlock = 512;	/* number of transaction blocks */
+static int nTxBlock = -1;	/* number of transaction blocks */
 module_param(nTxBlock, int, 0);
 MODULE_PARM_DESC(nTxBlock,
-		 "Number of transaction blocks (default:512, max:65536)");
+		 "Number of transaction blocks (max:65536)");
 
-static int nTxLock = 4096;	/* number of transaction locks */
+static int nTxLock = -1;	/* number of transaction locks */
 module_param(nTxLock, int, 0);
 MODULE_PARM_DESC(nTxLock,
-		 "Number of transaction locks (default:4096, max:65536)");
+		 "Number of transaction locks (max:65536)");
 
 struct tblock *TxBlock;	        /* transaction block table */
 static int TxLockLWM;		/* Low water mark for number of txLocks used */
@@ -124,6 +124,7 @@ static DEFINE_SPINLOCK(jfsTxnLock);
 
 DECLARE_WAIT_QUEUE_HEAD(jfs_sync_thread_wait);
 DECLARE_WAIT_QUEUE_HEAD(jfs_commit_thread_wait);
+static int jfs_commit_thread_waking;
 
 /*
  * Retry logic exist outside these macros to protect from spurrious wakeups.
@@ -226,6 +227,7 @@ static lid_t txLockAlloc(void)
 
 static void txLockFree(lid_t lid)
 {
+	TxLock[lid].tid = 0;
 	TxLock[lid].next = TxAnchor.freelock;
 	TxAnchor.freelock = lid;
 	TxAnchor.tlocksInUse--;
@@ -249,6 +251,25 @@ static void txLockFree(lid_t lid)
 int txInit(void)
 {
 	int k, size;
+	struct sysinfo si;
+
+	/* Set defaults for nTxLock and nTxBlock if unset */
+
+	if (nTxLock == -1) {
+		if (nTxBlock == -1) {
+			/* Base default on memory size */
+			si_meminfo(&si);
+			if (si.totalram > (256 * 1024)) /* 1 GB */
+				nTxLock = 64 * 1024;
+			else
+				nTxLock = si.totalram >> 2;
+		} else if (nTxBlock > (8 * 1024))
+			nTxLock = 64 * 1024;
+		else
+			nTxLock = nTxBlock << 3;
+	}
+	if (nTxBlock == -1)
+		nTxBlock = nTxLock >> 3;
 
 	/* Verify tunable parameters */
 	if (nTxBlock < 16)
@@ -259,6 +280,9 @@ int txInit(void)
 		nTxLock = 256;	/* No one should set it this low */
 	if (nTxLock > 65536)
 		nTxLock = 65536;
+
+	printk(KERN_INFO "JFS: nTxBlock = %d, nTxLock = %d\n",
+	       nTxBlock, nTxLock);
 	/*
 	 * initialize transaction block (tblock) table
 	 *
@@ -266,8 +290,8 @@ int txInit(void)
 	 * tid = 0 is reserved.
 	 */
 	TxLockLWM = (nTxLock * 4) / 10;
-	TxLockHWM = (nTxLock * 8) / 10;
-	TxLockVHWM = (nTxLock * 9) / 10;
+	TxLockHWM = (nTxLock * 7) / 10;
+	TxLockVHWM = (nTxLock * 8) / 10;
 
 	size = sizeof(struct tblock) * nTxBlock;
 	TxBlock = (struct tblock *) vmalloc(size);
@@ -543,9 +567,6 @@ void txEnd(tid_t tid)
 		 * synchronize with logsync barrier
 		 */
 		if (test_bit(log_SYNCBARRIER, &log->flag)) {
-			/* forward log syncpt */
-			/* lmSync(log); */
-
 			jfs_info("log barrier off: 0x%x", log->lsn);
 
 			/* enable new transactions start */
@@ -553,15 +574,22 @@ void txEnd(tid_t tid)
 
 			/* wakeup all waitors for logsync barrier */
 			TXN_WAKEUP(&log->syncwait);
+
+			TXN_UNLOCK();
+
+			/* forward log syncpt */
+			jfs_syncpt(log);
+
+			goto wakeup;
 		}
 	}
 
+	TXN_UNLOCK();
+wakeup:
 	/*
 	 * wakeup all waitors for a free tblock
 	 */
 	TXN_WAKEUP(&TxAnchor.freewait);
-
-	TXN_UNLOCK();
 }
 
 
@@ -610,8 +638,10 @@ struct tlock *txLock(tid_t tid, struct inode *ip, struct metapage * mp,
 
 	/* is page locked by the requester transaction ? */
 	tlck = lid_to_tlock(lid);
-	if ((xtid = tlck->tid) == tid)
+	if ((xtid = tlck->tid) == tid) {
+		TXN_UNLOCK();
 		goto grantLock;
+	}
 
 	/*
 	 * is page locked by anonymous transaction/lock ?
@@ -626,6 +656,7 @@ struct tlock *txLock(tid_t tid, struct inode *ip, struct metapage * mp,
 	 */
 	if (xtid == 0) {
 		tlck->tid = tid;
+		TXN_UNLOCK();
 		tblk = tid_to_tblock(tid);
 		/*
 		 * The order of the tlocks in the transaction is important
@@ -683,17 +714,18 @@ struct tlock *txLock(tid_t tid, struct inode *ip, struct metapage * mp,
 	 */
 	tlck->tid = tid;
 
+	TXN_UNLOCK();
+
 	/* mark tlock for meta-data page */
 	if (mp->xflag & COMMIT_PAGE) {
 
 		tlck->flag = tlckPAGELOCK;
 
 		/* mark the page dirty and nohomeok */
-		mark_metapage_dirty(mp);
-		atomic_inc(&mp->nohomeok);
+		metapage_nohomeok(mp);
 
 		jfs_info("locking mp = 0x%p, nohomeok = %d tid = %d tlck = 0x%p",
-			 mp, atomic_read(&mp->nohomeok), tid, tlck);
+			 mp, mp->nohomeok, tid, tlck);
 
 		/* if anonymous transaction, and buffer is on the group
 		 * commit synclist, mark inode to show this.  This will
@@ -739,8 +771,10 @@ struct tlock *txLock(tid_t tid, struct inode *ip, struct metapage * mp,
 		if (tlck->next == 0) {
 			/* This inode's first anonymous transaction */
 			jfs_ip->atltail = lid;
+			TXN_LOCK();
 			list_add_tail(&jfs_ip->anon_inode_list,
 				      &TxAnchor.anon_list);
+			TXN_UNLOCK();
 		}
 	}
 
@@ -798,8 +832,6 @@ struct tlock *txLock(tid_t tid, struct inode *ip, struct metapage * mp,
       grantLock:
 	tlck->type |= type;
 
-	TXN_UNLOCK();
-
 	return tlck;
 
 	/*
@@ -818,11 +850,19 @@ struct tlock *txLock(tid_t tid, struct inode *ip, struct metapage * mp,
 		BUG();
 	}
 	INCREMENT(stattx.waitlock);	/* statistics */
+	TXN_UNLOCK();
 	release_metapage(mp);
+	TXN_LOCK();
+	xtid = tlck->tid;	/* reaquire after dropping TXN_LOCK */
 
 	jfs_info("txLock: in waitLock, tid = %d, xtid = %d, lid = %d",
 		 tid, xtid, lid);
-	TXN_SLEEP_DROP_LOCK(&tid_to_tblock(xtid)->waitor);
+
+	/* Recheck everything since dropping TXN_LOCK */
+	if (xtid && (tlck->mp == mp) && (mp->lid == lid))
+		TXN_SLEEP_DROP_LOCK(&tid_to_tblock(xtid)->waitor);
+	else
+		TXN_UNLOCK();
 	jfs_info("txLock: awakened     tid = %d, lid = %d", tid, lid);
 
 	return NULL;
@@ -883,6 +923,7 @@ static void txUnlock(struct tblock * tblk)
 	struct metapage *mp;
 	struct jfs_log *log;
 	int difft, diffp;
+	unsigned long flags;
 
 	jfs_info("txUnlock: tblk = 0x%p", tblk);
 	log = JFS_SBI(tblk->sb)->log;
@@ -902,19 +943,14 @@ static void txUnlock(struct tblock * tblk)
 			assert(mp->xflag & COMMIT_PAGE);
 
 			/* hold buffer
-			 *
-			 * It's possible that someone else has the metapage.
-			 * The only things were changing are nohomeok, which
-			 * is handled atomically, and clsn which is protected
-			 * by the LOGSYNC_LOCK.
 			 */
-			hold_metapage(mp, 1);
+			hold_metapage(mp);
 
-			assert(atomic_read(&mp->nohomeok) > 0);
-			atomic_dec(&mp->nohomeok);
+			assert(mp->nohomeok > 0);
+			_metapage_homeok(mp);
 
 			/* inherit younger/larger clsn */
-			LOGSYNC_LOCK(log);
+			LOGSYNC_LOCK(log, flags);
 			if (mp->clsn) {
 				logdiff(difft, tblk->clsn, log);
 				logdiff(diffp, mp->clsn, log);
@@ -922,16 +958,11 @@ static void txUnlock(struct tblock * tblk)
 					mp->clsn = tblk->clsn;
 			} else
 				mp->clsn = tblk->clsn;
-			LOGSYNC_UNLOCK(log);
+			LOGSYNC_UNLOCK(log, flags);
 
 			assert(!(tlck->flag & tlckFREEPAGE));
 
-			if (tlck->flag & tlckWRITEPAGE) {
-				write_metapage(mp);
-			} else {
-				/* release page which has been forced */
-				release_metapage(mp);
-			}
+			put_metapage(mp);
 		}
 
 		/* insert tlock, and linelock(s) of the tlock if any,
@@ -958,10 +989,10 @@ static void txUnlock(struct tblock * tblk)
 	 * has been inserted in logsync list at txUpdateMap())
 	 */
 	if (tblk->lsn) {
-		LOGSYNC_LOCK(log);
+		LOGSYNC_LOCK(log, flags);
 		log->count--;
 		list_del(&tblk->synclist);
-		LOGSYNC_UNLOCK(log);
+		LOGSYNC_UNLOCK(log, flags);
 	}
 }
 
@@ -1544,14 +1575,14 @@ static int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	/* log after-image for logredo(): */
 	lrd->type = cpu_to_le16(LOG_REDOPAGE);
 
-	if (JFS_IP(tlck->ip)->next_index < MAX_INLINE_DIRTABLE_ENTRY) {
+	if (jfs_dirtable_inline(tlck->ip)) {
 		/*
 		 * The table has been truncated, we've must have deleted
 		 * the last entry, so don't bother logging this
 		 */
 		mp->lid = 0;
-		hold_metapage(mp, 0);
-		atomic_dec(&mp->nohomeok);
+		grab_metapage(mp);
+		metapage_homeok(mp);
 		discard_metapage(mp);
 		tlck->mp = NULL;
 		return 0;
@@ -1689,7 +1720,7 @@ static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	struct maplock *maplock;
 	struct xdlistlock *xadlock;
 	struct pxd_lock *pxdlock;
-	pxd_t *pxd;
+	pxd_t *page_pxd;
 	int next, lwm, hwm;
 
 	ip = tlck->ip;
@@ -1699,7 +1730,7 @@ static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	lrd->log.redopage.type = cpu_to_le16(LOG_XTREE);
 	lrd->log.redopage.l2linesize = cpu_to_le16(L2XTSLOTSIZE);
 
-	pxd = &lrd->log.redopage.pxd;
+	page_pxd = &lrd->log.redopage.pxd;
 
 	if (tlck->type & tlckBTROOT) {
 		lrd->log.redopage.type |= cpu_to_le16(LOG_BTROOT);
@@ -1729,9 +1760,9 @@ static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 		 * applying the after-image to the meta-data page.
 		 */
 		lrd->type = cpu_to_le16(LOG_REDOPAGE);
-//              *pxd = mp->cm_pxd;
-		PXDaddress(pxd, mp->index);
-		PXDlength(pxd,
+//              *page_pxd = mp->cm_pxd;
+		PXDaddress(page_pxd, mp->index);
+		PXDlength(page_pxd,
 			  mp->logical_size >> tblk->sb->s_blocksize_bits);
 		lrd->backchain = cpu_to_le32(lmLog(log, tblk, lrd, tlck));
 
@@ -1753,25 +1784,31 @@ static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 		tlck->flag |= tlckUPDATEMAP;
 		xadlock->flag = mlckALLOCXADLIST;
 		xadlock->count = next - lwm;
-		if ((xadlock->count <= 2) && (tblk->xflag & COMMIT_LAZY)) {
+		if ((xadlock->count <= 4) && (tblk->xflag & COMMIT_LAZY)) {
 			int i;
+			pxd_t *pxd;
 			/*
 			 * Lazy commit may allow xtree to be modified before
 			 * txUpdateMap runs.  Copy xad into linelock to
 			 * preserve correct data.
+			 *
+			 * We can fit twice as may pxd's as xads in the lock
 			 */
-			xadlock->xdlist = &xtlck->pxdlock;
-			memcpy(xadlock->xdlist, &p->xad[lwm],
-			       sizeof(xad_t) * xadlock->count);
-
-			for (i = 0; i < xadlock->count; i++)
+			xadlock->flag = mlckALLOCPXDLIST;
+			pxd = xadlock->xdlist = &xtlck->pxdlock;
+			for (i = 0; i < xadlock->count; i++) {
+				PXDaddress(pxd, addressXAD(&p->xad[lwm + i]));
+				PXDlength(pxd, lengthXAD(&p->xad[lwm + i]));
 				p->xad[lwm + i].flag &=
 				    ~(XAD_NEW | XAD_EXTENDED);
+				pxd++;
+			}
 		} else {
 			/*
 			 * xdlist will point to into inode's xtree, ensure
 			 * that transaction is not committed lazily.
 			 */
+			xadlock->flag = mlckALLOCXADLIST;
 			xadlock->xdlist = &p->xad[lwm];
 			tblk->xflag &= ~COMMIT_LAZY;
 		}
@@ -1813,8 +1850,8 @@ static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 		if (tblk->xflag & COMMIT_TRUNCATE) {
 			/* write NOREDOPAGE for the page */
 			lrd->type = cpu_to_le16(LOG_NOREDOPAGE);
-			PXDaddress(pxd, mp->index);
-			PXDlength(pxd,
+			PXDaddress(page_pxd, mp->index);
+			PXDlength(page_pxd,
 				  mp->logical_size >> tblk->sb->
 				  s_blocksize_bits);
 			lrd->backchain =
@@ -1849,22 +1886,32 @@ static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 		 * deleted page itself;
 		 */
 		tlck->flag |= tlckUPDATEMAP;
-		xadlock->flag = mlckFREEXADLIST;
 		xadlock->count = hwm - XTENTRYSTART + 1;
-		if ((xadlock->count <= 2) && (tblk->xflag & COMMIT_LAZY)) {
+		if ((xadlock->count <= 4) && (tblk->xflag & COMMIT_LAZY)) {
+			int i;
+			pxd_t *pxd;
 			/*
 			 * Lazy commit may allow xtree to be modified before
 			 * txUpdateMap runs.  Copy xad into linelock to
 			 * preserve correct data.
+			 *
+			 * We can fit twice as may pxd's as xads in the lock
 			 */
-			xadlock->xdlist = &xtlck->pxdlock;
-			memcpy(xadlock->xdlist, &p->xad[XTENTRYSTART],
-			       sizeof(xad_t) * xadlock->count);
+			xadlock->flag = mlckFREEPXDLIST;
+			pxd = xadlock->xdlist = &xtlck->pxdlock;
+			for (i = 0; i < xadlock->count; i++) {
+				PXDaddress(pxd,
+					addressXAD(&p->xad[XTENTRYSTART + i]));
+				PXDlength(pxd,
+					lengthXAD(&p->xad[XTENTRYSTART + i]));
+				pxd++;
+			}
 		} else {
 			/*
 			 * xdlist will point to into inode's xtree, ensure
 			 * that transaction is not committed lazily.
 			 */
+			xadlock->flag = mlckFREEXADLIST;
 			xadlock->xdlist = &p->xad[XTENTRYSTART];
 			tblk->xflag &= ~COMMIT_LAZY;
 		}
@@ -1895,7 +1942,7 @@ static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	 * header ?
 	 */
 	if (tlck->type & tlckTRUNCATE) {
-		pxd_t tpxd;	/* truncated extent of xad */
+		pxd_t pxd;	/* truncated extent of xad */
 		int twm;
 
 		/*
@@ -1924,8 +1971,9 @@ static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 		 * applying the after-image to the meta-data page.
 		 */
 		lrd->type = cpu_to_le16(LOG_REDOPAGE);
-		PXDaddress(pxd, mp->index);
-		PXDlength(pxd, mp->logical_size >> tblk->sb->s_blocksize_bits);
+		PXDaddress(page_pxd, mp->index);
+		PXDlength(page_pxd,
+			  mp->logical_size >> tblk->sb->s_blocksize_bits);
 		lrd->backchain = cpu_to_le32(lmLog(log, tblk, lrd, tlck));
 
 		/*
@@ -1943,7 +1991,7 @@ static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 			lrd->log.updatemap.type = cpu_to_le16(LOG_FREEPXD);
 			lrd->log.updatemap.nxd = cpu_to_le16(1);
 			lrd->log.updatemap.pxd = pxdlock->pxd;
-			tpxd = pxdlock->pxd;	/* save to format maplock */
+			pxd = pxdlock->pxd;	/* save to format maplock */
 			lrd->backchain =
 			    cpu_to_le32(lmLog(log, tblk, lrd, NULL));
 		}
@@ -2012,7 +2060,7 @@ static void xtLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 			pxdlock = (struct pxd_lock *) xadlock;
 			pxdlock->flag = mlckFREEPXD;
 			pxdlock->count = 1;
-			pxdlock->pxd = tpxd;
+			pxdlock->pxd = pxd;
 
 			jfs_info("xtLog: truncate ip:0x%p mp:0x%p count:%d "
 				 "hwm:%d", ip, mp, pxdlock->count, hwm);
@@ -2230,7 +2278,8 @@ void txForce(struct tblock * tblk)
 				tlck->flag &= ~tlckWRITEPAGE;
 
 				/* do not release page to freelist */
-
+				force_metapage(mp);
+#if 0
 				/*
 				 * The "right" thing to do here is to
 				 * synchronously write the metadata.
@@ -2242,9 +2291,10 @@ void txForce(struct tblock * tblk)
 				 * we can get by with synchronously writing
 				 * the pages when they are released.
 				 */
-				assert(atomic_read(&mp->nohomeok));
+				assert(mp->nohomeok);
 				set_bit(META_dirty, &mp->flag);
 				set_bit(META_sync, &mp->flag);
+#endif
 			}
 		}
 	}
@@ -2304,7 +2354,7 @@ static void txUpdateMap(struct tblock * tblk)
 			 */
 			mp = tlck->mp;
 			ASSERT(mp->xflag & COMMIT_PAGE);
-			hold_metapage(mp, 0);
+			grab_metapage(mp);
 		}
 
 		/*
@@ -2354,8 +2404,8 @@ static void txUpdateMap(struct tblock * tblk)
 				ASSERT(mp->lid == lid);
 				tlck->mp->lid = 0;
 			}
-			assert(atomic_read(&mp->nohomeok) == 1);
-			atomic_dec(&mp->nohomeok);
+			assert(mp->nohomeok == 1);
+			metapage_homeok(mp);
 			discard_metapage(mp);
 			tlck->mp = NULL;
 		}
@@ -2732,6 +2782,7 @@ int jfs_lazycommit(void *arg)
 
 	do {
 		LAZY_LOCK(flags);
+		jfs_commit_thread_waking = 0;	/* OK to wake another thread */
 		while (!list_empty(&TxAnchor.unlock_queue)) {
 			WorkDone = 0;
 			list_for_each_entry(tblk, &TxAnchor.unlock_queue,
@@ -2772,6 +2823,8 @@ int jfs_lazycommit(void *arg)
 			if (!WorkDone)
 				break;
 		}
+		/* In case a wakeup came while all threads were active */
+		jfs_commit_thread_waking = 0;
 
 		if (current->flags & PF_FREEZE) {
 			LAZY_UNLOCK(flags);
@@ -2804,10 +2857,13 @@ void txLazyUnlock(struct tblock * tblk)
 	list_add_tail(&tblk->cqueue, &TxAnchor.unlock_queue);
 	/*
 	 * Don't wake up a commit thread if there is already one servicing
-	 * this superblock.
+	 * this superblock, or if the last one we woke up hasn't started yet.
 	 */
-	if (!(JFS_SBI(tblk->sb)->commit_state & IN_LAZYCOMMIT))
+	if (!(JFS_SBI(tblk->sb)->commit_state & IN_LAZYCOMMIT) &&
+	    !jfs_commit_thread_waking) {
+		jfs_commit_thread_waking = 1;
 		wake_up(&jfs_commit_thread_wait);
+	}
 	LAZY_UNLOCK(flags);
 }
 
@@ -2815,24 +2871,9 @@ static void LogSyncRelease(struct metapage * mp)
 {
 	struct jfs_log *log = mp->log;
 
-	assert(atomic_read(&mp->nohomeok));
+	assert(mp->nohomeok);
 	assert(log);
-	atomic_dec(&mp->nohomeok);
-
-	if (atomic_read(&mp->nohomeok))
-		return;
-
-	hold_metapage(mp, 0);
-
-	LOGSYNC_LOCK(log);
-	mp->log = NULL;
-	mp->lsn = 0;
-	mp->clsn = 0;
-	log->count--;
-	list_del_init(&mp->synclist);
-	LOGSYNC_UNLOCK(log);
-
-	release_metapage(mp);
+	metapage_homeok(mp);
 }
 
 /*

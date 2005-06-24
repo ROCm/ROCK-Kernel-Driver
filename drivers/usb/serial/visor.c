@@ -215,6 +215,8 @@ static struct usb_device_id id_table [] = {
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_T_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TREO_650),
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_Z_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_ZIRE31_ID),
@@ -237,11 +239,15 @@ static struct usb_device_id id_table [] = {
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(SAMSUNG_VENDOR_ID, SAMSUNG_SPH_I500_ID), 
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
+	{ USB_DEVICE(TAPWAVE_VENDOR_ID, TAPWAVE_ZODIAC_ID),
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(GARMIN_VENDOR_ID, GARMIN_IQUE_3600_ID), 
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(ACEECA_VENDOR_ID, ACEECA_MEZ1000_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(KYOCERA_VENDOR_ID, KYOCERA_7135_ID),
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
+	{ USB_DEVICE(FOSSIL_VENDOR_ID, FOSSIL_ABACUS_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ },					/* optional parameter entry */
 	{ }					/* Terminating entry */
@@ -271,6 +277,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M125_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M130_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_T_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TREO_650) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_Z_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_ZIRE31_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_ZIRE_ID) },
@@ -284,9 +291,11 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_TJ25_ID) },
 	{ USB_DEVICE(SAMSUNG_VENDOR_ID, SAMSUNG_SCH_I330_ID) },
 	{ USB_DEVICE(SAMSUNG_VENDOR_ID, SAMSUNG_SPH_I500_ID) },
+	{ USB_DEVICE(TAPWAVE_VENDOR_ID, TAPWAVE_ZODIAC_ID) },
 	{ USB_DEVICE(GARMIN_VENDOR_ID, GARMIN_IQUE_3600_ID) },
 	{ USB_DEVICE(ACEECA_VENDOR_ID, ACEECA_MEZ1000_ID) },
 	{ USB_DEVICE(KYOCERA_VENDOR_ID, KYOCERA_7135_ID) },
+	{ USB_DEVICE(FOSSIL_VENDOR_ID, FOSSIL_ABACUS_ID) },
 	{ },					/* optional parameter entry */
 	{ }					/* Terminating entry */
 };
@@ -907,7 +916,7 @@ static int clie_3_5_startup (struct usb_serial *serial)
 	/* get the config number */
 	result = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0),
 				  USB_REQ_GET_CONFIGURATION, USB_DIR_IN,
-				  0, 0, &data, 1, HZ * 3);
+				  0, 0, &data, 1, 3000);
 	if (result < 0) {
 		dev_err(dev, "%s: get config number failed: %d\n", __FUNCTION__, result);
 		return result;
@@ -921,7 +930,7 @@ static int clie_3_5_startup (struct usb_serial *serial)
 	result = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0),
 				  USB_REQ_GET_INTERFACE, 
 				  USB_DIR_IN | USB_RECIP_INTERFACE,
-				  0, 0, &data, 1, HZ * 3);
+				  0, 0, &data, 1, 3000);
 	if (result < 0) {
 		dev_err(dev, "%s: get interface number failed: %d\n", __FUNCTION__, result);
 		return result;

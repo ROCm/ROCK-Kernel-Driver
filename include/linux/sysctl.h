@@ -135,7 +135,7 @@ enum
 	KERN_HZ_TIMER=65,	/* int: hz timer on or off */
 	KERN_UNKNOWN_NMI_PANIC=66, /* int: unknown nmi panic flag */
 	KERN_BOOTLOADER_TYPE=67, /* int: boot loader type */
-	KERN_KDB=68,		/* int: kdb on/off */
+	KERN_RANDOMIZE=68, /* int: randomize virtual address space */
 	KERN_DEFTIMESLICE=69,	/* int: nice   0 def timeslice */
 	KERN_MINTIMESLICE=70,	/* int: nice +19 min timeslice */
 	KERN_HZ=71,		/* unsigned long: internal kernel HZ */
@@ -351,6 +351,7 @@ enum
 	NET_TCP_MODERATE_RCVBUF=106,
 	NET_TCP_TSO_WIN_DIVISOR=107,
 	NET_TCP_BIC_BETA=108,
+	NET_IPV4_ICMP_ERRORS_USE_INBOUND_IFADDR=109,
 };
 
 enum {
@@ -404,6 +405,8 @@ enum
 	NET_IPV4_CONF_FORCE_IGMP_VERSION=17,
 	NET_IPV4_CONF_ARP_ANNOUNCE=18,
 	NET_IPV4_CONF_ARP_IGNORE=19,
+	NET_IPV4_CONF_PROMOTE_SECONDARIES=20,
+	__NET_IPV4_CONF_MAX
 };
 
 /* /proc/sys/net/ipv4/netfilter */
@@ -461,7 +464,8 @@ enum {
 	NET_IPV6_ROUTE_GC_INTERVAL=6,
 	NET_IPV6_ROUTE_GC_ELASTICITY=7,
 	NET_IPV6_ROUTE_MTU_EXPIRES=8,
-	NET_IPV6_ROUTE_MIN_ADVMSS=9
+	NET_IPV6_ROUTE_MIN_ADVMSS=9,
+	NET_IPV6_ROUTE_GC_MIN_INTERVAL_MS=10
 };
 
 enum {
@@ -481,7 +485,8 @@ enum {
 	NET_IPV6_REGEN_MAX_RETRY=14,
 	NET_IPV6_MAX_DESYNC_FACTOR=15,
 	NET_IPV6_MAX_ADDRESSES=16,
-	NET_IPV6_FORCE_MLD_VERSION=17
+	NET_IPV6_FORCE_MLD_VERSION=17,
+	__NET_IPV6_MAX
 };
 
 /* /proc/sys/net/ipv6/icmp */
@@ -506,7 +511,10 @@ enum {
 	NET_NEIGH_GC_INTERVAL=13,
 	NET_NEIGH_GC_THRESH1=14,
 	NET_NEIGH_GC_THRESH2=15,
-	NET_NEIGH_GC_THRESH3=16
+	NET_NEIGH_GC_THRESH3=16,
+	NET_NEIGH_RETRANS_TIME_MS=17,
+	NET_NEIGH_REACHABLE_TIME_MS=18,
+	__NET_NEIGH_MAX
 };
 
 /* /proc/sys/net/ipx */
@@ -642,6 +650,7 @@ enum {
 	NET_SCTP_MAX_BURST               = 12,
 	NET_SCTP_ADDIP_ENABLE		 = 13,
 	NET_SCTP_PRSCTP_ENABLE		 = 14,
+	NET_SCTP_SNDBUF_POLICY		 = 15,
 };
 
 /* /proc/sys/net/bridge */

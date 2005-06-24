@@ -149,7 +149,9 @@ acpi_install_fixed_event_handler (
 	acpi_gbl_fixed_event_handlers[event].handler = handler;
 	acpi_gbl_fixed_event_handlers[event].context = context;
 
-	status = acpi_enable_event (event, 0);
+	status = acpi_clear_event (event);
+	if (ACPI_SUCCESS(status))
+		status = acpi_enable_event (event, 0);
 	if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Could not enable fixed event.\n"));
 

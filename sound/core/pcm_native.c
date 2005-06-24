@@ -337,8 +337,8 @@ out:
 	return err;
 }
 
-static int snd_pcm_hw_params(snd_pcm_substream_t *substream,
-			     snd_pcm_hw_params_t *params)
+int snd_pcm_hw_params(snd_pcm_substream_t *substream,
+		      snd_pcm_hw_params_t *params)
 {
 	snd_pcm_runtime_t *runtime;
 	int err;
@@ -1368,32 +1368,43 @@ static int snd_pcm_drain(snd_pcm_substream_t *substream)
 	if (runtime->status->state == SNDRV_PCM_STATE_OPEN)
 		return -EBADFD;
 
+	down_read(&snd_pcm_link_rwsem);
 	snd_power_lock(card);
 	if (runtime->status->state == SNDRV_PCM_STATE_SUSPENDED) {
 		result = snd_power_wait(card, SNDRV_CTL_POWER_D0, substream->ffile);
-		if (result < 0) {
-			snd_power_unlock(card);
-			return result;
-		}
+		if (result < 0)
+			goto _unlock;
 	}
 
 	/* allocate temporary record for drain sync */
-	down_read(&snd_pcm_link_rwsem);
 	if (snd_pcm_stream_linked(substream)) {
 		drec = kmalloc(substream->group->count * sizeof(*drec), GFP_KERNEL);
 		if (! drec) {
-			up_read(&snd_pcm_link_rwsem);
-			snd_power_unlock(card);
-			return -ENOMEM;
+			result = -ENOMEM;
+			goto _unlock;
 		}
 	} else
 		drec = &drec_tmp;
 
-	/* count only playback streams */
+	snd_pcm_stream_lock_irq(substream);
+	/* resume pause */
+	if (runtime->status->state == SNDRV_PCM_STATE_PAUSED)
+		snd_pcm_pause(substream, 0);
+
+	/* pre-start/stop - all running streams are changed to DRAINING state */
+	result = snd_pcm_action(&snd_pcm_action_drain_init, substream, 0);
+	if (result < 0)
+		goto _end;
+
+	/* check streams with PLAYBACK & DRAINING */
 	num_drecs = 0;
 	snd_pcm_group_for_each(pos, substream) {
 		snd_pcm_substream_t *s = snd_pcm_group_substream_entry(pos);
 		runtime = s->runtime;
+		if (runtime->status->state != SNDRV_PCM_STATE_DRAINING) {
+			runtime->status->state = SNDRV_PCM_STATE_SETUP;
+			continue;
+		}
 		if (s->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			d = &drec[num_drecs++];
 			d->substream = s;
@@ -1407,21 +1418,9 @@ static int snd_pcm_drain(snd_pcm_substream_t *substream)
 				runtime->stop_threshold = runtime->buffer_size;
 		}
 	}
-	up_read(&snd_pcm_link_rwsem);
+
 	if (! num_drecs)
-		goto _error;
-
-	snd_pcm_stream_lock_irq(substream);
-	/* resume pause */
-	if (runtime->status->state == SNDRV_PCM_STATE_PAUSED)
-		snd_pcm_pause(substream, 0);
-
-	/* pre-start/stop - all running streams are changed to DRAINING state */
-	result = snd_pcm_action(&snd_pcm_action_drain_init, substream, 0);
-	if (result < 0) {
-		snd_pcm_stream_unlock_irq(substream);
-		goto _error;
-	}
+		goto _end;
 
 	for (;;) {
 		long tout;
@@ -1429,15 +1428,6 @@ static int snd_pcm_drain(snd_pcm_substream_t *substream)
 			result = -ERESTARTSYS;
 			break;
 		}
-		/* all finished? */
-		for (i = 0; i < num_drecs; i++) {
-			runtime = drec[i].substream->runtime;
-			if (runtime->status->state == SNDRV_PCM_STATE_DRAINING)
-				break;
-		}
-		if (i == num_drecs)
-			break; /* yes, all drained */
-
 		set_current_state(TASK_INTERRUPTIBLE);
 		snd_pcm_stream_unlock_irq(substream);
 		snd_power_unlock(card);
@@ -1454,11 +1444,15 @@ static int snd_pcm_drain(snd_pcm_substream_t *substream)
 			}
 			break;
 		}
+		/* all finished? */
+		for (i = 0; i < num_drecs; i++) {
+			runtime = drec[i].substream->runtime;
+			if (runtime->status->state == SNDRV_PCM_STATE_DRAINING)
+				break;
+		}
+		if (i == num_drecs)
+			break;
 	}
-
-	snd_pcm_stream_unlock_irq(substream);
-
- _error:
 	for (i = 0; i < num_drecs; i++) {
 		d = &drec[i];
 		runtime = d->substream->runtime;
@@ -1466,9 +1460,13 @@ static int snd_pcm_drain(snd_pcm_substream_t *substream)
 		runtime->stop_threshold = d->stop_threshold;
 	}
 
+ _end:
+	snd_pcm_stream_unlock_irq(substream);
 	if (drec != &drec_tmp)
 		kfree(drec);
+ _unlock:
 	snd_power_unlock(card);
+	up_read(&snd_pcm_link_rwsem);
 
 	return result;
 }

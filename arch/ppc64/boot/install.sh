@@ -17,6 +17,7 @@
 #   $2 - kernel image file
 #   $3 - kernel map file
 #   $4 - default install path (blank if root directory)
+#   $5 - kernel boot file, the zImage
 #
 
 # User may have a custom install script
@@ -27,7 +28,7 @@ if [ -x /sbin/installkernel ]; then exec /sbin/installkernel "$@"; fi
 # Default install
 
 # this should work for both the pSeries zImage and the iSeries vmlinux.sm
-image_name=`basename $2`
+image_name=`basename $5`
 
 if [ -f $4/$image_name ]; then
 	mv $4/$image_name $4/$image_name.old

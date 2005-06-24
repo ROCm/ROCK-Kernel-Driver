@@ -29,6 +29,7 @@
 #include <linux/timer.h>
 #include <linux/skbuff.h>
 #include <linux/wait.h>
+#include <asm/io.h>
 #include "hisax_if.h"
 #include "hfc4s8s_l1.h"
 
@@ -873,7 +874,7 @@ rx_b_frame(struct hfc4s8s_btype *bch)
 			bch->rx_ptr += 4;
 			z1 -= 4;
 		}
-		
+
 		while (z1--)
 #ifdef CONFIG_HISAX_HFC4S8S_PCIMEM
 			*(bch->rx_ptr++) = Read_hfc8(l1->hw, A_FIFO_DATA0);
@@ -1604,7 +1605,7 @@ hfc4s8s_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	hw->cardnum = card_cnt;
 	sprintf(hw->card_name, "hfc4s8s_%d", hw->cardnum);
 	printk(KERN_INFO "HFC-4S/8S: found adapter %s (%s) at %s\n",
-	       driver_data->device_name, hw->card_name, pdev->slot_name);
+	       driver_data->device_name, hw->card_name, pci_name(pdev));
 
 	spin_lock_init(&hw->lock);
 

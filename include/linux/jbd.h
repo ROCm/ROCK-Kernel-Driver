@@ -562,6 +562,7 @@ struct transaction_s
  * @j_sb_buffer: First part of superblock buffer
  * @j_superblock: Second part of superblock buffer
  * @j_format_version: Version of the superblock format
+ * @j_state_lock: Protect the various scalars in the journal
  * @j_barrier_count:  Number of processes waiting to create a barrier lock
  * @j_barrier: The barrier lock itself
  * @j_running_transaction: The current running transaction..
@@ -589,6 +590,7 @@ struct transaction_s
  * @j_fs_dev: Device which holds the client fs.  For internal journal this will
  *     be equal to j_dev
  * @j_maxlen: Total maximum capacity of the journal region on disk.
+ * @j_list_lock: Protects the buffer lists and internal buffer state.
  * @j_inode: Optional inode where we store the journal.  If present, all journal
  *     block numbers are mapped into this inode via bmap().
  * @j_tail_sequence:  Sequence number of the oldest transaction in the log 
@@ -604,8 +606,11 @@ struct transaction_s
  * @j_commit_interval: What is the maximum transaction lifetime before we begin
  *  a commit?
  * @j_commit_timer:  The timer used to wakeup the commit thread
+ * @j_revoke_lock: Protect the revoke table
  * @j_revoke: The revoke table - maintains the list of revoked blocks in the
  *     current transaction.
+ * @j_revoke_table: alternate revoke tables for j_revoke
+ * @j_private: An opaque pointer to fs-private information.
  */
 
 struct journal_s
@@ -789,6 +794,12 @@ struct journal_s
 	struct jbd_revoke_table_s *j_revoke_table[2];
 
 	/*
+	 * array of bhs for journal_commit_transaction
+	 */
+	struct buffer_head	**j_wbuf;
+	int			j_wbufsize;
+
+	/*
 	 * An opaque pointer to fs-private information.  ext3 puts its
 	 * superblock pointer here
 	 */
@@ -811,6 +822,7 @@ struct journal_s
  */
 
 /* Filing buffers */
+extern void __journal_temp_unlink_buffer(struct journal_head *jh);
 extern void journal_unfile_buffer(journal_t *, struct journal_head *);
 extern void __journal_unfile_buffer(struct journal_head *);
 extern void __journal_refile_buffer(struct journal_head *);
@@ -867,15 +879,12 @@ static inline handle_t *journal_current_handle(void)
 extern handle_t *journal_start(journal_t *, int nblocks);
 extern int	 journal_restart (handle_t *, int nblocks);
 extern int	 journal_extend (handle_t *, int nblocks);
-extern int	 journal_get_write_access(handle_t *, struct buffer_head *,
-						int *credits);
+extern int	 journal_get_write_access(handle_t *, struct buffer_head *);
 extern int	 journal_get_create_access (handle_t *, struct buffer_head *);
-extern int	 journal_get_undo_access(handle_t *, struct buffer_head *,
-						int *credits);
+extern int	 journal_get_undo_access(handle_t *, struct buffer_head *);
 extern int	 journal_dirty_data (handle_t *, struct buffer_head *);
 extern int	 journal_dirty_metadata (handle_t *, struct buffer_head *);
-extern void	 journal_release_buffer (handle_t *, struct buffer_head *,
-						int credits);
+extern void	 journal_release_buffer (handle_t *, struct buffer_head *);
 extern int	 journal_forget (handle_t *, struct buffer_head *);
 extern void	 journal_sync_buffer (struct buffer_head *);
 extern int	 journal_invalidatepage(journal_t *,
@@ -926,7 +935,7 @@ void journal_put_journal_head(struct journal_head *jh);
  */
 extern kmem_cache_t *jbd_handle_cache;
 
-static inline handle_t *jbd_alloc_handle(int gfp_flags)
+static inline handle_t *jbd_alloc_handle(unsigned int __nocast gfp_flags)
 {
 	return kmem_cache_alloc(jbd_handle_cache, gfp_flags);
 }

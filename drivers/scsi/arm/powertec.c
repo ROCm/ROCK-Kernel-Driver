@@ -1,7 +1,7 @@
 /*
  *  linux/drivers/acorn/scsi/powertec.c
  *
- *  Copyright (C) 1997-2003 Russell King
+ *  Copyright (C) 1997-2005 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -61,7 +61,7 @@ static int term[MAX_ECARDS] = { 1, 1, 1, 1, 1, 1, 1, 1 };
 struct powertec_info {
 	FAS216_Info		info;
 	struct expansion_card	*ec;
-	void			*term_port;
+	void __iomem		*base;
 	unsigned int		term_ctl;
 	struct scatterlist	sg[NR_SG];
 };
@@ -74,7 +74,8 @@ struct powertec_info {
 static void
 powertecscsi_irqenable(struct expansion_card *ec, int irqnr)
 {
-	writeb(POWERTEC_INTR_ENABLE, ec->irq_data);
+	struct powertec_info *info = ec->irq_data;
+	writeb(POWERTEC_INTR_ENABLE, info->base + POWERTEC_INTR_CONTROL);
 }
 
 /* Prototype: void powertecscsi_irqdisable(ec, irqnr)
@@ -85,7 +86,8 @@ powertecscsi_irqenable(struct expansion_card *ec, int irqnr)
 static void
 powertecscsi_irqdisable(struct expansion_card *ec, int irqnr)
 {
-	writeb(POWERTEC_INTR_DISABLE, ec->irq_data);
+	struct powertec_info *info = ec->irq_data;
+	writeb(POWERTEC_INTR_DISABLE, info->base + POWERTEC_INTR_CONTROL);
 }
 
 static const expansioncard_ops_t powertecscsi_ops = {
@@ -104,7 +106,7 @@ powertecscsi_terminator_ctl(struct Scsi_Host *host, int on_off)
 	struct powertec_info *info = (struct powertec_info *)host->hostdata;
 
 	info->term_ctl = on_off ? POWERTEC_TERM_ENABLE : 0;
-	writeb(info->term_ctl, info->term_port);
+	writeb(info->term_ctl, info->base + POWERTEC_TERM_CONTROL);
 }
 
 /* Prototype: void powertecscsi_intr(irq, *dev_id, *regs)
@@ -135,7 +137,7 @@ powertecscsi_dma_setup(struct Scsi_Host *host, Scsi_Pointer *SCp,
 {
 	struct powertec_info *info = (struct powertec_info *)host->hostdata;
 	struct device *dev = scsi_get_device(host);
-	int dmach = host->dma_channel;
+	int dmach = info->info.scsi.dma;
 
 	if (info->info.ifcfg.capabilities & FASCAP_DMA &&
 	    min_type == fasdma_real_all) {
@@ -174,8 +176,9 @@ powertecscsi_dma_setup(struct Scsi_Host *host, Scsi_Pointer *SCp,
 static void
 powertecscsi_dma_stop(struct Scsi_Host *host, Scsi_Pointer *SCp)
 {
-	if (host->dma_channel != NO_DMA)
-		disable_dma(host->dma_channel);
+	struct powertec_info *info = (struct powertec_info *)host->hostdata;
+	if (info->info.scsi.dma != NO_DMA)
+		disable_dma(info->info.scsi.dma);
 }
 
 /* Prototype: const char *powertecscsi_info(struct Scsi_Host * host)
@@ -315,7 +318,7 @@ powertecscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 	struct Scsi_Host *host;
 	struct powertec_info *info;
 	unsigned long resbase, reslen;
-	unsigned char *base;
+	void __iomem *base;
 	int ret;
 
 	ret = ecard_request_resources(ec);
@@ -337,26 +340,16 @@ powertecscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 		goto out_unmap;
 	}
 
-	host->base	  = (unsigned long)base;
-	host->irq	  = ec->irq;
-	host->dma_channel = ec->dma;
-
-	ec->irqaddr	= base + POWERTEC_INTR_STATUS;
-	ec->irqmask	= POWERTEC_INTR_BIT;
-	ec->irq_data	= base + POWERTEC_INTR_CONTROL;
-	ec->ops		= &powertecscsi_ops;
-
 	ecard_set_drvdata(ec, host);
 
 	info = (struct powertec_info *)host->hostdata;
-	info->term_port = base + POWERTEC_TERM_CONTROL;
+	info->base = base;
 	powertecscsi_terminator_ctl(host, term[ec->slot_no]);
-
-	device_create_file(&ec->dev, &dev_attr_bus_term);
 
 	info->info.scsi.io_base		= base + POWERTEC_FAS216_OFFSET;
 	info->info.scsi.io_shift	= POWERTEC_FAS216_SHIFT;
-	info->info.scsi.irq		= host->irq;
+	info->info.scsi.irq		= ec->irq;
+	info->info.scsi.dma		= ec->dma;
 	info->info.ifcfg.clockrate	= 40; /* MHz */
 	info->info.ifcfg.select_timeout	= 255;
 	info->info.ifcfg.asyncperiod	= 200; /* ns */
@@ -369,25 +362,32 @@ powertecscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 	info->info.dma.pseudo		= NULL;
 	info->info.dma.stop		= powertecscsi_dma_stop;
 
+	ec->irqaddr	= base + POWERTEC_INTR_STATUS;
+	ec->irqmask	= POWERTEC_INTR_BIT;
+	ec->irq_data	= info;
+	ec->ops		= &powertecscsi_ops;
+
+	device_create_file(&ec->dev, &dev_attr_bus_term);
+
 	ret = fas216_init(host);
 	if (ret)
 		goto out_free;
 
-	ret = request_irq(host->irq, powertecscsi_intr,
+	ret = request_irq(ec->irq, powertecscsi_intr,
 			  SA_INTERRUPT, "powertec", info);
 	if (ret) {
 		printk("scsi%d: IRQ%d not free: %d\n",
-		       host->host_no, host->irq, ret);
+		       host->host_no, ec->irq, ret);
 		goto out_release;
 	}
 
-	if (host->dma_channel != NO_DMA) {
-		if (request_dma(host->dma_channel, "powertec")) {
+	if (info->info.scsi.dma != NO_DMA) {
+		if (request_dma(info->info.scsi.dma, "powertec")) {
 			printk("scsi%d: DMA%d not free, using PIO\n",
-			       host->host_no, host->dma_channel);
-			host->dma_channel = NO_DMA;
+			       host->host_no, info->info.scsi.dma);
+			info->info.scsi.dma = NO_DMA;
 		} else {
-			set_dma_speed(host->dma_channel, 180);
+			set_dma_speed(info->info.scsi.dma, 180);
 			info->info.ifcfg.capabilities |= FASCAP_DMA;
 		}
 	}
@@ -396,9 +396,9 @@ powertecscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 	if (ret == 0)
 		goto out;
 
-	if (host->dma_channel != NO_DMA)
-		free_dma(host->dma_channel);
-	free_irq(host->irq, host);
+	if (info->info.scsi.dma != NO_DMA)
+		free_dma(info->info.scsi.dma);
+	free_irq(ec->irq, host);
 
  out_release:
 	fas216_release(host);
@@ -420,18 +420,18 @@ powertecscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 static void __devexit powertecscsi_remove(struct expansion_card *ec)
 {
 	struct Scsi_Host *host = ecard_get_drvdata(ec);
-	struct powertecscsi_info *info = (struct powertecscsi_info *)host->hostdata;
+	struct powertec_info *info = (struct powertec_info *)host->hostdata;
 
 	ecard_set_drvdata(ec, NULL);
 	fas216_remove(host);
 
 	device_remove_file(&ec->dev, &dev_attr_bus_term);
 
-	if (host->dma_channel != NO_DMA)
-		free_dma(host->dma_channel);
-	free_irq(host->irq, info);
+	if (info->info.scsi.dma != NO_DMA)
+		free_dma(info->info.scsi.dma);
+	free_irq(ec->irq, info);
 
-	iounmap((void *)host->base);
+	iounmap(info->base);
 
 	fas216_release(host);
 	scsi_host_put(host);

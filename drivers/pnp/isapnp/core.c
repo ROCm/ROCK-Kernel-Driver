@@ -52,9 +52,9 @@
 #endif
 
 int isapnp_disable;			/* Disable ISA PnP */
-int isapnp_rdp;				/* Read Data Port */
-int isapnp_reset = 1;			/* reset all PnP cards (deactivate) */
-int isapnp_verbose = 1;			/* verbose mode */
+static int isapnp_rdp;			/* Read Data Port */
+static int isapnp_reset = 1;		/* reset all PnP cards (deactivate) */
+static int isapnp_verbose = 1;		/* verbose mode */
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Generic ISA Plug & Play support");
@@ -121,23 +121,12 @@ unsigned char isapnp_read_byte(unsigned char idx)
 	return read_data();
 }
 
-unsigned short isapnp_read_word(unsigned char idx)
+static unsigned short isapnp_read_word(unsigned char idx)
 {
 	unsigned short val;
 
 	val = isapnp_read_byte(idx);
 	val = (val << 8) + isapnp_read_byte(idx+1);
-	return val;
-}
-
-unsigned int isapnp_read_dword(unsigned char idx)
-{
-	unsigned int val;
-
-	val = isapnp_read_byte(idx);
-	val = (val << 8) + isapnp_read_byte(idx+1);
-	val = (val << 8) + isapnp_read_byte(idx+2);
-	val = (val << 8) + isapnp_read_byte(idx+3);
 	return val;
 }
 
@@ -147,21 +136,13 @@ void isapnp_write_byte(unsigned char idx, unsigned char val)
 	write_data(val);
 }
 
-void isapnp_write_word(unsigned char idx, unsigned short val)
+static void isapnp_write_word(unsigned char idx, unsigned short val)
 {
 	isapnp_write_byte(idx, val >> 8);
 	isapnp_write_byte(idx+1, val);
 }
 
-void isapnp_write_dword(unsigned char idx, unsigned int val)
-{
-	isapnp_write_byte(idx, val >> 24);
-	isapnp_write_byte(idx+1, val >> 16);
-	isapnp_write_byte(idx+2, val >> 8);
-	isapnp_write_byte(idx+3, val);
-}
-
-void *isapnp_alloc(long size)
+static void *isapnp_alloc(long size)
 {
 	void *result;
 
@@ -196,24 +177,24 @@ static void isapnp_wait(void)
 	isapnp_write_byte(0x02, 0x02);
 }
 
-void isapnp_wake(unsigned char csn)
+static void isapnp_wake(unsigned char csn)
 {
 	isapnp_write_byte(0x03, csn);
 }
 
-void isapnp_device(unsigned char logdev)
+static void isapnp_device(unsigned char logdev)
 {
 	isapnp_write_byte(0x07, logdev);
 }
 
-void isapnp_activate(unsigned char logdev)
+static void isapnp_activate(unsigned char logdev)
 {
 	isapnp_device(logdev);
 	isapnp_write_byte(ISAPNP_CFG_ACTIVATE, 1);
 	udelay(250);
 }
 
-void isapnp_deactivate(unsigned char logdev)
+static void isapnp_deactivate(unsigned char logdev)
 {
 	isapnp_device(logdev);
 	isapnp_write_byte(ISAPNP_CFG_ACTIVATE, 0);
@@ -972,13 +953,7 @@ EXPORT_SYMBOL(isapnp_present);
 EXPORT_SYMBOL(isapnp_cfg_begin);
 EXPORT_SYMBOL(isapnp_cfg_end);
 EXPORT_SYMBOL(isapnp_read_byte);
-EXPORT_SYMBOL(isapnp_read_word);
-EXPORT_SYMBOL(isapnp_read_dword);
 EXPORT_SYMBOL(isapnp_write_byte);
-EXPORT_SYMBOL(isapnp_write_word);
-EXPORT_SYMBOL(isapnp_write_dword);
-EXPORT_SYMBOL(isapnp_wake);
-EXPORT_SYMBOL(isapnp_device);
 
 static int isapnp_read_resources(struct pnp_dev *dev, struct pnp_resource_table *res)
 {
@@ -1070,7 +1045,7 @@ struct pnp_protocol isapnp_protocol = {
 	.disable = isapnp_disable_resources,
 };
 
-int __init isapnp_init(void)
+static int __init isapnp_init(void)
 {
 	int cards;
 	struct pnp_card *card;

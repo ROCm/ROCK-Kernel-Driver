@@ -58,14 +58,6 @@
 #include <net/act_api.h>
 #include <net/pkt_cls.h>
 
-
-struct tc_u32_mark
-{
-	u32		val;
-	u32		mask;
-	u32		success;
-};
-
 struct tc_u_knode
 {
 	struct tc_u_knode	*next;

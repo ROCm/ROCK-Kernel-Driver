@@ -53,12 +53,16 @@ struct mthca_icm_chunk {
 
 struct mthca_icm {
 	struct list_head chunk_list;
+	int              refcount;
 };
 
 struct mthca_icm_table {
 	u64               virt;
 	int               num_icm;
-	struct semaphore  sem;
+	int               num_obj;
+	int               obj_size;
+	int               lowmem;
+	struct semaphore  mutex;
 	struct mthca_icm *icm[0];
 };
 
@@ -75,10 +79,17 @@ struct mthca_icm *mthca_alloc_icm(struct mthca_dev *dev, int npages,
 void mthca_free_icm(struct mthca_dev *dev, struct mthca_icm *icm);
 
 struct mthca_icm_table *mthca_alloc_icm_table(struct mthca_dev *dev,
-					      u64 virt, unsigned size,
-					      unsigned reserved,
+					      u64 virt, int obj_size,
+					      int nobj, int reserved,
 					      int use_lowmem);
 void mthca_free_icm_table(struct mthca_dev *dev, struct mthca_icm_table *table);
+int mthca_table_get(struct mthca_dev *dev, struct mthca_icm_table *table, int obj);
+void mthca_table_put(struct mthca_dev *dev, struct mthca_icm_table *table, int obj);
+void *mthca_table_find(struct mthca_icm_table *table, int obj);
+int mthca_table_get_range(struct mthca_dev *dev, struct mthca_icm_table *table,
+			  int start, int end);
+void mthca_table_put_range(struct mthca_dev *dev, struct mthca_icm_table *table,
+			   int start, int end);
 
 static inline void mthca_icm_first(struct mthca_icm *icm,
 				   struct mthca_icm_iter *iter)
@@ -118,5 +129,38 @@ static inline unsigned long mthca_icm_size(struct mthca_icm_iter *iter)
 {
 	return sg_dma_len(&iter->chunk->mem[iter->page_idx]);
 }
+
+enum {
+	MTHCA_DB_REC_PER_PAGE = 4096 / 8
+};
+
+struct mthca_db_page {
+	DECLARE_BITMAP(used, MTHCA_DB_REC_PER_PAGE);
+	u64       *db_rec;
+	dma_addr_t mapping;
+};
+
+struct mthca_db_table {
+	int 	       	      npages;
+	int 	       	      max_group1;
+	int 	       	      min_group2;
+	struct mthca_db_page *page;
+	struct semaphore      mutex;
+};
+
+enum {
+	MTHCA_DB_TYPE_INVALID   = 0x0,
+	MTHCA_DB_TYPE_CQ_SET_CI = 0x1,
+	MTHCA_DB_TYPE_CQ_ARM    = 0x2,
+	MTHCA_DB_TYPE_SQ        = 0x3,
+	MTHCA_DB_TYPE_RQ        = 0x4,
+	MTHCA_DB_TYPE_SRQ       = 0x5,
+	MTHCA_DB_TYPE_GROUP_SEP = 0x7
+};
+
+int mthca_init_db_tab(struct mthca_dev *dev);
+void mthca_cleanup_db_tab(struct mthca_dev *dev);
+int mthca_alloc_db(struct mthca_dev *dev, int type, u32 qn, u32 **db);
+void mthca_free_db(struct mthca_dev *dev, int type, int db_index);
 
 #endif /* MTHCA_MEMFREE_H */

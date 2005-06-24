@@ -14,6 +14,7 @@
 #include <linux/thread_info.h>
 #include <linux/cpumask.h>
 #include <linux/errno.h>
+#include <linux/nodemask.h>
 
 #include <asm/system.h>
 #include <asm/semaphore.h>
@@ -32,6 +33,7 @@
 #include <linux/pid.h>
 #include <linux/percpu.h>
 #include <linux/topology.h>
+#include <linux/seccomp.h>
 
 struct exec_domain;
 
@@ -173,7 +175,6 @@ extern void cpu_init (void);
 extern void trap_init(void);
 extern void update_process_times(int user);
 extern void scheduler_tick(void);
-extern unsigned long cache_decay_ticks;
 
 /* Attach to any functions which should be ignored in wchan output. */
 #define __sched		__attribute__((__section__(".sched.text")))
@@ -204,6 +205,12 @@ arch_get_unmapped_area_topdown(struct file *filp, unsigned long addr,
 extern void arch_unmap_area(struct vm_area_struct *area);
 extern void arch_unmap_area_topdown(struct vm_area_struct *area);
 
+#define set_mm_counter(mm, member, value) (mm)->_##member = (value)
+#define get_mm_counter(mm, member) ((mm)->_##member)
+#define add_mm_counter(mm, member, value) (mm)->_##member += (value)
+#define inc_mm_counter(mm, member) (mm)->_##member++
+#define dec_mm_counter(mm, member) (mm)->_##member--
+typedef unsigned long mm_counter_t;
 
 struct mm_struct {
 	struct vm_area_struct * mmap;		/* list of VMAs */
@@ -220,7 +227,7 @@ struct mm_struct {
 	atomic_t mm_count;			/* How many references to "struct mm_struct" (users count as 1) */
 	int map_count;				/* number of VMAs */
 	struct rw_semaphore mmap_sem;
-	spinlock_t page_table_lock;		/* Protects page tables, mm->rss, mm->anon_rss */
+	spinlock_t page_table_lock;		/* Protects page tables and some counters */
 
 	struct list_head mmlist;		/* List of maybe swapped mm's.  These are globally strung
 						 * together off init_mm.mmlist, and are protected
@@ -230,8 +237,12 @@ struct mm_struct {
 	unsigned long start_code, end_code, start_data, end_data;
 	unsigned long start_brk, brk, start_stack;
 	unsigned long arg_start, arg_end, env_start, env_end;
-	unsigned long rss, anon_rss, total_vm, locked_vm, shared_vm;
+	unsigned long total_vm, locked_vm, shared_vm;
 	unsigned long exec_vm, stack_vm, reserved_vm, def_flags, nr_ptes;
+
+	/* Special counters protected by the page_table_lock */
+	mm_counter_t _rss;
+	mm_counter_t _anon_rss;
 
 	unsigned long saved_auxv[42]; /* for /proc/PID/auxv */
 
@@ -301,6 +312,14 @@ struct signal_struct {
 	/* POSIX.1b Interval Timers */
 	struct list_head posix_timers;
 
+	/* ITIMER_REAL timer for the process */
+	struct timer_list real_timer;
+	unsigned long it_real_value, it_real_incr;
+
+	/* ITIMER_PROF and ITIMER_VIRTUAL timers for the process */
+	cputime_t it_prof_expires, it_virt_expires;
+	cputime_t it_prof_incr, it_virt_incr;
+
 	/* job control IDs */
 	pid_t pgrp;
 	pid_t tty_old_pgrp;
@@ -321,6 +340,14 @@ struct signal_struct {
 	unsigned long min_flt, maj_flt, cmin_flt, cmaj_flt;
 
 	/*
+	 * Cumulative ns of scheduled CPU time for dead threads in the
+	 * group, not including a zombie group leader.  (This only differs
+	 * from jiffies_to_ns(utime + stime) if sched_clock uses something
+	 * other than jiffies.)
+	 */
+	unsigned long long sched_time;
+
+	/*
 	 * We don't bother to synchronize most readers of this at all,
 	 * because there is no reader checking a limit that actually needs
 	 * to get both rlim_cur and rlim_max atomically, and either one
@@ -330,6 +357,15 @@ struct signal_struct {
 	 * have no need to disable irqs.
 	 */
 	struct rlimit rlim[RLIM_NLIMITS];
+
+	struct list_head cpu_timers[3];
+
+	/* keep the process-shared keyrings here so that they do the right
+	 * thing in threads created with CLONE_THREAD */
+#ifdef CONFIG_KEYS
+	struct key *session_keyring;	/* keyring inherited over fork */
+	struct key *process_keyring;	/* keyring private to this process */
+#endif
 };
 
 /*
@@ -463,17 +499,26 @@ struct sched_domain {
 	/* load_balance() stats */
 	unsigned long lb_cnt[MAX_IDLE_TYPES];
 	unsigned long lb_failed[MAX_IDLE_TYPES];
+	unsigned long lb_balanced[MAX_IDLE_TYPES];
 	unsigned long lb_imbalance[MAX_IDLE_TYPES];
+	unsigned long lb_gained[MAX_IDLE_TYPES];
+	unsigned long lb_hot_gained[MAX_IDLE_TYPES];
 	unsigned long lb_nobusyg[MAX_IDLE_TYPES];
 	unsigned long lb_nobusyq[MAX_IDLE_TYPES];
+
+	/* Active load balancing */
+	unsigned long alb_cnt;
+	unsigned long alb_failed;
+	unsigned long alb_pushed;
 
 	/* sched_balance_exec() stats */
 	unsigned long sbe_attempts;
 	unsigned long sbe_pushed;
 
 	/* try_to_wake_up() stats */
-	unsigned long ttwu_wake_affine;
-	unsigned long ttwu_wake_balance;
+	unsigned long ttwu_wake_remote;
+	unsigned long ttwu_move_affine;
+	unsigned long ttwu_move_balance;
 #endif
 };
 
@@ -489,6 +534,7 @@ extern void cpu_attach_domain(struct sched_domain *sd, int cpu);
 
 struct io_context;			/* See blkdev.h */
 void exit_io_context(void);
+struct cpuset;
 
 #define NGROUPS_SMALL		32
 #define NGROUPS_PER_BLOCK	((int)(PAGE_SIZE / sizeof(gid_t)))
@@ -533,16 +579,15 @@ struct task_struct {
 	unsigned long flags;	/* per process flags, defined below */
 	unsigned long ptrace;
 
-	int lock_depth;		/* Lock depth */
+	int lock_depth;		/* BKL lock depth */
 
 	int prio, static_prio;
 	struct list_head run_list;
 	prio_array_t *array;
 
-	unsigned short ioprio;
-
 	unsigned long sleep_avg;
 	unsigned long long timestamp, last_ran;
+	unsigned long long sched_time; /* sched_clock time spent running */
 	int activated;
 
 	unsigned long policy;
@@ -596,15 +641,16 @@ struct task_struct {
 	int __user *clear_child_tid;		/* CLONE_CHILD_CLEARTID */
 
 	unsigned long rt_priority;
-	unsigned long it_real_value, it_real_incr;
-	cputime_t it_virt_value, it_virt_incr;
-	cputime_t it_prof_value, it_prof_incr;
-	struct timer_list real_timer;
 	cputime_t utime, stime;
 	unsigned long nvcsw, nivcsw; /* context switch counts */
 	struct timespec start_time;
 /* mm fault and swap info: this can arguably be seen as either mm-specific or thread-specific */
 	unsigned long min_flt, maj_flt;
+
+  	cputime_t it_prof_expires, it_virt_expires;
+	unsigned long long it_sched_expires;
+	struct list_head cpu_timers[3];
+
 /* process credentials */
 	uid_t uid,euid,suid,fsuid;
 	gid_t gid,egid,sgid,fsgid;
@@ -613,12 +659,13 @@ struct task_struct {
 	unsigned keep_capabilities:1;
 	struct user_struct *user;
 #ifdef CONFIG_KEYS
-	struct key *session_keyring;	/* keyring inherited over fork */
-	struct key *process_keyring;	/* keyring private to this process (CLONE_THREAD) */
 	struct key *thread_keyring;	/* keyring private to this thread */
 #endif
 	int oomkilladj; /* OOM kill score adjustment (bit shift). */
-	char comm[TASK_COMM_LEN];
+	char comm[TASK_COMM_LEN]; /* executable name excluding path
+				     - access with [gs]et_task_comm (which lock
+				       it with task_lock())
+				     - initialized normally by flush_old_exec */
 /* file system info */
 	int link_count, total_link_count;
 /* ipc stuff */
@@ -646,6 +693,7 @@ struct task_struct {
 	
 	void *security;
 	struct audit_context *audit_context;
+	seccomp_t seccomp;
 
 /* Thread group tracking */
    	u32 parent_exec_id;
@@ -688,13 +736,11 @@ struct task_struct {
   	struct mempolicy *mempolicy;
 	short il_next;
 #endif
-
-/* TASK_UNMAPPED_BASE */
-	unsigned long map_base;
-
-	struct list_head private_pages;	/* per-process private pages */
-	int private_pages_count;
-	atomic_t fs_excl;	/* holding fs exclusive resources */
+#ifdef CONFIG_CPUSETS
+	struct cpuset *cpuset;
+	nodemask_t mems_allowed;
+	int cpuset_mems_generation;
+#endif
 };
 
 static inline pid_t process_group(struct task_struct *tsk)
@@ -721,12 +767,6 @@ extern void __put_task_struct(struct task_struct *tsk);
 #define put_task_struct(tsk) \
 do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 
-#ifndef __TASK_UNMAPPED_BASE
-#define __TASK_UNMAPPED_BASE 0UL
-#else
-#define __HAS_ARCH_PROC_MAPPED_BASE
-#endif
-
 /*
  * Per process flags
  */
@@ -751,6 +791,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_LESS_THROTTLE 0x00100000	/* Throttle me less: I clean memory */
 #define PF_SYNCWRITE	0x00200000	/* I am doing a sync write */
 #define PF_BORROWED_MM	0x00400000	/* I am a kthread doing use_mm */
+#define PF_RANDOMIZE	0x00800000	/* randomize virtual address space */
 
 /*
  * Only the _current_ task can read/write to tsk->flags, but other
@@ -789,6 +830,7 @@ static inline int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 #endif
 
 extern unsigned long long sched_clock(void);
+extern unsigned long long current_sched_time(const task_t *current_task);
 
 /* sched_exec is called by processes performing an exec */
 #ifdef CONFIG_SMP
@@ -974,7 +1016,6 @@ extern int  copy_thread(int, unsigned long, unsigned long, unsigned long, struct
 extern void flush_thread(void);
 extern void exit_thread(void);
 
-extern void exit_mm(struct task_struct *);
 extern void exit_files(struct task_struct *);
 extern void exit_signal(struct task_struct *);
 extern void __exit_signal(struct task_struct *);
@@ -984,7 +1025,6 @@ extern void exit_itimers(struct signal_struct *);
 
 extern NORET_TYPE void do_group_exit(int);
 
-extern void reparent_to_init(void);
 extern void daemonize(const char *, ...);
 extern int allow_signal(int);
 extern int disallow_signal(int);

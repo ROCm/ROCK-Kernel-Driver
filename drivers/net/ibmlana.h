@@ -37,6 +37,7 @@ typedef struct {
 		nexttxdescr,		/* last tx descriptor to be used    */
 		currtxdescr,		/* tx descriptor currently tx'ed    */
 		txused[TXBUFCNT];	/* busy flags                       */
+	void __iomem *base;
 	spinlock_t lock;
 } ibmlana_priv;
 

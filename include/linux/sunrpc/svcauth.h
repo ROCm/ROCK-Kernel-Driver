@@ -26,21 +26,23 @@ struct svc_cred {
 struct svc_rqst;		/* forward decl */
 
 /* Authentication is done in the context of a domain.
- * For a server, a domain represents a group of clients using
+ *
+ * Currently, the nfs server uses the auth_domain to stand
+ * for the "client" listed in /etc/exports.
+ *
+ * More generally, a domain might represent a group of clients using
  * a common mechanism for authentication and having a common mapping
  * between local identity (uid) and network identity.  All clients
  * in a domain have similar general access rights.  Each domain can
  * contain multiple principals which will have different specific right
  * based on normal Discretionary Access Control.
  *
- * For a client, a domain represents a number of servers which all
- * use a common authentication mechanism and network identity name space.
- *
  * A domain is created by an authentication flavour module based on name
  * only.  Userspace then fills in detail on demand.
  *
- * The creation of a domain typically implies creation of one or
- * more caches for storing domain specific information.
+ * In the case of auth_unix and auth_null, the auth_domain is also
+ * associated with entries in another cache representing the mapping
+ * of ip addresses to the given client.
  */
 struct auth_domain {
 	struct	cache_head	h;
@@ -92,6 +94,7 @@ struct auth_ops {
 	int	(*accept)(struct svc_rqst *rq, u32 *authp);
 	int	(*release)(struct svc_rqst *rq);
 	void	(*domain_release)(struct auth_domain *);
+	int	(*set_client)(struct svc_rqst *rq);
 };
 
 #define	SVC_GARBAGE	1
@@ -107,6 +110,7 @@ struct auth_ops {
 
 extern int	svc_authenticate(struct svc_rqst *rqstp, u32 *authp);
 extern int	svc_authorise(struct svc_rqst *rqstp);
+extern int	svc_set_client(struct svc_rqst *rqstp);
 extern int	svc_auth_register(rpc_authflavor_t flavor, struct auth_ops *aops);
 extern void	svc_auth_unregister(rpc_authflavor_t flavor);
 

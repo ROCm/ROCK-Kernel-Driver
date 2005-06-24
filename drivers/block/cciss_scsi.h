@@ -39,7 +39,6 @@
 #define SCSI_CCISS_CAN_QUEUE 2
 
 /* 
-	info:           	cciss_scsi_info,		\
 
 Note, cmd_per_lun could give us some trouble, so I'm setting it very low.
 Likewise, SCSI_CCISS_CAN_QUEUE is set very conservatively.

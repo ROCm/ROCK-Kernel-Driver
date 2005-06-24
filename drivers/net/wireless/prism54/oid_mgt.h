@@ -28,8 +28,7 @@ int mgt_init(islpci_private *);
 
 void mgt_clean(islpci_private *);
 
-/* I don't know where to put these 3 */
-extern const int frequency_list_bg[];
+/* I don't know where to put these 2 */
 extern const int frequency_list_a[];
 int channel_of_freq(int);
 
@@ -49,7 +48,6 @@ void mgt_set(islpci_private *, enum oid_num_t, void *);
 void mgt_get(islpci_private *, enum oid_num_t, void *);
 
 int mgt_commit(islpci_private *);
-void mgt_unlatch_all(islpci_private *);
 
 int mgt_mlme_answer(islpci_private *);
 

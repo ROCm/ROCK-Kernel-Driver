@@ -1,6 +1,6 @@
 
 /*
- * $Id: saa7134-cards.c,v 1.48 2005/01/13 17:22:33 kraxel Exp $
+ * $Id: saa7134-cards.c,v 1.54 2005/03/07 12:01:51 kraxel Exp $
  *
  * device driver for philips saa7134 based TV cards
  * card-specific stuff.
@@ -157,11 +157,11 @@ struct saa7134_board saa7134_boards[] = {
 			.gpio = 0x8000,
 		},
 	},
-	[SAA7134_BOARD_FLYTVPLATINUM] = {
+	[SAA7134_BOARD_FLYTVPLATINUM_MINI] = {
 		/* "Arnaud Quette" <aquette@free.fr> */
-		.name           = "LifeView FlyTV Platinum",
+		.name           = "LifeView FlyTV Platinum Mini",
 		.audio_clock    = 0x00200000,
-		.tuner_type     = TUNER_PHILIPS_SECAM,
+		.tuner_type     = TUNER_PHILIPS_TDA8290,
 		.inputs         = {{
 			.name = name_tv,
 			.vmux = 1,
@@ -176,6 +176,47 @@ struct saa7134_board saa7134_boards[] = {
 			.vmux = 8,
 			.amux = LINE2,
 		}},
+	},
+	[SAA7134_BOARD_FLYTVPLATINUM_FM] = {
+		/* LifeView FlyTV Platinum FM (LR214WF) */
+		/* "Peter Missel <peter.missel@onlinehome.de> */
+		.name           = "LifeView FlyTV Platinum FM",
+		.audio_clock    = 0x00200000,
+		.tuner_type     = TUNER_PHILIPS_TDA8290,
+		.gpiomask       = 0x1E000,	/* Set GP16 and unused 15,14,13 to Output */
+		.inputs         = {{
+			.name = name_tv,
+			.vmux = 1,
+			.amux = TV,
+			.gpio = 0x10000,	/* GP16=1 selects TV input */
+			.tv   = 1,
+                },{
+/*			.name = name_tv_mono,
+			.vmux = 1,
+			.amux = LINE2,
+			.gpio = 0x0000,
+			.tv   = 1,
+		},{
+*/			.name = name_comp1,	/* Composite signal on S-Video input */
+			.vmux = 0,
+			.amux = LINE2,
+//			.gpio = 0x4000,
+		},{
+			.name = name_comp2,	/* Composite input */
+			.vmux = 3,
+			.amux = LINE2,
+//			.gpio = 0x4000,
+		},{
+			.name = name_svideo,	/* S-Video signal on S-Video input */
+			.vmux = 8,
+			.amux = LINE2,
+//			.gpio = 0x4000,
+		}},
+		.radio = {
+			.name = name_radio,
+			.amux = TV,
+			.gpio = 0x00000,	/* GP16=0 selects FM radio antenna */
+		},
 	},
 	[SAA7134_BOARD_EMPRESS] = {
 		/* "Gert Vervoort" <gert.vervoort@philips.com> */
@@ -437,6 +478,7 @@ struct saa7134_board saa7134_boards[] = {
 		.audio_clock    = 0x00187de7,
 		.tuner_type     = TUNER_PHILIPS_FM1216ME_MK3,
 		.tda9887_conf   = TDA9887_PRESENT,
+		.mpeg           = SAA7134_MPEG_DVB,
 		.inputs = {{
 			.name   = name_tv,
 			.vmux   = 1,
@@ -543,6 +585,34 @@ struct saa7134_board saa7134_boards[] = {
                 .radio = {
                         .name = name_radio,
                         .amux = LINE1,
+                },
+	},
+	[SAA7135_BOARD_ASUSTeK_TVFM7135] = {
+                .name           = "ASUS TV-FM 7135",
+                .audio_clock    = 0x00187de7,
+                .tuner_type     = TUNER_PHILIPS_TDA8290,
+		.gpiomask       = 0x200000,
+                .inputs         = {{
+                        .name = name_tv,
+                        .vmux = 1,
+                        .amux = TV,
+			.gpio = 0x0000,
+                        .tv   = 1,
+                },{
+                        .name = name_comp1,
+                        .vmux = 4,
+                        .amux = LINE2,
+			.gpio = 0x0000,
+                },{
+                        .name = name_svideo,
+                        .vmux = 6,
+                        .amux = LINE2,
+			.gpio = 0x0000,
+                }},
+                .radio = {
+                        .name = name_radio,
+                        .amux = TV,
+			.gpio = 0x200000,
                 },
 	},
 	[SAA7134_BOARD_VA1000POWER] = {
@@ -1284,7 +1354,13 @@ struct saa7134_board saa7134_boards[] = {
   		.tda9887_conf   = TDA9887_PRESENT,
 		.inputs         = {{
        			.name = name_tv,
-			.vmux = 5,
+			.vmux = 1,
+			.amux = TV,
+			.tv   = 1,
+               },{
+			.name = name_tv_mono,
+			.vmux = 1,
+			.amux = LINE2,
 			.tv   = 1,
                 },{
                         .name = name_comp1,
@@ -1292,7 +1368,7 @@ struct saa7134_board saa7134_boards[] = {
                         .amux = LINE1,
                 },{
                         .name = name_svideo,
-                        .vmux = 4,
+                        .vmux = 8,
                         .amux = LINE1,
 		}},
 	},
@@ -1440,6 +1516,36 @@ struct saa7134_board saa7134_boards[] = {
 			 .amux = LINE1,
 		},
 	},
+	[SAA7134_BOARD_FLYDVBTDUO] = {
+		/* LifeView FlyDVB-T DUO */
+		/* "Nico Sabbi <nsabbi@tiscali.it> */
+		.name           = "LifeView FlyDVB-T DUO",
+		.audio_clock    = 0x00200000,
+		.tuner_type     = TUNER_PHILIPS_TDA8290,
+//		.gpiomask       = 0xe000,
+		.inputs         = {{
+			.name = name_tv,
+			.vmux = 1,
+			.amux = TV,
+//			.gpio = 0x0000,
+			.tv   = 1,
+                },{
+			.name = name_comp1,	/* Composite signal on S-Video input */
+			.vmux = 0,
+			.amux = LINE2,
+//			.gpio = 0x4000,
+		},{
+			.name = name_comp2,	/* Composite input */
+			.vmux = 3,
+			.amux = LINE2,
+//			.gpio = 0x4000,
+		},{
+			.name = name_svideo,	/* S-Video signal on S-Video input */
+			.vmux = 8,
+			.amux = LINE2,
+//			.gpio = 0x4000,
+		}},
+	},
 };
 const unsigned int saa7134_bcount = ARRAY_SIZE(saa7134_boards);
 
@@ -1517,8 +1623,20 @@ struct pci_device_id saa7134_pci_tbl[] = {
 		.vendor       = PCI_VENDOR_ID_PHILIPS,
 		.device       = PCI_DEVICE_ID_PHILIPS_SAA7135,
 		.subvendor    = 0x5168,
-		.subdevice    = 0x0212,
-		.driver_data  = SAA7134_BOARD_FLYTVPLATINUM,
+		.subdevice    = 0x0212, /* minipci, LR212 */
+		.driver_data  = SAA7134_BOARD_FLYTVPLATINUM_MINI,
+        },{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7133,
+		.subvendor    = 0x5168,	/* Animation Technologies (LifeView) */
+		.subdevice    = 0x0214, /* Standard PCI, LR214WF */
+		.driver_data  = SAA7134_BOARD_FLYTVPLATINUM_FM,
+        },{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7133,
+		.subvendor    = 0x1489, /* KYE */
+		.subdevice    = 0x0214, /* Genius VideoWonder ProTV */
+		.driver_data  = SAA7134_BOARD_FLYTVPLATINUM_FM, /* is an LR214WF actually */
         },{
 		.vendor       = PCI_VENDOR_ID_PHILIPS,
 		.device       = PCI_DEVICE_ID_PHILIPS_SAA7134,
@@ -1543,6 +1661,12 @@ struct pci_device_id saa7134_pci_tbl[] = {
                 .subvendor    = PCI_VENDOR_ID_ASUSTEK,
                 .subdevice    = 0x4842,
                 .driver_data  = SAA7134_BOARD_ASUSTeK_TVFM7134,
+	},{
+                .vendor       = PCI_VENDOR_ID_PHILIPS,
+                .device       = PCI_DEVICE_ID_PHILIPS_SAA7133,
+                .subvendor    = PCI_VENDOR_ID_ASUSTEK,
+                .subdevice    = 0x4845,
+                .driver_data  = SAA7135_BOARD_ASUSTeK_TVFM7135,
 	},{
                 .vendor       = PCI_VENDOR_ID_PHILIPS,
                 .device       = PCI_DEVICE_ID_PHILIPS_SAA7134,
@@ -1715,6 +1839,13 @@ struct pci_device_id saa7134_pci_tbl[] = {
 		.driver_data  = SAA7134_BOARD_PROVIDEO_PV952,
 
  	},{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7133,
+		.subvendor    = 0x5168,
+		.subdevice    = 0x0306,
+		.driver_data  = SAA7134_BOARD_FLYDVBTDUO,
+
+ 	},{
 		/* --- boards without eeprom + subsystem ID --- */
                 .vendor       = PCI_VENDOR_ID_PHILIPS,
                 .device       = PCI_DEVICE_ID_PHILIPS_SAA7134,
@@ -1821,10 +1952,9 @@ int saa7134_board_init1(struct saa7134_dev *dev)
 	case SAA7134_BOARD_FLYVIDEO2000:
 	case SAA7134_BOARD_FLYVIDEO3000:
 		dev->has_remote = 1;
-		/* fall throuth */
-	case SAA7134_BOARD_FLYTVPLATINUM:
 		board_flyvideo(dev);
 		break;
+	case SAA7134_BOARD_FLYTVPLATINUM_FM:
 	case SAA7134_BOARD_CINERGY400:
 	case SAA7134_BOARD_CINERGY600:
 	case SAA7134_BOARD_CINERGY600_MK3:

@@ -109,7 +109,6 @@ extern int APIC_init_uniprocessor (void);
 extern void disable_APIC_timer(void);
 extern void enable_APIC_timer(void);
 
-extern int check_nmi_watchdog (void);
 extern void enable_NMI_through_LVT0 (void * dummy);
 
 extern unsigned int nmi_watchdog;
@@ -117,10 +116,6 @@ extern unsigned int nmi_watchdog;
 #define NMI_IO_APIC	1
 #define NMI_LOCAL_APIC	2
 #define NMI_INVALID	3
-
-extern int lapic_disable(char *str);
-extern int lapic_enable(char *str);
-extern int enable_local_apic;
 
 #else /* !CONFIG_X86_LOCAL_APIC */
 static inline void lapic_shutdown(void) { }

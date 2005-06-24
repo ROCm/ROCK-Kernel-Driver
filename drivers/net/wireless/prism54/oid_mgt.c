@@ -24,8 +24,8 @@
 #include "isl_ioctl.h"
 
 /* to convert between channel and freq */
-const int frequency_list_bg[] = { 2412, 2417, 2422, 2427, 2432, 2437, 2442,
-	2447, 2452, 2457, 2462, 2467, 2472, 2484
+static const int frequency_list_bg[] = { 2412, 2417, 2422, 2427, 2432,
+	2437, 2442, 2447, 2452, 2457, 2462, 2467, 2472, 2484
 };
 
 int
@@ -730,6 +730,7 @@ mgt_commit(islpci_private *priv)
  *
  * The way to do this is to set ESSID. Note though that they may get 
  * unlatch before though by setting another OID. */
+#if 0
 void
 mgt_unlatch_all(islpci_private *priv)
 {
@@ -756,6 +757,7 @@ mgt_unlatch_all(islpci_private *priv)
 	if (rvalue)
 		printk(KERN_DEBUG "%s: Unlatching OIDs failed\n", priv->ndev->name);
 }
+#endif
 
 /* This will tell you if you are allowed to answer a mlme(ex) request .*/
 

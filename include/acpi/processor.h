@@ -201,7 +201,6 @@ static inline int acpi_processor_ppc_has_changed(struct acpi_processor *pr) {
 /* in processor_throttling.c */
 int acpi_processor_get_throttling_info (struct acpi_processor *pr);
 int acpi_processor_set_throttling (struct acpi_processor *pr, int state);
-int acpi_processor_throttling_open_fs(struct inode *inode, struct file *file);
 ssize_t acpi_processor_write_throttling (
         struct file		*file,
         const char		__user *buffer,
@@ -217,7 +216,6 @@ int acpi_processor_power_exit(struct acpi_processor *pr, struct acpi_device *dev
 
 /* in processor_thermal.c */
 int acpi_processor_get_limit_info (struct acpi_processor *pr);
-int acpi_processor_limit_open_fs(struct inode *inode, struct file *file);
 ssize_t acpi_processor_write_limit (
 	struct file		*file,
 	const char		__user *buffer,

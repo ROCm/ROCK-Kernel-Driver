@@ -25,6 +25,7 @@
 #include <asm/dcu.h>
 #include <asm/head.h>
 #include <asm/ttable.h>
+#include <asm/mmu.h>
 	
 /* This section from from _start to sparc64_boot_end should fit into
  * 0x0000.0000.0040.4000 to 0x0000.0000.0040.8000 and will be sharing space
@@ -88,8 +89,8 @@ sparc_ramdisk_image64:
 	 * PROM entry point is on %o4
 	 */
 sparc64_boot:
-	BRANCH_IF_CHEETAH_BASE(g1,g5,cheetah_boot)
-	BRANCH_IF_CHEETAH_PLUS_OR_FOLLOWON(g1,g5,cheetah_plus_boot)
+	BRANCH_IF_CHEETAH_BASE(g1,g7,cheetah_boot)
+	BRANCH_IF_CHEETAH_PLUS_OR_FOLLOWON(g1,g7,cheetah_plus_boot)
 	ba,pt	%xcc, spitfire_boot
 	 nop
 
@@ -102,11 +103,11 @@ cheetah_boot:
 	mov	DCR_BPE | DCR_RPE | DCR_SI | DCR_IFPOE | DCR_MS, %g1
 	wr	%g1, %asr18
 
-	sethi	%uhi(DCU_ME|DCU_RE|DCU_HPE|DCU_SPE|DCU_SL|DCU_WE), %g5
-	or	%g5, %ulo(DCU_ME|DCU_RE|DCU_HPE|DCU_SPE|DCU_SL|DCU_WE), %g5
-	sllx	%g5, 32, %g5
-	or	%g5, DCU_DM | DCU_IM | DCU_DC | DCU_IC, %g5
-	stxa	%g5, [%g0] ASI_DCU_CONTROL_REG
+	sethi	%uhi(DCU_ME|DCU_RE|DCU_HPE|DCU_SPE|DCU_SL|DCU_WE), %g7
+	or	%g7, %ulo(DCU_ME|DCU_RE|DCU_HPE|DCU_SPE|DCU_SL|DCU_WE), %g7
+	sllx	%g7, 32, %g7
+	or	%g7, DCU_DM | DCU_IM | DCU_DC | DCU_IC, %g7
+	stxa	%g7, [%g0] ASI_DCU_CONTROL_REG
 	membar	#Sync
 
 cheetah_generic_boot:
@@ -491,7 +492,7 @@ sun4u_init:
 	stxa	%g3, [%g2] ASI_DMMU
 	membar	#Sync
 
-	BRANCH_IF_ANY_CHEETAH(g1,g5,cheetah_tlb_fixup)
+	BRANCH_IF_ANY_CHEETAH(g1,g7,cheetah_tlb_fixup)
 
 	ba,pt	%xcc, spitfire_tlb_fixup
 	 nop
@@ -515,14 +516,31 @@ cheetah_tlb_fixup:
 	membar	#Sync
 
 	mov	2, %g2		/* Set TLB type to cheetah+. */
-	BRANCH_IF_CHEETAH_PLUS_OR_FOLLOWON(g5,g7,1f)
+	BRANCH_IF_CHEETAH_PLUS_OR_FOLLOWON(g1,g7,1f)
 
 	mov	1, %g2		/* Set TLB type to cheetah. */
 
-1:	sethi	%hi(tlb_type), %g5
-	stw	%g2, [%g5 + %lo(tlb_type)]
+1:	sethi	%hi(tlb_type), %g1
+	stw	%g2, [%g1 + %lo(tlb_type)]
 
-	/* Patch copy/page operations to cheetah optimized versions. */
+	BRANCH_IF_CHEETAH_PLUS_OR_FOLLOWON(g1,g7,1f)
+	ba,pt	%xcc, 2f
+	 nop
+
+1:	/* Patch context register writes to support nucleus page
+	 * size correctly.
+	 */
+	call	cheetah_plus_patch_etrap
+	 nop
+	call	cheetah_plus_patch_rtrap
+	 nop
+	call	cheetah_plus_patch_fpdis
+	 nop
+	call	cheetah_plus_patch_winfixup
+	 nop
+	
+
+2:	/* Patch copy/page operations to cheetah optimized versions. */
 	call	cheetah_patch_copyops
 	 nop
 	call	cheetah_patch_cachetlbops
@@ -549,8 +567,8 @@ spitfire_tlb_fixup:
 
 	/* Set TLB type to spitfire. */
 	mov	0, %g2
-	sethi	%hi(tlb_type), %g5
-	stw	%g2, [%g5 + %lo(tlb_type)]
+	sethi	%hi(tlb_type), %g1
+	stw	%g2, [%g1 + %lo(tlb_type)]
 
 tlb_fixup_done:
 	sethi	%hi(init_thread_union), %g6
@@ -578,11 +596,17 @@ tlb_fixup_done:
 #endif
 
 	wr	%g0, ASI_P, %asi
-	mov	1, %g5
-	sllx	%g5, THREAD_SHIFT, %g5
-	sub	%g5, (STACKFRAME_SZ + STACK_BIAS), %g5
-	add	%g6, %g5, %sp
+	mov	1, %g1
+	sllx	%g1, THREAD_SHIFT, %g1
+	sub	%g1, (STACKFRAME_SZ + STACK_BIAS), %g1
+	add	%g6, %g1, %sp
 	mov	0, %fp
+
+	/* Set per-cpu pointer initially to zero, this makes
+	 * the boot-cpu use the in-kernel-image per-cpu areas
+	 * before setup_per_cpu_area() is invoked.
+	 */
+	clr	%g5
 
 	wrpr	%g0, 0, %wstate
 	wrpr	%g0, 0x0, %tl
@@ -619,8 +643,8 @@ setup_tba:	/* i0 = is_starfire */
 	rdpr	%pstate, %o1
 	mov	%g6, %o2
 	wrpr	%o1, (PSTATE_AG|PSTATE_IE), %pstate
-	sethi	%hi(sparc64_ttable_tl0), %g5
-	wrpr	%g5, %tba
+	sethi	%hi(sparc64_ttable_tl0), %g1
+	wrpr	%g1, %tba
 	mov	%o2, %g6
 
 	/* Set up MMU globals */
@@ -632,6 +656,8 @@ setup_tba:	/* i0 = is_starfire */
 
 	mov	TSB_REG, %g1
 	stxa	%g0, [%g1] ASI_DMMU
+	membar	#Sync
+	stxa	%g0, [%g1] ASI_IMMU
 	membar	#Sync
 	mov	TLB_SFSR, %g1
 	sethi	%uhi(KERN_HIGHBITS), %g2
@@ -685,10 +711,23 @@ spitfire_vpte_base:
 	call	init_irqwork_curcpu
 	 nop
 
-	sethi	%hi(sparc64_ttable_tl0), %g5
 	call	prom_set_trap_table
-	 mov	%g5, %o0
+	 sethi	%hi(sparc64_ttable_tl0), %o0
 
+	BRANCH_IF_CHEETAH_PLUS_OR_FOLLOWON(g2,g3,1f)
+	ba,pt	%xcc, 2f
+	 nop
+
+1:	/* Start using proper page size encodings in ctx register.  */
+	sethi	%uhi(CTX_CHEETAH_PLUS_NUC), %g3
+	mov	PRIMARY_CONTEXT, %g1
+	sllx	%g3, 32, %g3
+	sethi	%hi(CTX_CHEETAH_PLUS_CTX0), %g2
+	or	%g3, %g2, %g3
+	stxa	%g3, [%g1] ASI_DMMU
+	membar	#Sync
+
+2:
 	rdpr	%pstate, %o1
 	or	%o1, PSTATE_IE, %o1
 	wrpr	%o1, 0, %pstate

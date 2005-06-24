@@ -144,11 +144,11 @@ xfs_dir2_leaf_tail_p(struct xfs_mount *mp, xfs_dir2_leaf_t *lp);
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_LEAF_BESTS_P)
 xfs_dir2_data_off_t *
-xfs_dir2_leaf_bests_p_arch(xfs_dir2_leaf_tail_t *ltp, xfs_arch_t arch);
-#define	XFS_DIR2_LEAF_BESTS_P_ARCH(ltp,arch)	xfs_dir2_leaf_bests_p_arch(ltp,arch)
+xfs_dir2_leaf_bests_p(xfs_dir2_leaf_tail_t *ltp);
+#define	XFS_DIR2_LEAF_BESTS_P(ltp)	xfs_dir2_leaf_bests_p(ltp)
 #else
-#define	XFS_DIR2_LEAF_BESTS_P_ARCH(ltp,arch)	\
-	((xfs_dir2_data_off_t *)(ltp) - INT_GET((ltp)->bestcount, arch))
+#define	XFS_DIR2_LEAF_BESTS_P(ltp)	\
+	((xfs_dir2_data_off_t *)(ltp) - INT_GET((ltp)->bestcount, ARCH_CONVERT))
 #endif
 
 /*

@@ -84,10 +84,11 @@ static int acpi_system_alarm_seq_show(struct seq_file *seq, void *offset)
 	u32			sec, min, hr;
 	u32			day, mo, yr;
 	unsigned char		rtc_control = 0;
+	unsigned long 		flags;
 
 	ACPI_FUNCTION_TRACE("acpi_system_alarm_seq_show");
 
-	spin_lock(&rtc_lock);
+	spin_lock_irqsave(&rtc_lock, flags);
 
 	sec = CMOS_READ(RTC_SECONDS_ALARM);
 	min = CMOS_READ(RTC_MINUTES_ALARM);
@@ -109,7 +110,7 @@ static int acpi_system_alarm_seq_show(struct seq_file *seq, void *offset)
 	else
 		yr = CMOS_READ(RTC_YEAR);
 
-	spin_unlock(&rtc_lock);
+	spin_unlock_irqrestore(&rtc_lock, flags);
 
 	if (!(rtc_control & RTC_DM_BINARY) || RTC_ALWAYS_BCD) {
 		BCD_TO_BIN(sec);

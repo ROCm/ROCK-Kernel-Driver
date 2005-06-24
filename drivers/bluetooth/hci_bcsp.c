@@ -28,7 +28,7 @@
  * $Id: hci_bcsp.c,v 1.2 2002/09/26 05:05:14 maxk Exp $
  */
 
-#define VERSION "0.1"
+#define VERSION "0.2"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -61,6 +61,8 @@
 #undef  BT_DMP
 #define BT_DMP( A... )
 #endif
+
+static int hciextn = 1;
 
 /* ---- BCSP CRC calculation ---- */
 
@@ -158,12 +160,13 @@ static int bcsp_enqueue(struct hci_uart *hu, struct sk_buff *skb)
 	case HCI_SCODATA_PKT:
 		skb_queue_tail(&bcsp->unrel, skb);
 		break;
-		
+
 	default:
 		BT_ERR("Unknown packet type");
 		kfree_skb(skb);
 		break;
 	}
+
 	return 0;
 }
 
@@ -171,7 +174,7 @@ static struct sk_buff *bcsp_prepare_pkt(struct bcsp_struct *bcsp, u8 *data,
 		int len, int pkt_type)
 {
 	struct sk_buff *nskb;
-	u8  hdr[4], chan;
+	u8 hdr[4], chan;
 	int rel, i;
 
 #ifdef CONFIG_BT_HCIUART_BCSP_TXCRC
@@ -204,6 +207,19 @@ static struct sk_buff *bcsp_prepare_pkt(struct bcsp_struct *bcsp, u8 *data,
 		return NULL;
 	}
 
+	if (hciextn && chan == 5) {
+		struct hci_command_hdr *hdr = (struct hci_command_hdr *) data;
+
+		if (hci_opcode_ogf(__le16_to_cpu(hdr->opcode)) == OGF_VENDOR_CMD) {
+			u8 desc = *(data + HCI_COMMAND_HDR_SIZE);
+			if ((desc & 0xf0) == 0xc0) {
+				data += HCI_COMMAND_HDR_SIZE + 1;
+				len  -= HCI_COMMAND_HDR_SIZE + 1;
+				chan = desc & 0x0f;
+			}
+		}
+	}
+
 	/* Max len of packet: (original len +4(bcsp hdr) +2(crc))*2
 	   (because bytes 0xc0 and 0xdb are escaped, worst case is
 	   when the packet is all made of 0xc0 and 0xdb :) )
@@ -226,19 +242,18 @@ static struct sk_buff *bcsp_prepare_pkt(struct bcsp_struct *bcsp, u8 *data,
 		BT_DBG("Sending packet with seqno %u", bcsp->msgq_txseq);
 		bcsp->msgq_txseq = ++(bcsp->msgq_txseq) & 0x07;
 	}
-#ifdef  CONFIG_BT_HCIUART_BCSP_TXCRC
+#ifdef CONFIG_BT_HCIUART_BCSP_TXCRC
 	hdr[0] |= 0x40;
 #endif
 
-	hdr[1]  = (len << 4) & 0xFF;
-	hdr[1] |= chan;
-	hdr[2]  = len >> 4;
-	hdr[3]  = ~(hdr[0] + hdr[1] + hdr[2]);
+	hdr[1] = ((len << 4) & 0xff) | chan;
+	hdr[2] = len >> 4;
+	hdr[3] = ~(hdr[0] + hdr[1] + hdr[2]);
 
 	/* Put BCSP header */
 	for (i = 0; i < 4; i++) {
 		bcsp_slip_one_byte(nskb, hdr[i]);
-#ifdef  CONFIG_BT_HCIUART_BCSP_TXCRC
+#ifdef CONFIG_BT_HCIUART_BCSP_TXCRC
 		bcsp_crc_update(&bcsp_txmsg_crc, hdr[i]);
 #endif
 	}
@@ -246,7 +261,7 @@ static struct sk_buff *bcsp_prepare_pkt(struct bcsp_struct *bcsp, u8 *data,
 	/* Put payload */
 	for (i = 0; i < len; i++) {
 		bcsp_slip_one_byte(nskb, data[i]);
-#ifdef  CONFIG_BT_HCIUART_BCSP_TXCRC
+#ifdef CONFIG_BT_HCIUART_BCSP_TXCRC
 		bcsp_crc_update(&bcsp_txmsg_crc, data[i]);
 #endif
 	}
@@ -487,14 +502,30 @@ static inline void bcsp_complete_rx_pkt(struct hci_uart *hu)
 		pass_up = 0;
 
 	if (!pass_up) {
-		if ((bcsp->rx_skb->data[1] & 0x0f) != 0 &&
-	    		(bcsp->rx_skb->data[1] & 0x0f) != 1) {
-			BT_ERR ("Packet for unknown channel (%u %s)",
-				bcsp->rx_skb->data[1] & 0x0f,
-				bcsp->rx_skb->data[0] & 0x80 ? 
-				"reliable" : "unreliable");
-		}
-		kfree_skb(bcsp->rx_skb);
+		struct hci_event_hdr hdr;
+		u8 desc = (bcsp->rx_skb->data[1] & 0x0f);
+
+		if (desc != 0 && desc != 1) {
+			if (hciextn) {
+				desc |= 0xc0;
+				skb_pull(bcsp->rx_skb, 4);
+				memcpy(skb_push(bcsp->rx_skb, 1), &desc, 1);
+
+				hdr.evt = 0xff;
+				hdr.plen = bcsp->rx_skb->len;
+				memcpy(skb_push(bcsp->rx_skb, HCI_EVENT_HDR_SIZE), &hdr, HCI_EVENT_HDR_SIZE);
+				bcsp->rx_skb->pkt_type = HCI_EVENT_PKT;
+
+				hci_recv_frame(bcsp->rx_skb);
+			} else {
+				BT_ERR ("Packet for unknown channel (%u %s)",
+					bcsp->rx_skb->data[1] & 0x0f,
+					bcsp->rx_skb->data[0] & 0x80 ? 
+					"reliable" : "unreliable");
+				kfree_skb(bcsp->rx_skb);
+			}
+		} else
+			kfree_skb(bcsp->rx_skb);
 	} else {
 		/* Pull out BCSP hdr */
 		skb_pull(bcsp->rx_skb, 4);
@@ -713,3 +744,6 @@ int bcsp_deinit(void)
 {
 	return hci_uart_unregister_proto(&bcsp);
 }
+
+module_param(hciextn, bool, 0644);
+MODULE_PARM_DESC(hciextn, "Convert HCI Extensions into BCSP packets");

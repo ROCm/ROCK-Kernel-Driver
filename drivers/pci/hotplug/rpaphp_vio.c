@@ -71,11 +71,11 @@ int register_vio_slot(struct device_node *dn)
 {
 	u32 *index;
 	char *name;
-	int rc = 1;
+	int rc = -EINVAL;
 	struct slot *slot = NULL;
 	
 	rc = rpaphp_get_drc_props(dn, NULL, &name, NULL, NULL);
-	if (rc)
+	if (rc < 0)
 		goto exit_rc;
 	index = (u32 *) get_property(dn, "ibm,my-drc-index", NULL);
 	if (!index)

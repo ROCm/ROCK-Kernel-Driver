@@ -40,21 +40,22 @@ config ACPI
 	  available at:
 	  <http://www.acpi.info>
 
+if ACPI
+
 config ACPI_BOOT
 	bool
-	depends on ACPI || X86_HT
 	default y
 
 config ACPI_INTERPRETER
 	bool
-	depends on ACPI
 	depends on !IA64_SGI_SN
 	default y
 
+if ACPI_INTERPRETER
+
 config ACPI_SLEEP
 	bool "Sleep States (EXPERIMENTAL)"
-	depends on X86 && ACPI
-	depends on ACPI_INTERPRETER
+	depends on X86
 	depends on EXPERIMENTAL && PM
 	default y
 	---help---
@@ -81,7 +82,6 @@ config ACPI_SLEEP_PROC_FS
 config ACPI_AC
 	tristate "AC Adapter"
 	depends on X86
-	depends on ACPI_INTERPRETER
 	default m
 	help
 	  This driver adds support for the AC Adapter object, which indicates
@@ -91,7 +91,6 @@ config ACPI_AC
 config ACPI_BATTERY
 	tristate "Battery"
 	depends on X86
-	depends on ACPI_INTERPRETER
 	default m
 	help
 	  This driver adds support for battery information through
@@ -100,7 +99,6 @@ config ACPI_BATTERY
 
 config ACPI_BUTTON
 	tristate "Button"
-	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default m
 	help
@@ -112,7 +110,6 @@ config ACPI_BUTTON
 
 config ACPI_VIDEO
 	tristate "Video"
-	depends on ACPI_INTERPRETER
 	depends on EXPERIMENTAL
 	depends on !IA64_SGI_SN
 	default m
@@ -127,7 +124,6 @@ config ACPI_VIDEO
 
 config ACPI_FAN
 	tristate "Fan"
-	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default m
 	help
@@ -136,7 +132,6 @@ config ACPI_FAN
 
 config ACPI_PROCESSOR
 	tristate "Processor"
-	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default m
 	help
@@ -165,7 +160,6 @@ config ACPI_THERMAL
 
 config ACPI_NUMA
 	bool "NUMA support"
-	depends on ACPI_INTERPRETER
 	depends on NUMA
 	depends on (IA64 || X86_64)
 	default y if IA64_GENERIC || IA64_SGI_SN2
@@ -173,7 +167,6 @@ config ACPI_NUMA
 config ACPI_ASUS
         tristate "ASUS/Medion Laptop Extras"
 	depends on X86
-	depends on ACPI_INTERPRETER
 	default m
         ---help---
           This driver provides support for extra features of ACPI-compatible
@@ -203,7 +196,6 @@ config ACPI_ASUS
 config ACPI_IBM
 	tristate "IBM ThinkPad Laptop Extras"
 	depends on X86
-	depends on ACPI_INTERPRETER
 	default m
 	---help---
 	  This is a Linux ACPI driver for the IBM ThinkPad laptops. It adds
@@ -217,7 +209,6 @@ config ACPI_IBM
 config ACPI_TOSHIBA
 	tristate "Toshiba Laptop Extras"
 	depends on X86
-	depends on ACPI_INTERPRETER
 	default m
 	---help---
 	  This driver adds support for access to certain system settings
@@ -244,7 +235,7 @@ config ACPI_TOSHIBA
 
 config ACPI_CUSTOM_DSDT
 	bool "Include Custom DSDT"
-	depends on ACPI_INTERPRETER && !STANDALONE
+	depends on !STANDALONE
 	default n 
 	help
 	  Thist option is to load a custom ACPI DSDT
@@ -271,7 +262,6 @@ config ACPI_BLACKLIST_YEAR
 
 config ACPI_DEBUG
 	bool "Debug Statements"
-	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default n
 	help
@@ -291,14 +281,12 @@ config ACPI_DEBUG_LITE
 
 config ACPI_BUS
 	bool
-	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default y
 
 config ACPI_EC
 	bool
 	depends on X86
-	depends on ACPI_INTERPRETER
 	default y
 	help
 	  This driver is required on some systems for the proper operation of
@@ -307,28 +295,27 @@ config ACPI_EC
 
 config ACPI_POWER
 	bool
-	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default y
 
 config ACPI_PCI
 	bool
-	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default PCI
 
 config ACPI_SYSTEM
 	bool
-	depends on ACPI_INTERPRETER
 	depends on !IA64_SGI_SN
 	default y
 	help
 	  This driver will enable your system to shut down using ACPI, and
 	  dump your ACPI DSDT table using /proc/acpi/dsdt.
 
+endif	# ACPI_INTERPRETER
+
 config X86_PM_TIMER
 	bool "Power Management Timer Support"
-	depends on X86 && ACPI
+	depends on X86
 	depends on ACPI_BOOT && EXPERIMENTAL
 	depends on !X86_64
 	default n
@@ -347,11 +334,33 @@ config X86_PM_TIMER
 
 config ACPI_CONTAINER
 	tristate "ACPI0004,PNP0A05 and PNP0A06 Container Driver (EXPERIMENTAL)"
-	depends on ACPI && EXPERIMENTAL
+	depends on EXPERIMENTAL
 	default (ACPI_HOTPLUG_MEMORY || ACPI_HOTPLUG_CPU || ACPI_HOTPLUG_IO)
 	 ---help---
 	 	This is the ACPI generic container driver which supports
 		ACPI0004, PNP0A05 and PNP0A06 devices
+
+config ACPI_HOTPLUG_MEMORY
+	tristate "Memory Hotplug"
+	depends on ACPI
+	depends on MEMORY_HOTPLUG
+	default n
+	help
+	  This driver adds supports for ACPI Memory Hotplug.  This driver
+	  provides support for fielding notifications on ACPI memory
+	  devices (PNP0C80) which represent memory ranges that may be
+	  onlined or offlined during runtime.  
+
+	  Enabling this driver assumes that your platform hardware
+	  and firmware have support for hot-plugging physical memory. If
+	  your system does not support physically adding or ripping out 
+	  memory DIMMs at some platfrom defined granularity (individually 
+	  or as a bank) at runtime, then you need not enable this driver.
+
+	  If one selects "m," this driver can be loaded using the following
+	  command: 
+		$>modprobe acpi_memhotplug 
+endif	# ACPI
 
 config ACPI_INITRD
 	bool "Read DSDT from initrd or initramfs"

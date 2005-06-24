@@ -137,7 +137,7 @@ btext_prepare_BAT(void)
 		boot_text_mapped = 0;
 		return;
 	}
-	if (PVR_VER(mfspr(PVR)) != 1) {
+	if (PVR_VER(mfspr(SPRN_PVR)) != 1) {
 		/* 603, 604, G3, G4, ... */
 		lowbits = addr & ~0xFF000000UL;
 		addr &= 0xFF000000UL;

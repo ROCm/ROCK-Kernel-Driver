@@ -42,7 +42,7 @@ static struct pci_device_id i82092aa_pci_ids[] = {
 };
 MODULE_DEVICE_TABLE(pci, i82092aa_pci_ids);
 
-static int i82092aa_socket_suspend (struct pci_dev *dev, u32 state)
+static int i82092aa_socket_suspend (struct pci_dev *dev, pm_message_t state)
 {
 	return pcmcia_socket_dev_suspend(&dev->dev, state);
 }
@@ -65,7 +65,6 @@ static struct pci_driver i82092aa_pci_drv = {
 /* the pccard structure and its functions */
 static struct pccard_operations i82092aa_operations = {
 	.init 		 	= i82092aa_init,
-	.suspend	   	= i82092aa_suspend,
 	.get_status		= i82092aa_get_status,
 	.get_socket		= i82092aa_get_socket,
 	.set_socket		= i82092aa_set_socket,
@@ -440,15 +439,6 @@ static int i82092aa_init(struct pcmcia_socket *sock)
 	return 0;
 }
                                                                                                                                                                                                                                               
-static int i82092aa_suspend(struct pcmcia_socket *sock)
-{
-	int retval;
-	enter("i82092aa_suspend");
-        retval =  i82092aa_set_socket(sock, &dead_socket);
-        leave("i82092aa_suspend");
-        return retval;
-}
-       
 static int i82092aa_get_status(struct pcmcia_socket *socket, u_int *value)
 {
 	unsigned int sock = container_of(socket, struct socket_info, socket)->number;

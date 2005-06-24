@@ -19,15 +19,11 @@
  *******************************************************************/
 
 /*
- * $Id: lpfc_compat.h 1.27 2004/10/15 02:06:38EDT sf_support Exp  $
+ * $Id: lpfc_compat.h 1.32 2005/01/25 17:51:45EST sf_support Exp  $
  *
  * This file provides macros to aid compilation in the Linux 2.4 kernel
  * over various platform architectures.
  */
-
-#ifndef _H_LPFC_COMPAT
-#define  _H_LPFC_COMPAT
-
 
 /*******************************************************************
 Note: HBA's SLI memory contains little-endian LW.
@@ -40,14 +36,14 @@ using writel() and readl().
 #if __BIG_ENDIAN
 
 static inline void
-lpfc_memcpy_to_slim( void *dest, void *src, unsigned int bytes)
+lpfc_memcpy_to_slim(void __iomem *dest, void *src, unsigned int bytes)
 {
-	uint32_t *dest32;
+	uint32_t __iomem *dest32;
 	uint32_t *src32;
 	unsigned int four_bytes;
 
 
-	dest32  = (uint32_t *) dest;
+	dest32  = (uint32_t __iomem *) dest;
 	src32  = (uint32_t *) src;
 
 	/* write input bytes, 4 bytes at a time */
@@ -62,15 +58,15 @@ lpfc_memcpy_to_slim( void *dest, void *src, unsigned int bytes)
 }
 
 static inline void
-lpfc_memcpy_from_slim( void *dest, void *src, unsigned int bytes)
+lpfc_memcpy_from_slim( void *dest, void __iomem *src, unsigned int bytes)
 {
 	uint32_t *dest32;
-	uint32_t *src32;
+	uint32_t __iomem *src32;
 	unsigned int four_bytes;
 
 
 	dest32  = (uint32_t *) dest;
-	src32  = (uint32_t *) src;
+	src32  = (uint32_t __iomem *) src;
 
 	/* read input bytes, 4 bytes at a time */
 	for (four_bytes = bytes /4; four_bytes > 0; four_bytes--) {
@@ -85,32 +81,17 @@ lpfc_memcpy_from_slim( void *dest, void *src, unsigned int bytes)
 #else
 
 static inline void
-lpfc_memcpy_to_slim( void *dest, void *src, unsigned int bytes)
+lpfc_memcpy_to_slim( void __iomem *dest, void *src, unsigned int bytes)
 {
 	/* actually returns 1 byte past dest */
 	memcpy_toio( dest, src, bytes);
 }
 
 static inline void
-lpfc_memcpy_from_slim( void *dest, void *src, unsigned int bytes)
+lpfc_memcpy_from_slim( void *dest, void __iomem *src, unsigned int bytes)
 {
 	/* actually returns 1 byte past dest */
 	memcpy_fromio( dest, src, bytes);
 }
 
-#endif /* __BIG_ENDIAN */
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,6)
-/* Provide local msecs_to_jiffies call for earlier kernels */
-static inline unsigned long msecs_to_jiffies(const unsigned int m)
-{
-#if HZ <= 1000 && !(1000 % HZ)
-	return (m + (1000 / HZ) - 1) / (1000 / HZ);
-#elif HZ > 1000 && !(HZ % 1000)
-	return m * (HZ / 1000);
-#else
-	return (m * HZ + 999) / 1000;
-#endif
-}
-#endif
-#endif				/*  _H_LPFC_COMPAT */
+#endif	/* __BIG_ENDIAN */

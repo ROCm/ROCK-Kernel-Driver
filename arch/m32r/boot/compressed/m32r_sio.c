@@ -46,9 +46,14 @@ static void putc(char c)
 	}
 	*BOOT_SIO0TXB = c;
 }
-#else
+#else /* defined(CONFIG_PLAT_M32700UT_Alpha) || defined(CONFIG_PLAT_M32700UT) */
+#ifdef CONFIG_MMU
 #define SIO0STS	(volatile unsigned short *)(0xa0efd000 + 14)
 #define SIO0TXB	(volatile unsigned short *)(0xa0efd000 + 30)
+#else
+#define SIO0STS	(volatile unsigned short *)(0x00efd000 + 14)
+#define SIO0TXB	(volatile unsigned short *)(0x00efd000 + 30)
+#endif
 
 static void putc(char c)
 {

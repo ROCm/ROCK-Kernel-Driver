@@ -109,7 +109,7 @@ mpc8540ads_setup_arch(void)
 	memcpy(pdata->mac_addr, binfo->bi_enet1addr, 6);
 
 	pdata = (struct gianfar_platform_data *) ppc_sys_get_pdata(MPC85xx_FEC);
-	pdata->board_flags = FSL_GIANFAR_BRD_HAS_PHY_INTR;
+	pdata->board_flags = 0;
 	pdata->interruptPHY = MPC85xx_IRQ_EXT5;
 	pdata->phyid = 3;
 	/* fixup phy address */
@@ -187,7 +187,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		strcpy(cmd_line, (char *) (r6 + KERNELBASE));
 	}
 
-	identify_ppc_sys_by_id(mfspr(SVR));
+	identify_ppc_sys_by_id(mfspr(SPRN_SVR));
 
 	/* setup the PowerPC module struct */
 	ppc_md.setup_arch = mpc8540ads_setup_arch;
@@ -210,6 +210,9 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #if defined(CONFIG_SERIAL_8250) && defined(CONFIG_SERIAL_TEXT_DEBUG)
 	ppc_md.progress = gen550_progress;
 #endif	/* CONFIG_SERIAL_8250 && CONFIG_SERIAL_TEXT_DEBUG */
+#if defined(CONFIG_SERIAL_8250) && defined(CONFIG_KGDB)
+	ppc_md.early_serial_map = mpc85xx_early_serial_map;
+#endif	/* CONFIG_SERIAL_8250 && CONFIG_KGDB */
 
 	if (ppc_md.progress)
 		ppc_md.progress("mpc8540ads_init(): exit", 0);

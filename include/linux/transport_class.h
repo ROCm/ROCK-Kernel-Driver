@@ -48,6 +48,14 @@ struct anon_transport_class cls = {				\
 #define class_to_transport_class(x) \
 	container_of(x, struct transport_class, class)
 
+struct transport_container {
+	struct attribute_container ac;
+	struct attribute_group *statistics;
+};
+
+#define attribute_container_to_transport_container(x) \
+	container_of(x, struct transport_container, ac)
+
 void transport_remove_device(struct device *);
 void transport_add_device(struct device *);
 void transport_setup_device(struct device *);
@@ -66,6 +74,16 @@ transport_unregister_device(struct device *dev)
 {
 	transport_remove_device(dev);
 	transport_destroy_device(dev);
+}
+
+static inline int transport_container_register(struct transport_container *tc)
+{
+	return attribute_container_register(&tc->ac);
+}
+
+static inline int transport_container_unregister(struct transport_container *tc)
+{
+	return attribute_container_unregister(&tc->ac);
 }
 
 int transport_class_register(struct transport_class *);

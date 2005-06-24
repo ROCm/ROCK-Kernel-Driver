@@ -26,8 +26,6 @@
 struct drive_info_struct { char dummy[32]; } drive_info;
 struct screen_info screen_info;
 
-unsigned char aux_device_present;
-
 extern int root_mountflags;
 extern char _etext, _edata, _end;
 

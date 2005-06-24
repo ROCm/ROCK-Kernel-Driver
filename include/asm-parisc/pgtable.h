@@ -39,6 +39,7 @@
         do{                                                     \
                 *(pteptr) = (pteval);                           \
         } while(0)
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
 
 #endif /* !__ASSEMBLY__ */
 
@@ -119,7 +120,7 @@
  * pgd entries used up by user/kernel:
  */
 
-#define FIRST_USER_PGD_NR	0
+#define FIRST_USER_ADDRESS	0
 
 #ifndef __ASSEMBLY__
 extern  void *vmalloc_start;
@@ -263,7 +264,7 @@ extern unsigned long *empty_zero_page;
 
 #define pte_none(x)     ((pte_val(x) == 0) || (pte_val(x) & _PAGE_FLUSH))
 #define pte_present(x)	(pte_val(x) & _PAGE_PRESENT)
-#define pte_clear(xp)	do { pte_val(*(xp)) = 0; } while (0)
+#define pte_clear(mm,addr,xp)	do { pte_val(*(xp)) = 0; } while (0)
 
 #define pmd_flag(x)	(pmd_val(x) & PxD_FLAG_MASK)
 #define pmd_address(x)	((unsigned long)(pmd_val(x) &~ PxD_FLAG_MASK) << PxD_VALUE_SHIFT)
@@ -431,7 +432,7 @@ extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 #define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
-static inline int ptep_test_and_clear_young(pte_t *ptep)
+static inline int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
 {
 #ifdef CONFIG_SMP
 	if (!pte_young(*ptep))
@@ -441,12 +442,12 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 	pte_t pte = *ptep;
 	if (!pte_young(pte))
 		return 0;
-	set_pte(ptep, pte_mkold(pte));
+	set_pte_at(vma->vm_mm, addr, ptep, pte_mkold(pte));
 	return 1;
 #endif
 }
 
-static inline int ptep_test_and_clear_dirty(pte_t *ptep)
+static inline int ptep_test_and_clear_dirty(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
 {
 #ifdef CONFIG_SMP
 	if (!pte_dirty(*ptep))
@@ -456,14 +457,14 @@ static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 	pte_t pte = *ptep;
 	if (!pte_dirty(pte))
 		return 0;
-	set_pte(ptep, pte_mkclean(pte));
+	set_pte_at(vma->vm_mm, addr, ptep, pte_mkclean(pte));
 	return 1;
 #endif
 }
 
 extern spinlock_t pa_dbit_lock;
 
-static inline pte_t ptep_get_and_clear(pte_t *ptep)
+static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	pte_t old_pte;
 	pte_t pte;
@@ -472,13 +473,13 @@ static inline pte_t ptep_get_and_clear(pte_t *ptep)
 	pte = old_pte = *ptep;
 	pte_val(pte) &= ~_PAGE_PRESENT;
 	pte_val(pte) |= _PAGE_FLUSH;
-	set_pte(ptep,pte);
+	set_pte_at(mm,addr,ptep,pte);
 	spin_unlock(&pa_dbit_lock);
 
 	return old_pte;
 }
 
-static inline void ptep_set_wrprotect(pte_t *ptep)
+static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 #ifdef CONFIG_SMP
 	unsigned long new, old;
@@ -489,17 +490,7 @@ static inline void ptep_set_wrprotect(pte_t *ptep)
 	} while (cmpxchg((unsigned long *) ptep, old, new) != old);
 #else
 	pte_t old_pte = *ptep;
-	set_pte(ptep, pte_wrprotect(old_pte));
-#endif
-}
-
-static inline void ptep_mkdirty(pte_t *ptep)
-{
-#ifdef CONFIG_SMP
-	set_bit(xlate_pabit(_PAGE_DIRTY_BIT), &pte_val(*ptep));
-#else
-	pte_t old_pte = *ptep;
-	set_pte(ptep, pte_mkdirty(old_pte));
+	set_pte_at(mm, addr, ptep, pte_wrprotect(old_pte));
 #endif
 }
 
@@ -510,6 +501,13 @@ static inline void ptep_mkdirty(pte_t *ptep)
 #define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
 		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
 
+#define io_remap_pfn_range(vma, vaddr, pfn, size, prot)		\
+		remap_pfn_range(vma, vaddr, pfn, size, prot)
+
+#define MK_IOSPACE_PFN(space, pfn)	(pfn)
+#define GET_IOSPACE(pfn)		0
+#define GET_PFN(pfn)			(pfn)
+
 /* We provide our own get_unmapped_area to provide cache coherency */
 
 #define HAVE_ARCH_UNMAPPED_AREA
@@ -518,7 +516,6 @@ static inline void ptep_mkdirty(pte_t *ptep)
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
-#define __HAVE_ARCH_PTEP_MKDIRTY
 #define __HAVE_ARCH_PTE_SAME
 #include <asm-generic/pgtable.h>
 

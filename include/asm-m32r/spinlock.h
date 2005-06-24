@@ -102,10 +102,8 @@ static inline void _raw_spin_lock(spinlock_t *lock)
 	unsigned long tmp0, tmp1;
 
 #ifdef CONFIG_DEBUG_SPINLOCK
-	__label__ here;
-here:
-	if (lock->magic != SPINLOCK_MAGIC) {
-		printk("pc: %p\n", &&here);
+	if (unlikely(lock->magic != SPINLOCK_MAGIC)) {
+		printk("pc: %p\n", __builtin_return_address(0));
 		BUG();
 	}
 #endif

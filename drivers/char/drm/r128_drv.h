@@ -130,10 +130,6 @@ typedef struct drm_r128_buf_priv {
    	drm_r128_freelist_t *list_entry;
 } drm_r128_buf_priv_t;
 
-                               /* r128_ioctl32.c */
-extern int r128_register_ioctl32( void );
-extern void r128_unregister_ioctl32( void );
-
 				/* r128_cce.c */
 extern int r128_cce_init( DRM_IOCTL_ARGS );
 extern int r128_cce_start( DRM_IOCTL_ARGS );
@@ -143,27 +139,13 @@ extern int r128_cce_idle( DRM_IOCTL_ARGS );
 extern int r128_engine_reset( DRM_IOCTL_ARGS );
 extern int r128_fullscreen( DRM_IOCTL_ARGS );
 extern int r128_cce_buffers( DRM_IOCTL_ARGS );
-extern int r128_getparam( DRM_IOCTL_ARGS );
 
 extern void r128_freelist_reset( drm_device_t *dev );
-extern drm_buf_t *r128_freelist_get( drm_device_t *dev );
 
 extern int r128_wait_ring( drm_r128_private_t *dev_priv, int n );
 
 extern int r128_do_cce_idle( drm_r128_private_t *dev_priv );
 extern int r128_do_cleanup_cce( drm_device_t *dev );
-extern int r128_do_cleanup_pageflip( drm_device_t *dev );
-
-				/* r128_state.c */
-extern int r128_cce_clear( DRM_IOCTL_ARGS );
-extern int r128_cce_swap( DRM_IOCTL_ARGS );
-extern int r128_cce_flip( DRM_IOCTL_ARGS );
-extern int r128_cce_vertex( DRM_IOCTL_ARGS );
-extern int r128_cce_indices( DRM_IOCTL_ARGS );
-extern int r128_cce_blit( DRM_IOCTL_ARGS );
-extern int r128_cce_depth( DRM_IOCTL_ARGS );
-extern int r128_cce_stipple( DRM_IOCTL_ARGS );
-extern int r128_cce_indirect( DRM_IOCTL_ARGS );
 
 extern int r128_driver_vblank_wait(drm_device_t *dev, unsigned int *sequence);
 
@@ -409,8 +391,6 @@ do {									\
 		    ((addr) & 0x1f) | R128_PLL_WR_EN);			\
 	R128_WRITE(R128_CLOCK_CNTL_DATA, (val));			\
 } while (0)
-
-extern int R128_READ_PLL(drm_device_t *dev, int addr);
 
 
 #define CCE_PACKET0( reg, n )		(R128_CCE_PACKET0 |		\

@@ -340,14 +340,11 @@ struct hermes_debug_entry {
 #ifdef __KERNEL__
 
 /* Timeouts */
-#define HERMES_BAP_BUSY_TIMEOUT (500) /* In iterations of ~1us */
+#define HERMES_BAP_BUSY_TIMEOUT (10000) /* In iterations of ~1us */
 
 /* Basic control structure */
 typedef struct hermes {
-	unsigned long iobase;
-	int io_space; /* 1 if we IO-mapped IO, 0 for memory-mapped IO? */
-#define HERMES_IO	1
-#define HERMES_MEM	0
+	void __iomem *iobase;
 	int reg_spacing;
 #define HERMES_16BIT_REGSPACING	0
 #define HERMES_32BIT_REGSPACING	1
@@ -362,21 +359,15 @@ typedef struct hermes {
 } hermes_t;
 
 /* Register access convenience macros */
-#define hermes_read_reg(hw, off) ((hw)->io_space ? \
-	inw((hw)->iobase + ( (off) << (hw)->reg_spacing )) : \
-	readw((hw)->iobase + ( (off) << (hw)->reg_spacing )))
-#define hermes_write_reg(hw, off, val) do { \
-	if ((hw)->io_space) \
-		outw_p((val), (hw)->iobase + ((off) << (hw)->reg_spacing)); \
-	else \
-		writew((val), (hw)->iobase + ((off) << (hw)->reg_spacing)); \
-	} while (0)
+#define hermes_read_reg(hw, off) \
+	(ioread16((hw)->iobase + ( (off) << (hw)->reg_spacing )))
+#define hermes_write_reg(hw, off, val) \
+	(iowrite16((val), (hw)->iobase + ((off) << (hw)->reg_spacing)))
 #define hermes_read_regn(hw, name) hermes_read_reg((hw), HERMES_##name)
 #define hermes_write_regn(hw, name, val) hermes_write_reg((hw), HERMES_##name, (val))
 
 /* Function prototypes */
-void hermes_struct_init(hermes_t *hw, ulong address, int io_space,
-			int reg_spacing);
+void hermes_struct_init(hermes_t *hw, void __iomem *address, int reg_spacing);
 int hermes_init(hermes_t *hw);
 int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0,
 		      struct hermes_response *resp);
@@ -430,41 +421,13 @@ static inline int hermes_inquire(hermes_t *hw, u16 rid)
 static inline void hermes_read_words(struct hermes *hw, int off, void *buf, unsigned count)
 {
 	off = off << hw->reg_spacing;
-
-	if (hw->io_space) {
-		insw(hw->iobase + off, buf, count);
-	} else {
-		unsigned i;
-		u16 *p;
-
-		/* This needs to *not* byteswap (like insw()) but
-		 * readw() does byteswap hence the conversion.  I hope
-		 * gcc is smart enough to fold away the two swaps on
-		 * big-endian platforms. */
-		for (i = 0, p = buf; i < count; i++) {
-			*p++ = cpu_to_le16(readw(hw->iobase + off));
-		}
-	}
+	ioread16_rep(hw->iobase + off, buf, count);
 }
 
 static inline void hermes_write_words(struct hermes *hw, int off, const void *buf, unsigned count)
 {
 	off = off << hw->reg_spacing;
-
-	if (hw->io_space) {
-		outsw(hw->iobase + off, buf, count);
-	} else {
-		unsigned i;
-		const u16 *p;
-
-		/* This needs to *not* byteswap (like outsw()) but
-		 * writew() does byteswap hence the conversion.  I
-		 * hope gcc is smart enough to fold away the two swaps
-		 * on big-endian platforms. */
-		for (i = 0, p = buf; i < count; i++) {
-			writew(le16_to_cpu(*p++), hw->iobase + off);
-		}
-	}
+	iowrite16_rep(hw->iobase + off, buf, count);
 }
 
 static inline void hermes_clear_words(struct hermes *hw, int off, unsigned count)
@@ -473,13 +436,8 @@ static inline void hermes_clear_words(struct hermes *hw, int off, unsigned count
 
 	off = off << hw->reg_spacing;
 
-	if (hw->io_space) {
-		for (i = 0; i < count; i++)
-			outw(0, hw->iobase + off);
-	} else {
-		for (i = 0; i < count; i++)
-			writew(0, hw->iobase + off);
-	}
+	for (i = 0; i < count; i++)
+		iowrite16(0, hw->iobase + off);
 }
 
 #define HERMES_READ_RECORD(hw, bap, rid, buf) \

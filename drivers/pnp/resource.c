@@ -21,11 +21,10 @@
 #include <linux/pnp.h>
 #include "base.h"
 
-int pnp_skip_pci_scan;				/* skip PCI resource scanning */
-int pnp_reserve_irq[16] = { [0 ... 15] = -1 };	/* reserve (don't use) some IRQ */
-int pnp_reserve_dma[8] = { [0 ... 7] = -1 };	/* reserve (don't use) some DMA */
-int pnp_reserve_io[16] = { [0 ... 15] = -1 };	/* reserve (don't use) some I/O region */
-int pnp_reserve_mem[16] = { [0 ... 15] = -1 };	/* reserve (don't use) some memory region */
+static int pnp_reserve_irq[16] = { [0 ... 15] = -1 };	/* reserve (don't use) some IRQ */
+static int pnp_reserve_dma[8] = { [0 ... 7] = -1 };	/* reserve (don't use) some DMA */
+static int pnp_reserve_io[16] = { [0 ... 15] = -1 };	/* reserve (don't use) some I/O region */
+static int pnp_reserve_mem[16] = { [0 ... 15] = -1 };	/* reserve (don't use) some memory region */
 
 
 /*
@@ -385,9 +384,9 @@ int pnp_check_irq(struct pnp_dev * dev, int idx)
 
 #ifdef CONFIG_PCI
 	/* check if the resource is being used by a pci device */
-	if (!pnp_skip_pci_scan) {
-		struct pci_dev * pci = NULL;
-		while ((pci = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pci)) != NULL) {
+	{
+		struct pci_dev *pci = NULL;
+		for_each_pci_dev(pci) {
 			if (pci->irq == *irq)
 				return 0;
 		}

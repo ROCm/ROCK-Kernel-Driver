@@ -77,6 +77,7 @@ struct hayes_esp_config {
 
 struct esp_struct {
 	int			magic;
+	spinlock_t		lock;
 	int			port;
 	int			irq;
 	int			flags; 		/* defined in tty.h */

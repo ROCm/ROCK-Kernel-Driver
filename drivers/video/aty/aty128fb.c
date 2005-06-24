@@ -166,7 +166,7 @@ static const char *r128_family[] __devinitdata = {
 static int aty128_probe(struct pci_dev *pdev,
                                const struct pci_device_id *ent);
 static void aty128_remove(struct pci_dev *pdev);
-static int aty128_pci_suspend(struct pci_dev *pdev, u32 state);
+static int aty128_pci_suspend(struct pci_dev *pdev, pm_message_t state);
 static int aty128_pci_resume(struct pci_dev *pdev);
 static int aty128_do_resume(struct pci_dev *pdev);
 
@@ -424,11 +424,6 @@ struct aty128fb_par {
 
 
 #define round_div(n, d) ((n+(d/2))/d)
-
-    /*
-     *  Interface used by the world
-     */
-int aty128fb_init(void);
 
 static int aty128fb_check_var(struct fb_var_screeninfo *var,
 			      struct fb_info *info);
@@ -1648,7 +1643,8 @@ static int aty128fb_sync(struct fb_info *info)
 	return 0;
 }
 
-int __init aty128fb_setup(char *options)
+#ifndef MODULE
+static int __init aty128fb_setup(char *options)
 {
 	char *this_opt;
 
@@ -1701,6 +1697,7 @@ int __init aty128fb_setup(char *options)
 	}
 	return 0;
 }
+#endif  /*  MODULE  */
 
 
 /*
@@ -2330,7 +2327,7 @@ static void aty128_set_suspend(struct aty128fb_par *par, int suspend)
 	}
 }
 
-static int aty128_pci_suspend(struct pci_dev *pdev, u32 state)
+static int aty128_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	struct fb_info *info = pci_get_drvdata(pdev);
 	struct aty128fb_par *par = info->par;
@@ -2370,6 +2367,14 @@ static int aty128_pci_suspend(struct pci_dev *pdev, u32 state)
 	/* Sleep */
 	par->asleep = 1;
 	par->lock_blank = 1;
+
+#ifdef CONFIG_PPC_PMAC
+	/* On powermac, we have hooks to properly suspend/resume AGP now,
+	 * use them here. We'll ultimately need some generic support here,
+	 * but the generic code isn't quite ready for that yet
+	 */
+	pmac_suspend_agp_for_card(pdev);
+#endif /* CONFIG_PPC_PMAC */
 
 	/* We need a way to make sure the fbdev layer will _not_ touch the
 	 * framebuffer before we put the chip to suspend state. On 2.4, I
@@ -2413,7 +2418,15 @@ static int aty128_do_resume(struct pci_dev *pdev)
 	par->lock_blank = 0;
 	aty128fb_blank(0, info);
 
-	pdev->dev.power.power_state = 0;
+#ifdef CONFIG_PPC_PMAC
+	/* On powermac, we have hooks to properly suspend/resume AGP now,
+	 * use them here. We'll ultimately need some generic support here,
+	 * but the generic code isn't quite ready for that yet
+	 */
+	pmac_resume_agp_for_card(pdev);
+#endif /* CONFIG_PPC_PMAC */
+
+	pdev->dev.power.power_state = PMSG_ON;
 
 	printk(KERN_DEBUG "aty128fb: resumed !\n");
 
@@ -2432,7 +2445,7 @@ static int aty128_pci_resume(struct pci_dev *pdev)
 }
 
 
-int __init aty128fb_init(void)
+static int __init aty128fb_init(void)
 {
 #ifndef MODULE
 	char *option = NULL;
@@ -2442,7 +2455,7 @@ int __init aty128fb_init(void)
 	aty128fb_setup(option);
 #endif
 
-	return pci_module_init(&aty128fb_driver);
+	return pci_register_driver(&aty128fb_driver);
 }
 
 static void __exit aty128fb_exit(void)
@@ -2452,7 +2465,6 @@ static void __exit aty128fb_exit(void)
 
 module_init(aty128fb_init);
 
-#ifdef MODULE
 module_exit(aty128fb_exit);
 
 MODULE_AUTHOR("(c)1999-2003 Brad Douglas <brad@neruo.com>");
@@ -2463,6 +2475,5 @@ MODULE_PARM_DESC(mode_option, "Specify resolution as \"<xres>x<yres>[-<bpp>][@<r
 #ifdef CONFIG_MTRR
 module_param_named(nomtrr, mtrr, invbool, 0);
 MODULE_PARM_DESC(nomtrr, "bool: Disable MTRR support (0 or 1=disabled) (default=0)");
-#endif
 #endif
 

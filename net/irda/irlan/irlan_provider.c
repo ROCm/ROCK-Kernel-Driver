@@ -74,10 +74,10 @@ static int irlan_provider_data_indication(void *instance, void *sap,
 	
 	self = (struct irlan_cb *) instance;
 
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == IRLAN_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return -1;);
 
-	ASSERT(skb != NULL, return -1;);
+	IRDA_ASSERT(skb != NULL, return -1;);
 
 	code = skb->data[0];
 	switch(code) {
@@ -134,11 +134,11 @@ static void irlan_provider_connect_indication(void *instance, void *sap,
 	self = (struct irlan_cb *) instance;
 	tsap = (struct tsap_cb *) sap;
 	
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 	
-	ASSERT(tsap == self->provider.tsap_ctrl,return;);
-	ASSERT(self->provider.state == IRLAN_IDLE, return;);
+	IRDA_ASSERT(tsap == self->provider.tsap_ctrl,return;);
+	IRDA_ASSERT(self->provider.state == IRLAN_IDLE, return;);
 
 	daddr = irttp_get_daddr(tsap);
 	saddr = irttp_get_saddr(tsap);
@@ -168,8 +168,8 @@ static void irlan_provider_connect_indication(void *instance, void *sap,
 void irlan_provider_connect_response(struct irlan_cb *self,
 				     struct tsap_cb *tsap)
 {
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 
 	/* Just accept */
 	irttp_connect_response(tsap, IRLAN_MTU, NULL);
@@ -187,12 +187,12 @@ static void irlan_provider_disconnect_indication(void *instance, void *sap,
 	self = (struct irlan_cb *) instance;
 	tsap = (struct tsap_cb *) sap;
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);	
-	ASSERT(tsap != NULL, return;);
-	ASSERT(tsap->magic == TTP_TSAP_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);	
+	IRDA_ASSERT(tsap != NULL, return;);
+	IRDA_ASSERT(tsap->magic == TTP_TSAP_MAGIC, return;);
 	
-	ASSERT(tsap == self->provider.tsap_ctrl, return;);
+	IRDA_ASSERT(tsap == self->provider.tsap_ctrl, return;);
 	
 	irlan_do_provider_event(self, IRLAN_LMP_DISCONNECT, NULL);
 }
@@ -234,12 +234,12 @@ int irlan_provider_parse_command(struct irlan_cb *self, int cmd,
         char *value;
 	int ret = RSP_SUCCESS;
 	
-	ASSERT(skb != NULL, return -RSP_PROTOCOL_ERROR;);
+	IRDA_ASSERT(skb != NULL, return -RSP_PROTOCOL_ERROR;);
 	
 	IRDA_DEBUG(4, "%s(), skb->len=%d\n", __FUNCTION__ , (int)skb->len);
 
-	ASSERT(self != NULL, return -RSP_PROTOCOL_ERROR;);
-	ASSERT(self->magic == IRLAN_MAGIC, return -RSP_PROTOCOL_ERROR;);
+	IRDA_ASSERT(self != NULL, return -RSP_PROTOCOL_ERROR;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return -RSP_PROTOCOL_ERROR;);
 	
 	if (!skb)
 		return -RSP_PROTOCOL_ERROR;
@@ -293,8 +293,8 @@ void irlan_provider_send_reply(struct irlan_cb *self, int command,
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 
 	skb = dev_alloc_skb(128);
 	if (!skb)
@@ -381,8 +381,8 @@ int irlan_provider_open_ctrl_tsap(struct irlan_cb *self)
 	
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == IRLAN_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return -1;);
 
 	/* Check if already open */
 	if (self->provider.tsap_ctrl)

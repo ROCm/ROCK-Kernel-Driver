@@ -68,7 +68,7 @@ static DECLARE_MUTEX(rfcomm_sem);
 #define rfcomm_lock()	down(&rfcomm_sem);
 #define rfcomm_unlock()	up(&rfcomm_sem);
 
-unsigned long rfcomm_event;
+static unsigned long rfcomm_event;
 
 static LIST_HEAD(session_list);
 static atomic_t terminate, running;
@@ -389,6 +389,8 @@ static int __rfcomm_dlc_close(struct rfcomm_dlc *d, int err)
 		rfcomm_dlc_unlock(d);
 
 		skb_queue_purge(&d->tx_queue);
+		rfcomm_session_put(s);
+
 		rfcomm_dlc_unlink(d);
 	}
 
@@ -597,6 +599,8 @@ static struct rfcomm_session *rfcomm_session_create(bdaddr_t *src, bdaddr_t *dst
 		*err = -ENOMEM;
 		goto failed;
 	}
+
+	rfcomm_session_hold(s);
 
 	s->initiator = 1;
 

@@ -1,9 +1,8 @@
 /*
     driver for LSI L64781 COFDM demodulator
 
-    Copyright (C) 2001 Holger Waechtler <holger@convergence.de>
-                       for Convergence Integrated Media GmbH
-                       Marko Kohtala <marko.kohtala@nokia.com>
+    Copyright (C) 2001 Holger Waechtler for Convergence Integrated Media GmbH
+                       Marko Kohtala <marko.kohtala@luukku.com>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -32,17 +31,13 @@
 
 
 struct l64781_state {
-
 	struct i2c_adapter* i2c;
-
 	struct dvb_frontend_ops ops;
-
 	const struct l64781_config* config;
-
 	struct dvb_frontend frontend;
 
 	/* private demodulator data */
-   	int first:1;
+	int first:1;
 };
 
 #define dprintk(args...) \
@@ -126,7 +121,7 @@ static int reset_and_configure (struct l64781_state* state)
 
 static int apply_frontend_param (struct dvb_frontend* fe, struct dvb_frontend_parameters *param)
 {
-	struct l64781_state* state = (struct l64781_state*) fe->demodulator_priv;
+	struct l64781_state* state = fe->demodulator_priv;
 	/* The coderates for FEC_NONE, FEC_4_5 and FEC_FEC_6_7 are arbitrary */
 	static const u8 fec_tab[] = { 7, 0, 1, 2, 9, 3, 10, 4 };
 	/* QPSK, QAM_16, QAM_64 */
@@ -239,7 +234,7 @@ static int apply_frontend_param (struct dvb_frontend* fe, struct dvb_frontend_pa
 
 static int get_frontend(struct dvb_frontend* fe, struct dvb_frontend_parameters* param)
 {
-	struct l64781_state* state = (struct l64781_state*) fe->demodulator_priv;
+	struct l64781_state* state = fe->demodulator_priv;
 	int tmp;
 
 
@@ -357,7 +352,7 @@ static int get_frontend(struct dvb_frontend* fe, struct dvb_frontend_parameters*
 
 static int l64781_read_status(struct dvb_frontend* fe, fe_status_t* status)
 {
-	struct l64781_state* state = (struct l64781_state*) fe->demodulator_priv;
+	struct l64781_state* state = fe->demodulator_priv;
 	int sync = l64781_readreg (state, 0x32);
 	int gain = l64781_readreg (state, 0x0e);
 
@@ -386,7 +381,7 @@ static int l64781_read_status(struct dvb_frontend* fe, fe_status_t* status)
 
 static int l64781_read_ber(struct dvb_frontend* fe, u32* ber)
 {
-	struct l64781_state* state = (struct l64781_state*) fe->demodulator_priv;
+	struct l64781_state* state = fe->demodulator_priv;
 
 	/*   XXX FIXME: set up counting period (reg 0x26...0x28)
 	 */
@@ -398,7 +393,7 @@ static int l64781_read_ber(struct dvb_frontend* fe, u32* ber)
 
 static int l64781_read_signal_strength(struct dvb_frontend* fe, u16* signal_strength)
 {
-	struct l64781_state* state = (struct l64781_state*) fe->demodulator_priv;
+	struct l64781_state* state = fe->demodulator_priv;
 
 	u8 gain = l64781_readreg (state, 0x0e);
 	*signal_strength = (gain << 8) | gain;
@@ -408,7 +403,7 @@ static int l64781_read_signal_strength(struct dvb_frontend* fe, u16* signal_stre
 
 static int l64781_read_snr(struct dvb_frontend* fe, u16* snr)
 {
-	struct l64781_state* state = (struct l64781_state*) fe->demodulator_priv;
+	struct l64781_state* state = fe->demodulator_priv;
 
 	u8 avg_quality = 0xff - l64781_readreg (state, 0x33);
 	*snr = (avg_quality << 8) | avg_quality; /* not exact, but...*/
@@ -418,7 +413,7 @@ static int l64781_read_snr(struct dvb_frontend* fe, u16* snr)
 
 static int l64781_read_ucblocks(struct dvb_frontend* fe, u32* ucblocks)
 {
-	struct l64781_state* state = (struct l64781_state*) fe->demodulator_priv;
+	struct l64781_state* state = fe->demodulator_priv;
 
 	*ucblocks = l64781_readreg (state, 0x37)
 	   | (l64781_readreg (state, 0x38) << 8);
@@ -428,7 +423,7 @@ static int l64781_read_ucblocks(struct dvb_frontend* fe, u32* ucblocks)
 
 static int l64781_sleep(struct dvb_frontend* fe)
 {
-	struct l64781_state* state = (struct l64781_state*) fe->demodulator_priv;
+	struct l64781_state* state = fe->demodulator_priv;
 
 	/* Power down */
 	return l64781_writereg (state, 0x3e, 0x5a);
@@ -436,7 +431,7 @@ static int l64781_sleep(struct dvb_frontend* fe)
 
 static int l64781_init(struct dvb_frontend* fe)
 {
-	struct l64781_state* state = (struct l64781_state*) fe->demodulator_priv;
+	struct l64781_state* state = fe->demodulator_priv;
 
         reset_and_configure (state);
 
@@ -489,7 +484,7 @@ static int l64781_get_tune_settings(struct dvb_frontend* fe, struct dvb_frontend
 
 static void l64781_release(struct dvb_frontend* fe)
 {
-	struct l64781_state* state = (struct l64781_state*) fe->demodulator_priv;
+	struct l64781_state* state = fe->demodulator_priv;
 	kfree(state);
 }
 
@@ -506,7 +501,7 @@ struct dvb_frontend* l64781_attach(const struct l64781_config* config,
 			   { .addr = config->demod_address, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 
 	/* allocate memory for the internal state */
-	state = (struct l64781_state*) kmalloc(sizeof(struct l64781_state), GFP_KERNEL);
+	state = kmalloc(sizeof(struct l64781_state), GFP_KERNEL);
 	if (state == NULL) goto error;
 
 	/* setup the state */
@@ -544,7 +539,7 @@ struct dvb_frontend* l64781_attach(const struct l64781_config* config,
 
 	/* Responds to all reads with 0 */
 	if (l64781_readreg(state, 0x1a) != 0) {
- 	        dprintk("Read 1 returned unexpcted value\n");
+	        dprintk("Read 1 returned unexpcted value\n");
 		goto error;
 	}
 
@@ -553,7 +548,7 @@ struct dvb_frontend* l64781_attach(const struct l64781_config* config,
 
 	/* Responds with register default value */
 	if (l64781_readreg(state, 0x1a) != 0xa1) {
- 	        dprintk("Read 2 returned unexpcted value\n");
+	        dprintk("Read 2 returned unexpcted value\n");
 		goto error;
 	}
 
@@ -564,7 +559,7 @@ struct dvb_frontend* l64781_attach(const struct l64781_config* config,
 
 error:
 	if (reg0x3e >= 0) l64781_writereg (state, 0x3e, reg0x3e);  /* restore reg 0x3e */
-	if (state) kfree(state);
+	kfree(state);
 	return NULL;
 }
 
@@ -581,10 +576,10 @@ static struct dvb_frontend_ops l64781_ops = {
 		.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 		      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 |
 		      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 |
-        	      FE_CAN_MUTE_TS
+		      FE_CAN_MUTE_TS
 	},
 
-     	.release = l64781_release,
+	.release = l64781_release,
 
 	.init = l64781_init,
 	.sleep = l64781_sleep,

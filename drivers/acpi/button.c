@@ -275,7 +275,7 @@ acpi_button_remove_fs (
                                 Driver Interface
    -------------------------------------------------------------------------- */
 
-void
+static void
 acpi_button_notify (
 	acpi_handle		handle,
 	u32			event,
@@ -302,7 +302,7 @@ acpi_button_notify (
 }
 
 
-acpi_status
+static acpi_status
 acpi_button_notify_fixed (
 	void			*data)
 {

@@ -470,8 +470,8 @@ static __inline__ void
 mcpn765_set_bat(void)
 {
 	mb();
-	mtspr(DBAT1U, 0xfe8000fe);
-	mtspr(DBAT1L, 0xfe80002a);
+	mtspr(SPRN_DBAT1U, 0xfe8000fe);
+	mtspr(SPRN_DBAT1L, 0xfe80002a);
 	mb();
 }
 

@@ -3,7 +3,8 @@
  *
  * Definitions for Artesyn Katana750i/3750 board.
  *
- * Tim Montgomery <timm@artesyncp.com>
+ * Author: Tim Montgomery <timm@artesyncp.com>
+ * Maintained by: Mark A. Greer <mgreer@mvista.com>
  *
  * Based on code done by Rabeeh Khoury - rabeeh@galileo.co.il
  * Based on code done by Mark A. Greer <mgreer@mvista.com>
@@ -19,18 +20,17 @@
  * PCI I/O space and 4 windows from the CPU bus to PCI MEM space.
  * We'll only use one PCI MEM window on each PCI bus.
  *
- * This is the CPU physical memory map (windows must be at least 1MB and start
+ * This is the CPU physical memory map (windows must be at least 64 KB and start
  * on a boundary that is a multiple of the window size):
  *
  *    0xff800000-0xffffffff      - Boot window
- *    0xf8400000-0xf85fffff      - Internal SRAM
- *    0xf8200000-0xf823ffff      - CPLD
- *    0xf8100000-0xf810ffff      - MV64360 Registers
- *    0xf8000000-0xf80fffff      - PLCC socket
- *    0xf0000000-0xf01fffff	 - Consistent memory pool
- *    0xe8000000-0xefffffff      - soldered flash
- *    0xc0000000-0xc0ffffff      - PCI I/O
- *    0x80000000-0xbfffffff      - PCI MEM
+ *    0xf8400000-0xf843ffff      - Internal SRAM
+ *    0xf8200000-0xf83fffff      - CPLD
+ *    0xf8100000-0xf810ffff      - MV64360 Registers (CONFIG_MV64X60_NEW_BASE)
+ *    0xf8000000-0xf80fffff      - Socketed FLASH
+ *    0xe0000000-0xefffffff      - Soldered FLASH
+ *    0xc0000000-0xc3ffffff      - PCI I/O (second hose)
+ *    0x80000000-0xbfffffff      - PCI MEM (second hose)
  */
 
 #ifndef __PPC_PLATFORMS_KATANA_H
@@ -38,33 +38,22 @@
 
 /* CPU Physical Memory Map setup. */
 #define KATANA_BOOT_WINDOW_BASE			0xff800000
+#define KATANA_BOOT_WINDOW_SIZE			0x00800000 /* 8 MB */
 #define KATANA_INTERNAL_SRAM_BASE		0xf8400000
 #define KATANA_CPLD_BASE			0xf8200000
-#define KATANA_BRIDGE_REG_BASE			0xf8100000
+#define KATANA_CPLD_SIZE			0x00200000 /* 2 MB */
 #define KATANA_SOCKET_BASE			0xf8000000
-#define KATANA_SOLDERED_FLASH_BASE		0xe8000000
-
-#define KATANA_BOOT_WINDOW_SIZE_ACTUAL		0x00800000 /* 8MB */
-#define KATANA_CPLD_SIZE_ACTUAL			0x00020000 /* 128KB */
-#define KATANA_SOCKETED_FLASH_SIZE_ACTUAL	0x00080000 /* 512KB */
-#define KATANA_SOLDERED_FLASH_SIZE_ACTUAL	0x02000000 /* 32MB */
-
-#define KATANA_BOOT_WINDOW_SIZE		max(MV64360_WINDOW_SIZE_MIN,	\
-		KATANA_BOOT_WINDOW_SIZE_ACTUAL)
-#define KATANA_CPLD_SIZE		max(MV64360_WINDOW_SIZE_MIN,	\
-		KATANA_CPLD_SIZE_ACTUAL)
-#define KATANA_SOCKETED_FLASH_SIZE	max(MV64360_WINDOW_SIZE_MIN,	\
-		KATANA_SOCKETED_FLASH_SIZE_ACTUAL)
-#define KATANA_SOLDERED_FLASH_SIZE	max(MV64360_WINDOW_SIZE_MIN,	\
-		KATANA_SOLDERED_FLASH_SIZE_ACTUAL)
+#define KATANA_SOCKETED_FLASH_SIZE		0x00100000 /* 1 MB */
+#define KATANA_SOLDERED_FLASH_BASE		0xe0000000
+#define KATANA_SOLDERED_FLASH_SIZE		0x10000000 /* 256 MB */
 
 #define KATANA_PCI1_MEM_START_PROC_ADDR         0x80000000
 #define KATANA_PCI1_MEM_START_PCI_HI_ADDR       0x00000000
 #define KATANA_PCI1_MEM_START_PCI_LO_ADDR       0x80000000
-#define KATANA_PCI1_MEM_SIZE                    0x40000000
+#define KATANA_PCI1_MEM_SIZE                    0x40000000 /* 1 GB */
 #define KATANA_PCI1_IO_START_PROC_ADDR          0xc0000000
 #define KATANA_PCI1_IO_START_PCI_ADDR           0x00000000
-#define KATANA_PCI1_IO_SIZE                     0x01000000
+#define KATANA_PCI1_IO_SIZE                     0x04000000 /* 64 MB */
 
 /* Board-specific IRQ info */
 #define  KATANA_PCI_INTA_IRQ_3750		64+8
@@ -138,6 +127,8 @@
 #define HSL_PLD_J4SGA_REG_OFF			0
 #define HSL_PLD_J4GA_REG_OFF			1
 #define HSL_PLD_J2GA_REG_OFF			2
+#define HSL_PLD_HOT_SWAP_OFF			6
+#define HSL_PLD_HOT_SWAP_LED_BIT		0x1
 #define GA_MASK					0x1f
 #define HSL_PLD_SIZE				0x1000
 #define K3750_GPP_GEO_ADDR_PINS			0xf8000000
@@ -162,7 +153,8 @@
 
 #define	KATANA_DEFAULT_BAUD			9600
 #define	KATANA_MPSC_CLK_SRC			8	  /* TCLK */
-#define	KATANA_MPSC_CLK_FREQ			133333333 /* 133.3333... MHz */
+
+#define	KATANA_MTD_MONITOR_SIZE			(1 << 20) /* 1 MB */
 
 #define	KATANA_ETH0_PHY_ADDR			12
 #define	KATANA_ETH1_PHY_ADDR			11
@@ -230,4 +222,34 @@ typedef enum {
 
 #endif
 
-#endif				/* __PPC_PLATFORMS_KATANA_H */
+static inline u32
+katana_bus_freq(void __iomem *cpld_base)
+{
+	u8 bd_cfg_0;
+
+	bd_cfg_0 = in_8(cpld_base + KATANA_CPLD_BD_CFG_0);
+
+	switch (bd_cfg_0 & KATANA_CPLD_BD_CFG_0_SYSCLK_MASK) {
+	case KATANA_CPLD_BD_CFG_0_SYSCLK_200:
+		return 200000000;
+		break;
+
+	case KATANA_CPLD_BD_CFG_0_SYSCLK_166:
+		return 166666666;
+		break;
+
+	case KATANA_CPLD_BD_CFG_0_SYSCLK_133:
+		return 133333333;
+		break;
+
+	case KATANA_CPLD_BD_CFG_0_SYSCLK_100:
+		return 100000000;
+		break;
+
+	default:
+		return 133333333;
+		break;
+	}
+}
+
+#endif	/* __PPC_PLATFORMS_KATANA_H */

@@ -27,13 +27,18 @@
 #define UNI_N_CFG_AGP_BASE		0x90
 #define UNI_N_CFG_GART_CTRL		0x94
 #define UNI_N_CFG_INTERNAL_STATUS	0x98
+#define UNI_N_CFG_GART_DUMMY_PAGE	0xa4
 
 /* UNI_N_CFG_GART_CTRL bits definitions */
-/* Not U3 */
 #define UNI_N_CFG_GART_INVAL		0x00000001
 #define UNI_N_CFG_GART_ENABLE		0x00000100
 #define UNI_N_CFG_GART_2xRESET		0x00010000
 #define UNI_N_CFG_GART_DISSBADET	0x00020000
+/* The following seems to only be used only on U3 <j.glisse@gmail.com> */
+#define U3_N_CFG_GART_SYNCMODE		0x00040000
+#define U3_N_CFG_GART_PERFRD		0x00080000
+#define U3_N_CFG_GART_B2BGNT		0x00200000
+#define U3_N_CFG_GART_FASTDDR		0x00400000
 
 /* My understanding of UniNorth AGP as of UniNorth rev 1.0x,
  * revision 1.5 (x4 AGP) may need further changes.

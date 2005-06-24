@@ -136,14 +136,29 @@ static inline void seeq_go(struct sgiseeq_private *sp,
 	hregs->rx_ctrl = HPC3_ERXCTRL_ACTIVE;
 }
 
-static inline void seeq_load_eaddr(struct net_device *dev,
-				   struct sgiseeq_regs *sregs)
+static inline void __sgiseeq_set_mac_address(struct net_device *dev)
 {
+	struct sgiseeq_private *sp = netdev_priv(dev);
+	struct sgiseeq_regs *sregs = sp->sregs;
 	int i;
 
 	sregs->tstat = SEEQ_TCMD_RB0;
 	for (i = 0; i < 6; i++)
 		sregs->rw.eth_addr[i] = dev->dev_addr[i];
+}
+
+static int sgiseeq_set_mac_address(struct net_device *dev, void *addr)
+{
+	struct sgiseeq_private *sp = netdev_priv(dev);
+	struct sockaddr *sa = addr;
+
+	memcpy(dev->dev_addr, sa->sa_data, dev->addr_len);
+
+	spin_lock_irq(&sp->tx_lock);
+	__sgiseeq_set_mac_address(dev);
+	spin_unlock_irq(&sp->tx_lock);
+
+	return 0;
 }
 
 #define TCNTINFO_INIT (HPCDMA_EOX | HPCDMA_ETXD)
@@ -159,13 +174,7 @@ static int seeq_init_ring(struct net_device *dev)
 	sp->rx_new = sp->tx_new = 0;
 	sp->rx_old = sp->tx_old = 0;
 
-	seeq_load_eaddr(dev, sp->sregs);
-
-	/* XXX for now just accept packets directly to us
-	 * XXX and ether-broadcast.  Will do multicast and
-	 * XXX promiscuous mode later. -davem
-	 */
-	sp->mode = SEEQ_RCMD_RBCAST;
+	__sgiseeq_set_mac_address(dev);
 
 	/* Setup tx ring. */
 	for(i = 0; i < SEEQ_TX_BUFFERS; i++) {
@@ -175,7 +184,7 @@ static int seeq_init_ring(struct net_device *dev)
 			buffer = (unsigned long) kmalloc(PKT_BUF_SZ, GFP_KERNEL);
 			if (!buffer)
 				return -ENOMEM;
-			sp->tx_desc[i].buf_vaddr = KSEG1ADDR(buffer);
+			sp->tx_desc[i].buf_vaddr = CKSEG1ADDR(buffer);
 			sp->tx_desc[i].tdma.pbuf = CPHYSADDR(buffer);
 		}
 		sp->tx_desc[i].tdma.cntinfo = TCNTINFO_INIT;
@@ -189,7 +198,7 @@ static int seeq_init_ring(struct net_device *dev)
 			buffer = (unsigned long) kmalloc(PKT_BUF_SZ, GFP_KERNEL);
 			if (!buffer)
 				return -ENOMEM;
-			sp->rx_desc[i].buf_vaddr = KSEG1ADDR(buffer);
+			sp->rx_desc[i].buf_vaddr = CKSEG1ADDR(buffer);
 			sp->rx_desc[i].rdma.pbuf = CPHYSADDR(buffer);
 		}
 		sp->rx_desc[i].rdma.cntinfo = RCNTINFO_INIT;
@@ -331,10 +340,17 @@ static inline void sgiseeq_rx(struct net_device *dev, struct sgiseeq_private *sp
 				/* Copy out of kseg1 to avoid silly cache flush. */
 				eth_copy_and_sum(skb, pkt_pointer + 2, len, 0);
 				skb->protocol = eth_type_trans(skb, dev);
-				netif_rx(skb);
-				dev->last_rx = jiffies;
-				sp->stats.rx_packets++;
-				sp->stats.rx_bytes += len;
+
+				/* We don't want to receive our own packets */
+				if (memcmp(eth_hdr(skb)->h_source, dev->dev_addr, ETH_ALEN)) {
+					netif_rx(skb);
+					dev->last_rx = jiffies;
+					sp->stats.rx_packets++;
+					sp->stats.rx_bytes += len;
+				} else {
+					/* Silently drop my own packets */
+					dev_kfree_skb_irq(skb);
+				}
 			} else {
 				printk (KERN_NOTICE "%s: Memory squeeze, deferring packet.\n",
 					dev->name);
@@ -373,7 +389,7 @@ static inline void kick_tx(struct sgiseeq_tx_desc *td,
 	 */
 	while ((td->tdma.cntinfo & (HPCDMA_XIU | HPCDMA_ETXD)) ==
 	      (HPCDMA_XIU | HPCDMA_ETXD))
-		td = (struct sgiseeq_tx_desc *)(long) KSEG1ADDR(td->tdma.pnext);
+		td = (struct sgiseeq_tx_desc *)(long) CKSEG1ADDR(td->tdma.pnext);
 	if (td->tdma.cntinfo & HPCDMA_XIU) {
 		hregs->tx_ndptr = CPHYSADDR(td);
 		hregs->tx_ctrl = HPC3_ETXCTRL_ACTIVE;
@@ -583,6 +599,22 @@ static struct net_device_stats *sgiseeq_get_stats(struct net_device *dev)
 
 static void sgiseeq_set_multicast(struct net_device *dev)
 {
+	struct sgiseeq_private *sp = (struct sgiseeq_private *) dev->priv;
+	unsigned char oldmode = sp->mode;
+
+	if(dev->flags & IFF_PROMISC)
+		sp->mode = SEEQ_RCMD_RANY;
+	else if ((dev->flags & IFF_ALLMULTI) || dev->mc_count)
+		sp->mode = SEEQ_RCMD_RBMCAST;
+	else
+		sp->mode = SEEQ_RCMD_RBCAST;
+
+	/* XXX I know this sucks, but is there a better way to reprogram
+	 * XXX the receiver? At least, this shouldn't happen too often.
+	 */
+
+	if (oldmode != sp->mode)
+		sgiseeq_reset(dev);
 }
 
 static inline void setup_tx_ring(struct sgiseeq_tx_desc *buf, int nbufs)
@@ -651,13 +683,14 @@ static int sgiseeq_init(struct hpc3_regs* regs, int irq)
 	sp->sregs = (struct sgiseeq_regs *) &hpc3c0->eth_ext[0];
 	sp->hregs = &hpc3c0->ethregs;
 	sp->name = sgiseeqstr;
+	sp->mode = SEEQ_RCMD_RBCAST;
 
 	sp->rx_desc = (struct sgiseeq_rx_desc *)
-	              KSEG1ADDR(ALIGNED(&sp->srings->rxvector[0]));
+	              CKSEG1ADDR(ALIGNED(&sp->srings->rxvector[0]));
 	dma_cache_wback_inv((unsigned long)&sp->srings->rxvector,
 	                    sizeof(sp->srings->rxvector));
 	sp->tx_desc = (struct sgiseeq_tx_desc *)
-	              KSEG1ADDR(ALIGNED(&sp->srings->txvector[0]));
+	              CKSEG1ADDR(ALIGNED(&sp->srings->txvector[0]));
 	dma_cache_wback_inv((unsigned long)&sp->srings->txvector,
 	                    sizeof(sp->srings->txvector));
 
@@ -681,6 +714,7 @@ static int sgiseeq_init(struct hpc3_regs* regs, int irq)
 	dev->watchdog_timeo	= (200 * HZ) / 1000;
 	dev->get_stats		= sgiseeq_get_stats;
 	dev->set_multicast_list	= sgiseeq_set_multicast;
+	dev->set_mac_address	= sgiseeq_set_mac_address;
 	dev->irq		= irq;
 
 	if (register_netdev(dev)) {

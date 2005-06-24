@@ -20,31 +20,31 @@
 #include <asm/io.h>
 #include <asm/time.h>
 
-#if MPC52xx_PF_CONSOLE_PORT == 0
-#define MPC52xx_CONSOLE		MPC52xx_PSC1
-#define MPC52xx_PSC_CONFIG_SHIFT	0
-#elif MPC52xx_PF_CONSOLE_PORT == 1
-#define MPC52xx_CONSOLE		MPC52xx_PSC2
-#define MPC52xx_PSC_CONFIG_SHIFT	4
-#elif MPC52xx_PF_CONSOLE_PORT == 2
-#define MPC52xx_CONSOLE		MPC52xx_PSC3
-#define MPC52xx_PSC_CONFIG_SHIFT	8
+
+#ifdef MPC52xx_PF_CONSOLE_PORT
+#define MPC52xx_CONSOLE MPC52xx_PSCx_OFFSET(MPC52xx_PF_CONSOLE_PORT)
+#define MPC52xx_PSC_CONFIG_SHIFT ((MPC52xx_PF_CONSOLE_PORT-1)<<2)
 #else
 #error "MPC52xx_PF_CONSOLE_PORT not defined"
 #endif
 
-static struct mpc52xx_psc *psc = (struct mpc52xx_psc *)MPC52xx_CONSOLE;
+static struct mpc52xx_psc __iomem *psc =
+	(struct mpc52xx_psc __iomem *) MPC52xx_PA(MPC52xx_CONSOLE);
 
 /* The decrementer counts at the system bus clock frequency
  * divided by four.  The most accurate time base is connected to the
- * rtc.  We read the decrementer change during one rtc tick (one second)
- * and multiply by 4 to get the system bus clock frequency.
+ * rtc.  We read the decrementer change during one rtc tick
+ * and multiply by 4 to get the system bus clock frequency. Since a
+ * rtc tick is one seconds, and that's pretty long, we change the rtc
+ * dividers temporarly to set them 64x faster ;)
  */
-int
+static int
 mpc52xx_ipbfreq(void)
 {
-	struct mpc52xx_rtc *rtc = (struct mpc52xx_rtc*)MPC52xx_RTC;
-	struct mpc52xx_cdm *cdm = (struct mpc52xx_cdm*)MPC52xx_CDM;
+	struct mpc52xx_rtc __iomem *rtc =
+		(struct mpc52xx_rtc __iomem *) MPC52xx_PA(MPC52xx_RTC_OFFSET);
+	struct mpc52xx_cdm __iomem *cdm =
+		(struct mpc52xx_cdm __iomem *) MPC52xx_PA(MPC52xx_CDM_OFFSET);
 	int current_time, previous_time;
 	int tbl_start, tbl_end;
 	int xlbfreq, ipbfreq;
@@ -67,7 +67,8 @@ mpc52xx_ipbfreq(void)
 unsigned long
 serial_init(int ignored, void *ignored2)
 {
-	struct mpc52xx_gpio *gpio = (struct mpc52xx_gpio *)MPC52xx_GPIO;
+	struct mpc52xx_gpio __iomem *gpio =
+		(struct mpc52xx_gpio __iomem *) MPC52xx_PA(MPC52xx_GPIO_OFFSET);
 	int divisor;
 	int mode1;
 	int mode2;
@@ -117,7 +118,7 @@ serial_init(int ignored, void *ignored2)
 void
 serial_putc(void *ignored, const char c)
 {
-	serial_init(0, 0);
+	serial_init(0, NULL);
 
 	while (!(in_be16(&psc->mpc52xx_psc_status) & MPC52xx_PSC_SR_TXEMP)) ;
 	out_8(&psc->mpc52xx_psc_buffer_8, c);

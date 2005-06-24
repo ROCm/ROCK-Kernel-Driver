@@ -6,12 +6,15 @@
  * This file is licensed under  the terms of the GNU General Public
  * License version 2. This program is licensed "as is" without any
  * warranty of any kind, whether express or implied.
+
+ * Modifications:
+ *     10-Mar-2005 LCVR  Changed S3C2410_VA to S3C24XX_VA
  */
 
 
 	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
 
-		mov	\tmp, #S3C2410_VA_IRQ
+		mov	\tmp, #S3C24XX_VA_IRQ
 		ldr	\irqnr, [ \tmp, #0x14 ]		@ get irq no
 30000:
 		teq	\irqnr, #4
@@ -45,7 +48,7 @@
 		.align	4
 20004:
 		mov	r1, #1
-		mov	\tmp, #S3C2410_VA_IRQ
+		mov	\tmp, #S3C24XX_VA_IRQ
 		ldmfd	r13!, { r0 - r4 , r8-r12, r14 }
 #endif
 
@@ -83,7 +86,7 @@
 
 		@ we get here from no main or external interrupts pending
 1002:
-		add	\tmp, \tmp, #S3C2410_VA_GPIO - S3C2410_VA_IRQ
+		add	\tmp, \tmp, #S3C24XX_VA_GPIO - S3C24XX_VA_IRQ
 		ldr	\irqstat, [ \tmp, # 0xa8 ]	@ EXTINTPEND
 		ldr	\irqnr, [ \tmp, # 0xa4 ]	@ EXTINTMASK
 

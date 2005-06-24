@@ -39,12 +39,17 @@ sh64_page_copy:
 	pta 3f, tr3
 	ptabs r18, tr0
 
+#if 0
+	/* TAKum03020 */
 	ld.q r2, 0x00, r63
 	ld.q r2, 0x20, r63
 	ld.q r2, 0x40, r63
 	ld.q r2, 0x60, r63
+#endif
 	alloco r3, 0x00
+	synco		! TAKum03020
 	alloco r3, 0x20
+	synco		! TAKum03020
 
 	movi 3968, r6
 	add  r3, r6, r6
@@ -60,11 +65,15 @@ sh64_page_copy:
    because they overlap with the time spent waiting for prefetches to
    complete. */
 1:
+#if 0
+	/* TAKum03020 */
 	bge/u r3, r6, tr2  ! skip prefetch for last 4 lines
 	ldx.q r3, r22, r63 ! prefetch 4 lines hence
+#endif
 2:
 	bge/u r3, r7, tr3  ! skip alloco for last 2 lines
 	alloco r3, 0x40    ! alloc destination line 2 lines ahead
+	synco		! TAKum03020
 3:
 	ldx.q r3, r60, r36
 	ldx.q r3, r61, r37

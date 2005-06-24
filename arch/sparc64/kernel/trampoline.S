@@ -15,6 +15,7 @@
 #include <asm/spitfire.h>
 #include <asm/processor.h>
 #include <asm/thread_info.h>
+#include <asm/mmu.h>
 
 	.data
 	.align	8
@@ -334,6 +335,20 @@ do_unlock:
 	call		init_irqwork_curcpu
 	 nop
 
+	BRANCH_IF_CHEETAH_PLUS_OR_FOLLOWON(g2,g3,1f)
+	ba,pt	%xcc, 2f
+	 nop
+
+1:	/* Start using proper page size encodings in ctx register.  */
+	sethi	%uhi(CTX_CHEETAH_PLUS_NUC), %g3
+	mov	PRIMARY_CONTEXT, %g1
+	sllx	%g3, 32, %g3
+	sethi	%hi(CTX_CHEETAH_PLUS_CTX0), %g2
+	or	%g3, %g2, %g3
+	stxa	%g3, [%g1] ASI_DMMU
+	membar	#Sync
+
+2:
 	rdpr		%pstate, %o1
 	or		%o1, PSTATE_IE, %o1
 	wrpr		%o1, 0, %pstate

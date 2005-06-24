@@ -16,6 +16,33 @@ config TIME_INTERPOLATION
 	bool
 	default y
 
+choice
+	prompt "Kernel page size"
+	default SPARC64_PAGE_SIZE_8KB
+
+config SPARC64_PAGE_SIZE_8KB
+	bool "8KB"
+	help
+	  This lets you select the page size of the kernel.
+
+	  8KB and 64KB work quite well, since Sparc ELF sections
+	  provide for up to 64KB alignment.
+
+	  Therefore, 512KB and 4MB are for expert hackers only.
+
+	  If you don't know what to do, choose 8KB.
+
+config SPARC64_PAGE_SIZE_64KB
+	bool "64KB"
+
+config SPARC64_PAGE_SIZE_512KB
+	bool "512KB"
+
+config SPARC64_PAGE_SIZE_4MB
+	bool "4MB"
+
+endchoice
+
 source "init/Kconfig"
 
 config SYSVIPC_COMPAT
@@ -91,6 +118,7 @@ config VT_CONSOLE
 
 config HW_CONSOLE
 	bool
+	depends on VT
 	default y
 
 config SMP
@@ -136,19 +164,10 @@ config NR_CPUS
 
 source "drivers/cpufreq/Kconfig"
 
-config CPU_FREQ_TABLE
-       tristate "CPU frequency table helpers"
-       depends on CPU_FREQ
-       default y
-       help
-         Many CPUFreq drivers use these helpers, so only say N here if
-	 the CPUFreq driver of your choice doesn't need these helpers.
-
-	 If in doubt, say Y.
-
 config US3_FREQ
 	tristate "UltraSPARC-III CPU Frequency driver"
-	depends on CPU_FREQ_TABLE
+	depends on CPU_FREQ
+	select CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for UltraSPARC-III processors.
 
@@ -158,7 +177,8 @@ config US3_FREQ
 
 config US2E_FREQ
 	tristate "UltraSPARC-IIe CPU Frequency driver"
-	depends on CPU_FREQ_TABLE
+	depends on CPU_FREQ
+	select CPU_FREQ_TABLE
 	help
 	  This adds the CPUFreq driver for UltraSPARC-IIe processors.
 
@@ -198,9 +218,11 @@ config HUGETLB_PAGE_SIZE_4MB
 	bool "4MB"
 
 config HUGETLB_PAGE_SIZE_512K
+	depends on !SPARC64_PAGE_SIZE_4MB
 	bool "512K"
 
 config HUGETLB_PAGE_SIZE_64K
+	depends on !SPARC64_PAGE_SIZE_4MB && !SPARC64_PAGE_SIZE_512K
 	bool "64K"
 
 endchoice

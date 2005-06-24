@@ -122,6 +122,7 @@ extern char *print_pci_hwpath(struct pci_dev *dev, char *path);
 extern void get_pci_node_path(struct pci_dev *dev, struct hardware_path *path);
 extern void init_parisc_bus(void);
 extern struct device *hwpath_to_device(struct hardware_path *modpath);
+extern void device_to_hwpath(struct device *dev, struct hardware_path *path);
 
 
 /* inventory.c: */

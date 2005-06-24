@@ -53,7 +53,7 @@ asmlinkage void sparc64_set_context(struct pt_regs *regs)
 	flush_user_windows();
 	if (get_thread_wsaved()					||
 	    (((unsigned long)ucp) & (sizeof(unsigned long)-1))	||
-	    (!__access_ok((unsigned long)ucp, sizeof(*ucp))))
+	    (!__access_ok(ucp, sizeof(*ucp))))
 		goto do_sigsegv;
 	grp  = &ucp->uc_mcontext.mc_gregs;
 	err  = __get_user(pc, &((*grp)[MC_PC]));

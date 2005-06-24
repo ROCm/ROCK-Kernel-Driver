@@ -22,7 +22,6 @@
 
 #include <linux/highmem.h>
 #include <linux/mempool.h>
-#include <linux/ioprio.h>
 
 /* Platforms may set this to teach the BIO layer about IOMMU hardware. */
 #include <asm/io.h>
@@ -60,6 +59,7 @@ struct bio_vec {
 	unsigned int	bv_offset;
 };
 
+struct bio_set;
 struct bio;
 typedef int (bio_end_io_t) (struct bio *, unsigned int, int);
 typedef void (bio_destructor_t) (struct bio *);
@@ -110,6 +110,7 @@ struct bio {
 	void			*bi_private;
 
 	bio_destructor_t	*bi_destructor;	/* destructor */
+	struct bio_set		*bi_set;	/* memory pools set */
 };
 
 /*
@@ -147,19 +148,6 @@ struct bio {
 #define BIO_RW_BARRIER	2
 #define BIO_RW_FAILFAST	3
 #define BIO_RW_SYNC	4
-
-/*
- * upper 16 bits of bi_rw define the io priority of this bio
- */
-#define BIO_PRIO_SHIFT	(8 * sizeof(unsigned long) - IOPRIO_BITS)
-#define bio_prio(bio)	((bio)->bi_rw >> BIO_PRIO_SHIFT)
-#define bio_prio_valid(bio)	ioprio_valid(bio_prio(bio))
-
-#define bio_set_prio(bio, prio)		do {			\
-	WARN_ON(prio >= (1 << IOPRIO_BITS));			\
-	(bio)->bi_rw &= ((1UL << BIO_PRIO_SHIFT) - 1);		\
-	(bio)->bi_rw |= ((unsigned long) (prio) << BIO_PRIO_SHIFT);	\
-} while (0)
 
 /*
  * various member access, note that bio_data should of course not be used
@@ -272,7 +260,11 @@ extern struct bio_pair *bio_split(struct bio *bi, mempool_t *pool,
 extern mempool_t *bio_split_pool;
 extern void bio_pair_release(struct bio_pair *dbio);
 
-extern struct bio *bio_alloc(int, int);
+extern struct bio_set *bioset_create(int, int, int);
+extern void bioset_free(struct bio_set *);
+
+extern struct bio *bio_alloc(unsigned int __nocast, int);
+extern struct bio *bio_alloc_bioset(unsigned int __nocast, int, struct bio_set *);
 extern void bio_put(struct bio *);
 
 extern void bio_endio(struct bio *, unsigned int, int);
@@ -281,7 +273,7 @@ extern int bio_phys_segments(struct request_queue *, struct bio *);
 extern int bio_hw_segments(struct request_queue *, struct bio *);
 
 extern void __bio_clone(struct bio *, struct bio *);
-extern struct bio *bio_clone(struct bio *, int);
+extern struct bio *bio_clone(struct bio *, unsigned int __nocast);
 
 extern void bio_init(struct bio *);
 
@@ -294,6 +286,7 @@ extern void bio_set_pages_dirty(struct bio *bio);
 extern void bio_check_pages_dirty(struct bio *bio);
 extern struct bio *bio_copy_user(struct request_queue *, unsigned long, unsigned int, int);
 extern int bio_uncopy_user(struct bio *);
+void zero_fill_bio(struct bio *bio);
 
 #ifdef CONFIG_HIGHMEM
 /*

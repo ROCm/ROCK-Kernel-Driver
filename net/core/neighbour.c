@@ -1430,6 +1430,7 @@ int neigh_delete(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 
 	read_lock(&neigh_tbl_lock);
 	for (tbl = neigh_tables; tbl; tbl = tbl->next) {
+		struct rtattr *dst_attr = nda[NDA_DST - 1];
 		struct neighbour *n;
 
 		if (tbl->family != ndm->ndm_family)
@@ -1437,20 +1438,18 @@ int neigh_delete(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		read_unlock(&neigh_tbl_lock);
 
 		err = -EINVAL;
-		if (!nda[NDA_DST - 1] ||
-		    nda[NDA_DST - 1]->rta_len != RTA_LENGTH(tbl->key_len))
+		if (!dst_attr || RTA_PAYLOAD(dst_attr) < tbl->key_len)
 			goto out_dev_put;
 
 		if (ndm->ndm_flags & NTF_PROXY) {
-			err = pneigh_delete(tbl,
-					    RTA_DATA(nda[NDA_DST - 1]), dev);
+			err = pneigh_delete(tbl, RTA_DATA(dst_attr), dev);
 			goto out_dev_put;
 		}
 
 		if (!dev)
 			goto out;
 
-		n = neigh_lookup(tbl, RTA_DATA(nda[NDA_DST - 1]), dev);
+		n = neigh_lookup(tbl, RTA_DATA(dst_attr), dev);
 		if (n) {
 			err = neigh_update(n, NULL, NUD_FAILED, 
 					   NEIGH_UPDATE_F_OVERRIDE|
@@ -1482,6 +1481,8 @@ int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 
 	read_lock(&neigh_tbl_lock);
 	for (tbl = neigh_tables; tbl; tbl = tbl->next) {
+		struct rtattr *lladdr_attr = nda[NDA_LLADDR - 1];
+		struct rtattr *dst_attr = nda[NDA_DST - 1];
 		int override = 1;
 		struct neighbour *n;
 
@@ -1490,48 +1491,49 @@ int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		read_unlock(&neigh_tbl_lock);
 
 		err = -EINVAL;
-		if (!nda[NDA_DST - 1] ||
-		    nda[NDA_DST - 1]->rta_len != RTA_LENGTH(tbl->key_len))
+		if (!dst_attr || RTA_PAYLOAD(dst_attr) < tbl->key_len)
 			goto out_dev_put;
+
 		if (ndm->ndm_flags & NTF_PROXY) {
 			err = -ENOBUFS;
-			if (pneigh_lookup(tbl,
-					  RTA_DATA(nda[NDA_DST - 1]), dev, 1))
+			if (pneigh_lookup(tbl, RTA_DATA(dst_attr), dev, 1))
 				err = 0;
 			goto out_dev_put;
 		}
+
 		err = -EINVAL;
 		if (!dev)
 			goto out;
-		if (nda[NDA_LLADDR - 1] &&
-		    nda[NDA_LLADDR - 1]->rta_len != RTA_LENGTH(dev->addr_len))
+		if (lladdr_attr && RTA_PAYLOAD(lladdr_attr) < dev->addr_len)
 			goto out_dev_put;
-		err = 0;
-		n = neigh_lookup(tbl, RTA_DATA(nda[NDA_DST - 1]), dev);
+	
+		n = neigh_lookup(tbl, RTA_DATA(dst_attr), dev);
 		if (n) {
-			if (nlh->nlmsg_flags & NLM_F_EXCL)
+			if (nlh->nlmsg_flags & NLM_F_EXCL) {
 				err = -EEXIST;
+				neigh_release(n);
+				goto out_dev_put;
+			}
+			
 			override = nlh->nlmsg_flags & NLM_F_REPLACE;
-		} else if (!(nlh->nlmsg_flags & NLM_F_CREATE))
+		} else if (!(nlh->nlmsg_flags & NLM_F_CREATE)) {
 			err = -ENOENT;
-		else {
-			n = __neigh_lookup_errno(tbl, RTA_DATA(nda[NDA_DST - 1]),
-						 dev);
+			goto out_dev_put;
+		} else {
+			n = __neigh_lookup_errno(tbl, RTA_DATA(dst_attr), dev);
 			if (IS_ERR(n)) {
 				err = PTR_ERR(n);
-				n = NULL;
+				goto out_dev_put;
 			}
 		}
-		if (!err) {
-			err = neigh_update(n, nda[NDA_LLADDR - 1] ?
-						RTA_DATA(nda[NDA_LLADDR - 1]) :
-						NULL,
-					   ndm->ndm_state,
-					   (override ? NEIGH_UPDATE_F_OVERRIDE : 0) |
-					   NEIGH_UPDATE_F_ADMIN);
-		}
-		if (n)
-			neigh_release(n);
+
+		err = neigh_update(n,
+				   lladdr_attr ? RTA_DATA(lladdr_attr) : NULL,
+				   ndm->ndm_state,
+				   (override ? NEIGH_UPDATE_F_OVERRIDE : 0) |
+				   NEIGH_UPDATE_F_ADMIN);
+
+		neigh_release(n);
 		goto out_dev_put;
 	}
 
@@ -1552,6 +1554,7 @@ static int neigh_fill_info(struct sk_buff *skb, struct neighbour *n,
 	unsigned char *b = skb->tail;
 	struct nda_cacheinfo ci;
 	int locked = 0;
+	u32 probes;
 	struct nlmsghdr *nlh = NLMSG_PUT(skb, pid, seq, event,
 					 sizeof(struct ndmsg));
 	struct ndmsg *ndm = NLMSG_DATA(nlh);
@@ -1571,9 +1574,11 @@ static int neigh_fill_info(struct sk_buff *skb, struct neighbour *n,
 	ci.ndm_confirmed = now - n->confirmed;
 	ci.ndm_updated	 = now - n->updated;
 	ci.ndm_refcnt	 = atomic_read(&n->refcnt) - 1;
+	probes = atomic_read(&n->probes);
 	read_unlock_bh(&n->lock);
 	locked		 = 0;
 	RTA_PUT(skb, NDA_CACHEINFO, sizeof(ci), &ci);
+	RTA_PUT(skb, NDA_PROBES, sizeof(probes), &probes);
 	nlh->nlmsg_len	 = skb->tail - b;
 	return skb->len;
 
@@ -1948,7 +1953,7 @@ static int neigh_stat_seq_show(struct seq_file *seq, void *v)
 	struct neigh_statistics *st = v;
 
 	if (v == SEQ_START_TOKEN) {
-		seq_printf(seq, "entries  allocs destroys hash_grows  lookups hits  res_failed  rcv_probes_mcast rcv_probes_ucast  periodic_gc_runs forced_gc_runs forced_gc_goal_miss\n");
+		seq_printf(seq, "entries  allocs destroys hash_grows  lookups hits  res_failed  rcv_probes_mcast rcv_probes_ucast  periodic_gc_runs forced_gc_runs\n");
 		return 0;
 	}
 
@@ -2047,7 +2052,7 @@ static void neigh_app_notify(struct neighbour *n)
 
 static struct neigh_sysctl_table {
 	struct ctl_table_header *sysctl_header;
-	ctl_table		neigh_vars[17];
+	ctl_table		neigh_vars[__NET_NEIGH_MAX];
 	ctl_table		neigh_dev[2];
 	ctl_table		neigh_neigh_dir[2];
 	ctl_table		neigh_proto_dir[2];
@@ -2170,6 +2175,22 @@ static struct neigh_sysctl_table {
 			.mode		= 0644,
 			.proc_handler	= &proc_dointvec,
 		},
+		{
+			.ctl_name	= NET_NEIGH_RETRANS_TIME_MS,
+			.procname	= "retrans_time_ms",
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &proc_dointvec_ms_jiffies,
+			.strategy	= &sysctl_ms_jiffies,
+		},
+		{
+			.ctl_name	= NET_NEIGH_REACHABLE_TIME_MS,
+			.procname	= "base_reachable_time_ms",
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &proc_dointvec_ms_jiffies,
+			.strategy	= &sysctl_ms_jiffies,
+		},
 	},
 	.neigh_dev = {
 		{
@@ -2200,7 +2221,7 @@ static struct neigh_sysctl_table {
 
 int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 			  int p_id, int pdev_id, char *p_name, 
-			  proc_handler *handler)
+			  proc_handler *handler, ctl_handler *strategy)
 {
 	struct neigh_sysctl_table *t = kmalloc(sizeof(*t), GFP_KERNEL);
 	const char *dev_name_source = NULL;
@@ -2214,10 +2235,6 @@ int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 	t->neigh_vars[1].data  = &p->ucast_probes;
 	t->neigh_vars[2].data  = &p->app_probes;
 	t->neigh_vars[3].data  = &p->retrans_time;
-	if (handler) {
-		t->neigh_vars[3].proc_handler = handler;
-		t->neigh_vars[3].extra1 = dev;
-	}
 	t->neigh_vars[4].data  = &p->base_reachable_time;
 	t->neigh_vars[5].data  = &p->delay_probe_time;
 	t->neigh_vars[6].data  = &p->gc_staletime;
@@ -2227,16 +2244,41 @@ int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 	t->neigh_vars[10].data = &p->proxy_delay;
 	t->neigh_vars[11].data = &p->locktime;
 
- 	dev_name_source = t->neigh_dev[0].procname;
 	if (dev) {
 		dev_name_source = dev->name;
 		t->neigh_dev[0].ctl_name = dev->ifindex;
-		memset(&t->neigh_vars[12], 0, sizeof(ctl_table));
+		t->neigh_vars[12].procname = NULL;
+		t->neigh_vars[13].procname = NULL;
+		t->neigh_vars[14].procname = NULL;
+		t->neigh_vars[15].procname = NULL;
 	} else {
+ 		dev_name_source = t->neigh_dev[0].procname;
 		t->neigh_vars[12].data = (int *)(p + 1);
 		t->neigh_vars[13].data = (int *)(p + 1) + 1;
 		t->neigh_vars[14].data = (int *)(p + 1) + 2;
 		t->neigh_vars[15].data = (int *)(p + 1) + 3;
+	}
+
+	t->neigh_vars[16].data  = &p->retrans_time;
+	t->neigh_vars[17].data  = &p->base_reachable_time;
+
+	if (handler || strategy) {
+		/* RetransTime */
+		t->neigh_vars[3].proc_handler = handler;
+		t->neigh_vars[3].strategy = strategy;
+		t->neigh_vars[3].extra1 = dev;
+		/* ReachableTime */
+		t->neigh_vars[4].proc_handler = handler;
+		t->neigh_vars[4].strategy = strategy;
+		t->neigh_vars[4].extra1 = dev;
+		/* RetransTime (in milliseconds)*/
+		t->neigh_vars[16].proc_handler = handler;
+		t->neigh_vars[16].strategy = strategy;
+		t->neigh_vars[16].extra1 = dev;
+		/* ReachableTime (in milliseconds) */
+		t->neigh_vars[17].proc_handler = handler;
+		t->neigh_vars[17].strategy = strategy;
+		t->neigh_vars[17].extra1 = dev;
 	}
 
 	dev_name = net_sysctl_strdup(dev_name_source);

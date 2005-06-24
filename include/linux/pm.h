@@ -116,11 +116,6 @@ void __deprecated pm_unregister(struct pm_dev *dev);
 void __deprecated pm_unregister_all(pm_callback callback);
 
 /*
- * Send a request to a single device
- */
-int __deprecated pm_send(struct pm_dev *dev, pm_request_t rqst, void *data);
-
-/*
  * Send a request to all devices
  */
 int __deprecated pm_send_all(pm_request_t rqst, void *data);
@@ -139,11 +134,6 @@ static inline struct pm_dev *pm_register(pm_dev_t type,
 static inline void pm_unregister(struct pm_dev *dev) {}
 
 static inline void pm_unregister_all(pm_callback callback) {}
-
-static inline int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data)
-{
-	return 0;
-}
 
 static inline int pm_send_all(pm_request_t rqst, void *data)
 {

@@ -200,7 +200,7 @@ static int msb_index (__u16 word)
 	 * able to check precisely what's going on. If a end user sees this,
 	 * it's very likely the peer. - Jean II */
 	if (word == 0) {
-		WARNING("%s(), Detected buggy peer, adjust null PV to 0x1!\n",
+		IRDA_WARNING("%s(), Detected buggy peer, adjust null PV to 0x1!\n",
 			 __FUNCTION__);
 		/* The only safe choice (we don't know the array size) */
 		word = 0x1;
@@ -278,8 +278,8 @@ static inline int value_highest_bit(__u32 value, __u32 *array, int size, __u16 *
  */
 void irda_qos_compute_intersection(struct qos_info *qos, struct qos_info *new)
 {
-	ASSERT(qos != NULL, return;);
-	ASSERT(new != NULL, return;);
+	IRDA_ASSERT(qos != NULL, return;);
+	IRDA_ASSERT(new != NULL, return;);
 
 	/* Apply */
 	qos->baud_rate.bits       &= new->baud_rate.bits;
@@ -351,7 +351,7 @@ static void irlap_adjust_qos_settings(struct qos_info *qos)
 	if (sysctl_min_tx_turn_time > qos->min_turn_time.value) {
 		int i;
 
-		WARNING("%s(), Detected buggy peer, adjust mtt to %dus!\n",
+		IRDA_WARNING("%s(), Detected buggy peer, adjust mtt to %dus!\n",
 			 __FUNCTION__, sysctl_min_tx_turn_time);
 
 		/* We don't really need bits, but easier this way */
@@ -390,7 +390,7 @@ static void irlap_adjust_qos_settings(struct qos_info *qos)
 	}
 #else /* Use method described in section 6.6.11 of IrLAP */
 	while (irlap_requested_line_capacity(qos) > line_capacity) {
-		ASSERT(index != 0, return;);
+		IRDA_ASSERT(index != 0, return;);
 
 		/* Must be able to send at least one frame */
 		if (qos->window_size.value > 1) {
@@ -402,8 +402,8 @@ static void irlap_adjust_qos_settings(struct qos_info *qos)
 			IRDA_DEBUG(2, "%s(), reducing data size to %d\n",
 				   __FUNCTION__, qos->data_size.value);
 		} else {
-			WARNING("%s(), nothing more we can do!\n",
-				__FUNCTION__);
+			IRDA_WARNING("%s(), nothing more we can do!\n",
+				     __FUNCTION__);
 		}
 	}
 #endif /* CONFIG_IRDA_DYNAMIC_WINDOW */
@@ -532,8 +532,8 @@ static int irlap_param_baud_rate(void *instance, irda_param_t *param, int get)
 
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == LAP_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	if (get) {
 		param->pv.i = self->qos_rx.baud_rate.bits;
@@ -568,8 +568,8 @@ static int irlap_param_link_disconnect(void *instance, irda_param_t *param,
 	
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 	
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == LAP_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 	
 	if (get)
 		param->pv.i = self->qos_rx.link_disc_time.bits;
@@ -600,8 +600,8 @@ static int irlap_param_max_turn_time(void *instance, irda_param_t *param,
 {
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 	
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == LAP_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 	
 	if (get)
 		param->pv.i = self->qos_rx.max_turn_time.bits;
@@ -622,8 +622,8 @@ static int irlap_param_data_size(void *instance, irda_param_t *param, int get)
 {
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 	
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == LAP_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 	
 	if (get)
 		param->pv.i = self->qos_rx.data_size.bits;
@@ -645,8 +645,8 @@ static int irlap_param_window_size(void *instance, irda_param_t *param,
 {
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 	
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == LAP_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 	
 	if (get)
 		param->pv.i = self->qos_rx.window_size.bits;
@@ -666,8 +666,8 @@ static int irlap_param_additional_bofs(void *instance, irda_param_t *param, int 
 {
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 	
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == LAP_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 	
 	if (get)
 		param->pv.i = self->qos_rx.additional_bofs.bits;
@@ -688,8 +688,8 @@ static int irlap_param_min_turn_time(void *instance, irda_param_t *param,
 {
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 	
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == LAP_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 	
 	if (get)
 		param->pv.i = self->qos_rx.min_turn_time.bits;
@@ -716,8 +716,8 @@ __u32 irlap_max_line_capacity(__u32 speed, __u32 max_turn_time)
 	i = value_index(speed, baud_rates, 10);
 	j = value_index(max_turn_time, max_turn_times, 4);
 
-	ASSERT(((i >=0) && (i <10)), return 0;);
-	ASSERT(((j >=0) && (j <4)), return 0;);
+	IRDA_ASSERT(((i >=0) && (i <10)), return 0;);
+	IRDA_ASSERT(((j >=0) && (j <4)), return 0;);
 
 	line_capacity = max_line_capacities[i][j];
 
@@ -748,7 +748,7 @@ void irda_qos_bits_to_value(struct qos_info *qos)
 {
 	int index;
 
-	ASSERT(qos != NULL, return;);
+	IRDA_ASSERT(qos != NULL, return;);
 	
 	index = msb_index(qos->baud_rate.bits);
 	qos->baud_rate.value = baud_rates[index];

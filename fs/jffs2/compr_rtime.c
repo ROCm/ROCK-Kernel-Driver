@@ -29,8 +29,10 @@
 #include "compr.h"
 
 /* _compress returns the compressed size, -1 if bigger */
-int jffs2_rtime_compress(unsigned char *data_in, unsigned char *cpage_out, 
-		   uint32_t *sourcelen, uint32_t *dstlen, void *model)
+static int jffs2_rtime_compress(unsigned char *data_in,
+				unsigned char *cpage_out,
+				uint32_t *sourcelen, uint32_t *dstlen,
+				void *model)
 {
 	short positions[256];
 	int outpos = 0;
@@ -69,8 +71,10 @@ int jffs2_rtime_compress(unsigned char *data_in, unsigned char *cpage_out,
 }		   
 
 
-int jffs2_rtime_decompress(unsigned char *data_in, unsigned char *cpage_out,
-		      uint32_t srclen, uint32_t destlen, void *model)
+static int jffs2_rtime_decompress(unsigned char *data_in,
+				  unsigned char *cpage_out,
+				  uint32_t srclen, uint32_t destlen,
+				  void *model)
 {
 	short positions[256];
 	int outpos = 0;

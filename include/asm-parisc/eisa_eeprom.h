@@ -13,6 +13,8 @@
 #ifndef ASM_EISA_EEPROM_H
 #define ASM_EISA_EEPROM_H
 
+extern void __iomem *eisa_eeprom_addr;
+
 #define HPEE_MAX_LENGTH       0x2000	/* maximum eeprom length */
 
 #define HPEE_SLOT_INFO(slot) (20+(48*slot))

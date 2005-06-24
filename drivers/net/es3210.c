@@ -159,6 +159,7 @@ static void cleanup_card(struct net_device *dev)
 {
 	free_irq(dev->irq, dev);
 	release_region(dev->base_addr, ES_IO_EXTENT);
+	iounmap(ei_status.mem);
 }
 
 #ifndef MODULE
@@ -271,9 +272,14 @@ static int __init es_probe1(struct net_device *dev, int ioaddr)
 		printk(" assigning ");
 	}
 
-	dev->mem_end = ei_status.rmem_end = dev->mem_start
-		+ (ES_STOP_PG - ES_START_PG)*256;
-	ei_status.rmem_start = dev->mem_start + TX_PAGES*256;
+	ei_status.mem = ioremap(dev->mem_start, (ES_STOP_PG - ES_START_PG)*256);
+	if (!ei_status.mem) {
+		printk("ioremap failed - giving up\n");
+		retval = -ENXIO;
+		goto out1;
+	}
+
+	dev->mem_end = dev->mem_start + (ES_STOP_PG - ES_START_PG)*256;
 
 	printk("mem %#lx-%#lx\n", dev->mem_start, dev->mem_end-1);
 
@@ -353,8 +359,8 @@ static void es_reset_8390(struct net_device *dev)
 static void
 es_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_page)
 {
-	unsigned long hdr_start = dev->mem_start + ((ring_page - ES_START_PG)<<8);
-	isa_memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
+	void __iomem *hdr_start = ei_status.mem + ((ring_page - ES_START_PG)<<8);
+	memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
 	hdr->count = (hdr->count + 3) & ~3;     /* Round up allocation. */
 }
 
@@ -367,27 +373,27 @@ es_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_page
 static void es_block_input(struct net_device *dev, int count, struct sk_buff *skb,
 						  int ring_offset)
 {
-	unsigned long xfer_start = dev->mem_start + ring_offset - (ES_START_PG<<8);
+	void __iomem *xfer_start = ei_status.mem + ring_offset - ES_START_PG*256;
 
-	if (xfer_start + count > ei_status.rmem_end) {
+	if (ring_offset + count > ES_STOP_PG*256) {
 		/* Packet wraps over end of ring buffer. */
-		int semi_count = ei_status.rmem_end - xfer_start;
-		isa_memcpy_fromio(skb->data, xfer_start, semi_count);
+		int semi_count = ES_STOP_PG*256 - ring_offset;
+		memcpy_fromio(skb->data, xfer_start, semi_count);
 		count -= semi_count;
-		isa_memcpy_fromio(skb->data + semi_count, ei_status.rmem_start, count);
+		memcpy_fromio(skb->data + semi_count, ei_status.mem, count);
 	} else {
 		/* Packet is in one chunk. */
-		isa_eth_io_copy_and_sum(skb, xfer_start, count, 0);
+		eth_io_copy_and_sum(skb, xfer_start, count, 0);
 	}
 }
 
 static void es_block_output(struct net_device *dev, int count,
 				const unsigned char *buf, int start_page)
 {
-	unsigned long shmem = dev->mem_start + ((start_page - ES_START_PG)<<8);
+	void __iomem *shmem = ei_status.mem + ((start_page - ES_START_PG)<<8);
 
 	count = (count + 3) & ~3;     /* Round up to doubleword */
-	isa_memcpy_toio(shmem, buf, count);
+	memcpy_toio(shmem, buf, count);
 }
 
 static int es_open(struct net_device *dev)

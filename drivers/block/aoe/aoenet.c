@@ -7,6 +7,7 @@
 #include <linux/hdreg.h>
 #include <linux/blkdev.h>
 #include <linux/netdevice.h>
+#include <linux/moduleparam.h>
 #include "aoe.h"
 
 #define NECODES 5
@@ -26,6 +27,19 @@ enum {
 };
 
 static char aoe_iflist[IFLISTSZ];
+module_param_string(aoe_iflist, aoe_iflist, IFLISTSZ, 0600);
+MODULE_PARM_DESC(aoe_iflist, "aoe_iflist=\"dev1 [dev2 ...]\"\n");
+
+#ifndef MODULE
+static int __init aoe_iflist_setup(char *str)
+{
+	strncpy(aoe_iflist, str, IFLISTSZ);
+	aoe_iflist[IFLISTSZ - 1] = '\0';
+	return 1;
+}
+
+__setup("aoe_iflist=", aoe_iflist_setup);
+#endif
 
 int
 is_aoe_netif(struct net_device *ifp)
@@ -36,7 +50,8 @@ is_aoe_netif(struct net_device *ifp)
 	if (aoe_iflist[0] == '\0')
 		return 1;
 
-	for (p = aoe_iflist; *p; p = q + strspn(q, WHITESPACE)) {
+	p = aoe_iflist + strspn(aoe_iflist, WHITESPACE);
+	for (; *p; p = q + strspn(q, WHITESPACE)) {
 		q = p + strcspn(p, WHITESPACE);
 		if (q != p)
 			len = q - p;
@@ -69,7 +84,7 @@ set_aoe_iflist(const char __user *user_str, size_t size)
 u64
 mac_addr(char addr[6])
 {
-	u64 n = 0;
+	__be64 n = 0;
 	char *p = (char *) &n;
 
 	memcpy(p + 2, addr, 6);	/* (sizeof addr != 6) */
@@ -108,7 +123,7 @@ static int
 aoenet_rcv(struct sk_buff *skb, struct net_device *ifp, struct packet_type *pt)
 {
 	struct aoe_hdr *h;
-	ulong n;
+	u32 n;
 
 	skb = skb_check(skb);
 	if (!skb)
@@ -121,7 +136,7 @@ aoenet_rcv(struct sk_buff *skb, struct net_device *ifp, struct packet_type *pt)
 	skb_push(skb, ETH_HLEN);	/* (1) */
 
 	h = (struct aoe_hdr *) skb->mac.raw;
-	n = __be32_to_cpu(*((u32 *) h->tag));
+	n = be32_to_cpu(h->tag);
 	if ((h->verfl & AOEFL_RSP) == 0 || (n & 1<<31))
 		goto exit;
 
@@ -132,7 +147,7 @@ aoenet_rcv(struct sk_buff *skb, struct net_device *ifp, struct packet_type *pt)
 		if (net_ratelimit())
 			printk(KERN_ERR "aoe: aoenet_rcv: error packet from %d.%d; "
 			       "ecode=%d '%s'\n",
-			       __be16_to_cpu(*((u16 *) h->major)), h->minor, 
+			       be16_to_cpu(h->major), h->minor, 
 			       h->err, aoe_errlist[n]);
 		goto exit;
 	}

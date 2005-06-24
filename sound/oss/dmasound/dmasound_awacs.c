@@ -2987,10 +2987,13 @@ printk("dmasound_pmac: Awacs/Screamer Codec Mfct: %d Rev %d\n", mfg, rev);
 
 	set_hw_byteswap(io) ; /* figure out if the h/w can do it */
 
-	/* get default volume from nvram
-	 * vol = (~nvram_read_byte(0x1308) & 7) << 1;
-	*/
+#ifdef CONFIG_NVRAM
+	/* get default volume from nvram */
 	vol = ((pmac_xpram_read( 8 ) & 7 ) << 1 );
+#else
+	vol = 0;
+#endif
+
 	/* set up tracking values */
 	spk_vol = vol * 100 ;
 	spk_vol /= 7 ; /* get set value to a percentage */

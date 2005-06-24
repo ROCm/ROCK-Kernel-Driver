@@ -65,23 +65,6 @@ static inline int adfs_readname(char *buf, char *ptr, int maxlen)
 	return buf - old_buf;
 }
 
-static inline void adfs_writename(char *to, char *from, int maxlen)
-{
-	int i;
-
-	for (i = 0; i < maxlen; i++) {
-		if (from[i] == '\0')
-			break;
-		if (from[i] == '.')
-			to[i] = '/';
-		else
-			to[i] = from[i];
-	}
-
-	for (; i < maxlen; i++)
-		to[i] = '\0';
-}
-
 #define ror13(v) ((v >> 13) | (v << 19))
 
 #define dir_u8(idx)				\

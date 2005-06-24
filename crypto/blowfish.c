@@ -349,8 +349,8 @@ static void encrypt_block(struct bf_ctx *bctx, u32 *dst, u32 *src)
 
 static void bf_encrypt(void *ctx, u8 *dst, const u8 *src)
 {
-	const u32 *in_blk = (const u32 *)src;
-	u32 *const out_blk = (u32 *)dst;
+	const __be32 *in_blk = (const __be32 *)src;
+	__be32 *const out_blk = (__be32 *)dst;
 	u32 in32[2], out32[2];
 
 	in32[0] = be32_to_cpu(in_blk[0]);
@@ -362,8 +362,8 @@ static void bf_encrypt(void *ctx, u8 *dst, const u8 *src)
 
 static void bf_decrypt(void *ctx, u8 *dst, const u8 *src)
 {
-	const u32 *in_blk = (const u32 *)src;
-	u32 *const out_blk = (u32 *)dst;
+	const __be32 *in_blk = (const __be32 *)src;
+	__be32 *const out_blk = (__be32 *)dst;
 	const u32 *P = ((struct bf_ctx *)ctx)->p;
 	const u32 *S = ((struct bf_ctx *)ctx)->s;
 	u32 yl = be32_to_cpu(in_blk[0]);

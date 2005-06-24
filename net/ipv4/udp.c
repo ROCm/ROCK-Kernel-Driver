@@ -7,7 +7,7 @@
  *
  * Version:	$Id: udp.c,v 1.102 2002/02/01 22:01:04 davem Exp $
  *
- * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
+ * Authors:	Ross Biro
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *		Arnt Gulbrandsen, <agulbra@nvg.unit.no>
  *		Alan Cox, <Alan.Cox@linux.org>
@@ -574,7 +574,8 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		connected = 0;
 	}
 	tos = RT_TOS(inet->tos);
-	if (sk->sk_localroute || (msg->msg_flags & MSG_DONTROUTE) || 
+	if (sock_flag(sk, SOCK_LOCALROUTE) ||
+	    (msg->msg_flags & MSG_DONTROUTE) || 
 	    (ipc.opt && ipc.opt->is_strictroute)) {
 		tos |= RTO_ONLINK;
 		connected = 0;
@@ -954,6 +955,8 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 	 * header and optional ESP marker bytes) and then modify the
 	 * protocol to ESP, and then call into the transform receiver.
 	 */
+	if (skb_cloned(skb) && pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
+		return 0;
 
 	/* Now we can update and verify the packet length... */
 	iph = skb->nh.iph;
@@ -997,7 +1000,6 @@ static int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 		kfree_skb(skb);
 		return -1;
 	}
-	nf_reset(skb);
 
 	if (up->encap_type) {
 		/*
@@ -1163,7 +1165,6 @@ int udp_rcv(struct sk_buff *skb)
 
 	if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb))
 		goto drop;
-	nf_reset(skb);
 
 	/* No socket. Drop packet silently, if checksum is wrong */
 	if (udp_checksum_complete(skb))
@@ -1372,7 +1373,7 @@ struct proto udp_prot = {
 	.hash =		udp_v4_hash,
 	.unhash =	udp_v4_unhash,
 	.get_port =	udp_v4_get_port,
-	.slab_obj_size = sizeof(struct udp_sock),
+	.obj_size =	sizeof(struct udp_sock),
 };
 
 /* ------------------------------------------------------------------------ */

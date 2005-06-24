@@ -50,7 +50,7 @@ warn(const char *fmt, ...)
 void *do_nofail(void *ptr, const char *expr)
 {
 	if (!ptr) {
-		fatal("Memory allocation failure: %s.\n", expr);
+		fatal("modpost: Memory allocation failure: %s.\n", expr);
 	}
 	return ptr;
 }

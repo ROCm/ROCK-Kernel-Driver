@@ -12,7 +12,6 @@
 #ifdef __KERNEL__
 #include <linux/time.h>
 #include <linux/list.h>
-#include <linux/device.h>
 #else
 #include <sys/time.h>
 #include <sys/ioctl.h>
@@ -328,6 +327,11 @@ struct input_absinfo {
 #define KEY_BRIGHTNESSDOWN	224
 #define KEY_BRIGHTNESSUP	225
 #define KEY_MEDIA		226
+
+#define KEY_SWITCHVIDEOMODE	227
+#define KEY_KBDILLUMTOGGLE	228
+#define KEY_KBDILLUMDOWN	229
+#define KEY_KBDILLUMUP		230
 
 #define KEY_UNKNOWN		240
 
@@ -856,7 +860,6 @@ struct input_dev {
 
 	struct input_handle *grab;
 	struct device *dev;
-	struct class_device cdev;
 
 	struct list_head	h_list;
 	struct list_head	node;

@@ -359,4 +359,18 @@ extern void dma_cache_inv(unsigned long start, unsigned long size);
 #endif
 
 #endif /* __KERNEL__ */
+
+#define __ARCH_HAS_NO_PAGE_ZERO_MAPPED		1
+
+/*
+ * Convert a physical pointer to a virtual kernel pointer for /dev/mem
+ * access
+ */
+#define xlate_dev_mem_ptr(p)	__va(p)
+
+/*
+ * Convert a virtual cached pointer to an uncached pointer
+ */
+#define xlate_dev_kmem_ptr(p)	p
+
 #endif /* _IO_H */

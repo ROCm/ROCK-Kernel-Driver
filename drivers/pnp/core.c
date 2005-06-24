@@ -18,7 +18,7 @@
 #include "base.h"
 
 
-LIST_HEAD(pnp_protocols);
+static LIST_HEAD(pnp_protocols);
 LIST_HEAD(pnp_global);
 DEFINE_SPINLOCK(pnp_lock);
 

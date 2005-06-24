@@ -59,28 +59,20 @@ extern struct task_struct *last_task_used_math;
 /*
  * User space process size: 2GB for 31 bit, 4TB for 64 bit.
  */
-#define TASK31_SIZE		(0x80000000UL)
-#define TASK64_SIZE		(0x40000000000UL)
-
 #ifndef __s390x__
 
-# define TASK_SIZE		TASK31_SIZE
-# define TASK_UNMAPPED_BASE	(current->map_base)
-# define __TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
-# define DEFAULT_TASK_SIZE	TASK31_SIZE
+# define TASK_SIZE		(0x80000000UL)
+# define TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
+# define DEFAULT_TASK_SIZE	(0x80000000UL)
 
 #else /* __s390x__ */
 
 # define TASK_SIZE		(test_thread_flag(TIF_31BIT) ? \
-					TASK31_SIZE : TASK64_SIZE)
-# define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_31BIT) ? \
-					(current->map_base) : (TASK64_SIZE / 2))
-# define __TASK_UNMAPPED_BASE	(TASK64_SIZE / 2)
-# define DEFAULT_TASK_SIZE	TASK64_SIZE
+					(0x80000000UL) : (0x40000000000UL))
+# define TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
+# define DEFAULT_TASK_SIZE	(0x40000000000UL)
 
 #endif /* __s390x__ */
-
-#define MM_VM_SIZE(mm)		DEFAULT_TASK_SIZE
 
 #define HAVE_ARCH_PICK_MMAP_LAYOUT
 

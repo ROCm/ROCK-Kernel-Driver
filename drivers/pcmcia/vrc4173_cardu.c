@@ -141,11 +141,6 @@ static int cardu_init(unsigned int slot)
 	return 0;
 }
 
-static int cardu_suspend(unsigned int slot)
-{
-	return -EINVAL;
-}
-
 static int cardu_register_callback(unsigned int sock,
                                            void (*handler)(void *, unsigned int),
                                            void * info)
@@ -433,7 +428,6 @@ static void cardu_proc_setup(unsigned int sock, struct proc_dir_entry *base)
 
 static struct pccard_operations cardu_operations = {
 	.init			= cardu_init,
-	.suspend		= cardu_suspend,
 	.register_callback	= cardu_register_callback,
 	.inquire_socket		= cardu_inquire_socket,
 	.get_status		= cardu_get_status,
@@ -620,3 +614,4 @@ static void __devexit vrc4173_cardu_exit(void)
 
 module_init(vrc4173_cardu_init);
 module_exit(vrc4173_cardu_exit);
+MODULE_DEVICE_TABLE(pci, vrc4173_cardu_id_table);

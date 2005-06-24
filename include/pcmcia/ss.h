@@ -203,6 +203,17 @@ struct pcmcia_socket {
 	u_char				pci_irq;
 	struct pci_dev *		cb_dev;
 
+
+	/* socket setup is done so resources should be able to be allocated. Only
+	 * if set to 1, calls to find_{io,mem}_region are handled, and insertion
+	 * events are actually managed by the PCMCIA layer.*/
+	u8				resource_setup_done:1;
+
+	/* is set to one if resource setup is done using adjust_resource_info() */
+	u8				resource_setup_old:1;
+
+	u8				reserved:6;
+
 	/* socket operations */
 	struct pccard_operations *	ops;
 	struct pccard_resource_ops *	resource_ops;
@@ -248,7 +259,7 @@ extern void pcmcia_unregister_socket(struct pcmcia_socket *socket);
 extern struct class pcmcia_socket_class;
 
 /* socket drivers are expected to use these callbacks in their .drv struct */
-extern int pcmcia_socket_dev_suspend(struct device *dev, u32 state);
+extern int pcmcia_socket_dev_suspend(struct device *dev, pm_message_t state);
 extern int pcmcia_socket_dev_resume(struct device *dev);
 
 #endif /* _LINUX_SS_H */

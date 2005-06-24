@@ -7,7 +7,7 @@
  *
  * Version:	@(#)Space.c	1.0.7	08/12/93
  *
- * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
+ * Authors:	Ross Biro
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *		Donald J. Becker, <becker@scyld.com>
  *
@@ -302,16 +302,6 @@ static struct devprobe2 m68k_probes[] __initdata = {
 	{NULL, 0},
 };
 
-static struct devprobe2 mips_probes[] __initdata = {
-#ifdef CONFIG_MIPS_JAZZ_SONIC
-	{sonic_probe, 0},
-#endif
-#ifdef CONFIG_BAGETLANCE        /* Lance-based Baget ethernet boards */
-        {bagetlance_probe, 0},
-#endif
-	{NULL, 0},
-};
-
 /*
  * Unified ethernet device probe, segmented per architecture and
  * per bus interface. This drives the legacy devices only for now.
@@ -325,7 +315,6 @@ static void __init ethif_probe2(int unit)
 		return;
 
 	(void)(	probe_list2(unit, m68k_probes, base_addr == 0) &&
-		probe_list2(unit, mips_probes, base_addr == 0) &&
 		probe_list2(unit, eisa_probes, base_addr == 0) &&
 		probe_list2(unit, mca_probes, base_addr == 0) &&
 		probe_list2(unit, isa_probes, base_addr == 0) &&

@@ -87,10 +87,10 @@ config USB_NET2280
 	default USB_GADGET
 
 config USB_GADGET_PXA2XX
-	boolean "PXA 2xx or IXP 4xx"
-	depends on ARCH_PXA || ARCH_IXP4XX
+	boolean "PXA 25x or IXP 4xx"
+	depends on (ARCH_PXA && PXA25x) || ARCH_IXP4XX
 	help
-	   Intel's PXA 2xx series XScale ARM-5TE processors include
+	   Intel's PXA 25x series XScale ARM-5TE processors include
 	   an integrated full speed USB 1.1 device controller.  The
 	   controller in the IXP 4xx series is register-compatible.
 
@@ -135,21 +135,6 @@ config USB_GOKU
 	depends on USB_GADGET_GOKU
 	default USB_GADGET
 
-# this could be built elsewhere (doesn't yet exist)
-config USB_GADGET_SA1100
-	boolean "SA 1100"
-	depends on ARCH_SA1100
-	help
-	   Intel's SA-1100 is an ARM-4 processor with an integrated
-	   full speed USB 1.1 device controller.
-
-	   It has two fixed-function endpoints, as well as endpoint
-	   zero (for control transfers).
-
-config USB_SA1100
-	tristate
-	depends on USB_GADGET_SA1100
-	default USB_GADGET
 
 config USB_GADGET_LH7A40X
 	boolean "LH7A40X"
@@ -161,6 +146,38 @@ config USB_LH7A40X
 	tristate
 	depends on USB_GADGET_LH7A40X
 	default USB_GADGET
+
+
+config USB_GADGET_OMAP
+	boolean "OMAP USB Device Controller"
+	depends on ARCH_OMAP
+	select ISP1301_OMAP if MACH_OMAP_H2 || MACH_OMAP_H3
+	help
+	   Many Texas Instruments OMAP processors have flexible full
+	   speed USB device controllers, with support for up to 30
+	   endpoints (plus endpoint zero).  This driver supports the
+	   controller in the OMAP 1611, and should work with controllers
+	   in other OMAP processors too, given minor tweaks.
+
+	   Say "y" to link the driver statically, or "m" to build a
+	   dynamically linked module called "omap_udc" and force all
+	   gadget drivers to also be dynamically linked.
+
+config USB_OMAP
+	tristate
+	depends on USB_GADGET_OMAP
+	default USB_GADGET
+
+config USB_OTG
+	boolean "OTG Support"
+	depends on USB_GADGET_OMAP && ARCH_OMAP_OTG && USB_OHCI_HCD
+	help
+	   The most notable feature of USB OTG is support for a
+	   "Dual-Role" device, which can act as either a device
+	   or a host.  The initial role choice can be changed
+	   later, when two dual-role devices talk to each other.
+
+	   Select this only if your OMAP board has a Mini-AB connector.
 
 
 config USB_GADGET_DUMMY_HCD
@@ -191,36 +208,8 @@ config USB_DUMMY_HCD
 	depends on USB_GADGET_DUMMY_HCD
 	default USB_GADGET
 
-config USB_GADGET_OMAP
-	boolean "OMAP USB Device Controller"
-	depends on ARCH_OMAP
-	select ISP1301_OMAP if MACH_OMAP_H2
-	help
-	   Many Texas Instruments OMAP processors have flexible full
-	   speed USB device controllers, with support for up to 30
-	   endpoints (plus endpoint zero).  This driver supports the
-	   controller in the OMAP 1611, and should work with controllers
-	   in other OMAP processors too, given minor tweaks.
-
-	   Say "y" to link the driver statically, or "m" to build a
-	   dynamically linked module called "omap_udc" and force all
-	   gadget drivers to also be dynamically linked.
-
-config USB_OMAP
-	tristate
-	depends on USB_GADGET_OMAP
-	default USB_GADGET
-
-config USB_OTG
-	boolean "OTG Support"
-	depends on USB_GADGET_OMAP && ARCH_OMAP_OTG && USB_OHCI_HCD
-	help
-	   The most notable feature of USB OTG is support for a
-	   "Dual-Role" device, which can act as either a device
-	   or a host.  The initial role choice can be changed
-	   later, when two dual-role devices talk to each other.
-
-	   Select this only if your OMAP board has a Mini-AB connector.
+# NOTE:  Please keep dummy_hcd LAST so that "real hardware" appears
+# first and will be selected by default.
 
 endchoice
 
@@ -355,8 +344,6 @@ config USB_GADGETFS
 
 config USB_FILE_STORAGE
 	tristate "File-backed Storage Gadget"
-	# we don't support the SA1100 because of its limitations
-	depends on USB_GADGET_SA1100 = n
 	help
 	  The File-backed Storage Gadget acts as a USB Mass Storage
 	  disk drive.  As its storage repository it can use a regular

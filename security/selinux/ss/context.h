@@ -17,6 +17,7 @@
 
 #include "ebitmap.h"
 #include "mls_types.h"
+#include "security.h"
 
 /*
  * A security context consists of an authenticated user
@@ -26,12 +27,8 @@ struct context {
 	u32 user;
 	u32 role;
 	u32 type;
-#ifdef CONFIG_SECURITY_SELINUX_MLS
 	struct mls_range range;
-#endif
 };
-
-#ifdef CONFIG_SECURITY_SELINUX_MLS
 
 static inline void mls_context_init(struct context *c)
 {
@@ -41,6 +38,9 @@ static inline void mls_context_init(struct context *c)
 static inline int mls_context_cpy(struct context *dst, struct context *src)
 {
 	int rc;
+
+	if (!selinux_mls_enabled)
+		return 0;
 
 	dst->range.level[0].sens = src->range.level[0].sens;
 	rc = ebitmap_cpy(&dst->range.level[0].cat, &src->range.level[0].cat);
@@ -57,6 +57,9 @@ out:
 
 static inline int mls_context_cmp(struct context *c1, struct context *c2)
 {
+	if (!selinux_mls_enabled)
+		return 1;
+
 	return ((c1->range.level[0].sens == c2->range.level[0].sens) &&
 		ebitmap_cmp(&c1->range.level[0].cat,&c2->range.level[0].cat) &&
 		(c1->range.level[1].sens == c2->range.level[1].sens) &&
@@ -65,26 +68,13 @@ static inline int mls_context_cmp(struct context *c1, struct context *c2)
 
 static inline void mls_context_destroy(struct context *c)
 {
+	if (!selinux_mls_enabled)
+		return;
+
 	ebitmap_destroy(&c->range.level[0].cat);
 	ebitmap_destroy(&c->range.level[1].cat);
 	mls_context_init(c);
 }
-
-#else
-
-static inline void mls_context_init(struct context *c)
-{ }
-
-static inline int mls_context_cpy(struct context *dst, struct context *src)
-{ return 0; }
-
-static inline int mls_context_cmp(struct context *c1, struct context *c2)
-{ return 1; }
-
-static inline void mls_context_destroy(struct context *c)
-{ }
-
-#endif
 
 static inline void context_init(struct context *c)
 {

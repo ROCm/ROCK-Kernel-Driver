@@ -100,6 +100,11 @@ enum si_intf_state {
 	/* FIXME - add watchdog stuff. */
 };
 
+/* Some BT-specific defines we need here. */
+#define IPMI_BT_INTMASK_REG		2
+#define IPMI_BT_INTMASK_CLEAR_IRQ_BIT	2
+#define IPMI_BT_INTMASK_ENABLE_IRQ_BIT	1
+
 enum si_type {
     SI_KCS, SI_SMIC, SI_BT
 };
@@ -175,6 +180,9 @@ struct smi_info
 	unsigned char ipmi_si_fw_rev_minor;
 	unsigned char ipmi_version_major;
 	unsigned char ipmi_version_minor;
+
+	/* Slave address, could be reported from DMI. */
+	unsigned char slave_addr;
 
 	/* Counters and things for the proc filesystem. */
 	spinlock_t count_lock;
@@ -407,7 +415,7 @@ static void handle_transaction_done(struct smi_info *smi_info)
 			/* Error fetching flags, just give up for
 			   now. */
 			smi_info->si_state = SI_NORMAL;
-		} else if (len < 3) {
+		} else if (len < 4) {
 			/* Hmm, no flags.  That's technically illegal, but
 			   don't use uninitialized data. */
 			smi_info->si_state = SI_NORMAL;
@@ -872,6 +880,17 @@ static irqreturn_t si_irq_handler(int irq, void *data, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t si_bt_irq_handler(int irq, void *data, struct pt_regs *regs)
+{
+	struct smi_info *smi_info = data;
+	/* We need to clear the IRQ flag for the BT interface. */
+	smi_info->io.outputb(&smi_info->io, IPMI_BT_INTMASK_REG,
+			     IPMI_BT_INTMASK_CLEAR_IRQ_BIT
+			     | IPMI_BT_INTMASK_ENABLE_IRQ_BIT);
+	return si_irq_handler(irq, data, regs);
+}
+
+
 static struct ipmi_smi_handlers handlers =
 {
 	.owner                  = THIS_MODULE,
@@ -897,21 +916,23 @@ static struct smi_info *smi_infos[SI_MAX_DRIVERS] =
 #define DEFAULT_REGSPACING	1
 
 static int           si_trydefaults = 1;
-static char          *si_type[SI_MAX_PARMS] = { NULL, NULL, NULL, NULL };
+static char          *si_type[SI_MAX_PARMS];
 #define MAX_SI_TYPE_STR 30
 static char          si_type_str[MAX_SI_TYPE_STR];
-static unsigned long addrs[SI_MAX_PARMS] = { 0, 0, 0, 0 };
-static int num_addrs = 0;
-static unsigned int  ports[SI_MAX_PARMS] = { 0, 0, 0, 0 };
-static int num_ports = 0;
-static int           irqs[SI_MAX_PARMS] = { 0, 0, 0, 0 };
-static int num_irqs = 0;
-static int           regspacings[SI_MAX_PARMS] = { 0, 0, 0, 0 };
+static unsigned long addrs[SI_MAX_PARMS];
+static int num_addrs;
+static unsigned int  ports[SI_MAX_PARMS];
+static int num_ports;
+static int           irqs[SI_MAX_PARMS];
+static int num_irqs;
+static int           regspacings[SI_MAX_PARMS];
 static int num_regspacings = 0;
-static int           regsizes[SI_MAX_PARMS] = { 0, 0, 0, 0 };
+static int           regsizes[SI_MAX_PARMS];
 static int num_regsizes = 0;
-static int           regshifts[SI_MAX_PARMS] = { 0, 0, 0, 0 };
+static int           regshifts[SI_MAX_PARMS];
 static int num_regshifts = 0;
+static int slave_addrs[SI_MAX_PARMS];
+static int num_slave_addrs = 0;
 
 
 module_param_named(trydefaults, si_trydefaults, bool, 0);
@@ -955,6 +976,12 @@ MODULE_PARM_DESC(regshifts, "The amount to shift the data read from the."
 		 " IPMI register, in bits.  For instance, if the data"
 		 " is read from a 32-bit word and the IPMI data is in"
 		 " bit 8-15, then the shift would be 8");
+module_param_array(slave_addrs, int, &num_slave_addrs, 0);
+MODULE_PARM_DESC(slave_addrs, "Set the default IPMB slave address for"
+		 " the controller.  Normally this is 0x20, but can be"
+		 " overridden by this parm.  This is an array indexed"
+		 " by interface number.");
+
 
 #define IPMI_MEM_ADDR_SPACE 1
 #define IPMI_IO_ADDR_SPACE  2
@@ -990,11 +1017,22 @@ static int std_irq_setup(struct smi_info *info)
 	if (!info->irq)
 		return 0;
 
-	rv = request_irq(info->irq,
-			 si_irq_handler,
-			 SA_INTERRUPT,
-			 DEVICE_NAME,
-			 info);
+	if (info->si_type == SI_BT) {
+		rv = request_irq(info->irq,
+				 si_bt_irq_handler,
+				 SA_INTERRUPT,
+				 DEVICE_NAME,
+				 info);
+		if (!rv)
+			/* Enable the interrupt in the BT interface. */
+			info->io.outputb(&info->io, IPMI_BT_INTMASK_REG,
+					 IPMI_BT_INTMASK_ENABLE_IRQ_BIT);
+	} else
+		rv = request_irq(info->irq,
+				 si_irq_handler,
+				 SA_INTERRUPT,
+				 DEVICE_NAME,
+				 info);
 	if (rv) {
 		printk(KERN_WARNING
 		       "ipmi_si: %s unable to claim interrupt %d,"
@@ -1013,6 +1051,9 @@ static void std_irq_cleanup(struct smi_info *info)
 	if (!info->irq)
 		return;
 
+	if (info->si_type == SI_BT)
+		/* Disable the interrupt in the BT interface. */
+		info->io.outputb(&info->io, IPMI_BT_INTMASK_REG, 0);
 	free_irq(info->irq, info);
 }
 
@@ -1466,6 +1507,11 @@ static int try_init_acpi(int intf_num, struct smi_info **new_info)
 	if (!is_new_interface(-1, addr_space, spmi->addr.address))
 		return -ENODEV;
 
+	if (!spmi->addr.register_bit_width) {
+		acpi_failure = 1;
+		return -ENODEV;
+	}
+
 	/* Figure out the interface type. */
 	switch (spmi->InterfaceType)
 	{
@@ -1510,8 +1556,17 @@ static int try_init_acpi(int intf_num, struct smi_info **new_info)
 		info->irq_setup = NULL;
 	}
 
-	regspacings[intf_num] = spmi->addr.register_bit_width / 8;
-	info->io.regspacing = spmi->addr.register_bit_width / 8;
+	if (spmi->addr.register_bit_width) {
+		/* A (hopefully) properly formed register bit width. */
+		regspacings[intf_num] = spmi->addr.register_bit_width / 8;
+		info->io.regspacing = spmi->addr.register_bit_width / 8;
+	} else {
+		/* Some broken systems get this wrong and set the value
+		 * to zero.  Assume it is the default spacing.  If that
+		 * is wrong, too bad, the vendor should fix the tables. */
+		regspacings[intf_num] = DEFAULT_REGSPACING;
+		info->io.regspacing = DEFAULT_REGSPACING;
+	}
 	regsizes[intf_num] = regspacings[intf_num];
 	info->io.regsize = regsizes[intf_num];
 	regshifts[intf_num] = spmi->addr.register_bit_offset;
@@ -1542,7 +1597,6 @@ static int try_init_acpi(int intf_num, struct smi_info **new_info)
 #endif
 
 #ifdef CONFIG_X86
-
 typedef struct dmi_ipmi_data
 {
 	u8   		type;
@@ -1550,23 +1604,28 @@ typedef struct dmi_ipmi_data
 	unsigned long	base_addr;
 	u8   		irq;
 	u8              offset;
-}dmi_ipmi_data_t;
+	u8              slave_addr;
+} dmi_ipmi_data_t;
+
+static dmi_ipmi_data_t dmi_data[SI_MAX_DRIVERS];
+static int dmi_data_entries;
 
 typedef struct dmi_header
 {
 	u8	type;
 	u8	length;
 	u16	handle;
-}dmi_header_t;
+} dmi_header_t;
 
-static int decode_dmi(dmi_header_t *dm, dmi_ipmi_data_t *ipmi_data)
+static int decode_dmi(dmi_header_t __iomem *dm, int intf_num)
 {
-	u8		*data = (u8 *)dm;
+	u8		__iomem *data = (u8 __iomem *)dm;
 	unsigned long  	base_addr;
 	u8		reg_spacing;
-	u8              len = dm->length;
+	u8              len = readb(&dm->length);
+	dmi_ipmi_data_t *ipmi_data = dmi_data+intf_num;
 
-	ipmi_data->type = data[4];
+	ipmi_data->type = readb(&data[4]);
 
 	memcpy(&base_addr, data+8, sizeof(unsigned long));
 	if (len >= 0x11) {
@@ -1581,12 +1640,12 @@ static int decode_dmi(dmi_header_t *dm, dmi_ipmi_data_t *ipmi_data)
 		}
 		/* If bit 4 of byte 0x10 is set, then the lsb for the address
 		   is odd. */
-		ipmi_data->base_addr = base_addr | ((data[0x10] & 0x10) >> 4);
+		ipmi_data->base_addr = base_addr | ((readb(&data[0x10]) & 0x10) >> 4);
 
-		ipmi_data->irq = data[0x11];
+		ipmi_data->irq = readb(&data[0x11]);
 
 		/* The top two bits of byte 0x10 hold the register spacing. */
-		reg_spacing = (data[0x10] & 0xC0) >> 6;
+		reg_spacing = (readb(&data[0x10]) & 0xC0) >> 6;
 		switch(reg_spacing){
 		case 0x00: /* Byte boundaries */
 		    ipmi_data->offset = 1;
@@ -1603,27 +1662,37 @@ static int decode_dmi(dmi_header_t *dm, dmi_ipmi_data_t *ipmi_data)
 		}
 	} else {
 		/* Old DMI spec. */
-		ipmi_data->base_addr = base_addr;
+		/* Note that technically, the lower bit of the base
+		 * address should be 1 if the address is I/O and 0 if
+		 * the address is in memory.  So many systems get that
+		 * wrong (and all that I have seen are I/O) so we just
+		 * ignore that bit and assume I/O.  Systems that use
+		 * memory should use the newer spec, anyway. */
+		ipmi_data->base_addr = base_addr & 0xfffe;
 		ipmi_data->addr_space = IPMI_IO_ADDR_SPACE;
 		ipmi_data->offset = 1;
 	}
 
-	if (is_new_interface(-1, ipmi_data->addr_space,ipmi_data->base_addr))
+	ipmi_data->slave_addr = readb(&data[6]);
+
+	if (is_new_interface(-1, ipmi_data->addr_space,ipmi_data->base_addr)) {
+		dmi_data_entries++;
 		return 0;
+	}
 
 	memset(ipmi_data, 0, sizeof(dmi_ipmi_data_t));
 
 	return -1;
 }
 
-static int dmi_table(u32 base, int len, int num,
-	dmi_ipmi_data_t *ipmi_data)
+static int dmi_table(u32 base, int len, int num)
 {
-	u8 		  *buf;
-	struct dmi_header *dm;
-	u8 		  *data;
+	u8 		  __iomem *buf;
+	struct dmi_header __iomem *dm;
+	u8 		  __iomem *data;
 	int 		  i=1;
 	int		  status=-1;
+	int               intf_num = 0;
 
 	buf = ioremap(base, len);
 	if(buf==NULL)
@@ -1633,20 +1702,21 @@ static int dmi_table(u32 base, int len, int num,
 
 	while(i<num && (data - buf) < len)
 	{
-		dm=(dmi_header_t *)data;
+		dm=(dmi_header_t __iomem *)data;
 
-		if((data-buf+dm->length) >= len)
+		if((data-buf+readb(&dm->length)) >= len)
         		break;
 
-		if (dm->type == 38) {
-			if (decode_dmi(dm, ipmi_data) == 0) {
-				status = 0;
-				break;
+		if (readb(&dm->type) == 38) {
+			if (decode_dmi(dm, intf_num) == 0) {
+				intf_num++;
+				if (intf_num >= SI_MAX_DRIVERS)
+					break;
 			}
 		}
 
-	        data+=dm->length;
-		while((data-buf) < len && (*data || data[1]))
+	        data+=readb(&dm->length);
+		while((data-buf) < len && (readb(data)||readb(data+1)))
 			data++;
 		data+=2;
 		i++;
@@ -1666,7 +1736,7 @@ inline static int dmi_checksum(u8 *buf)
 	return (sum==0);
 }
 
-static int dmi_iterator(dmi_ipmi_data_t *ipmi_data)
+static int dmi_decode(void)
 {
 	u8   buf[15];
 	u32  fp=0xF0000;
@@ -1684,7 +1754,7 @@ static int dmi_iterator(dmi_ipmi_data_t *ipmi_data)
 			u16 len=buf[7]<<8|buf[6];
 			u32 base=buf[11]<<24|buf[10]<<16|buf[9]<<8|buf[8];
 
-			if(dmi_table(base, len, num, ipmi_data) == 0)
+			if(dmi_table(base, len, num) == 0)
 				return 0;
 		}
 		fp+=16;
@@ -1696,16 +1766,13 @@ static int dmi_iterator(dmi_ipmi_data_t *ipmi_data)
 static int try_init_smbios(int intf_num, struct smi_info **new_info)
 {
 	struct smi_info   *info;
-	dmi_ipmi_data_t   ipmi_data;
+	dmi_ipmi_data_t   *ipmi_data = dmi_data+intf_num;
 	char              *io_type;
-	int               status;
 
-	status = dmi_iterator(&ipmi_data);
-
-	if (status < 0)
+	if (intf_num >= dmi_data_entries)
 		return -ENODEV;
 
-	switch(ipmi_data.type) {
+	switch(ipmi_data->type) {
 		case 0x01: /* KCS */
 			si_type[intf_num] = "kcs";
 			break;
@@ -1716,7 +1783,6 @@ static int try_init_smbios(int intf_num, struct smi_info **new_info)
 			si_type[intf_num] = "bt";
 			break;
 		default:
-			printk("ipmi_si: Unknown SMBIOS SI type.\n");
 			return -EIO;
 	}
 
@@ -1727,15 +1793,15 @@ static int try_init_smbios(int intf_num, struct smi_info **new_info)
 	}
 	memset(info, 0, sizeof(*info));
 
-	if (ipmi_data.addr_space == 1) {
+	if (ipmi_data->addr_space == 1) {
 		io_type = "memory";
 		info->io_setup = mem_setup;
-		addrs[intf_num] = ipmi_data.base_addr;
+		addrs[intf_num] = ipmi_data->base_addr;
 		info->io.info = &(addrs[intf_num]);
-	} else if (ipmi_data.addr_space == 2) {
+	} else if (ipmi_data->addr_space == 2) {
 		io_type = "I/O";
 		info->io_setup = port_setup;
-		ports[intf_num] = ipmi_data.base_addr;
+		ports[intf_num] = ipmi_data->base_addr;
 		info->io.info = &(ports[intf_num]);
 	} else {
 		kfree(info);
@@ -1743,20 +1809,23 @@ static int try_init_smbios(int intf_num, struct smi_info **new_info)
 		return -EIO;
 	}
 
-	regspacings[intf_num] = ipmi_data.offset;
+	regspacings[intf_num] = ipmi_data->offset;
 	info->io.regspacing = regspacings[intf_num];
 	if (!info->io.regspacing)
 		info->io.regspacing = DEFAULT_REGSPACING;
 	info->io.regsize = DEFAULT_REGSPACING;
 	info->io.regshift = regshifts[intf_num];
 
-	irqs[intf_num] = ipmi_data.irq;
+	info->slave_addr = ipmi_data->slave_addr;
+
+	irqs[intf_num] = ipmi_data->irq;
 
 	*new_info = info;
 
 	printk("ipmi_si: Found SMBIOS-specified state machine at %s"
-	       " address 0x%lx\n",
-	       io_type, (unsigned long)ipmi_data.base_addr);
+	       " address 0x%lx, slave address 0x%x\n",
+	       io_type, (unsigned long)ipmi_data->base_addr,
+	       ipmi_data->slave_addr);
 	return 0;
 }
 #endif /* CONFIG_X86 */
@@ -2121,6 +2190,7 @@ static int init_one_smi(int intf_num, struct smi_info **smi)
 			       new_smi,
 			       new_smi->ipmi_version_major,
 			       new_smi->ipmi_version_minor,
+			       new_smi->slave_addr,
 			       &(new_smi->intf));
 	if (rv) {
 		printk(KERN_ERR
@@ -2174,7 +2244,7 @@ static int init_one_smi(int intf_num, struct smi_info **smi)
 	/* Wait until we know that we are out of any interrupt
 	   handlers might have been running before we freed the
 	   interrupt. */
-	synchronize_kernel();
+	synchronize_sched();
 
 	if (new_smi->si_sm) {
 		if (new_smi->handlers)
@@ -2221,6 +2291,10 @@ static __init int init_ipmi_si(void)
 	if (bt_smi_handlers.version)
    	        printk(", BT version %s", bt_smi_handlers.version);
 	printk("\n");
+
+#ifdef CONFIG_X86
+	dmi_decode();
+#endif
 
 	rv = init_one_smi(0, &(smi_infos[pos]));
 	if (rv && !ports[0] && si_trydefaults) {
@@ -2283,7 +2357,7 @@ static void __exit cleanup_one_si(struct smi_info *to_clean)
 	/* Wait until we know that we are out of any interrupt
 	   handlers might have been running before we freed the
 	   interrupt. */
-	synchronize_kernel();
+	synchronize_sched();
 
 	/* Wait for the timer to stop.  This avoids problems with race
 	   conditions removing the timer here. */

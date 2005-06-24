@@ -24,6 +24,9 @@
  * Parts based on arch/arm/mach-pxa/pm.c
  *
  * Thanks to Dimitry Andric for debugging
+ *
+ * Modifications:
+ *     10-Mar-2005 LCVR  Changed S3C2410_VA_UART to S3C24XX_VA_UART
 */
 
 #include <linux/config.h>
@@ -144,9 +147,11 @@ static struct sleep_save gpio_save[] = {
 	SAVE_ITEM((va) + S3C2410_UBRDIV)
 
 static struct sleep_save uart_save[] = {
-	SAVE_UART(S3C2410_VA_UART0),
-	SAVE_UART(S3C2410_VA_UART1),
-	SAVE_UART(S3C2410_VA_UART2),
+	SAVE_UART(S3C24XX_VA_UART0),
+	SAVE_UART(S3C24XX_VA_UART1),
+#ifndef CONFIG_CPU_S3C2400
+	SAVE_UART(S3C24XX_VA_UART2),
+#endif
 };
 
 /* debug
@@ -391,7 +396,7 @@ void s3c2410_pm_do_save(struct sleep_save *ptr, int count)
 {
 	for (; count > 0; count--, ptr++) {
 		ptr->val = __raw_readl(ptr->reg);
-		DBG("saved %08lx value %08lx\n", ptr->reg, ptr->val);
+		DBG("saved %p value %08lx\n", ptr->reg, ptr->val);
 	}
 }
 
@@ -406,7 +411,7 @@ void s3c2410_pm_do_save(struct sleep_save *ptr, int count)
 void s3c2410_pm_do_restore(struct sleep_save *ptr, int count)
 {
 	for (; count > 0; count--, ptr++) {
-		printk(KERN_DEBUG "restore %08lx (restore %08lx, was %08x)\n",
+		printk(KERN_DEBUG "restore %p (restore %08lx, was %08x)\n",
 		       ptr->reg, ptr->val, __raw_readl(ptr->reg));
 
 		__raw_writel(ptr->val, ptr->reg);

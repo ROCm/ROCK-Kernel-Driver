@@ -54,7 +54,7 @@ static int adjust_pte(struct vm_area_struct *vma, unsigned long address)
 	 * fault (ie, is old), we can safely ignore any issues.
 	 */
 	if (pte_present(entry) && pte_val(entry) & shared_pte_mask) {
-		flush_cache_page(vma, address);
+		flush_cache_page(vma, address, pte_pfn(entry));
 		pte_val(entry) &= ~shared_pte_mask;
 		set_pte(pte, entry);
 		flush_tlb_page(vma, address);
@@ -115,7 +115,7 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page,
 	if (aliases)
 		adjust_pte(vma, addr);
 	else
-		flush_cache_page(vma, addr);
+		flush_cache_page(vma, addr, page_to_pfn(page));
 }
 
 /*

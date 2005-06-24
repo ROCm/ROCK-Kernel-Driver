@@ -48,6 +48,8 @@ static struct work_struct xfrm_state_gc_work;
 static struct list_head xfrm_state_gc_list = LIST_HEAD_INIT(xfrm_state_gc_list);
 static DEFINE_SPINLOCK(xfrm_state_gc_lock);
 
+static int xfrm_state_gc_flush_bundles;
+
 static void __xfrm_state_delete(struct xfrm_state *x);
 
 static struct xfrm_state_afinfo *xfrm_state_get_afinfo(unsigned short family);
@@ -80,6 +82,11 @@ static void xfrm_state_gc_task(void *data)
 	struct xfrm_state *x;
 	struct list_head *entry, *tmp;
 	struct list_head gc_list = LIST_HEAD_INIT(gc_list);
+
+	if (xfrm_state_gc_flush_bundles) {
+		xfrm_state_gc_flush_bundles = 0;
+		xfrm_flush_bundles();
+	}
 
 	spin_lock_bh(&xfrm_state_gc_lock);
 	list_splice_init(&xfrm_state_gc_list, &gc_list);
@@ -228,8 +235,10 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 		 * our caller holds.  A larger value means that
 		 * there are DSTs attached to this xfrm_state.
 		 */
-		if (atomic_read(&x->refcnt) > 2)
-			xfrm_flush_bundles();
+		if (atomic_read(&x->refcnt) > 2) {
+			xfrm_state_gc_flush_bundles = 1;
+			schedule_work(&xfrm_state_gc_work);
+		}
 
 		/* All xfrm_state objects are created by xfrm_state_alloc.
 		 * The xfrm_state_alloc call gives a reference, and that
@@ -295,10 +304,17 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 		unsigned short family)
 {
 	unsigned h = xfrm_dst_hash(daddr, family);
-	struct xfrm_state *x;
+	struct xfrm_state *x, *x0;
 	int acquire_in_progress = 0;
 	int error = 0;
 	struct xfrm_state *best = NULL;
+	struct xfrm_state_afinfo *afinfo;
+	
+	afinfo = xfrm_state_get_afinfo(family);
+	if (afinfo == NULL) {
+		*err = -EAFNOSUPPORT;
+		return NULL;
+	}
 
 	spin_lock_bh(&xfrm_state_lock);
 	list_for_each_entry(x, xfrm_state_bydst+h, bydst) {
@@ -306,7 +322,8 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 		    x->props.reqid == tmpl->reqid &&
 		    xfrm_state_addr_check(x, daddr, saddr, family) &&
 		    tmpl->mode == x->props.mode &&
-		    tmpl->id.proto == x->id.proto) {
+		    tmpl->id.proto == x->id.proto &&
+		    (tmpl->id.spi == x->id.spi || !tmpl->id.spi)) {
 			/* Resolution logic:
 			   1. There is a valid state with matching selector.
 			      Done.
@@ -333,14 +350,25 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 			} else if (x->km.state == XFRM_STATE_ERROR ||
 				   x->km.state == XFRM_STATE_EXPIRED) {
 				if (xfrm_selector_match(&x->sel, fl, family))
-					error = 1;
+					error = -ESRCH;
 			}
 		}
 	}
 
 	x = best;
-	if (!x && !error && !acquire_in_progress &&
-	    ((x = xfrm_state_alloc()) != NULL)) {
+	if (!x && !error && !acquire_in_progress) {
+		if (tmpl->id.spi &&
+		    (x0 = afinfo->state_lookup(daddr, tmpl->id.spi,
+		                               tmpl->id.proto)) != NULL) {
+			xfrm_state_put(x0);
+			error = -EEXIST;
+			goto out;
+		}
+		x = xfrm_state_alloc();
+		if (x == NULL) {
+			error = -ENOMEM;
+			goto out;
+		}
 		/* Initialize temporary selector matching only
 		 * to current session. */
 		xfrm_init_tempsel(x, fl, tmpl, daddr, saddr, family);
@@ -362,15 +390,16 @@ xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr,
 			x->km.state = XFRM_STATE_DEAD;
 			xfrm_state_put(x);
 			x = NULL;
-			error = 1;
+			error = -ESRCH;
 		}
 	}
+out:
 	if (x)
 		xfrm_state_hold(x);
 	else
-		*err = acquire_in_progress ? -EAGAIN :
-			(error ? -ESRCH : -ENOMEM);
+		*err = acquire_in_progress ? -EAGAIN : error;
 	spin_unlock_bh(&xfrm_state_lock);
+	xfrm_state_put_afinfo(afinfo);
 	return x;
 }
 
@@ -966,6 +995,36 @@ void xfrm_state_delete_tunnel(struct xfrm_state *x)
 }
 EXPORT_SYMBOL(xfrm_state_delete_tunnel);
 
+int xfrm_state_mtu(struct xfrm_state *x, int mtu)
+{
+	int res = mtu;
+
+	res -= x->props.header_len;
+
+	for (;;) {
+		int m = res;
+
+		if (m < 68)
+			return 68;
+
+		spin_lock_bh(&x->lock);
+		if (x->km.state == XFRM_STATE_VALID &&
+		    x->type && x->type->get_max_size)
+			m = x->type->get_max_size(x, m);
+		else
+			m += x->props.header_len;
+		spin_unlock_bh(&x->lock);
+
+		if (m <= mtu)
+			break;
+		res -= (m - mtu);
+	}
+
+	return res;
+}
+
+EXPORT_SYMBOL(xfrm_state_mtu);
+ 
 void __init xfrm_state_init(void)
 {
 	int i;

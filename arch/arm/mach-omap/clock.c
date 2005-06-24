@@ -17,6 +17,7 @@
 #include <asm/semaphore.h>
 #include <asm/hardware/clock.h>
 #include <asm/arch/board.h>
+#include <asm/arch/usb.h>
 
 #include "clock.h"
 
@@ -24,33 +25,40 @@ static LIST_HEAD(clocks);
 static DECLARE_MUTEX(clocks_sem);
 static DEFINE_SPINLOCK(clockfw_lock);
 static void propagate_rate(struct clk *  clk);
+/* External clock (MCLK & BCLK) functions */
+static int set_ext_clk_rate(struct clk *  clk, unsigned long rate);
+static long round_ext_clk_rate(struct clk *  clk, unsigned long rate);
+static void init_ext_clk(struct clk *  clk);
 /* MPU virtual clock functions */
-static int select_table_rate(unsigned long rate);
-static long round_to_table_rate(unsigned long rate);
+static int select_table_rate(struct clk *  clk, unsigned long rate);
+static long round_to_table_rate(struct clk *  clk, unsigned long rate);
 void clk_setdpll(__u16, __u16);
 
 struct mpu_rate rate_table[] = {
 	/* MPU MHz, xtal MHz, dpll1 MHz, CKCTL, DPLL_CTL
 	 * armdiv, dspdiv, dspmmu, tcdiv, perdiv, lcddiv
 	 */
-#if defined(CONFIG_OMAP_ARM_216MHZ) && defined(CONFIG_ARCH_OMAP16XX)
+#if defined(CONFIG_OMAP_ARM_216MHZ)
 	{ 216000000, 12000000, 216000000, 0x050d, 0x2910 }, /* 1/1/2/2/2/8 */
 #endif
-#if defined(CONFIG_OMAP_ARM_195MHZ) && defined(CONFIG_ARCH_OMAP730)
+#if defined(CONFIG_OMAP_ARM_195MHZ)
 	{ 195000000, 13000000, 195000000, 0x050e, 0x2790 }, /* 1/1/2/2/4/8 */
 #endif
-#if defined(CONFIG_OMAP_ARM_192MHZ) && defined(CONFIG_ARCH_OMAP16XX)
+#if defined(CONFIG_OMAP_ARM_192MHZ)
 	{ 192000000, 19200000, 192000000, 0x050f, 0x2510 }, /* 1/1/2/2/8/8 */
 	{ 192000000, 12000000, 192000000, 0x050f, 0x2810 }, /* 1/1/2/2/8/8 */
 	{  96000000, 12000000, 192000000, 0x055f, 0x2810 }, /* 2/2/2/2/8/8 */
 	{  48000000, 12000000, 192000000, 0x0ccf, 0x2810 }, /* 4/4/4/4/8/8 */
 	{  24000000, 12000000, 192000000, 0x0fff, 0x2810 }, /* 8/8/8/8/8/8 */
 #endif
-#if defined(CONFIG_OMAP_ARM_182MHZ) && defined(CONFIG_ARCH_OMAP730)
+#if defined(CONFIG_OMAP_ARM_182MHZ)
 	{ 182000000, 13000000, 182000000, 0x050e, 0x2710 }, /* 1/1/2/2/4/8 */
 #endif
 #if defined(CONFIG_OMAP_ARM_168MHZ)
 	{ 168000000, 12000000, 168000000, 0x010f, 0x2710 }, /* 1/1/1/2/8/8 */
+#endif
+#if defined(CONFIG_OMAP_ARM_150MHZ)
+	{ 150000000, 12000000, 150000000, 0x150a, 0x2cb0 }, /* 0/0/1/1/2/2 */
 #endif
 #if defined(CONFIG_OMAP_ARM_120MHZ)
 	{ 120000000, 12000000, 120000000, 0x010a, 0x2510 }, /* 1/1/1/2/4/4 */
@@ -174,12 +182,12 @@ static struct clk armwdt_ck = {
 	.recalc		= &watchdog_recalc,
 };
 
-static struct clk arminth_ck1610 = {
+static struct clk arminth_ck16xx = {
 	.name		= "arminth_ck",
 	.parent		= &arm_ck,
 	.flags		= CLOCK_IN_OMAP16XX,
 	.recalc		= &followparent_recalc,
-	/* Note: On 1610/1710 frequency can be divided by 2 by programming
+	/* Note: On 16xx the frequency can be divided by 2 by programming
 	 * ARM_CKCTL:ARM_INTHCK_SEL(14) to 1
 	 *
 	 * 1510 version is in TC clocks.
@@ -209,7 +217,7 @@ static struct clk dspmmu_ck = {
 static struct clk tc_ck = {
 	.name		= "tc_ck",
 	.parent		= &ck_dpll1,
-	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX | CLOCK_IN_OMAP730 |
 			  RATE_CKCTL | RATE_PROPAGATES | ALWAYS_ENABLED,
 	.rate_offset	= CKCTL_TCDIV_OFFSET,
 	.recalc		= &ckctl_recalc,
@@ -220,9 +228,9 @@ static struct clk arminth_ck1510 = {
 	.parent		= &tc_ck,
 	.flags		= CLOCK_IN_OMAP1510,
 	.recalc		= &followparent_recalc,
-	/* Note: On 1510 frequency follows TC_CK
+	/* Note: On 1510 the frequency follows TC_CK
 	 *
-	 * 1610/1710 version is in MPU clocks.
+	 * 16xx version is in MPU clocks.
 	 */
 };
 
@@ -309,7 +317,7 @@ static struct clk rhea2_ck = {
 static struct clk lcd_ck = {
 	.name		= "lcd_ck",
 	.parent		= &ck_dpll1,
-	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX | CLOCK_IN_OMAP730 |
 			  RATE_CKCTL,
 	.enable_reg	= ARM_IDLECT2,
 	.enable_bit	= EN_LCDCK,
@@ -338,7 +346,7 @@ static struct clk uart2_ck = {
 			  RATE_FIXED | ENABLE_REG_32BIT,
 	.enable_reg	= MOD_CONF_CTRL_0,
 	.enable_bit	= 30,
-	/* (1510/1610/1710)
+	/* (for both 1510 and 16xx)
 	 * The "enable bit" actually chooses between 48MHz and 12MHz/32kHz.
 	 */
 };
@@ -356,42 +364,72 @@ static struct clk uart3_ck = {
 	 */
 };
 
-static struct clk usb_ck1610 = {
-	.name		= "usb_ck",
+static struct clk usb_clko = {	/* 6 MHz output on W4_USB_CLKO */
+	.name		= "usb_clko",
 	/* Direct from ULPD, no parent */
-	.rate		= 48000000,
-	.flags		= CLOCK_IN_OMAP16XX |
+	.rate		= 6000000,
+	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
 			  RATE_FIXED | ENABLE_REG_32BIT,
 	.enable_reg	= ULPD_CLOCK_CTRL,
-	.enable_bit	= USB_MCLK_EN,
+	.enable_bit	= USB_MCLK_EN_BIT,
 };
 
-static struct clk usb_ck1510 = {
-	.name		= "usb_ck",
-	/* Direct from ULPD, no parent */
-	.rate		= 48000000,
-	.flags		= CLOCK_IN_OMAP1510 | RATE_FIXED,
-};
-
-static struct clk usb_hhc_ck = {
+static struct clk usb_hhc_ck1510 = {
 	.name		= "usb_hhc_ck",
 	/* Direct from ULPD, no parent */
 	.rate		= 48000000, /* Actually 2 clocks, 12MHz and 48MHz */
-	.flags		= CLOCK_IN_OMAP1510 | CLOCK_IN_OMAP16XX |
+	.flags		= CLOCK_IN_OMAP1510 |
 			  RATE_FIXED | ENABLE_REG_32BIT,
 	.enable_reg	= MOD_CONF_CTRL_0,
 	.enable_bit	= USB_HOST_HHC_UHOST_EN,
 };
 
-/* To be done --
-static struct clk mclk = {
-	.name		= "mclk",
+static struct clk usb_hhc_ck16xx = {
+	.name		= "usb_hhc_ck",
+	/* Direct from ULPD, no parent */
+	.rate		= 48000000,
+	/* OTG_SYSCON_2.OTG_PADEN == 0 (not 1510-compatible) */
+	.flags		= CLOCK_IN_OMAP16XX |
+			  RATE_FIXED | ENABLE_REG_32BIT,
+	.enable_reg	= OTG_BASE + 0x08 /* OTG_SYSCON_2 */,
+	.enable_bit	= 8 /* UHOST_EN */,
 };
 
-static struct clk bclk = {
-	.name		= "bclk",
+static struct clk mclk_1510 = {
+	.name		= "mclk",
+	/* Direct from ULPD, no parent. May be enabled by ext hardware. */
+	.rate		= 12000000,
+	.flags		= CLOCK_IN_OMAP1510 | RATE_FIXED,
 };
--- to be done */
+
+static struct clk mclk_16xx = {
+	.name		= "mclk",
+	/* Direct from ULPD, no parent. May be enabled by ext hardware. */
+	.flags		= CLOCK_IN_OMAP16XX,
+	.enable_reg	= COM_CLK_DIV_CTRL_SEL,
+	.enable_bit	= COM_ULPD_PLL_CLK_REQ,
+	.set_rate	= &set_ext_clk_rate,
+	.round_rate	= &round_ext_clk_rate,
+	.init		= &init_ext_clk,
+};
+
+static struct clk bclk_1510 = {
+	.name		= "bclk",
+	/* Direct from ULPD, no parent. May be enabled by ext hardware. */
+	.rate		= 12000000,
+	.flags		= CLOCK_IN_OMAP1510 | RATE_FIXED,
+};
+
+static struct clk bclk_16xx = {
+	.name		= "bclk",
+	/* Direct from ULPD, no parent. May be enabled by ext hardware. */
+	.flags		= CLOCK_IN_OMAP16XX,
+	.enable_reg	= SWD_CLK_DIV_CTRL_SEL,
+	.enable_bit	= SWD_ULPD_PLL_CLK_REQ,
+	.set_rate	= &set_ext_clk_rate,
+	.round_rate	= &round_ext_clk_rate,
+	.init		= &init_ext_clk,
+};
 
 static struct clk mmc1_ck = {
 	.name		= "mmc1_ck",
@@ -438,8 +476,7 @@ static struct clk *  onchip_clks[] = {
 	&armxor_ck,
 	&armtim_ck,
 	&armwdt_ck,
-	&arminth_ck1510,
-	&arminth_ck1610,
+	&arminth_ck1510,  &arminth_ck16xx,
 	/* CK_GEN2 clocks */
 	&dsp_ck,
 	&dspmmu_ck,
@@ -460,13 +497,10 @@ static struct clk *  onchip_clks[] = {
 	&uart1_ck,
 	&uart2_ck,
 	&uart3_ck,
-	&usb_ck1510,
-	&usb_ck1610,
-	&usb_hhc_ck,
-	/* To be done --
-	&mclk,
-	&bclk,
-	-- to be done */
+	&usb_clko,
+	&usb_hhc_ck1510, &usb_hhc_ck16xx,
+	&mclk_1510,  &mclk_16xx,
+	&bclk_1510,  &bclk_16xx,
 	&mmc1_ck,
 	&mmc2_ck,
 	/* Virtual clocks */
@@ -629,6 +663,13 @@ void clk_unuse(struct clk *clk)
 EXPORT_SYMBOL(clk_unuse);
 
 
+int clk_get_usecount(struct clk *clk)
+{
+        return clk->usecount;
+}
+EXPORT_SYMBOL(clk_get_usecount);
+
+
 unsigned long clk_get_rate(struct clk *clk)
 {
 	return clk->rate;
@@ -742,7 +783,7 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
 	}
 
 	if(clk->round_rate != 0)
-		return clk->round_rate(rate);
+		return clk->round_rate(clk, rate);
 
 	return clk->rate;
 }
@@ -761,10 +802,13 @@ static void propagate_rate(struct clk *  clk)
 }
 
 
-static int select_table_rate(unsigned long rate)
+static int select_table_rate(struct clk *  clk, unsigned long rate)
 {
 	/* Find the highest supported frequency <= rate and switch to it */
 	struct mpu_rate *  ptr;
+
+	if (clk != &virtual_ck_mpu)
+		return -EINVAL;
 
 	for (ptr = rate_table; ptr->rate; ptr++) {
 		if (ptr->xtal != ck_ref.rate)
@@ -792,11 +836,14 @@ static int select_table_rate(unsigned long rate)
 }
 
 
-static long round_to_table_rate(unsigned long rate)
+static long round_to_table_rate(struct clk *  clk, unsigned long rate)
 {
 	/* Find the highest supported frequency <= rate */
 	struct mpu_rate *  ptr;
 	long  highest_rate;
+
+	if (clk != &virtual_ck_mpu)
+		return -EINVAL;
 
 	highest_rate = -EINVAL;
 
@@ -840,7 +887,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 		ret = 0;
 	} else if(clk->set_rate != 0) {
 		spin_lock_irqsave(&clockfw_lock, flags);
-		ret = clk->set_rate(rate);
+		ret = clk->set_rate(clk, rate);
 		spin_unlock_irqrestore(&clockfw_lock, flags);
 	}
 
@@ -852,10 +899,79 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 EXPORT_SYMBOL(clk_set_rate);
 
 
+static unsigned calc_ext_dsor(unsigned long rate)
+{
+	unsigned dsor;
+
+	/* MCLK and BCLK divisor selection is not linear:
+	 * freq = 96MHz / dsor
+	 *
+	 * RATIO_SEL range: dsor <-> RATIO_SEL
+	 * 0..6: (RATIO_SEL+2) <-> (dsor-2)
+	 * 6..48:  (8+(RATIO_SEL-6)*2) <-> ((dsor-8)/2+6)
+	 * Minimum dsor is 2 and maximum is 96. Odd divisors starting from 9
+	 * can not be used.
+	 */
+	for (dsor = 2; dsor < 96; ++dsor) {
+		if ((dsor & 1) && dsor > 8)
+		  	continue;
+		if (rate >= 96000000 / dsor)
+			break;
+	}
+	return dsor;
+}
+
+
+static int set_ext_clk_rate(struct clk *  clk, unsigned long rate)
+{
+	unsigned dsor;
+	__u16 ratio_bits;
+
+	dsor = calc_ext_dsor(rate);
+	clk->rate = 96000000 / dsor;
+	if (dsor > 8)
+		ratio_bits = ((dsor - 8) / 2 + 6) << 2;
+	else
+		ratio_bits = (dsor - 2) << 2;
+
+	ratio_bits |= omap_readw(clk->enable_reg) & ~0xfd;
+	omap_writew(ratio_bits, clk->enable_reg);
+
+	return 0;
+}
+
+
+static long round_ext_clk_rate(struct clk *  clk, unsigned long rate)
+{
+	return 96000000 / calc_ext_dsor(rate);
+}
+
+
+static void init_ext_clk(struct clk *  clk)
+{
+	unsigned dsor;
+	__u16 ratio_bits;
+
+	/* Determine current rate and ensure clock is based on 96MHz APLL */
+	ratio_bits = omap_readw(clk->enable_reg) & ~1;
+	omap_writew(ratio_bits, clk->enable_reg);
+
+	ratio_bits = (ratio_bits & 0xfc) >> 2;
+	if (ratio_bits > 6)
+		dsor = (ratio_bits - 6) * 2 + 8;
+	else
+		dsor = ratio_bits + 2;
+
+	clk-> rate = 96000000 / dsor;
+}
+
+
 int clk_register(struct clk *clk)
 {
 	down(&clocks_sem);
 	list_add(&clk->node, &clocks);
+	if (clk->init)
+		clk->init(clk);
 	up(&clocks_sem);
 	return 0;
 }
@@ -887,6 +1003,11 @@ int __init clk_init(void)
 			clk_register(*clkp);
 			continue;
 		}
+
+		if (((*clkp)->flags &CLOCK_IN_OMAP730) && cpu_is_omap730()) {
+			clk_register(*clkp);
+			continue;
+		}
 	}
 
 	info = omap_get_config(OMAP_TAG_CLOCK, struct omap_clock_config);
@@ -906,7 +1027,7 @@ int __init clk_init(void)
 	omap_writew(0x1000, ARM_SYSST);
 
 	/* Find the highest supported frequency and enable it */
-	if (select_table_rate(~0)) {
+	if (select_table_rate(&virtual_ck_mpu, ~0)) {
 		printk(KERN_ERR "System frequencies not set. Check your config.\n");
 		/* Guess sane values (60MHz) */
 		omap_writew(0x2290, DPLL_CTL);

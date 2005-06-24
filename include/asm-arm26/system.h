@@ -245,6 +245,8 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
 
 #endif /* __ASSEMBLY__ */
 
+#define arch_align_stack(x) (x)
+
 #endif /* __KERNEL__ */
 
 #endif

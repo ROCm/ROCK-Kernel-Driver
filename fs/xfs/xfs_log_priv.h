@@ -74,17 +74,17 @@ struct xfs_mount;
  *  set lsns
  */
 
-#define ASSIGN_LSN_CYCLE(lsn,cycle,arch) \
-    INT_SET(((uint *)&(lsn))[LSN_FIELD_CYCLE(arch)], arch, (cycle));
-#define ASSIGN_LSN_BLOCK(lsn,block,arch) \
-    INT_SET(((uint *)&(lsn))[LSN_FIELD_BLOCK(arch)], arch, (block));
-#define ASSIGN_ANY_LSN(lsn,cycle,block,arch)  \
+#define ASSIGN_ANY_LSN_HOST(lsn,cycle,block)  \
     { \
-	ASSIGN_LSN_CYCLE(lsn,cycle,arch); \
-	ASSIGN_LSN_BLOCK(lsn,block,arch); \
+	(lsn) = ((xfs_lsn_t)(cycle)<<32)|(block); \
     }
-#define ASSIGN_LSN(lsn,log,arch) \
-    ASSIGN_ANY_LSN(lsn,(log)->l_curr_cycle,(log)->l_curr_block,arch);
+#define ASSIGN_ANY_LSN_DISK(lsn,cycle,block)  \
+    { \
+	INT_SET(((uint *)&(lsn))[0], ARCH_CONVERT, (cycle)); \
+	INT_SET(((uint *)&(lsn))[1], ARCH_CONVERT, (block)); \
+    }
+#define ASSIGN_LSN(lsn,log) \
+    ASSIGN_ANY_LSN_DISK(lsn,(log)->l_curr_cycle,(log)->l_curr_block);
 
 #define XLOG_SET(f,b)		(((f) & (b)) == (b))
 

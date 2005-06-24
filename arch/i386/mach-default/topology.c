@@ -30,7 +30,7 @@
 #include <linux/nodemask.h>
 #include <asm/cpu.h>
 
-struct i386_cpu cpu_devices[NR_CPUS];
+static struct i386_cpu cpu_devices[NR_CPUS];
 
 int arch_register_cpu(int num){
 	struct node *parent = NULL;

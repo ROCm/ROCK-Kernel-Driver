@@ -31,7 +31,6 @@
 #include <linux/list.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
-#include <linux/major.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/skbuff.h>
@@ -59,8 +58,6 @@ EXPORT_SYMBOL(proc_bt);
 /* Bluetooth sockets */
 #define BT_MAX_PROTO	8
 static struct net_proto_family *bt_proto[BT_MAX_PROTO];
-
-static kmem_cache_t *bt_sock_cache;
 
 int bt_sock_register(int proto, struct net_proto_family *ops)
 {
@@ -107,36 +104,6 @@ static int bt_sock_create(struct socket *sock, int proto)
 	}
 	return err; 
 }
-
-struct sock *bt_sock_alloc(struct socket *sock, int proto, int pi_size, int prio)
-{
-	struct sock *sk;
-	void *pi;
-
-	sk = sk_alloc(PF_BLUETOOTH, prio, sizeof(struct bt_sock), bt_sock_cache);
-	if (!sk)
-		return NULL;
-
-	if (pi_size) {
-		pi = kmalloc(pi_size, prio);
-		if (!pi) {
-			sk_free(sk);
-			return NULL;
-		}
-		memset(pi, 0, pi_size);
-		sk->sk_protinfo = pi;
-	}
-
-	sock_init_data(sock, sk);
-	INIT_LIST_HEAD(&bt_sk(sk)->accept_q);
-
-	sk->sk_zapped   = 0;
-	sk->sk_protocol = proto;
-	sk->sk_state    = BT_OPEN;
-
-	return sk;
-}
-EXPORT_SYMBOL(bt_sock_alloc);
 
 void bt_sock_link(struct bt_sock_list *l, struct sock *sk)
 {
@@ -355,16 +322,6 @@ static int __init bt_init(void)
 	if (proc_bt)
 		proc_bt->owner = THIS_MODULE;
 
-	/* Init socket cache */
-	bt_sock_cache = kmem_cache_create("bt_sock",
-			sizeof(struct bt_sock), 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
-
-	if (!bt_sock_cache) {
-		BT_ERR("Socket cache creation failed");
-		return -ENOMEM;
-	}
-
 	sock_register(&bt_sock_family_ops);
 
 	BT_INFO("HCI device and connection manager initialized");
@@ -383,7 +340,6 @@ static void __exit bt_exit(void)
 	bt_sysfs_cleanup();
 
 	sock_unregister(PF_BLUETOOTH);
-	kmem_cache_destroy(bt_sock_cache);
 
 	remove_proc_entry("bluetooth", NULL);
 }

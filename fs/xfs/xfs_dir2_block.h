@@ -87,13 +87,12 @@ xfs_dir2_block_tail_p(struct xfs_mount *mp, xfs_dir2_block_t *block);
  * Pointer to the leaf entries embedded in a data block (1-block format)
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_BLOCK_LEAF_P)
-struct xfs_dir2_leaf_entry *xfs_dir2_block_leaf_p_arch(
-	xfs_dir2_block_tail_t *btp, xfs_arch_t arch);
-#define	XFS_DIR2_BLOCK_LEAF_P_ARCH(btp,arch) \
-	xfs_dir2_block_leaf_p_arch(btp,arch)
+struct xfs_dir2_leaf_entry *xfs_dir2_block_leaf_p(xfs_dir2_block_tail_t *btp);
+#define	XFS_DIR2_BLOCK_LEAF_P(btp) \
+	xfs_dir2_block_leaf_p(btp)
 #else
-#define	XFS_DIR2_BLOCK_LEAF_P_ARCH(btp,arch)	\
-	(((struct xfs_dir2_leaf_entry *)(btp)) - INT_GET((btp)->count, arch))
+#define	XFS_DIR2_BLOCK_LEAF_P(btp)	\
+	(((struct xfs_dir2_leaf_entry *)(btp)) - INT_GET((btp)->count, ARCH_CONVERT))
 #endif
 
 /*

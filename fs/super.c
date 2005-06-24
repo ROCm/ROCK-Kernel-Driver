@@ -143,7 +143,7 @@ int __put_super_and_need_restart(struct super_block *sb)
 
 /**
  *	put_super	-	drop a temporary reference to superblock
- *	@s: superblock in question
+ *	@sb: superblock in question
  *
  *	Drops a temporary reference, frees superblock if there's no
  *	references left.
@@ -732,7 +732,7 @@ void kill_block_super(struct super_block *sb)
 
 	bdev_uevent(bdev, KOBJ_UMOUNT);
 	generic_shutdown_super(sb);
-	sync_blockdev (bdev);
+	sync_blockdev(bdev);
 	close_bdev_excl(bdev);
 }
 

@@ -19,14 +19,17 @@
 #include <asm/procinfo.h>
 #include <asm/ptrace.h>
 #include <asm/constants.h>
+#include <asm/thread_info.h>
 #include <asm/system.h>
 
 #define PROCINFO_MMUFLAGS	8
 #define PROCINFO_INITFUNC	12
 
+#define MACHINFO_TYPE		0
 #define MACHINFO_PHYSRAM	4
 #define MACHINFO_PHYSIO		8
 #define MACHINFO_PGOFFIO	12
+#define MACHINFO_NAME		16
 
 #ifndef CONFIG_XIP_KERNEL
 /*
@@ -101,12 +104,10 @@ ENTRY(stext)
 						@ and irqs disabled
 	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
 	movs	r10, r5				@ invalid processor (r5=0)?
-	moveq	r0, #'p'			@ yes, error 'p'
-	beq	__error
+	beq	__error_p				@ yes, error 'p'
 	bl	__lookup_machine_type		@ r5=machinfo
 	movs	r8, r5				@ invalid machine (r5=0)?
-	moveq	r0, #'a'			@ yes, error 'a'
-	beq	__error
+	beq	__error_a			@ yes, error 'a'
 	bl	__create_page_tables
 
 	/*
@@ -131,7 +132,7 @@ __switch_data:
 	.long	processor_id			@ r4
 	.long	__machine_arch_type		@ r5
 	.long	cr_alignment			@ r6
-	.long	init_thread_union+8192		@ sp
+	.long	init_thread_union + THREAD_START_SP @ sp
 
 /*
  * The following fragment of code is executed with the MMU on, and uses
@@ -359,22 +360,59 @@ __create_page_tables:
  * ought to tell the user, but since we don't have any guarantee that
  * we're even running on the right architecture, we do virtually nothing.
  *
- * r0 = ascii error character:
- *	a = invalid architecture
- *	p = invalid processor
- *	i = invalid calling convention
- *
- * Generally, only serious errors cause this.
+ * If CONFIG_DEBUG_LL is set we try to print out something about the error
+ * and hope for the best (useful if bootloader fails to pass a proper
+ * machine ID for example).
  */
+
+	.type	__error_p, %function
+__error_p:
+#ifdef CONFIG_DEBUG_LL
+	adr	r0, str_p1
+	bl	printascii
+	b	__error
+str_p1:	.asciz	"\nError: unrecognized/unsupported processor variant.\n"
+	.align
+#endif
+
+	.type	__error_a, %function
+__error_a:
+#ifdef CONFIG_DEBUG_LL
+	mov	r4, r1				@ preserve machine ID
+	adr	r0, str_a1
+	bl	printascii
+	mov	r0, r4
+	bl	printhex8
+	adr	r0, str_a2
+	bl	printascii
+	adr	r3, 3f
+	ldmia	r3, {r4, r5, r6}		@ get machine desc list
+	sub	r4, r3, r4			@ get offset between virt&phys
+	add	r5, r5, r4			@ convert virt addresses to
+	add	r6, r6, r4			@ physical address space
+1:	ldr	r0, [r5, #MACHINFO_TYPE]	@ get machine type
+	bl	printhex8
+	mov	r0, #'\t'
+	bl	printch
+	ldr     r0, [r5, #MACHINFO_NAME]	@ get machine name
+	add	r0, r0, r4
+	bl	printascii
+	mov	r0, #'\n'
+	bl	printch
+	add	r5, r5, #SIZEOF_MACHINE_DESC	@ next machine_desc
+	cmp	r5, r6
+	blo	1b
+	adr	r0, str_a3
+	bl	printascii
+	b	__error
+str_a1:	.asciz	"\nError: unrecognized/unsupported machine ID (r1 = 0x"
+str_a2:	.asciz	").\n\nAvailable machine support:\n\nID (hex)\tNAME\n"
+str_a3:	.asciz	"\nPlease check your kernel config and/or bootloader.\n"
+	.align
+#endif
+
 	.type	__error, %function
 __error:
-#ifdef CONFIG_DEBUG_LL
-	mov	r8, r0				@ preserve r0
-	adr	r0, err_str
-	bl	printascii
-	mov	r0, r8
-	bl	printch
-#endif
 #ifdef CONFIG_ARCH_RPC
 /*
  * Turn the screen red on a error - RiscPC only.
@@ -391,12 +429,6 @@ __error:
 1:	mov	r0, r0
 	b	1b
 
-#ifdef CONFIG_DEBUG_LL
-	.type	err_str, %object
-err_str:
-	.asciz	"\nError: "
-	.align
-#endif
 
 /*
  * Read processor ID register (CP#15, CR0), and look up in the linker-built
@@ -424,7 +456,7 @@ __lookup_processor_type:
 	beq	2f
 	add	r5, r5, #PROC_INFO_SZ		@ sizeof(proc_info_list)
 	cmp	r5, r6
-	blt	1b
+	blo	1b
 	mov	r5, #0				@ unknown processor
 2:	mov	pc, lr
 
@@ -465,12 +497,12 @@ __lookup_machine_type:
 	sub	r3, r3, r4			@ get offset between virt&phys
 	add	r5, r5, r3			@ convert virt addresses to
 	add	r6, r6, r3			@ physical address space
-1:	ldr	r3, [r5]			@ get machine type
+1:	ldr	r3, [r5, #MACHINFO_TYPE]	@ get machine type
 	teq	r3, r1				@ matches loader number?
 	beq	2f				@ found
 	add	r5, r5, #SIZEOF_MACHINE_DESC	@ next machine_desc
 	cmp	r5, r6
-	blt	1b
+	blo	1b
 	mov	r5, #0				@ unknown machine
 2:	mov	pc, lr
 

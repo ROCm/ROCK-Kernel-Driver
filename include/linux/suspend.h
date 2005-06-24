@@ -1,7 +1,7 @@
 #ifndef _LINUX_SWSUSP_H
 #define _LINUX_SWSUSP_H
 
-#if defined(CONFIG_X86) || defined(CONFIG_FRV)
+#if defined(CONFIG_X86) || defined(CONFIG_FRV) || defined(CONFIG_PPC32)
 #include <asm/suspend.h>
 #endif
 #include <linux/swap.h>
@@ -33,8 +33,6 @@ typedef struct pbe {
 
 #define SWAP_FILENAME_MAXLENGTH	32
 
-
-#define SUSPEND_PD_PAGES(x)     (((x)*sizeof(struct pbe))/PAGE_SIZE+1)
 
 extern dev_t swsusp_resume_device;
    

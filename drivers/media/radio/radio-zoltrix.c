@@ -29,7 +29,7 @@
 #include <linux/module.h>	/* Modules                        */
 #include <linux/init.h>		/* Initdata                       */
 #include <linux/ioport.h>	/* check_region, request_region   */
-#include <linux/delay.h>	/* udelay                 */
+#include <linux/delay.h>	/* udelay, msleep                 */
 #include <asm/io.h>		/* outb, outb_p                   */
 #include <asm/uaccess.h>	/* copy to/from user              */
 #include <linux/videodev.h>	/* kernel radio structs           */
@@ -51,15 +51,6 @@ struct zol_device {
 	struct semaphore lock;
 };
 
-
-/* local things */
-
-static void sleep_delay(void)
-{
-	/* Sleep nicely for +/- 10 mS */
-	schedule();
-}
-
 static int zol_setvol(struct zol_device *dev, int vol)
 {
 	dev->curvol = vol;
@@ -76,7 +67,7 @@ static int zol_setvol(struct zol_device *dev, int vol)
 	}
 
 	outb(dev->curvol-1, io);
-	sleep_delay();
+	msleep(10);
 	inb(io + 2);
 	up(&dev->lock);
 	return 0;
@@ -176,11 +167,10 @@ static int zol_getsigstr(struct zol_device *dev)
 	down(&dev->lock);
 	outb(0x00, io);         /* This stuff I found to do nothing */
 	outb(dev->curvol, io);
-	sleep_delay();
-	sleep_delay();
+	msleep(20);
 
 	a = inb(io);
-	sleep_delay();
+	msleep(10);
 	b = inb(io);
 
 	up(&dev->lock);
@@ -202,11 +192,10 @@ static int zol_is_stereo (struct zol_device *dev)
 	
 	outb(0x00, io);
 	outb(dev->curvol, io);
-	sleep_delay();
-	sleep_delay();
+	msleep(20);
 
 	x1 = inb(io);
-	sleep_delay();
+	msleep(10);
 	x2 = inb(io);
 
 	up(&dev->lock);
@@ -368,8 +357,7 @@ static int __init zoltrix_init(void)
 
 	outb(0, io);
 	outb(0, io);
-	sleep_delay();
-	sleep_delay();
+	msleep(20);
 	inb(io + 3);
 
 	zoltrix_unit.curvol = 0;

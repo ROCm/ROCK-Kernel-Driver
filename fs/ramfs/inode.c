@@ -45,7 +45,9 @@ static struct inode_operations ramfs_dir_inode_operations;
 
 static struct backing_dev_info ramfs_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
-	.memory_backed	= 1,	/* Does not contribute to dirty memory */
+	.capabilities	= BDI_CAP_NO_ACCT_DIRTY | BDI_CAP_NO_WRITEBACK |
+			  BDI_CAP_MAP_DIRECT | BDI_CAP_MAP_COPY |
+			  BDI_CAP_READ_MAP | BDI_CAP_WRITE_MAP | BDI_CAP_EXEC_MAP,
 };
 
 struct inode *ramfs_get_inode(struct super_block *sb, int mode, dev_t dev)

@@ -23,7 +23,7 @@ void (*__flush_cache_all)(void);
 void (*flush_cache_mm)(struct mm_struct *mm);
 void (*flush_cache_range)(struct vm_area_struct *vma, unsigned long start,
 	unsigned long end);
-void (*flush_cache_page)(struct vm_area_struct *vma, unsigned long page);
+void (*flush_cache_page)(struct vm_area_struct *vma, unsigned long page, unsigned long pfn);
 void (*flush_icache_range)(unsigned long start, unsigned long end);
 void (*flush_icache_page)(struct vm_area_struct *vma, struct page *page);
 
@@ -52,7 +52,7 @@ EXPORT_SYMBOL(_dma_cache_inv);
 asmlinkage int sys_cacheflush(unsigned long addr, unsigned long int bytes,
 	unsigned int cache)
 {
-	if (verify_area(VERIFY_WRITE, (void *) addr, bytes))
+	if (!access_ok(VERIFY_WRITE, (void *) addr, bytes))
 		return -EFAULT;
 
 	flush_icache_range(addr, addr + bytes);

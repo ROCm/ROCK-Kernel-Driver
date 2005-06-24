@@ -513,8 +513,8 @@ void iommu_unmap_single(struct iommu_table *tbl, dma_addr_t dma_handle,
  * Returns the virtual address of the buffer and sets dma_handle
  * to the dma address (mapping) of the first page.
  */
-void *iommu_alloc_consistent(struct iommu_table *tbl, size_t size,
-		dma_addr_t *dma_handle)
+void *iommu_alloc_coherent(struct iommu_table *tbl, size_t size,
+		dma_addr_t *dma_handle, unsigned int __nocast flag)
 {
 	void *ret = NULL;
 	dma_addr_t mapping;
@@ -538,7 +538,7 @@ void *iommu_alloc_consistent(struct iommu_table *tbl, size_t size,
 		return NULL;
 
 	/* Alloc enough pages (and possibly more) */
-	ret = (void *)__get_free_pages(GFP_ATOMIC, order);
+	ret = (void *)__get_free_pages(flag, order);
 	if (!ret)
 		return NULL;
 	memset(ret, 0, size);
@@ -553,7 +553,7 @@ void *iommu_alloc_consistent(struct iommu_table *tbl, size_t size,
 	return ret;
 }
 
-void iommu_free_consistent(struct iommu_table *tbl, size_t size,
+void iommu_free_coherent(struct iommu_table *tbl, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
 {
 	unsigned int npages;

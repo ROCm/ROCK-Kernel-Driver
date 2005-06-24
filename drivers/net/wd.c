@@ -131,6 +131,7 @@ static void cleanup_card(struct net_device *dev)
 {
 	free_irq(dev->irq, dev);
 	release_region(dev->base_addr - WD_NIC_OFFSET, WD_IO_EXTENT);
+	iounmap(ei_status.mem);
 }
 
 #ifndef MODULE
@@ -317,16 +318,22 @@ static int __init wd_probe1(struct net_device *dev, int ioaddr)
 	ei_status.rx_start_page = WD_START_PG + TX_PAGES;
 
 	/* Don't map in the shared memory until the board is actually opened. */
-	ei_status.rmem_start = dev->mem_start + TX_PAGES*256;
 
 	/* Some cards (eg WD8003EBT) can be jumpered for more (32k!) memory. */
 	if (dev->mem_end != 0) {
 		ei_status.stop_page = (dev->mem_end - dev->mem_start)/256;
+		ei_status.priv = dev->mem_end - dev->mem_start;
 	} else {
 		ei_status.stop_page = word16 ? WD13_STOP_PG : WD03_STOP_PG;
 		dev->mem_end = dev->mem_start + (ei_status.stop_page - WD_START_PG)*256;
+		ei_status.priv = (ei_status.stop_page - WD_START_PG)*256;
 	}
-	ei_status.rmem_end = dev->mem_end;
+
+	ei_status.mem = ioremap(dev->mem_start, ei_status.priv);
+	if (!ei_status.mem) {
+		free_irq(dev->irq, dev);
+		return -ENOMEM;
+	}
 
 	printk(" %s, IRQ %d, shared memory at %#lx-%#lx.\n",
 		   model_name, dev->irq, dev->mem_start, dev->mem_end-1);
@@ -397,7 +404,7 @@ wd_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_page
 {
 
 	int wd_cmdreg = dev->base_addr - WD_NIC_OFFSET; /* WD_CMDREG */
-	unsigned long hdr_start = dev->mem_start + ((ring_page - WD_START_PG)<<8);
+	void __iomem *hdr_start = ei_status.mem + ((ring_page - WD_START_PG)<<8);
 
 	/* We'll always get a 4 byte header read followed by a packet read, so
 	   we enable 16 bit mode before the header, and disable after the body. */
@@ -407,10 +414,10 @@ wd_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_page
 #ifdef __BIG_ENDIAN
 	/* Officially this is what we are doing, but the readl() is faster */
 	/* unfortunately it isn't endian aware of the struct               */
-	isa_memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
+	memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
 	hdr->count = le16_to_cpu(hdr->count);
 #else
-	((unsigned int*)hdr)[0] = isa_readl(hdr_start);
+	((unsigned int*)hdr)[0] = readl(hdr_start);
 #endif
 }
 
@@ -423,17 +430,18 @@ static void
 wd_block_input(struct net_device *dev, int count, struct sk_buff *skb, int ring_offset)
 {
 	int wd_cmdreg = dev->base_addr - WD_NIC_OFFSET; /* WD_CMDREG */
-	unsigned long xfer_start = dev->mem_start + ring_offset - (WD_START_PG<<8);
+	unsigned long offset = ring_offset - (WD_START_PG<<8);
+	void __iomem *xfer_start = ei_status.mem + offset;
 
-	if (xfer_start + count > ei_status.rmem_end) {
+	if (offset + count > ei_status.priv) {
 		/* We must wrap the input move. */
-		int semi_count = ei_status.rmem_end - xfer_start;
-		isa_memcpy_fromio(skb->data, xfer_start, semi_count);
+		int semi_count = ei_status.priv - offset;
+		memcpy_fromio(skb->data, xfer_start, semi_count);
 		count -= semi_count;
-		isa_memcpy_fromio(skb->data + semi_count, ei_status.rmem_start, count);
+		memcpy_fromio(skb->data + semi_count, ei_status.mem + TX_PAGES * 256, count);
 	} else {
 		/* Packet is in one chunk -- we can copy + cksum. */
-		isa_eth_io_copy_and_sum(skb, xfer_start, count, 0);
+		eth_io_copy_and_sum(skb, xfer_start, count, 0);
 	}
 
 	/* Turn off 16 bit access so that reboot works.	 ISA brain-damage */
@@ -446,16 +454,16 @@ wd_block_output(struct net_device *dev, int count, const unsigned char *buf,
 				int start_page)
 {
 	int wd_cmdreg = dev->base_addr - WD_NIC_OFFSET; /* WD_CMDREG */
-	long shmem = dev->mem_start + ((start_page - WD_START_PG)<<8);
+	void __iomem *shmem = ei_status.mem + ((start_page - WD_START_PG)<<8);
 
 
 	if (ei_status.word16) {
 		/* Turn on and off 16 bit access so that reboot works. */
 		outb(ISA16 | ei_status.reg5, wd_cmdreg+WD_CMDREG5);
-		isa_memcpy_toio(shmem, buf, count);
+		memcpy_toio(shmem, buf, count);
 		outb(ei_status.reg5, wd_cmdreg+WD_CMDREG5);
 	} else
-		isa_memcpy_toio(shmem, buf, count);
+		memcpy_toio(shmem, buf, count);
 }
 
 

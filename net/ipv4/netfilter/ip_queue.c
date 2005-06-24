@@ -15,6 +15,9 @@
  *             Zander).
  * 2000-08-01: Added Nick Williams' MAC support.
  * 2002-06-25: Code cleanup.
+ * 2005-01-10: Added /proc counter for dropped packets; fixed so
+ *             packets aren't delivered to user space if they're going 
+ *             to be dropped. 
  * 2005-05-26: local_bh_{disable,enable} around nf_reinject (Harald Welte)
  *
  */
@@ -61,6 +64,8 @@ static DEFINE_RWLOCK(queue_lock);
 static int peer_pid;
 static unsigned int copy_range;
 static unsigned int queue_total;
+static unsigned int queue_dropped = 0;
+static unsigned int queue_user_dropped = 0;
 static struct sock *ipqnl;
 static LIST_HEAD(queue_list);
 static DECLARE_MUTEX(ipqnl_sem);
@@ -80,18 +85,11 @@ ipq_issue_verdict(struct ipq_queue_entry *entry, int verdict)
 	kfree(entry);
 }
 
-static inline int
+static inline void
 __ipq_enqueue_entry(struct ipq_queue_entry *entry)
 {
-       if (queue_total >= queue_maxlen) {
-               if (net_ratelimit()) 
-                       printk(KERN_WARNING "ip_queue: full at %d entries, "
-                              "dropping packet(s).\n", queue_total);
-               return -ENOSPC;
-       }
        list_add(&entry->list, &queue_list);
        queue_total++;
-       return 0;
 }
 
 /*
@@ -318,14 +316,24 @@ ipq_enqueue_packet(struct sk_buff *skb, struct nf_info *info, void *data)
 	if (!peer_pid)
 		goto err_out_free_nskb; 
 
+	if (queue_total >= queue_maxlen) {
+                queue_dropped++;
+		status = -ENOSPC;
+		if (net_ratelimit())
+		          printk (KERN_WARNING "ip_queue: full at %d entries, "
+				  "dropping packets(s). Dropped: %d\n", queue_total,
+				  queue_dropped);
+		goto err_out_free_nskb;
+	}
+
  	/* netlink_unicast will either free the nskb or attach it to a socket */ 
 	status = netlink_unicast(ipqnl, nskb, peer_pid, MSG_DONTWAIT);
-	if (status < 0)
+	if (status < 0) {
+	        queue_user_dropped++;
 		goto err_out_unlock;
-	
-	status = __ipq_enqueue_entry(entry);
-	if (status < 0)
-		goto err_out_unlock;
+	}
+
+	__ipq_enqueue_entry(entry);
 
 	write_unlock_bh(&queue_lock);
 	return status;
@@ -548,20 +556,18 @@ ipq_rcv_skb(struct sk_buff *skb)
 static void
 ipq_rcv_sk(struct sock *sk, int len)
 {
-	do {
-		struct sk_buff *skb;
+	struct sk_buff *skb;
+	unsigned int qlen;
 
-		if (down_trylock(&ipqnl_sem))
-			return;
+	down(&ipqnl_sem);
 			
-		while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
-			ipq_rcv_skb(skb);
-			kfree_skb(skb);
-		}
+	for (qlen = skb_queue_len(&sk->sk_receive_queue); qlen; qlen--) {
+		skb = skb_dequeue(&sk->sk_receive_queue);
+		ipq_rcv_skb(skb);
+		kfree_skb(skb);
+	}
 		
-		up(&ipqnl_sem);
-
-	} while (ipqnl && ipqnl->sk_receive_queue.qlen);
+	up(&ipqnl_sem);
 }
 
 static int
@@ -647,12 +653,16 @@ ipq_get_info(char *buffer, char **start, off_t offset, int length)
 	              "Copy mode         : %hu\n"
 	              "Copy range        : %u\n"
 	              "Queue length      : %u\n"
-	              "Queue max. length : %u\n",
+	              "Queue max. length : %u\n"
+		      "Queue dropped     : %u\n"
+		      "Netlink dropped   : %u\n",
 	              peer_pid,
 	              copy_mode,
 	              copy_range,
 	              queue_total,
-	              queue_maxlen);
+	              queue_maxlen,
+		      queue_dropped,
+		      queue_user_dropped);
 
 	read_unlock_bh(&queue_lock);
 	

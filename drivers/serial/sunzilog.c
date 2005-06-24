@@ -1562,12 +1562,13 @@ static void __init sunzilog_register_serio(struct uart_sunzilog_port *up, int ch
 
 		serio->port_data = up;
 
-		serio->type = SERIO_RS232;
+		serio->id.type = SERIO_RS232;
 		if (channel == KEYBOARD_LINE) {
-			serio->type |= SERIO_SUNKBD;
+			serio->id.proto = SERIO_SUNKBD;
 			strlcpy(serio->name, "zskbd", sizeof(serio->name));
 		} else {
-			serio->type |= (SERIO_SUN | (1 << 16));
+			serio->id.proto = SERIO_SUN;
+			serio->id.extra = 1;
 			strlcpy(serio->name, "zsms", sizeof(serio->name));
 		}
 		strlcpy(serio->phys,

@@ -189,7 +189,7 @@ static struct irda_class_desc *irda_usb_find_class_desc(struct usb_device *dev, 
 	ret = usb_control_msg(dev, usb_rcvctrlpipe(dev,0),
 			IU_REQ_GET_CLASS_DESC,
 			USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-			0, ifnum, desc, sizeof(*desc), HZ);
+			0, ifnum, desc, sizeof(*desc), 1000);
 	
 	dbg("%s -  ret=%d", __FUNCTION__, ret);
 	if (ret < sizeof(*desc)) {

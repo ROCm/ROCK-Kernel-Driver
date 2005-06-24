@@ -358,39 +358,44 @@ struct uhci_hcd {
 	struct uhci_td *term_td;	/* Terminating TD, see UHCI bug */
 	struct uhci_qh *skelqh[UHCI_NUM_SKELQH];	/* Skeleton QH's */
 
-	spinlock_t schedule_lock;
-	struct uhci_frame_list *fl;		/* P: uhci->schedule_lock */
+	spinlock_t lock;
+	struct uhci_frame_list *fl;		/* P: uhci->lock */
 	int fsbr;				/* Full-speed bandwidth reclamation */
 	unsigned long fsbrtimeout;		/* FSBR delay */
 
 	enum uhci_state state;			/* FIXME: needs a spinlock */
 	unsigned long state_end;		/* Time of next transition */
-	int resume_detect;			/* Need a Global Resume */
-	unsigned int saved_framenumber;		/* Save during PM suspend */
+	unsigned int frame_number;		/* As of last check */
+	unsigned int is_stopped;
+#define UHCI_IS_STOPPED		9999		/* Larger than a frame # */
 
-	/* Support for port suspend/resume */
+	unsigned int scan_in_progress:1;	/* Schedule scan is running */
+	unsigned int need_rescan:1;		/* Redo the schedule scan */
+	unsigned int resume_detect:1;		/* Need a Global Resume */
+
+	/* Support for port suspend/resume/reset */
 	unsigned long port_c_suspend;		/* Bit-arrays of ports */
 	unsigned long suspended_ports;
 	unsigned long resuming_ports;
-	unsigned long resume_timeout;		/* Time to stop signalling */
+	unsigned long ports_timeout;		/* Time to stop signalling */
 
 	/* Main list of URB's currently controlled by this HC */
-	struct list_head urb_list;		/* P: uhci->schedule_lock */
+	struct list_head urb_list;		/* P: uhci->lock */
 
 	/* List of QH's that are done, but waiting to be unlinked (race) */
-	struct list_head qh_remove_list;	/* P: uhci->schedule_lock */
+	struct list_head qh_remove_list;	/* P: uhci->lock */
 	unsigned int qh_remove_age;		/* Age in frames */
 
 	/* List of TD's that are done, but waiting to be freed (race) */
-	struct list_head td_remove_list;	/* P: uhci->schedule_lock */
+	struct list_head td_remove_list;	/* P: uhci->lock */
 	unsigned int td_remove_age;		/* Age in frames */
 
 	/* List of asynchronously unlinked URB's */
-	struct list_head urb_remove_list;	/* P: uhci->schedule_lock */
+	struct list_head urb_remove_list;	/* P: uhci->lock */
 	unsigned int urb_remove_age;		/* Age in frames */
 
 	/* List of URB's awaiting completion callback */
-	struct list_head complete_list;		/* P: uhci->schedule_lock */
+	struct list_head complete_list;		/* P: uhci->lock */
 
 	int rh_numports;
 
@@ -436,13 +441,13 @@ struct urb_priv {
  * Locking in uhci.c
  *
  * Almost everything relating to the hardware schedule and processing
- * of URBs is protected by uhci->schedule_lock.  urb->status is protected
- * by urb->lock; that's the one exception.
+ * of URBs is protected by uhci->lock.  urb->status is protected by
+ * urb->lock; that's the one exception.
  *
- * To prevent deadlocks, never lock uhci->schedule_lock while holding
- * urb->lock.  The safe order of locking is:
+ * To prevent deadlocks, never lock uhci->lock while holding urb->lock.
+ * The safe order of locking is:
  *
- * #1 uhci->schedule_lock
+ * #1 uhci->lock
  * #2 urb->lock
  */
 

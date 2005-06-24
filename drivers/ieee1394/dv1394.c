@@ -2531,7 +2531,7 @@ static int handle_dv1394_init(struct file *file, unsigned int cmd, unsigned long
 	mm_segment_t old_fs;
 	int ret;
 
-	if (file->f_op->ioctl != dv1394_ioctl)
+	if (file->f_op->unlocked_ioctl != dv1394_ioctl)
 		return -EFAULT;
 
 	if (copy_from_user(&dv32, (void __user *)arg, sizeof(dv32)))
@@ -2547,8 +2547,7 @@ static int handle_dv1394_init(struct file *file, unsigned int cmd, unsigned long
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	ret = dv1394_ioctl(file,
-			   DV1394_IOC_INIT, (unsigned long)&dv);
+	ret = dv1394_ioctl(file, DV1394_IOC_INIT, (unsigned long)&dv);
 	set_fs(old_fs);
 
 	return ret;
@@ -2561,13 +2560,12 @@ static int handle_dv1394_get_status(struct file *file, unsigned int cmd, unsigne
 	mm_segment_t old_fs;
 	int ret;
 
-	if (file->f_op->ioctl != dv1394_ioctl)
+	if (file->f_op->unlocked_ioctl != dv1394_ioctl)
 		return -EFAULT;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	ret = dv1394_ioctl(file,
-			   DV1394_IOC_GET_STATUS, (unsigned long)&dv);
+	ret = dv1394_ioctl(file, DV1394_IOC_GET_STATUS, (unsigned long)&dv);
 	set_fs(old_fs);
 
 	if (!ret) {
@@ -2595,7 +2593,6 @@ static int handle_dv1394_get_status(struct file *file, unsigned int cmd, unsigne
 static long dv1394_compat_ioctl(struct file *file, unsigned int cmd,
 			       unsigned long arg)
 {
-	int err;
 	switch (cmd) {
 	case DV1394_IOC_SHUTDOWN:
 	case DV1394_IOC_SUBMIT_FRAMES:

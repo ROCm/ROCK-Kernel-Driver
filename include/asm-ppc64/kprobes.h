@@ -35,6 +35,11 @@ typedef unsigned int kprobe_opcode_t;
 #define BREAKPOINT_INSTRUCTION	0x7fe00008	/* trap */
 #define MAX_INSN_SIZE 1
 
+#define IS_TW(instr)		(((instr) & 0xfc0007fe) == 0x7c000008)
+#define IS_TD(instr)		(((instr) & 0xfc0007fe) == 0x7c000088)
+#define IS_TDI(instr)		(((instr) & 0xfc000000) == 0x08000000)
+#define IS_TWI(instr)		(((instr) & 0xfc000000) == 0x0c000000)
+
 #define JPROBE_ENTRY(pentry)	(kprobe_opcode_t *)((func_descr_t *)pentry)
 
 /* Architecture specific copy of original instruction */

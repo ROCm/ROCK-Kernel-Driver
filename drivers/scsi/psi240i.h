@@ -309,11 +309,7 @@ typedef struct _IDENTIFY_DATA2 {
 #endif	// PSI_EIDE_SCSIOP
 
 // function prototypes
-int Psi240i_Detect			(Scsi_Host_Template *tpnt);
 int Psi240i_Command			(Scsi_Cmnd *SCpnt);
-int Psi240i_QueueCommand	(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *));
 int Psi240i_Abort			(Scsi_Cmnd *SCpnt);
 int Psi240i_Reset			(Scsi_Cmnd *SCpnt, unsigned int flags);
-int Psi240i_BiosParam		(struct scsi_device *sdev, struct block_device *bdev,
-					sector_t capacity, int geom[]);
 #endif

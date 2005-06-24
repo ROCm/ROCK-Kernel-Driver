@@ -27,7 +27,7 @@ sh64_switch_to:
    r5 - &next->thread
 
    Outgoing results
-   r2 - last (=prev)
+   r2 - last (=prev) : this just stays in r2 throughout
 
    Want to create a full (struct pt_regs) on the stack to allow backtracing
    functions to work.  However, we only need to populate the callee-save
@@ -188,7 +188,6 @@ sh64_switch_to:
 	! epilogue
 	ld.l	r15, 0, r18
 	ld.l	r15, 4, r14
-	ori	r4, 0, r2	! last = prev
 	ptabs	r18, tr0
 	movi	FRAME_SIZE, r0
 	add	r15, r0, r15

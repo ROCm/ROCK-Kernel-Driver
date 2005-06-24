@@ -23,7 +23,6 @@
 #include <linux/config.h>	    /* for CONFIG_SCSI_LOGGING */
 
 #include <scsi/scsi_cmnd.h>
-#include <scsi/scsi_dbg.h>
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_eh.h>
 #include <scsi/scsi_request.h>
@@ -45,63 +44,6 @@ struct scsi_cmnd;
 struct scsi_device;
 struct scsi_target;
 struct scatterlist;
-
-/*
- * Legacy dma direction interfaces.
- *
- * This assumes the pci/sbus dma mapping flags have the same numercial
- * values as the generic dma-mapping ones.  Currently they have but there's
- * no way to check.  Better don't use these interfaces!
- */
-#define SCSI_DATA_UNKNOWN	(DMA_BIDIRECTIONAL)
-#define SCSI_DATA_WRITE		(DMA_TO_DEVICE)
-#define SCSI_DATA_READ		(DMA_FROM_DEVICE)
-#define SCSI_DATA_NONE		(DMA_NONE)
-
-#define scsi_to_pci_dma_dir(scsi_dir)	((int)(scsi_dir))
-#define scsi_to_sbus_dma_dir(scsi_dir)	((int)(scsi_dir))
-
-/*
- * Old names for debug prettyprinting functions.
- */
-static inline void print_Scsi_Cmnd(struct scsi_cmnd *cmd)
-{
-	return scsi_print_command(cmd);
-}
-static inline void print_command(unsigned char *cdb)
-{
-	return __scsi_print_command(cdb);
-}
-static inline void print_sense(const char *devclass, struct scsi_cmnd *cmd)
-{
-	return scsi_print_sense(devclass, cmd);
-}
-static inline void print_req_sense(const char *devclass, struct scsi_request *req)
-{
-	return scsi_print_req_sense(devclass, req);
-}
-static inline void print_driverbyte(int scsiresult)
-{
-	return scsi_print_driverbyte(scsiresult);
-}
-static inline void print_hostbyte(int scsiresult)
-{
-	return scsi_print_hostbyte(scsiresult);
-}
-static inline void print_status(unsigned char status)
-{
-	return scsi_print_status(status);
-}
-static inline int print_msg(const unsigned char *msg)
-{
-	return scsi_print_msg(msg);
-}
-
-/*
- * This is the crap from the old error handling code.  We have it in a special
- * place so that we can more easily delete it later on.
- */
-#include "scsi_obsolete.h"
 
 /* obsolete typedef junk. */
 #include "scsi_typedefs.h"

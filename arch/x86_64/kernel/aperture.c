@@ -33,7 +33,7 @@ int fallback_aper_force __initdata = 0;
 
 int fix_aperture __initdata = 1;
 
-/* This code runs before the PCI subsystem is initialized, so just 
+/* This code runs before the PCI subsystem is initialized, so just
    access the northbridge directly. */
 
 #define NB_ID_3 (PCI_VENDOR_ID_AMD | (0x1103<<16))
@@ -53,9 +53,9 @@ static u32 __init allocate_aperture(void)
 	aper_size = (32 * 1024 * 1024) << fallback_aper_order; 
 
 	/* 
-	 * Aperture has to be naturally aligned. This means an 2GB aperture won't 
-	 * have much chances to find a place in the lower 4GB of memory. 
-	 * Unfortunately we cannot move it up because that would make the 
+	 * Aperture has to be naturally aligned. This means an 2GB aperture won't
+	 * have much chances to find a place in the lower 4GB of memory.
+	 * Unfortunately we cannot move it up because that would make the
 	 * IOMMU useless.
 	 */
 	p = __alloc_bootmem_node(nd0, aper_size, aper_size, 0); 
@@ -66,7 +66,7 @@ static u32 __init allocate_aperture(void)
 			free_bootmem_node(nd0, (unsigned long)p, aper_size); 
 		return 0;
 	}
-	printk("Mapping aperture over %d KB of RAM @ %lx\n",  
+	printk("Mapping aperture over %d KB of RAM @ %lx\n",
 	       aper_size >> 10, __pa(p)); 
 	return (u32)__pa(p); 
 }
@@ -90,7 +90,7 @@ static int __init aperture_valid(char *name, u64 aper_base, u32 aper_size)
 	return 1;
 } 
 
-/* Find a PCI capability */ 
+/* Find a PCI capability */
 static __u32 __init find_cap(int num, int slot, int func, int cap) 
 { 
 	u8 pos;

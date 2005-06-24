@@ -31,6 +31,7 @@ struct xterm_chan {
 	int direct_rcv;
 };
 
+/* Not static because it's called directly by the tt mode gdb code */
 void *xterm_init(char *str, int device, struct chan_opts *opts)
 {
 	struct xterm_chan *data;
@@ -83,8 +84,11 @@ __uml_setup("xterm=", xterm_setup,
 "    are 'xterm=gnome-terminal,-t,-x'.\n\n"
 );
 
-/* XXX This badly needs some cleaning up in the error paths */
-int xterm_open(int input, int output, int primary, void *d, char **dev_out)
+/* XXX This badly needs some cleaning up in the error paths
+ * Not static because it's called directly by the tt mode gdb code
+ */
+int xterm_open(int input, int output, int primary, void *d,
+		      char **dev_out)
 {
 	struct xterm_chan *data = d;
 	unsigned long stack;
@@ -170,6 +174,7 @@ int xterm_open(int input, int output, int primary, void *d, char **dev_out)
 	return(new);
 }
 
+/* Not static because it's called directly by the tt mode gdb code */
 void xterm_close(int fd, void *d)
 {
 	struct xterm_chan *data = d;
@@ -183,12 +188,12 @@ void xterm_close(int fd, void *d)
 	os_close_file(fd);
 }
 
-void xterm_free(void *d)
+static void xterm_free(void *d)
 {
 	free(d);
 }
 
-int xterm_console_write(int fd, const char *buf, int n, void *d)
+static int xterm_console_write(int fd, const char *buf, int n, void *d)
 {
 	struct xterm_chan *data = d;
 

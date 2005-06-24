@@ -500,9 +500,9 @@ static int ipip6_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	if (tiph->frag_off)
-		mtu = dst_pmtu(&rt->u.dst) - sizeof(struct iphdr);
+		mtu = dst_mtu(&rt->u.dst) - sizeof(struct iphdr);
 	else
-		mtu = skb->dst ? dst_pmtu(skb->dst) : dev->mtu;
+		mtu = skb->dst ? dst_mtu(skb->dst) : dev->mtu;
 
 	if (mtu < 68) {
 		tunnel->stat.collisions++;

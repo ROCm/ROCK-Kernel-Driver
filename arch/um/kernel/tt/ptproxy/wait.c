@@ -9,14 +9,13 @@ terms and conditions.
 #include <errno.h>
 #include <signal.h>
 #include <sys/wait.h>
-#include <sys/ptrace.h>
 
 #include "ptproxy.h"
 #include "sysdep.h"
 #include "wait.h"
 #include "user_util.h"
+#include "ptrace_user.h"
 #include "sysdep/ptrace.h"
-#include "sysdep/ptrace_user.h"
 #include "sysdep/sigcontext.h"
 
 int proxy_wait_return(struct debugger *debugger, pid_t unused)
@@ -59,10 +58,10 @@ int real_wait_return(struct debugger *debugger)
 
 	pid = debugger->pid;
 
-	ip = ptrace(PTRACE_PEEKUSER, pid, PT_IP_OFFSET, 0);
+	ip = ptrace(PTRACE_PEEKUSR, pid, PT_IP_OFFSET, 0);
 	IP_RESTART_SYSCALL(ip);
 
-	if(ptrace(PTRACE_POKEUSER, pid, PT_IP_OFFSET, ip) < 0)
+	if(ptrace(PTRACE_POKEUSR, pid, PT_IP_OFFSET, ip) < 0)
 		tracer_panic("real_wait_return : Failed to restart system "
 			     "call, errno = %d\n", errno);
 

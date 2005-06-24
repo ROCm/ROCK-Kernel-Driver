@@ -1,35 +1,35 @@
 /*
- * budget.c: driver for the SAA7146 based Budget DVB cards 
+ * budget.c: driver for the SAA7146 based Budget DVB cards
  *
- * Compiled from various sources by Michael Hunold <michael@mihu.de> 
+ * Compiled from various sources by Michael Hunold <michael@mihu.de>
  *
  * Copyright (C) 2002 Ralph Metzler <rjkm@metzlerbros.de>
  *
- * Copyright (C) 1999-2002 Ralph  Metzler 
+ * Copyright (C) 1999-2002 Ralph  Metzler
  *                       & Marcus Metzler for convergence integrated media GmbH
  *
  * 26feb2004 Support for FS Activy Card (Grundig tuner) by
  *           Michael Dreher <michael@5dot1.de>,
  *           Oliver Endriss <o.endriss@gmx.de> and
  *           Andreas 'randy' Weinberger
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
- * 
+ *
  *
  * the project's page is at http://www.linuxtv.org/dvb/
  */
@@ -48,7 +48,6 @@ static void Set22K (struct budget *budget, int state)
 	saa7146_setgpio(dev, 3, (state ? SAA7146_GPIO_OUTHI : SAA7146_GPIO_OUTLO));
 }
 
-
 /* Diseqc functions only for TT Budget card */
 /* taken from the Skyvision DVB driver by
    Ralph Metzler <rjkm@metzlerbros.de> */
@@ -64,7 +63,6 @@ static void DiseqcSendBit (struct budget *budget, int data)
 	udelay(data ? 1000 : 500);
 }
 
-
 static void DiseqcSendByte (struct budget *budget, int data)
 {
 	int i, par=1, d;
@@ -79,7 +77,6 @@ static void DiseqcSendByte (struct budget *budget, int data)
 
 	DiseqcSendBit(budget, par);
 }
-
 
 static int SendDiSEqCMsg (struct budget *budget, int len, u8 *msg, unsigned long burst)
 {
@@ -119,7 +116,7 @@ static int SetVoltage_Activy (struct budget *budget, fe_sec_voltage_t voltage)
 {
 	struct saa7146_dev *dev=budget->dev;
 
-       dprintk(2, "budget: %p\n", budget);
+	dprintk(2, "budget: %p\n", budget);
 
 	switch (voltage) {
 		case SEC_VOLTAGE_13:
@@ -147,28 +144,29 @@ static int budget_set_tone(struct dvb_frontend* fe, fe_sec_tone_mode_t tone)
 	struct budget* budget = (struct budget*) fe->dvb->priv;
 
 	switch (tone) {
-               case SEC_TONE_ON:
-                       Set22K (budget, 1);
-                       break;
-               case SEC_TONE_OFF:
-                       Set22K (budget, 0);
-                       break;
+	case SEC_TONE_ON:
+		Set22K (budget, 1);
+		break;
 
-               default:
-                       return -EINVAL;
+	case SEC_TONE_OFF:
+		Set22K (budget, 0);
+		break;
+
+	default:
+		return -EINVAL;
 	}
 
 	return 0;
 }
 
 static int budget_diseqc_send_master_cmd(struct dvb_frontend* fe, struct dvb_diseqc_master_cmd* cmd)
-       {
+{
 	struct budget* budget = (struct budget*) fe->dvb->priv;
 
-               SendDiSEqCMsg (budget, cmd->msg_len, cmd->msg, 0);
+	SendDiSEqCMsg (budget, cmd->msg_len, cmd->msg, 0);
 
 	return 0;
-       }
+}
 
 static int budget_diseqc_send_burst(struct dvb_frontend* fe, fe_sec_mini_cmd_t minicmd)
 {
@@ -176,7 +174,7 @@ static int budget_diseqc_send_burst(struct dvb_frontend* fe, fe_sec_mini_cmd_t m
 
 	SendDiSEqCMsg (budget, 0, NULL, minicmd);
 
-       return 0;
+	return 0;
 }
 
 static int alps_bsrv2_pll_set(struct dvb_frontend* fe, struct dvb_frontend_parameters* params)
@@ -275,7 +273,7 @@ static int alps_bsru6_set_symbol_rate(struct dvb_frontend* fe, u32 srate, u32 ra
 	stv0299_writereg (fe, 0x21, (ratio      ) & 0xf0);
 
 	return 0;
-	}
+}
 
 static int alps_bsru6_pll_set(struct dvb_frontend* fe, struct dvb_frontend_parameters* params)
 {
@@ -368,7 +366,7 @@ static int grundig_29504_401_pll_set(struct dvb_frontend* fe, struct dvb_fronten
 
 	if (i2c_transfer (&budget->i2c_adap, &msg, 1) != 1) return -EIO;
 	return 0;
-	}
+}
 
 static struct l64781_config grundig_29504_401_config = {
 	.demod_address = 0x55,
@@ -434,22 +432,28 @@ static void frontend_init(struct budget *budget)
 		}
 		break;
 
-   	case 0x1004: // Hauppauge/TT DVB-C budget (ves1820/ALPS TDBE2(sp5659))
+	case 0x1004: // Hauppauge/TT DVB-C budget (ves1820/ALPS TDBE2(sp5659))
 
 		budget->dvb_frontend = ves1820_attach(&alps_tdbe2_config, &budget->i2c_adap, read_pwm(budget));
 		if (budget->dvb_frontend) break;
 		break;
 
-   	case 0x1005: // Hauppauge/TT Nova-T budget (L64781/Grundig 29504-401(tsa5060))
+	case 0x1005: // Hauppauge/TT Nova-T budget (L64781/Grundig 29504-401(tsa5060))
 
 		budget->dvb_frontend = l64781_attach(&grundig_29504_401_config, &budget->i2c_adap);
 		if (budget->dvb_frontend) break;
 		break;
 
-	case 0x4f61: // Fujitsu Siemens Activy Budget-S PCI (tda8083/Grundig 29504-451(tsa5522))
+	case 0x4f60: // Fujitsu Siemens Activy Budget-S PCI rev AL (stv0299/ALPS BSRU6(tsa5059))
+		budget->dvb_frontend = stv0299_attach(&alps_bsru6_config, &budget->i2c_adap);
+		if (budget->dvb_frontend) {
+			budget->dvb_frontend->ops->set_voltage = siemens_budget_set_voltage;
+			break;
+		}
+		break;
 
-		// grundig 29504-451
-                budget->dvb_frontend = tda8083_attach(&grundig_29504_451_config, &budget->i2c_adap);
+	case 0x4f61: // Fujitsu Siemens Activy Budget-S PCI rev GR (tda8083/Grundig 29504-451(tsa5522))
+		budget->dvb_frontend = tda8083_attach(&grundig_29504_451_config, &budget->i2c_adap);
 		if (budget->dvb_frontend) {
 			budget->dvb_frontend->ops->set_voltage = siemens_budget_set_voltage;
 			break;
@@ -464,7 +468,7 @@ static void frontend_init(struct budget *budget)
 		       budget->dev->pci->subsystem_vendor,
 		       budget->dev->pci->subsystem_device);
 	} else {
-		if (dvb_register_frontend(budget->dvb_adapter, budget->dvb_frontend)) {
+		if (dvb_register_frontend(&budget->dvb_adapter, budget->dvb_frontend)) {
 			printk("budget: Frontend registration failed!\n");
 			if (budget->dvb_frontend->ops->release)
 				budget->dvb_frontend->ops->release(budget->dvb_frontend);
@@ -493,12 +497,11 @@ static int budget_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 		return err;
 	}
 
-	budget->dvb_adapter->priv = budget;
+	budget->dvb_adapter.priv = budget;
 	frontend_init(budget);
 
 	return 0;
 }
-
 
 static int budget_detach (struct saa7146_dev* dev)
 {
@@ -515,22 +518,22 @@ static int budget_detach (struct saa7146_dev* dev)
 	return err;
 }
 
-
-
 static struct saa7146_extension budget_extension;
 
 MAKE_BUDGET_INFO(ttbs,	"TT-Budget/WinTV-NOVA-S  PCI",	BUDGET_TT);
 MAKE_BUDGET_INFO(ttbc,	"TT-Budget/WinTV-NOVA-C  PCI",	BUDGET_TT);
 MAKE_BUDGET_INFO(ttbt,	"TT-Budget/WinTV-NOVA-T  PCI",	BUDGET_TT);
 MAKE_BUDGET_INFO(satel,	"SATELCO Multimedia PCI",	BUDGET_TT_HW_DISEQC);
-MAKE_BUDGET_INFO(fsacs, "Fujitsu Siemens Activy Budget-S PCI", BUDGET_FS_ACTIVY);
+MAKE_BUDGET_INFO(fsacs0, "Fujitsu Siemens Activy Budget-S PCI (rev GR/grundig frontend)", BUDGET_FS_ACTIVY);
+MAKE_BUDGET_INFO(fsacs1, "Fujitsu Siemens Activy Budget-S PCI (rev AL/alps frontend)", BUDGET_FS_ACTIVY);
 
 static struct pci_device_id pci_tbl[] = {
 	MAKE_EXTENSION_PCI(ttbs,  0x13c2, 0x1003),
 	MAKE_EXTENSION_PCI(ttbc,  0x13c2, 0x1004),
 	MAKE_EXTENSION_PCI(ttbt,  0x13c2, 0x1005),
 	MAKE_EXTENSION_PCI(satel, 0x13c2, 0x1013),
-	MAKE_EXTENSION_PCI(fsacs, 0x1131, 0x4f61),
+	MAKE_EXTENSION_PCI(fsacs1,0x1131, 0x4f60),
+	MAKE_EXTENSION_PCI(fsacs0,0x1131, 0x4f61),
 	{
 		.vendor    = 0,
 	}
@@ -540,8 +543,8 @@ MODULE_DEVICE_TABLE(pci, pci_tbl);
 
 static struct saa7146_extension budget_extension = {
 	.name		= "budget dvb\0",
-	.flags	 	= 0,
-	
+	.flags		= 0,
+
 	.module		= THIS_MODULE,
 	.pci_tbl	= pci_tbl,
 	.attach		= budget_attach,
@@ -549,18 +552,16 @@ static struct saa7146_extension budget_extension = {
 
 	.irq_mask	= MASK_10,
 	.irq_func	= ttpci_budget_irq10_handler,
-};	
+};
 
-
-static int __init budget_init(void) 
+static int __init budget_init(void)
 {
 	return saa7146_register_extension(&budget_extension);
 }
 
-
 static void __exit budget_exit(void)
 {
-	saa7146_unregister_extension(&budget_extension); 
+	saa7146_unregister_extension(&budget_extension);
 }
 
 module_init(budget_init);
@@ -570,4 +571,3 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Ralph Metzler, Marcus Metzler, Michael Hunold, others");
 MODULE_DESCRIPTION("driver for the SAA7146 based so-called "
 		   "budget PCI DVB cards by Siemens, Technotrend, Hauppauge");
-

@@ -9,7 +9,7 @@
 #include <net/ip.h>
 #include <net/protocol.h>
 
-static int ipip_output(struct sk_buff *skb)
+static int ipip_output(struct xfrm_state *x, struct sk_buff *skb)
 {
 	struct iphdr *iph;
 	
@@ -115,7 +115,6 @@ static struct net_protocol ipip_protocol = {
 	.handler	=	ipip_rcv,
 	.err_handler	=	ipip_err,
 	.no_policy	=	1,
-	.xfrm_prot	=	1,
 };
 
 static int __init ipip_init(void)

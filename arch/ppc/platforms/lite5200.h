@@ -17,7 +17,7 @@
 #define __PLATFORMS_LITE5200_H__
 
 /* Serial port used for low-level debug */
-#define MPC52xx_PF_CONSOLE_PORT 0	/* PSC1 */
+#define MPC52xx_PF_CONSOLE_PORT 1	/* PSC1 */
 
 
 #endif /* __PLATFORMS_LITE5200_H__ */

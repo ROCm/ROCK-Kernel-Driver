@@ -141,7 +141,7 @@ int br_stp_handle_bpdu(struct sk_buff *skb)
 	unsigned char *buf;
 
 	/* insert into forwarding database after filtering to avoid spoofing */
-	br_fdb_insert(p->br, p, eth_hdr(skb)->h_source, 0);
+	br_fdb_update(p->br, p, eth_hdr(skb)->h_source);
 
 	/* need at least the 802 and STP headers */
 	if (!pskb_may_pull(skb, sizeof(header)+1) ||

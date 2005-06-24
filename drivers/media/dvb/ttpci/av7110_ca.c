@@ -91,8 +91,20 @@ void ci_get_data(struct dvb_ringbuffer *cibuf, u8 *data, int len)
 
 static int ci_ll_init(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *ciwbuf, int size)
 {
-	dvb_ringbuffer_init(cirbuf, vmalloc(size), size);
-	dvb_ringbuffer_init(ciwbuf, vmalloc(size), size);
+	struct dvb_ringbuffer *tab[] = { cirbuf, ciwbuf, NULL }, **p;
+	void *data;
+
+	for (p = tab; *p; p++) {
+		data = vmalloc(size);
+		if (!data) {
+			while (p-- != tab) {
+				vfree(p[0]->data);
+				p[0]->data = NULL;
+			}
+			return -ENOMEM;
+		}
+		dvb_ringbuffer_init(*p, data, size);
+	}
 	return 0;
 }
 
@@ -111,7 +123,7 @@ static void ci_ll_release(struct dvb_ringbuffer *cirbuf, struct dvb_ringbuffer *
 }
 
 static int ci_ll_reset(struct dvb_ringbuffer *cibuf, struct file *file,
-		int slots, ca_slot_info_t *slot)
+		       int slots, ca_slot_info_t *slot)
 {
 	int i;
 	int len = 0;
@@ -358,7 +370,7 @@ static struct dvb_device dvbdev_ca = {
 
 int av7110_ca_register(struct av7110 *av7110)
 {
-	return dvb_register_device(av7110->dvb_adapter, &av7110->ca_dev,
+	return dvb_register_device(&av7110->dvb_adapter, &av7110->ca_dev,
 				   &dvbdev_ca, av7110, DVB_DEVICE_CA);
 }
 
@@ -367,9 +379,9 @@ void av7110_ca_unregister(struct av7110 *av7110)
 	dvb_unregister_device(av7110->ca_dev);
 }
 
-void av7110_ca_init(struct av7110* av7110)
+int av7110_ca_init(struct av7110* av7110)
 {
-	ci_ll_init(&av7110->ci_rbuffer, &av7110->ci_wbuffer, 8192);
+	return ci_ll_init(&av7110->ci_rbuffer, &av7110->ci_wbuffer, 8192);
 }
 
 void av7110_ca_exit(struct av7110* av7110)

@@ -19,24 +19,21 @@
  *******************************************************************/
 
 /*
- * $Id: lpfc_hw.h 1.27 2004/10/06 00:14:40EDT sf_support Exp  $
+ * $Id: lpfc_hw.h 1.37 2005/03/29 19:51:45EST sf_support Exp  $
  */
 
-#ifndef  _H_LPFC_HW
-#define _H_LPFC_HW
+#define FDMI_DID        0xfffffaU
+#define NameServer_DID  0xfffffcU
+#define SCR_DID         0xfffffdU
+#define Fabric_DID      0xfffffeU
+#define Bcast_DID       0xffffffU
+#define Mask_DID        0xffffffU
+#define CT_DID_MASK     0xffff00U
+#define Fabric_DID_MASK 0xfff000U
+#define WELL_KNOWN_DID_MASK 0xfffff0U
 
-#define FDMI_DID        ((uint32_t)0xfffffa)
-#define NameServer_DID  ((uint32_t)0xfffffc)
-#define SCR_DID         ((uint32_t)0xfffffd)
-#define Fabric_DID      ((uint32_t)0xfffffe)
-#define Bcast_DID       ((uint32_t)0xffffff)
-#define Mask_DID        ((uint32_t)0xffffff)
-#define CT_DID_MASK     ((uint32_t)0xffff00)
-#define Fabric_DID_MASK ((uint32_t)0xfff000)
-#define WELL_KNOWN_DID_MASK ((uint32_t)0xfffff0)
-
-#define PT2PT_LocalID   ((uint32_t)1)
-#define PT2PT_RemoteID  ((uint32_t)2)
+#define PT2PT_LocalID	1
+#define PT2PT_RemoteID	2
 
 #define FF_DEF_EDTOV          2000	/* Default E_D_TOV (2000ms) */
 #define FF_DEF_ALTOV            15	/* Default AL_TIME (15ms) */
@@ -48,9 +45,9 @@
 
 #define FCELSSIZE             1024	/* maximum ELS transfer size */
 
-#define LPFC_FCP_RING            0	/* ring 2 for FCP initiator commands */
+#define LPFC_FCP_RING            0	/* ring 0 for FCP initiator commands */
 #define LPFC_IP_RING             1	/* ring 1 for IP commands */
-#define LPFC_ELS_RING            2	/* ring 0 for ELS commands */
+#define LPFC_ELS_RING            2	/* ring 2 for ELS commands */
 #define LPFC_FCP_NEXT_RING       3
 
 #define SLI2_IOCB_CMD_R0_ENTRIES    172	/* SLI-2 FCP command ring entries */
@@ -1025,7 +1022,7 @@ typedef struct {
 
 /* Start FireFly Register definitions */
 #define PCI_VENDOR_ID_EMULEX        0x10df
-#define PCI_DEVICE_ID_FIREFLY 	    0x1ae5
+#define PCI_DEVICE_ID_FIREFLY       0x1ae5
 #define PCI_DEVICE_ID_SUPERFLY      0xf700
 #define PCI_DEVICE_ID_DRAGONFLY     0xf800
 #define PCI_DEVICE_ID_RFLY          0xf095
@@ -1035,11 +1032,14 @@ typedef struct {
 #define PCI_DEVICE_ID_PEGASUS       0xf980
 #define PCI_DEVICE_ID_THOR          0xfa00
 #define PCI_DEVICE_ID_VIPER         0xfb00
-#define PCI_DEVICE_ID_HELIOS        0xf100
-#define PCI_DEVICE_ID_JFLY          0xf015
-#define PCI_DEVICE_ID_ZEPHYR        0xfd00
-#define PCI_DEVICE_ID_ZFLY          0xf0d5
+#define PCI_DEVICE_ID_HELIOS        0xfd00
+#define PCI_DEVICE_ID_BMID          0xf0d5
+#define PCI_DEVICE_ID_BSMB          0xf0d1
+#define PCI_DEVICE_ID_ZEPHYR        0xfe00
+#define PCI_DEVICE_ID_ZMID          0xf0e5
+#define PCI_DEVICE_ID_ZSMB          0xf0e1
 #define PCI_DEVICE_ID_LP101	    0xf0a1
+#define PCI_DEVICE_ID_LP10000S	    0xfc00
 
 #define JEDEC_ID_ADDRESS            0x0080001c
 #define FIREFLY_JEDEC_ID            0x1ACC
@@ -1075,7 +1075,7 @@ typedef struct {		/* FireFly BIU registers */
 
 /* Host Attention Register */
 
-#define HA_REG_OFFSET  0	/* Word offset from register base address */
+#define HA_REG_OFFSET  0	/* Byte offset from register base address */
 
 #define HA_R0RE_REQ    0x00000001	/* Bit  0 */
 #define HA_R0CE_RSP    0x00000002	/* Bit  1 */
@@ -1100,7 +1100,7 @@ typedef struct {		/* FireFly BIU registers */
 
 /* Chip Attention Register */
 
-#define CA_REG_OFFSET  1	/* Word offset from register base address */
+#define CA_REG_OFFSET  4	/* Byte offset from register base address */
 
 #define CA_R0CE_REQ    0x00000001	/* Bit  0 */
 #define CA_R0RE_RSP    0x00000002	/* Bit  1 */
@@ -1118,7 +1118,7 @@ typedef struct {		/* FireFly BIU registers */
 
 /* Host Status Register */
 
-#define HS_REG_OFFSET  2	/* Word offset from register base address */
+#define HS_REG_OFFSET  8	/* Byte offset from register base address */
 
 #define HS_MBRDY       0x00400000	/* Bit 22 */
 #define HS_FFRDY       0x00800000	/* Bit 23 */
@@ -1134,7 +1134,7 @@ typedef struct {		/* FireFly BIU registers */
 
 /* Host Control Register */
 
-#define HC_REG_OFFSET  3	/* Word offset from register base address */
+#define HC_REG_OFFSET  12	/* Word offset from register base address */
 
 #define HC_MBINT_ENA   0x00000001	/* Bit  0 */
 #define HC_R0INT_ENA   0x00000002	/* Bit  1 */
@@ -1490,8 +1490,9 @@ typedef struct {
 #define LINK_SPEED_AUTO 0       /* Auto selection */
 #define LINK_SPEED_1G   1       /* 1 Gigabaud */
 #define LINK_SPEED_2G   2       /* 2 Gigabaud */
-#define LINK_SPEED_4G   8       /* 4 Gigabaud */
-#define LINK_SPEED_10G   4      /* 10 Gigabaud */
+#define LINK_SPEED_4G   4       /* 4 Gigabaud */
+#define LINK_SPEED_8G   8       /* 4 Gigabaud */
+#define LINK_SPEED_10G   16      /* 10 Gigabaud */
 
 } INIT_LINK_VAR;
 
@@ -1656,11 +1657,13 @@ typedef struct {
 	uint32_t rttov;
 	uint32_t altov;
 	uint32_t lmt;
-#define LMT_RESERVED    0x0	/* Not used */
-#define LMT_266_10bit   0x1	/*  265.625 Mbaud 10 bit iface */
-#define LMT_532_10bit   0x2	/*  531.25  Mbaud 10 bit iface */
-#define LMT_1063_10bit  0x3	/* 1062.5   Mbaud 20 bit iface */
-#define LMT_2125_10bit  0x8	/* 2125     Mbaud 10 bit iface */
+#define LMT_RESERVED    0x0    /* Not used */
+#define LMT_266_10bit   0x1    /* 265.625 Mbaud 10 bit iface  */
+#define LMT_532_10bit   0x2    /* 531.25  Mbaud 10 bit iface  */
+#define LMT_1063_20bit  0x3    /* 1062.5   Mbaud 20 bit iface */
+#define LMT_1063_10bit  0x4    /* 1062.5   Mbaud 10 bit iface */
+#define LMT_2125_10bit  0x8    /* 2125     Mbaud 10 bit iface */
+#define LMT_4250_10bit  0x40   /* 4250     Mbaud 10 bit iface */
 
 	uint32_t rsvd2;
 	uint32_t rsvd3;
@@ -2044,8 +2047,12 @@ typedef struct {
 	uint32_t Ulu:1;
 #endif
 
-#define LA_1GHZ_LINK   4	/* lnkSpeed */
-#define LA_2GHZ_LINK   8	/* lnkSpeed */
+#define LA_UNKNW_LINK  0x0    /* lnkSpeed */
+#define LA_1GHZ_LINK   0x04   /* lnkSpeed */
+#define LA_2GHZ_LINK   0x08   /* lnkSpeed */
+#define LA_4GHZ_LINK   0x10   /* lnkSpeed */
+#define LA_8GHZ_LINK   0x20   /* lnkSpeed */
+#define LA_10GHZ_LINK  0x40   /* lnkSpeed */
 
 } READ_LA_VAR;
 
@@ -2086,7 +2093,9 @@ typedef struct {
 #define  DMP_NV_PARAMS           0x2
 
 #define  DMP_REGION_VPD          0xe
-#define  DMP_VPD_SIZE            0x100
+#define  DMP_VPD_SIZE            0x400  /* maximum amount of VPD */
+#define  DMP_RSP_OFFSET          0x14   /* word 5 contains first word of rsp */
+#define  DMP_RSP_SIZE            0x6C   /* maximum of 27 words of rsp data */
 
 /* Structure for MB Command CONFIG_PORT (0x88) */
 
@@ -2168,7 +2177,8 @@ typedef struct {
 } CONFIG_FARP_VAR;
 
 /* Union of all Mailbox Command types */
-#define MAILBOX_CMD_WSIZE 32
+#define MAILBOX_CMD_WSIZE	32
+#define MAILBOX_CMD_SIZE	(MAILBOX_CMD_WSIZE * sizeof(uint32_t))
 
 typedef union {
 	uint32_t varWords[MAILBOX_CMD_WSIZE - 1];
@@ -2224,7 +2234,7 @@ typedef union {
 	SLI2_DESC s2;
 } SLI_VAR;
 
-typedef volatile struct {
+typedef struct {
 #ifdef __BIG_ENDIAN_BITFIELD
 	uint16_t mbxStatus;
 	uint8_t mbxCommand;
@@ -2527,7 +2537,7 @@ typedef struct {
 	uint32_t fcpt_Length;	/* transfer ready for IWRITE */
 } FCPT_FIELDS64;
 
-typedef volatile struct _IOCB {	/* IOCB structure */
+typedef struct _IOCB {	/* IOCB structure */
 	union {
 		GENERIC_RSP grsp;	/* Generic response */
 		XR_SEQ_FIELDS xrseq;	/* XMIT / BCAST / RCV_SEQUENCE cmd */
@@ -2666,12 +2676,12 @@ lpfc_is_LC_HBA(unsigned short device)
 	if ((device == PCI_DEVICE_ID_TFLY) ||
 	    (device == PCI_DEVICE_ID_PFLY) ||
 	    (device == PCI_DEVICE_ID_LP101) ||
-	    (device == PCI_DEVICE_ID_JFLY) ||
-	    (device == PCI_DEVICE_ID_ZFLY) ||
+	    (device == PCI_DEVICE_ID_BMID) ||
+	    (device == PCI_DEVICE_ID_BSMB) ||
+	    (device == PCI_DEVICE_ID_ZMID) ||
+	    (device == PCI_DEVICE_ID_ZSMB) ||
 	    (device == PCI_DEVICE_ID_RFLY))
 		return 1;
 	else
 		return 0;
 }
-
-#endif				/* _H_LPFC_HW */

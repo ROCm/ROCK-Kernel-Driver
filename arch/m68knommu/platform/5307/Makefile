@@ -26,6 +26,4 @@ obj-$(CONFIG_M5307)	+= config.o timers.o
 obj-$(CONFIG_M528x)     += pit.o
 obj-$(CONFIG_M5407)	+= timers.o
 
-ifeq ($(CONFIG_M5307),y)
-extra-y := $(BOARD)/crt0_$(MODEL).o
-endif
+extra-y := head.o

@@ -1,6 +1,6 @@
 /************************************************************************
  * s2io.c: A Linux PCI-X Ethernet driver for S2IO 10GbE Server NIC
- * Copyright(c) 2002-2005 S2IO Technologies
+ * Copyright(c) 2002-2005 Neterion Inc.
 
  * This software may be used and distributed according to the terms of
  * the GNU General Public License (GPL), incorporated herein by reference.
@@ -36,28 +36,29 @@
  * in PCI Configuration space.
  ************************************************************************/
 
-#include<linux/config.h>
-#include<linux/module.h>
-#include<linux/types.h>
-#include<linux/errno.h>
-#include<linux/ioport.h>
-#include<linux/pci.h>
-#include<linux/kernel.h>
-#include<linux/netdevice.h>
-#include<linux/etherdevice.h>
-#include<linux/skbuff.h>
-#include<linux/init.h>
-#include<linux/delay.h>
-#include<linux/stddef.h>
-#include<linux/ioctl.h>
-#include<linux/timex.h>
-#include<linux/sched.h>
-#include<linux/ethtool.h>
-#include<asm/system.h>
-#include<asm/uaccess.h>
-#include<linux/version.h>
-#include<asm/io.h>
-#include<linux/workqueue.h>
+#include <linux/config.h>
+#include <linux/module.h>
+#include <linux/types.h>
+#include <linux/errno.h>
+#include <linux/ioport.h>
+#include <linux/pci.h>
+#include <linux/kernel.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
+#include <linux/init.h>
+#include <linux/delay.h>
+#include <linux/stddef.h>
+#include <linux/ioctl.h>
+#include <linux/timex.h>
+#include <linux/sched.h>
+#include <linux/ethtool.h>
+#include <linux/version.h>
+#include <linux/workqueue.h>
+
+#include <asm/io.h>
+#include <asm/system.h>
+#include <asm/uaccess.h>
 
 /* local include */
 #include "s2io.h"
@@ -65,7 +66,7 @@
 
 /* S2io Driver name & version. */
 static char s2io_driver_name[] = "s2io";
-static char s2io_driver_version[] = "Version 1.7.5.1";
+static char s2io_driver_version[] = "Version 1.7.7.1";
 
 /* 
  * Cards with following subsystem_id have a link state indication
@@ -243,6 +244,10 @@ static struct pci_device_id s2io_tbl[] __devinitdata = {
 	{PCI_VENDOR_ID_S2IO, PCI_DEVICE_ID_S2IO_WIN,
 	 PCI_ANY_ID, PCI_ANY_ID},
 	{PCI_VENDOR_ID_S2IO, PCI_DEVICE_ID_S2IO_UNI,
+	 PCI_ANY_ID, PCI_ANY_ID},
+	{PCI_VENDOR_ID_S2IO, PCI_DEVICE_ID_HERC_WIN,
+	 PCI_ANY_ID, PCI_ANY_ID},
+	{PCI_VENDOR_ID_S2IO, PCI_DEVICE_ID_HERC_UNI,
 	 PCI_ANY_ID, PCI_ANY_ID},
 	{0,}
 };
@@ -619,87 +624,22 @@ static int init_nic(struct s2io_nic *nic)
 	mac_info_t *mac_control;
 	struct config_param *config;
 	int mdio_cnt = 0, dtx_cnt = 0;
-	unsigned long long print_var, mem_share;
+	unsigned long long mem_share;
 
 	mac_control = &nic->mac_control;
 	config = &nic->config;
 
-	/* 
-	 * Set proper endian settings and verify the same by 
-	 * reading the PIF Feed-back register.
-	 */
-#ifdef  __BIG_ENDIAN
-	/*
-	 * The device by default set to a big endian format, so 
-	 * a big endian driver need not set anything.
-	 */
-	writeq(0xffffffffffffffffULL, &bar0->swapper_ctrl);
-	val64 = (SWAPPER_CTRL_PIF_R_FE |
-		 SWAPPER_CTRL_PIF_R_SE |
-		 SWAPPER_CTRL_PIF_W_FE |
-		 SWAPPER_CTRL_PIF_W_SE |
-		 SWAPPER_CTRL_TXP_FE |
-		 SWAPPER_CTRL_TXP_SE |
-		 SWAPPER_CTRL_TXD_R_FE |
-		 SWAPPER_CTRL_TXD_W_FE |
-		 SWAPPER_CTRL_TXF_R_FE |
-		 SWAPPER_CTRL_RXD_R_FE |
-		 SWAPPER_CTRL_RXD_W_FE |
-		 SWAPPER_CTRL_RXF_W_FE |
-		 SWAPPER_CTRL_XMSI_FE |
-		 SWAPPER_CTRL_XMSI_SE |
-		 SWAPPER_CTRL_STATS_FE | SWAPPER_CTRL_STATS_SE);
-	writeq(val64, &bar0->swapper_ctrl);
-#else
-	/* 
-	 * Initially we enable all bits to make it accessible by 
-	 * the driver, then we selectively enable only those bits 
-	 * that we want to set.
-	 */
-	writeq(0xffffffffffffffffULL, &bar0->swapper_ctrl);
-	val64 = (SWAPPER_CTRL_PIF_R_FE |
-		 SWAPPER_CTRL_PIF_R_SE |
-		 SWAPPER_CTRL_PIF_W_FE |
-		 SWAPPER_CTRL_PIF_W_SE |
-		 SWAPPER_CTRL_TXP_FE |
-		 SWAPPER_CTRL_TXP_SE |
-		 SWAPPER_CTRL_TXD_R_FE |
-		 SWAPPER_CTRL_TXD_R_SE |
-		 SWAPPER_CTRL_TXD_W_FE |
-		 SWAPPER_CTRL_TXD_W_SE |
-		 SWAPPER_CTRL_TXF_R_FE |
-		 SWAPPER_CTRL_RXD_R_FE |
-		 SWAPPER_CTRL_RXD_R_SE |
-		 SWAPPER_CTRL_RXD_W_FE |
-		 SWAPPER_CTRL_RXD_W_SE |
-		 SWAPPER_CTRL_RXF_W_FE |
-		 SWAPPER_CTRL_XMSI_FE |
-		 SWAPPER_CTRL_XMSI_SE |
-		 SWAPPER_CTRL_STATS_FE | SWAPPER_CTRL_STATS_SE);
-	writeq(val64, &bar0->swapper_ctrl);
-#endif
-
-	/* 
-	 * Verifying if endian settings are accurate by 
-	 * reading a feedback register.
-	 */
-	val64 = readq(&bar0->pif_rd_swapper_fb);
-	if (val64 != 0x0123456789ABCDEFULL) {
-		/* Endian settings are incorrect, calls for another dekko. */
-		print_var = (unsigned long long) val64;
-		DBG_PRINT(INIT_DBG, "%s: Endian settings are wrong",
-			  dev->name);
-		DBG_PRINT(ERR_DBG, ", feedback read %llx\n", print_var);
-
-		return FAILURE;
+	/* Initialize swapper control register */
+	if (s2io_set_swapper(nic)) {
+		DBG_PRINT(ERR_DBG,"ERROR: Setting Swapper failed\n");
+		return -1;
 	}
 
 	/* Remove XGXS from reset state */
 	val64 = 0;
 	writeq(val64, &bar0->sw_reset);
 	val64 = readq(&bar0->sw_reset);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ / 2);
+	msleep(500);
 
 	/*  Enable Receiving broadcasts */
 	add = &bar0->mac_cfg;
@@ -920,11 +860,15 @@ static int init_nic(struct s2io_nic *nic)
 	 * Initializing the Transmit and Receive Traffic Interrupt 
 	 * Scheme.
 	 */
-	/* TTI Initialization */
-	val64 = TTI_DATA1_MEM_TX_TIMER_VAL(0xFFF) |
+	/* TTI Initialization. Default Tx timer gets us about
+	 * 250 interrupts per sec. Continuous interrupts are enabled
+	 * by default.
+	 */
+	val64 = TTI_DATA1_MEM_TX_TIMER_VAL(0x2078) |
 	    TTI_DATA1_MEM_TX_URNG_A(0xA) |
 	    TTI_DATA1_MEM_TX_URNG_B(0x10) |
-	    TTI_DATA1_MEM_TX_URNG_C(0x30) | TTI_DATA1_MEM_TX_TIMER_AC_EN;
+	    TTI_DATA1_MEM_TX_URNG_C(0x30) | TTI_DATA1_MEM_TX_TIMER_AC_EN |
+		TTI_DATA1_MEM_TX_TIMER_CI_EN;
 	writeq(val64, &bar0->tti_data1_mem);
 
 	val64 = TTI_DATA2_MEM_TX_UFC_A(0x10) |
@@ -952,8 +896,7 @@ static int init_nic(struct s2io_nic *nic)
 				  dev->name);
 			return -1;
 		}
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ / 20);
+		msleep(50);
 		time++;
 	}
 
@@ -991,8 +934,7 @@ static int init_nic(struct s2io_nic *nic)
 			return -1;
 		}
 		time++;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ / 20);
+		msleep(50);
 	}
 
 	/* 
@@ -1352,7 +1294,7 @@ static int verify_xena_quiescence(u64 val64, int flag)
  *
  */
 
-void fix_mac_address(nic_t * sp)
+static void fix_mac_address(nic_t * sp)
 {
 	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	u64 val64;
@@ -1421,8 +1363,7 @@ static int start_nic(struct s2io_nic *nic)
 	SPECIAL_REG_WRITE(val64, &bar0->mc_rldram_mrs, UF);
 	val64 = readq(&bar0->mc_rldram_mrs);
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ / 10);	/* Delay by around 100 ms. */
+	msleep(100);			/* Delay by around 100 ms. */
 
 	/* Enabling ECC Protection. */
 	val64 = readq(&bar0->adapter_control);
@@ -1509,7 +1450,7 @@ static int start_nic(struct s2io_nic *nic)
  *  Return Value: void 
 */
 
-void free_tx_buffers(struct s2io_nic *nic)
+static void free_tx_buffers(struct s2io_nic *nic)
 {
 	struct net_device *dev = nic->dev;
 	struct sk_buff *skb;
@@ -1600,7 +1541,7 @@ static void stop_nic(struct s2io_nic *nic)
  *  SUCCESS on success or an appropriate -ve value on failure.
  */
 
-int fill_rx_buffers(struct s2io_nic *nic, int ring_no)
+static int fill_rx_buffers(struct s2io_nic *nic, int ring_no)
 {
 	struct net_device *dev = nic->dev;
 	struct sk_buff *skb;
@@ -2425,7 +2366,7 @@ static void alarm_intr_handler(struct s2io_nic *nic)
  *   SUCCESS on success and FAILURE on failure.
  */
 
-int wait_for_cmd_complete(nic_t * sp)
+static int wait_for_cmd_complete(nic_t * sp)
 {
 	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	int ret = FAILURE, cnt = 0;
@@ -2437,8 +2378,7 @@ int wait_for_cmd_complete(nic_t * sp)
 			ret = SUCCESS;
 			break;
 		}
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ / 20);
+		msleep(50);
 		if (cnt++ > 10)
 			break;
 	}
@@ -2456,7 +2396,7 @@ int wait_for_cmd_complete(nic_t * sp)
  *  void.
  */
 
-void s2io_reset(nic_t * sp)
+static void s2io_reset(nic_t * sp)
 {
 	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	u64 val64;
@@ -2477,15 +2417,13 @@ void s2io_reset(nic_t * sp)
 	 * As of now I'am just giving a 250ms delay and hoping that the
 	 * PCI write to sw_reset register is done by this time.
 	 */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ / 4);
+	msleep(250);
 
 	/* Restore the PCI state saved during initializarion. */
 	pci_restore_state(sp->pdev);
 	s2io_init_pci(sp);
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ / 4);
+	msleep(250);
 
 	/* SXE-002: Configure link and activity LED to turn it off */
 	subid = sp->pdev->subsystem_device;
@@ -2510,27 +2448,78 @@ void s2io_reset(nic_t * sp)
  *  SUCCESS on success and FAILURE on failure.
  */
 
-int s2io_set_swapper(nic_t * sp)
+static int s2io_set_swapper(nic_t * sp)
 {
 	struct net_device *dev = sp->dev;
 	XENA_dev_config_t __iomem *bar0 = sp->bar0;
-	u64 val64;
+	u64 val64, valt, valr;
 
 	/* 
 	 * Set proper endian settings and verify the same by reading
 	 * the PIF Feed-back register.
 	 */
+
+	val64 = readq(&bar0->pif_rd_swapper_fb);
+	if (val64 != 0x0123456789ABCDEFULL) {
+		int i = 0;
+		u64 value[] = { 0xC30000C3C30000C3ULL,   /* FE=1, SE=1 */
+				0x8100008181000081ULL,  /* FE=1, SE=0 */
+				0x4200004242000042ULL,  /* FE=0, SE=1 */
+				0};                     /* FE=0, SE=0 */
+
+		while(i<4) {
+			writeq(value[i], &bar0->swapper_ctrl);
+			val64 = readq(&bar0->pif_rd_swapper_fb);
+			if (val64 == 0x0123456789ABCDEFULL)
+				break;
+			i++;
+		}
+		if (i == 4) {
+			DBG_PRINT(ERR_DBG, "%s: Endian settings are wrong, ",
+				dev->name);
+			DBG_PRINT(ERR_DBG, "feedback read %llx\n",
+				(unsigned long long) val64);
+			return FAILURE;
+		}
+		valr = value[i];
+	} else {
+		valr = readq(&bar0->swapper_ctrl);
+	}
+
+	valt = 0x0123456789ABCDEFULL;
+	writeq(valt, &bar0->xmsi_address);
+	val64 = readq(&bar0->xmsi_address);
+
+	if(val64 != valt) {
+		int i = 0;
+		u64 value[] = { 0x00C3C30000C3C300ULL,  /* FE=1, SE=1 */
+				0x0081810000818100ULL,  /* FE=1, SE=0 */
+				0x0042420000424200ULL,  /* FE=0, SE=1 */
+				0};                     /* FE=0, SE=0 */
+
+		while(i<4) {
+			writeq((value[i] | valr), &bar0->swapper_ctrl);
+			writeq(valt, &bar0->xmsi_address);
+			val64 = readq(&bar0->xmsi_address);
+			if(val64 == valt)
+				break;
+			i++;
+		}
+		if(i == 4) {
+			DBG_PRINT(ERR_DBG, "Write failed, Xmsi_addr ");
+			DBG_PRINT(ERR_DBG, "reads:0x%llx\n",val64);
+			return FAILURE;
+		}
+	}
+	val64 = readq(&bar0->swapper_ctrl);
+	val64 &= 0xFFFF000000000000ULL;
+
 #ifdef  __BIG_ENDIAN
 	/* 
 	 * The device by default set to a big endian format, so a 
 	 * big endian driver need not set anything.
 	 */
-	writeq(0xffffffffffffffffULL, &bar0->swapper_ctrl);
-	val64 = (SWAPPER_CTRL_PIF_R_FE |
-		 SWAPPER_CTRL_PIF_R_SE |
-		 SWAPPER_CTRL_PIF_W_FE |
-		 SWAPPER_CTRL_PIF_W_SE |
-		 SWAPPER_CTRL_TXP_FE |
+	val64 |= (SWAPPER_CTRL_TXP_FE |
 		 SWAPPER_CTRL_TXP_SE |
 		 SWAPPER_CTRL_TXD_R_FE |
 		 SWAPPER_CTRL_TXD_W_FE |
@@ -2548,12 +2537,7 @@ int s2io_set_swapper(nic_t * sp)
 	 * driver, then we selectively enable only those bits that 
 	 * we want to set.
 	 */
-	writeq(0xffffffffffffffffULL, &bar0->swapper_ctrl);
-	val64 = (SWAPPER_CTRL_PIF_R_FE |
-		 SWAPPER_CTRL_PIF_R_SE |
-		 SWAPPER_CTRL_PIF_W_FE |
-		 SWAPPER_CTRL_PIF_W_SE |
-		 SWAPPER_CTRL_TXP_FE |
+	val64 |= (SWAPPER_CTRL_TXP_FE |
 		 SWAPPER_CTRL_TXP_SE |
 		 SWAPPER_CTRL_TXD_R_FE |
 		 SWAPPER_CTRL_TXD_R_SE |
@@ -2570,6 +2554,7 @@ int s2io_set_swapper(nic_t * sp)
 		 SWAPPER_CTRL_STATS_FE | SWAPPER_CTRL_STATS_SE);
 	writeq(val64, &bar0->swapper_ctrl);
 #endif
+	val64 = readq(&bar0->swapper_ctrl);
 
 	/* 
 	 * Verifying if endian settings are accurate by reading a 
@@ -2604,7 +2589,7 @@ int s2io_set_swapper(nic_t * sp)
  *   file on failure.
  */
 
-int s2io_open(struct net_device *dev)
+static int s2io_open(struct net_device *dev)
 {
 	nic_t *sp = dev->priv;
 	int err = 0;
@@ -2656,7 +2641,7 @@ int s2io_open(struct net_device *dev)
  *  file on failure.
  */
 
-int s2io_close(struct net_device *dev)
+static int s2io_close(struct net_device *dev)
 {
 	nic_t *sp = dev->priv;
 
@@ -2683,7 +2668,7 @@ int s2io_close(struct net_device *dev)
  *  0 on success & 1 on failure.
  */
 
-int s2io_xmit(struct sk_buff *skb, struct net_device *dev)
+static int s2io_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	nic_t *sp = dev->priv;
 	u16 frg_cnt, frg_len, i, queue, queue_len, put_off, get_off;
@@ -2903,7 +2888,7 @@ static irqreturn_t s2io_isr(int irq, void *dev_id, struct pt_regs *regs)
  *  pointer to the updated net_device_stats structure.
  */
 
-struct net_device_stats *s2io_get_stats(struct net_device *dev)
+static struct net_device_stats *s2io_get_stats(struct net_device *dev)
 {
 	nic_t *sp = dev->priv;
 	mac_info_t *mac_control;
@@ -3156,7 +3141,7 @@ static int s2io_ethtool_sset(struct net_device *dev,
  * return 0 on success.
  */
 
-int s2io_ethtool_gset(struct net_device *dev, struct ethtool_cmd *info)
+static int s2io_ethtool_gset(struct net_device *dev, struct ethtool_cmd *info)
 {
 	nic_t *sp = dev->priv;
 	info->supported = (SUPPORTED_10000baseT_Full | SUPPORTED_FIBRE);
@@ -3197,7 +3182,7 @@ static void s2io_ethtool_gdrvinfo(struct net_device *dev,
 	strncpy(info->version, s2io_driver_version,
 		sizeof(s2io_driver_version));
 	strncpy(info->fw_version, "", 32);
-	strncpy(info->bus_info, sp->pdev->slot_name, 32);
+	strncpy(info->bus_info, pci_name(sp->pdev), 32);
 	info->regdump_len = XENA_REG_SPACE;
 	info->eedump_len = XENA_EEPROM_SPACE;
 	info->testinfo_len = S2IO_TEST_LEN;
@@ -3303,11 +3288,10 @@ static int s2io_ethtool_idnic(struct net_device *dev, u32 data)
 		sp->id_timer.data = (unsigned long) sp;
 	}
 	mod_timer(&sp->id_timer, jiffies);
-	set_current_state(TASK_INTERRUPTIBLE);
 	if (data)
-		schedule_timeout(data * HZ);
+		msleep(data * 1000);
 	else
-		schedule_timeout(MAX_SCHEDULE_TIMEOUT);
+		msleep(0xFFFFFFFF);
 	del_timer_sync(&sp->id_timer);
 
 	if (CARDS_WITH_FAULTY_LINK_INDICATORS(subid)) {
@@ -3354,8 +3338,8 @@ static void s2io_ethtool_getpause_data(struct net_device *dev,
  * int, returns 0 on Success
  */
 
-int s2io_ethtool_setpause_data(struct net_device *dev,
-			       struct ethtool_pauseparam *ep)
+static int s2io_ethtool_setpause_data(struct net_device *dev,
+				      struct ethtool_pauseparam *ep)
 {
 	u64 val64;
 	nic_t *sp = dev->priv;
@@ -3410,8 +3394,7 @@ static int read_eeprom(nic_t * sp, int off, u32 * data)
 			ret = 0;
 			break;
 		}
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ / 20);
+		msleep(50);
 		exit_cnt++;
 	}
 
@@ -3451,8 +3434,7 @@ static int write_eeprom(nic_t * sp, int off, u32 data, int cnt)
 				ret = 0;
 			break;
 		}
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ / 20);
+		msleep(50);
 		exit_cnt++;
 	}
 
@@ -3472,8 +3454,8 @@ static int write_eeprom(nic_t * sp, int off, u32 data, int cnt)
  *  int  0 on success
  */
 
-int s2io_ethtool_geeprom(struct net_device *dev,
-			 struct ethtool_eeprom *eeprom, u8 * data_buf)
+static int s2io_ethtool_geeprom(struct net_device *dev,
+				struct ethtool_eeprom *eeprom, u8 * data_buf)
 {
 	u32 data, i, valid;
 	nic_t *sp = dev->priv;
@@ -3708,8 +3690,7 @@ static int s2io_bist_test(nic_t * sp, uint64_t * data)
 			ret = 0;
 			break;
 		}
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ / 10);
+		msleep(100);
 		cnt++;
 	}
 
@@ -3810,8 +3791,7 @@ static int s2io_rldram_test(nic_t * sp, uint64_t * data)
 			val64 = readq(&bar0->mc_rldram_test_ctrl);
 			if (val64 & MC_RLDRAM_TEST_DONE)
 				break;
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ / 5);
+			msleep(200);
 		}
 
 		if (cnt == 5)
@@ -3827,8 +3807,7 @@ static int s2io_rldram_test(nic_t * sp, uint64_t * data)
 			val64 = readq(&bar0->mc_rldram_test_ctrl);
 			if (val64 & MC_RLDRAM_TEST_DONE)
 				break;
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ / 2);
+			msleep(500);
 		}
 
 		if (cnt == 5)
@@ -3932,60 +3911,61 @@ static void s2io_get_ethtool_stats(struct net_device *dev,
 	nic_t *sp = dev->priv;
 	StatInfo_t *stat_info = sp->mac_control.stats_info;
 
-	tmp_stats[i++] = stat_info->tmac_frms;
-	tmp_stats[i++] = stat_info->tmac_data_octets;
-	tmp_stats[i++] = stat_info->tmac_drop_frms;
-	tmp_stats[i++] = stat_info->tmac_mcst_frms;
-	tmp_stats[i++] = stat_info->tmac_bcst_frms;
-	tmp_stats[i++] = stat_info->tmac_pause_ctrl_frms;
-	tmp_stats[i++] = stat_info->tmac_any_err_frms;
-	tmp_stats[i++] = stat_info->tmac_vld_ip_octets;
-	tmp_stats[i++] = stat_info->tmac_vld_ip;
-	tmp_stats[i++] = stat_info->tmac_drop_ip;
-	tmp_stats[i++] = stat_info->tmac_icmp;
-	tmp_stats[i++] = stat_info->tmac_rst_tcp;
-	tmp_stats[i++] = stat_info->tmac_tcp;
-	tmp_stats[i++] = stat_info->tmac_udp;
-	tmp_stats[i++] = stat_info->rmac_vld_frms;
-	tmp_stats[i++] = stat_info->rmac_data_octets;
-	tmp_stats[i++] = stat_info->rmac_fcs_err_frms;
-	tmp_stats[i++] = stat_info->rmac_drop_frms;
-	tmp_stats[i++] = stat_info->rmac_vld_mcst_frms;
-	tmp_stats[i++] = stat_info->rmac_vld_bcst_frms;
-	tmp_stats[i++] = stat_info->rmac_in_rng_len_err_frms;
-	tmp_stats[i++] = stat_info->rmac_long_frms;
-	tmp_stats[i++] = stat_info->rmac_pause_ctrl_frms;
-	tmp_stats[i++] = stat_info->rmac_discarded_frms;
-	tmp_stats[i++] = stat_info->rmac_usized_frms;
-	tmp_stats[i++] = stat_info->rmac_osized_frms;
-	tmp_stats[i++] = stat_info->rmac_frag_frms;
-	tmp_stats[i++] = stat_info->rmac_jabber_frms;
-	tmp_stats[i++] = stat_info->rmac_ip;
-	tmp_stats[i++] = stat_info->rmac_ip_octets;
-	tmp_stats[i++] = stat_info->rmac_hdr_err_ip;
-	tmp_stats[i++] = stat_info->rmac_drop_ip;
-	tmp_stats[i++] = stat_info->rmac_icmp;
-	tmp_stats[i++] = stat_info->rmac_tcp;
-	tmp_stats[i++] = stat_info->rmac_udp;
-	tmp_stats[i++] = stat_info->rmac_err_drp_udp;
-	tmp_stats[i++] = stat_info->rmac_pause_cnt;
-	tmp_stats[i++] = stat_info->rmac_accepted_ip;
-	tmp_stats[i++] = stat_info->rmac_err_tcp;
+	tmp_stats[i++] = le32_to_cpu(stat_info->tmac_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->tmac_data_octets);
+	tmp_stats[i++] = le64_to_cpu(stat_info->tmac_drop_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->tmac_mcst_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->tmac_bcst_frms);
+	tmp_stats[i++] = le64_to_cpu(stat_info->tmac_pause_ctrl_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->tmac_any_err_frms);
+	tmp_stats[i++] = le64_to_cpu(stat_info->tmac_vld_ip_octets);
+	tmp_stats[i++] = le32_to_cpu(stat_info->tmac_vld_ip);
+	tmp_stats[i++] = le32_to_cpu(stat_info->tmac_drop_ip);
+	tmp_stats[i++] = le32_to_cpu(stat_info->tmac_icmp);
+	tmp_stats[i++] = le32_to_cpu(stat_info->tmac_rst_tcp);
+	tmp_stats[i++] = le64_to_cpu(stat_info->tmac_tcp);
+	tmp_stats[i++] = le32_to_cpu(stat_info->tmac_udp);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_vld_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_data_octets);
+	tmp_stats[i++] = le64_to_cpu(stat_info->rmac_fcs_err_frms);
+	tmp_stats[i++] = le64_to_cpu(stat_info->rmac_drop_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_vld_mcst_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_vld_bcst_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_in_rng_len_err_frms);
+	tmp_stats[i++] = le64_to_cpu(stat_info->rmac_long_frms);
+	tmp_stats[i++] = le64_to_cpu(stat_info->rmac_pause_ctrl_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_discarded_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_usized_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_osized_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_frag_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_jabber_frms);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_ip);
+	tmp_stats[i++] = le64_to_cpu(stat_info->rmac_ip_octets);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_hdr_err_ip);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_drop_ip);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_icmp);
+	tmp_stats[i++] = le64_to_cpu(stat_info->rmac_tcp);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_udp);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_err_drp_udp);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_pause_cnt);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_accepted_ip);
+	tmp_stats[i++] = le32_to_cpu(stat_info->rmac_err_tcp);
 }
 
-int s2io_ethtool_get_regs_len(struct net_device *dev)
+static int s2io_ethtool_get_regs_len(struct net_device *dev)
 {
 	return (XENA_REG_SPACE);
 }
 
 
-u32 s2io_ethtool_get_rx_csum(struct net_device * dev)
+static u32 s2io_ethtool_get_rx_csum(struct net_device * dev)
 {
 	nic_t *sp = dev->priv;
 
 	return (sp->rx_csum);
 }
-int s2io_ethtool_set_rx_csum(struct net_device *dev, u32 data)
+
+static int s2io_ethtool_set_rx_csum(struct net_device *dev, u32 data)
 {
 	nic_t *sp = dev->priv;
 
@@ -3996,17 +3976,19 @@ int s2io_ethtool_set_rx_csum(struct net_device *dev, u32 data)
 
 	return 0;
 }
-int s2io_get_eeprom_len(struct net_device *dev)
+
+static int s2io_get_eeprom_len(struct net_device *dev)
 {
 	return (XENA_EEPROM_SPACE);
 }
 
-int s2io_ethtool_self_test_count(struct net_device *dev)
+static int s2io_ethtool_self_test_count(struct net_device *dev)
 {
 	return (S2IO_TEST_LEN);
 }
-void s2io_ethtool_get_strings(struct net_device *dev,
-			      u32 stringset, u8 * data)
+
+static void s2io_ethtool_get_strings(struct net_device *dev,
+				     u32 stringset, u8 * data)
 {
 	switch (stringset) {
 	case ETH_SS_TEST:
@@ -4017,12 +3999,13 @@ void s2io_ethtool_get_strings(struct net_device *dev,
 		       sizeof(ethtool_stats_keys));
 	}
 }
+
 static int s2io_ethtool_get_stats_count(struct net_device *dev)
 {
 	return (S2IO_STAT_LEN);
 }
 
-int s2io_ethtool_op_set_tx_csum(struct net_device *dev, u32 data)
+static int s2io_ethtool_op_set_tx_csum(struct net_device *dev, u32 data)
 {
 	if (data)
 		dev->features |= NETIF_F_IP_CSUM;
@@ -4078,7 +4061,7 @@ static struct ethtool_ops netdev_ethtool_ops = {
  *  function returns OP NOT SUPPORTED value.
  */
 
-int s2io_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+static int s2io_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	return -EOPNOTSUPP;
 }
@@ -4094,7 +4077,7 @@ int s2io_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
  *   file on failure.
  */
 
-int s2io_change_mtu(struct net_device *dev, int new_mtu)
+static int s2io_change_mtu(struct net_device *dev, int new_mtu)
 {
 	nic_t *sp = dev->priv;
 	XENA_dev_config_t __iomem *bar0 = sp->bar0;
@@ -4188,8 +4171,7 @@ static void s2io_set_link(unsigned long data)
 	 * Allow a small delay for the NICs self initiated 
 	 * cleanup to complete.
 	 */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ / 10);
+	msleep(100);
 
 	val64 = readq(&bar0->adapter_status);
 	if (verify_xena_quiescence(val64, nic->device_enabled_once)) {
@@ -4243,10 +4225,8 @@ static void s2io_card_down(nic_t * sp)
 	register u64 val64 = 0;
 
 	/* If s2io_set_link task is executing, wait till it completes. */
-	while (test_and_set_bit(0, &(sp->link_state))) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ / 20);
-	}
+	while (test_and_set_bit(0, &(sp->link_state)))
+		msleep(50);
 	atomic_set(&sp->card_state, CARD_DOWN);
 
 	/* disable Tx and Rx traffic on the NIC */
@@ -4262,8 +4242,7 @@ static void s2io_card_down(nic_t * sp)
 			break;
 		}
 
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ / 20);
+		msleep(50);
 		cnt++;
 		if (cnt == 10) {
 			DBG_PRINT(ERR_DBG,
@@ -4492,7 +4471,7 @@ static int rx_osm_handler(nic_t * sp, RxD_t * rxdp, int ring_no,
  *  void.
  */
 
-void s2io_link(nic_t * sp, int link)
+static void s2io_link(nic_t * sp, int link)
 {
 	struct net_device *dev = (struct net_device *) sp->dev;
 
@@ -4506,23 +4485,6 @@ void s2io_link(nic_t * sp, int link)
 		}
 	}
 	sp->last_link_state = link;
-}
-
-/**
- *  get_xena_rev_id - to identify revision ID of xena. 
- *  @pdev : PCI Dev structure
- *  Description:
- *  Function to identify the Revision ID of xena.
- *  Return value:
- *  returns the revision ID of the device.
- */
-
-int get_xena_rev_id(struct pci_dev *pdev)
-{
-	u8 id = 0;
-	int ret;
-	ret = pci_read_config_byte(pdev, PCI_REVISION_ID, (u8 *) & id);
-	return id;
 }
 
 /**
@@ -4576,7 +4538,7 @@ static void s2io_init_pci(nic_t * sp)
 			     &(sp->pcix_cmd));
 }
 
-MODULE_AUTHOR("Raghavendra Koushik <raghavendra.koushik@s2io.com>");
+MODULE_AUTHOR("Raghavendra Koushik <raghavendra.koushik@neterion.com>");
 MODULE_LICENSE("GPL");
 module_param(tx_fifo_num, int, 0);
 module_param_array(tx_fifo_len, int, NULL, 0);
@@ -4978,7 +4940,7 @@ int __init s2io_starter(void)
  * Description: This function is the cleanup routine for the driver. It unregist * ers the driver.
  */
 
-void s2io_closer(void)
+static void s2io_closer(void)
 {
 	pci_unregister_driver(&s2io_driver);
 	DBG_PRINT(INIT_DBG, "cleanup done\n");

@@ -285,6 +285,10 @@ static struct hfs_bnode *__hfs_bnode_create(struct hfs_btree *tree, u32 cnid)
 		page = read_cache_page(mapping, block++, (filler_t *)mapping->a_ops->readpage, NULL);
 		if (IS_ERR(page))
 			goto fail;
+		if (PageError(page)) {
+			page_cache_release(page);
+			goto fail;
+		}
 #if !REF_PAGES
 		page_cache_release(page);
 #endif
@@ -326,12 +330,16 @@ struct hfs_bnode *hfs_bnode_find(struct hfs_btree *tree, u32 num)
 		hfs_bnode_get(node);
 		spin_unlock(&tree->hash_lock);
 		wait_event(node->lock_wq, !test_bit(HFS_BNODE_NEW, &node->flags));
+		if (test_bit(HFS_BNODE_ERROR, &node->flags))
+			goto node_error;
 		return node;
 	}
 	spin_unlock(&tree->hash_lock);
 	node = __hfs_bnode_create(tree, num);
 	if (!node)
 		return ERR_PTR(-ENOMEM);
+	if (test_bit(HFS_BNODE_ERROR, &node->flags))
+		goto node_error;
 	if (!test_bit(HFS_BNODE_NEW, &node->flags))
 		return node;
 
@@ -416,6 +424,10 @@ struct hfs_bnode *hfs_bnode_create(struct hfs_btree *tree, u32 num)
 	node = __hfs_bnode_create(tree, num);
 	if (!node)
 		return ERR_PTR(-ENOMEM);
+	if (test_bit(HFS_BNODE_ERROR, &node->flags)) {
+		hfs_bnode_put(node);
+		return ERR_PTR(-EIO);
+	}
 
 	pagep = node->page;
 	memset(kmap(*pagep) + node->page_offset, 0,

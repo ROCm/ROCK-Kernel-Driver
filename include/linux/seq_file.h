@@ -18,6 +18,7 @@ struct seq_file {
 	size_t from;
 	size_t count;
 	loff_t index;
+	loff_t version;
 	struct semaphore sem;
 	struct seq_operations *op;
 	void *private;

@@ -811,6 +811,8 @@ do_udp_sendmsg:
 			hlimit = np->hop_limit;
 		if (hlimit < 0)
 			hlimit = dst_metric(dst, RTAX_HOPLIMIT);
+		if (hlimit < 0)
+			hlimit = ipv6_get_hoplimit(dst->dev);
 	}
 
 	if (msg->msg_flags&MSG_CONFIRM)
@@ -1034,7 +1036,7 @@ void udp6_proc_exit(void) {
 /* ------------------------------------------------------------------------ */
 
 struct proto udpv6_prot = {
-	.name =		"UDP",
+	.name =		"UDPv6",
 	.owner =	THIS_MODULE,
 	.close =	udpv6_close,
 	.connect =	ip6_datagram_connect,
@@ -1049,7 +1051,7 @@ struct proto udpv6_prot = {
 	.hash =		udp_v6_hash,
 	.unhash =	udp_v6_unhash,
 	.get_port =	udp_v6_get_port,
-	.slab_obj_size = sizeof(struct udp6_sock),
+	.obj_size =	sizeof(struct udp6_sock),
 };
 
 extern struct proto_ops inet6_dgram_ops;

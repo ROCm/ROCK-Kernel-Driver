@@ -56,6 +56,13 @@ struct irqdesc irq_desc[NR_IRQS];
 void (*init_arch_irq)(void) __initdata = NULL;
 
 /*
+ * No architecture-specific irq_finish function defined in arm/arch/irqs.h.
+ */
+#ifndef irq_finish
+#define irq_finish(irq) do { } while (0)
+#endif
+
+/*
  * Dummy mask/unmask handler
  */
 void dummy_mask_unmask_irq(unsigned int irq)
@@ -531,6 +538,8 @@ asmlinkage void asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
 	 */
 	if (!list_empty(&irq_pending))
 		do_pending_irqs(regs);
+
+	irq_finish(irq);
 
 	spin_unlock(&irq_controller_lock);
 	irq_exit();

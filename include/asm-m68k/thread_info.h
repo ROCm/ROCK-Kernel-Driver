@@ -68,6 +68,9 @@ extern int thread_flag_fixme(void);
 	case TIF_SYSCALL_TRACE:				\
 		tsk->thread.work.syscall_trace = val;	\
 		break;					\
+	case TIF_MEMDIE:				\
+		tsk->thread.work.memdie = val;		\
+		break;					\
 	default:					\
 		thread_flag_fixme();			\
 	}						\
@@ -84,6 +87,9 @@ extern int thread_flag_fixme(void);
 		break;					\
 	case TIF_SYSCALL_TRACE:				\
 		___res = tsk->thread.work.syscall_trace;\
+		break;					\
+	case TIF_MEMDIE:				\
+		___res = tsk->thread.work.memdie;\
 		break;					\
 	default:					\
 		___res = thread_flag_fixme();		\

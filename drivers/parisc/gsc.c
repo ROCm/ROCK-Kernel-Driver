@@ -38,14 +38,14 @@
 
 int gsc_alloc_irq(struct gsc_irq *i)
 {
-	int irq = txn_alloc_irq();
+	int irq = txn_alloc_irq(GSC_EIM_WIDTH);
 	if (irq < 0) {
 		printk("cannot get irq\n");
 		return irq;
 	}
 
 	i->txn_addr = txn_alloc_addr(irq);
-	i->txn_data = txn_alloc_data(irq, GSC_EIM_WIDTH);
+	i->txn_data = txn_alloc_data(irq);
 	i->irq = irq;
 
 	return irq;
@@ -64,7 +64,7 @@ int gsc_claim_irq(struct gsc_irq *i, int irq)
 	}
 
 	i->txn_addr = txn_alloc_addr(irq);
-	i->txn_data = txn_alloc_data(irq, GSC_EIM_WIDTH);
+	i->txn_data = txn_alloc_data(irq);
 	i->irq = irq;
 
 	return irq;
@@ -171,12 +171,16 @@ int gsc_assign_irq(struct hw_interrupt_type *type, void *data)
 
 void gsc_asic_assign_irq(struct gsc_asic *asic, int local_irq, int *irqp)
 {
-	int irq = gsc_assign_irq(&gsc_asic_interrupt_type, asic);
-	if (irq == NO_IRQ)
-		return;
+	int irq = asic->global_irq[local_irq];
+	
+	if (irq <= 0) {
+		irq = gsc_assign_irq(&gsc_asic_interrupt_type, asic);
+		if (irq == NO_IRQ)
+			return;
 
+		asic->global_irq[local_irq] = irq;
+	}
 	*irqp = irq;
-	asic->global_irq[local_irq] = irq;
 }
 
 void gsc_fixup_irqs(struct parisc_device *parent, void *ctrl,
@@ -198,8 +202,14 @@ void gsc_fixup_irqs(struct parisc_device *parent, void *ctrl,
 int gsc_common_setup(struct parisc_device *parent, struct gsc_asic *gsc_asic)
 {
 	struct resource *res;
+	int i;
 
 	gsc_asic->gsc = parent;
+
+	/* Initialise local irq -> global irq mapping */
+	for (i = 0; i < 32; i++) {
+		gsc_asic->global_irq[i] = NO_IRQ;
+	}
 
 	/* allocate resource region */
 	res = request_mem_region(gsc_asic->hpa, 0x100000, gsc_asic->name);

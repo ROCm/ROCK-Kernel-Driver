@@ -107,6 +107,8 @@ static int rxrpc_krxsecd(void *arg)
 
 		_debug("### End Inbound Calls");
 
+		try_to_freeze(PF_FREEZE);
+
                 /* discard pending signals */
 		rxrpc_discard_my_signals();
 

@@ -157,27 +157,6 @@ enum {D_PRT, D_PRO, D_UNI, D_MOD, D_GEO, D_SBY, D_DLY, D_SLV};
 
 static DEFINE_SPINLOCK(pd_lock);
 
-#ifndef MODULE
-
-#include "setup.h"
-
-static STT pd_stt[7] = {
-	{"drive0", 8, drive0},
-	{"drive1", 8, drive1},
-	{"drive2", 8, drive2},
-	{"drive3", 8, drive3},
-	{"disable", 1, &disable},
-	{"cluster", 1, &cluster},
-	{"nice", 1, &nice}
-};
-
-void pd_setup(char *str, int *ints)
-{
-	generic_setup(pd_stt, 7, str);
-}
-
-#endif
-
 module_param(verbose, bool, 0);
 module_param(major, int, 0);
 module_param(name, charp, 0);
@@ -255,7 +234,7 @@ struct pd_unit {
 	struct gendisk *gd;
 };
 
-struct pd_unit pd[PD_UNITS];
+static struct pd_unit pd[PD_UNITS];
 
 static char pd_scratch[512];	/* scratch block buffer */
 

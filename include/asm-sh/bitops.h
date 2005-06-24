@@ -262,9 +262,9 @@ found_middle:
 #define find_first_bit(addr, size) \
 	find_next_bit((addr), (size), 0)
 
-static __inline__ int find_next_zero_bit(void *addr, int size, int offset)
+static __inline__ int find_next_zero_bit(const unsigned long *addr, int size, int offset)
 {
-	unsigned long *p = ((unsigned long *) addr) + (offset >> 5);
+	const unsigned long *p = ((unsigned long *) addr) + (offset >> 5);
 	unsigned long result = offset & ~31UL;
 	unsigned long tmp;
 
@@ -325,7 +325,7 @@ found_middle:
  * bits is cleared.
  */
 
-static inline int sched_find_first_bit(unsigned long *b)
+static inline int sched_find_first_bit(const unsigned long *b)
 {
 	if (unlikely(b[0]))
 		return __ffs(b[0]);

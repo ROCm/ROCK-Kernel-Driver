@@ -174,14 +174,6 @@ static stlport_t	stl_dummyport;
  */
 static char		stl_unwanted[SC26198_RXFIFOSIZE];
 
-/*
- *	Keep track of what interrupts we have requested for us.
- *	We don't need to request an interrupt twice if it is being
- *	shared with another Stallion board.
- */
-static int	stl_gotintrs[STL_MAXBRDS];
-static int	stl_numintrs;
-
 /*****************************************************************************/
 
 static stlbrd_t		*stl_brds[STL_MAXBRDS];
@@ -240,13 +232,12 @@ static char	*stl_brdnames[] = {
 
 /*****************************************************************************/
 
-#ifdef MODULE
 /*
  *	Define some string labels for arguments passed from the module
  *	load line. These allow for easy board definitions, and easy
  *	modification of the io, memory and irq resoucres.
  */
-
+static int	stl_nargs = 0;
 static char	*board0[4];
 static char	*board1[4];
 static char	*board2[4];
@@ -307,16 +298,14 @@ MODULE_AUTHOR("Greg Ungerer");
 MODULE_DESCRIPTION("Stallion Multiport Serial Driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(board0, "1-4s");
+module_param_array(board0, charp, &stl_nargs, 0);
 MODULE_PARM_DESC(board0, "Board 0 config -> name[,ioaddr[,ioaddr2][,irq]]");
-MODULE_PARM(board1, "1-4s");
+module_param_array(board1, charp, &stl_nargs, 0);
 MODULE_PARM_DESC(board1, "Board 1 config -> name[,ioaddr[,ioaddr2][,irq]]");
-MODULE_PARM(board2, "1-4s");
+module_param_array(board2, charp, &stl_nargs, 0);
 MODULE_PARM_DESC(board2, "Board 2 config -> name[,ioaddr[,ioaddr2][,irq]]");
-MODULE_PARM(board3, "1-4s");
+module_param_array(board3, charp, &stl_nargs, 0);
 MODULE_PARM_DESC(board3, "Board 3 config -> name[,ioaddr[,ioaddr2][,irq]]");
-
-#endif
 
 /*****************************************************************************/
 
@@ -472,14 +461,12 @@ static unsigned int	stl_baudrates[] = {
  *	Declare all those functions in this driver!
  */
 
-#ifdef MODULE
 static void	stl_argbrds(void);
 static int	stl_parsebrd(stlconf_t *confp, char **argp);
 
 static unsigned long stl_atol(char *str);
-#endif
 
-int		stl_init(void);
+static int	stl_init(void);
 static int	stl_open(struct tty_struct *tty, struct file *filp);
 static void	stl_close(struct tty_struct *tty, struct file *filp);
 static int	stl_write(struct tty_struct *tty, const unsigned char *buf, int count);
@@ -504,7 +491,6 @@ static int	stl_readproc(char *page, char **start, off_t off, int count, int *eof
 
 static int	stl_brdinit(stlbrd_t *brdp);
 static int	stl_initports(stlbrd_t *brdp, stlpanel_t *panelp);
-static int	stl_mapirq(int irq, char *name);
 static int	stl_getserial(stlport_t *portp, struct serial_struct __user *sp);
 static int	stl_setserial(stlport_t *portp, struct serial_struct __user *sp);
 static int	stl_getbrdstats(combrd_t __user *bp);
@@ -513,11 +499,11 @@ static int	stl_clrportstats(stlport_t *portp, comstats_t __user *cp);
 static int	stl_getportstruct(stlport_t __user *arg);
 static int	stl_getbrdstruct(stlbrd_t __user *arg);
 static int	stl_waitcarrier(stlport_t *portp, struct file *filp);
-static void	stl_eiointr(stlbrd_t *brdp);
-static void	stl_echatintr(stlbrd_t *brdp);
-static void	stl_echmcaintr(stlbrd_t *brdp);
-static void	stl_echpciintr(stlbrd_t *brdp);
-static void	stl_echpci64intr(stlbrd_t *brdp);
+static int	stl_eiointr(stlbrd_t *brdp);
+static int	stl_echatintr(stlbrd_t *brdp);
+static int	stl_echmcaintr(stlbrd_t *brdp);
+static int	stl_echpciintr(stlbrd_t *brdp);
+static int	stl_echpci64intr(stlbrd_t *brdp);
 static void	stl_offintr(void *private);
 static void	*stl_memalloc(int len);
 static stlbrd_t *stl_allocbrd(void);
@@ -735,8 +721,6 @@ static struct file_operations	stl_fsiomem = {
 
 static struct class_simple *stallion_class;
 
-#ifdef MODULE
-
 /*
  *	Loadable module initialization stuff.
  */
@@ -807,6 +791,9 @@ static void __exit stallion_module_exit(void)
 	for (i = 0; (i < stl_nrbrds); i++) {
 		if ((brdp = stl_brds[i]) == (stlbrd_t *) NULL)
 			continue;
+
+		free_irq(brdp->irq, brdp);
+
 		for (j = 0; (j < STL_MAXPANELS); j++) {
 			panelp = brdp->panels[j];
 			if (panelp == (stlpanel_t *) NULL)
@@ -832,9 +819,6 @@ static void __exit stallion_module_exit(void)
 		stl_brds[i] = (stlbrd_t *) NULL;
 	}
 
-	for (i = 0; (i < stl_numintrs); i++)
-		free_irq(stl_gotintrs[i], NULL);
-
 	restore_flags(flags);
 }
 
@@ -851,15 +835,13 @@ static void stl_argbrds(void)
 {
 	stlconf_t	conf;
 	stlbrd_t	*brdp;
-	int		nrargs, i;
+	int		i;
 
 #ifdef DEBUG
 	printk("stl_argbrds()\n");
 #endif
 
-	nrargs = sizeof(stl_brdsp) / sizeof(char **);
-
-	for (i = stl_nrbrds; (i < nrargs); i++) {
+	for (i = stl_nrbrds; (i < stl_nargs); i++) {
 		memset(&conf, 0, sizeof(conf));
 		if (stl_parsebrd(&conf, stl_brdsp[i]) == 0)
 			continue;
@@ -958,8 +940,6 @@ static int stl_parsebrd(stlconf_t *confp, char **argp)
 		confp->irq = stl_atol(argp[i]);
 	return(1);
 }
-
-#endif
 
 /*****************************************************************************/
 
@@ -1992,23 +1972,14 @@ stl_readdone:
 
 static irqreturn_t stl_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
-	stlbrd_t	*brdp;
-	int		i;
-	int handled = 0;
+	stlbrd_t	*brdp = (stlbrd_t *) dev_id;
 
 #ifdef DEBUG
-	printk("stl_intr(irq=%d,regs=%x)\n", irq, (int) regs);
+	printk("stl_intr(brdp=%x,irq=%d,regs=%x)\n", (int) brdp, irq,
+	    (int) regs);
 #endif
 
-	for (i = 0; (i < stl_nrbrds); i++) {
-		if ((brdp = stl_brds[i]) == (stlbrd_t *) NULL)
-			continue;
-		if (brdp->state == 0)
-			continue;
-		handled = 1;
-		(* brdp->isr)(brdp);
-	}
-	return IRQ_RETVAL(handled);
+	return IRQ_RETVAL((* brdp->isr)(brdp));
 }
 
 /*****************************************************************************/
@@ -2017,15 +1988,19 @@ static irqreturn_t stl_intr(int irq, void *dev_id, struct pt_regs *regs)
  *	Interrupt service routine for EasyIO board types.
  */
 
-static void stl_eiointr(stlbrd_t *brdp)
+static int stl_eiointr(stlbrd_t *brdp)
 {
 	stlpanel_t	*panelp;
 	unsigned int	iobase;
+	int		handled = 0;
 
 	panelp = brdp->panels[0];
 	iobase = panelp->iobase;
-	while (inb(brdp->iostatus) & EIO_INTRPEND)
+	while (inb(brdp->iostatus) & EIO_INTRPEND) {
+		handled = 1;
 		(* panelp->isr)(panelp, iobase);
+	}
+	return handled;
 }
 
 /*****************************************************************************/
@@ -2034,15 +2009,17 @@ static void stl_eiointr(stlbrd_t *brdp)
  *	Interrupt service routine for ECH-AT board types.
  */
 
-static void stl_echatintr(stlbrd_t *brdp)
+static int stl_echatintr(stlbrd_t *brdp)
 {
 	stlpanel_t	*panelp;
 	unsigned int	ioaddr;
 	int		bnknr;
+	int		handled = 0;
 
 	outb((brdp->ioctrlval | ECH_BRDENABLE), brdp->ioctrl);
 
 	while (inb(brdp->iostatus) & ECH_INTRPEND) {
+		handled = 1;
 		for (bnknr = 0; (bnknr < brdp->nrbnks); bnknr++) {
 			ioaddr = brdp->bnkstataddr[bnknr];
 			if (inb(ioaddr) & ECH_PNLINTRPEND) {
@@ -2053,6 +2030,8 @@ static void stl_echatintr(stlbrd_t *brdp)
 	}
 
 	outb((brdp->ioctrlval | ECH_BRDDISABLE), brdp->ioctrl);
+
+	return handled;
 }
 
 /*****************************************************************************/
@@ -2061,13 +2040,15 @@ static void stl_echatintr(stlbrd_t *brdp)
  *	Interrupt service routine for ECH-MCA board types.
  */
 
-static void stl_echmcaintr(stlbrd_t *brdp)
+static int stl_echmcaintr(stlbrd_t *brdp)
 {
 	stlpanel_t	*panelp;
 	unsigned int	ioaddr;
 	int		bnknr;
+	int		handled = 0;
 
 	while (inb(brdp->iostatus) & ECH_INTRPEND) {
+		handled = 1;
 		for (bnknr = 0; (bnknr < brdp->nrbnks); bnknr++) {
 			ioaddr = brdp->bnkstataddr[bnknr];
 			if (inb(ioaddr) & ECH_PNLINTRPEND) {
@@ -2076,6 +2057,7 @@ static void stl_echmcaintr(stlbrd_t *brdp)
 			}
 		}
 	}
+	return handled;
 }
 
 /*****************************************************************************/
@@ -2084,11 +2066,12 @@ static void stl_echmcaintr(stlbrd_t *brdp)
  *	Interrupt service routine for ECH-PCI board types.
  */
 
-static void stl_echpciintr(stlbrd_t *brdp)
+static int stl_echpciintr(stlbrd_t *brdp)
 {
 	stlpanel_t	*panelp;
 	unsigned int	ioaddr;
 	int		bnknr, recheck;
+	int		handled = 0;
 
 	while (1) {
 		recheck = 0;
@@ -2099,11 +2082,13 @@ static void stl_echpciintr(stlbrd_t *brdp)
 				panelp = brdp->bnk2panel[bnknr];
 				(* panelp->isr)(panelp, (ioaddr & 0xfffc));
 				recheck++;
+				handled = 1;
 			}
 		}
 		if (! recheck)
 			break;
 	}
+	return handled;
 }
 
 /*****************************************************************************/
@@ -2112,13 +2097,15 @@ static void stl_echpciintr(stlbrd_t *brdp)
  *	Interrupt service routine for ECH-8/64-PCI board types.
  */
 
-static void stl_echpci64intr(stlbrd_t *brdp)
+static int stl_echpci64intr(stlbrd_t *brdp)
 {
 	stlpanel_t	*panelp;
 	unsigned int	ioaddr;
 	int		bnknr;
+	int		handled = 0;
 
 	while (inb(brdp->ioctrl) & 0x1) {
+		handled = 1;
 		for (bnknr = 0; (bnknr < brdp->nrbnks); bnknr++) {
 			ioaddr = brdp->bnkstataddr[bnknr];
 			if (inb(ioaddr) & ECH_PNLINTRPEND) {
@@ -2127,6 +2114,8 @@ static void stl_echpci64intr(stlbrd_t *brdp)
 			}
 		}
 	}
+
+	return handled;
 }
 
 /*****************************************************************************/
@@ -2169,39 +2158,6 @@ static void stl_offintr(void *private)
 		}
 	}
 	unlock_kernel();
-}
-
-/*****************************************************************************/
-
-/*
- *	Map in interrupt vector to this driver. Check that we don't
- *	already have this vector mapped, we might be sharing this
- *	interrupt across multiple boards.
- */
-
-static int __init stl_mapirq(int irq, char *name)
-{
-	int	rc, i;
-
-#ifdef DEBUG
-	printk("stl_mapirq(irq=%d,name=%s)\n", irq, name);
-#endif
-
-	rc = 0;
-	for (i = 0; (i < stl_numintrs); i++) {
-		if (stl_gotintrs[i] == irq)
-			break;
-	}
-	if (i >= stl_numintrs) {
-		if (request_irq(irq, stl_intr, SA_SHIRQ, name, NULL) != 0) {
-			printk("STALLION: failed to register interrupt "
-				"routine for %s irq=%d\n", name, irq);
-			rc = -ENODEV;
-		} else {
-			stl_gotintrs[stl_numintrs++] = irq;
-		}
-	}
-	return(rc);
 }
 
 /*****************************************************************************/
@@ -2389,7 +2345,13 @@ static inline int stl_initeio(stlbrd_t *brdp)
 	brdp->nrpanels = 1;
 	brdp->state |= BRD_FOUND;
 	brdp->hwid = status;
-	rc = stl_mapirq(brdp->irq, name);
+	if (request_irq(brdp->irq, stl_intr, SA_SHIRQ, name, brdp) != 0) {
+		printk("STALLION: failed to register interrupt "
+		    "routine for %s irq=%d\n", name, brdp->irq);
+		rc = -ENODEV;
+	} else {
+		rc = 0;
+	}
 	return(rc);
 }
 
@@ -2594,7 +2556,14 @@ static inline int stl_initech(stlbrd_t *brdp)
 		outb((brdp->ioctrlval | ECH_BRDDISABLE), brdp->ioctrl);
 
 	brdp->state |= BRD_FOUND;
-	i = stl_mapirq(brdp->irq, name);
+	if (request_irq(brdp->irq, stl_intr, SA_SHIRQ, name, brdp) != 0) {
+		printk("STALLION: failed to register interrupt "
+		    "routine for %s irq=%d\n", name, brdp->irq);
+		i = -ENODEV;
+	} else {
+		i = 0;
+	}
+
 	return(i);
 }
 
@@ -2807,9 +2776,7 @@ static inline int stl_initbrds(void)
  */
 	for (i = 0; (i < stl_nrbrds); i++) {
 		confp = &stl_brdconf[i];
-#ifdef MODULE
 		stl_parsebrd(confp, stl_brdsp[i]);
-#endif
 		if ((brdp = stl_allocbrd()) == (stlbrd_t *) NULL)
 			return(-ENOMEM);
 		brdp->brdnr = i;
@@ -2825,9 +2792,7 @@ static inline int stl_initbrds(void)
  *	Find any dynamically supported boards. That is via module load
  *	line options or auto-detected on the PCI bus.
  */
-#ifdef MODULE
 	stl_argbrds();
-#endif
 #ifdef CONFIG_PCI
 	stl_findpcibrds();
 #endif
@@ -3098,7 +3063,7 @@ static struct tty_operations stl_ops = {
 
 /*****************************************************************************/
 
-int __init stl_init(void)
+static int __init stl_init(void)
 {
 	int i;
 	printk(KERN_INFO "%s: version %s\n", stl_drvtitle, stl_drvversion);

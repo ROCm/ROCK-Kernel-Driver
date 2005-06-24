@@ -114,6 +114,14 @@ ppc4xx_pic_init(void)
 {
 	int i;
 
+	/*
+	 * NOTE: The assumption here is that NR_IRQS is 32 or less
+	 * (NR_IRQS is 32 for PowerPC 405 cores by default).
+	 */
+#if (NR_IRQS > 32)
+#error NR_IRQS > 32 not supported
+#endif
+
 #if XPAR_XINTC_USE_DCR == 0
 	intc = ioremap(XPAR_INTC_0_BASEADDR, 32);
 
@@ -138,6 +146,12 @@ ppc4xx_pic_init(void)
 
 	ppc_md.get_irq = xilinx_pic_get_irq;
 
-	for (i = 0; i < NR_IRQS; ++i)
+	for (i = 0; i < NR_IRQS; ++i) {
 		irq_desc[i].handler = &xilinx_intc;
+
+		if (XPAR_INTC_0_KIND_OF_INTR & (0x00000001 << i))
+			irq_desc[i].status &= ~IRQ_LEVEL;
+		else
+			irq_desc[i].status |= IRQ_LEVEL;
+	}
 }

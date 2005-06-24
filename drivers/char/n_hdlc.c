@@ -575,7 +575,6 @@ static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
 			   __u8 __user *buf, size_t nr)
 {
 	struct n_hdlc *n_hdlc = tty2n_hdlc(tty);
-	int error;
 	int ret;
 	struct n_hdlc_buf *rbuf;
 
@@ -587,11 +586,10 @@ static ssize_t n_hdlc_tty_read(struct tty_struct *tty, struct file *file,
 		return -EIO;
 
 	/* verify user access to buffer */
-	error = verify_area (VERIFY_WRITE, buf, nr);
-	if (error != 0) {
-		printk(KERN_WARNING"%s(%d) n_hdlc_tty_read() can't verify user "
-		"buffer\n",__FILE__,__LINE__);
-		return (error);
+	if (!access_ok(VERIFY_WRITE, buf, nr)) {
+		printk(KERN_WARNING "%s(%d) n_hdlc_tty_read() can't verify user "
+		"buffer\n", __FILE__, __LINE__);
+		return -EFAULT;
 	}
 
 	for (;;) {

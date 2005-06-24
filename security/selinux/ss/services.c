@@ -4,17 +4,17 @@
  * Authors : Stephen Smalley, <sds@epoch.ncsc.mil>
  *           James Morris <jmorris@redhat.com>
  *
- *  Copyright (C) 2003 Red Hat, Inc., James Morris <jmorris@redhat.com>
+ * Updated: Trusted Computer Solutions, Inc. <dgoeddel@trustedcs.com>
  *
- *	This program is free software; you can redistribute it and/or modify
- *	it under the terms of the GNU General Public License version 2,
- *      as published by the Free Software Foundation.
+ *	Support for enhanced MLS infrastructure.
  *
  * Updated: Frank Mayer <mayerf@tresys.com> and Karl MacMillan <kmacmillan@tresys.com>
  *
  * 	Added conditional policy language extensions
  *
+ * Copyright (C) 2004-2005 Trusted Computer Solutions, Inc.
  * Copyright (C) 2003 - 2004 Tresys Technology, LLC
+ * Copyright (C) 2003 Red Hat, Inc., James Morris <jmorris@redhat.com>
  *	This program is free software; you can redistribute it and/or modify
  *  	it under the terms of the GNU General Public License as published by
  *	the Free Software Foundation, version 2.
@@ -52,7 +52,7 @@ static DECLARE_MUTEX(load_sem);
 #define LOAD_LOCK down(&load_sem)
 #define LOAD_UNLOCK up(&load_sem)
 
-struct sidtab sidtab;
+static struct sidtab sidtab;
 struct policydb policydb;
 int ss_initialized = 0;
 
@@ -64,18 +64,30 @@ int ss_initialized = 0;
  */
 static u32 latest_granting = 0;
 
+/* Forward declaration. */
+static int context_struct_to_string(struct context *context, char **scontext,
+				    u32 *scontext_len);
+
 /*
  * Return the boolean value of a constraint expression
  * when it is applied to the specified source and target
  * security contexts.
+ *
+ * xcontext is a special beast...  It is used by the validatetrans rules
+ * only.  For these rules, scontext is the context before the transition,
+ * tcontext is the context after the transition, and xcontext is the context
+ * of the process performing the transition.  All other callers of
+ * constraint_expr_eval should pass in NULL for xcontext.
  */
 static int constraint_expr_eval(struct context *scontext,
 				struct context *tcontext,
+				struct context *xcontext,
 				struct constraint_expr *cexpr)
 {
 	u32 val1, val2;
 	struct context *c;
 	struct role_datum *r1, *r2;
+	struct mls_level *l1, *l2;
 	struct constraint_expr *e;
 	int s[CEXPR_MAXDEPTH];
 	int sp = -1;
@@ -132,6 +144,52 @@ static int constraint_expr_eval(struct context *scontext,
 					break;
 				}
 				break;
+			case CEXPR_L1L2:
+				l1 = &(scontext->range.level[0]);
+				l2 = &(tcontext->range.level[0]);
+				goto mls_ops;
+			case CEXPR_L1H2:
+				l1 = &(scontext->range.level[0]);
+				l2 = &(tcontext->range.level[1]);
+				goto mls_ops;
+			case CEXPR_H1L2:
+				l1 = &(scontext->range.level[1]);
+				l2 = &(tcontext->range.level[0]);
+				goto mls_ops;
+			case CEXPR_H1H2:
+				l1 = &(scontext->range.level[1]);
+				l2 = &(tcontext->range.level[1]);
+				goto mls_ops;
+			case CEXPR_L1H1:
+				l1 = &(scontext->range.level[0]);
+				l2 = &(scontext->range.level[1]);
+				goto mls_ops;
+			case CEXPR_L2H2:
+				l1 = &(tcontext->range.level[0]);
+				l2 = &(tcontext->range.level[1]);
+				goto mls_ops;
+mls_ops:
+			switch (e->op) {
+			case CEXPR_EQ:
+				s[++sp] = mls_level_eq(l1, l2);
+				continue;
+			case CEXPR_NEQ:
+				s[++sp] = !mls_level_eq(l1, l2);
+				continue;
+			case CEXPR_DOM:
+				s[++sp] = mls_level_dom(l1, l2);
+				continue;
+			case CEXPR_DOMBY:
+				s[++sp] = mls_level_dom(l2, l1);
+				continue;
+			case CEXPR_INCOMP:
+				s[++sp] = mls_level_incomp(l2, l1);
+				continue;
+			default:
+				BUG();
+				return 0;
+			}
+			break;
 			default:
 				BUG();
 				return 0;
@@ -155,6 +213,13 @@ static int constraint_expr_eval(struct context *scontext,
 			c = scontext;
 			if (e->attr & CEXPR_TARGET)
 				c = tcontext;
+			else if (e->attr & CEXPR_XTARGET) {
+				c = xcontext;
+				if (!c) {
+					BUG();
+					return 0;
+				}
+			}
 			if (e->attr & CEXPR_USER)
 				val1 = c->user;
 			else if (e->attr & CEXPR_ROLE)
@@ -252,17 +317,13 @@ static int context_struct_compute_av(struct context *scontext,
 	cond_compute_av(&policydb.te_cond_avtab, &avkey, avd);
 
 	/*
-	 * Remove any permissions prohibited by the MLS policy.
-	 */
-	mls_compute_av(scontext, tcontext, tclass_datum, &avd->allowed);
-
-	/*
-	 * Remove any permissions prohibited by a constraint.
+	 * Remove any permissions prohibited by a constraint (this includes
+	 * the MLS policy).
 	 */
 	constraint = tclass_datum->constraints;
 	while (constraint) {
 		if ((constraint->permissions & (avd->allowed)) &&
-		    !constraint_expr_eval(scontext, tcontext,
+		    !constraint_expr_eval(scontext, tcontext, NULL,
 					  constraint->expr)) {
 			avd->allowed = (avd->allowed) & ~(constraint->permissions);
 		}
@@ -290,6 +351,108 @@ static int context_struct_compute_av(struct context *scontext,
 	return 0;
 }
 
+static int security_validtrans_handle_fail(struct context *ocontext,
+                                           struct context *ncontext,
+                                           struct context *tcontext,
+                                           u16 tclass)
+{
+	char *o = NULL, *n = NULL, *t = NULL;
+	u32 olen, nlen, tlen;
+
+	if (context_struct_to_string(ocontext, &o, &olen) < 0)
+		goto out;
+	if (context_struct_to_string(ncontext, &n, &nlen) < 0)
+		goto out;
+	if (context_struct_to_string(tcontext, &t, &tlen) < 0)
+		goto out;
+	audit_log(current->audit_context,
+	          "security_validate_transition:  denied for"
+	          " oldcontext=%s newcontext=%s taskcontext=%s tclass=%s",
+	          o, n, t, policydb.p_class_val_to_name[tclass-1]);
+out:
+	kfree(o);
+	kfree(n);
+	kfree(t);
+
+	if (!selinux_enforcing)
+		return 0;
+	return -EPERM;
+}
+
+int security_validate_transition(u32 oldsid, u32 newsid, u32 tasksid,
+                                 u16 tclass)
+{
+	struct context *ocontext;
+	struct context *ncontext;
+	struct context *tcontext;
+	struct class_datum *tclass_datum;
+	struct constraint_node *constraint;
+	int rc = 0;
+
+	if (!ss_initialized)
+		return 0;
+
+	POLICY_RDLOCK;
+
+	/*
+	 * Remap extended Netlink classes for old policy versions.
+	 * Do this here rather than socket_type_to_security_class()
+	 * in case a newer policy version is loaded, allowing sockets
+	 * to remain in the correct class.
+	 */
+	if (policydb_loaded_version < POLICYDB_VERSION_NLCLASS)
+		if (tclass >= SECCLASS_NETLINK_ROUTE_SOCKET &&
+		    tclass <= SECCLASS_NETLINK_DNRT_SOCKET)
+			tclass = SECCLASS_NETLINK_SOCKET;
+
+	if (!tclass || tclass > policydb.p_classes.nprim) {
+		printk(KERN_ERR "security_validate_transition:  "
+		       "unrecognized class %d\n", tclass);
+		rc = -EINVAL;
+		goto out;
+	}
+	tclass_datum = policydb.class_val_to_struct[tclass - 1];
+
+	ocontext = sidtab_search(&sidtab, oldsid);
+	if (!ocontext) {
+		printk(KERN_ERR "security_validate_transition: "
+		       " unrecognized SID %d\n", oldsid);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	ncontext = sidtab_search(&sidtab, newsid);
+	if (!ncontext) {
+		printk(KERN_ERR "security_validate_transition: "
+		       " unrecognized SID %d\n", newsid);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	tcontext = sidtab_search(&sidtab, tasksid);
+	if (!tcontext) {
+		printk(KERN_ERR "security_validate_transition: "
+		       " unrecognized SID %d\n", tasksid);
+		rc = -EINVAL;
+		goto out;
+	}
+
+	constraint = tclass_datum->validatetrans;
+	while (constraint) {
+		if (!constraint_expr_eval(ocontext, ncontext, tcontext,
+		                          constraint->expr)) {
+			rc = security_validtrans_handle_fail(ocontext, ncontext,
+			                                     tcontext, tclass);
+			goto out;
+		}
+		constraint = constraint->next;
+	}
+
+out:
+	POLICY_RDUNLOCK;
+	return rc;
+}
+
 /**
  * security_compute_av - Compute access vector decisions.
  * @ssid: source security identifier
@@ -313,8 +476,8 @@ int security_compute_av(u32 ssid,
 	int rc = 0;
 
 	if (!ss_initialized) {
-		avd->allowed = requested;
-		avd->decided = requested;
+		avd->allowed = 0xffffffff;
+		avd->decided = 0xffffffff;
 		avd->auditallow = 0;
 		avd->auditdeny = 0xffffffff;
 		avd->seqno = latest_granting;
@@ -352,7 +515,7 @@ out:
  * to point to this string and set `*scontext_len' to
  * the length of the string.
  */
-int context_struct_to_string(struct context *context, char **scontext, u32 *scontext_len)
+static int context_struct_to_string(struct context *context, char **scontext, u32 *scontext_len)
 {
 	char *scontextp;
 
@@ -366,7 +529,7 @@ int context_struct_to_string(struct context *context, char **scontext, u32 *scon
 	*scontext_len += mls_compute_context_len(context);
 
 	/* Allocate space for the context; caller must free this space. */
-	scontextp = kmalloc(*scontext_len+1,GFP_ATOMIC);
+	scontextp = kmalloc(*scontext_len, GFP_ATOMIC);
 	if (!scontextp) {
 		return -ENOMEM;
 	}
@@ -375,17 +538,16 @@ int context_struct_to_string(struct context *context, char **scontext, u32 *scon
 	/*
 	 * Copy the user name, role name and type name into the context.
 	 */
-	sprintf(scontextp, "%s:%s:%s:",
+	sprintf(scontextp, "%s:%s:%s",
 		policydb.p_user_val_to_name[context->user - 1],
 		policydb.p_role_val_to_name[context->role - 1],
 		policydb.p_type_val_to_name[context->type - 1]);
 	scontextp += strlen(policydb.p_user_val_to_name[context->user - 1]) +
 	             1 + strlen(policydb.p_role_val_to_name[context->role - 1]) +
-	             1 + strlen(policydb.p_type_val_to_name[context->type - 1]) + 1;
+	             1 + strlen(policydb.p_type_val_to_name[context->type - 1]);
 
 	mls_sid_to_context(context, &scontextp);
 
-	scontextp--;
 	*scontextp = 0;
 
 	return 0;
@@ -715,23 +877,8 @@ static int security_compute_sid(u32 ssid,
 				}
 			}
 		}
-
-		if (!type_change && !roletr) {
-			/* No change in process role or type. */
-			*out_sid = ssid;
-			goto out_unlock;
-
-		}
 		break;
 	default:
-		if (!type_change &&
-		    (newcontext.user == tcontext->user) &&
-		    mls_context_cmp(scontext, tcontext)) {
-                        /* No change in object type, owner,
-			   or MLS attributes. */
-			*out_sid = tsid;
-			goto out_unlock;
-		}
 		break;
 	}
 
@@ -1049,9 +1196,11 @@ int security_load_policy(void *data, size_t len)
 		}
 		policydb_loaded_version = policydb.policyvers;
 		ss_initialized = 1;
-
+		seqno = ++latest_granting;
 		LOAD_UNLOCK;
 		selinux_complete_init();
+		avc_ss_reset(seqno);
+		selnl_notify_policyload(seqno);
 		return 0;
 	}
 
@@ -1363,36 +1512,37 @@ int security_get_user_sids(u32 fromsid,
 			if (!ebitmap_get_bit(&role->types, j))
 				continue;
 			usercon.type = j+1;
-			mls_for_user_ranges(user,usercon) {
-				rc = context_struct_compute_av(fromcon, &usercon,
-							       SECCLASS_PROCESS,
-							       PROCESS__TRANSITION,
-							       &avd);
-				if (rc ||  !(avd.allowed & PROCESS__TRANSITION))
-					continue;
-				rc = sidtab_context_to_sid(&sidtab, &usercon, &sid);
-				if (rc) {
+
+			if (mls_setup_user_range(fromcon, user, &usercon))
+				continue;
+
+			rc = context_struct_compute_av(fromcon, &usercon,
+						       SECCLASS_PROCESS,
+						       PROCESS__TRANSITION,
+						       &avd);
+			if (rc ||  !(avd.allowed & PROCESS__TRANSITION))
+				continue;
+			rc = sidtab_context_to_sid(&sidtab, &usercon, &sid);
+			if (rc) {
+				kfree(mysids);
+				goto out_unlock;
+			}
+			if (mynel < maxnel) {
+				mysids[mynel++] = sid;
+			} else {
+				maxnel += SIDS_NEL;
+				mysids2 = kmalloc(maxnel*sizeof(*mysids2), GFP_ATOMIC);
+				if (!mysids2) {
+					rc = -ENOMEM;
 					kfree(mysids);
 					goto out_unlock;
 				}
-				if (mynel < maxnel) {
-					mysids[mynel++] = sid;
-				} else {
-					maxnel += SIDS_NEL;
-					mysids2 = kmalloc(maxnel*sizeof(*mysids2), GFP_ATOMIC);
-					if (!mysids2) {
-						rc = -ENOMEM;
-						kfree(mysids);
-						goto out_unlock;
-					}
-					memset(mysids2, 0, maxnel*sizeof(*mysids2));
-					memcpy(mysids2, mysids, mynel * sizeof(*mysids2));
-					kfree(mysids);
-					mysids = mysids2;
-					mysids[mynel++] = sid;
-				}
+				memset(mysids2, 0, maxnel*sizeof(*mysids2));
+				memcpy(mysids2, mysids, mynel * sizeof(*mysids2));
+				kfree(mysids);
+				mysids = mysids2;
+				mysids[mynel++] = sid;
 			}
-			mls_end_user_ranges;
 		}
 	}
 

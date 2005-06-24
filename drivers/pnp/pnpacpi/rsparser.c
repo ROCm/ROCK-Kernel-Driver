@@ -94,8 +94,8 @@ static void
 pnpacpi_parse_allocated_dmaresource(struct pnp_resource_table * res, int dma)
 {
 	int i = 0;
-	while (!(res->dma_resource[i].flags & IORESOURCE_UNSET) &&
-			i < PNP_MAX_DMA)
+	while (i < PNP_MAX_DMA &&
+			!(res->dma_resource[i].flags & IORESOURCE_UNSET))
 		i++;
 	if (i < PNP_MAX_DMA) {
 		res->dma_resource[i].flags = IORESOURCE_DMA;  // Also clears _UNSET flag
@@ -219,9 +219,10 @@ static acpi_status pnpacpi_allocated_resource(struct acpi_resource *res,
 		res->data.address64.min_address_range, 
 		res->data.address64.address_length);
 		break;
+	case ACPI_RSTYPE_VENDOR:
+		break;
 	default:
-		pnp_warn("PnPACPI: Alloc type : %d not handle", 
-				res->id);
+		pnp_warn("PnPACPI: unknown resource type %d", res->id);
 		return AE_ERROR;
 	}
 			
@@ -508,7 +509,7 @@ static acpi_status pnpacpi_option_resource(struct acpi_resource *res,
 		case ACPI_RSTYPE_END_DPF:
 			return AE_CTRL_TERMINATE;
 		default:
-			pnp_warn("PnPACPI:Option type: %d not handle", res->id);
+			pnp_warn("PnPACPI: unknown resource type %d", res->id);
 			return AE_ERROR;
 	}
 			
@@ -810,7 +811,7 @@ int pnpacpi_encode_resources(struct pnp_resource_table *res_table,
 			mem ++;
 			break;
 		default: /* other type */
-			pnp_warn("Invalid type");
+			pnp_warn("unknown resource type %d", resource->id);
 			return -EINVAL;
 		}
 		resource ++;

@@ -137,6 +137,7 @@ struct device_node {
 	int	devfn;			/* for pci devices */
 	int	eeh_mode;		/* See eeh.h for possible EEH_MODEs */
 	int	eeh_config_addr;
+	int	pci_ext_config_space;	/* for pci devices */
 	struct  pci_controller *phb;	/* for pci devices */
 	struct	iommu_table *iommu_table;	/* for phb's or bridges */
 
@@ -146,9 +147,7 @@ struct device_node {
 	struct	device_node *sibling;
 	struct	device_node *next;	/* next device of same type */
 	struct	device_node *allnext;	/* next in list of all nodes */
-	struct  proc_dir_entry *pde;       /* this node's proc directory */
-	struct  proc_dir_entry *name_link; /* name symlink */
-	struct  proc_dir_entry *addr_link; /* addr symlink */
+	struct  proc_dir_entry *pde;	/* this node's proc directory */
 	struct  kref kref;
 	unsigned long _flags;
 };
@@ -173,15 +172,6 @@ static inline void set_node_proc_entry(struct device_node *dn, struct proc_dir_e
 	dn->pde = de;
 }
 
-static void inline set_node_name_link(struct device_node *dn, struct proc_dir_entry *de)
-{
-	dn->name_link = de;
-}
-
-static void inline set_node_addr_link(struct device_node *dn, struct proc_dir_entry *de)
-{
-	dn->addr_link = de;
-}
 
 /* OBSOLETE: Old stlye node lookup */
 extern struct device_node *find_devices(const char *name);
@@ -208,8 +198,8 @@ extern struct device_node *of_node_get(struct device_node *node);
 extern void of_node_put(struct device_node *node);
 
 /* For updating the device tree at runtime */
-extern int of_add_node(const char *path, struct property *proplist);
-extern int of_remove_node(struct device_node *np);
+extern void of_attach_node(struct device_node *);
+extern void of_detach_node(const struct device_node *);
 
 /* Other Prototypes */
 extern unsigned long prom_init(unsigned long, unsigned long, unsigned long,

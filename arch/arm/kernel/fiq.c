@@ -46,12 +46,6 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-#if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
-#warning This file requires GCC 3.3.x or older to build.  Alternatively,
-#warning please talk to GCC people to resolve the issues with the
-#warning assembly clobber list.
-#endif
-
 static unsigned long no_fiq_insn;
 
 /* Default reacquire function
@@ -91,44 +85,43 @@ void set_fiq_handler(void *start, unsigned int length)
 
 /*
  * Taking an interrupt in FIQ mode is death, so both these functions
- * disable irqs for the duration. 
+ * disable irqs for the duration.  Note - these functions are almost
+ * entirely coded in assembly.
  */
-void set_fiq_regs(struct pt_regs *regs)
+void __attribute__((naked)) set_fiq_regs(struct pt_regs *regs)
 {
 	register unsigned long tmp;
-	__asm__ volatile (
-	"mrs	%0, cpsr\n\
+	asm volatile (
+	"mov	ip, sp\n\
+	stmfd	sp!, {fp, ip, lr, pc}\n\
+	sub	fp, ip, #4\n\
+	mrs	%0, cpsr\n\
 	msr	cpsr_c, %2	@ select FIQ mode\n\
 	mov	r0, r0\n\
 	ldmia	%1, {r8 - r14}\n\
 	msr	cpsr_c, %0	@ return to SVC mode\n\
-	mov	r0, r0"
+	mov	r0, r0\n\
+	ldmea	fp, {fp, sp, pc}"
 	: "=&r" (tmp)
-	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE)
-	/* These registers aren't modified by the above code in a way
-	   visible to the compiler, but we mark them as clobbers anyway
-	   so that GCC won't put any of the input or output operands in
-	   them.  */
-	: "r8", "r9", "r10", "r11", "r12", "r13", "r14");
+	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE));
 }
 
-void get_fiq_regs(struct pt_regs *regs)
+void __attribute__((naked)) get_fiq_regs(struct pt_regs *regs)
 {
 	register unsigned long tmp;
-	__asm__ volatile (
-	"mrs	%0, cpsr\n\
+	asm volatile (
+	"mov	ip, sp\n\
+	stmfd	sp!, {fp, ip, lr, pc}\n\
+	sub	fp, ip, #4\n\
+	mrs	%0, cpsr\n\
 	msr	cpsr_c, %2	@ select FIQ mode\n\
 	mov	r0, r0\n\
 	stmia	%1, {r8 - r14}\n\
 	msr	cpsr_c, %0	@ return to SVC mode\n\
-	mov	r0, r0"
+	mov	r0, r0\n\
+	ldmea	fp, {fp, sp, pc}"
 	: "=&r" (tmp)
-	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE)
-	/* These registers aren't modified by the above code in a way
-	   visible to the compiler, but we mark them as clobbers anyway
-	   so that GCC won't put any of the input or output operands in
-	   them.  */
-	: "r8", "r9", "r10", "r11", "r12", "r13", "r14");
+	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE));
 }
 
 int claim_fiq(struct fiq_handler *f)

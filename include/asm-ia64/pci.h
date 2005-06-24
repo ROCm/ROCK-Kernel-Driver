@@ -121,14 +121,9 @@ struct pci_controller {
 
 extern struct pci_ops pci_root_ops;
 
-static inline int pci_name_bus(char *name, struct pci_bus *bus)
+static inline int pci_proc_domain(struct pci_bus *bus)
 {
-	if (pci_domain_nr(bus) == 0) {
-		sprintf(name, "%02x", bus->number);
-	} else {
-		sprintf(name, "%04x:%02x", pci_domain_nr(bus), bus->number);
-	}
-	return 0;
+	return (pci_domain_nr(bus) != 0);
 }
 
 static inline void pcibios_add_platform_entries(struct pci_dev *dev)

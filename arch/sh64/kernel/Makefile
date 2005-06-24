@@ -13,7 +13,7 @@
 # unless it's something special (ie not a .c file).
 #
 
-extra-y	:= head.o init_task.o vmlinux.lds.s
+extra-y	:= head.o init_task.o vmlinux.lds
 
 obj-y	:= process.o signal.o entry.o traps.o irq.o irq_intc.o \
 	   ptrace.o setup.o time.o sys_sh64.o semaphore.o sh_ksyms.o \
@@ -22,16 +22,14 @@ obj-y	:= process.o signal.o entry.o traps.o irq.o irq_intc.o \
 obj-$(CONFIG_HEARTBEAT)		+= led.o
 obj-$(CONFIG_SH_ALPHANUMERIC)	+= alphanum.o
 obj-$(CONFIG_SH_DMA)		+= dma.o
+obj-$(CONFIG_SH_FPU)		+= fpu.o
 obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
 obj-$(CONFIG_KALLSYMS)		+= unwind.o
 obj-$(CONFIG_PCI)		+= pci-dma.o pcibios.o
+obj-$(CONFIG_MODULES)		+= module.o
 
 ifeq ($(CONFIG_PCI),y)
 obj-$(CONFIG_CPU_SH5)		+= pci_sh5.o
-endif
-
-ifndef CONFIG_NOFPU_SUPPORT
-obj-y				+= fpu.o
 endif
 
 USE_STANDARD_AS_RULE := true

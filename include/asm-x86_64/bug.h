@@ -15,11 +15,15 @@ struct bug_frame {
 	unsigned short line;
 } __attribute__((packed));
 
+#ifdef CONFIG_BUG
 #define HAVE_ARCH_BUG
 #define BUG() \
 	asm volatile("ud2 ; .quad %c1 ; .short %c0" :: \
-		     "i"(__LINE__), "i" (__stringify(KBUILD_BASENAME)))
+		     "i"(__LINE__), "i" (__stringify(__FILE__)))
 void out_of_line_bug(void);
-#include <asm-generic/bug.h>
+#else
+static inline void out_of_line_bug(void) { }
+#endif
 
+#include <asm-generic/bug.h>
 #endif

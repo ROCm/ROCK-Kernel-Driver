@@ -39,8 +39,8 @@ void snd_gf1_mem_lock(snd_gf1_mem_t * alloc, int xup)
 	}
 }
 
-static snd_gf1_mem_block_t *snd_gf1_mem_xalloc(snd_gf1_mem_t * alloc,
-					       snd_gf1_mem_block_t * block)
+snd_gf1_mem_block_t *snd_gf1_mem_xalloc(snd_gf1_mem_t * alloc,
+				        snd_gf1_mem_block_t * block)
 {
 	snd_gf1_mem_block_t *pblock, *nblock;
 
@@ -105,8 +105,8 @@ int snd_gf1_mem_xfree(snd_gf1_mem_t * alloc, snd_gf1_mem_block_t * block)
 	return 0;
 }
 
-static snd_gf1_mem_block_t *snd_gf1_mem_look(snd_gf1_mem_t * alloc,
-					     unsigned int address)
+snd_gf1_mem_block_t *snd_gf1_mem_look(snd_gf1_mem_t * alloc,
+				      unsigned int address)
 {
 	snd_gf1_mem_block_t *block;
 
@@ -118,8 +118,8 @@ static snd_gf1_mem_block_t *snd_gf1_mem_look(snd_gf1_mem_t * alloc,
 	return NULL;
 }
 
-static snd_gf1_mem_block_t *snd_gf1_mem_share(snd_gf1_mem_t * alloc,
-					      unsigned int *share_id)
+snd_gf1_mem_block_t *snd_gf1_mem_share(snd_gf1_mem_t * alloc,
+				       unsigned int *share_id)
 {
 	snd_gf1_mem_block_t *block;
 

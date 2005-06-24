@@ -50,12 +50,12 @@ extern void flush_dcache_all(void);
 /* Cache control on the MPC8xx is provided through some additional
  * special purpose registers.
  */
-#define IC_CST		560	/* Instruction cache control/status */
-#define IC_ADR		561	/* Address needed for some commands */
-#define IC_DAT		562	/* Read-only data register */
-#define DC_CST		568	/* Data cache control/status */
-#define DC_ADR		569	/* Address needed for some commands */
-#define DC_DAT		570	/* Read-only data register */
+#define SPRN_IC_CST	560	/* Instruction cache control/status */
+#define SPRN_IC_ADR	561	/* Address needed for some commands */
+#define SPRN_IC_DAT	562	/* Read-only data register */
+#define SPRN_DC_CST	568	/* Data cache control/status */
+#define SPRN_DC_ADR	569	/* Address needed for some commands */
+#define SPRN_DC_DAT	570	/* Read-only data register */
 
 /* Commands.  Only the first few are available to the instruction cache.
 */

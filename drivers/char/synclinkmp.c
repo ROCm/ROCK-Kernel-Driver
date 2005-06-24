@@ -1,5 +1,5 @@
 /*
- * $Id: synclinkmp.c,v 4.29 2004/08/27 20:06:41 paulkf Exp $
+ * $Id: synclinkmp.c,v 4.34 2005/03/04 15:07:10 paulkf Exp $
  *
  * Device driver for Microgate SyncLink Multiport
  * high speed multiprotocol serial adapter.
@@ -487,7 +487,7 @@ module_param_array(maxframe, int, NULL, 0);
 module_param_array(dosyncppp, int, NULL, 0);
 
 static char *driver_name = "SyncLink MultiPort driver";
-static char *driver_version = "$Revision: 4.29 $";
+static char *driver_version = "$Revision: 4.34 $";
 
 static int synclinkmp_init_one(struct pci_dev *dev,const struct pci_device_id *ent);
 static void synclinkmp_remove_one(struct pci_dev *dev);
@@ -2313,7 +2313,7 @@ void isr_rxrdy(SLMP_INFO * info)
 		tty_flip_buffer_push(tty);
 }
 
-void isr_txeom(SLMP_INFO * info, unsigned char status)
+static void isr_txeom(SLMP_INFO * info, unsigned char status)
 {
 	if ( debug_level >= DEBUG_LEVEL_ISR )
 		printk("%s(%d):%s isr_txeom status=%02x\n",
@@ -3815,7 +3815,7 @@ void add_device(SLMP_INFO *info)
  *
  * Return Value:	pointer to SLMP_INFO if success, otherwise NULL
  */
-SLMP_INFO *alloc_dev(int adapter_num, int port_num, struct pci_dev *pdev)
+static SLMP_INFO *alloc_dev(int adapter_num, int port_num, struct pci_dev *pdev)
 {
 	SLMP_INFO *info;
 
@@ -4528,7 +4528,7 @@ void async_mode(SLMP_INFO *info)
 	 * 07..05  Reserved, must be 0
 	 * 04..00  RRC<4..0> Rx FIFO trigger active 0x00 = 1 byte
 	 */
-	write_reg(info, TRC0, 0x00);
+	write_reg(info, RRC, 0x00);
 
 	/* TRC0 Transmit Ready Control 0
 	 *
@@ -5205,7 +5205,7 @@ int irq_test(SLMP_INFO *info)
 
 /* initialize individual SCA device (2 ports)
  */
-int sca_init(SLMP_INFO *info)
+static int sca_init(SLMP_INFO *info)
 {
 	/* set wait controller to single mem partition (low), no wait states */
 	write_reg(info, PABR0, 0);	/* wait controller addr boundary 0 */

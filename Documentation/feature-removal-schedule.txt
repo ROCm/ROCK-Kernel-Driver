@@ -15,3 +15,71 @@ Why:	It has been unmaintained for a number of years, has unfixable
 	against the LSB, and can be replaced by using udev.
 Who:	Greg Kroah-Hartman <greg@kroah.com>
 
+---------------------------
+
+What:	ACPI S4bios support
+When:	May 2005
+Why:	Noone uses it, and it probably does not work, anyway. swsusp is
+	faster, more reliable, and people are actually using it.
+Who:	Pavel Machek <pavel@suse.cz>
+
+---------------------------
+
+What:	PCI Name Database (CONFIG_PCI_NAMES)
+When:	July 2005
+Why:	It bloats the kernel unnecessarily, and is handled by userspace better
+	(pciutils supports it.)  Will eliminate the need to try to keep the
+	pci.ids file in sync with the sf.net database all of the time.
+Who:	Greg Kroah-Hartman <gregkh@suse.de>
+
+---------------------------
+
+What:	io_remap_page_range() (macro or function)
+When:	September 2005
+Why:	Replaced by io_remap_pfn_range() which allows more memory space
+	addressabilty (by using a pfn) and supports sparc & sparc64
+	iospace as part of the pfn.
+Who:	Randy Dunlap <rddunlap@osdl.org>
+
+---------------------------
+
+What:	register_ioctl32_conversion() / unregister_ioctl32_conversion()
+When:	April 2005
+Why:	Replaced by ->compat_ioctl in file_operations and other method
+	vecors.
+Who:	Andi Kleen <ak@muc.de>, Christoph Hellwig <hch@lst.de>
+
+---------------------------
+
+What:	RCU API moves to EXPORT_SYMBOL_GPL
+When:	April 2006
+Files:	include/linux/rcupdate.h, kernel/rcupdate.c
+Why:	Outside of Linux, the only implementations of anything even
+	vaguely resembling RCU that I am aware of are in DYNIX/ptx,
+	VM/XA, Tornado, and K42.  I do not expect anyone to port binary
+	drivers or kernel modules from any of these, since the first two
+	are owned by IBM and the last two are open-source research OSes.
+	So these will move to GPL after a grace period to allow
+	people, who might be using implementations that I am not aware
+	of, to adjust to this upcoming change.
+Who:	Paul E. McKenney <paulmck@us.ibm.com>
+
+---------------------------
+
+What:	IEEE1394 Audio and Music Data Transmission Protocol driver,
+	Connection Management Procedures driver
+When:	November 2005
+Files:	drivers/ieee1394/{amdtp,cmp}*
+Why:	These are incomplete, have never worked, and are better implemented
+	in userland via raw1394 (see http://freebob.sourceforge.net/ for
+	example.)
+Who:	Jody McIntyre <scjody@steamballoon.com>
+
+---------------------------
+
+What:	raw1394: requests of type RAW1394_REQ_ISO_SEND, RAW1394_REQ_ISO_LISTEN
+When:	November 2005
+Why:	Deprecated in favour of the new ioctl-based rawiso interface, which is
+	more efficient.  You should really be using libraw1394 for raw1394
+	access anyway.
+Who:	Jody McIntyre <scjody@steamballoon.com>

@@ -140,7 +140,7 @@ static u8 pcmcia_used_irq[NR_IRQS];
 static int socket_resume(struct pcmcia_socket *skt);
 static int socket_suspend(struct pcmcia_socket *skt);
 
-int pcmcia_socket_dev_suspend(struct device *dev, u32 state)
+int pcmcia_socket_dev_suspend(struct device *dev, pm_message_t state)
 {
 	struct pcmcia_socket *socket;
 
@@ -221,6 +221,8 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 
 	cs_dbg(socket, 0, "pcmcia_register_socket(0x%p)\n", socket->ops);
 
+	spin_lock_init(&socket->lock);
+
 	if (socket->resource_ops->init) {
 		ret = socket->resource_ops->init(socket);
 		if (ret)
@@ -261,7 +263,6 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 	socket->cis_mem.speed = cis_speed;
 
 	INIT_LIST_HEAD(&socket->cis_cache);
-	spin_lock_init(&socket->lock);
 
 	init_completion(&socket->socket_released);
 	init_completion(&socket->thread_done);
@@ -564,7 +565,9 @@ static int socket_suspend(struct pcmcia_socket *skt)
 
 	send_event(skt, CS_EVENT_PM_SUSPEND, CS_EVENT_PRI_LOW);
 	skt->socket = dead_socket;
-	skt->ops->suspend(skt);
+	skt->ops->set_socket(skt, &skt->socket);
+	if (skt->ops->suspend)
+		skt->ops->suspend(skt);
 	skt->state |= SOCKET_SUSPEND;
 
 	return CS_SUCCESS;
@@ -585,6 +588,11 @@ static int socket_resume(struct pcmcia_socket *skt)
 	skt->socket = dead_socket;
 	skt->ops->init(skt);
 	skt->ops->set_socket(skt, &skt->socket);
+
+	if (!(skt->state & SOCKET_PRESENT)) {
+		skt->state &= ~SOCKET_SUSPEND;
+		return socket_insert(skt);
+	}
 
 	ret = socket_setup(skt, resume_delay);
 	if (ret == CS_SUCCESS) {

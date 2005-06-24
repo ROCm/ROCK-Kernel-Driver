@@ -49,8 +49,19 @@
 #include <asm/todc.h>
 #include <asm/bootinfo.h>
 #include <asm/ppc4xx_pic.h>
+#include <asm/ppcboot.h>
 
 #include <syslib/gen550.h>
+#include <syslib/ibm440gp_common.h>
+
+/*
+ * This is a horrible kludge, we eventually need to abstract this
+ * generic PHY stuff, so the  standard phy mode defines can be
+ * easily used from arch code.
+ */
+#include "../../../../drivers/net/ibm_emac/ibm_emac_phy.h"
+
+bd_t __res;
 
 static struct ibm44x_clocks clocks __initdata;
 
@@ -86,7 +97,7 @@ ebony_calibrate_decr(void)
 	 * on Rev. C silicon then errata forces us to
 	 * use the internal clock.
 	 */
-	switch (PVR_REV(mfspr(PVR))) {
+	switch (PVR_REV(mfspr(SPRN_PVR))) {
 		case PVR_REV(PVR_440GP_RB):
 			freq = EBONY_440GP_RB_SYSCLK;
 			break;
@@ -138,7 +149,7 @@ ebony_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 static void __init
 ebony_setup_pcix(void)
 {
-	void *pcix_reg_base;
+	void __iomem *pcix_reg_base;
 
 	pcix_reg_base = ioremap64(PCIX0_REG_BASE, PCIX_REG_SIZE);
 
@@ -199,9 +210,8 @@ ebony_setup_hose(void)
 	hose->io_space.end = EBONY_PCI_UPPER_IO;
 	hose->mem_space.start = EBONY_PCI_LOWER_MEM;
 	hose->mem_space.end = EBONY_PCI_UPPER_MEM;
-	isa_io_base =
-		(unsigned long)ioremap64(EBONY_PCI_IO_BASE, EBONY_PCI_IO_SIZE);
-	hose->io_base_virt = (void *)isa_io_base;
+	hose->io_base_virt = ioremap64(EBONY_PCI_IO_BASE, EBONY_PCI_IO_SIZE);
+	isa_io_base = (unsigned long)hose->io_base_virt;
 
 	setup_indirect_pci(hose,
 			EBONY_PCI_CFGA_PLB32,
@@ -258,19 +268,21 @@ ebony_early_serial_map(void)
 static void __init
 ebony_setup_arch(void)
 {
-	unsigned char * vpd_base;
 	struct ocp_def *def;
 	struct ocp_func_emac_data *emacdata;
 
 	/* Set mac_addr for each EMAC */
-	vpd_base = ioremap64(EBONY_VPD_BASE, EBONY_VPD_SIZE);
 	def = ocp_get_one_device(OCP_VENDOR_IBM, OCP_FUNC_EMAC, 0);
 	emacdata = def->additions;
-	memcpy(emacdata->mac_addr, EBONY_NA0_ADDR(vpd_base), 6);
+	emacdata->phy_map = 0x00000001;	/* Skip 0x00 */
+	emacdata->phy_mode = PHY_MODE_RMII;
+	memcpy(emacdata->mac_addr, __res.bi_enetaddr, 6);
+
 	def = ocp_get_one_device(OCP_VENDOR_IBM, OCP_FUNC_EMAC, 1);
 	emacdata = def->additions;
-	memcpy(emacdata->mac_addr, EBONY_NA1_ADDR(vpd_base), 6);
-	iounmap(vpd_base);
+	emacdata->phy_map = 0x00000001;	/* Skip 0x00 */
+	emacdata->phy_mode = PHY_MODE_RMII;
+	memcpy(emacdata->mac_addr, __res.bi_enet1addr, 6);
 
 	/*
 	 * Determine various clocks.
@@ -314,7 +326,14 @@ ebony_setup_arch(void)
 void __init platform_init(unsigned long r3, unsigned long r4,
 		unsigned long r5, unsigned long r6, unsigned long r7)
 {
-	parse_bootinfo((struct bi_record *) (r3 + KERNELBASE));
+	parse_bootinfo(find_bootinfo());
+
+	/*
+	 * If we were passed in a board information, copy it into the
+	 * residual data area.
+	 */
+	if (r3)
+		__res = *(bd_t *)(r3 + KERNELBASE);
 
 	ibm44x_platform_init();
 

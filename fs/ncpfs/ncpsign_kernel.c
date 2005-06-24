@@ -11,10 +11,9 @@
 
 #include <linux/string.h>
 #include <linux/ncp.h>
+#include <linux/bitops.h>
 #include "ncpsign_kernel.h"
 
-#define rol32(i,c) (((((i)&0xffffffff)<<c)&0xffffffff)| \
-                    (((i)&0xffffffff)>>(32-c)))
 /* i386: 32-bit, little endian, handles mis-alignment */
 #ifdef __i386__
 #define GET_LE32(p) (*(int *)(p))

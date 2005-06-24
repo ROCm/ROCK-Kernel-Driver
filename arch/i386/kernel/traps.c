@@ -37,10 +37,6 @@
 #include <linux/mca.h>
 #endif
 
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
-
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -61,9 +57,6 @@
 #include "mach_traps.h"
 
 asmlinkage int system_call(void);
-#ifdef	CONFIG_KDB
-asmlinkage int kdb_call(void);
-#endif	/* CONFIG_KDB */
 
 struct desc_struct default_ldt[] = { { 0, 0 }, { 0, 0 }, { 0, 0 },
 		{ 0, 0 }, { 0, 0 } };
@@ -92,9 +85,6 @@ asmlinkage void segment_not_present(void);
 asmlinkage void stack_segment(void);
 asmlinkage void general_protection(void);
 asmlinkage void page_fault(void);
-#ifdef	CONFIG_KDB
-asmlinkage void page_fault_mca(void);
-#endif	/* CONFIG_KDB */
 asmlinkage void coprocessor_error(void);
 asmlinkage void simd_coprocessor_error(void);
 asmlinkage void alignment_check(void);
@@ -350,17 +340,12 @@ void die(const char * str, struct pt_regs * regs, long err)
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	spin_unlock_irq(&die.lock);
-#ifdef	CONFIG_KDB
-	kdb_diemsg = str;
-	kdb(KDB_REASON_OOPS, err, regs);
-#endif	/* CONFIG_KDB */
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 
 	if (panic_on_oops) {
 		printk(KERN_EMERG "Fatal exception: panic in 5 seconds\n");
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(5 * HZ);
+		ssleep(5);
 		panic("Fatal exception");
 	}
 	do_exit(SIGSEGV);
@@ -455,7 +440,7 @@ fastcall void do_##name(struct pt_regs * regs, long error_code) \
 }
 
 DO_VM86_ERROR_INFO( 0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->eip)
-#if	!defined(CONFIG_KPROBES) && !defined(CONFIG_KDB)
+#ifndef CONFIG_KPROBES
 DO_VM86_ERROR( 3, SIGTRAP, "int3", int3)
 #endif
 DO_VM86_ERROR( 4, SIGSEGV, "overflow", overflow)
@@ -466,6 +451,7 @@ DO_ERROR(10, SIGSEGV, "invalid TSS", invalid_TSS)
 DO_ERROR(11, SIGBUS,  "segment not present", segment_not_present)
 DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
 DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, 0)
+DO_ERROR_INFO(32, SIGSEGV, "iret exception", iret_error, ILL_BADSTK, 0)
 
 fastcall void do_general_protection(struct pt_regs * regs, long error_code)
 {
@@ -551,9 +537,6 @@ static void io_check_error(unsigned char reason, struct pt_regs * regs)
 
 static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 {
-#ifdef	CONFIG_KDB
-	(void)kdb(KDB_REASON_NMI, reason, regs);
-#endif	/* CONFIG_KDB */
 #ifdef CONFIG_MCA
 	/* Might actually be able to figure out what the guilty party
 	* is. */
@@ -583,9 +566,6 @@ void die_nmi (struct pt_regs *regs, const char *msg)
 		smp_processor_id(), regs->eip);
 	show_registers(regs);
 	printk("console shuts up ...\n");
-#ifdef	CONFIG_KDB
-	kdb(KDB_REASON_NMI, 0, regs);
-#endif	/* CONFIG_KDB */
 	console_silent();
 	spin_unlock(&nmi_print_lock);
 	bust_spinlocks(0);
@@ -599,17 +579,7 @@ static void default_do_nmi(struct pt_regs * regs)
 	/* Only the BSP gets external NMIs from the system.  */
 	if (!smp_processor_id())
 		reason = get_nmi_reason();
-
-#if defined(CONFIG_SMP) && defined(CONFIG_KDB)
-	/*
-	 * Call the kernel debugger to see if this NMI is due
-	 * to an KDB requested IPI.  If so, kdb will handle it.
-	 */
-	if (kdb_ipi(regs, NULL)) {
-		return;
-	}
-#endif	/* defined(CONFIG_SMP) && defined(CONFIG_KDB) */
-
+ 
 	if (!(reason & 0xc0)) {
 		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT)
 							== NOTIFY_STOP)
@@ -673,16 +643,15 @@ void unset_nmi_callback(void)
 }
 
 #ifdef CONFIG_KPROBES
-fastcall int do_int3(struct pt_regs *regs, long error_code)
+fastcall void do_int3(struct pt_regs *regs, long error_code)
 {
 	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP)
 			== NOTIFY_STOP)
-		return 1;
+		return;
 	/* This is an interrupt gate, because kprobes wants interrupts
 	disabled.  Normal trap handlers don't. */
 	restore_interrupts(regs);
 	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
-	return 0;
 }
 #endif
 
@@ -715,11 +684,6 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 
 	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
-#ifdef	CONFIG_KDB
-	if (kdb(KDB_REASON_DEBUG, error_code, regs))
-		return;
-#endif	/* CONFIG_KDB */
-
 	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
 					SIGTRAP) == NOTIFY_STOP)
 		return;
@@ -742,8 +706,6 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 	/*
 	 * Single-stepping through TF: make sure we ignore any events in
 	 * kernel space (but re-enable TF when returning to user mode).
-	 * And if the event was due to a debugger (PT_DTRACE), clear the
-	 * TF flag so that register information is correct.
 	 */
 	if (condition & DR_STEP) {
 		/*
@@ -753,11 +715,6 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 		 */
 		if ((regs->xcs & 3) == 0)
 			goto clear_TF_reenable;
-
-		if (likely(tsk->ptrace & PT_DTRACE)) {
-			tsk->ptrace &= ~PT_DTRACE;
-			regs->eflags &= ~TF_MASK;
-		}
 	}
 
 	/* Ok, finally something we can handle */
@@ -781,16 +738,6 @@ clear_TF_reenable:
 	regs->eflags &= ~TF_MASK;
 	return;
 }
-
-#ifdef	CONFIG_KDB
-fastcall void do_int3(struct pt_regs * regs, long error_code)
-{
-	if (kdb(KDB_REASON_BREAK, error_code, regs))
-		return;
-	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
-}
-#endif	/* CONFIG_KDB */
-
 
 /*
  * Note that we play around with the 'TS' bit in an attempt to get
@@ -859,7 +806,7 @@ fastcall void do_coprocessor_error(struct pt_regs * regs, long error_code)
 	math_error((void __user *)regs->eip);
 }
 
-void simd_math_error(void __user *eip)
+static void simd_math_error(void __user *eip)
 {
 	struct task_struct * task;
 	siginfo_t info;
@@ -938,6 +885,51 @@ fastcall void do_spurious_interrupt_bug(struct pt_regs * regs,
 	/* No need to warn about this any longer. */
 	printk("Ignoring P6 Local APIC Spurious Interrupt Bug...\n");
 #endif
+}
+
+fastcall void setup_x86_bogus_stack(unsigned char * stk)
+{
+	unsigned long *switch16_ptr, *switch32_ptr;
+	struct pt_regs *regs;
+	unsigned long stack_top, stack_bot;
+	unsigned short iret_frame16_off;
+	int cpu = smp_processor_id();
+	/* reserve the space on 32bit stack for the magic switch16 pointer */
+	memmove(stk, stk + 8, sizeof(struct pt_regs));
+	switch16_ptr = (unsigned long *)(stk + sizeof(struct pt_regs));
+	regs = (struct pt_regs *)stk;
+	/* now the switch32 on 16bit stack */
+	stack_bot = (unsigned long)&per_cpu(cpu_16bit_stack, cpu);
+	stack_top = stack_bot +	CPU_16BIT_STACK_SIZE;
+	switch32_ptr = (unsigned long *)(stack_top - 8);
+	iret_frame16_off = CPU_16BIT_STACK_SIZE - 8 - 20;
+	/* copy iret frame on 16bit stack */
+	memcpy((void *)(stack_bot + iret_frame16_off), &regs->eip, 20);
+	/* fill in the switch pointers */
+	switch16_ptr[0] = (regs->esp & 0xffff0000) | iret_frame16_off;
+	switch16_ptr[1] = __ESPFIX_SS;
+	switch32_ptr[0] = (unsigned long)stk + sizeof(struct pt_regs) +
+		8 - CPU_16BIT_STACK_SIZE;
+	switch32_ptr[1] = __KERNEL_DS;
+}
+
+fastcall unsigned char * fixup_x86_bogus_stack(unsigned short sp)
+{
+	unsigned long *switch32_ptr;
+	unsigned char *stack16, *stack32;
+	unsigned long stack_top, stack_bot;
+	int len;
+	int cpu = smp_processor_id();
+	stack_bot = (unsigned long)&per_cpu(cpu_16bit_stack, cpu);
+	stack_top = stack_bot +	CPU_16BIT_STACK_SIZE;
+	switch32_ptr = (unsigned long *)(stack_top - 8);
+	/* copy the data from 16bit stack to 32bit stack */
+	len = CPU_16BIT_STACK_SIZE - 8 - sp;
+	stack16 = (unsigned char *)(stack_bot + sp);
+	stack32 = (unsigned char *)
+		(switch32_ptr[0] + CPU_16BIT_STACK_SIZE - 8 - len);
+	memcpy(stack32, stack16, len);
+	return stack32;
 }
 
 /*
@@ -1065,17 +1057,7 @@ void __init trap_init(void)
 	set_trap_gate(11,&segment_not_present);
 	set_trap_gate(12,&stack_segment);
 	set_trap_gate(13,&general_protection);
-#ifdef	CONFIG_KDB
-	if (test_bit(X86_FEATURE_MCE, boot_cpu_data.x86_capability) &&
-	    test_bit(X86_FEATURE_MCA, boot_cpu_data.x86_capability)) {
-		set_intr_gate(14,&page_fault_mca);
-	}
-	else {
-		set_intr_gate(14,&page_fault);
-	}
-#else	/* !CONFIG_KDB */
 	set_intr_gate(14,&page_fault);
-#endif	/* CONFIG_KDB */
 	set_trap_gate(15,&spurious_interrupt_bug);
 	set_trap_gate(16,&coprocessor_error);
 	set_trap_gate(17,&alignment_check);
@@ -1085,14 +1067,6 @@ void __init trap_init(void)
 	set_trap_gate(19,&simd_coprocessor_error);
 
 	set_system_gate(SYSCALL_VECTOR,&system_call);
-#ifdef	CONFIG_KDB
-	kdb_enablehwfault();
-	/*
-	 * A trap gate, used by the kernel to enter the 
-	 * debugger, preserving all registers.
-	 */
-	set_trap_gate(KDBENTER_VECTOR, &kdb_call);
-#endif	/* CONFIG_KDB */
 
 	/*
 	 * Should be a barrier for any external CPU state.
@@ -1101,3 +1075,10 @@ void __init trap_init(void)
 
 	trap_init_hook();
 }
+
+static int __init kstack_setup(char *s)
+{
+	kstack_depth_to_print = simple_strtoul(s, NULL, 0);
+	return 0;
+}
+__setup("kstack=", kstack_setup);

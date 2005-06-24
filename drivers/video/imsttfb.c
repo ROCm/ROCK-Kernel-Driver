@@ -228,7 +228,7 @@ struct initvalues {
 	__u8 addr, value;
 };
 
-static struct initvalues ibm_initregs[] __initdata = {
+static struct initvalues ibm_initregs[] __devinitdata = {
 	{ CLKCTL,	0x21 },
 	{ SYNCCTL,	0x00 },
 	{ HSYNCPOS,	0x00 },
@@ -275,7 +275,7 @@ static struct initvalues ibm_initregs[] __initdata = {
 	{ KEYCTL,	0x00 }
 };
 
-static struct initvalues tvp_initregs[] __initdata = {
+static struct initvalues tvp_initregs[] __devinitdata = {
 	{ TVPIRICC,	0x00 },
 	{ TVPIRBRC,	0xe4 },
 	{ TVPIRLAC,	0x06 },
@@ -338,7 +338,7 @@ enum {
 static int inverse = 0;
 static char fontname[40] __initdata = { 0 };
 #if defined(CONFIG_PPC)
-static signed char init_vmode __initdata = -1, init_cmode __initdata = -1;
+static signed char init_vmode __devinitdata = -1, init_cmode __devinitdata = -1;
 #endif
 
 static struct imstt_regvals tvp_reg_init_2 = {
@@ -1287,12 +1287,12 @@ imsttfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 		case FBIMSTT_SETCMAPREG:
 			if (copy_from_user(reg, argp, 8) || reg[0] > (0x1000 - sizeof(reg[0])) / sizeof(reg[0]))
 				return -EFAULT;
-			write_reg_le32(((u_int *)par->cmap_regs), reg[0], reg[1]);
+			write_reg_le32(((u_int __iomem *)par->cmap_regs), reg[0], reg[1]);
 			return 0;
 		case FBIMSTT_GETCMAPREG:
 			if (copy_from_user(reg, argp, 4) || reg[0] > (0x1000 - sizeof(reg[0])) / sizeof(reg[0]))
 				return -EFAULT;
-			reg[1] = read_reg_le32(((u_int *)par->cmap_regs), reg[0]);
+			reg[1] = read_reg_le32(((u_int __iomem *)par->cmap_regs), reg[0]);
 			if (copy_to_user((void __user *)(arg + 4), &reg[1], 4))
 				return -EFAULT;
 			return 0;
@@ -1348,7 +1348,7 @@ static struct fb_ops imsttfb_ops = {
 	.fb_ioctl 	= imsttfb_ioctl,
 };
 
-static void __init 
+static void __devinit
 init_imstt(struct fb_info *info)
 {
 	struct imstt_par *par = (struct imstt_par *) info->par;
@@ -1547,7 +1547,7 @@ imsttfb_remove(struct pci_dev *pdev)
 }
 
 #ifndef MODULE
-int __init 
+static int __init
 imsttfb_setup(char *options)
 {
 	char *this_opt;
@@ -1601,7 +1601,7 @@ imsttfb_setup(char *options)
 
 #endif /* MODULE */
 
-int __init imsttfb_init(void)
+static int __init imsttfb_init(void)
 {
 #ifndef MODULE
 	char *option = NULL;
@@ -1611,7 +1611,7 @@ int __init imsttfb_init(void)
 
 	imsttfb_setup(option);
 #endif
-	return pci_module_init(&imsttfb_pci_driver);
+	return pci_register_driver(&imsttfb_pci_driver);
 }
  
 static void __exit imsttfb_exit(void)
@@ -1619,9 +1619,8 @@ static void __exit imsttfb_exit(void)
 	pci_unregister_driver(&imsttfb_pci_driver);
 }
 
-#ifdef MODULE
 MODULE_LICENSE("GPL");
-#endif
+
 module_init(imsttfb_init);
 module_exit(imsttfb_exit);
 

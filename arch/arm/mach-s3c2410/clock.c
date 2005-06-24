@@ -1,7 +1,7 @@
 /* linux/arch/arm/mach-s3c2410/clock.c
  *
- * Copyright (c) 2004 Simtec Electronics
- * Ben Dooks <ben@simtec.co.uk>
+ * Copyright (c) 2004-2005 Simtec Electronics
+ *	Ben Dooks <ben@simtec.co.uk>
  *
  * S3C2410 Clock control support
  *
@@ -33,6 +33,7 @@
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/device.h>
+#include <linux/sysdev.h>
 
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
@@ -46,17 +47,12 @@
 #include <asm/arch/regs-clock.h>
 
 #include "clock.h"
+#include "cpu.h"
 
 /* clock information */
 
-unsigned long s3c24xx_xtal = 12*1000*1000;	/* default 12MHz */
-unsigned long s3c24xx_fclk;
-unsigned long s3c24xx_hclk;
-unsigned long s3c24xx_pclk;
-
 static LIST_HEAD(clocks);
 static DECLARE_MUTEX(clocks_sem);
-
 
 /* old functions */
 
@@ -206,6 +202,14 @@ EXPORT_SYMBOL(clk_get_parent);
 
 /* base clocks */
 
+static struct clk clk_xtal = {
+	.name		= "xtal",
+	.id		= -1,
+	.rate		= 0,
+	.parent		= NULL,
+	.ctrlbit	= 0,
+};
+
 static struct clk clk_f = {
 	.name		= "fclk",
 	.id		= -1,
@@ -286,6 +290,7 @@ static struct clk init_clocks[] = {
 	  .ctrlbit = S3C2410_CLKCON_USBD
 	},
 	{ .name    = "timers",
+	  .id	   = -1,
 	  .parent  = &clk_p,
 	  .enable  = s3c24xx_clkcon_enable,
 	  .ctrlbit = S3C2410_CLKCON_PWMT
@@ -378,19 +383,24 @@ int s3c24xx_register_clock(struct clk *clk)
 
 /* initalise all the clocks */
 
-int __init s3c24xx_setup_clocks(void)
+int __init s3c24xx_setup_clocks(unsigned long xtal,
+				unsigned long fclk,
+				unsigned long hclk,
+				unsigned long pclk)
 {
 	struct clk *clkp = init_clocks;
 	int ptr;
 	int ret;
 
-	printk(KERN_INFO "S3C2410 Clock control, (c) 2004 Simtec Electronics\n");
+	printk(KERN_INFO "S3C2410 Clocks, (c) 2004 Simtec Electronics\n");
 
 	/* initialise the main system clocks */
 
-	clk_h.rate = s3c24xx_hclk;
-	clk_p.rate = s3c24xx_pclk;
-	clk_f.rate = s3c24xx_fclk;
+	clk_xtal.rate = xtal;
+
+	clk_h.rate = hclk;
+	clk_p.rate = pclk;
+	clk_f.rate = fclk;
 
 	/* it looks like just setting the register here is not good
 	 * enough, and causes the odd hang at initial boot time, so
@@ -414,6 +424,9 @@ int __init s3c24xx_setup_clocks(void)
 
 	/* register our clocks */
 
+	if (s3c24xx_register_clock(&clk_xtal) < 0)
+		printk(KERN_ERR "failed to register master xtal\n");
+
 	if (s3c24xx_register_clock(&clk_f) < 0)
 		printk(KERN_ERR "failed to register cpu fclk\n");
 
@@ -422,6 +435,8 @@ int __init s3c24xx_setup_clocks(void)
 
 	if (s3c24xx_register_clock(&clk_p) < 0)
 		printk(KERN_ERR "failed to register cpu pclk\n");
+
+	/* register clocks from clock array */
 
 	for (ptr = 0; ptr < ARRAY_SIZE(init_clocks); ptr++, clkp++) {
 		ret = s3c24xx_register_clock(clkp);
@@ -434,4 +449,59 @@ int __init s3c24xx_setup_clocks(void)
 	return 0;
 }
 
+/* S3C2440 extended clock support */
 
+#ifdef CONFIG_CPU_S3C2440
+
+static struct clk s3c2440_clk_upll = {
+	.name		= "upll",
+	.id		= -1,
+};
+
+static struct clk s3c2440_clk_cam = {
+	.name		= "camif",
+	.parent		= &clk_h,
+	.id		= -1,
+	.enable		= s3c24xx_clkcon_enable,
+	.ctrlbit	= S3C2440_CLKCON_CAMERA,
+};
+
+static struct clk s3c2440_clk_ac97 = {
+	.name		= "ac97",
+	.parent		= &clk_p,
+	.id		= -1,
+	.enable		= s3c24xx_clkcon_enable,
+	.ctrlbit	= S3C2440_CLKCON_CAMERA,
+};
+
+static int s3c2440_clk_add(struct sys_device *sysdev)
+{
+	unsigned long upllcon = __raw_readl(S3C2410_UPLLCON);
+
+	s3c2440_clk_upll.rate = s3c2410_get_pll(upllcon, clk_xtal.rate);
+
+	printk("S3C2440: Clock Support, UPLL %ld.%03ld MHz\n",
+	       print_mhz(s3c2440_clk_upll.rate));
+
+	s3c24xx_register_clock(&s3c2440_clk_ac97);
+	s3c24xx_register_clock(&s3c2440_clk_cam);
+	s3c24xx_register_clock(&s3c2440_clk_upll);
+
+	clk_disable(&s3c2440_clk_ac97);
+	clk_disable(&s3c2440_clk_cam);
+
+	return 0;
+}
+
+static struct sysdev_driver s3c2440_clk_driver = {
+	.add	= s3c2440_clk_add,
+};
+
+static int s3c24xx_clk_driver(void)
+{
+	return sysdev_driver_register(&s3c2440_sysclass, &s3c2440_clk_driver);
+}
+
+arch_initcall(s3c24xx_clk_driver);
+
+#endif /* CONFIG_CPU_S3C2440 */

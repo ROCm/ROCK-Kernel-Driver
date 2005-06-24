@@ -331,10 +331,8 @@ static int help(struct sk_buff **pskb,
 	if (!find_nl_seq(ntohl(th->seq), ct_ftp_info, dir)) {
 		/* Now if this ends in \n, update ftp info. */
 		DEBUGP("ip_conntrack_ftp_help: wrong seq pos %s(%u) or %s(%u)\n",
-		       ct_ftp_info->seq_aft_nl_num[dir] > 0 ? "" : "(UNSET)",
-		       ct_ftp_info->seq_aft_nl[dir][0],
-		       ct_ftp_info->seq_aft_nl_num[dir] > 1 ? "" : "(UNSET)",
-		       ct_ftp_info->seq_aft_nl[dir][1]);
+		       ct_ftp_info->seq_aft_nl[0][dir] 
+		       old_seq_aft_nl_set ? "":"(UNSET) ", old_seq_aft_nl);
 		ret = NF_ACCEPT;
 		goto out_update_nl;
 	}

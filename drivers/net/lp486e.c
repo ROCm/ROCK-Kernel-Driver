@@ -112,8 +112,10 @@ enum commands {
 	CmdDiagnose = 7
 };
 
-char *CUcmdnames[8] = { "NOP", "IASetup", "Configure", "MulticastList",
-			"Tx", "TDR", "Dump", "Diagnose" };
+#if 0
+static const char *CUcmdnames[8] = { "NOP", "IASetup", "Configure", "MulticastList",
+				     "Tx", "TDR", "Dump", "Diagnose" };
+#endif
 
 /* Status word bits */
 #define	STAT_CX		0x8000	/* The CU finished executing a command
@@ -960,7 +962,7 @@ static void print_eth(char *add)
 		(unsigned char) add[12], (unsigned char) add[13]);
 }
 
-int __init lp486e_probe(struct net_device *dev) {
+static int __init lp486e_probe(struct net_device *dev) {
 	struct i596_private *lp;
 	unsigned char eth_addr[6] = { 0, 0xaa, 0, 0, 0, 0 };
 	unsigned char *bios;

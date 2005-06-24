@@ -25,7 +25,7 @@ struct compat_mq_attr {
 static inline int get_compat_mq_attr(struct mq_attr *attr,
 			const struct compat_mq_attr __user *uattr)
 {
-	if (verify_area(VERIFY_READ, uattr, sizeof *uattr))
+	if (!access_ok(VERIFY_READ, uattr, sizeof *uattr))
 		return -EFAULT;
 
 	return __get_user(attr->mq_flags, &uattr->mq_flags)
@@ -100,20 +100,6 @@ asmlinkage ssize_t compat_sys_mq_timedreceive(mqd_t mqdes,
 
 	return sys_mq_timedreceive(mqdes, u_msg_ptr, msg_len,
 			u_msg_prio, u_ts);
-}
-
-static int get_compat_sigevent(struct sigevent *event,
-		const struct compat_sigevent __user *u_event)
-{
-	if (verify_area(VERIFY_READ, u_event, sizeof(*u_event)))
-		return -EFAULT;
-
-	return __get_user(event->sigev_value.sival_int,
-			  &u_event->sigev_value.sival_int)
-	     | __get_user(event->sigev_signo, &u_event->sigev_signo)
-	     | __get_user(event->sigev_notify, &u_event->sigev_notify)
-	     | __get_user(event->sigev_notify_thread_id,
-			  &u_event->sigev_notify_thread_id);
 }
 
 asmlinkage long compat_sys_mq_notify(mqd_t mqdes,

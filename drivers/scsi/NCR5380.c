@@ -86,6 +86,7 @@
  * 5.  Test linked command handling code after Eric is ready with 
  *      the high level code.
  */
+#include <scsi/scsi_dbg.h>
 
 #if (NDEBUG & NDEBUG_LISTS)
 #define LIST(x,y) {printk("LINE:%d   Adding %p to %p\n", __LINE__, (void*)(x), (void*)(y)); if ((x)==(y)) udelay(5); }
@@ -533,7 +534,7 @@ static int should_disconnect(unsigned char cmd)
 static void NCR5380_set_timer(struct NCR5380_hostdata *hostdata, unsigned long timeout)
 {
 	hostdata->time_expires = jiffies + timeout;
-	schedule_delayed_work(&hostdata->coroutine, hostdata->time_expires);
+	schedule_delayed_work(&hostdata->coroutine, timeout);
 }
 
 
@@ -671,16 +672,8 @@ static void __init NCR5380_print_options(struct Scsi_Host *instance)
 
 static void NCR5380_print_status(struct Scsi_Host *instance)
 {
-	static char pr_bfr[512];
-	char *start;
-	int len;
-
 	NCR5380_dprint(NDEBUG_ANY, instance);
 	NCR5380_dprint_phase(NDEBUG_ANY, instance);
-
-	len = NCR5380_proc_info(instance, pr_bfr, &start, 0, sizeof(pr_bfr), 0);
-	pr_bfr[len] = 0;
-	printk("\n%s\n", pr_bfr);
 }
 
 /******************************************/
@@ -2379,7 +2372,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
  * 3..length+1  arguments
  *
  * Start the extended message buffer with the EXTENDED_MESSAGE
- * byte, since print_msg() wants the whole thing.  
+ * byte, since scsi_print_msg() wants the whole thing.  
  */
 					extended_msg[0] = EXTENDED_MESSAGE;
 					/* Accept first byte by clearing ACK */
@@ -2426,7 +2419,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
 				default:
 					if (!tmp) {
 						printk("scsi%d: rejecting message ", instance->host_no);
-						print_msg(extended_msg);
+						scsi_print_msg(extended_msg);
 						printk("\n");
 					} else if (tmp != EXTENDED_MESSAGE)
 						printk("scsi%d: rejecting unknown message %02x from target %d, lun %d\n", instance->host_no, tmp, cmd->device->id, cmd->device->lun);
@@ -2560,7 +2553,7 @@ static void NCR5380_reselect(struct Scsi_Host *instance) {
 
 	if (!(msg[0] & 0x80)) {
 		printk(KERN_ERR "scsi%d : expecting IDENTIFY message, got ", instance->host_no);
-		print_msg(msg);
+		scsi_print_msg(msg);
 		abort = 1;
 	} else {
 		/* Accept message by clearing ACK */
@@ -2685,12 +2678,7 @@ static int NCR5380_abort(Scsi_Cmnd * cmd) {
 	Scsi_Cmnd *tmp, **prev;
 	
 	printk(KERN_WARNING "scsi%d : aborting command\n", instance->host_no);
-	print_Scsi_Cmnd(cmd);
-
-	NCR5380_print_status(instance);
-
-	printk(KERN_WARNING "scsi%d : aborting command\n", instance->host_no);
-	print_Scsi_Cmnd(cmd);
+	scsi_print_command(cmd);
 
 	NCR5380_print_status(instance);
 

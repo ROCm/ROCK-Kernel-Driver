@@ -133,7 +133,11 @@ int async_wrap_skb(struct sk_buff *skb, __u8 *tx_buff, int buffsize)
 		 *  bufsize-5 since the maximum number of bytes that can be
 		 *  transmitted after this point is 5.
 		 */
-		ASSERT(n < (buffsize-5), return n;);
+		if(n >= (buffsize-5)) {
+			IRDA_ERROR("%s(), tx buffer overflow (n=%d)\n",
+				   __FUNCTION__, n);
+			return n;
+		}
 
 		n += stuff_byte(skb->data[i], tx_buff+n);
 		fcs.value = irda_fcs(fcs.value, skb->data[i]);
@@ -381,7 +385,7 @@ async_unwrap_ce(struct net_device *dev,
 		break;
 
 	case LINK_ESCAPE:
-		WARNING("%s: state not defined\n", __FUNCTION__);
+		IRDA_WARNING("%s: state not defined\n", __FUNCTION__);
 		break;
 
 	case BEGIN_FRAME:

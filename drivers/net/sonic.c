@@ -116,7 +116,7 @@ static int sonic_send_packet(struct sk_buff *skb, struct net_device *dev)
 	/*
 	 * Map the packet data into the logical DMA address space
 	 */
-	if ((laddr = vdma_alloc(PHYSADDR(skb->data), skb->len)) == ~0UL) {
+	if ((laddr = vdma_alloc(CPHYSADDR(skb->data), skb->len)) == ~0UL) {
 		printk("%s: no VDMA entry for transmit available.\n",
 		       dev->name);
 		dev_kfree_skb(skb);
@@ -223,7 +223,7 @@ static irqreturn_t sonic_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 			/* We must free the original skb */
 			if (lp->tx_skb[entry]) {
-				dev_kfree_skb(lp->tx_skb[entry]);
+				dev_kfree_skb_irq(lp->tx_skb[entry]);
 				lp->tx_skb[entry] = 0;
 			}
 			/* and the VDMA address */

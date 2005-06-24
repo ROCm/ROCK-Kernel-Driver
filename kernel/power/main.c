@@ -65,8 +65,10 @@ static int suspend_prepare(suspend_state_t state)
 			goto Thaw;
 	}
 
-	if ((error = device_suspend(PMSG_SUSPEND)))
+	if ((error = device_suspend(PMSG_SUSPEND))) {
+		printk(KERN_ERR "Some devices failed to suspend\n");
 		goto Finish;
+	}
 	return 0;
  Finish:
 	if (pm_ops->finish)
@@ -85,8 +87,10 @@ static int suspend_enter(suspend_state_t state)
 
 	local_irq_save(flags);
 
-	if ((error = device_power_down(PMSG_SUSPEND)))
+	if ((error = device_power_down(PMSG_SUSPEND))) {
+		printk(KERN_ERR "Some devices failed to power down\n");
 		goto Done;
+	}
 	error = pm_ops->enter(state);
 	device_power_up();
  Done:
@@ -115,7 +119,7 @@ static void suspend_finish(suspend_state_t state)
 
 
 
-char * pm_states[] = {
+static char * pm_states[] = {
 	[PM_SUSPEND_STANDBY]	= "standby",
 	[PM_SUSPEND_MEM]	= "mem",
 	[PM_SUSPEND_DISK]	= "disk",
@@ -152,14 +156,14 @@ static int enter_state(suspend_state_t state)
 		goto Unlock;
 	}
 
-	pr_debug("PM: Preparing system for suspend\n");
+	pr_debug("PM: Preparing system for %s sleep\n", pm_states[state]);
 	if ((error = suspend_prepare(state)))
 		goto Unlock;
 
-	pr_debug("PM: Entering state.\n");
+	pr_debug("PM: Entering %s sleep\n", pm_states[state]);
 	error = suspend_enter(state);
 
-	pr_debug("PM: Finishing up.\n");
+	pr_debug("PM: Finishing wakeup.\n");
 	suspend_finish(state);
  Unlock:
 	up(&pm_sem);

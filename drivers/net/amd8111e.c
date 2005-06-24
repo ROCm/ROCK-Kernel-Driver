@@ -105,6 +105,7 @@ Revision History:
 MODULE_AUTHOR("Advanced Micro Devices, Inc.");
 MODULE_DESCRIPTION ("AMD8111 based 10/100 Ethernet Controller. Driver Version 3.0.3");
 MODULE_LICENSE("GPL");
+MODULE_DEVICE_TABLE(pci, amd8111e_pci_tbl);
 module_param_array(speed_duplex, int, NULL, 0);
 MODULE_PARM_DESC(speed_duplex, "Set device speed and duplex modes, 0: Auto Negotitate, 1: 10Mbps Half Duplex, 2: 10Mbps Full Duplex, 3: 100Mbps Half Duplex, 4: 100Mbps Full Duplex");
 module_param_array(coalesce, bool, NULL, 0);
@@ -737,6 +738,7 @@ static int amd8111e_rx_poll(struct net_device *dev, int * budget)
 	short vtag;
 #endif
 	int rx_pkt_limit = dev->quota;
+	unsigned long flags;
 	
 	do{   
 		/* process receive packets until we use the quota*/
@@ -840,18 +842,19 @@ static int amd8111e_rx_poll(struct net_device *dev, int * budget)
 	/* Receive descriptor is empty now */
 	dev->quota -= num_rx_pkt;
 	*budget -= num_rx_pkt;
+
+	spin_lock_irqsave(&lp->lock, flags);
 	netif_rx_complete(dev);
-	/* enable receive interrupt */
 	writel(VAL0|RINTEN0, mmio + INTEN0);
 	writel(VAL2 | RDMD0, mmio + CMD0);
+	spin_unlock_irqrestore(&lp->lock, flags);
 	return 0;
+
 rx_not_empty:
 	/* Do not call a netif_rx_complete */
 	dev->quota -= num_rx_pkt;	
 	*budget -= num_rx_pkt;
 	return 1;
-
-	
 }
 
 #else
@@ -1260,18 +1263,20 @@ static irqreturn_t amd8111e_interrupt(int irq, void *dev_id, struct pt_regs *reg
 	struct net_device * dev = (struct net_device *) dev_id;
 	struct amd8111e_priv *lp = netdev_priv(dev);
 	void __iomem *mmio = lp->mmio;
-	unsigned int intr0;
+	unsigned int intr0, intren0;
 	unsigned int handled = 1;
 
-	if(dev == NULL)
+	if(unlikely(dev == NULL))
 		return IRQ_NONE;
 
-	if (regs) spin_lock (&lp->lock);
+	spin_lock(&lp->lock);
+
 	/* disabling interrupt */
 	writel(INTREN, mmio + CMD0);
 
 	/* Read interrupt status */
 	intr0 = readl(mmio + INT0);
+	intren0 = readl(mmio + INTEN0);
 
 	/* Process all the INT event until INTR bit is clear. */
 
@@ -1292,11 +1297,11 @@ static irqreturn_t amd8111e_interrupt(int irq, void *dev_id, struct pt_regs *reg
 			/* Schedule a polling routine */
 			__netif_rx_schedule(dev);
 		}
-		else {
+		else if (intren0 & RINTEN0) {
 			printk("************Driver bug! \
 				interrupt while in poll\n");
-			/* Fix by disabling interrupts */
-			writel(RINT0, mmio + INT0);
+			/* Fix by disable receive interrupts */
+			writel(RINTEN0, mmio + INTEN0);
 		}
 	}
 #else
@@ -1320,7 +1325,7 @@ static irqreturn_t amd8111e_interrupt(int irq, void *dev_id, struct pt_regs *reg
 err_no_interrupt:
 	writel( VAL0 | INTREN,mmio + CMD0);
 	
-	if (regs) spin_unlock(&lp->lock);
+	spin_unlock(&lp->lock);
 	
 	return IRQ_RETVAL(handled);
 }
@@ -1489,7 +1494,7 @@ static void amd8111e_read_regs(struct amd8111e_priv *lp, u32 *buf)
 amd8111e crc generator implementation is different from the kernel
 ether_crc() function.
 */
-int amd8111e_ether_crc(int len, char* mac_addr)
+static int amd8111e_ether_crc(int len, char* mac_addr)
 {
 	int i,byte;
 	unsigned char octet;
@@ -1717,7 +1722,7 @@ static int amd8111e_set_mac_address(struct net_device *dev, void *p)
 /* 
 This function changes the mtu of the device. It restarts the device  to initialize the descriptor with new receive buffers.
 */  
-int amd8111e_change_mtu(struct net_device *dev, int new_mtu)
+static int amd8111e_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct amd8111e_priv *lp = netdev_priv(dev);
 	int err;
@@ -1799,7 +1804,7 @@ static void amd8111e_tx_timeout(struct net_device *dev)
 	if(!err)
 		netif_wake_queue(dev);
 }
-static int amd8111e_suspend(struct pci_dev *pci_dev, u32 state)
+static int amd8111e_suspend(struct pci_dev *pci_dev, pm_message_t state)
 {	
 	struct net_device *dev = pci_get_drvdata(pci_dev);
 	struct amd8111e_priv *lp = netdev_priv(dev);

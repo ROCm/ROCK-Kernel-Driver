@@ -46,7 +46,7 @@
 #include <asm/io.h>
 
 /* Built in clock of the 69030 */
-const unsigned Fref = 14318180;
+static const unsigned Fref = 14318180;
 
 #define mmio_base (p->screen_base + 0x400000)
 
@@ -90,11 +90,6 @@ static void mm_write_ar(struct fb_info *p, u8 reg, u8 data)
 	mm_write_ind(reg, data, 0x780, 0x780);
 }
 #define write_ar(num, val)	mm_write_ar(p, num, val)
-
-/*
- * Exported functions
- */
-int asiliantfb_init(void);
 
 static int asiliantfb_pci_init(struct pci_dev *dp, const struct pci_device_id *);
 static int asiliantfb_check_var(struct fb_var_screeninfo *var,
@@ -465,7 +460,7 @@ static struct chips_init_reg chips_init_xr[] =
 	{0xd1, 0x01},
 };
 
-static void __init chips_hw_init(struct fb_info *p)
+static void __devinit chips_hw_init(struct fb_info *p)
 {
 	int i;
 
@@ -488,7 +483,7 @@ static void __init chips_hw_init(struct fb_info *p)
 		write_fr(chips_init_fr[i].addr, chips_init_fr[i].data);
 }
 
-static struct fb_fix_screeninfo asiliantfb_fix __initdata = {
+static struct fb_fix_screeninfo asiliantfb_fix __devinitdata = {
 	.id =		"Asiliant 69000",
 	.type =		FB_TYPE_PACKED_PIXELS,
 	.visual =	FB_VISUAL_PSEUDOCOLOR,
@@ -497,7 +492,7 @@ static struct fb_fix_screeninfo asiliantfb_fix __initdata = {
 	.smem_len =	0x200000,	/* 2MB */
 };
 
-static struct fb_var_screeninfo asiliantfb_var __initdata = {
+static struct fb_var_screeninfo asiliantfb_var __devinitdata = {
 	.xres 		= 640,
 	.yres 		= 480,
 	.xres_virtual 	= 640,
@@ -518,7 +513,7 @@ static struct fb_var_screeninfo asiliantfb_var __initdata = {
 	.vsync_len 	= 2,
 };
 
-static void __init init_asiliant(struct fb_info *p, unsigned long addr)
+static void __devinit init_asiliant(struct fb_info *p, unsigned long addr)
 {
 	p->fix			= asiliantfb_fix;
 	p->fix.smem_start	= addr;
@@ -604,12 +599,12 @@ static struct pci_driver asiliantfb_driver = {
 	.remove =	__devexit_p(asiliantfb_remove),
 };
 
-int __init asiliantfb_init(void)
+static int __init asiliantfb_init(void)
 {
 	if (fb_get_options("asiliantfb", NULL))
 		return -ENODEV;
 
-	return pci_module_init(&asiliantfb_driver);
+	return pci_register_driver(&asiliantfb_driver);
 }
 
 module_init(asiliantfb_init);

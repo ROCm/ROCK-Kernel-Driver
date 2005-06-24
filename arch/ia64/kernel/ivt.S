@@ -957,6 +957,8 @@ END(ia64_syscall_setup)
 	 * element, followed by the arguments.
 	 */
 ENTRY(dispatch_illegal_op_fault)
+	.prologue
+	.body
 	SAVE_MIN_WITH_COVER
 	ssm psr.ic | PSR_DEFAULT_BITS
 	;;
@@ -969,6 +971,7 @@ ENTRY(dispatch_illegal_op_fault)
 	mov out0=ar.ec
 	;;
 	SAVE_REST
+	PT_REGS_UNWIND_INFO(0)
 	;;
 	br.call.sptk.many rp=ia64_illegal_op_fault
 .ret0:	;;

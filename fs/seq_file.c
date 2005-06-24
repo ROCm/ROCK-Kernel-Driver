@@ -36,6 +36,13 @@ int seq_open(struct file *file, struct seq_operations *op)
 	p->op = op;
 	file->private_data = p;
 
+	/*
+	 * Wrappers around seq_open(e.g. swaps_open) need to be
+	 * aware of this. If they set f_version themselves, they
+	 * should call seq_open first and then set f_version.
+	 */
+	file->f_version = 0;
+
 	/* SEQ files support lseek, but not pread/pwrite */
 	file->f_mode &= ~(FMODE_PREAD | FMODE_PWRITE);
 	return 0;
@@ -44,7 +51,10 @@ EXPORT_SYMBOL(seq_open);
 
 /**
  *	seq_read -	->read() method for sequential files.
- *	@file, @buf, @size, @ppos: see file_operations method
+ *	@file: the file to read from
+ *	@buf: the buffer to read to
+ *	@size: the maximum number of bytes to read
+ *	@ppos: the current position in the file
  *
  *	Ready-made ->f_op->read()
  */
@@ -58,6 +68,18 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 	int err = 0;
 
 	down(&m->sem);
+	/*
+	 * seq_file->op->..m_start/m_stop/m_next may do special actions
+	 * or optimisations based on the file->f_version, so we want to
+	 * pass the file->f_version to those methods.
+	 *
+	 * seq_file->version is just copy of f_version, and seq_file
+	 * methods can treat it simply as file version.
+	 * It is copied in first and copied out after all operations.
+	 * It is convenient to have it as  part of structure to avoid the
+	 * need of passing another argument to all the seq_file methods.
+	 */
+	m->version = file->f_version;
 	/* grab buffer if we didn't have one */
 	if (!m->buf) {
 		m->buf = kmalloc(m->size = PAGE_SIZE, GFP_KERNEL);
@@ -98,6 +120,7 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 		if (!m->buf)
 			goto Enomem;
 		m->count = 0;
+		m->version = 0;
 	}
 	m->op->stop(m, p);
 	m->count = 0;
@@ -136,6 +159,7 @@ Done:
 		copied = err;
 	else
 		*ppos += copied;
+	file->f_version = m->version;
 	up(&m->sem);
 	return copied;
 Enomem:
@@ -153,6 +177,7 @@ static int traverse(struct seq_file *m, loff_t offset)
 	int error = 0;
 	void *p;
 
+	m->version = 0;
 	m->index = 0;
 	m->count = m->from = 0;
 	if (!offset)
@@ -197,7 +222,9 @@ Eoverflow:
 
 /**
  *	seq_lseek -	->llseek() method for sequential files.
- *	@file, @offset, @origin: see file_operations method
+ *	@file: the file in question
+ *	@offset: new position
+ *	@origin: 0 for absolute, 1 for relative position
  *
  *	Ready-made ->f_op->llseek()
  */
@@ -207,6 +234,7 @@ loff_t seq_lseek(struct file *file, loff_t offset, int origin)
 	long long retval = -EINVAL;
 
 	down(&m->sem);
+	m->version = file->f_version;
 	switch (origin) {
 		case 1:
 			offset += file->f_pos;
@@ -220,6 +248,7 @@ loff_t seq_lseek(struct file *file, loff_t offset, int origin)
 				if (retval) {
 					/* with extreme prejudice... */
 					file->f_pos = 0;
+					m->version = 0;
 					m->index = 0;
 					m->count = 0;
 				} else {
@@ -228,6 +257,7 @@ loff_t seq_lseek(struct file *file, loff_t offset, int origin)
 			}
 	}
 	up(&m->sem);
+	file->f_version = m->version;
 	return retval;
 }
 EXPORT_SYMBOL(seq_lseek);

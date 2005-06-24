@@ -140,6 +140,9 @@ struct rpc_xprt {
 	unsigned int		rcvsize,	/* socket receive buffer size */
 				sndsize;	/* socket send buffer size */
 
+	size_t			max_payload;	/* largest RPC payload size,
+						   in bytes */
+
 	struct rpc_wait_queue	sending;	/* requests waiting to send */
 	struct rpc_wait_queue	resend;		/* requests waiting to resend */
 	struct rpc_wait_queue	pending;	/* requests in flight */

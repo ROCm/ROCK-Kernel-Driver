@@ -18,6 +18,8 @@
 
 #include <linux/sched.h>
 #include <linux/init.h>
+#include <linux/module.h>
+
 #include <asm/atomic.h>
 #include <asm/semaphore.h>
 #include <asm/errno.h>
@@ -62,6 +64,7 @@ void __up(struct semaphore *sem)
 	__sem_update_count(sem, 1);
 	wake_up(&sem->wait);
 }
+EXPORT_SYMBOL(__up);
 
 /*
  * Note that when we come in to __down or __down_interruptible,
@@ -99,6 +102,7 @@ void __sched __down(struct semaphore *sem)
 	 */
 	wake_up(&sem->wait);
 }
+EXPORT_SYMBOL(__down);
 
 int __sched __down_interruptible(struct semaphore * sem)
 {
@@ -129,3 +133,4 @@ int __sched __down_interruptible(struct semaphore * sem)
 	wake_up(&sem->wait);
 	return retval;
 }
+EXPORT_SYMBOL(__down_interruptible);

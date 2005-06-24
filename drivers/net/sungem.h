@@ -170,6 +170,27 @@
  * them later. -DaveM
  */
 
+/* WakeOnLan Registers	*/
+#define WOL_MATCH0	0x3000UL
+#define WOL_MATCH1	0x3004UL
+#define WOL_MATCH2	0x3008UL
+#define WOL_MCOUNT	0x300CUL
+#define WOL_WAKECSR	0x3010UL
+
+/* WOL Match count register
+ */
+#define WOL_MCOUNT_N		0x00000010
+#define WOL_MCOUNT_M		0x00000000 /* 0 << 8 */
+
+#define WOL_WAKECSR_ENABLE	0x00000001
+#define WOL_WAKECSR_MII		0x00000002
+#define WOL_WAKECSR_SEEN	0x00000004
+#define WOL_WAKECSR_FILT_UCAST	0x00000008
+#define WOL_WAKECSR_FILT_MCAST	0x00000010
+#define WOL_WAKECSR_FILT_BCAST	0x00000020
+#define WOL_WAKECSR_FILT_SEEN	0x00000040
+
+
 /* Receive DMA Registers */
 #define RXDMA_CFG	0x4000UL	/* RX Configuration Register	*/
 #define RXDMA_DBLOW	0x4004UL	/* RX Descriptor Base Low	*/
@@ -952,45 +973,38 @@ enum link_state {
 };
 
 struct gem {
-	spinlock_t lock;
-	spinlock_t tx_lock;
-	void __iomem *regs;
-	int rx_new, rx_old;
-	int tx_new, tx_old;
+	spinlock_t		lock;
+	spinlock_t		tx_lock;
+	void __iomem		*regs;
+	int			rx_new, rx_old;
+	int			tx_new, tx_old;
 
-	/* Set when chip is actually in operational state
-	 * (ie. not power managed)
-	 */
-	int hw_running;
-	int opened;
-	struct semaphore pm_sem;
-	struct work_struct pm_task;
-	struct timer_list pm_timer;
-
-	struct gem_init_block *init_block;
-
-	struct sk_buff *rx_skbs[RX_RING_SIZE];
-	struct sk_buff *tx_skbs[RX_RING_SIZE];
+	unsigned int has_wol : 1;	/* chip supports wake-on-lan */
+	unsigned int asleep : 1;	/* chip asleep, protected by pm_sem */
+	unsigned int asleep_wol : 1;	/* was asleep with WOL enabled */
+	unsigned int opened : 1;	/* driver opened, protected by pm_sem */
+	unsigned int running : 1;	/* chip running, protected by lock */
+	
+	/* cell enable count, protected by lock */
+	int			cell_enabled;  
+	
+	struct semaphore	pm_sem;
 
 	u32			msg_enable;
 	u32			status;
 
 	struct net_device_stats net_stats;
 
-	enum gem_phy_type	phy_type;
-	struct mii_phy		phy_mii;
-	
 	int			tx_fifo_sz;
 	int			rx_fifo_sz;
 	int			rx_pause_off;
 	int			rx_pause_on;
 	int			rx_buf_sz;
-	int			mii_phy_addr;
-
+	u64			pause_entered;
+	u16			pause_last_time_recvd;
 	u32			mac_rx_cfg;
 	u32			swrst_base;
 
-	/* Autoneg & PHY control */
 	int			want_autoneg;
 	int			last_forced_speed;
 	enum link_state		lstate;
@@ -999,14 +1013,18 @@ struct gem {
 	int			wake_on_lan;
 	struct work_struct	reset_task;
 	volatile int		reset_task_pending;
-	
-	/* Diagnostic counters and state. */
-	u64			pause_entered;
-	u16			pause_last_time_recvd;
 
-	dma_addr_t gblock_dvma;
-	struct pci_dev *pdev;
-	struct net_device *dev;
+	enum gem_phy_type	phy_type;
+	struct mii_phy		phy_mii;
+	int			mii_phy_addr;
+		
+	struct gem_init_block	*init_block;
+	struct sk_buff		*rx_skbs[RX_RING_SIZE];
+	struct sk_buff		*tx_skbs[RX_RING_SIZE];
+	dma_addr_t		gblock_dvma;
+
+	struct pci_dev		*pdev;
+	struct net_device	*dev;
 #ifdef CONFIG_PPC_PMAC
 	struct device_node	*of_node;
 #endif

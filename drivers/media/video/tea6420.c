@@ -48,9 +48,6 @@ I2C_CLIENT_INSMOD;
 static struct i2c_driver driver;
 static struct i2c_client client_template;
 
-/* unique ID allocation */
-static int tea6420_id = 0;
-
 /* make a connection between the input 'i' and the output 'o'
    with gain 'g' for the tea6420-client 'client' (note: i = 6 means 'mute') */
 static int tea6420_switch(struct i2c_client *client, int i, int o, int g)
@@ -111,7 +108,6 @@ static int tea6420_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* fill client structure */
 	memcpy(client, &client_template, sizeof(struct i2c_client));
-	client->id = tea6420_id++;
 	client->addr = address;
 	client->adapter = adapter;
 

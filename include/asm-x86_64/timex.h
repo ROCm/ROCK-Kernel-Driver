@@ -16,8 +16,6 @@
 
 typedef unsigned long long cycles_t;
 
-extern cycles_t cacheflush_time;
-
 static inline cycles_t get_cycles (void)
 {
 	unsigned long long ret;

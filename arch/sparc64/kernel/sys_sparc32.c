@@ -264,11 +264,11 @@ asmlinkage long compat_sys_ipc(u32 call, u32 first, u32 second, u32 third, compa
 
 	switch (call) {
 	case SEMTIMEDOP:
-		if (third)
+		if (fifth)
 			/* sign extend semid */
 			return compat_sys_semtimedop((int)first,
 						     compat_ptr(ptr), second,
-						     compat_ptr(third));
+						     compat_ptr(fifth));
 		/* else fall through for normal semop() */
 	case SEMOP:
 		/* struct sembuf is the same on 32 and 64bit :)) */
@@ -352,17 +352,79 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat __user *statbuf)
 	err |= put_user(old_encode_dev(stat->rdev), &statbuf->st_rdev);
 	err |= put_user(stat->size, &statbuf->st_size);
 	err |= put_user(stat->atime.tv_sec, &statbuf->st_atime);
-	err |= put_user(0, &statbuf->__unused1);
+	err |= put_user(stat->atime.tv_nsec, &statbuf->st_atime_nsec);
 	err |= put_user(stat->mtime.tv_sec, &statbuf->st_mtime);
-	err |= put_user(0, &statbuf->__unused2);
+	err |= put_user(stat->mtime.tv_nsec, &statbuf->st_mtime_nsec);
 	err |= put_user(stat->ctime.tv_sec, &statbuf->st_ctime);
-	err |= put_user(0, &statbuf->__unused3);
+	err |= put_user(stat->ctime.tv_nsec, &statbuf->st_ctime_nsec);
 	err |= put_user(stat->blksize, &statbuf->st_blksize);
 	err |= put_user(stat->blocks, &statbuf->st_blocks);
 	err |= put_user(0, &statbuf->__unused4[0]);
 	err |= put_user(0, &statbuf->__unused4[1]);
 
 	return err;
+}
+
+int cp_compat_stat64(struct kstat *stat, struct compat_stat64 __user *statbuf)
+{
+	int err;
+
+	err  = put_user(huge_encode_dev(stat->dev), &statbuf->st_dev);
+	err |= put_user(stat->ino, &statbuf->st_ino);
+	err |= put_user(stat->mode, &statbuf->st_mode);
+	err |= put_user(stat->nlink, &statbuf->st_nlink);
+	err |= put_user(stat->uid, &statbuf->st_uid);
+	err |= put_user(stat->gid, &statbuf->st_gid);
+	err |= put_user(huge_encode_dev(stat->rdev), &statbuf->st_rdev);
+	err |= put_user(0, (unsigned long __user *) &statbuf->__pad3[0]);
+	err |= put_user(stat->size, &statbuf->st_size);
+	err |= put_user(stat->blksize, &statbuf->st_blksize);
+	err |= put_user(0, (unsigned int __user *) &statbuf->__pad4[0]);
+	err |= put_user(0, (unsigned int __user *) &statbuf->__pad4[4]);
+	err |= put_user(stat->blocks, &statbuf->st_blocks);
+	err |= put_user(stat->atime.tv_sec, &statbuf->st_atime);
+	err |= put_user(stat->atime.tv_nsec, &statbuf->st_atime_nsec);
+	err |= put_user(stat->mtime.tv_sec, &statbuf->st_mtime);
+	err |= put_user(stat->mtime.tv_nsec, &statbuf->st_mtime_nsec);
+	err |= put_user(stat->ctime.tv_sec, &statbuf->st_ctime);
+	err |= put_user(stat->ctime.tv_nsec, &statbuf->st_ctime_nsec);
+	err |= put_user(0, &statbuf->__unused4);
+	err |= put_user(0, &statbuf->__unused5);
+
+	return err;
+}
+
+asmlinkage long compat_sys_stat64(char __user * filename,
+		struct compat_stat64 __user *statbuf)
+{
+	struct kstat stat;
+	int error = vfs_stat(filename, &stat);
+
+	if (!error)
+		error = cp_compat_stat64(&stat, statbuf);
+	return error;
+}
+
+asmlinkage long compat_sys_lstat64(char __user * filename,
+		struct compat_stat64 __user *statbuf)
+{
+	struct kstat stat;
+	int error = vfs_lstat(filename, &stat);
+
+	if (!error)
+		error = cp_compat_stat64(&stat, statbuf);
+	return error;
+}
+
+asmlinkage long compat_sys_fstat64(unsigned int fd,
+		struct compat_stat64 __user * statbuf)
+{
+	struct kstat stat;
+	int error = vfs_fstat(fd, &stat);
+
+	if (!error)
+		error = cp_compat_stat64(&stat, statbuf);
+	return error;
 }
 
 asmlinkage long compat_sys_sysfs(int option, u32 arg1, u32 arg2)
@@ -1087,7 +1149,7 @@ sys_timer_create(clockid_t which_clock,
 		 timer_t __user *created_timer_id);
 
 long
-sys32_timer_create(u32 clock, struct sigevent32 __user *se32,
+sys32_timer_create(u32 clock, struct compat_sigevent __user *se32,
 		   timer_t __user *timer_id)
 {
 	struct sigevent se;
@@ -1098,12 +1160,7 @@ sys32_timer_create(u32 clock, struct sigevent32 __user *se32,
 	if (se32 == NULL)
 		return sys_timer_create(clock, NULL, timer_id);
 
-	memset(&se, 0, sizeof(struct sigevent));
-	if (get_user(se.sigev_value.sival_int,  &se32->sigev_value.sival_int) ||
-	    __get_user(se.sigev_signo, &se32->sigev_signo) ||
-	    __get_user(se.sigev_notify, &se32->sigev_notify) ||
-	    __copy_from_user(&se._sigev_un._pad, &se32->_sigev_un._pad,
-	    sizeof(se._sigev_un._pad)))
+	if (get_compat_sigevent(&se, se32))
 		return -EFAULT;
 
 	if (!access_ok(VERIFY_WRITE,timer_id,sizeof(timer_t)))
@@ -1120,35 +1177,4 @@ sys32_timer_create(u32 clock, struct sigevent32 __user *se32,
 		err = __put_user (t, timer_id);
 
 	return err;
-}
-
-asmlinkage long compat_sys_waitid(u32 which, u32 pid,
-				  struct compat_siginfo __user *uinfo,
-				  u32 options, struct compat_rusage __user *uru)
-{
-	siginfo_t info;
-	struct rusage ru;
-	long ret;
-	mm_segment_t old_fs = get_fs();
-
-	memset(&info, 0, sizeof(info));
-
-	set_fs (KERNEL_DS);
-	ret = sys_waitid(which, pid, (siginfo_t __user *) &info,
-			 options,
-			 uru ? (struct rusage __user *) &ru : NULL);
-	set_fs (old_fs);
-
-	if (ret < 0 || info.si_signo == 0)
-		return ret;
-
-	if (uru) {
-		ret = put_compat_rusage(&ru, uru);
-		if (ret)
-			return ret;
-	}
-
-	BUG_ON(info.si_code & __SI_MASK);
-	info.si_code |= __SI_CHLD;
-	return copy_siginfo_to_user32(uinfo, &info);
 }

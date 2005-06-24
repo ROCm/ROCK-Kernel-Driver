@@ -433,4 +433,6 @@ do {						\
 #define finish_arch_switch(rq, prev)	spin_unlock_irq(&(prev)->switch_lock)
 #define task_running(rq, p) 		((rq)->curr == (p) || spin_is_locked(&(p)->switch_lock))
 
+#define arch_align_stack(x) (x)
+
 #endif /* _ASM_SYSTEM_H */

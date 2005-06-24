@@ -152,10 +152,4 @@
  * Global variables
  */
 
-typedef struct {
-    char name[COLOR_NAME_LEN];
-    int value;
-} color_names_st;
-
-extern color_names_st color_names[];
 extern int color_table[][3];

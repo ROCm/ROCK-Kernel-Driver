@@ -358,6 +358,7 @@ static struct eisa_driver ne3210_eisa_driver = {
 
 MODULE_DESCRIPTION("NE3210 EISA Ethernet driver");
 MODULE_LICENSE("GPL");
+MODULE_DEVICE_TABLE(eisa, ne3210_ids);
 
 int ne3210_init(void)
 {

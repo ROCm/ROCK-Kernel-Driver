@@ -13,6 +13,7 @@
  *	08-Nov-2004	BJD	Initial creation
  *	12-Nov-2004	BJD	Added periodic IRQ and PM code
  *	22-Nov-2004	BJD	Sign-test on alarm code to check for <0
+ *	10-Mar-2005	LCVR	Changed S3C2410_VA_RTC to S3C24XX_VA_RTC
 */
 
 #include <linux/module.h>
@@ -38,8 +39,8 @@
 /* need this for the RTC_AF definitions */
 #include <linux/mc146818rtc.h>
 
-#undef S3C2410_VA_RTC
-#define S3C2410_VA_RTC s3c2410_rtc_base
+#undef S3C24XX_VA_RTC
+#define S3C24XX_VA_RTC s3c2410_rtc_base
 
 static struct resource *s3c2410_rtc_mem;
 
@@ -115,7 +116,7 @@ static void s3c2410_rtc_setfreq(int freq)
 
 /* Time read/write */
 
-static void s3c2410_rtc_gettime(struct rtc_time *rtc_tm)
+static int s3c2410_rtc_gettime(struct rtc_time *rtc_tm)
 {
 	unsigned int have_retried = 0;
 
@@ -150,6 +151,8 @@ static void s3c2410_rtc_gettime(struct rtc_time *rtc_tm)
 
 	rtc_tm->tm_year += 100;
 	rtc_tm->tm_mon -= 1;
+
+	return 0;
 }
 
 
@@ -170,7 +173,7 @@ static int s3c2410_rtc_settime(struct rtc_time *tm)
 	return 0;
 }
 
-static void s3c2410_rtc_getalarm(struct rtc_wkalrm *alrm)
+static int s3c2410_rtc_getalarm(struct rtc_wkalrm *alrm)
 {
 	struct rtc_time *alm_tm = &alrm->time;
 	unsigned int alm_en;
@@ -230,6 +233,8 @@ static void s3c2410_rtc_getalarm(struct rtc_wkalrm *alrm)
 	}
 
 	/* todo - set alrm->enabled ? */
+
+	return 0;
 }
 
 static int s3c2410_rtc_setalarm(struct rtc_wkalrm *alrm)
@@ -514,7 +519,7 @@ static struct timespec s3c2410_rtc_delta;
 
 static int ticnt_save;
 
-static int s3c2410_rtc_suspend(struct device *dev, u32 state, u32 level)
+static int s3c2410_rtc_suspend(struct device *dev, pm_message_t state, u32 level)
 {
 	struct rtc_time tm;
 	struct timespec time;

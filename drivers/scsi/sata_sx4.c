@@ -188,6 +188,7 @@ static Scsi_Host_Template pdc_sata_sht = {
 	.dma_boundary		= ATA_DMA_BOUNDARY,
 	.slave_configure	= ata_scsi_slave_config,
 	.bios_param		= ata_std_bios_param,
+	.ordered_flush		= 1,
 };
 
 static struct ata_port_operations pdc_20621_ops = {
@@ -244,6 +245,8 @@ static void pdc20621_host_stop(struct ata_host_set *host_set)
 
 	iounmap(dimm_mmio);
 	kfree(hpriv);
+
+	ata_host_stop(host_set);
 }
 
 static int pdc_port_start(struct ata_port *ap)

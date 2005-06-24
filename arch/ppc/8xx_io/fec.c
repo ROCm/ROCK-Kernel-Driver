@@ -1735,7 +1735,7 @@ static int __init fec_enet_init(void)
 
 	/* Bits moved from Rev. D onward.
 	*/
-	if ((mfspr(IMMR) & 0xffff) < 0x0501)
+	if ((mfspr(SPRN_IMMR) & 0xffff) < 0x0501)
 		immap->im_ioport.iop_pddir = 0x1c58;	/* Pre rev. D */
 	else
 		immap->im_ioport.iop_pddir = 0x1fff;	/* Rev. D and later */

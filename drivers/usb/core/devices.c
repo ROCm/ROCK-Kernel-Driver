@@ -59,6 +59,7 @@
 #include <linux/usbdevice_fs.h>
 #include <asm/uaccess.h>
 
+#include "usb.h"
 #include "hcd.h"
 
 #define MAX_TOPO_LEVEL		6
@@ -460,7 +461,7 @@ static ssize_t usb_device_dump(char __user **buffer, size_t *nbytes, loff_t *ski
 		return 0;
 	
 	if (level > MAX_TOPO_LEVEL)
-		return total_written;
+		return 0;
 	/* allocate 2^1 pages = 8K (on i386); should be more than enough for one device */
         if (!(pages_start = (char*) __get_free_pages(GFP_KERNEL,1)))
                 return -ENOMEM;
@@ -527,10 +528,7 @@ static ssize_t usb_device_dump(char __user **buffer, size_t *nbytes, loff_t *ski
 			length = *nbytes;
 		if (copy_to_user(*buffer, pages_start + *skip_bytes, length)) {
 			free_pages((unsigned long)pages_start, 1);
-			
-			if (total_written == 0)
-				return -EFAULT;
-			return total_written;
+			return -EFAULT;
 		}
 		*nbytes -= length;
 		*file_offset += length;
@@ -639,11 +637,8 @@ static int usb_device_open(struct inode *inode, struct file *file)
 
 static int usb_device_release(struct inode *inode, struct file *file)
 {
-	if (file->private_data) {
-		kfree(file->private_data);
-		file->private_data = NULL;
-	}
-
+	kfree(file->private_data);
+	file->private_data = NULL;
         return 0;
 }
 

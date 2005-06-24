@@ -285,33 +285,48 @@ static unsigned int joydev_poll(struct file *file, poll_table *wait)
 		(POLLIN | POLLRDNORM) : 0) | (list->joydev->exist ? 0 : (POLLHUP | POLLERR));
 }
 
-static int joydev_ioctl_common(struct joydev *joydev, unsigned int cmd, void __user *argp)
+static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
+	struct joydev_list *list = file->private_data;
+	struct joydev *joydev = list->joydev;
 	struct input_dev *dev = joydev->handle.dev;
+	void __user *argp = (void __user *)arg;
 	int i, j;
+
+	if (!joydev->exist) return -ENODEV;
 
 	switch (cmd) {
 
 		case JS_SET_CAL:
 			return copy_from_user(&joydev->glue.JS_CORR, argp,
-				sizeof(joydev->glue.JS_CORR)) ? -EFAULT : 0;
+				sizeof(struct JS_DATA_TYPE)) ? -EFAULT : 0;
 		case JS_GET_CAL:
 			return copy_to_user(argp, &joydev->glue.JS_CORR,
-				sizeof(joydev->glue.JS_CORR)) ? -EFAULT : 0;
+				sizeof(struct JS_DATA_TYPE)) ? -EFAULT : 0;
 		case JS_SET_TIMEOUT:
-			return get_user(joydev->glue.JS_TIMEOUT, (s32 __user *) argp);
+			return get_user(joydev->glue.JS_TIMEOUT, (int __user *) arg);
 		case JS_GET_TIMEOUT:
-			return put_user(joydev->glue.JS_TIMEOUT, (s32 __user *) argp);
+			return put_user(joydev->glue.JS_TIMEOUT, (int __user *) arg);
+		case JS_SET_TIMELIMIT:
+			return get_user(joydev->glue.JS_TIMELIMIT, (long __user *) arg);
+		case JS_GET_TIMELIMIT:
+			return put_user(joydev->glue.JS_TIMELIMIT, (long __user *) arg);
+		case JS_SET_ALL:
+			return copy_from_user(&joydev->glue, argp,
+						sizeof(struct JS_DATA_SAVE_TYPE)) ? -EFAULT : 0;
+		case JS_GET_ALL:
+			return copy_to_user(argp, &joydev->glue,
+						sizeof(struct JS_DATA_SAVE_TYPE)) ? -EFAULT : 0;
 
 		case JSIOCGVERSION:
-			return put_user(JS_VERSION, (__u32 __user *) argp);
+			return put_user(JS_VERSION, (__u32 __user *) arg);
 		case JSIOCGAXES:
-			return put_user(joydev->nabs, (__u8 __user *) argp);
+			return put_user(joydev->nabs, (__u8 __user *) arg);
 		case JSIOCGBUTTONS:
-			return put_user(joydev->nkey, (__u8 __user *) argp);
+			return put_user(joydev->nkey, (__u8 __user *) arg);
 		case JSIOCSCORR:
 			if (copy_from_user(joydev->corr, argp,
-				      sizeof(joydev->corr[0]) * joydev->nabs))
+				      sizeof(struct js_corr) * joydev->nabs))
 			    return -EFAULT;
 			for (i = 0; i < joydev->nabs; i++) {
 				j = joydev->abspam[i];
@@ -320,7 +335,7 @@ static int joydev_ioctl_common(struct joydev *joydev, unsigned int cmd, void __u
 			return 0;
 		case JSIOCGCORR:
 			return copy_to_user(argp, joydev->corr,
-						sizeof(joydev->corr[0]) * joydev->nabs) ? -EFAULT : 0;
+						sizeof(struct js_corr) * joydev->nabs) ? -EFAULT : 0;
 		case JSIOCSAXMAP:
 			if (copy_from_user(joydev->abspam, argp, sizeof(__u8) * (ABS_MAX + 1)))
 				return -EFAULT;
@@ -356,84 +371,6 @@ static int joydev_ioctl_common(struct joydev *joydev, unsigned int cmd, void __u
 	return -EINVAL;
 }
 
-#ifdef CONFIG_COMPAT
-static long joydev_compat_ioctl(struct file *file, unsigned cmd, unsigned long arg)
-{
-	struct joydev_list *list = file->private_data;
-	struct joydev *joydev = list->joydev;
-	void __user *argp = (void __user *)arg;
-	s32 tmp32;
-	struct JS_DATA_SAVE_TYPE_32 ds32;
-	int err;
-
-	if (!joydev->exist) return -ENODEV;
-	switch(cmd) {
-	case JS_SET_TIMELIMIT:
-		err = get_user(tmp32, (s32 __user *) arg);
-		if (err == 0)
-			joydev->glue.JS_TIMELIMIT = tmp32;
-		break;
-	case JS_GET_TIMELIMIT:
-		tmp32 = joydev->glue.JS_TIMELIMIT;
-		err = put_user(tmp32, (s32 __user *) arg);
-		break;
-
-	case JS_SET_ALL:
-		err = copy_from_user(&ds32, argp,
-				     sizeof(ds32)) ? -EFAULT : 0;
-		if (err == 0) {
-			joydev->glue.JS_TIMEOUT    = ds32.JS_TIMEOUT;
-			joydev->glue.BUSY          = ds32.BUSY;
-			joydev->glue.JS_EXPIRETIME = ds32.JS_EXPIRETIME;
-			joydev->glue.JS_TIMELIMIT  = ds32.JS_TIMELIMIT;
-			joydev->glue.JS_SAVE       = ds32.JS_SAVE;
-			joydev->glue.JS_CORR       = ds32.JS_CORR;
-		}
-		break;
-
-	case JS_GET_ALL:
-		ds32.JS_TIMEOUT    = joydev->glue.JS_TIMEOUT;
-		ds32.BUSY          = joydev->glue.BUSY;
-		ds32.JS_EXPIRETIME = joydev->glue.JS_EXPIRETIME;
-		ds32.JS_TIMELIMIT  = joydev->glue.JS_TIMELIMIT;
-		ds32.JS_SAVE       = joydev->glue.JS_SAVE;
-		ds32.JS_CORR       = joydev->glue.JS_CORR;
-
-		err = copy_to_user(argp, &ds32,
-					  sizeof(ds32)) ? -EFAULT : 0;
-		break;
-
-	default:
-		err = joydev_ioctl_common(joydev, cmd, argp);
-	}
-	return err;
-}
-#endif /* CONFIG_COMPAT */
-
-static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
-{
-	struct joydev_list *list = file->private_data;
-	struct joydev *joydev = list->joydev;
-	void __user *argp = (void __user *)arg;
-
-	if (!joydev->exist) return -ENODEV;
-
-	switch(cmd) {
-		case JS_SET_TIMELIMIT:
-			return get_user(joydev->glue.JS_TIMELIMIT, (long __user *) arg);
-		case JS_GET_TIMELIMIT:
-			return put_user(joydev->glue.JS_TIMELIMIT, (long __user *) arg);
-		case JS_SET_ALL:
-			return copy_from_user(&joydev->glue, argp,
-						sizeof(joydev->glue)) ? -EFAULT : 0;
-		case JS_GET_ALL:
-			return copy_to_user(argp, &joydev->glue,
-						sizeof(joydev->glue)) ? -EFAULT : 0;
-		default:
-			return joydev_ioctl_common(joydev, cmd, argp);
-	}
-}
-
 static struct file_operations joydev_fops = {
 	.owner =	THIS_MODULE,
 	.read =		joydev_read,
@@ -442,9 +379,6 @@ static struct file_operations joydev_fops = {
 	.open =		joydev_open,
 	.release =	joydev_release,
 	.ioctl =	joydev_ioctl,
-#ifdef CONFIG_COMPAT
-	.compat_ioctl =	joydev_compat_ioctl,
-#endif
 	.fasync =	joydev_fasync,
 };
 
@@ -488,7 +422,7 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 			joydev->nkey++;
 		}
 
-	for (i = 0; i < BTN_JOYSTICK - BTN_MISC + 1; i++)
+	for (i = 0; i < BTN_JOYSTICK - BTN_MISC; i++)
 		if (test_bit(i + BTN_MISC, dev->keybit)) {
 			joydev->keymap[i] = joydev->nkey;
 			joydev->keypam[joydev->nkey] = i + BTN_MISC;

@@ -7,18 +7,25 @@
 #include "linux/linkage.h"
 #include "linux/slab.h"
 #include "linux/shm.h"
+#include "linux/utsname.h"
+#include "linux/personality.h"
 #include "asm/uaccess.h"
 #define __FRAME_OFFSETS
 #include "asm/ptrace.h"
 #include "asm/unistd.h"
 #include "asm/prctl.h" /* XXX This should get the constants from libc */
 #include "choose-mode.h"
+#include "kern.h"
 
-asmlinkage long wrap_sys_shmat(int shmid, char __user *shmaddr, int shmflg)
+asmlinkage long sys_uname64(struct new_utsname __user * name)
 {
-	unsigned long raddr;
-
-	return do_shmat(shmid, shmaddr, shmflg, &raddr) ?: (long) raddr;
+	int err;
+	down_read(&uts_sem);
+	err = copy_to_user(name, &system_utsname, sizeof (*name));
+	up_read(&uts_sem);
+	if (personality(current->personality) == PER_LINUX32)
+		err |= copy_to_user(&name->machine, "i686", 5);
+	return err ? -EFAULT : 0;
 }
 
 #ifdef CONFIG_MODE_TT
@@ -29,22 +36,20 @@ long sys_modify_ldt_tt(int func, void *ptr, unsigned long bytecount)
 	/* XXX This should check VERIFY_WRITE depending on func, check this
 	 * in i386 as well.
 	 */
-	if(verify_area(VERIFY_READ, ptr, bytecount))
-		return(-EFAULT);
+	if (!access_ok(VERIFY_READ, ptr, bytecount))
+		return -EFAULT;
 	return(modify_ldt(func, ptr, bytecount));
 }
 #endif
 
 #ifdef CONFIG_MODE_SKAS
-extern int userspace_pid;
+extern int userspace_pid[];
 
-#ifndef __NR_mm_indirect
-#define __NR_mm_indirect 241
-#endif
+#include "skas_ptrace.h"
 
 long sys_modify_ldt_skas(int func, void *ptr, unsigned long bytecount)
 {
-	unsigned long args[6];
+	struct ptrace_ldt ldt;
         void *buf;
         int res, n;
 
@@ -66,12 +71,11 @@ long sys_modify_ldt_skas(int func, void *ptr, unsigned long bytecount)
                 goto out;
         }
 
-	args[0] = func;
-	args[1] = (unsigned long) buf;
-	args[2] = bytecount;
-	res = syscall(__NR_mm_indirect, &current->mm->context.u,
-		      __NR_modify_ldt, args);
-
+	ldt = ((struct ptrace_ldt) { .func	= func,
+				     .ptr	= buf,
+				     .bytecount = bytecount });
+#warning Need to look up userspace_pid by cpu
+	res = ptrace(PTRACE_LDT, userspace_pid[0], 0, (unsigned long) &ldt);
         if(res < 0)
                 goto out;
 
@@ -129,23 +133,27 @@ static long arch_prctl_tt(int code, unsigned long addr)
 
 #ifdef CONFIG_MODE_SKAS
 
+/* XXX: Must also call arch_prctl in the host, beside saving the segment bases! */
 static long arch_prctl_skas(int code, unsigned long addr)
 {
 	long ret = 0;
 
 	switch(code){
-	case ARCH_SET_GS:
-		current->thread.regs.regs.skas.regs[GS_BASE / sizeof(unsigned long)] = addr;
-		break;
 	case ARCH_SET_FS:
 		current->thread.regs.regs.skas.regs[FS_BASE / sizeof(unsigned long)] = addr;
 		break;
+	case ARCH_SET_GS:
+		current->thread.regs.regs.skas.regs[GS_BASE / sizeof(unsigned long)] = addr;
+		break;
 	case ARCH_GET_FS:
-		ret = put_user(current->thread.regs.regs.skas.regs[GS / sizeof(unsigned long)], &addr);
+		ret = put_user(current->thread.regs.regs.skas.
+				regs[FS_BASE / sizeof(unsigned long)],
+				(unsigned long __user *)addr);
 	        break;
 	case ARCH_GET_GS:
-		ret = put_user(current->thread.regs.regs.skas.regs[FS / sizeof(unsigned \
-long)], &addr);
+		ret = put_user(current->thread.regs.regs.skas.
+				regs[GS_BASE / sizeof(unsigned long)],
+				(unsigned long __user *)addr);
 	        break;
 	default:
 		ret = -EINVAL;

@@ -10,7 +10,6 @@
 #include <setjmp.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/ptrace.h>
 #include <sys/utsname.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -29,22 +28,8 @@
 #include "mem_user.h"
 #include "init.h"
 #include "helper.h"
+#include "ptrace_user.h"
 #include "uml-config.h"
-
-#define COMMAND_LINE_SIZE _POSIX_ARG_MAX
-
-/* Changed in linux_main and setup_arch, which run before SMP is started */
-char command_line[COMMAND_LINE_SIZE] = { 0 };
-
-void add_arg(char *cmd_line, char *arg)
-{
-	if (strlen(cmd_line) + strlen(arg) + 1 > COMMAND_LINE_SIZE) {
-		printf("add_arg: Too much command line!\n");
-		exit(1);
-	}
-	if(strlen(cmd_line) > 0) strcat(cmd_line, " ");
-	strcat(cmd_line, arg);
-}
 
 void stop(void)
 {
@@ -148,18 +133,6 @@ void setup_machinename(char *machine_out)
 
 	uname(&host);
 	strcpy(machine_out, host.machine);
-	/*
-	 * Pretend to be a i586 machine.
-	 *
-	 * This is a temporary workaround for several problems
-	 * triggered by the fact that the current 2.6 uml kernel
-	 * lacks a few system calls required for TLS/NPTL support,
-	 * whereas glibc expects these syscalls being present
-	 * unconditionally when the kernel version is 2.6.x.
-	 *
-	 */
-	if (0 == strcmp(machine_out,"i686"))
-		strcpy(machine_out,"i586");
 }
 
 char host_info[(_UTSNAME_LENGTH + 1) * 4 + _UTSNAME_NODENAME_LENGTH + 1];

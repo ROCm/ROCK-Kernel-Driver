@@ -14,6 +14,25 @@
 #include <asm/thread_info.h>
 
 	.text
+
+set_pcontext:
+cplus_winfixup_insn_1:
+	sethi	%hi(0), %l1
+	mov	PRIMARY_CONTEXT, %g1
+	sllx	%l1, 32, %l1
+cplus_winfixup_insn_2:
+	sethi	%hi(0), %g2
+	or	%l1, %g2, %l1
+	stxa	%l1, [%g1] ASI_DMMU
+	flush	%g6
+	retl
+	 nop
+
+cplus_wfinsn_1:
+	sethi	%uhi(CTX_CHEETAH_PLUS_NUC), %l1
+cplus_wfinsn_2:
+	sethi	%hi(CTX_CHEETAH_PLUS_CTX0), %g2
+
 	.align	32
 
 	/* Here are the rules, pay attention.
@@ -62,9 +81,8 @@ fill_fixup:
 	wrpr		%g0, 0x0, %canrestore		! Standard etrap stuff.
 	wrpr		%g2, 0x0, %wstate		! This must be consistent.
 	wrpr		%g0, 0x0, %otherwin		! We know this.
-	mov		PRIMARY_CONTEXT, %g1		! Change contexts...
-	stxa		%g0, [%g1] ASI_DMMU		! Back into the nucleus.
-	flush		%g6				! Flush instruction buffers
+	call		set_pcontext			! Change contexts...
+	 nop
 	rdpr		%pstate, %l1			! Prepare to change globals.
 	mov		%g6, %o7			! Get current.
 
@@ -75,6 +93,10 @@ fill_fixup:
 	wrpr		%l1, (PSTATE_IE | PSTATE_AG | PSTATE_RMO), %pstate
 	mov		%o7, %g6
 	ldx		[%g6 + TI_TASK], %g4
+#ifdef CONFIG_SMP
+	mov		TSB_REG, %g1
+	ldxa		[%g1] ASI_IMMU, %g5
+#endif
 
 	/* This is the same as below, except we handle this a bit special
 	 * since we must preserve %l5 and %l6, see comment above.
@@ -183,9 +205,8 @@ fill_fixup_mna:
 
 	wrpr		%g2, 0x0, %wstate		! This must be consistent.
 	wrpr		%g0, 0x0, %otherwin		! We know this.
-	mov		PRIMARY_CONTEXT, %g1		! Change contexts...
-	stxa		%g0, [%g1] ASI_DMMU		! Back into the nucleus.
-	flush		%g6				! Flush instruction buffers
+	call		set_pcontext			! Change contexts...
+	 nop
 	rdpr		%pstate, %l1			! Prepare to change globals.
 	mov		%g4, %o2			! Setup args for
 	mov		%g5, %o1			! final call to mem_address_unaligned.
@@ -196,6 +217,10 @@ fill_fixup_mna:
 	wrpr		%l1, (PSTATE_IE | PSTATE_AG | PSTATE_RMO), %pstate
 	mov		%o7, %g6			! Get current back.
 	ldx		[%g6 + TI_TASK], %g4		! Finish it.
+#ifdef CONFIG_SMP
+	mov		TSB_REG, %g1
+	ldxa		[%g1] ASI_IMMU, %g5
+#endif
 	call		mem_address_unaligned
 	 add		%sp, PTREGS_OFF, %o0
 
@@ -289,9 +314,8 @@ fill_fixup_dax:
 
 	wrpr		%g2, 0x0, %wstate		! This must be consistent.
 	wrpr		%g0, 0x0, %otherwin		! We know this.
-	mov		PRIMARY_CONTEXT, %g1		! Change contexts...
-	stxa		%g0, [%g1] ASI_DMMU		! Back into the nucleus.
-	flush		%g6				! Flush instruction buffers
+	call		set_pcontext			! Change contexts...
+	 nop
 	rdpr		%pstate, %l1			! Prepare to change globals.
 	mov		%g4, %o1			! Setup args for
 	mov		%g5, %o2			! final call to data_access_exception.
@@ -302,6 +326,10 @@ fill_fixup_dax:
 	wrpr		%l1, (PSTATE_IE | PSTATE_AG | PSTATE_RMO), %pstate
 	mov		%o7, %g6			! Get current back.
 	ldx		[%g6 + TI_TASK], %g4		! Finish it.
+#ifdef CONFIG_SMP
+	mov		TSB_REG, %g1
+	ldxa		[%g1] ASI_IMMU, %g5
+#endif
 	call		data_access_exception
 	 add		%sp, PTREGS_OFF, %o0
 
@@ -368,3 +396,22 @@ window_dax_from_user_common:
 	ba,pt		%xcc, rtrap
 	 clr		%l6
 	
+
+	.globl		cheetah_plus_patch_winfixup
+cheetah_plus_patch_winfixup:
+	sethi			%hi(cplus_wfinsn_1), %o0
+	sethi			%hi(cplus_winfixup_insn_1), %o2
+	lduw			[%o0 + %lo(cplus_wfinsn_1)], %o1
+	or			%o2, %lo(cplus_winfixup_insn_1), %o2
+	stw			%o1, [%o2]
+	flush			%o2
+
+	sethi			%hi(cplus_wfinsn_2), %o0
+	sethi			%hi(cplus_winfixup_insn_2), %o2
+	lduw			[%o0 + %lo(cplus_wfinsn_2)], %o1
+	or			%o2, %lo(cplus_winfixup_insn_2), %o2
+	stw			%o1, [%o2]
+	flush			%o2
+
+	retl
+	 nop

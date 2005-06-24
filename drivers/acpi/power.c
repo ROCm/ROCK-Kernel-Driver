@@ -58,8 +58,8 @@ ACPI_MODULE_NAME		("acpi_power")
 #define ACPI_POWER_RESOURCE_STATE_ON	0x01
 #define ACPI_POWER_RESOURCE_STATE_UNKNOWN 0xFF
 
-int acpi_power_add (struct acpi_device *device);
-int acpi_power_remove (struct acpi_device *device, int type);
+static int acpi_power_add (struct acpi_device *device);
+static int acpi_power_remove (struct acpi_device *device, int type);
 static int acpi_power_open_fs(struct inode *inode, struct file *file);
 
 static struct acpi_driver acpi_power_driver = {
@@ -479,7 +479,7 @@ end:
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
-struct proc_dir_entry		*acpi_power_dir;
+static struct proc_dir_entry	*acpi_power_dir;
 
 static int acpi_power_seq_show(struct seq_file *seq, void *offset)
 {
@@ -576,7 +576,7 @@ acpi_power_remove_fs (
                                 Driver Interface
    -------------------------------------------------------------------------- */
 
-int
+static int
 acpi_power_add (
 	struct acpi_device	*device)
 {
@@ -642,7 +642,7 @@ end:
 }
 
 
-int
+static int
 acpi_power_remove (
 	struct acpi_device	*device,
 	int			type)

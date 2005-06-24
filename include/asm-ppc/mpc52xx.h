@@ -10,7 +10,7 @@
  * Originally written by Dale Farnsworth <dfarnsworth@mvista.com> 
  * for the 2.4 kernel.
  *
- * Copyright (C) 2004 Sylvain Munaut <tnt@246tNt.com>
+ * Copyright (C) 2004-2005 Sylvain Munaut <tnt@246tNt.com>
  * Copyright (C) 2003 MontaVista, Software, Inc.
  *
  * This file is licensed under the terms of the GNU General Public License
@@ -26,53 +26,73 @@
 #include <asm/types.h>
 
 struct pt_regs;
-struct ocp_def;
 #endif /* __ASSEMBLY__ */
+
+
+/* ======================================================================== */
+/* PPC Sys devices definition                                               */
+/* ======================================================================== */
+
+enum ppc_sys_devices {
+	MPC52xx_MSCAN1,
+	MPC52xx_MSCAN2,
+	MPC52xx_SPI,
+	MPC52xx_USB,
+	MPC52xx_BDLC,
+	MPC52xx_PSC1,
+	MPC52xx_PSC2,
+	MPC52xx_PSC3,
+	MPC52xx_PSC4,
+	MPC52xx_PSC5,
+	MPC52xx_PSC6,
+	MPC52xx_FEC,
+	MPC52xx_ATA,
+	MPC52xx_I2C1,
+	MPC52xx_I2C2,
+};
 
 
 /* ======================================================================== */
 /* Main registers/struct addresses                                          */
 /* ======================================================================== */
-/* Theses are PHYSICAL addresses !                                          */
-/* TODO : There should be no static mapping, but it's not yet the case, so  */
-/*        we require a 1:1 mapping                                          */
 
+/* MBAR position */
 #define MPC52xx_MBAR		0xf0000000	/* Phys address */
-#define MPC52xx_MBAR_SIZE	0x00010000
 #define MPC52xx_MBAR_VIRT	0xf0000000	/* Virt address */
+#define MPC52xx_MBAR_SIZE	0x00010000
 
-#define MPC52xx_MMAP_CTL	(MPC52xx_MBAR + 0x0000)
-#define MPC52xx_SDRAM		(MPC52xx_MBAR + 0x0100)
-#define MPC52xx_CDM		(MPC52xx_MBAR + 0x0200)
-#define MPC52xx_SFTRST		(MPC52xx_MBAR + 0x0220)
-#define MPC52xx_SFTRST_BIT	0x01000000
-#define MPC52xx_INTR		(MPC52xx_MBAR + 0x0500)
-#define MPC52xx_GPTx(x)		(MPC52xx_MBAR + 0x0600 + ((x)<<4))
-#define MPC52xx_RTC		(MPC52xx_MBAR + 0x0800)
-#define MPC52xx_MSCAN1		(MPC52xx_MBAR + 0x0900)
-#define MPC52xx_MSCAN2		(MPC52xx_MBAR + 0x0980)
-#define MPC52xx_GPIO		(MPC52xx_MBAR + 0x0b00)
-#define MPC52xx_GPIO_WKUP	(MPC52xx_MBAR + 0x0c00)
-#define MPC52xx_PCI		(MPC52xx_MBAR + 0x0d00)
-#define MPC52xx_USB_OHCI	(MPC52xx_MBAR + 0x1000)
-#define MPC52xx_SDMA		(MPC52xx_MBAR + 0x1200)
-#define MPC52xx_XLB		(MPC52xx_MBAR + 0x1f00)
-#define MPC52xx_PSCx(x)		(MPC52xx_MBAR + 0x2000 + ((x)<<9))
-#define MPC52xx_PSC1		(MPC52xx_MBAR + 0x2000)
-#define MPC52xx_PSC2		(MPC52xx_MBAR + 0x2200)
-#define MPC52xx_PSC3		(MPC52xx_MBAR + 0x2400)
-#define MPC52xx_PSC4		(MPC52xx_MBAR + 0x2600)
-#define MPC52xx_PSC5		(MPC52xx_MBAR + 0x2800)
-#define MPC52xx_PSC6		(MPC52xx_MBAR + 0x2C00)
-#define MPC52xx_FEC		(MPC52xx_MBAR + 0x3000)
-#define MPC52xx_ATA		(MPC52xx_MBAR + 0x3a00)
-#define MPC52xx_I2C1		(MPC52xx_MBAR + 0x3d00)
-#define MPC52xx_I2C_MICR	(MPC52xx_MBAR + 0x3d20)
-#define MPC52xx_I2C2		(MPC52xx_MBAR + 0x3d40)
+#define MPC52xx_PA(x)		((phys_addr_t)(MPC52xx_MBAR + (x)))
+#define MPC52xx_VA(x)		((void __iomem *)(MPC52xx_MBAR_VIRT + (x)))
+
+/* Registers zone offset/size  */
+#define MPC52xx_MMAP_CTL_OFFSET		0x0000
+#define MPC52xx_MMAP_CTL_SIZE		0x068
+#define MPC52xx_SDRAM_OFFSET		0x0100
+#define MPC52xx_SDRAM_SIZE		0x010
+#define MPC52xx_CDM_OFFSET		0x0200
+#define MPC52xx_CDM_SIZE		0x038
+#define MPC52xx_INTR_OFFSET		0x0500
+#define MPC52xx_INTR_SIZE		0x04c
+#define MPC52xx_GPTx_OFFSET(x)		(0x0600 + ((x)<<4))
+#define MPC52xx_GPT_SIZE		0x010
+#define MPC52xx_RTC_OFFSET		0x0800
+#define MPC52xx_RTC_SIZE		0x024
+#define MPC52xx_GPIO_OFFSET		0x0b00
+#define MPC52xx_GPIO_SIZE		0x040
+#define MPC52xx_GPIO_WKUP_OFFSET	0x0c00
+#define MPC52xx_GPIO_WKUP_SIZE		0x028
+#define MPC52xx_PCI_OFFSET		0x0d00
+#define MPC52xx_PCI_SIZE		0x100
+#define MPC52xx_SDMA_OFFSET		0x1200
+#define MPC52xx_SDMA_SIZE		0x100
+#define MPC52xx_XLB_OFFSET		0x1f00
+#define MPC52xx_XLB_SIZE		0x100
+#define MPC52xx_PSCx_OFFSET(x)		(((x)!=6)?(0x1e00+((x)<<9)):0x2c00)
+#define MPC52xx_PSC_SIZE		0x0a0
 
 /* SRAM used for SDMA */
-#define MPC52xx_SRAM		(MPC52xx_MBAR + 0x8000)
-#define MPC52xx_SRAM_SIZE	(16*1024)
+#define MPC52xx_SRAM_OFFSET		0x8000
+#define MPC52xx_SRAM_SIZE		0x4000
 
 
 /* ======================================================================== */
@@ -119,11 +139,12 @@ struct ocp_def;
 #define MPC52xx_SPI_SPIF_IRQ		(MPC52xx_PERP_IRQ_BASE + 14)
 #define MPC52xx_I2C1_IRQ		(MPC52xx_PERP_IRQ_BASE + 15)
 #define MPC52xx_I2C2_IRQ		(MPC52xx_PERP_IRQ_BASE + 16)
-#define MPC52xx_CAN1_IRQ		(MPC52xx_PERP_IRQ_BASE + 17)
-#define MPC52xx_CAN2_IRQ		(MPC52xx_PERP_IRQ_BASE + 18)
+#define MPC52xx_MSCAN1_IRQ		(MPC52xx_PERP_IRQ_BASE + 17)
+#define MPC52xx_MSCAN2_IRQ		(MPC52xx_PERP_IRQ_BASE + 18)
 #define MPC52xx_IR_RX_IRQ		(MPC52xx_PERP_IRQ_BASE + 19)
 #define MPC52xx_IR_TX_IRQ		(MPC52xx_PERP_IRQ_BASE + 20)
 #define MPC52xx_XLB_ARB_IRQ		(MPC52xx_PERP_IRQ_BASE + 21)
+#define MPC52xx_BDLC_IRQ		(MPC52xx_PERP_IRQ_BASE + 22)
 
 
 
@@ -163,7 +184,7 @@ struct mpc52xx_mmap_ctl {
 	u32	cs6_start;	/* MMAP_CTRL + 0x58 */
 	u32	cs6_stop;	/* MMAP_CTRL + 0x5c */
 	u32	cs7_start;	/* MMAP_CTRL + 0x60 */
-	u32	cs7_stop;	/* MMAP_CTRL + 0x60 */
+	u32	cs7_stop;	/* MMAP_CTRL + 0x64 */
 };
 
 /* SDRAM control */
@@ -209,7 +230,7 @@ struct mpc52xx_sdma {
 
 	u16	tcr[16];	/* SDMA + 0x1c .. 0x3a */
 
-	u8	ipr[32];	/* SDMA + 0x3c .. 5b */
+	u8	ipr[32];	/* SDMA + 0x3c .. 0x5b */
 
 	u32	cReqSelect;	/* SDMA + 0x5c */
 	u32	task_size0;	/* SDMA + 0x60 */
@@ -391,7 +412,19 @@ extern void mpc52xx_halt(void);
 extern void mpc52xx_power_off(void);
 extern void mpc52xx_progress(char *s, unsigned short hex);
 extern void mpc52xx_calibrate_decr(void);
-extern void mpc52xx_add_board_devices(struct ocp_def board_ocp[]);
+
+extern void mpc52xx_find_bridges(void);
+
+
+	/* Matching of PSC function */
+struct mpc52xx_psc_func {
+	int id;
+	char *func;
+};
+
+extern int mpc52xx_match_psc_function(int psc_idx, const char *func);
+extern struct  mpc52xx_psc_func mpc52xx_psc_functions[];
+	/* This array is to be defined in platform file */
 
 #endif /* __ASSEMBLY__ */
 

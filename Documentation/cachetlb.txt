@@ -142,6 +142,11 @@ changes occur:
 	The ia64 sn2 platform is one example of a platform
 	that uses this interface.
 
+8) void lazy_mmu_prot_update(pte_t pte)
+	This interface is called whenever the protection on
+	any user PTEs change.  This interface provides a notification
+	to architecture specific code to take appropiate action.
+
 
 Next, we have the cache flushing interfaces.  In general, when Linux
 is changing an existing virtual-->physical mapping to a new value,
@@ -155,7 +160,7 @@ the sequence will be in one of the following forms:
 	   change_range_of_page_tables(mm, start, end);
 	   flush_tlb_range(vma, start, end);
 
-	3) flush_cache_page(vma, addr);
+	3) flush_cache_page(vma, addr, pfn);
 	   set_pte(pte_pointer, new_pte_val);
 	   flush_tlb_page(vma, addr);
 
@@ -203,7 +208,7 @@ Here are the routines, one by one:
 	call flush_cache_page (see below) for each entry which may be
 	modified.
 
-3) void flush_cache_page(struct vm_area_struct *vma, unsigned long addr)
+3) void flush_cache_page(struct vm_area_struct *vma, unsigned long addr, unsigned long pfn)
 
 	This time we need to remove a PAGE_SIZE sized range
 	from the cache.  The 'vma' is the backing structure used by
@@ -213,8 +218,14 @@ Here are the routines, one by one:
 	executable (and thus could be in the 'instruction cache' in
 	"Harvard" type cache layouts).
 
+	The 'pfn' indicates the physical page frame (shift this value
+	left by PAGE_SHIFT to get the physical address) that 'addr'
+	translates to.  It is this mapping which should be removed from
+	the cache.
+
 	After running, there will be no entries in the cache for
-	'vma->vm_mm' for virtual address 'addr'.
+	'vma->vm_mm' for virtual address 'addr' which translates
+	to 'pfn'.
 
 	This is used primarily during fault processing.
 

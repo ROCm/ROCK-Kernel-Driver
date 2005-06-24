@@ -53,9 +53,8 @@ struct rpc_task {
 	struct rpc_message	tk_msg;		/* RPC call info */
 	__u32 *			tk_buffer;	/* XDR buffer */
 	size_t			tk_bufsize;
-	__u8			tk_garb_retry,
-				tk_cred_retry,
-				tk_suid_retry;
+	__u8			tk_garb_retry;
+	__u8			tk_cred_retry;
 
 	unsigned long		tk_cookie;	/* Cookie for batching tasks */
 
@@ -118,9 +117,7 @@ typedef void			(*rpc_action)(struct rpc_task *);
  */
 #define RPC_TASK_ASYNC		0x0001		/* is an async task */
 #define RPC_TASK_SWAPPER	0x0002		/* is swapping in/out */
-#define RPC_TASK_SETUID		0x0004		/* is setuid process */
 #define RPC_TASK_CHILD		0x0008		/* is child of other task */
-#define RPC_CALL_REALUID	0x0010		/* try using real uid */
 #define RPC_CALL_MAJORSEEN	0x0020		/* major timeout seen */
 #define RPC_TASK_ROOTCREDS	0x0040		/* force root creds */
 #define RPC_TASK_DYNAMIC	0x0080		/* task was kmalloc'ed */
@@ -129,7 +126,6 @@ typedef void			(*rpc_action)(struct rpc_task *);
 #define RPC_TASK_NOINTR		0x0400		/* uninterruptible task */
 
 #define RPC_IS_ASYNC(t)		((t)->tk_flags & RPC_TASK_ASYNC)
-#define RPC_IS_SETUID(t)	((t)->tk_flags & RPC_TASK_SETUID)
 #define RPC_IS_CHILD(t)		((t)->tk_flags & RPC_TASK_CHILD)
 #define RPC_IS_SWAPPER(t)	((t)->tk_flags & RPC_TASK_SWAPPER)
 #define RPC_DO_ROOTOVERRIDE(t)	((t)->tk_flags & RPC_TASK_ROOTCREDS)

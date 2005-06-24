@@ -302,20 +302,6 @@
 #define B44_MII_TLEDCTRL	27	/* Traffic Meter LED */
 #define  MII_TLEDCTRL_ENABLE	0x0040
 
-/* XXX Add this to mii.h */
-#ifndef ADVERTISE_PAUSE
-#define ADVERTISE_PAUSE_CAP		0x0400
-#endif
-#ifndef ADVERTISE_PAUSE_ASYM
-#define ADVERTISE_PAUSE_ASYM		0x0800
-#endif
-#ifndef LPA_PAUSE
-#define LPA_PAUSE_CAP			0x0400
-#endif
-#ifndef LPA_PAUSE_ASYM
-#define LPA_PAUSE_ASYM			0x0800
-#endif
-
 struct dma_desc {
 	u32	ctrl;
 	u32	addr;
@@ -397,7 +383,6 @@ struct b44 {
 
 	struct ring_info	*rx_buffers;
 	struct ring_info	*tx_buffers;
-	unsigned char		*tx_bufs; 
 
 	u32			dma_offset;
 	u32			flags;
@@ -429,7 +414,7 @@ struct b44 {
 	struct pci_dev		*pdev;
 	struct net_device	*dev;
 
-	dma_addr_t		rx_ring_dma, tx_ring_dma,tx_bufs_dma;
+	dma_addr_t		rx_ring_dma, tx_ring_dma;
 
 	u32			rx_pending;
 	u32			tx_pending;

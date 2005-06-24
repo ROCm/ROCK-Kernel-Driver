@@ -73,21 +73,21 @@ S: Status, one of the following:
 3C359 NETWORK DRIVER
 P:	Mike Phillips
 M:	mikep@linuxtr.net
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 L:	linux-tr@linuxtr.net
 W:	http://www.linuxtr.net
 S:	Maintained
 
 3C505 NETWORK DRIVER
 P:	Philip Blundell
-M:	Philip.Blundell@pobox.com
-L:	linux-net@vger.kernel.org
+M:	philb@gnu.org
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 3CR990 NETWORK DRIVER
 P:	David Dillow
 M:	dave@thedillows.org
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 3W-XXXX ATA-RAID CONTROLLER DRIVER
@@ -130,7 +130,7 @@ S:	Maintained
 8169 10/100/1000 GIGABIT ETHERNET DRIVER
 P:	Francois Romieu
 M:	romieu@fr.zoreil.com
-L:	netdev@oss.sgi.com
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 8250/16?50 (AND CLONE UARTS) SERIAL DRIVER
@@ -143,7 +143,7 @@ S:	Maintained
 8390 NETWORK DRIVERS [WD80x3/SMC-ELITE, SMC-ULTRA, NE2000, 3C503, etc.]
 P:	Paul Gortmaker
 M:	p_gortmaker@yahoo.com
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 A2232 SERIAL BOARD DRIVER
@@ -155,7 +155,7 @@ S:	Maintained
 
 AIO
 P:	Benjamin LaHaise
-M:	bcrl@redhat.com
+M:	bcrl@kvack.org
 L:	linux-aio@kvack.org
 S:	Supported
 
@@ -171,14 +171,6 @@ M:	Robert.Siemer@gmx.de
 L:	linux-sound@vger.kernel.org
 W:	http://www.stud.uni-karlsruhe.de/~uh1b/
 S:	Maintained
-
-ACP/MWAVE MODEM
-P:	Paul B Schroeder
-M:	paulsch@us.ibm.com
-P:	Mike Sullivan
-M:	sullivam@us.ibm.com
-W:	http://www.ibm.com/linux/ltc/
-S:	Supported
 
 AACRAID SCSI RAID DRIVER
 P:	Adaptec OEM Raid Solutions
@@ -245,6 +237,12 @@ M:	duncan.sands@free.fr
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 W:	http://www.linux-usb.org/SpeedTouch/
+S:	Maintained
+
+ALI1563 I2C DRIVER
+P:	Rudolf Marek
+M:	r.marek@sh.cvut.cz
+L:	sensors@stimpy.netroedge.com
 S:	Maintained
 
 ALPHA PORT
@@ -334,7 +332,7 @@ S:	Maintained
 
 ARPD SUPPORT
 P:	Jonathan Layes
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 ASUS ACPI EXTRAS DRIVER
@@ -457,6 +455,11 @@ P:	Marcel Holtmann
 M:	marcel@holtmann.org
 S:	Maintained
 
+BLUETOOTH HCI BPA10X DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+S:	Maintained
+
 BLUETOOTH HCI BFUSB DRIVER
 P:	Marcel Holtmann
 M:	marcel@holtmann.org
@@ -501,7 +504,7 @@ P:	Gerd Knorr
 M:	kraxel@bytesex.org
 L:	video4linux-list@redhat.com
 W:	http://bytesex.org/bttv/
-S:	Maintained
+S:	Orphan
 
 BUSLOGIC SCSI DRIVER
 P:	Leonard N. Zubkoff
@@ -596,12 +599,11 @@ W:	http://developer.axis.com
 S:	Maintained
 
 CRYPTO API
-P:	James Morris
-M:	jmorris@redhat.com
+P:	Herbert Xu
+M:	herbert@gondor.apana.org.au
 P:	David S. Miller
 M:	davem@davemloft.net
-W	http://samba.org/~jamesm/crypto/
-L:	linux-kernel@vger.kernel.org
+L:	linux-crypto@vger.kernel.org
 S:	Maintained
 
 CYBERPRO FB DRIVER
@@ -704,16 +706,9 @@ S:	Orphaned
 
 DIGI RIGHTSWITCH NETWORK DRIVER
 P:	Rick Richardson
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 W:	http://www.digi.com
 S:	Orphaned
-
-DIGIBOARD PC/XE AND PC/XI DRIVER
-P:	Christoph Lameter
-M:	christoph@lameter.com
-W:	http://www.digi.com
-L:	digilnux@digi.com
-S:	Obsolete
 
 DIRECTORY NOTIFICATION
 P:	Stephen Rothwell
@@ -754,8 +749,10 @@ L:	linux-kernel@vger.kernel.org
 S:	Supported
 
 DRM DRIVERS
+P:	David Airlie
+M:	airlied@linux.ie
 L:	dri-devel@lists.sourceforge.net
-S:	Supported
+S:	Maintained
 
 DSCC4 DRIVER
 P:	François Romieu
@@ -814,8 +811,8 @@ S:	Maintained
 
 ETHEREXPRESS-16 NETWORK DRIVER
 P:	Philip Blundell
-M:	Philip.Blundell@pobox.com
-L:	linux-net@vger.kernel.org
+M:	philb@gnu.org
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 ETHERNET BRIDGE
@@ -878,7 +875,7 @@ S:	Maintained
 FRAME RELAY DLCI/FRAD (Sangoma drivers too)
 P:	Mike McLagan
 M:	mike.mclagan@linux.org
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 FREEVXFS FILESYSTEM
@@ -917,10 +914,17 @@ L:	linux-scsi@vger.kernel.org
 W:	http://www.icp-vortex.com/
 S:	Supported
 
-GENERIC HDLC DRIVER, N2 AND C101 DRIVERS
+GENERIC HDLC DRIVER, N2, C101, PCI200SYN and WANXL DRIVERS
 P:	Krzysztof Halasa
 M:	khc@pm.waw.pl
-W:	http://hq.pm.waw.pl/hdlc/
+W:	http://www.kernel.org/pub/linux/utils/net/hdlc/
+S:	Maintained
+
+HARMONY SOUND DRIVER
+P:	Kyle McMartin
+M:	kyle@parisc-linux.org
+W:	http://www.parisc-linux.org/~kyle/harmony/
+L:	parisc-linux@lists.parisc-linux.org
 S:	Maintained
 
 HAYES ESP SERIAL DRIVER
@@ -985,11 +989,6 @@ M:	mikulas@artax.karlin.mff.cuni.cz
 W:	http://artax.karlin.mff.cuni.cz/~mikulas/vyplody/hpfs/index-e.cgi
 S:	Maintained
 
-HPUSBSCSI
-P:	Oliver Neukum
-M:	oliver@neukum.name
-S:	Maintained
-
 HUGETLB FILESYSTEM
 P:	William Irwin
 M:	wli@holomorphy.com
@@ -998,8 +997,8 @@ S:	Maintained
 I2C AND SENSORS DRIVERS
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
-P:	Philip Edelbrock
-M:	phil@netroedge.com
+P:	Jean Delvare
+M:	khali@linux-fr.org
 L:	sensors@stimpy.netroedge.com
 W:	http://www.lm-sensors.nu/
 S:	Maintained
@@ -1037,8 +1036,8 @@ W:	http://www.ia64-linux.org/
 S:	Maintained
 
 SN-IA64 (Itanium) SUB-PLATFORM
-P:	Jesse Barnes
-M:	jbarnes@sgi.com
+P:	Greg Edwards
+M:	edwardsg@sgi.com
 L:	linux-altix@sgi.com
 L:	linux-ia64@vger.kernel.org
 W:	http://www.sgi.com/altix
@@ -1223,7 +1222,7 @@ S:	Maintained
 IPX NETWORK LAYER
 P:	Arnaldo Carvalho de Melo
 M:	acme@conectiva.com.br
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 IRDA SUBSYSTEM
@@ -1270,8 +1269,8 @@ S:	Maintained
 JFS FILESYSTEM
 P:	Dave Kleikamp
 M:	shaggy@austin.ibm.com
-L:	jfs-discussion@oss.software.ibm.com
-W:	http://oss.software.ibm.com/jfs/
+L:	jfs-discussion@lists.sourceforge.net
+W:	http://jfs.sourceforge.net/
 S:	Supported
 
 KCONFIG
@@ -1395,7 +1394,7 @@ W:	http://www.penguinppc.org/
 L:	linuxppc-embedded@ozlabs.org
 S:	Maintained
 
-LINUX FOR POWERPC EMBEDDED PPC85XX
+LINUX FOR POWERPC EMBEDDED PPC83XX AND PPC85XX
 P:     Kumar Gala
 M:     kumar.gala@freescale.com
 W:     http://www.penguinppc.org/
@@ -1490,7 +1489,7 @@ MARVELL MV64340 ETHERNET DRIVER
 P:	Manish Lachwani
 M:	Manish_Lachwani@pmc-sierra.com
 L:	linux-mips@linux-mips.org
-L:	netdev@oss.sgi.com
+L:	netdev@vger.kernel.org
 S:	Supported
 
 MATROX FRAMEBUFFER DRIVER
@@ -1600,13 +1599,13 @@ P:	Andrew Morton
 M:	akpm@osdl.org
 P:	Jeff Garzik
 M:	jgarzik@pobox.com
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 NETWORKING [GENERAL]
 P:	Networking Team
-M:	netdev@oss.sgi.com
-L:	linux-net@vger.kernel.org
+M:	netdev@vger.kernel.org
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 NETWORKING [IPv4/IPv6]
@@ -1622,7 +1621,7 @@ P:	Hideaki YOSHIFUJI
 M:	yoshfuji@linux-ipv6.org
 P:	Patrick McHardy
 M:	kaber@coreworks.de
-L:	netdev@oss.sgi.com
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 IPVS
@@ -1642,7 +1641,7 @@ NI5010 NETWORK DRIVER
 P:	Jan-Pascal van Best and Andreas Mohr
 M:	Jan-Pascal van Best <jvbest@qv3pluto.leidenuniv.nl>
 M:	Andreas Mohr <100.30936@germany.net>
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 NINJA SCSI-3 / NINJA SCSI-32Bi (16bit/CardBus) PCMCIA SCSI HOST ADAPTER DRIVER
@@ -1684,7 +1683,7 @@ P:	Peter De Shrijver
 M:	p2@ace.ulyssis.student.kuleuven.ac.be
 P:	Mike Phillips
 M:	mikep@linuxtr.net 
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 L:	linux-tr@linuxtr.net
 W:	http://www.linuxtr.net
 S:	Maintained
@@ -1713,18 +1712,20 @@ P:	Pavel Roskin
 M:	proski@gnu.org
 P:	David Gibson
 M:	hermes@gibson.dropbear.id.au
-W:	http://www.ozlabs.org/people/dgibson/dldwd
+L:	orinoco-users@lists.sourceforge.net
+L:	orinoco-devel@lists.sourceforge.net
+W:	http://www.nongnu.org/orinoco/
 S:	Maintained
 
 PARALLEL PORT SUPPORT
 P:	Phil Blundell
-M:	Philip.Blundell@pobox.com
+M:	philb@gnu.org
 P:	Tim Waugh
 M:	tim@cyberelk.net
 P:	David Campbell
 M:	campbell@torque.net
 P:	Andrea Arcangeli
-M:	andrea@e-mind.com
+M:	andrea@suse.de
 L:	linux-parport@lists.infradead.org
 W:	http://people.redhat.com/twaugh/parport/
 S:	Maintained
@@ -1789,7 +1790,7 @@ S:	Unmaintained
 PCNET32 NETWORK DRIVER
 P:	Thomas Bogendörfer
 M:	tsbogend@alpha.franken.de
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 PHRAM MTD DRIVER
@@ -1801,7 +1802,7 @@ S:	Maintained
 POSIX CLOCKS and TIMERS
 P:	George Anzinger
 M:	george@mvista.com
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 S:	Supported
 
 PNP SUPPORT
@@ -1836,7 +1837,7 @@ S:	Supported
 PRISM54 WIRELESS DRIVER
 P:	Prism54 Development Team
 M:	prism54-private@prism54.org
-L:	netdev@oss.sgi.com
+L:	netdev@vger.kernel.org
 W:	http://prism54.org
 S:	Maintained
 
@@ -1866,14 +1867,14 @@ W:	http://www.alarsen.net/linux/qnx4fs/
 S:	Maintained
 
 RADEON FRAMEBUFFER DISPLAY DRIVER
-P:	Ani Joshi
-M:	ajoshi@shell.unixbox.com
+P:	Benjamin Herrenschmidt
+M:	benh@kernel.crashing.org
 L:	linux-fbdev-devel@lists.sourceforge.net
 S:	Maintained
 
 RAGE128 FRAMEBUFFER DISPLAY DRIVER
-P:	Ani Joshi
-M:	ajoshi@shell.unixbox.com
+P:	Paul Mackerras
+M:	paulus@samba.org
 L:	linux-fbdev-devel@lists.sourceforge.net
 S:	Maintained
 
@@ -1881,6 +1882,11 @@ RAYLINK/WEBGEAR 802.11 WIRELESS LAN DRIVER
 P:	Corey Thomas
 M:	corey@world.std.com
 L:	linux-kernel@vger.kernel.org
+S:	Maintained
+
+RANDOM NUMBER DRIVER
+P:	Matt Mackall
+M:	mpm@selenic.com
 S:	Maintained
 
 REAL TIME CLOCK DRIVER
@@ -2045,10 +2051,11 @@ W:	http://gyver.homeip.net/sis5513/index.html
 S:	Maintained
 
 SIS 900/7016 FAST ETHERNET DRIVER
-P:	Ollie Lho
-M:	ollie@sis.com.tw
-L:	linux-net@vger.kernel.org
-S:	Supported
+P:	Daniele Venzano
+M:	venza@brownhat.org
+W:	http://www.brownhat.org/sis900.html
+L:	netdev@vger.kernel.org
+S:	Maintained
 
 SIS FRAMEBUFFER DRIVER
 P:	Thomas Winischhofer
@@ -2106,7 +2113,7 @@ S:	Maintained
 SONIC NETWORK DRIVER
 P:	Thomas Bogendoerfer
 M:	tsbogend@alpha.franken.de
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 S:	Maintained
 
 SONY VAIO CONTROL DEVICE DRIVER
@@ -2119,6 +2126,13 @@ SOUND
 P:	Jaroslav Kysela
 M:	perex@suse.cz
 L:	alsa-devel@alsa-project.org
+S:	Maintained
+
+TPM DEVICE DRIVER
+P:	Kylene Hall
+M:	kjhall@us.ibm.com
+W:	http://tpmdd.sourceforge.net
+L:	tpmdd-devel@lists.sourceforge.net
 S:	Maintained
 
 UltraSPARC (sparc64):
@@ -2156,7 +2170,7 @@ S:	Supported
 SPX NETWORK LAYER
 P:	Jay Schulist
 M:	jschlst@samba.org
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 S:	Supported
 
 SRM (Alpha) environment access
@@ -2196,9 +2210,10 @@ SUPERH64 (sh64)
 P:	Paul Mundt
 M:	lethal@linux-sh.org
 P:	Richard Curnow
-M:	richard.curnow@superh.com
+M:	rc@rc0.org.uk
 L:	linuxsh-shmedia-dev@lists.sourceforge.net
 W:	http://www.linux-sh.org
+W:	http://www.rc0.org.uk/sh64
 S:	Maintained
 
 SUN3/3X
@@ -2234,7 +2249,7 @@ S:	Maintained
 TOKEN-RING NETWORK DRIVER
 P:	Mike Phillips
 M:	mikep@linuxtr.net
-L:	linux-net@vger.kernel.org
+L:	netdev@vger.kernel.org
 L:	linux-tr@linuxtr.net
 W:	http://www.linuxtr.net
 S:	Maintained
@@ -2312,6 +2327,13 @@ M:	oliver@neukum.name
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
+
+USB BLOCK DRIVER (UB ub)
+P:	Pete Zaitcev
+M:	zaitcev@redhat.com
+L:	linux-kernel@vger.kernel.org
+L:	linux-usb-devel@lists.sourceforge.net
+S:	Supported
 
 USB BLUETOOTH TTY CONVERTER DRIVER
 P:	Greg Kroah-Hartman
@@ -2408,6 +2430,12 @@ M:	pe1rxq@amsat.org
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 W:	http://www.chello.nl/~j.vreeken/se401/
+S:	Maintained
+
+USB SERIAL CYBERJACK DRIVER
+P:	Matthias Bruestle and Harald Welte
+M:	support@reiner-sct.com
+W:	http://www.reiner-sct.de/support/treiber_cyberjack.php
 S:	Maintained
 
 USB SERIAL DIGI ACCELEPORT DRIVER
@@ -2542,8 +2570,9 @@ P:	Roger Luethi
 M:	rl@hellgate.ch
 S:	Maintained
 
-UCLINUX
+UCLINUX (AND M68KNOMMU)
 P:	Greg Ungerer
+M:	gerg@uclinux.org
 M:	gerg@snapgear.com
 P:	David McCullough
 M:	davidm@snapgear.com
@@ -2576,7 +2605,8 @@ S:	Maintained
 VIDEO FOR LINUX
 P:	Gerd Knorr
 M:	kraxel@bytesex.org
-S:	Maintained
+L:	video4linux-list@redhat.com
+S:	Orphan
 
 W1 DALLAS'S 1-WIRE BUS
 P:	Evgeniy Polyakov
@@ -2654,11 +2684,11 @@ M:	jpr@f6fbb.org
 L:	linux-hams@vger.kernel.org
 S:	Maintained
 
-YMFPCI YAMAHA PCI SOUND
+YMFPCI YAMAHA PCI SOUND (Use ALSA instead)
 P:	Pete Zaitcev
 M:	zaitcev@yahoo.com
 L:	linux-kernel@vger.kernel.org
-S:	Maintained
+S:	Obsolete
 
 Z8530 DRIVER FOR AX.25
 P:	Joerg Reuter

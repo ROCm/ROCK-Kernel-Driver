@@ -26,9 +26,6 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
-#ifdef CONFIG_MCA
-#include <linux/mca.h>
-#endif /* CONFIG_MCA */
 #include "sound_config.h"
 #include "sb_mixer.h"
 #include "sb.h"
@@ -289,6 +286,7 @@ static struct pnp_card_driver sb_pnp_driver = {
 	.probe         = sb_pnp_probe,
 	.remove        = sb_pnp_remove,
 };
+MODULE_DEVICE_TABLE(pnp_card, sb_pnp_card_table);
 #endif /* CONFIG_PNP */
 
 static int __init sb_init(void)

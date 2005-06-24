@@ -175,8 +175,8 @@ xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, xfs_caddr_t string)
 		     (void *)((unsigned long)log->l_grant_write_bytes),
 		     (void *)((unsigned long)log->l_curr_cycle),
 		     (void *)((unsigned long)log->l_curr_block),
-		     (void *)((unsigned long)CYCLE_LSN(log->l_tail_lsn, ARCH_NOCONVERT)),
-		     (void *)((unsigned long)BLOCK_LSN(log->l_tail_lsn, ARCH_NOCONVERT)),
+		     (void *)((unsigned long)CYCLE_LSN(log->l_tail_lsn)),
+		     (void *)((unsigned long)BLOCK_LSN(log->l_tail_lsn)),
 		     (void *)string,
 		     (void *)((unsigned long)13),
 		     (void *)((unsigned long)14),
@@ -890,8 +890,8 @@ xlog_space_left(xlog_t *log, int cycle, int bytes)
 	int tail_bytes;
 	int tail_cycle;
 
-	tail_bytes = BBTOB(BLOCK_LSN(log->l_tail_lsn, ARCH_NOCONVERT));
-	tail_cycle = CYCLE_LSN(log->l_tail_lsn, ARCH_NOCONVERT);
+	tail_bytes = BBTOB(BLOCK_LSN(log->l_tail_lsn));
+	tail_cycle = CYCLE_LSN(log->l_tail_lsn);
 	if ((tail_cycle == cycle) && (bytes >= tail_bytes)) {
 		free_bytes = log->l_logsize - (bytes - tail_bytes);
 	} else if ((tail_cycle + 1) < cycle) {
@@ -1164,7 +1164,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log->l_flags	   |= XLOG_ACTIVE_RECOVERY;
 
 	log->l_prev_block  = -1;
-	ASSIGN_ANY_LSN(log->l_tail_lsn, 1, 0, ARCH_NOCONVERT);
+	ASSIGN_ANY_LSN_HOST(log->l_tail_lsn, 1, 0);
 	/* log->l_tail_lsn = 0x100000000LL; cycle = 1; current block = 0 */
 	log->l_last_sync_lsn = log->l_tail_lsn;
 	log->l_curr_cycle  = 1;	    /* 0 is bad since this is initial value */
@@ -1321,19 +1321,19 @@ xlog_grant_push_ail(xfs_mount_t	*mp,
     free_threshold = MAX(free_threshold, (log->l_logBBsize >> 2));
     free_threshold = MAX(free_threshold, 256);
     if (free_blocks < free_threshold) {
-	threshold_block = BLOCK_LSN(tail_lsn, ARCH_NOCONVERT) + free_threshold;
-	threshold_cycle = CYCLE_LSN(tail_lsn, ARCH_NOCONVERT);
+	threshold_block = BLOCK_LSN(tail_lsn) + free_threshold;
+	threshold_cycle = CYCLE_LSN(tail_lsn);
 	if (threshold_block >= log->l_logBBsize) {
 	    threshold_block -= log->l_logBBsize;
 	    threshold_cycle += 1;
 	}
-	ASSIGN_ANY_LSN(threshold_lsn, threshold_cycle,
-		       threshold_block, ARCH_NOCONVERT);
+	ASSIGN_ANY_LSN_HOST(threshold_lsn, threshold_cycle,
+		       threshold_block);
 
 	/* Don't pass in an lsn greater than the lsn of the last
 	 * log record known to be on disk.
 	 */
-	if (XFS_LSN_CMP_ARCH(threshold_lsn, log->l_last_sync_lsn, ARCH_NOCONVERT) > 0)
+	if (XFS_LSN_CMP(threshold_lsn, log->l_last_sync_lsn) > 0)
 	    threshold_lsn = log->l_last_sync_lsn;
     }
     GRANT_UNLOCK(log, s);
@@ -1435,7 +1435,7 @@ xlog_sync(xlog_t		*log,
 	bp	    = iclog->ic_bp;
 	ASSERT(XFS_BUF_FSPRIVATE2(bp, unsigned long) == (unsigned long)1);
 	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)2);
-	XFS_BUF_SET_ADDR(bp, BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT));
+	XFS_BUF_SET_ADDR(bp, BLOCK_LSN(INT_GET(iclog->ic_header.h_lsn, ARCH_CONVERT)));
 
 	XFS_STATS_ADD(xs_log_blocks, BTOBB(count));
 
@@ -1728,9 +1728,9 @@ xlog_write(xfs_mount_t *	mp,
 		logop_head		= (xlog_op_header_t *)ptr;
 		INT_SET(logop_head->oh_tid, ARCH_CONVERT, ticket->t_tid);
 		logop_head->oh_clientid = ticket->t_clientid;
-		INT_ZERO(logop_head->oh_len, ARCH_CONVERT);
+		logop_head->oh_len	= 0;
 		logop_head->oh_flags    = XLOG_START_TRANS;
-		INT_ZERO(logop_head->oh_res2, ARCH_CONVERT);
+		logop_head->oh_res2	= 0;
 		ticket->t_flags		&= ~XLOG_TIC_INITED;	/* clear bit */
 		record_cnt++;
 
@@ -1742,7 +1742,7 @@ xlog_write(xfs_mount_t *	mp,
 	    logop_head			= (xlog_op_header_t *)ptr;
 	    INT_SET(logop_head->oh_tid, ARCH_CONVERT, ticket->t_tid);
 	    logop_head->oh_clientid	= ticket->t_clientid;
-	    INT_ZERO(logop_head->oh_res2, ARCH_CONVERT);
+	    logop_head->oh_res2		= 0;
 
 	    /* header copied directly */
 	    xlog_write_adv_cnt(ptr, len, log_offset, sizeof(xlog_op_header_t));
@@ -1888,10 +1888,10 @@ xlog_state_clean_log(xlog_t *log)
 				 */
 				changed = 2;
 			}
-			INT_ZERO(iclog->ic_header.h_num_logops, ARCH_CONVERT);
+			iclog->ic_header.h_num_logops = 0;
 			memset(iclog->ic_header.h_cycle_data, 0,
 			      sizeof(iclog->ic_header.h_cycle_data));
-			INT_ZERO(iclog->ic_header.h_lsn, ARCH_CONVERT);
+			iclog->ic_header.h_lsn = 0;
 		} else if (iclog->ic_state == XLOG_STATE_ACTIVE)
 			/* do nothing */;
 		else
@@ -1948,7 +1948,7 @@ xlog_get_lowest_lsn(
 	    if (!(lsn_log->ic_state & (XLOG_STATE_ACTIVE|XLOG_STATE_DIRTY))) {
 		lsn = INT_GET(lsn_log->ic_header.h_lsn, ARCH_CONVERT);
 		if ((lsn && !lowest_lsn) ||
-		    (XFS_LSN_CMP_ARCH(lsn, lowest_lsn, ARCH_NOCONVERT) < 0)) {
+		    (XFS_LSN_CMP(lsn, lowest_lsn) < 0)) {
 			lowest_lsn = lsn;
 		}
 	    }
@@ -2049,10 +2049,9 @@ xlog_state_do_callback(
 
 				lowest_lsn = xlog_get_lowest_lsn(log);
 				if (lowest_lsn && (
-					XFS_LSN_CMP_ARCH(
+					XFS_LSN_CMP(
 						lowest_lsn,
-						INT_GET(iclog->ic_header.h_lsn, ARCH_CONVERT),
-						ARCH_NOCONVERT
+						INT_GET(iclog->ic_header.h_lsn, ARCH_CONVERT)
 					)<0)) {
 					iclog = iclog->ic_next;
 					continue; /* Leave this iclog for
@@ -2068,10 +2067,9 @@ xlog_state_do_callback(
 				 * No one else can be here except us.
 				 */
 				s = GRANT_LOCK(log);
-				ASSERT(XFS_LSN_CMP_ARCH(
+				ASSERT(XFS_LSN_CMP(
 						log->l_last_sync_lsn,
-						INT_GET(iclog->ic_header.h_lsn, ARCH_CONVERT),
-						ARCH_NOCONVERT
+						INT_GET(iclog->ic_header.h_lsn, ARCH_CONVERT)
 					)<=0);
 				log->l_last_sync_lsn = INT_GET(iclog->ic_header.h_lsn, ARCH_CONVERT);
 				GRANT_UNLOCK(log, s);
@@ -2285,7 +2283,7 @@ restart:
 	if (log_offset == 0) {
 		ticket->t_curr_res -= log->l_iclog_hsize;
 		INT_SET(head->h_cycle, ARCH_CONVERT, log->l_curr_cycle);
-		ASSIGN_LSN(head->h_lsn, log, ARCH_CONVERT);
+		ASSIGN_LSN(head->h_lsn, log);
 		ASSERT(log->l_curr_block >= 0);
 	}
 
@@ -2427,9 +2425,9 @@ redo:
 	 * Otherwise, make sure that the cycles differ by exactly one and
 	 * check the byte count.
 	 */
-	if (CYCLE_LSN(tail_lsn, ARCH_NOCONVERT) != log->l_grant_write_cycle) {
-		ASSERT(log->l_grant_write_cycle-1 == CYCLE_LSN(tail_lsn, ARCH_NOCONVERT));
-		ASSERT(log->l_grant_write_bytes <= BBTOB(BLOCK_LSN(tail_lsn, ARCH_NOCONVERT)));
+	if (CYCLE_LSN(tail_lsn) != log->l_grant_write_cycle) {
+		ASSERT(log->l_grant_write_cycle-1 == CYCLE_LSN(tail_lsn));
+		ASSERT(log->l_grant_write_bytes <= BBTOB(BLOCK_LSN(tail_lsn)));
 	}
 #endif
 	xlog_trace_loggrant(log, tic, "xlog_grant_log_space: exit");
@@ -2560,9 +2558,9 @@ redo:
 	XLOG_GRANT_ADD_SPACE(log, need_bytes, 'w'); /* we've got enough space */
 #ifdef DEBUG
 	tail_lsn = log->l_tail_lsn;
-	if (CYCLE_LSN(tail_lsn, ARCH_NOCONVERT) != log->l_grant_write_cycle) {
-		ASSERT(log->l_grant_write_cycle-1 == CYCLE_LSN(tail_lsn, ARCH_NOCONVERT));
-		ASSERT(log->l_grant_write_bytes <= BBTOB(BLOCK_LSN(tail_lsn, ARCH_NOCONVERT)));
+	if (CYCLE_LSN(tail_lsn) != log->l_grant_write_cycle) {
+		ASSERT(log->l_grant_write_cycle-1 == CYCLE_LSN(tail_lsn));
+		ASSERT(log->l_grant_write_bytes <= BBTOB(BLOCK_LSN(tail_lsn)));
 	}
 #endif
 
@@ -3269,18 +3267,18 @@ xlog_verify_tail_lsn(xlog_t	    *log,
 {
     int blocks;
 
-    if (CYCLE_LSN(tail_lsn, ARCH_NOCONVERT) == log->l_prev_cycle) {
+    if (CYCLE_LSN(tail_lsn) == log->l_prev_cycle) {
 	blocks =
-	    log->l_logBBsize - (log->l_prev_block - BLOCK_LSN(tail_lsn, ARCH_NOCONVERT));
+	    log->l_logBBsize - (log->l_prev_block - BLOCK_LSN(tail_lsn));
 	if (blocks < BTOBB(iclog->ic_offset)+BTOBB(log->l_iclog_hsize))
 	    xlog_panic("xlog_verify_tail_lsn: ran out of log space");
     } else {
-	ASSERT(CYCLE_LSN(tail_lsn, ARCH_NOCONVERT)+1 == log->l_prev_cycle);
+	ASSERT(CYCLE_LSN(tail_lsn)+1 == log->l_prev_cycle);
 
-	if (BLOCK_LSN(tail_lsn, ARCH_NOCONVERT) == log->l_prev_block)
+	if (BLOCK_LSN(tail_lsn) == log->l_prev_block)
 	    xlog_panic("xlog_verify_tail_lsn: tail wrapped");
 
-	blocks = BLOCK_LSN(tail_lsn, ARCH_NOCONVERT) - log->l_prev_block;
+	blocks = BLOCK_LSN(tail_lsn) - log->l_prev_block;
 	if (blocks < BTOBB(iclog->ic_offset) + 1)
 	    xlog_panic("xlog_verify_tail_lsn: ran out of log space");
     }

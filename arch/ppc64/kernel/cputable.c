@@ -17,9 +17,12 @@
 #include <linux/sched.h>
 #include <linux/threads.h>
 #include <linux/init.h>
+#include <linux/module.h>
+
 #include <asm/cputable.h>
 
 struct cpu_spec* cur_cpu_spec = NULL;
+EXPORT_SYMBOL(cur_cpu_spec);
 
 /* NOTE:
  * Unlike ppc32, ppc64 will only call this once for the boot CPU, it's

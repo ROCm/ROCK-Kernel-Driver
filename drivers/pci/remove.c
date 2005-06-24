@@ -2,14 +2,6 @@
 #include <linux/module.h>
 #include "pci.h"
 
-#undef DEBUG
-
-#ifdef DEBUG
-#define DBG(x...) printk(x)
-#else
-#define DBG(x...)
-#endif
-
 static void pci_free_resources(struct pci_dev *dev)
 {
 	int i;

@@ -128,7 +128,6 @@ struct mostek48t08 {
 	char offset[6*1024];         /* Magic things may be here, who knows? */
 	struct mostek48t02 regs;     /* Here is what we are interested in.   */
 };
-extern struct mostek48t08 *mstk48t08_regs;
 
 extern enum sparc_clock_type sp_clock_typ;
 

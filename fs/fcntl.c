@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/security.h>
 #include <linux/ptrace.h>
+#include <linux/signal.h>
 
 #include <asm/poll.h>
 #include <asm/siginfo.h>
@@ -308,7 +309,7 @@ static long do_fcntl(int fd, unsigned int cmd, unsigned long arg,
 		break;
 	case F_SETSIG:
 		/* arg == 0 restores default behaviour. */
-		if (arg < 0 || arg > _NSIG) {
+		if (!valid_signal(arg)) {
 			break;
 		}
 		err = 0;
@@ -437,7 +438,7 @@ static void send_sigio_to_task(struct task_struct *p,
 			else
 				si.si_band = band_table[reason - POLL_IN];
 			si.si_fd    = fd;
-			if (!send_sig_info(fown->signum, &si, p))
+			if (!send_group_sig_info(fown->signum, &si, p))
 				break;
 		/* fall-through: fall back on the old plain SIGIO signal */
 		case 0:

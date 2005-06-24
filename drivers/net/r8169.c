@@ -415,7 +415,7 @@ struct rtl8169_private {
 	struct work_struct task;
 };
 
-MODULE_AUTHOR("Realtek and the Linux r8169 crew <netdev@oss.sgi.com>");
+MODULE_AUTHOR("Realtek and the Linux r8169 crew <netdev@vger.kernel.org>");
 MODULE_DESCRIPTION("RealTek RTL-8169 Gigabit Ethernet driver");
 module_param_array(media, int, &num_media, 0);
 module_param(rx_copybreak, int, 0);
@@ -1180,7 +1180,7 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	/* enable device (incl. PCI PM wakeup and hotplug setup) */
 	rc = pci_enable_device(pdev);
 	if (rc) {
-		printk(KERN_ERR PFX "%s: enable failure\n", pdev->slot_name);
+		printk(KERN_ERR PFX "%s: enable failure\n", pci_name(pdev));
 		goto err_out_free_dev;
 	}
 
@@ -1218,7 +1218,7 @@ rtl8169_init_board(struct pci_dev *pdev, struct net_device **dev_out,
 	rc = pci_request_regions(pdev, MODULENAME);
 	if (rc) {
 		printk(KERN_ERR PFX "%s: could not request regions.\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		goto err_out_mwi;
 	}
 
@@ -1449,7 +1449,7 @@ rtl8169_remove_one(struct pci_dev *pdev)
 
 #ifdef CONFIG_PM
 
-static int rtl8169_suspend(struct pci_dev *pdev, u32 state)
+static int rtl8169_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct rtl8169_private *tp = netdev_priv(dev);
@@ -1585,8 +1585,8 @@ rtl8169_hw_start(struct net_device *dev)
 	RTL_W8(ChipCmd, CmdTxEnb | CmdRxEnb);
 	RTL_W8(EarlyTxThres, EarlyTxThld);
 
-	/* For gigabit rtl8169, MTU + header + CRC + VLAN */
-	RTL_W16(RxMaxSize, tp->rx_buf_sz);
+	/* Low hurts. Let's disable the filtering. */
+	RTL_W16(RxMaxSize, 16383);
 
 	/* Set Rx Config register */
 	i = rtl8169_rx_config |
@@ -2127,6 +2127,11 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 	}
 }
 
+static inline int rtl8169_fragmented_frame(u32 status)
+{
+	return (status & (FirstFrag | LastFrag)) != (FirstFrag | LastFrag);
+}
+
 static inline void rtl8169_rx_csum(struct sk_buff *skb, struct RxDesc *desc)
 {
 	u32 opts1 = le32_to_cpu(desc->opts1);
@@ -2177,26 +2182,40 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 
 	while (rx_left > 0) {
 		unsigned int entry = cur_rx % NUM_RX_DESC;
+		struct RxDesc *desc = tp->RxDescArray + entry;
 		u32 status;
 
 		rmb();
-		status = le32_to_cpu(tp->RxDescArray[entry].opts1);
+		status = le32_to_cpu(desc->opts1);
 
 		if (status & DescOwn)
 			break;
 		if (status & RxRES) {
-			printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
+			printk(KERN_INFO "%s: Rx ERROR. status = %08x\n",
+			       dev->name, status);
 			tp->stats.rx_errors++;
 			if (status & (RxRWT | RxRUNT))
 				tp->stats.rx_length_errors++;
 			if (status & RxCRC)
 				tp->stats.rx_crc_errors++;
+			rtl8169_mark_to_asic(desc, tp->rx_buf_sz);
 		} else {
-			struct RxDesc *desc = tp->RxDescArray + entry;
 			struct sk_buff *skb = tp->Rx_skbuff[entry];
 			int pkt_size = (status & 0x00001FFF) - 4;
 			void (*pci_action)(struct pci_dev *, dma_addr_t,
 				size_t, int) = pci_dma_sync_single_for_device;
+
+			/*
+			 * The driver does not support incoming fragmented
+			 * frames. They are seen as a symptom of over-mtu
+			 * sized frames.
+			 */
+			if (unlikely(rtl8169_fragmented_frame(status))) {
+				tp->stats.rx_dropped++;
+				tp->stats.rx_length_errors++;
+				rtl8169_mark_to_asic(desc, tp->rx_buf_sz);
+				goto move_on;
+			}
 
 			rtl8169_rx_csum(skb, desc);
 			
@@ -2224,7 +2243,7 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 			tp->stats.rx_bytes += pkt_size;
 			tp->stats.rx_packets++;
 		}
-		
+move_on:		
 		cur_rx++; 
 		rx_left--;
 	}
@@ -2385,7 +2404,7 @@ core_down:
 	}
 
 	/* Give a racing hard_start_xmit a few cycles to complete. */
-	synchronize_kernel();
+	synchronize_sched();  /* FIXME: should this be synchronize_irq()? */
 
 	/*
 	 * And now for the 50k$ question: are IRQ disabled or not ?

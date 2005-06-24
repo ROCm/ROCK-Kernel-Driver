@@ -323,6 +323,7 @@ struct ac97_ops
 	
 #define AC97_DELUDED_MODEM	1	/* Audio codec reports its a modem */
 #define AC97_NO_PCM_VOLUME	2	/* Volume control is missing 	   */
+#define AC97_DEFAULT_POWER_OFF 4 /* Needs warm reset to power up */
 };
 
 extern int ac97_read_proc (char *page_out, char **start, off_t off,

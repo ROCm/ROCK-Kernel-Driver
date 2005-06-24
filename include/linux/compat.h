@@ -83,6 +83,12 @@ struct compat_rusage {
 
 extern int put_compat_rusage(const struct rusage *, struct compat_rusage __user *);
 
+struct compat_siginfo;
+
+extern asmlinkage long compat_sys_waitid(int, compat_pid_t,
+		struct compat_siginfo __user *, int,
+		struct compat_rusage __user *);
+
 struct compat_dirent {
 	u32		d_ino;
 	compat_off_t	d_off;
@@ -95,12 +101,14 @@ typedef union compat_sigval {
 	compat_uptr_t	sival_ptr;
 } compat_sigval_t;
 
+#define COMPAT_SIGEV_PAD_SIZE	((SIGEV_MAX_SIZE/sizeof(int)) - 3)
+
 typedef struct compat_sigevent {
 	compat_sigval_t sigev_value;
 	compat_int_t sigev_signo;
 	compat_int_t sigev_notify;
 	union {
-		compat_int_t _pad[SIGEV_PAD_SIZE];
+		compat_int_t _pad[COMPAT_SIGEV_PAD_SIZE];
 		compat_int_t _tid;
 
 		struct {
@@ -145,8 +153,10 @@ long compat_get_bitmap(unsigned long *mask, compat_ulong_t __user *umask,
 		       unsigned long bitmap_size);
 long compat_put_bitmap(compat_ulong_t __user *umask, unsigned long *mask,
 		       unsigned long bitmap_size);
-struct compat_siginfo;
 int copy_siginfo_from_user32(siginfo_t *to, struct compat_siginfo __user *from);
 int copy_siginfo_to_user32(struct compat_siginfo __user *to, siginfo_t *from);
+int get_compat_sigevent(struct sigevent *event,
+		const struct compat_sigevent __user *u_event);
+
 #endif /* CONFIG_COMPAT */
 #endif /* _LINUX_COMPAT_H */

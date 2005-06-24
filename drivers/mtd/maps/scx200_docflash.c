@@ -92,17 +92,16 @@ static int __init init_scx200_docflash(void)
 				      PCI_DEVICE_ID_NS_SCx200_BRIDGE,
 				      NULL)) == NULL)
 		return -ENODEV;
-	
-	if (!scx200_cb_probe(SCx200_CB_BASE)) {
-		printk(KERN_WARNING NAME ": no configuration block found\n");
+
+	/* check that we have found the configuration block */
+	if (!scx200_cb_present())
 		return -ENODEV;
-	}
 
 	if (probe) {
 		/* Try to use the present flash mapping if any */
 		pci_read_config_dword(bridge, SCx200_DOCCS_BASE, &base);
 		pci_read_config_dword(bridge, SCx200_DOCCS_CTRL, &ctrl);
-		pmr = inl(SCx200_CB_BASE + SCx200_PMR);
+		pmr = inl(scx200_cb_base + SCx200_PMR);
 
 		if (base == 0
 		    || (ctrl & 0x07000000) != 0x07000000
@@ -155,14 +154,14 @@ static int __init init_scx200_docflash(void)
 		
 		pci_write_config_dword(bridge, SCx200_DOCCS_BASE, docmem.start);
 		pci_write_config_dword(bridge, SCx200_DOCCS_CTRL, ctrl);
-		pmr = inl(SCx200_CB_BASE + SCx200_PMR);
+		pmr = inl(scx200_cb_base + SCx200_PMR);
 		
 		if (width == 8) {
 			pmr &= ~(1<<6);
 		} else {
 			pmr |= (1<<6);
 		}
-		outl(pmr, SCx200_CB_BASE + SCx200_PMR);
+		outl(pmr, scx200_cb_base + SCx200_PMR);
 	}
 	
        	printk(KERN_INFO NAME ": DOCCS mapped at 0x%lx-0x%lx, width %d\n", 

@@ -1908,8 +1908,8 @@ fail:;
 	return err;
 }
 
-LIST_HEAD(matroxfb_list);
-LIST_HEAD(matroxfb_driver_list);
+static LIST_HEAD(matroxfb_list);
+static LIST_HEAD(matroxfb_driver_list);
 
 #define matroxfb_l(x) list_entry(x, struct matrox_fb_info, next_fb)
 #define matroxfb_driver_l(x) list_entry(x, struct matroxfb_driver, node)
@@ -2287,7 +2287,7 @@ static void __exit matrox_done(void) {
 
 /* ************************* init in-kernel code ************************** */
 
-int __init matroxfb_setup(char *options) {
+static int __init matroxfb_setup(char *options) {
 	char *this_opt;
 
 	DBG(__FUNCTION__)
@@ -2428,7 +2428,7 @@ int __init matroxfb_setup(char *options) {
 
 static int __initdata initialized = 0;
 
-int __init matroxfb_init(void)
+static int __init matroxfb_init(void)
 {
 	char *option = NULL;
 

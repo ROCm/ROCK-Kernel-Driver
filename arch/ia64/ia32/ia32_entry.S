@@ -494,7 +494,7 @@ ia32_syscall_table:
   	data8 compat_sys_mq_notify
   	data8 compat_sys_mq_getsetattr
 	data8 sys_ni_syscall		/* reserved for kexec */
-	data8 sys32_waitid
+	data8 compat_sys_waitid
 
 	// guard against failures to increase IA32_NR_syscalls
 	.org ia32_syscall_table + 8*IA32_NR_syscalls

@@ -52,6 +52,7 @@
 #include <asm/ecard.h>
 
 #include "../scsi.h"
+#include <scsi/scsi_dbg.h>
 #include <scsi/scsi_host.h>
 #include "fas216.h"
 #include "scsi.h"
@@ -142,19 +143,13 @@ __setup("fas216_logging=", fas216_log_setup);
 static inline unsigned char fas216_readb(FAS216_Info *info, unsigned int reg)
 {
 	unsigned int off = reg << info->scsi.io_shift;
-	if (info->scsi.io_base)
-		return readb(info->scsi.io_base + off);
-	else
-		return inb(info->scsi.io_port + off);
+	return readb(info->scsi.io_base + off);
 }
 
 static inline void fas216_writeb(FAS216_Info *info, unsigned int reg, unsigned int val)
 {
 	unsigned int off = reg << info->scsi.io_shift;
-	if (info->scsi.io_base)
-		writeb(val, info->scsi.io_base + off);
-	else
-		outb(val, info->scsi.io_port + off);
+	writeb(val, info->scsi.io_base + off);
 }
 
 static void fas216_dumpstate(FAS216_Info *info)
@@ -197,8 +192,8 @@ static void fas216_dumpinfo(FAS216_Info *info)
 	printk("  { magic_start=%lX host=%p SCpnt=%p origSCpnt=%p\n",
 		info->magic_start, info->host, info->SCpnt,
 		info->origSCpnt);
-	printk("    scsi={ io_port=%X io_shift=%X irq=%X cfg={ %X %X %X %X }\n",
-		info->scsi.io_port, info->scsi.io_shift, info->scsi.irq,
+	printk("    scsi={ io_shift=%X irq=%X cfg={ %X %X %X %X }\n",
+		info->scsi.io_shift, info->scsi.irq,
 		info->scsi.cfg[0], info->scsi.cfg[1], info->scsi.cfg[2],
 		info->scsi.cfg[3]);
 	printk("           type=%p phase=%X\n",
@@ -315,7 +310,7 @@ fas216_log_command(FAS216_Info *info, int level, Scsi_Cmnd *SCpnt, char *fmt, ..
 	va_end(args);
 
 	printk(" CDB: ");
-	print_command(SCpnt->cmnd);
+	__scsi_print_command(SCpnt->cmnd);
 }
 
 static void
@@ -2087,7 +2082,7 @@ fas216_std_done(FAS216_Info *info, Scsi_Cmnd *SCpnt, unsigned int result)
 				info->host->host_no, '0' + SCpnt->device->id,
 				SCpnt->result, info->scsi.SCp.ptr,
 				info->scsi.SCp.this_residual);
-			print_command(SCpnt->cmnd);
+			__scsi_print_command(SCpnt->cmnd);
 			SCpnt->result &= ~(255 << 16);
 			SCpnt->result |= DID_BAD_TARGET << 16;
 			goto request_sense;
@@ -2122,7 +2117,7 @@ request_sense:
 	SCpnt->SCp.Message = 0;
 	SCpnt->SCp.Status = 0;
 	SCpnt->request_bufflen = sizeof(SCpnt->sense_buffer);
-	SCpnt->sc_data_direction = SCSI_DATA_READ;
+	SCpnt->sc_data_direction = DMA_FROM_DEVICE;
 	SCpnt->use_sg = 0;
 	SCpnt->tag = 0;
 	SCpnt->host_scribble = (void *)fas216_rq_sns_done;
@@ -2176,7 +2171,7 @@ static void fas216_done(FAS216_Info *info, unsigned int result)
 		       info->host->host_no, '0' + SCpnt->device->id,
 		       info->scsi.SCp.ptr, info->scsi.SCp.this_residual);
 		info->scsi.SCp.ptr = NULL;
-		print_command(SCpnt->cmnd);
+		__scsi_print_command(SCpnt->cmnd);
 	}
 
 	/*
@@ -2432,7 +2427,7 @@ int fas216_eh_abort(Scsi_Cmnd *SCpnt)
 	info->stats.aborts += 1;
 
 	printk(KERN_WARNING "scsi%d: abort command ", info->host->host_no);
-	print_command(SCpnt->data_cmnd);
+	__scsi_print_command(SCpnt->data_cmnd);
 
 	print_debug_list();
 	fas216_dumpstate(info);
@@ -2967,11 +2962,11 @@ int fas216_print_host(FAS216_Info *info, char *buffer)
 	return sprintf(buffer,
 			"\n"
 			"Chip    : %s\n"
-			" Address: 0x%08lx\n"
+			" Address: 0x%p\n"
 			" IRQ    : %d\n"
 			" DMA    : %d\n",
-			info->scsi.type, info->host->io_port,
-			info->host->irq, info->host->dma_channel);
+			info->scsi.type, info->scsi.io_base,
+			info->scsi.irq, info->scsi.dma);
 }
 
 int fas216_print_stats(FAS216_Info *info, char *buffer)

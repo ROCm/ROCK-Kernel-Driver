@@ -1,6 +1,6 @@
 /* Low-level parallel-port routines for 8255-based PC-style hardware.
  * 
- * Authors: Phil Blundell <Philip.Blundell@pobox.com>
+ * Authors: Phil Blundell <philb@gnu.org>
  *          Tim Waugh <tim@cyberelk.demon.co.uk>
  *	    Jose Renau <renau@acm.org>
  *          David Campbell <campbell@torque.net>
@@ -66,6 +66,10 @@
 #include <asm/parport.h>
 
 #define PARPORT_PC_MAX_PORTS PARPORT_MAX
+
+#ifdef CONFIG_ISA_DMA_API
+#define HAS_DMA
+#endif
 
 /* ECR modes */
 #define ECR_SPP 00
@@ -610,6 +614,7 @@ dump_parport_state ("leave fifo_write_block_pio", port);
 	return length - left;
 }
 
+#ifdef HAS_DMA
 static size_t parport_pc_fifo_write_block_dma (struct parport *port,
 					       const void *buf, size_t length)
 {
@@ -732,6 +737,17 @@ dump_parport_state ("enter fifo_write_block_dma", port);
 dump_parport_state ("leave fifo_write_block_dma", port);
 	return length - left;
 }
+#endif
+
+static inline size_t parport_pc_fifo_write_block(struct parport *port,
+					       const void *buf, size_t length)
+{
+#ifdef HAS_DMA
+	if (port->dma != PARPORT_DMA_NONE)
+		return parport_pc_fifo_write_block_dma (port, buf, length);
+#endif
+	return parport_pc_fifo_write_block_pio (port, buf, length);
+}
 
 /* Parallel Port FIFO mode (ECP chipsets) */
 static size_t parport_pc_compat_write_block_pio (struct parport *port,
@@ -758,10 +774,7 @@ static size_t parport_pc_compat_write_block_pio (struct parport *port,
 	port->physport->ieee1284.phase = IEEE1284_PH_FWD_DATA;
 
 	/* Write the data to the FIFO. */
-	if (port->dma != PARPORT_DMA_NONE)
-		written = parport_pc_fifo_write_block_dma (port, buf, length);
-	else
-		written = parport_pc_fifo_write_block_pio (port, buf, length);
+	written = parport_pc_fifo_write_block(port, buf, length);
 
 	/* Finish up. */
 	/* For some hardware we don't want to touch the mode until
@@ -856,10 +869,7 @@ static size_t parport_pc_ecp_write_block_pio (struct parport *port,
 	port->physport->ieee1284.phase = IEEE1284_PH_FWD_DATA;
 
 	/* Write the data to the FIFO. */
-	if (port->dma != PARPORT_DMA_NONE)
-		written = parport_pc_fifo_write_block_dma (port, buf, length);
-	else
-		written = parport_pc_fifo_write_block_pio (port, buf, length);
+	written = parport_pc_fifo_write_block(port, buf, length);
 
 	/* Finish up. */
 	/* For some hardware we don't want to touch the mode until
@@ -2285,6 +2295,7 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 		}
 
 #ifdef CONFIG_PARPORT_PC_FIFO
+#ifdef HAS_DMA
 		if (p->dma != PARPORT_DMA_NONE) {
 			if (request_dma (p->dma, p->name)) {
 				printk (KERN_WARNING "%s: dma %d in use, "
@@ -2306,7 +2317,8 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 				}
 			}
 		}
-#endif /* CONFIG_PARPORT_PC_FIFO */
+#endif
+#endif
 	}
 
 	/* Done probing.  Now put the port into a sensible start-up state. */
@@ -2367,11 +2379,13 @@ void parport_pc_unregister_port (struct parport *p)
 	if (p->modes & PARPORT_MODE_ECP)
 		release_region(p->base_hi, 3);
 #ifdef CONFIG_PARPORT_PC_FIFO
+#ifdef HAS_DMA
 	if (priv->dma_buf)
 		pci_free_consistent(priv->dev, PAGE_SIZE,
 				    priv->dma_buf,
 				    priv->dma_handle);
-#endif /* CONFIG_PARPORT_PC_FIFO */
+#endif
+#endif
 	kfree (p->private_data);
 	parport_put_port(p);
 	kfree (ops); /* hope no-one cached it */
@@ -2733,13 +2747,11 @@ enum parport_pc_pci_cards {
 	aks_0100,
 	mobility_pp,
 	netmos_9705,
+	netmos_9715,
+	netmos_9755,
 	netmos_9805,
 	netmos_9815,
 	netmos_9855,
-	netmos_9735,
-	netmos_9835,
-	netmos_9755,
-	netmos_9715
 };
 
 
@@ -2810,13 +2822,11 @@ static struct parport_pc_pci {
 	/* aks_0100 */                  { 1, { { 0, -1 }, } },
 	/* mobility_pp */		{ 1, { { 0, 1 }, } },
 	/* netmos_9705 */               { 1, { { 0, -1 }, } }, /* untested */
+        /* netmos_9715 */               { 2, { { 0, 1 }, { 2, 3 },} }, /* untested */
+        /* netmos_9755 */               { 2, { { 0, 1 }, { 2, 3 },} }, /* untested */
 	/* netmos_9805 */               { 1, { { 0, -1 }, } }, /* untested */
 	/* netmos_9815 */               { 2, { { 0, -1 }, { 2, -1 }, } }, /* untested */
 	/* netmos_9855 */               { 2, { { 0, -1 }, { 2, -1 }, } }, /* untested */
-	/* netmos_9735 */               { 1, { { 2, 3 }, } },  /* untested */
-	/* netmos_9835 */               { 1, { { 2, 3 }, } },  /* untested */
-        /* netmos_9755 */               { 2, { { 0, 1 }, { 2, 3 },} }, /* untested */
-        /* netmos_9715 */               { 2, { { 0, 1 }, { 2, 3 },} }, /* untested */
 };
 
 static struct pci_device_id parport_pc_pci_tbl[] = {
@@ -2889,28 +2899,30 @@ static struct pci_device_id parport_pc_pci_tbl[] = {
 	/* NetMos communication controllers */
 	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9705,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9705 },
+	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9715,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9715 },
+	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9755,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9755 },
 	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9805,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9805 },
 	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9815,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9815 },
 	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9855,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9855 },
-	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9735,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9735 },
-	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9835,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9835 },
-	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9755,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9755 },
-	{ PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9715,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, netmos_9715 },
 	{ 0, } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci,parport_pc_pci_tbl);
+
+struct pci_parport_data {
+	int num;
+	struct parport *ports[2];
+};
 
 static int parport_pc_pci_probe (struct pci_dev *dev,
 					   const struct pci_device_id *id)
 {
 	int err, count, n, i = id->driver_data;
+	struct pci_parport_data *data;
 
 	if (i < last_sio)
 		/* This is an onboard Super-IO and has already been probed */
@@ -2922,9 +2934,15 @@ static int parport_pc_pci_probe (struct pci_dev *dev,
 	if ((err = pci_enable_device (dev)) != 0)
 		return err;
 
+	data = kmalloc(sizeof(struct pci_parport_data), GFP_KERNEL);
+	if (!data)
+		return -ENOMEM;
+
 	if (cards[i].preinit_hook &&
-	    cards[i].preinit_hook (dev, PARPORT_IRQ_NONE, PARPORT_DMA_NONE))
+	    cards[i].preinit_hook (dev, PARPORT_IRQ_NONE, PARPORT_DMA_NONE)) {
+		kfree(data);
 		return -ENODEV;
+	}
 
 	for (n = 0; n < cards[i].numports; n++) {
 		int lo = cards[i].addr[n].lo;
@@ -2943,21 +2961,48 @@ static int parport_pc_pci_probe (struct pci_dev *dev,
 			"I/O at %#lx(%#lx)\n",
 			parport_pc_pci_tbl[i + last_sio].vendor,
 			parport_pc_pci_tbl[i + last_sio].device, io_lo, io_hi);
-		if (parport_pc_probe_port (io_lo, io_hi, PARPORT_IRQ_NONE,
-					   PARPORT_DMA_NONE, dev))
+		data->ports[count] =
+			parport_pc_probe_port (io_lo, io_hi, PARPORT_IRQ_NONE,
+					       PARPORT_DMA_NONE, dev);
+		if (data->ports[count])
 			count++;
 	}
+
+	data->num = count;
 
 	if (cards[i].postinit_hook)
 		cards[i].postinit_hook (dev, count == 0);
 
-	return count == 0 ? -ENODEV : 0;
+	if (count) {
+		pci_set_drvdata(dev, data);
+		return 0;
+	}
+
+	kfree(data);
+
+	return -ENODEV;
+}
+
+static void __devexit parport_pc_pci_remove(struct pci_dev *dev)
+{
+	struct pci_parport_data *data = pci_get_drvdata(dev);
+	int i;
+
+	pci_set_drvdata(dev, NULL);
+
+	if (data) {
+		for (i = data->num - 1; i >= 0; i--)
+			parport_pc_unregister_port(data->ports[i]);
+
+		kfree(data);
+	}
 }
 
 static struct pci_driver parport_pc_pci_driver = {
 	.name		= "parport_pc",
 	.id_table	= parport_pc_pci_tbl,
 	.probe		= parport_pc_pci_probe,
+	.remove		= __devexit_p(parport_pc_pci_remove),
 };
 
 static int __init parport_pc_init_superio (int autoirq, int autodma)

@@ -376,6 +376,20 @@ acpi_rs_get_list_length (
 			break;
 
 
+		case ACPI_RDESC_TYPE_EXTENDED_ADDRESS_SPACE:
+			/*
+			 * 64-Bit Address Resource
+			 */
+			buffer = byte_stream_buffer;
+
+			++buffer;
+			ACPI_MOVE_16_TO_16 (&temp16, buffer);
+
+			bytes_consumed = temp16 + 3;
+			structure_size = ACPI_SIZEOF_RESOURCE (struct acpi_resource_address64);
+			break;
+
+
 		case ACPI_RDESC_TYPE_QWORD_ADDRESS_SPACE:
 			/*
 			 * 64-Bit Address Resource

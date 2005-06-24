@@ -1,12 +1,13 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.9-rc2
-# Thu Sep 16 15:42:43 2004
+# Linux kernel version: 2.6.12-rc1-bk2
+# Mon Mar 28 00:10:36 2005
 #
 CONFIG_ARM=y
 CONFIG_MMU=y
 CONFIG_UID16=y
 CONFIG_RWSEM_GENERIC_SPINLOCK=y
+CONFIG_GENERIC_CALIBRATE_DELAY=y
 CONFIG_GENERIC_IOMAP=y
 
 #
@@ -15,6 +16,7 @@ CONFIG_GENERIC_IOMAP=y
 CONFIG_EXPERIMENTAL=y
 CONFIG_CLEAN_COMPILE=y
 CONFIG_BROKEN_ON_SMP=y
+CONFIG_LOCK_KERNEL=y
 
 #
 # General setup
@@ -26,22 +28,24 @@ CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
 # CONFIG_AUDIT is not set
-CONFIG_LOG_BUF_SHIFT=14
 CONFIG_HOTPLUG=y
+CONFIG_KOBJECT_UEVENT=y
 # CONFIG_IKCONFIG is not set
 CONFIG_EMBEDDED=y
 CONFIG_KALLSYMS=y
 CONFIG_KALLSYMS_ALL=y
 CONFIG_KALLSYMS_EXTRA_PASS=y
+CONFIG_BASE_FULL=y
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
-CONFIG_IOSCHED_NOOP=y
-CONFIG_IOSCHED_AS=y
-CONFIG_IOSCHED_DEADLINE=y
-CONFIG_IOSCHED_CFQ=y
 CONFIG_CC_OPTIMIZE_FOR_SIZE=y
 CONFIG_SHMEM=y
+CONFIG_CC_ALIGN_FUNCTIONS=0
+CONFIG_CC_ALIGN_LABELS=0
+CONFIG_CC_ALIGN_LOOPS=0
+CONFIG_CC_ALIGN_JUMPS=0
 # CONFIG_TINY_SHMEM is not set
+CONFIG_BASE_SMALL=0
 
 #
 # Loadable module support
@@ -50,6 +54,7 @@ CONFIG_MODULES=y
 # CONFIG_MODULE_UNLOAD is not set
 CONFIG_OBSOLETE_MODPARM=y
 # CONFIG_MODVERSIONS is not set
+# CONFIG_MODULE_SRCVERSION_ALL is not set
 CONFIG_KMOD=y
 
 #
@@ -73,46 +78,27 @@ CONFIG_ARCH_SA1100=y
 # CONFIG_ARCH_SHARK is not set
 # CONFIG_ARCH_LH7A40X is not set
 # CONFIG_ARCH_OMAP is not set
-# CONFIG_ARCH_VERSATILE_PB is not set
+# CONFIG_ARCH_VERSATILE is not set
 # CONFIG_ARCH_IMX is not set
+# CONFIG_ARCH_H720X is not set
 
 #
 # SA11x0 Implementations
 #
 # CONFIG_SA1100_ASSABET is not set
-# CONFIG_SA1100_ADSBITSY is not set
-# CONFIG_SA1100_BRUTUS is not set
 # CONFIG_SA1100_CERF is not set
 # CONFIG_SA1100_COLLIE is not set
 # CONFIG_SA1100_H3100 is not set
 # CONFIG_SA1100_H3600 is not set
 # CONFIG_SA1100_H3800 is not set
-# CONFIG_SA1100_EXTENEX1 is not set
-# CONFIG_SA1100_FLEXANET is not set
-# CONFIG_SA1100_FREEBIRD is not set
-# CONFIG_SA1100_GRAPHICSCLIENT is not set
-# CONFIG_SA1100_GRAPHICSMASTER is not set
 # CONFIG_SA1100_BADGE4 is not set
 # CONFIG_SA1100_JORNADA720 is not set
 # CONFIG_SA1100_HACKKIT is not set
-# CONFIG_SA1100_HUW_WEBPANEL is not set
-# CONFIG_SA1100_ITSY is not set
 # CONFIG_SA1100_LART is not set
-# CONFIG_SA1100_NANOENGINE is not set
-# CONFIG_SA1100_OMNIMETER is not set
-# CONFIG_SA1100_PANGOLIN is not set
 # CONFIG_SA1100_PLEB is not set
-# CONFIG_SA1100_PT_SYSTEM3 is not set
 # CONFIG_SA1100_SHANNON is not set
-# CONFIG_SA1100_SHERMAN is not set
 CONFIG_SA1100_SIMPAD=y
-# CONFIG_SA1100_PFS168 is not set
-# CONFIG_SA1100_VICTOR is not set
-# CONFIG_SA1100_XP860 is not set
-# CONFIG_SA1100_YOPY is not set
-# CONFIG_SA1100_STORK is not set
 # CONFIG_SA1100_SSP is not set
-# CONFIG_SA1100_USB is not set
 
 #
 # Processor Type
@@ -122,6 +108,7 @@ CONFIG_CPU_SA1100=y
 CONFIG_CPU_32v4=y
 CONFIG_CPU_ABRT_EV4=y
 CONFIG_CPU_CACHE_V4WB=y
+CONFIG_CPU_CACHE_VIVT=y
 CONFIG_CPU_TLB_V4WB=y
 CONFIG_CPU_MINICACHE=y
 
@@ -130,33 +117,75 @@ CONFIG_CPU_MINICACHE=y
 #
 
 #
-# General setup
+# Bus support
 #
-CONFIG_DISCONTIGMEM=y
 CONFIG_ISA=y
-# CONFIG_ZBOOT_ROM is not set
-CONFIG_ZBOOT_ROM_TEXT=0x0
-CONFIG_ZBOOT_ROM_BSS=0x0
-# CONFIG_CPU_FREQ is not set
 
 #
-# PCMCIA/CardBus support
+# PCCARD (PCMCIA/CardBus) support
 #
-CONFIG_PCMCIA=y
+CONFIG_PCCARD=y
 # CONFIG_PCMCIA_DEBUG is not set
+CONFIG_PCMCIA=y
+
+#
+# PC-card bridges
+#
 # CONFIG_I82365 is not set
 # CONFIG_TCIC is not set
 CONFIG_PCMCIA_SA1100=y
 
 #
-# At least one math emulation must be selected
+# Kernel Features
+#
+CONFIG_PREEMPT=y
+CONFIG_DISCONTIGMEM=y
+CONFIG_LEDS=y
+CONFIG_LEDS_TIMER=y
+# CONFIG_LEDS_CPU is not set
+CONFIG_ALIGNMENT_TRAP=y
+
+#
+# Boot options
+#
+CONFIG_ZBOOT_ROM_TEXT=0x0
+CONFIG_ZBOOT_ROM_BSS=0x0
+CONFIG_CMDLINE="mtdparts=sa1100:512k(boot),1m(kernel),-(root) console=ttySA0 root=1f02 noinitrd mem=64M jffs2_orphaned_inodes=delete rootfstype=jffs2"
+# CONFIG_XIP_KERNEL is not set
+
+#
+# CPU Frequency scaling
+#
+# CONFIG_CPU_FREQ is not set
+
+#
+# Floating point emulation
+#
+
+#
+# At least one emulation must be selected
 #
 CONFIG_FPE_NWFPE=y
 # CONFIG_FPE_NWFPE_XP is not set
 # CONFIG_FPE_FASTFPE is not set
+
+#
+# Userspace binary formats
+#
 CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_AOUT is not set
 CONFIG_BINFMT_MISC=m
+# CONFIG_ARTHUR is not set
+
+#
+# Power management options
+#
+CONFIG_PM=y
+CONFIG_APM=y
+
+#
+# Device Drivers
+#
 
 #
 # Generic Driver Options
@@ -165,28 +194,14 @@ CONFIG_STANDALONE=y
 CONFIG_PREVENT_FIRMWARE_BUILD=y
 CONFIG_FW_LOADER=m
 # CONFIG_DEBUG_DRIVER is not set
-CONFIG_PM=y
-CONFIG_PREEMPT=y
-CONFIG_APM=y
-# CONFIG_ARTHUR is not set
-CONFIG_CMDLINE="mtdparts=sa1100:512k(boot),1m(kernel),-(root) console=ttySA0 root=1f02 noinitrd mem=64M jffs2_orphaned_inodes=delete rootfstype=jffs2"
-CONFIG_LEDS=y
-CONFIG_LEDS_TIMER=y
-# CONFIG_LEDS_CPU is not set
-CONFIG_ALIGNMENT_TRAP=y
-
-#
-# Parallel port support
-#
-# CONFIG_PARPORT is not set
 
 #
 # Memory Technology Devices (MTD)
 #
 CONFIG_MTD=y
 # CONFIG_MTD_DEBUG is not set
-CONFIG_MTD_PARTITIONS=y
 CONFIG_MTD_CONCAT=y
+CONFIG_MTD_PARTITIONS=y
 # CONFIG_MTD_REDBOOT_PARTS is not set
 CONFIG_MTD_CMDLINE_PARTS=y
 # CONFIG_MTD_AFS_PARTS is not set
@@ -228,6 +243,7 @@ CONFIG_MTD_CFI_UTIL=y
 CONFIG_MTD_RAM=y
 # CONFIG_MTD_ROM is not set
 # CONFIG_MTD_ABSENT is not set
+# CONFIG_MTD_XIP is not set
 
 #
 # Mapping drivers for chip access
@@ -246,6 +262,7 @@ CONFIG_MTD_SA1100=y
 # CONFIG_MTD_PHRAM is not set
 # CONFIG_MTD_MTDRAM is not set
 # CONFIG_MTD_BLKMTD is not set
+# CONFIG_MTD_BLOCK2MTD is not set
 
 #
 # Disk-On-Chip Device Drivers
@@ -260,6 +277,11 @@ CONFIG_MTD_SA1100=y
 # CONFIG_MTD_NAND is not set
 
 #
+# Parallel port support
+#
+# CONFIG_PARPORT is not set
+
+#
 # Plug and Play support
 #
 # CONFIG_PNP is not set
@@ -269,16 +291,51 @@ CONFIG_MTD_SA1100=y
 #
 # CONFIG_BLK_DEV_FD is not set
 # CONFIG_BLK_DEV_XD is not set
+# CONFIG_BLK_DEV_COW_COMMON is not set
 CONFIG_BLK_DEV_LOOP=m
 # CONFIG_BLK_DEV_CRYPTOLOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
 CONFIG_BLK_DEV_RAM=m
+CONFIG_BLK_DEV_RAM_COUNT=16
 CONFIG_BLK_DEV_RAM_SIZE=8192
+CONFIG_INITRAMFS_SOURCE=""
+# CONFIG_CDROM_PKTCDVD is not set
+
+#
+# IO Schedulers
+#
+CONFIG_IOSCHED_NOOP=y
+CONFIG_IOSCHED_AS=y
+CONFIG_IOSCHED_DEADLINE=y
+CONFIG_IOSCHED_CFQ=y
+# CONFIG_ATA_OVER_ETH is not set
+
+#
+# ATA/ATAPI/MFM/RLL support
+#
+# CONFIG_IDE is not set
+
+#
+# SCSI device support
+#
+# CONFIG_SCSI is not set
 
 #
 # Multi-device support (RAID and LVM)
 #
 # CONFIG_MD is not set
+
+#
+# Fusion MPT device support
+#
+
+#
+# IEEE 1394 (FireWire) support
+#
+
+#
+# I2O device support
+#
 
 #
 # Networking support
@@ -308,6 +365,8 @@ CONFIG_IP_PNP_BOOTP=y
 # CONFIG_INET_ESP is not set
 # CONFIG_INET_IPCOMP is not set
 # CONFIG_INET_TUNNEL is not set
+# CONFIG_IP_TCPDIAG is not set
+# CONFIG_IP_TCPDIAG_IPV6 is not set
 # CONFIG_IPV6 is not set
 # CONFIG_NETFILTER is not set
 
@@ -327,7 +386,6 @@ CONFIG_IP_PNP_BOOTP=y
 # CONFIG_NET_DIVERT is not set
 # CONFIG_ECONET is not set
 # CONFIG_WAN_ROUTER is not set
-# CONFIG_NET_HW_FLOWCONTROL is not set
 
 #
 # QoS and/or fair queueing
@@ -405,10 +463,10 @@ CONFIG_BT_BNEP_PROTO_FILTER=y
 # Bluetooth device drivers
 #
 # CONFIG_BT_HCIUART is not set
-CONFIG_BT_HCIDTL1=m
-CONFIG_BT_HCIBT3C=m
-CONFIG_BT_HCIBLUECARD=m
-CONFIG_BT_HCIBTUART=m
+# CONFIG_BT_HCIDTL1 is not set
+# CONFIG_BT_HCIBT3C is not set
+# CONFIG_BT_HCIBLUECARD is not set
+# CONFIG_BT_HCIBTUART is not set
 # CONFIG_BT_HCIVHCI is not set
 CONFIG_NETDEVICES=y
 CONFIG_DUMMY=y
@@ -482,7 +540,7 @@ CONFIG_PCMCIA_WAVELAN=m
 #
 # Wireless 802.11b Pcmcia/Cardbus cards support
 #
-CONFIG_AIRO_CS=m
+# CONFIG_AIRO_CS is not set
 # CONFIG_PCMCIA_WL3501 is not set
 CONFIG_NET_WIRELESS=y
 
@@ -516,28 +574,6 @@ CONFIG_PPPOE=m
 # CONFIG_NETCONSOLE is not set
 
 #
-# ATA/ATAPI/MFM/RLL support
-#
-# CONFIG_IDE is not set
-
-#
-# SCSI device support
-#
-# CONFIG_SCSI is not set
-
-#
-# Fusion MPT device support
-#
-
-#
-# IEEE 1394 (FireWire) support
-#
-
-#
-# I2O device support
-#
-
-#
 # ISDN subsystem
 #
 # CONFIG_ISDN is not set
@@ -562,15 +598,6 @@ CONFIG_INPUT_EVDEV=m
 CONFIG_INPUT_EVBUG=y
 
 #
-# Input I/O drivers
-#
-# CONFIG_GAMEPORT is not set
-CONFIG_SOUND_GAMEPORT=y
-CONFIG_SERIO=m
-CONFIG_SERIO_SERPORT=m
-CONFIG_SERIO_CT82C710=m
-
-#
 # Input Device Drivers
 #
 # CONFIG_INPUT_KEYBOARD is not set
@@ -578,6 +605,16 @@ CONFIG_SERIO_CT82C710=m
 # CONFIG_INPUT_JOYSTICK is not set
 # CONFIG_INPUT_TOUCHSCREEN is not set
 # CONFIG_INPUT_MISC is not set
+
+#
+# Hardware I/O ports
+#
+CONFIG_SERIO=m
+CONFIG_SERIO_SERPORT=m
+# CONFIG_SERIO_LIBPS2 is not set
+# CONFIG_SERIO_RAW is not set
+# CONFIG_GAMEPORT is not set
+CONFIG_SOUND_GAMEPORT=y
 
 #
 # Character devices
@@ -629,9 +666,18 @@ CONFIG_LEGACY_PTY_COUNT=256
 # CONFIG_RAW_DRIVER is not set
 
 #
+# TPM devices
+#
+# CONFIG_TCG_TPM is not set
+
+#
 # I2C support
 #
 # CONFIG_I2C is not set
+
+#
+# Misc devices
+#
 
 #
 # Multimedia devices
@@ -642,6 +688,71 @@ CONFIG_LEGACY_PTY_COUNT=256
 # Digital Video Broadcasting Devices
 #
 # CONFIG_DVB is not set
+
+#
+# Graphics support
+#
+CONFIG_FB=y
+# CONFIG_FB_CFB_FILLRECT is not set
+# CONFIG_FB_CFB_COPYAREA is not set
+# CONFIG_FB_CFB_IMAGEBLIT is not set
+# CONFIG_FB_SOFT_CURSOR is not set
+# CONFIG_FB_MODE_HELPERS is not set
+# CONFIG_FB_TILEBLITTING is not set
+# CONFIG_FB_SA1100 is not set
+# CONFIG_FB_VIRTUAL is not set
+
+#
+# Console display driver support
+#
+# CONFIG_VGA_CONSOLE is not set
+# CONFIG_MDA_CONSOLE is not set
+CONFIG_DUMMY_CONSOLE=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
+# CONFIG_FONTS is not set
+CONFIG_FONT_8x8=y
+CONFIG_FONT_8x16=y
+
+#
+# Logo configuration
+#
+CONFIG_LOGO=y
+CONFIG_LOGO_LINUX_MONO=y
+CONFIG_LOGO_LINUX_VGA16=y
+CONFIG_LOGO_LINUX_CLUT224=y
+# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
+
+#
+# Sound
+#
+CONFIG_SOUND=y
+
+#
+# Advanced Linux Sound Architecture
+#
+# CONFIG_SND is not set
+
+#
+# Open Sound System
+#
+# CONFIG_SOUND_PRIME is not set
+
+#
+# USB support
+#
+CONFIG_USB_ARCH_HAS_HCD=y
+# CONFIG_USB_ARCH_HAS_OHCI is not set
+# CONFIG_USB is not set
+
+#
+# USB Gadget Support
+#
+# CONFIG_USB_GADGET is not set
+
+#
+# MMC/SD Card support
+#
+# CONFIG_MMC is not set
 
 #
 # File systems
@@ -660,10 +771,15 @@ CONFIG_REISERFS_FS=m
 CONFIG_REISERFS_PROC_INFO=y
 # CONFIG_REISERFS_FS_XATTR is not set
 # CONFIG_JFS_FS is not set
+
+#
+# XFS support
+#
 # CONFIG_XFS_FS is not set
 # CONFIG_MINIX_FS is not set
 # CONFIG_ROMFS_FS is not set
 # CONFIG_QUOTA is not set
+CONFIG_DNOTIFY=y
 # CONFIG_AUTOFS_FS is not set
 # CONFIG_AUTOFS4_FS is not set
 
@@ -712,6 +828,7 @@ CONFIG_JFFS_FS_VERBOSE=0
 CONFIG_JFFS2_FS=y
 CONFIG_JFFS2_FS_DEBUG=0
 # CONFIG_JFFS2_FS_NAND is not set
+# CONFIG_JFFS2_FS_NOR_ECC is not set
 # CONFIG_JFFS2_COMPRESSION_OPTIONS is not set
 CONFIG_JFFS2_ZLIB=y
 CONFIG_JFFS2_RTIME=y
@@ -734,7 +851,6 @@ CONFIG_NFS_V3=y
 # CONFIG_ROOT_NFS is not set
 CONFIG_LOCKD=y
 CONFIG_LOCKD_V4=y
-# CONFIG_EXPORTFS is not set
 CONFIG_SUNRPC=y
 # CONFIG_RPCSEC_GSS_KRB5 is not set
 # CONFIG_RPCSEC_GSS_SPKM3 is not set
@@ -749,6 +865,7 @@ CONFIG_SMB_FS=m
 # Partition Types
 #
 # CONFIG_PARTITION_ADVANCED is not set
+CONFIG_MSDOS_PARTITION=y
 
 #
 # Native Language Support
@@ -800,75 +917,21 @@ CONFIG_NLS_ISO8859_15=y
 # CONFIG_PROFILING is not set
 
 #
-# Graphics support
-#
-CONFIG_FB=y
-# CONFIG_FB_MODE_HELPERS is not set
-# CONFIG_FB_SA1100 is not set
-CONFIG_FB_MQ200=y
-# CONFIG_FB_VIRTUAL is not set
-
-#
-# Console display driver support
-#
-# CONFIG_VGA_CONSOLE is not set
-# CONFIG_MDA_CONSOLE is not set
-CONFIG_DUMMY_CONSOLE=y
-CONFIG_FRAMEBUFFER_CONSOLE=y
-# CONFIG_FONTS is not set
-CONFIG_FONT_8x8=y
-CONFIG_FONT_8x16=y
-
-#
-# Logo configuration
-#
-CONFIG_LOGO=y
-CONFIG_LOGO_LINUX_MONO=y
-CONFIG_LOGO_LINUX_VGA16=y
-CONFIG_LOGO_LINUX_CLUT224=y
-
-#
-# Sound
-#
-CONFIG_SOUND=y
-
-#
-# Advanced Linux Sound Architecture
-#
-# CONFIG_SND is not set
-
-#
-# Open Sound System
-#
-# CONFIG_SOUND_PRIME is not set
-
-#
-# Misc devices
-#
-
-#
-# USB support
-#
-
-#
-# USB Gadget Support
-#
-# CONFIG_USB_GADGET is not set
-
-#
-# MMC/SD Card support
-#
-# CONFIG_MMC is not set
-
-#
 # Kernel hacking
 #
+# CONFIG_PRINTK_TIME is not set
 CONFIG_DEBUG_KERNEL=y
 # CONFIG_MAGIC_SYSRQ is not set
+CONFIG_LOG_BUF_SHIFT=14
+# CONFIG_SCHEDSTATS is not set
 # CONFIG_DEBUG_SLAB is not set
+CONFIG_DEBUG_PREEMPT=y
 # CONFIG_DEBUG_SPINLOCK is not set
+# CONFIG_DEBUG_SPINLOCK_SLEEP is not set
+# CONFIG_DEBUG_KOBJECT is not set
 CONFIG_DEBUG_BUGVERBOSE=y
 # CONFIG_DEBUG_INFO is not set
+# CONFIG_DEBUG_FS is not set
 CONFIG_FRAME_POINTER=y
 CONFIG_DEBUG_USER=y
 # CONFIG_DEBUG_WAITQ is not set
@@ -879,12 +942,17 @@ CONFIG_DEBUG_LL=y
 #
 # Security options
 #
+# CONFIG_KEYS is not set
 # CONFIG_SECURITY is not set
 
 #
 # Cryptographic options
 #
 # CONFIG_CRYPTO is not set
+
+#
+# Hardware crypto devices
+#
 
 #
 # Library routines

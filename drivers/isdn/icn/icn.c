@@ -908,14 +908,13 @@ icn_loadproto(u_char __user * buffer, icn_card * card)
 	uint left = ICN_CODE_STAGE2;
 	uint cnt;
 	int timer;
-	int ret;
 	unsigned long flags;
 
 #ifdef BOOT_DEBUG
 	printk(KERN_DEBUG "icn_loadproto called\n");
 #endif
-	if ((ret = verify_area(VERIFY_READ, buffer, ICN_CODE_STAGE2)))
-		return ret;
+	if (!access_ok(VERIFY_READ, buffer, ICN_CODE_STAGE2))
+		return -EFAULT;
 	timer = 0;
 	spin_lock_irqsave(&dev.devlock, flags);
 	if (card->secondhalf) {

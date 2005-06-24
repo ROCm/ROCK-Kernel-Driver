@@ -26,7 +26,6 @@
 #include <asm/arch/mux.h>
 #include <asm/arch/usb.h>
 #include <asm/arch/board.h>
-#include <asm/arch/serial.h>
 
 #include "common.h"
 

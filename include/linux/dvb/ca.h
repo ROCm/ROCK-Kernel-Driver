@@ -1,9 +1,9 @@
-/* 
+/*
  * ca.h
  *
  * Copyright (C) 2000 Ralph  Metzler <ralph@convergence.de>
  *                  & Marcus Metzler <marcus@convergence.de>
-                      for convergence integrated media GmbH
+ *                    for convergence integrated media GmbH
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Lesser Public License
@@ -88,4 +88,3 @@ typedef struct ca_pid {
 #define CA_SET_PID        _IOW('o', 135, ca_pid_t)
 
 #endif
-

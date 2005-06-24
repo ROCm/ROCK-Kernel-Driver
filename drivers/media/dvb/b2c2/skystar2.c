@@ -5,14 +5,14 @@
  * Copyright (C) 2003  Vadim Catana, skystar@moldova.cc
  *
  * FIX: DISEQC Tone Burst in flexcop_diseqc_ioctl()
- * FIX: FULL soft DiSEqC for skystar2 (FlexCopII rev 130) VP310 equipped 
+ * FIX: FULL soft DiSEqC for skystar2 (FlexCopII rev 130) VP310 equipped
  *     Vincenzo Di Massa, hawk.it at tiscalinet.it
- * 	
+ *
  * Converted to Linux coding style
  * Misc reorganization, polishing, restyling
- *     Roberto Ragusa, r.ragusa at libero.it
- *       
- * Added hardware filtering support, 
+ *     Roberto Ragusa, skystar2-c5b8 at robertoragusa dot it
+ *
+ * Added hardware filtering support,
  *     Niklas Peinecke, peinecke at gdv.uni-hannover.de
  *
  *
@@ -97,7 +97,7 @@ struct adapter {
 	u8 mac_addr[8];
 	u32 dw_sram_type;
 
-	struct dvb_adapter *dvb_adapter;
+	struct dvb_adapter dvb_adapter;
 	struct dvb_demux demux;
 	struct dmxdev dmxdev;
 	struct dmx_frontend hw_frontend;
@@ -231,8 +231,8 @@ static void fixchipaddr(u32 device, u32 bus, u32 addr, u32 *ret)
 {
 	if (device == 0x20000000)
 		*ret = bus | ((addr >> 8) & 3);
-
-	*ret = bus;
+	else
+		*ret = bus;
 }
 
 static u32 flex_i2c_read(struct adapter *adapter, u32 device, u32 bus, u32 addr, u8 *buf, u32 len)
@@ -1968,7 +1968,7 @@ static int driver_initialize(struct pci_dev *pdev)
 		ctrl_enable_mac(adapter, 1);
 	}
 
-	adapter->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&adapter->lock);
 
 out:
 	return ret;
@@ -1996,10 +1996,6 @@ static void driver_halt(struct pci_dev *pdev)
 	free_adapter_object(adapter);
 
 	pci_set_drvdata(pdev, NULL);
-
-	pci_disable_device(pdev);
-	pci_release_region(pdev, 1);
-	pci_release_region(pdev, 0);
 }
 
 static int dvb_start_feed(struct dvb_demux_feed *dvbdmxfeed)
@@ -2356,7 +2352,7 @@ static int samsung_tdtc9251dh0_demod_init(struct dvb_frontend* fe)
 	return 0;
 }
 
-int samsung_tdtc9251dh0_pll_set(struct dvb_frontend* fe, struct dvb_frontend_parameters* params, u8* pllbuf)
+static int samsung_tdtc9251dh0_pll_set(struct dvb_frontend* fe, struct dvb_frontend_parameters* params, u8* pllbuf)
 {
 	u32 div;
 	unsigned char bs = 0;
@@ -2465,7 +2461,7 @@ static void frontend_init(struct adapter *skystar2)
 		       skystar2->pdev->subsystem_vendor,
 		       skystar2->pdev->subsystem_device);
 	} else {
-		if (dvb_register_frontend(skystar2->dvb_adapter, skystar2->fe)) {
+		if (dvb_register_frontend(&skystar2->dvb_adapter, skystar2->fe)) {
 			printk("skystar2: Frontend registration failed!\n");
 			if (skystar2->fe->ops->release)
 				skystar2->fe->ops->release(skystar2->fe);
@@ -2490,17 +2486,17 @@ static int skystar2_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (ret < 0)
 		goto out;
 
-	ret = dvb_register_adapter(&dvb_adapter, skystar2_pci_driver.name,
+	adapter = pci_get_drvdata(pdev);
+	dvb_adapter = &adapter->dvb_adapter;
+
+	ret = dvb_register_adapter(dvb_adapter, skystar2_pci_driver.name,
 				   THIS_MODULE);
 	if (ret < 0) {
 		printk("%s: Error registering DVB adapter\n", __FUNCTION__);
 		goto err_halt;
 	}
 
-	adapter = pci_get_drvdata(pdev);
-
 	dvb_adapter->priv = adapter;
-	adapter->dvb_adapter = dvb_adapter;
 
 
 	init_MUTEX(&adapter->i2c_sem);
@@ -2545,7 +2541,7 @@ static int skystar2_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	adapter->dmxdev.demux = dmx;
 	adapter->dmxdev.capabilities = 0;
 
-	ret = dvb_dmxdev_init(&adapter->dmxdev, adapter->dvb_adapter);
+	ret = dvb_dmxdev_init(&adapter->dmxdev, &adapter->dvb_adapter);
 	if (ret < 0)
 		goto err_dmx_release;
 
@@ -2563,7 +2559,7 @@ static int skystar2_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (ret < 0)
 		goto err_remove_mem_frontend;
 
-	dvb_net_init(adapter->dvb_adapter, &adapter->dvbnet, &dvbdemux->dmx);
+	dvb_net_init(&adapter->dvb_adapter, &adapter->dvbnet, &dvbdemux->dmx);
 
 	frontend_init(adapter);
 out:
@@ -2580,7 +2576,7 @@ err_dmx_release:
 err_i2c_del:
 	i2c_del_adapter(&adapter->i2c_adap);
 err_dvb_unregister:
-	dvb_unregister_adapter(adapter->dvb_adapter);
+	dvb_unregister_adapter(&adapter->dvb_adapter);
 err_halt:
 	driver_halt(pdev);
 	goto out;
@@ -2609,7 +2605,7 @@ static void skystar2_remove(struct pci_dev *pdev)
 	if (adapter->fe != NULL)
 		dvb_unregister_frontend(adapter->fe);
 
-	dvb_unregister_adapter(adapter->dvb_adapter);
+	dvb_unregister_adapter(&adapter->dvb_adapter);
 
 			i2c_del_adapter(&adapter->i2c_adap);
 
@@ -2633,7 +2629,7 @@ static struct pci_driver skystar2_pci_driver = {
 
 static int skystar2_init(void)
 {
-	return pci_module_init(&skystar2_pci_driver);
+	return pci_register_driver(&skystar2_pci_driver);
 }
 
 static void skystar2_cleanup(void)

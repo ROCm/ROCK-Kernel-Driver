@@ -14,64 +14,64 @@ MODULE_PARM_DESC(max_memory, "maximum memory usage for capture buffers (default:
 /* format descriptions for capture and preview */
 static struct saa7146_format formats[] = {
 	{
-		.name 		= "RGB-8 (3-3-2)",
+		.name		= "RGB-8 (3-3-2)",
 		.pixelformat	= V4L2_PIX_FMT_RGB332,
-		.trans 		= RGB08_COMPOSED,
+		.trans		= RGB08_COMPOSED,
 		.depth		= 8,
 		.flags		= 0,
 	}, {
-		.name 		= "RGB-16 (5/B-6/G-5/R)",
+		.name		= "RGB-16 (5/B-6/G-5/R)",
 		.pixelformat	= V4L2_PIX_FMT_RGB565,
-		.trans 		= RGB16_COMPOSED,
+		.trans		= RGB16_COMPOSED,
 		.depth		= 16,
 		.flags		= 0,
 	}, {
-		.name 		= "RGB-24 (B-G-R)",
+		.name		= "RGB-24 (B-G-R)",
 		.pixelformat	= V4L2_PIX_FMT_BGR24,
-		.trans 		= RGB24_COMPOSED,
+		.trans		= RGB24_COMPOSED,
 		.depth		= 24,
 		.flags		= 0,
 	}, {
-		.name 		= "RGB-32 (B-G-R)",
+		.name		= "RGB-32 (B-G-R)",
 		.pixelformat	= V4L2_PIX_FMT_BGR32,
-		.trans 		= RGB32_COMPOSED,
+		.trans		= RGB32_COMPOSED,
 		.depth		= 32,
 		.flags		= 0,
 	}, {
-		.name 		= "RGB-32 (R-G-B)",
+		.name		= "RGB-32 (R-G-B)",
 		.pixelformat	= V4L2_PIX_FMT_RGB32,
-		.trans 		= RGB32_COMPOSED,
+		.trans		= RGB32_COMPOSED,
 		.depth		= 32,
 		.flags		= 0,
 		.swap		= 0x2,
 	}, {
-		.name 		= "Greyscale-8",
+		.name		= "Greyscale-8",
 		.pixelformat	= V4L2_PIX_FMT_GREY,
-		.trans 		= Y8,
+		.trans		= Y8,
 		.depth		= 8,
 		.flags		= 0,
 	}, {
-		.name 		= "YUV 4:2:2 planar (Y-Cb-Cr)",
+		.name		= "YUV 4:2:2 planar (Y-Cb-Cr)",
 		.pixelformat	= V4L2_PIX_FMT_YUV422P,
-		.trans 		= YUV422_DECOMPOSED,
+		.trans		= YUV422_DECOMPOSED,
 		.depth		= 16,
 		.flags		= FORMAT_BYTE_SWAP|FORMAT_IS_PLANAR,
 	}, {
-		.name 		= "YVU 4:2:0 planar (Y-Cb-Cr)",
+		.name		= "YVU 4:2:0 planar (Y-Cb-Cr)",
 		.pixelformat	= V4L2_PIX_FMT_YVU420,
-		.trans 		= YUV420_DECOMPOSED,
+		.trans		= YUV420_DECOMPOSED,
 		.depth		= 12,
 		.flags		= FORMAT_BYTE_SWAP|FORMAT_IS_PLANAR,
 	}, {
-		.name 		= "YUV 4:2:0 planar (Y-Cb-Cr)",
+		.name		= "YUV 4:2:0 planar (Y-Cb-Cr)",
 		.pixelformat	= V4L2_PIX_FMT_YUV420,
-		.trans 		= YUV420_DECOMPOSED,
+		.trans		= YUV420_DECOMPOSED,
 		.depth		= 12,
 		.flags		= FORMAT_IS_PLANAR,
 	}, {
-		.name 		= "YUV 4:2:2 (U-Y-V-Y)",
+		.name		= "YUV 4:2:2 (U-Y-V-Y)",
 		.pixelformat	= V4L2_PIX_FMT_UYVY,
-		.trans 		= YUV422_COMPOSED,
+		.trans		= YUV422_COMPOSED,
 		.depth		= 16,
 		.flags		= 0,
 	}
@@ -80,19 +80,19 @@ static struct saa7146_format formats[] = {
 /* unfortunately, the saa7146 contains a bug which prevents it from doing on-the-fly byte swaps.
    due to this, it's impossible to provide additional *packed* formats, which are simply byte swapped
    (like V4L2_PIX_FMT_YUYV) ... 8-( */
-   
+
 static int NUM_FORMATS = sizeof(formats)/sizeof(struct saa7146_format);
 
 struct saa7146_format* format_by_fourcc(struct saa7146_dev *dev, int fourcc)
 {
 	int i, j = NUM_FORMATS;
-	
+
 	for (i = 0; i < j; i++) {
 		if (formats[i].pixelformat == fourcc) {
 			return formats+i;
 		}
 	}
-	
+
 	DEB_D(("unknown pixelformat:'%4.4s'\n",(char *)&fourcc));
 	return NULL;
 }
@@ -182,7 +182,7 @@ static int try_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
 	int err;
-	
+
 	switch (f->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
 	{
@@ -201,7 +201,7 @@ static int try_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 		field = f->fmt.pix.field;
 		maxw  = vv->standard->h_max_out;
 		maxh  = vv->standard->v_max_out;
-		
+
 		if (V4L2_FIELD_ANY == field) {
 			field = (f->fmt.pix.height > maxh/2)
 				? V4L2_FIELD_INTERLACED
@@ -237,10 +237,10 @@ static int try_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 
 		if (f->fmt.pix.bytesperline < calc_bpl)
 			f->fmt.pix.bytesperline = calc_bpl;
-			
+
 		if (f->fmt.pix.bytesperline > (2*PAGE_SIZE * fmt->depth)/8) /* arbitrary constraint */
 			f->fmt.pix.bytesperline = calc_bpl;
-			
+
 		f->fmt.pix.sizeimage = f->fmt.pix.bytesperline * f->fmt.pix.height;
 		DEB_D(("w:%d, h:%d, bytesperline:%d, sizeimage:%d\n",f->fmt.pix.width,f->fmt.pix.height,f->fmt.pix.bytesperline,f->fmt.pix.sizeimage));
 
@@ -277,36 +277,36 @@ int saa7146_start_preview(struct saa7146_fh *fh)
 	if (IS_CAPTURE_ACTIVE(fh) != 0) {
 		DEB_D(("streaming capture is active.\n"));
 		return -EBUSY;
-		}
+	}
 
 	/* check if overlay is running */
-	if (IS_OVERLAY_ACTIVE(fh) != 0) {		
+	if (IS_OVERLAY_ACTIVE(fh) != 0) {
 		if (vv->video_fh == fh) {
-		DEB_D(("overlay is already active.\n"));
-		return 0;
-	}
+			DEB_D(("overlay is already active.\n"));
+			return 0;
+		}
 		DEB_D(("overlay is already active in another open.\n"));
 		return -EBUSY;
 	}
-	
+
 	if (0 == saa7146_res_get(fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP)) {
 		DEB_D(("cannot get necessary overlay resources\n"));
 		return -EBUSY;
-	}	
-	
+	}
+
 	err = try_win(dev,&fh->ov.win);
 	if (0 != err) {
 		saa7146_res_free(vv->video_fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP);
 		return -EBUSY;
 	}
-	
+
 	vv->ov_data = &fh->ov;
 
 	DEB_D(("%dx%d+%d+%d %s field=%s\n",
 		fh->ov.win.w.width,fh->ov.win.w.height,
 		fh->ov.win.w.left,fh->ov.win.w.top,
 		vv->ov_fmt->name,v4l2_field_names[fh->ov.win.field]));
-	
+
 	if (0 != (ret = saa7146_enable_overlay(fh))) {
 		DEB_D(("enabling overlay failed: %d\n",ret));
 		saa7146_res_free(vv->video_fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP);
@@ -333,7 +333,7 @@ int saa7146_stop_preview(struct saa7146_fh *fh)
 	}
 
 	/* check if overlay is running at all */
-	if ((vv->video_status & STATUS_OVERLAY) == 0) {		
+	if ((vv->video_status & STATUS_OVERLAY) == 0) {
 		DEB_D(("no active overlay.\n"));
 		return 0;
 	}
@@ -347,7 +347,7 @@ int saa7146_stop_preview(struct saa7146_fh *fh)
 	vv->video_fh = NULL;
 
 	saa7146_disable_overlay(fh);
-	
+
 	saa7146_res_free(fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP);
 
 	return 0;
@@ -359,7 +359,7 @@ static int s_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 	struct saa7146_vv *vv = dev->vv_data;
 
 	int err;
-	
+
 	switch (f->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
 		DEB_EE(("V4L2_BUF_TYPE_VIDEO_CAPTURE: dev:%p, fh:%p\n",dev,fh));
@@ -387,7 +387,7 @@ static int s_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 			up(&dev->lock);
 			return -EFAULT;
 		}
-		
+
 		/* fh->ov.fh is used to indicate that we have valid overlay informations, too */
 		fh->ov.fh = fh;
 
@@ -395,8 +395,8 @@ static int s_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 
 		/* check if our current overlay is active */
 		if (IS_OVERLAY_ACTIVE(fh) != 0) {
-				saa7146_stop_preview(fh);
-				saa7146_start_preview(fh);
+			saa7146_stop_preview(fh);
+			saa7146_start_preview(fh);
 		}
 		return 0;
 	default:
@@ -454,7 +454,7 @@ static int NUM_CONTROLS = sizeof(controls)/sizeof(struct v4l2_queryctrl);
 static struct v4l2_queryctrl* ctrl_by_id(int id)
 {
 	int i;
-	
+
 	for (i = 0; i < NUM_CONTROLS; i++)
 		if (controls[i].id == id)
 			return controls+i;
@@ -515,7 +515,7 @@ static int set_control(struct saa7146_fh *fh, struct v4l2_control *c)
 		DEB_D(("unknown control %d\n",c->id));
 		return -EINVAL;
 	}
-	
+
 	down(&dev->lock);
 
 	switch (ctrl->type) {
@@ -578,10 +578,10 @@ static int set_control(struct saa7146_fh *fh, struct v4l2_control *c)
 	}
 	}
 	up(&dev->lock);
-	
+
 	if (IS_OVERLAY_ACTIVE(fh) != 0) {
-				saa7146_stop_preview(fh);
-				saa7146_start_preview(fh);
+		saa7146_stop_preview(fh);
+		saa7146_start_preview(fh);
 	}
 	return 0;
 }
@@ -633,7 +633,7 @@ static int saa7146_pgtable_build(struct saa7146_dev *dev, struct saa7146_buf *bu
 				return -1;
 			}
 		}
-		
+
 		ptr1 = pt1->cpu;
 		ptr2 = pt2->cpu;
 		ptr3 = pt3->cpu;
@@ -649,14 +649,14 @@ static int saa7146_pgtable_build(struct saa7146_dev *dev, struct saa7146_buf *bu
 		for(j=0;j<40;j++) {
 			printk("ptr1 %d: 0x%08x\n",j,ptr1[j]);
 		}
-*/		
+*/
 
 		/* if we have a user buffer, the first page may not be
 		   aligned to a page boundary. */
 		pt1->offset = buf->vb.dma.sglist->offset;
 		pt2->offset = pt1->offset+o1;
 		pt3->offset = pt1->offset+o2;
-		
+
 		/* create video-dma2 page table */
 		ptr1 = pt1->cpu;
 		for(i = m1; i <= m2 ; i++, ptr2++) {
@@ -675,7 +675,7 @@ static int saa7146_pgtable_build(struct saa7146_dev *dev, struct saa7146_buf *bu
 		for(;i<1024;i++,ptr3++) {
 			*ptr3 = fill;
 		}
-		/* finally: finish up video-dma1 page table */		
+		/* finally: finish up video-dma1 page table */
 		ptr1 = pt1->cpu+m1;
 		fill = pt1->cpu[m1];
 		for(i=m1;i<1024;i++,ptr1++) {
@@ -694,7 +694,7 @@ static int saa7146_pgtable_build(struct saa7146_dev *dev, struct saa7146_buf *bu
 		for(j=0;j<40;j++) {
 			printk("ptr3 %d: 0x%08x\n",j,ptr3[j]);
 		}
-*/				
+*/
 	} else {
 		struct saa7146_pgtable *pt = &buf->pt[0];
 		return saa7146_pgtable_build_single(pci, pt, list, length);
@@ -719,9 +719,9 @@ static int video_begin(struct saa7146_fh *fh)
 
 	if ((vv->video_status & STATUS_CAPTURE) != 0) {
 		if (vv->video_fh == fh) {
-		DEB_S(("already capturing.\n"));
+			DEB_S(("already capturing.\n"));
 			return 0;
-	}
+		}
 		DEB_S(("already capturing in another open.\n"));
 		return -EBUSY;
 	}
@@ -735,7 +735,7 @@ static int video_begin(struct saa7146_fh *fh)
 			return err;
 		}
 	}
-	
+
 	fmt = format_by_fourcc(dev,fh->video_fmt.pixelformat);
 	/* we need to have a valid format set here */
 	BUG_ON(NULL == fmt);
@@ -811,7 +811,7 @@ static int video_end(struct saa7146_fh *fh, struct file *file)
 	saa7146_write(dev, MC1, dmas);
 
 	spin_unlock_irqrestore(&dev->slock, flags);
-	
+
 	vv->video_fh = NULL;
 	vv->video_status = 0;
 
@@ -820,7 +820,7 @@ static int video_end(struct saa7146_fh *fh, struct file *file)
 	if (vv->ov_suspend != NULL) {
 		saa7146_start_preview(vv->ov_suspend);
 		vv->ov_suspend = NULL;
-}
+	}
 
 	return 0;
 }
@@ -847,7 +847,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		if( cmd == dev->ext_vv_data->ioctls[ee].cmd )
 			break;
 	}
-	
+
 	if( 0 != (dev->ext_vv_data->ioctls[ee].flags & SAA7146_EXCLUSIVE) ) {
 		DEB_D(("extension handles ioctl exclusive.\n"));
 		result = dev->ext_vv_data->ioctl(fh, cmd, arg);
@@ -860,7 +860,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			return result;
 		}
 	}
-	
+
 	/* fixme: add handle "after" case (is it still needed?) */
 
 	switch (fh->type) {
@@ -880,21 +880,21 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 	}
 
 	switch (cmd) {
- 	case VIDIOC_QUERYCAP:
+	case VIDIOC_QUERYCAP:
 	{
 		struct v4l2_capability *cap = arg;
 		memset(cap,0,sizeof(*cap));
 
 		DEB_EE(("VIDIOC_QUERYCAP\n"));
-		
+
                 strcpy(cap->driver, "saa7146 v4l2");
 		strlcpy(cap->card, dev->ext->name, sizeof(cap->card));
-		sprintf(cap->bus_info,"PCI:%s",dev->pci->slot_name);
+		sprintf(cap->bus_info,"PCI:%s", pci_name(dev->pci));
 		cap->version = SAA7146_VERSION_CODE;
 		cap->capabilities =
 			V4L2_CAP_VIDEO_CAPTURE |
 			V4L2_CAP_VIDEO_OVERLAY |
-			V4L2_CAP_READWRITE | 
+			V4L2_CAP_READWRITE |
 			V4L2_CAP_STREAMING;
 		cap->capabilities |= dev->ext_vv_data->capabilities;
 		return 0;
@@ -925,18 +925,18 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		if (NULL == fmt) {
 			return -EINVAL;
 		}
-		
+
 		/* planar formats are not allowed for overlay video, clipping and video dma would clash */
 		if (0 != (fmt->flags & FORMAT_IS_PLANAR)) {
 			DEB_S(("planar pixelformat '%4.4s' not allowed for overlay\n",(char *)&fmt->pixelformat));
 		}
 
 		/* check if overlay is running */
-		if (IS_OVERLAY_ACTIVE(fh) != 0) {		
+		if (IS_OVERLAY_ACTIVE(fh) != 0) {
 			if (vv->video_fh != fh) {
 				DEB_D(("refusing to change framebuffer informations while overlay is active in another open.\n"));
 				return -EBUSY;
-		}
+			}
 		}
 
 		down(&dev->lock);
@@ -971,7 +971,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			break;
 		}
 		default:
-			return -EINVAL;	
+			return -EINVAL;
 		}
 
 		DEB_EE(("VIDIOC_ENUM_FMT: type:%d, index:%d\n",f->type,f->index));
@@ -987,12 +987,12 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		    (c->id <  V4L2_CID_PRIVATE_BASE ||
 		     c->id >= V4L2_CID_PRIVATE_LASTP1))
 			return -EINVAL;
-			
+
 		ctrl = ctrl_by_id(c->id);
 		if( NULL == ctrl ) {
 			return -EINVAL;
 /*
-			c->flags = V4L2_CTRL_FLAG_DISABLED;	
+			c->flags = V4L2_CTRL_FLAG_DISABLED;
 			return 0;
 */
 		}
@@ -1006,10 +1006,6 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		return get_control(fh,arg);
 	}
 	case VIDIOC_S_CTRL:
-
-
-
-
 	{
 		DEB_EE(("VIDIOC_S_CTRL\n"));
 		err = set_control(fh,arg);
@@ -1073,7 +1069,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		v4l2_std_id *id = arg;
 		int found = 0;
 		int i, err;
-						
+
 		DEB_EE(("VIDIOC_S_STD\n"));
 
 		if ((vv->video_status & STATUS_CAPTURE) == STATUS_CAPTURE) {
@@ -1091,7 +1087,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		}
 
 		down(&dev->lock);
-		
+
 		for(i = 0; i < dev->ext_vv_data->num_stds; i++)
 			if (*id & dev->ext_vv_data->stds[i].id)
 				break;
@@ -1164,8 +1160,8 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 
 		err = video_begin(fh);
 		if( 0 != err) {
-				return err;
-			}
+			return err;
+		}
 		err = videobuf_streamon(q);
 		return err;
 	}
@@ -1190,7 +1186,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		err = videobuf_streamoff(q);
 		if (0 != err) {
 			DEB_D(("warning: videobuf_streamoff() failed.\n"));
-		video_end(fh, file);
+			video_end(fh, file);
 		} else {
 			err = video_end(fh, file);
 		}
@@ -1203,9 +1199,9 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		int i;
 
 		/* fixme: number of capture buffers and sizes for v4l apps */
-		int gbuffers = 2; 
+		int gbuffers = 2;
 		int gbufsize = 768*576*4;
-		
+
 		DEB_D(("VIDIOCGMBUF \n"));
 
 		q = &fh->video_q;
@@ -1242,7 +1238,7 @@ static int buffer_activate (struct saa7146_dev *dev,
 
 	buf->vb.state = STATE_ACTIVE;
 	saa7146_set_capture(dev,buf,next);
-	
+
 	mod_timer(&vv->video_q.timeout, jiffies+BUFFER_TIMEOUT);
 	return 0;
 }
@@ -1273,7 +1269,7 @@ static int buffer_prepare(struct videobuf_queue *q,
 		DEB_D(("size mismatch.\n"));
 		return -EINVAL;
 	}
-	
+
 	DEB_CAP(("buffer_prepare [size=%dx%d,bytes=%d,fields=%s]\n",
 		fh->video_fmt.width,fh->video_fmt.height,size,v4l2_field_names[fh->video_fmt.field]));
 	if (buf->vb.width  != fh->video_fmt.width  ||
@@ -1288,7 +1284,7 @@ static int buffer_prepare(struct videobuf_queue *q,
 
 	if (STATE_NEEDS_INIT == buf->vb.state) {
 		struct saa7146_format *sfmt;
-		
+
 		buf->vb.bytesperline  = fh->video_fmt.bytesperline;
 		buf->vb.width  = fh->video_fmt.width;
 		buf->vb.height = fh->video_fmt.height;
@@ -1296,9 +1292,9 @@ static int buffer_prepare(struct videobuf_queue *q,
 		buf->vb.field  = field;
 		buf->fmt       = &fh->video_fmt;
 		buf->vb.field  = fh->video_fmt.field;
-		
+
 		sfmt = format_by_fourcc(dev,buf->fmt->pixelformat);
-			
+
 		if( 0 != IS_PLANAR(sfmt->trans)) {
 			saa7146_pgtable_free(dev->pci, &buf->pt[0]);
 			saa7146_pgtable_free(dev->pci, &buf->pt[1]);
@@ -1311,7 +1307,7 @@ static int buffer_prepare(struct videobuf_queue *q,
 			saa7146_pgtable_free(dev->pci, &buf->pt[0]);
 			saa7146_pgtable_alloc(dev->pci, &buf->pt[0]);
 		}
-		
+
 		err = videobuf_iolock(dev->pci,&buf->vb, &vv->ov_fb);
 		if (err)
 			goto oops;
@@ -1345,7 +1341,7 @@ static int buffer_setup(struct videobuf_queue *q, unsigned int *count, unsigned 
 	if( (*count * *size) > (max_memory*1048576) ) {
 		*count = (max_memory*1048576) / *size;
 	}
-	
+
 	DEB_CAP(("%d buffers, %d bytes each.\n",*count,*size));
 
 	return 0;
@@ -1358,7 +1354,7 @@ static void buffer_queue(struct videobuf_queue *q, struct videobuf_buffer *vb)
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
 	struct saa7146_buf *buf = (struct saa7146_buf *)vb;
-	
+
 	DEB_CAP(("vbuf:%p\n",vb));
 	saa7146_buffer_queue(fh->dev,&vv->video_q,buf);
 }
@@ -1370,7 +1366,7 @@ static void buffer_release(struct videobuf_queue *q, struct videobuf_buffer *vb)
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_buf *buf = (struct saa7146_buf *)vb;
-	
+
 	DEB_CAP(("vbuf:%p\n",vb));
 	saa7146_dma_free(dev,buf);
 }
@@ -1434,13 +1430,13 @@ static void video_close(struct saa7146_dev *dev, struct file *file)
 	struct saa7146_fh *fh = (struct saa7146_fh *)file->private_data;
 	struct saa7146_vv *vv = dev->vv_data;
 	int err;
-	
+
 	if (IS_CAPTURE_ACTIVE(fh) != 0) {
-		err = video_end(fh, file);		
+		err = video_end(fh, file);
 	} else if (IS_OVERLAY_ACTIVE(fh) != 0) {
 		err = saa7146_stop_preview(fh);
 	}
-	
+
 	/* hmm, why is this function declared void? */
 	/* return err */
 }
@@ -1450,7 +1446,7 @@ static void video_irq_done(struct saa7146_dev *dev, unsigned long st)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 	struct saa7146_dmaqueue *q = &vv->video_q;
-	
+
 	spin_lock(&dev->slock);
 	DEB_CAP(("called.\n"));
 
@@ -1473,11 +1469,11 @@ static ssize_t video_read(struct file *file, char __user *data, size_t count, lo
 	DEB_EE(("called.\n"));
 
 	if ((vv->video_status & STATUS_CAPTURE) != 0) {
-	/* fixme: should we allow read() captures while streaming capture? */
+		/* fixme: should we allow read() captures while streaming capture? */
 		if (vv->video_fh == fh) {
-		DEB_S(("already capturing.\n"));
-		return -EBUSY;
-	}
+			DEB_S(("already capturing.\n"));
+			return -EBUSY;
+		}
 		DEB_S(("already capturing in another open.\n"));
 		return -EBUSY;
 	}
@@ -1487,10 +1483,10 @@ static ssize_t video_read(struct file *file, char __user *data, size_t count, lo
 		goto out;
 	}
 
-	ret = videobuf_read_one(&fh->video_q, data, count, ppos,
+	ret = videobuf_read_one(&fh->video_q , data, count, ppos,
 				file->f_flags & O_NONBLOCK);
 	if (ret != 0) {
-	video_end(fh, file);
+		video_end(fh, file);
 	} else {
 		ret = video_end(fh, file);
 	}
@@ -1500,7 +1496,7 @@ out:
 		saa7146_start_preview(vv->ov_suspend);
 		vv->ov_suspend = NULL;
 	}
-	
+
 	return ret;
 }
 

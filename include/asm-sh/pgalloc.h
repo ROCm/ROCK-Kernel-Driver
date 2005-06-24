@@ -1,7 +1,6 @@
 #ifndef __ASM_SH_PGALLOC_H
 #define __ASM_SH_PGALLOC_H
 
-#include <asm/processor.h>
 #include <linux/threads.h>
 #include <linux/slab.h>
 #include <linux/mm.h>

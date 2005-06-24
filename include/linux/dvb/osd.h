@@ -1,9 +1,9 @@
-/* 
+/*
  * osd.h
  *
  * Copyright (C) 2001 Ralph  Metzler <ralph@convergence.de>
  *                  & Marcus Metzler <marcus@convergence.de>
-                      for convergence integrated media GmbH
+ *                    for convergence integrated media GmbH
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Lesser Public License
@@ -93,7 +93,7 @@ typedef enum {
 // TODO: remove "test" in final version
   OSD_Text,       // (x0,y0,size,color,text)
   OSD_SetWindow, //  (x0) set window with number 0<x0<8 as current
-  OSD_MoveWindow, //  move current window to (x0, y0)  
+  OSD_MoveWindow, //  move current window to (x0, y0)
   OSD_OpenRaw,	// Open other types of OSD windows
 } OSD_Command;
 
@@ -138,8 +138,7 @@ typedef struct osd_cap_s {
 } osd_cap_t;
 
 
-#define OSD_SEND_CMD       _IOW('o', 160, osd_cmd_t)
+#define OSD_SEND_CMD            _IOW('o', 160, osd_cmd_t)
 #define OSD_GET_CAPABILITY      _IOR('o', 161, osd_cap_t)
 
 #endif
-

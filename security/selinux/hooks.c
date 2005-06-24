@@ -10,6 +10,8 @@
  *
  *  Copyright (C) 2001,2002 Networks Associates Technology, Inc.
  *  Copyright (C) 2003 Red Hat, Inc., James Morris <jmorris@redhat.com>
+ *  Copyright (C) 2004-2005 Trusted Computer Solutions, Inc.
+ *                          <dgoeddel@trustedcs.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License version 2,
@@ -65,6 +67,7 @@
 #include <linux/hugetlb.h>
 #include <linux/personality.h>
 #include <linux/sysctl.h>
+#include <linux/audit.h>
 
 #include "avc.h"
 #include "objsec.h"
@@ -669,6 +672,8 @@ static inline u16 socket_type_to_security_class(int family, int type, int protoc
 			return SECCLASS_NETLINK_IP6FW_SOCKET;
 		case NETLINK_DNRTMSG:
 			return SECCLASS_NETLINK_DNRT_SOCKET;
+		case NETLINK_KOBJECT_UEVENT:
+			return SECCLASS_NETLINK_KOBJECT_UEVENT_SOCKET;
 		default:
 			return SECCLASS_NETLINK_SOCKET;
 		}
@@ -827,7 +832,9 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 				       __FUNCTION__, context, -rc,
 				       inode->i_sb->s_id, inode->i_ino);
 				kfree(context);
-				goto out;
+				/* Leave with the unlabeled SID */
+				rc = 0;
+				break;
 			}
 		}
 		kfree(context);
@@ -872,18 +879,8 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 	isec->initialized = 1;
 
 out:
-	if (inode->i_sock) {
-		struct socket *sock = SOCKET_I(inode);
-		if (sock->sk) {
-			isec->sclass = socket_type_to_security_class(sock->sk->sk_family,
-			                                             sock->sk->sk_type,
-			                                             sock->sk->sk_protocol);
-		} else {
-			isec->sclass = SECCLASS_SOCKET;
-		}
-	} else {
+	if (isec->sclass == SECCLASS_FILE)
 		isec->sclass = inode_mode_to_security_class(inode->i_mode);
-	}
 
 	if (hold_sem)
 		up(&isec->sem);
@@ -919,9 +916,9 @@ static inline u32 signal_to_av(int sig)
 
 /* Check permission betweeen a pair of tasks, e.g. signal checks,
    fork check, ptrace check, etc. */
-int task_has_perm(struct task_struct *tsk1,
-		  struct task_struct *tsk2,
-		  u32 perms)
+static int task_has_perm(struct task_struct *tsk1,
+			 struct task_struct *tsk2,
+			 u32 perms)
 {
 	struct task_security_struct *tsec1, *tsec2;
 
@@ -932,8 +929,8 @@ int task_has_perm(struct task_struct *tsk1,
 }
 
 /* Check whether a task is allowed to use a capability. */
-int task_has_capability(struct task_struct *tsk,
-			int cap)
+static int task_has_capability(struct task_struct *tsk,
+			       int cap)
 {
 	struct task_security_struct *tsec;
 	struct avc_audit_data ad;
@@ -949,8 +946,8 @@ int task_has_capability(struct task_struct *tsk,
 }
 
 /* Check whether a task is allowed to use a system operation. */
-int task_has_system(struct task_struct *tsk,
-		    u32 perms)
+static int task_has_system(struct task_struct *tsk,
+			   u32 perms)
 {
 	struct task_security_struct *tsec;
 
@@ -963,10 +960,10 @@ int task_has_system(struct task_struct *tsk,
 /* Check whether a task has a particular permission to an inode.
    The 'adp' parameter is optional and allows other audit
    data to be passed (e.g. the dentry). */
-int inode_has_perm(struct task_struct *tsk,
-		   struct inode *inode,
-		   u32 perms,
-		   struct avc_audit_data *adp)
+static int inode_has_perm(struct task_struct *tsk,
+			  struct inode *inode,
+			  u32 perms,
+			  struct avc_audit_data *adp)
 {
 	struct task_security_struct *tsec;
 	struct inode_security_struct *isec;
@@ -1188,10 +1185,10 @@ static inline int may_rename(struct inode *old_dir,
 }
 
 /* Check whether a task can perform a filesystem operation. */
-int superblock_has_perm(struct task_struct *tsk,
-			struct super_block *sb,
-			u32 perms,
-			struct avc_audit_data *ad)
+static int superblock_has_perm(struct task_struct *tsk,
+			       struct super_block *sb,
+			       u32 perms,
+			       struct avc_audit_data *ad)
 {
 	struct task_security_struct *tsec;
 	struct superblock_security_struct *sbsec;
@@ -1248,7 +1245,7 @@ static inline u32 file_to_av(struct file *file)
 }
 
 /* Set an inode's SID to a specified value. */
-int inode_security_set_sid(struct inode *inode, u32 sid)
+static int inode_security_set_sid(struct inode *inode, u32 sid)
 {
 	struct inode_security_struct *isec = inode->i_security;
 	struct superblock_security_struct *sbsec = inode->i_sb->s_security;
@@ -1856,6 +1853,13 @@ static void selinux_bprm_post_apply_creds(struct linux_binprm *bprm)
 			initrlim = init_task.signal->rlim+i;
 			rlim->rlim_cur = min(rlim->rlim_max,initrlim->rlim_cur);
 		}
+		if (current->signal->rlim[RLIMIT_CPU].rlim_cur != RLIM_INFINITY) {
+			/*
+			 * This will cause RLIMIT_CPU calculations
+			 * to be refigured.
+			 */
+			current->it_prof_expires = jiffies_to_cputime(1);
+		}
 	}
 
 	/* Wake up the parent if it is waiting so that it can
@@ -2204,6 +2208,11 @@ static int selinux_inode_setxattr(struct dentry *dentry, char *name, void *value
 	if (rc)
 		return rc;
 
+	rc = security_validate_transition(isec->sid, newsid, tsec->sid,
+	                                  isec->sclass);
+	if (rc)
+		return rc;
+
 	return avc_has_perm(newsid,
 			    sbsec->sid,
 			    SECCLASS_FILESYSTEM,
@@ -2408,6 +2417,7 @@ static int selinux_file_ioctl(struct file *file, unsigned int cmd,
 
 static int file_map_prot_check(struct file *file, unsigned long prot, int shared)
 {
+#ifndef CONFIG_PPC32
 	if ((prot & PROT_EXEC) && (!file || (!shared && (prot & PROT_WRITE)))) {
 		/*
 		 * We are making executable an anonymous mapping or a
@@ -2418,6 +2428,7 @@ static int file_map_prot_check(struct file *file, unsigned long prot, int shared
 		if (rc)
 			return rc;
 	}
+#endif
 
 	if (file) {
 		/* read access is always possible with a mapping */
@@ -2435,27 +2446,36 @@ static int file_map_prot_check(struct file *file, unsigned long prot, int shared
 	return 0;
 }
 
-static int selinux_file_mmap(struct file *file, unsigned long prot, unsigned long flags)
+static int selinux_file_mmap(struct file *file, unsigned long reqprot,
+			     unsigned long prot, unsigned long flags)
 {
 	int rc;
 
-	rc = secondary_ops->file_mmap(file, prot, flags);
+	rc = secondary_ops->file_mmap(file, reqprot, prot, flags);
 	if (rc)
 		return rc;
+
+	if (selinux_checkreqprot)
+		prot = reqprot;
 
 	return file_map_prot_check(file, prot,
 				   (flags & MAP_TYPE) == MAP_SHARED);
 }
 
 static int selinux_file_mprotect(struct vm_area_struct *vma,
+				 unsigned long reqprot,
 				 unsigned long prot)
 {
 	int rc;
 
-	rc = secondary_ops->file_mprotect(vma, prot);
+	rc = secondary_ops->file_mprotect(vma, reqprot, prot);
 	if (rc)
 		return rc;
 
+	if (selinux_checkreqprot)
+		prot = reqprot;
+
+#ifndef CONFIG_PPC32
 	if (vma->vm_file != NULL && vma->anon_vma != NULL && (prot & PROT_EXEC)) {
 		/*
 		 * We are making executable a file mapping that has
@@ -2467,6 +2487,7 @@ static int selinux_file_mprotect(struct vm_area_struct *vma,
 		if (rc)
 			return rc;
 	}
+#endif
 
 	return file_map_prot_check(vma->vm_file, prot, vma->vm_flags&VM_SHARED);
 }
@@ -2834,8 +2855,7 @@ static int selinux_parse_skb_ipv6(struct sk_buff *skb, struct avc_audit_data *ad
 
 	nexthdr = ip6->nexthdr;
 	offset += sizeof(_ipv6h);
-	offset = ipv6_skip_exthdr(skb, offset, &nexthdr,
-				  skb->tail - skb->head - offset);
+	offset = ipv6_skip_exthdr(skb, offset, &nexthdr);
 	if (offset < 0)
 		goto out;
 
@@ -2950,18 +2970,15 @@ out:
 static void selinux_socket_post_create(struct socket *sock, int family,
 				       int type, int protocol, int kern)
 {
-	int err;
 	struct inode_security_struct *isec;
 	struct task_security_struct *tsec;
 
-	err = inode_doinit(SOCK_INODE(sock));
-	if (err < 0)
-		return;
 	isec = SOCK_INODE(sock)->i_security;
 
 	tsec = current->security;
 	isec->sclass = socket_type_to_security_class(family, type, protocol);
 	isec->sid = kern ? SECINITSID_KERNEL : tsec->sid;
+	isec->initialized = 1;
 
 	return;
 }
@@ -3065,7 +3082,53 @@ out:
 
 static int selinux_socket_connect(struct socket *sock, struct sockaddr *address, int addrlen)
 {
-	return socket_has_perm(current, sock, SOCKET__CONNECT);
+	struct inode_security_struct *isec;
+	int err;
+
+	err = socket_has_perm(current, sock, SOCKET__CONNECT);
+	if (err)
+		return err;
+
+	/*
+	 * If a TCP socket, check name_connect permission for the port.
+	 */
+	isec = SOCK_INODE(sock)->i_security;
+	if (isec->sclass == SECCLASS_TCP_SOCKET) {
+		struct sock *sk = sock->sk;
+		struct avc_audit_data ad;
+		struct sockaddr_in *addr4 = NULL;
+		struct sockaddr_in6 *addr6 = NULL;
+		unsigned short snum;
+		u32 sid;
+
+		if (sk->sk_family == PF_INET) {
+			addr4 = (struct sockaddr_in *)address;
+			if (addrlen != sizeof(struct sockaddr_in))
+				return -EINVAL;
+			snum = ntohs(addr4->sin_port);
+		} else {
+			addr6 = (struct sockaddr_in6 *)address;
+			if (addrlen != sizeof(struct sockaddr_in6))
+				return -EINVAL;
+			snum = ntohs(addr6->sin6_port);
+		}
+
+		err = security_port_sid(sk->sk_family, sk->sk_type,
+					sk->sk_protocol, snum, &sid);
+		if (err)
+			goto out;
+
+		AVC_AUDIT_DATA_INIT(&ad,NET);
+		ad.u.net.dport = htons(snum);
+		ad.u.net.family = sk->sk_family;
+		err = avc_has_perm(isec->sid, sid, isec->sclass,
+				   TCP_SOCKET__NAME_CONNECT, &ad);
+		if (err)
+			goto out;
+	}
+
+out:
+	return err;
 }
 
 static int selinux_socket_listen(struct socket *sock, int backlog)
@@ -3083,14 +3146,12 @@ static int selinux_socket_accept(struct socket *sock, struct socket *newsock)
 	if (err)
 		return err;
 
-	err = inode_doinit(SOCK_INODE(newsock));
-	if (err < 0)
-		return err;
 	newisec = SOCK_INODE(newsock)->i_security;
 
 	isec = SOCK_INODE(sock)->i_security;
 	newisec->sclass = isec->sclass;
 	newisec->sid = isec->sid;
+	newisec->initialized = 1;
 
 	return 0;
 }
@@ -3357,6 +3418,15 @@ static int selinux_nlmsg_perm(struct sock *sk, struct sk_buff *skb)
 	
 	err = selinux_nlmsg_lookup(isec->sclass, nlh->nlmsg_type, &perm);
 	if (err) {
+		if (err == -EINVAL) {
+			audit_log(current->audit_context,
+				  "SELinux:  unrecognized netlink message"
+				  " type=%hu for sclass=%hu\n",
+				  nlh->nlmsg_type, isec->sclass);
+			if (!selinux_enforcing)
+				err = 0;
+		}
+
 		/* Ignore */
 		if (err == -ENOENT)
 			err = 0;
@@ -3597,7 +3667,7 @@ static void msg_msg_free_security(struct msg_msg *msg)
 }
 
 static int ipc_has_perm(struct kern_ipc_perm *ipc_perms,
-			u16 sclass, u32 perms)
+			u32 perms)
 {
 	struct task_security_struct *tsec;
 	struct ipc_security_struct *isec;
@@ -3609,7 +3679,7 @@ static int ipc_has_perm(struct kern_ipc_perm *ipc_perms,
 	AVC_AUDIT_DATA_INIT(&ad, IPC);
 	ad.u.ipc_id = ipc_perms->key;
 
-	return avc_has_perm(tsec->sid, isec->sid, sclass, perms, &ad);
+	return avc_has_perm(tsec->sid, isec->sid, isec->sclass, perms, &ad);
 }
 
 static int selinux_msg_msg_alloc_security(struct msg_msg *msg)
@@ -3694,7 +3764,7 @@ static int selinux_msg_queue_msgctl(struct msg_queue *msq, int cmd)
 		return 0;
 	}
 
-	err = ipc_has_perm(&msq->q_perm, SECCLASS_MSGQ, perms);
+	err = ipc_has_perm(&msq->q_perm, perms);
 	return err;
 }
 
@@ -3846,7 +3916,7 @@ static int selinux_shm_shmctl(struct shmid_kernel *shp, int cmd)
 		return 0;
 	}
 
-	err = ipc_has_perm(&shp->shm_perm, SECCLASS_SHM, perms);
+	err = ipc_has_perm(&shp->shm_perm, perms);
 	return err;
 }
 
@@ -3865,7 +3935,7 @@ static int selinux_shm_shmat(struct shmid_kernel *shp,
 	else
 		perms = SHM__READ | SHM__WRITE;
 
-	return ipc_has_perm(&shp->shm_perm, SECCLASS_SHM, perms);
+	return ipc_has_perm(&shp->shm_perm, perms);
 }
 
 /* Semaphore security operations */
@@ -3954,7 +4024,7 @@ static int selinux_sem_semctl(struct sem_array *sma, int cmd)
 		return 0;
 	}
 
-	err = ipc_has_perm(&sma->sem_perm, SECCLASS_SEM, perms);
+	err = ipc_has_perm(&sma->sem_perm, perms);
 	return err;
 }
 
@@ -3968,17 +4038,12 @@ static int selinux_sem_semop(struct sem_array *sma,
 	else
 		perms = SEM__READ;
 
-	return ipc_has_perm(&sma->sem_perm, SECCLASS_SEM, perms);
+	return ipc_has_perm(&sma->sem_perm, perms);
 }
 
 static int selinux_ipc_permission(struct kern_ipc_perm *ipcp, short flag)
 {
-	struct ipc_security_struct *isec = ipcp->security;
-	u16 sclass = SECCLASS_IPC;
 	u32 av = 0;
-
-	if (isec && isec->magic == SELINUX_MAGIC)
-		sclass = isec->sclass;
 
 	av = 0;
 	if (flag & S_IRUGO)
@@ -3989,11 +4054,11 @@ static int selinux_ipc_permission(struct kern_ipc_perm *ipcp, short flag)
 	if (av == 0)
 		return 0;
 
-	return ipc_has_perm(ipcp, sclass, av);
+	return ipc_has_perm(ipcp, av);
 }
 
 /* module stacking operations */
-int selinux_register_security (const char *name, struct security_operations *ops)
+static int selinux_register_security (const char *name, struct security_operations *ops)
 {
 	if (secondary_ops != original_ops) {
 		printk(KERN_INFO "%s:  There is already a secondary security "
@@ -4010,7 +4075,7 @@ int selinux_register_security (const char *name, struct security_operations *ops
 	return 0;
 }
 
-int selinux_unregister_security (const char *name, struct security_operations *ops)
+static int selinux_unregister_security (const char *name, struct security_operations *ops)
 {
 	if (ops != secondary_ops) {
 		printk (KERN_INFO "%s:  trying to unregister a security module "
@@ -4080,6 +4145,7 @@ static int selinux_setprocattr(struct task_struct *p,
 	struct task_security_struct *tsec;
 	u32 sid = 0;
 	int error;
+	char *str = value;
 
 	if (current != p) {
 		/* SELinux only allows a process to change its own
@@ -4104,8 +4170,11 @@ static int selinux_setprocattr(struct task_struct *p,
 		return error;
 
 	/* Obtain a SID for the context, if one was specified. */
-	if (size) {
-		int error;
+	if (size && str[1] && str[1] != '\n') {
+		if (str[size-1] == '\n') {
+			str[size-1] = 0;
+			size--;
+		}
 		error = security_context_to_sid(value, size, &sid);
 		if (error)
 			return error;
@@ -4173,7 +4242,7 @@ static int selinux_setprocattr(struct task_struct *p,
 	return size;
 }
 
-struct security_operations selinux_ops = {
+static struct security_operations selinux_ops = {
 	.ptrace =			selinux_ptrace,
 	.capget =			selinux_capget,
 	.capset_check =			selinux_capset_check,
@@ -4322,7 +4391,7 @@ struct security_operations selinux_ops = {
 #endif
 };
 
-__init int selinux_init(void)
+static __init int selinux_init(void)
 {
 	struct task_security_struct *tsec;
 

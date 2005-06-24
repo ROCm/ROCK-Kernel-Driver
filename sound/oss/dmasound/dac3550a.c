@@ -40,9 +40,6 @@ static int daca_attach_adapter(struct i2c_adapter *adapter);
 static int daca_detect_client(struct i2c_adapter *adapter, int address);
 static int daca_detach_client(struct i2c_client *client);
 
-/* Unique ID allocation */
-static int daca_id;
-
 struct i2c_driver daca_driver = {  
 	.owner			= THIS_MODULE,
 	.name			= "DAC3550A driver  V " DACA_VERSION,
@@ -176,7 +173,6 @@ static int daca_detect_client(struct i2c_adapter *adapter, int address)
 	new_client->driver = &daca_driver;
 	new_client->flags = 0;
 	strcpy(new_client->name, client_name);
-	new_client->id = daca_id++; /* racy... */
 
 	if (daca_init_client(new_client))
 		goto bail;

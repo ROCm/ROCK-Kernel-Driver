@@ -55,7 +55,7 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 	struct list_head *le, *head;
 	struct dentry *toput = NULL;
 	int noprogress;
-
+	char nbuf[NAME_MAX+1];
 
 	/*
 	 * Attempt to find the inode.
@@ -176,7 +176,6 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 			 */
 			struct dentry *ppd;
 			struct dentry *npd;
-			char nbuf[NAME_MAX+1];
 
 			down(&pd->d_inode->i_sem);
 			ppd = CALL(nops,get_parent)(pd);
@@ -241,7 +240,6 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 	/* if we weren't after a directory, have one more step to go */
 	if (result != target_dir) {
 		struct dentry *nresult;
-		char nbuf[NAME_MAX+1];
 		err = CALL(nops,get_name)(target_dir, nbuf, result);
 		if (!err) {
 			down(&target_dir->d_inode->i_sem);

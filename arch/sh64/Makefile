@@ -11,13 +11,6 @@
 # for "archclean" and "archdep" for cleaning up and making dependencies for
 # this architecture
 #
-# Note that top level Makefile automagically builds dependencies for SUBDIRS
-# but does not automagically clean SUBDIRS. Therefore "archclean" should clean
-# up all, "archdep" does nothing on added SUBDIRS.
-#
-ifndef include_config
--include .config
-endif
 
 cpu-y				:= -mb
 cpu-$(CONFIG_LITTLE_ENDIAN)	:= -ml
@@ -37,9 +30,16 @@ AFLAGS		+= -m5 -isa=sh64 -traditional
 CFLAGS		+= $(cpu-y)
 
 LDFLAGS_vmlinux	+= --defsym phys_stext=_stext-$(CONFIG_CACHED_MEMORY_OFFSET) \
-		   -e phys_stext
+		  --defsym phys_stext_shmedia=phys_stext+1 \
+		  -e phys_stext_shmedia
 
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -R .stab -R .stabstr -S
+
+#
+# arch/sh64/defconfig never had any hope of being
+# frequently updated, so use one that does
+#
+KBUILD_DEFCONFIG	:= cayman_defconfig
 
 ifdef LOADADDR
 LINKFLAGS     += -Ttext $(word 1,$(LOADADDR))
@@ -52,7 +52,11 @@ machine-$(CONFIG_SH_ROMRAM)	:= romram
 
 head-y := arch/$(ARCH)/kernel/head.o arch/$(ARCH)/kernel/init_task.o
 
-core-y += $(addprefix arch/$(ARCH)/, kernel/ mm/ mach-$(machine-y)/)
+core-y	+= arch/sh64/kernel/ arch/sh64/mm/
+
+ifneq ($(machine-y),)
+core-y	+= arch/sh64/mach-$(machine-y)/
+endif
 
 LIBGCC := $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
 libs-y	+= arch/$(ARCH)/lib/ $(LIBGCC)
@@ -92,7 +96,7 @@ define filechk_gen-syscalltab
 	echo "struct syscall_info {"; \
 	echo "	const char *name;"; \
 	echo "} syscall_info_table[] = {"; \
-	sed -e '/^.*\.long /!d;s//\t{ "/;s/\(\([^/]*\)\/\)\{1\}.*/\2/; \
+	sed -e '/^.*\.long /!d;s//    { "/;s/\(\([^/]*\)\/\)\{1\}.*/\2/; \
 		s/[ \t]*$$//g;s/$$/" },/;s/\("\)sys_/\1/g'; \
 	echo "};"; \
 	echo ""; \

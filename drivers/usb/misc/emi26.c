@@ -30,6 +30,7 @@ typedef struct _INTEL_HEX_RECORD
 
 #define EMI26_VENDOR_ID 		0x086a  /* Emagic Soft-und Hardware GmBH */
 #define EMI26_PRODUCT_ID		0x0100	/* EMI 2|6 without firmware */
+#define EMI26B_PRODUCT_ID		0x0102	/* EMI 2|6 without firmware */
 
 #define ANCHOR_LOAD_INTERNAL	0xA0	/* Vendor specific request code for Anchor Upload/Download (This one is implemented in the core) */
 #define ANCHOR_LOAD_EXTERNAL	0xA3	/* This command is not implemented in the core. Requires firmware */
@@ -203,6 +204,7 @@ wraperr:
 
 static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(EMI26_VENDOR_ID, EMI26_PRODUCT_ID) },
+	{ USB_DEVICE(EMI26_VENDOR_ID, EMI26B_PRODUCT_ID) },
 	{ }                                             /* Terminating entry */
 };
 

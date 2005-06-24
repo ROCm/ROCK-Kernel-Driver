@@ -13,10 +13,13 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/dma-mapping.h>
+
 #include <asm/machdep.h>
 #include <asm/scatterlist.h>
 #include <asm/io.h>
 #include <asm/prom.h>
+
+#include <asm-generic/pci-dma-compat.h>
 
 #define PCIBIOS_MIN_IO		0x1000
 #define PCIBIOS_MIN_MEM		0x10000000
@@ -63,135 +66,22 @@ static inline int pcibios_prep_mwi(struct pci_dev *dev)
 
 extern unsigned int pcibios_assign_all_busses(void);
 
-/*
- * PCI DMA operations are abstracted for G5 vs. i/pSeries
- */
-struct pci_dma_ops {
-	void *		(*pci_alloc_consistent)(struct pci_dev *hwdev, size_t size,
-					dma_addr_t *dma_handle);
-	void		(*pci_free_consistent)(struct pci_dev *hwdev, size_t size,
-				       void *vaddr, dma_addr_t dma_handle);
-
-	dma_addr_t	(*pci_map_single)(struct pci_dev *hwdev, void *ptr,
-					  size_t size, enum dma_data_direction direction);
-	void		(*pci_unmap_single)(struct pci_dev *hwdev, dma_addr_t dma_addr,
-					    size_t size, enum dma_data_direction direction);
-	int		(*pci_map_sg)(struct pci_dev *hwdev, struct scatterlist *sg,
-				      int nents, enum dma_data_direction direction);
-	void		(*pci_unmap_sg)(struct pci_dev *hwdev, struct scatterlist *sg,
-					int nents, enum dma_data_direction direction);
-	int		(*pci_dma_supported)(struct pci_dev *hwdev, u64 mask);
-	int		(*pci_dac_dma_supported)(struct pci_dev *hwdev, u64 mask);
-};
-
-extern struct pci_dma_ops pci_dma_ops;
-
-static inline void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
-					 dma_addr_t *dma_handle)
-{
-	return pci_dma_ops.pci_alloc_consistent(hwdev, size, dma_handle);
-}
-
-static inline void pci_free_consistent(struct pci_dev *hwdev, size_t size,
-				       void *vaddr, dma_addr_t dma_handle)
-{
-	pci_dma_ops.pci_free_consistent(hwdev, size, vaddr, dma_handle);
-}
-
-static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
-					size_t size, int direction)
-{
-	return pci_dma_ops.pci_map_single(hwdev, ptr, size,
-			(enum dma_data_direction)direction);
-}
-
-static inline void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
-				    size_t size, int direction)
-{
-	pci_dma_ops.pci_unmap_single(hwdev, dma_addr, size,
-			(enum dma_data_direction)direction);
-}
-
-static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-			     int nents, int direction)
-{
-	return pci_dma_ops.pci_map_sg(hwdev, sg, nents,
-			(enum dma_data_direction)direction);
-}
-
-static inline void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-				int nents, int direction)
-{
-	pci_dma_ops.pci_unmap_sg(hwdev, sg, nents,
-			(enum dma_data_direction)direction);
-}
-
-static inline void pci_dma_sync_single_for_cpu(struct pci_dev *hwdev,
-					       dma_addr_t dma_handle,
-					       size_t size, int direction)
-{
-	BUG_ON(direction == PCI_DMA_NONE);
-	/* nothing to do */
-}
-
-static inline void pci_dma_sync_single_for_device(struct pci_dev *hwdev,
-						  dma_addr_t dma_handle,
-						  size_t size, int direction)
-{
-	BUG_ON(direction == PCI_DMA_NONE);
-	/* nothing to do */
-}
-
-static inline void pci_dma_sync_sg_for_cpu(struct pci_dev *hwdev,
-					   struct scatterlist *sg,
-					   int nelems, int direction)
-{
-	BUG_ON(direction == PCI_DMA_NONE);
-	/* nothing to do */
-}
-
-static inline void pci_dma_sync_sg_for_device(struct pci_dev *hwdev,
-					      struct scatterlist *sg,
-					      int nelems, int direction)
-{
-	BUG_ON(direction == PCI_DMA_NONE);
-	/* nothing to do */
-}
-
-/* Return whether the given PCI device DMA address mask can
- * be supported properly.  For example, if your device can
- * only drive the low 24-bits during PCI bus mastering, then
- * you would pass 0x00ffffff as the mask to this function.
- * We default to supporting only 32 bits DMA unless we have
- * an explicit override of this function in pci_dma_ops for
- * the platform
- */
-static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
-{
-	if (pci_dma_ops.pci_dma_supported)
-		return pci_dma_ops.pci_dma_supported(hwdev, mask);
-	return (mask < 0x100000000ull);
-}
+extern struct dma_mapping_ops pci_dma_ops;
 
 /* For DAC DMA, we currently don't support it by default, but
  * we let the platform override this
  */
 static inline int pci_dac_dma_supported(struct pci_dev *hwdev,u64 mask)
 {
-	if (pci_dma_ops.pci_dac_dma_supported)
-		return pci_dma_ops.pci_dac_dma_supported(hwdev, mask);
+	if (pci_dma_ops.dac_dma_supported)
+		return pci_dma_ops.dac_dma_supported(&hwdev->dev, mask);
 	return 0;
-}
-
-static inline int pci_dma_mapping_error(dma_addr_t dma_addr)
-{
-	return dma_mapping_error(dma_addr);
 }
 
 extern int pci_domain_nr(struct pci_bus *bus);
 
-/* Set the name of the bus as it appears in /proc/bus/pci */
-extern int pci_name_bus(char *name, struct pci_bus *bus);
+/* Decide whether to display the domain number in /proc */
+extern int pci_proc_domain(struct pci_bus *bus);
 
 struct vm_area_struct;
 /* Map a range of PCI memory or I/O space for a device into user space */
@@ -200,10 +90,6 @@ int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,
 
 /* Tell drivers/pci/proc.c that we have pci_mmap_page_range() */
 #define HAVE_PCI_MMAP	1
-
-#define pci_map_page(dev, page, off, size, dir) \
-		pci_map_single(dev, (page_address(page) + (off)), size, dir)
-#define pci_unmap_page(dev,addr,sz,dir) pci_unmap_single(dev,addr,sz,dir)
 
 /* pci_unmap_{single,page} is not a nop, thus... */
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)	\
@@ -243,6 +129,13 @@ extern struct pci_controller *init_phb_dynamic(struct device_node *dn);
 extern int pci_read_irq_line(struct pci_dev *dev);
 
 extern void pcibios_add_platform_entries(struct pci_dev *dev);
+
+struct file;
+extern pgprot_t	pci_phys_mem_access_prot(struct file *file,
+					 unsigned long offset,
+					 unsigned long size,
+					 pgprot_t prot);
+
 
 #endif	/* __KERNEL__ */
 

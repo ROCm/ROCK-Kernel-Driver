@@ -110,7 +110,7 @@ static int snd_virmidi_dev_receive_event(snd_virmidi_dev_t *rdev, snd_seq_event_
  * handler of a remote port which is attached to the virmidi via
  * SNDRV_VIRMIDI_SEQ_ATTACH.
  */
-#if 0
+/* exported */
 int snd_virmidi_receive(snd_rawmidi_t *rmidi, snd_seq_event_t *ev)
 {
 	snd_virmidi_dev_t *rdev;
@@ -118,7 +118,6 @@ int snd_virmidi_receive(snd_rawmidi_t *rmidi, snd_seq_event_t *ev)
 	rdev = rmidi->private_data;
 	return snd_virmidi_dev_receive_event(rdev, ev);
 }
-#endif  /*  0  */
 
 /*
  * event handler of virmidi port
@@ -385,7 +384,7 @@ static int snd_virmidi_dev_attach_seq(snd_virmidi_dev_t *rdev)
 	info->client = client;
 	info->type = KERNEL_CLIENT;
 	sprintf(info->name, "%s %d-%d", rdev->rmidi->name, rdev->card->number, rdev->device);
-	snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_SET_CLIENT_INFO, info);
+	snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_SET_CLIENT_INFO, &info);
 
 	/* create a port */
 	memset(pinfo, 0, sizeof(*pinfo));
@@ -406,7 +405,7 @@ static int snd_virmidi_dev_attach_seq(snd_virmidi_dev_t *rdev)
 	pcallbacks.unuse = snd_virmidi_unuse;
 	pcallbacks.event_input = snd_virmidi_event_input;
 	pinfo->kernel = &pcallbacks;
-	err = snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_CREATE_PORT, pinfo);
+	err = snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_CREATE_PORT, &pinfo);
 	if (err < 0) {
 		snd_seq_delete_kernel_client(client);
 		rdev->client = -1;
@@ -549,3 +548,4 @@ module_init(alsa_virmidi_init)
 module_exit(alsa_virmidi_exit)
 
 EXPORT_SYMBOL(snd_virmidi_new);
+EXPORT_SYMBOL(snd_virmidi_receive);

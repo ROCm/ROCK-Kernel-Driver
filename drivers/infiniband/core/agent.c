@@ -45,13 +45,10 @@
 #include "smi.h"
 #include "agent_priv.h"
 #include "mad_priv.h"
-
+#include "agent.h"
 
 spinlock_t ib_agent_port_list_lock;
 static LIST_HEAD(ib_agent_port_list);
-
-extern kmem_cache_t *ib_mad_cache;
-
 
 /*
  * Caller must hold ib_agent_port_list_lock
@@ -66,14 +63,13 @@ __ib_get_agent_port(struct ib_device *device, int port_num,
 
 	if (device) {
 		list_for_each_entry(entry, &ib_agent_port_list, port_list) {
-			if (entry->dr_smp_agent->device == device &&
+			if (entry->smp_agent->device == device &&
 			    entry->port_num == port_num)
 				return entry;
 		}
 	} else {
 		list_for_each_entry(entry, &ib_agent_port_list, port_list) {
-			if ((entry->dr_smp_agent == mad_agent) ||
-			    (entry->lr_smp_agent == mad_agent) ||
+			if ((entry->smp_agent == mad_agent) ||
 			    (entry->perf_mgmt_agent == mad_agent))
 				return entry;
 		}
@@ -111,7 +107,7 @@ int smi_check_local_dr_smp(struct ib_smp *smp,
 		return 1;
 	}
 
-	return smi_check_local_smp(port_priv->dr_smp_agent, smp);
+	return smi_check_local_smp(port_priv->smp_agent, smp);
 }
 
 static int agent_mad_send(struct ib_mad_agent *mad_agent,
@@ -133,7 +129,6 @@ static int agent_mad_send(struct ib_mad_agent *mad_agent,
 		goto out;
 	agent_send_wr->mad = mad_priv;
 
-	/* PCI mapping */
 	gather_list.addr = dma_map_single(mad_agent->device->dma_device,
 					  &mad_priv->mad,
 					  sizeof(mad_priv->mad),
@@ -231,10 +226,8 @@ int agent_send(struct ib_mad_private *mad,
 	/* Get mad agent based on mgmt_class in MAD */
 	switch (mad->mad.mad.mad_hdr.mgmt_class) {
 		case IB_MGMT_CLASS_SUBN_DIRECTED_ROUTE:
-			mad_agent = port_priv->dr_smp_agent;
-			break;
 		case IB_MGMT_CLASS_SUBN_LID_ROUTED:
-			mad_agent = port_priv->lr_smp_agent;
+			mad_agent = port_priv->smp_agent;
 			break;
 		case IB_MGMT_CLASS_PERF_MGMT:
 			mad_agent = port_priv->perf_mgmt_agent;
@@ -267,7 +260,6 @@ static void agent_send_handler(struct ib_mad_agent *mad_agent,
 	list_del(&agent_send_wr->send_list);
 	spin_unlock_irqrestore(&port_priv->send_list_lock, flags);
 
-	/* Unmap PCI */
 	dma_unmap_single(mad_agent->device->dma_device,
 			 pci_unmap_addr(agent_send_wr, mapping),
 			 sizeof(agent_send_wr->mad->mad),
@@ -284,7 +276,6 @@ int ib_agent_port_open(struct ib_device *device, int port_num)
 {
 	int ret;
 	struct ib_agent_port_private *port_priv;
-	struct ib_mad_reg_req reg_req;
 	unsigned long flags;
 
 	/* First, check if port already open for SMI */
@@ -308,35 +299,19 @@ int ib_agent_port_open(struct ib_device *device, int port_num)
 	spin_lock_init(&port_priv->send_list_lock);
 	INIT_LIST_HEAD(&port_priv->send_posted_list);
 
-	/* Obtain MAD agent for directed route SM class */
-	reg_req.mgmt_class = IB_MGMT_CLASS_SUBN_DIRECTED_ROUTE;
-	reg_req.mgmt_class_version = 1;
+	/* Obtain send only MAD agent for SM class (SMI QP) */
+	port_priv->smp_agent = ib_register_mad_agent(device, port_num,
+						     IB_QPT_SMI,
+						     NULL, 0,
+						    &agent_send_handler,
+						     NULL, NULL);
 
-	port_priv->dr_smp_agent = ib_register_mad_agent(device, port_num,
-							IB_QPT_SMI,
-							NULL, 0,
-						       &agent_send_handler,
-							NULL, NULL);
-
-	if (IS_ERR(port_priv->dr_smp_agent)) {
-		ret = PTR_ERR(port_priv->dr_smp_agent);
+	if (IS_ERR(port_priv->smp_agent)) {
+		ret = PTR_ERR(port_priv->smp_agent);
 		goto error2;
 	}
 
-	/* Obtain MAD agent for LID routed SM class */
-	reg_req.mgmt_class = IB_MGMT_CLASS_SUBN_LID_ROUTED;
-	port_priv->lr_smp_agent = ib_register_mad_agent(device, port_num,
-							IB_QPT_SMI,
-							NULL, 0,
-						       &agent_send_handler,
-							NULL, NULL);
-	if (IS_ERR(port_priv->lr_smp_agent)) {
-		ret = PTR_ERR(port_priv->lr_smp_agent);
-		goto error3;
-	}
-
-	/* Obtain MAD agent for PerfMgmt class */
-	reg_req.mgmt_class = IB_MGMT_CLASS_PERF_MGMT;
+	/* Obtain send only MAD agent for PerfMgmt class (GSI QP) */
 	port_priv->perf_mgmt_agent = ib_register_mad_agent(device, port_num,
 							   IB_QPT_GSI,
 							   NULL, 0,
@@ -344,15 +319,15 @@ int ib_agent_port_open(struct ib_device *device, int port_num)
 							   NULL, NULL);
 	if (IS_ERR(port_priv->perf_mgmt_agent)) {
 		ret = PTR_ERR(port_priv->perf_mgmt_agent);
-		goto error4;
+		goto error3;
 	}
 
-	port_priv->mr = ib_get_dma_mr(port_priv->dr_smp_agent->qp->pd,
+	port_priv->mr = ib_get_dma_mr(port_priv->smp_agent->qp->pd,
 				      IB_ACCESS_LOCAL_WRITE);
 	if (IS_ERR(port_priv->mr)) {
 		printk(KERN_ERR SPFX "Couldn't get DMA MR\n");
 		ret = PTR_ERR(port_priv->mr);
-		goto error5;
+		goto error4;
 	}
 
 	spin_lock_irqsave(&ib_agent_port_list_lock, flags);
@@ -361,12 +336,10 @@ int ib_agent_port_open(struct ib_device *device, int port_num)
 
 	return 0;
 
-error5:
-	ib_unregister_mad_agent(port_priv->perf_mgmt_agent);
 error4:
-	ib_unregister_mad_agent(port_priv->lr_smp_agent);
+	ib_unregister_mad_agent(port_priv->perf_mgmt_agent);
 error3:
-	ib_unregister_mad_agent(port_priv->dr_smp_agent);
+	ib_unregister_mad_agent(port_priv->smp_agent);
 error2:
 	kfree(port_priv);
 error1:
@@ -391,8 +364,7 @@ int ib_agent_port_close(struct ib_device *device, int port_num)
 	ib_dereg_mr(port_priv->mr);
 
 	ib_unregister_mad_agent(port_priv->perf_mgmt_agent);
-	ib_unregister_mad_agent(port_priv->lr_smp_agent);
-	ib_unregister_mad_agent(port_priv->dr_smp_agent);
+	ib_unregister_mad_agent(port_priv->smp_agent);
 	kfree(port_priv);
 
 	return 0;

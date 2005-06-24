@@ -16,6 +16,13 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *  ========
+ *
+ *  Copyright (C) 2004-2005   James Smart, Emulex Corporation
+ *    Rewrite for host, target, device, and remote port attributes,
+ *    statistics, and service functions...
+ *
  */
 #ifndef SCSI_TRANSPORT_FC_H
 #define SCSI_TRANSPORT_FC_H
@@ -61,8 +68,10 @@ enum fc_port_type {
  */
 enum fc_port_state {
 	FC_PORTSTATE_UNKNOWN,
+	FC_PORTSTATE_NOTPRESENT,
 	FC_PORTSTATE_ONLINE,
 	FC_PORTSTATE_OFFLINE,		/* User has taken Port Offline */
+	FC_PORTSTATE_BLOCKED,
 	FC_PORTSTATE_BYPASSED,
 	FC_PORTSTATE_DIAGNOSTICS,
 	FC_PORTSTATE_LINKDOWN,
@@ -103,35 +112,134 @@ enum fc_port_state {
  * scsi_transport_fc.c (for the ascii descriptions).
  */
 enum fc_tgtid_binding_type  {
+	FC_TGTID_BIND_NONE,
 	FC_TGTID_BIND_BY_WWPN,
 	FC_TGTID_BIND_BY_WWNN,
 	FC_TGTID_BIND_BY_ID,
 };
 
+/*
+ * FC Remote Port Roles
+ * Note: values are not enumerated, as they can be "or'd" together
+ * for reporting (e.g. report roles). If you alter this list,
+ * you also need to alter scsi_transport_fc.c (for the ascii descriptions).
+ */
+#define FC_RPORT_ROLE_UNKNOWN			0x00
+#define FC_RPORT_ROLE_FCP_TARGET		0x01
+#define FC_RPORT_ROLE_FCP_INITIATOR		0x02
+#define FC_RPORT_ROLE_IP_PORT			0x04
 
 
 /*
- * FC Remote Port (Target) Attributes
+ * fc_rport_identifiers: This set of data contains all elements
+ * to uniquely identify a remote FC port. The driver uses this data
+ * to report the existence of a remote FC port in the topology. Internally,
+ * the transport uses this data for attributes and to manage consistent
+ * target id bindings.
+ */
+struct fc_rport_identifiers {
+	u64 node_name;
+	u64 port_name;
+	u32 port_id;
+	u32 roles;
+};
+
+/* Macro for use in defining Remote Port attributes */
+#define FC_RPORT_ATTR(_name,_mode,_show,_store)				\
+struct class_device_attribute class_device_attr_rport_##_name = 	\
+	__ATTR(_name,_mode,_show,_store)
+
+
+/*
+ * FC Remote Port Attributes
+ *
+ * This structure exists for each remote FC port that a LLDD notifies
+ * the subsystem of.  A remote FC port may or may not be a SCSI Target,
+ * also be a SCSI initiator, IP endpoint, etc. As such, the remote
+ * port is considered a separate entity, independent of "role" (such
+ * as scsi target).
+ *
+ * --
+ *
+ * Attributes are based on HBAAPI V2.0 definitions. Only those
+ * attributes that are determinable by the local port (aka Host)
+ * are contained.
+ *
+ * Fixed attributes are not expected to change. The driver is
+ * expected to set these values after successfully calling
+ * fc_remote_port_add(). The transport fully manages all get functions
+ * w/o driver interaction.
+ *
+ * Dynamic attributes are expected to change. The driver participates
+ * in all get/set operations via functions provided by the driver.
+ *
+ * Private attributes are transport-managed values. They are fully
+ * managed by the transport w/o driver interaction.
+ */
+
+struct fc_rport {	/* aka fc_starget_attrs */
+	/* Fixed Attributes */
+	u32 maxframe_size;
+	u32 supported_classes;
+
+	/* Dynamic Attributes */
+	u32 dev_loss_tmo;	/* Remote Port loss timeout in seconds. */
+
+	/* Private (Transport-managed) Attributes */
+	u64 node_name;
+	u64 port_name;
+	u32 port_id;
+	u32 roles;
+	enum fc_port_state port_state;	/* Will only be ONLINE or UNKNOWN */
+	u32 scsi_target_id;
+
+	/* exported data */
+	void *dd_data;			/* Used for driver-specific storage */
+
+	/* internal data */
+	unsigned int channel;
+	u32 number;
+	struct list_head peers;
+	struct device dev;
+ 	struct work_struct dev_loss_work;
+ 	struct work_struct scan_work;
+} __attribute__((aligned(sizeof(unsigned long))));
+
+#define	dev_to_rport(d)				\
+	container_of(d, struct fc_rport, dev)
+#define transport_class_to_rport(classdev)	\
+	dev_to_rport(classdev->dev)
+#define rport_to_shost(r)			\
+	dev_to_shost(r->dev.parent)
+
+/*
+ * FC SCSI Target Attributes
+ *
+ * The SCSI Target is considered an extention of a remote port (as
+ * a remote port can be more than a SCSI Target). Within the scsi
+ * subsystem, we leave the Target as a separate entity. Doing so
+ * provides backward compatibility with prior FC transport api's,
+ * and lets remote ports be handled entirely within the FC transport
+ * and independently from the scsi subsystem. The drawback is that
+ * some data will be duplicated.
  */
 
 struct fc_starget_attrs {	/* aka fc_target_attrs */
-	int port_id;
+	/* Dynamic Attributes */
 	u64 node_name;
 	u64 port_name;
-	u32 dev_loss_tmo;	/* Remote Port loss timeout in seconds. */
-	struct work_struct dev_loss_work;
+	u32 port_id;
 };
 
-#define fc_starget_port_id(x) \
-	(((struct fc_starget_attrs *)&(x)->starget_data)->port_id)
 #define fc_starget_node_name(x) \
 	(((struct fc_starget_attrs *)&(x)->starget_data)->node_name)
 #define fc_starget_port_name(x)	\
 	(((struct fc_starget_attrs *)&(x)->starget_data)->port_name)
-#define fc_starget_dev_loss_tmo(x) \
-	(((struct fc_starget_attrs *)&(x)->starget_data)->dev_loss_tmo)
-#define fc_starget_dev_loss_work(x) \
-	(((struct fc_starget_attrs *)&(x)->starget_data)->dev_loss_work)
+#define fc_starget_port_id(x) \
+	(((struct fc_starget_attrs *)&(x)->starget_data)->port_id)
+
+#define starget_to_rport(s)			\
+	scsi_is_fc_rport(s->dev.parent) ? dev_to_rport(s->dev.parent) : NULL
 
 
 /*
@@ -197,11 +305,7 @@ struct fc_host_attrs {
 	char symbolic_name[FC_SYMBOLIC_NAME_SIZE];
 	u32 supported_speeds;
 	u32 maxframe_size;
-	char hardware_version[FC_VERSION_STRING_SIZE];
-	char firmware_version[FC_VERSION_STRING_SIZE];
 	char serial_number[FC_SERIAL_NUMBER_SIZE];
-	char opt_rom_version[FC_VERSION_STRING_SIZE];
-	char driver_version[FC_VERSION_STRING_SIZE];
 
 	/* Dynamic Attributes */
 	u32 port_id;
@@ -210,13 +314,15 @@ struct fc_host_attrs {
 	u8  active_fc4s[FC_FC4_LIST_SIZE];
 	u32 speed;
 	u64 fabric_name;
-	u32 link_down_tmo;	/* Link Down timeout in seconds. */
 
 	/* Private (Transport-managed) Attributes */
 	enum fc_tgtid_binding_type  tgtid_bind_type;
 
 	/* internal data */
-	struct work_struct link_down_work;
+	struct list_head rports;
+	struct list_head rport_bindings;
+	u32 next_rport_number;
+	u32 next_target_id;
 };
 
 #define fc_host_node_name(x) \
@@ -233,16 +339,8 @@ struct fc_host_attrs {
 	(((struct fc_host_attrs *)(x)->shost_data)->supported_speeds)
 #define fc_host_maxframe_size(x)	\
 	(((struct fc_host_attrs *)(x)->shost_data)->maxframe_size)
-#define fc_host_hardware_version(x)	\
-	(((struct fc_host_attrs *)(x)->shost_data)->hardware_version)
-#define fc_host_firmware_version(x)	\
-	(((struct fc_host_attrs *)(x)->shost_data)->firmware_version)
 #define fc_host_serial_number(x)	\
 	(((struct fc_host_attrs *)(x)->shost_data)->serial_number)
-#define fc_host_opt_rom_version(x)	\
-	(((struct fc_host_attrs *)(x)->shost_data)->opt_rom_version)
-#define fc_host_driver_version(x)	\
-	(((struct fc_host_attrs *)(x)->shost_data)->driver_version)
 #define fc_host_port_id(x)	\
 	(((struct fc_host_attrs *)(x)->shost_data)->port_id)
 #define fc_host_port_type(x)	\
@@ -255,21 +353,26 @@ struct fc_host_attrs {
 	(((struct fc_host_attrs *)(x)->shost_data)->speed)
 #define fc_host_fabric_name(x)	\
 	(((struct fc_host_attrs *)(x)->shost_data)->fabric_name)
-#define fc_host_link_down_tmo(x) \
-	(((struct fc_host_attrs *)(x)->shost_data)->link_down_tmo)
 #define fc_host_tgtid_bind_type(x) \
 	(((struct fc_host_attrs *)(x)->shost_data)->tgtid_bind_type)
-#define fc_host_link_down_work(x) \
-	(((struct fc_host_attrs *)(x)->shost_data)->link_down_work)
+#define fc_host_rports(x) \
+	(((struct fc_host_attrs *)(x)->shost_data)->rports)
+#define fc_host_rport_bindings(x) \
+	(((struct fc_host_attrs *)(x)->shost_data)->rport_bindings)
+#define fc_host_next_rport_number(x) \
+	(((struct fc_host_attrs *)(x)->shost_data)->next_rport_number)
+#define fc_host_next_target_id(x) \
+	(((struct fc_host_attrs *)(x)->shost_data)->next_target_id)
 
 
 /* The functions by which the transport class and the driver communicate */
 struct fc_function_template {
-	void 	(*get_starget_port_id)(struct scsi_target *);
+	void    (*get_rport_dev_loss_tmo)(struct fc_rport *);
+	void	(*set_rport_dev_loss_tmo)(struct fc_rport *, u32);
+
 	void	(*get_starget_node_name)(struct scsi_target *);
 	void	(*get_starget_port_name)(struct scsi_target *);
-	void    (*get_starget_dev_loss_tmo)(struct scsi_target *);
-	void	(*set_starget_dev_loss_tmo)(struct scsi_target *, u32);
+	void 	(*get_starget_port_id)(struct scsi_target *);
 
 	void 	(*get_host_port_id)(struct Scsi_Host *);
 	void	(*get_host_port_type)(struct Scsi_Host *);
@@ -277,11 +380,12 @@ struct fc_function_template {
 	void	(*get_host_active_fc4s)(struct Scsi_Host *);
 	void	(*get_host_speed)(struct Scsi_Host *);
 	void	(*get_host_fabric_name)(struct Scsi_Host *);
-	void    (*get_host_link_down_tmo)(struct Scsi_Host *);
-	void	(*set_host_link_down_tmo)(struct Scsi_Host *, u32);
 
 	struct fc_host_statistics * (*get_fc_host_stats)(struct Scsi_Host *);
 	void	(*reset_fc_host_stats)(struct Scsi_Host *);
+
+	/* allocation lengths for host-specific data */
+	u32	 			dd_fcrport_size;
 
 	/* 
 	 * The driver sets these to tell the transport class it
@@ -289,10 +393,20 @@ struct fc_function_template {
 	 * is not set, the attribute will be private to the transport
 	 * class 
 	 */
-	unsigned long	show_starget_port_id:1;
+
+	/* remote port fixed attributes */
+	unsigned long	show_rport_maxframe_size:1;
+	unsigned long	show_rport_supported_classes:1;
+	unsigned long   show_rport_dev_loss_tmo:1;
+
+	/*
+	 * target dynamic attributes
+	 * These should all be "1" if the driver uses the remote port
+	 * add/delete functions (so attributes reflect rport values).
+	 */
 	unsigned long	show_starget_node_name:1;
 	unsigned long	show_starget_port_name:1;
-	unsigned long   show_starget_dev_loss_tmo:1;
+	unsigned long	show_starget_port_id:1;
 
 	/* host fixed attributes */
 	unsigned long	show_host_node_name:1;
@@ -302,11 +416,7 @@ struct fc_function_template {
 	unsigned long	show_host_symbolic_name:1;
 	unsigned long	show_host_supported_speeds:1;
 	unsigned long	show_host_maxframe_size:1;
-	unsigned long	show_host_hardware_version:1;
-	unsigned long	show_host_firmware_version:1;
 	unsigned long	show_host_serial_number:1;
-	unsigned long	show_host_opt_rom_version:1;
-	unsigned long	show_host_driver_version:1;
 	/* host dynamic attributes */
 	unsigned long	show_host_port_id:1;
 	unsigned long	show_host_port_type:1;
@@ -314,15 +424,19 @@ struct fc_function_template {
 	unsigned long	show_host_active_fc4s:1;
 	unsigned long	show_host_speed:1;
 	unsigned long	show_host_fabric_name:1;
-	unsigned long   show_host_link_down_tmo:1;
 };
 
 
-struct scsi_transport_template *fc_attach_transport(struct fc_function_template *);
+struct scsi_transport_template *fc_attach_transport(
+			struct fc_function_template *);
 void fc_release_transport(struct scsi_transport_template *);
-int fc_target_block(struct scsi_target *starget);
-void fc_target_unblock(struct scsi_target *starget);
-int fc_host_block(struct Scsi_Host *shost);
-void fc_host_unblock(struct Scsi_Host *shost);
+void fc_remove_host(struct Scsi_Host *);
+struct fc_rport *fc_remote_port_add(struct Scsi_Host *shost,
+			int channel, struct fc_rport_identifiers  *ids);
+void fc_remote_port_delete(struct fc_rport  *rport);
+void fc_remote_port_rolechg(struct fc_rport  *rport, u32 roles);
+int fc_remote_port_block(struct fc_rport *rport);
+void fc_remote_port_unblock(struct fc_rport *rport);
+int scsi_is_fc_rport(const struct device *);
 
 #endif /* SCSI_TRANSPORT_FC_H */

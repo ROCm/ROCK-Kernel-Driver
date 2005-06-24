@@ -10,7 +10,7 @@
 /*** Version/name ***/
 #define INTELFB_VERSION			"0.9.2"
 #define INTELFB_MODULE_NAME		"intelfb"
-#define SUPPORTED_CHIPSETS		"830M/845G/852GM/855GM/865G"
+#define SUPPORTED_CHIPSETS		"830M/845G/852GM/855GM/865G/915G"
 
 
 /*** Debug/feature defines ***/
@@ -36,7 +36,7 @@
 #endif
 
 #ifndef PREFERRED_MODE
-#define PREFERRED_MODE			"1024x768-16@60"
+#define PREFERRED_MODE			"1024x768-32@70"
 #endif
 
 /*** hw-related values ***/
@@ -46,6 +46,7 @@
 #define PCI_DEVICE_ID_INTEL_845G	0x2562
 #define PCI_DEVICE_ID_INTEL_85XGM	0x3582
 #define PCI_DEVICE_ID_INTEL_865G	0x2572
+#define PCI_DEVICE_ID_INTEL_915G	0x2582
 
 /* Size of MMIO region */
 #define INTEL_REG_SIZE			0x80000
@@ -117,7 +118,8 @@ enum intel_chips {
 	INTEL_852GME,
 	INTEL_855GM,
 	INTEL_855GME,
-	INTEL_865G
+	INTEL_865G,
+	INTEL_915G
 };
 
 struct intelfb_hwstate {

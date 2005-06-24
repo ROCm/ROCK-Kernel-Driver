@@ -1119,7 +1119,7 @@ static inline int ipmr_forward_finish(struct sk_buff *skb)
 	if (unlikely(opt->optlen))
 		ip_forward_options(skb);
 
-	return ip_dst_output(skb);
+	return dst_output(skb);
 }
 
 /*
@@ -1171,7 +1171,7 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c, int vifi)
 
 	dev = rt->u.dst.dev;
 
-	if (skb->len+encap > dst_pmtu(&rt->u.dst) && (ntohs(iph->frag_off) & IP_DF)) {
+	if (skb->len+encap > dst_mtu(&rt->u.dst) && (ntohs(iph->frag_off) & IP_DF)) {
 		/* Do not fragment multicasts. Alas, IPv4 does not
 		   allow to send ICMP, so that packets will disappear
 		   to blackhole.

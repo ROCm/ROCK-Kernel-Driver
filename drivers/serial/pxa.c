@@ -161,20 +161,12 @@ receive_chars(struct uart_pxa_port *up, int *status, struct pt_regs *regs)
 			else if (*status & UART_LSR_FE)
 				flag = TTY_FRAME;
 		}
+
 		if (uart_handle_sysrq_char(&up->port, ch, regs))
 			goto ignore_char;
-		if ((*status & up->port.ignore_status_mask) == 0) {
-			tty_insert_flip_char(tty, ch, flag);
-		}
-		if ((*status & UART_LSR_OE) &&
-		    tty->flip.count < TTY_FLIPBUF_SIZE) {
-			/*
-			 * Overrun is special, since it's reported
-			 * immediately, and doesn't affect the current
-			 * character.
-			 */
-			tty_insert_flip_char(tty, 0, TTY_OVERRUN);
-		}
+
+		uart_insert_char(&up->port, *status, UART_LSR_OE, ch, flag);
+
 	ignore_char:
 		*status = serial_in(up, UART_LSR);
 	} while ((*status & UART_LSR_DR) && (max_count-- > 0));
@@ -797,7 +789,7 @@ static struct uart_driver serial_pxa_reg = {
 	.cons		= PXA_CONSOLE,
 };
 
-static int serial_pxa_suspend(struct device *_dev, u32 state, u32 level)
+static int serial_pxa_suspend(struct device *_dev, pm_message_t state, u32 level)
 {
         struct uart_pxa_port *sport = dev_get_drvdata(_dev);
 

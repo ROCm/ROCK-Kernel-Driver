@@ -177,6 +177,10 @@ typedef union {
 
 extern long perfmonctl(int fd, int cmd, void *arg, int narg);
 
+typedef struct {
+	void (*handler)(int irq, void *arg, struct pt_regs *regs);
+} pfm_intr_handler_desc_t;
+
 extern void pfm_save_regs (struct task_struct *);
 extern void pfm_load_regs (struct task_struct *);
 
@@ -187,6 +191,10 @@ extern void pfm_syst_wide_update_task(struct task_struct *, unsigned long info, 
 extern void pfm_inherit(struct task_struct *task, struct pt_regs *regs);
 extern void pfm_init_percpu(void);
 extern void pfm_handle_work(void);
+extern int  pfm_install_alt_pmu_interrupt(pfm_intr_handler_desc_t *h);
+extern int  pfm_remove_alt_pmu_interrupt(pfm_intr_handler_desc_t *h);
+
+
 
 /*
  * Reset PMD register flags
@@ -253,6 +261,18 @@ extern int pfm_mod_write_dbrs(struct task_struct *task, void *req, unsigned int 
 #define PFM_CPUINFO_SYST_WIDE	0x1	/* if set a system wide session exists */
 #define PFM_CPUINFO_DCR_PP	0x2	/* if set the system wide session has started */
 #define PFM_CPUINFO_EXCL_IDLE	0x4	/* the system wide session excludes the idle task */
+
+/*
+ * sysctl control structure. visible to sampling formats
+ */
+typedef struct {
+	int	debug;		/* turn on/off debugging via syslog */
+	int	debug_ovfl;	/* turn on/off debug printk in overflow handler */
+	int	fastctxsw;	/* turn on/off fast (unsecure) ctxsw */
+	int	expert_mode;	/* turn on/off value checking */
+} pfm_sysctl_t;
+extern pfm_sysctl_t pfm_sysctl;
+
 
 #endif /* __KERNEL__ */
 

@@ -5,8 +5,9 @@ The main development site and CVS repository for these
 drivers is http://linuxtv.org/.
 
 The developer mailing list linux-dvb is also hosted there,
-see http://linuxtv.org/mailinglists.xml. Please check
-the archive http://linuxtv.org/mailinglists/linux-dvb/
+see http://linuxtv.org/lists.php. Please check
+the archive http://linuxtv.org/pipermail/linux-dvb/
+and the Wiki http://linuxtv.org/wiki/
 before asking newbie questions on the list.
 
 API documentation, utilities and test/example programs
@@ -15,7 +16,7 @@ are available as part of the old driver package for Linux 2.4
 We plan to split this into separate packages, but it's not
 been done yet.
 
-http://linuxtv.org/download/dvb/
+http://linuxtv.org/downloads/
 
 What's inside this directory:
 

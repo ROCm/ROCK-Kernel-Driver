@@ -400,8 +400,8 @@ static int sctp_packet(struct ip_conntrack *conntrack,
 					return -1;
 			}
 			DEBUGP("Setting vtag %x for dir %d\n", 
-					ih->init_tag, CTINFO2DIR(ctinfo));
-			conntrack->proto.sctp.vtag[IP_CT_DIR_ORIGINAL] = ih->init_tag;
+					ih->init_tag, !CTINFO2DIR(ctinfo));
+			conntrack->proto.sctp.vtag[!CTINFO2DIR(ctinfo)] = ih->init_tag;
 		}
 
 		conntrack->proto.sctp.state = newconntrack;

@@ -436,7 +436,7 @@ out:
 
 	/* change mtu on this route */
 	if (type == ICMP_DEST_UNREACH && code == ICMP_FRAG_NEEDED) {
-		if (rel_info > dst_pmtu(skb2->dst)) {
+		if (rel_info > dst_mtu(skb2->dst)) {
 			kfree_skb(skb2);
 			return;
 		}
@@ -476,11 +476,6 @@ static int ipip_rcv(struct sk_buff *skb)
 
 	read_lock(&ipip_lock);
 	if ((tunnel = ipip_tunnel_lookup(iph->saddr, iph->daddr)) != NULL) {
-		/* IPIP packets decapsulated by IPsec missed netfilter hooks */
-		if (nf_xfrm_local_done(skb, NULL)) {
-			nf_rcv_postxfrm_local(skb);
-			return 0;
-		}
 		if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
 			read_unlock(&ipip_lock);
 			kfree_skb(skb);
@@ -574,9 +569,9 @@ static int ipip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	if (tiph->frag_off)
-		mtu = dst_pmtu(&rt->u.dst) - sizeof(struct iphdr);
+		mtu = dst_mtu(&rt->u.dst) - sizeof(struct iphdr);
 	else
-		mtu = skb->dst ? dst_pmtu(skb->dst) : dev->mtu;
+		mtu = skb->dst ? dst_mtu(skb->dst) : dev->mtu;
 
 	if (mtu < 68) {
 		tunnel->stat.collisions++;

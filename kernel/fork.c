@@ -29,6 +29,7 @@
 #include <linux/mman.h>
 #include <linux/fs.h>
 #include <linux/cpu.h>
+#include <linux/cpuset.h>
 #include <linux/security.h>
 #include <linux/swap.h>
 #include <linux/syscalls.h>
@@ -78,6 +79,24 @@ int nr_processes(void)
 # define free_task_struct(tsk)	kmem_cache_free(task_struct_cachep, (tsk))
 static kmem_cache_t *task_struct_cachep;
 #endif
+
+/* SLAB cache for signal_struct structures (tsk->signal) */
+kmem_cache_t *signal_cachep;
+
+/* SLAB cache for sighand_struct structures (tsk->sighand) */
+kmem_cache_t *sighand_cachep;
+
+/* SLAB cache for files_struct structures (tsk->files) */
+kmem_cache_t *files_cachep;
+
+/* SLAB cache for fs_struct structures (tsk->fs) */
+kmem_cache_t *fs_cachep;
+
+/* SLAB cache for vm_area_struct structures */
+kmem_cache_t *vm_area_cachep;
+
+/* SLAB cache for mm_struct structures (tsk->mm) */
+static kmem_cache_t *mm_cachep;
 
 void free_task(struct task_struct *tsk)
 {
@@ -130,6 +149,8 @@ void __init fork_init(unsigned long mempages)
 
 	init_task.signal->rlim[RLIMIT_NPROC].rlim_cur = max_threads/2;
 	init_task.signal->rlim[RLIMIT_NPROC].rlim_max = max_threads/2;
+	init_task.signal->rlim[RLIMIT_SIGPENDING] =
+		init_task.signal->rlim[RLIMIT_NPROC];
 }
 
 static struct task_struct *dup_task_struct(struct task_struct *orig)
@@ -154,10 +175,6 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	tsk->thread_info = ti;
 	ti->task = tsk;
 
-	/* initialize list of pages privately reserved by process */
-	INIT_LIST_HEAD(&tsk->private_pages);
-	tsk->private_pages_count = 0;
-
 	/* One for us, one for whoever does the "release_task()" (usually parent) */
 	atomic_set(&tsk->usage,2);
 	return tsk;
@@ -179,8 +196,8 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	mm->mmap_cache = NULL;
 	mm->free_area_cache = oldmm->mmap_base;
 	mm->map_count = 0;
-	mm->rss = 0;
-	mm->anon_rss = 0;
+	set_mm_counter(mm, rss, 0);
+	set_mm_counter(mm, anon_rss, 0);
 	cpus_clear(mm->cpu_vm_mask);
 	mm->mm_rb = RB_ROOT;
 	rb_link = &mm->mm_rb.rb_node;
@@ -476,7 +493,7 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 	if (retval)
 		goto free_pt;
 
-	mm->hiwater_rss = mm->rss;
+	mm->hiwater_rss = get_mm_counter(mm,rss);
 	mm->hiwater_vm = mm->total_vm;
 
 good_mm:
@@ -724,6 +741,7 @@ static inline int copy_sighand(unsigned long clone_flags, struct task_struct * t
 static inline int copy_signal(unsigned long clone_flags, struct task_struct * tsk)
 {
 	struct signal_struct *sig;
+	int ret;
 
 	if (clone_flags & CLONE_THREAD) {
 		atomic_inc(&current->signal->count);
@@ -734,6 +752,13 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	tsk->signal = sig;
 	if (!sig)
 		return -ENOMEM;
+
+	ret = copy_thread_group_keys(tsk);
+	if (ret < 0) {
+		kmem_cache_free(signal_cachep, sig);
+		return ret;
+	}
+
 	atomic_set(&sig->count, 1);
 	atomic_set(&sig->live, 1);
 	init_waitqueue_head(&sig->wait_chldexit);
@@ -745,6 +770,16 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	init_sigpending(&sig->shared_pending);
 	INIT_LIST_HEAD(&sig->posix_timers);
 
+	sig->it_real_value = sig->it_real_incr = 0;
+	sig->real_timer.function = it_real_fn;
+	sig->real_timer.data = (unsigned long) tsk;
+	init_timer(&sig->real_timer);
+
+	sig->it_virt_expires = cputime_zero;
+	sig->it_virt_incr = cputime_zero;
+	sig->it_prof_expires = cputime_zero;
+	sig->it_prof_incr = cputime_zero;
+
 	sig->tty = current->signal->tty;
 	sig->pgrp = process_group(current);
 	sig->session = current->signal->session;
@@ -754,10 +789,23 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	sig->utime = sig->stime = sig->cutime = sig->cstime = cputime_zero;
 	sig->nvcsw = sig->nivcsw = sig->cnvcsw = sig->cnivcsw = 0;
 	sig->min_flt = sig->maj_flt = sig->cmin_flt = sig->cmaj_flt = 0;
+	sig->sched_time = 0;
+	INIT_LIST_HEAD(&sig->cpu_timers[0]);
+	INIT_LIST_HEAD(&sig->cpu_timers[1]);
+	INIT_LIST_HEAD(&sig->cpu_timers[2]);
 
 	task_lock(current->group_leader);
 	memcpy(sig->rlim, current->signal->rlim, sizeof sig->rlim);
 	task_unlock(current->group_leader);
+
+	if (sig->rlim[RLIMIT_CPU].rlim_cur != RLIM_INFINITY) {
+		/*
+		 * New sole thread in the process gets an expiry time
+		 * of the whole CPU time limit.
+		 */
+		tsk->it_prof_expires =
+			secs_to_cputime(sig->rlim[RLIMIT_CPU].rlim_cur);
+	}
 
 	return 0;
 }
@@ -871,22 +919,21 @@ static task_t *copy_process(unsigned long clone_flags,
 	clear_tsk_thread_flag(p, TIF_SIGPENDING);
 	init_sigpending(&p->pending);
 
-	p->it_real_value = 0;
-	p->it_real_incr = 0;
-	p->it_virt_value = cputime_zero;
-	p->it_virt_incr = cputime_zero;
-	p->it_prof_value = cputime_zero;
-	p->it_prof_incr = cputime_zero;
-	init_timer(&p->real_timer);
-	p->real_timer.data = (unsigned long) p;
-
 	p->utime = cputime_zero;
 	p->stime = cputime_zero;
+ 	p->sched_time = 0;
 	p->rchar = 0;		/* I/O counter: bytes read */
 	p->wchar = 0;		/* I/O counter: bytes written */
 	p->syscr = 0;		/* I/O counter: read syscalls */
 	p->syscw = 0;		/* I/O counter: write syscalls */
 	acct_clear_integrals(p);
+
+ 	p->it_virt_expires = cputime_zero;
+	p->it_prof_expires = cputime_zero;
+ 	p->it_sched_expires = 0;
+ 	INIT_LIST_HEAD(&p->cpu_timers[0]);
+ 	INIT_LIST_HEAD(&p->cpu_timers[1]);
+ 	INIT_LIST_HEAD(&p->cpu_timers[2]);
 
 	p->lock_depth = -1;		/* -1 = no lock */
 	do_posix_clock_monotonic_gettime(&p->start_time);
@@ -943,9 +990,6 @@ static task_t *copy_process(unsigned long clone_flags,
 	 * of CLONE_PTRACE.
 	 */
 	clear_tsk_thread_flag(p, TIF_SYSCALL_TRACE);
-#ifdef TIF_SYSCALL_EMU
-	clear_tsk_thread_flag(p, TIF_SYSCALL_EMU);
-#endif
 
 	/* Our parent execution domain becomes current domain
 	   These must match for thread signalling to apply */
@@ -1023,17 +1067,29 @@ static task_t *copy_process(unsigned long clone_flags,
 			set_tsk_thread_flag(p, TIF_SIGPENDING);
 		}
 
+		if (!cputime_eq(current->signal->it_virt_expires,
+				cputime_zero) ||
+		    !cputime_eq(current->signal->it_prof_expires,
+				cputime_zero) ||
+		    current->signal->rlim[RLIMIT_CPU].rlim_cur != RLIM_INFINITY ||
+		    !list_empty(&current->signal->cpu_timers[0]) ||
+		    !list_empty(&current->signal->cpu_timers[1]) ||
+		    !list_empty(&current->signal->cpu_timers[2])) {
+			/*
+			 * Have child wake up on its first tick to check
+			 * for process CPU timers.
+			 */
+			p->it_prof_expires = jiffies_to_cputime(1);
+		}
+
 		spin_unlock(&current->sighand->siglock);
 	}
-
-	/*
-	 * inherit ioprio
-	 */
-	p->ioprio = current->ioprio;
 
 	SET_LINKS(p);
 	if (unlikely(p->ptrace & PT_PTRACED))
 		__ptrace_link(p, current->parent);
+
+	cpuset_fork(p);
 
 	attach_pid(p, PIDTYPE_PID, p->pid);
 	attach_pid(p, PIDTYPE_TGID, p->tgid);
@@ -1195,24 +1251,6 @@ long do_fork(unsigned long clone_flags,
 	}
 	return pid;
 }
-
-/* SLAB cache for signal_struct structures (tsk->signal) */
-kmem_cache_t *signal_cachep;
-
-/* SLAB cache for sighand_struct structures (tsk->sighand) */
-kmem_cache_t *sighand_cachep;
-
-/* SLAB cache for files_struct structures (tsk->files) */
-kmem_cache_t *files_cachep;
-
-/* SLAB cache for fs_struct structures (tsk->fs) */
-kmem_cache_t *fs_cachep;
-
-/* SLAB cache for vm_area_struct structures */
-kmem_cache_t *vm_area_cachep;
-
-/* SLAB cache for mm_struct structures (tsk->mm) */
-kmem_cache_t *mm_cachep;
 
 void __init proc_caches_init(void)
 {

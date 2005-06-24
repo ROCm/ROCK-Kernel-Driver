@@ -444,7 +444,7 @@ int saa7146_vv_init(struct saa7146_dev* dev, struct saa7146_ext_vv *ext_vv)
 	memset(vv, 0x0, sizeof(*vv));
 
 	DEB_EE(("dev:%p\n",dev));
-	
+
 	/* set default values for video parts of the saa7146 */
 	saa7146_write(dev, BCS_CTRL, 0x80400040);
 
@@ -497,7 +497,7 @@ int saa7146_register_device(struct video_device **vid, struct saa7146_dev* dev,
 	struct video_device *vfd;
 
 	DEB_EE(("dev:%p, name:'%s', type:%d\n",dev,name,type));
- 
+
 	// released by vfd->release
  	vfd = video_device_alloc();
 	if (vfd == NULL)

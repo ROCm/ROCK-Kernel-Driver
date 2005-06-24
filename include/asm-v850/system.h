@@ -108,4 +108,6 @@ extern inline unsigned long __xchg (unsigned long with,
 	return tmp;
 }
 
+#define arch_align_stack(x) (x)
+
 #endif /* __V850_SYSTEM_H__ */

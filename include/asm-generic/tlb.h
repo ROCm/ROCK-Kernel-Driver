@@ -88,11 +88,11 @@ tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 {
 	int freed = tlb->freed;
 	struct mm_struct *mm = tlb->mm;
-	int rss = mm->rss;
+	int rss = get_mm_counter(mm, rss);
 
 	if (rss < freed)
 		freed = rss;
-	mm->rss = rss - freed;
+	add_mm_counter(mm, rss, -freed);
 	tlb_flush_mmu(tlb, start, end);
 
 	/* keep the page table cache within bounds */

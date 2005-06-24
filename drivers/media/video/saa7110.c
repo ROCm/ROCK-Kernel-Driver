@@ -30,6 +30,7 @@
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/wait.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
@@ -204,13 +205,16 @@ static const unsigned char initseq[1 + SAA7110_NR_REG] = {
 static int
 determine_norm (struct i2c_client *client)
 {
+	DEFINE_WAIT(wait);
 	struct saa7110 *decoder = i2c_get_clientdata(client);
 	int status;
 
 	/* mode changed, start automatic detection */
 	saa7110_write_block(client, initseq, sizeof(initseq));
 	saa7110_selmux(client, decoder->input);
-	sleep_on_timeout(&decoder->wq, HZ / 4);
+	prepare_to_wait(&decoder->wq, &wait, TASK_UNINTERRUPTIBLE);
+	schedule_timeout(HZ/4);
+	finish_wait(&decoder->wq, &wait);
 	status = saa7110_read(client);
 	if (status & 0x40) {
 		dprintk(1, KERN_INFO "%s: status=0x%02x (no signal)\n",
@@ -249,7 +253,9 @@ determine_norm (struct i2c_client *client)
 	saa7110_write(client, 0x11, 0x59);
 	//saa7110_write(client,0x2E,0x9A);
 
-	sleep_on_timeout(&decoder->wq, HZ / 4);
+	prepare_to_wait(&decoder->wq, &wait, TASK_UNINTERRUPTIBLE);
+	schedule_timeout(HZ/4);
+	finish_wait(&decoder->wq, &wait);
 
 	status = saa7110_read(client);
 	if ((status & 0x03) == 0x01) {
@@ -475,7 +481,6 @@ static struct i2c_client_address_data addr_data = {
 	.force			= force
 };
 
-static int saa7110_i2c_id = 0;
 static struct i2c_driver i2c_driver_saa7110;
 
 static int
@@ -506,9 +511,7 @@ saa7110_detect_client (struct i2c_adapter *adapter,
 	client->adapter = adapter;
 	client->driver = &i2c_driver_saa7110;
 	client->flags = I2C_CLIENT_ALLOW_USE;
-	client->id = saa7110_i2c_id++;
-	snprintf(I2C_NAME(client), sizeof(I2C_NAME(client)) - 1,
-		"saa7110[%d]", client->id);
+	strlcpy(I2C_NAME(client), "saa7110", sizeof(I2C_NAME(client)));
 
 	decoder = kmalloc(sizeof(struct saa7110), GFP_KERNEL);
 	if (decoder == 0) {

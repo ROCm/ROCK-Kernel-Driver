@@ -188,7 +188,6 @@ static int stripe_status(struct dm_target *ti,
 	struct stripe_c *sc = (struct stripe_c *) ti->private;
 	unsigned int sz = 0;
 	unsigned int i;
-	char buffer[32];
 
 	switch (type) {
 	case STATUSTYPE_INFO:
@@ -197,11 +196,9 @@ static int stripe_status(struct dm_target *ti,
 
 	case STATUSTYPE_TABLE:
 		DMEMIT("%d " SECTOR_FORMAT, sc->stripes, sc->chunk_mask + 1);
-		for (i = 0; i < sc->stripes; i++) {
-			format_dev_t(buffer, sc->stripe[i].dev->bdev->bd_dev);
-			DMEMIT(" %s " SECTOR_FORMAT, buffer,
+		for (i = 0; i < sc->stripes; i++)
+			DMEMIT(" %s " SECTOR_FORMAT, sc->stripe[i].dev->name,
 			       sc->stripe[i].physical_start);
-		}
 		break;
 	}
 	return 0;

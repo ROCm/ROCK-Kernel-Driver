@@ -488,8 +488,8 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	 * Save away %fs and %gs. No need to save %es and %ds, as
 	 * those are always kernel segments while inside the kernel.
 	 */
-	savesegment(fs,prev->fs);
-	savesegment(gs,prev->gs);
+	asm volatile("movl %%fs,%0":"=m" (*(int *)&prev->fs));
+	asm volatile("movl %%gs,%0":"=m" (*(int *)&prev->gs));
 
 	/*
 	 * We clobber FS and GS here so that we avoid a GPF when restoring

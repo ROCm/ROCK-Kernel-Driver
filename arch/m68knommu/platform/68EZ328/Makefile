@@ -4,9 +4,8 @@
 
 obj-y := config.o
 
-extra-y := $(BOARD)/bootlogo.rh $(BOARD)/crt0_$(MODEL).o
+extra-y := bootlogo.rh
 
-$(obj)/$(BOARD)/bootlogo.rh: $(src)/bootlogo.h
+$(obj)/bootlogo.rh: $(src)/bootlogo.h
 	perl $(src)/../68328/bootlogo.pl < $(src)/bootlogo.h \
-		> $(obj)/$(BOARD)/bootlogo.rh
-
+		> $(obj)/bootlogo.rh

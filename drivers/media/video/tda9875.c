@@ -399,7 +399,6 @@ static struct i2c_driver driver = {
 static struct i2c_client client_template =
 {
         I2C_DEVNAME("tda9875"),
-        .id        = -1,
         .driver    = &driver,
 };
 

@@ -156,15 +156,12 @@ static int au1x00_pcmcia_sock_init(struct pcmcia_socket *sock)
 static int au1x00_pcmcia_suspend(struct pcmcia_socket *sock)
 {
 	struct au1000_pcmcia_socket *skt = to_au1000_socket(sock);
-	int ret;
 
 	debug("suspending socket %u\n", skt->nr);
 
-	ret = au1x00_pcmcia_config_skt(skt, &dead_socket);
-	if (ret == 0)
-		skt->ops->socket_suspend(skt);
+	skt->ops->socket_suspend(skt);
 
-	return ret;
+	return 0;
 }
 
 static DEFINE_SPINLOCK(status_lock);
@@ -521,7 +518,7 @@ static int au1x00_drv_pcmcia_probe(struct device *dev)
 }
 
 
-static int au1x00_drv_pcmcia_suspend(struct device *dev, u32 state, u32 level)
+static int au1x00_drv_pcmcia_suspend(struct device *dev, pm_message_t state, u32 level)
 {
 	int ret = 0;
 	if (level == SUSPEND_SAVE_STATE)

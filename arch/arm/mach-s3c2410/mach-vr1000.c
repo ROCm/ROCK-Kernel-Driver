@@ -24,6 +24,9 @@
  *     14-Jan-2005 BJD  Added clock init
  *     15-Jan-2005 BJD  Add serial port device definition
  *     20-Jan-2005 BJD  Use UPF_IOREMAP for ports
+ *     10-Feb-2005 BJD  Added power-off capability
+ *     10-Mar-2005 LCVR Changed S3C2410_VA to S3C24XX_VA
+ *     14-Mar-2006 BJD  void __iomem fixes
 */
 
 #include <linux/kernel.h>
@@ -52,8 +55,8 @@
 #include <asm/irq.h>
 #include <asm/mach-types.h>
 
-//#include <asm/debug-ll.h>
 #include <asm/arch/regs-serial.h>
+#include <asm/arch/regs-gpio.h>
 
 #include "clock.h"
 #include "devs.h"
@@ -61,10 +64,10 @@
 #include "usb-simtec.h"
 
 /* macros for virtual address mods for the io space entries */
-#define VA_C5(item) ((item) + BAST_VAM_CS5)
-#define VA_C4(item) ((item) + BAST_VAM_CS4)
-#define VA_C3(item) ((item) + BAST_VAM_CS3)
-#define VA_C2(item) ((item) + BAST_VAM_CS2)
+#define VA_C5(item) ((unsigned long)(item) + BAST_VAM_CS5)
+#define VA_C4(item) ((unsigned long)(item) + BAST_VAM_CS4)
+#define VA_C3(item) ((unsigned long)(item) + BAST_VAM_CS3)
+#define VA_C2(item) ((unsigned long)(item) + BAST_VAM_CS2)
 
 /* macros to modify the physical addresses for io space */
 
@@ -76,8 +79,8 @@
 static struct map_desc vr1000_iodesc[] __initdata = {
   /* ISA IO areas */
 
-  { S3C2410_VA_ISA_BYTE, PA_CS2(BAST_PA_ISAIO),	   SZ_16M, MT_DEVICE },
-  { S3C2410_VA_ISA_WORD, PA_CS3(BAST_PA_ISAIO),	   SZ_16M, MT_DEVICE },
+  { (u32)S3C24XX_VA_ISA_BYTE, PA_CS2(BAST_PA_ISAIO),	   SZ_16M, MT_DEVICE },
+  { (u32)S3C24XX_VA_ISA_WORD, PA_CS3(BAST_PA_ISAIO),	   SZ_16M, MT_DEVICE },
 
   /* we could possibly compress the next set down into a set of smaller tables
    * pagetables, but that would mean using an L2 section, and it still means
@@ -85,10 +88,10 @@ static struct map_desc vr1000_iodesc[] __initdata = {
    */
 
   /* bast CPLD control registers, and external interrupt controls */
-  { VR1000_VA_CTRL1, VR1000_PA_CTRL1,		       SZ_1M, MT_DEVICE },
-  { VR1000_VA_CTRL2, VR1000_PA_CTRL2,		       SZ_1M, MT_DEVICE },
-  { VR1000_VA_CTRL3, VR1000_PA_CTRL3,		       SZ_1M, MT_DEVICE },
-  { VR1000_VA_CTRL4, VR1000_PA_CTRL4,		       SZ_1M, MT_DEVICE },
+  { (u32)VR1000_VA_CTRL1, VR1000_PA_CTRL1,	       SZ_1M, MT_DEVICE },
+  { (u32)VR1000_VA_CTRL2, VR1000_PA_CTRL2,	       SZ_1M, MT_DEVICE },
+  { (u32)VR1000_VA_CTRL3, VR1000_PA_CTRL3,	       SZ_1M, MT_DEVICE },
+  { (u32)VR1000_VA_CTRL4, VR1000_PA_CTRL4,	       SZ_1M, MT_DEVICE },
 
   /* peripheral space... one for each of fast/slow/byte/16bit */
   /* note, ide is only decoded in word space, even though some registers
@@ -269,6 +272,11 @@ static struct s3c24xx_board vr1000_board __initdata = {
 	.clocks_count  = ARRAY_SIZE(vr1000_clocks),
 };
 
+static void vr1000_power_off(void)
+{
+	s3c2410_gpio_cfgpin(S3C2410_GPB9, S3C2410_GPB9_OUTP);
+	s3c2410_gpio_setpin(S3C2410_GPB9, 1);
+}
 
 void __init vr1000_map_io(void)
 {
@@ -285,6 +293,8 @@ void __init vr1000_map_io(void)
 
 	s3c24xx_uclk.parent  = &s3c24xx_clkout1;
 
+	pm_power_off = vr1000_power_off;
+
 	s3c24xx_init_io(vr1000_iodesc, ARRAY_SIZE(vr1000_iodesc));
 	s3c24xx_init_clocks(0);
 	s3c24xx_init_uarts(vr1000_uartcfgs, ARRAY_SIZE(vr1000_uartcfgs));
@@ -299,7 +309,7 @@ void __init vr1000_init_irq(void)
 
 MACHINE_START(VR1000, "Thorcom-VR1000")
      MAINTAINER("Ben Dooks <ben@simtec.co.uk>")
-     BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, S3C2410_VA_UART)
+     BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, (u32)S3C24XX_VA_UART)
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(vr1000_map_io)
      INITIRQ(vr1000_init_irq)

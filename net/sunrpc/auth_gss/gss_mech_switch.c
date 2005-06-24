@@ -143,7 +143,7 @@ gss_mech_get(struct gss_api_mech *gm)
 EXPORT_SYMBOL(gss_mech_get);
 
 struct gss_api_mech *
-gss_mech_get_by_name(char *name)
+gss_mech_get_by_name(const char *name)
 {
 	struct gss_api_mech	*pos, *gm = NULL;
 
@@ -233,8 +233,8 @@ EXPORT_SYMBOL(gss_mech_put);
 
 /* The mech could probably be determined from the token instead, but it's just
  * as easy for now to pass it in. */
-u32
-gss_import_sec_context(struct xdr_netobj	*input_token,
+int
+gss_import_sec_context(const void *input_token, size_t bufsize,
 		       struct gss_api_mech	*mech,
 		       struct gss_ctx		**ctx_id)
 {
@@ -244,7 +244,7 @@ gss_import_sec_context(struct xdr_netobj	*input_token,
 	(*ctx_id)->mech_type = gss_mech_get(mech);
 
 	return mech->gm_ops
-		->gss_import_sec_context(input_token, *ctx_id);
+		->gss_import_sec_context(input_token, bufsize, *ctx_id);
 }
 
 /* gss_get_mic: compute a mic over message and return mic_token. */

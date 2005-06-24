@@ -319,8 +319,8 @@ static __inline__ void
 lopec_set_bat(void)
 {
 	mb();
-	mtspr(DBAT1U, 0xf8000ffe);
-	mtspr(DBAT1L, 0xf800002a);
+	mtspr(SPRN_DBAT1U, 0xf8000ffe);
+	mtspr(SPRN_DBAT1L, 0xf800002a);
 	mb();
 }
 

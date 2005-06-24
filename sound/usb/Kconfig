@@ -6,7 +6,6 @@ menu "USB devices"
 config SND_USB_AUDIO
 	tristate "USB Audio/MIDI driver"
 	depends on SND && USB
-	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help

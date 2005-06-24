@@ -31,7 +31,7 @@ struct amba_driver {
 	int			(*probe)(struct amba_device *, void *);
 	int			(*remove)(struct amba_device *);
 	void			(*shutdown)(struct amba_device *);
-	int			(*suspend)(struct amba_device *, u32);
+	int			(*suspend)(struct amba_device *, pm_message_t);
 	int			(*resume)(struct amba_device *);
 	struct amba_id		*id_table;
 };

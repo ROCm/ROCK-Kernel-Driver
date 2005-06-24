@@ -222,7 +222,7 @@ static int irda_tx_complete_fsm(struct sir_dev *dev)
 			return 0;
 
 		default:
-			ERROR("%s - undefined state\n", __FUNCTION__);
+			IRDA_ERROR("%s - undefined state\n", __FUNCTION__);
 			return -EINVAL;
 		}
 		fsm->substate = next_state;
@@ -391,12 +391,12 @@ static void irda_config_fsm(void *data)
 			break;
 
 		default:
-			ERROR("%s - undefined state\n", __FUNCTION__);
+			IRDA_ERROR("%s - undefined state\n", __FUNCTION__);
 			fsm->result = -EINVAL;
 			/* fall thru */
 
 		case SIRDEV_STATE_ERROR:
-			ERROR("%s - error: %d\n", __FUNCTION__, fsm->result);
+			IRDA_ERROR("%s - error: %d\n", __FUNCTION__, fsm->result);
 
 #if 0	/* don't enable this before we have netdev->tx_timeout to recover */
 			netif_stop_queue(dev->netdev);
@@ -439,7 +439,7 @@ int sirdev_schedule_request(struct sir_dev *dev, int initial_state, unsigned par
 
 	if (fsm->state == SIRDEV_STATE_DEAD) {
 		/* race with sirdev_close should never happen */
-		ERROR("%s(), instance staled!\n", __FUNCTION__);
+		IRDA_ERROR("%s(), instance staled!\n", __FUNCTION__);
 		up(&fsm->sem);
 		return -ESTALE;		/* or better EPIPE? */
 	}

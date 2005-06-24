@@ -289,8 +289,7 @@ static ssize_t rtas_log_read(struct file * file, char __user * buf,
 
 	count = rtas_error_log_buffer_max;
 
-	error = verify_area(VERIFY_WRITE, buf, count);
-	if (error)
+	if (!access_ok(VERIFY_WRITE, buf, count))
 		return -EFAULT;
 
 	tmp = kmalloc(count, GFP_KERNEL);
@@ -347,7 +346,7 @@ static int enable_surveillance(int timeout)
 	if (error == 0)
 		return 0;
 
-	if (error == RTAS_NO_SUCH_INDICATOR) {
+	if (error == -EINVAL) {
 		printk(KERN_INFO "rtasd: surveillance not supported\n");
 		return 0;
 	}
@@ -400,10 +399,33 @@ static void do_event_scan(int event_scan)
 	} while(error == 0);
 }
 
+static void do_event_scan_all_cpus(long delay)
+{
+	int cpu;
+
+	lock_cpu_hotplug();
+	cpu = first_cpu(cpu_online_map);
+	for (;;) {
+		set_cpus_allowed(current, cpumask_of_cpu(cpu));
+		do_event_scan(rtas_token("event-scan"));
+		set_cpus_allowed(current, CPU_MASK_ALL);
+
+		/* Drop hotplug lock, and sleep for the specified delay */
+		unlock_cpu_hotplug();
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(delay);
+		lock_cpu_hotplug();
+
+		cpu = next_cpu(cpu, cpu_online_map);
+		if (cpu == NR_CPUS)
+			break;
+	}
+	unlock_cpu_hotplug();
+}
+
 static int rtasd(void *unused)
 {
 	unsigned int err_type;
-	int cpu = 0;
 	int event_scan = rtas_token("event-scan");
 	int rc;
 
@@ -437,17 +459,7 @@ static int rtasd(void *unused)
 	}
 
 	/* First pass. */
-	lock_cpu_hotplug();
-	for_each_online_cpu(cpu) {
-		DEBUG("scheduling on %d\n", cpu);
-		set_cpus_allowed(current, cpumask_of_cpu(cpu));
-		DEBUG("watchdog scheduled on cpu %d\n", smp_processor_id());
-
-		do_event_scan(event_scan);
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ);
-	}
-	unlock_cpu_hotplug();
+	do_event_scan_all_cpus(HZ);
 
 	if (surveillance_timeout != -1) {
 		DEBUG("enabling surveillance\n");
@@ -455,25 +467,11 @@ static int rtasd(void *unused)
 		DEBUG("surveillance enabled\n");
 	}
 
-	lock_cpu_hotplug();
-	cpu = first_cpu(cpu_online_map);
-	for (;;) {
-		set_cpus_allowed(current, cpumask_of_cpu(cpu));
-		do_event_scan(event_scan);
-		set_cpus_allowed(current, CPU_MASK_ALL);
-
-		/* Drop hotplug lock, and sleep for a bit (at least
-		 * one second since some machines have problems if we
-		 * call event-scan too quickly). */
-		unlock_cpu_hotplug();
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout((HZ*60/rtas_event_scan_rate) / 2);
-		lock_cpu_hotplug();
-
-		cpu = next_cpu(cpu, cpu_online_map);
-		if (cpu == NR_CPUS)
-			cpu = first_cpu(cpu_online_map);
-	}
+	/* Delay should be at least one second since some
+	 * machines have problems if we call event-scan too
+	 * quickly. */
+	for (;;)
+		do_event_scan_all_cpus((HZ*60/rtas_event_scan_rate) / 2);
 
 error:
 	/* Should delete proc entries */

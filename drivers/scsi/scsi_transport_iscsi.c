@@ -264,13 +264,13 @@ static int iscsi_host_match(struct attribute_container *cont,
 		return 0;
 
 	shost = dev_to_shost(dev);
-	if (!shost->transportt  || shost->transportt->host_attrs.class
+	if (!shost->transportt  || shost->transportt->host_attrs.ac.class
 	    != &iscsi_host_class.class)
 		return 0;
 
 	i = to_iscsi_internal(shost->transportt);
 	
-	return &i->t.host_attrs == cont;
+	return &i->t.host_attrs.ac == cont;
 }
 
 static int iscsi_target_match(struct attribute_container *cont,
@@ -283,13 +283,13 @@ static int iscsi_target_match(struct attribute_container *cont,
 		return 0;
 
 	shost = dev_to_shost(dev->parent);
-	if (!shost->transportt  || shost->transportt->host_attrs.class
+	if (!shost->transportt  || shost->transportt->host_attrs.ac.class
 	    != &iscsi_host_class.class)
 		return 0;
 
 	i = to_iscsi_internal(shost->transportt);
 	
-	return &i->t.target_attrs == cont;
+	return &i->t.target_attrs.ac == cont;
 }
 
 struct scsi_transport_template *
@@ -305,10 +305,10 @@ iscsi_attach_transport(struct iscsi_function_template *fnt)
 	memset(i, 0, sizeof(struct iscsi_internal));
 	i->fnt = fnt;
 
-	i->t.target_attrs.attrs = &i->session_attrs[0];
-	i->t.target_attrs.class = &iscsi_transport_class.class;
-	i->t.target_attrs.match = iscsi_target_match;
-	attribute_container_register(&i->t.target_attrs);
+	i->t.target_attrs.ac.attrs = &i->session_attrs[0];
+	i->t.target_attrs.ac.class = &iscsi_transport_class.class;
+	i->t.target_attrs.ac.match = iscsi_target_match;
+	transport_container_register(&i->t.target_attrs);
 	i->t.target_size = sizeof(struct iscsi_class_session);
 
 	SETUP_SESSION_RD_ATTR(tsih);
@@ -335,10 +335,10 @@ iscsi_attach_transport(struct iscsi_function_template *fnt)
 	BUG_ON(count > ISCSI_SESSION_ATTRS);
 	i->session_attrs[count] = NULL;
 
-	i->t.host_attrs.attrs = &i->host_attrs[0];
-	i->t.host_attrs.class = &iscsi_host_class.class;
-	i->t.host_attrs.match = iscsi_host_match;
-	attribute_container_register(&i->t.host_attrs);
+	i->t.host_attrs.ac.attrs = &i->host_attrs[0];
+	i->t.host_attrs.ac.class = &iscsi_host_class.class;
+	i->t.host_attrs.ac.match = iscsi_host_match;
+	transport_container_register(&i->t.host_attrs);
 	i->t.host_size = 0;
 
 	count = 0;
@@ -357,9 +357,9 @@ void iscsi_release_transport(struct scsi_transport_template *t)
 {
 	struct iscsi_internal *i = to_iscsi_internal(t);
 
-	attribute_container_unregister(&i->t.target_attrs);
-	attribute_container_unregister(&i->t.host_attrs);
-
+	transport_container_unregister(&i->t.target_attrs);
+	transport_container_unregister(&i->t.host_attrs);
+  
 	kfree(i);
 }
 

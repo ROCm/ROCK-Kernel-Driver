@@ -194,32 +194,6 @@ int mmBlockInHeap(memHeap_t *heap, PMemBlock b)
 		return 0;
 }
 
-/* Kludgey workaround for existing i810 server.  Remove soon.
- */
-memHeap_t *mmAddRange( memHeap_t *heap,
-		       int ofs,
-		       int size )
-{
-	PMemBlock blocks;
-	blocks = (TMemBlock *)drm_calloc(2, sizeof(TMemBlock), DRM_MEM_DRIVER);
-	if (blocks != NULL) {
-		blocks[0].size = size;
-		blocks[0].free = 1;
-		blocks[0].ofs = ofs;
-		blocks[0].next = &blocks[1];
-
-		/* Discontinuity - stops JoinBlock from trying to join
-		 * non-adjacent ranges.
-		 */
-		blocks[1].size = 0;
-		blocks[1].free = 0;
-		blocks[1].ofs = ofs+size;
-		blocks[1].next = (PMemBlock)heap;
-		return (memHeap_t *)blocks;
-	} else
-		return heap;
-}
-
 static TMemBlock* SliceBlock(TMemBlock *p, 
 			     int startofs, int size, 
 			     int reserved, int alignment)
@@ -325,61 +299,3 @@ int mmFreeMem(PMemBlock b)
 	return 0;
 }
 
-int mmReserveMem(memHeap_t *heap, int offset,int size)
-{
-	int endofs;
-	TMemBlock *p;
-
-	if (heap == NULL || size <= 0)
-		return -1;
-
-	endofs = offset + size;
-	p = (TMemBlock *)heap;
-	while (p && p->ofs <= offset) {
-		if (ISFREE(p) && endofs <= (p->ofs+p->size)) {
-			SliceBlock(p,offset,size,1,1);
-			return 0;
-		}
-		p = p->next;
-	}
-	return -1;
-}
-
-int mmFreeReserved(memHeap_t *heap, int offset)
-{
-	TMemBlock *p,*prev;
-
-	if (heap == NULL)
-		return -1;
-
-	p = (TMemBlock *)heap;
-	prev = NULL;
-	while (p != NULL && p->ofs != offset) {
-		prev = p;
-		p = p->next;
-	}
-	if (p == NULL || !p->reserved)
-		return -1;
-
-	p->free = 1;
-	p->reserved = 0;
-	Join2Blocks(p);
-	if (prev != NULL)
-		Join2Blocks(prev);
-	return 0;
-}
-
-void mmDestroy(memHeap_t *heap)
-{
-	TMemBlock *p,*q;
-
-	if (heap == NULL)
-		return;
-
-	p = (TMemBlock *)heap;
-	while (p != NULL) {
-		q = p->next;
-		drm_free(p, sizeof(TMemBlock), DRM_MEM_DRIVER);
-		p = q;
-	}
-}

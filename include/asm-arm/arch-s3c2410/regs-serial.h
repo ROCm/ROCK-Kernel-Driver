@@ -27,14 +27,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * Modifications:
+ *     10-Mar-2005 LCVR  Changed S3C2410_VA to S3C24XX_VA (s3c2400 support)
  */
 
 #ifndef __ASM_ARM_REGS_SERIAL_H
 #define __ASM_ARM_REGS_SERIAL_H
 
-#define S3C2410_VA_UART0      (S3C2410_VA_UART)
-#define S3C2410_VA_UART1      (S3C2410_VA_UART + 0x4000 )
-#define S3C2410_VA_UART2      (S3C2410_VA_UART + 0x8000 )
+#define S3C24XX_VA_UART0      (S3C24XX_VA_UART)
+#define S3C24XX_VA_UART1      (S3C24XX_VA_UART + 0x4000 )
+#define S3C24XX_VA_UART2      (S3C24XX_VA_UART + 0x8000 )
 
 #define S3C2410_PA_UART0      (S3C2410_PA_UART)
 #define S3C2410_PA_UART1      (S3C2410_PA_UART + 0x4000 )
@@ -73,6 +76,11 @@
 #define S3C2440_UCON_UCLK	  (1<<10)
 #define S3C2440_UCON_PCLK2	  (2<<10)
 #define S3C2440_UCON_FCLK	  (3<<10)
+#define S3C2440_UCON2_FCLK_EN	  (1<<15)
+#define S3C2440_UCON0_DIVMASK	  (15 << 12)
+#define S3C2440_UCON1_DIVMASK	  (15 << 12)
+#define S3C2440_UCON2_DIVMASK	  (7 << 12)
+#define S3C2440_UCON_DIVSHIFT	  (12)
 
 #define S3C2410_UCON_UCLK	  (1<<10)
 #define S3C2410_UCON_SBREAK	  (1<<4)

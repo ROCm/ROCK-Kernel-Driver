@@ -388,7 +388,7 @@ static int cs_hardware_init(struct cs_card *card);
 static int cs46xx_powerup(struct cs_card *card, unsigned int type);
 static int cs461x_powerdown(struct cs_card *card, unsigned int type, int suspendflag);
 static void cs461x_clear_serial_FIFOs(struct cs_card *card, int type);
-static int cs46xx_suspend_tbl(struct pci_dev *pcidev, u32 state);
+static int cs46xx_suspend_tbl(struct pci_dev *pcidev, pm_message_t state);
 static int cs46xx_resume_tbl(struct pci_dev *pcidev);
 
 #ifndef CS46XX_ACPI_SUPPORT
@@ -3640,7 +3640,7 @@ static int cs46xx_restart_part(struct cs_card *card)
 
 static void cs461x_reset(struct cs_card *card);
 static void cs461x_proc_stop(struct cs_card *card);
-static int cs46xx_suspend(struct cs_card *card, u32 state)
+static int cs46xx_suspend(struct cs_card *card, pm_message_t state)
 {
 	unsigned int tmp;
 	CS_DBGOUT(CS_PM | CS_FUNCTION, 4, 
@@ -5774,7 +5774,7 @@ static int cs46xx_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 #endif
 
 #if CS46XX_ACPI_SUPPORT
-static int cs46xx_suspend_tbl(struct pci_dev *pcidev, u32 state)
+static int cs46xx_suspend_tbl(struct pci_dev *pcidev, pm_message_t state)
 {
 	struct cs_card *s = PCI_GET_DRIVER_DATA(pcidev);
 	CS_DBGOUT(CS_PM | CS_FUNCTION, 2, 

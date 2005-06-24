@@ -139,9 +139,9 @@ static void m1541_cache_flush(void)
 	}
 }
 
-static void *m1541_alloc_page(void)
+static void *m1541_alloc_page(struct agp_bridge_data *bridge)
 {
-	void *addr = agp_generic_alloc_page();
+	void *addr = agp_generic_alloc_page(agp_bridge);
 	u32 temp;
 
 	if (!addr)
@@ -192,7 +192,7 @@ static struct aper_size_info_32 ali_generic_sizes[7] =
 	{4, 1024, 0, 3}
 };
 
-struct agp_bridge_driver ali_generic_bridge = {
+static struct agp_bridge_driver ali_generic_bridge = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= ali_generic_sizes,
 	.size_type		= U32_APER_SIZE,
@@ -215,7 +215,7 @@ struct agp_bridge_driver ali_generic_bridge = {
 	.agp_destroy_page	= ali_destroy_page,
 };
 
-struct agp_bridge_driver ali_m1541_bridge = {
+static struct agp_bridge_driver ali_m1541_bridge = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= ali_generic_sizes,
 	.size_type		= U32_APER_SIZE,
@@ -398,7 +398,7 @@ static int __init agp_ali_init(void)
 {
 	if (agp_off)
 		return -EINVAL;
-	return pci_module_init(&agp_ali_pci_driver);
+	return pci_register_driver(&agp_ali_pci_driver);
 }
 
 static void __exit agp_ali_cleanup(void)

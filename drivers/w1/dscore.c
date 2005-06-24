@@ -45,9 +45,6 @@ int ds_set_speed(struct ds_device *, int);
 int ds_reset(struct ds_device *, struct ds_status *);
 int ds_detect(struct ds_device *, struct ds_status *);
 int ds_stop_pulse(struct ds_device *, int);
-int ds_send_data(struct ds_device *, unsigned char *, int);
-int ds_recv_data(struct ds_device *, unsigned char *, int);
-int ds_recv_status(struct ds_device *, struct ds_status *);
 struct ds_device * ds_get_device(void);
 void ds_put_device(struct ds_device *);
 
@@ -84,7 +81,7 @@ static int ds_send_control_cmd(struct ds_device *dev, u16 value, u16 index)
 	int err;
 	
 	err = usb_control_msg(dev->udev, usb_sndctrlpipe(dev->udev, dev->ep[EP_CONTROL]), 
-			CONTROL_CMD, 0x40, value, index, NULL, 0, HZ);
+			CONTROL_CMD, 0x40, value, index, NULL, 0, 1000);
 	if (err < 0) {
 		printk(KERN_ERR "Failed to send command control message %x.%x: err=%d.\n", 
 				value, index, err);
@@ -99,7 +96,7 @@ static int ds_send_control_mode(struct ds_device *dev, u16 value, u16 index)
 	int err;
 	
 	err = usb_control_msg(dev->udev, usb_sndctrlpipe(dev->udev, dev->ep[EP_CONTROL]), 
-			MODE_CMD, 0x40, value, index, NULL, 0, HZ);
+			MODE_CMD, 0x40, value, index, NULL, 0, 1000);
 	if (err < 0) {
 		printk(KERN_ERR "Failed to send mode control message %x.%x: err=%d.\n", 
 				value, index, err);
@@ -114,7 +111,7 @@ static int ds_send_control(struct ds_device *dev, u16 value, u16 index)
 	int err;
 	
 	err = usb_control_msg(dev->udev, usb_sndctrlpipe(dev->udev, dev->ep[EP_CONTROL]), 
-			COMM_CMD, 0x40, value, index, NULL, 0, HZ);
+			COMM_CMD, 0x40, value, index, NULL, 0, 1000);
 	if (err < 0) {
 		printk(KERN_ERR "Failed to send control message %x.%x: err=%d.\n", 
 				value, index, err);
@@ -148,7 +145,7 @@ int ds_recv_status_nodump(struct ds_device *dev, struct ds_status *st, unsigned 
 	return count;
 }
 
-int ds_recv_status(struct ds_device *dev, struct ds_status *st)
+static int ds_recv_status(struct ds_device *dev, struct ds_status *st)
 {
 	unsigned char buf[64];
 	int count, err = 0, i;
@@ -206,14 +203,14 @@ int ds_recv_status(struct ds_device *dev, struct ds_status *st)
 	return err;
 }
 
-int ds_recv_data(struct ds_device *dev, unsigned char *buf, int size)
+static int ds_recv_data(struct ds_device *dev, unsigned char *buf, int size)
 {
 	int count, err;
 	struct ds_status st;
 	
 	count = 0;
 	err = usb_bulk_msg(dev->udev, usb_rcvbulkpipe(dev->udev, dev->ep[EP_DATA_IN]), 
-				buf, size, &count, HZ);
+				buf, size, &count, 1000);
 	if (err < 0) {
 		printk(KERN_INFO "Clearing ep0x%x.\n", dev->ep[EP_DATA_IN]);
 		usb_clear_halt(dev->udev, usb_rcvbulkpipe(dev->udev, dev->ep[EP_DATA_IN]));
@@ -234,12 +231,12 @@ int ds_recv_data(struct ds_device *dev, unsigned char *buf, int size)
 	return count;
 }
 
-int ds_send_data(struct ds_device *dev, unsigned char *buf, int len)
+static int ds_send_data(struct ds_device *dev, unsigned char *buf, int len)
 {
 	int count, err;
 	
 	count = 0;
-	err = usb_bulk_msg(dev->udev, usb_sndbulkpipe(dev->udev, dev->ep[EP_DATA_OUT]), buf, len, &count, HZ);
+	err = usb_bulk_msg(dev->udev, usb_sndbulkpipe(dev->udev, dev->ep[EP_DATA_OUT]), buf, len, &count, 1000);
 	if (err < 0) {
 		printk(KERN_ERR "Failed to read 1-wire data from 0x02: err=%d.\n", err);
 		return err;
@@ -774,15 +771,19 @@ EXPORT_SYMBOL(ds_read_block);
 EXPORT_SYMBOL(ds_write_byte);
 EXPORT_SYMBOL(ds_write_bit);
 EXPORT_SYMBOL(ds_write_block);
-EXPORT_SYMBOL(ds_start_pulse);
-EXPORT_SYMBOL(ds_set_speed);
 EXPORT_SYMBOL(ds_reset);
-EXPORT_SYMBOL(ds_detect);
-EXPORT_SYMBOL(ds_stop_pulse);
-EXPORT_SYMBOL(ds_send_data);
-EXPORT_SYMBOL(ds_recv_data);
-EXPORT_SYMBOL(ds_recv_status);
-EXPORT_SYMBOL(ds_search);
 EXPORT_SYMBOL(ds_get_device);
 EXPORT_SYMBOL(ds_put_device);
 
+/*
+ * This functions can be used for EEPROM programming, 
+ * when driver will be included into mainline this will 
+ * require uncommenting.
+ */
+#if 0
+EXPORT_SYMBOL(ds_start_pulse);
+EXPORT_SYMBOL(ds_set_speed);
+EXPORT_SYMBOL(ds_detect);
+EXPORT_SYMBOL(ds_stop_pulse);
+EXPORT_SYMBOL(ds_search);
+#endif

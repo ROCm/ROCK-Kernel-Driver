@@ -235,7 +235,7 @@ static void __devexit matrox_w1_remove(struct pci_dev *pdev)
 
 static int __init matrox_w1_init(void)
 {
-	return pci_module_init(&matrox_w1_pci_driver);
+	return pci_register_driver(&matrox_w1_pci_driver);
 }
 
 static void __exit matrox_w1_fini(void)

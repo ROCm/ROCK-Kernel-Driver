@@ -37,12 +37,10 @@
 #include <net/ipv6.h>
 #include <linux/icmpv6.h>
 
-static int esp6_output(struct sk_buff *skb)
+static int esp6_output(struct xfrm_state *x, struct sk_buff *skb)
 {
 	int err;
 	int hdr_len;
-	struct dst_entry *dst = skb->dst;
-	struct xfrm_state *x  = dst->xfrm;
 	struct ipv6hdr *top_iph;
 	struct ipv6_esp_hdr *esph;
 	struct crypto_tfm *tfm;

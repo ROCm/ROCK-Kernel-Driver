@@ -30,6 +30,7 @@
 #include <linux/acpi.h>
 #include <linux/nodemask.h>
 #include <asm/srat.h>
+#include <asm/topology.h>
 
 /*
  * proximity macros and definitions
@@ -57,8 +58,6 @@ static struct node_memory_chunk_s node_memory_chunk[MAXCHUNKS];
 static int num_memory_chunks;		/* total number of memory chunks */
 static int zholes_size_init;
 static unsigned long zholes_size[MAX_NUMNODES * MAX_NR_ZONES];
-
-extern unsigned long node_start_pfn[], node_end_pfn[];
 
 extern void * boot_ioremap(unsigned long, unsigned long);
 
@@ -182,6 +181,38 @@ static __init void chunk_to_zones(unsigned long cstart, unsigned long cend,
 	}
 }
 
+/*
+ * The SRAT table always lists ascending addresses, so can always
+ * assume that the first "start" address that you see is the real
+ * start of the node, and that the current "end" address is after
+ * the previous one.
+ */
+static __init void node_read_chunk(int nid, struct node_memory_chunk_s *memory_chunk)
+{
+	/*
+	 * Only add present memory as told by the e820.
+	 * There is no guarantee from the SRAT that the memory it
+	 * enumerates is present at boot time because it represents
+	 * *possible* memory hotplug areas the same as normal RAM.
+	 */
+	if (memory_chunk->start_pfn >= max_pfn) {
+		printk (KERN_INFO "Ignoring SRAT pfns: 0x%08lx -> %08lx\n",
+			memory_chunk->start_pfn, memory_chunk->end_pfn);
+		return;
+	}
+	if (memory_chunk->nid != nid)
+		return;
+
+	if (!node_has_online_mem(nid))
+		node_start_pfn[nid] = memory_chunk->start_pfn;
+
+	if (node_start_pfn[nid] > memory_chunk->start_pfn)
+		node_start_pfn[nid] = memory_chunk->start_pfn;
+
+	if (node_end_pfn[nid] < memory_chunk->end_pfn)
+		node_end_pfn[nid] = memory_chunk->end_pfn;
+}
+
 /* Parse the ACPI Static Resource Affinity Table */
 static int __init acpi20_parse_srat(struct acpi_table_srat *sratp)
 {
@@ -262,29 +293,18 @@ static int __init acpi20_parse_srat(struct acpi_table_srat *sratp)
 	printk("Number of memory chunks in system = %d\n", num_memory_chunks);
 
 	for (j = 0; j < num_memory_chunks; j++){
+		struct node_memory_chunk_s * chunk = &node_memory_chunk[j];
 		printk("chunk %d nid %d start_pfn %08lx end_pfn %08lx\n",
-		       j, node_memory_chunk[j].nid,
-		       node_memory_chunk[j].start_pfn,
-		       node_memory_chunk[j].end_pfn);
+		       j, chunk->nid, chunk->start_pfn, chunk->end_pfn);
+		node_read_chunk(chunk->nid, chunk);
 	}
  
-	/*calculate node_start_pfn/node_end_pfn arrays*/
 	for_each_online_node(nid) {
-		int been_here_before = 0;
+		unsigned long start = node_start_pfn[nid];
+		unsigned long end = node_end_pfn[nid];
 
-		for (j = 0; j < num_memory_chunks; j++){
-			if (node_memory_chunk[j].nid == nid) {
-				if (been_here_before == 0) {
-					node_start_pfn[nid] = node_memory_chunk[j].start_pfn;
-					node_end_pfn[nid] = node_memory_chunk[j].end_pfn;
-					been_here_before = 1;
-				} else { /* We've found another chunk of memory for the node */
-					if (node_start_pfn[nid] < node_memory_chunk[j].start_pfn) {
-						node_end_pfn[nid] = node_memory_chunk[j].end_pfn;
-					}
-				}
-			}
-		}
+		memory_present(nid, start, end);
+		node_remap_size[nid] = node_memmap_size_bytes(nid, start, end);
 	}
 	return 1;
 out_fail:

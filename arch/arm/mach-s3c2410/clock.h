@@ -1,7 +1,8 @@
 /*
  * linux/arch/arm/mach-s3c2410/clock.h
  *
- * Copyright (c) 2004 Simtec Electronics
+ * Copyright (c) 2004-2005 Simtec Electronics
+ *	http://www.simtec.co.uk/products/SWLINUX/
  *	Written by Ben Dooks, <ben@simtec.co.uk>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -29,13 +30,6 @@ extern struct clk s3c24xx_clkout0;
 extern struct clk s3c24xx_clkout1;
 extern struct clk s3c24xx_uclk;
 
-/* processor clock settings, in Hz */
-
-extern unsigned long s3c24xx_xtal;
-extern unsigned long s3c24xx_pclk;
-extern unsigned long s3c24xx_hclk;
-extern unsigned long s3c24xx_fclk;
-
 /* exports for arch/arm/mach-s3c2410
  *
  * Please DO NOT use these outside of arch/arm/mach-s3c2410
@@ -44,4 +38,7 @@ extern unsigned long s3c24xx_fclk;
 extern int s3c24xx_clkcon_enable(struct clk *clk, int enable);
 extern int s3c24xx_register_clock(struct clk *clk);
 
-extern int s3c24xx_setup_clocks(void);
+extern int s3c24xx_setup_clocks(unsigned long xtal,
+				unsigned long fclk,
+				unsigned long hclk,
+				unsigned long pclk);

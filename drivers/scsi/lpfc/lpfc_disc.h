@@ -19,73 +19,52 @@
  *******************************************************************/
 
 /*
- * $Id: lpfc_disc.h 1.41 2004/10/11 11:48:11EDT sf_support Exp  $
+ * $Id: lpfc_disc.h 1.61 2005/04/07 08:46:52EDT sf_support Exp  $
  */
-
-#ifndef  _H_LPFC_DISC
-#define  _H_LPFC_DISC
-
-#include "lpfc_hw.h"
-
-struct lpfc_target;
 
 #define FC_MAX_HOLD_RSCN     32	      /* max number of deferred RSCNs */
 #define FC_MAX_NS_RSP        65536    /* max size NameServer rsp */
 #define FC_MAXLOOP           126      /* max devices supported on a fc loop */
 #define LPFC_DISC_FLOGI_TMO  10	      /* Discovery FLOGI ratov */
 
-/* Defines for failMask bitmask
- * These are reasons that the device is not currently available
- * for I/O to be sent.
- */
-#define LPFC_DEV_LINK_DOWN       0x1	/* Link is down */
-#define LPFC_DEV_DISAPPEARED     0x2	/* Device disappeared from mapped
-					   list */
-#define LPFC_DEV_DISCOVERY_INP   0x4	/* Device to go through discovery */
-#define LPFC_DEV_DISCONNECTED    0x8 	/* noactive connection to remote dev */
-
-/* These defines are used for set failMask routines */
-#define LPFC_SET_BITMASK		1
-#define LPFC_CLR_BITMASK		2
-
-/* Provide an enumeration for the Types of addresses a FARP can resolve. */
-typedef enum lpfc_farp_addr_type {
-	LPFC_FARP_BY_IEEE,
-	LPFC_FARP_BY_WWPN,
-	LPFC_FARP_BY_WWNN,
-} LPFC_FARP_ADDR_TYPE;
 
 /* This is the protocol dependent definition for a Node List Entry.
  * This is used by Fibre Channel protocol to support FCP.
  */
 
-struct lpfc_bindlist {
-	struct list_head      nlp_listp;
-	struct lpfc_target    *nlp_Target;	/* ptr to the tgt structure */
-	struct lpfc_name      nlp_portname;	/* port name */
-	struct lpfc_name      nlp_nodename;	/* node name */
-	uint16_t              nlp_bind_type;
-	uint16_t              nlp_sid;		/* scsi id */
-	uint32_t              nlp_DID;		/* FibreChannel D_ID of entry */
+/* structure used to queue event to the discovery tasklet */
+struct lpfc_work_evt {
+	struct list_head      evt_listp;
+	void                * evt_arg1;
+	void                * evt_arg2;
+	uint32_t              evt;
 };
+
+#define LPFC_EVT_NODEV_TMO	0x1
+#define LPFC_EVT_ONLINE		0x2
+#define LPFC_EVT_OFFLINE	0x3
+#define LPFC_EVT_ELS_RETRY	0x4
 
 struct lpfc_nodelist {
 	struct list_head nlp_listp;
 	struct lpfc_name nlp_portname;		/* port name */
 	struct lpfc_name nlp_nodename;		/* node name */
-	uint32_t         nlp_failMask;		/* failure mask for device */
 	uint32_t         nlp_flag;		/* entry  flags */
 	uint32_t         nlp_DID;		/* FC D_ID of entry */
-	uint32_t         nlp_last_elscmd;  	/* Last ELS cmd sent */
+	uint32_t         nlp_last_elscmd;	/* Last ELS cmd sent */
 	uint16_t         nlp_type;
 #define NLP_FC_NODE        0x1			/* entry is an FC node */
 #define NLP_FABRIC         0x4			/* entry rep a Fabric entity */
 #define NLP_FCP_TARGET     0x8			/* entry is an FCP target */
+#define NLP_FCP_INITIATOR  0x10			/* entry is an FCP Initiator */
 
 	uint16_t        nlp_rpi;
 	uint16_t        nlp_state;		/* state transition indicator */
 	uint16_t        nlp_xri;		/* output exchange id for RPI */
 	uint16_t        nlp_sid;		/* scsi id */
+#define NLP_NO_SID		0xffff
+	uint16_t	nlp_maxframe;		/* Max RCV frame size */
+	uint8_t		nlp_class_sup;		/* Supported Classes */
 	uint8_t         nlp_retry;		/* used for ELS retries */
 	uint8_t         nlp_disc_refcnt;	/* used for DSM */
 	uint8_t         nlp_fcp_info;	        /* class info, bits 0-3 */
@@ -93,32 +72,12 @@ struct lpfc_nodelist {
 
 	struct timer_list   nlp_delayfunc;	/* Used for delayed ELS cmds */
 	struct timer_list   nlp_tmofunc;	/* Used for nodev tmo */
-	struct lpfc_target *nlp_Target;		/* Pointer to the target
-						   structure */
-#ifdef FC_TRANS_VER1
-	struct scsi_target *starget;		/* Pointer to midlayer target
-						   structure. */
-#endif
-
-	struct lpfc_bindlist *nlp_listp_bind;	/* Linked list bounded remote
-						   ports */
+	struct fc_rport *rport;			/* Corresponding FC transport
+						   port structure */
 	struct lpfc_nodelist *nlp_rpi_hash_next;
 	struct lpfc_hba      *nlp_phba;
-};
-
-/*++
- * lpfc_node_farp_list:
- *   This data structure defines the attributes associated with
- *   an outstanding FARP REQ to a remote node.
- *
- *   listentry - head of this list of pending farp requests.
- *   rnode_addr - The address of the remote node.  Either the IEEE, WWPN, or
- *                WWNN.  Used in the FARP request.
- *
- --*/
-struct lpfc_node_farp_pend {
-	struct list_head listentry;
-	struct lpfc_name rnode_addr;
+	struct lpfc_work_evt nodev_timeout_evt;
+	struct lpfc_work_evt els_retry_evt;
 };
 
 /* Defines for nlp_flag (uint32) */
@@ -139,19 +98,12 @@ struct lpfc_node_farp_pend {
 #define NLP_LOGO_SND       0x100	/* sent LOGO request for this entry */
 #define NLP_RNID_SND       0x400	/* sent RNID request for this entry */
 #define NLP_ELS_SND_MASK   0x7e0	/* sent ELS request for this entry */
-#define NLP_AUTOMAP        0x800	/* Entry was automap'ed */
-#define NLP_SEED_WWPN      0x1000	/* Entry scsi id is seeded for WWPN */
-#define NLP_SEED_WWNN      0x2000	/* Entry scsi id is seeded for WWNN */
-#define NLP_SEED_DID       0x4000	/* Entry scsi id is seeded for DID */
-#define NLP_SEED_MASK      0x807000	/* mask for seeded flags */
-#define NLP_NS_NODE        0x8000	/* Authenticated entry by NameServer */
 #define NLP_NODEV_TMO      0x10000	/* nodev timeout is running for node */
 #define NLP_DELAY_TMO      0x20000	/* delay timeout is running for node */
 #define NLP_NPR_2B_DISC    0x40000	/* node is included in num_disc_nodes */
 #define NLP_RCV_PLOGI      0x80000	/* Rcv'ed PLOGI from remote system */
 #define NLP_LOGO_ACC       0x100000	/* Process LOGO after ACC completes */
 #define NLP_TGT_NO_SCSIID  0x200000	/* good PRLI but no binding for scsid */
-#define NLP_SEED_ALPA      0x800000	/* SCSI id is derived from alpa array */
 #define NLP_ACC_REGLOGIN   0x1000000	/* Issue Reg Login after successful
 					   ACC */
 #define NLP_NPR_ADISC      0x2000000	/* Issue ADISC when dq'ed from
@@ -252,21 +204,3 @@ struct lpfc_node_farp_pend {
 #define NLP_EVT_DEVICE_RECOVERY   0xc	/* Device existence unknown */
 #define NLP_EVT_MAX_EVENT         0xd
 
-/* structure used to queue event to the discovery tasklet */
-struct lpfc_disc_evt {
-	struct list_head      evt_listp;
-	void                * evt_arg1;
-	void                * evt_arg2;
-	uint32_t              evt;
-};
-typedef struct lpfc_disc_evt LPFC_DISC_EVT_t;
-
-#define LPFC_EVT_MBOX		0x1
-#define LPFC_EVT_SOL_IOCB	0x2
-#define LPFC_EVT_UNSOL_IOCB	0x3
-
-/* Definitions for Binding Entry Type for lpfc_parse_binding_entry()  */
-#define LPFC_BIND_WW_NN_PN   0
-#define LPFC_BIND_DID        1
-
-#endif				/* _H_LPFC_DISC */

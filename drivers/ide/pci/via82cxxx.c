@@ -332,11 +332,8 @@ static int via_set_drive(ide_drive_t *drive, u8 speed)
 	struct ide_timing t, p;
 	unsigned int T, UT;
 
-	if (speed != XFER_PIO_SLOW && speed != drive->current_speed)
-		if (ide_config_drive_speed(drive, speed))
-			printk(KERN_WARNING "ide%d: Drive %d didn't "
-				"accept speed setting. Oh, well.\n",
-				drive->dn >> 1, drive->dn & 1);
+	if (speed != XFER_PIO_SLOW)
+		ide_config_drive_speed(drive, speed);
 
 	T = 1000000000 / via_clock;
 

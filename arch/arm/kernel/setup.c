@@ -92,8 +92,6 @@ struct cpu_user_fns cpu_user;
 struct cpu_cache_fns cpu_cache;
 #endif
 
-unsigned char aux_device_present;
-
 char elf_platform[ELF_PLATFORM_SIZE];
 EXPORT_SYMBOL(elf_platform);
 

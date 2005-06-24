@@ -515,23 +515,25 @@ static const struct {
 
 
 /*--- Interface used by the world ------------------------------------------*/
-int cirrusfb_init (void);
-int cirrusfb_setup (char *options);
+static int cirrusfb_init (void);
+#ifndef MODULE
+static int cirrusfb_setup (char *options);
+#endif
 
-int cirrusfb_open (struct fb_info *info, int user);
-int cirrusfb_release (struct fb_info *info, int user);
-int cirrusfb_setcolreg (unsigned regno, unsigned red, unsigned green,
-			unsigned blue, unsigned transp,
-			struct fb_info *info);
-int cirrusfb_check_var (struct fb_var_screeninfo *var,
-			struct fb_info *info);
-int cirrusfb_set_par (struct fb_info *info);
-int cirrusfb_pan_display (struct fb_var_screeninfo *var,
-			  struct fb_info *info);
-int cirrusfb_blank (int blank_mode, struct fb_info *info);
-void cirrusfb_fillrect (struct fb_info *info, const struct fb_fillrect *region);
-void cirrusfb_copyarea(struct fb_info *info, const struct fb_copyarea *area);
-void cirrusfb_imageblit(struct fb_info *info, const struct fb_image *image);
+static int cirrusfb_open (struct fb_info *info, int user);
+static int cirrusfb_release (struct fb_info *info, int user);
+static int cirrusfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+			       unsigned blue, unsigned transp,
+			       struct fb_info *info);
+static int cirrusfb_check_var (struct fb_var_screeninfo *var,
+			       struct fb_info *info);
+static int cirrusfb_set_par (struct fb_info *info);
+static int cirrusfb_pan_display (struct fb_var_screeninfo *var,
+				 struct fb_info *info);
+static int cirrusfb_blank (int blank_mode, struct fb_info *info);
+static void cirrusfb_fillrect (struct fb_info *info, const struct fb_fillrect *region);
+static void cirrusfb_copyarea(struct fb_info *info, const struct fb_copyarea *area);
+static void cirrusfb_imageblit(struct fb_info *info, const struct fb_image *image);
 
 /* function table of the above functions */
 static struct fb_ops cirrusfb_ops = {
@@ -600,7 +602,7 @@ static void cirrusfb_dbg_print_byte (const char *name, unsigned char val);
 static int opencount = 0;
 
 /*--- Open /dev/fbx ---------------------------------------------------------*/
-int cirrusfb_open (struct fb_info *info, int user)
+static int cirrusfb_open (struct fb_info *info, int user)
 {
 	if (opencount++ == 0)
 		switch_monitor (info->par, 1);
@@ -608,7 +610,7 @@ int cirrusfb_open (struct fb_info *info, int user)
 }
 
 /*--- Close /dev/fbx --------------------------------------------------------*/
-int cirrusfb_release (struct fb_info *info, int user)
+static int cirrusfb_release (struct fb_info *info, int user)
 {
 	if (--opencount == 0)
 		switch_monitor (info->par, 0);
@@ -660,8 +662,8 @@ static long cirrusfb_get_mclk (long freq, int bpp, long *div)
 	return mclk;
 }
 
-int cirrusfb_check_var(struct fb_var_screeninfo *var,
-		       struct fb_info *info)
+static int cirrusfb_check_var(struct fb_var_screeninfo *var,
+			      struct fb_info *info)
 {
 	struct cirrusfb_info *cinfo = info->par;
 	int nom, den;		/* translyting from pixels->bytes */
@@ -1573,15 +1575,15 @@ static int cirrusfb_set_par_foo (struct fb_info *info)
 
 /* for some reason incomprehensible to me, cirrusfb requires that you write
  * the registers twice for the settings to take..grr. -dte */
-int cirrusfb_set_par (struct fb_info *info)
+static int cirrusfb_set_par (struct fb_info *info)
 {
 	cirrusfb_set_par_foo (info);
 	return cirrusfb_set_par_foo (info);
 }
 
-int cirrusfb_setcolreg (unsigned regno, unsigned red, unsigned green,
-			unsigned blue, unsigned transp,
-			struct fb_info *info)
+static int cirrusfb_setcolreg (unsigned regno, unsigned red, unsigned green,
+			       unsigned blue, unsigned transp,
+			       struct fb_info *info)
 {
 	struct cirrusfb_info *cinfo = info->par;
 
@@ -1632,8 +1634,8 @@ int cirrusfb_setcolreg (unsigned regno, unsigned red, unsigned green,
 
 	performs display panning - provided hardware permits this
 **************************************************************************/
-int cirrusfb_pan_display (struct fb_var_screeninfo *var,
-			  struct fb_info *info)
+static int cirrusfb_pan_display (struct fb_var_screeninfo *var,
+				 struct fb_info *info)
 {
 	int xoffset = 0;
 	int yoffset = 0;
@@ -1702,7 +1704,7 @@ int cirrusfb_pan_display (struct fb_var_screeninfo *var,
 }
 
 
-int cirrusfb_blank (int blank_mode, struct fb_info *info)
+static int cirrusfb_blank (int blank_mode, struct fb_info *info)
 {
 	/*
 	 *  Blank the screen if blank_mode != 0, else unblank. If blank == NULL
@@ -2036,7 +2038,7 @@ static void cirrusfb_prim_fillrect(struct cirrusfb_info *cinfo,
 	return;
 }
 
-void cirrusfb_fillrect (struct fb_info *info, const struct fb_fillrect *region)
+static void cirrusfb_fillrect (struct fb_info *info, const struct fb_fillrect *region)
 {
 	struct cirrusfb_info *cinfo = info->par;
 	struct fb_fillrect modded;
@@ -2086,7 +2088,7 @@ static void cirrusfb_prim_copyarea(struct cirrusfb_info *cinfo,
 }
 
 
-void cirrusfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
+static void cirrusfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
 	struct cirrusfb_info *cinfo = info->par;
 	struct fb_copyarea modded;
@@ -2121,7 +2123,7 @@ void cirrusfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 	cirrusfb_prim_copyarea(cinfo, &modded);
 }
 
-void cirrusfb_imageblit(struct fb_info *info, const struct fb_image *image)
+static void cirrusfb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	struct cirrusfb_info *cinfo = info->par;
 
@@ -2459,7 +2461,7 @@ err_out:
 	return ret;
 }
 
-void __devexit cirrusfb_pci_unregister (struct pci_dev *pdev)
+static void __devexit cirrusfb_pci_unregister (struct pci_dev *pdev)
 {
 	struct fb_info *info = pci_get_drvdata(pdev);
 	DPRINTK ("ENTER\n");
@@ -2605,7 +2607,7 @@ static struct zorro_driver cirrusfb_zorro_driver = {
 };
 #endif /* CONFIG_ZORRO */
 
-int __init cirrusfb_init(void)
+static int __init cirrusfb_init(void)
 {
 	int error = 0;
 
@@ -2621,7 +2623,7 @@ int __init cirrusfb_init(void)
 	error |= zorro_module_init(&cirrusfb_zorro_driver);
 #endif
 #ifdef CONFIG_PCI
-	error |= pci_module_init(&cirrusfb_pci_driver);
+	error |= pci_register_driver(&cirrusfb_pci_driver);
 #endif
 	return error;
 }
@@ -2629,7 +2631,7 @@ int __init cirrusfb_init(void)
 
 
 #ifndef MODULE
-int __init cirrusfb_setup(char *options) {
+static int __init cirrusfb_setup(char *options) {
 	char *this_opt, s[32];
 	int i;
 
@@ -2664,7 +2666,7 @@ MODULE_AUTHOR("Copyright 1999,2000 Jeff Garzik <jgarzik@pobox.com>");
 MODULE_DESCRIPTION("Accelerated FBDev driver for Cirrus Logic chips");
 MODULE_LICENSE("GPL");
 
-void __exit cirrusfb_exit (void)
+static void __exit cirrusfb_exit (void)
 {
 #ifdef CONFIG_PCI
 	pci_unregister_driver(&cirrusfb_pci_driver);

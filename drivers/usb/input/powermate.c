@@ -320,7 +320,7 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 	usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
 		0x0a, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
 		0, interface->desc.bInterfaceNumber, NULL, 0,
-		HZ * USB_CTRL_SET_TIMEOUT);
+		USB_CTRL_SET_TIMEOUT);
 
 	if (!(pm = kmalloc(sizeof(struct powermate_device), GFP_KERNEL)))
 		return -ENOMEM;

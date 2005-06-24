@@ -422,6 +422,12 @@ acpi_ex_resolve_multiple (
 			 * This could of course in turn be another reference object.
 			 */
 			obj_desc = *(obj_desc->reference.where);
+			if (!obj_desc) {
+				/* NULL package elements are allowed */
+
+				type = 0; /* Uninitialized */
+				goto exit;
+			}
 			break;
 
 

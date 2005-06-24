@@ -70,9 +70,6 @@ extern void load_gs_index(unsigned);
 		".previous"			\
 		: :"r" (value), "r" (0))
 
-#define savesegment(seg, value) \
-	asm volatile("mov %%" #seg ",%0":"=m" (*(short *)&(value)))
-
 #define set_debug(value,register) \
                 __asm__("movq %0,%%db" #register  \
 		: /* no output */ \
@@ -340,5 +337,7 @@ void enable_hlt(void);
 
 #define HAVE_EAT_KEY
 void eat_key(void);
+
+extern unsigned long arch_align_stack(unsigned long sp);
 
 #endif

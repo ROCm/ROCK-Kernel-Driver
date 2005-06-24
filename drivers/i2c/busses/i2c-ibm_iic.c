@@ -630,10 +630,6 @@ static struct i2c_algorithm iic_algo = {
 	.name 		= "IBM IIC algorithm",
 	.id   		= I2C_ALGO_OCP,
 	.master_xfer 	= iic_xfer,
-	.smbus_xfer	= NULL,
-	.slave_send	= NULL,
-	.slave_recv	= NULL,
-	.algo_control	= NULL,
 	.functionality	= iic_func
 };
 

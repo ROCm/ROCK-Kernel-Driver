@@ -100,14 +100,15 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 			buddy->pte_low |= _PAGE_GLOBAL;
 	}
 }
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
 
-static inline void pte_clear(pte_t *ptep)
+static inline void pte_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	/* Preserve global status for the pair */
 	if (pte_val(*ptep_buddy(ptep)) & _PAGE_GLOBAL)
-		set_pte(ptep, __pte(_PAGE_GLOBAL));
+		set_pte_at(mm, addr, ptep, __pte(_PAGE_GLOBAL));
 	else
-		set_pte(ptep, __pte(0));
+		set_pte_at(mm, addr, ptep, __pte(0));
 }
 #else
 /*
@@ -130,16 +131,17 @@ static inline void set_pte(pte_t *ptep, pte_t pteval)
 	}
 #endif
 }
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
 
-static inline void pte_clear(pte_t *ptep)
+static inline void pte_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 #if !defined(CONFIG_CPU_R3000) && !defined(CONFIG_CPU_TX39XX)
 	/* Preserve global status for the pair */
 	if (pte_val(*ptep_buddy(ptep)) & _PAGE_GLOBAL)
-		set_pte(ptep, __pte(_PAGE_GLOBAL));
+		set_pte_at(mm, addr, ptep, __pte(_PAGE_GLOBAL));
 	else
 #endif
-		set_pte(ptep, __pte(0));
+		set_pte_at(mm, addr, ptep, __pte(0));
 }
 #endif
 
@@ -365,10 +367,26 @@ static inline int io_remap_page_range(struct vm_area_struct *vma,
 	phys_t phys_addr_high = fixup_bigphys_addr(paddr, size);
 	return remap_pfn_range(vma, vaddr, phys_addr_high >> PAGE_SHIFT, size, prot);
 }
+
+static inline int io_remap_pfn_range(struct vm_area_struct *vma,
+		unsigned long vaddr,
+		unsigned long pfn,
+		unsigned long size,
+		pgprot_t prot)
+{
+	phys_t phys_addr_high = fixup_bigphys_addr(pfn << PAGE_SHIFT, size);
+	return remap_pfn_range(vma, vaddr, pfn, size, prot);
+}
 #else
 #define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
-	remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
+		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
+#define io_remap_pfn_range(vma, vaddr, pfn, size, prot)		\
+		remap_pfn_range(vma, vaddr, pfn, size, prot)
 #endif
+
+#define MK_IOSPACE_PFN(space, pfn)	(pfn)
+#define GET_IOSPACE(pfn)		0
+#define GET_PFN(pfn)			(pfn)
 
 #include <asm-generic/pgtable.h>
 

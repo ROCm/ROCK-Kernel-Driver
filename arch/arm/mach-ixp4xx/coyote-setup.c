@@ -3,7 +3,7 @@
  *
  * Board setup for ADI Engineering and IXDGP425 boards
  *
- * Copyright (C) 2003-2004 MontaVista Software, Inc.
+ * Copyright (C) 2003-2005 MontaVista Software, Inc.
  *
  * Author: Deepak Saxena <dsaxena@plexity.net>
  */
@@ -13,7 +13,7 @@
 #include <linux/device.h>
 #include <linux/serial.h>
 #include <linux/tty.h>
-#include <linux/serial_core.h>
+#include <linux/serial_8250.h>
 
 #include <asm/types.h>
 #include <asm/setup.h>
@@ -24,39 +24,8 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/flash.h>
 
-#ifdef	__ARMEB__
-#define	REG_OFFSET	3
-#else
-#define	REG_OFFSET	0
-#endif
-
-/*
- * Only one serial port is connected on the Coyote & IXDPG425
- */
-static struct uart_port coyote_serial_port = {
-	.membase	= (char*)(IXP4XX_UART2_BASE_VIRT + REG_OFFSET),
-	.mapbase	= (IXP4XX_UART2_BASE_PHYS),
-	.irq		= IRQ_IXP4XX_UART2,
-	.flags		= UPF_SKIP_TEST,
-	.iotype		= UPIO_MEM,	
-	.regshift	= 2,
-	.uartclk	= IXP4XX_UART_XTAL,
-	.line		= 0,
-	.type		= PORT_XSCALE,
-	.fifosize	= 32
-};
-
 void __init coyote_map_io(void)
 {
-	if (machine_is_ixdpg425()) {
-		coyote_serial_port.membase =
-			(char*)(IXP4XX_UART1_BASE_VIRT + REG_OFFSET);
-		coyote_serial_port.mapbase = IXP4XX_UART1_BASE_PHYS;
-		coyote_serial_port.irq = IRQ_IXP4XX_UART1;
-	}
-
-	early_serial_setup(&coyote_serial_port);
-
 	ixp4xx_map_io();
 }
 
@@ -81,14 +50,49 @@ static struct platform_device coyote_flash = {
 	.resource	= &coyote_flash_resource,
 };
 
+static struct resource coyote_uart_resource = {
+	.start	= IXP4XX_UART2_BASE_PHYS,
+	.end	= IXP4XX_UART2_BASE_PHYS + 0x0fff,
+	.flags	= IORESOURCE_MEM,
+};
+
+static struct plat_serial8250_port coyote_uart_data = {
+	.mapbase	= IXP4XX_UART2_BASE_PHYS,
+	.membase	= (char *)IXP4XX_UART2_BASE_VIRT + REG_OFFSET,
+	.irq		= IRQ_IXP4XX_UART2,
+	.flags		= UPF_BOOT_AUTOCONF,
+	.iotype		= UPIO_MEM,
+	.regshift	= 2,
+	.uartclk	= IXP4XX_UART_XTAL,
+};
+
+static struct platform_device coyote_uart = {
+	.name		= "serial8250",
+	.id		= 0,
+	.dev			= {
+		.platform_data	= &coyote_uart_data,
+	},
+	.num_resources	= 1,
+	.resource	= &coyote_uart_resource,
+};
+
 static struct platform_device *coyote_devices[] __initdata = {
-	&coyote_flash
+	&coyote_flash,
+	&coyote_uart
 };
 
 static void __init coyote_init(void)
 {
 	*IXP4XX_EXP_CS0 |= IXP4XX_FLASH_WRITABLE;
 	*IXP4XX_EXP_CS1 = *IXP4XX_EXP_CS0;
+
+	if (machine_is_ixdpg425()) {
+		coyote_uart_data.membase =
+			(char*)(IXP4XX_UART1_BASE_VIRT + REG_OFFSET);
+		coyote_uart_data.mapbase = IXP4XX_UART1_BASE_PHYS;
+		coyote_uart_data.irq = IRQ_IXP4XX_UART1;
+	}
+
 
 	ixp4xx_sys_init();
 	platform_add_devices(coyote_devices, ARRAY_SIZE(coyote_devices));

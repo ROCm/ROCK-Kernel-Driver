@@ -248,7 +248,7 @@ xor_vis_4:
 	.globl	xor_vis_5
 	.type	xor_vis_5,#function
 xor_vis_5:
-	mov	%o5, %g5
+	save	%sp, -192, %sp
 	rd	%fprs, %o5
 	andcc	%o5, FPRS_FEF|FPRS_DU, %g0
 	be,pt	%icc, 0f
@@ -256,61 +256,60 @@ xor_vis_5:
 	jmpl	%g1 + %lo(VISenter), %g7
 	 add	%g7, 8, %g7
 0:	wr	%g0, FPRS_FEF, %fprs
-	mov	%g5, %o5
 	rd	%asi, %g1
 	wr	%g0, ASI_BLK_P, %asi
 	membar	#LoadStore|#StoreLoad|#StoreStore
-	sub	%o0, 64, %o0
-	ldda	[%o1] %asi, %f0
-	ldda	[%o2] %asi, %f16
+	sub	%i0, 64, %i0
+	ldda	[%i1] %asi, %f0
+	ldda	[%i2] %asi, %f16
 
-5:	ldda	[%o3] %asi, %f32
+5:	ldda	[%i3] %asi, %f32
 	fxor	%f0, %f16, %f48
 	fxor	%f2, %f18, %f50
-	add	%o1, 64, %o1
+	add	%i1, 64, %i1
 	fxor	%f4, %f20, %f52
 	fxor	%f6, %f22, %f54
-	add	%o2, 64, %o2
+	add	%i2, 64, %i2
 	fxor	%f8, %f24, %f56
 	fxor	%f10, %f26, %f58
 	fxor	%f12, %f28, %f60
 	fxor	%f14, %f30, %f62
-	ldda	[%o4] %asi, %f16
+	ldda	[%i4] %asi, %f16
 	fxor	%f48, %f32, %f48
 	fxor	%f50, %f34, %f50
 	fxor	%f52, %f36, %f52
 	fxor	%f54, %f38, %f54
-	add	%o3, 64, %o3
+	add	%i3, 64, %i3
 	fxor	%f56, %f40, %f56
 	fxor	%f58, %f42, %f58
 	fxor	%f60, %f44, %f60
 	fxor	%f62, %f46, %f62
-	ldda	[%o5] %asi, %f32
+	ldda	[%i5] %asi, %f32
 	fxor	%f48, %f16, %f48
 	fxor	%f50, %f18, %f50
-	add	%o4, 64, %o4
+	add	%i4, 64, %i4
 	fxor	%f52, %f20, %f52
 	fxor	%f54, %f22, %f54
-	add	%o5, 64, %o5
+	add	%i5, 64, %i5
 	fxor	%f56, %f24, %f56
 	fxor	%f58, %f26, %f58
 	fxor	%f60, %f28, %f60
 	fxor	%f62, %f30, %f62
-	ldda	[%o1] %asi, %f0
+	ldda	[%i1] %asi, %f0
 	fxor	%f48, %f32, %f48
 	fxor	%f50, %f34, %f50
 	fxor	%f52, %f36, %f52
 	fxor	%f54, %f38, %f54
 	fxor	%f56, %f40, %f56
 	fxor	%f58, %f42, %f58
-	subcc	%o0, 64, %o0
+	subcc	%i0, 64, %i0
 	fxor	%f60, %f44, %f60
 	fxor	%f62, %f46, %f62
-	stda	%f48, [%o1 - 64] %asi
+	stda	%f48, [%i1 - 64] %asi
 	bne,pt	%xcc, 5b
-	 ldda	[%o2] %asi, %f16
+	 ldda	[%i2] %asi, %f16
 
-	ldda	[%o3] %asi, %f32
+	ldda	[%i3] %asi, %f32
 	fxor	%f0, %f16, %f48
 	fxor	%f2, %f18, %f50
 	fxor	%f4, %f20, %f52
@@ -319,7 +318,7 @@ xor_vis_5:
 	fxor	%f10, %f26, %f58
 	fxor	%f12, %f28, %f60
 	fxor	%f14, %f30, %f62
-	ldda	[%o4] %asi, %f16
+	ldda	[%i4] %asi, %f16
 	fxor	%f48, %f32, %f48
 	fxor	%f50, %f34, %f50
 	fxor	%f52, %f36, %f52
@@ -328,7 +327,7 @@ xor_vis_5:
 	fxor	%f58, %f42, %f58
 	fxor	%f60, %f44, %f60
 	fxor	%f62, %f46, %f62
-	ldda	[%o5] %asi, %f32
+	ldda	[%i5] %asi, %f32
 	fxor	%f48, %f16, %f48
 	fxor	%f50, %f18, %f50
 	fxor	%f52, %f20, %f52
@@ -346,9 +345,10 @@ xor_vis_5:
 	fxor	%f58, %f42, %f58
 	fxor	%f60, %f44, %f60
 	fxor	%f62, %f46, %f62
-	stda	%f48, [%o1] %asi
+	stda	%f48, [%i1] %asi
 	membar	#Sync|#StoreStore|#StoreLoad
 	wr	%g1, %g0, %asi
-	retl
-	 wr	%g0, 0, %fprs
+	wr	%g0, 0, %fprs
+	ret
+	 restore
 	.size	xor_vis_5, .-xor_vis_5

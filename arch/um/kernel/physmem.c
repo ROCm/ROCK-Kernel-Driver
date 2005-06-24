@@ -294,7 +294,6 @@ int init_maps(unsigned long physmem, unsigned long iomem, unsigned long highmem)
 		INIT_LIST_HEAD(&p->lru);
 	}
 
-	mem_map = map;
 	max_mapnr = total_pages;
 	return(0);
 }

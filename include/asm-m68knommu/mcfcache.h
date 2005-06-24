@@ -15,14 +15,14 @@
 
 /*
  *	The different ColdFire families have different cache arrangments.
- *	Everything from a small linstruction only cache, to configurable
+ *	Everything from a small instruction only cache, to configurable
  *	data and/or instruction cache, to unified instruction/data, to 
  *	harvard style separate instruction and data caches.
  */
 
 #if defined(CONFIG_M5206) || defined(CONFIG_M5206e) || defined(CONFIG_M5272)
 /*
- *	Simple verion 2 core cache. These have instruction cache only,
+ *	Simple version 2 core cache. These have instruction cache only,
  *	we just need to invalidate it and enable it.
  */
 .macro CACHE_ENABLE
@@ -98,7 +98,7 @@
 
 #if defined(CONFIG_M5407)
 /*
- *	Version 4 cores have a true hardvard style separate instruction
+ *	Version 4 cores have a true harvard style separate instruction
  *	and data cache. Invalidate and enable cache, also enable write
  *	buffers and branch accelerator.
  */

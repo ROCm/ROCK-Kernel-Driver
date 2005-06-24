@@ -91,6 +91,15 @@ config KEYBOARD_LKKBD
 	  To compile this driver as a module, choose M here: the
 	  module will be called lkkbd.
 
+config KEYBOARD_LOCOMO
+	tristate "LoCoMo Keyboard Support"
+	depends on SHARP_LOCOMO
+	help
+	  Say Y here if you are running Linux on a Sharp Zaurus Collie or Poodle based PDA
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called locomokbd.
+
 config KEYBOARD_XTKBD
 	tristate "XT keyboard"
 	select SERIO

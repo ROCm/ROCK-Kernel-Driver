@@ -53,7 +53,7 @@ u_char const data_sizes_16[32] = {
   14, 0, 94, 10,  2, 10,  2,  8
 };
 
-u_char const data_sizes_32[32] = {
+static u_char const data_sizes_32[32] = {
   4,  4,  8,  2,  0,  0,  0,  0,
   4,  4,  8,  2,  4,  4,  8,  2,
   28, 0,108, 10,  2, 10,  0,  8,  
@@ -208,7 +208,7 @@ int FPU_load_store(u_char type, fpu_addr_modes addr_modes,
       break;
     case 024:     /* fldcw */
       RE_ENTRANT_CHECK_OFF;
-      FPU_verify_area(VERIFY_READ, data_address, 2);
+      FPU_access_ok(VERIFY_READ, data_address, 2);
       FPU_get_user(control_word, (unsigned short __user *) data_address);
       RE_ENTRANT_CHECK_ON;
       if ( partial_status & ~control_word & CW_Exceptions )
@@ -243,7 +243,7 @@ int FPU_load_store(u_char type, fpu_addr_modes addr_modes,
       break;
     case 034:      /* fstcw m16int */
       RE_ENTRANT_CHECK_OFF;
-      FPU_verify_area(VERIFY_WRITE,data_address,2);
+      FPU_access_ok(VERIFY_WRITE,data_address,2);
       FPU_put_user(control_word, (unsigned short __user *) data_address);
       RE_ENTRANT_CHECK_ON;
       return 1;
@@ -255,7 +255,7 @@ int FPU_load_store(u_char type, fpu_addr_modes addr_modes,
       break;
     case 036:      /* fstsw m2byte */
       RE_ENTRANT_CHECK_OFF;
-      FPU_verify_area(VERIFY_WRITE,data_address,2);
+      FPU_access_ok(VERIFY_WRITE,data_address,2);
       FPU_put_user(status_word(),(unsigned short __user *) data_address);
       RE_ENTRANT_CHECK_ON;
       return 1;

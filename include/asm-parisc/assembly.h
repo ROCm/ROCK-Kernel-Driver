@@ -37,6 +37,7 @@
 #define LDREGX  ldwx,s
 #define LDREGM	ldwm
 #define STREGM	stwm
+#define SHRREG  shr
 #define RP_OFFSET	20
 #define FRAME_SIZE	64
 #define CALLEE_SAVE_FRAME_SIZE	128
@@ -44,7 +45,7 @@
 
 #ifdef CONFIG_PA20
 #define BL		b,l
-# ifdef CONFIG_PARISC64
+# ifdef CONFIG_64BIT
 #  define LEVEL		2.0w
 # else
 #  define LEVEL		2.0

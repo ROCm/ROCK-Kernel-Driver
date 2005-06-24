@@ -145,29 +145,14 @@ static void mark_screen_rdonly(struct task_struct * tsk)
 	preempt_disable();
 	spin_lock(&tsk->mm->page_table_lock);
 	pgd = pgd_offset(tsk->mm, 0xA0000);
-	if (pgd_none(*pgd))
+	if (pgd_none_or_clear_bad(pgd))
 		goto out;
-	if (pgd_bad(*pgd)) {
-		pgd_ERROR(*pgd);
-		pgd_clear(pgd);
-		goto out;
-	}
 	pud = pud_offset(pgd, 0xA0000);
-	if (pud_none(*pud))
+	if (pud_none_or_clear_bad(pud))
 		goto out;
-	if (pud_bad(*pud)) {
-		pud_ERROR(*pud);
-		pud_clear(pud);
-		goto out;
-	}
 	pmd = pmd_offset(pud, 0xA0000);
-	if (pmd_none(*pmd))
+	if (pmd_none_or_clear_bad(pmd))
 		goto out;
-	if (pmd_bad(*pmd)) {
-		pmd_ERROR(*pmd);
-		pmd_clear(pmd);
-		goto out;
-	}
 	pte = mapped = pte_offset_map(pmd, 0xA0000);
 	for (i = 0; i < 32; i++) {
 		if (pte_present(*pte))
@@ -237,7 +222,7 @@ asmlinkage int sys_vm86(struct pt_regs regs)
 			goto out;
 		case VM86_PLUS_INSTALL_CHECK:
 			/* NOTE: on old vm86 stuff this will return the error
-			   from verify_area(), because the subfunction is
+			   from access_ok(), because the subfunction is
 			   interpreted as (invalid) address to vm86_struct.
 			   So the installation check works.
 			 */
@@ -309,8 +294,8 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
  */
 	info->regs32->eax = 0;
 	tsk->thread.saved_esp0 = tsk->thread.esp0;
-	savesegment(fs,tsk->thread.saved_fs);
-	savesegment(gs,tsk->thread.saved_gs);
+	asm volatile("mov %%fs,%0":"=m" (tsk->thread.saved_fs));
+	asm volatile("mov %%gs,%0":"=m" (tsk->thread.saved_gs));
 
 	tss = &per_cpu(init_tss, get_cpu());
 	tsk->thread.esp0 = (unsigned long) &info->VM86_TSS_ESP0;
@@ -732,12 +717,12 @@ static irqreturn_t irq_handler(int intno, void *dev_id, struct pt_regs * regs)
 	irqbits |= irq_bit;
 	if (vm86_irqs[intno].sig)
 		send_sig(vm86_irqs[intno].sig, vm86_irqs[intno].tsk, 1);
-	spin_unlock_irqrestore(&irqbits_lock, flags);
 	/*
 	 * IRQ will be re-enabled when user asks for the irq (whether
 	 * polling or as a result of the signal)
 	 */
-	disable_irq(intno);
+	disable_irq_nosync(intno);
+	spin_unlock_irqrestore(&irqbits_lock, flags);
 	return IRQ_HANDLED;
 
 out:
@@ -769,17 +754,20 @@ static inline int get_and_reset_irq(int irqnumber)
 {
 	int bit;
 	unsigned long flags;
+	int ret = 0;
 	
 	if (invalid_vm86_irq(irqnumber)) return 0;
 	if (vm86_irqs[irqnumber].tsk != current) return 0;
 	spin_lock_irqsave(&irqbits_lock, flags);	
 	bit = irqbits & (1 << irqnumber);
 	irqbits &= ~bit;
+	if (bit) {
+		enable_irq(irqnumber);
+		ret = 1;
+	}
+
 	spin_unlock_irqrestore(&irqbits_lock, flags);	
-	if (!bit)
-		return 0;
-	enable_irq(irqnumber);
-	return 1;
+	return ret;
 }
 
 

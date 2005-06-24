@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-video.c,v 1.53 2005/01/20 12:54:46 kraxel Exp $
+ * $Id: cx88-video.c,v 1.58 2005/03/07 15:58:05 kraxel Exp $
  *
  * device driver for Conexant 2388x based TV cards
  * video4linux video interface
@@ -325,7 +325,7 @@ static struct cx88_ctrl cx8800_ctls[] = {
 		.shift                 = 0,
 	}
 };
-const int CX8800_CTLS = ARRAY_SIZE(cx8800_ctls);
+static const int CX8800_CTLS = ARRAY_SIZE(cx8800_ctls);
 
 /* ------------------------------------------------------------------- */
 /* resource management                                                 */
@@ -665,7 +665,7 @@ static void buffer_release(struct videobuf_queue *q, struct videobuf_buffer *vb)
 	cx88_free_buffer(fh->dev->pci,buf);
 }
 
-struct videobuf_queue_ops cx8800_video_qops = {
+static struct videobuf_queue_ops cx8800_video_qops = {
 	.buf_setup    = buffer_setup,
 	.buf_prepare  = buffer_prepare,
 	.buf_queue    = buffer_queue,
@@ -1341,7 +1341,6 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 			0;
 		if (UNSET != core->tuner_type)
 			cap->capabilities |= V4L2_CAP_TUNER;
-
 		return 0;
 	}
 
@@ -1432,7 +1431,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 		if (*i >= 4)
 			return -EINVAL;
 		down(&dev->lock);
-		dev->core->audiomode = UNSET; 
+		cx88_newstation(core);
 		video_mux(dev,*i);
 		up(&dev->lock);
 		return 0;
@@ -1594,7 +1593,7 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 			return -EINVAL;
 		down(&dev->lock);
 		dev->freq = f->frequency;
-		dev->core->audiomode = UNSET; 
+		cx88_newstation(core);
 #ifdef V4L2_I2C_CLIENTS
 		cx88_call_i2c_clients(dev->core,VIDIOC_S_FREQUENCY,f);
 #else
@@ -1925,7 +1924,7 @@ static struct file_operations video_fops =
 	.llseek        = no_llseek,
 };
 
-struct video_device cx8800_video_template =
+static struct video_device cx8800_video_template =
 {
 	.name          = "cx8800-video",
 	.type          = VID_TYPE_CAPTURE|VID_TYPE_TUNER|VID_TYPE_SCALES,
@@ -1934,7 +1933,7 @@ struct video_device cx8800_video_template =
 	.minor         = -1,
 };
 
-struct video_device cx8800_vbi_template =
+static struct video_device cx8800_vbi_template =
 {
 	.name          = "cx8800-vbi",
 	.type          = VID_TYPE_TELETEXT|VID_TYPE_TUNER,
@@ -1952,7 +1951,7 @@ static struct file_operations radio_fops =
 	.llseek        = no_llseek,
 };
 
-struct video_device cx8800_radio_template =
+static struct video_device cx8800_radio_template =
 {
 	.name          = "cx8800-radio",
 	.type          = VID_TYPE_TUNER,
@@ -2161,7 +2160,7 @@ static void __devexit cx8800_finidev(struct pci_dev *pci_dev)
 	kfree(dev);
 }
 
-static int cx8800_suspend(struct pci_dev *pci_dev, u32 state)
+static int cx8800_suspend(struct pci_dev *pci_dev, pm_message_t state)
 {
         struct cx8800_dev *dev = pci_get_drvdata(pci_dev);
 	struct cx88_core *core = dev->core;
@@ -2186,7 +2185,7 @@ static int cx8800_suspend(struct pci_dev *pci_dev, u32 state)
 #endif
 
 	pci_save_state(pci_dev);
-	if (0 != pci_set_power_state(pci_dev, state)) {
+	if (0 != pci_set_power_state(pci_dev, pci_choose_state(pci_dev, state))) {
 		pci_disable_device(pci_dev);
 		dev->state.disabled = 1;
 	}
@@ -2202,7 +2201,7 @@ static int cx8800_resume(struct pci_dev *pci_dev)
 		pci_enable_device(pci_dev);
 		dev->state.disabled = 0;
 	}
-	pci_set_power_state(pci_dev, 0);
+	pci_set_power_state(pci_dev, PCI_D0);
 	pci_restore_state(pci_dev);
 
 #if 1
@@ -2227,7 +2226,7 @@ static int cx8800_resume(struct pci_dev *pci_dev)
 
 /* ----------------------------------------------------------- */
 
-struct pci_device_id cx8800_pci_tbl[] = {
+static struct pci_device_id cx8800_pci_tbl[] = {
 	{
 		.vendor       = 0x14f1,
 		.device       = 0x8800,
@@ -2259,7 +2258,7 @@ static int cx8800_init(void)
 	printk(KERN_INFO "cx2388x: snapshot date %04d-%02d-%02d\n",
 	       SNAPSHOT/10000, (SNAPSHOT/100)%100, SNAPSHOT%100);
 #endif
-	return pci_module_init(&cx8800_pci_driver);
+	return pci_register_driver(&cx8800_pci_driver);
 }
 
 static void cx8800_fini(void)

@@ -129,6 +129,99 @@ int ide_end_request (ide_drive_t *drive, int uptodate, int nr_sectors)
 }
 EXPORT_SYMBOL(ide_end_request);
 
+/*
+ * Power Management state machine. This one is rather trivial for now,
+ * we should probably add more, like switching back to PIO on suspend
+ * to help some BIOSes, re-do the door locking on resume, etc...
+ */
+
+enum {
+	ide_pm_flush_cache	= ide_pm_state_start_suspend,
+	idedisk_pm_standby,
+
+	idedisk_pm_idle		= ide_pm_state_start_resume,
+	ide_pm_restore_dma,
+};
+
+static void ide_complete_power_step(ide_drive_t *drive, struct request *rq, u8 stat, u8 error)
+{
+	if (drive->media != ide_disk)
+		return;
+
+	switch (rq->pm->pm_step) {
+	case ide_pm_flush_cache:	/* Suspend step 1 (flush cache) complete */
+		if (rq->pm->pm_state == 4)
+			rq->pm->pm_step = ide_pm_state_completed;
+		else
+			rq->pm->pm_step = idedisk_pm_standby;
+		break;
+	case idedisk_pm_standby:	/* Suspend step 2 (standby) complete */
+		rq->pm->pm_step = ide_pm_state_completed;
+		break;
+	case idedisk_pm_idle:		/* Resume step 1 (idle) complete */
+		rq->pm->pm_step = ide_pm_restore_dma;
+		break;
+	}
+}
+
+static ide_startstop_t ide_start_power_step(ide_drive_t *drive, struct request *rq)
+{
+	ide_task_t *args = rq->special;
+
+	memset(args, 0, sizeof(*args));
+
+	if (drive->media != ide_disk) {
+		/* skip idedisk_pm_idle for ATAPI devices */
+		if (rq->pm->pm_step == idedisk_pm_idle)
+			rq->pm->pm_step = ide_pm_restore_dma;
+	}
+
+	switch (rq->pm->pm_step) {
+	case ide_pm_flush_cache:	/* Suspend step 1 (flush cache) */
+		if (drive->media != ide_disk)
+			break;
+		/* Not supported? Switch to next step now. */
+		if (!drive->wcache || !ide_id_has_flush_cache(drive->id)) {
+			ide_complete_power_step(drive, rq, 0, 0);
+			return ide_stopped;
+		}
+		if (ide_id_has_flush_cache_ext(drive->id))
+			args->tfRegister[IDE_COMMAND_OFFSET] = WIN_FLUSH_CACHE_EXT;
+		else
+			args->tfRegister[IDE_COMMAND_OFFSET] = WIN_FLUSH_CACHE;
+		args->command_type = IDE_DRIVE_TASK_NO_DATA;
+		args->handler	   = &task_no_data_intr;
+		return do_rw_taskfile(drive, args);
+
+	case idedisk_pm_standby:	/* Suspend step 2 (standby) */
+		args->tfRegister[IDE_COMMAND_OFFSET] = WIN_STANDBYNOW1;
+		args->command_type = IDE_DRIVE_TASK_NO_DATA;
+		args->handler	   = &task_no_data_intr;
+		return do_rw_taskfile(drive, args);
+
+	case idedisk_pm_idle:		/* Resume step 1 (idle) */
+		args->tfRegister[IDE_COMMAND_OFFSET] = WIN_IDLEIMMEDIATE;
+		args->command_type = IDE_DRIVE_TASK_NO_DATA;
+		args->handler = task_no_data_intr;
+		return do_rw_taskfile(drive, args);
+
+	case ide_pm_restore_dma:	/* Resume step 2 (restore DMA) */
+		/*
+		 * Right now, all we do is call hwif->ide_dma_check(drive),
+		 * we could be smarter and check for current xfer_speed
+		 * in struct drive etc...
+		 */
+		if ((drive->id->capability & 1) == 0)
+			break;
+		if (drive->hwif->ide_dma_check == NULL)
+			break;
+		drive->hwif->ide_dma_check(drive);
+		break;
+	}
+	rq->pm->pm_step = ide_pm_state_completed;
+	return ide_stopped;
+}
+
 /**
  *	ide_complete_pm_request - end the current Power Management request
  *	@drive: target drive
@@ -276,7 +369,7 @@ void ide_end_drive_cmd (ide_drive_t *drive, u8 stat, u8 err)
 		printk("%s: complete_power_step(step: %d, stat: %x, err: %x)\n",
 			drive->name, rq->pm->pm_step, stat, err);
 #endif
-		DRIVER(drive)->complete_power_step(drive, rq, stat, err);
+		ide_complete_power_step(drive, rq, stat, err);
 		if (rq->pm->pm_step == ide_pm_state_completed)
 			ide_complete_pm_request(drive, rq);
 		return;
@@ -317,6 +410,17 @@ static void try_to_flush_leftover_data (ide_drive_t *drive)
 	}
 }
 
+static void ide_kill_rq(ide_drive_t *drive, struct request *rq)
+{
+	if (rq->rq_disk) {
+		ide_driver_t *drv;
+
+		drv = *(ide_driver_t **)rq->rq_disk->private_data;
+		drv->end_request(drive, 0, 0);
+	} else
+		ide_end_request(drive, 0, 0);
+}
+
 static ide_startstop_t ide_ata_error(ide_drive_t *drive, struct request *rq, u8 stat, u8 err)
 {
 	ide_hwif_t *hwif = drive->hwif;
@@ -351,7 +455,7 @@ static ide_startstop_t ide_ata_error(ide_drive_t *drive, struct request *rq, u8 
 		hwif->OUTB(WIN_IDLEIMMEDIATE, IDE_COMMAND_REG);
 
 	if (rq->errors >= ERROR_MAX || blk_noretry_request(rq))
-		drive->driver->end_request(drive, 0, 0);
+		ide_kill_rq(drive, rq);
 	else {
 		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
 			++rq->errors;
@@ -380,7 +484,7 @@ static ide_startstop_t ide_atapi_error(ide_drive_t *drive, struct request *rq, u
 		hwif->OUTB(WIN_IDLEIMMEDIATE, IDE_COMMAND_REG);
 
 	if (rq->errors >= ERROR_MAX) {
-		drive->driver->end_request(drive, 0, 0);
+		ide_kill_rq(drive, rq);
 	} else {
 		if ((rq->errors & ERROR_RESET) == ERROR_RESET) {
 			++rq->errors;
@@ -399,6 +503,8 @@ __ide_error(ide_drive_t *drive, struct request *rq, u8 stat, u8 err)
 		return ide_ata_error(drive, rq, stat, err);
 	return ide_atapi_error(drive, rq, stat, err);
 }
+
+EXPORT_SYMBOL_GPL(__ide_error);
 
 /**
  *	ide_error	-	handle an error on the IDE
@@ -430,7 +536,13 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, u8 stat)
 		return ide_stopped;
 	}
 
-	return drive->driver->error(drive, rq, stat, err);
+	if (rq->rq_disk) {
+		ide_driver_t *drv;
+
+		drv = *(ide_driver_t **)rq->rq_disk->private_data;
+		return drv->error(drive, rq, stat, err);
+	} else
+		return __ide_error(drive, rq, stat, err);
 }
 
 EXPORT_SYMBOL_GPL(ide_error);
@@ -440,9 +552,12 @@ ide_startstop_t __ide_abort(ide_drive_t *drive, struct request *rq)
 	if (drive->media != ide_disk)
 		rq->errors |= ERROR_RESET;
 
-	DRIVER(drive)->end_request(drive, 0, 0);
+	ide_kill_rq(drive, rq);
+
 	return ide_stopped;
 }
+
+EXPORT_SYMBOL_GPL(__ide_abort);
 
 /**
  *	ide_abort	-	abort pending IDE operatins
@@ -472,7 +587,13 @@ ide_startstop_t ide_abort(ide_drive_t *drive, const char *msg)
 		return ide_stopped;
 	}
 
-	return drive->driver->abort(drive, rq);
+	if (rq->rq_disk) {
+		ide_driver_t *drv;
+
+		drv = *(ide_driver_t **)rq->rq_disk->private_data;
+		return drv->abort(drive, rq);
+	} else
+		return __ide_abort(drive, rq);
 }
 
 /**
@@ -525,11 +646,70 @@ static ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 			udelay(100);
 	}
 
-	if (!OK_STAT(stat, READY_STAT, BAD_STAT) && DRIVER(drive) != NULL)
+	if (!OK_STAT(stat, READY_STAT, BAD_STAT))
 		return ide_error(drive, "drive_cmd", stat);
 		/* calls ide_end_drive_cmd */
 	ide_end_drive_cmd(drive, stat, hwif->INB(IDE_ERROR_REG));
 	return ide_stopped;
+}
+
+static void ide_init_specify_cmd(ide_drive_t *drive, ide_task_t *task)
+{
+	task->tfRegister[IDE_NSECTOR_OFFSET] = drive->sect;
+	task->tfRegister[IDE_SECTOR_OFFSET]  = drive->sect;
+	task->tfRegister[IDE_LCYL_OFFSET]    = drive->cyl;
+	task->tfRegister[IDE_HCYL_OFFSET]    = drive->cyl>>8;
+	task->tfRegister[IDE_SELECT_OFFSET]  = ((drive->head-1)|drive->select.all)&0xBF;
+	task->tfRegister[IDE_COMMAND_OFFSET] = WIN_SPECIFY;
+
+	task->handler = &set_geometry_intr;
+}
+
+static void ide_init_restore_cmd(ide_drive_t *drive, ide_task_t *task)
+{
+	task->tfRegister[IDE_NSECTOR_OFFSET] = drive->sect;
+	task->tfRegister[IDE_COMMAND_OFFSET] = WIN_RESTORE;
+
+	task->handler = &recal_intr;
+}
+
+static void ide_init_setmult_cmd(ide_drive_t *drive, ide_task_t *task)
+{
+	task->tfRegister[IDE_NSECTOR_OFFSET] = drive->mult_req;
+	task->tfRegister[IDE_COMMAND_OFFSET] = WIN_SETMULT;
+
+	task->handler = &set_multmode_intr;
+}
+
+static ide_startstop_t ide_disk_special(ide_drive_t *drive)
+{
+	special_t *s = &drive->special;
+	ide_task_t args;
+
+	memset(&args, 0, sizeof(ide_task_t));
+	args.command_type = IDE_DRIVE_TASK_NO_DATA;
+
+	if (s->b.set_geometry) {
+		s->b.set_geometry = 0;
+		ide_init_specify_cmd(drive, &args);
+	} else if (s->b.recalibrate) {
+		s->b.recalibrate = 0;
+		ide_init_restore_cmd(drive, &args);
+	} else if (s->b.set_multmode) {
+		s->b.set_multmode = 0;
+		if (drive->mult_req > drive->id->max_multsect)
+			drive->mult_req = drive->id->max_multsect;
+		ide_init_setmult_cmd(drive, &args);
+	} else if (s->all) {
+		int special = s->all;
+		s->all = 0;
+		printk(KERN_ERR "%s: bad special flag: 0x%02x\n", drive->name, special);
+		return ide_stopped;
+	}
+
+	do_rw_taskfile(drive, &args);
+
+	return ide_started;
 }
 
 /**
@@ -553,9 +733,14 @@ static ide_startstop_t do_special (ide_drive_t *drive)
 		if (HWIF(drive)->tuneproc != NULL)
 			HWIF(drive)->tuneproc(drive, drive->tune_req);
 		return ide_stopped;
+	} else {
+		if (drive->media == ide_disk)
+			return ide_disk_special(drive);
+
+		s->all = 0;
+		drive->mult_req = 0;
+		return ide_stopped;
 	}
-	else
-		return DRIVER(drive)->special(drive);
 }
 
 void ide_map_sg(ide_drive_t *drive, struct request *rq)
@@ -761,6 +946,8 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 		return startstop;
 	}
 	if (!drive->special.all) {
+		ide_driver_t *drv;
+
 		if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK))
 			return execute_drive_cmd(drive, rq);
 		else if (rq->flags & REQ_DRIVE_TASKFILE)
@@ -770,17 +957,19 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 			printk("%s: start_power_step(step: %d)\n",
 				drive->name, rq->pm->pm_step);
 #endif
-			startstop = DRIVER(drive)->start_power_step(drive, rq);
+			startstop = ide_start_power_step(drive, rq);
 			if (startstop == ide_stopped &&
 			    rq->pm->pm_step == ide_pm_state_completed)
 				ide_complete_pm_request(drive, rq);
 			return startstop;
 		}
-		return (DRIVER(drive)->do_request(drive, rq, block));
+
+		drv = *(ide_driver_t **)rq->rq_disk->private_data;
+		return drv->do_request(drive, rq, block);
 	}
 	return do_special(drive);
 kill_rq:
-	DRIVER(drive)->end_request(drive, 0, 0);
+	ide_kill_rq(drive, rq);
 	return ide_stopped;
 }
 
@@ -799,53 +988,6 @@ void ide_stall_queue (ide_drive_t *drive, unsigned long timeout)
 		timeout = WAIT_WORSTCASE;
 	drive->sleep = timeout + jiffies;
 	drive->sleeping = 1;
-}
-
-void ide_unpin_hwgroup(ide_drive_t *drive)
-{
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-
-	if (in_interrupt())
-		return;
-
-	if (hwgroup) {
-		spin_lock_irq(&ide_lock);
-		HWGROUP(drive)->busy = 0;
-		drive->blocked = 0;
-		do_ide_request(drive->queue);
-		spin_unlock_irq(&ide_lock);
-	}
-}
-
-void ide_pin_hwgroup(ide_drive_t *drive)
-{
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-
-	if (in_interrupt())
-		return;
-
-	/*
-	 * should only happen very early, so not a problem
-	 */
-	if (!hwgroup)
-		return;
-
-	spin_lock_irq(&ide_lock);
-	do {
-		if (!hwgroup->busy && !drive->blocked &&
-		    !blk_queue_flushing(drive->queue))
-			break;
-		spin_unlock_irq(&ide_lock);
-		schedule_timeout(HZ/100);
-		spin_lock_irq(&ide_lock);
-	} while (hwgroup->busy || drive->blocked || blk_queue_flushing(drive->queue));
-
-	/*
-	 * we've now secured exclusive access to this hwgroup
-	 */
-	hwgroup->busy = 1;
-	drive->blocked = 1;
-	spin_unlock_irq(&ide_lock);
 }
 
 EXPORT_SYMBOL(ide_stall_queue);
@@ -1501,8 +1643,6 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
-
-	rq->rq_disk = drive->disk;
 
 	/*
 	 * we need to hold an extra reference to request for safe inspection

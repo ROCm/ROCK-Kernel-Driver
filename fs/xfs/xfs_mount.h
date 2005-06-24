@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2005 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -210,15 +210,16 @@ typedef int		(*xfs_bmapi_t)(struct xfs_trans *, void *,
 				struct xfs_bmap_free *);
 typedef int		(*xfs_bmap_eof_t)(void *, xfs_fileoff_t, int, int *);
 typedef int		(*xfs_iomap_write_direct_t)(
-				void *, loff_t, size_t, int,
+				void *, xfs_off_t, size_t, int,
 				struct xfs_bmbt_irec *, int *, int);
 typedef int		(*xfs_iomap_write_delay_t)(
-				void *, loff_t, size_t, int,
+				void *, xfs_off_t, size_t, int,
 				struct xfs_bmbt_irec *, int *);
 typedef int		(*xfs_iomap_write_allocate_t)(
-				void *, struct xfs_bmbt_irec *, int *);
+				void *, xfs_off_t, size_t,
+				struct xfs_bmbt_irec *, int *);
 typedef int		(*xfs_iomap_write_unwritten_t)(
-				void *, loff_t, size_t);
+				void *, xfs_off_t, size_t);
 typedef uint		(*xfs_lck_map_shared_t)(void *);
 typedef void		(*xfs_lock_t)(void *, uint);
 typedef void		(*xfs_lock_demote_t)(void *, uint);
@@ -258,9 +259,9 @@ typedef struct xfs_ioops {
 #define XFS_IOMAP_WRITE_DELAY(mp, io, offset, count, flags, mval, nmap) \
 	(*(mp)->m_io_ops.xfs_iomap_write_delay) \
 		((io)->io_obj, offset, count, flags, mval, nmap)
-#define XFS_IOMAP_WRITE_ALLOCATE(mp, io, mval, nmap) \
+#define XFS_IOMAP_WRITE_ALLOCATE(mp, io, offset, count, mval, nmap) \
 	(*(mp)->m_io_ops.xfs_iomap_write_allocate) \
-		((io)->io_obj, mval, nmap)
+		((io)->io_obj, offset, count, mval, nmap)
 #define XFS_IOMAP_WRITE_UNWRITTEN(mp, io, offset, count) \
 	(*(mp)->m_io_ops.xfs_iomap_write_unwritten) \
 		((io)->io_obj, offset, count)
@@ -418,6 +419,8 @@ typedef struct xfs_mount {
 #define XFS_MOUNT_IDELETE	0x00040000	/* delete empty inode clusters*/
 #define XFS_MOUNT_SWALLOC	0x00080000	/* turn on stripe width
 						 * allocation */
+#define XFS_MOUNT_IHASHSIZE	0x00100000	/* inode hash table size */
+#define XFS_MOUNT_DIRSYNC	0x00200000	/* synchronous directory ops */
 
 /*
  * Default minimum read and write sizes.
@@ -426,10 +429,10 @@ typedef struct xfs_mount {
 #define XFS_WRITEIO_LOG_LARGE	16
 
 /*
- * Max and min values for UIO and mount-option defined I/O sizes;
- * min value can't be less than a page.  Currently unused.
+ * Max and min values for mount-option defined I/O
+ * preallocation sizes.
  */
-#define XFS_MAX_IO_LOG		16	/* 64K */
+#define XFS_MAX_IO_LOG		30	/* 1G */
 #define XFS_MIN_IO_LOG		PAGE_SHIFT
 
 /*
@@ -554,8 +557,7 @@ extern void	xfs_freesb(xfs_mount_t *);
 extern void	xfs_do_force_shutdown(bhv_desc_t *, int, char *, int);
 extern int	xfs_syncsub(xfs_mount_t *, int, int, int *);
 extern xfs_agnumber_t	xfs_initialize_perag(xfs_mount_t *, xfs_agnumber_t);
-extern void	xfs_xlatesb(void *, struct xfs_sb *, int, xfs_arch_t,
-			__int64_t);
+extern void	xfs_xlatesb(void *, struct xfs_sb *, int, __int64_t);
 
 extern struct vfsops xfs_vfsops;
 extern struct vnodeops xfs_vnodeops;

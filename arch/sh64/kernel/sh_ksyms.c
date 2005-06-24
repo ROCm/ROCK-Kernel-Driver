@@ -19,6 +19,7 @@
 #include <linux/in6.h>
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
+#include <linux/tty.h>
 
 #include <asm/semaphore.h>
 #include <asm/processor.h>
@@ -50,7 +51,6 @@ EXPORT_SYMBOL(kernel_thread);
 /* Networking helper routines. */
 EXPORT_SYMBOL(csum_partial_copy);
 
-EXPORT_SYMBOL(strtok);
 EXPORT_SYMBOL(strpbrk);
 EXPORT_SYMBOL(strstr);
 
@@ -72,12 +72,18 @@ EXPORT_SYMBOL(strlen);
 
 EXPORT_SYMBOL(flush_dcache_page);
 
+/* For ext3 */
+EXPORT_SYMBOL(sh64_page_clear);
+
 /* Ugh.  These come in from libgcc.a at link time. */
 
 extern void __sdivsi3(void);
 extern void __muldi3(void);
 extern void __udivsi3(void);
+extern char __div_table;
 EXPORT_SYMBOL(__sdivsi3);
 EXPORT_SYMBOL(__muldi3);
 EXPORT_SYMBOL(__udivsi3);
+EXPORT_SYMBOL(__div_table);
+
 

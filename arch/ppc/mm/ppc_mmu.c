@@ -138,11 +138,11 @@ void __init setbat(int index, unsigned long virt, unsigned long phys,
 	union ubat *bat = BATS[index];
 
 	if (((flags & _PAGE_NO_CACHE) == 0) &&
-	    (cur_cpu_spec[0]->cpu_features & CPU_FTR_NEED_COHERENT))
+	    cpu_has_feature(CPU_FTR_NEED_COHERENT))
 		flags |= _PAGE_COHERENT;
 
 	bl = (size >> 17) - 1;
-	if (PVR_VER(mfspr(PVR)) != 1) {
+	if (PVR_VER(mfspr(SPRN_PVR)) != 1) {
 		/* 603, 604, etc. */
 		/* Do DBAT first */
 		wimgxpp = flags & (_PAGE_WRITETHRU | _PAGE_NO_CACHE
@@ -191,7 +191,7 @@ void __init MMU_init_hw(void)
 	extern unsigned int hash_page[];
 	extern unsigned int flush_hash_patch_A[], flush_hash_patch_B[];
 
-	if ((cur_cpu_spec[0]->cpu_features & CPU_FTR_HPTE_TABLE) == 0) {
+	if (!cpu_has_feature(CPU_FTR_HPTE_TABLE)) {
 		/*
 		 * Put a blr (procedure return) instruction at the
 		 * start of hash_page, since we can still get DSI

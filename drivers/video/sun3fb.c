@@ -505,7 +505,7 @@ void sun3fb_palette(int enter)
 			if (fb->restore_palette) {
 				if (enter)
 					fb->restore_palette(fb);
-				else if (vt_cons[i]->vc_mode != KD_GRAPHICS)
+				else if (vc_cons[i].d->vc_mode != KD_GRAPHICS)
 				         vc_cons[i].d->vc_sw->con_set_palette(vc_cons[i].d, color_table);
 			}
 		}

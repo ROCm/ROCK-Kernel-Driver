@@ -26,7 +26,6 @@
  * This is needed for the following functions:
  *  - inode_has_buffers
  *  - invalidate_inode_buffers
- *  - fsync_bdev
  *  - invalidate_bdev
  *
  * FIXME: remove all knowledge of the buffer layer from this file
@@ -120,7 +119,6 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode->i_blkbits = sb->s_blocksize_bits;
 		inode->i_flags = 0;
 		atomic_set(&inode->i_count, 1);
-		inode->i_sock = 0;
 		inode->i_op = &empty_iops;
 		inode->i_fop = &empty_fops;
 		inode->i_nlink = 1;
@@ -336,14 +334,6 @@ static int invalidate_list(struct list_head *head, struct list_head *dispose)
 	return busy;
 }
 
-/*
- * This is a two-stage process. First we collect all
- * offending inodes onto the throw-away list, and in
- * the second stage we actually dispose of them. This
- * is because we don't want to sleep while messing
- * with the global lists..
- */
- 
 /**
  *	invalidate_inodes	- discard the inodes on a device
  *	@sb: superblock
@@ -370,16 +360,11 @@ int invalidate_inodes(struct super_block * sb)
 
 EXPORT_SYMBOL(invalidate_inodes);
  
-int __invalidate_device(struct block_device *bdev, int do_sync)
+int __invalidate_device(struct block_device *bdev)
 {
-	struct super_block *sb;
-	int res;
+	struct super_block *sb = get_super(bdev);
+	int res = 0;
 
-	if (do_sync)
-		fsync_bdev(bdev);
-
-	res = 0;
-	sb = get_super(bdev);
 	if (sb) {
 		/*
 		 * no need to lock the super, get_super holds the
@@ -394,7 +379,6 @@ int __invalidate_device(struct block_device *bdev, int do_sync)
 	invalidate_bdev(bdev, 0);
 	return res;
 }
-
 EXPORT_SYMBOL(__invalidate_device);
 
 static int can_unuse(struct inode *inode)
@@ -1102,15 +1086,16 @@ static inline void iput_final(struct inode *inode)
  *	@inode: inode to put
  *
  *	Puts an inode, dropping its usage count. If the inode use count hits
- *	zero the inode is also then freed and may be destroyed.
+ *	zero, the inode is then freed and may also be destroyed.
+ *
+ *	Consequently, iput() can sleep.
  */
 void iput(struct inode *inode)
 {
 	if (inode) {
 		struct super_operations *op = inode->i_sb->s_op;
 
-		if (inode->i_state == I_CLEAR)
-			BUG();
+		BUG_ON(inode->i_state == I_CLEAR);
 
 		if (op && op->put_inode)
 			op->put_inode(inode);

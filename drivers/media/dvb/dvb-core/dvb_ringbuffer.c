@@ -2,9 +2,9 @@
  *
  * dvb_ringbuffer.c: ring buffer implementation for the dvb driver
  *
- * Copyright (C) 2003 Oliver Endriss 
+ * Copyright (C) 2003 Oliver Endriss
  * Copyright (C) 2004 Andrew de Quincey
- * 
+ *
  * based on code originally found in av7110.c & dvb_ci.c:
  * Copyright (C) 1999-2003 Ralph  Metzler
  *                       & Marcus Metzler for convergence integrated media GmbH
@@ -13,7 +13,7 @@
  * modify it under the terms of the GNU Lesser General Public License
  * as published by the Free Software Foundation; either version 2.1
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -63,7 +63,7 @@ int dvb_ringbuffer_empty(struct dvb_ringbuffer *rbuf)
 ssize_t dvb_ringbuffer_free(struct dvb_ringbuffer *rbuf)
 {
         ssize_t free;
-  
+
         free = rbuf->pread - rbuf->pwrite;
         if (free <= 0)
                 free += rbuf->size;
@@ -75,7 +75,7 @@ ssize_t dvb_ringbuffer_free(struct dvb_ringbuffer *rbuf)
 ssize_t dvb_ringbuffer_avail(struct dvb_ringbuffer *rbuf)
 {
         ssize_t avail;
-  
+
         avail = rbuf->pwrite - rbuf->pread;
         if (avail < 0)
                 avail += rbuf->size;
@@ -137,19 +137,19 @@ ssize_t dvb_ringbuffer_write(struct dvb_ringbuffer *rbuf, const u8 *buf, size_t 
 {
         size_t todo = len;
         size_t split;
-    
+
         split = (rbuf->pwrite + len > rbuf->size) ? rbuf->size - rbuf->pwrite : 0;
 
         if (split > 0) {
-		memcpy(rbuf->data+rbuf->pwrite, buf, split);
+                memcpy(rbuf->data+rbuf->pwrite, buf, split);
                 buf += split;
                 todo -= split;
                 rbuf->pwrite = 0;
         }
-	memcpy(rbuf->data+rbuf->pwrite, buf, todo);
+        memcpy(rbuf->data+rbuf->pwrite, buf, todo);
         rbuf->pwrite = (rbuf->pwrite + todo) % rbuf->size;
 
-	return len;
+        return len;
 }
 
 ssize_t dvb_ringbuffer_pkt_write(struct dvb_ringbuffer *rbuf, u8* buf, size_t len)

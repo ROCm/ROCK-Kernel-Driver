@@ -207,163 +207,22 @@ static void send_reset(struct sk_buff *oldskb, int hook)
 					   nskb->nh.iph->ihl);
 
 	/* "Never happens" */
-	if (nskb->len > dst_pmtu(nskb->dst))
+	if (nskb->len > dst_mtu(nskb->dst))
 		goto free_nskb;
 
 	nf_ct_attach(nskb, oldskb);
 
 	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, nskb, NULL, nskb->dst->dev,
-		ip_finish_output);
+		dst_output);
 	return;
 
  free_nskb:
 	kfree_skb(nskb);
 }
 
-static void send_unreach(struct sk_buff *skb_in, int code)
+static inline void send_unreach(struct sk_buff *skb_in, int code)
 {
-	struct iphdr *iph;
-	struct icmphdr *icmph;
-	struct sk_buff *nskb;
-	u32 saddr;
-	u8 tos;
-	int hh_len, length;
-	struct rtable *rt = (struct rtable*)skb_in->dst;
-	unsigned char *data;
-
-	if (!rt)
-		return;
-
-	/* FIXME: Use sysctl number. --RR */
-	if (!xrlim_allow(&rt->u.dst, 1*HZ))
-		return;
-
-	iph = skb_in->nh.iph;
-
-	/* No replies to physical multicast/broadcast */
-	if (skb_in->pkt_type!=PACKET_HOST)
-		return;
-
-	/* Now check at the protocol level */
-	if (rt->rt_flags&(RTCF_BROADCAST|RTCF_MULTICAST))
-		return;
-
-	/* Only reply to fragment 0. */
-	if (iph->frag_off&htons(IP_OFFSET))
-		return;
-
-	/* Ensure we have at least 8 bytes of proto header. */
-	if (skb_in->len < skb_in->nh.iph->ihl*4 + 8)
-		return;
-
-	/* If we send an ICMP error to an ICMP error a mess would result.. */
-	if (iph->protocol == IPPROTO_ICMP) {
-		struct icmphdr ihdr;
-
-		icmph = skb_header_pointer(skb_in, skb_in->nh.iph->ihl*4,
-					   sizeof(ihdr), &ihdr);
-		if (!icmph)
-			return;
-
-		/* Between echo-reply (0) and timestamp (13),
-		   everything except echo-request (8) is an error.
-		   Also, anything greater than NR_ICMP_TYPES is
-		   unknown, and hence should be treated as an error... */
-		if ((icmph->type < ICMP_TIMESTAMP
-		     && icmph->type != ICMP_ECHOREPLY
-		     && icmph->type != ICMP_ECHO)
-		    || icmph->type > NR_ICMP_TYPES)
-			return;
-	}
-
-	saddr = iph->daddr;
-	if (!(rt->rt_flags & RTCF_LOCAL))
-		saddr = 0;
-
-	tos = (iph->tos & IPTOS_TOS_MASK) | IPTOS_PREC_INTERNETCONTROL;
-
-	{
-		struct flowi fl = {
-			.nl_u = {
-				.ip4_u = {
-					.daddr = skb_in->nh.iph->saddr,
-					.saddr = saddr,
-					.tos = RT_TOS(tos)
-				}
-			},
-			.proto = IPPROTO_ICMP,
-			.uli_u = {
-				.icmpt = {
-					.type = ICMP_DEST_UNREACH,
-					.code = code
-				}
-			}
-		};
-
-		if (ip_route_output_key(&rt, &fl))
-			return;
-	}
-	/* RFC says return as much as we can without exceeding 576 bytes. */
-	length = skb_in->len + sizeof(struct iphdr) + sizeof(struct icmphdr);
-
-	if (length > dst_pmtu(&rt->u.dst))
-		length = dst_pmtu(&rt->u.dst);
-	if (length > 576)
-		length = 576;
-
-	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
-
-	nskb = alloc_skb(hh_len + length, GFP_ATOMIC);
-	if (!nskb) {
-		ip_rt_put(rt);
-		return;
-	}
-
-	nskb->priority = 0;
-	nskb->dst = &rt->u.dst;
-	skb_reserve(nskb, hh_len);
-
-	/* Set up IP header */
-	iph = nskb->nh.iph
-		= (struct iphdr *)skb_put(nskb, sizeof(struct iphdr));
-	iph->version=4;
-	iph->ihl=5;
-	iph->tos=tos;
-	iph->tot_len = htons(length);
-
-	/* PMTU discovery never applies to ICMP packets. */
-	iph->frag_off = 0;
-
-	iph->ttl = MAXTTL;
-	ip_select_ident(iph, &rt->u.dst, NULL);
-	iph->protocol=IPPROTO_ICMP;
-	iph->saddr=rt->rt_src;
-	iph->daddr=rt->rt_dst;
-	iph->check=0;
-	iph->check = ip_fast_csum((unsigned char *)iph, iph->ihl);
-
-	/* Set up ICMP header. */
-	icmph = nskb->h.icmph
-		= (struct icmphdr *)skb_put(nskb, sizeof(struct icmphdr));
-	icmph->type = ICMP_DEST_UNREACH;
-	icmph->code = code;	
-	icmph->un.gateway = 0;
-	icmph->checksum = 0;
-	
-	/* Copy as much of original packet as will fit */
-	data = skb_put(nskb,
-		       length - sizeof(struct iphdr) - sizeof(struct icmphdr));
-
-	skb_copy_bits(skb_in, 0, data,
-		      length - sizeof(struct iphdr) - sizeof(struct icmphdr));
-
-	icmph->checksum = ip_compute_csum((unsigned char *)icmph,
-					  length - sizeof(struct iphdr));
-
-	nf_ct_attach(nskb, skb_in);
-
-	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, nskb, NULL, nskb->dst->dev,
-		ip_finish_output);
+	icmp_send(skb_in, ICMP_DEST_UNREACH, code, 0);
 }	
 
 static unsigned int reject(struct sk_buff **pskb,

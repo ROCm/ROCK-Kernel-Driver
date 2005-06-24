@@ -169,6 +169,21 @@ struct pcmcia_device {
 		event_callback_args_t 	event_callback_args;
 	}			client;
 
+	/* information about this device */
+	u8			has_manf_id:1;
+	u8			has_card_id:1;
+	u8			has_func_id:1;
+	u8			reserved:5;
+
+	u8			func_id;
+	u16			manf_id;
+	u16			card_id;
+
+	char *			prod_id[4];
+
+	/* device driver wanted by cardmgr */
+	struct pcmcia_driver *	cardmgr;
+
 	struct device		dev;
 };
 

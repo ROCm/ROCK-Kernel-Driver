@@ -24,18 +24,6 @@ struct michael_mic_ctx {
 };
 
 
-static inline u32 rotl(u32 val, int bits)
-{
-	return (val << bits) | (val >> (32 - bits));
-}
-
-
-static inline u32 rotr(u32 val, int bits)
-{
-	return (val >> bits) | (val << (32 - bits));
-}
-
-
 static inline u32 xswap(u32 val)
 {
 	return ((val & 0x00ff00ff) << 8) | ((val & 0xff00ff00) >> 8);
@@ -44,13 +32,13 @@ static inline u32 xswap(u32 val)
 
 #define michael_block(l, r)	\
 do {				\
-	r ^= rotl(l, 17);	\
+	r ^= rol32(l, 17);	\
 	l += r;			\
 	r ^= xswap(l);		\
 	l += r;			\
-	r ^= rotl(l, 3);	\
+	r ^= rol32(l, 3);	\
 	l += r;			\
-	r ^= rotr(l, 2);	\
+	r ^= ror32(l, 2);	\
 	l += r;			\
 } while (0)
 

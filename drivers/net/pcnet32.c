@@ -22,8 +22,8 @@
  *************************************************************************/
 
 #define DRV_NAME	"pcnet32"
-#define DRV_VERSION	"1.30i"
-#define DRV_RELDATE	"06.28.2004"
+#define DRV_VERSION	"1.30j"
+#define DRV_RELDATE	"29.04.2005"
 #define PFX		DRV_NAME ": "
 
 static const char *version =
@@ -256,6 +256,7 @@ static int homepna[MAX_UNITS];
  *	   homepna for selecting HomePNA mode for PCNet/Home 79C978.
  * v1.30h  24 Jun 2004 Don Fry correctly select auto, speed, duplex in bcr32.
  * v1.30i  28 Jun 2004 Don Fry change to use module_param.
+ * v1.30j  29 Apr 2005 Don Fry fix skb/map leak with loopback test.
  */
 
 
@@ -395,6 +396,7 @@ static void pcnet32_led_blink_callback(struct net_device *dev);
 static int pcnet32_get_regs_len(struct net_device *dev);
 static void pcnet32_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 	void *ptr);
+static void pcnet32_purge_tx_ring(struct net_device *dev);
 
 enum pci_flags_bit {
     PCI_USES_IO=1, PCI_USES_MEM=2, PCI_USES_MASTER=4,
@@ -785,6 +787,7 @@ static int pcnet32_loopback_test(struct net_device *dev, uint64_t *data1)
     }
 
 clean_up:
+    pcnet32_purge_tx_ring(dev);
     x = a->read_csr(ioaddr, 15) & 0xFFFF;
     a->write_csr(ioaddr, 15, (x & ~0x0044));	/* reset bits 6 and 2 */
 
@@ -1351,7 +1354,8 @@ pcnet32_probe1(unsigned long ioaddr, int shared, struct pci_dev *pdev)
 	printk(KERN_INFO "%s: registered as %s\n", dev->name, lp->name);
     cards_found++;
 
-    a->write_bcr(ioaddr, 2, 0x1002);	/* enable LED writes */
+    /* enable LED writes */
+    a->write_bcr(ioaddr, 2, a->read_bcr(ioaddr, 2) | 0x1000);
 
     return 0;
 
@@ -1429,25 +1433,36 @@ pcnet32_open(struct net_device *dev)
 	val |= 0x10;
     lp->a.write_csr (ioaddr, 124, val);
 
-    /* 24 Jun 2004 according AMD, in order to change the PHY,
-     * DANAS (or DISPM for 79C976) must be set; then select the speed,
-     * duplex, and/or enable auto negotiation, and clear DANAS */
-    if (lp->mii && !(lp->options & PCNET32_PORT_ASEL)) {
-	lp->a.write_bcr(ioaddr, 32, lp->a.read_bcr(ioaddr, 32) | 0x0080);
-	/* disable Auto Negotiation, set 10Mpbs, HD */
-	val = lp->a.read_bcr(ioaddr, 32) & ~0xb8;
-	if (lp->options & PCNET32_PORT_FD)
-	    val |= 0x10;
-	if (lp->options & PCNET32_PORT_100)
-	    val |= 0x08;
-	lp->a.write_bcr (ioaddr, 32, val);
+    /* Allied Telesyn AT 2700/2701 FX looses the link, so skip that */
+    if (lp->pci_dev->subsystem_vendor == PCI_VENDOR_ID_AT &&
+        (lp->pci_dev->subsystem_device == PCI_SUBDEVICE_ID_AT_2700FX ||
+	 lp->pci_dev->subsystem_device == PCI_SUBDEVICE_ID_AT_2701FX)) {
+	printk(KERN_DEBUG "%s: Skipping PHY selection.\n", dev->name);
     } else {
-	if (lp->options & PCNET32_PORT_ASEL) {
-	    lp->a.write_bcr(ioaddr, 32, lp->a.read_bcr(ioaddr, 32) | 0x0080);
-	    /* enable auto negotiate, setup, disable fd */
-	    val = lp->a.read_bcr(ioaddr, 32) & ~0x98;
-	    val |= 0x20;
-	    lp->a.write_bcr(ioaddr, 32, val);
+	/*
+	 * 24 Jun 2004 according AMD, in order to change the PHY,
+	 * DANAS (or DISPM for 79C976) must be set; then select the speed,
+	 * duplex, and/or enable auto negotiation, and clear DANAS
+	 */
+	if (lp->mii && !(lp->options & PCNET32_PORT_ASEL)) {
+	    lp->a.write_bcr(ioaddr, 32,
+				lp->a.read_bcr(ioaddr, 32) | 0x0080);
+	    /* disable Auto Negotiation, set 10Mpbs, HD */
+	    val = lp->a.read_bcr(ioaddr, 32) & ~0xb8;
+	    if (lp->options & PCNET32_PORT_FD)
+		val |= 0x10;
+	    if (lp->options & PCNET32_PORT_100)
+		val |= 0x08;
+	    lp->a.write_bcr (ioaddr, 32, val);
+	} else {
+	    if (lp->options & PCNET32_PORT_ASEL) {
+		lp->a.write_bcr(ioaddr, 32,
+			lp->a.read_bcr(ioaddr, 32) | 0x0080);
+		/* enable auto negotiate, setup, disable fd */
+		val = lp->a.read_bcr(ioaddr, 32) & ~0x98;
+		val |= 0x20;
+		lp->a.write_bcr(ioaddr, 32, val);
+	    }
 	}
     }
 

@@ -282,8 +282,9 @@
 #define __NR_add_key		269
 #define __NR_request_key	270
 #define __NR_keyctl		271
+#define __NR_waitid		272
 
-#define __NR_syscalls		272
+#define __NR_syscalls		273
 #ifdef __KERNEL__
 #define NR_syscalls	__NR_syscalls
 #endif
@@ -472,7 +473,7 @@ long sys_rt_sigaction(int sig, const struct sigaction __user *act,
  * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
  * but it doesn't work on all toolchains, so we just do it by hand
  */
-#define cond_syscall(x) asm(".weak\t." #x "\n\t.set\t." #x ",.sys_ni_syscall");
+#define cond_syscall(x) asm(".weak\t." #x "\n\t.set\t." #x ",.sys_ni_syscall")
 
 #endif		/* __KERNEL__ */
 

@@ -1,4 +1,4 @@
-/* 
+/*
  * dvb_frontend.h
  *
  * Copyright (C) 2001 convergence integrated media GmbH

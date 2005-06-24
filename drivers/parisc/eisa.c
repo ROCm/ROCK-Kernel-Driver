@@ -44,6 +44,7 @@
 #include <asm/parisc-device.h>
 #include <asm/delay.h>
 #include <asm/eisa_bus.h>
+#include <asm/eisa_eeprom.h>
 
 #if 0
 #define EISA_DBG(msg, arg... ) printk(KERN_DEBUG "eisa: " msg , ## arg )
@@ -55,6 +56,8 @@
 #define MIRAGE_EEPROM_BASE_ADDR 0xF00C0400
 
 static DEFINE_SPINLOCK(eisa_irq_lock);
+
+void __iomem *eisa_eeprom_addr;
 
 /* We can only have one EISA adapter in the system because neither
  * implementation can be flexed.
@@ -351,6 +354,7 @@ static int __devinit eisa_probe(struct parisc_device *dev)
 	}
 	
 	EISA_bus = 1;
+
 	if (dev->num_addrs) {
 		/* newer firmware hand out the eeprom address */
 		eisa_dev.eeprom_addr = dev->addr[0];
@@ -362,8 +366,9 @@ static int __devinit eisa_probe(struct parisc_device *dev)
 			eisa_dev.eeprom_addr = MIRAGE_EEPROM_BASE_ADDR;
 		}
 	}
-	eisa_eeprom_init(eisa_dev.eeprom_addr);
-	result = eisa_enumerator(eisa_dev.eeprom_addr, &eisa_dev.hba.io_space, &eisa_dev.hba.lmmio_space);
+	eisa_eeprom_addr = ioremap(eisa_dev.eeprom_addr, HPEE_MAX_LENGTH);
+	result = eisa_enumerator(eisa_dev.eeprom_addr, &eisa_dev.hba.io_space,
+			&eisa_dev.hba.lmmio_space);
 	init_eisa_pic();
 
 	if (result >= 0) {

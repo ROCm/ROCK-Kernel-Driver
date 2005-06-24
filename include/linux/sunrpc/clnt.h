@@ -52,7 +52,6 @@ struct rpc_clnt {
 				cl_intr     : 1,/* interruptible */
 				cl_chatty   : 1,/* be verbose */
 				cl_autobind : 1,/* use getport() */
-				cl_droppriv : 1,/* enable NFS suid hack */
 				cl_oneshot  : 1,/* dispose after use */
 				cl_dead     : 1;/* abandoned */
 
@@ -132,6 +131,7 @@ void		rpc_restart_call(struct rpc_task *);
 void		rpc_clnt_sigmask(struct rpc_clnt *clnt, sigset_t *oldset);
 void		rpc_clnt_sigunmask(struct rpc_clnt *clnt, sigset_t *oldset);
 void		rpc_setbufsize(struct rpc_clnt *, unsigned int, unsigned int);
+size_t		rpc_max_payload(struct rpc_clnt *);
 
 static __inline__
 int rpc_call(struct rpc_clnt *clnt, u32 proc, void *argp, void *resp, int flags)

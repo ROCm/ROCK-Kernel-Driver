@@ -460,7 +460,6 @@ void jffs2_rotate_lists(struct jffs2_sb_info *c);
 int jffs2_do_mount_fs(struct jffs2_sb_info *c);
 
 /* erase.c */
-void jffs2_erase_block(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 void jffs2_erase_pending_blocks(struct jffs2_sb_info *c, int count);
 
 #ifdef CONFIG_JFFS2_FS_NAND

@@ -25,6 +25,7 @@
 #include <linux/crc32.h>
 #include "nodelist.h"
 
+static int jffs2_flash_setup(struct jffs2_sb_info *c);
 
 static int jffs2_do_setattr (struct inode *inode, struct iattr *iattr)
 {
@@ -644,7 +645,7 @@ void jffs2_gc_release_page(struct jffs2_sb_info *c,
 	page_cache_release(pg);
 }
 
-int jffs2_flash_setup(struct jffs2_sb_info *c) {
+static int jffs2_flash_setup(struct jffs2_sb_info *c) {
 	int ret = 0;
 	
 	if (jffs2_cleanmarker_oob(c)) {

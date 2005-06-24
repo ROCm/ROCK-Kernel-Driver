@@ -18,9 +18,9 @@ Jeff Dike (jdike@karaya.com) : Modified for integration into uml
 #include <termios.h>
 #include <sys/wait.h>
 #include <sys/types.h>
-#include <sys/ptrace.h>
 #include <sys/ioctl.h>
 #include <asm/unistd.h>
+#include "ptrace_user.h"
 
 #include "ptproxy.h"
 #include "sysdep.h"

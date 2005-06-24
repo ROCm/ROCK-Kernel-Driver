@@ -21,7 +21,7 @@ int x86_udelay_tsc = 0;		/* Delay via TSC */
 
 void __delay(unsigned long loops)
 {
-	unsigned long bclock, now;
+	unsigned bclock, now;
 	
 	rdtscl(bclock);
 	do

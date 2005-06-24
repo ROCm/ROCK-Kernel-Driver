@@ -205,7 +205,7 @@ static void keyspan_pda_request_unthrottle( struct usb_serial *serial )
 				 0, /* index */
 				 NULL,
 				 0,
-				 2*HZ);
+				 2000);
 	if (result < 0)
 		dbg("%s - error %d from usb_control_msg", 
 		    __FUNCTION__, result);
@@ -330,7 +330,7 @@ static int keyspan_pda_setbaud (struct usb_serial *serial, int baud)
 			     0, /* index */
 			     NULL, /* &data */
 			     0, /* size */
-			     2*HZ); /* timeout */
+			     2000); /* timeout */
 	return(rc);
 }
 
@@ -348,7 +348,7 @@ static void keyspan_pda_break_ctl (struct usb_serial_port *port, int break_state
 	result = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
 				4, /* set break */
 				USB_TYPE_VENDOR | USB_RECIP_INTERFACE | USB_DIR_OUT,
-				value, 0, NULL, 0, 2*HZ);
+				value, 0, NULL, 0, 2000);
 	if (result < 0)
 		dbg("%s - error %d from usb_control_msg", 
 		    __FUNCTION__, result);
@@ -416,7 +416,7 @@ static int keyspan_pda_get_modem_info(struct usb_serial *serial,
 	rc = usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev, 0),
 			     3, /* get pins */
 			     USB_TYPE_VENDOR|USB_RECIP_INTERFACE|USB_DIR_IN,
-			     0, 0, &data, 1, 2*HZ);
+			     0, 0, &data, 1, 2000);
 	if (rc > 0)
 		*value = data;
 	return rc;
@@ -430,7 +430,7 @@ static int keyspan_pda_set_modem_info(struct usb_serial *serial,
 	rc = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
 			     3, /* set pins */
 			     USB_TYPE_VENDOR|USB_RECIP_INTERFACE|USB_DIR_OUT,
-			     value, 0, NULL, 0, 2*HZ);
+			     value, 0, NULL, 0, 2000);
 	return rc;
 }
 
@@ -545,7 +545,7 @@ static int keyspan_pda_write(struct usb_serial_port *port,
 				     0, /* index */
 				     &room,
 				     1,
-				     2*HZ);
+				     2000);
 		if (rc < 0) {
 			dbg(" roomquery failed");
 			goto exit;
@@ -653,7 +653,7 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 			     0, /* index */
 			     &room,
 			     1,
-			     2*HZ);
+			     2000);
 	if (rc < 0) {
 		dbg("%s - roomquery failed", __FUNCTION__);
 		goto error;

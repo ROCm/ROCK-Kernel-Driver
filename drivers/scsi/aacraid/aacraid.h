@@ -507,40 +507,32 @@ struct aac_queue_block
  */
  
 struct sa_drawbridge_CSR {
-						//	 Offset |	Name
-	u32	reserved[10];			//	00h-27h |   Reserved
-	u8	LUT_Offset;			//	28h	|	Looup Table Offset
-	u8	reserved1[3];			// 	29h-2bh	|	Reserved
-	u32	LUT_Data;			//	2ch	|	Looup Table Data	
-	u32	reserved2[26];			//	30h-97h	|	Reserved
-	u16	PRICLEARIRQ;			//	98h	|	Primary Clear Irq
-	u16	SECCLEARIRQ;			//	9ah	|	Secondary Clear Irq
-	u16	PRISETIRQ;			//	9ch	|	Primary Set Irq
-	u16	SECSETIRQ;			//	9eh	|	Secondary Set Irq
-	u16	PRICLEARIRQMASK;		//	a0h	|	Primary Clear Irq Mask
-	u16	SECCLEARIRQMASK;		//	a2h	|	Secondary Clear Irq Mask
-	u16	PRISETIRQMASK;			//	a4h	|	Primary Set Irq Mask
-	u16	SECSETIRQMASK;			//	a6h	|	Secondary Set Irq Mask
-	u32	MAILBOX0;			//	a8h	|	Scratchpad 0
-	u32	MAILBOX1;			//	ach	|	Scratchpad 1
-	u32	MAILBOX2;			//	b0h	|	Scratchpad 2
-	u32	MAILBOX3;			//	b4h	|	Scratchpad 3
-	u32	MAILBOX4;			//	b8h	|	Scratchpad 4
-	u32	MAILBOX5;			//	bch	|	Scratchpad 5
-	u32	MAILBOX6;			//	c0h	|	Scratchpad 6
-	u32	MAILBOX7;			//	c4h	|	Scratchpad 7
-
-	u32	ROM_Setup_Data;			//	c8h | 	Rom Setup and Data
-	u32	ROM_Control_Addr;		//	cch | 	Rom Control and Address
-
-	u32	reserved3[12];			//	d0h-ffh	| 	reserved
-	u32	LUT[64];			// 100h-1ffh|	Lookup Table Entries
-
-	//
-	//  TO DO
-	//	need to add DMA, I2O, UART, etc registers form 80h to 364h
-	//
-
+				/*	Offset 	|  Name */
+	__le32	reserved[10];	/*	00h-27h |  Reserved */
+	u8	LUT_Offset;	/*	28h	|  Lookup Table Offset */
+	u8	reserved1[3];	/* 	29h-2bh	|  Reserved */
+	__le32	LUT_Data;	/*	2ch	|  Looup Table Data */
+	__le32	reserved2[26];	/*	30h-97h	|  Reserved */
+	__le16	PRICLEARIRQ;	/*	98h	|  Primary Clear Irq */
+	__le16	SECCLEARIRQ;	/*	9ah	|  Secondary Clear Irq */
+	__le16	PRISETIRQ;	/*	9ch	|  Primary Set Irq */
+	__le16	SECSETIRQ;	/*	9eh	|  Secondary Set Irq */
+	__le16	PRICLEARIRQMASK;/*	a0h	|  Primary Clear Irq Mask */
+	__le16	SECCLEARIRQMASK;/*	a2h	|  Secondary Clear Irq Mask */
+	__le16	PRISETIRQMASK;	/*	a4h	|  Primary Set Irq Mask */
+	__le16	SECSETIRQMASK;	/*	a6h	|  Secondary Set Irq Mask */
+	__le32	MAILBOX0;	/*	a8h	|  Scratchpad 0 */
+	__le32	MAILBOX1;	/*	ach	|  Scratchpad 1 */
+	__le32	MAILBOX2;	/*	b0h	|  Scratchpad 2 */
+	__le32	MAILBOX3;	/*	b4h	|  Scratchpad 3 */
+	__le32	MAILBOX4;	/*	b8h	|  Scratchpad 4 */
+	__le32	MAILBOX5;	/*	bch	|  Scratchpad 5 */
+	__le32	MAILBOX6;	/*	c0h	|  Scratchpad 6 */
+	__le32	MAILBOX7;	/*	c4h	|  Scratchpad 7 */
+	__le32	ROM_Setup_Data;	/*	c8h 	|  Rom Setup and Data */
+	__le32	ROM_Control_Addr;/*	cch 	|  Rom Control and Address */
+	__le32	reserved3[12];	/*	d0h-ffh	|  reserved */
+	__le32	LUT[64];	/*    100h-1ffh	|  Lookup Table Entries */
 };
 
 #define Mailbox0	SaDbCSR.MAILBOX0
@@ -556,13 +548,13 @@ struct sa_drawbridge_CSR {
 #define DoorbellClrReg_p SaDbCSR.PRICLEARIRQ
 
 
-#define	DOORBELL_0	cpu_to_le16(0x0001)
-#define DOORBELL_1	cpu_to_le16(0x0002)
-#define DOORBELL_2	cpu_to_le16(0x0004)
-#define DOORBELL_3	cpu_to_le16(0x0008)
-#define DOORBELL_4	cpu_to_le16(0x0010)
-#define DOORBELL_5	cpu_to_le16(0x0020)
-#define DOORBELL_6	cpu_to_le16(0x0040)
+#define	DOORBELL_0	0x0001
+#define DOORBELL_1	0x0002
+#define DOORBELL_2	0x0004
+#define DOORBELL_3	0x0008
+#define DOORBELL_4	0x0010
+#define DOORBELL_5	0x0020
+#define DOORBELL_6	0x0040
 
 	
 #define PrintfReady	DOORBELL_5
@@ -585,25 +577,29 @@ struct sa_registers {
  */
 
 struct rx_mu_registers {
-						//	 Local	|   PCI*	|	Name
-						//			|		|
-	u32	ARSR;				//	1300h	|	00h	|	APIC Register Select Register
-	u32	reserved0;			//	1304h	|	04h	|	Reserved
-	u32	AWR;				//	1308h	|	08h	|	APIC Window Register
-	u32	reserved1;			//	130Ch	|	0Ch	|	Reserved
-	u32	IMRx[2];			//	1310h	|	10h	|	Inbound Message Registers
-	u32	OMRx[2];			//	1318h	|	18h	|	Outbound Message Registers
-	u32	IDR;				//	1320h	|	20h	|	Inbound Doorbell Register
-	u32	IISR;				//	1324h	|	24h	|	Inbound Interrupt Status Register
-	u32	IIMR;				//	1328h	|	28h	|	Inbound Interrupt Mask Register
-	u32	ODR;				//	132Ch	|	2Ch	|	Outbound Doorbell Register
-	u32	OISR;				//	1330h	|	30h	|	Outbound Interrupt Status Register
-	u32	OIMR;				//	1334h	|	34h	|	Outbound Interrupt Mask Register
-						// * Must access through ATU Inbound Translation Window
+			    /*	Local  | PCI*| Name */
+	__le32	ARSR;	    /*	1300h  | 00h | APIC Register Select Register */
+	__le32	reserved0;  /*	1304h  | 04h | Reserved */
+	__le32	AWR;	    /*	1308h  | 08h | APIC Window Register */
+	__le32	reserved1;  /*	130Ch  | 0Ch | Reserved */
+	__le32	IMRx[2];    /*	1310h  | 10h | Inbound Message Registers */
+	__le32	OMRx[2];    /*	1318h  | 18h | Outbound Message Registers */
+	__le32	IDR;	    /*	1320h  | 20h | Inbound Doorbell Register */
+	__le32	IISR;	    /*	1324h  | 24h | Inbound Interrupt 
+						Status Register */
+	__le32	IIMR;	    /*	1328h  | 28h | Inbound Interrupt 
+					 	Mask Register */
+	__le32	ODR;	    /*	132Ch  | 2Ch | Outbound Doorbell Register */
+	__le32	OISR;	    /*	1330h  | 30h | Outbound Interrupt 
+						Status Register */
+	__le32	OIMR;	    /*	1334h  | 34h | Outbound Interrupt 
+						Mask Register */
+			    /* * Must access through ATU Inbound 
+			     	 Translation Window */
 };
 
 struct rx_inbound {
-	u32	Mailbox[8];
+	__le32	Mailbox[8];
 };
 
 #define	InboundMailbox0		IndexRegs.Mailbox[0]
@@ -613,28 +609,27 @@ struct rx_inbound {
 #define	InboundMailbox4		IndexRegs.Mailbox[4]
 #define	InboundMailbox5		IndexRegs.Mailbox[5]
 #define	InboundMailbox6		IndexRegs.Mailbox[6]
-#define	InboundMailbox7		IndexRegs.Mailbox[7]
 
-#define	INBOUNDDOORBELL_0	cpu_to_le32(0x00000001)
-#define INBOUNDDOORBELL_1	cpu_to_le32(0x00000002)
-#define INBOUNDDOORBELL_2	cpu_to_le32(0x00000004)
-#define INBOUNDDOORBELL_3	cpu_to_le32(0x00000008)
-#define INBOUNDDOORBELL_4	cpu_to_le32(0x00000010)
-#define INBOUNDDOORBELL_5	cpu_to_le32(0x00000020)
-#define INBOUNDDOORBELL_6	cpu_to_le32(0x00000040)
+#define	INBOUNDDOORBELL_0	0x00000001
+#define INBOUNDDOORBELL_1	0x00000002
+#define INBOUNDDOORBELL_2	0x00000004
+#define INBOUNDDOORBELL_3	0x00000008
+#define INBOUNDDOORBELL_4	0x00000010
+#define INBOUNDDOORBELL_5	0x00000020
+#define INBOUNDDOORBELL_6	0x00000040
 
-#define	OUTBOUNDDOORBELL_0	cpu_to_le32(0x00000001)
-#define OUTBOUNDDOORBELL_1	cpu_to_le32(0x00000002)
-#define OUTBOUNDDOORBELL_2	cpu_to_le32(0x00000004)
-#define OUTBOUNDDOORBELL_3	cpu_to_le32(0x00000008)
-#define OUTBOUNDDOORBELL_4	cpu_to_le32(0x00000010)
+#define	OUTBOUNDDOORBELL_0	0x00000001
+#define OUTBOUNDDOORBELL_1	0x00000002
+#define OUTBOUNDDOORBELL_2	0x00000004
+#define OUTBOUNDDOORBELL_3	0x00000008
+#define OUTBOUNDDOORBELL_4	0x00000010
 
 #define InboundDoorbellReg	MUnit.IDR
 #define OutboundDoorbellReg	MUnit.ODR
 
 struct rx_registers {
-	struct rx_mu_registers		MUnit;		// 1300h - 1334h
-	u32				reserved1[6];	// 1338h - 134ch
+	struct rx_mu_registers		MUnit;		/* 1300h - 1334h */
+	__le32				reserved1[6];	/* 1338h - 134ch */
 	struct rx_inbound		IndexRegs;
 };
 
@@ -652,7 +647,7 @@ struct rx_registers {
 
 struct rkt_registers {
 	struct rkt_mu_registers		MUnit;		 /* 1300h - 1334h */
-	u32				reserved1[1010]; /* 1338h - 22fch */
+	__le32				reserved1[1010]; /* 1338h - 22fch */
 	struct rkt_inbound		IndexRegs;	 /* 2300h - */
 };
 
@@ -824,6 +819,9 @@ struct aac_adapter_info
 #define AAC_OPT_NONDASD			cpu_to_le32(1<<12)
 #define AAC_OPT_SCSI_MANAGED    	cpu_to_le32(1<<13)
 #define AAC_OPT_RAID_SCSI_MODE		cpu_to_le32(1<<14)
+#define AAC_OPT_SUPPLEMENT_ADAPTER_INFO	cpu_to_le32(1<<16)
+#define AAC_OPT_NEW_COMM		cpu_to_le32(1<<17)
+#define AAC_OPT_NEW_COMM_64		cpu_to_le32(1<<18)
 
 struct aac_dev
 {
@@ -1482,15 +1480,19 @@ extern struct aac_common aac_config;
  *	Monitor/Kernel API
  */
 
-#define	BREAKPOINT_REQUEST		cpu_to_le32(0x00000004)
-#define	INIT_STRUCT_BASE_ADDRESS	cpu_to_le32(0x00000005)
-#define READ_PERMANENT_PARAMETERS	cpu_to_le32(0x0000000a)
-#define WRITE_PERMANENT_PARAMETERS	cpu_to_le32(0x0000000b)
-#define HOST_CRASHING			cpu_to_le32(0x0000000d)
-#define	SEND_SYNCHRONOUS_FIB		cpu_to_le32(0x0000000c)
-#define	COMMAND_POST_RESULTS		cpu_to_le32(0x00000014)
-#define GET_ADAPTER_PROPERTIES		cpu_to_le32(0x00000019)
-#define RE_INIT_ADAPTER			cpu_to_le32(0x000000ee)
+#define	BREAKPOINT_REQUEST		0x00000004
+#define	INIT_STRUCT_BASE_ADDRESS	0x00000005
+#define READ_PERMANENT_PARAMETERS	0x0000000a
+#define WRITE_PERMANENT_PARAMETERS	0x0000000b
+#define HOST_CRASHING			0x0000000d
+#define	SEND_SYNCHRONOUS_FIB		0x0000000c
+#define COMMAND_POST_RESULTS		0x00000014
+#define GET_ADAPTER_PROPERTIES		0x00000019
+#define GET_DRIVER_BUFFER_PROPERTIES	0x00000023
+#define RCV_TEMP_READINGS		0x00000025
+#define GET_COMM_PREFERRED_SETTINGS	0x00000026
+#define IOP_RESET			0x00001000
+#define RE_INIT_ADAPTER			0x000000ee
 
 /*
  *	Adapter Status Register
@@ -1513,22 +1515,22 @@ extern struct aac_common aac_config;
  *	Phases are bit oriented.  It is NOT valid  to have multiple bits set						
  */					
 
-#define	SELF_TEST_FAILED		(cpu_to_le32(0x00000004))
-#define MONITOR_PANIC			(cpu_to_le32(0x00000020))
-#define	KERNEL_UP_AND_RUNNING		(cpu_to_le32(0x00000080))
-#define	KERNEL_PANIC			(cpu_to_le32(0x00000100))
+#define	SELF_TEST_FAILED		0x00000004
+#define	MONITOR_PANIC			0x00000020
+#define	KERNEL_UP_AND_RUNNING		0x00000080
+#define	KERNEL_PANIC			0x00000100
 
 /*
  *	Doorbell bit defines
  */
 
-#define DoorBellSyncCmdAvailable	cpu_to_le32(1<<0)	// Host -> Adapter
-#define DoorBellPrintfDone		cpu_to_le32(1<<5)	// Host -> Adapter
-#define DoorBellAdapterNormCmdReady	cpu_to_le32(1<<1)	// Adapter -> Host
-#define DoorBellAdapterNormRespReady	cpu_to_le32(1<<2)	// Adapter -> Host
-#define DoorBellAdapterNormCmdNotFull	cpu_to_le32(1<<3)	// Adapter -> Host
-#define DoorBellAdapterNormRespNotFull	cpu_to_le32(1<<4)	// Adapter -> Host
-#define DoorBellPrintfReady		cpu_to_le32(1<<5)	// Adapter -> Host
+#define DoorBellSyncCmdAvailable	(1<<0)	/* Host -> Adapter */
+#define DoorBellPrintfDone		(1<<5)	/* Host -> Adapter */
+#define DoorBellAdapterNormCmdReady	(1<<1)	/* Adapter -> Host */
+#define DoorBellAdapterNormRespReady	(1<<2)	/* Adapter -> Host */
+#define DoorBellAdapterNormCmdNotFull	(1<<3)	/* Adapter -> Host */
+#define DoorBellAdapterNormRespNotFull	(1<<4)	/* Adapter -> Host */
+#define DoorBellPrintfReady		(1<<5)	/* Adapter -> Host */
 
 /*
  *	For FIB communication, we need all of the following things
@@ -1599,7 +1601,6 @@ void fib_dealloc(struct fib * context);
 void aac_printf(struct aac_dev *dev, u32 val);
 int fib_send(u16 command, struct fib * context, unsigned long size, int priority, int wait, int reply, fib_callback callback, void *ctxt);
 int aac_consumer_get(struct aac_dev * dev, struct aac_queue * q, struct aac_entry **entry);
-int aac_consumer_avail(struct aac_dev * dev, struct aac_queue * q);
 void aac_consumer_free(struct aac_dev * dev, struct aac_queue * q, u32 qnum);
 int fib_complete(struct fib * context);
 #define fib_data(fibctx) ((void *)(fibctx)->hw_fib->data)

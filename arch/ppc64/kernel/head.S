@@ -37,6 +37,7 @@
 #include <asm/bug.h>
 #include <asm/cputable.h>
 #include <asm/setup.h>
+#include <asm/hvcall.h>
 
 #ifdef CONFIG_PPC_ISERIES
 #define DO_SOFT_DISABLE
@@ -45,7 +46,6 @@
 /*
  * hcall interface to pSeries LPAR
  */
-#define HVSC		.long 0x44000022
 #define H_SET_ASR	0x30
 
 /*
@@ -54,7 +54,6 @@
  * 0x0100 - 0x2fff : pSeries Interrupt prologs
  * 0x3000 - 0x3fff : Interrupt support
  * 0x4000 - 0x4fff : NACA
- * 0x5000 - 0x5fff : SystemCfg
  * 0x6000	   : iSeries and common interrupt prologs
  * 0x9000 - 0x9fff : Initial segment table
  */
@@ -517,16 +516,7 @@ __end_interrupts:
 	.globl naca
 naca:
 	.llong itVpdAreas
-#endif
 
-	. = SYSTEMCFG_PHYS_ADDR
-	.globl __start_systemcfg
-__start_systemcfg:
-	. = (SYSTEMCFG_PHYS_ADDR + PAGE_SIZE)
-	.globl __end_systemcfg
-__end_systemcfg:
-
-#ifdef CONFIG_PPC_ISERIES
 	/*
 	 * The iSeries LPAR map is at this fixed address
 	 * so that the HvReleaseData structure can address
@@ -535,6 +525,8 @@ __end_systemcfg:
 	 * The VSID values below are dependent on the
 	 * VSID generation algorithm.  See include/asm/mmu_context.h.
 	 */
+
+	. = 0x4800
 
 	.llong	2		/* # ESIDs to be mapped by hypervisor	 */
 	.llong	1		/* # memory ranges to be mapped by hypervisor */
@@ -634,10 +626,10 @@ system_reset_iSeries:
 	lhz	r24,PACAPACAINDEX(r13)	/* Get processor # */
 	cmpwi	0,r24,0			/* Are we processor 0? */
 	beq	.__start_initialization_iSeries	/* Start up the first processor */
-	mfspr	r4,CTRLF
-	li	r5,RUNLATCH		/* Turn off the run light */
+	mfspr	r4,SPRN_CTRLF
+	li	r5,CTRL_RUNLATCH	/* Turn off the run light */
 	andc	r4,r4,r5
-	mtspr	CTRLT,r4
+	mtspr	SPRN_CTRLT,r4
 
 1:
 	HMT_LOW
@@ -930,7 +922,9 @@ fp_unavailable_common:
 altivec_unavailable_common:
 	EXCEPTION_PROLOG_COMMON(0xf20, PACA_EXGEN)
 #ifdef CONFIG_ALTIVEC
+BEGIN_FTR_SECTION
 	bne	.load_up_altivec	/* if from user, just load it up */
+END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 #endif
 	bl	.save_nvgprs
 	addi	r3,r1,STACK_FRAME_OVERHEAD
@@ -958,11 +952,12 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 	 * accessing a userspace segment (even from the kernel). We assume
 	 * kernel addresses always have the high bit set.
 	 */
-	rlwinm	r4,r4,32-23,29,29	/* DSISR_STORE -> _PAGE_RW */
+	rlwinm	r4,r4,32-25+9,31-9,31-9	/* DSISR_STORE -> _PAGE_RW */
 	rotldi	r0,r3,15		/* Move high bit into MSR_PR posn */
 	orc	r0,r12,r0		/* MSR_PR | ~high_bit */
 	rlwimi	r4,r0,32-13,30,30	/* becomes _PAGE_USER access bit */
 	ori	r4,r4,1			/* add _PAGE_PRESENT */
+	rlwimi	r4,r5,22+2,31-2,31-2	/* Set _PAGE_EXEC if trap is 0x400 */
 
 	/*
 	 * On iSeries, we soft-disable interrupts here, then
@@ -1263,10 +1258,6 @@ _STATIC(__start_initialization_iSeries)
 	LOADADDR(r2,__toc_start)
 	addi	r2,r2,0x4000
 	addi	r2,r2,0x4000
-
-	LOADADDR(r9,systemcfg)
-	SET_REG_TO_CONST(r4, SYSTEMCFG_VIRT_ADDR)
-	std	r4,0(r9)		/* set the systemcfg pointer */
 
 	bl	.iSeries_early_setup
 
@@ -1772,7 +1763,7 @@ _GLOBAL(__secondary_start)
 	sc				/* HvCall_setASR */
 #else
 	/* set the ASR */
-	li	r3,SYSTEMCFG_PHYS_ADDR	/* r3 = ptr to systemcfg	 */
+	ld	r3,systemcfg@got(r2)	/* r3 = ptr to systemcfg	 */
 	lwz	r3,PLATFORM(r3)		/* r3 = platform flags		 */
 	cmpldi 	r3,PLATFORM_PSERIES_LPAR
 	bne	98f
@@ -1861,12 +1852,6 @@ _STATIC(start_here_multiplatform)
 	ori	r6,r6,MSR_RI
 	mtmsrd	r6			/* RI on */
 
-	/* setup the systemcfg pointer which is needed by *tab_initialize	*/
-	LOADADDR(r6,systemcfg)
-	sub	r6,r6,r26		/* addr of the variable systemcfg */
-	li	r27,SYSTEMCFG_PHYS_ADDR
-	std	r27,0(r6)	 	/* set the value of systemcfg	*/
-
 #ifdef CONFIG_HMT
 	/* Start up the second thread on cpu 0 */
 	mfspr	r3,PVR
@@ -1941,7 +1926,7 @@ _STATIC(start_here_multiplatform)
 	/* set the ASR */
 	ld	r3,PACASTABREAL(r13)
 	ori	r4,r3,1			/* turn on valid bit		 */
-	li	r3,SYSTEMCFG_PHYS_ADDR	/* r3 = ptr to systemcfg */
+	ld	r3,systemcfg@got(r2)	/* r3 = ptr to systemcfg */
 	lwz	r3,PLATFORM(r3)		/* r3 = platform flags */
 	cmpldi 	r3,PLATFORM_PSERIES_LPAR
 	bne	98f
@@ -1960,7 +1945,7 @@ _STATIC(start_here_multiplatform)
 	mtasr	r4			/* set the stab location	*/
 99:
 	/* Set SDR1 (hash table pointer) */
-	li	r3,SYSTEMCFG_PHYS_ADDR	/* r3 = ptr to systemcfg */
+	ld	r3,systemcfg@got(r2)	/* r3 = ptr to systemcfg */
 	lwz	r3,PLATFORM(r3)		/* r3 = platform flags */
 	/* Test if bit 0 is set (LPAR bit) */
 	andi.	r3,r3,0x1
@@ -1997,11 +1982,6 @@ _STATIC(start_here_common)
 	 */
 	li	r3,0
 	bl	.do_cpu_ftr_fixups
-
-	/* setup the systemcfg pointer */
-	LOADADDR(r9,systemcfg)
-	SET_REG_TO_CONST(r8, SYSTEMCFG_VIRT_ADDR)
-	std	r8,0(r9)
 
 	LOADADDR(r26, boot_cpuid)
 	lwz	r26,0(r26)
@@ -2102,9 +2082,9 @@ _GLOBAL(hmt_start_secondary)
 	mfspr	r4, HID0
 	ori	r4, r4, 0x1
 	mtspr	HID0, r4
-	mfspr	r4, CTRLF
+	mfspr	r4, SPRN_CTRLF
 	oris	r4, r4, 0x40
-	mtspr	CTRLT, r4
+	mtspr	SPRN_CTRLT, r4
 	blr
 #endif
 

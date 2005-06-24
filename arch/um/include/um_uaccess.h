@@ -20,7 +20,8 @@
 #define access_ok(type, addr, size) \
 	CHOOSE_MODE_PROC(access_ok_tt, access_ok_skas, type, addr, size)
 
-static inline int verify_area(int type, const void __user *addr, unsigned long size)
+/* this function will go away soon - use access_ok() instead */
+static inline int __deprecated verify_area(int type, const void __user *addr, unsigned long size)
 {
 	return (CHOOSE_MODE_PROC(verify_area_tt, verify_area_skas, type, addr,
 				size));

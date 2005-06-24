@@ -174,7 +174,7 @@ static struct pci_driver vortex_driver = {
 
 static int __init vortex_init(void)
 {
-	return pci_module_init(&vortex_driver);
+	return pci_register_driver(&vortex_driver);
 }
 
 static void __exit vortex_exit(void)

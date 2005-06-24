@@ -273,10 +273,11 @@ static inline void __raw_writeq(unsigned long long b, volatile void __iomem *add
 }
 #endif /* !USE_HPPA_IOREMAP */
 
+/* readb can never be const, so use __fswab instead of le*_to_cpu */
 #define readb(addr) __raw_readb(addr)
-#define readw(addr) le16_to_cpu(__raw_readw(addr))
-#define readl(addr) le32_to_cpu(__raw_readl(addr))
-#define readq(addr) le64_to_cpu(__raw_readq(addr))
+#define readw(addr) __fswab16(__raw_readw(addr))
+#define readl(addr) __fswab32(__raw_readl(addr))
+#define readq(addr) __fswab64(__raw_readq(addr))
 #define writeb(b, addr) __raw_writeb(b, addr)
 #define writew(b, addr) __raw_writew(cpu_to_le16(b), addr)
 #define writel(b, addr) __raw_writel(cpu_to_le32(b), addr)
@@ -402,5 +403,16 @@ extern void outsl (unsigned long port, const void *src, unsigned long count);
 #define F_EXTEND(x) ((unsigned long)((x) | (0xffffffff00000000ULL)))
 
 #include <asm-generic/iomap.h>
+
+/*
+ * Convert a physical pointer to a virtual kernel pointer for /dev/mem
+ * access
+ */
+#define xlate_dev_mem_ptr(p)	__va(p)
+
+/*
+ * Convert a virtual cached pointer to an uncached pointer
+ */
+#define xlate_dev_kmem_ptr(p)	p
 
 #endif

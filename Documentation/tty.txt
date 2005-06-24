@@ -93,6 +93,11 @@ write_wakeup()	-	May be called at any point between open and close.
 			ldisc must be careful about setting order and to
 			handle unexpected calls. Must not sleep.
 
+			The driver is forbidden from calling this directly
+			from the ->write call from the ldisc as the ldisc
+			is permitted to call the driver write method from
+			this function. In such a situation defer it.
+
 
 Locking
 

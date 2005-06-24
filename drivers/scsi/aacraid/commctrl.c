@@ -74,12 +74,14 @@ static int ioctl_send_fib(struct aac_dev * dev, void __user *arg)
 	 *	will not overrun the buffer when we copy the memory. Return
 	 *	an error if we would.
 	 */
-	if(le32_to_cpu(kfib->header.Size) > sizeof(struct hw_fib) - sizeof(struct aac_fibhdr)) {
+	if (le16_to_cpu(kfib->header.Size) > 
+			sizeof(struct hw_fib) - sizeof(struct aac_fibhdr)) {
 		fib_free(fibptr);
 		return -EINVAL;
 	}
 
-	if (copy_from_user((void *) kfib, arg, le32_to_cpu(kfib->header.Size) + sizeof(struct aac_fibhdr))) {
+	if (copy_from_user(kfib, arg, le16_to_cpu(kfib->header.Size) +
+				sizeof(struct aac_fibhdr))) {
 		fib_free(fibptr);
 		return -EFAULT;
 	}
@@ -93,7 +95,7 @@ static int ioctl_send_fib(struct aac_dev * dev, void __user *arg)
 		kfib->header.XferState = 0;
 	} else {
 		int retval = fib_send(kfib->header.Command, fibptr,
-				le32_to_cpu(kfib->header.Size) , FsaNormal,
+				le16_to_cpu(kfib->header.Size) , FsaNormal,
 				1, 1, NULL, NULL);
 		if (retval) {
 			fib_free(fibptr);
@@ -538,7 +540,9 @@ int aac_send_raw_srb(struct aac_dev* dev, void __user * arg)
 		struct sgmap* psg = &srbcmd->sg;
 		byte_count = 0;
 
-		actual_fibsize = sizeof (struct aac_srb) + (((srbcmd->sg.count & 0xff) - 1) * sizeof (struct sgentry));
+		actual_fibsize = sizeof (struct aac_srb) + 
+			(((le32_to_cpu(srbcmd->sg.count) & 0xff) - 1) * 
+			 sizeof (struct sgentry));
 		if(actual_fibsize != fibsize){ // User made a mistake - should not continue
 			printk(KERN_DEBUG"aacraid: Bad Size specified in Raw SRB command\n");
 			rcode = -EINVAL;

@@ -764,7 +764,6 @@ void matroxfb_unregister_driver(struct matroxfb_driver* drv);
 #define matroxfb_DAC_unlock_irqrestore(flags) spin_unlock_irqrestore(&ACCESS_FBINFO(lock.DAC),flags)
 extern void matroxfb_DAC_out(CPMINFO int reg, int val);
 extern int matroxfb_DAC_in(CPMINFO int reg);
-extern struct list_head matroxfb_list;
 extern void matroxfb_var2my(struct fb_var_screeninfo* fvsi, struct my_timming* mt);
 extern int matroxfb_wait_for_sync(WPMINFO u_int32_t crtc);
 extern int matroxfb_enable_irq(WPMINFO int reenable);

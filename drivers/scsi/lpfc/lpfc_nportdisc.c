@@ -19,25 +19,24 @@
  *******************************************************************/
 
 /*
- * $Id: lpfc_nportdisc.c 1.139 2004/10/13 17:22:59EDT sf_support Exp  $
+ * $Id: lpfc_nportdisc.c 1.179 2005/04/13 11:59:13EDT sf_support Exp  $
  */
 
-#include <linux/version.h>
 #include <linux/blkdev.h>
-#include <linux/dma-mapping.h>
 #include <linux/pci.h>
-#include <linux/spinlock.h>
+#include <linux/interrupt.h>
+
 #include <scsi/scsi_device.h>
+#include <scsi/scsi_host.h>
+#include <scsi/scsi_transport_fc.h>
+
+#include "lpfc_hw.h"
 #include "lpfc_sli.h"
 #include "lpfc_disc.h"
 #include "lpfc_scsi.h"
 #include "lpfc.h"
-#include "lpfc_crtn.h"
-#include "lpfc_hw.h"
 #include "lpfc_logmsg.h"
-#include "lpfc_mem.h"
-
-extern uint8_t lpfcAlpaArray[];
+#include "lpfc_crtn.h"
 
 
 /* Called to verify a rcv'ed ADISC was intended for us. */
@@ -116,7 +115,7 @@ lpfc_check_elscmpl_iocb(struct lpfc_hba * phba,
 {
 	struct lpfc_dmabuf *pcmd, *prsp;
 	uint32_t *lp;
-	void     *ptr;
+	void     *ptr = NULL;
 	IOCB_t   *irsp;
 
 	irsp = &rspiocb->iocb;
@@ -126,13 +125,12 @@ lpfc_check_elscmpl_iocb(struct lpfc_hba * phba,
 	 * freeing associated memory till after ABTS completes.
 	 */
 	if (pcmd) {
-		prsp = (struct lpfc_dmabuf *) pcmd->list.next;
-		lp = (uint32_t *) prsp->virt;
-
-		pci_dma_sync_single_for_cpu(phba->pcidev, prsp->phys,
-			LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
-
-		ptr = (void *)((uint8_t *)lp + sizeof(uint32_t));
+		prsp =  list_get_first(&pcmd->list, struct lpfc_dmabuf,
+				       list);
+		if (prsp) {
+			lp = (uint32_t *) prsp->virt;
+			ptr = (void *)((uint8_t *)lp + sizeof(uint32_t));
+		}
 	}
 	else {
 		/* Force ulpStatus error since we are returning NULL ptr */
@@ -151,7 +149,7 @@ lpfc_check_elscmpl_iocb(struct lpfc_hba * phba,
  * associated with a LPFC_NODELIST entry. This
  * routine effectively results in a "software abort".
  */
-static int
+int
 lpfc_els_abort(struct lpfc_hba * phba, struct lpfc_nodelist * ndlp,
 	int send_abts)
 {
@@ -159,6 +157,7 @@ lpfc_els_abort(struct lpfc_hba * phba, struct lpfc_nodelist * ndlp,
 	struct lpfc_sli_ring *pring;
 	struct lpfc_iocbq *iocb, *next_iocb;
 	IOCB_t *icmd;
+	int    found = 0;
 
 	/* Abort outstanding I/O on NPort <nlp_DID> */
 	lpfc_printf_log(phba, KERN_INFO, LOG_DISCOVERY,
@@ -171,58 +170,86 @@ lpfc_els_abort(struct lpfc_hba * phba, struct lpfc_nodelist * ndlp,
 	pring = &psli->ring[LPFC_ELS_RING];
 
 	/* First check the txq */
-	list_for_each_entry_safe(iocb, next_iocb, &pring->txq, list) {
-		/* Check to see if iocb matches the nport we are looking for */
-		if ((lpfc_check_sli_ndlp(phba, pring, iocb, ndlp))) {
-			/* It matches, so deque and call compl with an error */
-			list_del(&iocb->list);
-			pring->txq_cnt--;
-			if (iocb->iocb_cmpl) {
-				icmd = &iocb->iocb;
-				icmd->ulpStatus = IOSTAT_LOCAL_REJECT;
-				icmd->un.ulpWord[4] = IOERR_SLI_ABORTED;
-				(iocb->iocb_cmpl) (phba, iocb, iocb);
-			} else {
-				mempool_free(iocb, phba->iocb_mem_pool);
+	do {
+		found = 0;
+		spin_lock_irq(phba->host->host_lock);
+		list_for_each_entry_safe(iocb, next_iocb, &pring->txq, list) {
+			/* Check to see if iocb matches the nport we are looking
+			   for */
+			if ((lpfc_check_sli_ndlp(phba, pring, iocb, ndlp))) {
+				found = 1;
+				/* It matches, so deque and call compl with an
+				   error */
+				list_del(&iocb->list);
+				pring->txq_cnt--;
+				if (iocb->iocb_cmpl) {
+					icmd = &iocb->iocb;
+					icmd->ulpStatus = IOSTAT_LOCAL_REJECT;
+					icmd->un.ulpWord[4] = IOERR_SLI_ABORTED;
+					spin_unlock_irq(phba->host->host_lock);
+					(iocb->iocb_cmpl) (phba, iocb, iocb);
+					spin_lock_irq(phba->host->host_lock);
+				} else {
+					list_add_tail(&iocb->list,
+							&phba->lpfc_iocb_list);
+				}
+				break;
 			}
 		}
-	}
+		spin_unlock_irq(phba->host->host_lock);
+	} while (found);
 
 	/* Everything on txcmplq will be returned by firmware
- 	* with a no rpi / linkdown / abort error.  For ring 0,
-	* ELS discovery, we want to get rid of it right here.
- 	*/
+	 * with a no rpi / linkdown / abort error.  For ring 0,
+	 * ELS discovery, we want to get rid of it right here.
+	 */
 	/* Next check the txcmplq */
-	list_for_each_entry_safe(iocb, next_iocb, &pring->txcmplq, list) {
-		/* Check to see if iocb matches the nport we are looking for */
-		if ((lpfc_check_sli_ndlp (phba, pring, iocb, ndlp))) {
-			/* It matches, so deque and call compl with an error */
-			list_del(&iocb->list);
-			pring->txcmplq_cnt--;
+	do {
+		found = 0;
+		spin_lock_irq(phba->host->host_lock);
+		list_for_each_entry_safe(iocb, next_iocb, &pring->txcmplq,
+					 list) {
+			/* Check to see if iocb matches the nport we are looking
+			   for */
+			if ((lpfc_check_sli_ndlp (phba, pring, iocb, ndlp))) {
+				found = 1;
+				/* It matches, so deque and call compl with an
+				   error */
+				list_del(&iocb->list);
+				pring->txcmplq_cnt--;
 
-			icmd = &iocb->iocb;
-			/* If the driver is completing an ELS
-			 * command early, flush it out of the firmware.
-			 */
-			if (send_abts &&
-			   (icmd->ulpCommand == CMD_ELS_REQUEST64_CR) &&
-			   (icmd->un.elsreq64.bdl.ulpIoTag32)) {
-				lpfc_sli_issue_abort_iotag32(phba, pring, iocb);
-			}
-			if (iocb->iocb_cmpl) {
-				icmd->ulpStatus = IOSTAT_LOCAL_REJECT;
-				icmd->un.ulpWord[4] = IOERR_SLI_ABORTED;
-				(iocb->iocb_cmpl) (phba, iocb, iocb);
-			} else {
-				mempool_free(iocb, phba->iocb_mem_pool);
+				icmd = &iocb->iocb;
+				/* If the driver is completing an ELS
+				 * command early, flush it out of the firmware.
+				 */
+				if (send_abts &&
+				   (icmd->ulpCommand == CMD_ELS_REQUEST64_CR) &&
+				   (icmd->un.elsreq64.bdl.ulpIoTag32)) {
+					lpfc_sli_issue_abort_iotag32(phba,
+							     pring, iocb);
+				}
+				if (iocb->iocb_cmpl) {
+					icmd->ulpStatus = IOSTAT_LOCAL_REJECT;
+					icmd->un.ulpWord[4] = IOERR_SLI_ABORTED;
+					spin_unlock_irq(phba->host->host_lock);
+					(iocb->iocb_cmpl) (phba, iocb, iocb);
+					spin_lock_irq(phba->host->host_lock);
+				} else {
+					list_add_tail(&iocb->list,
+							&phba->lpfc_iocb_list);
+				}
+				break;
 			}
 		}
-	}
+		spin_unlock_irq(phba->host->host_lock);
+	} while(found);
 
 	/* If we are delaying issuing an ELS command, cancel it */
-	if(ndlp->nlp_flag & NLP_DELAY_TMO) {
+	if (ndlp->nlp_flag & NLP_DELAY_TMO) {
 		ndlp->nlp_flag &= ~NLP_DELAY_TMO;
 		del_timer_sync(&ndlp->nlp_delayfunc);
+		if (!list_empty(&ndlp->els_retry_evt.evt_listp))
+			list_del_init(&ndlp->els_retry_evt.evt_listp);
 	}
 	return (0);
 }
@@ -238,6 +265,7 @@ lpfc_rcv_plogi(struct lpfc_hba * phba,
 	struct serv_parm *sp;
 	LPFC_MBOXQ_t *mbox;
 	struct ls_rjt stat;
+	int rc;
 
 	memset(&stat, 0, sizeof (struct ls_rjt));
 	if (phba->hba_state <= LPFC_FLOGI) {
@@ -247,7 +275,7 @@ lpfc_rcv_plogi(struct lpfc_hba * phba,
 		 */
 		if (phba->fc_flag & FC_PT2PT) {
 			lpfc_els_abort_flogi(phba);
-		        if(!(phba->fc_flag & FC_PT2PT_PLOGI)) {
+		        if (!(phba->fc_flag & FC_PT2PT_PLOGI)) {
 				/* If the other side is supposed to initiate
 				 * the PLOGI anyway, just ACC it now and
 				 * move on with discovery.
@@ -265,7 +293,9 @@ lpfc_rcv_plogi(struct lpfc_hba * phba,
 		else {
 			stat.un.b.lsRjtRsnCode = LSRJT_LOGICAL_BSY;
 			stat.un.b.lsRjtRsnCodeExp = LSEXP_NOTHING_MORE;
-			goto out;
+			lpfc_els_rsp_reject(phba, stat.un.lsRjtError, cmdiocb,
+					    ndlp);
+			return 0;
 		}
 	}
 	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
@@ -275,7 +305,8 @@ lpfc_rcv_plogi(struct lpfc_hba * phba,
 		/* Reject this request because invalid parameters */
 		stat.un.b.lsRjtRsnCode = LSRJT_UNABLE_TPC;
 		stat.un.b.lsRjtRsnCodeExp = LSEXP_SPARM_OPTIONS;
-		goto out;
+		lpfc_els_rsp_reject(phba, stat.un.lsRjtError, cmdiocb, ndlp);
+		return (0);
 	}
 	icmd = &cmdiocb->iocb;
 
@@ -294,9 +325,23 @@ lpfc_rcv_plogi(struct lpfc_hba * phba,
 	} else {
 		ndlp->nlp_fcp_info |= CLASS3;
 	}
+	ndlp->nlp_class_sup = 0;
+	if (sp->cls1.classValid)
+		ndlp->nlp_class_sup |= FC_COS_CLASS1;
+	if (sp->cls2.classValid)
+		ndlp->nlp_class_sup |= FC_COS_CLASS2;
+	if (sp->cls3.classValid)
+		ndlp->nlp_class_sup |= FC_COS_CLASS3;
+	if (sp->cls4.classValid)
+		ndlp->nlp_class_sup |= FC_COS_CLASS4;
+	ndlp->nlp_maxframe =
+		((sp->cmn.bbRcvSizeMsb & 0x0F) << 8) | sp->cmn.bbRcvSizeLsb;
 
 	/* no need to reg_login if we are already in one of these states */
 	switch(ndlp->nlp_state) {
+	case  NLP_STE_NPR_NODE:
+		if (!(ndlp->nlp_flag & NLP_NPR_ADISC))
+			break;
 	case  NLP_STE_REG_LOGIN_ISSUE:
 	case  NLP_STE_PRLI_ISSUE:
 	case  NLP_STE_UNMAPPED_NODE:
@@ -305,42 +350,32 @@ lpfc_rcv_plogi(struct lpfc_hba * phba,
 		return (1);
 	}
 
-	if ((mbox = mempool_alloc(phba->mbox_mem_pool, GFP_ATOMIC)) == 0) {
-		stat.un.b.lsRjtRsnCode = LSRJT_UNABLE_TPC;
-		stat.un.b.lsRjtRsnCodeExp = LSEXP_OUT_OF_RESOURCE;
-		goto out;
-	}
-
 	if ((phba->fc_flag & FC_PT2PT)
 	    && !(phba->fc_flag & FC_PT2PT_PLOGI)) {
 		/* rcv'ed PLOGI decides what our NPortId will be */
 		phba->fc_myDID = icmd->un.rcvels.parmRo;
+		mbox = mempool_alloc(phba->mbox_mem_pool, GFP_KERNEL);
+		if (mbox == NULL)
+			goto out;
 		lpfc_config_link(phba, mbox);
-		if (lpfc_sli_issue_mbox
-		    (phba, mbox, (MBX_NOWAIT | MBX_STOP_IOCB))
-		    == MBX_NOT_FINISHED) {
+		mbox->mbox_cmpl = lpfc_sli_def_mbox_cmpl;
+		rc = lpfc_sli_issue_mbox
+			(phba, mbox, (MBX_NOWAIT | MBX_STOP_IOCB));
+		if (rc == MBX_NOT_FINISHED) {
 			mempool_free( mbox, phba->mbox_mem_pool);
-			stat.un.b.lsRjtRsnCode = LSRJT_UNABLE_TPC;
-			stat.un.b.lsRjtRsnCodeExp = LSEXP_OUT_OF_RESOURCE;
 			goto out;
 		}
-		if ((mbox = mempool_alloc(phba->mbox_mem_pool,
-			GFP_ATOMIC)) == 0) {
-			stat.un.b.lsRjtRsnCode = LSRJT_UNABLE_TPC;
-			stat.un.b.lsRjtRsnCodeExp = LSEXP_OUT_OF_RESOURCE;
-			goto out;
-		}
+
 		lpfc_can_disctmo(phba);
 	}
+	mbox = mempool_alloc(phba->mbox_mem_pool, GFP_KERNEL);
+	if (mbox == NULL)
+		goto out;
 
-	if(lpfc_reg_login(phba, icmd->un.rcvels.remoteID,
+	if (lpfc_reg_login(phba, icmd->un.rcvels.remoteID,
 			   (uint8_t *) sp, mbox, 0)) {
 		mempool_free( mbox, phba->mbox_mem_pool);
-		stat.un.b.lsRjtRsnCode = LSRJT_UNABLE_TPC;
-		stat.un.b.lsRjtRsnCodeExp = LSEXP_OUT_OF_RESOURCE;
-out:
-		lpfc_els_rsp_reject(phba, stat.un.lsRjtError, cmdiocb, ndlp);
-		return (0);
+		goto out;
 	}
 
 	/* ACC PLOGI rsp command needs to execute first,
@@ -353,13 +388,19 @@ out:
 	/* If there is an outstanding PLOGI issued, abort it before
 	 * sending ACC rsp to PLOGI recieved.
 	 */
-	if(ndlp->nlp_state == NLP_STE_PLOGI_ISSUE) {
+	if (ndlp->nlp_state == NLP_STE_PLOGI_ISSUE) {
 		/* software abort outstanding PLOGI */
 		lpfc_els_abort(phba, ndlp, 1);
 	}
 	ndlp->nlp_flag |= NLP_RCV_PLOGI;
 	lpfc_els_rsp_acc(phba, ELS_CMD_PLOGI, cmdiocb, ndlp, mbox, 0);
 	return (1);
+
+out:
+	stat.un.b.lsRjtRsnCode = LSRJT_UNABLE_TPC;
+	stat.un.b.lsRjtRsnCodeExp = LSEXP_OUT_OF_RESOURCE;
+	lpfc_els_rsp_reject(phba, stat.un.lsRjtError, cmdiocb, ndlp);
+	return (0);
 }
 
 static int
@@ -413,7 +454,9 @@ lpfc_rcv_padisc(struct lpfc_hba * phba,
 	/* 1 sec timeout */
 	mod_timer(&ndlp->nlp_delayfunc, jiffies + HZ);
 
+	spin_lock_irq(phba->host->host_lock);
 	ndlp->nlp_flag |= NLP_DELAY_TMO;
+	spin_unlock_irq(phba->host->host_lock);
 	ndlp->nlp_state = NLP_STE_NPR_NODE;
 	lpfc_nlp_list(phba, ndlp, NLP_NPR_LIST);
 	return (0);
@@ -431,13 +474,19 @@ lpfc_rcv_logo(struct lpfc_hba * phba,
 	ndlp->nlp_flag |= NLP_LOGO_ACC;
 	lpfc_els_rsp_acc(phba, ELS_CMD_ACC, cmdiocb, ndlp, NULL, 0);
 
-	ndlp->nlp_last_elscmd = (unsigned long)ELS_CMD_PLOGI;
-	mod_timer(&ndlp->nlp_delayfunc, jiffies + HZ * 1);
+	if (!(ndlp->nlp_type & NLP_FABRIC)) {
+		/* Only try to re-login if this is NOT a Fabric Node */
+		ndlp->nlp_last_elscmd = (unsigned long)ELS_CMD_PLOGI;
+		mod_timer(&ndlp->nlp_delayfunc, jiffies + HZ * 1);
+		spin_lock_irq(phba->host->host_lock);
+		ndlp->nlp_flag |= NLP_DELAY_TMO;
+		spin_unlock_irq(phba->host->host_lock);
+	}
 
-	ndlp->nlp_flag |= NLP_DELAY_TMO;
 	ndlp->nlp_state = NLP_STE_NPR_NODE;
 	lpfc_nlp_list(phba, ndlp, NLP_NPR_LIST);
 
+	ndlp->nlp_flag &= ~NLP_NPR_ADISC;
 	/* The driver has to wait until the ACC completes before it continues
 	 * processing the LOGO.  The action will resume in
 	 * lpfc_cmpl_els_logo_acc routine. Since part of processing includes an
@@ -446,232 +495,41 @@ lpfc_rcv_logo(struct lpfc_hba * phba,
 	return (0);
 }
 
-static int
-lpfc_binding_found(struct lpfc_bindlist * blp, struct lpfc_nodelist * ndlp)
+static void
+lpfc_rcv_prli(struct lpfc_hba * phba,
+		      struct lpfc_nodelist * ndlp,
+		      struct lpfc_iocbq *cmdiocb)
 {
-	uint16_t bindtype = blp->nlp_bind_type;
+	struct lpfc_dmabuf *pcmd;
+	uint32_t *lp;
+	PRLI *npr;
+	struct fc_rport *rport = ndlp->rport;
+	u32 roles;
 
-	if ((bindtype & FCP_SEED_DID) &&
-		   (ndlp->nlp_DID == be32_to_cpu(blp->nlp_DID))) {
-		return (1);
-	} else if ((bindtype & FCP_SEED_WWPN) &&
-		   (memcmp(&ndlp->nlp_portname, &blp->nlp_portname,
-			   sizeof (struct lpfc_name)) == 0)) {
-		return (1);
-	} else if ((bindtype & FCP_SEED_WWNN) &&
-		   (memcmp(&ndlp->nlp_nodename, &blp->nlp_nodename,
-			    sizeof (struct lpfc_name)) == 0)) {
-		return (1);
+	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
+	lp = (uint32_t *) pcmd->virt;
+	npr = (PRLI *) ((uint8_t *) lp + sizeof (uint32_t));
+
+	ndlp->nlp_type &= ~(NLP_FCP_TARGET | NLP_FCP_INITIATOR);
+	ndlp->nlp_fcp_info &= ~NLP_FCP_2_DEVICE;
+	if ((npr->acceptRspCode == PRLI_REQ_EXECUTED) &&
+	    (npr->prliType == PRLI_FCP_TYPE)) {
+		if (npr->initiatorFunc)
+			ndlp->nlp_type |= NLP_FCP_INITIATOR;
+		if (npr->targetFunc)
+			ndlp->nlp_type |= NLP_FCP_TARGET;
+		if (npr->Retry)
+			ndlp->nlp_fcp_info |= NLP_FCP_2_DEVICE;
 	}
-	return (0);
-}
-
-static int
-lpfc_binding_useid(struct lpfc_hba * phba, uint32_t sid)
-{
-	struct lpfc_bindlist *blp;
-
-	list_for_each_entry(blp, &phba->fc_nlpbind_list, nlp_listp) {
-		if (blp->nlp_sid == sid) {
-			return (1);
-		}
+	if (rport) {
+		/* We need to update the rport role values */
+		roles = FC_RPORT_ROLE_UNKNOWN;
+		if (ndlp->nlp_type & NLP_FCP_INITIATOR)
+			roles |= FC_RPORT_ROLE_FCP_INITIATOR;
+		if (ndlp->nlp_type & NLP_FCP_TARGET)
+			roles |= FC_RPORT_ROLE_FCP_TARGET;
+		fc_remote_port_rolechg(rport, roles);
 	}
-	return (0);
-}
-
-static int
-lpfc_mapping_useid(struct lpfc_hba * phba, uint32_t sid)
-{
-	struct lpfc_nodelist *mapnode;
-	struct lpfc_bindlist *blp;
-
-	list_for_each_entry(mapnode, &phba->fc_nlpmap_list, nlp_listp) {
-		blp = mapnode->nlp_listp_bind;
-		if (blp->nlp_sid == sid) {
-			return (1);
-		}
-	}
-	return (0);
-}
-
-static struct lpfc_bindlist *
-lpfc_create_binding(struct lpfc_hba * phba,
-		    struct lpfc_nodelist * ndlp, uint16_t index,
-		    uint16_t bindtype)
-{
-	struct lpfc_bindlist *blp;
-
-	if ((blp = mempool_alloc(phba->bind_mem_pool, GFP_ATOMIC))) {
-		memset(blp, 0, sizeof (struct lpfc_bindlist));
-		switch (bindtype) {
-		case FCP_SEED_WWPN:
-			blp->nlp_bind_type = FCP_SEED_WWPN;
-			break;
-		case FCP_SEED_WWNN:
-			blp->nlp_bind_type = FCP_SEED_WWNN;
-			break;
-		case FCP_SEED_DID:
-			blp->nlp_bind_type = FCP_SEED_DID;
-			break;
-		}
-		blp->nlp_sid = index;
-		blp->nlp_DID = ndlp->nlp_DID;
-		memcpy(&blp->nlp_nodename, &ndlp->nlp_nodename,
-		       sizeof (struct lpfc_name));
-		memcpy(&blp->nlp_portname, &ndlp->nlp_portname,
-		       sizeof (struct lpfc_name));
-
-		return (blp);
-	}
-	return NULL;
-}
-
-
-static struct lpfc_bindlist *
-lpfc_consistent_bind_get(struct lpfc_hba * phba, struct lpfc_nodelist * ndlp)
-{
-	struct lpfc_bindlist *blp, *next_blp;
-	uint16_t index;
-
-	/* check binding list */
-	list_for_each_entry_safe(blp, next_blp, &phba->fc_nlpbind_list,
-				nlp_listp) {
-		if (lpfc_binding_found(blp, ndlp)) {
-
-			/* take it off the binding list */
-			phba->fc_bind_cnt--;
-			list_del_init(&blp->nlp_listp);
-
-			/* Reassign scsi id <sid> to NPort <nlp_DID> */
-			lpfc_printf_log(phba,
-					KERN_INFO,
-					LOG_DISCOVERY | LOG_FCP,
-					"%d:0213 Reassign scsi id x%x to "
-					"NPort x%x Data: x%x x%x x%x x%x\n",
-					phba->brd_no,
-					blp->nlp_sid, ndlp->nlp_DID,
-					blp->nlp_bind_type, ndlp->nlp_flag,
-					ndlp->nlp_state, ndlp->nlp_rpi);
-
-			return (blp);
-		}
-	}
-
-	/* NOTE: if scan-down = 2 and we have private loop, then we use
-	 * AlpaArray to determine sid.
-	 */
-	if ((phba->cfg_fcp_bind_method == 4) &&
-	    ((phba->fc_flag & (FC_PUBLIC_LOOP | FC_FABRIC)) ||
-	     (phba->fc_topology != TOPOLOGY_LOOP))) {
-		/* Log message: ALPA based binding used on a non loop
-		   topology */
-		lpfc_printf_log(phba,
-				KERN_WARNING,
-				LOG_DISCOVERY,
-				"%d:0245 ALPA based bind method used on an HBA "
-				"which is in a nonloop topology Data: x%x\n",
-				phba->brd_no,
-				phba->fc_topology);
-	}
-
-	if ((phba->cfg_fcp_bind_method == 4) &&
-	    !(phba->fc_flag & (FC_PUBLIC_LOOP | FC_FABRIC)) &&
-	    (phba->fc_topology == TOPOLOGY_LOOP)) {
-		for (index = 0; index < FC_MAXLOOP; index++) {
-			if (ndlp->nlp_DID == (uint32_t) lpfcAlpaArray[index]) {
-				if ((blp =
-				     lpfc_create_binding(phba, ndlp, index,
-							 FCP_SEED_DID))) {
-					return (blp);
-				}
-				goto errid;
-			}
-		}
-	}
-
-	if (phba->cfg_automap) {
-		while (1) {
-			if ((lpfc_binding_useid(phba, phba->sid_cnt))
-			     || (lpfc_mapping_useid (phba, phba->sid_cnt))) {
-
-				phba->sid_cnt++;
-			} else {
-				if ((blp =
-				     lpfc_create_binding(phba, ndlp,
-							 phba->sid_cnt,
-							 phba->fcp_mapping))) {
-					blp->nlp_bind_type |= FCP_SEED_AUTO;
-
-					phba->sid_cnt++;
-					return (blp);
-				}
-				goto errid;
-			}
-		}
-	}
-	/* if automap on */
-errid:
-	/* Cannot assign scsi id on NPort <nlp_DID> */
-	lpfc_printf_log(phba,
-			KERN_INFO,
-			LOG_DISCOVERY | LOG_FCP,
-			"%d:0230 Cannot assign scsi ID on NPort x%x "
-			"Data: x%x x%x x%x\n",
-			phba->brd_no,
-			ndlp->nlp_DID, ndlp->nlp_flag, ndlp->nlp_state,
-			ndlp->nlp_rpi);
-
-	return NULL;
-}
-
-static uint32_t
-lpfc_assign_binding(struct lpfc_hba * phba,
-		struct lpfc_nodelist * ndlp, struct lpfc_bindlist *blp)
-{
-	struct lpfc_target *targetp;
-
-	targetp = lpfc_find_target(phba, blp->nlp_sid, ndlp);
-	if(!targetp) {
-		/* Cannot assign scsi id <sid> to NPort <nlp_DID> */
-		lpfc_printf_log(phba,
-			KERN_INFO,
-			LOG_DISCOVERY | LOG_FCP,
-			"%d:0229 Cannot assign scsi id x%x to NPort x%x "
-			"Data: x%x x%x x%x\n",
-			phba->brd_no, blp->nlp_sid,
-			ndlp->nlp_DID, ndlp->nlp_flag, ndlp->nlp_state,
-			ndlp->nlp_rpi);
-		return(0);
-	}
-	ndlp->nlp_sid = blp->nlp_sid;
-	ndlp->nlp_flag &= ~NLP_SEED_MASK;
-	switch ((blp->nlp_bind_type & FCP_SEED_MASK)) {
-	case FCP_SEED_WWPN:
-		ndlp->nlp_flag |= NLP_SEED_WWPN;
-		break;
-	case FCP_SEED_WWNN:
-		ndlp->nlp_flag |= NLP_SEED_WWNN;
-		break;
-	case FCP_SEED_DID:
-		ndlp->nlp_flag |= NLP_SEED_DID;
-		break;
-	}
-	if (blp->nlp_bind_type & FCP_SEED_AUTO) {
-		ndlp->nlp_flag |= NLP_AUTOMAP;
-	}
-	/* Assign scsi id <sid> to NPort <nlp_DID> */
-	lpfc_printf_log(phba,
-		KERN_INFO,
-		LOG_DISCOVERY | LOG_FCP,
-		"%d:0216 Assign scsi "
-		"id x%x to NPort x%x "
-		"Data: x%x x%x x%x x%x\n",
-		phba->brd_no,
-		ndlp->nlp_sid, ndlp->nlp_DID,
-		blp->nlp_bind_type,
-		ndlp->nlp_flag, ndlp->nlp_state,
-		ndlp->nlp_rpi);
-	return(1);
 }
 
 static uint32_t
@@ -681,14 +539,17 @@ lpfc_disc_set_adisc(struct lpfc_hba * phba,
 	/* Check config parameter use-adisc or FCP-2 */
 	if ((phba->cfg_use_adisc == 0) &&
 		!(phba->fc_flag & FC_RSCN_MODE)) {
-		return (0);
+		if (!(ndlp->nlp_fcp_info & NLP_FCP_2_DEVICE))
+			return (0);
 	}
+	spin_lock_irq(phba->host->host_lock);
 	ndlp->nlp_flag |= NLP_NPR_ADISC;
+	spin_unlock_irq(phba->host->host_lock);
 	return (1);
 }
 
 static uint32_t
-lpfc_disc_nodev(struct lpfc_hba * phba,
+lpfc_disc_noop(struct lpfc_hba * phba,
 		struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	/* This routine does nothing, just return the current state */
@@ -696,21 +557,19 @@ lpfc_disc_nodev(struct lpfc_hba * phba,
 }
 
 static uint32_t
-lpfc_disc_neverdev(struct lpfc_hba * phba,
+lpfc_disc_illegal(struct lpfc_hba * phba,
 		   struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	lpfc_printf_log(phba,
 			KERN_ERR,
 			LOG_DISCOVERY,
-			"%d:0253 Freeing node x%x due to invalid event x%x, "
+			"%d:0253 Illegal State Transition: node x%x event x%x, "
 			"state x%x Data: x%x x%x\n",
 			phba->brd_no,
 			ndlp->nlp_DID, evt, ndlp->nlp_state, ndlp->nlp_rpi,
 			ndlp->nlp_flag);
-	lpfc_nlp_list(phba, ndlp, NLP_NO_LIST);
-	return (NLP_STE_FREED_NODE);
+	return (ndlp->nlp_state);
 }
-
 
 /* Start of Discovery State Machine routines */
 
@@ -719,15 +578,10 @@ lpfc_rcv_plogi_unused_node(struct lpfc_hba * phba,
 			   struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
 
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
-
-	if(lpfc_rcv_plogi(phba, ndlp, cmdiocb)) {
+	if (lpfc_rcv_plogi(phba, ndlp, cmdiocb)) {
 		ndlp->nlp_state = NLP_STE_UNUSED_NODE;
 		lpfc_nlp_list(phba, ndlp, NLP_UNUSED_LIST);
 		return (ndlp->nlp_state);
@@ -750,15 +604,12 @@ lpfc_rcv_logo_unused_node(struct lpfc_hba * phba,
 			  struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq     *cmdiocb;
-	struct lpfc_dmabuf    *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
 
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
-
+	spin_lock_irq(phba->host->host_lock);
 	ndlp->nlp_flag |= NLP_LOGO_ACC;
+	spin_unlock_irq(phba->host->host_lock);
 	lpfc_els_rsp_acc(phba, ELS_CMD_ACC, cmdiocb, ndlp, NULL, 0);
 	lpfc_nlp_list(phba, ndlp, NLP_UNUSED_LIST);
 
@@ -782,10 +633,10 @@ lpfc_device_rm_unused_node(struct lpfc_hba * phba,
 }
 
 static uint32_t
-lpfc_rcv_plogi_plogi_issue(struct lpfc_hba * phba,
-			   struct lpfc_nodelist * ndlp,
-			   struct lpfc_iocbq *cmdiocb, uint32_t evt)
+lpfc_rcv_plogi_plogi_issue(struct lpfc_hba * phba, struct lpfc_nodelist * ndlp,
+			   void *arg, uint32_t evt)
 {
+	struct lpfc_iocbq *cmdiocb = arg;
 	struct lpfc_dmabuf *pcmd;
 	struct serv_parm *sp;
 	uint32_t *lp;
@@ -795,9 +646,6 @@ lpfc_rcv_plogi_plogi_issue(struct lpfc_hba * phba,
 	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
 	lp = (uint32_t *) pcmd->virt;
 	sp = (struct serv_parm *) ((uint8_t *) lp + sizeof (uint32_t));
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	memset(&stat, 0, sizeof (struct ls_rjt));
 
@@ -827,20 +675,17 @@ lpfc_rcv_els_plogi_issue(struct lpfc_hba * phba,
 			  struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq     *cmdiocb;
-	struct lpfc_dmabuf    *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	/* software abort outstanding PLOGI */
 	lpfc_els_abort(phba, ndlp, 1);
 	mod_timer(&ndlp->nlp_delayfunc, jiffies + HZ * 1);
+	spin_lock_irq(phba->host->host_lock);
 	ndlp->nlp_flag |= NLP_DELAY_TMO;
+	spin_unlock_irq(phba->host->host_lock);
 
-	if(evt == NLP_EVT_RCV_LOGO) {
+	if (evt == NLP_EVT_RCV_LOGO) {
 		lpfc_els_rsp_acc(phba, ELS_CMD_ACC, cmdiocb, ndlp, NULL, 0);
 	}
 	else {
@@ -876,64 +721,91 @@ lpfc_cmpl_plogi_plogi_issue(struct lpfc_hba * phba,
 
 	irsp = &rspiocb->iocb;
 
-	if (irsp->ulpStatus == 0) {
-		pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
+	if (irsp->ulpStatus)
+		goto out;
 
-		prsp = (struct lpfc_dmabuf *) pcmd->list.next;
-		lp = (uint32_t *) prsp->virt;
+	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
 
-		pci_dma_sync_single_for_cpu(phba->pcidev, prsp->phys,
-			LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
+	prsp = list_get_first(&pcmd->list,
+			      struct lpfc_dmabuf,
+			      list);
+	lp = (uint32_t *) prsp->virt;
 
-		sp = (struct serv_parm *) ((uint8_t *) lp + sizeof (uint32_t));
-		if ((lpfc_check_sparm(phba, ndlp, sp, CLASS3))) {
-			/* PLOGI chkparm OK */
-			lpfc_printf_log(phba,
-					KERN_INFO,
-					LOG_ELS,
-					"%d:0121 PLOGI chkparm OK "
-					"Data: x%x x%x x%x x%x\n",
-					phba->brd_no,
-					ndlp->nlp_DID, ndlp->nlp_state,
-					ndlp->nlp_flag, ndlp->nlp_rpi);
+	sp = (struct serv_parm *) ((uint8_t *) lp + sizeof (uint32_t));
+	if (!lpfc_check_sparm(phba, ndlp, sp, CLASS3))
+		goto out;
 
-			if ((phba->cfg_fcp_class == 2) &&
-			    (sp->cls2.classValid)) {
-				ndlp->nlp_fcp_info |= CLASS2;
-			} else {
-				ndlp->nlp_fcp_info |= CLASS3;
-			}
+	/* PLOGI chkparm OK */
+	lpfc_printf_log(phba,
+			KERN_INFO,
+			LOG_ELS,
+			"%d:0121 PLOGI chkparm OK "
+			"Data: x%x x%x x%x x%x\n",
+			phba->brd_no,
+			ndlp->nlp_DID, ndlp->nlp_state,
+			ndlp->nlp_flag, ndlp->nlp_rpi);
 
-			if ((mbox = mempool_alloc(phba->mbox_mem_pool,
-						  GFP_ATOMIC))) {
-				lpfc_unreg_rpi(phba, ndlp);
-				if (lpfc_reg_login
-				    (phba, irsp->un.elsreq64.remoteID,
-				     (uint8_t *) sp, mbox, 0) == 0) {
-					/* set_slim mailbox command needs to
-					 * execute first, queue this command to
-					 * be processed later.
-					 */
-					mbox->mbox_cmpl =
-					    lpfc_mbx_cmpl_reg_login;
-					mbox->context2 = ndlp;
-					if (lpfc_sli_issue_mbox(phba, mbox,
-					     (MBX_NOWAIT | MBX_STOP_IOCB))
-					    != MBX_NOT_FINISHED) {
-						ndlp->nlp_state =
-					    	NLP_STE_REG_LOGIN_ISSUE;
-						lpfc_nlp_list(phba, ndlp,
-						      NLP_REGLOGIN_LIST);
-						return (ndlp->nlp_state);
-					}
-					mempool_free(mbox, phba->mbox_mem_pool);
-				} else {
-					mempool_free(mbox, phba->mbox_mem_pool);
-				}
-			}
+	if ((phba->cfg_fcp_class == 2) &&
+	    (sp->cls2.classValid)) {
+		ndlp->nlp_fcp_info |= CLASS2;
+	} else {
+		ndlp->nlp_fcp_info |= CLASS3;
+	}
+	ndlp->nlp_class_sup = 0;
+	if (sp->cls1.classValid)
+		ndlp->nlp_class_sup |= FC_COS_CLASS1;
+	if (sp->cls2.classValid)
+		ndlp->nlp_class_sup |= FC_COS_CLASS2;
+	if (sp->cls3.classValid)
+		ndlp->nlp_class_sup |= FC_COS_CLASS3;
+	if (sp->cls4.classValid)
+		ndlp->nlp_class_sup |= FC_COS_CLASS4;
+	ndlp->nlp_maxframe =
+		((sp->cmn.bbRcvSizeMsb & 0x0F) << 8) |
+		sp->cmn.bbRcvSizeLsb;
+
+	if (!(mbox = mempool_alloc(phba->mbox_mem_pool,
+				   GFP_KERNEL)))
+		goto out;
+
+	lpfc_unreg_rpi(phba, ndlp);
+	if (lpfc_reg_login
+	    (phba, irsp->un.elsreq64.remoteID,
+	     (uint8_t *) sp, mbox, 0) == 0) {
+		/* set_slim mailbox command needs to
+		 * execute first, queue this command to
+		 * be processed later.
+		 */
+		switch(ndlp->nlp_DID) {
+		case NameServer_DID:
+			mbox->mbox_cmpl =
+				lpfc_mbx_cmpl_ns_reg_login;
+			break;
+		case FDMI_DID:
+			mbox->mbox_cmpl =
+				lpfc_mbx_cmpl_fdmi_reg_login;
+			break;
+		default:
+			mbox->mbox_cmpl =
+				lpfc_mbx_cmpl_reg_login;
 		}
+		mbox->context2 = ndlp;
+		if (lpfc_sli_issue_mbox(phba, mbox,
+					(MBX_NOWAIT | MBX_STOP_IOCB))
+		    != MBX_NOT_FINISHED) {
+			ndlp->nlp_state =
+				NLP_STE_REG_LOGIN_ISSUE;
+			lpfc_nlp_list(phba, ndlp,
+				      NLP_REGLOGIN_LIST);
+			return (ndlp->nlp_state);
+		}
+		mempool_free(mbox, phba->mbox_mem_pool);
+	} else {
+		mempool_free(mbox, phba->mbox_mem_pool);
 	}
 
+
+ out:
 	/* Free this node since the driver cannot login or has the wrong
 	   sparm */
 	lpfc_nlp_list(phba, ndlp, NLP_NO_LIST);
@@ -961,7 +833,9 @@ lpfc_device_recov_plogi_issue(struct lpfc_hba * phba,
 
 	ndlp->nlp_state = NLP_STE_NPR_NODE;
 	lpfc_nlp_list(phba, ndlp, NLP_NPR_LIST);
+	spin_lock_irq(phba->host->host_lock);
 	ndlp->nlp_flag &= ~NLP_NPR_2B_DISC;
+	spin_unlock_irq(phba->host->host_lock);
 
 	return (ndlp->nlp_state);
 }
@@ -972,18 +846,13 @@ lpfc_rcv_plogi_adisc_issue(struct lpfc_hba * phba,
 			    uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	/* software abort outstanding ADISC */
 	lpfc_els_abort(phba, ndlp, 1);
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
 
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
-
-	if(lpfc_rcv_plogi(phba, ndlp, cmdiocb)) {
+	if (lpfc_rcv_plogi(phba, ndlp, cmdiocb)) {
 		return (ndlp->nlp_state);
 	}
 	ndlp->nlp_state = NLP_STE_PLOGI_ISSUE;
@@ -999,13 +868,8 @@ lpfc_rcv_prli_adisc_issue(struct lpfc_hba * phba,
 			    uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_els_rsp_prli_acc(phba, cmdiocb, ndlp);
 	return (ndlp->nlp_state);
@@ -1017,13 +881,8 @@ lpfc_rcv_logo_adisc_issue(struct lpfc_hba * phba,
 			    uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	/* software abort outstanding ADISC */
 	lpfc_els_abort(phba, ndlp, 0);
@@ -1038,13 +897,8 @@ lpfc_rcv_padisc_adisc_issue(struct lpfc_hba * phba,
 			    uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_padisc(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
@@ -1056,13 +910,8 @@ lpfc_rcv_prlo_adisc_issue(struct lpfc_hba * phba,
 			    uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	/* Treat like rcv logo */
 	lpfc_rcv_logo(phba, ndlp, cmdiocb);
@@ -1075,7 +924,6 @@ lpfc_cmpl_adisc_adisc_issue(struct lpfc_hba * phba,
 			    uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb, *rspiocb;
-	struct lpfc_bindlist *blp;
 	IOCB_t *irsp;
 	ADISC *ap;
 
@@ -1090,7 +938,9 @@ lpfc_cmpl_adisc_adisc_issue(struct lpfc_hba * phba,
 		ndlp->nlp_last_elscmd = (unsigned long)ELS_CMD_PLOGI;
 		/* 1 sec timeout */
 		mod_timer(&ndlp->nlp_delayfunc, jiffies + HZ);
+		spin_lock_irq(phba->host->host_lock);
 		ndlp->nlp_flag |= NLP_DELAY_TMO;
+		spin_unlock_irq(phba->host->host_lock);
 
 		memset(&ndlp->nlp_nodename, 0, sizeof (struct lpfc_name));
 		memset(&ndlp->nlp_portname, 0, sizeof (struct lpfc_name));
@@ -1100,30 +950,8 @@ lpfc_cmpl_adisc_adisc_issue(struct lpfc_hba * phba,
 		lpfc_unreg_rpi(phba, ndlp);
 		return (ndlp->nlp_state);
 	}
-   	/* move to mapped / unmapped list accordingly */
-	/* Can we assign a SCSI Id to this NPort */
-	if ((blp = lpfc_consistent_bind_get(phba, ndlp))) {
-		/* Next 4 lines MUST be in this order */
-		if(lpfc_assign_binding(phba, ndlp, blp)) {
-			lpfc_nlp_list(phba, ndlp, NLP_MAPPED_LIST);
-			ndlp->nlp_listp_bind = blp;
-			ndlp->nlp_state = NLP_STE_MAPPED_NODE;
-
-			lpfc_set_failmask(phba, ndlp,
-				(LPFC_DEV_DISCOVERY_INP|LPFC_DEV_DISCONNECTED),
-				LPFC_CLR_BITMASK);
-
-			return (ndlp->nlp_state);
-		}
-	}
-	ndlp->nlp_flag |= NLP_TGT_NO_SCSIID;
-	lpfc_nlp_list(phba, ndlp, NLP_UNMAPPED_LIST);
-	ndlp->nlp_state = NLP_STE_UNMAPPED_NODE;
-
-	lpfc_set_failmask(phba, ndlp,
-		(LPFC_DEV_DISCOVERY_INP | LPFC_DEV_DISCONNECTED),
-		LPFC_CLR_BITMASK);
-
+	ndlp->nlp_state = NLP_STE_MAPPED_NODE;
+	lpfc_nlp_list(phba, ndlp, NLP_MAPPED_LIST);
 	return (ndlp->nlp_state);
 }
 
@@ -1149,7 +977,9 @@ lpfc_device_recov_adisc_issue(struct lpfc_hba * phba,
 
 	ndlp->nlp_state = NLP_STE_NPR_NODE;
 	lpfc_nlp_list(phba, ndlp, NLP_NPR_LIST);
+	spin_lock_irq(phba->host->host_lock);
 	ndlp->nlp_flag &= ~NLP_NPR_2B_DISC;
+	spin_unlock_irq(phba->host->host_lock);
 
 	lpfc_disc_set_adisc(phba, ndlp);
 	return (ndlp->nlp_state);
@@ -1161,13 +991,8 @@ lpfc_rcv_plogi_reglogin_issue(struct lpfc_hba * phba,
 			      uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_plogi(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
@@ -1179,13 +1004,8 @@ lpfc_rcv_prli_reglogin_issue(struct lpfc_hba * phba,
 			     uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_els_rsp_prli_acc(phba, cmdiocb, ndlp);
 	return (ndlp->nlp_state);
@@ -1197,13 +1017,8 @@ lpfc_rcv_logo_reglogin_issue(struct lpfc_hba * phba,
 			     uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_logo(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
@@ -1215,13 +1030,8 @@ lpfc_rcv_padisc_reglogin_issue(struct lpfc_hba * phba,
 			       uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_padisc(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
@@ -1261,7 +1071,9 @@ lpfc_cmpl_reglogin_reglogin_issue(struct lpfc_hba * phba,
 				did, mb->mbxStatus, phba->hba_state);
 
 		mod_timer(&ndlp->nlp_delayfunc, jiffies + HZ * 1);
+		spin_lock_irq(phba->host->host_lock);
 		ndlp->nlp_flag |= NLP_DELAY_TMO;
+		spin_unlock_irq(phba->host->host_lock);
 
 		lpfc_issue_els_logo(phba, ndlp, 0);
 		/* Put ndlp in npr list set plogi timer for 1 sec */
@@ -1305,7 +1117,9 @@ lpfc_device_recov_reglogin_issue(struct lpfc_hba * phba,
 {
 	ndlp->nlp_state = NLP_STE_NPR_NODE;
 	lpfc_nlp_list(phba, ndlp, NLP_NPR_LIST);
+	spin_lock_irq(phba->host->host_lock);
 	ndlp->nlp_flag &= ~NLP_NPR_2B_DISC;
+	spin_unlock_irq(phba->host->host_lock);
 	return (ndlp->nlp_state);
 }
 
@@ -1314,13 +1128,8 @@ lpfc_rcv_plogi_prli_issue(struct lpfc_hba * phba,
 			  struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_plogi(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
@@ -1331,13 +1140,8 @@ lpfc_rcv_prli_prli_issue(struct lpfc_hba * phba,
 			 struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_els_rsp_prli_acc(phba, cmdiocb, ndlp);
 	return (ndlp->nlp_state);
@@ -1348,13 +1152,8 @@ lpfc_rcv_logo_prli_issue(struct lpfc_hba * phba,
 			 struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	/* Software abort outstanding PRLI before sending acc */
 	lpfc_els_abort(phba, ndlp, 1);
@@ -1368,13 +1167,8 @@ lpfc_rcv_padisc_prli_issue(struct lpfc_hba * phba,
 			   struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_padisc(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
@@ -1403,7 +1197,6 @@ lpfc_cmpl_prli_prli_issue(struct lpfc_hba * phba,
 	struct lpfc_iocbq *cmdiocb, *rspiocb;
 	IOCB_t *irsp;
 	PRLI *npr;
-	struct lpfc_bindlist *blp;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
 	rspiocb = cmdiocb->context_un.rsp_iocb;
@@ -1413,46 +1206,24 @@ lpfc_cmpl_prli_prli_issue(struct lpfc_hba * phba,
 	if (irsp->ulpStatus) {
 		ndlp->nlp_state = NLP_STE_UNMAPPED_NODE;
 		lpfc_nlp_list(phba, ndlp, NLP_UNMAPPED_LIST);
-		lpfc_set_failmask(phba, ndlp, LPFC_DEV_DISCOVERY_INP,
-				  LPFC_CLR_BITMASK);
 		return (ndlp->nlp_state);
 	}
 
 	/* Check out PRLI rsp */
-	if ((npr->acceptRspCode != PRLI_REQ_EXECUTED) ||
-	    (npr->prliType != PRLI_FCP_TYPE) || (npr->targetFunc != 1)) {
-		ndlp->nlp_state = NLP_STE_UNMAPPED_NODE;
-		lpfc_nlp_list(phba, ndlp, NLP_UNMAPPED_LIST);
-		lpfc_set_failmask(phba, ndlp,
-			(LPFC_DEV_DISCOVERY_INP | LPFC_DEV_DISCONNECTED),
-			LPFC_CLR_BITMASK);
-		return (ndlp->nlp_state);
-	}
-	if (npr->Retry == 1) {
-		ndlp->nlp_fcp_info |= NLP_FCP_2_DEVICE;
+	ndlp->nlp_type &= ~(NLP_FCP_TARGET | NLP_FCP_INITIATOR);
+	ndlp->nlp_fcp_info &= ~NLP_FCP_2_DEVICE;
+	if ((npr->acceptRspCode == PRLI_REQ_EXECUTED) &&
+	    (npr->prliType == PRLI_FCP_TYPE)) {
+		if (npr->initiatorFunc)
+			ndlp->nlp_type |= NLP_FCP_INITIATOR;
+		if (npr->targetFunc)
+			ndlp->nlp_type |= NLP_FCP_TARGET;
+		if (npr->Retry)
+			ndlp->nlp_fcp_info |= NLP_FCP_2_DEVICE;
 	}
 
-	/* Can we assign a SCSI Id to this NPort */
-	if ((blp = lpfc_consistent_bind_get(phba, ndlp))) {
-		/* Next 4 lines MUST be in this order */
-		if(lpfc_assign_binding(phba, ndlp, blp)) {
-			lpfc_nlp_list(phba, ndlp, NLP_MAPPED_LIST);
-			ndlp->nlp_listp_bind = blp;
-			ndlp->nlp_state = NLP_STE_MAPPED_NODE;
-
-			lpfc_set_failmask(phba, ndlp,
-				(LPFC_DEV_DISCOVERY_INP|LPFC_DEV_DISCONNECTED),
-				LPFC_CLR_BITMASK);
-			return (ndlp->nlp_state);
-		}
-	}
-	ndlp->nlp_flag |= NLP_TGT_NO_SCSIID;
-	lpfc_nlp_list(phba, ndlp, NLP_UNMAPPED_LIST);
-	ndlp->nlp_state = NLP_STE_UNMAPPED_NODE;
-
-	lpfc_set_failmask(phba, ndlp,
-		(LPFC_DEV_DISCOVERY_INP | LPFC_DEV_DISCONNECTED),
-		LPFC_CLR_BITMASK);
+	ndlp->nlp_state = NLP_STE_MAPPED_NODE;
+	lpfc_nlp_list(phba, ndlp, NLP_MAPPED_LIST);
 	return (ndlp->nlp_state);
 }
 
@@ -1510,7 +1281,9 @@ lpfc_device_recov_prli_issue(struct lpfc_hba * phba,
 
 	ndlp->nlp_state = NLP_STE_NPR_NODE;
 	lpfc_nlp_list(phba, ndlp, NLP_NPR_LIST);
+	spin_lock_irq(phba->host->host_lock);
 	ndlp->nlp_flag &= ~NLP_NPR_2B_DISC;
+	spin_unlock_irq(phba->host->host_lock);
 	return (ndlp->nlp_state);
 }
 
@@ -1519,13 +1292,8 @@ lpfc_rcv_plogi_unmap_node(struct lpfc_hba * phba,
 			  struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_plogi(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
@@ -1536,14 +1304,10 @@ lpfc_rcv_prli_unmap_node(struct lpfc_hba * phba,
 			 struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
 
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
-
+	lpfc_rcv_prli(phba, ndlp, cmdiocb);
 	lpfc_els_rsp_prli_acc(phba, cmdiocb, ndlp);
 	return (ndlp->nlp_state);
 }
@@ -1553,13 +1317,8 @@ lpfc_rcv_logo_unmap_node(struct lpfc_hba * phba,
 			 struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_logo(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
@@ -1570,13 +1329,8 @@ lpfc_rcv_padisc_unmap_node(struct lpfc_hba * phba,
 			   struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_padisc(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
@@ -1587,13 +1341,8 @@ lpfc_rcv_prlo_unmap_node(struct lpfc_hba * phba,
 			 struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	/* Treat like rcv logo */
 	lpfc_rcv_logo(phba, ndlp, cmdiocb);
@@ -1617,13 +1366,8 @@ lpfc_rcv_plogi_mapped_node(struct lpfc_hba * phba,
 			   struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_plogi(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
@@ -1634,13 +1378,8 @@ lpfc_rcv_prli_mapped_node(struct lpfc_hba * phba,
 			  struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_els_rsp_prli_acc(phba, cmdiocb, ndlp);
 	return (ndlp->nlp_state);
@@ -1651,13 +1390,8 @@ lpfc_rcv_logo_mapped_node(struct lpfc_hba * phba,
 			  struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_logo(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
@@ -1669,13 +1403,8 @@ lpfc_rcv_padisc_mapped_node(struct lpfc_hba * phba,
 			    uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_padisc(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
@@ -1686,18 +1415,14 @@ lpfc_rcv_prlo_mapped_node(struct lpfc_hba * phba,
 			  struct lpfc_nodelist * ndlp, void *arg, uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	/* flush the target */
-	lpfc_sli_abort_iocb_tgt(phba,
-			       &phba->sli.ring[phba->sli.fcp_ring],
-			       ndlp->nlp_sid);
+	spin_lock_irq(phba->host->host_lock);
+	lpfc_sli_abort_iocb(phba, &phba->sli.ring[phba->sli.fcp_ring],
+			       ndlp->nlp_sid, 0, 0, LPFC_CTX_TGT);
+	spin_unlock_irq(phba->host->host_lock);
 
 	/* Treat like rcv logo */
 	lpfc_rcv_logo(phba, ndlp, cmdiocb);
@@ -1711,7 +1436,9 @@ lpfc_device_recov_mapped_node(struct lpfc_hba * phba,
 {
 	ndlp->nlp_state = NLP_STE_NPR_NODE;
 	lpfc_nlp_list(phba, ndlp, NLP_NPR_LIST);
+	spin_lock_irq(phba->host->host_lock);
 	ndlp->nlp_flag &= ~NLP_NPR_2B_DISC;
+	spin_unlock_irq(phba->host->host_lock);
 	lpfc_disc_set_adisc(phba, ndlp);
 	return (ndlp->nlp_state);
 }
@@ -1722,26 +1449,23 @@ lpfc_rcv_plogi_npr_node(struct lpfc_hba * phba,
 			    uint32_t evt)
 {
 	struct lpfc_iocbq *cmdiocb;
-	struct lpfc_dmabuf *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	/* Ignore PLOGI if we have an outstanding LOGO */
 	if (ndlp->nlp_flag & NLP_LOGO_SND) {
 		return (ndlp->nlp_state);
 	}
 
-	if(lpfc_rcv_plogi(phba, ndlp, cmdiocb)) {
+	if (lpfc_rcv_plogi(phba, ndlp, cmdiocb)) {
+		spin_lock_irq(phba->host->host_lock);
 		ndlp->nlp_flag &= ~(NLP_NPR_ADISC | NLP_NPR_2B_DISC);
+		spin_unlock_irq(phba->host->host_lock);
 		return (ndlp->nlp_state);
 	}
 
 	/* send PLOGI immediately, move to PLOGI issue state */
-	if(!(ndlp->nlp_flag & NLP_DELAY_TMO)) {
+	if (!(ndlp->nlp_flag & NLP_DELAY_TMO)) {
 			ndlp->nlp_state = NLP_STE_PLOGI_ISSUE;
 			lpfc_nlp_list(phba, ndlp, NLP_PLOGI_LIST);
 			lpfc_issue_els_plogi(phba, ndlp, 0);
@@ -1755,21 +1479,16 @@ lpfc_rcv_prli_npr_node(struct lpfc_hba * phba,
 			    uint32_t evt)
 {
 	struct lpfc_iocbq     *cmdiocb;
-	struct lpfc_dmabuf    *pcmd;
 	struct ls_rjt          stat;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	memset(&stat, 0, sizeof (struct ls_rjt));
 	stat.un.b.lsRjtRsnCode = LSRJT_UNABLE_TPC;
 	stat.un.b.lsRjtRsnCodeExp = LSEXP_NOTHING_MORE;
 	lpfc_els_rsp_reject(phba, stat.un.lsRjtError, cmdiocb, ndlp);
 
-	if(!(ndlp->nlp_flag & NLP_DELAY_TMO)) {
+	if (!(ndlp->nlp_flag & NLP_DELAY_TMO)) {
 		if (ndlp->nlp_flag & NLP_NPR_ADISC) {
 			ndlp->nlp_state = NLP_STE_ADISC_ISSUE;
 			lpfc_nlp_list(phba, ndlp, NLP_ADISC_LIST);
@@ -1789,29 +1508,10 @@ lpfc_rcv_logo_npr_node(struct lpfc_hba * phba,
 			    uint32_t evt)
 {
 	struct lpfc_iocbq     *cmdiocb;
-	struct lpfc_dmabuf         *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
 
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
-
-	ndlp->nlp_flag |= NLP_LOGO_ACC;
-	lpfc_els_rsp_acc(phba, ELS_CMD_ACC, cmdiocb, ndlp, NULL, 0);
-
-	if(ndlp->nlp_flag & NLP_DELAY_TMO) {
-		if (ndlp->nlp_last_elscmd == (unsigned long)ELS_CMD_PLOGI) {
-			return (ndlp->nlp_state);
-		} else {
-			del_timer_sync(&ndlp->nlp_delayfunc);
-			ndlp->nlp_flag &= ~NLP_DELAY_TMO;
-		}
-	}
-
-	ndlp->nlp_state = NLP_STE_PLOGI_ISSUE;
-	lpfc_nlp_list(phba, ndlp, NLP_PLOGI_LIST);
-	lpfc_issue_els_plogi(phba, ndlp, 0);
+	lpfc_rcv_logo(phba, ndlp, cmdiocb);
 	return (ndlp->nlp_state);
 }
 
@@ -1821,17 +1521,12 @@ lpfc_rcv_padisc_npr_node(struct lpfc_hba * phba,
 			    uint32_t evt)
 {
 	struct lpfc_iocbq     *cmdiocb;
-	struct lpfc_dmabuf    *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_rcv_padisc(phba, ndlp, cmdiocb);
 
-	if(!(ndlp->nlp_flag & NLP_DELAY_TMO)) {
+	if (!(ndlp->nlp_flag & NLP_DELAY_TMO)) {
 		if (ndlp->nlp_flag & NLP_NPR_ADISC) {
 			ndlp->nlp_state = NLP_STE_ADISC_ISSUE;
 			lpfc_nlp_list(phba, ndlp, NLP_ADISC_LIST);
@@ -1851,22 +1546,21 @@ lpfc_rcv_prlo_npr_node(struct lpfc_hba * phba,
 			    uint32_t evt)
 {
 	struct lpfc_iocbq     *cmdiocb;
-	struct lpfc_dmabuf         *pcmd;
 
 	cmdiocb = (struct lpfc_iocbq *) arg;
-	pcmd = (struct lpfc_dmabuf *) cmdiocb->context2;
-
-	pci_dma_sync_single_for_cpu(phba->pcidev, pcmd->phys,
-		LPFC_BPL_SIZE, PCI_DMA_FROMDEVICE);
 
 	lpfc_els_rsp_acc(phba, ELS_CMD_ACC, cmdiocb, ndlp, NULL, 0);
 
-	if(ndlp->nlp_flag & NLP_DELAY_TMO) {
+	if (ndlp->nlp_flag & NLP_DELAY_TMO) {
 		if (ndlp->nlp_last_elscmd == (unsigned long)ELS_CMD_PLOGI) {
 			return (ndlp->nlp_state);
 		} else {
-			del_timer_sync(&ndlp->nlp_delayfunc);
+			spin_lock_irq(phba->host->host_lock);
 			ndlp->nlp_flag &= ~NLP_DELAY_TMO;
+			spin_unlock_irq(phba->host->host_lock);
+			del_timer_sync(&ndlp->nlp_delayfunc);
+			if (!list_empty(&ndlp->els_retry_evt.evt_listp))
+				list_del_init(&ndlp->els_retry_evt.evt_listp);
 		}
 	}
 
@@ -1920,7 +1614,9 @@ lpfc_device_recov_npr_node(struct lpfc_hba * phba,
 			    struct lpfc_nodelist * ndlp, void *arg,
 			    uint32_t evt)
 {
+	spin_lock_irq(phba->host->host_lock);
 	ndlp->nlp_flag &= ~NLP_NPR_2B_DISC;
+	spin_unlock_irq(phba->host->host_lock);
 	return (ndlp->nlp_state);
 }
 
@@ -1981,119 +1677,120 @@ lpfc_device_recov_npr_node(struct lpfc_hba * phba,
  * unmapped lists.
  */
 
-static void *lpfc_disc_action[NLP_STE_MAX_STATE * NLP_EVT_MAX_EVENT] = {
-	/* Action routine                          Event       Current State  */
-	(void *)lpfc_rcv_plogi_unused_node,	/* RCV_PLOGI   UNUSED_NODE    */
-	(void *)lpfc_rcv_els_unused_node,	/* RCV_PRLI        */
-	(void *)lpfc_rcv_logo_unused_node,	/* RCV_LOGO        */
-	(void *)lpfc_rcv_els_unused_node,	/* RCV_ADISC       */
-	(void *)lpfc_rcv_els_unused_node,	/* RCV_PDISC       */
-	(void *)lpfc_rcv_els_unused_node,	/* RCV_PRLO        */
-	(void *)lpfc_disc_neverdev,		/* CMPL_PLOGI      */
-	(void *)lpfc_disc_neverdev,		/* CMPL_PRLI       */
-	(void *)lpfc_cmpl_logo_unused_node,	/* CMPL_LOGO       */
-	(void *)lpfc_disc_neverdev,		/* CMPL_ADISC      */
-	(void *)lpfc_disc_neverdev,		/* CMPL_REG_LOGIN  */
-	(void *)lpfc_device_rm_unused_node,	/* DEVICE_RM       */
-	(void *)lpfc_disc_neverdev,		/* DEVICE_RECOVERY */
+static uint32_t (*lpfc_disc_action[NLP_STE_MAX_STATE * NLP_EVT_MAX_EVENT])
+     (struct lpfc_hba *, struct lpfc_nodelist *, void *, uint32_t) = {
+	/* Action routine                  Event       Current State  */
+	lpfc_rcv_plogi_unused_node,	/* RCV_PLOGI   UNUSED_NODE    */
+	lpfc_rcv_els_unused_node,	/* RCV_PRLI        */
+	lpfc_rcv_logo_unused_node,	/* RCV_LOGO        */
+	lpfc_rcv_els_unused_node,	/* RCV_ADISC       */
+	lpfc_rcv_els_unused_node,	/* RCV_PDISC       */
+	lpfc_rcv_els_unused_node,	/* RCV_PRLO        */
+	lpfc_disc_illegal,		/* CMPL_PLOGI      */
+	lpfc_disc_illegal,		/* CMPL_PRLI       */
+	lpfc_cmpl_logo_unused_node,	/* CMPL_LOGO       */
+	lpfc_disc_illegal,		/* CMPL_ADISC      */
+	lpfc_disc_illegal,		/* CMPL_REG_LOGIN  */
+	lpfc_device_rm_unused_node,	/* DEVICE_RM       */
+	lpfc_disc_illegal,		/* DEVICE_RECOVERY */
 
-	(void *)lpfc_rcv_plogi_plogi_issue,	/* RCV_PLOGI   PLOGI_ISSUE    */
-	(void *)lpfc_rcv_els_plogi_issue,	/* RCV_PRLI        */
-	(void *)lpfc_rcv_els_plogi_issue,	/* RCV_LOGO        */
-	(void *)lpfc_rcv_els_plogi_issue,	/* RCV_ADISC       */
-	(void *)lpfc_rcv_els_plogi_issue,	/* RCV_PDISC       */
-	(void *)lpfc_rcv_els_plogi_issue,	/* RCV_PRLO        */
-	(void *)lpfc_cmpl_plogi_plogi_issue,	/* CMPL_PLOGI      */
-	(void *)lpfc_disc_neverdev,		/* CMPL_PRLI       */
-	(void *)lpfc_disc_neverdev,		/* CMPL_LOGO       */
-	(void *)lpfc_disc_neverdev,		/* CMPL_ADISC      */
-	(void *)lpfc_disc_neverdev,		/* CMPL_REG_LOGIN  */
-	(void *)lpfc_device_rm_plogi_issue,	/* DEVICE_RM       */
-	(void *)lpfc_device_recov_plogi_issue,	/* DEVICE_RECOVERY */
+	lpfc_rcv_plogi_plogi_issue,	/* RCV_PLOGI   PLOGI_ISSUE    */
+	lpfc_rcv_els_plogi_issue,	/* RCV_PRLI        */
+	lpfc_rcv_els_plogi_issue,	/* RCV_LOGO        */
+	lpfc_rcv_els_plogi_issue,	/* RCV_ADISC       */
+	lpfc_rcv_els_plogi_issue,	/* RCV_PDISC       */
+	lpfc_rcv_els_plogi_issue,	/* RCV_PRLO        */
+	lpfc_cmpl_plogi_plogi_issue,	/* CMPL_PLOGI      */
+	lpfc_disc_illegal,		/* CMPL_PRLI       */
+	lpfc_disc_illegal,		/* CMPL_LOGO       */
+	lpfc_disc_illegal,		/* CMPL_ADISC      */
+	lpfc_disc_illegal,		/* CMPL_REG_LOGIN  */
+	lpfc_device_rm_plogi_issue,	/* DEVICE_RM       */
+	lpfc_device_recov_plogi_issue,	/* DEVICE_RECOVERY */
 
-	(void *)lpfc_rcv_plogi_adisc_issue,     /* RCV_PLOGI   ADISC_ISSUE    */
-	(void *)lpfc_rcv_prli_adisc_issue,      /* RCV_PRLI        */
-	(void *)lpfc_rcv_logo_adisc_issue,      /* RCV_LOGO        */
-	(void *)lpfc_rcv_padisc_adisc_issue,    /* RCV_ADISC       */
-	(void *)lpfc_rcv_padisc_adisc_issue,    /* RCV_PDISC       */
-	(void *)lpfc_rcv_prlo_adisc_issue,      /* RCV_PRLO        */
-	(void *)lpfc_disc_neverdev,    		/* CMPL_PLOGI      */
-	(void *)lpfc_disc_neverdev,     	/* CMPL_PRLI       */
-	(void *)lpfc_disc_neverdev,   		/* CMPL_LOGO       */
-	(void *)lpfc_cmpl_adisc_adisc_issue,    /* CMPL_ADISC      */
-	(void *)lpfc_disc_neverdev, 		/* CMPL_REG_LOGIN  */
-	(void *)lpfc_device_rm_adisc_issue,     /* DEVICE_RM       */
-	(void *)lpfc_device_recov_adisc_issue,  /* DEVICE_RECOVERY */
+	lpfc_rcv_plogi_adisc_issue,	/* RCV_PLOGI   ADISC_ISSUE    */
+	lpfc_rcv_prli_adisc_issue,	/* RCV_PRLI        */
+	lpfc_rcv_logo_adisc_issue,	/* RCV_LOGO        */
+	lpfc_rcv_padisc_adisc_issue,	/* RCV_ADISC       */
+	lpfc_rcv_padisc_adisc_issue,	/* RCV_PDISC       */
+	lpfc_rcv_prlo_adisc_issue,	/* RCV_PRLO        */
+	lpfc_disc_illegal,		/* CMPL_PLOGI      */
+	lpfc_disc_illegal,		/* CMPL_PRLI       */
+	lpfc_disc_illegal,		/* CMPL_LOGO       */
+	lpfc_cmpl_adisc_adisc_issue,	/* CMPL_ADISC      */
+	lpfc_disc_illegal,		/* CMPL_REG_LOGIN  */
+	lpfc_device_rm_adisc_issue,	/* DEVICE_RM       */
+	lpfc_device_recov_adisc_issue,	/* DEVICE_RECOVERY */
 
-	(void *)lpfc_rcv_plogi_reglogin_issue,	/* RCV_PLOGI  REG_LOGIN_ISSUE */
-	(void *)lpfc_rcv_prli_reglogin_issue,	/* RCV_PLOGI       */
-	(void *)lpfc_rcv_logo_reglogin_issue,	/* RCV_LOGO        */
-	(void *)lpfc_rcv_padisc_reglogin_issue,	/* RCV_ADISC       */
-	(void *)lpfc_rcv_padisc_reglogin_issue,	/* RCV_PDISC       */
-	(void *)lpfc_rcv_prlo_reglogin_issue,	/* RCV_PRLO        */
-	(void *)lpfc_disc_neverdev,		/* CMPL_PLOGI      */
-	(void *)lpfc_disc_neverdev,		/* CMPL_PRLI       */
-	(void *)lpfc_disc_neverdev,		/* CMPL_LOGO       */
-	(void *)lpfc_disc_neverdev,		/* CMPL_ADISC      */
-	(void *)lpfc_cmpl_reglogin_reglogin_issue,/* CMPL_REG_LOGIN  */
-	(void *)lpfc_device_rm_reglogin_issue,	/* DEVICE_RM       */
-	(void *)lpfc_device_recov_reglogin_issue,/* DEVICE_RECOVERY */
+	lpfc_rcv_plogi_reglogin_issue,	/* RCV_PLOGI  REG_LOGIN_ISSUE */
+	lpfc_rcv_prli_reglogin_issue,	/* RCV_PLOGI       */
+	lpfc_rcv_logo_reglogin_issue,	/* RCV_LOGO        */
+	lpfc_rcv_padisc_reglogin_issue,	/* RCV_ADISC       */
+	lpfc_rcv_padisc_reglogin_issue,	/* RCV_PDISC       */
+	lpfc_rcv_prlo_reglogin_issue,	/* RCV_PRLO        */
+	lpfc_disc_illegal,		/* CMPL_PLOGI      */
+	lpfc_disc_illegal,		/* CMPL_PRLI       */
+	lpfc_disc_illegal,		/* CMPL_LOGO       */
+	lpfc_disc_illegal,		/* CMPL_ADISC      */
+	lpfc_cmpl_reglogin_reglogin_issue,/* CMPL_REG_LOGIN  */
+	lpfc_device_rm_reglogin_issue,	/* DEVICE_RM       */
+	lpfc_device_recov_reglogin_issue,/* DEVICE_RECOVERY */
 
-	(void *)lpfc_rcv_plogi_prli_issue,	/* RCV_PLOGI   PRLI_ISSUE     */
-	(void *)lpfc_rcv_prli_prli_issue,	/* RCV_PRLI        */
-	(void *)lpfc_rcv_logo_prli_issue,	/* RCV_LOGO        */
-	(void *)lpfc_rcv_padisc_prli_issue,	/* RCV_ADISC       */
-	(void *)lpfc_rcv_padisc_prli_issue,	/* RCV_PDISC       */
-	(void *)lpfc_rcv_prlo_prli_issue,	/* RCV_PRLO        */
-	(void *)lpfc_disc_neverdev,		/* CMPL_PLOGI      */
-	(void *)lpfc_cmpl_prli_prli_issue,	/* CMPL_PRLI       */
-	(void *)lpfc_disc_neverdev,		/* CMPL_LOGO       */
-	(void *)lpfc_disc_neverdev,		/* CMPL_ADISC      */
-	(void *)lpfc_disc_neverdev,		/* CMPL_REG_LOGIN  */
-	(void *)lpfc_device_rm_prli_issue,	/* DEVICE_RM       */
-	(void *)lpfc_device_recov_prli_issue,	/* DEVICE_RECOVERY */
+	lpfc_rcv_plogi_prli_issue,	/* RCV_PLOGI   PRLI_ISSUE     */
+	lpfc_rcv_prli_prli_issue,	/* RCV_PRLI        */
+	lpfc_rcv_logo_prli_issue,	/* RCV_LOGO        */
+	lpfc_rcv_padisc_prli_issue,	/* RCV_ADISC       */
+	lpfc_rcv_padisc_prli_issue,	/* RCV_PDISC       */
+	lpfc_rcv_prlo_prli_issue,	/* RCV_PRLO        */
+	lpfc_disc_illegal,		/* CMPL_PLOGI      */
+	lpfc_cmpl_prli_prli_issue,	/* CMPL_PRLI       */
+	lpfc_disc_illegal,		/* CMPL_LOGO       */
+	lpfc_disc_illegal,		/* CMPL_ADISC      */
+	lpfc_disc_illegal,		/* CMPL_REG_LOGIN  */
+	lpfc_device_rm_prli_issue,	/* DEVICE_RM       */
+	lpfc_device_recov_prli_issue,	/* DEVICE_RECOVERY */
 
-	(void *)lpfc_rcv_plogi_unmap_node,	/* RCV_PLOGI   UNMAPPED_NODE  */
-	(void *)lpfc_rcv_prli_unmap_node,	/* RCV_PRLI        */
-	(void *)lpfc_rcv_logo_unmap_node,	/* RCV_LOGO        */
-	(void *)lpfc_rcv_padisc_unmap_node,	/* RCV_ADISC       */
-	(void *)lpfc_rcv_padisc_unmap_node,	/* RCV_PDISC       */
-	(void *)lpfc_rcv_prlo_unmap_node,	/* RCV_PRLO        */
-	(void *)lpfc_disc_neverdev,		/* CMPL_PLOGI      */
-	(void *)lpfc_disc_neverdev,		/* CMPL_PRLI       */
-	(void *)lpfc_disc_neverdev,		/* CMPL_LOGO       */
-	(void *)lpfc_disc_neverdev,		/* CMPL_ADISC      */
-	(void *)lpfc_disc_neverdev,		/* CMPL_REG_LOGIN  */
-	(void *)lpfc_disc_neverdev,		/* DEVICE_RM       */
-	(void *)lpfc_device_recov_unmap_node,	/* DEVICE_RECOVERY */
+	lpfc_rcv_plogi_unmap_node,	/* RCV_PLOGI   UNMAPPED_NODE  */
+	lpfc_rcv_prli_unmap_node,	/* RCV_PRLI        */
+	lpfc_rcv_logo_unmap_node,	/* RCV_LOGO        */
+	lpfc_rcv_padisc_unmap_node,	/* RCV_ADISC       */
+	lpfc_rcv_padisc_unmap_node,	/* RCV_PDISC       */
+	lpfc_rcv_prlo_unmap_node,	/* RCV_PRLO        */
+	lpfc_disc_illegal,		/* CMPL_PLOGI      */
+	lpfc_disc_illegal,		/* CMPL_PRLI       */
+	lpfc_disc_illegal,		/* CMPL_LOGO       */
+	lpfc_disc_illegal,		/* CMPL_ADISC      */
+	lpfc_disc_illegal,		/* CMPL_REG_LOGIN  */
+	lpfc_disc_illegal,		/* DEVICE_RM       */
+	lpfc_device_recov_unmap_node,	/* DEVICE_RECOVERY */
 
-	(void *)lpfc_rcv_plogi_mapped_node,	/* RCV_PLOGI   MAPPED_NODE    */
-	(void *)lpfc_rcv_prli_mapped_node,	/* RCV_PRLI        */
-	(void *)lpfc_rcv_logo_mapped_node,	/* RCV_LOGO        */
-	(void *)lpfc_rcv_padisc_mapped_node,	/* RCV_ADISC       */
-	(void *)lpfc_rcv_padisc_mapped_node,	/* RCV_PDISC       */
-	(void *)lpfc_rcv_prlo_mapped_node,	/* RCV_PRLO        */
-	(void *)lpfc_disc_neverdev,		/* CMPL_PLOGI      */
-	(void *)lpfc_disc_neverdev,		/* CMPL_PRLI       */
-	(void *)lpfc_disc_neverdev,		/* CMPL_LOGO       */
-	(void *)lpfc_disc_neverdev,		/* CMPL_ADISC      */
-	(void *)lpfc_disc_neverdev,		/* CMPL_REG_LOGIN  */
-	(void *)lpfc_disc_neverdev,		/* DEVICE_RM       */
-	(void *)lpfc_device_recov_mapped_node,	/* DEVICE_RECOVERY */
+	lpfc_rcv_plogi_mapped_node,	/* RCV_PLOGI   MAPPED_NODE    */
+	lpfc_rcv_prli_mapped_node,	/* RCV_PRLI        */
+	lpfc_rcv_logo_mapped_node,	/* RCV_LOGO        */
+	lpfc_rcv_padisc_mapped_node,	/* RCV_ADISC       */
+	lpfc_rcv_padisc_mapped_node,	/* RCV_PDISC       */
+	lpfc_rcv_prlo_mapped_node,	/* RCV_PRLO        */
+	lpfc_disc_illegal,		/* CMPL_PLOGI      */
+	lpfc_disc_illegal,		/* CMPL_PRLI       */
+	lpfc_disc_illegal,		/* CMPL_LOGO       */
+	lpfc_disc_illegal,		/* CMPL_ADISC      */
+	lpfc_disc_illegal,		/* CMPL_REG_LOGIN  */
+	lpfc_disc_illegal,		/* DEVICE_RM       */
+	lpfc_device_recov_mapped_node,	/* DEVICE_RECOVERY */
 
-	(void *)lpfc_rcv_plogi_npr_node,        /* RCV_PLOGI   NPR_NODE    */
-	(void *)lpfc_rcv_prli_npr_node,         /* RCV_PRLI        */
-	(void *)lpfc_rcv_logo_npr_node,         /* RCV_LOGO        */
-	(void *)lpfc_rcv_padisc_npr_node,       /* RCV_ADISC       */
-	(void *)lpfc_rcv_padisc_npr_node,       /* RCV_PDISC       */
-	(void *)lpfc_rcv_prlo_npr_node,         /* RCV_PRLO        */
-	(void *)lpfc_disc_neverdev,             /* CMPL_PLOGI      */
-	(void *)lpfc_disc_neverdev,             /* CMPL_PRLI       */
-	(void *)lpfc_cmpl_logo_npr_node,        /* CMPL_LOGO       */
-	(void *)lpfc_disc_nodev,		/* CMPL_ADISC      */
-	(void *)lpfc_cmpl_reglogin_npr_node,    /* CMPL_REG_LOGIN  */
-	(void *)lpfc_device_rm_npr_node,        /* DEVICE_RM       */
-	(void *)lpfc_device_recov_npr_node,     /* DEVICE_RECOVERY */
+	lpfc_rcv_plogi_npr_node,        /* RCV_PLOGI   NPR_NODE    */
+	lpfc_rcv_prli_npr_node,         /* RCV_PRLI        */
+	lpfc_rcv_logo_npr_node,         /* RCV_LOGO        */
+	lpfc_rcv_padisc_npr_node,       /* RCV_ADISC       */
+	lpfc_rcv_padisc_npr_node,       /* RCV_PDISC       */
+	lpfc_rcv_prlo_npr_node,         /* RCV_PRLO        */
+	lpfc_disc_noop,			/* CMPL_PLOGI      */
+	lpfc_disc_noop,			/* CMPL_PRLI       */
+	lpfc_cmpl_logo_npr_node,        /* CMPL_LOGO       */
+	lpfc_disc_noop,			/* CMPL_ADISC      */
+	lpfc_cmpl_reglogin_npr_node,    /* CMPL_REG_LOGIN  */
+	lpfc_device_rm_npr_node,        /* DEVICE_RM       */
+	lpfc_device_recov_npr_node,     /* DEVICE_RECOVERY */
 };
 
 int
@@ -2116,9 +1813,7 @@ lpfc_disc_state_machine(struct lpfc_hba * phba,
 			phba->brd_no,
 			evt, ndlp->nlp_DID, cur_state, ndlp->nlp_flag);
 
-	func = (uint32_t(*)(struct lpfc_hba *, struct lpfc_nodelist *, void *,
-			    uint32_t))
-	    lpfc_disc_action[(cur_state * NLP_EVT_MAX_EVENT) + evt];
+	func = lpfc_disc_action[(cur_state * NLP_EVT_MAX_EVENT) + evt];
 	rc = (func) (phba, ndlp, arg, evt);
 
 	/* DSM out state <rc> on NPort <nlp_DID> */
@@ -2134,8 +1829,9 @@ lpfc_disc_state_machine(struct lpfc_hba * phba,
 	/* Check to see if ndlp removal is deferred */
 	if ((ndlp->nlp_disc_refcnt == 0)
 	    && (ndlp->nlp_flag & NLP_DELAY_REMOVE)) {
-
+		spin_lock_irq(phba->host->host_lock);
 		ndlp->nlp_flag &= ~NLP_DELAY_REMOVE;
+		spin_unlock_irq(phba->host->host_lock);
 		lpfc_nlp_remove(phba, ndlp);
 		return (NLP_STE_FREED_NODE);
 	}

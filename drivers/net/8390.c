@@ -999,6 +999,7 @@ static void ethdev_setup(struct net_device *dev)
 
 /**
  * alloc_ei_netdev - alloc_etherdev counterpart for 8390
+ * @size: extra bytes to allocate
  *
  * Allocate 8390-specific net_device.
  */

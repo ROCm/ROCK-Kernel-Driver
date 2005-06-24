@@ -15,6 +15,7 @@
 #include <linux/hardirq.h>
 #include <asm/bootinfo.h>
 #include <asm/irq.h>
+#include <asm/thread_info.h>
 
 #define DEFINE(sym, val) \
         asm volatile("\n->" #sym " %0 " #val : : "i" (val))
@@ -63,10 +64,13 @@ int main(void)
 	DEFINE(PT_A2, offsetof(struct pt_regs, a2));
 	DEFINE(PT_PC, offsetof(struct pt_regs, pc));
 	DEFINE(PT_SR, offsetof(struct pt_regs, sr));
+
+#ifdef CONFIG_COLDFIRE
+	/* bitfields are a bit difficult */
+	DEFINE(PT_FORMATVEC, offsetof(struct pt_regs, sr) - 2);
+#else
 	/* bitfields are a bit difficult */
 	DEFINE(PT_VECTOR, offsetof(struct pt_regs, pc) + 4);
-
-#ifndef CONFIG_COLDFIRE
 	/* offsets into the irq_handler struct */
 	DEFINE(IRQ_HANDLER, offsetof(struct irq_node, handler));
 	DEFINE(IRQ_DEVID, offsetof(struct irq_node, dev_id));
@@ -84,6 +88,14 @@ int main(void)
 
 	DEFINE(PT_PTRACED, PT_PTRACED);
 	DEFINE(PT_DTRACE, PT_DTRACE);
+
+	DEFINE(THREAD_SIZE, THREAD_SIZE);
+
+	/* Offsets in thread_info structure */
+	DEFINE(TI_TASK, offsetof(struct thread_info, task));
+	DEFINE(TI_EXECDOMAIN, offsetof(struct thread_info, exec_domain));
+	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
+	DEFINE(TI_CPU, offsetof(struct thread_info, cpu));
 
 	return 0;
 }

@@ -17,7 +17,6 @@
 #include "linux/utime.h"
 #include "asm/mman.h"
 #include "asm/uaccess.h"
-#include "asm/ipc.h"
 #include "kern_util.h"
 #include "user_util.h"
 #include "sysdep/syscalls.h"
@@ -26,12 +25,6 @@
 
 /*  Unlocked, I don't care if this is a bit off */
 int nsyscalls = 0;
-
-long um_mount(char __user * dev_name, char __user * dir_name,
-	      char __user * type, unsigned long new_flags, void __user * data)
-{
-	return(sys_mount(dev_name, dir_name, type, new_flags, data));
-}
 
 long sys_fork(void)
 {
@@ -152,11 +145,6 @@ long sys_olduname(struct oldold_utsname * name)
 	error = error ? -EFAULT : 0;
 
 	return error;
-}
-
-long execute_syscall(void *r)
-{
-	return(CHOOSE_MODE_PROC(execute_syscall_tt, execute_syscall_skas, r));
 }
 
 DEFINE_SPINLOCK(syscall_lock);

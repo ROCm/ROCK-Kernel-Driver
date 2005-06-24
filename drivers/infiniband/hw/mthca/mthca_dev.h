@@ -49,23 +49,18 @@
 #define DRV_VERSION	"0.06-pre"
 #define DRV_RELDATE	"November 8, 2004"
 
-/* Types of supported HCA */
-enum {
-	TAVOR,			/* MT23108                        */
-	ARBEL_COMPAT,		/* MT25208 in Tavor compat mode   */
-	ARBEL_NATIVE		/* MT25208 with extended features */
-};
-
 enum {
 	MTHCA_FLAG_DDR_HIDDEN = 1 << 1,
 	MTHCA_FLAG_SRQ        = 1 << 2,
 	MTHCA_FLAG_MSI        = 1 << 3,
 	MTHCA_FLAG_MSI_X      = 1 << 4,
-	MTHCA_FLAG_NO_LAM     = 1 << 5
+	MTHCA_FLAG_NO_LAM     = 1 << 5,
+	MTHCA_FLAG_FMR        = 1 << 6,
+	MTHCA_FLAG_MEMFREE    = 1 << 7,
+	MTHCA_FLAG_PCIE       = 1 << 8
 };
 
 enum {
-	MTHCA_KAR_PAGE  = 1,
 	MTHCA_MAX_PORTS = 2
 };
 
@@ -89,6 +84,19 @@ enum {
 	MTHCA_NUM_EQ
 };
 
+enum {
+	MTHCA_OPCODE_NOP            = 0x00,
+	MTHCA_OPCODE_RDMA_WRITE     = 0x08,
+	MTHCA_OPCODE_RDMA_WRITE_IMM = 0x09,
+	MTHCA_OPCODE_SEND           = 0x0a,
+	MTHCA_OPCODE_SEND_IMM       = 0x0b,
+	MTHCA_OPCODE_RDMA_READ      = 0x10,
+	MTHCA_OPCODE_ATOMIC_CS      = 0x11,
+	MTHCA_OPCODE_ATOMIC_FA      = 0x12,
+	MTHCA_OPCODE_BIND_MW        = 0x18,
+	MTHCA_OPCODE_INVALID        = 0xff
+};
+
 struct mthca_cmd {
 	int                       use_events;
 	struct semaphore          hcr_sem;
@@ -108,6 +116,7 @@ struct mthca_limits {
 	int      gid_table_len;
 	int      pkey_table_len;
 	int      local_ca_ack_delay;
+	int      num_uars;
 	int      max_sg;
 	int      num_qps;
 	int      reserved_qps;
@@ -121,7 +130,7 @@ struct mthca_limits {
 	int      reserved_eqs;
 	int      num_mpts;
 	int      num_mtt_segs;
-	int      mtt_seg_size;
+	int      fmr_reserved_mtts;
 	int      reserved_mtts;
 	int      reserved_mrws;
 	int      reserved_uars;
@@ -148,23 +157,42 @@ struct mthca_array {
 	} *page_list;
 };
 
+struct mthca_uar_table {
+	struct mthca_alloc alloc;
+	u64                uarc_base;
+	int                uarc_size;
+};
+
 struct mthca_pd_table {
 	struct mthca_alloc alloc;
 };
 
+struct mthca_buddy {
+	unsigned long **bits;
+	int             max_order;
+	spinlock_t      lock;
+};
+
 struct mthca_mr_table {
 	struct mthca_alloc      mpt_alloc;
-	int                     max_mtt_order;
-	unsigned long         **mtt_buddy;
+	struct mthca_buddy      mtt_buddy;
+	struct mthca_buddy     *fmr_mtt_buddy;
 	u64                     mtt_base;
+	u64                     mpt_base;
 	struct mthca_icm_table *mtt_table;
 	struct mthca_icm_table *mpt_table;
+	struct {
+		void __iomem   *mpt_base;
+		void __iomem   *mtt_base;
+		struct mthca_buddy mtt_buddy;
+	} tavor_fmr;
 };
 
 struct mthca_eq_table {
 	struct mthca_alloc alloc;
 	void __iomem      *clr_int;
 	u32                clr_mask;
+	u32                arm_mask;
 	struct mthca_eq    eq[MTHCA_NUM_EQ];
 	u64                icm_virt;
 	struct page       *icm_page;
@@ -189,6 +217,7 @@ struct mthca_qp_table {
 	struct mthca_array     	qp;
 	struct mthca_icm_table *qp_table;
 	struct mthca_icm_table *eqp_table;
+	struct mthca_icm_table *rdb_table;
 };
 
 struct mthca_av_table {
@@ -200,8 +229,9 @@ struct mthca_av_table {
 };
 
 struct mthca_mcg_table {
-	struct semaphore   sem;
-	struct mthca_alloc alloc;
+	struct semaphore   	sem;
+	struct mthca_alloc 	alloc;
+	struct mthca_icm_table *table;
 };
 
 struct mthca_dev {
@@ -210,6 +240,7 @@ struct mthca_dev {
 
 	int          	 hca_type;
 	unsigned long	 mthca_flags;
+	unsigned long    device_cap_flags;
 
 	u32              rev_id;
 
@@ -237,13 +268,22 @@ struct mthca_dev {
 	struct semaphore cap_mask_mutex;
 
 	void __iomem    *hcr;
-	void __iomem    *ecr_base;
-	void __iomem    *clr_base;
 	void __iomem    *kar;
+	void __iomem    *clr_base;
+	union {
+		struct {
+			void __iomem *ecr_base;
+		} tavor;
+		struct {
+			void __iomem *eq_arm;
+			void __iomem *eq_set_ci_base;
+		} arbel;
+	} eq_regs;
 
 	struct mthca_cmd    cmd;
 	struct mthca_limits limits;
 
+	struct mthca_uar_table uar_table;
 	struct mthca_pd_table  pd_table;
 	struct mthca_mr_table  mr_table;
 	struct mthca_eq_table  eq_table;
@@ -252,8 +292,10 @@ struct mthca_dev {
 	struct mthca_av_table  av_table;
 	struct mthca_mcg_table mcg_table;
 
-	struct mthca_pd       driver_pd;
-	struct mthca_mr       driver_mr;
+	struct mthca_uar       driver_uar;
+	struct mthca_db_table *db_tab;
+	struct mthca_pd        driver_pd;
+	struct mthca_mr        driver_mr;
 
 	struct ib_mad_agent  *send_agent[MTHCA_MAX_PORTS][2];
 	struct ib_ah         *sm_ah[MTHCA_MAX_PORTS];
@@ -310,6 +352,7 @@ void mthca_array_clear(struct mthca_array *array, int index);
 int mthca_array_init(struct mthca_array *array, int nent);
 void mthca_array_cleanup(struct mthca_array *array, int nent);
 
+int mthca_init_uar_table(struct mthca_dev *dev);
 int mthca_init_pd_table(struct mthca_dev *dev);
 int mthca_init_mr_table(struct mthca_dev *dev);
 int mthca_init_eq_table(struct mthca_dev *dev);
@@ -318,6 +361,7 @@ int mthca_init_qp_table(struct mthca_dev *dev);
 int mthca_init_av_table(struct mthca_dev *dev);
 int mthca_init_mcg_table(struct mthca_dev *dev);
 
+void mthca_cleanup_uar_table(struct mthca_dev *dev);
 void mthca_cleanup_pd_table(struct mthca_dev *dev);
 void mthca_cleanup_mr_table(struct mthca_dev *dev);
 void mthca_cleanup_eq_table(struct mthca_dev *dev);
@@ -329,6 +373,9 @@ void mthca_cleanup_mcg_table(struct mthca_dev *dev);
 int mthca_register_device(struct mthca_dev *dev);
 void mthca_unregister_device(struct mthca_dev *dev);
 
+int mthca_uar_alloc(struct mthca_dev *dev, struct mthca_uar *uar);
+void mthca_uar_free(struct mthca_dev *dev, struct mthca_uar *uar);
+
 int mthca_pd_alloc(struct mthca_dev *dev, struct mthca_pd *pd);
 void mthca_pd_free(struct mthca_dev *dev, struct mthca_pd *pd);
 
@@ -338,15 +385,25 @@ int mthca_mr_alloc_phys(struct mthca_dev *dev, u32 pd,
 			u64 *buffer_list, int buffer_size_shift,
 			int list_len, u64 iova, u64 total_size,
 			u32 access, struct mthca_mr *mr);
-void mthca_free_mr(struct mthca_dev *dev, struct mthca_mr *mr);
+void mthca_free_mr(struct mthca_dev *dev,  struct mthca_mr *mr);
+
+int mthca_fmr_alloc(struct mthca_dev *dev, u32 pd,
+		    u32 access, struct mthca_fmr *fmr);
+int mthca_tavor_map_phys_fmr(struct ib_fmr *ibfmr, u64 *page_list,
+			     int list_len, u64 iova);
+void mthca_tavor_fmr_unmap(struct mthca_dev *dev, struct mthca_fmr *fmr);
+int mthca_arbel_map_phys_fmr(struct ib_fmr *ibfmr, u64 *page_list,
+			     int list_len, u64 iova);
+void mthca_arbel_fmr_unmap(struct mthca_dev *dev, struct mthca_fmr *fmr);
+int mthca_free_fmr(struct mthca_dev *dev,  struct mthca_fmr *fmr);
 
 int mthca_map_eq_icm(struct mthca_dev *dev, u64 icm_virt);
 void mthca_unmap_eq_icm(struct mthca_dev *dev);
 
 int mthca_poll_cq(struct ib_cq *ibcq, int num_entries,
 		  struct ib_wc *entry);
-void mthca_arm_cq(struct mthca_dev *dev, struct mthca_cq *cq,
-		  int solicited);
+int mthca_tavor_arm_cq(struct ib_cq *cq, enum ib_cq_notify notify);
+int mthca_arbel_arm_cq(struct ib_cq *cq, enum ib_cq_notify notify);
 int mthca_init_cq(struct mthca_dev *dev, int nent,
 		  struct mthca_cq *cq);
 void mthca_free_cq(struct mthca_dev *dev,
@@ -357,11 +414,15 @@ void mthca_cq_clean(struct mthca_dev *dev, u32 cqn, u32 qpn);
 void mthca_qp_event(struct mthca_dev *dev, u32 qpn,
 		    enum ib_event_type event_type);
 int mthca_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr, int attr_mask);
-int mthca_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
-		    struct ib_send_wr **bad_wr);
-int mthca_post_receive(struct ib_qp *ibqp, struct ib_recv_wr *wr,
-		       struct ib_recv_wr **bad_wr);
-int mthca_free_err_wqe(struct mthca_qp *qp, int is_send,
+int mthca_tavor_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
+			  struct ib_send_wr **bad_wr);
+int mthca_tavor_post_receive(struct ib_qp *ibqp, struct ib_recv_wr *wr,
+			     struct ib_recv_wr **bad_wr);
+int mthca_arbel_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
+			  struct ib_send_wr **bad_wr);
+int mthca_arbel_post_receive(struct ib_qp *ibqp, struct ib_recv_wr *wr,
+			     struct ib_recv_wr **bad_wr);
+int mthca_free_err_wqe(struct mthca_dev *dev, struct mthca_qp *qp, int is_send,
 		       int index, int *dbd, u32 *new_wqe);
 int mthca_alloc_qp(struct mthca_dev *dev,
 		   struct mthca_pd *pd,
@@ -369,14 +430,12 @@ int mthca_alloc_qp(struct mthca_dev *dev,
 		   struct mthca_cq *recv_cq,
 		   enum ib_qp_type type,
 		   enum ib_sig_type send_policy,
-		   enum ib_sig_type recv_policy,
 		   struct mthca_qp *qp);
 int mthca_alloc_sqp(struct mthca_dev *dev,
 		    struct mthca_pd *pd,
 		    struct mthca_cq *send_cq,
 		    struct mthca_cq *recv_cq,
 		    enum ib_sig_type send_policy,
-		    enum ib_sig_type recv_policy,
 		    int qpn,
 		    int port,
 		    struct mthca_sqp *sqp);
@@ -405,6 +464,11 @@ void mthca_free_agents(struct mthca_dev *dev);
 static inline struct mthca_dev *to_mdev(struct ib_device *ibdev)
 {
 	return container_of(ibdev, struct mthca_dev, ib_dev);
+}
+
+static inline int mthca_is_memfree(struct mthca_dev *dev)
+{
+	return dev->mthca_flags & MTHCA_FLAG_MEMFREE;
 }
 
 #endif /* MTHCA_DEV_H */

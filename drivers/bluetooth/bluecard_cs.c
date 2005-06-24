@@ -35,6 +35,7 @@
 #include <linux/ioport.h>
 #include <linux/spinlock.h>
 #include <linux/moduleparam.h>
+#include <linux/wait.h>
 
 #include <linux/skbuff.h>
 #include <asm/io.h>
@@ -289,8 +290,9 @@ static void bluecard_write_wakeup(bluecard_info_t *info)
 		clear_bit(ready_bit, &(info->tx_state));
 
 		if (skb->pkt_type & 0x80) {
+			DECLARE_WAIT_QUEUE_HEAD(wq);
+			DEFINE_WAIT(wait);
 
-			wait_queue_head_t wait;
 			unsigned char baud_reg;
 
 			switch (skb->pkt_type) {
@@ -311,8 +313,9 @@ static void bluecard_write_wakeup(bluecard_info_t *info)
 			}
 
 			/* Wait until the command reaches the baseband */
-			init_waitqueue_head(&wait);
-			interruptible_sleep_on_timeout(&wait, HZ / 10);
+			prepare_to_wait(&wq, &wait, TASK_INTERRUPTIBLE);
+			schedule_timeout(HZ/10);
+			finish_wait(&wq, &wait);
 
 			/* Set baud on baseband */
 			info->ctrl_reg &= ~0x03;
@@ -324,8 +327,9 @@ static void bluecard_write_wakeup(bluecard_info_t *info)
 			outb(info->ctrl_reg, iobase + REG_CONTROL);
 
 			/* Wait before the next HCI packet can be send */
-			interruptible_sleep_on_timeout(&wait, HZ);
-
+			prepare_to_wait(&wq, &wait, TASK_INTERRUPTIBLE);
+			schedule_timeout(HZ);
+			finish_wait(&wq, &wait);
 		}
 
 		if (len == skb->len) {

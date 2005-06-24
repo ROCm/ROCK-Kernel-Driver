@@ -30,6 +30,8 @@
 
 #define VIPER_INT_WORD  0xFFFBF088      /* addr of viper interrupt word */
 
+static struct gsc_asic asp;
+
 static void asp_choose_irq(struct parisc_device *dev, void *ctrl)
 {
 	int irq;
@@ -51,6 +53,14 @@ static void asp_choose_irq(struct parisc_device *dev, void *ctrl)
 	}
 
 	gsc_asic_assign_irq(ctrl, irq, &dev->irq);
+
+	switch (dev->id.sversion) {
+	case 0x73:	irq =  2; break; /* i8042 High-priority */
+	case 0x76:	irq =  0; break; /* EISA BA */
+	default:	return;		 /* Other */
+	}
+
+	gsc_asic_assign_irq(ctrl, irq, &dev->aux_irq);
 }
 
 /* There are two register ranges we're interested in.  Interrupt /
@@ -64,20 +74,15 @@ static void asp_choose_irq(struct parisc_device *dev, void *ctrl)
 int __init
 asp_init_chip(struct parisc_device *dev)
 {
-	struct gsc_asic *asp;
 	struct gsc_irq gsc_irq;
 	int ret;
 
-	asp = kmalloc(sizeof(*asp), GFP_KERNEL);
-	if(!asp)
-		return -ENOMEM;
-
-	asp->version = gsc_readb(dev->hpa + ASP_VER_OFFSET) & 0xf;
-	asp->name = (asp->version == 1) ? "Asp" : "Cutoff";
-	asp->hpa = ASP_INTERRUPT_ADDR;
+	asp.version = gsc_readb(dev->hpa + ASP_VER_OFFSET) & 0xf;
+	asp.name = (asp.version == 1) ? "Asp" : "Cutoff";
+	asp.hpa = ASP_INTERRUPT_ADDR;
 
 	printk(KERN_INFO "%s version %d at 0x%lx found.\n", 
-		asp->name, asp->version, dev->hpa);
+		asp.name, asp.version, dev->hpa);
 
 	/* the IRQ ASP should use */
 	ret = -EBUSY;
@@ -87,9 +92,9 @@ asp_init_chip(struct parisc_device *dev)
 		goto out;
 	}
 
-	asp->eim = ((u32) gsc_irq.txn_addr) | gsc_irq.txn_data;
+	asp.eim = ((u32) gsc_irq.txn_addr) | gsc_irq.txn_data;
 
-	ret = request_irq(gsc_irq.irq, gsc_asic_intr, 0, "asp", asp);
+	ret = request_irq(gsc_irq.irq, gsc_asic_intr, 0, "asp", &asp);
 	if (ret < 0)
 		goto out;
 
@@ -97,13 +102,13 @@ asp_init_chip(struct parisc_device *dev)
 	gsc_writel((1 << (31 - ASP_GSC_IRQ)),VIPER_INT_WORD);
 
 	/* Done init'ing, register this driver */
-	ret = gsc_common_setup(dev, asp);
+	ret = gsc_common_setup(dev, &asp);
 	if (ret)
 		goto out;
 
-	gsc_fixup_irqs(dev, asp, asp_choose_irq);
+	gsc_fixup_irqs(dev, &asp, asp_choose_irq);
 	/* Mongoose is a sibling of Asp, not a child... */
-	gsc_fixup_irqs(parisc_parent(dev), asp, asp_choose_irq);
+	gsc_fixup_irqs(parisc_parent(dev), &asp, asp_choose_irq);
 
 	/* initialize the chassis LEDs */ 
 #ifdef CONFIG_CHASSIS_LCD_LED	
@@ -111,10 +116,7 @@ asp_init_chip(struct parisc_device *dev)
 		    ASP_LED_ADDR);
 #endif
 
-	return 0;
-
-out:
-	kfree(asp);
+ out:
 	return ret;
 }
 

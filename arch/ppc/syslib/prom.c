@@ -308,7 +308,7 @@ map_interrupt(unsigned int **irq, struct device_node **ictrler,
 	struct device_node *p, *ipar;
 	unsigned int *imap, *imask, *ip;
 	int i, imaplen, match;
-	int newintrc, newaddrc;
+	int newintrc = 1, newaddrc = 1;
 	unsigned int *reg;
 	int naddrc;
 

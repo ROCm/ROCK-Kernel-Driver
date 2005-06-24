@@ -1725,235 +1725,229 @@ static struct ac97_pcm ac97_pcm_defs[] __devinitdata = {
 
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
-		.subvendor = 0x0e11,
-		.subdevice = 0x008a,
+		.vendor = 0x0e11,
+		.device = 0x008a,
 		.name = "Compaq Evo W4000",	/* AD1885 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x0e11,
-		.subdevice = 0x00b8,
+		.vendor = 0x0e11,
+		.device = 0x00b8,
 		.name = "Compaq Evo D510C",
 		.type = AC97_TUNE_HP_ONLY
 	},
         {
-		.subvendor = 0x0e11,
-		.subdevice = 0x0860,
+		.vendor = 0x0e11,
+		.device = 0x0860,
 		.name = "HP/Compaq nx7010",
 		.type = AC97_TUNE_MUTE_LED
         },
 	{
-		.subvendor = 0x1014,
-		.subdevice = 0x1f00,
+		.vendor = 0x1014,
+		.device = 0x1f00,
 		.name = "MS-9128",
 		.type = AC97_TUNE_ALC_JACK
 	},
 	{
-		.subvendor = 0x1028,
-		.subdevice = 0x00d8,
+		.vendor = 0x1028,
+		.device = 0x00d8,
 		.name = "Dell Precision 530",	/* AD1885 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x1028,
-		.subdevice = 0x010d,
+		.vendor = 0x1028,
+		.device = 0x010d,
 		.name = "Dell",	/* which model?  AD1885 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x1028,
-		.subdevice = 0x0126,
+		.vendor = 0x1028,
+		.device = 0x0126,
 		.name = "Dell Optiplex GX260",	/* AD1981A */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x1028,
-		.subdevice = 0x012c,
+		.vendor = 0x1028,
+		.device = 0x012c,
 		.name = "Dell Precision 650",	/* AD1981A */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x1028,
-		.subdevice = 0x012d,
+		.vendor = 0x1028,
+		.device = 0x012d,
 		.name = "Dell Precision 450",	/* AD1981B*/
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x1028,
-		.subdevice = 0x0147,
+		.vendor = 0x1028,
+		.device = 0x0147,
 		.name = "Dell",	/* which model?  AD1981B*/
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x1028,
-		.subdevice = 0x0163,
+		.vendor = 0x1028,
+		.device = 0x0163,
 		.name = "Dell Unknown",	/* STAC9750/51 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x103c,
-		.subdevice = 0x006d,
+		.vendor = 0x103c,
+		.device = 0x006d,
 		.name = "HP zv5000",
 		.type = AC97_TUNE_MUTE_LED	/*AD1981B*/
 	},
 	{	/* FIXME: which codec? */
-		.subvendor = 0x103c,
-		.subdevice = 0x00c3,
+		.vendor = 0x103c,
+		.device = 0x00c3,
 		.name = "HP xw6000",
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x103c,
-		.subdevice = 0x088c,
+		.vendor = 0x103c,
+		.device = 0x088c,
 		.name = "HP nc8000",
 		.type = AC97_TUNE_MUTE_LED
 	},
 	{
-		.subvendor = 0x103c,
-		.subdevice = 0x0890,
+		.vendor = 0x103c,
+		.device = 0x0890,
 		.name = "HP nc6000",
 		.type = AC97_TUNE_MUTE_LED
 	},
 	{
-		.subvendor = 0x103c,
-		.subdevice = 0x129d,
+		.vendor = 0x103c,
+		.device = 0x129d,
 		.name = "HP xw8000",
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x103c,
-		.subdevice = 0x12f1,
+		.vendor = 0x103c,
+		.device = 0x12f1,
 		.name = "HP xw8200",	/* AD1981B*/
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x103c,
-		.subdevice = 0x12f2,
+		.vendor = 0x103c,
+		.device = 0x12f2,
 		.name = "HP xw6200",
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x103c,
-		.subdevice = 0x3008,
+		.vendor = 0x103c,
+		.device = 0x3008,
 		.name = "HP xw4200",	/* AD1981B*/
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x104d,
-		.subdevice = 0x8197,
+		.vendor = 0x104d,
+		.device = 0x8197,
 		.name = "Sony S1XP",
 		.type = AC97_TUNE_INV_EAPD
 	},
  	{
-		.subvendor = 0x1043,
-		.subdevice = 0x80f3,
+		.vendor = 0x1043,
+		.device = 0x80f3,
 		.name = "ASUS ICH5/AD1985",
 		.type = AC97_TUNE_AD_SHARING
 	},
 	{
-		.subvendor = 0x10cf,
-		.subdevice = 0x11c3,
+		.vendor = 0x10cf,
+		.device = 0x11c3,
 		.name = "Fujitsu-Siemens E4010",
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x10cf,
-		.subdevice = 0x1225,
-		.name = "Fujitsu-Siemens T3010",
-		.type = AC97_TUNE_HP_ONLY
-	},
-	{
-		.subvendor = 0x10cf,
-		.subdevice = 0x1253,
+		.vendor = 0x10cf,
+		.device = 0x1253,
 		.name = "Fujitsu S6210",	/* STAC9750/51 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x10f1,
-		.subdevice = 0x2665,
+		.vendor = 0x10f1,
+		.device = 0x2665,
 		.name = "Fujitsu-Siemens Celsius",	/* AD1981? */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x10f1,
-		.subdevice = 0x2885,
+		.vendor = 0x10f1,
+		.device = 0x2885,
 		.name = "AMD64 Mobo",	/* ALC650 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x110a,
-		.subdevice = 0x0056,
+		.vendor = 0x110a,
+		.device = 0x0056,
 		.name = "Fujitsu-Siemens Scenic",	/* AD1981? */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x11d4,
-		.subdevice = 0x5375,
+		.vendor = 0x11d4,
+		.device = 0x5375,
 		.name = "ADI AD1985 (discrete)",
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x1462,
-		.subdevice = 0x5470,
+		.vendor = 0x1462,
+		.device = 0x5470,
 		.name = "MSI P4 ATX 645 Ultra",
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x1734,
-		.subdevice = 0x0088,
+		.vendor = 0x1734,
+		.device = 0x0088,
 		.name = "Fujitsu-Siemens D1522",	/* AD1981 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x8086,
-		.subdevice = 0x2000,
+		.vendor = 0x8086,
+		.device = 0x2000,
 		.mask = 0xfff0,
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_AD_SHARING
 	},
 	{
-		.subvendor = 0x8086,
-		.subdevice = 0x4000,
+		.vendor = 0x8086,
+		.device = 0x4000,
 		.mask = 0xfff0,
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_AD_SHARING
 	},
 	{
-		.subvendor = 0x8086,
-		.subdevice = 0x4856,
+		.vendor = 0x8086,
+		.device = 0x4856,
 		.name = "Intel D845WN (82801BA)",
 		.type = AC97_TUNE_SWAP_HP
 	},
 	{
-		.subvendor = 0x8086,
-		.subdevice = 0x4d44,
+		.vendor = 0x8086,
+		.device = 0x4d44,
 		.name = "Intel D850EMV2",	/* AD1885 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x8086,
-		.subdevice = 0x4d56,
+		.vendor = 0x8086,
+		.device = 0x4d56,
 		.name = "Intel ICH/AD1885",
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
-		.subvendor = 0x8086,
-		.subdevice = 0x6000,
+		.vendor = 0x8086,
+		.device = 0x6000,
 		.mask = 0xfff0,
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_AD_SHARING
 	},
 	{
-		.subvendor = 0x8086,
-		.subdevice = 0xe000,
+		.vendor = 0x8086,
+		.device = 0xe000,
 		.mask = 0xfff0,
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_AD_SHARING
 	},
 #if 0 /* FIXME: this seems wrong on most boards */
 	{
-		.subvendor = 0x8086,
-		.subdevice = 0xa000,
+		.vendor = 0x8086,
+		.device = 0xa000,
 		.mask = 0xfff0,
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_HP_ONLY
@@ -2855,7 +2849,7 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_intel8x0_init(void)
 {
-	return pci_register_driver(&driver);
+	return pci_module_init(&driver);
 }
 
 static void __exit alsa_card_intel8x0_exit(void)

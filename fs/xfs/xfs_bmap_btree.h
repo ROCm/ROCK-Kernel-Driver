@@ -505,7 +505,7 @@ xfs_exntst_t
 xfs_bmbt_get_state(
 	xfs_bmbt_rec_t	*r);
 
-#if ARCH_CONVERT != ARCH_NOCONVERT
+#if __BYTE_ORDER != __BIG_ENDIAN
 void
 xfs_bmbt_disk_get_all(
 	xfs_bmbt_rec_t	*r,
@@ -631,7 +631,7 @@ xfs_bmbt_set_state(
 	xfs_bmbt_rec_t	*r,
 	xfs_exntst_t	v);
 
-#if ARCH_CONVERT != ARCH_NOCONVERT
+#if __BYTE_ORDER != __BIG_ENDIAN
 void
 xfs_bmbt_disk_set_all(
 	xfs_bmbt_rec_t	*r,

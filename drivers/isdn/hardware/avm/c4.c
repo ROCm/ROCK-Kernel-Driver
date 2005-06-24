@@ -1288,7 +1288,7 @@ static int __init c4_init(void)
 	} else
 		strcpy(rev, "1.0");
 
-	err = pci_module_init(&c4_pci_driver);
+	err = pci_register_driver(&c4_pci_driver);
 	if (!err) {
 		strlcpy(capi_driver_c2.revision, rev, 32);
 		register_capi_driver(&capi_driver_c2);

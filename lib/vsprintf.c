@@ -580,7 +580,7 @@ EXPORT_SYMBOL(scnprintf);
  */
 int vsprintf(char *buf, const char *fmt, va_list args)
 {
-	return vsnprintf(buf, (~0U)>>1, fmt, args);
+	return vsnprintf(buf, INT_MAX, fmt, args);
 }
 
 EXPORT_SYMBOL(vsprintf);
@@ -601,7 +601,7 @@ int sprintf(char * buf, const char *fmt, ...)
 	int i;
 
 	va_start(args, fmt);
-	i=vsprintf(buf,fmt,args);
+	i=vsnprintf(buf, INT_MAX, fmt, args);
 	va_end(args);
 	return i;
 }

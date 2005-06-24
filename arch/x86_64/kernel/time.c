@@ -26,6 +26,10 @@
 #include <linux/sysdev.h>
 #include <linux/bcd.h>
 #include <linux/kallsyms.h>
+#include <linux/acpi.h>
+#ifdef CONFIG_ACPI
+#include <acpi/achware.h>	/* for PM timer frequency */
+#endif
 #include <asm/8253pit.h>
 #include <asm/pgtable.h>
 #include <asm/vsyscall.h>
@@ -46,7 +50,7 @@ EXPORT_SYMBOL(jiffies_64);
 #ifdef CONFIG_CPU_FREQ
 static void cpufreq_delayed_get(void);
 #endif
-
+extern void i8254_timer_resume(void);
 extern int using_apic_timer;
 
 DEFINE_SPINLOCK(rtc_lock);
@@ -58,7 +62,7 @@ static int notsc __initdata = 0;
 #undef HPET_HACK_ENABLE_DANGEROUS
 
 unsigned int cpu_khz;					/* TSC clocks / usec, not used here */
-unsigned long hpet_period;				/* fsecs / HPET clock */
+static unsigned long hpet_period;			/* fsecs / HPET clock */
 unsigned long hpet_tick;				/* HPET clocks / interrupt */
 unsigned long vxtime_hz = PIT_TICK_RATE;
 int report_lost_ticks;				/* command line option */
@@ -396,6 +400,10 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			(offset - vxtime.last)*(NSEC_PER_SEC/HZ) / hpet_tick;
 
 		vxtime.last = offset;
+#ifdef CONFIG_X86_PM_TIMER
+	} else if (vxtime.mode == VXTIME_PMTMR) {
+		lost = pmtimer_mark_offset();
+#endif
 	} else {
 		offset = (((tsc - vxtime.last_tsc) *
 			   vxtime.tsc_quot) >> 32) - (USEC_PER_SEC / HZ);
@@ -551,11 +559,10 @@ unsigned long get_cmos_time(void)
 	    BCD_TO_BIN(year);
 
 /*
- * This will work up to Dec 31, 2069.
+ * x86-64 systems only exists since 2002.
+ * This will work up to Dec 31, 2100
  */
-
-	if ((year += 1900) < 1970)
-		year += 100;
+	year += 2000;
 
 	return mktime(year, mon, day, hour, min, sec);
 }
@@ -615,6 +622,9 @@ static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
         struct cpufreq_freqs *freq = data;
 	unsigned long *lpj, dummy;
 
+	if (cpu_has(&cpu_data[freq->cpu], X86_FEATURE_CONSTANT_TSC))
+		return 0;
+
 	lpj = &dummy;
 	if (!(freq->flags & CPUFREQ_CONST_LOOPS))
 #ifdef CONFIG_SMP
@@ -622,8 +632,6 @@ static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 #else
 	lpj = &boot_cpu_data.loops_per_jiffy;
 #endif
-
-
 
 	if (!ref_freq) {
 		ref_freq = freq->old;
@@ -898,6 +906,13 @@ void __init time_init(void)
 			hpet_period;
 		cpu_khz = hpet_calibrate_tsc();
 		timename = "HPET";
+#ifdef CONFIG_X86_PM_TIMER
+	} else if (pmtmr_ioport) {
+		vxtime_hz = PM_TIMER_FREQUENCY;
+		timename = "PM";
+		pit_init();
+		cpu_khz = pit_calibrate_tsc();
+#endif
 	} else {
 		pit_init();
 		cpu_khz = pit_calibrate_tsc();
@@ -916,35 +931,57 @@ void __init time_init(void)
 	setup_irq(0, &irq0);
 
 	set_cyc2ns_scale(cpu_khz / 1000);
+
+#ifndef CONFIG_SMP
+	time_init_gtod();
+#endif
 }
 
-void __init time_init_smp(void)
+/*
+ * Make an educated guess if the TSC is trustworthy and synchronized
+ * over all CPUs.
+ */
+static __init int unsynchronized_tsc(void)
+{
+#ifdef CONFIG_SMP
+	if (oem_force_hpet_timer())
+		return 1;
+ 	/* Intel systems are normally all synchronized. Exceptions
+ 	   are handled in the OEM check above. */
+ 	if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
+ 		return 0;
+ 	/* All in a single socket - should be synchronized */
+ 	if (cpus_weight(cpu_core_map[0]) == num_online_cpus())
+ 		return 0;
+#endif
+ 	/* Assume multi socket systems are not synchronized */
+ 	return num_online_cpus() > 1;
+}
+
+/*
+ * Decide after all CPUs are booted what mode gettimeofday should use.
+ */
+void __init time_init_gtod(void)
 {
 	char *timetype;
 
-	/*
-	 * AMD systems with more than one CPU don't have fully synchronized
-	 * TSCs. Always use HPET gettimeofday for these, although it is slower.
-	 * Intel SMP systems usually have synchronized TSCs, so use always
-	 * the TSC.
-	 *
-	 * Exceptions:
-	 * IBM Summit2 checked by oem_force_hpet_timer().
- 	 * AMD dual core may also not need HPET. Check me.
-	 *
-	 * Can be turned off with "notsc".
-	 */
-	if (num_online_cpus() > 1 &&
-	    boot_cpu_data.x86_vendor == X86_VENDOR_AMD)
-		notsc = 1;
-	/* Some systems will want to disable TSC and use HPET. */
-	if (oem_force_hpet_timer())
+	if (unsynchronized_tsc())
 		notsc = 1;
 	if (vxtime.hpet_address && notsc) {
 		timetype = "HPET";
 		vxtime.last = hpet_readl(HPET_T0_CMP) - hpet_tick;
 		vxtime.mode = VXTIME_HPET;
 		do_gettimeoffset = do_gettimeoffset_hpet;
+#ifdef CONFIG_X86_PM_TIMER
+	/* Using PM for gettimeofday is quite slow, but we have no other
+	   choice because the TSC is too unreliable on some systems. */
+	} else if (pmtmr_ioport && !vxtime.hpet_address && notsc) {
+		timetype = "PM";
+		do_gettimeoffset = do_gettimeoffset_pm;
+		vxtime.mode = VXTIME_PMTMR;
+		sysctl_vsyscall = 0;
+		printk(KERN_INFO "Disabling vsyscall due to use of PM timer\n");
+#endif
 	} else {
 		timetype = vxtime.hpet_address ? "HPET/TSC" : "PIT/TSC";
 		vxtime.mode = VXTIME_TSC;
@@ -958,7 +995,7 @@ __setup("report_lost_ticks", time_setup);
 static long clock_cmos_diff;
 static unsigned long sleep_start;
 
-static int timer_suspend(struct sys_device *dev, u32 state)
+static int timer_suspend(struct sys_device *dev, pm_message_t state)
 {
 	/*
 	 * Estimate time zone so that set_time can update the clock
@@ -980,6 +1017,8 @@ static int timer_resume(struct sys_device *dev)
 
 	if (vxtime.hpet_address)
 		hpet_reenable();
+	else
+		i8254_timer_resume();
 
 	sec = ctime + clock_cmos_diff;
 	write_seqlock_irqsave(&xtime_lock,flags);

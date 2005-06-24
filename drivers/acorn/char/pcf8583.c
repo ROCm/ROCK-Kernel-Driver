@@ -51,7 +51,6 @@ pcf8583_attach(struct i2c_adapter *adap, int addr, int kind)
 		return -ENOMEM;
 
 	memset(c, 0, sizeof(*c));
-	c->id		= pcf8583_driver.id;
 	c->addr		= addr;
 	c->adapter	= adap;
 	c->driver	= &pcf8583_driver;

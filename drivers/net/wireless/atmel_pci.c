@@ -25,6 +25,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/netdevice.h>
+#include "atmel.h"
 
 MODULE_AUTHOR("Simon Kelley");
 MODULE_DESCRIPTION("Support for Atmel at76c50x 802.11 wireless ethernet cards.");
@@ -40,9 +41,6 @@ MODULE_DEVICE_TABLE(pci, card_ids);
 
 static int atmel_pci_probe(struct pci_dev *, const struct pci_device_id *);
 static void atmel_pci_remove(struct pci_dev *);
-struct net_device *init_atmel_card(int, int, char *, struct device *, 
-				   int (*present_func)(void *), void * );
-void stop_atmel_card( struct net_device *, int );
 
 static struct pci_driver atmel_driver = {
 	.name     = "atmel",
@@ -63,7 +61,7 @@ static int __devinit atmel_pci_probe(struct pci_dev *pdev,
 	pci_set_master(pdev);
 	
 	dev = init_atmel_card(pdev->irq, pdev->resource[1].start, 
-			      "atmel_at76c506%s.bin",
+			      ATMEL_FW_TYPE_506,
 			      &pdev->dev, NULL, NULL);
 	if (!dev)
 		return -ENODEV;

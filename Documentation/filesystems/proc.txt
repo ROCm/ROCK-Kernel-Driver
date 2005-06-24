@@ -909,16 +909,6 @@ nr_free_inodes
 Represents the  number of free inodes. Ie. The number of inuse inodes is
 (nr_inodes - nr_free_inodes).
 
-super-nr and super-max
-----------------------
-
-Again, super  block structures are allocated by the kernel, but not freed. The
-file super-max  contains  the  maximum  number  of super block handlers, where
-super-nr shows the number of currently allocated ones.
-
-Every mounted file system needs a super block, so if you plan to mount lots of
-file systems, you may want to increase these numbers.
-
 aio-nr and aio-max-nr
 ---------------------
 
@@ -1754,18 +1744,25 @@ settings contain additional options to set garbage collection parameters.
 
 In the interface directories you'll find the following entries:
 
-base_reachable_time
--------------------
+base_reachable_time, base_reachable_time_ms
+-------------------------------------------
 
 A base  value  used for computing the random reachable time value as specified
 in RFC2461.
 
-retrans_time
-------------
+Expression of base_reachable_time, which is deprecated, is in seconds.
+Expression of base_reachable_time_ms is in milliseconds.
 
-The time,  expressed  in  jiffies  (1/100 sec), between retransmitted Neighbor
-Solicitation messages.  Used  for  address  resolution  and  to determine if a
-neighbor is unreachable.
+retrans_time, retrans_time_ms
+-----------------------------
+
+The time between retransmitted Neighbor Solicitation messages.
+Used for address resolution and to determine if a neighbor is
+unreachable.
+
+Expression of retrans_time, which is deprecated, is in 1/100 seconds (for
+IPv4) or in jiffies (for IPv6).
+Expression of retrans_time_ms is in milliseconds.
 
 unres_qlen
 ----------

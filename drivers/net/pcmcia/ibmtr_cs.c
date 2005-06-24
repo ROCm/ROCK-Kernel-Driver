@@ -343,7 +343,8 @@ static void ibmtr_config(dev_link_t *link)
     CS_CHECK(MapMemPage, pcmcia_map_mem_page(info->sram_win_handle, &mem));
 
     ti->sram_base = mem.CardOffset >> 12;
-    ti->sram_virt = (u_long)ioremap(req.Base, req.Size);
+    ti->sram_virt = ioremap(req.Base, req.Size);
+    ti->sram_phys = req.Base;
 
     CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
 
@@ -401,7 +402,7 @@ static void ibmtr_release(dev_link_t *link)
     pcmcia_release_irq(link->handle, &link->irq);
     if (link->win) {
 	struct tok_info *ti = netdev_priv(dev);
-	iounmap((void *)ti->mmio);
+	iounmap(ti->mmio);
 	pcmcia_release_window(link->win);
 	pcmcia_release_window(info->sram_win_handle);
     }
@@ -433,7 +434,7 @@ static int ibmtr_event(event_t event, int priority,
         if (link->state & DEV_CONFIG) {
 	    /* set flag to bypass normal interrupt code */
 	    struct tok_info *priv = netdev_priv(dev);
-	    priv->sram_virt |= 1;
+	    priv->sram_phys |= 1;
 	    netif_device_detach(dev);
         }
         break;

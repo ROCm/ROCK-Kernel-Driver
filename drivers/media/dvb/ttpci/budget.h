@@ -29,47 +29,45 @@ struct budget_info {
 /* place to store all the necessary device information */
 struct budget {
 
-        /* devices */
-        struct dvb_device       dvb_dev;
-        struct dvb_net               dvb_net;
+	/* devices */
+	struct dvb_device dvb_dev;
+	struct dvb_net dvb_net;
 
-        struct saa7146_dev	*dev;
+	struct saa7146_dev *dev;
 
-	struct i2c_adapter	i2c_adap;
-	struct budget_info	*card;
+	struct i2c_adapter i2c_adap;
+	struct budget_info *card;
 
-	unsigned char		*grabbing;
-	struct saa7146_pgtable	pt;
+	unsigned char *grabbing;
+	struct saa7146_pgtable pt;
 
-	struct tasklet_struct   fidb_tasklet;
-	struct tasklet_struct   vpe_tasklet;
+	struct tasklet_struct fidb_tasklet;
+	struct tasklet_struct vpe_tasklet;
 
-        struct dmxdev                dmxdev;
-        struct dvb_demux	demux;
+	struct dmxdev dmxdev;
+	struct dvb_demux demux;
 
-        struct dmx_frontend          hw_frontend;
-        struct dmx_frontend          mem_frontend;
+	struct dmx_frontend hw_frontend;
+	struct dmx_frontend mem_frontend;
 
-        int                     fe_synced; 
-        struct semaphore        pid_mutex;
+	int fe_synced;
+	struct semaphore pid_mutex;
 
-	int                     ci_present;
-        int                     video_port;
+	int ci_present;
+	int video_port;
 
-        u8 tsf;
-        u32 ttbp;
-        int feeding;
+	u8 tsf;
+	u32 ttbp;
+	int feeding;
 
 	spinlock_t feedlock;
 
 	spinlock_t debilock;
 
-        struct dvb_adapter       *dvb_adapter;
+	struct dvb_adapter dvb_adapter;
 	struct dvb_frontend *dvb_frontend;
-	void			 *priv;
+	void *priv;
 };
-
-
 
 #define MAKE_BUDGET_INFO(x_var,x_name,x_type) \
 static struct budget_info x_var ## _info = { \
@@ -94,6 +92,9 @@ static struct saa7146_pci_extension_data x_var = { \
 #define BUDGET_KNC1S		   8
 #define BUDGET_KNC1C		   9
 #define BUDGET_KNC1T		   10
+#define BUDGET_KNC1SP		   11
+#define BUDGET_KNC1CP		   12
+#define BUDGET_KNC1TP		   13
 
 #define BUDGET_VIDEO_PORTA         0
 #define BUDGET_VIDEO_PORTB         1
@@ -101,9 +102,9 @@ static struct saa7146_pci_extension_data x_var = { \
 extern int ttpci_budget_init(struct budget *budget, struct saa7146_dev *dev,
 			     struct saa7146_pci_extension_data *info,
 			     struct module *owner);
-extern int ttpci_budget_deinit (struct budget *budget);
-extern void ttpci_budget_irq10_handler (struct saa7146_dev* dev, u32 *isr);
-extern void ttpci_budget_set_video_port(struct saa7146_dev* dev, int video_port);
+extern int ttpci_budget_deinit(struct budget *budget);
+extern void ttpci_budget_irq10_handler(struct saa7146_dev *dev, u32 * isr);
+extern void ttpci_budget_set_video_port(struct saa7146_dev *dev, int video_port);
 extern int ttpci_budget_debiread(struct budget *budget, u32 config, int addr, int count,
 				 int uselocks, int nobusyloop);
 extern int ttpci_budget_debiwrite(struct budget *budget, u32 config, int addr, int count, u32 value,

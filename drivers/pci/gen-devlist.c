@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_NAME_SIZE 89
+#define MAX_NAME_SIZE 200
 
 static void
 pq(FILE *f, const char *c, int len)

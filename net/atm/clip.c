@@ -58,6 +58,7 @@ static int start_timer = 1;
 
 static int to_atmarpd(enum atmarp_ctrl_type type,int itf,unsigned long ip)
 {
+	struct sock *sk;
 	struct atmarp_ctrl *ctrl;
 	struct sk_buff *skb;
 
@@ -70,8 +71,10 @@ static int to_atmarpd(enum atmarp_ctrl_type type,int itf,unsigned long ip)
 	ctrl->itf_num = itf;
 	ctrl->ip = ip;
 	atm_force_charge(atmarpd,skb->truesize);
-	skb_queue_tail(&atmarpd->sk->sk_receive_queue, skb);
-	atmarpd->sk->sk_data_ready(atmarpd->sk, skb->len);
+
+	sk = sk_atm(atmarpd);
+	skb_queue_tail(&sk->sk_receive_queue, skb);
+	sk->sk_data_ready(sk, skb->len);
 	return 0;
 }
 
@@ -434,7 +437,7 @@ static int clip_start_xmit(struct sk_buff *skb,struct net_device *dev)
 		memcpy(here,llc_oui,sizeof(llc_oui));
 		((u16 *) here)[3] = skb->protocol;
 	}
-	atomic_add(skb->truesize, &vcc->sk->sk_wmem_alloc);
+	atomic_add(skb->truesize, &sk_atm(vcc)->sk_wmem_alloc);
 	ATM_SKB(skb)->atm_options = vcc->atm_options;
 	entry->vccs->last_use = jiffies;
 	DPRINTK("atm_skb(%p)->vcc(%p)->dev(%p)\n",skb,vcc,vcc->dev);
@@ -493,7 +496,7 @@ static int clip_mkip(struct atm_vcc *vcc,int timeout)
 	vcc->push = clip_push;
 	vcc->pop = clip_pop;
 	skb_queue_head_init(&copy);
-	skb_migrate(&vcc->sk->sk_receive_queue, &copy);
+	skb_migrate(&sk_atm(vcc)->sk_receive_queue, &copy);
 	/* re-process everything received between connection setup and MKIP */
 	while ((skb = skb_dequeue(&copy)) != NULL)
 		if (!clip_devs) {
@@ -686,10 +689,10 @@ static void atmarpd_close(struct atm_vcc *vcc)
 	barrier();
 	unregister_inetaddr_notifier(&clip_inet_notifier);
 	unregister_netdevice_notifier(&clip_dev_notifier);
-	if (skb_peek(&vcc->sk->sk_receive_queue))
+	if (skb_peek(&sk_atm(vcc)->sk_receive_queue))
 		printk(KERN_ERR "atmarpd_close: closing with requests "
 		    "pending\n");
-	skb_queue_purge(&vcc->sk->sk_receive_queue);
+	skb_queue_purge(&sk_atm(vcc)->sk_receive_queue);
 	DPRINTK("(done)\n");
 	module_put(THIS_MODULE);
 }
@@ -723,7 +726,7 @@ static int atm_init_atmarp(struct atm_vcc *vcc)
 	set_bit(ATM_VF_READY,&vcc->flags);
 	    /* allow replies and avoid getting closed if signaling dies */
 	vcc->dev = &atmarpd_dev;
-	vcc_insert_socket(vcc->sk);
+	vcc_insert_socket(sk_atm(vcc));
 	vcc->push = NULL;
 	vcc->pop = NULL; /* crash */
 	vcc->push_oam = NULL; /* crash */
@@ -822,7 +825,7 @@ static void atmarp_info(struct seq_file *seq, struct net_device *dev,
 	int svc, llc, off;
 
 	svc = ((clip_vcc == SEQ_NO_VCC_TOKEN) ||
-	       (clip_vcc->vcc->sk->sk_family == AF_ATMSVC));
+	       (sk_atm(clip_vcc->vcc)->sk_family == AF_ATMSVC));
 
 	llc = ((clip_vcc == SEQ_NO_VCC_TOKEN) ||
 	       clip_vcc->encap);

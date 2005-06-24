@@ -70,6 +70,7 @@
 #include <linux/sched.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
+#include <linux/dma-mapping.h>
 #include <asm/io.h>
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
@@ -371,7 +372,7 @@ he_init_one(struct pci_dev *pci_dev, const struct pci_device_id *pci_ent)
 
 	if (pci_enable_device(pci_dev))
 		return -EIO;
-	if (pci_set_dma_mask(pci_dev, HE_DMA_MASK) != 0) {
+	if (pci_set_dma_mask(pci_dev, DMA_32BIT_MASK) != 0) {
 		printk(KERN_WARNING "he: no suitable dma available\n");
 		err = -EIO;
 		goto init_one_failure;
@@ -411,8 +412,7 @@ he_init_one(struct pci_dev *pci_dev, const struct pci_device_id *pci_ent)
 init_one_failure:
 	if (atm_dev)
 		atm_dev_deregister(atm_dev);
-	if (he_dev)
-		kfree(he_dev);
+	kfree(he_dev);
 	pci_disable_device(pci_dev);
 	return err;
 }
@@ -2533,8 +2533,7 @@ he_open(struct atm_vcc *vcc)
 open_failed:
 
 	if (err) {
-		if (he_vcc)
-			kfree(he_vcc);
+		kfree(he_vcc);
 		clear_bit(ATM_VF_ADDR, &vcc->flags);
 	}
 	else
@@ -2610,7 +2609,7 @@ he_close(struct atm_vcc *vcc)
 		 * TBRQ, the host issues the close command to the adapter.
 		 */
 
-		while (((tx_inuse = atomic_read(&vcc->sk->sk_wmem_alloc)) > 0) &&
+		while (((tx_inuse = atomic_read(&sk_atm(vcc)->sk_wmem_alloc)) > 0) &&
 		       (retry < MAX_RETRY)) {
 			msleep(sleep);
 			if (sleep < 250)
@@ -3079,7 +3078,7 @@ static struct pci_driver he_driver = {
 
 static int __init he_init(void)
 {
-	return pci_module_init(&he_driver);
+	return pci_register_driver(&he_driver);
 }
 
 static void __exit he_cleanup(void)

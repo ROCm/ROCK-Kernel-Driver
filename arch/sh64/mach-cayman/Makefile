@@ -6,6 +6,6 @@
 # unless it's something special (ie not a .c file).
 #
 
-obj-y := setup.o irq.o
+obj-y := setup.o irq.o iomap.o
 obj-$(CONFIG_HEARTBEAT)	+= led.o
 

@@ -8,7 +8,7 @@
 #include <linux/cpu.h>
 #include <asm/system.h>
 
-#ifdef CONFIG_SMP
+#if defined(CONFIG_STOP_MACHINE) && defined(CONFIG_SMP)
 /**
  * stop_machine_run: freeze the machine on all CPUs and run this function
  * @fn: the function to run

@@ -114,9 +114,9 @@ static int aout32_core_dump(long signr, struct pt_regs *regs, struct file *file)
 
 /* make sure we actually have a data and stack area to dump */
 	set_fs(USER_DS);
-	if (verify_area(VERIFY_READ, (void __user *) START_DATA(dump), dump.u_dsize))
+	if (!access_ok(VERIFY_READ, (void __user *) START_DATA(dump), dump.u_dsize))
 		dump.u_dsize = 0;
-	if (verify_area(VERIFY_READ, (void __user *) START_STACK(dump), dump.u_ssize))
+	if (!access_ok(VERIFY_READ, (void __user *) START_STACK(dump), dump.u_ssize))
 		dump.u_ssize = 0;
 
 	set_fs(KERNEL_DS);
@@ -241,7 +241,7 @@ static int load_aout32_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	current->mm->brk = ex.a_bss +
 		(current->mm->start_brk = N_BSSADDR(ex));
 
-	current->mm->rss = 0;
+	set_mm_counter(current->mm, rss, 0);
 	current->mm->mmap = NULL;
 	compute_creds(bprm);
  	current->flags &= ~PF_FORKNOEXEC;

@@ -150,7 +150,6 @@ config BLK_DEV_IDEDISK
 
 config IDEDISK_MULTI_MODE
 	bool "Use multi-mode by default"
-	depends on BLK_DEV_IDEDISK
 	help
 	  If you get this error, try to say Y here:
 

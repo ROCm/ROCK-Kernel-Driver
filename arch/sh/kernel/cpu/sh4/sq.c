@@ -379,7 +379,7 @@ static int sq_mmap(struct file *file, struct vm_area_struct *vma)
 
 	map = __sq_alloc_mapping(vma->vm_start, offset, size, "Userspace");
 
-	if (io_remap_page_range(vma, map->sq_addr, map->addr,
+	if (io_remap_pfn_range(vma, map->sq_addr, map->addr >> PAGE_SHIFT,
 				size, vma->vm_page_prot))
 		return -EAGAIN;
 

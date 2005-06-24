@@ -27,6 +27,9 @@
 #include <linux/shmem_fs.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
+#include <linux/audit.h>
+#include <linux/ptrace.h>
+
 #include <asm/uaccess.h>
 
 #include "util.h"
@@ -600,6 +603,8 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 			err = -EFAULT;
 			goto out;
 		}
+		if ((err = audit_ipc_perms(0, setbuf.uid, setbuf.gid, setbuf.mode)))
+			return err;
 		down(&shm_ids.sem);
 		shp = shm_lock(shmid);
 		err=-EINVAL;
@@ -766,6 +771,18 @@ invalid:
 		err = PTR_ERR(user_addr);
 out:
 	return err;
+}
+
+asmlinkage long sys_shmat(int shmid, char __user *shmaddr, int shmflg)
+{
+	unsigned long ret;
+	long err;
+
+	err = do_shmat(shmid, shmaddr, shmflg, &ret);
+	if (err)
+		return err;
+	force_successful_syscall_return();
+	return (long)ret;
 }
 
 /*

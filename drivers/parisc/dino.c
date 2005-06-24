@@ -653,14 +653,13 @@ dino_fixup_bus(struct pci_bus *bus)
 				      PCI_INTERRUPT_PIN, 1, &irq_pin);
 			irq_pin = (irq_pin + PCI_SLOT(dev->devfn) - 1) % 4 ;
 			printk(KERN_WARNING "Device %s has undefined IRQ, "
-					"setting to %d\n", dev->slot_name,
-					irq_pin);
+					"setting to %d\n", pci_name(dev), irq_pin);
 			dino_cfg_write(dev->bus, dev->devfn, 
 				       PCI_INTERRUPT_LINE, 1, irq_pin);
 			dino_assign_irq(dino_dev, irq_pin, &dev->irq);
 #else
 			dev->irq = 65535;
-			printk(KERN_WARNING "Device %s has unassigned IRQ\n", dev->slot_name);	
+			printk(KERN_WARNING "Device %s has unassigned IRQ\n", pci_name(dev));
 #endif
 		} else {
 

@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-driver.c,v 1.34 2005/01/07 13:11:19 kraxel Exp $
+    $Id: bttv-driver.c,v 1.37 2005/02/21 13:57:59 kraxel Exp $
 
     bttv - Bt848 frame grabber driver
 
@@ -3167,6 +3167,82 @@ static struct video_device radio_template =
 };
 
 /* ----------------------------------------------------------------------- */
+/* some debug code                                                         */
+
+static int bttv_risc_decode(u32 risc)
+{
+	static char *instr[16] = {
+		[ BT848_RISC_WRITE     >> 28 ] = "write",
+		[ BT848_RISC_SKIP      >> 28 ] = "skip",
+		[ BT848_RISC_WRITEC    >> 28 ] = "writec",
+		[ BT848_RISC_JUMP      >> 28 ] = "jump",
+		[ BT848_RISC_SYNC      >> 28 ] = "sync",
+		[ BT848_RISC_WRITE123  >> 28 ] = "write123",
+		[ BT848_RISC_SKIP123   >> 28 ] = "skip123",
+		[ BT848_RISC_WRITE1S23 >> 28 ] = "write1s23",
+	};
+	static int incr[16] = {
+		[ BT848_RISC_WRITE     >> 28 ] = 2,
+		[ BT848_RISC_JUMP      >> 28 ] = 2,
+		[ BT848_RISC_SYNC      >> 28 ] = 2,
+		[ BT848_RISC_WRITE123  >> 28 ] = 5,
+		[ BT848_RISC_SKIP123   >> 28 ] = 2,
+		[ BT848_RISC_WRITE1S23 >> 28 ] = 3,
+	};
+	static char *bits[] = {
+		"be0",  "be1",  "be2",  "be3/resync",
+		"set0", "set1", "set2", "set3",
+		"clr0", "clr1", "clr2", "clr3",
+		"irq",  "res",  "eol",  "sol",
+	};
+	int i;
+
+	printk("0x%08x [ %s", risc,
+	       instr[risc >> 28] ? instr[risc >> 28] : "INVALID");
+	for (i = ARRAY_SIZE(bits)-1; i >= 0; i--)
+		if (risc & (1 << (i + 12)))
+			printk(" %s",bits[i]);
+	printk(" count=%d ]\n", risc & 0xfff);
+	return incr[risc >> 28] ? incr[risc >> 28] : 1;
+}
+
+static void bttv_risc_disasm(struct bttv *btv,
+			     struct btcx_riscmem *risc)
+{
+	unsigned int i,j,n;
+
+	printk("%s: risc disasm: %p [dma=0x%08lx]\n",
+	       btv->c.name, risc->cpu, (unsigned long)risc->dma);
+	for (i = 0; i < (risc->size >> 2); i += n) {
+		printk("%s:   0x%lx: ", btv->c.name,
+		       (unsigned long)(risc->dma + (i<<2)));
+		n = bttv_risc_decode(risc->cpu[i]);
+		for (j = 1; j < n; j++)
+			printk("%s:   0x%lx: 0x%08x [ arg #%d ]\n",
+			       btv->c.name, (unsigned long)(risc->dma + ((i+j)<<2)),
+			       risc->cpu[i+j], j);
+		if (0 == risc->cpu[i])
+			break;
+	}
+}
+
+static void bttv_print_riscaddr(struct bttv *btv)
+{
+	printk("  main: %08Lx\n",
+	       (unsigned long long)btv->main.dma);
+	printk("  vbi : o=%08Lx e=%08Lx\n",
+	       btv->cvbi ? (unsigned long long)btv->cvbi->top.dma : 0,
+	       btv->cvbi ? (unsigned long long)btv->cvbi->bottom.dma : 0);
+	printk("  cap : o=%08Lx e=%08Lx\n",
+	       btv->curr.top    ? (unsigned long long)btv->curr.top->top.dma : 0,
+	       btv->curr.bottom ? (unsigned long long)btv->curr.bottom->bottom.dma : 0);
+	printk("  scr : o=%08Lx e=%08Lx\n",
+	       btv->screen ? (unsigned long long)btv->screen->top.dma : 0,
+	       btv->screen ? (unsigned long long)btv->screen->bottom.dma : 0);
+	bttv_risc_disasm(btv, &btv->main);
+}
+
+/* ----------------------------------------------------------------------- */
 /* irq handler                                                             */
 
 static char *irq_name[] = {
@@ -3202,21 +3278,6 @@ static void bttv_print_irqbits(u32 print, u32 mark)
 		if (mark & (1 << i))
 			printk("*");
 	}
-}
-
-static void bttv_print_riscaddr(struct bttv *btv)
-{
-	printk("  main: %08Lx\n",
-	       (unsigned long long)btv->main.dma);
-	printk("  vbi : o=%08Lx e=%08Lx\n",
-	       btv->cvbi ? (unsigned long long)btv->cvbi->top.dma : 0,
-	       btv->cvbi ? (unsigned long long)btv->cvbi->bottom.dma : 0);
-	printk("  cap : o=%08Lx e=%08Lx\n",
-	       btv->curr.top    ? (unsigned long long)btv->curr.top->top.dma : 0,
-	       btv->curr.bottom ? (unsigned long long)btv->curr.bottom->bottom.dma : 0);
-	printk("  scr : o=%08Lx e=%08Lx\n",
-	       btv->screen ? (unsigned long long)btv->screen->top.dma  : 0,
-	       btv->screen ? (unsigned long long)btv->screen->bottom.dma : 0);
 }
 
 static void bttv_irq_debug_low_latency(struct bttv *btv, u32 rc)
@@ -3921,7 +3982,7 @@ static void __devexit bttv_remove(struct pci_dev *pci_dev)
         return;
 }
 
-static int bttv_suspend(struct pci_dev *pci_dev, u32 state)
+static int bttv_suspend(struct pci_dev *pci_dev, pm_message_t state)
 {
         struct bttv *btv = pci_get_drvdata(pci_dev);
 	struct bttv_buffer_set idle;

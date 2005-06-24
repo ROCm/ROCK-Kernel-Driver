@@ -517,8 +517,7 @@ static void ti_shutdown(struct usb_serial *serial)
 		}
 	}
 
-	if (tdev)
-		kfree(tdev);
+	kfree(tdev);
 	usb_set_serial_data(serial, NULL);
 }
 
@@ -1580,7 +1579,7 @@ static int ti_command_out_sync(struct ti_device *tdev, __u8 command,
 	status = usb_control_msg(tdev->td_serial->dev,
 		usb_sndctrlpipe(tdev->td_serial->dev, 0), command,
 		(USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_OUT),
-		value, moduleid, data, size, HZ);
+		value, moduleid, data, size, 1000);
 
 	if (status == size)
 		status = 0;
@@ -1600,7 +1599,7 @@ static int ti_command_in_sync(struct ti_device *tdev, __u8 command,
 	status = usb_control_msg(tdev->td_serial->dev,
 		usb_rcvctrlpipe(tdev->td_serial->dev, 0), command,
 		(USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN),
-		value, moduleid, data, size, HZ);
+		value, moduleid, data, size, 1000);
 
 	if (status == size)
 		status = 0;
@@ -1685,7 +1684,7 @@ static int ti_download_firmware(struct ti_device *tdev,
 	dbg("%s - downloading firmware", __FUNCTION__);
 	for (pos = 0; pos < buffer_size; pos += done) {
 		len = min(buffer_size - pos, TI_DOWNLOAD_MAX_PACKET_SIZE);
-		status = usb_bulk_msg(dev, pipe, buffer+pos, len, &done, HZ);
+		status = usb_bulk_msg(dev, pipe, buffer+pos, len, &done, 1000);
 		if (status)
 			break;
 	}

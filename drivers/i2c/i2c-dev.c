@@ -55,7 +55,7 @@ struct i2c_dev {
 static struct i2c_dev *i2c_dev_array[I2C_MINORS];
 static DEFINE_SPINLOCK(i2c_dev_array_lock);
 
-struct i2c_dev *i2c_dev_get_by_minor(unsigned index)
+static struct i2c_dev *i2c_dev_get_by_minor(unsigned index)
 {
 	struct i2c_dev *i2c_dev;
 
@@ -65,7 +65,7 @@ struct i2c_dev *i2c_dev_get_by_minor(unsigned index)
 	return i2c_dev;
 }
 
-struct i2c_dev *i2c_dev_get_by_adapter(struct i2c_adapter *adap)
+static struct i2c_dev *i2c_dev_get_by_adapter(struct i2c_adapter *adap)
 {
 	struct i2c_dev *i2c_dev = NULL;
 
@@ -166,8 +166,8 @@ static ssize_t i2cdev_write (struct file *file, const char __user *buf, size_t c
 	return ret;
 }
 
-int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd, 
-                  unsigned long arg)
+static int i2cdev_ioctl(struct inode *inode, struct file *file,
+		unsigned int cmd, unsigned long arg)
 {
 	struct i2c_client *client = (struct i2c_client *)file->private_data;
 	struct i2c_rdwr_ioctl_data rdwr_arg;
@@ -500,7 +500,6 @@ static struct i2c_driver i2cdev_driver = {
 
 static struct i2c_client i2cdev_client_template = {
 	.name		= "I2C /dev entry",
-	.id		= 1,
 	.addr		= -1,
 	.driver		= &i2cdev_driver,
 };

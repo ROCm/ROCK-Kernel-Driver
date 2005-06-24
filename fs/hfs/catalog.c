@@ -33,7 +33,7 @@ void hfs_cat_build_key(btree_key *key, u32 parent, struct qstr *name)
 	}
 }
 
-int hfs_cat_build_record(hfs_cat_rec *rec, u32 cnid, struct inode *inode)
+static int hfs_cat_build_record(hfs_cat_rec *rec, u32 cnid, struct inode *inode)
 {
 	__be32 mtime = hfs_mtime();
 

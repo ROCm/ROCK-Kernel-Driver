@@ -51,7 +51,7 @@ static int serverworks_create_page_map(struct serverworks_page_map *page_map)
 	}
 	SetPageReserved(virt_to_page(page_map->real));
 	global_cache_flush();
-	page_map->remapped = ioremap_nocache(virt_to_gart(page_map->real), 
+	page_map->remapped = ioremap_nocache(virt_to_gart(page_map->real),
 					    PAGE_SIZE);
 	if (page_map->remapped == NULL) {
 		ClearPageReserved(virt_to_page(page_map->real));
@@ -141,7 +141,7 @@ static int serverworks_create_gatt_pages(int nr_tables)
 #define GET_GATT_OFF(addr) ((addr & 0x003ff000) >> 12)
 #endif
 
-static int serverworks_create_gatt_table(void)
+static int serverworks_create_gatt_table(struct agp_bridge_data *bridge)
 {
 	struct aper_size_info_lvl2 *value;
 	struct serverworks_page_map page_dir;
@@ -192,7 +192,7 @@ static int serverworks_create_gatt_table(void)
 	return 0;
 }
 
-static int serverworks_free_gatt_table(void)
+static int serverworks_free_gatt_table(struct agp_bridge_data *bridge)
 {
 	struct serverworks_page_map page_dir;
    
@@ -341,7 +341,7 @@ static int serverworks_insert_memory(struct agp_memory *mem,
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = SVRWRKS_GET_GATT(addr);
-		writel(agp_bridge->driver->mask_memory(mem->memory[i], mem->type), cur_gatt+GET_GATT_OFF(addr));
+		writel(agp_bridge->driver->mask_memory(agp_bridge, mem->memory[i], mem->type), cur_gatt+GET_GATT_OFF(addr));
 	}
 	serverworks_tlbflush(mem);
 	return 0;
@@ -387,15 +387,15 @@ static struct aper_size_info_lvl2 serverworks_sizes[7] =
 	{32, 8192, 0xfe000000}
 };
 
-static void serverworks_agp_enable(u32 mode)
+static void serverworks_agp_enable(struct agp_bridge_data *bridge, u32 mode)
 {
 	u32 command;
 
 	pci_read_config_dword(serverworks_private.svrwrks_dev,
-			      agp_bridge->capndx + PCI_AGP_STATUS,
+			      bridge->capndx + PCI_AGP_STATUS,
 			      &command);
 
-	command = agp_collect_device_status(mode, command);
+	command = agp_collect_device_status(bridge, mode, command);
 
 	command &= ~0x10;	/* disable FW */
 	command &= ~0x08;
@@ -403,13 +403,13 @@ static void serverworks_agp_enable(u32 mode)
 	command |= 0x100;
 
 	pci_write_config_dword(serverworks_private.svrwrks_dev,
-			       agp_bridge->capndx + PCI_AGP_COMMAND,
+			       bridge->capndx + PCI_AGP_COMMAND,
 			       command);
 
 	agp_device_command(command, 0);
 }
 
-struct agp_bridge_driver sworks_driver = {
+static struct agp_bridge_driver sworks_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= serverworks_sizes,
 	.size_type		= LVL2_APER_SIZE,
@@ -541,7 +541,7 @@ static int __init agp_serverworks_init(void)
 {
 	if (agp_off)
 		return -EINVAL;
-	return pci_module_init(&agp_serverworks_pci_driver);
+	return pci_register_driver(&agp_serverworks_pci_driver);
 }
 
 static void __exit agp_serverworks_cleanup(void)

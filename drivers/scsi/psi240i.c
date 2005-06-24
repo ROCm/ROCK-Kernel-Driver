@@ -390,7 +390,7 @@ static irqreturn_t do_Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
  *	Returns:		Status code.
  *
  ****************************************************************/
-int Psi240i_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
+static int Psi240i_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	{
 	UCHAR		   *cdb = (UCHAR *)SCpnt->cmnd;					// Pointer to SCSI CDB
 	PADAPTER240I	padapter = HOSTDATA (SCpnt->device->host); 			// Pointer to adapter control structure
@@ -509,7 +509,7 @@ int Psi240i_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
  *	Returns:		Nothing.
  *
  **************************************************************************/
-void ReadChipMemory (void *pdata, USHORT base, USHORT length, USHORT port)
+static void ReadChipMemory (void *pdata, USHORT base, USHORT length, USHORT port)
 	{
 	USHORT	z, zz;
 	UCHAR	*pd = (UCHAR *)pdata;
@@ -538,7 +538,7 @@ void ReadChipMemory (void *pdata, USHORT base, USHORT length, USHORT port)
  *	Returns:		Number of adapters found.
  *
  ****************************************************************/
-int Psi240i_Detect (Scsi_Host_Template *tpnt)
+static int Psi240i_Detect (Scsi_Host_Template *tpnt)
 	{
 	int					board;
 	int					count = 0;
@@ -654,7 +654,7 @@ static int Psi240i_Release(struct Scsi_Host *shost)
  *	Returns:		zero.
  *
  ****************************************************************/
-int Psi240i_BiosParam (struct scsi_device *sdev, struct block_device *dev,
+static int Psi240i_BiosParam (struct scsi_device *sdev, struct block_device *dev,
 		sector_t capacity, int geom[])
 	{
 	POUR_DEVICE	pdev;

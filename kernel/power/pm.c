@@ -151,7 +151,7 @@ void pm_unregister_all(pm_callback callback)
  *	execution and unload yourself.
  */
  
-int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data)
+static int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data)
 {
 	int status = 0;
 	unsigned long prev_state, next_state;

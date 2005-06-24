@@ -45,7 +45,7 @@ int llc_build_and_send_pkt(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev;
 	int rc = -ECONNABORTED;
-	struct llc_opt *llc = llc_sk(sk);
+	struct llc_sock *llc = llc_sk(sk);
 
 	if (llc->state == LLC_CONN_STATE_ADM)
 		goto out;
@@ -86,7 +86,7 @@ int llc_establish_connection(struct sock *sk, u8 *lmac, u8 *dmac, u8 dsap)
 	int rc = -EISCONN;
 	struct llc_addr laddr, daddr;
 	struct sk_buff *skb;
-	struct llc_opt *llc = llc_sk(sk);
+	struct llc_sock *llc = llc_sk(sk);
 	struct sock *existing;
 
 	laddr.lsap = llc->sap->laddr.lsap;

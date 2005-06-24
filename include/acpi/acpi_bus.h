@@ -328,7 +328,6 @@ int acpi_bus_receive_event (struct acpi_bus_event *event);
 int acpi_bus_register_driver (struct acpi_driver *driver);
 int acpi_bus_unregister_driver (struct acpi_driver *driver);
 int acpi_bus_scan (struct acpi_device *start);
-int acpi_bus_trim(struct acpi_device *start, int rmdevice);
 int acpi_bus_add (struct acpi_device **child, struct acpi_device *parent,
 		acpi_handle handle, int type);
 

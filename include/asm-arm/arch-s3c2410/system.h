@@ -30,7 +30,7 @@ void (*s3c24xx_idle)(void);
 
 void s3c24xx_default_idle(void)
 {
-	unsigned long reg = S3C2410_CLKCON;
+	void __iomem *reg = S3C2410_CLKCON;
 	unsigned long tmp;
 	int i;
 

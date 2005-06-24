@@ -50,19 +50,23 @@
  */
 #define PCI_GET_DN(dev) ((struct device_node *)((dev)->sysdata))
 
-static inline struct iommu_table *devnode_table(struct pci_dev *dev)
+static inline struct iommu_table *devnode_table(struct device *dev)
 {
-	if (!dev)
-		dev = ppc64_isabridge_dev;
-	if (!dev)
-		return NULL;
+	struct pci_dev *pdev;
+
+	if (!dev) {
+		pdev = ppc64_isabridge_dev;
+		if (!pdev)
+			return NULL;
+	} else
+		pdev = to_pci_dev(dev);
 
 #ifdef CONFIG_PPC_ISERIES
-	return ISERIES_DEVNODE(dev)->iommu_table;
+	return ISERIES_DEVNODE(pdev)->iommu_table;
 #endif /* CONFIG_PPC_ISERIES */
 
 #ifdef CONFIG_PPC_MULTIPLATFORM
-	return PCI_GET_DN(dev)->iommu_table;
+	return PCI_GET_DN(pdev)->iommu_table;
 #endif /* CONFIG_PPC_MULTIPLATFORM */
 }
 
@@ -71,16 +75,17 @@ static inline struct iommu_table *devnode_table(struct pci_dev *dev)
  * Returns the virtual address of the buffer and sets dma_handle
  * to the dma address (mapping) of the first page.
  */
-static void *pci_iommu_alloc_consistent(struct pci_dev *hwdev, size_t size,
-			   dma_addr_t *dma_handle)
+static void *pci_iommu_alloc_coherent(struct device *hwdev, size_t size,
+			   dma_addr_t *dma_handle, unsigned int __nocast flag)
 {
-	return iommu_alloc_consistent(devnode_table(hwdev), size, dma_handle);
+	return iommu_alloc_coherent(devnode_table(hwdev), size, dma_handle,
+			flag);
 }
 
-static void pci_iommu_free_consistent(struct pci_dev *hwdev, size_t size,
+static void pci_iommu_free_coherent(struct device *hwdev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
 {
-	iommu_free_consistent(devnode_table(hwdev), size, vaddr, dma_handle);
+	iommu_free_coherent(devnode_table(hwdev), size, vaddr, dma_handle);
 }
 
 /* Creates TCEs for a user provided buffer.  The user buffer must be 
@@ -89,46 +94,46 @@ static void pci_iommu_free_consistent(struct pci_dev *hwdev, size_t size,
  * need not be page aligned, the dma_addr_t returned will point to the same
  * byte within the page as vaddr.
  */
-static dma_addr_t pci_iommu_map_single(struct pci_dev *hwdev, void *vaddr,
+static dma_addr_t pci_iommu_map_single(struct device *hwdev, void *vaddr,
 		size_t size, enum dma_data_direction direction)
 {
 	return iommu_map_single(devnode_table(hwdev), vaddr, size, direction);
 }
 
 
-static void pci_iommu_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_handle,
+static void pci_iommu_unmap_single(struct device *hwdev, dma_addr_t dma_handle,
 		size_t size, enum dma_data_direction direction)
 {
 	iommu_unmap_single(devnode_table(hwdev), dma_handle, size, direction);
 }
 
 
-static int pci_iommu_map_sg(struct pci_dev *pdev, struct scatterlist *sglist,
+static int pci_iommu_map_sg(struct device *pdev, struct scatterlist *sglist,
 		int nelems, enum dma_data_direction direction)
 {
-	return iommu_map_sg(&pdev->dev, devnode_table(pdev), sglist,
+	return iommu_map_sg(pdev, devnode_table(pdev), sglist,
 			nelems, direction);
 }
 
-static void pci_iommu_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist,
+static void pci_iommu_unmap_sg(struct device *pdev, struct scatterlist *sglist,
 		int nelems, enum dma_data_direction direction)
 {
 	iommu_unmap_sg(devnode_table(pdev), sglist, nelems, direction);
 }
 
 /* We support DMA to/from any memory page via the iommu */
-static int pci_iommu_dma_supported(struct pci_dev *pdev, u64 mask)
+static int pci_iommu_dma_supported(struct device *dev, u64 mask)
 {
 	return 1;
 }
 
 void pci_iommu_init(void)
 {
-	pci_dma_ops.pci_alloc_consistent = pci_iommu_alloc_consistent;
-	pci_dma_ops.pci_free_consistent = pci_iommu_free_consistent;
-	pci_dma_ops.pci_map_single = pci_iommu_map_single;
-	pci_dma_ops.pci_unmap_single = pci_iommu_unmap_single;
-	pci_dma_ops.pci_map_sg = pci_iommu_map_sg;
-	pci_dma_ops.pci_unmap_sg = pci_iommu_unmap_sg;
-	pci_dma_ops.pci_dma_supported = pci_iommu_dma_supported;
+	pci_dma_ops.alloc_coherent = pci_iommu_alloc_coherent;
+	pci_dma_ops.free_coherent = pci_iommu_free_coherent;
+	pci_dma_ops.map_single = pci_iommu_map_single;
+	pci_dma_ops.unmap_single = pci_iommu_unmap_single;
+	pci_dma_ops.map_sg = pci_iommu_map_sg;
+	pci_dma_ops.unmap_sg = pci_iommu_unmap_sg;
+	pci_dma_ops.dma_supported = pci_iommu_dma_supported;
 }

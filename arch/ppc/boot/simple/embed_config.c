@@ -506,7 +506,7 @@ embed_config(bd_t **bdp)
 	memcpy(bd->bi_enetaddr, cp, 6);
 
 	/* can busfreq be calculated? */
-	pvr = mfspr(PVR);
+	pvr = mfspr(SPRN_PVR);
 	if ((pvr & 0xffff0000) == 0x80820000) {
 		bd->bi_busfreq = 100000000;
 		clk_8280(bd);

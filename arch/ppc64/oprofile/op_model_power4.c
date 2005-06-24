@@ -54,7 +54,7 @@ static void power4_reg_setup(struct op_counter_config *ctr,
 	 *
 	 * It has been verified to work on POWER5 so we enable it there.
 	 */
-	if (cur_cpu_spec->cpu_features & CPU_FTR_MMCRA_SIHV)
+	if (cpu_has_feature(CPU_FTR_MMCRA_SIHV))
 		mmcra_has_sihv = 1;
 
 	/*
@@ -224,7 +224,7 @@ static unsigned long get_pc(struct pt_regs *regs)
 	if (mmcra & MMCRA_SIPR)
 		return pc;
 
-#ifdef CONFIG_PPC_PSERIES
+#ifdef CONFIG_PPC_RTAS
 	/* Were we in RTAS? */
 	if (pc >= rtas.base && pc < (rtas.base + rtas.size))
 		/* function descriptor madness */

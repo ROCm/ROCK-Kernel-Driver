@@ -70,4 +70,9 @@ typedef struct board_info {
 #define	CPCI690_IPMI_SIZE		max(GT64260_WINDOW_SIZE_MIN,	\
 						CPCI690_IPMI_SIZE_ACTUAL)
 
+#define	CPCI690_MPSC_BAUD			9600
+#define	CPCI690_MPSC_CLK_SRC			8 /* TCLK */
+
+#define	CPCI690_BUS_FREQ			133333333
+
 #endif /* __PPC_PLATFORMS_CPCI690_H */

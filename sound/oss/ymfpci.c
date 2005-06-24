@@ -2074,7 +2074,7 @@ static /*const*/ struct file_operations ymf_mixer_fops = {
 /*
  */
 
-static int ymf_suspend(struct pci_dev *pcidev, u32 unused)
+static int ymf_suspend(struct pci_dev *pcidev, pm_message_t unused)
 {
 	struct ymf_unit *unit = pci_get_drvdata(pcidev);
 	unsigned long flags;

@@ -18,7 +18,7 @@ config DRM
 
 config DRM_TDFX
 	tristate "3dfx Banshee/Voodoo3+"
-	depends on DRM
+	depends on DRM && PCI
 	help
 	  Choose this option if you have a 3dfx Banshee or Voodoo3 (or later),
 	  graphics card.  If M is selected, the module will be called tdfx.

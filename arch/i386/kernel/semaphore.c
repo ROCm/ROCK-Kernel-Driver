@@ -10,7 +10,7 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  *
- * rw semaphores implemented November 1999 by Benjamin LaHaise <bcrl@redhat.com>
+ * rw semaphores implemented November 1999 by Benjamin LaHaise <bcrl@kvack.org>
  */
 #include <linux/config.h>
 #include <linux/sched.h>
@@ -49,12 +49,12 @@
  *    we cannot lose wakeup events.
  */
 
-fastcall void __up(struct semaphore *sem)
+static fastcall void __attribute_used__  __up(struct semaphore *sem)
 {
 	wake_up(&sem->wait);
 }
 
-fastcall void __sched __down(struct semaphore * sem)
+static fastcall void __attribute_used__ __sched __down(struct semaphore * sem)
 {
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
@@ -91,7 +91,7 @@ fastcall void __sched __down(struct semaphore * sem)
 	tsk->state = TASK_RUNNING;
 }
 
-fastcall int __sched __down_interruptible(struct semaphore * sem)
+static fastcall int __attribute_used__ __sched __down_interruptible(struct semaphore * sem)
 {
 	int retval = 0;
 	struct task_struct *tsk = current;
@@ -154,7 +154,7 @@ fastcall int __sched __down_interruptible(struct semaphore * sem)
  * single "cmpxchg" without failure cases,
  * but then it wouldn't work on a 386.
  */
-fastcall int __down_trylock(struct semaphore * sem)
+static fastcall int __attribute_used__ __down_trylock(struct semaphore * sem)
 {
 	int sleepers;
 	unsigned long flags;

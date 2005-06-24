@@ -14,9 +14,6 @@
 #include <linux/tty.h>
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 #include <linux/module.h>       /* for EXPORT_SYMBOL */
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 #include <linux/hardirq.h>
 
 #include <asm/fpswa.h>
@@ -98,9 +95,6 @@ die (const char *str, struct pt_regs *regs, long err)
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	spin_unlock_irq(&die.lock);
-#ifdef	CONFIG_KDB
-	(void)kdb(KDB_REASON_OOPS, err, regs);
-#endif	/* CONFIG_KDB */
   	do_exit(SIGSEGV);
 }
 
@@ -116,6 +110,24 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 {
 	siginfo_t siginfo;
 	int sig, code;
+
+	/* break.b always sets cr.iim to 0, which causes problems for
+	 * debuggers.  Get the real break number from the original instruction,
+	 * but only for kernel code.  User space break.b is left alone, to
+	 * preserve the existing behaviour.  All break codings have the same
+	 * format, so there is no need to check the slot type.
+	 */
+	if (break_num == 0 && !user_mode(regs)) {
+		struct ia64_psr *ipsr = ia64_psr(regs);
+		unsigned long *bundle = (unsigned long *)regs->cr_iip;
+		unsigned long slot;
+		switch (ipsr->ri) {
+		      case 0:  slot = (bundle[0] >>  5); break;
+		      case 1:  slot = (bundle[0] >> 46) | (bundle[1] << 18); break;
+		      default: slot = (bundle[1] >> 23); break;
+		}
+		break_num = ((slot >> 36 & 1) << 20) | (slot >> 6 & 0xfffff);
+	}
 
 	/* SIGILL, SIGFPE, SIGSEGV, and SIGBUS want these field initialized: */
 	siginfo.si_addr = (void __user *) (regs->cr_iip + ia64_psr(regs)->ri);
@@ -184,14 +196,6 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 		if (break_num < 0x80000) {
 			sig = SIGILL; code = __ILL_BREAK;
 		} else {
-#ifdef	CONFIG_KDB
-			if (break_num == KDB_BREAK_ENTER &&
-			    kdb(KDB_REASON_ENTER, break_num, regs))
-				return;		/* kdb handled it */
-			if (break_num == KDB_BREAK_BREAK &&
-			    kdb(KDB_REASON_BREAK, break_num, regs))
-				return;		/* kdb handled it */
-#endif	/* CONFIG_KDB */
 			sig = SIGTRAP; code = TRAP_BRKPT;
 		}
 	}
@@ -216,13 +220,21 @@ disabled_fph_fault (struct pt_regs *regs)
 
 	/* first, grant user-level access to fph partition: */
 	psr->dfh = 0;
+
+	/*
+	 * Make sure that no other task gets in on this processor
+	 * while we're claiming the FPU
+	 */
+	preempt_disable();
 #ifndef CONFIG_SMP
 	{
 		struct task_struct *fpu_owner
 			= (struct task_struct *)ia64_get_kr(IA64_KR_FPU_OWNER);
 
-		if (ia64_is_local_fpu_owner(current))
+		if (ia64_is_local_fpu_owner(current)) {
+			preempt_enable_no_resched();
 			return;
+		}
 
 		if (fpu_owner)
 			ia64_flush_fph(fpu_owner);
@@ -240,6 +252,7 @@ disabled_fph_fault (struct pt_regs *regs)
 		 */
 		psr->mfh = 1;
 	}
+	preempt_enable_no_resched();
 }
 
 static inline int
@@ -537,10 +550,6 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		      case 35: siginfo.si_code = TRAP_BRANCH; ifa = 0; break;
 		      case 36: siginfo.si_code = TRAP_TRACE; ifa = 0; break;
 		}
-#ifdef	CONFIG_KDB
-		if (!user_mode(&regs) && kdb(KDB_REASON_DEBUG, vector, &regs))
-			return;	/* kdb handled this */
-#endif	/* CONFIG_KDB */
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
 		siginfo.si_addr  = (void __user *) ifa;

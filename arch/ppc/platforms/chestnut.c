@@ -28,6 +28,7 @@
 #include <linux/ide.h>
 #include <linux/serial.h>
 #include <linux/serial_core.h>
+#include <linux/mtd/physmap.h>
 #include <asm/system.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
@@ -42,8 +43,8 @@
 #include <asm/mv64x60.h>
 #include <platforms/chestnut.h>
 
-static u32 boot_base; /* Virtual addr of 8bit boot */
-static u32 cpld_base; /* Virtual addr of CPLD Regs */
+static void __iomem *sram_base; /* Virtual addr of Internal SRAM */
+static void __iomem *cpld_base; /* Virtual addr of CPLD Regs */
 
 static mv64x60_handle_t	bh;
 
@@ -65,7 +66,8 @@ extern void mv64360_pcibios_fixup(mv64x60_handle_t *bh);
  *
  ****/
 static void __init
-chestnut_calibrate_decr(void){
+chestnut_calibrate_decr(void)
+{
 	ulong freq;
 
 	freq = CHESTNUT_BUS_SPEED / 4;
@@ -75,8 +77,6 @@ chestnut_calibrate_decr(void){
 
 	tb_ticks_per_jiffy = freq / HZ;
 	tb_to_us = mulhwu_scale_factor(freq, 1000000);
-
-	return;
 }
 
 static int
@@ -103,7 +103,7 @@ chestnut_find_end_of_memory(void)
       		mem_size = mv64x60_get_mem_size(CONFIG_MV64X60_NEW_BASE,
 				MV64x60_TYPE_MV64460);
    	}
-   	return(mem_size);
+   	return mem_size;
 }
 
 #if defined(CONFIG_SERIAL_8250)
@@ -155,7 +155,7 @@ chestnut_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	};
 	const long min_idsel = 1, max_idsel = 4, irqs_per_slot = 4;
 
-	return (PCI_IRQ_TABLE_LOOKUP);
+	return PCI_IRQ_TABLE_LOOKUP;
 }
 
 
@@ -193,24 +193,30 @@ chestnut_setup_bridge(void)
 	si.pci_0.pci_cmd_bits = 0;
 	si.pci_0.latency_timer = 0x80;
 
-	si.window_preserve_mask_32_lo = CHESTNUT_PRESERVE_MASK;
-
 	for (i=0; i<MV64x60_CPU2MEM_WINDOWS; i++) {
+#if defined(CONFIG_NOT_COHERENT_CACHE)
 		si.cpu_prot_options[i] = 0;
-#ifdef CONFIG_NOT_CACHE_COHERENT
-		si.cpu_snoop_options[i] = MV64360_CPU_SNOOP_NONE;
+		si.enet_options[i] = MV64360_ENET2MEM_SNOOP_NONE;
+		si.mpsc_options[i] = MV64360_MPSC2MEM_SNOOP_NONE;
+		si.idma_options[i] = MV64360_IDMA2MEM_SNOOP_NONE;
+
+		si.pci_1.acc_cntl_options[i] =
+		    MV64360_PCI_ACC_CNTL_SNOOP_NONE |
+		    MV64360_PCI_ACC_CNTL_SWAP_NONE |
+		    MV64360_PCI_ACC_CNTL_MBURST_128_BYTES |
+		    MV64360_PCI_ACC_CNTL_RDSIZE_256_BYTES;
 #else
-		si.cpu_snoop_options[i] = MV64360_CPU_SNOOP_WB; /* risky */
+		si.cpu_prot_options[i] = 0;
+		si.enet_options[i] = MV64360_ENET2MEM_SNOOP_NONE; /* errata */
+		si.mpsc_options[i] = MV64360_MPSC2MEM_SNOOP_NONE; /* errata */
+		si.idma_options[i] = MV64360_IDMA2MEM_SNOOP_NONE; /* errata */
+
+		si.pci_1.acc_cntl_options[i] =
+		    MV64360_PCI_ACC_CNTL_SNOOP_WB |
+		    MV64360_PCI_ACC_CNTL_SWAP_NONE |
+		    MV64360_PCI_ACC_CNTL_MBURST_32_BYTES |
+		    MV64360_PCI_ACC_CNTL_RDSIZE_32_BYTES;
 #endif
-		si.pci_0.acc_cntl_options[i] =
-#ifdef CONFIG_NOT_CACHE_COHERENT
-			MV64360_PCI_ACC_CNTL_SNOOP_NONE |
-#else
-			MV64360_PCI_ACC_CNTL_SNOOP_WB | /* risky */
-#endif
-			MV64360_PCI_ACC_CNTL_SWAP_NONE |
-			MV64360_PCI_ACC_CNTL_MBURST_32_BYTES |
-			MV64360_PCI_ACC_CNTL_RDSIZE_32_BYTES;
 	}
 
    	/* Lookup host bridge - on CPU 0 - no SMP support */
@@ -227,55 +233,44 @@ chestnut_setup_bridge(void)
 	bh.hose_a->first_busno = 0;
 	bh.hose_a->last_busno = 0xff;
 	bh.hose_a->last_busno = pciauto_bus_scan(bh.hose_a, 0);
-
 }
 
 void __init
 chestnut_setup_peripherals(void)
 {
-
    	mv64x60_set_32bit_window(&bh, MV64x60_CPU2BOOT_WIN,
 			CHESTNUT_BOOT_8BIT_BASE, CHESTNUT_BOOT_8BIT_SIZE, 0);
+	bh.ci->enable_window_32bit(&bh, MV64x60_CPU2BOOT_WIN);
 
 	mv64x60_set_32bit_window(&bh, MV64x60_CPU2DEV_0_WIN,
 			CHESTNUT_32BIT_BASE, CHESTNUT_32BIT_SIZE, 0);
+	bh.ci->enable_window_32bit(&bh, MV64x60_CPU2DEV_0_WIN);
+
 	mv64x60_set_32bit_window(&bh, MV64x60_CPU2DEV_1_WIN,
 			CHESTNUT_CPLD_BASE, CHESTNUT_CPLD_SIZE, 0);
+	bh.ci->enable_window_32bit(&bh, MV64x60_CPU2DEV_1_WIN);
+	cpld_base = ioremap(CHESTNUT_CPLD_BASE, CHESTNUT_CPLD_SIZE);
 
 	mv64x60_set_32bit_window(&bh, MV64x60_CPU2DEV_2_WIN,
 			CHESTNUT_UART_BASE, CHESTNUT_UART_SIZE, 0);
+	bh.ci->enable_window_32bit(&bh, MV64x60_CPU2DEV_2_WIN);
+
 	mv64x60_set_32bit_window(&bh, MV64x60_CPU2DEV_3_WIN,
 			CHESTNUT_FRAM_BASE, CHESTNUT_FRAM_SIZE, 0);
-   	/* Set up window for internal sram (256KByte insize) */
+	bh.ci->enable_window_32bit(&bh, MV64x60_CPU2DEV_3_WIN);
+
    	mv64x60_set_32bit_window(&bh, MV64x60_CPU2SRAM_WIN,
-			CHESTNUT_INTERNAL_SRAM_BASE,
-			CHESTNUT_INTERNAL_SRAM_SIZE, 0);
+			CHESTNUT_INTERNAL_SRAM_BASE, MV64360_SRAM_SIZE, 0);
+	bh.ci->enable_window_32bit(&bh, MV64x60_CPU2SRAM_WIN);
 
-	boot_base = (u32)ioremap(CHESTNUT_BOOT_8BIT_BASE,
-				CHESTNUT_BOOT_8BIT_SIZE);
-	cpld_base = (u32)ioremap(CHESTNUT_CPLD_BASE, CHESTNUT_CPLD_SIZE);
-
-   	/*
-    	 * Configure internal SRAM -
-    	 * Cache coherent write back, incase
-	 *      CONFIG_MV64360_SRAM_CACHE_COHERENT set
-    	 * Parity enabled.
-    	 * Parity error propagation
-    	 * Arbitration not parked for CPU only
-    	 * Other bits are reserved.
-    	 */
-#ifdef CONFIG_MV64360_SRAM_CACHE_COHERENT
-   	mv64x60_write(&bh, MV64360_SRAM_CONFIG, 0x001600b2);
-#else
+#ifdef CONFIG_NOT_COHERENT_CACHE
    	mv64x60_write(&bh, MV64360_SRAM_CONFIG, 0x001600b0);
+#else
+   	mv64x60_write(&bh, MV64360_SRAM_CONFIG, 0x001600b2);
 #endif
+	sram_base = ioremap(CHESTNUT_INTERNAL_SRAM_BASE, MV64360_SRAM_SIZE);
+   	memset(sram_base, 0, MV64360_SRAM_SIZE);
 
-   	/*
-    	 * Setting the SRAM to 0. Note that this generates parity errors on
-	 * internal data path in SRAM since it's first time accessing it
-	 * while after reset it's not configured
-    	*/
-   	memset((void *)CHESTNUT_INTERNAL_SRAM_BASE, 0, CHESTNUT_INTERNAL_SRAM_SIZE);
 	/*
 	 * Configure MPP pins for PCI DMA
 	 *
@@ -312,9 +307,9 @@ chestnut_setup_peripherals(void)
 			(0xf << 20) |	/* MPPSel13 GPIO[13] */
 			(0xf << 24) |	/* MPPSel14 GPIO[14] */
 			(0xf << 28));	/* MPPSel15 GPIO[15] */
-	mv64x60_set_bits(&bh, MV64x60_GPP_IO_CNTL,
+	mv64x60_set_bits(&bh, MV64x60_GPP_IO_CNTL, /* Output */
 			BIT(1)  | BIT(2)  | BIT(4)  | BIT(5)  | BIT(6)  |
-			BIT(9)  | BIT(10) | BIT(13) | BIT(14) | BIT(15)); /* Output */
+			BIT(9)  | BIT(10) | BIT(13) | BIT(14) | BIT(15));
 
    	/*
     	 * Configure the following MPP pins to indicate a level
@@ -364,7 +359,7 @@ chestnut_setup_peripherals(void)
    	/*
     	 * Dismiss and then enable interrupt on CPU #0 high cause register
     	 * BIT27 summarizes GPP interrupts 24-31
-    	*/
+    	 */
    	mv64x60_set_bits(&bh, MV64360_IC_CPU0_INTR_MASK_HI, BIT(27));
 
    	if (ppc_md.progress)
@@ -423,13 +418,31 @@ chestnut_setup_arch(void)
 
 	/* Identify the system */
 	printk(KERN_INFO "System Identification: IBM 750FX/GX Eval Board\n");
-	printk(KERN_INFO "IBM 750FX/GX port (C) 2004 MontaVista Software, Inc. (source@mvista.com)\n");
+	printk(KERN_INFO "IBM 750FX/GX port (C) 2004 MontaVista Software, Inc."
+		" (source@mvista.com)\n");
 
 	if (ppc_md.progress)
       		ppc_md.progress("chestnut_setup_arch: exit", 0);
-
-	return;
 }
+
+#ifdef CONFIG_MTD_PHYSMAP
+static struct mtd_partition ptbl;
+
+static int __init
+chestnut_setup_mtd(void)
+{
+	memset(&ptbl, 0, sizeof(ptbl));
+
+	ptbl.name = "User FS";
+	ptbl.size = CHESTNUT_32BIT_SIZE;
+
+	physmap_map.size = CHESTNUT_32BIT_SIZE;
+	physmap_set_partitions(&ptbl, 1);
+	return 0;
+}
+
+arch_initcall(chestnut_setup_mtd);
+#endif
 
 /**************************************************************************
  * FUNCTION: chestnut_restart
@@ -450,7 +463,7 @@ chestnut_restart(char *cmd)
          *
          * MPP24 - board reset
          */
-   	writeb(0x1, (void __iomem *)(cpld_base+3));
+   	writeb(0x1, cpld_base + 3);
 
 	/* GPP pin tied to MPP earlier */
         mv64x60_set_bits(&bh, MV64x60_GPP_VALUE_SET, BIT(24));
@@ -474,37 +487,6 @@ chestnut_power_off(void)
 	/* NOTREACHED */
 }
 
-#define SET_PCI_COMMAND_INVALIDATE
-#ifdef SET_PCI_COMMAND_INVALIDATE
-/*
- * Dave Wilhardt found that PCI_COMMAND_INVALIDATE must
- * be set for each device if you are using cache coherency.
- */
-static void __init
-set_pci_command_invalidate(void)
-{
-	struct pci_dev *dev = NULL;
-	u16 val;
-
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-		pci_read_config_word(dev, PCI_COMMAND, &val);
-		val |= PCI_COMMAND_INVALIDATE;
-		pci_write_config_word(dev, PCI_COMMAND, val);
-
-		pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE,
-				      L1_CACHE_LINE_SIZE >> 2);
-	}
-}
-#endif
-
-static void __init
-chestnut_pci_fixups(void)
-{
-#ifdef SET_PCI_COMMAND_INVALIDATE
-	set_pci_command_invalidate();
-#endif
-}
-
 /**************************************************************************
  * FUNCTION: chestnut_map_io
  *
@@ -514,27 +496,9 @@ chestnut_pci_fixups(void)
 static void __init
 chestnut_map_io(void)
 {
-#ifdef CONFIG_MV64360_SRAM_CACHEABLE
-   	io_block_mapping(CHESTNUT_INTERNAL_SRAM_BASE,
-       			CHESTNUT_INTERNAL_SRAM_BASE,
-       			CHESTNUT_INTERNAL_SRAM_SIZE,
-       			_PAGE_KERNEL | _PAGE_GUARDED);
-#else
-#ifdef CONFIG_MV64360_SRAM_CACHE_COHERENT
-   	io_block_mapping(CHESTNUT_INTERNAL_SRAM_BASE,
-       			CHESTNUT_INTERNAL_SRAM_BASE,
-       			CHESTNUT_INTERNAL_SRAM_SIZE,
-       			_PAGE_KERNEL | _PAGE_GUARDED | _PAGE_COHERENT);
-#else
-   	io_block_mapping(CHESTNUT_INTERNAL_SRAM_BASE,
-       			CHESTNUT_INTERNAL_SRAM_BASE,
-       			CHESTNUT_INTERNAL_SRAM_SIZE,
-       			_PAGE_IO);
-#endif /* !CONFIG_MV64360_SRAM_CACHE_COHERENT */
-#endif /* !CONFIG_MV64360_SRAM_CACHEABLE */
-
 #if defined(CONFIG_SERIAL_TEXT_DEBUG) || defined(CONFIG_KGDB)
-	io_block_mapping(CHESTNUT_UART_BASE, CHESTNUT_UART_BASE, 0x100000, _PAGE_IO);
+	io_block_mapping(CHESTNUT_UART_BASE, CHESTNUT_UART_BASE, 0x100000,
+		_PAGE_IO);
 #endif
 }
 
@@ -549,11 +513,9 @@ static __inline__ void
 chestnut_set_bat(void)
 {
         mb();
-        mtspr(DBAT3U, 0xf0001ffe);
-        mtspr(DBAT3L, 0xf000002a);
+        mtspr(SPRN_DBAT3U, 0xf0001ffe);
+        mtspr(SPRN_DBAT3L, 0xf000002a);
         mb();
-
-	return;
 }
 
 /**************************************************************************
@@ -587,7 +549,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.find_end_of_memory = chestnut_find_end_of_memory;
 	ppc_md.setup_io_mappings  = chestnut_map_io;
-	ppc_md.pcibios_fixup = chestnut_pci_fixups;
 
 	ppc_md.restart = chestnut_restart;
    	ppc_md.power_off = chestnut_power_off;
@@ -603,8 +564,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.heartbeat = NULL;
 
-	ppc_md.pcibios_fixup = chestnut_pci_fixups;
-
 	bh.p_base = CONFIG_MV64X60_NEW_BASE;
 
 	chestnut_set_bat();
@@ -618,6 +577,4 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	if (ppc_md.progress)
                 ppc_md.progress("chestnut_init(): exit", 0);
-
-        return;
 }

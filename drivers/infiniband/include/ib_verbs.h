@@ -73,7 +73,6 @@ enum ib_device_cap_flags {
 	IB_DEVICE_RC_RNR_NAK_GEN	= (1<<12),
 	IB_DEVICE_SRQ_RESIZE		= (1<<13),
 	IB_DEVICE_N_NOTIFY_CQ		= (1<<14),
-	IB_DEVICE_RQ_SIG_TYPE		= (1<<15)
 };
 
 enum ib_atomic_cap {
@@ -408,7 +407,6 @@ struct ib_qp_init_attr {
 	struct ib_srq	       *srq;
 	struct ib_qp_cap	cap;
 	enum ib_sig_type	sq_sig_type;
-	enum ib_sig_type	rq_sig_type;
 	enum ib_qp_type		qp_type;
 	u8			port_num; /* special QP types only */
 };
@@ -533,10 +531,6 @@ enum ib_send_flags {
 	IB_SEND_INLINE		= (1<<3)
 };
 
-enum ib_recv_flags {
-	IB_RECV_SIGNALED	= 1
-};
-
 struct ib_sge {
 	u64	addr;
 	u32	length;
@@ -579,7 +573,6 @@ struct ib_recv_wr {
 	u64			wr_id;
 	struct ib_sge	       *sg_list;
 	int			num_sge;
-	int			recv_flags;
 };
 
 enum ib_access_flags {

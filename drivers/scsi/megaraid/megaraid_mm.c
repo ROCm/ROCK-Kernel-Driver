@@ -16,6 +16,7 @@
  */
 
 #include "megaraid_mm.h"
+#include <linux/smp_lock.h>
 
 
 // Entry points for char node driver
@@ -43,8 +44,7 @@ static void mraid_mm_free_adp_resources(mraid_mmadp_t *);
 static void mraid_mm_teardown_dma_pools(mraid_mmadp_t *);
 
 #ifdef CONFIG_COMPAT
-static int mraid_mm_compat_ioctl(unsigned int, unsigned int, unsigned long,
-		struct file *);
+static long mraid_mm_compat_ioctl(struct file *, unsigned int, unsigned long);
 #endif
 
 MODULE_AUTHOR("LSI Logic Corporation");
@@ -71,6 +71,9 @@ static wait_queue_head_t wait_q;
 static struct file_operations lsi_fops = {
 	.open	= mraid_mm_open,
 	.ioctl	= mraid_mm_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = mraid_mm_compat_ioctl,
+#endif
 	.owner	= THIS_MODULE,
 };
 
@@ -1215,8 +1218,6 @@ mraid_mm_init(void)
 
 	INIT_LIST_HEAD(&adapters_list_g);
 
-	register_ioctl32_conversion(MEGAIOCCMD, mraid_mm_compat_ioctl);
-
 	return 0;
 }
 
@@ -1225,13 +1226,15 @@ mraid_mm_init(void)
  * mraid_mm_compat_ioctl	: 32bit to 64bit ioctl conversion routine
  */
 #ifdef CONFIG_COMPAT
-static int
-mraid_mm_compat_ioctl(unsigned int fd, unsigned int cmd,
-			unsigned long arg, struct file *filep)
+static long
+mraid_mm_compat_ioctl(struct file *filep, unsigned int cmd,
+		      unsigned long arg)
 {
-	struct inode *inode = filep->f_dentry->d_inode;
-
-	return mraid_mm_ioctl(inode, filep, cmd, arg);
+	int err;
+	lock_kernel();
+	err = mraid_mm_ioctl(NULL, filep, cmd, arg);
+	unlock_kernel();
+	return err;
 }
 #endif
 
@@ -1244,7 +1247,6 @@ mraid_mm_exit(void)
 	con_log(CL_DLEVEL1 , ("exiting common mod\n"));
 
 	unregister_chrdev(majorno, "megadev");
-	unregister_ioctl32_conversion(MEGAIOCCMD);
 }
 
 module_init(mraid_mm_init);

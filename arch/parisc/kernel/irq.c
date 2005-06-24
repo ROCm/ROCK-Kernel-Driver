@@ -5,6 +5,7 @@
  * Copyright (C) 1994, 1995, 1996, 1997, 1998 Ralf Baechle
  * Copyright (C) 1999 SuSE GmbH (Philipp Rumpf, prumpf@tux.org)
  * Copyright (C) 1999-2000 Grant Grundler
+ * Copyright (c) 2005 Matthew Wilcox
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -22,37 +23,18 @@
  */
 #include <linux/bitops.h>
 #include <linux/config.h>
-#include <linux/eisa.h>
 #include <linux/errno.h>
 #include <linux/init.h>
-#include <linux/module.h>
-#include <linux/signal.h>
-#include <linux/types.h>
-#include <linux/ioport.h>
-#include <linux/timex.h>
-#include <linux/slab.h>
-#include <linux/random.h>
-#include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
-#include <linux/irq.h>
 #include <linux/seq_file.h>
 #include <linux/spinlock.h>
+#include <linux/types.h>
 
-#include <asm/cache.h>
-#include <asm/pdc.h>
-
-#undef DEBUG_IRQ
 #undef PARISC_IRQ_CR16_COUNTS
 
 extern irqreturn_t timer_interrupt(int, void *, struct pt_regs *);
 extern irqreturn_t ipi_interrupt(int, void *, struct pt_regs *);
-
-#ifdef DEBUG_IRQ
-#define DBG_IRQ(irq, x)	if ((irq) != TIMER_IRQ) printk x
-#else /* DEBUG_IRQ */
-#define DBG_IRQ(irq, x)	do { } while (0)
-#endif /* DEBUG_IRQ */
 
 #define EIEM_MASK(irq)       (1UL<<(CPU_IRQ_MAX - irq))
 
@@ -120,8 +102,10 @@ int show_interrupts(struct seq_file *p, void *v)
 	}
 
 	if (i < NR_IRQS) {
+		struct irqaction *action;
+
 		spin_lock_irqsave(&irq_desc[i].lock, flags);
-		struct irqaction *action = irq_desc[i].action;
+		action = irq_desc[i].action;
 		if (!action)
 			goto skip;
 		seq_printf(p, "%3d: ", i);
@@ -200,13 +184,33 @@ int txn_claim_irq(int irq)
 	return cpu_claim_irq(irq, NULL, NULL) ? -1 : irq;
 }
 
-int txn_alloc_irq(void)
+/*
+ * The bits_wide parameter accommodates the limitations of the HW/SW which
+ * use these bits:
+ * Legacy PA I/O (GSC/NIO): 5 bits (architected EIM register)
+ * V-class (EPIC):          6 bits
+ * N/L/A-class (iosapic):   8 bits
+ * PCI 2.2 MSI:            16 bits
+ * Some PCI devices:       32 bits (Symbios SCSI/ATM/HyperFabric)
+ *
+ * On the service provider side:
+ * o PA 1.1 (and PA2.0 narrow mode)     5-bits (width of EIR register)
+ * o PA 2.0 wide mode                   6-bits (per processor)
+ * o IA64                               8-bits (0-256 total)
+ *
+ * So a Legacy PA I/O device on a PA 2.0 box can't use all the bits supported
+ * by the processor...and the N/L-class I/O subsystem supports more bits than
+ * PA2.0 has. The first case is the problem.
+ */
+int txn_alloc_irq(unsigned int bits_wide)
 {
 	int irq;
 
 	/* never return irq 0 cause that's the interval timer */
 	for (irq = CPU_IRQ_BASE + 1; irq <= CPU_IRQ_MAX; irq++) {
 		if (cpu_claim_irq(irq, NULL, NULL) < 0)
+			continue;
+		if ((irq - CPU_IRQ_BASE) >= (1 << bits_wide))
 			continue;
 		return irq;
 	}
@@ -215,7 +219,7 @@ int txn_alloc_irq(void)
 	return -1;
 }
 
-unsigned long txn_alloc_addr(int virt_irq)
+unsigned long txn_alloc_addr(unsigned int virt_irq)
 {
 	static int next_cpu = -1;
 
@@ -233,36 +237,8 @@ unsigned long txn_alloc_addr(int virt_irq)
 }
 
 
-/*
-** The alloc process needs to accept a parameter to accommodate limitations
-** of the HW/SW which use these bits:
-** Legacy PA I/O (GSC/NIO): 5 bits (architected EIM register)
-** V-class (EPIC):          6 bits
-** N/L-class/A500:          8 bits (iosapic)
-** PCI 2.2 MSI:             16 bits (I think)
-** Existing PCI devices:    32-bits (all Symbios SCSI/ATM/HyperFabric)
-**
-** On the service provider side:
-** o PA 1.1 (and PA2.0 narrow mode)     5-bits (width of EIR register)
-** o PA 2.0 wide mode                   6-bits (per processor)
-** o IA64                               8-bits (0-256 total)
-**
-** So a Legacy PA I/O device on a PA 2.0 box can't use all
-** the bits supported by the processor...and the N/L-class
-** I/O subsystem supports more bits than PA2.0 has. The first
-** case is the problem.
-*/
-unsigned int txn_alloc_data(int virt_irq, unsigned int bits_wide)
+unsigned int txn_alloc_data(unsigned int virt_irq)
 {
-	/* XXX FIXME : bits_wide indicates how wide the transaction
-	** data is allowed to be...we may need a different virt_irq
-	** if this one won't work. Another reason to index virtual
-	** irq's into a table which can manage CPU/IRQ bit separately.
-	*/
-	if ((virt_irq - CPU_IRQ_BASE) > (1 << (bits_wide - 1))) {
-		panic("Sorry -- didn't allocate valid IRQ for this device\n");
-	}
-
 	return virt_irq - CPU_IRQ_BASE;
 }
 
@@ -270,42 +246,35 @@ unsigned int txn_alloc_data(int virt_irq, unsigned int bits_wide)
 void do_cpu_irq_mask(struct pt_regs *regs)
 {
 	unsigned long eirr_val;
-	unsigned int i=3;	/* limit time in interrupt context */
+
+	irq_enter();
 
 	/*
-	 * PSW_I or EIEM bits cannot be enabled until after the
-	 * interrupts are processed.
-	 * timer_interrupt() assumes it won't get interrupted when it
-	 * holds the xtime_lock...an unmasked interrupt source could
-	 * interrupt and deadlock by trying to grab xtime_lock too.
-	 * Keeping PSW_I and EIEM disabled avoids this.
+	 * Only allow interrupt processing to be interrupted by the
+	 * timer tick
 	 */
-	set_eiem(0UL);	/* disable all extr interrupt for now */
+	set_eiem(EIEM_MASK(TIMER_IRQ));
 
 	/* 1) only process IRQs that are enabled/unmasked (cpu_eiem)
 	 * 2) We loop here on EIRR contents in order to avoid
 	 *    nested interrupts or having to take another interrupt
 	 *    when we could have just handled it right away.
-	 * 3) Limit the number of times we loop to make sure other
-	 *    processing can occur.
 	 */
 	for (;;) {
 		unsigned long bit = (1UL << (BITS_PER_LONG - 1));
 		unsigned int irq;
 		eirr_val = mfctl(23) & cpu_eiem;
-		if (!eirr_val || !i--)
+		if (!eirr_val)
 			break;
+
+		if (eirr_val & EIEM_MASK(TIMER_IRQ))
+			set_eiem(0);
 
 		mtctl(eirr_val, 23); /* reset bits we are going to process */
 
-#ifdef DEBUG_IRQ
-		if (eirr_val != (1UL << MAX_CPU_IRQ))
-			printk(KERN_DEBUG "do_cpu_irq_mask  0x%x & 0x%x\n", eirr_val, cpu_eiem);
-#endif
-
 		/* Work our way from MSb to LSb...same order we alloc EIRs */
 		for (irq = TIMER_IRQ; eirr_val && bit; bit>>=1, irq++) {
-			if (!(bit & eirr_val & cpu_eiem))
+			if (!(bit & eirr_val))
 				continue;
 
 			/* clear bit in mask - can exit loop sooner */
@@ -315,6 +284,7 @@ void do_cpu_irq_mask(struct pt_regs *regs)
 		}
 	}
 	set_eiem(cpu_eiem);
+	irq_exit();
 }
 
 

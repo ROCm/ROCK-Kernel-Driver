@@ -32,7 +32,7 @@
  *              Linux 1.3.0 changes by
  *                      Alan Cox <Alan.Cox@linux.org>
  *              More debugging, DMA support, currently maintained by
- *                      Philip Blundell <Philip.Blundell@pobox.com>
+ *                      Philip Blundell <philb@gnu.org>
  *              Multicard/soft configurable dma channel/rev 2 hardware support
  *                      by Christopher Collins <ccollins@pcug.org.au>
  *		Ethtool support (jgarzik), 11/17/2001

@@ -632,7 +632,7 @@ irda_irnet_destroy(irnet_socket *	self)
       self->iriap = NULL;
     }
 
-  /* Cleanup eventual discoveries from connection attempt */
+  /* Cleanup eventual discoveries from connection attempt or control channel */
   if(self->discoveries != NULL)
     {
       /* Cleanup our copy of the discovery log */

@@ -19,23 +19,25 @@
  *******************************************************************/
 
 /*
- * $Id: lpfc_mem.c 1.69 2004/09/28 07:54:24EDT sf_support Exp  $
+ * $Id: lpfc_mem.c 1.79 2005/04/13 14:25:50EDT sf_support Exp  $
  */
 
 #include <linux/mempool.h>
 #include <linux/pci.h>
-#include <linux/slab.h>
-#include <scsi/scsi_device.h>
+#include <linux/interrupt.h>
 
+#include "lpfc_hw.h"
 #include "lpfc_sli.h"
 #include "lpfc_disc.h"
 #include "lpfc_scsi.h"
 #include "lpfc.h"
 #include "lpfc_crtn.h"
-#include "lpfc_mem.h"
+
+#define LPFC_MBUF_POOL_SIZE     64      /* max elements in MBUF safety pool */
+#define LPFC_MEM_POOL_SIZE      64      /* max elem in non-DMA safety pool */
 
 static void *
-lpfc_pool_kmalloc(int gfp_flags, void *data)
+lpfc_pool_kmalloc(unsigned int gfp_flags, void *data)
 {
 	return kmalloc((unsigned long)data, gfp_flags);
 }
@@ -52,15 +54,15 @@ lpfc_mem_alloc(struct lpfc_hba * phba)
 	struct lpfc_dma_pool *pool = &phba->lpfc_mbuf_safety_pool;
 	int i;
 
-	phba->lpfc_scsi_dma_ext_pool = pci_pool_create("lpfc_scsi_dma_ext_pool",
-				phba->pcidev, LPFC_SCSI_DMA_EXT_SIZE, 8, 0);
-	if (!phba->lpfc_scsi_dma_ext_pool)
+	phba->lpfc_scsi_dma_buf_pool = pci_pool_create("lpfc_scsi_dma_buf_pool",
+				phba->pcidev, phba->cfg_sg_dma_buf_size, 8, 0);
+	if (!phba->lpfc_scsi_dma_buf_pool)
 		goto fail;
 
 	phba->lpfc_mbuf_pool = pci_pool_create("lpfc_mbuf_pool", phba->pcidev,
 							LPFC_BPL_SIZE, 8,0);
 	if (!phba->lpfc_mbuf_pool)
-		goto fail_free_dma_ext_pool;
+		goto fail_free_dma_buf_pool;
 
 	pool->elements = kmalloc(sizeof(struct lpfc_dmabuf) *
 					 LPFC_MBUF_POOL_SIZE, GFP_KERNEL);
@@ -75,23 +77,11 @@ lpfc_mem_alloc(struct lpfc_hba * phba)
 		pool->current_count++;
 	}
 
-	phba->iocb_mem_pool = mempool_create(LPFC_MEM_POOL_SIZE,
-			lpfc_pool_kmalloc, lpfc_pool_kfree,
-			(void *)(unsigned long)sizeof(struct lpfc_iocbq));
-	if (!phba->iocb_mem_pool)
-		goto fail_free_mbuf_pool;
-
-	phba->scsibuf_mem_pool = mempool_create(LPFC_MEM_POOL_SIZE,
-			lpfc_pool_kmalloc, lpfc_pool_kfree,
-			(void *)(unsigned long)sizeof(struct lpfc_scsi_buf));
-	if (!phba->scsibuf_mem_pool)
-		goto fail_free_iocb_pool;
-
 	phba->mbox_mem_pool = mempool_create(LPFC_MEM_POOL_SIZE,
 				lpfc_pool_kmalloc, lpfc_pool_kfree,
 				(void *)(unsigned long)sizeof(LPFC_MBOXQ_t));
 	if (!phba->mbox_mem_pool)
-		goto fail_free_scsibuf_pool;
+		goto fail_free_mbuf_pool;
 
 	phba->nlp_mem_pool = mempool_create(LPFC_MEM_POOL_SIZE,
 			lpfc_pool_kmalloc, lpfc_pool_kfree,
@@ -99,30 +89,18 @@ lpfc_mem_alloc(struct lpfc_hba * phba)
 	if (!phba->nlp_mem_pool)
 		goto fail_free_mbox_pool;
 
-	phba->bind_mem_pool = mempool_create(LPFC_MEM_POOL_SIZE,
-			lpfc_pool_kmalloc, lpfc_pool_kfree,
-			(void *)(unsigned long)sizeof(struct lpfc_bindlist));
-	if (!phba->bind_mem_pool)
-		goto fail_free_nlp_pool;
-
 	return 0;
 
- fail_free_nlp_pool:
-	mempool_destroy(phba->nlp_mem_pool);
  fail_free_mbox_pool:
 	mempool_destroy(phba->mbox_mem_pool);
- fail_free_scsibuf_pool:
-	mempool_destroy(phba->scsibuf_mem_pool);
- fail_free_iocb_pool:
-	mempool_destroy(phba->iocb_mem_pool);
  fail_free_mbuf_pool:
 	while (--i)
 		pci_pool_free(phba->lpfc_mbuf_pool, pool->elements[i].virt,
 						 pool->elements[i].phys);
 	kfree(pool->elements);
 	pci_pool_destroy(phba->lpfc_mbuf_pool);
- fail_free_dma_ext_pool:
-	pci_pool_destroy(phba->lpfc_scsi_dma_ext_pool);
+ fail_free_dma_buf_pool:
+	pci_pool_destroy(phba->lpfc_scsi_dma_buf_pool);
  fail:
 	return -ENOMEM;
 }
@@ -133,16 +111,28 @@ lpfc_mem_free(struct lpfc_hba * phba)
 	struct lpfc_sli *psli = &phba->sli;
 	struct lpfc_dma_pool *pool = &phba->lpfc_mbuf_safety_pool;
 	LPFC_MBOXQ_t *mbox, *next_mbox;
+	struct lpfc_dmabuf   *mp;
 	int i;
 
 	list_for_each_entry_safe(mbox, next_mbox, &psli->mboxq, list) {
+		mp = (struct lpfc_dmabuf *) (mbox->context1);
+		if (mp) {
+			lpfc_mbuf_free(phba, mp->virt, mp->phys);
+			kfree(mp);
+		}
 		list_del(&mbox->list);
 		mempool_free(mbox, phba->mbox_mem_pool);
 	}
 
-	psli->sliinit.sli_flag &= ~LPFC_SLI_MBOX_ACTIVE;
+	psli->sli_flag &= ~LPFC_SLI_MBOX_ACTIVE;
 	if (psli->mbox_active) {
-		mempool_free(psli->mbox_active, phba->mbox_mem_pool);
+		mbox = psli->mbox_active;
+		mp = (struct lpfc_dmabuf *) (mbox->context1);
+		if (mp) {
+			lpfc_mbuf_free(phba, mp->virt, mp->phys);
+			kfree(mp);
+		}
+		mempool_free(mbox, phba->mbox_mem_pool);
 		psli->mbox_active = NULL;
 	}
 
@@ -150,13 +140,10 @@ lpfc_mem_free(struct lpfc_hba * phba)
 		pci_pool_free(phba->lpfc_mbuf_pool, pool->elements[i].virt,
 						 pool->elements[i].phys);
 	kfree(pool->elements);
-	mempool_destroy(phba->bind_mem_pool);
 	mempool_destroy(phba->nlp_mem_pool);
 	mempool_destroy(phba->mbox_mem_pool);
-	mempool_destroy(phba->scsibuf_mem_pool);
-	mempool_destroy(phba->iocb_mem_pool);
 
-	pci_pool_destroy(phba->lpfc_scsi_dma_ext_pool);
+	pci_pool_destroy(phba->lpfc_scsi_dma_buf_pool);
 	pci_pool_destroy(phba->lpfc_mbuf_pool);
 }
 
@@ -166,7 +153,7 @@ lpfc_mbuf_alloc(struct lpfc_hba *phba, int mem_flags, dma_addr_t *handle)
 	struct lpfc_dma_pool *pool = &phba->lpfc_mbuf_safety_pool;
 	void *ret;
 
-	ret = pci_pool_alloc(phba->lpfc_mbuf_pool, GFP_ATOMIC, handle);
+	ret = pci_pool_alloc(phba->lpfc_mbuf_pool, GFP_KERNEL, handle);
 
 	if (!ret && ( mem_flags & MEM_PRI) && pool->current_count) {
 		pool->current_count--;

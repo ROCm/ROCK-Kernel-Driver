@@ -259,4 +259,6 @@ static __inline__ unsigned long __xchg(unsigned long x, volatile void * ptr, int
 void disable_hlt(void);
 void enable_hlt(void);
 
+#define arch_align_stack(x) (x)
+
 #endif

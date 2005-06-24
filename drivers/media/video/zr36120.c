@@ -30,6 +30,7 @@
 #include <linux/mm.h>
 #include <linux/pci.h>
 #include <linux/signal.h>
+#include <linux/wait.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
@@ -899,12 +900,11 @@ long zoran_read(struct video_device* dev, char* buf, unsigned long count, int no
 		zoran_cap(ztv, 1);
 
 		/* wait till this buffer gets grabbed */
-		while (unused->status == FBUFFER_BUSY) {
-			interruptible_sleep_on(&ztv->grabq);
-			/* see if a signal did it */
-			if (signal_pending(current))
-				return -EINTR;
-		}
+		wait_event_interruptible(ztv->grabq,
+				(unused->status != FBUFFER_BUSY));
+		/* see if a signal did it */
+		if (signal_pending(current))
+			return -EINTR;
 		done = unused;
 	}
 	else
@@ -1326,12 +1326,11 @@ int zoran_ioctl(struct video_device* dev, unsigned int cmd, void *arg)
 			return -EINVAL;
 		 case FBUFFER_BUSY:
 			/* wait till this buffer gets grabbed */
-			while (ztv->grabinfo[i].status == FBUFFER_BUSY) {
-				interruptible_sleep_on(&ztv->grabq);
-				/* see if a signal did it */
-				if (signal_pending(current))
-					return -EINTR;
-			}
+			wait_event_interruptible(ztv->grabq,
+					(ztv->grabinfo[i].status != FBUFFER_BUSY));
+			/* see if a signal did it */
+			if (signal_pending(current))
+				return -EINTR;
 			/* don't fall through; a DONE buffer is not UNUSED */
 			break;
 		 case FBUFFER_DONE:
@@ -1640,12 +1639,11 @@ long vbi_read(struct video_device* dev, char* buf, unsigned long count, int nonb
 		zoran_cap(ztv, 1);
 
 		/* wait till this buffer gets grabbed */
-		while (unused->status == FBUFFER_BUSY) {
-			interruptible_sleep_on(&ztv->vbiq);
-			/* see if a signal did it */
-			if (signal_pending(current))
-				return -EINTR;
-		}
+		wait_event_interruptible(ztv->vbiq,
+				(unused->status != FBUFFER_BUSY));
+		/* see if a signal did it */
+		if (signal_pending(current))
+			return -EINTR;
 		done = unused;
 	}
 	else

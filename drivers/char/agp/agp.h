@@ -1,5 +1,6 @@
 /*
  * AGPGART
+ * Copyright (C) 2004 Silicon Graphics, Inc.
  * Copyright (C) 2002-2004 Dave Jones
  * Copyright (C) 1999 Jeff Hartmann
  * Copyright (C) 1999 Precision Insight, Inc.
@@ -100,18 +101,19 @@ struct agp_bridge_driver {
 	struct gatt_mask *masks;
 	int (*fetch_size)(void);
 	int (*configure)(void);
-	void (*agp_enable)(u32);
+	void (*agp_enable)(struct agp_bridge_data *, u32);
 	void (*cleanup)(void);
 	void (*tlb_flush)(struct agp_memory *);
-	unsigned long (*mask_memory)(unsigned long, int);
+	unsigned long (*mask_memory)(struct agp_bridge_data *,
+		unsigned long, int);
 	void (*cache_flush)(void);
-	int (*create_gatt_table)(void);
-	int (*free_gatt_table)(void);
+	int (*create_gatt_table)(struct agp_bridge_data *);
+	int (*free_gatt_table)(struct agp_bridge_data *);
 	int (*insert_memory)(struct agp_memory *, off_t, int);
 	int (*remove_memory)(struct agp_memory *, off_t, int);
 	struct agp_memory *(*alloc_by_type) (size_t, int);
 	void (*free_by_type)(struct agp_memory *);
-	void *(*agp_alloc_page)(void);
+	void *(*agp_alloc_page)(struct agp_bridge_data *);
 	void (*agp_destroy_page)(void *);
 };
 
@@ -137,8 +139,10 @@ struct agp_bridge_data {
 	int max_memory_agp;	/* in number of pages */
 	int aperture_size_idx;
 	int capndx;
+	int flags;
 	char major_version;
 	char minor_version;
+	struct list_head list;
 };
 
 #define KB(x)	((x) * 1024)
@@ -243,24 +247,26 @@ int agp_frontend_initialize(void);
 void agp_frontend_cleanup(void);
 
 /* Generic routines. */
-void agp_generic_enable(u32 mode);
-int agp_generic_create_gatt_table(void);
-int agp_generic_free_gatt_table(void);
+void agp_generic_enable(struct agp_bridge_data *bridge, u32 mode);
+int agp_generic_create_gatt_table(struct agp_bridge_data *bridge);
+int agp_generic_free_gatt_table(struct agp_bridge_data *bridge);
 struct agp_memory *agp_create_memory(int scratch_pages);
 int agp_generic_insert_memory(struct agp_memory *mem, off_t pg_start, int type);
 int agp_generic_remove_memory(struct agp_memory *mem, off_t pg_start, int type);
 struct agp_memory *agp_generic_alloc_by_type(size_t page_count, int type);
 void agp_generic_free_by_type(struct agp_memory *curr);
-void *agp_generic_alloc_page(void);
+void *agp_generic_alloc_page(struct agp_bridge_data *bridge);
 void agp_generic_destroy_page(void *addr);
 void agp_free_key(int key);
 int agp_num_entries(void);
-u32 agp_collect_device_status(u32 mode, u32 command);
+u32 agp_collect_device_status(struct agp_bridge_data *bridge, u32 mode, u32 command);
 void agp_device_command(u32 command, int agp_v3);
 int agp_3_5_enable(struct agp_bridge_data *bridge);
 void global_cache_flush(void);
 void get_agp_version(struct agp_bridge_data *bridge);
-unsigned long agp_generic_mask_memory(unsigned long addr, int type);
+unsigned long agp_generic_mask_memory(struct agp_bridge_data *bridge,
+	unsigned long addr, int type);
+struct agp_bridge_data *agp_generic_find_bridge(struct pci_dev *pdev);
 
 /* generic routines for agp>=3 */
 int agp3_generic_fetch_size(void);
@@ -316,5 +322,12 @@ extern int agp_try_unsupported_boot;
 
 #define AGPCTRL_APERENB		(1<<8)
 #define AGPCTRL_GTLBEN		(1<<7)
+
+#define AGP2_RESERVED_MASK 0x00fffcc8
+#define AGP3_RESERVED_MASK 0x00ff00c4
+
+#define AGP_ERRATA_FASTWRITES 1<<0
+#define AGP_ERRATA_SBA	 1<<1
+#define AGP_ERRATA_1X 1<<2
 
 #endif	/* _AGP_BACKEND_PRIV_H */

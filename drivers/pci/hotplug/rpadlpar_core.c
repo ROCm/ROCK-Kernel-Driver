@@ -142,7 +142,7 @@ static int pci_add_secondary_bus(struct device_node *dn,
 	child = pci_add_new_bus(bridge_dev->bus, bridge_dev, sec_busno);
 	if (!child) {
 		printk(KERN_ERR "%s: could not add secondary bus\n", __FUNCTION__);
-		return 1;
+		return -ENOMEM;
 	}
 
 	sprintf(child->name, "PCI Bus #%02x", child->number);
@@ -204,7 +204,7 @@ static int dlpar_pci_remove_bus(struct pci_dev *bridge_dev)
 	if (!bridge_dev) {
 		printk(KERN_ERR "%s: unexpected null device\n",
 			__FUNCTION__);
-		return 1;
+		return -EINVAL;
 	}
 
 	secondary_bus = bridge_dev->subordinate;
@@ -212,7 +212,7 @@ static int dlpar_pci_remove_bus(struct pci_dev *bridge_dev)
 	if (unmap_bus_range(secondary_bus)) {
 		printk(KERN_ERR "%s: failed to unmap bus range\n",
 			__FUNCTION__);
-		return 1;
+		return -ERANGE;
 	}
 
 	pci_remove_bus_device(bridge_dev);
@@ -282,7 +282,7 @@ static int dlpar_remove_phb(struct slot *slot)
 	}
 
 	rc = dlpar_remove_root_bus(phb);
-	if (rc)
+	if (rc < 0)
 		return rc;
 
 	return 0;
@@ -294,7 +294,7 @@ static int dlpar_add_phb(struct device_node *dn)
 
 	phb = init_phb_dynamic(dn);
 	if (!phb)
-		return 1;
+		return -EINVAL;
 
 	return 0;
 }

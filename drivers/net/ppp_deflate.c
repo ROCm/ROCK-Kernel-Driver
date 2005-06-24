@@ -87,8 +87,7 @@ static void z_comp_free(void *arg)
 
 	if (state) {
 		zlib_deflateEnd(&state->strm);
-		if (state->strm.workspace)
-			vfree(state->strm.workspace);
+		vfree(state->strm.workspace);
 		kfree(state);
 	}
 }
@@ -308,8 +307,7 @@ static void z_decomp_free(void *arg)
 
 	if (state) {
 		zlib_inflateEnd(&state->strm);
-		if (state->strm.workspace)
-			kfree(state->strm.workspace);
+		kfree(state->strm.workspace);
 		kfree(state);
 	}
 }
@@ -600,7 +598,7 @@ extern void ppp_unregister_compressor (struct compressor *cp);
 /*
  * Procedures exported to if_ppp.c.
  */
-struct compressor ppp_deflate = {
+static struct compressor ppp_deflate = {
 	.compress_proto =	CI_DEFLATE,
 	.comp_alloc =		z_comp_alloc,
 	.comp_free =		z_comp_free,
@@ -618,7 +616,7 @@ struct compressor ppp_deflate = {
 	.owner =		THIS_MODULE
 };
 
-struct compressor ppp_deflate_draft = {
+static struct compressor ppp_deflate_draft = {
 	.compress_proto =	CI_DEFLATE_DRAFT,
 	.comp_alloc =		z_comp_alloc,
 	.comp_free =		z_comp_free,

@@ -53,9 +53,7 @@ static int sendcmd(
 	int cmd_type);
 
 
-const char *cciss_scsi_info(struct Scsi_Host *sa);
-
-int cciss_scsi_proc_info(
+static int cciss_scsi_proc_info(
 		struct Scsi_Host *sh,
 		char *buffer, /* data buffer */
 		char **start, 	   /* where data in buffer starts */
@@ -63,7 +61,7 @@ int cciss_scsi_proc_info(
 		int length, 	   /* length of data in buffer */
 		int func);	   /* 0 == read, 1 == write */
 
-int cciss_scsi_queue_command (struct scsi_cmnd *cmd, 
+static int cciss_scsi_queue_command (struct scsi_cmnd *cmd,
 		void (* done)(struct scsi_cmnd *));
 
 static struct cciss_scsi_hba_t ccissscsi[MAX_CTLR] = {
@@ -717,8 +715,6 @@ cciss_scsi_detect(int ctlr)
 	return 0;
 }
 
-static void __exit cleanup_cciss_module(void);
-
 static void
 cciss_unmap_one(struct pci_dev *pdev,
 		CommandList_struct *cp,
@@ -1119,7 +1115,7 @@ cciss_scsi_user_command(int ctlr, int hostno, char *buffer, int length)
 }
 
 
-int
+static int
 cciss_scsi_proc_info(struct Scsi_Host *sh,
 		char *buffer, /* data buffer */
 		char **start, 	   /* where data in buffer starts */
@@ -1153,29 +1149,6 @@ cciss_scsi_proc_info(struct Scsi_Host *sh,
 		return cciss_scsi_user_command(cntl_num, sh->host_no,
 			buffer, length);	
 } 
-
-/* this is via the generic proc support */
-const char *
-cciss_scsi_info(struct Scsi_Host *sa)
-{
-	static char buf[300];
-	ctlr_info_t *ci;
-
-	/* probably need to work on putting a bit more info in here... */
-	/* this is output via the /proc filesystem. */
-
-	ci = (ctlr_info_t *) sa->hostdata[0];
-
-	sprintf(buf, "%s %c%c%c%c\n",
-		ci->product_name, 
-		ci->firm_ver[0],
-		ci->firm_ver[1],
-		ci->firm_ver[2],
-		ci->firm_ver[3]);
-
-	return buf; 
-}
-
 
 /* cciss_scatter_gather takes a struct scsi_cmnd, (cmd), and does the pci 
    dma mapping  and fills in the scatter gather entries of the 
@@ -1230,7 +1203,7 @@ cciss_scatter_gather(struct pci_dev *pdev,
 }
 
 
-int 
+static int
 cciss_scsi_queue_command (struct scsi_cmnd *cmd, void (* done)(struct scsi_cmnd *))
 {
 	ctlr_info_t **c;

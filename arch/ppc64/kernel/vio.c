@@ -557,48 +557,61 @@ int vio_disable_interrupts(struct vio_dev *dev)
 EXPORT_SYMBOL(vio_disable_interrupts);
 #endif
 
-dma_addr_t vio_map_single(struct vio_dev *dev, void *vaddr,
+static dma_addr_t vio_map_single(struct device *dev, void *vaddr,
 			  size_t size, enum dma_data_direction direction)
 {
-	return iommu_map_single(dev->iommu_table, vaddr, size, direction);
+	return iommu_map_single(to_vio_dev(dev)->iommu_table, vaddr, size,
+			direction);
 }
-EXPORT_SYMBOL(vio_map_single);
 
-void vio_unmap_single(struct vio_dev *dev, dma_addr_t dma_handle,
+static void vio_unmap_single(struct device *dev, dma_addr_t dma_handle,
 		      size_t size, enum dma_data_direction direction)
 {
-	iommu_unmap_single(dev->iommu_table, dma_handle, size, direction);
+	iommu_unmap_single(to_vio_dev(dev)->iommu_table, dma_handle, size,
+			direction);
 }
-EXPORT_SYMBOL(vio_unmap_single);
 
-int vio_map_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
-	       enum dma_data_direction direction)
+static int vio_map_sg(struct device *dev, struct scatterlist *sglist,
+		int nelems, enum dma_data_direction direction)
 {
-	return iommu_map_sg(&vdev->dev, vdev->iommu_table, sglist,
+	return iommu_map_sg(dev, to_vio_dev(dev)->iommu_table, sglist,
 			nelems, direction);
 }
-EXPORT_SYMBOL(vio_map_sg);
 
-void vio_unmap_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
-		  enum dma_data_direction direction)
+static void vio_unmap_sg(struct device *dev, struct scatterlist *sglist,
+		int nelems, enum dma_data_direction direction)
 {
-	iommu_unmap_sg(vdev->iommu_table, sglist, nelems, direction);
+	iommu_unmap_sg(to_vio_dev(dev)->iommu_table, sglist, nelems, direction);
 }
-EXPORT_SYMBOL(vio_unmap_sg);
 
-void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
-			   dma_addr_t *dma_handle)
+static void *vio_alloc_coherent(struct device *dev, size_t size,
+			   dma_addr_t *dma_handle, unsigned int __nocast flag)
 {
-	return iommu_alloc_consistent(dev->iommu_table, size, dma_handle);
+	return iommu_alloc_coherent(to_vio_dev(dev)->iommu_table, size,
+			dma_handle, flag);
 }
-EXPORT_SYMBOL(vio_alloc_consistent);
 
-void vio_free_consistent(struct vio_dev *dev, size_t size,
+static void vio_free_coherent(struct device *dev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
 {
-	iommu_free_consistent(dev->iommu_table, size, vaddr, dma_handle);
+	iommu_free_coherent(to_vio_dev(dev)->iommu_table, size, vaddr,
+			dma_handle);
 }
-EXPORT_SYMBOL(vio_free_consistent);
+
+static int vio_dma_supported(struct device *dev, u64 mask)
+{
+	return 1;
+}
+
+struct dma_mapping_ops vio_dma_ops = {
+	.alloc_coherent = vio_alloc_coherent,
+	.free_coherent = vio_free_coherent,
+	.map_single = vio_map_single,
+	.unmap_single = vio_unmap_single,
+	.map_sg = vio_map_sg,
+	.unmap_sg = vio_unmap_sg,
+	.dma_supported = vio_dma_supported,
+};
 
 static int vio_bus_match(struct device *dev, struct device_driver *drv)
 {

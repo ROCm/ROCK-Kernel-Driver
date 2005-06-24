@@ -37,13 +37,6 @@
 #include "dvb_net.h"
 
 
-
-
-
-
-
-
-
 #ifdef CONFIG_DVB_CINERGYT2_TUNING
 	#define STREAM_URB_COUNT (CONFIG_DVB_CINERGYT2_STREAM_URB_COUNT)
 	#define STREAM_BUF_SIZE (CONFIG_DVB_CINERGYT2_STREAM_BUF_SIZE)
@@ -66,7 +59,7 @@ static int debug;
 module_param_named(debug, debug, int, 0644);
 MODULE_PARM_DESC(debug, "Turn on/off debugging (default:off).");
 
-#define dprintk(level, args...) \
+#define dprintk(level, args...)						\
 do {									\
 	if ((debug & level)) {						\
 		printk("%s: %s(): ", __stringify(KBUILD_MODNAME),	\
@@ -77,8 +70,8 @@ do {									\
 enum cinergyt2_ep1_cmd {
 	CINERGYT2_EP1_PID_TABLE_RESET		= 0x01,
 	CINERGYT2_EP1_PID_SETUP			= 0x02,
-	CINERGYT2_EP1_CONTROL_STREAM_TRANSFER 	= 0x03,
-	CINERGYT2_EP1_SET_TUNER_PARAMETERS 	= 0x04,
+	CINERGYT2_EP1_CONTROL_STREAM_TRANSFER	= 0x03,
+	CINERGYT2_EP1_SET_TUNER_PARAMETERS	= 0x04,
 	CINERGYT2_EP1_GET_TUNER_STATUS		= 0x05,
 	CINERGYT2_EP1_START_SCAN		= 0x06,
 	CINERGYT2_EP1_CONTINUE_SCAN		= 0x07,
@@ -126,7 +119,7 @@ struct cinergyt2 {
 	struct dvb_demux demux;
 	struct usb_device *udev;
 	struct semaphore sem;
-	struct dvb_adapter *adapter;
+	struct dvb_adapter adapter;
 	struct dvb_device *fedev;
 	struct dmxdev dmxdev;
 	struct dvb_net dvbnet;
@@ -143,7 +136,7 @@ struct cinergyt2 {
 
 	void *streambuf;
 	dma_addr_t streambuf_dmahandle;
-	struct urb *stream_urb[STREAM_URB_COUNT];
+	struct urb *stream_urb [STREAM_URB_COUNT];
 
 #ifdef ENABLE_RC
 	struct input_dev rc_input_dev;
@@ -164,47 +157,47 @@ struct cinergyt2_rc_event {
 } __attribute__((packed));
 
 static const uint32_t rc_keys [] = {
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xfe01eb04,	KEY_POWER,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xfd02eb04,	KEY_1,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xfc03eb04,	KEY_2,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xfb04eb04,	KEY_3,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xfa05eb04,	KEY_4,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xf906eb04,	KEY_5,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xf807eb04,	KEY_6,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xf708eb04,	KEY_7,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xf609eb04,	KEY_8,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xf50aeb04,	KEY_9,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xf30ceb04,	KEY_0,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xfe01eb04,	KEY_POWER,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xfd02eb04,	KEY_1,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xfc03eb04,	KEY_2,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xfb04eb04,	KEY_3,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xfa05eb04,	KEY_4,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xf906eb04,	KEY_5,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xf807eb04,	KEY_6,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xf708eb04,	KEY_7,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xf609eb04,	KEY_8,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xf50aeb04,	KEY_9,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xf30ceb04,	KEY_0,
 	CINERGYT2_RC_EVENT_TYPE_NEC,	0xf40beb04,	KEY_VIDEO,
 	CINERGYT2_RC_EVENT_TYPE_NEC,	0xf20deb04,	KEY_REFRESH,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xf10eeb04,	KEY_SELECT,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xf00feb04,	KEY_EPG,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xef10eb04,	KEY_UP,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xeb14eb04,	KEY_DOWN,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xee11eb04,	KEY_LEFT,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xec13eb04,	KEY_RIGHT,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xed12eb04,	KEY_OK,	
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xea15eb04,	KEY_TEXT,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xe916eb04,	KEY_INFO,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xe817eb04,	KEY_RED,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xe718eb04,	KEY_GREEN,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xe619eb04,	KEY_YELLOW,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xe51aeb04,	KEY_BLUE,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xe31ceb04,	KEY_VOLUMEUP,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xe11eeb04,	KEY_VOLUMEDOWN,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xe21deb04,	KEY_MUTE,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xe41beb04,	KEY_CHANNELUP,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xe01feb04,	KEY_CHANNELDOWN,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xbf40eb04,	KEY_PAUSE,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xb34ceb04,	KEY_PLAY,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xa758eb04,	KEY_RECORD,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xab54eb04,	KEY_PREVIOUS,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xb748eb04,	KEY_STOP,
-	CINERGYT2_RC_EVENT_TYPE_NEC, 	0xa35ceb04,	KEY_NEXT
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xf10eeb04,	KEY_SELECT,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xf00feb04,	KEY_EPG,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xef10eb04,	KEY_UP,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xeb14eb04,	KEY_DOWN,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xee11eb04,	KEY_LEFT,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xec13eb04,	KEY_RIGHT,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xed12eb04,	KEY_OK,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xea15eb04,	KEY_TEXT,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xe916eb04,	KEY_INFO,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xe817eb04,	KEY_RED,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xe718eb04,	KEY_GREEN,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xe619eb04,	KEY_YELLOW,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xe51aeb04,	KEY_BLUE,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xe31ceb04,	KEY_VOLUMEUP,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xe11eeb04,	KEY_VOLUMEDOWN,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xe21deb04,	KEY_MUTE,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xe41beb04,	KEY_CHANNELUP,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xe01feb04,	KEY_CHANNELDOWN,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xbf40eb04,	KEY_PAUSE,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xb34ceb04,	KEY_PLAY,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xa758eb04,	KEY_RECORD,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xab54eb04,	KEY_PREVIOUS,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xb748eb04,	KEY_STOP,
+	CINERGYT2_RC_EVENT_TYPE_NEC,	0xa35ceb04,	KEY_NEXT
 };
 
 static int cinergyt2_command (struct cinergyt2 *cinergyt2,
-		    char *send_buf, int send_buf_len,
+			      char *send_buf, int send_buf_len,
 			      char *recv_buf, int recv_buf_len)
 {
 	int actual_len;
@@ -212,7 +205,7 @@ static int cinergyt2_command (struct cinergyt2 *cinergyt2,
 	int ret;
 
 	ret = usb_bulk_msg(cinergyt2->udev, usb_sndbulkpipe(cinergyt2->udev, 1),
-			   send_buf, send_buf_len, &actual_len, HZ);
+			   send_buf, send_buf_len, &actual_len, 1000);
 
 	if (ret)
 		dprintk(1, "usb_bulk_msg (send) failed, err %i\n", ret);
@@ -221,7 +214,7 @@ static int cinergyt2_command (struct cinergyt2 *cinergyt2,
 		recv_buf = &dummy;
 
 	ret = usb_bulk_msg(cinergyt2->udev, usb_rcvbulkpipe(cinergyt2->udev, 1),
-			   recv_buf, recv_buf_len, &actual_len, HZ);
+			   recv_buf, recv_buf_len, &actual_len, 1000);
 
 	if (ret)
 		dprintk(1, "usb_bulk_msg (read) failed, err %i\n", ret);
@@ -232,13 +225,13 @@ static int cinergyt2_command (struct cinergyt2 *cinergyt2,
 static void cinergyt2_control_stream_transfer (struct cinergyt2 *cinergyt2, int enable)
 {
 	char buf [] = { CINERGYT2_EP1_CONTROL_STREAM_TRANSFER, enable ? 1 : 0 };
-  	cinergyt2_command(cinergyt2, buf, sizeof(buf), NULL, 0);
+	cinergyt2_command(cinergyt2, buf, sizeof(buf), NULL, 0);
 }
 
 static void cinergyt2_sleep (struct cinergyt2 *cinergyt2, int sleep)
 {
 	char buf [] = { CINERGYT2_EP1_SLEEP_MODE, sleep ? 1 : 0 };
-  	cinergyt2_command(cinergyt2, buf, sizeof(buf), NULL, 0);
+	cinergyt2_command(cinergyt2, buf, sizeof(buf), NULL, 0);
 	cinergyt2->sleeping = sleep;
 }
 
@@ -290,7 +283,7 @@ static int cinergyt2_alloc_stream_urbs (struct cinergyt2 *cinergyt2)
 {
 	int i;
 
-	cinergyt2->streambuf = pci_alloc_consistent(NULL, 
+	cinergyt2->streambuf = pci_alloc_consistent(NULL,
 					      STREAM_URB_COUNT*STREAM_BUF_SIZE,
 					      &cinergyt2->streambuf_dmahandle);
 	if (!cinergyt2->streambuf) {
@@ -301,7 +294,7 @@ static int cinergyt2_alloc_stream_urbs (struct cinergyt2 *cinergyt2)
 	memset(cinergyt2->streambuf, 0, STREAM_URB_COUNT*STREAM_BUF_SIZE);
 
 	for (i=0; i<STREAM_URB_COUNT; i++) {
-		struct urb *urb;	
+		struct urb *urb;
 
 		if (!(urb = usb_alloc_urb(0, GFP_ATOMIC))) {
 			dprintk(1, "failed to alloc consistent stream urbs, bailing out!\n");
@@ -352,9 +345,9 @@ static int cinergyt2_start_feed(struct dvb_demux_feed *dvbdmxfeed)
 
 	if (down_interruptible(&cinergyt2->sem))
 		return -ERESTARTSYS;
-	
+
 	if (cinergyt2->streaming == 0)
-	       	cinergyt2_start_stream_xfer(cinergyt2);
+		cinergyt2_start_stream_xfer(cinergyt2);
 
 	cinergyt2->streaming++;
 	up(&cinergyt2->sem);
@@ -364,7 +357,7 @@ static int cinergyt2_start_feed(struct dvb_demux_feed *dvbdmxfeed)
 static int cinergyt2_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 {
 	struct dvb_demux *demux = dvbdmxfeed->demux;
-	struct cinergyt2 *cinergyt2 = demux->priv;	
+	struct cinergyt2 *cinergyt2 = demux->priv;
 
 	if (down_interruptible(&cinergyt2->sem))
 		return -ERESTARTSYS;
@@ -497,7 +490,7 @@ static int cinergyt2_open (struct inode *inode, struct file *file)
 	if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
 		cinergyt2_sleep(cinergyt2, 0);
 		schedule_delayed_work(&cinergyt2->query_work, HZ/2);
-}
+	}
 
 	up(&cinergyt2->sem);
 	return 0;
@@ -520,20 +513,20 @@ static int cinergyt2_release (struct inode *inode, struct file *file)
 	up(&cinergyt2->sem);
 
 	return dvb_generic_release(inode, file);
-	}
+}
 
 static unsigned int cinergyt2_poll (struct file *file, struct poll_table_struct *wait)
-	{
+{
 	struct dvb_device *dvbdev = file->private_data;
 	struct cinergyt2 *cinergyt2 = dvbdev->priv;
 	poll_wait(file, &cinergyt2->poll_wq, wait);
 	return (POLLIN | POLLRDNORM | POLLPRI);
-	}
+}
 
 
 static int cinergyt2_ioctl (struct inode *inode, struct file *file,
 		     unsigned cmd, unsigned long arg)
-	{
+{
 	struct dvb_device *dvbdev = file->private_data;
 	struct cinergyt2 *cinergyt2 = dvbdev->priv;
 	struct dvbt_get_status_msg *stat = &cinergyt2->status;
@@ -574,7 +567,7 @@ static int cinergyt2_ioctl (struct inode *inode, struct file *file,
 		/* UNC are already converted to host byte order... */
 		return put_user(stat->uncorrected_block_count,
 				(__u32 __user *) arg);
-	
+
 	case FE_SET_FRONTEND:
 	{
 		struct dvbt_set_parameters_msg *param = &cinergyt2->param;
@@ -611,7 +604,7 @@ static int cinergyt2_ioctl (struct inode *inode, struct file *file,
 	case FE_GET_FRONTEND:
 		/**
 		 *  trivial to implement (see struct dvbt_get_status_msg).
-		 *  equivalent to FE_READ ioctls, but needs 
+		 *  equivalent to FE_READ ioctls, but needs
 		 *  TPS -> linux-dvb parameter set conversion. Feel free
 		 *  to implement this and send us a patch if you need this
 		 *  functionality.
@@ -661,7 +654,7 @@ static int cinergyt2_mmap(struct file *file, struct vm_area_struct *vma)
 		goto bailout;
 	}
 
-        vma->vm_flags |= (VM_IO | VM_DONTCOPY);
+	vma->vm_flags |= (VM_IO | VM_DONTCOPY);
 	vma->vm_file = file;
 
 	ret = remap_pfn_range(vma, vma->vm_start,
@@ -700,7 +693,7 @@ static void cinergyt2_query_rc (void *data)
 	if (down_interruptible(&cinergyt2->sem))
 		return;
 
-	len = cinergyt2_command(cinergyt2, buf, sizeof(buf), 
+	len = cinergyt2_command(cinergyt2, buf, sizeof(buf),
 			     (char *) rc_events, sizeof(rc_events));
 
 	for (n=0; len>0 && n<(len/sizeof(rc_events[0])); n++) {
@@ -712,7 +705,7 @@ static void cinergyt2_query_rc (void *data)
 			/**
 			 * keyrepeat bit. If we would handle this properly
 			 * we would need to emit down events as long the
-			 * keyrepeat goes, a up event if no further 
+			 * keyrepeat goes, a up event if no further
 			 * repeat bits occur. Would need a timer to implement
 			 * and no other driver does this, so we simply
 			 * emit the last key up/down sequence again.
@@ -733,7 +726,7 @@ static void cinergyt2_query_rc (void *data)
 			input_report_key(&cinergyt2->rc_input_dev, cinergyt2->rc_input_event, 1);
 			input_report_key(&cinergyt2->rc_input_dev, cinergyt2->rc_input_event, 0);
 			input_sync(&cinergyt2->rc_input_dev);
-	    	}
+		}
 	}
 
 	schedule_delayed_work(&cinergyt2->rc_query_work,
@@ -793,7 +786,7 @@ static int cinergyt2_probe (struct usb_interface *intf,
 
 	cinergyt2->udev = interface_to_usbdev(intf);
 	cinergyt2->param.cmd = CINERGYT2_EP1_SET_TUNER_PARAMETERS;
-	
+
 	if (cinergyt2_alloc_stream_urbs (cinergyt2) < 0) {
 		dprintk(1, "unable to allocate stream urbs\n");
 		kfree(cinergyt2);
@@ -808,8 +801,8 @@ static int cinergyt2_probe (struct usb_interface *intf,
 	cinergyt2->demux.start_feed = cinergyt2_start_feed;
 	cinergyt2->demux.stop_feed = cinergyt2_stop_feed;
 	cinergyt2->demux.dmx.capabilities = DMX_TS_FILTERING |
-					 DMX_SECTION_FILTERING |
-					 DMX_MEMORY_BASED_FILTERING;
+					    DMX_SECTION_FILTERING |
+					    DMX_MEMORY_BASED_FILTERING;
 
 	if ((err = dvb_dmx_init(&cinergyt2->demux)) < 0) {
 		dprintk(1, "dvb_dmx_init() failed (err = %d)\n", err);
@@ -820,20 +813,20 @@ static int cinergyt2_probe (struct usb_interface *intf,
 	cinergyt2->dmxdev.demux = &cinergyt2->demux.dmx;
 	cinergyt2->dmxdev.capabilities = 0;
 
-	if ((err = dvb_dmxdev_init(&cinergyt2->dmxdev, cinergyt2->adapter)) < 0) {
+	if ((err = dvb_dmxdev_init(&cinergyt2->dmxdev, &cinergyt2->adapter)) < 0) {
 		dprintk(1, "dvb_dmxdev_init() failed (err = %d)\n", err);
 		goto bailout;
 	}
 
-	if (dvb_net_init(cinergyt2->adapter, &cinergyt2->dvbnet, &cinergyt2->demux.dmx))
+	if (dvb_net_init(&cinergyt2->adapter, &cinergyt2->dvbnet, &cinergyt2->demux.dmx))
 		dprintk(1, "dvb_net_init() failed!\n");
 
-	dvb_register_device(cinergyt2->adapter, &cinergyt2->fedev,
+	dvb_register_device(&cinergyt2->adapter, &cinergyt2->fedev,
 			    &cinergyt2_fe_template, cinergyt2,
 			    DVB_DEVICE_FRONTEND);
 
 #ifdef ENABLE_RC
-	init_input_dev(&cinergyt2->rc_input_dev);			
+	init_input_dev(&cinergyt2->rc_input_dev);
 
 	cinergyt2->rc_input_dev.evbit[0] = BIT(EV_KEY);
 	cinergyt2->rc_input_dev.keycodesize = sizeof(unsigned char);
@@ -846,7 +839,7 @@ static int cinergyt2_probe (struct usb_interface *intf,
 	input_register_device(&cinergyt2->rc_input_dev);
 
 	cinergyt2->rc_input_event = KEY_MAX;
-	
+
 	INIT_WORK(&cinergyt2->rc_query_work, cinergyt2_query_rc, cinergyt2);
 	schedule_delayed_work(&cinergyt2->rc_query_work, HZ/2);
 #endif
@@ -855,7 +848,7 @@ static int cinergyt2_probe (struct usb_interface *intf,
 bailout:
 	dvb_dmxdev_release(&cinergyt2->dmxdev);
 	dvb_dmx_release(&cinergyt2->demux);
-	dvb_unregister_adapter (cinergyt2->adapter);
+	dvb_unregister_adapter (&cinergyt2->adapter);
 	cinergyt2_free_stream_urbs (cinergyt2);
 	kfree(cinergyt2);
 	return -ENOMEM;
@@ -878,16 +871,15 @@ static void cinergyt2_disconnect (struct usb_interface *intf)
 	dvb_net_release(&cinergyt2->dvbnet);
 	dvb_dmxdev_release(&cinergyt2->dmxdev);
 	dvb_dmx_release(&cinergyt2->demux);
-
 	dvb_unregister_device(cinergyt2->fedev);
-	dvb_unregister_adapter(cinergyt2->adapter);
+	dvb_unregister_adapter(&cinergyt2->adapter);
 
 	cinergyt2_free_stream_urbs(cinergyt2);
 	up(&cinergyt2->sem);
 	kfree(cinergyt2);
 }
 
-static int cinergyt2_suspend (struct usb_interface *intf, u32 state)
+static int cinergyt2_suspend (struct usb_interface *intf, pm_message_t state)
 {
 	struct cinergyt2 *cinergyt2 = usb_get_intfdata (intf);
 
@@ -901,7 +893,7 @@ static int cinergyt2_suspend (struct usb_interface *intf, u32 state)
 #endif
 		cancel_delayed_work(&cinergyt2->query_work);
 		if (cinergyt2->streaming)
-		       	cinergyt2_stop_stream_xfer(cinergyt2);
+			cinergyt2_stop_stream_xfer(cinergyt2);
 		flush_scheduled_work();
 		cinergyt2_sleep(cinergyt2, 1);
 	}
@@ -922,7 +914,7 @@ static int cinergyt2_resume (struct usb_interface *intf)
 		cinergyt2_sleep(cinergyt2, 0);
 		cinergyt2_command(cinergyt2, (char *) param, sizeof(*param), NULL, 0);
 		if (cinergyt2->streaming)
-		       	cinergyt2_start_stream_xfer(cinergyt2);
+			cinergyt2_start_stream_xfer(cinergyt2);
 		schedule_delayed_work(&cinergyt2->query_work, HZ/2);
 	}
 
@@ -941,13 +933,13 @@ static const struct usb_device_id cinergyt2_table [] __devinitdata = {
 MODULE_DEVICE_TABLE(usb, cinergyt2_table);
 
 static struct usb_driver cinergyt2_driver = {
-	.owner 		= THIS_MODULE,
+	.owner	= THIS_MODULE,
 	.name	= "cinergyT2",
-	.probe 		= cinergyt2_probe,
-	.disconnect 	= cinergyt2_disconnect,
+	.probe	= cinergyt2_probe,
+	.disconnect	= cinergyt2_disconnect,
 	.suspend	= cinergyt2_suspend,
 	.resume		= cinergyt2_resume,
-	.id_table 	= cinergyt2_table
+	.id_table	= cinergyt2_table
 };
 
 static int __init cinergyt2_init (void)

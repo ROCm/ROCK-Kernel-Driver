@@ -66,34 +66,6 @@
 #define COLLIE_LCM_IRQ_GPIO_nSD_DETECT	IRQ_LOCOMO_GPIO13
 #define COLLIE_LCM_IRQ_GPIO_nSD_WP	IRQ_LOCOMO_GPIO14
 
-/*
- * Flash Memory mappings
- *
- */
-
-#define FLASH_MEM_BASE 0xe8ffc000
-#define	FLASH_DATA(adr) (*(volatile unsigned int*)(FLASH_MEM_BASE+(adr)))
-#define	FLASH_DATA_F(adr) (*(volatile float32 *)(FLASH_MEM_BASE+(adr)))
-#define FLASH_MAGIC_CHG(a,b,c,d) ( ( d << 24 ) | ( c << 16 )  | ( b << 8 ) | a )
-
-// COMADJ
-#define FLASH_COMADJ_MAJIC	FLASH_MAGIC_CHG('C','M','A','D')
-#define	FLASH_COMADJ_MAGIC_ADR	0x00
-#define	FLASH_COMADJ_DATA_ADR	0x04
-
-// TOUCH PANEL
-#define FLASH_TOUCH_MAJIC	FLASH_MAGIC_CHG('T','U','C','H')
-#define	FLASH_TOUCH_MAGIC_ADR	0x1C
-#define	FLASH_TOUCH_XP_DATA_ADR	0x20
-#define	FLASH_TOUCH_YP_DATA_ADR	0x24
-#define	FLASH_TOUCH_XD_DATA_ADR	0x28
-#define	FLASH_TOUCH_YD_DATA_ADR	0x2C
-
-// AD
-#define FLASH_AD_MAJIC	FLASH_MAGIC_CHG('B','V','A','D')
-#define	FLASH_AD_MAGIC_ADR	0x30
-#define	FLASH_AD_DATA_ADR	0x34
-
 /* GPIO's on the TC35143AF (Toshiba Analog Frontend) */
 #define COLLIE_TC35143_GPIO_VERSION0    UCB_IO_0	/* GPIO0=Version                 */
 #define COLLIE_TC35143_GPIO_TBL_CHK     UCB_IO_1	/* GPIO1=TBL_CHK                 */

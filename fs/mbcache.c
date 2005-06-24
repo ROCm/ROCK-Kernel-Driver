@@ -57,7 +57,7 @@
 
 #define MB_CACHE_WRITER ((unsigned short)~0U >> 1)
 
-DECLARE_WAIT_QUEUE_HEAD(mb_cache_queue);
+static DECLARE_WAIT_QUEUE_HEAD(mb_cache_queue);
 		
 MODULE_AUTHOR("Andreas Gruenbacher <a.gruenbacher@computer.org>");
 MODULE_DESCRIPTION("Meta block cache (for extended attributes)");
@@ -225,7 +225,7 @@ mb_cache_shrink_fn(int nr_to_scan, unsigned int gfp_mask)
 						   e_lru_list), gfp_mask);
 	}
 out:
-	return count;
+	return (count / 100) * sysctl_vfs_cache_pressure;
 }
 
 

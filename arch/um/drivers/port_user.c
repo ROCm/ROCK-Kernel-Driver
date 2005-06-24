@@ -28,7 +28,7 @@ struct port_chan {
 	char dev[sizeof("32768\0")];
 };
 
-void *port_init(char *str, int device, struct chan_opts *opts)
+static void *port_init(char *str, int device, struct chan_opts *opts)
 {
 	struct port_chan *data;
 	void *kern_data;
@@ -65,7 +65,7 @@ void *port_init(char *str, int device, struct chan_opts *opts)
 	return(NULL);
 }
 
-void port_free(void *d)
+static void port_free(void *d)
 {
 	struct port_chan *data = d;
 
@@ -73,7 +73,8 @@ void port_free(void *d)
 	kfree(data);
 }
 
-int port_open(int input, int output, int primary, void *d, char **dev_out)
+static int port_open(int input, int output, int primary, void *d,
+		     char **dev_out)
 {
 	struct port_chan *data = d;
 	int fd, err;
@@ -92,7 +93,7 @@ int port_open(int input, int output, int primary, void *d, char **dev_out)
 	return(fd);
 }
 
-void port_close(int fd, void *d)
+static void port_close(int fd, void *d)
 {
 	struct port_chan *data = d;
 
@@ -100,7 +101,7 @@ void port_close(int fd, void *d)
 	os_close_file(fd);
 }
 
-int port_console_write(int fd, const char *buf, int n, void *d)
+static int port_console_write(int fd, const char *buf, int n, void *d)
 {
 	struct port_chan *data = d;
 

@@ -18,9 +18,6 @@
 #include <linux/console.h>
 #include <asm/types.h>
 #include "fbcon.h"
-#ifdef CONFIG_BOOTSPLASH
-#include "../bootsplash/bootsplash.h"
-#endif
 
 /*
  * Accelerated handlers.
@@ -42,7 +39,7 @@ static inline int get_attribute(struct fb_info *info, u16 c)
 {
 	int attribute = 0;
 
-	if (fb_get_color_depth(info) == 1) {
+	if (fb_get_color_depth(&info->var) == 1) {
 		if (attr_underline(c))
 			attribute |= FBCON_ATTRIBUTE_UNDERLINE;
 		if (attr_reverse(c))
@@ -80,13 +77,6 @@ static void bit_bmove(struct vc_data *vc, struct fb_info *info, int sy,
 {
 	struct fb_copyarea area;
 
-#ifdef CONFIG_BOOTSPLASH
-	if (info->splash_data) {
-		splash_bmove(info->splash_data, vc, info,
-			sy, sx, dy, dx, height, width);
-		return;
-	}
-#endif
 	area.sx = sx * vc->vc_font.width;
 	area.sy = sy * vc->vc_font.height;
 	area.dx = dx * vc->vc_font.width;
@@ -103,13 +93,6 @@ static void bit_clear(struct vc_data *vc, struct fb_info *info, int sy,
 	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
 	struct fb_fillrect region;
 
-#ifdef CONFIG_BOOTSPLASH
-	if (info->splash_data) {
-		splash_clear(info->splash_data, vc, info,
-						sy, sx, height, width);
-		return;
-	}
-#endif
 	region.color = attr_bgcol_ec(bgshift, vc);
 	region.dx = sx * vc->vc_font.width;
 	region.dy = sy * vc->vc_font.height;
@@ -143,13 +126,6 @@ static void bit_putcs(struct vc_data *vc, struct fb_info *info,
 	unsigned int attribute = get_attribute(info, scr_readw(s));
 	struct fb_image image;
 	u8 *src, *dst, *buf = NULL;
-
-#ifdef CONFIG_BOOTSPLASH
-	if (info->splash_data) {
-		splash_putcs(info->splash_data, vc, info, s, count, yy, xx);
-		return;
-	}
-#endif
 
 	if (attribute) {
 		buf = kmalloc(cellsize, GFP_KERNEL);
@@ -223,7 +199,10 @@ static void bit_putcs(struct vc_data *vc, struct fb_info *info,
 		count -= cnt;
 	}
 
-	if (buf)
+	/* buf is always NULL except when in monochrome mode, so in this case
+	   it's a gain to check buf against NULL even though kfree() handles
+	   NULL pointers just fine */
+	if (unlikely(buf))
 		kfree(buf);
 }
 
@@ -238,13 +217,6 @@ static void bit_clear_margins(struct vc_data *vc, struct fb_info *info,
 	unsigned int rs = info->var.xres - rw;
 	unsigned int bs = info->var.yres - bh;
 	struct fb_fillrect region;
-
-#ifdef CONFIG_BOOTSPLASH
-	if (info->splash_data) {
-		splash_clear_margins(info->splash_data, vc, info, bottom_only);
-		return;
-	}
-#endif
 
 	region.color = attr_bgcol_ec(bgshift, vc);
 	region.rop = ROP_COPY;
@@ -283,7 +255,7 @@ static void bit_cursor(struct vc_data *vc, struct fb_info *info,
 		if (y + softback_lines >= vc->vc_rows) {
 			mode = CM_ERASE;
 			ops->cursor_flash = 0;
-            return;
+			return;
 		} else
 			y += softback_lines;
 	}
@@ -304,8 +276,7 @@ static void bit_cursor(struct vc_data *vc, struct fb_info *info,
 		dst = kmalloc(w * vc->vc_font.height, GFP_ATOMIC);
 		if (!dst)
 			return;
-		if (ops->cursor_data)
-			kfree(ops->cursor_data);
+		kfree(ops->cursor_data);
 		ops->cursor_data = dst;
 		update_attr(dst, src, attribute, vc);
 		src = dst;
@@ -352,8 +323,7 @@ static void bit_cursor(struct vc_data *vc, struct fb_info *info,
 		if (!mask)
 			return;
 
-		if (ops->cursor_state.mask)
-			kfree(ops->cursor_state.mask);
+		kfree(ops->cursor_state.mask);
 		ops->cursor_state.mask = mask;
 
 		p->cursor_shape = vc->vc_cursor_type;
@@ -413,13 +383,6 @@ static void bit_cursor(struct vc_data *vc, struct fb_info *info,
 	cursor.image.depth = 1;
 	cursor.rop = ROP_XOR;
 
-#ifdef CONFIG_BOOTSPLASH
-	if (info->splash_data) {
-	    splash_cursor(info->splash_data, info, &cursor);
-	    ops->cursor_reset = 0;
-	    return;
-	}
-#endif
 	info->fbops->fb_cursor(info, &cursor);
 
 	ops->cursor_reset = 0;

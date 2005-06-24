@@ -121,18 +121,18 @@ struct inet_sock {
 	__u16			dport;		/* Destination port */
 	__u16			num;		/* Local port */
 	__u32			saddr;		/* Sending source */
-	int			uc_ttl;		/* Unicast TTL */
-	int			tos;		/* TOS */
-	unsigned	   	cmsg_flags;
+	__s16			uc_ttl;		/* Unicast TTL */
+	__u16			cmsg_flags;
 	struct ip_options	*opt;
 	__u16			sport;		/* Source port */
-	unsigned char		hdrincl;	/* Include headers ? */
-	__u8			mc_ttl;		/* Multicasting TTL */
-	__u8			mc_loop;	/* Loopback */
-	__u8			pmtudisc;
 	__u16			id;		/* ID counter for DF pkts */
+	__u8			tos;		/* TOS */
+	__u8			mc_ttl;		/* Multicasting TTL */
+	__u8			pmtudisc;
 	unsigned		recverr : 1,
-				freebind : 1;
+				freebind : 1,
+				hdrincl : 1,
+				mc_loop : 1;
 	int			mc_index;	/* Multicast device index */
 	__u32			mc_addr;
 	struct ip_mc_socklist	*mc_list;	/* Group array */
@@ -152,6 +152,7 @@ struct inet_sock {
 };
 
 #define IPCORK_OPT	1	/* ip-options has been held in ipcork.opt */
+#define IPCORK_ALLFRAG	2	/* always fragment (for ipv6 for now) */
 
 static inline struct inet_sock *inet_sk(const struct sock *sk)
 {
@@ -163,7 +164,7 @@ static inline void __inet_sk_copy_descendant(struct sock *sk_to,
 					     const int ancestor_size)
 {
 	memcpy(inet_sk(sk_to) + 1, inet_sk(sk_from) + 1,
-	       sk_from->sk_prot->slab_obj_size - ancestor_size);
+	       sk_from->sk_prot->obj_size - ancestor_size);
 }
 #if !(defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE))
 static inline void inet_sk_copy_descendant(struct sock *sk_to,

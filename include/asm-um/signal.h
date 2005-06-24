@@ -11,6 +11,9 @@
 #define do_signal do_signal_renamed
 #include "asm/arch/signal.h"
 #undef do_signal
+#undef ptrace_signal_deliver
+
+#define ptrace_signal_deliver(regs, cookie) do {} while(0)
 
 #endif
 

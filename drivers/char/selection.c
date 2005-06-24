@@ -43,15 +43,13 @@ static char *sel_buffer;
    from interrupt (via scrollback/front) */
 
 /* set reverse video on characters s-e of console with selection. */
-inline static void
-highlight(const int s, const int e)
+static inline void highlight(const int s, const int e)
 {
 	invert_screen(sel_cons, s, e-s+2, 1);
 }
 
 /* use complementary color to show the pointer */
-inline static void
-highlight_pointer(const int where)
+static inline void highlight_pointer(const int where)
 {
 	complement_pos(sel_cons, where);
 }
@@ -122,7 +120,7 @@ int set_selection(const struct tiocl_selection __user *sel, struct tty_struct *t
 
 	{ unsigned short xs, ys, xe, ye;
 
-	  if (verify_area(VERIFY_READ, sel, sizeof(*sel)))
+	  if (!access_ok(VERIFY_READ, sel, sizeof(*sel)))
 		return -EFAULT;
 	  __get_user(xs, &sel->xs);
 	  __get_user(ys, &sel->ys);
@@ -277,7 +275,7 @@ int set_selection(const struct tiocl_selection __user *sel, struct tty_struct *t
  */
 int paste_selection(struct tty_struct *tty)
 {
-	struct vt_struct *vt = (struct vt_struct *) tty->driver_data;
+	struct vc_data *vc = (struct vc_data *)tty->driver_data;
 	int	pasted = 0, count;
 	struct  tty_ldisc *ld;
 	DECLARE_WAITQUEUE(wait, current);
@@ -288,7 +286,7 @@ int paste_selection(struct tty_struct *tty)
 
 	ld = tty_ldisc_ref_wait(tty);
 	
-	add_wait_queue(&vt->paste_wait, &wait);
+	add_wait_queue(&vc->paste_wait, &wait);
 	while (sel_buffer && sel_buffer_lth > pasted) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (test_bit(TTY_THROTTLED, &tty->flags)) {
@@ -300,7 +298,7 @@ int paste_selection(struct tty_struct *tty)
 		tty->ldisc.receive_buf(tty, sel_buffer + pasted, NULL, count);
 		pasted += count;
 	}
-	remove_wait_queue(&vt->paste_wait, &wait);
+	remove_wait_queue(&vc->paste_wait, &wait);
 	current->state = TASK_RUNNING;
 
 	tty_ldisc_deref(ld);

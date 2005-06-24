@@ -11,4 +11,5 @@ obj-$(CONFIG_PCI_HOST_VIA82C505) += via82c505.o
 obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
 obj-$(CONFIG_TIMER_ACORN)	+= time-acorn.o
 obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
 obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o

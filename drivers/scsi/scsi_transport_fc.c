@@ -16,6 +16,13 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *  ========
+ *
+ *  Copyright (C) 2004-2005   James Smart, Emulex Corporation
+ *    Rewrite for host, target, device, and remote port attributes,
+ *    statistics, and service functions...
+ *
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -90,8 +97,10 @@ static struct {
 	char			*name;
 } fc_port_state_names[] = {
 	{ FC_PORTSTATE_UNKNOWN,		"Unknown" },
+	{ FC_PORTSTATE_NOTPRESENT,	"Not Present" },
 	{ FC_PORTSTATE_ONLINE,		"Online" },
 	{ FC_PORTSTATE_OFFLINE,		"Offline" },
+	{ FC_PORTSTATE_BLOCKED,		"Blocked" },
 	{ FC_PORTSTATE_BYPASSED,	"Bypassed" },
 	{ FC_PORTSTATE_DIAGNOSTICS,	"Diagnostics" },
 	{ FC_PORTSTATE_LINKDOWN,	"Linkdown" },
@@ -108,9 +117,10 @@ static struct {
 	char				*name;
 	int				matchlen;
 } fc_tgtid_binding_type_names[] = {
+	{ FC_TGTID_BIND_NONE, "none", 4 },
 	{ FC_TGTID_BIND_BY_WWPN, "wwpn (World Wide Port Name)", 4 },
 	{ FC_TGTID_BIND_BY_WWNN, "wwnn (World Wide Node Name)", 4 },
-	{ FC_TGTID_BIND_BY_ID, "fcportid (FC Address)", 8 },
+	{ FC_TGTID_BIND_BY_ID, "port_id (FC Address)", 7 },
 };
 fc_enum_name_search(tgtid_bind_type, fc_tgtid_binding_type,
 		fc_tgtid_binding_type_names)
@@ -139,7 +149,7 @@ get_fc_##title##_names(u32 table_key, char *buf)		\
 }
 
 
-/* Convert fc_cos bit values to ascii string name */
+/* Convert FC_COS bit values to ascii string name */
 static struct {
 	u32 			value;
 	char			*name;
@@ -153,7 +163,7 @@ static struct {
 fc_bitfield_name_search(cos, fc_cos_names)
 
 
-/* Convert fc_port_speed bit values to ascii string name */
+/* Convert FC_PORTSPEED bit values to ascii string name */
 static struct {
 	u32 			value;
 	char			*name;
@@ -179,67 +189,102 @@ show_fc_fc4s (char *buf, u8 *fc4_list)
 }
 
 
+/* Convert FC_RPORT_ROLE bit values to ascii string name */
+static struct {
+	u32 			value;
+	char			*name;
+} fc_remote_port_role_names[] = {
+	{ FC_RPORT_ROLE_FCP_TARGET,	"FCP Target" },
+	{ FC_RPORT_ROLE_FCP_INITIATOR,	"FCP Initiator" },
+	{ FC_RPORT_ROLE_IP_PORT,	"IP Port" },
+};
+fc_bitfield_name_search(remote_port_roles, fc_remote_port_role_names)
 
-static void fc_timeout_blocked_host(void *data);
-static void fc_timeout_blocked_tgt(void *data);
+/*
+ * Define roles that are specific to port_id. Values are relative to ROLE_MASK.
+ */
+#define FC_WELLKNOWN_PORTID_MASK	0xfffff0
+#define FC_WELLKNOWN_ROLE_MASK  	0x00000f
+#define FC_FPORT_PORTID			0x00000e
+#define FC_FABCTLR_PORTID		0x00000d
+#define FC_DIRSRVR_PORTID		0x00000c
+#define FC_TIMESRVR_PORTID		0x00000b
+#define FC_MGMTSRVR_PORTID		0x00000a
 
-#define FC_STARGET_NUM_ATTRS 	4	/* increase this if you add attributes */
-#define FC_STARGET_OTHER_ATTRS 	0	/* increase this if you add "always on"
-					 * attributes */
+
+static void fc_timeout_blocked_rport(void *data);
+static void fc_scsi_scan_rport(void *data);
+static void fc_rport_terminate(struct fc_rport  *rport);
+
+/*
+ * Attribute counts pre object type...
+ * Increase these values if you add attributes
+ */
+#define FC_STARGET_NUM_ATTRS 	3
+#define FC_RPORT_NUM_ATTRS	9
 #define FC_HOST_NUM_ATTRS	15
 
 struct fc_internal {
 	struct scsi_transport_template t;
 	struct fc_function_template *f;
-	/* The actual attributes */
+
+	/*
+	 * For attributes : each object has :
+	 *   An array of the actual attributes structures
+	 *   An array of null-terminated pointers to the attribute
+	 *     structures - used for mid-layer interaction.
+	 *
+	 * The attribute containers for the starget and host are are
+	 * part of the midlayer. As the remote port is specific to the
+	 * fc transport, we must provide the attribute container.
+	 */
 	struct class_device_attribute private_starget_attrs[
-						FC_STARGET_NUM_ATTRS];
-	/* The array of null terminated pointers to attributes
-	 * needed by scsi_sysfs.c */
-	struct class_device_attribute *starget_attrs[
-			FC_STARGET_NUM_ATTRS + FC_STARGET_OTHER_ATTRS + 1];
+							FC_STARGET_NUM_ATTRS];
+	struct class_device_attribute *starget_attrs[FC_STARGET_NUM_ATTRS + 1];
 
 	struct class_device_attribute private_host_attrs[FC_HOST_NUM_ATTRS];
 	struct class_device_attribute *host_attrs[FC_HOST_NUM_ATTRS + 1];
+
+	struct transport_container rport_attr_cont;
+	struct class_device_attribute private_rport_attrs[FC_RPORT_NUM_ATTRS];
+	struct class_device_attribute *rport_attrs[FC_RPORT_NUM_ATTRS + 1];
 };
 
 #define to_fc_internal(tmpl)	container_of(tmpl, struct fc_internal, t)
 
-static int fc_add_target(struct device *dev)
+static int fc_target_setup(struct device *dev)
 {
 	struct scsi_target *starget = to_scsi_target(dev);
-	/* 
-	 * Set default values easily detected by the midlayer as
-	 * failure cases.  The scsi lldd is responsible for initializing
-	 * all transport attributes to valid values per target.
-	 */
-	fc_starget_node_name(starget) = -1;
-	fc_starget_port_name(starget) = -1;
-	fc_starget_port_id(starget) = -1;
-	fc_starget_dev_loss_tmo(starget) = -1;
-	INIT_WORK(&fc_starget_dev_loss_work(starget),
-		  fc_timeout_blocked_tgt, starget);
-	return 0;
-}
+	struct fc_rport *rport = starget_to_rport(starget);
 
-static int fc_remove_target(struct device *dev)
-{
-	struct scsi_target *starget = to_scsi_target(dev);
-	/* Stop the target timer */
-	if (cancel_delayed_work(&fc_starget_dev_loss_work(starget)))
-		flush_scheduled_work();
+	/*
+	 * if parent is remote port, use values from remote port.
+	 * Otherwise, this host uses the fc_transport, but not the
+	 * remote port interface. As such, initialize to known non-values.
+	 */
+	if (rport) {
+		fc_starget_node_name(starget) = rport->node_name;
+		fc_starget_port_name(starget) = rport->port_name;
+		fc_starget_port_id(starget) = rport->port_id;
+	} else {
+		fc_starget_node_name(starget) = -1;
+		fc_starget_port_name(starget) = -1;
+		fc_starget_port_id(starget) = -1;
+	}
+
 	return 0;
 }
 
 static DECLARE_TRANSPORT_CLASS(fc_transport_class,
 			       "fc_transport",
-			       fc_add_target,
-			       fc_remove_target,
+			       fc_target_setup,
+			       NULL,
 			       NULL);
 
-static int fc_add_host(struct device *dev)
+static int fc_host_setup(struct device *dev)
 {
 	struct Scsi_Host *shost = dev_to_shost(dev);
+
 	/* 
 	 * Set default values easily detected by the midlayer as
 	 * failure cases.  The scsi lldd is responsible for initializing
@@ -254,16 +299,8 @@ static int fc_add_host(struct device *dev)
 		sizeof(fc_host_symbolic_name(shost)));
 	fc_host_supported_speeds(shost) = FC_PORTSPEED_UNKNOWN;
 	fc_host_maxframe_size(shost) = -1;
-	memset(fc_host_hardware_version(shost), 0,
-		sizeof(fc_host_hardware_version(shost)));
-	memset(fc_host_firmware_version(shost), 0,
-		sizeof(fc_host_firmware_version(shost)));
 	memset(fc_host_serial_number(shost), 0,
 		sizeof(fc_host_serial_number(shost)));
-	memset(fc_host_opt_rom_version(shost), 0,
-		sizeof(fc_host_opt_rom_version(shost)));
-	memset(fc_host_driver_version(shost), 0,
-		sizeof(fc_host_driver_version(shost)));
 
 	fc_host_port_id(shost) = -1;
 	fc_host_port_type(shost) = FC_PORTTYPE_UNKNOWN;
@@ -272,33 +309,58 @@ static int fc_add_host(struct device *dev)
 		sizeof(fc_host_active_fc4s(shost)));
 	fc_host_speed(shost) = FC_PORTSPEED_UNKNOWN;
 	fc_host_fabric_name(shost) = -1;
- 	fc_host_link_down_tmo(shost) = -1;
 
 	fc_host_tgtid_bind_type(shost) = FC_TGTID_BIND_BY_WWPN;
 
-	INIT_WORK(&fc_host_link_down_work(shost),
-		  fc_timeout_blocked_host, shost);
-	return 0;
-}
+	INIT_LIST_HEAD(&fc_host_rports(shost));
+	INIT_LIST_HEAD(&fc_host_rport_bindings(shost));
+	fc_host_next_rport_number(shost) = 0;
+	fc_host_next_target_id(shost) = 0;
 
-static int fc_remove_host(struct device *dev)
-{
-	struct Scsi_Host *shost = dev_to_shost(dev);
-	/* Stop the host timer */
-	if (cancel_delayed_work(&fc_host_link_down_work(shost)))
-		flush_scheduled_work();
 	return 0;
 }
 
 static DECLARE_TRANSPORT_CLASS(fc_host_class,
 			       "fc_host",
-			       fc_add_host,
-			       fc_remove_host,
+			       fc_host_setup,
+			       NULL,
 			       NULL);
+
+/*
+ * Setup and Remove actions for remote ports are handled
+ * in the service functions below.
+ */
+static DECLARE_TRANSPORT_CLASS(fc_rport_class,
+			       "fc_remote_ports",
+			       NULL,
+			       NULL,
+			       NULL);
+
+/*
+ * Module Parameters
+ */
+
+/*
+ * dev_loss_tmo: the default number of seconds that the FC transport
+ *   should insulate the loss of a remote port.
+ *   The maximum will be capped by the value of SCSI_DEVICE_BLOCK_MAX_TIMEOUT.
+ */
+static unsigned int fc_dev_loss_tmo = SCSI_DEVICE_BLOCK_MAX_TIMEOUT;
+
+module_param_named(dev_loss_tmo, fc_dev_loss_tmo, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(dev_loss_tmo,
+		 "Maximum number of seconds that the FC transport should"
+		 " insulate the loss of a remote port. Once this value is"
+		 " exceeded, the scsi target is removed. Value should be"
+		 " between 1 and SCSI_DEVICE_BLOCK_MAX_TIMEOUT.");
+
 
 static __init int fc_transport_init(void)
 {
 	int error = transport_class_register(&fc_host_class);
+	if (error)
+		return error;
+	error = transport_class_register(&fc_rport_class);
 	if (error)
 		return error;
 	return transport_class_register(&fc_transport_class);
@@ -307,57 +369,218 @@ static __init int fc_transport_init(void)
 static void __exit fc_transport_exit(void)
 {
 	transport_class_unregister(&fc_transport_class);
+	transport_class_unregister(&fc_rport_class);
 	transport_class_unregister(&fc_host_class);
 }
 
 /*
- * Remote Port (Target) Attribute Management
+ * FC Remote Port Attribute Management
  */
 
-#define fc_starget_show_function(field, format_string, cast)		\
+#define fc_rport_show_function(field, format_string, sz, cast)		\
+static ssize_t								\
+show_fc_rport_##field (struct class_device *cdev, char *buf)		\
+{									\
+	struct fc_rport *rport = transport_class_to_rport(cdev);	\
+	struct Scsi_Host *shost = rport_to_shost(rport);		\
+	struct fc_internal *i = to_fc_internal(shost->transportt);	\
+	if (i->f->get_rport_##field)					\
+		i->f->get_rport_##field(rport);				\
+	return snprintf(buf, sz, format_string, cast rport->field); 	\
+}
+
+#define fc_rport_store_function(field)					\
+static ssize_t								\
+store_fc_rport_##field(struct class_device *cdev, const char *buf,	\
+			   size_t count)				\
+{									\
+	int val;							\
+	struct fc_rport *rport = transport_class_to_rport(cdev);	\
+	struct Scsi_Host *shost = rport_to_shost(rport);		\
+	struct fc_internal *i = to_fc_internal(shost->transportt);	\
+	val = simple_strtoul(buf, NULL, 0);				\
+	i->f->set_rport_##field(rport, val);				\
+	return count;							\
+}
+
+#define fc_rport_rd_attr(field, format_string, sz)			\
+	fc_rport_show_function(field, format_string, sz, )		\
+static FC_CLASS_DEVICE_ATTR(rport, field, S_IRUGO,			\
+			 show_fc_rport_##field, NULL)
+
+#define fc_rport_rd_attr_cast(field, format_string, sz, cast)		\
+	fc_rport_show_function(field, format_string, sz, (cast))	\
+static FC_CLASS_DEVICE_ATTR(rport, field, S_IRUGO,			\
+			  show_fc_rport_##field, NULL)
+
+#define fc_rport_rw_attr(field, format_string, sz)			\
+	fc_rport_show_function(field, format_string, sz, )		\
+	fc_rport_store_function(field)					\
+static FC_CLASS_DEVICE_ATTR(rport, field, S_IRUGO | S_IWUSR,		\
+			show_fc_rport_##field,				\
+			store_fc_rport_##field)
+
+
+#define fc_private_rport_show_function(field, format_string, sz, cast)	\
+static ssize_t								\
+show_fc_rport_##field (struct class_device *cdev, char *buf)		\
+{									\
+	struct fc_rport *rport = transport_class_to_rport(cdev);	\
+	return snprintf(buf, sz, format_string, cast rport->field); 	\
+}
+
+#define fc_private_rport_rd_attr(field, format_string, sz)		\
+	fc_private_rport_show_function(field, format_string, sz, )	\
+static FC_CLASS_DEVICE_ATTR(rport, field, S_IRUGO,			\
+			 show_fc_rport_##field, NULL)
+
+#define fc_private_rport_rd_attr_cast(field, format_string, sz, cast)	\
+	fc_private_rport_show_function(field, format_string, sz, (cast)) \
+static FC_CLASS_DEVICE_ATTR(rport, field, S_IRUGO,			\
+			  show_fc_rport_##field, NULL)
+
+
+#define fc_private_rport_rd_enum_attr(title, maxlen)			\
+static ssize_t								\
+show_fc_rport_##title (struct class_device *cdev, char *buf)		\
+{									\
+	struct fc_rport *rport = transport_class_to_rport(cdev);	\
+	const char *name;						\
+	name = get_fc_##title##_name(rport->title);			\
+	if (!name)							\
+		return -EINVAL;						\
+	return snprintf(buf, maxlen, "%s\n", name);			\
+}									\
+static FC_CLASS_DEVICE_ATTR(rport, title, S_IRUGO,			\
+			show_fc_rport_##title, NULL)
+
+
+#define SETUP_RPORT_ATTRIBUTE_RD(field)					\
+	i->private_rport_attrs[count] = class_device_attr_rport_##field; \
+	i->private_rport_attrs[count].attr.mode = S_IRUGO;		\
+	i->private_rport_attrs[count].store = NULL;			\
+	i->rport_attrs[count] = &i->private_rport_attrs[count];		\
+	if (i->f->show_rport_##field)					\
+		count++
+
+#define SETUP_PRIVATE_RPORT_ATTRIBUTE_RD(field)				\
+	i->private_rport_attrs[count] = class_device_attr_rport_##field; \
+	i->private_rport_attrs[count].attr.mode = S_IRUGO;		\
+	i->private_rport_attrs[count].store = NULL;			\
+	i->rport_attrs[count] = &i->private_rport_attrs[count];		\
+	count++
+
+#define SETUP_RPORT_ATTRIBUTE_RW(field)					\
+	i->private_rport_attrs[count] = class_device_attr_rport_##field; \
+	if (!i->f->set_rport_##field) {					\
+		i->private_rport_attrs[count].attr.mode = S_IRUGO;	\
+		i->private_rport_attrs[count].store = NULL;		\
+	}								\
+	i->rport_attrs[count] = &i->private_rport_attrs[count];		\
+	if (i->f->show_rport_##field)					\
+		count++
+
+
+/* The FC Transport Remote Port Attributes: */
+
+/* Fixed Remote Port Attributes */
+
+fc_private_rport_rd_attr(maxframe_size, "%u bytes\n", 20);
+
+static ssize_t
+show_fc_rport_supported_classes (struct class_device *cdev, char *buf)
+{
+	struct fc_rport *rport = transport_class_to_rport(cdev);
+	if (rport->supported_classes == FC_COS_UNSPECIFIED)
+		return snprintf(buf, 20, "unspecified\n");
+	return get_fc_cos_names(rport->supported_classes, buf);
+}
+static FC_CLASS_DEVICE_ATTR(rport, supported_classes, S_IRUGO,
+		show_fc_rport_supported_classes, NULL);
+
+/* Dynamic Remote Port Attributes */
+
+fc_rport_rw_attr(dev_loss_tmo, "%d\n", 20);
+
+
+/* Private Remote Port Attributes */
+
+fc_private_rport_rd_attr_cast(node_name, "0x%llx\n", 20, unsigned long long);
+fc_private_rport_rd_attr_cast(port_name, "0x%llx\n", 20, unsigned long long);
+fc_private_rport_rd_attr(port_id, "0x%06x\n", 20);
+
+static ssize_t
+show_fc_rport_roles (struct class_device *cdev, char *buf)
+{
+	struct fc_rport *rport = transport_class_to_rport(cdev);
+
+	/* identify any roles that are port_id specific */
+	if ((rport->port_id != -1) &&
+	    (rport->port_id & FC_WELLKNOWN_PORTID_MASK) ==
+					FC_WELLKNOWN_PORTID_MASK) {
+		switch (rport->port_id & FC_WELLKNOWN_ROLE_MASK) {
+		case FC_FPORT_PORTID:
+			return snprintf(buf, 30, "Fabric Port\n");
+		case FC_FABCTLR_PORTID:
+			return snprintf(buf, 30, "Fabric Controller\n");
+		case FC_DIRSRVR_PORTID:
+			return snprintf(buf, 30, "Directory Server\n");
+		case FC_TIMESRVR_PORTID:
+			return snprintf(buf, 30, "Time Server\n");
+		case FC_MGMTSRVR_PORTID:
+			return snprintf(buf, 30, "Management Server\n");
+		default:
+			return snprintf(buf, 30, "Unknown Fabric Entity\n");
+		}
+	} else {
+		if (rport->roles == FC_RPORT_ROLE_UNKNOWN)
+			return snprintf(buf, 20, "unknown\n");
+		return get_fc_remote_port_roles_names(rport->roles, buf);
+	}
+}
+static FC_CLASS_DEVICE_ATTR(rport, roles, S_IRUGO,
+		show_fc_rport_roles, NULL);
+
+fc_private_rport_rd_enum_attr(port_state, FC_PORTSTATE_MAX_NAMELEN);
+fc_private_rport_rd_attr(scsi_target_id, "%d\n", 20);
+
+
+
+/*
+ * FC SCSI Target Attribute Management
+ */
+
+/*
+ * Note: in the target show function we recognize when the remote
+ *  port is in the heirarchy and do not allow the driver to get
+ *  involved in sysfs functions. The driver only gets involved if
+ *  it's the "old" style that doesn't use rports.
+ */
+#define fc_starget_show_function(field, format_string, sz, cast)	\
 static ssize_t								\
 show_fc_starget_##field (struct class_device *cdev, char *buf)		\
 {									\
 	struct scsi_target *starget = transport_class_to_starget(cdev);	\
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);	\
 	struct fc_internal *i = to_fc_internal(shost->transportt);	\
-	if (i->f->get_starget_##field)					\
+	struct fc_rport *rport = starget_to_rport(starget);		\
+	if (rport)							\
+		fc_starget_##field(starget) = rport->field;		\
+	else if (i->f->get_starget_##field)				\
 		i->f->get_starget_##field(starget);			\
-	return snprintf(buf, 20, format_string, 			\
+	return snprintf(buf, sz, format_string, 			\
 		cast fc_starget_##field(starget)); 			\
 }
 
-#define fc_starget_store_function(field, format_string)			\
-static ssize_t								\
-store_fc_starget_##field(struct class_device *cdev, const char *buf,	\
-			   size_t count)				\
-{									\
-	int val;							\
-	struct scsi_target *starget = transport_class_to_starget(cdev);	\
-	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);	\
-	struct fc_internal *i = to_fc_internal(shost->transportt);	\
-									\
-	val = simple_strtoul(buf, NULL, 0);				\
-	i->f->set_starget_##field(starget, val);			\
-	return count;							\
-}
-
-#define fc_starget_rd_attr(field, format_string)			\
-	fc_starget_show_function(field, format_string, )		\
+#define fc_starget_rd_attr(field, format_string, sz)			\
+	fc_starget_show_function(field, format_string, sz, )		\
 static FC_CLASS_DEVICE_ATTR(starget, field, S_IRUGO,			\
 			 show_fc_starget_##field, NULL)
 
-#define fc_starget_rd_attr_cast(field, format_string, cast)		\
-	fc_starget_show_function(field, format_string, (cast))		\
+#define fc_starget_rd_attr_cast(field, format_string, sz, cast)		\
+	fc_starget_show_function(field, format_string, sz, (cast))	\
 static FC_CLASS_DEVICE_ATTR(starget, field, S_IRUGO,			\
 			  show_fc_starget_##field, NULL)
-
-#define fc_starget_rw_attr(field, format_string)			\
-	fc_starget_show_function(field, format_string, )		\
-	fc_starget_store_function(field, format_string)			\
-static FC_CLASS_DEVICE_ATTR(starget, field, S_IRUGO | S_IWUSR,		\
-			show_fc_starget_##field,			\
-			store_fc_starget_##field)
 
 #define SETUP_STARGET_ATTRIBUTE_RD(field)				\
 	i->private_starget_attrs[count] = class_device_attr_starget_##field; \
@@ -377,12 +600,10 @@ static FC_CLASS_DEVICE_ATTR(starget, field, S_IRUGO | S_IWUSR,		\
 	if (i->f->show_starget_##field)					\
 		count++
 
-/* The FC Tranport Remote Port (Target) Attributes: */
-fc_starget_rd_attr_cast(node_name, "0x%llx\n", unsigned long long);
-fc_starget_rd_attr_cast(port_name, "0x%llx\n", unsigned long long);
-fc_starget_rd_attr(port_id, "0x%06x\n");
-fc_starget_rw_attr(dev_loss_tmo, "%d\n");
-
+/* The FC Transport SCSI Target Attributes: */
+fc_starget_rd_attr_cast(node_name, "0x%llx\n", 20, unsigned long long);
+fc_starget_rd_attr_cast(port_name, "0x%llx\n", 20, unsigned long long);
+fc_starget_rd_attr(port_id, "0x%06x\n", 20);
 
 
 /*
@@ -400,7 +621,7 @@ show_fc_host_##field (struct class_device *cdev, char *buf)		\
 	return snprintf(buf, sz, format_string, cast fc_host_##field(shost)); \
 }
 
-#define fc_host_store_function(field, format_string)			\
+#define fc_host_store_function(field)					\
 static ssize_t								\
 store_fc_host_##field(struct class_device *cdev, const char *buf,	\
 			   size_t count)				\
@@ -426,7 +647,7 @@ static FC_CLASS_DEVICE_ATTR(host, field, S_IRUGO,			\
 
 #define fc_host_rw_attr(field, format_string, sz)			\
 	fc_host_show_function(field, format_string, sz, )		\
-	fc_host_store_function(field, format_string)			\
+	fc_host_store_function(field)					\
 static FC_CLASS_DEVICE_ATTR(host, field, S_IRUGO | S_IWUSR,		\
 			show_fc_host_##field,				\
 			store_fc_host_##field)
@@ -539,11 +760,7 @@ fc_private_host_rd_attr_cast(node_name, "0x%llx\n", 20, unsigned long long);
 fc_private_host_rd_attr_cast(port_name, "0x%llx\n", 20, unsigned long long);
 fc_private_host_rd_attr(symbolic_name, "%s\n", (FC_SYMBOLIC_NAME_SIZE +1));
 fc_private_host_rd_attr(maxframe_size, "%u bytes\n", 20);
-fc_private_host_rd_attr(hardware_version, "%s\n", (FC_VERSION_STRING_SIZE +1));
-fc_private_host_rd_attr(firmware_version, "%s\n", (FC_VERSION_STRING_SIZE +1));
 fc_private_host_rd_attr(serial_number, "%s\n", (FC_SERIAL_NUMBER_SIZE +1));
-fc_private_host_rd_attr(opt_rom_version, "%s\n", (FC_VERSION_STRING_SIZE +1));
-fc_private_host_rd_attr(driver_version, "%s\n", (FC_VERSION_STRING_SIZE +1));
 
 
 /* Dynamic Host Attributes */
@@ -584,7 +801,6 @@ fc_host_rd_attr(port_id, "0x%06x\n", 20);
 fc_host_rd_enum_attr(port_type, FC_PORTTYPE_MAX_NAMELEN);
 fc_host_rd_enum_attr(port_state, FC_PORTSTATE_MAX_NAMELEN);
 fc_host_rd_attr_cast(fabric_name, "0x%llx\n", 20, unsigned long long);
-fc_host_rw_attr(link_down_tmo, "%d\n", 20);
 
 
 /* Private Host Attributes */
@@ -606,10 +822,22 @@ store_fc_private_host_tgtid_bind_type(struct class_device *cdev,
 	const char *buf, size_t count)
 {
 	struct Scsi_Host *shost = transport_class_to_shost(cdev);
-	enum fc_tgtid_binding_type val;
+	struct fc_rport *rport, *next_rport;
+ 	enum fc_tgtid_binding_type val;
+	unsigned long flags;
 
 	if (get_fc_tgtid_bind_type_match(buf, &val))
 		return -EINVAL;
+
+	/* if changing bind type, purge all unused consistent bindings */
+	if (val != fc_host_tgtid_bind_type(shost)) {
+		spin_lock_irqsave(shost->host_lock, flags);
+		list_for_each_entry_safe(rport, next_rport,
+				&fc_host_rport_bindings(shost), peers)
+			fc_rport_terminate(rport);
+		spin_unlock_irqrestore(shost->host_lock, flags);
+	}
+
 	fc_host_tgtid_bind_type(shost) = val;
 	return count;
 }
@@ -734,13 +962,13 @@ static int fc_host_match(struct attribute_container *cont,
 		return 0;
 
 	shost = dev_to_shost(dev);
-	if (!shost->transportt  || shost->transportt->host_attrs.class
+	if (!shost->transportt  || shost->transportt->host_attrs.ac.class
 	    != &fc_host_class.class)
 		return 0;
 
 	i = to_fc_internal(shost->transportt);
-	
-	return &i->t.host_attrs == cont;
+
+	return &i->t.host_attrs.ac == cont;
 }
 
 static int fc_target_match(struct attribute_container *cont,
@@ -753,62 +981,99 @@ static int fc_target_match(struct attribute_container *cont,
 		return 0;
 
 	shost = dev_to_shost(dev->parent);
-	if (!shost->transportt  || shost->transportt->host_attrs.class
+	if (!shost->transportt  || shost->transportt->host_attrs.ac.class
 	    != &fc_host_class.class)
 		return 0;
 
 	i = to_fc_internal(shost->transportt);
-	
-	return &i->t.target_attrs == cont;
+
+	return &i->t.target_attrs.ac == cont;
 }
 
+static void fc_rport_dev_release(struct device *dev)
+{
+	struct fc_rport *rport = dev_to_rport(dev);
+	put_device(dev->parent);
+	kfree(rport);
+}
+
+int scsi_is_fc_rport(const struct device *dev)
+{
+	return dev->release == fc_rport_dev_release;
+}
+EXPORT_SYMBOL(scsi_is_fc_rport);
+
+static int fc_rport_match(struct attribute_container *cont,
+			    struct device *dev)
+{
+	struct Scsi_Host *shost;
+	struct fc_internal *i;
+
+	if (!scsi_is_fc_rport(dev))
+		return 0;
+
+	shost = dev_to_shost(dev->parent);
+	if (!shost->transportt  || shost->transportt->host_attrs.ac.class
+	    != &fc_host_class.class)
+		return 0;
+
+	i = to_fc_internal(shost->transportt);
+
+	return &i->rport_attr_cont.ac == cont;
+}
 
 struct scsi_transport_template *
 fc_attach_transport(struct fc_function_template *ft)
 {
 	struct fc_internal *i = kmalloc(sizeof(struct fc_internal),
 					GFP_KERNEL);
-	int count = 0;
+	int count;
 
 	if (unlikely(!i))
 		return NULL;
 
 	memset(i, 0, sizeof(struct fc_internal));
 
-	i->t.target_attrs.attrs = &i->starget_attrs[0];
-	i->t.target_attrs.class = &fc_transport_class.class;
-	i->t.target_attrs.match = fc_target_match;
-	attribute_container_register(&i->t.target_attrs);
+	i->t.target_attrs.ac.attrs = &i->starget_attrs[0];
+	i->t.target_attrs.ac.class = &fc_transport_class.class;
+	i->t.target_attrs.ac.match = fc_target_match;
 	i->t.target_size = sizeof(struct fc_starget_attrs);
+	transport_container_register(&i->t.target_attrs);
 
-	i->t.host_attrs.attrs = &i->host_attrs[0];
-	i->t.host_attrs.class = &fc_host_class.class;
-	i->t.host_attrs.match = fc_host_match;
-	attribute_container_register(&i->t.host_attrs);
+	i->t.host_attrs.ac.attrs = &i->host_attrs[0];
+	i->t.host_attrs.ac.class = &fc_host_class.class;
+	i->t.host_attrs.ac.match = fc_host_match;
 	i->t.host_size = sizeof(struct fc_host_attrs);
-
 	if (ft->get_fc_host_stats)
-		i->t.host_statistics = &fc_statistics_group;
+		i->t.host_attrs.statistics = &fc_statistics_group;
+	transport_container_register(&i->t.host_attrs);
+
+	i->rport_attr_cont.ac.attrs = &i->rport_attrs[0];
+	i->rport_attr_cont.ac.class = &fc_rport_class.class;
+	i->rport_attr_cont.ac.match = fc_rport_match;
+	transport_container_register(&i->rport_attr_cont);
 
 	i->f = ft;
 
+	/* Transport uses the shost workq for scsi scanning */
+	i->t.create_work_queue = 1;
 	
 	/*
-	 * setup remote port (target) attributes
+	 * Setup SCSI Target Attributes.
 	 */
-	SETUP_STARGET_ATTRIBUTE_RD(port_id);
-	SETUP_STARGET_ATTRIBUTE_RD(port_name);
+	count = 0;
 	SETUP_STARGET_ATTRIBUTE_RD(node_name);
-	SETUP_STARGET_ATTRIBUTE_RW(dev_loss_tmo);
+	SETUP_STARGET_ATTRIBUTE_RD(port_name);
+	SETUP_STARGET_ATTRIBUTE_RD(port_id);
 
 	BUG_ON(count > FC_STARGET_NUM_ATTRS);
-
-	/* Setup the always-on attributes here */
 
 	i->starget_attrs[count] = NULL;
 
 
-	/* setup host attributes */
+	/*
+	 * Setup SCSI Host Attributes.
+	 */
 	count=0;
 	SETUP_HOST_ATTRIBUTE_RD(node_name);
 	SETUP_HOST_ATTRIBUTE_RD(port_name);
@@ -817,11 +1082,7 @@ fc_attach_transport(struct fc_function_template *ft)
 	SETUP_HOST_ATTRIBUTE_RD(symbolic_name);
 	SETUP_HOST_ATTRIBUTE_RD(supported_speeds);
 	SETUP_HOST_ATTRIBUTE_RD(maxframe_size);
-	SETUP_HOST_ATTRIBUTE_RD(hardware_version);
-	SETUP_HOST_ATTRIBUTE_RD(firmware_version);
 	SETUP_HOST_ATTRIBUTE_RD(serial_number);
-	SETUP_HOST_ATTRIBUTE_RD(opt_rom_version);
-	SETUP_HOST_ATTRIBUTE_RD(driver_version);
 
 	SETUP_HOST_ATTRIBUTE_RD(port_id);
 	SETUP_HOST_ATTRIBUTE_RD(port_type);
@@ -829,7 +1090,6 @@ fc_attach_transport(struct fc_function_template *ft)
 	SETUP_HOST_ATTRIBUTE_RD(active_fc4s);
 	SETUP_HOST_ATTRIBUTE_RD(speed);
 	SETUP_HOST_ATTRIBUTE_RD(fabric_name);
-	SETUP_HOST_ATTRIBUTE_RW(link_down_tmo);
 
 	/* Transport-managed attributes */
 	SETUP_PRIVATE_HOST_ATTRIBUTE_RW(tgtid_bind_type);
@@ -838,6 +1098,23 @@ fc_attach_transport(struct fc_function_template *ft)
 
 	i->host_attrs[count] = NULL;
 
+	/*
+	 * Setup Remote Port Attributes.
+	 */
+	count=0;
+	SETUP_RPORT_ATTRIBUTE_RD(maxframe_size);
+	SETUP_RPORT_ATTRIBUTE_RD(supported_classes);
+	SETUP_RPORT_ATTRIBUTE_RW(dev_loss_tmo);
+	SETUP_PRIVATE_RPORT_ATTRIBUTE_RD(node_name);
+	SETUP_PRIVATE_RPORT_ATTRIBUTE_RD(port_name);
+	SETUP_PRIVATE_RPORT_ATTRIBUTE_RD(port_id);
+	SETUP_PRIVATE_RPORT_ATTRIBUTE_RD(roles);
+	SETUP_PRIVATE_RPORT_ATTRIBUTE_RD(port_state);
+	SETUP_PRIVATE_RPORT_ATTRIBUTE_RD(scsi_target_id);
+
+	BUG_ON(count > FC_RPORT_NUM_ATTRS);
+
+	i->rport_attrs[count] = NULL;
 
 	return &i->t;
 }
@@ -847,205 +1124,538 @@ void fc_release_transport(struct scsi_transport_template *t)
 {
 	struct fc_internal *i = to_fc_internal(t);
 
-	attribute_container_unregister(&i->t.target_attrs);
-	attribute_container_unregister(&i->t.host_attrs);
+	transport_container_unregister(&i->t.target_attrs);
+	transport_container_unregister(&i->t.host_attrs);
+	transport_container_unregister(&i->rport_attr_cont);
 
 	kfree(i);
 }
 EXPORT_SYMBOL(fc_release_transport);
 
 
-
 /**
- * fc_device_block - called by target functions to block a scsi device
- * @dev:	scsi device
- * @data:	unused
- **/
-static void fc_device_block(struct scsi_device *sdev, void *data)
-{
-	scsi_internal_device_block(sdev);
-}
-
-/**
- * fc_device_unblock - called by target functions to unblock a scsi device
- * @dev:	scsi device
- * @data:	unused
- **/
-static void fc_device_unblock(struct scsi_device *sdev, void *data)
-{
-	scsi_internal_device_unblock(sdev);
-}
-
-/**
- * fc_timeout_blocked_tgt - Timeout handler for blocked scsi targets
- *			 that fail to recover in the alloted time.
- * @data:	scsi target that failed to reappear in the alloted time.
- **/
-static void fc_timeout_blocked_tgt(void  *data)
-{
-	struct scsi_target *starget = (struct scsi_target *)data;
-
-	dev_printk(KERN_ERR, &starget->dev, 
-		"blocked target time out: target resuming\n");
-
-	/* 
-	 * set the device going again ... if the scsi lld didn't
-	 * unblock this device, then IO errors will probably
-	 * result if the host still isn't ready.
-	 */
-	starget_for_each_device(starget, NULL, fc_device_unblock);
-}
-
-/**
- * fc_target_block - block a target by temporarily putting all its scsi devices
- *		into the SDEV_BLOCK state.
- * @starget:	scsi target managed by this fc scsi lldd.
+ * fc_remove_host - called to terminate any fc_transport-related elements
+ *                  for a scsi host.
+ * @rport:	remote port to be unblocked.
  *
- * scsi lldd's with a FC transport call this routine to temporarily stop all
- * scsi commands to all devices managed by this scsi target.  Called 
- * from interrupt or normal process context.
+ * This routine is expected to be called immediately preceeding the
+ * a driver's call to scsi_remove_host().
  *
- * Returns zero if successful or error if not
+ * WARNING: A driver utilizing the fc_transport, which fails to call
+ *   this routine prior to scsi_remote_host(), will leave dangling
+ *   objects in /sys/class/fc_remote_ports. Access to any of these
+ *   objects can result in a system crash !!!
  *
- * Notes:       
- *	The timeout and timer types are extracted from the fc transport 
- *	attributes from the caller's target pointer.  This routine assumes no
- *	locks are held on entry.
- **/
-int
-fc_target_block(struct scsi_target *starget)
-{
-	int timeout = fc_starget_dev_loss_tmo(starget);
-	struct work_struct *work = &fc_starget_dev_loss_work(starget);
-
-	if (timeout < 0 || timeout > SCSI_DEVICE_BLOCK_MAX_TIMEOUT)
-		return -EINVAL;
-
-	starget_for_each_device(starget, NULL, fc_device_block);
-
-	/* The scsi lld blocks this target for the timeout period only. */
-	schedule_delayed_work(work, timeout * HZ);
-
-	return 0;
-}
-EXPORT_SYMBOL(fc_target_block);
-
-/**
- * fc_target_unblock - unblock a target following a fc_target_block request.
- * @starget:	scsi target managed by this fc scsi lldd.	
- *
- * scsi lld's with a FC transport call this routine to restart IO to all 
- * devices associated with the caller's scsi target following a fc_target_block
- * request.  Called from interrupt or normal process context.
- *
- * Notes:       
+ * Notes:
  *	This routine assumes no locks are held on entry.
  **/
 void
-fc_target_unblock(struct scsi_target *starget)
+fc_remove_host(struct Scsi_Host *shost)
 {
-	/* 
-	 * Stop the target timer first. Take no action on the del_timer
-	 * failure as the state machine state change will validate the
-	 * transaction. 
-	 */
-	if (cancel_delayed_work(&fc_starget_dev_loss_work(starget)))
-		flush_scheduled_work();
+	struct fc_rport *rport, *next_rport;
 
-	starget_for_each_device(starget, NULL, fc_device_unblock);
+	/* Remove any remote ports */
+	list_for_each_entry_safe(rport, next_rport,
+			&fc_host_rports(shost), peers)
+		fc_rport_terminate(rport);
+	list_for_each_entry_safe(rport, next_rport,
+			&fc_host_rport_bindings(shost), peers)
+		fc_rport_terminate(rport);
 }
-EXPORT_SYMBOL(fc_target_unblock);
+EXPORT_SYMBOL(fc_remove_host);
 
 /**
- * fc_timeout_blocked_host - Timeout handler for blocked scsi hosts
- *			 that fail to recover in the alloted time.
- * @data:	scsi host that failed to recover its devices in the alloted
- *		time.
+ * fc_rport_create - allocates and creates a remote FC port.
+ * @shost:	scsi host the remote port is connected to.
+ * @channel:	Channel on shost port connected to.
+ * @ids:	The world wide names, fc address, and FC4 port
+ *		roles for the remote port.
+ *
+ * Allocates and creates the remoter port structure, including the
+ * class and sysfs creation.
+ *
+ * Notes:
+ *	This routine assumes no locks are held on entry.
  **/
-static void fc_timeout_blocked_host(void  *data)
+struct fc_rport *
+fc_rport_create(struct Scsi_Host *shost, int channel,
+	struct fc_rport_identifiers  *ids)
 {
-	struct Scsi_Host *shost = (struct Scsi_Host *)data;
-	struct scsi_device *sdev;
+	struct fc_host_attrs *fc_host =
+			(struct fc_host_attrs *)shost->shost_data;
+	struct fc_internal *fci = to_fc_internal(shost->transportt);
+	struct fc_rport *rport;
+	struct device *dev;
+	unsigned long flags;
+	int error;
+	size_t size;
 
-	dev_printk(KERN_ERR, &shost->shost_gendev, 
-		"blocked host time out: host resuming\n");
+	size = (sizeof(struct fc_rport) + fci->f->dd_fcrport_size);
+	rport = kmalloc(size, GFP_KERNEL);
+	if (unlikely(!rport)) {
+		printk(KERN_ERR "%s: allocation failure\n", __FUNCTION__);
+		return NULL;
+	}
+	memset(rport, 0, size);
 
-	shost_for_each_device(sdev, shost) {
-		/* 
-		 * set the device going again ... if the scsi lld didn't
-		 * unblock this device, then IO errors will probably
-		 * result if the host still isn't ready.
-		 */
-		scsi_internal_device_unblock(sdev);
+	rport->maxframe_size = -1;
+	rport->supported_classes = FC_COS_UNSPECIFIED;
+	rport->dev_loss_tmo = fc_dev_loss_tmo;
+	memcpy(&rport->node_name, &ids->node_name, sizeof(rport->node_name));
+	memcpy(&rport->port_name, &ids->port_name, sizeof(rport->port_name));
+	rport->port_id = ids->port_id;
+	rport->roles = ids->roles;
+	rport->port_state = FC_PORTSTATE_ONLINE;
+	if (fci->f->dd_fcrport_size)
+		rport->dd_data = &rport[1];
+	rport->channel = channel;
+
+	INIT_WORK(&rport->dev_loss_work, fc_timeout_blocked_rport, rport);
+	INIT_WORK(&rport->scan_work, fc_scsi_scan_rport, rport);
+
+	spin_lock_irqsave(shost->host_lock, flags);
+
+	rport->number = fc_host->next_rport_number++;
+	if (rport->roles & FC_RPORT_ROLE_FCP_TARGET)
+		rport->scsi_target_id = fc_host->next_target_id++;
+	else
+		rport->scsi_target_id = -1;
+	list_add_tail(&rport->peers, &fc_host_rports(shost));
+	get_device(&shost->shost_gendev);
+
+	spin_unlock_irqrestore(shost->host_lock, flags);
+
+	dev = &rport->dev;
+	device_initialize(dev);
+	dev->parent = get_device(&shost->shost_gendev);
+	dev->release = fc_rport_dev_release;
+	sprintf(dev->bus_id, "rport-%d:%d-%d",
+		shost->host_no, channel, rport->number);
+	transport_setup_device(dev);
+
+	error = device_add(dev);
+	if (error) {
+		printk(KERN_ERR "FC Remote Port device_add failed\n");
+		goto delete_rport;
+	}
+	transport_add_device(dev);
+	transport_configure_device(dev);
+
+	if (rport->roles & FC_RPORT_ROLE_FCP_TARGET)
+		/* initiate a scan of the target */
+		scsi_queue_work(shost, &rport->scan_work);
+
+	return rport;
+
+delete_rport:
+	transport_destroy_device(dev);
+	put_device(dev->parent);
+	spin_lock_irqsave(shost->host_lock, flags);
+	list_del(&rport->peers);
+	put_device(&shost->shost_gendev);
+	spin_unlock_irqrestore(shost->host_lock, flags);
+	put_device(dev->parent);
+	kfree(rport);
+	return NULL;
+}
+
+/**
+ * fc_remote_port_add - notifies the fc transport of the existence
+ *		of a remote FC port.
+ * @shost:	scsi host the remote port is connected to.
+ * @channel:	Channel on shost port connected to.
+ * @ids:	The world wide names, fc address, and FC4 port
+ *		roles for the remote port.
+ *
+ * The LLDD calls this routine to notify the transport of the existence
+ * of a remote port. The LLDD provides the unique identifiers (wwpn,wwn)
+ * of the port, it's FC address (port_id), and the FC4 roles that are
+ * active for the port.
+ *
+ * For ports that are FCP targets (aka scsi targets), the FC transport
+ * maintains consistent target id bindings on behalf of the LLDD.
+ * A consistent target id binding is an assignment of a target id to
+ * a remote port identifier, which persists while the scsi host is
+ * attached. The remote port can disappear, then later reappear, and
+ * it's target id assignment remains the same. This allows for shifts
+ * in FC addressing (if binding by wwpn or wwnn) with no apparent
+ * changes to the scsi subsystem which is based on scsi host number and
+ * target id values.  Bindings are only valid during the attachment of
+ * the scsi host. If the host detaches, then later re-attaches, target
+ * id bindings may change.
+ *
+ * This routine is responsible for returning a remote port structure.
+ * The routine will search the list of remote ports it maintains
+ * internally on behalf of consistent target id mappings. If found, the
+ * remote port structure will be reused. Otherwise, a new remote port
+ * structure will be allocated.
+ *
+ * Whenever a remote port is allocated, a new fc_remote_port class
+ * device is created.
+ *
+ * Should not be called from interrupt context.
+ *
+ * Notes:
+ *	This routine assumes no locks are held on entry.
+ **/
+struct fc_rport *
+fc_remote_port_add(struct Scsi_Host *shost, int channel,
+	struct fc_rport_identifiers  *ids)
+{
+	struct fc_rport *rport;
+	unsigned long flags;
+	int match = 0;
+
+	if (likely((ids->roles & FC_RPORT_ROLE_FCP_TARGET) &&
+		(fc_host_tgtid_bind_type(shost) != FC_TGTID_BIND_NONE))) {
+
+		/* search for a matching consistent binding */
+
+		spin_lock_irqsave(shost->host_lock, flags);
+
+		list_for_each_entry(rport, &fc_host_rport_bindings(shost),
+					peers) {
+			if (rport->channel != channel)
+				continue;
+
+			switch (fc_host_tgtid_bind_type(shost)) {
+			case FC_TGTID_BIND_BY_WWPN:
+				if (rport->port_name == ids->port_name)
+					match = 1;
+				break;
+			case FC_TGTID_BIND_BY_WWNN:
+				if (rport->node_name == ids->node_name)
+					match = 1;
+				break;
+			case FC_TGTID_BIND_BY_ID:
+				if (rport->port_id == ids->port_id)
+					match = 1;
+				break;
+			case FC_TGTID_BIND_NONE: /* to keep compiler happy */
+				break;
+			}
+
+			if (match) {
+				list_move_tail(&rport->peers,
+					&fc_host_rports(shost));
+				break;
+			}
+		}
+
+		spin_unlock_irqrestore(shost->host_lock, flags);
+
+		if (match) {
+			memcpy(&rport->node_name, &ids->node_name,
+				sizeof(rport->node_name));
+			memcpy(&rport->port_name, &ids->port_name,
+				sizeof(rport->port_name));
+			rport->port_id = ids->port_id;
+			rport->roles = ids->roles;
+			rport->port_state = FC_PORTSTATE_ONLINE;
+
+			if (rport->roles & FC_RPORT_ROLE_FCP_TARGET)
+				/* initiate a scan of the target */
+				scsi_queue_work(shost, &rport->scan_work);
+
+			return rport;
+		}
+	}
+
+	/* No consistent binding found - create new remote port entry */
+	rport = fc_rport_create(shost, channel, ids);
+
+	return rport;
+}
+EXPORT_SYMBOL(fc_remote_port_add);
+
+/*
+ * fc_rport_tgt_remove - Removes the scsi target on the remote port
+ * @rport:	The remote port to be operated on
+ */
+static void
+fc_rport_tgt_remove(struct fc_rport *rport)
+{
+	struct Scsi_Host *shost = rport_to_shost(rport);
+
+	scsi_target_unblock(&rport->dev);
+
+	/* Stop anything on the workq */
+	if (!cancel_delayed_work(&rport->dev_loss_work))
+		flush_scheduled_work();
+	scsi_flush_work(shost);
+
+	scsi_remove_target(&rport->dev);
+}
+
+/*
+ * fc_rport_terminate - this routine tears down and deallocates a remote port.
+ * @rport:	The remote port to be terminated
+ *
+ * Notes:
+ *	This routine assumes no locks are held on entry.
+ */
+static void
+fc_rport_terminate(struct fc_rport  *rport)
+{
+	struct Scsi_Host *shost = rport_to_shost(rport);
+	struct device *dev = &rport->dev;
+	unsigned long flags;
+
+	fc_rport_tgt_remove(rport);
+
+	transport_remove_device(dev);
+	device_del(dev);
+	transport_destroy_device(dev);
+	spin_lock_irqsave(shost->host_lock, flags);
+	list_del(&rport->peers);
+	spin_unlock_irqrestore(shost->host_lock, flags);
+	put_device(&shost->shost_gendev);
+}
+
+/**
+ * fc_remote_port_delete - notifies the fc transport that a remote
+ *		port is no longer in existence.
+ * @rport:	The remote port that no longer exists
+ *
+ * The LLDD calls this routine to notify the transport that a remote
+ * port is no longer part of the topology. Note: Although a port
+ * may no longer be part of the topology, it may persist in the remote
+ * ports displayed by the fc_host. This is done so that target id
+ * mappings (managed via the remote port structures), are always visible
+ * as long as the mapping is valid, regardless of port state,
+ *
+ * If the remote port is not an FCP Target, it will be fully torn down
+ * and deallocated, including the fc_remote_port class device.
+ *
+ * If the remote port is an FCP Target, the port structure will be
+ * marked as Not Present, but will remain as long as there is a valid
+ * SCSI target id mapping associated with the port structure. Validity
+ * is determined by the binding type. If binding by wwpn, then the port
+ * structure is always valid and will not be deallocated until the host
+ * is removed.  If binding by wwnn, then the port structure is valid
+ * until another port with the same node name is found in the topology.
+ * If binding by port id (fc address), then the port structure is valid
+ * valid until another port with the same address is identified.
+ *
+ * Called from interrupt or normal process context.
+ *
+ * Notes:
+ *	This routine assumes no locks are held on entry.
+ **/
+void
+fc_remote_port_delete(struct fc_rport  *rport)
+{
+	struct Scsi_Host *shost = rport_to_shost(rport);
+	unsigned long flags;
+
+	/* If no scsi target id mapping or consistent binding type, delete it */
+	if ((rport->scsi_target_id == -1) ||
+	    (fc_host_tgtid_bind_type(shost) == FC_TGTID_BIND_NONE)) {
+		fc_rport_terminate(rport);
+		return;
+	}
+
+	fc_rport_tgt_remove(rport);
+
+	spin_lock_irqsave(shost->host_lock, flags);
+	list_move_tail(&rport->peers, &fc_host_rport_bindings(shost));
+	spin_unlock_irqrestore(shost->host_lock, flags);
+
+	/*
+	 * Note: We do not remove or clear the hostdata area. This allows
+	 *   host-specific target data to persist along with the
+	 *   scsi_target_id. It's up to the host to manage it's hostdata area.
+	 */
+
+	/*
+	 * Reinitialize port attributes that may change if the port comes back.
+	 */
+	rport->maxframe_size = -1;
+	rport->supported_classes = FC_COS_UNSPECIFIED;
+	rport->roles = FC_RPORT_ROLE_UNKNOWN;
+	rport->port_state = FC_PORTSTATE_NOTPRESENT;
+
+	/* remove the identifiers that aren't used in the consisting binding */
+	switch (fc_host_tgtid_bind_type(shost)) {
+	case FC_TGTID_BIND_BY_WWPN:
+		rport->node_name = -1;
+		rport->port_id = -1;
+		break;
+	case FC_TGTID_BIND_BY_WWNN:
+		rport->port_name = -1;
+		rport->port_id = -1;
+		break;
+	case FC_TGTID_BIND_BY_ID:
+		rport->node_name = -1;
+		rport->port_name = -1;
+		break;
+	case FC_TGTID_BIND_NONE:	/* to keep compiler happy */
+		break;
 	}
 }
+EXPORT_SYMBOL(fc_remote_port_delete);
 
 /**
- * fc_host_block - block all scsi devices managed by the calling host temporarily 
- *		by putting each device in the SDEV_BLOCK state.
- * @shost:	scsi host pointer that contains all scsi device siblings.
+ * fc_remote_port_rolechg - notifies the fc transport that the roles
+ *		on a remote may have changed.
+ * @rport:	The remote port that changed.
  *
- * scsi lld's with a FC transport call this routine to temporarily stop all
- * scsi commands to all devices managed by this host.  Called 
- * from interrupt or normal process context.
+ * The LLDD calls this routine to notify the transport that the roles
+ * on a remote port may have changed. The largest effect of this is
+ * if a port now becomes a FCP Target, it must be allocated a
+ * scsi target id.  If the port is no longer a FCP target, any
+ * scsi target id value assigned to it will persist in case the
+ * role changes back to include FCP Target. No changes in the scsi
+ * midlayer will be invoked if the role changes (in the expectation
+ * that the role will be resumed. If it doesn't normal error processing
+ * will take place).
+ *
+ * Should not be called from interrupt context.
+ *
+ * Notes:
+ *	This routine assumes no locks are held on entry.
+ **/
+void
+fc_remote_port_rolechg(struct fc_rport  *rport, u32 roles)
+{
+	struct Scsi_Host *shost = rport_to_shost(rport);
+	struct fc_host_attrs *fc_host =
+			(struct fc_host_attrs *)shost->shost_data;
+	unsigned long flags;
+	int create = 0;
+
+	rport->roles = roles;
+
+	spin_lock_irqsave(shost->host_lock, flags);
+	if ((rport->scsi_target_id == -1) &&
+	    (rport->roles & FC_RPORT_ROLE_FCP_TARGET)) {
+		rport->scsi_target_id = fc_host->next_target_id++;
+		create = 1;
+	}
+	spin_unlock_irqrestore(shost->host_lock, flags);
+
+	if (create)
+		/* initiate a scan of the target */
+		scsi_queue_work(shost, &rport->scan_work);
+}
+EXPORT_SYMBOL(fc_remote_port_rolechg);
+
+/**
+ * fc_timeout_blocked_rport - Timeout handler for blocked remote port
+ *                       that fails to return in the alloted time.
+ * @data:	scsi target that failed to reappear in the alloted time.
+ **/
+static void
+fc_timeout_blocked_rport(void  *data)
+{
+	struct fc_rport *rport = (struct fc_rport *)data;
+
+	rport->port_state = FC_PORTSTATE_OFFLINE;
+
+	dev_printk(KERN_ERR, &rport->dev,
+		"blocked FC remote port time out: removing target\n");
+
+	/*
+	 * As this only occurs if the remote port (scsi target)
+	 * went away and didn't come back - we'll remove
+	 * all attached scsi devices.
+	 */
+	scsi_target_unblock(&rport->dev);
+	scsi_remove_target(&rport->dev);
+}
+
+/**
+ * fc_remote_port_block - temporarily block any scsi traffic to a remote port.
+ * @rport:	remote port to be blocked.
+ *
+ * scsi lldd's with a FC transport call this routine to temporarily stop
+ * all scsi traffic to a remote port. If the port is not a SCSI target,
+ * no action is taken. If the port is a SCSI target, all attached devices
+ * are placed into a SDEV_BLOCK state and a timer is started. The timer is
+ * represents the maximum amount of time the port may be blocked. If the
+ * timer expires, the port is considered non-existent and the attached
+ * scsi devices will be removed.
+ *
+ * Called from interrupt or normal process context.
  *
  * Returns zero if successful or error if not
  *
  * Notes:
+ *      This routine assumes no locks are held on entry.
+ *
  *	The timeout and timer types are extracted from the fc transport 
- *	attributes from the caller's host pointer.  This routine assumes no
- *	locks are held on entry.
+ *	attributes from the caller's rport pointer.
  **/
 int
-fc_host_block(struct Scsi_Host *shost)
+fc_remote_port_block(struct fc_rport *rport)
 {
-	struct scsi_device *sdev;
-	int timeout = fc_host_link_down_tmo(shost);
-	struct work_struct *work = &fc_host_link_down_work(shost);
+	int timeout = rport->dev_loss_tmo;
+	struct work_struct *work = &rport->dev_loss_work;
 
 	if (timeout < 0 || timeout > SCSI_DEVICE_BLOCK_MAX_TIMEOUT)
 		return -EINVAL;
 
-	shost_for_each_device(sdev, shost) {
-		scsi_internal_device_block(sdev);
-	}
+	scsi_target_block(&rport->dev);
 
+	/* cap the length the devices can be blocked */
 	schedule_delayed_work(work, timeout * HZ);
 
+	rport->port_state = FC_PORTSTATE_BLOCKED;
 	return 0;
 }
-EXPORT_SYMBOL(fc_host_block);
+EXPORT_SYMBOL(fc_remote_port_block);
 
 /**
- * fc_host_unblock - unblock all devices managed by this host following a 
- *		fc_host_block request.
- * @shost:	scsi host containing all scsi device siblings to unblock.
+ * fc_remote_port_unblock - restart any blocked scsi traffic to a remote port.
+ * @rport:	remote port to be unblocked.
  *
- * scsi lld's with a FC transport call this routine to restart IO to all scsi
- * devices managed by the specified scsi host following an fc_host_block 
+ * scsi lld's with a FC transport call this routine to restart IO to all
+ * devices associated with the caller's scsi target following a fc_target_block
  * request.  Called from interrupt or normal process context.
  *
- * Notes:       
+ * Notes:
  *	This routine assumes no locks are held on entry.
  **/
-void
-fc_host_unblock(struct Scsi_Host *shost)
+ void
+fc_remote_port_unblock(struct fc_rport *rport)
 {
-	struct scsi_device *sdev;
+	struct work_struct *work = &rport->dev_loss_work;
+	struct Scsi_Host *shost = rport_to_shost(rport);
 
-	/* 
-	 * Stop the host timer first. Take no action on the del_timer
+	/*
+	 * Stop the target timer first. Take no action on the del_timer
 	 * failure as the state machine state change will validate the
 	 * transaction.
 	 */
-	if (cancel_delayed_work(&fc_host_link_down_work(shost)))
+	if (!cancel_delayed_work(work))
 		flush_scheduled_work();
 
-	shost_for_each_device(sdev, shost) {
-		scsi_internal_device_unblock(sdev);
-	}
+	if (rport->port_state == FC_PORTSTATE_OFFLINE)
+		/*
+		 * initiate a scan of the target as the target has
+		 * been torn down.
+		 */
+		scsi_queue_work(shost, &rport->scan_work);
+	else
+		scsi_target_unblock(&rport->dev);
+
+	rport->port_state = FC_PORTSTATE_ONLINE;
 }
-EXPORT_SYMBOL(fc_host_unblock);
+EXPORT_SYMBOL(fc_remote_port_unblock);
+
+/**
+ * fc_scsi_scan_rport - called to perform a scsi scan on a remote port.
+ * @data:	remote port to be scanned.
+ **/
+static void
+fc_scsi_scan_rport(void *data)
+{
+	struct fc_rport *rport = (struct fc_rport *)data;
+
+	scsi_scan_target(&rport->dev, rport->channel, rport->scsi_target_id,
+			SCAN_WILD_CARD, 1);
+}
+
 
 MODULE_AUTHOR("Martin Hicks");
 MODULE_DESCRIPTION("FC Transport Attributes");

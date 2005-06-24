@@ -27,6 +27,15 @@ config MTD_DEBUG_VERBOSE
 	help
 	  Determines the verbosity level of the MTD debugging messages.
 
+config MTD_CONCAT
+	tristate "MTD concatenating support"
+	depends on MTD
+	help
+	  Support for concatenating several MTD devices into a single
+	  (virtual) one. This allows you to have -for example- a JFFS(2)
+	  file system spanning multiple physical flash chips. If unsure,
+	  say 'Y'.
+
 config MTD_PARTITIONS
 	bool "MTD partitioning support"
 	depends on MTD
@@ -39,15 +48,6 @@ config MTD_PARTITIONS
 	  Note, however, that you don't need this option for the DiskOnChip
 	  devices. Partitioning on NFTL 'devices' is a different - that's the
 	  'normal' form of partitioning used on a block device.
-
-config MTD_CONCAT
-	tristate "MTD concatenating support"
-	depends on MTD
-	help
-	  Support for concatenating several MTD devices into a single
-	  (virtual) one. This allows you to have -for example- a JFFS(2)
-	  file system spanning multiple physical flash chips. If unsure,
-	  say 'Y'.
 
 config MTD_REDBOOT_PARTS
 	tristate "RedBoot partition table parsing"

@@ -224,6 +224,7 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 	int do_wakeup;
 	struct iovec *iov = (struct iovec *)_iov;
 	size_t total_len;
+	ssize_t chars;
 
 	total_len = iov_length(iov, nr_segs);
 	/* Null write succeeds. */
@@ -242,24 +243,26 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 	}
 
 	/* We try to merge small writes */
-	if (info->nrbufs && total_len < PAGE_SIZE) {
+	chars = total_len & (PAGE_SIZE-1); /* size of the last buffer */
+	if (info->nrbufs && chars != 0) {
 		int lastbuf = (info->curbuf + info->nrbufs - 1) & (PIPE_BUFFERS-1);
 		struct pipe_buffer *buf = info->bufs + lastbuf;
 		struct pipe_buf_operations *ops = buf->ops;
 		int offset = buf->offset + buf->len;
-		if (ops->can_merge && offset + total_len <= PAGE_SIZE) {
+		if (ops->can_merge && offset + chars <= PAGE_SIZE) {
 			void *addr = ops->map(filp, info, buf);
-			int error = pipe_iov_copy_from_user(offset + addr, iov, total_len);
+			int error = pipe_iov_copy_from_user(offset + addr, iov, chars);
 			ops->unmap(info, buf);
 			ret = error;
 			do_wakeup = 1;
 			if (error)
 				goto out;
-			buf->len += total_len;
-			ret = total_len;
-			goto out;
+			buf->len += chars;
+			total_len -= chars;
+			ret = chars;
+			if (!total_len)
+				goto out;
 		}
-			
 	}
 
 	for (;;) {
@@ -271,7 +274,6 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 		}
 		bufs = info->nrbufs;
 		if (bufs < PIPE_BUFFERS) {
-			ssize_t chars;
 			int newbuf = (info->curbuf + bufs) & (PIPE_BUFFERS-1);
 			struct pipe_buffer *buf = info->bufs + newbuf;
 			struct page *page = info->tmp_page;

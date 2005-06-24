@@ -60,6 +60,157 @@
 #define unuseracc(ubuffer, size, flags)
 #endif
 
+STATIC int
+xfs_bulkstat_one_iget(
+	xfs_mount_t	*mp,		/* mount point for filesystem */
+	xfs_ino_t	ino,		/* inode number to get data for */
+	xfs_daddr_t	bno,		/* starting bno of inode cluster */
+	xfs_bstat_t	*buf,		/* return buffer */
+	int		*stat)		/* BULKSTAT_RV_... */
+{
+	xfs_dinode_core_t *dic;		/* dinode core info pointer */
+	xfs_inode_t	*ip;		/* incore inode pointer */
+	int		error;
+
+	error = xfs_iget(mp, NULL, ino, 0, XFS_ILOCK_SHARED, &ip, bno);
+	if (error) {
+		*stat = BULKSTAT_RV_NOTHING;
+		return error;
+	}
+
+	ASSERT(ip != NULL);
+	ASSERT(ip->i_blkno != (xfs_daddr_t)0);
+	if (ip->i_d.di_mode == 0) {
+		*stat = BULKSTAT_RV_NOTHING;
+		error = XFS_ERROR(ENOENT);
+		goto out_iput;
+	}
+
+	dic = &ip->i_d;
+
+	/* xfs_iget returns the following without needing
+	 * further change.
+	 */
+	buf->bs_nlink = dic->di_nlink;
+	buf->bs_projid = dic->di_projid;
+	buf->bs_ino = ino;
+	buf->bs_mode = dic->di_mode;
+	buf->bs_uid = dic->di_uid;
+	buf->bs_gid = dic->di_gid;
+	buf->bs_size = dic->di_size;
+	buf->bs_atime.tv_sec = dic->di_atime.t_sec;
+	buf->bs_atime.tv_nsec = dic->di_atime.t_nsec;
+	buf->bs_mtime.tv_sec = dic->di_mtime.t_sec;
+	buf->bs_mtime.tv_nsec = dic->di_mtime.t_nsec;
+	buf->bs_ctime.tv_sec = dic->di_ctime.t_sec;
+	buf->bs_ctime.tv_nsec = dic->di_ctime.t_nsec;
+	buf->bs_xflags = xfs_ip2xflags(ip);
+	buf->bs_extsize = dic->di_extsize << mp->m_sb.sb_blocklog;
+	buf->bs_extents = dic->di_nextents;
+	buf->bs_gen = dic->di_gen;
+	memset(buf->bs_pad, 0, sizeof(buf->bs_pad));
+	buf->bs_dmevmask = dic->di_dmevmask;
+	buf->bs_dmstate = dic->di_dmstate;
+	buf->bs_aextents = dic->di_anextents;
+
+	switch (dic->di_format) {
+	case XFS_DINODE_FMT_DEV:
+		buf->bs_rdev = ip->i_df.if_u2.if_rdev;
+		buf->bs_blksize = BLKDEV_IOSIZE;
+		buf->bs_blocks = 0;
+		break;
+	case XFS_DINODE_FMT_LOCAL:
+	case XFS_DINODE_FMT_UUID:
+		buf->bs_rdev = 0;
+		buf->bs_blksize = mp->m_sb.sb_blocksize;
+		buf->bs_blocks = 0;
+		break;
+	case XFS_DINODE_FMT_EXTENTS:
+	case XFS_DINODE_FMT_BTREE:
+		buf->bs_rdev = 0;
+		buf->bs_blksize = mp->m_sb.sb_blocksize;
+		buf->bs_blocks = dic->di_nblocks + ip->i_delayed_blks;
+		break;
+	}
+
+ out_iput:
+	xfs_iput(ip, XFS_ILOCK_SHARED);
+	return error;
+}
+
+STATIC int
+xfs_bulkstat_one_dinode(
+	xfs_mount_t	*mp,		/* mount point for filesystem */
+	xfs_ino_t	ino,		/* inode number to get data for */
+	xfs_dinode_t	*dip,		/* dinode inode pointer */
+	xfs_bstat_t	*buf)		/* return buffer */
+{
+	xfs_dinode_core_t *dic;		/* dinode core info pointer */
+
+	dic = &dip->di_core;
+
+	/*
+	 * The inode format changed when we moved the link count and
+	 * made it 32 bits long.  If this is an old format inode,
+	 * convert it in memory to look like a new one.  If it gets
+	 * flushed to disk we will convert back before flushing or
+	 * logging it.  We zero out the new projid field and the old link
+	 * count field.  We'll handle clearing the pad field (the remains
+	 * of the old uuid field) when we actually convert the inode to
+	 * the new format. We don't change the version number so that we
+	 * can distinguish this from a real new format inode.
+	 */
+	if (INT_GET(dic->di_version, ARCH_CONVERT) == XFS_DINODE_VERSION_1) {
+		buf->bs_nlink = INT_GET(dic->di_onlink, ARCH_CONVERT);
+		buf->bs_projid = 0;
+	} else {
+		buf->bs_nlink = INT_GET(dic->di_nlink, ARCH_CONVERT);
+		buf->bs_projid = INT_GET(dic->di_projid, ARCH_CONVERT);
+	}
+
+	buf->bs_ino = ino;
+	buf->bs_mode = INT_GET(dic->di_mode, ARCH_CONVERT);
+	buf->bs_uid = INT_GET(dic->di_uid, ARCH_CONVERT);
+	buf->bs_gid = INT_GET(dic->di_gid, ARCH_CONVERT);
+	buf->bs_size = INT_GET(dic->di_size, ARCH_CONVERT);
+	buf->bs_atime.tv_sec = INT_GET(dic->di_atime.t_sec, ARCH_CONVERT);
+	buf->bs_atime.tv_nsec = INT_GET(dic->di_atime.t_nsec, ARCH_CONVERT);
+	buf->bs_mtime.tv_sec = INT_GET(dic->di_mtime.t_sec, ARCH_CONVERT);
+	buf->bs_mtime.tv_nsec = INT_GET(dic->di_mtime.t_nsec, ARCH_CONVERT);
+	buf->bs_ctime.tv_sec = INT_GET(dic->di_ctime.t_sec, ARCH_CONVERT);
+	buf->bs_ctime.tv_nsec = INT_GET(dic->di_ctime.t_nsec, ARCH_CONVERT);
+	buf->bs_xflags = xfs_dic2xflags(dic);
+	buf->bs_extsize = INT_GET(dic->di_extsize, ARCH_CONVERT) << mp->m_sb.sb_blocklog;
+	buf->bs_extents = INT_GET(dic->di_nextents, ARCH_CONVERT);
+	buf->bs_gen = INT_GET(dic->di_gen, ARCH_CONVERT);
+	memset(buf->bs_pad, 0, sizeof(buf->bs_pad));
+	buf->bs_dmevmask = INT_GET(dic->di_dmevmask, ARCH_CONVERT);
+	buf->bs_dmstate = INT_GET(dic->di_dmstate, ARCH_CONVERT);
+	buf->bs_aextents = INT_GET(dic->di_anextents, ARCH_CONVERT);
+
+	switch (INT_GET(dic->di_format, ARCH_CONVERT)) {
+	case XFS_DINODE_FMT_DEV:
+		buf->bs_rdev = INT_GET(dip->di_u.di_dev, ARCH_CONVERT);
+		buf->bs_blksize = BLKDEV_IOSIZE;
+		buf->bs_blocks = 0;
+		break;
+	case XFS_DINODE_FMT_LOCAL:
+	case XFS_DINODE_FMT_UUID:
+		buf->bs_rdev = 0;
+		buf->bs_blksize = mp->m_sb.sb_blocksize;
+		buf->bs_blocks = 0;
+		break;
+	case XFS_DINODE_FMT_EXTENTS:
+	case XFS_DINODE_FMT_BTREE:
+		buf->bs_rdev = 0;
+		buf->bs_blksize = mp->m_sb.sb_blocksize;
+		buf->bs_blocks = INT_GET(dic->di_nblocks, ARCH_CONVERT);
+		break;
+	}
+
+	return 0;
+}
+
 /*
  * Return stat information for one inode.
  * Return 0 if ok, else errno.
@@ -77,11 +228,8 @@ xfs_bulkstat_one(
 	int		*stat)		/* BULKSTAT_RV_... */
 {
 	xfs_bstat_t	*buf;		/* return buffer */
-	int		error;		/* error value */
+	int		error = 0;	/* error value */
 	xfs_dinode_t	*dip;		/* dinode inode pointer */
-	xfs_dinode_core_t *dic;		/* dinode core info pointer */
-	xfs_inode_t	*ip = NULL;	/* incore inode pointer */
-	xfs_arch_t      arch;           /* these are set according to      */
 
 	dip = (xfs_dinode_t *)dibuff;
 
@@ -102,122 +250,26 @@ xfs_bulkstat_one(
 		/* We're not being passed a pointer to a dinode.  This happens
 		 * if BULKSTAT_FG_IGET is selected.  Do the iget.
 		 */
-		error = xfs_iget(mp, NULL, ino, 0, XFS_ILOCK_SHARED, &ip, bno);
-		if (error) {
-			*stat = BULKSTAT_RV_NOTHING;
-			return error;
-		}
-		ASSERT(ip != NULL);
-		ASSERT(ip->i_blkno != (xfs_daddr_t)0);
-		if (ip->i_d.di_mode == 0) {
-			xfs_iput_new(ip, XFS_ILOCK_SHARED);
-			*stat = BULKSTAT_RV_NOTHING;
-			kmem_free(buf, sizeof(*buf));
-			return XFS_ERROR(ENOENT);
-		}
-		dic = &ip->i_d;
-		arch = ARCH_NOCONVERT;		/* in-core! */
-		ASSERT(dic != NULL);
-
-		/* xfs_iget returns the following without needing
-		 * further change.
-		 */
-		buf->bs_nlink = dic->di_nlink;
-		buf->bs_projid = dic->di_projid;
-
+		error = xfs_bulkstat_one_iget(mp, ino, bno, buf, stat);
+		if (error)
+			goto out_free;
 	} else {
-		dic = &dip->di_core;
-		ASSERT(dic != NULL);
-
-		/* buffer dinode_core is in on-disk arch */
-		arch = ARCH_CONVERT;
-
-		/*
-		 * The inode format changed when we moved the link count and
-		 * made it 32 bits long.  If this is an old format inode,
-		 * convert it in memory to look like a new one.  If it gets
-		 * flushed to disk we will convert back before flushing or
-		 * logging it.  We zero out the new projid field and the old link
-		 * count field.  We'll handle clearing the pad field (the remains
-		 * of the old uuid field) when we actually convert the inode to
-		 * the new format. We don't change the version number so that we
-		 * can distinguish this from a real new format inode.
-		 */
-		if (INT_GET(dic->di_version, arch) == XFS_DINODE_VERSION_1) {
-			buf->bs_nlink = INT_GET(dic->di_onlink, arch);
-			buf->bs_projid = 0;
-		}
-		else {
-			buf->bs_nlink = INT_GET(dic->di_nlink, arch);
-			buf->bs_projid = INT_GET(dic->di_projid, arch);
-		}
-
-	}
-
-	buf->bs_ino = ino;
-	buf->bs_mode = INT_GET(dic->di_mode, arch);
-	buf->bs_uid = INT_GET(dic->di_uid, arch);
-	buf->bs_gid = INT_GET(dic->di_gid, arch);
-	buf->bs_size = INT_GET(dic->di_size, arch);
-	buf->bs_atime.tv_sec = INT_GET(dic->di_atime.t_sec, arch);
-	buf->bs_atime.tv_nsec = INT_GET(dic->di_atime.t_nsec, arch);
-	buf->bs_mtime.tv_sec = INT_GET(dic->di_mtime.t_sec, arch);
-	buf->bs_mtime.tv_nsec = INT_GET(dic->di_mtime.t_nsec, arch);
-	buf->bs_ctime.tv_sec = INT_GET(dic->di_ctime.t_sec, arch);
-	buf->bs_ctime.tv_nsec = INT_GET(dic->di_ctime.t_nsec, arch);
-	buf->bs_xflags = xfs_dic2xflags(dic, arch);
-	buf->bs_extsize = INT_GET(dic->di_extsize, arch) << mp->m_sb.sb_blocklog;
-	buf->bs_extents = INT_GET(dic->di_nextents, arch);
-	buf->bs_gen = INT_GET(dic->di_gen, arch);
-	memset(buf->bs_pad, 0, sizeof(buf->bs_pad));
-	buf->bs_dmevmask = INT_GET(dic->di_dmevmask, arch);
-	buf->bs_dmstate = INT_GET(dic->di_dmstate, arch);
-	buf->bs_aextents = INT_GET(dic->di_anextents, arch);
-
-	switch (INT_GET(dic->di_format, arch)) {
-	case XFS_DINODE_FMT_DEV:
-		if ( ip ) {
-			buf->bs_rdev = ip->i_df.if_u2.if_rdev;
-		} else {
-			buf->bs_rdev = INT_GET(dip->di_u.di_dev, arch);
-		}
-
-		buf->bs_blksize = BLKDEV_IOSIZE;
-		buf->bs_blocks = 0;
-		break;
-	case XFS_DINODE_FMT_LOCAL:
-	case XFS_DINODE_FMT_UUID:
-		buf->bs_rdev = 0;
-		buf->bs_blksize = mp->m_sb.sb_blocksize;
-		buf->bs_blocks = 0;
-		break;
-	case XFS_DINODE_FMT_EXTENTS:
-	case XFS_DINODE_FMT_BTREE:
-		buf->bs_rdev = 0;
-		buf->bs_blksize = mp->m_sb.sb_blocksize;
-		if ( ip ) {
-			buf->bs_blocks = INT_GET(dic->di_nblocks, arch) + ip->i_delayed_blks;
-		} else {
-			buf->bs_blocks = INT_GET(dic->di_nblocks, arch);
-		}
-		break;
-	}
-
-	if (ip) {
-		xfs_iput(ip, XFS_ILOCK_SHARED);
+		xfs_bulkstat_one_dinode(mp, ino, dip, buf);
 	}
 
 	if (copy_to_user(buffer, buf, sizeof(*buf)))  {
-		kmem_free(buf, sizeof(*buf));
 		*stat = BULKSTAT_RV_NOTHING;
-		return EFAULT;
+		error =  EFAULT;
+		goto out_free;
 	}
 
-	kmem_free(buf, sizeof(*buf));
 	*stat = BULKSTAT_RV_DIDONE;
 	if (ubused)
 		*ubused = sizeof(*buf);
-	return 0;
+
+ out_free:
+	kmem_free(buf, sizeof(*buf));
+	return error;
 }
 
 /*
@@ -352,7 +404,7 @@ xfs_bulkstat(
 			    tmp &&	/* lookup succeeded */
 					/* got the record, should always work */
 			    !(error = xfs_inobt_get_rec(cur, &gino, &gcnt,
-				    &gfree, &i, ARCH_NOCONVERT)) &&
+				    &gfree, &i)) &&
 			    i == 1 &&
 					/* this is the right chunk */
 			    agino < gino + XFS_INODES_PER_CHUNK &&
@@ -421,7 +473,7 @@ xfs_bulkstat(
 			 */
 			if (error ||
 			    (error = xfs_inobt_get_rec(cur, &gino, &gcnt,
-				    &gfree, &i, ARCH_NOCONVERT)) ||
+				    &gfree, &i)) ||
 			    i == 0) {
 				end_of_ag = 1;
 				break;
@@ -744,7 +796,7 @@ xfs_inumbers(
 			}
 		}
 		if ((error = xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree,
-			&i, ARCH_NOCONVERT)) ||
+			&i)) ||
 		    i == 0) {
 			xfs_buf_relse(agbp);
 			agbp = NULL;

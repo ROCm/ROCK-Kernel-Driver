@@ -1,4 +1,6 @@
-<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN"[]>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+	"http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" []>
 
 <book id="Reed-Solomon-Library-Guide">
  <bookinfo>
@@ -223,7 +225,7 @@ int numerr, errpos[8];
 .....
 /* Decode 512 byte in data8.*/
 numerr = decode_rs8 (rs_decoder, NULL, NULL, 512, syn, 0, errpos, 0, corr);
-for (i = 0; i < numerr; i++) {
+for (i = 0; i &lt; numerr; i++) {
 	do_error_correction_in_your_buffer(errpos[i], corr[i]);
 }
 		</programlisting>

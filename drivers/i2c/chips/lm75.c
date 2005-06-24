@@ -22,6 +22,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/jiffies.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 #include "lm75.h"
@@ -73,8 +74,6 @@ static struct i2c_driver lm75_driver = {
 	.detach_client	= lm75_detach_client,
 };
 
-static int lm75_id;
-
 #define show(value)	\
 static ssize_t show_##value(struct device *dev, char *buf)		\
 {									\
@@ -91,8 +90,11 @@ static ssize_t set_##value(struct device *dev, const char *buf, size_t count)	\
 	struct i2c_client *client = to_i2c_client(dev);		\
 	struct lm75_data *data = i2c_get_clientdata(client);	\
 	int temp = simple_strtoul(buf, NULL, 10);		\
+								\
+	down(&data->update_lock);				\
 	data->value = LM75_TEMP_TO_REG(temp);			\
 	lm75_write_value(client, reg, data->value);		\
+	up(&data->update_lock);					\
 	return count;						\
 }
 set(temp_max, LM75_REG_TEMP_OS);
@@ -196,8 +198,6 @@ static int lm75_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* Fill in the remaining client fields and put it into the global list */
 	strlcpy(new_client->name, name, I2C_NAME_SIZE);
-
-	new_client->id = lm75_id++;
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);
 
@@ -263,8 +263,8 @@ static struct lm75_data *lm75_update_device(struct device *dev)
 
 	down(&data->update_lock);
 
-	if ((jiffies - data->last_updated > HZ + HZ / 2) ||
-	    (jiffies < data->last_updated) || !data->valid) {
+	if (time_after(jiffies, data->last_updated + HZ + HZ / 2)
+	    || !data->valid) {
 		dev_dbg(&client->dev, "Starting lm75 update\n");
 
 		data->temp_input = lm75_read_value(client, LM75_REG_TEMP);

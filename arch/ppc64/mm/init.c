@@ -38,6 +38,7 @@
 #include <linux/highmem.h>
 #include <linux/idr.h>
 #include <linux/nodemask.h>
+#include <linux/module.h>
 
 #include <asm/pgalloc.h>
 #include <asm/page.h>
@@ -62,6 +63,8 @@
 #include <asm/system.h>
 #include <asm/iommu.h>
 #include <asm/abs_addr.h>
+#include <asm/vdso.h>
+#include <asm/imalloc.h>
 
 int mem_init_done;
 unsigned long ioremap_bot = IMALLOC_BASE;
@@ -134,14 +137,78 @@ void iounmap(volatile void __iomem *addr)
 
 #else
 
+static void unmap_im_area_pte(pmd_t *pmd, unsigned long addr,
+				  unsigned long end)
+{
+	pte_t *pte;
+
+	pte = pte_offset_kernel(pmd, addr);
+	do {
+		pte_t ptent = ptep_get_and_clear(&ioremap_mm, addr, pte);
+		WARN_ON(!pte_none(ptent) && !pte_present(ptent));
+	} while (pte++, addr += PAGE_SIZE, addr != end);
+}
+
+static inline void unmap_im_area_pmd(pud_t *pud, unsigned long addr,
+				     unsigned long end)
+{
+	pmd_t *pmd;
+	unsigned long next;
+
+	pmd = pmd_offset(pud, addr);
+	do {
+		next = pmd_addr_end(addr, end);
+		if (pmd_none_or_clear_bad(pmd))
+			continue;
+		unmap_im_area_pte(pmd, addr, next);
+	} while (pmd++, addr = next, addr != end);
+}
+
+static inline void unmap_im_area_pud(pgd_t *pgd, unsigned long addr,
+				     unsigned long end)
+{
+	pud_t *pud;
+	unsigned long next;
+
+	pud = pud_offset(pgd, addr);
+	do {
+		next = pud_addr_end(addr, end);
+		if (pud_none_or_clear_bad(pud))
+			continue;
+		unmap_im_area_pmd(pud, addr, next);
+	} while (pud++, addr = next, addr != end);
+}
+
+static void unmap_im_area(unsigned long addr, unsigned long end)
+{
+	struct mm_struct *mm = &ioremap_mm;
+	unsigned long next;
+	pgd_t *pgd;
+
+	spin_lock(&mm->page_table_lock);
+
+	pgd = pgd_offset_i(addr);
+	flush_cache_vunmap(addr, end);
+	do {
+		next = pgd_addr_end(addr, end);
+		if (pgd_none_or_clear_bad(pgd))
+			continue;
+		unmap_im_area_pud(pgd, addr, next);
+	} while (pgd++, addr = next, addr != end);
+	flush_tlb_kernel_range(start, end);
+
+	spin_unlock(&mm->page_table_lock);
+}
+
 /*
  * map_io_page currently only called by __ioremap
  * map_io_page adds an entry to the ioremap page table
  * and adds an entry to the HPT, possibly bolting it
  */
-static void map_io_page(unsigned long ea, unsigned long pa, int flags)
+static int map_io_page(unsigned long ea, unsigned long pa, int flags)
 {
 	pgd_t *pgdp;
+	pud_t *pudp;
 	pmd_t *pmdp;
 	pte_t *ptep;
 	unsigned long vsid;
@@ -149,11 +216,18 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 	if (mem_init_done) {
 		spin_lock(&ioremap_mm.page_table_lock);
 		pgdp = pgd_offset_i(ea);
-		pmdp = pmd_alloc(&ioremap_mm, pgdp, ea);
+		pudp = pud_alloc(&ioremap_mm, pgdp, ea);
+		if (!pudp)
+			return -ENOMEM;
+		pmdp = pmd_alloc(&ioremap_mm, pudp, ea);
+		if (!pmdp)
+			return -ENOMEM;
 		ptep = pte_alloc_kernel(&ioremap_mm, pmdp, ea);
-
+		if (!ptep)
+			return -ENOMEM;
 		pa = abs_to_phys(pa);
-		set_pte(ptep, pfn_pte(pa >> PAGE_SHIFT, __pgprot(flags)));
+		set_pte_at(&ioremap_mm, ea, ptep, pfn_pte(pa >> PAGE_SHIFT,
+							  __pgprot(flags)));
 		spin_unlock(&ioremap_mm.page_table_lock);
 	} else {
 		unsigned long va, vpn, hash, hpteg;
@@ -178,6 +252,7 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 			panic("map_io_page: could not insert mapping");
 		}
 	}
+	return 0;
 }
 
 
@@ -189,27 +264,30 @@ static void __iomem * __ioremap_com(unsigned long addr, unsigned long pa,
 
 	if ((flags & _PAGE_PRESENT) == 0)
 		flags |= pgprot_val(PAGE_KERNEL);
-	if (flags & (_PAGE_NO_CACHE | _PAGE_WRITETHRU))
-		flags |= _PAGE_GUARDED;
 
-	for (i = 0; i < size; i += PAGE_SIZE) {
-		map_io_page(ea+i, pa+i, flags);
-	}
+	for (i = 0; i < size; i += PAGE_SIZE)
+		if (map_io_page(ea+i, pa+i, flags))
+			goto failure;
 
 	return (void __iomem *) (ea + (addr & ~PAGE_MASK));
+ failure:
+	if (mem_init_done)
+		unmap_im_area(ea, ea + size);
+	return NULL;
 }
 
 
 void __iomem *
 ioremap(unsigned long addr, unsigned long size)
 {
-	return __ioremap(addr, size, _PAGE_NO_CACHE);
+	return __ioremap(addr, size, _PAGE_NO_CACHE | _PAGE_GUARDED);
 }
 
-void __iomem *
-__ioremap(unsigned long addr, unsigned long size, unsigned long flags)
+void __iomem * __ioremap(unsigned long addr, unsigned long size,
+			 unsigned long flags)
 {
 	unsigned long pa, ea;
+	void __iomem *ret;
 
 	/*
 	 * Choose an address to map it to.
@@ -232,12 +310,16 @@ __ioremap(unsigned long addr, unsigned long size, unsigned long flags)
 		if (area == NULL)
 			return NULL;
 		ea = (unsigned long)(area->addr);
+		ret = __ioremap_com(addr, pa, ea, size, flags);
+		if (!ret)
+			im_free(area->addr);
 	} else {
 		ea = ioremap_bot;
-		ioremap_bot += size;
+		ret = __ioremap_com(addr, pa, ea, size, flags);
+		if (ret)
+			ioremap_bot += size;
 	}
-
-	return __ioremap_com(addr, pa, ea, size, flags);
+	return ret;
 }
 
 #define IS_PAGE_ALIGNED(_val) ((_val) == ((_val) & PAGE_MASK))
@@ -246,6 +328,7 @@ int __ioremap_explicit(unsigned long pa, unsigned long ea,
 		       unsigned long size, unsigned long flags)
 {
 	struct vm_struct *area;
+	void __iomem *ret;
 	
 	/* For now, require page-aligned values for pa, ea, and size */
 	if (!IS_PAGE_ALIGNED(pa) || !IS_PAGE_ALIGNED(ea) ||
@@ -270,12 +353,18 @@ int __ioremap_explicit(unsigned long pa, unsigned long ea,
 			return 1;
 		}
 		if (ea != (unsigned long) area->addr) {
-			printk(KERN_ERR "unexpected addr return from im_get_area\n");
+			printk(KERN_ERR "unexpected addr return from "
+			       "im_get_area\n");
 			return 1;
 		}
 	}
 	
-	if (__ioremap_com(pa, pa, ea, size, flags) != (void *) ea) {
+	ret = __ioremap_com(pa, pa, ea, size, flags);
+	if (ret == NULL) {
+		printk(KERN_ERR "ioremap_explicit() allocation failure !\n");
+		return 1;
+	}
+	if (ret != (void *) ea) {
 		printk(KERN_ERR "__ioremap_com() returned unexpected addr\n");
 		return 1;
 	}
@@ -283,108 +372,28 @@ int __ioremap_explicit(unsigned long pa, unsigned long ea,
 	return 0;
 }
 
-static void unmap_im_area_pte(pmd_t *pmd, unsigned long address,
-				  unsigned long size)
-{
-	unsigned long end;
-	pte_t *pte;
-
-	if (pmd_none(*pmd))
-		return;
-	if (pmd_bad(*pmd)) {
-		pmd_ERROR(*pmd);
-		pmd_clear(pmd);
-		return;
-	}
-
-	pte = pte_offset_kernel(pmd, address);
-	address &= ~PMD_MASK;
-	end = address + size;
-	if (end > PMD_SIZE)
-		end = PMD_SIZE;
-
-	do {
-		pte_t page;
-		page = ptep_get_and_clear(pte);
-		address += PAGE_SIZE;
-		pte++;
-		if (pte_none(page))
-			continue;
-		if (pte_present(page))
-			continue;
-		printk(KERN_CRIT "Whee.. Swapped out page in kernel page table\n");
-	} while (address < end);
-}
-
-static void unmap_im_area_pmd(pgd_t *dir, unsigned long address,
-				  unsigned long size)
-{
-	unsigned long end;
-	pmd_t *pmd;
-
-	if (pgd_none(*dir))
-		return;
-	if (pgd_bad(*dir)) {
-		pgd_ERROR(*dir);
-		pgd_clear(dir);
-		return;
-	}
-
-	pmd = pmd_offset(dir, address);
-	address &= ~PGDIR_MASK;
-	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
-
-	do {
-		unmap_im_area_pte(pmd, address, end - address);
-		address = (address + PMD_SIZE) & PMD_MASK;
-		pmd++;
-	} while (address < end);
-}
-
 /*  
  * Unmap an IO region and remove it from imalloc'd list.
  * Access to IO memory should be serialized by driver.
  * This code is modeled after vmalloc code - unmap_vm_area()
  *
- * XXX	what about calls before mem_init_done (ie python_countermeasures())	
+ * XXX	what about calls before mem_init_done (ie python_countermeasures())
  */
 void iounmap(volatile void __iomem *token)
 {
-	unsigned long address, start, end, size;
-	struct mm_struct *mm;
-	pgd_t *dir;
+	unsigned long address, size;
 	void *addr;
 
-	if (!mem_init_done) {
+	if (!mem_init_done)
 		return;
-	}
 	
 	addr = (void *) ((unsigned long __force) token & PAGE_MASK);
 	
-	if ((size = im_free(addr)) == 0) {
+	if ((size = im_free(addr)) == 0)
 		return;
-	}
 
 	address = (unsigned long)addr; 
-	start = address;
-	end = address + size;
-
-	mm = &ioremap_mm;
-	spin_lock(&mm->page_table_lock);
-
-	dir = pgd_offset_i(address);
-	flush_cache_vunmap(address, end);
-	do {
-		unmap_im_area_pmd(dir, address, end - address);
-		address = (address + PGDIR_SIZE) & PGDIR_MASK;
-		dir++;
-	} while (address && (address < end));
-	flush_tlb_kernel_range(start, end);
-
-	spin_unlock(&mm->page_table_lock);
-	return;
+	unmap_im_area(address, address + size);
 }
 
 static int iounmap_subset_regions(unsigned long addr, unsigned long size)
@@ -440,6 +449,10 @@ int iounmap_explicit(volatile void __iomem *start, unsigned long size)
 }
 
 #endif
+
+EXPORT_SYMBOL(ioremap);
+EXPORT_SYMBOL(__ioremap);
+EXPORT_SYMBOL(iounmap);
 
 void free_initmem(void)
 {
@@ -656,9 +669,8 @@ void __init paging_init(void)
 	zones_size[ZONE_DMA] = top_of_ram >> PAGE_SHIFT;
 	zholes_size[ZONE_DMA] = (top_of_ram - total_ram) >> PAGE_SHIFT;
 
-	free_area_init_node(0, &contig_page_data, zones_size,
+	free_area_init_node(0, NODE_DATA(0), zones_size,
 			    __pa(PAGE_OFFSET) >> PAGE_SHIFT, zholes_size);
-	mem_map = contig_page_data.node_mem_map;
 }
 #endif /* CONFIG_DISCONTIGMEM */
 
@@ -743,6 +755,8 @@ void __init mem_init(void)
 #ifdef CONFIG_PPC_ISERIES
 	iommu_vio_init();
 #endif
+	/* Initialize the vDSO */
+	vdso_init();
 }
 
 /*
@@ -752,18 +766,19 @@ void __init mem_init(void)
  */
 void flush_dcache_page(struct page *page)
 {
-	if (cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE)
+	if (cpu_has_feature(CPU_FTR_COHERENT_ICACHE))
 		return;
 	/* avoid an atomic op if possible */
 	if (test_bit(PG_arch_1, &page->flags))
 		clear_bit(PG_arch_1, &page->flags);
 }
+EXPORT_SYMBOL(flush_dcache_page);
 
 void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 {
 	clear_page(page);
 
-	if (cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE)
+	if (cpu_has_feature(CPU_FTR_COHERENT_ICACHE))
 		return;
 	/*
 	 * We shouldnt have to do this, but some versions of glibc
@@ -775,6 +790,7 @@ void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 	if (test_bit(PG_arch_1, &pg->flags))
 		clear_bit(PG_arch_1, &pg->flags);
 }
+EXPORT_SYMBOL(clear_user_page);
 
 void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
 		    struct page *pg)
@@ -796,7 +812,7 @@ void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
 		return;
 #endif
 
-	if (cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE)
+	if (cpu_has_feature(CPU_FTR_COHERENT_ICACHE))
 		return;
 
 	/* avoid an atomic op if possible */
@@ -812,6 +828,7 @@ void flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
 	maddr = (unsigned long)page_address(page) + (addr & ~PAGE_MASK);
 	flush_icache_range(maddr, maddr + len);
 }
+EXPORT_SYMBOL(flush_icache_user_range);
 
 /*
  * This is called at the end of handling a user page fault, when the
@@ -832,8 +849,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	unsigned long flags;
 
 	/* handle i-cache coherency */
-	if (!(cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE) &&
-	    !(cur_cpu_spec->cpu_features & CPU_FTR_NOEXECUTE)) {
+	if (!cpu_has_feature(CPU_FTR_COHERENT_ICACHE) &&
+	    !cpu_has_feature(CPU_FTR_NOEXECUTE)) {
 		unsigned long pfn = pte_pfn(pte);
 		if (pfn_valid(pfn)) {
 			struct page *page = pfn_to_page(pfn);
@@ -900,3 +917,16 @@ void pgtable_cache_init(void)
 	if (!zero_cache)
 		panic("pgtable_cache_init(): could not create zero_cache!\n");
 }
+
+pgprot_t phys_mem_access_prot(struct file *file, unsigned long addr,
+			      unsigned long size, pgprot_t vma_prot)
+{
+	if (ppc_md.phys_mem_access_prot)
+		return ppc_md.phys_mem_access_prot(file, addr, size, vma_prot);
+
+	if (!page_is_ram(addr >> PAGE_SHIFT))
+		vma_prot = __pgprot(pgprot_val(vma_prot)
+				    | _PAGE_GUARDED | _PAGE_NO_CACHE);
+	return vma_prot;
+}
+EXPORT_SYMBOL(phys_mem_access_prot);

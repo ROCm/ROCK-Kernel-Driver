@@ -43,10 +43,10 @@ extern time_t last_rtc_update;
 struct gettimeofday_vars {
 	unsigned long tb_to_xs;
 	unsigned long stamp_xsec;
+	unsigned long tb_orig_stamp;
 };
 
 struct gettimeofday_struct {
-	unsigned long tb_orig_stamp;
 	unsigned long tb_ticks_per_sec;
 	struct gettimeofday_vars vars[2];
 	struct gettimeofday_vars * volatile varp;
@@ -102,5 +102,14 @@ static inline unsigned long tb_ticks_since(unsigned long tstamp)
 unsigned mulhwu_scale_factor(unsigned, unsigned);
 void div128_by_32( unsigned long dividend_high, unsigned long dividend_low,
 		   unsigned divisor, struct div_result *dr );
+
+/* Used to store Processor Utilization register (purr) values */
+
+struct cpu_usage {
+        u64 current_tb;  /* Holds the current purr register values */
+};
+
+DECLARE_PER_CPU(struct cpu_usage, cpu_usage_array);
+
 #endif /* __KERNEL__ */
 #endif /* __PPC64_TIME_H */

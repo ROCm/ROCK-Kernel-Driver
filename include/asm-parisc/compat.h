@@ -131,15 +131,15 @@ typedef u32		compat_sigset_word;
  */
 typedef	u32		compat_uptr_t;
 
-static inline void *compat_ptr(compat_uptr_t uptr)
+static inline void __user *compat_ptr(compat_uptr_t uptr)
 {
-	return (void *)(unsigned long)uptr;
+	return (void __user *)(unsigned long)uptr;
 }
 
-static __inline__ void *compat_alloc_user_space(long len)
+static __inline__ void __user *compat_alloc_user_space(long len)
 {
 	struct pt_regs *regs = &current->thread.regs;
-	return (void *)regs->gr[30];
+	return (void __user *)regs->gr[30];
 }
 
 #endif /* _ASM_PARISC_COMPAT_H */

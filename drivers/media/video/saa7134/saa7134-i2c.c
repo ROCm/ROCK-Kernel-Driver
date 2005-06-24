@@ -1,5 +1,5 @@
 /*
- * $Id: saa7134-i2c.c,v 1.9 2004/12/10 12:33:39 kraxel Exp $
+ * $Id: saa7134-i2c.c,v 1.10 2005/01/24 17:37:23 kraxel Exp $
  *
  * device driver for philips saa7134 based TV cards
  * i2c interface support
@@ -206,7 +206,8 @@ static inline int i2c_send_byte(struct saa7134_dev *dev,
 	dword &= 0x0f;
 	dword |= (attr << 6);
 	dword |= ((__u32)data << 8);
-	dword |= 0x00 << 16;
+	dword |= 0x00 << 16;  /* 100 kHz */
+//	dword |= 0x40 << 16;  /* 400 kHz */
 	dword |= 0xf0 << 24;
 	saa_writel(SAA7134_I2C_ATTR_STATUS >> 2, dword);
 #endif
@@ -360,7 +361,6 @@ static struct i2c_adapter saa7134_adap_template = {
 
 static struct i2c_client saa7134_client_template = {
 	I2C_DEVNAME("saa7134 internal"),
-        .id        = -1,
 };
 
 /* ----------------------------------------------------------- */

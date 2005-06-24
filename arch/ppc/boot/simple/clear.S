@@ -7,7 +7,7 @@
 	bl	_setup_L2CR;					\
 								\
 	/* If 745x, turn off L3CR as well */			\
-	mfspr	r8,PVR;						\
+	mfspr	r8,SPRN_PVR;					\
 	srwi	r8,r8,16;					\
 								\
 	cmpli	cr0,r8,0x8000;			/* 7450 */	\

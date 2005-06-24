@@ -36,6 +36,7 @@
 #include <linux/module.h>
 #include <linux/kallsyms.h>
 #include <linux/ptrace.h>
+#include <linux/random.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -55,7 +56,7 @@
 
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
-int hlt_counter;
+static int hlt_counter;
 
 unsigned long boot_option_idle_override = 0;
 EXPORT_SYMBOL(boot_option_idle_override);
@@ -72,7 +73,7 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
  * Powermanagement idle function, if any..
  */
 void (*pm_idle)(void);
-static cpumask_t cpu_idle_map;
+static DEFINE_PER_CPU(unsigned int, cpu_idle_state);
 
 void disable_hlt(void)
 {
@@ -145,22 +146,21 @@ static void poll_idle (void)
  */
 void cpu_idle (void)
 {
-	int cpu = _smp_processor_id();
-
 	/* endless idle loop with no priority at all */
 	while (1) {
 		while (!need_resched()) {
 			void (*idle)(void);
 
-			if (cpu_isset(cpu, cpu_idle_map))
-				cpu_clear(cpu, cpu_idle_map);
+			if (__get_cpu_var(cpu_idle_state))
+				__get_cpu_var(cpu_idle_state) = 0;
+
 			rmb();
 			idle = pm_idle;
 
 			if (!idle)
 				idle = default_idle;
 
-			irq_stat[cpu].idle_timestamp = jiffies;
+			__get_cpu_var(irq_stat).idle_timestamp = jiffies;
 			idle();
 		}
 		schedule();
@@ -169,16 +169,28 @@ void cpu_idle (void)
 
 void cpu_idle_wait(void)
 {
-	int cpu;
+	unsigned int cpu, this_cpu = get_cpu();
 	cpumask_t map;
 
-	for_each_online_cpu(cpu)
-		cpu_set(cpu, cpu_idle_map);
+	set_cpus_allowed(current, cpumask_of_cpu(this_cpu));
+	put_cpu();
+
+	cpus_clear(map);
+	for_each_online_cpu(cpu) {
+		per_cpu(cpu_idle_state, cpu) = 1;
+		cpu_set(cpu, map);
+	}
+
+	__get_cpu_var(cpu_idle_state) = 0;
 
 	wmb();
 	do {
 		ssleep(1);
-		cpus_and(map, cpu_idle_map, cpu_online_map);
+		for_each_online_cpu(cpu) {
+			if (cpu_isset(cpu, map) && !per_cpu(cpu_idle_state, cpu))
+				cpu_clear(cpu, map);
+		}
+		cpus_and(map, map, cpu_online_map);
 	} while (!cpus_empty(map));
 }
 EXPORT_SYMBOL_GPL(cpu_idle_wait);
@@ -388,6 +400,17 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	int err;
 
 	childregs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
+	/*
+	 * The below -8 is to reserve 8 bytes on top of the ring0 stack.
+	 * This is necessary to guarantee that the entire "struct pt_regs"
+	 * is accessable even if the CPU haven't stored the SS/ESP registers
+	 * on the stack (interrupt gate does not save these registers
+	 * when switching to the same priv ring).
+	 * Therefore beware: accessing the xss/esp fields of the
+	 * "struct pt_regs" is possible, but they may contain the
+	 * completely wrong values.
+	 */
+	childregs = (struct pt_regs *) ((unsigned long) childregs - 8);
 	*childregs = *regs;
 	childregs->eax = 0;
 	childregs->esp = esp;
@@ -536,13 +559,6 @@ handle_io_bitmap(struct thread_struct *next, struct tss_struct *tss)
 	 */
 	tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET_LAZY;
 }
-/*
- * This special macro can be used to load a debugging register
- */
-#define loaddebug(thread,register) \
-		__asm__("movl %0,%%db" #register  \
-			: /* no output */ \
-			:"r" (thread->debugreg[register]))
 
 /*
  *	switch_to(x,yn) should switch tasks from x to y.
@@ -596,8 +612,8 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	 * Save away %fs and %gs. No need to save %es and %ds, as
 	 * those are always kernel segments while inside the kernel.
 	 */
-	savesegment(fs,prev->fs);
-	savesegment(gs,prev->gs);
+	asm volatile("mov %%fs,%0":"=m" (prev->fs));
+	asm volatile("mov %%gs,%0":"=m" (prev->gs));
 
 	/*
 	 * Restore %fs and %gs if needed.
@@ -828,3 +844,9 @@ asmlinkage int sys_get_thread_area(struct user_desc __user *u_info)
 	return 0;
 }
 
+unsigned long arch_align_stack(unsigned long sp)
+{
+	if (randomize_va_space)
+		sp -= get_random_int() % 8192;
+	return sp & ~0xf;
+}

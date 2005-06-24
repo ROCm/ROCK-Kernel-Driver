@@ -118,13 +118,18 @@ Linux kernel mailing list:
 	linux-kernel@vger.kernel.org
 	[mail majordomo@vger.kernel.org to subscribe]
 
+Linux Device Drivers, Third Edition (covers 2.6.10):
+	http://lwn.net/Kernel/LDD3/  (free version)
+
 Kernel traffic:
 	Weekly summary of kernel list activity (much easier to read)
 	http://www.kerneltraffic.org/kernel-traffic/
 
 LWN.net:
 	Weekly summary of kernel development activity - http://lwn.net/
-	2.6 driver porting information:
+	2.6 API changes:
+		http://lwn.net/Articles/2.6-kernel-api/
+	Porting drivers from prior kernels to 2.6:
 		http://lwn.net/Articles/driver-porting/
 
 KernelTrap:

@@ -40,6 +40,14 @@ extern unsigned int mcf_timerlevel;
 /***************************************************************************/
 
 /*
+ *	Some platforms need software versions of the GPIO data registers.
+ */
+unsigned short ppdata;
+unsigned char ledbank = 0xff;
+
+/***************************************************************************/
+
+/*
  *	DMA channel base address table.
  */
 unsigned int   dma_base_addr[MAX_M68K_DMA_CHANNELS] = {

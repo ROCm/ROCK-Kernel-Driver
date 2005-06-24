@@ -363,7 +363,7 @@ static long qc_capture(struct qcam_device *q, char __user *buf, unsigned long le
 	size_t wantlen, outptr = 0;
 	char tmpbuf[BUFSZ];
 
-	if (verify_area(VERIFY_WRITE, buf, len))
+	if (!access_ok(VERIFY_WRITE, buf, len))
 		return -EFAULT;
 
 	/* Wait for camera to become ready */

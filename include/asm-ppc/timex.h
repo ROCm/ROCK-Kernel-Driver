@@ -19,8 +19,6 @@ typedef unsigned long cycles_t;
  * Currently only used on SMP.
  */
 
-extern cycles_t cacheflush_time;
-
 static inline cycles_t get_cycles(void)
 {
 	cycles_t ret = 0;

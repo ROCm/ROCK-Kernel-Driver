@@ -171,13 +171,11 @@ void snd_midi_event_reset_decode(snd_midi_event_t *dev)
 	spin_unlock_irqrestore(&dev->lock, flags);
 }
 
-#if 0
 void snd_midi_event_init(snd_midi_event_t *dev)
 {
 	snd_midi_event_reset_encode(dev);
 	snd_midi_event_reset_decode(dev);
 }
-#endif  /*  0  */
 
 void snd_midi_event_no_status(snd_midi_event_t *dev, int on)
 {
@@ -187,7 +185,6 @@ void snd_midi_event_no_status(snd_midi_event_t *dev, int on)
 /*
  * resize buffer
  */
-#if 0
 int snd_midi_event_resize_buffer(snd_midi_event_t *dev, int bufsize)
 {
 	unsigned char *new_buf, *old_buf;
@@ -207,7 +204,6 @@ int snd_midi_event_resize_buffer(snd_midi_event_t *dev, int bufsize)
 	kfree(old_buf);
 	return 0;
 }
-#endif  /*  0  */
 
 /*
  *  read bytes and encode to sequencer event if finished
@@ -521,6 +517,8 @@ static int extra_decode_xrpn(snd_midi_event_t *dev, unsigned char *buf, int coun
  
 EXPORT_SYMBOL(snd_midi_event_new);
 EXPORT_SYMBOL(snd_midi_event_free);
+EXPORT_SYMBOL(snd_midi_event_resize_buffer);
+EXPORT_SYMBOL(snd_midi_event_init);
 EXPORT_SYMBOL(snd_midi_event_reset_encode);
 EXPORT_SYMBOL(snd_midi_event_reset_decode);
 EXPORT_SYMBOL(snd_midi_event_no_status);

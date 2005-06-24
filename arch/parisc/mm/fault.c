@@ -225,7 +225,7 @@ bad_area:
 		si.si_signo = SIGSEGV;
 		si.si_errno = 0;
 		si.si_code = SEGV_MAPERR;
-		si.si_addr = (void *) address;
+		si.si_addr = (void __user *) address;
 		force_sig_info(SIGSEGV, &si, current);
 		return;
 	}

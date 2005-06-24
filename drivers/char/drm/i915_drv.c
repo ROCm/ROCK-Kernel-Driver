@@ -29,7 +29,7 @@ int postinit( struct drm_device *dev, unsigned long flags )
 		DRIVER_MINOR,
 		DRIVER_PATCHLEVEL,
 		DRIVER_DATE,
-		dev->minor,
+		dev->primary.minor,
 		pci_pretty_name(dev->pdev)
 		);
 	return 0;

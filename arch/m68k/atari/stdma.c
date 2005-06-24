@@ -34,6 +34,7 @@
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/wait.h>
 
 #include <asm/atari_stdma.h>
 #include <asm/atariints.h>
@@ -81,11 +82,10 @@ void stdma_lock(irqreturn_t (*handler)(int, void *, struct pt_regs *),
 
 	local_irq_save(flags);		/* protect lock */
 
-	while(stdma_locked)
-		/* Since the DMA is used for file system purposes, we
-		 have to sleep uninterruptible (there may be locked
-		 buffers) */
-		sleep_on(&stdma_wait);
+	/* Since the DMA is used for file system purposes, we
+	 have to sleep uninterruptible (there may be locked
+	 buffers) */
+	wait_event(stdma_wait, !stdma_locked);
 
 	stdma_locked   = 1;
 	stdma_isr      = handler;

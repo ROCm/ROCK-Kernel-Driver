@@ -25,7 +25,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	        "fxsr", "sse", "sse2", "ss", "ht", "tm", "ia64", "pbe",
 
 		/* AMD-defined */
-		"pni", NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, "syscall", NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, "mp", "nx", NULL, "mmxext", NULL,
 		NULL, "fxsr_opt", NULL, NULL, NULL, "lm", "3dnowext", "3dnow",
@@ -94,8 +94,13 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if (c->x86_cache_size >= 0)
 		seq_printf(m, "cache size\t: %d KB\n", c->x86_cache_size);
 #ifdef CONFIG_X86_HT
-	seq_printf(m, "physical id\t: %d\n", phys_proc_id[n]);
-	seq_printf(m, "siblings\t: %d\n", c->x86_num_cores * smp_num_siblings);
+	if (c->x86_num_cores * smp_num_siblings > 1) {
+		seq_printf(m, "physical id\t: %d\n", phys_proc_id[n]);
+		seq_printf(m, "siblings\t: %d\n",
+				c->x86_num_cores * smp_num_siblings);
+		seq_printf(m, "core id\t\t: %d\n", cpu_core_id[n]);
+		seq_printf(m, "cpu cores\t: %d\n", c->x86_num_cores);
+	}
 #endif
 	
 	/* We use exception 16 if we have hardware math and we've either seen it or the CPU claims it is internal */
@@ -126,6 +131,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	seq_printf(m, "\nbogomips\t: %lu.%02lu\n\n",
 		     c->loops_per_jiffy/(500000/HZ),
 		     (c->loops_per_jiffy/(5000/HZ)) % 100);
+
 	return 0;
 }
 

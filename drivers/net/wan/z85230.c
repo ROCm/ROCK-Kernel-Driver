@@ -734,7 +734,7 @@ irqreturn_t z8530_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	u8 intr;
 	static volatile int locker=0;
 	int work=0;
-	struct z8530_irqhandler *irqs=dev->chanA.irqs;
+	struct z8530_irqhandler *irqs;
 	
 	if(locker)
 	{
@@ -758,6 +758,8 @@ irqreturn_t z8530_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		/* Now walk the chip and see what it is wanting - it may be
 		   an IRQ for someone else remember */
 		   
+		irqs=dev->chanA.irqs;
+
 		if(intr & (CHARxIP|CHATxIP|CHAEXT))
 		{
 			if(intr&CHARxIP)

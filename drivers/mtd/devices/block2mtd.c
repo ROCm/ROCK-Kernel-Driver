@@ -59,7 +59,7 @@ void cache_readahead(struct address_space *mapping, int index)
 
 	end_index = ((isize - 1) >> PAGE_CACHE_SHIFT);
 
-	spin_lock_irq(&mapping->tree_lock);
+	read_lock_irq(&mapping->tree_lock);
 	for (i = 0; i < PAGE_READAHEAD; i++) {
 		pagei = index + i;
 		if (pagei > end_index) {
@@ -71,16 +71,16 @@ void cache_readahead(struct address_space *mapping, int index)
 			break;
 		if (page)
 			continue;
-		spin_unlock_irq(&mapping->tree_lock);
+		read_unlock_irq(&mapping->tree_lock);
 		page = page_cache_alloc_cold(mapping);
-		spin_lock_irq(&mapping->tree_lock);
+		read_lock_irq(&mapping->tree_lock);
 		if (!page)
 			break;
 		page->index = pagei;
 		list_add(&page->lru, &page_pool);
 		ret++;
 	}
-	spin_unlock_irq(&mapping->tree_lock);
+	read_unlock_irq(&mapping->tree_lock);
 	if (ret)
 		read_cache_pages(mapping, &page_pool, filler, NULL);
 }

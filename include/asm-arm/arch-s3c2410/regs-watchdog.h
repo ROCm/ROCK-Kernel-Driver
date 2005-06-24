@@ -12,13 +12,14 @@
  *  Changelog:
  *    21-06-2003     BJD     Created file
  *    12-03-2004     BJD     Updated include protection
+ *    10-03-2005     LCVR    Changed S3C2410_VA to S3C24XX_VA
 */
 
 
 #ifndef __ASM_ARCH_REGS_WATCHDOG_H
 #define __ASM_ARCH_REGS_WATCHDOG_H "$Id: watchdog.h,v 1.2 2003/04/29 13:31:09 ben Exp $"
 
-#define S3C2410_WDOGREG(x) ((x) + S3C2410_VA_WATCHDOG)
+#define S3C2410_WDOGREG(x) ((x) + S3C24XX_VA_WATCHDOG)
 
 #define S3C2410_WTCON	   S3C2410_WDOGREG(0x00)
 #define S3C2410_WTDAT	   S3C2410_WDOGREG(0x04)

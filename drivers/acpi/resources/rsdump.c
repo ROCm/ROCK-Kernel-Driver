@@ -571,7 +571,7 @@ acpi_rs_dump_address16 (
 			break;
 		}
 
-		acpi_os_printf (" Type Specific: %s Translation\n",
+		acpi_os_printf ("  Type Specific: %s Translation\n",
 			ACPI_SPARSE_TRANSLATION ==
 			address16_data->attribute.io.translation_attribute ?
 			"Sparse" : "Dense");
@@ -584,8 +584,8 @@ acpi_rs_dump_address16 (
 
 	default:
 
-		acpi_os_printf ("Invalid resource type. Exiting.\n");
-		return;
+		acpi_os_printf ("0x%2.2X\n", address16_data->resource_type);
+		break;
 	}
 
 	acpi_os_printf ("  Resource %s\n",
@@ -718,7 +718,7 @@ acpi_rs_dump_address32 (
 			break;
 		}
 
-		acpi_os_printf (" Type Specific: %s Translation\n",
+		acpi_os_printf ("  Type Specific: %s Translation\n",
 			ACPI_SPARSE_TRANSLATION ==
 			address32_data->attribute.io.translation_attribute ?
 			"Sparse" : "Dense");
@@ -731,8 +731,8 @@ acpi_rs_dump_address32 (
 
 	default:
 
-		acpi_os_printf ("  Invalid Resource Type..exiting.\n");
-		return;
+		acpi_os_printf ("  Resource Type: 0x%2.2X\n", address32_data->resource_type);
+		break;
 	}
 
 	acpi_os_printf ("  Resource %s\n",
@@ -865,7 +865,7 @@ acpi_rs_dump_address64 (
 			break;
 		}
 
-		acpi_os_printf (" Type Specific: %s Translation\n",
+		acpi_os_printf ("  Type Specific: %s Translation\n",
 			ACPI_SPARSE_TRANSLATION ==
 			address64_data->attribute.io.translation_attribute ?
 			"Sparse" : "Dense");
@@ -878,8 +878,8 @@ acpi_rs_dump_address64 (
 
 	default:
 
-		acpi_os_printf ("  Invalid Resource Type..exiting.\n");
-		return;
+		acpi_os_printf ("  Resource Type: 0x%2.2X\n", address64_data->resource_type);
+		break;
 	}
 
 	acpi_os_printf ("  Resource %s\n",
@@ -913,7 +913,10 @@ acpi_rs_dump_address64 (
 	acpi_os_printf ("  Address Length: %8.8X%8.8X\n",
 			 ACPI_FORMAT_UINT64 (address64_data->address_length));
 
-	if(0xFF != address64_data->resource_source.index) {
+	acpi_os_printf ("  Type Specific Attributes: %8.8X%8.8X\n",
+			 ACPI_FORMAT_UINT64 (address64_data->type_specific_attributes));
+
+	if (0xFF != address64_data->resource_source.index) {
 		acpi_os_printf ("  Resource Source Index: %X\n",
 				 address64_data->resource_source.index);
 		acpi_os_printf ("  Resource Source: %s\n",

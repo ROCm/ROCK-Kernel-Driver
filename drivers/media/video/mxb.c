@@ -731,7 +731,7 @@ static int mxb_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 		t->signal = 0xffff;
 		t->afc = 0;		
 
-		byte = mxb->tda9840->driver->command(mxb->tda9840,TDA9840_DETECT, NULL);
+		mxb->tda9840->driver->command(mxb->tda9840,TDA9840_DETECT, &byte);
 		t->audmode = mxb->cur_mode;
 		
 		if( byte < 0 ) {

@@ -27,7 +27,7 @@
 #include <linux/spinlock.h>
 #include <linux/threads.h>
 #include <linux/interrupt.h>
-#include <asm/irq.h>
+#include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -204,8 +204,8 @@ static int tda80xx_set_parameters(struct tda80xx_state* state,
 	 * r = k * clk / symbol_rate
 	 *
 	 * k:	2^21 for caa 0..3,
-	 * 	2^20 for caa 4..5,
-	 * 	2^19 for caa 6..7
+	 *	2^20 for caa 4..5,
+	 *	2^19 for caa 6..7
 	 */
 	if (symbol_rate <= (clk * 3) / 32)
 		k = (1 << 19);
@@ -400,7 +400,7 @@ static void tda80xx_wait_diseqc_fifo(struct tda80xx_state* state)
 
 static int tda8044_init(struct dvb_frontend* fe)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 	int ret;
 
 	/*
@@ -422,7 +422,7 @@ static int tda8044_init(struct dvb_frontend* fe)
 	tda80xx_write(state, 0x00, tda8044_inittab_post, sizeof(tda8044_inittab_post));
 
 	if (state->config->pll_init) {
-	   	tda80xx_writereg(state, 0x1c, 0x80);
+		tda80xx_writereg(state, 0x1c, 0x80);
 		state->config->pll_init(fe);
 		tda80xx_writereg(state, 0x1c, 0x00);
 	}
@@ -432,12 +432,12 @@ static int tda8044_init(struct dvb_frontend* fe)
 
 static int tda8083_init(struct dvb_frontend* fe)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	tda80xx_write(state, 0x00, tda8083_inittab, sizeof(tda8083_inittab));
 
 	if (state->config->pll_init) {
-	   	tda80xx_writereg(state, 0x1c, 0x80);
+		tda80xx_writereg(state, 0x1c, 0x80);
 		state->config->pll_init(fe);
 		tda80xx_writereg(state, 0x1c, 0x00);
 	}
@@ -445,24 +445,9 @@ static int tda8083_init(struct dvb_frontend* fe)
 	return 0;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 static int tda80xx_set_voltage(struct dvb_frontend* fe, fe_sec_voltage_t voltage)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	switch (voltage) {
 	case SEC_VOLTAGE_13:
@@ -478,7 +463,7 @@ static int tda80xx_set_voltage(struct dvb_frontend* fe, fe_sec_voltage_t voltage
 
 static int tda80xx_set_tone(struct dvb_frontend* fe, fe_sec_tone_mode_t tone)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	switch (tone) {
 	case SEC_TONE_OFF:
@@ -492,7 +477,7 @@ static int tda80xx_set_tone(struct dvb_frontend* fe, fe_sec_tone_mode_t tone)
 
 static int tda80xx_send_diseqc_msg(struct dvb_frontend* fe, struct dvb_diseqc_master_cmd *cmd)
 {
-   	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	if (cmd->msg_len > 6)
 		return -EINVAL;
@@ -507,7 +492,7 @@ static int tda80xx_send_diseqc_msg(struct dvb_frontend* fe, struct dvb_diseqc_ma
 
 static int tda80xx_send_diseqc_burst(struct dvb_frontend* fe, fe_sec_mini_cmd_t cmd)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	switch (cmd) {
 	case SEC_MINI_A:
@@ -527,7 +512,7 @@ static int tda80xx_send_diseqc_burst(struct dvb_frontend* fe, fe_sec_mini_cmd_t 
 
 static int tda80xx_sleep(struct dvb_frontend* fe)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	tda80xx_writereg(state, 0x00, 0x02);	/* enter standby */
 
@@ -536,7 +521,7 @@ static int tda80xx_sleep(struct dvb_frontend* fe)
 
 static int tda80xx_set_frontend(struct dvb_frontend* fe, struct dvb_frontend_parameters *p)
 {
-   	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	tda80xx_writereg(state, 0x1c, 0x80);
 	state->config->pll_set(fe, p);
@@ -552,7 +537,7 @@ static int tda80xx_set_frontend(struct dvb_frontend* fe, struct dvb_frontend_par
 
 static int tda80xx_get_frontend(struct dvb_frontend* fe, struct dvb_frontend_parameters *p)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	if (!state->config->irq)
 		tda80xx_read_status_int(state);
@@ -565,7 +550,7 @@ static int tda80xx_get_frontend(struct dvb_frontend* fe, struct dvb_frontend_par
 
 static int tda80xx_read_status(struct dvb_frontend* fe, fe_status_t* status)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	if (!state->config->irq)
 		tda80xx_read_status_int(state);
@@ -576,7 +561,7 @@ static int tda80xx_read_status(struct dvb_frontend* fe, fe_status_t* status)
 
 static int tda80xx_read_ber(struct dvb_frontend* fe, u32* ber)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 	int ret;
 	u8 buf[3];
 
@@ -590,7 +575,7 @@ static int tda80xx_read_ber(struct dvb_frontend* fe, u32* ber)
 
 static int tda80xx_read_signal_strength(struct dvb_frontend* fe, u16* strength)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	u8 gain = ~tda80xx_readreg(state, 0x01);
 	*strength = (gain << 8) | gain;
@@ -600,7 +585,7 @@ static int tda80xx_read_signal_strength(struct dvb_frontend* fe, u16* strength)
 
 static int tda80xx_read_snr(struct dvb_frontend* fe, u16* snr)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	u8 quality = tda80xx_readreg(state, 0x08);
 	*snr = (quality << 8) | quality;
@@ -610,7 +595,7 @@ static int tda80xx_read_snr(struct dvb_frontend* fe, u16* snr)
 
 static int tda80xx_read_ucblocks(struct dvb_frontend* fe, u32* ucblocks)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	*ucblocks = tda80xx_readreg(state, 0x0f);
 	if (*ucblocks == 0xff)
@@ -621,7 +606,7 @@ static int tda80xx_read_ucblocks(struct dvb_frontend* fe, u32* ucblocks)
 
 static int tda80xx_init(struct dvb_frontend* fe)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	switch(state->id) {
 	case ID_TDA8044:
@@ -635,7 +620,7 @@ static int tda80xx_init(struct dvb_frontend* fe)
 
 static void tda80xx_release(struct dvb_frontend* fe)
 {
-	struct tda80xx_state* state = (struct tda80xx_state*) fe->demodulator_priv;
+	struct tda80xx_state* state = fe->demodulator_priv;
 
 	if (state->config->irq)
 		free_irq(state->config->irq, &state->worklet);
@@ -652,7 +637,7 @@ struct dvb_frontend* tda80xx_attach(const struct tda80xx_config* config,
 	int ret;
 
 	/* allocate memory for the internal state */
-	state = (struct tda80xx_state*) kmalloc(sizeof(struct tda80xx_state), GFP_KERNEL);
+	state = kmalloc(sizeof(struct tda80xx_state), GFP_KERNEL);
 	if (state == NULL) goto error;
 
 	/* setup the state */
@@ -698,7 +683,7 @@ struct dvb_frontend* tda80xx_attach(const struct tda80xx_config* config,
 	return &state->frontend;
 
 error:
-	if (state) kfree(state);
+	kfree(state);
 	return NULL;
 }
 
@@ -735,9 +720,9 @@ static struct dvb_frontend_ops tda80xx_ops = {
 	.read_ucblocks = tda80xx_read_ucblocks,
 
 	.diseqc_send_master_cmd = tda80xx_send_diseqc_msg,
-     	.diseqc_send_burst = tda80xx_send_diseqc_burst,
-     	.set_tone = tda80xx_set_tone,
-     	.set_voltage = tda80xx_set_voltage,
+	.diseqc_send_burst = tda80xx_send_diseqc_burst,
+	.set_tone = tda80xx_set_tone,
+	.set_voltage = tda80xx_set_voltage,
 };
 
 module_param(debug, int, 0644);

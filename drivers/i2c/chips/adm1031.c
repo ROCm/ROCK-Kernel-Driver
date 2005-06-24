@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/jiffies.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 
@@ -109,8 +110,6 @@ static struct i2c_driver adm1031_driver = {
 	.attach_adapter = adm1031_attach_adapter,
 	.detach_client = adm1031_detach_client,
 };
-
-static int adm1031_id;
 
 static inline u8 adm1031_read_value(struct i2c_client *client, u8 reg)
 {
@@ -255,7 +254,7 @@ set_fan_auto_channel(struct device *dev, const char *buf, size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1031_data *data = i2c_get_clientdata(client);
-	int val;
+	int val = simple_strtol(buf, NULL, 10);
 	u8 reg;
 	int ret;
 	u8 old_fan_mode;
@@ -263,7 +262,6 @@ set_fan_auto_channel(struct device *dev, const char *buf, size_t count, int nr)
 	old_fan_mode = data->conf1;
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	
 	if ((ret = get_fan_auto_nearest(data, nr, val, data->conf1, &reg))) {
 		up(&data->update_lock);
@@ -328,10 +326,9 @@ set_auto_temp_min(struct device *dev, const char *buf, size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1031_data *data = i2c_get_clientdata(client);
-	int val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->auto_temp[nr] = AUTO_TEMP_MIN_TO_REG(val, data->auto_temp[nr]);
 	adm1031_write_value(client, ADM1031_REG_AUTO_TEMP(nr),
 			    data->auto_temp[nr]);
@@ -349,10 +346,9 @@ set_auto_temp_max(struct device *dev, const char *buf, size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1031_data *data = i2c_get_clientdata(client);
-	int val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	data->temp_max[nr] = AUTO_TEMP_MAX_TO_REG(val, data->auto_temp[nr], data->pwm[nr]);
 	adm1031_write_value(client, ADM1031_REG_AUTO_TEMP(nr),
 			    data->temp_max[nr]);
@@ -405,10 +401,10 @@ set_pwm(struct device *dev, const char *buf, size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1031_data *data = i2c_get_clientdata(client);
-	int val;
+	int val = simple_strtol(buf, NULL, 10);
 	int reg;
+
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	if ((data->conf1 & ADM1031_CONF1_AUTO_MODE) && 
 	    (((val>>4) & 0xf) != 5)) {
 		/* In automatic mode, the only PWM accepted is 33% */
@@ -512,10 +508,9 @@ set_fan_min(struct device *dev, const char *buf, size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1031_data *data = i2c_get_clientdata(client);
-	int val;
+	int val = simple_strtol(buf, NULL, 10);
 
 	down(&data->update_lock);
-	val = simple_strtol(buf, NULL, 10);
 	if (val) {
 		data->fan_min[nr] = 
 			FAN_TO_REG(val, FAN_DIV_FROM_REG(data->fan_div[nr]));
@@ -531,12 +526,11 @@ set_fan_div(struct device *dev, const char *buf, size_t count, int nr)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct adm1031_data *data = i2c_get_clientdata(client);
-	int val;
+	int val = simple_strtol(buf, NULL, 10);
 	u8 tmp;
-	int old_div = FAN_DIV_FROM_REG(data->fan_div[nr]);
+	int old_div;
 	int new_min;
 
-	val = simple_strtol(buf, NULL, 10);
 	tmp = val == 8 ? 0xc0 :
 	      val == 4 ? 0x80 :
 	      val == 2 ? 0x40 :	
@@ -544,7 +538,9 @@ set_fan_div(struct device *dev, const char *buf, size_t count, int nr)
 	      0xff;
 	if (tmp == 0xff)
 		return -EINVAL;
+	
 	down(&data->update_lock);
+	old_div = FAN_DIV_FROM_REG(data->fan_div[nr]);
 	data->fan_div[nr] = (tmp & 0xC0) | (0x3f & data->fan_div[nr]);
 	new_min = data->fan_min[nr] * old_div / 
 		FAN_DIV_FROM_REG(data->fan_div[nr]);
@@ -781,8 +777,6 @@ static int adm1031_detect(struct i2c_adapter *adapter, int address, int kind)
 	data->chip_type = kind;
 
 	strlcpy(new_client->name, name, I2C_NAME_SIZE);
-
-	new_client->id = adm1031_id++;
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);
 
@@ -888,8 +882,8 @@ static struct adm1031_data *adm1031_update_device(struct device *dev)
 
 	down(&data->update_lock);
 
-	if ((jiffies - data->last_updated > HZ + HZ / 2) ||
-	    (jiffies < data->last_updated) || !data->valid) {
+	if (time_after(jiffies, data->last_updated + HZ + HZ / 2)
+	    || !data->valid) {
 
 		dev_dbg(&client->dev, "Starting adm1031 update\n");
 		for (chan = 0;

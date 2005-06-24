@@ -2,8 +2,6 @@
  * include/asm-parisc/serial.h
  */
 
-#include <linux/config.h>
-
 /*
  * This assumes you have a 7.272727 MHz clock for your UART.
  * The documentation implies a 40Mhz clock, and elsewhere a 7Mhz clock

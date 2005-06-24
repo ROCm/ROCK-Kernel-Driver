@@ -56,6 +56,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/jiffies.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
 #include <linux/i2c-vid.h>
@@ -203,12 +204,6 @@ struct lm87_data {
 };
 
 /*
- * Internal variables
- */
-
-static int lm87_id;
-
-/*
  * Sysfs stuff
  */
 
@@ -257,9 +252,12 @@ static void set_in_min(struct device *dev, const char *buf, int nr)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm87_data *data = i2c_get_clientdata(client);
 	long val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->in_min[nr] = IN_TO_REG(val, data->in_scale[nr]);
 	lm87_write_value(client, nr<6 ? LM87_REG_IN_MIN(nr) :
 			 LM87_REG_AIN_MIN(nr-6), data->in_min[nr]);
+	up(&data->update_lock);
 }
 
 static void set_in_max(struct device *dev, const char *buf, int nr)
@@ -267,9 +265,12 @@ static void set_in_max(struct device *dev, const char *buf, int nr)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm87_data *data = i2c_get_clientdata(client);
 	long val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->in_max[nr] = IN_TO_REG(val, data->in_scale[nr]);
 	lm87_write_value(client, nr<6 ? LM87_REG_IN_MAX(nr) :
 			 LM87_REG_AIN_MAX(nr-6), data->in_max[nr]);
+	up(&data->update_lock);
 }
 
 #define set_in(offset) \
@@ -322,20 +323,26 @@ show_temp(3);
 
 static void set_temp_low(struct device *dev, const char *buf, int nr)
 {
-    struct i2c_client *client = to_i2c_client(dev);
-    struct lm87_data *data = i2c_get_clientdata(client);
-    long val = simple_strtol(buf, NULL, 10);
-    data->temp_low[nr] = TEMP_TO_REG(val);
-    lm87_write_value(client, LM87_REG_TEMP_LOW[nr], data->temp_low[nr]);
+	struct i2c_client *client = to_i2c_client(dev);
+	struct lm87_data *data = i2c_get_clientdata(client);
+	long val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
+	data->temp_low[nr] = TEMP_TO_REG(val);
+	lm87_write_value(client, LM87_REG_TEMP_LOW[nr], data->temp_low[nr]);
+	up(&data->update_lock);
 }
 
 static void set_temp_high(struct device *dev, const char *buf, int nr)
 {
-    struct i2c_client *client = to_i2c_client(dev);
-    struct lm87_data *data = i2c_get_clientdata(client);
-    long val = simple_strtol(buf, NULL, 10);
-    data->temp_high[nr] = TEMP_TO_REG(val);
-    lm87_write_value(client, LM87_REG_TEMP_HIGH[nr], data->temp_high[nr]);
+	struct i2c_client *client = to_i2c_client(dev);
+	struct lm87_data *data = i2c_get_clientdata(client);
+	long val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
+	data->temp_high[nr] = TEMP_TO_REG(val);
+	lm87_write_value(client, LM87_REG_TEMP_HIGH[nr], data->temp_high[nr]);
+	up(&data->update_lock);
 }
 
 #define set_temp(offset) \
@@ -403,9 +410,12 @@ static void set_fan_min(struct device *dev, const char *buf, int nr)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm87_data *data = i2c_get_clientdata(client);
 	long val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->fan_min[nr] = FAN_TO_REG(val,
 			    FAN_DIV_FROM_REG(data->fan_div[nr]));
 	lm87_write_value(client, LM87_REG_FAN_MIN(nr), data->fan_min[nr]);
+	up(&data->update_lock);
 }
 
 /* Note: we save and restore the fan minimum here, because its value is
@@ -418,16 +428,21 @@ static ssize_t set_fan_div(struct device *dev, const char *buf,
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm87_data *data = i2c_get_clientdata(client);
 	long val = simple_strtol(buf, NULL, 10);
-	unsigned long min = FAN_FROM_REG(data->fan_min[nr],
-			    FAN_DIV_FROM_REG(data->fan_div[nr]));
+	unsigned long min;
 	u8 reg;
+
+	down(&data->update_lock);
+	min = FAN_FROM_REG(data->fan_min[nr],
+			   FAN_DIV_FROM_REG(data->fan_div[nr]));
 
 	switch (val) {
 	case 1: data->fan_div[nr] = 0; break;
 	case 2: data->fan_div[nr] = 1; break;
 	case 4: data->fan_div[nr] = 2; break;
 	case 8: data->fan_div[nr] = 3; break;
-	default: return -EINVAL;
+	default:
+		up(&data->update_lock);
+		return -EINVAL;
 	}
 
 	reg = lm87_read_value(client, LM87_REG_VID_FAN_DIV);
@@ -444,6 +459,8 @@ static ssize_t set_fan_div(struct device *dev, const char *buf,
 	data->fan_min[nr] = FAN_TO_REG(min, val);
 	lm87_write_value(client, LM87_REG_FAN_MIN(nr),
 			 data->fan_min[nr]);
+	up(&data->update_lock);
+
 	return count;
 }
 
@@ -504,8 +521,11 @@ static ssize_t set_aout(struct device *dev, const char *buf, size_t count)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm87_data *data = i2c_get_clientdata(client);
 	long val = simple_strtol(buf, NULL, 10);
+
+	down(&data->update_lock);
 	data->aout = AOUT_TO_REG(val);
 	lm87_write_value(client, LM87_REG_AOUT, data->aout);
+	up(&data->update_lock);
 	return count;
 }
 static DEVICE_ATTR(aout_output, S_IRUGO | S_IWUSR, show_aout, set_aout);
@@ -569,7 +589,6 @@ static int lm87_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* We can fill in the remaining client fields */
 	strlcpy(new_client->name, "lm87", I2C_NAME_SIZE);
-	new_client->id = lm87_id++;
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);
 
@@ -720,9 +739,7 @@ static struct lm87_data *lm87_update_device(struct device *dev)
 
 	down(&data->update_lock);
 
-	if (jiffies - data->last_updated > HZ
-	  || jiffies < data->last_updated
-	  || !data->valid) {
+	if (time_after(jiffies, data->last_updated + HZ) || !data->valid) {
 		int i, j;
 
 		dev_dbg(&client->dev, "Updating data.\n");

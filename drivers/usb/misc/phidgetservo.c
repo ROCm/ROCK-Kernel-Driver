@@ -148,7 +148,7 @@ change_position_v30(struct phidget_servo *servo, int servo_no, int degrees,
 
 	retval = usb_control_msg(servo->udev,
 				 usb_sndctrlpipe(servo->udev, 0),
-				 0x09, 0x21, 0x0200, 0x0000, buffer, 6, 2 * HZ);
+				 0x09, 0x21, 0x0200, 0x0000, buffer, 6, 2000);
 
 	kfree(buffer);
 
@@ -199,7 +199,7 @@ change_position_v20(struct phidget_servo *servo, int servo_no, int degrees,
 
 	retval = usb_control_msg(servo->udev,
 				 usb_sndctrlpipe(servo->udev, 0),
-				 0x09, 0x21, 0x0200, 0x0000, buffer, 2, 2 * HZ);
+				 0x09, 0x21, 0x0200, 0x0000, buffer, 2, 2000);
 
 	kfree(buffer);
 

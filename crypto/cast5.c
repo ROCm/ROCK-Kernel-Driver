@@ -567,14 +567,11 @@ static const u32 sb8[256] = {
 	0xeaee6801, 0x8db2a283, 0xea8bf59e
 };
 
-
-#define rol(n,x) ( ((x) << (n)) | ((x) >> (32-(n))) )
-
-#define F1(D,m,r)  (  (I = ((m) + (D))), (I=rol((r),I)),   \
+#define F1(D,m,r)  (  (I = ((m) + (D))), (I=rol32(I,(r))),   \
     (((s1[I >> 24] ^ s2[(I>>16)&0xff]) - s3[(I>>8)&0xff]) + s4[I&0xff]) )
-#define F2(D,m,r)  (  (I = ((m) ^ (D))), (I=rol((r),I)),   \
+#define F2(D,m,r)  (  (I = ((m) ^ (D))), (I=rol32(I,(r))),   \
     (((s1[I >> 24] - s2[(I>>16)&0xff]) + s3[(I>>8)&0xff]) ^ s4[I&0xff]) )
-#define F3(D,m,r)  (  (I = ((m) - (D))), (I=rol((r),I)),   \
+#define F3(D,m,r)  (  (I = ((m) - (D))), (I=rol32(I,(r))),   \
     (((s1[I >> 24] + s2[(I>>16)&0xff]) ^ s3[(I>>8)&0xff]) - s4[I&0xff]) )
 
 

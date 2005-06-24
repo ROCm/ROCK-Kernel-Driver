@@ -58,8 +58,8 @@
 #define MAX_MGMT_CLASS		80
 #define MAX_MGMT_VERSION	8
 #define MAX_MGMT_OUI		8
-#define MAX_MGMT_VENDOR_RANGE2	IB_MGMT_CLASS_VENDOR_RANGE2_END - \
-				IB_MGMT_CLASS_VENDOR_RANGE2_START + 1
+#define MAX_MGMT_VENDOR_RANGE2	(IB_MGMT_CLASS_VENDOR_RANGE2_END - \
+				IB_MGMT_CLASS_VENDOR_RANGE2_START + 1)
 
 struct ib_mad_list_head {
 	struct list_head list;
@@ -69,6 +69,7 @@ struct ib_mad_list_head {
 struct ib_mad_private_header {
 	struct ib_mad_list_head mad_list;
 	struct ib_mad_recv_wc recv_wc;
+	struct ib_wc wc;
 	DECLARE_PCI_UNMAP_ADDR(mapping)
 } __attribute__ ((packed));
 
@@ -95,6 +96,8 @@ struct ib_mad_agent_private {
 	unsigned long timeout;
 	struct list_head local_list;
 	struct work_struct local_work;
+	struct list_head canceled_list;
+	struct work_struct canceled_work;
 
 	atomic_t refcount;
 	wait_queue_head_t wait;
@@ -191,5 +194,7 @@ struct ib_mad_port_private {
 	struct work_struct work;
 	struct ib_mad_qp_info qp_info[IB_MAD_QPS_CORE];
 };
+
+extern kmem_cache_t *ib_mad_cache;
 
 #endif	/* __IB_MAD_PRIV_H__ */

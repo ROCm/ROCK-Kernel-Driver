@@ -28,13 +28,21 @@ static ssize_t aoedisk_show_mac(struct gendisk * disk, char *page)
 {
 	struct aoedev *d = disk->private_data;
 
-	return snprintf(page, PAGE_SIZE, "%012llx\n", mac_addr(d->addr));
+	return snprintf(page, PAGE_SIZE, "%012llx\n",
+			(unsigned long long)mac_addr(d->addr));
 }
 static ssize_t aoedisk_show_netif(struct gendisk * disk, char *page)
 {
 	struct aoedev *d = disk->private_data;
 
 	return snprintf(page, PAGE_SIZE, "%s\n", d->ifp->name);
+}
+/* firmware version */
+static ssize_t aoedisk_show_fwver(struct gendisk * disk, char *page)
+{
+	struct aoedev *d = disk->private_data;
+
+	return snprintf(page, PAGE_SIZE, "0x%04x\n", (unsigned int) d->fw_ver);
 }
 
 static struct disk_attribute disk_attr_state = {
@@ -49,6 +57,10 @@ static struct disk_attribute disk_attr_netif = {
 	.attr = {.name = "netif", .mode = S_IRUGO },
 	.show = aoedisk_show_netif
 };
+static struct disk_attribute disk_attr_fwver = {
+	.attr = {.name = "firmware-version", .mode = S_IRUGO },
+	.show = aoedisk_show_fwver
+};
 
 static void
 aoedisk_add_sysfs(struct aoedev *d)
@@ -56,6 +68,7 @@ aoedisk_add_sysfs(struct aoedev *d)
 	sysfs_create_file(&d->gd->kobj, &disk_attr_state.attr);
 	sysfs_create_file(&d->gd->kobj, &disk_attr_mac.attr);
 	sysfs_create_file(&d->gd->kobj, &disk_attr_netif.attr);
+	sysfs_create_file(&d->gd->kobj, &disk_attr_fwver.attr);
 }
 void
 aoedisk_rm_sysfs(struct aoedev *d)
@@ -63,6 +76,7 @@ aoedisk_rm_sysfs(struct aoedev *d)
 	sysfs_remove_link(&d->gd->kobj, "state");
 	sysfs_remove_link(&d->gd->kobj, "mac");
 	sysfs_remove_link(&d->gd->kobj, "netif");
+	sysfs_remove_link(&d->gd->kobj, "firmware-version");
 }
 
 static int
@@ -124,6 +138,7 @@ aoeblk_make_request(request_queue_t *q, struct bio *bio)
 	}
 	memset(buf, 0, sizeof(*buf));
 	INIT_LIST_HEAD(&buf->bufs);
+	buf->start_time = jiffies;
 	buf->bio = bio;
 	buf->resid = bio->bi_size;
 	buf->sector = bio->bi_sector;
@@ -145,8 +160,8 @@ aoeblk_make_request(request_queue_t *q, struct bio *bio)
 	list_add_tail(&buf->bufs, &d->bufq);
 	aoecmd_work(d);
 
-	sl = d->skblist;
-	d->skblist = NULL;
+	sl = d->sendq_hd;
+	d->sendq_hd = d->sendq_tl = NULL;
 
 	spin_unlock_irqrestore(&d->lock, flags);
 
@@ -241,7 +256,8 @@ aoeblk_gdalloc(void *vp)
 	aoedisk_add_sysfs(d);
 	
 	printk(KERN_INFO "aoe: %012llx e%lu.%lu v%04x has %llu "
-		"sectors\n", mac_addr(d->addr), d->aoemajor, d->aoeminor,
+		"sectors\n", (unsigned long long)mac_addr(d->addr),
+		d->aoemajor, d->aoeminor,
 		d->fw_ver, (long long)d->ssize);
 }
 

@@ -391,7 +391,7 @@ static int tower_open (struct inode *inode, struct file *file)
 				  0,
 				  &reset_reply,
 				  sizeof(reset_reply),
-				  HZ);
+				  1000);
 	if (result < 0) {
 		err("LEGO USB Tower reset control request failed");
 		retval = result;
@@ -859,7 +859,7 @@ static int tower_probe (struct usb_interface *interface, const struct usb_device
 		info ("udev is NULL.");
 	}
 
-	/* allocate memory for our device state and intialize it */
+	/* allocate memory for our device state and initialize it */
 
 	dev = kmalloc (sizeof(struct lego_usb_tower), GFP_KERNEL);
 
@@ -972,7 +972,7 @@ static int tower_probe (struct usb_interface *interface, const struct usb_device
 				  0,
 				  &get_version_reply,
 				  sizeof(get_version_reply),
-				  HZ);
+				  1000);
 	if (result < 0) {
 		err("LEGO USB Tower get version control request failed");
 		retval = result;

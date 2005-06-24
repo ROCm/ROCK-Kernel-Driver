@@ -56,6 +56,8 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 	smp_wmb();
 	ptep->pte_low = pte.pte_low;
 }
+#define set_pte_at(mm,addr,ptep,pteval) set_pte(ptep,pteval)
+
 #define __HAVE_ARCH_SET_PTE_ATOMIC
 #define set_pte_atomic(pteptr,pteval) \
 		set_64bit((unsigned long long *)(pteptr),pte_val(pteval))
@@ -88,7 +90,7 @@ static inline void pud_clear (pud_t * pud) { }
 #define pmd_offset(pud, address) ((pmd_t *) pud_page(*(pud)) + \
 			pmd_index(address))
 
-static inline pte_t ptep_get_and_clear(pte_t *ptep)
+static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
 	pte_t res;
 

@@ -115,7 +115,7 @@ static int usb_set_report(struct usb_interface *intf, unsigned char type,
 		usb_sndctrlpipe(interface_to_usbdev(intf), 0),
                 USB_REQ_SET_REPORT, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
                 (type << 8) + id, intf->altsetting[0].desc.bInterfaceNumber,
-		buf, size, HZ);
+		buf, size, 1000);
 }
 
 static void wacom_pl_irq(struct urb *urb, struct pt_regs *regs)

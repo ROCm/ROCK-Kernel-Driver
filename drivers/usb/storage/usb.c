@@ -66,7 +66,7 @@
 #include "debug.h"
 #include "initializers.h"
 
-#ifdef CONFIG_USB_STORAGE_HP8200e
+#ifdef CONFIG_USB_STORAGE_USBAT
 #include "shuttle_usbat.h"
 #endif
 #ifdef CONFIG_USB_STORAGE_SDDR09
@@ -100,9 +100,13 @@ MODULE_LICENSE("GPL");
 static unsigned int delay_use = 5;
 module_param(delay_use, uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(delay_use, "seconds to delay before using a new device");
-unsigned int usb_genesys_transport_delay = 110;
-module_param(usb_genesys_transport_delay, uint, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(usb_genesys_transport_delay, "udelay value in transport.c, only for vendor genesys, default == 110");
+
+
+/* These are used to make sure the module doesn't unload before all the
+ * threads have exited.
+ */
+static atomic_t total_threads = ATOMIC_INIT(0);
+static DECLARE_COMPLETION(threads_gone);
 
 
 static int storage_probe(struct usb_interface *iface,
@@ -146,9 +150,7 @@ static struct usb_device_id storage_usb_ids [] = {
 	{ USB_INTERFACE_INFO(USB_CLASS_MASS_STORAGE, US_SC_QIC, US_PR_BULK) },
 	{ USB_INTERFACE_INFO(USB_CLASS_MASS_STORAGE, US_SC_UFI, US_PR_BULK) },
 	{ USB_INTERFACE_INFO(USB_CLASS_MASS_STORAGE, US_SC_8070, US_PR_BULK) },
-#if !defined(CONFIG_BLK_DEV_UB) && !defined(CONFIG_BLK_DEV_UB_MODULE)
 	{ USB_INTERFACE_INFO(USB_CLASS_MASS_STORAGE, US_SC_SCSI, US_PR_BULK) },
-#endif
 
 	/* Terminating entry */
 	{ }
@@ -222,16 +224,14 @@ static struct us_unusual_dev us_unusual_dev_list[] = {
 	  .useTransport = US_PR_BULK},
 	{ .useProtocol = US_SC_8070,
 	  .useTransport = US_PR_BULK},
-#if !defined(CONFIG_BLK_DEV_UB) && !defined(CONFIG_BLK_DEV_UB_MODULE)
 	{ .useProtocol = US_SC_SCSI,
 	  .useTransport = US_PR_BULK},
-#endif
 
 	/* Terminating entry */
 	{ NULL }
 };
 
-struct usb_driver usb_storage_driver = {
+static struct usb_driver usb_storage_driver = {
 	.owner =	THIS_MODULE,
 	.name =		"usb-storage",
 	.probe =	storage_probe,
@@ -293,10 +293,12 @@ static int usb_stor_control_thread(void * __us)
 	 * so get rid of all our resources.
 	 */
 	daemonize("usb-storage");
-
 	current->flags |= PF_NOFREEZE;
-
 	unlock_kernel();
+
+	/* acquire a reference to the host, so it won't be deallocated
+	 * until we're ready to exit */
+	scsi_host_get(host);
 
 	/* signal that we've started the thread */
 	complete(&(us->notify));
@@ -311,9 +313,9 @@ static int usb_stor_control_thread(void * __us)
 		/* lock the device pointers */
 		down(&(us->dev_semaphore));
 
-		/* if us->srb is NULL, we are being asked to exit */
-		if (us->srb == NULL) {
-			US_DEBUGP("-- exit command received\n");
+		/* if the device has disconnected, we are free to exit */
+		if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
+			US_DEBUGP("-- exiting\n");
 			up(&(us->dev_semaphore));
 			break;
 		}
@@ -325,12 +327,6 @@ static int usb_stor_control_thread(void * __us)
 		if (test_bit(US_FLIDX_TIMED_OUT, &us->flags)) {
 			us->srb->result = DID_ABORT << 16;
 			goto SkipForAbort;
-		}
-
-		/* don't do anything if we are disconnecting */
-		if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
-			US_DEBUGP("No command during disconnect\n");
-			goto SkipForDisconnect;
 		}
 
 		scsi_unlock(host);
@@ -400,13 +396,14 @@ SkipForAbort:
 			complete(&(us->notify));
 
 		/* finished working on this command */
-SkipForDisconnect:
 		us->srb = NULL;
 		scsi_unlock(host);
 
 		/* unlock the device pointers */
 		up(&(us->dev_semaphore));
 	} /* for (;;) */
+
+	scsi_host_put(host);
 
 	/* notify the exit routine that we're actually exiting now 
 	 *
@@ -422,7 +419,7 @@ SkipForDisconnect:
 	 * This is important in preemption kernels, which transfer the flow
 	 * of execution immediately upon a complete().
 	 */
-	complete_and_exit(&(us->notify), 0);
+	complete_and_exit(&threads_gone, 0);
 }	
 
 /***********************************************************************
@@ -485,6 +482,13 @@ static void get_device_info(struct us_data *us, int id_index)
 			unusual_dev->useTransport;
 	us->flags = unusual_dev->flags;
 
+	/*
+	 * This flag is only needed when we're in high-speed, so let's
+	 * disable it if we're in full-speed
+	 */
+	if (dev->speed != USB_SPEED_HIGH)
+		us->flags &= ~US_FL_GO_SLOW;
+
 	/* Log a message if a non-generic unusual_dev entry contains an
 	 * unnecessary subclass or protocol override.  This may stimulate
 	 * reports from users that will help us remove unneeded entries
@@ -543,10 +547,10 @@ static int get_transport(struct us_data *us)
 		us->transport_reset = usb_stor_Bulk_reset;
 		break;
 
-#ifdef CONFIG_USB_STORAGE_HP8200e
+#ifdef CONFIG_USB_STORAGE_USBAT
 	case US_PR_SCM_ATAPI:
 		us->transport_name = "SCM/ATAPI";
-		us->transport = hp8200e_transport;
+		us->transport = usbat_transport;
 		us->transport_reset = usb_stor_CB_reset;
 		us->max_lun = 1;
 		break;
@@ -764,6 +768,7 @@ static int usb_stor_acquire_resources(struct us_data *us)
 		return p;
 	}
 	us->pid = p;
+	atomic_inc(&total_threads);
 
 	/* Wait for the thread to start */
 	wait_for_completion(&(us->notify));
@@ -772,37 +777,16 @@ static int usb_stor_acquire_resources(struct us_data *us)
 }
 
 /* Release all our dynamic resources */
-void usb_stor_release_resources(struct us_data *us)
+static void usb_stor_release_resources(struct us_data *us)
 {
 	US_DEBUGP("-- %s\n", __FUNCTION__);
 
-	/* Kill the control thread.  The SCSI host must already have been
-	 * removed so it won't try to queue any more commands.
+	/* Tell the control thread to exit.  The SCSI host must
+	 * already have been removed so it won't try to queue
+	 * any more commands.
 	 */
-	if (us->pid) {
-
-		/* Wait for the thread to be idle */
-		down(&us->dev_semaphore);
-		US_DEBUGP("-- sending exit command to thread\n");
-
-		/* If the SCSI midlayer queued a final command just before
-		 * scsi_remove_host() was called, us->srb might not be
-		 * NULL.  We can overwrite it safely, because the midlayer
-		 * will not wait for the command to finish.  Also the
-		 * control thread will already have been awakened.
-		 * That's okay, an extra up() on us->sema won't hurt.
-		 *
-		 * Enqueue the command, wake up the thread, and wait for 
-		 * notification that it has exited.
-		 */
-		scsi_lock(us_to_host(us));
-		us->srb = NULL;
-		scsi_unlock(us_to_host(us));
-		up(&us->dev_semaphore);
-
-		up(&us->sema);
-		wait_for_completion(&us->notify);
-	}
+	US_DEBUGP("-- sending exit command to thread\n");
+	up(&us->sema);
 
 	/* Call the destructor routine, if it exists */
 	if (us->extra_destructor) {
@@ -813,7 +797,6 @@ void usb_stor_release_resources(struct us_data *us)
 	/* Free the extra data and the URB */
 	kfree(us->extra);
 	usb_free_urb(us->current_urb);
-
 }
 
 /* Dissociate from the USB device */
@@ -846,6 +829,13 @@ static int usb_stor_scan_thread(void * __us)
 	daemonize("usb-stor-scan");
 	unlock_kernel();
 
+	/* Acquire a reference to the host, so it won't be deallocated
+	 * until we're ready to exit */
+	scsi_host_get(us_to_host(us));
+
+	/* Signal that we've started the thread */
+	complete(&(us->notify));
+
 	printk(KERN_DEBUG
 		"usb-storage: device found at %d\n", us->pusb_dev->devnum);
 
@@ -854,7 +844,7 @@ static int usb_stor_scan_thread(void * __us)
 		printk(KERN_DEBUG "usb-storage: waiting for device "
 				"to settle before scanning\n");
 retry:
-		wait_event_interruptible_timeout(us->scsi_scan_wait,
+		wait_event_interruptible_timeout(us->delay_wait,
 				test_bit(US_FLIDX_DISCONNECTING, &us->flags),
 				delay_use * HZ);
 		if (current->flags & PF_FREEZE) {
@@ -867,9 +857,12 @@ retry:
 	if (!test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
 		scsi_scan_host(us_to_host(us));
 		printk(KERN_DEBUG "usb-storage: device scan complete\n");
+
+		/* Should we unbind if no devices were detected? */
 	}
 
-	complete_and_exit(&us->scsi_scan_done, 0);
+	scsi_host_put(us_to_host(us));
+	complete_and_exit(&threads_gone, 0);
 }
 
 
@@ -900,9 +893,7 @@ static int storage_probe(struct usb_interface *intf,
 	init_MUTEX(&(us->dev_semaphore));
 	init_MUTEX_LOCKED(&(us->sema));
 	init_completion(&(us->notify));
-	init_waitqueue_head(&us->dev_reset_wait);
-	init_waitqueue_head(&us->scsi_scan_wait);
-	init_completion(&us->scsi_scan_done);
+	init_waitqueue_head(&us->delay_wait);
 
 	/* Associate the us_data structure with the USB device */
 	result = associate_dev(us, intf);
@@ -970,12 +961,17 @@ static int storage_probe(struct usb_interface *intf,
 		scsi_remove_host(host);
 		goto BadDevice;
 	}
+	atomic_inc(&total_threads);
+
+	/* Wait for the thread to start */
+	wait_for_completion(&(us->notify));
 
 	return 0;
 
 	/* We come here if there are any problems */
 BadDevice:
 	US_DEBUGP("storage_probe() failed\n");
+	set_bit(US_FLIDX_DISCONNECTING, &us->flags);
 	usb_stor_release_resources(us);
 	dissociate_dev(us);
 	scsi_host_put(host);
@@ -990,15 +986,13 @@ static void storage_disconnect(struct usb_interface *intf)
 	US_DEBUGP("storage_disconnect() called\n");
 
 	/* Prevent new USB transfers, stop the current command, and
-	 * interrupt a device-reset delay */
+	 * interrupt a SCSI-scan or device-reset delay */
 	set_bit(US_FLIDX_DISCONNECTING, &us->flags);
 	usb_stor_stop_transport(us);
-	wake_up(&us->dev_reset_wait);
+	wake_up(&us->delay_wait);
 
-	/* Interrupt the SCSI-device-scanning thread's time delay, and
-	 * wait for the thread to finish */
-	wake_up(&us->scsi_scan_wait);
-	wait_for_completion(&us->scsi_scan_done);
+	/* It doesn't matter if the SCSI-scanning thread is still running.
+	 * The thread will exit when it sees the DISCONNECTING flag. */
 
 	/* Wait for the current command to finish, then remove the host */
 	down(&us->dev_semaphore);
@@ -1041,6 +1035,16 @@ static void __exit usb_stor_exit(void)
 	 */
 	US_DEBUGP("-- calling usb_deregister()\n");
 	usb_deregister(&usb_storage_driver) ;
+
+	/* Don't return until all of our control and scanning threads
+	 * have exited.  Since each thread signals threads_gone as its
+	 * last act, we have to call wait_for_completion the right number
+	 * of times.
+	 */
+	while (atomic_read(&total_threads) > 0) {
+		wait_for_completion(&threads_gone);
+		atomic_dec(&total_threads);
+	}
 }
 
 module_init(usb_stor_init);

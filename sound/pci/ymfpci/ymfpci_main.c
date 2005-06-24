@@ -829,7 +829,9 @@ static snd_pcm_hardware_t snd_ymfpci_capture =
 
 static void snd_ymfpci_pcm_free_substream(snd_pcm_runtime_t *runtime)
 {
-	kfree(runtime->private_data);
+	ymfpci_pcm_t *ypcm = runtime->private_data;
+	
+	kfree(ypcm);
 }
 
 static int snd_ymfpci_playback_open_1(snd_pcm_substream_t * substream)
@@ -1419,15 +1421,17 @@ static snd_kcontrol_new_t snd_ymfpci_drec_source __devinitdata = {
 
 static int snd_ymfpci_info_single(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
+	unsigned int mask = 1;
+
 	switch (kcontrol->private_value) {
 	case YDSXGR_SPDIFOUTCTRL: break;
 	case YDSXGR_SPDIFINCTRL: break;
 	default: return -EINVAL;
 	}
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->type = mask == 1 ? SNDRV_CTL_ELEM_TYPE_BOOLEAN : SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 1;
 	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 1;
+	uinfo->value.integer.max = mask;
 	return 0;
 }
 
@@ -1435,7 +1439,7 @@ static int snd_ymfpci_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 {
 	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
 	int reg = kcontrol->private_value;
-	unsigned int shift = 0, mask = 1;
+	unsigned int shift = 0, mask = 1, invert = 0;
 	
 	switch (kcontrol->private_value) {
 	case YDSXGR_SPDIFOUTCTRL: break;
@@ -1443,6 +1447,8 @@ static int snd_ymfpci_get_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	default: return -EINVAL;
 	}
 	ucontrol->value.integer.value[0] = (snd_ymfpci_readl(chip, reg) >> shift) & mask;
+	if (invert)
+		ucontrol->value.integer.value[0] = mask - ucontrol->value.integer.value[0];
 	return 0;
 }
 
@@ -1450,7 +1456,7 @@ static int snd_ymfpci_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 {
 	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
 	int reg = kcontrol->private_value;
-	unsigned int shift = 0, mask = 1;
+	unsigned int shift = 0, mask = 1, invert = 0;
 	int change;
 	unsigned int val, oval;
 	
@@ -1460,6 +1466,8 @@ static int snd_ymfpci_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	default: return -EINVAL;
 	}
 	val = (ucontrol->value.integer.value[0] & mask);
+	if (invert)
+		val = mask - val;
 	val <<= shift;
 	spin_lock_irq(&chip->reg_lock);
 	oval = snd_ymfpci_readl(chip, reg);
@@ -1479,13 +1487,14 @@ static int snd_ymfpci_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 static int snd_ymfpci_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	unsigned int reg = kcontrol->private_value;
+	unsigned int mask = 16383;
 
 	if (reg < 0x80 || reg >= 0xc0)
 		return -EINVAL;
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->type = mask == 1 ? SNDRV_CTL_ELEM_TYPE_BOOLEAN : SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 2;
 	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 16383;
+	uinfo->value.integer.max = mask;
 	return 0;
 }
 
@@ -1493,7 +1502,7 @@ static int snd_ymfpci_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 {
 	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
 	unsigned int reg = kcontrol->private_value;
-	unsigned int shift_left = 0, shift_right = 16, mask = 16383;
+	unsigned int shift_left = 0, shift_right = 16, mask = 16383, invert = 0;
 	unsigned int val;
 	
 	if (reg < 0x80 || reg >= 0xc0)
@@ -1503,6 +1512,10 @@ static int snd_ymfpci_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	spin_unlock_irq(&chip->reg_lock);
 	ucontrol->value.integer.value[0] = (val >> shift_left) & mask;
 	ucontrol->value.integer.value[1] = (val >> shift_right) & mask;
+	if (invert) {
+		ucontrol->value.integer.value[0] = mask - ucontrol->value.integer.value[0];
+		ucontrol->value.integer.value[1] = mask - ucontrol->value.integer.value[1];
+	}
 	return 0;
 }
 
@@ -1510,7 +1523,7 @@ static int snd_ymfpci_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 {
 	ymfpci_t *chip = snd_kcontrol_chip(kcontrol);
 	unsigned int reg = kcontrol->private_value;
-	unsigned int shift_left = 0, shift_right = 16, mask = 16383;
+	unsigned int shift_left = 0, shift_right = 16, mask = 16383, invert = 0;
 	int change;
 	unsigned int val1, val2, oval;
 	
@@ -1518,6 +1531,10 @@ static int snd_ymfpci_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 		return -EINVAL;
 	val1 = ucontrol->value.integer.value[0] & mask;
 	val2 = ucontrol->value.integer.value[1] & mask;
+	if (invert) {
+		val1 = mask - val1;
+		val2 = mask - val2;
+	}
 	val1 <<= shift_left;
 	val2 <<= shift_right;
 	spin_lock_irq(&chip->reg_lock);

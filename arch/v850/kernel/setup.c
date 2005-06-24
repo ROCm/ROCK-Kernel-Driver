@@ -283,5 +283,4 @@ init_mem_alloc (unsigned long ram_start, unsigned long ram_len)
 	NODE_DATA(0)->node_mem_map = NULL;
 	free_area_init_node (0, NODE_DATA(0), zones_size,
 			     ADDR_TO_PAGE (PAGE_OFFSET), 0);
-	mem_map = NODE_DATA(0)->node_mem_map;
 }

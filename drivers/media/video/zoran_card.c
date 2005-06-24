@@ -41,6 +41,7 @@
 #include <linux/spinlock.h>
 #include <linux/sem.h>
 #include <linux/kmod.h>
+#include <linux/wait.h>
 
 #include <linux/pci.h>
 #include <linux/interrupt.h>
@@ -968,6 +969,7 @@ zoran_open_init_params (struct zoran *zr)
 static void __devinit
 test_interrupts (struct zoran *zr)
 {
+	DEFINE_WAIT(wait);
 	int timeout, icr;
 
 	clear_interrupt_counters(zr);
@@ -975,7 +977,9 @@ test_interrupts (struct zoran *zr)
 	zr->testing = 1;
 	icr = btread(ZR36057_ICR);
 	btwrite(0x78000000 | ZR36057_ICR_IntPinEn, ZR36057_ICR);
-	timeout = interruptible_sleep_on_timeout(&zr->test_q, 1 * HZ);
+	prepare_to_wait(&zr->test_q, &wait, TASK_INTERRUPTIBLE);
+	timeout = schedule_timeout(HZ);
+	finish_wait(&zr->test_q, &wait);
 	btwrite(0, ZR36057_ICR);
 	btwrite(0x78000000, ZR36057_ISR);
 	zr->testing = 0;

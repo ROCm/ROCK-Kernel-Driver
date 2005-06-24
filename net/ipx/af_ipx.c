@@ -80,8 +80,6 @@ static struct proto_ops ipx_dgram_ops;
 LIST_HEAD(ipx_interfaces);
 DEFINE_SPINLOCK(ipx_interfaces_lock);
 
-static kmem_cache_t *ipx_sk_slab;
-
 struct ipx_interface *ipx_primary_net;
 struct ipx_interface *ipx_internal_net;
 
@@ -310,7 +308,7 @@ static void __ipxitf_down(struct ipx_interface *intrfc)
 		s->sk_error_report(s);
 		ipxs->intrfc = NULL;
 		ipxs->port   = 0;
-		s->sk_zapped = 1;	/* Indicates it is no longer bound */
+		sock_set_flag(s, SOCK_ZAPPED); /* Indicates it is no longer bound */
 		sk_del_node_init(s);
 	}
 	INIT_HLIST_HEAD(&intrfc->if_sklist);
@@ -1347,6 +1345,12 @@ out:
 	return rc;
 }
 
+static struct proto ipx_proto = {
+	.name	  = "IPX",
+	.owner	  = THIS_MODULE,
+	.obj_size = sizeof(struct ipx_sock),
+};
+
 static int ipx_create(struct socket *sock, int protocol)
 {
 	int rc = -ESOCKTNOSUPPORT;
@@ -1361,8 +1365,8 @@ static int ipx_create(struct socket *sock, int protocol)
 	if (sock->type != SOCK_DGRAM)
 		goto out;
 
-	sk = sk_alloc(PF_IPX, GFP_KERNEL, sizeof(struct ipx_sock), ipx_sk_slab);
        	rc = -ENOMEM;
+	sk = sk_alloc(PF_IPX, GFP_KERNEL, &ipx_proto, 1);
 	if (!sk)
 		goto out;
 #ifdef IPX_REFCNT_DEBUG
@@ -1371,7 +1375,6 @@ static int ipx_create(struct socket *sock, int protocol)
 			atomic_read(&ipx_sock_nr));
 #endif
 	sock_init_data(sock, sk);
-	sk_set_owner(sk, THIS_MODULE);
 	sk->sk_no_check = 1;		/* Checksum off by default */
 	sock->ops = &ipx_dgram_ops;
 	rc = 0;
@@ -1427,7 +1430,7 @@ static int ipx_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	struct sockaddr_ipx *addr = (struct sockaddr_ipx *)uaddr;
 	int rc = -EINVAL;
 
-	if (!sk->sk_zapped || addr_len != sizeof(struct sockaddr_ipx))
+	if (!sock_flag(sk, SOCK_ZAPPED) || addr_len != sizeof(struct sockaddr_ipx))
 		goto out;
 
 	intrfc = ipxitf_find_using_net(addr->sipx_network);
@@ -1505,7 +1508,7 @@ static int ipx_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 #endif	/* CONFIG_IPX_INTERN */
 
 	ipxitf_insert_socket(intrfc, sk);
-	sk->sk_zapped = 0;
+	sock_reset_flag(sk, SOCK_ZAPPED);
 
 	rc = 0;
 out_put:
@@ -1774,7 +1777,7 @@ static int ipx_recvmsg(struct kiocb *iocb, struct socket *sock,
 	}
 	
 	rc = -ENOTCONN;
-	if (sk->sk_zapped)
+	if (sock_flag(sk, SOCK_ZAPPED))
 		goto out;
 
 	skb = skb_recv_datagram(sk, flags & ~MSG_DONTWAIT,
@@ -1954,12 +1957,10 @@ static char ipx_snap_err_msg[] __initdata =
 
 static int __init ipx_init(void)
 {
-	ipx_sk_slab = kmem_cache_create("ipx_sock",
-					sizeof(struct ipx_sock), 0,
-					SLAB_HWCACHE_ALIGN, NULL, NULL);
+	int rc = proto_register(&ipx_proto, 1);
 
-	if (ipx_sk_slab == NULL)
-		return -ENOMEM;
+	if (rc != 0)
+		goto out;
 
 	sock_register(&ipx_family_ops);
 
@@ -1986,7 +1987,8 @@ static int __init ipx_init(void)
 	register_netdevice_notifier(&ipx_dev_notifier);
 	ipx_register_sysctl();
 	ipx_proc_init();
-	return 0;
+out:
+	return rc;
 }
 
 static void __exit ipx_proto_finito(void)
@@ -2012,11 +2014,7 @@ static void __exit ipx_proto_finito(void)
 	destroy_EII_client(pEII_datalink);
 	pEII_datalink = NULL;
 
-	if (ipx_sk_slab != NULL) {
-		kmem_cache_destroy(ipx_sk_slab);
-		ipx_sk_slab = NULL;
-	}
-
+	proto_unregister(&ipx_proto);
 	sock_unregister(ipx_family_ops.family);
 }
 

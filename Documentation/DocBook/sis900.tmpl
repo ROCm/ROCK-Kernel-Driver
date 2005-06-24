@@ -1,25 +1,27 @@
-<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN"[]>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.1.2//EN"
+	"http://www.oasis-open.org/docbook/xml/4.1.2/docbookx.dtd" []>
 
 <book id="SiS900Guide">
 
 <bookinfo>
 
-<title>SiS 900/7016 Fast Ethernet Device Driver</Title>
+<title>SiS 900/7016 Fast Ethernet Device Driver</title>
 
 <authorgroup>
 <author>
-<FirstName>Ollie</FirstName>
+<firstname>Ollie</firstname>
 <surname>Lho</surname>
 </author>
 
 <author>
-<FirstName>Lei Chun</FirstName>
+<firstname>Lei Chun</firstname>
 <surname>Chang</surname>
 </author>
 </authorgroup>
 
-<edition>Document Revision: 0.3 for SiS900 driver v1.06 & v1.07</edition>
-<PubDate>November 16, 2000</PubDate>
+<edition>Document Revision: 0.3 for SiS900 driver v1.06 &amp; v1.07</edition>
+<pubdate>November 16, 2000</pubdate>
 
 <copyright>
  <year>1999</year>
@@ -48,21 +50,21 @@
  </para>
 </legalnotice>
 
-<Abstract>
-<Para>
+<abstract>
+<para>
 This document gives some information on installation and usage of SiS 900/7016
 device driver under Linux.
-</Para>
-</Abstract>
+</para>
+</abstract>
 
 </bookinfo>
 
 <toc></toc>
 
 <chapter id="intro">
- <Title>Introduction</Title>
+ <title>Introduction</title>
 
-<Para>
+<para>
 This document describes the revision 1.06 and 1.07 of SiS 900/7016 Fast Ethernet 
 device driver under Linux. The driver is developed by Silicon Integrated
 System Corp. and distributed freely under the GNU General Public License (GPL).
@@ -70,265 +72,265 @@ The driver can be compiled as a loadable module and used under Linux kernel
 version 2.2.x. (rev. 1.06)
 With minimal changes, the driver can also be used under 2.3.x and 2.4.x kernel 
 (rev. 1.07), please see 
-<XRef LinkEnd="install">. If you are intended to 
+<xref linkend="install"/>. If you are intended to
 use the driver for earlier kernels, you are on your own.
-</Para>
+</para>
 
-<Para>
+<para>
 The driver is tested with usual TCP/IP applications including
 FTP, Telnet, Netscape etc. and is used constantly by the developers.
-</Para>
+</para>
 
-<Para>
+<para>
 Please send all comments/fixes/questions to
-<ULink URL="mailto:lcchang@sis.com.tw">Lei-Chun Chang</ULink>.
-</Para>
+<ulink url="mailto:lcchang@sis.com.tw">Lei-Chun Chang</ulink>.
+</para>
 </chapter>
 
 <chapter id="changes">
- <Title>Changes</Title>
+ <title>Changes</title>
 
-<Para>
+<para>
 Changes made in Revision 1.07
 
-<OrderedList>
-<ListItem>
-<Para>
+<orderedlist>
+<listitem>
+<para>
 Separation of sis900.c and sis900.h in order to move most 
 constant definition to sis900.h (many of those constants were
 corrected)
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Clean up PCI detection, the pci-scan from Donald Becker were not used,
 just simple pci&lowbar;find&lowbar;*.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 MII detection is modified to support multiple mii transceiver.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Bugs in read&lowbar;eeprom, mdio&lowbar;* were removed.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Lot of sis900 irrelevant comments were removed/changed and
 more comments were added to reflect the real situation.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Clean up of physical/virtual address space mess in buffer 
 descriptors.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Better transmit/receive error handling.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 The driver now uses zero-copy single buffer management
 scheme to improve performance.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Names of variables were changed to be more consistent.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Clean up of auo-negotiation and timer code.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Automatic detection and change of PHY on the fly.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Bug in mac probing fixed.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Fix 630E equalier problem by modifying the equalizer workaround rule.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Support for ICS1893 10/100 Interated PHYceiver.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Support for media select by ifconfig.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 Added kernel-doc extratable documentation.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-</OrderedList>
-</Para>
+</orderedlist>
+</para>
 </chapter>
 
 <chapter id="tested">
- <Title>Tested Environment</Title>
+ <title>Tested Environment</title>
 
-<Para>
+<para>
 This driver is developed on the following hardware
 
-<ItemizedList>
-<ListItem>
+<itemizedlist>
+<listitem>
 
-<Para>
+<para>
 Intel Celeron 500 with SiS 630 (rev 02) chipset
-</Para>
-</ListItem>
-<ListItem>
+</para>
+</listitem>
+<listitem>
 
-<Para>
+<para>
 SiS 900 (rev 01) and SiS 7016/7014 Fast Ethernet Card
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-</ItemizedList>
+</itemizedlist>
 
 and tested with these software environments
 
-<ItemizedList>
-<ListItem>
+<itemizedlist>
+<listitem>
 
-<Para>
+<para>
 Red Hat Linux version 6.2
-</Para>
-</ListItem>
-<ListItem>
+</para>
+</listitem>
+<listitem>
 
-<Para>
+<para>
 Linux kernel version 2.4.0
-</Para>
-</ListItem>
-<ListItem>
+</para>
+</listitem>
+<listitem>
 
-<Para>
+<para>
 Netscape version 4.6
-</Para>
-</ListItem>
-<ListItem>
+</para>
+</listitem>
+<listitem>
 
-<Para>
+<para>
 NcFTP 3.0.0 beta 18
-</Para>
-</ListItem>
-<ListItem>
+</para>
+</listitem>
+<listitem>
 
-<Para>
+<para>
 Samba version 2.0.3
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-</ItemizedList>
+</itemizedlist>
 
-</Para>
+</para>
 
 </chapter>
 
 <chapter id="files">
-<Title>Files in This Package</Title>
+<title>Files in This Package</title>
 
-<Para>
+<para>
 In the package you can find these files:
-</Para>
+</para>
 
-<Para>
-<VariableList>
+<para>
+<variablelist>
 
-<VarListEntry>
-<Term>sis900.c</Term>
-<ListItem>
-<Para>
+<varlistentry>
+<term>sis900.c</term>
+<listitem>
+<para>
 Driver source file in C 
-</Para>
-</ListItem>
-</VarListEntry>
+</para>
+</listitem>
+</varlistentry>
 
-<VarListEntry>
-<Term>sis900.h</Term>
-<ListItem>
-<Para>
+<varlistentry>
+<term>sis900.h</term>
+<listitem>
+<para>
 Header file for sis900.c
-</Para>
-</ListItem>
-</VarListEntry>
+</para>
+</listitem>
+</varlistentry>
 
-<VarListEntry>
-<Term>sis900.sgml</Term>
-<ListItem>
-<Para>
+<varlistentry>
+<term>sis900.sgml</term>
+<listitem>
+<para>
 DocBook SGML source of the document
-</Para>
-</ListItem>
-</VarListEntry>
+</para>
+</listitem>
+</varlistentry>
 
-<VarListEntry>
-<Term>sis900.txt</Term>
-<ListItem>
-<Para>
+<varlistentry>
+<term>sis900.txt</term>
+<listitem>
+<para>
 Driver document in plain text
-</Para>
-</ListItem>
-</VarListEntry>
+</para>
+</listitem>
+</varlistentry>
 
-</VariableList>
-</Para>
+</variablelist>
+</para>
 </chapter>
 
 <chapter id="install">
- <Title>Installation</Title>
+ <title>Installation</title>
 
-<Para>
+<para>
 Silicon Integrated System Corp. is cooperating closely with core Linux Kernel
 developers. The revisions of SiS 900 driver are distributed by the usuall channels
 for kernel tar files and patches. Those kernel tar files for official kernel and
 patches for kernel pre-release can be download at 
-<ULink URL="http://ftp.kernel.org/pub/linux/kernel/">official kernel ftp site</ULink> 
+<ulink url="http://ftp.kernel.org/pub/linux/kernel/">official kernel ftp site</ulink>
 and its mirrors.
 The 1.06 revision can be found in kernel version later than 2.3.15 and pre-2.2.14, 
 and 1.07 revision can be found in kernel version 2.4.0.
 If you have no prior experience in networking under Linux, please read
-<ULink URL="http://www.tldp.org/">Ethernet HOWTO</ULink> and
-<ULink URL="http://www.tldp.org/">Networking HOWTO</ULink> available from
+<ulink url="http://www.tldp.org/">Ethernet HOWTO</ulink> and
+<ulink url="http://www.tldp.org/">Networking HOWTO</ulink> available from
 Linux Documentation Project (LDP).
-</Para>
+</para>
 
-<Para>
+<para>
 The driver is bundled in release later than 2.2.11 and 2.3.15 so this 
 is the most easy case. 
 Be sure you have the appropriate packages for compiling kernel source.
@@ -338,63 +340,63 @@ in kernel release, you should have your driver file
 <filename>sis900.c</filename> and <filename>sis900.h</filename> 
 copied into <filename class="directory">/usr/src/linux/drivers/net/</filename> first.
 There are two alternative ways to install the driver
-</Para>
+</para>
 
-<Sect1>
-<Title>Building the driver as loadable module</Title>
+<sect1>
+<title>Building the driver as loadable module</title>
 
-<Para>
+<para>
 To build the driver as a loadable kernel module you have to reconfigure
 the kernel to activate network support by
-</Para>
+</para>
 
-<Para><screen>
+<para><screen>
 make menuconfig
-</screen></Para>
+</screen></para>
 
-<Para>
+<para>
 Choose <quote>Loadable module support  ---></quote>, 
 then select <quote>Enable loadable module support</quote>.
-</Para>
+</para>
 
-<Para>
+<para>
 Choose <quote>Network Device Support  ---></quote>, select 
 <quote>Ethernet (10 or 100Mbit)</quote>.
 Then select <quote>EISA, VLB, PCI and on board controllers</quote>, 
 and choose <quote>SiS 900/7016 PCI Fast Ethernet Adapter support</quote> 
 to <quote>M</quote>.
-</Para>
+</para>
 
-<Para>
+<para>
 After reconfiguring the kernel, you can make the driver module by
-</Para>
+</para>
 
-<Para><screen>
+<para><screen>
 make modules
-</screen></Para>
+</screen></para>
 
-<Para>
+<para>
 The driver should be compiled with no errors. After compiling the driver,
 the driver can be installed to proper place by
-</Para>
+</para>
 
-<Para><screen>
+<para><screen>
 make modules_install
-</screen></Para>
+</screen></para>
 
-<Para>
+<para>
 Load the driver into kernel by
-</Para>
+</para>
 
-<Para><screen>
+<para><screen>
 insmod sis900
-</screen></Para>
+</screen></para>
 
-<Para>
+<para>
 When loading the driver into memory, some information message can be view by
-</Para>
+</para>
 
-<Para>
+<para>
 <screen>
 dmesg
 </screen>
@@ -404,103 +406,103 @@ or
 <screen>
 cat /var/log/message
 </screen>
-</Para>
+</para>
 
-<Para>
+<para>
 If the driver is loaded properly you will have messages similar to this:
-</Para>
+</para>
 
-<Para><screen>
+<para><screen>
 sis900.c: v1.07.06  11/07/2000
 eth0: SiS 900 PCI Fast Ethernet at 0xd000, IRQ 10, 00:00:e8:83:7f:a4.
 eth0: SiS 900 Internal MII PHY transceiver found at address 1.
 eth0: Using SiS 900 Internal MII PHY as default
-</screen></Para>
+</screen></para>
 
-<Para>
+<para>
 showing the version of the driver and the results of probing routine.
-</Para>
+</para>
 
-<Para>
+<para>
 Once the driver is loaded, network can be brought up by
-</Para>
+</para>
 
-<Para><screen>
+<para><screen>
 /sbin/ifconfig eth0 IPADDR broadcast BROADCAST netmask NETMASK media TYPE
-</screen></Para>
+</screen></para>
 
-<Para>
+<para>
 where IPADDR, BROADCAST, NETMASK are your IP address, broadcast address and
 netmask respectively. TYPE is used to set medium type used by the device. 
 Typical values are "10baseT"(twisted-pair 10Mbps Ethernet) or "100baseT"
 (twisted-pair 100Mbps Ethernet). For more information on how to configure 
 network interface, please refer to  
-<ULink URL="http://www.tldp.org/">Networking HOWTO</ULink>.
-</Para>
+<ulink url="http://www.tldp.org/">Networking HOWTO</ulink>.
+</para>
 
-<Para>
+<para>
 The link status is also shown by kernel messages. For example, after the
 network interface is activated, you may have the message:
-</Para>
+</para>
 
-<Para><screen>
+<para><screen>
 eth0: Media Link On 100mbps full-duplex
-</screen></Para>
+</screen></para>
 
-<Para>
+<para>
 If you try to unplug the twist pair (TP) cable you will get
-</Para>
+</para>
 
-<Para><screen>
+<para><screen>
 eth0: Media Link Off
-</screen></Para>
+</screen></para>
 
-<Para>
+<para>
 indicating that the link is failed.
-</Para>
-</Sect1>
+</para>
+</sect1>
 
-<Sect1>
-<Title>Building the driver into kernel</Title>
+<sect1>
+<title>Building the driver into kernel</title>
 
-<Para>
+<para>
 If you want to make the driver into kernel, choose <quote>Y</quote> 
 rather than <quote>M</quote> on 
 <quote>SiS 900/7016 PCI Fast Ethernet Adapter support</quote> 
 when configuring the kernel. Build the kernel image in the usual way
-</Para>
+</para>
 
-<Para><screen>
+<para><screen>
 make clean
 
 make bzlilo
-</screen></Para>
+</screen></para>
 
-<Para>
+<para>
 Next time the system reboot, you have the driver in memory.
-</Para>
+</para>
 
-</Sect1>
+</sect1>
 </chapter>
 
 <chapter id="problems">
- <Title>Known Problems and Bugs</Title>
+ <title>Known Problems and Bugs</title>
 
-<Para>
+<para>
 There are some known problems and bugs. If you find any other bugs please 
-mail to <ULink URL="mailto:lcchang@sis.com.tw">lcchang@sis.com.tw</ULink>
+mail to <ulink url="mailto:lcchang@sis.com.tw">lcchang@sis.com.tw</ulink>
 
-<OrderedList>
+<orderedlist>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 AM79C901 HomePNA PHY is not thoroughly tested, there may be some 
 bugs in the <quote>on the fly</quote> change of transceiver. 
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 A bug is hidden somewhere in the receive buffer management code, 
 the bug causes NULL pointer reference in the kernel. This fault is 
 caught before bad things happen and reported with the message:
@@ -509,70 +511,70 @@ caught before bad things happen and reported with the message:
 eth0: NULL pointer encountered in Rx ring, skipping 
 </computeroutput>
 
-which can be viewed with <Literal remap="tt">dmesg</Literal> or 
-<Literal remap="tt">cat /var/log/message</Literal>.
-</Para>
-</ListItem>
+which can be viewed with <literal remap="tt">dmesg</literal> or
+<literal remap="tt">cat /var/log/message</literal>.
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 The media type change from 10Mbps to 100Mbps twisted-pair ethernet 
 by ifconfig causes the media link down.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-</OrderedList>
-</Para>
+</orderedlist>
+</para>
 </chapter>
 
 <chapter id="RHistory">
- <Title>Revision History</Title>
+ <title>Revision History</title>
 
-<Para>
-<ItemizedList>
+<para>
+<itemizedlist>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 November 13, 2000, Revision 1.07, seventh release, 630E problem fixed 
 and further clean up.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 November 4, 1999, Revision 1.06, Second release, lots of clean up
 and optimization.
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-<ListItem>
-<Para>
+<listitem>
+<para>
 August 8, 1999, Revision 1.05, Initial Public Release
-</Para>
-</ListItem>
+</para>
+</listitem>
 
-</ItemizedList>
-</Para>
+</itemizedlist>
+</para>
 </chapter>
 
 <chapter id="acknowledgements">
- <Title>Acknowledgements</Title>
+ <title>Acknowledgements</title>
 
-<Para>
+<para>
 This driver was originally derived form 
-<ULink URL="mailto:becker@cesdis1.gsfc.nasa.gov">Donald Becker</ULink>'s
-<ULink URL="ftp://cesdis.gsfc.nasa.gov/pub/linux/drivers/kern-2.3/pci-skeleton.c"
->pci-skeleton</ULink> and
-<ULink URL="ftp://cesdis.gsfc.nasa.gov/pub/linux/drivers/kern-2.3/rtl8139.c"
->rtl8139</ULink> drivers. Donald also provided various suggestion
+<ulink url="mailto:becker@cesdis1.gsfc.nasa.gov">Donald Becker</ulink>'s
+<ulink url="ftp://cesdis.gsfc.nasa.gov/pub/linux/drivers/kern-2.3/pci-skeleton.c"
+>pci-skeleton</ulink> and
+<ulink url="ftp://cesdis.gsfc.nasa.gov/pub/linux/drivers/kern-2.3/rtl8139.c"
+>rtl8139</ulink> drivers. Donald also provided various suggestion
 regarded with improvements made in revision 1.06.
-</Para>
+</para>
 
-<Para>
+<para>
 The 1.05 revision was created by 
-<ULink URL="mailto:cmhuang@sis.com.tw">Jim Huang</ULink>, AMD 79c901 
-support was added by <ULink URL="mailto:lcs@sis.com.tw">Chin-Shan Li</ULink>.
-</Para>
+<ulink url="mailto:cmhuang@sis.com.tw">Jim Huang</ulink>, AMD 79c901
+support was added by <ulink url="mailto:lcs@sis.com.tw">Chin-Shan Li</ulink>.
+</para>
 </chapter>
 
 <chapter id="functions">

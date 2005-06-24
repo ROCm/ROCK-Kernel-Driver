@@ -112,7 +112,8 @@
 	likely(__access_ok((unsigned long)(addr), (size),__access_mask))
 
 /*
- * verify_area: - Obsolete, use access_ok()
+ * verify_area: - Obsolete/deprecated and will go away soon,
+ * use access_ok() instead.
  * @type: Type of access: %VERIFY_READ or %VERIFY_WRITE
  * @addr: User space pointer to start of block to check
  * @size: Size of block to check
@@ -128,7 +129,7 @@
  *
  * See access_ok() for more details.
  */
-static inline int verify_area(int type, const void * addr, unsigned long size)
+static inline int __deprecated verify_area(int type, const void * addr, unsigned long size)
 {
 	return access_ok(type, addr, size) ? 0 : -EFAULT;
 }
@@ -257,7 +258,8 @@ struct __large_struct { unsigned long buf[100]; };
 									\
 	might_sleep();							\
 	__gu_addr = (long) (ptr);					\
-	__gu_err = verify_area(VERIFY_READ, (void *) __gu_addr, size);	\
+	__gu_err = access_ok(VERIFY_READ, (void *) __gu_addr, size)	\
+				? 0 : -EFAULT;				\
 									\
 	if (likely(!__gu_err)) {					\
 		switch (size) {						\
@@ -352,7 +354,8 @@ extern void __get_user_unknown(void);
 	might_sleep();							\
 	__pu_val = (x);							\
 	__pu_addr = (long) (ptr);					\
-	__pu_err = verify_area(VERIFY_WRITE, (void *) __pu_addr, size);	\
+	__pu_err = access_ok(VERIFY_WRITE, (void *) __pu_addr, size)	\
+				? 0 : -EFAULT;				\
 									\
 	if (likely(!__pu_err)) {					\
 		switch (size) {						\

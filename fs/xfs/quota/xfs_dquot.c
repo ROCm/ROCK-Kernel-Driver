@@ -261,21 +261,19 @@ xfs_qm_adjust_dqlimits(
 {
 	xfs_quotainfo_t		*q = mp->m_quotainfo;
 
-	ASSERT(!INT_ISZERO(d->d_id, ARCH_CONVERT));
+	ASSERT(d->d_id);
 
-	if (q->qi_bsoftlimit && INT_ISZERO(d->d_blk_softlimit, ARCH_CONVERT))
+	if (q->qi_bsoftlimit && !d->d_blk_softlimit)
 		INT_SET(d->d_blk_softlimit, ARCH_CONVERT, q->qi_bsoftlimit);
-	if (q->qi_bhardlimit && INT_ISZERO(d->d_blk_hardlimit, ARCH_CONVERT))
+	if (q->qi_bhardlimit && !d->d_blk_hardlimit)
 		INT_SET(d->d_blk_hardlimit, ARCH_CONVERT, q->qi_bhardlimit);
-	if (q->qi_isoftlimit && INT_ISZERO(d->d_ino_softlimit, ARCH_CONVERT))
+	if (q->qi_isoftlimit && !d->d_ino_softlimit)
 		INT_SET(d->d_ino_softlimit, ARCH_CONVERT, q->qi_isoftlimit);
-	if (q->qi_ihardlimit && INT_ISZERO(d->d_ino_hardlimit, ARCH_CONVERT))
+	if (q->qi_ihardlimit && !d->d_ino_hardlimit)
 		INT_SET(d->d_ino_hardlimit, ARCH_CONVERT, q->qi_ihardlimit);
-	if (q->qi_rtbsoftlimit &&
-	    INT_ISZERO(d->d_rtb_softlimit, ARCH_CONVERT))
+	if (q->qi_rtbsoftlimit && !d->d_rtb_softlimit)
 		INT_SET(d->d_rtb_softlimit, ARCH_CONVERT, q->qi_rtbsoftlimit);
-	if (q->qi_rtbhardlimit &&
-	    INT_ISZERO(d->d_rtb_hardlimit, ARCH_CONVERT))
+	if (q->qi_rtbhardlimit && !d->d_rtb_hardlimit)
 		INT_SET(d->d_rtb_hardlimit, ARCH_CONVERT, q->qi_rtbhardlimit);
 }
 
@@ -295,7 +293,7 @@ xfs_qm_adjust_dqtimers(
 	xfs_mount_t		*mp,
 	xfs_disk_dquot_t	*d)
 {
-	ASSERT(!INT_ISZERO(d->d_id, ARCH_CONVERT));
+	ASSERT(d->d_id);
 
 #ifdef QUOTADEBUG
 	if (INT_GET(d->d_blk_hardlimit, ARCH_CONVERT))
@@ -308,7 +306,7 @@ xfs_qm_adjust_dqtimers(
 		ASSERT(INT_GET(d->d_rtb_softlimit, ARCH_CONVERT) <=
 			INT_GET(d->d_rtb_hardlimit, ARCH_CONVERT));
 #endif
-	if (INT_ISZERO(d->d_btimer, ARCH_CONVERT)) {
+	if (!d->d_btimer) {
 		if ((INT_GET(d->d_blk_softlimit, ARCH_CONVERT) &&
 		    (INT_GET(d->d_bcount, ARCH_CONVERT) >=
 				INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) ||
@@ -319,17 +317,17 @@ xfs_qm_adjust_dqtimers(
 				get_seconds() + XFS_QI_BTIMELIMIT(mp));
 		}
 	} else {
-		if ((INT_ISZERO(d->d_blk_softlimit, ARCH_CONVERT) ||
+		if ((!d->d_blk_softlimit ||
 		    (INT_GET(d->d_bcount, ARCH_CONVERT) <
 				INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) &&
-		    (INT_ISZERO(d->d_blk_hardlimit, ARCH_CONVERT) ||
+		    (!d->d_blk_hardlimit ||
 		    (INT_GET(d->d_bcount, ARCH_CONVERT) <
 				INT_GET(d->d_blk_hardlimit, ARCH_CONVERT)))) {
-			INT_ZERO(d->d_btimer, ARCH_CONVERT);
+			d->d_btimer = 0;
 		}
 	}
 
-	if (INT_ISZERO(d->d_itimer, ARCH_CONVERT)) {
+	if (!d->d_itimer) {
 		if ((INT_GET(d->d_ino_softlimit, ARCH_CONVERT) &&
 		    (INT_GET(d->d_icount, ARCH_CONVERT) >=
 				INT_GET(d->d_ino_softlimit, ARCH_CONVERT))) ||
@@ -340,17 +338,17 @@ xfs_qm_adjust_dqtimers(
 				get_seconds() + XFS_QI_ITIMELIMIT(mp));
 		}
 	} else {
-		if ((INT_ISZERO(d->d_ino_softlimit, ARCH_CONVERT) ||
+		if ((!d->d_ino_softlimit ||
 		    (INT_GET(d->d_icount, ARCH_CONVERT) <
 				INT_GET(d->d_ino_softlimit, ARCH_CONVERT)))  &&
-		    (INT_ISZERO(d->d_ino_hardlimit, ARCH_CONVERT) ||
+		    (!d->d_ino_hardlimit ||
 		    (INT_GET(d->d_icount, ARCH_CONVERT) <
 				INT_GET(d->d_ino_hardlimit, ARCH_CONVERT)))) {
-			INT_ZERO(d->d_itimer, ARCH_CONVERT);
+			d->d_itimer = 0;
 		}
 	}
 
-	if (INT_ISZERO(d->d_rtbtimer, ARCH_CONVERT)) {
+	if (!d->d_rtbtimer) {
 		if ((INT_GET(d->d_rtb_softlimit, ARCH_CONVERT) &&
 		    (INT_GET(d->d_rtbcount, ARCH_CONVERT) >=
 				INT_GET(d->d_rtb_softlimit, ARCH_CONVERT))) ||
@@ -361,13 +359,13 @@ xfs_qm_adjust_dqtimers(
 				get_seconds() + XFS_QI_RTBTIMELIMIT(mp));
 		}
 	} else {
-		if ((INT_ISZERO(d->d_rtb_softlimit, ARCH_CONVERT) ||
+		if ((!d->d_rtb_softlimit ||
 		    (INT_GET(d->d_rtbcount, ARCH_CONVERT) <
 				INT_GET(d->d_rtb_softlimit, ARCH_CONVERT))) &&
-		    (INT_ISZERO(d->d_rtb_hardlimit, ARCH_CONVERT) ||
+		    (!d->d_rtb_hardlimit ||
 		    (INT_GET(d->d_rtbcount, ARCH_CONVERT) <
 				INT_GET(d->d_rtb_hardlimit, ARCH_CONVERT)))) {
-			INT_ZERO(d->d_rtbtimer, ARCH_CONVERT);
+			d->d_rtbtimer = 0;
 		}
 	}
 }
@@ -385,7 +383,7 @@ xfs_qm_dqwarn(
 	/*
 	 * root's limits are not real limits.
 	 */
-	if (INT_ISZERO(d->d_id, ARCH_CONVERT))
+	if (!d->d_id)
 		return (0);
 
 	warned = 0;
@@ -397,10 +395,10 @@ xfs_qm_dqwarn(
 			warned++;
 		}
 	} else {
-		if (INT_ISZERO(d->d_blk_softlimit, ARCH_CONVERT) ||
+		if (!d->d_blk_softlimit ||
 		    (INT_GET(d->d_bcount, ARCH_CONVERT) <
 		     INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) {
-			INT_ZERO(d->d_bwarns, ARCH_CONVERT);
+			d->d_bwarns = 0;
 		}
 	}
 
@@ -412,10 +410,10 @@ xfs_qm_dqwarn(
 			warned++;
 		}
 	} else {
-		if ((INT_ISZERO(d->d_ino_softlimit, ARCH_CONVERT)) ||
+		if (!d->d_ino_softlimit ||
 		    (INT_GET(d->d_icount, ARCH_CONVERT) <
 		     INT_GET(d->d_ino_softlimit, ARCH_CONVERT))) {
-			INT_ZERO(d->d_iwarns, ARCH_CONVERT);
+			d->d_iwarns = 0;
 		}
 	}
 #ifdef QUOTADEBUG

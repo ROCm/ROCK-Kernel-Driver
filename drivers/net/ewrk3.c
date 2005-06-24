@@ -273,6 +273,7 @@ struct ewrk3_stats {
 struct ewrk3_private {
 	char adapter_name[80];	/* Name exported to /proc/ioports */
 	u_long shmem_base;	/* Shared memory start address */
+	void __iomem *shmem;
 	u_long shmem_length;	/* Shared memory window length */
 	struct net_device_stats stats;	/* Public stats */
 	struct ewrk3_stats pktStats; /* Private stats counters */
@@ -281,7 +282,7 @@ struct ewrk3_private {
 	u_char lemac;		/* Chip rev. level */
 	u_char hard_strapped;	/* Don't allow a full open */
 	u_char txc;		/* Transmit cut through */
-	u_char *mctbl;		/* Pointer to the multicast table */
+	void __iomem *mctbl;	/* Pointer to the multicast table */
 	u_char led_mask;	/* Used to reserve LED access for ethtool */
 	spinlock_t hw_lock;
 };
@@ -535,6 +536,9 @@ ewrk3_hw_init(struct net_device *dev, u_long iobase)
 
 	lp = netdev_priv(dev);
 	lp->shmem_base = mem_start;
+	lp->shmem = ioremap(mem_start, shmem_length);
+	if (!lp->shmem)
+		return -ENOMEM;
 	lp->shmem_length = shmem_length;
 	lp->lemac = lemac;
 	lp->hard_strapped = hard_strapped;
@@ -590,6 +594,7 @@ ewrk3_hw_init(struct net_device *dev, u_long iobase)
 				} else {
 					printk(", but incorrect IRQ line detected.\n");
 				}
+				iounmap(lp->shmem);
 				return -ENXIO;
 			}
 
@@ -768,7 +773,7 @@ static int ewrk3_queue_pkt (struct sk_buff *skb, struct net_device *dev)
 {
 	struct ewrk3_private *lp = netdev_priv(dev);
 	u_long iobase = dev->base_addr;
-	u_long buf = 0;
+	void __iomem *buf = NULL;
 	u_char icr;
 	u_char page;
 
@@ -801,13 +806,13 @@ static int ewrk3_queue_pkt (struct sk_buff *skb, struct net_device *dev)
 	if (lp->shmem_length == IO_ONLY) {
 		outb (page, EWRK3_IOPR);
 	} else if (lp->shmem_length == SHMEM_2K) {
-		buf = lp->shmem_base;
+		buf = lp->shmem;
 		outb (page, EWRK3_MPR);
 	} else if (lp->shmem_length == SHMEM_32K) {
-		buf = ((((short) page << 11) & 0x7800) + lp->shmem_base);
+		buf = (((short) page << 11) & 0x7800) + lp->shmem;
 		outb ((page >> 4), EWRK3_MPR);
 	} else if (lp->shmem_length == SHMEM_64K) {
-		buf = ((((short) page << 11) & 0xf800) + lp->shmem_base);
+		buf = (((short) page << 11) & 0xf800) + lp->shmem;
 		outb ((page >> 5), EWRK3_MPR);
 	} else {
 		printk (KERN_ERR "%s: Oops - your private data area is hosed!\n",
@@ -831,30 +836,28 @@ static int ewrk3_queue_pkt (struct sk_buff *skb, struct net_device *dev)
 		}
 		outb (page, EWRK3_TQ);	/* Start sending pkt */
 	} else {
-		isa_writeb ((char) (TCR_QMODE | TCR_PAD | TCR_IFC), buf);	/* ctrl byte */
+		writeb ((char) (TCR_QMODE | TCR_PAD | TCR_IFC), buf);	/* ctrl byte */
 		buf += 1;
-		isa_writeb ((char) (skb->len & 0xff), buf);	/* length (16 bit xfer) */
+		writeb ((char) (skb->len & 0xff), buf);	/* length (16 bit xfer) */
 		buf += 1;
 		if (lp->txc) {
-			isa_writeb ((char)
-				    (((skb->len >> 8) & 0xff) | XCT), buf);
+			writeb(((skb->len >> 8) & 0xff) | XCT, buf);
 			buf += 1;
-			isa_writeb (0x04, buf);	/* index byte */
+			writeb (0x04, buf);	/* index byte */
 			buf += 1;
-			isa_writeb (0x00, (buf + skb->len));	/* Write the XCT flag */
-			isa_memcpy_toio (buf, skb->data, PRELOAD);	/* Write PRELOAD bytes */
+			writeb (0x00, (buf + skb->len));	/* Write the XCT flag */
+			memcpy_toio (buf, skb->data, PRELOAD);	/* Write PRELOAD bytes */
 			outb (page, EWRK3_TQ);	/* Start sending pkt */
-			isa_memcpy_toio (buf + PRELOAD,
+			memcpy_toio (buf + PRELOAD,
 					 skb->data + PRELOAD,
 					 skb->len - PRELOAD);
-			isa_writeb (0xff, (buf + skb->len));	/* Write the XCT flag */
+			writeb (0xff, (buf + skb->len));	/* Write the XCT flag */
 		} else {
-			isa_writeb ((char)
-				    ((skb->len >> 8) & 0xff), buf);
+			writeb ((skb->len >> 8) & 0xff, buf);
 			buf += 1;
-			isa_writeb (0x04, buf);	/* index byte */
+			writeb (0x04, buf);	/* index byte */
 			buf += 1;
-			isa_memcpy_toio (buf, skb->data, skb->len);	/* Write data bytes */
+			memcpy_toio (buf, skb->data, skb->len);	/* Write data bytes */
 			outb (page, EWRK3_TQ);	/* Start sending pkt */
 		}
 	}
@@ -940,7 +943,7 @@ static int ewrk3_rx(struct net_device *dev)
 	u_long iobase = dev->base_addr;
 	int i, status = 0;
 	u_char page;
-	u_long buf = 0;
+	void __iomem *buf = NULL;
 
 	while (inb(EWRK3_RQC) && !status) {	/* Whilst there's incoming data */
 		if ((page = inb(EWRK3_RQ)) < lp->mPage) {	/* Get next entry's buffer page */
@@ -950,13 +953,13 @@ static int ewrk3_rx(struct net_device *dev)
 			if (lp->shmem_length == IO_ONLY) {
 				outb(page, EWRK3_IOPR);
 			} else if (lp->shmem_length == SHMEM_2K) {
-				buf = lp->shmem_base;
+				buf = lp->shmem;
 				outb(page, EWRK3_MPR);
 			} else if (lp->shmem_length == SHMEM_32K) {
-				buf = ((((short) page << 11) & 0x7800) + lp->shmem_base);
+				buf = (((short) page << 11) & 0x7800) + lp->shmem;
 				outb((page >> 4), EWRK3_MPR);
 			} else if (lp->shmem_length == SHMEM_64K) {
-				buf = ((((short) page << 11) & 0xf800) + lp->shmem_base);
+				buf = (((short) page << 11) & 0xf800) + lp->shmem;
 				outb((page >> 5), EWRK3_MPR);
 			} else {
 				status = -1;
@@ -972,9 +975,9 @@ static int ewrk3_rx(struct net_device *dev)
 					pkt_len = inb(EWRK3_DATA);
 					pkt_len |= ((u_short) inb(EWRK3_DATA) << 8);
 				} else {
-					rx_status = isa_readb(buf);
+					rx_status = readb(buf);
 					buf += 1;
-					pkt_len = isa_readw(buf);
+					pkt_len = readw(buf);
 					buf += 3;
 				}
 
@@ -1001,7 +1004,7 @@ static int ewrk3_rx(struct net_device *dev)
 								*p++ = inb(EWRK3_DATA);
 							}
 						} else {
-							isa_memcpy_fromio(p, buf, pkt_len);
+							memcpy_fromio(p, buf, pkt_len);
 						}
 
 						for (i = 1; i < EWRK3_PKT_STAT_SZ - 1; i++) {
@@ -1153,9 +1156,9 @@ static void set_multicast_list(struct net_device *dev)
 	csr = inb(EWRK3_CSR);
 
 	if (lp->shmem_length == IO_ONLY) {
-		lp->mctbl = (char *) PAGE0_HTE;
+		lp->mctbl = NULL;
 	} else {
-		lp->mctbl = (char *) (lp->shmem_base + PAGE0_HTE);
+		lp->mctbl = lp->shmem + PAGE0_HTE;
 	}
 
 	csr &= ~(CSR_PME | CSR_MCE);
@@ -1184,7 +1187,7 @@ static void SetMulticastFilter(struct net_device *dev)
 	u_long iobase = dev->base_addr;
 	int i;
 	char *addrs, bit, byte;
-	short *p = (short *) lp->mctbl;
+	short __iomem *p = lp->mctbl;
 	u16 hashcode;
 	u32 crc;
 
@@ -1192,7 +1195,7 @@ static void SetMulticastFilter(struct net_device *dev)
 
 	if (lp->shmem_length == IO_ONLY) {
 		outb(0, EWRK3_IOPR);
-		outw(EEPROM_OFFSET(lp->mctbl), EWRK3_PIR1);
+		outw(PAGE0_HTE, EWRK3_PIR1);
 	} else {
 		outb(0, EWRK3_MPR);
 	}
@@ -1202,7 +1205,7 @@ static void SetMulticastFilter(struct net_device *dev)
 			if (lp->shmem_length == IO_ONLY) {
 				outb(0xff, EWRK3_DATA);
 			} else {	/* memset didn't work here */
-				isa_writew(0xffff, (int) p);
+				writew(0xffff, p);
 				p++;
 				i++;
 			}
@@ -1219,8 +1222,8 @@ static void SetMulticastFilter(struct net_device *dev)
 				outb(0x00, EWRK3_DATA);
 			}
 		} else {
-			isa_memset_io((int) lp->mctbl, 0, (HASH_TABLE_LEN >> 3));
-			isa_writeb(0x80, (int) (lp->mctbl + (HASH_TABLE_LEN >> 4) - 1));
+			memset_io(lp->mctbl, 0, HASH_TABLE_LEN >> 3);
+			writeb(0x80, lp->mctbl + (HASH_TABLE_LEN >> 4) - 1);
 		}
 
 		/* Update table */
@@ -1237,13 +1240,13 @@ static void SetMulticastFilter(struct net_device *dev)
 				if (lp->shmem_length == IO_ONLY) {
 					u_char tmp;
 
-					outw((short) ((long) lp->mctbl) + byte, EWRK3_PIR1);
+					outw(PAGE0_HTE + byte, EWRK3_PIR1);
 					tmp = inb(EWRK3_DATA);
 					tmp |= bit;
-					outw((short) ((long) lp->mctbl) + byte, EWRK3_PIR1);
+					outw(PAGE0_HTE + byte, EWRK3_PIR1);
 					outb(tmp, EWRK3_DATA);
 				} else {
-					isa_writeb(isa_readb((int)(lp->mctbl + byte)) | bit, (int)(lp->mctbl + byte));
+					writeb(readb(lp->mctbl + byte) | bit, lp->mctbl + byte);
 				}
 			}
 		}
@@ -1654,8 +1657,7 @@ static int ewrk3_phys_id(struct net_device *dev, u32 data)
 
 		/* Wait a little while */
 		spin_unlock_irqrestore(&lp->hw_lock, flags);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ>>2);
+		msleep(250);
 		spin_lock_irqsave(&lp->hw_lock, flags);
 
 		/* Exit if we got a signal */
@@ -1784,7 +1786,7 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			}
 		} else {
 			outb(0, EWRK3_MPR);
-			isa_memcpy_fromio(tmp->addr, lp->shmem_base + PAGE0_HTE, (HASH_TABLE_LEN >> 3));
+			memcpy_fromio(tmp->addr, lp->shmem + PAGE0_HTE, (HASH_TABLE_LEN >> 3));
 		}
 		spin_unlock_irqrestore(&lp->hw_lock, flags);
 
@@ -1954,10 +1956,13 @@ static __exit void ewrk3_exit_module(void)
 	int i;
 
 	for( i=0; i<ndevs; i++ ) {
-		unregister_netdev(ewrk3_devs[i]);
-		release_region(ewrk3_devs[i]->base_addr, EWRK3_TOTAL_SIZE);
-		free_netdev(ewrk3_devs[i]);
+		struct net_device *dev = ewrk3_devs[i];
+		struct ewrk3_private *lp = netdev_priv(dev);
 		ewrk3_devs[i] = NULL;
+		unregister_netdev(dev);
+		release_region(dev->base_addr, EWRK3_TOTAL_SIZE);
+		iounmap(lp->shmem);
+		free_netdev(dev);
 	}
 }
 

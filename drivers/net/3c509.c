@@ -214,7 +214,7 @@ static void el3_poll_controller(struct net_device *dev);
 #endif
 
 #ifdef CONFIG_EISA
-struct eisa_device_id el3_eisa_ids[] = {
+static struct eisa_device_id el3_eisa_ids[] = {
 		{ "TCM5092" },
 		{ "TCM5093" },
 		{ "" }
@@ -222,7 +222,7 @@ struct eisa_device_id el3_eisa_ids[] = {
 
 static int el3_eisa_probe (struct device *device);
 
-struct eisa_driver el3_eisa_driver = {
+static struct eisa_driver el3_eisa_driver = {
 		.id_table = el3_eisa_ids,
 		.driver   = {
 				.name    = "3c509",

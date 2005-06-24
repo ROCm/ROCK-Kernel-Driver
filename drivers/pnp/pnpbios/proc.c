@@ -2,7 +2,7 @@
  * /proc/bus/pnp interface for Plug and Play devices
  *
  * Written by David Hinds, dahinds@users.sourceforge.net
- * Modified by Thomas Hood, jdthood@mail.com
+ * Modified by Thomas Hood
  *
  * The .../devices and .../<node> and .../boot/<node> files are
  * utilized by the lspnp and setpnp utilities, supplied with the

@@ -5,10 +5,16 @@
  * Author : Stephen Smalley, <sds@epoch.ncsc.mil>
  */
 
-/* Updated: Frank Mayer <mayerf@tresys.com> and Karl MacMillan <kmacmillan@tresys.com>
+/*
+ * Updated: Trusted Computer Solutions, Inc. <dgoeddel@trustedcs.com>
+ *
+ *	Support for enhanced MLS infrastructure.
+ *
+ * Updated: Frank Mayer <mayerf@tresys.com> and Karl MacMillan <kmacmillan@tresys.com>
  *
  * 	Added conditional policy language extensions
  *
+ * Copyright (C) 2004-2005 Trusted Computer Solutions, Inc.
  * Copyright (C) 2003 - 2004 Tresys Technology, LLC
  *	This program is free software; you can redistribute it and/or modify
  *  	it under the terms of the GNU General Public License as published by
@@ -34,13 +40,6 @@
 /* Permission attributes */
 struct perm_datum {
 	u32 value;		/* permission bit + 1 */
-#ifdef CONFIG_SECURITY_SELINUX_MLS
-#define MLS_BASE_READ    1	/* MLS base permission `read' */
-#define MLS_BASE_WRITE   2	/* MLS base permission `write' */
-#define MLS_BASE_READBY  4	/* MLS base permission `readby' */
-#define MLS_BASE_WRITEBY 8	/* MLS base permission `writeby' */
-	u32 base_perms;		/* MLS base permission mask */
-#endif
 };
 
 /* Attributes of a common prefix for access vectors */
@@ -56,9 +55,7 @@ struct class_datum {
 	struct common_datum *comdatum;	/* common datum */
 	struct symtab permissions;	/* class-specific permission symbol table */
 	struct constraint_node *constraints;	/* constraints on class permissions */
-#ifdef CONFIG_SECURITY_SELINUX_MLS
-	struct mls_perms mlsperms;	/* MLS base permission masks */
-#endif
+	struct constraint_node *validatetrans;	/* special transition rules */
 };
 
 /* Role attributes */
@@ -91,13 +88,11 @@ struct type_datum {
 struct user_datum {
 	u32 value;			/* internal user value */
 	struct ebitmap roles;		/* set of authorized roles for user */
-#ifdef CONFIG_SECURITY_SELINUX_MLS
-	struct mls_range_list *ranges;	/* list of authorized MLS ranges for user */
-#endif
+	struct mls_range range;		/* MLS range (min - max) for user */
+	struct mls_level dfltlevel;	/* default login MLS level for user */
 };
 
 
-#ifdef CONFIG_SECURITY_SELINUX_MLS
 /* Sensitivity attributes */
 struct level_datum {
 	struct mls_level *level;	/* sensitivity and associated categories */
@@ -109,7 +104,13 @@ struct cat_datum {
 	u32 value;		/* internal category bit + 1 */
 	unsigned char isalias;  /* is this category an alias for another? */
 };
-#endif
+
+struct range_trans {
+	u32 dom;			/* current process domain */
+	u32 type;			/* program executable type */
+	struct mls_range range;		/* new range */
+	struct range_trans *next;
+};
 
 /* Boolean data type */
 struct cond_bool_datum {
@@ -164,15 +165,10 @@ struct genfs {
 #define SYM_ROLES   2
 #define SYM_TYPES   3
 #define SYM_USERS   4
-#ifdef CONFIG_SECURITY_SELINUX_MLS
-#define SYM_LEVELS  5
-#define SYM_CATS    6
-#define SYM_BOOLS   7
-#define SYM_NUM     8
-#else
 #define SYM_BOOLS   5
-#define SYM_NUM     6
-#endif
+#define SYM_LEVELS  6
+#define SYM_CATS    7
+#define SYM_NUM     8
 
 /* object context array indices */
 #define OCON_ISID  0	/* initial SIDs */
@@ -193,9 +189,9 @@ struct policydb {
 #define p_roles symtab[SYM_ROLES]
 #define p_types symtab[SYM_TYPES]
 #define p_users symtab[SYM_USERS]
+#define p_bools symtab[SYM_BOOLS]
 #define p_levels symtab[SYM_LEVELS]
 #define p_cats symtab[SYM_CATS]
-#define p_bools symtab[SYM_BOOLS]
 
 	/* symbol names indexed by (value - 1) */
 	char **sym_val_to_name[SYM_NUM];
@@ -204,9 +200,9 @@ struct policydb {
 #define p_role_val_to_name sym_val_to_name[SYM_ROLES]
 #define p_type_val_to_name sym_val_to_name[SYM_TYPES]
 #define p_user_val_to_name sym_val_to_name[SYM_USERS]
+#define p_bool_val_to_name sym_val_to_name[SYM_BOOLS]
 #define p_sens_val_to_name sym_val_to_name[SYM_LEVELS]
 #define p_cat_val_to_name sym_val_to_name[SYM_CATS]
-#define p_bool_val_to_name sym_val_to_name[SYM_BOOLS]
 
 	/* class, role, and user attributes indexed by (value - 1) */
 	struct class_datum **class_val_to_struct;
@@ -238,21 +234,12 @@ struct policydb {
 	   fixed labeling behavior. */
   	struct genfs *genfs;
 
-#ifdef CONFIG_SECURITY_SELINUX_MLS
-	/* number of legitimate MLS levels */
-	u32 nlevels;
-
-	struct ebitmap trustedreaders;
-	struct ebitmap trustedwriters;
-	struct ebitmap trustedobjects;
-#endif
+	/* range transitions */
+	struct range_trans *range_tr;
 
 	unsigned int policyvers;
 };
 
-extern int policydb_init(struct policydb *p);
-extern int policydb_index_classes(struct policydb *p);
-extern int policydb_index_others(struct policydb *p);
 extern void policydb_destroy(struct policydb *p);
 extern int policydb_load_isids(struct policydb *p, struct sidtab *s);
 extern int policydb_context_isvalid(struct policydb *p, struct context *c);

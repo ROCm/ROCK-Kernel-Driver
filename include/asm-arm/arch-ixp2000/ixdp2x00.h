@@ -21,7 +21,7 @@
  * On board CPLD memory map
  */
 #define IXDP2X00_PHYS_CPLD_BASE		0xc7000000
-#define IXDP2X00_VIRT_CPLD_BASE		0xfefdd000
+#define IXDP2X00_VIRT_CPLD_BASE		0xfafff000
 #define IXDP2X00_CPLD_SIZE		0x00001000
 
 

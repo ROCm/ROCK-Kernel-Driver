@@ -37,7 +37,6 @@ r_base = .
 	mov	%cs, %ax	# Code and data in the same place
 	mov	%ax, %ds
 
-	mov	$1, %bx		# Flag an SMP trampoline
 	cli			# We should be safe anyway
 
 	movl	$0xA5A5A5A5, trampoline_data - r_base
@@ -46,31 +45,20 @@ r_base = .
 	lidt	idt_48 - r_base	# load idt with 0, 0
 	lgdt	gdt_48 - r_base	# load gdt with whatever is appropriate
 
-	movw    $__KERNEL_DS,%ax
-	movw    %ax,%ds
-	movw    %ax,%es
-	
 	xor	%ax, %ax
 	inc	%ax		# protected mode (PE) bit
 	lmsw	%ax		# into protected mode
-	jmp	flush_instr
-flush_instr:
-	ljmpl	$__KERNEL32_CS, $0x00100000
-			# jump to startup_32 in arch/x86_64/kernel/head.S
+	# flaush prefetch and jump to startup_32 in arch/x86_64/kernel/head.S
+	ljmpl	$__KERNEL32_CS, $(startup_32-__START_KERNEL_map)
 
+	# Careful these need to be in the same 64K segment as the above;
 idt_48:
 	.word	0			# idt limit = 0
 	.word	0, 0			# idt base = 0L
 
 gdt_48:
-	.short	0x0800			# gdt limit = 2048, 256 GDT entries
-	.globl tramp_gdt_ptr
-tramp_gdt_ptr:
-	.long	0			# gdt base = gdt (first SMP CPU)
-					# this is filled in by C because the 64bit
-					# linker doesn't support absolute 32bit
-					# relocations. 
-	
+	.short	__KERNEL32_CS + 7	# gdt limit
+	.long	cpu_gdt_table-__START_KERNEL_map
 
 .globl trampoline_end
 trampoline_end:	

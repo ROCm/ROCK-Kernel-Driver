@@ -38,7 +38,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_qstor"
-#define DRV_VERSION	"0.03"
+#define DRV_VERSION	"0.04"
 
 enum {
 	QS_PORTS		= 4,
@@ -120,6 +120,7 @@ static int qs_check_atapi_dma(struct ata_queued_cmd *qc);
 static void qs_bmdma_stop(struct ata_port *ap);
 static u8 qs_bmdma_status(struct ata_port *ap);
 static void qs_irq_clear(struct ata_port *ap);
+static void qs_eng_timeout(struct ata_port *ap);
 
 static Scsi_Host_Template qs_ata_sht = {
 	.module			= THIS_MODULE,
@@ -152,7 +153,7 @@ static struct ata_port_operations qs_ata_ops = {
 	.phy_reset		= qs_phy_reset,
 	.qc_prep		= qs_qc_prep,
 	.qc_issue		= qs_qc_issue,
-	.eng_timeout		= ata_eng_timeout,
+	.eng_timeout		= qs_eng_timeout,
 	.irq_handler		= qs_intr,
 	.irq_clear		= qs_irq_clear,
 	.scr_read		= qs_scr_read,
@@ -212,7 +213,7 @@ static void qs_irq_clear(struct ata_port *ap)
 	/* nothing */
 }
 
-static void qs_enter_reg_mode(struct ata_port *ap)
+static inline void qs_enter_reg_mode(struct ata_port *ap)
 {
 	u8 __iomem *chan = ap->host_set->mmio_base + (ap->port_no * 0x4000);
 
@@ -220,15 +221,32 @@ static void qs_enter_reg_mode(struct ata_port *ap)
 	readb(chan + QS_CCT_CTR0);        /* flush */
 }
 
-static void qs_phy_reset(struct ata_port *ap)
+static inline void qs_reset_channel_logic(struct ata_port *ap)
 {
 	u8 __iomem *chan = ap->host_set->mmio_base + (ap->port_no * 0x4000);
+
+	writeb(QS_CTR1_RCHN, chan + QS_CCT_CTR1);
+	readb(chan + QS_CCT_CTR0);        /* flush */
+	qs_enter_reg_mode(ap);
+}
+
+static void qs_phy_reset(struct ata_port *ap)
+{
 	struct qs_port_priv *pp = ap->private_data;
 
 	pp->state = qs_state_idle;
-	writeb(QS_CTR1_RCHN, chan + QS_CCT_CTR1);
-	qs_enter_reg_mode(ap);
+	qs_reset_channel_logic(ap);
 	sata_phy_reset(ap);
+}
+
+static void qs_eng_timeout(struct ata_port *ap)
+{
+	struct qs_port_priv *pp = ap->private_data;
+
+	if (pp->state != qs_state_idle) /* healthy paranoia */
+		pp->state = qs_state_mmio;
+	qs_reset_channel_logic(ap);
+	ata_eng_timeout(ap);
 }
 
 static u32 qs_scr_read (struct ata_port *ap, unsigned int sc_reg)
@@ -518,6 +536,8 @@ static void qs_host_stop(struct ata_host_set *host_set)
 
 	writeb(0, mmio_base + QS_HCT_CTRL); /* disable host interrupts */
 	writeb(QS_CNFG3_GSRST, mmio_base + QS_HCF_CNFG3); /* global reset */
+
+	ata_host_stop(host_set);
 }
 
 static void qs_host_init(unsigned int chip_id, struct ata_probe_ent *pe)

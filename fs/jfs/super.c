@@ -210,6 +210,10 @@ static void jfs_put_super(struct super_block *sb)
 		unload_nls(sbi->nls_tab);
 	sbi->nls_tab = NULL;
 
+	truncate_inode_pages(sbi->direct_inode->i_mapping, 0);
+	iput(sbi->direct_inode);
+	sbi->direct_inode = NULL;
+
 	kfree(sbi);
 }
 
@@ -235,7 +239,7 @@ static match_table_t tokens = {
 static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 			 int *flag)
 {
-	void *nls_map = NULL;
+	void *nls_map = (void *)-1;	/* -1: no change;  NULL: none */
 	char *p;
 	struct jfs_sb_info *sbi = JFS_SBI(sb);
 
@@ -263,12 +267,17 @@ static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 			/* Don't do anything ;-) */
 			break;
 		case Opt_iocharset:
-			if (nls_map)	/* specified iocharset twice! */
+			if (nls_map && nls_map != (void *) -1)
 				unload_nls(nls_map);
-			nls_map = load_nls(args[0].from);
-			if (!nls_map) {
-				printk(KERN_ERR "JFS: charset not found\n");
-				goto cleanup;
+			if (!strcmp(args[0].from, "none"))
+				nls_map = NULL;
+			else {
+				nls_map = load_nls(args[0].from);
+				if (!nls_map) {
+					printk(KERN_ERR
+					       "JFS: charset not found\n");
+					goto cleanup;
+				}
 			}
 			break;
 		case Opt_resize:
@@ -318,7 +327,7 @@ static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 		}
 	}
 
-	if (nls_map) {
+	if (nls_map != (void *) -1) {
 		/* Discard old (if remount) */
 		if (sbi->nls_tab)
 			unload_nls(sbi->nls_tab);
@@ -327,7 +336,7 @@ static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 	return 1;
 
 cleanup:
-	if (nls_map)
+	if (nls_map && nls_map != (void *) -1)
 		unload_nls(nls_map);
 	return 0;
 }
@@ -353,6 +362,12 @@ static int jfs_remount(struct super_block *sb, int *flags, char *data)
 	}
 
 	if ((sb->s_flags & MS_RDONLY) && !(*flags & MS_RDONLY)) {
+		/*
+		 * Invalidate any previously read metadata.  fsck may have
+		 * changed the on-disk data since we mounted r/o
+		 */
+		truncate_inode_pages(JFS_SBI(sb)->direct_inode->i_mapping, 0);
+
 		JFS_SBI(sb)->flag = flag;
 		return jfs_mount_rw(sb, 1);
 	}
@@ -423,12 +438,26 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_op = &jfs_super_operations;
 	sb->s_export_op = &jfs_export_operations;
 
+	/*
+	 * Initialize direct-mapping inode/address-space
+	 */
+	inode = new_inode(sb);
+	if (inode == NULL)
+		goto out_kfree;
+	inode->i_ino = 0;
+	inode->i_nlink = 1;
+	inode->i_size = sb->s_bdev->bd_inode->i_size;
+	inode->i_mapping->a_ops = &jfs_metapage_aops;
+	mapping_set_gfp_mask(inode->i_mapping, GFP_NOFS);
+
+	sbi->direct_inode = inode;
+
 	rc = jfs_mount(sb);
 	if (rc) {
 		if (!silent) {
 			jfs_err("jfs_mount failed w/return code = %d", rc);
 		}
-		goto out_kfree;
+		goto out_mount_failed;
 	}
 	if (sb->s_flags & MS_RDONLY)
 		sbi->log = NULL;
@@ -477,6 +506,13 @@ out_no_rw:
 	if (rc) {
 		jfs_err("jfs_umount failed with return code %d", rc);
 	}
+out_mount_failed:
+	filemap_fdatawrite(sbi->direct_inode->i_mapping);
+	filemap_fdatawait(sbi->direct_inode->i_mapping);
+	truncate_inode_pages(sbi->direct_inode->i_mapping, 0);
+	make_bad_inode(sbi->direct_inode);
+	iput(sbi->direct_inode);
+	sbi->direct_inode = NULL;
 out_kfree:
 	if (sbi->nls_tab)
 		unload_nls(sbi->nls_tab);
@@ -522,8 +558,10 @@ static int jfs_sync_fs(struct super_block *sb, int wait)
 	struct jfs_log *log = JFS_SBI(sb)->log;
 
 	/* log == NULL indicates read-only mount */
-	if (log)
+	if (log) {
 		jfs_flush_journal(log, wait);
+		jfs_syncpt(log);
+	}
 
 	return 0;
 }
@@ -622,7 +660,7 @@ static int __init init_jfs_fs(void)
 
 	if (commit_threads < 1)
 		commit_threads = num_online_cpus();
-	else if (commit_threads > MAX_COMMIT_THREADS)
+	if (commit_threads > MAX_COMMIT_THREADS)
 		commit_threads = MAX_COMMIT_THREADS;
 
 	for (i = 0; i < commit_threads; i++) {

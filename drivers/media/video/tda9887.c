@@ -478,9 +478,9 @@ static int tda9887_set_pinnacle(struct tda9887 *t, char *buf)
 /* ---------------------------------------------------------------------- */
 
 static char pal[] = "-";
-module_param_string(pal, pal, 0644, sizeof(pal));
+module_param_string(pal, pal, sizeof(pal), 0644);
 static char secam[] = "-";
-module_param_string(secam, secam, 0644, sizeof(secam));
+module_param_string(secam, secam, sizeof(secam), 0644);
 
 static int tda9887_fixup_std(struct tda9887 *t)
 {
@@ -557,7 +557,7 @@ static int tda9887_configure(struct tda9887 *t)
 #if 0
 	/* This as-is breaks some cards, must be fixed in a
 	 * card-specific way, probably using TDA9887_SET_CONFIG to
-	  * turn on/off port2 */
+	 * turn on/off port2 */
 	if (t->std & V4L2_STD_SECAM_L) {
 		/* secam fixup (FIXME: move this to tvnorms array?) */
 		buf[1] &= ~cOutputPort2Inactive;
@@ -741,7 +741,7 @@ tda9887_command(struct i2c_client *client, unsigned int cmd, void *arg)
 	return 0;
 }
 
-static int tda9887_suspend(struct device * dev, u32 state, u32 level)
+static int tda9887_suspend(struct device * dev, pm_message_t state, u32 level)
 {
 	dprintk("tda9887: suspend\n");
 	return 0;

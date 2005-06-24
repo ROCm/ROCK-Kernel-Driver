@@ -80,14 +80,31 @@ static void nfs_writeback_done_partial(struct nfs_write_data *, int);
 static void nfs_writeback_done_full(struct nfs_write_data *, int);
 static int nfs_wait_on_write_congestion(struct address_space *, int);
 static int nfs_wait_on_requests(struct inode *, unsigned long, unsigned int);
+static int nfs_flush_inode(struct inode *inode, unsigned long idx_start,
+			   unsigned int npages, int how);
 
 static kmem_cache_t *nfs_wdata_cachep;
 mempool_t *nfs_wdata_mempool;
-mempool_t *nfs_commit_mempool;
+static mempool_t *nfs_commit_mempool;
 
 static DECLARE_WAIT_QUEUE_HEAD(nfs_write_congestion);
 
-void nfs_writedata_release(struct rpc_task *task)
+static inline struct nfs_write_data *nfs_commit_alloc(void)
+{
+	struct nfs_write_data *p = mempool_alloc(nfs_commit_mempool, SLAB_NOFS);
+	if (p) {
+		memset(p, 0, sizeof(*p));
+		INIT_LIST_HEAD(&p->pages);
+	}
+	return p;
+}
+
+static inline void nfs_commit_free(struct nfs_write_data *p)
+{
+	mempool_free(p, nfs_commit_mempool);
+}
+
+static void nfs_writedata_release(struct rpc_task *task)
 {
 	struct nfs_write_data	*wdata = (struct nfs_write_data *)task->tk_calldata;
 	nfs_writedata_free(wdata);
@@ -990,7 +1007,7 @@ static int nfs_flush_one(struct list_head *head, struct inode *inode, int how)
 	return -ENOMEM;
 }
 
-int
+static int
 nfs_flush_list(struct list_head *head, int wpages, int how)
 {
 	LIST_HEAD(one_request);
@@ -1240,7 +1257,7 @@ static void nfs_commit_rpcsetup(struct list_head *head,
 /*
  * Commit dirty pages
  */
-int
+static int
 nfs_commit_list(struct list_head *head, int how)
 {
 	struct nfs_write_data	*data;
@@ -1314,8 +1331,8 @@ nfs_commit_done(struct rpc_task *task)
 }
 #endif
 
-int nfs_flush_inode(struct inode *inode, unsigned long idx_start,
-		   unsigned int npages, int how)
+static int nfs_flush_inode(struct inode *inode, unsigned long idx_start,
+			   unsigned int npages, int how)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 	LIST_HEAD(head);

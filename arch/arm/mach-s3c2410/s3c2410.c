@@ -17,7 +17,7 @@
  *     21-Aug-2004 BJD  Added new struct s3c2410_board handler
  *     28-Sep-2004 BJD  Updates for new serial port bits
  *     04-Nov-2004 BJD  Updated UART configuration process
- *     10-Jan-2004 BJD  Removed s3c2410_clock_tick_rate
+ *     10-Jan-2005 BJD  Removed s3c2410_clock_tick_rate
 */
 
 #include <linux/kernel.h>
@@ -164,31 +164,32 @@ void __init s3c2410_map_io(struct map_desc *mach_desc, int mach_size)
 void __init s3c2410_init_clocks(int xtal)
 {
 	unsigned long tmp;
+	unsigned long fclk;
+	unsigned long hclk;
+	unsigned long pclk;
 
 	/* now we've got our machine bits initialised, work out what
 	 * clocks we've got */
 
-	s3c24xx_fclk = s3c2410_get_pll(__raw_readl(S3C2410_MPLLCON),
-				       s3c24xx_xtal);
+	fclk = s3c2410_get_pll(__raw_readl(S3C2410_MPLLCON), xtal);
 
 	tmp = __raw_readl(S3C2410_CLKDIVN);
 
 	/* work out clock scalings */
 
-	s3c24xx_hclk = s3c24xx_fclk / ((tmp & S3C2410_CLKDIVN_HDIVN) ? 2 : 1);
-	s3c24xx_pclk = s3c24xx_hclk / ((tmp & S3C2410_CLKDIVN_PDIVN) ? 2 : 1);
+	hclk = fclk / ((tmp & S3C2410_CLKDIVN_HDIVN) ? 2 : 1);
+	pclk = hclk / ((tmp & S3C2410_CLKDIVN_PDIVN) ? 2 : 1);
 
 	/* print brieft summary of clocks, etc */
 
 	printk("S3C2410: core %ld.%03ld MHz, memory %ld.%03ld MHz, peripheral %ld.%03ld MHz\n",
-	       print_mhz(s3c24xx_fclk), print_mhz(s3c24xx_hclk),
-	       print_mhz(s3c24xx_pclk));
+	       print_mhz(fclk), print_mhz(hclk), print_mhz(pclk));
 
 	/* initialise the clocks here, to allow other things like the
 	 * console to use them
 	 */
 
-	s3c24xx_setup_clocks();
+	s3c24xx_setup_clocks(xtal, fclk, hclk, pclk);
 }
 
 int __init s3c2410_init(void)

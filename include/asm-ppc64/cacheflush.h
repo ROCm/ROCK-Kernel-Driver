@@ -12,7 +12,7 @@
 #define flush_cache_all()			do { } while (0)
 #define flush_cache_mm(mm)			do { } while (0)
 #define flush_cache_range(vma, start, end)	do { } while (0)
-#define flush_cache_page(vma, vmaddr)		do { } while (0)
+#define flush_cache_page(vma, vmaddr, pfn)	do { } while (0)
 #define flush_icache_page(vma, page)		do { } while (0)
 #define flush_cache_vmap(start, end)		do { } while (0)
 #define flush_cache_vunmap(start, end)		do { } while (0)
@@ -28,8 +28,7 @@ extern void flush_icache_user_range(struct vm_area_struct *vma,
 
 extern void flush_dcache_range(unsigned long start, unsigned long stop);
 extern void flush_dcache_phys_range(unsigned long start, unsigned long stop);
-extern void flush_inval_dcache_phys_range(unsigned long start,
-					  unsigned long stop);
+extern void flush_inval_dcache_range(unsigned long start, unsigned long stop);
 
 #define copy_to_user_page(vma, page, vaddr, dst, src, len) \
 do { memcpy(dst, src, len); \
@@ -42,7 +41,7 @@ extern void __flush_dcache_icache(void *page_va);
 
 static inline void flush_icache_range(unsigned long start, unsigned long stop)
 {
-	if (!(cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE))
+	if (!cpu_has_feature(CPU_FTR_COHERENT_ICACHE))
 		__flush_icache_range(start, stop);
 }
 

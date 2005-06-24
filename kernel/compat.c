@@ -23,17 +23,18 @@
 #include <linux/security.h>
 
 #include <asm/uaccess.h>
+#include <asm/bug.h>
 
 int get_compat_timespec(struct timespec *ts, const struct compat_timespec __user *cts)
 {
-	return (verify_area(VERIFY_READ, cts, sizeof(*cts)) ||
+	return (!access_ok(VERIFY_READ, cts, sizeof(*cts)) ||
 			__get_user(ts->tv_sec, &cts->tv_sec) ||
 			__get_user(ts->tv_nsec, &cts->tv_nsec)) ? -EFAULT : 0;
 }
 
 int put_compat_timespec(const struct timespec *ts, struct compat_timespec __user *cts)
 {
-	return (verify_area(VERIFY_WRITE, cts, sizeof(*cts)) ||
+	return (!access_ok(VERIFY_WRITE, cts, sizeof(*cts)) ||
 			__put_user(ts->tv_sec, &cts->tv_sec) ||
 			__put_user(ts->tv_nsec, &cts->tv_nsec)) ? -EFAULT : 0;
 }
@@ -413,6 +414,36 @@ compat_sys_wait4(compat_pid_t pid, compat_uint_t __user *stat_addr, int options,
 	}
 }
 
+asmlinkage long compat_sys_waitid(int which, compat_pid_t pid,
+		struct compat_siginfo __user *uinfo, int options,
+		struct compat_rusage __user *uru)
+{
+	siginfo_t info;
+	struct rusage ru;
+	long ret;
+	mm_segment_t old_fs = get_fs();
+
+	memset(&info, 0, sizeof(info));
+
+	set_fs(KERNEL_DS);
+	ret = sys_waitid(which, pid, (siginfo_t __user *)&info, options,
+			 uru ? (struct rusage __user *)&ru : NULL);
+	set_fs(old_fs);
+
+	if ((ret < 0) || (info.si_signo == 0))
+		return ret;
+
+	if (uru) {
+		ret = put_compat_rusage(&ru, uru);
+		if (ret)
+			return ret;
+	}
+
+	BUG_ON(info.si_code & __SI_MASK);
+	info.si_code |= __SI_CHLD;
+	return copy_siginfo_to_user32(uinfo, &info);
+}
+
 static int compat_get_user_cpu_mask(compat_ulong_t __user *user_mask_ptr,
 				    unsigned len, cpumask_t *new_mask)
 {
@@ -599,6 +630,27 @@ long compat_sys_clock_nanosleep(clockid_t which_clock, int flags,
 	return err;	
 } 
 
+/*
+ * We currently only need the following fields from the sigevent
+ * structure: sigev_value, sigev_signo, sig_notify and (sometimes
+ * sigev_notify_thread_id).  The others are handled in user mode.
+ * We also assume that copying sigev_value.sival_int is sufficient
+ * to keep all the bits of sigev_value.sival_ptr intact.
+ */
+int get_compat_sigevent(struct sigevent *event,
+		const struct compat_sigevent __user *u_event)
+{
+	memset(event, 0, sizeof(*event));
+	return (!access_ok(VERIFY_READ, u_event, sizeof(*u_event)) ||
+		__get_user(event->sigev_value.sival_int,
+			&u_event->sigev_value.sival_int) ||
+		__get_user(event->sigev_signo, &u_event->sigev_signo) ||
+		__get_user(event->sigev_notify, &u_event->sigev_notify) ||
+		__get_user(event->sigev_notify_thread_id,
+			&u_event->sigev_notify_thread_id))
+		? -EFAULT : 0;
+}
+
 /* timer_create is architecture specific because it needs sigevent conversion */
 
 long compat_get_bitmap(unsigned long *mask, compat_ulong_t __user *umask,
@@ -612,7 +664,7 @@ long compat_get_bitmap(unsigned long *mask, compat_ulong_t __user *umask,
 	/* align bitmap up to nearest compat_long_t boundary */
 	bitmap_size = ALIGN(bitmap_size, BITS_PER_COMPAT_LONG);
 
-	if (verify_area(VERIFY_READ, umask, bitmap_size / 8))
+	if (!access_ok(VERIFY_READ, umask, bitmap_size / 8))
 		return -EFAULT;
 
 	nr_compat_longs = BITS_TO_COMPAT_LONGS(bitmap_size);
@@ -653,7 +705,7 @@ long compat_put_bitmap(compat_ulong_t __user *umask, unsigned long *mask,
 	/* align bitmap up to nearest compat_long_t boundary */
 	bitmap_size = ALIGN(bitmap_size, BITS_PER_COMPAT_LONG);
 
-	if (verify_area(VERIFY_WRITE, umask, bitmap_size / 8))
+	if (!access_ok(VERIFY_WRITE, umask, bitmap_size / 8))
 		return -EFAULT;
 
 	nr_compat_longs = BITS_TO_COMPAT_LONGS(bitmap_size);

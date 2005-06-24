@@ -6,9 +6,27 @@
 #include <linux/init.h>
 #include <linux/pagemap.h>
 #include <linux/agp_backend.h>
+#include <linux/delay.h>
 #include <asm/uninorth.h>
 #include <asm/pci-bridge.h>
+#include <asm/prom.h>
+#include <asm/pmac_feature.h>
 #include "agp.h"
+
+/*
+ * NOTES for uninorth3 (G5 AGP) supports :
+ *
+ * There maybe also possibility to have bigger cache line size for
+ * agp (see pmac_pci.c and look for cache line). Need to be investigated
+ * by someone.
+ *
+ * PAGE size are hardcoded but this may change, see asm/page.h.
+ *
+ * Jerome Glisse <j.glisse@gmail.com>
+ */
+static int uninorth_rev;
+static int is_u3;
+
 
 static int uninorth_fetch_size(void)
 {
@@ -39,26 +57,39 @@ static int uninorth_fetch_size(void)
 
 static void uninorth_tlbflush(struct agp_memory *mem)
 {
+	u32 ctrl = UNI_N_CFG_GART_ENABLE;
+
+	if (is_u3)
+		ctrl |= U3_N_CFG_GART_PERFRD;
 	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
-			UNI_N_CFG_GART_ENABLE | UNI_N_CFG_GART_INVAL);
-	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
-			UNI_N_CFG_GART_ENABLE);
-	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
-			UNI_N_CFG_GART_ENABLE | UNI_N_CFG_GART_2xRESET);
-	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
-			UNI_N_CFG_GART_ENABLE);
+			       ctrl | UNI_N_CFG_GART_INVAL);
+	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL, ctrl);
+
+	if (uninorth_rev <= 0x30) {
+		pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
+				       ctrl | UNI_N_CFG_GART_2xRESET);
+		pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
+				       ctrl);
+	}
 }
 
 static void uninorth_cleanup(void)
 {
-	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
-			UNI_N_CFG_GART_ENABLE | UNI_N_CFG_GART_INVAL);
-	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
-			0);
-	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
-			UNI_N_CFG_GART_2xRESET);
-	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
-			0);
+	u32 tmp;
+
+	pci_read_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL, &tmp);
+	if (!(tmp & UNI_N_CFG_GART_ENABLE))
+		return;
+	tmp |= UNI_N_CFG_GART_INVAL;
+	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL, tmp);
+	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL, 0);
+
+	if (uninorth_rev <= 0x30) {
+		pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
+				       UNI_N_CFG_GART_2xRESET);
+		pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_GART_CTRL,
+				       0);
+	}
 }
 
 static int uninorth_configure(void)
@@ -81,8 +112,21 @@ static int uninorth_configure(void)
 	 * the AGP aperture isn't mapped at bus physical address 0
 	 */
 	agp_bridge->gart_bus_addr = 0;
+#ifdef CONFIG_PPC64
+	/* Assume U3 or later on PPC64 systems */
+	/* high 4 bits of GART physical address go in UNI_N_CFG_AGP_BASE */
+	pci_write_config_dword(agp_bridge->dev, UNI_N_CFG_AGP_BASE,
+			       (agp_bridge->gatt_bus_addr >> 32) & 0xf);
+#else
 	pci_write_config_dword(agp_bridge->dev,
 		UNI_N_CFG_AGP_BASE, agp_bridge->gart_bus_addr);
+#endif
+
+	if (is_u3) {
+		pci_write_config_dword(agp_bridge->dev,
+				       UNI_N_CFG_GART_DUMMY_PAGE,
+				       agp_bridge->scratch_page_real >> 12);
+	}
 	
 	return 0;
 }
@@ -105,13 +149,14 @@ static int uninorth_insert_memory(struct agp_memory *mem, off_t pg_start,
 	j = pg_start;
 
 	while (j < (pg_start + mem->page_count)) {
-		if (!PGE_EMPTY(agp_bridge, agp_bridge->gatt_table[j]))
+		if (agp_bridge->gatt_table[j])
 			return -EBUSY;
 		j++;
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
-		agp_bridge->gatt_table[j] = cpu_to_le32((mem->memory[i] & 0xfffff000) | 0x00000001UL);
+		agp_bridge->gatt_table[j] =
+		    cpu_to_le32((mem->memory[i] & 0xFFFFF000UL) | 0x1UL);
 		flush_dcache_range((unsigned long)__va(mem->memory[i]),
 				   (unsigned long)__va(mem->memory[i])+0x1000);
 	}
@@ -124,38 +169,200 @@ static int uninorth_insert_memory(struct agp_memory *mem, off_t pg_start,
 	return 0;
 }
 
-static void uninorth_agp_enable(u32 mode)
+static int u3_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 {
-	u32 command, scratch;
+	int i, num_entries;
+	void *temp;
+	u32 *gp;
+
+	temp = agp_bridge->current_size;
+	num_entries = A_SIZE_32(temp)->num_entries;
+
+	if (type != 0 || mem->type != 0)
+		/* We know nothing of memory types */
+		return -EINVAL;
+	if ((pg_start + mem->page_count) > num_entries)
+		return -EINVAL;
+
+	gp = (u32 *) &agp_bridge->gatt_table[pg_start];
+	for (i = 0; i < mem->page_count; ++i) {
+		if (gp[i]) {
+			printk("u3_insert_memory: entry 0x%x occupied (%x)\n",
+			       i, gp[i]);
+			return -EBUSY;
+		}
+	}
+
+	for (i = 0; i < mem->page_count; i++) {
+		gp[i] = (mem->memory[i] >> PAGE_SHIFT) | 0x80000000UL;
+		flush_dcache_range((unsigned long)__va(mem->memory[i]),
+				   (unsigned long)__va(mem->memory[i])+0x1000);
+	}
+	mb();
+	flush_dcache_range((unsigned long)gp, (unsigned long) &gp[i]);
+	uninorth_tlbflush(mem);
+
+	return 0;
+}
+
+int u3_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
+{
+	size_t i;
+	u32 *gp;
+
+	if (type != 0 || mem->type != 0)
+		/* We know nothing of memory types */
+		return -EINVAL;
+
+	gp = (u32 *) &agp_bridge->gatt_table[pg_start];
+	for (i = 0; i < mem->page_count; ++i)
+		gp[i] = 0;
+	mb();
+	flush_dcache_range((unsigned long)gp, (unsigned long) &gp[i]);
+	uninorth_tlbflush(mem);
+
+	return 0;
+}
+
+static void uninorth_agp_enable(struct agp_bridge_data *bridge, u32 mode)
+{
+	u32 command, scratch, status;
 	int timeout;
 
-	pci_read_config_dword(agp_bridge->dev,
-			      agp_bridge->capndx + PCI_AGP_STATUS,
-			      &command);
+	pci_read_config_dword(bridge->dev,
+			      bridge->capndx + PCI_AGP_STATUS,
+			      &status);
 
-	command = agp_collect_device_status(mode, command);
-	command |= 0x100;
+	command = agp_collect_device_status(bridge, mode, status);
+	command |= PCI_AGP_COMMAND_AGP;
+	
+	if (uninorth_rev == 0x21) {
+		/*
+		 * Darwin disable AGP 4x on this revision, thus we
+		 * may assume it's broken. This is an AGP2 controller.
+		 */
+		command &= ~AGPSTAT2_4X;
+	}
+
+	if ((uninorth_rev >= 0x30) && (uninorth_rev <= 0x33)) {
+		/*
+		 * We need to to set REQ_DEPTH to 7 for U3 versions 1.0, 2.1,
+		 * 2.2 and 2.3, Darwin do so.
+		 */
+		if ((command >> AGPSTAT_RQ_DEPTH_SHIFT) > 7)
+			command = (command & ~AGPSTAT_RQ_DEPTH)
+				| (7 << AGPSTAT_RQ_DEPTH_SHIFT);
+	}
 
 	uninorth_tlbflush(NULL);
 
 	timeout = 0;
 	do {
-		pci_write_config_dword(agp_bridge->dev,
-				       agp_bridge->capndx + PCI_AGP_COMMAND,
+		pci_write_config_dword(bridge->dev,
+				       bridge->capndx + PCI_AGP_COMMAND,
 				       command);
-		pci_read_config_dword(agp_bridge->dev,
-				       agp_bridge->capndx + PCI_AGP_COMMAND,
+		pci_read_config_dword(bridge->dev,
+				      bridge->capndx + PCI_AGP_COMMAND,
 				       &scratch);
-	} while ((scratch & 0x100) == 0 && ++timeout < 1000);
-	if ((scratch & 0x100) == 0)
-		printk(KERN_ERR PFX "failed to write UniNorth AGP command reg\n");
+	} while ((scratch & PCI_AGP_COMMAND_AGP) == 0 && ++timeout < 1000);
+	if ((scratch & PCI_AGP_COMMAND_AGP) == 0)
+		printk(KERN_ERR PFX "failed to write UniNorth AGP"
+		       " command register\n");
 
-	agp_device_command(command, 0);
+	if (uninorth_rev >= 0x30) {
+		/* This is an AGP V3 */
+		agp_device_command(command, (status & AGPSTAT_MODE_3_0));
+	} else {
+		/* AGP V2 */
+		agp_device_command(command, 0);
+	}
 
 	uninorth_tlbflush(NULL);
 }
 
-static int uninorth_create_gatt_table(void)
+#ifdef CONFIG_PM
+/*
+ * These Power Management routines are _not_ called by the normal PCI PM layer,
+ * but directly by the video driver through function pointers in the device
+ * tree.
+ */
+static int agp_uninorth_suspend(struct pci_dev *pdev)
+{
+	struct agp_bridge_data *bridge;
+	u32 cmd;
+	u8 agp;
+	struct pci_dev *device = NULL;
+
+	bridge = agp_find_bridge(pdev);
+	if (bridge == NULL)
+		return -ENODEV;
+
+	/* Only one suspend supported */
+	if (bridge->dev_private_data)
+		return 0;
+
+	/* turn off AGP on the video chip, if it was enabled */
+	for_each_pci_dev(device) {
+		/* Don't touch the bridge yet, device first */
+		if (device == pdev)
+			continue;
+		/* Only deal with devices on the same bus here, no Mac has a P2P
+		 * bridge on the AGP port, and mucking around the entire PCI
+		 * tree is source of problems on some machines because of a bug
+		 * in some versions of pci_find_capability() when hitting a dead
+		 * device
+		 */
+		if (device->bus != pdev->bus)
+			continue;
+		agp = pci_find_capability(device, PCI_CAP_ID_AGP);
+		if (!agp)
+			continue;
+		pci_read_config_dword(device, agp + PCI_AGP_COMMAND, &cmd);
+		if (!(cmd & PCI_AGP_COMMAND_AGP))
+			continue;
+		printk("uninorth-agp: disabling AGP on device %s\n",
+				pci_name(device));
+		cmd &= ~PCI_AGP_COMMAND_AGP;
+		pci_write_config_dword(device, agp + PCI_AGP_COMMAND, cmd);
+	}
+
+	/* turn off AGP on the bridge */
+	agp = pci_find_capability(pdev, PCI_CAP_ID_AGP);
+	pci_read_config_dword(pdev, agp + PCI_AGP_COMMAND, &cmd);
+	bridge->dev_private_data = (void *)cmd;
+	if (cmd & PCI_AGP_COMMAND_AGP) {
+		printk("uninorth-agp: disabling AGP on bridge %s\n",
+				pci_name(pdev));
+		cmd &= ~PCI_AGP_COMMAND_AGP;
+		pci_write_config_dword(pdev, agp + PCI_AGP_COMMAND, cmd);
+	}
+	/* turn off the GART */
+	uninorth_cleanup();
+
+	return 0;
+}
+
+static int agp_uninorth_resume(struct pci_dev *pdev)
+{
+	struct agp_bridge_data *bridge;
+	u32 command;
+
+	bridge = agp_find_bridge(pdev);
+	if (bridge == NULL)
+		return -ENODEV;
+
+	command = (u32)bridge->dev_private_data;
+	bridge->dev_private_data = NULL;
+	if (!(command & PCI_AGP_COMMAND_AGP))
+		return 0;
+
+	uninorth_agp_enable(bridge, command);
+
+	return 0;
+}
+#endif /* CONFIG_PM */
+
+static int uninorth_create_gatt_table(struct agp_bridge_data *bridge)
 {
 	char *table;
 	char *table_end;
@@ -167,12 +374,12 @@ static int uninorth_create_gatt_table(void)
 	struct page *page;
 
 	/* We can't handle 2 level gatt's */
-	if (agp_bridge->driver->size_type == LVL2_APER_SIZE)
+	if (bridge->driver->size_type == LVL2_APER_SIZE)
 		return -EINVAL;
 
 	table = NULL;
-	i = agp_bridge->aperture_size_idx;
-	temp = agp_bridge->current_size;
+	i = bridge->aperture_size_idx;
+	temp = bridge->current_size;
 	size = page_order = num_entries = 0;
 
 	do {
@@ -184,11 +391,11 @@ static int uninorth_create_gatt_table(void)
 
 		if (table == NULL) {
 			i++;
-			agp_bridge->current_size = A_IDX32(agp_bridge);
+			bridge->current_size = A_IDX32(bridge);
 		} else {
-			agp_bridge->aperture_size_idx = i;
+			bridge->aperture_size_idx = i;
 		}
-	} while (!table && (i < agp_bridge->driver->num_aperture_sizes));
+	} while (!table && (i < bridge->driver->num_aperture_sizes));
 
 	if (table == NULL)
 		return -ENOMEM;
@@ -198,28 +405,26 @@ static int uninorth_create_gatt_table(void)
 	for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
 		SetPageReserved(page);
 
-	agp_bridge->gatt_table_real = (u32 *) table;
-	agp_bridge->gatt_table = (u32 *)table;
-	agp_bridge->gatt_bus_addr = virt_to_gart(table);
+	bridge->gatt_table_real = (u32 *) table;
+	bridge->gatt_table = (u32 *)table;
+	bridge->gatt_bus_addr = virt_to_gart(table);
 
-	for (i = 0; i < num_entries; i++) {
-		agp_bridge->gatt_table[i] =
-		    (unsigned long) agp_bridge->scratch_page;
-	}
+	for (i = 0; i < num_entries; i++)
+		bridge->gatt_table[i] = 0;
 
 	flush_dcache_range((unsigned long)table, (unsigned long)table_end);
 
 	return 0;
 }
 
-static int uninorth_free_gatt_table(void)
+static int uninorth_free_gatt_table(struct agp_bridge_data *bridge)
 {
 	int page_order;
 	char *table, *table_end;
 	void *temp;
 	struct page *page;
 
-	temp = agp_bridge->current_size;
+	temp = bridge->current_size;
 	page_order = A_SIZE_32(temp)->page_order;
 
 	/* Do not worry about freeing memory, because if this is
@@ -227,13 +432,13 @@ static int uninorth_free_gatt_table(void)
 	 * from the table.
 	 */
 
-	table = (char *) agp_bridge->gatt_table_real;
+	table = (char *) bridge->gatt_table_real;
 	table_end = table + ((PAGE_SIZE * (1 << page_order)) - 1);
 
 	for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
 		ClearPageReserved(page);
 
-	free_pages((unsigned long) agp_bridge->gatt_table_real, page_order);
+	free_pages((unsigned long) bridge->gatt_table_real, page_order);
 
 	return 0;
 }
@@ -252,6 +457,22 @@ static struct aper_size_info_32 uninorth_sizes[7] =
 	{128, 32768, 5, 32},
 	{64, 16384, 4, 16},
 #endif	
+	{32, 8192, 3, 8},
+	{16, 4096, 2, 4},
+	{8, 2048, 1, 2},
+	{4, 1024, 0, 1}
+};
+
+/*
+ * Not sure that u3 supports that high aperture sizes but it
+ * would strange if it did not :)
+ */
+static struct aper_size_info_32 u3_sizes[8] =
+{
+	{512, 131072, 7, 128},
+	{256, 65536, 6, 64},
+	{128, 32768, 5, 32},
+	{64, 16384, 4, 16},
 	{32, 8192, 3, 8},
 	{16, 4096, 2, 4},
 	{8, 2048, 1, 2},
@@ -282,6 +503,31 @@ struct agp_bridge_driver uninorth_agp_driver = {
 	.cant_use_aperture	= 1,
 };
 
+struct agp_bridge_driver u3_agp_driver = {
+	.owner			= THIS_MODULE,
+	.aperture_sizes		= (void *)u3_sizes,
+	.size_type		= U32_APER_SIZE,
+	.num_aperture_sizes	= 8,
+	.configure		= uninorth_configure,
+	.fetch_size		= uninorth_fetch_size,
+	.cleanup		= uninorth_cleanup,
+	.tlb_flush		= uninorth_tlbflush,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= NULL,
+	.cache_flush		= null_cache_flush,
+	.agp_enable		= uninorth_agp_enable,
+	.create_gatt_table	= uninorth_create_gatt_table,
+	.free_gatt_table	= uninorth_free_gatt_table,
+	.insert_memory		= u3_insert_memory,
+	.remove_memory		= u3_remove_memory,
+	.alloc_by_type		= agp_generic_alloc_by_type,
+	.free_by_type		= agp_generic_free_by_type,
+	.agp_alloc_page		= agp_generic_alloc_page,
+	.agp_destroy_page	= agp_generic_destroy_page,
+	.cant_use_aperture	= 1,
+	.needs_scratch_page	= 1,
+};
+
 static struct agp_device_ids uninorth_agp_device_ids[] __devinitdata = {
 	{
 		.device_id	= PCI_DEVICE_ID_APPLE_UNI_N_AGP,
@@ -299,6 +545,18 @@ static struct agp_device_ids uninorth_agp_device_ids[] __devinitdata = {
 		.device_id	= PCI_DEVICE_ID_APPLE_UNI_N_AGP2,
 		.chipset_name	= "UniNorth 2",
 	},
+	{
+		.device_id	= PCI_DEVICE_ID_APPLE_U3_AGP,
+		.chipset_name	= "U3",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_APPLE_U3L_AGP,
+		.chipset_name	= "U3L",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_APPLE_U3H_AGP,
+		.chipset_name	= "U3H",
+	},
 };
 
 static int __devinit agp_uninorth_probe(struct pci_dev *pdev,
@@ -306,6 +564,7 @@ static int __devinit agp_uninorth_probe(struct pci_dev *pdev,
 {
 	struct agp_device_ids *devs = uninorth_agp_device_ids;
 	struct agp_bridge_data *bridge;
+	struct device_node *uninorth_node;
 	u8 cap_ptr;
 	int j;
 
@@ -327,13 +586,42 @@ static int __devinit agp_uninorth_probe(struct pci_dev *pdev,
 	return -ENODEV;
 
  found:
+	/* Set revision to 0 if we could not read it. */
+	uninorth_rev = 0;
+	is_u3 = 0;
+	/* Locate core99 Uni-N */
+	uninorth_node = of_find_node_by_name(NULL, "uni-n");
+	/* Locate G5 u3 */
+	if (uninorth_node == NULL) {
+		is_u3 = 1;
+		uninorth_node = of_find_node_by_name(NULL, "u3");
+	}
+	if (uninorth_node) {
+		int *revprop = (int *)
+			get_property(uninorth_node, "device-rev", NULL);
+		if (revprop != NULL)
+			uninorth_rev = *revprop & 0x3f;
+		of_node_put(uninorth_node);
+	}
+
+#ifdef CONFIG_PM
+	/* Inform platform of our suspend/resume caps */
+	pmac_register_agp_pm(pdev, agp_uninorth_suspend, agp_uninorth_resume);
+#endif
+
+	/* Allocate & setup our driver */
 	bridge = agp_alloc_bridge();
 	if (!bridge)
 		return -ENOMEM;
 
-	bridge->driver = &uninorth_agp_driver;
+	if (is_u3)
+		bridge->driver = &u3_agp_driver;
+	else
+		bridge->driver = &uninorth_agp_driver;
+
 	bridge->dev = pdev;
 	bridge->capndx = cap_ptr;
+	bridge->flags = AGP_ERRATA_FASTWRITES;
 
 	/* Fill in the mode register */
 	pci_read_config_dword(pdev, cap_ptr+PCI_AGP_STATUS, &bridge->mode);
@@ -345,6 +633,11 @@ static int __devinit agp_uninorth_probe(struct pci_dev *pdev,
 static void __devexit agp_uninorth_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+#ifdef CONFIG_PM
+	/* Inform platform of our suspend/resume caps */
+	pmac_register_agp_pm(pdev, NULL, NULL);
+#endif
 
 	agp_remove_bridge(bridge);
 	agp_put_bridge(bridge);
@@ -375,7 +668,7 @@ static int __init agp_uninorth_init(void)
 {
 	if (agp_off)
 		return -EINVAL;
-	return pci_module_init(&agp_uninorth_pci_driver);
+	return pci_register_driver(&agp_uninorth_pci_driver);
 }
 
 static void __exit agp_uninorth_cleanup(void)

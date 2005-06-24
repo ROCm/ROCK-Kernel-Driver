@@ -494,7 +494,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
 	chan->data = data;
 	chan->enabled_irqs = OMAP_DMA_TOUT_IRQ | OMAP_DMA_DROP_IRQ | OMAP_DMA_BLOCK_IRQ;
 
-	if (cpu_is_omap16xx() || cpu_is_omap730()) {
+	if (cpu_is_omap16xx()) {
 		/* If the sync device is set, configure it dynamically. */
 		if (dev_id != 0) {
 			set_gdma_dev(free_ch + 1, dev_id);

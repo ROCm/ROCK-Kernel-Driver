@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-bast/dma.c
  *
- * (c) 2003,2004 Simtec Electronics
+ * (c) 2003-2005 Simtec Electronics
  *	Ben Dooks <ben@simtec.co.uk>
  *
  * S3C2410 DMA core
@@ -12,6 +12,7 @@
  * published by the Free Software Foundation.
  *
  * Changelog:
+ *  27-Feb-2005 BJD  Added kmem cache for dma descriptors
  *  18-Nov-2004 BJD  Removed error for loading onto stopped channel
  *  10-Nov-2004 BJD  Ensure all external symbols exported for modules
  *  10-Nov-2004 BJD  Use sys_device and sysdev_class for power management
@@ -57,6 +58,7 @@
 
 /* io map for dma */
 static void __iomem *dma_base;
+static kmem_cache_t *dma_kmem;
 
 /* dma channel state information */
 s3c2410_dma_chan_t s3c2410_chans[S3C2410_DMA_CHANNELS];
@@ -432,7 +434,7 @@ int s3c2410_dma_enqueue(unsigned int channel, void *id,
 	pr_debug("%s: id=%p, data=%08x, size=%d\n",
 		 __FUNCTION__, id, (unsigned int)data, size);
 
-	buf = (s3c2410_dma_buf_t *)kmalloc(sizeof(*buf), GFP_ATOMIC);
+	buf = kmem_cache_alloc(dma_kmem, GFP_ATOMIC);
 	if (buf == NULL) {
 		pr_debug("%s: out of memory (%d alloc)\n",
 			 __FUNCTION__, sizeof(*buf));
@@ -511,7 +513,7 @@ s3c2410_dma_freebuf(s3c2410_dma_buf_t *buf)
 	buf->magic = -1;
 
 	if (magicok) {
-		kfree(buf);
+		kmem_cache_free(dma_kmem, buf);
 	} else {
 		printk("s3c2410_dma_freebuf: buff %p with bad magic\n", buf);
 	}
@@ -782,6 +784,10 @@ int s3c2410_dma_free(dmach_t channel, s3c2410_dma_client_t *client)
 
 	chan->client = NULL;
 	chan->in_use = 0;
+
+	if (chan->irq_claimed)
+		free_irq(chan->irq, (void *)chan);
+	chan->irq_claimed = 0;
 
 	local_irq_restore(flags);
 
@@ -1090,7 +1096,7 @@ EXPORT_SYMBOL(s3c2410_dma_getposition);
 
 #ifdef CONFIG_PM
 
-static int s3c2410_dma_suspend(struct sys_device *dev, u32 state)
+static int s3c2410_dma_suspend(struct sys_device *dev, pm_message_t state)
 {
 	s3c2410_dma_chan_t *cp = container_of(dev, s3c2410_dma_chan_t, dev);
 
@@ -1128,6 +1134,14 @@ static struct sysdev_class dma_sysclass = {
 	.resume		= s3c2410_dma_resume,
 };
 
+/* kmem cache implementation */
+
+static void s3c2410_dma_cache_ctor(void *p, kmem_cache_t *c, unsigned long f)
+{
+	memset(p, 0, sizeof(s3c2410_dma_buf_t));
+}
+
+
 /* initialisation code */
 
 static int __init s3c2410_init_dma(void)
@@ -1147,6 +1161,16 @@ static int __init s3c2410_init_dma(void)
 	ret = sysdev_class_register(&dma_sysclass);
 	if (ret != 0) {
 		printk(KERN_ERR "dma sysclass registration failed\n");
+		goto err;
+	}
+
+	dma_kmem = kmem_cache_create("dma_desc", sizeof(s3c2410_dma_buf_t), 0,
+				     SLAB_HWCACHE_ALIGN,
+				     s3c2410_dma_cache_ctor, NULL);
+
+	if (dma_kmem == NULL) {
+		printk(KERN_ERR "dma failed to make kmem cache\n");
+		ret = -ENOMEM;
 		goto err;
 	}
 
@@ -1181,6 +1205,7 @@ static int __init s3c2410_init_dma(void)
 	return 0;
 
  err:
+	kmem_cache_destroy(dma_kmem);
 	iounmap(dma_base);
 	dma_base = NULL;
 	return ret;

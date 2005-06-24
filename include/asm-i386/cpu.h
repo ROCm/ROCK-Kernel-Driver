@@ -11,7 +11,6 @@
 struct i386_cpu {
 	struct cpu cpu;
 };
-extern struct i386_cpu cpu_devices[NR_CPUS];
 extern int arch_register_cpu(int num);
 #ifdef CONFIG_HOTPLUG_CPU
 extern void arch_unregister_cpu(int);

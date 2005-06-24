@@ -291,7 +291,8 @@ static int ati_insert_memory(struct agp_memory * mem,
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
-		writel(agp_bridge->driver->mask_memory(mem->memory[i], mem->type), cur_gatt+GET_GATT_OFF(addr));
+		writel(agp_bridge->driver->mask_memory(agp_bridge,
+			mem->memory[i], mem->type), cur_gatt+GET_GATT_OFF(addr));
 		readl(cur_gatt+GET_GATT_OFF(addr));	/* PCI Posting. */
 	}
 	agp_bridge->driver->tlb_flush(mem);
@@ -319,7 +320,7 @@ static int ati_remove_memory(struct agp_memory * mem, off_t pg_start,
 	return 0;
 }
 
-static int ati_create_gatt_table(void)
+static int ati_create_gatt_table(struct agp_bridge_data *bridge)
 {
 	struct aper_size_info_lvl2 *value;
 	ati_page_map page_dir;
@@ -342,7 +343,7 @@ static int ati_create_gatt_table(void)
 
 	agp_bridge->gatt_table_real = (u32 *)page_dir.real;
 	agp_bridge->gatt_table = (u32 __iomem *) page_dir.remapped;
-	agp_bridge->gatt_bus_addr = virt_to_bus(page_dir.real);
+	agp_bridge->gatt_bus_addr = virt_to_gart(page_dir.real);
 
 	/* Write out the size register */
 	current_size = A_SIZE_LVL2(agp_bridge->current_size);
@@ -372,7 +373,7 @@ static int ati_create_gatt_table(void)
 
 	/* Calculate the agp offset */
 	for(i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
-		writel(virt_to_bus(ati_generic_private.gatt_pages[i]->real) | 1,
+		writel(virt_to_gart(ati_generic_private.gatt_pages[i]->real) | 1,
 			page_dir.remapped+GET_PAGE_DIR_OFF(addr));
 		readl(page_dir.remapped+GET_PAGE_DIR_OFF(addr));	/* PCI Posting. */
 	}
@@ -380,7 +381,7 @@ static int ati_create_gatt_table(void)
 	return 0;
 }
 
-static int ati_free_gatt_table(void)
+static int ati_free_gatt_table(struct agp_bridge_data *bridge)
 {
 	ati_page_map page_dir;
 
@@ -392,7 +393,7 @@ static int ati_free_gatt_table(void)
 	return 0;
 }
 
-struct agp_bridge_driver ati_generic_bridge = {
+static struct agp_bridge_driver ati_generic_bridge = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= ati_generic_sizes,
 	.size_type		= LVL2_APER_SIZE,
@@ -531,7 +532,7 @@ static int __init agp_ati_init(void)
 {
 	if (agp_off)
 		return -EINVAL;
-	return pci_module_init(&agp_ati_pci_driver);
+	return pci_register_driver(&agp_ati_pci_driver);
 }
 
 static void __exit agp_ati_cleanup(void)

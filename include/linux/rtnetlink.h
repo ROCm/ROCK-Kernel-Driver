@@ -89,9 +89,13 @@ enum {
 	RTM_GETANYCAST	= 62,
 #define RTM_GETANYCAST	RTM_GETANYCAST
 
-	RTM_MAX,
-#define RTM_MAX		RTM_MAX
+	__RTM_MAX,
+#define RTM_MAX		(((__RTM_MAX + 3) & ~3) - 1)
 };
+
+#define RTM_NR_MSGTYPES	(RTM_MAX + 1 - RTM_BASE)
+#define RTM_NR_FAMILIES	(RTM_NR_MSGTYPES >> 2)
+#define RTM_FAM(cmd)	(((cmd) - RTM_BASE) >> 2)
 
 /* 
    Generic structure for encapsulation of optional route information.
@@ -250,6 +254,7 @@ enum rtattr_type_t
 	RTA_FLOW,
 	RTA_CACHEINFO,
 	RTA_SESSION,
+	RTA_MP_ALGO,
 	__RTA_MAX
 };
 
@@ -346,6 +351,7 @@ enum
 #define RTAX_FEATURE_ECN	0x00000001
 #define RTAX_FEATURE_SACK	0x00000002
 #define RTAX_FEATURE_TIMESTAMP	0x00000004
+#define RTAX_FEATURE_ALLFRAG	0x00000008
 
 struct rta_session
 {
@@ -446,6 +452,7 @@ enum
 	NDA_DST,
 	NDA_LLADDR,
 	NDA_CACHEINFO,
+	NDA_PROBES,
 	__NDA_MAX
 };
 
@@ -699,7 +706,6 @@ enum
 	TCA_RATE,
 	TCA_FCNT,
 	TCA_STATS2,
-	TCA_ACT_STATS,
 	__TCA_MAX
 };
 
@@ -779,6 +785,11 @@ extern void __rta_fill(struct sk_buff *skb, int attrtype, int attrlen, const voi
 		 goto rtattr_failure; \
    	__rta_fill(skb, attrtype, attrlen, data); }) 
 
+#define RTA_PUT_NOHDR(skb, attrlen, data) \
+({	if (unlikely(skb_tailroom(skb) < (int)(attrlen))) \
+		goto rtattr_failure; \
+	memcpy(skb_put(skb, RTA_ALIGN(attrlen)), data, attrlen); })
+		
 static inline struct rtattr *
 __rta_reserve(struct sk_buff *skb, int attrtype, int attrlen)
 {

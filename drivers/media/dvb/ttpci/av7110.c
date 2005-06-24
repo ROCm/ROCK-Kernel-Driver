@@ -2,7 +2,7 @@
  * driver for the SAA7146 based AV110 cards (like the Fujitsu-Siemens DVB)
  * av7110.c: initialization and demux stuff
  *
- * Copyright (C) 1999-2002 Ralph  Metzler 
+ * Copyright (C) 1999-2002 Ralph  Metzler
  *                       & Marcus Metzler for convergence integrated media GmbH
  *
  * originally based on code by:
@@ -12,19 +12,19 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
- * 
+ *
  *
  * the project's page is at http://www.linuxtv.org/dvb/
  */
@@ -75,9 +75,9 @@
 
 int av7110_debug;
 
-static int vidmode=CVBS_RGB_OUT;
+static int vidmode = CVBS_RGB_OUT;
 static int pids_off;
-static int adac=DVB_ADAC_TI;
+static int adac = DVB_ADAC_TI;
 static int hw_sections;
 static int rgb_on;
 static int volume = 255;
@@ -109,14 +109,14 @@ static int av7110_num = 0;
 {\
 	if (fe_func != NULL) { \
 		av7110_copy = fe_func; \
-	   	fe_func = av7110_func; \
+		fe_func = av7110_func; \
 	} \
 }
 
 
 static void init_av7110_av(struct av7110 *av7110)
 {
-	struct saa7146_dev *dev=av7110->dev;
+	struct saa7146_dev *dev = av7110->dev;
 
 	/* set internal volume control to maximum */
 	av7110->adac_type = DVB_ADAC_TI;
@@ -130,28 +130,28 @@ static void init_av7110_av(struct av7110 *av7110)
 	av7110->current_input = 0;
 	if (i2c_writereg(av7110, 0x20, 0x00, 0x00) == 1) {
 		printk ("dvb-ttpci: Crystal audio DAC @ card %d detected\n",
-			av7110->dvb_adapter->num);
+			av7110->dvb_adapter.num);
 		av7110->adac_type = DVB_ADAC_CRYSTAL;
 		i2c_writereg(av7110, 0x20, 0x01, 0xd2);
 		i2c_writereg(av7110, 0x20, 0x02, 0x49);
 		i2c_writereg(av7110, 0x20, 0x03, 0x00);
 		i2c_writereg(av7110, 0x20, 0x04, 0x00);
 
-	/**
-	 * some special handling for the Siemens DVB-C cards...
-	 */
+		/**
+		 * some special handling for the Siemens DVB-C cards...
+		 */
 	} else if (0 == av7110_init_analog_module(av7110)) {
 		/* done. */
 	}
 	else if (dev->pci->subsystem_vendor == 0x110a) {
 		printk("dvb-ttpci: DVB-C w/o analog module @ card %d detected\n",
-			av7110->dvb_adapter->num);
+			av7110->dvb_adapter.num);
 		av7110->adac_type = DVB_ADAC_NONE;
 	}
 	else {
 		av7110->adac_type = adac;
 		printk("dvb-ttpci: adac type set to %d @ card %d\n",
-			av7110->dvb_adapter->num, av7110->adac_type);
+			av7110->dvb_adapter.num, av7110->adac_type);
 	}
 
 	if (av7110->adac_type == DVB_ADAC_NONE || av7110->adac_type == DVB_ADAC_MSP) {
@@ -161,8 +161,8 @@ static void init_av7110_av(struct av7110 *av7110)
 		if (rgb_on &&
 		    (av7110->dev->pci->subsystem_vendor == 0x110a) && (av7110->dev->pci->subsystem_device == 0x0000)) {
 			saa7146_setgpio(dev, 1, SAA7146_GPIO_OUTHI); // RGB on, SCART pin 16
-		//saa7146_setgpio(dev, 3, SAA7146_GPIO_OUTLO); // SCARTpin 8
-	}
+			//saa7146_setgpio(dev, 3, SAA7146_GPIO_OUTLO); // SCARTpin 8
+		}
 	}
 
 	av7110_set_volume(av7110, av7110->mixer.volume_left, av7110->mixer.volume_right);
@@ -175,7 +175,7 @@ static void recover_arm(struct av7110 *av7110)
 
 	av7110_bootarm(av7110);
 	msleep(100);
-        restart_feeds(av7110);
+	restart_feeds(av7110);
 	av7110_fw_cmd(av7110, COMTYPE_PIDFILTER, SetIR, 1, av7110->ir_config);
 }
 
@@ -183,23 +183,32 @@ static void arm_error(struct av7110 *av7110)
 {
 	dprintk(4, "%p\n",av7110);
 
-        av7110->arm_errors++;
-        av7110->arm_ready=0;
-        recover_arm(av7110);
+	av7110->arm_errors++;
+	av7110->arm_ready = 0;
+	recover_arm(av7110);
+}
+
+static void av7110_arm_sync(struct av7110 *av7110)
+{
+	av7110->arm_rmmod = 1;
+	wake_up_interruptible(&av7110->arm_wait);
+
+	while (av7110->arm_thread)
+		msleep(1);
 }
 
 static int arm_thread(void *data)
 {
 	struct av7110 *av7110 = data;
-        u16 newloops = 0;
+	u16 newloops = 0;
 	int timeout;
 
 	dprintk(4, "%p\n",av7110);
-	
-        lock_kernel ();
-        daemonize ("arm_mon");
-        sigfillset (&current->blocked);
-        unlock_kernel ();
+
+        lock_kernel();
+        daemonize("arm_mon");
+        sigfillset(&current->blocked);
+        unlock_kernel();
 
 	av7110->arm_thread = current;
 
@@ -211,31 +220,31 @@ static int arm_thread(void *data)
 			break;
 		}
 
-                if (!av7110->arm_ready)
-                        continue;
+		if (!av7110->arm_ready)
+			continue;
 
-                if (down_interruptible(&av7110->dcomlock))
-                        break;
+		if (down_interruptible(&av7110->dcomlock))
+			break;
 
-                newloops=rdebi(av7110, DEBINOSWAP, STATUS_LOOPS, 0, 2);
-                up(&av7110->dcomlock);
+		newloops = rdebi(av7110, DEBINOSWAP, STATUS_LOOPS, 0, 2);
+		up(&av7110->dcomlock);
 
-                if (newloops==av7110->arm_loops) {
+		if (newloops == av7110->arm_loops) {
 			printk(KERN_ERR "dvb-ttpci: ARM crashed @ card %d\n",
-				av7110->dvb_adapter->num);
+			       av7110->dvb_adapter.num);
 
 			arm_error(av7110);
 			av7710_set_video_mode(av7110, vidmode);
 
 			init_av7110_av(av7110);
 
-                        if (down_interruptible(&av7110->dcomlock))
-                                break;
+			if (down_interruptible(&av7110->dcomlock))
+				break;
 
-                        newloops=rdebi(av7110, DEBINOSWAP, STATUS_LOOPS, 0, 2)-1;
-                        up(&av7110->dcomlock);
-                }
-                av7110->arm_loops=newloops;
+			newloops = rdebi(av7110, DEBINOSWAP, STATUS_LOOPS, 0, 2) - 1;
+			up(&av7110->dcomlock);
+		}
+		av7110->arm_loops = newloops;
 	}
 
 	av7110->arm_thread = NULL;
@@ -245,15 +254,15 @@ static int arm_thread(void *data)
 
 /**
  *  Hack! we save the last av7110 ptr. This should be ok, since
- *  you rarely will use more then one IR control. 
+ *  you rarely will use more then one IR control.
  *
  *  If we want to support multiple controls we would have to do much more...
  */
-void av7110_setup_irc_config (struct av7110 *av7110, u32 ir_config)
+void av7110_setup_irc_config(struct av7110 *av7110, u32 ir_config)
 {
 	static struct av7110 *last;
 
-	dprintk(4, "%p\n",av7110);
+	dprintk(4, "%p\n", av7110);
 
 	if (!av7110)
 		av7110 = last;
@@ -268,22 +277,22 @@ void av7110_setup_irc_config (struct av7110 *av7110, u32 ir_config)
 
 static void (*irc_handler)(u32);
 
-void av7110_register_irc_handler(void (*func)(u32)) 
+void av7110_register_irc_handler(void (*func)(u32))
 {
 	dprintk(4, "registering %p\n", func);
-        irc_handler = func;
+	irc_handler = func;
 }
 
-void av7110_unregister_irc_handler(void (*func)(u32)) 
+void av7110_unregister_irc_handler(void (*func)(u32))
 {
 	dprintk(4, "unregistering %p\n", func);
-        irc_handler = NULL;
+	irc_handler = NULL;
 }
 
 static void run_handlers(unsigned long ircom)
 {
-        if (irc_handler != NULL)
-                (*irc_handler)((u32) ircom);
+	if (irc_handler != NULL)
+		(*irc_handler)((u32) ircom);
 }
 
 static DECLARE_TASKLET(irtask, run_handlers, 0);
@@ -291,8 +300,8 @@ static DECLARE_TASKLET(irtask, run_handlers, 0);
 static void IR_handle(struct av7110 *av7110, u32 ircom)
 {
 	dprintk(4, "ircommand = %08x\n", ircom);
-        irtask.data = (unsigned long) ircom;
-        tasklet_schedule(&irtask);
+	irtask.data = (unsigned long) ircom;
+	tasklet_schedule(&irtask);
 }
 
 /****************************************************************************
@@ -300,51 +309,51 @@ static void IR_handle(struct av7110 *av7110, u32 ircom)
  ****************************************************************************/
 
 static int DvbDmxFilterCallback(u8 *buffer1, size_t buffer1_len,
-                     u8 * buffer2, size_t buffer2_len,
-                     struct dvb_demux_filter *dvbdmxfilter,
-                     enum dmx_success success,
-                     struct av7110 *av7110)
+				u8 *buffer2, size_t buffer2_len,
+				struct dvb_demux_filter *dvbdmxfilter,
+				enum dmx_success success,
+				struct av7110 *av7110)
 {
-        if (!dvbdmxfilter->feed->demux->dmx.frontend)
-                return 0;
-        if (dvbdmxfilter->feed->demux->dmx.frontend->source==DMX_MEMORY_FE)
-                return 0;
-        
-        switch(dvbdmxfilter->type) {
-        case DMX_TYPE_SEC:
-                if ((((buffer1[1]<<8)|buffer1[2])&0xfff)+3!=buffer1_len)
-                        return 0;
-                if (dvbdmxfilter->doneq) {
-                        struct dmx_section_filter *filter=&dvbdmxfilter->filter;
-                        int i;
-                        u8 xor, neq=0;
-                        
-                        for (i=0; i<DVB_DEMUX_MASK_MAX; i++) {
-                                xor=filter->filter_value[i]^buffer1[i];
-                                neq|=dvbdmxfilter->maskandnotmode[i]&xor;
-                        }
-                        if (!neq)
-                                return 0;
-                }
-                return dvbdmxfilter->feed->cb.sec(buffer1, buffer1_len,
+	if (!dvbdmxfilter->feed->demux->dmx.frontend)
+		return 0;
+	if (dvbdmxfilter->feed->demux->dmx.frontend->source == DMX_MEMORY_FE)
+		return 0;
+
+	switch (dvbdmxfilter->type) {
+	case DMX_TYPE_SEC:
+		if ((((buffer1[1] << 8) | buffer1[2]) & 0xfff) + 3 != buffer1_len)
+			return 0;
+		if (dvbdmxfilter->doneq) {
+			struct dmx_section_filter *filter = &dvbdmxfilter->filter;
+			int i;
+			u8 xor, neq = 0;
+
+			for (i = 0; i < DVB_DEMUX_MASK_MAX; i++) {
+				xor = filter->filter_value[i] ^ buffer1[i];
+				neq |= dvbdmxfilter->maskandnotmode[i] & xor;
+			}
+			if (!neq)
+				return 0;
+		}
+		return dvbdmxfilter->feed->cb.sec(buffer1, buffer1_len,
 						  buffer2, buffer2_len,
 						  &dvbdmxfilter->filter,
-						  DMX_OK); 
-        case DMX_TYPE_TS:
-                if (!(dvbdmxfilter->feed->ts_type & TS_PACKET)) 
-                        return 0;
-                if (dvbdmxfilter->feed->ts_type & TS_PAYLOAD_ONLY) 
-                        return dvbdmxfilter->feed->cb.ts(buffer1, buffer1_len,
-                                                         buffer2, buffer2_len,
-                                                         &dvbdmxfilter->feed->feed.ts,
-                                                         DMX_OK); 
-                else
+						  DMX_OK);
+	case DMX_TYPE_TS:
+		if (!(dvbdmxfilter->feed->ts_type & TS_PACKET))
+			return 0;
+		if (dvbdmxfilter->feed->ts_type & TS_PAYLOAD_ONLY)
+			return dvbdmxfilter->feed->cb.ts(buffer1, buffer1_len,
+							 buffer2, buffer2_len,
+							 &dvbdmxfilter->feed->feed.ts,
+							 DMX_OK);
+		else
 			av7110_p2t_write(buffer1, buffer1_len,
-                                  dvbdmxfilter->feed->pid, 
-                                  &av7110->p2t_filter[dvbdmxfilter->index]);
+					 dvbdmxfilter->feed->pid,
+					 &av7110->p2t_filter[dvbdmxfilter->index]);
 	default:
-	        return 0;
-        }
+		return 0;
+	}
 }
 
 
@@ -352,9 +361,9 @@ static int DvbDmxFilterCallback(u8 *buffer1, size_t buffer1_len,
 static inline void print_time(char *s)
 {
 #ifdef DEBUG_TIMING
-        struct timeval tv;
-        do_gettimeofday(&tv);
-        printk("%s: %d.%d\n", s, (int)tv.tv_sec, (int)tv.tv_usec);
+	struct timeval tv;
+	do_gettimeofday(&tv);
+	printk("%s: %d.%d\n", s, (int)tv.tv_sec, (int)tv.tv_usec);
 #endif
 }
 
@@ -379,129 +388,129 @@ static inline void start_debi_dma(struct av7110 *av7110, int dir,
 		irdebi(av7110, DEBISWAB, addr, 0, len);
 }
 
-static void debiirq (unsigned long data)
+static void debiirq(unsigned long data)
 {
-	struct av7110 *av7110 = (struct av7110*) data;
-        int type=av7110->debitype;
-        int handle=(type>>8)&0x1f;
+	struct av7110 *av7110 = (struct av7110 *) data;
+	int type = av7110->debitype;
+	int handle = (type >> 8) & 0x1f;
 	unsigned int xfer = 0;
 
-        print_time("debi");
+	print_time("debi");
 	dprintk(4, "type 0x%04x\n", type);
 
-        if (type==-1) {
+	if (type == -1) {
 		printk("DEBI irq oops @ %ld, psr:0x%08x, ssr:0x%08x\n",
 		       jiffies, saa7146_read(av7110->dev, PSR),
 		       saa7146_read(av7110->dev, SSR));
 		goto debi_done;
-        }
-        av7110->debitype=-1;
+	}
+	av7110->debitype = -1;
 
-        switch (type&0xff) {
+	switch (type & 0xff) {
 
-        case DATA_TS_RECORD:
-                dvb_dmx_swfilter_packets(&av7110->demux, 
-                                      (const u8 *)av7110->debi_virt, 
-                                      av7110->debilen/188);
+	case DATA_TS_RECORD:
+		dvb_dmx_swfilter_packets(&av7110->demux,
+					 (const u8 *) av7110->debi_virt,
+					 av7110->debilen / 188);
 		xfer = RX_BUFF;
 		break;
 
-        case DATA_PES_RECORD:
-                if (av7110->demux.recording) 
+	case DATA_PES_RECORD:
+		if (av7110->demux.recording)
 			av7110_record_cb(&av7110->p2t[handle],
-                                  (u8 *)av7110->debi_virt,
-                                  av7110->debilen);
+					 (u8 *) av7110->debi_virt,
+					 av7110->debilen);
 		xfer = RX_BUFF;
 		break;
 
-        case DATA_IPMPE:
-        case DATA_FSECTION:
-        case DATA_PIPING:
-                if (av7110->handle2filter[handle]) 
-                        DvbDmxFilterCallback((u8 *)av7110->debi_virt, 
-                                             av7110->debilen, NULL, 0, 
-                                             av7110->handle2filter[handle], 
-                                             DMX_OK, av7110); 
+	case DATA_IPMPE:
+	case DATA_FSECTION:
+	case DATA_PIPING:
+		if (av7110->handle2filter[handle])
+			DvbDmxFilterCallback((u8 *)av7110->debi_virt,
+					     av7110->debilen, NULL, 0,
+					     av7110->handle2filter[handle],
+					     DMX_OK, av7110);
 		xfer = RX_BUFF;
 		break;
 
-        case DATA_CI_GET:
-        {
-                u8 *data=av7110->debi_virt;
+	case DATA_CI_GET:
+	{
+		u8 *data = av7110->debi_virt;
 
-                if ((data[0]<2) && data[2]==0xff) {
-                        int flags=0;
-                        if (data[5]>0) 
-                                flags|=CA_CI_MODULE_PRESENT;
-                        if (data[5]>5) 
-                                flags|=CA_CI_MODULE_READY;
-                        av7110->ci_slot[data[0]].flags=flags;
-                } else
-                        ci_get_data(&av7110->ci_rbuffer, 
-                                    av7110->debi_virt, 
-                                    av7110->debilen);
+		if ((data[0] < 2) && data[2] == 0xff) {
+			int flags = 0;
+			if (data[5] > 0)
+				flags |= CA_CI_MODULE_PRESENT;
+			if (data[5] > 5)
+				flags |= CA_CI_MODULE_READY;
+			av7110->ci_slot[data[0]].flags = flags;
+		} else
+			ci_get_data(&av7110->ci_rbuffer,
+				    av7110->debi_virt,
+				    av7110->debilen);
 		xfer = RX_BUFF;
 		break;
-        }
+	}
 
-        case DATA_COMMON_INTERFACE:
-                CI_handle(av7110, (u8 *)av7110->debi_virt, av7110->debilen);
+	case DATA_COMMON_INTERFACE:
+		CI_handle(av7110, (u8 *)av7110->debi_virt, av7110->debilen);
 #if 0
-        {
-                int i;
+	{
+		int i;
 
-                printk("av7110%d: ", av7110->num);
-                printk("%02x ", *(u8 *)av7110->debi_virt);
-                printk("%02x ", *(1+(u8 *)av7110->debi_virt));
-                for (i=2; i<av7110->debilen; i++)
-                  printk("%02x ", (*(i+(unsigned char *)av7110->debi_virt)));
-                for (i=2; i<av7110->debilen; i++)
-                  printk("%c", chtrans(*(i+(unsigned char *)av7110->debi_virt)));
+		printk("av7110%d: ", av7110->num);
+		printk("%02x ", *(u8 *)av7110->debi_virt);
+		printk("%02x ", *(1+(u8 *)av7110->debi_virt));
+		for (i = 2; i < av7110->debilen; i++)
+			printk("%02x ", (*(i+(unsigned char *)av7110->debi_virt)));
+		for (i = 2; i < av7110->debilen; i++)
+			printk("%c", chtrans(*(i+(unsigned char *)av7110->debi_virt)));
 
-                printk("\n");
-        }
+		printk("\n");
+	}
 #endif
 		xfer = RX_BUFF;
 		break;
 
-        case DATA_DEBUG_MESSAGE:
-                ((s8*)av7110->debi_virt)[Reserved_SIZE-1]=0;
-                printk("%s\n", (s8 *)av7110->debi_virt);
+	case DATA_DEBUG_MESSAGE:
+		((s8*)av7110->debi_virt)[Reserved_SIZE - 1] = 0;
+		printk("%s\n", (s8 *) av7110->debi_virt);
 		xfer = RX_BUFF;
 		break;
 
-        case DATA_CI_PUT:
+	case DATA_CI_PUT:
 		dprintk(4, "debi DATA_CI_PUT\n");
-        case DATA_MPEG_PLAY:
+	case DATA_MPEG_PLAY:
 		dprintk(4, "debi DATA_MPEG_PLAY\n");
-        case DATA_BMP_LOAD:
+	case DATA_BMP_LOAD:
 		dprintk(4, "debi DATA_BMP_LOAD\n");
 		xfer = TX_BUFF;
 		break;
-        default:
-                break;
-        }
+	default:
+		break;
+	}
 debi_done:
-        spin_lock(&av7110->debilock);
+	spin_lock(&av7110->debilock);
 	if (xfer)
 		iwdebi(av7110, DEBINOSWAP, xfer, 0, 2);
-        ARM_ClearMailBox(av7110);
-        spin_unlock(&av7110->debilock);
+	ARM_ClearMailBox(av7110);
+	spin_unlock(&av7110->debilock);
 }
 
 /* irq from av7110 firmware writing the mailbox register in the DPRAM */
-static void gpioirq (unsigned long data)
+static void gpioirq(unsigned long data)
 {
-	struct av7110 *av7110 = (struct av7110*) data;
-        u32 rxbuf, txbuf;
-        int len;
-        
-        if (av7110->debitype !=-1)
+	struct av7110 *av7110 = (struct av7110 *) data;
+	u32 rxbuf, txbuf;
+	int len;
+
+	if (av7110->debitype != -1)
 		/* we shouldn't get any irq while a debi xfer is running */
 		printk("dvb-ttpci: GPIO0 irq oops @ %ld, psr:0x%08x, ssr:0x%08x\n",
 		       jiffies, saa7146_read(av7110->dev, PSR),
 		       saa7146_read(av7110->dev, SSR));
-       
+
 	if (saa7146_wait_for_debi_done(av7110->dev, 0)) {
 		printk(KERN_ERR "%s: saa7146_wait_for_debi_done timed out\n", __FUNCTION__);
 		BUG(); /* maybe we should try resetting the debi? */
@@ -511,37 +520,37 @@ static void gpioirq (unsigned long data)
 	ARM_ClearIrq(av7110);
 
 	/* see what the av7110 wants */
-        av7110->debitype = irdebi(av7110, DEBINOSWAP, IRQ_STATE, 0, 2);
-        av7110->debilen  = irdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
-        rxbuf=irdebi(av7110, DEBINOSWAP, RX_BUFF, 0, 2);
-        txbuf=irdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
+	av7110->debitype = irdebi(av7110, DEBINOSWAP, IRQ_STATE, 0, 2);
+	av7110->debilen  = irdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
+	rxbuf = irdebi(av7110, DEBINOSWAP, RX_BUFF, 0, 2);
+	txbuf = irdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
 	len = (av7110->debilen + 3) & ~3;
 
-        print_time("gpio");
+	print_time("gpio");
 	dprintk(8, "GPIO0 irq 0x%04x %d\n", av7110->debitype, av7110->debilen);
 
-        switch (av7110->debitype&0xff) {
+	switch (av7110->debitype & 0xff) {
 
-        case DATA_TS_PLAY:
-        case DATA_PES_PLAY:
-                break;
+	case DATA_TS_PLAY:
+	case DATA_PES_PLAY:
+		break;
 
 	case DATA_MPEG_VIDEO_EVENT:
 	{
 		u32 h_ar;
 		struct video_event event;
 
-                av7110->video_size.w = irdebi(av7110, DEBINOSWAP, STATUS_MPEG_WIDTH, 0, 2);
-                h_ar = irdebi(av7110, DEBINOSWAP, STATUS_MPEG_HEIGHT_AR, 0, 2);
+		av7110->video_size.w = irdebi(av7110, DEBINOSWAP, STATUS_MPEG_WIDTH, 0, 2);
+		h_ar = irdebi(av7110, DEBINOSWAP, STATUS_MPEG_HEIGHT_AR, 0, 2);
 
-                iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
-                iwdebi(av7110, DEBINOSWAP, RX_BUFF, 0, 2);
+		iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
+		iwdebi(av7110, DEBINOSWAP, RX_BUFF, 0, 2);
 
 		av7110->video_size.h = h_ar & 0xfff;
 		dprintk(8, "GPIO0 irq: DATA_MPEG_VIDEO_EVENT: w/h/ar = %u/%u/%u\n",
-				av7110->video_size.w,
-				av7110->video_size.h,
-				av7110->video_size.aspect_ratio);
+			av7110->video_size.w,
+			av7110->video_size.h,
+			av7110->video_size.aspect_ratio);
 
 		event.type = VIDEO_EVENT_SIZE_CHANGED;
 		event.u.size.w = av7110->video_size.w;
@@ -567,139 +576,139 @@ static void gpioirq (unsigned long data)
 		break;
 	}
 
-        case DATA_CI_PUT:
-        {
-                int avail;
-                struct dvb_ringbuffer *cibuf=&av7110->ci_wbuffer;
+	case DATA_CI_PUT:
+	{
+		int avail;
+		struct dvb_ringbuffer *cibuf = &av7110->ci_wbuffer;
 
-                avail=dvb_ringbuffer_avail(cibuf);
-                if (avail<=2) {
-                        iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
-                        iwdebi(av7110, DEBINOSWAP, TX_LEN, 0, 2);
-                        iwdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
-                        break;
-                } 
-                len= DVB_RINGBUFFER_PEEK(cibuf,0)<<8;
-                len|=DVB_RINGBUFFER_PEEK(cibuf,1);
-                if (avail<len+2) {
-                        iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
-                        iwdebi(av7110, DEBINOSWAP, TX_LEN, 0, 2);
-                        iwdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
-                        break;
-                } 
-                DVB_RINGBUFFER_SKIP(cibuf,2); 
+		avail = dvb_ringbuffer_avail(cibuf);
+		if (avail <= 2) {
+			iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
+			iwdebi(av7110, DEBINOSWAP, TX_LEN, 0, 2);
+			iwdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
+			break;
+		}
+		len = DVB_RINGBUFFER_PEEK(cibuf, 0) << 8;
+		len |= DVB_RINGBUFFER_PEEK(cibuf, 1);
+		if (avail < len + 2) {
+			iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
+			iwdebi(av7110, DEBINOSWAP, TX_LEN, 0, 2);
+			iwdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
+			break;
+		}
+		DVB_RINGBUFFER_SKIP(cibuf, 2);
 
-                dvb_ringbuffer_read(cibuf,av7110->debi_virt,len,0);
+		dvb_ringbuffer_read(cibuf, av7110->debi_virt, len, 0);
 
-                iwdebi(av7110, DEBINOSWAP, TX_LEN, len, 2);
-                iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, len, 2);
+		iwdebi(av7110, DEBINOSWAP, TX_LEN, len, 2);
+		iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, len, 2);
 		dprintk(8, "DMA: CI\n");
 		start_debi_dma(av7110, DEBI_WRITE, DPRAM_BASE + txbuf, len);
-                spin_unlock(&av7110->debilock);
+		spin_unlock(&av7110->debilock);
 		wake_up(&cibuf->queue);
-                return;
-        }
+		return;
+	}
 
-        case DATA_MPEG_PLAY:
-                if (!av7110->playing) {
-                        iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
-                        iwdebi(av7110, DEBINOSWAP, TX_LEN, 0, 2);
-                        iwdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
-                        break;
-                }
-                len=0;
-                if (av7110->debitype&0x100) {
-                        spin_lock(&av7110->aout.lock);
-			len=av7110_pes_play(av7110->debi_virt, &av7110->aout, 2048);
-                        spin_unlock(&av7110->aout.lock);
-                }
-                if (len<=0 && (av7110->debitype&0x200)
-                        &&av7110->videostate.play_state!=VIDEO_FREEZED) {
-                        spin_lock(&av7110->avout.lock);
-			len=av7110_pes_play(av7110->debi_virt, &av7110->avout, 2048);
-                        spin_unlock(&av7110->avout.lock);
-                }
-                if (len<=0) {
-                        iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
-                        iwdebi(av7110, DEBINOSWAP, TX_LEN, 0, 2);
-                        iwdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
-                        break;
-                } 
+	case DATA_MPEG_PLAY:
+		if (!av7110->playing) {
+			iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
+			iwdebi(av7110, DEBINOSWAP, TX_LEN, 0, 2);
+			iwdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
+			break;
+		}
+		len = 0;
+		if (av7110->debitype & 0x100) {
+			spin_lock(&av7110->aout.lock);
+			len = av7110_pes_play(av7110->debi_virt, &av7110->aout, 2048);
+			spin_unlock(&av7110->aout.lock);
+		}
+		if (len <= 0 && (av7110->debitype & 0x200)
+		    &&av7110->videostate.play_state != VIDEO_FREEZED) {
+			spin_lock(&av7110->avout.lock);
+			len = av7110_pes_play(av7110->debi_virt, &av7110->avout, 2048);
+			spin_unlock(&av7110->avout.lock);
+		}
+		if (len <= 0) {
+			iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
+			iwdebi(av7110, DEBINOSWAP, TX_LEN, 0, 2);
+			iwdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
+			break;
+		}
 		dprintk(8, "GPIO0 PES_PLAY len=%04x\n", len);
-                iwdebi(av7110, DEBINOSWAP, TX_LEN, len, 2);
-                iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, len, 2);
+		iwdebi(av7110, DEBINOSWAP, TX_LEN, len, 2);
+		iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, len, 2);
 		dprintk(8, "DMA: MPEG_PLAY\n");
 		start_debi_dma(av7110, DEBI_WRITE, DPRAM_BASE + txbuf, len);
-                spin_unlock(&av7110->debilock);
-                return;
+		spin_unlock(&av7110->debilock);
+		return;
 
-        case DATA_BMP_LOAD:
-                len=av7110->debilen;
+	case DATA_BMP_LOAD:
+		len = av7110->debilen;
 		dprintk(8, "gpio DATA_BMP_LOAD len %d\n", len);
-                if (!len) {
-                        av7110->bmp_state=BMP_LOADED;
-                        iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
-                        iwdebi(av7110, DEBINOSWAP, TX_LEN, 0, 2);
-                        iwdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
-                        wake_up(&av7110->bmpq);
+		if (!len) {
+			av7110->bmp_state = BMP_LOADED;
+			iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, 0, 2);
+			iwdebi(av7110, DEBINOSWAP, TX_LEN, 0, 2);
+			iwdebi(av7110, DEBINOSWAP, TX_BUFF, 0, 2);
+			wake_up(&av7110->bmpq);
 			dprintk(8, "gpio DATA_BMP_LOAD done\n");
-                        break;
-                }
-                if (len>av7110->bmplen)
-                        len=av7110->bmplen;
-                if (len>2*1024)
-                        len=2*1024;
-                iwdebi(av7110, DEBINOSWAP, TX_LEN, len, 2);
-                iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, len, 2);
-                memcpy(av7110->debi_virt, av7110->bmpbuf+av7110->bmpp, len);
-                av7110->bmpp+=len;
-                av7110->bmplen-=len;
+			break;
+		}
+		if (len > av7110->bmplen)
+			len = av7110->bmplen;
+		if (len > 2 * 1024)
+			len = 2 * 1024;
+		iwdebi(av7110, DEBINOSWAP, TX_LEN, len, 2);
+		iwdebi(av7110, DEBINOSWAP, IRQ_STATE_EXT, len, 2);
+		memcpy(av7110->debi_virt, av7110->bmpbuf+av7110->bmpp, len);
+		av7110->bmpp += len;
+		av7110->bmplen -= len;
 		dprintk(8, "gpio DATA_BMP_LOAD DMA len %d\n", len);
 		start_debi_dma(av7110, DEBI_WRITE, DPRAM_BASE+txbuf, len);
-                spin_unlock(&av7110->debilock);
-                return;
+		spin_unlock(&av7110->debilock);
+		return;
 
-        case DATA_CI_GET:
-        case DATA_COMMON_INTERFACE:
-        case DATA_FSECTION:
-        case DATA_IPMPE:
-        case DATA_PIPING:
-                if (!len || len>4*1024) {
-                        iwdebi(av7110, DEBINOSWAP, RX_BUFF, 0, 2);
-                        break;
+	case DATA_CI_GET:
+	case DATA_COMMON_INTERFACE:
+	case DATA_FSECTION:
+	case DATA_IPMPE:
+	case DATA_PIPING:
+		if (!len || len > 4 * 1024) {
+			iwdebi(av7110, DEBINOSWAP, RX_BUFF, 0, 2);
+			break;
 		}
 		/* fall through */
 
-        case DATA_TS_RECORD:
-        case DATA_PES_RECORD:
+	case DATA_TS_RECORD:
+	case DATA_PES_RECORD:
 		dprintk(8, "DMA: TS_REC etc.\n");
 		start_debi_dma(av7110, DEBI_READ, DPRAM_BASE+rxbuf, len);
-                spin_unlock(&av7110->debilock);
-                return;
+		spin_unlock(&av7110->debilock);
+		return;
 
-        case DATA_DEBUG_MESSAGE:
-                if (!len || len>0xff) {
-                        iwdebi(av7110, DEBINOSWAP, RX_BUFF, 0, 2);
-                        break;
-                }
+	case DATA_DEBUG_MESSAGE:
+		if (!len || len > 0xff) {
+			iwdebi(av7110, DEBINOSWAP, RX_BUFF, 0, 2);
+			break;
+		}
 		start_debi_dma(av7110, DEBI_READ, Reserved, len);
-                spin_unlock(&av7110->debilock);
-                return;
+		spin_unlock(&av7110->debilock);
+		return;
 
-        case DATA_IRCOMMAND: 
-                IR_handle(av7110, 
-                          swahw32(irdebi(av7110, DEBINOSWAP, Reserved, 0, 4)));
-                iwdebi(av7110, DEBINOSWAP, RX_BUFF, 0, 2);
-                break;
+	case DATA_IRCOMMAND:
+		IR_handle(av7110,
+			  swahw32(irdebi(av7110, DEBINOSWAP, Reserved, 0, 4)));
+		iwdebi(av7110, DEBINOSWAP, RX_BUFF, 0, 2);
+		break;
 
-        default:
+	default:
 		printk("dvb-ttpci: gpioirq unknown type=%d len=%d\n",
-                       av7110->debitype, av7110->debilen);
-                break;
-        }      
-        av7110->debitype=-1;
+		       av7110->debitype, av7110->debilen);
+		break;
+	}
+	av7110->debitype = -1;
 	ARM_ClearMailBox(av7110);
-        spin_unlock(&av7110->debilock);
+	spin_unlock(&av7110->debilock);
 }
 
 
@@ -718,7 +727,7 @@ static int dvb_osd_ioctl(struct inode *inode, struct file *file,
 		return av7110_osd_capability(av7110, (osd_cap_t *) parg);
 
 	return -EINVAL;
-        }
+}
 
 
 static struct file_operations dvb_osd_fops = {
@@ -740,7 +749,7 @@ static struct dvb_device dvbdev_osd = {
 
 static inline int SetPIDs(struct av7110 *av7110, u16 vpid, u16 apid, u16 ttpid,
 			  u16 subpid, u16 pcrpid)
-        {
+{
 	dprintk(4, "%p\n", av7110);
 
 	if (vpid == 0x1fff || apid == 0x1fff ||
@@ -760,7 +769,7 @@ void ChangePIDs(struct av7110 *av7110, u16 vpid, u16 apid, u16 ttpid,
 		u16 subpid, u16 pcrpid)
 {
 	dprintk(4, "%p\n", av7110);
-        
+
 	if (down_interruptible(&av7110->pid_mutex))
 		return;
 
@@ -772,13 +781,13 @@ void ChangePIDs(struct av7110 *av7110, u16 vpid, u16 apid, u16 ttpid,
 		av7110->pids[DMX_PES_TELETEXT] = ttpid;
 	if (!(pcrpid & 0x8000))
 		av7110->pids[DMX_PES_PCR] = pcrpid;
-	
+
 	av7110->pids[DMX_PES_SUBTITLE] = 0;
 
 	if (av7110->fe_synced) {
 		pcrpid = av7110->pids[DMX_PES_PCR];
 		SetPIDs(av7110, vpid, apid, ttpid, subpid, pcrpid);
-        }
+	}
 
 	up(&av7110->pid_mutex);
 }
@@ -795,8 +804,8 @@ static int StartHWFilter(struct dvb_demux_filter *dvbdmxfilter)
 	u16 buf[20];
 	int ret, i;
 	u16 handle;
-//	u16 mode=0x0320;
-	u16 mode=0xb96a;
+//	u16 mode = 0x0320;
+	u16 mode = 0xb96a;
 
 	dprintk(4, "%p\n", av7110);
 
@@ -809,11 +818,11 @@ static int StartHWFilter(struct dvb_demux_filter *dvbdmxfilter)
 					(dvbdmxfilter->filter.filter_value[i] << 8) |
 					dvbdmxfilter->maskandmode[i];
 			mode = 4;
-                }
+		}
 	} else if ((dvbdmxfeed->ts_type & TS_PACKET) &&
 		   !(dvbdmxfeed->ts_type & TS_PAYLOAD_ONLY)) {
 		av7110_p2t_init(&av7110->p2t_filter[dvbdmxfilter->index], dvbdmxfeed);
-        }
+	}
 
 	buf[0] = (COMTYPE_PID_FILTER << 8) + AddPIDFilter;
 	buf[1] = 16;
@@ -828,13 +837,13 @@ static int StartHWFilter(struct dvb_demux_filter *dvbdmxfilter)
 				ret, handle);
 		dvbdmxfilter->hw_handle = 0xffff;
 		return -1;
-        }
+	}
 
 	av7110->handle2filter[handle] = dvbdmxfilter;
 	dvbdmxfilter->hw_handle = handle;
 
 	return ret;
-                }
+}
 
 static int StopHWFilter(struct dvb_demux_filter *dvbdmxfilter)
 {
@@ -843,7 +852,7 @@ static int StopHWFilter(struct dvb_demux_filter *dvbdmxfilter)
 	u16 answ[2];
 	int ret;
 	u16 handle;
-        
+
 	dprintk(4, "%p\n", av7110);
 
 	handle = dvbdmxfilter->hw_handle;
@@ -851,7 +860,7 @@ static int StopHWFilter(struct dvb_demux_filter *dvbdmxfilter)
 		printk("%s tried to stop invalid filter %04x, filter type = %x\n",
 				__FUNCTION__, handle, dvbdmxfilter->type);
 		return 0;
-                }
+	}
 
 	av7110->handle2filter[handle] = NULL;
 
@@ -865,8 +874,8 @@ static int StopHWFilter(struct dvb_demux_filter *dvbdmxfilter)
 				__FUNCTION__, buf[0], buf[1], buf[2], ret,
 				answ[0], answ[1], dvbdmxfilter->feed->pid);
 		ret = -1;
-        }
-        return ret;
+	}
+	return ret;
 }
 
 
@@ -890,7 +899,7 @@ static void dvb_feed_start_pid(struct dvb_demux_feed *dvbdmxfeed)
 	}
 	if (dvbdmxfeed->pes_type <= 2 || dvbdmxfeed->pes_type == 4)
 		ChangePIDs(av7110, npids[1], npids[0], npids[2], npids[3], npids[4]);
-        
+
 	if (dvbdmxfeed->pes_type < 2 && npids[0])
 		if (av7110->fe_synced)
 			av7110_fw_cmd(av7110, COMTYPE_PIDFILTER, Scan, 0);
@@ -902,16 +911,16 @@ static void dvb_feed_start_pid(struct dvb_demux_feed *dvbdmxfeed)
 			av7110_av_start_record(av7110, RP_VIDEO, dvbdmxfeed);
 	}
 }
-                
+
 static void dvb_feed_stop_pid(struct dvb_demux_feed *dvbdmxfeed)
 {
 	struct dvb_demux *dvbdmx = dvbdmxfeed->demux;
 	struct av7110 *av7110 = (struct av7110 *) dvbdmx->priv;
 	u16 *pid = dvbdmx->pids, npids[5];
 	int i;
-                
+
 	dprintk(4, "%p\n", av7110);
-                
+
 	if (dvbdmxfeed->pes_type <= 1) {
 		av7110_av_stop(av7110, dvbdmxfeed->pes_type ?  RP_VIDEO : RP_AUDIO);
 		if (!av7110->rec_mode)
@@ -926,31 +935,31 @@ static void dvb_feed_stop_pid(struct dvb_demux_feed *dvbdmxfeed)
 		if (dvbdmxfeed->ts_type & TS_PACKET)
 			StopHWFilter(dvbdmxfeed->filter);
 		npids[2] = 0;
-                break;
+		break;
 	case 0:
 	case 1:
 	case 4:
 		if (!pids_off)
 			return;
 		npids[i] = (pid[i]&0x8000) ? 0 : pid[i];
-                break;
-        }
+		break;
+	}
 	ChangePIDs(av7110, npids[1], npids[0], npids[2], npids[3], npids[4]);
 }
-        
+
 static int av7110_start_feed(struct dvb_demux_feed *feed)
 {
 	struct dvb_demux *demux = feed->demux;
 	struct av7110 *av7110 = demux->priv;
-                
+
 	dprintk(4, "%p\n", av7110);
-                
+
 	if (!demux->dmx.frontend)
 		return -EINVAL;
-                        
+
 	if (feed->pid > 0x1fff)
 		return -EINVAL;
-                        
+
 	if (feed->type == DMX_TYPE_TS) {
 		if ((feed->ts_type & TS_DECODER) &&
 		    (feed->pes_type < DMX_TS_PES_OTHER)) {
@@ -965,17 +974,17 @@ static int av7110_start_feed(struct dvb_demux_feed *feed)
 					       av7110_av_start_play(av7110,RP_AV);
 					       demux->playing = 1;
 					}
-                        break;
-                default:
+				break;
+			default:
 				dvb_feed_start_pid(feed);
-                        break;
-                }
+				break;
+			}
 		} else if ((feed->ts_type & TS_PACKET) &&
 			   (demux->dmx.frontend->source != DMX_MEMORY_FE)) {
 			StartHWFilter(feed->filter);
 		}
 	}
-                
+
 	if (feed->type == DMX_TYPE_SEC) {
 		int i;
 
@@ -989,8 +998,8 @@ static int av7110_start_feed(struct dvb_demux_feed *feed)
 			demux->filter[i].state = DMX_STATE_GO;
 			if (demux->dmx.frontend->source != DMX_MEMORY_FE)
 				StartHWFilter(&demux->filter[i]);
-        }
-        }
+		}
+	}
 
 	return 0;
 }
@@ -1023,7 +1032,7 @@ static int av7110_stop_feed(struct dvb_demux_feed *feed)
 	if (feed->type == DMX_TYPE_SEC) {
 		int i;
 
-		for (i=0; i<demux->filternum; i++)
+		for (i = 0; i<demux->filternum; i++)
 			if (demux->filter[i].state == DMX_STATE_GO &&
 			    demux->filter[i].filter.parent == &feed->feed.sec) {
 				demux->filter[i].state = DMX_STATE_READY;
@@ -1032,7 +1041,7 @@ static int av7110_stop_feed(struct dvb_demux_feed *feed)
 		}
 	}
 
-        return 0;
+	return 0;
 }
 
 
@@ -1085,14 +1094,14 @@ static int dvb_get_stc(struct dmx_demux *demux, unsigned int num,
 	if (ret) {
 		printk(KERN_ERR "%s: av7110_fw_request error\n", __FUNCTION__);
 		return -EIO;
-}
+	}
 	dprintk(2, "fwstc = %04hx %04hx %04hx %04hx\n",
 		fwstc[0], fwstc[1], fwstc[2], fwstc[3]);
 
 	*stc =	(((uint64_t) ((fwstc[3] & 0x8000) >> 15)) << 32) |
 		(((uint64_t)  fwstc[1]) << 16) | ((uint64_t) fwstc[0]);
 	*base = 1;
-        
+
 	dprintk(4, "stc = %lu\n", (unsigned long)*stc);
 
 	return 0;
@@ -1109,15 +1118,16 @@ static int av7110_set_tone(struct dvb_frontend* fe, fe_sec_tone_mode_t tone)
 	struct av7110* av7110 = (struct av7110*) fe->dvb->priv;
 
 	switch (tone) {
-		case SEC_TONE_ON:
-			Set22K(av7110, 1);
-			break;
-		case SEC_TONE_OFF:
-			Set22K(av7110, 0);
-			break;
+	case SEC_TONE_ON:
+		Set22K(av7110, 1);
+		break;
 
-		default:
-			return -EINVAL;
+	case SEC_TONE_OFF:
+		Set22K(av7110, 0);
+		break;
+
+	default:
+		return -EINVAL;
 	}
 
 	return 0;
@@ -1241,21 +1251,21 @@ static void vpeirq(unsigned long data)
 
 static int av7110_register(struct av7110 *av7110)
 {
-        int ret, i;
-        struct dvb_demux *dvbdemux=&av7110->demux;
+	int ret, i;
+	struct dvb_demux *dvbdemux = &av7110->demux;
 	struct dvb_demux *dvbdemux1 = &av7110->demux1;
 
 	dprintk(4, "%p\n", av7110);
 
-        if (av7110->registered)
-                return -1;
+	if (av7110->registered)
+		return -1;
 
-        av7110->registered=1;
+	av7110->registered = 1;
 
-        dvbdemux->priv = (void *) av7110;
+	dvbdemux->priv = (void *) av7110;
 
-	for (i=0; i<32; i++)
-		av7110->handle2filter[i]=NULL;
+	for (i = 0; i < 32; i++)
+		av7110->handle2filter[i] = NULL;
 
 	dvbdemux->filternum = 32;
 	dvbdemux->feednum = 32;
@@ -1271,37 +1281,37 @@ static int av7110_register(struct av7110 *av7110)
 	av7110->dmxdev.filternum = 32;
 	av7110->dmxdev.demux = &dvbdemux->dmx;
 	av7110->dmxdev.capabilities = 0;
-        
-	dvb_dmxdev_init(&av7110->dmxdev, av7110->dvb_adapter);
 
-        av7110->hw_frontend.source = DMX_FRONTEND_0;
+	dvb_dmxdev_init(&av7110->dmxdev, &av7110->dvb_adapter);
 
-        ret = dvbdemux->dmx.add_frontend(&dvbdemux->dmx, &av7110->hw_frontend);
+	av7110->hw_frontend.source = DMX_FRONTEND_0;
 
-        if (ret < 0)
-                return ret;
-        
-        av7110->mem_frontend.source = DMX_MEMORY_FE;
+	ret = dvbdemux->dmx.add_frontend(&dvbdemux->dmx, &av7110->hw_frontend);
+
+	if (ret < 0)
+		return ret;
+
+	av7110->mem_frontend.source = DMX_MEMORY_FE;
 
 	ret = dvbdemux->dmx.add_frontend(&dvbdemux->dmx, &av7110->mem_frontend);
 
 	if (ret < 0)
-                return ret;
-        
-        ret = dvbdemux->dmx.connect_frontend(&dvbdemux->dmx, 
+		return ret;
+
+	ret = dvbdemux->dmx.connect_frontend(&dvbdemux->dmx,
 					     &av7110->hw_frontend);
-        if (ret < 0)
-                return ret;
+	if (ret < 0)
+		return ret;
 
 	av7110_av_register(av7110);
 	av7110_ca_register(av7110);
 
 #ifdef CONFIG_DVB_AV7110_OSD
-	dvb_register_device(av7110->dvb_adapter, &av7110->osd_dev,
+	dvb_register_device(&av7110->dvb_adapter, &av7110->osd_dev,
 			    &dvbdev_osd, av7110, DVB_DEVICE_OSD);
 #endif
-        
-        dvb_net_init(av7110->dvb_adapter, &av7110->dvb_net, &dvbdemux->dmx);
+
+	dvb_net_init(&av7110->dvb_adapter, &av7110->dvb_net, &dvbdemux->dmx);
 
 	if (budgetpatch) {
 		/* initialize software demux1 without its own frontend
@@ -1324,9 +1334,9 @@ static int av7110_register(struct av7110 *av7110)
 		av7110->dmxdev1.demux = &dvbdemux1->dmx;
 		av7110->dmxdev1.capabilities = 0;
 
-		dvb_dmxdev_init(&av7110->dmxdev1, av7110->dvb_adapter);
+		dvb_dmxdev_init(&av7110->dmxdev1, &av7110->dvb_adapter);
 
-		dvb_net_init(av7110->dvb_adapter, &av7110->dvb_net1, &dvbdemux1->dmx);
+		dvb_net_init(&av7110->dvb_adapter, &av7110->dvb_net1, &dvbdemux1->dmx);
 		printk("dvb-ttpci: additional demux1 for budget-patch registered\n");
 	}
 	return 0;
@@ -1335,13 +1345,13 @@ static int av7110_register(struct av7110 *av7110)
 
 static void dvb_unregister(struct av7110 *av7110)
 {
-        struct dvb_demux *dvbdemux=&av7110->demux;
+	struct dvb_demux *dvbdemux = &av7110->demux;
 	struct dvb_demux *dvbdemux1 = &av7110->demux1;
 
 	dprintk(4, "%p\n", av7110);
 
-        if (!av7110->registered)
-                return;
+	if (!av7110->registered)
+		return;
 
 	if (budgetpatch) {
 		dvb_net_release(&av7110->dvb_net1);
@@ -1353,11 +1363,11 @@ static void dvb_unregister(struct av7110 *av7110)
 	dvb_net_release(&av7110->dvb_net);
 
 	dvbdemux->dmx.close(&dvbdemux->dmx);
-        dvbdemux->dmx.remove_frontend(&dvbdemux->dmx, &av7110->hw_frontend);
-        dvbdemux->dmx.remove_frontend(&dvbdemux->dmx, &av7110->mem_frontend);
+	dvbdemux->dmx.remove_frontend(&dvbdemux->dmx, &av7110->hw_frontend);
+	dvbdemux->dmx.remove_frontend(&dvbdemux->dmx, &av7110->mem_frontend);
 
-        dvb_dmxdev_release(&av7110->dmxdev);
-        dvb_dmx_release(&av7110->demux);
+	dvb_dmxdev_release(&av7110->dmxdev);
+	dvb_dmx_release(&av7110->demux);
 
 	if (av7110->fe != NULL)
 		dvb_unregister_frontend(av7110->fe);
@@ -1375,7 +1385,7 @@ int i2c_writereg(struct av7110 *av7110, u8 id, u8 reg, u8 val)
 {
 	u8 msg[2] = { reg, val };
 	struct i2c_msg msgs;
-	
+
 	msgs.flags = 0;
 	msgs.addr = id / 2;
 	msgs.len = 2;
@@ -1411,10 +1421,10 @@ static int check_firmware(struct av7110* av7110)
 {
 	u32 crc = 0, len = 0;
 	unsigned char *ptr;
-		
+
 	/* check for firmware magic */
 	ptr = av7110->bin_fw;
-	if (ptr[0] != 'A' || ptr[1] != 'V' || 
+	if (ptr[0] != 'A' || ptr[1] != 'V' ||
 	    ptr[2] != 'F' || ptr[3] != 'W') {
 		printk("dvb-ttpci: this is not an av7110 firmware\n");
 		return -EINVAL;
@@ -1422,34 +1432,34 @@ static int check_firmware(struct av7110* av7110)
 	ptr += 4;
 
 	/* check dpram file */
-	crc = ntohl(*(u32*)ptr);
+	crc = ntohl(*(u32*) ptr);
 	ptr += 4;
-	len = ntohl(*(u32*)ptr);
+	len = ntohl(*(u32*) ptr);
 	ptr += 4;
 	if (len >= 512) {
 		printk("dvb-ttpci: dpram file is way to big.\n");
 		return -EINVAL;
 	}
-	if( crc != crc32_le(0,ptr,len)) {
+	if (crc != crc32_le(0, ptr, len)) {
 		printk("dvb-ttpci: crc32 of dpram file does not match.\n");
 		return -EINVAL;
 	}
 	av7110->bin_dpram = ptr;
 	av7110->size_dpram = len;
 	ptr += len;
-	
+
 	/* check root file */
-	crc = ntohl(*(u32*)ptr);
+	crc = ntohl(*(u32*) ptr);
 	ptr += 4;
-	len = ntohl(*(u32*)ptr);
+	len = ntohl(*(u32*) ptr);
 	ptr += 4;
-	
+
 	if (len <= 200000 || len >= 300000 ||
 	    len > ((av7110->bin_fw + av7110->size_fw) - ptr)) {
-		printk("dvb-ttpci: root file has strange size (%d). aborting.\n",len);
+		printk("dvb-ttpci: root file has strange size (%d). aborting.\n", len);
 		return -EINVAL;
 	}
-	if( crc != crc32_le(0,ptr,len)) {
+	if( crc != crc32_le(0, ptr, len)) {
 		printk("dvb-ttpci: crc32 of root file does not match.\n");
 		return -EINVAL;
 	}
@@ -1460,6 +1470,11 @@ static int check_firmware(struct av7110* av7110)
 
 #ifdef CONFIG_DVB_AV7110_FIRMWARE_FILE
 #include "av7110_firm.h"
+static void put_firmware(struct av7110* av7110)
+{
+	av7110->bin_fw = NULL;
+}
+
 static inline int get_firmware(struct av7110* av7110)
 {
 	av7110->bin_fw = dvb_ttpci_fw;
@@ -1467,6 +1482,11 @@ static inline int get_firmware(struct av7110* av7110)
 	return check_firmware(av7110);
 }
 #else
+static void put_firmware(struct av7110* av7110)
+{
+	vfree(av7110->bin_fw);
+}
+
 static int get_firmware(struct av7110* av7110)
 {
 	int ret;
@@ -1495,7 +1515,7 @@ static int get_firmware(struct av7110* av7110)
 	}
 
 	/* check if the firmware is available */
-	av7110->bin_fw = (unsigned char*) vmalloc(fw->size);
+	av7110->bin_fw = (unsigned char *) vmalloc(fw->size);
 	if (NULL == av7110->bin_fw) {
 		dprintk(1, "out of memory\n");
 		release_firmware(fw);
@@ -1603,11 +1623,11 @@ static int alps_bsru6_set_symbol_rate(struct dvb_frontend* fe, u32 srate, u32 ra
 	else if (srate < 30000000) { aclk = 0xb6; bclk = 0x53; }
 	else if (srate < 45000000) { aclk = 0xb4; bclk = 0x51; }
 
-	stv0299_writereg (fe, 0x13, aclk);
-	stv0299_writereg (fe, 0x14, bclk);
-	stv0299_writereg (fe, 0x1f, (ratio >> 16) & 0xff);
-	stv0299_writereg (fe, 0x20, (ratio >>  8) & 0xff);
-	stv0299_writereg (fe, 0x21, (ratio      ) & 0xf0);
+	stv0299_writereg(fe, 0x13, aclk);
+	stv0299_writereg(fe, 0x14, bclk);
+	stv0299_writereg(fe, 0x1f, (ratio >> 16) & 0xff);
+	stv0299_writereg(fe, 0x20, (ratio >>  8) & 0xff);
+	stv0299_writereg(fe, 0x21, (ratio      ) & 0xf0);
 
 	return 0;
 }
@@ -1631,7 +1651,7 @@ static int alps_bsru6_pll_set(struct dvb_frontend* fe, struct dvb_frontend_param
 
 	if (params->frequency > 1530000) data[3] = 0xc0;
 
-	ret = i2c_transfer (&av7110->i2c_adap, &msg, 1);
+	ret = i2c_transfer(&av7110->i2c_adap, &msg, 1);
 	if (ret != 1)
 		return -EIO;
 	return 0;
@@ -1653,6 +1673,106 @@ static struct stv0299_config alps_bsru6_config = {
 };
 
 
+static u8 alps_bsbe1_inittab[] = {
+	0x01, 0x15,
+	0x02, 0x30,
+	0x03, 0x00,
+	0x04, 0x7d,   /* F22FR = 0x7d, F22 = f_VCO / 128 / 0x7d = 22 kHz */
+	0x05, 0x35,   /* I2CT = 0, SCLT = 1, SDAT = 1 */
+	0x06, 0x40,   /* DAC not used, set to high impendance mode */
+	0x07, 0x00,   /* DAC LSB */
+	0x08, 0x40,   /* DiSEqC off, LNB power on OP2/LOCK pin on */
+	0x09, 0x00,   /* FIFO */
+	0x0c, 0x51,   /* OP1 ctl = Normal, OP1 val = 1 (LNB Power ON) */
+	0x0d, 0x82,   /* DC offset compensation = ON, beta_agc1 = 2 */
+	0x0e, 0x23,   /* alpha_tmg = 2, beta_tmg = 3 */
+	0x10, 0x3f,   // AGC2  0x3d
+	0x11, 0x84,
+	0x12, 0xb5,   // Lock detect: -64  Carrier freq detect:on
+	0x15, 0xc9,   // lock detector threshold
+	0x16, 0x00,
+	0x17, 0x00,
+	0x18, 0x00,
+	0x19, 0x00,
+	0x1a, 0x00,
+	0x1f, 0x50,
+	0x20, 0x00,
+	0x21, 0x00,
+	0x22, 0x00,
+	0x23, 0x00,
+	0x28, 0x00,  // out imp: normal  out type: parallel FEC mode:0
+	0x29, 0x1e,  // 1/2 threshold
+	0x2a, 0x14,  // 2/3 threshold
+	0x2b, 0x0f,  // 3/4 threshold
+	0x2c, 0x09,  // 5/6 threshold
+	0x2d, 0x05,  // 7/8 threshold
+	0x2e, 0x01,
+	0x31, 0x1f,  // test all FECs
+	0x32, 0x19,  // viterbi and synchro search
+	0x33, 0xfc,  // rs control
+	0x34, 0x93,  // error control
+	0x0f, 0x92,
+	0xff, 0xff
+};
+
+static int alps_bsbe1_pll_set(struct dvb_frontend* fe, struct dvb_frontend_parameters* params)
+{
+	struct av7110* av7110 = (struct av7110*) fe->dvb->priv;
+	int ret;
+	u8 data[4];
+	u32 div;
+	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = sizeof(data) };
+
+	if ((params->frequency < 950000) || (params->frequency > 2150000))
+		return -EINVAL;
+
+	div = (params->frequency + (125 - 1)) / 125; // round correctly
+	data[0] = (div >> 8) & 0x7f;
+	data[1] = div & 0xff;
+	data[2] = 0x80 | ((div & 0x18000) >> 10) | 4;
+	data[3] = (params->frequency > 1530000) ? 0xE0 : 0xE4;
+
+	ret = i2c_transfer(&av7110->i2c_adap, &msg, 1);
+	return (ret != 1) ? -EIO : 0;
+}
+
+static struct stv0299_config alps_bsbe1_config = {
+	.demod_address = 0x68,
+	.inittab = alps_bsbe1_inittab,
+	.mclk = 88000000UL,
+	.invert = 1,
+	.enhanced_tuning = 0,
+	.skip_reinit = 0,
+	.min_delay_ms = 100,
+	.set_symbol_rate = alps_bsru6_set_symbol_rate,
+	.pll_set = alps_bsbe1_pll_set,
+};
+
+static int lnbp21_set_voltage(struct dvb_frontend* fe, fe_sec_voltage_t voltage)
+{
+	struct av7110* av7110 = (struct av7110*) fe->dvb->priv;
+	int ret;
+	u8 data[1];
+	struct i2c_msg msg = { .addr = 0x08, .flags = 0, .buf = data, .len = sizeof(data) };
+
+	switch(voltage) {
+	case SEC_VOLTAGE_OFF:
+		data[0] = 0x00;
+		break;
+	case SEC_VOLTAGE_13:
+		data[0] = 0x44;
+		break;
+	case SEC_VOLTAGE_18:
+		data[0] = 0x4c;
+		break;
+	default:
+		return -EINVAL;
+	};
+
+	ret = i2c_transfer(&av7110->i2c_adap, &msg, 1);
+	return (ret != 1) ? -EIO : 0;
+}
+
 
 static int alps_tdbe2_pll_set(struct dvb_frontend* fe, struct dvb_frontend_parameters* params)
 {
@@ -1668,7 +1788,7 @@ static int alps_tdbe2_pll_set(struct dvb_frontend* fe, struct dvb_frontend_param
 	data[2] = 0x85 | ((div >> 10) & 0x60);
 	data[3] = (params->frequency < 174000000 ? 0x88 : params->frequency < 470000000 ? 0x84 : 0x81);
 
-	if (i2c_transfer (&av7110->i2c_adap, &msg, 1) != 1)
+	if (i2c_transfer(&av7110->i2c_adap, &msg, 1) != 1)
 		return -EIO;
 	return 0;
 }
@@ -1698,7 +1818,7 @@ static int grundig_29504_451_pll_set(struct dvb_frontend* fe,
 	data[2] = 0x8e;
 	data[3] = 0x00;
 
-	if (i2c_transfer (&av7110->i2c_adap, &msg, 1) != 1)
+	if (i2c_transfer(&av7110->i2c_adap, &msg, 1) != 1)
 		return -EIO;
 	return 0;
 }
@@ -1726,7 +1846,7 @@ static int philips_cd1516_pll_set(struct dvb_frontend* fe,
 	data[2] = 0x8e;
 	data[3] = (f < 174000000 ? 0xa1 : f < 470000000 ? 0x92 : 0x34);
 
-	if (i2c_transfer (&av7110->i2c_adap, &msg, 1) != 1)
+	if (i2c_transfer(&av7110->i2c_adap, &msg, 1) != 1)
 		return -EIO;
 	return 0;
 }
@@ -1760,7 +1880,7 @@ static int alps_tdlb7_pll_set(struct dvb_frontend* fe, struct dvb_frontend_param
 	data[2] = 0x85;
 	data[3] = pwr << 6;
 
-	if (i2c_transfer (&av7110->i2c_adap, &msg, 1) != 1)
+	if (i2c_transfer(&av7110->i2c_adap, &msg, 1) != 1)
 		return -EIO;
 	return 0;
 }
@@ -1808,16 +1928,16 @@ static int nexusca_stv0297_pll_set(struct dvb_frontend* fe, struct dvb_frontend_
 		return -EINVAL;
 
 	stv0297_enable_plli2c(fe);
-	if (i2c_transfer (&av7110->i2c_adap, &msg, 1) != 1) {
+	if (i2c_transfer(&av7110->i2c_adap, &msg, 1) != 1) {
 		printk("nexusca: pll transfer failed!\n");
 		return -EIO;
 	}
 
 	// wait for PLL lock
-	for(i=0; i< 20; i++) {
+	for(i = 0; i < 20; i++) {
 
 		stv0297_enable_plli2c(fe);
-		if (i2c_transfer (&av7110->i2c_adap, &readmsg, 1) == 1)
+		if (i2c_transfer(&av7110->i2c_adap, &readmsg, 1) == 1)
 			if (data[0] & 0x40) break;
 		msleep(10);
 	}
@@ -1831,6 +1951,45 @@ static struct stv0297_config nexusca_stv0297_config = {
 	.invert = 1,
 	.pll_set = nexusca_stv0297_pll_set,
 };
+
+
+
+static int grundig_29504_401_pll_set(struct dvb_frontend* fe, struct dvb_frontend_parameters* params)
+{
+	struct av7110* av7110 = (struct av7110*) fe->dvb->priv;
+	u32 div;
+	u8 cfg, cpump, band_select;
+	u8 data[4];
+	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = sizeof(data) };
+
+	div = (36125000 + params->frequency) / 166666;
+
+	cfg = 0x88;
+
+	if (params->frequency < 175000000) cpump = 2;
+	else if (params->frequency < 390000000) cpump = 1;
+	else if (params->frequency < 470000000) cpump = 2;
+	else if (params->frequency < 750000000) cpump = 1;
+	else cpump = 3;
+
+	if (params->frequency < 175000000) band_select = 0x0e;
+	else if (params->frequency < 470000000) band_select = 0x05;
+	else band_select = 0x03;
+
+	data[0] = (div >> 8) & 0x7f;
+	data[1] = div & 0xff;
+	data[2] = ((div >> 10) & 0x60) | cfg;
+	data[3] = (cpump << 6) | band_select;
+
+	if (i2c_transfer (&av7110->i2c_adap, &msg, 1) != 1) return -EIO;
+	return 0;
+}
+
+static struct l64781_config grundig_29504_401_config = {
+	.demod_address = 0x55,
+	.pll_set = grundig_29504_401_pll_set,
+};
+
 
 
 static void av7110_fe_lock_fix(struct av7110* av7110, fe_status_t status)
@@ -1855,9 +2014,9 @@ static void av7110_fe_lock_fix(struct av7110* av7110, fe_status_t status)
 			av7110->pids[DMX_PES_AUDIO],
 			av7110->pids[DMX_PES_TELETEXT], 0,
 			av7110->pids[DMX_PES_PCR]);
-	                av7110_fw_cmd(av7110, COMTYPE_PIDFILTER, Scan, 0);
+		av7110_fw_cmd(av7110, COMTYPE_PIDFILTER, Scan, 0);
 	} else {
-			SetPIDs(av7110, 0, 0, 0, 0, 0);
+		SetPIDs(av7110, 0, 0, 0, 0, 0);
 		av7110_fw_cmd(av7110, COMTYPE_PID_FILTER, FlushTSQueue, 0);
 		av7110_wait_msgstate(av7110, GPMQBusy);
 	}
@@ -1959,8 +2118,10 @@ static u8 read_pwm(struct av7110* av7110)
 	return pwm;
 }
 
-static void frontend_init(struct av7110 *av7110)
+static int frontend_init(struct av7110 *av7110)
 {
+	int ret;
+
 	if (av7110->dev->pci->subsystem_vendor == 0x110a) {
 		switch(av7110->dev->pci->subsystem_device) {
 		case 0x0000: // Fujitsu/Siemens DVB-Cable (ves1820/Philips CD1516(??))
@@ -2038,6 +2199,11 @@ static void frontend_init(struct av7110 *av7110)
 			}
 			break;
 
+		case 0x0008: // Hauppauge/TT DVB-T
+
+			av7110->fe = l64781_attach(&grundig_29504_401_config, &av7110->i2c_adap);
+			break;
+
 		case 0x000A: // Hauppauge/TT Nexus-CA rev1.X
 
 			av7110->fe = stv0297_attach(&nexusca_stv0297_config, &av7110->i2c_adap, 0x7b);
@@ -2050,10 +2216,20 @@ static void frontend_init(struct av7110 *av7110)
 				av7110->dev->i2c_bitrate = SAA7146_I2C_BUS_BIT_RATE_240;
 				break;
 			}
+			break;
+
+		case 0x000E: /* Hauppauge/TT Nexus-S rev 2.3 */
+			/* ALPS BSBE1 */
+			av7110->fe = stv0299_attach(&alps_bsbe1_config, &av7110->i2c_adap);
+			if (av7110->fe)
+				av7110->fe->ops->set_voltage = lnbp21_set_voltage;
+			break;
 		}
 	}
 
-	if (av7110->fe == NULL) {
+	if (!av7110->fe) {
+		/* FIXME: propagate the failure code from the lower layers */
+		ret = -ENOMEM;
 		printk("dvb-ttpci: A frontend driver was not found for device %04x/%04x subsystem %04x/%04x\n",
 		       av7110->dev->pci->vendor,
 		       av7110->dev->pci->device,
@@ -2070,13 +2246,15 @@ static void frontend_init(struct av7110 *av7110)
 		FE_FUNC_OVERRIDE(av7110->fe->ops->dishnetwork_send_legacy_command, av7110->fe_dishnetwork_send_legacy_command, av7110_fe_dishnetwork_send_legacy_command);
 		FE_FUNC_OVERRIDE(av7110->fe->ops->set_frontend, av7110->fe_set_frontend, av7110_fe_set_frontend);
 
-		if (dvb_register_frontend(av7110->dvb_adapter, av7110->fe)) {
+		ret = dvb_register_frontend(&av7110->dvb_adapter, av7110->fe);
+		if (ret < 0) {
 			printk("av7110: Frontend registration failed!\n");
 			if (av7110->fe->ops->release)
 				av7110->fe->ops->release(av7110->fe);
 			av7110->fe = NULL;
 		}
 	}
+	return ret;
 }
 
 /* Budgetpatch note:
@@ -2146,10 +2324,10 @@ static void frontend_init(struct av7110 *av7110)
  */
 static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_data *pci_ext)
 {
-	struct av7110 *av7110 = NULL;
-	int length = TS_WIDTH * TS_HEIGHT;
-	int ret = 0;
-	int count = 0;
+	const int length = TS_WIDTH * TS_HEIGHT;
+	struct pci_dev *pdev = dev->pci;
+	struct av7110 *av7110;
+	int ret, count = 0;
 
 	dprintk(4, "dev: %p\n", dev);
 
@@ -2243,23 +2421,26 @@ static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_d
 	}
 
 	/* prepare the av7110 device struct */
-	if (!(av7110 = kmalloc (sizeof (struct av7110), GFP_KERNEL))) {
+	av7110 = kmalloc(sizeof(struct av7110), GFP_KERNEL);
+	if (!av7110) {
 		dprintk(1, "out of memory\n");
 		return -ENOMEM;
 	}
 
 	memset(av7110, 0, sizeof(struct av7110));
-	
-	av7110->card_name = (char*)pci_ext->ext_priv;
+
+	av7110->card_name = (char*) pci_ext->ext_priv;
 	av7110->dev = dev;
 	dev->ext_priv = av7110;
 
-	if ((ret = get_firmware(av7110))) {
-		kfree(av7110);
-		return ret;
-	}
+	ret = get_firmware(av7110);
+	if (ret < 0)
+		goto err_kfree_0;
 
-	dvb_register_adapter(&av7110->dvb_adapter, av7110->card_name, THIS_MODULE);
+	ret = dvb_register_adapter(&av7110->dvb_adapter, av7110->card_name,
+				   THIS_MODULE);
+	if (ret < 0)
+		goto err_put_firmware_1;
 
 	/* the Siemens DVB needs this if you want to have the i2c chips
 	   get recognized before the main driver is fully loaded */
@@ -2274,21 +2455,21 @@ static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_d
 
 	saa7146_i2c_adapter_prepare(dev, &av7110->i2c_adap, SAA7146_I2C_BUS_BIT_RATE_120); /* 275 kHz */
 
-	if (i2c_add_adapter(&av7110->i2c_adap) < 0) {
-err_no_mem:
-		dvb_unregister_adapter (av7110->dvb_adapter);
-		kfree(av7110);
-		return -ENOMEM;
-	}
+	ret = i2c_add_adapter(&av7110->i2c_adap);
+	if (ret < 0)
+		goto err_dvb_unregister_adapter_2;
 
-	ttpci_eeprom_parse_mac(&av7110->i2c_adap, av7110->dvb_adapter->proposed_mac);
+	ttpci_eeprom_parse_mac(&av7110->i2c_adap,
+			       av7110->dvb_adapter.proposed_mac);
+	ret = -ENOMEM;
 
 	if (budgetpatch) {
 		spin_lock_init(&av7110->feedlock1);
-		av7110->grabbing = saa7146_vmalloc_build_pgtable(
-					 dev->pci, length, &av7110->pt);
+		av7110->grabbing = saa7146_vmalloc_build_pgtable(pdev, length,
+								 &av7110->pt);
 		if (!av7110->grabbing)
-			goto err_no_mem;
+			goto err_i2c_del_3;
+
 		saa7146_write(dev, PCI_BT_V1, 0x1c1f101f);
 		saa7146_write(dev, BCS_CTRL, 0x80400040);
 		/* set dd1 stream a & b */
@@ -2363,131 +2544,140 @@ err_no_mem:
 		/* end of budgetpatch register initialization */
 		tasklet_init (&av7110->vpe_tasklet,  vpeirq,  (unsigned long) av7110);
 	} else {
-	saa7146_write(dev, PCI_BT_V1, 0x1c00101f);
-	saa7146_write(dev, BCS_CTRL, 0x80400040);
+		saa7146_write(dev, PCI_BT_V1, 0x1c00101f);
+		saa7146_write(dev, BCS_CTRL, 0x80400040);
 
-	/* set dd1 stream a & b */
-      	saa7146_write(dev, DD1_STREAM_B, 0x00000000);
-	saa7146_write(dev, DD1_INIT, 0x03000000);
-	saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
+		/* set dd1 stream a & b */
+		saa7146_write(dev, DD1_STREAM_B, 0x00000000);
+		saa7146_write(dev, DD1_INIT, 0x03000000);
+		saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
 
-	/* upload all */
-	saa7146_write(dev, MC2, 0x077c077c);
-        saa7146_write(dev, GPIO_CTRL, 0x000000);
+		/* upload all */
+		saa7146_write(dev, MC2, 0x077c077c);
+		saa7146_write(dev, GPIO_CTRL, 0x000000);
 	}
 
 	tasklet_init (&av7110->debi_tasklet, debiirq, (unsigned long) av7110);
 	tasklet_init (&av7110->gpio_tasklet, gpioirq, (unsigned long) av7110);
 
-        sema_init(&av7110->pid_mutex, 1);
+	sema_init(&av7110->pid_mutex, 1);
 
-        /* locks for data transfers from/to AV7110 */
-        spin_lock_init (&av7110->debilock);
-        sema_init(&av7110->dcomlock, 1);
-        av7110->debitype=-1;
+	/* locks for data transfers from/to AV7110 */
+	spin_lock_init(&av7110->debilock);
+	sema_init(&av7110->dcomlock, 1);
+	av7110->debitype = -1;
 
-        /* default OSD window */
-        av7110->osdwin=1;
+	/* default OSD window */
+	av7110->osdwin = 1;
 	sema_init(&av7110->osd_sema, 1);
 
-        /* ARM "watchdog" */
+	/* ARM "watchdog" */
 	init_waitqueue_head(&av7110->arm_wait);
-        av7110->arm_thread=NULL;
-     
-        /* allocate and init buffers */
-        av7110->debi_virt = pci_alloc_consistent(dev->pci, 8192,
-						 &av7110->debi_bus);
-	if (!av7110->debi_virt) {
-		ret = -ENOMEM;
-                goto err;
-	}
+	av7110->arm_thread = NULL;
 
-        av7110->iobuf = vmalloc(AVOUTLEN+AOUTLEN+BMPLEN+4*IPACKS);
-	if (!av7110->iobuf) {
-		ret = -ENOMEM;
-                goto err;
-	}
+	/* allocate and init buffers */
+	av7110->debi_virt = pci_alloc_consistent(pdev, 8192, &av7110->debi_bus);
+	if (!av7110->debi_virt)
+		goto err_saa71466_vfree_4;
 
-	av7110_av_init(av7110);
 
-        /* init BMP buffer */
-        av7110->bmpbuf=av7110->iobuf+AVOUTLEN+AOUTLEN;
-        init_waitqueue_head(&av7110->bmpq);
-        
-	av7110_ca_init(av7110);
+	av7110->iobuf = vmalloc(AVOUTLEN+AOUTLEN+BMPLEN+4*IPACKS);
+	if (!av7110->iobuf)
+		goto err_pci_free_5;
 
-        /* load firmware into AV7110 cards */
-	av7110_bootarm(av7110);
-	if (av7110_firmversion(av7110)) {
-		ret = -EIO;
-		goto err2;
-	}
+	ret = av7110_av_init(av7110);
+	if (ret < 0)
+		goto err_iobuf_vfree_6;
+
+	/* init BMP buffer */
+	av7110->bmpbuf = av7110->iobuf+AVOUTLEN+AOUTLEN;
+	init_waitqueue_head(&av7110->bmpq);
+
+	ret = av7110_ca_init(av7110);
+	if (ret < 0)
+		goto err_av7110_av_exit_7;
+
+	/* load firmware into AV7110 cards */
+	ret = av7110_bootarm(av7110);
+	if (ret < 0)
+		goto err_av7110_ca_exit_8;
+
+	ret = av7110_firmversion(av7110);
+	if (ret < 0)
+		goto err_stop_arm_9;
 
 	if (FW_VERSION(av7110->arm_app)<0x2501)
 		printk ("dvb-ttpci: Warning, firmware version 0x%04x is too old. "
 			"System might be unstable!\n", FW_VERSION(av7110->arm_app));
 
-	if (kernel_thread(arm_thread, (void *) av7110, 0) < 0) {
-		printk("dvb-ttpci: failed to start arm_mon kernel thread @ card %d\n",
-		       av7110->dvb_adapter->num);
-		goto err2;
-	}
+	ret = kernel_thread(arm_thread, (void *) av7110, 0);
+	if (ret < 0)
+		goto err_stop_arm_9;
 
 	/* set initial volume in mixer struct */
 	av7110->mixer.volume_left  = volume;
 	av7110->mixer.volume_right = volume;
-	
+
 	init_av7110_av(av7110);
 
-	av7110_register(av7110);
-	
+	ret = av7110_register(av7110);
+	if (ret < 0)
+		goto err_arm_thread_stop_10;
+
 	/* special case DVB-C: these cards have an analog tuner
 	   plus need some special handling, so we have separate
 	   saa7146_ext_vv data for these... */
 	ret = av7110_init_v4l(av7110);
-	
-	if (ret)
-		goto err3;
+	if (ret < 0)
+		goto err_av7110_unregister_11;
 
-	av7110->dvb_adapter->priv = av7110;
-	frontend_init(av7110);
+	av7110->dvb_adapter.priv = av7110;
+	ret = frontend_init(av7110);
+	if (ret < 0)
+		goto err_av7110_exit_v4l_12;
 
+#if defined(CONFIG_INPUT_EVDEV) || defined(CONFIG_INPUT_EVDEV_MODULE)
+	av7110_ir_init();
+#endif
 	printk(KERN_INFO "dvb-ttpci: found av7110-%d.\n", av7110_num);
-	av7110->device_initialized = 1;
 	av7110_num++;
-        return 0;
-
-err3:
-	av7110->arm_rmmod = 1;
-	wake_up_interruptible(&av7110->arm_wait);
-	while (av7110->arm_thread)
-		msleep(1);
-err2:
-	av7110_ca_exit(av7110);
-	av7110_av_exit(av7110);
-err:
-	i2c_del_adapter(&av7110->i2c_adap);
-
-	dvb_unregister_adapter (av7110->dvb_adapter);
-
-	if (NULL != av7110->debi_virt)
-		pci_free_consistent(dev->pci, 8192, av7110->debi_virt, av7110->debi_bus);
-	if (NULL != av7110->iobuf)
-		vfree(av7110->iobuf);
-	if (NULL != av7110 ) {
-		kfree(av7110);
-	}
-
+out:
 	return ret;
+
+err_av7110_exit_v4l_12:
+	av7110_exit_v4l(av7110);
+err_av7110_unregister_11:
+	dvb_unregister(av7110);
+err_arm_thread_stop_10:
+	av7110_arm_sync(av7110);
+err_stop_arm_9:
+	/* Nothing to do. Rejoice. */
+err_av7110_ca_exit_8:
+	av7110_ca_exit(av7110);
+err_av7110_av_exit_7:
+	av7110_av_exit(av7110);
+err_iobuf_vfree_6:
+	vfree(av7110->iobuf);
+err_pci_free_5:
+	pci_free_consistent(pdev, 8192, av7110->debi_virt, av7110->debi_bus);
+err_saa71466_vfree_4:
+	if (!av7110->grabbing)
+		saa7146_pgtable_free(pdev, &av7110->pt);
+err_i2c_del_3:
+	i2c_del_adapter(&av7110->i2c_adap);
+err_dvb_unregister_adapter_2:
+	dvb_unregister_adapter(&av7110->dvb_adapter);
+err_put_firmware_1:
+	put_firmware(av7110);
+err_kfree_0:
+	kfree(av7110);
+	goto out;
 }
 
-static int av7110_detach (struct saa7146_dev* saa)
+static int av7110_detach(struct saa7146_dev* saa)
 {
-	struct av7110 *av7110 = (struct av7110*)saa->ext_priv;
+	struct av7110 *av7110 = saa->ext_priv;
 	dprintk(4, "%p\n", av7110);
-	
-	if (!av7110->device_initialized )
-		return 0;
 
 	if (budgetpatch) {
 		/* Disable RPS1 */
@@ -2503,17 +2693,13 @@ static int av7110_detach (struct saa7146_dev* saa)
 	}
 	av7110_exit_v4l(av7110);
 
-	av7110->arm_rmmod=1;
-	wake_up_interruptible(&av7110->arm_wait);
-
-	while (av7110->arm_thread)
-		msleep(1);
+	av7110_arm_sync(av7110);
 
 	tasklet_kill(&av7110->debi_tasklet);
 	tasklet_kill(&av7110->gpio_tasklet);
 
 	dvb_unregister(av7110);
-	
+
 	SAA7146_IER_DISABLE(saa, MASK_19 | MASK_03);
 	SAA7146_ISR_CLEAR(saa, MASK_19 | MASK_03);
 
@@ -2526,21 +2712,21 @@ static int av7110_detach (struct saa7146_dev* saa)
 
 	i2c_del_adapter(&av7110->i2c_adap);
 
-	dvb_unregister_adapter (av7110->dvb_adapter);
+	dvb_unregister_adapter (&av7110->dvb_adapter);
 
 	av7110_num--;
-#ifndef CONFIG_DVB_AV7110_FIRMWARE_FILE 
-	if (av7110->bin_fw)
-		vfree(av7110->bin_fw);
-#endif
-	kfree (av7110);
+
+	put_firmware(av7110);
+
+	kfree(av7110);
+
 	saa->ext_priv = NULL;
 
 	return 0;
 }
 
 
-static void av7110_irq(struct saa7146_dev* dev, u32 *isr) 
+static void av7110_irq(struct saa7146_dev* dev, u32 *isr)
 {
 	struct av7110 *av7110 = dev->ext_priv;
 
@@ -2569,13 +2755,13 @@ static void av7110_irq(struct saa7146_dev* dev, u32 *isr)
 		 */
 		SAA7146_IER_DISABLE(av7110->dev, MASK_19);
 		SAA7146_ISR_CLEAR(av7110->dev, MASK_19);
-		tasklet_schedule (&av7110->debi_tasklet);
+		tasklet_schedule(&av7110->debi_tasklet);
 	}
-	
+
 	if (*isr & MASK_03) {
 		//printk("av7110_irq: GPIO\n");
-		tasklet_schedule (&av7110->gpio_tasklet);
-}
+		tasklet_schedule(&av7110->gpio_tasklet);
+	}
 
 	if ((*isr & MASK_10) && budgetpatch)
 		tasklet_schedule(&av7110->vpe_tasklet);
@@ -2594,23 +2780,26 @@ MAKE_AV7110_INFO(ttt_1_X,    "Technotrend/Hauppauge WinTV DVB-T rev1.X");
 MAKE_AV7110_INFO(ttc_1_X,    "Technotrend/Hauppauge WinTV Nexus-CA rev1.X");
 MAKE_AV7110_INFO(ttc_2_X,    "Technotrend/Hauppauge WinTV DVB-C rev2.X");
 MAKE_AV7110_INFO(tts_2_X,    "Technotrend/Hauppauge WinTV Nexus-S rev2.X");
+MAKE_AV7110_INFO(tts_2_3,    "Technotrend/Hauppauge WinTV Nexus-S rev2.3");
 MAKE_AV7110_INFO(tts_1_3se,  "Technotrend/Hauppauge WinTV DVB-S rev1.3 SE");
+MAKE_AV7110_INFO(ttt,        "Technotrend/Hauppauge DVB-T");
 MAKE_AV7110_INFO(fsc,        "Fujitsu Siemens DVB-C");
 MAKE_AV7110_INFO(fss,        "Fujitsu Siemens DVB-S rev1.6");
 
 static struct pci_device_id pci_tbl[] = {
+	MAKE_EXTENSION_PCI(fsc,       0x110a, 0x0000),
 	MAKE_EXTENSION_PCI(tts_1_X,   0x13c2, 0x0000),
 	MAKE_EXTENSION_PCI(ttt_1_X,   0x13c2, 0x0001),
 	MAKE_EXTENSION_PCI(ttc_2_X,   0x13c2, 0x0002),
 	MAKE_EXTENSION_PCI(tts_2_X,   0x13c2, 0x0003),
-	MAKE_EXTENSION_PCI(tts_1_3se, 0x13c2, 0x1002),
-	MAKE_EXTENSION_PCI(fsc,       0x110a, 0x0000),
-	MAKE_EXTENSION_PCI(ttc_1_X,   0x13c2, 0x000a),
 	MAKE_EXTENSION_PCI(fss,       0x13c2, 0x0006),
+	MAKE_EXTENSION_PCI(ttt,       0x13c2, 0x0008),
+	MAKE_EXTENSION_PCI(ttc_1_X,   0x13c2, 0x000a),
+	MAKE_EXTENSION_PCI(tts_2_3,   0x13c2, 0x000e),
+	MAKE_EXTENSION_PCI(tts_1_3se, 0x13c2, 0x1002),
 
 /*	MAKE_EXTENSION_PCI(???, 0x13c2, 0x0004), UNDEFINED CARD */ // Galaxis DVB PC-Sat-Carte
 /*	MAKE_EXTENSION_PCI(???, 0x13c2, 0x0005), UNDEFINED CARD */ // Technisat SkyStar1
-/*	MAKE_EXTENSION_PCI(???, 0x13c2, 0x0008), UNDEFINED CARD */ // TT/Hauppauge WinTV DVB-T v????
 /*	MAKE_EXTENSION_PCI(???, 0x13c2, 0x0009), UNDEFINED CARD */ // TT/Hauppauge WinTV Nexus-CA v????
 
 	{
@@ -2632,25 +2821,13 @@ static struct saa7146_extension av7110_extension = {
 
 	.irq_mask	= MASK_19 | MASK_03 | MASK_10,
 	.irq_func	= av7110_irq,
-};	
+};
 
 
-static int __init av7110_init(void) 
+static int __init av7110_init(void)
 {
 	int retval;
 	retval = saa7146_register_extension(&av7110_extension);
-#if defined(CONFIG_INPUT_EVDEV) || defined(CONFIG_INPUT_EVDEV_MODULE)
-	if (retval)
-		goto failed_saa7146_register;
-	
-	retval = av7110_ir_init();
-	if (retval)
-		goto failed_av7110_ir_init;
-	return 0;
-failed_av7110_ir_init:
-	saa7146_unregister_extension(&av7110_extension);
-failed_saa7146_register:
-#endif
 	return retval;
 }
 
@@ -2670,4 +2847,3 @@ MODULE_DESCRIPTION("driver for the SAA7146 based AV110 PCI DVB cards by "
 		   "Siemens, Technotrend, Hauppauge");
 MODULE_AUTHOR("Ralph Metzler, Marcus Metzler, others");
 MODULE_LICENSE("GPL");
-

@@ -52,7 +52,7 @@ static ssize_t read_file_##type(struct file *file, char __user *user_buf,	\
 	char buf[32];								\
 	type *val = file->private_data;						\
 										\
-	snprintf(buf, sizeof(buf), format, *val);				\
+	snprintf(buf, sizeof(buf), format "\n", *val);				\
 	return simple_read_from_buffer(user_buf, count, ppos, buf, strlen(buf));\
 }										\
 static ssize_t write_file_##type(struct file *file, const char __user *user_buf,\
@@ -186,7 +186,7 @@ static ssize_t read_file_bool(struct file *file, char __user *user_buf,
 	char buf[3];
 	u32 *val = file->private_data;
 	
-	if (val)
+	if (*val)
 		buf[0] = 'Y';
 	else
 		buf[0] = 'N';

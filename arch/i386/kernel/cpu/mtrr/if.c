@@ -98,16 +98,20 @@ mtrr_write(struct file *file, const char __user *buf, size_t len, loff_t * ppos)
 	unsigned long long base, size;
 	char *ptr;
 	char line[LINE_SIZE];
+	size_t linelen;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
+	if (!len)
+		return -EINVAL;
 	memset(line, 0, LINE_SIZE);
 	if (len > LINE_SIZE)
 		len = LINE_SIZE;
 	if (copy_from_user(line, buf, len - 1))
 		return -EFAULT;
-	ptr = line + strlen(line) - 1;
-	if (*ptr == '\n')
+	linelen = strlen(line);
+	ptr = line + linelen - 1;
+	if (linelen && *ptr == '\n')
 		*ptr = '\0';
 	if (!strncmp(line, "disable=", 8)) {
 		reg = simple_strtoul(line + 8, &ptr, 0);

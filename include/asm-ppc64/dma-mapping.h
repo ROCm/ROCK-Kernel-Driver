@@ -19,7 +19,7 @@
 extern int dma_supported(struct device *dev, u64 mask);
 extern int dma_set_mask(struct device *dev, u64 dma_mask);
 extern void *dma_alloc_coherent(struct device *dev, size_t size,
-		dma_addr_t *dma_handle, int flag);
+		dma_addr_t *dma_handle, unsigned int __nocast flag);
 extern void dma_free_coherent(struct device *dev, size_t size, void *cpu_addr,
 		dma_addr_t dma_handle);
 extern dma_addr_t dma_map_single(struct device *dev, void *cpu_addr,
@@ -112,5 +112,25 @@ dma_cache_sync(void *vaddr, size_t size,
 	BUG_ON(direction == DMA_NONE);
 	/* nothing to do */
 }
+
+/*
+ * DMA operations are abstracted for G5 vs. i/pSeries, PCI vs. VIO
+ */
+struct dma_mapping_ops {
+	void *		(*alloc_coherent)(struct device *dev, size_t size,
+				dma_addr_t *dma_handle, unsigned int __nocast flag);
+	void		(*free_coherent)(struct device *dev, size_t size,
+				void *vaddr, dma_addr_t dma_handle);
+	dma_addr_t	(*map_single)(struct device *dev, void *ptr,
+				size_t size, enum dma_data_direction direction);
+	void		(*unmap_single)(struct device *dev, dma_addr_t dma_addr,
+				size_t size, enum dma_data_direction direction);
+	int		(*map_sg)(struct device *dev, struct scatterlist *sg,
+				int nents, enum dma_data_direction direction);
+	void		(*unmap_sg)(struct device *dev, struct scatterlist *sg,
+				int nents, enum dma_data_direction direction);
+	int		(*dma_supported)(struct device *dev, u64 mask);
+	int		(*dac_dma_supported)(struct device *dev, u64 mask);
+};
 
 #endif	/* _ASM_DMA_MAPPING_H */

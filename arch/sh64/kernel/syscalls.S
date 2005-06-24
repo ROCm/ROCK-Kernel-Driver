@@ -268,7 +268,7 @@ sys_call_table:
 	.long sys_msgrcv
 	.long sys_msgget
 	.long sys_msgctl
-	.long sys_ni_syscall /* sys_shmatcall */
+	.long sys_shmat
 	.long sys_shmdt			/* 245 */
 	.long sys_shmget
 	.long sys_shmctl
@@ -337,4 +337,9 @@ sys_call_table:
 	.long sys_mq_timedreceive
 	.long sys_mq_notify
 	.long sys_mq_getsetattr		/* 310 */
+	.long sys_ni_syscall	/* Reserved for kexec */
+	.long sys_waitid
+	.long sys_add_key
+	.long sys_request_key
+	.long sys_keyctl		/* 315 */
 

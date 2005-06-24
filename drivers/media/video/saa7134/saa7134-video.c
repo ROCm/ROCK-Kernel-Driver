@@ -1,5 +1,5 @@
 /*
- * $Id: saa7134-video.c,v 1.25 2004/12/10 12:33:39 kraxel Exp $
+ * $Id: saa7134-video.c,v 1.28 2005/02/15 15:59:35 kraxel Exp $
  *
  * device driver for philips saa7134 based TV cards
  * video4linux video interface
@@ -268,6 +268,24 @@ static struct saa7134_tvnorm tvnorms[] = {
 		.chroma_ctrl2  = 0x06,
 		.vgate_misc    = 0x1c,
 
+	},{
+		.name          = "PAL-60",
+		.id            = V4L2_STD_PAL_60,
+
+		.h_start       = 0,
+		.h_stop        = 719,
+		.video_v_start = 22,
+		.video_v_stop  = 22+239,
+		.vbi_v_start   = 10, /* FIXME */
+		.vbi_v_stop    = 21, /* FIXME */
+		.src_timing    = 1,
+
+		.sync_control  = 0x18,
+		.luma_control  = 0x40,
+		.chroma_ctrl1  = 0x81,
+		.chroma_gain   = 0x2a,
+		.chroma_ctrl2  = 0x06,
+		.vgate_misc    = 0x1c,
 	}
 };
 #define TVNORMS ARRAY_SIZE(tvnorms)

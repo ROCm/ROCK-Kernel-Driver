@@ -587,6 +587,7 @@ struct nfs4_readdir_arg {
 	u32				count;
 	struct page **			pages;	/* zero-copy data */
 	unsigned int			pgbase;	/* zero-copy data */
+	const u32 *			bitmask;
 };
 
 struct nfs4_readdir_res {
@@ -707,7 +708,7 @@ struct nfs_rpc_ops {
 	int	(*read)    (struct nfs_read_data *);
 	int	(*write)   (struct nfs_write_data *);
 	int	(*commit)  (struct nfs_write_data *);
-	struct inode *	(*create)  (struct inode *, struct dentry *,
+	int	(*create)  (struct inode *, struct dentry *,
 			    struct iattr *, int);
 	int	(*remove)  (struct inode *, struct qstr *);
 	int	(*unlink_setup)  (struct rpc_message *,
@@ -761,8 +762,6 @@ extern struct nfs_rpc_ops	nfs_v4_clientops;
 extern struct rpc_version	nfs_version2;
 extern struct rpc_version	nfs_version3;
 extern struct rpc_version	nfs_version4;
-extern struct rpc_program	nfs_program;
-extern struct rpc_stat		nfs_rpcstat;
 
 extern struct rpc_version	nfsacl_version3;
 extern struct rpc_program	nfsacl_program;

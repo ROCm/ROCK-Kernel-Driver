@@ -26,39 +26,25 @@ void flush_tlb_pending(void)
 	struct mmu_gather *mp = &__get_cpu_var(mmu_gathers);
 
 	if (mp->tlb_nr) {
-		unsigned long context = mp->mm->context;
-
-		if (CTX_VALID(context)) {
+		if (CTX_VALID(mp->mm->context)) {
 #ifdef CONFIG_SMP
 			smp_flush_tlb_pending(mp->mm, mp->tlb_nr,
 					      &mp->vaddrs[0]);
 #else
-			__flush_tlb_pending(CTX_HWBITS(context), mp->tlb_nr,
-					    &mp->vaddrs[0]);
+			__flush_tlb_pending(CTX_HWBITS(mp->mm->context),
+					    mp->tlb_nr, &mp->vaddrs[0]);
 #endif
 		}
 		mp->tlb_nr = 0;
 	}
 }
 
-void tlb_batch_add(pte_t *ptep, pte_t orig)
+void tlb_batch_add(struct mm_struct *mm, unsigned long vaddr, pte_t *ptep, pte_t orig)
 {
 	struct mmu_gather *mp = &__get_cpu_var(mmu_gathers);
-	struct page *ptepage;
-	struct mm_struct *mm;
-	unsigned long vaddr, nr;
+	unsigned long nr;
 
-	ptepage = virt_to_page(ptep);
-	mm = (struct mm_struct *) ptepage->mapping;
-
-	/* It is more efficient to let flush_tlb_kernel_range()
-	 * handle these cases.
-	 */
-	if (mm == &init_mm)
-		return;
-
-	vaddr = ptepage->index +
-		(((unsigned long)ptep & ~PAGE_MASK) * PTRS_PER_PTE);
+	vaddr &= PAGE_MASK;
 	if (pte_exec(orig))
 		vaddr |= 0x1UL;
 
@@ -85,6 +71,7 @@ void tlb_batch_add(pte_t *ptep, pte_t orig)
 	}
 
 no_cache_flush:
+
 	if (mp->tlb_frozen)
 		return;
 
@@ -113,11 +100,10 @@ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long start, unsigned long
 	if (mp->tlb_frozen)
 		return;
 
-	/* Nobody should call us with start below VM hole and end above.
-	 * See if it is really true.
-	 */
-	BUG_ON(s > e);
+	/* If start is greater than end, that is a real problem.  */
+	BUG_ON(start > end);
 
+	/* However, straddling the VA space hole is quite normal. */
 	s &= PMD_MASK;
 	e = (e + PMD_SIZE - 1) & PMD_MASK;
 
@@ -135,6 +121,22 @@ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long start, unsigned long
 
 	start = vpte_base + (s >> (PAGE_SHIFT - 3));
 	end = vpte_base + (e >> (PAGE_SHIFT - 3));
+
+	/* If the request straddles the VA space hole, we
+	 * need to swap start and end.  The reason this
+	 * occurs is that "vpte_base" is the center of
+	 * the linear page table mapping area.  Thus,
+	 * high addresses with the sign bit set map to
+	 * addresses below vpte_base and non-sign bit
+	 * addresses map to addresses above vpte_base.
+	 */
+	if (end < start) {
+		unsigned long tmp = start;
+
+		start = end;
+		end = tmp;
+	}
+
 	while (start < end) {
 		mp->vaddrs[nr] = start;
 		mp->tlb_nr = ++nr;
@@ -146,11 +148,4 @@ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long start, unsigned long
 	}
 	if (nr)
 		flush_tlb_pending();
-}
-
-unsigned long __ptrs_per_pmd(void)
-{
-	if (test_thread_flag(TIF_32BIT))
-		return (1UL << (32 - (PAGE_SHIFT-3) - PAGE_SHIFT));
-	return REAL_PTRS_PER_PMD;
 }

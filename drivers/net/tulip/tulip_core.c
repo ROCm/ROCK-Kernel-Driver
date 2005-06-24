@@ -1107,15 +1107,18 @@ static void set_rx_mode(struct net_device *dev)
 			entry = tp->cur_tx++ % TX_RING_SIZE;
 
 			if (entry != 0) {
-				/* Avoid a chip errata by prefixing a dummy entry. */
-				tp->tx_buffers[entry].skb = NULL;
-				tp->tx_buffers[entry].mapping = 0;
-				tp->tx_ring[entry].length =
-					(entry == TX_RING_SIZE-1) ? cpu_to_le32(DESC_RING_WRAP) : 0;
-				tp->tx_ring[entry].buffer1 = 0;
-				/* Must set DescOwned later to avoid race with chip */
-				dummy = entry;
-				entry = tp->cur_tx++ % TX_RING_SIZE;
+				/* Avoid a chip errata by prefixing a dummy entry. Don't do
+				   this on the ULI526X as it triggers a different problem */
+				if (!(tp->chip_id == ULI526X && (tp->revision == 0x40 || tp->revision == 0x50))) {
+					tp->tx_buffers[entry].skb = NULL;
+					tp->tx_buffers[entry].mapping = 0;
+					tp->tx_ring[entry].length =
+						(entry == TX_RING_SIZE-1) ? cpu_to_le32(DESC_RING_WRAP) : 0;
+					tp->tx_ring[entry].buffer1 = 0;
+					/* Must set DescOwned later to avoid race with chip */
+					dummy = entry;
+					entry = tp->cur_tx++ % TX_RING_SIZE;
+				}
 			}
 
 			tp->tx_buffers[entry].skb = NULL;
@@ -1754,7 +1757,7 @@ err_out_free_netdev:
 
 #ifdef CONFIG_PM
 
-static int tulip_suspend (struct pci_dev *pdev, u32 state)
+static int tulip_suspend (struct pci_dev *pdev, pm_message_t state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 

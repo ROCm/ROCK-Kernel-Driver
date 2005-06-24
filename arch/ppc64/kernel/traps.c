@@ -41,6 +41,7 @@
 #include <asm/rtas.h>
 #include <asm/systemcfg.h>
 #include <asm/machdep.h>
+#include <asm/pmc.h>
 
 #ifdef CONFIG_DEBUGGER
 int (*__debugger)(struct pt_regs *regs);
@@ -278,6 +279,9 @@ static void parse_fpe(struct pt_regs *regs)
  * fault.  Return zero on success.
  */
 
+#define INST_MFSPR_PVR		0x7c1f42a6
+#define INST_MFSPR_PVR_MASK	0xfc1fffff
+
 #define INST_DCBA		0x7c0005ec
 #define INST_DCBA_MASK		0x7c0007fe
 
@@ -295,6 +299,15 @@ static int emulate_instruction(struct pt_regs *regs)
 
 	if (get_user(instword, (unsigned int __user *)(regs->nip)))
 		return -EFAULT;
+
+	/* Emulate the mfspr rD, PVR. */
+	if ((instword & INST_MFSPR_PVR_MASK) == INST_MFSPR_PVR) {
+		unsigned int rd;
+
+		rd = (instword >> 21) & 0x1f;
+		regs->gpr[rd] = mfspr(SPRN_PVR);
+		return 0;
+	}
 
 	/* Emulating the dcba insn is just a no-op.  */
 	if ((instword & INST_DCBA_MASK) == INST_DCBA) {
@@ -389,11 +402,6 @@ void program_check_exception(struct pt_regs *regs)
 	if (regs->msr & 0x100000) {
 		/* IEEE FP exception */
 		parse_fpe(regs);
-
-	} else if (regs->msr & 0x40000) {
-		/* Privileged instruction */
-		_exception(SIGILL, regs, ILL_PRVOPC, regs->nip);
-
 	} else if (regs->msr & 0x20000) {
 		/* trap exception */
 
@@ -410,7 +418,7 @@ void program_check_exception(struct pt_regs *regs)
 		_exception(SIGTRAP, regs, TRAP_BRKPT, regs->nip);
 
 	} else {
-		/* Illegal instruction; try to emulate it.  */
+		/* Privileged or illegal instruction; try to emulate it. */
 		switch (emulate_instruction(regs)) {
 		case 0:
 			regs->nip += 4;
@@ -422,7 +430,12 @@ void program_check_exception(struct pt_regs *regs)
 			break;
 
 		default:
-			_exception(SIGILL, regs, ILL_ILLOPC, regs->nip);
+			if (regs->msr & 0x40000)
+				/* priveleged */
+				_exception(SIGILL, regs, ILL_PRVOPC, regs->nip);
+			else
+				/* illegal */
+				_exception(SIGILL, regs, ILL_ILLOPC, regs->nip);
 			break;
 		}
 	}
@@ -437,31 +450,18 @@ void kernel_fp_unavailable_exception(struct pt_regs *regs)
 
 void altivec_unavailable_exception(struct pt_regs *regs)
 {
-#ifndef CONFIG_ALTIVEC
 	if (user_mode(regs)) {
 		/* A user program has executed an altivec instruction,
 		   but this kernel doesn't support altivec. */
 		_exception(SIGILL, regs, ILL_ILLOPC, regs->nip);
 		return;
 	}
-#endif
 	printk(KERN_EMERG "Unrecoverable VMX/Altivec Unavailable Exception "
 			  "%lx at %lx\n", regs->trap, regs->nip);
 	die("Unrecoverable VMX/Altivec Unavailable Exception", regs, SIGABRT);
 }
 
-/* Ensure exceptions are disabled */
-static void dummy_perf(struct pt_regs *regs)
-{
-	unsigned int mmcr0 = mfspr(SPRN_MMCR0);
-
-	mmcr0 &= ~(MMCR0_PMXE|MMCR0_PMAO);
-	mtspr(SPRN_MMCR0, mmcr0);
-}
-
-void (*perf_irq)(struct pt_regs *) = dummy_perf;
-
-EXPORT_SYMBOL(perf_irq);
+extern perf_irq_t perf_irq;
 
 void performance_monitor_exception(struct pt_regs *regs)
 {

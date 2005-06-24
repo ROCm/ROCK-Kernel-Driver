@@ -221,7 +221,7 @@ void __init ibm440gx_l2c_setup(struct ibm44x_clocks* p)
 	/* Disable L2C on rev.A, rev.B and 800MHz version of rev.C,
 	   enable it on all other revisions
 	 */
-	u32 pvr = mfspr(PVR);
+	u32 pvr = mfspr(SPRN_PVR);
 	if (pvr == PVR_440GX_RA || pvr == PVR_440GX_RB ||
 	    (pvr == PVR_440GX_RC && p->cpu > 667000000))
 		ibm440gx_l2c_disable();

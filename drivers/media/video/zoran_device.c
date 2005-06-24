@@ -46,6 +46,7 @@
 #include <linux/video_decoder.h>
 #include <linux/video_encoder.h>
 #include <linux/delay.h>
+#include <linux/wait.h>
 
 #include <asm/io.h>
 
@@ -696,11 +697,10 @@ wait_grab_pending (struct zoran *zr)
 	if (!zr->v4l_memgrab_active)
 		return 0;
 
-	while (zr->v4l_pend_tail != zr->v4l_pend_head) {
-		interruptible_sleep_on(&zr->v4l_capq);
-		if (signal_pending(current))
-			return -ERESTARTSYS;
-	}
+	wait_event_interruptible(zr->v4l_capq,
+			(zr->v4l_pend_tail == zr->v4l_pend_head));
+	if (signal_pending(current))
+		return -ERESTARTSYS;
 
 	spin_lock_irqsave(&zr->spinlock, flags);
 	zr36057_set_memgrab(zr, 0);

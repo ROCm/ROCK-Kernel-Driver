@@ -62,7 +62,7 @@ sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
 
 		if (!ptr)
 			break;
-		if ((ret = verify_area (VERIFY_READ, ptr, sizeof(long)))
+		if ((ret = access_ok(VERIFY_READ, ptr, sizeof(long)) ? 0 : -EFAULT)
 		    || (ret = get_user(fourth.__pad, (void **)ptr)))
 			break;
 		ret = sys_semctl (first, second, third, fourth);
@@ -78,7 +78,7 @@ sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
 
 			if (!ptr)
 				break;
-			if ((ret = verify_area (VERIFY_READ, ptr, sizeof(tmp)))
+			if ((ret = access_ok(VERIFY_READ, ptr, sizeof(tmp)) ? 0 : -EFAULT)
 			    || (ret = copy_from_user(&tmp,
 						(struct ipc_kludge *) ptr,
 						sizeof (tmp))))
@@ -104,8 +104,8 @@ sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
 		default: {
 			ulong raddr;
 
-			if ((ret = verify_area(VERIFY_WRITE, (ulong*) third,
-					       sizeof(ulong))))
+			if ((ret = access_ok(VERIFY_WRITE, (ulong*) third,
+					       sizeof(ulong)) ? 0 : -EFAULT))
 				break;
 			ret = do_shmat (first, (char *) ptr, second, &raddr);
 			if (ret)

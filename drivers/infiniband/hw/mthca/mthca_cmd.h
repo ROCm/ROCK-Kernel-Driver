@@ -95,7 +95,21 @@ enum {
 };
 
 enum {
-	DEV_LIM_FLAG_SRQ = 1 << 6
+	DEV_LIM_FLAG_RC                 = 1 << 0,
+	DEV_LIM_FLAG_UC                 = 1 << 1,
+	DEV_LIM_FLAG_UD                 = 1 << 2,
+	DEV_LIM_FLAG_RD                 = 1 << 3,
+	DEV_LIM_FLAG_RAW_IPV6           = 1 << 4,
+	DEV_LIM_FLAG_RAW_ETHER          = 1 << 5,
+	DEV_LIM_FLAG_SRQ                = 1 << 6,
+	DEV_LIM_FLAG_BAD_PKEY_CNTR      = 1 << 8,
+	DEV_LIM_FLAG_BAD_QKEY_CNTR      = 1 << 9,
+	DEV_LIM_FLAG_MW                 = 1 << 16,
+	DEV_LIM_FLAG_AUTO_PATH_MIG      = 1 << 17,
+	DEV_LIM_FLAG_ATOMIC             = 1 << 18,
+	DEV_LIM_FLAG_RAW_MULTI          = 1 << 19,
+	DEV_LIM_FLAG_UD_AV_PORT_ENFORCE = 1 << 20,
+	DEV_LIM_FLAG_UD_MULTI           = 1 << 21,
 };
 
 struct mthca_dev_lim {
@@ -148,7 +162,6 @@ struct mthca_dev_lim {
 	int cqc_entry_sz;
 	int srq_entry_sz;
 	int uar_scratch_entry_sz;
-	int mtt_seg_sz;
 	int mpt_entry_sz;
 	union {
 		struct {
@@ -263,6 +276,7 @@ int mthca_HW2SW_MPT(struct mthca_dev *dev, void *mpt_entry,
 		    int mpt_index, u8 *status);
 int mthca_WRITE_MTT(struct mthca_dev *dev, u64 *mtt_entry,
 		    int num_mtt, u8 *status);
+int mthca_SYNC_TPT(struct mthca_dev *dev, u8 *status);
 int mthca_MAP_EQ(struct mthca_dev *dev, u64 event_mask, int unmap,
 		 int eq_num, u8 *status);
 int mthca_SW2HW_EQ(struct mthca_dev *dev, void *eq_context,

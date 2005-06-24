@@ -209,7 +209,7 @@ static int BuildSgList (Scsi_Cmnd *SCpnt, PADAPTER2000 padapter, PDEV2000 pdev)
 	if ( SCpnt->use_sg )
 		{
 		sg = (struct scatterlist *)SCpnt->request_buffer;
-		zc = pci_map_sg (padapter->pdev, sg, SCpnt->use_sg, scsi_to_pci_dma_dir (SCpnt->sc_data_direction));
+		zc = pci_map_sg (padapter->pdev, sg, SCpnt->use_sg, SCpnt->sc_data_direction);
 		for ( z = 0;  z < zc;  z++ )
 			{
 			pdev->scatGath[z].address = cpu_to_le32 (sg_dma_address (sg));
@@ -225,7 +225,9 @@ static int BuildSgList (Scsi_Cmnd *SCpnt, PADAPTER2000 padapter, PDEV2000 pdev)
 		outl (0, padapter->mb3);
 		return TRUE;
 		}
-	SCpnt->SCp.have_data_in = pci_map_single (padapter->pdev, SCpnt->request_buffer, SCpnt->request_bufflen, scsi_to_pci_dma_dir (SCpnt->sc_data_direction));
+	SCpnt->SCp.have_data_in = pci_map_single (padapter->pdev,
+			SCpnt->request_buffer, SCpnt->request_bufflen,
+			SCpnt->sc_data_direction);
 	outl (SCpnt->SCp.have_data_in, padapter->mb2);
 	outl (SCpnt->request_bufflen, padapter->mb3);
 	return TRUE;
@@ -340,11 +342,11 @@ unmapProceed:;
 			}
 		}
 	if ( SCpnt->SCp.have_data_in )
-		pci_unmap_single (padapter->pdev, SCpnt->SCp.have_data_in, SCpnt->request_bufflen, scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+		pci_unmap_single (padapter->pdev, SCpnt->SCp.have_data_in, SCpnt->request_bufflen, SCpnt->sc_data_direction);
 	else 
 		{
 		if ( SCpnt->use_sg )
-			pci_unmap_sg (padapter->pdev, (struct scatterlist *)SCpnt->request_buffer, SCpnt->use_sg, scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+			pci_unmap_sg (padapter->pdev, (struct scatterlist *)SCpnt->request_buffer, SCpnt->use_sg, SCpnt->sc_data_direction);
 		}
 
 irqProceed:;
@@ -438,8 +440,8 @@ int Pci2000_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	if ( bus )
 		{
 		DEB (if(*cdb) printk ("\nCDB: %X-  %X %X %X %X %X %X %X %X %X %X ", SCpnt->cmd_len, cdb[0], cdb[1], cdb[2], cdb[3], cdb[4], cdb[5], cdb[6], cdb[7], cdb[8], cdb[9]));
-		DEB (if(*cdb) printk ("\ntimeout_per_command: %d, timeout_total: %d, timeout: %d, internal_timout: %d", SCpnt->timeout_per_command,
-							  SCpnt->timeout_total, SCpnt->timeout, SCpnt->internal_timeout));
+		DEB (if(*cdb) printk ("\ntimeout_per_command: %d, timeout_total: %d, timeout: %d", SCpnt->timeout_per_command,
+							  SCpnt->timeout_total, SCpnt->timeout));
 		outl (SCpnt->timeout_per_command, padapter->mb1);
 		outb_p (CMD_SCSI_TIMEOUT, padapter->cmd);
 		if ( WaitReady (padapter) )
@@ -495,7 +497,7 @@ int Pci2000_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 						else
 							{
 							SCpnt->SCp.have_data_in = pci_map_single (padapter->pdev, SCpnt->request_buffer, SCpnt->request_bufflen,
-													  scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+													  SCpnt->sc_data_direction);
 							outl (SCpnt->SCp.have_data_in, padapter->mb2);
 							}
 						outl (cdb[5], padapter->mb0);
@@ -511,13 +513,13 @@ int Pci2000_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 				SCpnt->SCp.have_data_in = pci_map_single (padapter->pdev,
 									  ((struct scatterlist *)SCpnt->request_buffer)->address,
 									  SCpnt->request_bufflen,
-									  scsi_to_pci_dma_dir (SCpnt->sc_data_direction));
+									  SCpnt->sc_data_direction);
 				}
 			else
 				{
 				SCpnt->SCp.have_data_in = pci_map_single (padapter->pdev, SCpnt->request_buffer,
 									  SCpnt->request_bufflen,
-									  scsi_to_pci_dma_dir (SCpnt->sc_data_direction));
+									  SCpnt->sc_data_direction);
 				}
 			outl (SCpnt->SCp.have_data_in, padapter->mb2);
 			outl (SCpnt->request_bufflen, padapter->mb3);

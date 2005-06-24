@@ -1,5 +1,5 @@
 /*
- * $Id: video-buf.c,v 1.17 2004/12/10 12:33:40 kraxel Exp $
+ * $Id: video-buf.c,v 1.18 2005/02/24 13:32:30 kraxel Exp $
  *
  * generic helper functions for video4linux capture buffers, to handle
  * memory management and PCI DMA.  Right now bttv + saa7134 use it.
@@ -217,9 +217,18 @@ int videobuf_dma_pci_map(struct pci_dev *dev, struct videobuf_dmabuf *dma)
 		return -ENOMEM;
 	}
 
-	if (!dma->bus_addr)
+	if (!dma->bus_addr) {
 		dma->sglen = pci_map_sg(dev,dma->sglist,dma->nr_pages,
 					dma->direction);
+		if (0 == dma->sglen) {
+			printk(KERN_WARNING
+			       "%s: pci_map_sg failed\n",__FUNCTION__);
+			kfree(dma->sglist);
+			dma->sglist = NULL;
+			dma->sglen = 0;
+			return -EIO;
+		}
+	}
 	return 0;
 }
 

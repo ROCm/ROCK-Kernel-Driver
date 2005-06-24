@@ -344,3 +344,29 @@ lmb_abs_to_phys(unsigned long aa)
 
 	return pa;
 }
+
+/*
+ * Truncate the lmb list to memory_limit if it's set
+ * You must call lmb_analyze() after this.
+ */
+void __init lmb_enforce_memory_limit(void)
+{
+	extern unsigned long memory_limit;
+	unsigned long i, limit;
+	struct lmb_region *mem = &(lmb.memory);
+
+	if (! memory_limit)
+		return;
+
+	limit = memory_limit;
+	for (i = 0; i < mem->cnt; i++) {
+		if (limit > mem->region[i].size) {
+			limit -= mem->region[i].size;
+			continue;
+		}
+
+		mem->region[i].size = limit;
+		mem->cnt = i + 1;
+		break;
+	}
+}

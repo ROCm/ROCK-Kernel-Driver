@@ -7,7 +7,7 @@
  *
  * Version:	$Id: af_inet.c,v 1.137 2002/02/01 22:01:03 davem Exp $
  *
- * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
+ * Authors:	Ross Biro
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
  *		Florian La Roche, <flla@stud.uni-sb.de>
  *		Alan Cox, <A.Cox@swansea.ac.uk>
@@ -73,7 +73,6 @@
 #include <linux/socket.h>
 #include <linux/in.h>
 #include <linux/kernel.h>
-#include <linux/major.h>
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/timer.h>
@@ -281,14 +280,11 @@ static int inet_create(struct socket *sock, int protocol)
 	BUG_TRAP(answer_prot->slab != NULL);
 
 	err = -ENOBUFS;
-	sk = sk_alloc(PF_INET, GFP_KERNEL,
-		      answer_prot->slab_obj_size,
-		      answer_prot->slab);
+	sk = sk_alloc(PF_INET, GFP_KERNEL, answer_prot, 1);
 	if (sk == NULL)
 		goto out;
 
 	err = 0;
-	sk->sk_prot = answer_prot;
 	sk->sk_no_check = answer_no_check;
 	if (INET_PROTOSW_REUSE & answer_flags)
 		sk->sk_reuse = 1;
@@ -309,7 +305,6 @@ static int inet_create(struct socket *sock, int protocol)
 	inet->id = 0;
 
 	sock_init_data(sock, sk);
-	sk_set_owner(sk, sk->sk_prot->owner);
 
 	sk->sk_destruct	   = inet_sock_destruct;
 	sk->sk_family	   = PF_INET;
@@ -1026,21 +1021,17 @@ static int __init inet_init(void)
 		goto out;
 	}
 
-	rc = sk_alloc_slab(&tcp_prot, "tcp_sock");
-	if (rc) {
-		sk_alloc_slab_error(&tcp_prot);
+	rc = proto_register(&tcp_prot, 1);
+	if (rc)
 		goto out;
-	}
-	rc = sk_alloc_slab(&udp_prot, "udp_sock");
-	if (rc) {
-		sk_alloc_slab_error(&udp_prot);
-		goto out_tcp_free_slab;
-	}
-	rc = sk_alloc_slab(&raw_prot, "raw_sock");
-	if (rc) {
-		sk_alloc_slab_error(&raw_prot);
-		goto out_udp_free_slab;
-	}
+
+	rc = proto_register(&udp_prot, 1);
+	if (rc)
+		goto out_unregister_tcp_proto;
+
+	rc = proto_register(&raw_prot, 1);
+	if (rc)
+		goto out_unregister_udp_proto;
 
 	/*
 	 *	Tell SOCKET that we are alive... 
@@ -1114,10 +1105,10 @@ static int __init inet_init(void)
 	rc = 0;
 out:
 	return rc;
-out_tcp_free_slab:
-	sk_free_slab(&tcp_prot);
-out_udp_free_slab:
-	sk_free_slab(&udp_prot);
+out_unregister_tcp_proto:
+	proto_unregister(&tcp_prot);
+out_unregister_udp_proto:
+	proto_unregister(&udp_prot);
 	goto out;
 }
 
@@ -1190,6 +1181,7 @@ EXPORT_SYMBOL(inet_stream_connect);
 EXPORT_SYMBOL(inet_stream_ops);
 EXPORT_SYMBOL(inet_unregister_protosw);
 EXPORT_SYMBOL(net_statistics);
+EXPORT_SYMBOL(sysctl_ip_nonlocal_bind);
 
 #ifdef INET_REFCNT_DEBUG
 EXPORT_SYMBOL(inet_sock_nr);

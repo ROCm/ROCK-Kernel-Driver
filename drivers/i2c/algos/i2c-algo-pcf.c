@@ -78,7 +78,6 @@ static void i2c_stop(struct i2c_algo_pcf_data *adap)
 	set_pcf(adap, 1, I2C_PCF_STOP);
 }
 
-
 static int wait_for_bb(struct i2c_algo_pcf_data *adap) {
 
 	int timeout = DEF_TIMEOUT;
@@ -108,6 +107,26 @@ static int wait_for_pin(struct i2c_algo_pcf_data *adap, int *status) {
 	while (timeout-- && (*status & I2C_PCF_PIN)) {
 		adap->waitforpin();
 		*status = get_pcf(adap, 1);
+	}
+	if (*status & I2C_PCF_LAB) {
+		DEB2(printk(KERN_INFO 
+			"i2c-algo-pcf.o: lost arbitration (CSR 0x%02x)\n",
+			 *status));
+		/* Cleanup from LAB-- reset and enable ESO.
+		 * This resets the PCF8584; since we've lost the bus, no
+		 * further attempts should be made by callers to clean up 
+		 * (no i2c_stop() etc.)
+		 */
+		set_pcf(adap, 1, I2C_PCF_PIN);
+		set_pcf(adap, 1, I2C_PCF_ESO);
+		/* TODO: we should pause for a time period sufficient for any
+		 * running I2C transaction to complete-- the arbitration
+		 * logic won't work properly until the next START is seen.
+		 */
+		DEB2(printk(KERN_INFO 
+			"i2c-algo-pcf.o: reset LAB condition (CSR 0x%02x)\n", 
+			get_pcf(adap,1)));
+		return(-EINTR);
 	}
 #endif
 	if (timeout <= 0)
@@ -188,15 +207,21 @@ static inline int try_address(struct i2c_algo_pcf_data *adap,
 		       unsigned char addr, int retries)
 {
 	int i, status, ret = -1;
+	int wfp;
 	for (i=0;i<retries;i++) {
 		i2c_outb(adap, addr);
 		i2c_start(adap);
 		status = get_pcf(adap, 1);
-		if (wait_for_pin(adap, &status) >= 0) {
+		if ((wfp = wait_for_pin(adap, &status)) >= 0) {
 			if ((status & I2C_PCF_LRB) == 0) { 
 				i2c_stop(adap);
 				break;	/* success! */
 			}
+		}
+		if (wfp == -EINTR) {
+			/* arbitration lost */
+			udelay(adap->udelay);
+			return -EINTR;
 		}
 		i2c_stop(adap);
 		udelay(adap->udelay);
@@ -219,6 +244,10 @@ static int pcf_sendbytes(struct i2c_adapter *i2c_adap, const char *buf,
 		i2c_outb(adap, buf[wrcount]);
 		timeout = wait_for_pin(adap, &status);
 		if (timeout) {
+			if (timeout == -EINTR) {
+				/* arbitration lost */
+				return -EINTR;
+			}
 			i2c_stop(adap);
 			dev_err(&i2c_adap->dev, "i2c_write: error - timeout.\n");
 			return -EREMOTEIO; /* got a better one ?? */
@@ -247,11 +276,16 @@ static int pcf_readbytes(struct i2c_adapter *i2c_adap, char *buf,
 {
 	int i, status;
 	struct i2c_algo_pcf_data *adap = i2c_adap->algo_data;
+	int wfp;
 
 	/* increment number of bytes to read by one -- read dummy byte */
 	for (i = 0; i <= count; i++) {
 
-		if (wait_for_pin(adap, &status)) {
+		if ((wfp = wait_for_pin(adap, &status))) {
+			if (wfp == -EINTR) {
+				/* arbitration lost */
+				return -EINTR;
+			}
 			i2c_stop(adap);
 			dev_err(&i2c_adap->dev, "pcf_readbytes timed out.\n");
 			return (-1);
@@ -366,6 +400,10 @@ static int pcf_xfer(struct i2c_adapter *i2c_adap,
 		/* Wait for PIN (pending interrupt NOT) */
 		timeout = wait_for_pin(adap, &status);
 		if (timeout) {
+			if (timeout == -EINTR) {
+				/* arbitration lost */
+				return (-EINTR);
+			}
 			i2c_stop(adap);
 			DEB2(printk(KERN_ERR "i2c-algo-pcf.o: Timeout waiting "
 				    "for PIN(1) in pcf_xfer\n");)

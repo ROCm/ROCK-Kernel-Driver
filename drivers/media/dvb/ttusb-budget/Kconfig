@@ -10,6 +10,6 @@ config DVB_TTUSB_BUDGET
 	  produced by Hauppauge, shipped under the brand name 'Nova-USB'.
 
           These devices don't have a MPEG decoder built in, so you need
-	  an external software decoder to watch TV.	  
+	  an external software decoder to watch TV.
 
 	  Say Y if you own such a device and want to use it.

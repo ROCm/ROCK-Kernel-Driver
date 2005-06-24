@@ -49,7 +49,8 @@
 
 #define access_ok(type, addr, size) (__range_not_ok(addr,size) == 0)
 
-extern inline int verify_area(int type, const void __user * addr, unsigned long size)
+/* this function will go away soon - use access_ok() instead */
+extern inline int __deprecated verify_area(int type, const void __user * addr, unsigned long size)
 {
 	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }
@@ -73,6 +74,7 @@ struct exception_table_entry
 	unsigned long insn, fixup;
 };
 
+#define ARCH_HAS_SEARCH_EXTABLE
 
 /*
  * These are the main single-value transfer routines.  They automatically
@@ -89,16 +91,11 @@ struct exception_table_entry
  * accesses to the same area of user memory).
  */
 
-extern void __get_user_1(void);
-extern void __get_user_2(void);
-extern void __get_user_4(void);
-extern void __get_user_8(void);
-
 #define __get_user_x(size,ret,x,ptr) \
 	__asm__ __volatile__("call __get_user_" #size \
 		:"=a" (ret),"=d" (x) \
-		:"0" (ptr) \
-		:"rbx")
+		:"c" (ptr) \
+		:"r8")
 
 /* Careful: we have to cast the result to the type of the pointer for sign reasons */
 #define get_user(x,ptr)							\
@@ -120,14 +117,13 @@ extern void __put_user_1(void);
 extern void __put_user_2(void);
 extern void __put_user_4(void);
 extern void __put_user_8(void);
-
 extern void __put_user_bad(void);
 
 #define __put_user_x(size,ret,x,ptr)					\
 	__asm__ __volatile__("call __put_user_" #size			\
 		:"=a" (ret)						\
-		:"0" (ptr),"d" (x)					\
-		:"rbx")
+		:"c" (ptr),"d" (x)					\
+		:"r8")
 
 #define put_user(x,ptr)							\
   __put_user_check((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
@@ -150,10 +146,15 @@ extern void __put_user_bad(void);
 
 #define __put_user_check(x,ptr,size)			\
 ({							\
-	int __pu_err = -EFAULT;				\
+	int __pu_err;					\
 	__typeof__(*(ptr)) __user *__pu_addr = (ptr);	\
-	if (likely(access_ok(VERIFY_WRITE,__pu_addr,size)))	\
-		__put_user_size((x),__pu_addr,(size),__pu_err);	\
+	switch (size) { 				\
+	case 1: __put_user_x(1,__pu_err,x,__pu_addr); break;	\
+	case 2: __put_user_x(2,__pu_err,x,__pu_addr); break;	\
+	case 4: __put_user_x(4,__pu_err,x,__pu_addr); break;	\
+	case 8: __put_user_x(8,__pu_err,x,__pu_addr); break;	\
+	default: __put_user_bad();			\
+	}						\
 	__pu_err;					\
 })
 
@@ -204,6 +205,10 @@ struct __large_struct { unsigned long buf[100]; };
 	__gu_err;						\
 })
 
+extern int __get_user_1(void);
+extern int __get_user_2(void);
+extern int __get_user_4(void);
+extern int __get_user_8(void);
 extern int __get_user_bad(void);
 
 #define __get_user_size(x,ptr,size,retval)				\

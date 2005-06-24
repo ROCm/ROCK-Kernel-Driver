@@ -721,6 +721,7 @@ journal_t * journal_init_dev(struct block_device *bdev,
 {
 	journal_t *journal = journal_init_common();
 	struct buffer_head *bh;
+	int n;
 
 	if (!journal)
 		return NULL;
@@ -735,6 +736,17 @@ journal_t * journal_init_dev(struct block_device *bdev,
 	J_ASSERT(bh != NULL);
 	journal->j_sb_buffer = bh;
 	journal->j_superblock = (journal_superblock_t *)bh->b_data;
+
+	/* journal descriptor can store up to n blocks -bzzz */
+	n = journal->j_blocksize / sizeof(journal_block_tag_t);
+	journal->j_wbufsize = n;
+	journal->j_wbuf = kmalloc(n * sizeof(struct buffer_head*), GFP_KERNEL);
+	if (!journal->j_wbuf) {
+		printk(KERN_ERR "%s: Cant allocate bhs for commit thread\n",
+			__FUNCTION__);
+		kfree(journal);
+		journal = NULL;
+	}
 
 	return journal;
 }
@@ -752,6 +764,7 @@ journal_t * journal_init_inode (struct inode *inode)
 	struct buffer_head *bh;
 	journal_t *journal = journal_init_common();
 	int err;
+	int n;
 	unsigned long blocknr;
 
 	if (!journal)
@@ -767,6 +780,17 @@ journal_t * journal_init_inode (struct inode *inode)
 
 	journal->j_maxlen = inode->i_size >> inode->i_sb->s_blocksize_bits;
 	journal->j_blocksize = inode->i_sb->s_blocksize;
+
+	/* journal descriptor can store up to n blocks -bzzz */
+	n = journal->j_blocksize / sizeof(journal_block_tag_t);
+	journal->j_wbufsize = n;
+	journal->j_wbuf = kmalloc(n * sizeof(struct buffer_head*), GFP_KERNEL);
+	if (!journal->j_wbuf) {
+		printk(KERN_ERR "%s: Cant allocate bhs for commit thread\n",
+			__FUNCTION__);
+		kfree(journal);
+		return NULL;
+	}
 
 	err = journal_bmap(journal, 0, &blocknr);
 	/* If that failed, give up */
@@ -1141,12 +1165,17 @@ void journal_destroy(journal_t *journal)
 		iput(journal->j_inode);
 	if (journal->j_revoke)
 		journal_destroy_revoke(journal);
+	kfree(journal->j_wbuf);
 	kfree(journal);
 }
 
 
 /**
  *int journal_check_used_features () - Check if features specified are used.
+ * @journal: Journal to check.
+ * @compat: bitmask of compatible features
+ * @ro: bitmask of features that force read-only mount
+ * @incompat: bitmask of incompatible features
  * 
  * Check whether the journal uses all of a given set of
  * features.  Return true (non-zero) if it does. 
@@ -1174,6 +1203,10 @@ int journal_check_used_features (journal_t *journal, unsigned long compat,
 
 /**
  * int journal_check_available_features() - Check feature set in journalling layer
+ * @journal: Journal to check.
+ * @compat: bitmask of compatible features
+ * @ro: bitmask of features that force read-only mount
+ * @incompat: bitmask of incompatible features
  * 
  * Check whether the journaling code supports the use of
  * all of a given set of features on this journal.  Return true
@@ -1206,6 +1239,10 @@ int journal_check_available_features (journal_t *journal, unsigned long compat,
 
 /**
  * int journal_set_features () - Mark a given journal feature in the superblock
+ * @journal: Journal to act on.
+ * @compat: bitmask of compatible features
+ * @ro: bitmask of features that force read-only mount
+ * @incompat: bitmask of incompatible features
  *
  * Mark a given journal feature as present on the
  * superblock.  Returns true if the requested features could be set. 
@@ -1238,6 +1275,7 @@ int journal_set_features (journal_t *journal, unsigned long compat,
 
 /**
  * int journal_update_format () - Update on-disk journal structure.
+ * @journal: Journal to act on.
  *
  * Given an initialised but unloaded journal struct, poke about in the
  * on-disk structure to update it to the most recent supported version.
@@ -1538,6 +1576,7 @@ int journal_errno(journal_t *journal)
 
 /** 
  * int journal_clear_err () - clears the journal's error state
+ * @journal: journal to act on.
  *
  * An error must be cleared or Acked to take a FS out of readonly
  * mode.
@@ -1557,6 +1596,7 @@ int journal_clear_err(journal_t *journal)
 
 /** 
  * void journal_ack_err() - Ack journal err.
+ * @journal: journal to act on.
  *
  * An error must be cleared or Acked to take a FS out of readonly
  * mode.
@@ -1575,11 +1615,7 @@ int journal_blocks_per_page(struct inode *inode)
 }
 
 /*
- * Simple support for retying memory allocations.  Introduced to help to
- * debug different VM deadlock avoidance strategies. 
- */
-/*
- * Simple support for retying memory allocations.  Introduced to help to
+ * Simple support for retrying memory allocations.  Introduced to help to
  * debug different VM deadlock avoidance strategies. 
  */
 void * __jbd_kmalloc (const char *where, size_t size, int flags, int retry)
@@ -1767,6 +1803,7 @@ static void __journal_remove_journal_head(struct buffer_head *bh)
 		if (jh->b_transaction == NULL &&
 				jh->b_next_transaction == NULL &&
 				jh->b_cp_transaction == NULL) {
+			J_ASSERT_JH(jh, jh->b_jlist == BJ_None);
 			J_ASSERT_BH(bh, buffer_jbd(bh));
 			J_ASSERT_BH(bh, jh2bh(jh) == bh);
 			BUFFER_TRACE(bh, "remove journal_head");

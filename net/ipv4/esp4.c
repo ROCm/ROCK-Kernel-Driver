@@ -17,11 +17,9 @@ struct esp_decap_data {
 	__u8		proto;
 };
 
-static int esp_output(struct sk_buff *skb)
+static int esp_output(struct xfrm_state *x, struct sk_buff *skb)
 {
 	int err;
-	struct dst_entry *dst = skb->dst;
-	struct xfrm_state *x  = dst->xfrm;
 	struct iphdr *top_iph;
 	struct ip_esp_hdr *esph;
 	struct crypto_tfm *tfm;
@@ -474,14 +472,13 @@ static struct net_protocol esp4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	esp4_err,
 	.no_policy	=	1,
-	.xfrm_prot	=	1,
 };
 
 static int __init esp4_init(void)
 {
 	struct xfrm_decap_state decap;
 
-	if (sizeof(struct esp_decap_data)  <
+	if (sizeof(struct esp_decap_data)  >
 	    sizeof(decap.decap_data)) {
 		extern void decap_data_too_small(void);
 

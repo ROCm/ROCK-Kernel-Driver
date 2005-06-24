@@ -238,7 +238,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	q->make_request_fn = mfn;
 	q->backing_dev_info.ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE;
 	q->backing_dev_info.state = 0;
-	q->backing_dev_info.memory_backed = 0;
+	q->backing_dev_info.capabilities = BDI_CAP_MAP_COPY;
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
 	blk_queue_dma_alignment(q, 511);
@@ -271,10 +271,9 @@ static inline void rq_init(request_queue_t *q, struct request *rq)
 {
 	INIT_LIST_HEAD(&rq->queuelist);
 
-	rq->bio = rq->biotail = NULL;
-	rq->ioprio = 0;
-	rq->rq_status = RQ_ACTIVE;
 	rq->errors = 0;
+	rq->rq_status = RQ_ACTIVE;
+	rq->bio = rq->biotail = NULL;
 	rq->buffer = NULL;
 	rq->ref_count = 1;
 	rq->q = q;
@@ -283,8 +282,6 @@ static inline void rq_init(request_queue_t *q, struct request *rq)
 	rq->data_len = 0;
 	rq->data = NULL;
 	rq->sense = NULL;
-	rq->timeout = 0;
-	rq->pm = NULL;
 	rq->end_io = NULL;
 	rq->end_io_data = NULL;
 }
@@ -819,6 +816,7 @@ fail:
  * blk_queue_init_tags - initialize the queue tag info
  * @q:  the request queue for the device
  * @depth:  the maximum queue depth supported
+ * @tags: the tag to use
  **/
 int blk_queue_init_tags(request_queue_t *q, int depth,
 			struct blk_queue_tag *tags)
@@ -1458,7 +1456,11 @@ void __generic_unplug_device(request_queue_t *q)
 	if (!blk_remove_plug(q))
 		return;
 
-	q->request_fn(q);
+	/*
+	 * was plugged, fire request_fn if queue has stuff to do
+	 */
+	if (elv_next_request(q))
+		q->request_fn(q);
 }
 EXPORT_SYMBOL(__generic_unplug_device);
 
@@ -1587,7 +1589,8 @@ void blk_run_queue(struct request_queue *q)
 
 	spin_lock_irqsave(q->queue_lock, flags);
 	blk_remove_plug(q);
-	q->request_fn(q);
+	if (!elv_queue_empty(q))
+		q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 EXPORT_SYMBOL(blk_run_queue);
@@ -1772,8 +1775,8 @@ static inline void blk_free_request(request_queue_t *q, struct request *rq)
 	mempool_free(rq, q->rq.rq_pool);
 }
 
-static inline struct request *
-blk_alloc_request(request_queue_t *q, int rw, struct bio *bio, int gfp_mask)
+static inline struct request *blk_alloc_request(request_queue_t *q, int rw,
+						int gfp_mask)
 {
 	struct request *rq = mempool_alloc(q->rq.rq_pool, gfp_mask);
 
@@ -1786,7 +1789,7 @@ blk_alloc_request(request_queue_t *q, int rw, struct bio *bio, int gfp_mask)
 	 */
 	rq->flags = rw;
 
-	if (!elv_set_request(q, rq, bio, gfp_mask))
+	if (!elv_set_request(q, rq, gfp_mask))
 		return rq;
 
 	mempool_free(rq, q->rq.rq_pool);
@@ -1869,8 +1872,7 @@ static void freed_request(request_queue_t *q, int rw)
 /*
  * Get a free request, queue_lock must not be held
  */
-static struct request *get_request(request_queue_t *q, int rw, struct bio *bio,
-				   int gfp_mask)
+static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 {
 	struct request *rq = NULL;
 	struct request_list *rl = &q->rq;
@@ -1893,7 +1895,7 @@ static struct request *get_request(request_queue_t *q, int rw, struct bio *bio,
 		}
 	}
 
-	switch (elv_may_queue(q, rw, bio)) {
+	switch (elv_may_queue(q, rw)) {
 		case ELV_MQUEUE_NO:
 			goto rq_starved;
 		case ELV_MQUEUE_MAY:
@@ -1918,7 +1920,7 @@ get_rq:
 		set_queue_congested(q, rw);
 	spin_unlock_irq(q->queue_lock);
 
-	rq = blk_alloc_request(q, rw, bio, gfp_mask);
+	rq = blk_alloc_request(q, rw, gfp_mask);
 	if (!rq) {
 		/*
 		 * Allocation failed presumably due to memory. Undo anything
@@ -1959,8 +1961,7 @@ out:
  * No available requests for this queue, unplug the device and wait for some
  * requests to become available.
  */
-static struct request *get_request_wait(request_queue_t *q, int rw,
-					struct bio *bio)
+static struct request *get_request_wait(request_queue_t *q, int rw)
 {
 	DEFINE_WAIT(wait);
 	struct request *rq;
@@ -1972,7 +1973,7 @@ static struct request *get_request_wait(request_queue_t *q, int rw,
 		prepare_to_wait_exclusive(&rl->wait[rw], &wait,
 				TASK_UNINTERRUPTIBLE);
 
-		rq = get_request(q, rw, bio, GFP_NOIO);
+		rq = get_request(q, rw, GFP_NOIO);
 
 		if (!rq) {
 			struct io_context *ioc;
@@ -2002,9 +2003,9 @@ struct request *blk_get_request(request_queue_t *q, int rw, int gfp_mask)
 	BUG_ON(rw != READ && rw != WRITE);
 
 	if (gfp_mask & __GFP_WAIT)
-		rq = get_request_wait(q, rw, NULL);
+		rq = get_request_wait(q, rw);
 	else
-		rq = get_request(q, rw, NULL, gfp_mask);
+		rq = get_request(q, rw, gfp_mask);
 
 	return rq;
 }
@@ -2160,7 +2161,7 @@ EXPORT_SYMBOL(blk_rq_map_user);
 /**
  * blk_rq_unmap_user - unmap a request with user data
  * @rq:		request to be unmapped
- * @ubuf:	user buffer
+ * @bio:	bio for the request
  * @ulen:	length of user buffer
  *
  * Description:
@@ -2378,6 +2379,7 @@ static void __blk_put_request(request_queue_t *q, struct request *req)
 		return;
 
 	req->rq_status = RQ_INACTIVE;
+	req->q = NULL;
 	req->rl = NULL;
 
 	/*
@@ -2506,8 +2508,6 @@ static int attempt_merge(request_queue_t *q, struct request *req,
 		req->rq_disk->in_flight--;
 	}
 
-	req->ioprio = ioprio_best(req->ioprio, next->ioprio);
-
 	__blk_put_request(q, next);
 	return 1;
 }
@@ -2569,16 +2569,15 @@ EXPORT_SYMBOL(__blk_attempt_remerge);
 static int __make_request(request_queue_t *q, struct bio *bio)
 {
 	struct request *req, *freereq = NULL;
-	int el_ret, rw, nr_sectors, cur_nr_sectors, barrier, err;
-	unsigned short prio;
+	int el_ret, rw, nr_sectors, cur_nr_sectors, barrier, err, sync;
 	sector_t sector;
 
 	sector = bio->bi_sector;
 	nr_sectors = bio_sectors(bio);
 	cur_nr_sectors = bio_cur_sectors(bio);
-	prio = bio_prio(bio);
 
 	rw = bio_data_dir(bio);
+	sync = bio_sync(bio);
 
 	/*
 	 * low level driver can indicate that it wants pages above a
@@ -2616,7 +2615,6 @@ again:
 			req->biotail->bi_next = bio;
 			req->biotail = bio;
 			req->nr_sectors = req->hard_nr_sectors += nr_sectors;
-			req->ioprio = ioprio_best(req->ioprio, prio);
 			drive_stat_acct(req, nr_sectors, 0);
 			if (!attempt_back_merge(q, req))
 				elv_merged_request(q, req);
@@ -2641,7 +2639,6 @@ again:
 			req->hard_cur_sectors = cur_nr_sectors;
 			req->sector = req->hard_sector = sector;
 			req->nr_sectors = req->hard_nr_sectors += nr_sectors;
-			req->ioprio = ioprio_best(req->ioprio, prio);
 			drive_stat_acct(req, nr_sectors, 0);
 			if (!attempt_front_merge(q, req))
 				elv_merged_request(q, req);
@@ -2669,7 +2666,7 @@ get_rq:
 		freereq = NULL;
 	} else {
 		spin_unlock_irq(q->queue_lock);
-		if ((freereq = get_request(q, rw, bio, GFP_ATOMIC)) == NULL) {
+		if ((freereq = get_request(q, rw, GFP_ATOMIC)) == NULL) {
 			/*
 			 * READA bit set
 			 */
@@ -2677,7 +2674,7 @@ get_rq:
 			if (bio_rw_ahead(bio))
 				goto end_io;
 	
-			freereq = get_request_wait(q, rw, bio);
+			freereq = get_request_wait(q, rw);
 		}
 		goto again;
 	}
@@ -2705,7 +2702,6 @@ get_rq:
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
 	req->bio = req->biotail = bio;
-	req->ioprio = prio;
 	req->rq_disk = bio->bi_bdev->bd_disk;
 	req->start_time = jiffies;
 
@@ -2713,7 +2709,7 @@ get_rq:
 out:
 	if (freereq)
 		__blk_put_request(q, freereq);
-	if (bio_sync(bio))
+	if (sync)
 		__generic_unplug_device(q);
 
 	spin_unlock_irq(q->queue_lock);
@@ -2753,7 +2749,6 @@ void blk_finish_queue_drain(request_queue_t *q)
 {
 	struct request_list *rl = &q->rq;
 	struct request *rq;
-	int requeued = 0;
 
 	spin_lock_irq(q->queue_lock);
 	clear_bit(QUEUE_FLAG_DRAIN, &q->queue_flags);
@@ -2762,12 +2757,8 @@ void blk_finish_queue_drain(request_queue_t *q)
 		rq = list_entry_rq(q->drain_list.next);
 
 		list_del_init(&rq->queuelist);
-		elv_requeue_request(q, rq);
-		requeued++;
+		__elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
 	}
-
-	if (requeued)
-		q->request_fn(q);
 
 	spin_unlock_irq(q->queue_lock);
 
@@ -2965,7 +2956,7 @@ void submit_bio(int rw, struct bio *bio)
 
 	BIO_BUG_ON(!bio->bi_size);
 	BIO_BUG_ON(!bio->bi_io_vec);
-	bio->bi_rw |= rw;
+	bio->bi_rw = rw;
 	if (rw & WRITE)
 		mod_page_state(pgpgout, count);
 	else
@@ -3324,7 +3315,6 @@ void exit_io_context(void)
 	local_irq_save(flags);
 	ioc = current->io_context;
 	current->io_context = NULL;
-	ioc->task = NULL;
 	local_irq_restore(flags);
 
 	if (ioc->aic && ioc->aic->exit)
@@ -3359,13 +3349,13 @@ struct io_context *get_io_context(int gfp_flags)
 	ret = kmem_cache_alloc(iocontext_cachep, gfp_flags);
 	if (ret) {
 		atomic_set(&ret->refcount, 1);
-		ret->task = current;
-		ret->set_ioprio = NULL;
+		ret->pid = tsk->pid;
 		ret->last_waited = jiffies; /* doesn't matter... */
 		ret->nr_batch_requests = 0; /* because this is 0 */
 		ret->aic = NULL;
 		ret->cic = NULL;
-	
+		spin_lock_init(&ret->lock);
+
 		local_irq_save(flags);
 
 		/*

@@ -20,9 +20,10 @@ config PCCARD
 	  To compile this driver as modules, choose M here: the
 	  module will be called pcmcia_core.
 
+if PCCARD
+
 config PCMCIA_DEBUG
 	bool "Enable PCCARD debugging"
-	depends on PCCARD != n
 	help
 	  Say Y here to enable PCMCIA subsystem debugging.  You
 	  will need to choose the debugging level either via the
@@ -41,7 +42,6 @@ config PCMCIA_DEBUG
 
 config PCMCIA
 	tristate "16-bit PCMCIA support"
-	depends on PCCARD
 	default y
 	---help---
 	   This option enables support for 16-bit PCMCIA cards. Most older
@@ -60,7 +60,7 @@ config PCMCIA
 
 config CARDBUS
 	bool "32-bit CardBus support"	
-	depends on PCCARD && PCI
+	depends on PCI
 	default y
 	---help---
 	  CardBus is a bus mastering architecture for PC-cards, which allows
@@ -77,7 +77,7 @@ comment "PC-card bridges"
 
 config YENTA
 	tristate "CardBus yenta-compatible bridge support"
-	depends on PCCARD && PCI
+	depends on PCI
 #fixme: remove dependendcy on CARDBUS
 	depends on CARDBUS
 	select PCCARD_NONSTATIC
@@ -197,6 +197,7 @@ config PCMCIA_VRC4173
 
 config PCCARD_NONSTATIC
 	tristate
-	depends on PCCARD
+
+endif	# PCCARD
 
 endmenu

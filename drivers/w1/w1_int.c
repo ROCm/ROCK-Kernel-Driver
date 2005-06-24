@@ -74,7 +74,6 @@ struct w1_master * w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
 	INIT_LIST_HEAD(&dev->slist);
 	init_MUTEX(&dev->mutex);
 
-	init_waitqueue_head(&dev->kwait);
 	init_completion(&dev->dev_released);
 	init_completion(&dev->dev_exited);
 
@@ -217,8 +216,5 @@ void w1_remove_master_device(struct w1_bus_master *bm)
 	__w1_remove_master_device(dev);
 }
 
-EXPORT_SYMBOL(w1_alloc_dev);
-EXPORT_SYMBOL(w1_free_dev);
 EXPORT_SYMBOL(w1_add_master_device);
 EXPORT_SYMBOL(w1_remove_master_device);
-EXPORT_SYMBOL(__w1_remove_master_device);

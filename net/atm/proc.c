@@ -71,9 +71,7 @@ struct vcc_state {
 
 static inline int compare_family(struct sock *sk, int family)
 {
-	struct atm_vcc *vcc = atm_sk(sk);
-
-	return !family || (vcc->sk->sk_family == family);
+	return !family || (sk->sk_family == family);
 }
 
 static int __vcc_walk(struct sock **sock, int family, int *bucket, loff_t l)
@@ -203,13 +201,15 @@ static const char *vcc_state(struct atm_vcc *vcc)
 
 static void vcc_info(struct seq_file *seq, struct atm_vcc *vcc)
 {
+	struct sock *sk = sk_atm(vcc);
+
 	seq_printf(seq, "%p ", vcc);
 	if (!vcc->dev)
 		seq_printf(seq, "Unassigned    ");
 	else 
 		seq_printf(seq, "%3d %3d %5d ", vcc->dev->number, vcc->vpi,
 			vcc->vci);
-	switch (vcc->sk->sk_family) {
+	switch (sk->sk_family) {
 		case AF_ATMPVC:
 			seq_printf(seq, "PVC");
 			break;
@@ -217,12 +217,12 @@ static void vcc_info(struct seq_file *seq, struct atm_vcc *vcc)
 			seq_printf(seq, "SVC");
 			break;
 		default:
-			seq_printf(seq, "%3d", vcc->sk->sk_family);
+			seq_printf(seq, "%3d", sk->sk_family);
 	}
-	seq_printf(seq, " %04lx  %5d %7d/%7d %7d/%7d [%d]\n", vcc->flags, vcc->sk->sk_err,
-		atomic_read(&vcc->sk->sk_wmem_alloc),vcc->sk->sk_sndbuf,
-		atomic_read(&vcc->sk->sk_rmem_alloc),vcc->sk->sk_rcvbuf,
-		atomic_read(&vcc->sk->sk_refcnt));
+	seq_printf(seq, " %04lx  %5d %7d/%7d %7d/%7d [%d]\n", vcc->flags, sk->sk_err,
+		  atomic_read(&sk->sk_wmem_alloc), sk->sk_sndbuf,
+		  atomic_read(&sk->sk_rmem_alloc), sk->sk_rcvbuf,
+		  atomic_read(&sk->sk_refcnt));
 }
 
 static void svc_info(struct seq_file *seq, struct atm_vcc *vcc)

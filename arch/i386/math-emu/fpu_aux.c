@@ -21,7 +21,7 @@ static void fnop(void)
 {
 }
 
-void fclex(void)
+static void fclex(void)
 {
   partial_status &= ~(SW_Backward|SW_Summary|SW_Stack_Fault|SW_Precision|
 		   SW_Underflow|SW_Overflow|SW_Zero_Div|SW_Denorm_Op|

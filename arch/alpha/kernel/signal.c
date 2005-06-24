@@ -91,7 +91,7 @@ osf_sigaction(int sig, const struct osf_sigaction __user *act,
 
 	if (act) {
 		old_sigset_t mask;
-		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		if (!access_ok(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
 		    __get_user(new_ka.sa.sa_flags, &act->sa_flags))
 			return -EFAULT;
@@ -103,7 +103,7 @@ osf_sigaction(int sig, const struct osf_sigaction __user *act,
 	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
 
 	if (!ret && oact) {
-		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		if (!access_ok(VERIFY_WRITE, oact, sizeof(*oact)) ||
 		    __put_user(old_ka.sa.sa_handler, &oact->sa_handler) ||
 		    __put_user(old_ka.sa.sa_flags, &oact->sa_flags))
 			return -EFAULT;
@@ -298,7 +298,7 @@ do_sigreturn(struct sigcontext __user *sc, struct pt_regs *regs,
 	sigset_t set;
 
 	/* Verify that it's a good sigcontext before using it */
-	if (verify_area(VERIFY_READ, sc, sizeof(*sc)))
+	if (!access_ok(VERIFY_READ, sc, sizeof(*sc)))
 		goto give_sigsegv;
 	if (__get_user(set.sig[0], &sc->sc_mask))
 		goto give_sigsegv;
@@ -336,7 +336,7 @@ do_rt_sigreturn(struct rt_sigframe __user *frame, struct pt_regs *regs,
 	sigset_t set;
 
 	/* Verify that it's a good ucontext_t before using it */
-	if (verify_area(VERIFY_READ, &frame->uc, sizeof(frame->uc)))
+	if (!access_ok(VERIFY_READ, &frame->uc, sizeof(frame->uc)))
 		goto give_sigsegv;
 	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
 		goto give_sigsegv;
@@ -446,7 +446,7 @@ setup_frame(int sig, struct k_sigaction *ka, sigset_t *set,
 
 	oldsp = rdusp();
 	frame = get_sigframe(ka, oldsp, sizeof(*frame));
-	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
 	err |= setup_sigcontext(&frame->sc, regs, sw, set->sig[0], oldsp);
@@ -497,7 +497,7 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	oldsp = rdusp();
 	frame = get_sigframe(ka, oldsp, sizeof(*frame));
-	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
 	err |= copy_siginfo_to_user(&frame->info, info);

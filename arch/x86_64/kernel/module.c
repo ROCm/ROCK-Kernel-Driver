@@ -29,108 +29,32 @@
 #include <asm/pgtable.h>
 
 #define DEBUGP(fmt...) 
- 
-static struct vm_struct *mod_vmlist;
 
+#ifndef CONFIG_UML
 void module_free(struct module *mod, void *module_region)
 {
-	struct vm_struct **prevp, *map;
-	int i;
-	unsigned long addr = (unsigned long)module_region;
-
-	if (!addr)
-		return;
-	write_lock(&vmlist_lock); 
-	for (prevp = &mod_vmlist ; (map = *prevp) ; prevp = &map->next) {
-		if ((unsigned long)map->addr == addr) {
-			*prevp = map->next;
-			goto found;
-		}
-	}
-	write_unlock(&vmlist_lock); 
-	printk("Trying to unmap nonexistent module vm area (%lx)\n", addr);
-	return;
- found:
-	unmap_vm_area(map);
-	write_unlock(&vmlist_lock); 
-	if (map->pages) {
-		for (i = 0; i < map->nr_pages; i++)
-			if (map->pages[i])
-				__free_page(map->pages[i]);	
-		kfree(map->pages);
-	}
-	kfree(map);					
+	vfree(module_region);
+	/* FIXME: If module_region == mod->init_region, trim exception
+           table entries. */
 }
 
 void *module_alloc(unsigned long size)
 {
-	struct vm_struct **p, *tmp, *area;
-	struct page **pages;
-	void *addr;
-	unsigned int nr_pages, array_size, i;
+	struct vm_struct *area;
 
 	if (!size)
-		return NULL; 
+		return NULL;
 	size = PAGE_ALIGN(size);
 	if (size > MODULES_LEN)
 		return NULL;
 
-	area = (struct vm_struct *) kmalloc(sizeof(*area), GFP_KERNEL);
+	area = __get_vm_area(size, VM_ALLOC, MODULES_VADDR, MODULES_END);
 	if (!area)
 		return NULL;
-	memset(area, 0, sizeof(struct vm_struct));
 
-	write_lock(&vmlist_lock);
-	addr = (void *) MODULES_VADDR;
-	for (p = &mod_vmlist; (tmp = *p); p = &tmp->next) {
-		void *next; 
-		DEBUGP("vmlist %p %lu addr %p\n", tmp->addr, tmp->size, addr);
-		if (size + (unsigned long) addr + PAGE_SIZE < (unsigned long) tmp->addr)
-			break;
-		next = (void *) (tmp->size + (unsigned long) tmp->addr);
-		if (next > addr) 
-			addr = next;
-	}
-
-	if ((unsigned long)addr + size >= MODULES_END) {
-		write_unlock(&vmlist_lock);
-		kfree(area); 
-		return NULL;
-	}
-	DEBUGP("addr %p\n", addr);
-
-	area->next = *p;
-	*p = area;
-	area->size = size + PAGE_SIZE;
-	area->addr = addr;
-	write_unlock(&vmlist_lock);
-
-	nr_pages = size >> PAGE_SHIFT;
-	array_size = (nr_pages * sizeof(struct page *));
-
-	area->nr_pages = nr_pages;
-	area->pages = pages = kmalloc(array_size, GFP_KERNEL);
-	if (!area->pages) 
-		goto fail;
-
-	memset(area->pages, 0, array_size);
-	for (i = 0; i < nr_pages; i++) {
-		area->pages[i] = alloc_page(GFP_KERNEL);
-		if (area->pages[i] == NULL)
-			goto fail;
-	}
-	
-	if (map_vm_area(area, PAGE_KERNEL_EXEC, &pages))
-		goto fail;
-	
-	memset(addr, 0, size);
-	DEBUGP("module_alloc size %lu = %p\n", size, addr);
-	return addr;
-
-fail:
-	module_free(NULL, addr);
-	return NULL;
+	return __vmalloc_area(area, GFP_KERNEL, PAGE_KERNEL_EXEC);
 }
+#endif
 
 /* We don't need anything special. */
 int module_frob_arch_sections(Elf_Ehdr *hdr,

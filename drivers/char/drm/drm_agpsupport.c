@@ -52,7 +52,7 @@ int drm_agp_info(struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	 *priv	 = filp->private_data;
-	drm_device_t	 *dev	 = priv->dev;
+	drm_device_t	 *dev	 = priv->head->dev;
 	DRM_AGP_KERN     *kern;
 	drm_agp_info_t   info;
 
@@ -91,15 +91,14 @@ int drm_agp_acquire(struct inode *inode, struct file *filp,
 		     unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	 *priv	 = filp->private_data;
-	drm_device_t	 *dev	 = priv->dev;
-	int              retcode;
+	drm_device_t	 *dev	 = priv->head->dev;
 
 	if (!dev->agp)
 		return -ENODEV;
 	if (dev->agp->acquired)
 		return -EBUSY;
-	if ((retcode = agp_backend_acquire()))
-		return retcode;
+	if (!(dev->agp->bridge = agp_backend_acquire(dev->pdev)))
+		return -ENODEV;
 	dev->agp->acquired = 1;
 	return 0;
 }
@@ -119,11 +118,11 @@ int drm_agp_release(struct inode *inode, struct file *filp,
 		     unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	 *priv	 = filp->private_data;
-	drm_device_t	 *dev	 = priv->dev;
+	drm_device_t	 *dev	 = priv->head->dev;
 
 	if (!dev->agp || !dev->agp->acquired)
 		return -EINVAL;
-	agp_backend_release();
+	agp_backend_release(dev->agp->bridge);
 	dev->agp->acquired = 0;
 	return 0;
 
@@ -134,9 +133,9 @@ int drm_agp_release(struct inode *inode, struct file *filp,
  *
  * Calls agp_backend_release().
  */
-void drm_agp_do_release(void)
+void drm_agp_do_release(drm_device_t *dev)
 {
-  agp_backend_release();
+  agp_backend_release(dev->agp->bridge);
 }
 
 /**
@@ -155,7 +154,7 @@ int drm_agp_enable(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	 *priv	 = filp->private_data;
-	drm_device_t	 *dev	 = priv->dev;
+	drm_device_t	 *dev	 = priv->head->dev;
 	drm_agp_mode_t   mode;
 
 	if (!dev->agp || !dev->agp->acquired)
@@ -165,7 +164,7 @@ int drm_agp_enable(struct inode *inode, struct file *filp,
 		return -EFAULT;
 
 	dev->agp->mode    = mode.mode;
-	agp_enable(mode.mode);
+	agp_enable(dev->agp->bridge, mode.mode);
 	dev->agp->base    = dev->agp->agp_info.aper_base;
 	dev->agp->enabled = 1;
 	return 0;
@@ -187,7 +186,7 @@ int drm_agp_alloc(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	 *priv	 = filp->private_data;
-	drm_device_t	 *dev	 = priv->dev;
+	drm_device_t	 *dev	 = priv->head->dev;
 	drm_agp_buffer_t request;
 	drm_agp_mem_t    *entry;
 	DRM_AGP_MEM      *memory;
@@ -207,7 +206,7 @@ int drm_agp_alloc(struct inode *inode, struct file *filp,
 	pages = (request.size + PAGE_SIZE - 1) / PAGE_SIZE;
 	type = (u32) request.type;
 
-	if (!(memory = drm_alloc_agp(pages, type))) {
+	if (!(memory = drm_alloc_agp(dev->agp->bridge, pages, type))) {
 		drm_free(entry, sizeof(*entry), DRM_MEM_AGPLISTS);
 		return -ENOMEM;
 	}
@@ -272,7 +271,7 @@ int drm_agp_unbind(struct inode *inode, struct file *filp,
 		    unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	  *priv	 = filp->private_data;
-	drm_device_t	  *dev	 = priv->dev;
+	drm_device_t	  *dev	 = priv->head->dev;
 	drm_agp_binding_t request;
 	drm_agp_mem_t     *entry;
 	int ret;
@@ -308,7 +307,7 @@ int drm_agp_bind(struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	  *priv	 = filp->private_data;
-	drm_device_t	  *dev	 = priv->dev;
+	drm_device_t	  *dev	 = priv->head->dev;
 	drm_agp_binding_t request;
 	drm_agp_mem_t     *entry;
 	int               retcode;
@@ -349,7 +348,7 @@ int drm_agp_free(struct inode *inode, struct file *filp,
 		  unsigned int cmd, unsigned long arg)
 {
 	drm_file_t	 *priv	 = filp->private_data;
-	drm_device_t	 *dev	 = priv->dev;
+	drm_device_t	 *dev	 = priv->head->dev;
 	drm_agp_buffer_t request;
 	drm_agp_mem_t    *entry;
 
@@ -381,14 +380,24 @@ int drm_agp_free(struct inode *inode, struct file *filp,
  * \return pointer to a drm_agp_head structure.
  *
  */
-drm_agp_head_t *drm_agp_init(void)
+drm_agp_head_t *drm_agp_init(drm_device_t *dev)
 {
 	drm_agp_head_t *head         = NULL;
 
 	if (!(head = drm_alloc(sizeof(*head), DRM_MEM_AGPLISTS)))
 		return NULL;
 	memset((void *)head, 0, sizeof(*head));
-	agp_copy_info(&head->agp_info);
+	head->bridge = agp_find_bridge(dev->pdev);
+	if (!head->bridge) {
+		if (!(head->bridge = agp_backend_acquire(dev->pdev))) {
+			drm_free(head, sizeof(*head), DRM_MEM_AGPLISTS);
+			return NULL;
+		}
+		agp_copy_info(head->bridge, &head->agp_info);
+		agp_backend_release(head->bridge);
+	} else {
+		agp_copy_info(head->bridge, &head->agp_info);
+	}
 	if (head->agp_info.chipset == NOT_SUPPORTED) {
 		drm_free(head, sizeof(*head), DRM_MEM_AGPLISTS);
 		return NULL;
@@ -406,9 +415,9 @@ drm_agp_head_t *drm_agp_init(void)
 }
 
 /** Calls agp_allocate_memory() */
-DRM_AGP_MEM *drm_agp_allocate_memory(size_t pages, u32 type)
+DRM_AGP_MEM *drm_agp_allocate_memory(struct agp_bridge_data *bridge, size_t pages, u32 type)
 {
-	return agp_allocate_memory(pages, type);
+	return agp_allocate_memory(bridge, pages, type);
 }
 
 /** Calls agp_free_memory() */

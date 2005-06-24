@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-cards.c,v 1.56 2005/01/13 17:22:33 kraxel Exp $
+ * $Id: cx88-cards.c,v 1.66 2005/03/04 09:12:23 kraxel Exp $
  *
  * device driver for Conexant 2388x based TV cards
  * card-specific stuff.
@@ -26,15 +26,7 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 
-#if defined(CONFIG_VIDEO_CX88_DVB) || defined(CONFIG_VIDEO_CX88_DVB_MODULE)
-# define WITH_DVB 1
-#endif
-
 #include "cx88.h"
-#ifdef WITH_DVB
-# include "dvb-pll.h"
-# include "cx22702.h"
-#endif
 
 /* ------------------------------------------------------------------ */
 /* board config info                                                  */
@@ -60,6 +52,7 @@ struct cx88_board cx88_boards[] = {
 	[CX88_BOARD_HAUPPAUGE] = {
 		.name		= "Hauppauge WinTV 34xxx models",
 		.tuner_type     = UNSET,
+		.tda9887_conf   = TDA9887_PRESENT,
 		.input          = {{
 			.type   = CX88_VMUX_TELEVISION,
 			.vmux   = 0,
@@ -218,10 +211,33 @@ struct cx88_board cx88_boards[] = {
                 .input          = {{
                         .type   = CX88_VMUX_TELEVISION,
                         .vmux   = 0,
-                }},
+			.gpio0  = 0x0035e700,
+			.gpio1  = 0x00003004,
+			.gpio2  = 0x0035e700,
+			.gpio3  = 0x02000000,
+		},{
+
+			.type   = CX88_VMUX_COMPOSITE1,
+			.vmux   = 1,
+			.gpio0  = 0x0035c700,
+			.gpio1  = 0x00003004,
+			.gpio2  = 0x0035c700,
+			.gpio3  = 0x02000000,
+		},{
+			.type   = CX88_VMUX_SVIDEO,
+			.vmux   = 2,
+			.gpio0  = 0x0035c700,
+			.gpio1  = 0x0035c700,
+			.gpio2  = 0x02000000,
+			.gpio3  = 0x02000000,
+		}},
                 .radio = {
-                        .type   = CX88_RADIO,
-                },
+			.type   = CX88_RADIO,
+			.gpio0  = 0x0035d700,
+			.gpio1  = 0x00007004,
+			.gpio2  = 0x0035d700,
+			.gpio3  = 0x02000000,
+		 },
         },
         [CX88_BOARD_LEADTEK_PVR2000] = {
 		// gpio values for PAL version from regspy by DScaler
@@ -476,6 +492,115 @@ struct cx88_board cx88_boards[] = {
 		}},
 		.dvb            = 1,
 	},
+	[CX88_BOARD_PCHDTV_HD3000] = {
+		.name           = "pcHDTV HD3000 HDTV",
+		.tuner_type     = TUNER_THOMSON_DTT7610,
+		.input          = {{
+			.type   = CX88_VMUX_TELEVISION,
+			.vmux   = 0,
+			.gpio0  = 0x00008484,
+			.gpio1  = 0x00000000,
+			.gpio2  = 0x00000000,
+			.gpio3  = 0x00000000,
+		},{
+			.type   = CX88_VMUX_COMPOSITE1,
+			.vmux   = 1,
+			.gpio0  = 0x00008400,
+			.gpio1  = 0x00000000,
+			.gpio2  = 0x00000000,
+			.gpio3  = 0x00000000,
+		},{
+			.type   = CX88_VMUX_SVIDEO,
+			.vmux   = 2,
+			.gpio0  = 0x00008400,
+			.gpio1  = 0x00000000,
+			.gpio2  = 0x00000000,
+			.gpio3  = 0x00000000,
+		}},
+		.radio = {
+			.type   = CX88_RADIO,
+			.vmux   = 2,
+			.gpio0  = 0x00008400,
+			.gpio1  = 0x00000000,
+			.gpio2  = 0x00000000,
+			.gpio3  = 0x00000000,
+		},
+		.dvb            = 1,
+	},
+	[CX88_BOARD_HAUPPAUGE_ROSLYN] = {
+		// entry added by Kaustubh D. Bhalerao <bhalerao.1@osu.edu>
+		// GPIO values obtained from regspy, courtesy Sean Covel
+		.name        = "Hauppauge WinTV 28xxx (Roslyn) models",
+		.tuner_type  = UNSET,
+		.input          = {{
+			.type   = CX88_VMUX_TELEVISION,
+			.vmux   = 0,
+			.gpio0  = 0xed12,  // internal decoder
+			.gpio2  = 0x00ff,
+		},{
+			.type   = CX88_VMUX_DEBUG,
+			.vmux   = 0,
+			.gpio0  = 0xff01,  // mono from tuner chip
+		},{
+			.type   = CX88_VMUX_COMPOSITE1,
+			.vmux   = 1,
+			.gpio0  = 0xff02,
+		},{
+			.type   = CX88_VMUX_SVIDEO,
+			.vmux   = 2,
+			.gpio0  = 0xed92,
+			.gpio2  = 0x00ff,
+		}},
+		.radio = {
+			 .type   = CX88_RADIO,
+			 .gpio0  = 0xed96,
+			 .gpio2  = 0x00ff,
+		 },
+		.blackbird = 1,
+	},
+	[CX88_BOARD_DIGITALLOGIC_MEC] = {
+		/* params copied over from Leadtek PVR 2000 */
+		.name           = "Digital-Logic MICROSPACE Entertainment Center (MEC)",
+		/* not sure yet about the tuner type */
+		.tuner_type     = 38,
+		.tda9887_conf   = TDA9887_PRESENT,
+		.input          = {{
+			.type   = CX88_VMUX_TELEVISION,
+			.vmux   = 0,
+			.gpio0  = 0x0000bde6,
+		},{
+			.type   = CX88_VMUX_COMPOSITE1,
+			.vmux   = 1,
+			.gpio0  = 0x0000bde6,
+		},{
+			.type   = CX88_VMUX_SVIDEO,
+			.vmux   = 2,
+			.gpio0  = 0x0000bde6,
+		}},
+		.radio = {
+			.type   = CX88_RADIO,
+			.gpio0  = 0x0000bd62,
+		},
+		.blackbird = 1,
+	},
+	[CX88_BOARD_IODATA_GVBCTV7E] = {
+		.name           = "IODATA GV/BCTV7E",
+		.tuner_type     = TUNER_PHILIPS_FQ1286,
+		.tda9887_conf   = TDA9887_PRESENT,
+		.input          = {{
+			.type   = CX88_VMUX_TELEVISION,
+			.vmux   = 1,
+			.gpio1  = 0x0000e03f,
+		},{
+			.type   = CX88_VMUX_COMPOSITE1,
+			.vmux   = 2,
+			.gpio1  = 0x0000e07f,
+		},{
+			.type   = CX88_VMUX_SVIDEO,
+			.vmux   = 3,
+			.gpio1  = 0x0000e07f,
+		}}
+	},
 };
 const unsigned int cx88_bcount = ARRAY_SIZE(cx88_boards);
 
@@ -579,6 +704,18 @@ struct cx88_subid cx88_subids[] = {
 		.subvendor = 0x17DE,
 		.subdevice = 0xA8A6,
 		.card      = CX88_BOARD_DNTV_LIVE_DVB_T,
+	},{
+		.subvendor = 0x0070,
+		.subdevice = 0x2801,
+		.card      = CX88_BOARD_HAUPPAUGE_ROSLYN,
+	},{
+		.subvendor = 0x14F1,
+		.subdevice = 0x0342,
+		.card      = CX88_BOARD_DIGITALLOGIC_MEC,
+	},{
+		.subvendor = 0x10fc,
+		.subdevice = 0xd035,
+		.card      = CX88_BOARD_IODATA_GVBCTV7E,
 	}
 };
 const unsigned int cx88_idcount = ARRAY_SIZE(cx88_subids);
@@ -622,7 +759,6 @@ static void hauppauge_eeprom(struct cx88_core *core, u8 *eeprom_data)
 	core->has_radio  = tv.has_radio;
 }
 
-#ifdef WITH_DVB
 static int hauppauge_eeprom_dvb(struct cx88_core *core, u8 *ee)
 {
 	int model;
@@ -645,23 +781,18 @@ static int hauppauge_eeprom_dvb(struct cx88_core *core, u8 *ee)
 	/* Make sure we support the tuner */
 	tuner = ee[0x2d];
 	switch(tuner) {
-	case 0x4B: /* ddt 7595 */
+	case 0x4B: /* dtt 7595 */
 	case 0x4C: /* dtt 7592 */
-		core->pll_desc = &dvb_pll_thomson_dtt759x;
 		break;
 	default:
 		printk("%s: error: unknown hauppauge tuner 0x%02x\n",
 		       core->name, tuner);
 		return -ENODEV;
 	}
-	printk(KERN_INFO "%s: hauppauge eeprom: model=%d, tuner=%d (%s)\n",
-	       core->name, model, tuner, 
-	       core->pll_desc ? core->pll_desc->name : "UNKNOWN");
-
-	core->pll_addr   = 0x61;
-	core->demod_addr = 0x43;
+	printk(KERN_INFO "%s: hauppauge eeprom: model=%d, tuner=%d\n",
+	       core->name, model, tuner);
+	return 0;
 }
-#endif
 
 /* ----------------------------------------------------------------------- */
 /* some GDI (was: Modular Technology) specific stuff                       */
@@ -753,6 +884,7 @@ void cx88_card_setup(struct cx88_core *core)
 
 	switch (core->board) {
 	case CX88_BOARD_HAUPPAUGE:
+	case CX88_BOARD_HAUPPAUGE_ROSLYN:
 		if (0 == core->i2c_rc)
 			hauppauge_eeprom(core,eeprom+8);
 		break;
@@ -764,33 +896,17 @@ void cx88_card_setup(struct cx88_core *core)
 		if (0 == core->i2c_rc)
 			leadtek_eeprom(core,eeprom);
 		break;
-#ifdef WITH_DVB
 	case CX88_BOARD_HAUPPAUGE_DVB_T1:
 		if (0 == core->i2c_rc)
 			hauppauge_eeprom_dvb(core,eeprom);
 		break;
-	case CX88_BOARD_CONEXANT_DVB_T1:
-		core->pll_desc   = &dvb_pll_thomson_dtt7579;
-		core->pll_addr   = 0x60;
-		core->demod_addr = 0x43;
-		break;
 	case CX88_BOARD_DVICO_FUSIONHDTV_DVB_T1:
-		/* GPIO0:0 is hooked to mt352 reset pin */
-		cx_set(MO_GP0_IO, 0x00000101);
-		cx_clear(MO_GP0_IO, 0x00000001);
-		msleep(1);
-		cx_set(MO_GP0_IO, 0x00000101);
-		core->pll_addr = 0x61;
-		core->pll_desc = &dvb_pll_lg_z201;
-		break;
 	case CX88_BOARD_DVICO_FUSIONHDTV_DVB_T_PLUS:
 		/* GPIO0:0 is hooked to mt352 reset pin */
 		cx_set(MO_GP0_IO, 0x00000101);
 		cx_clear(MO_GP0_IO, 0x00000001);
 		msleep(1);
 		cx_set(MO_GP0_IO, 0x00000101);
-		core->pll_addr = 0x60;
-		core->pll_desc = &dvb_pll_thomson_dtt7579;
 		break;
 	case CX88_BOARD_KWORLD_DVB_T:
 	case CX88_BOARD_DNTV_LIVE_DVB_T:
@@ -800,10 +916,7 @@ void cx88_card_setup(struct cx88_core *core)
 		msleep(1);
 		cx_clear(MO_GP0_IO, 0x00000007);
 		cx_set(MO_GP2_IO, 0x00000101);
-		core->pll_addr = 0x61;
-		core->pll_desc = &dvb_pll_unknown_1;
 		break;
-#endif
 	}
 	if (cx88_boards[core->board].radio.type == CX88_RADIO)
 		core->has_radio = 1;

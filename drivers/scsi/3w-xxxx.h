@@ -6,7 +6,7 @@
    		     Arnaldo Carvalho de Melo <acme@conectiva.com.br>
                      Brad Strand <linux@3ware.com>
 
-   Copyright (C) 1999-2004 3ware Inc.
+   Copyright (C) 1999-2005 3ware Inc.
 
    Kernel compatiblity By:	Andre Hedrick <andre@suse.com>
    Non-Copyright (C) 2000	Andre Hedrick <andre@suse.com>
@@ -227,6 +227,7 @@ static unsigned char tw_sense_table[][4] =
 #define TW_IN_RESET                           2
 #define TW_IN_CHRDEV_IOCTL                    3
 #define TW_MAX_SECTORS                        256
+#define TW_MAX_IOCTL_SECTORS		      512
 #define TW_AEN_WAIT_TIME                      1000
 #define TW_IOCTL_WAIT_TIME                    (1 * HZ) /* 1 second */
 #define TW_ISR_DONT_COMPLETE                  2
@@ -397,7 +398,6 @@ typedef struct TAG_TW_Device_Extension {
 	unsigned long		*alignment_virtual_address[TW_Q_LENGTH];
 	unsigned long		alignment_physical_address[TW_Q_LENGTH];
 	int			is_unit_present[TW_MAX_UNITS];
-	int			num_units;
 	unsigned long		*command_packet_virtual_address[TW_Q_LENGTH];
 	unsigned long		command_packet_physical_address[TW_Q_LENGTH];
 	struct pci_dev		*tw_pci_dev;

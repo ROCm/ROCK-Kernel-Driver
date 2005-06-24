@@ -567,7 +567,7 @@ struct sa1111_driver {
 	unsigned int		devid;
 	int (*probe)(struct sa1111_dev *);
 	int (*remove)(struct sa1111_dev *);
-	int (*suspend)(struct sa1111_dev *, u32);
+	int (*suspend)(struct sa1111_dev *, pm_message_t);
 	int (*resume)(struct sa1111_dev *);
 };
 

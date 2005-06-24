@@ -148,6 +148,198 @@ extern int tcf_exts_dump(struct sk_buff *skb, struct tcf_exts *exts,
 extern int tcf_exts_dump_stats(struct sk_buff *skb, struct tcf_exts *exts,
 	                       struct tcf_ext_map *map);
 
+/**
+ * struct tcf_pkt_info - packet information
+ */
+struct tcf_pkt_info
+{
+	unsigned char *		ptr;
+	int			nexthdr;
+};
+
+#ifdef CONFIG_NET_EMATCH
+
+struct tcf_ematch_ops;
+
+/**
+ * struct tcf_ematch - extended match (ematch)
+ * 
+ * @matchid: identifier to allow userspace to reidentify a match
+ * @flags: flags specifying attributes and the relation to other matches
+ * @ops: the operations lookup table of the corresponding ematch module
+ * @datalen: length of the ematch specific configuration data
+ * @data: ematch specific data
+ */
+struct tcf_ematch
+{
+	struct tcf_ematch_ops * ops;
+	unsigned long		data;
+	unsigned int		datalen;
+	u16			matchid;
+	u16			flags;
+};
+
+static inline int tcf_em_is_container(struct tcf_ematch *em)
+{
+	return !em->ops;
+}
+
+static inline int tcf_em_is_simple(struct tcf_ematch *em)
+{
+	return em->flags & TCF_EM_SIMPLE;
+}
+
+static inline int tcf_em_is_inverted(struct tcf_ematch *em)
+{
+	return em->flags & TCF_EM_INVERT;
+}
+
+static inline int tcf_em_last_match(struct tcf_ematch *em)
+{
+	return (em->flags & TCF_EM_REL_MASK) == TCF_EM_REL_END;
+}
+
+static inline int tcf_em_early_end(struct tcf_ematch *em, int result)
+{
+	if (tcf_em_last_match(em))
+		return 1;
+
+	if (result == 0 && em->flags & TCF_EM_REL_AND)
+		return 1;
+
+	if (result != 0 && em->flags & TCF_EM_REL_OR)
+		return 1;
+
+	return 0;
+}
+	
+/**
+ * struct tcf_ematch_tree - ematch tree handle
+ *
+ * @hdr: ematch tree header supplied by userspace
+ * @matches: array of ematches
+ */
+struct tcf_ematch_tree
+{
+	struct tcf_ematch_tree_hdr hdr;
+	struct tcf_ematch *	matches;
+	
+};
+
+/**
+ * struct tcf_ematch_ops - ematch module operations
+ * 
+ * @kind: identifier (kind) of this ematch module
+ * @datalen: length of expected configuration data (optional)
+ * @change: called during validation (optional)
+ * @match: called during ematch tree evaluation, must return 1/0
+ * @destroy: called during destroyage (optional)
+ * @dump: called during dumping process (optional)
+ * @owner: owner, must be set to THIS_MODULE
+ * @link: link to previous/next ematch module (internal use)
+ */
+struct tcf_ematch_ops
+{
+	int			kind;
+	int			datalen;
+	int			(*change)(struct tcf_proto *, void *,
+					  int, struct tcf_ematch *);
+	int			(*match)(struct sk_buff *, struct tcf_ematch *,
+					 struct tcf_pkt_info *);
+	void			(*destroy)(struct tcf_proto *,
+					   struct tcf_ematch *);
+	int			(*dump)(struct sk_buff *, struct tcf_ematch *);
+	struct module		*owner;
+	struct list_head	link;
+};
+
+extern int tcf_em_register(struct tcf_ematch_ops *);
+extern int tcf_em_unregister(struct tcf_ematch_ops *);
+extern int tcf_em_tree_validate(struct tcf_proto *, struct rtattr *,
+				struct tcf_ematch_tree *);
+extern void tcf_em_tree_destroy(struct tcf_proto *, struct tcf_ematch_tree *);
+extern int tcf_em_tree_dump(struct sk_buff *, struct tcf_ematch_tree *, int);
+extern int __tcf_em_tree_match(struct sk_buff *, struct tcf_ematch_tree *,
+			       struct tcf_pkt_info *);
+
+/**
+ * tcf_em_tree_change - replace ematch tree of a running classifier
+ *
+ * @tp: classifier kind handle
+ * @dst: destination ematch tree variable
+ * @src: source ematch tree (temporary tree from tcf_em_tree_validate)
+ *
+ * This functions replaces the ematch tree in @dst with the ematch
+ * tree in @src. The classifier in charge of the ematch tree may be
+ * running.
+ */
+static inline void tcf_em_tree_change(struct tcf_proto *tp,
+				      struct tcf_ematch_tree *dst,
+				      struct tcf_ematch_tree *src)
+{
+	tcf_tree_lock(tp);
+	memcpy(dst, src, sizeof(*dst));
+	tcf_tree_unlock(tp);
+}
+
+/**
+ * tcf_em_tree_match - evaulate an ematch tree
+ *
+ * @skb: socket buffer of the packet in question
+ * @tree: ematch tree to be used for evaluation
+ * @info: packet information examined by classifier
+ *
+ * This function matches @skb against the ematch tree in @tree by going
+ * through all ematches respecting their logic relations returning
+ * as soon as the result is obvious.
+ *
+ * Returns 1 if the ematch tree as-one matches, no ematches are configured
+ * or ematch is not enabled in the kernel, otherwise 0 is returned.
+ */
+static inline int tcf_em_tree_match(struct sk_buff *skb,
+				    struct tcf_ematch_tree *tree,
+				    struct tcf_pkt_info *info)
+{
+	if (tree->hdr.nmatches)
+		return __tcf_em_tree_match(skb, tree, info);
+	else
+		return 1;
+}
+
+#else /* CONFIG_NET_EMATCH */
+
+struct tcf_ematch_tree
+{
+};
+
+#define tcf_em_tree_validate(tp, tb, t) ((void)(t), 0)
+#define tcf_em_tree_destroy(tp, t) do { (void)(t); } while(0)
+#define tcf_em_tree_dump(skb, t, tlv) (0)
+#define tcf_em_tree_change(tp, dst, src) do { } while(0)
+#define tcf_em_tree_match(skb, t, info) ((void)(info), 1)
+
+#endif /* CONFIG_NET_EMATCH */
+
+static inline unsigned char * tcf_get_base_ptr(struct sk_buff *skb, int layer)
+{
+	switch (layer) {
+		case TCF_LAYER_LINK:
+			return skb->data;
+		case TCF_LAYER_NETWORK:
+			return skb->nh.raw;
+		case TCF_LAYER_TRANSPORT:
+			return skb->h.raw;
+	}
+
+	return NULL;
+}
+
+static inline int tcf_valid_offset(struct sk_buff *skb, unsigned char *ptr,
+				   int len)
+{
+	return unlikely((ptr + len) < skb->tail && ptr > skb->head);
+}
+
 #ifdef CONFIG_NET_CLS_IND
 static inline int
 tcf_change_indev(struct tcf_proto *tp, char *indev, struct rtattr *indev_tlv)

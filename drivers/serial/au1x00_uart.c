@@ -320,7 +320,9 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 	ignore_char:
 		*status = serial_inp(up, UART_LSR);
 	} while ((*status & UART_LSR_DR) && (max_count-- > 0));
+	spin_unlock(&up->port.lock);
 	tty_flip_buffer_push(tty);
+	spin_lock(&up->port.lock);
 }
 
 static _INLINE_ void transmit_chars(struct uart_8250_port *up)
@@ -1242,75 +1244,12 @@ static struct uart_driver serial8250_reg = {
 	.cons			= SERIAL8250_CONSOLE,
 };
 
-/*
- * register_serial and unregister_serial allows for 16x50 serial ports to be
- * configured at run-time, to support PCMCIA modems.
- */
-
-static int __register_serial(struct serial_struct *req, int line)
-{
-	struct uart_port port;
-
-	port.iobase   = req->port;
-	port.membase  = req->iomem_base;
-	port.irq      = req->irq;
-	port.uartclk  = req->baud_base * 16;
-	port.fifosize = req->xmit_fifo_size;
-	port.regshift = req->iomem_reg_shift;
-	port.iotype   = req->io_type;
-	port.flags    = req->flags | UPF_BOOT_AUTOCONF;
-	port.mapbase  = req->iomap_base;
-	port.line     = line;
-
-	if (HIGH_BITS_OFFSET)
-		port.iobase |= (long) req->port_high << HIGH_BITS_OFFSET;
-
-	/*
-	 * If a clock rate wasn't specified by the low level
-	 * driver, then default to the standard clock rate.
-	 */
-	if (port.uartclk == 0)
-		port.uartclk = BASE_BAUD * 16;
-
-	return uart_register_port(&serial8250_reg, &port);
-}
-
-/**
- *	register_serial - configure a 16x50 serial port at runtime
- *	@req: request structure
- *
- *	Configure the serial port specified by the request. If the
- *	port exists and is in use an error is returned. If the port
- *	is not currently in the table it is added.
- *
- *	The port is then probed and if necessary the IRQ is autodetected
- *	If this fails an error is returned.
- *
- *	On success the port is ready to use and the line number is returned.
- */
-int register_serial(struct serial_struct *req)
-{
-	return __register_serial(req, -1);
-}
-
 int __init early_serial_setup(struct uart_port *port)
 {
 	serial8250_isa_init_ports();
 	serial8250_ports[port->line].port	= *port;
 	serial8250_ports[port->line].port.ops	= &serial8250_pops;
 	return 0;
-}
-
-/**
- *	unregister_serial - remove a 16x50 serial port at runtime
- *	@line: serial line number
- *
- *	Remove one serial port.  This may be called from interrupt
- *	context.
- */
-void unregister_serial(int line)
-{
-	uart_unregister_port(&serial8250_reg, line);
 }
 
 /**
@@ -1366,8 +1305,6 @@ static void __exit serial8250_exit(void)
 module_init(serial8250_init);
 module_exit(serial8250_exit);
 
-EXPORT_SYMBOL(register_serial);
-EXPORT_SYMBOL(unregister_serial);
 EXPORT_SYMBOL(serial8250_suspend_port);
 EXPORT_SYMBOL(serial8250_resume_port);
 

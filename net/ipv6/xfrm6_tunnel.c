@@ -343,7 +343,7 @@ void xfrm6_tunnel_free_spi(xfrm_address_t *saddr)
 
 EXPORT_SYMBOL(xfrm6_tunnel_free_spi);
 
-static int xfrm6_tunnel_output(struct sk_buff *skb)
+static int xfrm6_tunnel_output(struct xfrm_state *x, struct sk_buff *skb)
 {
 	struct ipv6hdr *top_iph;
 

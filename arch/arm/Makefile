@@ -22,15 +22,13 @@ CFLAGS		+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
 endif
 
 ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
-CFLAGS		+= -mbig-endian
+CPPFLAGS	+= -mbig-endian
 AS		+= -EB
 LD		+= -EB
-AFLAGS		+= -mbig-endian
 else
-CFLAGS		+= -mlittle-endian
+CPPFLAGS	+= -mlittle-endian
 AS		+= -EL
 LD		+= -EL
-AFLAGS		+= -mlittle-endian
 endif
 
 comma = ,

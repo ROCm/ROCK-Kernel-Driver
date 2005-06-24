@@ -186,25 +186,9 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
  *
  * ADDRESS: Virtual Address (U0 address)
  */
-void flush_cache_page(struct vm_area_struct *vma, unsigned long address)
+void flush_cache_page(struct vm_area_struct *vma, unsigned long address, unsigned long pfn)
 {
-	pgd_t *dir;
-	pmd_t *pmd;
-	pte_t *pte;
-	pte_t entry;
-	unsigned long phys;
-
-	dir = pgd_offset(vma->vm_mm, address);
-	pmd = pmd_offset(dir, address);
-	if (pmd_none(*pmd) || pmd_bad(*pmd))
-		return;
-	pte = pte_offset(pmd, address);
-	entry = *pte;
-	if (pte_none(entry) || !pte_present(entry))
-		return;
-
-	phys = pte_val(entry)&PTE_PHYS_MASK;
-	__flush_dcache_page(phys);
+	__flush_dcache_page(pfn << PAGE_SHIFT);
 }
 
 /*

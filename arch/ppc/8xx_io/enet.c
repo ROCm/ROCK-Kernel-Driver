@@ -657,7 +657,7 @@ static int __init scc_enet_init(void)
 
 	cp = cpmp;	/* Get pointer to Communication Processor */
 
-	immap = (immap_t *)(mfspr(IMMR) & 0xFFFF0000);	/* and to internal registers */
+	immap = (immap_t *)(mfspr(SPRN_IMMR) & 0xFFFF0000);	/* and to internal registers */
 
 	bd = (bd_t *)__res;
 

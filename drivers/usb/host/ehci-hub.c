@@ -42,9 +42,9 @@ static int ehci_hub_suspend (struct usb_hcd *hcd)
 	spin_lock_irq (&ehci->lock);
 
 	/* stop schedules, clean any completed work */
-	if (HCD_IS_RUNNING(hcd->state)) {
+	if (HC_IS_RUNNING(hcd->state)) {
 		ehci_quiesce (ehci);
-		hcd->state = USB_STATE_QUIESCING;
+		hcd->state = HC_STATE_QUIESCING;
 	}
 	ehci->command = readl (&ehci->regs->command);
 	if (ehci->reclaim)
@@ -72,8 +72,9 @@ static int ehci_hub_suspend (struct usb_hcd *hcd)
 	}
 
 	/* turn off now-idle HC */
+	del_timer_sync (&ehci->watchdog);
 	ehci_halt (ehci);
-	hcd->state = HCD_STATE_SUSPENDED;
+	hcd->state = HC_STATE_SUSPENDED;
 
 	ehci->next_statechange = jiffies + msecs_to_jiffies(10);
 	spin_unlock_irq (&ehci->lock);
@@ -145,7 +146,7 @@ static int ehci_hub_resume (struct usb_hcd *hcd)
 	}
 
 	ehci->next_statechange = jiffies + msecs_to_jiffies(5);
-	hcd->state = USB_STATE_RUNNING;
+	hcd->state = HC_STATE_RUNNING;
 
 	/* Now we can safely re-enable irqs */
 	if (intr_enable)
@@ -178,7 +179,7 @@ static int check_reset_complete (
 	if (!(port_status & PORT_PE)) {
 
 		/* with integrated TT, there's nobody to hand it to! */
-		if (ehci_is_ARC(ehci)) {
+		if (ehci_is_TDI(ehci)) {
 			ehci_dbg (ehci,
 				"Failed to enable port %d on root hub TT\n",
 				index+1);
@@ -212,7 +213,7 @@ ehci_hub_status_data (struct usb_hcd *hcd, char *buf)
 	unsigned long	flags;
 
 	/* if !USB_SUSPEND, root hub timers won't get shut down ... */
-	if (!HCD_IS_RUNNING(hcd->state))
+	if (!HC_IS_RUNNING(hcd->state))
 		return 0;
 
 	/* init status to no-changes */
@@ -281,6 +282,8 @@ ehci_hub_descriptor (
 	temp = 0x0008;			/* per-port overcurrent reporting */
 	if (HCS_PPC (ehci->hcs_params))
 		temp |= 0x0001;		/* per-port power control */
+	else
+		temp |= 0x0002;		/* no power switching */
 #if 0
 // re-enable when we support USB_PORT_FEAT_INDICATOR below.
 	if (HCS_INDICATOR (ehci->hcs_params))
@@ -436,9 +439,12 @@ static int ehci_hub_control (
 			/* force reset to complete */
 			writel (temp & ~PORT_RESET,
 					&ehci->regs->port_status [wIndex]);
+			/* REVISIT:  some hardware needs 550+ usec to clear
+			 * this bit; seems too long to spin routinely...
+			 */
 			retval = handshake (
 					&ehci->regs->port_status [wIndex],
-					PORT_RESET, 0, 500);
+					PORT_RESET, 0, 750);
 			if (retval != 0) {
 				ehci_err (ehci, "port %d reset error %d\n",
 					wIndex + 1, retval);
@@ -517,7 +523,7 @@ static int ehci_hub_control (
 			 * transaction translator built in.
 			 */
 			if ((temp & (PORT_PE|PORT_CONNECT)) == PORT_CONNECT
-					&& !ehci_is_ARC(ehci)
+					&& !ehci_is_TDI(ehci)
 					&& PORT_USB11 (temp)) {
 				ehci_dbg (ehci,
 					"port %d low speed --> companion\n",

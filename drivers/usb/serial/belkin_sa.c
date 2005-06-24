@@ -158,7 +158,7 @@ struct belkin_sa_private {
  * ***************************************************************************
  */
 
-#define WDR_TIMEOUT (HZ * 5 ) /* default urb timeout */
+#define WDR_TIMEOUT 5000 /* default urb timeout */
 
 /* assumes that struct usb_serial *serial is available */
 #define BSA_USB_CMD(c,v) usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0), \
@@ -202,8 +202,7 @@ static void belkin_sa_shutdown (struct usb_serial *serial)
 	for (i=0; i < serial->num_ports; ++i) {
 		/* My special items, the standard routines free my urbs */
 		priv = usb_get_serial_port_data(serial->port[i]);
-		if (priv)
-			kfree(priv);
+		kfree(priv);
 	}
 }
 

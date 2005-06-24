@@ -33,7 +33,7 @@
  */
 static void rose_send_iframe(struct sock *sk, struct sk_buff *skb)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	if (skb == NULL)
 		return;
@@ -48,7 +48,7 @@ static void rose_send_iframe(struct sock *sk, struct sk_buff *skb)
 
 void rose_kick(struct sock *sk)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 	struct sk_buff *skb, *skbn;
 	unsigned short start, end;
 
@@ -112,7 +112,7 @@ void rose_kick(struct sock *sk)
 
 void rose_enquiry_response(struct sock *sk)
 {
-	rose_cb *rose = rose_sk(sk);
+	struct rose_sock *rose = rose_sk(sk);
 
 	if (rose->condition & ROSE_COND_OWN_RX_BUSY)
 		rose_write_internal(sk, ROSE_RNR);

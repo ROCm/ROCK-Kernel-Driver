@@ -24,11 +24,12 @@
  * implement at 0xf1000000 only at this time
  *
  *    0xfff00000-0xffffffff      - 8 Flash
+ *    0xffe00000-0xffefffff      - BOOT SRAM
  *    0xffd00000-0xffd00004      - CPLD
  *    0xffc00000-0xffc0000f      - UART
  *    0xffb00000-0xffb07fff      - FRAM
- *    0xffa00000-0xffafffff      - *** HOLE ***
- *    0xff900000-0xff9fffff      - MV64460 Integrated SRAM
+ *    0xff840000-0xffafffff      - *** HOLE ***
+ *    0xff800000-0xff83ffff      - MV64460 Integrated SRAM
  *    0xfe000000-0xff8fffff      - *** HOLE ***
  *    0xfc000000-0xfdffffff      - 32bit Flash
  *    0xf1010000-0xfbffffff      - *** HOLE ***
@@ -49,9 +50,7 @@
 #define CHESTNUT_UART_SIZE_ACTUAL		16
 #define CHESTNUT_FRAM_BASE			0xffb00000
 #define CHESTNUT_FRAM_SIZE_ACTUAL		(32*1024)
-#define CHESTNUT_BRIDGE_REG_BASE		0xf1000000
-#define CHESTNUT_INTERNAL_SRAM_BASE		0xff900000
-#define CHESTNUT_INTERNAL_SRAM_SIZE_ACTUAL	(256*1024)
+#define CHESTNUT_INTERNAL_SRAM_BASE		0xff800000
 #define CHESTNUT_32BIT_BASE			0xfc000000
 #define CHESTNUT_32BIT_SIZE			(32*1024*1024)
 
@@ -65,14 +64,16 @@
 					CHESTNUT_UART_SIZE_ACTUAL)
 #define CHESTNUT_FRAM_SIZE		max(MV64360_WINDOW_SIZE_MIN, \
 					CHESTNUT_FRAM_SIZE_ACTUAL)
-#define CHESTNUT_INTERNAL_SRAM_SIZE	max(MV64360_WINDOW_SIZE_MIN, \
-					CHESTNUT_INTERNAL_SRAM_SIZE_ACTUAL)
 
 #define CHESTNUT_BUS_SPEED		200000000
 #define CHESTNUT_PIBS_DATABASE		0xf0000 /* from PIBS src code */
 
-#define MV64360_ETH_PORT_SERIAL_CONTROL_REG_PORT0 	0x243c
-#define MV64360_ETH_PORT_SERIAL_CONTROL_REG_PORT1 	0x283c
+#define	KATANA_ETH0_PHY_ADDR			12
+#define	KATANA_ETH1_PHY_ADDR			11
+#define	KATANA_ETH2_PHY_ADDR			4
+
+#define CHESTNUT_ETH_TX_QUEUE_SIZE		800
+#define CHESTNUT_ETH_RX_QUEUE_SIZE		400
 
 /*
  * PCI windows
@@ -89,17 +90,17 @@
 /*
  * Board-specific IRQ info
  */
-#define CHESTNUT_PCI_SLOT0_IRQ	64+31
-#define CHESTNUT_PCI_SLOT1_IRQ	64+30
-#define CHESTNUT_PCI_SLOT2_IRQ	64+29
-#define CHESTNUT_PCI_SLOT3_IRQ	64+28
+#define CHESTNUT_PCI_SLOT0_IRQ	(64 + 31)
+#define CHESTNUT_PCI_SLOT1_IRQ	(64 + 30)
+#define CHESTNUT_PCI_SLOT2_IRQ	(64 + 29)
+#define CHESTNUT_PCI_SLOT3_IRQ	(64 + 28)
 
 /* serial port definitions */
-#define CHESTNUT_UART0_IO_BASE  CHESTNUT_UART_BASE+8
+#define CHESTNUT_UART0_IO_BASE  (CHESTNUT_UART_BASE + 8)
 #define CHESTNUT_UART1_IO_BASE  CHESTNUT_UART_BASE
 
-#define UART0_INT           	64+25
-#define UART1_INT        	64+26
+#define UART0_INT           	(64 + 25)
+#define UART1_INT        	(64 + 26)
 
 #ifdef CONFIG_SERIAL_MANY_PORTS
 #define RS_TABLE_SIZE  64
@@ -108,7 +109,7 @@
 #endif
 
 /* Rate for the 3.6864 Mhz clock for the onboard serial chip */
-#define BASE_BAUD 		( 3686400 / 16 )
+#define BASE_BAUD 		(3686400 / 16)
 
 #ifdef CONFIG_SERIAL_DETECT_IRQ
 #define STD_COM_FLAGS (ASYNC_BOOT_AUTOCONF|ASYNC_SKIP_TEST|ASYNC_AUTO_IRQ)

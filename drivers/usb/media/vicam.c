@@ -441,7 +441,7 @@ static int __send_control_msg(struct vicam_camera *cam,
 				 request,
 				 USB_DIR_OUT | USB_TYPE_VENDOR |
 				 USB_RECIP_DEVICE, value, index,
-				 cp, size, HZ);
+				 cp, size, 1000);
 
 	status = min(status, 0);
 
@@ -977,7 +977,7 @@ read_frame(struct vicam_camera *cam, int framenum)
 	n = usb_bulk_msg(cam->udev,
 			 usb_rcvbulkpipe(cam->udev, cam->bulkEndpoint),
 			 cam->raw_image,
-			 512 * 242 + 128, &actual_length, HZ*10);
+			 512 * 242 + 128, &actual_length, 10000);
 
 	if (n < 0) {
 		printk(KERN_ERR "Problem during bulk read of frame data: %d\n",

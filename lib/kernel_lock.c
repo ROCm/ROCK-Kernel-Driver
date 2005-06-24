@@ -79,7 +79,7 @@ EXPORT_SYMBOL(smp_processor_id);
  *
  * Don't use in new code.
  */
-DECLARE_MUTEX(kernel_sem);
+static DECLARE_MUTEX(kernel_sem);
 
 /*
  * Re-acquire the kernel semaphore.

@@ -33,8 +33,9 @@
 #include <asm/cputable.h>
 #include <asm/rtas.h>
 #include <asm/system.h>
+#include <asm/time.h>
 
-#define MODULE_VERS "1.5"
+#define MODULE_VERS "1.6"
 #define MODULE_NAME "lparcfg"
 
 /* #define LPARCFG_DEBUG */
@@ -214,13 +215,20 @@ static void h_pic(unsigned long *pool_idle_time, unsigned long *num_procs)
 }
 
 static unsigned long get_purr(void);
-/* ToDo:  get sum of purr across all processors.  The purr collection code
- * is coming, but at this time is still problematic, so for now this
- * function will return 0.
- */
+
+/* Track sum of all purrs across all processors. This is used to further */
+/* calculate usage values by different applications                       */
+
 static unsigned long get_purr(void)
 {
 	unsigned long sum_purr = 0;
+	int cpu;
+	struct cpu_usage *cu;
+
+	for_each_cpu(cpu) {
+		cu = &per_cpu(cpu_usage_array, cpu);
+		sum_purr += cu->current_tb;
+	}
 	return sum_purr;
 }
 

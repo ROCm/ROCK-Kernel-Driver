@@ -18,7 +18,7 @@
 
 #ifndef __ASSEMBLY__
 
-/* Sparc is not segmented, however we need to be able to fool verify_area()
+/* Sparc is not segmented, however we need to be able to fool access_ok()
  * when doing system calls from kernel mode legitimately.
  *
  * "For historical reasons, these macros are grossly misnamed." -Linus
@@ -41,14 +41,16 @@
  * No one can read/write anything from userland in the kernel space by setting
  * large size and address near to PAGE_OFFSET - a fault will break his intentions.
  */
-#define __user_ok(addr,size) ((addr) < STACK_TOP)
+#define __user_ok(addr, size) ({ (void)(size); (addr) < STACK_TOP; })
 #define __kernel_ok (segment_eq(get_fs(), KERNEL_DS))
 #define __access_ok(addr,size) (__user_ok((addr) & get_fs().seg,(size)))
-#define access_ok(type,addr,size) __access_ok((unsigned long)(addr),(size))
+#define access_ok(type, addr, size)					\
+	({ (void)(type); __access_ok((unsigned long)(addr), size); })
 
-static inline int verify_area(int type, const void __user * addr, unsigned long size)
+/* this function will go away soon - use access_ok() instead */
+static inline int __deprecated verify_area(int type, const void __user * addr, unsigned long size)
 {
-	return access_ok(type,addr,size)?0:-EFAULT;
+	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }
 
 /*

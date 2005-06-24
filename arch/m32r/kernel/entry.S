@@ -69,16 +69,17 @@
 #include <asm/mmu_context.h>
 
 #if !defined(CONFIG_MMU)
-#define sys_madvise             sys_ni_syscall
-#define sys_readahead           sys_ni_syscall
-#define sys_mprotect            sys_ni_syscall
-#define sys_msync               sys_ni_syscall
-#define sys_mlock               sys_ni_syscall
-#define sys_munlock             sys_ni_syscall
-#define sys_mlockall            sys_ni_syscall
-#define sys_munlockall          sys_ni_syscall
-#define sys_mremap              sys_ni_syscall
-#define sys_mincore             sys_ni_syscall
+#define sys_madvise		sys_ni_syscall
+#define sys_readahead		sys_ni_syscall
+#define sys_mprotect		sys_ni_syscall
+#define sys_msync		sys_ni_syscall
+#define sys_mlock		sys_ni_syscall
+#define sys_munlock		sys_ni_syscall
+#define sys_mlockall		sys_ni_syscall
+#define sys_munlockall		sys_ni_syscall
+#define sys_mremap		sys_ni_syscall
+#define sys_mincore		sys_ni_syscall
+#define sys_remap_file_pages	sys_ni_syscall
 #endif /* CONFIG_MMU */
 
 #define R4(reg)			@reg

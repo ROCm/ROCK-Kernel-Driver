@@ -41,6 +41,7 @@
 #include <linux/kallsyms.h>
 #include <linux/writeback.h>
 #include <linux/cpu.h>
+#include <linux/cpuset.h>
 #include <linux/efi.h>
 #include <linux/unistd.h>
 #include <linux/rmap.h>
@@ -64,10 +65,6 @@
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
 #endif
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 
 /*
  * Versions of gcc older than that listed below may actually compile
@@ -113,8 +110,8 @@ EXPORT_SYMBOL(system_state);
 /*
  * Boot command-line arguments
  */
-#define MAX_INIT_ARGS 32
-#define MAX_INIT_ENVS 32
+#define MAX_INIT_ARGS CONFIG_INIT_ENV_ARG_LIMIT
+#define MAX_INIT_ENVS CONFIG_INIT_ENV_ARG_LIMIT
 
 extern void time_init(void);
 /* Default late time init is NULL. archs can override this later. */
@@ -160,24 +157,6 @@ char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 static const char *panic_later, *panic_param;
 
 extern struct obs_kernel_param __setup_start[], __setup_end[];
-
-#ifdef	CONFIG_KDB
-static int __init kdb_setup(char *str)
-{
-	if (strcmp(str, "on") == 0) {
-		kdb_on = 1;
-	} else if (strcmp(str, "off") == 0) {
-		kdb_on = 0;
-	} else if (strcmp(str, "early") == 0) {
-		kdb_on = 1;
-		kdb_flags |= KDB_FLAG_EARLYKDB;
-	} else
-		printk("kdb flag %s not recognised\n", str);
-	return 0;
-}
-
-__setup("kdb=", kdb_setup);
-#endif	/* CONFIG_KDB */
 
 static int __init obsolete_checksetup(char *line)
 {
@@ -230,6 +209,14 @@ static int __init quiet_kernel(char *str)
 
 __setup("debug", debug_kernel);
 __setup("quiet", quiet_kernel);
+
+static int __init loglevel(char *str)
+{
+	get_option(&str, &console_loglevel);
+	return 1;
+}
+
+__setup("loglevel=", loglevel);
 
 /*
  * Unknown boot options get handed to init, unless they look like
@@ -369,12 +356,11 @@ static void __init smp_init(void)
 	}
 
 	/* Any cleanup work */
-	printk("Brought up %ld CPUs\n", (long)num_online_cpus());
+	printk(KERN_INFO "Brought up %ld CPUs\n", (long)num_online_cpus());
 	smp_cpus_done(max_cpus);
 #if 0
 	/* Get other processors into their bootup holding patterns. */
 
-	smp_threads_ready=1;
 	smp_commence();
 #endif
 }
@@ -445,6 +431,7 @@ asmlinkage void __init start_kernel(void)
  */
 	lock_kernel();
 	page_address_init();
+	printk(KERN_NOTICE);
 	printk(linux_banner);
 	setup_arch(&command_line);
 	setup_per_cpu_areas();
@@ -468,7 +455,7 @@ asmlinkage void __init start_kernel(void)
 	preempt_disable();
 	build_all_zonelists();
 	page_alloc_init();
-	printk("Kernel command line: %s\n", saved_command_line);
+	printk(KERN_NOTICE "Kernel command line: %s\n", saved_command_line);
 	parse_early_param();
 	parse_args("Booting kernel", command_line, __start___param,
 		   __stop___param - __start___param,
@@ -511,14 +498,6 @@ asmlinkage void __init start_kernel(void)
 	pgtable_cache_init();
 	prio_tree_init();
 	anon_vma_init();
-
-#ifdef	CONFIG_KDB
-	kdb_init();
-	if (KDB_FLAG(EARLYKDB)) {
-		KDB_ENTER();
-	}
-#endif	/* CONFIG_KDB */
-
 #ifdef CONFIG_X86
 	if (efi_enabled)
 		efi_enter_virtual_mode();
@@ -527,6 +506,7 @@ asmlinkage void __init start_kernel(void)
 	proc_caches_init();
 	buffer_init();
 	unnamed_dev_init();
+	key_init();
 	security_init();
 	vfs_caches_init(num_physpages);
 	radix_tree_init();
@@ -536,6 +516,8 @@ asmlinkage void __init start_kernel(void)
 #ifdef CONFIG_PROC_FS
 	proc_root_init();
 #endif
+	cpuset_init();
+
 	check_bugs();
 
 	/* Do the rest non-__init'ed, we're now alive */
@@ -581,7 +563,7 @@ static void __init do_initcalls(void)
 			local_irq_enable();
 		}
 		if (msg) {
-			printk("error in initcall at 0x%p: "
+			printk(KERN_WARNING "error in initcall at 0x%p: "
 				"returned with %s\n", *call, msg);
 		}
 	}
@@ -602,7 +584,6 @@ static void __init do_basic_setup(void)
 	/* drivers will send hotplug events */
 	init_workqueues();
 	usermodehelper_init();
-	key_init();
 	driver_init();
 
 #ifdef CONFIG_SYSCTL
@@ -654,6 +635,10 @@ static int init(void * unused)
 {
 	lock_kernel();
 	/*
+	 * init can run on any cpu.
+	 */
+	set_cpus_allowed(current, CPU_MASK_ALL);
+	/*
 	 * Tell the world that we're going to be the grim
 	 * reaper of innocent orphaned children.
 	 *
@@ -680,6 +665,8 @@ static int init(void * unused)
 	smp_init();
 	sched_init_smp();
 
+	cpuset_init_smp();
+
 	do_basic_setup();
 
 	/*
@@ -702,7 +689,7 @@ static int init(void * unused)
 	numa_default_policy();
 
 	if (sys_open((const char __user *) "/dev/console", O_RDWR, 0) < 0)
-		printk("Warning: unable to open an initial console.\n");
+		printk(KERN_WARNING "Warning: unable to open an initial console.\n");
 
 	(void) sys_dup(0);
 	(void) sys_dup(0);

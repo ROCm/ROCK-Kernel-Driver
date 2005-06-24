@@ -169,7 +169,7 @@ struct dvb_frontend* ttusbdecfe_dvbt_attach(const struct ttusbdecfe_config* conf
 	return &state->frontend;
 
 error:
-	if (state) kfree(state);
+	kfree(state);
 	return NULL;
 }
 
@@ -195,7 +195,7 @@ struct dvb_frontend* ttusbdecfe_dvbs_attach(const struct ttusbdecfe_config* conf
 	return &state->frontend;
 
 error:
-	if (state) kfree(state);
+	kfree(state);
 	return NULL;
 }
 

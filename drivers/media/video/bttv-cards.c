@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-cards.c,v 1.42 2005/01/13 17:22:33 kraxel Exp $
+    $Id: bttv-cards.c,v 1.47 2005/02/22 14:06:32 kraxel Exp $
 
     bttv-cards.c
 
@@ -80,6 +80,9 @@ static void picolo_tetra_init(struct bttv *btv);
 static void tibetCS16_muxsel(struct bttv *btv, unsigned int input);
 static void tibetCS16_init(struct bttv *btv);
 
+static void kodicom4400r_muxsel(struct bttv *btv, unsigned int input);
+static void kodicom4400r_init(struct bttv *btv);
+
 static void sigmaSLC_muxsel(struct bttv *btv, unsigned int input);
 static void sigmaSQ_muxsel(struct bttv *btv, unsigned int input);
 
@@ -101,6 +104,7 @@ static unsigned int pll[BTTV_MAX]    = { [ 0 ... (BTTV_MAX-1) ] = UNSET };
 static unsigned int tuner[BTTV_MAX]  = { [ 0 ... (BTTV_MAX-1) ] = UNSET };
 static unsigned int svhs[BTTV_MAX]   = { [ 0 ... (BTTV_MAX-1) ] = UNSET };
 static unsigned int remote[BTTV_MAX] = { [ 0 ... (BTTV_MAX-1) ] = UNSET };
+static struct bttv  *master[BTTV_MAX] = { [ 0 ... (BTTV_MAX-1) ] = NULL };
 #ifdef MODULE
 static unsigned int autoload = 1;
 #else
@@ -170,6 +174,8 @@ static struct CARD {
 	// some cards ship with byteswapped IDs ...
 	{ 0x1200bd11, BTTV_PINNACLE,      "Pinnacle PCTV [bswap]" },
 	{ 0xff00bd11, BTTV_PINNACLE,      "Pinnacle PCTV [bswap]" },
+	// this seems to happen as well ...
+	{ 0xff1211bd, BTTV_PINNACLE,      "Pinnacle PCTV" },
 
 	{ 0x3000121a, BTTV_VOODOOTV_FM,   "3Dfx VoodooTV FM/ VoodooTV 200" },
 	{ 0x263710b4, BTTV_VOODOOTV_FM,   "3Dfx VoodooTV FM/ VoodooTV 200" },
@@ -291,7 +297,7 @@ static struct CARD {
 	{ 0x07611461, BTTV_AVDVBT_761,    "AverMedia AverTV DVB-T 761" },
 	{ 0x001c11bd, BTTV_PINNACLESAT,   "Pinnacle PCTV Sat" },
 	{ 0x002611bd, BTTV_TWINHAN_DST,   "Pinnacle PCTV SAT CI" },
-	{ 0x00011822, BTTV_TWINHAN_DST,   "Twinhan VisionPlus DVB-T" },
+	{ 0x00011822, BTTV_TWINHAN_DST,   "Twinhan VisionPlus DVB" },
 	{ 0xfc00270f, BTTV_TWINHAN_DST,   "ChainTech digitop DST-1000 DVB-S" },
 	{ 0x07711461, BTTV_AVDVBT_771,    "AVermedia AverTV DVB-T 771" },
 	{ 0xdb1018ac, BTTV_DVICO_DVBT_LITE,    "DVICO FusionHDTV DVB-T Lite" },
@@ -1920,6 +1926,7 @@ struct tvcard bttv_tvcards[] = {
 	.svhs           = 2,
 	.muxsel         = { 2, 3, 1, 0},
 	.tuner_type     = TUNER_PHILIPS_ATSC,
+	.has_dvb        = 1,
 },{
 	.name           = "Twinhan DST + clones",
 	.no_msp34xx     = 1,
@@ -2187,6 +2194,63 @@ struct tvcard bttv_tvcards[] = {
 		.no_tda7432	= 1,
 		.tuner_type     = -1,
 		.muxsel_hook    = tibetCS16_muxsel,
+},
+{
+	/* Bill Brack <wbrack@mmm.com.hk> */
+	/*
+	 * Note that, because of the card's wiring, the "master"
+	 * BT878A chip (i.e. the one which controls the analog switch
+	 * and must use this card type) is the 2nd one detected.  The
+	 * other 3 chips should use card type 0x85, whose description
+	 * follows this one.  There is a EEPROM on the card (which is
+	 * connected to the I2C of one of those other chips), but is
+	 * not currently handled.  There is also a facility for a
+	 * "monitor", which is also not currently implemented.
+	 */
+	.name		= "Kodicom 4400R (master)",
+	.video_inputs	= 16,
+	.audio_inputs	= 0,
+	.tuner		= -1,
+	.tuner_type	= -1,
+	.svhs		= -1,
+	/* GPIO bits 0-9 used for analog switch:
+	 *   00 - 03:	camera selector
+	 *   04 - 06:	channel (controller) selector
+	 *   07:	data (1->on, 0->off)
+	 *   08:	strobe
+	 *   09:	reset
+	 * bit 16 is input from sync separator for the channel
+	 */
+	.gpiomask	= 0x0003ff,
+	.no_gpioirq     = 1,
+	.muxsel		= { 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3 },
+	.pll		= PLL_28,
+	.no_msp34xx	= 1,
+	.no_tda7432	= 1,
+	.no_tda9875	= 1,
+	.muxsel_hook	= kodicom4400r_muxsel,
+},
+{
+	/* Bill Brack <wbrack@mmm.com.hk> */
+	/* Note that, for reasons unknown, the "master" BT878A chip (i.e. the
+	 * one which controls the analog switch, and must use the card type)
+	 * is the 2nd one detected.  The other 3 chips should use this card
+	 * type
+	 */
+	.name		= "Kodicom 4400R (slave)",
+	.video_inputs	= 16,
+	.audio_inputs	= 0,
+	.tuner		= -1,
+	.tuner_type	= -1,
+	.svhs		= -1,
+	.gpiomask	= 0x010000,
+	.no_gpioirq     = 1,
+	.muxsel		= { 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3 },
+	.pll		= PLL_28,
+	.no_msp34xx	= 1,
+	.no_tda7432	= 1,
+	.no_tda9875	= 1,
+	.muxsel_hook	= kodicom4400r_muxsel,
 }};
 
 static const unsigned int bttv_num_tvcards = ARRAY_SIZE(bttv_tvcards);
@@ -2680,6 +2744,9 @@ void __devinit bttv_init_card2(struct bttv *btv)
 		break;
 	case BTTV_TIBET_CS16:
 		tibetCS16_init(btv);
+		break;
+	case BTTV_KODICOM_4400R:
+		kodicom4400r_init(btv);
 		break;
 	}
 
@@ -3889,6 +3956,112 @@ static void tibetCS16_init(struct bttv *btv)
 	/* enable gpio bits, mask obtained via btSpy */
 	gpio_inout(0xffffff, 0x0f7fff);
 	gpio_write(0x0f7fff);
+}
+
+/*
+ * The following routines for the Kodicom-4400r get a little mind-twisting.
+ * There is a "master" controller and three "slave" controllers, together
+ * an analog switch which connects any of 16 cameras to any of the BT87A's.
+ * The analog switch is controlled by the "master", but the detection order
+ * of the four BT878A chips is in an order which I just don't understand.
+ * The "master" is actually the second controller to be detected.  The
+ * logic on the board uses logical numbers for the 4 controlers, but
+ * those numbers are different from the detection sequence.  When working
+ * with the analog switch, we need to "map" from the detection sequence
+ * over to the board's logical controller number.  This mapping sequence
+ * is {3, 0, 2, 1}, i.e. the first controller to be detected is logical
+ * unit 3, the second (which is the master) is logical unit 0, etc.
+ * We need to maintain the status of the analog switch (which of the 16
+ * cameras is connected to which of the 4 controllers).  Rather than
+ * add to the bttv structure for this, we use the data reserved for
+ * the mbox (unused for this card type).
+ */
+
+/*
+ * First a routine to set the analog switch, which controls which camera
+ * is routed to which controller.  The switch comprises an X-address
+ * (gpio bits 0-3, representing the camera, ranging from 0-15), and a
+ * Y-address (gpio bits 4-6, representing the controller, ranging from 0-3).
+ * A data value (gpio bit 7) of '1' enables the switch, and '0' disables
+ * the switch.  A STROBE bit (gpio bit 8) latches the data value into the
+ * specified address.  The idea is to set the address and data, then bring
+ * STROBE high, and finally bring STROBE back to low.
+ */
+static void kodicom4400r_write(struct bttv *btv,
+			       unsigned char xaddr,
+			       unsigned char yaddr,
+			       unsigned char data) {
+	unsigned int udata;
+
+	udata = (data << 7) | ((yaddr&3) << 4) | (xaddr&0xf);
+	gpio_bits(0x1ff, udata);		/* write ADDR and DAT */
+	gpio_bits(0x1ff, udata | (1 << 8));	/* strobe high */
+	gpio_bits(0x1ff, udata);		/* strobe low */
+}
+
+/*
+ * Next the mux select.  Both the "master" and "slave" 'cards' (controllers)
+ * use this routine.  The routine finds the "master" for the card, maps
+ * the controller number from the detected position over to the logical
+ * number, writes the appropriate data to the analog switch, and housekeeps
+ * the local copy of the switch information.  The parameter 'input' is the
+ * requested camera number (0 - 15).
+ */
+static void kodicom4400r_muxsel(struct bttv *btv, unsigned int input)
+{
+	char *sw_status;
+	int xaddr, yaddr;
+	struct bttv *mctlr;
+	static unsigned char map[4] = {3, 0, 2, 1};
+
+	mctlr = master[btv->c.nr];
+	if (mctlr == NULL) {	/* ignore if master not yet detected */
+		return;
+	}
+	yaddr = (btv->c.nr - mctlr->c.nr + 1) & 3; /* the '&' is for safety */
+	yaddr = map[yaddr];
+	sw_status = (char *)(&mctlr->mbox_we);
+	xaddr = input & 0xf;
+	/* Check if the controller/camera pair has changed, else ignore */
+	if (sw_status[yaddr] != xaddr)
+	{
+		/* "open" the old switch, "close" the new one, save the new */
+		kodicom4400r_write(mctlr, sw_status[yaddr], yaddr, 0);
+		sw_status[yaddr] = xaddr;
+		kodicom4400r_write(mctlr, xaddr, yaddr, 1);
+	}
+}
+
+/*
+ * During initialisation, we need to reset the analog switch.  We
+ * also preset the switch to map the 4 connectors on the card to the
+ * *user's* (see above description of kodicom4400r_muxsel) channels
+ * 0 through 3
+ */
+static void kodicom4400r_init(struct bttv *btv)
+{
+	char *sw_status = (char *)(&btv->mbox_we);
+	int ix;
+
+	gpio_inout(0x0003ff, 0x0003ff);
+	gpio_write(1 << 9);	/* reset MUX */
+	gpio_write(0);
+	/* Preset camera 0 to the 4 controllers */
+	for (ix=0; ix<4; ix++) {
+		sw_status[ix] = ix;
+		kodicom4400r_write(btv, ix, ix, 1);
+	}
+	/*
+	 * Since this is the "master", we need to set up the
+	 * other three controller chips' pointers to this structure
+	 * for later use in the muxsel routine.
+	 */
+	if ((btv->c.nr<1) || (btv->c.nr>BTTV_MAX-3))
+	    return;
+	master[btv->c.nr-1] = btv;
+	master[btv->c.nr]   = btv;
+	master[btv->c.nr+1] = btv;
+	master[btv->c.nr+2] = btv;
 }
 
 // The Grandtec X-Guard framegrabber card uses two Dual 4-channel

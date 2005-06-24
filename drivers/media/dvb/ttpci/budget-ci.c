@@ -1,7 +1,7 @@
 /*
- * budget-ci.c: driver for the SAA7146 based Budget DVB cards 
+ * budget-ci.c: driver for the SAA7146 based Budget DVB cards
  *
- * Compiled from various sources by Michael Hunold <michael@mihu.de> 
+ * Compiled from various sources by Michael Hunold <michael@mihu.de>
  *
  *     msp430 IR support contributed by Jack Thomasson <jkt@Helius.COM>
  *     partially based on the Siemens DVB driver by Ralph+Marcus Metzler
@@ -12,19 +12,19 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
  * GNU General Public License for more details.
- * 
+ *
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
- * 
+ *
  *
  * the project's page is at http://www.linuxtv.org/dvb/
  */
@@ -76,57 +76,56 @@ struct budget_ci {
    Hauppauge (from NOVA-CI-s box product)
    i've taken a "middle of the road" approach and note the differences
 */
-static  u16 key_map[64] = {
+static u16 key_map[64] = {
 	/* 0x0X */
 	KEY_0, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8,
 	KEY_9,
 	KEY_ENTER,
 	KEY_RED,
-	KEY_POWER,              /* RADIO on Hauppauge */
+	KEY_POWER,		/* RADIO on Hauppauge */
 	KEY_MUTE,
 	0,
-	KEY_A,                  /* TV on Hauppauge */
+	KEY_A,			/* TV on Hauppauge */
 	/* 0x1X */
 	KEY_VOLUMEUP, KEY_VOLUMEDOWN,
 	0, 0,
 	KEY_B,
 	0, 0, 0, 0, 0, 0, 0,
 	KEY_UP, KEY_DOWN,
-	KEY_OPTION,             /* RESERVED on Hauppauge */
+	KEY_OPTION,		/* RESERVED on Hauppauge */
 	KEY_BREAK,
 	/* 0x2X */
 	KEY_CHANNELUP, KEY_CHANNELDOWN,
-	KEY_PREVIOUS,           /* Prev. Ch on Zenith, SOURCE on Hauppauge */
+	KEY_PREVIOUS,		/* Prev. Ch on Zenith, SOURCE on Hauppauge */
 	0, KEY_RESTART, KEY_OK,
-	KEY_CYCLEWINDOWS,       /* MINIMIZE on Hauppauge */
+	KEY_CYCLEWINDOWS,	/* MINIMIZE on Hauppauge */
 	0,
-	KEY_ENTER,              /* VCR mode on Zenith */
+	KEY_ENTER,		/* VCR mode on Zenith */
 	KEY_PAUSE,
 	0,
 	KEY_RIGHT, KEY_LEFT,
 	0,
-	KEY_MENU,               /* FULL SCREEN on Hauppauge */
+	KEY_MENU,		/* FULL SCREEN on Hauppauge */
 	0,
 	/* 0x3X */
 	KEY_SLOW,
-	KEY_PREVIOUS,           /* VCR mode on Zenith */
+	KEY_PREVIOUS,		/* VCR mode on Zenith */
 	KEY_REWIND,
 	0,
 	KEY_FASTFORWARD,
 	KEY_PLAY, KEY_STOP,
 	KEY_RECORD,
-	KEY_TUNER,              /* TV/VCR on Zenith */
+	KEY_TUNER,		/* TV/VCR on Zenith */
 	0,
 	KEY_C,
 	0,
 	KEY_EXIT,
 	KEY_POWER2,
-	KEY_TUNER,              /* VCR mode on Zenith */
+	KEY_TUNER,		/* VCR mode on Zenith */
 	0,
 };
 
-
-static void msp430_ir_debounce (unsigned long data)
+static void msp430_ir_debounce(unsigned long data)
 {
 	struct input_dev *dev = (struct input_dev *) data;
 
@@ -138,34 +137,32 @@ static void msp430_ir_debounce (unsigned long data)
 	dev->rep[0] = 0;
 	dev->timer.expires = jiffies + HZ * 350 / 1000;
 	add_timer(&dev->timer);
-	input_event(dev, EV_KEY, key_map[dev->repeat_key], 2);  /* REPEAT */
+	input_event(dev, EV_KEY, key_map[dev->repeat_key], 2);	/* REPEAT */
 }
 
-
-
-static void msp430_ir_interrupt (unsigned long data)
+static void msp430_ir_interrupt(unsigned long data)
 {
-	struct budget_ci *budget_ci = (struct budget_ci*) data;
+	struct budget_ci *budget_ci = (struct budget_ci *) data;
 	struct input_dev *dev = &budget_ci->input_dev;
 	unsigned int code =
 		ttpci_budget_debiread(&budget_ci->budget, DEBINOSWAP, DEBIADDR_IR, 2, 1, 0) >> 8;
 
 	if (code & 0x40) {
-	        code &= 0x3f;
+		code &= 0x3f;
 
-        	if (timer_pending(&dev->timer)) {
-                	if (code == dev->repeat_key) {
-                        	++dev->rep[0];
-	                        return;
-        	        }
-                	del_timer(&dev->timer);
-		        input_event(dev, EV_KEY, key_map[dev->repeat_key], !!0);
+		if (timer_pending(&dev->timer)) {
+			if (code == dev->repeat_key) {
+				++dev->rep[0];
+				return;
+			}
+			del_timer(&dev->timer);
+			input_event(dev, EV_KEY, key_map[dev->repeat_key], !!0);
 		}
 
 		if (!key_map[code]) {
 			printk("DVB (%s): no key for %02x!\n", __FUNCTION__, code);
-		        return;
-       		}
+			return;
+		}
 
 		/* initialize debounce and repeat */
 		dev->repeat_key = code;
@@ -174,25 +171,24 @@ static void msp430_ir_interrupt (unsigned long data)
 		/* 350 milliseconds */
 		dev->timer.expires = jiffies + HZ * 350 / 1000;
 		/* MAKE */
-        	input_event(dev, EV_KEY, key_map[code], !0);
+		input_event(dev, EV_KEY, key_map[code], !0);
 		add_timer(&dev->timer);
 	}
 }
 
-
-static int msp430_ir_init (struct budget_ci *budget_ci)
+static int msp430_ir_init(struct budget_ci *budget_ci)
 {
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 	int i;
 
 	memset(&budget_ci->input_dev, 0, sizeof(struct input_dev));
 
-	sprintf (budget_ci->ir_dev_name, "Budget-CI dvb ir receiver %s", saa->name);
+	sprintf(budget_ci->ir_dev_name, "Budget-CI dvb ir receiver %s", saa->name);
 	budget_ci->input_dev.name = budget_ci->ir_dev_name;
 
 	set_bit(EV_KEY, budget_ci->input_dev.evbit);
 
-	for (i=0; i<sizeof(key_map)/sizeof(*key_map); i++)
+	for (i = 0; i < sizeof(key_map) / sizeof(*key_map); i++)
 		if (key_map[i])
 			set_bit(key_map[i], budget_ci->input_dev.keybit);
 
@@ -202,13 +198,12 @@ static int msp430_ir_init (struct budget_ci *budget_ci)
 
 	saa7146_write(saa, IER, saa7146_read(saa, IER) | MASK_06);
 
-	saa7146_setgpio(saa, 3, SAA7146_GPIO_IRQHI); 
+	saa7146_setgpio(saa, 3, SAA7146_GPIO_IRQHI);
 
 	return 0;
 }
 
-
-static void msp430_ir_deinit (struct budget_ci *budget_ci)
+static void msp430_ir_deinit(struct budget_ci *budget_ci)
 {
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 	struct input_dev *dev = &budget_ci->input_dev;
@@ -224,7 +219,7 @@ static void msp430_ir_deinit (struct budget_ci *budget_ci)
 
 static int ciintf_read_attribute_mem(struct dvb_ca_en50221 *ca, int slot, int address)
 {
-	struct budget_ci* budget_ci = (struct budget_ci*) ca->data;
+	struct budget_ci *budget_ci = (struct budget_ci *) ca->data;
 
 	if (slot != 0)
 		return -EINVAL;
@@ -235,7 +230,7 @@ static int ciintf_read_attribute_mem(struct dvb_ca_en50221 *ca, int slot, int ad
 
 static int ciintf_write_attribute_mem(struct dvb_ca_en50221 *ca, int slot, int address, u8 value)
 {
-	struct budget_ci* budget_ci = (struct budget_ci*) ca->data;
+	struct budget_ci *budget_ci = (struct budget_ci *) ca->data;
 
 	if (slot != 0)
 		return -EINVAL;
@@ -246,7 +241,7 @@ static int ciintf_write_attribute_mem(struct dvb_ca_en50221 *ca, int slot, int a
 
 static int ciintf_read_cam_control(struct dvb_ca_en50221 *ca, int slot, u8 address)
 {
-	struct budget_ci* budget_ci = (struct budget_ci*) ca->data;
+	struct budget_ci *budget_ci = (struct budget_ci *) ca->data;
 
 	if (slot != 0)
 		return -EINVAL;
@@ -257,7 +252,7 @@ static int ciintf_read_cam_control(struct dvb_ca_en50221 *ca, int slot, u8 addre
 
 static int ciintf_write_cam_control(struct dvb_ca_en50221 *ca, int slot, u8 address, u8 value)
 {
-	struct budget_ci* budget_ci = (struct budget_ci*) ca->data;
+	struct budget_ci *budget_ci = (struct budget_ci *) ca->data;
 
 	if (slot != 0)
 		return -EINVAL;
@@ -268,7 +263,7 @@ static int ciintf_write_cam_control(struct dvb_ca_en50221 *ca, int slot, u8 addr
 
 static int ciintf_slot_reset(struct dvb_ca_en50221 *ca, int slot)
 {
-	struct budget_ci* budget_ci = (struct budget_ci*) ca->data;
+	struct budget_ci *budget_ci = (struct budget_ci *) ca->data;
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 
 	if (slot != 0)
@@ -283,13 +278,13 @@ static int ciintf_slot_reset(struct dvb_ca_en50221 *ca, int slot)
 			       CICONTROL_RESET, 1, 0);
 
 	saa7146_setgpio(saa, 1, SAA7146_GPIO_OUTHI);
-   	ttpci_budget_set_video_port(saa, BUDGET_VIDEO_PORTB);
+	ttpci_budget_set_video_port(saa, BUDGET_VIDEO_PORTB);
 	return 0;
 }
 
 static int ciintf_slot_shutdown(struct dvb_ca_en50221 *ca, int slot)
 {
-   	struct budget_ci* budget_ci = (struct budget_ci*) ca->data;
+	struct budget_ci *budget_ci = (struct budget_ci *) ca->data;
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 
 	if (slot != 0)
@@ -302,7 +297,7 @@ static int ciintf_slot_shutdown(struct dvb_ca_en50221 *ca, int slot)
 
 static int ciintf_slot_ts_enable(struct dvb_ca_en50221 *ca, int slot)
 {
-	struct budget_ci* budget_ci = (struct budget_ci*) ca->data;
+	struct budget_ci *budget_ci = (struct budget_ci *) ca->data;
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 	int tmp;
 
@@ -315,14 +310,13 @@ static int ciintf_slot_ts_enable(struct dvb_ca_en50221 *ca, int slot)
 	ttpci_budget_debiwrite(&budget_ci->budget, DEBICICTL, DEBIADDR_CICONTROL, 1,
 			       tmp | CICONTROL_ENABLETS, 1, 0);
 
-   	ttpci_budget_set_video_port(saa, BUDGET_VIDEO_PORTA);
+	ttpci_budget_set_video_port(saa, BUDGET_VIDEO_PORTA);
 	return 0;
 }
 
-
-static void ciintf_interrupt (unsigned long data)
+static void ciintf_interrupt(unsigned long data)
 {
-	struct budget_ci *budget_ci = (struct budget_ci*) data;
+	struct budget_ci *budget_ci = (struct budget_ci *) data;
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 	unsigned int flags;
 
@@ -335,7 +329,7 @@ static void ciintf_interrupt (unsigned long data)
 	if (flags & CICONTROL_CAMDETECT) {
 
 		// GPIO should be set to trigger on falling edge if a CAM is present
-	saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
+		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
 
 		if (budget_ci->slot_status & SLOTSTATUS_NONE) {
 			// CAM insertion IRQ
@@ -359,7 +353,7 @@ static void ciintf_interrupt (unsigned long data)
 		// the CAM might not actually be ready yet.
 		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQHI);
 
-	   	// generate a CAM removal IRQ if we haven't already
+		// generate a CAM removal IRQ if we haven't already
 		if (budget_ci->slot_status & SLOTSTATUS_OCCUPIED) {
 			// CAM removal IRQ
 			budget_ci->slot_status = SLOTSTATUS_NONE;
@@ -369,7 +363,7 @@ static void ciintf_interrupt (unsigned long data)
 	}
 }
 
-static int ciintf_init(struct budget_ci* budget_ci)
+static int ciintf_init(struct budget_ci *budget_ci)
 {
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 	int flags;
@@ -401,7 +395,7 @@ static int ciintf_init(struct budget_ci* budget_ci)
 	budget_ci->ca.slot_shutdown = ciintf_slot_shutdown;
 	budget_ci->ca.slot_ts_enable = ciintf_slot_ts_enable;
 	budget_ci->ca.data = budget_ci;
-	if ((result = dvb_ca_en50221_init(budget_ci->budget.dvb_adapter,
+	if ((result = dvb_ca_en50221_init(&budget_ci->budget.dvb_adapter,
 					  &budget_ci->ca,
 					  DVB_CA_EN50221_FLAG_IRQ_CAMCHANGE |
 					  DVB_CA_EN50221_FLAG_IRQ_FR |
@@ -409,11 +403,10 @@ static int ciintf_init(struct budget_ci* budget_ci)
 		printk("budget_ci: CI interface detected, but initialisation failed.\n");
 		goto error;
 	}
-
 	// Setup CI slot IRQ
-	tasklet_init (&budget_ci->ciintf_irq_tasklet, ciintf_interrupt, (unsigned long) budget_ci);
+	tasklet_init(&budget_ci->ciintf_irq_tasklet, ciintf_interrupt, (unsigned long) budget_ci);
 	if (budget_ci->slot_status != SLOTSTATUS_NONE) {
-	saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
+		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
 	} else {
 		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQHI);
 	}
@@ -438,7 +431,7 @@ error:
 	return result;
 }
 
-static void ciintf_deinit(struct budget_ci* budget_ci)
+static void ciintf_deinit(struct budget_ci *budget_ci)
 {
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 
@@ -461,20 +454,20 @@ static void ciintf_deinit(struct budget_ci* budget_ci)
 	saa7146_write(saa, MC1, saa7146_read(saa, MC1) | (0x800 << 16));
 }
 
-static void budget_ci_irq (struct saa7146_dev *dev, u32 *isr)
+static void budget_ci_irq(struct saa7146_dev *dev, u32 * isr)
 {
-        struct budget_ci *budget_ci = (struct budget_ci*) dev->ext_priv;
+	struct budget_ci *budget_ci = (struct budget_ci *) dev->ext_priv;
 
 	dprintk(8, "dev: %p, budget_ci: %p\n", dev, budget_ci);
 
-        if (*isr & MASK_06)
-                tasklet_schedule (&budget_ci->msp430_irq_tasklet);
+	if (*isr & MASK_06)
+		tasklet_schedule(&budget_ci->msp430_irq_tasklet);
 
-        if (*isr & MASK_10)
-		ttpci_budget_irq10_handler (dev, isr);
+	if (*isr & MASK_10)
+		ttpci_budget_irq10_handler(dev, isr);
 
 	if ((*isr & MASK_03) && (budget_ci->budget.ci_present))
-		tasklet_schedule (&budget_ci->ciintf_irq_tasklet);
+		tasklet_schedule(&budget_ci->ciintf_irq_tasklet);
 }
 
 
@@ -888,7 +881,7 @@ static void frontend_init(struct budget_ci *budget_ci)
 		       budget_ci->budget.dev->pci->subsystem_device);
 	} else {
 		if (dvb_register_frontend
-		    (budget_ci->budget.dvb_adapter, budget_ci->budget.dvb_frontend)) {
+		    (&budget_ci->budget.dvb_adapter, budget_ci->budget.dvb_frontend)) {
 			printk("budget-ci: Frontend registration failed!\n");
 			if (budget_ci->budget.dvb_frontend->ops->release)
 				budget_ci->budget.dvb_frontend->ops->release(budget_ci->budget.dvb_frontend);
@@ -902,7 +895,7 @@ static int budget_ci_attach(struct saa7146_dev *dev, struct saa7146_pci_extensio
 	struct budget_ci *budget_ci;
 	int err;
 
-	if (!(budget_ci = kmalloc (sizeof(struct budget_ci), GFP_KERNEL)))
+	if (!(budget_ci = kmalloc(sizeof(struct budget_ci), GFP_KERNEL)))
 		return -ENOMEM;
 
 	dprintk(2, "budget_ci: %p\n", budget_ci);
@@ -912,28 +905,26 @@ static int budget_ci_attach(struct saa7146_dev *dev, struct saa7146_pci_extensio
 	dev->ext_priv = budget_ci;
 
 	if ((err = ttpci_budget_init(&budget_ci->budget, dev, info, THIS_MODULE))) {
-		kfree (budget_ci);
+		kfree(budget_ci);
 		return err;
 	}
 
-	tasklet_init (&budget_ci->msp430_irq_tasklet, msp430_ir_interrupt,
-		      (unsigned long) budget_ci);
+	tasklet_init(&budget_ci->msp430_irq_tasklet, msp430_ir_interrupt,
+		     (unsigned long) budget_ci);
 
-	msp430_ir_init (budget_ci);
+	msp430_ir_init(budget_ci);
 
 	ciintf_init(budget_ci);
 
-	budget_ci->budget.dvb_adapter->priv = budget_ci;
+	budget_ci->budget.dvb_adapter.priv = budget_ci;
 	frontend_init(budget_ci);
 
 	return 0;
 }
 
-
-
-static int budget_ci_detach (struct saa7146_dev* dev)
+static int budget_ci_detach(struct saa7146_dev *dev)
 {
-	struct budget_ci *budget_ci = (struct budget_ci*) dev->ext_priv;
+	struct budget_ci *budget_ci = (struct budget_ci *) dev->ext_priv;
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 	int err;
 
@@ -941,60 +932,57 @@ static int budget_ci_detach (struct saa7146_dev* dev)
 		ciintf_deinit(budget_ci);
 	if (budget_ci->budget.dvb_frontend)
 		dvb_unregister_frontend(budget_ci->budget.dvb_frontend);
-	err = ttpci_budget_deinit (&budget_ci->budget);
+	err = ttpci_budget_deinit(&budget_ci->budget);
 
-	tasklet_kill (&budget_ci->msp430_irq_tasklet);
+	tasklet_kill(&budget_ci->msp430_irq_tasklet);
 
-	msp430_ir_deinit (budget_ci);
+	msp430_ir_deinit(budget_ci);
 
 	// disable frontend and CI interface
 	saa7146_setgpio(saa, 2, SAA7146_GPIO_INPUT);
 
-	kfree (budget_ci);
+	kfree(budget_ci);
 
 	return err;
 }
 
+static struct saa7146_extension budget_extension;
 
-
-static struct saa7146_extension budget_extension; 
-
-MAKE_BUDGET_INFO(ttbci,	"TT-Budget/WinTV-NOVA-CI PCI",	BUDGET_TT_HW_DISEQC);
-MAKE_BUDGET_INFO(ttbt2,	"TT-Budget/WinTV-NOVA-T  PCI",	BUDGET_TT);
+MAKE_BUDGET_INFO(ttbci, "TT-Budget/WinTV-NOVA-CI PCI", BUDGET_TT_HW_DISEQC);
+MAKE_BUDGET_INFO(ttbt2, "TT-Budget/WinTV-NOVA-T	 PCI", BUDGET_TT);
 
 static struct pci_device_id pci_tbl[] = {
 	MAKE_EXTENSION_PCI(ttbci, 0x13c2, 0x100c),
 	MAKE_EXTENSION_PCI(ttbci, 0x13c2, 0x100f),
-	MAKE_EXTENSION_PCI(ttbt2,  0x13c2, 0x1011),
+	MAKE_EXTENSION_PCI(ttbt2, 0x13c2, 0x1011),
 	{
-		.vendor    = 0,
-	}
+	 .vendor = 0,
+	 }
 };
 
 MODULE_DEVICE_TABLE(pci, pci_tbl);
 
 static struct saa7146_extension budget_extension = {
-	.name		= "budget_ci dvb\0",
-	.flags	 	= 0,
+	.name = "budget_ci dvb\0",
+	.flags = 0,
 
-	.module		= THIS_MODULE,
-	.pci_tbl	= &pci_tbl[0],
-	.attach		= budget_ci_attach,
-	.detach		= budget_ci_detach,
+	.module = THIS_MODULE,
+	.pci_tbl = &pci_tbl[0],
+	.attach = budget_ci_attach,
+	.detach = budget_ci_detach,
 
-	.irq_mask	= MASK_03 | MASK_06 | MASK_10,
-	.irq_func	= budget_ci_irq,
-};	
+	.irq_mask = MASK_03 | MASK_06 | MASK_10,
+	.irq_func = budget_ci_irq,
+};
 
-
-static int __init budget_ci_init(void) 
+static int __init budget_ci_init(void)
 {
 	return saa7146_register_extension(&budget_extension);
 }
 
 static void __exit budget_ci_exit(void)
 {
-	saa7146_unregister_extension(&budget_extension); 
+	saa7146_unregister_extension(&budget_extension);
 }
 
 module_init(budget_ci_init);
@@ -1005,4 +993,3 @@ MODULE_AUTHOR("Michael Hunold, Jack Thomasson, Andrew de Quincey, others");
 MODULE_DESCRIPTION("driver for the SAA7146 based so-called "
 		   "budget PCI DVB cards w/ CI-module produced by "
 		   "Siemens, Technotrend, Hauppauge");
-

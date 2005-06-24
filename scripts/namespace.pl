@@ -406,6 +406,11 @@ sub resolve_external_references
 					&& $name !~ /^__.*per_cpu_end/
 					&& $name !~ /^__alt_instructions/
 					&& $name !~ /^__setup_/
+					&& $name !~ /^jiffies/
+					&& $name !~ /^__mod_timer/
+					&& $name !~ /^__mod_page_state/
+					&& $name !~ /^init_module/
+					&& $name !~ /^cleanup_module/
 				) {
 					printf "Cannot resolve ";
 					printf "weak " if ($type eq "w");

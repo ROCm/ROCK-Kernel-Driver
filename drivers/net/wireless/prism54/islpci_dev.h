@@ -211,8 +211,6 @@ islpci_trigger(islpci_private *priv)
 			       priv->device_base);
 }
 
-struct net_device_stats *islpci_statistics(struct net_device *);
-
 int islpci_free_memory(islpci_private *);
 struct net_device *islpci_setup(struct pci_dev *);
 #endif				/* _ISLPCI_DEV_H */

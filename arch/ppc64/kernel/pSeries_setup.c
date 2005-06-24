@@ -320,9 +320,10 @@ static  void __init pSeries_discover_pic(void)
 	}
 }
 
-static void pSeries_cpu_die(void)
+static void pSeries_mach_cpu_die(void)
 {
 	local_irq_disable();
+	idle_task_exit();
 	/* Some hardware requires clearing the CPPR, while other hardware does not
 	 * it is safe either way
 	 */
@@ -362,7 +363,7 @@ static void __init pSeries_init_early(void)
 		find_udbg_vterm();
 	else if (physport) {
 		/* Map the uart for udbg. */
-		comport = (void *)__ioremap(physport, 16, _PAGE_NO_CACHE);
+		comport = (void *)ioremap(physport, 16);
 		udbg_init_uart(comport, default_speed);
 
 		ppc_md.udbg_putc = udbg_putc;
@@ -599,7 +600,7 @@ struct machdep_calls __initdata pSeries_md = {
 	.power_off		= rtas_power_off,
 	.halt			= rtas_halt,
 	.panic			= rtas_os_term,
-	.cpu_die		= pSeries_cpu_die,
+	.cpu_die		= pSeries_mach_cpu_die,
 	.get_boot_time		= pSeries_get_boot_time,
 	.get_rtc_time		= pSeries_get_rtc_time,
 	.set_rtc_time		= pSeries_set_rtc_time,

@@ -60,121 +60,6 @@
 
 #define NFSDDBG_FACILITY		NFSDDBG_XDR
 
-static const char utf8_byte_len[256] = {
-	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-	1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2, 2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-	3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3, 4,4,4,4,4,4,4,4,5,5,5,5,6,6,0,0
-};
-
-static inline int
-is_legal_utf8_sequence(unsigned char *source, int length)
-{
-	unsigned char *ptr;
-	unsigned char c;
-
-	if (length==1) return 1;
-
-	/* Check for overlong sequence, and check second byte */
-	c = *(source + 1);
-	switch (*source) {
-	case 0xE0: /* 3 bytes */
-		if ( c < 0xA0 ) return 0;
-		break;
-	case 0xF0: /* 4 bytes */
-		if ( c < 0x90 ) return 0;
-		break;
-	case 0xF8: /* 5 bytes */
-		if ( c < 0xC8 ) return 0;
-		break;
-	case 0xFC: /* 6 bytes */
-		if ( c < 0x84 ) return 0;
-		break;
-	default:
-		if ( (c & 0xC0) != 0x80) return 0;
-	}
-
-	/* Check that trailing bytes look like 10xxxxxx */
-	for (ptr = source++ + length - 1; ptr>source; ptr--)
-		if ( ((*ptr) & 0xC0) != 0x80 ) return 0;
-	return 1;
-}
-
-/* This does some screening on disallowed unicode characters.  It is NOT
- * comprehensive.
- */
-static int
-is_allowed_utf8_char(unsigned char *source, int length)
-{
-	/* We assume length and source point to a valid utf8 sequence */
-	unsigned char c;
-
-	/* Disallow F0000 and up (in utf8, F3B08080) */
-	if (*source > 0xF3 ) return 0;
-	c = *(source + 1);
-	switch (*source) {
-	case 0xF3:
-		if (c >= 0xB0) return 0;
-		break;
-	/* Disallow D800-F8FF (in utf8, EDA080-EFA3BF */
-	case 0xED:
-		if (c >= 0xA0) return 0;
-		break;
-	case 0xEE:
-		return 0;
-		break;
-	case 0xEF:
-		if (c <= 0xA3) return 0;
-	/* Disallow FFF9-FFFF (EFBFB9-EFBFBF) */
-		if (c==0xBF)
-			/* Don't need to check <=0xBF, since valid utf8 */
-			if ( *(source+2) >= 0xB9) return 0;
-		break;
-	}
-	return 1;
-}
-
-/* This routine should really check to see that the proper stringprep
- * mappings have been applied.  Instead, we do a simple screen of some
- * of the more obvious illegal values by calling is_allowed_utf8_char.
- * This will allow many illegal strings through, but if a client behaves,
- * it will get full functionality.  The other option (apart from full
- * stringprep checking) is to limit everything to an easily handled subset,
- * such as 7-bit ascii.
- *
- * Note - currently calling routines ignore return value except as boolean.
- */
-static int
-check_utf8(char *str, int len)
-{
-	unsigned char *chunk, *sourceend;
-	int chunklen;
-
-	chunk = str;
-	sourceend = str + len;
-
-	while (chunk < sourceend) {
-		chunklen = utf8_byte_len[*chunk];
-		if (!chunklen)
-			return nfserr_inval;
-		if (chunk + chunklen > sourceend)
-			return nfserr_inval;
-		if (!is_legal_utf8_sequence(chunk, chunklen))
-			return nfserr_inval;
-		if (!is_allowed_utf8_char(chunk, chunklen))
-			return nfserr_inval;
-		if ( (chunklen==1) && (!*chunk) )
-			return nfserr_inval; /* Disallow embedded nulls */
-		chunk += chunklen;
-	}
-
-	return 0;
-}
-
 static int
 check_filename(char *str, int len, int err)
 {
@@ -187,7 +72,7 @@ check_filename(char *str, int len, int err)
 	for (i = 0; i < len; i++)
 		if (str[i] == '/')
 			return err;
-	return check_utf8(str, len);
+	return 0;
 }
 
 /*
@@ -403,8 +288,6 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 			READ_BUF(dummy32);
 			len += XDR_QUADLEN(dummy32) << 2;
 			READMEM(buf, dummy32);
-			if (check_utf8(buf, dummy32))
-				return nfserr_inval;
 			ace.whotype = nfs4_acl_get_whotype(buf, dummy32);
 			status = 0;
 			if (ace.whotype != NFS4_ACL_WHO_NAMED)
@@ -439,8 +322,6 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 		READ_BUF(dummy32);
 		len += (XDR_QUADLEN(dummy32) << 2);
 		READMEM(buf, dummy32);
-		if (check_utf8(buf, dummy32))
-			return nfserr_inval;
 		if ((status = nfsd_map_name_to_uid(argp->rqstp, buf, dummy32, &iattr->ia_uid)))
 			goto out_nfserr;
 		iattr->ia_valid |= ATTR_UID;
@@ -452,8 +333,6 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 		READ_BUF(dummy32);
 		len += (XDR_QUADLEN(dummy32) << 2);
 		READMEM(buf, dummy32);
-		if (check_utf8(buf, dummy32))
-			return nfserr_inval;
 		if ((status = nfsd_map_name_to_gid(argp->rqstp, buf, dummy32, &iattr->ia_gid)))
 			goto out_nfserr;
 		iattr->ia_valid |= ATTR_GID;
@@ -585,8 +464,6 @@ nfsd4_decode_create(struct nfsd4_compoundargs *argp, struct nfsd4_create *create
 		READ32(create->cr_linklen);
 		READ_BUF(create->cr_linklen);
 		SAVEMEM(create->cr_linkname, create->cr_linklen);
-		if (check_utf8(create->cr_linkname, create->cr_linklen))
-			return nfserr_inval;
 		break;
 	case NF4BLK:
 	case NF4CHR:
@@ -1454,7 +1331,10 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		if (bmval0 & FATTR4_WORD0_ACL) {
 			if (status == -EOPNOTSUPP)
 				bmval0 &= ~FATTR4_WORD0_ACL;
-			else if (status != 0)
+			else if (status == -EINVAL) {
+				status = nfserr_attrnotsupp;
+				goto out;
+			} else if (status != 0)
 				goto out_nfserr;
 		}
 	}
@@ -2191,10 +2071,10 @@ nfsd4_encode_read(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_read 
 	}
 	read->rd_vlen = v;
 
-	nfserr = nfsd_read(read->rd_rqstp, read->rd_fhp,
-			   read->rd_offset,
-			   read->rd_iov, read->rd_vlen,
-			   &maxcount);
+	nfserr = nfsd_read(read->rd_rqstp, read->rd_fhp, read->rd_filp,
+			read->rd_offset, read->rd_iov, read->rd_vlen,
+			&maxcount);
+
 	if (nfserr == nfserr_symlink)
 		nfserr = nfserr_inval;
 	if (nfserr)

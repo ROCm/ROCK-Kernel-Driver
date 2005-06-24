@@ -25,8 +25,6 @@
 
 typedef unsigned long long cycles_t;
 
-extern cycles_t cacheflush_time;
-
 static __inline__ cycles_t get_cycles (void)
 {
 	return 0;

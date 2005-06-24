@@ -227,7 +227,7 @@ static int actisys_reset(struct irda_task *task)
 	dongle_t *self = (dongle_t *) task->instance;
 	int ret = 0;
 
-	ASSERT(task != NULL, return -1;);
+	IRDA_ASSERT(task != NULL, return -1;);
 
 	self->reset_task = task;
 
@@ -254,7 +254,8 @@ static int actisys_reset(struct irda_task *task)
 		self->speed = 9600;	/* That's the default */
 		break;
 	default:
-		ERROR("%s(), unknown state %d\n", __FUNCTION__, task->state);
+		IRDA_ERROR("%s(), unknown state %d\n",
+			   __FUNCTION__, task->state);
 		irda_task_next_state(task, IRDA_TASK_DONE);
 		self->reset_task = NULL;
 		ret = -1;

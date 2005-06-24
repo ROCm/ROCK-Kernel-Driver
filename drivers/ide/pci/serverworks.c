@@ -341,7 +341,7 @@ static int svwks_ide_dma_end (ide_drive_t *drive)
 	return __ide_dma_end(drive);
 }
 
-static unsigned int __init init_chipset_svwks (struct pci_dev *dev, const char *name)
+static unsigned int __devinit init_chipset_svwks (struct pci_dev *dev, const char *name)
 {
 	unsigned int reg;
 	u8 btr;
@@ -508,7 +508,7 @@ static unsigned int __init ata66_svwks (ide_hwif_t *hwif)
 }
 
 #undef CAN_SW_DMA
-static void __init init_hwif_svwks (ide_hwif_t *hwif)
+static void __devinit init_hwif_svwks (ide_hwif_t *hwif)
 {
 	u8 dma_stat = 0;
 
@@ -556,7 +556,7 @@ static void __init init_hwif_svwks (ide_hwif_t *hwif)
 /*
  * We allow the BM-DMA driver to only work on enabled interfaces.
  */
-static void __init init_dma_svwks (ide_hwif_t *hwif, unsigned long dmabase)
+static void __devinit init_dma_svwks (ide_hwif_t *hwif, unsigned long dmabase)
 {
 	struct pci_dev *dev = hwif->pci_dev;
 
@@ -568,7 +568,7 @@ static void __init init_dma_svwks (ide_hwif_t *hwif, unsigned long dmabase)
 	ide_setup_dma(hwif, dmabase, 8);
 }
 
-static int __init init_setup_svwks (struct pci_dev *dev, ide_pci_device_t *d)
+static int __devinit init_setup_svwks (struct pci_dev *dev, ide_pci_device_t *d)
 {
 	return ide_setup_pci_device(dev, d);
 }

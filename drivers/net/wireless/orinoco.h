@@ -7,7 +7,7 @@
 #ifndef _ORINOCO_H
 #define _ORINOCO_H
 
-#define DRIVER_VERSION "0.13e"
+#define DRIVER_VERSION "0.14alpha2"
 
 #include <linux/types.h>
 #include <linux/spinlock.h>
@@ -30,6 +30,12 @@ struct orinoco_key {
 	char data[ORINOCO_MAX_KEY_SIZE];
 } __attribute__ ((packed));
 
+typedef enum {
+	FIRMWARE_TYPE_AGERE,
+	FIRMWARE_TYPE_INTERSIL,
+	FIRMWARE_TYPE_SYMBOL
+} fwtype_t;
+
 struct orinoco_private {
 	void *card;	/* Pointer to card dependent structure */
 	int (*hard_reset)(struct orinoco_private *);
@@ -42,7 +48,6 @@ struct orinoco_private {
 	/* driver state */
 	int open;
 	u16 last_linkstatus;
-	int connected;
 
 	/* Net device stuff */
 	struct net_device *ndev;
@@ -54,19 +59,22 @@ struct orinoco_private {
 	u16 txfid;
 
 	/* Capabilities of the hardware/firmware */
-	int firmware_type;
-#define FIRMWARE_TYPE_AGERE 1
-#define FIRMWARE_TYPE_INTERSIL 2
-#define FIRMWARE_TYPE_SYMBOL 3
-	int has_ibss, has_port3, has_ibss_any, ibss_port;
-	int has_wep, has_big_wep;
-	int has_mwo;
-	int has_pm;
-	int has_preamble;
-	int has_sensitivity;
+	fwtype_t firmware_type;
+	char fw_name[32];
+	int ibss_port;
 	int nicbuf_size;
 	u16 channel_mask;
-	int broken_disableport;
+
+	/* Boolean capabilities */
+	unsigned int has_ibss:1;
+	unsigned int has_port3:1;
+	unsigned int has_wep:1;
+	unsigned int has_big_wep:1;
+	unsigned int has_mwo:1;
+	unsigned int has_pm:1;
+	unsigned int has_preamble:1;
+	unsigned int has_sensitivity:1;
+	unsigned int broken_disableport:1;
 
 	/* Configuration paramaters */
 	u32 iw_mode;
@@ -108,6 +116,7 @@ extern int orinoco_debug;
 
 extern struct net_device *alloc_orinocodev(int sizeof_card,
 					   int (*hard_reset)(struct orinoco_private *));
+extern void free_orinocodev(struct net_device *dev);
 extern int __orinoco_up(struct net_device *dev);
 extern int __orinoco_down(struct net_device *dev);
 extern int orinoco_stop(struct net_device *dev);
@@ -127,7 +136,7 @@ extern inline int orinoco_lock(struct orinoco_private *priv,
 {
 	spin_lock_irqsave(&priv->lock, *flags);
 	if (priv->hw_unavailable) {
-		printk(KERN_DEBUG "orinoco_lock() called with hw_unavailable (dev=%p)\n",
+		DEBUG(1, "orinoco_lock() called with hw_unavailable (dev=%p)\n",
 		       priv->ndev);
 		spin_unlock_irqrestore(&priv->lock, *flags);
 		return -EBUSY;

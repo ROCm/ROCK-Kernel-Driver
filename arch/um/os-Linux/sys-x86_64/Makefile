@@ -5,7 +5,6 @@
 
 obj-$(CONFIG_MODE_SKAS) = registers.o
 
-USER_OBJS := $(foreach file,$(obj-y),$(obj)/$(file))
+USER_OBJS := $(obj-y)
 
-$(USER_OBJS) : %.o: %.c
-	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
+include arch/um/scripts/Makefile.rules

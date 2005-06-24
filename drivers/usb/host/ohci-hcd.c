@@ -148,10 +148,22 @@ static void ohci_stop (struct usb_hcd *hcd);
 #include "ohci-q.c"
 
 
-/* Some boards don't support per-port power switching */
-static int power_switching = 0;
-module_param (power_switching, bool, 0);
-MODULE_PARM_DESC (power_switching, "true (not default) to switch port power");
+/*
+ * On architectures with edge-triggered interrupts we must never return
+ * IRQ_NONE.
+ */
+#if defined(CONFIG_SA1111)  /* ... or other edge-triggered systems */
+#define IRQ_NOTMINE	IRQ_HANDLED
+#else
+#define IRQ_NOTMINE	IRQ_NONE
+#endif
+
+
+/* Some boards misreport power switching/overcurrent */
+static int distrust_firmware = 1;
+module_param (distrust_firmware, bool, 0);
+MODULE_PARM_DESC (distrust_firmware,
+	"true to distrust firmware power/overcurrent setup");
 
 /* Some boards leave IR set wrongly, since they fail BIOS/SMM handshakes */
 static int no_handshake = 0;
@@ -240,7 +252,7 @@ static int ohci_urb_enqueue (
 	spin_lock_irqsave (&ohci->lock, flags);
 
 	/* don't submit to a dead HC */
-	if (!HCD_IS_RUNNING(hcd->state)) {
+	if (!HC_IS_RUNNING(hcd->state)) {
 		retval = -ENODEV;
 		goto fail;
 	}
@@ -308,7 +320,7 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 #endif		  
 
 	spin_lock_irqsave (&ohci->lock, flags);
- 	if (HCD_IS_RUNNING(hcd->state)) {
+ 	if (HC_IS_RUNNING(hcd->state)) {
 		urb_priv_t  *urb_priv;
 
 		/* Unless an IRQ completed the unlink while it was being
@@ -355,7 +367,7 @@ ohci_endpoint_disable (struct usb_hcd *hcd, struct usb_host_endpoint *ep)
 rescan:
 	spin_lock_irqsave (&ohci->lock, flags);
 
-	if (!HCD_IS_RUNNING (hcd->state)) {
+	if (!HC_IS_RUNNING (hcd->state)) {
 sanitize:
 		ed->state = ED_IDLE;
 		finish_unlinks (ohci, 0, NULL);
@@ -532,8 +544,9 @@ static int ohci_run (struct ohci_hcd *ohci)
 	// flush the writes
 	(void) ohci_readl (ohci, &ohci->regs->control);
 	msleep(temp);
-	if (power_switching) {
-		unsigned ports = roothub_a (ohci) & RH_A_NDP; 
+	temp = roothub_a (ohci);
+	if (!(temp & RH_A_NPS)) {
+		unsigned ports = temp & RH_A_NDP; 
 
 		/* power down each port */
 		for (temp = 0; temp < ports; temp++)
@@ -574,7 +587,6 @@ retry:
 		// flush those writes
 		(void) ohci_readl (ohci, &ohci->regs->control);
 	}
-	ohci_writel (ohci, ohci->fminterval, &ohci->regs->fminterval);
 
 	/* Tell the controller where the control and bulk lists are
 	 * The lists are empty now. */
@@ -607,7 +619,7 @@ retry:
 	ohci->hc_control &= OHCI_CTRL_RWC;
  	ohci->hc_control |= OHCI_CONTROL_INIT | OHCI_USB_OPER;
  	ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
-	ohci_to_hcd(ohci)->state = USB_STATE_RUNNING;
+	ohci_to_hcd(ohci)->state = HC_STATE_RUNNING;
 
 	/* wake on ConnectStatusChange, matching external hubs */
 	ohci_writel (ohci, RH_HS_DRWE, &ohci->regs->roothub.status);
@@ -624,21 +636,16 @@ retry:
 		/* NSC 87560 and maybe others */
 		temp |= RH_A_NOCP;
 		temp &= ~(RH_A_POTPGT | RH_A_NPS);
-	} else if (power_switching) {
-		/* act like most external hubs:  use per-port power
-		 * switching and overcurrent reporting.
-		 */
-		temp &= ~(RH_A_NPS | RH_A_NOCP);
-		temp |= RH_A_PSM | RH_A_OCPM;
-	} else {
+		ohci_writel (ohci, temp, &ohci->regs->roothub.a);
+	} else if ((ohci->flags & OHCI_QUIRK_AMD756) || distrust_firmware) {
 		/* hub power always on; required for AMD-756 and some
 		 * Mac platforms.  ganged overcurrent reporting, if any.
 		 */
 		temp |= RH_A_NPS;
+		ohci_writel (ohci, temp, &ohci->regs->roothub.a);
 	}
-	ohci_writel (ohci, temp, &ohci->regs->roothub.a);
 	ohci_writel (ohci, RH_HS_LPSC, &ohci->regs->roothub.status);
-	ohci_writel (ohci, power_switching ? RH_B_PPCM : 0,
+	ohci_writel (ohci, (temp & RH_A_NPS) ? 0 : RH_B_PPCM,
 						&ohci->regs->roothub.b);
 	// flush those writes
 	(void) ohci_readl (ohci, &ohci->regs->control);
@@ -646,9 +653,9 @@ retry:
 	spin_unlock_irq (&ohci->lock);
 
 	// POTPGT delay is bits 24-31, in 2 ms units.
-	mdelay ((roothub_a (ohci) >> 23) & 0x1fe);
+	mdelay ((temp >> 23) & 0x1fe);
 	bus = &ohci_to_hcd(ohci)->self;
-	ohci_to_hcd(ohci)->state = USB_STATE_RUNNING;
+	ohci_to_hcd(ohci)->state = HC_STATE_RUNNING;
 
 	ohci_dump (ohci, 1);
 
@@ -667,7 +674,7 @@ retry:
 	}
 
 	udev->speed = USB_SPEED_FULL;
-	if (hcd_register_root (udev, ohci_to_hcd(ohci)) != 0) {
+	if (usb_hcd_register_root_hub (udev, ohci_to_hcd(ohci)) != 0) {
 		usb_put_dev (udev);
 		disable (ohci);
 		ohci->hc_control &= ~OHCI_CTRL_HCFS;
@@ -706,7 +713,7 @@ static irqreturn_t ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 
 	/* interrupt for some other device? */
 	} else if ((ints &= ohci_readl (ohci, &regs->intrenable)) == 0) {
-		return IRQ_NONE;
+		return IRQ_NOTMINE;
 	} 
 
 	if (ints & OHCI_INTR_UE) {
@@ -720,16 +727,17 @@ static irqreturn_t ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 
 	if (ints & OHCI_INTR_RD) {
 		ohci_vdbg (ohci, "resume detect\n");
-		schedule_work(&ohci->rh_resume);
+		if (hcd->state != HC_STATE_QUIESCING)
+			schedule_work(&ohci->rh_resume);
 	}
 
 	if (ints & OHCI_INTR_WDH) {
-		if (HCD_IS_RUNNING(hcd->state))
+		if (HC_IS_RUNNING(hcd->state))
 			ohci_writel (ohci, OHCI_INTR_WDH, &regs->intrdisable);	
 		spin_lock (&ohci->lock);
 		dl_done_list (ohci, ptregs);
 		spin_unlock (&ohci->lock);
-		if (HCD_IS_RUNNING(hcd->state))
+		if (HC_IS_RUNNING(hcd->state))
 			ohci_writel (ohci, OHCI_INTR_WDH, &regs->intrenable); 
 	}
   
@@ -742,11 +750,11 @@ static irqreturn_t ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 	if (ohci->ed_rm_list)
 		finish_unlinks (ohci, ohci_frame_no(ohci), ptregs);
 	if ((ints & OHCI_INTR_SF) != 0 && !ohci->ed_rm_list
-			&& HCD_IS_RUNNING(hcd->state))
+			&& HC_IS_RUNNING(hcd->state))
 		ohci_writel (ohci, OHCI_INTR_SF, &regs->intrdisable);	
 	spin_unlock (&ohci->lock);
 
-	if (HCD_IS_RUNNING(hcd->state)) {
+	if (HC_IS_RUNNING(hcd->state)) {
 		ohci_writel (ohci, ints, &regs->intrstatus);
 		ohci_writel (ohci, OHCI_INTR_MIE, &regs->intrenable);	
 		// flush those writes
@@ -901,12 +909,17 @@ MODULE_LICENSE ("GPL");
 #include "ohci-au1xxx.c"
 #endif
 
+#ifdef CONFIG_USB_OHCI_HCD_PPC_SOC
+#include "ohci-ppc-soc.c"
+#endif
+
 #if !(defined(CONFIG_PCI) \
       || defined(CONFIG_SA1111) \
       || defined(CONFIG_ARCH_OMAP) \
       || defined (CONFIG_ARCH_LH7A404) \
       || defined (CONFIG_PXA27x) \
       || defined (CONFIG_SOC_AU1X00) \
+      || defined (CONFIG_USB_OHCI_HCD_PPC_SOC) \
 	)
 #error "missing bus glue for ohci-hcd"
 #endif

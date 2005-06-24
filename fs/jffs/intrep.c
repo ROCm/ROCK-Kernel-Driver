@@ -72,7 +72,7 @@
 #include "jffs_fm.h"
 
 long no_jffs_node = 0;
-long no_jffs_file = 0;
+static long no_jffs_file = 0;
 #if defined(JFFS_MEMORY_DEBUG) && JFFS_MEMORY_DEBUG
 long no_jffs_control = 0;
 long no_jffs_raw_inode = 0;
@@ -85,6 +85,32 @@ long no_name = 0;
 
 static int jffs_scan_flash(struct jffs_control *c);
 static int jffs_update_file(struct jffs_file *f, struct jffs_node *node);
+static int jffs_build_file(struct jffs_file *f);
+static int jffs_free_file(struct jffs_file *f);
+static int jffs_free_node_list(struct jffs_file *f);
+static int jffs_garbage_collect_now(struct jffs_control *c);
+static int jffs_insert_file_into_hash(struct jffs_file *f);
+static int jffs_remove_redundant_nodes(struct jffs_file *f);
+
+/* Is there enough space on the flash?  */
+static inline int JFFS_ENOUGH_SPACE(struct jffs_control *c, __u32 space)
+{
+	struct jffs_fmcontrol *fmc = c->fmc;
+
+	while (1) {
+		if ((fmc->flash_size - (fmc->used_size + fmc->dirty_size))
+			>= fmc->min_free_size + space) {
+			return 1;
+		}
+		if (fmc->dirty_size < fmc->sector_size)
+			return 0;
+
+		if (jffs_garbage_collect_now(c)) {
+		  D1(printk("JFFS_ENOUGH_SPACE: jffs_garbage_collect_now() failed.\n"));
+		  return 0;
+		}
+	}
+}
 
 #if CONFIG_JFFS_FS_VERBOSE > 0
 static __u8
@@ -331,7 +357,7 @@ flash_erase_region(struct mtd_info *mtd, loff_t start,
 }
 
 /* This routine calculates checksums in JFFS.  */
-__u32
+static __u32
 jffs_checksum(const void *data, int size)
 {
 	__u32 sum = 0;
@@ -344,7 +370,7 @@ jffs_checksum(const void *data, int size)
 }
 
 
-int
+static int
 jffs_checksum_flash(struct mtd_info *mtd, loff_t start, int size, __u32 *result)
 {
 	__u32 sum = 0;
@@ -646,7 +672,7 @@ jffs_build_fs_fail:
   a (even) higher degree of confidence in your mount process. 
   A higher number would of course slow down your mount.
 */
-int check_partly_erased_sectors(struct jffs_fmcontrol *fmc){
+static int check_partly_erased_sectors(struct jffs_fmcontrol *fmc){
 
 #define NUM_REREADS             4 /* see note above */
 #define READ_AHEAD_BYTES        4096 /* must be a multiple of 4, 
@@ -1478,7 +1504,7 @@ jffs_classify_node(struct jffs_node *node)
 
 /* Remove redundant nodes from a file.  Mark the on-flash memory
    as dirty.  */
-int
+static int
 jffs_remove_redundant_nodes(struct jffs_file *f)
 {
 	struct jffs_node *newest_node;
@@ -1532,7 +1558,7 @@ jffs_remove_redundant_nodes(struct jffs_file *f)
 
 
 /* Insert a file into the hash table.  */
-int
+static int
 jffs_insert_file_into_hash(struct jffs_file *f)
 {
 	int i = f->ino % f->c->hash_len;
@@ -1580,7 +1606,7 @@ jffs_insert_file_into_tree(struct jffs_file *f)
 
 
 /* Remove a file from the hash table.  */
-int
+static int
 jffs_unlink_file_from_hash(struct jffs_file *f)
 {
 	D3(printk("jffs_unlink_file_from_hash(): f: 0x%p, "
@@ -2038,7 +2064,7 @@ jffs_foreach_file(struct jffs_control *c, int (*func)(struct jffs_file *))
 
 
 /* Free all nodes associated with a file.  */
-int
+static int
 jffs_free_node_list(struct jffs_file *f)
 {
 	struct jffs_node *node;
@@ -2058,7 +2084,7 @@ jffs_free_node_list(struct jffs_file *f)
 
 
 /* Free a file and its name.  */
-int
+static int
 jffs_free_file(struct jffs_file *f)
 {
 	D3(printk("jffs_free_file: f #%u, \"%s\"\n",
@@ -2073,7 +2099,7 @@ jffs_free_file(struct jffs_file *f)
 	return 0;
 }
 
-long
+static long
 jffs_get_file_count(void)
 {
 	return no_jffs_file;
@@ -2127,7 +2153,7 @@ jffs_file_count(struct jffs_file *f)
 
 /* Build up a file's range list from scratch by going through the
    version list.  */
-int
+static int
 jffs_build_file(struct jffs_file *f)
 {
 	struct jffs_node *n;
@@ -2481,7 +2507,6 @@ jffs_update_file(struct jffs_file *f, struct jffs_node *node)
 	return 0;
 }
 
-
 /* Print the contents of a node.  */
 void
 jffs_print_node(struct jffs_node *n)
@@ -2541,6 +2566,7 @@ jffs_print_raw_inode(struct jffs_raw_inode *raw_inode)
 
 
 /* Print the contents of a file.  */
+#if 0
 int
 jffs_print_file(struct jffs_file *f)
 {
@@ -2580,7 +2606,7 @@ jffs_print_file(struct jffs_file *f)
 	D(printk("}\n"));
 	return 0;
 }
-
+#endif  /*  0  */
 
 void
 jffs_print_hash_table(struct jffs_control *c)
@@ -2655,7 +2681,7 @@ jffs_print_memory_allocation_statistics(void)
 
 
 /* Rewrite `size' bytes, and begin at `node'.  */
-int
+static int
 jffs_rewrite_data(struct jffs_file *f, struct jffs_node *node, __u32 size)
 {
 	struct jffs_control *c = f->c;
@@ -2858,7 +2884,7 @@ retry:
    process and is often called multiple times at each occasion of a
    garbage collect.  */
 
-int
+static int
 jffs_garbage_collect_next(struct jffs_control *c)
 {
 	struct jffs_fmcontrol *fmc = c->fmc;
@@ -3097,7 +3123,7 @@ jffs_clear_end_of_node(struct jffs_control *c, __u32 erase_size)
 } /* jffs_clear_end_of_node()  */
 
 /* Try to erase as much as possible of the dirt in the flash memory.  */
-long
+static long
 jffs_try_to_erase(struct jffs_control *c)
 {
 	struct jffs_fmcontrol *fmc = c->fmc;
@@ -3198,7 +3224,7 @@ jffs_try_to_erase(struct jffs_control *c)
    collection can be.  */
 
 
-int
+static int
 jffs_garbage_collect_now(struct jffs_control *c)
 {
 	struct jffs_fmcontrol *fmc = c->fmc;

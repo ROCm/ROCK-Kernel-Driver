@@ -2,7 +2,7 @@
  * Parallel port device probing code
  *
  * Authors:    Carsten Gross, carsten@sol.wohnheim.uni-ulm.de
- *             Philip Blundell <Philip.Blundell@pobox.com>
+ *             Philip Blundell <philb@gnu.org>
  */
 
 #include <linux/module.h>

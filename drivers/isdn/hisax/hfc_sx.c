@@ -1382,14 +1382,14 @@ hfcsx_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 }
 
 #ifdef __ISAPNP__
-static struct isapnp_device_id hfc_ids[] __initdata = {
+static struct isapnp_device_id hfc_ids[] __devinitdata = {
 	{ ISAPNP_VENDOR('T', 'A', 'G'), ISAPNP_FUNCTION(0x2620),
 	  ISAPNP_VENDOR('T', 'A', 'G'), ISAPNP_FUNCTION(0x2620), 
 	  (unsigned long) "Teles 16.3c2" },
 	{ 0, }
 };
 
-static struct isapnp_device_id *ipid __initdata = &hfc_ids[0];
+static struct isapnp_device_id *ipid __devinitdata = &hfc_ids[0];
 static struct pnp_card *pnp_c __devinitdata = NULL;
 #endif
 

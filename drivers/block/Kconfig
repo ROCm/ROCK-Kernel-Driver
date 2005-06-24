@@ -6,7 +6,7 @@ menu "Block devices"
 
 config BLK_DEV_FD
 	tristate "Normal floppy disk support"
-	depends on (!ARCH_S390 && !M68K && !IA64 && !USERMODE) || Q40 || (SUN3X && BROKEN)
+	depends on (!ARCH_S390 && !M68K && !IA64 && !UML && !ARM) || Q40 || (SUN3X && BROKEN) || ARCH_RPC || ARCH_EBSA285
 	---help---
 	  If you want to use the floppy disk drive(s) of your PC under Linux,
 	  say Y. Information about this driver, especially important for IBM
@@ -42,7 +42,7 @@ config MAC_FLOPPY
 
 config BLK_DEV_PS2
 	tristate "PS/2 ESDI hard disk support"
-	depends on MCA && MCA_LEGACY
+	depends on MCA && MCA_LEGACY && BROKEN
 	help
 	  Say Y here if you have a PS/2 machine with a MCA bus and an ESDI
 	  hard disk.
@@ -105,7 +105,7 @@ config ATARI_SLM
 
 config BLK_DEV_XD
 	tristate "XT hard disk support"
-	depends on ISA
+	depends on ISA && ISA_DMA_API
 	help
 	  Very old 8 bit hard disk controllers used in the IBM XT computer
 	  will be supported if you say Y here.
@@ -210,7 +210,7 @@ config BLK_DEV_UMEM
 
 config BLK_DEV_UBD
 	bool "Virtual block device"
-	depends on USERMODE
+	depends on UML
 	---help---
           The User-Mode Linux port includes a driver called UBD which will let
           you access arbitrary files on the host computer as block devices.
@@ -243,7 +243,7 @@ config BLK_DEV_COW_COMMON
 
 config MMAPPER
 	tristate "Example IO memory driver (BROKEN)"
-	depends on USERMODE && BROKEN
+	depends on UML && BROKEN
 	---help---
           The User-Mode Linux port can provide support for IO Memory
           emulation with this option.  This allows a host file to be
@@ -455,7 +455,7 @@ config INITRAMFS_ROOT_GID
 #for instance.
 config LBD
 	bool "Support for Large Block Devices"
-	depends on X86 || MIPS32 || PPC32 || ARCH_S390_31 || SUPERH || USERMODE
+	depends on X86 || MIPS32 || PPC32 || ARCH_S390_31 || SUPERH || UML
 	help
 	  Say Y here if you want to attach large (bigger than 2TB) discs to
 	  your machine, or if you want to have a raid or loopback device
@@ -463,7 +463,7 @@ config LBD
 
 config CDROM_PKTCDVD
 	tristate "Packet writing on CD/DVD media"
-	depends on !USERMODE
+	depends on !UML
 	help
 	  If you have a CDROM drive that supports packet writing, say Y to
 	  include preliminary support. It should work with any MMC/Mt Fuji

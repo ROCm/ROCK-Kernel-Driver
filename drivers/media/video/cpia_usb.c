@@ -308,7 +308,7 @@ static int WritePacket(struct usb_device *udev, const u8 *packet, u8 *buf, size_
 			 packet[1] + (packet[0] << 8),
 			 USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 			 packet[2] + (packet[3] << 8), 
-			 packet[4] + (packet[5] << 8), buf, size, HZ);
+			 packet[4] + (packet[5] << 8), buf, size, 1000);
 }
 
 /****************************************************************************
@@ -325,7 +325,7 @@ static int ReadPacket(struct usb_device *udev, u8 *packet, u8 *buf, size_t size)
 			 packet[1] + (packet[0] << 8),
 			 USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 			 packet[2] + (packet[3] << 8), 
-			 packet[4] + (packet[5] << 8), buf, size, HZ);
+			 packet[4] + (packet[5] << 8), buf, size, 1000);
 }
 
 static int cpia_usb_transferCmd(void *privdata, u8 *command, u8 *data)

@@ -973,6 +973,7 @@ config HFS_FS
 config HFSPLUS_FS
 	tristate "Apple Extended HFS file system support"
 	select NLS
+	select NLS_UTF8
 	help
 	  If you say Y here, you will be able to mount extended format
 	  Macintosh-formatted hard drive partitions with full read-write access.

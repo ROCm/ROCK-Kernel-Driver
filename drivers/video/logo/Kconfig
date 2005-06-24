@@ -25,7 +25,7 @@ config LOGO_LINUX_CLUT224
 
 config LOGO_DEC_CLUT224
 	bool "224-color Digital Equipment Corporation Linux logo"
-	depends on LOGO && MACH_DECSTATION
+	depends on LOGO && (MACH_DECSTATION || ALPHA)
 	default y
 
 config LOGO_MAC_CLUT224
@@ -45,7 +45,7 @@ config LOGO_SGI_CLUT224
 
 config LOGO_SUN_CLUT224
 	bool "224-color Sun Linux logo"
-	depends on LOGO && (SPARC || SPARC64)
+	depends on LOGO && (SPARC32 || SPARC64)
 	default y
 
 config LOGO_SUPERH_MONO

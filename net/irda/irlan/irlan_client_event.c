@@ -77,8 +77,8 @@ static int (*state[])(struct irlan_cb *, IRLAN_EVENT event, struct sk_buff *) =
 void irlan_do_client_event(struct irlan_cb *self, IRLAN_EVENT event, 
 			   struct sk_buff *skb) 
 {
-	ASSERT(self != NULL, return;);
-	ASSERT(self->magic == IRLAN_MAGIC, return;);
+	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return;);
 
 	(*state[ self->client.state]) (self, event, skb);
 }
@@ -94,13 +94,14 @@ static int irlan_client_state_idle(struct irlan_cb *self, IRLAN_EVENT event,
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == IRLAN_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return -1;);
 	
 	switch (event) {
 	case IRLAN_DISCOVERY_INDICATION:
 		if (self->client.iriap) {
-			WARNING("%s(), busy with a previous query\n", __FUNCTION__);
+			IRDA_WARNING("%s(), busy with a previous query\n",
+				     __FUNCTION__);
 			return -EBUSY;
 		}
 		
@@ -137,12 +138,12 @@ static int irlan_client_state_query(struct irlan_cb *self, IRLAN_EVENT event,
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == IRLAN_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return -1;);
 	
 	switch(event) {
 	case IRLAN_IAS_PROVIDER_AVAIL:
-		ASSERT(self->dtsap_sel_ctrl != 0, return -1;);
+		IRDA_ASSERT(self->dtsap_sel_ctrl != 0, return -1;);
 
 		self->client.open_retries = 0;
 		
@@ -190,7 +191,7 @@ static int irlan_client_state_conn(struct irlan_cb *self, IRLAN_EVENT event,
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
-	ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
 	
 	switch (event) {
 	case IRLAN_CONNECT_COMPLETE:
@@ -225,11 +226,11 @@ static int irlan_client_state_info(struct irlan_cb *self, IRLAN_EVENT event,
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
 	
 	switch (event) {
 	case IRLAN_DATA_INDICATION:
-		ASSERT(skb != NULL, return -1;);
+		IRDA_ASSERT(skb != NULL, return -1;);
 	
 		irlan_client_parse_response(self, skb);
 		
@@ -267,7 +268,7 @@ static int irlan_client_state_media(struct irlan_cb *self, IRLAN_EVENT event,
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
-	ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
 
 	switch(event) {
 	case IRLAN_DATA_INDICATION:
@@ -306,7 +307,7 @@ static int irlan_client_state_open(struct irlan_cb *self, IRLAN_EVENT event,
 
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
-	ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
 
 	switch(event) {
 	case IRLAN_DATA_INDICATION:
@@ -316,7 +317,7 @@ static int irlan_client_state_open(struct irlan_cb *self, IRLAN_EVENT event,
 		 *  Check if we have got the remote TSAP for data 
 		 *  communications
 		 */
-	  	ASSERT(self->dtsap_sel_data != 0, return -1;);
+	  	IRDA_ASSERT(self->dtsap_sel_data != 0, return -1;);
 
 		/* Check which access type we are dealing with */
 		switch (self->client.access_type) {
@@ -377,7 +378,7 @@ static int irlan_client_state_wait(struct irlan_cb *self, IRLAN_EVENT event,
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 	
-	ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
 	
 	switch(event) {
 	case IRLAN_PROVIDER_SIGNAL:
@@ -408,7 +409,7 @@ static int irlan_client_state_arb(struct irlan_cb *self, IRLAN_EVENT event,
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
 	
 	switch(event) {
 	case IRLAN_CHECK_CON_ARB:
@@ -463,8 +464,8 @@ static int irlan_client_state_data(struct irlan_cb *self, IRLAN_EVENT event,
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__ );
 
-	ASSERT(self != NULL, return -1;);
-	ASSERT(self->magic == IRLAN_MAGIC, return -1;);
+	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self->magic == IRLAN_MAGIC, return -1;);
 
 	switch(event) {
 	case IRLAN_DATA_INDICATION:

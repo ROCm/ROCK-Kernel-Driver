@@ -31,18 +31,15 @@
 #include <linux/suspend.h>
 #include <linux/writeback.h>
 #include <linux/buffer_head.h>		/* for fsync_bdev() */
-
+#include <linux/swap.h>
 #include <linux/spinlock.h>
+#include <linux/vt_kern.h>
+#include <linux/workqueue.h>
 
 #include <asm/ptrace.h>
 
-extern void reset_vc(unsigned int);
-
 /* Whether we react on sysrq keys or just ignore them */
 int sysrq_enabled = 1;
-
-/* Machine specific power off function */
-void (*sysrq_power_off)(void);
 
 /* Loglevel sysrq handler */
 static void sysrq_handle_loglevel(int key, struct pt_regs *pt_regs,
@@ -69,7 +66,7 @@ static void sysrq_handle_SAK(int key, struct pt_regs *pt_regs,
 {
 	if (tty)
 		do_SAK(tty);
-	reset_vc(fg_console);
+	reset_vc(vc_cons[fg_console].d);
 }
 static struct sysrq_key_op sysrq_SAK_op = {
 	.handler	= sysrq_handle_SAK,
@@ -213,6 +210,24 @@ static struct sysrq_key_op sysrq_term_op = {
 	.enable_mask	= SYSRQ_ENABLE_SIGNAL,
 };
 
+static void moom_callback(void *ignored)
+{
+	out_of_memory(GFP_KERNEL);
+}
+
+static DECLARE_WORK(moom_work, moom_callback, NULL);
+
+static void sysrq_handle_moom(int key, struct pt_regs *pt_regs,
+			      struct tty_struct *tty)
+{
+	schedule_work(&moom_work);
+}
+static struct sysrq_key_op sysrq_moom_op = {
+	.handler	= sysrq_handle_moom,
+	.help_msg	= "Full",
+	.action_msg	= "Manual OOM execution",
+};
+
 static void sysrq_handle_kill(int key, struct pt_regs *pt_regs,
 			      struct tty_struct *tty) 
 {
@@ -261,7 +276,7 @@ static struct sysrq_key_op *sysrq_key_table[SYSRQ_KEY_TABLE_LENGTH] = {
 /* c */ NULL,
 /* d */	NULL,
 /* e */	&sysrq_term_op,
-/* f */	NULL,
+/* f */	&sysrq_moom_op,
 /* g */	NULL,
 /* h */	NULL,
 /* i */	&sysrq_kill_op,
@@ -350,7 +365,7 @@ void __handle_sysrq(int key, struct pt_regs *pt_regs, struct tty_struct *tty, in
 		/* Should we check for enabled operations (/proc/sysrq-trigger should not)
 		 * and is the invoked operation enabled? */
 		if (!check_mask || sysrq_enabled == 1 ||
-		    sysrq_enabled & op_p->enable_mask) {
+		    (sysrq_enabled & op_p->enable_mask)) {
 			printk ("%s\n", op_p->action_msg);
 			console_loglevel = orig_log_level;
 			op_p->handler(key, pt_regs, tty);

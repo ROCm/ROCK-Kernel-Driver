@@ -56,7 +56,7 @@ static struct Mode *modePtr;
 int
 main (int argc, const char * const * argv)
 {
-    int offset = 0, clear_screen = 0, end_common_opts = 0, retval;
+    int offset = 0, opt_clear = 0, end_common_opts = 0, retval;
     const char *title = NULL;
 
 #ifdef LOCALE
@@ -89,7 +89,7 @@ main (int argc, const char * const * argv)
                 offset += 2;
             }
 	} else if (!strcmp (argv[offset + 1], "--clear")) {
-	    if (clear_screen) {	/* Hey, "--clear" can't appear twice! */
+	    if (opt_clear) {		/* Hey, "--clear" can't appear twice! */
 		Usage (argv[0]);
 		exit (-1);
 	    } else if (argc == 2) {	/* we only want to clear the screen */
@@ -98,7 +98,7 @@ main (int argc, const char * const * argv)
 		end_dialog ();
 		return 0;
 	    } else {
-		clear_screen = 1;
+		opt_clear = 1;
 		offset++;
 	    }
 	} else			/* no more common options */
@@ -127,7 +127,7 @@ main (int argc, const char * const * argv)
     init_dialog ();
     retval = (*(modePtr->jumper)) (title, argc - offset, argv + offset);
 
-    if (clear_screen) {		/* clear screen before exit */
+    if (opt_clear) {		/* clear screen before exit */
 	attr_clear (stdscr, LINES, COLS, screen_attr);
 	refresh ();
     }

@@ -74,7 +74,7 @@ extern unsigned long p_mapped_by_tlbcam(unsigned long pa);
 #define p_mapped_by_tlbcam(x)	(0UL)
 #endif /* HAVE_TLBCAM */
 
-#ifdef CONFIG_44x
+#ifdef CONFIG_PTE_64BIT
 /* 44x uses an 8kB pgdir because it has 8-byte Linux PTEs. */
 #define PGDIR_ORDER	1
 #else
@@ -102,11 +102,6 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 
 	if (mem_init_done) {
 		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
-		if (pte) {
-			struct page *ptepage = virt_to_page(pte);
-			ptepage->mapping = (void *) mm;
-			ptepage->index = address & PMD_MASK;
-		}
 	} else {
 		pte = (pte_t *)early_get_page();
 		if (pte)
@@ -126,11 +121,8 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 #endif
 
 	ptepage = alloc_pages(flags, 0);
-	if (ptepage) {
-		ptepage->mapping = (void *) mm;
-		ptepage->index = address & PMD_MASK;
+	if (ptepage)
 		clear_highpage(ptepage);
-	}
 	return ptepage;
 }
 
@@ -139,7 +131,6 @@ void pte_free_kernel(pte_t *pte)
 #ifdef CONFIG_SMP
 	hash_page_sync();
 #endif
-	virt_to_page(pte)->mapping = NULL;
 	free_page((unsigned long)pte);
 }
 
@@ -148,17 +139,16 @@ void pte_free(struct page *ptepage)
 #ifdef CONFIG_SMP
 	hash_page_sync();
 #endif
-	ptepage->mapping = NULL;
 	__free_page(ptepage);
 }
 
-#ifndef CONFIG_44x
+#ifndef CONFIG_PHYS_64BIT
 void __iomem *
 ioremap(phys_addr_t addr, unsigned long size)
 {
 	return __ioremap(addr, size, _PAGE_NO_CACHE);
 }
-#else /* CONFIG_44x */
+#else /* CONFIG_PHYS_64BIT */
 void __iomem *
 ioremap64(unsigned long long addr, unsigned long size)
 {
@@ -172,7 +162,7 @@ ioremap(phys_addr_t addr, unsigned long size)
 
 	return ioremap64(addr64, size);
 }
-#endif /* CONFIG_44x */
+#endif /* CONFIG_PHYS_64BIT */
 
 void __iomem *
 __ioremap(phys_addr_t addr, unsigned long size, unsigned long flags)
@@ -203,7 +193,7 @@ __ioremap(phys_addr_t addr, unsigned long size, unsigned long flags)
 	 */
 	if ( mem_init_done && (p < virt_to_phys(high_memory)) )
 	{
-		printk("__ioremap(): phys addr "PTE_FMT" is RAM lr %p\n", p,
+		printk("__ioremap(): phys addr "PHYS_FMT" is RAM lr %p\n", p,
 		       __builtin_return_address(0));
 		return NULL;
 	}
@@ -298,7 +288,7 @@ map_page(unsigned long va, phys_addr_t pa, int flags)
 	pg = pte_alloc_kernel(&init_mm, pd, va);
 	if (pg != 0) {
 		err = 0;
-		set_pte(pg, pfn_pte(pa >> PAGE_SHIFT, __pgprot(flags)));
+		set_pte_at(&init_mm, va, pg, pfn_pte(pa >> PAGE_SHIFT, __pgprot(flags)));
 		if (mem_init_done)
 			flush_HPTE(0, va, pmd_val(*pd));
 	}
