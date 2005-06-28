@@ -26,6 +26,8 @@ extern void security_fixup_ops (struct security_operations *ops);
 extern struct security_operations capability_security_ops;
 
 struct security_operations *security_ops;	/* Initialized to NULL */
+int security_enabled;				/* ditto */
+EXPORT_SYMBOL(security_enabled);
 
 static inline int verify(struct security_operations *ops)
 {
@@ -62,6 +64,7 @@ int __init security_init(void)
 		return -EIO;
 	}
 
+	security_enabled = 0;
 	security_ops = &capability_security_ops;
 
 	/* Initialize compiled-in security modules */
@@ -94,6 +97,7 @@ int register_security(struct security_operations *ops)
 		return -EAGAIN;
 
 	security_ops = ops;
+	security_enabled = 1;
 
 	return 0;
 }
@@ -118,6 +122,7 @@ int unregister_security(struct security_operations *ops)
 		return -EINVAL;
 	}
 
+	security_enabled = 0;
 	security_ops = &capability_security_ops;
 
 	return 0;
