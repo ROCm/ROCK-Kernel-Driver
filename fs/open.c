@@ -10,7 +10,7 @@
 #include <linux/file.h>
 #include <linux/smp_lock.h>
 #include <linux/quotaops.h>
-#include <linux/dnotify.h>
+#include <linux/fsnotify.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/tty.h>
@@ -944,9 +944,11 @@ asmlinkage long sys_open(const char __user * filename, int flags, int mode)
 		fd = get_unused_fd();
 		if (fd >= 0) {
 			struct file *f = filp_open(tmp, flags, mode);
+
 			error = PTR_ERR(f);
 			if (IS_ERR(f))
 				goto out_error;
+			fsnotify_open(f->f_dentry);
 			fd_install(fd, f);
 		}
 out:
