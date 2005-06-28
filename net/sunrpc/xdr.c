@@ -993,8 +993,7 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 			return -EINVAL;
 	} else {
 		if (xdr_decode_word(buf, base, &desc->array_len) != 0 ||
-		    (unsigned long) base + 4 + desc->array_len *
-				    desc->elem_size > buf->len)
+		    desc->array_len > (buf->len - base - 4) / desc->elem_size)
 			return -EINVAL;
 	}
 	base += 4;
@@ -1187,8 +1186,8 @@ int
 xdr_encode_array2(struct xdr_buf *buf, unsigned int base,
 		  struct xdr_array2_desc *desc)
 {
-	if ((unsigned long) base + 4 + desc->array_len * desc->elem_size >
-	    buf->head->iov_len + buf->page_len + buf->tail->iov_len)
+	if (buf->head->iov_len + buf->page_len + buf->tail->iov_len -
+	    base < desc->array_len * desc->elem_size + 4)
 		return -EINVAL;
 
 	return xdr_xcode_array2(buf, base, desc, 1);
