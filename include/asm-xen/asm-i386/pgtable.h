@@ -436,10 +436,10 @@ do {				  					\
 	ptep_set_access_flags(__vma, __address, __ptep, __entry, 1);	\
 } while (0)
 
-#define __HAVE_ARCH_PTEP_ESTABLISH_NEW
-#define ptep_establish_new(__vma, __address, __ptep, __entry)		\
+
+#define set_pte_at(__mm, __addr, __ptep, __entry)			\
 do {				  					\
-	if (likely((__vma)->vm_mm == current->mm)) {			\
+	if (likely(__mm == current->mm)) {				\
 		xen_flush_page_update_queue();				\
 		HYPERVISOR_update_va_mapping((__address)>>PAGE_SHIFT,	\
 					     __entry, 0);		\
@@ -447,6 +447,9 @@ do {				  					\
 		xen_l1_entry_update((__ptep), (__entry).pte_low);	\
 	}								\
 } while (0)
+#define __HAVE_ARCH_PTEP_ESTABLISH_NEW
+#define ptep_establish_new(__vma, __address, __ptep, __entry)		\
+	set_pte_at((__vma)->vm_mm, __address, __ptep, __entry)
 
 /* NOTE: make_page* callers must call flush_page_update_queue() */
 void make_lowmem_page_readonly(void *va);
