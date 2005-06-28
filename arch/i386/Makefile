@@ -77,7 +77,7 @@ CFLAGS += $(call cc-option,-fno-unit-at-a-time)
 # m586 and genericarch is likely a distribution kernel. optimize for the
 # most common CPU (686)
 ifeq ($(CONFIG_X86_GENERICARCH),y)
-cflags-$(CONFIG_M586) += -mcpu=i686
+cflags-$(CONFIG_M586) += -mtune=i686
 endif
 
 CFLAGS += $(cflags-y)
