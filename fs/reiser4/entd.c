@@ -133,7 +133,7 @@ entd(void *arg)
 		int result = 0;
 
 		if (me->flags & PF_FREEZE)
-			refrigerator(PF_FREEZE);
+			refrigerator();
 
 		spin_lock(&ent->guard);
 

@@ -111,7 +111,7 @@ extern void account_system_vtime(struct task_struct *);
 #define account_system_vtime(prev) do { } while (0)
 #endif
 
-#define finish_arch_switch(rq, prev) do {				     \
+#define finish_arch_switch(prev) do {				     \
 	set_fs(current->thread.mm_segment);				     \
 	account_system_vtime(prev);					     \
 } while (0)

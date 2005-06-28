@@ -192,7 +192,7 @@ static int prepare_repacking_session (void * arg)
 		return ret;
 
 	if (current->flags & PF_FREEZE)
-		refrigerator(PF_FREEZE);
+		refrigerator();
 
 	begin_work();
 	balance_dirty_pages_ratelimited(get_current_super_private()->fake->i_mapping);

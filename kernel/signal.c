@@ -2254,7 +2254,7 @@ sys_rt_sigtimedwait(const sigset_t __user *uthese,
 			ret = -EINTR;
 	}
 	if (current->flags & PF_FREEZE)
-		refrigerator(1);
+		refrigerator();
 
 	return ret;
 }

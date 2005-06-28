@@ -109,7 +109,7 @@ ktxnmgrd(void *arg)
 		/* software suspend support. */
 		if (me->flags & PF_FREEZE) {
 			spin_unlock(&ctx->guard);
-			refrigerator(PF_FREEZE/*PF_IOTHREAD*/);
+			refrigerator();
 			spin_lock(&ctx->guard);
 		}
 
