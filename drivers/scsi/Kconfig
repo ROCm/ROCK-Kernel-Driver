@@ -1789,19 +1789,6 @@ config ZFCP
           called zfcp. If you want to compile it as a module, say M here
           and read <file:Documentation/modules.txt>.
 
-config SCSI_OPENISCSI
-	tristate "iSCSI over TCP/IP software initiator"
-	depends on SCSI
-	select SCSI_ISCSI_ATTRS
-	help
-	  If you want to access iSCSI devices over TCP/IP through a
-	  software client initiator say Y.
-
-	  This driver is also available as a module. This module will be
-	  called iscsi_tcp. If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
-
-
 endmenu
 
 source "drivers/scsi/pcmcia/Kconfig"
