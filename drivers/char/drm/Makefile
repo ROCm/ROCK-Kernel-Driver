@@ -20,6 +20,11 @@ ffb-objs    := ffb_drv.o ffb_context.o
 sis-objs    := sis_drv.o sis_ds.o sis_mm.o
 via-objs    := via_irq.o via_drv.o via_ds.o via_map.o via_mm.o via_dma.o via_verifier.o
 
+ifeq ($(CONFIG_COMPAT),y)
+drm-objs    += drm_ioc32.o
+radeon-objs += radeon_ioc32.o
+endif
+
 obj-$(CONFIG_DRM)	+= drm.o
 obj-$(CONFIG_DRM_GAMMA) += gamma.o
 obj-$(CONFIG_DRM_TDFX)	+= tdfx.o

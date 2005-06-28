@@ -962,7 +962,7 @@ static void ndisc_recv_na(struct sk_buff *skb)
 			if (rt) {
 				/* Mark as expired (may be in use elsewhere) */
 				rt->rt6i_expires = jiffies - 1;
-				ip6_del_rt(rt, NULL, NULL);
+				ip6_del_rt(rt, NULL, NULL, NULL);
 			}
 		}
 
@@ -1104,7 +1104,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 
 	if (rt && lifetime == 0) {
 		neigh_clone(neigh);
-		ip6_del_rt(rt, NULL, NULL);
+		ip6_del_rt(rt, NULL, NULL, NULL);
 		rt = NULL;
 	}
 

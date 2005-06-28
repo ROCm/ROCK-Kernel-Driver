@@ -146,7 +146,7 @@
 static struct lp_struct lp_table[LP_NO];
 
 static unsigned int lp_count = 0;
-static struct class_simple *lp_class;
+static struct class *lp_class;
 
 #ifdef CONFIG_LP_CONSOLE
 static struct parport *console_registered; // initially NULL
@@ -807,7 +807,7 @@ static int lp_register(int nr, struct parport *port)
 	if (reset)
 		lp_reset(nr);
 
-	class_simple_device_add(lp_class, MKDEV(LP_MAJOR, nr), NULL,
+	class_device_create(lp_class, MKDEV(LP_MAJOR, nr), NULL,
 				"lp%d", nr);
 	devfs_mk_cdev(MKDEV(LP_MAJOR, nr), S_IFCHR | S_IRUGO | S_IWUGO,
 			"printers/%d", nr);
@@ -910,7 +910,7 @@ static int __init lp_init (void)
 	}
 
 	devfs_mk_dir("printers");
-	lp_class = class_simple_create(THIS_MODULE, "printer");
+	lp_class = class_create(THIS_MODULE, "printer");
 	if (IS_ERR(lp_class)) {
 		err = PTR_ERR(lp_class);
 		goto out_devfs;
@@ -933,7 +933,7 @@ static int __init lp_init (void)
 	return 0;
 
 out_class:
-	class_simple_destroy(lp_class);
+	class_destroy(lp_class);
 out_devfs:
 	devfs_remove("printers");
 	unregister_chrdev(LP_MAJOR, "lp");
@@ -984,10 +984,10 @@ static void lp_cleanup_module (void)
 			continue;
 		parport_unregister_device(lp_table[offset].dev);
 		devfs_remove("printers/%d", offset);
-		class_simple_device_remove(MKDEV(LP_MAJOR, offset));
+		class_device_destroy(lp_class, MKDEV(LP_MAJOR, offset));
 	}
 	devfs_remove("printers");
-	class_simple_destroy(lp_class);
+	class_destroy(lp_class);
 }
 
 __setup("lp=", lp_setup);

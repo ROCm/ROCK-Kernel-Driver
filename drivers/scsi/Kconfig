@@ -1210,28 +1210,6 @@ config SCSI_PAS16
 	  To compile this driver as a module, choose M here: the
 	  module will be called pas16.
 
-config SCSI_PCI2000
-	tristate "PCI2000 support"
-	depends on PCI && SCSI && BROKEN
-	help
-	  This is support for the PCI2000I EIDE interface card which acts as a
-	  SCSI host adapter.  Please read the SCSI-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called pci2000.
-
-config SCSI_PCI2220I
-	tristate "PCI2220i support"
-	depends on PCI && SCSI && BROKEN
-	help
-	  This is support for the PCI2220i EIDE interface card which acts as a
-	  SCSI host adapter.  Please read the SCSI-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called pci2220i.
-
 config SCSI_PSI240I
 	tristate "PSI240i support"
 	depends on ISA && SCSI
@@ -1810,6 +1788,19 @@ config ZFCP
           This driver is also available as a module. This module will be
           called zfcp. If you want to compile it as a module, say M here
           and read <file:Documentation/modules.txt>.
+
+config SCSI_OPENISCSI
+	tristate "iSCSI over TCP/IP software initiator"
+	depends on SCSI
+	select SCSI_ISCSI_ATTRS
+	help
+	  If you want to access iSCSI devices over TCP/IP through a
+	  software client initiator say Y.
+
+	  This driver is also available as a module. This module will be
+	  called iscsi_tcp. If you want to compile it as a module, say M
+	  here and read <file:Documentation/modules.txt>.
+
 
 endmenu
 

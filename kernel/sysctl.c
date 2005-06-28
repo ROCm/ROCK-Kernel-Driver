@@ -58,6 +58,7 @@ extern int sysctl_overcommit_ratio;
 extern int max_threads;
 extern int sysrq_enabled;
 extern int core_uses_pid;
+extern int suid_dumpable;
 extern char core_pattern[];
 extern int cad_pid;
 extern int pid_max;
@@ -659,6 +660,30 @@ static ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+	{
+		.ctl_name	= KERN_DEFTIMESLICE, 
+		.procname	= "def-timeslice",
+		.data		=  &def_timeslice,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_MINTIMESLICE, 
+		.procname	= "min-timeslice",
+		.data		= &min_timeslice,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_HZ, 
+		.procname	= "HZ",
+		.data		= &__HZ,
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
+		.proc_handler	= &proc_dointvec,
+	},
 
 	{ .ctl_name = 0 }
 };
@@ -976,27 +1001,11 @@ static ctl_table fs_table[] = {
 	},
 #endif
 	{
-		.ctl_name	= KERN_DEFTIMESLICE, 
-		.procname	= "def-timeslice",
-		.data		=  &def_timeslice,
+		.ctl_name	= KERN_SETUID_DUMPABLE,
+		.procname	= "suid_dumpable",
+		.data		= &suid_dumpable,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_MINTIMESLICE, 
-		.procname	= "min-timeslice",
-		.data		= &min_timeslice,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_HZ, 
-		.procname	= "HZ",
-		.data		= &__HZ,
-		.maxlen		= sizeof(int),
-		.mode		= 0444,
 		.proc_handler	= &proc_dointvec,
 	},
 	{ .ctl_name = 0 }
@@ -1040,8 +1049,7 @@ int do_sysctl(int __user *name, int nlen, void __user *oldval, size_t __user *ol
 		int error = parse_table(name, nlen, oldval, oldlenp, 
 					newval, newlen, head->ctl_table,
 					&context);
-		if (context)
-			kfree(context);
+		kfree(context);
 		if (error != -ENOTDIR)
 			return error;
 		tmp = tmp->next;

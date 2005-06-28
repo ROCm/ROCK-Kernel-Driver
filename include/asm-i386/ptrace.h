@@ -80,7 +80,8 @@ enum EFLAGS {
 #ifdef __KERNEL__
 struct task_struct;
 extern void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs, int error_code);
-#define user_mode(regs) ((VM_MASK & (regs)->eflags) || (3 & (regs)->xcs))
+#define user_mode(regs)		(3 & (regs)->xcs)
+#define user_mode_vm(regs)	((VM_MASK & (regs)->eflags) || user_mode(regs))
 #define instruction_pointer(regs) ((regs)->eip)
 #if defined(CONFIG_SMP) && defined(CONFIG_FRAME_POINTER)
 extern unsigned long profile_pc(struct pt_regs *regs);

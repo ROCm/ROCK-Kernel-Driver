@@ -509,7 +509,7 @@ repeat:
 			continue;
 		if (!test(inode, data))
 			continue;
-		if (inode->i_state & (I_FREEING|I_CLEAR)) {
+		if (inode->i_state & (I_FREEING|I_CLEAR|I_WILL_FREE)) {
 			__wait_on_freeing_inode(inode);
 			goto repeat;
 		}
@@ -534,7 +534,7 @@ repeat:
 			continue;
 		if (inode->i_sb != sb)
 			continue;
-		if (inode->i_state & (I_FREEING|I_CLEAR)) {
+		if (inode->i_state & (I_FREEING|I_CLEAR|I_WILL_FREE)) {
 			__wait_on_freeing_inode(inode);
 			goto repeat;
 		}
@@ -736,7 +736,7 @@ EXPORT_SYMBOL(iunique);
 struct inode *igrab(struct inode *inode)
 {
 	spin_lock(&inode_lock);
-	if (!(inode->i_state & I_FREEING))
+	if (!(inode->i_state & (I_FREEING|I_WILL_FREE)))
 		__iget(inode);
 	else
 		/*
@@ -1033,17 +1033,21 @@ void generic_forget_inode(struct inode *inode)
 		if (!(inode->i_state & (I_DIRTY|I_LOCK)))
 			list_move(&inode->i_list, &inode_unused);
 		inodes_stat.nr_unused++;
-		spin_unlock(&inode_lock);
-		if (!sb || (sb->s_flags & MS_ACTIVE))
+		if (!sb || (sb->s_flags & MS_ACTIVE)) {
+			spin_unlock(&inode_lock);
 			return;
+		}
+		inode->i_state |= I_WILL_FREE;
+		spin_unlock(&inode_lock);
 		write_inode_now(inode, 1);
 		spin_lock(&inode_lock);
+		inode->i_state &= ~I_WILL_FREE;
 		inodes_stat.nr_unused--;
 		hlist_del_init(&inode->i_hash);
 	}
 	list_del_init(&inode->i_list);
 	list_del_init(&inode->i_sb_list);
-	inode->i_state|=I_FREEING;
+	inode->i_state |= I_FREEING;
 	inodes_stat.nr_inodes--;
 	spin_unlock(&inode_lock);
 	if (inode->i_data.nrpages)
