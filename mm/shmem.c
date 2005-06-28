@@ -1596,6 +1596,8 @@ static int shmem_statfs(struct super_block *sb, struct kstatfs *buf)
 	return 0;
 }
 
+static void shmem_destroy_inode(struct inode *inode);
+
 /*
  * File creation. Allocate an inode, and we're done..
  */
@@ -1606,6 +1608,11 @@ shmem_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 	int error = -ENOSPC;
 
 	if (inode) {
+		error = shmem_acl_init(inode, dir);
+		if (error) {
+			shmem_destroy_inode(inode);
+			return error;
+		}
 		if (dir->i_mode & S_ISGID) {
 			inode->i_gid = dir->i_gid;
 			if (S_ISDIR(mode))
@@ -2000,6 +2007,9 @@ static int shmem_fill_super(struct super_block *sb,
 	sb->s_magic = TMPFS_MAGIC;
 	sb->s_op = &shmem_ops;
 	sb->s_xattr = shmem_xattr_handlers;
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	sb->s_flags |= MS_POSIXACL;
+#endif
 
 	inode = shmem_get_inode(sb, S_IFDIR | mode, 0);
 	if (!inode)
@@ -2036,6 +2046,7 @@ static void shmem_destroy_inode(struct inode *inode)
 		/* only struct inode is valid if it's an inline symlink */
 		mpol_free_shared_policy(&SHMEM_I(inode)->policy);
 	}
+	shmem_acl_destroy_inode(inode);
 	kmem_cache_free(shmem_inode_cachep, SHMEM_I(inode));
 }
 
@@ -2046,6 +2057,10 @@ static void init_once(void *foo, kmem_cache_t *cachep, unsigned long flags)
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
 		inode_init_once(&p->vfs_inode);
+#ifdef CONFIG_TMPFS_POSIX_ACL
+		p->i_acl = NULL;
+		p->i_default_acl = NULL;
+#endif
 	}
 }
 
@@ -2094,6 +2109,8 @@ static struct inode_operations shmem_inode_operations = {
 	.listxattr      = generic_listxattr,
 	.removexattr    = generic_removexattr,
 #endif
+	.setattr	= shmem_setattr,
+	.permission	= shmem_permission,
 };
 
 static struct inode_operations shmem_dir_inode_operations = {
@@ -2113,6 +2130,8 @@ static struct inode_operations shmem_dir_inode_operations = {
 	.listxattr      = generic_listxattr,
 	.removexattr    = generic_removexattr,
 #endif
+	.setattr	= shmem_setattr,
+	.permission	= shmem_permission,
 #endif
 };
 
@@ -2123,6 +2142,8 @@ static struct inode_operations shmem_special_inode_operations = {
 	.listxattr	= generic_listxattr,
 	.removexattr	= generic_removexattr,
 #endif
+	.setattr	= shmem_setattr,
+	.permission	= shmem_permission,
 };
 
 static struct super_operations shmem_ops = {
@@ -2181,6 +2202,10 @@ static struct xattr_handler shmem_xattr_security_handler = {
 #ifdef CONFIG_TMPFS_XATTR
 
 static struct xattr_handler *shmem_xattr_handlers[] = {
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	&shmem_xattr_acl_access_handler,
+	&shmem_xattr_acl_default_handler,
+#endif
 #ifdef CONFIG_TMPFS_SECURITY
 	&shmem_xattr_security_handler,
 #endif
