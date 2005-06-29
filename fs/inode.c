@@ -81,7 +81,6 @@ static struct hlist_head *inode_hashtable;
  * the i_state of an inode while it is in use..
  */
 DEFINE_SPINLOCK(inode_lock);
-EXPORT_SYMBOL(inode_lock);
 
 /*
  * iprune_sem provides exclusion between the kswapd or try_to_free_pages
@@ -97,7 +96,6 @@ DECLARE_MUTEX(iprune_sem);
  * Statistics gathering..
  */
 struct inodes_stat_t inodes_stat;
-EXPORT_SYMBOL(inodes_stat);
 
 static kmem_cache_t * inode_cachep;
 
@@ -181,7 +179,7 @@ void destroy_inode(struct inode *inode)
 	else
 		kmem_cache_free(inode_cachep, (inode));
 }
-EXPORT_SYMBOL(destroy_inode);
+
 
 /*
  * These are initializations that only need to be done
@@ -236,7 +234,6 @@ void __iget(struct inode * inode)
 		list_move(&inode->i_list, &inode_in_use);
 	inodes_stat.nr_unused--;
 }
-EXPORT_SYMBOL(__iget);
 
 /**
  * clear_inode - clear an inode
@@ -1025,7 +1022,7 @@ void generic_delete_inode(struct inode *inode)
 
 EXPORT_SYMBOL(generic_delete_inode);
 
-void generic_forget_inode(struct inode *inode)
+static void generic_forget_inode(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;
 
@@ -1055,7 +1052,6 @@ void generic_forget_inode(struct inode *inode)
 	clear_inode(inode);
 	destroy_inode(inode);
 }
-EXPORT_SYMBOL(generic_forget_inode);
 
 /*
  * Normal UNIX filesystem behaviour: delete the
@@ -1291,7 +1287,6 @@ void wake_up_inode(struct inode *inode)
 	smp_mb();
 	wake_up_bit(&inode->i_state, __I_LOCK);
 }
-EXPORT_SYMBOL(wake_up_inode);
 
 static __initdata unsigned long ihash_entries;
 static int __init set_ihash_entries(char *str)

@@ -648,7 +648,6 @@ unsigned find_get_pages(struct address_space *mapping, pgoff_t start,
 	read_unlock_irq(&mapping->tree_lock);
 	return ret;
 }
-
 EXPORT_SYMBOL(find_get_pages);
 
 /*
@@ -671,6 +670,7 @@ unsigned find_get_pages_tag(struct address_space *mapping, pgoff_t *index,
 	read_unlock_irq(&mapping->tree_lock);
 	return ret;
 }
+EXPORT_SYMBOL(find_get_pages_tag);
 
 /*
  * Same as grab_cache_page, but do not wait if the page is unavailable.

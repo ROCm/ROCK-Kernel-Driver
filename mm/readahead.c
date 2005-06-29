@@ -525,6 +525,7 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 out:
 	return ra->prev_page + 1;
 }
+EXPORT_SYMBOL(page_cache_readahead);
 
 /*
  * handle_ra_miss() is called when it is known that a page which should have
@@ -541,7 +542,7 @@ void handle_ra_miss(struct address_space *mapping,
 	ra->flags |= RA_FLAG_MISS;
 	ra->flags &= ~RA_FLAG_INCACHE;
 }
-EXPORT_SYMBOL(page_cache_readahead);
+EXPORT_SYMBOL(handle_ra_miss);
 
 /*
  * Given a desired number of PAGE_CACHE_SIZE readahead pages, return a
