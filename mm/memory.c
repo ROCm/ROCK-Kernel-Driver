@@ -2236,11 +2236,6 @@ int in_gate_area_no_task(unsigned long addr)
 #ifdef CONFIG_KDB
 struct page * kdb_follow_page(struct mm_struct *mm, unsigned long address, int write)
 {
-	struct page *page = follow_page(mm, address, write);
-
-	if (!page)
-		return get_page_map(page);
-
-	return page;
+	return follow_page(mm, address, write);
 }
 #endif
