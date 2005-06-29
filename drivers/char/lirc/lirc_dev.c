@@ -97,7 +97,7 @@ static struct irctl irctls[MAX_IRCTL_DEVICES];
 static struct file_operations fops;
 
 /* Only used for sysfs but defined to void otherwise */
-static struct class_simple *lirc_class;
+static struct class *lirc_class;
 
 /*  helper function
  *  initializes the irctl structure
@@ -349,7 +349,7 @@ int lirc_register_plugin(struct lirc_plugin *p)
 			S_IFCHR|S_IRUSR|S_IWUSR,
 			DEV_LIRC "/%u", ir->p.minor);
 #endif
-	class_simple_device_add(lirc_class, MKDEV(IRCTL_DEV_MAJOR, ir->p.minor),
+	class_device_create(lirc_class, MKDEV(IRCTL_DEV_MAJOR, ir->p.minor),
 				NULL, "lirc%u", ir->p.minor);
 
 	if(p->sample_rate || p->get_queue) {
@@ -380,7 +380,7 @@ int lirc_register_plugin(struct lirc_plugin *p)
 	return minor;
 	
 out_sysfs:
-	class_simple_device_remove(MKDEV(IRCTL_DEV_MAJOR, ir->p.minor));
+	class_device_destroy(lirc_class, MKDEV(IRCTL_DEV_MAJOR, ir->p.minor));
 #ifdef LIRC_HAVE_DEVFS_24
 	devfs_unregister(ir->devfs_handle);
 #endif
@@ -458,7 +458,7 @@ int lirc_unregister_plugin(int minor)
 #ifdef LIRC_HAVE_DEVFS_26
 	devfs_remove(DEV_LIRC "/%u", ir->p.minor);
 #endif
-	class_simple_device_remove(MKDEV(IRCTL_DEV_MAJOR, ir->p.minor));
+	class_device_destroy(lirc_class, MKDEV(IRCTL_DEV_MAJOR, ir->p.minor));
 
 	if (ir->buf != ir->p.rbuf){
 		lirc_buffer_free(ir->buf);
@@ -776,9 +776,9 @@ static int lirc_dev_init(void)
 		goto out;
 	}
 
-	lirc_class = class_simple_create(THIS_MODULE, "lirc");
+	lirc_class = class_create(THIS_MODULE, "lirc");
 	if(IS_ERR(lirc_class)) {
-		printk(KERN_ERR "lirc_dev: class_simple_create failed\n");
+		printk(KERN_ERR "lirc_dev: class_create failed\n");
 		goto out_unregister;
 	}
 
@@ -816,7 +816,7 @@ void cleanup_module(void)
 	int ret;
 
 	ret = unregister_chrdev(IRCTL_DEV_MAJOR, IRCTL_DEV_NAME);
-	class_simple_destroy(lirc_class);
+	class_destroy(lirc_class);
 
 	if(ret)
 		printk("lirc_dev: error in module_unregister_chrdev: %d\n", ret);

@@ -69,12 +69,12 @@ static inline void del_timer_sync(struct timer_list * timerlist)
 #endif /* DEVFS 2.4 */
 
 #ifndef LIRC_HAVE_SYSFS
-#define class_simple_destroy(x) do { } while(0)
-#define class_simple_create(x,y) NULL
-#define class_simple_device_remove(x) do { } while(0)
-#define class_simple_device_add(x, y, z, xx, yy) 0
+#define class_destroy(x) do { } while(0)
+#define class_create(x,y) NULL
+#define class_device_destroy(x,y) do { } while(0)
+#define class_device_create(x, y, z, xx, yy) 0
 #define IS_ERR(x) 0
-struct class_simple 
+struct class 
 {
 	int notused;
 };	
