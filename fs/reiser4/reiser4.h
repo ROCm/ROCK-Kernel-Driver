@@ -11,7 +11,7 @@
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/fs.h>
-#include <asm/hardirq.h>
+#include <linux/hardirq.h>
 #include <linux/sched.h>
 
 /*
