@@ -10,7 +10,7 @@
 #define GENERIC_ACL_H
 
 #include <linux/posix_acl.h>
-#include <linux/xattr_acl.h>
+#include <linux/posix_acl_xattr.h>
 
 struct generic_acl_operations {
 	struct posix_acl *(*getacl)(struct inode *, int);

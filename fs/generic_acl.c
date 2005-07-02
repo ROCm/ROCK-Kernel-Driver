@@ -25,11 +25,11 @@ generic_acl_list(struct inode *inode, struct generic_acl_operations *ops,
 
 	switch(type) {
 		case ACL_TYPE_ACCESS:
-			name = XATTR_NAME_ACL_ACCESS;
+			name = POSIX_ACL_XATTR_ACCESS;
 			break;
 
 		case ACL_TYPE_DEFAULT:
-			name = XATTR_NAME_ACL_DEFAULT;
+			name = POSIX_ACL_XATTR_DEFAULT;
 			break;
 			
 		default:

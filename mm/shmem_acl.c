@@ -113,14 +113,14 @@ shmem_set_acl_default(struct inode *inode, const char *name, const void *value,
 }
 
 struct xattr_handler shmem_xattr_acl_access_handler = {
-	.prefix = XATTR_NAME_ACL_ACCESS,
+	.prefix = POSIX_ACL_XATTR_ACCESS,
 	.list	= shmem_list_acl_access,
 	.get	= shmem_get_acl_access,
 	.set	= shmem_set_acl_access,
 };
 
 struct xattr_handler shmem_xattr_acl_default_handler = {
-	.prefix = XATTR_NAME_ACL_DEFAULT,
+	.prefix = POSIX_ACL_XATTR_DEFAULT,
 	.list	= shmem_list_acl_default,
 	.get	= shmem_get_acl_default,
 	.set	= shmem_set_acl_default,

@@ -80,7 +80,7 @@ NIKITA-FIXME-HANS: period?
 #include <linux/quotaops.h>
 #include <linux/security.h> /* security_inode_delete() */
 #include <linux/writeback.h> /* wake_up_inode() */
-#include <linux/xattr_acl.h>
+#include <linux/posix_acl_xattr.h>
 #include <linux/xattr.h>
 
 /* helper function to print errors */
