@@ -90,12 +90,13 @@ static int __init sd_auditmode(char *str)
 	get_option(&str, &subdomain_audit);
 	return 1;
 }
-__setup("subdomain_owlsm=", sd_owlsmmode);
+__setup("subdomain_audit=", sd_auditmode);
 static int __init sd_owlsmmode(char *str)
 {
 	get_option(&str, &subdomain_owlsm);
 	return 1;
 }
+__setup("subdomain_owlsm=", sd_owlsmmode);
 #endif
 
 static int subdomain_ptrace (struct task_struct *parent, struct task_struct *child)

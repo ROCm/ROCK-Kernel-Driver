@@ -276,30 +276,13 @@ int sd_path_match(const char *name, const char *pathname, pattern_t ptype)
 
 	/* trailing glob pattern */
 	}else if (ptype == ePatternTailGlob){
-		const char      *p = pathname,
-				*pattp = name;
-
-       		while (*p && *pattp){
-                	if (unlikely(*pattp == '*')){
-				retval=1;
-                        	goto done;
-                	}else if (*p != *pattp){
-                        	retval=0;
-				goto done;
-                	}else{
-                        	++p;
-                        	++pattp;
-                	}
-        	}
-
-		retval = (*p == 0 && (*pattp == 0 || *pattp == '*'));
+		retval = (strncmp(name, pathname, strlen(name) - 2) == 0);
 	}else{
 		SD_WARN("%s: Invalid pattern_t %d\n", 
 			__FUNCTION__, ptype);
 		retval=0;
 	}
 
-done:
 	SD_DEBUG("%s(%d): %s %s [%s]\n", 
 		__FUNCTION__, retval, name, pathname,
 		sd_getpattern_type(ptype));
@@ -514,15 +497,18 @@ void sd_attr_trace(const char *name, struct subdomain *sd, struct iattr *iattr, 
 	}
 
 #ifdef SYSLOG_TEMPFIX
-	SD_WARN("%s%s attribute (%s%s%s%s%s%s) change to %s (%s(%d) profile %s active %s)\n",
+	SD_WARN("%s%s attribute (%s%s%s%s%s%s%s) change to %s (%s(%d) profile %s active %s)\n",
 		status,
 		newname != name ? "-SYSLOGFIX" : "",
 		iattr->ia_valid & ATTR_MODE ? "mode," : "",
 		iattr->ia_valid & ATTR_UID ? "uid," : "",
 		iattr->ia_valid & ATTR_GID ? "gid," : "",
 		iattr->ia_valid & ATTR_SIZE ? "size," : "",
-		iattr->ia_valid & ATTR_ATIME_SET ? "atime," : "",
-		iattr->ia_valid & ATTR_MTIME_SET ? "mtime," : "",
+		((iattr->ia_valid & ATTR_ATIME_SET) ||
+		 (iattr->ia_valid & ATTR_ATIME)) ? "atime," : "",
+		((iattr->ia_valid & ATTR_MTIME_SET) ||
+		 (iattr->ia_valid & ATTR_MTIME)) ? "mtime," : "",
+		iattr->ia_valid & ATTR_CTIME ? "ctime," : "",
 		newname ? newname : "KMALLOC-ERROR",
 		current->comm, current->pid,
 		sd->profile->name, sd->active->name);
@@ -530,14 +516,17 @@ void sd_attr_trace(const char *name, struct subdomain *sd, struct iattr *iattr, 
 	if (newname != name)
 		kfree(newname);
 #else
-	SD_WARN("%s attribute (%s%s%s%s%s%s) change to %s (%s(%d) profile %s active %s)\n",
+	SD_WARN("%s attribute (%s%s%s%s%s%s%s) change to %s (%s(%d) profile %s active %s)\n",
 		status,
 		iattr->ia_valid & ATTR_MODE ? "mode," : "",
 		iattr->ia_valid & ATTR_UID ? "uid," : "",
 		iattr->ia_valid & ATTR_GID ? "gid," : "",
 		iattr->ia_valid & ATTR_SIZE ? "size," : "",
-		iattr->ia_valid & ATTR_ATIME_SET ? "atime," : "",
-		iattr->ia_valid & ATTR_MTIME_SET ? "mtime," : "",
+		((iattr->ia_valid & ATTR_ATIME_SET) ||
+		 (iattr->ia_valid & ATTR_ATIME)) ? "atime," : "",
+		((iattr->ia_valid & ATTR_MTIME_SET) ||
+		 (iattr->ia_valid & ATTR_MTIME)) ? "mtime," : "",
+		iattr->ia_valid & ATTR_CTIME ? "ctime," : "",
 		name, current->comm, current->pid,
 		sd->profile->name, sd->active->name);
 #endif
