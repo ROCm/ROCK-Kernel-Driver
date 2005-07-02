@@ -374,8 +374,11 @@ struct pci_bus * __devinit pci_add_new_bus(struct pci_bus *parent, struct pci_de
 	struct pci_bus *child;
 
 	child = pci_alloc_child_bus(parent, dev, busnr);
-	if (child)
+	if (child) {
+		spin_lock(&pci_bus_lock);
 		list_add_tail(&child->node, &parent->children);
+		spin_unlock(&pci_bus_lock);
+	}
 	return child;
 }
 
@@ -395,16 +398,6 @@ static void pci_enable_crs(struct pci_dev *dev)
 	pci_write_config_word(dev, rpcap + PCI_EXP_RTCTL, rpctl);
 }
 
-static void __devinit pci_fixup_parent_subordinate_busnr(struct pci_bus *child, int max)
-{
-	struct pci_bus *parent = child->parent;
-	while (parent->parent && parent->subordinate < max) {
-		parent->subordinate = max;
-		pci_write_config_byte(parent->self, PCI_SUBORDINATE_BUS, max);
-		parent = parent->parent;
-	}
-}
-
 unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus);
 
 /*
@@ -421,7 +414,7 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 {
 	struct pci_bus *child;
 	int is_cardbus = (dev->hdr_type == PCI_HEADER_TYPE_CARDBUS);
-	u32 buses;
+	u32 buses, i;
 	u16 bctl;
 
 	pci_read_config_dword(dev, PCI_PRIMARY_BUS, &buses);
@@ -457,7 +450,7 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 			return max;
 		}
 
-		child = pci_alloc_child_bus(bus, dev, busnr);
+		child = pci_add_new_bus(bus, dev, busnr);
 		if (!child)
 			return max;
 		child->primary = buses & 0xFF;
@@ -480,7 +473,11 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 		/* Clear errors */
 		pci_write_config_word(dev, PCI_STATUS, 0xffff);
 
-		child = pci_alloc_child_bus(bus, dev, ++max);
+		/* Prevent assigning a bus number that already exists.
+		 * This can happen when a bridge is hot-plugged */
+		if (pci_find_bus(pci_domain_nr(bus), max+1))
+			return max;
+		child = pci_add_new_bus(bus, dev, ++max);
 		buses = (buses & 0xff000000)
 		      | ((unsigned int)(child->primary)     <<  0)
 		      | ((unsigned int)(child->secondary)   <<  8)
@@ -502,13 +499,7 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 
 		if (!is_cardbus) {
 			child->bridge_ctl = PCI_BRIDGE_CTL_NO_ISA;
-			/*
-			 * Adjust subordinate busnr in parent buses.
-			 * We do this before scanning for children because
-			 * some devices may not be detected if the bios
-			 * was lazy.
-			 */
-			pci_fixup_parent_subordinate_busnr(child, max);
+
 			/* Now we can scan all subordinate buses... */
 			max = pci_scan_child_bus(child);
 		} else {
@@ -517,8 +508,11 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 			 * as cards with a PCI-to-PCI bridge can be
 			 * inserted later.
 			 */
-			max += CARDBUS_RESERVE_BUSNR;
-			pci_fixup_parent_subordinate_busnr(child, max);
+			for (i=0; i<CARDBUS_RESERVE_BUSNR; i++)
+				if (pci_find_bus(pci_domain_nr(bus),
+							max+i+1))
+					break;
+			max += i;
 		}
 		/*
 		 * Set the subordinate bus number to its real value.
@@ -774,7 +768,9 @@ pci_scan_single_device(struct pci_bus *bus, int devfn)
 	 * and the bus list for fixup functions, etc.
 	 */
 	INIT_LIST_HEAD(&dev->global_list);
+	spin_lock(&pci_bus_lock);
 	list_add_tail(&dev->bus_list, &bus->devices);
+	spin_unlock(&pci_bus_lock);
 
 	return dev;
 }
@@ -895,7 +891,9 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 		pr_debug("PCI: Bus %04x:%02x already known\n", pci_domain_nr(b), bus);
 		goto err_out;
 	}
+	spin_lock(&pci_bus_lock);
 	list_add_tail(&b->node, &pci_root_buses);
+	spin_unlock(&pci_bus_lock);
 
 	memset(dev, 0, sizeof(*dev));
 	dev->parent = parent;
@@ -928,8 +926,6 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 
 	b->subordinate = pci_scan_child_bus(b);
 
-	pci_bus_add_devices(b);
-
 	return b;
 
 sys_create_link_err:
@@ -939,7 +935,9 @@ class_dev_create_file_err:
 class_dev_reg_err:
 	device_unregister(dev);
 dev_reg_err:
+	spin_lock(&pci_bus_lock);
 	list_del(&b->node);
+	spin_unlock(&pci_bus_lock);
 err_out:
 	kfree(dev);
 	kfree(b);

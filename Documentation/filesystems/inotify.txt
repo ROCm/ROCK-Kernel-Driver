@@ -8,7 +8,9 @@ Document started 15 Mar 2005 by Robert Love <rml@novell.com>
 (i) User Interface
 
 Inotify is controlled by a device node, /dev/inotify.  If you do not use udev,
-this device may need to be created manually.  First step, open it
+this device may need to be created manually.
+
+First step in using inotify is to open the device file:
 
 	int dev_fd = open ("/dev/inotify", O_RDONLY);
 
@@ -17,7 +19,7 @@ the object is a file or directory and the mask is a bitmask of one or more
 inotify events that the application wishes to receive.  See <linux/inotify.h>
 for valid events.  A watch is referenced by a watch descriptor, or wd.
 
-Watches are added via a file descriptor.
+Watches are added via a file descriptor to the file.
 
 Watches on a directory will return events on any files inside of the directory.
 
@@ -64,7 +66,7 @@ You can slurp multiple events by passing a large buffer, for example
 
 Will return as many events as are available and fit in BUF_LEN.
 
-/dev/inotify is also select() and poll() able.
+/dev/inotify is also select()- and poll()-able.
 
 You can find the size of the current event queue via the FIONREAD ioctl.
 
@@ -83,41 +85,71 @@ See fs/inotify.c for the locking and lifetime rules.
 
 (iii) Rationale
 
-Q: What is the design decision behind not tying the watch to the
-open fd of the watched object?
+Q: What is the design decision behind not tying the watch to the open fd of
+   the watched object?
 
-A: Watches are associated with an open inotify device, not an
-open file.  This solves the primary problem with dnotify:
-keeping the file open pins the file and thus, worse, pins the
-mount.  Dnotify is therefore infeasible for use on a desktop
-system with removable media as the media cannot be unmounted.
+A: Watches are associated with an open inotify device, not an open file.
+   This solves the primary problem with dnotify: keeping the file open pins
+   the file and thus, worse, pins the mount.  Dnotify is therefore infeasible
+   for use on a desktop system with removable media as the media cannot be
+   unmounted.
 
-Q: What is the design decision behind using an-fd-per-device as
-opposed to an fd-per-watch?
+Q: What is the design decision behind using an-fd-per-device as opposed to
+   an fd-per-watch?
 
-A: An fd-per-watch quickly consumes more file descriptors than
-are allowed, more fd's than are feasible to manage, and more
-fd's than are ideally select()-able.  Yes, root can bump the
-per-process fd limit and yes, users can use epoll, but requiring
-both is silly and an extraneous requirement.  A watch consumes
-less memory than an open file, separating the number spaces is
-thus sensible.  The current design is what user-space developers
-want: Users open the device, once, and add n watches, requiring
-but one fd and no twiddling with fd limits.
-Opening /dev/inotify two thousand times is silly.  If we can
-implement user-space's preferences cleanly--and we can, the idr
-layer makes stuff like this trivial--then we should.
+A: An fd-per-watch quickly consumes more file descriptors than are allowed,
+   more fd's than are feasible to manage, and more fd's than are optimally
+   select()-able.  Yes, root can bump the per-process fd limit and yes, users
+   can use epoll, but requiring both is a silly and extraneous requirement.
+   A watch consumes less memory than an open file, separating the number
+   spaces is thus sensible.  The current design is what user-space developers
+   want: Users open the device, once, and add n watches, requiring but one fd
+   and no twiddling with fd limits.  Opening /dev/inotify two thousand times
+   is silly.  If we can implement user-space's preferences cleanly--and we
+   can, the idr layer makes stuff like this trivial--then we should.
+
+   There are other good arguments.  With a single fd, there is a single
+   item to block on, which is mapped to a single queue of events.  The single
+   fd returns all watch events and also any potential out-of-band data.  If
+   every fd was a separate watch,
+
+   - There would be no way to get event ordering.  Events on file foo and
+     file bar would pop poll() on both fd's, but there would be no way to tell
+     which happened first.  A single queue trivially gives you ordering.  Such
+     ordering is crucial to existing applications such as Beagle.  Imagine
+     "mv a b ; mv b a" events without ordering.
+
+   - We'd have to maintain n fd's and n internal queues with state,
+     versus just one.  It is a lot messier in the kernel.  A single, linear
+     queue is the data structure that makes sense.
+
+   - User-space developers prefer the current API.  The Beagle guys, for
+     example, love it.  Trust me, I asked.  It is not a surprise: Who'd want
+     to manage and block on 1000 fd's via select?
+
+   - You'd have to manage the fd's, as an example: Call close() when you
+     received a delete event.
+
+   - No way to get out of band data.
+
+   - 1024 is still too low.  ;-)
+
+   When you talk about designing a file change notification system that
+   scales to 1000s of directories, juggling 1000s of fd's just does not seem
+   the right interface.  It is too heavy.
 
 Q: Why a device node?
 
-A: The second biggest problem with dnotify is that the user
-interface sucks ass.  Signals are a terrible, terrible interface
-for file notification.  Or for anything, for that matter.  The
-idea solution, from all perspectives, is a file descriptor based
-one that allows basic file I/O and poll/select.  Obtaining the
-fd and managing the watches could of been done either via a
-device file or a family of new system calls.  We decided to
-implement a device file because adding three or four new system
-calls that mirrored open, close, and ioctl seemed silly.  A
-character device makes sense from user-space and was easy to
-implement inside of the kernel.
+A: The poor user-space interface is the second biggest problem with dnotify.
+   Signals are a terrible, terrible interface for file notification.  Or for
+   anything, for that matter.  The idea solution, from all perspectives, is a
+   file descriptor-based one that allows basic file I/O and poll/select.
+   Obtaining the fd and managing the watches could have been done either via a
+   device file or a family of new system calls.  We decided to implement a
+   device file because adding three or four new system calls that mirrored
+   open, close, and ioctl seemed silly.  A character device makes sense from
+   user-space and was easy to implement inside of the kernel.
+
+   Additionally, it _is_ possible to open /dev/inotify more than once and
+   juggle more than one queue and thus more than one associated fd.
+

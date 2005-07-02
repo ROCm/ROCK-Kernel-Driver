@@ -567,10 +567,11 @@ void inotify_unmount_inodes(struct list_head *list)
 		struct list_head *watches;
 
 		/*
-		 * We cannot __iget() an inode in state I_CLEAR, which is fine
-		 * as by that point the inode cannot have any watches.
+		 * We cannot __iget() an inode in state I_CLEAR or I_FREEING,
+		 * which is fine because by that point the inode cannot have
+		 * any associated watches.
 		 */
-		if (inode->i_state & I_CLEAR)
+		if (inode->i_state & (I_CLEAR | I_FREEING))
 			continue;
 
 		/* In case the remove_watch() drops a reference */

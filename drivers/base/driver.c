@@ -62,19 +62,20 @@ EXPORT_SYMBOL_GPL(driver_for_each_device);
  * @data: Data to pass to match function
  * @match: Callback function to check device
  *
- * This is similar to the driver_for_each_device() function above, but it
- * returns a reference to a device that is 'found' for later use, as determined
- * by the @match callback. The callback should return a bool - 0 if
- * the device doesn't match and 1 if it does.
- * The function will return if a device is found.
+ * This is similar to the driver_for_each_device() function above, but
+ * it returns a reference to a device that is 'found' for later use, as
+ * determined by the @match callback.
+ *
+ * The callback should return 0 if the device doesn't match and non-zero
+ * if it does.  If the callback returns non-zero, this function will
+ * return to the caller and not iterate over any more devices.
  */
-
 struct device * driver_find_device(struct device_driver *drv,
 				   struct device * start, void * data,
 				   int (*match)(struct device *, void *))
 {
 	struct klist_iter i;
-	struct device * dev;
+	struct device *dev;
 
 	if (!drv)
 		return NULL;
@@ -87,7 +88,6 @@ struct device * driver_find_device(struct device_driver *drv,
 	klist_iter_exit(&i);
 	return dev;
 }
-
 EXPORT_SYMBOL_GPL(driver_find_device);
 
 /**

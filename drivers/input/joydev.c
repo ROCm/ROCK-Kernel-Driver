@@ -357,7 +357,7 @@ static int joydev_ioctl_common(struct joydev *joydev, unsigned int cmd, void __u
 }
 
 #ifdef CONFIG_COMPAT
-static long joydev_compat_ioctl(struct file *file, unsigned cmd, unsigned long arg)
+static long joydev_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct joydev_list *list = file->private_data;
 	struct joydev *joydev = list->joydev;
