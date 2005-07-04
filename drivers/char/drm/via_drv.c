@@ -54,11 +54,6 @@ static int version(drm_version_t * version)
 	return 0;
 }
 
-static int dri_library_name(struct drm_device * dev, char * buf)
-{
-	return snprintf(buf, PAGE_SIZE, "unichrome\n");
-}
-
 static struct pci_device_id pciidlist[] = {
 	viadrv_PCI_IDS
 };
@@ -75,10 +70,8 @@ static drm_ioctl_desc_t ioctls[] = {
 	[DRM_IOCTL_NR(DRM_VIA_FLUSH)] = {via_flush_ioctl, 1, 0},
 	[DRM_IOCTL_NR(DRM_VIA_PCICMD)] = {via_pci_cmdbuffer, 1, 0},
 	[DRM_IOCTL_NR(DRM_VIA_CMDBUF_SIZE)] = {via_cmdbuf_size, 1, 0},
-	[DRM_IOCTL_NR(DRM_VIA_WAIT_IRQ)] = {via_wait_irq, 1, 0}
 };
 
-static int probe(struct pci_dev *pdev, const struct pci_device_id *ent);
 static struct drm_driver driver = {
 	.driver_features =
 	    DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_IRQ |
@@ -91,7 +84,6 @@ static struct drm_driver driver = {
 	.irq_uninstall = via_driver_irq_uninstall,
 	.irq_handler = via_driver_irq_handler,
 	.dma_quiescent = via_driver_dma_quiescent,
-	.dri_library_name = dri_library_name,
 	.reclaim_buffers = drm_core_reclaim_buffers,
 	.get_map_ofs = drm_core_get_map_ofs,
 	.get_reg_ofs = drm_core_get_reg_ofs,
@@ -111,20 +103,13 @@ static struct drm_driver driver = {
 	.pci_driver = {
 		.name = DRIVER_NAME,
 		.id_table = pciidlist,
-		.probe = probe,
-		.remove = __devexit_p(drm_cleanup_pci),
 	}
 };
-
-static int probe(struct pci_dev *pdev, const struct pci_device_id *ent)
-{
-	return drm_get_dev(pdev, ent, &driver);
-}
 
 static int __init via_init(void)
 {
 	via_init_command_verifier();
-	return drm_init(&driver, pciidlist);
+	return drm_init(&driver);
 }
 
 static void __exit via_exit(void)
