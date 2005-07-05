@@ -1,5 +1,6 @@
 /*
  * Copyright 2004 The Unichrome Project. All Rights Reserved.
+ * Copyright 2005 Thomas Hellstrom. All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -15,12 +16,12 @@
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
- * THE UNICHROME PROJECT, AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * THE AUTHOR(S), AND/OR THE COPYRIGHT HOLDER(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * Author: Thomas Hellstr� 2004.
+ * Author: Thomas Hellstrom 2004, 2005.
  * This code was written using docs obtained under NDA from VIA Inc.
  *
  * Don't run this code directly on an AGP buffer. Due to cache problems it will
@@ -677,16 +678,66 @@ via_check_header2( uint32_t const **buffer, const uint32_t *buf_end,
 	return state_command;
 }
 
+static __inline__ verifier_state_t
+via_parse_header2( drm_via_private_t *dev_priv, uint32_t const **buffer, const uint32_t *buf_end,
+		   int *fire_count)
+{
+	uint32_t cmd;
+	const uint32_t *buf = *buffer;
+	const uint32_t *next_fire; 
+	int burst = 0;
+
+	next_fire = dev_priv->fire_offsets[*fire_count];
+	buf++;
+	cmd = (*buf & 0xFFFF0000) >> 16;
+	VIA_WRITE(HC_REG_TRANS_SET + HC_REG_BASE, *buf++);
+	switch(cmd) {
+	case HC_ParaType_CmdVdata:
+		while ((buf < buf_end) &&
+		       (*fire_count < dev_priv->num_fire_offsets) && 
+		       (*buf & HC_ACMD_MASK) == HC_ACMD_HCmdB ) {
+			while(buf <= next_fire) {
+				VIA_WRITE(HC_REG_TRANS_SPACE + HC_REG_BASE + (burst & 63), *buf++);
+				burst += 4;
+			}
+			if ( ( buf < buf_end ) && ((*buf & HALCYON_FIREMASK) == HALCYON_FIRECMD))
+				buf++;
+
+			if (++(*fire_count) < dev_priv->num_fire_offsets) 
+				next_fire = dev_priv->fire_offsets[*fire_count];
+		}
+		break;
+	default:
+		while(buf < buf_end) {
+			
+			if ( *buf == HC_HEADER2 ||
+			     (*buf & HALCYON_HEADER1MASK) == HALCYON_HEADER1  ||
+			     (*buf & VIA_VIDEOMASK) == VIA_VIDEO_HEADER5 ||
+			     (*buf & VIA_VIDEOMASK) == VIA_VIDEO_HEADER6 ) break;
+			
+			VIA_WRITE(HC_REG_TRANS_SPACE + HC_REG_BASE + (burst & 63), *buf++);
+			burst +=4;
+		}
+	}
+	*buffer = buf;
+	return state_command;
+}
+
+
 
 static __inline__ int
 verify_mmio_address( uint32_t address)
 {
 	if ((address > 0x3FF) && (address < 0xC00 )) {
-		DRM_ERROR("Invalid HALCYON_HEADER1 command. "
+		DRM_ERROR("Invalid VIDEO DMA command. "
 			  "Attempt to access 3D- or command burst area.\n");
 		return 1;
-	} else if (address > 0xCFF ) {
-		DRM_ERROR("Invalid HALCYON_HEADER1 command. "
+	} else if ((address > 0xCFF) && (address < 0x1300)) {
+		DRM_ERROR("Invalid VIDEO DMA command. "
+			  "Attempt to access PCI DMA area.\n");
+		return 1;		
+	} else if (address > 0x13FF ) {
+		DRM_ERROR("Invalid VIDEO DMA command. "
 			  "Attempt to access VGA registers.\n");
 		return 1;
 	}
@@ -746,6 +797,22 @@ via_check_header1( uint32_t const **buffer, const uint32_t *buf_end )
 }
 
 static __inline__ verifier_state_t
+via_parse_header1( drm_via_private_t *dev_priv, uint32_t const **buffer, const uint32_t *buf_end )
+{
+	register uint32_t cmd;
+	const uint32_t *buf = *buffer;
+
+	while (buf < buf_end) {
+		cmd = *buf;
+		if ((cmd & HALCYON_HEADER1MASK) != HALCYON_HEADER1) break;
+		VIA_WRITE( (cmd & ~HALCYON_HEADER1MASK) << 2, *++buf); 
+		buf++;
+	}
+	*buffer = buf;
+	return state_command;
+}
+
+static __inline__ verifier_state_t
 via_check_vheader5( uint32_t const **buffer, const uint32_t *buf_end )
 {
 	uint32_t data;
@@ -771,12 +838,30 @@ via_check_vheader5( uint32_t const **buffer, const uint32_t *buf_end )
 	}
 	if (eat_words(&buf, buf_end, data)) 
 		return state_error;
-	if (verify_video_tail(&buf, buf_end, 4 - (data & 3))) 
+	if ((data & 3) && verify_video_tail(&buf, buf_end, 4 - (data & 3))) 
 		return state_error;
 	*buffer = buf;
 	return state_command;
 	       
 } 
+
+static __inline__ verifier_state_t
+via_parse_vheader5( drm_via_private_t *dev_priv, uint32_t const **buffer, const uint32_t *buf_end )
+{
+  uint32_t addr, count, i;
+	const uint32_t *buf = *buffer;
+	
+	addr = *buf++ & ~VIA_VIDEOMASK;
+	i = count = *buf;
+	buf += 3;
+	while(i--) {
+		VIA_WRITE(addr, *buf++);
+	}
+	if (count & 3) buf += 4 - (count & 3);
+	*buffer = buf;
+	return state_command;	       
+} 
+
 
 static __inline__ verifier_state_t
 via_check_vheader6( uint32_t const **buffer, const uint32_t *buf_end )
@@ -785,13 +870,12 @@ via_check_vheader6( uint32_t const **buffer, const uint32_t *buf_end )
 	const uint32_t *buf = *buffer;
 	uint32_t i;
 
-	DRM_ERROR("H6\n");
 
 	if (buf_end - buf < 4) {
 		DRM_ERROR("Illegal termination of video header6 command\n");
 		return state_error;
 	}
-
+	buf++;
 	data = *buf++;
 	if (*buf++ != 0x00F60000) {
 		DRM_ERROR("Illegal header6 header data\n");
@@ -803,17 +887,39 @@ via_check_vheader6( uint32_t const **buffer, const uint32_t *buf_end )
 	}
 	if ((buf_end - buf) < (data << 1)) {
 		DRM_ERROR("Illegal termination of video header6 command\n");
+		return state_error;
 	}
 	for (i=0; i<data; ++i) {
 		if (verify_mmio_address(*buf++))
 			return state_error;
 		buf++;
 	}
-	if (verify_video_tail(&buf, buf_end, 4 - ((data << 1) & 3)))
+	data <<= 1;
+	if ((data & 3) && verify_video_tail(&buf, buf_end, 4 - (data & 3)))
 		return state_error;
 	*buffer = buf;
 	return state_command;
 } 
+
+static __inline__ verifier_state_t
+via_parse_vheader6( drm_via_private_t *dev_priv, uint32_t const **buffer, const uint32_t *buf_end )
+{
+
+  uint32_t addr, count, i;
+	const uint32_t *buf = *buffer;
+
+	i = count = *++buf;
+	buf += 3;
+	while(i--) {
+		addr = *buf++;
+		VIA_WRITE(addr, *buf++);
+	}
+	count <<= 1;
+	if (count & 3) buf += 4 - (count & 3);
+	*buffer = buf;
+	return state_command;
+} 
+
 
 
 int 
@@ -827,7 +933,7 @@ via_verify_command_stream(const uint32_t * buf, unsigned int size, drm_device_t 
 	uint32_t cmd;
 	const uint32_t *buf_end = buf + ( size >> 2 );
 	verifier_state_t state = state_command;
-	
+	int pro_group_a = dev_priv->pro_group_a;
 	
 	hc_state->dev = dev;
 	hc_state->unfinished = no_sequence;
@@ -840,7 +946,7 @@ via_verify_command_stream(const uint32_t * buf, unsigned int size, drm_device_t 
 
 		switch (state) {
 		case state_header2:
-			state = via_check_header2( &buf, buf_end, hc_state );
+		  state = via_check_header2( &buf, buf_end, hc_state );
 			break;
 		case state_header1:
 			state = via_check_header1( &buf, buf_end );
@@ -856,9 +962,9 @@ via_verify_command_stream(const uint32_t * buf, unsigned int size, drm_device_t 
 				state = state_header2;
 			else if ((cmd & HALCYON_HEADER1MASK) == HALCYON_HEADER1) 
 				state = state_header1;
-			else if ((cmd & VIA_VIDEOMASK) == VIA_VIDEO_HEADER5)
+			else if (pro_group_a && (cmd & VIA_VIDEOMASK) == VIA_VIDEO_HEADER5)
 				state = state_vheader5;
-			else if ((cmd & VIA_VIDEOMASK) == VIA_VIDEO_HEADER6)
+			else if (pro_group_a && (cmd & VIA_VIDEOMASK) == VIA_VIDEO_HEADER6)
 				state = state_vheader6;
 			else {
 				DRM_ERROR("Invalid / Unimplemented DMA HEADER command. 0x%x\n",
@@ -878,6 +984,59 @@ via_verify_command_stream(const uint32_t * buf, unsigned int size, drm_device_t 
 	}
 	return 0;
 }
+
+int 
+via_parse_command_stream(drm_device_t *dev, const uint32_t * buf, unsigned int size)
+{
+
+	drm_via_private_t *dev_priv = (drm_via_private_t *) dev->dev_private;
+	uint32_t cmd;
+	const uint32_t *buf_end = buf + ( size >> 2 );
+	verifier_state_t state = state_command;
+	int fire_count = 0;
+	
+	while (buf < buf_end) {
+
+		switch (state) {
+		case state_header2:
+		  state = via_parse_header2( dev_priv, &buf, buf_end, &fire_count );
+			break;
+		case state_header1:
+			state = via_parse_header1( dev_priv, &buf, buf_end );
+			break;
+		case state_vheader5:
+			state = via_parse_vheader5( dev_priv, &buf, buf_end );
+			break;
+		case state_vheader6:
+			state = via_parse_vheader6( dev_priv, &buf, buf_end );
+			break;
+		case state_command:
+			if (HALCYON_HEADER2 == (cmd = *buf)) 
+				state = state_header2;
+			else if ((cmd & HALCYON_HEADER1MASK) == HALCYON_HEADER1) 
+				state = state_header1;
+			else if ((cmd & VIA_VIDEOMASK) == VIA_VIDEO_HEADER5)
+				state = state_vheader5;
+			else if ((cmd & VIA_VIDEOMASK) == VIA_VIDEO_HEADER6)
+				state = state_vheader6;
+			else {
+				DRM_ERROR("Invalid / Unimplemented DMA HEADER command. 0x%x\n",
+					  cmd);
+				state = state_error;
+			}
+			break;
+		case state_error:
+		default:
+			return DRM_ERR(EINVAL);			
+		}
+	}	
+	if (state == state_error) {
+		return DRM_ERR(EINVAL);
+	}
+	return 0;
+}
+
+
 
 static void 
 setup_hazard_table(hz_init_t init_table[], hazard_t table[], int size)

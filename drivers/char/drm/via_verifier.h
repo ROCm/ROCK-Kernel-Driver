@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * Author: Thomas Hellstrï¿½ 2004.
+ * Author: Thomas Hellström 2004.
  */
 
 #ifndef _VIA_VERIFIER_H_

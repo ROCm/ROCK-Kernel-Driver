@@ -27,23 +27,35 @@
 #define DRIVER_AUTHOR	"VIA"
 
 #define DRIVER_NAME		"via"
-#define DRIVER_DESC		"VIA Unichrome"
-#define DRIVER_DATE		"20050314"
+#define DRIVER_DESC		"VIA Unichrome / Pro"
+#define DRIVER_DATE		"20050523"
 
 #define DRIVER_MAJOR		2
-#define DRIVER_MINOR		5
-#define DRIVER_PATCHLEVEL	0
+#define DRIVER_MINOR		6
+#define DRIVER_PATCHLEVEL	3
 
 #include "via_verifier.h"
 
-#define VIA_PCI_BUF_SIZE 120000
-#define VIA_FIRE_BUF_SIZE  2048
+#define VIA_PCI_BUF_SIZE 60000
+#define VIA_FIRE_BUF_SIZE  1024
+#define VIA_NUM_IRQS 2
+
+
 
 typedef struct drm_via_ring_buffer {
 	drm_map_t map;
 	char *virtual_start;
 } drm_via_ring_buffer_t;
 
+typedef uint32_t maskarray_t[5];
+
+typedef struct drm_via_irq {
+	atomic_t irq_received;
+	uint32_t pending_mask;
+	uint32_t enable_mask;
+	wait_queue_head_t irq_queue;
+} drm_via_irq_t;
+	
 typedef struct drm_via_private {
 	drm_via_sarea_t *sarea_priv;
 	drm_map_t *sarea;
@@ -66,6 +78,12 @@ typedef struct drm_via_private {
 	char pci_buf[VIA_PCI_BUF_SIZE];
 	const uint32_t *fire_offsets[VIA_FIRE_BUF_SIZE];
 	uint32_t num_fire_offsets;
+	int pro_group_a;
+	drm_via_irq_t via_irqs[VIA_NUM_IRQS];
+	unsigned num_irqs;
+	maskarray_t *irq_masks;
+	uint32_t irq_enable_mask; 
+	uint32_t irq_pending_mask;	
 } drm_via_private_t;
 
 /* VIA MMIO register access */
@@ -92,6 +110,9 @@ extern void via_driver_irq_uninstall(drm_device_t * dev);
 extern int via_dma_cleanup(drm_device_t * dev);
 extern void via_init_command_verifier(void);
 extern int via_driver_dma_quiescent(drm_device_t * dev);
+extern void via_init_futex(drm_via_private_t *dev_priv);
+extern void via_cleanup_futex(drm_via_private_t *dev_priv);
+extern void via_release_futex(drm_via_private_t *dev_priv, int context);
 
 
 #endif

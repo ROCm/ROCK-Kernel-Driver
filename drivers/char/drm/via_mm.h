@@ -28,7 +28,7 @@ typedef struct {
 	unsigned int context;
 	unsigned int size;
 	unsigned long offset;
-	unsigned int free;
+	unsigned long free;
 } drm_via_mm_t;
 
 typedef struct {

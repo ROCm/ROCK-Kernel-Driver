@@ -1,10 +1,10 @@
 /* i915_drv.h -- Private header for the I915 driver -*- linux-c -*-
  */
 /**************************************************************************
- *
+ * 
  * Copyright 2003 Tungsten Graphics, Inc., Cedar Park, Texas.
  * All Rights Reserved.
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -12,11 +12,11 @@
  * distribute, sub license, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice (including the
  * next paragraph) shall be included in all copies or substantial portions
  * of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
@@ -24,7 +24,7 @@
  * ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
+ * 
  **************************************************************************/
 
 #ifndef _I915_DRV_H_
@@ -37,20 +37,16 @@
 
 #define DRIVER_NAME		"i915"
 #define DRIVER_DESC		"Intel Graphics"
-#define DRIVER_DATE		"20040405"
+#define DRIVER_DATE		"20041217"
 
 /* Interface history:
  *
  * 1.1: Original.
+ * 1.2: Add Power Management
  */
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		1
+#define DRIVER_MINOR		2
 #define DRIVER_PATCHLEVEL	0
-
-/* We use our own dma mechanisms, not the drm template code.  However,
- * the shared IRQ code is useful to us:
- */
-#define __HAVE_PM		1
 
 typedef struct _drm_i915_ring_buffer {
 	int tail_mask;
@@ -79,9 +75,10 @@ typedef struct drm_i915_private {
 	drm_i915_sarea_t *sarea_priv;
 	drm_i915_ring_buffer_t ring;
 
+	drm_dma_handle_t *status_page_dmah;
 	void *hw_status_page;
-	unsigned long counter;
 	dma_addr_t dma_status_page;
+	unsigned long counter;
 
 	int back_offset;
 	int front_offset;
@@ -96,31 +93,28 @@ typedef struct drm_i915_private {
 	int tex_lru_log_granularity;
 	int allow_batchbuffer;
 	struct mem_block *agp_heap;
+	unsigned int sr01, adpa, ppcr, dvob, dvoc, lvds;
 } drm_i915_private_t;
 
 				/* i915_dma.c */
-extern int i915_dma_init(DRM_IOCTL_ARGS);
-extern int i915_dma_cleanup(drm_device_t * dev);
-extern int i915_flush_ioctl(DRM_IOCTL_ARGS);
-extern int i915_batchbuffer(DRM_IOCTL_ARGS);
-extern int i915_flip_bufs(DRM_IOCTL_ARGS);
-extern int i915_getparam(DRM_IOCTL_ARGS);
-extern int i915_setparam(DRM_IOCTL_ARGS);
-extern int i915_cmdbuffer(DRM_IOCTL_ARGS);
 extern void i915_kernel_lost_context(drm_device_t * dev);
-extern void i915_driver_pretakedown(drm_device_t *dev);
-extern void i915_driver_prerelease(drm_device_t *dev, DRMFILE filp);
+extern void i915_driver_pretakedown(drm_device_t * dev);
+extern void i915_driver_prerelease(drm_device_t * dev, DRMFILE filp);
+extern int i915_driver_device_is_agp(drm_device_t * dev);
 
 /* i915_irq.c */
 extern int i915_irq_emit(DRM_IOCTL_ARGS);
 extern int i915_irq_wait(DRM_IOCTL_ARGS);
-extern int i915_wait_irq(drm_device_t * dev, int irq_nr);
-extern int i915_emit_irq(drm_device_t * dev);
 
 extern irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS);
-extern void i915_driver_irq_preinstall(drm_device_t *dev);
-extern void i915_driver_irq_postinstall(drm_device_t *dev);
-extern void i915_driver_irq_uninstall(drm_device_t *dev);
+extern void i915_driver_irq_preinstall(drm_device_t * dev);
+extern void i915_driver_irq_postinstall(drm_device_t * dev);
+extern void i915_driver_irq_uninstall(drm_device_t * dev);
+
+/* i915_pm.c */
+extern int i915_suspend(struct pci_dev *pdev, u32 state);
+extern int i915_resume(struct pci_dev *pdev);
+extern int i915_power(drm_device_t *dev, unsigned int state);
 
 /* i915_mem.c */
 extern int i915_mem_alloc(DRM_IOCTL_ARGS);
@@ -130,10 +124,10 @@ extern void i915_mem_takedown(struct mem_block **heap);
 extern void i915_mem_release(drm_device_t * dev,
 			     DRMFILE filp, struct mem_block *heap);
 
-#define I915_READ(reg)          DRM_READ32(dev_priv->mmio_map, reg)
-#define I915_WRITE(reg,val)     DRM_WRITE32(dev_priv->mmio_map, reg, val)
-#define I915_READ16(reg) 	DRM_READ16(dev_priv->mmio_map, reg)
-#define I915_WRITE16(reg,val)	DRM_WRITE16(dev_priv->mmio_map, reg, val)
+#define I915_READ(reg)          DRM_READ32(dev_priv->mmio_map, (reg))
+#define I915_WRITE(reg,val)     DRM_WRITE32(dev_priv->mmio_map, (reg), (val))
+#define I915_READ16(reg) 	DRM_READ16(dev_priv->mmio_map, (reg))
+#define I915_WRITE16(reg,val)	DRM_WRITE16(dev_priv->mmio_map, (reg), (val))
 
 #define I915_VERBOSE 0
 
@@ -196,6 +190,13 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 
 #define PPCR			0x61204
 #define PPCR_ON			(1<<0)
+
+#define DVOB			0x61140
+#define DVOB_ON			(1<<31)
+#define DVOC			0x61160
+#define DVOC_ON			(1<<31)
+#define LVDS			0x61180
+#define LVDS_ON			(1<<31)
 
 #define ADPA			0x61100
 #define ADPA_DPMS_MASK		(~(3<<10))

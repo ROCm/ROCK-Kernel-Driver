@@ -73,6 +73,8 @@
 #define DRM_VIA_FLUSH	        0x09
 #define DRM_VIA_PCICMD	        0x0a
 #define DRM_VIA_CMDBUF_SIZE	0x0b
+#define NOT_USED
+#define DRM_VIA_WAIT_IRQ        0x0d
 
 #define DRM_IOCTL_VIA_ALLOCMEM	  DRM_IOWR(DRM_COMMAND_BASE + DRM_VIA_ALLOCMEM, drm_via_mem_t)
 #define DRM_IOCTL_VIA_FREEMEM	  DRM_IOW( DRM_COMMAND_BASE + DRM_VIA_FREEMEM, drm_via_mem_t)
@@ -86,6 +88,7 @@
 #define DRM_IOCTL_VIA_PCICMD	  DRM_IOW( DRM_COMMAND_BASE + DRM_VIA_PCICMD, drm_via_cmdbuffer_t)
 #define DRM_IOCTL_VIA_CMDBUF_SIZE DRM_IOWR( DRM_COMMAND_BASE + DRM_VIA_CMDBUF_SIZE, \
 					    drm_via_cmdbuf_size_t)
+#define DRM_IOCTL_VIA_WAIT_IRQ    DRM_IOWR( DRM_COMMAND_BASE + DRM_VIA_WAIT_IRQ, drm_via_irqwait_t)
 
 /* Indices into buf.Setup where various bits of state are mirrored per
  * context and per buffer.  These can be fired at the card as a unit,
@@ -200,6 +203,26 @@ typedef struct _drm_via_cmdbuf_size {
 	uint32_t size;
 } drm_via_cmdbuf_size_t;
 
+typedef enum {
+	VIA_IRQ_ABSOLUTE = 0x0,
+	VIA_IRQ_RELATIVE = 0x1,
+	VIA_IRQ_SIGNAL = 0x10000000,
+	VIA_IRQ_FORCE_SEQUENCE = 0x20000000
+} via_irq_seq_type_t;
+
+#define VIA_IRQ_FLAGS_MASK 0xF0000000
+
+struct drm_via_wait_irq_request{
+	unsigned irq;
+	via_irq_seq_type_t type;
+	uint32_t sequence;
+	uint32_t signal;
+};
+
+typedef union drm_via_irqwait {
+	struct drm_via_wait_irq_request request;
+	struct drm_wait_vblank_reply reply;
+} drm_via_irqwait_t;
 
 #ifdef __KERNEL__
 
@@ -214,6 +237,7 @@ int via_cmdbuffer(DRM_IOCTL_ARGS);
 int via_flush_ioctl(DRM_IOCTL_ARGS);
 int via_pci_cmdbuffer(DRM_IOCTL_ARGS);
 int via_cmdbuf_size(DRM_IOCTL_ARGS);
+int via_wait_irq(DRM_IOCTL_ARGS);
 
 #endif
 #endif				/* _VIA_DRM_H_ */

@@ -29,7 +29,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
 #include <linux/config.h>
 #include "drmP.h"
 #include "drm.h"
@@ -38,31 +37,40 @@
 
 #include "drm_pciids.h"
 
-static int postinit( struct drm_device *dev, unsigned long flags )
+static int postinit(struct drm_device *dev, unsigned long flags)
 {
-	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d: %s\n",
-		DRIVER_NAME,
-		DRIVER_MAJOR,
-		DRIVER_MINOR,
-		DRIVER_PATCHLEVEL,
-		DRIVER_DATE,
-		dev->primary.minor,
-		pci_pretty_name(dev->pdev)
-		);
+	DRM_INFO("Initialized %s %d.%d.%d %s on minor %d: %s\n",
+		 DRIVER_NAME,
+		 DRIVER_MAJOR,
+		 DRIVER_MINOR,
+		 DRIVER_PATCHLEVEL,
+		 DRIVER_DATE, dev->primary.minor, pci_pretty_name(dev->pdev)
+	    );
 	return 0;
 }
 
-static int version( drm_version_t *version )
+static int version(drm_version_t * version)
 {
 	int len;
 
 	version->version_major = DRIVER_MAJOR;
 	version->version_minor = DRIVER_MINOR;
 	version->version_patchlevel = DRIVER_PATCHLEVEL;
-	DRM_COPY( version->name, DRIVER_NAME );
-	DRM_COPY( version->date, DRIVER_DATE );
-	DRM_COPY( version->desc, DRIVER_DESC );
+	DRM_COPY(version->name, DRIVER_NAME);
+	DRM_COPY(version->date, DRIVER_DATE);
+	DRM_COPY(version->desc, DRIVER_DESC);
 	return 0;
+}
+
+static int dri_library_name(struct drm_device * dev, char * buf)
+{
+	drm_radeon_private_t *dev_priv = dev->dev_private;
+	int family = dev_priv->flags & CHIP_FAMILY_MASK;
+
+	return snprintf(buf, PAGE_SIZE, "%s\n",
+		(family < CHIP_R200) ? "radeon" :
+		((family < CHIP_R300) ? "r200" :
+ 		"r300"));
 }
 
 static struct pci_device_id pciidlist[] = {
@@ -72,15 +80,21 @@ static struct pci_device_id pciidlist[] = {
 extern drm_ioctl_desc_t radeon_ioctls[];
 extern int radeon_max_ioctl;
 
+static int probe(struct pci_dev *pdev, const struct pci_device_id *ent);
 static struct drm_driver driver = {
-	.driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG | DRIVER_HAVE_IRQ | DRIVER_HAVE_DMA | DRIVER_IRQ_SHARED | DRIVER_IRQ_VBL,
+	.driver_features =
+	    DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG |
+	    DRIVER_HAVE_IRQ | DRIVER_HAVE_DMA | DRIVER_IRQ_SHARED |
+	    DRIVER_IRQ_VBL,
 	.dev_priv_size = sizeof(drm_radeon_buf_priv_t),
-	.preinit = radeon_driver_preinit,
-	.postcleanup = radeon_driver_postcleanup,
+	.preinit = radeon_preinit,
+	.presetup = radeon_presetup,
+	.postcleanup = radeon_postcleanup,
 	.prerelease = radeon_driver_prerelease,
 	.pretakedown = radeon_driver_pretakedown,
 	.open_helper = radeon_driver_open_helper,
 	.vblank_wait = radeon_driver_vblank_wait,
+	.dri_library_name = dri_library_name,
 	.irq_preinstall = radeon_driver_irq_preinstall,
 	.irq_postinstall = radeon_driver_irq_postinstall,
 	.irq_uninstall = radeon_driver_irq_uninstall,
@@ -104,17 +118,24 @@ static struct drm_driver driver = {
 #ifdef CONFIG_COMPAT
 		.compat_ioctl = radeon_compat_ioctl,
 #endif
-	},
+		},
 	.pci_driver = {
-		.name          = DRIVER_NAME,
-		.id_table      = pciidlist,
+		.name = DRIVER_NAME,
+		.id_table = pciidlist,
+		.probe = probe,
+		.remove = __devexit_p(drm_cleanup_pci),
 	}
 };
+
+static int probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+{
+	return drm_get_dev(pdev, ent, &driver);
+}
 
 static int __init radeon_init(void)
 {
 	driver.num_ioctls = radeon_max_ioctl;
-	return drm_init(&driver);
+	return drm_init(&driver, pciidlist);
 }
 
 static void __exit radeon_exit(void)
@@ -125,6 +146,6 @@ static void __exit radeon_exit(void)
 module_init(radeon_init);
 module_exit(radeon_exit);
 
-MODULE_AUTHOR( DRIVER_AUTHOR );
-MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_AUTHOR(DRIVER_AUTHOR);
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL and additional rights");

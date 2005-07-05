@@ -28,7 +28,10 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE 
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: Various
+ * Authors: 
+ *    Tungsten Graphics, 
+ *    Erdi Chen, 
+ *    Thomas Hellstrom.
  */
 
 #include "drmP.h"
@@ -38,7 +41,7 @@
 #include "via_3d_reg.h"
 
 #define CMDBUF_ALIGNMENT_SIZE   (0x100)
-#define CMDBUF_ALIGNMENT_MASK   (0xff)
+#define CMDBUF_ALIGNMENT_MASK   (0x0ff)
 
 /* defines for VIA 3D registers */
 #define VIA_REG_STATUS          0x400
@@ -58,7 +61,7 @@
 	dev_priv->dma_low +=8;					\
 }
 
-#define via_flush_write_combine() DRM_MEMORYBARRIER()
+#define via_flush_write_combine() DRM_MEMORYBARRIER() 
 
 #define VIA_OUT_RING_QW(w1,w2)			\
 	*vb++ = (w1);				\
@@ -70,6 +73,9 @@ static void via_cmdbuf_pause(drm_via_private_t * dev_priv);
 static void via_cmdbuf_reset(drm_via_private_t * dev_priv);
 static void via_cmdbuf_rewind(drm_via_private_t * dev_priv);
 static int via_wait_idle(drm_via_private_t * dev_priv);
+static void via_pad_cache(drm_via_private_t *dev_priv, int qwords);
+
+
 /*
  * Free space in command buffer.
  */
@@ -182,6 +188,12 @@ static int via_initialize(drm_device_t * dev,
 		return DRM_ERR(EFAULT);
 	}
 
+	if (!dev->agp || !dev->agp->base) {
+		DRM_ERROR("%s called with no agp memory available\n", 
+			  __FUNCTION__);
+		return DRM_ERR(EFAULT);
+	}
+
 	dev_priv->ring.map.offset = dev->agp->base + init->offset;
 	dev_priv->ring.map.size = init->size;
 	dev_priv->ring.map.type = 0;
@@ -247,6 +259,8 @@ int via_dma_init(DRM_IOCTL_ARGS)
 	return retcode;
 }
 
+
+
 static int via_dispatch_cmdbuffer(drm_device_t * dev, drm_via_cmdbuffer_t * cmd)
 {
 	drm_via_private_t *dev_priv;
@@ -275,12 +289,13 @@ static int via_dispatch_cmdbuffer(drm_device_t * dev, drm_via_cmdbuffer_t * cmd)
 	 * copy it to AGP memory when ready.
 	 */
 
-	
+		
 	if ((ret = via_verify_command_stream((uint32_t *)dev_priv->pci_buf, cmd->size, dev, 1))) {
 		return ret;
 	}
        	
-	vb = via_check_dma(dev_priv, cmd->size);
+	
+	vb = via_check_dma(dev_priv, (cmd->size < 0x100) ? 0x102 : cmd->size);
 	if (vb == NULL) {
 		return DRM_ERR(EAGAIN);
 	}
@@ -288,6 +303,14 @@ static int via_dispatch_cmdbuffer(drm_device_t * dev, drm_via_cmdbuffer_t * cmd)
 	memcpy(vb, dev_priv->pci_buf, cmd->size);
 	
 	dev_priv->dma_low += cmd->size;
+
+	/*
+	 * Small submissions somehow stalls the CPU. (AGP cache effects?)
+	 * pad to greater size.
+	 */
+
+	if (cmd->size < 0x100)
+	  via_pad_cache(dev_priv,(0x100 - cmd->size) >> 3);
 	via_cmdbuf_pause(dev_priv);
 
 	return 0;
@@ -333,58 +356,8 @@ int via_cmdbuffer(DRM_IOCTL_ARGS)
 	return 0;
 }
 
-static int via_parse_pci_cmdbuffer(drm_device_t * dev, const char *buf,
-				   unsigned int size)
-{
-	drm_via_private_t *dev_priv = dev->dev_private;
-	const uint32_t *regbuf = (const uint32_t *) buf;
-	const uint32_t *regend = regbuf + (size >> 2);
-	const uint32_t *next_fire; 
-	int fire_count = 0;
-	int ret;
-	int check_2d_cmd = 1;
-
-
-
-	if ((ret = via_verify_command_stream(regbuf, size, dev, 0)))
-		return ret;
-
-	next_fire = dev_priv->fire_offsets[fire_count];
-	while (regbuf != regend) {	
-		if ( *regbuf == HALCYON_HEADER2 ) {
-		  
-			regbuf++;
-			check_2d_cmd = ( *regbuf != HALCYON_SUB_ADDR0 );
-			VIA_WRITE(HC_REG_TRANS_SET + HC_REG_BASE, *regbuf++);
-			
-		} else if ( check_2d_cmd && ((*regbuf & HALCYON_HEADER1MASK) == HALCYON_HEADER1 )) {
-
-			register uint32_t addr = ( (*regbuf++ ) & ~HALCYON_HEADER1MASK) << 2;
-			VIA_WRITE( addr, *regbuf++ );
-
-		} else if ( (fire_count < dev_priv->num_fire_offsets) && 
-			    (regbuf == next_fire) &&
-			    (( *regbuf & HALCYON_FIREMASK ) == HALCYON_FIRECMD) ) {
-
-			next_fire = dev_priv->fire_offsets[++fire_count];
-
-			VIA_WRITE(HC_REG_TRANS_SPACE + HC_REG_BASE, *regbuf++);
-
-			if ( ( regbuf != regend ) && 
-			     ((*regbuf & HALCYON_FIREMASK) == HALCYON_FIRECMD))
-				regbuf++;
-			if (( *regbuf & HALCYON_CMDBMASK ) != HC_ACMD_HCmdB )
-				check_2d_cmd = 1;
-		} else {
-
-			VIA_WRITE(HC_REG_TRANS_SPACE + HC_REG_BASE , *regbuf++);
-
-		}
-	} 
-	return 0;
-
-}
-
+extern int 
+via_parse_command_stream(drm_device_t *dev, const uint32_t * buf, unsigned int size);
 static int via_dispatch_pci_cmdbuffer(drm_device_t * dev,
 				      drm_via_cmdbuffer_t * cmd)
 {
@@ -396,7 +369,12 @@ static int via_dispatch_pci_cmdbuffer(drm_device_t * dev,
 	} 
 	if (DRM_COPY_FROM_USER(dev_priv->pci_buf, cmd->buf, cmd->size))
 		return DRM_ERR(EFAULT);
-	ret = via_parse_pci_cmdbuffer(dev, dev_priv->pci_buf, cmd->size);
+	
+	if ((ret = via_verify_command_stream((uint32_t *)dev_priv->pci_buf, cmd->size, dev, 0))) {
+		return ret;
+	}
+	
+	ret = via_parse_command_stream(dev, (const uint32_t *)dev_priv->pci_buf, cmd->size);
 	return ret;
 }
 
@@ -426,7 +404,7 @@ int via_pci_cmdbuffer(DRM_IOCTL_ARGS)
 static inline uint32_t *via_align_buffer(drm_via_private_t * dev_priv,
 					 uint32_t * vb, int qw_count)
 {
-	for (; qw_count > 0; --qw_count) {
+        for (; qw_count > 0; --qw_count) {
 		VIA_OUT_RING_QW(HC_DUMMY, HC_DUMMY);
 	}
 	return vb;
@@ -595,6 +573,16 @@ static void via_cmdbuf_start(drm_via_private_t * dev_priv)
 	VIA_WRITE(VIA_REG_TRANSPACE, pause_addr_lo);
 
 	VIA_WRITE(VIA_REG_TRANSPACE, command | HC_HAGPCMNT_MASK);
+}
+
+static void via_pad_cache(drm_via_private_t *dev_priv, int qwords)
+{
+	uint32_t *vb;
+
+	via_cmdbuf_wait(dev_priv, qwords + 2);
+	vb = via_get_dma(dev_priv);
+	VIA_OUT_RING_QW( HC_HEADER2, HC_ParaType_NotTex << 16);
+	via_align_buffer(dev_priv,vb,qwords);
 }
 
 static inline void via_dummy_bitblt(drm_via_private_t * dev_priv)

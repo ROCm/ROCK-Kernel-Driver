@@ -36,30 +36,28 @@
 
 #include "drm_pciids.h"
 
-static int postinit( struct drm_device *dev, unsigned long flags )
+static int postinit(struct drm_device *dev, unsigned long flags)
 {
-	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d: %s\n",
-		DRIVER_NAME,
-		DRIVER_MAJOR,
-		DRIVER_MINOR,
-		DRIVER_PATCHLEVEL,
-		DRIVER_DATE,
-		dev->primary.minor,
-		pci_pretty_name(dev->pdev)
-		);
+	DRM_INFO("Initialized %s %d.%d.%d %s on minor %d: %s\n",
+		 DRIVER_NAME,
+		 DRIVER_MAJOR,
+		 DRIVER_MINOR,
+		 DRIVER_PATCHLEVEL,
+		 DRIVER_DATE, dev->primary.minor, pci_pretty_name(dev->pdev)
+	    );
 	return 0;
 }
 
-static int version( drm_version_t *version )
+static int version(drm_version_t * version)
 {
 	int len;
 
 	version->version_major = DRIVER_MAJOR;
 	version->version_minor = DRIVER_MINOR;
 	version->version_patchlevel = DRIVER_PATCHLEVEL;
-	DRM_COPY( version->name, DRIVER_NAME );
-	DRM_COPY( version->date, DRIVER_DATE );
-	DRM_COPY( version->desc, DRIVER_DESC );
+	DRM_COPY(version->name, DRIVER_NAME);
+	DRM_COPY(version->date, DRIVER_DATE);
+	DRM_COPY(version->desc, DRIVER_DESC);
 	return 0;
 }
 
@@ -67,6 +65,7 @@ static struct pci_device_id pciidlist[] = {
 	tdfx_PCI_IDS
 };
 
+static int probe(struct pci_dev *pdev, const struct pci_device_id *ent);
 static struct drm_driver driver = {
 	.driver_features = DRIVER_USE_MTRR,
 	.reclaim_buffers = drm_core_reclaim_buffers,
@@ -82,16 +81,24 @@ static struct drm_driver driver = {
 		.mmap = drm_mmap,
 		.poll = drm_poll,
 		.fasync = drm_fasync,
-	},
+		},
 	.pci_driver = {
-		.name          = DRIVER_NAME,
-		.id_table      = pciidlist,
+		.name = DRIVER_NAME,
+		.id_table = pciidlist,
+		.probe = probe,
+		.remove = __devexit_p(drm_cleanup_pci),
 	}
 };
 
+static int probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+{
+	return drm_get_dev(pdev, ent, &driver);
+}
+
+
 static int __init tdfx_init(void)
 {
-	return drm_init(&driver);
+	return drm_init(&driver, pciidlist);
 }
 
 static void __exit tdfx_exit(void)
@@ -102,6 +109,6 @@ static void __exit tdfx_exit(void)
 module_init(tdfx_init);
 module_exit(tdfx_exit);
 
-MODULE_AUTHOR( DRIVER_AUTHOR );
-MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_AUTHOR(DRIVER_AUTHOR);
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL and additional rights");

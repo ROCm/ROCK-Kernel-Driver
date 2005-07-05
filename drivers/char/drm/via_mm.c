@@ -135,9 +135,7 @@ int via_init_context(struct drm_device *dev, int context)
 int via_final_context(struct drm_device *dev, int context)
 {	
         int i;
-	volatile int *lock;
 	drm_via_private_t *dev_priv = (drm_via_private_t *) dev->dev_private;
-	drm_via_sarea_t *sAPriv = dev_priv->sarea_priv;
 
 	for (i = 0; i < MAX_CONTEXT; i++)
 		if (global_ppriv[i].used &&
@@ -146,7 +144,7 @@ int via_final_context(struct drm_device *dev, int context)
 
 	if (i < MAX_CONTEXT) {
 		set_t *set;
-		unsigned int item;
+		ITEM_TYPE item;
 		int retval;
 
 		DRM_DEBUG("find socket %d, context = %d\n", i, context);
@@ -155,7 +153,7 @@ int via_final_context(struct drm_device *dev, int context)
 		set = global_ppriv[i].sets[0];
 		retval = via_setFirst(set, &item);
 		while (retval) {
-			DRM_DEBUG("free video memory 0x%x\n", item);
+			DRM_DEBUG("free video memory 0x%lx\n", item);
 			via_mmFreeMem((PMemBlock) item);
 			retval = via_setNext(set, &item);
 		}
@@ -165,28 +163,15 @@ int via_final_context(struct drm_device *dev, int context)
 		set = global_ppriv[i].sets[1];
 		retval = via_setFirst(set, &item);
 		while (retval) {
-			DRM_DEBUG("free agp memory 0x%x\n", item);
+			DRM_DEBUG("free agp memory 0x%lx\n", item);
 			via_mmFreeMem((PMemBlock) item);
 			retval = via_setNext(set, &item);
 		}
 		via_setDestroy(set);
-
 		global_ppriv[i].used = 0;
 	}
+	via_release_futex(dev_priv, context); 
 	
-	/*
-	 * Release futex locks.
-	 */ 
-
-	for (i=0; i < VIA_NR_XVMC_LOCKS; ++i) {
-	        lock = (int *) XVMCLOCKPTR(sAPriv, i);
-		if ( (_DRM_LOCKING_CONTEXT( *lock ) == context)) {
-			if (_DRM_LOCK_IS_HELD( *lock ) && (*lock & _DRM_LOCK_CONT)) {
-				DRM_WAKEUP( &(dev_priv->decoder_queue[i]));
-			}
-			*lock = 0;
-		}
-	}
 			
 #if defined(__linux__)
 	/* Linux specific until context tracking code gets ported to BSD */
@@ -196,6 +181,7 @@ int via_final_context(struct drm_device *dev, int context)
 		if (dev->irq)
 			drm_irq_uninstall(dev);
 
+		via_cleanup_futex(dev_priv);
 		via_do_cleanup_map(dev);
 	}
 #endif
@@ -208,6 +194,7 @@ int via_mem_alloc(DRM_IOCTL_ARGS)
 	drm_via_mem_t mem;
 
 	DRM_COPY_FROM_USER_IOCTL(mem, (drm_via_mem_t *) data, sizeof(mem));
+
 	switch (mem.type) {
 	case VIDEO:
 		if (via_fb_alloc(&mem) < 0)
@@ -241,7 +228,7 @@ static int via_fb_alloc(drm_via_mem_t * mem)
 	block = via_mmAllocMem(FBHeap, fb.size, 5, 0);
 	if (block) {
 		fb.offset = block->ofs;
-		fb.free = (unsigned int)block;
+		fb.free = (unsigned long)block;
 		if (!add_alloc_set(fb.context, VIDEO, fb.free)) {
 			DRM_DEBUG("adding to allocation set fails\n");
 			via_mmFreeMem((PMemBlock) fb.free);
@@ -278,7 +265,7 @@ static int via_agp_alloc(drm_via_mem_t * mem)
 	block = via_mmAllocMem(AgpHeap, agp.size, 5, 0);
 	if (block) {
 		agp.offset = block->ofs;
-		agp.free = (unsigned int)block;
+		agp.free = (unsigned long)block;
 		if (!add_alloc_set(agp.context, AGP, agp.free)) {
 			DRM_DEBUG("adding to allocation set fails\n");
 			via_mmFreeMem((PMemBlock) agp.free);
@@ -342,7 +329,7 @@ static int via_fb_free(drm_via_mem_t * mem)
 		retval = -1;
 	}
 
-	DRM_DEBUG("free fb, free = %d\n", fb.free);
+	DRM_DEBUG("free fb, free = %ld\n", fb.free);
 
 	return retval;
 }
@@ -365,7 +352,7 @@ static int via_agp_free(drm_via_mem_t * mem)
 		retval = -1;
 	}
 
-	DRM_DEBUG("free agp, free = %d\n", agp.free);
+	DRM_DEBUG("free agp, free = %ld\n", agp.free);
 
 	return retval;
 }
