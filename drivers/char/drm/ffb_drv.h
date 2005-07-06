@@ -1,4 +1,4 @@
-/* $Id: ffb_drv.h,v 1.5 2004/09/30 21:27:59 jonsmirl Exp $
+/* $Id: ffb_drv.h,v 1.1 2000/06/01 04:24:39 davem Exp $
  * ffb_drv.h: Creator/Creator3D direct rendering driver.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
@@ -78,11 +78,11 @@ typedef struct _ffb_fbc {
 						/*			fastfill(NX)	*/
 /*0x78*/unsigned int		pad6[2];	/* Reserved				*/
 /*0x80*/unsigned int		pad7[32];	/* Reserved				*/
-
+	
 	/* Setup Unit's vertex state register */
 /*100*/	volatile unsigned int	suvtx;
 /*104*/	unsigned int		pad8[63];	/* Reserved				*/
-
+	
 	/* Frame Buffer Control Registers */
 /*200*/	volatile unsigned int	ppc;		/* Pixel Processor Control		*/
 /*204*/	volatile unsigned int	wid;		/* Current WID				*/
@@ -125,7 +125,7 @@ typedef struct _ffb_fbc {
 /*298*/	volatile unsigned int	ypmask;		/* Y PlaneMask				*/
 /*29c*/	volatile unsigned int	zpmask;		/* Z PlaneMask				*/
 /*2a0*/	ffb_auxclip		auxclip[4]; 	/* Auxilliary Viewport Clip		*/
-
+	
 	/* New 3dRAM III support regs */
 /*2c0*/	volatile unsigned int	rawblend2;
 /*2c4*/	volatile unsigned int	rawpreblend;
@@ -143,7 +143,7 @@ typedef struct _ffb_fbc {
 /*2f4*/	volatile unsigned int	rawcmp;
 /*2f8*/	volatile unsigned int	rawwac;
 /*2fc*/	volatile unsigned int	fbramid;
-
+	
 /*300*/	volatile unsigned int	drawop;		/* Draw OPeration			*/
 /*304*/	unsigned int		pad10[2];	/* Reserved				*/
 /*30c*/	volatile unsigned int	lpat;		/* Line Pattern control			*/
@@ -280,5 +280,7 @@ extern unsigned long ffb_get_unmapped_area(struct file *filp,
 					   unsigned long len,
 					   unsigned long pgoff,
 					   unsigned long flags);
-extern unsigned long ffb_driver_get_map_ofs(drm_map_t *map)
-extern unsigned long ffb_driver_get_reg_ofs(drm_device_t *dev)
+extern void ffb_set_context_ioctls(void);
+extern drm_ioctl_desc_t DRM(ioctls)[];
+
+extern int ffb_driver_context_switch(drm_device_t *dev, int old, int new);

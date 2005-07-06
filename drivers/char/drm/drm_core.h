@@ -1,7 +1,5 @@
 /*
  * Copyright 2004 Jon Smirl <jonsmirl@gmail.com>
- * Copyright 1998-2003 VIA Technologies, Inc. All Rights Reserved.
- * Copyright 2001-2003 S3 Graphics, Inc. All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,7 +20,6 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-
 #define CORE_AUTHOR		"Gareth Hughes, Leif Delgass, José Fonseca, Jon Smirl"
 
 #define CORE_NAME		"drm"

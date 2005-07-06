@@ -1,12 +1,12 @@
-/**
- * \file drm_memory.h
+/** 
+ * \file drm_memory.h 
  * Memory management wrappers for DRM
  *
  * \author Rickard E. (Rik) Faith <faith@valinux.com>
  * \author Gareth Hughes <gareth@valinux.com>
  */
 
-/*
+/* 
  * Created: Thu Feb  4 14:00:34 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
@@ -35,15 +35,15 @@
 
 #include <linux/config.h>
 #include <linux/highmem.h>
+#include <linux/vmalloc.h>
 #include "drmP.h"
 
 /**
  * Cut down version of drm_memory_debug.h, which used to be called
- * drm_memory.h.
+ * drm_memory.h.  
  */
 
-/* Need the 4-argument version of vmap().  */
-#if __OS_HAS_AGP && defined(VMAP_4_ARGS)
+#if __OS_HAS_AGP
 
 #include <linux/vmalloc.h>
 
@@ -57,23 +57,11 @@
 # endif
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-#ifndef pte_offset_kernel
-# define pte_offset_kernel(dir, address)	pte_offset(dir, address)
-#endif
-#ifndef pte_pfn
-# define pte_pfn(pte)				(pte_page(pte) - mem_map)
-#endif
-#ifndef pfn_to_page
-# define pfn_to_page(pfn)			(mem_map + (pfn))
-#endif
-#endif
-
 /*
  * Find the drm_map that covers the range [offset, offset+size).
  */
-static inline drm_map_t *drm_lookup_map(unsigned long offset,
-					unsigned long size, drm_device_t * dev)
+static inline drm_map_t *
+drm_lookup_map (unsigned long offset, unsigned long size, drm_device_t *dev)
 {
 	struct list_head *list;
 	drm_map_list_t *r_list;
@@ -84,18 +72,16 @@ static inline drm_map_t *drm_lookup_map(unsigned long offset,
 		map = r_list->map;
 		if (!map)
 			continue;
-		if (map->offset <= offset
-		    && (offset + size) <= (map->offset + map->size))
+		if (map->offset <= offset && (offset + size) <= (map->offset + map->size))
 			return map;
 	}
 	return NULL;
 }
 
-static inline void *agp_remap(unsigned long offset, unsigned long size,
-			      drm_device_t * dev)
+static inline void *
+agp_remap (unsigned long offset, unsigned long size, drm_device_t *dev)
 {
-	unsigned long *phys_addr_map, i, num_pages =
-	    PAGE_ALIGN(size) / PAGE_SIZE;
+	unsigned long *phys_addr_map, i, num_pages = PAGE_ALIGN(size) / PAGE_SIZE;
 	struct drm_agp_mem *agpmem;
 	struct page **page_map;
 	void *addr;
@@ -108,8 +94,7 @@ static inline void *agp_remap(unsigned long offset, unsigned long size,
 
 	for (agpmem = dev->agp->memory; agpmem; agpmem = agpmem->next)
 		if (agpmem->bound <= offset
-		    && (agpmem->bound + (agpmem->pages << PAGE_SHIFT)) >=
-		    (offset + size))
+		    && (agpmem->bound + (agpmem->pages << PAGE_SHIFT)) >= (offset + size))
 			break;
 	if (!agpmem)
 		return NULL;
@@ -124,8 +109,7 @@ static inline void *agp_remap(unsigned long offset, unsigned long size,
 	if (!page_map)
 		return NULL;
 
-	phys_addr_map =
-	    agpmem->memory->memory + (offset - agpmem->bound) / PAGE_SIZE;
+	phys_addr_map = agpmem->memory->memory + (offset - agpmem->bound) / PAGE_SIZE;
 	for (i = 0; i < num_pages; ++i)
 		page_map[i] = pfn_to_page(phys_addr_map[i] >> PAGE_SHIFT);
 	addr = vmap(page_map, num_pages, VM_IOREMAP, PAGE_AGP);
@@ -134,100 +118,80 @@ static inline void *agp_remap(unsigned long offset, unsigned long size,
 	return addr;
 }
 
-static inline unsigned long drm_follow_page(void *vaddr)
+static inline unsigned long
+drm_follow_page (void *vaddr)
 {
 	pgd_t *pgd = pgd_offset_k((unsigned long) vaddr);
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,10)
-	pmd_t *pmd = pmd_offset(pgd, (unsigned long)vaddr);
-#else
 	pud_t *pud = pud_offset(pgd, (unsigned long) vaddr);
 	pmd_t *pmd = pmd_offset(pud, (unsigned long) vaddr);
-#endif
 	pte_t *ptep = pte_offset_kernel(pmd, (unsigned long) vaddr);
 	return pte_pfn(*ptep) << PAGE_SHIFT;
 }
 
-#else				/* __OS_HAS_AGP */
+#else /* __OS_HAS_AGP */
 
-static inline drm_map_t *drm_lookup_map(unsigned long offset,
-					unsigned long size, drm_device_t * dev)
+static inline drm_map_t *drm_lookup_map(unsigned long offset, unsigned long size, drm_device_t *dev)
 {
-	return NULL;
+  return NULL;
 }
 
-static inline void *agp_remap(unsigned long offset, unsigned long size,
-			      drm_device_t * dev)
+static inline void *agp_remap(unsigned long offset, unsigned long size, drm_device_t *dev)
 {
-	return NULL;
+  return NULL;
 }
 
-static inline unsigned long drm_follow_page(void *vaddr)
+static inline unsigned long drm_follow_page (void *vaddr)
 {
-	return 0;
+  return 0;
 }
+
 #endif
 
-#ifndef DEBUG_MEMORY
-static inline void *drm_ioremap(unsigned long offset, unsigned long size,
-				drm_device_t * dev)
+static inline void *drm_ioremap(unsigned long offset, unsigned long size, drm_device_t *dev)
 {
-#if defined(VMAP_4_ARGS)
 	if (drm_core_has_AGP(dev) && dev->agp && dev->agp->cant_use_aperture) {
 		drm_map_t *map = drm_lookup_map(offset, size, dev);
 
 		if (map && map->type == _DRM_AGP)
 			return agp_remap(offset, size, dev);
 	}
-#endif
-
 	return ioremap(offset, size);
 }
 
-static inline void *drm_ioremap_nocache(unsigned long offset,
-					unsigned long size, drm_device_t * dev)
+static inline void *drm_ioremap_nocache(unsigned long offset, unsigned long size,
+					drm_device_t *dev)
 {
-#if defined(VMAP_4_ARGS)
 	if (drm_core_has_AGP(dev) && dev->agp && dev->agp->cant_use_aperture) {
 		drm_map_t *map = drm_lookup_map(offset, size, dev);
 
 		if (map && map->type == _DRM_AGP)
 			return agp_remap(offset, size, dev);
 	}
-#endif
-
 	return ioremap_nocache(offset, size);
 }
 
-static inline void drm_ioremapfree(void *pt, unsigned long size,
-				   drm_device_t * dev)
+static inline void drm_ioremapfree(void *pt, unsigned long size, drm_device_t *dev)
 {
-#if defined(VMAP_4_ARGS)
 	/*
 	 * This is a bit ugly.  It would be much cleaner if the DRM API would use separate
 	 * routines for handling mappings in the AGP space.  Hopefully this can be done in
 	 * a future revision of the interface...
 	 */
 	if (drm_core_has_AGP(dev) && dev->agp && dev->agp->cant_use_aperture
-	    && ((unsigned long)pt >= VMALLOC_START
-		&& (unsigned long)pt < VMALLOC_END)) {
+	    && ((unsigned long) pt >= VMALLOC_START && (unsigned long) pt < VMALLOC_END))
+	{
 		unsigned long offset;
 		drm_map_t *map;
 
-		offset = drm_follow_page(pt) | ((unsigned long)pt & ~PAGE_MASK);
+		offset = drm_follow_page(pt) | ((unsigned long) pt & ~PAGE_MASK);
 		map = drm_lookup_map(offset, size, dev);
 		if (map && map->type == _DRM_AGP) {
 			vunmap(pt);
 			return;
 		}
 	}
-#endif
+
 	iounmap(pt);
 }
-#else
-extern void *drm_ioremap(unsigned long offset, unsigned long size,
-				drm_device_t * dev);
-extern void *drm_ioremap_nocache(unsigned long offset,
-					unsigned long size, drm_device_t * dev);
-extern void drm_ioremapfree(void *pt, unsigned long size,
-				   drm_device_t * dev);
-#endif
+
+

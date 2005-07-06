@@ -23,6 +23,13 @@ config DRM_TDFX
 	  Choose this option if you have a 3dfx Banshee or Voodoo3 (or later),
 	  graphics card.  If M is selected, the module will be called tdfx.
 
+config DRM_GAMMA
+	tristate "3dlabs GMX 2000"
+	depends on DRM && BROKEN
+	help
+	  This is the old gamma driver, please tell me if it might actually
+	  work.
+
 config DRM_R128
 	tristate "ATI Rage 128"
 	depends on DRM && PCI
@@ -75,17 +82,19 @@ endchoice
 
 config DRM_MGA
 	tristate "Matrox g200/g400"
-	depends on DRM && (!X86_64 || BROKEN) && (!PPC || BROKEN)
+	depends on DRM && AGP
 	help
-	  Choose this option if you have a Matrox G200, G400, G450 or G550
-	  graphics card.  If M is selected, the module will be called mga.
+	  Choose this option if you have a Matrox G200, G400 or G450 graphics
+	  card.  If M is selected, the module will be called mga.  AGP
+	  support is required for this driver to work.
 
 config DRM_SIS
 	tristate "SiS video cards"
-	depends on DRM
+	depends on DRM && AGP
 	help
 	  Choose this option if you have a SiS 630 or compatible video 
-	  chipset. If M is selected the module will be called sis.
+          chipset. If M is selected the module will be called sis. AGP
+          support is required for this driver to work.
 
 config DRM_VIA
 	tristate "Via unichrome video cards"

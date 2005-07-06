@@ -38,7 +38,7 @@
 
 #include "drm_pciids.h"
 
-static int postinit(struct drm_device *dev, unsigned long flags)
+static int postinit( struct drm_device *dev, unsigned long flags )
 {
 	/* i810 has 4 more counters */
 	dev->counters += 4;
@@ -46,33 +46,30 @@ static int postinit(struct drm_device *dev, unsigned long flags)
 	dev->types[7] = _DRM_STAT_PRIMARY;
 	dev->types[8] = _DRM_STAT_SECONDARY;
 	dev->types[9] = _DRM_STAT_DMA;
-
-	DRM_INFO("Initialized %s %d.%d.%d %s on minor %d: %s\n",
-		 DRIVER_NAME,
-		 DRIVER_MAJOR,
-		 DRIVER_MINOR,
-		 DRIVER_PATCHLEVEL,
-		 DRIVER_DATE, dev->primary.minor, pci_pretty_name(dev->pdev)
-	    );
+	
+	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d: %s\n",
+		DRIVER_NAME,
+		DRIVER_MAJOR,
+		DRIVER_MINOR,
+		DRIVER_PATCHLEVEL,
+		DRIVER_DATE,
+		dev->primary.minor,
+		pci_pretty_name(dev->pdev)
+		);
 	return 0;
 }
 
-static int version(drm_version_t * version)
+static int version( drm_version_t *version )
 {
 	int len;
 
 	version->version_major = DRIVER_MAJOR;
 	version->version_minor = DRIVER_MINOR;
 	version->version_patchlevel = DRIVER_PATCHLEVEL;
-	DRM_COPY(version->name, DRIVER_NAME);
-	DRM_COPY(version->date, DRIVER_DATE);
-	DRM_COPY(version->desc, DRIVER_DESC);
+	DRM_COPY( version->name, DRIVER_NAME );
+	DRM_COPY( version->date, DRIVER_DATE );
+	DRM_COPY( version->desc, DRIVER_DESC );
 	return 0;
-}
-
-static int dri_library_name(struct drm_device * dev, char * buf)
-{
-	return snprintf(buf, PAGE_SIZE, "i830\n");
 }
 
 static struct pci_device_id pciidlist[] = {
@@ -82,20 +79,16 @@ static struct pci_device_id pciidlist[] = {
 extern drm_ioctl_desc_t i810_ioctls[];
 extern int i810_max_ioctl;
 
-static int probe(struct pci_dev *pdev, const struct pci_device_id *ent);
 static struct drm_driver driver = {
-	.driver_features =
-	    DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR |
-	    DRIVER_HAVE_DMA | DRIVER_DMA_QUEUE,
+	.driver_features = DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_DMA | DRIVER_DMA_QUEUE,
 	.dev_priv_size = sizeof(drm_i810_buf_priv_t),
 	.pretakedown = i810_driver_pretakedown,
 	.prerelease = i810_driver_prerelease,
-	.device_is_agp = i810_driver_device_is_agp,
 	.release = i810_driver_release,
 	.dma_quiescent = i810_driver_dma_quiescent,
+	.reclaim_buffers = i810_reclaim_buffers,
 	.get_map_ofs = drm_core_get_map_ofs,
 	.get_reg_ofs = drm_core_get_reg_ofs,
-	.dri_library_name = dri_library_name,
 	.postinit = postinit,
 	.version = version,
 	.ioctls = i810_ioctls,
@@ -107,24 +100,17 @@ static struct drm_driver driver = {
 		.mmap = drm_mmap,
 		.poll = drm_poll,
 		.fasync = drm_fasync,
-		},
+	},
 	.pci_driver = {
-		.name = DRIVER_NAME,
-		.id_table = pciidlist,
-		.probe = probe,
-		.remove = __devexit_p(drm_cleanup_pci),
-		}
+		.name          = DRIVER_NAME,
+		.id_table      = pciidlist,
+	},
 };
-
-static int probe(struct pci_dev *pdev, const struct pci_device_id *ent)
-{
-	return drm_get_dev(pdev, ent, &driver);
-}
 
 static int __init i810_init(void)
 {
 	driver.num_ioctls = i810_max_ioctl;
-	return drm_init(&driver, pciidlist);
+	return drm_init(&driver);
 }
 
 static void __exit i810_exit(void)
@@ -135,6 +121,6 @@ static void __exit i810_exit(void)
 module_init(i810_init);
 module_exit(i810_exit);
 
-MODULE_AUTHOR(DRIVER_AUTHOR);
-MODULE_DESCRIPTION(DRIVER_DESC);
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL and additional rights");

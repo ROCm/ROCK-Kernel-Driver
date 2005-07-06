@@ -1,18 +1,20 @@
-/* $Id: ffb_drv.c,v 1.13 2004/10/13 16:40:53 jonsmirl Exp $
+/* $Id: ffb_drv.c,v 1.16 2001/10/18 16:00:24 davem Exp $
  * ffb_drv.c: Creator/Creator3D direct rendering driver.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
  */
 
 #include <linux/config.h>
+#include "ffb.h"
+#include "drmP.h"
+
+#include "ffb_drv.h"
+
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
 #include <asm/shmparam.h>
 #include <asm/oplib.h>
 #include <asm/upa.h>
-
-#include "drmP.h"
-#include "ffb_drv.h"
 
 #define DRIVER_AUTHOR		"David S. Miller"
 
@@ -84,7 +86,7 @@ static void get_ffb_type(ffb_dev_priv_t *ffb_priv, int instance)
 	};
 }
 
-static void ffb_apply_upa_parent_ranges(int parent,
+static void ffb_apply_upa_parent_ranges(int parent, 
 					struct linux_prom64_registers *regs)
 {
 	struct linux_prom64_ranges ranges[PROMREG_MAX];
@@ -134,35 +136,8 @@ static int ffb_init_one(drm_device_t *dev, int prom_node, int parent_node,
 	get_ffb_type(ffb_priv, instance);
 	for (i = 0; i < FFB_MAX_CTXS; i++)
 		ffb_priv->hw_state[i] = NULL;
-
+	
 	return 0;
-}
-
-static int __init ffb_count_siblings(int root)
-{
-	int node, child, count = 0;
-
-	child = prom_getchild(root);
-	for (node = prom_searchsiblings(child, "SUNW,ffb"); node;
-	     node = prom_searchsiblings(prom_getsibling(node), "SUNW,ffb"))
-		count++;
-
-	return count;
-}
-
-static int __init ffb_scan_siblings(int root, int instance)
-{
-	int node, child;
-
-	child = prom_getchild(root);
-	for (node = prom_searchsiblings(child, "SUNW,ffb"); node;
-	     node = prom_searchsiblings(prom_getsibling(node), "SUNW,ffb")) {
-		ffb_position[instance].node = node;
-		ffb_position[instance].root = root;
-		instance++;
-	}
-
-	return instance;
 }
 
 static drm_map_t *ffb_find_map(struct file *filp, unsigned long off)
@@ -235,30 +210,17 @@ unsigned long ffb_get_unmapped_area(struct file *filp,
 	return addr;
 }
 
-/* This functions must be here since it references drm_numdevs)
- * which drm_drv.h declares.
- */
-int ffb_presetup(drm_device_t *dev)
+static int ffb_presetup(drm_device_t *dev)
 {
 	ffb_dev_priv_t	*ffb_priv;
-	drm_device_t *temp_dev;
 	int ret = 0;
-	int i;
+	int i = 0;
 
 	/* Check for the case where no device was found. */
 	if (ffb_position == NULL)
 		return -ENODEV;
 
-	/* Find our instance number by finding our device in dev structure */
-	for (i = 0; i < drm_numdevs; i++) {
-		temp_dev = &(drm_device[i]);
-		if(temp_dev == dev)
-			break;
-	}
-
-	if (i == drm_numdevs)
-		return -ENODEV;
-
+	/* code used to use numdevs no numdevs anymore */
 	ffb_priv = kmalloc(sizeof(ffb_dev_priv_t), GFP_KERNEL);
 	if (!ffb_priv)
 		return -ENOMEM;
@@ -272,18 +234,73 @@ int ffb_presetup(drm_device_t *dev)
 	return ret;
 }
 
-#include "drm_pciids.h"
-
-static int postinit( struct drm_device *dev, unsigned long flags )
+static void ffb_driver_release(drm_device_t *dev, struct file *filp)
 {
-	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d: %s\n",
+	ffb_dev_priv_t *fpriv = (ffb_dev_priv_t *) dev->dev_private;
+	int context = _DRM_LOCKING_CONTEXT(dev->lock.hw_lock->lock);
+	int idx;
+
+	idx = context - 1;
+	if (fpriv &&
+	    context != DRM_KERNEL_CONTEXT &&
+	    fpriv->hw_state[idx] != NULL) {
+		kfree(fpriv->hw_state[idx]);
+		fpriv->hw_state[idx] = NULL;
+	}	
+}
+
+static void ffb_driver_pretakedown(drm_device_t *dev)
+{
+	if (dev->dev_private) kfree(dev->dev_private);
+}
+
+static int ffb_driver_postcleanup(drm_device_t *dev)
+{
+	if (ffb_position != NULL) kfree(ffb_position);
+	return 0;
+}
+
+static void ffb_driver_kernel_context_switch_unlock(struct drm_device *dev, drm_lock_t *lock)
+{
+	dev->lock.filp = 0;
+	{
+		__volatile__ unsigned int *plock = &dev->lock.hw_lock->lock;
+		unsigned int old, new, prev, ctx;
+		
+		ctx = lock->context;
+		do {
+			old  = *plock;
+			new  = ctx;
+			prev = cmpxchg(plock, old, new);
+		} while (prev != old);
+	}
+	wake_up_interruptible(&dev->lock.lock_queue);
+}
+
+static unsigned long ffb_driver_get_map_ofs(drm_map_t *map)
+{
+	return (map->offset & 0xffffffff);
+}
+
+static unsigned long ffb_driver_get_reg_ofs(drm_device_t *dev)
+{
+       ffb_dev_priv_t *ffb_priv = (ffb_dev_priv_t *)dev->dev_private;
+       
+       if (ffb_priv)
+               return ffb_priv->card_phys_base;
+       
+       return 0;
+}
+
+static int postinit( struct drm_device *dev, unsigned long flags ) 
+{
+	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d\n",
 		DRIVER_NAME,
 		DRIVER_MAJOR,
 		DRIVER_MINOR,
 		DRIVER_PATCHLEVEL,
 		DRIVER_DATE,
-		dev->minor,
-		pci_pretty_name(pdev)
+		dev->minor
 		);
 	return 0;
 }
@@ -301,58 +318,47 @@ static int version( drm_version_t *version )
 	return 0;
 }
 
-static struct pci_device_id pciidlist[] = {
-	ffb_PCI_IDS
+static drm_ioctl_desc_t ioctls[] = {
+	
 };
 
-static struct drm_driver ffb_driver = {
+static struct drm_driver driver = {
+	.driver_features = 0,
+	.dev_priv_size = sizeof(u32),
 	.release = ffb_driver_release,
-	.presetup = ffb_driver_presetup,
+	.presetup = ffb_presetup,
 	.pretakedown = ffb_driver_pretakedown,
 	.postcleanup = ffb_driver_postcleanup,
-	.kernel_context_switch = ffb_context_switch,
+	.kernel_context_switch = ffb_driver_context_switch,
 	.kernel_context_switch_unlock = ffb_driver_kernel_context_switch_unlock,
 	.get_map_ofs = ffb_driver_get_map_ofs,
 	.get_reg_ofs = ffb_driver_get_reg_ofs,
-	.reclaim_buffers = drm_core_reclaim_buffers,
 	.postinit = postinit,
 	.version = version,
-	fops = {
-		.owner   = THIS_MODULE,
-		.open	 = drm_open,
+	.ioctls = ioctls,
+	.num_ioctls = DRM_ARRAY_SIZE(ioctls),
+	.fops = {
+		.owner = THIS_MODULE,
+		.open = drm_open,
 		.release = drm_release,
-		.ioctl	 = drm_ioctl,
-		.mmap	 = drm_mmap,
-		.fasync  = drm_fasync,
-		.poll    = drm_poll,
-		.get_unmapped_area = ffb_get_unmapped_area,
+		.ioctl = drm_ioctl,
+		.mmap = drm_mmap,
+		.poll = drm_poll,
+		.fasync = drm_fasync,
 	},
-};
-
-static int probe(struct pci_dev *pdev, const struct pci_device_id *ent)
-{
-	return drm_probe(pdev, ent, &driver);
-}
-
-static struct pci_driver pci_driver = {
-	.name          = DRIVER_NAME,
-	.id_table      = pciidlist,
-	.probe         = probe,
-	.remove        = __devexit_p(drm_cleanup_pci),
 };
 
 static int __init ffb_init(void)
 {
-	return drm_init(&pci_driver, pciidlist, &driver);
+	return -ENODEV;
 }
 
 static void __exit ffb_exit(void)
 {
-	drm_exit(&pci_driver);
 }
 
 module_init(ffb_init);
-module_exit(ffb_exit));
+module_exit(ffb_exit);
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
