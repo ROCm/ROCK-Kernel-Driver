@@ -103,15 +103,4 @@ config DRM_VIA
 	  Choose this option if you have a Via unichrome or compatible video 
 	  chipset. If M is selected the module will be called via.
 
-config DRM_MACH64
-	tristate "ATI Rage Pro (Mach64)"
-	depends on DRM && PCI
-	help
-	  Choose this option if you have an ATI Rage Pro (mach64 chipset)
-	  graphics card.  Example cards include:  3D Rage Pro, Xpert 98,
-	  3D Rage LT Pro, 3D Rage XL/XC, and 3D Rage Mobility (P/M, M1).
-	  Cards earlier than ATI Rage Pro (e.g. Rage II) are not supported.
-	  If M is selected, the module will be called mach64.  AGP support for
-	  this card is strongly suggested (unless you have a PCI version).
-
 
