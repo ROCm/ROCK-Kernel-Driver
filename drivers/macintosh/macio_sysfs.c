@@ -6,14 +6,15 @@
 
 #define macio_config_of_attr(field, format_string)			\
 static ssize_t								\
-field##_show (struct device *dev, char *buf)				\
+field##_show (struct device *dev, struct device_attribute *attr,	\
+              char *buf)						\
 {									\
 	struct macio_dev *mdev = to_macio_device (dev);			\
 	return sprintf (buf, format_string, mdev->ofdev.node->field);	\
 }
 
 static ssize_t
-compatible_show (struct device *dev, char *buf)
+compatible_show (struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct of_device *of;
 	char *compat;
