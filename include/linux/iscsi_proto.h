@@ -1,7 +1,8 @@
 /*
  * RFC 3720 (iSCSI) protocol data types
  *
- * Copyright (C) 2005 Dmitry Yusupov, Alex Aizman
+ * Copyright (C) 2005 Dmitry Yusupov
+ * Copyright (C) 2005 Alex Aizman
  * maintained by open-iscsi@googlegroups.com
  *
  * This program is free software; you can redistribute it and/or modify
@@ -89,7 +90,7 @@ struct iscsi_hdr {
 #define ISCSI_OP_ASYNC_EVENT		0x32
 #define ISCSI_OP_REJECT			0x3f
 
-/* SCSI Command Header */
+/* iSCSI PDU Header */
 struct iscsi_cmd {
 	uint8_t opcode;
 	uint8_t flags;
