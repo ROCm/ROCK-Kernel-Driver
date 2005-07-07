@@ -23,7 +23,7 @@
 #ifndef SCSI_TRANSPORT_ISCSI_H
 #define SCSI_TRANSPORT_ISCSI_H
 
-#include <iscsi_if.h>
+#include <linux/iscsi_if.h>
 
 /**
  * struct iscsi_transport - iSCSI Transport template

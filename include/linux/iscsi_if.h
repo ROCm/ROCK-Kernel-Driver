@@ -21,7 +21,7 @@
 #ifndef ISCSI_IF_H
 #define ISCSI_IF_H
 
-#include <iscsi_proto.h>
+#include <linux/iscsi_proto.h>
 
 #define UEVENT_BASE			10
 #define KEVENT_BASE			100
