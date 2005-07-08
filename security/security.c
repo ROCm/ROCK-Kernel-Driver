@@ -21,7 +21,7 @@
 #define SECURITY_FRAMEWORK_VERSION	"1.0.0"
 
 /* things that live in dummy.c */
-extern void security_fixup_ops (struct security_operations *ops);
+extern void security_fixup_ops(struct security_operations *ops);
 /* default security ops */
 extern struct security_operations capability_security_ops;
 

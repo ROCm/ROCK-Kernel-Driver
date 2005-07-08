@@ -352,13 +352,11 @@ struct security_operations capability_security_ops = {
 };
 
 EXPORT_SYMBOL(capability_security_ops);
-/* Note: If the capability security module is loaded, we do NOT register
- * the capability_security_ops but a second structure that has the
- * identical entries. The reason is that this way,
- * - we could stack on top of capability if it was stackable
- * - a loaded capability module will prevent others to register, which
- *   is the previous behaviour; if capabilities are used as default (not
- *   because the module has been loaded), we allow the replacement.
+/* Note: capability_security_ops is the default for security_ops
+ * now which gets used if no LSM is loaded.
+ * If capability is loaded, a copy of capability_security_ops
+ * is registered, so we know whether or not we use a non-default
+ * security_ops. If we don't, replacement is not possible.
  */
 #endif
 

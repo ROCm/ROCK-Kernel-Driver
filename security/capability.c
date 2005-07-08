@@ -24,13 +24,22 @@
 #include <linux/ptrace.h>
 #include <linux/moduleparam.h>
 
-/* Note: If the capability security module is loaded, we do NOT register
- * the capability_security_ops but a second structure capability_ops
- * that has the identical entries. The reasons:
- * - we could stack on top of capability if it was stackable
- * - a loaded capability module will prevent others to register, which
- *   is the previous behaviour; if capabilities are used as default (not
- *   because the module has been loaded), we allow the replacement.
+/* Note: Capabilities are default now, even if CONFIG_SECURITY
+ * is enabled and no LSM is loaded. (Previously, the dummy
+ * functions would have been called in that case which resulted
+ * in a slightly unusable system.)
+ * The capability LSM may still be compiled and loaded; it won't
+ * make a difference though except for slowing down some operations
+ * a tiny bit and (more severly) for disallowing loading another LSM.
+ * To have it as LSM may still be useful: It could be stacked on top
+ * of another LSM (if the other LSM allows this or if the stacker
+ * is used).
+ * If the capability LSM is loaded, we do NOT register the 
+ * capability_security_ops but a second structure capability_ops
+ * that has identical entries. We need to differentiate
+ * between capabilities used as default and used as LSM as in
+ * the latter case replacing it by just loading another LSM is
+ * not possible.
  */
 
 /* Struct from commoncaps */
@@ -49,11 +58,11 @@ MODULE_PARM_DESC(disable, "To disable capabilities module set disable = 1");
 
 static int __init capability_init (void)
 {
-	memcpy(&capability_ops, &capability_security_ops, sizeof(capability_ops));
 	if (capability_disable) {
 		printk(KERN_INFO "Capabilities disabled at initialization\n");
 		return 0;
 	}
+	memcpy(&capability_ops, &capability_security_ops, sizeof(capability_ops));
 	/* register ourselves with the security framework */
 	if (register_security (&capability_ops)) {
 		/* try registering with primary module */
