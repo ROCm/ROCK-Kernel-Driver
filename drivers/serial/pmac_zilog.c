@@ -1850,7 +1850,7 @@ err_out:
 	return rc;
 }
 
-static struct of_device_id pmz_match[] =
+static struct of_device_id pmz_match[] = 
 {
 	{
 	.name 		= "ch-a",

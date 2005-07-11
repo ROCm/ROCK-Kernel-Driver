@@ -647,7 +647,7 @@ static int __devexit platinumfb_remove(struct of_device* odev)
 	return 0;
 }
 
-static struct of_device_id platinumfb_match[] =
+static struct of_device_id platinumfb_match[] = 
 {
 	{
 	.name 		= "platinum",

@@ -1637,7 +1637,7 @@ pmac_ide_pci_resume(struct pci_dev *pdev)
 	return rc;
 }
 
-static struct of_device_id pmac_ide_macio_match[] =
+static struct of_device_id pmac_ide_macio_match[] = 
 {
 	{
 	.name 		= "IDE",

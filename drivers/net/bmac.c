@@ -1645,7 +1645,7 @@ static int __devexit bmac_remove(struct macio_dev *mdev)
 	return 0;
 }
 
-static struct of_device_id bmac_match[] =
+static struct of_device_id bmac_match[] = 
 {
 	{
 	.name 		= "bmac",

@@ -2012,7 +2012,7 @@ static int mesh_remove(struct macio_dev *mdev)
 }
 
 
-static struct of_device_id mesh_match[] =
+static struct of_device_id mesh_match[] = 
 {
 	{
 	.name 		= "mesh",

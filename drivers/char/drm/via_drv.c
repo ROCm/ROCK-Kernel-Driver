@@ -73,7 +73,6 @@ static drm_ioctl_desc_t ioctls[] = {
 	[DRM_IOCTL_NR(DRM_VIA_WAIT_IRQ)] = {via_wait_irq, 1, 0}
 };
 
-static int probe(struct pci_dev *pdev, const struct pci_device_id *ent);
 static struct drm_driver driver = {
 	.driver_features =
 	    DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_IRQ |

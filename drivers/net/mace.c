@@ -1009,7 +1009,7 @@ static irqreturn_t mace_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
     return IRQ_HANDLED;
 }
 
-static struct of_device_id mace_match[] =
+static struct of_device_id mace_match[] = 
 {
 	{
 	.name 		= "mace",

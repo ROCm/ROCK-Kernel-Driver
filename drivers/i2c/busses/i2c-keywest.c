@@ -721,7 +721,7 @@ dispose_iface_of_platform(struct of_device* dev)
 	return dispose_iface(&dev->dev);
 }
 
-static struct of_device_id i2c_keywest_match[] =
+static struct of_device_id i2c_keywest_match[] = 
 {
 	{
 	.type		= "i2c",

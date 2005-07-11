@@ -544,7 +544,7 @@ static int mac53c94_remove(struct macio_dev *mdev)
 }
 
 
-static struct of_device_id mac53c94_match[] =
+static struct of_device_id mac53c94_match[] = 
 {
 	{
 	.name 		= "53c94",

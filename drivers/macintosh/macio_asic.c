@@ -126,8 +126,6 @@ static int macio_device_resume(struct device * dev)
 	return 0;
 }
 
-extern struct device_attribute macio_dev_attrs[];
-
 static int macio_hotplug (struct device *dev, char **envp, int num_envp,
                           char *buffer, int buffer_size)
 {
@@ -150,31 +148,31 @@ static int macio_hotplug (struct device *dev, char **envp, int num_envp,
 
 	/* stuff we want to pass to /sbin/hotplug */
 	envp[i++] = scratch;
-	length += scnprintf(scratch, buffer_size - length, "OF_NAME=%s",
-				of->node->name);
+	length += scnprintf (scratch, buffer_size - length, "OF_NAME=%s",
+	                     of->node->name);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
 	++length;
 	scratch += length;
 
 	envp[i++] = scratch;
-	length += scnprintf(scratch, buffer_size - length, "OF_TYPE=%s",
-				of->node->type);
+	length += scnprintf (scratch, buffer_size - length, "OF_TYPE=%s",
+	                     of->node->type);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
 	++length;
 	scratch += length;
 
-	/* Since the compatible field can contain pretty much anything
-	 * it's not really legal to split it out with commas. We split it
-	 * up using a number of environment variables instead. */
+        /* Since the compatible field can contain pretty much anything
+         * it's not really legal to split it out with commas. We split it
+         * up using a number of environment variables instead. */
 
 	compat = (char *) get_property(of->node, "compatible", &cplen);
 	while (compat && cplen > 0) {
 		int l;
-		envp[i++] = scratch;
-		length += scnprintf(scratch, buffer_size - length,
-					"OF_COMPATIBLE_%d=%s", seen, compat);
+                envp[i++] = scratch;
+		length += scnprintf (scratch, buffer_size - length,
+		                     "OF_COMPATIBLE_%d=%s", seen, compat);
 		if ((buffer_size - length <= 0) || (i >= num_envp))
 			return -ENOMEM;
 		length++;
@@ -186,8 +184,8 @@ static int macio_hotplug (struct device *dev, char **envp, int num_envp,
 	}
 
 	envp[i++] = scratch;
-	length += scnprintf(scratch, buffer_size - length,
-				"OF_COMPATIBLE_N=%d", seen);
+	length += scnprintf (scratch, buffer_size - length,
+	                     "OF_COMPATIBLE_N=%d", seen);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
 	++length;
@@ -196,14 +194,14 @@ static int macio_hotplug (struct device *dev, char **envp, int num_envp,
 	envp[i] = NULL;
 
 	return 0;
-
 }
+
 extern struct device_attribute macio_dev_attrs[];
 
 struct bus_type macio_bus_type = {
        .name	= "macio",
        .match	= macio_bus_match,
-	.hotplug = macio_hotplug,
+       .hotplug = macio_hotplug,
        .suspend	= macio_device_suspend,
        .resume	= macio_device_resume,
        .dev_attrs = macio_dev_attrs,
