@@ -828,12 +828,16 @@ static int __posix_lock_file(struct inode *inode, struct file_lock *request)
 		/* Detect adjacent or overlapping regions (if same lock type)
 		 */
 		if (request->fl_type == fl->fl_type) {
+			/* In all comparisons of start vs end, use
+			 * "start - 1" rather than "end + 1". If end
+			 * is OFFSET_MAX, end + 1 will become negative.
+			 */
 			if (fl->fl_end < request->fl_start - 1)
 				goto next_lock;
 			/* If the next lock in the list has entirely bigger
 			 * addresses than the new one, insert the lock here.
 			 */
-			if (fl->fl_start > request->fl_end + 1)
+			if (fl->fl_start - 1 > request->fl_end)
 				break;
 
 			/* If we come here, the new and old lock are of the
@@ -1591,7 +1595,7 @@ out:
 /* Apply the lock described by l to an open file descriptor.
  * This implements both the F_SETLK and F_SETLKW commands of fcntl().
  */
-int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock __user *l)
+int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock __user *l, int fd)
 {
 	struct file_lock *file_lock = locks_alloc_lock();
 	struct flock flock;
@@ -1666,6 +1670,18 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock __user *l)
 		break;
 	}
 
+	/* Make sure the file is still open, otherwise we need
+	 * to release the lock we just claimed. */
+	spin_lock(&current->files->file_lock);
+	if (current->files->fd[fd] != filp) {
+		/* Darn - someone closed the file in the meanwhile. */
+		spin_unlock(&current->files->file_lock);
+		locks_remove_posix(filp, current->files);
+		error = -EBADF;
+	} else {
+		spin_unlock(&current->files->file_lock);
+	}
+
  out:
 	locks_free_lock(file_lock);
 	return error;
@@ -1724,7 +1740,7 @@ out:
 /* Apply the lock described by l to an open file descriptor.
  * This implements both the F_SETLK and F_SETLKW commands of fcntl().
  */
-int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 __user *l)
+int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 __user *l, int fd)
 {
 	struct file_lock *file_lock = locks_alloc_lock();
 	struct flock64 flock;
@@ -1799,6 +1815,18 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 __user *l)
 		break;
 	}
 
+	/* Make sure the file is still open, otherwise we need
+	 * to release the lock we just claimed. */
+	spin_lock(&current->files->file_lock);
+	if (current->files->fd[fd] != filp) {
+		/* Darn - someone closed the file in the meanwhile. */
+		spin_unlock(&current->files->file_lock);
+		locks_remove_posix(filp, current->files);
+		error = -EBADF;
+	} else {
+		spin_unlock(&current->files->file_lock);
+	}
+
 out:
 	locks_free_lock(file_lock);
 	return error;
@@ -1813,47 +1841,60 @@ out:
 void locks_remove_posix(struct file *filp, fl_owner_t owner)
 {
 	struct file_lock lock, **before;
+	pid_t tgid;
+	int more;
 
-	/*
-	 * If there are no locks held on this file, we don't need to call
-	 * posix_lock_file().  Another process could be setting a lock on this
-	 * file at the same time, but we wouldn't remove that lock anyway.
-	 */
-	before = &filp->f_dentry->d_inode->i_flock;
-	if (*before == NULL)
-		return;
+	do {
+		/*
+		 * If there are no locks held on this file, we don't need to call
+		 * posix_lock_file().  Another process could be setting a lock on this
+		 * file at the same time, but we wouldn't remove that lock anyway.
+		 */
+		before = &filp->f_dentry->d_inode->i_flock;
+		if (*before == NULL)
+			return;
 
-	lock.fl_type = F_UNLCK;
-	lock.fl_flags = FL_POSIX;
-	lock.fl_start = 0;
-	lock.fl_end = OFFSET_MAX;
-	lock.fl_owner = owner;
-	lock.fl_pid = current->tgid;
-	lock.fl_file = filp;
-	lock.fl_ops = NULL;
-	lock.fl_lmops = NULL;
+		more = 0;
+		tgid = 0;
 
-	if (filp->f_op && filp->f_op->lock != NULL) {
-		filp->f_op->lock(filp, F_SETLK, &lock);
-		goto out;
-	}
-
-	/* Can't use posix_lock_file here; we need to remove it no matter
-	 * which pid we have.
-	 */
-	lock_kernel();
-	while (*before != NULL) {
-		struct file_lock *fl = *before;
-		if (IS_POSIX(fl) && posix_same_owner(fl, &lock)) {
-			locks_delete_lock(before);
-			continue;
+		/* Can't use posix_lock_file here; we need to remove it no matter
+		 * which pid we have.
+		 */
+		lock_kernel();
+		while (*before != NULL) {
+			struct file_lock *fl = *before;
+			if (IS_POSIX(fl) && posix_same_owner(fl, &lock)) {
+				if (tgid == 0 || tgid == fl->fl_pid) {
+					tgid = fl->fl_pid;
+					locks_delete_lock(before);
+					continue;
+				}
+				/* We have locks owned by a different tgid.
+				 * Need to come back. */
+				more = 1;
+			}
+			before = &fl->fl_next;
 		}
-		before = &fl->fl_next;
-	}
-	unlock_kernel();
-out:
-	if (lock.fl_ops && lock.fl_ops->fl_release_private)
-		lock.fl_ops->fl_release_private(&lock);
+		unlock_kernel();
+
+		if (tgid != 0) {
+			lock.fl_type = F_UNLCK;
+			lock.fl_flags = FL_POSIX;
+			lock.fl_start = 0;
+			lock.fl_end = OFFSET_MAX;
+			lock.fl_owner = owner;
+			lock.fl_pid = tgid;
+			lock.fl_file = filp;
+			lock.fl_ops = NULL;
+			lock.fl_lmops = NULL;
+
+			if (filp->f_op && filp->f_op->lock != NULL) {
+				filp->f_op->lock(filp, F_SETLK, &lock);
+				if (lock.fl_ops && lock.fl_ops->fl_release_private)
+					lock.fl_ops->fl_release_private(&lock);
+			}
+		}
+	} while (more);
 }
 
 EXPORT_SYMBOL(locks_remove_posix);
