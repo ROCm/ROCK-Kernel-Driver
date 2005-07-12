@@ -455,8 +455,9 @@ svc_recvfrom(struct svc_rqst *rqstp, struct kvec *iov, int nr, int buflen)
 	struct socket	*sock;
 	int		len, alen;
 
-	rqstp->rq_addrlen = sizeof(rqstp->rq_addr);
 	sock = rqstp->rq_sock->sk_sock;
+	rqstp->rq_daddr = inet_sk((const struct sock *)sock)->rcv_saddr;
+	rqstp->rq_addrlen = sizeof(rqstp->rq_addr);
 
 	msg.msg_name    = &rqstp->rq_addr;
 	msg.msg_namelen = sizeof(rqstp->rq_addr);
