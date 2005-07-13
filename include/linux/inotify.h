@@ -23,16 +23,6 @@ struct inotify_event {
 	char		name[0];	/* stub for possible name */
 };
 
-/*
- * struct inotify_watch_request - represents a watch request
- *
- * Pass to the inotify device via the INOTIFY_WATCH ioctl
- */
-struct inotify_watch_request {
-	int		fd;		/* fd of filename to watch */
-	__u32		mask;		/* event mask */
-};
-
 /* the following are legal, implemented events that user-space can watch for */
 #define IN_ACCESS		0x00000001	/* File was accessed */
 #define IN_MODIFY		0x00000002	/* File was modified */
@@ -67,12 +57,6 @@ struct inotify_watch_request {
 #define IN_ALL_EVENTS	(IN_ACCESS | IN_MODIFY | IN_ATTRIB | IN_CLOSE_WRITE | \
 			 IN_CLOSE_NOWRITE | IN_OPEN | IN_MOVED_FROM | \
 			 IN_MOVED_TO | IN_DELETE | IN_CREATE | IN_DELETE_SELF)
-
-#define INOTIFY_IOCTL_MAGIC	'Q'
-#define INOTIFY_IOCTL_MAXNR	2
-
-#define INOTIFY_WATCH  		_IOR(INOTIFY_IOCTL_MAGIC, 1, struct inotify_watch_request)
-#define INOTIFY_IGNORE 		_IOR(INOTIFY_IOCTL_MAGIC, 2, int)
 
 #ifdef __KERNEL__
 

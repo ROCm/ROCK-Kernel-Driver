@@ -1930,8 +1930,7 @@ static int b44_suspend(struct pci_dev *pdev, pm_message_t state)
 	b44_free_rings(bp);
 
 	spin_unlock_irq(&bp->lock);
-
-	free_irq(dev->irq, dev);
+	pci_disable_device(pdev);
 	return 0;
 }
 
@@ -1941,12 +1940,11 @@ static int b44_resume(struct pci_dev *pdev)
 	struct b44 *bp = netdev_priv(dev);
 
 	pci_restore_state(pdev);
+	pci_enable_device(pdev);
+	pci_set_master(pdev);
 
 	if (!netif_running(dev))
 		return 0;
-
-	if (request_irq(dev->irq, b44_interrupt, SA_SHIRQ, dev->name, dev))
-		printk(KERN_ERR PFX "%s: request_irq failed\n", dev->name);
 
 	spin_lock_irq(&bp->lock);
 

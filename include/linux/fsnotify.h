@@ -216,19 +216,10 @@ static inline void fsnotify_change(struct dentry *dentry, unsigned int ia_valid)
 
 /*
  * fsnotify_oldname_init - save off the old filename before we change it
- *
- * XXX: This could be kstrdup if only we could add that to lib/string.c
  */
 static inline const char *fsnotify_oldname_init(const char *name)
 {
-	size_t len;
-	char *buf;
-
-	len = strlen(name) + 1;
-	buf = kmalloc(len, GFP_KERNEL);
-	if (likely(buf))
-		memcpy(buf, name, len);
-	return buf;
+	return kstrdup(name, GFP_KERNEL);
 }
 
 /*

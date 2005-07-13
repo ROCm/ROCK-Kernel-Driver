@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/file.h>
+#include <linux/mount.h>
 #include <linux/namei.h>
 #include <linux/poll.h>
 #include <linux/device.h>
@@ -42,9 +43,12 @@ static atomic_t inotify_cookie;
 static kmem_cache_t *watch_cachep;
 static kmem_cache_t *event_cachep;
 
-static int max_user_devices;
-static int max_user_watches;
-static unsigned int max_queued_events;
+static struct vfsmount *inotify_mnt;
+
+/* These are configurable via /proc/sys/inotify */
+int inotify_max_user_devices;
+int inotify_max_user_watches;
+int inotify_max_queued_events;
 
 /*
  * Lock ordering:
@@ -120,64 +124,6 @@ struct inotify_watch {
 	s32 			wd;	/* watch descriptor */
 	u32			mask;	/* event mask for this watch */
 };
-
-static ssize_t show_max_queued_events(struct class_device *class, char *buf)
-{
-	return sprintf(buf, "%d\n", max_queued_events);
-}
-
-static ssize_t store_max_queued_events(struct class_device *class,
-				       const char *buf, size_t count)
-{
-	unsigned int max;
-
-	if (sscanf(buf, "%u", &max) > 0 && max > 0) {
-		max_queued_events = max;
-		return strlen(buf);
-	}
-	return -EINVAL;
-}
-
-static ssize_t show_max_user_devices(struct class_device *class, char *buf)
-{
-	return sprintf(buf, "%d\n", max_user_devices);
-}
-
-static ssize_t store_max_user_devices(struct class_device *class,
-				      const char *buf, size_t count)
-{
-	int max;
-
-	if (sscanf(buf, "%d", &max) > 0 && max > 0) {
-		max_user_devices = max;
-		return strlen(buf);
-	}
-	return -EINVAL;
-}
-
-static ssize_t show_max_user_watches(struct class_device *class, char *buf)
-{
-	return sprintf(buf, "%d\n", max_user_watches);
-}
-
-static ssize_t store_max_user_watches(struct class_device *class,
-				      const char *buf, size_t count)
-{
-	int max;
-
-	if (sscanf(buf, "%d", &max) > 0 && max > 0) {
-		max_user_watches = max;
-		return strlen(buf);
-	}
-	return -EINVAL;
-}
-
-static CLASS_DEVICE_ATTR(max_queued_events, S_IRUGO | S_IWUSR,
-			 show_max_queued_events, store_max_queued_events);
-static CLASS_DEVICE_ATTR(max_user_devices, S_IRUGO | S_IWUSR,
-			 show_max_user_devices, store_max_user_devices);
-static CLASS_DEVICE_ATTR(max_user_watches, S_IRUGO | S_IWUSR,
-			 show_max_user_watches, store_max_user_watches);
 
 static inline void get_inotify_dev(struct inotify_device *dev)
 {
@@ -374,6 +320,23 @@ static int inotify_dev_get_wd(struct inotify_device *dev,
 }
 
 /*
+ * find_inode - resolve a user-given path to a specific inode and return a nd
+ */
+static int find_inode(const char __user *dirname, struct nameidata *nd)
+{
+	int error;
+
+	error = __user_walk(dirname, LOOKUP_FOLLOW, nd);
+	if (error)
+		return error;
+	/* you can only watch an inode if you have read permissions on it */
+	error = permission(nd->dentry->d_inode, MAY_READ, NULL);
+	if (error) 
+		path_release (nd);
+	return error;
+}
+
+/*
  * create_watch - creates a watch on the given device.
  *
  * Callers must hold dev->sem.  Calls inotify_dev_get_wd() so may sleep.
@@ -385,7 +348,7 @@ static struct inotify_watch *create_watch(struct inotify_device *dev,
 	struct inotify_watch *watch;
 	int ret;
 
-	if (atomic_read(&dev->user->inotify_watches) >= max_user_watches)
+	if (atomic_read(&dev->user->inotify_watches) >= inotify_max_user_watches)
 		return ERR_PTR(-ENOSPC);
 
 	watch = kmem_cache_alloc(watch_cachep, GFP_KERNEL);
@@ -560,29 +523,56 @@ EXPORT_SYMBOL_GPL(inotify_get_cookie);
  */
 void inotify_unmount_inodes(struct list_head *list)
 {
-	struct inode *inode, *next_i;
+	struct inode *inode, *next_i, *need_iput = NULL;
 
 	list_for_each_entry_safe(inode, next_i, list, i_sb_list) {
 		struct inotify_watch *watch, *next_w;
+		struct inode *need_iput_tmp;
 		struct list_head *watches;
 
 		/*
-		 * We cannot __iget() an inode in state I_CLEAR or I_FREEING,
-		 * which is fine because by that point the inode cannot have
-		 * any associated watches.
+		 * If i_count is zero, the inode cannot have any watches and
+		 * doing an __iget/iput with MS_ACTIVE clear would actually
+		 * evict all inodes with zero i_count from icache which is
+		 * unnecessarily violent and may in fact be illegal to do.
 		 */
-		if (inode->i_state & (I_CLEAR | I_FREEING))
+		if (!atomic_read(&inode->i_count))
 			continue;
 
-		/* In case the remove_watch() drops a reference */
-		__iget(inode);
+		/*
+		 * We cannot __iget() an inode in state I_CLEAR, I_FREEING, or
+		 * I_WILL_FREE which is fine because by that point the inode
+		 * cannot have any associated watches.
+		 */
+		if (inode->i_state & (I_CLEAR | I_FREEING | I_WILL_FREE))
+			continue;
+
+		need_iput_tmp = need_iput;
+		need_iput = NULL;
+		/* In case the remove_watch() drops a reference. */
+		if (inode != need_iput_tmp)
+			__iget(inode);
+		else
+			need_iput_tmp = NULL;
+		/* In case the dropping of a reference would nuke next_i. */
+		if ((&next_i->i_sb_list != list) &&
+				atomic_read(&next_i->i_count) &&
+				!(next_i->i_state & (I_CLEAR | I_FREEING |
+					I_WILL_FREE))) {
+			__iget(next_i);
+			need_iput = next_i;
+		}
 
 		/*
-		 * We can safely drop inode_lock here because the per-sb list
-		 * of inodes must not change during unmount and iprune_sem
-		 * keeps shrink_icache_memory() away.
+		 * We can safely drop inode_lock here because we hold
+		 * references on both inode and next_i.  Also no new inodes
+		 * will be added since the umount has begun.  Finally,
+		 * iprune_sem keeps shrink_icache_memory() away.
 		 */
 		spin_unlock(&inode_lock);
+
+		if (need_iput_tmp)
+			iput(need_iput_tmp);
 
 		/* for each watch, send IN_UNMOUNT and then remove it */
 		down(&inode->inotify_sem);
@@ -714,51 +704,6 @@ static ssize_t inotify_read(struct file *file, char __user *buf,
 	return ret;
 }
 
-static int inotify_open(struct inode *inode, struct file *file)
-{
-	struct inotify_device *dev;
-	struct user_struct *user;
-	int ret;
-
-	user = get_uid(current->user);
-
-	if (unlikely(atomic_read(&user->inotify_devs) >= max_user_devices)) {
-		ret = -EMFILE;
-		goto out_err;
-	}
-
-	dev = kmalloc(sizeof(struct inotify_device), GFP_KERNEL);
-	if (unlikely(!dev)) {
-		ret = -ENOMEM;
-		goto out_err;
-	}
-
-	idr_init(&dev->idr);
-	INIT_LIST_HEAD(&dev->events);
-	INIT_LIST_HEAD(&dev->watches);
-	init_waitqueue_head(&dev->wq);
-	sema_init(&dev->sem, 1);
-	dev->event_count = 0;
-	dev->queue_size = 0;
-	dev->max_events = max_queued_events;
-	dev->user = user;
-	atomic_set(&dev->count, 0);
-
-	get_inotify_dev(dev);
-	atomic_inc(&user->inotify_devs);
-
-	file->private_data = dev;
-
-	ret = nonseekable_open(inode, file);
-	if (ret)
-		goto out_err;
-
-	return 0;
-out_err:
-	free_uid(user);
-	return ret;
-}
-
 static int inotify_release(struct inode *ignored, struct file *file)
 {
 	struct inotify_device *dev = file->private_data;
@@ -805,58 +750,6 @@ static int inotify_release(struct inode *ignored, struct file *file)
 	return 0;
 }
 
-static int inotify_add_watch(struct inotify_device *dev, int fd, u32 mask)
-{
-	struct inotify_watch *watch, *old;
-	struct inode *inode;
-	struct file *filp;
-	int ret;
-
-	filp = fget(fd);
-	if (!filp)
-		return -EBADF;
-	inode = filp->f_dentry->d_inode;
-
-	down(&inode->inotify_sem);
-	down(&dev->sem);
-
-	/* don't let user-space set invalid bits: we don't want flags set */
-	mask &= IN_ALL_EVENTS;
-	if (!mask) {
-		ret = -EINVAL;
-		goto out;
-	}
-
-	/*
-	 * Handle the case of re-adding a watch on an (inode,dev) pair that we
-	 * are already watching.  We just update the mask and return its wd.
-	 */
-	old = inode_find_dev(inode, dev);
-	if (unlikely(old)) {
-		old->mask = mask;
-		ret = old->wd;
-		goto out;
-	}
-
-	watch = create_watch(dev, mask, inode);
-	if (unlikely(IS_ERR(watch))) {
-		ret = PTR_ERR(watch);
-		goto out;
-	}
-
-	/* Add the watch to the device's and the inode's list */
-	list_add(&watch->d_list, &dev->watches);
-	list_add(&watch->i_list, &inode->inotify_watches);
-	ret = watch->wd;
-
-out:
-	up(&dev->sem);
-	up(&inode->inotify_sem);
-	fput(filp);
-
-	return ret;
-}
-
 /*
  * inotify_ignore - handle the INOTIFY_IGNORE ioctl, asking that a given wd be
  * removed from the device.
@@ -897,29 +790,13 @@ static long inotify_ioctl(struct file *file, unsigned int cmd,
 			  unsigned long arg)
 {
 	struct inotify_device *dev;
-	struct inotify_watch_request request;
 	void __user *p;
 	int ret = -ENOTTY;
-	s32 wd;
 
 	dev = file->private_data;
 	p = (void __user *) arg;
 
 	switch (cmd) {
-	case INOTIFY_WATCH:
-		if (unlikely(copy_from_user(&request, p, sizeof (request)))) {
-			ret = -EFAULT;
-			break;
-		}
-		ret = inotify_add_watch(dev, request.fd, request.mask);
-		break;
-	case INOTIFY_IGNORE:
-		if (unlikely(get_user(wd, (int __user *) p))) {
-			ret = -EFAULT;
-			break;
-		}
-		ret = inotify_ignore(dev, wd);
-		break;
 	case FIONREAD:
 		ret = put_user(dev->queue_size, (int __user *) p);
 		break;
@@ -929,19 +806,166 @@ static long inotify_ioctl(struct file *file, unsigned int cmd,
 }
 
 static struct file_operations inotify_fops = {
-	.owner		= THIS_MODULE,
-	.poll		= inotify_poll,
-	.read		= inotify_read,
-	.open		= inotify_open,
-	.release	= inotify_release,
-	.unlocked_ioctl	= inotify_ioctl,
+	.poll           = inotify_poll,
+	.read           = inotify_read,
+	.release        = inotify_release,
+	.unlocked_ioctl = inotify_ioctl,
 	.compat_ioctl	= inotify_ioctl,
 };
 
-static struct miscdevice inotify_device = {
-	.minor  = MISC_DYNAMIC_MINOR,
-	.name	= "inotify",
-	.fops	= &inotify_fops,
+asmlinkage long sys_inotify_init(void)
+{
+	struct inotify_device *dev;
+	struct user_struct *user;
+	int ret = -ENOTTY;
+	int fd;
+	struct file *filp;
+
+	fd = get_unused_fd();
+	if (fd < 0) {
+		ret = fd;
+		goto out;
+	}
+
+	filp = get_empty_filp();
+	if (!filp) {
+		put_unused_fd(fd);
+		ret = -ENFILE;
+		goto out;
+	}
+	filp->f_op = &inotify_fops;
+	filp->f_vfsmnt = mntget(inotify_mnt);
+	filp->f_dentry = dget(inotify_mnt->mnt_root);
+	filp->f_mapping = filp->f_dentry->d_inode->i_mapping;
+	filp->f_mode = FMODE_READ;
+	filp->f_flags = O_RDONLY;
+
+	user = get_uid(current->user);
+
+	if (unlikely(atomic_read(&user->inotify_devs) >= inotify_max_user_devices)) {
+		ret = -EMFILE;
+		goto out_err;
+	}
+
+	dev = kmalloc(sizeof(struct inotify_device), GFP_KERNEL);
+	if (unlikely(!dev)) {
+		ret = -ENOMEM;
+		goto out_err;
+	}
+
+	idr_init(&dev->idr);
+	INIT_LIST_HEAD(&dev->events);
+	INIT_LIST_HEAD(&dev->watches);
+	init_waitqueue_head(&dev->wq);
+	sema_init(&dev->sem, 1);
+	dev->event_count = 0;
+	dev->queue_size = 0;
+	dev->max_events = inotify_max_queued_events;
+	dev->user = user;
+	atomic_set(&dev->count, 0);
+
+	get_inotify_dev(dev);
+	atomic_inc(&user->inotify_devs);
+
+	filp->private_data = dev;
+	fd_install (fd, filp);
+	return fd;
+out_err:
+	put_unused_fd (fd);
+	put_filp (filp);
+	free_uid(user);
+out:
+	return ret;
+}
+
+asmlinkage long sys_inotify_add_watch(int fd, const char *path, u32 mask)
+{
+	struct inotify_watch *watch, *old;
+	struct inode *inode;
+	struct inotify_device *dev;
+	struct nameidata nd;
+	struct file *filp;
+	int ret;
+
+	filp = fget(fd);
+	if (!filp)
+		return -EBADF;
+
+	dev = filp->private_data;
+
+	ret = find_inode ((const char __user*)path, &nd);
+	if (ret)
+		goto fput_and_out;
+
+	/* Held in place by reference in nd */
+	inode = nd.dentry->d_inode;
+
+	down(&inode->inotify_sem);
+	down(&dev->sem);
+
+	/* don't let user-space set invalid bits: we don't want flags set */
+	mask &= IN_ALL_EVENTS;
+	if (!mask) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/*
+	 * Handle the case of re-adding a watch on an (inode,dev) pair that we
+	 * are already watching.  We just update the mask and return its wd.
+	 */
+	old = inode_find_dev(inode, dev);
+	if (unlikely(old)) {
+		old->mask = mask;
+		ret = old->wd;
+		goto out;
+	}
+
+	watch = create_watch(dev, mask, inode);
+	if (unlikely(IS_ERR(watch))) {
+		ret = PTR_ERR(watch);
+		goto out;
+	}
+
+	/* Add the watch to the device's and the inode's list */
+	list_add(&watch->d_list, &dev->watches);
+	list_add(&watch->i_list, &inode->inotify_watches);
+	ret = watch->wd;
+out:
+	path_release (&nd);
+	up(&dev->sem);
+	up(&inode->inotify_sem);
+fput_and_out:
+	fput(filp);
+	return ret;
+}
+
+asmlinkage long sys_inotify_rm_watch(int fd, u32 wd)
+{
+	struct file *filp;
+	struct inotify_device *dev;
+	int ret;
+
+	filp = fget(fd);
+	if (!filp)
+		return -EBADF;
+	dev = filp->private_data;
+	ret = inotify_ignore (dev, wd);
+	fput(filp);
+	return ret;
+}
+
+static struct super_block *
+inotify_get_sb(struct file_system_type *fs_type, int flags,
+	       const char *dev_name, void *data)
+{
+    return get_sb_pseudo(fs_type, "inotify", NULL, 0xBAD1DEA);
+}
+
+static struct file_system_type inotify_fs_type = {
+    .name           = "inotifyfs",
+    .get_sb         = inotify_get_sb,
+    .kill_sb        = kill_anon_super,
 };
 
 /*
@@ -951,21 +975,12 @@ static struct miscdevice inotify_device = {
  */
 static int __init inotify_init(void)
 {
-	struct class_device *class;
-	int ret;
+	register_filesystem(&inotify_fs_type);
+	inotify_mnt = kern_mount(&inotify_fs_type);
 
-	ret = misc_register(&inotify_device);
-	if (unlikely(ret))
-		panic("inotify: misc_register returned %d\n", ret);
-
-	max_queued_events = 8192;
-	max_user_devices = 128;
-	max_user_watches = 8192;
-
-	class = inotify_device.class;
-	class_device_create_file(class, &class_device_attr_max_queued_events);
-	class_device_create_file(class, &class_device_attr_max_user_devices);
-	class_device_create_file(class, &class_device_attr_max_user_watches);
+	inotify_max_queued_events = 8192;
+	inotify_max_user_devices = 128;
+	inotify_max_user_watches = 8192;
 
 	atomic_set(&inotify_cookie, 0);
 
@@ -976,7 +991,7 @@ static int __init inotify_init(void)
 					 sizeof(struct inotify_kernel_event),
 					 0, SLAB_PANIC, NULL, NULL);
 
-	printk(KERN_INFO "inotify device minor=%d\n", inotify_device.minor);
+	printk(KERN_INFO "inotify syscall\n");
 
 	return 0;
 }
