@@ -1591,8 +1591,8 @@ static inline int security_inode_symlink (struct inode *dir,
 static inline void security_inode_post_symlink (struct inode *dir,
 						struct dentry *dentry,
 						const char *old_name)
-# ifdef CONFIG_SECURITY
 {
+# ifdef CONFIG_SECURITY
 	if (dentry->d_inode && unlikely (IS_PRIVATE (dentry->d_inode)))
 		return;
 # endif /* CONFIG_SECURITY */
@@ -1650,8 +1650,8 @@ static inline int security_inode_mknod (struct inode *dir,
 static inline void security_inode_post_mknod (struct inode *dir,
 					      struct dentry *dentry,
 					      int mode, dev_t dev)
-# ifdef CONFIG_SECURITY
 {
+# ifdef CONFIG_SECURITY
 	if (dentry->d_inode && unlikely (IS_PRIVATE (dentry->d_inode)))
 		return;
 # endif /* CONFIG_SECURITY */
