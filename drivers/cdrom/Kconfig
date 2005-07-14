@@ -67,7 +67,7 @@ config GSCD
 
 config SBPCD
 	tristate "Matsushita/Panasonic/Creative, Longshine, TEAC CDROM support"
-	depends on CD_NO_IDESCSI && BROKEN
+	depends on CD_NO_IDESCSI && BROKEN_ON_SMP
 	---help---
 	  This driver supports most of the drives which use the Panasonic or
 	  Sound Blaster interface.  Please read the file
@@ -166,7 +166,6 @@ config SJCD
 config ISP16_CDI
 	tristate "ISP16/MAD16/Mozart soft configurable cdrom interface support"
 	depends on CD_NO_IDESCSI
-	depends on BROKEN
 	---help---
 	  These are sound cards with built-in cdrom interfaces using the OPTi
 	  82C928 or 82C929 chips. Say Y here to have them detected and
