@@ -10,7 +10,6 @@ slip-objs := slip_kern.o slip_user.o
 slirp-objs := slirp_kern.o slirp_user.o
 daemon-objs := daemon_kern.o daemon_user.o
 mcast-objs := mcast_kern.o mcast_user.o
-#pcap-objs := pcap_kern.o pcap_user.o $(PCAP)
 net-objs := net_kern.o net_user.o
 mconsole-objs := mconsole_kern.o mconsole_user.o
 hostaudio-objs := hostaudio_kern.o
@@ -23,6 +22,17 @@ x11-objs := x11_kern.o x11_user.o \
 	../../../drivers/video/cfbimgblt.o \
 	../../../drivers/video/softcursor.o 
 
+LDFLAGS_pcap.o := -r $(shell $(CC) $(CFLAGS) -print-file-name=libpcap.a)
+
+$(obj)/pcap.o: $(obj)/pcap_kern.o $(obj)/pcap_user.o
+	$(LD) -r -dp -o $@ $^ $(LDFLAGS) $(LDFLAGS_pcap.o)
+#XXX: The call below does not work because the flags are added before the
+# object name, so nothing from the library gets linked.
+#$(call if_changed,ld)
+
+# When the above is fixed, don't forget to add this too!
+#targets := $(obj)/pcap.o
+
 obj-y := stdio_console.o fd.o chan_kern.o chan_user.o line.o
 obj-$(CONFIG_SSL) += ssl.o
 obj-$(CONFIG_STDERR_CONSOLE) += stderr_console.o
@@ -31,7 +41,7 @@ obj-$(CONFIG_UML_NET_SLIP) += slip.o slip_common.o
 obj-$(CONFIG_UML_NET_SLIRP) += slirp.o slip_common.o
 obj-$(CONFIG_UML_NET_DAEMON) += daemon.o 
 obj-$(CONFIG_UML_NET_MCAST) += mcast.o 
-#obj-$(CONFIG_UML_NET_PCAP) += pcap.o $(PCAP)
+obj-$(CONFIG_UML_NET_PCAP) += pcap.o
 obj-$(CONFIG_UML_NET) += net.o 
 obj-$(CONFIG_MCONSOLE) += mconsole.o
 obj-$(CONFIG_MMAPPER) += mmapper_kern.o 
@@ -47,6 +57,7 @@ obj-$(CONFIG_UML_WATCHDOG) += harddog.o
 obj-$(CONFIG_BLK_DEV_COW_COMMON) += cow_user.o
 obj-$(CONFIG_UML_RANDOM) += random.o
 
-USER_OBJS := fd.o null.o pty.o tty.o xterm.o slip_common.o
+# pcap_user.o must be added explicitly.
+USER_OBJS := fd.o null.o pty.o tty.o xterm.o slip_common.o pcap_user.o
 
 include arch/um/scripts/Makefile.rules
