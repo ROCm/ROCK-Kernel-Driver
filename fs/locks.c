@@ -1841,60 +1841,47 @@ out:
 void locks_remove_posix(struct file *filp, fl_owner_t owner)
 {
 	struct file_lock lock, **before;
-	pid_t tgid;
-	int more;
 
-	do {
-		/*
-		 * If there are no locks held on this file, we don't need to call
-		 * posix_lock_file().  Another process could be setting a lock on this
-		 * file at the same time, but we wouldn't remove that lock anyway.
-		 */
-		before = &filp->f_dentry->d_inode->i_flock;
-		if (*before == NULL)
-			return;
+	/*
+	 * If there are no locks held on this file, we don't need to call
+	 * posix_lock_file().  Another process could be setting a lock on this
+	 * file at the same time, but we wouldn't remove that lock anyway.
+	 */
+	before = &filp->f_dentry->d_inode->i_flock;
+	if (*before == NULL)
+		return;
 
-		more = 0;
-		tgid = 0;
+	lock.fl_type = F_UNLCK;
+	lock.fl_flags = FL_POSIX;
+	lock.fl_start = 0;
+	lock.fl_end = OFFSET_MAX;
+	lock.fl_owner = owner;
+	lock.fl_pid = current->tgid;
+	lock.fl_file = filp;
+	lock.fl_ops = NULL;
+	lock.fl_lmops = NULL;
 
-		/* Can't use posix_lock_file here; we need to remove it no matter
-		 * which pid we have.
-		 */
-		lock_kernel();
-		while (*before != NULL) {
-			struct file_lock *fl = *before;
-			if (IS_POSIX(fl) && posix_same_owner(fl, &lock)) {
-				if (tgid == 0 || tgid == fl->fl_pid) {
-					tgid = fl->fl_pid;
-					locks_delete_lock(before);
-					continue;
-				}
-				/* We have locks owned by a different tgid.
-				 * Need to come back. */
-				more = 1;
-			}
-			before = &fl->fl_next;
+	if (filp->f_op && filp->f_op->lock != NULL) {
+		filp->f_op->lock(filp, F_SETLK, &lock);
+		goto out;
+	}
+
+	/* Can't use posix_lock_file here; we need to remove it no matter
+	 * which pid we have.
+	 */
+	lock_kernel();
+	while (*before != NULL) {
+		struct file_lock *fl = *before;
+		if (IS_POSIX(fl) && posix_same_owner(fl, &lock)) {
+			locks_delete_lock(before);
+			continue;
 		}
-		unlock_kernel();
-
-		if (tgid != 0) {
-			lock.fl_type = F_UNLCK;
-			lock.fl_flags = FL_POSIX;
-			lock.fl_start = 0;
-			lock.fl_end = OFFSET_MAX;
-			lock.fl_owner = owner;
-			lock.fl_pid = tgid;
-			lock.fl_file = filp;
-			lock.fl_ops = NULL;
-			lock.fl_lmops = NULL;
-
-			if (filp->f_op && filp->f_op->lock != NULL) {
-				filp->f_op->lock(filp, F_SETLK, &lock);
-				if (lock.fl_ops && lock.fl_ops->fl_release_private)
-					lock.fl_ops->fl_release_private(&lock);
-			}
-		}
-	} while (more);
+		before = &fl->fl_next;
+	}
+	unlock_kernel();
+out:
+	if (lock.fl_ops && lock.fl_ops->fl_release_private)
+		lock.fl_ops->fl_release_private(&lock);
 }
 
 EXPORT_SYMBOL(locks_remove_posix);
