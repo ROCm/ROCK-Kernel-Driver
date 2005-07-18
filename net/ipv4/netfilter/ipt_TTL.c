@@ -40,7 +40,7 @@ static unsigned int ipt_ttl_target(struct sk_buff **pskb,
 				new_ttl = 255;
 			break;
 		case IPT_TTL_DEC:
-			new_ttl = iph->ttl + info->ttl;
+			new_ttl = iph->ttl - info->ttl;
 			if (new_ttl < 0)
 				new_ttl = 0;
 			break;
