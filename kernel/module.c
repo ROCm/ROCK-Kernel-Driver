@@ -1252,8 +1252,8 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 			if (ELF_ST_BIND(sym[i].st_info) == STB_WEAK)
 				break;
 
-			printk(KERN_WARNING "%s: Unknown symbol %s, st_info == 0x%x\n",
-			       mod->name, strtab + sym[i].st_name,(ELF_ST_BIND(sym[i].st_info)));
+			printk(KERN_WARNING "%s: Unknown symbol %s\n",
+			       mod->name, strtab + sym[i].st_name);
 			ret = -ENOENT;
 			break;
 
@@ -1500,9 +1500,6 @@ static inline void add_kallsyms(struct module *mod,
 }
 #endif /* CONFIG_KALLSYMS */
 
-/* unprotected ok, happens also on single cpu */
-static char *mod_in_progress;
-
 /* Allocate and load the module: note that size of section 0 is always
    zero, and we rely on this for optional sections. */
 static struct module *load_module(void __user *umod,
@@ -1583,11 +1580,6 @@ static struct module *load_module(void __user *umod,
 		goto free_hdr;
 	}
 	mod = (void *)sechdrs[modindex].sh_addr;
-
-	if (mod_in_progress)
-		printk(KERN_DEBUG "%s: '%s' and '%s' loaded parallel\n", __FUNCTION__, mod_in_progress, mod->name);
-	else
-		mod_in_progress = mod->name;
 
 	if (symindex == 0) {
 		printk(KERN_WARNING "%s: module has no symbols (stripped?)\n",
@@ -1859,16 +1851,6 @@ static struct module *load_module(void __user *umod,
  arch_cleanup:
 	module_arch_cleanup(mod);
  cleanup:
-	if (err) {
-		char *p = "";
-		if (-EEXIST == err && mod)
-			printk(KERN_DEBUG "%s: '%s' already loaded (dont worry)\n",__FUNCTION__, mod->name);
-		else {
-			if (mod)
-				p = mod->name;
-			printk(KERN_DEBUG "%s '%s': err 0x%lx (dont worry)\n",__FUNCTION__, p, err);
-		}
-	}
 	module_unload_free(mod);
 	module_free(mod, mod->module_init);
  free_core:
@@ -1879,7 +1861,6 @@ static struct module *load_module(void __user *umod,
  free_mod:
 	kfree(args);
  free_hdr:
-	mod_in_progress = NULL;
 	vfree(hdr);
 	if (err < 0) return ERR_PTR(err);
 	else return ptr;
