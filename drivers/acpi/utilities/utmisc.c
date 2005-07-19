@@ -1503,6 +1503,7 @@ acpi_ut_report_warning (
 	acpi_os_printf ("%8s-%04d: *** Warning: ", module_name, line_number);
 }
 
+EXPORT_SYMBOL(acpi_ut_report_warning);
 
 /*******************************************************************************
  *
