@@ -1292,6 +1292,15 @@ do_it_again:
 			tty->minimum_to_wake = (minimum - (b - buf));
 		
 		if (!input_available_p(tty, 0)) {
+#ifdef CONFIG_BOOTSPLASH
+			if (file->f_dentry->d_inode->i_rdev == MKDEV(TTY_MAJOR,0) ||
+			    file->f_dentry->d_inode->i_rdev == MKDEV(TTY_MAJOR,1) ||
+			    file->f_dentry->d_inode->i_rdev == MKDEV(TTYAUX_MAJOR,0) ||
+			    file->f_dentry->d_inode->i_rdev == MKDEV(TTYAUX_MAJOR,1)) {
+				extern int splash_verbose(void);
+				(void)splash_verbose();
+			}
+#endif
 			if (test_bit(TTY_OTHER_CLOSED, &tty->flags)) {
 				retval = -EIO;
 				break;
