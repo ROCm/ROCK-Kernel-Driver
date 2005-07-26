@@ -446,67 +446,6 @@ static struct inode *get_root_inode(struct super_block *sb, unsigned mode)
 	return fuse_iget(sb, 1, 0, &attr);
 }
 
-static struct dentry *fuse_get_dentry(struct super_block *sb, void *vobjp)
-{
-	__u32 *objp = vobjp;
-	unsigned long nodeid = objp[0];
-	__u32 generation = objp[1];
-	struct inode *inode;
-	struct dentry *entry;
-
-	if (nodeid == 0)
-		return ERR_PTR(-ESTALE);
-
-	inode = ilookup5(sb, nodeid, fuse_inode_eq, &nodeid);
-	if (!inode)
-		return ERR_PTR(-ESTALE);
-	if (inode->i_generation != generation) {
-		iput(inode);
-		return ERR_PTR(-ESTALE);
-	}
-
-	entry = d_alloc_anon(inode);
-	if (!entry) {
-		iput(inode);
-		return ERR_PTR(-ENOMEM);
-	}
-
-	return entry;
-}
-
-static int fuse_encode_fh(struct dentry *dentry, __u32 *fh, int *max_len,
-			  int connectable)
-{
-	struct inode *inode = dentry->d_inode;
-	int len = *max_len;
-	int type = 1;
-
-	if (len < 2 || (connectable && len < 4))
-		return 255;
-
-	len = 2;
-	fh[0] = get_fuse_inode(inode)->nodeid;
-	fh[1] = inode->i_generation;
-	if (connectable && !S_ISDIR(inode->i_mode)) {
-		struct inode *parent;
-
-		spin_lock(&dentry->d_lock);
-		parent = dentry->d_parent->d_inode;
-		fh[2] = get_fuse_inode(parent)->nodeid;
-		fh[3] = parent->i_generation;
-		spin_unlock(&dentry->d_lock);
-		len = 4;
-		type = 2;
-	}
-	*max_len = len;
-	return type;
-}
-
-static struct export_operations fuse_export_operations = {
-	.get_dentry	= fuse_get_dentry,
-	.encode_fh      = fuse_encode_fh,
-};
-
 static struct super_operations fuse_super_operations = {
 	.alloc_inode    = fuse_alloc_inode,
 	.destroy_inode  = fuse_destroy_inode,
@@ -533,7 +472,6 @@ static int fuse_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_magic = FUSE_SUPER_MAGIC;
 	sb->s_op = &fuse_super_operations;
 	sb->s_maxbytes = MAX_LFS_FILESIZE;
-	sb->s_export_op = &fuse_export_operations;
 
 	file = fget(d.fd);
 	if (!file)
