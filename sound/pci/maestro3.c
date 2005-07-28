@@ -1050,22 +1050,22 @@ static struct m3_hv_quirk m3_hv_quirk_list[] = {
  * lowlevel functions
  */
 
-inline static void snd_m3_outw(m3_t *chip, u16 value, unsigned long reg)
+static inline void snd_m3_outw(m3_t *chip, u16 value, unsigned long reg)
 {
 	outw(value, chip->iobase + reg);
 }
 
-inline static u16 snd_m3_inw(m3_t *chip, unsigned long reg)
+static inline u16 snd_m3_inw(m3_t *chip, unsigned long reg)
 {
 	return inw(chip->iobase + reg);
 }
 
-inline static void snd_m3_outb(m3_t *chip, u8 value, unsigned long reg)
+static inline void snd_m3_outb(m3_t *chip, u8 value, unsigned long reg)
 {
 	outb(value, chip->iobase + reg);
 }
 
-inline static u8 snd_m3_inb(m3_t *chip, unsigned long reg)
+static inline u8 snd_m3_inb(m3_t *chip, unsigned long reg)
 {
 	return inb(chip->iobase + reg);
 }
