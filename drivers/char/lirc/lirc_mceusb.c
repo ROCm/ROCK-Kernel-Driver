@@ -349,16 +349,6 @@ static int set_use_inc(void* data)
 
 static void set_use_dec(void* data)
 {
-	/* check for unplug here */
-	struct usb_skel* dev = (struct usb_skel*) data;
-	if( !dev->udev )
-	{ 
-		lirc_unregister_plugin( dev->minor );
-		lirc_buffer_free( dev->plugin->rbuf );
-		kfree( dev->plugin->rbuf );
-		kfree( dev->plugin );
-	}
-	
 	MOD_DEC_USE_COUNT;
 }
 
@@ -871,6 +861,7 @@ static void * mceusb_probe(struct usb_device *udev, unsigned int ifnum,
 	plugin->sample_rate = 80;   // sample at 100hz (10ms)
 	plugin->add_to_buf  = &mceusb_add_to_buf;
 	//    plugin->fops        = &mceusb_fops;
+	plugin->owner       = THIS_MODULE;
 	if( lirc_register_plugin(plugin) < 0 )
 	{
 		kfree( plugin );

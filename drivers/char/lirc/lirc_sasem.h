@@ -1,8 +1,15 @@
+/*      $Id: lirc_sasem.h,v 1.3 2005/03/29 17:51:45 lirc Exp $      */
+
+#ifndef LIRC_SASEM_H
+#define LIRC_SASEM_H
+
+#include "kcompat.h"
+
 /*
  * Version Information
  */
-#define DRIVER_VERSION 		"v0.1"
-#define DATE 			"June 2004"
+#define DRIVER_VERSION  	"v0.4"
+#define DATE            	"Mar 2005"
 #define DRIVER_AUTHOR 		"Oliver Stabel <oliver.stabel@gmx.de>"
 #define DRIVER_DESC 		"USB Driver for Sasem Remote Controller V1.1"
 #define DRIVER_SHORTDESC 	"Sasem"
@@ -19,52 +26,68 @@ static const char longbanner[] = {
 #define MAX_INTERRUPT_DATA 8
 #define SASEM_MINOR 144
 
-static const char sc_cSasemCode[MAX_INTERRUPT_DATA] =
+#include <linux/version.h>
+#include <linux/time.h>
+
+static const char SasemCode[MAX_INTERRUPT_DATA] =
 	{ 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
-typedef struct usb_driver t_usb_driver, *tp_usb_driver;
-typedef struct usb_device t_usb_device, *tp_usb_device;
-typedef struct usb_interface t_usb_interface, *tp_usb_interface;
-typedef struct usb_device_id t_usb_device_id, *tp_usb_device_id;
-typedef struct usb_host_interface t_usb_host_interface,
-	*tp_usb_host_interface;
-typedef struct usb_interface_descriptor t_usb_interface_descriptor,
-	*tp_usb_interface_descriptor;
-typedef struct usb_endpoint_descriptor t_usb_endpoint_descriptor,
-	*tp_usb_endpoint_descriptor;
-typedef struct urb t_urb, *tp_urb;
+struct SasemDevice {
+	struct usb_device *Device;
+	struct usb_endpoint_descriptor *DescriptorIn;
+	struct usb_endpoint_descriptor *DescriptorOut;
+	struct urb *UrbIn;
+	struct urb *UrbOut;
+	struct timeval PressTime;
+	unsigned int InterfaceNum;
+	int	Devnum;
+	unsigned char BufferIn[MAX_INTERRUPT_DATA];
+	unsigned char BufferOut[MAX_INTERRUPT_DATA];
+	struct semaphore SemLock;
 
-typedef struct semaphore t_semaphore, *tp_semaphore;
-
-typedef struct lirc_plugin t_lirc_plugin, *tp_lirc_plugin;
-typedef struct lirc_buffer t_lirc_buffer;
-
-struct sasemDevice {
-	t_usb_device *m_device;
-	t_usb_endpoint_descriptor *m_descriptorIn;
-	t_usb_endpoint_descriptor *m_descriptorOut;
-	t_urb *m_urbIn;
-	t_urb *m_urbOut;
-	unsigned int m_iInterfaceNum;
-	int	m_iDevnum;
-	unsigned char m_cBufferIn[MAX_INTERRUPT_DATA];
-	t_semaphore m_semLock;
-
-	char m_cLastCode[MAX_INTERRUPT_DATA];
-	int m_iCodeSaved;
+	char LastCode[MAX_INTERRUPT_DATA];
+	int CodeSaved;
 	
 	/* lirc */
-	t_lirc_plugin *m_lircPlugin;
-	int m_iConnected;
+	struct lirc_plugin *LircPlugin;
+	int Connected;
+
+	/* LCDProc */
+	int Open;
+	wait_queue_head_t QueueWrite;
+	wait_queue_head_t QueueOpen;
 };
 
-typedef struct sasemDevice t_sasemDevice, *tp_sasemDevice;
+#ifndef KERNEL_2_5
+static void * SasemProbe(struct usb_device *Device, unsigned InterfaceNum,
+		const struct usb_device_id *ID);
+static void SasemDisconnect(struct usb_device *Device, void *Ptr);
+static void SasemCallbackIn(struct urb *Urb);
+static void SasemCallbackOut(struct urb *Urb);
+#else
+static int SasemProbe(struct usb_interface *Int,
+		      const struct usb_device_id *ID);
+static void SasemDisconnect(struct usb_interface *Int); 
+static void SasemCallbackIn(struct urb *Urb, struct pt_regs *regs);
+static void SasemCallbackOut(struct urb *Urb, struct pt_regs *regs);
+#endif
 
-static void* s_sasemProbe(t_usb_device *p_dev, unsigned p_iInterfaceNum,
-			  const t_usb_device_id *p_id);
-static void s_sasemDisconnect(t_usb_device *p_dev, void *p_ptr);
-static void s_sasemCallbackIn(t_urb *p_urb);
+/* lirc */
+static int UnregisterFromLirc(struct SasemDevice *SasemDevice);
+static int LircSetUseInc(void *Data);
+static void LircSetUseDec(void *Data);
 
-static int s_unregister_from_lirc(t_sasemDevice *p_sasemDevice);
-static int s_lirc_set_use_inc(void *p_data);
-static void s_lirc_set_use_dec(void *p_data);
+#define IOCTL_GET_HARD_VERSION  1
+#define IOCTL_GET_DRV_VERSION   2
+
+static int SasemFSOpen(struct inode *Inode, struct file *File);
+static int SasemFSRelease(struct inode *Inode, struct file *File);
+static ssize_t SasemFSWrite(struct file *File, const char *Buffer,
+			size_t Count, loff_t *Pos);
+static ssize_t SasemFSRead(struct file *File, char *Buffer,
+			size_t Count, loff_t *Unused_pos);
+static int SasemFSIoctl(struct inode *Inode, struct file *File,
+			unsigned Cmd, unsigned long Arg);
+static unsigned SasemFSPoll(struct file *File, poll_table *Wait);
+
+#endif

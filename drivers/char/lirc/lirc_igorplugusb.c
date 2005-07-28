@@ -59,6 +59,7 @@
 #include <linux/poll.h>
 #include <linux/smp_lock.h>
 #include <linux/time.h>
+
 #include "kcompat.h"
 #include "lirc.h"
 #include "lirc_dev.h"
@@ -246,7 +247,6 @@ struct irctl {
 
 	/* lirc */
 	struct lirc_plugin *p;
-	int connected;
 
 	/* handle sending (init strings) */
 	int send_flags;
@@ -259,7 +259,6 @@ static int unregister_from_lirc(struct irctl *ir)
 {
 	struct lirc_plugin *p = ir->p;
 	int devnum;
-	int rtn;
 
 	if(!ir->p)
         	return -EINVAL;
@@ -267,28 +266,7 @@ static int unregister_from_lirc(struct irctl *ir)
 	devnum = ir->devnum;
 	dprintk(DRIVER_NAME "[%d]: unregister from lirc called\n", devnum);
 
-	if ((rtn = lirc_unregister_plugin(p->minor)) > 0) {
-		printk(DRIVER_NAME "[%d]: error in lirc_unregister minor: %d\n"
-			"Trying again...\n", devnum, p->minor);
-		if (rtn == -EBUSY) {
-			printk(DRIVER_NAME
-				"[%d]: device is opened, will unregister"
-				" on close\n", devnum);
-			return -EAGAIN;
-		}
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ);
-
-		if ((rtn = lirc_unregister_plugin(p->minor)) > 0) {
-			printk(DRIVER_NAME "[%d]: lirc_unregister failed\n",
-			devnum);
-		}
-	}
-
-	if (rtn != SUCCESS) {
-		dprintk(DRIVER_NAME "[%d]: didn't free resources\n", devnum);
-		return -EAGAIN;
-	}
+	lirc_unregister_plugin(p->minor);
 
 	printk(DRIVER_NAME "[%d]: usb remote disconnected\n", devnum);
 
@@ -312,11 +290,9 @@ static int set_use_inc(void *data)
 
 	MOD_INC_USE_COUNT;
 
-	if (!ir->connected) {
-		if (!ir->usbdev)
-			return -ENODEV;
-
-		ir->connected = 1;
+	if (!ir->usbdev)
+	{
+		return -ENODEV;
 	}
 
 	return SUCCESS;
@@ -332,12 +308,6 @@ static void set_use_dec(void *data)
 	}
 	dprintk(DRIVER_NAME "[%d]: set use dec\n", ir->devnum);
 
-	if (ir->connected) {
-		IRLOCK;
-		ir->connected = 0;
-                unregister_from_lirc(ir);
-		IRUNLOCK;
-	}
 	MOD_DEC_USE_COUNT;
 }
 
@@ -536,6 +506,7 @@ static void *usb_remote_probe(struct usb_device *dev, unsigned int ifnum,
 			plugin->set_use_dec = &set_use_dec;
 			plugin->sample_rate = SAMPLE_RATE;    /* per second */
 			plugin->add_to_buf = &usb_remote_poll;
+			plugin->owner = THIS_MODULE;
 
 			init_MUTEX(&ir->lock);
 			init_waitqueue_head(&ir->wait_out);
@@ -578,7 +549,6 @@ static void *usb_remote_probe(struct usb_device *dev, unsigned int ifnum,
 	ir->devnum = devnum;
 	ir->usbdev = dev;
 	ir->len_in = DEVICE_BUFLEN+DEVICE_HEADERLEN;
-	ir->connected = 0;
 	ir->in_space = 1; /* First mode2 event is a space. */
 	do_gettimeofday(&ir->last_time);
 

@@ -1,4 +1,4 @@
-/*      $Id: kcompat.h,v 5.9 2004/09/05 16:48:48 lirc Exp $      */
+/*      $Id: kcompat.h,v 5.11 2005/02/19 15:12:58 lirc Exp $      */
 
 #ifndef _KCOMPAT_H
 #define _KCOMPAT_H
@@ -69,12 +69,12 @@ static inline void del_timer_sync(struct timer_list * timerlist)
 #endif /* DEVFS 2.4 */
 
 #ifndef LIRC_HAVE_SYSFS
-#define class_destroy(x) do { } while(0)
-#define class_create(x,y) NULL
-#define class_device_destroy(x,y) do { } while(0)
-#define class_device_create(x, y, z, xx, yy) 0
+#define class_simple_destroy(x) do { } while(0)
+#define class_simple_create(x,y) NULL
+#define class_simple_device_remove(x) do { } while(0)
+#define class_simple_device_add(x, y, z, xx, yy) 0
 #define IS_ERR(x) 0
-struct class 
+struct class_simple 
 {
 	int notused;
 };	
@@ -84,25 +84,40 @@ struct class
 #define KERNEL_2_5
 
 /*
- * Recent kernels should handle some of this autmatically by 
- * increasing/decreasing use count when a dependant module is 
- * loaded/unloaded but we need to keep track when a chardev is 
- * opened/closed.
+ * We still are using MOD_INC_USE_COUNT/MOD_DEC_USE_COUNT in the set_use_inc 
+ * function of all modules for 2.4 kernel compatibility.
+ * 
+ * For 2.6 kernels reference counting is done in lirc_dev by 
+ * try_module_get()/module_put() because the old approach is racy.
+ * 
  */
 #ifdef MOD_INC_USE_COUNT
 #undef MOD_INC_USE_COUNT
 #endif
-#define MOD_INC_USE_COUNT try_module_get(THIS_MODULE)
+#define MOD_INC_USE_COUNT
 
 #ifdef MOD_DEC_USE_COUNT
 #undef MOD_DEC_USE_COUNT
 #endif
-#define MOD_DEC_USE_COUNT module_put(THIS_MODULE)
+#define MOD_DEC_USE_COUNT
 
 #ifdef EXPORT_NO_SYMBOLS
 #undef EXPORT_NO_SYMBOLS
 #endif
 #define EXPORT_NO_SYMBOLS
+
+#define WE_DONT_USE_LOCAL_OPEN_CLOSE 0
+
+#else  /* Kernel < 2.5.0 */
+
+static inline int try_module_get(struct module *module)
+{
+	return 1;
+}
+
+static inline void module_put(struct module *module)
+{
+}
 
 #endif /* Kernel >= 2.5.0 */
 
@@ -112,10 +127,6 @@ struct class
 
 #ifndef MODULE_PARM_DESC
 #define MODULE_PARM_DESC(x,y)
-#endif
-
-#ifndef MODULE_ALIAS_CHARDEV_MAJOR
-#define MODULE_ALIAS_CHARDEV_MAJOR(x)
 #endif
 
 #ifndef MODULE_DEVICE_TABLE
@@ -148,6 +159,42 @@ typedef void irqreturn_t;
 
 #if !defined(pci_pretty_name)
 #define pci_pretty_name(dev) ((dev)->name)
+#endif
+
+/*************************** I2C specific *****************************/
+#include <linux/i2c.h>
+
+#ifndef I2C_CLIENT_END
+#error "********************************************************"
+#error " Sorry, this driver needs the new I2C stack.            "
+#error " You can get it at http://www2.lm-sensors.nu/~lm78/.    "
+#error "********************************************************"
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 5, 0)
+
+#undef i2c_use_client
+#define i2c_use_client(client_ptr) do { \
+	if ((client_ptr)->adapter->inc_use) \
+		(client_ptr)->adapter->inc_use((client_ptr)->adapter); \
+} while (0)
+
+#undef i2c_release_client
+#define i2c_release_client(client_ptr) do { \
+	if ((client_ptr)->adapter->dec_use) \
+		(client_ptr)->adapter->dec_use((client_ptr)->adapter); \
+} while (0)
+
+#undef i2c_get_clientdata
+#define i2c_get_clientdata(client) ((client)->data)
+
+
+#undef i2c_set_clientdata
+#define i2c_set_clientdata(client_ptr, new_data) do { \
+	(client_ptr)->data = new_data; \
+} while (0)
+
+
 #endif
 
 #endif /* _KCOMPAT_H */

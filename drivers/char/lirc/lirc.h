@@ -1,4 +1,4 @@
-/*      $Id: lirc.h,v 5.8 2003/01/26 12:57:59 lirc Exp $      */
+/*      $Id: lirc.h,v 5.9 2005/02/27 15:05:39 lirc Exp $      */
 
 #ifndef _LINUX_LIRC_H
 #define _LINUX_LIRC_H
@@ -77,6 +77,7 @@ typedef int lirc_t;
 #define LIRC_GET_REC_CARRIER           _IOR('i', 0x00000004, __u32)
 #define LIRC_GET_SEND_DUTY_CYCLE       _IOR('i', 0x00000005, __u32)
 #define LIRC_GET_REC_DUTY_CYCLE        _IOR('i', 0x00000006, __u32)
+#define LIRC_GET_REC_RESOLUTION        _IOR('i', 0x00000007, __u32)
 
 /* code length in bits, currently only for LIRC_MODE_LIRCCODE */
 #define LIRC_GET_LENGTH                _IOR('i', 0x0000000f, __u32)

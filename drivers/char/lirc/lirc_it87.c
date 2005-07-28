@@ -402,6 +402,7 @@ static struct lirc_plugin plugin = {
        set_use_inc:    set_use_inc,
        set_use_dec:    set_use_dec,
        fops:           &lirc_fops,
+       owner:	       THIS_MODULE,
 };
 
 
@@ -812,14 +813,14 @@ static int init_port(void)
 	}
 	
 	/* get I/O port access and IRQ line */
-	retval = check_region(io, 8);
-	if (retval < 0) {
+	if (request_region(io, 8, LIRC_DRIVER_NAME) == NULL)
+	{
 		printk(KERN_ERR LIRC_DRIVER_NAME
 		       ": i/o port 0x%.4x already in use.\n",
 		       io);
 		/* Leaving MB PnP Mode */
 		it87_write(IT87_CFGCTRL, 0x2);
-		return retval;
+		return -EBUSY;
 	}
 
 	/* activate CIR-Device */
@@ -837,7 +838,6 @@ static int init_port(void)
 		return retval;
 	}
 
-	request_region(io, 8, LIRC_DRIVER_NAME);
 	printk(KERN_INFO LIRC_DRIVER_NAME
 	       ": I/O port 0x%.4x, IRQ %d.\n",
 	       io,

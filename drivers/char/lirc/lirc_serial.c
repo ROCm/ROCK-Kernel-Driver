@@ -1,4 +1,4 @@
-/*      $Id: lirc_serial.c,v 5.56 2004/09/05 16:48:49 lirc Exp $      */
+/*      $Id: lirc_serial.c,v 5.65 2005/02/19 15:13:02 lirc Exp $      */
 
 /****************************************************************************
  ** lirc_serial.c ***********************************************************
@@ -63,7 +63,7 @@
 
 #include <linux/config.h>
 
-#ifndef CONFIG_SERIAL_MODULE
+#if 0 /* defined(CONFIG_SERIAL) || defined(CONFIG_SERIAL_8250) */
 #warning "******************************************"
 #warning " Your serial port driver is compiled into "
 #warning " the kernel. You will have to release the "
@@ -156,6 +156,8 @@ static int softcarrier=1;
 #else
 static int softcarrier=0;
 #endif
+
+static int share_irq = 0;
 static int debug = 0;
 
 #define dprintk(fmt, args...)                                   \
@@ -266,8 +268,7 @@ static struct lirc_serial hardware[]=
 #define WBUF_LEN 256
 
 static int sense = -1;   /* -1 = auto, 0 = active high, 1 = active low */
-
-static spinlock_t lirc_lock = SPIN_LOCK_UNLOCKED;
+static int txsense = 0;   /* 0 = active high, 1 = active low */
 
 static int io = LIRC_PORT;
 static int irq = LIRC_IRQ;
@@ -332,12 +333,26 @@ static inline void soutp(int offset, int value)
 
 static inline void on(void)
 {
-	soutp(UART_MCR,hardware[type].on);
+	if (txsense)
+	{
+		soutp(UART_MCR,hardware[type].off);
+	}
+	else
+	{
+		soutp(UART_MCR,hardware[type].on);
+	}
 }
   
 static inline void off(void)
 {
-	soutp(UART_MCR,hardware[type].off);
+	if (txsense)
+	{
+		soutp(UART_MCR,hardware[type].on);
+	}
+	else
+	{
+		soutp(UART_MCR,hardware[type].off);
+	}
 }
 
 #ifndef MAX_UDELAY_MS
@@ -644,6 +659,12 @@ static irqreturn_t irq_handler(int i, void *blah, struct pt_regs *regs)
 	long deltv;
 	lirc_t data;
 	
+	if((sinp(UART_IIR) & UART_IIR_NO_INT))
+	{
+		/* not our interrupt */
+		return IRQ_RETVAL(IRQ_NONE);
+	}
+	
 	counter=0;
 	do{
 		counter++;
@@ -727,15 +748,13 @@ static irqreturn_t irq_handler(int i, void *blah, struct pt_regs *regs)
 	return IRQ_RETVAL(IRQ_HANDLED);
 }
 
-static DECLARE_WAIT_QUEUE_HEAD(power_supply_queue);
-
 static int init_port(void)
 {
 	unsigned long flags;
 
-        /* Check io region*/
 	
-        if((check_region(io,8))==-EBUSY)
+	/* Reserve io region. */
+	if(request_region(io, 8, LIRC_DRIVER_NAME)==NULL)
 	{
 		printk(KERN_ERR  LIRC_DRIVER_NAME  
 		       ": port %04x already in use\n", io);
@@ -747,9 +766,6 @@ static int init_port(void)
 		       ": make sure this module is loaded first\n");
 		return(-EBUSY);
 	}
-	
-	/* Reserve io region. */
-	request_region(io, 8, LIRC_DRIVER_NAME);
 	
 	local_irq_save(flags);
 	
@@ -767,7 +783,7 @@ static int init_port(void)
 	sinp(UART_MSR);
 	
 	/* Set line for power source */
-	soutp(UART_MCR, hardware[type].off);
+	off();
 	
 	/* Clear registers again to be sure. */
 	sinp(UART_LSR);
@@ -805,7 +821,8 @@ static int init_port(void)
 	{
 		/* wait 1 sec for the power supply */
 		
-		sleep_on_timeout(&power_supply_queue,HZ);
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(HZ);
 		
 		sense=(sinp(UART_MSR) & hardware[type].signal_pin) ? 1:0;
 		printk(KERN_INFO  LIRC_DRIVER_NAME  ": auto-detected active "
@@ -825,32 +842,26 @@ static int set_use_inc(void* data)
 	int result;
 	unsigned long flags;
 	
-	spin_lock(&lirc_lock);
-	if(MOD_IN_USE)
-	{
-		spin_unlock(&lirc_lock);
-		return -EBUSY;
-	}
-	
 	/* Init read buffer. */
 	if (lirc_buffer_init(&rbuf, sizeof(lirc_t), RBUF_LEN) < 0)
 		return -ENOMEM;
 	
 	/* initialize timestamp */
 	do_gettimeofday(&lasttv);
+
+	result=request_irq(irq,irq_handler,
+			   SA_INTERRUPT | (share_irq ? SA_SHIRQ:0),
+			   LIRC_DRIVER_NAME,(void *)&hardware);
 	
-	result=request_irq(irq,irq_handler,SA_INTERRUPT,LIRC_DRIVER_NAME,NULL);
 	switch(result)
 	{
 	case -EBUSY:
 		printk(KERN_ERR LIRC_DRIVER_NAME ": IRQ %d busy\n", irq);
-		spin_unlock(&lirc_lock);
                 lirc_buffer_free(&rbuf);
 		return -EBUSY;
 	case -EINVAL:
 		printk(KERN_ERR LIRC_DRIVER_NAME
 		       ": Bad irq number or handler\n");
-		spin_unlock(&lirc_lock);
                 lirc_buffer_free(&rbuf);
 		return -EINVAL;
 	default:
@@ -868,7 +879,6 @@ static int set_use_inc(void* data)
 	local_irq_restore(flags);
 	
 	MOD_INC_USE_COUNT;
-	spin_unlock(&lirc_lock);
 	return 0;
 }
 
@@ -884,8 +894,9 @@ static void set_use_dec(void* data)
 	soutp(UART_IER, sinp(UART_IER)&
 	      (~(UART_IER_MSI|UART_IER_RLSI|UART_IER_THRI|UART_IER_RDI)));
 	local_irq_restore(flags);
+
+	free_irq(irq, (void *)&hardware);
 	
-	free_irq(irq, NULL);
 	dprintk("freed IRQ %d\n", irq);
 	lirc_buffer_free(&rbuf);
 	
@@ -1013,6 +1024,7 @@ static struct lirc_plugin plugin = {
 	set_use_dec:	set_use_dec,
 	ioctl:		lirc_ioctl,
 	fops:		&lirc_fops,
+	owner:		THIS_MODULE,
 };
 
 #ifdef MODULE
@@ -1070,9 +1082,18 @@ MODULE_PARM_DESC(io, "I/O address base (0x3f8 or 0x2f8)");
 module_param(irq, int, 0444);
 MODULE_PARM_DESC(irq, "Interrupt (4 or 3)");
 
+module_param(share_irq, bool, 0444);
+MODULE_PARM_DESC(share_irq, "Share interrupts (0 = off, 1 = on)");
+
 module_param(sense, bool, 0444);
 MODULE_PARM_DESC(sense, "Override autodetection of IR receiver circuit"
 		 " (0 = active high, 1 = active low )");
+
+#ifdef LIRC_SERIAL_TRANSMITTER
+module_param(txsense, bool, 0444);
+MODULE_PARM_DESC(txsense, "Sense of transmitter circuit"
+		 " (0 = active high, 1 = active low )");
+#endif
 
 module_param(softcarrier, bool, 0444);
 MODULE_PARM_DESC(softcarrier, "Software carrier (0 = off, 1 = on)");

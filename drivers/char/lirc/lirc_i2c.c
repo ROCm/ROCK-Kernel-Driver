@@ -1,4 +1,4 @@
-/*      $Id: lirc_i2c.c,v 1.26 2004/09/05 16:48:48 lirc Exp $      */
+/*      $Id: lirc_i2c.c,v 1.34 2005/03/28 09:25:36 lirc Exp $      */
 
 /*
  * i2c IR lirc plugin for Hauppauge and Pixelview cards - new 2.3.x i2c stack
@@ -11,6 +11,10 @@
  *      Ulrich Mueller <ulrich.mueller42@web.de>
  * modified for Asus TV-Box and Creative/VisionTek BreakOut-Box by
  *      Stefan Jahn <stefan@lkcc.org>
+ * modified for inclusion into kernel sources by
+ *      Jerome Brock <jbrock@users.sourceforge.net>
+ * modified for Leadtek Winfast PVR2000 by
+ *      Thomas Reitmayr (treitmayr@yahoo.com)
  *
  * parts are cut&pasted from the old lirc_haup.c driver
  *
@@ -30,15 +34,12 @@
  *
  */
 
-#include <linux/version.h>
-#if LINUX_VERSION_CODE < 0x020200
-#error "--- Sorry, this driver needs kernel version 2.2.0 or higher. ---"
-#endif
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
 
+#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kmod.h>
 #include <linux/kernel.h>
@@ -49,25 +50,12 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
-
-#ifndef I2C_CLIENT_END
-#error "********************************************************"
-#error " Sorry, this driver needs the new I2C stack.            "
-#error " You can get it at http://www2.lm-sensors.nu/~lm78/.    "
-#error "********************************************************"
-#endif
-
 #include <linux/i2c-algo-bit.h>
 
 #include <asm/semaphore.h>
 
 #include "kcompat.h"
 #include "lirc_dev.h"
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
-#include "../drivers/char/bttv.h"
-#else
-#include "../drivers/media/video/bttv.h"
-#endif
 
 struct IR {
 	struct lirc_plugin l;
@@ -106,6 +94,35 @@ static inline int reverse(int data, int bits)
 	}
 
 	return c;
+}
+
+static int add_to_buf_adap(void* data, struct lirc_buffer* buf)
+{
+	struct IR *ir = data;
+	unsigned char keybuf[4];
+	
+	keybuf[0] = 0x00;
+	i2c_master_send(&ir->c,keybuf,1);
+	/* poll IR chip */
+	if(i2c_master_recv(&ir->c,keybuf,sizeof(keybuf)) != sizeof(keybuf))
+	{
+		dprintk("read error\n");
+		return -EIO;
+	}
+	
+	dprintk("key (0x%02x%02x%02x%02x)\n",
+		keybuf[0], keybuf[1], keybuf[2], keybuf[3]);
+	
+	/* key pressed ? */
+	if (keybuf[2] == 0xff)
+		return -ENODATA;
+	
+	/* remove repeat bit */
+	keybuf[2] &= 0x7f;
+	keybuf[3] |= 0x80;
+	
+	lirc_buffer_write_1(buf, keybuf);
+	return 0;
 }
 
 static int add_to_buf_pcf8574(void* data, struct lirc_buffer* buf)
@@ -152,18 +169,19 @@ static int add_to_buf_pcf8574(void* data, struct lirc_buffer* buf)
 	return 0;
 }
 
-static int add_to_buf_haup(void* data, struct lirc_buffer* buf)
+/* common for Hauppauge IR receivers */
+static int add_to_buf_haup_common(void* data, struct lirc_buffer* buf,
+		unsigned char* keybuf, int size, int offset)
 {
 	struct IR *ir = data;
-	unsigned char keybuf[3];
 	__u16 code;
 	unsigned char codes[2];
 
 	/* poll IR chip */
-	if (3 == i2c_master_recv(&ir->c,keybuf,3)) {
-		ir->b[0] = keybuf[0];
-		ir->b[1] = keybuf[1];
-		ir->b[2] = keybuf[2];
+	if (size == i2c_master_recv(&ir->c,keybuf,size)) {
+		ir->b[0] = keybuf[offset];
+		ir->b[1] = keybuf[offset+1];
+		ir->b[2] = keybuf[offset+2];
 		dprintk("key (0x%02x/0x%02x)\n", ir->b[0], ir->b[1]);
 	} else {
 		dprintk("read error\n");
@@ -182,6 +200,54 @@ static int add_to_buf_haup(void* data, struct lirc_buffer* buf)
 
 	/* return it */
 	lirc_buffer_write_1( buf, codes );
+	return 0;
+}
+
+/* specific for the Hauppauge PVR150 IR receiver */
+static int add_to_buf_haup_pvr150(void* data, struct lirc_buffer* buf)
+{
+	unsigned char keybuf[6];
+	/* fetch 6 bytes, first relevant is at offset 3 */
+	return add_to_buf_haup_common(data, buf, keybuf, 6, 3);
+}
+
+/* used for all Hauppauge IR receivers but the PVR150 */
+static int add_to_buf_haup(void* data, struct lirc_buffer* buf)
+{
+	unsigned char keybuf[3];
+	/* fetch 3 bytes, first relevant is at offset 0 */
+	return add_to_buf_haup_common(data, buf, keybuf, 3, 0);
+}
+
+
+static int add_to_buf_pvr2000(void* data, struct lirc_buffer* buf)
+{
+	struct IR *ir = data;
+	unsigned char key;
+	s32 flags;
+	s32 code;
+
+	/* poll IR chip */
+	if (-1 == (flags = i2c_smbus_read_byte_data(&ir->c,0x10))) {
+		dprintk("read error\n");
+		return -ENODATA;
+	}
+	/* key pressed ? */
+	if (0 == (flags & 0x80))
+		return -ENODATA;
+
+	/* read actual key code */
+	if (-1 == (code = i2c_smbus_read_byte_data(&ir->c,0x00))) {
+		dprintk("read error\n");
+		return -ENODATA;
+	}
+
+	key = code & 0xFF;
+
+	dprintk("IR Key/Flags: (0x%02x/0x%02x)\n", key, flags & 0xFF);
+
+	/* return it */
+	lirc_buffer_write_1( buf, &key );
 	return 0;
 }
 
@@ -207,7 +273,7 @@ static int add_to_buf_pv951(void* data, struct lirc_buffer* buf)
 	struct IR *ir = data;
 	unsigned char key;
 	unsigned char codes[4];
-	
+
 	/* poll IR chip */
 	if (1 != i2c_master_recv(&ir->c,&key,1)) {
 		dprintk("read error\n");
@@ -264,12 +330,7 @@ static int set_use_inc(void* data)
 	/* lock bttv in memory while /dev/lirc is in use  */
 	/* this is completely broken code. lirc_unregister_plugin()
 	   must be possible even when the device is open */
-#ifdef KERNEL_2_5
 	i2c_use_client(&ir->c);
-#else
-	if (ir->c.adapter->inc_use) 
-		ir->c.adapter->inc_use(ir->c.adapter);
-#endif
 
 	MOD_INC_USE_COUNT;
 	return 0;
@@ -279,19 +340,15 @@ static void set_use_dec(void* data)
 {
 	struct IR *ir = data;
 
-#ifdef KERNEL_2_5
 	i2c_release_client(&ir->c);
-#else
-	if (ir->c.adapter->dec_use) 
-		ir->c.adapter->dec_use(ir->c.adapter);
-#endif
 	MOD_DEC_USE_COUNT;
 }
 
 static struct lirc_plugin lirc_template = {
 	name:        "lirc_i2c",
 	set_use_inc: set_use_inc,
-	set_use_dec: set_use_dec
+	set_use_dec: set_use_dec,
+	owner:       THIS_MODULE
 };
 
 /* ----------------------------------------------------------------------- */
@@ -332,11 +389,7 @@ static int ir_attach(struct i2c_adapter *adap, int addr,
 	
 	ir->c.adapter = adap;
 	ir->c.addr    = addr;
-#ifdef KERNEL_2_5
 	i2c_set_clientdata(&ir->c, ir);
-#else
-	ir->c.data    = ir;
-#endif
 	ir->l.data    = ir;
 	ir->l.minor   = minor;
 	ir->l.sample_rate = 10;
@@ -354,11 +407,32 @@ static int ir_attach(struct i2c_adapter *adap, int addr,
 		ir->l.code_length = 32;
 		ir->l.add_to_buf=add_to_buf_pv951;
 		break;
+	case 0x71:
+		/* The PVR150 IR receiver uses the same protocol as other 
+		   Hauppauge cards, but the data flow is different, so we need
+		   to deal with it by its own.
+		 */
+		strcpy(ir->c.name,"Hauppauge IR (PVR150)");
+		ir->l.code_length = 13;
+		ir->l.add_to_buf=add_to_buf_haup_pvr150;
+		break;
+	case 0x6b:
+		strcpy(ir->c.name,"Adaptec IR");
+		ir->l.code_length = 32;
+		ir->l.add_to_buf=add_to_buf_adap;
+		break;
 	case 0x18:
 	case 0x1a:
-		strcpy(ir->c.name,"Hauppauge IR");
-		ir->l.code_length = 13;
-		ir->l.add_to_buf=add_to_buf_haup;
+		if (adap->id == (I2C_ALGO_BIT | I2C_HW_B_BT848)) {
+			strcpy(ir->c.name,"Hauppauge IR");
+			ir->l.code_length = 13;
+			ir->l.add_to_buf=add_to_buf_haup;
+		}
+		else {
+			strcpy(ir->c.name,"Leadtek IR");
+			ir->l.code_length = 8;
+			ir->l.add_to_buf=add_to_buf_pvr2000;
+		}
 		break;
 	case 0x30:
 		strcpy(ir->c.name,"KNC ONE IR");
@@ -385,31 +459,17 @@ static int ir_attach(struct i2c_adapter *adap, int addr,
 	/* register device */
 	i2c_attach_client(&ir->c);
 	ir->l.minor = lirc_register_plugin(&ir->l);
-#ifdef KERNEL_2_5
 	i2c_use_client(&ir->c);
-#else
-	if (ir->c.adapter->inc_use) 
-		ir->c.adapter->inc_use(ir->c.adapter);
-#endif
 	
 	return 0;
 }
 
 static int ir_detach(struct i2c_client *client)
 {
-#ifdef KERNEL_2_5
 	struct IR *ir = i2c_get_clientdata(client);
-#else
-        struct IR *ir = client->data;
-#endif
 	
 	/* unregister device */
-#ifdef KERNEL_2_5
 	i2c_release_client(&ir->c);
-#else
-	if (ir->c.adapter->dec_use) 
-		ir->c.adapter->dec_use(ir->c.adapter);
-#endif
 	lirc_unregister_plugin(ir->l.minor);
 	i2c_detach_client(&ir->c);
 
@@ -427,9 +487,20 @@ static int ir_probe(struct i2c_adapter *adap) {
 	   internal. 
 	   
 	   That's why we probe 0x1a (~0x34) first. CB 
+
+	   The i2c address for the Hauppauge PVR-150 card is 0xe2,
+	   so we need to probe 0x71 as well.
 	*/
 	
-	static const int probe[] = { 0x1a, 0x18, 0x4b, 0x64, 0x30, -1};
+	static const int probe[] = {
+		0x1a, /* Hauppauge IR external */
+		0x18, /* Hauppauge IR internal */
+		0x71, /* Hauppauge IR (PVR150) */
+		0x4b, /* PV951 IR */
+		0x64, /* Pixelview IR */
+		0x30, /* KNC ONE IR */
+		0x6b, /* Adaptec IR */
+		-1};
 	struct i2c_client c; char buf; int i,rc;
 
 	if (adap->id == (I2C_ALGO_BIT | I2C_HW_B_BT848)) {
@@ -447,6 +518,22 @@ static int ir_probe(struct i2c_adapter *adap) {
 			}
 		}
 	}
+
+#ifdef I2C_HW_B_CX2388x
+	/* Leadtek Winfast PVR2000 */
+	else if (adap->id == (I2C_ALGO_BIT | I2C_HW_B_CX2388x)) {
+		memset(&c,0,sizeof(c));
+		c.adapter = adap;
+		c.addr    = 0x18;
+		rc = i2c_master_recv(&c,&buf,1);
+		dprintk("probe 0x%02x @ %s: %s\n",
+			c.addr, adap->name, 
+			(1 == rc) ? "yes" : "no");
+		if (1 == rc) {
+			ir_attach(adap,c.addr,0,0);
+		}
+	}
+#endif
 
 	/* Asus TV-Box and Creative/VisionTek BreakOut-Box (PCF8574) */
 	else if (adap->id == (I2C_ALGO_BIT | I2C_HW_B_RIVA)) {
@@ -513,6 +600,8 @@ int init_module(void)
 {
 	request_module("bttv");
 	request_module("rivatv");
+	request_module("ivtv");
+	request_module("cx8800");
 	i2c_add_driver(&driver);
 	return 0;
 }
@@ -523,7 +612,7 @@ void cleanup_module(void)
 }
 
 MODULE_DESCRIPTION("Infrared receiver driver for Hauppauge and Pixelview cards (i2c stack)");
-MODULE_AUTHOR("Gerd Knorr, Michal Kochanowicz, Christoph Bartelmus, Ulrich Mueller, Stefan Jahn");
+MODULE_AUTHOR("Gerd Knorr, Michal Kochanowicz, Christoph Bartelmus, Ulrich Mueller, Stefan Jahn, Jerome Brock");
 MODULE_LICENSE("GPL");
 
 module_param(minor, int, 0444);

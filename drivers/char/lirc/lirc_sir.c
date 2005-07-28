@@ -48,7 +48,7 @@
  
 #include <linux/config.h>
 
-#if !defined(LIRC_ON_SA1100) && !defined(CONFIG_SERIAL_MODULE)
+#if 0 /* !defined(LIRC_ON_SA1100) && !defined(CONFIG_SERIAL_MODULE) */
 #warning "******************************************"
 #warning " Your serial port driver is compiled into "
 #warning " the kernel. You will have to release the "
@@ -302,7 +302,7 @@ static ssize_t lirc_read(struct file * file, char * buf, size_t count,
 	if(n%sizeof(lirc_t)) return(-EINVAL);
 	
 	add_wait_queue(&lirc_read_queue,&wait);
-	current->state=TASK_INTERRUPTIBLE;
+	set_current_state(TASK_INTERRUPTIBLE);
 	while(n<count)
 	{
 		if(rx_head!=rx_tail)
@@ -331,11 +331,11 @@ static ssize_t lirc_read(struct file * file, char * buf, size_t count,
 				break;
 			}
 			schedule();
-			current->state=TASK_INTERRUPTIBLE;
+			set_current_state(TASK_INTERRUPTIBLE);
 		}
 	}
 	remove_wait_queue(&lirc_read_queue,&wait);
-	current->state=TASK_RUNNING;
+	set_current_state(TASK_RUNNING);
 	return (n ? n : retval);
 }
 static ssize_t lirc_write(struct file * file, const char * buf, size_t n, loff_t * pos)
@@ -558,6 +558,7 @@ static struct lirc_plugin plugin = {
        set_use_inc:    set_use_inc,
        set_use_dec:    set_use_dec,
        fops:           &lirc_fops,
+       owner:          THIS_MODULE,
 };
 
 
@@ -664,9 +665,8 @@ static irqreturn_t sir_interrupt(int irq, void * dev_id,
 		deltv = delta(&last_tv, &curr_tv);
 		do
 		{
-			dprintk("t %lu , d %d\n", deltintrtv, (int)data);
 			data=Ser2UTDR;
-			//printk("data: %d\n",data);
+			dprintk("%d data: %u\n", n, (unsigned int) data);
 			n++;
 		}
 		while(status&UTSR0_RID && /* do not empty fifo in
@@ -1049,14 +1049,13 @@ static int init_port(void)
 {
 	int retval;
 	
-#ifndef LIRC_ON_SA1100
 	/* get I/O port access and IRQ line */
-	retval = check_region(io, 8);
-	if (retval < 0) {
+#ifndef LIRC_ON_SA1100
+	if(request_region(io, 8, LIRC_DRIVER_NAME) == NULL)
+	{
 		printk(KERN_ERR LIRC_DRIVER_NAME
-			": i/o port 0x%.4x already in use.\n",
-			io);
-		return retval;
+		       ": i/o port 0x%.4x already in use.\n", io);
+		return -EBUSY;
 	}
 #endif
 	retval = request_irq(irq, sir_interrupt, SA_INTERRUPT,
@@ -1068,7 +1067,6 @@ static int init_port(void)
 		return retval;
 	}
 #ifndef LIRC_ON_SA1100
-	request_region(io, 8, LIRC_DRIVER_NAME);
 	printk(KERN_INFO LIRC_DRIVER_NAME
 		": I/O port 0x%.4x, IRQ %d.\n",
 		io, irq);
@@ -1083,7 +1081,6 @@ static int init_port(void)
 
 static void drop_port(void)
 {
-	disable_irq(irq);
 	free_irq(irq, NULL);
 	del_timer_sync(&timerlist);
 #ifndef LIRC_ON_SA1100
@@ -1246,7 +1243,6 @@ static int init_lirc_sir(void)
 	if (retval < 0)
 		return retval;
 	init_hardware();
-	enable_irq(irq);
 	printk(KERN_INFO LIRC_DRIVER_NAME
 		": Installed.\n");
 	return 0;

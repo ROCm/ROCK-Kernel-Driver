@@ -25,7 +25,7 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * $Id: lirc_gpio.c,v 1.40 2004/08/07 10:06:08 lirc Exp $
+ * $Id: lirc_gpio.c,v 1.43 2005/04/14 12:04:44 lirc Exp $
  *
  */
 
@@ -47,13 +47,11 @@
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
 #include "../drivers/char/bttv.h"
-#include "../drivers/char/bttvp.h"
 #else
 #include "../drivers/media/video/bttv.h"
-#include "../drivers/media/video/bttvp.h"
 #endif
 
-#if BTTV_VERSION_CODE < KERNEL_VERSION(0,7,45)
+#if 0 /* BTTV_VERSION_CODE < KERNEL_VERSION(0,7,45) */
 #error "*******************************************************"
 #error " Sorry, this driver needs bttv version 0.7.45 or       "
 #error " higher. If you are using the bttv package, copy it to "
@@ -140,6 +138,7 @@ static struct rcv_info rcv_infos[] = {
 	 * distinguish between the two cards, we enable the extra bit
 	 * based on the card id: */
 	{BTTV_WINFAST2000,   0x6606107d, 0x000008f8,          0, 0x0000100,          0,   0,  0, 32},
+	{BTTV_WINFAST2000,   0x6609107d, 0x000008f8,          0, 0x0000100,          0,   0,  0, 32},
 	/* default: */
 	{BTTV_WINFAST2000,            0, 0x000000f8,          0, 0x0000100,          0,   0,  0, 32},
 #ifdef BTTV_GVBCTV5PCI
@@ -360,6 +359,7 @@ static struct lirc_plugin plugin = {
 	.get_queue	= get_queue,
 	.set_use_inc	= set_use_inc,
 	.set_use_dec	= set_use_dec,
+	.owner          = THIS_MODULE,
 };
 
 /*
@@ -520,26 +520,7 @@ int init_module(void)
  */
 void cleanup_module(void)
 {
-	int ret;
-
-	ret = lirc_unregister_plugin(minor);
- 
-	if (0 > ret) {
-		printk(LOGHEAD "error in lirc_unregister_minor: %d\n"
-		       "Trying again...\n",
-		       minor, ret);
-
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(HZ);
-
-		ret = lirc_unregister_plugin(minor);
- 
-		if (0 > ret) {
-			printk(LOGHEAD "error in lirc_unregister_minor: %d!!!\n",
-			       minor, ret);
-			return;
-		}
-	}
+	lirc_unregister_plugin(minor);
 
 	dprintk(LOGHEAD "module successfully unloaded\n", minor);
 }

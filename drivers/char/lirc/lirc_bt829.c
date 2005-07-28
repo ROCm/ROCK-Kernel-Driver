@@ -144,6 +144,7 @@ int init_module(void)
 	atir_plugin.add_to_buf  = atir_add_to_buf;
 	atir_plugin.set_use_inc = atir_set_use_inc;
 	atir_plugin.set_use_dec = atir_set_use_dec;
+	atir_plugin.owner       = THIS_MODULE;
 
 	atir_minor = lirc_register_plugin(&atir_plugin);
 	dprintk("ATIR driver is registered on minor %d\n",atir_minor);
