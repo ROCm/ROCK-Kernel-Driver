@@ -280,16 +280,6 @@ config ACPI_DEBUG
 	  of verbosity. Saying Y enables these statements. This will increase
 	  your kernel size by around 50K.
 
-config ACPI_DEBUG_LITE
-        bool "Print ACPI errors and warnings"
-        depends on ACPI
-        default n
-        help
-          Full ACPI_DEBUG output slows down the system significantly,
-	  even if not enabled during runtime.
-	  This variable takes care that errors and warnings will still be printed,
-	  but higher debug levels can not be enabled any more during runtime.
-
 config ACPI_BUS
 	bool
 	default y

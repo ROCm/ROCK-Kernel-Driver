@@ -45,8 +45,6 @@
 #define _ACUTILS_H
 
 
-#include <linux/module.h>
-
 typedef
 acpi_status (*acpi_pkg_callback) (
 	u8                              object_type,

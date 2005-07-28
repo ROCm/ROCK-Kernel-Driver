@@ -675,7 +675,7 @@ acpi_ut_get_descriptor_name (
 }
 
 
-#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER) || defined(ACPI_DEBUG_LITE)
+#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
 /*
  * Strings and procedures used for debug only
  */

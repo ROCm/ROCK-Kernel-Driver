@@ -690,9 +690,11 @@ acpi_ex_convert_to_target_type (
 
 
 	default:
-		ACPI_REPORT_ERROR (("Unknown Target type ID 0x%X dest_type %s\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"Unknown Target type ID 0x%X Op %s dest_type %s\n",
 			GET_CURRENT_ARG_TYPE (walk_state->op_info->runtime_args),
-		        acpi_ut_get_type_name (destination_type)));
+			walk_state->op_info->name, acpi_ut_get_type_name (destination_type)));
+
 		ACPI_REPORT_ERROR (("Bad Target Type (ARGI): %X\n",
 			GET_CURRENT_ARG_TYPE (walk_state->op_info->runtime_args)))
 		status = AE_AML_INTERNAL;

@@ -90,7 +90,7 @@ typedef u32                                     acpi_mutex_handle;
 #define NUM_MUTEX                       MAX_MUTEX+1
 
 
-#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER) || defined(ACPI_DEBUG_LITE)
+#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
 #ifdef DEFINE_ACPI_GLOBALS
 
 /* Names for the mutexes used in the subsystem */
