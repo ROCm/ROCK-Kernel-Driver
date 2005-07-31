@@ -117,6 +117,7 @@ extern int unaligned_enabled;
 extern int sysctl_ieee_emulation_warnings;
 #endif
 extern int sysctl_userprocess_debug;
+extern int spin_retry;
 #endif
 
 extern int sysctl_hz_timer;
@@ -664,8 +665,18 @@ static ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+#if defined(CONFIG_ARCH_S390)
 	{
-		.ctl_name	= KERN_DEFTIMESLICE, 
+		.ctl_name	= KERN_SPIN_RETRY,
+		.procname	= "spin_retry",
+		.data		= &spin_retry,
+		.maxlen		= sizeof (int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+#endif
+	{
+		.ctl_name	= KERN_DEFTIMESLICE,
 		.procname	= "def-timeslice",
 		.data		=  &def_timeslice,
 		.maxlen		= sizeof(int),
@@ -673,7 +684,7 @@ static ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 	{
-		.ctl_name	= KERN_MINTIMESLICE, 
+		.ctl_name	= KERN_MINTIMESLICE,
 		.procname	= "min-timeslice",
 		.data		= &min_timeslice,
 		.maxlen		= sizeof(int),
@@ -681,14 +692,13 @@ static ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 	{
-		.ctl_name	= KERN_HZ, 
+		.ctl_name	= KERN_HZ,
 		.procname	= "HZ",
 		.data		= &__HZ,
 		.maxlen		= sizeof(int),
 		.mode		= 0444,
 		.proc_handler	= &proc_dointvec,
 	},
-
 	{ .ctl_name = 0 }
 };
 
