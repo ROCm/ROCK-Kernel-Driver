@@ -785,10 +785,10 @@ kdbm_sc(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		goto out;
 
 	kdb_printf("scsi_cmnd at 0x%lx\n", addr);
-	kdb_printf("state = %d  owner = %d  device = 0x%p\nb",
-		    sc->state, sc->owner, sc->device);
-	kdb_printf("next = 0x%p  eh_state = %d done = 0x%p\n",
-		   sc->list.next, sc->eh_state, sc->done);
+	kdb_printf("device = 0x%p\nb",
+		    sc->device);
+	kdb_printf("next = 0x%p done = 0x%p\n",
+		   sc->list.next, sc->done);
 	kdb_printf("serial_number = %ld  retries = %d timeout = %d\n",
 		   sc->serial_number, sc->retries, sc->timeout);
 	kdb_printf("cmd_len = %d  old_cmd_len = %d\n",
@@ -803,8 +803,8 @@ kdbm_sc(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		   sc->data_cmnd[10], sc->data_cmnd[11]);
 	kdb_printf("request_buffer = 0x%p  request_bufflen = %d\n",
 		   sc->request_buffer, sc->request_bufflen);
-	kdb_printf("use_sg = %d  old_use_sg = %d sglist_len = %d abore_reason = %d\n",
-		   sc->use_sg, sc->old_use_sg, sc->sglist_len, sc->abort_reason);
+	kdb_printf("use_sg = %d  old_use_sg = %d sglist_len = %d\n",
+		   sc->use_sg, sc->old_use_sg, sc->sglist_len);
 	kdb_printf("bufflen = %d  buffer = 0x%p  underflow = %d transfersize = %d\n",
 		   sc->bufflen, sc->buffer, sc->underflow, sc->transfersize);
 	kdb_printf("tag = %d pid = %ld\n",
