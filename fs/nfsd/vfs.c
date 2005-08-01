@@ -878,7 +878,7 @@ out:
  * Helper function to page-align the write payload.
  */
 static inline int
-nfsd_page_align_payload(struct iovec *vec, int vlen)
+nfsd_page_align_payload(struct kvec *vec, int vlen)
 {
 	unsigned char *this_page, *prev_page;
 	int i, chunk0, chunk1;
