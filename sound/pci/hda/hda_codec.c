@@ -749,12 +749,14 @@ int snd_hda_mixer_amp_volume_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 	long *valp = ucontrol->value.integer.value;
 	int change = 0;
 
-	if (chs & 1)
+	if (chs & 1) {
 		change = snd_hda_codec_amp_update(codec, nid, 0, dir, idx,
 						  0x7f, *valp);
+		valp++;
+	}
 	if (chs & 2)
 		change |= snd_hda_codec_amp_update(codec, nid, 1, dir, idx,
-						   0x7f, valp[1]);
+						   0x7f, *valp);
 	return change;
 }
 
@@ -796,12 +798,15 @@ int snd_hda_mixer_amp_switch_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 	long *valp = ucontrol->value.integer.value;
 	int change = 0;
 
-	if (chs & 1)
+	if (chs & 1) {
 		change = snd_hda_codec_amp_update(codec, nid, 0, dir, idx,
 						  0x80, *valp ? 0 : 0x80);
+		valp++;
+	}
 	if (chs & 2)
 		change |= snd_hda_codec_amp_update(codec, nid, 1, dir, idx,
-						   0x80, valp[1] ? 0 : 0x80);
+						   0x80, *valp ? 0 : 0x80);
+	
 	return change;
 }
 
@@ -1541,8 +1546,11 @@ int snd_hda_check_board_config(struct hda_codec *codec, const struct hda_board_c
 		for (c = tbl; c->modelname || c->pci_subvendor; c++) {
 			if (c->pci_subvendor == subsystem_vendor &&
 			    (! c->pci_subdevice /* all match */||
-			     (c->pci_subdevice == subsystem_device)))
+			     (c->pci_subdevice == subsystem_device))) {
+				snd_printdd(KERN_INFO "hda_codec: PCI %x:%x, codec config %d is selected\n",
+					    subsystem_vendor, subsystem_device, c->config);
 				return c->config;
+			}
 		}
 	}
 	return -1;
@@ -1803,11 +1811,25 @@ int snd_hda_parse_pin_def_config(struct hda_codec *codec, struct auto_pin_cfg *c
 				cfg->line_out_pins[j] = nid;
 			}
 
-	/* Swap surround and CLFE: the association order is front/CLFE/surr/back */
-	if (cfg->line_outs >= 3) {
+	/* Reorder the surround channels
+	 * ALSA sequence is front/surr/clfe/side
+	 * HDA sequence is:
+	 *    4-ch: front/surr  =>  OK as it is
+	 *    6-ch: front/clfe/surr
+	 *    8-ch: front/clfe/side/surr
+	 */
+	switch (cfg->line_outs) {
+	case 3:
 		nid = cfg->line_out_pins[1];
 		cfg->line_out_pins[1] = cfg->line_out_pins[2];
 		cfg->line_out_pins[2] = nid;
+		break;
+	case 4:
+		nid = cfg->line_out_pins[1];
+		cfg->line_out_pins[1] = cfg->line_out_pins[3];
+		cfg->line_out_pins[3] = cfg->line_out_pins[2];
+		cfg->line_out_pins[2] = nid;
+		break;
 	}
 
 	return 0;
