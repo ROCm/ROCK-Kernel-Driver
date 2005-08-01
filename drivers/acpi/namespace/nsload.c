@@ -123,8 +123,11 @@ acpi_ns_load_table (
 	 * Check whether the table already exists -> then deny loading it again
 	 * Use OEM id and revision id of the table to identify uniqueness.
 	 */
-
-	for (count = 0;count < acpi_gbl_table_lists[table_desc->type].count; count++){
+	table_desc_loaded = acpi_gbl_table_lists[table_desc->type].next;
+	for (count = 0;
+	     count < acpi_gbl_table_lists[table_desc->type].count
+	       && table_desc_loaded != NULL;
+	     count++){
 		table_desc_loaded = acpi_gbl_table_lists[table_desc->type].next;
 		if (table_desc_loaded->loaded_into_namespace
 		    && table_desc_loaded->pointer->revision ==
@@ -134,8 +137,9 @@ acpi_ns_load_table (
 			){
 			ACPI_REPORT_WARNING (("Table %s has already been loaded (not bad)\n", 
 					      table_desc->pointer->oem_table_id));
-			return (AE_ALREADY_EXISTS);
+			return (AE_OK);
 		}
+		table_desc_loaded = table_desc_loaded->next;
 	}
 
 	/*
