@@ -29,6 +29,7 @@
  *	Sound core interface functions
  */
  
+struct device;
 extern int register_sound_special(struct file_operations *fops, int unit);
 extern int register_sound_special_device(struct file_operations *fops, int unit, struct device *dev);
 extern int register_sound_mixer(struct file_operations *fops, int dev);
