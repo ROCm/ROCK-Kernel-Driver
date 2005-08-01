@@ -874,6 +874,46 @@ out:
 	return err;
 }
 
+/*
+ * Helper function to page-align the write payload.
+ */
+static inline int
+nfsd_page_align_payload(struct iovec *vec, int vlen)
+{
+	unsigned char *this_page, *prev_page;
+	int i, chunk0, chunk1;
+
+	/* The following checks are just paranoia */
+	if (vlen < 2)
+		return 0;
+
+	if (vec[0].iov_len + vec[vlen-1].iov_len != PAGE_CACHE_SIZE)
+		return 0;
+	for (i = 1; i < vlen - 1; ++i) {
+		if (vec[i].iov_len != PAGE_CACHE_SIZE)
+			return 0;
+	}
+
+	chunk0 = vec[0].iov_len;
+	chunk1 = PAGE_CACHE_SIZE - chunk0;
+
+	this_page = (unsigned char *) vec[vlen-1].iov_base;
+	for (i = vlen-1; i; --i) {
+		prev_page = (unsigned char *) vec[i-1].iov_base;
+
+		/* Push trailing partial page so it's
+		 * aligned with the end of the page, then
+		 * pull up the missing chunk from the previous
+		 * page */
+		memmove(this_page + chunk0, this_page, chunk1);
+		memcpy(this_page, prev_page + chunk1, chunk0);
+		vec[i].iov_len = PAGE_CACHE_SIZE;
+		this_page = prev_page;
+	}
+
+	return 1;
+}
+
 static inline int
 nfsd_vfs_write(struct svc_rqst *rqstp, struct svc_fh *fhp, struct file *file,
 				loff_t offset, struct kvec *vec, int vlen,
@@ -916,6 +956,17 @@ nfsd_vfs_write(struct svc_rqst *rqstp, struct svc_fh *fhp, struct file *file,
 		stable = 0;
 	if (stable && !EX_WGATHER(exp))
 		file->f_flags |= O_SYNC;
+
+	/* Hack: if we're rewriting the file, make sure
+	 * we align the iovec properly to avoid costly
+	 * read-modify-write operations on the block devices.
+	 * This hack can go away once we have generic_file_writev.
+	 */
+	if ((offset < inode->i_size)
+	 && (cnt % PAGE_CACHE_SIZE) == 0
+	 && vec->iov_len != PAGE_CACHE_SIZE
+	 && nfsd_page_align_payload(vec, vlen))
+		vec++, vlen--;
 
 	/* Write the data. */
 	oldfs = get_fs(); set_fs(KERNEL_DS);
