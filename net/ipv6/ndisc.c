@@ -916,12 +916,7 @@ static void ndisc_recv_na(struct sk_buff *skb)
 				   "ICMPv6 NA: invalid link-layer address length\n");
 			return;
 		}
-	} else if (ipv6_addr_is_multicast(daddr)) {
-		ND_PRINTK2(KERN_WARNING
-			   "ICMPv6 NA: multicasted NA missing target link-layer address\n");
-		return;
 	}
-
 	if ((ifp = ipv6_get_ifaddr(&msg->target, dev, 1))) {
 		if (ifp->flags & IFA_F_TENTATIVE) {
 			addrconf_dad_failure(ifp);
@@ -959,11 +954,8 @@ static void ndisc_recv_na(struct sk_buff *skb)
 			 */
 			struct rt6_info *rt;
 			rt = rt6_get_dflt_router(saddr, dev);
-			if (rt) {
-				/* Mark as expired (may be in use elsewhere) */
-				rt->rt6i_expires = jiffies - 1;
+			if (rt)
 				ip6_del_rt(rt, NULL, NULL, NULL);
-			}
 		}
 
 out:
@@ -1134,7 +1126,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 	}
 
 	if (rt)
-		fib6_update_expiry(rt, lifetime);
+		rt->rt6i_expires = jiffies + (HZ * lifetime);
 
 	if (ra_msg->icmph.icmp6_hop_limit) {
 		in6_dev->cnf.hop_limit = ra_msg->icmph.icmp6_hop_limit;

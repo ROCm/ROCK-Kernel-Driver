@@ -269,6 +269,8 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 		return NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, ip6_maybe_reroute);
 	}
 
+	if (net_ratelimit())
+		printk(KERN_DEBUG "IPv6: sending pkt_too_big to self\n");
 	skb->dev = dst->dev;
 	icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, skb->dev);
 	IP6_INC_STATS(IPSTATS_MIB_FRAGFAILS);
@@ -473,9 +475,15 @@ static void ip6_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 #ifdef CONFIG_NETFILTER
 	to->nfmark = from->nfmark;
 	/* Connection association is same as pre-frag packet */
+	nf_conntrack_put(to->nfct);
 	to->nfct = from->nfct;
 	nf_conntrack_get(to->nfct);
 	to->nfctinfo = from->nfctinfo;
+#if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
+	nf_conntrack_put_reasm(to->nfct_reasm);
+	to->nfct_reasm = from->nfct_reasm;
+	nf_conntrack_get_reasm(to->nfct_reasm);
+#endif
 #ifdef CONFIG_BRIDGE_NETFILTER
 	nf_bridge_put(to->nf_bridge);
 	to->nf_bridge = from->nf_bridge;
@@ -865,6 +873,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 
 	fragheaderlen = sizeof(struct ipv6hdr) + (opt ? opt->opt_nflen : 0);
+	maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen - sizeof(struct frag_hdr);
 
 	if (mtu <= sizeof(struct ipv6hdr) + IPV6_MAXPLEN) {
 		if (inet->cork.length + length > sizeof(struct ipv6hdr) + IPV6_MAXPLEN - fragheaderlen) {
@@ -888,11 +897,6 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	 *        are too large.
 	 * --yoshfuji 
 	 */
-
-	if (fragheaderlen + inet->cork.length + length <= mtu)
-		maxfraglen = mtu;
-	else
-		maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen - sizeof(struct frag_hdr);
 
 	inet->cork.length += length;
 
