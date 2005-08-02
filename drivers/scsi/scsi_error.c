@@ -1586,16 +1586,9 @@ static void scsi_invoke_strategy_handler(struct Scsi_Host *shost)
 	list_for_each_safe(lh, lh_sf, &eh_work_q) {
 		scmd = list_entry(lh, struct scsi_cmnd, eh_entry);
 
-		if ((scmd->eh_eflags & SCSI_EH_CANCEL_CMD) || 
-		    !SCSI_SENSE_VALID(scmd))
-			continue;
 		scmd->retries = scmd->allowed;
 		scsi_eh_finish_cmd(scmd, &eh_done_q);
 	}
-
-	if (!list_empty(&eh_work_q))
-		if (!scsi_eh_abort_cmds(&eh_work_q, &eh_done_q))
-			scsi_eh_ready_devs(shost, &eh_work_q, &eh_done_q);
 
 	scsi_eh_flush_done_q(&eh_done_q);
 }
