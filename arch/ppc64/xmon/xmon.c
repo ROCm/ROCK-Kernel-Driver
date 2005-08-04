@@ -132,11 +132,14 @@ static void csum(void);
 static void bootcmds(void);
 void dump_segments(void);
 static void symbol_lookup(void);
+static void xmon_show_stack(unsigned long sp, unsigned long lr, unsigned long pc);
 static void xmon_print_symbol(unsigned long address, const char *mid,
 			      const char *after);
 static const char *getvecname(unsigned long vec);
 
 static void debug_trace(void);
+
+int xmon_no_auto_backtrace;
 
 extern int print_insn_powerpc(unsigned long, unsigned long, int);
 extern void printf(const char *fmt, ...);
@@ -771,6 +774,10 @@ cmds(struct pt_regs *excp)
 
 	last_cmd = NULL;
 	xmon_regs = excp;
+
+	if (!xmon_no_auto_backtrace++)
+		xmon_show_stack(excp->gpr[1], excp->link, excp->nip);
+
 	for(;;) {
 #ifdef CONFIG_SMP
 		printf("%x:", smp_processor_id());
@@ -2496,15 +2503,25 @@ static void dump_stab(void)
 	}
 }
 
-void xmon_init(void)
+void xmon_init(int enable)
 {
-	__debugger = xmon;
-	__debugger_ipi = xmon_ipi;
-	__debugger_bpt = xmon_bpt;
-	__debugger_sstep = xmon_sstep;
-	__debugger_iabr_match = xmon_iabr_match;
-	__debugger_dabr_match = xmon_dabr_match;
-	__debugger_fault_handler = xmon_fault_handler;
+	if (enable) {
+		__debugger = xmon;
+		__debugger_ipi = xmon_ipi;
+		__debugger_bpt = xmon_bpt;
+		__debugger_sstep = xmon_sstep;
+		__debugger_iabr_match = xmon_iabr_match;
+		__debugger_dabr_match = xmon_dabr_match;
+		__debugger_fault_handler = xmon_fault_handler;
+	} else {
+		__debugger = NULL;
+		__debugger_ipi = NULL;
+		__debugger_bpt = NULL;
+		__debugger_sstep = NULL;
+		__debugger_iabr_match = NULL;
+		__debugger_dabr_match = NULL;
+		__debugger_fault_handler = NULL;
+	}
 }
 
 void dump_segments(void)

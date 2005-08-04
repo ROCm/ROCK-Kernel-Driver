@@ -92,6 +92,8 @@ extern void udbg_init_maple_realmode(void);
 	do { ppc_md.udbg_putc = call_rtas_display_status_delay; } while(0)
 #endif
 
+extern int xmon_no_auto_backtrace;
+
 /* extern void *stab; */
 extern unsigned long klimit;
 
@@ -627,7 +629,7 @@ void __init setup_system(void)
 	 * Initialize xmon
 	 */
 #ifdef CONFIG_XMON_DEFAULT
-	xmon_init();
+	xmon_init(1);
 #endif
 	/*
 	 * Register early console
@@ -1350,11 +1352,15 @@ static int __init early_xmon(char *p)
 	/* ensure xmon is enabled */
 	if (p) {
 		if (strncmp(p, "on", 2) == 0)
-			xmon_init();
+			xmon_init(1);
+		if (strncmp(p, "off", 3) == 0)
+			xmon_init(0);
+		if (strncmp(p, "nobt", 4) == 0)
+			xmon_no_auto_backtrace = 1;
 		if (strncmp(p, "early", 5) != 0)
 			return 0;
 	}
-	xmon_init();
+	xmon_init(1);
 	debugger(NULL);
 
 	return 0;
