@@ -132,6 +132,8 @@ acpi_ns_load_table (
 		if (table_desc_loaded->loaded_into_namespace
 		    && table_desc_loaded->pointer->revision ==
 			       table_desc->pointer->revision
+		    && table_desc_loaded->pointer->checksum ==
+			       table_desc->pointer->checksum
 		    && !memcmp(table_desc_loaded->pointer->oem_table_id, 
 			       table_desc->pointer->oem_table_id, 8)
 			){
