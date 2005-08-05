@@ -17,6 +17,8 @@
 #ifndef __SUBDOMAIN_H
 #define __SUBDOMAIN_H
 
+#define __INLINE__ inline
+
 // #define SUBDOMAIN_FS
 
 /* for IFNAMSIZ */
@@ -137,9 +139,6 @@ struct sdprofile {
 	struct nd_entry *net_entryp[POS_KERN_COD_NET_MAX - POS_KERN_COD_NET_MIN + 1];
 	struct list_head list;		/* list of profiles */
 	struct list_head sub;		/* sub profiles, for change_hat */
-#if defined NETDOMAIN && defined NETDOMAIN_SKUSERS
-	struct list_head sk_users;	/* list of listening TCP + UDP */
-#endif
 	struct flagval   flags;		/* per profile debug flags */
 
 	int	isstale;		/* is profile stale */
@@ -181,43 +180,6 @@ struct sd_path_data {
 	struct list_head *head, *pos;
 	int errno;
 };
-
-#ifdef NETDOMAIN
-/*
- * netdomain, a socket's subdomain
- * 
- * Stored in sock->security upon socket creation to hold information
- * necessary for netdomain.
- *
- * - active is used to determine when original active profile
- *   used for connecting/accepting tcp connection has changed (changehat
- *   or profile replacement)
- *
- * - tcpconntype is used to determine how the original tcp socket was
- *   created, either via local host accepting or local host connecting
- *   This information is used to revaluate permissions if the cached
- *   active subdomain is determined to be different that the tasks
- *   current subdomain.
- */
-
-#define ND_ID_MAGIC	SD_ID_MAGIC
-
-struct netdomain {
-	__u32				nd_magic;
-	struct sdprofile		*active;
-#ifdef NETDOMAIN_SKUSERS
-	struct list_head 		sk_users_next;
-	struct sock*			sk;
-#endif
-	__u8 				iface_checked;
-	enum{nd_mode_none,
-	     nd_mode_listening,
-	     nd_mode_accepted, 
-	     nd_mode_connected} 	tcpmode;
-};
-
-#define ND_NETDOMAIN(sec)	((struct netdomain*)(sec))
-#endif /* NETDOMAIN */
 
 #define SD_SUBDOMAIN(sec)	((struct subdomain*)(sec))
 #define SD_PROFILE(sec)		((struct sdprofile*)(sec))
@@ -281,13 +243,6 @@ extern const char *subdomain_version_nl(void);
 #if defined (PRINTK_TEMPFIX) && ( defined (CONFIG_SMP) || defined (CONFIG_PREEMPT))
 extern volatile int sd_log_buf_has_data;
 extern void dump_sdprintk (void);
-#endif
-
-#ifdef NETDOMAIN
-/* netdomain.c */
-#ifdef NETDOMAIN_SKUSERS
-extern void nd_skusers_exch(struct sdprofile *old, struct sdprofile *new, int all);
-#endif
 #endif
 
 #endif // __SUBDOMAIN_H

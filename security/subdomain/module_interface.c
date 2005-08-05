@@ -41,22 +41,22 @@ typedef struct {
 	u32  version;
 } sd_ext;
 
-static inline int
-sd_inbounds (void *p, sd_ext *e, int size)
+static __INLINE__ int
+sd_inbounds (void *p, sd_ext *e, size_t size)
 {
 	return (p+size <= e->end);
 }
 
-static inline void *
-sd_inc(void *p, sd_ext *e, int size)
+static __INLINE__ void *
+sd_inc(void *p, sd_ext *e, size_t size)
 {
 	if (sd_inbounds(p, e, size))
 		return p+size;
-	SD_DEBUG("%s: requested inc of %d bytes out of bounds (start %p, extent %p, pos %p\n", INTERFACE_ID, size, e->start, e->end, p);
+	SD_DEBUG("%s: requested inc of %zd bytes out of bounds (start %p, extent %p, pos %p\n", INTERFACE_ID, size, e->start, e->end, p);
 	return 0;
 }
 
-static inline void *
+static __INLINE__ void *
 sd_is_X (void *p, sd_ext *e, enum sd_code code, int required)
 {
 	__u8 *b = (__u8 *) p;
@@ -72,7 +72,7 @@ sd_is_X (void *p, sd_ext *e, enum sd_code code, int required)
 	return 0;
 }
 
-static inline void *
+static __INLINE__ void *
 sd_read8 (void *p, sd_ext *e, __u8 *b)
 {
 	__u8 *c = (__u8 *) p;
@@ -81,7 +81,7 @@ sd_read8 (void *p, sd_ext *e, __u8 *b)
 	return sd_inc(p, e, 1);
 }
 
-static inline void *
+static __INLINE__ void *
 sd_read16 (void *p, sd_ext *e, __u16 *b)
 {
 	__u16 *c = (__u16 *) p;
@@ -90,7 +90,7 @@ sd_read16 (void *p, sd_ext *e, __u16 *b)
 	return sd_inc(p, e, 2);
 }
 
-static inline void *
+static __INLINE__ void *
 sd_read32 (void *p, sd_ext *e, __u32 *b)
 {
 	__u32 *c = (__u32 *) p;
@@ -180,7 +180,7 @@ sd_is_blob (void *p, sd_ext *e, char *name, __u32 *len)
 	return 0;
 }
 
-static inline void *
+static __INLINE__ void *
 sd_read8_t (void *p, sd_ext *e, __u8 *b, char *name)
 {
 	void *c;
@@ -193,7 +193,7 @@ sd_read8_t (void *p, sd_ext *e, __u8 *b, char *name)
 	return 0;
 }
 
-static inline void *
+static __INLINE__ void *
 sd_read16_t (void *p, sd_ext *e, __u16 *b, char *name)
 {
 	void *c;
@@ -205,7 +205,7 @@ sd_read16_t (void *p, sd_ext *e, __u16 *b, char *name)
 	return 0;
 }
 
-static inline void *
+static __INLINE__ void *
 sd_read32_t (void *p, sd_ext *e, __u32 *b, char *name)
 {
 	void *c;
@@ -230,25 +230,25 @@ sd_read_blob (void *p, sd_ext *e, char *name, void *buf, int size)
 	return 0;
 }
 
-inline void *
+static __INLINE__ void *
 sd_read_structhead(void *p, sd_ext *e, char *name)
 {
 	return sd_is_X_name(p, e, SD_STRUCT, name, name!=NULL);
 }
 
-inline void *
+static __INLINE__ void *
 sd_read_structend(void *p, sd_ext *e)
 {
 	return sd_is_X(p, e, SD_STRUCTEND, 1);
 }
 
-inline void *
+static __INLINE__ void *
 sd_read_listhead(void *p, sd_ext *e, char *name)
 {
 	return sd_is_X_name(p, e, SD_LIST, name, name!=NULL);
 }
 
-inline void *
+static __INLINE__ void *
 sd_read_listend(void *p, sd_ext *e)
 {
 	return sd_is_X(p, e, SD_LISTEND, 1);
@@ -277,7 +277,7 @@ sd_get_string(void *p, sd_ext *e, int maxsize, char *name, char **string)
 	return 0;
 }
 
-static inline void *
+static __INLINE__ void *
 sd_activate_net_entry(void *p, sd_ext *e, struct nd_entry **r_entry)
 {
 	char *iface = NULL;
@@ -401,7 +401,7 @@ sd_activate_net_entry(void *p, sd_ext *e, struct nd_entry **r_entry)
 }
 
 /* use in place of get_pattern */
-static inline void *
+static __INLINE__ void *
 sd_activate_pattern(void *p, sd_ext *e, pcre **r_pcre)
 {
 	pcre *pattern_k = NULL;
@@ -447,7 +447,7 @@ sd_activate_pattern(void *p, sd_ext *e, pcre **r_pcre)
 	return 0;
 }
 
-static inline void *
+static __INLINE__ void *
 sd_activate_file_entry(void *p, sd_ext *e, struct sd_entry **r_entry)
 {
 	char *name = NULL,
@@ -522,7 +522,7 @@ sd_activate_file_entry(void *p, sd_ext *e, struct sd_entry **r_entry)
 	return 0;
 }
 
-static inline int
+static __INLINE__ int
 check_rule_and_add(struct sd_entry *file_entry, struct sdprofile *profile,
 		   char **message)
 {
@@ -568,7 +568,7 @@ check_rule_and_add(struct sd_entry *file_entry, struct sdprofile *profile,
 	return 0;
 }
 
-static inline int
+static __INLINE__ int
 check_netrule_and_add(struct nd_entry *net_entry, struct sdprofile *profile,
 		      char **message)
 {
@@ -882,13 +882,6 @@ sd_file_prof_repl (void *udata, size_t size)
 
 		sd_subdomainlist_iterate(taskreplace_iter, (void*)&data);
 
-#if defined NETDOMAIN && defined NETDOMAIN_SKUSERS
-		/* Change any sockets (soft intr context) using old profile
-		 * to use new profile
-		 */
-		nd_skusers_exch(data.old_profile, data.new_profile, 0);
-#endif
-
 		/* mark old profile as stale */
 		data.old_profile->isstale=1;
 
@@ -922,11 +915,6 @@ sd_file_prof_remove (const char *name, size_t size)
 
 		/* remove profile from any tasks using it */
 		sd_subdomainlist_iterateremove(taskremove_iter, (void*)old_profile);
-
-#if defined NETDOMAIN && defined NETDOMAIN_SKUSERS
-		/* drop all netdomains using this profile */
-		nd_skusers_exch(old_profile, NULL, 1);
-#endif
 
 		/* drop reference obtained by sd_profilelist_find */
 		put_sdprofile(old_profile);

@@ -41,7 +41,7 @@
  *
  * Simple wrapper for kfree.
  */
-static inline void put_name(char *name)
+static __INLINE__ void put_name(char *name)
 {
 	if (name){
 		kfree(name);
@@ -54,14 +54,14 @@ static inline void put_name(char *name)
  *
  * Simple wrapper for kfree.
  */
-static inline void put_pattern(pcre *pattern)
+static __INLINE__ void put_pattern(pcre *pattern)
 {
 	if (pattern){
 		kfree(pattern);
 	}
 }
 
-static inline void put_sd_entry(struct sd_entry *entry)
+static __INLINE__ void put_sd_entry(struct sd_entry *entry)
 {
 	if (entry) {
 		put_name (entry->filename);
@@ -76,7 +76,7 @@ static inline void put_sd_entry(struct sd_entry *entry)
 /*
  * free_sd_entry - destroy existing sd_entry 
  */
-static inline void free_sd_entry(struct sd_entry *entry)
+static __INLINE__ void free_sd_entry(struct sd_entry *entry)
 {
 	if (entry) {
 		kfree(entry);
@@ -89,7 +89,7 @@ static inline void free_sd_entry(struct sd_entry *entry)
  * Creates, zeroes and returns a new network subdomain structure.
  * Returns NULL on failure.
  */
-static inline struct nd_entry * alloc_nd_entry(void)
+static __INLINE__ struct nd_entry * alloc_nd_entry(void)
 {
 	struct nd_entry *entry;
 
@@ -104,7 +104,7 @@ static inline struct nd_entry * alloc_nd_entry(void)
 /*
  * free_nd_entry - destroy existing nd_entry 
  */
-static inline void free_nd_entry(struct nd_entry * entry)
+static __INLINE__ void free_nd_entry(struct nd_entry * entry)
 {
 	if (entry){
 		kfree(entry);
@@ -118,7 +118,7 @@ static inline void free_nd_entry(struct nd_entry * entry)
  * file entry structure.  Structure is zeroed.  Returns new structure on
  * success, NULL on failure.
  */
-static inline struct sd_entry * alloc_sd_entry(void) 
+static __INLINE__ struct sd_entry * alloc_sd_entry(void) 
 {
 	struct sd_entry *entry;
 
@@ -134,7 +134,7 @@ static inline struct sd_entry * alloc_sd_entry(void)
  * count_entries - counts sd (file) entries in a profile
  * @profile: profile to count
  */
-static inline void count_entries(struct sdprofile *profile)
+static __INLINE__ void count_entries(struct sdprofile *profile)
 {
 	struct sd_entry *entry;
 	int i, count=0;
@@ -169,7 +169,7 @@ static inline void count_entries(struct sdprofile *profile)
  * count_net_entries - counts non globbed sd (file) entries in a profile
  * @profile: profile to count
  */
-static inline void count_net_entries(struct sdprofile *profile)
+static __INLINE__ void count_net_entries(struct sdprofile *profile)
 {
 	struct nd_entry *entry;
 	int i, count = 0;
@@ -206,7 +206,7 @@ static inline void count_net_entries(struct sdprofile *profile)
  * put_iface - free interface name (simple kfree() wrapper)
  * @iface: pointer to interface name
  */
-static inline void put_iface(char *iface)
+static __INLINE__ void put_iface(char *iface)
 {
 	if (iface){
 		kfree(iface);
@@ -271,19 +271,6 @@ void free_sdprofile(struct sdprofile *profile)
 		BUG();
 	}
 
-#if defined NETDOMAIN && defined NETDOMAIN_SKUSERS
-	/* profile still has netdomains (sockets) using it.
-	* This is not possible, as the profile is put each time a nd_free
-	* is called on socket close
-	*/
-	if (!list_empty(&profile->sk_users)){
-		SD_ERROR("%s: internal error, profile '%s' still has sk_users\n",
-			__FUNCTION__,
-			profile->name);
-		BUG();
-	}
-#endif
-
 	for (sdent = profile->file_entry; sdent; sdent = next_sdent) {
 		next_sdent = sdent->next;
 		if (sdent->filename) {
@@ -335,7 +322,7 @@ void free_sdprofile(struct sdprofile *profile)
  *
  * @sd: task's subdomain
  */
-static inline void
+static __INLINE__ void
 task_remove(struct subdomain *sd)
 {
 	/* SD_WLOCK held here */
@@ -385,7 +372,7 @@ int remove=0;
  * @sd: task's subdomain
  * @new: old profile
  */
-static inline void
+static __INLINE__ void
 task_replace(struct subdomain *sd , struct sdprofile *new)
 {
 	struct sdprofile *subprofile = NULL;
@@ -452,25 +439,23 @@ struct sd_taskreplace_data *data = (struct sd_taskreplace_data *)cookie;
 }
 
 
+#ifdef SUBDOMAIN_PROCATTR
 int sd_setprocattr_changehat(char *hatinfo, size_t infosize)
 {
-	int error = -EINVAL, tmplen;
+	int error = -EINVAL;
 	char *token=NULL, 
 	     *hat, *smagic, *tmp;
 	__u32 magic;
+	int rc, len, consumed;
 
 	SD_DEBUG("%s: %p %d\n",  
 		__FUNCTION__,
 		hatinfo, (int) infosize);
 
 	/* strip leading white space */
-	tmplen=infosize;
-	while (tmplen){
-		if (isblank(*hatinfo)){
-			hatinfo++;
-			infosize--;
-		}
-		tmplen--;
+	while(infosize && isblank(*hatinfo)) {
+		hatinfo++;
+		infosize--;
 	}
 
 	if (infosize == 0){
@@ -500,40 +485,33 @@ int sd_setprocattr_changehat(char *hatinfo, size_t infosize)
 		tmp++;
 	}
 
-	if (!*tmp){
+	if (!*tmp || tmp == token){
 		SD_WARN("%s: Invalid input '%s'\n", 
 			__FUNCTION__,
 			token);
 		goto out;
 	}
 
-	if (tmp == token){
-		/* no magic specified */
-		magic=0;
-	}else{
-		int rc, len, consumed;
-
-		/* split magic and hat into two strings */
-		*tmp = 0;
-		smagic = token;
+	/* split magic and hat into two strings */
+	*tmp = 0;
+	smagic = token;
 
 
-		/* 
-		 * Initially set consumed=strlen(magic), as if sscanf 
-		 * consumes all input via the %x it will not process the %n 
-		 * directive. Otherwise, if sscanf does not consume all the 
-		 * input it will process the %n and update consumed.
-		 */
-		consumed=len=strlen(smagic);
+	/* 
+	 * Initially set consumed=strlen(magic), as if sscanf 
+	 * consumes all input via the %x it will not process the %n 
+	 * directive. Otherwise, if sscanf does not consume all the 
+	 * input it will process the %n and update consumed.
+	 */
+	consumed=len=strlen(smagic);
 
-		rc=sscanf(smagic, "%x%n", &magic, &consumed);
-
-		if (rc != 1 || consumed != len){
-			SD_WARN("%s: Invalid hex magic %s\n", 
-				__FUNCTION__,
-				smagic);
-			goto out;
-		}
+	rc=sscanf(smagic, "%x%n", &magic, &consumed);
+	
+	if (rc != 1 || consumed != len){
+		SD_WARN("%s: Invalid hex magic %s\n", 
+			__FUNCTION__,
+			smagic);
+		goto out;
 	}
 
 	hat = tmp+1;
@@ -558,17 +536,17 @@ int sd_setprocattr_changehat(char *hatinfo, size_t infosize)
 		
 out:
 	if (token){
+		memset(token, 0, infosize);
 		kfree(token);
 	}
 
 	return error;
 }
 
-#ifdef SUBDOMAIN_PROCATTR
 int sd_setprocattr_setprofile(struct task_struct *p, char *profilename, 
 			      size_t profilesize)
 {
-	int error = -EINVAL, tmplen;
+	int error = -EINVAL;
 	struct sdprofile *profile;
 	char *name=NULL;
 
@@ -577,14 +555,9 @@ int sd_setprocattr_setprofile(struct task_struct *p, char *profilename,
 		current->comm, current->pid);	
 
 	/* strip leading white space */
-	tmplen=profilesize;
-	while (tmplen){
-		if (isblank(*profilename)){
-			profilename++;
-			profilesize--;
-		}
-
-		tmplen--;
+	while (profilesize && isblank(*profilename)) {
+		profilename++;
+		profilesize--;
 	}
 
 	if (profilesize == 0){
@@ -707,7 +680,7 @@ out:
 #endif // SUBDOMAIN_PROCATTR
 
 #ifdef SD_OLD_INTERFACE
-#  include "module_old_interface.c"
-#else
-#  include "module_interface.c"
+#error "Old interface is deprecated"
 #endif
+
+#include "module_interface.c"

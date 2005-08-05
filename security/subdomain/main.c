@@ -42,7 +42,7 @@
  * symbols.  So we force an enen number here by escaping.
  * This code will GO AWAY once syslog bug is fixed
  */
-static inline 
+static __INLINE__ 
 const char* _escape_percent(const char *name)
 {
 int count = 0, len = 0;
@@ -79,7 +79,9 @@ char *dptr, *newname = (char*)name;
 }		
 #endif // SYSLOG_TEMPFIX
 
-#if defined (PRINTK_TEMPFIX) && ( defined (CONFIG_SMP) || defined (CONFIG_PREEMPT))
+/* Linux kernel 2.6.10+ doesn't require the PRINTK_FIX */
+#if defined (PRINTK_TEMPFIX) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10) &&\
+            (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT))
 /* A local buffer to get around printk in sys_setscheduler problems */
 #define __LOG_BUF_LEN 4096
 
@@ -107,23 +109,25 @@ void dump_sdprintk()
 	spin_lock_irqsave(&logbuf_lock, flags);
 	start = log_start;
 	end = log_end;
-	if (start == end) goto done;
-	if (log_dumping) goto done;
-	overflow = log_overflow;
+	if (start == end || log_dumping) goto done;
+	/* buffer still has data but other CPUs don't need to try dumping it */
+	sd_log_buf_has_data = 0;
 	log_dumping = 1;
+	overflow = log_overflow;
 	spin_unlock_irqrestore(&logbuf_lock, flags);
 
-	/* printk can not be called with the logbuf_lock held, on systems with the
-         * printk scheduler locking bug (sd_printk isn't needed on systems without this
-         * bug).
-         * IF dump_sdprintk held the logbuf_lock around the printk, then there would
-         * be a race condition that could deadlock on SMP systems.
+	/* printk can not be called with the logbuf_lock held, on systems with
+	 * the printk scheduler locking bug (sd_printk isn't needed on systems
+	 * without this bug).
+         * IF dump_sdprintk held the logbuf_lock around the printk, then there
+	 * would be a race condition that could deadlock on SMP systems.
          * 1. CPU1 dump_sdprintk takes the logbuf_lock
-         * 2. CPU2 another cpu calls set_priority or set_scheduler taking the scheduler lock
-         *    the task is confined and subdomain goes to generate a reject message
-         *    thus attempting to take the logbuf_lock (spins)
-	 * 3. CPU1 printk finish and invokes the scheduler which tries to take the
-         *    scheduler lock (spins)
+         * 2. CPU2 another cpu calls set_priority or set_scheduler taking the
+	 *    scheduler lock the task is confined and subdomain goes to
+	 *    generate a reject message thus attempting to take the logbuf_lock
+	 *    (spins)
+	 * 3. CPU1 printk finish and invokes the scheduler which tries to take
+	 *    the scheduler lock (spins)
          * 4. Deadlock
 	 */
 
@@ -144,9 +148,11 @@ void dump_sdprintk()
 	}
 	log_start = end;
 	log_dumping = 0;
+	/* its possible data was inserted in the buffer while dumping
+	 * we don't loop or even check for this condition to guarentee
+	 * we exit.  Any data that got added will be dumped later 
+	 */
  done:
-	if (end == log_end)
-		sd_log_buf_has_data = 0;
 	spin_unlock_irqrestore(&logbuf_lock, flags);
 }
 
@@ -193,7 +199,7 @@ static asmlinkage int sd_printk(const char *fmt, ...)
 }
 #endif /* PRINTK_TEMPFIX */
 
-static inline 
+static __INLINE__ 
 const char* sd_getpattern_type(pattern_t ptype)
 {
 const char *ptype_names[] = {
@@ -217,7 +223,7 @@ const char *ptype_names[] = {
  *
  * Determine if request is for write access to /proc/self/attr/current
  */
-static inline 
+static __INLINE__ 
 int sd_taskattr_access(const char *procrelname)
 {
 /* 
@@ -241,7 +247,7 @@ const int maxbuflen=sizeof(buf);
  * This compares two pathnames and accounts for globbing name from the
  * sd_entry.  Returns 1 on match, 0 otherwise.
  */
-static inline 
+static __INLINE__ 
 int sd_pattern_match(const char *regex, pcre *compiled, const char *name)
 {
 int pcreret;
@@ -265,7 +271,7 @@ int retval;
  * This compares two pathnames and accounts for globbing name from the
  * sd_entry.  Returns 1 on match, 0 otherwise.
  */
-static inline 
+static __INLINE__ 
 int sd_path_match(const char *name, const char *pathname, pattern_t ptype)
 {
 	int retval;
@@ -295,7 +301,7 @@ int sd_path_match(const char *name, const char *pathname, pattern_t ptype)
  * @name: filename
  * @profile: profile
  */
-static inline 
+static __INLINE__ 
 int sd_file_mode(const char *name, struct sdprofile *profile)
 {
 	struct sd_entry *entry;
@@ -330,7 +336,7 @@ out:
  * This returns a refcounted vfsmount that matches via looking at
  * all mountpoints and returning the first match.  NULL on no match.
  */
-static inline
+static __INLINE__
 struct vfsmount *find_mnt(struct dentry *d)
 {
 	struct sd_path_data data;
@@ -366,7 +372,7 @@ struct vfsmount *find_mnt(struct dentry *d)
  *       else
  *          *xmod = KERN_COD_MAY_EXEC
  */
-static inline
+static __INLINE__
 int sd_get_execmode(const char *name, struct subdomain *sd, int *xmod)
 {
 	struct sdprofile *profile;
@@ -482,7 +488,7 @@ not_confined:
  * Prints out the status of the attribute change request.  Only prints
  * accepted when in audit mode.
  */
-static inline
+static __INLINE__
 void sd_attr_trace(const char *name, struct subdomain *sd, struct iattr *iattr, int error)
 {
 	char *status = "AUDITING";
@@ -542,7 +548,7 @@ void sd_attr_trace(const char *name, struct subdomain *sd, struct iattr *iattr, 
  * Prints out the status of the permission request.  Only prints
  * accepted when in audit mode.
  */
-static inline
+static __INLINE__
 void sd_perm_trace(const char *name, struct subdomain *sd, int mask, int error)
 {
 	char *status = "AUDITING";
@@ -582,70 +588,6 @@ void sd_perm_trace(const char *name, struct subdomain *sd, int mask, int error)
 #endif
 }
 
-#ifdef NETDOMAIN
-/**
- * nd_perm_trace - trace permission
- *
- * @tsk: task
- * @saddr: source (local) IP address
- * @daddr: destination (remote) IP address
- * @sport: source (local) port in network byte order
- * @dport: destination (remote) port in network bute order
- * @ifname: interface name (or NULL)
- * @sd: current subdomain (or NULL if not confined)
- * @mode: requested permission  (unlike sd_file_perm, this is not a mask)
- * @error: error flag
- *
- * Prints out the status of the permission request.  Only prints
- * accepted when in audit mode.
- */
-static inline
-void nd_perm_trace(struct task_struct *tsk,
-		   __u32 saddr, __u32 daddr, __u16 sport, __u16 dport, 
-		   char *ifname, struct subdomain* sd, int mode, int error)
-{
-	char *status = "AUDITING";
-	__u32 _saddr, _daddr;
-	__u16 _sport, _dport;
-
-	if (error){
-		status = SUBDOMAIN_COMPLAIN(sd) ? "PERMITTING" : "REJECTING";
-	}else if (!SUBDOMAIN_AUDIT(sd)){
-		return;
-	}
-
-	if (mode == KERN_COD_TCP_ACCEPT || mode == KERN_COD_UDP_RECEIVE ||
-	    mode == KERN_COD_LOGTCP_RECEIVE){
-
-		/* reverse source and dest to be more human readable */
-		_saddr = daddr;
-		_sport = dport;
-		_daddr = saddr;
-		_dport = sport;
-	}else{
-		_saddr = saddr;
-		_sport = sport;
-		_daddr = daddr;
-		_dport = dport;
-	}
-
-	ND_WARN("%s %s%s%s%s%s%s from source %u.%u.%u.%u:%hu to destination %u.%u.%u.%u:%hu via iface %s (%s(%d) profile %s active %s)\n",
-		status,
-		mode & KERN_COD_TCP_ACCEPT	? "tcp_accept" : "",
-		mode & KERN_COD_TCP_CONNECT	? "tcp_connect" : "",
-		mode & KERN_COD_UDP_SEND	? "udp_send" : "",
-		mode & KERN_COD_UDP_RECEIVE	? "udp_receive": "",
-		mode & KERN_COD_LOGTCP_SEND	? "tcp_send" : "",
-		mode & KERN_COD_LOGTCP_RECEIVE	? "tcp_receive" : "",
-		NIPQUAD(_saddr), ntohs(_sport), 
-		NIPQUAD(_daddr), ntohs(_dport), 
-		ifname ? ifname : "n/a",
-		tsk ? tsk->comm : "comm n/a",
-		tsk ? tsk->pid : -1,
-		sd->profile->name, sd->active->name);
-}
-#endif // NETDOMAIN
-
 /**
  * sd_link_perm_trace - trace link permission
  * @lname: name requested as new link
@@ -656,7 +598,7 @@ void nd_perm_trace(struct task_struct *tsk,
  * Prints out the status of the permission request.  Only prints
  * accepted when in audit mode.
  */
-static inline
+static __INLINE__
 void sd_link_perm_trace(const char *lname, const char *tname, 
 					struct subdomain *sd,  int error)
 {
@@ -765,256 +707,6 @@ out:
 /***********************************
  * GLOBAL PERMISSION CHECK FUNCTIONS
  ***********************************/
-
-#ifdef NETDOMAIN
-/*
- * __nd_network_perm
- * 	Netdomain permissions check. 
- * 	Returns 0 on access allowed and < 0 on failure.  
- * 	In order to pass we must find a matching rule then	
- *	check the permissions for the rule.
- *
- * @tsk: task
- * @sd: current subdomain (or NULL if not confined)
- * @saddr: source (local) IP address
- * @daddr: destination (remote) IP address
- * @sport: source (local) port in network byte order
- * @dport: destination (remote) port in network bute order
- * @ifname: interface name (or NULL)
- * @mode: requested permission
- */
-int 
-__nd_network_perm (struct task_struct *tsk,
-		   struct subdomain *sd, 
-		   __u32 saddr,  __u16 sport, 
-		   __u32 daddr, __u16 dport, 
-		   char * ifname, int mode)
-{
-	struct sdprofile *profile;
-	struct nd_entry *net_entry;
-	int error, index, logmode, i;
-	
-	/* If we are not confined:
-	 * 	- no profile 
-	 * 	- [opposite of subdomain] no netdomain rules in the profile 
-	 * then access is allowed.  
-	 * Otherwise access is denied.
-	 */
-
-	error = 0;
-
-	if (!__sd_is_ndconfined(sd)){
-		/* exit with access allowed */
-		ND_DEBUG("%s: not confined\n", __FUNCTION__);
-		goto done_notrace;
-	}
-
-	/* from here on, return an error unless we match a rule */
-	error = -EACCES;
-
-
-	/* now that we know sd is valid, do some basic logging */
-
-	ND_DEBUG("%s: active %s(%p) profile %s(%p) comm %s(%d)\n",
-		__FUNCTION__,
-		sd->active ? sd->active->name : "NULL",	
-		sd->active,
-		sd->profile ? sd->profile->name : "NULL",
-		sd->profile,
-		tsk ? tsk->comm : "n/a",
-		tsk ? tsk->pid : -1);
-
-	ND_DEBUG("%s: src=%u.%u.%u.%u:%hu dest=%u.%u.%u.%u:%hu iface=%s mode=0x%x\n", 
-		__FUNCTION__, 
-		NIPQUAD(saddr), ntohs(sport),
-		NIPQUAD(daddr), ntohs(dport),
-		ifname ? ifname : "n/a",
-		mode);
-
-
-	/* KERN_COD_LOGTCP_SEND and KERN_COD_LOGTCP_RECEIVE are not true 
-	 * permissions.  Check for them here and mask them out
-	 * Value is used for logging only
-	 */
-	if (mode & KERN_COD_LOGTCP_SEND){	
-		logmode = KERN_COD_LOGTCP_SEND;
-		mode = mode & ~KERN_COD_LOGTCP_SEND;
-	}else if (mode & KERN_COD_LOGTCP_RECEIVE){
-		logmode = KERN_COD_LOGTCP_RECEIVE;
-		mode = mode & ~KERN_COD_LOGTCP_RECEIVE;
-	}else{
-		logmode = mode;
-	}
-
-	index = -1;
-	for (i=POS_KERN_COD_NET_MIN;i<=POS_KERN_COD_NET_MAX;i++){
-		/* only one permission allowed per node for netdomain */
-		if (mode == (1<<i)){
-			index=NET_POS_TO_INDEX(i);
-			break;
-		}
-	}
-
-	if (index == -1){
-		ND_WARN("%s: invalid mode 0x%x\n",
-			__FUNCTION__,
-			mode);
-		goto done_notrace;
-	}
-
-	profile = sd->profile;
-
-	net_entry = profile->net_entryp[index];
-
-	/* No netdomain entries for this rule but __sd_is_ndconfined test 
-	 * above indicates we have at least one netdomain rule so EACCES
-	 * here
-	 */
-	if (!net_entry){
-		ND_DEBUG("%s: no entries for mode %d index %d\n", 
-			__FUNCTION__, mode, index);
-		goto done;
-	}
-
-	for (; net_entry; net_entry = net_entry->nextp[index]) {
-		/* N.B if net_entry->saddr or net_entry->daddr are ommited
-		 * from the profile, the parser passes a value of 0.
-		 * It should of course use INADDR_NONE which is 0xffffffff.
-		 *
-		 * To make this clear, we use a literla 0 rather than 
-		 * INADDR_ANY (which is also #defined to 0) when checking 
-		 * saddr/daddr.
-		 */
-
-		ND_DEBUG("%s: entry src=%u.%u.%u.%u:%hu-%hu smask=%08x dest=%u.%u.%u.%u:%hu-%hu dmask=%08x iface=%s mode=0x%x\n", 
-			__FUNCTION__, 
-			NIPQUAD(net_entry->saddr), 
-				net_entry->src_port[0],
-				net_entry->src_port[1],
-			net_entry->smask,
-			NIPQUAD(net_entry->daddr), 
-				net_entry->dst_port[0],
-				net_entry->dst_port[1],
-			net_entry->dmask,
-			net_entry->iface ? net_entry->iface : "n/a",
-			net_entry->mode);
-
-		/* Check source address:
-		 * Lazy matching:  proceeds if passed saddr is INADDR_ANY or
-		 * if stored net_entry saddr is INADDR_ANY
-		 */
-		if (saddr != INADDR_ANY && 
-		    net_entry->saddr != 0 &&
-		    (saddr & net_entry->smask) != net_entry->saddr) {
-			/* source address does not match */
-			ND_DEBUG("%s: saddr did not match\n", __FUNCTION__);
-			continue;
-		}
-
-		/* Check dest address:
-		 * Lazy matching:  proceeds if passed daddr is INADDR_ANY or
-		 * if stored net_entry daddr is INADDR_ANY
-		 */
-		if (daddr != INADDR_ANY &&
-		    net_entry->daddr != 0 &&
-	    	    (daddr & net_entry->dmask) != net_entry->daddr) {
-			/* destination address does not match */
-			ND_DEBUG("%s: daddr did not match\n", __FUNCTION__);
-			continue;
-		}
-
-		/* Check source port:
-		 * Lazy matching:  proceeds if passed sport is 0 or
-		 * if stored net_entry src_port[0] is 0
-		 */
-		if (sport != 0 && 
-		    net_entry->src_port[0] != 0 &&
-		    (ntohs(sport) < net_entry->src_port[0] || 
-		     ntohs(sport) > net_entry->src_port[1])) {
-			/* source port does not match */
-			ND_DEBUG("%s: sport did not match\n", __FUNCTION__);
-			continue;
-		}
-
-		/* Check dest port:
-		 * Lazy matching:  proceeds if passed dport is 0 or
-		 * if stored net_entry dst_port[0] is 0
-		 */
-		if (dport != 0 &&
-		    net_entry->dst_port[0] != 0 && 
-		    (ntohs(dport) < net_entry->dst_port[0] || 
-		     ntohs(dport) > net_entry->dst_port[1])) {
-			/* dest port does not match */
-			ND_DEBUG("%s: dport did not match\n", __FUNCTION__);
-			continue;
-		}
-
-		/* Check interface name:
-		 * Lazy matching:  proceeds if passed dport is NULL or
-		 * if stored net_entry iface is NULL
-		 */
-		if (ifname &&
-		    net_entry->iface &&
-		    strcmp(ifname, net_entry->iface) != 0){
-			/* interface does not match */
-			ND_DEBUG("%s: iface did not match\n", __FUNCTION__);
-			continue;
-		}
-
-		/* Check requested mode (permission):
-		 * Unlike subdomain, this is not a mask, as only
-		 * one operation is implied per node.
-		 * No lazy matching is allowed.
-		 */
-
-		if (net_entry->mode != mode) {
-			/* mode does not match */
-			ND_DEBUG("%s: mode did not match\n", __FUNCTION__);
-			continue;
-		}
-
-		/* MATCH */
-		ND_DEBUG("%s: MATCH!\n", __FUNCTION__);
-		error = 0;
-		break;
-
-	} /* for_each */
-
-done:
-	nd_perm_trace(tsk, saddr, daddr, sport, dport, 
-		      ifname, sd, logmode, error);
-
-	if (SUBDOMAIN_COMPLAIN(sd)){
-		error=0;
-	}
-
-done_notrace:
- 	return error;
-}
-
-/*
- * nd_network_perm
- *
- * @sd: current subdomain (or NULL if not confined)
- * @saddr: source (local) IP address
- * @daddr: destination (remote) IP address
- * @sport: source (local) port in network byte order
- * @dport: destination (remote) port in network bute order
- * @ifname: interface name (or NULL)
- * @mode: requested permission
- */
-int 
-nd_network_perm (struct subdomain *sd, 
-		 __u32 saddr, __u16 sport,
-		 __u32 daddr, __u16 dport, 
-		 char * ifname, int mode)
-{
-	return __nd_network_perm(current, sd, 
-				 saddr, sport, 
-				 daddr, dport, 
-				 ifname, mode);
-}
-#endif /* NETDOMAIN */
 
 /*
  * sd_file_perm - calculate access mode for file
@@ -1313,8 +1005,8 @@ int error = 0;
 				status = "AUDITING";
 			}
 
-#if defined (PRINTK_TEMPFIX) && ( defined (CONFIG_SMP) || defined (CONFIG_PREEMPT))
-
+#if defined (PRINTK_TEMPFIX) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10) &&\
+            (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT))
 			/* ugly hack to work around a SMP scheduler bug,
 			 * related to calling printk from sys_setscheduler */
 			if (cap == CAP_SYS_NICE) 
@@ -1863,7 +1555,7 @@ void sd_release(struct task_struct *p)
  *
  * Switch to a new hat.  Return 0 on success, error otherwise.
  */
-static inline 
+static __INLINE__ 
 int do_change_hat(const char *hat_name, struct subdomain *sd)
 {
 	struct sdprofile *sub;

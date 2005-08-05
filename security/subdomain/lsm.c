@@ -39,10 +39,6 @@
 #include "subdomain.h"
 #include "inline.h"
 
-#ifdef NETDOMAIN
-#include "netdomain.c"
-#endif
-
 // main SD lock, manipulated by SD_[RW]LOCK and SD_[RW]UNLOCK (see subdomain.h)
 rwlock_t sd_lock = RW_LOCK_UNLOCKED;
 
@@ -55,13 +51,7 @@ int subdomain_debug=0;
 /* Audit mode */
 int subdomain_audit=0;
 /* OWLSM mode */
-int subdomain_owlsm=1;
-
-#ifdef NETDOMAIN
-int netdomain_enabled=1;
-#else
-int netdomain_enabled=0;
-#endif
+int subdomain_owlsm=0;
 
 #ifdef MODULE
 MODULE_PARM(subdomain_complain, "i");
@@ -289,7 +279,8 @@ static int subdomain_inode_create (struct inode *inode, struct dentry *dentry,
 
 	sd = get_sdcopy(&sdcopy);
 
-	error=sd_perm_dentry(dentry, sd, MAY_WRITE);
+	/* At a minimum, need write perm to create */
+	error = sd_perm_dentry(dentry, sd, MAY_WRITE);
 
 	put_sdcopy(sd);
 
@@ -303,7 +294,7 @@ static int subdomain_inode_create (struct inode *inode, struct dentry *dentry,
  * The last two checks are here as a workaround for atd(8), to be
  * removed one day. 
  */
-static inline int do_owlsm_link(struct dentry *old_dentry, struct inode *inode,
+static __INLINE__ int do_owlsm_link(struct dentry *old_dentry, struct inode *inode,
                                 struct dentry *new_dentry)
 {   
 	struct inode* i = old_dentry->d_inode;
@@ -456,7 +447,7 @@ static int subdomain_inode_rename (struct inode *old_inode,
  * directories, unless the link is owned by the
  * owner of the directory.
  */
-static inline int do_owlsm_follow_link(struct dentry *dentry,
+static __INLINE__ int do_owlsm_follow_link(struct dentry *dentry,
 				   struct nameidata *nameidata)
 {
 	struct inode *inode = dentry->d_inode;
@@ -548,11 +539,12 @@ static int subdomain_file_permission (struct file *file, int mask)
 	struct sdprofile *f_profile;
 	int error = 0;
 
-#if defined (PRINTK_TEMPFIX) && ( defined (CONFIG_SMP) || defined (CONFIG_PREEMPT))
+#if defined (PRINTK_TEMPFIX) && LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10) &&\
+            (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT))
 	/* ugly hack.  This is slightly racey, but lets us not have
 	 * grab a spin lock just to test if there is data.  The
          * worst thing that can happen is we call dump_sdprintk,
-	 * and doesn't have any data to print, which is ok
+	 * and it doesn't have any data to print, which is ok
 	 */
 	if (unlikely(sd_log_buf_has_data))
 		dump_sdprintk();
@@ -610,8 +602,13 @@ static void subdomain_file_free_security (struct file *file)
 	put_sdprofile(p);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
+static int subdomain_file_mmap (struct file *file, unsigned long reqprot,
+				unsigned long prot, unsigned long flags)
+#else
 static int subdomain_file_mmap (struct file *file, unsigned long prot,
 			    unsigned long flags)
+#endif
 {
 int error = 0, 
     mask = 0;
@@ -690,7 +687,7 @@ static int subdomain_getprocattr(struct task_struct *p, char *name, void *value,
 	struct subdomain sdcopy,
 			 *sd;
 	char *str=value;
-	int len;
+	size_t len;
 
 	if (strcmp(name, "current") != 0){
 		/* 
@@ -718,7 +715,7 @@ static int subdomain_getprocattr(struct task_struct *p, char *name, void *value,
 	SD_RUNLOCK;
 
 	if (__sd_is_confined(sd)){
-		int lena, lenm, lenp=0;
+		size_t lena, lenm, lenp=0;
 		const char *enforce_str = " (enforce)";
 		const char *complain_str = " (complain)";
 		const char *mode_str = SUBDOMAIN_COMPLAIN(sd) ? complain_str : enforce_str;
@@ -732,7 +729,8 @@ static int subdomain_getprocattr(struct task_struct *p, char *name, void *value,
 			lenp = strlen(sd->profile->name);
 			len += (lenp + 1);	/* +1 for ^ */
 		}
-		len+= (lenm + 2); /* for \n\0 */
+		/* DONT null terminate strings we output via proc */
+		len += (lenm + 1); /* for \n */
 
 		if (len <= size){
 			if (lenp){
@@ -746,20 +744,17 @@ static int subdomain_getprocattr(struct task_struct *p, char *name, void *value,
 			memcpy(str, mode_str, lenm);
 			str+=lenm;
 			*str++='\n';
-			*str++=0;
 			error = len;
 		}else{
 			error = -ERANGE;
 		}
 	}else{
 		const char *unconstrained_str = SD_UNCONSTRAINED "\n";
-		int lenu = strlen(unconstrained_str);
+		len = strlen(unconstrained_str);
 
-		len=lenu + 1;
-
+		/* DONT null terminate strings we output via proc */
 		if (len <= size){
-			memcpy(str, unconstrained_str, lenu);
-			str[lenu] = 0;
+			memcpy(str, unconstrained_str, len);
 			error = len;
 		}else{
 			error = -ERANGE;
@@ -795,7 +790,7 @@ const char *cmd_changehat = "changehat ",
 	if (size > strlen(cmd_changehat) &&
 	    strncmp(cmd, cmd_changehat, strlen(cmd_changehat)) == 0){
 		char *hatinfo = cmd + strlen(cmd_changehat);
-		int infosize = size - strlen(cmd_changehat);
+		size_t infosize = size - strlen(cmd_changehat);
 
 		/* Only the current process may change it's hat */
 		if (current != p){
@@ -817,8 +812,6 @@ const char *cmd_changehat = "changehat ",
 			 * set return to #bytes in orig request
 			 */
 			error = size;
-		}else{
-			error = -EACCES;
 		}
 
 	/* SET NEW PROFILE */
@@ -831,7 +824,7 @@ const char *cmd_changehat = "changehat ",
 		 */
 
 		if (!capable(CAP_SYS_ADMIN)){
-			SD_WARN("%s: Unpriviliged attempt by task %s(%d) [user %d] to assign new profile to task %s(%d)\n",
+			SD_WARN("%s: Unprivileged attempt by task %s(%d) [user %d] to assign new profile to task %s(%d)\n",
 				__FUNCTION__,
 				current->comm,
 				current->pid,
@@ -848,7 +841,7 @@ const char *cmd_changehat = "changehat ",
 
 		if (!confined){
 			char *profile = cmd + strlen(cmd_setprofile);
-			int profilesize = size - strlen(cmd_setprofile);
+			size_t profilesize = size - strlen(cmd_setprofile);
 
 			error = sd_setprocattr_setprofile(p, profile, profilesize);
 			if (error == 0){
@@ -885,91 +878,6 @@ out:
 	return error;
 }
 #endif // SUBDOMAIN_PROCATTR
-
-#ifdef NETDOMAIN
-static int subdomain_sk_alloc_security(struct sock *sk, int family, int priority)
-{
-	return nd_alloc(sk, family, priority);
-}
-
-static void subdomain_sk_free_security(struct sock * sk)
-{
-	nd_free(sk);
-}
-
-static int subdomain_socket_create(int family, int type, int protocol)
-{
-	int error = 0;
-	struct subdomain *sd;
-                                                                                
-        ND_DEBUG("%s: %d %d %d\n" ,
-                __FUNCTION__,
-                family, type, protocol);
-                                                                                
-        SD_RLOCK;
-                                                                                
-        sd = SD_SUBDOMAIN(current->security);
-                                                                                
-        /* restrict raw sockets if profile is netdomain confined */
-        if (type == SOCK_RAW && __sd_is_ndconfined(sd) && !capable(CAP_NET_RAW)){
-                SD_WARN("REJECTING access to raw socket (%s(%d) profile %s active %s)\n",
-                        current->comm, current->pid,
-                        sd->profile->name, sd->active->name);
-                error = -EPERM;
-        }
-                                                                                
-        SD_RUNLOCK;
-                                                                                
-        return error;
-}
-
-void subdomain_socket_post_create(struct socket * sock, int family,
-	                          int type, int protocol)
-{
-	return nd_create(sock, family, type, protocol);
-}
-
-static int subdomain_socket_connect(struct socket *sock, 
-				    struct sockaddr *address,
-				    int addrlen)
-{
-	return nd_connect(sock, address, addrlen);
-}
-
-static int subdomain_socket_accept(struct socket *sock, struct socket *newsock)
-{
-        return nd_accept(sock, newsock);
-}
-
-static void subdomain_socket_post_accept(struct socket *sock, struct socket *newsock)
-{
-        return nd_post_accept(sock, newsock);
-}
-
-static int subdomain_socket_listen(struct socket * sock, int backlog)
-{
-	return nd_listen(sock, backlog);
-}
-
-static int subdomain_socket_sendmsg(struct socket *sock, struct msghdr *msg,
-				    int size)
-{
-	return nd_sendmsg(sock, msg, size);
-}
-
-static int subdomain_socket_recvmsg(struct socket *sock, struct msghdr *msg,
-				    int size, int flags)
-{
-	return nd_recvmsg(sock, msg, size, flags);
-}
-
-static int subdomain_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
-{
-/* WARNING:  this entry point is in 'soft interrupt' NOT process context */
-
-	return nd_rcv(sk, skb);
-}
-#endif /* NETDOMAIN */
 
 struct security_operations subdomain_ops = {
 	.ptrace =			subdomain_ptrace,
@@ -1017,20 +925,6 @@ struct security_operations subdomain_ops = {
 	.getprocattr =			subdomain_getprocattr,
 	.setprocattr =			subdomain_setprocattr,
 #endif
-	
-#ifdef NETDOMAIN
-	.socket_create =		subdomain_socket_create,
-	.socket_post_create = 		subdomain_socket_post_create,
-	.socket_connect =		subdomain_socket_connect,
-	.socket_accept =		subdomain_socket_accept,
-	.socket_post_accept =		subdomain_socket_post_accept,
-	.socket_listen =		subdomain_socket_listen,
-	.socket_sendmsg =		subdomain_socket_sendmsg,
-	.socket_recvmsg =		subdomain_socket_recvmsg,
-	.socket_sock_rcv_skb =		subdomain_socket_sock_rcv_skb,
-	.sk_alloc_security =		subdomain_sk_alloc_security,
-	.sk_free_security =		subdomain_sk_free_security,
-#endif /* NETDOMAIN */
 };
 
 #ifdef SUBDOMAIN_FS
@@ -1161,13 +1055,6 @@ static int __init subdomain_init(void)
 	get_sdprofile(null_complain_profile);
 	null_complain_profile->flags.complain = 1;
 
-#ifdef NETDOMAIN
-	/*
-	 * HOOK INTO IPV4/IPV6 HANDLERS
-	 */
-	nd_set_handlers();
-#endif
-
 	/*
 	 * REGISTER SubDomain WITH LSM
 	 */
@@ -1175,18 +1062,14 @@ static int __init subdomain_init(void)
 		SD_WARN("Unable to load SubDomain\n");
 		goto register_out;
 	}
-	SD_INFO("SubDomain (version %s%s) initialized%s\n", 
+	SD_INFO("SubDomain (version %s) initialized%s\n", 
 		subdomain_version(),
-		netdomain_enabled ? " Netdomain" : "",
 		subdomain_complain ? complainmsg : "");
 
 	/* DONE */
 	return error;
 
 register_out:
-#ifdef NETDOMAIN
-	nd_restore_handlers();	
-#endif
 
 complain2_out:
 	free_sdprofile(null_complain_profile);
@@ -1214,9 +1097,6 @@ static int subdomain_exit_removeall_iter(struct subdomain *sd, void *cookie)
 			sd->active->name, sd->active);
 		put_sdprofile(sd->profile);
 		put_sdprofile(sd->active);
-#if defined NETDOMAIN && defined NETDOMAIN_SKUSERS
-		nd_skusers_exch(sd->profile, NULL, 1);
-#endif
 		sd->profile = sd->active = NULL;
 	}
 
@@ -1248,10 +1128,6 @@ static void __exit subdomain_exit(void)
 #ifdef SUBDOMAIN_FS
 	if (unregister_filesystem(&sd_fs_type))
 		SD_WARN("Unable to properly deactivate SubDomain fs\n");
-#endif
-
-#ifdef NETDOMAIN
-	nd_restore_handlers();	
 #endif
 
 	if (unregister_security(&subdomain_ops))

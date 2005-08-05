@@ -32,9 +32,6 @@ static ssize_t sd_version_read(struct file *file, CHARUSER *buf, size_t size, lo
 static ssize_t sd_control_read(struct file *file, CHARUSER *buf, size_t size, loff_t *ppos);
 static ssize_t sd_control_write(struct file *file, const CHARUSER *buf, size_t size, loff_t *ppos);
 
-#ifdef SD_OLD_INTERFACE
-static int sd_prof_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
-#else
 /* extern from module-interface.c */
 extern ssize_t sd_file_prof_add(void *, size_t);
 extern ssize_t sd_file_prof_repl (void *, size_t);
@@ -65,7 +62,6 @@ static struct file_operations subdomainfs_profile_remove = {
 static struct file_operations subdomainfs_profile_debug = {
   .write = sd_profile_debug
 };
-#endif // SD_OLD_INTERFACE
 
 static struct inode_operations sd_root_iops = {
 	.lookup =	sd_root_lookup,
@@ -76,10 +72,6 @@ static struct file_operations subdomainfs_profiles_fops = {
 	.read =		seq_read,
 	.llseek =	seq_lseek,
 	.release =	sd_prof_release,
-
-#ifdef SD_OLD_INTERFACE
-	.ioctl = 	sd_prof_ioctl,
-#endif
 };
 
 static struct file_operations subdomainfs_version_fops = {
@@ -146,20 +138,23 @@ int sd_fill_root(struct dentry * root)
 	 	 * currently loaded 
 		 */
 		{"profiles", 		S_IFREG, 0440, &subdomainfs_profiles_fops, 0, 0, 0},
+
 		/* interface for obtaining version# of subdomain */
 		{"version",  		S_IFREG, 0440, &subdomainfs_version_fops, 0, 0, 0},
+
+		/* interface for loading/removing/replacing profiles */
+		{".load",    		S_IFREG, 0640, &subdomainfs_profile_load, 0, 0, 0},
+		{".replace", 		S_IFREG, 0640, &subdomainfs_profile_replace, 0, 0, 0},
+		{".remove",  		S_IFREG, 0640, &subdomainfs_profile_remove, 0, 0, 0},
+		{".debug",   		S_IFREG, 0640, &subdomainfs_profile_debug, 0, 0, 0},
+
+		/* interface for setting binary config values */
 		{"control",  		S_IFDIR, 0550, NULL, 0, 0, 0},
 		{control_owlsm,    	S_IFREG, 0640, &subdomainfs_control_fops, 0, 0, 0},
 		{control_complain, 	S_IFREG, 0640, &subdomainfs_control_fops, 0, 0, 0},
 		{control_audit,    	S_IFREG, 0640, &subdomainfs_control_fops, 0, 0, 0},
 		{control_debug,    	S_IFREG, 0640, &subdomainfs_control_fops, 0, 0, 0},
 		{NULL,       		S_IFDIR, 0,    NULL, 0, 0, 0},
-#ifndef SD_OLD_INTERFACE
-		{".load",    		S_IFREG, 0640, &subdomainfs_profile_load, 0, 0, 0},
-		{".replace", 		S_IFREG, 0640, &subdomainfs_profile_replace, 0, 0, 0},
-		{".remove",  		S_IFREG, 0640, &subdomainfs_profile_remove, 0, 0, 0},
-		{".debug",   		S_IFREG, 0640, &subdomainfs_profile_debug, 0, 0, 0},
-#endif // !SD_OLD_INTERFACE
 	};
 		
 	const int num_entries = sizeof(root_entries) / sizeof(struct root_entry);
@@ -259,24 +254,6 @@ static struct dentry *sd_root_lookup(struct inode *dir, struct dentry *dentry)
 	return NULL;
 }
 
-#ifdef SD_OLD_INTERFACE
-static int sd_prof_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
-{
-	if (_IOC_TYPE(cmd) == 0x5D){
-		return sd_sys_security(SD_ID_MAGIC, _IOC_NR(cmd), (unsigned long*) arg);	
-	}else{
-		SD_WARN("%s: Invalid ioctl %d.%d\n", 
-			__FUNCTION__,
-			_IOC_TYPE(cmd), _IOC_NR(cmd));
-		return -EINVAL;
-	}
-	SD_ERROR("%s: Invalid ioctl %d.%d\n", 
-		__FUNCTION__,
-		_IOC_TYPE(cmd), _IOC_NR(cmd));
-	return -EINVAL;
-}
-#endif //SD_OLD_INTERFACE
-
 static int sd_prof_open(struct inode *inode, struct file *file)
 {
 	return seq_open(file, &subdomainfs_profiles_op);
@@ -320,8 +297,8 @@ static size_t sd_control(int rw, struct file *file, CHARUSER *buf, size_t size ,
 {
 	const unsigned char *name = file->f_dentry->d_name.name;
 	int *var = NULL;
-	char *varstr = "X\n";
-	const size_t maxlen=2;
+	char varstr[2] = { 'X', '\n' };
+	const size_t maxlen=sizeof(varstr);
 
 	/* loff_t is signed */
 	if (*ppos < 0)
@@ -440,7 +417,6 @@ error:
 	return -ENOMEM;
 }
 
-#ifndef SD_OLD_INTERFACE
 /* Profile loading, replacing, removing interface for 2.6 kernels */
 
 
@@ -469,9 +445,6 @@ static ssize_t sd_profile_load(struct file *f, const char *buf,
 		return -EPERM;
 	}
 
-	if (size < 0)
-		return -EFAULT;
-  
 	data = vmalloc(size);
 	if (data == NULL) return -ENOMEM;
 
@@ -514,9 +487,6 @@ static ssize_t sd_profile_replace(struct file *f, const char *buf,
 		return -EPERM;
 	}
 
-	if (size < 0)
-		return -EFAULT;
-	
 	data = vmalloc(size);
 	if (data == NULL) return -ENOMEM;
 
@@ -559,9 +529,6 @@ static ssize_t sd_profile_remove(struct file *f, const char *buf,
 		return -EPERM;
 	}
 
-	if (size < 0)
-		return -EFAULT;
-	
 	data = (char *) vmalloc(size+1);
 	if (data == NULL) return -ENOMEM;
 
@@ -605,9 +572,6 @@ static ssize_t sd_profile_debug(struct file *f, const char *buf,
 		return -EPERM;
 	}
 
-	if (size < 0)
-		return -EFAULT;
-	
 	data = vmalloc(size);
 	if (data == NULL) return -ENOMEM;
 
@@ -623,6 +587,4 @@ static ssize_t sd_profile_debug(struct file *f, const char *buf,
 	return error;
 
 }
-#endif /* !SD_OLD_INTERFACE */
-
 #endif /* SUBDOMAIN FS */

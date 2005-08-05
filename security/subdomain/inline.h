@@ -6,97 +6,7 @@
 #include <linux/list.h>
 #include <linux/namespace.h>
 
-#ifdef NETDOMAIN
-static inline int nd_is_valid(struct netdomain *nd)
-{
-int rc=0;
-
-	if (nd && nd->nd_magic == ND_ID_MAGIC){
-		rc=1;
-	}
-
-	return rc;
-}
-
-static inline int nd_is_confined(struct netdomain *nd)
-{
-	return nd_is_valid(nd) && 
-		nd->active && 
-		nd->active->num_net_entries;
-}
-
-static inline char* get_ifname(struct sock *sk, ifname_t name)
-{
-char *ifname = NULL;
-struct dst_entry *dst;
-
-	dst = sk_dst_get(sk);
-
-	if (dst){
-	       	if (dst->dev){
-			memcpy(name, dst->dev->name, sizeof(ifname_t));
-			ifname=name;
-			ND_DEBUG("%s: interface name = %s\n", 
-				__FUNCTION__,
-				ifname);
-
-		}
-
-		dst_release(dst);
-	}
-
-	return ifname;
-}
-
-static inline struct task_struct* get_waitingtask(struct sock *sk)
-{
-/* WARNING:
- * a) We are in soft interrupt context when this is called
- * b) read lock on tasklist spinlock should be held around this 
- *    call and any manipulation of the returned task_struct
- * c) Doing this has been described as a misuse of the data
- *    structure.  It's also been called ugly.
- */
-
-struct task_struct *tsk = NULL;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-wait_queue_head_t *wqh = sk->sk_sleep;
-#define WQ_LOCK spin_lock_irqsave
-#define WQ_UNLOCK spin_unlock_irqrestore
-#else
-wait_queue_head_t *wqh = sk->sleep;
-#define WQ_LOCK wq_read_lock_irqsave
-#define WQ_UNLOCK wq_read_unlock_irqrestore
-#endif
-unsigned long flags;
-
-	if (wqh){
-		WQ_LOCK(&wqh->lock, flags);
-
-		if (!list_empty(&wqh->task_list)){
-			/* any waiting task is fine
-		 	* which one would get data is upto scheduler
-		 	* so just pick the head/first
-		 	*/
-			wait_queue_t *wq; 
-
-			/* get via containing record */
-			wq=list_entry(wqh->task_list.next, 
-					wait_queue_t, task_list);
-
-			tsk=wq->task;
-		}
-	
-		WQ_UNLOCK(&wqh->lock, flags);
-	}
-
-	return tsk;
-#undef WA_LOCK
-#undef WA_UNLOCK
-}
-#endif // NETDOMAIN
-
-static inline int __sd_is_confined(struct subdomain *sd)
+static __INLINE__ int __sd_is_confined(struct subdomain *sd)
 {
 int rc=0;
 
@@ -108,7 +18,7 @@ int rc=0;
 	return rc;
 }
 
-static inline int __sd_is_ndconfined(struct subdomain *sd)
+static __INLINE__ int __sd_is_ndconfined(struct subdomain *sd)
 {
 	return __sd_is_confined(sd) && 
 		sd->profile->num_net_entries;
@@ -121,7 +31,7 @@ static inline int __sd_is_ndconfined(struct subdomain *sd)
  *  Check if @sd contains a valid profile.
  *  Return 1 if confined, 0 otherwise.
  */
-static inline int sd_is_confined(void)
+static __INLINE__ int sd_is_confined(void)
 {
 	struct subdomain *sd = SD_SUBDOMAIN(current->security);
 	return __sd_is_confined(sd);
@@ -134,27 +44,27 @@ static inline int sd_is_confined(void)
  * 0 otherwise.
  *Used to obtain 
  */
-static inline int __sd_sub_defined(struct subdomain *sd)
+static __INLINE__ int __sd_sub_defined(struct subdomain *sd)
 {
 	 if (__sd_is_confined(sd) && !list_empty(&sd->profile->sub))
 		 return 1;
 
 	 return 0;
 }
-static inline int sd_sub_defined(void)
+static __INLINE__ int sd_sub_defined(void)
 {
 	struct subdomain *sd = SD_SUBDOMAIN(current->security);
 	return __sd_sub_defined(sd);
 }
 
-static inline struct sdprofile * get_sdprofile(struct sdprofile *p)
+static __INLINE__ struct sdprofile * get_sdprofile(struct sdprofile *p)
 {
 	if (p)
 		atomic_inc(&p->count);
 	return p;
 }
 
-static inline void put_sdprofile(struct sdprofile *p)
+static __INLINE__ void put_sdprofile(struct sdprofile *p)
 {
 	if (p) 
 		if (atomic_dec_and_test(&p->count))
@@ -162,7 +72,7 @@ static inline void put_sdprofile(struct sdprofile *p)
 }
 
 /* simple struct subdomain alloc/free wrappers */
-static inline struct subdomain * alloc_subdomain(struct task_struct *tsk)
+static __INLINE__ struct subdomain * alloc_subdomain(struct task_struct *tsk)
 {
 	struct subdomain *sd = kmalloc(sizeof(struct subdomain), GFP_KERNEL);
 	/* zero it first */
@@ -181,7 +91,7 @@ static inline struct subdomain * alloc_subdomain(struct task_struct *tsk)
 
 	return sd;
 }
-static inline void free_subdomain(struct subdomain *sd)
+static __INLINE__ void free_subdomain(struct subdomain *sd)
 {
 	sd_subdomainlist_remove(sd);
 	kfree(sd);
@@ -193,7 +103,7 @@ static inline void free_subdomain(struct subdomain *sd)
  * This routine allocates, initializes, and returns a new zeored
  * profile structure. Returns NULL on failure.
  */
-static inline struct sdprofile * alloc_sdprofile(void) 
+static __INLINE__ struct sdprofile * alloc_sdprofile(void) 
 {
 	struct sdprofile *profile;
 
@@ -204,9 +114,6 @@ static inline struct sdprofile * alloc_sdprofile(void)
 		memset(profile, 0, sizeof(struct sdprofile));
 		INIT_LIST_HEAD(&profile->list);
 		INIT_LIST_HEAD(&profile->sub);
-#if defined NETDOMAIN && defined NETDOMAIN_SKUSERS
-		INIT_LIST_HEAD(&profile->sk_users);
-#endif
 	}
 	return profile;
 }
@@ -215,12 +122,12 @@ static inline struct sdprofile * alloc_sdprofile(void)
  * sd_put_name - release name (really just free_page)
  * @name: name to release.
  */
-static inline void sd_put_name(char *name)
+static __INLINE__ void sd_put_name(char *name)
 {
 	free_page((unsigned long)name);
 }
 
-static inline struct sdprofile * __sd_find_profile(const char *name, struct list_head *head)
+static __INLINE__ struct sdprofile * __sd_find_profile(const char *name, struct list_head *head)
 {
 	struct list_head *lh;
 
@@ -241,7 +148,7 @@ static inline struct sdprofile * __sd_find_profile(const char *name, struct list
 	return NULL;
 }
 
-static inline struct subdomain * __get_sdcopy(struct subdomain *new,
+static __INLINE__ struct subdomain * __get_sdcopy(struct subdomain *new,
 				 	      struct task_struct *tsk)
 {
 	struct subdomain *old, 
@@ -267,7 +174,7 @@ static inline struct subdomain * __get_sdcopy(struct subdomain *new,
 	return temp;
 }
 
-static inline struct subdomain *get_sdcopy(struct subdomain *new)
+static __INLINE__ struct subdomain *get_sdcopy(struct subdomain *new)
 {
 	struct subdomain *temp;
 
@@ -280,7 +187,7 @@ static inline struct subdomain *get_sdcopy(struct subdomain *new)
 	return temp;
 }
 
-static inline void put_sdcopy(struct subdomain *temp)
+static __INLINE__ void put_sdcopy(struct subdomain *temp)
 {
 	if (temp){
 		put_sdprofile(temp->active);
@@ -295,7 +202,7 @@ static inline void put_sdcopy(struct subdomain *temp)
  * @rdentry is used to obtain the filesystem root dentry
  * @dentry is the actual dentry object we want to obtain pathnames to.
  */
-static inline void sd_path_begin2(struct dentry *rdentry, struct dentry *dentry, struct sd_path_data *data)
+static __INLINE__ void sd_path_begin2(struct dentry *rdentry, struct dentry *dentry, struct sd_path_data *data)
 {
 	data->dentry = dentry;
 	data->root = dget(rdentry->d_sb->s_root);
@@ -312,7 +219,7 @@ static inline void sd_path_begin2(struct dentry *rdentry, struct dentry *dentry,
  * @dentry is used both for obtaining the filesystem root 
  *  and also for the actual dentry object we want to obtain pathnames to.
  */
-static inline void sd_path_begin(struct dentry *dentry, struct sd_path_data *data)
+static __INLINE__ void sd_path_begin(struct dentry *dentry, struct sd_path_data *data)
 {
 	sd_path_begin2(dentry, dentry, data);
 }
@@ -321,7 +228,7 @@ static inline void sd_path_begin(struct dentry *dentry, struct sd_path_data *dat
  * Return the next pathname that dentry (from sd_path_begin) may be reached
  * through.  If no more paths exists or in the case of error, NULL is returned.
  */
-static inline char *sd_path_getname(struct sd_path_data *data)
+static __INLINE__ char *sd_path_getname(struct sd_path_data *data)
 {
 char *name = NULL;
 struct vfsmount *mnt;
@@ -348,7 +255,7 @@ struct vfsmount *mnt;
  * Return the next mountpoint which has the same root dentry as was passed
  * to sd_path_begin2. If no more mount points exist, NULL is returned.
  */
-static inline struct vfsmount *sd_path_getmnt(struct sd_path_data *data)
+static __INLINE__ struct vfsmount *sd_path_getmnt(struct sd_path_data *data)
 {
 struct vfsmount *mnt = NULL;
 
@@ -373,7 +280,7 @@ struct vfsmount *mnt = NULL;
  * If an error occured in a previous sd_path_getmnt it is returned.
  * Otherwise 0 is returned
  */
-static inline int sd_path_end(struct sd_path_data *data)
+static __INLINE__ int sd_path_end(struct sd_path_data *data)
 {
 	up_read(&data->namespace->sem);
 	dput(data->root);
@@ -381,7 +288,7 @@ static inline int sd_path_end(struct sd_path_data *data)
 	return data->errno;
 }
 
-static inline int isblank(unsigned char c)
+static __INLINE__ int isblank(unsigned char c)
 {
 	return c == ' ' || c == '\t';
 }

@@ -167,7 +167,7 @@ void sd_profilelist_release(void)
  * sd_profile_dump - dump a profile
  * @profile: profile to dump
  */
-static inline void sd_profile_dump_lvl(struct sdprofile *profile, int sub)
+static __INLINE__ void sd_profile_dump_lvl(struct sdprofile *profile, int sub)
 {
 	struct sd_entry *sdent;
 
