@@ -30,7 +30,7 @@ enum {
 	FW_STATUS_READY,
 };
 
-static int loading_timeout = 10;	/* In seconds */
+static int loading_timeout = 30;	/* In seconds */
 
 /* fw_lock could be moved to 'struct firmware_priv' but since it is just
  * guarding for corner cases a global lock should be OK */
