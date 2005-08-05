@@ -4264,7 +4264,7 @@ qla4xxx_topcat_reset(scsi_qla_host_t *ha){
  * Context:
  *      Kernel context.
  **************************************************************************/
-inline uint8_t
+uint8_t
 qla4xxx_soft_reset(scsi_qla_host_t *ha){
 
 	QL4PRINT(QLP2, printk(KERN_WARNING "scsi%d: %s: chip reset!\n",
