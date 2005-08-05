@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE
  *
- * QLogic qla4xxx driver for Linux 2.4.x
+ * QLogic qla4xxx driver for Linux 2.6.x
  * Copyright (C) 2004 Qlogic Corporation
  * (www.qlogic.com)
  *
@@ -30,9 +30,18 @@
 
 #include "ql4_def.h"
 
-int   eepromSize  = EEPROM_SIZE;
-int   addrBits    = EEPROM_NO_ADDR_BITS;
-int   dataBits    = EEPROM_NO_DATA_BITS;
+#define EEPROM_SIZE(ha) \
+	(IS_QLA4022(ha) ? \
+	 FM93C86A_SIZE_16 : \
+	 FM93C66A_SIZE_16)
+	
+#define EEPROM_NO_ADDR_BITS(ha) \
+	(IS_QLA4022(ha) ? \
+	 FM93C86A_NO_ADDR_BITS_16 : \
+	 FM93C56A_NO_ADDR_BITS_16)
+
+#define EEPROM_NO_DATA_BITS(ha) FM93C56A_DATA_BITS_16
+
 int   eepromCmdData = 0;
 
 
@@ -76,10 +85,10 @@ static int FM93C56A_Cmd(scsi_qla_host_t *ha, int cmd, int addr)
 		cmd = cmd << 1;
 	}
 
-	mask = 1 << (addrBits-1);
+	mask = 1 << (EEPROM_NO_ADDR_BITS(ha)-1);
 	// Force the previous data bit to be different
 	previousBit = 0xffff;
-	for (i = 0; i < addrBits; i++) {
+	for (i = 0; i < EEPROM_NO_ADDR_BITS(ha); i++) {
 		dataBit = (addr & mask) ? AUBURN_EEPROM_DO_1 : AUBURN_EEPROM_DO_0;
 		if (previousBit != dataBit) {
 			// If the bit changed, then change the DO state to match
@@ -111,7 +120,7 @@ static int FM93C56A_DataIn(scsi_qla_host_t *ha, unsigned short *value)
 
 	// Read the data bits
 	// The first bit is a dummy.  Clock right over it.
-	for (i = 0; i < dataBits; i++) {
+	for (i = 0; i < EEPROM_NO_DATA_BITS(ha); i++) {
 		WRT_REG_DWORD(ISP_NVRAM(ha), eepromCmdData | AUBURN_EEPROM_CLK_RISE);
 		WRT_REG_DWORD(ISP_NVRAM(ha), eepromCmdData | AUBURN_EEPROM_CLK_FALL);
 		dataBit = (RD_REG_DWORD(ISP_NVRAM(ha)) & AUBURN_EEPROM_DI_1) ? 1 : 0;
@@ -156,9 +165,9 @@ qla4xxx_is_NVRAM_configuration_valid(scsi_qla_host_t *ha)
 	uint8_t status = QLA_ERROR;
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
-	for (index = 0;	index < EEPROM_SIZE; index++) {
+	for (index = 0;	index < EEPROM_SIZE(ha); index++) {
 		checksum += RD_NVRAM_WORD(ha, index);
-	} 
+	}
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	if (checksum == 0)
@@ -169,128 +178,50 @@ qla4xxx_is_NVRAM_configuration_valid(scsi_qla_host_t *ha)
 
 /*************************************************************************
  *
- *			Hardware Semaphore
+ *			Hardware Semaphore routines
  *
  *************************************************************************/
-
-isp4xxxSemInfo_t semInfo4010[] = {
-	{ SEM_HW_LOCK,     4}
-	, { SEM_GPO,         6}
-	, { SEM_SDRAM_INIT,  8}
-	, { SEM_PHY_GBIC,   10}
-	, { SEM_NVRAM,      12}
-	, { SEM_FLASH,      14}
-};
-
-isp4xxxSemInfo_t semInfo4022[] = {
-        { SEM_DRIVER,        1}
-        , { SEM_DRAM,  	     4}
-	, { SEM_GPO,         7}
-	, { SEM_PHY_GBIC,    7}
-	, { SEM_NVRAM,      10}
-	, { SEM_FLASH,      13}
-};
-
-static uint32_t SEM_READ(scsi_qla_host_t *ha, uint32_t semId)
+int ql4xxx_sem_spinlock(scsi_qla_host_t *ha, u32 sem_mask, u32 sem_bits)
 {
-	if (IS_QLA4022(ha))
-		return ((RD_REG_DWORD(ISP_NVRAM(ha)) >> semInfo4022[semId].semShift) & SEM_MASK);
-	else
-		return ((RD_REG_DWORD(ISP_NVRAM(ha)) >> semInfo4010[semId].semShift) & SEM_MASK);
+    uint32_t      value;
 
-}
-
-
-static void SEM_WRITE(scsi_qla_host_t *ha, uint32_t semId, uint8_t owner)
-{
-	if (IS_QLA4022(ha))
-		WRT_REG_DWORD(ISP_NVRAM(ha), (SEM_MASK << 16 << semInfo4022[semId].semShift) | (owner << semInfo4022[semId].semShift));
-	else
-		WRT_REG_DWORD(ISP_NVRAM(ha), (SEM_MASK << 16 << semInfo4010[semId].semShift) | (owner << semInfo4010[semId].semShift));
-}
-
-/**************************************************************************
- * qla4xxx_take_hw_semaphore
- *	This routine acquires the specified semaphore for the iSCSI
- *	storage driver.
- *
- * Input:
- * 	ha - Pointer to host adapter structure.
- *	sem - Indicates which semaphore.
- *	wait_flag - specifies type of wait to acquire semaphore
- *		    SEM_FLG_WAIT_FOREVER = wait indefinitely
- *		    SEM_FLG_TIMED_WAIT = wait for a specified amout of time
- *	            SEM_FLG_NO_WAIT = try once to acquire semaphore
- *
- * Returns:
- *	QLA_SUCCESS - Successfully acquired semaphore
- *	QLA_ERROR   - Failed to acquire semaphore
- *
- * Context:
- *	?? context.
- **************************************************************************/
-uint8_t
-qla4xxx_take_hw_semaphore(scsi_qla_host_t *ha, uint32_t sem, uint8_t wait_flag)
-{
-	uint32_t wait_time = SEMAPHORE_TOV;
-	unsigned long flags = 0;
-
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-
-	for (SEM_WRITE(ha, sem, SEM_OWNER_STORAGE);
-	     (SEM_READ(ha, sem) != SEM_OWNER_STORAGE) && (wait_time--);
-	     (SEM_WRITE(ha, sem, SEM_OWNER_STORAGE), PCI_POSTING(ISP_NVRAM(ha)))) {
-		if (wait_flag == SEM_FLG_NO_WAIT) {
-			spin_unlock_irqrestore(&ha->hardware_lock, flags);
-			return(QLA_ERROR);
-		}
-
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(1 * HZ);
-		spin_lock_irqsave(&ha->hardware_lock, flags);
+    DEBUG2(printk(KERN_INFO "scsi%d: Trying to get SEM lock - mask= 0x%x, code = 0x%x\n",
+	ha->host_no, sem_mask, sem_bits);)
+    while ( 1 ) {
+        WRT_REG_DWORD(ISP_SEMAPHORE(ha), (sem_mask | sem_bits));
+        value = RD_REG_DWORD(ISP_SEMAPHORE(ha));
+        if ((value & (sem_mask >> 16)) == sem_bits) {
+    		DEBUG2(printk(KERN_INFO "scsi%d: Got SEM LOCK - mask= 0x%x, code = 0x%x\n",
+		ha->host_no, sem_mask, sem_bits);)
+            break;
 	}
-
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
-	if (wait_time)
-		return(QLA_SUCCESS);
-	else
-		return(QLA_ERROR);
+    }
+   return (1);
 }
 
-/**************************************************************************
- * qla4xxx_clear_hw_semaphore
- *	This routine restores the specified semaphore to the available
- *	state.
- *
- * Input:
- * 	ha - Pointer to host adapter structure.
- *	sem - Indicates which semaphore.
- *
- * Returns:
- *	QLA_SUCCESS - Successfully restored semaphore
- *	QLA_ERROR   - Failed to restore semaphore
- *
- * Context:
- *	?? context.
- **************************************************************************/
-void
-qla4xxx_clear_hw_semaphore(scsi_qla_host_t *ha, uint32_t sem)
+void ql4xxx_sem_unlock(scsi_qla_host_t *ha, u32 sem_mask)
 {
-	unsigned long flags = 0;
 
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-
-	if (SEM_READ(ha, sem) == SEM_OWNER_STORAGE) {
-		SEM_WRITE(ha, sem, SEM_AVAILABLE);
-		PCI_POSTING(ISP_NVRAM(ha));
-	}	
-	
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+    WRT_REG_DWORD(ISP_SEMAPHORE(ha), sem_mask);
+    PCI_POSTING(ISP_SEMAPHORE(ha));
+    DEBUG2(printk(KERN_INFO "scsi%d: UNLOCK SEM - mask= 0x%x\n",
+	 ha->host_no, sem_mask);)
 }
 
+int ql4xxx_sem_lock(scsi_qla_host_t *ha, u32 sem_mask, u32 sem_bits)
+{
+    uint32_t      value;
 
+    WRT_REG_DWORD(ISP_SEMAPHORE(ha), (sem_mask | sem_bits));
+    value = RD_REG_DWORD(ISP_SEMAPHORE(ha));
+    if ((value & (sem_mask >> 16)) == sem_bits) {
+    	DEBUG2(printk(KERN_INFO "scsi%d: Got SEM LOCK - mask= 0x%x, code = 0x%x, sema code=0x%x\n",
+		ha->host_no, sem_mask, sem_bits, value);)
+        return (1);
+    } else {
+        return (0);
+    }
+}
 
 /*
  * Overrides for Emacs so that we get a uniform tabbing style.

@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE                                     *
  *                                                                            *
- * QLogic ISP4xxx device driver for Linux 2.4.x                               *
+ * QLogic ISP4xxx device driver for Linux 2.6.x                               *
  * Copyright (C) 2004 Qlogic Corporation                                      *
  * (www.qlogic.com)                                                           *
  *                                                                            *
@@ -57,30 +57,35 @@ extern uint32_t ql_dbg_level;
 #define ENTER(x) do {QL4PRINT(QLP12, printk("qla4xxx: Entering %s()\n", x));} while(0);
 #define LEAVE(x) do {QL4PRINT(QLP12, printk("qla4xxx: Leaving  %s()\n", x));} while(0);
 
-uint8_t qla4xxx_get_debug_level(uint32_t *dbg_level);
-uint8_t qla4xxx_set_debug_level(uint32_t dbg_level);
+inline uint8_t qla4xxx_get_debug_level(uint32_t *dbg_level);
+inline uint8_t qla4xxx_set_debug_level(uint32_t dbg_level);
 
 void     qla4xxx_dump_bytes(uint32_t, void *, uint32_t);
 void     qla4xxx_dump_words(uint32_t, void *, uint32_t);
 void     qla4xxx_dump_dwords(uint32_t, void *, uint32_t);
 void     qla4xxx_print_scsi_cmd(uint32_t dbg_mask, struct scsi_cmnd *cmd);
 void     qla4xxx_print_srb_info(uint32_t dbg_mask, srb_t *srb);
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 void     qla4xxx_print_iocb_passthru(uint32_t dbg_mask, scsi_qla_host_t *ha, INT_IOCB_PASSTHRU *iocb);
+#endif
 
 /*
  * Driver debug definitions.
  */
 /* #define QL_DEBUG_LEVEL_1  */	/* Output register accesses to COM1 */
-/* #define QL_DEBUG_LEVEL_2  */ /* Output error msgs to COM1 */
 
 /* #define QL_DEBUG_LEVEL_3  */	/* Output function trace msgs to COM1 */
+/* #define QL_DEBUG_LEVEL_4  */	
+/* #define QL_DEBUG_LEVEL_5  */	
+/* #define QL_DEBUG_LEVEL_9  */	
 
-// #define DEBUG(x)       do {x;} while (0);
+/* #define QL_DEBUG_LEVEL_2  */ /* Output error msgs to COM1 */
+
 #define DEBUG(x)	do {} while (0);
 
 #if defined(QL_DEBUG_LEVEL_2)
-#define DEBUG2(x)       do {x;} while (0);
-#define DEBUG2_3(x)     do {x;} while (0);
+#define DEBUG2(x)      do {x;} while (0);
+#define DEBUG2_3(x)   do {x;} while (0);
 #else
 #define DEBUG2(x)	do {} while (0);
 #endif

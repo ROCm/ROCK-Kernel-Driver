@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE
  *
- * QLogic ISP4xxx device driver for Linux 2.4.x
+ * QLogic ISP4xxx device driver for Linux 2.6.x
  * Copyright (C) 2004 Qlogic Corporation
  * (www.qlogic.com)
  *
@@ -19,38 +19,7 @@
 
 /* Management functions for various lists */
 
-/*************************************/
-
-static inline void
-__add_to_pending_srb_q(scsi_qla_host_t *ha, srb_t *srb)
-{
-	QL4PRINT(QLP8, printk("scsi%d: %s: ha %d, srb = %p\n",
-			      ha->host_no, __func__, ha->instance, srb));
-	list_add_tail(&srb->list_entry, &ha->pending_srb_q);
-	srb->state = SRB_PENDING_STATE;
-	ha->pending_srb_q_count++;
-}
-
-static inline void
-__add_to_pending_srb_q_head(scsi_qla_host_t *ha, srb_t *srb)
-{
-	QL4PRINT(QLP8, printk("scsi%d: %s: ha %d, srb = %p\n",
-			      ha->host_no, __func__, ha->instance, srb));
-	list_add(&srb->list_entry, &ha->pending_srb_q);
-	srb->state = SRB_PENDING_STATE;
-	ha->pending_srb_q_count++;
-}
-
-static inline void
-__del_from_pending_srb_q(scsi_qla_host_t *ha, srb_t *srb)
-{
-	QL4PRINT(QLP8, printk("scsi%d: %s: ha %d, srb = %p\n",
-			      ha->host_no, __func__, ha->instance, srb));
-	list_del_init(&srb->list_entry);
-	srb->state = SRB_NO_QUEUE_STATE;
-	ha->pending_srb_q_count--;
-}
-
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
 /*************************************/
 
 static inline void
@@ -117,14 +86,16 @@ static inline srb_t *__del_from_done_srb_q_head(scsi_qla_host_t *ha)
 
 	return(srb);
 }
+#endif
 
 /*************************************/
 
 static inline void
 __add_to_free_srb_q(scsi_qla_host_t *ha, srb_t *srb)
 {
-	QL4PRINT(QLP8, printk("scsi%d: %s: ha %d, srb = %p\n",
-			      ha->host_no, __func__, ha->instance, srb));
+	DEBUG(printk("scsi%d: %s: instance %d, srb = %p\n",
+			      ha->host_no, __func__, ha->instance,
+			      srb ));
 
 	//memset(srb, 0, sizeof(srb_t));
 	list_add_tail(&srb->list_entry, &ha->free_srb_q);
@@ -135,8 +106,9 @@ __add_to_free_srb_q(scsi_qla_host_t *ha, srb_t *srb)
 static inline void __del_from_free_srb_q(scsi_qla_host_t *ha, srb_t *srb)
 {
 
-	QL4PRINT(QLP8, printk("scsi%d: %s: ha %d, srb = %p\n",
-			      ha->host_no, __func__, ha->instance, srb));
+	DEBUG(printk("scsi%d: %s: instance %d, srb = %p\n",
+			      ha->host_no, __func__, ha->instance,
+			      srb ));
 	list_del_init(&srb->list_entry);
 	srb->state = SRB_NO_QUEUE_STATE;
 	ha->free_srb_q_count--;
@@ -154,70 +126,19 @@ static inline srb_t *__del_from_free_srb_q_head(scsi_qla_host_t *ha)
 
 		/* Return pointer to srb structure */
 		srb = list_entry(ptr, srb_t, list_entry);
-		memset(srb, 0, sizeof(*srb));
+		// memset(srb, 0, sizeof(*srb));
 		srb->state = SRB_NO_QUEUE_STATE;
 		ha->free_srb_q_count--;
 	}
-	QL4PRINT(QLP8, printk("scsi%d: %s: ha %d, srb = %p\n",
-			      ha->host_no, __func__, ha->instance, srb));
+	DEBUG(printk("scsi%d: %s: instance %d, srb = %p\n",
+			      ha->host_no, __func__, ha->instance,
+			      srb ));
 
 	return(srb);
 }
 
-/*************************************/
 
-static inline void
-__add_to_suspended_lun_q(scsi_qla_host_t *ha, os_lun_t *lun)
-{
-	QL4PRINT(QLP8, printk("scsi%d: %s: ha %d, lun = %d\n",
-			      ha->host_no, __func__, ha->instance, lun->lun));
-	list_add_tail(&lun->list_entry, &ha->suspended_lun_q);
-	ha->suspended_lun_q_count++;
-}
-
-static inline void
-__del_from_suspended_lun_q(scsi_qla_host_t *ha, os_lun_t *lun)
-{
-	QL4PRINT(QLP8, printk("scsi%d: %s: ha %d, lun = %d\n",
-			      ha->host_no, __func__, ha->instance, lun->lun));
-	list_del_init(&lun->list_entry);
-	ha->suspended_lun_q_count--;
-}
-
-
-/******************************************************************************/
-/******************************************************************************/
-
-static inline void
-add_to_pending_srb_q(scsi_qla_host_t *ha, srb_t *srb)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&ha->list_lock, flags);
-	__add_to_pending_srb_q(ha ,srb);
-	spin_unlock_irqrestore(&ha->list_lock, flags);
-}
-
-static inline void
-add_to_pending_srb_q_head(scsi_qla_host_t *ha, srb_t *srb)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&ha->list_lock, flags);
-	__add_to_pending_srb_q_head(ha ,srb);
-	spin_unlock_irqrestore(&ha->list_lock, flags);
-}
-
-static inline void
-del_from_pending_srb_q(scsi_qla_host_t *ha, srb_t *srb)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&ha->list_lock, flags);
-	__del_from_pending_srb_q(ha ,srb);
-	spin_unlock_irqrestore(&ha->list_lock, flags);
-}
-
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
 /*************************************/
 
 static inline void
@@ -279,6 +200,7 @@ del_from_done_srb_q_head(scsi_qla_host_t *ha)
 	// spin_unlock_irqrestore(&ha->adapter_lock, flags);
 	return(srb);
 }
+#endif
 
 /*************************************/
 

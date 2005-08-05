@@ -53,18 +53,10 @@ qla4xxx_reset_lun_fo_counts(scsi_qla_host_t *ha, os_lun_t *lq)
 	os_lun_t        *orig_lq;
 	struct list_head *list;
 	unsigned long   flags ;
+	uint16_t        path_id;
+	struct fo_information *mp_info;
 
 	spin_lock_irqsave(&ha->list_lock, flags);
-	/*
-	 * the pending queue.
-	 */
-	list_for_each(list,&ha->pending_srb_q)
-	{
-		tsp = list_entry(list, srb_t, list_entry);
-		orig_lq = tsp->lun_queue;
-		if (orig_lq == lq)
-			tsp->fo_retry_cnt = 0;
-	}
 	/*
 	 * the retry queue.
 	 */
@@ -87,6 +79,12 @@ qla4xxx_reset_lun_fo_counts(scsi_qla_host_t *ha, os_lun_t *lq)
 			tsp->fo_retry_cnt = 0;
 	}
 	spin_unlock_irqrestore(&ha->list_lock, flags);
+
+	/* reset the failover retry count on all the paths */
+	mp_info	= (struct fo_information *) lq->fo_info;
+	for (path_id = 0; path_id < MAX_PATHS_PER_DEVICE ; path_id++)
+			mp_info->fo_retry_cnt[path_id] = 0;
+	
 }
 
 
@@ -145,33 +143,46 @@ void qla4xxx_find_all_active_ports(srb_t *sp)
 static uint8_t
 qla4xxx_fo_count_retries(scsi_qla_host_t *ha, srb_t *sp)
 {
-	uint8_t		retry = 1;
+	
+	uint8_t		retry = 0;
 	os_lun_t	*lq;
 	os_tgt_t	*tq;
 	scsi_qla_host_t	*vis_ha;
+	uint16_t        path_id;
+	struct fo_information *mp_info;
+	
 
 	DEBUG9(printk("%s: entered.\n", __func__);)
+	lq = sp->lun_queue;
+	mp_info	= (struct fo_information *) lq->fo_info;
+ 	if (test_and_clear_bit(LUN_MPIO_RESET_CNTS, &lq->flags))
+		for (path_id = 0; path_id < MAX_PATHS_PER_DEVICE ; path_id++)
+ 			mp_info->fo_retry_cnt[path_id] = 0;
 
-	if (++sp->fo_retry_cnt >  qla_fo_params.MaxRetriesPerIo) {
-		/* no more failovers for this request */
-		retry = 0;
-		sp->fo_retry_cnt = 0;
-		printk(KERN_INFO
-		    "qla4xxx: no more failovers for request - pid= %ld\n",
-		    sp->cmd->serial_number);
+	/* check to see if we have exhausted retries on all the paths */
+    	for( path_id = 0; path_id < mp_info->path_cnt; path_id++)  {
+            if(mp_info->fo_retry_cnt[path_id] >=
+                    qla_fo_params.MaxRetriesPerPath)
+                            continue;
+            retry = 1;
+            break;
+    	}
+
+	if (!retry) {
+         printk(KERN_INFO "qla4x00: no more failovers for request - pid = %ld",sp->cmd->serial_number);
 	} else {
 		/*
 		 * We haven't exceeded the max retries for this request, check
 		 * max retries this path
 		 */
-		if ((sp->fo_retry_cnt % qla_fo_params.MaxRetriesPerPath) == 0) {
-			DEBUG2(printk("qla4xxx_fo_count_retries: FAILOVER - "
-			    "queuing ha=%d, sp=%p, pid =%ld, "
-			    "fo retry= %d \n",
-			    ha->host_no,
-			    sp, sp->cmd->serial_number,
-			    sp->fo_retry_cnt);)
-
+		if ((++sp->fo_retry_cnt % qla_fo_params.MaxRetriesPerPath) == 0) {
+			path_id = sp->fclun->fcport->cur_path;
+			mp_info->fo_retry_cnt[path_id]++;
+			DEBUG2(printk("scsi%d: %s: FAILOVER - queuing ha=%d, sp=%p,"
+				"pid =%ld, path_id=%d fo retry= %d \n",
+				 ha->host_no, __func__, ha->host_no, sp,
+				sp->cmd->serial_number, path_id,
+				mp_info->fo_retry_cnt[path_id]);)
 			/*
 			 * Note: we don't want it to timeout, so it is
 			 * recycling on the retry queue and the fialover queue.
@@ -217,7 +228,7 @@ qla4xxx_fo_check_device(scsi_qla_host_t *ha, srb_t *sp)
 	case NOT_READY:
 		if (fcport->flags & (FCF_MSA_DEVICE | FCF_EVA_DEVICE)) {
 			/*
-			 * if we can't access port 
+			 * if we can't access port
 			 */
 			if ((cp->sense_buffer[12] == 0x4 &&
 			    (cp->sense_buffer[13] == 0x0 ||
@@ -226,7 +237,7 @@ qla4xxx_fo_check_device(scsi_qla_host_t *ha, srb_t *sp)
 				sp->err_id = SRB_ERR_DEVICE;
 				return 1;
 			}
-		} 
+		}
 		break;
 
 	case UNIT_ATTENTION:
@@ -240,7 +251,7 @@ qla4xxx_fo_check_device(scsi_qla_host_t *ha, srb_t *sp)
 			    cp->sense_buffer[13] == 0x9)) {
 				/* failback lun */
 			}
-		} 
+		}
 		break;
 
 	}
@@ -286,7 +297,10 @@ qla4xxx_fo_check(scsi_qla_host_t *ha, srb_t *sp)
 		"DID_PARITY",
 		"DID_ERROR",
 		"DID_RESET",
-		"DID_BAD_INTR"
+		"DID_BAD_INTR",
+		"DID_PASSTHROUGH",
+		"DID_SOFT_ERROR",
+		/* "DID_IMM_RETRY" */
 	};
 #endif
 
@@ -305,11 +319,16 @@ qla4xxx_fo_check(scsi_qla_host_t *ha, srb_t *sp)
 			sp->cmd->result = DID_BUS_BUSY << 16;
 			retry = 1;
 		}
-		DEBUG2(printk("qla4xxx_fo_check: pid= %ld sp %p/%d/%d retry count=%d, "
-		    "retry flag = %d, host status (%s)\n",
+		DEBUG2(printk("scsi%d: %s: pid= %ld sp %p/%d/%d retry count=%d, "
+		    "retry flag = %d, host status (%s), retuned status (%s)\n",
+		    ha->host_no, __func__,
 		    sp->cmd->serial_number, sp, sp->state, sp->err_id, sp->fo_retry_cnt, retry,
-		    reason[host_status]);)
+		    reason[host_status], reason[host_byte(sp->cmd->result)]);)
 	}
+
+ 	/* Clear out any FO retry counts on good completions. */
+ 	if (host_status == DID_OK)
+ 		set_bit(LUN_MPIO_RESET_CNTS, &sp->lun_queue->flags);
 
 	DEBUG9(printk("%s: exiting. retry = %d.\n", __func__, retry);)
 
@@ -562,10 +581,10 @@ qla4xxx_send_fo_notification(fc_lun_t *old_lp, fc_lun_t *new_lp)
 
 	if (qla_fo_params.FailoverNotifyType == FO_NOTIFY_TYPE_SPINUP ||
 		new_lp->fcport->notify_type == FO_NOTIFY_TYPE_SPINUP ) {
-		rval = qla4xxx_spinup(new_lp->fcport->ha, new_lp->fcport, 
-			new_lp->lun); 
+		rval = qla4xxx_spinup(new_lp->fcport->ha, new_lp->fcport,
+			new_lp->lun);
 	}
-
+	
 	if (qla_fo_params.FailoverNotifyType == FO_NOTIFY_TYPE_CDB) {
 	}
 #endif

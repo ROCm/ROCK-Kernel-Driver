@@ -1,10 +1,10 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE
- *
+				 *
  * QLogic ISP4xxx device driver for Linux 2.6.x
  * Copyright (C) 2004 QLogic Corporation
  * (www.qlogic.com)
- *
+				 *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2, or (at your option) any
@@ -16,9 +16,9 @@
  * General Public License for more details.
  *
  ******************************************************************************/
-/*
+					/*
  * Module Name: ql4nvrm.h
- */
+					 */
 
 
 #ifndef _QL2XNVRM_H_
@@ -31,15 +31,9 @@
 #define  FM93C56A_SIZE_8      0x100
 #define  FM93C56A_SIZE_16     0x80
 #define  FM93C66A_SIZE_8      0x200
-#define  FM93C66A_SIZE_16     0x100
-#define  FM93C86A_SIZE_16     0x400
+#define  FM93C66A_SIZE_16     0x100  /* 4010 */
+#define  FM93C86A_SIZE_16     0x400  /* 4022 */
 	
-#ifdef QLA4022
-#define  EEPROM_SIZE          FM93C86A_SIZE_16
-#else
-#define  EEPROM_SIZE          FM93C66A_SIZE_16
-#endif
-
 #define  FM93C56A_START       0x1
 
 // Commands
@@ -58,23 +52,15 @@
 #define  FM93C56A_ERASE_ALL_EXT  0x2
 
 // Address Bits
-#define  FM93C56A_NO_ADDR_BITS_16   8
-#define  FM93C56A_NO_ADDR_BITS_8    9
-#define  FM93C86A_NO_ADDR_BITS_16   10
-
-#ifdef QLA4022
-#define  EEPROM_NO_ADDR_BITS  FM93C86A_NO_ADDR_BITS_16
-#else
-#define  EEPROM_NO_ADDR_BITS  FM93C56A_NO_ADDR_BITS_16
-#endif
+#define  FM93C56A_NO_ADDR_BITS_16   8  /* 4010 */
+#define  FM93C56A_NO_ADDR_BITS_8    9  /* 4010 */
+#define  FM93C86A_NO_ADDR_BITS_16   10 /* 4022 */
 
 
 // Data Bits
 #define  FM93C56A_DATA_BITS_16   16
 #define  FM93C56A_DATA_BITS_8    8
 
-#define  EEPROM_NO_DATA_BITS  FM93C56A_DATA_BITS_16
-	
 // Special Bits
 #define  FM93C56A_READ_DUMMY_BITS   1
 #define  FM93C56A_READY             0
@@ -320,6 +306,7 @@ typedef struct {
  *			Hardware Semaphore
  *
  *************************************************************************/
+#if 0
 //
 // Semaphore register definitions
 //
@@ -334,14 +321,12 @@ typedef struct {
 //
 typedef enum
 {
-	SEM_DRIVER
+	SEM_HW_LOCK
 	, SEM_GPO
 	, SEM_SDRAM_INIT
-	, SEM_DRAM
 	, SEM_PHY_GBIC
 	, SEM_NVRAM
 	, SEM_FLASH
-	, SEM_HW_LOCK
 
 	, SEM_COUNT // Not a real semaphore, just indicates how many there are
 } ISP4XXX_SEMAPHORE;
@@ -358,6 +343,8 @@ typedef struct {
 #define SEM_FLG_NO_WAIT		0
 #define SEM_FLG_WAIT_FOREVER	1
 #define SEM_FLG_TIMED_WAIT	2
+
+#endif
 
 
 

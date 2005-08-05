@@ -41,10 +41,6 @@
 #include <scsi/scsi_cmnd.h>
 
 /* XXX(dg): move to pci_ids.h */
-#ifndef PCI_DEVICE_ID_QLOGIC_ISP4000
-#define PCI_DEVICE_ID_QLOGIC_ISP4000	0x4000
-#endif
-
 #ifndef PCI_DEVICE_ID_QLOGIC_ISP4010
 #define PCI_DEVICE_ID_QLOGIC_ISP4010	0x4010
 #endif
@@ -53,14 +49,8 @@
 #define PCI_DEVICE_ID_QLOGIC_ISP4022	0x4022
 #endif
 
-#if defined(CONFIG_SCSI_QLA4XXX) || defined(CONFIG_SCSI_QLA4XXX_MODULE)
 #define IS_QLA4010(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP4010)
 #define IS_QLA4022(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP4022)
-#else
-#error CONFIG_SCSI_QLA4XXX must be defined for compilation.  Fix your Makefile
-#define IS_QLA4010(ha)	0
-#define IS_QLA4022(ha)	0
-#endif
 
 #if defined(CONFIG_COMPAT) && !defined(CONFIG_IA64)
 #define QLA_CONFIG_COMPAT
@@ -71,9 +61,6 @@
  * command source for 4000 module
  *----------------------------------------------------------------------------*/
 #define QLA4010
-#define QLA4XXX_BOARD_ID		0x4010
-#define QLA4XXX_BOARD_ID_STRING		"4010"
-#define QLA4XXX_BOARD_NAME_STRING	"QLA4010"
 #define QLA4XXX_BOARD_PORTS		1
 #define QLA4XXX_PROC_NAME		"qla4010"
 
@@ -139,8 +126,9 @@
 #define INVALID_ENTRY			0xFFFF
 #define MAX_CMDS_TO_RISC		1024
 #define MAX_SRBS			MAX_CMDS_TO_RISC
-#define MBOX_AEN_REG_COUNT		4
-#define MAX_INIT_RETRIES		2
+#define MBOX_AEN_REG_COUNT		5
+#define MAX_INIT_RETRIES		5
+#define IOCB_HIWAT_CUSHION		16
 
 /*
  * Buffer sizes
@@ -213,6 +201,8 @@
 #   define RD_REG_BYTE(addr)	     readb(addr)
 #   define RD_REG_WORD(addr)         readw(addr)
 #   define RD_REG_DWORD(addr)        readl(addr)
+#   define RD_REG_WORD_RELAXED(addr) 	readw_relaxed(addr)
+#   define RD_REG_DWORD_RELAXED(addr)	readl_relaxed(addr)
 #   define WRT_REG_BYTE(addr, data)  writeb(data, addr)
 #   define WRT_REG_WORD(addr, data)  writew(data, addr)
 #   define WRT_REG_DWORD(addr, data) writel(data, addr)
@@ -236,7 +226,7 @@
 /*
  * Retry & Timeout Values
  *************************/
-#define MBOX_TOV			30
+#define MBOX_TOV			60
 #define SOFT_RESET_TOV			30
 #define RESET_INTR_TOV			3
 #define SEMAPHORE_TOV			10
@@ -265,19 +255,16 @@ typedef struct _srb_t {
 	struct scsi_qla_host *ha;		/* HA the SP is queued on */
 
 	uint16_t     flags;		/* (1) Status flags. */
-	#define SRB_TIMEOUT		BIT_0	/* timed out. */
-	#define SRB_ABORT_PENDING	BIT_1	/* abort sent to device. */
-	#define SRB_ABORTED		BIT_2	/* aborted command already. */
 	#define SRB_DMA_VALID		BIT_3	/* DMA Buffer mapped. */
+
 	#define SRB_GOT_SENSE		BIT_4	/* sense data recieved. */
 	#define SRB_IOCTL_CMD		BIT_5	/* generated from an IOCTL. */
-	#define SRB_INTERNAL_CMD	BIT_6	/* generated internally. */
 	#define SRB_BUSY		BIT_7	/* in busy retry state. */
+
 	#define SRB_FO_CANCEL		BIT_8	/* don't need to failover. */
 	#define SRB_RETRY		BIT_9	/* needs retrying. */
 	#define SRB_TAPE		BIT_10	/* FCP2 (Tape) command. */
 	#define SRB_FAILOVER		BIT_11	/* being failed-over. */
-	#define SRB_UNCONFIGURED	BIT_12
 
 
 	uint8_t     state;		/* (1) Status flags. */
@@ -330,7 +317,7 @@ typedef struct _srb_t {
 	struct      timer_list   timer;		 /* used to timeout command */
 	uint16_t    os_tov;
 	uint16_t    iocb_tov;
-	uint16_t    iocb_cnt;
+	uint16_t    iocb_cnt;		/* Number of used iocbs */
 	uint16_t    cc_stat;
 	u_long      r_start;	      /* Time we recieve a cmd from OS*/
 	u_long      u_start;	      /* Time when we handed the cmd to F/W */
@@ -369,9 +356,14 @@ typedef struct os_tgt {
 typedef struct os_lun {
 	struct fc_lun *fclun;		/* FC LUN context pointer. */
 	struct list_head list_entry;	/* 16 x10 For suspended lun list */
+	struct scsi_device *sdev;
+	
 	spinlock_t lun_lock;		/* 24 x18 For suspended lun list */
 	unsigned long           flags;
-	#define LS_LUN_DELAYED		0
+	#define LF_LUN_DELAYED		0
+	#define LF_LUN_SUSPEND		1
+	#define LF_LUN_BLOCKED		2
+	#define LUN_MPIO_RESET_CNTS	3	/* Lun */
 
 	uint8_t lun_state;		/* 00 x00 */
 	#define LS_LUN_READY		0   /* LUN is ready to accept commands */
@@ -398,6 +390,9 @@ typedef struct os_lun {
 	atomic_t suspend_timer;		/* 12 x0c Timer for suspending lun */
 	//struct list_head list_entry;	/* 16 x10 List structure for suspended lun list */
 	//spinlock_t lun_lock;		/* 24 x18 Spinlock for suspended lun list */
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
+	void  *fo_info;
+#endif
 } os_lun_t;
 
 /* Never set this to Zero */
@@ -473,6 +468,9 @@ typedef struct ddb_entry {
 	#define DF_NO_RELOGIN		1  /* Do not relogin if IOCTL logged it out */
 	#define DF_ISNS_DISCOVERED	2  /* Device was discovered via iSNS */
 
+	unsigned long dev_scan_wait_to_start_relogin;
+	unsigned long dev_scan_wait_to_complete_relogin;
+
 	uint8_t  ip_addr[ISCSI_IPADDR_SIZE];
 	// uint8_t  ip_addr[4];		 /* 68 x44 */
 	uint8_t  iscsi_name[ISCSI_NAME_SIZE];	 /* 72 x48 */
@@ -500,11 +498,10 @@ typedef struct fc_port {
 	struct list_head fcluns;
 
 	struct scsi_qla_host *ha;
-	struct scsi_qla_host *vis_ha;		/* only used when suspending lun */
+	struct scsi_qla_host *vis_ha;	/* only used when suspending lun */
 	ddb_entry_t     *ddbptr;
 
 	uint8_t  *iscsi_name;
-	// uint8_t  ip_addr[ISCSI_IPADDR_SIZE];
 	fc_port_type_t port_type;
 
 	atomic_t state;
@@ -568,6 +565,7 @@ typedef struct fc_port {
 
 #define	FCF_VSA			BIT_19
 #define	FCF_HD_DEVICE		BIT_20
+#define FCF_NONFO_DEVICE	BIT_21	/* Non Failover device */
 
 /* No loop ID flag. */
 //#define FC_NO_LOOP_ID		0x1000
@@ -585,7 +583,6 @@ typedef struct fc_lun {
 	uint8_t flags;
 	#define	FLF_VISIBLE_LUN		BIT_0
 	#define	FLF_ACTIVE_LUN		BIT_1
-	#define	FLF_UNCONFIGURED	BIT_2
 
 	uint8_t lun_state;		/* 00 x00 */
 	#define LS_LUN_RESET_MARKER_NEEDED 4   /* LUN Reset marker needed */
@@ -619,8 +616,8 @@ typedef struct _ATTRIBUTE_LIST {
 	#define ISNS_ATTR_TYPE_STRING     2   // UTF-8 encoded string
 	#define ISNS_ATTR_TYPE_ULONG      3
 	#define ISNS_ATTR_TYPE_ADDRESS    4   // 128-bit IPv6
-	uint8_t type;
-	uint32_t data;
+	uint32_t type;
+	unsigned long data;
 } ATTRIBUTE_LIST;
 
 typedef struct hba_ioctl{
@@ -677,6 +674,7 @@ typedef struct scsi_qla_host {
 	#define AF_TOPCAT_CHIP_PRESENT	      9 /* 0x00000200 */
 	#define AF_IRQ_ATTACHED	      	     10 /* 0x00000400 */
 	#define AF_64BIT_PCI_ADDR	     11 /* 0x00000800 */
+	#define AF_HA_GOING_AWAY	     12 /* 0x00001000 */
 
 	unsigned long   dpc_flags;
 	#define DPC_RESET_HA		      1 /* 0x00000002 */
@@ -690,14 +688,17 @@ typedef struct scsi_qla_host {
 	#define DPC_AEN			      9 /* 0x00000200 */
 
 	/* Failover flags */
-	#define	DPC_FAILOVER_EVENT_NEEDED    10
-	#define	DPC_FAILOVER_EVENT	     11
-	#define	DPC_FAILOVER_NEEDED   	     12
+	#define	DPC_FAILOVER_EVENT_NEEDED    10 /* 0x00000400 */
+	#define	DPC_FAILOVER_EVENT	     11 /* 0x00000800 */
+	#define	DPC_FAILOVER_NEEDED   	     12 /* 0x00001000 */
 
-	#define DPC_WAIT_TO_RELOGIN_DEVICE   13
+	#define DPC_WAIT_TO_RELOGIN_DEVICE   13 /* 0x00002000 */
+	#define DPC_CHECK_LUN		     14 /* 0x00004000 */
+	#define DPC_GET_DHCP_IP_ADDR	     15 /* 0x00008000 */
 
 	uint16_t        iocb_cnt;
 	uint16_t        iocb_hiwat;
+	uint16_t        req_q_count;	/* Number of available request queue entries. */
 
 	u_long          i_start;	/* jiffies at start of IOCTL */
 	u_long          i_end;		/* jiffies at end of IOCTL */
@@ -750,6 +751,7 @@ typedef struct scsi_qla_host {
 	uint32_t        mailbox_timeout_count;
 	uint32_t        seconds_since_last_intr;
 	uint32_t        seconds_since_last_heartbeat;
+	uint32_t        mac_index;
 
 	/* Info Needed for Management App */
 	/* --- From GetFwVersion --- */
@@ -760,6 +762,7 @@ typedef struct scsi_qla_host {
 	uint16_t        firmware_options;
 	uint16_t        tcp_options;
 	uint8_t         ip_address[IP_ADDR_LEN];
+	uint8_t         subnet_mask[IP_ADDR_LEN];
 	uint8_t         isns_ip_address[IP_ADDR_LEN];
 	uint16_t        isns_server_port_number;
 	uint8_t         alias[32];
@@ -785,6 +788,7 @@ typedef struct scsi_qla_host {
 	#define ISNS_FLAG_QUERY_SINGLE_OBJECT   5  /* 0x00000020 */
 	#define ISNS_FLAG_SCN_IN_PROGRESS       6  /* 0x00000040 */
 	#define ISNS_FLAG_SCN_RESTART           7  /* 0x00000080 */
+	#define ISNS_FLAG_DEV_SCAN_DONE         27 /* 0x08000000 */
 	#define ISNS_FLAG_REREGISTER            28 /* 0x10000000 */
 	#define ISNS_FLAG_RESTART_SERVICE       31 /* 0x80000000 */
 
@@ -827,6 +831,7 @@ typedef struct scsi_qla_host {
 	atomic_t        check_relogin_timeouts;
 	uint32_t        retry_reset_ha_cnt;
 	uint32_t        isp_reset_timer;	 /* reset test timer */
+	uint32_t        nic_reset_timer;	 /* simulated nic reset test timer */
 
 	int             eh_start;		/* To wake up the mid layer error
 						 * handler thread */
@@ -840,15 +845,17 @@ typedef struct scsi_qla_host {
 	spinlock_t      list_lock  ____cacheline_aligned;
 
 	/* internal srb queues */
-	struct          list_head failover_queue;	      /* failover list link. */
-
-	struct          list_head pending_srb_q;		/* pending queue */
-	struct          list_head retry_srb_q;
-	struct          list_head free_srb_q;
-	uint16_t        pending_srb_q_count;
-	uint16_t        retry_srb_q_count;
-	uint16_t        free_srb_q_count;
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
+	struct          list_head failover_queue;	      /* failover request list. */
 	uint16_t        failover_cnt;
+#endif
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
+	struct          list_head retry_srb_q;	      /* retry queue request list */
+	uint16_t        retry_srb_q_count;
+#endif
+
+	struct          list_head free_srb_q;
+	uint16_t        free_srb_q_count;
 	uint16_t        num_srbs_allocated;
 
 	/* This spinlock must be held with irqs disabled in order to access
@@ -865,13 +872,10 @@ typedef struct scsi_qla_host {
 	 * After the list_lock is released, return all of
 	 * these commands to the OS */
 
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
 	struct list_head done_srb_q;
 	uint16_t         done_srb_q_count;
-
-	/* Suspended LUN queue (uses adapter_lock) */
-	struct list_head suspended_lun_q;
-	uint32_t         suspended_lun_q_count;
-
+#endif
 
 	/* This spinlock is used to protect "io transactions", you must	
 	 * aquire it before doing any IO to the card, eg with RD_REG*() and
@@ -916,7 +920,6 @@ typedef struct scsi_qla_host {
 	uint16_t        response_in;
 	uint16_t        response_out;
 
-	uint16_t        req_q_count;		/* Number of available entries. */
 	/* aen queue variables */
 	uint16_t        aen_q_count;		/* Number of available aen_q entries */
 	uint16_t        aen_in;		/* Current indexes */
@@ -927,15 +930,11 @@ typedef struct scsi_qla_host {
 	uint16_t        pdu_count;		/* Number of available aen_q entries */
 	uint16_t        pdu_in;		/* Current indexes */
 	uint16_t        pdu_out;
-	PDU_ENTRY       *pdu_buffsv;
-	dma_addr_t      pdu_buffsp;
-	unsigned long   pdu_buff_size;
 
 	PDU_ENTRY       *free_pdu_top;
 	PDU_ENTRY       *free_pdu_bottom;
 	uint16_t        pdu_active;
 	PDU_ENTRY       pdu_queue[MAX_PDU_ENTRIES];
-	uint8_t         pdu_buf_used[MAX_PDU_ENTRIES];
 
 	/* This semaphore protects several threads to do mailbox commands
 	 * concurrently.
@@ -967,8 +966,6 @@ typedef struct scsi_qla_host {
 	// ddb_entry_t *target_map[MAX_TARGETS];
 	/* OS target queue pointers. */
 	os_tgt_t        *otgt[MAX_TARGETS+1];
-	os_tgt_t        temp_tgt;
-	os_lun_t        temp_lun;
 
 	/* Map ddb_list entry by FW ddb index */
 	ddb_entry_t     *fw_ddb_index_map[MAX_DDB_ENTRIES];
@@ -1027,8 +1024,9 @@ typedef struct {
 #define REBUILD_DDB_LIST	1
 
 /* Defines for process_aen() */
-#define PROCESS_ALL_AENS	0
-#define FLUSH_DDB_CHANGED_AENS	1
+#define PROCESS_ALL_AENS	 0
+#define FLUSH_DDB_CHANGED_AENS	 1
+#define RELOGIN_DDB_CHANGED_AENS 2
 
 /* Defines for qla4xxx_take_hw_semaphore */
 #define NO_WAIT		0
@@ -1050,6 +1048,7 @@ typedef struct {
 #include "ql4_inline.h"
 #include "ql4_listops.h"
 #include "ql4_isns.h"
+#include "ql4_foln.h"
 
 
 #endif /*_QLA4XXX_H */

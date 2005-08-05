@@ -20,7 +20,7 @@
 /****************************************
  *	Issues requests for failover module
  ****************************************/
- 
+
 // #include "qla_os.h"
 #include "ql4_def.h"
 
@@ -34,10 +34,10 @@
  *  Function Prototypes.
  */
 
-int qla4xxx_issue_scsi_inquiry(scsi_qla_host_t *ha, 
+int qla4xxx_issue_scsi_inquiry(scsi_qla_host_t *ha,
 	fc_port_t *fcport, fc_lun_t *fclun );
 int qla4xxx_test_active_lun(fc_port_t *fcport, fc_lun_t *fclun);
-int qla4xxx_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun, 
+int qla4xxx_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun,
 	char	*evpd_buf, int wwlun_size);
 fc_lun_t * qla4xxx_cfg_lun(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun,
                 inq_cmd_rsp_t *inq, dma_addr_t inq_dma);
@@ -52,8 +52,8 @@ static int qla4xxx_report_lun(scsi_qla_host_t *ha, fc_port_t *fcport,
 		   rpt_lun_cmd_rsp_t *rlc, dma_addr_t rlc_dma);
 	
 int
-qla4xxx_spinup(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun); 
-				
+qla4xxx_spinup(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun);
+
 /*
  * qla4xxx_get_wwuln_from_device
  *	Issue SCSI inquiry page code 0x83 command for LUN WWLUN_NAME.
@@ -71,12 +71,12 @@ qla4xxx_spinup(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun);
  */
 
 int
-qla4xxx_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun, 
+qla4xxx_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun,
 	char	*evpd_buf, int wwlun_size)
 {
 
 	evpd_inq_cmd_rsp_t	*pkt;
-	int		rval, rval1; 
+	int		rval, rval1;
 	dma_addr_t	phys_address = 0;
 	int		retries;
 	uint8_t	comp_status;
@@ -102,7 +102,7 @@ qla4xxx_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun,
 
 	if (pkt == NULL) {
 		printk(KERN_WARNING
-		    "scsi(%d): Memory Allocation failed - INQ\n",
+		    "scsi%d: Memory Allocation failed - INQ\n",
 		    ha->host_no);
 		ha->mem_err++;
 		return rval;
@@ -119,7 +119,7 @@ qla4xxx_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun,
 		pkt->p.cmd.control_flags =(CF_READ | CF_SIMPLE_TAG);
 		pkt->p.cmd.cdb[0] = INQUIRY;
 		pkt->p.cmd.cdb[1] = INQ_EVPD_SET;
-		pkt->p.cmd.cdb[2] = INQ_DEV_IDEN_PAGE; 
+		pkt->p.cmd.cdb[2] = INQ_DEV_IDEN_PAGE;
 		pkt->p.cmd.cdb[4] = VITAL_PRODUCT_DATA_SIZE;
 		pkt->p.cmd.dataSegCnt = __constant_cpu_to_le16(1);
 		pkt->p.cmd.timeout = __constant_cpu_to_le16(10);
@@ -159,7 +159,7 @@ qla4xxx_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun,
 		    scsi_status & SCSISTAT_CHECK_CONDITION) {
 
 			if (scsi_status & SCSISTAT_CHECK_CONDITION) {
-				DEBUG2(printk("scsi(%d): INQ "
+				DEBUG2(printk("scsi%d: INQ "
 				    "SCSISTAT_CHECK_CONDITION Sense Data "
 				    "%02x %02x %02x %02x %02x %02x %02x %02x\n",
 				    ha->host_no,
@@ -185,7 +185,7 @@ qla4xxx_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun,
 			rval1 = QLA_SUCCESS;
 			break;
 		}
-	} 
+	}
 
 	if (rval1 == QLA_SUCCESS &&
 	    pkt->inq[1] == INQ_DEV_IDEN_PAGE ) {
@@ -199,7 +199,7 @@ qla4xxx_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun,
 			memcpy(evpd_buf,&pkt->inq[8], WWLUN_SIZE);
 			rval = WWLUN_SIZE;
 			printk(KERN_INFO "%s : Lun(%d)  WWLUN may "
-			    "not be complete, Buffer too small" 
+			    "not be complete, Buffer too small"
 			    " need: %d provided: %d\n",__func__,
 			    fclun->lun,pkt->inq[7],WWLUN_SIZE);
 		}
@@ -210,7 +210,7 @@ qla4xxx_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun,
 			 * ILLEGAL REQUEST - 0x05
 			 * INVALID FIELD IN CDB - 24 : 00
 			 */
-			if(pkt->p.rsp.senseData[2] == 0x05 && 
+			if(pkt->p.rsp.senseData[2] == 0x05 &&
 			    pkt->p.rsp.senseData[12] == 0x24 &&
 			    pkt->p.rsp.senseData[13] == 0x00 ) {
 
@@ -221,7 +221,7 @@ qla4xxx_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun,
 				DEBUG2(printk(KERN_INFO "%s Lun(%d) does not"
 				    " support Inquiry Page Code-0x83\n",	
 				    __func__,fclun->lun);)
-				DEBUG2(printk( KERN_INFO "Unhandled check " 
+				DEBUG2(printk( KERN_INFO "Unhandled check "
 				    "condition sense_data[2]=0x%x"  		
 				    " sense_data[12]=0x%x "
 				    "sense_data[13]=0x%x\n",
@@ -242,7 +242,7 @@ qla4xxx_get_wwuln_from_device(mp_host_t *host, fc_lun_t *fclun,
 		rval = 0 ;
 	}
 
-	pci_free_consistent(ha->pdev, sizeof(evpd_inq_cmd_rsp_t), 
+	pci_free_consistent(ha->pdev, sizeof(evpd_inq_cmd_rsp_t),
 	    			pkt, phys_address);
 
 	//printk("%s exit\n",__func__);
@@ -309,7 +309,7 @@ qla4xxx_inquiry(scsi_qla_host_t *ha, fc_port_t *fcport,
 		}
 		inq->p.cmd.cmdSeqNum = cpu_to_le32(ddb_entry->CmdSn);	
 		
-		DEBUG2(printk("scsi(%d): Lun Inquiry - fcport=[%04x/%p],"
+		DEBUG2(printk("scsi%d: Lun Inquiry - fcport=[%04x/%p],"
 		    " lun (%d)\n",
 		    ha->host_no, fcport->loop_id, fcport, lun));
 
@@ -320,7 +320,7 @@ qla4xxx_inquiry(scsi_qla_host_t *ha, fc_port_t *fcport,
 		scsi_status = inq->p.rsp.scsiStatus;
 		iscsi_flags = inq->p.rsp.iscsiFlags;
 
-		DEBUG2(printk("scsi(%d): lun (%d) inquiry - "
+		DEBUG2(printk("scsi%d: lun (%d) inquiry - "
 		    "inq[0]= 0x%x, comp status 0x%x, scsi status 0x%x, "
 		    "rval=%d\n",
 		    ha->host_no, lun, inq->inq[0], comp_status, scsi_status,
@@ -329,14 +329,14 @@ qla4xxx_inquiry(scsi_qla_host_t *ha, fc_port_t *fcport,
 		if (rval1 != QLA_SUCCESS || comp_status != SCS_COMPLETE ||
 		    scsi_status & SCSISTAT_CHECK_CONDITION) {
 
-			DEBUG2(printk("scsi(%d): INQ failed to issue iocb! "
+			DEBUG2(printk("scsi%d: INQ failed to issue iocb! "
 			    "fcport=[%04x/%p] rval=%x cs=%x ss=%x\n",
 			    ha->host_no, fcport->loop_id, fcport, rval1,
 			    comp_status, scsi_status));
 
 
 			if (scsi_status & SCSISTAT_CHECK_CONDITION) {
-				DEBUG2(printk("scsi(%d): INQ "
+				DEBUG2(printk("scsi%d: INQ "
 				    "SCSISTAT_CHECK_CONDITION Sense Data "
 				    "%02x %02x %02x %02x %02x %02x %02x %02x\n",
 				    ha->host_no,
@@ -368,7 +368,7 @@ qla4xxx_inquiry(scsi_qla_host_t *ha, fc_port_t *fcport,
 }
 
 int
-qla4xxx_issue_scsi_inquiry(scsi_qla_host_t *ha, 
+qla4xxx_issue_scsi_inquiry(scsi_qla_host_t *ha,
 	fc_port_t *fcport, fc_lun_t *fclun )
 {
 	inq_cmd_rsp_t	*pkt;
@@ -380,14 +380,14 @@ qla4xxx_issue_scsi_inquiry(scsi_qla_host_t *ha,
 
 	if (pkt == NULL) {
 		printk(KERN_WARNING
-		    "scsi(%d): Memory Allocation failed - INQ\n", ha->host_no);
+		    "scsi%d: Memory Allocation failed - INQ\n", ha->host_no);
 		ha->mem_err++;
 		return BIT_0;
 	}
 
 	if ( qla4xxx_inquiry(ha, fcport,
 		fclun->lun, pkt, phys_address) != QLA_SUCCESS) {
-			 
+			
 		DEBUG2(printk("%s: Failed lun inquiry - "
 			"inq[0]= 0x%x, "
 			"\n",
@@ -403,10 +403,10 @@ qla4xxx_issue_scsi_inquiry(scsi_qla_host_t *ha,
 }
 
 int
-qla4xxx_test_active_lun(fc_port_t *fcport, fc_lun_t *fclun) 
+qla4xxx_test_active_lun(fc_port_t *fcport, fc_lun_t *fclun)
 {
 	tur_cmd_rsp_t	*pkt;
-	int		rval = 0 ; 
+	int		rval = 0 ;
 	dma_addr_t	phys_address = 0;
 	int		retry;
 	uint8_t	comp_status;
@@ -421,13 +421,13 @@ qla4xxx_test_active_lun(fc_port_t *fcport, fc_lun_t *fclun)
 
 	ha = fcport->ha;
 	if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD){
-		DEBUG2(printk("scsi(%d) %s leaving: Port loop_id 0x%02x is marked DEAD\n",
+		DEBUG2(printk("scsi%d: %s: leaving: Port loop_id 0x%02x is marked DEAD\n",
 			ha->host_no,__func__,fcport->loop_id);)
 		return rval;
 	}
 	
 	if ( fclun == NULL ){
-		DEBUG2(printk("scsi(%d) %s Bad fclun ptr on entry.\n",
+		DEBUG2(printk("scsi%d: %s: Bad fclun ptr on entry.\n",
 			ha->host_no,__func__);)
 		return rval;
 	}
@@ -439,7 +439,7 @@ qla4xxx_test_active_lun(fc_port_t *fcport, fc_lun_t *fclun)
 
 	if (pkt == NULL) {
 		printk(KERN_WARNING
-		    "scsi(%d): Memory Allocation failed - TUR\n",
+		    "scsi%d: Memory Allocation failed - TUR\n",
 		    ha->host_no);
 		ha->mem_err++;
 		return rval;
@@ -506,9 +506,9 @@ qla4xxx_test_active_lun(fc_port_t *fcport, fc_lun_t *fclun)
 			    pkt->p.rsp.senseData[12],
 			    pkt->p.rsp.senseData[13]));
 
-			if (pkt->p.rsp.senseData[2] == NOT_READY && 
+			if (pkt->p.rsp.senseData[2] == NOT_READY &&
 			    pkt->p.rsp.senseData[12] == 0x4 &&
-			    pkt->p.rsp.senseData[13] == 0x2) 
+			    pkt->p.rsp.senseData[13] == 0x2)
 				break;
 		}
 	} while ((rval != QLA_SUCCESS || comp_status != SCS_COMPLETE ||
@@ -521,14 +521,14 @@ qla4xxx_test_active_lun(fc_port_t *fcport, fc_lun_t *fclun)
 		    pkt->p.rsp.senseData[13] == 0x2)) &&
 	     comp_status == SCS_COMPLETE)) {
 		
-		DEBUG2(printk("scsi(%d) %s - Lun (0x%02x:%d) set to ACTIVE.\n",
+		DEBUG2(printk("scsi%d: %s: - Lun (0x%02x:%d) set to ACTIVE.\n",
 		    ha->host_no, __func__, fcport->loop_id, lun));
 
 		/* We found an active path */
 		fclun->flags |= FLF_ACTIVE_LUN;
 		rval = 1;
 	} else {
-		DEBUG2(printk("scsi(%d) %s - Lun (0x%02x:%d) set to "
+		DEBUG2(printk("scsi%d: %s: - Lun (0x%02x:%d) set to "
 		    "INACTIVE.\n", ha->host_no, __func__,
 		    fcport->loop_id, lun));
 		/* fcport->flags &= ~(FCF_MSA_PORT_ACTIVE); */
@@ -544,7 +544,7 @@ qla4xxx_test_active_lun(fc_port_t *fcport, fc_lun_t *fclun)
 
 #if MSA1000_SUPPORTED
 static fc_lun_t *
-qla4xxx_find_data_lun(fc_port_t *fcport) 
+qla4xxx_find_data_lun(fc_port_t *fcport)
 {
 	scsi_qla_host_t *ha;
 	fc_lun_t	*fclun, *ret_fclun;
@@ -569,7 +569,7 @@ qla4xxx_find_data_lun(fc_port_t *fcport)
 /*
  * qla4xxx_test_active_port
  *	Determines if the port is in active or standby mode. First, we
- *	need to locate a storage lun then do a TUR on it. 
+ *	need to locate a storage lun then do a TUR on it.
  *
  * Input:
  *	fcport = port structure pointer.
@@ -583,10 +583,10 @@ qla4xxx_find_data_lun(fc_port_t *fcport)
  *	Kernel context.
  */
 int
-qla4xxx_test_active_port(fc_port_t *fcport) 
+qla4xxx_test_active_port(fc_port_t *fcport)
 {
 	tur_cmd_rsp_t	*pkt;
-	int		rval = 0 ; 
+	int		rval = 0 ;
 	dma_addr_t	phys_address = 0;
 	int		retry;
 	uint16_t	comp_status;
@@ -599,7 +599,7 @@ qla4xxx_test_active_port(fc_port_t *fcport)
 
 	ha = fcport->ha;
 	if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD) {
-		DEBUG2(printk("scsi(%ld) %s leaving: Port 0x%02x is marked "
+		DEBUG2(printk("scsi%d: %s: leaving: Port 0x%02x is marked "
 		    "DEAD\n", ha->host_no,__func__,fcport->loop_id);)
 		return rval;
 	}
@@ -608,7 +608,7 @@ qla4xxx_test_active_port(fc_port_t *fcport)
 		DEBUG2(printk(KERN_INFO "%s leaving: Couldn't find data lun\n",
 		    __func__);)
 		return rval;
-	} 
+	}
 	lun = fclun->lun;
 
 	pkt = pci_alloc_consistent(ha->pdev, sizeof(tur_cmd_rsp_t),
@@ -681,13 +681,13 @@ qla4xxx_test_active_port(fc_port_t *fcport)
 		    pkt->p.rsp.req_sense_data[12] == 0x4 &&
 		    pkt->p.rsp.req_sense_data[13] == 0x2 ) ) &&
 	     comp_status == CS_COMPLETE)) {
-		DEBUG2(printk("scsi(%ld) %s - Port (0x%04x) set to ACTIVE.\n",
+		DEBUG2(printk("scsi%d: %s: - Port (0x%04x) set to ACTIVE.\n",
 		    ha->host_no, __func__, fcport->loop_id));
 		/* We found an active path */
        		fcport->flags |= FCF_MSA_PORT_ACTIVE;
 		rval = 1;
 	} else {
-		DEBUG2(printk("scsi(%ld) %s - Port (0x%04x) set to INACTIVE.\n",
+		DEBUG2(printk("scsi%d: %s: - Port (0x%04x) set to INACTIVE.\n",
 		    ha->host_no, __func__, fcport->loop_id));
        		fcport->flags &= ~(FCF_MSA_PORT_ACTIVE);
 	}
@@ -715,19 +715,23 @@ qla4xxx_cfg_lun(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun,
                 inq_cmd_rsp_t *inq, dma_addr_t inq_dma)
 {
 	fc_lun_t *fclun;
+	uint8_t	device_type;
+
 
 	/* Bypass LUNs that failed. */
 	if (qla4xxx_failover_enabled(ha)) {
 	if (qla4xxx_inquiry(ha, fcport, lun, inq, inq_dma) != QLA_SUCCESS) {
-		DEBUG2(printk("scsi(%d): Failed inquiry - loop id=0x%04x "
-		    "lun=%d\n", ha->host_no, fcport->loop_id, lun));
+		DEBUG2(printk("scsi%d: %s: Failed inquiry - loop id=0x%04x "
+		    "lun=%d\n", ha->host_no, __func__, fcport->loop_id, lun));
 
 		return (NULL);
 	}
 	}
 
-	switch (inq->inq[0]) {
+	device_type =  inq->inq[0] & 0x1f;
+	switch (device_type) {
 	case TYPE_DISK:
+		break;
 	case TYPE_PROCESSOR:
 	case TYPE_WORM:
 	case TYPE_ROM:
@@ -737,18 +741,19 @@ qla4xxx_cfg_lun(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun,
 	case TYPE_ENCLOSURE:
 	case 0x20:
 	case 0x0C:
+		fcport->flags |= FCF_NONFO_DEVICE;
 		break;
 	case TYPE_TAPE:
 		fcport->flags |= FCF_TAPE_PRESENT;
 		break;
 	default:
-		DEBUG2(printk("scsi(%d): Unsupported lun type -- "
+		DEBUG2(printk("scsi%d: %s: Unsupported lun type -- "
 		    "loop id=0x%04x lun=%d type=%x\n",
-		    ha->host_no, fcport->loop_id, lun, inq->inq[0]));
+		    ha->host_no, __func__, fcport->loop_id, lun, inq->inq[0]));
 		return (NULL);
 	}
 
-	fcport->device_type = inq->inq[0];
+	fcport->device_type = device_type;
 	
 	/* Does this port require special failover handling? */
 	if (qla4xxx_failover_enabled(ha)) {
@@ -756,7 +761,7 @@ qla4xxx_cfg_lun(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun,
 		qla4xxx_set_device_flags(ha, fcport);
 	}
 	fclun = qla4xxx_add_fclun(fcport, lun);
-
+	
 	if (fclun != NULL) {
 		atomic_set(&fcport->state, FCS_ONLINE);
 	}
@@ -856,7 +861,7 @@ qla4xxx_rpt_lun_discovery(scsi_qla_host_t *ha, fc_port_t *fcport,
 		lun = CHAR_TO_SHORT(rlc->list.lst[cnt].lsb,
 		    rlc->list.lst[cnt].msb.b);
 
-		DEBUG2(printk("scsi(%d): RLC lun = (%d)\n", ha->host_no, lun));
+		DEBUG2(printk("scsi%d: %s: RLC lun = (%d)\n", ha->host_no, __func__, lun));
 
 		/* We only support 0 through MAX_LUNS-1 range */
 		if (lun < MAX_LUNS) {
@@ -946,17 +951,17 @@ qla4xxx_report_lun(scsi_qla_host_t *ha, fc_port_t *fcport,
 				break;
 			}
 
-			DEBUG2(printk("scsi(%d): RLC failed to issue iocb! "
+			DEBUG2(printk("scsi%d: %s: RLC failed to issue iocb! "
 			    "fcport=[%04x/%p] rval=%x cs=%x ss=%x\n",
-			    ha->host_no, fcport->loop_id, fcport, rval,
+			    ha->host_no, __func__, fcport->loop_id, fcport, rval,
 			    comp_status, scsi_status));
 
 			rval = QLA_ERROR;
 			if (scsi_status & SCSISTAT_CHECK_CONDITION) {
-				DEBUG2(printk("scsi(%d): RLC "
+				DEBUG2(printk("scsi%d: %s: RLC "
 				    "SCSISTAT_CHECK_CONDITION Sense Data "
 				    "%02x %02x %02x %02x %02x %02x %02x %02x\n",
-				    ha->host_no,
+				    ha->host_no, __func__,
 				    rlc->p.rsp.senseData[0],
 				    rlc->p.rsp.senseData[1],
 				    rlc->p.rsp.senseData[2],
@@ -981,7 +986,7 @@ qla4xxx_report_lun(scsi_qla_host_t *ha, fc_port_t *fcport,
 
 #if MSA1000_SUPPORTED
 static int
-qla4xxx_spinup(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun) 
+qla4xxx_spinup(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun)
 {
 	inq_cmd_rsp_t	*pkt;
 	int		rval = QLA_SUCCESS;
@@ -1002,10 +1007,10 @@ qla4xxx_spinup(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun)
 		return( QLA_FUNCTION_FAILED);
 	}
 
-	count = 5; 
+	count = 5;
 	retry = 5;
 	if (atomic_read(&fcport->state) != FCS_ONLINE) {
-		DEBUG2(printk("scsi(%ld) %s leaving: Port 0x%02x is not ONLINE\n",
+		DEBUG2(printk("scsi%d: %s: leaving: Port 0x%02x is not ONLINE\n",
 			ha->host_no,__func__,fcport->loop_id);)
 		rval =  QLA_FUNCTION_FAILED;
 	}
@@ -1043,12 +1048,11 @@ qla4xxx_spinup(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun)
 		}
 
 		if ( (scsi_status & SS_CHECK_CONDITION) ) {
-			DEBUG2(printk("%s(%ld): SS_CHECK_CONDITION "
+			DEBUG2(printk("scsi%d: %s: SS_CHECK_CONDITION "
 			    "Sense Data "
 			    "%02x %02x %02x %02x "
 			    "%02x %02x %02x %02x\n",
-			    __func__,
-			    ha->host_no,
+			    ha->host_no, __func__,
 			    pkt->p.rsp.req_sense_data[0],
 			    pkt->p.rsp.req_sense_data[1],
 			    pkt->p.rsp.req_sense_data[2],
@@ -1070,7 +1074,7 @@ qla4xxx_spinup(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun)
 					retry--;
 		}
 
-		printk(KERN_INFO 
+		printk(KERN_INFO
 			"qla_fo(%ld): Sending Start - count %d, retry=%d"
 		    "comp status 0x%x, "
 		    "scsi status 0x%x, rval=%d\n",
@@ -1078,7 +1082,7 @@ qla4xxx_spinup(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun)
 		    count,
 		    retry,
 		    comp_status,
-		    scsi_status, 
+		    scsi_status,
 		    rval);
 
 		if ((rval != QLA_SUCCESS) || (comp_status != CS_COMPLETE))
@@ -1099,7 +1103,7 @@ qla4xxx_spinup(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun)
 		    "scsi status 0x%x. loop_id=%d\n",
 				ha->host_no,
 		    comp_status,
-		    scsi_status, 
+		    scsi_status,
 		    fcport->loop_id);)
 				rval =  QLA_FUNCTION_FAILED;
 	}

@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE                                     *
  *                                                                            *
- * QLogic ISP4xxx device driver for Linux 2.4.x                               *
+ * QLogic ISP4xxx device driver for Linux 2.6.x                               *
  * Copyright (C) 2004 Qlogic Corporation                                      *
  * (www.qlogic.com)                                                           *
  *                                                                            *
@@ -176,12 +176,6 @@ qla4xxx_get_pdu(scsi_qla_host_t *ha, uint32_t length)
 	PDU_ENTRY       *free_pdu_bottom;
 	uint16_t        pdu_active;
 
-	uint16_t        i, j;
-	uint16_t        num_pages;
-	uint16_t        first_page;
-	uint16_t        free_pages;
-	uint8_t         pages_available;
-
 	if (ha->free_pdu_top == NULL) {
 		QL4PRINT(QLP2|QLP19,
 			 printk("scsi%d: %s: Out of PDUs!\n",
@@ -192,81 +186,54 @@ qla4xxx_get_pdu(scsi_qla_host_t *ha, uint32_t length)
 	/* Save current state */
 	free_pdu_top    = ha->free_pdu_top;
 	free_pdu_bottom = ha->free_pdu_bottom;
+	pdu_active = ha->pdu_active + 1;
 
+	/* get next available pdu */
 	pdu = free_pdu_top;
 	free_pdu_top = pdu->Next;
 
 	if (free_pdu_top == NULL)
 		free_pdu_bottom = NULL;
 
-	pdu_active = ha->pdu_active + 1;
 
-	QL4PRINT(QLP19,
-		 printk("scsi%d: %s: Get PDU queue SUCCEEDED!  "
-			"Top %p Bot %p PDU %p Active %d\n",
-			ha->host_no, __func__,
-			free_pdu_top, free_pdu_bottom, pdu, pdu_active));
-
+	/* round up to nearest page */
 	length = (length + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1);
-	num_pages = (uint16_t) (length / PAGE_SIZE);
-	free_pages = 0;
-	first_page = (uint16_t) (-1);
-	pages_available = 0;
 
-	/* Try to allocate contiguous free pages */
-	for (i=0; i+num_pages <= MAX_PDU_ENTRIES; i++) {
-		if (!ha->pdu_buf_used[i]) {
-			first_page = i;
-			pages_available = 1;
-			for (j=i+1; j<num_pages; j++) {
-				if (ha->pdu_buf_used[j]) {
-					first_page = (uint16_t) (-1);
-					pages_available = 0;
-					i = j;
-					break;
-				}
-			}
-			if (pages_available)
-				break;
-		}
-	}
-	if (!pages_available) {
+
+	/* Allocate pdu buffer PDU */
+	pdu->Buff = pci_alloc_consistent(ha->pdev, length, &pdu->DmaBuff);
+	if (pdu->Buff == NULL) {
 		QL4PRINT(QLP2|QLP19,
-			 printk("scsi%d: %s: No contiguous pages available! "
-				"Top %p Bot %p PDU %p Active %d\n",
-				ha->host_no, __func__,
-				free_pdu_top, free_pdu_bottom, pdu, pdu_active));
+			 printk("scsi%d: %s: Unable to allocate memory "
+				"for PDU buffer\n",
+				ha->host_no, __func__));
 		return(NULL);
 	}
-
-	for (i=0; i<num_pages; i++)
-		ha->pdu_buf_used[first_page+i] = 1;
-
-	ha->free_pdu_top = free_pdu_top;
-	ha->free_pdu_bottom = free_pdu_bottom;
-	ha->pdu_active = pdu_active;
-
-	/* Fill in PDU */
-	pdu->Buff = (uint8_t *) (&(ha->pdu_buffsv) + (first_page * PAGE_SIZE));
+	
+	memset(pdu->Buff, 0, length);
+	
+	/* Fill in remainder of PDU */
 	pdu->BuffLen = length;
 	pdu->SendBuffLen = 0;
 	pdu->RecvBuffLen = 0;
 	pdu->Next = NULL;
 
+	ha->free_pdu_top = free_pdu_top;
+	ha->free_pdu_bottom = free_pdu_bottom;
+	ha->pdu_active = pdu_active;
+
 	QL4PRINT(QLP19,
-		 printk("scsi%d: %s: Get PDU buffers SUCCEEDED!  "
-			"Top %p Bot %p PDU %p Buf %p Length %x Active %d\n",
-			ha->host_no, __func__, free_pdu_top, free_pdu_bottom,
-			pdu, pdu->Buff, pdu->BuffLen, pdu_active));
+		 printk("scsi%d: %s: Get PDU SUCCEEDED!  "
+			"Top %p Bot %p PDU %p Buf %p DmaBuf %lx Length %x "
+			"Active %d\n", ha->host_no, __func__, free_pdu_top,
+			free_pdu_bottom, pdu, pdu->Buff,
+			(unsigned long)pdu->DmaBuff, pdu->BuffLen,
+			pdu_active));
 	return(pdu);
 }
 
 void qla4xxx_free_pdu(scsi_qla_host_t *ha, PDU_ENTRY *pdu)
 {
-	uint16_t first_page;
-	uint16_t num_pages;
-	uint16_t i;
-
 	if (ha->free_pdu_bottom == NULL) {
 		ha->free_pdu_top = pdu;
 		ha->free_pdu_bottom = pdu;
@@ -276,17 +243,15 @@ void qla4xxx_free_pdu(scsi_qla_host_t *ha, PDU_ENTRY *pdu)
 		ha->free_pdu_bottom = pdu;
 	}
 
-	/* Free buffer resources */
-	first_page = (unsigned long) pdu->Buff - ((unsigned long) &ha->pdu_buffsv / PAGE_SIZE);
-	num_pages = (uint16_t) (pdu->BuffLen / PAGE_SIZE);
-	for (i=0; i<num_pages; i++)
-		ha->pdu_buf_used[first_page+i] = 0;
+	pci_free_consistent(ha->pdev, pdu->BuffLen, pdu->Buff, pdu->DmaBuff);
 	ha->pdu_active--;
 
 	QL4PRINT(QLP19,
-		 printk("scsi%d: %s: Top %p Bot %p PDU %p Buf %p Length %x Active %d\n",
-			ha->host_no, __func__, ha->free_pdu_top, ha->free_pdu_bottom,
-			pdu, pdu->Buff, pdu->BuffLen, ha->pdu_active));
+		 printk("scsi%d: %s: Top %p Bot %p PDU %p Buf %p DmaBuf %lx, "
+			"Length %x Active %d\n", ha->host_no, __func__,
+			ha->free_pdu_top,  ha->free_pdu_bottom, pdu, pdu->Buff,
+			(unsigned long) pdu->DmaBuff, pdu->BuffLen,
+			ha->pdu_active));
 
 	/* Clear PDU */
 	pdu->Buff = NULL;
@@ -294,6 +259,7 @@ void qla4xxx_free_pdu(scsi_qla_host_t *ha, PDU_ENTRY *pdu)
 	pdu->SendBuffLen = 0;
 	pdu->RecvBuffLen = 0;
 	pdu->Next = NULL;
+	pdu->DmaBuff = 0;
 }
 
 /**************************************************************************
@@ -316,7 +282,7 @@ uint8_t
 qla4xxx_send_passthru0_iocb(scsi_qla_host_t *ha,
 			    uint16_t fw_ddb_index,
 			    uint16_t connection_id,
-			    uint8_t *pdu_data,
+			    dma_addr_t pdu_dma_data,
 			    uint32_t send_len,
 			    uint32_t recv_len,
 			    uint16_t control_flags,
@@ -324,14 +290,8 @@ qla4xxx_send_passthru0_iocb(scsi_qla_host_t *ha,
 {
 	PASSTHRU0_ENTRY *passthru_entry;
 	uint8_t         status = QLA_SUCCESS;
-	dma_addr_t      pdu_dma_data;
 
 	ENTER("qla4xxx_send_passthru0_iocb");
-
-	if (send_len) {
-		QL4PRINT(QLP19, printk("PDU (0x%p) ->\n", pdu_data));
-		qla4xxx_dump_bytes(QLP19, pdu_data, send_len);
-	}
 
 	/* Get pointer to the queue entry for the marker */
 	if (qla4xxx_get_req_pkt(ha, (QUEUE_ENTRY **) &passthru_entry)
@@ -352,11 +312,6 @@ qla4xxx_send_passthru0_iocb(scsi_qla_host_t *ha,
 	passthru_entry->connectionID   = cpu_to_le16(connection_id);
 	passthru_entry->timeout        = __constant_cpu_to_le16(PT_DEFAULT_TIMEOUT);
 
-	pdu_dma_data = ha->pdu_buffsp;
-	
-	/* FIXMEdg: What is this ????  */
-	pdu_dma_data += ((unsigned long) pdu_data - ha->pdu_buffsp);
-
 	if (send_len) {
 		control_flags |= PT_FLAG_SEND_BUFFER;
 		passthru_entry->outDataSeg64.base.addrHigh  =
@@ -365,6 +320,7 @@ qla4xxx_send_passthru0_iocb(scsi_qla_host_t *ha,
 		cpu_to_le32(LSDW(pdu_dma_data));
 		passthru_entry->outDataSeg64.count          =
 		cpu_to_le32(send_len);
+
 		QL4PRINT(QLP19,
 			 printk("scsi%d: %s: sending 0x%X bytes, "
 				"pdu_dma_data = %lx\n",
@@ -384,9 +340,9 @@ qla4xxx_send_passthru0_iocb(scsi_qla_host_t *ha,
 
 	wmb();
 
-	QL4PRINT(QLP19, printk(KERN_INFO "scsi%d: Passthru0 IOCB type %x count %x In (%x) %p\n",
+	QL4PRINT(QLP19, printk(KERN_INFO "scsi%d: Passthru0 IOCB type %x count %x In (%x) pt0 %p handle %x\n",
 			       ha->host_no, passthru_entry->hdr.entryType,
-			       passthru_entry->hdr.entryCount, ha->request_in, passthru_entry));
+			       passthru_entry->hdr.entryCount, ha->request_in, passthru_entry, handle));
 	qla4xxx_dump_bytes(QLP10, passthru_entry, sizeof(*passthru_entry));
 
 

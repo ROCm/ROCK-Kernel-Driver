@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE                                     *
  *                                                                            *
- * QLogic ISP4xxx device driver for Linux 2.4.x                               *
+ * QLogic ISP4xxx device driver for Linux 2.6.x                               *
  * Copyright (C) 2004 Qlogic Corporation                                      *
  * (www.qlogic.com)                                                           *
  *                                                                            *
@@ -60,7 +60,8 @@
 //#define QLP20 0x00100000  // iSNS info
 //#define QLP24 0x01000000  // Scatter/Gather info
 
-uint32_t ql_dbg_level = QLP1;
+//uint32_t ql_dbg_level = QLP1|QLP2|QLP7|QLP20;
+uint32_t ql_dbg_level = 0;
 
 /**************************************************************************
  * qla4xxx_get_debug_level
@@ -75,7 +76,7 @@ uint32_t ql_dbg_level = QLP1;
  * Returns:
  *	QLA_SUCCESS - always
  **************************************************************************/
-uint8_t
+inline uint8_t
 qla4xxx_get_debug_level(uint32_t *dbg_level)
 {
 	*dbg_level = ql_dbg_level;
@@ -96,7 +97,7 @@ qla4xxx_get_debug_level(uint32_t *dbg_level)
  * Returns:
  *	QLA_SUCCESS - always
  **************************************************************************/
-uint8_t
+inline uint8_t
 qla4xxx_set_debug_level(uint32_t dbg_level)
 {
 	ql_dbg_level = dbg_level;
@@ -390,6 +391,7 @@ qla4xxx_print_srb_info(uint32_t dbg_mask, srb_t *srb)
 	}
 }
 
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 void
 qla4xxx_print_iocb_passthru(uint32_t dbg_mask, scsi_qla_host_t *ha, INT_IOCB_PASSTHRU *iocb)
 {
@@ -406,6 +408,7 @@ qla4xxx_print_iocb_passthru(uint32_t dbg_mask, scsi_qla_host_t *ha, INT_IOCB_PAS
 		qla4xxx_dump_bytes(dbg_mask, iocb->RspData, iocb->RspDataLen);
 	}
 }
+#endif
 
 /* hardware_lock taken */
 void
@@ -488,7 +491,7 @@ __dump_registers(uint32_t dbg_mask, scsi_qla_host_t *ha)
 
 
 	for (i=0; i<MBOX_REG_COUNT; i++) {
-		printk(KERN_INFO "0x%02X mailbox[%d]     = 0x%08X\n",
+		printk(KERN_INFO "0x%02X mailbox[%d]      = 0x%08X\n",
 		       (uint8_t) offsetof(isp_reg_t, mailbox[i]), i,
 		       RD_REG_DWORD(&ha->reg->mailbox[i]));
 	}
@@ -512,17 +515,17 @@ __dump_registers(uint32_t dbg_mask, scsi_qla_host_t *ha)
 	}
 	else if (IS_QLA4022(ha)) {
 
-		     printk(KERN_INFO "0x%02X intr_mask  = 0x%08X\n",
-			    (uint8_t) offsetof(isp_reg_t, u1.isp4022.intr_mask),
-			    RD_REG_DWORD(&ha->reg->u1.isp4022.intr_mask));
-
-		     printk(KERN_INFO "0x%02X nvram      = 0x%08X\n",
-			    (uint8_t) offsetof(isp_reg_t, u1.isp4022.nvram),
-			    RD_REG_DWORD(&ha->reg->u1.isp4022.nvram));
-
-		     printk(KERN_INFO "0x%02X semaphore  = 0x%08X\n",
-			    (uint8_t) offsetof(isp_reg_t, u1.isp4022.semaphore),
-			    RD_REG_DWORD(&ha->reg->u1.isp4022.semaphore));
+		printk(KERN_INFO "0x%02X intr_mask       = 0x%08X\n",
+		    (uint8_t) offsetof(isp_reg_t, u1.isp4022.intr_mask),
+		    RD_REG_DWORD(&ha->reg->u1.isp4022.intr_mask));
+		
+		printk(KERN_INFO "0x%02X nvram           = 0x%08X\n",
+		    (uint8_t) offsetof(isp_reg_t, u1.isp4022.nvram),
+		    RD_REG_DWORD(&ha->reg->u1.isp4022.nvram));
+		
+		printk(KERN_INFO "0x%02X semaphore       = 0x%08X\n",
+		    (uint8_t) offsetof(isp_reg_t, u1.isp4022.semaphore),
+		    RD_REG_DWORD(&ha->reg->u1.isp4022.semaphore));
 	}
 
 	printk(KERN_INFO "0x%02X req_q_in        = 0x%08X\n",
@@ -565,44 +568,44 @@ __dump_registers(uint32_t dbg_mask, scsi_qla_host_t *ha)
 	}
 	else if (IS_QLA4022(ha)) {
 
-		     printk(KERN_INFO "Page 0 Registers:\n");
+		printk(KERN_INFO "Page 0 Registers:\n");
+	
+		printk(KERN_INFO "0x%02X ext_hw_conf     = 0x%08X\n",
+		    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p0.ext_hw_conf),
+		    RD_REG_DWORD(&ha->reg->u2.isp4022.p0.ext_hw_conf));
 		
-		     printk(KERN_INFO "0x%02X ext_hw_conf     = 0x%08X\n",
-			    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p0.ext_hw_conf),
-			    RD_REG_DWORD(&ha->reg->u2.isp4022.p0.ext_hw_conf));
-
-		     printk(KERN_INFO "0x%02X port_ctrl       = 0x%08X\n",
-			    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p0.port_ctrl),
-			    RD_REG_DWORD(&ha->reg->u2.isp4022.p0.port_ctrl));
-
-		     printk(KERN_INFO "0x%02X port_status     = 0x%08X\n",
-			    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p0.port_status),
-			    RD_REG_DWORD(&ha->reg->u2.isp4022.p0.port_status));
-
-		     printk(KERN_INFO "0x%02X gp_out          = 0x%08X\n",
-			    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p0.gp_out),
-			    RD_REG_DWORD(&ha->reg->u2.isp4022.p0.gp_out));
-
-		     printk(KERN_INFO "0x%02X gp_in           = 0x%08X\n",
-			    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p0.gp_in),
-			    RD_REG_DWORD(&ha->reg->u2.isp4022.p0.gp_in));
-
-		     printk(KERN_INFO "0x%02X port_err_status = 0x%08X\n",
-			    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p0.port_err_status),
-			    RD_REG_DWORD(&ha->reg->u2.isp4022.p0.port_err_status));
+		printk(KERN_INFO "0x%02X port_ctrl       = 0x%08X\n",
+		    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p0.port_ctrl),
+		    RD_REG_DWORD(&ha->reg->u2.isp4022.p0.port_ctrl));
 		
-		     printk(KERN_INFO "Page 1 Registers:\n");
+		printk(KERN_INFO "0x%02X port_status     = 0x%08X\n",
+		    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p0.port_status),
+		    RD_REG_DWORD(&ha->reg->u2.isp4022.p0.port_status));
 		
-		     WRT_REG_DWORD(&ha->reg->ctrl_status, HOST_MEM_CFG_PAGE &
-				   SET_RMASK(CSR_SCSI_PAGE_SELECT));
-
-		     printk(KERN_INFO "0x%02X req_q_out       = 0x%08X\n",
-			    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p1.req_q_out),
-			    RD_REG_DWORD(&ha->reg->u2.isp4022.p1.req_q_out));
-
-		     WRT_REG_DWORD(&ha->reg->ctrl_status, PORT_CTRL_STAT_PAGE &
-				   SET_RMASK(CSR_SCSI_PAGE_SELECT));
-
+		printk(KERN_INFO "0x%02X gp_out          = 0x%08X\n",
+		    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p0.gp_out),
+		    RD_REG_DWORD(&ha->reg->u2.isp4022.p0.gp_out));
+		
+		printk(KERN_INFO "0x%02X gp_in           = 0x%08X\n",
+		    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p0.gp_in),
+		    RD_REG_DWORD(&ha->reg->u2.isp4022.p0.gp_in));
+		
+		printk(KERN_INFO "0x%02X port_err_status = 0x%08X\n",
+		    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p0.port_err_status),
+		    RD_REG_DWORD(&ha->reg->u2.isp4022.p0.port_err_status));
+		
+		printk(KERN_INFO "Page 1 Registers:\n");
+		
+		WRT_REG_DWORD(&ha->reg->ctrl_status, HOST_MEM_CFG_PAGE &
+			   SET_RMASK(CSR_SCSI_PAGE_SELECT));
+		
+		printk(KERN_INFO "0x%02X req_q_out       = 0x%08X\n",
+		    (uint8_t) offsetof(isp_reg_t, u2.isp4022.p1.req_q_out),
+		    RD_REG_DWORD(&ha->reg->u2.isp4022.p1.req_q_out));
+		
+		WRT_REG_DWORD(&ha->reg->ctrl_status, PORT_CTRL_STAT_PAGE &
+			   SET_RMASK(CSR_SCSI_PAGE_SELECT));
+		
 	}
 }
 

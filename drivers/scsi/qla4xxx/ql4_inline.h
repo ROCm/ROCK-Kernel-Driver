@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE                                     *
  *                                                                            *
- * QLogic ISP4xxx device driver for Linux 2.4.x                               *
+ * QLogic ISP4xxx device driver for Linux 2.6.x                               *
  * Copyright (C) 2004 Qlogic Corporation                                      *
  * (www.qlogic.com)                                                           *
  *                                                                            *
@@ -46,10 +46,6 @@ qla4xxx_lookup_lun_handle(scsi_qla_host_t *ha, os_tgt_t *tq, uint16_t lun)
 
 	if (tq && lun < MAX_LUNS)
 		lq = tq->olun[lun];
-	 
-	QL4PRINT(QLP3, printk("scsi%d: %s: lun %d, lun_entry = %p\n",
-	    ha->host_no, __func__, lun, lq));
-
 	return lq;
 }
 
@@ -141,7 +137,7 @@ qla4xxx_lookup_ddb_by_fw_index(scsi_qla_host_t *ha, uint32_t fw_ddb_index)
 		ddb_entry = ha->fw_ddb_index_map[fw_ddb_index];
 	}
 
-	QL4PRINT(QLP3, printk("scsi%d: %s: index [%d], ddb_entry = %p\n",
+	DEBUG3(printk("scsi%d: %s: index [%d], ddb_entry = %p\n",
 	    ha->host_no, __func__, fw_ddb_index, ddb_entry));
 
 	return ddb_entry;
@@ -168,7 +164,7 @@ qla4xxx_mark_device_missing(scsi_qla_host_t *ha, ddb_entry_t *ddb_entry)
 	if (ddb_entry->fcport != NULL)
 		atomic_set(&ddb_entry->fcport->state, FCS_DEVICE_LOST);
 
-	QL4PRINT(QLP3, printk(KERN_INFO "scsi%d:%d:%d: index [%d] marked "
+	QL4PRINT(QLP2, printk(KERN_INFO "scsi%d:%d:%d: index [%d] marked "
 	    "MISSING\n", ha->host_no, ddb_entry->bus, ddb_entry->target,
 	    ddb_entry->fw_ddb_index));
 }
@@ -199,11 +195,16 @@ static inline void __qla4xxx_enable_intrs(scsi_qla_host_t *ha)
 	ENTER("qla4xxx_enable_intrs");
 	set_bit(AF_INTERRUPTS_ON, &ha->flags);
 
-	WRT_REG_DWORD(&ha->reg->ctrl_status, SET_RMASK(CSR_SCSI_INTR_ENABLE));
-	PCI_POSTING(&ha->reg->ctrl_status);
-	QL4PRINT(QLP7, printk("scsi%d: %s: intSET_RMASK = %08x\n",
+	if( IS_QLA4022(ha) ) {
+		WRT_REG_DWORD(&ha->reg->u1.isp4022.intr_mask, SET_RMASK(IMR_SCSI_INTR_ENABLE));
+		PCI_POSTING(&ha->reg->u1.isp4022.intr_mask);
+	} else {
+		WRT_REG_DWORD(&ha->reg->ctrl_status, SET_RMASK(CSR_SCSI_INTR_ENABLE));
+		PCI_POSTING(&ha->reg->ctrl_status);
+		QL4PRINT(QLP7, printk("scsi%d: %s: intSET_RMASK = %08x\n",
 			      ha->host_no, __func__,
 			      RD_REG_DWORD(&ha->reg->ctrl_status)));
+	}
 	LEAVE("qla4xxx_enable_intrs");
 }
 
@@ -213,11 +214,19 @@ static inline void __qla4xxx_disable_intrs(scsi_qla_host_t *ha)
 	ENTER("qla4xxx_disable_intrs");
 	clear_bit(AF_INTERRUPTS_ON, &ha->flags);
 	
-	WRT_REG_DWORD(&ha->reg->ctrl_status, CLR_RMASK(CSR_SCSI_INTR_ENABLE));
-	PCI_POSTING(&ha->reg->ctrl_status);
-	QL4PRINT(QLP7, printk("scsi%d: %s: intSET_RMASK = %08x\n",
+	if( IS_QLA4022(ha) ) {
+		WRT_REG_DWORD(&ha->reg->u1.isp4022.intr_mask, CLR_RMASK(IMR_SCSI_INTR_ENABLE));
+		PCI_POSTING(&ha->reg->u1.isp4022.intr_mask);
+		QL4PRINT(QLP7, printk("scsi%d: %s: intr_mask = %08x\n",
+			      ha->host_no, __func__,
+			      RD_REG_DWORD(&ha->reg->u1.isp4022.intr_mask)));
+	} else {
+		WRT_REG_DWORD(&ha->reg->ctrl_status, CLR_RMASK(CSR_SCSI_INTR_ENABLE));
+		PCI_POSTING(&ha->reg->ctrl_status);
+		QL4PRINT(QLP7, printk("scsi%d: %s: intSET_RMASK = %08x\n",
 			      ha->host_no, __func__,
 			      RD_REG_DWORD(&ha->reg->ctrl_status)));
+	}
 	LEAVE("qla4xxx_disable_intrs");
 }
 static inline void qla4xxx_enable_intrs(scsi_qla_host_t *ha)

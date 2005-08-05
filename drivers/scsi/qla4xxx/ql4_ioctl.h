@@ -42,7 +42,7 @@ typedef struct {
 extern void *
 Q64BIT_TO_PTR(uint64_t);
 
-extern void *
+extern inline void *
 ql4_kzmalloc(int, int);
 
 extern char *

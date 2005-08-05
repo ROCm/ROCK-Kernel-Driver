@@ -103,7 +103,7 @@ typedef struct _mp_path_list {
 }
 mp_path_list_t;
 
-/*
+	/*
  * Definitions for failover notify SRBs.  These SRBs contain failover notify
  * CDBs to notify a target that a failover has occurred.
  *
@@ -123,6 +123,7 @@ typedef struct _mp_lun {
 	struct list_head	ports_list;
 	int			path_cnt;		/* Must be > 1 for fo device  */
 	int			siz;			/* Size of wwuln  */
+	struct fo_information	*info;
 	uint8_t		wwuln[WWLUN_SIZE];/* lun id from inquiry page 83. */
 }
 mp_lun_t;
@@ -206,6 +207,11 @@ typedef struct failover_notify_entry {
 }
 failover_notify_t;
 
+struct fo_information {
+	uint8_t path_cnt;
+	uint32_t fo_retry_cnt[MAX_PATHS_PER_DEVICE];
+};
+
 #if 0
 /* ** NEW simified version of T3 ** */
 typedef struct {
@@ -224,8 +230,8 @@ typedef struct {
 	uint8_t   reserved1;	
 	uint8_t   scsi_cdb[IOCB_MAX_CDB_LEN];
 	uint8_t   lun[8];
-	uint32_t  cmd_seq_num;	  
-	uint16_t  timeout;	 
+	uint32_t  cmd_seq_num;	
+	uint16_t  timeout;	
 	uint16_t  desg_count;	
 	uint32_t  byte_count;
 	uint32_t dseg_0_address[2];

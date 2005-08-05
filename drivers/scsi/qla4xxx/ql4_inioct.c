@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE                                     *
  *                                                                            *
- * QLogic ISP4xxx device driver for Linux 2.4.x                               *
+ * QLogic ISP4xxx device driver for Linux 2.6.x                               *
  * Copyright (C) 2004 Qlogic Corporation                                      *
  * (www.qlogic.com)                                                           *
  *                                                                            *
@@ -225,6 +225,7 @@ qla4intioctl_ping(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 {
 	int		status = 0;
 	INT_PING	ping;
+	uint32_t	ip_addr;
 	uint32_t	mbox_cmd[MBOX_REG_COUNT];
 	uint32_t	mbox_sts[MBOX_REG_COUNT];
 
@@ -278,8 +279,9 @@ qla4intioctl_ping(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
 	memset(&mbox_sts, 0, sizeof(mbox_sts));
 	mbox_cmd[0] = MBOX_CMD_PING;
-	mbox_cmd[1] = ping.PacketCount;
-	memcpy(&mbox_cmd[2], &ping.IPAddr.IPAddress, EXT_DEF_IP_ADDR_SIZE);
+	mbox_cmd[1] = cpu_to_le16(ping.PacketCount);
+	memcpy(&ip_addr, &ping.IPAddr.IPAddress, EXT_DEF_IP_ADDR_SIZE);
+	mbox_cmd[2] = cpu_to_le32(ip_addr);
 
 	if (qla4xxx_mailbox_command(ha, 6, 1, &mbox_cmd[0], &mbox_sts[0]) ==
 	    QLA_ERROR) {
@@ -1119,6 +1121,11 @@ qla4intioctl_set_flash(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 
 #endif
 
+	QL4PRINT(QLP4,
+	    printk("scsi%d: %s: offset=%08x, len=%08x\n",
+	    ha->host_no, __func__,
+	    paccess_flash->DataOffset, paccess_flash->DataLen));
+
 	/*
 	 * Issue Mailbox Command
 	 */
@@ -1312,7 +1319,7 @@ qla4intioctl_hba_reset(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 		wait_count = jiffies + ADAPTER_RESET_TOV * HZ;
 		while (test_bit(DPC_RESET_HA_DESTROY_DDB_LIST,
 		    &ha->dpc_flags) != 0) {
-			if (wait_count <= jiffies)
+			if (time_after_eq(jiffies, wait_count))
 				break;
 
 			/* wait for 1 second */
@@ -1539,6 +1546,25 @@ qla4intioctl_iocb_passthru(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 		goto exit_iocb_passthru;
 	}
 
+	if ((iocb->IOCBCmdBuffer[0x00] == 0x3A) &&
+	    (iocb->IOCBCmdBuffer[0x0A] == 0x10) &&
+	    (iocb->IOCBCmdBuffer[0x0B] == 0x80) &&
+	    (iocb->SendData[0x0C] == 0x81) &&
+	    (iocb->SendData[0x0D] == 0x4F)) {
+		// ok to process command, proceed ...
+	} else {
+		QL4PRINT(QLP2, printk("scsi%d: %s: unable to process command. "
+                                      "Did not pass secure I/O boundary check.\n",
+                                      ha->host_no, __func__));
+		QL4PRINT(QLP2, printk("IOCBCmdBuffer[0x00] = 0x%x, expecting 0x3A\n", iocb->IOCBCmdBuffer[0x00]));
+		QL4PRINT(QLP2, printk("IOCBCmdBuffer[0x0A] = 0x%x, expecting 0x10\n", iocb->IOCBCmdBuffer[0x0A]));
+		QL4PRINT(QLP2, printk("IOCBCmdBuffer[0x0B] = 0x%x, expecting 0x80\n", iocb->IOCBCmdBuffer[0x0B]));
+		QL4PRINT(QLP2, printk("SendData[0x0C] = 0x%x, expecting 0x81\n", iocb->SendData[0x0C]));
+		QL4PRINT(QLP2, printk("SendData[0x0D] = 0x%x, expecting 0x4F\n", iocb->SendData[0x0D]));
+		status = (-EFAULT);
+		ioctl->Status = EXT_STATUS_INVALID_PARAM;
+		goto exit_iocb_passthru;
+	}
 
 	/* --- Get pointer to the passthru queue entry --- */
 	spin_lock_irqsave(&ha->hardware_lock, flags);

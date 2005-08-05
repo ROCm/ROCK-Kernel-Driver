@@ -221,7 +221,7 @@ typedef struct _EXT_IOCTL_ISCSI {
 	UINT16	HbaSelect;				/* 2   */
 	UINT32	VendorSpecificStatus[11];		/* 44  */
 	UINT64	Signature2;				/* 8   */
-} EXT_IOCTL_ISCSI, *PEXT_IOCTL_ISCSI;			/* 106 */
+} __attribute__((packed)) EXT_IOCTL_ISCSI, *PEXT_IOCTL_ISCSI;	/* 106 */
 
 /*
  * ****************************************************************************

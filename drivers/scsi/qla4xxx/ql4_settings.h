@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE                                     *
  *                                                                            *
- * QLogic ISP4xxx device driver for Linux 2.4.x                               *
+ * QLogic ISP4xxx device driver for Linux 2.6.x                               *
  * Copyright (C) 2004 Qlogic Corporation                                      *
  * (www.qlogic.com)                                                           *
  *                                                                            *
@@ -33,6 +33,7 @@
  * used for debug purposes only.
  ****************************************/
 #define ISP_RESET_TEST		0 /* Issues BIG HAMMER (reset) every 3 minutes */
+#define NIC_RESET_TEST		0 /* Simulates NIC card reset every 3 minutes */
 #define BYTE_ORDER_SUPPORT_ENABLED 0 /* In the process of translating IOCTL structures */
 
 /*
@@ -57,6 +58,8 @@
  */
 #define DEBUG_QLA4xx		0	/* For Debug of qla4xxx */
 
+#define	DISABLE_HBA_RESETS	0
+
 /* Failover options */
 #define MAX_RECOVERYTIME	10	/*
 					 * Max suspend time for a lun recovery
@@ -66,7 +69,7 @@
 
 #define EXTEND_CMD_TIMEOUT	60
 #if 0
-/* 
+/*
  * When a lun is suspended for the "Not Ready" condition then it will suspend
  * the lun for increments of 6 sec delays.  SUSPEND_COUNT is that count.
  */
@@ -79,6 +82,8 @@
  */
 
 #define MAX_RETRIES_OF_ISP_ABORT	5
+
+#define	DISABLE_HBA_RESETS		1
 
 //#include "ql4_version.h"
 #endif

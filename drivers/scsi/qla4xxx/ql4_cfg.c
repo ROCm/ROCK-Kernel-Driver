@@ -47,7 +47,7 @@ static mp_host_t * qla4xxx_find_host_by_iscsiname(uint8_t *);
 
 static mp_path_t * qla4xxx_find_or_allocate_path(mp_host_t *, mp_device_t *,
     uint16_t, uint16_t, fc_port_t *);
-
+	
 static uint32_t qla4xxx_cfg_register_failover_lun(mp_device_t *,srb_t *,
     fc_lun_t *);
 static uint32_t qla4xxx_send_failover_notify(mp_device_t *, uint8_t,
@@ -83,7 +83,7 @@ qla4xxx_find_or_allocate_lun(mp_host_t *, uint16_t ,
     fc_port_t *, fc_lun_t *);
 static void qla4xxx_add_lun( mp_device_t *, mp_lun_t *);
 static mp_port_t	*
-qla4xxx_find_or_allocate_port(mp_host_t *, mp_lun_t *, 
+qla4xxx_find_or_allocate_port(mp_host_t *, mp_lun_t *,
 	mp_path_t *);
 static mp_port_t	*
 qla4xxx_find_port_by_name(mp_lun_t *, mp_path_t *);
@@ -113,7 +113,7 @@ static int mp_initialized;
  */
 
  /*
- *  Borrowed from scsi_scan.c 
+ *  Borrowed from scsi_scan.c
  */
 int16_t
 qla4xxx_cfg_lookup_device(unsigned char *response_data)
@@ -151,25 +151,25 @@ qla4xxx_set_device_flags(scsi_qla_host_t *ha, fc_port_t *fcport)
 	fcport->flags &= ~(FCF_XP_DEVICE|FCF_MSA_DEVICE|FCF_EVA_DEVICE);
 	if ((cfg_device_list[fcport->cfg_id].flags & 1)) {
 		printk(KERN_INFO
-		    "scsi(%d) :Loop id 0x%04x is an XP device\n", ha->host_no,
+		    "scsi%d: Loop id 0x%04x is an XP device\n", ha->host_no,
 		    fcport->loop_id);
 		fcport->flags |= FCF_XP_DEVICE;
 	} else if ((cfg_device_list[fcport->cfg_id].flags & 2)) {
 		printk(KERN_INFO
-		    "scsi(%d) :Loop id 0x%04x is a MSA1000 device\n",
+		    "scsi%d: Loop id 0x%04x is a MSA1000 device\n",
 		    ha->host_no, fcport->loop_id);
 		fcport->flags |= FCF_MSA_DEVICE;
 		fcport->flags |= FCF_FAILBACK_DISABLE;
 	} else if ((cfg_device_list[fcport->cfg_id].flags & 4)) {
 		printk(KERN_INFO
-		    "scsi(%d) :Loop id 0x%04x is a EVA device\n", ha->host_no,
+		    "scsi%d: Loop id 0x%04x is a EVA device\n", ha->host_no,
 		    fcport->loop_id);
 		fcport->flags |= FCF_EVA_DEVICE;
 		fcport->flags |= FCF_FAILBACK_DISABLE;
-	} 
+	}
 	if ((cfg_device_list[fcport->cfg_id].flags & 8)) {
 		printk(KERN_INFO
-		    "scsi(%d) :Loop id 0x%04x has FAILOVERS disabled.\n",
+		    "scsi%d: Loop id 0x%04x has FAILOVERS disabled.\n",
 		    ha->host_no, fcport->loop_id);
 		fcport->flags |= FCF_FAILOVER_DISABLE;
 	}
@@ -189,9 +189,9 @@ qla4xxx_configure_cfg_device(fc_port_t *fcport)
 	/* Set any notify options */
 	if (cfg_device_list[id].notify_type != FO_NOTIFY_TYPE_NONE) {
 		fcport->notify_type = cfg_device_list[id].notify_type;
-	}   
+	}
 
-	DEBUG2(printk("%s - Configuring device \n", __func__)); 
+	DEBUG2(printk("%s - Configuring device \n", __func__));
 
 	/* Disable failover capability if needed  and return */
 	fcport->fo_combine = cfg_device_list[id].fo_combine;
@@ -221,7 +221,7 @@ qla4xxx_cfg_init(scsi_qla_host_t *ha)
 
 	ENTER("qla4xxx_cfg_init");
 	set_bit(CFG_ACTIVE, &ha->cfg_flags);
-	mp_initialized = 1; 
+	mp_initialized = 1;
 	/* First HBA, initialize the failover global properties */
 	qla4xxx_fo_init_params(ha);
 
@@ -400,7 +400,7 @@ qla4xxx_cfg_remap(scsi_qla_host_t *halist)
 {
 	scsi_qla_host_t *ha;
 
-	mp_initialized = 1; 
+	mp_initialized = 1;
 	read_lock(&qla4xxx_hostlist_lock);
 	list_for_each_entry(ha, &qla4xxx_hostlist, list) {
 		DEBUG2(printk("Entering %s ...\n",__func__);)
@@ -410,7 +410,7 @@ qla4xxx_cfg_remap(scsi_qla_host_t *halist)
 		clear_bit(CFG_FAILOVER, &ha->cfg_flags);
 	}
 	read_unlock(&qla4xxx_hostlist_lock);
-	mp_initialized = 0; 
+	mp_initialized = 0;
 	DEBUG2(printk("Exiting %s ...\n",__func__);)
 
 	return QLA_SUCCESS;
@@ -460,7 +460,7 @@ qla4xxx_allocate_mp_port(uint8_t *iscsiname)
 }
 
 static mp_port_t	*
-qla4xxx_find_port_by_name(mp_lun_t *mplun, 
+qla4xxx_find_port_by_name(mp_lun_t *mplun,
 	mp_path_t *path)
 {
 	mp_port_t	*port = NULL;
@@ -479,7 +479,7 @@ qla4xxx_find_port_by_name(mp_lun_t *mplun,
 
 
 static mp_port_t	*
-qla4xxx_find_or_allocate_port(mp_host_t *host, mp_lun_t *mplun, 
+qla4xxx_find_or_allocate_port(mp_host_t *host, mp_lun_t *mplun,
 	mp_path_t *path)
 {
 	mp_port_t	*port = NULL;
@@ -502,15 +502,15 @@ qla4xxx_find_or_allocate_port(mp_host_t *host, mp_lun_t *mplun,
 			   DEBUG(printk("scsi%ld %s: Found matching mp port %02x%02x%02x"
 			    "%02x%02x%02x%02x%02x.\n",
 			    instance, __func__, port->iscsiname[0], port->iscsiname[1],
-			    port->iscsiname[2], port->iscsiname[3], 
-			    port->iscsiname[4], port->iscsiname[5], 
+			    port->iscsiname[2], port->iscsiname[3],
+			    port->iscsiname[4], port->iscsiname[5],
 			    port->iscsiname[6], port->iscsiname[7]);)
 				port->path_list[instance] = path->id;
 				port->hba_list[instance] = host->ha;
 				port->cnt++;
 				DEBUG(printk("%s: adding iscsiname - port[%d] = "
 			    "%p at index = %d with path id %d\n",
-			    __func__, (int)instance ,port, 
+			    __func__, (int)instance ,port,
 				(int)instance, path->id);)
 			}
 			return port;
@@ -521,7 +521,7 @@ qla4xxx_find_or_allocate_port(mp_host_t *host, mp_lun_t *mplun,
 		port->cnt++;
 		DEBUG(printk("%s: allocate and adding iscsiname - port[%d] = "
 			    "%p at index = %d with path id %d\n",
-			    __func__, (int)instance, port, 
+			    __func__, (int)instance, port,
 				(int)instance, path->id);)
 		port->path_list[instance] = path->id;
 		port->hba_list[instance] = host->ha;
@@ -534,7 +534,7 @@ qla4xxx_find_or_allocate_port(mp_host_t *host, mp_lun_t *mplun,
 
 /*
  * qla4xxx_cfg_failover_port
- *      Failover all the luns on the specified target to 
+ *      Failover all the luns on the specified target to
  *		the new path.
  *
  * Inputs:
@@ -543,7 +543,7 @@ qla4xxx_find_or_allocate_port(mp_host_t *host, mp_lun_t *mplun,
  *      tgt - pointer to target
  *
  * Returns:
- *      
+ *
  */
 static fc_lun_t *
 qla4xxx_cfg_failover_port( mp_host_t *host, mp_device_t *dp,
@@ -592,7 +592,7 @@ qla4xxx_cfg_failover_port( mp_host_t *host, mp_device_t *dp,
 	/* we failover all the luns on this port */
 	list_for_each_entry(fclun, &fcport->fcluns, list) {
 		l = fclun->lun;
-		if( (fclun->flags & FLF_VISIBLE_LUN) ) {  
+		if( (fclun->flags & FLF_VISIBLE_LUN) ) {
 			continue;
 		}
 		dp->path_list->current_path[l] = new_path->id;
@@ -608,7 +608,7 @@ qla4xxx_cfg_failover_port( mp_host_t *host, mp_device_t *dp,
 		}
 
 		vis_host = vis_path->host;
-		up = (os_lun_t *) GET_LU_Q(vis_host->ha, 
+		up = (os_lun_t *) GET_LU_Q(vis_host->ha,
 		    dp->dev_id, l);
 		if (up == NULL ) {
 		DEBUG2(printk("%s: instance %d: No lun queue"
@@ -630,7 +630,7 @@ qla4xxx_cfg_failover_port( mp_host_t *host, mp_device_t *dp,
 			if( fclun->device_type == TYPE_DISK) {
 				new_fclun = fclun;
 				/* send a reset lun command as well */
-			printk(KERN_INFO 
+			printk(KERN_INFO
 			    "scsi(%ld:0x%x:%d) sending reset lun \n",
 					fcport->ha->host_no,
 					fcport->loop_id, l);
@@ -668,6 +668,7 @@ qla4xxx_cfg_failover(scsi_qla_host_t *ha, fc_lun_t *fp,
 	mp_path_t	*new_path;		/* new path pointer */
 	fc_lun_t	*new_fp = NULL;
 	fc_port_t	*fcport, *new_fcport;
+	struct fo_information	*mp_info = NULL;
 
 	ENTER("qla4xxx_cfg_failover");
 	DEBUG2(printk("%s entered\n",__func__);)
@@ -677,59 +678,71 @@ qla4xxx_cfg_failover(scsi_qla_host_t *ha, fc_lun_t *fp,
 		if ((dp = qla4xxx_find_mp_dev_by_id(
 		    host, tgt->id)) != NULL ) {
 
-			DEBUG3(printk("qla4xxx_cfg_failover: dp = %p\n", dp);)
+			DEBUG2(printk("scsi%d: %s: ha=%p instance=%d dp = %p, id=%d\n",
+				      ha->host_no, __func__, ha, ha->instance, dp, tgt->id);)
+
 			/*
 			 * Point at the next path in the path list if there is
 			 * one, and if it hasn't already been failed over by
 			 * another I/O. If there is only one path continuer
 			 * to point at it.
 			 */
-			new_path = qla4xxx_select_next_path(host, dp, 
+			new_path = qla4xxx_select_next_path(host, dp,
 				fp->lun, sp);
 			if( new_path == NULL )
 				goto cfg_failover_done;
-			new_fp = qla4xxx_find_matching_lun(fp->lun, 
+			new_fp = qla4xxx_find_matching_lun(fp->lun,
 					dp, new_path);
 			if( new_fp == NULL )
 				goto cfg_failover_done;
-			DEBUG2(printk("cfg_failover: new path=%p, new pathid=%d"
+			DEBUG2(printk("scsi%d: %s: new path=%p, new pathid=%d"
 					" new fp lun= %p\n",
-				new_path, new_path->id, new_fp);)
+                                      ha->host_no, __func__,
+                                      new_path, new_path->id, new_fp);)
 
 			fcport = fp->fcport;
 			if( (fcport->flags & FCF_MSA_DEVICE) ) {
-				/* 
-				 * "select next path" has already 
-				 * send out the switch path notify 
-				 * command, so inactive old path 
+				/*
+				 * "select next path" has already
+				 * send out the switch path notify
+				 * command, so inactive old path
 				 */
        				fcport->flags &= ~(FCF_MSA_PORT_ACTIVE);
-				if( qla4xxx_cfg_failover_port( host, dp, 
+				if( qla4xxx_cfg_failover_port( host, dp,
 						new_path, fcport, sp) == NULL ) {
+						mp_info = (struct fo_information *)
+							sp->lun_queue->fo_info;
+						mp_info->fo_retry_cnt[new_path->id]
+						    += qla_fo_params.MaxRetriesPerPath;
+						
 					printk(KERN_INFO
-						"scsi(%d): Fail to failover device "
+						"scsi%d: Fail to failover device "
 						" - fcport = %p\n",
 						host->ha->host_no, fcport);
 					goto cfg_failover_done;
 				}
-			} else if( (fcport->flags & FCF_EVA_DEVICE) ) { 
+			} else if( (fcport->flags & FCF_EVA_DEVICE) ) {
 				new_fcport = new_path->port;
-				if ( qla4xxx_test_active_lun( 
+				if ( qla4xxx_test_active_lun(
 					new_fcport, new_fp ) ) {
-					qla4xxx_cfg_register_failover_lun(dp, 
+					qla4xxx_cfg_register_failover_lun(dp,
 						sp, new_fp);
 				 	 /* send a reset lun command as well */
-				 	 printk(KERN_INFO 
+				 	 printk(KERN_INFO
 			    	 	 "scsi(%d:0x%x:%d) sending"
 					 "reset lun \n",
 					 new_fcport->ha->host_no,
 					 new_fcport->loop_id, new_fp->lun);
-					 qla4xxx_reset_lun(new_fcport->ha,
-		  				 new_fcport->ddbptr,
-		  				 new_fp);
+					 	qla4xxx_reset_lun(new_fcport->ha,
+		  				 	new_fcport->ddbptr,
+		  				 	new_fp);
 				} else {
+					mp_info = (struct fo_information *)
+						sp->lun_queue->fo_info;
+					mp_info->fo_retry_cnt[new_path->id]
+				    	+= qla_fo_params.MaxRetriesPerPath;
 					DEBUG2(printk(
-						"scsi(%d): %s Fail to failover lun "
+						"scsi%d: %s Fail to failover lun "
 						"old fclun= %p, new fclun= %p\n",
 						host->ha->host_no,
 						 __func__,fp, new_fp);)
@@ -1020,9 +1033,9 @@ qla4xxx_allocate_path(mp_host_t *host, uint16_t path_id,
 	/* Copy the supplied information into the MP_PATH.  */
 	path->host = host;
 
-	DEBUG3(printk("%s(%ld): assigned port pointer %p "
-		    "to path id %d.\n",
-	    __func__, host->ha->host_no, port, path_id);)
+		DEBUG3(printk("%s(%ld): assigned port pointer %p "
+			    "to path id %d.\n",
+		    __func__, host->ha->host_no, port, path_id);)
 	path->port = port;
 
 	path->id   = path_id;
@@ -1177,7 +1190,7 @@ qla4xxx_find_matching_lunid(char	*buf)
 			if (temp_dp == NULL)
 				continue;
 
-			for( lun = temp_dp->luns; lun != NULL ; 
+			for( lun = temp_dp->luns; lun != NULL ;
 					lun = lun->next ) {
 
 				if (lun->siz > WWLUN_SIZE )
@@ -1214,10 +1227,10 @@ qla4xxx_find_matching_lunid(char	*buf)
  *      Kernel context.
  */
 int
-qla4xxx_combine_by_lunid( void *vhost, uint16_t dev_id, 
-	fc_port_t *fcport, uint16_t pathid) 
+qla4xxx_combine_by_lunid( void *vhost, uint16_t dev_id,
+	fc_port_t *fcport, uint16_t pathid)
 {
-	mp_host_t	*host = (mp_host_t *) vhost; 
+	mp_host_t	*host = (mp_host_t *) vhost;
 	int fail = 0;
 	mp_path_t 	*path;
 	mp_device_t *dp = NULL;
@@ -1227,16 +1240,16 @@ qla4xxx_combine_by_lunid( void *vhost, uint16_t dev_id,
 	int		l;
 
 	ENTER("qla4xxx_combine_by_lunid");
-	//printk("Entering %s\n", __func__); 
+	//printk("Entering %s\n", __func__);
 
-	/* 
+	/*
 	 * Currently mp_config_required is not process by this routine
-	 * because we create common nodename for the gui, so we can use 
+	 * because we create common nodename for the gui, so we can use
 	 * the normal common namename processing.
 	 */
 #if MSA1000_SUPPORTED
 	if (mp_initialized && fcport->flags & FCF_MSA_DEVICE) {
-		 qla4xxx_test_active_port(fcport); 
+		 qla4xxx_test_active_port(fcport);
 	}
 #endif
 	list_for_each_entry(fclun, &fcport->fcluns, list) {
@@ -1253,41 +1266,45 @@ qla4xxx_combine_by_lunid( void *vhost, uint16_t dev_id,
  		*/
 		dp = lun->dp;
 		if (fclun->mplun == NULL )
-			fclun->mplun = lun; 
+			fclun->mplun = lun;
 		path = qla4xxx_find_or_allocate_path(host, dp,
 		    dp->dev_id, pathid, fcport);
 		if (path == NULL || dp == NULL) {
 			fail++;
 			continue;
 		}
-
+		
 		/* set the lun active flag */
-		if (mp_initialized && fcport->flags & FCF_EVA_DEVICE) { 
-		     qla4xxx_test_active_lun( 
+		if (mp_initialized && fcport->flags & FCF_EVA_DEVICE) {
+		     qla4xxx_test_active_lun(
 			path->port, fclun );
 		}
 
 		/* Add fclun to path list */
 		if (lun->paths[path->id] == NULL) {
 			lun->paths[path->id] = fclun;
-			DEBUG2(printk("Updated path[%d]= %p for lun %p\n",
-				path->id, fclun, lun);)
 			lun->path_cnt++;
+			DEBUG2(printk(
+			   "Updated path[%d]= %p for lun %p; max paths=%d\n",
+				path->id, fclun, lun,
+				lun->path_cnt));
+			if ( lun->info )
+				lun->info->path_cnt = lun->path_cnt;
 		}
 			
-		/* 
+		/*
 		 * if we have a visible lun then make
-		 * the target visible as well 
+		 * the target visible as well
 		 */
 		l = lun->number;
-		if( (fclun->flags & FLF_VISIBLE_LUN)  ) {  
+		if( (fclun->flags & FLF_VISIBLE_LUN)) {
 			if (dp->path_list->visible ==
 			    PATH_INDEX_INVALID) {
 				dp->path_list->visible = path->id;
 				DEBUG2(printk("%s: dp %p setting "
 				    "visible id to %d\n",
 				    __func__,dp,path->id );)
-			}  
+			}
 			dp->path_list->current_path[l] = path->id;
 			path->lun_data.data[l] |=
 			    LUN_DATA_PREFERRED_PATH;
@@ -1299,7 +1316,7 @@ qla4xxx_combine_by_lunid( void *vhost, uint16_t dev_id,
 			 * Whenever a port or lun is "active" then
 			 * force it to be a preferred path.
     			 */
-   			if (qla4xxx_find_first_active_path(dp, lun) 
+   			if (qla4xxx_find_first_active_path(dp, lun)
 				== path ){
    				dp->path_list->current_path[l] =
 				    path->id;
@@ -1321,8 +1338,11 @@ qla4xxx_combine_by_lunid( void *vhost, uint16_t dev_id,
 		}
 	}
 
-	if (fail)
+	if (fail) {
+	   /* turn off failover */
+		// fcport->flags |= FCF_FAILOVER_DISABLE;
 		return 0;		
+	}
 	return 1;		
 }
 	
@@ -1515,7 +1535,7 @@ qla4xxx_find_or_allocate_lun(mp_host_t *host, uint16_t dev_id,
 #if 0
 	mp_device_t		*temp_dp = NULL;
 #endif
-	uint16_t		len;
+	uint16_t		len = 0;
 	uint16_t		idx;
 	uint16_t		new_id = dev_id;
 	char			wwulnbuf[WWLUN_SIZE];
@@ -1533,32 +1553,36 @@ qla4xxx_find_or_allocate_lun(mp_host_t *host, uint16_t dev_id,
 		    " lun num=%d fclun %p mplun %p hba inst=%d, port =%p, dev id = %d\n",
 		    __func__, fclun->lun, fclun, fclun->mplun, host->instance, port,
 		    dev_id);)
-	/* 
-	 * Perform inquiry page 83 to get the wwuln or 
+	/*
+	 * Perform inquiry page 83 to get the wwuln or
 	 * use what was specified by the user.
 	 */
 	if ( (port->flags & FCF_CONFIG) ) {
-			if( (len = fclun->mplen) != 0 ) 
-				memcpy(wwulnbuf, fclun->mpbuf, len); 
+			if( (len = fclun->mplen) != 0 )
+				memcpy(wwulnbuf, fclun->mpbuf, len);
 	} else {
-		len = qla4xxx_get_wwuln_from_device(host, fclun, 
-			&wwulnbuf[0], WWLUN_SIZE); 
-		/* if fail to do the inq then exit */
-		if( len == 0 ) {
-			return lun;
+		if( port->device_type == TYPE_DISK ){
+			len = qla4xxx_get_wwuln_from_device(host, fclun,
+				&wwulnbuf[0], WWLUN_SIZE);
+			/* if fail to do the inq then exit */
+			if( len == 0 ) {
+				return lun;
+			}
 		}
+			
 	}
 
 	if( len != 0 )
 		lun = qla4xxx_find_matching_lunid(wwulnbuf);
 
-	/* 
+	/*
 	 * If this is a visible "controller" lun and
 	 * it is already exists on somewhere world wide
- 	 * then allocate a new device, so it can be 
+ 	 * then allocate a new device, so it can be
 	 * exported it to the OS.
 	 */
-	if( (fclun->flags & FLF_VISIBLE_LUN) &&
+	if( ((fclun->flags & FLF_VISIBLE_LUN) ||
+	    (port->device_type != TYPE_DISK ) ) &&
 		lun != NULL ) {
 		if( fclun->mplun ==  NULL ) {
 			lun = NULL;
@@ -1571,7 +1595,7 @@ qla4xxx_find_or_allocate_lun(mp_host_t *host, uint16_t dev_id,
 			lun = fclun->mplun;
 			return lun;
 		}
-	} 
+	}
 
 	if (lun != NULL ) {
 		DEBUG2(printk("%s: Found an existing "
@@ -1604,61 +1628,63 @@ qla4xxx_find_or_allocate_lun(mp_host_t *host, uint16_t dev_id,
 			qla4xxx_add_iscsiname_to_mp_dev(dp,
 		    	port->iscsi_name, NULL);
 
-			DEBUG2(printk("%s(%d): (1) Added iscsiname and mp_dev[%d] update"
+			DEBUG2(printk("scsi%d: %s: (1) Added iscsiname and mp_dev[%d] update"
 		    	" with dp %p\n ",
-		    	__func__, host->ha->host_no, dp->dev_id, dp);)
+		    	host->ha->host_no, __func__, dp->dev_id, dp);)
 			if(host->mp_devs[dp->dev_id] == NULL ) {
 				host->mp_devs[dp->dev_id] = dp;
-				dp->use_cnt++; 
+				dp->use_cnt++;
 			}	
-		} 
+		}
 	} else {
 		DEBUG2(printk("%s: MP_lun %d not found "
 		    "for fclun %p inst=%d, port =%p, dev id = %d\n",
 		    __func__, fclun->lun, fclun, host->instance, port,
 		    dev_id);)
 				
-			if( (dp = qla4xxx_find_mp_dev_by_iscsiname(host,
-			    	port->iscsi_name, &idx)) == NULL || new_dev ) {
-				DEBUG2(printk("%s(%d): No match for WWPN. Creating new mpdev \n"
-		    	"iscsi_name (%s)\n",
-		    	__func__, host->ha->host_no, 
-		    	port->iscsi_name );)
+		if ((dp = qla4xxx_find_mp_dev_by_iscsiname(host,
+							   port->iscsi_name, &idx)) == NULL || new_dev) {
+			DEBUG2(printk("scsi%d: %s: No match for WWPN. "
+				      "Creating new mpdev \n"
+				      "iscsi_name (%s)\n",
+				      host->ha->host_no, __func__,
+				      port->iscsi_name );)
 			dp = qla4xxx_allocate_mp_dev(port->iscsi_name, port->iscsi_name);
 			/* find a good index */
-			for( i = dev_id; i < MAX_MP_DEVICES; i++ )
-				if(host->mp_devs[i] == NULL ) {
+			for (i = dev_id; i < MAX_MP_DEVICES; i++)
+				if (host->mp_devs[i] == NULL) {
 					new_id = i;
 					break;
 				}
-			} else if( dp !=  NULL ) { /* found dp */
-				new_id = dp->dev_id;
-			}
+		}
+		else if (dp !=  NULL) {		   /* found dp */
+			new_id = dp->dev_id;
+		}
 			
-			if( dp !=  NULL ) {
+		if (dp !=  NULL) {
 			DEBUG2(printk("%s(%d): (2) mp_dev[%d] update"
-		    	" with dp %p\n ",
-		    	__func__, host->ha->host_no, new_id, dp);)
-				host->mp_devs[new_id] = dp;
-				dp->dev_id = new_id;
-				dp->use_cnt++;
-				lun = kmalloc(sizeof(mp_lun_t), GFP_KERNEL);
-				if (lun != NULL) {
-					memset(lun, 0, sizeof(*lun));
-					DEBUG(printk("Added lun %p to dp %p lun number %d\n",
-					lun, dp, fclun->lun);)
-					DEBUG(qla4xxx_dump_buffer(wwulnbuf, len);)
-					memcpy(lun->wwuln, wwulnbuf, len);
-					lun->siz = len;
-					lun->number = fclun->lun;
-					lun->dp = dp;
-					qla4xxx_add_lun(dp, lun);
-					INIT_LIST_HEAD(&lun->ports_list);
-				}
+				      " with dp %p\n ",
+				      __func__, host->ha->host_no, new_id, dp);)
+			host->mp_devs[new_id] = dp;
+			dp->dev_id = new_id;
+			dp->use_cnt++;
+			lun = kmalloc(sizeof(mp_lun_t), GFP_KERNEL);
+			if (lun != NULL) {
+				memset(lun, 0, sizeof(*lun));
+				DEBUG(printk("Added lun %p to dp %p lun number %d\n",
+					     lun, dp, fclun->lun);)
+				DEBUG(qla4xxx_dump_buffer(wwulnbuf, len);)
+				memcpy(lun->wwuln, wwulnbuf, len);
+				lun->siz = len;
+				lun->number = fclun->lun;
+				lun->dp = dp;
+				qla4xxx_add_lun(dp, lun);
+				INIT_LIST_HEAD(&lun->ports_list);
 			}
-			else
-				printk(KERN_WARNING
-			    	"qla4xxx: Couldn't get memory for dp. \n");
+		}
+		else
+			printk(KERN_WARNING
+			       "qla4xxx: Couldn't get memory for dp. \n");
 	}
 
 	DEBUG(printk("Exiting %s\n", __func__);)
@@ -1838,7 +1864,7 @@ qla4xxx_send_failover_notify(mp_device_t *dp,
 				DEBUG(printk("%s: Send CDB Error "
 				    "lun=(%d).\n", __func__, lun);)
 			}
-	} else {
+	 } else {
 		/* EMPTY */
 		DEBUG4(printk("%s: failover disabled or no notify routine "
 		    "defined.\n", __func__);)
@@ -1848,7 +1874,7 @@ qla4xxx_send_failover_notify(mp_device_t *dp,
 }
 
 static mp_path_t *
-qla4xxx_find_host_from_port(mp_device_t *dp, 
+qla4xxx_find_host_from_port(mp_device_t *dp,
 		mp_host_t *host,
 		mp_port_t *port )
 {
@@ -1883,12 +1909,12 @@ qla4xxx_find_host_from_port(mp_device_t *dp,
 
 /*
  * Find_best_port
- * This routine tries to locate the best port to the target that 
- * doesn't require issuing a target notify command. 
+ * This routine tries to locate the best port to the target that
+ * doesn't require issuing a target notify command.
  */
 /* ARGSUSED */
 static mp_path_t *
-qla4xxx_find_best_port(mp_device_t *dp, 
+qla4xxx_find_best_port(mp_device_t *dp,
 		mp_path_t *orig_path,
 		mp_port_t *port,
 		fc_lun_t *fclun )
@@ -1899,7 +1925,7 @@ qla4xxx_find_best_port(mp_device_t *dp,
 	int		i, found;
 	fc_lun_t 	*new_fp;
 	struct list_head *list, *temp;
-	mp_lun_t *mplun = (mp_lun_t *)fclun->mplun; 
+	mp_lun_t *mplun = (mp_lun_t *)fclun->mplun;
 	unsigned long	instance;
 	uint16_t	id;
 
@@ -1926,20 +1952,20 @@ qla4xxx_find_best_port(mp_device_t *dp,
 			DEBUG(printk(
 			"qla%d %s: Checking fclun %p, for pathid=%d\n",
 				(int)instance,__func__, new_fp, id);)
-			if( new_fp == NULL ) 
+			if( new_fp == NULL )
 				continue;
 			new_path = qla4xxx_find_path_by_id(dp, id);
 			if( new_path != NULL ) {
 			DEBUG(printk(
 			"qla%d %s: Found new path new_fp=%p, "
 			"path=%p, flags=0x%x\n",
-				(int)new_path->host->instance,__func__, new_fp, 
+				(int)new_path->host->instance,__func__, new_fp,
 				new_path, new_path->port->flags);)
 
 
 			if (atomic_read(&new_path->port->state) ==
 			    FCS_DEVICE_DEAD) {
-				DEBUG2(printk("qla(%d) %s - Port (0x%04x) "
+				DEBUG2(printk("scsi%d: %s: - Port (0x%04x) "
 				    "DEAD.\n", (int)new_path->host->instance,
 				    __func__, new_path->port->loop_id));
 				continue;
@@ -1948,7 +1974,7 @@ qla4xxx_find_best_port(mp_device_t *dp,
 			/* Is this path on an active controller? */
 			if( (new_path->port->flags & FCF_EVA_DEVICE)  &&
 	   			!(new_fp->flags & FLF_ACTIVE_LUN) ){
-			 DEBUG2(printk("qla(%d) %s - EVA Port (0x%04x) INACTIVE.\n",
+			 DEBUG2(printk("scsi%d: %s: - EVA Port (0x%04x) INACTIVE.\n",
 			(int)new_path->host->instance, __func__,
 			new_path->port->loop_id);)
 				continue;
@@ -1956,7 +1982,7 @@ qla4xxx_find_best_port(mp_device_t *dp,
 
 			if( (new_path->port->flags & FCF_MSA_DEVICE)  &&
        			   !(new_path->port->flags & FCF_MSA_PORT_ACTIVE) ) {
-			 DEBUG2(printk("qla(%d) %s - MSA Port (0x%04x) INACTIVE.\n",
+			 DEBUG2(printk("scsi%d: %s: - MSA Port (0x%04x) INACTIVE.\n",
 			(int)new_path->host->instance, __func__,
 			new_path->port->loop_id);)
 				continue;
@@ -1964,7 +1990,7 @@ qla4xxx_find_best_port(mp_device_t *dp,
 
 			/* found a good path */
 			DEBUG2(printk(
-			"qla%d %s: *** Changing from port %p to new port %p - pathid=%d\n",
+			"scsi%d: %s: *** Changing from port %p to new port %p - pathid=%d\n",
 				(int)instance,__func__, port, temp_port, new_path->id); )
 			 return( new_path );
 			}
@@ -1975,7 +2001,7 @@ qla4xxx_find_best_port(mp_device_t *dp,
 }
 
 void
-qla4xxx_find_all_active_ports(srb_t *sp) 
+qla4xxx_find_all_active_ports(srb_t *sp)
 {
 	scsi_qla_host_t *ha;
 	fc_port_t *fcport;
@@ -2018,11 +2044,11 @@ qla4xxx_find_all_active_ports(srb_t *sp)
 
 /*
  * qla4xxx_smart_failover
- *      This routine tries to be smart about how it selects the 
+ *      This routine tries to be smart about how it selects the
  *	next path. It selects the next path base on whether the
  *	loop went down or the port went down. If the loop went
  *	down it will select the next HBA. Otherwise, it will select
- *	the next port. 
+ *	the next port.
  *
  * Inputs:
  *      device           Device being failed over.
@@ -2030,16 +2056,16 @@ qla4xxx_find_all_active_ports(srb_t *sp)
  *      orig_path           path that was failed over from.
  *
  * Return:
- *      next path	next path to use. 
- *	flag 		1 - Don't send notify command 
- *	 		0 - Send notify command 
+ *      next path	next path to use.
+ *	flag 		1 - Don't send notify command
+ *	 		0 - Send notify command
  *
  * Context:
  *      Kernel context.
  */
 /* ARGSUSED */
 static mp_path_t *
-qla4xxx_smart_path(mp_device_t *dp, 
+qla4xxx_smart_path(mp_device_t *dp,
 	mp_path_t *orig_path, srb_t *sp, int *flag )
 {
 	mp_path_t	*path = NULL;
@@ -2047,11 +2073,11 @@ qla4xxx_smart_path(mp_device_t *dp,
 	mp_port_t *port;
 	mp_host_t *host= orig_path->host;
 		
-	DEBUG2(printk("Entering %s - sp err = %d, instance =%d\n", 
+	DEBUG2(printk("Entering %s - sp err = %d, instance =%d\n",
 		__func__, sp->err_id, (int)host->instance);)
 
 	qla4xxx_find_all_active_ports(sp);
- 
+
 	if( sp != NULL ) {
 		fclun = sp->lun_queue->fclun;
 		if( fclun == NULL ) {
@@ -2060,43 +2086,43 @@ qla4xxx_smart_path(mp_device_t *dp,
 				(int)host->instance,__func__, fclun, orig_path->id);
 			return( orig_path->next );
 		}
-		port = qla4xxx_find_port_by_name( 
+		port = qla4xxx_find_port_by_name(
 			(mp_lun_t *)fclun->mplun, orig_path);
 		if( port == NULL ) {
 			printk( KERN_INFO
 			"scsi%d %s: couldn't find MP port %p pathid=%d\n",
 				(int)host->instance,__func__, port, orig_path->id);
 			return( orig_path->next );
-		} 
+		}
 
 		/* Change to next HOST if loop went down */
 		if( sp->err_id == SRB_ERR_LOOP )  {
-			path = qla4xxx_find_host_from_port(dp, 
+			path = qla4xxx_find_host_from_port(dp,
 					host, port );
 			if( path != NULL ) {
 				port->fo_cnt++;
 				*flag = 1;
-		  		/* if we used all the hbas then 
-			   	try and get another port */ 
+		  		/* if we used all the hbas then
+			   	try and get another port */
 		  		if( port->fo_cnt > port->cnt ) {
 					port->fo_cnt = 0;
 					*flag = 0;
-					path = 
-					  qla4xxx_find_best_port(dp, 
+					path =
+					  qla4xxx_find_best_port(dp,
 						orig_path, port, fclun );
 					if( path )
 						*flag = 1;
 		   		}
 			}
 		} else {
-			path = qla4xxx_find_best_port(dp, 
+			path = qla4xxx_find_best_port(dp,
 				orig_path, port, fclun );
 			if( path )
 				*flag = 1;
 		}
 	}
 	/* Default path is next path*/
-	if (path == NULL) 
+	if (path == NULL)
 		path = orig_path->next;
 
 	DEBUG3(printk("Exiting %s\n", __func__);)
@@ -2151,14 +2177,14 @@ qla4xxx_select_next_path(mp_host_t *host, mp_device_t *dp, uint8_t lun,
        		if (orig_path->port && (orig_path->port->flags &
 		    (FCF_MSA_DEVICE|FCF_EVA_DEVICE))) {
 			path = qla4xxx_smart_path(dp, orig_path, sp,
-			    &skip_notify); 
+			    &skip_notify);
 		} else
 			path = orig_path->next;
 
 		new_host = path->host;
 
 		/* FIXME may need to check for HBA being reset */
-		DEBUG2(printk("%s: orig path = %p new path = %p " 
+		DEBUG2(printk("%s: orig path = %p new path = %p "
 		    "curr idx = %d, new idx = %d\n",
 		    __func__, orig_path, path, orig_path->id, path->id);)
 		DEBUG3(printk("  FAILOVER: device name: %s\n",
@@ -2224,10 +2250,10 @@ qla4xxx_update_mp_host(mp_host_t  *host)
 		if (fcport->port_type != FCT_TARGET)
 			continue;
 
-		DEBUG2(printk("%s(%d): checking fcport list. update port "
+		DEBUG2(printk("scsi%d: %s: checking fcport list. update port "
 		    "%p-%02x%02x%02x%02x%02x%02x%02x%02x dev_id %d "
 		    "to ha inst %d.\n",
-		    __func__, ha->host_no,
+		    ha->host_no, __func__,
 		    fcport,
 		    fcport->iscsi_name[0], fcport->iscsi_name[1],
 		    fcport->iscsi_name[2], fcport->iscsi_name[3],
@@ -2279,7 +2305,7 @@ qla4xxx_update_mp_device(mp_host_t *host,
 
 	ENTER("qla4xxx_update_mp_device");
 
-	DEBUG3(printk("%s(%ld): entered. host %p inst=%d," 
+	DEBUG3(printk("%s(%ld): entered. host %p inst=%d,"
 	    "port iscsi_name=%s, dev id = %d\n",
 	    __func__, host->ha->host_no, host, host->instance,
 	    port->iscsi_name,
@@ -2288,8 +2314,8 @@ qla4xxx_update_mp_device(mp_host_t *host,
 	if (!qla4xxx_is_name_zero(port->iscsi_name)) {
 		if( port->fo_combine ) {
 			return( port->fo_combine(host, dev_id, port, pathid) );
-		} else 
-			success = qla4xxx_combine_by_lunid( host, dev_id, port, pathid ); 
+		} else
+			success = qla4xxx_combine_by_lunid( host, dev_id, port, pathid );
 
 	} else {
 		/* EMPTY */
@@ -2422,7 +2448,7 @@ qla4xxx_find_matching_lun_by_num(uint16_t lun_no, mp_device_t *dp,
 }
 
 static fc_lun_t  *
-qla4xxx_find_matching_lun(uint8_t lun, mp_device_t *dp, 
+qla4xxx_find_matching_lun(uint8_t lun, mp_device_t *dp,
 	mp_path_t *newpath)
 {
 	fc_lun_t *lp;
@@ -2560,7 +2586,7 @@ qla4xxx_find_mp_dev_by_iscsiname(mp_host_t *host, uint8_t *name, uint16_t *pidx)
 	}
 
 	DEBUG3(printk("%s: exiting.\n", __func__);)
- 
+
  	return NULL;
  }
 
@@ -2623,15 +2649,15 @@ qla4xxx_map_os_targets(mp_host_t *host)
 	for (t = 0; t < MAX_TARGETS; t++ ) {
 		dp = host->mp_devs[t];
 		if (dp != NULL) {
-			DEBUG2(printk("%s: (%d) found a dp=%p, "
+			DEBUG2(printk("scsi%d: %s: (%d) found a dp=%p, "
 			    "host=%p, ha=%p\n",
-			    __func__, t, dp, host,ha);)
+			    ha->host_no, __func__, t, dp, host, ha);)
 
 			if ((path = qla4xxx_get_visible_path(dp)) == NULL) {
 				DEBUG2( printk(KERN_INFO
-				    "qla_cfg(%d): No visible path "
+				    "scsi%d: %s: No visible path "
 				    "for target %d, dp = %p\n",
-				    host->instance, t, dp); )
+				    host->instance,  __func__, t, dp); )
 				continue;
 			}
 
@@ -2640,9 +2666,12 @@ qla4xxx_map_os_targets(mp_host_t *host)
 				if (TGT_Q(ha, t) == NULL) {
 					/* XXX need to check for NULL */
 					tgt = qla4xxx_tgt_alloc(ha, t);
+					if( tgt == NULL )
+						continue;
 					memcpy(tgt->iscsi_name,dp->devname,
 					    ISCSI_NAME_SIZE);
 					tgt->fcport = path->port;
+					tgt->id = dp->dev_id;
 				}
 				if (path->port)
 					path->port->os_target_id = t;
@@ -2659,7 +2688,7 @@ qla4xxx_map_os_targets(mp_host_t *host)
 				    "device= %p, tgt=%d has HIDDEN "
 				    "path, path id=%d\n",
 				    __func__, ha->host_no,
-				    host->instance, dp, t, 
+				    host->instance, dp, t,
 					path->id); )
 				continue;
 			}
@@ -2675,12 +2704,12 @@ qla4xxx_map_os_targets(mp_host_t *host)
 }
 
 static void
-qla4xxx_map_or_failover_oslun(mp_host_t *host, mp_device_t *dp, 
+qla4xxx_map_or_failover_oslun(mp_host_t *host, mp_device_t *dp,
 	uint16_t t, uint16_t lun_no)
 {
 	int	i;
 
-	/* 
+	/*
 	 * if this is initization time and we couldn't map the
 	 * lun then try and find a usable path.
 	 */
@@ -2724,12 +2753,12 @@ qla4xxx_map_os_luns(mp_host_t *host, mp_device_t *dp, uint16_t t)
 			lun_no = lun->number;
 			DEBUG2(printk("%s: instance %d: Mapping target %d, lun %d..\n",
 				__func__,host->instance,t,lun->number);)
-			qla4xxx_map_or_failover_oslun(host, dp, 
+			qla4xxx_map_or_failover_oslun(host, dp,
 				t, lun_no);
 			up = (os_lun_t *) GET_LU_Q(host->ha, t, lun_no);
 			if (up == NULL || up->fclun == NULL) {
 			DEBUG2(printk("%s: instance %d: No FCLUN for target %d, lun %d.. \n",
-				__func__,host->instance,t,lun->number);)
+					__func__,host->instance,t,lun->number);)
 				continue;
 			}
 			if (up->fclun->fcport == NULL) {
@@ -2740,10 +2769,13 @@ qla4xxx_map_os_luns(mp_host_t *host, mp_device_t *dp, uint16_t t)
 			DEBUG2(printk("%s: instance %d: Mapping target %d, lun %d.. to path id %d\n",
 				__func__,host->instance,t,lun->number,
 			    up->fclun->fcport->cur_path);)
+			if (lun->info == NULL )
+				lun->info =
+				    (struct fo_information *) up->fo_info;
 		}
 	} else {
 		for (lun_no = 0; lun_no < MAX_LUNS; lun_no++ ) {
-			qla4xxx_map_or_failover_oslun(host, dp, 
+			qla4xxx_map_or_failover_oslun(host, dp,
 				t, lun_no);
 		}
 	}
@@ -2776,6 +2808,7 @@ qla4xxx_map_a_oslun(mp_host_t *host, mp_device_t *dp, uint16_t t, uint16_t lun)
 	mp_path_t	*path, *vis_path;
 	mp_host_t 	*vis_host;
 	uint8_t		status = 0;
+	struct fo_information 	*mp_info;
 
 	if ((id = dp->path_list->current_path[lun]) != PATH_INDEX_INVALID) {
 		DEBUG3(printk( "qla4xxx(%d): Current path for lun %d is path id %d\n",
@@ -2837,6 +2870,8 @@ qla4xxx_map_a_oslun(mp_host_t *host, mp_device_t *dp, uint16_t t, uint16_t lun)
 							t, lun)) != NULL) {
 
 						lq->fclun = fclun;
+						mp_info	= (struct fo_information *) lq->fo_info;
+						mp_info->path_cnt = dp->path_list->path_cnt;
 					}
 		DEBUG(printk( "qla4xxx(%d): lun allocated %p for lun %d\n",
 			 host->instance,lq,lun);)
@@ -3017,6 +3052,7 @@ qla4xxx_failback_single_lun(mp_device_t *dp, uint8_t lun, uint8_t new)
 	os_lun_t *lq;
 	mp_path_t	*vis_path;
 	mp_host_t 	*vis_host;
+	struct fo_information *mp_info;
 
 	/* Failback and update statistics. */
 	if ((pathlist = dp->path_list) == NULL)
@@ -3070,6 +3106,8 @@ qla4xxx_failback_single_lun(mp_device_t *dp, uint8_t lun, uint8_t new)
 
 	vis_host = vis_path->host;
 	if ((lq = qla4xxx_lun_alloc(vis_host->ha, dp->dev_id, lun)) != NULL) {
+		mp_info	= (struct fo_information *) lq->fo_info;
+		mp_info->path_cnt = dp->path_list->path_cnt;
 		qla4xxx_delay_lun(vis_host->ha, lq, ql4xrecoveryTime);
 		qla4xxx_flush_failover_q(vis_host->ha, lq);
 		qla4xxx_reset_lun_fo_counts(vis_host->ha, lq);
@@ -3116,7 +3154,7 @@ qla4xxx_failback_single_lun(mp_device_t *dp, uint8_t lun, uint8_t new)
 	}
 	vis_host = vis_path->host;
 	/* Schedule the recovery before we move the luns */
-	if( (lq = (os_lun_t *) 
+	if( (lq = (os_lun_t *)
 		LUN_Q(vis_host->ha, dp->dev_id, lun)) == NULL ) {
 		printk(KERN_INFO
 			"qla4xxx(%d): No visible lun for "
@@ -3146,7 +3184,7 @@ qla4xxx_failback_single_lun(mp_device_t *dp, uint8_t lun, uint8_t new)
 
 
 	/* Send a failover notification. */
-	status = qla4xxx_send_failover_notify(dp, lun, 
+	status = qla4xxx_send_failover_notify(dp, lun,
 			new_path, old_path);
 
 	new_host = 	new_path->host;
@@ -3212,9 +3250,9 @@ qla4xxx_failback_luns( mp_host_t  *host)
 		        if ((path->port->flags & FCF_FAILBACK_DISABLE))
 				continue;
 
-			/* 
+			/*
 			 * Failback all the paths for this host,
-			 * the luns could be preferred across all paths 
+			 * the luns could be preferred across all paths
 			 */
 			DEBUG4(printk("%s(%d): Lun Data for device %p, "
 			    "dev id=%d, path id=%d\n",
@@ -3284,7 +3322,7 @@ qla4xxx_find_first_active_path( mp_device_t *dp, mp_lun_t *lun)
 		    tmp_path = tmp_path->next, cnt++) {
 			fcport = tmp_path->port;
 			if (fcport != NULL) {
-				if ((fcport->flags & FCF_EVA_DEVICE)) { 
+				if ((fcport->flags & FCF_EVA_DEVICE)) {
 					fclun = lun->paths[tmp_path->id];
 					if (fclun == NULL)
 						continue;
@@ -3331,7 +3369,7 @@ qla4xxx_setup_new_path( mp_device_t *dp, mp_path_t *path, fc_port_t *fcport)
 	int		i;
 
 	ENTER("qla4xxx_setup_new_path");
-	DEBUG(printk("qla4xxx_setup_new_path: path %p path id %d, fcport = %p\n", 
+	DEBUG(printk("qla4xxx_setup_new_path: path %p path id %d, fcport = %p\n",
 		path, path->id, path->port);)
 
 	/* If this is a visible path, and there is not already a
@@ -3390,7 +3428,7 @@ qla4xxx_setup_new_path( mp_device_t *dp, mp_path_t *path, fc_port_t *fcport)
 		}
 	}
 
-	if (!(fcport->flags & (FCF_MSA_DEVICE | FCF_EVA_DEVICE))) { 
+	if (!(fcport->flags & (FCF_MSA_DEVICE | FCF_EVA_DEVICE))) {
 		/*
 		 * For each LUN, evaluate whether the new path that is added is
 		 * better than the existing path.  If it is, make it the
@@ -3441,7 +3479,7 @@ void
 qla4xxx_cfg_mem_free(scsi_qla_host_t *ha)
 {
 	mp_lun_t        *cur_lun;
-	mp_lun_t        *tmp_lun; 
+	mp_lun_t        *tmp_lun;
 	mp_device_t *dp;
 	mp_path_list_t  *path_list;
 	mp_path_t       *tmp_path, *path;
@@ -3450,6 +3488,7 @@ qla4xxx_cfg_mem_free(scsi_qla_host_t *ha)
 	struct list_head *list, *temp_list;
 	int	id, cnt;
 
+        down(&mp_hosts_lock);
 	if ((host = qla4xxx_cfg_find_host(ha)) != NULL) {
 		if( mp_num_hosts == 0 )
 			return;
@@ -3484,26 +3523,27 @@ qla4xxx_cfg_mem_free(scsi_qla_host_t *ha)
 					temp->mp_devs[id] = NULL;
 				}
 			}
-			/* Free all the lun struc's attached 
+			/* Free all the lun struc's attached
 			 * to this mp_device */
-			for ( cur_lun = dp->luns; (cur_lun); 
+			for ( cur_lun = dp->luns; (cur_lun != NULL);
 					cur_lun = cur_lun->next) {
-				DEBUG(printk(KERN_INFO
+				DEBUG2(printk(KERN_INFO
 						"host%d - Removing lun:%p "
 						"attached to device:%p\n",
 						host->instance,
 						cur_lun,dp);)
-				list_for_each_safe(list, temp_list, 
+				list_for_each_safe(list, temp_list,
 					&cur_lun->ports_list) {
 		
 					temp_port = list_entry(list, mp_port_t, list);
 					list_del_init(&temp_port->list);
 				
-					DEBUG(printk(KERN_INFO
+					DEBUG2(printk(KERN_INFO
 						"host%d - Removing port:%p "
 						"attached to lun:%p\n",
 						host->instance, temp_port,
 						cur_lun);)
+					kfree(temp_port);
 	
 				}
 				tmp_lun = cur_lun;
@@ -3537,5 +3577,6 @@ qla4xxx_cfg_mem_free(scsi_qla_host_t *ha)
 		kfree(host);
 		mp_num_hosts--;
 	}
+        up(&mp_hosts_lock);
 }
 

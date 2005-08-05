@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE                                     *
  *                                                                            *
- * QLogic ISP4xxx device driver for Linux 2.4.x                               *
+ * QLogic ISP4xxx device driver for Linux 2.6.x                               *
  * Copyright (C) 2004 Qlogic Corporation                                      *
  * (www.qlogic.com)                                                           *
  *                                                                            *
@@ -39,7 +39,6 @@
  *      qla4xxx_proc_info
  *      qla4xxx_get_adapter_handle
  *      qla4xxx_release
- *      add_to_active_array
  *      del_from_active_array
  *      qla4xxx_normalize_dma_addr
  *      qla4xxx_alloc_cont_entry
@@ -56,7 +55,7 @@
  *      qla4xxx_do_dpc
  *      qla4xxx_panic
  *      qla4xxx_eh_wait_on_command
- *      WAIT_FOR_ADAPTER_UP
+ *      qla4xxx_wait_for_hba_online
  *      qla4xxx_eh_abort
  *      qla4010_soft_reset
  *      qla4xxx_topcat_reset
@@ -107,19 +106,19 @@ int qla4xxx_hba_count = 0;
  * command line, we define a dummy buffer here to avoid having insmod
  * write wild stuff into our code segment
  */
-
-int ql4xdiscoverywait=15;
+int ql4xdiscoverywait=60;
 module_param(ql4xdiscoverywait, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(ql4xdiscoverywait,
 		 "Discovery wait time");
-
-int ql4xportdownretrycount= 60;
-module_param(ql4xportdownretrycount, int, S_IRUGO|S_IRUSR);
-MODULE_PARM_DESC(ql4xportdownretrycount,
-		 "Port down retry count");
+int ql4xdontresethba=0;
+module_param(ql4xdontresethba, int, S_IRUGO|S_IRUSR);
+MODULE_PARM_DESC(ql4xdontresethba,
+		 "Dont reset the HBA when the driver gets 0x8002 AEN "
+		 " default it will reset hba :0"
+		 " set to 1 to avoid resetting HBA");
 
 #ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
-int ql4xcmdretrycount = 30;
+int ql4xcmdretrycount = 40;
 #else
 int ql4xcmdretrycount = 20;
 #endif
@@ -129,17 +128,12 @@ MODULE_PARM_DESC(ql4xcmdretrycount,
 		 "Default value in non-failover mode is 20, "
 		 "in failover mode, 30.");
 
-int ql4xmaxqdepth = 2;
+int ql4xmaxqdepth = 0;
 module_param(ql4xmaxqdepth, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(ql4xmaxqdepth,
 		 "Maximum queue depth to report for target devices.");
 
-int ql4xcmdtimeout = 5;
-module_param(ql4xcmdtimeout, int, S_IRUGO|S_IRUSR);
-MODULE_PARM_DESC(ql4xcmdtimeout,
-		 "Command timeout");
-
-int extended_error_logging = 0;	/* 0 = off, 1 = log errors, 2 = debug logging */
+int extended_error_logging = 2;	/* 0 = off, 1 = log errors, 2 = debug logging */
 module_param(extended_error_logging, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(extended_error_logging,
 		 "Option to enable extended error logging, "
@@ -173,12 +167,8 @@ struct info_str {
  *---------------------------------------------------------------------------*/
 const char *ddb_state_msg[] = DDB_STATE_TBL();
 const char *srb_state_msg[] = SRB_STATE_TBL();
-#if 0
-const char *dev_state_msg[] = DEV_STATE_TBL();
-const char *lun_state_msg[] = LUN_STATE_TBL();
-const char *adapter_state_msg[] = ADAPTER_STATE_TBL();
-#endif
 
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 /*
  * extern from ql4_xioctl.c
  */
@@ -190,6 +180,7 @@ extern int
 qla4xxx_alloc_ioctl_mem(scsi_qla_host_t *);
 extern void
 qla4xxx_free_ioctl_mem(scsi_qla_host_t *);
+#endif
 
 
 static uint8_t qla4xxx_mem_alloc(scsi_qla_host_t *ha);
@@ -201,9 +192,9 @@ void qla4xxx_add_timer_to_cmd(srb_t *srb, int timeout);
 static void qla4xxx_flush_active_srbs(scsi_qla_host_t *ha);
 uint8_t qla4xxx_reset_target(scsi_qla_host_t *ha, ddb_entry_t *ddb_entry);
 uint8_t qla4xxx_recover_adapter(scsi_qla_host_t *ha, uint8_t renew_ddb_list);
-inline uint32_t qla4xxx_normalize_dma_addr(dma_addr_t *e_addr,  uint32_t *e_len, dma_addr_t *ne_addr, uint32_t *ne_len);
-inline uint8_t qla4xxx_alloc_cont_entry(scsi_qla_host_t *ha, DATA_SEG_A64 **cur_dsd, uint16_t *avail_dsds);
-void qla4xxx_config_dma_addressing(scsi_qla_host_t *ha);
+inline void qla4xxx_config_dma_addressing(scsi_qla_host_t *ha);
+
+CONTINUE_ENTRY *qla4xxx_alloc_cont_entry(scsi_qla_host_t *ha);
 
 static void qla4xxx_free_other_mem(scsi_qla_host_t *ha);
 static int qla4xxx_iospace_config(scsi_qla_host_t *ha);
@@ -213,12 +204,23 @@ extern fc_lun_t * qla4xxx_add_fclun(fc_port_t *fcport, uint16_t lun);
 /*
  * PCI driver interface definitions
  *---------------------------------------------------------------------------*/
-static struct pci_device_id qla4010_pci_tbl[] __devinitdata =
+static struct pci_device_id qla4xxx_pci_tbl[] __devinitdata =
 {
-	{QLA4XXX_VENDOR_ID, QLA4010_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0},
-	{0,}
+	{
+		.vendor		= PCI_VENDOR_ID_QLOGIC,
+		.device		= PCI_DEVICE_ID_QLOGIC_ISP4010,
+		.subvendor	= PCI_ANY_ID,
+		.subdevice	= PCI_ANY_ID,
+	},
+	{
+		.vendor		= PCI_VENDOR_ID_QLOGIC,
+		.device		= PCI_DEVICE_ID_QLOGIC_ISP4022,
+		.subvendor	= PCI_ANY_ID,
+		.subdevice	= PCI_ANY_ID,
+	},
+	{0, 0},
 };
-MODULE_DEVICE_TABLE(pci, qla4010_pci_tbl);
+MODULE_DEVICE_TABLE(pci, qla4xxx_pci_tbl);
 
 static int __devinit qla4xxx_probe_adapter(struct pci_dev *, const struct pci_device_id *);
 static void __devexit qla4xxx_remove_adapter(struct pci_dev *);
@@ -226,7 +228,7 @@ static void qla4xxx_free_adapter(scsi_qla_host_t *ha);
 
 struct pci_driver qla4xxx_pci_driver = {
 	.name           = DRIVER_NAME,
-	.id_table       = qla4010_pci_tbl,
+	.id_table       = qla4xxx_pci_tbl,
 	.probe          = qla4xxx_probe_adapter,
 	.remove         = qla4xxx_remove_adapter,
 };
@@ -263,6 +265,9 @@ static struct scsi_host_template qla4xxx_driver_template = {
 	.cmd_per_lun		= 3,
 	.use_clustering		= ENABLE_CLUSTERING,
 	.sg_tablesize		= SG_ALL,
+		
+	/* 2^32-1 size limit */
+	.max_sectors 		= 0xffff,
 };
 
 /**************************************************************************
@@ -279,50 +284,8 @@ static struct scsi_host_template qla4xxx_driver_template = {
  *      Kernel context.
  **************************************************************************/
 int
-qla4xxx_set_info(char *buffer, int length, struct Scsi_Host *HBAptr)
+qla4xxx_set_info(char *buffer, int length, struct Scsi_Host *host)
 {
-#if 0
-        uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
-
-	if (length < 13 || strncmp("scsi-qla", buffer, 8))
-		goto out;
-
-	/*
-	 * Usage: echo "scsi-qlascan " > /proc/scsi/<driver-name>/<adapter-id>
-	 *
-	 * <driver-name> can be either one : qla2100/qla2200/qla2300	
-	 *
-	 * Ex:- For qla2300 driver: 
-	 *	echo "scsi-qlascan " > /proc/scsi/qla2300/<adapter-id>
-	 *
-	 * <adapter-id> is the instance number of the HBA.
-	 *
-	 * Scan for all luns on all ports. 
-	 */
-	if (!strncmp("ping", buffer + 8, 4)) {
-		printk("scsi-qla%ld: Pinging ..  \n",
-		    HBAptr->ha->host_no);
-	}
-
-	/*
-	    * Issue Mailbox Command
-	 */
-	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
-	memset(&mbox_sts, 0, sizeof(mbox_sts));
-	mbox_cmd[0] = MBOX_CMD_PING;
-	mbox_cmd[1] = 20;
-	mbox_cmd[2] = (192 << 0) | (168 << 8) | (4 << 16) | (54 << 24);
-	if (qla4xxx_mailbox_command(to_qla_host(host), 3, 1,
-	    &mbox_cmd[0], &mbox_sts[0])
-	    == QLA_ERROR) {
-		printk("scsi%d: %s: unable to ping IP address\n",
-		    to_qla_host(host)->host_no, __func__);
-	} else
-		printk("scsi%d: %s: ping IP address OK!\n",
-		    to_qla_host(host)->host_no, __func__);
-out:
-#endif
 	return(-ENOSYS);  /* Currently this is a no-op */
 }
 
@@ -341,20 +304,6 @@ qla4xxx_module_init(void)
 	printk(KERN_INFO "qla4xxx: Adapter Reset Test Enabled!  "
 	       "Adapter Resets will be issued every 3 minutes!\n");
 #endif
-
-	switch (extended_error_logging) {
-	case 0:
-		// Default set in ql4print.c file
-		break;
-	case 1:
-		ql_dbg_level = QLP1|QLP2;
-		printk("qla4xxx: Extended Error Logging ENABLED\n");
-		break;
-	case 2:
-		ql_dbg_level = QLP1|QLP2|QLP4|QLP7|QLP12;
-		printk("qla4xxx: Debug Error Logging ENABLED\n");
-		break;
-	}
 
 #ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 	qla4xxx_ioctl_init();
@@ -440,12 +389,12 @@ qla4xxx_probe_adapter(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	/* Initialize lists and spinlocks. */
 	INIT_LIST_HEAD(&ha->ddb_list);
-	INIT_LIST_HEAD(&ha->pending_srb_q);
-	INIT_LIST_HEAD(&ha->retry_srb_q);
-	INIT_LIST_HEAD(&ha->done_srb_q);
-	INIT_LIST_HEAD(&ha->suspended_lun_q);
 	INIT_LIST_HEAD(&ha->free_srb_q);
 	INIT_LIST_HEAD(&ha->fcports);
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
+	INIT_LIST_HEAD(&ha->done_srb_q);
+	INIT_LIST_HEAD(&ha->retry_srb_q);
+#endif
 
 	init_MUTEX(&ha->mbox_sem);
 	init_waitqueue_head(&ha->mailbox_wait_queue);
@@ -472,7 +421,7 @@ qla4xxx_probe_adapter(struct pci_dev *pdev, const struct pci_device_id *ent)
 		    "not match PCI function number (0x%x)\n",
 		    ha->function_number, PCI_FUNC(pdev->devfn));
 
-		goto probe_failed;
+		goto probe_disable_device;
 	}
 
 	/*
@@ -482,7 +431,7 @@ qla4xxx_probe_adapter(struct pci_dev *pdev, const struct pci_device_id *ent)
 		ql4_printk(KERN_WARNING, ha,
 		    "[ERROR] Failed to allocate memory for adapter\n");
 
-		goto probe_failed;
+		goto probe_disable_device;
 	}
 
 #ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
@@ -498,9 +447,8 @@ qla4xxx_probe_adapter(struct pci_dev *pdev, const struct pci_device_id *ent)
 	 */
 	status = qla4xxx_initialize_adapter(ha, REBUILD_DDB_LIST);
 	while ((status == QLA_ERROR) &&
-	       test_bit(DPC_RESET_HA, &ha->dpc_flags) &&
 	       (init_retry_count++ < MAX_INIT_RETRIES)) {
-		QL4PRINT(QLP2, printk("scsi: %s: retrying adapter "
+		DEBUG2(printk("scsi: %s: retrying adapter "
 		    "initialization (%d)\n", __func__, init_retry_count));
 
 		qla4xxx_soft_reset(ha);
@@ -510,20 +458,18 @@ qla4xxx_probe_adapter(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (status == QLA_ERROR) {
 		ql4_printk(KERN_WARNING, ha,"Failed to initialize adapter\n");
 
-		QL4PRINT(QLP2, printk(KERN_INFO
-		    "scsi: Failed to initialize adapter\n"));
+		DEBUG2(printk(KERN_INFO "scsi: Failed to initialize adapter\n"));
 
 		goto probe_failed;
 	}
 
 	host->cmd_per_lun = 3;
 	host->io_port = ha->io_addr;
-	host->max_channel = QLA4XXX_BOARD_PORTS-1;
+	host->max_channel =  0;
 	host->max_lun = MAX_LUNS-1;
 	host->max_id = MAX_TARGETS;
 	host->unique_id = ha->instance;
 	host->max_cmd_len = IOCB_MAX_CDB_LEN;
-	//FIXME	KH: What does 128 represent.  We shouldn't use hard-coded values.
 	host->can_queue = REQUEST_QUEUE_DEPTH + 128;
 
 	/* Startup the kernel thread for this host adapter. */
@@ -531,6 +477,21 @@ qla4xxx_probe_adapter(struct pci_dev *pdev, const struct pci_device_id *ent)
 	    "qla4xxx_dpc\n", __func__));
 	ha->dpc_should_die = 0;
 	ha->dpc_pid = kernel_thread(qla4xxx_do_dpc, ha, 0);
+	init_retry_count = 0;
+	while ((ha->dpc_pid < 0) &&
+	       (init_retry_count++ < MAX_INIT_RETRIES)) {
+		ha->dpc_pid = kernel_thread(qla4xxx_do_dpc, ha, 0);
+		if (ha->dpc_pid < 0) {
+			printk(KERN_WARNING
+				" host_no =%d Unable to start DPC thread!"
+				"init_retry_count =%d\n", ha->host_no,
+				init_retry_count);
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(1 * HZ);
+		} else {
+		 	break;	
+		}	
+	}
 	if (ha->dpc_pid < 0) {
 		ql4_printk(KERN_WARNING, ha, "Unable to start DPC thread!\n");
 
@@ -567,8 +528,7 @@ qla4xxx_probe_adapter(struct pci_dev *pdev, const struct pci_device_id *ent)
 	list_add_tail(&ha->list, &qla4xxx_hostlist);
 	write_unlock(&qla4xxx_hostlist_lock);
 
-	//if (displayConfig)
-		qla4xxx_display_config();
+	qla4xxx_display_config();
 
 	set_bit(AF_INIT_DONE, &ha->flags);
 	qla4xxx_hba_count++;
@@ -578,7 +538,7 @@ qla4xxx_probe_adapter(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (scsi_add_host(host, &pdev->dev))
 		goto probe_failed;
 
-#ifdef	CONFIG_SCSI_QLA2XXX_FAILOVER
+#ifdef	CONFIG_SCSI_QLA4XXX_FAILOVER
 	/*
  	 * if failover is enabled
 	 */
@@ -587,22 +547,22 @@ qla4xxx_probe_adapter(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	printk(KERN_INFO
-	    " QLogic iSCSI HBA Driver version: %s-fo %c\n"
+	    " QLogic iSCSI HBA Driver version: %s-fo%c\n"
 	    "  QLogic ISP%04x @ %s hdma%c, host#=%d, fw=%02d.%02d.%02d.%02d\n",
-	    QLA4XXX_DRIVER_VERSION, 
+	    QLA4XXX_DRIVER_VERSION,
 	    (qla4xxx_failover_enabled(ha)) ? '+': '-',
 	    ha->pdev->device, pci_name(ha->pdev),
 	    test_bit(AF_64BIT_PCI_ADDR, &ha->flags) ? '+': '-', ha->host_no,
-	    ha->firmware_version[0], ha->firmware_version[1], 
+	    ha->firmware_version[0], ha->firmware_version[1],
 	    ha->patch_number, ha->build_number);
 #else
 	printk(KERN_INFO
 	    " QLogic iSCSI HBA Driver version: %s\n"
 	    "  QLogic ISP%04x @ %s hdma%c, host#=%d, fw=%02d.%02d.%02d.%02d\n",
-	    QLA4XXX_DRIVER_VERSION, 
+	    QLA4XXX_DRIVER_VERSION,
 	    ha->pdev->device, pci_name(ha->pdev),
 	    test_bit(AF_64BIT_PCI_ADDR, &ha->flags) ? '+': '-', ha->host_no,
-	    ha->firmware_version[0], ha->firmware_version[1], 
+	    ha->firmware_version[0], ha->firmware_version[1],
 	    ha->patch_number, ha->build_number);
 #endif
 	scsi_scan_host(host);
@@ -653,9 +613,10 @@ static void
 qla4xxx_free_adapter(scsi_qla_host_t *ha)
 {
 	int ret;
-	unsigned long flags;
 
 	ENTER(__func__);
+
+	set_bit(AF_HA_GOING_AWAY, &ha->flags);
 
 #if 0
 	/* Deregister with the iSNS Server */
@@ -690,23 +651,6 @@ qla4xxx_free_adapter(scsi_qla_host_t *ha)
 		qla4xxx_disable_intrs(ha);
 	}
 
-	/* Issue Soft Reset to put firmware in unknown state */
-	QL4PRINT(QLP7, printk("scsi%d: %s: Soft Reset\n", ha->host_no,
-	    __func__));
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-	WRT_REG_DWORD(&ha->reg->ctrl_status, SET_RMASK(CSR_SOFT_RESET));
-	PCI_POSTING(&ha->reg->ctrl_status);
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
-	/* Remove timer thread, if present */
-	if (ha->timer_active) {
-		QL4PRINT(QLP7, printk("scsi%d: %s: Removing timer thread for "
-		    "adapter %d\n", ha->host_no, __func__, ha->instance));
-
-		del_timer_sync(&ha->timer);
-		ha->timer_active = 0;
-	}
-
 	/* Kill the kernel thread for this host */
 	if (ha->dpc_pid >= 0) {
 		ha->dpc_should_die = 1;
@@ -719,6 +663,19 @@ qla4xxx_free_adapter(scsi_qla_host_t *ha)
 			/* TODO: SOMETHING MORE??? */
 		} else
 			wait_for_completion(&ha->dpc_exited);
+	}
+
+	/* Issue Soft Reset to put firmware in unknown state */
+	QL4PRINT(QLP7, printk("scsi%d: %s: Soft Reset\n",ha->host_no,__func__));
+	qla4xxx_soft_reset(ha);
+
+	/* Remove timer thread, if present */
+	if (ha->timer_active) {
+		QL4PRINT(QLP7, printk("scsi%d: %s: Removing timer thread for "
+		    "adapter %d\n", ha->host_no, __func__, ha->instance));
+
+		del_timer_sync(&ha->timer);
+		ha->timer_active = 0;
 	}
 
 	/* free extra memory */
@@ -866,6 +823,7 @@ qla4xxx_display_config(void)
 		    ha->my_mac[3], ha->my_mac[4], ha->my_mac[5]);
 	}
 	read_unlock(&qla4xxx_hostlist_lock);
+
 }
 
 /**************************************************************************
@@ -881,7 +839,7 @@ qla4xxx_display_config(void)
  * Context:
  *      Kernel context.
  **************************************************************************/
-uint32_t
+inline uint32_t
 qla4xxx_get_hba_count(void)
 {
 	return(qla4xxx_hba_count);
@@ -900,7 +858,7 @@ qla4xxx_get_hba_count(void)
  * At exit, the @ha's flags.enable_64bit_addressing set to indicated
  * supported addressing method.
  */
-void
+inline void
 qla4xxx_config_dma_addressing(scsi_qla_host_t *ha)
 {
 	/* Assume 32bit DMA address. */
@@ -957,11 +915,9 @@ qla4xxx_alloc_srb_pool(scsi_qla_host_t *ha)
 	srb_t *srb;
 	int i;
 	uint8_t status = QLA_ERROR;
-	unsigned long flags;
 
 	ENTER("qla4xxx_alloc_srb_pool");
 
-	spin_lock_irqsave(&ha->list_lock, flags);
 	ha->num_srbs_allocated = 0;
 	ha->free_srb_q_count = 0; /* incremented in add_to_free_srb_q routine */
 
@@ -982,12 +938,11 @@ qla4xxx_alloc_srb_pool(scsi_qla_host_t *ha)
 			__add_to_free_srb_q(ha, srb);
 		}
 	}
-	spin_unlock_irqrestore(&ha->list_lock, flags);
 
 	if (ha->free_srb_q_count)
 		status = QLA_SUCCESS;
 
-	QL4PRINT(QLP7, printk("scsi%d: %s: Allocated %d SRB(s)\n",
+	DEBUG2(printk("scsi%d: %s: Allocated %d SRB(s)\n",
 	    ha->host_no, __func__, ha->free_srb_q_count));
 
 	LEAVE("qla4xxx_alloc_srb_pool");
@@ -1107,24 +1062,6 @@ qla4xxx_mem_alloc(scsi_qla_host_t *ha)
 	    ha->host_no, __func__, (unsigned long)ha->shadow_regs_dma,
 	    ha->shadow_regs));
 
-	/* Allocate PDU Buffers
-	 * -------------------- */
-	ha->pdu_buff_size = MAX_PDU_ENTRIES*PAGE_SIZE;
-	ha->pdu_buffsv = pci_alloc_consistent(ha->pdev, ha->pdu_buff_size,
-	    &ha->pdu_buffsp);
-	if (ha->pdu_buffsv == NULL) {
-		ql4_printk(KERN_WARNING, ha,
-		    "Memory Allocation failed - PDU buffers.\n");
-
-		goto mem_alloc_error_exit;
-	}
-	memset(ha->pdu_buffsv, 0, MAX_PDU_ENTRIES*PAGE_SIZE);
-	ha->free_pdu_top = ha->pdu_buffsv;
-
-	QL4PRINT(QLP7, printk("scsi%d: %s: PDU buffers 0x%lx (%p)\n",
-	    ha->host_no, __func__, (unsigned long)ha->pdu_buffsp,
-	    ha->pdu_buffsv));
-
 	/* Allocate iSNS Discovered Target Database
 	 * ---------------------------------------- */
 	ha->isns_disc_tgt_database_size = sizeof(ISNS_DISCOVERED_TARGET) *
@@ -1202,16 +1139,6 @@ qla4xxx_mem_free(scsi_qla_host_t *ha)
 	ha->response_dma = 0;
 	ha->shadow_regs = NULL;
 	ha->shadow_regs_dma = 0;
-
-	if (ha->pdu_buffsv) {
-		QL4PRINT(QLP7, printk("scsi%d: %s: free PDU buffers.\n",
-		    ha->host_no, __func__));
-
-		pci_free_consistent(ha->pdev, ha->pdu_buff_size,
-		    ha->pdu_buffsv, ha->pdu_buffsp);
-	}
-	ha->pdu_buffsv = 0;
-	ha->pdu_buffsp = 0;
 
 	if (ha->isns_disc_tgt_databasev) {
 		QL4PRINT(QLP7, printk("scsi%d: %s: free iSNS DB.\n",
@@ -1308,9 +1235,10 @@ qla4xxx_slave_configure(struct scsi_device *sdev)
 		lun_entry = qla4xxx_lookup_lun_handle(ha, tgt_entry,
 		    sdev->lun);
 	        if (lun_entry != NULL) {
+			lun_entry->sdev = sdev;
 			if (sdev->type == TYPE_TAPE) {
 				tgt_entry->fcport->flags |= FCF_TAPE_PRESENT;
-				lun_entry->fclun->flags |= FCF_TAPE_PRESENT;
+				// lun_entry->fclun->flags |= FLF_TAPE_PRESENT;
 			}
 		}
 	}
@@ -1530,7 +1458,7 @@ qla4xxx_proc_dump_scanned_devices(scsi_qla_host_t *ha, struct info_str *info)
 			ddb_entry->ip_addr[3],
 			ddb_entry->fw_ddb_index);
 		i++;
-	} 
+	}
 
 	
 	//copy_info(info, "SCSI scanned device Information:\n");
@@ -1553,6 +1481,17 @@ qla4xxx_proc_dump_scanned_devices(scsi_qla_host_t *ha, struct info_str *info)
 			if (up->fclun->fcport == NULL) {
 				continue;
 			}
+
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
+			if (!qla4xxx_failover_enabled(ha)) {
+				if (up->tot_io_count < 4)
+					continue;
+			}
+#else
+    			/* don't display luns if OS didn't probe */
+			if (up->tot_io_count < 4)
+				continue;
+#endif
 
 			ddb_entry = up->fclun->fcport->ddbptr;
 			copy_info(info,
@@ -1636,7 +1575,9 @@ qla4xxx_proc_info(struct Scsi_Host *shost, char *buffer, char **start,
 	scsi_qla_host_t *ha = NULL;
 	struct info_str info;
 	unsigned long   flags;
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
 	srb_t *srb, *stemp;
+#endif
 
 	QL4PRINT(QLP16, printk("scsi%d: Entering %s: buff_in=%p, "
 			       "offset=0x%lx, length=0x%x\n",
@@ -1663,15 +1604,13 @@ qla4xxx_proc_info(struct Scsi_Host *shost, char *buffer, char **start,
 	info.pos    = 0;
 
 	/* start building the print buffer */
-	copy_info(&info, "QLogic iSCSI Adapter for ISP %s:\n",
-		  QLA4XXX_BOARD_ID_STRING);
+	copy_info(&info, "QLogic iSCSI Adapter for ISP %x:\n",
+	    ha->pdev->device);
 	copy_info(&info, "Driver version %s\n", QLA4XXX_DRIVER_VERSION);
-	copy_info(&info, "Code starts at address = %p\n", qla4xxx_set_info);
 	copy_info(&info, "Firmware version %2d.%02d.%02d.%02d\n",
-		  ha->firmware_version[0], ha->firmware_version[1],
-		  ha->patch_number, ha->build_number);
-	copy_info(&info, "SCSI Host Adapter Information: %s\n",
-		  QLA4XXX_BOARD_NAME_STRING);
+	    ha->firmware_version[0], ha->firmware_version[1],
+	    ha->patch_number, ha->build_number);
+	copy_info(&info, "Code starts at address = %p\n", qla4xxx_set_info);
 
 #if 0
 	copy_info(&info, "MEDIA TYPE - %s\n",
@@ -1716,16 +1655,6 @@ qla4xxx_proc_info(struct Scsi_Host *shost, char *buffer, char **start,
 		  ha->aen_q_count, MAX_AEN_ENTRIES);
 	copy_info(&info, "Number of Mailbox Timeouts = %d\n",
 		  ha->mailbox_timeout_count);
-#if 0
-	copy_info(&info, "Total H/W int = 0x%lx\n",
-		  (unsigned long)ha->isr_count);
-	copy_info(&info, "Total RISC int = 0x%lx\n",
-		  (unsigned long)ha->total_io_count);
-	copy_info(&info, "Number of Spurious interrupts = %d\n",
-		  ha->spurious_int_count);
-	copy_info(&info, "Seconds since last Interrupt = %d\n",
-		  ha->seconds_since_last_intr);
-#endif
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	copy_info(&info, "Interrupt Status = %d\n",
@@ -1738,19 +1667,8 @@ qla4xxx_proc_info(struct Scsi_Host *shost, char *buffer, char **start,
 		  (ql4xmaxqdepth == 0) ? 16 : ql4xmaxqdepth);
 	copy_info(&info, "Adapter flags = 0x%x, DPC flags = 0x%x\n",
 		  ha->flags, ha->dpc_flags);
-	copy_info(&info, "Number of commands in pending_srb_q = %d\n",
-		  ha->pending_srb_q_count);
 
-	if (((ql_dbg_level & QLP16) != 0) && (ha->pending_srb_q_count)) {
-		copy_info(&info, "\nDump pending_srb_q:\n");
-		spin_lock_irqsave(&ha->list_lock, flags);
-		list_for_each_entry_safe(srb, stemp, &ha->pending_srb_q,
-		    list_entry)
-			qla4xxx_proc_dump_srb_info(ha, &info, srb);
-		spin_unlock_irqrestore(&ha->list_lock, flags);
-		copy_info(&info, "\n");
-	}
-
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
 	copy_info(&info, "Number of commands in retry_srb_q = %d\n",
 		  ha->retry_srb_q_count);
 
@@ -1776,12 +1694,14 @@ qla4xxx_proc_info(struct Scsi_Host *shost, char *buffer, char **start,
 		spin_unlock_irqrestore(&ha->list_lock, flags);
 		copy_info(&info, "\n");
 	}
-
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 	if (qla4xxx_failover_enabled(ha)) {
 		copy_info(&info,
 		    "Number of reqs in failover_q= %d\n",
 		    ha->failover_cnt);
 	}
+#endif
+#endif
 	
 	copy_info(&info, "Dpc flags = 0x%lx\n", ha->dpc_flags);
 
@@ -1825,7 +1745,7 @@ qla4xxx_proc_info(struct Scsi_Host *shost, char *buffer, char **start,
 	return(retval);
 }
 
-//XXX failover only
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 /**************************************************************************
  * qla4xxx_get_adapter_handle
  *      This routine returns the adapter handle that corresponds to the
@@ -1864,43 +1784,7 @@ qla4xxx_get_adapter_handle(uint16_t instance)
 
 	return NULL;
 }
-
-/**************************************************************************
- * add_to_active_array
- *      This routine adds an srb to the active array at the specified index.
- *
- * Input:
- *      ha - Pointer to host adapter structure.
- *      index - index into to the active_array
- *      srb - Pointer to SCSI Request Block
- *
- * Returns:
- *      None
- *
- * Context:
- *      Kernel context.
- **************************************************************************/
-void
-add_to_active_array(scsi_qla_host_t *ha, uint32_t index, srb_t *srb)
-{
-	ddb_entry_t *ddb_entry = qla4xxx_lookup_ddb_by_fw_index(ha, srb->fw_ddb_index);
-	os_lun_t *lun_entry = srb->lun_queue;
-
-	/* put command in active array */
-	ha->active_srb_array[index] = srb;
-	srb->cmd->host_scribble = (unsigned char *)(unsigned long)index;
-
-	/* update counters */
-	ha->active_srb_count++;
-	ha->req_q_count -= srb->entry_count;
-	if (ddb_entry) ddb_entry->out_count++;
-	if (lun_entry) {
-		lun_entry->out_count++;
-		lun_entry->tot_io_count++;
-	}
-	srb->active_array_index = index;
-	srb->state = SRB_ACTIVE_STATE;
-}
+#endif
 
 /**************************************************************************
  * del_from_active_array
@@ -1933,8 +1817,9 @@ del_from_active_array(scsi_qla_host_t *ha, uint32_t index)
 			os_lun_t *lun_entry = srb->lun_queue;
 
 			/* update counters */
+			if ((srb->flags & SRB_DMA_VALID) != 0) {
 			ha->req_q_count += srb->entry_count;
-			ha->iocb_cnt -= srb->iocb_cnt;
+				ha->iocb_cnt -= srb->entry_count;
 			if (ha->active_srb_count)
 				ha->active_srb_count--;
 			// if (ddb_entry) ddb_entry->out_count--;
@@ -1944,6 +1829,7 @@ del_from_active_array(scsi_qla_host_t *ha, uint32_t index)
 			srb->active_array_index = INVALID_ENTRY;
 			if (srb->cmd)
 				srb->cmd->host_scribble = NULL;
+		}
 		}
 		else
 			QL4PRINT(QLP2,
@@ -1959,33 +1845,147 @@ del_from_active_array(scsi_qla_host_t *ha, uint32_t index)
 	return(srb);
 }
 
-inline uint8_t
-qla4xxx_alloc_cont_entry(scsi_qla_host_t *ha,
-			 DATA_SEG_A64 **cur_dsd,
-			 uint16_t *avail_dsds)
+uint16_t
+qla4xxx_calc_request_entries(uint16_t dsds)
 {
-	CONTINUE_ENTRY *cont_entry;
-	ENTER("qla4xxx_alloc_cont_entry");
+	uint16_t iocbs;/* number of request queue entries */
+				/* (commamd + continue) */
+	iocbs = 1;
+	if (dsds > COMMAND_SEG) {
+		iocbs += (dsds - COMMAND_SEG) / CONTINUE_SEG;
+		if ((dsds - COMMAND_SEG) % CONTINUE_SEG)
+			iocbs++;
+	}
+	return (iocbs);
+}
 
-	/* Get request queue entry and adjust ring index. */
-	if (qla4xxx_get_req_pkt(ha, (QUEUE_ENTRY **) &cont_entry) != QLA_SUCCESS) {
-		QL4PRINT(QLP2, printk("scsi%d: %s: Unable to allocate "
-				      "continuation packet\n",
-				      ha->host_no, __func__));
+void
+qla4xxx_build_scsi_iocbs(srb_t *srb, COMMAND_ENTRY *cmd_entry, uint16_t tot_dsds)
+{
+	scsi_qla_host_t	*ha;
+	uint16_t	avail_dsds;
+	DATA_SEG_A64 *cur_dsd;
+	struct scsi_cmnd *cmd;
 
-		LEAVE("qla4xxx_alloc_cont_entry");
-		return(QLA_ERROR);
+	cmd = srb->cmd;
+	ha = srb->ha;
+
+	if (cmd->request_bufflen == 0 ||
+	    cmd->sc_data_direction == DMA_NONE) {
+		/* No data being transferred */
+		QL4PRINT(QLP5, printk("scsi%d:%d:%d:%d: %s: No data xfer\n",
+		    ha->host_no, cmd->device->channel, cmd->device->id,
+		    cmd->device->lun, __func__));
+
+		cmd_entry->ttlByteCnt = __constant_cpu_to_le32(0);
+		return;
 	}
 
-	cont_entry->hdr.entryType = ET_CONTINUE;
-	cont_entry->hdr.entryCount = 1;
-	cont_entry->hdr.systemDefined =
-	(uint8_t) cpu_to_le16(ha->request_in);
-	*cur_dsd = (DATA_SEG_A64 *) &cont_entry->dataseg[0];
-	*avail_dsds = CONTINUE_SEG;
+	avail_dsds = COMMAND_SEG;
+	cur_dsd = (DATA_SEG_A64 *) &(cmd_entry->dataseg[0]);
 
-	LEAVE("qla4xxx_alloc_cont_entry");
-	return(QLA_SUCCESS);
+	/* Load data segments */
+	if (cmd->use_sg) {
+		struct  scatterlist *cur_seg;
+		struct  scatterlist *end_seg;
+
+		/* Data transfer with Scatter/Gather
+		 *
+		 * We must build an SG list in adapter format, as the kernel's
+		 * SG list cannot be used directly because of data field size
+		 * (__alpha__) differences and the kernel SG list uses virtual
+		 * addresses where we need physical addresses.
+		 */
+		cur_seg = (struct scatterlist *) cmd->request_buffer;
+		end_seg = cur_seg + tot_dsds;
+
+		while (cur_seg < end_seg) {
+			dma_addr_t sle_dma;
+
+			/* Allocate additional continuation packets? */
+			if (avail_dsds == 0) {
+				CONTINUE_ENTRY *cont_entry;
+
+				cont_entry = qla4xxx_alloc_cont_entry(ha);
+				cur_dsd = (DATA_SEG_A64 *) &cont_entry->dataseg[0];
+				avail_dsds = CONTINUE_SEG;
+			}
+
+			sle_dma = sg_dma_address(cur_seg);
+			cur_dsd->base.addrLow = cpu_to_le32(LSDW(sle_dma));
+			cur_dsd->base.addrHigh = cpu_to_le32(MSDW(sle_dma));
+			cur_dsd->count = cpu_to_le32(sg_dma_len(cur_seg));
+			avail_dsds--;
+
+			DEBUG(printk("scsi%d:%d:%d:%d: %s: S/G "
+			    "DSD %p phys_addr=%x:%08x, len=0x%x, tot_dsd=0x%x, "
+			    "avail_dsd=0x%x\n", ha->host_no,
+			    cmd->device->channel, cmd->device->id,
+			    cmd->device->lun, __func__, cur_dsd,
+			    cur_dsd->base.addrHigh, cur_dsd->base.addrLow,
+			    cur_dsd->count, tot_dsds, avail_dsds));
+
+			cur_dsd++;
+			cur_seg++;
+	}
+	} else {
+		/* Data transfer without SG entries. */
+		dma_addr_t	req_dma;
+		struct page	*page;
+		unsigned long	offset;
+
+		page = virt_to_page(cmd->request_buffer);
+		offset = ((unsigned long) cmd->request_buffer & ~PAGE_MASK);
+		req_dma = pci_map_page(ha->pdev, page, offset,
+		    cmd->request_bufflen, cmd->sc_data_direction);
+		srb->saved_dma_handle = req_dma;
+
+		cur_dsd->base.addrLow = cpu_to_le32(LSDW(req_dma));
+		cur_dsd->base.addrHigh = cpu_to_le32(MSDW(req_dma));
+		cur_dsd->count = cpu_to_le32(cmd->request_bufflen);
+
+		QL4PRINT(QLP5, printk("scsi%d:%d:%d:%d: %s: No S/G transfer, "
+		    "DSD=%p cmd=%p dma_addr=%x:%08x, len=%x, tot_dsd=0x%x, "
+		    "avail_dsd=0x%x\n", ha->host_no, cmd->device->channel,
+		    cmd->device->id, cmd->device->lun, __func__, cur_dsd, cmd,
+		    cur_dsd->base.addrHigh, cur_dsd->base.addrLow,
+		    cur_dsd->count, tot_dsds, avail_dsds));
+
+		cur_dsd++;
+	}
+}
+
+CONTINUE_ENTRY *
+qla4xxx_alloc_cont_entry(scsi_qla_host_t *ha)
+{
+        CONTINUE_ENTRY *cont_entry;
+        ENTER("qla4xxx_alloc_cont_entry");
+
+        cont_entry = (CONTINUE_ENTRY *)ha->request_ptr;
+
+        /* Advance request queue pointer */
+        if (ha->request_in == (REQUEST_QUEUE_DEPTH - 1)) {
+                ha->request_in = 0;
+                ha->request_ptr = ha->request_ring;
+                QL4PRINT(QLP10, printk("scsi%d: %s: wraparound -- new "
+                    "request_in = %04x, new request_ptr = %p\n", ha->host_no,
+                    __func__, ha->request_in, ha->request_ptr));
+        } else {
+		ha->request_in++;
+                ha->request_ptr++;
+                QL4PRINT(QLP10, printk("scsi%d: %s: new request_in = %04x, new "
+                    "request_ptr = %p\n", ha->host_no, __func__, ha->request_in,
+                    ha->request_ptr));
+        }
+
+        /* Load packet defaults */
+        cont_entry->hdr.entryType = ET_CONTINUE;
+        cont_entry->hdr.entryCount = 1;
+        cont_entry->hdr.systemDefined =
+        (uint8_t) cpu_to_le16(ha->request_in);
+
+        LEAVE("qla4xxx_alloc_cont_entry");
+        return(cont_entry);
 }
 
 /**************************************************************************
@@ -2017,20 +2017,16 @@ qla4xxx_send_command_to_isp(scsi_qla_host_t *os_ha, srb_t *srb)
 	ddb_entry_t   *ddb_entry;
 	os_lun_t   *lun_entry;
 	COMMAND_ENTRY *cmd_entry;
-	uint16_t      saved_request_in;
-	QUEUE_ENTRY   *saved_request_ptr;
+	struct scatterlist *sg = NULL;
 
-	uint16_t avail_dsds;
-	DATA_SEG_A64 *cur_dsd;
 	uint16_t      tot_dsds;	/* number of data segments */
 				/* (sg entries, if sg request) */
+	uint16_t	req_cnt;	/* number of request queue entries */
 
-	uint8_t       tot_iocbs;/* number of request queue entries */
-				/* (commamd + continue) */
 	unsigned long flags;
+	uint16_t	cnt;
 	uint16_t      i;
 	uint32_t      index;
-	uint8_t       found = 0;
 	fc_lun_t                *fclun;
 	scsi_qla_host_t *ha;
 	char		tag[2];
@@ -2041,9 +2037,6 @@ qla4xxx_send_command_to_isp(scsi_qla_host_t *os_ha, srb_t *srb)
 	fclun = srb->lun_queue->fclun;
 	ha = fclun->fcport->ha;
 
-	/* FIXME: Where are we checking the iocb count? The f/w can only accept
-	 * a max number of IOCB and mailbox commands.
-	 */
 	cmd = srb->cmd;
 	ddb_entry = fclun->fcport->ddbptr;
 	lun_entry = srb->lun_queue;
@@ -2054,30 +2047,11 @@ qla4xxx_send_command_to_isp(scsi_qla_host_t *os_ha, srb_t *srb)
 		    QLA_SUCCESS) {
 			return(QLA_ERROR);
 		}
-	}
 	ha->marker_needed = 0;
+	}
 
 	/* Acquire hardware specific lock */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
-
-	/* Save some variables to undo things if an error occurs */
-	saved_request_in  = ha->request_in;
-	saved_request_ptr = ha->request_ptr;
-
-	tot_dsds = 0;
-	tot_iocbs = 1;
-	avail_dsds = COMMAND_SEG;
-
-	/* Get request queue entry and adjust ring index. */
-	if (qla4xxx_get_req_pkt(ha, (QUEUE_ENTRY **) &cmd_entry) !=
-	    QLA_SUCCESS) {
-		QL4PRINT(QLP2, printk("scsi%d:%d:%d:%d: %s: request queue is "
-		    "full, try again later\n", ha->host_no,
-		    cmd->device->channel, cmd->device->id, cmd->device->lun,
-		    __func__));
-
-		goto exit_send_cmd;
-	}
 
 	/* Check for room in active srb array */
 	index = ha->current_active_index;
@@ -2086,50 +2060,87 @@ qla4xxx_send_command_to_isp(scsi_qla_host_t *os_ha, srb_t *srb)
 		if (index == MAX_SRBS)
 			index = 1;
 		if (ha->active_srb_array[index] == 0) {
-			found = 1;
 			ha->current_active_index = index;
 			break;
 		}
 	}
-	if (!found) {
-		QL4PRINT(QLP2, printk("scsi%d:%d:%d:%d: %s: no room in active "
-		    "array, try again later\n", ha->host_no,
-		    cmd->device->channel, cmd->device->id, cmd->device->lun,
-		    __func__));
-
-		goto exit_send_cmd_return_request;
+	if (i >= MAX_SRBS) {
+		printk(KERN_INFO "scsi%d: %s: NO more SRB entries"
+		    "used iocbs=%d, \n reqs remaining=%d\n", ha->host_no,
+		    __func__, ha->iocb_cnt, ha->req_q_count);
+		goto queuing_error;
 	}
 
-	/* Build command entry packet to send to ISP. */
-	/* If in connection mode, bump sequence number */
-	if ((ha->firmware_options & FWOPT_SESSION_MODE) != 0)
-		ddb_entry->CmdSn++;
 
+	/* Calculate the number of request entries needed. */
+	tot_dsds = 0;
+	if (cmd->use_sg) {
+		sg = (struct scatterlist *) cmd->request_buffer;
+		tot_dsds = pci_map_sg(ha->pdev, sg, cmd->use_sg,
+		    cmd->sc_data_direction);
+		if (tot_dsds == 0)
+			goto queuing_error;
+	} else if (cmd->request_bufflen) {
+	    tot_dsds++;
+	}
+	req_cnt = qla4xxx_calc_request_entries(tot_dsds);
+
+	if (ha->req_q_count < (req_cnt + 2)) {
+		// cnt = RD_REG_WORD_RELAXED(ISP_REQ_Q_OUT(ha));
+	    	cnt = (uint16_t) le32_to_cpu(ha->shadow_regs->req_q_out);
+		if (ha->request_in < cnt)
+			ha->req_q_count = cnt - ha->request_in;
+		else
+			ha->req_q_count = REQUEST_QUEUE_DEPTH - (ha->request_in - cnt);
+		DEBUG(printk(KERN_INFO "scsi%d: %s: new request queue count -"
+		    "calc req_q_count=%d, reqs needed=%d, shadow reqs=%d, req_in =%d\n", ha->host_no,
+		    __func__, ha->req_q_count, req_cnt, cnt, ha->request_in));
+	}
+
+	if (ha->req_q_count < (req_cnt + 2)) {
+		/* free the resources */
+		if (cmd->use_sg)
+			pci_unmap_sg(ha->pdev, sg, cmd->use_sg, cmd->sc_data_direction);
+		DEBUG(printk(KERN_INFO "scsi%d: %s: No more request queues, "
+		    "used iocbs=%d, \n reqs remaining=%d, reqs needed=%d\n", ha->host_no,
+		    __func__, ha->iocb_cnt, ha->req_q_count, req_cnt));
+		goto queuing_error;
+	}
+
+	/* total iocbs active */
+	if ((ha->iocb_cnt + req_cnt)  >= REQUEST_QUEUE_DEPTH ) {
+		if (cmd->use_sg)
+			pci_unmap_sg(ha->pdev, sg, cmd->use_sg, cmd->sc_data_direction);
+		goto queuing_error;
+	}
+
+	/* Build command packet */
+	cmd_entry = (COMMAND_ENTRY *) ha->request_ptr;
+	memset(cmd_entry, 0, sizeof(COMMAND_ENTRY));
 	cmd_entry->hdr.entryType = ET_COMMAND;
 	cmd_entry->handle = cpu_to_le32(index);
 	cmd_entry->target = cpu_to_le16(ddb_entry->fw_ddb_index);
 	cmd_entry->connection_id = cpu_to_le16(ddb_entry->connection_id);
+	
 	cmd_entry->lun[1] = LSB(cmd->device->lun);	/* SAMII compliant. */
 	cmd_entry->lun[2] = MSB(cmd->device->lun);
 	cmd_entry->cmdSeqNum = cpu_to_le32(ddb_entry->CmdSn);
 	cmd_entry->ttlByteCnt = cpu_to_le32(cmd->request_bufflen);
 	memcpy(cmd_entry->cdb, cmd->cmnd, MIN(MAX_COMMAND_SIZE, cmd->cmd_len));
+	cmd_entry->dataSegCnt = cpu_to_le16(tot_dsds);
+	cmd_entry->hdr.entryCount = req_cnt;
 
 	/* Set firmware timeout to [target_mgmt_timeout + IOCB_TOV_MARGIN]
 	 * seconds less than OS timeout.
-	 * We want the firmware to time out the command first */
-	cmd_entry->timeout = (cmd->timeout_per_command / HZ);
+	 * We want the firmware to time out the command first
+	 */
 	if (cmd_entry->timeout > ddb_entry->task_mgmt_timeout + IOCB_TOV_MARGIN)
-		cmd_entry->timeout -=
-		    (ddb_entry->task_mgmt_timeout + IOCB_TOV_MARGIN);
+		cmd_entry->timeout = (cmd->timeout_per_command / HZ)
+					- (QLA_CMD_TIMER_DELTA+1);
 	cmd_entry->timeout = cpu_to_le16(cmd_entry->timeout);
 
 	srb->iocb_tov = cmd_entry->timeout;
 	srb->os_tov = cmd->timeout_per_command / HZ;
-
-	QL4PRINT(QLP10, printk("scsi%d:%d:%d:%d: %s: timeout set to %d "
-	    "seconds, \n", ha->host_no, cmd->device->channel, cmd->device->id,
-	    cmd->device->lun, __func__, cmd_entry->timeout));
 
 	/* Set data transfer direction control flags
 	 * NOTE: Look at data_direction bits iff there is data to be
@@ -2156,219 +2167,61 @@ qla4xxx_send_command_to_isp(scsi_qla_host_t *os_ha, srb_t *srb)
 		}
 	}
 
-	/* Set data segments and byte counts */
-	cur_dsd = (DATA_SEG_A64 *) &(cmd_entry->dataseg[0]);
-	if (cmd->request_bufflen == 0 ||
-	    cmd->sc_data_direction == DMA_NONE) {
-		/* No data being transferred */
-		QL4PRINT(QLP5, printk("scsi%d:%d:%d:%d: %s: No data xfer\n",
-		    ha->host_no, cmd->device->channel, cmd->device->id,
-		    cmd->device->lun, __func__));
+	/* Advance request queue pointer */
+	ha->request_in++;
+        if (ha->request_in == REQUEST_QUEUE_DEPTH ) {
+                ha->request_in = 0;
+                ha->request_ptr = ha->request_ring;
+        } else {
+                ha->request_ptr++;
+        }
 
-		tot_dsds = 0;
-		cmd_entry->ttlByteCnt = __constant_cpu_to_le32(0);
-	} else if (cmd->use_sg) {
-		struct  scatterlist *cur_seg;
-		struct  scatterlist *end_seg;
-		int     nseg;
+	qla4xxx_build_scsi_iocbs(srb, cmd_entry, tot_dsds);
 
-		/* Data transfer with Scatter/Gather
-		 *
-		 * We must build an SG list in adapter format, as the kernel's
-		 * SG list cannot be used directly because of data field size
-		 * (__alpha__) differences and the kernel SG list uses virtual
-		 * addresses where we need physical addresses.
-		 */
-		cur_seg = (struct scatterlist *) cmd->request_buffer;
-		nseg = pci_map_sg(ha->pdev, cur_seg, cmd->use_sg,
-		    cmd->sc_data_direction);
-		if (nseg == 0)
-			goto exit_send_cmd;
-		end_seg = cur_seg + nseg;
-
-		while (cur_seg < end_seg) {
-			dma_addr_t sle_dma;
-
-			/* Allocate additional continuation packets? */
-			if (avail_dsds == 0) {
-				tot_iocbs++;
-				if (qla4xxx_alloc_cont_entry(ha, &cur_dsd,
-				    &avail_dsds) == QLA_ERROR) {
-					QL4PRINT(QLP2,
-					    printk("scsi%d:%d:%d:%d: %s: "
-						    "request queue full, "
-						    "unmap sg, try again "
-						    "later\n", ha->host_no,
-						    cmd->device->channel,
-						    cmd->device->id,
-						    cmd->device->lun,
-						    __func__));
-
-					goto exit_send_cmd_return_dma;
-				}
-			}
-
-			sle_dma = sg_dma_address(cur_seg);
-			cur_dsd->base.addrLow = cpu_to_le32(LSDW(sle_dma));
-			cur_dsd->base.addrHigh = cpu_to_le32(MSDW(sle_dma));
-			cur_dsd->count = cpu_to_le32(sg_dma_len(cur_seg));
-			tot_dsds++;
-			avail_dsds--;
-
-			QL4PRINT(QLP5|QLP24, printk("scsi%d:%d:%d:%d: %s: S/G "
-			    "DSD %p phys_addr=%x:%08x, len=0x%x, tot_dsd=0x%x, "
-			    "avail_dsd=0x%x\n", ha->host_no,
-			    cmd->device->channel, cmd->device->id,
-			    cmd->device->lun, __func__, cur_dsd,
-			    cur_dsd->base.addrHigh, cur_dsd->base.addrLow,
-			    cur_dsd->count, tot_dsds, avail_dsds));
-
-			cur_dsd++;
-			cur_seg++;
-		}
-	} else {
-		/* Data transfer without SG entries. */
-		dma_addr_t	req_dma;
-		struct page	*page;
-		unsigned long	offset;
-
-		page = virt_to_page(cmd->request_buffer);
-		offset = ((unsigned long) cmd->request_buffer & ~PAGE_MASK);
-		req_dma = pci_map_page(ha->pdev, page, offset,
-		    cmd->request_bufflen, cmd->sc_data_direction);
-		srb->saved_dma_handle = req_dma;
-		if (!srb->saved_dma_handle) {
-			QL4PRINT(QLP2, printk("scsi%d:%d:%d:%d: %s: pci "
-			    "mapping failed!, try again later\n", ha->host_no,
-			    cmd->device->channel, cmd->device->id,
-			    cmd->device->lun, __func__));
-
-			goto exit_send_cmd_return_dma;
-		}
-
-		cur_dsd->base.addrLow = cpu_to_le32(LSDW(req_dma));
-		cur_dsd->base.addrHigh = cpu_to_le32(MSDW(req_dma));
-		cur_dsd->count = cpu_to_le32(cmd->request_bufflen);
-		tot_dsds++;
-		avail_dsds--;
-
-		QL4PRINT(QLP5, printk("scsi%d:%d:%d:%d: %s: No S/G transfer, "
-		    "DSD=%p cmd=%p dma_addr=%x:%08x, len=%x, tot_dsd=0x%x, "
-		    "avail_dsd=0x%x\n", ha->host_no, cmd->device->channel,
-		    cmd->device->id, cmd->device->lun, __func__, cur_dsd, cmd,
-		    cur_dsd->base.addrHigh, cur_dsd->base.addrLow,
-		    cur_dsd->count, tot_dsds, avail_dsds));
-
-		cur_dsd++;
-	}
-
-	cmd_entry->dataSegCnt = cpu_to_le16(tot_dsds);
-	cmd_entry->hdr.entryCount = srb->entry_count = tot_iocbs;
 	wmb();
 
 	/* put command in active array */
 	ha->active_srb_array[index] = srb;
 	srb->cmd->host_scribble = (unsigned char *)(unsigned long)index;
+	//srb->active_array_index = index;
 
 	/* update counters */
 	ha->active_srb_count++;
-	ha->req_q_count -= srb->entry_count;
-	ddb_entry->out_count++;
 	lun_entry->out_count++;
 	lun_entry->tot_io_count++;
-	srb->active_array_index = index;
 	srb->state = SRB_ACTIVE_STATE;
 	srb->flags |= SRB_DMA_VALID;
 
 	/* Track IOCB used */
-	ha->iocb_cnt += tot_iocbs;
-	srb->iocb_cnt = tot_iocbs;
+	ha->iocb_cnt += req_cnt;
+	srb->entry_count = req_cnt;
+	ha->req_q_count -= req_cnt;
 
 	/* Debug print statements */
 #ifdef QL_DEBUG_LEVEL_3
-	QL4PRINT(QLP14, printk("scsi%d:%d:%d:%d: %s: CDB = ", ha->host_no,
+	printk("scsi%d:%d:%d:%d: %s: CDB = ", ha->host_no,
 	    cmd->device->channel, cmd->device->target, cmd->device->lun,
-	    __func__));
+	    __func__);
 	for (i = 0; i < cmd->cmd_len; i++)
-		QL4PRINT(QLP14, printk("%02x ", cmd->cmnd[i]));
-	QL4PRINT(QLP14, printk("\n"));
-
-	QL4PRINT(QLP5, printk("scsi%d: %s: srb=%p, srb->index=0x%x, "
-			      "cmd_entry->handle=0x%x "
-			      "tot_dsds=%d, tot_iocbs=%d\n",
-			      ha->host_no, __func__, srb,
-			      srb->active_array_index,
-			      cmd_entry->handle,
-			      tot_dsds, tot_iocbs));
-
-	QL4PRINT(QLP10|QLP24, printk("scsi%d: %s: cmd_entry 0x%p\n",
-				     ha->host_no, __func__, cmd_entry));
-	qla4xxx_dump_bytes(QLP10|QLP24, cmd_entry, sizeof(*cmd_entry));
-
-	for (i=1; i<=tot_iocbs-1; i++) {
-		CONTINUE_ENTRY *cont_entry = (CONTINUE_ENTRY *) cmd_entry+i;
-		QL4PRINT(QLP10|QLP24,
-			 printk("\nscsi%d: %s: cont_entry 0x%p\n",
-				ha->host_no, __func__, cont_entry));
-		qla4xxx_dump_bytes(QLP10|QLP24,
-				   cont_entry, sizeof(*cont_entry));
-	}
-
-	/* Tell ISP that there's a new request */
-	QL4PRINT(QLP5, printk("scsi%d: %s: RequestQueueIn %x\n",
-			      ha->host_no, __func__, ha->request_in));
+		printk("%02x ", cmd->cmnd[i]);
+	printk("\n");
 #endif
-
 	srb->u_start = jiffies;
-	ha->f_start = srb->u_start;
 	WRT_REG_DWORD(&ha->reg->req_q_in, ha->request_in);
 	PCI_POSTING(&ha->reg->req_q_in);
-
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	LEAVE("qla4xxx_send_command_to_isp");
 
 	return(QLA_SUCCESS);
 
-exit_send_cmd_return_dma:
-	/* Unmap srb dma buffer */
-	pci_unmap_sg(ha->pdev, (struct scatterlist *)cmd->request_buffer,
-	    cmd->use_sg, cmd->sc_data_direction);
-
-exit_send_cmd_return_request:
-	/* restore request queue in pointers */
-	ha->request_in = saved_request_in;
-	ha->request_ptr = saved_request_ptr;
-
-exit_send_cmd:
+queuing_error:
 	/* Release hardware specific lock */
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	LEAVE("qla4xxx_send_command_to_isp");
 
 	return(QLA_ERROR);
-}
-
-static inline void
-qla4xxx_delete_from_done_queue(scsi_qla_host_t *dest_ha, srb_t *sp)
-{
-	/* remove command from done list */
-	list_del_init(&sp->list_entry);
-	sp->state = SRB_NO_QUEUE_STATE;
-
-	if (sp->flags & SRB_DMA_VALID) {
-		sp->flags &= ~SRB_DMA_VALID;
-
-		/* Release memory used for this I/O */
-		if (sp->cmd->use_sg) {
-			pci_unmap_sg(dest_ha->pdev, sp->cmd->request_buffer,
-			    sp->cmd->use_sg, sp->cmd->sc_data_direction);
-		} else if (sp->cmd->request_bufflen) {
-			pci_unmap_page(dest_ha->pdev, sp->saved_dma_handle,
-			    sp->cmd->request_bufflen,
-			    sp->cmd->sc_data_direction);
-		}
-	}
 }
 
 /**************************************************************************
@@ -2416,7 +2269,7 @@ qla4xxx_done(scsi_qla_host_t *old_ha)
 
 		cmd = srb->cmd;
 		if (cmd == NULL) {
-#if  0
+#if 0
 			panic("qla4xxx_done: SP %p already freed - %s %d.\n",
 			      srb, __FILE__,__LINE__);
 #else
@@ -2426,9 +2279,46 @@ qla4xxx_done(scsi_qla_host_t *old_ha)
 
 		vis_ha = (scsi_qla_host_t *)cmd->device->host->hostdata;
 		lq = srb->lun_queue;
+		if( lq == NULL ) {
+			DEBUG2(printk("qla4xxx_done: lq == NULL  , sp= %p, %s %d \n",
+			      srb, __FILE__,__LINE__);)
+			continue;
+		}
+		if( lq->fclun == NULL ) {
+			DEBUG2(printk("qla4xxx_done: lq->fclun == NULL  , sp=%p %s %d \n",
+			       srb,__FILE__,__LINE__);)
+			continue;
+		}
+		if( lq->fclun->fcport == NULL ) {
+			DEBUG2(printk("qla4xxx_done: lq->fclun->fcport == NULL  , sp=%p %s %d \n",
+			       srb,__FILE__,__LINE__);)
+			continue;
+		}
 		ha = srb->ha;
+		/* Release memory used for this I/O */
+		if ((srb->flags & SRB_DMA_VALID) != 0) {
+			srb->flags &= ~SRB_DMA_VALID;
+	
+			/* Release memory used for this I/O */
+			if (cmd->use_sg) {
+				pci_unmap_sg(ha->pdev,
+					     cmd->request_buffer,
+					     cmd->use_sg,
+					     cmd->sc_data_direction);
+			} else if (cmd->request_bufflen) {
+				pci_unmap_page(ha->pdev,
+					       srb->saved_dma_handle,
+					       cmd->request_bufflen,
+					       cmd->sc_data_direction);
+			}
+	
+			ha->total_mbytes_xferred += cmd->request_bufflen / 1024;
+			// ha->iocb_cnt -= srb->iocb_cnt;
+			// srb->iocb_cnt = 0;
+		}
 
 #ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
+		// qla4xxx_do_fo_check(ha, sp, vis_ha);
 		if (!(srb->flags & (SRB_TAPE)) &&
 		    qla4xxx_failover_enabled(ha)) {
 			/*
@@ -2446,8 +2336,8 @@ qla4xxx_done(scsi_qla_host_t *old_ha)
 					 * several times before selecting a new
 					 * path.
 					 */
-					add_to_pending_srb_q_head(vis_ha, srb);
-					qla4xxx_start_io(vis_ha);
+					// qla4xxx_complete_request(vis_ha,srb);
+					qla4xxx_start_fo_cmd(vis_ha, srb);
 				}
 				else {
 					/* we failover this path */
@@ -2466,6 +2356,60 @@ qla4xxx_done(scsi_qla_host_t *old_ha)
 	LEAVE(__func__);
 
 	return(cnt);
+}
+
+/**************************************************************************
+ * qla4xxx_request_cleanup
+ *      This routine frees resources for a command that
+ *      didn't get completed.
+ *
+ * Input:
+ *      ha - Pointer to host adapter structure.
+ *      srb - Pointer to SCSI Request Block
+ *
+ * Remarks:
+ *    The srb pointer should be guaranteed to be nonzero before calling
+ *    this function.  The caller should also ensure that the list_lock is
+ *    released before calling this function.
+ *
+ * Returns:
+ *
+ * Context:
+ *      Kernel/Interrupt context.
+ **************************************************************************/
+void
+qla4xxx_request_cleanup(scsi_qla_host_t *ha, srb_t *srb)
+{
+	struct scsi_cmnd *cmd;
+
+	qla4xxx_delete_timer_from_cmd(srb);
+
+	cmd = srb->cmd;
+	/*  Let abort handler know we are completing the command */
+	CMD_SP(cmd) = NULL;
+
+	/* Release memory used for this I/O */
+	if ( (srb->flags & SRB_DMA_VALID) ) {
+		srb->flags &= ~SRB_DMA_VALID;
+
+		/* Release memory used for this I/O */
+		if (cmd->use_sg) {
+			pci_unmap_sg(ha->pdev,
+				     cmd->request_buffer,
+				     cmd->use_sg,
+				     cmd->sc_data_direction);
+		}
+		else if (cmd->request_bufflen) {
+			pci_unmap_page(ha->pdev,
+				       srb->saved_dma_handle,
+				       cmd->request_bufflen,
+				       srb->cmd->sc_data_direction);
+		}
+	}
+
+	srb->cmd = NULL;
+	add_to_free_srb_q(ha, srb);
+
 }
 
 /**************************************************************************
@@ -2516,9 +2460,9 @@ qla4xxx_complete_request(scsi_qla_host_t *ha, srb_t *srb)
 		goto exit_complete_request;
 	}
 
-	/* FIXMEdg:  */
 	/*  Let abort handler know we are completing the command */
 	CMD_SP(cmd) = NULL;
+
 
 	/* Release memory used for this I/O */
 	if ((srb->flags & SRB_DMA_VALID) != 0) {
@@ -2549,6 +2493,8 @@ qla4xxx_complete_request(scsi_qla_host_t *ha, srb_t *srb)
 		}
 
 		ha->total_mbytes_xferred += cmd->request_bufflen / 1024;
+		// ha->iocb_cnt -= srb->iocb_cnt;
+		//srb->iocb_cnt = 0;
 	}
 
 	if (host_byte(cmd->result) == DID_OK) {
@@ -2574,7 +2520,17 @@ qla4xxx_complete_request(scsi_qla_host_t *ha, srb_t *srb)
 	// qla4xxx_dump_command(ha, cmd);
 
 	#endif
-
+#if 0
+	if (host_byte(cmd->result) != DID_OK ) {
+			    DEBUG2(printk("scsi%d:%d:%d:%d: %s: "
+				"did_error=%d, pid=%ld\n",
+				ha->host_no, cmd->device->channel, cmd->device->id,
+				cmd->device->lun,
+				__func__,
+				host_byte(cmd->result),
+    				cmd->serial_number));
+	}
+#endif
 	/*
 	 * WORKAROUND
 	 * A backdoor device-reset (via eh_resets) requires different
@@ -2584,6 +2540,7 @@ qla4xxx_complete_request(scsi_qla_host_t *ha, srb_t *srb)
 	if (host_byte(cmd->result) == DID_RESET) {
 		#define EH_ACTIVE 1
 		if (ha->host->eh_active != EH_ACTIVE)
+			// srb->cmd->result = DID_IMM_RETRY << 16;
 			srb->cmd->result = DID_BUS_BUSY << 16;
 	}
 
@@ -2597,31 +2554,11 @@ qla4xxx_complete_request(scsi_qla_host_t *ha, srb_t *srb)
 				   MIN(0x20, sizeof(cmd->sense_buffer)));
 	}
 
-	if (host_byte(cmd->result) == DID_RESET ||
-	    host_byte(cmd->result) == DID_BUS_BUSY ||
-	    host_byte(cmd->result) == DID_ABORT ||
-	    host_byte(cmd->result) == DID_ERROR) {
-		QL4PRINT(QLP2,
-			 printk("scsi%d:%d:%d:%d: %s: cmd=%p sp=%p "
-				"didstat=%X comp=%x scsistat=(%x), "
-				"host_failed=%d, to=%ds\n",
-				ha->host_no, cmd->device->channel, cmd->device->target,
-				cmd->lun, __func__, cmd, srb,
-				host_byte(cmd->result), srb->cc_stat,
-				CMD_SCSI_STATUS(cmd) & 0xff,
-				cmd->host->host_failed, cmd->timeout_per_command/HZ));
-	}
 #endif
 
 	/* Call the mid-level driver interrupt handler */
 	srb->cmd = NULL;
 	add_to_free_srb_q(ha, srb);
-
-	QL4PRINT(QLP5, printk("scsi%d: %s: request completed w/ result "
-			      "hoststat=%X scsistat=(%x)\n",
-			      ha->host_no, __func__,
-			      host_byte(cmd->result),
-			      CMD_SCSI_STATUS(cmd) & 0xff));
 
 
 	// CMD_SP(cmd) = NULL;
@@ -2673,68 +2610,72 @@ qla4xxx_queuecommand(struct scsi_cmnd *cmd, void (*done_fn)(struct scsi_cmnd *))
 	l = cmd->device->lun;
 	ha = (scsi_qla_host_t *) cmd->device->host->hostdata;
 
+	cmd->scsi_done = done_fn;
 	spin_unlock_irq(ha->host->host_lock);
 
 	/*
-	 * Retrieve srb from pool.  If no srb available, Notify the OS to queue
-	 * commands in the OS.  The OS will not attempt to queue more commands
-	 * until a command is returned to the OS.
+	 * Allocate a comand packet
 	 */
 	srb = del_from_free_srb_q_head(ha);
 	if (srb == NULL) {
-		QL4PRINT(QLP2, printk("scsi%d: %s: srb not available, retry "
-		    "later\n", ha->host_no, __func__));
-
-		return_status = 1;
+		DEBUG2(printk("scsi%d: %s: srb not available\n"
+		    , ha->host_no, __func__);)
+		DEBUG2(printk("Number of free srbs   = %d of %d\n",
+		  ha->free_srb_q_count, ha->num_srbs_allocated);)
 
 		spin_lock_irq(ha->host->host_lock);
 
-		return (return_status);
+		// return_status = SCSI_MLQUEUE_HOST_BUSY;	
+		return (1);
 	}
 
 	/* Link the srb with cmd */
-	CMD_SP(cmd) = (char *)srb;
-	cmd->scsi_done = done_fn;
 	srb->cmd = cmd;
-	srb->r_start = jiffies;	/*Time we recieved the I/O*/
+	CMD_SP(cmd) = (void *)srb;
+	srb->r_start = jiffies;
 	srb->flags = 0;
-
 	srb->fo_retry_cnt = 0;
-
 	srb->err_id = 0;
+	srb->ha = ha;
+	srb->iocb_cnt = 0;
+
+	/* Start command timer. */
 	if ((cmd->timeout_per_command/HZ) > QLA_CMD_TIMER_DELTA)
 		qla4xxx_add_timer_to_cmd(srb, (cmd->timeout_per_command / HZ) -
 		    QLA_CMD_TIMER_DELTA);
 	else
 		qla4xxx_add_timer_to_cmd(srb, (cmd->timeout_per_command / HZ));
 
-	/* Extend the command timeout value because the iscsi enviornment
-	 * command needs more time to complete.  Otherwise, commands start
-	 * timing out frequently causing device resets.
-	 */
-	qla4xxx_extend_timeout(srb->cmd, (ql4xcmdtimeout-1)*EXTEND_CMD_TOV);
-
 	/* retrieve device and lun handles */
 	tgt_entry = qla4xxx_lookup_target_by_SCSIID(ha, b, t);
 	if (tgt_entry ==  NULL) {
 		cmd->result = DID_NO_CONNECT << 16;
-		goto exit_qc_call_done;
+		goto qc_complete;
 	}
 	
 	lun_entry = qla4xxx_lookup_lun_handle(ha, tgt_entry, l);
 	if (lun_entry == NULL) {
+
+		/* If no target, don't create lun */
 #ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
-		if (qla4xxx_failover_enabled(ha) ||
+		if ((qla4xxx_failover_enabled(ha) && l != 0) ||
 			tgt_entry->fcport == NULL ) {
 			cmd->result = DID_NO_CONNECT << 16;
-			goto exit_qc_call_done;
+			goto qc_complete;
 		}
 #else
 		if (tgt_entry->fcport == NULL) {
 			cmd->result = DID_NO_CONNECT << 16;
-			goto exit_qc_call_done;
+			goto qc_complete;
 		}
 #endif
+
+		/* Only allocate luns for ddb device state SESSION_ACTIVE */
+		if (tgt_entry->fcport->ddbptr->fw_ddb_device_state != DDB_DS_SESSION_ACTIVE) {
+			cmd->result = DID_NO_CONNECT << 16;
+			goto qc_complete;
+		}
+
 		/*
 		 * Allocate a LUN queue for this request if we haven't
 		 * already did it on a previous command.
@@ -2745,113 +2686,254 @@ qla4xxx_queuecommand(struct scsi_cmnd *cmd, void (*done_fn)(struct scsi_cmnd *))
 			DEBUG2(printk("%s: Can't get FCLUN queue.\n",
 			    __func__);)
 			cmd->result = DID_ERROR << 16;
-			goto exit_qc_call_done;
+			goto qc_complete;
 		}
 		
 		/* Assume this type right now and fixup after command completes */
 		fclun->device_type = TYPE_DISK;
 		lun_entry = qla4xxx_fclun_bind(ha, fcport, fclun);
+		if( lun_entry  == NULL ) {
+			DEBUG2(printk("%s: Can't Bind or allocate LUN queue.\n",
+		    __func__);)
+			cmd->result = DID_ERROR << 16;
+			goto qc_complete;
+		}
 	}
 
-	/* failover */
 	srb->tgt_queue = tgt_entry;
 	srb->lun_queue = lun_entry;
 	srb->fclun = lun_entry->fclun;
 	if (lun_entry->fclun == NULL) {
 		cmd->result = DID_NO_CONNECT << 16;
-//XXX
-printk("scsi%d: sp=%ld -- lq=%p lq->fclun == NULL\n",
-    ha->host_no, srb->cmd->serial_number, lun_entry);
-		goto exit_qc_call_done;
+		DEBUG2(printk(
+		    "scsi%d: (lq->fclun == NULL) sp=%ld,lq=%p\n",
+    		ha->host_no, srb->cmd->serial_number, lun_entry));
+		goto qc_complete;
 	}
 	fcport = lun_entry->fclun->fcport;
 	if (fcport ==  NULL) {
 		cmd->result = DID_NO_CONNECT << 16;
-//XXX
-printk("scsi%d: sp=%ld -- lq=%p lq->fclun=%p lq->fclun->fcport == NULL\n",
-    ha->host_no, srb->cmd->serial_number, lun_entry, lun_entry->fclun);
-		goto exit_qc_call_done;
+		DEBUG2(printk(
+		 "scsi%d: (lq->fclun->fcport == NULL) sp=%ld, lq=%p,"
+		 "lq->fclun=%p\n",
+    		ha->host_no, srb->cmd->serial_number,
+		lun_entry, lun_entry->fclun));
+		goto qc_complete;
 	}
 
 	ddb_entry = fcport->ddbptr;
 	if (ddb_entry ==  NULL) {
 		cmd->result = DID_NO_CONNECT << 16;
-//XXX
-printk("scsi%d: sp=%ld -- ddbe=%p fcport->ddbptr == NULL\n",
-    ha->host_no, srb->cmd->serial_number, ddb_entry);
-		goto exit_qc_call_done;
+		DEBUG2(printk("scsi%d: (ddbptr == NULL) sp=%ld, ddb entry=%p\n",
+    		ha->host_no, srb->cmd->serial_number, ddb_entry));
+		goto qc_complete;
 	}
 	srb->ha = fcport->ha;
 
 	/* Only modify the allowed count if the target is a *non* tape device */
-	if ((fcport->flags & FCF_TAPE_PRESENT) == 0 &&
+	if ( !(fcport->flags & FCF_TAPE_PRESENT) &&
 	    cmd->allowed < ql4xcmdretrycount)
 		cmd->allowed = ql4xcmdretrycount;
 	
-	/* Final pre-check :
-	 *	Either PORT_DOWN_TIMER OR LINK_DOWN_TIMER Expired.
-	 */
+	if ( (fcport->flags & FCF_TAPE_PRESENT) ||
+		(fcport->flags & FCF_NONFO_DEVICE) )
+		srb->flags |= SRB_TAPE;
+	
 	if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD) {
-		/*
-		 * Add the command to the done-queue for later failover
-		 * processing.
-		 */
+		cmd->result = DID_NO_CONNECT << 16;
 		if (!test_bit(AF_LINK_UP, &fcport->ha->flags))
 			srb->err_id = SRB_ERR_LOOP;
 		else
 			srb->err_id = SRB_ERR_PORT;
-//XXX
-printk("scsi%d: sp=%ld -- errid=%d fcport=%p fcport is dead\n",
-    ha->host_no, srb->cmd->serial_number, srb->err_id, fcport);
-		cmd->result = DID_NO_CONNECT << 16;
+		DEBUG2(printk(
+		    "scsi%d: PORT DEAD sp=%ld, errid=%d, fcport=%p\n",
+    		ha->host_no, srb->cmd->serial_number, srb->err_id, fcport));
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
 		add_to_done_srb_q(ha, srb);
 		qla4xxx_done(ha);
 		spin_lock_irq(ha->host->host_lock);
 		return 0;
+#else
+		goto qc_complete;
+#endif
 	}
 
+	/*
+	 * If the device is missing or the adapter is OFFLINE,
+	 * put the request on the retry queue.
+	 */
+	if (atomic_read(&ddb_entry->state) == DEV_STATE_MISSING ||
+	    !ADAPTER_UP(fcport->ha)) {
+		DEBUG2(printk("scsi%d: PORT missing or HBA link-down"
+		    "-ddb state=0x%x, hba flags=0x%lx, sp=%ld"
+		    "\n", fcport->ha->host_no,
+		    atomic_read(&ddb_entry->state),
+		    fcport->ha->flags, srb->cmd->serial_number));
 
-	/* Prepare the srb with ddb index */
-	// srb->fw_ddb_index = fcport->ddbptr->fw_ddb_index;
-	// srb->lun = l;
+		qla4xxx_device_suspend(ha, lun_entry, srb);
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
+		spin_lock_irq(ha->host->host_lock);
+		return 0;
+#else
+		goto qc_complete;
+#endif
+	}
 
-	/* FIXME: Add target suspended logic here and Device dead exit */
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
+	if (!(srb->flags & SRB_TAPE) &&
+	    (test_bit(CFG_FAILOVER, &fcport->ha->cfg_flags) ||
+	     (srb->flags & SRB_FAILOVER))) {
+		DEBUG2(printk("scsi%d: Failover flag set - sp=%ld"
+		    "cfg flags=0x%lx, srb flags 0x%x\n",
+                              fcport->ha->host_no, srb->cmd->serial_number,
+		    fcport->ha->cfg_flags,srb->flags ));
 
-	/* Print debug information */
-	QL4PRINT(QLP5, printk("scsi%d: %s: b%d, t%d ,l%d, ",
-			      ha->host_no, __func__, b, t, l));
-	QL4PRINT(QLP5, printk("cdb = "));
-	QL4PRINT(QLP5, printk("%02X %02X %02X %02X %02X %02X %02X %02X "
-			      "%02X %02X\n",
-			      cmd->cmnd[0], cmd->cmnd[1], cmd->cmnd[2],
-			      cmd->cmnd[3], cmd->cmnd[4], cmd->cmnd[5],
-			      cmd->cmnd[6], cmd->cmnd[7], cmd->cmnd[8],
-			      cmd->cmnd[9]));
-
-	QL4PRINT(QLP5, printk("scsi%d: %s: device state = 0x%x\n",
-			      ha->host_no, __func__,
-			      atomic_read(&ddb_entry->state)));
-
-        if (tgt_entry && test_bit(TQF_SUSPENDED, &tgt_entry->flags) &&
-	    (srb->flags & SRB_TAPE) == 0) {
-		/* If target suspended put incoming I/O in retry_q. */
-		qla4xxx_extend_timeout(srb->cmd, 10);
+		qla4xxx_extend_timeout(srb->cmd, EXTEND_CMD_TOV);
 		add_to_retry_srb_q(ha, srb);
-	} else
-		add_to_pending_srb_q(ha, srb);
+		spin_lock_irq(ha->host->host_lock);
+		return 0;
+	}
+#endif
 
-	/* FIXME: Add affinity changes here */
-	qla4xxx_start_io(ha);
+	/*
+	 * If this request's lun is suspended then put the request on
+	 * the  scsi_retry queue.
+	 */
+	if (lun_entry->lun_state == LS_LUN_SUSPENDED) {
+		DEBUG2(printk("scsi%d: Lun suspended - sp=%ld - "
+		    "retry_q\n", fcport->ha->host_no,
+		    srb->cmd->serial_number));
 
+		qla4xxx_device_suspend(ha, lun_entry, srb);
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
+		spin_lock_irq(ha->host->host_lock);
+		return 0;
+#else
+		goto qc_complete;
+#endif
+	}
+
+	DEBUG(printk(
+		    "scsi%d: %s sp=%ld, errid=%d, sp->flags=0x%x fcport=%p\n",
+    		ha->host_no, __func__, srb->cmd->serial_number, srb->err_id, srb->flags, fcport));
+
+	/* If target suspended put incoming I/O in retry_q. */
+	if (test_bit(TQF_SUSPENDED, &tgt_entry->flags) &&
+	    (srb->flags & SRB_TAPE) == 0) {
+		qla4xxx_device_suspend(ha, lun_entry, srb);
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
+		spin_lock_irq(ha->host->host_lock);
+		return 0;
+#else
+		goto qc_complete;
+#endif
+	}
+
+	if (qla4xxx_send_command_to_isp(ha, srb) != QLA_SUCCESS) {
+		/*
+		 * Unable to send command to the ISP at this time.
+		 * Notify the OS to queue commands.
+		 */
+		DEBUG(printk("scsi%d: %s: unable to send cmd "
+		    "to ISP, retry later\n", ha->host_no, __func__));
+		qla4xxx_request_cleanup(ha, srb);
+		return_status = SCSI_MLQUEUE_HOST_BUSY;	
+
+	}
 	spin_lock_irq(ha->host->host_lock);
 	return(return_status);
 
-exit_qc_call_done:
+qc_complete:
 	qla4xxx_complete_request(ha, srb);
 
 	spin_lock_irq(ha->host->host_lock);
 	return(return_status);
 }
+
+/**************************************************************************
+ * qla4xxx_device_suspend
+ *      This routine is invoked by driver to stall the request queue
+ *
+ * Input:
+ *
+ * Remarks:
+ *	This routine calls the scsi_device_quiesce which may go to sleep.
+ * Returns:
+ *      None
+ *
+ * Context:
+ *      Kernel context.
+ **************************************************************************/
+int
+qla4xxx_device_suspend( scsi_qla_host_t *ha, os_lun_t *lun_entry, srb_t *srb )
+{
+#ifdef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
+	struct scsi_device *sdev = lun_entry->sdev;
+#endif
+	int	ret = 0;
+
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
+	qla4xxx_extend_timeout(srb->cmd, EXTEND_CMD_TOV);
+	add_to_retry_srb_q(ha, srb);
+#else
+	if (!test_bit(LF_LUN_BLOCKED, &lun_entry->flags)) {
+		set_bit(LF_LUN_BLOCKED, &lun_entry->flags);
+		ret = scsi_internal_device_block(sdev);
+	}
+#endif
+	return ret;
+}
+
+#ifdef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
+void
+qla4xxx_device_unsuspend( os_lun_t *lun_entry )
+{
+	struct scsi_device *sdev = lun_entry->sdev;
+
+	clear_bit(LF_LUN_BLOCKED, &lun_entry->flags);
+	scsi_internal_device_unblock(sdev);
+}
+
+void
+qla4xxx_check_for_blocked_luns(scsi_qla_host_t *ha)
+{
+	int   t,l;
+	os_lun_t 	*lun_entry;
+	os_tgt_t 	*tgt_entry;
+	fc_port_t       *fcport;
+			
+	for (t = 0; t < MAX_TARGETS; t++) {
+	
+		if ( (tgt_entry = TGT_Q(ha, t)) == NULL )
+			continue;
+
+		if (test_bit(TQF_SUSPENDED, &tgt_entry->flags) ){
+			continue;
+		}
+
+		for (l = 0; l < MAX_LUNS ; l++) {
+			lun_entry = LUN_Q(ha, t, l);
+			if (lun_entry == NULL)
+				continue;
+						
+			if( test_bit(LF_LUN_BLOCKED, &lun_entry->flags) ) {
+			    if (lun_entry->lun_state == LS_LUN_SUSPENDED)
+					continue;
+			    fcport = lun_entry->fclun->fcport;
+
+			    if ( !(atomic_read(&fcport->state) ==
+					FCS_DEVICE_DEAD ||
+	    			atomic_read(&fcport->state) ==
+					FCS_ONLINE)  ) {
+					continue;
+			    }
+			    qla4xxx_device_unsuspend(lun_entry);
+			}
+					
+		}
+	}
+}
+#endif
 
 /**************************************************************************
  * qla4xxx_extend_timeout
@@ -2886,126 +2968,6 @@ qla4xxx_extend_timeout(struct scsi_cmnd *cmd, int timeout)
 	}
 }
 
-/**************************************************************************
- * qla4xxx_start_io
- *      This routine retrieves and processes next request from the pending
- *      queue.
- *
- * Input:
- *      ha - Pointer to host adapter structure.
- *
- * Returns:
- *      None
- *
- * Context:
- *      Kernel/Interrupt context.
- **************************************************************************/
-void
-qla4xxx_start_io(scsi_qla_host_t *ha)
-{
-	ddb_entry_t     *ddb_entry;
-	os_lun_t     *lun_entry;
-	srb_t           *srb;
-	fc_port_t               *fcport;
-	unsigned long   flags;
-
-	ENTER("qla4xxx_start_io");
-	spin_lock_irqsave(&ha->list_lock, flags);
-	while (!list_empty(&ha->pending_srb_q)) {
-		srb = list_entry(ha->pending_srb_q.next, srb_t, list_entry);
-
-
-		__del_from_pending_srb_q(ha, srb);
-
-		lun_entry = srb->lun_queue;
-		fcport = lun_entry->fclun->fcport;
-		ddb_entry = fcport->ddbptr;
-
-		/* If device is dead or has gone away,
-		 * send request back to OS */
-		/* FIXME: What about testing the AF_LINK_UP status for the LINK ??? */
-		if ((atomic_read(&ddb_entry->state) == DEV_STATE_DEAD)) {
-			if (!test_bit(AF_LINK_UP, &fcport->ha->flags))
-				srb->err_id = SRB_ERR_LOOP;
-			else
-				srb->err_id = SRB_ERR_PORT;
-
-			DEBUG2(printk("scsi%d: Port dead, err_id=%d, sp=%ld - "
-			    "retry_q\n", fcport->ha->host_no,srb->err_id,
-			    srb->cmd->serial_number));
-
-			srb->cmd->result = DID_NO_CONNECT << 16;
-			__add_to_done_srb_q(ha, srb);
-			continue;
-		}
-
-		/*
-		 * If the device is missing or the adapter is OFFLINE,
-		 * put the request on the retry queue.
-		 */
-		if (atomic_read(&ddb_entry->state) == DEV_STATE_MISSING ||
-		    !ADAPTER_UP(fcport->ha)) {
-			DEBUG2(printk("scsi%d: Port missing or adapter down"
-			    "-ddb state=0x%x, hba flags=0x%lx, sp=%ld - "
-			    "retry_q\n", fcport->ha->host_no,
-			    atomic_read(&ddb_entry->state),
-			    fcport->ha->flags, srb->cmd->serial_number));
-
-			qla4xxx_extend_timeout(srb->cmd, EXTEND_CMD_TOV);
-			__add_to_retry_srb_q(ha, srb);
-			continue;
-		}
-
-		if (!(srb->flags & SRB_TAPE) &&
-		    (test_bit(CFG_FAILOVER, &fcport->ha->cfg_flags) ||
-		     (srb->flags & SRB_FAILOVER))) {
-			DEBUG2(printk("scsi%d: Failover flag set - sp=%ld"
-			    "cfg flags=0x%lx - retry_q\n",
-			    fcport->ha->host_no, srb->cmd->serial_number,
-			    fcport->ha->cfg_flags ));
-
-			qla4xxx_extend_timeout(srb->cmd, EXTEND_CMD_TOV);
-			__add_to_retry_srb_q(ha, srb);
-			continue;
-		}
-
-		/*
-		 * If this request's lun is suspended then put the request on
-		 * the  scsi_retry queue.
-		 */
-		if (lun_entry->lun_state == LS_LUN_SUSPENDED) {
-			DEBUG2(printk("scsi%d: Lun suspended - sp=%ld - "
-			    "retry_q\n", fcport->ha->host_no,
-			    srb->cmd->serial_number));
-
-			__add_to_retry_srb_q(ha, srb);
-			continue;
-		}
-
-
-		/* Release target queue lock */
-		spin_unlock_irqrestore(&ha->list_lock, flags);
-		if (qla4xxx_send_command_to_isp(ha, srb) != QLA_SUCCESS) {
-			/*
-			 * Unable to send command to the ISP at this time.
-			 * Notify the OS to queue commands in the OS.  The OS
-			 * will not attempt to queue more commands until a
-			 * command is returned to the OS.
-			 */
-			QL4PRINT(QLP2, printk("scsi%d: %s: unable to send cmd "
-			    "to ISP, retry later\n", ha->host_no, __func__));
-
-			add_to_pending_srb_q_head(ha, srb);
-			goto  exit_start_io;
-		}
-		spin_lock_irqsave(&ha->list_lock, flags);
-
-	}
-	spin_unlock_irqrestore(&ha->list_lock, flags);
-
-exit_start_io:
-	LEAVE("qla4xxx_start_io");
-}
 
 /**************************************************************************
  * qla4xxx_os_cmd_timeout
@@ -3018,7 +2980,6 @@ exit_start_io:
  *
  * Returns:
  * None.
- * Note:Need to add the support for if( sp->state == SRB_FAILOVER_STATE).
  **************************************************************************/
 void
 qla4xxx_os_cmd_timeout(srb_t *sp)
@@ -3034,7 +2995,7 @@ qla4xxx_os_cmd_timeout(srb_t *sp)
 	cmd = sp->cmd;
 	vis_ha = (scsi_qla_host_t *) cmd->device->host->hostdata;
 
-	DEBUG3(printk("cmd_timeout: Entering sp->state = %x\n", sp->state);)
+	DEBUG2(printk("%s: Entering sp->state = %x\n", __func__, sp->state);)
 
 	t = cmd->device->id;
 	l = cmd->device->lun;
@@ -3046,46 +3007,14 @@ qla4xxx_os_cmd_timeout(srb_t *sp)
 	 *    OR in Lun Queue
 	 * Return this IO back to host
 	 */
-	spin_lock_irqsave(&vis_ha->list_lock, flags);
 	processed = 0;
-	if (sp->state == SRB_PENDING_STATE) {
-		__del_from_pending_srb_q(vis_ha, sp);
-		DEBUG2(printk(KERN_INFO "scsi%d: Found in Pending queue "
-			      "pid %ld, State = %x., "
-			      "fcport state=%d jiffies=%lx\n",
-			      vis_ha->host_no,
-			      sp->cmd->serial_number, sp->state,
-			      atomic_read(&fcport->state),
-			      jiffies);)
-
-		/*
-		 * If FC_DEVICE is marked as dead return the cmd with
-		 * DID_NO_CONNECT status.  Otherwise set the host_byte to
-		 * DID_BUS_BUSY to let the OS  retry this cmd.
-		 */
-		if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD) {
-			cmd->result = DID_NO_CONNECT << 16;
-			if (!test_bit(AF_LINK_UP, &fcport->ha->flags))
-				sp->err_id = SRB_ERR_LOOP;
-			else
-				sp->err_id = SRB_ERR_PORT;
-		}
-		else {
-			cmd->result = DID_BUS_BUSY << 16;
-		}
-		__add_to_done_srb_q(vis_ha, sp);
-		processed++;
-	}
-	spin_unlock_irqrestore(&vis_ha->list_lock, flags);
-	if (processed) {
-		qla4xxx_done(vis_ha);
-		return;
-	}
-
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
 	spin_lock_irqsave(&dest_ha->list_lock, flags);
-	if ((sp->state == SRB_RETRY_STATE)  ||
-	    /* (sp->state == SRB_SCSI_RETRY_STATE)  || */
-	    (sp->state == SRB_FAILOVER_STATE)) {
+	if ((sp->state == SRB_RETRY_STATE)
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
+	    || (sp->state == SRB_FAILOVER_STATE)
+#endif
+	    				    ) {
 
 		DEBUG2(printk(KERN_INFO "scsi%d: Found in (Scsi) Retry queue or "
 			      "failover Q pid %ld, State = %x., "
@@ -3097,24 +3026,23 @@ qla4xxx_os_cmd_timeout(srb_t *sp)
 
 		if ((sp->state == SRB_RETRY_STATE)) {
 			__del_from_retry_srb_q(dest_ha, sp);
-#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 		}
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 		else if ((sp->state == SRB_FAILOVER_STATE)) {
 			__del_from_failover_queue(dest_ha, sp);
-#endif
 		}
+#endif
 
 		/*
 		 * If FC_DEVICE is marked as dead return the cmd with
 		 * DID_NO_CONNECT status.  Otherwise set the host_byte to
-		 * DID_BUS_BUSY to let the OS  retry this cmd.
+		 * DID_IMM_RETRY to let the OS  retry this cmd.
 		 */
-#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 		if (qla4xxx_failover_enabled(dest_ha)) {
+			// cmd->result = DID_IMM_RETRY << 16;
 			cmd->result = DID_BUS_BUSY << 16;
 		}
 		else
-#endif
 		{
 			if (atomic_read(&fcport->state) == FCS_DEVICE_DEAD) {
 				qla4xxx_extend_timeout(cmd, EXTEND_CMD_TOV);
@@ -3125,6 +3053,7 @@ qla4xxx_os_cmd_timeout(srb_t *sp)
 					sp->err_id = SRB_ERR_PORT;
 			}
 			else {
+				// cmd->result = DID_IMM_RETRY << 16;
 				cmd->result = DID_BUS_BUSY << 16;
 			}
 		}
@@ -3137,17 +3066,22 @@ qla4xxx_os_cmd_timeout(srb_t *sp)
 		qla4xxx_done(dest_ha);
 		return;
 	}
+#endif
 
 	spin_lock_irqsave(&dest_ha->list_lock, cpu_flags);
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
 	if (sp->state == SRB_DONE_STATE) {
 		/* IO in done_q  -- leave it */
-		DEBUG2(printk("scsi%d: Found in Done queue pid %ld sp=%p.\n",
-			      dest_ha->host_no, sp->cmd->serial_number, sp);)
+		DEBUG2(printk("scsi%d: %s: Found in Done queue pid %ld sp=%p.\n",
+			      dest_ha->host_no, __func__, sp->cmd->serial_number, sp);)
 	}
 	else if (sp->state == SRB_SUSPENDED_STATE) {
-		DEBUG2(printk("scsi%d: Found SP %p in suspended state  "
+#else
+	if (sp->state == SRB_SUSPENDED_STATE) {
+#endif
+		DEBUG2(printk("scsi%d: %s: Found SP %p in suspended state  "
 			      "- pid %ld:\n",
-			      dest_ha->host_no,sp,
+			      dest_ha->host_no,__func__, sp,
 			      sp->cmd->serial_number);)
 	}
 	else if (sp->state == SRB_ACTIVE_STATE) {
@@ -3181,7 +3115,7 @@ qla4xxx_os_cmd_timeout(srb_t *sp)
 			       "qla_cmd_timeout: State indicates it is with "
 			       "ISP, But not in active array\n");
 		}
-		spin_lock_irqsave(&dest_ha->list_lock, cpu_flags);	/* 01/03 */
+		spin_lock_irqsave(&dest_ha->list_lock, cpu_flags);
 	}
 	else if (sp->state == SRB_ACTIVE_TIMEOUT_STATE) {
 		/* double timeout */
@@ -3248,7 +3182,6 @@ qla4xxx_delete_timer_from_cmd(srb_t *srb )
 		del_timer(&srb->timer);
 		srb->timer.function =  NULL;
 		srb->timer.data = (unsigned long) NULL;
-		QL4PRINT(QLP3, printk("%s: srb %p\n", __func__, srb));
 	}
 }
 
@@ -3278,7 +3211,7 @@ qla4xxx_timer(unsigned long p)
 	ddb_entry_t *ddb_entry, *dtemp;
 	int             start_dpc = 0;
 	os_lun_t *lun_entry;
-	os_tgt_t *tq;
+	unsigned long cpu_flags;
 	int             t, l;
 
 #if ISP_RESET_TEST
@@ -3290,42 +3223,61 @@ qla4xxx_timer(unsigned long p)
 		ha->isp_reset_timer = 0;
 	}
 #endif
+#if NIC_RESET_TEST
+	if (ha->nic_reset_timer++ == (60 *3)) {
 
-	QL4PRINT(QLP6, printk("scsi%d: %s: A%d=%d/%d [%lx,%lx,%lx] <%d,%d> "
-	    "{%d,%d,%d,%d} %d\n", ha->host_no, __func__, ha->instance,
+		printk("scsi%d: %s ********** simulated NIC Reset ***********\n",
+		       ha->host_no, __func__);
+
+		//FIXME: Get code from Ron
+
+		ha->nic_reset_timer = 0;
+	}
+#endif
+
+	DEBUG3(printk("scsi%d: %s: Host%d=%d/%d flags=[%lx,%lx,%lx] <%d,%d> "
+	    "AENs={%d}, counters={%d,%d} %d\n", ha->host_no, __func__, ha->instance,
 	    ha->spurious_int_count, (uint32_t)ha->isr_count, ha->flags,
 	    ha->dpc_flags, ha->isns_flags, ha->aborted_io_count,
 	    ha->mailbox_timeout_count, MAX_AEN_ENTRIES-ha->aen_q_count,
-	    ha->pending_srb_q_count, ha->retry_srb_q_count,
+	    ha->retry_srb_q_count,
 	    ha->active_srb_count, ha->seconds_since_last_intr));
-
 	/* Do we need to process the retry queue? */
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
 	if (!list_empty(&ha->retry_srb_q)) {
 		start_dpc++;
 	}
+#endif
 
-#ifdef CONFIG_SCSI_QLA2XXX_FAILOVER
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 	/*
 	 * We try and failover any request in the failover
 	 * queue every second.
 	 */
 	if (!list_empty(&ha->failover_queue)) {
 		set_bit(DPC_FAILOVER_NEEDED, &ha->dpc_flags);
+		DEBUG2(printk("scsi%d: %s:"
+			   "Pending retry_q requests, "
+			    "=%d\n", ha->host_no, __func__,
+			    ha->retry_srb_q_count));
 		start_dpc++;
 	}
 #endif
 
 	/* LUN suspension */
 	for (t = 0; t < MAX_TARGETS; t++) {
-		if ((tq = ha->otgt[t]) == NULL)
-			continue;
-
 		for (l = 0; l < MAX_LUNS ; l++) {
-			unsigned long cpu_flags;
-
-			if ((lun_entry = (os_lun_t *) tq->olun[l]) == NULL)
+			lun_entry = GET_LU_Q(ha, t, l);
+			if (lun_entry == NULL)
 				continue;
 
+#ifdef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
+			if( test_bit(LF_LUN_BLOCKED, &lun_entry->flags) ){
+				set_bit(DPC_CHECK_LUN, &ha->dpc_flags);
+				start_dpc++;
+			}
+#endif
+			
 			spin_lock_irqsave(&lun_entry->lun_lock, cpu_flags);
 			if (lun_entry->lun_state != LS_LUN_SUSPENDED ||
 			    !atomic_read(&lun_entry->suspend_timer)) {
@@ -3334,8 +3286,8 @@ qla4xxx_timer(unsigned long p)
 				continue;
 			}
 
-			QL4PRINT(QLP2, printk("scsi%d: %s: processing "
-			    "suspend_lun_q lun=%d suspend_timer=%d "
+			DEBUG2(printk("scsi%d: %s:"
+			    "suspended lun_q - lun=%d, timer=%d "
 			    "retry_count=%d\n", ha->host_no, __func__,
 			    lun_entry->lun,
 			    atomic_read(&lun_entry->suspend_timer),
@@ -3347,14 +3299,15 @@ qla4xxx_timer(unsigned long p)
 				continue;
 			}
 
-			if (test_and_clear_bit(LS_LUN_DELAYED,
+			
+			if (test_and_clear_bit(LF_LUN_DELAYED,
 			    &lun_entry->flags)) {
 				lun_entry->lun_state = LS_LUN_READY;
 			} else {
 				lun_entry->retry_count++;
 				if (lun_entry->retry_count ==
 				    lun_entry->max_retry_count) {
-					QL4PRINT(QLP2, printk("scsi%d: %s: LUN "
+					DEBUG2(printk("scsi%d: %s: LUN "
 					    "%d TIMEOUT RETRY_CNT:%d\n",
 					    ha->host_no, __func__,
 					    lun_entry->lun,
@@ -3362,7 +3315,7 @@ qla4xxx_timer(unsigned long p)
 
 					lun_entry->lun_state = LS_LUN_TIMEOUT;
 				} else {
-					QL4PRINT(QLP2, printk("scsi%d: %s: LUN "
+					DEBUG2(printk("scsi%d: %s: LUN "
 					    "%d RETRY\n", ha->host_no, __func__,
 					    lun_entry->lun));
 
@@ -3400,13 +3353,17 @@ qla4xxx_timer(unsigned long p)
 				    "%s: index [%d] marked DEAD\n", ha->host_no,
 				    ddb_entry->bus, ddb_entry->target, __func__,
 				    ddb_entry->fw_ddb_index);)
+#ifdef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
+				set_bit(DPC_CHECK_LUN, &ha->dpc_flags);
+#endif
+				start_dpc++;
 			}
 		}
 
 
 		/* Count down time between sending relogins */
 		if (ADAPTER_UP(ha) && (!test_bit(DF_RELOGIN, &ddb_entry->flags) &&
-		    (atomic_read(&ddb_entry->state) != DEV_STATE_ONLINE))) {
+		    (atomic_read(&ddb_entry->state) == DEV_STATE_MISSING))) {
 			if (atomic_read(&ddb_entry->retry_relogin_timer) !=
 			    INVALID_ENTRY) {
 				if (atomic_read(&ddb_entry->retry_relogin_timer) == 0) {
@@ -3435,7 +3392,7 @@ qla4xxx_timer(unsigned long p)
 			    DEV_STATE_ONLINE &&
 			    ddb_entry->fw_ddb_device_state ==
 			    DDB_DS_SESSION_FAILED) {
-				/* Reset login timer */
+				/* Reset retry relogin timer */
 				atomic_inc(&ddb_entry->relogin_retry_count);
 				QL4PRINT(QLP2, printk(KERN_INFO
 				    "scsi%d:%d:%d: index[%d] relogin timed "
@@ -3449,18 +3406,23 @@ qla4xxx_timer(unsigned long p)
 				    "after %d seconds\n", ha->host_no,
 				    ddb_entry->bus, ddb_entry->target,
 				    ddb_entry->fw_ddb_index,
-				    ddb_entry->default_time2wait));
+				    ddb_entry->default_time2wait+4));
 
 				atomic_set(&ddb_entry->retry_relogin_timer,
-				    ddb_entry->default_time2wait);
-
+				    ddb_entry->default_time2wait + 4);
 			}
 		}
 	}
 
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
 	if (!list_empty(&ha->done_srb_q)) {
+		DEBUG2(printk("scsi%d: %s:"
+			   "Pending done_q requests, "
+			    "=%d\n", ha->host_no, __func__,
+			    ha->done_srb_q_count));
 		start_dpc++;
 	}
+#endif
 
 #if EH_WAKEUP_WORKAROUND
 	/*
@@ -3517,6 +3479,7 @@ qla4xxx_timer(unsigned long p)
 			clear_bit(ISNS_FLAG_RESTART_SERVICE, &ha->isns_flags);
 	}
 
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 	if (test_bit(DPC_FAILOVER_EVENT_NEEDED, &ha->dpc_flags)) {
 		if (ha->failback_delay)  {
 			ha->failback_delay--;
@@ -3530,6 +3493,7 @@ qla4xxx_timer(unsigned long p)
 			clear_bit(DPC_FAILOVER_EVENT_NEEDED, &ha->dpc_flags);
 		}
 	}
+#endif
 
 	/* Wakeup the dpc routine for this adapter, if needed */
 	if ((start_dpc ||
@@ -3542,13 +3506,16 @@ qla4xxx_timer(unsigned long p)
 	     test_bit(DPC_IOCTL_ERROR_RECOVERY, &ha->dpc_flags) ||
 	     test_bit(DPC_ISNS_RESTART, &ha->dpc_flags) ||
 	     test_bit(DPC_ISNS_RESTART_COMPLETION, &ha->dpc_flags) ||
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 	     test_bit(DPC_FAILOVER_EVENT, &ha->dpc_flags) ||
 	     test_bit(DPC_FAILOVER_NEEDED, &ha->dpc_flags) ||
+#endif
+	     test_bit(DPC_GET_DHCP_IP_ADDR, &ha->dpc_flags) ||
 	     test_bit(DPC_AEN, &ha->dpc_flags)) &&
 	    !test_bit(AF_DPC_SCHEDULED, &ha->flags) &&
 	    !ha->dpc_active && ha->dpc_wait) {
-		QL4PRINT(QLP2, printk("scsi%d: %s: scheduling dpc routine\n",
-		    ha->host_no, __func__));
+		DEBUG2(printk("scsi%d: %s: scheduling dpc routine - dpc flags = 0x%lx\n",
+		    ha->host_no, __func__, ha->dpc_flags));
 		set_bit(AF_DPC_SCHEDULED, &ha->flags);
 		up(ha->dpc_wait);
 	}
@@ -3556,9 +3523,10 @@ qla4xxx_timer(unsigned long p)
 	/* Reschedule timer thread to call us back in one second */
 	mod_timer(&ha->timer, jiffies + HZ);
 
-	ha->seconds_since_last_intr ++;
+	DEBUG2(ha->seconds_since_last_intr++;)
 }
 
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 void
 qla4xxx_ioctl_error_recovery(scsi_qla_host_t *ha)
 {
@@ -3587,6 +3555,7 @@ qla4xxx_ioctl_error_recovery(scsi_qla_host_t *ha)
 
 	spin_unlock_irqrestore(ha->host->host_lock, flags);
 }
+#endif
 
 
 /**************************************************************************
@@ -3632,7 +3601,7 @@ qla4xxx_do_dpc(void *data)
 	complete(&ha->dpc_inited);
 
 	while (1) {
-		QL4PRINT(QLP2|QLP12, printk("scsi%d: %s: DPC handler sleeping "
+		DEBUG2(printk("scsi%d: %s: DPC handler sleeping "
 		    "*****************\n", ha->host_no, __func__));
 
 		if (down_interruptible(&sem))
@@ -3641,38 +3610,33 @@ qla4xxx_do_dpc(void *data)
 		if (ha->dpc_should_die)
 			break;
 
-		QL4PRINT(QLP2|QLP12, printk("scsi%d: %s: DPC handler waking up "
+		DEBUG2(printk("scsi%d: %s: DPC handler waking up "
 		    "****************\n", ha->host_no, __func__));
 
-		QL4PRINT(QLP2, printk("scsi%d: %s: ha->flags = 0x%08lx\n",
+		DEBUG2(printk("scsi%d: %s: ha->flags = 0x%08lx\n",
 		    ha->host_no, __func__, ha->flags));
-
-		QL4PRINT(QLP2, printk("scsi%d: %s: ha->dpc_flags = 0x%08lx\n",
+		DEBUG2(printk("scsi%d: %s: ha->dpc_flags = 0x%08lx\n",
 		    ha->host_no, __func__, ha->dpc_flags));
 
 		/* Initialization not yet finished. Don't do anything yet. */
 		if (!test_bit(AF_INIT_DONE, &ha->flags) || ha->dpc_active)
 			continue;
-
+			
 		ha->dpc_active = 1;
 		clear_bit(AF_DPC_SCHEDULED, &ha->flags);
 
-		/* FIXMEdg: */
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
 		if (!list_empty(&ha->done_srb_q))
 			qla4xxx_done(ha);
 
-
 		/* ---- return cmds on retry_q? --- */
-		QL4PRINT(QLP3, printk("scsi%d: %s: Do we need to return cmds "
-		    "on the retry_q?\n", ha->host_no, __func__));
-
 		if (!list_empty(&ha->retry_srb_q)) {
 			srb_t    *srb, *stemp;
 			unsigned long flags;
 
 			spin_lock_irqsave(&ha->list_lock, flags);
 
-			QL4PRINT(QLP2, printk("scsi%d: %s: found %d srbs in "
+			DEBUG2(printk("scsi%d: %s: found %d srbs in "
 			    "retry_srb_q \n", ha->host_no, __func__,
 			    ha->retry_srb_q_count));
 
@@ -3691,8 +3655,7 @@ qla4xxx_do_dpc(void *data)
 				if (ddb_entry &&
 				    atomic_read(&ddb_entry->state) ==
 				    DEV_STATE_DEAD) {
-					QL4PRINT(QLP2,
-						 printk("scsi%d: %s: found srb %p "
+					DEBUG2(printk("scsi%d: %s: found srb %p "
 							"in retry_srb_q, "
 							"Device DEAD, returning\n",
 							ha->host_no, __func__,
@@ -3711,25 +3674,32 @@ qla4xxx_do_dpc(void *data)
 				if (ADAPTER_UP(ha) &&
 				    (atomic_read(&ddb_entry->state)
 				     == DEV_STATE_ONLINE)) {
-					QL4PRINT(QLP2,
-						 printk("scsi%d: %s: found srb %p "
+					DEBUG2(printk("scsi%d: %s: found srb %p "
 							"in retry_srb_q, "
 							"Device ONLINE, returning\n",
 							ha->host_no, __func__,
 							srb));
 
 					__del_from_retry_srb_q(ha, srb);
+					// srb->cmd->result = DID_IMM_RETRY << 16;
 					srb->cmd->result = DID_BUS_BUSY << 16;
 					__add_to_done_srb_q(ha,srb);
 				}
 			}
 			spin_unlock_irqrestore(&ha->list_lock, flags);
 
-			/* FIXMEdg: */
 			if (!list_empty(&ha->done_srb_q))
 				qla4xxx_done(ha);
 
 		}
+#else
+		/* ---- wakeup suspended luns --- */
+		if (test_and_clear_bit(DPC_CHECK_LUN, &ha->dpc_flags)) {
+			qla4xxx_check_for_blocked_luns(ha);
+		}
+#endif
+
+
 
 #ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 		if (qla4xxx_failover_enabled(ha))
@@ -3740,34 +3710,37 @@ qla4xxx_do_dpc(void *data)
 		 */
 
 		/* ---- recover adapter? --- */
-		QL4PRINT(QLP3, printk("scsi%d: %s: Do we need to "
-				      "recover the adapter?\n",
-				      ha->host_no, __func__));
-
 		if (ADAPTER_UP(ha) ||
-		    (test_bit(DPC_RETRY_RESET_HA, &ha->dpc_flags) &&
-			test_bit(DPC_RESET_HA, &ha->dpc_flags)) ||
+		    test_bit(DPC_RESET_HA, &ha->dpc_flags) ||
 		    test_bit(DPC_RESET_HA_INTR, &ha->dpc_flags) ||
 		    test_bit(DPC_RESET_HA_DESTROY_DDB_LIST, &ha->dpc_flags)) {
+
+#if	DISABLE_HBA_RESETS
+				QL4PRINT(QLP2, printk("scsi: %s: ignoring RESET_HA, "
+				    "rebootdisable=1 \n", __func__));
+				clear_bit(DPC_RESET_HA, &ha->dpc_flags);
+				clear_bit(DPC_RESET_HA_INTR, &ha->dpc_flags);
+				clear_bit(DPC_RESET_HA_DESTROY_DDB_LIST, &ha->dpc_flags);
+#else
 			if (test_bit(DPC_RESET_HA_DESTROY_DDB_LIST,
 			    &ha->dpc_flags))
-				/* dg 09/23 Never initialize ddb list once we up and running 
+				/* dg 09/23 Never initialize ddb list once we up and running
 					qla4xxx_recover_adapter(ha, REBUILD_DDB_LIST); */
 				qla4xxx_recover_adapter(ha, PRESERVE_DDB_LIST);
 			
 			if (test_bit(DPC_RESET_HA, &ha->dpc_flags))
 				qla4xxx_recover_adapter(ha, PRESERVE_DDB_LIST);
 			
-			if (test_bit(DPC_RESET_HA_INTR, &ha->dpc_flags)) {
+			if (test_and_clear_bit(DPC_RESET_HA_INTR, &ha->dpc_flags)) {
 				uint8_t wait_time = RESET_INTR_TOV;
 				unsigned long flags = 0;
 
 				qla4xxx_flush_active_srbs(ha);
 
 				spin_lock_irqsave(&ha->hardware_lock, flags);
-				while ((RD_REG_DWORD(ISP_PORT_STATUS(ha)) &
-				    PSR_INIT_COMPLETE) == 0) {
-					if (wait_time-- == 0)
+				while ((RD_REG_DWORD(&ha->reg->ctrl_status) &
+				    (CSR_SOFT_RESET|CSR_FORCE_SOFT_RESET)) != 0) {
+					if (--wait_time == 0)
 						break;
 
 					spin_unlock_irqrestore(
@@ -3782,33 +3755,32 @@ qla4xxx_do_dpc(void *data)
 				spin_unlock_irqrestore(&ha->hardware_lock,
 				    flags);
 
-				if (wait_time == 0)
+				if (wait_time == 0) {
 					QL4PRINT(QLP2,
-						 printk("scsi%d: %s: IC bit not set\n",
+						 printk("scsi%d: %s: SR|FSR bit not cleared-- resetting\n",
 							ha->host_no, __func__));
 
-				qla4xxx_initialize_adapter(
+					set_bit(DPC_RESET_HA, &ha->dpc_flags);
+				}
+				else if (!test_bit(AF_HA_GOING_AWAY, &ha->flags)) {
+					qla4xxx_initialize_adapter(
 							  ha,
 							  PRESERVE_DDB_LIST);
-				clear_bit(DPC_RESET_HA_INTR, &ha->dpc_flags);
+					qla4xxx_enable_intrs(ha);
+				}
 			}
-
-
+#endif
 		}
 
 		/* ---- process AEN? --- */
-		DEBUG3(printk("scsi%d: %s: Do we need to "
-				      "process an AEN?\n",
-				      ha->host_no, __func__));
-
 		if (test_and_clear_bit(DPC_AEN, &ha->dpc_flags))
 			qla4xxx_process_aen(ha, PROCESS_ALL_AENS);
 
-		/* ---- relogin device? --- */
-		DEBUG3(printk("scsi%d: %s: Do we need to "
-				      "relogin a device?\n",
-				      ha->host_no, __func__));
+		/* ---- Get DHCP IP Address? --- */
+		if (test_and_clear_bit(DPC_GET_DHCP_IP_ADDR, &ha->dpc_flags))
+			qla4xxx_get_dhcp_ip_address(ha);
 
+		/* ---- relogin device? --- */
 		if (ADAPTER_UP(ha) &&
 		    test_and_clear_bit(DPC_RELOGIN_DEVICE, &ha->dpc_flags)) {
 			list_for_each_entry_safe(ddb_entry, dtemp,
@@ -3822,40 +3794,36 @@ qla4xxx_do_dpc(void *data)
 		}
 
 		/* ---- restart iSNS server? --- */
-		QL4PRINT(QLP3, printk("scsi%d: %s: Do we need to "
-				      "restart the iSNS server?\n",
-				      ha->host_no, __func__));
-
 		if (ADAPTER_UP(ha) &&
 		    test_and_clear_bit(DPC_ISNS_RESTART, &ha->dpc_flags)) {
 			qla4xxx_isns_restart_service(ha);
 		}
 
 		if (ADAPTER_UP(ha) &&
-		    test_and_clear_bit(DPC_ISNS_RESTART_COMPLETION, &ha->dpc_flags)) {
+		    test_and_clear_bit(DPC_ISNS_RESTART_COMPLETION,
+			    &ha->dpc_flags)) {
 			uint32_t ip_addr = 0;
 			IPAddr2Uint32(ha->isns_ip_address, &ip_addr);
 
 			if (qla4xxx_isns_restart_service_completion(ha,
-								    ip_addr,
-								    ha->isns_server_port_number)
+							    ip_addr,
+					    ha->isns_server_port_number)
 			    != QLA_SUCCESS) {
-				QL4PRINT(QLP2|QLP6,
-					 printk(KERN_WARNING "scsi%d: %s: "
+				DEBUG2( printk(KERN_WARNING "scsi%d: %s: "
 						"restart service failed\n",
 						ha->host_no, __func__));
 			}
 		}
 
-		if (test_and_clear_bit(DPC_IOCTL_ERROR_RECOVERY, &ha->dpc_flags)) {
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
+		if (test_and_clear_bit(DPC_IOCTL_ERROR_RECOVERY,
+		    &ha->dpc_flags)) {
 			qla4xxx_ioctl_error_recovery(ha);
 		}
+#endif
 
 		ha->dpc_active = 0;
 	}
-
-	QL4PRINT(QLP7, printk("scsi%d: %s: Wake up, we're leaving\n",
-			      ha->host_no, __func__));
 
 	/*
 	* Make sure that nobody tries to wake us up again.
@@ -3884,16 +3852,14 @@ qla4xxx_do_dpc(void *data)
  *      Kernel context.
  **************************************************************************/
 static int
-qla4xxx_eh_wait_on_command(scsi_qla_host_t *ha, struct scsi_cmnd *cmd){
-
-	int             done = 0;
-	srb_t           *rp;
-	uint32_t        max_wait_time = EH_WAIT_CMD_TOV;
-
-	ENTER("qla4xxx_eh_wait_on_command");
+qla4xxx_eh_wait_on_command(scsi_qla_host_t *ha, struct scsi_cmnd *cmd)
+{
+	int done = 0;
+	srb_t *rp;
+	uint32_t max_wait_time = EH_WAIT_CMD_TOV;
 
 	do {
-		/*Checking to see if its returned to OS */
+		/* Checking to see if its returned to OS */
 		rp = (srb_t *) CMD_SP(cmd);
 		if (rp == NULL) {
 			done++;
@@ -3905,23 +3871,24 @@ qla4xxx_eh_wait_on_command(scsi_qla_host_t *ha, struct scsi_cmnd *cmd){
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(2*HZ);
 
+
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
 		while ((rp = del_from_done_srb_q_head(ha)) != NULL)
 			qla4xxx_complete_request(ha, rp);
+#endif
 
 		spin_lock_irq(ha->host->host_lock);
-	} while ((max_wait_time--));
+	} while (max_wait_time--);
 
 	if (done)
 		QL4PRINT(QLP2, printk("scsi%d: %s: found cmd=%p.\n",
-				      ha->host_no, __func__, cmd));
+		    ha->host_no, __func__, cmd));
 
-	LEAVE("qla4xxx_eh_wait_on_command");
-
-	return(done);
+	return done;
 }
 
 /**************************************************************************
- * WAIT_FOR_ADAPTER_UP
+ * qla4xxx_wait_for_hba_online
  *      This routine
  *
  * Input:
@@ -3937,27 +3904,32 @@ qla4xxx_eh_wait_on_command(scsi_qla_host_t *ha, struct scsi_cmnd *cmd){
  *      Kernel context.  Assume io_request_lock LOCKED upon entry
  **************************************************************************/
 inline uint8_t
-WAIT_FOR_ADAPTER_UP(scsi_qla_host_t *ha){
-	while (1) {
-		if (ADAPTER_UP(ha))
-			return(QLA_SUCCESS);
+qla4xxx_wait_for_hba_online(scsi_qla_host_t *ha)
+{
+	unsigned long wait_online;
 
-		if (!ADAPTER_UP(ha) &&
-		    (ha->retry_reset_ha_cnt == 0)) {
-			QL4PRINT(QLP2, printk("scsi%d: %s: adapter down, retry_reset_ha_cnt = %d\n",
-					      ha->host_no, __func__, ha->retry_reset_ha_cnt));
-			return(QLA_ERROR);
+	wait_online = jiffies + (30 * HZ);
+	while (time_before(jiffies, wait_online)) {
+		if (ADAPTER_UP(ha))
+			return QLA_SUCCESS;
+
+		if (!ADAPTER_UP(ha) && (ha->retry_reset_ha_cnt == 0)) {
+			QL4PRINT(QLP2, printk("scsi%d: %s: adapter down, "
+			    "retry_reset_ha_cnt = %d\n", ha->host_no, __func__,
+			    ha->retry_reset_ha_cnt));
+
+			return QLA_ERROR;
 		}
 
-		spin_unlock_irq(ha->host->host_lock);
+		QL4PRINT(QLP3, printk("scsi%d: %s: adapter down, "
+		    "retry_reset_ha_cnt = %d, delay 2 sec.\n", ha->host_no,
+		    __func__, ha->retry_reset_ha_cnt));
 
-		QL4PRINT(QLP3, printk("scsi%d: %s: adapter down, retry_reset_ha_cnt = %d, delay 2 sec.\n",
-				      ha->host_no, __func__, ha->retry_reset_ha_cnt));
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(2*HZ);
-
-		spin_lock_irq(ha->host->host_lock);
+		schedule_timeout(2 * HZ);
 	}
+
+	return QLA_ERROR;
 }
 
 /**************************************************************************
@@ -3986,14 +3958,19 @@ qla4xxx_eh_abort(struct scsi_cmnd *cmd)
 {
 	int return_status = FAILED;
 	scsi_qla_host_t *ha, *vis_ha;
-	srb_t *srb, *stemp;
-	unsigned long flags;
+	srb_t *srb;
+	srb_t *stemp;
 
-	ENTER("qla4xxx_eh_abort");
+	srb = (srb_t *) CMD_SP(cmd);
+	if (!srb) {
+		/* Already returned to upper-layers. */
+		ql4_printk(KERN_INFO, to_qla_host(cmd->device->host),
+		    "Command already completed cmd=%ld.\n", cmd->serial_number);
+
+		return SUCCESS;
+	}
 
 	vis_ha = (scsi_qla_host_t *) cmd->device->host->hostdata;
-	srb = (srb_t *) CMD_SP(cmd);
-
 #ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 	if (qla4xxx_failover_enabled(vis_ha))
 		ha = (scsi_qla_host_t *)srb->ha;
@@ -4003,78 +3980,43 @@ qla4xxx_eh_abort(struct scsi_cmnd *cmd)
 	ha = vis_ha;
 #endif
 
-	if (!srb) {
-		/* Srb invalid, for some reason, possibly already returned
-		 * to the OS */
-		QL4PRINT(QLP2, printk("scsi%d:%d:%d: %s: NULL srb %p, "
-				      "cmd %p may have already been returned to OS.\n",
-				      ha->host_no, cmd->device->channel,
-				      cmd->device->id, __func__, srb, cmd));
-
-		return_status = SUCCESS;
-		return(return_status);
-	}
-
 	ha->aborted_io_count++;
 
 	/* Print statements
 	 * ---------------- */
-	QL4PRINT(QLP2,
-		 printk(KERN_INFO "scsi%d:%d:%d:%d: abort srb=%p, cmd=%p, state=%s, "
-			"r_start=%ld , u_start=%ld\n",
-			ha->host_no, cmd->device->channel, cmd->device->id,
-			cmd->device->lun,
-			srb, cmd, srb_state_msg[srb->state],srb->r_start,srb->u_start));
-
-	qla4xxx_dump_dwords(QLP10, srb, sizeof(*srb));
-
+	QL4PRINT(QLP2, printk(KERN_INFO
+	    "scsi%d:%d:%d:%d: abort srb=%p, cmd=%p, state=%s, \nr_start=%ld , "
+	    "u_start=%ld\n", ha->host_no, cmd->device->channel,
+	    cmd->device->id, cmd->device->lun, srb, cmd,
+	    srb_state_msg[srb->state],srb->r_start,srb->u_start));
+		DEBUG2(printk(
+		    "scsi%d: sp=%ld, errid=%d\n",
+    		ha->host_no, srb->cmd->serial_number, srb->err_id));
+	// qla4xxx_dump_dwords(QLP10, srb, sizeof(*srb));
+	__dump_registers(QLP2, ha);
 	/* If srb found in done_q, return the cmd with ABORTED status */
-	spin_lock_irqsave(&ha->adapter_lock, flags);
+#ifndef CONFIG_SCSI_QLA4XXX_USE_KERNELQ
+	spin_lock(&ha->adapter_lock);
 	list_for_each_entry_safe(srb, stemp, &ha->done_srb_q, list_entry) {
 		if (srb->cmd != cmd)
 			continue;
 
-		QL4PRINT(QLP2,
-			 printk("scsi%d: %s: srb %p found on done queue\n",
-				ha->host_no, __func__, srb));
+		QL4PRINT(QLP2, printk("scsi%d: %s: srb %p found on done "
+		    "queue\n", ha->host_no, __func__, srb));
 
 		cmd->result = DID_ABORT << 16;
 
-		spin_unlock_irqrestore(&ha->adapter_lock, flags);
-
+		spin_unlock(&ha->adapter_lock);
 		spin_unlock_irq(ha->host->host_lock);
 		while ((srb = del_from_done_srb_q_head(ha)) != NULL)
 			qla4xxx_complete_request(ha, srb);
 		spin_lock_irq(ha->host->host_lock);
 
-		return_status = SUCCESS;
-		goto exit_abort;
+		return SUCCESS;
 	}
-	spin_unlock_irqrestore(&ha->adapter_lock, flags);
-
-	/* If srb found in pending_srb_q, return  the cmd with ABORTED status */
-	spin_lock_irqsave(&ha->list_lock, flags);
-	list_for_each_entry_safe(srb, stemp, &ha->pending_srb_q, list_entry) {
-		if (srb->cmd != cmd)
-			continue;
-
-		QL4PRINT(QLP2,
-			 printk("scsi%d: %s: srb %p found on pending queue\n",
-				ha->host_no, __func__, srb));
-
-		__del_from_pending_srb_q(ha, srb);
-		cmd->result = DID_ABORT << 16;
-
-		spin_unlock_irqrestore(&ha->list_lock, flags);
-		qla4xxx_complete_request(ha, srb);
-
-		return_status = SUCCESS;
-		goto exit_abort;
-	}
-	spin_unlock_irqrestore(&ha->list_lock, flags);
-
-	/* If srb found in retry_srb_q, return it with ABORTED status */
-	spin_lock_irqsave(&ha->list_lock, flags);
+	spin_unlock(&ha->adapter_lock);
+	
+	spin_lock(&ha->list_lock);
 	list_for_each_entry_safe(srb, stemp, &ha->retry_srb_q, list_entry) {
 		if (srb->cmd != cmd)
 			continue;
@@ -4086,55 +4028,54 @@ qla4xxx_eh_abort(struct scsi_cmnd *cmd)
 		__del_from_retry_srb_q(ha, srb);
 		cmd->result = DID_ABORT << 16;
 
-		spin_unlock_irqrestore(&ha->list_lock, flags);
+		spin_unlock(&ha->list_lock);
 		spin_unlock_irq(ha->host->host_lock);
 		qla4xxx_complete_request(ha, srb);
 		spin_lock_irq(ha->host->host_lock);
-		return_status = SUCCESS;
-		goto exit_abort;
+		return SUCCESS;
 	}
-	spin_unlock_irqrestore(&ha->list_lock, flags);
+	spin_unlock(&ha->list_lock);
+#endif
 
 #ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 	if (qla4xxx_failover_enabled(vis_ha)) {
-		spin_lock_irqsave(&ha->list_lock, flags);
+		spin_lock(&ha->list_lock);
 		list_for_each_entry_safe(srb, stemp, &ha->failover_queue,
 		    list_entry) {
 			if (cmd != srb->cmd)
 				continue;
 
-			QL4PRINT(QLP2,
-				 printk(KERN_INFO "scsi%d: %s: srb %p found on retry queue\n",
-					ha->host_no, __func__, srb));
+			QL4PRINT(QLP2, printk("scsi%d: %s: srb %p found on "
+			    "failover queue\n", ha->host_no, __func__, srb));
 
 			/* Remove srb from failover queue. */
 			__del_from_failover_queue(ha, srb);
+
 			srb->cmd->result = DID_ABORT << 16;
 
-			spin_unlock_irqrestore(&ha->list_lock, flags);
+			spin_unlock(&ha->list_lock);
 			spin_unlock_irq(ha->host->host_lock);
 			qla4xxx_complete_request(ha, srb);
 			spin_lock_irq(ha->host->host_lock);
+
 			return_status = SUCCESS;
-			goto exit_abort;
+			return return_status;
 		}
-		spin_unlock_irqrestore(&ha->list_lock, flags);
+		spin_unlock(&ha->list_lock);
 	}
 #endif
 	/*
-	 * Aborts get translated to "device resets" by the scsi switch
-	 * which will return a RESET status and not ABORT. Since the
-	 * mid-level is expecting an ABORT status during an abort(),
-	 * we always elevate to device reset.
+	 * Aborts get translated to "device resets" by the scsi switch which
+	 * will return a RESET status and not ABORT. Since the mid-level is
+	 * expecting an ABORT status during an abort(), we always elevate to
+	 * device reset.
 	 */
 	return_status = FAILED;
 
-exit_abort:
 	QL4PRINT(QLP2, printk("scsi%d: %s: return with status = %x\n",
-			      ha->host_no, __func__, return_status));
-	LEAVE("qla4xxx_eh_abort");
+	    ha->host_no, __func__, return_status));
 
-	return(return_status);
+	return return_status;
 }
 
 /**************************************************************************
@@ -4156,7 +4097,7 @@ qla4010_soft_reset(scsi_qla_host_t *ha){
 	uint32_t  max_wait_time;
 	unsigned long flags = 0;
 	uint8_t status = QLA_ERROR;
-	uint16_t ctrl_status;
+	uint32_t ctrl_status;
 
 	ENTER(__func__);
 
@@ -4180,7 +4121,7 @@ qla4010_soft_reset(scsi_qla_host_t *ha){
 	max_wait_time = RESET_INTR_TOV;
 	do {
 		spin_lock_irqsave(&ha->hardware_lock, flags);
-		ctrl_status = RD_REG_WORD(&ha->reg->ctrl_status);
+		ctrl_status = RD_REG_DWORD(&ha->reg->ctrl_status);
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 		if ((ctrl_status & CSR_NET_RESET_INTR) == 0)
@@ -4188,7 +4129,7 @@ qla4010_soft_reset(scsi_qla_host_t *ha){
 
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1 * HZ);
-	} while ((max_wait_time--));
+	} while ((--max_wait_time));
 
 	if ((ctrl_status & CSR_NET_RESET_INTR) != 0) {
 		QL4PRINT(QLP2,
@@ -4204,7 +4145,7 @@ qla4010_soft_reset(scsi_qla_host_t *ha){
 	max_wait_time = SOFT_RESET_TOV;
 	do {
 		spin_lock_irqsave(&ha->hardware_lock, flags);
-		ctrl_status = RD_REG_WORD(&ha->reg->ctrl_status);
+		ctrl_status = RD_REG_DWORD(&ha->reg->ctrl_status);
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 		if ((ctrl_status & CSR_SOFT_RESET) == 0) {
@@ -4214,7 +4155,7 @@ qla4010_soft_reset(scsi_qla_host_t *ha){
 
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1 * HZ);
-	} while ((max_wait_time--));
+	} while ((--max_wait_time));
 
 	/*
 	 * Also, make sure that the SCSI Reset Interrupt bit has been cleared
@@ -4228,6 +4169,37 @@ qla4010_soft_reset(scsi_qla_host_t *ha){
 	}
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
+	/* If soft reset fails then most probably the bios on other
+	 * function is also enabled.
+	 * Since the initialization is sequential the other fn
+	 * wont be able to acknowledge the soft reset.
+	 * Issue a force soft reset to workaround this scenario.
+	 */
+	if (max_wait_time == 0) {
+		/* Issue Force Soft Reset */
+		spin_lock_irqsave(&ha->hardware_lock, flags);
+		WRT_REG_DWORD(&ha->reg->ctrl_status,
+			SET_RMASK(CSR_FORCE_SOFT_RESET));
+		PCI_POSTING(&ha->reg->ctrl_status);
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+		/* Wait until the firmware tells us the Soft Reset is done */
+		max_wait_time = SOFT_RESET_TOV;
+		do {
+			spin_lock_irqsave(&ha->hardware_lock, flags);
+			ctrl_status = RD_REG_DWORD(&ha->reg->ctrl_status);
+			spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+			if ((ctrl_status & CSR_FORCE_SOFT_RESET) == 0) {
+				status = QLA_SUCCESS;
+				break;
+			}
+
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(1 * HZ);
+		} while ((--max_wait_time));
+	}
+
+	QL4PRINT(QLP2, printk("%s status=%d\n",__func__, status));
 	LEAVE(__func__);
 	return(status);
 }
@@ -4253,11 +4225,12 @@ qla4xxx_topcat_reset(scsi_qla_host_t *ha){
 	QL4PRINT(QLP2, printk(KERN_WARNING "scsi%d: %s: TopCat chip reset!\n",
 			      ha->host_no, __func__));
 
-	if (qla4xxx_take_hw_semaphore(ha, SEM_NVRAM, SEM_FLG_TIMED_WAIT) != QLA_SUCCESS) {
+	QL4XXX_LOCK_NVRAM(ha);
+	/* if (qla4xxx_take_hw_semaphore(ha, SEM_NVRAM, SEM_FLG_TIMED_WAIT) != QLA_SUCCESS) {
 		QL4PRINT(QLP2, printk(KERN_WARNING "scsi%d: %s: Unable to take SEM_NVRAM "
 				      "semaphore\n", ha->host_no, __func__));
 		return(QLA_ERROR);
-	}
+	} */
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 
@@ -4271,7 +4244,8 @@ qla4xxx_topcat_reset(scsi_qla_host_t *ha){
 
 	TOPCAT_POST_RESET_DELAY();
 
-	qla4xxx_clear_hw_semaphore(ha, SEM_NVRAM);
+	/* qla4xxx_clear_hw_semaphore(ha, SEM_NVRAM); */
+	QL4XXX_UNLOCK_NVRAM(ha);
 	return(QLA_SUCCESS);
 }
 
@@ -4290,8 +4264,11 @@ qla4xxx_topcat_reset(scsi_qla_host_t *ha){
  * Context:
  *      Kernel context.
  **************************************************************************/
-uint8_t
+inline uint8_t
 qla4xxx_soft_reset(scsi_qla_host_t *ha){
+
+	QL4PRINT(QLP2, printk(KERN_WARNING "scsi%d: %s: chip reset!\n",
+			      ha->host_no, __func__));
 	if (test_bit(AF_TOPCAT_CHIP_PRESENT, &ha->flags)) {
 		uint8_t status = QLA_ERROR;
 
@@ -4339,8 +4316,8 @@ qla4xxx_hard_reset(scsi_qla_host_t *ha){
 		return(status);
 	}
 	else
-		return(qla4010_soft_reset(ha));
-}
+                return(qla4010_soft_reset(ha));
+	}
 
 /**************************************************************************
  * qla4xxx_cmd_wait
@@ -4371,13 +4348,13 @@ qla4xxx_cmd_wait(scsi_qla_host_t *ha){
 	ENTER("qla4xxx_cmd_wait: started\n");
 
 	while (wait_cnt) {
-		spin_lock_irqsave(&ha->hardware_lock, flags);
+	spin_lock_irqsave(&ha->hardware_lock, flags);
 		/* Find a command that hasn't completed. */
-		for (index = 1; index < MAX_SRBS; index++) {
+	for (index = 1; index < MAX_SRBS; index++) {
 			if (ha->active_srb_array[index] != NULL)
 				break;
 		}
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
+			spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 		/* If No Commands are pending, wait is complete */
 		if (index == MAX_SRBS) {
@@ -4434,7 +4411,7 @@ qla4xxx_recover_adapter(scsi_qla_host_t *ha, uint8_t renew_ddb_list){
 
 	/* Stall incoming I/O until we are done */
 	clear_bit(AF_ONLINE, &ha->flags);
-	QL4PRINT(QLP2, printk("scsi%d: %s calling qla4xxx_cmd_wait\n",
+	DEBUG2(printk("scsi%d: %s calling qla4xxx_cmd_wait\n",
 			      ha->host_no, __func__));
 
 	/* Wait for outstanding commands to complete.
@@ -4445,16 +4422,14 @@ qla4xxx_recover_adapter(scsi_qla_host_t *ha, uint8_t renew_ddb_list){
 	qla4xxx_disable_intrs(ha);
 
 	/* Flush any pending ddb changed AENs */
-	if (renew_ddb_list == 1) {
-		qla4xxx_process_aen(ha, FLUSH_DDB_CHANGED_AENS);
-	}
+	qla4xxx_process_aen(ha, FLUSH_DDB_CHANGED_AENS);
 
 	/* Reset the firmware.  If successful, function
 	 * returns with ISP interrupts enabled.
 	 */
 	if (status == QLA_SUCCESS) {
-		QL4PRINT(QLP2,
-			 printk(KERN_INFO "scsi%d: %s - Performing soft reset..\n",
+		DEBUG2(printk(KERN_INFO
+		    "scsi%d: %s - Performing soft reset..\n",
 				ha->host_no,__func__));
 		status = qla4xxx_soft_reset(ha);
 	}
@@ -4465,22 +4440,20 @@ qla4xxx_recover_adapter(scsi_qla_host_t *ha, uint8_t renew_ddb_list){
 	 * commands have not returned, then do a HARD reset.
 	 */
 	if (status == QLA_ERROR) {
-		QL4PRINT(QLP2,
-			 printk(KERN_INFO "scsi%d: %s - Performing hard reset..\n",
+		DEBUG2(printk(KERN_INFO
+		    "scsi%d: %s - Performing hard reset..\n",
 				ha->host_no,__func__));
 		status = qla4xxx_hard_reset(ha);
 	}
 
 	/* Flush any pending ddb changed AENs */
-	if (renew_ddb_list == 1) {
-		qla4xxx_process_aen(ha, FLUSH_DDB_CHANGED_AENS);
-	}
+	qla4xxx_process_aen(ha, FLUSH_DDB_CHANGED_AENS);
 
 	/* Re-initialize firmware. If successful, function returns
 	 * with ISP interrupts enabled */
 	if (status == QLA_SUCCESS) {
-		QL4PRINT(QLP2,
-			 printk(KERN_INFO "scsi%d: %s - Initializing adapter..\n",
+		DEBUG2(printk(
+		    KERN_INFO "scsi%d: %s - Initializing adapter..\n",
 				ha->host_no, __func__));
 
 		/* If successful, AF_ONLINE flag set in
@@ -4496,7 +4469,7 @@ qla4xxx_recover_adapter(scsi_qla_host_t *ha, uint8_t renew_ddb_list){
 		 * resetting the ha */
 		if (!test_bit(DPC_RETRY_RESET_HA, &ha->dpc_flags)) {
 			ha->retry_reset_ha_cnt = MAX_RESET_HA_RETRIES;
-			QL4PRINT(QLP2,
+			DEBUG2(
 				 printk(KERN_INFO "scsi%d: recover adapter - "
 					"retrying (%d) more times\n",
 					ha->host_no, ha->retry_reset_ha_cnt));
@@ -4507,10 +4480,9 @@ qla4xxx_recover_adapter(scsi_qla_host_t *ha, uint8_t renew_ddb_list){
 			if (ha->retry_reset_ha_cnt > 0) {
 				/* Schedule another Reset HA -- DPC will retry */
 				ha->retry_reset_ha_cnt--;
-				QL4PRINT(QLP2,
-					 printk(KERN_INFO
-						"scsi%d: recover adapter - "
-						"retry remaining %d\n", ha->host_no,
+				DEBUG2(printk(KERN_INFO
+					"scsi%d: recover adapter - "
+					"retry remaining %d\n", ha->host_no,
 						ha->retry_reset_ha_cnt));
 				status = QLA_ERROR;
 			}
@@ -4518,15 +4490,15 @@ qla4xxx_recover_adapter(scsi_qla_host_t *ha, uint8_t renew_ddb_list){
 			if (ha->retry_reset_ha_cnt == 0) {
 				/* Recover adapter retries have been exhausted.
 				 * Adapter DEAD */
-				QL4PRINT(QLP2,
-					 printk(KERN_INFO
-						"scsi%d: recover adapter failed - "
-						"board disabled\n", ha->host_no));
+				DEBUG2( printk(KERN_INFO
+					"scsi%d: recover adapter failed - "
+					"board disabled\n", ha->host_no));
 				qla4xxx_flush_active_srbs(ha);
 				clear_bit(DPC_RETRY_RESET_HA, &ha->dpc_flags);
 				clear_bit(DPC_RESET_HA, &ha->dpc_flags);
-				clear_bit(DPC_RESET_HA_DESTROY_DDB_LIST, &ha->dpc_flags);
-				status = QLA_SUCCESS;
+				clear_bit(DPC_RESET_HA_DESTROY_DDB_LIST,
+				    &ha->dpc_flags);
+				status = QLA_ERROR;
 			}
 		}
 	}
@@ -4537,8 +4509,12 @@ qla4xxx_recover_adapter(scsi_qla_host_t *ha, uint8_t renew_ddb_list){
 	}
 
 	ha->adapter_error_count++;
-	QL4PRINT(QLP2,
-		 printk(KERN_INFO "scsi%d: recover adapter (end)\n", ha->host_no));
+
+ 	if (status == QLA_SUCCESS)
+ 		qla4xxx_enable_intrs(ha);
+
+	DEBUG2( printk(KERN_INFO
+	    "scsi%d: recover adapter .. DONE\n", ha->host_no));
 	LEAVE("qla4xxx_recover_adapter");
 	return(status);
 }
@@ -4559,42 +4535,35 @@ qla4xxx_recover_adapter(scsi_qla_host_t *ha, uint8_t renew_ddb_list){
  *      Kernel context.
  **************************************************************************/
 int
-qla4xxx_eh_wait_for_active_target_commands(scsi_qla_host_t *ha, int target, int lun){
-	int     cnt;
-	int     status;
-	unsigned long   flags;
-	srb_t           *sp;
-	struct scsi_cmnd       *cmd;
+qla4xxx_eh_wait_for_active_target_commands(scsi_qla_host_t *ha, int t, int l)
+{
+	int cnt;
+	int status;
+	srb_t *sp;
+	struct scsi_cmnd *cmd;
 
-	status = 0;
-	ENTER("qla4xxx_eh_wait_for_active_target_commands");
 	/*
 	 * Waiting for all commands for the designated target in the active
 	 * array
 	 */
+	status = 0;
 	for (cnt = 1; cnt < MAX_SRBS; cnt++) {
-		spin_lock_irqsave(&ha->hardware_lock, flags);
+		spin_lock(&ha->hardware_lock);
 		sp = ha->active_srb_array[cnt];
 		if (sp) {
 			cmd = sp->cmd;
-			spin_unlock_irqrestore(&ha->hardware_lock, flags);
-			if (cmd->device->id == target &&
-			    cmd->device->lun == lun) {
-
+			spin_unlock(&ha->hardware_lock);
+			if (cmd->device->id == t && cmd->device->lun == l) {
 				if (!qla4xxx_eh_wait_on_command(ha, cmd)) {
 					status++;
 					break;
 				}
 			}
-		}
-		else {
-			spin_unlock_irqrestore(&ha->hardware_lock, flags);
+		} else {
+			spin_unlock(&ha->hardware_lock);
 		}
 	}
-	QL4PRINT(QLP2,
-		 printk(KERN_INFO "scsi%d: %s return_status=%d\n", ha->host_no, __func__, status));
-	LEAVE("qla4xxx_eh_wait_for_active_target_commands");
-	return(status);
+	return status;
 }
 
 /**************************************************************************
@@ -4618,65 +4587,87 @@ qla4xxx_eh_wait_for_active_target_commands(scsi_qla_host_t *ha, int target, int 
  * Context:
  *      Kernel context.  io_request_lock LOCKED
  **************************************************************************/
-int
-qla4xxx_eh_device_reset(struct scsi_cmnd *cmd){
-	int ret_status = FAILED;
-	scsi_qla_host_t *ha;
-	os_lun_t     *lun_entry;
-	os_tgt_t         *tgt_entry;
-	fc_lun_t        *fclun;
+ int
+qla4xxx_eh_device_reset(struct scsi_cmnd *cmd)
+{
+	int return_status = FAILED;
+ 	scsi_qla_host_t *ha;
+	os_lun_t *lun_entry;
+	os_tgt_t *tgt_entry;
+	fc_lun_t *fclun;
+	uint8_t stat;
 
-	ENTER("qla4xxx_eh_device_reset");
+ 	ha = (scsi_qla_host_t *) cmd->device->host->hostdata;
 
-	ha = (scsi_qla_host_t *) cmd->device->host->hostdata;
+	/* Retrieve device and lun handles */
+ 	tgt_entry = qla4xxx_lookup_target_by_SCSIID(ha, cmd->device->channel,
+ 	    cmd->device->id);
+	if (!tgt_entry)
+		return FAILED;
+	lun_entry = qla4xxx_lookup_lun_handle(ha, tgt_entry, cmd->device->lun);
+	if (!lun_entry)
+		return FAILED;
+	fclun = lun_entry->fclun;
+	if (!fclun)
+		return FAILED;
 
-	QL4PRINT(QLP2,
-		 printk(KERN_INFO "scsi%d:%d:%d:%d: device reset\n",
-			ha->host_no, cmd->device->channel, cmd->device->id,
-			cmd->device->lun));
+	ql4_printk(KERN_INFO, ha,
+	    "scsi%d:%d:%d:%d: DEVICE RESET ISSUED.\n", ha->host_no,
+	    cmd->device->channel, cmd->device->id, cmd->device->lun);
 
-	// qla4xxx_extend_timeout(cmd, (ql4xcmdtimeout-1)*EXTEND_CMD_TOV);
+	DEBUG2(printk(KERN_INFO
+	    "scsi%d: DEVICE_RESET cmd=%p jiffies = 0x%lx, timeout=%x, "
+	    "dpc_flags=%lx, status=%x allowed=%d cmd.state=%x\n",
+	    ha->host_no, cmd, jiffies, cmd->timeout_per_command / HZ,
+	    ha->dpc_flags, cmd->result, cmd->allowed, cmd->state));
 
-	/* retrieve device and lun handles */
-	tgt_entry = qla4xxx_lookup_target_by_SCSIID(ha, cmd->device->channel,
-	    cmd->device->id);
-	if (tgt_entry) {
-		/*
-		 * If we are coming in from the back-door, stall I/O until
-		 * complete.
-		 */
-		if (!cmd->device->host->eh_active)
-			set_bit(TQF_SUSPENDED, &tgt_entry->flags);
-		
-		lun_entry = qla4xxx_lookup_lun_handle(ha, tgt_entry,
-		    cmd->device->lun);
-		if (lun_entry) {
-			if ((fclun = lun_entry->fclun) != NULL) {
-				if (qla4xxx_reset_lun(ha, fclun->fcport->ddbptr, fclun)
-				    == QLA_SUCCESS) {
-					/* Send marker to unlock queues on next command */
-					ha->marker_needed =1;
+	/* If we are coming in from the back-door, stall I/O until complete. */
+	if (!cmd->device->host->eh_active) {
+		set_bit(TQF_SUSPENDED, &tgt_entry->flags);
+	}
+	
+	spin_unlock_irq(ha->host->host_lock);
+	stat = qla4xxx_reset_lun(ha, fclun->fcport->ddbptr, fclun);
+	spin_lock_irq(ha->host->host_lock);
+	if (stat != QLA_SUCCESS) {
+		ql4_printk(KERN_INFO, ha, "DEVICE RESET FAILED. %d\n", stat);
 
-					/* Waiting for all active commands to complete for the device */
-					spin_lock_irq(ha->host->host_lock);
-					if (qla4xxx_eh_wait_for_active_target_commands(ha,
-					    cmd->device->id,
-					    cmd->device->lun) == 0)
-						ret_status = SUCCESS;
-					spin_unlock_irq(ha->host->host_lock);
-				}
-			}
-		}
-		if (!cmd->device->host->eh_active)
-			clear_bit(TQF_SUSPENDED, &tgt_entry->flags);
+		goto eh_dev_reset_done;
 	}
 
+	/* Send marker. */
+	ha->marker_needed = 1;
 
-	QL4PRINT(QLP2, printk("scsi%d: %s: return with status = %x\n",
-			      ha->host_no, __func__, ret_status));
-	LEAVE("qla4xxx_eh_device_reset");
-	return(ret_status);
-}
+	/*
+	 * If we are coming down the EH path, wait for all commands to complete
+	 * for the device.
+	 */
+	if (cmd->device->host->eh_active) {
+		if (qla4xxx_eh_wait_for_active_target_commands(ha,
+		    cmd->device->id, cmd->device->lun)) {
+			ql4_printk(KERN_INFO, ha, "DEVICE RESET FAILED - "
+			    "waiting for commands.\n");
+
+			goto eh_dev_reset_done;
+ 		}
+ 	}
+
+	ql4_printk(KERN_INFO, ha,
+	    "scsi(%d:%d:%d:%d): DEVICE RESET SUCCEEDED.\n", ha->host_no,
+	    cmd->device->channel, cmd->device->id, cmd->device->lun);
+
+	return_status = SUCCESS;
+
+eh_dev_reset_done:
+
+	if (!cmd->device->host->eh_active)
+		clear_bit(TQF_SUSPENDED, &tgt_entry->flags);
+ 	QL4PRINT(QLP2, printk("scsi%d: %s: return with status = %x\n",
+	    ha->host_no, __func__, return_status));
+
+	return return_status;
+ }
+
 
 /**************************************************************************
  * qla4xxx_eh_bus_reset
@@ -4694,30 +4685,32 @@ qla4xxx_eh_device_reset(struct scsi_cmnd *cmd){
  *      Kernel context.  io_request_lock LOCKED
  **************************************************************************/
 int
-qla4xxx_eh_bus_reset(struct scsi_cmnd *cmd){
+qla4xxx_eh_bus_reset(struct scsi_cmnd *cmd)
+{
 	uint8_t status = QLA_SUCCESS;
-	int     ret_status;
+	int     return_status = FAILED;
 	scsi_qla_host_t *ha;
 	ddb_entry_t *ddb_entry, *dtemp;
 
-	ENTER("qla4xxx_eh_bus_reset");
-
 	ha = (scsi_qla_host_t *) cmd->device->host->hostdata;
-	QL4PRINT(QLP2,
-		 printk(KERN_INFO "scsi%d:%d: bus reset\n", ha->host_no,
-			 cmd->device->channel));
+
+	ql4_printk(KERN_INFO, ha,
+	    "scsi(%d:%d:%d:%d): BUS RESET ISSUED.\n", ha->host_no,
+	    cmd->device->channel, cmd->device->id, cmd->device->lun);
+
+	spin_unlock_irq(ha->host->host_lock);
+	if (qla4xxx_wait_for_hba_online(ha) != QLA_SUCCESS) {
+		QL4PRINT(QLP2, printk("scsi%d:%d: %s: Unable to reset "
+		    "bus.  Adapter DEAD.\n", ha->host_no,
+		    cmd->device->channel, __func__));
+
+		spin_lock_irq(ha->host->host_lock);
+		return FAILED;
+	}
+	spin_lock_irq(ha->host->host_lock);
 
 	/* Attempt to reset all valid targets with outstanding commands */
 	list_for_each_entry_safe(ddb_entry, dtemp, &ha->ddb_list, list_entry) {
-		if (WAIT_FOR_ADAPTER_UP(ha) != QLA_SUCCESS) {
-			QL4PRINT(QLP2, printk("scsi%d:%d: %s: Unable to reset "
-			    "bus.  Adapter DEAD.\n", ha->host_no,
-			    cmd->device->channel, __func__));
-
-			ret_status = FAILED;
-			goto exit_bus_rst;
-		}
-
 		QL4PRINT(QLP5, printk("scsi%d: %s: reset target b%d, t%x, "
 		    "index [%d]\n", ha->host_no, __func__, ddb_entry->bus,
 		    ddb_entry->target, ddb_entry->fw_ddb_index));
@@ -4730,26 +4723,13 @@ qla4xxx_eh_bus_reset(struct scsi_cmnd *cmd){
 	 * Status is QLA_SUCCESS if target resets for ALL devices completed
 	 * successfully.  Otherwise the status is QLA_ERROR.
 	 */
-	if (status == QLA_SUCCESS) {
-		QL4PRINT(QLP2,
-			 printk(KERN_INFO "scsi%d:%d: bus reset SUCCEEDED\n",
-				ha->host_no, cmd->device->channel));
+	if (status == QLA_SUCCESS)
+		return_status = SUCCESS;
 
-		/* restore debug level */
-		ret_status = SUCCESS;
-	}
-	else {
-		QL4PRINT(QLP2,
-			 printk(KERN_INFO "scsi%d:%d: bus reset FAILED\n",
-				ha->host_no, cmd->device->channel));
-		ret_status = FAILED;
-	}
+	ql4_printk(KERN_INFO, ha, "BUS RESET %s.\n",
+	    (return_status == FAILED) ? "FAILED" : "SUCCEDED");
 
-	exit_bus_rst:
-	QL4PRINT(QLP2, printk("scsi%d: %s: return with status = %x\n",
-			      ha->host_no, __func__, ret_status));
-	LEAVE("qla4xxx_eh_bus_reset");
-	return(ret_status);
+	return return_status;
 }
 
 /**************************************************************************
@@ -4772,42 +4752,46 @@ qla4xxx_eh_bus_reset(struct scsi_cmnd *cmd){
  * Context:
  *      Kernel context.
  **************************************************************************/
-uint8_t qla4xxx_reset_target(scsi_qla_host_t *ha,
-			     ddb_entry_t *ddb_entry){
+uint8_t
+qla4xxx_reset_target(scsi_qla_host_t *ha, ddb_entry_t *ddb_entry)
+{
 	uint8_t status = QLA_SUCCESS;
 	fc_lun_t *fclun;
 	fc_port_t *fcport;
+	uint8_t stat;
 
 	/* Reset all LUNs on this target */
 	fcport = ddb_entry->fcport;
-	list_for_each_entry(fclun, &fcport->fcluns, list){
-		if (qla4xxx_reset_lun(ha, ddb_entry, fclun) == QLA_SUCCESS) {
-			/* Send marker to unlock queues on next command */
+	list_for_each_entry(fclun, &fcport->fcluns, list) {
+		spin_unlock_irq(ha->host->host_lock);
+		stat = qla4xxx_reset_lun(ha, ddb_entry, fclun);
+		spin_lock_irq(ha->host->host_lock);
+		if (stat == QLA_SUCCESS) {
+			/* Send marker. */
 			ha->marker_needed =1;
 
-			/* Waiting for all active commands to complete for the device */
-			spin_lock_irq(ha->host->host_lock);
-			status |= qla4xxx_eh_wait_for_active_target_commands(ha, ddb_entry->target, fclun->lun);
-			spin_unlock_irq(ha->host->host_lock);
-		}
-		else {
+			/*
+			 * Waiting for all active commands to complete for the
+			 * device.
+			 */
+			status |= qla4xxx_eh_wait_for_active_target_commands(
+			    ha, ddb_entry->target, fclun->lun);
+		} else {
 			status |= QLA_ERROR;
 		}
 	}
 
 	if (status == QLA_SUCCESS) {
-		QL4PRINT(QLP2,
-			 printk(KERN_INFO "scsi%d:%d:%d: device reset SUCCEEDED\n",
-				ha->host_no, ddb_entry->bus, fcport->os_target_id));
-	}
-	else {
-		QL4PRINT(QLP2,
-			 printk(KERN_INFO "scsi%d:%d:%d: device reset FAILED\n",
-				ha->host_no, ddb_entry->bus, fcport->os_target_id));
+		QL4PRINT(QLP2, printk("scsi%d:%d:%d: device reset SUCCEEDED.\n",
+		    ha->host_no, ddb_entry->bus, fcport->os_target_id));
+	} else {
+		QL4PRINT(QLP2, printk("scsi%d:%d:%d: device reset FAILED.\n",
+		    ha->host_no, ddb_entry->bus, fcport->os_target_id));
+
 		status = QLA_ERROR;
 	}
 
-	return(status);
+	return status;
 }
 
 /**************************************************************************
@@ -4845,7 +4829,11 @@ qla4xxx_flush_active_srbs(scsi_qla_host_t *ha){
 					"returning\n", ha->host_no, __func__, srb));
 			del_from_active_array(ha, i);
 			srb->cmd->result =  DID_RESET  <<  16;
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 			add_to_done_srb_q(ha,srb);
+#else
+			qla4xxx_complete_request(ha,srb);
+#endif
 		}
 	}
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
@@ -4874,41 +4862,38 @@ qla4xxx_flush_active_srbs(scsi_qla_host_t *ha){
  *      Kernel context.  io_request_lock LOCKED
  **************************************************************************/
 int
-qla4xxx_eh_host_reset(struct scsi_cmnd *cmd){
-	int ret_status;
+qla4xxx_eh_host_reset(struct scsi_cmnd *cmd)
+{
+	int return_status = FAILED;
 	scsi_qla_host_t *ha;
-	ENTER("qla4xxx_eh_host_reset");
 
 	ha = (scsi_qla_host_t *) cmd->device->host->hostdata;
-	QL4PRINT(QLP2,
-		 printk(KERN_INFO "scsi%d: - host reset\n", ha->host_no));
 
-	if (WAIT_FOR_ADAPTER_UP(ha) != QLA_SUCCESS) {
-		QL4PRINT(QLP2, printk("scsi%d: %s: Unable to reset host.  "
-				      "Adapter DEAD.\n",
-				      ha->host_no, __func__));
-
-		ret_status = FAILED;
-		goto exit_host_rst;
-	}
+	ql4_printk(KERN_INFO, ha,
+	    "scsi(%d:%d:%d:%d): ADAPTER RESET ISSUED.\n", ha->host_no,
+	    cmd->device->channel, cmd->device->id, cmd->device->lun);
 
 	spin_unlock_irq(ha->host->host_lock);
-	if (qla4xxx_recover_adapter(ha, PRESERVE_DDB_LIST)
-	    == QLA_SUCCESS) {
-		ret_status = SUCCESS;
+
+	if (qla4xxx_wait_for_hba_online(ha) != QLA_SUCCESS) {
+		QL4PRINT(QLP2, printk("scsi%d:%d: %s: Unable to reset "
+		    "host.  Adapter DEAD.\n", ha->host_no,
+		    cmd->device->channel, __func__));
+
+		spin_lock_irq(ha->host->host_lock);
+		return FAILED;
 	}
-	else {
-		ret_status = FAILED;
+
+	if (qla4xxx_recover_adapter(ha, PRESERVE_DDB_LIST) == QLA_SUCCESS) {
+		return_status = SUCCESS;
 	}
+
+	ql4_printk(KERN_INFO, ha, "HOST RESET %s.\n",
+	    (return_status == FAILED) ? "FAILED" : "SUCCEDED");
+
 	spin_lock_irq(ha->host->host_lock);
 
-exit_host_rst:
-	QL4PRINT(QLP2, printk("scsi%d: %s: return with status = %x\n",
-			      ha->host_no, __func__, ret_status));
-
-	LEAVE("qla4xxx_eh_host_reset");
-
-	return(ret_status);
+	return return_status;
 }
 
 /*
@@ -4927,7 +4912,7 @@ qla4xxx_free_other_mem(scsi_qla_host_t *ha)
 
 	if (ha == NULL) {
 		/* error */
-		DEBUG2(printk("%s(): ERROR invalid ha pointer.\n", __func__));
+		DEBUG2(printk("%s: ERROR invalid ha pointer.\n", __func__));
 		return;
 	}
 
@@ -4947,7 +4932,6 @@ qla4xxx_free_other_mem(scsi_qla_host_t *ha)
 	}
 	INIT_LIST_HEAD(&ha->fcports);
 }
-
 
 #if 0
 

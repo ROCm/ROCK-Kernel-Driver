@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE
  *
- * QLogic ISP4xxx device driver for Linux 2.4.x
+ * QLogic ISP4xxx device driver for Linux 2.6.x
  * Copyright (C) 2004 QLogic Corporation
  * (www.qlogic.com)
  *
@@ -18,7 +18,7 @@
  ******************************************************************************/
 
 /*
- * QLogic ISP4xxx Multi-path LUN Support Driver 
+ * QLogic ISP4xxx Multi-path LUN Support Driver
  * Linux specific functions
  *
  */
@@ -111,9 +111,9 @@ qla4xxx_set_lun_data_from_config(mp_host_t *host, fc_port_t *port,
 
 	if (rval == -1) {
 		/* EMPTY */
-		DEBUG2(printk("%s(%ld): no preferred mask entry found for "
+		DEBUG2(printk("scsi%d: %s: no preferred mask entry found for "
 		    "path id %d on port %02x%02x%02x%02x%02x%02x%02x%02x.\n",
-		    __func__, ha->host_no, path->id,
+		    ha->host_no, __func__, path->id,
 		    path->portname[0], path->portname[1],
 		    path->portname[2], path->portname[3],
 		    path->portname[4], path->portname[5],
@@ -267,7 +267,7 @@ qla4xxx_cfg_build_path_tree(scsi_qla_host_t *ha)
 	name = 	&ha->init_cb->port_name[0];
 	if (!qla4xxx_is_nodename_equal(name, port_name)) {
 		printk(KERN_INFO
-		    "scsi(%d): Adapter nodenames don't match - ha = %p.\n",
+		    "scsi%d: Adapter nodenames don't match - ha = %p.\n",
 		    (int)ha->instance,ha);
 		DEBUG(printk("qla(%d): Adapter nodenames don't match - "
 		    "ha=%p. port name=%02x%02x%02x%02x%02x%02x%02x%02x\n",
@@ -289,14 +289,14 @@ qla4xxx_cfg_build_path_tree(scsi_qla_host_t *ha)
 	instance = ha->instance;
 	if ((host = qla4xxx_alloc_host(ha)) == NULL) {
 		printk(KERN_INFO
-		    "scsi(%d): Couldn't allocate host - ha = %p.\n",
+		    "scsi%d: Couldn't allocate host - ha = %p.\n",
 		    (int)instance,ha);
 	} else {
 		/* create a dummy port */
 		port = kmalloc(sizeof(fc_port_t), GFP_KERNEL);
 		if (port == NULL) {
 			printk(KERN_INFO
-			    "scsi(%d): Couldn't allocate port.\n",
+			    "scsi%d: Couldn't allocate port.\n",
 			    (int)instance);
 			DEBUG(printk("qla(%d): Couldn't allocate port.\n",
 			    (int)host->instance);)
@@ -367,7 +367,7 @@ qla4xxx_cfg_build_path_tree(scsi_qla_host_t *ha)
 				port->flags |= FCF_CONFIG;
 
 				/*
-				 * Get "target-N-device-N-control" if property 
+				 * Get "target-N-device-N-control" if property
 				 * is present then all luns are visible.
 				 */
 				sprintf(propbuf,
@@ -390,10 +390,10 @@ qla4xxx_cfg_build_path_tree(scsi_qla_host_t *ha)
 				    control_byte);)
 
 				port->mp_byte = control_byte;
-				DEBUG(printk("%s(%ld): calling update_mp_device"
+				DEBUG(printk("scsi%d: %s: calling update_mp_device"
 				    " for host %p port %p-%02x%02x%02x%02x%02x"
 				    "%02x%02x%02x tgt=%d mpbyte=%02x.\n",
-				    __func__, ha->host_no, host, port,
+				    ha->host_no, __func__, host, port,
 				    port->port_name[0], port->port_name[1],
 				    port->port_name[2], port->port_name[3],
 				    port->port_name[4], port->port_name[5],
@@ -554,11 +554,11 @@ qla4xxx_cfg_display_devices(int flag)
 						for (i = 0 ; i < lun->siz ;
 							       	i++) {
 							sprintf(tmp_buf+i,
-								"%02x", 
+								"%02x",
 							  lun->wwuln[i]);
 						}
 						printk(KERN_INFO "%s:%02d;\n",
-							tmp_buf,lun->siz); 
+							tmp_buf,lun->siz);
 					}
 					dev_no++;
 				}

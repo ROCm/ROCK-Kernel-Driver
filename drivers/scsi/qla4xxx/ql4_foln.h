@@ -74,7 +74,7 @@ typedef struct {
 } rpt_lun_cmd_rsp_t;
 
 
-/* 
+/*
  * Device configuration table
  *
  * This table provides a library of information about the device
@@ -82,7 +82,7 @@ typedef struct {
 struct cfg_device_info {
 	const char *vendor;
 	const char *model;
-	const int  flags;	/* bit 0 (0x1) -- translate the real 
+	const int  flags;	/* bit 0 (0x1) -- translate the real
 				   WWNN to the common WWNN for the target AND
 				   XP_DEVICE */
 				/* bit 1 (0x2) -- MSA 1000  */
@@ -169,8 +169,8 @@ extern int qla4xxx_cfg_remap(scsi_qla_host_t *);
 extern void qla4xxx_set_device_flags(scsi_qla_host_t *, fc_port_t *);
 
 extern int16_t qla4xxx_cfg_lookup_device(unsigned char *);
-extern int qla4xxx_combine_by_lunid(void *, uint16_t, fc_port_t *, uint16_t); 
-extern int qla4xxx_export_target(void *, uint16_t, fc_port_t *, uint16_t); 
+extern int qla4xxx_combine_by_lunid(void *, uint16_t, fc_port_t *, uint16_t);
+extern int qla4xxx_export_target(void *, uint16_t, fc_port_t *, uint16_t);
 
 extern int qla4xxx_test_active_lun(fc_port_t *, fc_lun_t *);
 extern int qla4xxx_test_active_port(fc_port_t *);
@@ -193,6 +193,7 @@ extern int qla4xxx_search_failover_queue(scsi_qla_host_t *, struct scsi_cmnd *);
 extern void qla4xxx_process_failover_event(scsi_qla_host_t *);
 extern int qla4xxx_do_fo_check(scsi_qla_host_t *, srb_t *, scsi_qla_host_t *);
 extern void qla4xxx_start_all_adapters(scsi_qla_host_t *);
+extern void qla4xxx_start_fo_cmd(scsi_qla_host_t *ha, srb_t *srb);
 
 extern int ql4xfailover;
 extern int ql4xrecoveryTime;
@@ -220,7 +221,7 @@ extern struct cfg_device_info cfg_device_list[];
 #define qla4xxx_search_failover_queue(ha, cmd)			(0)
 #define qla4xxx_do_fo_check(ha, sp, vis_ha)			(0)
 #define qla4xxx_failover_enabled(ha)				(0)
-#endif /* CONFIG_SCSI_QLA2XXX_FAILOVER */
+#endif /* CONFIG_SCSI_QLA4XXX_FAILOVER */
 
 static __inline int
 qla4xxx_is_fcport_in_config(scsi_qla_host_t *ha, fc_port_t *fcport)

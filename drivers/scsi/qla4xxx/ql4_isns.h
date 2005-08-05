@@ -210,8 +210,11 @@ typedef struct {
 // The following macro assumes that the attribute is wholly contained within
 // the buffer in question and is valid (see VALIDATE_ATTR below).
 
-#define NEXT_ATTR(pattr)    \
-    (PISNS_ATTRIBUTE)(pattr->value + DWSWAP(pattr->length))
+static inline PISNS_ATTRIBUTE
+NEXT_ATTR(PISNS_ATTRIBUTE pattr)
+{
+	return (PISNS_ATTRIBUTE) (&pattr->value[0] + be32_to_cpu(pattr->length));
+}
 
 static inline uint8_t
 VALIDATE_ATTR(PISNS_ATTRIBUTE PAttr, uint8_t *buffer_end)
@@ -222,10 +225,6 @@ VALIDATE_ATTR(PISNS_ATTRIBUTE PAttr, uint8_t *buffer_end)
 
 	if ((((unsigned long)&PAttr->length + sizeof(PAttr->length)) <= (unsigned long)buffer_end) &&
 	    (unsigned long)NEXT_ATTR(PAttr) <= (unsigned long)buffer_end) {
-//printk("%s: end attr_len = 0x%x, end_buf = 0x%x\n", __func__,
-//       (unsigned long)&PAttr->length + sizeof(PAttr->length),
-//       (unsigned long)buffer_end);
-
 		return(1);
 	}
 

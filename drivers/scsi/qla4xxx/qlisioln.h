@@ -105,7 +105,7 @@
 
 
 /***********************************
- * These are regular command codes 
+ * These are regular command codes
  * idx range from 0x00 to 0x2f
  ***********************************/
 #define EXT_DEF_REG_CC_START_IDX	0x00
@@ -134,7 +134,7 @@
 #define EXT_DEF_REG_CC_END_IDX		0x06
 
 /***********************************
- * Internal command codes 
+ * Internal command codes
  * idx range from 0x10 to 0x2f
  ***********************************/
 #define EXT_DEF_INT_CC_START_IDX	0x10

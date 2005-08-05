@@ -277,6 +277,11 @@ typedef struct isp_reg_t {
 	} u2;
 } isp_reg_t;			//256 x100
 
+#define ISP_SEMAPHORE(ha) \
+	(IS_QLA4022(ha) ? \
+	 &ha->reg->u1.isp4022.semaphore : \
+	 &ha->reg->u1.isp4010.nvram)
+
 #define ISP_NVRAM(ha) \
 	(IS_QLA4022(ha) ? \
 	 &ha->reg->u1.isp4022.nvram : \
@@ -291,6 +296,11 @@ typedef struct isp_reg_t {
 	(IS_QLA4022(ha) ? \
 	 &ha->reg->u2.isp4022.p0.port_status : \
 	 &ha->reg->u2.isp4010.port_status)
+
+#define ISP_PORT_CTRL(ha) \
+	(IS_QLA4022(ha) ? \
+	 &ha->reg->u2.isp4022.p0.port_ctrl : \
+	 &ha->reg->u2.isp4010.port_ctrl)
 
 #define ISP_REQ_Q_OUT(ha) \
 	(IS_QLA4022(ha) ? \
@@ -312,6 +322,118 @@ typedef struct isp_reg_t {
 	 &ha->reg->u2.isp4022.p0.gp_in : \
 	 &ha->reg->u2.isp4010.gp_in)
 
+/* Semaphore Defines for 4010 */
+#define QL4010_DRVR_SEM_BITS    0x00000030
+#define QL4010_GPIO_SEM_BITS    0x000000c0
+#define QL4010_SDRAM_SEM_BITS   0x00000300
+#define QL4010_PHY_SEM_BITS     0x00000c00
+#define QL4010_NVRAM_SEM_BITS   0x00003000
+#define QL4010_FLASH_SEM_BITS   0x0000c000
+
+#define QL4010_DRVR_SEM_MASK    0x00300000
+#define QL4010_GPIO_SEM_MASK    0x00c00000
+#define QL4010_SDRAM_SEM_MASK   0x03000000
+#define QL4010_PHY_SEM_MASK     0x0c000000
+#define	QL4010_NVRAM_SEM_MASK	0x30000000
+#define QL4010_FLASH_SEM_MASK   0xc0000000
+
+
+/* Semaphore Defines for 4022 */
+#define QL4022_RESOURCE_MASK_BASE_CODE 0x7
+#define QL4022_RESOURCE_BITS_BASE_CODE 0x4
+
+#define QL4022_DRVR_SEM_BITS    (QL4022_RESOURCE_BITS_BASE_CODE << 1)
+#define QL4022_DDR_RAM_SEM_BITS (QL4022_RESOURCE_BITS_BASE_CODE << 4)
+#define QL4022_PHY_GIO_SEM_BITS (QL4022_RESOURCE_BITS_BASE_CODE << 7)
+#define QL4022_NVRAM_SEM_BITS   (QL4022_RESOURCE_BITS_BASE_CODE << 10)
+#define QL4022_FLASH_SEM_BITS   (QL4022_RESOURCE_BITS_BASE_CODE << 13)
+
+#define QL4022_DRVR_SEM_MASK    (QL4022_RESOURCE_MASK_BASE_CODE << (1+16))
+#define QL4022_DDR_RAM_SEM_MASK (QL4022_RESOURCE_MASK_BASE_CODE << (4+16))
+#define QL4022_PHY_GIO_SEM_MASK (QL4022_RESOURCE_MASK_BASE_CODE << (7+16))
+#define QL4022_NVRAM_SEM_MASK   (QL4022_RESOURCE_MASK_BASE_CODE << (10+16))
+#define QL4022_FLASH_SEM_MASK   (QL4022_RESOURCE_MASK_BASE_CODE << (13+16))
+
+
+#define QL4XXX_LOCK_FLASH(a)    \
+	(IS_QLA4022(a) ? \
+    ql4xxx_sem_spinlock(a, QL4022_FLASH_SEM_MASK, (QL4022_RESOURCE_BITS_BASE_CODE | (a->mac_index)) << 13) : \
+    ql4xxx_sem_spinlock(a, QL4010_FLASH_SEM_MASK, QL4010_FLASH_SEM_BITS) )
+
+#define QL4XXX_LOCK_NVRAM(a)    \
+	(IS_QLA4022(a) ? \
+	ql4xxx_sem_spinlock(a, QL4022_NVRAM_SEM_MASK, (QL4022_RESOURCE_BITS_BASE_CODE | (a->mac_index)) << 10) : \
+	ql4xxx_sem_spinlock(a, QL4010_NVRAM_SEM_MASK, QL4010_NVRAM_SEM_BITS) )
+
+#define QL4XXX_LOCK_GIO(a) \
+	(IS_QLA4022(a) ? \
+	ql4xxx_sem_spinlock(a, QL4022_PHY_GIO_SEM_MASK, (QL4022_RESOURCE_BITS_BASE_CODE | (a->mac_index)) << 7) : \
+	ql4xxx_sem_spinlock(a, QL4010_GPIO_SEM_MASK, QL4010_GPIO_SEM_BITS) )
+
+#define QL4XXX_LOCK_PHY(a) \
+	(IS_QLA4022(a) ? \
+	ql4xxx_sem_spinlock(a, QL4022_PHY_GIO_SEM_MASK, (QL4022_RESOURCE_BITS_BASE_CODE | (a->mac_index)) << 7) : \
+	ql4xxx_sem_spinlock(a, QL4010_PHY_SEM_MASK, QL4010_PHY_SEM_BITS) )
+
+#define QL4XXX_LOCK_DDR_RAM(a)  \
+	(IS_QLA4022(a) ? \
+	ql4xxx_sem_spinlock(a, QL4022_DDR_RAM_SEM_MASK, (QL4022_RESOURCE_BITS_BASE_CODE | (a->mac_index)) << 4) : \
+	ql4xxx_sem_spinlock(a, QL4010_SDRAM_SEM_MASK, QL4010_SDRAM_SEM_BITS) )
+
+#define QL4XXX_LOCK_DRVR(a)  \
+	(IS_QLA4022(a) ? \
+	ql4xxx_sem_lock(a, QL4022_DRVR_SEM_MASK, (QL4022_RESOURCE_BITS_BASE_CODE | (a->mac_index)) << 1) : \
+	ql4xxx_sem_lock(a, QL4010_DRVR_SEM_MASK, QL4010_DRVR_SEM_BITS) )
+
+#define QL4XXX_UNLOCK_DRVR(a) \
+	(IS_QLA4022(a) ? \
+	ql4xxx_sem_unlock(a, QL4022_DRVR_SEM_MASK) : \
+	ql4xxx_sem_unlock(a, QL4010_DRVR_SEM_MASK) )
+
+#define QL4XXX_UNLOCK_GIO(a) \
+	(IS_QLA4022(a) ? \
+	ql4xxx_sem_unlock(a, QL4022_PHY_GIO_SEM_MASK) : \
+	ql4xxx_sem_unlock(a, QL4010_GPIO_SEM_MASK) )
+
+#define QL4XXX_UNLOCK_DDR_RAM(a)  \
+	(IS_QLA4022(a) ? \
+	ql4xxx_sem_unlock(a, QL4022_DDR_RAM_SEM_MASK) : \
+	ql4xxx_sem_unlock(a, QL4010_SDRAM_SEM_MASK) )
+
+#define QL4XXX_UNLOCK_PHY(a) \
+	(IS_QLA4022(a) ? \
+	ql4xxx_sem_unlock(a, QL4022_PHY_GIO_SEM_MASK) : \
+	ql4xxx_sem_unlock(a, QL4010_PHY_SEM_MASK) )
+
+#define QL4XXX_UNLOCK_NVRAM(a) \
+	(IS_QLA4022(a) ? \
+	ql4xxx_sem_unlock(a, QL4022_NVRAM_SEM_MASK) : \
+	ql4xxx_sem_unlock(a, QL4010_NVRAM_SEM_MASK) )
+
+#define QL4XXX_UNLOCK_FLASH(a)  \
+	(IS_QLA4022(a) ? \
+	ql4xxx_sem_unlock(a, QL4022_FLASH_SEM_MASK) : \
+	ql4xxx_sem_unlock(a, QL4010_FLASH_SEM_MASK) )
+
+
+#define QL4XXX_LOCK_DRVR_WAIT(a)                                                           \
+{																					   \
+    int i = 0;																			   \
+    while(1) {																		   \
+        if(QL4XXX_LOCK_DRVR(a) == 0) {										               \
+	    set_current_state(TASK_UNINTERRUPTIBLE); \
+	    schedule_timeout(10); \
+            if(!i) {																   \
+                DEBUG2(printk(KERN_INFO"scsi%d: %s: Waiting for Global Init Semaphore...\n",a->host_no,__func__)); \
+                i++;																   \
+            }																		   \
+        }																			   \
+        else {																		   \
+            DEBUG2(printk(KERN_INFO"scsi%d: %s: Global Init Semaphore acquired.\n",a->host_no,__func__));		   \
+            break;																	   \
+        }																			   \
+    }																				   \
+}
 /* Page # defines for 4022 */
 #define PORT_CTRL_STAT_PAGE                     0 /* 4022 */
 #define HOST_MEM_CFG_PAGE                       1 /* 4022 */
@@ -339,11 +461,19 @@ typedef struct isp_reg_t {
 #define CSR_FORCE_SOFT_RESET                    0x00002000 /* 4022 */
 #define CSR_FATAL_ERROR                         0x00004000
 #define CSR_SOFT_RESET                          0x00008000
+#define ISP_CONTROL_FN_MASK     		CSR_FUNC_NUM
+#define ISP_CONTROL_FN0_NET     		0x0400
+#define ISP_CONTROL_FN0_SCSI    		0x0500
+#define ISP_CONTROL_FN1_NET     		0x0600
+#define ISP_CONTROL_FN1_SCSI    		0x0700
 
 #define INTR_PENDING                            (CSR_SCSI_COMPLETION_INTR | CSR_SCSI_PROCESSOR_INTR | CSR_SCSI_RESET_INTR)
 
 /* ISP InterruptMask definitions */
 #define IMR_SCSI_INTR_ENABLE                    0x00000004  /* 4022 */
+
+/* ISP 4022 nvram definitions */
+#define NVR_WRITE_ENABLE			0x00000010  /* 4022 */
 
 // ISP port_ctrl definitions
 #define PCR_CONFIG_COMPLETE			0x00008000  /* 4022 */
@@ -505,6 +635,7 @@ typedef union _EXTERNAL_HW_CONFIG_REG {
 		#define DIAG_TEST_NW_INT_LOOPBACK		0x0007
 		#define DIAG_TEST_NW_EXT_LOOPBACK		0x0008
 #define MBOX_CMD_GET_CRASH_RECORD       	0x0076	/* 4010 only */
+#define MBOX_CMD_GET_CONN_EVENT_LOG       	0x0077
 #define MBOX_CMD_NOP                            0x00FF
 
 // Mailbox status definitions
@@ -544,6 +675,7 @@ typedef union _EXTERNAL_HW_CONFIG_REG {
 		#define ISNS_EVENT_CONNECTION_OPENED		0x0001
 		#define ISNS_EVENT_CONNECTION_FAILED		0x0002
 #define MBOX_ASTS_IPSEC_SYSTEM_FATAL_ERROR	0x8022
+#define MBOX_ASTS_SUBNET_STATE_CHANGE		0x8027
 
 
 /*************************************************************************/
@@ -717,7 +849,7 @@ typedef struct _DEV_DB_ENTRY {
 	UINT16 sndMarkerInt;  /* 12-13 */
 	UINT16 iSCSIMaxSndDataSegLen;  /* 14-15 */
 	UINT16 firstBurstSize;	   /* 16-17 */
-	UINT16 minTime2Wait; /* 18-19 */
+	UINT16 minTime2Wait; /* 18-19 : RA :default_time2wait */
 	UINT16 maxTime2Retain; /* 1A-1B */
 	UINT16 maxOutstndngR2T;	   /* 1C-1D */
 	UINT16 keepAliveTimeout;   /* 1E-1F */
@@ -860,6 +992,22 @@ typedef struct _CRASH_RECORD {
 	UINT8   in_out_RISC_stack_dump[0]; /*280 - ??? */
 } CRASH_RECORD, *PCRASH_RECORD;
 
+
+/*************************************************************************/
+
+#define MAX_CONN_EVENT_LOG_ENTRIES	100
+
+typedef struct _CONN_EVENT_LOG_ENTRY {
+	UINT32  timestamp_sec;		/* 00 - 03 seconds since boot */
+	UINT32  timestamp_ms;		/* 04 - 07 milliseconds since boot */
+	UINT16  device_index;		/* 08 - 09  */
+	UINT16  fw_conn_state;		/* 0A - 0B  */
+	UINT8   event_type;		/* 0C - 0C  */
+	UINT8   error_code;		/* 0D - 0D  */
+	UINT16  error_code_detail;	/* 0E - 0F  */
+	UINT8   num_consecutive_events;	/* 10 - 10  */
+	UINT8   rsvd[3];		/* 11 - 13  */
+} CONN_EVENT_LOG_ENTRY, *PCONN_EVENT_LOG_ENTRY;
 
 
 /*************************************************************************
@@ -1060,11 +1208,12 @@ typedef struct _MARKER_ENTRY {
 	UINT32  system_defined;	/* 04-07 */
 	UINT16  target;		/* 08-09 */
 	UINT16  modifier;	/* 0A-0B */
-   #define MM_LUN_RESET         1
-   #define MM_TARGET_WARM_RESET 0
+   #define MM_LUN_RESET         0
+   #define MM_TARGET_WARM_RESET 1
    #define MM_TARGET_COLD_RESET 2
-   #define MM_CLEAR_TASK_SET    0
-   #define MM_ABORT_TASK_SET    0
+   #define MM_CLEAR_ACA    	3
+   #define MM_CLEAR_TASK_SET    4
+   #define MM_ABORT_TASK_SET    5
 
 	UINT16  flags;		/* 0C-0D */
 	UINT16  reserved1;	/* 0E-0F */
@@ -1386,6 +1535,7 @@ typedef struct _PDU_ENTRY {
 	UINT32       SendBuffLen;
 	UINT32       RecvBuffLen;
 	struct _PDU_ENTRY *Next;
+	dma_addr_t DmaBuff;
 } PDU_ENTRY, *PPDU_ENTRY;
 
 typedef struct _ISNS_DISCOVERED_TARGET_PORTAL {

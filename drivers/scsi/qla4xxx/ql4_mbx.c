@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE                                     *
  *                                                                            *
- * QLogic ISP4xxx device driver for Linux 2.4.x                               *
+ * QLogic ISP4xxx device driver for Linux 2.6.x                               *
  * Copyright (C) 2004 Qlogic Corporation                                      *
  * (www.qlogic.com)                                                           *
  *                                                                            *
@@ -112,14 +112,18 @@ qla4xxx_mailbox_command(scsi_qla_host_t *ha,
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	intr_status = RD_REG_DWORD(&ha->reg->ctrl_status);
 	if (intr_status & CSR_SCSI_PROCESSOR_INTR) {
+#if 0
 		QL4PRINT(QLP2,
 			 printk("scsi%d: %s: Trying to execute a mailbox request, "
 				"while another one is interrupting\n"
 				"Service existing interrupt first\n",
 				ha->host_no, __func__));
+#endif
 
 		/* Service existing interrupt */
 		qla4xxx_interrupt_service_routine(ha, intr_status);
+
+		clear_bit(AF_MBOX_COMMAND_DONE, &ha->flags);
 	}
 
 
@@ -151,7 +155,6 @@ qla4xxx_mailbox_command(scsi_qla_host_t *ha,
 	PCI_POSTING(&ha->reg->ctrl_status);
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	add_wait_queue(&ha->mailbox_wait_queue,&wait);
 
@@ -173,10 +176,10 @@ qla4xxx_mailbox_command(scsi_qla_host_t *ha,
 	 * -----------------------------
 	 */
 	wait_count = jiffies + MBOX_TOV * HZ;
-
 	while (test_bit(AF_MBOX_COMMAND_DONE, &ha->flags) == 0) {
-		if (wait_count <= jiffies)
+		if (time_after_eq(jiffies, wait_count)) {	
 			break;
+		}
 
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 
@@ -195,8 +198,10 @@ qla4xxx_mailbox_command(scsi_qla_host_t *ha,
 			ha->mbox_status_count = outCount;
 			qla4xxx_interrupt_service_routine(ha, intr_status);
 			// DG XXX
+#ifdef CONFIG_SCSI_QLA4XXX_FAILOVER
 			if (!list_empty(&ha->done_srb_q))
 				qla4xxx_done(ha);
+#endif
 		}
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
@@ -205,7 +210,11 @@ qla4xxx_mailbox_command(scsi_qla_host_t *ha,
 		 * NOTE: Interrupt_handler may be called here,
 		 *       if interrupts are enabled
 		 */
+#if 0
 		udelay(10);
+#else
+		schedule_timeout(10);
+#endif
 	} /* wait loop */
 
 
@@ -459,9 +468,10 @@ qla4xxx_clear_database_entry(scsi_qla_host_t *ha, uint16_t fw_ddb_index)
 	if (qla4xxx_mailbox_command(ha, 2, 5, &mbox_cmd[0], &mbox_sts[0])
 	    != QLA_SUCCESS) {
 		QL4PRINT(QLP2,
-			 printk("scsi%d: %s: MBOX_CMD_CLEAR_DATABASE_ENTRY "
-				"failed sts %04X index [%d], state %04x\n",
-				ha->host_no, __func__, mbox_sts[0], fw_ddb_index, mbox_sts[4]));
+		    printk("scsi%d: %s: MBOX_CMD_CLEAR_DATABASE_ENTRY "
+		    "failed sts %04X index [%d], state %04x\n",
+		    ha->host_no, __func__, mbox_sts[0], fw_ddb_index,
+		    mbox_sts[4]));
 		return(QLA_ERROR);
 	}
 
@@ -523,8 +533,8 @@ qla4xxx_initialize_fw_cb(scsi_qla_host_t *ha)
 		return (status);
 	}
 
-	QL4PRINT(QLP10, printk("scsi%d: Init Fw Ctrl Blk\n", ha->host_no));
-	qla4xxx_dump_bytes(QLP10, init_fw_cb, sizeof(INIT_FW_CTRL_BLK));
+	// QL4PRINT(QLP10, printk("scsi%d: Init Fw Ctrl Blk\n", ha->host_no));
+	// qla4xxx_dump_bytes(QLP10, init_fw_cb, sizeof(INIT_FW_CTRL_BLK));
 
 	/*
 	 * Initialize request and response queues
@@ -563,6 +573,8 @@ qla4xxx_initialize_fw_cb(scsi_qla_host_t *ha)
 
 	memcpy(ha->ip_address, init_fw_cb->IPAddr,
 	    MIN(sizeof(ha->ip_address), sizeof(init_fw_cb->IPAddr)));
+	memcpy(ha->subnet_mask, init_fw_cb->SubnetMask,
+	    MIN(sizeof(ha->subnet_mask), sizeof(init_fw_cb->SubnetMask)));
 	memcpy(ha->isns_ip_address, init_fw_cb->iSNSIPAddr,
 	    MIN(sizeof(ha->isns_ip_address), sizeof(init_fw_cb->iSNSIPAddr)));
 	memcpy(ha->name_string, init_fw_cb->iSCSINameString,
@@ -571,11 +583,8 @@ qla4xxx_initialize_fw_cb(scsi_qla_host_t *ha)
 	    MIN(sizeof(ha->alias), sizeof(init_fw_cb->Alias)));
 
 	/* Save Command Line Paramater info */
-	ha->port_down_retry_count = ql4xportdownretrycount;
+	ha->port_down_retry_count = le16_to_cpu(init_fw_cb->KeepAliveTimeout);
 	ha->discovery_wait = ql4xdiscoverywait;
-
-	/* High-water mark of IOCBs */
-	ha->iocb_hiwat = MAX_SRBS-2;
 
 	/*
 	 * Send Initialize Firmware Control Block
@@ -679,6 +688,91 @@ qla4xxx_initialize_fw_cb(scsi_qla_host_t *ha)
 	return status;
 }
 
+
+/**************************************************************************
+ * qla4xxx_get_dhcp_ip_address
+ *	This routine retrieves the IP Address obtained via DHCP for the
+ *	specified adapter.
+ *
+ * Input:
+ * 	ha - Pointer to host adapter structure.
+ *
+ * Returns:
+ *	QLA_SUCCESS - Successfully obtained DHCP IP Address
+ *	QLA_ERROR   - Failed to obtained
+ *
+ * Context:
+ *	Kernel context.
+ **************************************************************************/
+uint8_t
+qla4xxx_get_dhcp_ip_address(scsi_qla_host_t *ha)
+{
+	INIT_FW_CTRL_BLK  *init_fw_cb;
+	dma_addr_t	  init_fw_cb_dma;
+	uint32_t   mbox_cmd[MBOX_REG_COUNT];
+	uint32_t   mbox_sts[MBOX_REG_COUNT];
+
+	ENTER(__func__);
+
+	init_fw_cb = pci_alloc_consistent(ha->pdev, sizeof(INIT_FW_CTRL_BLK),
+	  &init_fw_cb_dma);
+	if (init_fw_cb == NULL) {
+		printk("scsi%d: %s: Unable to alloc init_cb\n", ha->host_no,
+		    __func__);
+		return 10;
+	}
+
+	/*
+	 * Get Initialize Firmware Control Block
+	 */
+	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
+	memset(&mbox_sts, 0, sizeof(mbox_sts));
+	memset(init_fw_cb, 0, sizeof(INIT_FW_CTRL_BLK));
+	mbox_cmd[0] = MBOX_CMD_GET_INIT_FW_CTRL_BLOCK;
+	mbox_cmd[2] = LSDW(init_fw_cb_dma);
+	mbox_cmd[3] = MSDW(init_fw_cb_dma);
+
+	if (qla4xxx_mailbox_command(ha, 4, 1, &mbox_cmd[0], &mbox_sts[0])
+	    != QLA_SUCCESS) {
+		QL4PRINT(QLP2,
+			 printk("scsi%d: %s: Failed to get init_fw_ctrl_blk\n",
+				ha->host_no, __func__));
+		LEAVE(__func__);
+		pci_free_consistent(ha->pdev, sizeof(INIT_FW_CTRL_BLK),
+		    init_fw_cb, init_fw_cb_dma);
+		return QLA_ERROR;
+	}
+
+	/*
+	 * Save IP Address
+	 */
+	memcpy(ha->ip_address, init_fw_cb->IPAddr,
+	    MIN(sizeof(ha->ip_address), sizeof(init_fw_cb->IPAddr)));
+	memcpy(ha->subnet_mask, init_fw_cb->SubnetMask,
+	    MIN(sizeof(ha->subnet_mask), sizeof(init_fw_cb->SubnetMask)));
+
+	QL4PRINT(QLP7, printk("scsi%d: %s: "
+	    "IP Address            %d.%d.%d.%d\n", ha->host_no,
+	    __func__, ha->ip_address[0], ha->ip_address[1],
+	    ha->ip_address[2], ha->ip_address[3]));
+	QL4PRINT(QLP7, printk("scsi%d: %s: "
+	    "Subnet Mask           %d.%d.%d.%d\n", ha->host_no,
+	    __func__, ha->subnet_mask[0], ha->subnet_mask[1],
+	    ha->subnet_mask[2], ha->subnet_mask[3]));
+	QL4PRINT(QLP7, printk("scsi%d: %s: "
+	    "Default Gateway       %d.%d.%d.%d\n", ha->host_no,
+	    __func__, init_fw_cb->GatewayIPAddr[0],
+	    init_fw_cb->GatewayIPAddr[1], init_fw_cb->GatewayIPAddr[2],
+	    init_fw_cb->GatewayIPAddr[3]));
+
+
+	pci_free_consistent(ha->pdev, sizeof(INIT_FW_CTRL_BLK), init_fw_cb,
+	    init_fw_cb_dma);
+
+	LEAVE(__func__);
+	return QLA_SUCCESS;
+}
+
 /**************************************************************************
  * qla4xxx_get_firmware_state
  *	This routine retrieves the firmware state for the specified adapter.
@@ -717,7 +811,56 @@ qla4xxx_get_firmware_state(scsi_qla_host_t *ha)
 	ha->firmware_state = mbox_sts[1];
 	ha->board_id       = mbox_sts[2];
 	ha->addl_fw_state  = mbox_sts[3];
+	DEBUG2(printk("%s firmware_state=0x%x\n", __func__, ha->firmware_state);)
 	LEAVE("qla4xxx_get_firmware_state");
+	return(QLA_SUCCESS);
+}
+
+/**************************************************************************
+ * qla4xxx_get_firmware_status
+ *	This routine retrieves the firmware status for the specified adapter.
+ *
+ * Input:
+ * 	ha - Pointer to host adapter structure.
+ *
+ * Returns:
+ *	QLA_SUCCESS - Successfully retrieved firmware status
+ *	QLA_ERROR   - Failed to retrieve firmware status
+ *
+ * Context:
+ *	Kernel context.
+ **************************************************************************/
+uint8_t
+qla4xxx_get_firmware_status(scsi_qla_host_t *ha)
+{
+	uint32_t mbox_cmd[MBOX_REG_COUNT];
+	uint32_t mbox_sts[MBOX_REG_COUNT];
+
+	ENTER(__func__);
+
+	/* Get firmware version */
+	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
+	memset(&mbox_sts, 0, sizeof(mbox_sts));
+	mbox_cmd[0] = MBOX_CMD_GET_FW_STATUS;
+	if (qla4xxx_mailbox_command(ha, 1, 3, &mbox_cmd[0], &mbox_sts[0])
+	    != QLA_SUCCESS) {
+		QL4PRINT(QLP2,
+			 printk("scsi%d: %s: MBOX_CMD_GET_FW_STATUS failed w/ "
+				"status %04X\n",
+				ha->host_no, __func__, mbox_sts[0]));
+		return(QLA_ERROR);
+	}
+
+	/* High-water mark of IOCBs */
+	ha->iocb_hiwat = mbox_sts[2];
+	if (ha->iocb_hiwat > IOCB_HIWAT_CUSHION)
+		ha->iocb_hiwat -= IOCB_HIWAT_CUSHION;
+	else
+		ql4_printk(KERN_INFO, ha, "WARNING!!!  You have less "
+			   "than %d firmare IOCBs available (%d).\n",
+			   IOCB_HIWAT_CUSHION, ha->iocb_hiwat);
+
+	LEAVE(__func__);
 	return(QLA_SUCCESS);
 }
 
@@ -754,20 +897,19 @@ qla4xxx_get_fwddb_entry(scsi_qla_host_t *ha,
 		      uint32_t        *num_valid_ddb_entries,
 		      uint32_t        *next_ddb_index,
 		      uint32_t        *fw_ddb_device_state,
-		      uint32_t        *time2wait,
+		      uint32_t        *conn_err_detail,
 		      uint16_t        *tcp_source_port_num,
 		      uint16_t        *connection_id)
 {
 	uint8_t         status = QLA_ERROR;
-	uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
+	uint32_t	mbox_cmd[MBOX_REG_COUNT];
+	uint32_t	mbox_sts[MBOX_REG_COUNT];
 
-	ENTER("qla4xxx_fwget_ddb_entry");
+	ENTER(__func__);
 
 	/* Make sure the device index is valid */
 	if (fw_ddb_index >= MAX_DDB_ENTRIES) {
-		QL4PRINT(QLP2,
-			 printk("scsi%d: %s: index [%d] out of range.\n",
+		DEBUG2( printk("scsi%d: %s: index [%d] out of range.\n",
 				ha->host_no, __func__, fw_ddb_index));
 		goto exit_get_fwddb;
 	}
@@ -781,36 +923,31 @@ qla4xxx_get_fwddb_entry(scsi_qla_host_t *ha,
 
 	if (qla4xxx_mailbox_command(ha, 4, 7, &mbox_cmd[0], &mbox_sts[0])
 	    == QLA_ERROR) {
-		QL4PRINT(QLP2,
-			 printk("scsi%d: %s: MBOX_CMD_GET_DATABASE_ENTRY failed "
-				"with status 0x%04X\n",
-				ha->host_no, __func__, mbox_sts[0]));
+		DEBUG2(printk("scsi%d: %s: MBOX_CMD_GET_DATABASE_ENTRY failed "
+		    "with status 0x%04X\n",
+		    ha->host_no, __func__, mbox_sts[0]));
 		goto exit_get_fwddb;
 	}
 
 	if (fw_ddb_index != mbox_sts[1]) {
-		QL4PRINT(QLP2,
-			 printk("scsi%d: %s: index mismatch [%d] != [%d].\n",
-				ha->host_no, __func__, fw_ddb_index,
-				mbox_sts[1]));
+		DEBUG2(printk("scsi%d: %s: index mismatch [%d] != [%d].\n",
+		    ha->host_no, __func__, fw_ddb_index,
+		    mbox_sts[1]));
 		goto exit_get_fwddb;
 	}
 
 	if (fw_ddb_entry) {
-		QL4PRINT(QLP10, printk("scsi%d: fw_ddb_entry = %p\n", ha->host_no, fw_ddb_entry));
-		qla4xxx_dump_bytes(QLP10, fw_ddb_entry, sizeof(*fw_ddb_entry));
-
-		QL4PRINT(QLP7,
-			 printk("scsi%d: %s: index [%d] MB0 %04x Tot %d Next %d "
-				"State %04x %d.%d.%d.%d:%04d \"%s\"\n",
-				ha->host_no, __func__, fw_ddb_index,
-				mbox_sts[0], mbox_sts[2], mbox_sts[3], mbox_sts[4],
-				fw_ddb_entry->ipAddr[0],
-				fw_ddb_entry->ipAddr[1],
-				fw_ddb_entry->ipAddr[2],
-				fw_ddb_entry->ipAddr[3],
-				le16_to_cpu(fw_ddb_entry->portNumber),
-				fw_ddb_entry->iscsiName));
+		ql4_printk(KERN_INFO, ha,
+		    "DDB[%d] MB0 %04x Tot %d Next %d "
+		    "State %04x ConnErr %08x %d.%d.%d.%d:%04d \"%s\"\n",
+		    fw_ddb_index,
+		    mbox_sts[0], mbox_sts[2], mbox_sts[3], mbox_sts[4], mbox_sts[5],
+		    fw_ddb_entry->ipAddr[0],
+		    fw_ddb_entry->ipAddr[1],
+		    fw_ddb_entry->ipAddr[2],
+		    fw_ddb_entry->ipAddr[3],
+		    le16_to_cpu(fw_ddb_entry->portNumber),
+		    fw_ddb_entry->iscsiName);
 	}
 
 	if (num_valid_ddb_entries)
@@ -821,9 +958,13 @@ qla4xxx_get_fwddb_entry(scsi_qla_host_t *ha,
 
 	if (fw_ddb_device_state)
 		*fw_ddb_device_state = mbox_sts[4];
-
-	if (time2wait)
-		*time2wait = mbox_sts[5];
+	/* RA: This mailbox has been changed to pass connection error and details.
+	 * Its true for ISP4010 as per Version E - Not sure when it was changed.
+	 * Get the time2wait from the fw_dd_entry field : default_time2wait which
+ 	 * we call it as minTime2Wait DEV_DB_ENTRY struct.
+	 */
+	if (conn_err_detail)
+		*conn_err_detail = mbox_sts[5];
 
 	if (tcp_source_port_num)
 		*tcp_source_port_num = (uint16_t) mbox_sts[6] >> 16;
@@ -835,7 +976,7 @@ qla4xxx_get_fwddb_entry(scsi_qla_host_t *ha,
 
 	exit_get_fwddb:
 
-	LEAVE("qla4xxx_get_fwddb_entry");
+	LEAVE(__func__);
 	return(status);
 }
 
@@ -891,6 +1032,38 @@ qla4xxx_set_ddb_entry(scsi_qla_host_t *ha,
 	mbox_cmd[2] = LSDW(fw_ddb_entry_dma);
 	mbox_cmd[3] = MSDW(fw_ddb_entry_dma);
 
+	status = qla4xxx_mailbox_command(ha, 4, 1, &mbox_cmd[0], &mbox_sts[0]);
+	if (status == QLA_SUCCESS) {
+		QL4PRINT(QLP7, printk("scsi%d: %s: mbx[0] = 0x%04x\n",
+				      ha->host_no, __func__, mbox_sts[0]));
+	}
+
+	LEAVE("qla4xxx_set_fwddb_entry");
+	return(status);
+}
+
+uint8_t
+qla4xxx_conn_open_session_login(scsi_qla_host_t *ha,
+		      uint16_t        fw_ddb_index )
+{
+	uint8_t         status = QLA_ERROR;
+	uint32_t mbox_cmd[MBOX_REG_COUNT];
+	uint32_t mbox_sts[MBOX_REG_COUNT];
+
+	QL4PRINT(QLP7, printk("scsi%d: %s: index [%d]\n",
+			      ha->host_no, __func__, fw_ddb_index));
+
+	/* Do not wait for completion. The firmware will send us an
+	 * ASTS_DATABASE_CHANGED (0x8014) to notify us of the login status.
+	 */
+	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
+	memset(&mbox_sts, 0, sizeof(mbox_sts));
+	mbox_cmd[0] = MBOX_CMD_CONN_OPEN_SESS_LOGIN;
+	mbox_cmd[1] = (uint32_t) fw_ddb_index;
+	mbox_cmd[2] = 0;
+	mbox_cmd[3] = 0;
+	mbox_cmd[4] = 0;
+
 	if (qla4xxx_mailbox_command(ha, 4, 0, &mbox_cmd[0], &mbox_sts[0]) != QLA_SUCCESS) {
 		status = QLA_ERROR;
 	}
@@ -898,7 +1071,8 @@ qla4xxx_set_ddb_entry(scsi_qla_host_t *ha,
 		status = QLA_SUCCESS;
 	}
 
-	LEAVE("qla4xxx_set_fwddb_entry");
+	printk("%s fw_ddb_index=%d status=%d mbx0_1=0x%x :0x%x\n",
+		__func__,fw_ddb_index, status, mbox_sts[0], mbox_sts[1]);
 	return(status);
 }
 
@@ -1050,6 +1224,108 @@ qla4xxx_get_crash_record(scsi_qla_host_t *ha)
 }
 
 /**************************************************************************
+ * qla4xxx_get_conn_event_log
+ *	This routine retrieves the connection event log
+ *
+ * Input:
+ * 	ha - Pointer to host adapter structure.
+ *
+ * Returns:
+ *	None
+ *
+ * Context:
+ *	Kernel context.
+ **************************************************************************/
+void
+qla4xxx_get_conn_event_log(scsi_qla_host_t *ha)
+{
+	uint32_t mbox_cmd[MBOX_REG_COUNT];
+	uint32_t mbox_sts[MBOX_REG_COUNT];
+	CONN_EVENT_LOG_ENTRY    *event_log = NULL;
+	dma_addr_t      event_log_dma = 0;
+	uint32_t        event_log_size = 0;
+	uint32_t	num_valid_entries;
+	//uint32_t	oldest_entry = 0;
+	uint8_t		i;
+
+	ENTER(__func__);
+	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
+	memset(&mbox_sts, 0, sizeof(mbox_cmd));
+
+	/*
+	 * Get size of crash record
+	 */
+	mbox_cmd[0] = MBOX_CMD_GET_CONN_EVENT_LOG;
+
+	if (qla4xxx_mailbox_command(ha, 4, 5, &mbox_cmd[0], &mbox_sts[0])
+	    != QLA_SUCCESS) {
+		QL4PRINT(QLP2, printk("scsi%d: %s: ERROR: Unable to retrieve size!\n",
+				      ha->host_no, __func__));
+		goto exit_get_event_log;
+	}
+
+	event_log_size = mbox_sts[4];
+	if (event_log_size == 0) {
+		QL4PRINT(QLP2, printk("scsi%d: %s: ERROR: Event log size is 0!\n",
+				      ha->host_no, __func__));
+		goto exit_get_event_log;
+	}
+
+	/*
+	 * Alloc Memory for Crash Record
+	 */
+	event_log = (CONN_EVENT_LOG_ENTRY *) pci_alloc_consistent(ha->pdev,
+						event_log_size,
+						&event_log_dma);
+
+	if (event_log == NULL){
+		QL4PRINT(QLP2, printk("scsi%d: %s: ERROR: Unable to allocate "
+				      " memory (%d bytes) for event log!\n",
+				      ha->host_no, __func__, event_log_size));
+		goto exit_get_event_log;
+	}
+
+	/*
+	 * Get Crash Record
+	 */
+	mbox_cmd[0] = MBOX_CMD_GET_CONN_EVENT_LOG;
+	mbox_cmd[2] = LSDW(event_log_dma);
+	mbox_cmd[3] = MSDW(event_log_dma);
+
+	if (qla4xxx_mailbox_command(ha, 4, 5, &mbox_cmd[0], &mbox_sts[0])
+	    != QLA_SUCCESS) {
+		QL4PRINT(QLP2, printk("scsi%d: %s: ERROR: Unable to retrieve "
+				      "event log!\n", ha->host_no, __func__));
+		goto exit_get_event_log;
+	}
+
+	/*
+	 * Dump Event Log
+	 */
+	num_valid_entries = mbox_sts[1];
+	//FIXME:  Code wraparound entries later ...
+	//if (num_valid_entries > MAX_CONN_EVENT_LOG_ENTRIES)
+	//	oldest_entry = num_valid_entries % MAX_CONN_EVENT_LOG_ENTRIES;
+
+	QL4PRINT(QLP1, printk(KERN_INFO "scsi%d: Connection Event Log Dump (%d entries):\n",
+			      ha->host_no, num_valid_entries));
+
+	if (ql_dbg_level & QLP1) {
+		for (i=0; i < num_valid_entries; i++) {
+			qla4xxx_dump_buffer((uint8_t *)event_log+(i*sizeof(*event_log)), sizeof(*event_log));
+		}
+	}
+
+	exit_get_event_log:
+	if (event_log)
+		pci_free_consistent(ha->pdev,
+				    event_log_size,
+				    event_log,
+				    event_log_dma);
+	LEAVE(__func__);
+}
+
+/**************************************************************************
  * qla4xxx_reset_lun
  *	This routine performs a LUN RESET on the specified target/lun.
  *
@@ -1082,7 +1358,7 @@ qla4xxx_reset_lun(scsi_qla_host_t *ha,
 
 	ENTER("qla4xxx_reset_lun");
 
-	spin_unlock_irq(ha->host->host_lock);
+	//spin_unlock_irq(ha->host->host_lock);
 
 	QL4PRINT(QLP2, printk(KERN_INFO
 	    "scsi%d:%d:%d:%d: lun reset issued\n", ha->host_no, ddb_entry->bus,
@@ -1113,7 +1389,7 @@ qla4xxx_reset_lun(scsi_qla_host_t *ha,
 		status = QLA_ERROR;
 	}
 
-	spin_lock_irq(ha->host->host_lock);
+	//spin_lock_irq(ha->host->host_lock);
 
 	LEAVE("qla4xxx_reset_lun");
 

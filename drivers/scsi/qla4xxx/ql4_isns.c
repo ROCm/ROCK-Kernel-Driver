@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE                                     *
  *                                                                            *
- * QLogic ISP4xxx device driver for Linux 2.4.x                               *
+ * QLogic ISP4xxx device driver for Linux 2.6.x                               *
  * Copyright (C) 2004 Qlogic Corporation                                      *
  * (www.qlogic.com)                                                           *
  *                                                                            *
@@ -155,7 +155,7 @@ qla4xxx_strtolower(uint8_t *str)
 void
 qla4xxx_isns_build_entity_id(scsi_qla_host_t *ha)
 {
-	sprintf(ha->isns_entity_id, "eid:qlogic:qla4010-%s", ha->serial_number);
+	sprintf(ha->isns_entity_id, "%s.%d", ha->serial_number, ha->function_number);
 	qla4xxx_strtolower(ha->isns_entity_id);
 }
 
@@ -294,13 +294,13 @@ qla4xxx_isns_init_isns_reg_attr_list(scsi_qla_host_t *ha)
 		{ ISNS_ATTR_TAG_DELIMITER,         ISNS_ATTR_TYPE_EMPTY,   0},
 		// Operating attributes to register
 		{ ISNS_ATTR_TAG_ENTITY_IDENTIFIER, ISNS_ATTR_TYPE_STRING,  -1},
-		{ ISNS_ATTR_TAG_ENTITY_PROTOCOL,   ISNS_ATTR_TYPE_ULONG,   DWSWAP(ENTITY_PROTOCOL_ISCSI)},
+		{ ISNS_ATTR_TAG_ENTITY_PROTOCOL,   ISNS_ATTR_TYPE_ULONG,   cpu_to_be32(ENTITY_PROTOCOL_ISCSI)},
 		{ ISNS_ATTR_TAG_PORTAL_IP_ADDRESS, ISNS_ATTR_TYPE_ADDRESS, -1},
 		{ ISNS_ATTR_TAG_PORTAL_PORT,       ISNS_ATTR_TYPE_ULONG,   -1},
 		{ ISNS_ATTR_TAG_SCN_PORT,          ISNS_ATTR_TYPE_ULONG,   -1},
 		{ ISNS_ATTR_TAG_ESI_PORT,          ISNS_ATTR_TYPE_ULONG,   -1},
 		{ ISNS_ATTR_TAG_ISCSI_NAME,        ISNS_ATTR_TYPE_STRING,  (unsigned long) ha->name_string},
-		{ ISNS_ATTR_TAG_ISCSI_NODE_TYPE,   ISNS_ATTR_TYPE_ULONG,   DWSWAP(ISCSI_NODE_TYPE_INITIATOR)},
+		{ ISNS_ATTR_TAG_ISCSI_NODE_TYPE,   ISNS_ATTR_TYPE_ULONG,   cpu_to_be32(ISCSI_NODE_TYPE_INITIATOR)},
 		{ ISNS_ATTR_TAG_ISCSI_ALIAS,       ISNS_ATTR_TYPE_STRING,  -1},		// Friendly machine name?
 
 		{ 0, 0, 0}		// Terminating NULL entry
@@ -342,7 +342,7 @@ qla4xxx_isns_init_isns_scn_reg_attr_list(scsi_qla_host_t *ha)
 		// Required delimiter to indicate division between key and operating attrs.
 		{ ISNS_ATTR_TAG_DELIMITER,         ISNS_ATTR_TYPE_EMPTY,   0},
 		// Operating attributes
-		{ ISNS_ATTR_TAG_ISCSI_SCN_BITMAP,  ISNS_ATTR_TYPE_ULONG,   DWSWAP(ISCSI_SCN_OBJECT_UPDATED |
+		{ ISNS_ATTR_TAG_ISCSI_SCN_BITMAP,  ISNS_ATTR_TYPE_ULONG,   cpu_to_be32(ISCSI_SCN_OBJECT_UPDATED |
 										  ISCSI_SCN_OBJECT_ADDED |
 										  ISCSI_SCN_OBJECT_REMOVED |
 										  ISCSI_SCN_TARGET_AND_SELF_INFO_ONLY)},
@@ -379,7 +379,7 @@ qla4xxx_isns_init_isns_dev_get_next_attr_list(scsi_qla_host_t *ha)
 		// Required delimiter to indicate division between key and operating attrs.
 		{ ISNS_ATTR_TAG_DELIMITER,         ISNS_ATTR_TYPE_EMPTY,  0},
 		// Operating attributes (attributes of object matching key attribute to return)
-		{ ISNS_ATTR_TAG_ISCSI_NODE_TYPE,   ISNS_ATTR_TYPE_ULONG,  DWSWAP(ISCSI_NODE_TYPE_TARGET)},
+		{ ISNS_ATTR_TAG_ISCSI_NODE_TYPE,   ISNS_ATTR_TYPE_ULONG,  cpu_to_be32(ISCSI_NODE_TYPE_TARGET)},
 
 		{ 0, 0, 0}		// Terminating NULL entry
 	};
@@ -436,7 +436,7 @@ qla4xxx_isns_init_attributes (scsi_qla_host_t *ha)
 			{ ISNS_ATTR_TAG_DELIMITER,         ISNS_ATTR_TYPE_EMPTY,  0},
 			// Operating attributes to register
 			{ ISNS_ATTR_TAG_ISCSI_NAME,        ISNS_ATTR_TYPE_STRING, (unsigned long) ha->name_string},
-			{ ISNS_ATTR_TAG_ISCSI_NODE_TYPE,   ISNS_ATTR_TYPE_ULONG,  DWSWAP(ISCSI_NODE_TYPE_INITIATOR)},
+			{ ISNS_ATTR_TAG_ISCSI_NODE_TYPE,   ISNS_ATTR_TYPE_ULONG,  cpu_to_be32(ISCSI_NODE_TYPE_INITIATOR)},
 			{ ISNS_ATTR_TAG_ISCSI_ALIAS,       ISNS_ATTR_TYPE_STRING, -1},	    // Friendly machine name?
 
 			{ 0, 0, 0}	// Terminating NULL entry
@@ -463,7 +463,7 @@ qla4xxx_isns_init_attributes (scsi_qla_host_t *ha)
 			{ ISNS_ATTR_TAG_DELIMITER,         ISNS_ATTR_TYPE_EMPTY,  0},
 			// Operating attributes to update
 			{ ISNS_ATTR_TAG_ISCSI_NAME,        ISNS_ATTR_TYPE_STRING, (unsigned long) ha->name_string},
-			{ ISNS_ATTR_TAG_ISCSI_NODE_TYPE,   ISNS_ATTR_TYPE_ULONG,  DWSWAP(ISCSI_NODE_TYPE_INITIATOR)},
+			{ ISNS_ATTR_TAG_ISCSI_NODE_TYPE,   ISNS_ATTR_TYPE_ULONG,  cpu_to_be32(ISCSI_NODE_TYPE_INITIATOR)},
 			{ ISNS_ATTR_TAG_ISCSI_ALIAS,       ISNS_ATTR_TYPE_STRING, -1},	    // Friendly machine name?
 
 			{ 0, 0, 0}	// Terminating NULL entry
@@ -508,11 +508,11 @@ qla4xxx_isns_append_attribute(scsi_qla_host_t *ha,
 	switch (attribute->type) {
 	case ISNS_ATTR_TYPE_EMPTY:
 		data_len = 0;
-		if ((isns_attr->value + data_len) > buffer_end) {
+		if ((&isns_attr->value[0] + data_len) > buffer_end) {
 			return(QLA_ERROR);
 		}
-		isns_attr->tag = attribute->isns_tag;
-		isns_attr->length = data_len;
+		isns_attr->tag = cpu_to_be32(attribute->isns_tag);
+		isns_attr->length = cpu_to_be32(data_len);
 		break;
 
 	case ISNS_ATTR_TYPE_STRING:
@@ -522,17 +522,18 @@ qla4xxx_isns_append_attribute(scsi_qla_host_t *ha,
 		 * You should encode your strings for UTF-8 before registering
 		 * them with the iSNS server.
 		 */
-		data_len = strlen ((uint8_t *) (unsigned long) attribute->data) + sizeof(uint8_t);
+		data_len = strlen ((uint8_t *) attribute->data) + sizeof(uint8_t);
 		if (data_len % 4) {
 			data_len += (4 - (data_len % 4)); // Pad to 4 byte boundary.
 		}
-		if ((isns_attr->value + data_len) > buffer_end) {
+
+		if ((&isns_attr->value[0] + data_len) > buffer_end) {
 			return(QLA_ERROR);
 		}
-		isns_attr->tag = attribute->isns_tag;
-		isns_attr->length = data_len;
+		isns_attr->tag = cpu_to_be32(attribute->isns_tag);
+		isns_attr->length = cpu_to_be32(data_len);
 		memset(isns_attr->value, 0, data_len);
-		strcpy (&isns_attr->value[0], (uint8_t *) (unsigned long) attribute->data);
+		strcpy (&isns_attr->value[0], (uint8_t *) attribute->data);
 		break;
 
 	case ISNS_ATTR_TYPE_ULONG:
@@ -540,21 +541,24 @@ qla4xxx_isns_append_attribute(scsi_qla_host_t *ha,
 		if ((isns_attr->value + data_len) > buffer_end) {
 			return(QLA_ERROR);
 		}
-		isns_attr->tag = attribute->isns_tag;
-		isns_attr->length = data_len;
+		isns_attr->tag = cpu_to_be32(attribute->isns_tag);
+		isns_attr->length = cpu_to_be32(data_len);
 		*(uint32_t *) isns_attr->value = (uint32_t) attribute->data;
 		break;
 
 	case ISNS_ATTR_TYPE_ADDRESS:
-		local = (uint8_t *) (unsigned long) attribute->data;
+		local = (uint8_t *) attribute->data;
 		data_len = 16;	     // Size of an IPv6 address
 		if ((isns_attr->value + data_len) > buffer_end) {
 			return(QLA_ERROR);
 		}
-		isns_attr->tag = attribute->isns_tag;
-		isns_attr->length = data_len;
-		// WARNING: This doesn't handle IPv6 addresses.
+		isns_attr->tag = cpu_to_be32(attribute->isns_tag);
+		isns_attr->length = cpu_to_be32(data_len);
+		// Prepend IP Address with 0xFFFF to indicate this is an IPv4
+		// only address. IPv6 addresses not supported by driver.
 		memset(isns_attr->value, 0, 16);
+		isns_attr->value[10] = 0xFF;
+		isns_attr->value[11] = 0xFF;
 		isns_attr->value[12] = local[0];
 		isns_attr->value[13] = local[1];
 		isns_attr->value[14] = local[2];
@@ -566,12 +570,7 @@ qla4xxx_isns_append_attribute(scsi_qla_host_t *ha,
 
 	}
 
-	*buffer = isns_attr->value + isns_attr->length;
-
-	// Swap Tag and Length values.
-
-	isns_attr->tag = DWSWAP(isns_attr->tag);
-	isns_attr->length = DWSWAP(isns_attr->length);
+	*buffer = &isns_attr->value[0] + data_len;
 
 	return(QLA_SUCCESS);
 }
@@ -615,8 +614,12 @@ qla4xxx_isns_get_server_request(scsi_qla_host_t *ha,
 	pdu_entry->SendBuffLen = 0;
 	pdu_entry->RecvBuffLen = pdu_entry->BuffLen;
 
+	QL4PRINT(QLP19, printk("PDU (0x%p) 0x%x ->\n", pdu_entry->Buff, pdu_entry->SendBuffLen));
+	qla4xxx_dump_bytes(QLP19, pdu_entry->Buff, pdu_entry->SendBuffLen);
+
 	if (qla4xxx_send_passthru0_iocb(ha, ISNS_DEVICE_INDEX, connection_id,
-					pdu_entry->Buff, pdu_entry->SendBuffLen,
+					pdu_entry->DmaBuff,
+					pdu_entry->SendBuffLen,
 					pdu_entry->RecvBuffLen,
 					PT_FLAG_ISNS_PDU | PT_FLAG_WAIT_4_RESPONSE,
 					qla4xxx_isns_build_iocb_handle(ha, /*ISNS_REQ_RSP_PDU*/ISNS_ASYNCH_REQ_PDU, pdu_entry))
@@ -685,17 +688,17 @@ qla4xxx_isns_build_registration_packet(scsi_qla_host_t *ha,
 	 * Fill in all of the run time requested data in the attribute array,
 	 * then call build_request_packet to do the actual work.
 	 */
-	ha->isns_reg_attr_list[1].data = (uint32_t)(unsigned long) isns_entity_id;
-	ha->isns_reg_attr_list[3].data = (uint32_t)(unsigned long) isns_entity_id;
-	ha->isns_reg_attr_list[5].data = (uint32_t)(unsigned long) ip_addr;
-	ha->isns_reg_attr_list[6].data = DWSWAP(port_number);
-	ha->isns_reg_attr_list[7].data = DWSWAP(scn_port);
-	ha->isns_reg_attr_list[8].data = DWSWAP(esi_port);
+	ha->isns_reg_attr_list[1].data = (unsigned long) isns_entity_id;
+	ha->isns_reg_attr_list[3].data = (unsigned long) isns_entity_id;
+	ha->isns_reg_attr_list[5].data = (unsigned long) ip_addr;
+	ha->isns_reg_attr_list[6].data = cpu_to_be32(port_number);
+	ha->isns_reg_attr_list[7].data = cpu_to_be32(scn_port);
+	ha->isns_reg_attr_list[8].data = cpu_to_be32(esi_port);
 	if (local_alias && local_alias[0]) {
-		ha->isns_reg_attr_list[11].data = (uint32_t) (unsigned long) local_alias;
+		ha->isns_reg_attr_list[11].data = (unsigned long) local_alias;
 	}
 	else {
-		ha->isns_reg_attr_list[11].data = (uint32_t) "<No alias specified>";
+		ha->isns_reg_attr_list[11].data = (unsigned long) "<No alias specified>";
 	}
 
 	return(qla4xxx_isns_build_request_packet(ha, buff, buff_size,
@@ -719,10 +722,10 @@ qla4xxx_isns_build_deregistration_packet(scsi_qla_host_t *ha,
 	 * Fill in all of the run time requested data in the attribute array,
 	 * then call build_request_packet to do the actual work.
 	 */
-	ha->isns_dereg_attr_list[2].data = (uint32_t) (unsigned long) isns_entity_id;
+	ha->isns_dereg_attr_list[2].data = (unsigned long) isns_entity_id;
 	#if 0
-	ha->isns_dereg_attr_list[3].data = (uint32_t) (unsigned long) ip_addr;
-	ha->isns_dereg_attr_list[4].data = (uint32_t) DWSWAP(WSWAP(port_number));
+	ha->isns_dereg_attr_list[3].data = (unsigned long) ip_addr;
+	ha->isns_dereg_attr_list[4].data = (unsigned long) cpu_to_be32(port_number);
 	#endif
 
 	return(qla4xxx_isns_build_request_packet(ha, buff, buff_size,
@@ -755,9 +758,11 @@ qla4xxx_isns_build_request_packet(scsi_qla_host_t *ha,
 	 * message header plus at least one attribute.
 	 */
 	if (buffer_size < (sizeof(*isns_message) + sizeof(*attr_list))) {
-		QL4PRINT(QLP12, printk("scsi%d: %s: Insufficient buffer size %d, need %d\n",
+		QL4PRINT(QLP12, printk("scsi%d: %s: Insufficient buffer size "
+				       "%d, need %d\n",
 				       ha->host_no, __func__, buffer_size,
-				       (unsigned int) (sizeof(*isns_message) + sizeof(*attr_list))));
+				       (unsigned int) (sizeof(*isns_message) +
+						       sizeof(*attr_list))));
 
 		return(QLA_ERROR);
 	}
@@ -766,21 +771,28 @@ qla4xxx_isns_build_request_packet(scsi_qla_host_t *ha,
 	buffer_end = (uint8_t *) ((unsigned long) buffer + buffer_size);
 
 	/* Initialize message header contents */
-	isns_message->isnsp_version = WSWAP(ISNSP_VERSION);
-	isns_message->function_id   = WSWAP(function_id);
-	isns_message->flags         = WSWAP(ISNSP_CLIENT_SENDER |
+	isns_message->isnsp_version = cpu_to_be16(ISNSP_VERSION);
+	isns_message->function_id   = cpu_to_be16(function_id);
+	if (use_replace_flag) {
+		isns_message->flags = cpu_to_be16(ISNSP_CLIENT_SENDER |
+                                                  ISNSP_FIRST_PDU |
+						  ISNSP_LAST_PDU |
+						  ISNSP_REPLACE_FLAG);
+	}
+	else {
+		isns_message->flags = cpu_to_be16(ISNSP_CLIENT_SENDER |
 					    ISNSP_FIRST_PDU |
 					    ISNSP_LAST_PDU);
-	if (use_replace_flag)
-		isns_message->flags |= WSWAP(ISNSP_REPLACE_FLAG);
-	isns_message->transaction_id = WSWAP(tx_id);
+	}
+
+	isns_message->transaction_id = cpu_to_be16(tx_id);
 	isns_message->sequence_id    = 0; // First and only packet in this message
 
 	ptr = payload_start = &isns_message->payload[0];
 
 	/*
-	 * Now that most of the message header has been initialized (we'll fill in
-	 * the size when we're finished), let's append the desired attributes
+	 * Now that most of the message header has been initialized (we'll fill
+	 * in the size when we're finished), let's append the desired attributes
 	 * to the request packet.
 	 */
 	success = 1;
@@ -800,9 +812,11 @@ qla4xxx_isns_build_request_packet(scsi_qla_host_t *ha,
 	 * We've successfully finished building the request packet.
 	 * Set the size field.
 	 */
-	isns_message->pdu_length = WSWAP((uint32_t) (unsigned long) ptr - (uint32_t) (unsigned long) payload_start);
+	isns_message->pdu_length = cpu_to_be16((unsigned long) ptr -
+                                               (unsigned long) payload_start);
 
-	*packet_size = (uint32_t) ((uint32_t) (unsigned long) ptr - (uint32_t) (unsigned long) buffer);
+	*packet_size = (uint32_t) ((unsigned long) ptr -
+				   (unsigned long) buffer);
 
 	return(QLA_SUCCESS);
 }
@@ -811,9 +825,9 @@ uint8_t
 qla4xxx_isns_build_server_request_response_packet(scsi_qla_host_t *ha,
 						  uint8_t * buffer,
 						  uint32_t buffer_size,
-						  uint16_t function_id,
-						  uint32_t error_code,
-						  uint16_t transaction_id,
+						  uint16_t function_id,	 //cpu
+						  uint32_t error_code,	 //cpu
+						  uint16_t transaction_id, //cpu
 						  uint32_t *packet_size)
 {
 	ISNSP_MESSAGE_HEADER * isns_message;
@@ -832,32 +846,35 @@ qla4xxx_isns_build_server_request_response_packet(scsi_qla_host_t *ha,
 	}
 
 	isns_message = (ISNSP_MESSAGE_HEADER *) buffer;
-	isns_response = (ISNSP_RESPONSE_HEADER *) isns_message->payload;
+	isns_response = (ISNSP_RESPONSE_HEADER *) &isns_message->payload[0];
 	payload_start = ( uint8_t *) isns_response;
 	buffer_end = ( uint8_t *) (buffer + buffer_size);
 
 	// Initialize message header contents.
 
-	isns_message->isnsp_version = WSWAP(ISNSP_VERSION);
-	isns_message->function_id = function_id;
-	isns_message->flags = WSWAP(ISNSP_CLIENT_SENDER |
+	isns_message->isnsp_version = cpu_to_be16(ISNSP_VERSION);
+	isns_message->function_id = (function_id);
+	//isns_message->function_id = cpu_to_be16(function_id);
+	isns_message->flags = cpu_to_be16(ISNSP_CLIENT_SENDER |
 				    ISNSP_FIRST_PDU |
 				    ISNSP_LAST_PDU);
-	isns_message->transaction_id = transaction_id;
+	isns_message->transaction_id =(transaction_id);
+	//isns_message->transaction_id = cpu_to_be16(transaction_id);
 	isns_message->sequence_id = 0;	 // First and only packet in this message
 
-	isns_response->error_code = DWSWAP(error_code);
+	isns_response->error_code = cpu_to_be32(error_code);
 
-	ptr = isns_response->attributes;
+	ptr = &isns_response->attributes[0];
 
 	// We've successfully finished building the request packet.
 	// Set the size field.
 
 	//QLASSERT (!((ptr - payload_start) % 4));
 
-	isns_message->pdu_length = WSWAP((uint32_t) (unsigned long) ptr - (uint32_t) (unsigned long) payload_start);
+	isns_message->pdu_length = cpu_to_be16((unsigned long) ptr -
+                                               (unsigned long) payload_start);
 
-	*packet_size = (uint32_t) (unsigned long) ptr - (uint32_t) (unsigned long) buffer;
+	*packet_size = (unsigned long) ptr - (unsigned long) buffer;
 
 	return(QLA_SUCCESS);
 }
@@ -874,7 +891,7 @@ qla4xxx_isns_build_dev_get_next_packet (scsi_qla_host_t *ha,
 
 	if (last_iscsi_name && last_iscsi_name[0]) {
 		ha->isns_dev_get_next_attr_list[1].type = ISNS_ATTR_TYPE_STRING;
-		ha->isns_dev_get_next_attr_list[1].data = (uint32_t) (unsigned long) last_iscsi_name;
+		ha->isns_dev_get_next_attr_list[1].data = (unsigned long) last_iscsi_name;
 	}
 	else {
 		ha->isns_dev_get_next_attr_list[1].type = ISNS_ATTR_TYPE_EMPTY;
@@ -899,7 +916,7 @@ qla4xxx_isns_build_dev_attr_qry_packet (scsi_qla_host_t *ha,
 	// Fill in all of the run time requested data in the attribute array
 	// then call qla4xxx_isns_build_request_packet to do the actual work.
 
-	ha->isns_dev_attr_qry_attr_list[1].data = (uint32_t) (unsigned long) object_iscsi_name;
+	ha->isns_dev_attr_qry_attr_list[1].data = (unsigned long) object_iscsi_name;
 
 	return(qla4xxx_isns_build_request_packet(ha, buffer, buffer_size,
 						 ISNS_FCID_DevAttrQry,
@@ -912,7 +929,7 @@ uint8_t
 qla4xxx_isns_parse_get_next_response(scsi_qla_host_t *ha,
 				     uint8_t *buffer,
 				     uint32_t buffer_size,
-				     uint32_t *isns_error,
+				     uint32_t *isns_error, // cpu, w.r.t. PPC byte order
 				     uint8_t *last_iscsi_name,
 				     uint32_t last_iscsi_name_size,
 				     uint8_t *IsTarget)
@@ -925,13 +942,15 @@ qla4xxx_isns_parse_get_next_response(scsi_qla_host_t *ha,
 	*IsTarget = 0;
 
 	isns_message = (ISNSP_MESSAGE_HEADER *) buffer;
-	buffer_end = ( uint8_t *) (( uint8_t *) isns_message->payload +
-				   WSWAP(isns_message->pdu_length));
+	buffer_end = ( uint8_t *) (( uint8_t *) &isns_message->payload[0] +
+				   be16_to_cpu(isns_message->pdu_length));
 
 	// Validate pdu_length specified in the iSNS message header.
 
-	if (((uint32_t) (unsigned long) buffer_end - (uint32_t) (unsigned long) buffer) > buffer_size) {
-		QL4PRINT(QLP2, printk("scsi%d: %s: Invalid length field in iSNS response from iSNS server\n",
+	if (((unsigned long) buffer_end -
+	     (unsigned long) buffer) > buffer_size) {
+		QL4PRINT(QLP2, printk("scsi%d: %s: Invalid length field in "
+				      "iSNS response from iSNS server\n",
 				      ha->host_no, __func__));
 		return(QLA_ERROR);
 	}
@@ -941,17 +960,17 @@ qla4xxx_isns_parse_get_next_response(scsi_qla_host_t *ha,
 
 	// Ensure that we have the correct function_id.
 
-	if (isns_message->function_id != WSWAP(ISNS_FCID_DevGetNextRsp)) {
+	if (be16_to_cpu(isns_message->function_id) != ISNS_FCID_DevGetNextRsp) {
 		QL4PRINT(QLP2, printk("scsi%d: %s: Invalid Function ID (0x%04x) "
 				      "in iSNS response from iSNS server\n",
 				      ha->host_no, __func__,
-				      WSWAP(isns_message->function_id)));
+				      be16_to_cpu(isns_message->function_id)));
 		return(QLA_ERROR);
 	}
 
-	isns_response = (ISNSP_RESPONSE_HEADER *) isns_message->payload;
+	isns_response = (ISNSP_RESPONSE_HEADER *) &isns_message->payload[0];
 
-	*isns_error = DWSWAP(isns_response->error_code);
+	*isns_error = be32_to_cpu(isns_response->error_code);
 	if (*isns_error) {
 		QL4PRINT(QLP2, printk("scsi%d: %s: iSNS Error code: %d\n",
 				      ha->host_no, __func__, *isns_error));
@@ -959,6 +978,7 @@ qla4xxx_isns_parse_get_next_response(scsi_qla_host_t *ha,
 		if (*isns_error == ISNS_ERR_NO_SUCH_ENTRY) {
 			QL4PRINT(QLP2, printk("scsi%d: %s: No more targets.\n",
 					      ha->host_no, __func__));
+			set_bit(ISNS_FLAG_DEV_SCAN_DONE, &ha->isns_flags);
 		}
 		else {
 			QL4PRINT(QLP2, printk("scsi%d: %s: Get Next failed. Error code %x\n",
@@ -967,13 +987,13 @@ qla4xxx_isns_parse_get_next_response(scsi_qla_host_t *ha,
 		return(QLA_ERROR);
 	}
 
-	isns_attr = (ISNS_ATTRIBUTE *) isns_response->attributes;
+	isns_attr = (ISNS_ATTRIBUTE *) &isns_response->attributes[0];
 
 	// Save the returned key attribute for the next DevGetNext request.
 
-	if (VALIDATE_ATTR(isns_attr, buffer_end) && isns_attr->tag ==
-	    DWSWAP(ISNS_ATTR_TAG_ISCSI_NAME)) {
-		strncpy(last_iscsi_name, isns_attr->value, last_iscsi_name_size);
+	if (VALIDATE_ATTR(isns_attr, buffer_end) &&
+	    be32_to_cpu(isns_attr->tag) == ISNS_ATTR_TAG_ISCSI_NAME) {
+		strncpy(last_iscsi_name, &isns_attr->value[0], last_iscsi_name_size);
 	}
 	else {
 		QL4PRINT(QLP2, printk("scsi%d: %s: Bad Key attribute in DevGetNextRsp\n",
@@ -985,8 +1005,8 @@ qla4xxx_isns_parse_get_next_response(scsi_qla_host_t *ha,
 
 	isns_attr = NEXT_ATTR(isns_attr);
 
-	if (VALIDATE_ATTR(isns_attr, buffer_end) && isns_attr->tag
-	    == DWSWAP(ISNS_ATTR_TAG_DELIMITER)) {
+	if (VALIDATE_ATTR(isns_attr, buffer_end) &&
+	    be32_to_cpu(isns_attr->tag) == ISNS_ATTR_TAG_DELIMITER) {
 		;	// Do nothing.
 	}
 	else {
@@ -1001,16 +1021,16 @@ qla4xxx_isns_parse_get_next_response(scsi_qla_host_t *ha,
 
 	isns_attr = NEXT_ATTR(isns_attr);
 
-	if (VALIDATE_ATTR(isns_attr, buffer_end) && isns_attr->tag ==
-	    DWSWAP(ISNS_ATTR_TAG_ISCSI_NODE_TYPE)) {
-		if (DWSWAP(*(uint32_t *) isns_attr->value) & ISCSI_NODE_TYPE_TARGET) {
+	if (VALIDATE_ATTR(isns_attr, buffer_end) &&
+	    be32_to_cpu(isns_attr->tag) == ISNS_ATTR_TAG_ISCSI_NODE_TYPE) {
+		if (be32_to_cpu(*(uint32_t *) &isns_attr->value[0]) & ISCSI_NODE_TYPE_TARGET) {
 			*IsTarget = 1;
 		}
 	}
 	#if 0
 	else {
-		QL4PRINT(QLP2, printk("scsi%d: %s: Bad operating attr in DevGetNextRsp\n",
-				      ha->host_no, __func__));
+		QL4PRINT(QLP2, printk("scsi%d: %s: Bad operating attr in DevGetNextRsp (%d)\n",
+				      ha->host_no, __func__, be16_to_cpu(isns_attr->tag)));
 		return(QLA_ERROR);
 	}
 	#endif
@@ -1022,7 +1042,7 @@ uint8_t
 qla4xxx_isns_parse_query_response (scsi_qla_host_t *ha,
 				   uint8_t *buffer,
 				   uint32_t buffer_size,
-				   uint32_t *isns_error,
+				   uint32_t *isns_error,    // cpu
 				   ISNS_DISCOVERED_TARGET *isns_discovered_target,
 				   uint8_t *IsTarget,
 				   uint8_t *last_iscsi_name)
@@ -1037,12 +1057,16 @@ qla4xxx_isns_parse_query_response (scsi_qla_host_t *ha,
 	uint32_t i;
 
 	isns_message = (ISNSP_MESSAGE_HEADER *) buffer;
-	buffer_end = isns_message->payload + WSWAP(isns_message->pdu_length);
+	buffer_end = &isns_message->payload[0] +
+		be16_to_cpu(isns_message->pdu_length);
 
 	// Validate pdu_length specified in the iSNS message header.
 
-	if (((uint32_t) (unsigned long) buffer_end - (uint32_t) (unsigned long) buffer) > buffer_size) {
-		QL4PRINT(QLP2, printk("scsi%d: %s: Invalid length field in iSNS response from iSNS server\n", ha->host_no, __func__));
+	if (((unsigned long) buffer_end -
+	     (unsigned long) buffer) > buffer_size) {
+		QL4PRINT(QLP2, printk("scsi%d: %s: Invalid length field in "
+				      "iSNS response from iSNS server\n",
+				      ha->host_no, __func__));
 		return(QLA_ERROR);
 	}
 
@@ -1051,21 +1075,21 @@ qla4xxx_isns_parse_query_response (scsi_qla_host_t *ha,
 
 	// Ensure that we have the correct function_id.
 
-	if (isns_message->function_id != WSWAP(ISNS_FCID_DevAttrQryRsp)) {
+	if (be16_to_cpu(isns_message->function_id) != ISNS_FCID_DevAttrQryRsp) {
 		QL4PRINT(QLP2, printk("scsi%d: %s: Invalid Function ID %04x in iSNS response\n",
 				      ha->host_no, __func__,
-				      WSWAP(isns_message->function_id)));
+				      be16_to_cpu(isns_message->function_id)));
 		return(QLA_ERROR);
 	}
 
-	isns_response = (ISNSP_RESPONSE_HEADER *) isns_message->payload;
+	isns_response = (ISNSP_RESPONSE_HEADER *) &isns_message->payload[0];
 
 	QL4PRINT(QLP20, printk("-----------------------------\n"));
 	QL4PRINT(QLP20, printk("scsi%d: %s: DevAttrQry response from iSNS server:\n",
 			       ha->host_no, __func__));
 
-	*isns_error = DWSWAP(isns_response->error_code);
-	if (isns_response->error_code) {
+	*isns_error = be32_to_cpu(isns_response->error_code);
+	if (*isns_error) {
 		QL4PRINT(QLP2, printk("scsi%d: %s: iSNS Query failed.  error_code %x.\n",
 				      ha->host_no, __func__, *isns_error));
 		return(QLA_ERROR);
@@ -1073,28 +1097,28 @@ qla4xxx_isns_parse_query_response (scsi_qla_host_t *ha,
 
 	QL4PRINT(QLP20, printk("scsi%d: %s: Attributes:\n", ha->host_no, __func__));
 
-	isns_attr = (ISNS_ATTRIBUTE *) isns_response->attributes;
+	isns_attr = (ISNS_ATTRIBUTE *) &isns_response->attributes[0];
 
 	// Skip key and delimiter attributes.
 
-	while (VALIDATE_ATTR(isns_attr, buffer_end) && isns_attr->tag !=
-	       DWSWAP(ISNS_ATTR_TAG_DELIMITER)) {
+	while (VALIDATE_ATTR(isns_attr, buffer_end) &&
+	       be32_to_cpu(isns_attr->tag) != ISNS_ATTR_TAG_DELIMITER) {
 		// Point to next attribute.
-		if (DWSWAP(isns_attr->tag) == ISNS_ATTR_TAG_ISCSI_NAME) {
+		if (be32_to_cpu(isns_attr->tag) == ISNS_ATTR_TAG_ISCSI_NAME) {
 			// Note that this string is in UTF-8 format.  In production code,
 			// it would be necessary to convert from UTF-8 before using the
 			// string.
 			QL4PRINT(QLP20, printk("scsi%d: %s: MsgTag iSCSI Name: \"%s\"\n",
-					       ha->host_no, __func__, isns_attr->value));
+					       ha->host_no, __func__, &isns_attr->value[0]));
 			if (strlen (isns_attr->value) > 256)
 				return(QLA_ERROR);
-			strcpy (last_iscsi_name, (uint8_t *) isns_attr->value);
+			strcpy (last_iscsi_name, (uint8_t *) &isns_attr->value[0]);
 		}
 		isns_attr = NEXT_ATTR(isns_attr);
 	}
 
-	if (!VALIDATE_ATTR(isns_attr, buffer_end) || isns_attr->tag !=
-	    DWSWAP(ISNS_ATTR_TAG_DELIMITER)) {
+	if (!VALIDATE_ATTR(isns_attr, buffer_end) ||
+	    be32_to_cpu(isns_attr->tag) != ISNS_ATTR_TAG_DELIMITER) {
 		// There was no delimiter attribute in the response.
 		return(QLA_ERROR);
 	}
@@ -1106,15 +1130,15 @@ qla4xxx_isns_parse_query_response (scsi_qla_host_t *ha,
 		// We only need to parse for the operating attributes that we
 		// requested in the DevAttrQuery.
 
-		switch (DWSWAP(isns_attr->tag)) {
+		switch (be32_to_cpu(isns_attr->tag)) {
 		case ISNS_ATTR_TAG_ENTITY_PROTOCOL:
-			if (DWSWAP(*(uint32_t *) isns_attr->value) != ENTITY_PROTOCOL_ISCSI) {
+			if (be32_to_cpu(*(uint32_t *) isns_attr->value) != ENTITY_PROTOCOL_ISCSI) {
 				QL4PRINT(QLP2, printk("scsi%d: %s: Entity does not support iSCSI protocol\n", ha->host_no, __func__));
 			}
 			break;
 
 		case ISNS_ATTR_TAG_ISCSI_NODE_TYPE:
-			switch (DWSWAP(*(uint32_t *) isns_attr->value)) {
+			switch (be32_to_cpu(*(uint32_t *) isns_attr->value)) {
 			case ISCSI_NODE_TYPE_TARGET:
 				QL4PRINT(QLP20, printk("scsi%d: %s: iSCSI node type Target\n", ha->host_no, __func__));
 				*IsTarget = 1;
@@ -1136,7 +1160,7 @@ qla4xxx_isns_parse_query_response (scsi_qla_host_t *ha,
 
 		case ISNS_ATTR_TAG_MGMT_IP_ADDRESS:
 			// WARNING: This doesn't handle IPv6 addresses.
-			tmpptr = isns_attr->value;
+			tmpptr = &isns_attr->value[0];
 			for (i = 0; i < 8; i++) {
 				if (tmpptr[i])
 					return(QLA_ERROR);
@@ -1154,7 +1178,7 @@ qla4xxx_isns_parse_query_response (scsi_qla_host_t *ha,
 
 		case ISNS_ATTR_TAG_PORTAL_IP_ADDRESS:
 			// WARNING: This doesn't handle IPv6 addresses.
-			tmpptr = isns_attr->value;
+			tmpptr = &isns_attr->value[0];
 			for (i = 0; i < 8; i++) {
 				if (tmpptr[i])
 					return(QLA_ERROR);
@@ -1176,9 +1200,9 @@ qla4xxx_isns_parse_query_response (scsi_qla_host_t *ha,
 			break;
 
 		case ISNS_ATTR_TAG_PORTAL_PORT:
-			wTmp = (uint16_t) (DWSWAP(*(uint32_t *) isns_attr->value));
+			wTmp = (uint16_t) (be32_to_cpu(*(uint32_t *) isns_attr->value));
 			QL4PRINT(QLP20, printk("scsi%d: %s: Portal port: %u\n",
-					       ha->host_no, __func__, DWSWAP(*(uint32_t *) isns_attr->value)));
+					       ha->host_no, __func__, be32_to_cpu(*(uint32_t *) isns_attr->value)));
 			if (isns_discovered_target->NumPortals >= ISNS_MAX_PORTALS)
 				break;
 			isns_discovered_target->Portal[isns_discovered_target->NumPortals].PortNumber = wTmp;
@@ -1190,7 +1214,7 @@ qla4xxx_isns_parse_query_response (scsi_qla_host_t *ha,
 			// it would be necessary to convert from UTF-8 before using the
 			// string.
 			QL4PRINT(QLP20, printk("scsi%d: %s: Portal Symbolic Name: \"%s\"\n",
-					       ha->host_no, __func__, isns_attr->value));
+					       ha->host_no, __func__, &isns_attr->value[0]));
 #if 0
 			if (isns_discovered_target->NumPortals >= ISNS_MAX_PORTALS)
 				break;
@@ -1203,29 +1227,29 @@ qla4xxx_isns_parse_query_response (scsi_qla_host_t *ha,
 		case ISNS_ATTR_TAG_SCN_PORT:
 			QL4PRINT(QLP20, printk("scsi%d: %s: SCN port: %u\n",
 					       ha->host_no, __func__,
-					       DWSWAP(*(uint32_t *) isns_attr->value)));
+					       be32_to_cpu(*(uint32_t *) isns_attr->value)));
 			break;
 
 		case ISNS_ATTR_TAG_ESI_PORT:
 			QL4PRINT(QLP20, printk("scsi%d: %s: ESI port: %u\n",
 					       ha->host_no, __func__,
-					       DWSWAP(*(uint32_t *) isns_attr->value)));
+					       be32_to_cpu(*(uint32_t *) isns_attr->value)));
 			break;
 
 		case ISNS_ATTR_TAG_ESI_INTERVAL:
 			QL4PRINT(QLP20, printk("scsi%d: %s: ESI Interval: %u\n",
 					       ha->host_no, __func__,
-					       DWSWAP(*(uint32_t *) isns_attr->value)));
+					       be32_to_cpu(*(uint32_t *) isns_attr->value)));
 			break;
 
 		case ISNS_ATTR_TAG_REGISTRATION_PERIOD:
 			QL4PRINT(QLP20, printk("scsi%d: %s: Entity Registration Period: %u\n",
 					       ha->host_no, __func__,
-					       DWSWAP(*(uint32_t *) isns_attr->value)));
+					       be32_to_cpu(*(uint32_t *) isns_attr->value)));
 			break;
 
 		case ISNS_ATTR_TAG_PORTAL_SECURITY_BITMAP:
-			ulTmp = DWSWAP(*(uint32_t *) isns_attr->value);
+			ulTmp = be32_to_cpu(*(uint32_t *) isns_attr->value);
 
 			QL4PRINT(QLP20, printk("scsi%d: %s: Portal Security Bitmap:\n", ha->host_no, __func__));
 			if (ulTmp & ISNS_SECURITY_BITMAP_VALID) {
@@ -1282,10 +1306,10 @@ qla4xxx_isns_parse_query_response (scsi_qla_host_t *ha,
 			break;
 
 		case ISNS_ATTR_TAG_DD_ID:
-			ulTmp = DWSWAP(*(uint32_t *) isns_attr->value);
+			ulTmp = be32_to_cpu(*(uint32_t *) isns_attr->value);
 			QL4PRINT(QLP20, printk("scsi%d: %s: DD ID: %u\n",
 					       ha->host_no, __func__,
-					       DWSWAP(*(uint32_t *) isns_attr->value)));
+					       be32_to_cpu(*(uint32_t *) isns_attr->value)));
 			isns_discovered_target->DDID = ulTmp;
 			break;
 
@@ -1305,8 +1329,11 @@ qla4xxx_isns_parse_query_response (scsi_qla_host_t *ha,
 uint8_t
 qla4xxx_isns_process_response(scsi_qla_host_t *ha, PASSTHRU_STATUS_ENTRY *sts_entry)
 {
-	PDU_ENTRY *pdu_entry = (PDU_ENTRY *) &ha->pdu_queue[IOCB_ISNS_PT_PDU_INDEX(sts_entry->handle)];
-	uint32_t pdu_type = IOCB_ISNS_PT_PDU_TYPE(sts_entry->handle);
+	uint32_t handle = le32_to_cpu(sts_entry->handle);
+	uint32_t inResidual = le32_to_cpu(sts_entry->inResidual);
+	uint16_t connectionID = le16_to_cpu(sts_entry->connectionID);
+	PDU_ENTRY *pdu_entry = (PDU_ENTRY *) &ha->pdu_queue[IOCB_ISNS_PT_PDU_INDEX(handle)];
+	uint32_t pdu_type = IOCB_ISNS_PT_PDU_TYPE(handle);
 	uint8_t status = QLA_SUCCESS;
 
 	ENTER("qla4xxx_passthru_status_entry");
@@ -1317,16 +1344,16 @@ qla4xxx_isns_process_response(scsi_qla_host_t *ha, PASSTHRU_STATUS_ENTRY *sts_en
 			"InResidual/Len=0x%x/0x%x\n",
 			ha->host_no, __func__,
 			ha->isns_flags,
-			sts_entry->timeout,
+			le16_to_cpu(sts_entry->timeout),
 			sts_entry->completionStatus,
-			sts_entry->outResidual,
+			le32_to_cpu(sts_entry->outResidual),
 			pdu_entry->SendBuffLen,
-			sts_entry->inResidual,
+			inResidual,
 			pdu_entry->RecvBuffLen));
 
-	if (pdu_entry->RecvBuffLen - sts_entry->inResidual) {
+	if (pdu_entry->RecvBuffLen - inResidual) {
 		QL4PRINT(QLP19, printk("PDU (0x%p) <-\n", pdu_entry->Buff));
-		qla4xxx_dump_bytes(QLP19, pdu_entry->Buff, (pdu_entry->RecvBuffLen - sts_entry->inResidual));
+		qla4xxx_dump_bytes(QLP19, pdu_entry->Buff, (pdu_entry->RecvBuffLen - inResidual));
 	}
 
 
@@ -1343,7 +1370,7 @@ qla4xxx_isns_process_response(scsi_qla_host_t *ha, PASSTHRU_STATUS_ENTRY *sts_en
 		break;
 
 	case ISNS_ASYNCH_REQ_PDU:
-		pdu_entry->RecvBuffLen -= sts_entry->inResidual;
+		pdu_entry->RecvBuffLen -= inResidual;
 
 		QL4PRINT(QLP19, printk("scsi%d: %s ISNS_ASYNCH_REQ_PDU  PDU Buff=%p, PDU RecvLen=0x%X\n",
 				       ha->host_no, __func__, pdu_entry->Buff, pdu_entry->RecvBuffLen));
@@ -1361,7 +1388,7 @@ qla4xxx_isns_process_response(scsi_qla_host_t *ha, PASSTHRU_STATUS_ENTRY *sts_en
 		if (qla4xxx_isns_parse_and_dispatch_server_request(ha,
 								   pdu_entry->Buff,
 								   pdu_entry->RecvBuffLen,
-								   sts_entry->connectionID)
+								   connectionID)
 		    != QLA_SUCCESS) {
 			QL4PRINT(QLP2,
 				 printk("scsi%d: %s ISNS_ASYNCH_REQ_PDU "
@@ -1372,7 +1399,7 @@ qla4xxx_isns_process_response(scsi_qla_host_t *ha, PASSTHRU_STATUS_ENTRY *sts_en
 		break;
 
 	case ISNS_REQ_RSP_PDU:
-		pdu_entry->RecvBuffLen -= sts_entry->inResidual;
+		pdu_entry->RecvBuffLen -= inResidual;
 
 		QL4PRINT(QLP19, printk("scsi%d: %s ISNS_REQ_RSP_PDU  PDU Buff=%p, PDU RecvLen=0x%X\n",
 				       ha->host_no, __func__, pdu_entry->Buff, pdu_entry->RecvBuffLen));
@@ -1402,7 +1429,7 @@ qla4xxx_isns_process_response(scsi_qla_host_t *ha, PASSTHRU_STATUS_ENTRY *sts_en
 	default:
 		QL4PRINT(QLP2,
 			 printk("scsi%d: %s iSNS handle 0x%x invalid\n",
-				ha->host_no, __func__, sts_entry->handle));
+				ha->host_no, __func__, handle));
 		status = QLA_ERROR;
 		break;
 	}
@@ -1456,18 +1483,22 @@ qla4xxx_isns_reassemble_pdu(scsi_qla_host_t *ha, uint8_t *buffer, uint32_t *buff
 			*buffer_size = 0;
 			return(QLA_ERROR);
 		}
-		else if (isns_message->isnsp_version != WSWAP(ISNSP_VERSION)) {
+		else if (be16_to_cpu(isns_message->isnsp_version) !=
+			 ISNSP_VERSION) {
+
 			QL4PRINT(QLP2,
 				 printk(KERN_WARNING "scsi%d: %s: Bad Version "
 					"number in iSNS Message Header "
 					"(%04x, expecting %04x), discard PDU\n",
 					ha->host_no, __func__,
-					isns_message->isnsp_version,
-					WSWAP(ISNSP_VERSION)));
+					be16_to_cpu(isns_message->isnsp_version),
+					ISNSP_VERSION));
 			*buffer_size = 0;
 			return(QLA_ERROR);
 		}
-		else if (bytes_remaining < sizeof(ISNSP_MESSAGE_HEADER) + WSWAP(isns_message->pdu_length)) {
+		else if (bytes_remaining < sizeof(ISNSP_MESSAGE_HEADER) +
+			 be16_to_cpu(isns_message->pdu_length)) {
+
 			QL4PRINT(QLP2,
 				 printk(KERN_WARNING "scsi%d: %s: Short PDU "
 					"in sequence. BytesRemaining %x, "
@@ -1478,8 +1509,12 @@ qla4xxx_isns_reassemble_pdu(scsi_qla_host_t *ha, uint8_t *buffer, uint32_t *buff
 			return(QLA_ERROR);
 		}
 
-		if (bytes_remaining == sizeof(ISNSP_MESSAGE_HEADER) + WSWAP(isns_message->pdu_length)) {
-			if (!(WSWAP(isns_message->flags) & ISNSP_LAST_PDU)) {
+		if (bytes_remaining == sizeof(ISNSP_MESSAGE_HEADER) +
+		    be16_to_cpu(isns_message->pdu_length)) {
+
+			if (!(be16_to_cpu(isns_message->flags) &
+			      ISNSP_LAST_PDU)) {
+
 				QL4PRINT(QLP2,
 					 printk(KERN_WARNING "scsi%d: %s: "
 						"Last PDU Flag not set at end "
@@ -1490,10 +1525,15 @@ qla4xxx_isns_reassemble_pdu(scsi_qla_host_t *ha, uint8_t *buffer, uint32_t *buff
 			}
 		}
 
-		new_pdu_length += WSWAP(isns_message->pdu_length);
-		pdu_size = sizeof(ISNSP_MESSAGE_HEADER) + WSWAP(isns_message->pdu_length);
-		isns_message = (ISNSP_MESSAGE_HEADER *) ((uint8_t *) isns_message + pdu_size);
-		bytes_remaining = bytes_remaining > pdu_size ? bytes_remaining - pdu_size : 0;
+		new_pdu_length += be16_to_cpu(isns_message->pdu_length);
+		pdu_size = sizeof(ISNSP_MESSAGE_HEADER) +
+			be16_to_cpu(isns_message->pdu_length);
+
+		isns_message = (ISNSP_MESSAGE_HEADER *) ((uint8_t *)
+							 isns_message + pdu_size);
+
+		bytes_remaining = bytes_remaining > pdu_size ?
+			bytes_remaining - pdu_size : 0;
 	}
 	while (bytes_remaining);
 
@@ -1503,7 +1543,7 @@ qla4xxx_isns_reassemble_pdu(scsi_qla_host_t *ha, uint8_t *buffer, uint32_t *buff
 	i = 0;
 	QL4PRINT(QLP19, printk("scsi%d: %s: PDU%d=%p payloadLength=%04x\n",
 			       ha->host_no, __func__, i, dest_ptr,
-			       WSWAP(isns_message->pdu_length)));
+			       be16_to_cpu(isns_message->pdu_length)));
 
 	while (bytes_remaining) {
 		// If this is the first PDU perform no copy,
@@ -1511,7 +1551,7 @@ qla4xxx_isns_reassemble_pdu(scsi_qla_host_t *ha, uint8_t *buffer, uint32_t *buff
 
 		if (dest_ptr != buffer) {
 			i++;
-			copy_size = WSWAP(isns_message->pdu_length);
+			copy_size = be16_to_cpu(isns_message->pdu_length);
 			src_ptr = (uint8_t *) isns_message->payload;
 			QL4PRINT(QLP19,
 				 printk("scsi%d: %s: PDU%d %p <= %p (%04x)\n",
@@ -1520,19 +1560,24 @@ qla4xxx_isns_reassemble_pdu(scsi_qla_host_t *ha, uint8_t *buffer, uint32_t *buff
 			memcpy(dest_ptr, src_ptr, copy_size);
 			dest_ptr += copy_size;
 		}
-		pdu_size = sizeof(ISNSP_MESSAGE_HEADER) + WSWAP(isns_message->pdu_length);
-		isns_message = (ISNSP_MESSAGE_HEADER *) ((uint8_t *) isns_message + pdu_size);
-		bytes_remaining = bytes_remaining > pdu_size ? bytes_remaining - pdu_size : 0;
+		pdu_size = sizeof(ISNSP_MESSAGE_HEADER) +
+			be16_to_cpu(isns_message->pdu_length);
+
+		isns_message = (ISNSP_MESSAGE_HEADER *) ((uint8_t *)
+							 isns_message + pdu_size);
+
+		bytes_remaining = bytes_remaining > pdu_size ?
+			bytes_remaining - pdu_size : 0;
 	}
 
 	isns_message = (ISNSP_MESSAGE_HEADER *) buffer;
 
 	// Update pdu_length field in reassembled PDU to reflect actual
 	// combined PDU payload length.
-	isns_message->pdu_length = WSWAP(new_pdu_length);
+	isns_message->pdu_length = cpu_to_be16(new_pdu_length);
 
 	// Also set LAST_PDU flag in reassembled PDU
-	isns_message->flags |= WSWAP(ISNSP_LAST_PDU);
+	isns_message->flags |= cpu_to_be16(ISNSP_LAST_PDU);
 
 	// Return number of bytes in buffer to caller.
 	*buffer_size = new_pdu_length + sizeof(ISNSP_MESSAGE_HEADER);
@@ -1569,44 +1614,45 @@ qla4xxx_isns_scn (scsi_qla_host_t *ha,
 	if (qla4xxx_isns_build_server_request_response_packet(ha,
 							      pdu_entry->Buff,
 							      pdu_entry->BuffLen,
-							      isns_req_message->function_id | WSWAP(0x8000),
+							      (be16_to_cpu(isns_req_message->function_id) | 0x8000),
 							      ISNS_ERR_SUCCESS,
-							      isns_req_message->transaction_id,
+							      be16_to_cpu(isns_req_message->transaction_id),
 							      &packet_size)
 	    != QLA_SUCCESS) {
 		QL4PRINT(QLP2,
-			 printk("scsi%d: %s: qla4xxx_isns_build_server_request_response_packet failed\n",
+			 printk("scsi%d: %s: qla4xxx_isns_build_server_"
+				"request_response_packet failed\n",
 				ha->host_no, __func__));
 		qla4xxx_free_pdu (ha, pdu_entry);
 		return(QLA_ERROR);
 	}
 	isns_rsp_message = (ISNSP_MESSAGE_HEADER *) pdu_entry->Buff;
-	isns_response = (ISNSP_RESPONSE_HEADER *) isns_rsp_message->payload;
+	isns_response = (ISNSP_RESPONSE_HEADER *) &isns_rsp_message->payload[0];
 	payload_start = (uint8_t *) isns_response;
 	rsp_buffer_end = (uint8_t *) (pdu_entry->Buff + pdu_entry->BuffLen);
 
-	ptr = isns_response->attributes;
+	ptr = &isns_response->attributes[0];
 
-	req_buffer_end = (uint8_t *) ((uint8_t *) isns_req_message->payload +
-				      WSWAP(isns_req_message->pdu_length));
+	req_buffer_end = (uint8_t *) ((uint8_t *) &isns_req_message->payload[0] +
+				      be16_to_cpu(isns_req_message->pdu_length));
 
 	// Point to the source attribute in the request.  We need to return only
 	// this attribute in the SCN Response.
-	attr = (ISNS_ATTRIBUTE *) isns_req_message->payload;
+	attr = (ISNS_ATTRIBUTE *) &isns_req_message->payload[0];
 	if (!VALIDATE_ATTR(attr, req_buffer_end)) {
-		isns_response->error_code = DWSWAP(ISNS_ERR_MSG_FORMAT);
+		isns_response->error_code = cpu_to_be32(ISNS_ERR_MSG_FORMAT);
 		QL4PRINT(QLP2, printk("scsi%d: %s: Malformed packet\n",
 				      ha->host_no, __func__));
 	}
 
 	// Validate that this is an iSCSI Name attribute.
-	if (attr->tag != DWSWAP(ISNS_ATTR_TAG_ISCSI_NAME)) {
+	if (be32_to_cpu(attr->tag) != ISNS_ATTR_TAG_ISCSI_NAME) {
 		QL4PRINT(QLP2, printk("scsi%d: %s: Did not find iSCSN Name attribute\n",
 				      ha->host_no, __func__));
 	}
 
 	// Copy source attribute to return buffer.
-	copy_size = sizeof(ISNS_ATTRIBUTE) + DWSWAP(attr->length);
+	copy_size = sizeof(ISNS_ATTRIBUTE) + be32_to_cpu(attr->length);
 
 	if (ptr + copy_size < rsp_buffer_end) {
 		// Attribute will fit in the response buffer.  Go ahead
@@ -1624,24 +1670,23 @@ qla4xxx_isns_scn (scsi_qla_host_t *ha,
 
 	//QLASSERT (!((ptr - payload_start) % 4));
 
-	isns_rsp_message->pdu_length = WSWAP((uint32_t) (unsigned long) ptr - (uint32_t) (unsigned long) payload_start);
+	isns_rsp_message->pdu_length = cpu_to_be16((unsigned long) ptr -
+                                                   (unsigned long) payload_start);
 
-	packet_size = (uint32_t) (unsigned long) ptr - (uint32_t) (unsigned long) pdu_entry->Buff;
+	packet_size = (unsigned long) ptr - (unsigned long) pdu_entry->Buff;
 
 	pdu_entry->SendBuffLen = packet_size;
 	pdu_entry->RecvBuffLen = 0;
 
-	QL4PRINT(QLP10, printk("scsi%d: %s: Dump Send Buff %p %x\n",
-			       ha->host_no, __func__, pdu_entry->Buff,
-			       pdu_entry->SendBuffLen));
-	qla4xxx_dump_bytes (QLP10, pdu_entry->Buff, pdu_entry->SendBuffLen);
 	QL4PRINT(QLP20, printk("---------------------------\n"));
 	QL4PRINT(QLP20, printk("scsi%d: %s:                            sending  %d SCNRsp\n",
 			       ha->host_no, __func__,
-			       WSWAP(isns_rsp_message->transaction_id)));
+			       be16_to_cpu(isns_rsp_message->transaction_id)));
+	QL4PRINT(QLP19, printk("PDU (0x%p) 0x%x ->\n", pdu_entry->Buff, pdu_entry->SendBuffLen));
+	qla4xxx_dump_bytes(QLP19, pdu_entry->Buff, pdu_entry->SendBuffLen);
 
 	if (qla4xxx_send_passthru0_iocb (ha, ISNS_DEVICE_INDEX, ConnectionId,
-					 pdu_entry->Buff,
+					 pdu_entry->DmaBuff,
 					 pdu_entry->SendBuffLen,
 					 pdu_entry->RecvBuffLen,
 					 PT_FLAG_ISNS_PDU,
@@ -1700,9 +1745,9 @@ qla4xxx_isns_esi (scsi_qla_host_t *ha,
 	if (qla4xxx_isns_build_server_request_response_packet(ha,
 							      pdu_entry->Buff,
 							      pdu_entry->BuffLen,
-							      isns_req_message->function_id | WSWAP(0x8000),
+							      (be16_to_cpu(isns_req_message->function_id) | 0x8000),
 							      ISNS_ERR_SUCCESS,
-							      isns_req_message->transaction_id,
+							      be16_to_cpu(isns_req_message->transaction_id),
 							      &packet_size)
 	    != QLA_SUCCESS) {
 		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_isns_build_server_request_response_packet failed\n",
@@ -1711,18 +1756,19 @@ qla4xxx_isns_esi (scsi_qla_host_t *ha,
 		return(QLA_ERROR);
 	}
 	isns_rsp_message = (ISNSP_MESSAGE_HEADER *) pdu_entry->Buff;
-	isns_response = (ISNSP_RESPONSE_HEADER *) isns_rsp_message->payload;
+	isns_response = (ISNSP_RESPONSE_HEADER *) &isns_rsp_message->payload[0];
 	payload_start = ( uint8_t *) isns_response;
 	rsp_buffer_end = ( uint8_t *) (pdu_entry->Buff + pdu_entry->BuffLen);
 
-	ptr = isns_response->attributes;
+	ptr = &isns_response->attributes[0];
 
-	req_buffer_end = ( uint8_t *) (( uint8_t *) isns_req_message->payload +
-				       WSWAP(isns_req_message->pdu_length));
+	req_buffer_end =
+		( uint8_t *) (( uint8_t *) &isns_req_message->payload[0] +
+                              be16_to_cpu(isns_req_message->pdu_length));
 
 	// Point to the source attribute in the request.  We need to return
 	// all attributes in the ESI Response.
-	attr = (ISNS_ATTRIBUTE *) isns_req_message->payload;
+	attr = (ISNS_ATTRIBUTE *) &isns_req_message->payload[0];
 
 	// Copy source attributes to return buffer.
 	copy_size = req_buffer_end - ( uint8_t *) attr;
@@ -1744,26 +1790,25 @@ qla4xxx_isns_esi (scsi_qla_host_t *ha,
 
 	//QLASSERT (!((ptr - payload_start) % 4));
 
-	isns_rsp_message->pdu_length = WSWAP((uint32_t) (unsigned long) ptr - (uint32_t) (unsigned long) payload_start);
+	isns_rsp_message->pdu_length = cpu_to_be16((unsigned long) ptr -
+                                                   (unsigned long) payload_start);
 
-	packet_size = (uint32_t) (unsigned long) ptr - (uint32_t) (unsigned long) pdu_entry->Buff;
+	packet_size = (unsigned long) ptr - (unsigned long) pdu_entry->Buff;
 
 	pdu_entry->SendBuffLen = packet_size;
 	pdu_entry->RecvBuffLen = 0;
 
-	QL4PRINT(QLP10, printk("scsi%d: %s: Dump Send Buff %p %x\n",
-			       ha->host_no, __func__, pdu_entry->Buff,
-			       pdu_entry->SendBuffLen));
-	qla4xxx_dump_bytes (QLP10, pdu_entry->Buff, pdu_entry->SendBuffLen);
 	QL4PRINT(QLP20, printk("---------------------------\n"));
 	QL4PRINT(QLP20,
 		 printk("scsi%d: %s:                            sending  %d ESIRsp\n",
 			ha->host_no, __func__,
-			WSWAP(isns_rsp_message->transaction_id)));
+			be16_to_cpu(isns_rsp_message->transaction_id)));
+	QL4PRINT(QLP19, printk("PDU (0x%p) 0x%x ->\n", pdu_entry->Buff, pdu_entry->SendBuffLen));
+	qla4xxx_dump_bytes(QLP19, pdu_entry->Buff, pdu_entry->SendBuffLen);
 
 	if (qla4xxx_send_passthru0_iocb(ha, ISNS_DEVICE_INDEX,
 					ConnectionId,
-					pdu_entry->Buff,
+					pdu_entry->DmaBuff,
 					pdu_entry->SendBuffLen,
 					pdu_entry->RecvBuffLen,
 					PT_FLAG_ISNS_PDU,
@@ -1784,7 +1829,7 @@ qla4xxx_isns_server_request_error(scsi_qla_host_t *ha,
 				  uint8_t *buffer,
 				  uint32_t buffer_size,
 				  uint16_t connection_id,
-				  uint32_t error_code)
+				  uint32_t error_code)	 //cpu
 {
 	PDU_ENTRY *pdu_entry;
 	ISNSP_MESSAGE_HEADER *isns_message;
@@ -1792,7 +1837,7 @@ qla4xxx_isns_server_request_error(scsi_qla_host_t *ha,
 	uint32_t packet_size;
 
 	isns_message = (ISNSP_MESSAGE_HEADER *) buffer;
-	function_id = WSWAP(isns_message->function_id);
+	function_id = be16_to_cpu(isns_message->function_id);
 
 	// Return "Message Format Error"
 	if ((pdu_entry = qla4xxx_get_pdu(ha, sizeof(ISNSP_MESSAGE_HEADER) +
@@ -1802,12 +1847,15 @@ qla4xxx_isns_server_request_error(scsi_qla_host_t *ha,
 		return(QLA_ERROR);
 	}
 
-	if (qla4xxx_isns_build_server_request_response_packet(ha, pdu_entry->Buff, pdu_entry->BuffLen,
-							      isns_message->function_id | WSWAP(0x8000),
-							      error_code, isns_message->transaction_id,
-							      &packet_size)
-	    != QLA_SUCCESS) {
-		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_isns_build_server_request_response_packet failed\n",
+	if (qla4xxx_isns_build_server_request_response_packet(
+		ha, pdu_entry->Buff, pdu_entry->BuffLen,
+                (be16_to_cpu(isns_message->function_id) | 0x8000),
+                error_code,
+                be16_to_cpu(isns_message->transaction_id),
+                &packet_size) != QLA_SUCCESS) {
+
+		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_isns_build_server_"
+				      "request_response_packet failed\n",
 				      ha->host_no, __func__));
 		qla4xxx_free_pdu(ha, pdu_entry);
 		return(QLA_ERROR);
@@ -1815,16 +1863,20 @@ qla4xxx_isns_server_request_error(scsi_qla_host_t *ha,
 
 	pdu_entry->SendBuffLen = packet_size;
 	pdu_entry->RecvBuffLen = 0;
-	QL4PRINT(QLP10, printk("scsi%d: %s: Dump Send Buff %p %x\n",
-			       ha->host_no, __func__, pdu_entry->Buff,
-			       pdu_entry->SendBuffLen));
-	qla4xxx_dump_bytes(QLP10, pdu_entry->Buff, pdu_entry->SendBuffLen);
-	if (qla4xxx_send_passthru0_iocb(ha, ISNS_DEVICE_INDEX, connection_id,
-					pdu_entry->Buff, pdu_entry->SendBuffLen,
+
+	QL4PRINT(QLP19, printk("PDU (0x%p) 0x%x ->\n", pdu_entry->Buff, pdu_entry->SendBuffLen));
+	qla4xxx_dump_bytes(QLP19, pdu_entry->Buff, pdu_entry->SendBuffLen);
+
+	if (qla4xxx_send_passthru0_iocb(
+		ha, ISNS_DEVICE_INDEX, connection_id,
+					pdu_entry->DmaBuff,
+					pdu_entry->SendBuffLen,
 					pdu_entry->RecvBuffLen, PT_FLAG_ISNS_PDU,
 					qla4xxx_isns_build_iocb_handle(ha, ISNS_ASYNCH_RSP_PDU, pdu_entry))
 	    != QLA_SUCCESS) {
-		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_send_passthru0_iocb failed\n, ha->host_no, __func__",
+
+		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_send_passthru0_iocb "
+				      "failed\n, ha->host_no, __func__",
 				      ha->host_no, __func__));
 		qla4xxx_free_pdu(ha, pdu_entry);
 		return(QLA_ERROR);
@@ -1841,21 +1893,27 @@ qla4xxx_isns_parse_and_dispatch_server_request(scsi_qla_host_t *ha,
 {
 	ISNSP_MESSAGE_HEADER *isns_message;
 	uint16_t function_id;
+	uint16_t transaction_id;
 
 	isns_message = (ISNSP_MESSAGE_HEADER *) buffer;
-	function_id = WSWAP(isns_message->function_id);
+	function_id = be16_to_cpu(isns_message->function_id);
+	transaction_id = be16_to_cpu(isns_message->transaction_id);
 
 	// Validate pdu_length specified in the iSNS message header.
-	if ((uint32_t) (offsetof (ISNSP_MESSAGE_HEADER, payload) +
-			WSWAP(isns_message->pdu_length)) > buffer_size) {
+	if ((offsetof (ISNSP_MESSAGE_HEADER, payload) +
+             be16_to_cpu(isns_message->pdu_length)) > buffer_size) {
+
 		QL4PRINT(QLP2, printk("scsi%d: %s: Invalid message size %u %u\n",
 				      ha->host_no, __func__,
 				      (uint32_t) (offsetof(ISNSP_MESSAGE_HEADER, payload) +
-						  WSWAP(isns_message->pdu_length)),
+                                       be16_to_cpu(isns_message->pdu_length)),
 				      buffer_size));
 
 		if (function_id <= ISNS_FCID_ESI) {
-			return(qla4xxx_isns_server_request_error(ha, buffer, buffer_size, connection_id, ISNS_ERR_MSG_FORMAT));
+			return(qla4xxx_isns_server_request_error(ha, buffer,
+								 buffer_size,
+								 connection_id,
+								 ISNS_ERR_MSG_FORMAT));
 		}
 		return(QLA_ERROR);
 	}
@@ -1867,21 +1925,21 @@ qla4xxx_isns_parse_and_dispatch_server_request(scsi_qla_host_t *ha,
 	case ISNS_FCID_SCN:
 		QL4PRINT(QLP2, printk("scsi%d: %s:  received %d SCN\n",
 				      ha->host_no, __func__,
-				      WSWAP(isns_message->transaction_id)));
+				      transaction_id));
 		return(qla4xxx_isns_scn(ha, buffer, buffer_size, connection_id));
 		break;
 
 	case ISNS_FCID_ESI:
 		QL4PRINT(QLP2, printk("scsi%d: %s:  received %d ESI\n",
 				      ha->host_no, __func__,
-				      WSWAP(isns_message->transaction_id)));
+				      transaction_id));
 		return(qla4xxx_isns_esi(ha, buffer, buffer_size, connection_id));
 		break;
 
 	default:
 		QL4PRINT(QLP2, printk("scsi%d: %s:  received %d Unknown iSNS ServerRequest %x\n",
 				      ha->host_no, __func__,
-				      WSWAP(isns_message->transaction_id), function_id));
+				      transaction_id, function_id));
 		if (function_id <= ISNS_FCID_ESI) {
 			// Return "Message Not Supported"
 			return(qla4xxx_isns_server_request_error (ha,
@@ -1907,10 +1965,12 @@ qla4xxx_isns_parse_and_dispatch_server_response(scsi_qla_host_t *ha,
 	ISNSP_RESPONSE_HEADER *isns_response;
 	ISNS_ATTRIBUTE *isns_attr;
 	uint16_t function_id;
+	uint16_t transaction_id;
 	uint8_t *buffer_end;
 
 	isns_message = (ISNSP_MESSAGE_HEADER *) buffer;
-	buffer_end = (uint8_t *) ((uint8_t *) isns_message->payload + WSWAP(isns_message->pdu_length));
+	buffer_end = (uint8_t *) ((uint8_t *) isns_message->payload +
+				  be16_to_cpu(isns_message->pdu_length));
 
 	isns_attr = (ISNS_ATTRIBUTE *) isns_message->payload;
 
@@ -1924,14 +1984,18 @@ qla4xxx_isns_parse_and_dispatch_server_response(scsi_qla_host_t *ha,
 		return(QLA_ERROR);
 	}
 
+	transaction_id = be16_to_cpu(isns_message->transaction_id);
+	function_id = be16_to_cpu(isns_message->function_id);
 	/*
 	 * It is safe to assume from this point on that the pdu_length value
 	 * (and thus our idea about the end of the buffer) is valid.
 	 */
-	if (WSWAP(isns_message->transaction_id) > ha->isns_transaction_id) {
-		QL4PRINT(QLP2, printk("scsi%d: %s: Invalid message transaction ID recv %x exp %x\n",
+	if (transaction_id > ha->isns_transaction_id) {
+
+		QL4PRINT(QLP2, printk("scsi%d: %s: Invalid message transaction "
+				      "ID recv %x exp %x\n",
 				      ha->host_no, __func__,
-				      WSWAP(isns_message->transaction_id),
+				      transaction_id,
 				      ha->isns_transaction_id));
 		qla4xxx_dump_bytes(QLP2, buffer, buffer_size);
 
@@ -1939,9 +2003,8 @@ qla4xxx_isns_parse_and_dispatch_server_response(scsi_qla_host_t *ha,
 		return(QLA_ERROR);
 	}
 
-	function_id = WSWAP(isns_message->function_id);
 
-	isns_response = (ISNSP_RESPONSE_HEADER *) isns_message->payload;
+	isns_response = (ISNSP_RESPONSE_HEADER *) &isns_message->payload[0];
 
 	//QL4PRINT(QLP20, printk("---------------------------\n"));
 	//QL4PRINT(QLP20, printk("scsi%d: %s: received function_id %x\n",
@@ -1951,43 +2014,43 @@ qla4xxx_isns_parse_and_dispatch_server_response(scsi_qla_host_t *ha,
 	case ISNS_FCID_DevAttrRegRsp:
 		QL4PRINT(QLP20, printk("scsi%d: %s: received %d DevAttrRegRsp\n",
 				       ha->host_no, __func__,
-				       WSWAP(isns_message->transaction_id)));
+				       transaction_id));
 		return(qla4xxx_isns_dev_attr_reg_rsp(ha, buffer, buffer_size));
 
 	case ISNS_FCID_DevAttrQryRsp:
 		QL4PRINT(QLP20, printk("scsi%d: %s: received %d DevAttrQryRsp\n",
 				       ha->host_no, __func__,
-				       WSWAP(isns_message->transaction_id)));
+				       transaction_id));
 		return(qla4xxx_isns_dev_attr_qry_rsp(ha, buffer, buffer_size));
 
 	case ISNS_FCID_DevGetNextRsp:
 		QL4PRINT(QLP20, printk("scsi%d: %s: received %d DevGetNextRsp\n",
 				       ha->host_no, __func__,
-				       WSWAP(isns_message->transaction_id)));
+				       transaction_id));
 		return(qla4xxx_isns_dev_get_next_rsp(ha, buffer, buffer_size));
 
 	case ISNS_FCID_DevDeregRsp:
 		QL4PRINT(QLP20, printk("scsi%d: %s: received %d DevDeregRsp\n",
 				       ha->host_no, __func__,
-				       WSWAP(isns_message->transaction_id)));
+				       transaction_id));
 		return(qla4xxx_isns_dev_dereg_rsp(ha, buffer, buffer_size));
 
 	case ISNS_FCID_SCNRegRsp:
 		QL4PRINT(QLP20, printk("scsi%d: %s: received %d SCNRegRsp\n",
 				       ha->host_no, __func__,
-				       WSWAP(isns_message->transaction_id)));
+				       transaction_id));
 		return(qla4xxx_isns_scn_reg_rsp(ha, buffer, buffer_size));
 
 	case ISNS_FCID_SCNDeregRsp:
 		QL4PRINT(QLP20, printk("scsi%d: %s: received %d SCNDeregRsp\n",
 				       ha->host_no, __func__,
-				       WSWAP(isns_message->transaction_id)));
+				       transaction_id));
 		return(qla4xxx_isns_scn_dereg_rsp(ha, buffer, buffer_size));
 
 	default:
 		QL4PRINT(QLP2, printk("scsi%d: %s: Received %d Unknown iSNS function_id %x\n",
 				      ha->host_no, __func__,
-				      WSWAP(isns_message->transaction_id), function_id));
+				      transaction_id, function_id));
 		break;
 	}
 	return(QLA_SUCCESS);
@@ -2026,18 +2089,20 @@ qla4xxx_isns_dev_attr_reg(scsi_qla_host_t *ha)
 	pdu_entry->SendBuffLen = packet_size;
 	pdu_entry->RecvBuffLen = pdu_entry->BuffLen;
 
-	QL4PRINT(QLP19, printk("scsi%d: Dump Send Buff 0x%p 0x%x\n",
-			       ha->host_no, pdu_entry->Buff, pdu_entry->SendBuffLen));
-	qla4xxx_dump_bytes(QLP19, pdu_entry->Buff, pdu_entry->SendBuffLen);
 	QL4PRINT(QLP20, printk("---------------------------\n"));
 	QL4PRINT(QLP20, printk("scsi%d: %s:                    sending %d DevAttrReg\n",
 			       ha->host_no, __func__, ha->isns_transaction_id));
 
-	QL4PRINT(QLP20, printk("scsi%d: %s: Registering iSNS . . .\n", ha->host_no, __func__));
+	QL4PRINT(QLP19, printk("PDU (0x%p) 0x%x ->\n", pdu_entry->Buff, pdu_entry->SendBuffLen));
+	qla4xxx_dump_bytes(QLP19, pdu_entry->Buff, pdu_entry->SendBuffLen);
 
-	if (qla4xxx_send_passthru0_iocb(ha, ISNS_DEVICE_INDEX,
+	QL4PRINT(QLP20, printk("scsi%d: %s: Registering iSNS . . .\n",
+			       ha->host_no, __func__));
+
+	if (qla4xxx_send_passthru0_iocb(
+		ha, ISNS_DEVICE_INDEX,
 					ISNS_DEFAULT_SERVER_CONN_ID,
-					pdu_entry->Buff,
+					pdu_entry->DmaBuff,
 					pdu_entry->SendBuffLen,
 					pdu_entry->RecvBuffLen,
 					PT_FLAG_ISNS_PDU|PT_FLAG_WAIT_4_RESPONSE,
@@ -2062,16 +2127,18 @@ qla4xxx_isns_dev_attr_reg_rsp(scsi_qla_host_t *ha,
 {
 	ISNSP_MESSAGE_HEADER *isns_message;
 	ISNSP_RESPONSE_HEADER *isns_response;
+	uint32_t error_code;
 
 	isns_message = (ISNSP_MESSAGE_HEADER *) buffer;
-	isns_response = (ISNSP_RESPONSE_HEADER *) isns_message->payload;
+	isns_response = (ISNSP_RESPONSE_HEADER *) &isns_message->payload[0];
+	error_code = be32_to_cpu(isns_response->error_code);
 
-	if (isns_response->error_code) {
+	if (error_code) {
 		QL4PRINT(QLP2, printk("scsi%d: %s: iSNS DevAttrReg failed, "
 				      "error code (%x) \"%s\"\n",
 				      ha->host_no, __func__,
-				      DWSWAP(isns_response->error_code),
-				      isns_error_code_msg[DWSWAP(isns_response->error_code)]));
+				      error_code,
+				      isns_error_code_msg[error_code]));
 		clear_bit(ISNS_FLAG_ISNS_SRV_REGISTERED, &ha->isns_flags);
 		return(QLA_ERROR);
 	}
@@ -2097,10 +2164,12 @@ qla4xxx_isns_scn_reg(scsi_qla_host_t *ha)
 		return(QLA_ERROR);
 	}
 
-	if (qla4xxx_isns_build_scn_registration_packet(ha, isns_pdu_entry->Buff,
-						       isns_pdu_entry->BuffLen,
+	if (qla4xxx_isns_build_scn_registration_packet(
+		ha, isns_pdu_entry->Buff, isns_pdu_entry->BuffLen,
 						       &packet_size) != QLA_SUCCESS) {
-		QL4PRINT(QLP2, printk("scsi%d: %s: qla4xxx_isns_build_scn_registration_packet failed\n",
+
+		QL4PRINT(QLP2, printk("scsi%d: %s: qla4xxx_isns_build_scn_"
+				      "registration_packet failed\n",
 				      ha->host_no, __func__));
 		qla4xxx_free_pdu(ha, isns_pdu_entry);
 		return(QLA_ERROR);
@@ -2108,22 +2177,23 @@ qla4xxx_isns_scn_reg(scsi_qla_host_t *ha)
 
 	isns_pdu_entry->SendBuffLen = packet_size;
 	isns_pdu_entry->RecvBuffLen = isns_pdu_entry->BuffLen;
-	QL4PRINT(QLP10, printk("scsi%d: %s: Dump Send Buff %p %x\n",
-			       ha->host_no, __func__,
-			       isns_pdu_entry->Buff, isns_pdu_entry->SendBuffLen));
-	qla4xxx_dump_bytes(QLP10, isns_pdu_entry->Buff, isns_pdu_entry->SendBuffLen);
+	
 	QL4PRINT(QLP20, printk("---------------------------\n"));
 	QL4PRINT(QLP20, printk("scsi%d :%s:                        sending  %d SCNReg\n",
 			       ha->host_no, __func__, ha->isns_transaction_id));
+	QL4PRINT(QLP19, printk("PDU (0x%p) 0x%x ->\n", isns_pdu_entry->Buff, isns_pdu_entry->SendBuffLen));
+	qla4xxx_dump_bytes(QLP19, isns_pdu_entry->Buff, isns_pdu_entry->SendBuffLen);
 
-	if (qla4xxx_send_passthru0_iocb(ha, ISNS_DEVICE_INDEX,
+	if (qla4xxx_send_passthru0_iocb(
+		ha, ISNS_DEVICE_INDEX,
 					ISNS_DEFAULT_SERVER_CONN_ID,
-					isns_pdu_entry->Buff,
+					isns_pdu_entry->DmaBuff,
 					isns_pdu_entry->SendBuffLen,
 					isns_pdu_entry->RecvBuffLen,
 					PT_FLAG_ISNS_PDU | PT_FLAG_WAIT_4_RESPONSE,
 					qla4xxx_isns_build_iocb_handle(ha, ISNS_REQ_RSP_PDU, isns_pdu_entry))
 	    != QLA_SUCCESS) {
+
 		QL4PRINT(QLP2, printk("scsi%d: %s: qla4xxx_send_passthru0_iocb failed\n",
 				      ha->host_no, __func__));
 		qla4xxx_free_pdu(ha, isns_pdu_entry);
@@ -2148,7 +2218,7 @@ qla4xxx_isns_scn_reg_rsp(scsi_qla_host_t *ha,
 		QL4PRINT(QLP2,
 			 printk("scsi%d: %s: iSNS SCNReg failed, error code %x\n",
 				ha->host_no, __func__,
-				DWSWAP(isns_response->error_code)));
+				be32_to_cpu(isns_response->error_code)));
 		clear_bit(ISNS_FLAG_ISNS_SCN_REGISTERED, &ha->isns_flags);
 		return(QLA_ERROR);
 	}
@@ -2157,7 +2227,8 @@ qla4xxx_isns_scn_reg_rsp(scsi_qla_host_t *ha,
 
 	ha->isns_num_discovered_targets = 0;
 	if (qla4xxx_isns_dev_get_next(ha, NULL) != QLA_SUCCESS) {
-		QL4PRINT(QLP2, printk("scsi%d: %s: qla4xxx_isns_dev_get_next failed\n",
+		QL4PRINT(QLP2,
+			 printk("scsi%d: %s: qla4xxx_isns_dev_get_next failed\n",
 				      ha->host_no, __func__));
 	}
 
@@ -2192,25 +2263,25 @@ qla4xxx_isns_dev_attr_qry(scsi_qla_host_t *ha,
 	pdu_entry->SendBuffLen = packet_size;
 	pdu_entry->RecvBuffLen = pdu_entry->BuffLen;
 
-	QL4PRINT(QLP10, printk("scsi%d: %s: Dump Send Buff %p %x\n",
-			       ha->host_no, __func__, pdu_entry->Buff,
-			       pdu_entry->SendBuffLen));
-	qla4xxx_dump_bytes (QLP10, pdu_entry->Buff, pdu_entry->SendBuffLen);
 	QL4PRINT(QLP20, printk("---------------------------\n"));
 	QL4PRINT(QLP20,
 		 printk("scsi%d: %s:                     sending  %d DevAttrQry\n",
 			ha->host_no, __func__, ha->isns_transaction_id));
+	QL4PRINT(QLP19, printk("PDU (0x%p) 0x%x ->\n", pdu_entry->Buff, pdu_entry->SendBuffLen));
+	qla4xxx_dump_bytes(QLP19, pdu_entry->Buff, pdu_entry->SendBuffLen);
 
-	if (qla4xxx_send_passthru0_iocb(ha, ISNS_DEVICE_INDEX,
+	if (qla4xxx_send_passthru0_iocb(
+		ha, ISNS_DEVICE_INDEX,
 					ISNS_DEFAULT_SERVER_CONN_ID,
-					pdu_entry->Buff,
+					pdu_entry->DmaBuff,
 					pdu_entry->SendBuffLen,
 					pdu_entry->RecvBuffLen,
 					PT_FLAG_ISNS_PDU | PT_FLAG_WAIT_4_RESPONSE,
 					qla4xxx_isns_build_iocb_handle (ha, ISNS_REQ_RSP_PDU, pdu_entry))
 	    != QLA_SUCCESS) {
-		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_send_passthru0_iocb failed\n",
-				      ha->host_no, __func__));
+
+		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_send_passthru0_iocb "
+				      "failed\n", ha->host_no, __func__));
 		qla4xxx_free_pdu (ha, pdu_entry);
 		return(QLA_ERROR);
 	}
@@ -2259,9 +2330,11 @@ qla4xxx_isns_dev_attr_qry_rsp(scsi_qla_host_t *ha,
 					      &bIsTarget,
 					      last_iscsi_name)
 	    == QLA_SUCCESS) {
+
 		if (bIsTarget &&
 		    discovered_target->NameString[0] &&
 		    discovered_target->NumPortals) {
+
 			for (i = 0; i < ha->isns_num_discovered_targets; i++) {
 				if (!strcmp(discovered_target->NameString,
 					    ha->isns_disc_tgt_databasev[i].NameString)) {
@@ -2342,22 +2415,22 @@ qla4xxx_isns_dev_get_next(scsi_qla_host_t *ha,
 	pdu_entry->SendBuffLen = packet_size;
 	pdu_entry->RecvBuffLen = pdu_entry->BuffLen;
 
-	QL4PRINT(QLP10, printk("scsi%d: %s: Dump Send Buff %p %x\n",
-			       ha->host_no, __func__, pdu_entry->Buff,
-			       pdu_entry->SendBuffLen));
-	qla4xxx_dump_bytes (QLP10, pdu_entry->Buff, pdu_entry->SendBuffLen);
 	QL4PRINT(QLP20, printk("---------------------------\n"));
 	QL4PRINT(QLP20, printk("scsi%d: %s:                     sending  %d DevGetNext\n",
 			       ha->host_no, __func__, ha->isns_transaction_id));
+	QL4PRINT(QLP19, printk("PDU (0x%p) 0x%x ->\n", pdu_entry->Buff, pdu_entry->SendBuffLen));
+	qla4xxx_dump_bytes(QLP19, pdu_entry->Buff, pdu_entry->SendBuffLen);
 
-	if (qla4xxx_send_passthru0_iocb(ha, ISNS_DEVICE_INDEX,
+	if (qla4xxx_send_passthru0_iocb(
+		ha, ISNS_DEVICE_INDEX,
 					ISNS_DEFAULT_SERVER_CONN_ID,
-					pdu_entry->Buff,
+					pdu_entry->DmaBuff,
 					pdu_entry->SendBuffLen,
 					pdu_entry->RecvBuffLen,
 					PT_FLAG_ISNS_PDU | PT_FLAG_WAIT_4_RESPONSE,
 					qla4xxx_isns_build_iocb_handle(ha, ISNS_REQ_RSP_PDU, pdu_entry))
 	    != QLA_SUCCESS) {
+
 		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_send_passthru0_iocb failed\n",
 				      ha->host_no, __func__));
 		qla4xxx_free_pdu (ha, pdu_entry);
@@ -2450,8 +2523,8 @@ qla4xxx_isns_dev_dereg(scsi_qla_host_t *ha)
 						     &packet_size)
 	    != QLA_SUCCESS) {
 		QL4PRINT(QLP2,
-			 printk("scsi%d: %s:  QLiSNSBuildDeregistrationPacket failed\n",
-				ha->host_no, __func__));
+			 printk("scsi%d: %s:  QLiSNSBuildDeregistrationPacket "
+				"failed\n", ha->host_no, __func__));
 		qla4xxx_free_pdu (ha, pdu_entry);
 		return(QLA_ERROR);
 	}
@@ -2459,23 +2532,23 @@ qla4xxx_isns_dev_dereg(scsi_qla_host_t *ha)
 	pdu_entry->SendBuffLen = packet_size;
 	pdu_entry->RecvBuffLen = pdu_entry->BuffLen;
 
-	QL4PRINT(QLP10, printk("scsi%d: %s: Dump Send Buff %p %x\n",
-			       ha->host_no, __func__, pdu_entry->Buff,
-			       pdu_entry->SendBuffLen));
-	qla4xxx_dump_bytes(QLP10, pdu_entry->Buff, pdu_entry->SendBuffLen);
 	QL4PRINT(QLP20, printk("---------------------------\n"));
 	QL4PRINT(QLP20,
 		 printk("scsi%d: %s:                       sending  %d DevDereg\n",
 			ha->host_no, __func__, ha->isns_transaction_id));
+	QL4PRINT(QLP19, printk("PDU (0x%p) 0x%x ->\n", pdu_entry->Buff, pdu_entry->SendBuffLen));
+	qla4xxx_dump_bytes(QLP19, pdu_entry->Buff, pdu_entry->SendBuffLen);
 
-	if (qla4xxx_send_passthru0_iocb(ha, ISNS_DEVICE_INDEX,
+	if (qla4xxx_send_passthru0_iocb(
+		ha, ISNS_DEVICE_INDEX,
 					ISNS_DEFAULT_SERVER_CONN_ID,
-					pdu_entry->Buff,
+					pdu_entry->DmaBuff,
 					pdu_entry->SendBuffLen,
 					pdu_entry->RecvBuffLen,
 					PT_FLAG_ISNS_PDU | PT_FLAG_WAIT_4_RESPONSE,
 					qla4xxx_isns_build_iocb_handle(ha, ISNS_REQ_RSP_PDU, pdu_entry))
 	    != QLA_SUCCESS) {
+
 		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_send_passthru0_iocb failed\n",
 				      ha->host_no, __func__));
 		qla4xxx_free_pdu(ha, pdu_entry);
@@ -2495,14 +2568,14 @@ qla4xxx_isns_dev_dereg_rsp(scsi_qla_host_t *ha,
 	ISNSP_RESPONSE_HEADER * isns_response;
 
 	isns_message = (ISNSP_MESSAGE_HEADER *) buffer;
-	isns_response = (ISNSP_RESPONSE_HEADER *) isns_message->payload;
+	isns_response = (ISNSP_RESPONSE_HEADER *) &isns_message->payload[0];
 
 	clear_bit(ISNS_FLAG_ISNS_SRV_REGISTERED, &ha->isns_flags);
 
-	if (isns_response->error_code) {
+	if (be32_to_cpu(isns_response->error_code)) {
 		QL4PRINT(QLP10, printk("scsi%d: %s: iSNS SCNDereg rsp code %x\n",
 				       ha->host_no, __func__,
-				       DWSWAP(isns_response->error_code)));
+				       be32_to_cpu(isns_response->error_code)));
 	}
 
 	if (test_bit(ISNS_FLAG_REREGISTER, &ha->isns_flags)) {
@@ -2524,7 +2597,8 @@ qla4xxx_isns_scn_dereg(scsi_qla_host_t *ha)
 	uint32_t packet_size;
 
 	if ((pdu_entry = qla4xxx_get_pdu(ha, PAGE_SIZE)) == NULL) {
-		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_get_pdu failed\n", ha->host_no, __func__));
+		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_get_pdu failed\n",
+				      ha->host_no, __func__));
 		return(QLA_ERROR);
 	}
 
@@ -2532,28 +2606,35 @@ qla4xxx_isns_scn_dereg(scsi_qla_host_t *ha)
 							 pdu_entry->BuffLen,
 							 &packet_size)
 	    != QLA_SUCCESS) {
-		QL4PRINT(QLP2, printk("scsi%d: %s:  QLiSNSBuildSCNDeregistrationPacket failed\n", ha->host_no, __func__));
+		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_isns_build_scn_"
+				      "deregistration_packet failed\n",
+				      ha->host_no, __func__));
 		qla4xxx_free_pdu (ha, pdu_entry);
 		return(QLA_ERROR);
 	}
 
 	pdu_entry->SendBuffLen = packet_size;
 	pdu_entry->RecvBuffLen = pdu_entry->BuffLen;
-	QL4PRINT(QLP10, printk("scsi%d: %s: Dump Send Buff %p %x\n",
-			       ha->host_no, __func__, pdu_entry->Buff,
-			       pdu_entry->SendBuffLen));
-	qla4xxx_dump_bytes (QLP10, pdu_entry->Buff, pdu_entry->SendBuffLen);
+
 	QL4PRINT(QLP20, printk("---------------------------\n"));
-	QL4PRINT(QLP20, printk("scsi%d: %s:                       sending  %d SCNDereg\n", ha->host_no, __func__, ha->isns_transaction_id));
-	if (qla4xxx_send_passthru0_iocb (ha, ISNS_DEVICE_INDEX,
+	QL4PRINT(QLP20, printk("scsi%d: %s:                       sending  %d SCNDereg\n",
+			       ha->host_no, __func__, ha->isns_transaction_id));
+	QL4PRINT(QLP19, printk("PDU (0x%p) 0x%x ->\n", pdu_entry->Buff, pdu_entry->SendBuffLen));
+	qla4xxx_dump_bytes(QLP19, pdu_entry->Buff, pdu_entry->SendBuffLen);
+
+	clear_bit(ISNS_FLAG_DEV_SCAN_DONE, &ha->isns_flags);
+
+	if (qla4xxx_send_passthru0_iocb(ha, ISNS_DEVICE_INDEX,
 					 ISNS_DEFAULT_SERVER_CONN_ID,
-					 pdu_entry->Buff,
+					 pdu_entry->DmaBuff,
 					 pdu_entry->SendBuffLen,
 					 pdu_entry->RecvBuffLen,
 					 PT_FLAG_ISNS_PDU | PT_FLAG_WAIT_4_RESPONSE,
 					 qla4xxx_isns_build_iocb_handle (ha, ISNS_REQ_RSP_PDU, pdu_entry))
 	    != QLA_SUCCESS) {
-		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_send_passthru0_iocb failed\n", ha->host_no, __func__));
+
+		QL4PRINT(QLP2, printk("scsi%d: %s:  qla4xxx_send_passthru0_iocb "
+				      "failed\n", ha->host_no, __func__));
 		qla4xxx_free_pdu (ha, pdu_entry);
 		return(QLA_ERROR);
 	}
@@ -2570,14 +2651,14 @@ qla4xxx_isns_scn_dereg_rsp(scsi_qla_host_t *ha,
 	ISNSP_RESPONSE_HEADER *isns_response;
 
 	isns_message = (ISNSP_MESSAGE_HEADER *) buffer;
-	isns_response = (ISNSP_RESPONSE_HEADER *) isns_message->payload;
+	isns_response = (ISNSP_RESPONSE_HEADER *) &isns_message->payload[0];
 
 	clear_bit(ISNS_FLAG_ISNS_SCN_REGISTERED, &ha->isns_flags);
 
-	if (isns_response->error_code) {
+	if (be32_to_cpu(isns_response->error_code)) {
 		QL4PRINT(QLP10, printk("scsi%d: %s: iSNS SCNDereg rsp code %x\n",
 				       ha->host_no, __func__,
-				       DWSWAP(isns_response->error_code)));
+				       be32_to_cpu(isns_response->error_code)));
 	}
 
 	if (test_bit(ISNS_FLAG_REREGISTER, &ha->isns_flags)) {

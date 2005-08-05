@@ -1,7 +1,7 @@
 /*****************************************************************************
 *                  QLOGIC LINUX SOFTWARE
 *
-* QLogic device driver for Linux 2.4.x+
+* QLogic device driver for Linux 2.6.x+
 * Copyright (C) 2004 QLogic Corporation
 * (www.qlogic.com)
 *

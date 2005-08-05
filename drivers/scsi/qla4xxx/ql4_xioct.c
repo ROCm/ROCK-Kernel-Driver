@@ -1,7 +1,7 @@
 /******************************************************************************
  *                  QLOGIC LINUX SOFTWARE                                     *
  *                                                                            *
- * QLogic ISP4xxx device driver for Linux 2.4.x                               *
+ * QLogic ISP4xxx device driver for Linux 2.6.x                               *
  * Copyright (C) 2004 Qlogic Corporation                                      *
  * (www.qlogic.com)                                                           *
  *                                                                            *
@@ -85,12 +85,13 @@ qla4xxx_ioctl(struct scsi_device *, int, void *);
 /*
  * ioctl initialization
  */
-static struct class_simple *apidev_class;
+static struct class *apidev_class;
+
 static int apidev_major;
 
-static int 
+static int
 apidev_ioctl(struct inode *inode, struct file *fp, unsigned int cmd,
-    unsigned long arg) 
+    unsigned long arg)
 {
 	return (qla4xxx_ioctl(NULL, (int)cmd, (void*)arg));
 }
@@ -100,7 +101,7 @@ static struct file_operations apidev_fops = {
 	.ioctl = apidev_ioctl,
 };
 
-void *
+inline void *
 ql4_kzmalloc(int siz, int code)
 {
 	void *		bp;
@@ -189,11 +190,11 @@ qla4xxx_alloc_ioctl_mem(scsi_qla_host_t *ha)
 	ha->ioctl->scrap_mem_used = 0;
 
 	QL4PRINT(QLP4|QLP7,
-	    printk("scsi(%d): %s: scrap_mem_size=%d.\n",
+	    printk("scsi%d: %s: scrap_mem_size=%d.\n",
 	    ha->host_no, __func__, ha->ioctl->scrap_mem_size));
 
 	QL4PRINT(QLP4,
-	    printk("scsi(%d): %s: inst %d exiting.\n",
+	    printk("scsi%d: %s: inst %d exiting.\n",
 	    ha->host_no, __func__, ha->instance));
 
 	LEAVE(__func__);
@@ -291,7 +292,7 @@ qla4xxx_get_ioctl_scrap_mem(scsi_qla_host_t *ha, void **ppmem, uint32_t size)
 		ha->ioctl->scrap_mem_used += size;
 	} else {
 		QL4PRINT(QLP2|QLP4,
-		    printk("scsi(%d): %s: no more scrap memory.\n",
+		    printk("scsi%d: %s: no more scrap memory.\n",
 		    ha->host_no, __func__));
 
 		ret = QLA_ERROR;
@@ -343,7 +344,7 @@ qla4xxx_ioctl_init(void)
 	    printk("scsi: %s: entered.\n",
 	    __func__));
 
-	apidev_class = class_simple_create(THIS_MODULE, "qla4xxx");
+	apidev_class = class_create(THIS_MODULE, "qla4xxx");
 	if (IS_ERR(apidev_class)) {
 		QL4PRINT(QLP2|QLP4,
 		    printk("%s(): Unable to sysfs class for qla4xxx.\n",
@@ -362,7 +363,7 @@ qla4xxx_ioctl_init(void)
 		    printk("%s(): Unable to register CHAR device (%d)\n",
 		    __func__, apidev_major));
 
-		class_simple_destroy(apidev_class);
+		class_destroy(apidev_class);
 		apidev_class = NULL;
 
 		return apidev_major;
@@ -371,7 +372,7 @@ qla4xxx_ioctl_init(void)
 	    printk("scsi: %s: apidev_major=%d.\n",
 	    __func__, apidev_major));
 
-	tmp = class_simple_device_add(apidev_class, MKDEV(apidev_major, 0),
+	tmp = class_device_create(apidev_class, MKDEV(apidev_major, 0),
 	    NULL, "qla4xxx");
 	QL4PRINT(QLP4,
 	    printk("scsi: %s: tmp=%p.\n",
@@ -401,11 +402,11 @@ qla4xxx_ioctl_exit(void)
 	ql4_apidev_cleanup_32ioctl();
 #endif
 
-	class_simple_device_remove(MKDEV(apidev_major, 0));
+	class_device_destroy(apidev_class,MKDEV(apidev_major, 0));
 
 	unregister_chrdev(apidev_major, "qla4xxx");
 
-	class_simple_destroy(apidev_class);
+	class_destroy(apidev_class);
 
 	apidev_class = NULL;
 
@@ -880,8 +881,8 @@ qla4extioctl_query_disc_iscsi_node(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 		pdisc_node->SessionID       = ddb_entry->target_session_id;
 		pdisc_node->ConnectionID    = ddb_entry->connection_id;
 		pdisc_node->PortalGroupID   = 0;
-		pdisc_node->ScsiAddr.Bus    = ddb_entry->bus;
-		pdisc_node->ScsiAddr.Target = ddb_entry->target;
+		pdisc_node->ScsiAddr.Bus    = 0;
+		pdisc_node->ScsiAddr.Target = ddb_entry->fcport->os_target_id;
 		pdisc_node->ScsiAddr.Lun    = 0;
 	}
 
@@ -1107,7 +1108,7 @@ qla4extioctl_query_driver(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	if ((status = copy_to_user(Q64BIT_TO_PTR(ioctl->ResponseAdr), pdinfo,
 	    sizeof(EXT_DRIVER_INFO))) != 0) {
 		QL4PRINT(QLP2|QLP4,
-		    printk("scsi(%d): %s: error copy to response buffer.\n",
+		    printk("scsi%d: %s: error copy to response buffer.\n",
 		    ha->host_no, __func__));
 
 		ioctl->Status = EXT_STATUS_COPY_ERR;
@@ -1211,7 +1212,7 @@ qla4extioctl_query_fw(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	    sizeof(EXT_FW_INFO))) != 0) {
 		ioctl->Status = EXT_STATUS_COPY_ERR;
 		QL4PRINT(QLP2|QLP4,
-		    printk("scsi(%d): %s: response copy error.\n",
+		    printk("scsi%d: %s: response copy error.\n",
 		    ha->host_no, __func__));
 
 		goto exit_query_fw;
@@ -1340,7 +1341,7 @@ qla4extioctl_query_chip(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	    pchip_info, sizeof(EXT_CHIP_INFO))) != 0) {
 		ioctl->Status = EXT_STATUS_COPY_ERR;
 		QL4PRINT(QLP2|QLP4,
-		    printk("scsi(%d): %s: response copy error.\n",
+		    printk("scsi%d: %s: response copy error.\n",
 		    ha->host_no, __func__));
 
 		goto exit_query_chip;
@@ -1821,7 +1822,7 @@ qla4extioctl_get_device_entry_iscsi(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 		}
 	}
 
-	if (ioctl->ResponseLen < sizeof(EXT_DEVICE_ENTRY_ISCSI)) { 
+	if (ioctl->ResponseLen < sizeof(EXT_DEVICE_ENTRY_ISCSI)) {
 		QL4PRINT(QLP2, printk("scsi%d: %s: memory area too small\n",
 		    ha->host_no, __func__));
 
@@ -2242,12 +2243,12 @@ qla4extioctl_get_isns_server(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	 *---------------------------------------------------*/
 	memset(pisns_server, 0, sizeof(EXT_ISNS_SERVER));
 	pisns_server->PerformiSNSDiscovery =
-	    (pflash_init_fw_cb->init_fw_cb.TCPOptions & TOPT_ISNS_ENABLE) ? 1:0;
+	    (cpu_to_le16(pflash_init_fw_cb->init_fw_cb.TCPOptions) & TOPT_ISNS_ENABLE) ? 1:0;
 	pisns_server->AutomaticiSNSDiscovery =
-	    (pflash_init_fw_cb->init_fw_cb.TCPOptions &
+	    (cpu_to_le16(pflash_init_fw_cb->init_fw_cb.TCPOptions) &
 	    TOPT_LEARN_ISNS_IP_ADDR_ENABLE) ? 1 : 0;
 	pisns_server->PortNumber =
-	    pflash_init_fw_cb->init_fw_cb.iSNSServerPortNumber;
+	    cpu_to_le16(pflash_init_fw_cb->init_fw_cb.iSNSServerPortNumber);
 	pisns_server->IPAddr.Type = EXT_DEF_TYPE_ISCSI_IP;
 	memcpy(pisns_server->IPAddr.IPAddress,
 	       pflash_init_fw_cb->init_fw_cb.iSNSIPAddr,
@@ -2866,7 +2867,7 @@ qla4extioctl_set_init_fw_iscsi(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	 * Copy the data from the user's buffer
 	 */
 	if ((status = copy_from_user((uint8_t *)pinit_fw,
-	    Q64BIT_TO_PTR(ioctl->RequestAdr), sizeof(EXT_INIT_FW_ISCSI))) != 
+	    Q64BIT_TO_PTR(ioctl->RequestAdr), sizeof(EXT_INIT_FW_ISCSI))) !=
 	    0) {
 		QL4PRINT(QLP2,
 		    printk("scsi%d: %s: unable to copy data to user's "
@@ -3014,6 +3015,8 @@ qla4extioctl_set_isns_server(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	uint32_t	mbox_sts[MBOX_REG_COUNT];
 	EXT_ISNS_SERVER *pisns_server;
 	FLASH_INIT_FW_CTRL_BLK *pflash_init_fw_cb = NULL;
+	uint16_t	tcp_options;
+	uint16_t	port_number;
 
 
 	ENTER(__func__);
@@ -3109,31 +3112,31 @@ qla4extioctl_set_isns_server(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	 *----------------------------------------------*/
 	pflash_init_fw_cb = (FLASH_INIT_FW_CTRL_BLK *)ha->ioctl_dma_bufv;
 
+	// convert a couple of variables used for comparisons
+	tcp_options = le16_to_cpu(pflash_init_fw_cb->init_fw_cb.TCPOptions);
+	port_number = le16_to_cpu(pflash_init_fw_cb->init_fw_cb.iSNSServerPortNumber);
+
 	if (pisns_server->PerformiSNSDiscovery) {
 		if (pisns_server->AutomaticiSNSDiscovery) {
-			pflash_init_fw_cb->init_fw_cb.TCPOptions |=
-			    TOPT_LEARN_ISNS_IP_ADDR_ENABLE;
+			tcp_options |= TOPT_LEARN_ISNS_IP_ADDR_ENABLE;
 			memset(pflash_init_fw_cb->init_fw_cb.iSNSIPAddr, 0,
 			       sizeof(pflash_init_fw_cb->init_fw_cb.iSNSIPAddr));
 		} else {
-			pflash_init_fw_cb->init_fw_cb.TCPOptions &=
-			    ~TOPT_LEARN_ISNS_IP_ADDR_ENABLE;
+			tcp_options &= ~TOPT_LEARN_ISNS_IP_ADDR_ENABLE;
 			memcpy(pflash_init_fw_cb->init_fw_cb.iSNSIPAddr,
 			    pisns_server->IPAddr.IPAddress,
 			    MIN(sizeof(pflash_init_fw_cb->init_fw_cb.iSNSIPAddr),
 			    sizeof(pisns_server->IPAddr.IPAddress)));
 		}
 
-		pflash_init_fw_cb->init_fw_cb.iSNSServerPortNumber =
-		    (pisns_server->PortNumber) ?  pisns_server->PortNumber :
-		    EXT_DEF_ISNS_WELL_KNOWN_PORT;
-		pflash_init_fw_cb->init_fw_cb.TCPOptions |= TOPT_ISNS_ENABLE;
+		port_number = EXT_DEF_ISNS_WELL_KNOWN_PORT;
+		tcp_options |= TOPT_ISNS_ENABLE;
 
 	} else {
-		pflash_init_fw_cb->init_fw_cb.TCPOptions &= ~TOPT_ISNS_ENABLE;
+		tcp_options &= ~TOPT_ISNS_ENABLE;
 		memset(pflash_init_fw_cb->init_fw_cb.iSNSIPAddr, 0,
 		       sizeof(pflash_init_fw_cb->init_fw_cb.iSNSIPAddr));
-		pflash_init_fw_cb->init_fw_cb.iSNSServerPortNumber = 0;
+		port_number = 0;
 	}
 
 	QL4PRINT(QLP4, printk("scsi%d: %s: IPAddr %d.%d.%d.%d Port# %04d\n",
@@ -3142,19 +3145,21 @@ qla4extioctl_set_isns_server(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	    pflash_init_fw_cb->init_fw_cb.iSNSIPAddr[1],
 	    pflash_init_fw_cb->init_fw_cb.iSNSIPAddr[2],
 	    pflash_init_fw_cb->init_fw_cb.iSNSIPAddr[3],
-	    pflash_init_fw_cb->init_fw_cb.iSNSServerPortNumber));
+	    port_number));
 
 	/*
 	 * If the internal iSNS info is different from the flash_init_fw_cb,
 	 * flash it now.
 	 *------------------------------------------------------------------*/
 	if (((ha->tcp_options & TOPT_LEARN_ISNS_IP_ADDR_ENABLE) !=
-	    (pflash_init_fw_cb->init_fw_cb.TCPOptions &
-	    TOPT_LEARN_ISNS_IP_ADDR_ENABLE)) ||
+	    (tcp_options & TOPT_LEARN_ISNS_IP_ADDR_ENABLE)) ||
 	    (!IPAddrIsEqual(ha->isns_ip_address,
 	    pflash_init_fw_cb->init_fw_cb.iSNSIPAddr)) ||
-	    (ha->isns_server_port_number !=
-	    pflash_init_fw_cb->init_fw_cb.iSNSServerPortNumber)) {
+	    (ha->isns_server_port_number != port_number)) {
+
+		pflash_init_fw_cb->init_fw_cb.TCPOptions = cpu_to_le16(tcp_options);
+		pflash_init_fw_cb->init_fw_cb.iSNSServerPortNumber = cpu_to_le16(port_number);
+
 		memset(&mbox_cmd, 0, sizeof(mbox_cmd));
 		memset(&mbox_sts, 0, sizeof(mbox_sts));
 		mbox_cmd[0] = MBOX_CMD_WRITE_FLASH;
@@ -3197,8 +3202,7 @@ qla4extioctl_set_isns_server(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 		       MIN(sizeof(ha->isns_ip_address),
 		sizeof(pflash_init_fw_cb->init_fw_cb.iSNSIPAddr)));
 
-		ha->isns_server_port_number =
-		pflash_init_fw_cb->init_fw_cb.iSNSServerPortNumber;
+		ha->isns_server_port_number = port_number;
 	}
 
 	/*
@@ -3224,7 +3228,7 @@ qla4extioctl_set_isns_server(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 				ioctl->ResponseLen = 0;
 				goto exit_set_isns_svr;
 			}
-		} else if (test_bit(ISNS_FLAG_ISNS_SRV_ENABLED, 
+		} else if (test_bit(ISNS_FLAG_ISNS_SRV_ENABLED,
 		    &ha->isns_flags) && IPAddrIsZero(ha->isns_ip_address)) {
 			qla4xxx_isns_disable(ha);
 		}
@@ -3429,6 +3433,7 @@ qla4extioctl_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	EXT_SCSI_PASSTHRU_ISCSI *pscsi_pass;
 	struct scsi_device	*pscsi_device;
 	struct scsi_cmnd	*pscsi_cmd;
+	struct request		*request = NULL;
 	srb_t			*srb;
 	uint32_t		dma_buf_len;
 	os_tgt_t		*tgt_entry;
@@ -3473,6 +3478,18 @@ qla4extioctl_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 		goto error_exit_scsi_pass;
 	}
 
+	if (qla4xxx_get_ioctl_scrap_mem(ha, (void **)&request,
+	    sizeof(struct request))) {
+		/* not enough memory */
+		ioctl->Status = EXT_STATUS_NO_MEMORY;
+		QL4PRINT(QLP2|QLP4,
+		    printk("%s(%d): inst=%d scrap not big enough. "
+		    "size requested=%ld.\n",
+		    __func__, ha->host_no, ha->instance,
+		    (ulong)sizeof(struct request)));
+		goto error_exit_scsi_pass;
+	}
+	
 	if (qla4xxx_get_ioctl_scrap_mem(ha, (void **)&pscsi_pass,
 	    sizeof(EXT_SCSI_PASSTHRU_ISCSI))) {
 		/* not enough memory */
@@ -3489,12 +3506,14 @@ qla4extioctl_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	memset(pscsi_pass, 0, sizeof(EXT_SCSI_PASSTHRU_ISCSI));
 	memset(pscsi_cmd, 0, sizeof(struct scsi_cmnd));
 	pscsi_cmd->device = pscsi_device;
+	pscsi_cmd->request = request;
+	pscsi_cmd->request->nr_hw_segments = 1;
 
 	/* ---- Get passthru structure from user space ---- */
 	if ((status = copy_from_user((uint8_t *)pscsi_pass,
 	    Q64BIT_TO_PTR(ioctl->RequestAdr),
 	    sizeof(EXT_SCSI_PASSTHRU_ISCSI))) != 0) {
-		QL4PRINT(QLP2,
+		QL4PRINT(QLP2|QLP4,
 		    printk("scsi%d: %s: unable to copy passthru struct "
 		    "from user's memory area.\n",
 		    ha->host_no, __func__));
@@ -3510,25 +3529,83 @@ qla4extioctl_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	    pscsi_pass, sizeof(EXT_SCSI_PASSTHRU_ISCSI));
 
 	/* ---- Make sure device exists ---- */
-	tgt_entry = qla4xxx_lookup_target_by_SCSIID(ha, pscsi_pass->Addr.Bus,
+	tgt_entry = qla4xxx_lookup_target_by_SCSIID(ha,
+						    pscsi_pass->Addr.Bus,
 	    pscsi_pass->Addr.Target);
 	if (tgt_entry ==  NULL) {
+		QL4PRINT(QLP2|QLP4,
+		    printk("scsi%d: %s: unable to find target queue for "
+		    "tgt %d.\n",
+		    ha->host_no, __func__, pscsi_pass->Addr.Target));
+		ioctl->Status = EXT_STATUS_ERR;
 		goto error_exit_scsi_pass;
 	}
 
 	lun_entry = qla4xxx_lookup_lun_handle(ha, tgt_entry,
 	    pscsi_pass->Addr.Lun);
 	if (lun_entry ==  NULL) {
+		fc_lun_t *fclun;
+
+		/* ---- Create temporary lun --- */
+		if (qla4xxx_get_ioctl_scrap_mem(ha, (void **)&lun_entry,
+                                                sizeof(*lun_entry))) {
+			/* not enough memory */
+			ioctl->Status = EXT_STATUS_NO_MEMORY;
+		QL4PRINT(QLP2|QLP4,
+			    printk("%s(%d): inst=%d scrap not big enough. "
+			    "size requested=%ld.\n",
+			    __func__, ha->host_no, ha->instance,
+			    (ulong)sizeof(*lun_entry)));
+			goto error_exit_scsi_pass;
+		}
+
+		if (qla4xxx_get_ioctl_scrap_mem(ha, (void **)&fclun,
+                                                sizeof(*fclun))) {
+			/* not enough memory */
+			ioctl->Status = EXT_STATUS_NO_MEMORY;
+			QL4PRINT(QLP2|QLP4,
+			    printk("%s(%d): inst=%d scrap not big enough. "
+			    "size requested=%ld.\n",
+			    __func__, ha->host_no, ha->instance,
+			    (ulong)sizeof(*fclun)));
+		goto error_exit_scsi_pass;
+	}
+
+		fcport = tgt_entry->fcport;
+
+		fclun->lun = pscsi_pass->Addr.Lun;
+		fclun->fcport = fcport;
+		fclun->device_type = TYPE_DISK;
+		
+		lun_entry->fclun = fclun;
+		lun_entry->fclun->fcport = fcport;
+		lun_entry->lun_state = LS_LUN_READY;
+		spin_lock_init(&lun_entry->lun_lock);
+
+		goto scsipt_lun_created;
+	}
+
+	if (lun_entry->fclun ==  NULL) {
+		QL4PRINT(QLP2|QLP4,
+		    printk("scsi%d: %s: unable to find fclun of lun queue "
+		    "for lun %d.\n",
+		    ha->host_no, __func__, pscsi_pass->Addr.Lun));
+		ioctl->Status = EXT_STATUS_ERR;
 		goto error_exit_scsi_pass;
 	}
 
 	fcport = lun_entry->fclun->fcport;
 	if (fcport ==  NULL) {
+		QL4PRINT(QLP2|QLP4,
+		    printk("scsi%d: %s: unable to find fcport of lun queue "
+		    "for lun %d.\n",
+		    ha->host_no, __func__, pscsi_pass->Addr.Lun));
+		ioctl->Status = EXT_STATUS_ERR;
 		goto error_exit_scsi_pass;
 	}
 
+scsipt_lun_created:
 	ddb_entry = fcport->ddbptr;
-
 	if (ddb_entry == NULL) {
 		QL4PRINT(QLP2|QLP4,
 		    printk("scsi%d: %s: invalid device (b%d,t%d) specified.\n",
@@ -3590,6 +3667,11 @@ qla4extioctl_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 	srb->fw_ddb_index = ddb_entry->fw_ddb_index;
 	srb->lun = pscsi_cmd->device->lun;
 	srb->flags |= SRB_IOCTL_CMD;
+	srb->fo_retry_cnt = 0;
+	srb->tgt_queue = tgt_entry;
+	srb->lun_queue = lun_entry;
+	srb->fclun = lun_entry->fclun;
+	srb->ha = fcport->ha;
 
 	if (pscsi_pass->CdbLength == 6 || pscsi_pass->CdbLength == 10 ||
 	    pscsi_pass->CdbLength == 12 || pscsi_pass->CdbLength == 16) {
@@ -3647,7 +3729,6 @@ qla4extioctl_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 
 	QL4PRINT(QLP4, printk("\n"));
 
-
 	/* ---- prepare for receiving completion ---- */
 	ha->ioctl->ioctl_scsi_pass_in_progress = 1;
 	ha->ioctl->ioctl_tov = pscsi_cmd->timeout_per_command;
@@ -3699,7 +3780,7 @@ qla4extioctl_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 
 			/* Wait for command to get out of active state */
 			wait_cnt = jiffies + WAIT_CMD_TOV * HZ;
-			while (wait_cnt > jiffies){
+			while (!time_after_eq(jiffies, wait_cnt)) {
 				if (srb->flags != SRB_ACTIVE_STATE)
 					break;
 
@@ -3707,6 +3788,10 @@ qla4extioctl_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				schedule_timeout(1 * HZ);
 			}
+
+			/* Command timed-out, but it's still active.
+			 * When it comes back, just discard it. */
+			srb->cmd = NULL;
 		}
 
 		ha->ioctl->ioctl_scsi_pass_in_progress = 0;
@@ -3726,6 +3811,12 @@ qla4extioctl_scsi_passthru(scsi_qla_host_t *ha, EXT_IOCTL_ISCSI *ioctl)
 		memcpy(pscsi_pass->SenseData, pscsi_cmd->sense_buffer,
 		    MIN(CMD_ACTUAL_SNSLEN(pscsi_cmd),
 		    sizeof(pscsi_pass->SenseData)));
+
+		QL4PRINT(QLP2|QLP4|QLP10,
+		    printk("scsi%d: %s: sense data dump:\n",
+		    ha->host_no, __func__));
+		qla4xxx_dump_bytes(QLP2|QLP4|QLP10,
+		    pscsi_pass->SenseData, sizeof(pscsi_pass->SenseData));
 	}
 
 	/* ---- check for command completion --- */
