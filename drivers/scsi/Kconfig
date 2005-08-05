@@ -1318,6 +1318,8 @@ config SCSI_LPFC
           This lpfc driver supports the Emulex LightPulse
           Family of Fibre Channel PCI host adapters.
 
+source "drivers/scsi/qla4xxx/Kconfig"
+
 config SCSI_SEAGATE
 	tristate "Seagate ST-02 and Future Domain TMC-8xx SCSI support"
 	depends on X86 && ISA && SCSI && BROKEN
