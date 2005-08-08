@@ -22,6 +22,7 @@
 #define NETLINK_KOBJECT_UEVENT	15	/* Kernel messages to userspace */
 #define NETLINK_TAPBASE		16	/* 16 to 31 are ethertap */
 
+#define NETLINK_ISCSI		31	/* iSCSI Open Interface */
 #define MAX_LINKS 32		
 
 struct sockaddr_nl

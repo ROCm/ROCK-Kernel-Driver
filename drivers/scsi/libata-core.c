@@ -2973,13 +2973,12 @@ static void ata_qc_timeout(struct ata_queued_cmd *qc)
 		goto out;
 	}
 
-	/* hack alert!  We cannot use the supplied completion
-	 * function from inside the ->eh_strategy_handler() thread.
-	 * libata is the only user of ->eh_strategy_handler() in
-	 * any kernel, so the default scsi_done() assumes it is
-	 * not being called from the SCSI EH.
+	/*
+	 * Do not call scsi_finish_command; this will be handled
+	 * by scsi_eh (control is passed back to scsi_eh after
+	 * this routine has finished).
 	 */
-	qc->scsidone = scsi_finish_command;
+	qc->scsidone = ata_qc_timeout_done;
 
 	switch (qc->tf.protocol) {
 
