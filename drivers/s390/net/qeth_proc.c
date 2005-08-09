@@ -27,66 +27,59 @@ const char *VERSION_QETH_PROC_C = "$Revision: 1.13 $";
 #define QETH_PROCFILE_NAME "qeth"
 static struct proc_dir_entry *qeth_procfile;
 
-static struct device *qeth_procfile_next_device(struct klist_iter *i)
+static int
+qeth_procfile_seq_match(struct device *dev, void *data)
 {
-	struct klist_node * n = klist_next(i);
-	return n ? container_of(n, struct device, knode_driver) : NULL;
+	return 1;
 }
 
 static void *
 qeth_procfile_seq_start(struct seq_file *s, loff_t *offset)
 {
-	struct device *next_dev = NULL;
-	struct klist_iter iter;
-	int i = 0;
+	struct device *dev;
+	loff_t nr;
 
-	if (*offset == 0)
+	down_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
+
+	nr = *offset;
+	if (nr == 0)
 		return SEQ_START_TOKEN;
 
-	klist_iter_init(&qeth_ccwgroup_driver.driver.klist_devices, &iter);
+	dev = driver_find_device(&qeth_ccwgroup_driver.driver, NULL,
+				 NULL, qeth_procfile_seq_match);
 
-	while ((next_dev = qeth_procfile_next_device(&iter)))
-	       if (++i == *offset)
-		       goto found;
-	next_dev = NULL;
-
- found:
-	klist_iter_exit(&iter);
-
-	return next_dev;
+	/* get card at pos *offset */
+	nr = *offset;
+	while (nr-- > 1 && dev)
+		dev = driver_find_device(&qeth_ccwgroup_driver.driver, dev,
+					 NULL, qeth_procfile_seq_match);
+	return (void *) dev;
 }
 
 static void
 qeth_procfile_seq_stop(struct seq_file *s, void* it)
 {
-	return;
+	up_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
 }
 
 static void *
 qeth_procfile_seq_next(struct seq_file *s, void *it, loff_t *offset)
 {
-	struct klist_iter iter;
-	struct device *current_dev = it;
-	struct device *next_dev;
+	struct device *prev, *next;
 
-	if (!it)
-		return NULL;
-
-	if (it == SEQ_START_TOKEN)
-		current_dev = NULL;
-
-	klist_iter_init_node(&qeth_ccwgroup_driver.driver.klist_devices, 
-			     &iter, current_dev == SEQ_START_TOKEN? 
-			     &current_dev->knode_driver : NULL );
-
-	next_dev = qeth_procfile_next_device(&iter);
-
-	if (!next_dev)
-		return NULL;
-
-	(*offset)++;
-
-	return next_dev;
+	if (it == SEQ_START_TOKEN) {
+		next = driver_find_device(&qeth_ccwgroup_driver.driver,
+					  NULL, NULL, qeth_procfile_seq_match);
+		if (next)
+			(*offset)++;
+		return (void *) next;
+	}
+	prev = (struct device *) it;
+	next = driver_find_device(&qeth_ccwgroup_driver.driver,
+				  prev, NULL, qeth_procfile_seq_match);
+	if (next)
+		(*offset)++;
+	return (void *) next;
 }
 
 static inline const char *
@@ -129,7 +122,7 @@ qeth_get_router_str(struct qeth_card *card, int ipv)
 static int
 qeth_procfile_seq_show(struct seq_file *s, void *it)
 {
-	struct device *device = it;
+	struct device *device;
 	struct qeth_card *card;
 	char tmp[12]; /* for qeth_get_prioq_str */
 
@@ -141,6 +134,7 @@ qeth_procfile_seq_show(struct seq_file *s, void *it)
 			      "-------------- ---- ------ ---------- ---- "
 			      "---- ----- -----\n");
 	} else {
+		device = (struct device *) it;
 		card = device->driver_data;
 		seq_printf(s, "%s/%s/%s x%02X   %-10s %-14s %-4i ",
 				CARD_RDEV_ID(card),
@@ -191,12 +185,51 @@ static struct proc_dir_entry *qeth_perf_procfile;
 
 #ifdef CONFIG_QETH_PERF_STATS
 
+static void *
+qeth_perf_procfile_seq_start(struct seq_file *s, loff_t *offset)
+{
+	struct device *dev = NULL;
+	int nr;
+
+	down_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
+	/* get card at pos *offset */
+	dev = driver_find_device(&qeth_ccwgroup_driver.driver, NULL, NULL,
+				 qeth_procfile_seq_match);
+
+	/* get card at pos *offset */
+	nr = *offset;
+	while (nr-- > 1 && dev)
+		dev = driver_find_device(&qeth_ccwgroup_driver.driver, dev,
+					 NULL, qeth_procfile_seq_match);
+	return (void *) dev;
+}
+
+static void
+qeth_perf_procfile_seq_stop(struct seq_file *s, void* it)
+{
+	up_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
+}
+
+static void *
+qeth_perf_procfile_seq_next(struct seq_file *s, void *it, loff_t *offset)
+{
+	struct device *prev, *next;
+
+	prev = (struct device *) it;
+	next = driver_find_device(&qeth_ccwgroup_driver.driver, prev,
+				  NULL, qeth_procfile_seq_match);
+	if (next)
+		(*offset)++;
+	return (void *) next;
+}
+
 static int
 qeth_perf_procfile_seq_show(struct seq_file *s, void *it)
 {
-	struct device *device = it;
+	struct device *device;
 	struct qeth_card *card;
 
+	device = (struct device *) it;
 	card = device->driver_data;
 	seq_printf(s, "For card with devnos %s/%s/%s (%s):\n",
 			CARD_RDEV_ID(card),
@@ -266,9 +299,9 @@ qeth_perf_procfile_seq_show(struct seq_file *s, void *it)
 }
 
 static struct seq_operations qeth_perf_procfile_seq_ops = {
-	.start = qeth_procfile_seq_start,
-	.stop  = qeth_procfile_seq_stop,
-	.next  = qeth_procfile_seq_next,
+	.start = qeth_perf_procfile_seq_start,
+	.stop  = qeth_perf_procfile_seq_stop,
+	.next  = qeth_perf_procfile_seq_next,
 	.show  = qeth_perf_procfile_seq_show,
 };
 
@@ -295,10 +328,54 @@ static struct file_operations qeth_perf_procfile_fops = {
 #define QETH_IPATO_PROCFILE_NAME "qeth_ipa_takeover"
 static struct proc_dir_entry *qeth_ipato_procfile;
 
+static void *
+qeth_ipato_procfile_seq_start(struct seq_file *s, loff_t *offset)
+{
+	struct device *dev;
+	loff_t nr;
+
+	down_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
+	/* TODO: finish this */
+	/*
+	 * maybe SEQ_SATRT_TOKEN can be returned for offset 0
+	 * output driver settings then;
+	 * else output setting for respective card
+	 */
+
+	dev = driver_find_device(&qeth_ccwgroup_driver.driver, NULL, NULL,
+				 qeth_procfile_seq_match);
+
+	/* get card at pos *offset */
+	nr = *offset;
+	while (nr-- > 1 && dev)
+		dev = driver_find_device(&qeth_ccwgroup_driver.driver, dev,
+					 NULL, qeth_procfile_seq_match);
+	return (void *) dev;
+}
+
+static void
+qeth_ipato_procfile_seq_stop(struct seq_file *s, void* it)
+{
+	up_read(&qeth_ccwgroup_driver.driver.bus->subsys.rwsem);
+}
+
+static void *
+qeth_ipato_procfile_seq_next(struct seq_file *s, void *it, loff_t *offset)
+{
+	struct device *prev, *next;
+
+	prev = (struct device *) it;
+	next = driver_find_device(&qeth_ccwgroup_driver.driver, prev,
+				  NULL, qeth_procfile_seq_match);
+	if (next)
+		(*offset)++;
+	return (void *) next;
+}
+
 static int
 qeth_ipato_procfile_seq_show(struct seq_file *s, void *it)
 {
-	struct device *device = it;
+	struct device *device;
 	struct qeth_card *card;
 
 	/* TODO: finish this */
@@ -307,15 +384,16 @@ qeth_ipato_procfile_seq_show(struct seq_file *s, void *it)
 	 * output driver settings then;
 	 * else output setting for respective card
 	 */
+	device = (struct device *) it;
 	card = device->driver_data;
 
 	return 0;
 }
 
 static struct seq_operations qeth_ipato_procfile_seq_ops = {
-	.start = qeth_procfile_seq_start,
-	.stop  = qeth_procfile_seq_stop,
-	.next  = qeth_procfile_seq_next,
+	.start = qeth_ipato_procfile_seq_start,
+	.stop  = qeth_ipato_procfile_seq_stop,
+	.next  = qeth_ipato_procfile_seq_next,
 	.show  = qeth_ipato_procfile_seq_show,
 };
 

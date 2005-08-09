@@ -8120,21 +8120,22 @@ static struct notifier_block qeth_ip6_notifier = {
 #endif
 
 static int
-__qeth_reboot_card(struct device *dev, void *data)
+__qeth_reboot_event_card(struct device *dev, void *data)
 {
-	struct qeth_card *card = (struct qeth_card *) dev->driver_data;
+	struct qeth_card *card;
 
+	card = (struct qeth_card *) dev->driver_data;
 	qeth_clear_ip_list(card, 0, 0);
 	qeth_qdio_clear_card(card, 0);
-
 	return 0;
 }
 
 static int
 qeth_reboot_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
-	driver_for_each_device(&qeth_ccwgroup_driver.driver, NULL, NULL, 
-			       __qeth_reboot_card);
+
+	driver_for_each_device(&qeth_ccwgroup_driver.driver, NULL, NULL,
+			       __qeth_reboot_event_card);
 	return NOTIFY_DONE;
 }
 
