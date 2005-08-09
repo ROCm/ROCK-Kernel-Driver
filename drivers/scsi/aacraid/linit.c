@@ -27,8 +27,11 @@
  * Abstract: Linux Driver entry module for Adaptec RAID Array Controller
  */
 
-#define AAC_DRIVER_VERSION		"1.1.2-lk2"
-#define AAC_DRIVER_BUILD_DATE		__DATE__
+#define AAC_DRIVER_VERSION		"1.1-4"
+#ifndef AAC_DRIVER_BRANCH
+#define AAC_DRIVER_BRANCH		""
+#endif
+#define AAC_DRIVER_BUILD_DATE		__DATE__ " " __TIME__
 #define AAC_DRIVERNAME			"aacraid"
 
 #include <linux/compat.h>
@@ -58,16 +61,24 @@
 
 #include "aacraid.h"
 
+#ifdef AAC_DRIVER_BUILD
+#define _str(x) #x
+#define str(x) _str(x)
+#define AAC_DRIVER_FULL_VERSION	AAC_DRIVER_VERSION "[" str(AAC_DRIVER_BUILD) "]" AAC_DRIVER_BRANCH
+#else
+#define AAC_DRIVER_FULL_VERSION	AAC_DRIVER_VERSION AAC_DRIVER_BRANCH " " AAC_DRIVER_BUILD_DATE
+#endif
 
 MODULE_AUTHOR("Red Hat Inc and Adaptec");
 MODULE_DESCRIPTION("Dell PERC2, 2/Si, 3/Si, 3/Di, "
 		   "Adaptec Advanced Raid Products, "
 		   "and HP NetRAID-4M SCSI driver");
 MODULE_LICENSE("GPL");
-MODULE_VERSION(AAC_DRIVER_VERSION);
+MODULE_VERSION(AAC_DRIVER_FULL_VERSION);
 
 static LIST_HEAD(aac_devices);
 static int aac_cfg_major = -1;
+char aac_driver_version[] = AAC_DRIVER_FULL_VERSION;
 
 /*
  * Because of the way Linux names scsi devices, the order in this table has
@@ -839,11 +850,12 @@ static int __devinit aac_probe_one(struct pci_dev *pdev,
 
 	return 0;
 
-out_deinit:
+ out_deinit:
 	kill_proc(aac->thread_pid, SIGKILL, 0);
 	wait_for_completion(&aac->aif_completion);
 
 	aac_send_shutdown(aac);
+	aac_adapter_disable_int(aac);
 	fib_map_free(aac);
 	pci_free_consistent(aac->pdev, aac->comm_size, aac->comm_addr, aac->comm_phys);
 	kfree(aac->queues);
@@ -860,6 +872,13 @@ out_deinit:
 	return error;
 }
 
+static void aac_shutdown(struct pci_dev *dev)
+{
+	struct Scsi_Host *shost = pci_get_drvdata(dev);
+	struct aac_dev *aac = (struct aac_dev *)shost->hostdata;
+	aac_send_shutdown(aac);
+}
+
 static void __devexit aac_remove_one(struct pci_dev *pdev)
 {
 	struct Scsi_Host *shost = pci_get_drvdata(pdev);
@@ -871,6 +890,7 @@ static void __devexit aac_remove_one(struct pci_dev *pdev)
 	wait_for_completion(&aac->aif_completion);
 
 	aac_send_shutdown(aac);
+	aac_adapter_disable_int(aac);
 	fib_map_free(aac);
 	pci_free_consistent(aac->pdev, aac->comm_size, aac->comm_addr,
 			aac->comm_phys);
@@ -891,14 +911,15 @@ static struct pci_driver aac_pci_driver = {
 	.id_table	= aac_pci_tbl,
 	.probe		= aac_probe_one,
 	.remove		= __devexit_p(aac_remove_one),
+	.shutdown 	= aac_shutdown,
 };
 
 static int __init aac_init(void)
 {
 	int error;
 	
-	printk(KERN_INFO "Red Hat/Adaptec aacraid driver (%s %s)\n",
-			AAC_DRIVER_VERSION, AAC_DRIVER_BUILD_DATE);
+	printk(KERN_INFO "Adaptec %s driver (%s)\n",
+	  AAC_DRIVERNAME, aac_driver_version);
 
 	error = pci_module_init(&aac_pci_driver);
 	if (error)
@@ -909,6 +930,7 @@ static int __init aac_init(void)
 		printk(KERN_WARNING
 		       "aacraid: unable to register \"aac\" device.\n");
 	}
+
 	return 0;
 }
 

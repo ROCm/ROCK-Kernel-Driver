@@ -635,6 +635,8 @@ ahc_linux_slave_alloc(struct scsi_device *sdev)
 	
 	targ->sdev[sdev->lun] = sdev;
 
+	spi_period(starget) = 0;
+
 	return 0;
 }
 
@@ -1612,9 +1614,9 @@ ahc_send_async(struct ahc_softc *ahc, char channel,
 		if (channel == 'B')
 			target_offset += 8;
 		starget = ahc->platform_data->starget[target_offset];
-		targ = scsi_transport_target_data(starget);
-		if (targ == NULL)
+		if (starget == NULL)
 			break;
+		targ = scsi_transport_target_data(starget);
 
 		target_ppr_options =
 			(spi_dt(starget) ? MSG_EXT_PPR_DT_REQ : 0)
