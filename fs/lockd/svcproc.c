@@ -22,7 +22,8 @@
 
 #define NLMDBG_FACILITY		NLMDBG_CLIENT
 
-static u32	nlmsvc_callback(struct svc_rqst *, u32, struct nlm_res *);
+static u32	nlmsvc_callback(struct svc_rqst *, u32,
+			struct nlm_res *, const char *);
 static void	nlmsvc_callback_exit(struct rpc_task *);
 
 #ifdef CONFIG_LOCKD_V4
@@ -276,7 +277,8 @@ nlmsvc_proc_test_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlmsvc_proc_test(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_TEST_RES, &res);
+		stat = nlmsvc_callback(rqstp, NLMPROC_TEST_RES, &res,
+				argp->lock.caller);
 	return stat;
 }
 
@@ -291,7 +293,8 @@ nlmsvc_proc_lock_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlmsvc_proc_lock(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_LOCK_RES, &res);
+		stat = nlmsvc_callback(rqstp, NLMPROC_LOCK_RES, &res,
+				argp->lock.caller);
 	return stat;
 }
 
@@ -306,7 +309,8 @@ nlmsvc_proc_cancel_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlmsvc_proc_cancel(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_CANCEL_RES, &res);
+		stat = nlmsvc_callback(rqstp, NLMPROC_CANCEL_RES, &res,
+				argp->lock.caller);
 	return stat;
 }
 
@@ -321,7 +325,8 @@ nlmsvc_proc_unlock_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlmsvc_proc_unlock(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_UNLOCK_RES, &res);
+		stat = nlmsvc_callback(rqstp, NLMPROC_UNLOCK_RES, &res,
+				argp->lock.caller);
 	return stat;
 }
 
@@ -336,7 +341,8 @@ nlmsvc_proc_granted_msg(struct svc_rqst *rqstp, struct nlm_args *argp,
 	memset(&res, 0, sizeof(res));
 
 	if ((stat = nlmsvc_proc_granted(rqstp, argp, &res)) == 0)
-		stat = nlmsvc_callback(rqstp, NLMPROC_GRANTED_RES, &res);
+		stat = nlmsvc_callback(rqstp, NLMPROC_GRANTED_RES, &res,
+				argp->lock.caller);
 	return stat;
 }
 
@@ -456,7 +462,7 @@ nlmsvc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 		return rpc_system_err;
 	}
 
-	nlm_host_rebooted(argp->mon, argp->state);
+	nlm_host_rebooted(&saddr, argp->mon, argp->state);
 	return rpc_success;
 }
 
@@ -480,7 +486,8 @@ nlmsvc_proc_granted_res(struct svc_rqst *rqstp, struct nlm_res  *argp,
  * This is the generic lockd callback for async RPC calls
  */
 static u32
-nlmsvc_callback(struct svc_rqst *rqstp, u32 proc, struct nlm_res *resp)
+nlmsvc_callback(struct svc_rqst *rqstp, u32 proc, struct nlm_res *resp,
+		const char *hostname)
 {
 	struct nlm_host	*host;
 	struct nlm_rqst	*call;

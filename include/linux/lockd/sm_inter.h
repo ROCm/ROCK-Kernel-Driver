@@ -19,7 +19,7 @@
 #define SM_NOTIFY	6
 
 #define SM_MAXSTRLEN	1024
-#define SMSVC_XDRSIZE	sizeof(struct nsm_args)
+#define SMSVC_XDRSIZE	(sizeof(struct nsm_args) + SM_MAXSTRLEN)
 
 /*
  * Arguments for all calls to statd
@@ -44,11 +44,10 @@ struct nsm_res {
 };
 
 extern int	nsm_statd_upcalls_init(void);
-#ifdef CONFIG_STATD
 extern int	nsm_kernel_statd_init(void);
-#endif
 extern int	(*nsm_monitor)(struct nlm_host *);
 extern int	(*nsm_unmonitor)(struct nlm_host *);
 extern u32	nsm_local_state;
+extern int	statd_authenticate(struct svc_rqst *);
 
 #endif /* LINUX_LOCKD_SM_INTER_H */

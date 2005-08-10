@@ -90,7 +90,7 @@ nlm_lookup_file(struct svc_rqst *rqstp, struct nlm_file **result,
 	 * the file.
 	 */
 	if ((nfserr = nlmsvc_ops->fopen(rqstp, f, &file->f_file)) != 0) {
-		dprintk("lockd: open failed (errno %d)\n", nfserr);
+		dprintk("lockd: open failed (error %d)\n", nfserr);
 		goto out_free;
 	}
 
@@ -315,6 +315,7 @@ nlmsvc_invalidate_all(void)
 			printk(KERN_WARNING "lockd: host has reference count %u "
 				"after nlmsvc_free_host_resources!\n",
 				atomic_read(&host->h_count));
+
 		}
 		nlm_release_host(host);
 	}

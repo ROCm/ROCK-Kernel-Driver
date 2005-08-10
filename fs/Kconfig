@@ -1515,10 +1515,6 @@ config ROOT_NFS
 
 config LOCKD
 	tristate
-	select STATD
-
-config STATD
-	bool
 
 config LOCKD_V4
 	bool

@@ -126,8 +126,8 @@ nlm_decode_lock(u32 *p, struct nlm_lock *lock)
 	s32			start, len, end;
 
 	if (!(p = xdr_decode_string(p, &lock->caller,
-				    &lock->len,
-				    NLM_MAXSTRLEN))
+					    &lock->len,
+					    NLM_MAXSTRLEN))
 	 || !(p = nlm_decode_fh(p, &lock->fh))
 	 || !(p = nlm_decode_oh(p, &lock->oh)))
 		return NULL;
@@ -302,7 +302,7 @@ nlmsvc_decode_shareargs(struct svc_rqst *rqstp, u32 *p, nlm_args *argp)
 
 	if (!(p = nlm_decode_cookie(p, &argp->cookie))
 	 || !(p = xdr_decode_string(p, &lock->caller,
-				    &lock->len, NLM_MAXSTRLEN))
+					    &lock->len, NLM_MAXSTRLEN))
 	 || !(p = nlm_decode_fh(p, &lock->fh))
 	 || !(p = nlm_decode_oh(p, &lock->oh)))
 		return 0;
@@ -336,7 +336,7 @@ nlmsvc_decode_notify(struct svc_rqst *rqstp, u32 *p, struct nlm_args *argp)
 	struct nlm_lock	*lock = &argp->lock;
 
 	if (!(p = xdr_decode_string(p, &lock->caller,
-				    &lock->len, NLM_MAXSTRLEN)))
+					    &lock->len, NLM_MAXSTRLEN)))
 		return 0;
 	argp->state = ntohl(*p++);
 	return xdr_argsize_check(rqstp, p);

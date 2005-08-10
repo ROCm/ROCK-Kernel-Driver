@@ -45,8 +45,7 @@ struct nlm_host {
 	unsigned short		h_proto;	/* transport proto */
 	unsigned short		h_reclaiming : 1,
 				h_server     : 1, /* server side, not client side */
-				h_inuse      : 1,
-				h_rebooted   : 1;
+				h_inuse      : 1;
 	wait_queue_head_t	h_gracewait;	/* wait while reclaiming */
 	u32			h_state;	/* pseudo-state counter */
 	u32			h_nsmstate;	/* true remote NSM state */
@@ -57,7 +56,7 @@ struct nlm_host {
 	unsigned long		h_expires;	/* eligible for GC */
 	struct list_head	h_lockowners;	/* Lockowners for the client */
 	spinlock_t		h_lock;
-	struct nsm_handle *	h_nsmhandle;	/* for kernel statd */
+	struct nsm_handle *	h_nsmhandle;	/* NSM status handle */
 };
 
 /*
@@ -65,9 +64,10 @@ struct nlm_host {
  */
 struct nsm_handle {
 	struct list_head	sm_link;
-	atomic_t		sm_count;
+	atomic_t                sm_count;
 	char *			sm_name;
-	unsigned int		sm_monitored : 1,
+	struct sockaddr_in      sm_addr;
+	unsigned int            sm_monitored : 1,
 				sm_sticky : 1;	/* don't unmonitor */
 };
 
@@ -149,12 +149,11 @@ extern struct svc_procedure	nlmsvc_procedures[];
 #ifdef CONFIG_LOCKD_V4
 extern struct svc_procedure	nlmsvc_procedures4[];
 #endif
-#ifdef CONFIG_STATD
 extern struct svc_procedure	nsmsvc_procedures[];
-#endif
 extern int			nlmsvc_grace_period;
 extern unsigned long		nlmsvc_timeout;
 extern int			nlm_max_hosts;
+extern int			nsm_use_hostnames;
 
 /*
  * Lockd client functions
@@ -182,9 +181,11 @@ struct nlm_host * nlm_get_host(struct nlm_host *);
 void		  nlm_release_host(struct nlm_host *);
 void		  nlm_shutdown_hosts(void);
 extern struct nlm_host *nlm_find_client(void);
-extern void	  nlm_host_rebooted(const char *, u32);
-struct nsm_handle *nsm_find(const char *);
-void		  nsm_release(struct nsm_handle *);
+extern void	nlm_host_rebooted(const struct sockaddr_in *, const char *, u32);
+struct nsm_handle *nsm_find(const struct sockaddr_in *, const char *);
+void		nsm_release(struct nsm_handle *);
+
+
 
 /*
  * Server-side lock handling
@@ -221,7 +222,7 @@ nlmsvc_file_inode(struct nlm_file *file)
  * Compare two host addresses (needs modifying for ipv6)
  */
 static __inline__ int
-nlm_cmp_addr(struct sockaddr_in *sin1, struct sockaddr_in *sin2)
+nlm_cmp_addr(const struct sockaddr_in *sin1, const struct sockaddr_in *sin2)
 {
 	return sin1->sin_addr.s_addr == sin2->sin_addr.s_addr;
 }

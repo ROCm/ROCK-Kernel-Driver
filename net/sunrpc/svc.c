@@ -221,20 +221,25 @@ svc_register(struct svc_serv *serv, int proto, unsigned short port)
 	unsigned long		flags;
 	int			i, error = 0, dummy;
 
-	progp = serv->sv_program;
-
 	if (!port)
 		clear_thread_flag(TIF_SIGPENDING);
 
-	while (progp) {
-		dprintk("RPC: svc_register(%s, %s, %d)\n",
-			progp->pg_name,
-			proto == IPPROTO_UDP?  "udp" : "tcp",
-			port);
-
+	for (progp = serv->sv_program; progp; progp = progp->pg_next) {
 		for (i = 0; i < progp->pg_nvers; i++) {
 			if (progp->pg_vers[i] == NULL)
 				continue;
+
+			dprintk("RPC: svc_register(%s, %s, %d, %d)%s\n",
+					progp->pg_name,
+					proto == IPPROTO_UDP?  "udp" : "tcp",
+					port,
+					i,
+					progp->pg_vers[i]->vs_hidden?
+						" (but not telling portmap)" : "");
+
+			if (progp->pg_vers[i]->vs_hidden)
+				continue;
+
 			error = rpc_register(progp->pg_prog, i, proto, port, &dummy);
 			if (error < 0)
 				break;
@@ -243,7 +248,6 @@ svc_register(struct svc_serv *serv, int proto, unsigned short port)
 				break;
 			}
 		}
-		progp = progp->pg_next;
 	}
 
 	if (!port) {

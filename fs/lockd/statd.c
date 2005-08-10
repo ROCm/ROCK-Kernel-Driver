@@ -1,5 +1,5 @@
 /*
- * linux/fs/lockd/statd.c
+ * linux/fs/lockd/nsmproc.c
  *
  * Kernel-based status monitor. This is an alternative to
  * the code in mon.c.
@@ -85,23 +85,26 @@ nsm_kernel_statd_init(void)
 }
 
 /*
- * Build the NSM file name path
+ * Build the NSM file name
  */
 static char *
-nsm_get_name(const char *hostname)
+nsm_filename(struct nsm_handle *nsm)
 {
 	char	*name;
-
-	if (strchr(hostname, '/') != NULL) {
-		printk(KERN_NOTICE "lockd: invalid characters in hostname \"%s\"\n", hostname);
-		return ERR_PTR(-EINVAL);
-	}
 
 	name = (char *) __get_free_page(GFP_KERNEL);
 	if (name == NULL)
 		return ERR_PTR(-ENOMEM);
 
-	snprintf(name, PAGE_SIZE, "%s/%s", NSM_SM_PATH, hostname);
+	if (nsm_use_hostnames) {
+		snprintf(name, PAGE_SIZE, "%s/%s",
+				NSM_SM_PATH, nsm->sm_name);
+	} else {
+		/* FIXME IPV6 */
+		snprintf(name, PAGE_SIZE, "%s/%u.%u.%u.%u",
+				NSM_SM_PATH,
+				NIPQUAD(nsm->sm_addr.sin_addr));
+	}
 	return name;
 }
 
@@ -115,17 +118,16 @@ nsm_put_name(char *name)
  * Create the NSM monitor file
  */
 static int
-nsm_create(const char *hostname)
+nsm_create(struct nsm_handle *nsm)
 {
 	struct file	*filp;
 	char		*filename;
 	int		res = 0;
 
-	dprintk("lockd: creating statd monitor file %s\n", hostname);
+	dprintk("lockd: creating statd monitor file for %s\n", nsm->sm_name);
 
-	filename = nsm_get_name(hostname);
-	if (IS_ERR(filename))
-		return PTR_ERR(filename);
+	if (!(filename = nsm_filename(nsm)))
+		return -ENOMEM;
 
 	filp = filp_open(filename, O_CREAT|O_SYNC|O_RDWR, 0644);
 	if (IS_ERR(filp)) {
@@ -143,7 +145,7 @@ nsm_create(const char *hostname)
 }
 
 static int
-nsm_unlink(const char *hostname)
+nsm_unlink(struct nsm_handle *nsm)
 {
 	struct nameidata nd;
 	struct inode	*inode = NULL;
@@ -151,9 +153,8 @@ nsm_unlink(const char *hostname)
 	char		*filename;
 	int		res = 0;
 
-	filename = nsm_get_name(hostname);
-	if (IS_ERR(filename))
-		return PTR_ERR(filename);
+	if (!(filename = nsm_filename(nsm)))
+		return -ENOMEM;
 
 	if ((res = path_lookup(filename, LOOKUP_PARENT, &nd)) != 0)
 		goto exit;
@@ -197,7 +198,7 @@ exit:
 }
 
 static int
-with_privilege(int (*func)(const char *), const char *hostname)
+with_privilege(int (*func)(struct nsm_handle *), struct nsm_handle *nsm)
 {
 	kernel_cap_t	cap = current->cap_effective;
 	int		res = 0, mask;
@@ -214,7 +215,7 @@ with_privilege(int (*func)(const char *), const char *hostname)
 	swap_ugid(uid_t, fsuid);
 	swap_ugid(gid_t, fsgid);
 
-	res = func(hostname);
+	res = func(nsm);
 
 	/* drop privileges */
 	current->cap_effective = cap;
@@ -241,8 +242,9 @@ __nsm_monitor(struct nlm_host *host)
 	dprintk("lockd: nsm_monitor(%s)\n", host->h_name);
 	if ((nsm = host->h_nsmhandle) == NULL)
 		BUG();
+
 	if (!nsm->sm_monitored) {
-		res = with_privilege(nsm_create, nsm->sm_name);
+		res = with_privilege(nsm_create, nsm);
 		if (res >= 0) {
 			nsm->sm_monitored = 1;
 		} else {
@@ -277,12 +279,7 @@ __nsm_unmonitor(struct nlm_host *host)
 	 && nsm->sm_monitored && !nsm->sm_sticky) {
 		dprintk("lockd: nsm_unmonitor(%s)\n", host->h_name);
 
-		nsm->sm_monitored = 0;
-		res = with_privilege(nsm_unlink, nsm->sm_name);
-		if (res < 0) {
-			dprintk(KERN_NOTICE "nsm_unmonitor(%s) failed: errno=%d\n",
-					nsm->sm_name, -res);
-		}
+		res = with_privilege(nsm_unlink, nsm);
 	}
 
 	nsm_release(nsm);
@@ -292,6 +289,17 @@ __nsm_unmonitor(struct nlm_host *host)
 /*
  * NSM server implementation starts here
  */
+int
+statd_authenticate(struct svc_rqst *rqstp)
+{
+	/* No authentication for statd. Many statd implementations
+	 * even send their reboot notifications from an unprivileged
+	 * port.
+	 */
+	rqstp->rq_client = NULL;
+	return SVC_OK;
+}
+
 
 /*
  * NULL: Test for presence of service
@@ -310,8 +318,11 @@ static int
 nsmsvc_proc_notify(struct svc_rqst *rqstp, struct nsm_args *argp,
 				           struct nsm_res  *resp)
 {
+	struct sockaddr_in	saddr = rqstp->rq_addr;
+
 	dprintk("statd: NOTIFY        called\n");
-	nlm_host_rebooted(argp->mon_name, argp->state);
+
+	nlm_host_rebooted(&saddr, argp->mon_name, argp->state);
 	return rpc_success;
 }
 
@@ -348,6 +359,7 @@ nsmsvc_decode_stat_chge(struct svc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 {
 	__u32	mon_name_len;
 
+	/* Skip over the client's mon_name */
 	p = xdr_decode_string(p, &argp->mon_name, &mon_name_len, SM_MAXSTRLEN);
 	if (p == NULL)
 		return 0;

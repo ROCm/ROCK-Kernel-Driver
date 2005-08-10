@@ -428,7 +428,7 @@ nlm4svc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 		return rpc_system_err;
 	}
 
-	nlm_host_rebooted(argp->mon, argp->state);
+	nlm_host_rebooted(&saddr, argp->mon, argp->state);
 	return rpc_success;
 }
 

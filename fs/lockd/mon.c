@@ -3,8 +3,8 @@
  *
  * The kernel statd client.
  *
- * When using the kernel statd implementation, none of the
- * stuff inside this file is used. 
+ * When using the kernel statd service, none of the
+ * stuff inside this file is used.
  * Instead look at statd.c
  *
  * Copyright (C) 1996, Olaf Kirch <okir@monad.swb.de>
@@ -18,16 +18,17 @@
 #include <linux/lockd/lockd.h>
 #include <linux/lockd/sm_inter.h>
 
+
 #define NLMDBG_FACILITY		NLMDBG_MONITOR
 
 static struct rpc_clnt *	nsm_create(void);
-static int			__nsm_monitor(struct nlm_host *host);
-static int			__nsm_unmonitor(struct nlm_host *host);
+static int			__nsm_monitor(struct nlm_host *);
+static int			__nsm_unmonitor(struct nlm_host *);
 
 static struct rpc_program	nsm_program;
 
 /*
- * Local NSM state.
+ * Local NSM state
  * This should really be initialized somehow.
  */
 u32				nsm_local_state;
@@ -79,7 +80,7 @@ nsm_mon_unmon(struct nsm_handle *nsm, u32 proc, struct nsm_res *res)
 /*
  * Set up monitoring of a remote host
  */
-static int
+int
 __nsm_monitor(struct nlm_host *host)
 {
 	struct nsm_handle *nsm;
@@ -94,6 +95,7 @@ __nsm_monitor(struct nlm_host *host)
 		return 0;
 
 	status = nsm_mon_unmon(nsm, SM_MON, &res);
+
 	if (status < 0 || res.status != 0)
 		printk(KERN_NOTICE "lockd: cannot monitor %s\n", host->h_name);
 	else
@@ -104,7 +106,7 @@ __nsm_monitor(struct nlm_host *host)
 /*
  * Cease to monitor remote host
  */
-static int
+int
 __nsm_unmonitor(struct nlm_host *host)
 {
 	struct nsm_handle *nsm;
@@ -169,7 +171,7 @@ out_err:
 static u32 *
 xdr_encode_common(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 {
-	char	buffer[20];
+	char	buffer[20], *name;
 
 	/*
 	 * Use the dotted-quad IP address of the remote host as
@@ -177,8 +179,13 @@ xdr_encode_common(struct rpc_rqst *rqstp, u32 *p, struct nsm_args *argp)
 	 * hostname first for whatever remote hostname it receives,
 	 * so this works alright.
 	 */
-	sprintf(buffer, "%u.%u.%u.%u", NIPQUAD(argp->addr));
-	if (!(p = xdr_encode_string(p, buffer))
+	if (nsm_use_hostnames) {
+		name = argp->mon_name;
+	} else {
+		sprintf(buffer, "%u.%u.%u.%u", NIPQUAD(argp->addr));
+		name = buffer;
+	}
+	if (!(p = xdr_encode_string(p, name))
 	 || !(p = xdr_encode_string(p, system_utsname.nodename)))
 		return ERR_PTR(-EIO);
 	*p++ = htonl(argp->prog);
