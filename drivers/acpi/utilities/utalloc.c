@@ -674,6 +674,9 @@ acpi_ut_find_allocation (
 {
 	struct acpi_debug_mem_block     *element;
 
+	/* too slow to be usable */
+	return NULL;
+
 
 	ACPI_FUNCTION_ENTRY ();
 
