@@ -4199,10 +4199,9 @@ static ssize_t floppy_cmos_show(struct device *dev,
 	struct platform_device *p;
 	int drive;
 
-	p = container_of(dev,struct platform_device,dev);
+	p = container_of(dev, struct platform_device,dev);
 	drive = p->id;
-
-	return sprintf(buf,"%X\n", UDP->cmos);
+	return sprintf(buf, "%X\n", UDP->cmos);
 }
 DEVICE_ATTR(cmos,S_IRUGO,floppy_cmos_show,NULL);
 
