@@ -165,7 +165,7 @@ static union acpi_ec	*ec_ecdt;
 
 /* External interfaces use first EC only, so remember */
 static struct acpi_device *first_ec;
-static int acpi_ec_polling_mode = EC_POLLING;
+static int acpi_ec_polling_mode = EC_BURST;
 
 /* --------------------------------------------------------------------------
                              Transaction Management
