@@ -492,6 +492,23 @@ static int hub_hub_status(struct usb_hub *hub,
 	return ret;
 }
 
+static int hub_port_disable(struct usb_hub *hub, int port1, int set_state)
+{
+	struct usb_device *hdev = hub->hdev;
+	int ret;
+
+	if (hdev->children[port1-1] && set_state) {
+		usb_set_device_state(hdev->children[port1-1],
+				USB_STATE_NOTATTACHED);
+	}
+	ret = clear_port_feature(hdev, port1, USB_PORT_FEAT_ENABLE);
+	if (ret)
+		dev_err(hub->intfdev, "cannot disable port %d (err = %d)\n",
+			port1, ret);
+
+	return ret;
+}
+
 static int hub_configure(struct usb_hub *hub,
 	struct usb_endpoint_descriptor *endpoint)
 {
@@ -712,19 +729,35 @@ fail:
 
 static unsigned highspeed_hubs;
 
+/* Called after the hub driver is unbound from a hub with children */
+static void hub_remove_children_work(void *__hub)
+{
+	struct usb_hub		*hub = __hub;
+	struct usb_device	*hdev = hub->hdev;
+	int			i;
+
+	kfree(hub);
+
+	usb_lock_device(hdev);
+	for (i = 0; i < hdev->maxchild; ++i) {
+		if (hdev->children[i])
+			usb_disconnect(&hdev->children[i]);
+	}
+	usb_unlock_device(hdev);
+	usb_put_dev(hdev);
+}
+
 static void hub_disconnect(struct usb_interface *intf)
 {
 	struct usb_hub *hub = usb_get_intfdata (intf);
 	struct usb_device *hdev;
+	int n, port1;
 
-	if (!hub)
-		return;
+	usb_set_intfdata (intf, NULL);
 	hdev = hub->hdev;
 
 	if (hdev->speed == USB_SPEED_HIGH)
 		highspeed_hubs--;
-
-	usb_set_intfdata (intf, NULL);
 
 	hub_quiesce(hub);
 	usb_free_urb(hub->urb);
@@ -746,8 +779,27 @@ static void hub_disconnect(struct usb_interface *intf)
 		hub->buffer = NULL;
 	}
 
-	/* Free the memory */
-	kfree(hub);
+	/* If there are any children then this is an unbind only, not a
+	 * physical disconnection.  The active ports must be disabled
+	 * and later on we must call usb_disconnect().  We can't call
+	 * it now because we may not hold the hub's device lock.
+	 */
+	n = 0;
+	for (port1 = 1; port1 <= hdev->maxchild; ++port1) {
+		if (hdev->children[port1 - 1]) {
+			++n;
+			hub_port_disable(hub, port1, 1);
+		}
+	}
+
+	if (n == 0)
+		kfree(hub);
+	else {
+		/* Reuse the hub->leds work_struct for our own purposes */
+		INIT_WORK(&hub->leds, hub_remove_children_work, hub);
+		schedule_work(&hub->leds);
+		usb_get_dev(hdev);
+	}
 }
 
 static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
@@ -1051,6 +1103,7 @@ void usb_disconnect(struct usb_device **pdev)
 	dev_dbg (&udev->dev, "unregistering device\n");
 	release_address(udev);
 	usbfs_remove_device(udev);
+	usbdev_remove(udev);
 	usb_remove_sysfs_dev_files(udev);
 
 	/* Avoid races with recursively_mark_NOTATTACHED() */
@@ -1290,6 +1343,7 @@ int usb_new_device(struct usb_device *udev)
 	/* USB device state == configured ... usable */
 
 	/* add a /proc/bus/usb entry */
+	usbdev_add(udev);
 	usbfs_add_device(udev);
 	return 0;
 
@@ -1426,23 +1480,6 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 		port1);
 
 	return status;
-}
-
-static int hub_port_disable(struct usb_hub *hub, int port1, int set_state)
-{
-	struct usb_device *hdev = hub->hdev;
-	int ret;
-
-	if (hdev->children[port1-1] && set_state) {
-		usb_set_device_state(hdev->children[port1-1],
-				USB_STATE_NOTATTACHED);
-	}
-	ret = clear_port_feature(hdev, port1, USB_PORT_FEAT_ENABLE);
-	if (ret)
-		dev_err(hub->intfdev, "cannot disable port %d (err = %d)\n",
-			port1, ret);
-
-	return ret;
 }
 
 /*
