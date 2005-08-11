@@ -390,6 +390,8 @@ int ata_scsi_error(struct Scsi_Host *host)
 	ap = (struct ata_port *) &host->hostdata[0];
 	ap->ops->eng_timeout(ap);
 
+	INIT_LIST_HEAD(&host->eh_cmd_q);
+
 	DPRINTK("EXIT\n");
 	return 0;
 }

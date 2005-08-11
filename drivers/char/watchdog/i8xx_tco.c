@@ -1,5 +1,5 @@
 /*
- *	i8xx_tco 0.07:	TCO timer driver for i8xx chipsets
+ *	i8xx_tco:	TCO timer driver for i8xx chipsets
  *
  *	(c) Copyright 2000 kernel concepts <nils@kernelconcepts.de>, All Rights Reserved.
  *				http://www.kernelconcepts.de
@@ -63,6 +63,9 @@
  *  20050128 Wim Van Sebroeck <wim@iguana.be>
  *	0.07 Added support for the ICH4-M, ICH6, ICH6R, ICH6-M, ICH6W and ICH6RW
  *	     chipsets. Also added support for the "undocumented" ICH7 chipset.
+ *  20050807 Wim Van Sebroeck <wim@iguana.be>
+ *	0.08 Make sure that the watchdog is only "armed" when started.
+ *	     (Kernel Bug 4251)
  */
 
 /*
@@ -87,7 +90,7 @@
 #include "i8xx_tco.h"
 
 /* Module and version information */
-#define TCO_VERSION "0.07"
+#define TCO_VERSION "0.08"
 #define TCO_MODULE_NAME "i8xx TCO timer"
 #define TCO_DRIVER_NAME   TCO_MODULE_NAME ", v" TCO_VERSION
 #define PFX TCO_MODULE_NAME ": "
