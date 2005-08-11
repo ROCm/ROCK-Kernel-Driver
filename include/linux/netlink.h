@@ -20,7 +20,6 @@
 #define NETLINK_DNRTMSG		14	/* DECnet routing messages */
 #define NETLINK_KOBJECT_UEVENT	15	/* Kernel messages to userspace */
 
-#define NETLINK_ISCSI		31	/* iSCSI Open Interface */
 #define MAX_LINKS 32		
 
 struct sockaddr_nl
