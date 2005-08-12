@@ -22,12 +22,17 @@
 #define SHUTDOWN_REBOOT    1
 #define SHUTDOWN_SUSPEND   2
 
-void machine_restart(char * __unused)
+void machine_emergency_restart(void)
 {
 	/* We really want to get pending console data out before we die. */
 	extern void xencons_force_flush(void);
 	xencons_force_flush();
 	HYPERVISOR_reboot();
+}
+
+void machine_restart(char * __unused)
+{
+	machine_emergency_restart();
 }
 
 void machine_halt(void)

@@ -909,6 +909,15 @@ void local_teardown_timer_irq(void)
 }
 #endif
 
+int read_current_timer(unsigned long *timer_val)
+{
+	if (cur_timer->read_timer) {
+		*timer_val = cur_timer->read_timer();
+		return 0;
+	}
+	return -1;
+}
+
 /*
  * /proc/sys/xen: This really belongs in another file. It can stay here for
  * now however.
