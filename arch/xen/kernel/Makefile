@@ -7,7 +7,7 @@ XENARCH	:= $(subst ",,$(CONFIG_XENARCH))
 CPPFLAGS_vmlinux.lds += -U$(XENARCH)
 
 $(obj)/vmlinux.lds.S:
-	@ln -fsn $(srctree)/arch/$(XENARCH)/kernel/vmlinux.lds.S $@
+	@ln -fsn $(srctree)/arch/xen/kernel/vmlinux-$(XENARCH).lds.S $@
 
 extra-y += vmlinux.lds
 
