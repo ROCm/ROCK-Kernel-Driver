@@ -6,7 +6,7 @@
  * be a little careful about namespace pollution etc.  Also, we cannot
  * assume GCC is being used.
  */
-
+#ifndef __ASSEMBLY__
 typedef unsigned long	__kernel_ino_t;
 typedef unsigned int	__kernel_mode_t;
 typedef unsigned long	__kernel_nlink_t;
@@ -115,5 +115,5 @@ static __inline__ void __FD_ZERO(__kernel_fd_set *p)
 }
 
 #endif /* defined(__KERNEL__) */
-
+#endif
 #endif

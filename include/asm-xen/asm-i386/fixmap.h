@@ -27,6 +27,7 @@
 #include <asm/acpi.h>
 #include <asm/apicdef.h>
 #include <asm/page.h>
+#include <asm-xen/gnttab.h>
 #ifdef CONFIG_HIGHMEM
 #include <linux/threads.h>
 #include <asm/kmap_types.h>
@@ -79,11 +80,14 @@ enum fixed_addresses {
 #ifdef CONFIG_ACPI_BOOT
 	FIX_ACPI_BEGIN,
 	FIX_ACPI_END = FIX_ACPI_BEGIN + FIX_ACPI_PAGES - 1,
+	FIX_ACPI_RSDP_PAGE,
 #endif
 #ifdef CONFIG_PCI_MMCONFIG
 	FIX_PCIE_MCFG,
 #endif
 	FIX_SHARED_INFO,
+	FIX_GNTTAB_BEGIN,
+	FIX_GNTTAB_END = FIX_GNTTAB_BEGIN + NR_GRANT_FRAMES - 1,
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 #define NR_FIX_ISAMAPS	256
 	FIX_ISAMAP_END,
@@ -100,15 +104,9 @@ enum fixed_addresses {
 
 extern void __set_fixmap (enum fixed_addresses idx,
 					unsigned long phys, pgprot_t flags);
-extern void __set_fixmap_ma (enum fixed_addresses idx,
-					unsigned long mach, pgprot_t flags);
 
 #define set_fixmap(idx, phys) \
 		__set_fixmap(idx, phys, PAGE_KERNEL)
-#define set_fixmap_ma(idx, phys) \
-		__set_fixmap_ma(idx, phys, PAGE_KERNEL)
-#define set_fixmap_ma_ro(idx, phys) \
-		__set_fixmap_ma(idx, phys, PAGE_KERNEL_RO)
 /*
  * Some hardware wants to get fixmapped without caching.
  */

@@ -16,26 +16,38 @@ XENARCH	:= $(subst ",,$(CONFIG_XENARCH))
 
 # pick up headers from include/asm-xen/asm in preference over include/asm
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include/asm-xen -Iinclude/asm-xen -iwithprefix include
+ifneq ($(KBUILD_SRC),)
+NOSTDINC_FLAGS += -I$(srctree)/include/asm-xen
+endif
 
 # make uname return the processor arch
 UTS_MACHINE := $(XENARCH)
 
 core-y	+= arch/xen/kernel/
 
+.PHONY: include2/asm
+include2/asm:
+ifneq ($(KBUILD_SRC),)
+	@echo '  SYMLINK ../include/asm-$(XENARCH) -> include2/asm'
+	$(Q)ln -fsn ../include/asm-$(XENARCH) include2/asm
+endif
+
 include/.asm-ignore: include/asm
 	@rm -f include/.asm-ignore
 	@mv include/asm include/.asm-ignore
 	@echo '  SYMLINK include/asm -> include/asm-$(XENARCH)'
 	$(Q)if [ ! -d include ]; then mkdir -p include; fi;
-	@ln -fsn asm-$(XENARCH) include/asm
+	@ln -fsn $(srctree)/include/asm-$(XENARCH) include/asm
 
 include/asm-xen/asm:
 	@echo '  SYMLINK $@ -> include/asm-xen/asm-$(XENARCH)'
-	@ln -fsn asm-$(XENARCH) $@
+	@mkdir -p include/asm-xen
+	@ln -fsn $(srctree)/include/asm-xen/asm-$(XENARCH) $@
 
 arch/xen/arch:
 	@rm -f $@
-	@ln -fsn $(XENARCH) $@
+	@mkdir -p arch/xen
+	@ln -fsn $(srctree)/arch/xen/$(XENARCH) $@
 
 arch/$(XENARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
@@ -44,7 +56,7 @@ include/asm-$(ARCH)/asm_offsets.h: arch/$(XENARCH)/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
 
 prepare: include/.asm-ignore include/asm-xen/asm \
-	arch/xen/arch include/asm-$(ARCH)/asm_offsets.h ;
+	arch/xen/arch include/asm-$(ARCH)/asm_offsets.h include2/asm ;
 
 all: vmlinuz
 
@@ -62,7 +74,7 @@ install: vmlinuz
 	install -m0664 System.map $(INSTALL_PATH)/boot/System.map-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
 	ln -f -s vmlinuz-$(XINSTALL_NAME)$(INSTALL_SUFFIX) $(INSTALL_PATH)/boot/vmlinuz-$(VERSION).$(PATCHLEVEL)$(XENGUEST)$(INSTALL_SUFFIX)
 	mkdir -p $(INSTALL_PATH)/usr/include/xen/linux
-	install -m0644 include/asm-xen/linux-public/*.h $(INSTALL_PATH)/usr/include/xen/linux
+	install -m0644 $(srctree)/include/asm-xen/linux-public/*.h $(INSTALL_PATH)/usr/include/xen/linux
 
 archclean:
 	@if [ -e arch/xen/arch ]; then $(MAKE) $(clean)=arch/xen/arch; fi;

@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2003, B Dragovic
  * Copyright (c) 2003-2004, M Williamson, K Fraser
+ * Copyright (c) 2005 Dan M. Smith, IBM Corporation
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -42,13 +43,16 @@
 #include <linux/vmalloc.h>
 #include <asm-xen/xen_proc.h>
 #include <asm-xen/hypervisor.h>
-#include <asm-xen/ctrl_if.h>
 #include <asm-xen/balloon.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 #include <linux/list.h>
+
+#include<asm-xen/xenbus.h>
+
+#define PAGES2KB(_p) ((_p)<<(PAGE_SHIFT-10))
 
 static struct proc_dir_entry *balloon_pde;
 
@@ -81,7 +85,7 @@ static struct timer_list balloon_timer;
 /* Use the private and mapping fields of struct page as a list. */
 #define PAGE_TO_LIST(p) ( (struct list_head *)&p->private )
 #define LIST_TO_PAGE(l) ( list_entry( ((unsigned long *)l),   \
-				      struct page, private ) )
+                                      struct page, private ) )
 #define UNLIST_PAGE(p)  do { list_del(PAGE_TO_LIST(p));       \
                              p->mapping = NULL;               \
                              p->private = 0; } while(0)
@@ -137,24 +141,6 @@ static struct page *balloon_retrieve(void)
         balloon_low--;
 
     return page;
-}
-
-static inline pte_t *get_ptep(unsigned long addr)
-{
-    pgd_t *pgd;
-    pud_t *pud;
-    pmd_t *pmd;
-
-    pgd = pgd_offset_k(addr);
-    if ( pgd_none(*pgd) || pgd_bad(*pgd) ) BUG();
-
-    pud = pud_offset(pgd, addr);
-    if ( pud_none(*pud) || pud_bad(*pud) ) BUG();
-
-    pmd = pmd_offset(pud, addr);
-    if ( pmd_none(*pmd) || pmd_bad(*pmd) ) BUG();
-
-    return pte_offset_kernel(pmd, addr);
 }
 
 static void balloon_alarm(unsigned long unused)
@@ -220,14 +206,18 @@ static void balloon_process(void *unused)
 
             /* Update P->M and M->P tables. */
             phys_to_machine_mapping[pfn] = mfn_list[i];
-            queue_machphys_update(mfn_list[i], pfn);
+            xen_machphys_update(mfn_list[i], pfn);
             
             /* Link back into the page tables if it's not a highmem page. */
             if ( pfn < max_low_pfn )
-                queue_l1_entry_update(
-                    get_ptep((unsigned long)__va(pfn << PAGE_SHIFT)),
-                    (mfn_list[i] << PAGE_SHIFT) | pgprot_val(PAGE_KERNEL));
-            
+            {
+                HYPERVISOR_update_va_mapping(
+                    (unsigned long)__va(pfn << PAGE_SHIFT),
+                    __pte_ma((mfn_list[i] << PAGE_SHIFT) |
+                             pgprot_val(PAGE_KERNEL)),
+                    0);
+            }
+
             /* Finally, relinquish the memory back to the system allocator. */
             ClearPageReserved(page);
             set_page_count(page, 1);
@@ -259,7 +249,8 @@ static void balloon_process(void *unused)
             {
                 v = phys_to_virt(pfn << PAGE_SHIFT);
                 scrub_pages(v, 1);
-                queue_l1_entry_update(get_ptep((unsigned long)v), 0);
+                HYPERVISOR_update_va_mapping(
+                    (unsigned long)v, __pte_ma(0), 0);
             }
 #ifdef CONFIG_XEN_SCRUB_PAGES
             else
@@ -273,9 +264,7 @@ static void balloon_process(void *unused)
 
         /* Ensure that ballooned highmem pages don't have cached mappings. */
         kmap_flush_unused();
-
-        /* Flush updates through and flush the TLB. */
-        xen_tlb_flush();
+        flush_tlb_all();
 
         /* No more mappings: invalidate pages in P2M and add to balloon. */
         for ( i = 0; i < debt; i++ )
@@ -312,29 +301,48 @@ static void set_new_target(unsigned long target)
     schedule_work(&balloon_worker);
 }
 
-static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
+static struct xenbus_watch target_watch =
 {
-    switch ( msg->subtype )
+    .node = "memory/target"
+};
+
+/* React to a change in the target key */
+static void watch_target(struct xenbus_watch *watch, const char *node)
+{
+    unsigned long new_target;
+    int err;
+
+    err = xenbus_scanf("memory", "target", "%lu", &new_target);
+        
+    if(err != 1) 
     {
-    case CMSG_MEM_REQUEST_SET:
-    {
-        mem_request_t *req = (mem_request_t *)&msg->msg[0];
-        if ( msg->length != sizeof(mem_request_t) )
-            goto parse_error;
-        set_new_target(req->target);
-        req->status = 0;
-    }
-    break;        
-    default:
-        goto parse_error;
+        printk(KERN_ERR "Unable to read memory/target\n");
+        return;
+    } 
+        
+    set_new_target(new_target >> PAGE_SHIFT);
+    
+}
+
+/* Setup our watcher
+   NB: Assumes xenbus_lock is held!
+*/
+int balloon_init_watcher(struct notifier_block *notifier,
+                         unsigned long event,
+                         void *data)
+{
+    int err;
+
+    BUG_ON(down_trylock(&xenbus_lock) == 0);
+
+    err = register_xenbus_watch(&target_watch);
+
+    if (err) {
+        printk(KERN_ERR "Failed to set balloon watcher\n");
     }
 
-    ctrl_if_send_response(msg);
-    return;
-
- parse_error:
-    msg->length = 0;
-    ctrl_if_send_response(msg);
+    return NOTIFY_DONE;
+    
 }
 
 static int balloon_write(struct file *file, const char __user *buffer,
@@ -366,7 +374,6 @@ static int balloon_read(char *page, char **start, off_t off,
 {
     int len;
 
-#define K(_p) ((_p)<<(PAGE_SHIFT-10))
     len = sprintf(
         page,
         "Current allocation: %8lu kB\n"
@@ -374,13 +381,14 @@ static int balloon_read(char *page, char **start, off_t off,
         "Low-mem balloon:    %8lu kB\n"
         "High-mem balloon:   %8lu kB\n"
         "Xen hard limit:     ",
-        K(current_pages), K(target_pages), K(balloon_low), K(balloon_high));
+        PAGES2KB(current_pages), PAGES2KB(target_pages), 
+        PAGES2KB(balloon_low), PAGES2KB(balloon_high));
 
     if ( hard_limit != ~0UL )
         len += sprintf(
             page + len, 
             "%8lu kB (inc. %8lu kB driver headroom)\n",
-            K(hard_limit), K(driver_pages));
+            PAGES2KB(hard_limit), PAGES2KB(driver_pages));
     else
         len += sprintf(
             page + len,
@@ -389,6 +397,8 @@ static int balloon_read(char *page, char **start, off_t off,
     *eof = 1;
     return len;
 }
+
+static struct notifier_block xenstore_notifier;
 
 static int __init balloon_init(void)
 {
@@ -416,9 +426,7 @@ static int __init balloon_init(void)
 
     balloon_pde->read_proc  = balloon_read;
     balloon_pde->write_proc = balloon_write;
-
-    (void)ctrl_if_register_receiver(CMSG_MEM_REQUEST, balloon_ctrlif_rx, 0);
-
+    
     /* Initialise the balloon with excess memory space. */
     for ( pfn = xen_start_info.nr_pages; pfn < max_pfn; pfn++ )
     {
@@ -427,6 +435,11 @@ static int __init balloon_init(void)
             balloon_append(page);
     }
 
+    target_watch.callback = watch_target;
+    xenstore_notifier.notifier_call = balloon_init_watcher;
+
+    register_xenstore_notifier(&xenstore_notifier);
+    
     return 0;
 }
 

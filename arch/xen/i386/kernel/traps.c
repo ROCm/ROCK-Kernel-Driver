@@ -303,7 +303,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 	};
 	static int die_counter;
 
-	if (die.lock_owner != _smp_processor_id()) {
+	if (die.lock_owner != raw_smp_processor_id()) {
 		console_verbose();
 		spin_lock_irq(&die.lock);
 		die.lock_owner = smp_processor_id();
@@ -342,8 +342,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 
 	if (panic_on_oops) {
 		printk(KERN_EMERG "Fatal exception: panic in 5 seconds\n");
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(5 * HZ);
+		ssleep(5);
 		panic("Fatal exception");
 	}
 	do_exit(SIGSEGV);
@@ -450,6 +449,7 @@ DO_ERROR(10, SIGSEGV, "invalid TSS", invalid_TSS)
 DO_ERROR(11, SIGBUS,  "segment not present", segment_not_present)
 DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
 DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, 0)
+DO_ERROR_INFO(32, SIGSEGV, "iret exception", iret_error, ILL_BADSTK, 0)
 #ifdef CONFIG_X86_MCE
 DO_ERROR(18, SIGBUS, "machine check", machine_check)
 #endif
@@ -465,14 +465,7 @@ fastcall void do_general_protection(struct pt_regs * regs, long error_code)
 		unsigned long ldt;
 		__asm__ __volatile__ ("sldt %0" : "=r" (ldt));
 		if (ldt == 0) {
-			mmu_update_t u;
-			u.ptr = MMU_EXTENDED_COMMAND;
-			u.ptr |= (unsigned long)&default_ldt[0];
-			u.val = MMUEXT_SET_LDT | (5 << MMUEXT_CMD_SHIFT);
-			if (unlikely(HYPERVISOR_mmu_update(&u, 1, NULL) < 0)) {
-				show_trace(NULL, (unsigned long *)&u);
-				panic("Failed to install default LDT");
-			}
+			xen_set_ldt((unsigned long)&default_ldt[0], 5);
 			return;
 		}
 	}
@@ -616,6 +609,14 @@ fastcall void do_nmi(struct pt_regs * regs, long error_code)
 	nmi_enter();
 
 	cpu = smp_processor_id();
+
+#ifdef CONFIG_HOTPLUG_CPU
+	if (!cpu_online(cpu)) {
+		nmi_exit();
+		return;
+	}
+#endif
+
 	++nmi_count(cpu);
 
 	if (!nmi_callback(regs, cpu))
@@ -635,16 +636,15 @@ void unset_nmi_callback(void)
 }
 
 #ifdef CONFIG_KPROBES
-fastcall int do_int3(struct pt_regs *regs, long error_code)
+fastcall void do_int3(struct pt_regs *regs, long error_code)
 {
 	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP)
 			== NOTIFY_STOP)
-		return 1;
+		return;
 	/* This is an interrupt gate, because kprobes wants interrupts
 	disabled.  Normal trap handlers don't. */
 	restore_interrupts(regs);
 	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
-	return 0;
 }
 #endif
 
@@ -701,8 +701,6 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 	/*
 	 * Single-stepping through TF: make sure we ignore any events in
 	 * kernel space (but re-enable TF when returning to user mode).
-	 * And if the event was due to a debugger (PT_DTRACE), clear the
-	 * TF flag so that register information is correct.
 	 */
 	if (condition & DR_STEP) {
 		/*
@@ -712,11 +710,6 @@ fastcall void do_debug(struct pt_regs * regs, long error_code)
 		 */
 		if ((regs->xcs & 2) == 0)
 			goto clear_TF_reenable;
-
-		if (likely(tsk->ptrace & PT_DTRACE)) {
-			tsk->ptrace &= ~PT_DTRACE;
-			regs->eflags &= ~TF_MASK;
-		}
 	}
 
 	/* Ok, finally something we can handle */
@@ -806,7 +799,7 @@ fastcall void do_coprocessor_error(struct pt_regs * regs, long error_code)
 	math_error((void __user *)regs->eip);
 }
 
-void simd_math_error(void __user *eip)
+static void simd_math_error(void __user *eip)
 {
 	struct task_struct * task;
 	siginfo_t info;
@@ -878,6 +871,51 @@ fastcall void do_simd_coprocessor_error(struct pt_regs * regs,
 	}
 }
 
+fastcall void setup_x86_bogus_stack(unsigned char * stk)
+{
+	unsigned long *switch16_ptr, *switch32_ptr;
+	struct pt_regs *regs;
+	unsigned long stack_top, stack_bot;
+	unsigned short iret_frame16_off;
+	int cpu = smp_processor_id();
+	/* reserve the space on 32bit stack for the magic switch16 pointer */
+	memmove(stk, stk + 8, sizeof(struct pt_regs));
+	switch16_ptr = (unsigned long *)(stk + sizeof(struct pt_regs));
+	regs = (struct pt_regs *)stk;
+	/* now the switch32 on 16bit stack */
+	stack_bot = (unsigned long)&per_cpu(cpu_16bit_stack, cpu);
+	stack_top = stack_bot +	CPU_16BIT_STACK_SIZE;
+	switch32_ptr = (unsigned long *)(stack_top - 8);
+	iret_frame16_off = CPU_16BIT_STACK_SIZE - 8 - 20;
+	/* copy iret frame on 16bit stack */
+	memcpy((void *)(stack_bot + iret_frame16_off), &regs->eip, 20);
+	/* fill in the switch pointers */
+	switch16_ptr[0] = (regs->esp & 0xffff0000) | iret_frame16_off;
+	switch16_ptr[1] = __ESPFIX_SS;
+	switch32_ptr[0] = (unsigned long)stk + sizeof(struct pt_regs) +
+		8 - CPU_16BIT_STACK_SIZE;
+	switch32_ptr[1] = __KERNEL_DS;
+}
+
+fastcall unsigned char * fixup_x86_bogus_stack(unsigned short sp)
+{
+	unsigned long *switch32_ptr;
+	unsigned char *stack16, *stack32;
+	unsigned long stack_top, stack_bot;
+	int len;
+	int cpu = smp_processor_id();
+	stack_bot = (unsigned long)&per_cpu(cpu_16bit_stack, cpu);
+	stack_top = stack_bot +	CPU_16BIT_STACK_SIZE;
+	switch32_ptr = (unsigned long *)(stack_top - 8);
+	/* copy the data from 16bit stack to 32bit stack */
+	len = CPU_16BIT_STACK_SIZE - 8 - sp;
+	stack16 = (unsigned char *)(stack_bot + sp);
+	stack32 = (unsigned char *)
+		(switch32_ptr[0] + CPU_16BIT_STACK_SIZE - 8 - len);
+	memcpy(stack32, stack16, len);
+	return stack32;
+}
+
 /*
  *  'math_state_restore()' saves the current math information in the
  * old math state array, and gets the new ones from the current task
@@ -893,15 +931,7 @@ asmlinkage void math_state_restore(struct pt_regs regs)
 	struct thread_info *thread = current_thread_info();
 	struct task_struct *tsk = thread->task;
 
-	/*
-	 * A trap in kernel mode can be ignored. It'll be the fast XOR or
-	 * copying libraries, which will correctly save/restore state and
-	 * reset the TS bit in CR0.
-	 */
-	if ((regs.xcs & 2) == 0)
-		return;
-
-	clts();		/* Allow maths ops (or we recurse) */
+	/* NB. 'clts' is done for us by Xen during virtual trap. */
 	if (!tsk_used_math(tsk))
 		init_fpu(tsk);
 	restore_fpu(tsk);
@@ -964,17 +994,33 @@ static trap_info_t trap_table[] = {
 void __init trap_init(void)
 {
 	HYPERVISOR_set_trap_table(trap_table);
-	HYPERVISOR_set_fast_trap(SYSCALL_VECTOR);
 
 	/*
 	 * default LDT is a single-entry callgate to lcall7 for iBCS
 	 * and a callgate to lcall27 for Solaris/x86 binaries
 	 */
 	make_lowmem_page_readonly(&default_ldt[0]);
-	xen_flush_page_update_queue();
 
 	/*
 	 * Should be a barrier for any external CPU state.
 	 */
 	cpu_init();
 }
+
+void smp_trap_init(trap_info_t *trap_ctxt)
+{
+	trap_info_t *t = trap_table;
+
+	for (t = trap_table; t->address; t++) {
+		trap_ctxt[t->vector].flags = t->flags;
+		trap_ctxt[t->vector].cs = t->cs;
+		trap_ctxt[t->vector].address = t->address;
+	}
+}
+
+static int __init kstack_setup(char *s)
+{
+	kstack_depth_to_print = simple_strtoul(s, NULL, 0);
+	return 0;
+}
+__setup("kstack=", kstack_setup);

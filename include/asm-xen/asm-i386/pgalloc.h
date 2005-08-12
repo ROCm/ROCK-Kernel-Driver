@@ -2,7 +2,6 @@
 #define _I386_PGALLOC_H
 
 #include <linux/config.h>
-#include <asm/processor.h>
 #include <asm/fixmap.h>
 #include <linux/threads.h>
 #include <linux/mm.h>		/* for struct page */
@@ -11,12 +10,23 @@
 #define pmd_populate_kernel(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
 
-#define pmd_populate(mm, pmd, pte) do {				\
-	set_pmd(pmd, __pmd(_PAGE_TABLE +			\
-		((unsigned long long)page_to_pfn(pte) <<	\
-			(unsigned long long) PAGE_SHIFT)));	\
-	flush_page_update_queue();				\
+#define pmd_populate(mm, pmd, pte) 					\
+do {									\
+	if (unlikely((mm)->context.pinned)) {				\
+		if (!PageHighMem(pte))					\
+			HYPERVISOR_update_va_mapping(			\
+			  (unsigned long)__va(page_to_pfn(pte)<<PAGE_SHIFT),\
+			  pfn_pte(page_to_pfn(pte), PAGE_KERNEL_RO), 0);\
+		set_pmd(pmd, __pmd(_PAGE_TABLE +			\
+			((unsigned long long)page_to_pfn(pte) <<	\
+				(unsigned long long) PAGE_SHIFT)));	\
+	} else {							\
+		*(pmd) = __pmd(_PAGE_TABLE +				\
+			((unsigned long long)page_to_pfn(pte) <<	\
+				(unsigned long long) PAGE_SHIFT));	\
+	}								\
 } while (0)
+
 /*
  * Allocate and free page tables.
  */
@@ -30,7 +40,6 @@ static inline void pte_free_kernel(pte_t *pte)
 {
 	free_page((unsigned long)pte);
 	make_page_writable(pte);
-	flush_page_update_queue();
 }
 
 extern void pte_free(struct page *pte);

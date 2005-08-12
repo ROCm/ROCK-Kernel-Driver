@@ -80,23 +80,42 @@ VM_MASK		= 0x00020000
 #define evtchn_upcall_pending		/* 0 */
 #define evtchn_upcall_mask		1
 
-#define XEN_GET_VCPU_INFO(reg)	movl HYPERVISOR_shared_info,reg
-#define XEN_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
-#define XEN_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
-#define XEN_SAVE_UPCALL_MASK(reg,tmp,off) \
-	movb evtchn_upcall_mask(reg), tmp; \
-	movb tmp, off(%esp)
+#define sizeof_vcpu_shift		3
 
+#ifdef CONFIG_SMP
+#define preempt_disable(reg)	incl TI_preempt_count(reg)
+#define preempt_enable(reg)	decl TI_preempt_count(reg)
+#define XEN_GET_VCPU_INFO(reg)	preempt_disable(%ebp)			; \
+				movl TI_cpu(%ebp),reg			; \
+				shl  $sizeof_vcpu_shift,reg		; \
+				addl HYPERVISOR_shared_info,reg
+#define XEN_PUT_VCPU_INFO(reg) preempt_enable(%ebp)
+#define XEN_PUT_VCPU_INFO_fixup .byte 0xff,0xff,0xff
+#else
+#define XEN_GET_VCPU_INFO(reg) movl HYPERVISOR_shared_info,reg
+#define XEN_PUT_VCPU_INFO(reg)
+#define XEN_PUT_VCPU_INFO_fixup
+#endif
+
+#define XEN_LOCKED_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
+#define XEN_LOCKED_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
+#define XEN_BLOCK_EVENTS(reg)	XEN_GET_VCPU_INFO(reg)			; \
+				XEN_LOCKED_BLOCK_EVENTS(reg)		; \
+    				XEN_PUT_VCPU_INFO(reg)
+#define XEN_UNBLOCK_EVENTS(reg)	XEN_GET_VCPU_INFO(reg)			; \
+				XEN_LOCKED_UNBLOCK_EVENTS(reg)		; \
+    				XEN_PUT_VCPU_INFO(reg)
 #define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(reg)
 
 #ifdef CONFIG_PREEMPT
-#define preempt_stop		XEN_BLOCK_EVENTS(%esi)
+#define preempt_stop		GET_THREAD_INFO(%ebp)			; \
+				XEN_BLOCK_EVENTS(%esi)
 #else
 #define preempt_stop
 #define resume_kernel		restore_all
 #endif
 
-#define SAVE_ALL_NO_EVENTMASK \
+#define SAVE_ALL \
 	cld; \
 	pushl %es; \
 	pushl %ds; \
@@ -110,11 +129,6 @@ VM_MASK		= 0x00020000
 	movl $(__USER_DS), %edx; \
 	movl %edx, %ds; \
 	movl %edx, %es;
-
-#define SAVE_ALL \
-	SAVE_ALL_NO_EVENTMASK; \
-	XEN_GET_VCPU_INFO(%esi); \
-	XEN_SAVE_UPCALL_MASK(%esi,%dl,EVENT_MASK)
 
 #define RESTORE_INT_REGS \
 	popl %ebx;	\
@@ -164,7 +178,6 @@ ENTRY(ret_from_fork)
 	call schedule_tail
 	GET_THREAD_INFO(%ebp)
 	popl %eax
-	XEN_GET_VCPU_INFO(%esi)
 	jmp syscall_exit
 
 /*
@@ -185,7 +198,6 @@ ret_from_intr:
 	testl $(VM_MASK | 2), %eax
 	jz resume_kernel		# returning to kernel or vm86-space
 ENTRY(resume_userspace)
-	XEN_GET_VCPU_INFO(%esi)
 	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
@@ -197,7 +209,6 @@ ENTRY(resume_userspace)
 
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
-	XEN_GET_VCPU_INFO(%esi)
 	XEN_BLOCK_EVENTS(%esi)
 	cmpl $0,TI_preempt_count(%ebp)	# non-zero preempt_count ?
 	jnz restore_all
@@ -241,7 +252,7 @@ sysenter_past_esp:
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
 
-	testb $(_TIF_SYSCALL_EMU|_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
 	jnz syscall_trace_entry
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
@@ -264,8 +275,8 @@ ENTRY(system_call)
 	pushl %eax			# save orig_eax
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
-					# system call tracing in operation / emulation
-	testb $(_TIF_SYSCALL_EMU|_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
+					# system call tracing in operation
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
 	jnz syscall_trace_entry
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
@@ -284,9 +295,11 @@ restore_all:
 	jnz resume_vm86
 	movb EVENT_MASK(%esp), %al
 	notb %al			# %al == ~saved_mask
+	XEN_GET_VCPU_INFO(%esi)
 	andb evtchn_upcall_mask(%esi),%al
 	andb $1,%al			# %al == mask & ~saved_mask
 	jnz restore_all_enable_events	#     != 0 => reenable event delivery
+	XEN_PUT_VCPU_INFO(%esi)
 	RESTORE_ALL
 
 resume_vm86:
@@ -341,19 +354,10 @@ syscall_trace_entry:
 	movl %esp, %eax
 	xorl %edx,%edx
 	call do_syscall_trace
-	cmpl $0, %eax
-	jne syscall_skip		# ret != 0 -> running under PTRACE_SYSEMU,
-					# so must skip actual syscall
 	movl ORIG_EAX(%esp), %eax
 	cmpl $(nr_syscalls), %eax
 	jnae syscall_call
 	jmp syscall_exit
-syscall_skip:
-	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
-					# setting need_resched or sigpending
-					# between sampling and the iret
-	movl TI_flags(%ebp), %ecx
-	jmp work_pending
 
 	# perform syscall exit tracing
 	ALIGN
@@ -445,8 +449,6 @@ error_code:
 	movl %ecx, %ds
 	movl %ecx, %es
 	movl %esp,%eax			# pt_regs pointer
-	XEN_GET_VCPU_INFO(%esi)
-	XEN_SAVE_UPCALL_MASK(%esi,%bl,EVENT_MASK)
 	call *%edi
 	jmp ret_from_exception
 
@@ -463,27 +465,27 @@ error_code:
 # activation and restart the handler using the previous one.
 ENTRY(hypervisor_callback)
 	pushl %eax
-	SAVE_ALL_NO_EVENTMASK
+	SAVE_ALL
 	movl EIP(%esp),%eax
 	cmpl $scrit,%eax
 	jb   11f
 	cmpl $ecrit,%eax
 	jb   critical_region_fixup
-11:	XEN_GET_VCPU_INFO(%esi)
-	movb $0, EVENT_MASK(%esp)
-	push %esp
+11:	push %esp
 	call evtchn_do_upcall
 	add  $4,%esp
 	jmp  ret_from_intr
 
         ALIGN
 restore_all_enable_events:  
-	XEN_UNBLOCK_EVENTS(%esi)
+	XEN_LOCKED_UNBLOCK_EVENTS(%esi)
 scrit:	/**** START OF CRITICAL REGION ****/
 	XEN_TEST_PENDING(%esi)
 	jnz  14f			# process more events if necessary...
+	XEN_PUT_VCPU_INFO(%esi)
 	RESTORE_ALL
-14:	XEN_BLOCK_EVENTS(%esi)
+14:	XEN_LOCKED_BLOCK_EVENTS(%esi)
+	XEN_PUT_VCPU_INFO(%esi)
 	jmp  11b
 ecrit:  /**** END OF CRITICAL REGION ****/
 # [How we do the fixup]. We want to merge the current stack frame with the
@@ -496,24 +498,30 @@ ecrit:  /**** END OF CRITICAL REGION ****/
 critical_region_fixup:
 	addl $critical_fixup_table-scrit,%eax
 	movzbl (%eax),%eax		# %eax contains num bytes popped
-	mov  %esp,%esi
+	cmpb $0xff,%al                  # 0xff => vcpu_info critical region
+	jne  15f
+	GET_THREAD_INFO(%ebp)
+	XEN_PUT_VCPU_INFO(%esi)         # abort vcpu_info critical region
+        xorl %eax,%eax
+15:	mov  %esp,%esi
 	add  %eax,%esi			# %esi points at end of src region
 	mov  %esp,%edi
 	add  $0x34,%edi			# %edi points at end of dst region
 	mov  %eax,%ecx
 	shr  $2,%ecx			# convert words to bytes
-	je   16f			# skip loop if nothing to copy
-15:	subl $4,%esi			# pre-decrementing copy loop
+	je   17f			# skip loop if nothing to copy
+16:	subl $4,%esi			# pre-decrementing copy loop
 	subl $4,%edi
 	movl (%esi),%eax
 	movl %eax,(%edi)
-	loop 15b
-16:	movl %edi,%esp			# final %edi is top of merged stack
+	loop 16b
+17:	movl %edi,%esp			# final %edi is top of merged stack
 	jmp  11b
 
 critical_fixup_table:
-	.byte 0x00,0x00,0x00		# testb $0xff,(%esi) = XEN_TEST_PENDING
-	.byte 0x00,0x00			# jnz  14f
+	.byte 0xff,0xff,0xff		# testb $0xff,(%esi) = XEN_TEST_PENDING
+	.byte 0xff,0xff			# jnz  14f
+	XEN_PUT_VCPU_INFO_fixup
 	.byte 0x00			# pop  %ebx
 	.byte 0x04			# pop  %ecx
 	.byte 0x08			# pop  %edx
@@ -525,7 +533,8 @@ critical_fixup_table:
 	.byte 0x20			# pop  %es
 	.byte 0x24,0x24,0x24		# add  $4,%esp
 	.byte 0x28			# iret
-	.byte 0x00,0x00,0x00,0x00	# movb $1,1(%esi)
+	.byte 0xff,0xff,0xff,0xff	# movb $1,1(%esi)
+	XEN_PUT_VCPU_INFO_fixup
 	.byte 0x00,0x00			# jmp  11b
 
 # Hypervisor uses this for application faults while it executes.
@@ -604,8 +613,6 @@ debug_stack_correct:
 	xorl %edx,%edx			# error code 0
 	movl %esp,%eax			# pt_regs pointer
 	call do_debug
-	testl %eax,%eax
-	jnz restore_all
 	jmp ret_from_exception
 
 #if 0 /* XEN */
@@ -660,8 +667,6 @@ ENTRY(int3)
 	xorl %edx,%edx		# zero error code
 	movl %esp,%eax		# pt_regs pointer
 	call do_int3
-	testl %eax,%eax
-	jnz restore_all
 	jmp ret_from_exception
 
 ENTRY(overflow)
@@ -729,8 +734,6 @@ ENTRY(page_fault)
 	movl %eax, %ds
 	movl %eax, %es
 	movl %esp,%eax			/* pt_regs pointer */
-	XEN_GET_VCPU_INFO(%esi)
-	XEN_SAVE_UPCALL_MASK(%esi,%bl,EVENT_MASK)
 	call do_page_fault
 	jmp ret_from_exception
 
@@ -745,296 +748,6 @@ ENTRY(fixup_4gb_segment)
 	pushl $do_fixup_4gb_segment
 	jmp error_code
 
-.data
-ENTRY(sys_call_table)
-	.long sys_restart_syscall	/* 0 - old "setup()" system call, used for restarting */
-	.long sys_exit
-	.long sys_fork
-	.long sys_read
-	.long sys_write
-	.long sys_open		/* 5 */
-	.long sys_close
-	.long sys_waitpid
-	.long sys_creat
-	.long sys_link
-	.long sys_unlink	/* 10 */
-	.long sys_execve
-	.long sys_chdir
-	.long sys_time
-	.long sys_mknod
-	.long sys_chmod		/* 15 */
-	.long sys_lchown16
-	.long sys_ni_syscall	/* old break syscall holder */
-	.long sys_stat
-	.long sys_lseek
-	.long sys_getpid	/* 20 */
-	.long sys_mount
-	.long sys_oldumount
-	.long sys_setuid16
-	.long sys_getuid16
-	.long sys_stime		/* 25 */
-	.long sys_ptrace
-	.long sys_alarm
-	.long sys_fstat
-	.long sys_pause
-	.long sys_utime		/* 30 */
-	.long sys_ni_syscall	/* old stty syscall holder */
-	.long sys_ni_syscall	/* old gtty syscall holder */
-	.long sys_access
-	.long sys_nice
-	.long sys_ni_syscall	/* 35 - old ftime syscall holder */
-	.long sys_sync
-	.long sys_kill
-	.long sys_rename
-	.long sys_mkdir
-	.long sys_rmdir		/* 40 */
-	.long sys_dup
-	.long sys_pipe
-	.long sys_times
-	.long sys_ni_syscall	/* old prof syscall holder */
-	.long sys_brk		/* 45 */
-	.long sys_setgid16
-	.long sys_getgid16
-	.long sys_signal
-	.long sys_geteuid16
-	.long sys_getegid16	/* 50 */
-	.long sys_acct
-	.long sys_umount	/* recycled never used phys() */
-	.long sys_ni_syscall	/* old lock syscall holder */
-	.long sys_ioctl
-	.long sys_fcntl		/* 55 */
-	.long sys_ni_syscall	/* old mpx syscall holder */
-	.long sys_setpgid
-	.long sys_ni_syscall	/* old ulimit syscall holder */
-	.long sys_olduname
-	.long sys_umask		/* 60 */
-	.long sys_chroot
-	.long sys_ustat
-	.long sys_dup2
-	.long sys_getppid
-	.long sys_getpgrp	/* 65 */
-	.long sys_setsid
-	.long sys_sigaction
-	.long sys_sgetmask
-	.long sys_ssetmask
-	.long sys_setreuid16	/* 70 */
-	.long sys_setregid16
-	.long sys_sigsuspend
-	.long sys_sigpending
-	.long sys_sethostname
-	.long sys_setrlimit	/* 75 */
-	.long sys_old_getrlimit
-	.long sys_getrusage
-	.long sys_gettimeofday
-	.long sys_settimeofday
-	.long sys_getgroups16	/* 80 */
-	.long sys_setgroups16
-	.long old_select
-	.long sys_symlink
-	.long sys_lstat
-	.long sys_readlink	/* 85 */
-	.long sys_uselib
-	.long sys_swapon
-	.long sys_reboot
-	.long old_readdir
-	.long old_mmap		/* 90 */
-	.long sys_munmap
-	.long sys_truncate
-	.long sys_ftruncate
-	.long sys_fchmod
-	.long sys_fchown16	/* 95 */
-	.long sys_getpriority
-	.long sys_setpriority
-	.long sys_ni_syscall	/* old profil syscall holder */
-	.long sys_statfs
-	.long sys_fstatfs	/* 100 */
-	.long sys_ioperm
-	.long sys_socketcall
-	.long sys_syslog
-	.long sys_setitimer
-	.long sys_getitimer	/* 105 */
-	.long sys_newstat
-	.long sys_newlstat
-	.long sys_newfstat
-	.long sys_uname
-	.long sys_iopl		/* 110 */
-	.long sys_vhangup
-	.long sys_ni_syscall	/* old "idle" system call */
-	.long sys_vm86old
-	.long sys_wait4
-	.long sys_swapoff	/* 115 */
-	.long sys_sysinfo
-	.long sys_ipc
-	.long sys_fsync
-	.long sys_sigreturn
-	.long sys_clone		/* 120 */
-	.long sys_setdomainname
-	.long sys_newuname
-	.long sys_modify_ldt
-	.long sys_adjtimex
-	.long sys_mprotect	/* 125 */
-	.long sys_sigprocmask
-	.long sys_ni_syscall	/* old "create_module" */ 
-	.long sys_init_module
-	.long sys_delete_module
-	.long sys_ni_syscall	/* 130:	old "get_kernel_syms" */
-	.long sys_quotactl
-	.long sys_getpgid
-	.long sys_fchdir
-	.long sys_bdflush
-	.long sys_sysfs		/* 135 */
-	.long sys_personality
-	.long sys_ni_syscall	/* reserved for afs_syscall */
-	.long sys_setfsuid16
-	.long sys_setfsgid16
-	.long sys_llseek	/* 140 */
-	.long sys_getdents
-	.long sys_select
-	.long sys_flock
-	.long sys_msync
-	.long sys_readv		/* 145 */
-	.long sys_writev
-	.long sys_getsid
-	.long sys_fdatasync
-	.long sys_sysctl
-	.long sys_mlock		/* 150 */
-	.long sys_munlock
-	.long sys_mlockall
-	.long sys_munlockall
-	.long sys_sched_setparam
-	.long sys_sched_getparam   /* 155 */
-	.long sys_sched_setscheduler
-	.long sys_sched_getscheduler
-	.long sys_sched_yield
-	.long sys_sched_get_priority_max
-	.long sys_sched_get_priority_min  /* 160 */
-	.long sys_sched_rr_get_interval
-	.long sys_nanosleep
-	.long sys_mremap
-	.long sys_setresuid16
-	.long sys_getresuid16	/* 165 */
-	.long sys_vm86
-	.long sys_ni_syscall	/* Old sys_query_module */
-	.long sys_poll
-	.long sys_nfsservctl
-	.long sys_setresgid16	/* 170 */
-	.long sys_getresgid16
-	.long sys_prctl
-	.long sys_rt_sigreturn
-	.long sys_rt_sigaction
-	.long sys_rt_sigprocmask	/* 175 */
-	.long sys_rt_sigpending
-	.long sys_rt_sigtimedwait
-	.long sys_rt_sigqueueinfo
-	.long sys_rt_sigsuspend
-	.long sys_pread64	/* 180 */
-	.long sys_pwrite64
-	.long sys_chown16
-	.long sys_getcwd
-	.long sys_capget
-	.long sys_capset	/* 185 */
-	.long sys_sigaltstack
-	.long sys_sendfile
-	.long sys_ni_syscall	/* reserved for streams1 */
-	.long sys_ni_syscall	/* reserved for streams2 */
-	.long sys_vfork		/* 190 */
-	.long sys_getrlimit
-	.long sys_mmap2
-	.long sys_truncate64
-	.long sys_ftruncate64
-	.long sys_stat64	/* 195 */
-	.long sys_lstat64
-	.long sys_fstat64
-	.long sys_lchown
-	.long sys_getuid
-	.long sys_getgid	/* 200 */
-	.long sys_geteuid
-	.long sys_getegid
-	.long sys_setreuid
-	.long sys_setregid
-	.long sys_getgroups	/* 205 */
-	.long sys_setgroups
-	.long sys_fchown
-	.long sys_setresuid
-	.long sys_getresuid
-	.long sys_setresgid	/* 210 */
-	.long sys_getresgid
-	.long sys_chown
-	.long sys_setuid
-	.long sys_setgid
-	.long sys_setfsuid	/* 215 */
-	.long sys_setfsgid
-	.long sys_pivot_root
-	.long sys_mincore
-	.long sys_madvise
-	.long sys_getdents64	/* 220 */
-	.long sys_fcntl64
-	.long sys_ni_syscall	/* reserved for TUX */
-	.long sys_ni_syscall
-	.long sys_gettid
-	.long sys_readahead	/* 225 */
-	.long sys_setxattr
-	.long sys_lsetxattr
-	.long sys_fsetxattr
-	.long sys_getxattr
-	.long sys_lgetxattr	/* 230 */
-	.long sys_fgetxattr
-	.long sys_listxattr
-	.long sys_llistxattr
-	.long sys_flistxattr
-	.long sys_removexattr	/* 235 */
-	.long sys_lremovexattr
-	.long sys_fremovexattr
-	.long sys_tkill
-	.long sys_sendfile64
-	.long sys_futex		/* 240 */
-	.long sys_sched_setaffinity
-	.long sys_sched_getaffinity
-	.long sys_set_thread_area
-	.long sys_get_thread_area
-	.long sys_io_setup	/* 245 */
-	.long sys_io_destroy
-	.long sys_io_getevents
-	.long sys_io_submit
-	.long sys_io_cancel
-	.long sys_fadvise64	/* 250 */
-	.long sys_ni_syscall
-	.long sys_exit_group
-	.long sys_lookup_dcookie
-	.long sys_epoll_create
-	.long sys_epoll_ctl	/* 255 */
-	.long sys_epoll_wait
- 	.long sys_remap_file_pages
- 	.long sys_set_tid_address
- 	.long sys_timer_create
- 	.long sys_timer_settime		/* 260 */
- 	.long sys_timer_gettime
- 	.long sys_timer_getoverrun
- 	.long sys_timer_delete
- 	.long sys_clock_settime
- 	.long sys_clock_gettime		/* 265 */
- 	.long sys_clock_getres
- 	.long sys_clock_nanosleep
-	.long sys_statfs64
-	.long sys_fstatfs64	
-	.long sys_tgkill	/* 270 */
-	.long sys_utimes
- 	.long sys_fadvise64_64
-	.long sys_ni_syscall	/* sys_vserver */
-	.long sys_mbind
-	.long sys_get_mempolicy
-	.long sys_set_mempolicy
-	.long sys_mq_open
-	.long sys_mq_unlink
-	.long sys_mq_timedsend
-	.long sys_mq_timedreceive	/* 280 */
-	.long sys_mq_notify
-	.long sys_mq_getsetattr
-	.long sys_ni_syscall		/* reserved for kexec */
-	.long sys_waitid
-	.long sys_ni_syscall		/* 285 */ /* available */
-	.long sys_add_key
-	.long sys_request_key
-	.long sys_keyctl
+#include "syscall_table.S"
 
 syscall_table_size=(.-sys_call_table)

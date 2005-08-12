@@ -15,6 +15,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <asm-xen/ctrl_if.h>
+#include <asm-xen/evtchn.h>
 #include <asm-xen/xen-public/io/netif.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
@@ -35,11 +36,12 @@ typedef struct netif_st {
     domid_t          domid;
     unsigned int     handle;
 
+    u8               fe_dev_addr[6];
+
     /* Physical parameters of the comms window. */
     unsigned long    tx_shmem_frame;
     unsigned long    rx_shmem_frame;
     unsigned int     evtchn;
-    int              irq;
 
     /* The shared rings and indexes. */
     netif_tx_interface_t *tx;
@@ -48,6 +50,9 @@ typedef struct netif_st {
     /* Private indexes into shared ring. */
     NETIF_RING_IDX rx_req_cons;
     NETIF_RING_IDX rx_resp_prod; /* private version of shared variable */
+#ifdef CONFIG_XEN_NETDEV_GRANT_RX
+    NETIF_RING_IDX rx_resp_prod_copy; /* private version of shared variable */
+#endif
     NETIF_RING_IDX tx_req_cons;
     NETIF_RING_IDX tx_resp_prod; /* private version of shared variable */
 
@@ -76,6 +81,7 @@ typedef struct netif_st {
 
 void netif_create(netif_be_create_t *create);
 void netif_destroy(netif_be_destroy_t *destroy);
+void netif_creditlimit(netif_be_creditlimit_t *creditlimit);
 void netif_connect(netif_be_connect_t *connect);
 int  netif_disconnect(netif_be_disconnect_t *disconnect, u8 rsp_id);
 void netif_disconnect_complete(netif_t *netif);

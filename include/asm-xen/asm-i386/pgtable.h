@@ -35,12 +35,9 @@ extern unsigned long empty_zero_page[1024];
 extern pgd_t swapper_pg_dir[1024];
 extern kmem_cache_t *pgd_cache;
 extern kmem_cache_t *pmd_cache;
-extern kmem_cache_t *pte_cache;
 extern spinlock_t pgd_lock;
 extern struct page *pgd_list;
 
-void pte_ctor(void *, kmem_cache_t *, unsigned long);
-void pte_dtor(void *, kmem_cache_t *, unsigned long);
 void pmd_ctor(void *, kmem_cache_t *, unsigned long);
 void pgd_ctor(void *, kmem_cache_t *, unsigned long);
 void pgd_dtor(void *, kmem_cache_t *, unsigned long);
@@ -64,7 +61,7 @@ void paging_init(void);
 #define PGDIR_MASK	(~(PGDIR_SIZE-1))
 
 #define USER_PTRS_PER_PGD	(TASK_SIZE/PGDIR_SIZE)
-#define FIRST_USER_PGD_NR	0
+#define FIRST_USER_ADDRESS	0
 
 #define USER_PGD_PTRS (PAGE_OFFSET >> PGDIR_SHIFT)
 #define KERNEL_PGD_PTRS (PTRS_PER_PGD-USER_PGD_PTRS)
@@ -88,9 +85,6 @@ void paging_init(void);
 #else
 # define VMALLOC_END	(FIXADDR_START-2*PAGE_SIZE)
 #endif
-
-extern void *high_memory;
-extern unsigned long vmalloc_earlyreserve;
 
 /*
  * The 4MB page is guessing..  Detailed in the infamous "Chapter H"
@@ -200,21 +194,21 @@ extern unsigned long long __PAGE_KERNEL, __PAGE_KERNEL_EXEC;
 /*
  * Define this if things work differently on an i386 and an i486:
  * it will (on an i486) warn about kernel memory accesses that are
- * done without a 'verify_area(VERIFY_WRITE,..)'
+ * done without a 'access_ok(VERIFY_WRITE,..)'
  */
-#undef TEST_VERIFY_AREA
+#undef TEST_ACCESS_OK
 
 /* The boot page tables (all created as a single array) */
 extern unsigned long pg0[];
 
 #define pte_present(x)	((x).pte_low & (_PAGE_PRESENT | _PAGE_PROTNONE))
-#define pte_clear(xp)	do { set_pte(xp, __pte(0)); } while (0)
+#define pte_clear(mm,addr,xp)	do { set_pte_at(mm, addr, xp, __pte(0)); } while (0)
 
 #define pmd_none(x)	(!pmd_val(x))
 /* pmd_present doesn't just test the _PAGE_PRESENT bit since wr.p.t.
    can temporarily clear it. */
 #define pmd_present(x)	(pmd_val(x))
-/* pmd_clear below */
+#define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
 #define pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 
 
@@ -245,6 +239,7 @@ static inline pte_t pte_mkexec(pte_t pte)	{ (pte).pte_low |= _PAGE_USER; return 
 static inline pte_t pte_mkdirty(pte_t pte)	{ (pte).pte_low |= _PAGE_DIRTY; return pte; }
 static inline pte_t pte_mkyoung(pte_t pte)	{ (pte).pte_low |= _PAGE_ACCESSED; return pte; }
 static inline pte_t pte_mkwrite(pte_t pte)	{ (pte).pte_low |= _PAGE_RW; return pte; }
+static inline pte_t pte_mkhuge(pte_t pte)      { (pte).pte_low |= _PAGE_PRESENT | _PAGE_PSE; return pte; }
 
 #ifdef CONFIG_X86_PAE
 # include <asm/pgtable-3level.h>
@@ -252,36 +247,24 @@ static inline pte_t pte_mkwrite(pte_t pte)	{ (pte).pte_low |= _PAGE_RW; return p
 # include <asm/pgtable-2level.h>
 #endif
 
-static inline int ptep_test_and_clear_dirty(pte_t *ptep)
+static inline int ptep_test_and_clear_dirty(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
 {
-	pte_t pte = *ptep;
-	int ret = pte_dirty(pte);
-	if (ret)
-		xen_l1_entry_update(ptep, pte_mkclean(pte).pte_low);
-	return ret;
+	if (!pte_dirty(*ptep))
+		return 0;
+	return test_and_clear_bit(_PAGE_BIT_DIRTY, &ptep->pte_low);
 }
 
-static inline int ptep_test_and_clear_young(pte_t *ptep)
+static inline int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned long addr, pte_t *ptep)
 {
-	pte_t pte = *ptep;
-	int ret = pte_young(pte);
-	if (ret)
-		xen_l1_entry_update(ptep, pte_mkold(pte).pte_low);
-	return ret;
+	if (!pte_young(*ptep))
+		return 0;
+	return test_and_clear_bit(_PAGE_BIT_ACCESSED, &ptep->pte_low);
 }
 
-static inline void ptep_set_wrprotect(pte_t *ptep)
+static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, pte_t *ptep)
 {
-	pte_t pte = *ptep;
-	if (pte_write(pte))
-		set_pte(ptep, pte_wrprotect(pte));
-}
-
-static inline void ptep_mkdirty(pte_t *ptep)
-{
-	pte_t pte = *ptep;
-	if (!pte_dirty(pte))
-		xen_l1_entry_update(ptep, pte_mkdirty(pte).pte_low);
+	if (pte_write(*ptep))
+		clear_bit(_PAGE_BIT_RW, &ptep->pte_low);
 }
 
 /*
@@ -297,7 +280,7 @@ static inline void ptep_mkdirty(pte_t *ptep)
  */
 
 #define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
-#define mk_pte_huge(entry) ((entry).pte_low |= _PAGE_PRESENT | _PAGE_PSE)
+//#define mk_pte_huge(entry) ((entry).pte_low |= _PAGE_PRESENT | _PAGE_PSE)
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
@@ -316,11 +299,6 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 }
 
 #define page_pte(page) page_pte_prot(page, __pgprot(0))
-
-#define pmd_clear(xp)	do {					\
-	set_pmd(xp, __pmd(0));					\
-	xen_flush_page_update_queue();				\
-} while (0)
 
 #define pmd_large(pmd) \
 ((pmd_val(pmd) & (_PAGE_PSE|_PAGE_PRESENT)) == (_PAGE_PSE|_PAGE_PRESENT))
@@ -421,10 +399,9 @@ extern void noexec_setup(const char *str);
 	do {								  \
 		if (__dirty) {						  \
 		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
-			    xen_flush_page_update_queue();                \
-			    HYPERVISOR_update_va_mapping((__address)>>PAGE_SHIFT, (__entry), UVMF_INVLPG); \
+			    HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG|UVMF_MULTI|(unsigned long)((__vma)->vm_mm->cpu_vm_mask.bits)); \
 			} else {                                          \
-                            xen_l1_entry_update((__ptep), (__entry).pte_low); \
+                            xen_l1_entry_update((__ptep), (__entry)); \
 			    flush_tlb_page((__vma), (__address));         \
 			}                                                 \
 		}							  \
@@ -436,28 +413,32 @@ do {				  					\
 	ptep_set_access_flags(__vma, __address, __ptep, __entry, 1);	\
 } while (0)
 
-
-#define set_pte_at(__mm, __addr, __ptep, __entry)			\
-do {				  					\
-	if (likely(__mm == current->mm)) {				\
-		xen_flush_page_update_queue();				\
-		HYPERVISOR_update_va_mapping((__address)>>PAGE_SHIFT,	\
-					     __entry, 0);		\
-	} else {							\
-		xen_l1_entry_update((__ptep), (__entry).pte_low);	\
-	}								\
-} while (0)
 #define __HAVE_ARCH_PTEP_ESTABLISH_NEW
 #define ptep_establish_new(__vma, __address, __ptep, __entry)		\
-	set_pte_at((__vma)->vm_mm, __address, __ptep, __entry)
+do {				  					\
+	if (likely((__vma)->vm_mm == current->mm)) {			\
+		HYPERVISOR_update_va_mapping((__address),		\
+					     __entry, 0);		\
+	} else {							\
+		xen_l1_entry_update((__ptep), (__entry));	\
+	}								\
+} while (0)
 
-/* NOTE: make_page* callers must call flush_page_update_queue() */
+#ifndef CONFIG_XEN_SHADOW_MODE
 void make_lowmem_page_readonly(void *va);
 void make_lowmem_page_writable(void *va);
 void make_page_readonly(void *va);
 void make_page_writable(void *va);
 void make_pages_readonly(void *va, unsigned int nr);
 void make_pages_writable(void *va, unsigned int nr);
+#else
+#define make_lowmem_page_readonly(_va) ((void)0)
+#define make_lowmem_page_writable(_va) ((void)0)
+#define make_page_readonly(_va)        ((void)0)
+#define make_page_writable(_va)        ((void)0)
+#define make_pages_readonly(_va, _nr)  ((void)0)
+#define make_pages_writable(_va, _nr)  ((void)0)
+#endif
 
 #define virt_to_ptep(__va)						\
 ({									\
@@ -480,7 +461,6 @@ void make_pages_writable(void *va, unsigned int nr);
 #define kern_addr_valid(addr)	(1)
 #endif /* !CONFIG_DISCONTIGMEM */
 
-#define DOMID_LOCAL (0xFFFFU)
 int direct_remap_area_pages(struct mm_struct *mm,
                             unsigned long address, 
                             unsigned long machine_addr,
@@ -498,11 +478,14 @@ direct_remap_area_pages(vma->vm_mm,from,phys,size,prot,DOMID_IO)
 #define io_remap_pfn_range(vma,from,pfn,size,prot) \
 direct_remap_area_pages(vma->vm_mm,from,pfn<<PAGE_SHIFT,size,prot,DOMID_IO)
 
+#define MK_IOSPACE_PFN(space, pfn)	(pfn)
+#define GET_IOSPACE(pfn)		0
+#define GET_PFN(pfn)			(pfn)
+
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
-#define __HAVE_ARCH_PTEP_MKDIRTY
 #define __HAVE_ARCH_PTE_SAME
 #include <asm-generic/pgtable.h>
 

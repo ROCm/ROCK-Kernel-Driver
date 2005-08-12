@@ -57,9 +57,10 @@ static pmd_t * __init one_md_table_init(pgd_t *pgd)
 {
 	pud_t *pud;
 	pmd_t *pmd_table;
-		
+
 #ifdef CONFIG_X86_PAE
 	pmd_table = (pmd_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+	make_page_readonly(pmd_table);
 	set_pgd(pgd, __pgd(__pa(pmd_table) | _PAGE_PRESENT));
 	pud = pud_offset(pgd, 0);
 	if (pmd_table != pmd_offset(pud, 0)) 
@@ -115,13 +116,13 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 	pmd_idx = pmd_index(vaddr);
 	pgd = pgd_base + pgd_idx;
 
-	for ( ; (pgd_idx < PTRS_PER_PGD_NO_HV) && (vaddr != end); pgd++, pgd_idx++) {
+	for ( ; (pgd_idx < PTRS_PER_PGD) && (vaddr != end); pgd++, pgd_idx++) {
 		if (pgd_none(*pgd)) 
 			one_md_table_init(pgd);
 		pud = pud_offset(pgd, vaddr);
 		pmd = pmd_offset(pud, vaddr);
 		for (; (pmd_idx < PTRS_PER_PMD) && (vaddr != end); pmd++, pmd_idx++) {
-			if (pmd_none(*pmd)) 
+			if (vaddr < HYPERVISOR_VIRT_START && pmd_none(*pmd)) 
 				one_page_table_init(pmd);
 
 			vaddr += PMD_SIZE;
@@ -160,13 +161,26 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 	pmd_idx = pmd_index(PAGE_OFFSET);
 	pte_ofs = pte_index(PAGE_OFFSET);
 
-	for (; pgd_idx < PTRS_PER_PGD_NO_HV; pgd++, pgd_idx++) {
+	for (; pgd_idx < PTRS_PER_PGD; pgd++, pgd_idx++) {
+#ifdef CONFIG_XEN
+		/*
+		 * Native linux hasn't PAE-paging enabled yet at this
+		 * point.  When running as xen domain we are in PAE
+		 * mode already, thus we can't simply hook a empty
+		 * pmd.  That would kill the mappings we are currently
+		 * using ...
+		 */
+		pmd = pmd_offset(pud_offset(pgd, PAGE_OFFSET), PAGE_OFFSET);
+#else
 		pmd = one_md_table_init(pgd);
+#endif
 		if (pfn >= max_low_pfn)
 			continue;
 		pmd += pmd_idx;
 		for (; pmd_idx < PTRS_PER_PMD && pfn < max_low_pfn; pmd++, pmd_idx++) {
 			unsigned int address = pfn * PAGE_SIZE + PAGE_OFFSET;
+			if (address >= HYPERVISOR_VIRT_START)
+				continue;
 
 			/* Map with big pages if possible, otherwise create normal page tables. */
 			if (cpu_has_pse) {
@@ -192,7 +206,6 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 				}
 				pte_ofs = 0;
 			}
-			flush_page_update_queue();
 		}
 		pmd_idx = 0;
 	}
@@ -249,13 +262,10 @@ static inline int page_is_ram(unsigned long pagenr)
 pte_t *kmap_pte;
 pgprot_t kmap_prot;
 
-EXPORT_SYMBOL(kmap_prot);
-EXPORT_SYMBOL(kmap_pte);
-
 #define kmap_get_fixmap_pte(vaddr)					\
 	pte_offset_kernel(pmd_offset(pud_offset(pgd_offset_k(vaddr), vaddr), (vaddr)), (vaddr))
 
-void __init kmap_init(void)
+static void __init kmap_init(void)
 {
 	unsigned long kmap_vstart;
 
@@ -266,7 +276,7 @@ void __init kmap_init(void)
 	kmap_prot = PAGE_KERNEL;
 }
 
-void __init permanent_kmaps_init(pgd_t *pgd_base)
+static void __init permanent_kmaps_init(pgd_t *pgd_base)
 {
 	pgd_t *pgd;
 	pud_t *pud;
@@ -288,7 +298,7 @@ void __init one_highpage_init(struct page *page, int pfn, int bad_ppro)
 {
 	if (page_is_ram(pfn) && !(bad_ppro && page_kills_ppro(pfn))) {
 		ClearPageReserved(page);
-		set_bit(PG_highmem, &page->flags);
+//		set_bit(PG_highmem, &page->flags);
 		set_page_count(page, 1);
 		if (pfn < xen_start_info.nr_pages)
 			__free_page(page);
@@ -298,7 +308,7 @@ void __init one_highpage_init(struct page *page, int pfn, int bad_ppro)
 }
 
 #ifndef CONFIG_DISCONTIGMEM
-void __init set_highmem_pages_init(int bad_ppro) 
+static void __init set_highmem_pages_init(int bad_ppro)
 {
 	int pfn;
 	for (pfn = highstart_pfn; pfn < highend_pfn; pfn++)
@@ -354,15 +364,40 @@ static void __init pagetable_init (void)
 	 * page directory, write-protect the new page directory, then switch to
 	 * it. We clean up by write-enabling and then freeing the old page dir.
 	 */
+#ifndef CONFIG_X86_PAE
 	memcpy(pgd_base, old_pgd, PTRS_PER_PGD_NO_HV*sizeof(pgd_t));
 	make_page_readonly(pgd_base);
-	queue_pgd_pin(__pa(pgd_base));
+	xen_pgd_pin(__pa(pgd_base));
 	load_cr3(pgd_base);
-	queue_pgd_unpin(__pa(old_pgd));
+	xen_pgd_unpin(__pa(old_pgd));
 	make_page_writable(old_pgd);
 	__flush_tlb_all();
 	free_bootmem(__pa(old_pgd), PAGE_SIZE);
+#else
+	{
+		pud_t *old_pud = pud_offset(old_pgd+3, PAGE_OFFSET);
+		pmd_t *old_pmd = pmd_offset(old_pud, PAGE_OFFSET);
+		pmd_t *new_pmd = alloc_bootmem_low_pages(PAGE_SIZE);
 
+		memcpy(new_pmd,  old_pmd, PAGE_SIZE);
+		memcpy(pgd_base, old_pgd, PTRS_PER_PGD_NO_HV*sizeof(pgd_t));
+		set_pgd(&pgd_base[3], __pgd(__pa(new_pmd) | _PAGE_PRESENT));
+
+		make_page_readonly(new_pmd);
+		make_page_readonly(pgd_base);
+		xen_pgd_pin(__pa(pgd_base));
+		load_cr3(pgd_base);
+		xen_pgd_unpin(__pa(old_pgd));
+		make_page_writable(old_pgd);
+		make_page_writable(old_pmd);
+		__flush_tlb_all();
+
+		free_bootmem(__pa(old_pgd), PAGE_SIZE);
+		free_bootmem(__pa(old_pmd), PAGE_SIZE);
+	}
+#endif
+
+	init_mm.context.pinned = 1;
 	kernel_physical_mapping_init(pgd_base);
 	remap_numa_kva();
 
@@ -375,7 +410,7 @@ static void __init pagetable_init (void)
 
 	permanent_kmaps_init(pgd_base);
 
-#ifdef CONFIG_X86_PAE
+#if 0 /* def CONFIG_X86_PAE */
 	/*
 	 * Add low memory identity-mappings - SMP needs it when
 	 * starting up on an AP from real-mode. In the non-PAE
@@ -383,7 +418,7 @@ static void __init pagetable_init (void)
 	 * All user-space mappings are explicitly cleared after
 	 * SMP startup.
 	 */
-	pgd_base[0] = pgd_base[USER_PTRS_PER_PGD];
+	set_pgd(&pgd_base[0], pgd_base[USER_PTRS_PER_PGD]);
 #endif
 }
 
@@ -418,45 +453,13 @@ void zap_low_mappings (void)
 	 * us, because pgd_clear() is a no-op on i386.
 	 */
 	for (i = 0; i < USER_PTRS_PER_PGD; i++)
-#ifdef CONFIG_X86_PAE
+#if defined(CONFIG_X86_PAE) && !defined(CONFIG_XEN)
 		set_pgd(swapper_pg_dir+i, __pgd(1 + __pa(empty_zero_page)));
 #else
 		set_pgd(swapper_pg_dir+i, __pgd(0));
 #endif
 	flush_tlb_all();
 }
-
-#ifndef CONFIG_DISCONTIGMEM
-void __init zone_sizes_init(void)
-{
-	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
-	unsigned int /*max_dma,*/ high, low;
-	
-	/*
-	 * XEN: Our notion of "DMA memory" is fake when running over Xen.
-	 * We simply put all RAM in the DMA zone so that those drivers which
-	 * needlessly specify GFP_DMA do not get starved of RAM unnecessarily.
-	 * Those drivers that *do* require lowmem are screwed anyway when
-	 * running over Xen!
-	 */
-	/*max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;*/
-	low = max_low_pfn;
-	high = highend_pfn;
-	
-	/*if (low < max_dma)*/
-		zones_size[ZONE_DMA] = low;
-	/*else*/ {
-		/*zones_size[ZONE_DMA] = max_dma;*/
-		/*zones_size[ZONE_NORMAL] = low - max_dma;*/
-#ifdef CONFIG_HIGHMEM
-		zones_size[ZONE_HIGHMEM] = high - low;
-#endif
-	}
-	free_area_init(zones_size);	
-}
-#else
-extern void zone_sizes_init(void);
-#endif /* !CONFIG_DISCONTIGMEM */
 
 static int disable_nx __initdata = 0;
 u64 __supported_pte_mask = ~_PAGE_NX;
@@ -549,10 +552,12 @@ void __init paging_init(void)
 
 	pagetable_init();
 
-#ifdef CONFIG_X86_PAE
+#if defined(CONFIG_X86_PAE) && !defined(CONFIG_XEN)
 	/*
 	 * We will bail out later - printk doesn't work right now so
 	 * the user would just see a hanging kernel.
+	 * when running as xen domain we are already in PAE mode at
+	 * this point.
 	 */
 	if (cpu_has_pae)
 		set_in_cr4(X86_CR4_PAE);
@@ -560,11 +565,9 @@ void __init paging_init(void)
 	__flush_tlb_all();
 
 	kmap_init();
-	zone_sizes_init();
 
 	/* Switch to the real shared_info page, and clear the dummy page. */
-	flush_page_update_queue();
-	set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info);
+	set_fixmap(FIX_SHARED_INFO, xen_start_info.shared_info);
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
@@ -572,10 +575,11 @@ void __init paging_init(void)
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
 		if (xen_start_info.flags & SIF_PRIVILEGED)
-			set_fixmap_ma(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
+			set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 		else
-			set_fixmap_ma_ro(FIX_ISAMAP_BEGIN - i,
-					 virt_to_machine(empty_zero_page));
+			__set_fixmap(FIX_ISAMAP_BEGIN - i,
+				     virt_to_machine(empty_zero_page),
+				     PAGE_KERNEL_RO);
 #endif
 }
 
@@ -586,7 +590,7 @@ void __init paging_init(void)
  * but fortunately the switch to using exceptions got rid of all that.
  */
 
-void __init test_wp_bit(void)
+static void __init test_wp_bit(void)
 {
 	printk("Checking if this processor honours the WP bit even in supervisor mode... ");
 
@@ -605,20 +609,17 @@ void __init test_wp_bit(void)
 	}
 }
 
-#ifndef CONFIG_DISCONTIGMEM
 static void __init set_max_mapnr_init(void)
 {
 #ifdef CONFIG_HIGHMEM
-	max_mapnr = num_physpages = highend_pfn;
+	num_physpages = highend_pfn;
 #else
-	max_mapnr = num_physpages = max_low_pfn;
+	num_physpages = max_low_pfn;
+#endif
+#ifndef CONFIG_DISCONTIGMEM
+	max_mapnr = num_physpages;
 #endif
 }
-#define __free_all_bootmem() free_all_bootmem()
-#else
-#define __free_all_bootmem() free_all_bootmem_node(NODE_DATA(0))
-extern void set_max_mapnr_init(void);
-#endif /* !CONFIG_DISCONTIGMEM */
 
 static struct kcore_list kcore_mem, kcore_vmalloc; 
 
@@ -650,16 +651,16 @@ void __init mem_init(void)
 	set_max_mapnr_init();
 
 #ifdef CONFIG_HIGHMEM
-	high_memory = (void *) __va(highstart_pfn * PAGE_SIZE);
+	high_memory = (void *) __va(highstart_pfn * PAGE_SIZE - 1) + 1;
 #else
-	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
+	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE - 1) + 1;
 #endif
 	printk("vmalloc area: %lx-%lx, maxmem %lx\n",
 	       VMALLOC_START,VMALLOC_END,MAXMEM);
 	BUG_ON(VMALLOC_START > VMALLOC_END);
 	
 	/* this will put all low memory onto the freelists */
-	totalram_pages += __free_all_bootmem();
+	totalram_pages += free_all_bootmem();
 	/* XEN: init and count low-mem pages outside initial allocation. */
 	for (pfn = xen_start_info.nr_pages; pfn < max_low_pfn; pfn++) {
 		ClearPageReserved(&mem_map[pfn]);
@@ -715,18 +716,9 @@ void __init mem_init(void)
 
 kmem_cache_t *pgd_cache;
 kmem_cache_t *pmd_cache;
-kmem_cache_t *pte_cache;
 
 void __init pgtable_cache_init(void)
 {
-	pte_cache = kmem_cache_create("pte",
-				PTRS_PER_PTE*sizeof(pte_t),
-				PTRS_PER_PTE*sizeof(pte_t),
-				0,
-				pte_ctor,
-				pte_dtor);
-	if (!pte_cache)
-		panic("pgtable_cache_init(): Cannot create pte cache");
 	if (PTRS_PER_PMD > 1) {
 		pmd_cache = kmem_cache_create("pmd",
 					PTRS_PER_PMD*sizeof(pmd_t),
@@ -738,8 +730,13 @@ void __init pgtable_cache_init(void)
 			panic("pgtable_cache_init(): cannot create pmd cache");
 	}
 	pgd_cache = kmem_cache_create("pgd",
+#if 0 /* How the heck _this_ works in native linux ??? */
 				PTRS_PER_PGD*sizeof(pgd_t),
 				PTRS_PER_PGD*sizeof(pgd_t),
+#else
+				PAGE_SIZE,
+				PAGE_SIZE,
+#endif
 				0,
 				pgd_ctor,
 				pgd_dtor);

@@ -50,6 +50,17 @@
 #include <linux/vmalloc.h>
 #include <asm/fixmap.h>
 
+/*
+ * Convert a physical pointer to a virtual kernel pointer for /dev/mem
+ * access
+ */
+#define xlate_dev_mem_ptr(p)	__va(p)
+
+/*
+ * Convert a virtual cached pointer to an uncached pointer
+ */
+#define xlate_dev_kmem_ptr(p)	p
+
 /**
  *	virt_to_phys	-	map virtual addresses to physical
  *	@address: address to remap
@@ -351,7 +362,7 @@ static inline unsigned type in##bwl(int port) { \
 #endif
 
 
-#if __UNSAFE_IO__
+#ifdef __UNSAFE_IO__
 #define ____BUILDIO(bwl,bw,type) \
 static inline void out##bwl##_local(unsigned type value, int port) { \
 	__asm__ __volatile__("out" #bwl " %" #bw "0, %w1" : : "a"(value), "Nd"(port)); \

@@ -34,6 +34,7 @@
  * Vectors 0x20-0x2f are used for ISA interrupts.
  */
 
+#if 0
 /*
  * Special IRQ vectors used by the SMP architecture, 0xf0-0xff
  *
@@ -56,6 +57,10 @@
  * sources per level' errata.
  */
 #define LOCAL_TIMER_VECTOR	0xef
+#endif
+
+#define SPURIOUS_APIC_VECTOR	0xff
+#define ERROR_APIC_VECTOR	0xfe
 
 /*
  * First APIC vector available to drivers: (vectors 0x30-0xee)
@@ -64,8 +69,6 @@
  */
 #define FIRST_DEVICE_VECTOR	0x31
 #define FIRST_SYSTEM_VECTOR	0xef
-
-#define TIMER_IRQ		timer_irq
 
 /*
  * 16 8259A IRQ's, 208 potential APIC interrupt sources.
@@ -77,14 +80,18 @@
  * the usable vector space is 0x20-0xff (224 vectors)
  */
 
-#if 0
+#define NR_IPIS 8
+
+#define RESCHEDULE_VECTOR	1
+#define INVALIDATE_TLB_VECTOR	2
+#define CALL_FUNCTION_VECTOR	3
+
 /*
  * The maximum number of vectors supported by i386 processors
  * is limited to 256. For processors other than i386, NR_VECTORS
  * should be changed accordingly.
  */
 #define NR_VECTORS 256
-#endif
 
 #define FPU_IRQ			13
 
@@ -103,10 +110,10 @@
  */
 
 #define PIRQ_BASE		0
-#define NR_PIRQS		128
+#define NR_PIRQS		256
 
 #define DYNIRQ_BASE		(PIRQ_BASE + NR_PIRQS)
-#define NR_DYNIRQS		128
+#define NR_DYNIRQS		256
 
 #define NR_IRQS			(NR_PIRQS + NR_DYNIRQS)
 #define NR_IRQ_VECTORS		NR_IRQS
@@ -116,16 +123,5 @@
 
 #define dynirq_to_irq(_x)	((_x) + DYNIRQ_BASE)
 #define irq_to_dynirq(_x)	((_x) - DYNIRQ_BASE)
-
-#ifndef __ASSEMBLY__
-/* Dynamic binding of event channels and VIRQ sources to Linux IRQ space. */
-extern int  bind_virq_to_irq(int virq);
-extern void unbind_virq_from_irq(int virq);
-extern int  bind_evtchn_to_irq(int evtchn);
-extern void unbind_evtchn_from_irq(int evtchn);
-
-extern void irq_suspend(void);
-extern void irq_resume(void);
-#endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_IRQ_VECTORS_H */

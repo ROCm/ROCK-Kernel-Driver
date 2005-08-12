@@ -35,7 +35,7 @@
 #include <linux/delay.h>
 #include <linux/version.h>
 
-#define DP(_f) printk(KERN_ALERT "  " _f "\n")
+#define DP(_f, _args...) printk(KERN_ALERT "  " _f "\n" , ## _args )
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #define __LINKAGE fastcall
@@ -46,12 +46,15 @@
 __LINKAGE void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 {
     static unsigned long printed = 0;
+    char info[100];
     int i;
 
     if ( !test_and_set_bit(0, &printed) )
     {
         HYPERVISOR_vm_assist(VMASST_CMD_disable,
-                             VMASST_TYPE_4gb_segments_notify);
+			     VMASST_TYPE_4gb_segments_notify);
+
+        sprintf(info, "%s (pid=%d)", current->comm, current->tgid);
 
         DP("");
         DP("***************************************************************");
@@ -61,6 +64,7 @@ __LINKAGE void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         DP("**          slow. To ensure full performance you should      **");
         DP("**          execute the following as root:                   **");
         DP("**          mv /lib/tls /lib/tls.disabled                    **");
+        DP("** Offending process: %-38.38s **", info);
         DP("***************************************************************");
         DP("***************************************************************");
         DP("");

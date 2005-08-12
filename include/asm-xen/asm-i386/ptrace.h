@@ -57,7 +57,8 @@ struct pt_regs {
 #ifdef __KERNEL__
 struct task_struct;
 extern void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs, int error_code);
-#define user_mode(regs) ((VM_MASK & (regs)->eflags) || (2 & (regs)->xcs))
+#define user_mode(regs) (3 & (regs)->xcs)
+#define user_mode_vm(regs) ((VM_MASK & (regs)->eflags) || (2 & (regs)->xcs))
 #define instruction_pointer(regs) ((regs)->eip)
 #if defined(CONFIG_SMP) && defined(CONFIG_FRAME_POINTER)
 extern unsigned long profile_pc(struct pt_regs *regs);
@@ -65,27 +66,5 @@ extern unsigned long profile_pc(struct pt_regs *regs);
 #define profile_pc(regs) instruction_pointer(regs)
 #endif
 #endif
-
-/*For SKAS3 support.*/
-#ifndef _LINUX_PTRACE_STRUCT_DEF
-#define _LINUX_PTRACE_STRUCT_DEF
-
-#define PTRACE_FAULTINFO	  52
-#define PTRACE_SIGPENDING	  53
-#define PTRACE_LDT		  54
-#define PTRACE_SWITCH_MM 	  55
-
-struct ptrace_faultinfo {
-	int is_write;
-	unsigned long addr;
-};
-
-struct ptrace_ldt {
-	int func;
-  	void *ptr;
-	unsigned long bytecount;
-};
-
-#endif /*ifndef _LINUX_PTRACE_STRUCT_DEF*/
 
 #endif

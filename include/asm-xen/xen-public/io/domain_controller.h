@@ -10,28 +10,44 @@
 #ifndef __XEN_PUBLIC_IO_DOMAIN_CONTROLLER_H__
 #define __XEN_PUBLIC_IO_DOMAIN_CONTROLLER_H__
 
+#include "ring.h"
+
 /*
  * CONTROLLER MESSAGING INTERFACE.
  */
 
-typedef struct {
+typedef struct control_msg {
     u8 type;     /*  0: echoed in response */
     u8 subtype;  /*  1: echoed in response */
     u8 id;       /*  2: echoed in response */
     u8 length;   /*  3: number of bytes in 'msg' */
     u8 msg[60];  /*  4: type-specific message data */
-} PACKED control_msg_t; /* 64 bytes */
+} control_msg_t; /* 64 bytes */
 
+/* These are used by the control message deferred ring. */
 #define CONTROL_RING_SIZE 8
 typedef u32 CONTROL_RING_IDX;
 #define MASK_CONTROL_IDX(_i) ((_i)&(CONTROL_RING_SIZE-1))
 
-typedef struct {
-    control_msg_t tx_ring[CONTROL_RING_SIZE];   /*    0: guest -> controller */
-    control_msg_t rx_ring[CONTROL_RING_SIZE];   /*  512: controller -> guest */
-    CONTROL_RING_IDX tx_req_prod, tx_resp_prod; /* 1024, 1028 */
-    CONTROL_RING_IDX rx_req_prod, rx_resp_prod; /* 1032, 1036 */
-} PACKED control_if_t; /* 1040 bytes */
+/*
+ * Generate control ring structures and types.
+ *
+ * CONTROL_RING_MEM is currently an 8-slot ring of ctrl_msg_t structs and
+ * two 32-bit counters:  (64 * 8) + (2 * 4) = 520
+ */
+#define CONTROL_RING_MEM 520
+DEFINE_RING_TYPES(ctrl, control_msg_t, control_msg_t);
+
+typedef struct control_if {
+    union {
+        ctrl_sring_t tx_ring; /* guest -> controller  */
+        char __x[CONTROL_RING_MEM];
+    };
+    union {
+        ctrl_sring_t rx_ring; /* controller -> guest  */
+        char __y[CONTROL_RING_MEM];
+    };
+} control_if_t;
 
 /*
  * Top-level command types.
@@ -43,7 +59,10 @@ typedef struct {
 #define CMSG_NETIF_FE       4  /* Network-device frontend */
 #define CMSG_SHUTDOWN       6  /* Shutdown messages       */
 #define CMSG_MEM_REQUEST    7  /* Memory reservation reqs */
-
+#define CMSG_USBIF_BE       8  /* USB controller backend  */
+#define CMSG_USBIF_FE       9  /* USB controller frontend */
+#define CMSG_VCPU_HOTPLUG  10  /* Hotplug VCPU messages   */
+#define CMSG_DEBUG         11  /* PDB backend             */
 
 /******************************************************************************
  * CONSOLE DEFINITIONS
@@ -68,10 +87,10 @@ typedef struct {
 #define CMSG_BLKIF_FE_INTERFACE_DISCONNECT      34
 #define CMSG_BLKIF_FE_INTERFACE_QUERY           35
 
-/* These are used by both front-end and back-end drivers. */
+#ifndef blkif_vdev_t
 #define blkif_vdev_t   u16
+#endif
 #define blkif_pdev_t   u32
-#define blkif_sector_t u64
 
 /*
  * CMSG_BLKIF_FE_INTERFACE_STATUS:
@@ -84,12 +103,12 @@ typedef struct {
 #define BLKIF_INTERFACE_STATUS_DISCONNECTED 1 /* Exists but is disconnected. */
 #define BLKIF_INTERFACE_STATUS_CONNECTED    2 /* Exists and is connected.    */
 #define BLKIF_INTERFACE_STATUS_CHANGED      3 /* A device has been added or removed. */
-typedef struct {
-    u32 handle; /*  0 */
-    u32 status; /*  4 */
-    u16 evtchn; /*  8: (only if status == BLKIF_INTERFACE_STATUS_CONNECTED). */
-    domid_t domid; /* 10: status != BLKIF_INTERFACE_STATUS_DESTROYED */
-} PACKED blkif_fe_interface_status_t; /* 12 bytes */
+typedef struct blkif_fe_interface_status {
+    u32 handle;
+    u32 status;
+    u16 evtchn;    /* (only if status == BLKIF_INTERFACE_STATUS_CONNECTED). */
+    domid_t domid; /* status != BLKIF_INTERFACE_STATUS_DESTROYED */
+} blkif_fe_interface_status_t;
 
 /*
  * CMSG_BLKIF_FE_DRIVER_STATUS:
@@ -105,46 +124,45 @@ typedef struct {
  */
 #define BLKIF_DRIVER_STATUS_DOWN   0
 #define BLKIF_DRIVER_STATUS_UP     1
-typedef struct {
+typedef struct blkif_fe_driver_status {
     /* IN */
-    u32 status;        /*  0: BLKIF_DRIVER_STATUS_??? */
+    u32 status;        /* BLKIF_DRIVER_STATUS_??? */
     /* OUT */
     /* Driver should query interfaces [0..max_handle]. */
-    u32 max_handle;    /*  4 */
-} PACKED blkif_fe_driver_status_t; /* 8 bytes */
+    u32 max_handle;
+} blkif_fe_driver_status_t;
 
 /*
  * CMSG_BLKIF_FE_INTERFACE_CONNECT:
  *  If successful, the domain controller will acknowledge with a
  *  STATUS_CONNECTED message.
  */
-typedef struct {
-    u32      handle;      /*  0 */
-    u32      __pad;
-    memory_t shmem_frame; /*  8 */
-    MEMORY_PADDING;
-} PACKED blkif_fe_interface_connect_t; /* 16 bytes */
+typedef struct blkif_fe_interface_connect {
+    u32      handle;
+    memory_t shmem_frame;
+    int      shmem_ref;
+} blkif_fe_interface_connect_t;
 
 /*
  * CMSG_BLKIF_FE_INTERFACE_DISCONNECT:
  *  If successful, the domain controller will acknowledge with a
  *  STATUS_DISCONNECTED message.
  */
-typedef struct {
-    u32 handle; /*  0 */
-} PACKED blkif_fe_interface_disconnect_t; /* 4 bytes */
+typedef struct blkif_fe_interface_disconnect {
+    u32 handle;
+} blkif_fe_interface_disconnect_t;
 
 /*
  * CMSG_BLKIF_FE_INTERFACE_QUERY:
  */
-typedef struct {
+typedef struct blkif_fe_interface_query {
     /* IN */
-    u32 handle; /*  0 */
+    u32 handle;
     /* OUT */
-    u32 status; /*  4 */
-    u16 evtchn; /*  8: (only if status == BLKIF_INTERFACE_STATUS_CONNECTED). */
-    domid_t domid; /* 10: status != BLKIF_INTERFACE_STATUS_DESTROYED */
-} PACKED blkif_fe_interface_query_t; /* 12 bytes */
+    u32 status;
+    u16 evtchn;    /* (only if status == BLKIF_INTERFACE_STATUS_CONNECTED). */
+    domid_t domid; /* status != BLKIF_INTERFACE_STATUS_DESTROYED */
+} blkif_fe_interface_query_t;
 
 
 /******************************************************************************
@@ -158,8 +176,6 @@ typedef struct {
 #define CMSG_BLKIF_BE_DISCONNECT  3  /* Disconnect i/f from remote driver.   */
 #define CMSG_BLKIF_BE_VBD_CREATE  4  /* Create a new VBD for an interface.   */
 #define CMSG_BLKIF_BE_VBD_DESTROY 5  /* Delete a VBD from an interface.      */
-#define CMSG_BLKIF_BE_VBD_GROW    6  /* Append an extent to a given VBD.     */
-#define CMSG_BLKIF_BE_VBD_SHRINK  7  /* Remove last extent from a given VBD. */
 
 /* Messages to domain controller. */
 #define CMSG_BLKIF_BE_DRIVER_STATUS 32
@@ -167,12 +183,6 @@ typedef struct {
 /*
  * Message request/response definitions for block-device messages.
  */
-
-typedef struct {
-    blkif_sector_t sector_start;   /*  0 */
-    blkif_sector_t sector_length;  /*  8 */
-    blkif_pdev_t   device;         /* 16 */
-} PACKED blkif_extent_t; /* 20 bytes */
 
 /* Non-specific 'okay' return. */
 #define BLKIF_BE_STATUS_OKAY                0
@@ -185,7 +195,7 @@ typedef struct {
 #define BLKIF_BE_STATUS_VBD_EXISTS          5
 #define BLKIF_BE_STATUS_VBD_NOT_FOUND       6
 #define BLKIF_BE_STATUS_OUT_OF_MEMORY       7
-#define BLKIF_BE_STATUS_EXTENT_NOT_FOUND    8
+#define BLKIF_BE_STATUS_PHYSDEV_NOT_FOUND   8
 #define BLKIF_BE_STATUS_MAPPING_ERROR       9
 
 /* This macro can be used to create an array of descriptive error strings. */
@@ -207,14 +217,13 @@ typedef struct {
  *  created. The controller will send a DOWN notification to the front-end
  *  driver.
  */
-typedef struct { 
+typedef struct blkif_be_create { 
     /* IN */
-    domid_t    domid;         /*  0: Domain attached to new interface.   */
-    u16        __pad;
-    u32        blkif_handle;  /*  4: Domain-specific interface handle.   */
+    domid_t    domid;         /* Domain attached to new interface.   */
+    u32        blkif_handle;  /* Domain-specific interface handle.   */
     /* OUT */
-    u32        status;        /*  8 */
-} PACKED blkif_be_create_t; /* 12 bytes */
+    u32        status;
+} blkif_be_create_t;
 
 /*
  * CMSG_BLKIF_BE_DESTROY:
@@ -222,14 +231,13 @@ typedef struct {
  *  torn down. The controller will send a DESTROYED notification to the
  *  front-end driver.
  */
-typedef struct { 
+typedef struct blkif_be_destroy { 
     /* IN */
-    domid_t    domid;         /*  0: Identify interface to be destroyed. */
-    u16        __pad;
-    u32        blkif_handle;  /*  4: ...ditto...                         */
+    domid_t    domid;         /* Identify interface to be destroyed. */
+    u32        blkif_handle;  /* ...ditto...                         */
     /* OUT */
-    u32        status;        /*  8 */
-} PACKED blkif_be_destroy_t; /* 12 bytes */
+    u32        status;
+} blkif_be_destroy_t;
 
 /*
  * CMSG_BLKIF_BE_CONNECT:
@@ -237,17 +245,16 @@ typedef struct {
  *  connected. The controller will send a CONNECTED notification to the
  *  front-end driver.
  */
-typedef struct { 
+typedef struct blkif_be_connect {
     /* IN */
-    domid_t    domid;         /*  0: Domain attached to new interface.   */
-    u16        __pad;
-    u32        blkif_handle;  /*  4: Domain-specific interface handle.   */
-    memory_t   shmem_frame;   /*  8: Page cont. shared comms window.     */
-    MEMORY_PADDING;
-    u32        evtchn;        /* 16: Event channel for notifications.    */
+    domid_t    domid;         /* Domain attached to new interface.   */
+    u32        blkif_handle;  /* Domain-specific interface handle.   */
+    memory_t   shmem_frame;   /* Page cont. shared comms window.     */
+    int        shmem_ref;     /* Grant table reference.              */
+    u32        evtchn;        /* Event channel for notifications.    */
     /* OUT */
-    u32        status;        /* 20 */
-} PACKED blkif_be_connect_t;  /* 24 bytes */
+    u32        status;
+} blkif_be_connect_t;
 
 /*
  * CMSG_BLKIF_BE_DISCONNECT:
@@ -255,63 +262,36 @@ typedef struct {
  *  disconnected. The controller will send a DOWN notification to the front-end
  *  driver.
  */
-typedef struct { 
+typedef struct blkif_be_disconnect { 
     /* IN */
-    domid_t    domid;         /*  0: Domain attached to new interface.   */
-    u16        __pad;
-    u32        blkif_handle;  /*  4: Domain-specific interface handle.   */
+    domid_t    domid;         /* Domain attached to new interface.   */
+    u32        blkif_handle;  /* Domain-specific interface handle.   */
     /* OUT */
-    u32        status;        /*  8 */
-} PACKED blkif_be_disconnect_t; /* 12 bytes */
+    u32        status;
+} blkif_be_disconnect_t;
 
 /* CMSG_BLKIF_BE_VBD_CREATE */
-typedef struct { 
+typedef struct blkif_be_vbd_create {
     /* IN */
-    domid_t    domid;         /*  0: Identify blkdev interface.          */
-    u16        __pad;
-    u32        blkif_handle;  /*  4: ...ditto...                         */
-    blkif_vdev_t vdevice;     /*  8: Interface-specific id for this VBD. */
-    u16        readonly;      /* 10: Non-zero -> VBD isn't writable.     */
+    domid_t    domid;         /* Identify blkdev interface.          */
+    u32        blkif_handle;  /* ...ditto...                         */
+    blkif_pdev_t pdevice;
+    u32        dev_handle;    /* Extended device id field.           */
+    blkif_vdev_t vdevice;     /* Interface-specific id for this VBD. */
+    u16        readonly;      /* Non-zero -> VBD isn't writable.     */
     /* OUT */
-    u32        status;        /* 12 */
-} PACKED blkif_be_vbd_create_t; /* 16 bytes */
+    u32        status;
+} blkif_be_vbd_create_t;
 
 /* CMSG_BLKIF_BE_VBD_DESTROY */
-typedef struct {
+typedef struct blkif_be_vbd_destroy {
     /* IN */
-    domid_t    domid;         /*  0: Identify blkdev interface.          */
-    u16        __pad0;        /*  2 */
-    u32        blkif_handle;  /*  4: ...ditto...                         */
-    blkif_vdev_t vdevice;     /*  8: Interface-specific id of the VBD.   */
-    u16        __pad1;        /* 10 */
+    domid_t    domid;         /* Identify blkdev interface.          */
+    u32        blkif_handle;  /* ...ditto...                         */
+    blkif_vdev_t vdevice;     /* Interface-specific id of the VBD.   */
     /* OUT */
-    u32        status;        /* 12 */
-} PACKED blkif_be_vbd_destroy_t; /* 16 bytes */
-
-/* CMSG_BLKIF_BE_VBD_GROW */
-typedef struct { 
-    /* IN */
-    domid_t    domid;         /*  0: Identify blkdev interface.          */
-    u16        __pad0;        /*  2 */
-    u32        blkif_handle;  /*  4: ...ditto...                         */
-    blkif_extent_t extent;    /*  8: Physical extent to append to VBD.   */
-    blkif_vdev_t vdevice;     /* 28: Interface-specific id of the VBD.   */
-    u16        __pad1;        /* 30 */
-    /* OUT */
-    u32        status;        /* 32 */
-} PACKED blkif_be_vbd_grow_t; /* 36 bytes */
-
-/* CMSG_BLKIF_BE_VBD_SHRINK */
-typedef struct { 
-    /* IN */
-    domid_t    domid;         /*  0: Identify blkdev interface.          */
-    u16        __pad0;        /*  2 */
-    u32        blkif_handle;  /*  4: ...ditto...                         */
-    blkif_vdev_t vdevice;     /*  8: Interface-specific id of the VBD.   */
-    u16        __pad1;        /* 10 */
-    /* OUT */
-    u32        status;        /* 12 */
-} PACKED blkif_be_vbd_shrink_t; /* 16 bytes */
+    u32        status;
+} blkif_be_vbd_destroy_t;
 
 /*
  * CMSG_BLKIF_BE_DRIVER_STATUS:
@@ -319,9 +299,9 @@ typedef struct {
  *  If the driver goes DOWN while interfaces are still UP, the controller
  *  will automatically send DOWN notifications.
  */
-typedef struct {
-    u32        status;        /*  0: BLKIF_DRIVER_STATUS_??? */
-} PACKED blkif_be_driver_status_t; /* 4 bytes */
+typedef struct blkif_be_driver_status {
+    u32        status;        /* BLKIF_DRIVER_STATUS_??? */
+} blkif_be_driver_status_t;
 
 
 /******************************************************************************
@@ -348,13 +328,13 @@ typedef struct {
 #define NETIF_INTERFACE_STATUS_DISCONNECTED 1 /* Exists but is disconnected. */
 #define NETIF_INTERFACE_STATUS_CONNECTED    2 /* Exists and is connected.    */
 #define NETIF_INTERFACE_STATUS_CHANGED      3 /* A device has been added or removed. */
-typedef struct {
-    u32        handle; /*  0 */
-    u32        status; /*  4 */
-    u16        evtchn; /*  8: status == NETIF_INTERFACE_STATUS_CONNECTED */
-    u8         mac[6]; /* 10: status == NETIF_INTERFACE_STATUS_CONNECTED */
-    domid_t    domid;  /* 16: status != NETIF_INTERFACE_STATUS_DESTROYED */
-} PACKED netif_fe_interface_status_t; /* 18 bytes */
+typedef struct netif_fe_interface_status {
+    u32        handle;
+    u32        status;
+    u16        evtchn; /* status == NETIF_INTERFACE_STATUS_CONNECTED */
+    u8         mac[6]; /* status == NETIF_INTERFACE_STATUS_CONNECTED */
+    domid_t    domid;  /* status != NETIF_INTERFACE_STATUS_DESTROYED */
+} netif_fe_interface_status_t;
 
 /*
  * CMSG_NETIF_FE_DRIVER_STATUS:
@@ -370,49 +350,46 @@ typedef struct {
  */
 #define NETIF_DRIVER_STATUS_DOWN   0
 #define NETIF_DRIVER_STATUS_UP     1
-typedef struct {
+typedef struct netif_fe_driver_status {
     /* IN */
-    u32        status;        /*  0: NETIF_DRIVER_STATUS_??? */
+    u32        status;        /* NETIF_DRIVER_STATUS_??? */
     /* OUT */
     /* Driver should query interfaces [0..max_handle]. */
-    u32        max_handle;    /*  4 */
-} PACKED netif_fe_driver_status_t; /* 8 bytes */
+    u32        max_handle;
+} netif_fe_driver_status_t;
 
 /*
  * CMSG_NETIF_FE_INTERFACE_CONNECT:
  *  If successful, the domain controller will acknowledge with a
  *  STATUS_CONNECTED message.
  */
-typedef struct {
-    u32        handle;         /*  0 */
-    u32        __pad;          /*  4 */
-    memory_t   tx_shmem_frame; /*  8 */
-    MEMORY_PADDING;
-    memory_t   rx_shmem_frame; /* 16 */
-    MEMORY_PADDING;
-} PACKED netif_fe_interface_connect_t; /* 24 bytes */
+typedef struct netif_fe_interface_connect {
+    u32        handle;
+    memory_t   tx_shmem_frame;
+    memory_t   rx_shmem_frame;
+} netif_fe_interface_connect_t;
 
 /*
  * CMSG_NETIF_FE_INTERFACE_DISCONNECT:
  *  If successful, the domain controller will acknowledge with a
  *  STATUS_DISCONNECTED message.
  */
-typedef struct {
-    u32        handle;        /*  0 */
-} PACKED netif_fe_interface_disconnect_t; /* 4 bytes */
+typedef struct netif_fe_interface_disconnect {
+    u32        handle;
+} netif_fe_interface_disconnect_t;
 
 /*
  * CMSG_NETIF_FE_INTERFACE_QUERY:
  */
-typedef struct {
+typedef struct netif_fe_interface_query {
     /* IN */
-    u32        handle; /*  0 */
+    u32        handle;
     /* OUT */
-    u32        status; /*  4 */
-    u16        evtchn; /*  8: status == NETIF_INTERFACE_STATUS_CONNECTED */
-    u8         mac[6]; /* 10: status == NETIF_INTERFACE_STATUS_CONNECTED */
-    domid_t    domid;  /* 16: status != NETIF_INTERFACE_STATUS_DESTROYED */
-} PACKED netif_fe_interface_query_t; /* 18 bytes */
+    u32        status;
+    u16        evtchn; /* status == NETIF_INTERFACE_STATUS_CONNECTED */
+    u8         mac[6]; /* status == NETIF_INTERFACE_STATUS_CONNECTED */
+    domid_t    domid;  /* status != NETIF_INTERFACE_STATUS_DESTROYED */
+} netif_fe_interface_query_t;
 
 
 /******************************************************************************
@@ -424,6 +401,7 @@ typedef struct {
 #define CMSG_NETIF_BE_DESTROY     1  /* Destroy a net-device interface.    */
 #define CMSG_NETIF_BE_CONNECT     2  /* Connect i/f to remote driver.        */
 #define CMSG_NETIF_BE_DISCONNECT  3  /* Disconnect i/f from remote driver.   */
+#define CMSG_NETIF_BE_CREDITLIMIT 4  /* Limit i/f to a given credit limit. */
 
 /* Messages to domain controller. */
 #define CMSG_NETIF_BE_DRIVER_STATUS 32
@@ -459,16 +437,15 @@ typedef struct {
  *  created. The controller will send a DOWN notification to the front-end
  *  driver.
  */
-typedef struct { 
+typedef struct netif_be_create { 
     /* IN */
-    domid_t    domid;         /*  0: Domain attached to new interface.   */
-    u16        __pad0;        /*  2 */
-    u32        netif_handle;  /*  4: Domain-specific interface handle.   */
-    u8         mac[6];        /*  8 */
-    u16        __pad1;        /* 14 */
+    domid_t    domid;         /* Domain attached to new interface.   */
+    u32        netif_handle;  /* Domain-specific interface handle.   */
+    u8         mac[6];
+    u8         be_mac[6];
     /* OUT */
-    u32        status;        /* 16 */
-} PACKED netif_be_create_t; /* 20 bytes */
+    u32        status;
+} netif_be_create_t;
 
 /*
  * CMSG_NETIF_BE_DESTROY:
@@ -476,14 +453,28 @@ typedef struct {
  *  torn down. The controller will send a DESTROYED notification to the
  *  front-end driver.
  */
-typedef struct { 
+typedef struct netif_be_destroy { 
     /* IN */
-    domid_t    domid;         /*  0: Identify interface to be destroyed. */
-    u16        __pad;
-    u32        netif_handle;  /*  4: ...ditto...                         */
+    domid_t    domid;         /* Identify interface to be destroyed. */
+    u32        netif_handle;  /* ...ditto...                         */
     /* OUT */
-    u32   status;             /*  8 */
-} PACKED netif_be_destroy_t; /* 12 bytes */
+    u32   status;
+} netif_be_destroy_t;
+
+/*
+ * CMSG_NETIF_BE_CREDITLIMIT:
+ *  Limit a virtual interface to "credit_bytes" bytes per "period_usec" 
+ *  microseconds.  
+ */
+typedef struct netif_be_creditlimit { 
+    /* IN */
+    domid_t    domid;          /* Domain attached to new interface.   */
+    u32        netif_handle;   /* Domain-specific interface handle.   */
+    u32        credit_bytes;   /* Vifs credit of bytes per period.    */
+    u32        period_usec;    /* Credit replenishment period.        */
+    /* OUT */
+    u32        status;
+} netif_be_creditlimit_t;
 
 /*
  * CMSG_NETIF_BE_CONNECT:
@@ -491,20 +482,16 @@ typedef struct {
  *  connected. The controller will send a CONNECTED notification to the
  *  front-end driver.
  */
-typedef struct { 
+typedef struct netif_be_connect { 
     /* IN */
-    domid_t    domid;          /*  0: Domain attached to new interface.   */
-    u16        __pad0;         /*  2 */
-    u32        netif_handle;   /*  4: Domain-specific interface handle.   */
-    memory_t   tx_shmem_frame; /*  8: Page cont. tx shared comms window.  */
-    MEMORY_PADDING;
-    memory_t   rx_shmem_frame; /* 16: Page cont. rx shared comms window.  */
-    MEMORY_PADDING;
-    u16        evtchn;         /* 24: Event channel for notifications.    */
-    u16        __pad1;         /* 26 */
+    domid_t    domid;          /* Domain attached to new interface.   */
+    u32        netif_handle;   /* Domain-specific interface handle.   */
+    memory_t   tx_shmem_frame; /* Page cont. tx shared comms window.  */
+    memory_t   rx_shmem_frame; /* Page cont. rx shared comms window.  */
+    u16        evtchn;         /* Event channel for notifications.    */
     /* OUT */
-    u32        status;         /* 28 */
-} PACKED netif_be_connect_t; /* 32 bytes */
+    u32        status;
+} netif_be_connect_t;
 
 /*
  * CMSG_NETIF_BE_DISCONNECT:
@@ -512,14 +499,13 @@ typedef struct {
  *  disconnected. The controller will send a DOWN notification to the front-end
  *  driver.
  */
-typedef struct { 
+typedef struct netif_be_disconnect { 
     /* IN */
-    domid_t    domid;         /*  0: Domain attached to new interface.   */
-    u16        __pad;
-    u32        netif_handle;  /*  4: Domain-specific interface handle.   */
+    domid_t    domid;         /* Domain attached to new interface.   */
+    u32        netif_handle;  /* Domain-specific interface handle.   */
     /* OUT */
-    u32        status;        /*  8 */
-} PACKED netif_be_disconnect_t; /* 12 bytes */
+    u32        status;
+} netif_be_disconnect_t;
 
 /*
  * CMSG_NETIF_BE_DRIVER_STATUS:
@@ -527,10 +513,205 @@ typedef struct {
  *  If the driver goes DOWN while interfaces are still UP, the domain
  *  will automatically send DOWN notifications.
  */
-typedef struct {
-    u32        status;        /*  0: NETIF_DRIVER_STATUS_??? */
-} PACKED netif_be_driver_status_t; /* 4 bytes */
+typedef struct netif_be_driver_status {
+    u32        status;        /* NETIF_DRIVER_STATUS_??? */
+} netif_be_driver_status_t;
 
+
+
+/******************************************************************************
+ * USB-INTERFACE FRONTEND DEFINITIONS
+ */
+
+/* Messages from domain controller to guest. */
+#define CMSG_USBIF_FE_INTERFACE_STATUS_CHANGED   0
+
+/* Messages from guest to domain controller. */
+#define CMSG_USBIF_FE_DRIVER_STATUS_CHANGED     32
+#define CMSG_USBIF_FE_INTERFACE_CONNECT         33
+#define CMSG_USBIF_FE_INTERFACE_DISCONNECT      34
+/*
+ * CMSG_USBIF_FE_INTERFACE_STATUS_CHANGED:
+ *  Notify a guest about a status change on one of its block interfaces.
+ *  If the interface is DESTROYED or DOWN then the interface is disconnected:
+ *   1. The shared-memory frame is available for reuse.
+ *   2. Any unacknowledged messages pending on the interface were dropped.
+ */
+#define USBIF_INTERFACE_STATUS_DESTROYED    0 /* Interface doesn't exist.    */
+#define USBIF_INTERFACE_STATUS_DISCONNECTED 1 /* Exists but is disconnected. */
+#define USBIF_INTERFACE_STATUS_CONNECTED    2 /* Exists and is connected.    */
+typedef struct usbif_fe_interface_status_changed {
+    u32 status;
+    u16 evtchn;    /* (only if status == BLKIF_INTERFACE_STATUS_CONNECTED). */
+    domid_t domid; /* status != BLKIF_INTERFACE_STATUS_DESTROYED */
+    u32 bandwidth;
+    u32 num_ports;
+} usbif_fe_interface_status_changed_t;
+
+/*
+ * CMSG_USBIF_FE_DRIVER_STATUS_CHANGED:
+ *  Notify the domain controller that the front-end driver is DOWN or UP.
+ *  When the driver goes DOWN then the controller will send no more
+ *  status-change notifications.
+ *  If the driver goes DOWN while interfaces are still UP, the domain
+ *  will automatically take the interfaces DOWN.
+ * 
+ *  NB. The controller should not send an INTERFACE_STATUS_CHANGED message
+ *  for interfaces that are active when it receives an UP notification. We
+ *  expect that the frontend driver will query those interfaces itself.
+ */
+#define USBIF_DRIVER_STATUS_DOWN   0
+#define USBIF_DRIVER_STATUS_UP     1
+typedef struct usbif_fe_driver_status_changed {
+    /* IN */
+    u32 status;        /* USBIF_DRIVER_STATUS_??? */
+} usbif_fe_driver_status_changed_t;
+
+/*
+ * CMSG_USBIF_FE_INTERFACE_CONNECT:
+ *  If successful, the domain controller will acknowledge with a
+ *  STATUS_CONNECTED message.
+ */
+typedef struct usbif_fe_interface_connect {
+    memory_t shmem_frame;
+} usbif_fe_interface_connect_t;
+
+/*
+ * CMSG_USBIF_FE_INTERFACE_DISCONNECT:
+ *  If successful, the domain controller will acknowledge with a
+ *  STATUS_DISCONNECTED message.
+ */
+typedef struct usbif_fe_interface_disconnect {
+    int dummy; /* make struct non-empty */
+} usbif_fe_interface_disconnect_t;
+
+
+/******************************************************************************
+ * USB-INTERFACE BACKEND DEFINITIONS
+ */
+
+/* Messages from domain controller. */
+#define CMSG_USBIF_BE_CREATE       0  /* Create a new block-device interface. */
+#define CMSG_USBIF_BE_DESTROY      1  /* Destroy a block-device interface.    */
+#define CMSG_USBIF_BE_CONNECT      2  /* Connect i/f to remote driver.        */
+#define CMSG_USBIF_BE_DISCONNECT   3  /* Disconnect i/f from remote driver.   */
+#define CMSG_USBIF_BE_CLAIM_PORT   4  /* Claim host port for a domain.        */
+#define CMSG_USBIF_BE_RELEASE_PORT 5  /* Release host port.                   */
+/* Messages to domain controller. */
+#define CMSG_USBIF_BE_DRIVER_STATUS_CHANGED 32
+
+/* Non-specific 'okay' return. */
+#define USBIF_BE_STATUS_OKAY                0
+/* Non-specific 'error' return. */
+#define USBIF_BE_STATUS_ERROR               1
+/* The following are specific error returns. */
+#define USBIF_BE_STATUS_INTERFACE_EXISTS    2
+#define USBIF_BE_STATUS_INTERFACE_NOT_FOUND 3
+#define USBIF_BE_STATUS_INTERFACE_CONNECTED 4
+#define USBIF_BE_STATUS_OUT_OF_MEMORY       7
+#define USBIF_BE_STATUS_MAPPING_ERROR       9
+
+/* This macro can be used to create an array of descriptive error strings. */
+#define USBIF_BE_STATUS_ERRORS {    \
+    "Okay",                         \
+    "Non-specific error",           \
+    "Interface already exists",     \
+    "Interface not found",          \
+    "Interface is still connected", \
+    "Out of memory",                \
+    "Could not map domain memory" }
+
+/*
+ * CMSG_USBIF_BE_CREATE:
+ *  When the driver sends a successful response then the interface is fully
+ *  created. The controller will send a DOWN notification to the front-end
+ *  driver.
+ */
+typedef struct usbif_be_create { 
+    /* IN */
+    domid_t    domid;         /* Domain attached to new interface.   */
+    /* OUT */
+    u32        status;
+} usbif_be_create_t;
+
+/*
+ * CMSG_USBIF_BE_DESTROY:
+ *  When the driver sends a successful response then the interface is fully
+ *  torn down. The controller will send a DESTROYED notification to the
+ *  front-end driver.
+ */
+typedef struct usbif_be_destroy { 
+    /* IN */
+    domid_t    domid;         /* Identify interface to be destroyed. */
+    /* OUT */
+    u32        status;
+} usbif_be_destroy_t;
+
+/*
+ * CMSG_USBIF_BE_CONNECT:
+ *  When the driver sends a successful response then the interface is fully
+ *  connected. The controller will send a CONNECTED notification to the
+ *  front-end driver.
+ */
+typedef struct usbif_be_connect { 
+    /* IN */
+    domid_t    domid;         /* Domain attached to new interface.   */
+    memory_t   shmem_frame;   /* Page cont. shared comms window.     */
+    u32        evtchn;        /* Event channel for notifications.    */
+    u32        bandwidth;     /* Bandwidth allocated for isoch / int - us
+                               * per 1ms frame (ie between 0 and 900 or 800
+                               * depending on USB version). */
+    /* OUT */
+    u32        status;
+} usbif_be_connect_t;
+
+/*
+ * CMSG_USBIF_BE_DISCONNECT:
+ *  When the driver sends a successful response then the interface is fully
+ *  disconnected. The controller will send a DOWN notification to the front-end
+ *  driver.
+ */
+typedef struct usbif_be_disconnect { 
+    /* IN */
+    domid_t    domid;         /* Domain attached to new interface.   */
+    /* OUT */
+    u32        status;
+} usbif_be_disconnect_t;
+
+/*
+ * CMSG_USBIF_BE_DRIVER_STATUS_CHANGED:
+ *  Notify the domain controller that the back-end driver is DOWN or UP.
+ *  If the driver goes DOWN while interfaces are still UP, the controller
+ *  will automatically send DOWN notifications.
+ */
+typedef struct usbif_be_driver_status_changed {
+    u32        status;        /* USBIF_DRIVER_STATUS_??? */
+} usbif_be_driver_status_changed_t;
+
+#define USB_PATH_LEN 16
+
+/*
+ * CMSG_USBIF_BE_CLAIM_PORT:
+ * Instruct the backend driver to claim any device plugged into the specified
+ * host port and to allow the specified domain to control that port.
+ */
+typedef struct usbif_be_claim_port {
+    /* IN */
+    domid_t  domid;        /* which domain                 */
+    u32      usbif_port;   /* port on the virtual root hub */
+    u32      status;       /* status of operation          */
+    char path[USB_PATH_LEN]; /* Currently specified in the Linux style - may need to be
+                    * converted to some OS-independent format at some stage. */
+} usbif_be_claim_port_t;
+
+/*
+ * CMSG_USBIF_BE_RELEASE_PORT: 
+ * Instruct the backend driver to release any device plugged into the specified
+ * host port.
+ */
+typedef struct usbif_be_release_port {
+    char     path[USB_PATH_LEN];
+} usbif_be_release_port_t;
 
 /******************************************************************************
  * SHUTDOWN DEFINITIONS
@@ -545,10 +726,28 @@ typedef struct {
                                     /* SHUTDOWN_suspend.                     */
 #define CMSG_SHUTDOWN_SYSRQ     3
 
-typedef struct {
-    char key;      /* 0: sysrq key */
-    char __pad[3]; /* 1: */
-} PACKED shutdown_sysrq_t; /* 4 bytes */
+typedef struct shutdown_sysrq {
+    char key;      /* sysrq key */
+} shutdown_sysrq_t;
+
+/******************************************************************************
+ * VCPU HOTPLUG CONTROLS
+ */
+
+/*
+ * Subtypes for shutdown messages.
+ */
+#define CMSG_VCPU_HOTPLUG_OFF   0   /* turn vcpu off */
+#define CMSG_VCPU_HOTPLUG_ON    1   /* turn vcpu on  */
+
+/*
+ * CMSG_VCPU_HOTPLUG:
+ *  Indicate which vcpu's state should change
+ */
+typedef struct vcpu_hotplug {
+    u32 vcpu;         /* VCPU's whose state will change */
+    u32 status;       /* Return code indicates success or failure. */
+} vcpu_hotplug_t;
 
 /******************************************************************************
  * MEMORY CONTROLS
@@ -560,12 +759,25 @@ typedef struct {
  * CMSG_MEM_REQUEST:
  *  Request that the domain change its memory reservation.
  */
-typedef struct {
+typedef struct mem_request {
     /* OUT */
-    u32 target;       /* 0: Target memory reservation in pages.       */
+    u32 target;       /* Target memory reservation in pages.       */
     /* IN  */
-    u32 status;       /* 4: Return code indicates success or failure. */
-} PACKED mem_request_t; /* 8 bytes */
+    u32 status;       /* Return code indicates success or failure. */
+} mem_request_t;
 
+
+/******************************************************************************
+ * PDB INTERFACE DEFINITIONS
+ */
+
+#define CMSG_DEBUG_CONNECTION_STATUS 0
+typedef struct pdb_Connection {
+#define PDB_CONNECTION_STATUS_UP   1
+#define PDB_CONNECTION_STATUS_DOWN 2
+    u32      status;
+    memory_t ring;       /* status: UP */
+    u32      evtchn;     /* status: UP */
+} pdb_connection_t, *pdb_connection_p;
 
 #endif /* __XEN_PUBLIC_IO_DOMAIN_CONTROLLER_H__ */

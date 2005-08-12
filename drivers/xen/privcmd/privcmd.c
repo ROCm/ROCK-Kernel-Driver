@@ -19,6 +19,7 @@
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/seq_file.h>
+#include <linux/kthread.h>
 
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
@@ -27,6 +28,11 @@
 #include <asm-xen/linux-public/privcmd.h>
 #include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/xen_proc.h>
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#define pud_t pgd_t
+#define pud_offset(d, va) d
+#endif
 
 static struct proc_dir_entry *privcmd_intf;
 
@@ -44,6 +50,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         if ( copy_from_user(&hypercall, (void *)data, sizeof(hypercall)) )
             return -EFAULT;
 
+#if defined(__i386__)
         __asm__ __volatile__ (
             "pushl %%ebx; pushl %%ecx; pushl %%edx; pushl %%esi; pushl %%edi; "
             "movl  4(%%eax),%%ebx ;"
@@ -55,7 +62,18 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
             TRAP_INSTR "; "
             "popl %%edi; popl %%esi; popl %%edx; popl %%ecx; popl %%ebx"
             : "=a" (ret) : "0" (&hypercall) : "memory" );
-
+#elif defined (__x86_64__)
+	__asm__ __volatile__ (
+	    "movq   %5,%%r10; movq %6,%%r8;" TRAP_INSTR
+	    : "=a" (ret)
+	    : "a" ((unsigned long)hypercall.op), 
+	      "D" ((unsigned long)hypercall.arg[0]), 
+	      "S" ((unsigned long)hypercall.arg[1]),
+	      "d" ((unsigned long)hypercall.arg[2]), 
+	      "g" ((unsigned long)hypercall.arg[3]),
+	      "g" ((unsigned long)hypercall.arg[4])
+	    : "r11","rcx","r8","r10","memory");
+#endif
     }
     break;
 
@@ -83,6 +101,8 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         {
             int j, n = ((mmapcmd.num-i)>PRIVCMD_MMAP_SZ)?
                 PRIVCMD_MMAP_SZ:(mmapcmd.num-i);
+
+
             if ( copy_from_user(&msg, p, n*sizeof(privcmd_mmap_entry_t)) )
                 return -EFAULT;
      
@@ -115,8 +135,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 
     case IOCTL_PRIVCMD_MMAPBATCH:
     {
-#define MAX_DIRECTMAP_MMU_QUEUE 130
-        mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *w, *v;
+        mmu_update_t u;
         privcmd_mmapbatch_t m;
         struct vm_area_struct *vma = NULL;
         unsigned long *p, addr;
@@ -137,11 +156,6 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         if ( (m.addr + (m.num<<PAGE_SHIFT)) > vma->vm_end )
         { ret = -EFAULT; goto batch_err; }
 
-        u[0].ptr  = MMU_EXTENDED_COMMAND;
-        u[0].val  = MMUEXT_SET_FOREIGNDOM;
-        u[0].val |= (unsigned long)m.dom << 16;
-        v = w = &u[1];
-
         p = m.arr;
         addr = m.addr;
         for ( i = 0; i < m.num; i++, addr += PAGE_SIZE, p++ )
@@ -149,24 +163,24 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
             if ( get_user(mfn, p) )
                 return -EFAULT;
 
-            v->val = (mfn << PAGE_SHIFT) | pgprot_val(vma->vm_page_prot);
+            u.val = (mfn << PAGE_SHIFT) | pgprot_val(vma->vm_page_prot);
 
             __direct_remap_area_pages(vma->vm_mm,
                                       addr, 
                                       PAGE_SIZE, 
-                                      v);
+                                      &u);
 
-            if ( unlikely(HYPERVISOR_mmu_update(u, v - u + 1, NULL) < 0) )
-                put_user( 0xF0000000 | mfn, p );
-
-            v = w;
+            if ( unlikely(HYPERVISOR_mmu_update(&u, 1, NULL, m.dom) < 0) )
+                put_user(0xF0000000 | mfn, p);
         }
+
         ret = 0;
         break;
 
     batch_err:
         printk("batch_err ret=%d vma=%p addr=%lx num=%d arr=%p %lx-%lx\n", 
-               ret, vma, m.addr, m.num, m.arr, vma->vm_start, vma->vm_end);
+               ret, vma, m.addr, m.num, m.arr,
+               vma ? vma->vm_start : 0, vma ? vma->vm_end : 0);
         break;
     }
     break;
@@ -174,13 +188,44 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 
     case IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN:
     {
-	unsigned long m2p_start_mfn = 
-	    HYPERVISOR_shared_info->arch.mfn_to_pfn_start;
+        unsigned long m2pv = (unsigned long)machine_to_phys_mapping;
+        pgd_t *pgd = pgd_offset_k(m2pv);
+        pud_t *pud = pud_offset(pgd, m2pv);
+        pmd_t *pmd = pmd_offset(pud, m2pv);
+        unsigned long m2p_start_mfn = (*(unsigned long *)pmd) >> PAGE_SHIFT; 
+        ret = put_user(m2p_start_mfn, (unsigned long *)data) ? -EFAULT: 0;
+    }
+    break;
 
-	if( put_user( m2p_start_mfn, (unsigned long *) data ) )
-	    ret = -EFAULT;
-	else
-	    ret = 0;
+    case IOCTL_PRIVCMD_INITDOMAIN_STORE:
+    {
+        extern int do_xenbus_probe(void*);
+        unsigned long page;
+
+        if (xen_start_info.store_evtchn != 0) {
+            ret = xen_start_info.store_mfn;
+            break;
+        }
+
+        /* Allocate page. */
+        page = get_zeroed_page(GFP_KERNEL);
+        if (!page) {
+            ret = -ENOMEM;
+            break;
+        }
+
+        /* We don't refcnt properly, so set reserved on page.
+         * (this allocation is permanent) */
+        SetPageReserved(virt_to_page(page));
+
+        /* Initial connect. Setup channel and page. */
+        xen_start_info.store_evtchn = data;
+        xen_start_info.store_mfn = pfn_to_mfn(virt_to_phys((void *)page) >>
+                                              PAGE_SHIFT);
+        ret = xen_start_info.store_mfn;
+
+        /* We'll return then this will wait for daemon to answer */
+        kthread_run(do_xenbus_probe, NULL, "xenbus_probe");
     }
     break;
 
@@ -207,9 +252,6 @@ static struct file_operations privcmd_file_ops = {
 
 static int __init privcmd_init(void)
 {
-    if ( !(xen_start_info.flags & SIF_PRIVILEGED) )
-        return 0;
-
     privcmd_intf = create_xen_proc_entry("privcmd", 0400);
     if ( privcmd_intf != NULL )
         privcmd_intf->proc_fops = &privcmd_file_ops;

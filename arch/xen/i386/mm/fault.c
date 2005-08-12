@@ -21,6 +21,7 @@
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 #include <linux/highmem.h>
 #include <linux/module.h>
+#include <linux/percpu.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -29,7 +30,7 @@
 
 extern void die(const char *,struct pt_regs *,long);
 
-pgd_t *cur_pgd;			/* XXXsmp */
+DEFINE_PER_CPU(pgd_t *, cur_pgd);
 
 /*
  * Unlock any spinlocks which will prevent us from getting the
@@ -203,6 +204,63 @@ static inline int is_prefetch(struct pt_regs *regs, unsigned long addr,
 
 fastcall void do_invalid_op(struct pt_regs *, unsigned long);
 
+#ifdef CONFIG_X86_PAE
+static void dump_fault_path(unsigned long address)
+{
+	unsigned long *p, page;
+
+        page = __pa(per_cpu(cur_pgd, smp_processor_id()));
+	p  = (unsigned long *)__va(page);
+	p += (address >> 30) * 2;
+	printk(KERN_ALERT "%08lx -> *pde = %08lx:%08lx\n", page, p[1], p[0]);
+	if (p[0] & 1) {
+		page = p[0] & PAGE_MASK;
+		address &= 0x3fffffff;
+		page = machine_to_phys(page);
+		p  = (unsigned long *)__va(page);
+		p += (address >> 21) * 2;
+		printk(KERN_ALERT "%08lx -> *pme = %08lx:%08lx\n", page, p[1], p[0]);
+#ifndef CONFIG_HIGHPTE
+		if (p[0] & 1) {
+			page = p[0] & PAGE_MASK;
+			address &= 0x001fffff;
+			page = machine_to_phys(page);
+			p  = (unsigned long *) __va(page);
+			p += (address >> 12) * 2;
+			printk(KERN_ALERT "%08lx -> *pte = %08lx:%08lx\n", page, p[1], p[0]);
+		}
+#endif
+	}
+}
+#else
+static void dump_fault_path(unsigned long address)
+{
+	unsigned long page;
+
+	page = ((unsigned long *) per_cpu(cur_pgd, smp_processor_id()))
+	    [address >> 22];
+	printk(KERN_ALERT "*pde = ma %08lx pa %08lx\n", page,
+	       machine_to_phys(page));
+	/*
+	 * We must not directly access the pte in the highpte
+	 * case, the page table might be allocated in highmem.
+	 * And lets rather not kmap-atomic the pte, just in case
+	 * it's allocated already.
+	 */
+#ifndef CONFIG_HIGHPTE
+	if (page & 1) {
+		page &= PAGE_MASK;
+		address &= 0x003ff000;
+		page = machine_to_phys(page);
+		page = ((unsigned long *) __va(page))[address >> PAGE_SHIFT];
+		printk(KERN_ALERT "*pte = ma %08lx pa %08lx\n", page,
+		       machine_to_phys(page));
+	}
+#endif
+}
+#endif
+
+
 /*
  * This routine handles page faults.  It determines the address,
  * and the problem, and then passes it off to one of the appropriate
@@ -218,8 +276,7 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
-	struct vm_area_struct * vma;
-	unsigned long page;
+	struct vm_area_struct * vma, * prev_vma;
 	int write;
 	siginfo_t info;
 
@@ -313,7 +370,8 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 		if (address + 32 < regs->esp)
 			goto bad_area;
 	}
-	if (expand_stack(vma, address, NULL))
+	find_vma_prev(current->mm, address, &prev_vma);
+	if (expand_stack(vma, address, prev_vma))
 		goto bad_area;
 /*
  * Ok, we have a good vm_area for this memory access, so
@@ -453,26 +511,7 @@ no_context:
 	printk(" at virtual address %08lx\n",address);
 	printk(KERN_ALERT " printing eip:\n");
 	printk("%08lx\n", regs->eip);
-	page = ((unsigned long *) cur_pgd)[address >> 22];
-	printk(KERN_ALERT "*pde = ma %08lx pa %08lx\n", page,
-	       machine_to_phys(page));
-	/*
-	 * We must not directly access the pte in the highpte
-	 * case, the page table might be allocated in highmem.
-	 * And lets rather not kmap-atomic the pte, just in case
-	 * it's allocated already.
-	 */
-#ifndef CONFIG_HIGHPTE
-	if (page & 1) {
-		page &= PAGE_MASK;
-		address &= 0x003ff000;
-		page = machine_to_phys(page);
-		page = ((unsigned long *) __va(page))[address >> PAGE_SHIFT];
-		printk(KERN_ALERT "*pte = ma %08lx pa %08lx\n", page,
-		       machine_to_phys(page));
-	}
-#endif
-	show_trace(NULL, (unsigned long *)&regs[1]);
+	dump_fault_path(address);
 	die("Oops", regs, error_code);
 	bust_spinlocks(0);
 	do_exit(SIGKILL);
@@ -529,7 +568,7 @@ vmalloc_fault:
 		pmd_t *pmd, *pmd_k;
 		pte_t *pte_k;
 
-		pgd = index + cur_pgd;
+		pgd = index + per_cpu(cur_pgd, smp_processor_id());
 		pgd_k = init_mm.pgd + index;
 
 		if (!pgd_present(*pgd_k))
@@ -551,7 +590,6 @@ vmalloc_fault:
 		if (!pmd_present(*pmd_k))
 			goto no_context;
 		set_pmd(pmd, *pmd_k);
-		xen_flush_page_update_queue(); /* flush PMD update */
 
 		pte_k = pte_offset_kernel(pmd_k, address);
 		if (!pte_present(*pte_k))

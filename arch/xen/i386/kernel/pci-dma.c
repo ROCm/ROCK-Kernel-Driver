@@ -14,12 +14,7 @@
 #include <linux/version.h>
 #include <asm/io.h>
 #include <asm-xen/balloon.h>
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define pte_offset_kernel pte_offset
-#define pud_t pgd_t
-#define pud_offset(d, va) d
-#endif
+#include <asm/tlbflush.h>
 
 struct dma_coherent_mem {
 	void		*virt_base;
@@ -29,78 +24,13 @@ struct dma_coherent_mem {
 	unsigned long	*bitmap;
 };
 
-static void
-xen_contig_memory(unsigned long vstart, unsigned int order)
-{
-	/*
-	 * Ensure multi-page extents are contiguous in machine memory.
-	 * This code could be cleaned up some, and the number of
-	 * hypercalls reduced.
-	 */
-	pgd_t         *pgd; 
-	pud_t         *pud; 
-	pmd_t         *pmd;
-	pte_t         *pte;
-	unsigned long  pfn, i, flags;
-
-	scrub_pages(vstart, 1 << order);
-
-        balloon_lock(flags);
-
-	/* 1. Zap current PTEs, giving away the underlying pages. */
-	for (i = 0; i < (1<<order); i++) {
-		pgd = pgd_offset_k(vstart + (i*PAGE_SIZE));
-		pud = pud_offset(pgd, vstart + (i*PAGE_SIZE));
-		pmd = pmd_offset(pud, vstart + (i*PAGE_SIZE));
-		pte = pte_offset_kernel(pmd, vstart + (i*PAGE_SIZE));
-		pfn = pte_val_ma(*pte) >> PAGE_SHIFT;
-		queue_l1_entry_update(pte, 0);
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] =
-			INVALID_P2M_ENTRY;
-		flush_page_update_queue();
-		if (HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
-					  &pfn, 1, 0) != 1) BUG();
-	}
-	/* 2. Get a new contiguous memory extent. */
-	if (HYPERVISOR_dom_mem_op(MEMOP_increase_reservation,
-				  &pfn, 1, order) != 1) BUG();
-	/* 3. Map the new extent in place of old pages. */
-	for (i = 0; i < (1<<order); i++) {
-		pgd = pgd_offset_k(vstart + (i*PAGE_SIZE));
-		pud = pud_offset(pgd, vstart + (i*PAGE_SIZE));
-		pmd = pmd_offset(pud, vstart + (i*PAGE_SIZE));
-		pte = pte_offset_kernel(pmd, vstart + (i*PAGE_SIZE));
-		queue_l1_entry_update(pte,
-				      ((pfn+i)<<PAGE_SHIFT)|__PAGE_KERNEL);
-		queue_machphys_update(pfn+i, (__pa(vstart)>>PAGE_SHIFT)+i);
-		phys_to_machine_mapping[(__pa(vstart)>>PAGE_SHIFT)+i] = pfn+i;
-	}
-	/* Flush updates through and flush the TLB. */
-	xen_tlb_flush();
-
-	balloon_unlock(flags);
-}
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
-			   dma_addr_t *dma_handle)
-#else
 void *dma_alloc_coherent(struct device *dev, size_t size,
-			   dma_addr_t *dma_handle, int gfp)
-#endif
+			   dma_addr_t *dma_handle, unsigned int __nocast gfp)
 {
 	void *ret;
+	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
 	unsigned int order = get_order(size);
 	unsigned long vstart;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	int gfp = GFP_ATOMIC;
-
-	if (hwdev == NULL || ((u32)hwdev->dma_mask < 0xffffffff))
-		gfp |= GFP_DMA;
-#else
-	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
-
 	/* ignore region specifiers */
 	gfp &= ~(__GFP_DMA | __GFP_HIGHMEM);
 
@@ -119,7 +49,6 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 
 	if (dev == NULL || (dev->coherent_dma_mask < 0xffffffff))
 		gfp |= GFP_DMA;
-#endif
 
 	vstart = __get_free_pages(gfp, order);
 	ret = (void *)vstart;
@@ -132,14 +61,6 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 	}
 	return ret;
 }
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-void pci_free_consistent(struct pci_dev *hwdev, size_t size,
-			 void *vaddr, dma_addr_t dma_handle)
-{
-	free_pages((unsigned long)vaddr, get_order(size));
-}
-#else
 
 void dma_free_coherent(struct device *dev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
@@ -232,4 +153,130 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
 }
 EXPORT_SYMBOL(dma_mark_declared_memory_occupied);
 
-#endif
+static LIST_HEAD(dma_map_head);
+static DEFINE_SPINLOCK(dma_map_lock);
+struct dma_map_entry {
+	struct list_head list;
+	dma_addr_t dma;
+	char *bounce, *host;
+	size_t size;
+};
+#define DMA_MAP_MATCHES(e,d) (((e)->dma<=(d)) && (((e)->dma+(e)->size)>(d)))
+
+dma_addr_t
+dma_map_single(struct device *dev, void *ptr, size_t size,
+	       enum dma_data_direction direction)
+{
+	struct dma_map_entry *ent;
+	void *bnc;
+	dma_addr_t dma;
+	unsigned long flags;
+
+	BUG_ON(direction == DMA_NONE);
+
+	/*
+	 * Even if size is sub-page, the buffer may still straddle a page
+	 * boundary. Take into account buffer start offset. All other calls are
+	 * conservative and always search the dma_map list if it's non-empty.
+	 */
+	if ((((unsigned int)ptr & ~PAGE_MASK) + size) <= PAGE_SIZE) {
+		dma = virt_to_bus(ptr);
+	} else {
+		BUG_ON((bnc = dma_alloc_coherent(dev, size, &dma, GFP_ATOMIC)) == NULL);
+		BUG_ON((ent = kmalloc(sizeof(*ent), GFP_ATOMIC)) == NULL);
+		if (direction != DMA_FROM_DEVICE)
+			memcpy(bnc, ptr, size);
+		ent->dma    = dma;
+		ent->bounce = bnc;
+		ent->host   = ptr;
+		ent->size   = size;
+		spin_lock_irqsave(&dma_map_lock, flags);
+		list_add(&ent->list, &dma_map_head);
+		spin_unlock_irqrestore(&dma_map_lock, flags);
+	}
+
+	flush_write_buffers();
+	return dma;
+}
+EXPORT_SYMBOL(dma_map_single);
+
+void
+dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
+		 enum dma_data_direction direction)
+{
+	struct dma_map_entry *ent;
+	unsigned long flags;
+
+	BUG_ON(direction == DMA_NONE);
+
+	/* Fast-path check: are there any multi-page DMA mappings? */
+	if (!list_empty(&dma_map_head)) {
+		spin_lock_irqsave(&dma_map_lock, flags);
+		list_for_each_entry ( ent, &dma_map_head, list ) {
+			if (DMA_MAP_MATCHES(ent, dma_addr)) {
+				list_del(&ent->list);
+				break;
+			}
+		}
+		spin_unlock_irqrestore(&dma_map_lock, flags);
+		if (&ent->list != &dma_map_head) {
+			BUG_ON(dma_addr != ent->dma);
+			BUG_ON(size != ent->size);
+			if (direction != DMA_TO_DEVICE)
+				memcpy(ent->host, ent->bounce, size);
+			dma_free_coherent(dev, size, ent->bounce, ent->dma);
+			kfree(ent);
+		}
+	}
+}
+EXPORT_SYMBOL(dma_unmap_single);
+
+void
+dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
+			enum dma_data_direction direction)
+{
+	struct dma_map_entry *ent;
+	unsigned long flags, off;
+
+	/* Fast-path check: are there any multi-page DMA mappings? */
+	if (!list_empty(&dma_map_head)) {
+		spin_lock_irqsave(&dma_map_lock, flags);
+		list_for_each_entry ( ent, &dma_map_head, list )
+			if (DMA_MAP_MATCHES(ent, dma_handle))
+				break;
+		spin_unlock_irqrestore(&dma_map_lock, flags);
+		if (&ent->list != &dma_map_head) {
+			off = dma_handle - ent->dma;
+			BUG_ON((off + size) > ent->size);
+			/*if (direction != DMA_TO_DEVICE)*/
+				memcpy(ent->host+off, ent->bounce+off, size);
+		}
+	}
+}
+EXPORT_SYMBOL(dma_sync_single_for_cpu);
+
+void
+dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t size,
+                           enum dma_data_direction direction)
+{
+	struct dma_map_entry *ent;
+	unsigned long flags, off;
+
+	/* Fast-path check: are there any multi-page DMA mappings? */
+	if (!list_empty(&dma_map_head)) {
+		spin_lock_irqsave(&dma_map_lock, flags);
+		list_for_each_entry ( ent, &dma_map_head, list )
+			if (DMA_MAP_MATCHES(ent, dma_handle))
+				break;
+		spin_unlock_irqrestore(&dma_map_lock, flags);
+		if (&ent->list != &dma_map_head) {
+			off = dma_handle - ent->dma;
+			BUG_ON((off + size) > ent->size);
+			/*if (direction != DMA_FROM_DEVICE)*/
+				memcpy(ent->bounce+off, ent->host+off, size);
+		}
+	}
+
+	flush_write_buffers();
+}
+EXPORT_SYMBOL(dma_sync_single_for_device);

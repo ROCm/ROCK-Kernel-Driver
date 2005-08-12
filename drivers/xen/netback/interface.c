@@ -3,7 +3,7 @@
  * 
  * Network-device interface management.
  * 
- * Copyright (c) 2004, Keir Fraser
+ * Copyright (c) 2004-2005, Keir Fraser
  */
 
 #include "common.h"
@@ -33,7 +33,8 @@ static void __netif_up(netif_t *netif)
     spin_lock_bh(&dev->xmit_lock);
     netif->active = 1;
     spin_unlock_bh(&dev->xmit_lock);
-    (void)request_irq(netif->irq, netif_be_int, 0, dev->name, netif);
+    (void)bind_evtchn_to_irqhandler(
+        netif->evtchn, netif_be_int, 0, dev->name, netif);
     netif_schedule_work(netif);
 }
 
@@ -43,7 +44,7 @@ static void __netif_down(netif_t *netif)
     spin_lock_bh(&dev->xmit_lock);
     netif->active = 0;
     spin_unlock_bh(&dev->xmit_lock);
-    free_irq(netif->irq, netif);
+    unbind_evtchn_from_irqhandler(netif->evtchn, netif);
     netif_deschedule_work(netif);
 }
 
@@ -76,7 +77,6 @@ static void __netif_disconnect_complete(void *arg)
      * may be outstanding requests in the network stack whose asynchronous
      * responses must still be notified to the remote driver.
      */
-    unbind_evtchn_from_irq(netif->evtchn);
     vfree(netif->tx); /* Frees netif->rx as well. */
 
     /* Construct the deferred response message. */
@@ -140,7 +140,7 @@ void netif_create(netif_be_create_t *create)
 
     netif->credit_bytes = netif->remaining_credit = ~0UL;
     netif->credit_usec  = 0UL;
-    /*init_ac_timer(&new_vif->credit_timeout);*/
+    init_timer(&netif->credit_timeout);
 
     pnetif = &netif_hash[NETIF_HASH(domid, handle)];
     while ( *pnetif != NULL )
@@ -159,17 +159,29 @@ void netif_create(netif_be_create_t *create)
     dev->get_stats       = netif_be_get_stats;
     dev->open            = net_open;
     dev->stop            = net_close;
+    dev->features        = NETIF_F_NO_CSUM;
 
     /* Disable queuing. */
     dev->tx_queue_len = 0;
 
-    /*
-     * Initialise a dummy MAC address. We choose the numerically largest
-     * non-broadcast address to prevent the address getting stolen by an 
-     * Ethernet bridge for STP purposes. (FE:FF:FF:FF:FF:FF)
-     */
-    memset(dev->dev_addr, 0xFF, ETH_ALEN);
-    dev->dev_addr[0] &= ~0x01;
+    if ( (create->be_mac[0] == 0) && (create->be_mac[1] == 0) &&
+         (create->be_mac[2] == 0) && (create->be_mac[3] == 0) &&
+         (create->be_mac[4] == 0) && (create->be_mac[5] == 0) )
+    {
+        /*
+         * Initialise a dummy MAC address. We choose the numerically largest
+         * non-broadcast address to prevent the address getting stolen by an
+         * Ethernet bridge for STP purposes. (FE:FF:FF:FF:FF:FF)
+         */ 
+        memset(dev->dev_addr, 0xFF, ETH_ALEN);
+        dev->dev_addr[0] &= ~0x01;
+    }
+    else
+    {
+        memcpy(dev->dev_addr, create->be_mac, ETH_ALEN);
+    }
+
+    memcpy(netif->fe_dev_addr, create->mac, ETH_ALEN);
 
     rtnl_lock();
     err = register_netdevice(dev);
@@ -223,6 +235,38 @@ void netif_destroy(netif_be_destroy_t *destroy)
     destroy->status = NETIF_BE_STATUS_OKAY;
 }
 
+void netif_creditlimit(netif_be_creditlimit_t *creditlimit)
+{
+    domid_t       domid  = creditlimit->domid;
+    unsigned int  handle = creditlimit->netif_handle;
+    netif_t      *netif;
+
+    netif = netif_find_by_handle(domid, handle);
+    if ( unlikely(netif == NULL) )
+    {
+        DPRINTK("netif_creditlimit attempted for non-existent netif"
+                " (%u,%u)\n", creditlimit->domid, creditlimit->netif_handle); 
+        creditlimit->status = NETIF_BE_STATUS_INTERFACE_NOT_FOUND;
+        return; 
+    }
+
+    /* Set the credit limit (reset remaining credit to new limit). */
+    netif->credit_bytes = netif->remaining_credit = creditlimit->credit_bytes;
+    netif->credit_usec = creditlimit->period_usec;
+
+    if ( netif->status == CONNECTED )
+    {
+        /*
+         * Schedule work so that any packets waiting under previous credit 
+         * limit are dealt with (acts like a replenishment point).
+         */
+        netif->credit_timeout.expires = jiffies;
+        netif_schedule_work(netif);
+    }
+    
+    creditlimit->status = NETIF_BE_STATUS_OKAY;
+}
+
 void netif_connect(netif_be_connect_t *connect)
 {
     domid_t       domid  = connect->domid;
@@ -234,9 +278,6 @@ void netif_connect(netif_be_connect_t *connect)
     pgprot_t      prot;
     int           error;
     netif_t      *netif;
-#if 0
-    struct net_device *eth0_dev;
-#endif
 
     netif = netif_find_by_handle(domid, handle);
     if ( unlikely(netif == NULL) )
@@ -259,7 +300,7 @@ void netif_connect(netif_be_connect_t *connect)
         return;
     }
 
-    prot = __pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED);
+    prot = __pgprot(_KERNPG_TABLE);
     error  = direct_remap_area_pages(&init_mm, 
                                      VMALLOC_VMADDR(vma->addr),
                                      tx_shmem_frame<<PAGE_SHIFT, PAGE_SIZE,
@@ -281,7 +322,6 @@ void netif_connect(netif_be_connect_t *connect)
     }
 
     netif->evtchn         = evtchn;
-    netif->irq            = bind_evtchn_to_irq(evtchn);
     netif->tx_shmem_frame = tx_shmem_frame;
     netif->rx_shmem_frame = rx_shmem_frame;
     netif->tx             = 

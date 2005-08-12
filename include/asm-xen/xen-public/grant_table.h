@@ -71,17 +71,17 @@
  * [XEN]: This field is written by Xen and read by the sharing guest.
  * [GST]: This field is written by the guest and read by Xen.
  */
-typedef struct {
+typedef struct grant_entry {
     /* GTF_xxx: various type and flag information.  [XEN,GST] */
-    u16     flags;      /* 0 */
+    u16     flags;
     /* The domain being granted foreign privileges. [GST] */
-    domid_t domid;      /* 2 */
+    domid_t domid;
     /*
      * GTF_permit_access: Frame that @domid is allowed to map and access. [GST]
      * GTF_accept_transfer: Frame whose ownership transferred by @domid. [XEN]
      */
-    u32     frame;      /* 4 */
-} PACKED grant_entry_t; /* 8 bytes */
+    u32     frame;
+} grant_entry_t;
 
 /*
  * Type of grant entry.
@@ -148,18 +148,16 @@ typedef u16 grant_ref_t;
  *     to be accounted to the correct grant reference!
  */
 #define GNTTABOP_map_grant_ref        0
-typedef struct {
+typedef struct gnttab_map_grant_ref {
     /* IN parameters. */
-    memory_t    host_virt_addr;       /*  0 */
-    MEMORY_PADDING;
-    domid_t     dom;                  /*  8 */
-    grant_ref_t ref;                  /* 10 */
-    u16         flags;                /* 12: GNTMAP_* */
+    memory_t    host_virt_addr;
+    domid_t     dom;
+    grant_ref_t ref;
+    u16         flags;                /* GNTMAP_* */
     /* OUT parameters. */
-    s16         handle;               /* 14: +ve: handle; -ve: GNTST_* */
-    memory_t    dev_bus_addr;         /* 16 */
-    MEMORY_PADDING;
-} PACKED gnttab_map_grant_ref_t; /* 24 bytes */
+    s16         handle;               /* +ve: handle; -ve: GNTST_* */
+    memory_t    dev_bus_addr;
+} gnttab_map_grant_ref_t;
 
 /*
  * GNTTABOP_unmap_grant_ref: Destroy one or more grant-reference mappings
@@ -173,17 +171,16 @@ typedef struct {
  *     mappings will remain in the device or host TLBs.
  */
 #define GNTTABOP_unmap_grant_ref      1
-typedef struct {
+typedef struct gnttab_unmap_grant_ref {
     /* IN parameters. */
-    memory_t    host_virt_addr;       /*  0 */
-    MEMORY_PADDING;
-    memory_t    dev_bus_addr;         /*  8 */
-    MEMORY_PADDING;
-    u16         handle;               /* 16 */
+    memory_t    host_virt_addr;
+    memory_t    dev_bus_addr;
+    u16         handle;
     /* OUT parameters. */
-    s16         status;               /* 18: GNTST_* */
-    u32         __pad;
-} PACKED gnttab_unmap_grant_ref_t; /* 24 bytes */
+    s16         status;               /* GNTST_* */
+} gnttab_unmap_grant_ref_t;
+
+#define GNTUNMAP_DEV_FROM_VIRT (~0U)
 
 /*
  * GNTTABOP_setup_table: Set up a grant table for <dom> comprising at least
@@ -195,16 +192,40 @@ typedef struct {
  *  3. Xen may not support more than a single grant-table page per domain.
  */
 #define GNTTABOP_setup_table          2
-typedef struct {
+typedef struct gnttab_setup_table {
     /* IN parameters. */
-    domid_t     dom;                  /*  0 */
-    u16         nr_frames;            /*  2 */
-    u16         __pad;
+    domid_t     dom;
+    u16         nr_frames;
     /* OUT parameters. */
-    s16         status;               /*  6: GNTST_* */
-    unsigned long *frame_list;        /*  8 */
-    MEMORY_PADDING;
-} PACKED gnttab_setup_table_t; /* 16 bytes */
+    s16         status;               /* GNTST_* */
+    unsigned long *frame_list;
+} gnttab_setup_table_t;
+
+/*
+ * GNTTABOP_dump_table: Dump the contents of the grant table to the
+ * xen console. Debugging use only.
+ */
+#define GNTTABOP_dump_table           3
+typedef struct gnttab_dump_table {
+    /* IN parameters. */
+    domid_t     dom;
+    /* OUT parameters. */
+    s16         status;               /* GNTST_* */
+} gnttab_dump_table_t;
+
+/*
+ * GNTTABOP_donate_grant_ref: Donate <frame> to a foreign domain.  The
+ * foreign domain has previously registered the details of the transfer.
+ * These can be identified from <handle>, a grant reference.
+ */
+#define GNTTABOP_donate                4
+typedef struct {
+    memory_t    mfn;		      /*  0 */
+    domid_t     domid;		      /*  4 */
+    u16         handle;               /*  8 */
+    s16         status;               /*  10: GNTST_* */
+    u32         __pad;
+} gnttab_donate_t;	      /*  14 bytes */
 
 /*
  * Bitfield values for update_pin_status.flags.
@@ -233,9 +254,11 @@ typedef struct {
 #define GNTST_general_error    (-1) /* General undefined error.              */
 #define GNTST_bad_domain       (-2) /* Unrecognsed domain id.                */
 #define GNTST_bad_gntref       (-3) /* Unrecognised or inappropriate gntref. */
-#define GNTST_bad_handle       (-3) /* Unrecognised or inappropriate handle. */
-#define GNTST_no_device_space  (-4) /* Out of space in I/O MMU.              */
-#define GNTST_permission_denied (-5) /* Not enough privilege for operation.  */
+#define GNTST_bad_handle       (-4) /* Unrecognised or inappropriate handle. */
+#define GNTST_bad_virt_addr    (-5) /* Inappropriate virtual address to map. */
+#define GNTST_bad_dev_addr     (-6) /* Inappropriate device address to unmap.*/
+#define GNTST_no_device_space  (-7) /* Out of space in I/O MMU.              */
+#define GNTST_permission_denied (-8) /* Not enough privilege for operation.  */
 
 #define GNTTABOP_error_msgs {                   \
     "okay",                                     \
@@ -243,9 +266,10 @@ typedef struct {
     "unrecognised domain id",                   \
     "invalid grant reference",                  \
     "invalid mapping handle",                   \
+    "invalid virtual address",                  \
+    "invalid device address",                   \
     "no spare translation slot in the I/O MMU", \
     "permission denied"                         \
 }
-        
 
 #endif /* __XEN_PUBLIC_GRANT_TABLE_H__ */

@@ -8,6 +8,7 @@
  *  arch/xen/drivers/blkif/frontend
  * 
  * Copyright (c) 2003-2004, Keir Fraser & Steve Hand
+ * Copyright (c) 2005, Christopher Clark
  */
 
 #include "common.h"
@@ -25,13 +26,11 @@
 #define BATCH_PER_DOMAIN 16
 
 static unsigned long mmap_vstart;
-#define MMAP_PAGES_PER_REQUEST \
-    (BLKIF_MAX_SEGMENTS_PER_REQUEST + 1)
-#define MMAP_PAGES             \
-    (MAX_PENDING_REQS * MMAP_PAGES_PER_REQUEST)
-#define MMAP_VADDR(_req,_seg)                        \
-    (mmap_vstart +                                   \
-     ((_req) * MMAP_PAGES_PER_REQUEST * PAGE_SIZE) + \
+#define MMAP_PAGES                                              \
+    (MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST)
+#define MMAP_VADDR(_req,_seg)                                   \
+    (mmap_vstart +                                              \
+     ((_req) * BLKIF_MAX_SEGMENTS_PER_REQUEST * PAGE_SIZE) +    \
      ((_seg) * PAGE_SIZE))
 
 /*
@@ -47,8 +46,6 @@ typedef struct {
     atomic_t       pendcnt;
     unsigned short operation;
     int            status;
-    void          *bounce_page;
-    unsigned int   bounce_off, bounce_len;
 } pending_req_t;
 
 /*
@@ -83,6 +80,29 @@ static inline void flush_plugged_queue(void)
 }
 #endif
 
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+/* When using grant tables to map a frame for device access then the
+ * handle returned must be used to unmap the frame. This is needed to
+ * drop the ref count on the frame.
+ */
+static u16 pending_grant_handles[MMAP_PAGES];
+#define pending_handle(_idx, _i) \
+    (pending_grant_handles[((_idx) * BLKIF_MAX_SEGMENTS_PER_REQUEST) + (_i)])
+#define BLKBACK_INVALID_HANDLE (0xFFFF)
+#endif
+
+#ifdef CONFIG_XEN_BLKDEV_TAP_BE
+/*
+ * If the tap driver is used, we may get pages belonging to either the tap
+ * or (more likely) the real frontend.  The backend must specify which domain
+ * a given page belongs to in update_va_mapping though.  For the moment, 
+ * the tap rewrites the ID field of the request to contain the request index
+ * and the id of the real front end domain.
+ */
+#define BLKTAP_COOKIE 0xbeadfeed
+static inline domid_t ID_TO_DOM(unsigned long id) { return (id >> 16); }
+#endif
+
 static int do_block_io_op(blkif_t *blkif, int max_to_do);
 static void dispatch_probe(blkif_t *blkif, blkif_request_t *req);
 static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req);
@@ -91,20 +111,40 @@ static void make_response(blkif_t *blkif, unsigned long id,
 
 static void fast_flush_area(int idx, int nr_pages)
 {
-    multicall_entry_t mcl[MMAP_PAGES_PER_REQUEST];
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+    unsigned int i, invcount = 0;
+    u16 handle;
+
+    for ( i = 0; i < nr_pages; i++ )
+    {
+        if ( BLKBACK_INVALID_HANDLE != ( handle = pending_handle(idx, i) ) )
+        {
+            unmap[i].host_virt_addr = MMAP_VADDR(idx, i);
+            unmap[i].dev_bus_addr   = 0;
+            unmap[i].handle         = handle;
+            pending_handle(idx, i) = BLKBACK_INVALID_HANDLE;
+            invcount++;
+        }
+    }
+    if ( unlikely(HYPERVISOR_grant_table_op(
+                    GNTTABOP_unmap_grant_ref, unmap, invcount)))
+        BUG();
+#else
+
+    multicall_entry_t mcl[BLKIF_MAX_SEGMENTS_PER_REQUEST];
     int               i;
 
     for ( i = 0; i < nr_pages; i++ )
     {
-        mcl[i].op = __HYPERVISOR_update_va_mapping;
-        mcl[i].args[0] = MMAP_VADDR(idx, i) >> PAGE_SHIFT;
-        mcl[i].args[1] = 0;
-        mcl[i].args[2] = 0;
+	MULTI_update_va_mapping(mcl+i, MMAP_VADDR(idx, i),
+				__pte(0), 0);
     }
 
-    mcl[nr_pages-1].args[2] = UVMF_FLUSH_TLB;
+    mcl[nr_pages-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
     if ( unlikely(HYPERVISOR_multicall(mcl, nr_pages) != 0) )
         BUG();
+#endif
 }
 
 
@@ -234,15 +274,6 @@ static void __end_block_io_op(pending_req_t *pending_req, int uptodate)
     if ( atomic_dec_and_test(&pending_req->pendcnt) )
     {
         int pending_idx = pending_req - pending_reqs;
-        if ( unlikely(pending_req->bounce_page != NULL) )
-        {
-            memcpy((void *)(MMAP_VADDR(pending_idx, 0) +
-                            pending_req->bounce_off),
-                   (void *)((unsigned long)pending_req->bounce_page +
-                            pending_req->bounce_off),
-                   pending_req->bounce_len);
-            free_page((unsigned long)pending_req->bounce_page);
-        }
         fast_flush_area(pending_idx, pending_req->nr_pages);
         make_response(pending_req->blkif, pending_req->id,
                       pending_req->operation, pending_req->status);
@@ -292,17 +323,16 @@ irqreturn_t blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 
 static int do_block_io_op(blkif_t *blkif, int max_to_do)
 {
-    blkif_ring_t *blk_ring = blkif->blk_ring_base;
+    blkif_back_ring_t *blk_ring = &blkif->blk_ring;
     blkif_request_t *req;
-    BLKIF_RING_IDX i, rp;
+    RING_IDX i, rp;
     int more_to_do = 0;
 
-    rp = blk_ring->req_prod;
+    rp = blk_ring->sring->req_prod;
     rmb(); /* Ensure we see queued requests up to 'rp'. */
 
-    /* Take items off the comms ring, taking care not to overflow. */
-    for ( i = blkif->blk_req_cons; 
-          (i != rp) && ((i-blkif->blk_resp_prod) != BLKIF_RING_SIZE);
+    for ( i = blk_ring->req_cons; 
+         (i != rp) && !RING_REQUEST_CONS_OVERFLOW(blk_ring, i);
           i++ )
     {
         if ( (max_to_do-- == 0) || (NR_PENDING_REQS == MAX_PENDING_REQS) )
@@ -311,7 +341,7 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
             break;
         }
         
-        req = &blk_ring->ring[MASK_BLKIF_IDX(i)].req;
+        req = RING_GET_REQUEST(blk_ring, i);
         switch ( req->operation )
         {
         case BLKIF_OP_READ:
@@ -325,14 +355,13 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
 
         default:
             DPRINTK("error: unknown block io operation [%d]\n",
-                    blk_ring->ring[i].req.operation);
-            make_response(blkif, blk_ring->ring[i].req.id, 
-                          blk_ring->ring[i].req.operation, BLKIF_RSP_ERROR);
+                    req->operation);
+            make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
             break;
         }
     }
 
-    blkif->blk_req_cons = i;
+    blk_ring->req_cons = i;
     return more_to_do;
 }
 
@@ -347,15 +376,53 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
 
     /* Make sure the buffer is page-sized. */
     if ( (blkif_first_sect(req->frame_and_sects[0]) != 0) ||
-         (blkif_last_sect(req->frame_and_sects[0]) != 7) )
+         (blkif_last_sect(req->frame_and_sects[0]) != ((PAGE_SIZE/512)-1)) )
         goto out;
 
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    {
+        struct gnttab_map_grant_ref map;
+
+        map.host_virt_addr = MMAP_VADDR(pending_idx, 0);
+        map.flags = GNTMAP_host_map;
+        map.ref = blkif_gref_from_fas(req->frame_and_sects[0]);
+        map.dom = blkif->domid;
+
+        if ( unlikely(HYPERVISOR_grant_table_op(
+                        GNTTABOP_map_grant_ref, &map, 1)))
+            BUG();
+
+        if ( map.handle < 0 )
+            goto out;
+
+        pending_handle(pending_idx, 0) = map.handle;
+    }
+#else /* else CONFIG_XEN_BLKDEV_GRANT */
+
+#ifdef CONFIG_XEN_BLKDEV_TAP_BE
+    /* Grab the real frontend out of the probe message. */
+    if (req->frame_and_sects[1] == BLKTAP_COOKIE) 
+        blkif->is_blktap = 1;
+#endif
+
+
+#ifdef CONFIG_XEN_BLKDEV_TAP_BE
     if ( HYPERVISOR_update_va_mapping_otherdomain(
-        MMAP_VADDR(pending_idx, 0) >> PAGE_SHIFT,
+        MMAP_VADDR(pending_idx, 0),
         (pte_t) { (req->frame_and_sects[0] & PAGE_MASK) | __PAGE_KERNEL },
-        0, blkif->domid) )
+        0, (blkif->is_blktap ? ID_TO_DOM(req->id) : blkif->domid) ) )
+        
         goto out;
-
+#else
+    if ( HYPERVISOR_update_va_mapping_otherdomain(
+        MMAP_VADDR(pending_idx, 0),
+        (pte_t) { (req->frame_and_sects[0] & PAGE_MASK) | __PAGE_KERNEL },
+        0, blkif->domid) ) 
+        
+        goto out;
+#endif
+#endif /* endif CONFIG_XEN_BLKDEV_GRANT */
+   
     rsp = vbd_probe(blkif, (vdisk_t *)MMAP_VADDR(pending_idx, 0), 
                     PAGE_SIZE / sizeof(vdisk_t));
 
@@ -368,114 +435,152 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 {
     extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
     int operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
-    short nr_sects;
-    unsigned long buffer, fas;
-    int i, tot_sects, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
+    unsigned long fas = 0;
+    int i, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
     pending_req_t *pending_req;
-    unsigned long  remap_prot;
-    multicall_entry_t mcl[MMAP_PAGES_PER_REQUEST];
-
-    /* We map virtual scatter/gather segments to physical segments. */
-    int new_segs, nr_psegs = 0;
-    phys_seg_t phys_seg[BLKIF_MAX_SEGMENTS_PER_REQUEST + 1];
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+#else
+    unsigned long remap_prot;
+    multicall_entry_t mcl[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+#endif
+    struct phys_req preq;
+    struct { 
+        unsigned long buf; unsigned int nsec;
+    } seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+    unsigned int nseg;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+    struct buffer_head *bh;
+#else
+    struct bio *bio = NULL, *biolist[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+    int nbio = 0;
+    request_queue_t *q;
+#endif
 
     /* Check that number of segments is sane. */
-    if ( unlikely(req->nr_segments == 0) || 
-         unlikely(req->nr_segments > BLKIF_MAX_SEGMENTS_PER_REQUEST) )
+    nseg = req->nr_segments;
+    if ( unlikely(nseg == 0) || 
+         unlikely(nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST) )
     {
-        DPRINTK("Bad number of segments in request (%d)\n", req->nr_segments);
+        DPRINTK("Bad number of segments in request (%d)\n", nseg);
         goto bad_descriptor;
     }
 
-    /*
-     * Check each address/size pair is sane, and convert into a
-     * physical device and block offset. Note that if the offset and size
-     * crosses a virtual extent boundary, we may end up with more
-     * physical scatter/gather segments than virtual segments.
-     */
-    for ( i = tot_sects = 0; i < req->nr_segments; i++, tot_sects += nr_sects )
+    preq.dev           = req->device;
+    preq.sector_number = req->sector_number;
+    preq.nr_sects      = 0;
+
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    for ( i = 0; i < nseg; i++ )
     {
-        fas      = req->frame_and_sects[i];
-        buffer   = (fas & PAGE_MASK) | (blkif_first_sect(fas) << 9);
-        nr_sects = blkif_last_sect(fas) - blkif_first_sect(fas) + 1;
+        fas         = req->frame_and_sects[i];
+        seg[i].nsec = blkif_last_sect(fas) - blkif_first_sect(fas) + 1;
 
-        if ( nr_sects <= 0 )
+        if ( seg[i].nsec <= 0 )
             goto bad_descriptor;
+        preq.nr_sects += seg[i].nsec;
 
-        phys_seg[nr_psegs].dev           = req->device;
-        phys_seg[nr_psegs].sector_number = req->sector_number + tot_sects;
-        phys_seg[nr_psegs].buffer        = buffer;
-        phys_seg[nr_psegs].nr_sects      = nr_sects;
+        map[i].host_virt_addr = MMAP_VADDR(pending_idx, i);
+        map[i].dom = blkif->domid;
+        map[i].ref = blkif_gref_from_fas(fas);
+        map[i].flags = GNTMAP_host_map;
+        if ( operation == WRITE )
+            map[i].flags |= GNTMAP_readonly;
+    }
 
-        /* Translate the request into the relevant 'physical device' */
-        new_segs = vbd_translate(&phys_seg[nr_psegs], blkif, operation);
-        if ( new_segs < 0 )
-        { 
-            DPRINTK("access denied: %s of [%llu,%llu] on dev=%04x\n", 
-                    operation == READ ? "read" : "write", 
-                    req->sector_number + tot_sects, 
-                    req->sector_number + tot_sects + nr_sects, 
-                    req->device); 
+    if ( unlikely(HYPERVISOR_grant_table_op(
+                    GNTTABOP_map_grant_ref, map, nseg)))
+        BUG();
+
+    for ( i = 0; i < nseg; i++ )
+    {
+        if ( unlikely(map[i].handle < 0) )
+        {
+            DPRINTK("invalid buffer -- could not remap it\n");
+            fast_flush_area(pending_idx, nseg);
             goto bad_descriptor;
         }
-  
-        nr_psegs += new_segs;
-        ASSERT(nr_psegs <= (BLKIF_MAX_SEGMENTS_PER_REQUEST+1));
+
+        phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
+            FOREIGN_FRAME(map[i].dev_bus_addr);
+
+        pending_handle(pending_idx, i) = map[i].handle;
+    }
+#endif
+
+    for ( i = 0; i < nseg; i++ )
+    {
+        fas         = req->frame_and_sects[i];
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+        seg[i].buf  = (map[i].dev_bus_addr << PAGE_SHIFT) |
+                      (blkif_first_sect(fas) << 9);
+#else
+        seg[i].buf  = (fas & PAGE_MASK) | (blkif_first_sect(fas) << 9);
+        seg[i].nsec = blkif_last_sect(fas) - blkif_first_sect(fas) + 1;
+        if ( seg[i].nsec <= 0 )
+            goto bad_descriptor;
+        preq.nr_sects += seg[i].nsec;
+#endif
     }
 
-    /* Nonsensical zero-sized request? */
-    if ( unlikely(nr_psegs == 0) )
+    if ( vbd_translate(&preq, blkif, operation) != 0 )
+    {
+        DPRINTK("access denied: %s of [%llu,%llu] on dev=%04x\n", 
+                operation == READ ? "read" : "write", preq.sector_number,
+                preq.sector_number + preq.nr_sects, preq.dev); 
         goto bad_descriptor;
+    }
 
+#ifndef CONFIG_XEN_BLKDEV_GRANT
     if ( operation == READ )
         remap_prot = _PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW;
     else
         remap_prot = _PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED;
 
-    for ( i = 0; i < nr_psegs; i++ )
-    {
-        mcl[i].op = __HYPERVISOR_update_va_mapping_otherdomain;
-        mcl[i].args[0] = MMAP_VADDR(pending_idx, i) >> PAGE_SHIFT;
-        mcl[i].args[1] = (phys_seg[i].buffer & PAGE_MASK) | remap_prot;
-        mcl[i].args[2] = 0;
-        mcl[i].args[3] = blkif->domid;
 
+    for ( i = 0; i < nseg; i++ )
+    {
+	MULTI_update_va_mapping_otherdomain(
+	    mcl+i, MMAP_VADDR(pending_idx, i),
+	    pfn_pte_ma(seg[i].buf >> PAGE_SHIFT, __pgprot(remap_prot)),
+	    0, blkif->domid);
+#ifdef CONFIG_XEN_BLKDEV_TAP_BE
+        if ( blkif->is_blktap )
+            mcl[i].args[MULTI_UVMDOMID_INDEX] = ID_TO_DOM(req->id);
+#endif
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
-            FOREIGN_FRAME(phys_seg[i].buffer >> PAGE_SHIFT);
+            FOREIGN_FRAME(seg[i].buf >> PAGE_SHIFT);
     }
 
-    if ( unlikely(HYPERVISOR_multicall(mcl, nr_psegs) != 0) )
-        BUG();
+    BUG_ON(HYPERVISOR_multicall(mcl, nseg) != 0);
 
-    for ( i = 0; i < nr_psegs; i++ )
+    for ( i = 0; i < nseg; i++ )
     {
-        if ( unlikely(mcl[i].args[5] != 0) )
+        if ( unlikely(mcl[i].result != 0) )
         {
             DPRINTK("invalid buffer -- could not remap it\n");
-            fast_flush_area(pending_idx, nr_psegs);
+            fast_flush_area(pending_idx, nseg);
             goto bad_descriptor;
         }
     }
+#endif /* end ifndef CONFIG_XEN_BLKDEV_GRANT */
 
     pending_req = &pending_reqs[pending_idx];
     pending_req->blkif     = blkif;
     pending_req->id        = req->id;
     pending_req->operation = operation;
     pending_req->status    = BLKIF_RSP_OKAY;
-    pending_req->nr_pages  = nr_psegs;
-    pending_req->bounce_page = NULL;
-    atomic_set(&pending_req->pendcnt, nr_psegs);
-    pending_cons++;
+    pending_req->nr_pages  = nseg;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+    atomic_set(&pending_req->pendcnt, nseg);
+    pending_cons++;
     blkif_get(blkif);
 
-    /* Now we pass each segment down to the real blkdev layer. */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-    for ( i = 0; i < nr_psegs; i++ )
+    for ( i = 0; i < nseg; i++ )
     {
-        struct buffer_head *bh;
-
-        bh = kmem_cache_alloc(buffer_head_cachep, GFP_ATOMIC);
+        bh = kmem_cache_alloc(buffer_head_cachep, GFP_KERNEL);
         if ( unlikely(bh == NULL) )
         {
             __end_block_io_op(pending_req, 0);
@@ -485,12 +590,12 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         memset(bh, 0, sizeof (struct buffer_head));
 
         init_waitqueue_head(&bh->b_wait);
-        bh->b_size          = phys_seg[i].nr_sects << 9;
-        bh->b_dev           = phys_seg[i].dev;
-        bh->b_rdev          = phys_seg[i].dev;
-        bh->b_rsector       = (unsigned long)phys_seg[i].sector_number;
+        bh->b_size          = seg[i].nsec << 9;
+        bh->b_dev           = preq.dev;
+        bh->b_rdev          = preq.dev;
+        bh->b_rsector       = (unsigned long)preq.sector_number;
         bh->b_data          = (char *)MMAP_VADDR(pending_idx, i) +
-            (phys_seg[i].buffer & ~PAGE_MASK);
+            (seg[i].buf & ~PAGE_MASK);
         bh->b_page          = virt_to_page(MMAP_VADDR(pending_idx, i));
         bh->b_end_io        = end_block_io_op;
         bh->b_private       = pending_req;
@@ -504,67 +609,60 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 
         /* Dispatch a single request. We'll flush it to disc later. */
         generic_make_request(operation, bh);
+
+        preq.sector_number += seg[i].nsec;
     }
+
 #else
-    for ( i = 0; i < nr_psegs; i++ )
+
+    for ( i = 0; i < nseg; i++ )
     {
-        struct bio *bio;
-        request_queue_t *q;
-
-        bio = bio_alloc(GFP_ATOMIC, 1);
-        if ( unlikely(bio == NULL) )
+        if ( ((int)preq.sector_number|(int)seg[i].nsec) &
+             ((bdev_hardsect_size(preq.bdev) >> 9) - 1) )
         {
-            __end_block_io_op(pending_req, 0);
-            continue;
+            DPRINTK("Misaligned I/O request from domain %d", blkif->domid);
+            goto cleanup_and_fail;
         }
 
-        bio->bi_bdev    = phys_seg[i].bdev;
-        bio->bi_private = pending_req;
-        bio->bi_end_io  = end_block_io_op;
-        bio->bi_sector  = phys_seg[i].sector_number;
-
-        /* Is the request misaligned with respect to hardware sector size? */
-        if ( ((bio->bi_sector | phys_seg[i].nr_sects) &
-              ((bdev_hardsect_size(bio->bi_bdev) >> 9) - 1)) )
+        while ( (bio == NULL) ||
+                (bio_add_page(bio,
+                              virt_to_page(MMAP_VADDR(pending_idx, i)),
+                              seg[i].nsec << 9,
+                              seg[i].buf & ~PAGE_MASK) == 0) )
         {
-            /* We can't bounce scatter-gather requests. */
-            if ( (nr_psegs != 1) ||
-                 ((pending_req->bounce_page = (void *)
-                   __get_free_page(GFP_KERNEL)) == NULL) )
+            bio = biolist[nbio++] = bio_alloc(GFP_KERNEL, nseg-i);
+            if ( unlikely(bio == NULL) )
             {
-                printk("xen_blk: Unaligned scatter-gather request!\n");
-                bio_put(bio);
-                __end_block_io_op(pending_req, 0);
-                continue;
+            cleanup_and_fail:
+                for ( i = 0; i < (nbio-1); i++ )
+                    bio_put(biolist[i]);
+                fast_flush_area(pending_idx, nseg);
+                goto bad_descriptor;
             }
-
-            /* Record offset and length within a bounce page. */
-            pending_req->bounce_off = (bio->bi_sector << 9) & ~PAGE_MASK;
-            pending_req->bounce_len = phys_seg[i].nr_sects << 9;
-
-            /* Submit a page-aligned I/O. */
-            bio->bi_sector &= ~((PAGE_SIZE >> 9) - 1);
-            bio_add_page(
-                bio, virt_to_page(pending_req->bounce_page), PAGE_SIZE, 0);
-        }
-        else
-        {
-            bio_add_page(
-                bio,
-                virt_to_page(MMAP_VADDR(pending_idx, i)),
-                phys_seg[i].nr_sects << 9,
-                phys_seg[i].buffer & ~PAGE_MASK);
+                
+            bio->bi_bdev    = preq.bdev;
+            bio->bi_private = pending_req;
+            bio->bi_end_io  = end_block_io_op;
+            bio->bi_sector  = preq.sector_number;
         }
 
-        if ( (q = bdev_get_queue(bio->bi_bdev)) != plugged_queue )
-        {
-            flush_plugged_queue();
-            blk_get_queue(q);
-            plugged_queue = q;
-        }
-
-        submit_bio(operation, bio);
+        preq.sector_number += seg[i].nsec;
     }
+
+    if ( (q = bdev_get_queue(bio->bi_bdev)) != plugged_queue )
+    {
+        flush_plugged_queue();
+        blk_get_queue(q);
+        plugged_queue = q;
+    }
+
+    atomic_set(&pending_req->pendcnt, nbio);
+    pending_cons++;
+    blkif_get(blkif);
+
+    for ( i = 0; i < nbio; i++ )
+        submit_bio(operation, biolist[i]);
+
 #endif
 
     return;
@@ -585,16 +683,17 @@ static void make_response(blkif_t *blkif, unsigned long id,
 {
     blkif_response_t *resp;
     unsigned long     flags;
+    blkif_back_ring_t *blk_ring = &blkif->blk_ring;
 
     /* Place on the response ring for the relevant domain. */ 
     spin_lock_irqsave(&blkif->blk_ring_lock, flags);
-    resp = &blkif->blk_ring_base->
-        ring[MASK_BLKIF_IDX(blkif->blk_resp_prod)].resp;
+    resp = RING_GET_RESPONSE(blk_ring, blk_ring->rsp_prod_pvt);
     resp->id        = id;
     resp->operation = op;
     resp->status    = st;
     wmb(); /* Ensure other side can see the response fields. */
-    blkif->blk_ring_base->resp_prod = ++blkif->blk_resp_prod;
+    blk_ring->rsp_prod_pvt++;
+    RING_PUSH_RESPONSES(blk_ring);
     spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 
     /* Kick the relevant domain. */
@@ -638,6 +737,15 @@ static int __init blkif_init(void)
 #endif
 
     blkif_ctrlif_init();
+    
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    memset( pending_grant_handles,  BLKBACK_INVALID_HANDLE, MMAP_PAGES );
+    printk(KERN_ALERT "Blkif backend is using grant tables.\n");
+#endif
+
+#ifdef CONFIG_XEN_BLKDEV_TAP_BE
+    printk(KERN_ALERT "NOTE: Blkif backend is running with tap support on!\n");
+#endif
 
     return 0;
 }

@@ -4,6 +4,8 @@
 #include <asm/ldt.h>
 #include <asm/segment.h>
 
+#define CPU_16BIT_STACK_SIZE 1024
+
 #ifndef __ASSEMBLY__
 
 #include <linux/preempt.h>
@@ -12,6 +14,8 @@
 #include <asm/mmu.h>
 
 extern struct desc_struct cpu_gdt_table[NR_CPUS][GDT_ENTRIES];
+
+DECLARE_PER_CPU(unsigned char, cpu_16bit_stack[CPU_16BIT_STACK_SIZE]);
 
 struct Xgt_desc_struct {
 	unsigned short size;
@@ -103,7 +107,7 @@ static inline void clear_LDT(void)
 	 * it slows down context switching. Noone uses it anyway.
 	 */
 	cpu = cpu;		/* XXX avoid compiler warning */
-	queue_set_ldt(0UL, 0);
+	xen_set_ldt(0UL, 0);
 	put_cpu();
 }
 
@@ -118,14 +122,13 @@ static inline void load_LDT_nolock(mm_context_t *pc, int cpu)
 	if (likely(!count))
 		segments = NULL;
 
-	queue_set_ldt((unsigned long)segments, count);
+	xen_set_ldt((unsigned long)segments, count);
 }
 
 static inline void load_LDT(mm_context_t *pc)
 {
 	int cpu = get_cpu();
 	load_LDT_nolock(pc, cpu);
-	flush_page_update_queue();
 	put_cpu();
 }
 
@@ -137,9 +140,6 @@ static inline unsigned long get_desc_base(unsigned long *desc)
 		(desc[1] & 0xff000000);
 	return base;
 }
-
-extern int __modify_ldt(struct mm_struct * mm, int func, void __user *ptr,
-		      unsigned long bytecount);
 
 #endif /* !__ASSEMBLY__ */
 

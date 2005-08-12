@@ -4,11 +4,11 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/bitops.h>
-#include <asm/synch_bitops.h>
+#include <asm-xen/synch_bitops.h>
 #include <asm/segment.h>
 #include <asm/cpufeature.h>
 #include <asm-xen/hypervisor.h>
-#include <asm-xen/evtchn.h>
+#include <asm/smp_alt.h>
 
 #ifdef __KERNEL__
 
@@ -84,7 +84,7 @@ static inline unsigned long _get_base(char * addr)
 #define loadsegment(seg,value)			\
 	asm volatile("\n"			\
 		"1:\t"				\
-		"movl %0,%%" #seg "\n"		\
+		"mov %0,%%" #seg "\n"		\
 		"2:\n"				\
 		".section .fixup,\"ax\"\n"	\
 		"3:\t"				\
@@ -96,39 +96,43 @@ static inline unsigned long _get_base(char * addr)
 		".align 4\n\t"			\
 		".long 1b,3b\n"			\
 		".previous"			\
-		: :"m" (*(unsigned int *)&(value)))
+		: :"m" (value))
 
 /*
  * Save a segment register away
  */
 #define savesegment(seg, value) \
-	asm volatile("movl %%" #seg ",%0":"=m" (*(int *)&(value)))
+	asm volatile("mov %%" #seg ",%0":"=m" (value))
 
 /*
  * Clear and set 'TS' bit respectively
  */
-/* NB. 'clts' is done for us by Xen during virtual trap. */
-#define clts() ((void)0)
-#define read_cr0() \
-	BUG();
+#define clts() (HYPERVISOR_fpu_taskswitch(0))
+#define read_cr0() ({ \
+	unsigned int __dummy; \
+	__asm__( \
+		"movl %%cr0,%0\n\t" \
+		:"=r" (__dummy)); \
+	__dummy; \
+})
 #define write_cr0(x) \
-	BUG();
+	__asm__("movl %0,%%cr0": :"r" (x));
 
-#define read_cr4() \
-	BUG();
+#define read_cr4() ({ \
+	unsigned int __dummy; \
+	__asm__( \
+		"movl %%cr4,%0\n\t" \
+		:"=r" (__dummy)); \
+	__dummy; \
+})
 #define write_cr4(x) \
-	BUG();
-#define stts() (HYPERVISOR_fpu_taskswitch())
+	__asm__("movl %0,%%cr4": :"r" (x));
+#define stts() (HYPERVISOR_fpu_taskswitch(1))
 
 #endif	/* __KERNEL__ */
 
-static inline void wbinvd(void)
-{
-	mmu_update_t u;
-	u.ptr = MMU_EXTENDED_COMMAND;
-	u.val = MMUEXT_FLUSH_CACHE;
-	(void)HYPERVISOR_mmu_update(&u, 1, NULL);
-}
+#define wbinvd() \
+	__asm__ __volatile__ ("wbinvd": : :"memory");
 
 static inline unsigned long get_limit(unsigned long segment)
 {
@@ -248,19 +252,19 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 	unsigned long prev;
 	switch (size) {
 	case 1:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgb %b1,%2"
+		__asm__ __volatile__(LOCK "cmpxchgb %b1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 2:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgw %w1,%2"
+		__asm__ __volatile__(LOCK "cmpxchgw %w1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 4:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %1,%2"
+		__asm__ __volatile__(LOCK "cmpxchgl %1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
@@ -424,11 +428,55 @@ struct alt_instr {
 #endif
 
 #ifdef CONFIG_SMP
-#define smp_mb()	mb()
-#define smp_rmb()	rmb()
 #define smp_wmb()	wmb()
-#define smp_read_barrier_depends()	read_barrier_depends()
+#if defined(CONFIG_SMP_ALTERNATIVES) && !defined(MODULE)
+#define smp_alt_mb(instr)                                           \
+__asm__ __volatile__("6667:\nnop\nnop\nnop\nnop\nnop\nnop\n6668:\n" \
+		     ".section __smp_alternatives,\"a\"\n"          \
+		     ".long 6667b\n"                                \
+                     ".long 6673f\n"                                \
+		     ".previous\n"                                  \
+		     ".section __smp_replacements,\"a\"\n"          \
+		     "6673:.byte 6668b-6667b\n"                     \
+		     ".byte 6670f-6669f\n"                          \
+		     ".byte 6671f-6670f\n"                          \
+                     ".byte 0\n"                                    \
+		     ".byte %c0\n"                                  \
+		     "6669:lock;addl $0,0(%%esp)\n"                 \
+		     "6670:" instr "\n"                             \
+		     "6671:\n"                                      \
+		     ".previous\n"                                  \
+		     :                                              \
+		     : "i" (X86_FEATURE_XMM2)                       \
+		     : "memory")
+#define smp_rmb() smp_alt_mb("lfence")
+#define smp_mb()  smp_alt_mb("mfence")
+#define set_mb(var, value) do {                                     \
+unsigned long __set_mb_temp;                                        \
+__asm__ __volatile__("6667:movl %1, %0\n6668:\n"                    \
+		     ".section __smp_alternatives,\"a\"\n"          \
+		     ".long 6667b\n"                                \
+		     ".long 6673f\n"                                \
+		     ".previous\n"                                  \
+		     ".section __smp_replacements,\"a\"\n"          \
+		     "6673: .byte 6668b-6667b\n"                    \
+		     ".byte 6670f-6669f\n"                          \
+		     ".byte 0\n"                                    \
+		     ".byte 6671f-6670f\n"                          \
+		     ".byte -1\n"                                   \
+		     "6669: xchg %1, %0\n"                          \
+		     "6670:movl %1, %0\n"                           \
+		     "6671:\n"                                      \
+		     ".previous\n"                                  \
+		     : "=m" (var), "=r" (__set_mb_temp)             \
+		     : "1" (value)                                  \
+		     : "memory"); } while (0)
+#else
+#define smp_rmb()	rmb()
+#define smp_mb()	mb()
 #define set_mb(var, value) do { xchg(&var, value); } while (0)
+#endif
+#define smp_read_barrier_depends()	read_barrier_depends()
 #else
 #define smp_mb()	barrier()
 #define smp_rmb()	barrier()
@@ -451,54 +499,60 @@ struct alt_instr {
 
 #define __cli()								\
 do {									\
-	HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask = 1;	\
+	vcpu_info_t *_vcpu;						\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	_vcpu->evtchn_upcall_mask = 1;					\
+	preempt_enable_no_resched();					\
 	barrier();							\
 } while (0)
 
 #define __sti()								\
 do {									\
-	shared_info_t *_shared = HYPERVISOR_shared_info;		\
+	vcpu_info_t *_vcpu;						\
 	barrier();							\
-	_shared->vcpu_data[0].evtchn_upcall_mask = 0;			\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	_vcpu->evtchn_upcall_mask = 0;					\
 	barrier(); /* unmask then check (avoid races) */		\
-	if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )	\
-	force_evtchn_callback();					\
+	if ( unlikely(_vcpu->evtchn_upcall_pending) )			\
+		force_evtchn_callback();				\
+	preempt_enable();						\
 } while (0)
 
 #define __save_flags(x)							\
 do {									\
-	(x) = HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask;	\
+	vcpu_info_t *_vcpu;						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	(x) = _vcpu->evtchn_upcall_mask;				\
 } while (0)
 
 #define __restore_flags(x)						\
 do {									\
-	shared_info_t *_shared = HYPERVISOR_shared_info;		\
+	vcpu_info_t *_vcpu;						\
 	barrier();							\
-	if ( (_shared->vcpu_data[0].evtchn_upcall_mask = (x)) == 0 ) {	\
-	barrier(); /* unmask then check (avoid races) */		\
-	if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )	\
-	    force_evtchn_callback();					\
-	}								\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {			\
+		barrier(); /* unmask then check (avoid races) */	\
+		if ( unlikely(_vcpu->evtchn_upcall_pending) )		\
+			force_evtchn_callback();			\
+		preempt_enable();					\
+	} else								\
+		preempt_enable_no_resched();				\
 } while (0)
 
-#define safe_halt()	     ((void)0)
+#define safe_halt()		((void)0)
 
 #define __save_and_cli(x)						\
 do {									\
-	(x) = HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask;	\
-	HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask = 1;	\
+	vcpu_info_t *_vcpu;						\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	(x) = _vcpu->evtchn_upcall_mask;				\
+	_vcpu->evtchn_upcall_mask = 1;					\
+	preempt_enable_no_resched();					\
 	barrier();							\
-} while (0)
-
-#define __save_and_sti(x)						\
-do {									\
-	shared_info_t *_shared = HYPERVISOR_shared_info;		\
-	barrier();							\
-	(x) = _shared->vcpu_data[0].evtchn_upcall_mask;			\
-	_shared->vcpu_data[0].evtchn_upcall_mask = 0;			\
-	barrier(); /* unmask then check (avoid races) */		\
-	if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )	\
-	force_evtchn_callback();					\
 } while (0)
 
 #define local_irq_save(x)	__save_and_cli(x)
@@ -507,7 +561,8 @@ do {									\
 #define local_irq_disable()	__cli()
 #define local_irq_enable()	__sti()
 
-#define irqs_disabled() HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask
+#define irqs_disabled()			\
+    HYPERVISOR_shared_info->vcpu_data[smp_processor_id()].evtchn_upcall_mask
 
 /*
  * disable hlt during certain critical i/o operations
@@ -518,5 +573,7 @@ void enable_hlt(void);
 
 extern int es7000_plat;
 void cpu_idle_wait(void);
+
+extern unsigned long arch_align_stack(unsigned long sp);
 
 #endif

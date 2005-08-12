@@ -40,7 +40,9 @@
 #include <linux/efi.h>
 #include <linux/init.h>
 #include <linux/edd.h>
+#include <linux/nodemask.h>
 #include <linux/kernel.h>
+#include <linux/percpu.h>
 #include <linux/notifier.h>
 #include <video/edid.h>
 #include <asm/e820.h>
@@ -52,6 +54,7 @@
 #include <asm/ist.h>
 #include <asm/io.h>
 #include <asm-xen/hypervisor.h>
+#include <asm-xen/xen-public/physdev.h>
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
@@ -80,7 +83,6 @@ struct cpuinfo_x86 new_cpu_data __initdata = { 0, 0, 0, 0, -1, 0, 1, 0, -1 };
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 0, 1, 0, -1 };
 
 unsigned long mmu_cr4_features;
-EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
 #ifdef	CONFIG_ACPI_INTERPRETER
 	int acpi_disabled = 0;
@@ -122,8 +124,6 @@ struct sys_desc_table_struct {
 struct edid_info edid_info;
 struct ist_info ist_info;
 struct e820map e820;
-
-unsigned char aux_device_present;
 
 extern void early_cpu_init(void);
 extern void dmi_scan_machine(void);
@@ -287,6 +287,10 @@ static void __init probe_roms(void)
 	unsigned char *rom;
 	int	      i;
 
+	/* Nothing to do if not running in dom0. */
+	if (!(xen_start_info.flags & SIF_INITDOMAIN))
+		return;
+
 	/* video rom */
 	upper = adapter_rom_resources[0].start;
 	for (start = video_rom_resource.start; start < upper; start += 2048) {
@@ -356,9 +360,6 @@ EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
 unsigned int *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
 EXPORT_SYMBOL(phys_to_machine_mapping);
-
-multicall_entry_t multicall_list[8];
-int nr_multicall_ents = 0;
 
 /* Raw start-of-day parameters from the hypervisor. */
 union xen_start_info_union xen_start_info_union;
@@ -454,10 +455,10 @@ struct change_member {
 	struct e820entry *pbios; /* pointer to original bios entry */
 	unsigned long long addr; /* address for this change point */
 };
-struct change_member change_point_list[2*E820MAX] __initdata;
-struct change_member *change_point[2*E820MAX] __initdata;
-struct e820entry *overlap_list[E820MAX] __initdata;
-struct e820entry new_bios[E820MAX] __initdata;
+static struct change_member change_point_list[2*E820MAX] __initdata;
+static struct change_member *change_point[2*E820MAX] __initdata;
+static struct e820entry *overlap_list[E820MAX] __initdata;
+static struct e820entry new_bios[E820MAX] __initdata;
 
 static int __init sanitize_e820_map(struct e820entry * biosmap, char * pnr_map)
 {
@@ -696,12 +697,14 @@ static inline void copy_edd(void)
 static void __init parse_cmdline_early (char ** cmdline_p)
 {
 	char c = ' ', *to = command_line, *from = saved_command_line;
-	int len = 0;
+	int len = 0, max_cmdline;
 	int userdef = 0;
 
-	memcpy(saved_command_line, xen_start_info.cmd_line, MAX_CMDLINE);
+	if ((max_cmdline = MAX_GUEST_CMDLINE) > COMMAND_LINE_SIZE)
+		max_cmdline = COMMAND_LINE_SIZE;
+	memcpy(saved_command_line, xen_start_info.cmd_line, max_cmdline);
 	/* Save unparsed command line copy for /proc/cmdline */
-	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
+	saved_command_line[max_cmdline-1] = '\0';
 
 	for (;;) {
 		if (c != ' ')
@@ -780,7 +783,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			noexec_setup(from + 7);
 
 
-#ifdef  CONFIG_X86_SMP
+#ifdef  CONFIG_X86_MPPARSE
 		/*
 		 * If the BIOS enumerates physical processors before logical,
 		 * maxcpus=N at enumeration-time can be used to disable HT.
@@ -995,8 +998,6 @@ unsigned long __init find_max_low_pfn(void)
 	return max_low_pfn;
 }
 
-#ifndef CONFIG_DISCONTIGMEM
-
 /*
  * Free all available memory for boot time allocation.  Used
  * as a callback function by efi_memory_walk()
@@ -1059,6 +1060,7 @@ static void __init register_bootmem_low_pages(unsigned long max_low_pfn)
 	}
 }
 
+#ifndef CONFIG_XEN
 /*
  * workaround for Dell systems that neglect to reserve EBDA
  */
@@ -1069,16 +1071,18 @@ static void __init reserve_ebda_region(void)
 	if (addr)
 		reserve_bootmem(addr, PAGE_SIZE);	
 }
+#endif
 
+#ifndef CONFIG_DISCONTIGMEM
+void __init setup_bootmem_allocator(void);
 static unsigned long __init setup_memory(void)
 {
-	unsigned long bootmap_size, start_pfn, max_low_pfn;
 
 	/*
 	 * partially used pages are not usable - thus
 	 * we are rounding upwards:
 	 */
-	start_pfn = PFN_UP(__pa(xen_start_info.pt_base)) + xen_start_info.nr_pt_frames;
+ 	min_low_pfn = PFN_UP(__pa(xen_start_info.pt_base)) + xen_start_info.nr_pt_frames;
 
 	find_max_pfn();
 
@@ -1094,10 +1098,50 @@ static unsigned long __init setup_memory(void)
 #endif
 	printk(KERN_NOTICE "%ldMB LOWMEM available.\n",
 			pages_to_mb(max_low_pfn));
+
+	setup_bootmem_allocator();
+
+	return max_low_pfn;
+}
+
+void __init zone_sizes_init(void)
+{
+	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
+	unsigned int max_dma, low;
+
+	/*
+	 * XEN: Our notion of "DMA memory" is fake when running over Xen.
+	 * We simply put all RAM in the DMA zone so that those drivers which
+	 * needlessly specify GFP_DMA do not get starved of RAM unnecessarily.
+	 * Those drivers that *do* require lowmem are screwed anyway when
+	 * running over Xen!
+	 */
+	max_dma = max_low_pfn;
+	low = max_low_pfn;
+
+	if (low < max_dma)
+		zones_size[ZONE_DMA] = low;
+	else {
+		zones_size[ZONE_DMA] = max_dma;
+		zones_size[ZONE_NORMAL] = low - max_dma;
+#ifdef CONFIG_HIGHMEM
+		zones_size[ZONE_HIGHMEM] = highend_pfn - low;
+#endif
+	}
+	free_area_init(zones_size);
+}
+#else
+extern unsigned long setup_memory(void);
+extern void zone_sizes_init(void);
+#endif /* !CONFIG_DISCONTIGMEM */
+
+void __init setup_bootmem_allocator(void)
+{
+	unsigned long bootmap_size;
 	/*
 	 * Initialize the boot-time allocator (with low memory only):
 	 */
-	bootmap_size = init_bootmem(start_pfn, max_low_pfn);
+	bootmap_size = init_bootmem(min_low_pfn, max_low_pfn);
 
 	register_bootmem_low_pages(max_low_pfn);
 
@@ -1107,8 +1151,15 @@ static unsigned long __init setup_memory(void)
 	 * the (very unlikely) case of us accidentally initializing the
 	 * bootmem allocator with an invalid RAM area.
 	 */
-	reserve_bootmem(HIGH_MEMORY, (PFN_PHYS(start_pfn) +
+	reserve_bootmem(HIGH_MEMORY, (PFN_PHYS(min_low_pfn) +
 			 bootmap_size + PAGE_SIZE-1) - (HIGH_MEMORY));
+
+#ifndef CONFIG_XEN
+	/*
+	 * reserve physical page 0 - it's a special BIOS page on many boxes,
+	 * enabling clean reboots, SMP operation, laptop functions.
+	 */
+	reserve_bootmem(0, PAGE_SIZE);
 
 	/* reserve EBDA region, it's a 4K region */
 	reserve_ebda_region();
@@ -1134,12 +1185,7 @@ static unsigned long __init setup_memory(void)
 	 */
 	acpi_reserve_bootmem();
 #endif
-#ifdef CONFIG_X86_FIND_SMP_CONFIG
-	/*
-	 * Find and reserve possible boot-time SMP configuration:
-	 */
-	find_smp_config();
-#endif
+#endif /* !CONFIG_XEN */
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (xen_start_info.mod_start) {
@@ -1160,12 +1206,25 @@ static unsigned long __init setup_memory(void)
 #endif
 
 	phys_to_machine_mapping = (unsigned int *)xen_start_info.mfn_list;
-
-	return max_low_pfn;
 }
-#else
-extern unsigned long setup_memory(void);
-#endif /* !CONFIG_DISCONTIGMEM */
+
+/*
+ * The node 0 pgdat is initialized before all of these because
+ * it's needed for bootmem.  node>0 pgdats have their virtual
+ * space allocated before the pagetables are in place to access
+ * them, so they can't be cleared then.
+ *
+ * This should all compile down to nothing when NUMA is off.
+ */
+void __init remapped_pgdat_init(void)
+{
+	int nid;
+
+	for_each_online_node(nid) {
+		if (nid != 0)
+			memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
+	}
+}
 
 /*
  * Request address space for all standard RAM and ROM resources
@@ -1220,8 +1279,9 @@ static void __init register_memory(void)
 	else
 		legacy_init_iomem_resources(&code_resource, &data_resource);
 
-	/* EFI systems may still have VGA */
-	request_resource(&iomem_resource, &video_ram_resource);
+	if (xen_start_info.flags & SIF_INITDOMAIN)
+		/* EFI systems may still have VGA */
+		request_resource(&iomem_resource, &video_ram_resource);
 
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
@@ -1397,6 +1457,7 @@ static void set_mca_bus(int x) { }
 void __init setup_arch(char **cmdline_p)
 {
 	int i, j;
+	physdev_op_t op;
 	unsigned long max_low_pfn;
 
 	/* Force a quick death if the kernel panics. */
@@ -1408,6 +1469,8 @@ void __init setup_arch(char **cmdline_p)
 	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
 
 	HYPERVISOR_vm_assist(VMASST_CMD_enable, VMASST_TYPE_4gb_segments);
+	HYPERVISOR_vm_assist(VMASST_CMD_enable,
+			     VMASST_TYPE_writable_pagetables);
 
 	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
 	early_cpu_init();
@@ -1440,7 +1503,6 @@ void __init setup_arch(char **cmdline_p)
 		machine_submodel_id = SYS_DESC_TABLE.table[1];
 		BIOS_revision = SYS_DESC_TABLE.table[2];
 	}
-	aux_device_present = AUX_DEVICE_INFO;
 	bootloader_type = LOADER_TYPE;
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
@@ -1500,6 +1562,15 @@ void __init setup_arch(char **cmdline_p)
 	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
 #endif
 	paging_init();
+	remapped_pgdat_init();
+	zone_sizes_init();
+
+#ifdef CONFIG_X86_FIND_SMP_CONFIG
+	/*
+	 * Find and reserve possible boot-time SMP configuration:
+	 */
+	find_smp_config();
+#endif
 
 	/* Make sure we have a correctly sized P->M table. */
 	if (max_pfn != xen_start_info.nr_pages) {
@@ -1564,11 +1635,25 @@ void __init setup_arch(char **cmdline_p)
 	if (efi_enabled)
 		efi_map_memmap();
 
+	op.cmd             = PHYSDEVOP_SET_IOPL;
+	op.u.set_iopl.iopl = 1;
+	HYPERVISOR_physdev_op(&op);
+
+#ifdef CONFIG_ACPI_BOOT
+	if (!(xen_start_info.flags & SIF_INITDOMAIN)) {
+		printk(KERN_INFO "ACPI in unprivileged domain disabled\n");
+		acpi_disabled = 1;
+		acpi_ht = 0;
+	}
+#endif
+
+#ifdef CONFIG_ACPI_BOOT
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
 	acpi_boot_table_init();
 	acpi_boot_init();
+#endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
 	if (smp_found_config)
@@ -1580,17 +1665,6 @@ void __init setup_arch(char **cmdline_p)
 	noirqdebug_setup("");
 
 	register_memory();
-
-	/* If we are a privileged guest OS then we should request IO privs. */
-	if (xen_start_info.flags & SIF_PRIVILEGED) {
-		dom0_op_t op;
-		op.cmd           = DOM0_IOPL;
-		op.u.iopl.domain = DOMID_SELF;
-		op.u.iopl.iopl   = 1;
-		if (HYPERVISOR_dom0_op(&op) != 0)
-			panic("Unable to obtain IOPL, despite SIF_PRIVILEGED");
-		current->thread.io_pl = 1;
-	}
 
 	if (xen_start_info.flags & SIF_INITDOMAIN) {
 		if (!(xen_start_info.flags & SIF_PRIVILEGED))

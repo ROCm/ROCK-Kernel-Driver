@@ -10,6 +10,9 @@
  *	<tomsoft@informatik.tu-chemnitz.de>
  */
 
+#ifdef CONFIG_XEN
+#include "irq_vectors.h"
+#endif
 #define TIMER_IRQ 0
 
 /*
@@ -22,6 +25,7 @@
  * the usable vector space is 0x20-0xff (224 vectors)
  */
 
+#ifndef CONFIG_XEN
 /*
  * The maximum number of vectors supported by x86_64 processors
  * is limited to 256. For processors other than x86_64, NR_VECTORS
@@ -37,6 +41,7 @@
 #else
 #define NR_IRQS 224
 #define NR_IRQ_VECTORS 1024
+#endif
 #endif
 
 static __inline__ int irq_canonicalize(int irq)

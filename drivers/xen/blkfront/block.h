@@ -33,6 +33,7 @@
 #define __XEN_DRIVERS_BLOCK_H__
 
 #include <linux/config.h>
+#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -44,8 +45,10 @@
 #include <linux/blkdev.h>
 #include <linux/major.h>
 #include <linux/devfs_fs_kernel.h>
+#include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/xen.h>
 #include <asm-xen/xen-public/io/blkif.h>
+#include <asm-xen/xen-public/io/ring.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
@@ -98,13 +101,16 @@ struct xlbd_major_info {
 struct xlbd_disk_info {
     int xd_device;
     struct xlbd_major_info *mi;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+    struct xlbd_disk_info  *next_waiting;
+    request_queue_t        *rq;
+#endif
 };
 
 typedef struct xen_block {
     int usage;
 } xen_block_t;
 
-extern struct request_queue *xlbd_blk_queue;
 extern spinlock_t blkif_io_lock;
 
 extern int blkif_open(struct inode *inode, struct file *filep);
@@ -114,6 +120,10 @@ extern int blkif_ioctl(struct inode *inode, struct file *filep,
 extern int blkif_check(dev_t dev);
 extern int blkif_revalidate(dev_t dev);
 extern void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp);
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+extern void blkif_control_probe_send(
+    blkif_request_t *req, blkif_response_t *rsp, unsigned long address);
+#endif
 extern void do_blkif_request (request_queue_t *rq); 
 
 extern void xlvbd_update_vbds(void);

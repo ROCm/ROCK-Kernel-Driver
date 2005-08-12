@@ -23,7 +23,14 @@
  * XEN "SYSTEM CALLS" (a.k.a. HYPERCALLS).
  */
 
-/* EAX = vector; EBX, ECX, EDX, ESI, EDI = args 1, 2, 3, 4, 5. */
+/*
+ * x86_32: EAX = vector; EBX, ECX, EDX, ESI, EDI = args 1, 2, 3, 4, 5.
+ *         EAX = return value
+ *         (argument registers may be clobbered on return)
+ * x86_64: RAX = vector; RDI, RSI, RDX, R10, R8, R9 = args 1, 2, 3, 4, 5, 6. 
+ *         RAX = return value
+ *         (argument registers not clobbered on return; RCX, R11 are)
+ */
 #define __HYPERVISOR_set_trap_table        0
 #define __HYPERVISOR_mmu_update            1
 #define __HYPERVISOR_set_gdt               2
@@ -35,7 +42,6 @@
 #define __HYPERVISOR_set_debugreg          8
 #define __HYPERVISOR_get_debugreg          9
 #define __HYPERVISOR_update_descriptor    10
-#define __HYPERVISOR_set_fast_trap        11
 #define __HYPERVISOR_dom_mem_op           12
 #define __HYPERVISOR_multicall            13
 #define __HYPERVISOR_update_va_mapping    14
@@ -47,43 +53,34 @@
 #define __HYPERVISOR_grant_table_op       20
 #define __HYPERVISOR_vm_assist            21
 #define __HYPERVISOR_update_va_mapping_otherdomain 22
-#define __HYPERVISOR_switch_vm86          23
-
-/*
- * MULTICALLS
- * 
- * Multicalls are listed in an array, with each element being a fixed size 
- * (BYTES_PER_MULTICALL_ENTRY). Each is of the form (op, arg1, ..., argN)
- * where each element of the tuple is a machine word. 
- */
-#define ARGS_PER_MULTICALL_ENTRY 8
-
+#define __HYPERVISOR_switch_vm86          23 /* x86/32 only */
+#define __HYPERVISOR_switch_to_user       23 /* x86/64 only */
+#define __HYPERVISOR_boot_vcpu            24
+#define __HYPERVISOR_set_segment_base     25 /* x86/64 only */
+#define __HYPERVISOR_mmuext_op            26
+#define __HYPERVISOR_acm_op               27
 
 /* 
  * VIRTUAL INTERRUPTS
  * 
  * Virtual interrupts that a guest OS may receive from Xen.
  */
-#define VIRQ_MISDIRECT  0  /* Catch-all interrupt for unbound VIRQs.      */
-#define VIRQ_TIMER      1  /* Timebase update, and/or requested timeout.  */
-#define VIRQ_DEBUG      2  /* Request guest to dump debug info.           */
-#define VIRQ_CONSOLE    3  /* (DOM0) bytes received on emergency console. */
-#define VIRQ_DOM_EXC    4  /* (DOM0) Exceptional event for some domain.   */
-#define VIRQ_PARITY_ERR 5  /* (DOM0) NMI parity error.                    */
-#define VIRQ_IO_ERR     6  /* (DOM0) NMI I/O error.                       */
+#define VIRQ_TIMER      0  /* Timebase update, and/or requested timeout.  */
+#define VIRQ_DEBUG      1  /* Request guest to dump debug info.           */
+#define VIRQ_CONSOLE    2  /* (DOM0) bytes received on emergency console. */
+#define VIRQ_DOM_EXC    3  /* (DOM0) Exceptional event for some domain.   */
+#define VIRQ_PARITY_ERR 4  /* (DOM0) NMI parity error.                    */
+#define VIRQ_IO_ERR     5  /* (DOM0) NMI I/O error.                       */
+#define VIRQ_DEBUGGER   6  /* (DOM0) A domain has paused for debugging.   */
 #define NR_VIRQS        7
 
 /*
  * MMU-UPDATE REQUESTS
  * 
  * HYPERVISOR_mmu_update() accepts a list of (ptr, val) pairs.
+ * A foreigndom (FD) can be specified (or DOMID_SELF for none).
+ * Where the FD has some effect, it is described below.
  * ptr[1:0] specifies the appropriate MMU_* command.
- * 
- * FOREIGN DOMAIN (FD)
- * -------------------
- *  Some commands recognise an explicitly-declared foreign domain,
- *  in which case they will operate with respect to the foreigner rather than
- *  the calling domain. Where the FD has some effect, it is described below.
  * 
  * ptr[1:0] == MMU_NORMAL_PT_UPDATE:
  * Updates an entry in a page table. If updating an L1 table, and the new
@@ -100,72 +97,103 @@
  * ptr[:2]  -- Machine address within the frame whose mapping to modify.
  *             The frame must belong to the FD, if one is specified.
  * val      -- Value to write into the mapping entry.
- *  
- * ptr[1:0] == MMU_EXTENDED_COMMAND:
- * val[7:0] -- MMUEXT_* command.
- * 
- *   val[7:0] == MMUEXT_(UN)PIN_*_TABLE:
- *   ptr[:2]  -- Machine address of frame to be (un)pinned as a p.t. page.
- *               The frame must belong to the FD, if one is specified.
- * 
- *   val[7:0] == MMUEXT_NEW_BASEPTR:
- *   ptr[:2]  -- Machine address of new page-table base to install in MMU.
- * 
- *   val[7:0] == MMUEXT_TLB_FLUSH:
- *   No additional arguments.
- * 
- *   val[7:0] == MMUEXT_INVLPG:
- *   ptr[:2]  -- Linear address to be flushed from the TLB.
- * 
- *   val[7:0] == MMUEXT_FLUSH_CACHE:
- *   No additional arguments. Writes back and flushes cache contents.
- * 
- *   val[7:0] == MMUEXT_SET_LDT:
- *   ptr[:2]  -- Linear address of LDT base (NB. must be page-aligned).
- *   val[:8]  -- Number of entries in LDT.
- * 
- *   val[7:0] == MMUEXT_TRANSFER_PAGE:
- *   val[31:16] -- Domain to whom page is to be transferred.
- *   (val[15:8],ptr[9:2]) -- 16-bit reference into transferee's grant table.
- *   ptr[:12]  -- Page frame to be reassigned to the FD.
- *                (NB. The frame must currently belong to the calling domain).
- * 
- *   val[7:0] == MMUEXT_SET_FOREIGNDOM:
- *   val[31:16] -- Domain to set as the Foreign Domain (FD).
- *                 (NB. DOMID_SELF is not recognised)
- *                 If FD != DOMID_IO then the caller must be privileged.
- * 
- *   val[7:0] == MMUEXT_CLEAR_FOREIGNDOM:
- *   Clears the FD.
- * 
- *   val[7:0] == MMUEXT_REASSIGN_PAGE:
- *   ptr[:2]  -- A machine address within the page to be reassigned to the FD.
- *               (NB. page must currently belong to the calling domain).
  */
 #define MMU_NORMAL_PT_UPDATE     0 /* checked '*ptr = val'. ptr is MA.       */
-#define MMU_MACHPHYS_UPDATE      2 /* ptr = MA of frame to modify entry for  */
-#define MMU_EXTENDED_COMMAND     3 /* least 8 bits of val demux further      */
-#define MMUEXT_PIN_L1_TABLE      0 /* ptr = MA of frame to pin               */
-#define MMUEXT_PIN_L2_TABLE      1 /* ptr = MA of frame to pin               */
-#define MMUEXT_PIN_L3_TABLE      2 /* ptr = MA of frame to pin               */
-#define MMUEXT_PIN_L4_TABLE      3 /* ptr = MA of frame to pin               */
-#define MMUEXT_UNPIN_TABLE       4 /* ptr = MA of frame to unpin             */
-#define MMUEXT_NEW_BASEPTR       5 /* ptr = MA of new pagetable base         */
-#define MMUEXT_TLB_FLUSH         6 /* ptr = NULL                             */
-#define MMUEXT_INVLPG            7 /* ptr = VA to invalidate                 */
-#define MMUEXT_FLUSH_CACHE       8
-#define MMUEXT_SET_LDT           9 /* ptr = VA of table; val = # entries     */
-#define MMUEXT_SET_FOREIGNDOM   10 /* val[31:16] = dom                       */
-#define MMUEXT_CLEAR_FOREIGNDOM 11
-#define MMUEXT_TRANSFER_PAGE    12 /* ptr = MA of frame; val[31:16] = dom    */
-#define MMUEXT_REASSIGN_PAGE    13
-#define MMUEXT_CMD_MASK        255
-#define MMUEXT_CMD_SHIFT         8
+#define MMU_MACHPHYS_UPDATE      1 /* ptr = MA of frame to modify entry for  */
+
+/*
+ * MMU EXTENDED OPERATIONS
+ * 
+ * HYPERVISOR_mmuext_op() accepts a list of mmuext_op structures.
+ * A foreigndom (FD) can be specified (or DOMID_SELF for none).
+ * Where the FD has some effect, it is described below.
+ * 
+ * cmd: MMUEXT_(UN)PIN_*_TABLE
+ * mfn: Machine frame number to be (un)pinned as a p.t. page.
+ *      The frame must belong to the FD, if one is specified.
+ * 
+ * cmd: MMUEXT_NEW_BASEPTR
+ * mfn: Machine frame number of new page-table base to install in MMU.
+ * 
+ * cmd: MMUEXT_NEW_USER_BASEPTR [x86/64 only]
+ * mfn: Machine frame number of new page-table base to install in MMU
+ *      when in user space.
+ * 
+ * cmd: MMUEXT_TLB_FLUSH_LOCAL
+ * No additional arguments. Flushes local TLB.
+ * 
+ * cmd: MMUEXT_INVLPG_LOCAL
+ * linear_addr: Linear address to be flushed from the local TLB.
+ * 
+ * cmd: MMUEXT_TLB_FLUSH_MULTI
+ * vcpumask: Pointer to bitmap of VCPUs to be flushed.
+ * 
+ * cmd: MMUEXT_INVLPG_MULTI
+ * linear_addr: Linear address to be flushed.
+ * vcpumask: Pointer to bitmap of VCPUs to be flushed.
+ * 
+ * cmd: MMUEXT_TLB_FLUSH_ALL
+ * No additional arguments. Flushes all VCPUs' TLBs.
+ * 
+ * cmd: MMUEXT_INVLPG_ALL
+ * linear_addr: Linear address to be flushed from all VCPUs' TLBs.
+ * 
+ * cmd: MMUEXT_FLUSH_CACHE
+ * No additional arguments. Writes back and flushes cache contents.
+ * 
+ * cmd: MMUEXT_SET_LDT
+ * linear_addr: Linear address of LDT base (NB. must be page-aligned).
+ * nr_ents: Number of entries in LDT.
+ * 
+ * cmd: MMUEXT_REASSIGN_PAGE
+ * mfn: Machine frame number to be reassigned to the FD.
+ *      (NB. page must currently belong to the calling domain).
+ */
+#define MMUEXT_PIN_L1_TABLE      0
+#define MMUEXT_PIN_L2_TABLE      1
+#define MMUEXT_PIN_L3_TABLE      2
+#define MMUEXT_PIN_L4_TABLE      3
+#define MMUEXT_UNPIN_TABLE       4
+#define MMUEXT_NEW_BASEPTR       5
+#define MMUEXT_TLB_FLUSH_LOCAL   6
+#define MMUEXT_INVLPG_LOCAL      7
+#define MMUEXT_TLB_FLUSH_MULTI   8
+#define MMUEXT_INVLPG_MULTI      9
+#define MMUEXT_TLB_FLUSH_ALL    10
+#define MMUEXT_INVLPG_ALL       11
+#define MMUEXT_FLUSH_CACHE      12
+#define MMUEXT_SET_LDT          13
+#define MMUEXT_REASSIGN_PAGE    14
+#define MMUEXT_NEW_USER_BASEPTR 15
+
+#ifndef __ASSEMBLY__
+struct mmuext_op {
+    unsigned int cmd;
+    union {
+        /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR, REASSIGN_PAGE */
+        memory_t mfn;
+        /* INVLPG_LOCAL, INVLPG_ALL, SET_LDT */
+        memory_t linear_addr;
+    };
+    union {
+        /* SET_LDT */
+        unsigned int nr_ents;
+        /* TLB_FLUSH_MULTI, INVLPG_MULTI */
+        void *vcpumask;
+    };
+};
+#endif
 
 /* These are passed as 'flags' to update_va_mapping. They can be ORed. */
-#define UVMF_FLUSH_TLB          1 /* Flush entire TLB. */
-#define UVMF_INVLPG             2 /* Flush the VA mapping being updated. */
-
+/* When specifying UVMF_MULTI, also OR in a pointer to a CPU bitmap.   */
+/* UVMF_LOCAL is merely UVMF_MULTI with a NULL bitmap pointer.         */
+#define UVMF_NONE               (0UL<<0) /* No flushing at all.   */
+#define UVMF_TLB_FLUSH          (1UL<<0) /* Flush entire TLB(s).  */
+#define UVMF_INVLPG             (2UL<<0) /* Flush only one entry. */
+#define UVMF_FLUSHTYPE_MASK     (3UL<<0)
+#define UVMF_MULTI              (0UL<<2) /* Flush subset of TLBs. */
+#define UVMF_LOCAL              (0UL<<2) /* Flush local TLB.      */
+#define UVMF_ALL                (1UL<<2) /* Flush all TLBs.       */
 
 /*
  * Commands to HYPERVISOR_sched_op().
@@ -173,8 +201,11 @@
 #define SCHEDOP_yield           0   /* Give up the CPU voluntarily.       */
 #define SCHEDOP_block           1   /* Block until an event is received.  */
 #define SCHEDOP_shutdown        2   /* Stop executing this domain.        */
+#define SCHEDOP_vcpu_down       3   /* make target VCPU not-runnable.     */
+#define SCHEDOP_vcpu_up         4   /* make target VCPU runnable.         */
 #define SCHEDOP_cmdmask       255   /* 8-bit command. */
 #define SCHEDOP_reasonshift     8   /* 8-bit reason code. (SCHEDOP_shutdown) */
+#define SCHEDOP_vcpushift       8   /* 8-bit VCPU target. (SCHEDOP_up|down) */
 
 /*
  * Reason codes for SCHEDOP_shutdown. These may be interpreted by control 
@@ -243,9 +274,9 @@ typedef u16 domid_t;
  */
 typedef struct
 {
-    memory_t ptr;    /* Machine address of PTE. */
-    memory_t val;    /* New contents of PTE.    */
-} PACKED mmu_update_t;
+    u64 ptr;       /* Machine address of PTE. */
+    u64 val;       /* New contents of PTE.    */
+} mmu_update_t;
 
 /*
  * Send an array of these to HYPERVISOR_multicall().
@@ -253,56 +284,84 @@ typedef struct
  */
 typedef struct
 {
-    cpureg_t op;
-    cpureg_t args[7];
-} PACKED multicall_entry_t;
+    unsigned long op, result;
+    unsigned long args[6];
+} multicall_entry_t;
 
 /* Event channel endpoints per domain. */
 #define NR_EVENT_CHANNELS 1024
 
-/* No support for multi-processor guests. */
-#define MAX_VIRT_CPUS 1
+/*
+ * Per-VCPU information goes here. This will be cleaned up more when Xen 
+ * actually supports multi-VCPU guests.
+ */
+typedef struct vcpu_info {
+    /*
+     * 'evtchn_upcall_pending' is written non-zero by Xen to indicate
+     * a pending notification for a particular VCPU. It is then cleared 
+     * by the guest OS /before/ checking for pending work, thus avoiding
+     * a set-and-check race. Note that the mask is only accessed by Xen
+     * on the CPU that is currently hosting the VCPU. This means that the
+     * pending and mask flags can be updated by the guest without special
+     * synchronisation (i.e., no need for the x86 LOCK prefix).
+     * This may seem suboptimal because if the pending flag is set by
+     * a different CPU then an IPI may be scheduled even when the mask
+     * is set. However, note:
+     *  1. The task of 'interrupt holdoff' is covered by the per-event-
+     *     channel mask bits. A 'noisy' event that is continually being
+     *     triggered can be masked at source at this very precise
+     *     granularity.
+     *  2. The main purpose of the per-VCPU mask is therefore to restrict
+     *     reentrant execution: whether for concurrency control, or to
+     *     prevent unbounded stack usage. Whatever the purpose, we expect
+     *     that the mask will be asserted only for short periods at a time,
+     *     and so the likelihood of a 'spurious' IPI is suitably small.
+     * The mask is read before making an event upcall to the guest: a
+     * non-zero mask therefore guarantees that the VCPU will not receive
+     * an upcall activation. The mask is cleared when the VCPU requests
+     * to block: this avoids wakeup-waiting races.
+     */
+    u8 evtchn_upcall_pending;
+    u8 evtchn_upcall_mask;
+    u32 evtchn_pending_sel;
+#ifdef __ARCH_HAS_VCPU_INFO
+    arch_vcpu_info_t arch;
+#endif
+} vcpu_info_t;
+
+typedef struct vcpu_time_info {
+    /*
+     * Updates to the following values are preceded and followed by an
+     * increment of 'version'. The guest can therefore detect updates by
+     * looking for changes to 'version'. If the least-significant bit of
+     * the version number is set then an update is in progress and the guest
+     * must wait to read a consistent set of values.
+     * The correct way to interact with the version number is similar to
+     * Linux's seqlock: see the implementations of read_seqbegin/read_seqretry.
+     */
+    u32 version;
+    u64 tsc_timestamp;   /* TSC at last update of time vals.  */
+    u64 system_time;     /* Time, in nanosecs, since boot.    */
+    /*
+     * Current system time:
+     *   system_time + ((tsc - tsc_timestamp) << tsc_shift) * tsc_to_system_mul
+     * CPU frequency (Hz):
+     *   ((10^9 << 32) / tsc_to_system_mul) >> tsc_shift
+     */
+    u32 tsc_to_system_mul;
+    s8  tsc_shift;
+} vcpu_time_info_t;
 
 /*
- * Xen/guestos shared data -- pointer provided in start_info.
+ * Xen/kernel shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.
  */
-typedef struct shared_info_st
-{
-    /*
-     * Per-VCPU information goes here. This will be cleaned up more when Xen 
-     * actually supports multi-VCPU guests.
-     */
-    struct {
-        /*
-         * 'evtchn_upcall_pending' is written non-zero by Xen to indicate
-         * a pending notification for a particular VCPU. It is then cleared 
-         * by the guest OS /before/ checking for pending work, thus avoiding
-         * a set-and-check race. Note that the mask is only accessed by Xen
-         * on the CPU that is currently hosting the VCPU. This means that the
-         * pending and mask flags can be updated by the guest without special
-         * synchronisation (i.e., no need for the x86 LOCK prefix).
-         * This may seem suboptimal because if the pending flag is set by
-         * a different CPU then an IPI may be scheduled even when the mask
-         * is set. However, note:
-         *  1. The task of 'interrupt holdoff' is covered by the per-event-
-         *     channel mask bits. A 'noisy' event that is continually being
-         *     triggered can be masked at source at this very precise
-         *     granularity.
-         *  2. The main purpose of the per-VCPU mask is therefore to restrict
-         *     reentrant execution: whether for concurrency control, or to
-         *     prevent unbounded stack usage. Whatever the purpose, we expect
-         *     that the mask will be asserted only for short periods at a time,
-         *     and so the likelihood of a 'spurious' IPI is suitably small.
-         * The mask is read before making an event upcall to the guest: a
-         * non-zero mask therefore guarantees that the VCPU will not receive
-         * an upcall activation. The mask is cleared when the VCPU requests
-         * to block: this avoids wakeup-waiting races.
-         */
-        u8 evtchn_upcall_pending;
-        u8 evtchn_upcall_mask;
-        u8 pad0, pad1;
-    } PACKED vcpu_data[MAX_VIRT_CPUS];  /*   0 */
+typedef struct shared_info {
+    vcpu_info_t vcpu_data[MAX_VIRT_CPUS];
+
+    vcpu_time_info_t vcpu_time[MAX_VIRT_CPUS];
+
+    u32 n_vcpu;
 
     /*
      * A domain can have up to 1024 "event channels" on which it can send
@@ -335,42 +394,20 @@ typedef struct shared_info_st
      * 32-bit selector to be set. Each bit in the selector covers a 32-bit
      * word in the PENDING bitfield array.
      */
-    u32 evtchn_pending[32];             /*   4 */
-    u32 evtchn_pending_sel;             /* 132 */
-    u32 evtchn_mask[32];                /* 136 */
+    u32 evtchn_pending[32];
+    u32 evtchn_mask[32];
 
     /*
-     * Time: The following abstractions are exposed: System Time, Clock Time,
-     * Domain Virtual Time. Domains can access Cycle counter time directly.
+     * Wallclock time: updated only by control software. Guests should base
+     * their gettimeofday() syscall on this wallclock-base value.
      */
-    u64                cpu_freq;        /* 264: CPU frequency (Hz).          */
-
-    /*
-     * The following values are updated periodically (and not necessarily
-     * atomically!). The guest OS detects this because 'time_version1' is
-     * incremented just before updating these values, and 'time_version2' is
-     * incremented immediately after. See the Xen-specific Linux code for an
-     * example of how to read these values safely (arch/xen/kernel/time.c).
-     */
-    u32                time_version1;   /* 272 */
-    u32                time_version2;   /* 276 */
-    tsc_timestamp_t    tsc_timestamp;   /* TSC at last update of time vals.  */
-    u64                system_time;     /* Time, in nanosecs, since boot.    */
-    u32                wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
-    u32                wc_usec;         /* Usecs 00:00:00 UTC, Jan 1, 1970.  */
-    u64                domain_time;     /* Domain virtual time, in nanosecs. */
-
-    /*
-     * Timeout values:
-     * Allow a domain to specify a timeout value in system time and 
-     * domain virtual time.
-     */
-    u64                wall_timeout;    /* 312 */
-    u64                domain_timeout;  /* 320 */
+    u32 wc_version;      /* Version counter: see vcpu_time_info_t. */
+    u32 wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
+    u32 wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
 
     arch_shared_info_t arch;
 
-} PACKED shared_info_t;
+} shared_info_t;
 
 /*
  * Start-of-day memory layout for the initial domain (DOM0):
@@ -397,38 +434,34 @@ typedef struct shared_info_st
  *     extended by an extra 4MB to ensure this.
  */
 
-#define MAX_CMDLINE 256
-typedef struct {
-    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */
-    memory_t nr_pages;        /*  0: Total pages allocated to this domain. */
-    _MEMORY_PADDING(A);
-    memory_t shared_info;     /*  8: MACHINE address of shared info struct.*/
-    _MEMORY_PADDING(B);
-    u32      flags;           /* 16: SIF_xxx flags.                        */
-    u16      domain_controller_evtchn; /* 20 */
-    u16      __pad;
-    /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).      */
-    memory_t pt_base;         /* 24: VIRTUAL address of page directory.    */
-    _MEMORY_PADDING(C);
-    memory_t nr_pt_frames;    /* 32: Number of bootstrap p.t. frames.      */
-    _MEMORY_PADDING(D);
-    memory_t mfn_list;        /* 40: VIRTUAL address of page-frame list.   */
-    _MEMORY_PADDING(E);
-    memory_t mod_start;       /* 48: VIRTUAL address of pre-loaded module. */
-    _MEMORY_PADDING(F);
-    memory_t mod_len;         /* 56: Size (bytes) of pre-loaded module.    */
-    _MEMORY_PADDING(G);
-    u8 cmd_line[MAX_CMDLINE]; /* 64 */
-} PACKED start_info_t; /* 320 bytes */
+#define MAX_GUEST_CMDLINE 1024
+typedef struct start_info {
+    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
+    memory_t nr_pages;        /* Total pages allocated to this domain.    */
+    memory_t shared_info;     /* MACHINE address of shared info struct.   */
+    u32      flags;           /* SIF_xxx flags.                           */
+    u16      domain_controller_evtchn;
+    /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).     */
+    memory_t pt_base;         /* VIRTUAL address of page directory.       */
+    memory_t nr_pt_frames;    /* Number of bootstrap p.t. frames.         */
+    memory_t mfn_list;        /* VIRTUAL address of page-frame list.      */
+    memory_t mod_start;       /* VIRTUAL address of pre-loaded module.    */
+    memory_t mod_len;         /* Size (bytes) of pre-loaded module.       */
+    s8 cmd_line[MAX_GUEST_CMDLINE];
+    memory_t store_mfn;       /* MACHINE page number of shared page.      */
+    u16      store_evtchn;    /* Event channel for store communication.   */
+} start_info_t;
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */
 #define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
 #define SIF_BLK_BE_DOMAIN (1<<4)  /* Is this a block backend domain? */
 #define SIF_NET_BE_DOMAIN (1<<5)  /* Is this a net backend domain? */
-
+#define SIF_USB_BE_DOMAIN (1<<6)  /* Is this a usb backend domain? */
 /* For use in guest OSes. */
 extern shared_info_t *HYPERVISOR_shared_info;
+
+typedef u64 cpumap_t;
 
 #endif /* !__ASSEMBLY__ */
 

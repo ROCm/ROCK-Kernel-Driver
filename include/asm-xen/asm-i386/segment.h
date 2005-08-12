@@ -38,7 +38,7 @@
  *  24 - APM BIOS support
  *  25 - APM BIOS support 
  *
- *  26 - unused
+ *  26 - ESPFIX small SS
  *  27 - unused
  *  28 - unused
  *  29 - unused
@@ -71,20 +71,23 @@
 #define GDT_ENTRY_PNPBIOS_BASE		(GDT_ENTRY_KERNEL_BASE + 6)
 #define GDT_ENTRY_APMBIOS_BASE		(GDT_ENTRY_KERNEL_BASE + 11)
 
+#define GDT_ENTRY_ESPFIX_SS		(GDT_ENTRY_KERNEL_BASE + 14)
+#define __ESPFIX_SS (GDT_ENTRY_ESPFIX_SS * 8)
+
 #define GDT_ENTRY_DOUBLEFAULT_TSS	31
 
 /*
- * The GDT has LAST_RESERVED_GDT_ENTRY + 1 entries
+ * The GDT has 32 entries
  */
-#define GDT_ENTRIES (LAST_RESERVED_GDT_ENTRY + 1)
+#define GDT_ENTRIES 32
 
 #define GDT_SIZE (GDT_ENTRIES * 8)
 
 /* Simple and small GDT entries for booting only */
 
-#define __BOOT_CS	FLAT_GUESTOS_CS
+#define __BOOT_CS	FLAT_KERNEL_CS
 
-#define __BOOT_DS	FLAT_GUESTOS_DS
+#define __BOOT_DS	FLAT_KERNEL_DS
 
 /*
  * The interrupt descriptor table has room for 256 idt's,

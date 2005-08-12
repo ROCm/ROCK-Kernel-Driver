@@ -48,6 +48,28 @@ config XEN_BLKDEV_BACKEND
 	  block devices to other guests via a high-performance shared-memory
 	  interface.
 
+config XEN_BLKDEV_TAP_BE
+        bool "Block Tap support for backend driver (DANGEROUS)"
+        depends on XEN_BLKDEV_BACKEND
+        default n
+        help
+          If you intend to use the block tap driver, the backend domain will
+          not know the domain id of the real frontend, and so will not be able
+          to map its data pages.  This modifies the backend to attempt to map
+          from both the tap domain and the real frontend.  This presents a
+          security risk, and so should ONLY be used for development
+          with the blktap.  This option will be removed as the block drivers are
+          modified to use grant tables.
+
+config XEN_BLKDEV_GRANT
+        bool "Grant table substrate for block drivers"
+        depends on !XEN_BLKDEV_TAP_BE
+        default y
+        help
+          This introduces the use of grant tables as a data exhange mechanism
+          between the frontend and backend block drivers. This currently
+          conflicts with the block tap.
+
 config XEN_NETDEV_BACKEND
 	bool "Network-device backend driver"
 	depends on XEN_PHYSDEV_ACCESS
@@ -75,6 +97,20 @@ config XEN_NETDEV_FRONTEND
 	  dedicated device-driver domain, or your master control domain
 	  (domain 0), then you almost certainly want to say Y here.
 
+config XEN_NETDEV_GRANT_TX
+        bool "Grant table substrate for net drivers tx path (DANGEROUS)"
+        default n
+        help
+          This introduces the use of grant tables as a data exhange mechanism
+          between the frontend and backend network drivers.
+
+config XEN_NETDEV_GRANT_RX
+        bool "Grant table substrate for net drivers rx path (DANGEROUS)"
+        default n
+        help
+          This introduces the use of grant tables as a data exhange mechanism
+          between the frontend and backend network drivers.
+
 config XEN_NETDEV_FRONTEND_PIPELINED_TRANSMITTER
 	bool "Pipelined transmitter (DANGEROUS)"
 	depends on XEN_NETDEV_FRONTEND
@@ -92,9 +128,21 @@ config XEN_NETDEV_FRONTEND_PIPELINED_TRANSMITTER
 	  are unsure; or if you experience network hangs when this option is
 	  enabled; then you must say N here.
 
-config XEN_WRITABLE_PAGETABLES
-	bool
-	default y
+config XEN_BLKDEV_TAP
+	bool "Block device tap driver"
+	default n
+	help
+	  This driver allows a VM to interact on block device channels
+	  to other VMs.  Block messages may be passed through or redirected
+	  to a character device, allowing device prototyping in application
+	  space.  Odds are that you want to say N here.
+
+config XEN_SHADOW_MODE
+	bool "Fake shadow mode"
+	default n
+    help
+      fakes out a shadow mode kernel
+
 
 config XEN_SCRUB_PAGES
 	bool "Scrub memory before freeing it to Xen"
@@ -109,17 +157,17 @@ config XEN_SCRUB_PAGES
 
 choice
 	prompt "Processor Type"
-	default X86
+	default XEN_X86
 
-config X86
+config XEN_X86
 	bool "X86"
 	help
 	  Choose this option if your computer is a X86 architecture.
 
-config X86_64
+config XEN_X86_64
 	bool "X86_64"
 	help
-	  Choose this option if your computer is a X86 architecture.
+	  Choose this option if your computer is a X86_64 architecture.
 
 endchoice
 
@@ -131,8 +179,12 @@ config HAVE_ARCH_DEV_ALLOC_SKB
 
 source "init/Kconfig"
 
-if X86
+if XEN_X86
 source "arch/xen/i386/Kconfig"
+endif
+
+if XEN_X86_64
+source "arch/xen/x86_64/Kconfig"
 endif
 
 menu "Executable file formats"
@@ -143,6 +195,12 @@ endmenu
 
 source "arch/xen/Kconfig.drivers"
 
+if XEN_PRIVILEGED_GUEST
+menu "Power management options"
+source "drivers/acpi/Kconfig"
+endmenu
+endif
+
 source "fs/Kconfig"
 
 source "security/Kconfig"
@@ -150,3 +208,5 @@ source "security/Kconfig"
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
+
+source "arch/xen/Kconfig.debug"

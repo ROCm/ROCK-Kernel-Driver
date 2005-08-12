@@ -9,12 +9,18 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/blkdev.h>
+#include <linux/vmalloc.h>
 #include <asm/io.h>
 #include <asm/setup.h>
 #include <asm/pgalloc.h>
 #include <asm-xen/ctrl_if.h>
+#include <asm-xen/evtchn.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/io/blkif.h>
+#include <asm-xen/xen-public/io/ring.h>
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+#include <asm-xen/gnttab.h>
+#endif
 
 #if 0
 #define ASSERT(_p) \
@@ -36,19 +42,16 @@ struct block_device;
 
 typedef struct blkif_st {
     /* Unique identifier for this interface. */
-    domid_t          domid;
-    unsigned int     handle;
+    domid_t           domid;
+    unsigned int      handle;
     /* Physical parameters of the comms window. */
-    unsigned long    shmem_frame;
-    unsigned int     evtchn;
-    int              irq;
+    unsigned long     shmem_frame;
+    unsigned int      evtchn;
     /* Comms information. */
-    blkif_ring_t    *blk_ring_base; /* ioremap()'ed ptr to shmem_frame. */
-    BLKIF_RING_IDX     blk_req_cons;  /* Request consumer. */
-    BLKIF_RING_IDX     blk_resp_prod; /* Private version of resp. producer. */
+    blkif_back_ring_t blk_ring;
     /* VBDs attached to this interface. */
-    rb_root_t        vbd_rb;        /* Mapping from 16-bit vdevices to VBDs. */
-    spinlock_t       vbd_lock;      /* Protects VBD mapping. */
+    rb_root_t         vbd_rb;        /* Mapping from 16-bit vdevices to VBDs.*/
+    spinlock_t        vbd_lock;      /* Protects VBD mapping. */
     /* Private fields. */
     enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
     /*
@@ -56,12 +59,21 @@ typedef struct blkif_st {
      * We therefore need to store the id from the original request.
      */
     u8               disconnect_rspid;
+#ifdef CONFIG_XEN_BLKDEV_TAP_BE
+    /* Is this a blktap frontend */
+    unsigned int     is_blktap;
+#endif
     struct blkif_st *hash_next;
     struct list_head blkdev_list;
     spinlock_t       blk_ring_lock;
     atomic_t         refcnt;
 
     struct work_struct work;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    u16 shmem_handle;
+    memory_t shmem_vaddr;
+    grant_ref_t shmem_ref;
+#endif
 } blkif_t;
 
 void blkif_create(blkif_be_create_t *create);
@@ -77,38 +89,19 @@ blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle);
             blkif_disconnect_complete(_b);        \
     } while (0)
 
-/* An entry in a list of xen_extents. */
-typedef struct _blkif_extent_le { 
-    blkif_extent_t extent;               /* an individual extent */
-    struct _blkif_extent_le *next;       /* and a pointer to the next */ 
-    struct block_device *bdev;
-} blkif_extent_le_t; 
-
-typedef struct _vbd { 
-    blkif_vdev_t       vdevice;   /* what the domain refers to this vbd as */
-    unsigned char      readonly;  /* Non-zero -> read-only */
-    unsigned char      type;      /* VDISK_TYPE_xxx */
-    blkif_extent_le_t *extents;   /* list of xen_extents making up this vbd */
-    rb_node_t          rb;        /* for linking into R-B tree lookup struct */
-} vbd_t; 
-
 void vbd_create(blkif_be_vbd_create_t *create); 
-void vbd_grow(blkif_be_vbd_grow_t *grow); 
-void vbd_shrink(blkif_be_vbd_shrink_t *shrink);
 void vbd_destroy(blkif_be_vbd_destroy_t *delete); 
 int vbd_probe(blkif_t *blkif, vdisk_t *vbd_info, int max_vbds);
 void destroy_all_vbds(blkif_t *blkif);
 
-/* Describes a [partial] disk extent (part of a block io request) */
-typedef struct {
+struct phys_req {
     unsigned short       dev;
     unsigned short       nr_sects;
     struct block_device *bdev;
-    unsigned long        buffer;
     blkif_sector_t       sector_number;
-} phys_seg_t;
+};
 
-int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation); 
+int vbd_translate(struct phys_req *req, blkif_t *blkif, int operation); 
 
 void blkif_interface_init(void);
 void blkif_ctrlif_init(void);
