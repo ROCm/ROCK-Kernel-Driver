@@ -173,4 +173,10 @@ config ANSLCD
 	tristate "Support for ANS LCD display"
 	depends on ADB_CUDA && PPC_PMAC
 
+config MACONLINUX
+	tristate "Mac on Linux kernel module"
+	depends on PPC32 && PPC_PMAC && !SMP
+	help
+	  call helpdesk
+
 endmenu
