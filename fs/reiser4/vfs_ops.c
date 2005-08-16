@@ -1333,7 +1333,9 @@ reiser4_internal void reiser4_handle_error(void)
 		sb->s_flags |= MS_RDONLY;
 		break;
 	case 2:
-		machine_restart(NULL);
+		panic("Hans tried to call machine_restart(NULL); here\n"
+		      "But we stopped him from doing so.\n"
+		      "A simple panic() call like this one does the job as well.\n");
 	}
 }
 
