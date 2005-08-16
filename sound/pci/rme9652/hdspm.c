@@ -65,7 +65,7 @@ module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable/disable specific HDSPM soundcards.");
 
 module_param_array(precise_ptr, bool, NULL, 0444);
-MODULE_PARM_DESC(precise_ptr, "Enable precise pointer, or disable.");
+MODULE_PARM_DESC(precise_ptr, "Enable or disable precise pointer.");
 
 module_param_array(line_outs_monitor, bool, NULL, 0444);
 MODULE_PARM_DESC(line_outs_monitor,
@@ -1104,14 +1104,14 @@ static int snd_hdspm_midi_output_close(snd_rawmidi_substream_t * substream)
 	return 0;
 }
 
-snd_rawmidi_ops_t snd_hdspm_midi_output =
+static snd_rawmidi_ops_t snd_hdspm_midi_output =
 {
 	.open =		snd_hdspm_midi_output_open,
 	.close =	snd_hdspm_midi_output_close,
 	.trigger =	snd_hdspm_midi_output_trigger,
 };
 
-snd_rawmidi_ops_t snd_hdspm_midi_input =
+static snd_rawmidi_ops_t snd_hdspm_midi_input =
 {
 	.open =		snd_hdspm_midi_input_open,
 	.close =	snd_hdspm_midi_input_close,

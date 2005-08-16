@@ -157,6 +157,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x54524123, 0xffffffff, "TR28602",		NULL,		NULL }, // only guess --jk [TR28023 = eMicro EM28023 (new CT1297)]
 { 0x54584e20, 0xffffffff, "TLC320AD9xC",	NULL,		NULL },
 { 0x56494161, 0xffffffff, "VIA1612A",		NULL,		NULL }, // modified ICE1232 with S/PDIF
+{ 0x56494170, 0xffffffff, "VIA1617A",		patch_vt1617a,	NULL }, // modified VT1616 with S/PDIF
 { 0x57454301, 0xffffffff, "W83971D",		NULL,		NULL },
 { 0x574d4c00, 0xffffffff, "WM9701A",		NULL,		NULL },
 { 0x574d4C03, 0xffffffff, "WM9703,WM9707,WM9708,WM9717", patch_wolfson03, NULL},
@@ -1828,7 +1829,7 @@ static int snd_ac97_dev_register(snd_device_t *device)
 	ac97->dev.parent = ac97->bus->card->dev;
 	ac97->dev.platform_data = ac97;
 	ac97->dev.release = ac97_device_release;
-	strncpy(ac97->dev.bus_id, snd_ac97_get_short_name(ac97), BUS_ID_SIZE);
+	snprintf(ac97->dev.bus_id, BUS_ID_SIZE, "card%d-%d", ac97->bus->card->number, ac97->num);
 	if ((err = device_register(&ac97->dev)) < 0) {
 		snd_printk(KERN_ERR "Can't register ac97 bus\n");
 		ac97->dev.bus = NULL;
@@ -2580,8 +2581,6 @@ int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk, const char *o
 {
 	int result;
 
-	snd_assert(quirk, return -EINVAL);
-
 	/* quirk overriden? */
 	if (override && strcmp(override, "-1") && strcmp(override, "default")) {
 		result = apply_quirk_str(ac97, override);
@@ -2589,6 +2588,9 @@ int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk, const char *o
 			snd_printk(KERN_ERR "applying quirk type %s failed (%d)\n", override, result);
 		return result;
 	}
+
+	if (! quirk)
+		return -EINVAL;
 
 	for (; quirk->subvendor; quirk++) {
 		if (quirk->subvendor != ac97->subsystem_vendor)
