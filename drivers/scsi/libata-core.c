@@ -41,7 +41,6 @@
 #include <scsi/scsi.h>
 #include "scsi.h"
 #include "scsi_priv.h"
-#include "scsi_logging.h"
 #include <scsi/scsi_host.h>
 #include <linux/libata.h>
 #include <asm/io.h>
@@ -2924,11 +2923,6 @@ static void atapi_request_sense(struct ata_port *ap, struct ata_device *dev,
 	DPRINTK("EXIT\n");
 }
 
-void ata_qc_timeout_done(struct scsi_cmnd *scmd)
-{
-	return;
-}
-
 /**
  *	ata_qc_timeout - Handle timeout of queued command
  *	@qc: Command that timed out
@@ -2961,24 +2955,26 @@ static void ata_qc_timeout(struct ata_queued_cmd *qc)
 		struct scsi_cmnd *cmd = qc->scsicmd;
 
 		if (!(cmd->eh_eflags & SCSI_EH_CANCEL_CMD)) {
-			/* finish completing original command */
-			qc->scsidone = ata_qc_timeout_done;
 
+			/* finish completing original command */
 			__ata_qc_complete(qc);
 
 			atapi_request_sense(ap, dev, cmd);
 
 			cmd->result = (CHECK_CONDITION << 1) | (DID_OK << 16);
+			scsi_finish_command(cmd);
+
+			goto out;
 		}
-		goto out;
 	}
 
-	/*
-	 * Do not call scsi_finish_command; this will be handled
-	 * by scsi_eh (control is passed back to scsi_eh after
-	 * this routine has finished).
+	/* hack alert!  We cannot use the supplied completion
+	 * function from inside the ->eh_strategy_handler() thread.
+	 * libata is the only user of ->eh_strategy_handler() in
+	 * any kernel, so the default scsi_done() assumes it is
+	 * not being called from the SCSI EH.
 	 */
-	qc->scsidone = ata_qc_timeout_done;
+	qc->scsidone = scsi_finish_command;
 
 	switch (qc->tf.protocol) {
 
