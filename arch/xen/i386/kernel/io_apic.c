@@ -100,6 +100,9 @@ int sis_apic_bug = -1;
  */
 int nr_ioapic_registers[MAX_IO_APICS];
 
+/* Set by dmi_scan */
+extern int need_timer_irq_tweak;
+
 /*
  * Rough estimation of how many shared IRQs there are, can
  * be changed anytime.
@@ -1296,6 +1299,12 @@ static void __init setup_IO_APIC_irqs(void)
 			if (!apic && (irq < 16))
 				disable_8259A_irq(irq);
 		}
+		/* Timer interrupt */
+		if (need_timer_irq_tweak && irq == 0) {
+			entry.delivery_mode = 0;
+			entry.dest_mode = 0;
+			printk("Timer IRQ delivery and dest mode set to 0\n");
+		}
 		spin_lock_irqsave(&ioapic_lock, flags);
 		io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
 		io_apic_write(apic, 0x10+2*pin, *(((int *)&entry)+0));
@@ -1334,6 +1343,12 @@ static void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 	entry.polarity = 0;
 	entry.trigger = 0;
 	entry.vector = vector;
+
+	if (need_timer_irq_tweak) {
+		entry.delivery_mode = 0;
+		entry.dest_mode = 0;
+		printk("ExtINT_IRQ0_pin: delivery and dest mode set to 0\n");
+	}
 
 	/*
 	 * The timer IRQ doesn't have to know that behind the

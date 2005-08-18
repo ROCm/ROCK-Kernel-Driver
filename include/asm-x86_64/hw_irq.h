@@ -48,7 +48,6 @@ struct hw_interrupt_type;
  *
  *  Vectors 0xf0-0xf9 are free (reserved for future Linux use).
  */
-#ifndef CONFIG_XEN
 #define SPURIOUS_APIC_VECTOR	0xff
 #define ERROR_APIC_VECTOR	0xfe
 #define INVALIDATE_TLB_VECTOR	0xfd
@@ -58,7 +57,7 @@ struct hw_interrupt_type;
 #define KDB_VECTOR	0xf9
 
 #define THERMAL_APIC_VECTOR	0xf0
-#endif
+
 
 /*
  * Local APIC timer IRQ vector is on a different priority level,

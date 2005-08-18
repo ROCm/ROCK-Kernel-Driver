@@ -202,9 +202,9 @@ void init_cpu_khz(void)
 	struct vcpu_time_info *info = &HYPERVISOR_shared_info->vcpu_time[0];
 	do_div(__cpu_khz, info->tsc_to_system_mul);
 	if ( info->tsc_shift < 0 )
-		cpu_khz = __cpu_khz >> -info->tsc_shift;
+		cpu_khz = __cpu_khz << -info->tsc_shift;
 	else
-		cpu_khz = __cpu_khz << info->tsc_shift;
+		cpu_khz = __cpu_khz >> info->tsc_shift;
 }
 
 static u64 get_nsec_offset(struct shadow_time_info *shadow)
@@ -536,16 +536,13 @@ unsigned long profile_pc(struct pt_regs *regs)
 EXPORT_SYMBOL(profile_pc);
 #endif
 
-/*
- * timer_interrupt() needs to keep up the real-time clock,
- * as well as call the "do_timer()" routine every clocktick
- */
-static inline void do_timer_interrupt(int irq, void *dev_id,
-					struct pt_regs *regs)
+irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	s64 delta, delta_cpu;
 	int cpu = smp_processor_id();
 	struct shadow_time_info *shadow = &per_cpu(shadow_time, cpu);
+
+	write_seqlock(&xtime_lock);
 
 	do {
 		get_time_values_from_xen();
@@ -568,7 +565,6 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		for (cpu = 0; cpu < num_online_cpus(); cpu++)
 			printk(" %d: %lld\n", cpu,
 			       per_cpu(processed_system_time, cpu));
-		return;
 	}
 
 	/* System-wide jiffy work. */
@@ -578,7 +574,18 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		do_timer(regs);
 	}
 
-	/* Local CPU jiffy work. */
+	if (shadow_tv_version != HYPERVISOR_shared_info->wc_version) {
+		update_wallclock();
+		clock_was_set();
+	}
+
+	write_sequnlock(&xtime_lock);
+
+	/*
+         * Local CPU jiffy work. No need to hold xtime_lock, and I'm not sure
+         * if there is risk of deadlock if we do (since update_process_times
+         * may do scheduler rebalancing work and thus acquire runqueue locks).
+         */
 	while (delta_cpu >= NS_PER_TICK) {
 		delta_cpu -= NS_PER_TICK;
 		per_cpu(processed_system_time, cpu) += NS_PER_TICK;
@@ -586,29 +593,6 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		profile_tick(CPU_PROFILING, regs);
 	}
 
-	if (shadow_tv_version != HYPERVISOR_shared_info->wc_version) {
-		update_wallclock();
-		clock_was_set();
-	}
-}
-
-/*
- * This is the same as the above, except we _also_ save the current
- * Time Stamp Counter value at the time of the timer interrupt, so that
- * we later on can estimate the time of day more exactly.
- */
-irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
-{
-	/*
-	 * Here we are in the timer irq handler. We just have irqs locally
-	 * disabled but we don't know if the timer_bh is running on the other
-	 * CPU. We need to avoid to SMP race with it. NOTE: we don' t need
-	 * the irq version of write_lock because as just said we have irq
-	 * locally disabled. -arca
-	 */
-	write_seqlock(&xtime_lock);
-	do_timer_interrupt(irq, NULL, regs);
-	write_sequnlock(&xtime_lock);
 	return IRQ_HANDLED;
 }
 

@@ -35,7 +35,7 @@ int dma_map_sg(struct device *hwdev, struct scatterlist *sg,
 		struct scatterlist *s = &sg[i];
 		BUG_ON(!s->page); 
 		s->dma_address = virt_to_bus(page_address(s->page) +s->offset);
-		s->dma_length = s->length;
+		//s->dma_length = s->length;
 	}
 	return nents;
 }
@@ -54,7 +54,7 @@ void dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 		struct scatterlist *s = &sg[i];
 		BUG_ON(s->page == NULL); 
 		BUG_ON(s->dma_address == 0); 
-		dma_unmap_single(dev, s->dma_address, s->dma_length, dir);
+		dma_unmap_single(dev, s->dma_address, s->/*dma_*/length, dir);
 	} 
 }
 
