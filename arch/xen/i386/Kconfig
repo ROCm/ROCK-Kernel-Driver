@@ -957,4 +957,8 @@ config SECCOMP
 
 	  If unsure, say Y. Only embedded should say N here.
 
+config PROC_MM
+	bool "/proc/mm support"
+	default y
+
 endmenu
