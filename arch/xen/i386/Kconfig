@@ -964,7 +964,7 @@ config PROC_MM
 	  /proc/mm is used by User-Mode Linux and allows for better address 
 	  space protection and speeds UML up.
 
-source kernel/Kconfig.hz
+#source kernel/Kconfig.hz
 
 config PHYSICAL_START
 	hex "Physical address where the kernel is loaded" if EMBEDDED

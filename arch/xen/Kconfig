@@ -21,6 +21,8 @@ config NO_IDLE_HZ
 	default y
 
 
+source kernel/Kconfig.hz
+
 menu "XEN"
 
 config XEN_PRIVILEGED_GUEST
