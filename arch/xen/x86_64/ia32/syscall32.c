@@ -14,10 +14,9 @@
 #include <asm/tlbflush.h>
 #include <asm/ia32_unistd.h>
 
-#define USE_INT80
+#include "syscall32_syscall.S"
 
 #ifdef USE_INT80
-/* 32bit VDSOs mapped into user space: See syscall32_syscall.S */ 
 extern unsigned char syscall32_int80[], syscall32_int80_end[];
 #else
 static int use_sysenter = -1;

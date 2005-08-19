@@ -765,9 +765,9 @@ void do_fork_idle(void *_c_idle)
  */
 static int __cpuinit do_boot_cpu(int cpu, int apicid)
 {
-        unsigned long boot_error;
-        int timeout;
-        unsigned long start_rip;
+	unsigned long boot_error;
+	int timeout;
+	unsigned long start_rip;
 #ifdef CONFIG_XEN
 	vcpu_guest_context_t ctxt;
 	extern void startup_64_smp(void);
@@ -1090,7 +1090,6 @@ static __init void enforce_max_cpus(unsigned max_cpus)
 static void prefill_possible_map(void)
 {
 	int i;
-	// Xen note: if (i < HYPERVISOR_shared_info->n_vcpu) {
 	for (i = 0; i < NR_CPUS; i++)
 		cpu_set(i, cpu_possible_map);
 }

@@ -8,8 +8,8 @@
  *
  */
  
-#include "blktap.h"
 #include <asm-xen/evtchn.h>
+#include "blktap.h"
 
 static char *blkif_state_name[] = {
     [BLKIF_STATE_CLOSED]       = "closed",

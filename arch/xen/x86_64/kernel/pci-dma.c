@@ -35,7 +35,7 @@ int dma_map_sg(struct device *hwdev, struct scatterlist *sg,
 		struct scatterlist *s = &sg[i];
 		BUG_ON(!s->page); 
 		s->dma_address = virt_to_bus(page_address(s->page) +s->offset);
-		//s->dma_length = s->length;
+		s->dma_length = s->length;
 	}
 	return nents;
 }

@@ -633,8 +633,6 @@ config ARCH_SELECT_MEMORY_MODEL
 	def_bool y
 	depends on ARCH_SPARSEMEM_ENABLE
 
-source "mm/Kconfig"
-
 config HAVE_ARCH_EARLY_PFN_TO_NID
 	bool
 	default y

@@ -5,11 +5,11 @@ XENARCH	:= $(subst ",,$(CONFIG_XENARCH))
 
 CFLAGS	+= -Iarch/$(XENARCH)/kernel
 
-obj-$(CONFIG_IA32_EMULATION) := ia32entry.o syscall32.o
+obj-$(CONFIG_IA32_EMULATION) := ia32entry.o syscall32.o syscall32_syscall.o
 
 c-obj-$(CONFIG_IA32_EMULATION) := sys_ia32.o ia32_ioctl.o \
 	ia32_signal.o tls32.o \
-	ia32_binfmt.o fpu32.o ptrace32.o syscall32.o syscall32_syscall.o
+	ia32_binfmt.o fpu32.o ptrace32.o 
 
 s-obj-y :=
 
@@ -18,7 +18,7 @@ c-obj-$(CONFIG_IA32_EMULATION) += $(sysv-y)
 
 c-obj-$(CONFIG_IA32_AOUT) += ia32_aout.o
 
-$(obj)/syscall32_syscall.o: $(src)/syscall32.c \
+$(obj)/syscall32_syscall.o: \
 	$(foreach F,int80 sysenter syscall,$(obj)/vsyscall-$F.so)
 
 # Teach kbuild about targets

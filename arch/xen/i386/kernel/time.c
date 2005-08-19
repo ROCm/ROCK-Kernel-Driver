@@ -160,10 +160,27 @@ static void delay_tsc(unsigned long loops)
 	} while ((now-bclock) < loops);
 }
 
+unsigned long read_timer_tsc(void)
+{
+	unsigned long retval;
+	rdtscl(retval);
+	return retval;
+}
+
 struct timer_opts timer_tsc = {
 	.name = "tsc",
 	.delay = delay_tsc,
+	.read_timer = read_timer_tsc,
 };
+
+int read_current_timer(unsigned long *timer_val)
+{
+	if (cur_timer->read_timer) {
+		*timer_val = cur_timer->read_timer();
+		return 0;
+	}
+	return -1;
+}
 
 /*
  * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
@@ -775,7 +792,7 @@ void __init time_init(void)
 	update_wallclock();
 
 	init_cpu_khz();
-	printk(KERN_INFO "Xen reported: %lu.%03lu MHz processor.\n",
+	printk(KERN_INFO "Xen reported: %u.%03u MHz processor.\n",
 	       cpu_khz / 1000, cpu_khz % 1000);
 
 #if defined(__x86_64__)
@@ -919,11 +936,6 @@ static int __init xen_sysctl_init(void)
 	return 0;
 }
 __initcall(xen_sysctl_init);
-
-int read_current_timer(unsigned long *timer_val)
-{
-	return -1;
-}
 
 /*
  * Local variables:

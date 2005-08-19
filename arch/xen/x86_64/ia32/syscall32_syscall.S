@@ -1,15 +1,22 @@
+#define USE_INT80
+
+#ifdef __ASSEMBLY__
+
 /* 32bit VDSOs mapped into user space. */
 
 	.section ".init.data","aw"
 
-#define USE_INT80	/* Nasty: duplicate define */
 #ifdef USE_INT80
+
 	.globl syscall32_int80
 	.globl syscall32_int80_end
+
 syscall32_int80:
 	.incbin "arch/x86_64/ia32/vsyscall-int80.so"
 syscall32_int80_end:
+
 #endif
+
 	.globl syscall32_syscall
 	.globl syscall32_syscall_end
 
@@ -23,3 +30,5 @@ syscall32_syscall_end:
 syscall32_sysenter:
 	.incbin "arch/x86_64/ia32/vsyscall-sysenter.so"
 syscall32_sysenter_end:
+
+#endif

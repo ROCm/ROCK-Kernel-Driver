@@ -217,7 +217,8 @@ static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
 #define __PAGE_KERNEL_LARGE \
 	(__PAGE_KERNEL | _PAGE_PSE | _PAGE_USER )
 #define __PAGE_KERNEL_LARGE_EXEC \
-	(__PAGE_KERNEL_EXEC | _PAGE_PSE)
+	(__PAGE_KERNEL_EXEC | _PAGE_PSE | _PAGE_USER )
+
 
 /*
  * We don't support GLOBAL page in xenolinux64

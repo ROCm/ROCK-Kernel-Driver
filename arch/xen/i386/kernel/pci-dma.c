@@ -48,7 +48,7 @@ dma_map_sg(struct device *hwdev, struct scatterlist *sg, int nents,
 		for (i = 0; i < nents; i++ ) {
 			sg[i].dma_address =
 				page_to_phys(sg[i].page) + sg[i].offset;
-			//sg[i].dma_length  = sg[i].length;
+			sg[i].dma_length  = sg[i].length;
 			BUG_ON(!sg[i].page);
 			IOMMU_BUG_ON(address_needs_mapping(
 				hwdev, sg[i].dma_address));

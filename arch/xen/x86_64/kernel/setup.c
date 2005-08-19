@@ -783,6 +783,7 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 #endif	/* !CONFIG_XEN */
+
 #ifdef CONFIG_KEXEC
 	if (crashk_res.start != crashk_res.end) {
 		reserve_bootmem(crashk_res.start,

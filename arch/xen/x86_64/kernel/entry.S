@@ -452,7 +452,7 @@ ENTRY(stub_rt_sigreturn)
 	je 1f
 	swapgs	
 #endif        
-1:	incl	%gs:pda_irqcount	# RED-PEN should check preempt count
+1:	incl %gs:pda_irqcount	# RED-PEN should check preempt count
 	movq %gs:pda_irqstackptr,%rax
 	cmoveq %rax,%rsp							
 	pushq %rdi			# save old stack	
@@ -1063,7 +1063,7 @@ ENTRY(call_softirq)
 	pushq %r15
 	movq %rsp,%r15
 	incl %gs:pda_irqcount
-	cmove %rax,%rsp
+	cmoveq %rax,%rsp
 	call __do_softirq
 	movq %r15,%rsp
 	decl %gs:pda_irqcount

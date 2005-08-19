@@ -508,13 +508,13 @@ swiotlb_map_sg(struct device *hwdev, struct scatterlist *sg, int nelems,
 				   to do proper error handling. */
 				swiotlb_full(hwdev, sg->length, dir, 0);
 				swiotlb_unmap_sg(hwdev, sg - i, i, dir);
-				sg[0]./*dma_*/length = 0;
+				sg[0].dma_length = 0;
 				return 0;
 			}
 			sg->dma_address = (dma_addr_t)virt_to_bus(map);
 		} else
 			sg->dma_address = dev_addr;
-		//sg->dma_length = sg->length;
+		sg->dma_length = sg->length;
 	}
 	return nelems;
 }
@@ -535,7 +535,7 @@ swiotlb_unmap_sg(struct device *hwdev, struct scatterlist *sg, int nelems,
 		if (sg->dma_address != SG_ENT_PHYS_ADDRESS(sg))
 			unmap_single(hwdev, 
 				     (void *)bus_to_virt(sg->dma_address),
-				     sg->/*dma_*/length, dir);
+				     sg->dma_length, dir);
 }
 
 /*
@@ -557,7 +557,7 @@ swiotlb_sync_sg_for_cpu(struct device *hwdev, struct scatterlist *sg,
 		if (sg->dma_address != SG_ENT_PHYS_ADDRESS(sg))
 			sync_single(hwdev,
 				    (void *)bus_to_virt(sg->dma_address),
-				    sg->/*dma_*/length, dir);
+				    sg->dma_length, dir);
 }
 
 void
@@ -572,7 +572,7 @@ swiotlb_sync_sg_for_device(struct device *hwdev, struct scatterlist *sg,
 		if (sg->dma_address != SG_ENT_PHYS_ADDRESS(sg))
 			sync_single(hwdev,
 				    (void *)bus_to_virt(sg->dma_address),
-				    sg->/*dma_*/length, dir);
+				    sg->dma_length, dir);
 }
 
 dma_addr_t
