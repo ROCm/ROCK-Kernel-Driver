@@ -1746,7 +1746,7 @@ S:	Maintained
 
 OPL3-SA2, SA3, and SAx DRIVER
 P:	Zwane Mwaikambo
-M:	zwane@commfireservices.com
+M:	zwane@arm.linux.org.uk
 L:	linux-sound@vger.kernel.org
 S:	Maintained
 
@@ -2002,7 +2002,7 @@ S:	Maintained
 
 SC1200 WDT DRIVER
 P:	Zwane Mwaikambo
-M:	zwane@commfireservices.com
+M:	zwane@arm.linux.org.uk
 S:	Maintained
 
 SCHEDULER
