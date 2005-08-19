@@ -17,31 +17,9 @@
 #define USE_INT80
 
 #ifdef USE_INT80
-/* 32bit VDSOs mapped into user space. */ 
-asm(".section \".init.data\",\"aw\"\n"
-    "syscall32_int80:\n"
-    ".incbin \"arch/xen/x86_64/ia32/vsyscall-int80.so\"\n"
-    "syscall32_int80_end:\n"
-    "syscall32_syscall:\n"
-    ".incbin \"arch/xen/x86_64/ia32/vsyscall-syscall.so\"\n"
-    "syscall32_syscall_end:\n"
-    "syscall32_sysenter:\n"
-    ".incbin \"arch/xen/x86_64/ia32/vsyscall-sysenter.so\"\n"
-    "syscall32_sysenter_end:\n"
-    ".previous");
-
+/* 32bit VDSOs mapped into user space: See syscall32_syscall.S */ 
 extern unsigned char syscall32_int80[], syscall32_int80_end[];
 #else
-/* 32bit VDSOs mapped into user space. */ 
-asm(".section \".init.data\",\"aw\"\n"
-    "syscall32_syscall:\n"
-    ".incbin \"arch/xen/x86_64/ia32/vsyscall-syscall.so\"\n"
-    "syscall32_syscall_end:\n"
-    "syscall32_sysenter:\n"
-    ".incbin \"arch/xen/x86_64/ia32/vsyscall-sysenter.so\"\n"
-    "syscall32_sysenter_end:\n"
-    ".previous");
-
 static int use_sysenter = -1;
 #endif
 
