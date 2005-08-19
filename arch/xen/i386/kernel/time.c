@@ -72,7 +72,8 @@
 
 #include <asm-xen/evtchn.h>
 
-extern spinlock_t i8259A_lock;
+#include <asm/i8259.h>
+
 int pit_latch_buggy;              /* extern */
 
 u64 jiffies_64 = INITIAL_JIFFIES;
@@ -89,10 +90,14 @@ struct timezone __sys_tz __section_sys_tz;
 #endif
 
 unsigned int cpu_khz;	/* Detected as we calibrate the TSC */
+EXPORT_SYMBOL(cpu_khz);
 
 extern unsigned long wall_jiffies;
 
 DEFINE_SPINLOCK(rtc_lock);
+EXPORT_SYMBOL(rtc_lock);
+
+#include <asm/i8253.h>
 
 DEFINE_SPINLOCK(i8253_lock);
 EXPORT_SYMBOL(i8253_lock);
@@ -612,6 +617,8 @@ unsigned long get_cmos_time(void)
 
 	return retval;
 }
+EXPORT_SYMBOL(get_cmos_time);
+
 static void sync_cmos_clock(unsigned long dummy);
 
 static struct timer_list sync_cmos_timer =
@@ -893,15 +900,6 @@ void local_teardown_timer_irq(void)
 }
 #endif
 
-int read_current_timer(unsigned long *timer_val)
-{
-	if (cur_timer->read_timer) {
-		*timer_val = cur_timer->read_timer();
-		return 0;
-	}
-	return -1;
-}
-
 /*
  * /proc/sys/xen: This really belongs in another file. It can stay here for
  * now however.
@@ -921,6 +919,11 @@ static int __init xen_sysctl_init(void)
 	return 0;
 }
 __initcall(xen_sysctl_init);
+
+int read_current_timer(unsigned long *timer_val)
+{
+	return -1;
+}
 
 /*
  * Local variables:

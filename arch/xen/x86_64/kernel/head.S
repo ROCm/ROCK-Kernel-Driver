@@ -232,12 +232,12 @@ ENTRY(level3_physmem_pgt)
 	.org 0xd000
 #ifdef CONFIG_ACPI_SLEEP
 ENTRY(wakeup_level4_pgt)
-	.quad	0x0000000000102007		/* -> level3_ident_pgt */
+	.quad	0x0000000000002007 + __PHYSICAL_START	/* -> level3_ident_pgt */
 	.fill	255,8,0
-	.quad	0x000000000010a007
+	.quad	0x000000000000a007 + __PHYSICAL_START
 	.fill	254,8,0
 	/* (2^48-(2*1024*1024*1024))/(2^39) = 511 */
-	.quad	0x0000000000103007		/* -> level3_kernel_pgt */
+	.quad	0x0000000000003007 + __PHYSICAL_START	/* -> level3_kernel_pgt */
 #endif
 
 	.data

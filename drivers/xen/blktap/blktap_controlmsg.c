@@ -8,7 +8,6 @@
  *
  */
  
-#include <asm-xen/evtchn.h>
 #include "blktap.h"
 #include <asm-xen/evtchn.h>
 

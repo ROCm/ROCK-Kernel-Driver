@@ -13,7 +13,7 @@ i386-obj-y := hypervisor.o
 
 #obj-y	 := init.o fault.o ioremap.o extable.o pageattr.o
 #c-obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o
-c-obj-$(CONFIG_DISCONTIGMEM) += numa.o
+c-obj-$(CONFIG_NUMA) += numa.o
 c-obj-$(CONFIG_K8_NUMA) += k8topology.o
 
 hugetlbpage-y = ../../../i386/mm/hugetlbpage.o

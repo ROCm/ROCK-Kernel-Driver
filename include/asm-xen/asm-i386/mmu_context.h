@@ -36,8 +36,6 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 }
 
 #define prepare_arch_switch(next)	__prepare_arch_switch()
-//#define finish_arch_switch(rq, next)	spin_unlock_irq(&(rq)->lock)
-//#define task_running(rq, p)		((rq)->curr == (p))
 
 static inline void __prepare_arch_switch(void)
 {

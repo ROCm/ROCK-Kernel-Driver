@@ -10,6 +10,7 @@ obj-y	:= init.o pgtable.o fault.o ioremap.o hypervisor.o
 c-obj-y	:= extable.o mmap.o pageattr.o
 
 c-obj-$(CONFIG_DISCONTIGMEM)	+= discontig.o
+c-obj-$(CONFIG_NUMA) += discontig.o
 c-obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o
 obj-$(CONFIG_HIGHMEM) += highmem.o
 c-obj-$(CONFIG_BOOT_IOREMAP) += boot_ioremap.o

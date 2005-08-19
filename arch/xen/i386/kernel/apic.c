@@ -34,6 +34,7 @@
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
 #include <asm/hpet.h>
+#include <asm/i8253.h>
 
 #include <mach_apic.h>
 
@@ -81,3 +82,5 @@ int __init APIC_init_uniprocessor (void)
 
 	return 0;
 }
+
+int enable_local_apic __initdata = 0;

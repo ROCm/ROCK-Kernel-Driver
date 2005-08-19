@@ -149,7 +149,7 @@ static int __is_prefetch(struct pt_regs *regs, unsigned long addr)
 
 		if (instr > limit)
 			break;
-		if (__get_user(opcode, (unsigned char *) instr))
+		if (__get_user(opcode, (unsigned char __user *) instr))
 			break; 
 
 		instr_hi = opcode & 0xf0; 
@@ -176,7 +176,7 @@ static int __is_prefetch(struct pt_regs *regs, unsigned long addr)
 			scan_more = 0;
 			if (instr > limit)
 				break;
-			if (__get_user(opcode, (unsigned char *) instr)) 
+			if (__get_user(opcode, (unsigned char __user *) instr))
 				break;
 			prefetch = (instr_lo == 0xF) &&
 				(opcode == 0x0D || opcode == 0x18);
@@ -370,9 +370,9 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 		if (address + 32 < regs->esp)
 			goto bad_area;
 	}
-	find_vma_prev(current->mm, address, &prev_vma);
-	if (expand_stack(vma, address, prev_vma))
-		goto bad_area;
+        find_vma_prev(current->mm, address, &prev_vma);
+        if (expand_stack(vma, address, prev_vma))
+                goto bad_area;
 /*
  * Ok, we have a good vm_area for this memory access, so
  * we can handle it..
@@ -512,6 +512,9 @@ no_context:
 	printk(KERN_ALERT " printing eip:\n");
 	printk("%08lx\n", regs->eip);
 	dump_fault_path(address);
+	tsk->thread.cr2 = address;
+	tsk->thread.trap_no = 14;
+	tsk->thread.error_code = error_code;
 	die("Oops", regs, error_code);
 	bust_spinlocks(0);
 	do_exit(SIGKILL);

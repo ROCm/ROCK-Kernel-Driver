@@ -203,8 +203,6 @@ endif
 
 source "fs/Kconfig"
 
-source "mm/Kconfig"
-
 source "security/Kconfig"
 
 source "crypto/Kconfig"

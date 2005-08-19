@@ -20,6 +20,7 @@
 #include <linux/cache.h>
 #include <linux/interrupt.h>
 #include <linux/cpu.h>
+#include <linux/module.h>
 
 #include <asm/mtrr.h>
 #include <asm/tlbflush.h>
@@ -429,6 +430,7 @@ void flush_tlb_page(struct vm_area_struct * vma, unsigned long va)
 
 	preempt_enable();
 }
+EXPORT_SYMBOL(flush_tlb_page);
 
 static void do_flush_tlb_all(void* info)
 {
@@ -484,6 +486,16 @@ struct call_data_struct {
 	atomic_t finished;
 	int wait;
 };
+
+void lock_ipi_call_lock(void)
+{
+	spin_lock_irq(&call_lock);
+}
+
+void unlock_ipi_call_lock(void)
+{
+	spin_unlock_irq(&call_lock);
+}
 
 static struct call_data_struct * call_data;
 
@@ -546,6 +558,7 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
 	return 0;
 }
+EXPORT_SYMBOL(smp_call_function);
 
 static void stop_this_cpu (void * dummy)
 {

@@ -11,6 +11,7 @@
 #include <linux/mm.h>
 #include <linux/string.h>
 #include <linux/pci.h>
+#include <linux/module.h>
 #include <linux/version.h>
 #include <asm/io.h>
 #include <asm-xen/balloon.h>

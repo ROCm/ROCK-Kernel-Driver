@@ -26,15 +26,18 @@ void * __ioremap(unsigned long phys_addr, unsigned long size,
 {
 	return NULL;
 }
+EXPORT_SYMBOL(__ioremap);
 
 void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 {
 	return NULL;
 }
+EXPORT_SYMBOL(ioremap_nocache);
 
 void iounmap(volatile void __iomem *addr)
 {
 }
+EXPORT_SYMBOL(iounmap);
 
 void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 {
@@ -135,7 +138,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	}
 	return (void __iomem *) (offset + (char __iomem *)addr);
 }
-
+EXPORT_SYMBOL(__ioremap);
 
 /**
  * ioremap_nocache     -   map bus memory into CPU space
@@ -192,6 +195,7 @@ void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 
 	return p;					
 }
+EXPORT_SYMBOL(ioremap_nocache);
 
 void iounmap(volatile void __iomem *addr)
 {
@@ -204,7 +208,7 @@ void iounmap(volatile void __iomem *addr)
 #endif
 	p = remove_vm_area((void *) (PAGE_MASK & (unsigned long __force) addr));
 	if (!p) { 
-		printk("__iounmap: bad address %p\n", addr);
+		printk(KERN_WARNING "iounmap: bad address %p\n", addr);
 		return;
 	}
 
@@ -217,6 +221,7 @@ void iounmap(volatile void __iomem *addr)
 	} 
 	kfree(p); 
 }
+EXPORT_SYMBOL(iounmap);
 
 void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 {

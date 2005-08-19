@@ -8,7 +8,8 @@
  * 
  *  X86-64 port
  *	Andi Kleen.
- * 
+ *
+ *	CPU hotplug support - ashok.raj@intel.com
  *  $Id: process.c,v 1.38 2002/01/15 10:08:03 ak Exp $
  * 
  *  Jun Nakajima <jun.nakajima@intel.com> 
@@ -38,6 +39,7 @@
 #include <linux/ptrace.h>
 #include <linux/utsname.h>
 #include <linux/random.h>
+#include <linux/kprobes.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -102,10 +104,15 @@ void xen_idle(void)
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
+DECLARE_PER_CPU(int, cpu_state);
+
 #include <asm/nmi.h>
 /* We don't actually take CPU down, just spin without interrupts. */
 static inline void play_dead(void)
 {
+	idle_task_exit();
+	wbinvd();
+	mb();
 	/* Ack it */
 	__get_cpu_var(cpu_state) = CPU_DEAD;
 
@@ -185,7 +192,7 @@ EXPORT_SYMBOL_GPL(cpu_idle_wait);
 
 /* XXX XEN doesn't use mwait_idle(), select_idle_routine(), idle_setup(). */
 /* Always use xen_idle() instead. */
-void __init select_idle_routine(const struct cpuinfo_x86 *c) {}
+void __cpuinit select_idle_routine(const struct cpuinfo_x86 *c) {}
 
 /* Prints also some state that isn't saved in the pt_regs */ 
 void __show_regs(struct pt_regs * regs)
@@ -241,6 +248,14 @@ void exit_thread(void)
 {
 	struct task_struct *me = current;
 	struct thread_struct *t = &me->thread;
+
+	/*
+	 * Remove function-return probe instances associated with this task
+	 * and put them back on the free list. Do not insert an exit probe for
+	 * this function, it will be disabled by kprobe_flush_task if you do.
+	 */
+	kprobe_flush_task(me);
+
 	if (me->thread.io_bitmap_ptr) { 
 		struct tss_struct *tss = &per_cpu(init_tss, get_cpu());
 
@@ -264,6 +279,13 @@ void flush_thread(void)
 {
 	struct task_struct *tsk = current;
 	struct thread_info *t = current_thread_info();
+
+	/*
+	 * Remove function-return probe instances associated with this task
+	 * and put them back on the free list. Do not insert an exit probe for
+	 * this function, it will be disabled by kprobe_flush_task if you do.
+	 */
+	kprobe_flush_task(tsk);
 
 	if (t->flags & _TIF_ABI_PENDING)
 		t->flags ^= (_TIF_ABI_PENDING | _TIF_IA32);
@@ -395,12 +417,36 @@ out:
 }
 
 /*
+ * This function selects if the context switch from prev to next
+ * has to tweak the TSC disable bit in the cr4.
+ */
+static inline void disable_tsc(struct task_struct *prev_p,
+			       struct task_struct *next_p)
+{
+	struct thread_info *prev, *next;
+
+	/*
+	 * gcc should eliminate the ->thread_info dereference if
+	 * has_secure_computing returns 0 at compile time (SECCOMP=n).
+	 */
+	prev = prev_p->thread_info;
+	next = next_p->thread_info;
+
+	if (has_secure_computing(prev) || has_secure_computing(next)) {
+		/* slow path here */
+		if (has_secure_computing(prev) &&
+		    !has_secure_computing(next)) {
+			write_cr4(read_cr4() & ~X86_CR4_TSD);
+		} else if (!has_secure_computing(prev) &&
+			   has_secure_computing(next))
+			write_cr4(read_cr4() | X86_CR4_TSD);
+	}
+}
+
+/*
  * This special macro can be used to load a debugging register
  */
-#define loaddebug(thread,register) \
-		HYPERVISOR_set_debugreg((register),	\
-			(thread->debugreg ## register))
-
+#define loaddebug(thread,r) set_debug(thread->debugreg ## r, r)
 
 static inline void __save_init_fpu( struct task_struct *tsk )
 {
@@ -529,6 +575,8 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 		loaddebug(next, 7);
 	}
 
+	disable_tsc(prev_p, next_p);
+
 	return prev_p;
 }
 
@@ -629,7 +677,7 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 
 	switch (code) { 
 	case ARCH_SET_GS:
-		if (addr >= TASK_SIZE) 
+		if (addr >= TASK_SIZE_OF(task))
 			return -EPERM; 
 		cpu = get_cpu();
 		/* handle small bases via the GDT because that's faster to 
@@ -655,7 +703,7 @@ long do_arch_prctl(struct task_struct *task, int code, unsigned long addr)
 	case ARCH_SET_FS:
 		/* Not strictly needed for fs, but do it for symmetry
 		   with gs */
-		if (addr >= TASK_SIZE)
+		if (addr >= TASK_SIZE_OF(task))
 			return -EPERM; 
 		cpu = get_cpu();
 		/* handle small bases via the GDT because that's faster to 

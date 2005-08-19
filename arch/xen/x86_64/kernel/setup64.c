@@ -35,7 +35,7 @@
 #endif
 char x86_boot_params[BOOT_PARAM_SIZE] __initdata = {0,};
 
-cpumask_t cpu_initialized __initdata = CPU_MASK_NONE;
+cpumask_t cpu_initialized __cpuinitdata = CPU_MASK_NONE;
 
 struct x8664_pda cpu_pda[NR_CPUS] __cacheline_aligned; 
 
@@ -227,7 +227,7 @@ void syscall_init(void)
 #endif
 }
 
-void __init check_efer(void)
+void __cpuinit check_efer(void)
 {
 	unsigned long efer;
 
@@ -244,7 +244,7 @@ void __init check_efer(void)
  * 'CPU state barrier', nothing should get across.
  * A lot of state is already set up in PDA init.
  */
-void __init cpu_init (void)
+void __cpuinit cpu_init (void)
 {
 #ifdef CONFIG_SMP
 	int cpu = stack_smp_processor_id();

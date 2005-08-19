@@ -156,6 +156,11 @@ void irq_ctx_init(int cpu)
 		cpu,hardirq_ctx[cpu],softirq_ctx[cpu]);
 }
 
+void irq_ctx_exit(int cpu)
+{
+	hardirq_ctx[cpu] = NULL;
+}
+
 extern asmlinkage void __do_softirq(void);
 
 asmlinkage void do_softirq(void)
@@ -259,6 +264,7 @@ skip:
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
+#include <mach_apic.h>
 
 void fixup_irqs(cpumask_t map)
 {

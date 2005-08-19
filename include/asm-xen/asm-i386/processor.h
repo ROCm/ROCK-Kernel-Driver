@@ -29,7 +29,7 @@ struct desc_struct {
 };
 
 #define desc_empty(desc) \
-		(!((desc)->a | (desc)->b))
+		(!((desc)->a + (desc)->b))
 
 #define desc_equal(desc1, desc2) \
 		(((desc1)->a == (desc2)->a) && ((desc1)->b == (desc2)->b))
@@ -514,11 +514,12 @@ static inline void load_esp0(struct tss_struct *tss, struct thread_struct *threa
 } while (0)
 
 /*
- * This special macro can be used to load a debugging register
+ * These special macros can be used to get or set a debugging register
  */
-#define loaddebug(thread,register) \
-	HYPERVISOR_set_debugreg((register),     \
-			((thread)->debugreg[register]))
+#define get_debugreg(var, register)			\
+	var = HYPERVISOR_get_debugreg(register)
+#define set_debugreg(value, register)			\
+	HYPERVISOR_set_debugreg(register, value)
 
 /* Forward declaration, a strange C thing */
 struct task_struct;
@@ -699,5 +700,18 @@ extern void select_idle_routine(const struct cpuinfo_x86 *c);
 #define cache_line_size() (boot_cpu_data.x86_cache_alignment)
 
 extern unsigned long boot_option_idle_override;
+extern void enable_sep_cpu(void);
+extern int sysenter_setup(void);
+
+#ifdef CONFIG_MTRR
+/* For the xen port stubbed out these functions. KYS */
+//extern void mtrr_ap_init(void);
+//extern void mtrr_bp_init(void);
+#define mtrr_ap_init() do {} while (0)
+#define mtrr_bp_init() do {} while (0)
+#else
+#define mtrr_ap_init() do {} while (0)
+#define mtrr_bp_init() do {} while (0)
+#endif
 
 #endif /* __ASM_I386_PROCESSOR_H */

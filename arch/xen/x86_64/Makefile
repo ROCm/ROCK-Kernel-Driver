@@ -38,7 +38,7 @@ export IA32_CC IA32_LD IA32_AS IA32_OBJCOPY IA32_CPP
 
 
 LDFLAGS		:= -m elf_x86_64
-#LDFLAGS_vmlinux := -e stext
+LDFLAGS_vmlinux :=
 
 CHECKFLAGS      += -D__x86_64__ -m64
 
@@ -66,7 +66,9 @@ CFLAGS += $(call cc-option,-funit-at-a-time,)
 head-y := arch/xen/x86_64/kernel/head.o arch/xen/x86_64/kernel/head64.o arch/xen/x86_64/kernel/init_task.o
 
 libs-y 					+= arch/x86_64/lib/
-core-y					+= arch/xen/x86_64/kernel/ arch/xen/x86_64/mm/
+core-y					+= arch/xen/x86_64/kernel/ \
+					arch/xen/x86_64/mm/ \
+					arch/x86_64/crypto/
 core-$(CONFIG_IA32_EMULATION)		+= arch/xen/x86_64/ia32/
 drivers-$(CONFIG_PCI)			+= arch/xen/x86_64/pci/
 drivers-$(CONFIG_OPROFILE)		+= arch/x86_64/oprofile/

@@ -109,7 +109,7 @@ void __init x86_64_start_kernel(char * real_mode_data)
 		setup_early_printk(s);
 #endif
 
-#ifdef CONFIG_DISCONTIGMEM
+#ifdef CONFIG_NUMA
 	s = strstr(saved_command_line, "numa=");
 	if (s != NULL)
 		numa_setup(s+5);

@@ -34,6 +34,7 @@ obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o
 c-obj-$(CONFIG_X86_LOCAL_APIC)	+= nmi.o
 obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o
 c-obj-$(CONFIG_X86_REBOOTFIXUPS)+= reboot_fixups.o
+c-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o crash.o
 c-obj-$(CONFIG_X86_NUMAQ)	+= numaq.o
 c-obj-$(CONFIG_X86_SUMMIT_NUMA)	+= summit.o
 c-obj-$(CONFIG_MODULES)		+= module.o
