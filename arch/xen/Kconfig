@@ -193,11 +193,17 @@ source "fs/Kconfig.binfmt"
 
 endmenu
 
+source "net/Kconfig"
+
 source "arch/xen/Kconfig.drivers"
 
 if XEN_PRIVILEGED_GUEST
 menu "Power management options"
+
+source "kernel/power/Kconfig"
+
 source "drivers/acpi/Kconfig"
+
 endmenu
 endif
 

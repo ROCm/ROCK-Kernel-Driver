@@ -85,7 +85,7 @@ static void fix_processor_context(void)
 
 	set_tss_desc(cpu,t);	/* This just modifies memory; should not be necessary. But... This is necessary, because 386 hardware has concept of busy TSS or some similar stupidity. */
  #ifndef CONFIG_XEN
- 	/* set_tss_desc already clears the busy bit on xen*/
+ 	/* set_tss_desc already clears the busy bit on xen */
         per_cpu(cpu_gdt_table, cpu)[GDT_ENTRY_TSS].b &= 0xfffffdff;
  #endif
 

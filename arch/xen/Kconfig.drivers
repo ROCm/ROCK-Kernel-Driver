@@ -28,11 +28,6 @@ if XEN_PHYSDEV_ACCESS
 source "drivers/message/fusion/Kconfig"
 source "drivers/ieee1394/Kconfig"
 source "drivers/message/i2o/Kconfig"
-endif
-
-source "net/Kconfig"
-
-if XEN_PHYSDEV_ACCESS
 source "drivers/net/Kconfig"
 source "drivers/isdn/Kconfig"
 source "drivers/telephony/Kconfig"

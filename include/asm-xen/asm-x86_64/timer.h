@@ -22,7 +22,6 @@ struct timer_opts {
 	unsigned long (*get_offset)(void);
 	unsigned long long (*monotonic_clock)(void);
 	void (*delay)(unsigned long);
-	unsigned long (*read_timer)(void);
 };
 
 struct init_timer_opts {

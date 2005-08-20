@@ -104,14 +104,6 @@ cpumask_t cpu_sibling_map[NR_CPUS] __cacheline_aligned;
 cpumask_t cpu_core_map[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(cpu_core_map);
 
-#ifndef CONFIG_XEN
-/*
- * Trampoline 80x86 program as an array.
- */
-
-extern unsigned char trampoline_data[];
-extern unsigned char trampoline_end[];
-
 /* State of each CPU */
 DEFINE_PER_CPU(int, cpu_state) = { 0 };
 
@@ -124,6 +116,14 @@ struct task_struct *idle_thread_array[NR_CPUS] __cpuinitdata ;
 
 #define get_idle_for_cpu(x)     (idle_thread_array[(x)])
 #define set_idle_for_cpu(x,p)   (idle_thread_array[(x)] = (p))
+
+#ifndef CONFIG_XEN
+/*
+ * Trampoline 80x86 program as an array.
+ */
+
+extern unsigned char trampoline_data[];
+extern unsigned char trampoline_end[];
 
 /*
  * Currently trivial. Write the real->protected mode

@@ -166,9 +166,12 @@ unsigned long read_timer_tsc(void)
 struct timer_opts timer_tsc = {
 	.name = "tsc",
 	.delay = delay_tsc,
+#if !defined(__x86_64__)
 	.read_timer = read_timer_tsc,
+#endif
 };
 
+#if !defined(__x86_64__)
 int read_current_timer(unsigned long *timer_val)
 {
 	if (cur_timer->read_timer) {
@@ -177,6 +180,7 @@ int read_current_timer(unsigned long *timer_val)
 	}
 	return -1;
 }
+#endif
 
 /*
  * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,

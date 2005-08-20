@@ -9,7 +9,7 @@
 #include "mtrr.h"
 
 void generic_get_mtrr(unsigned int reg, unsigned long *base,
-		      unsigned long *size, mtrr_type * type)
+		      unsigned int *size, mtrr_type * type)
 {
 	dom0_op_t op;
 
@@ -103,7 +103,8 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 {
 	int i, max;
 	mtrr_type ltype;
-	unsigned long lbase, lsize;
+	unsigned long lbase;
+	unsigned int lsize;
 	int error = -EINVAL;
 	dom0_op_t op;
 
