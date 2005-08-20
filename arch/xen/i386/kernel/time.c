@@ -72,8 +72,6 @@
 
 #include <asm-xen/evtchn.h>
 
-#include <asm/i8259.h>
-
 int pit_latch_buggy;              /* extern */
 
 u64 jiffies_64 = INITIAL_JIFFIES;
@@ -96,8 +94,6 @@ extern unsigned long wall_jiffies;
 
 DEFINE_SPINLOCK(rtc_lock);
 EXPORT_SYMBOL(rtc_lock);
-
-#include <asm/i8253.h>
 
 DEFINE_SPINLOCK(i8253_lock);
 EXPORT_SYMBOL(i8253_lock);

@@ -233,8 +233,6 @@ config SCHED_SMT
 	  cost of slightly increased overhead in some places. If unsure say
 	  N here.
 
-#source "kernel/Kconfig.preempt"
-
 config K8_NUMA
        bool "K8 NUMA support"
        select NUMA
@@ -412,8 +410,6 @@ config SECCOMP
 
 	  If unsure, say Y. Only embedded should say N here.
 
-
-#source kernel/Kconfig.hz
 
 endmenu
 

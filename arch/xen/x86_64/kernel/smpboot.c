@@ -858,7 +858,7 @@ do_rest:
 	ctxt.user_regs.ss = __KERNEL_DS|0x3;
 	ctxt.user_regs.cs = __KERNEL_CS|0x3;
 	ctxt.user_regs.rip = start_rip;
-	ctxt.user_regs.rsp = idle->thread.rsp;
+	ctxt.user_regs.rsp = c_idle.idle->thread.rsp;
 #define X86_EFLAGS_IOPL_RING3 0x3000
 	ctxt.user_regs.eflags = X86_EFLAGS_IF | X86_EFLAGS_IOPL_RING3;
 
@@ -891,7 +891,7 @@ do_rest:
 
 	/* Ring 1 stack is the initial stack. */
 	ctxt.kernel_ss = __KERNEL_DS;
-	ctxt.kernel_sp = idle->thread.rsp;
+	ctxt.kernel_sp = c_idle.idle->thread.rsp;
 
 	/* Callback handlers. */
 	ctxt.event_callback_eip    = (unsigned long)hypervisor_callback;
