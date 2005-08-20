@@ -26,7 +26,7 @@
  * the same here.
  */
 int dma_map_sg(struct device *hwdev, struct scatterlist *sg,
-	       int nents, int direction)
+	       int nents, enum dma_data_direction direction)
 {
 	int i;
 
@@ -47,7 +47,7 @@ EXPORT_SYMBOL(dma_map_sg);
  * pci_unmap_single() above.
  */
 void dma_unmap_sg(struct device *dev, struct scatterlist *sg,
-		  int nents, int dir)
+		  int nents, enum dma_data_direction dir)
 {
 	int i;
 	for (i = 0; i < nents; i++) { 
@@ -101,7 +101,7 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 	if (ret == NULL)
 		return ret;
 
-	xen_contig_memory(vstart, order);
+	//xen_contig_memory(vstart, order);
 
 	memset(ret, 0, size);
 	*dma_handle = virt_to_bus(ret);
