@@ -895,6 +895,10 @@ pcibios_fixup_OF_interrupts(void)
 void __init
 pmac_pcibios_fixup(void)
 {
+#ifdef CONFIG_ISAPNP
+	extern int isapnp_disable;
+	isapnp_disable = 1;
+#endif
 	/* Fixup interrupts according to OF tree */
 	pcibios_fixup_OF_interrupts();
 
