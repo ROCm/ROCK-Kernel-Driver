@@ -548,6 +548,16 @@ void __cpuinit start_secondary(void)
 	 */
 	set_cpu_sibling_map(smp_processor_id());
 
+#ifndef CONFIG_XEN
+	/* 
+  	 * Wait for TSC sync to not schedule things before.
+	 * We still process interrupts, which could see an inconsistent
+	 * time in that window unfortunately. 
+	 * Do this here because TSC sync has global unprotected state.
+ 	 */
+	tsc_sync_wait();
+#endif
+
 	/*
 	 * We need to hold call_lock, so there is no inconsistency
 	 * between the time smp_call_function() determines number of
@@ -564,15 +574,6 @@ void __cpuinit start_secondary(void)
 	cpu_set(smp_processor_id(), cpu_online_map);
 	per_cpu(cpu_state, smp_processor_id()) = CPU_ONLINE;
 	unlock_ipi_call_lock();
-
-	mb();
-
-#ifndef CONFIG_XEN
-	/* Wait for TSC sync to not schedule things before.
-	   We still process interrupts, which could see an inconsistent
-	   time in that window unfortunately. */
-	tsc_sync_wait();
-#endif
 
 	cpu_idle();
 }
@@ -883,7 +884,7 @@ do_rest:
 		for (va = cpu_gdt_descr[cpu].address, f = 0;
 		     va < cpu_gdt_descr[cpu].address + cpu_gdt_descr[cpu].size;
 		     va += PAGE_SIZE, f++) {
-			ctxt.gdt_frames[f] = virt_to_machine(va) >> PAGE_SHIFT;
+			ctxt.gdt_frames[f] = virt_to_mfn(va);
 			make_page_readonly((void *)va);
 		}
 		ctxt.gdt_ents = GDT_ENTRIES;
@@ -898,7 +899,7 @@ do_rest:
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
 	ctxt.syscall_callback_eip  = (unsigned long)system_call;
 
-	ctxt.ctrlreg[3] = (unsigned long)virt_to_machine(init_level4_pgt);
+	ctxt.ctrlreg[3] = virt_to_mfn(init_level4_pgt) << PAGE_SHIFT;
 
 	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
 
@@ -1453,4 +1454,10 @@ void smp_resume(void)
 	smp_intr_init();
 	local_setup_timer_irq();
 }
+
+void _restore_vcpu(void)
+{
+	/* XXX need to write this */
+}
+
 #endif

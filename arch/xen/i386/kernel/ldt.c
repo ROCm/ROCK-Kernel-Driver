@@ -202,7 +202,7 @@ static int read_default_ldt(void __user * ptr, unsigned long bytecount)
 static int write_ldt(struct mm_struct * mm, void __user * ptr, unsigned long bytecount, int oldmode)
 {
 	__u32 entry_1, entry_2, *lp;
-	unsigned long mach_lp;
+	maddr_t mach_lp;
 	int error;
 	struct user_desc ldt_info;
 
@@ -249,7 +249,8 @@ static int write_ldt(struct mm_struct * mm, void __user * ptr, unsigned long byt
 
 	/* Install the new entry ...  */
 install:
-	error = HYPERVISOR_update_descriptor(mach_lp, entry_1, entry_2);
+	error = HYPERVISOR_update_descriptor(
+		mach_lp, (u64)entry_1 | ((u64)entry_2<<32));
 
 out_unlock:
 	up(&mm->context.sem);

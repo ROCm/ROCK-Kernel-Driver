@@ -446,22 +446,28 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 }
 
 #ifndef CONFIG_NUMA
-static void __init
-contig_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
+#ifdef CONFIG_XEN
+static void __init contig_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
+{
+        unsigned long bootmap_size = init_bootmem(start_pfn, end_pfn);
+        free_bootmem(0, end_pfn << PAGE_SHIFT);   
+        /* XXX KAF: Why can't we leave low 1MB of memory free? */
+        reserve_bootmem(0, (PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1));
+}
+#else
+static void __init contig_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 {
         unsigned long bootmap_size, bootmap; 
-
 	memory_present(0, start_pfn, end_pfn);
-
         bootmap_size = bootmem_bootmap_pages(end_pfn)<<PAGE_SHIFT;
-        bootmap = start_pfn;
-        bootmap_size = init_bootmem(bootmap, end_pfn);
+        bootmap = find_e820_area(0, end_pfn<<PAGE_SHIFT, bootmap_size);
+        if (bootmap == -1L) 
+                panic("Cannot find bootmem map of size %ld\n",bootmap_size);
+        bootmap_size = init_bootmem(bootmap >> PAGE_SHIFT, end_pfn);
+        e820_bootmem_free(&contig_page_data, 0, end_pfn << PAGE_SHIFT); 
         reserve_bootmem(bootmap, bootmap_size);
-        
-        free_bootmem(start_pfn << PAGE_SHIFT, (end_pfn - start_pfn) << PAGE_SHIFT);   
-        reserve_bootmem(0, (PFN_PHYS(start_pfn) +
-                            bootmap_size + PAGE_SIZE-1));
-}
+} 
+#endif	/* !CONFIG_XEN */
 #endif
 
 /* Use inline assembly to define this because the nops are defined 
@@ -823,7 +829,7 @@ void __init setup_arch(char **cmdline_p)
 		for ( i=0, j=0; i < end_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
 		{	
 			pfn_to_mfn_frame_list[j] = 
-				virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
+				virt_to_mfn(&phys_to_machine_mapping[i]);
 		}
 
 	}

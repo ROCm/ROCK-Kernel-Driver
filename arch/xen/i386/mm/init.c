@@ -41,6 +41,8 @@
 #include <asm/sections.h>
 #include <asm-xen/hypervisor.h>
 
+extern unsigned long *contiguous_bitmap;
+
 #if defined(CONFIG_SWIOTLB)
 extern void swiotlb_init(void);
 int swiotlb;
@@ -340,18 +342,15 @@ extern void __init remap_numa_kva(void);
 #define remap_numa_kva() do {} while (0)
 #endif
 
+pgd_t *swapper_pg_dir;
+
 static void __init pagetable_init (void)
 {
 	unsigned long vaddr;
-	pgd_t *pgd_base = swapper_pg_dir;
-	pgd_t *old_pgd = (pgd_t *)xen_start_info.pt_base;
+	pgd_t *pgd_base = (pgd_t *)xen_start_info.pt_base;
 
-#ifdef CONFIG_X86_PAE
-	int i;
-	/* Init entries of the first-level page table to the zero page */
-	for (i = 0; i < PTRS_PER_PGD; i++)
-		set_pgd(pgd_base + i, __pgd(__pa(empty_zero_page) | _PAGE_PRESENT));
-#endif
+	swapper_pg_dir = pgd_base;
+	init_mm.pgd    = pgd_base;
 
 	/* Enable PSE if available */
 	if (cpu_has_pse) {
@@ -365,44 +364,6 @@ static void __init pagetable_init (void)
 		__PAGE_KERNEL_EXEC |= _PAGE_GLOBAL;
 	}
 
-	/*
-	 * Switch to proper mm_init page directory. Initialise from the current
-	 * page directory, write-protect the new page directory, then switch to
-	 * it. We clean up by write-enabling and then freeing the old page dir.
-	 */
-#ifndef CONFIG_X86_PAE
-	memcpy(pgd_base, old_pgd, PTRS_PER_PGD_NO_HV*sizeof(pgd_t));
-	make_page_readonly(pgd_base);
-	xen_pgd_pin(__pa(pgd_base));
-	load_cr3(pgd_base);
-	xen_pgd_unpin(__pa(old_pgd));
-	make_page_writable(old_pgd);
-	__flush_tlb_all();
-	free_bootmem(__pa(old_pgd), PAGE_SIZE);
-#else
-	{
-		pud_t *old_pud = pud_offset(old_pgd+3, PAGE_OFFSET);
-		pmd_t *old_pmd = pmd_offset(old_pud, PAGE_OFFSET);
-		pmd_t *new_pmd = alloc_bootmem_low_pages(PAGE_SIZE);
-
-		memcpy(new_pmd,  old_pmd, PAGE_SIZE);
-		memcpy(pgd_base, old_pgd, PTRS_PER_PGD_NO_HV*sizeof(pgd_t));
-		set_pgd(&pgd_base[3], __pgd(__pa(new_pmd) | _PAGE_PRESENT));
-
-		make_page_readonly(new_pmd);
-		make_page_readonly(pgd_base);
-		xen_pgd_pin(__pa(pgd_base));
-		load_cr3(pgd_base);
-		xen_pgd_unpin(__pa(old_pgd));
-		make_page_writable(old_pgd);
-		make_page_writable(old_pmd);
-		__flush_tlb_all();
-
-		free_bootmem(__pa(old_pgd), PAGE_SIZE);
-		free_bootmem(__pa(old_pmd), PAGE_SIZE);
-	}
-#endif
-
 	init_mm.context.pinned = 1;
 	kernel_physical_mapping_init(pgd_base);
 	remap_numa_kva();
@@ -415,17 +376,6 @@ static void __init pagetable_init (void)
 	page_table_range_init(vaddr, 0, pgd_base);
 
 	permanent_kmaps_init(pgd_base);
-
-#if 0 /* def CONFIG_X86_PAE */
-	/*
-	 * Add low memory identity-mappings - SMP needs it when
-	 * starting up on an AP from real-mode. In the non-PAE
-	 * case we already have these mappings through head.S.
-	 * All user-space mappings are explicitly cleared after
-	 * SMP startup.
-	 */
-	set_pgd(&pgd_base[0], pgd_base[USER_PTRS_PER_PGD]);
-#endif
 }
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
@@ -636,6 +586,11 @@ void __init mem_init(void)
 	int tmp;
 	int bad_ppro;
 	unsigned long pfn;
+
+	contiguous_bitmap = alloc_bootmem_low_pages(
+		(max_low_pfn + 2*BITS_PER_LONG) >> 3);
+	BUG_ON(!contiguous_bitmap);
+	memset(contiguous_bitmap, 0, (max_low_pfn + 2*BITS_PER_LONG) >> 3);
 
 #if defined(CONFIG_SWIOTLB)
 	swiotlb_init();	

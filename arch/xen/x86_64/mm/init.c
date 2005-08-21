@@ -40,6 +40,12 @@
 #include <asm/proto.h>
 #include <asm/smp.h>
 
+extern unsigned long *contiguous_bitmap;
+
+#if defined(CONFIG_SWIOTLB)
+extern void swiotlb_init(void);
+#endif
+
 #ifndef Dprintk
 #define Dprintk(x...)
 #endif
@@ -736,7 +742,7 @@ void __init paging_init(void)
 				set_fixmap(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 			else
 				__set_fixmap(FIX_ISAMAP_BEGIN - i,
-					     virt_to_machine(empty_zero_page),
+					     virt_to_mfn(empty_zero_page) << PAGE_SHIFT,
 					     PAGE_KERNEL_RO);
 	}
 #endif
@@ -794,8 +800,12 @@ void __init mem_init(void)
 	int codesize, reservedpages, datasize, initsize;
 	int tmp;
 
+	contiguous_bitmap = alloc_bootmem_low_pages(
+		(end_pfn + 2*BITS_PER_LONG) >> 3);
+	BUG_ON(!contiguous_bitmap);
+	memset(contiguous_bitmap, 0, (end_pfn + 2*BITS_PER_LONG) >> 3);
+
 #if defined(CONFIG_SWIOTLB)
-	extern void swiotlb_init(void);
 	swiotlb_init();	
 #endif
 
