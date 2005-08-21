@@ -58,7 +58,7 @@ SECTIONS
 #define BINALIGN(x,y) (((x) + (y) - 1)  & ~((y) - 1))
 #define CACHE_ALIGN(x) BINALIGN(x, CONFIG_X86_L1_CACHE_BYTES)
 
-  .vsyscall_0 -10*1024*1024: AT ((LOADADDR(.data.cacheline_aligned) + SIZEOF(.data.cacheline_aligned) + 4095) & ~(4095)) { *(.vsyscall_0) }
+  .vsyscall_0 -10*1024*1024: AT ((LOADADDR(.data.read_mostly) + SIZEOF(.data.read_mostly) + 4095) & ~(4095)) { *(.vsyscall_0) }
   __vsyscall_0 = LOADADDR(.vsyscall_0);
   . = ALIGN(CONFIG_X86_L1_CACHE_BYTES);
   .xtime_lock : AT CACHE_ALIGN(AFTER(.vsyscall_0)) { *(.xtime_lock) }
