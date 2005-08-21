@@ -495,8 +495,16 @@ static int __init set_preferred_console(void)
 	char *name;
 	int offset = 0;
 
+	/*
+	 * this happens if booted with BootX
+	 * do not run serial8250_console_init
+	 */
 	if (of_stdout_device == NULL)
+	{
+		if (_MACH_Pmac == _machine)
+			do_not_try_pc_legacy_8250_console = 1;
 		return -ENODEV;
+	}
 
 	/* The user has requested a console so this is already set up. */
 	if (strstr(saved_command_line, "console="))
