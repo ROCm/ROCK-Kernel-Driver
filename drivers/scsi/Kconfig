@@ -252,6 +252,24 @@ config ISCSI_TCP
 
 	 http://linux-iscsi.sf.net
 
+config ISCSI_TARGET
+	tristate "iSCSI Target over TCP/IP"
+	depends on SCSI && INET
+	help
+	 The iSCSI Enterprise Target is an open source iSCSI target
+	 with professional features. It is aimed at working well in
+	 enterprise environment under real workload, and is scalable
+	 and versatile enough to meet the challenge of future storage
+	 needs and developements.
+
+	 To compile this driver as a module, choose M here: the
+	 module will be called iscsi_trgt.
+
+	 The userspace component needed to initialize the driver, documentation,
+	 and sample configuration files can be found here:
+
+	 http://iscsitarget.sf.net
+
 endmenu
 
 menu "SCSI low-level drivers"
