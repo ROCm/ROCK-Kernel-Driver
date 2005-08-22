@@ -1025,7 +1025,8 @@ static int __devinit do_boot_cpu(int apicid, int cpu)
 	ctxt.ctrlreg[3] = virt_to_mfn(swapper_pg_dir) << PAGE_SHIFT;
 
 	boot_error = HYPERVISOR_boot_vcpu(cpu, &ctxt);
-	printk("boot error: %ld\n", boot_error);
+	if (boot_error)
+		printk("boot error: %ld\n", boot_error);
 
 	if (!boot_error) {
 		/*
