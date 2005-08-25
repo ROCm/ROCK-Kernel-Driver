@@ -102,12 +102,12 @@ dump_packet(int tag, void *addr, u32 ap)
 #endif
 
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-static grant_ref_t gref_tx_head, gref_tx_terminal;
+static grant_ref_t gref_tx_head;
 static grant_ref_t grant_tx_ref[NETIF_TX_RING_SIZE + 1];
 #endif
 
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-static grant_ref_t gref_rx_head, gref_rx_terminal;
+static grant_ref_t gref_rx_head;
 static grant_ref_t grant_rx_ref[NETIF_RX_RING_SIZE + 1];
 #endif
 
@@ -441,8 +441,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         
         np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.id = id;
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-        if (unlikely((ref = gnttab_claim_grant_reference(&gref_rx_head, 
-                                                gref_rx_terminal)) < 0)) {
+	ref = gnttab_claim_grant_reference(&gref_rx_head);
+        if (unlikely(ref < 0)) {
             printk(KERN_ALERT "#### netfront can't claim rx reference\n");
             BUG();
         }
@@ -537,8 +537,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
     tx->id   = id;
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    if (unlikely((ref = gnttab_claim_grant_reference(&gref_tx_head, 
-                                                     gref_tx_terminal)) < 0)) {
+    ref = gnttab_claim_grant_reference(&gref_tx_head);
+    if (unlikely(ref < 0)) {
         printk(KERN_ALERT "#### netfront can't claim tx grant reference\n");
         BUG();
     }
@@ -919,6 +919,7 @@ static void vif_show(struct net_private *np)
 /* Send a connect message to xend to tell it to bring up the interface. */
 static void send_interface_connect(struct net_private *np)
 {
+    int err;
     ctrl_msg_t cmsg = {
         .type    = CMSG_NETIF_FE,
         .subtype = CMSG_NETIF_FE_INTERFACE_CONNECT,
@@ -929,26 +930,22 @@ static void send_interface_connect(struct net_private *np)
     msg->handle = np->handle;
     msg->tx_shmem_frame = virt_to_mfn(np->tx);
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    msg->tx_shmem_ref   = (u32)gnttab_claim_grant_reference(&gref_tx_head, 
-                                                            gref_tx_terminal);
-    if(msg->tx_shmem_ref < 0) { 
-        printk(KERN_ALERT "#### netfront can't claim tx_shmem reference\n");
+    err = gnttab_grant_foreign_access(rdomid, msg->tx_shmem_frame, 0);
+    if (err < 0) {
+        printk(KERN_ALERT "#### netfront can't grant access to tx_shmem\n");
         BUG();
     }
-    gnttab_grant_foreign_access_ref (msg->tx_shmem_ref, rdomid, 
-                                     msg->tx_shmem_frame, 0);
+    msg->tx_shmem_ref = err;
 #endif
 
     msg->rx_shmem_frame = virt_to_mfn(np->rx);
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    msg->rx_shmem_ref   = (u32)gnttab_claim_grant_reference(&gref_rx_head, 
-                                                            gref_rx_terminal);
-    if(msg->rx_shmem_ref < 0) {
-        printk(KERN_ALERT "#### netfront can't claim rx_shmem reference\n");
+    err = gnttab_grant_foreign_access(rdomid, msg->rx_shmem_frame, 0);
+    if (err < 0) {
+        printk(KERN_ALERT "#### netfront can't grant access to rx_shmem\n");
         BUG();
     }
-    gnttab_grant_foreign_access_ref (msg->rx_shmem_ref, rdomid, 
-                                     msg->rx_shmem_frame, 0);
+    msg->rx_shmem_ref = err;
 #endif
 
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
@@ -1418,18 +1415,18 @@ static int __init netif_init(void)
     if (xen_start_info.flags & SIF_INITDOMAIN)
         return 0;
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    /* A grant for every ring slot, plus one for the ring itself */
-    if (gnttab_alloc_grant_references(NETIF_TX_RING_SIZE + 1,
-                                      &gref_tx_head, &gref_tx_terminal) < 0) {
+    /* A grant for every ring slot */
+    if (gnttab_alloc_grant_references(NETIF_TX_RING_SIZE,
+                                      &gref_tx_head) < 0) {
         printk(KERN_ALERT "#### netfront can't alloc tx grant refs\n");
         return 1;
     }
     printk(KERN_ALERT "Netdev frontend (TX) is using grant tables.\n"); 
 #endif
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    /* A grant for every ring slot, plus one for the ring itself */
-    if (gnttab_alloc_grant_references(NETIF_RX_RING_SIZE + 1,
-                                      &gref_rx_head, &gref_rx_terminal) < 0) {
+    /* A grant for every ring slot */
+    if (gnttab_alloc_grant_references(NETIF_RX_RING_SIZE,
+                                      &gref_rx_head) < 0) {
         printk(KERN_ALERT "#### netfront can't alloc rx grant refs\n");
         return 1;
     }
@@ -1457,10 +1454,10 @@ static int __init netif_init(void)
 static void netif_exit(void)
 {
 #ifdef CONFIG_XEN_NETDEV_GRANT_TX
-    gnttab_free_grant_references(NETIF_TX_RING_SIZE + 1, gref_tx_head);
+    gnttab_free_grant_references(gref_tx_head);
 #endif
 #ifdef CONFIG_XEN_NETDEV_GRANT_RX
-    gnttab_free_grant_references(NETIF_RX_RING_SIZE + 1, gref_rx_head);
+    gnttab_free_grant_references(gref_rx_head);
 #endif
 }
 

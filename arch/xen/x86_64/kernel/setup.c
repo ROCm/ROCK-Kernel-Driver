@@ -451,13 +451,14 @@ static void __init contig_initmem_init(unsigned long start_pfn, unsigned long en
 {
         unsigned long bootmap_size = init_bootmem(start_pfn, end_pfn);
         free_bootmem(0, end_pfn << PAGE_SHIFT);   
-        /* XXX KAF: Why can't we leave low 1MB of memory free? */
-        reserve_bootmem(0, (PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1));
+        reserve_bootmem(HIGH_MEMORY,
+                        (PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1)
+                        - HIGH_MEMORY);
 }
 #else
 static void __init contig_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 {
-        unsigned long bootmap_size, bootmap; 
+        unsigned long bootmap_size, bootmap;
 	memory_present(0, start_pfn, end_pfn);
         bootmap_size = bootmem_bootmap_pages(end_pfn)<<PAGE_SHIFT;
         bootmap = find_e820_area(0, end_pfn<<PAGE_SHIFT, bootmap_size);
@@ -812,21 +813,21 @@ void __init setup_arch(char **cmdline_p)
 		/* Make sure we have a large enough P->M table. */
 		if (end_pfn > xen_start_info.nr_pages) {
 			phys_to_machine_mapping = alloc_bootmem(
-				max_pfn * sizeof(unsigned long));
+				max_pfn * sizeof(u32));
 			memset(phys_to_machine_mapping, ~0,
-			       max_pfn * sizeof(unsigned long));
+			       max_pfn * sizeof(u32));
 			memcpy(phys_to_machine_mapping,
-			       (unsigned long *)xen_start_info.mfn_list,
-			       xen_start_info.nr_pages * sizeof(unsigned long));
+			       (u32 *)xen_start_info.mfn_list,
+			       xen_start_info.nr_pages * sizeof(u32));
 			free_bootmem(
 				__pa(xen_start_info.mfn_list), 
 				PFN_PHYS(PFN_UP(xen_start_info.nr_pages *
-						sizeof(unsigned long))));
+						sizeof(u32))));
 		}
 
 		pfn_to_mfn_frame_list = alloc_bootmem(PAGE_SIZE);
 
-		for ( i=0, j=0; i < end_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
+		for ( i=0, j=0; i < end_pfn; i+=(PAGE_SIZE/sizeof(u32)), j++ )
 		{	
 			pfn_to_mfn_frame_list[j] = 
 				virt_to_mfn(&phys_to_machine_mapping[i]);
