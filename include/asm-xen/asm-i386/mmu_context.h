@@ -19,8 +19,8 @@ void destroy_context(struct mm_struct *mm);
 /* LDT initialization for a clean environment - needed for SKAS.*/
 static inline void init_new_empty_context(struct mm_struct *mm)
 {
+	memset(&mm->context, 0, sizeof(mm->context));
 	init_MUTEX(&mm->context.sem);
-	mm->context.size = 0;
 }
 
 /* LDT copy for SKAS - for the above problem.*/

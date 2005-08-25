@@ -102,24 +102,26 @@ int copy_context(struct mm_struct *mm, struct mm_struct *old_mm)
 {
 	int retval = 0;
 
-	//memset(&mm->context, 0, sizeof(mm->context));
 	if (old_mm && old_mm->context.size > 0) {
 		down(&old_mm->context.sem);
 		retval = copy_ldt(mm, old_mm);
 		up(&old_mm->context.sem);
-	}
-	if (retval == 0) {
-		spin_lock(&mm_unpinned_lock);
-		list_add(&mm->context.unpinned, &mm_unpinned);
-		spin_unlock(&mm_unpinned_lock);
 	}
 	return retval;
 }
 
 int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 {
+	int retval;
+
 	init_new_empty_context(mm);
-	return copy_context(mm, current->mm);
+	retval = copy_context(mm, current->mm);
+	if (retval == 0) {
+		spin_lock(&mm_unpinned_lock);
+		list_add(&mm->context.unpinned, &mm_unpinned);
+		spin_unlock(&mm_unpinned_lock);
+	}
+	return retval;
 }
 
 /*

@@ -959,7 +959,7 @@ config PROC_MM
 	bool "/proc/mm support"
 	default y
 	help
-	  /proc/mm is used by User-Mode Linux and allows for better address 
+	  /proc/mm is used by User-Mode Linux and allows for better address
 	  space protection and speeds UML up.
 
 config PHYSICAL_START
