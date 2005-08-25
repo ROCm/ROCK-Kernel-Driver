@@ -97,8 +97,7 @@ void *kmap_atomic_pfn(unsigned long pfn, enum km_type type)
 
 	idx = type + KM_TYPE_NR*smp_processor_id();
 	vaddr = __fix_to_virt(FIX_KMAP_BEGIN + idx);
-	set_pte(kmap_pte-idx, pfn_pte(pfn, kmap_prot));
-	__flush_tlb_one(vaddr);
+	set_pte_at_sync(&init_mm, vaddr, kmap_pte-idx, pfn_pte(pfn, kmap_prot));
 
 	return (void*) vaddr;
 }
