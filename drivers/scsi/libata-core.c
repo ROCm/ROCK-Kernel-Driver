@@ -2929,18 +2929,17 @@ static void ata_qc_timeout(struct ata_queued_cmd *qc)
 	if (qc->dev->class == ATA_DEV_ATAPI && qc->scsicmd) {
 		struct scsi_cmnd *cmd = qc->scsicmd;
 
-		if (!(cmd->eh_eflags & SCSI_EH_CANCEL_CMD)) {
+		/* finish completing original command */
+		__ata_qc_complete(qc);
 
-			/* finish completing original command */
-			__ata_qc_complete(qc);
-
+		if (SCSI_SENSE_VALID(cmd)) {
 			atapi_request_sense(ap, dev, cmd);
-
+		
 			cmd->result = (CHECK_CONDITION << 1) | (DID_OK << 16);
-			scsi_finish_command(cmd);
-
-			goto out;
 		}
+		scsi_finish_command(cmd);
+
+		goto out;
 	}
 
 	/* hack alert!  We cannot use the supplied completion
