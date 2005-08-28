@@ -71,8 +71,14 @@ struct SheepVars {
  * MOL:			fake_addr,	MOL_IP
  */
 
+static struct proto sheep_proto = {
+	.name = "SHEEP",
+	.owner = THIS_MODULE,
+	.obj_size = sizeof(struct SheepVars),
+};
+
 #ifdef LINUX_26
-#define compat_sk_alloc(a,b,c)	sk_alloc( (a), (b), NULL, (c))
+#define compat_sk_alloc(a,b,c)	sk_alloc( (a), (b), &sheep_proto, (c))
 #define skt_set_dead(skt)	do {} while(0)
 #define wmem_alloc		sk_wmem_alloc
 #else
