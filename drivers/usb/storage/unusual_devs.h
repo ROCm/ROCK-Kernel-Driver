@@ -164,6 +164,12 @@ UNUSUAL_DEV(  0x04b0, 0x0405, 0x0100, 0x0100,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY),
 
+UNUSUAL_DEV(  0x0409, 0x0040, 0x0150, 0x0150,
+		"NEC",
+		"NEC USB UF000x",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_SINGLE_LUN),
+
 /* BENQ DC5330
  * Reported by Manuel Fombuena <mfombuena@ya.com> and
  * Frank Copeland <fjc@thingy.apana.org.au> */
