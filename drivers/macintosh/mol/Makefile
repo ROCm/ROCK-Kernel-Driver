@@ -18,17 +18,16 @@ MOL_OBJS =	\
 		misc.o \
 		_traps.o \
 		hook.o \
-		_actions.o \
-		_performance.o \
+		_actions.o
 
 
 mol-objs	:= $(MOL_OBJS)
-obj-m		:= mol.o _kuname.o sheep.o
+obj-m		:= mol.o sheep.o
 
 RELBUILD	= $(obj)/relbuild.tmp.pl
 MOL_INCLUDE_DIR = $(srctree)/$(src)/include
 MOL_ASMFLAGS    = $(ASMFLAGS) $(INCLUDES) -D__ASSEMBLY__ -D__KERNEL__
-EXTRA_CFLAGS	= -I$(MOL_INCLUDE_DIR)
+EXTRA_CFLAGS	= -I$(MOL_INCLUDE_DIR) -I$(obj)/include
 
 $(obj)/asm_offsets.c:	$(srctree)/$(src)/asm_offsets.c $(MOL_INCLUDE_DIR)/asm_offsets.h
 	rm -f $@
@@ -36,8 +35,10 @@ $(obj)/asm_offsets.c:	$(srctree)/$(src)/asm_offsets.c $(MOL_INCLUDE_DIR)/asm_off
 
 $(obj)/hook.o:		$(obj)/include/reloc_table.h
 $(obj)/_traps.o:	$(obj)/asm_offsets.h $(srctree)/$(src)/asm-files/traps.S $(srctree)/$(src)/asm-files/*.S
+$(obj)/include: FORCE
+	mkdir -vp $@
 
-$(obj)/include/reloc_table.h: $(obj)/_traps.o
+$(obj)/include/reloc_table.h: $(obj)/_traps.o $(obj)/include
 	$(RM) -fv $@ $@.tmp ; echo "/* WARNING! DO NOT EDIT! AUTOMATICALLY GENERATED! */" > $@.tmp
 	$(RM) -fv $(RELBUILD)
 	echo "#!/usr/bin/perl -w" > $(RELBUILD)
@@ -67,14 +68,4 @@ $(obj)/asm_offsets.h:   $(srctree)/$(src)/asm_offsets.c $(MOL_INCLUDE_DIR)/asm_o
 	echo "/* WARNING! Automatically generated from 'shared/asm_offsets.c' - DO NOT EDIT! */" > $@
 	grep '^#' tmp-offsets.s >> $@
 	$(RM) -fv $(obj)/tmp-offsets.*
-
-$(obj)/_performance.c: $(PERFOBJS)
-	$(RM) -fv $@ $@.tmp; echo "/* WARNING! DO NOT EDIT! AUTOMATICALLY GENERATED! */" > $@.tmp
-	echo "#include \"performance.h\"" >> $@.tmp
-	$(NM) $(PERFOBJS) | awk -- '/gPerf__/ { print "unsigned long "$$2";" }' >> $@.tmp
-	echo "perf_info_t g_perf_info_table[] = {" >> $@.tmp
-	$(NM) $(PERFOBJS) | awk -- '/gPerf__/ { print "  { \""$$2"\",&"$$2"}," }' >> $@.tmp
-	echo "  {0,0} };" >> $@.tmp
-	cat $@.tmp | sed s/_gPerf/gPerf/g > $@
-	$(RM) -fv $@.tmp
 
