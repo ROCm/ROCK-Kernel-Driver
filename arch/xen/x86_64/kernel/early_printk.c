@@ -7,6 +7,8 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 
+#ifndef CONFIG_XEN
+
 /* Simple VGA output */
 
 #ifdef __i386__
@@ -63,7 +65,6 @@ static struct console early_vga_console = {
 	.index =	-1,
 };
 
-#ifndef CONFIG_XEN
 /* Serial functions loosely based on a similar package from Klaus P. Gerlicher */ 
 
 static int early_serial_base = 0x3f8;  /* ttyS0 */
@@ -152,7 +153,8 @@ static __init void early_serial_init(char *s)
 	outb((divisor >> 8) & 0xff, early_serial_base + DLH); 
 	outb(c & ~DLAB, early_serial_base + LCR);
 }
-#else
+
+#else /* CONFIG_XEN */
 
 static void
 early_serial_write(struct console *con, const char *s, unsigned count)
@@ -171,6 +173,13 @@ early_serial_write(struct console *con, const char *s, unsigned count)
 static __init void early_serial_init(char *s)
 {
 }
+
+/*
+ * No early VGA console on Xen, as we do not have convenient ISA-space
+ * mappings. Someone should fix this for domain 0. For now, use fake serial.
+ */
+#define early_vga_console early_serial_console
+
 #endif
 
 static struct console early_serial_console = {
@@ -222,11 +231,16 @@ int __init setup_early_printk(char *opt)
 	} else if (!strncmp(buf, "ttyS", 4)) { 
 		early_serial_init(buf);
 		early_console = &early_serial_console;		
+#ifndef CONFIG_XEN
 	} else if (!strncmp(buf, "vga", 3)
 	           && SCREEN_INFO.orig_video_isVGA == 1) {
 		max_xpos = SCREEN_INFO.orig_video_cols;
 		max_ypos = SCREEN_INFO.orig_video_lines;
 		early_console = &early_vga_console; 
+#else
+	} else if (!strncmp(buf, "vga", 3)) {
+		early_console = &early_vga_console; 
+#endif
 	}
 	early_console_initialized = 1;
 	register_console(early_console);       

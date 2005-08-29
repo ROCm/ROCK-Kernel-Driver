@@ -134,14 +134,6 @@ static int __do_suspend(void *ignore)
     /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
 	/* XXX SMH: yes it would :-( */	
 
-#ifdef CONFIG_XEN_NETDEV_FRONTEND
-    extern void netif_suspend(void);
-    extern void netif_resume(void);  
-#else
-#define netif_suspend() do{}while(0)
-#define netif_resume()  do{}while(0)
-#endif
-
 #ifdef CONFIG_XEN_USB_FRONTEND
     extern void usbif_resume();
 #else
@@ -223,8 +215,6 @@ static int __do_suspend(void *ignore)
     kmem_cache_shrink(pgd_cache);
 #endif
 
-    netif_suspend();
-
     time_suspend();
 
 #ifdef CONFIG_SMP
@@ -281,8 +271,6 @@ static int __do_suspend(void *ignore)
 #endif
 
     time_resume();
-
-    netif_resume();
 
     usbif_resume();
 

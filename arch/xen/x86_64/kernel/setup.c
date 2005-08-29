@@ -447,18 +447,24 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 
 #ifndef CONFIG_NUMA
 #ifdef CONFIG_XEN
-static void __init contig_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
+static void __init
+contig_initmem_init(unsigned long start_pfn_phys, unsigned long end_pfn)
 {
-        unsigned long bootmap_size = init_bootmem(start_pfn, end_pfn);
+        unsigned long bootmap_size;
+
+        memory_present(0, start_pfn_phys, end_pfn);
+        bootmap_size = init_bootmem(start_pfn, end_pfn);
         free_bootmem(0, end_pfn << PAGE_SHIFT);   
         reserve_bootmem(HIGH_MEMORY,
                         (PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1)
                         - HIGH_MEMORY);
 }
 #else
-static void __init contig_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
+static void __init
+contig_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 {
-        unsigned long bootmap_size, bootmap;
+        unsigned long bootmap_size, bootmap; 
+
         memory_present(0, start_pfn, end_pfn);
         bootmap_size = bootmem_bootmap_pages(end_pfn)<<PAGE_SHIFT;
         bootmap = find_e820_area(0, end_pfn<<PAGE_SHIFT, bootmap_size);
@@ -560,48 +566,7 @@ static inline void copy_edd(void)
 }
 #endif
 
-#ifdef CONFIG_XEN
-#define reserve_ebda_region() void(0)
-
-static void __init print_memory_map(char *who)
-{
-        int i;
-
-        for (i = 0; i < e820.nr_map; i++) {
-                early_printk(" %s: %016Lx - %016Lx ", who,
-                        e820.map[i].addr,
-                        e820.map[i].addr + e820.map[i].size);
-                switch (e820.map[i].type) {
-                case E820_RAM:  early_printk("(usable)\n");
-                                break;
-                case E820_RESERVED:
-                                early_printk("(reserved)\n");
-                                break;
-                case E820_ACPI:
-                                early_printk("(ACPI data)\n");
-                                break;
-                case E820_NVS:
-                                early_printk("(ACPI NVS)\n");
-                                break;
-                default:        early_printk("type %u\n", e820.map[i].type);
-                                break;
-                }
-        }
-}
-
-void __init smp_alloc_memory(void)
-{
-	int cpu;
-
-	for (cpu = 1; cpu < NR_CPUS; cpu++) {
-		cpu_gdt_descr[cpu].address = (unsigned long)
-			alloc_bootmem_low_pages(PAGE_SIZE);
-		/* XXX free unused pages later */
-	}
-}
-
-
-#else
+#ifndef CONFIG_XEN
 #define EBDA_ADDR_POINTER 0x40E
 static void __init reserve_ebda_region(void)
 {
@@ -652,7 +617,6 @@ void __init setup_arch(char **cmdline_p)
 			     VMASST_TYPE_writable_pagetables);
 
         ARCH_SETUP
-        print_memory_map(machine_specific_memory_setup());
 #else
  	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
  	drive_info = DRIVE_INFO;
@@ -767,9 +731,6 @@ void __init setup_arch(char **cmdline_p)
 			initrd_start = 0;
 		}
 	}
-#endif
-#ifdef CONFIG_SMP
-	smp_alloc_memory();
 #endif
 #else	/* CONFIG_XEN */
 #ifdef CONFIG_BLK_DEV_INITRD
