@@ -2,22 +2,21 @@
  *
  * Name:	skgesirq.h
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 1.30 $
- * Date:	$Date: 2003/07/04 12:34:13 $
- * Purpose:	SK specific Gigabit Ethernet special IRQ functions
+ * Version:	$Revision: 2.3 $
+ * Date:	$Date: 2004/05/28 14:42:03 $
+ * Purpose:	Gigabit Ethernet special IRQ functions
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
  *	(C)Copyright 1998-2002 SysKonnect.
- *	(C)Copyright 2002-2003 Marvell.
+ *	(C)Copyright 2002-2004 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
  *	the Free Software Foundation; either version 2 of the License, or
  *	(at your option) any later version.
- *
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
@@ -44,10 +43,10 @@
 #define SK_HWEV_SET_SPEED		9	/* Set Link Speed by PNMI */
 #define SK_HWEV_HALFDUP_CHK		10	/* Half Duplex Hangup Workaround */
 
-#define SK_WA_ACT_TIME		(5000000UL)	/* 5 sec */
-#define SK_WA_INA_TIME		(100000UL)	/* 100 msec */
+#define SK_WA_ACT_TIME		1000000UL	/* 1000 msec (1 sec) */
+#define SK_WA_INA_TIME		 100000UL	/*  100 msec */
 
-#define SK_HALFDUP_CHK_TIME	(10000UL)	/* 10 msec */
+#define SK_HALFDUP_CHK_TIME	  10000UL	/*   10 msec */
 
 /*
  * Define the error numbers and messages
@@ -102,10 +101,35 @@
 #define SKERR_SIRQ_E024MSG	"FIFO overflow error"
 #define SKERR_SIRQ_E025		(SKERR_SIRQ_E024+1)
 #define SKERR_SIRQ_E025MSG	"2 Pair Downshift detected"
+#define SKERR_SIRQ_E026		(SKERR_SIRQ_E025+1)
+#define SKERR_SIRQ_E026MSG	"Uncorrectable PCI Express error"
+#define SKERR_SIRQ_E027		(SKERR_SIRQ_E026+1)
+#define SKERR_SIRQ_E027MSG	"PCI express protocol violation error"
+#define SKERR_SIRQ_E028		(SKERR_SIRQ_E027+1)
+#define SKERR_SIRQ_E028MSG	"Parity error on RAM 1 (read)"
+#define SKERR_SIRQ_E029		(SKERR_SIRQ_E028+1)
+#define SKERR_SIRQ_E029MSG	"Parity error on RAM 1 (write)"
+#define SKERR_SIRQ_E030		(SKERR_SIRQ_E029+1)
+#define SKERR_SIRQ_E030MSG	"Parity error on RAM 2 (read)"
+#define SKERR_SIRQ_E031		(SKERR_SIRQ_E030+1)
+#define SKERR_SIRQ_E031MSG	"Parity error on RAM 2 (write)"
+#define SKERR_SIRQ_E032		(SKERR_SIRQ_E031+1)
+#define SKERR_SIRQ_E032MSG	"TCP segmentation error async. queue 1"
+#define SKERR_SIRQ_E033		(SKERR_SIRQ_E032+1)
+#define SKERR_SIRQ_E033MSG	"TCP segmentation error sync. queue 1"
+#define SKERR_SIRQ_E034		(SKERR_SIRQ_E033+1)
+#define SKERR_SIRQ_E034MSG	"TCP segmentation error async. queue 2"
+#define SKERR_SIRQ_E035		(SKERR_SIRQ_E034+1)
+#define SKERR_SIRQ_E035MSG	"TCP segmentation error sync. queue 2"
+#define SKERR_SIRQ_E036		(SKERR_SIRQ_E035+1)
+#define SKERR_SIRQ_E036MSG	"CHECK failure polling unit"
 
 extern void SkGeSirqIsr(SK_AC *pAC, SK_IOC IoC, SK_U32 Istatus);
 extern int  SkGeSirqEvent(SK_AC *pAC, SK_IOC IoC, SK_U32 Event, SK_EVPARA Para);
 extern void SkHWLinkUp(SK_AC *pAC, SK_IOC IoC, int Port);
 extern void SkHWLinkDown(SK_AC *pAC, SK_IOC IoC, int Port);
+extern void SkGeYuSirqIsr(SK_AC *pAC, SK_IOC IoC, SK_U32 Istatus);
+extern void SkYuk2SirqIsr(SK_AC *pAC, SK_IOC IoC, SK_U32 Istatus);
 
 #endif	/* _INC_SKGESIRQ_H_ */
+

@@ -2,8 +2,8 @@
  *
  * Name:	skcsum.h
  * Project:	GEnesis - SysKonnect SK-NET Gigabit Ethernet (SK-98xx)
- * Version:	$Revision: 1.10 $
- * Date:	$Date: 2003/08/20 13:59:57 $
+ * Version:	$Revision: 2.2 $
+ * Date:	$Date: 2003/12/29 15:37:26 $
  * Purpose:	Store/verify Internet checksum in send/receive packets.
  *
  ******************************************************************************/
@@ -157,9 +157,7 @@ typedef struct s_CsProtocolStatistics {
 typedef struct s_Csum {
 	/* Enabled receive SK_PROTO_XXX bit flags. */
 	unsigned ReceiveFlags[SK_MAX_NETS];
-#ifdef TX_CSUM
 	unsigned TransmitFlags[SK_MAX_NETS];
-#endif /* TX_CSUM */
 
 	/* The protocol statistics structure; one per supported protocol. */
 	SKCS_PROTO_STATS ProtoStats[SK_MAX_NETS][SKCS_NUM_PROTOCOLS];

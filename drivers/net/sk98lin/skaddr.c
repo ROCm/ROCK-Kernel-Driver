@@ -2,8 +2,8 @@
  *
  * Name:	skaddr.c
  * Project:	Gigabit Ethernet Adapters, ADDR-Module
- * Version:	$Revision: 1.52 $
- * Date:	$Date: 2003/06/02 13:46:15 $
+ * Version:	$Revision: 2.6 $
+ * Date:	$Date: 2005/05/11 10:05:14 $
  * Purpose:	Manage Addresses (Multicast and Unicast) and Promiscuous Mode.
  *
  ******************************************************************************/
@@ -44,7 +44,7 @@
 
 #if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"@(#) $Id: skaddr.c,v 1.52 2003/06/02 13:46:15 tschilli Exp $ (C) Marvell.";
+	"@(#) $Id: skaddr.c,v 2.6 2005/05/11 10:05:14 tschilli Exp $ (C) Marvell.";
 #endif /* DEBUG ||!LINT || !SK_SLIM */
 
 #define __SKADDR_C
@@ -79,7 +79,7 @@ extern "C" {
 
 /* 64-bit hash values with all bits set. */
 
-static const SK_U16	OnesHash[4] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+SK_U16	OnesHash[4] = {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
 
 /* local variables ************************************************************/
 
@@ -191,11 +191,11 @@ int		Level)	/* initialization level */
 		pAC->Addr.Port[pAC->Addr.Net[0].ActivePort].Exact[0] =
 			pAC->Addr.Net[0].CurrentMacAddress;
 #if SK_MAX_NETS > 1
-		/* Set logical MAC address for net 2 to (log | 3). */
+		/* Set logical MAC address for net 2 to. */
 		if (!pAC->Addr.Net[1].CurrentMacAddressSet) {
 			pAC->Addr.Net[1].PermanentMacAddress =
 				pAC->Addr.Net[0].PermanentMacAddress;
-			pAC->Addr.Net[1].PermanentMacAddress.a[5] |= 3;
+			pAC->Addr.Net[1].PermanentMacAddress.a[5] += 1;
 			/* Set the current logical MAC address to the permanent one. */
 			pAC->Addr.Net[1].CurrentMacAddress =
 				pAC->Addr.Net[1].PermanentMacAddress;
@@ -213,7 +213,7 @@ int		Level)	/* initialization level */
 					pAC->Addr.Net[i].PermanentMacAddress.a[2],
 					pAC->Addr.Net[i].PermanentMacAddress.a[3],
 					pAC->Addr.Net[i].PermanentMacAddress.a[4],
-					pAC->Addr.Net[i].PermanentMacAddress.a[5]))
+					pAC->Addr.Net[i].PermanentMacAddress.a[5]));
 			
 			SK_DBG_MSG(pAC, SK_DBGMOD_ADDR, SK_DBGCAT_INIT,
 				("Logical MAC Address (Net%d): %02X %02X %02X %02X %02X %02X\n",
@@ -223,7 +223,7 @@ int		Level)	/* initialization level */
 					pAC->Addr.Net[i].CurrentMacAddress.a[2],
 					pAC->Addr.Net[i].CurrentMacAddress.a[3],
 					pAC->Addr.Net[i].CurrentMacAddress.a[4],
-					pAC->Addr.Net[i].CurrentMacAddress.a[5]))
+					pAC->Addr.Net[i].CurrentMacAddress.a[5]));
 		}
 #endif	/* DEBUG */
 
@@ -266,7 +266,7 @@ int		Level)	/* initialization level */
 					pAPort->PermanentMacAddress.a[2],
 					pAPort->PermanentMacAddress.a[3],
 					pAPort->PermanentMacAddress.a[4],
-					pAPort->PermanentMacAddress.a[5]))
+					pAPort->PermanentMacAddress.a[5]));
 			
 			SK_DBG_MSG(pAC, SK_DBGMOD_ADDR, SK_DBGCAT_INIT,
 				("SkAddrInit: Physical MAC Address: %02X %02X %02X %02X %02X %02X\n",
@@ -275,7 +275,7 @@ int		Level)	/* initialization level */
 					pAPort->CurrentMacAddress.a[2],
 					pAPort->CurrentMacAddress.a[3],
 					pAPort->CurrentMacAddress.a[4],
-					pAPort->CurrentMacAddress.a[5]))
+					pAPort->CurrentMacAddress.a[5]));
 #endif /* DEBUG */
 		}
 		/* pAC->Addr.InitDone = SK_INIT_IO; */
@@ -339,10 +339,14 @@ int		Flags)		/* permanent/non-perm, sw-only */
 	}
 	
 	if (pAC->GIni.GIGenesis) {
+#ifdef GENESIS
 		ReturnCode = SkAddrXmacMcClear(pAC, IoC, PortNumber, Flags);
+#endif
 	}
 	else {
+#ifdef YUKON
 		ReturnCode = SkAddrGmacMcClear(pAC, IoC, PortNumber, Flags);
+#endif
 	}
 
 	return (ReturnCode);
@@ -352,7 +356,7 @@ int		Flags)		/* permanent/non-perm, sw-only */
 #endif /* !SK_SLIM */
 
 #ifndef SK_SLIM
-
+#ifdef GENESIS
 /******************************************************************************
  *
  *	SkAddrXmacMcClear - clear the multicast table
@@ -404,11 +408,11 @@ int		Flags)		/* permanent/non-perm, sw-only */
 	return (SK_ADDR_SUCCESS);
 	
 }	/* SkAddrXmacMcClear */
-
+#endif	/* GENESIS */
 #endif /* !SK_SLIM */
 
 #ifndef SK_SLIM
-
+#ifdef YUKON
 /******************************************************************************
  *
  *	SkAddrGmacMcClear - clear the multicast table
@@ -447,7 +451,7 @@ int		Flags)		/* permanent/non-perm, sw-only */
 			pAC->Addr.Port[PortNumber].InexactFilter.Bytes[4],
 			pAC->Addr.Port[PortNumber].InexactFilter.Bytes[5],
 			pAC->Addr.Port[PortNumber].InexactFilter.Bytes[6],
-			pAC->Addr.Port[PortNumber].InexactFilter.Bytes[7]))
+			pAC->Addr.Port[PortNumber].InexactFilter.Bytes[7]));
 #endif	/* DEBUG */
 
 	/* Clear InexactFilter */
@@ -489,7 +493,7 @@ int		Flags)		/* permanent/non-perm, sw-only */
 			pAC->Addr.Port[PortNumber].InexactFilter.Bytes[4],
 			pAC->Addr.Port[PortNumber].InexactFilter.Bytes[5],
 			pAC->Addr.Port[PortNumber].InexactFilter.Bytes[6],
-			pAC->Addr.Port[PortNumber].InexactFilter.Bytes[7]))
+			pAC->Addr.Port[PortNumber].InexactFilter.Bytes[7]));
 #endif	/* DEBUG */
 	
 	if (!(Flags & SK_MC_SW_ONLY)) {
@@ -499,9 +503,10 @@ int		Flags)		/* permanent/non-perm, sw-only */
 	return (SK_ADDR_SUCCESS);
 
 }	/* SkAddrGmacMcClear */
+#endif	/* YUKON */
 
 #ifndef SK_ADDR_CHEAT
-
+#ifdef GENESIS
 /******************************************************************************
  *
  *	SkXmacMcHash - hash multicast address
@@ -538,8 +543,9 @@ unsigned char *pMc)	/* Multicast address */
 	return (Crc & ((1 << HASH_BITS) - 1));
 
 }	/* SkXmacMcHash */
+#endif	/* GENESIS */
 
-
+#ifdef YUKON
 /******************************************************************************
  *
  *	SkGmacMcHash - hash multicast address
@@ -597,7 +603,7 @@ unsigned char *pMc)	/* Multicast address */
 	return (Crc & ((1 << HASH_BITS) - 1));
 
 }	/* SkGmacMcHash */
-
+#endif	/* YUKON */
 #endif	/* !SK_ADDR_CHEAT */
 
 /******************************************************************************
@@ -638,17 +644,21 @@ int			Flags)		/* permanent/non-permanent */
 	}
 	
 	if (pAC->GIni.GIGenesis) {
+#ifdef GENESIS
 		ReturnCode = SkAddrXmacMcAdd(pAC, IoC, PortNumber, pMc, Flags);
+#endif
 	}
 	else {
+#ifdef YUKON
 		ReturnCode = SkAddrGmacMcAdd(pAC, IoC, PortNumber, pMc, Flags);
+#endif
 	}
 
 	return (ReturnCode);
 
 }	/* SkAddrMcAdd */
 
-
+#ifdef GENESIS
 /******************************************************************************
  *
  *	SkAddrXmacMcAdd - add a multicast address to a port
@@ -758,8 +768,9 @@ int		Flags)		/* permanent/non-permanent */
 	}
 
 }	/* SkAddrXmacMcAdd */
+#endif	/* GENESIS */
 
-
+#ifdef YUKON
 /******************************************************************************
  *
  *	SkAddrGmacMcAdd - add a multicast address to a port
@@ -821,7 +832,7 @@ int		Flags)		/* permanent/non-permanent */
 			pAC->Addr.Port[PortNumber].InexactRlmtFilter.Bytes[4],
 			pAC->Addr.Port[PortNumber].InexactRlmtFilter.Bytes[5],
 			pAC->Addr.Port[PortNumber].InexactRlmtFilter.Bytes[6],
-			pAC->Addr.Port[PortNumber].InexactRlmtFilter.Bytes[7]))
+			pAC->Addr.Port[PortNumber].InexactRlmtFilter.Bytes[7]));
 #endif	/* DEBUG */
 	}
 	else {	/* not permanent => DRV */
@@ -845,7 +856,7 @@ int		Flags)		/* permanent/non-permanent */
 			pAC->Addr.Port[PortNumber].InexactDrvFilter.Bytes[4],
 			pAC->Addr.Port[PortNumber].InexactDrvFilter.Bytes[5],
 			pAC->Addr.Port[PortNumber].InexactDrvFilter.Bytes[6],
-			pAC->Addr.Port[PortNumber].InexactDrvFilter.Bytes[7]))
+			pAC->Addr.Port[PortNumber].InexactDrvFilter.Bytes[7]));
 #endif	/* DEBUG */
 	}
 	
@@ -860,7 +871,7 @@ int		Flags)		/* permanent/non-permanent */
 	return (SK_MC_FILTERING_INEXACT);
 	
 }	/* SkAddrGmacMcAdd */
-
+#endif	/* YUKON */
 #endif /* !SK_SLIM */
 
 /******************************************************************************
@@ -892,7 +903,7 @@ SK_AC	*pAC,		/* adapter context */
 SK_IOC	IoC,		/* I/O context */
 SK_U32	PortNumber)	/* Port Number */
 {
-	int ReturnCode = 0;
+	int ReturnCode = SK_ADDR_ILLEGAL_PORT;
 #if (!defined(SK_SLIM) || defined(DEBUG))
 	if (PortNumber >= (SK_U32) pAC->GIni.GIMacsFound) {
 		return (SK_ADDR_ILLEGAL_PORT);
@@ -948,13 +959,13 @@ SK_U32	PortNumber)	/* Port Number */
 	SK_ADDR_PORT	*pAPort;
 
 	SK_DBG_MSG(pAC,SK_DBGMOD_ADDR, SK_DBGCAT_CTRL,
-		("SkAddrXmacMcUpdate on Port %u.\n", PortNumber))
+		("SkAddrXmacMcUpdate on Port %u.\n", PortNumber));
 	
 	pAPort = &pAC->Addr.Port[PortNumber];
 
 #ifdef DEBUG
 	SK_DBG_MSG(pAC,SK_DBGMOD_ADDR, SK_DBGCAT_CTRL,
-		("Next0 on Port %d: %d\n", PortNumber, Next0[PortNumber]))
+		("Next0 on Port %d: %d\n", PortNumber, Next0[PortNumber]));
 #endif /* DEBUG */
 
 	/* Start with 0 to also program the logical MAC address. */
@@ -1043,7 +1054,7 @@ SK_U32	PortNumber)	/* Port Number */
 				pAPort->Exact[i].a[2],
 				pAPort->Exact[i].a[3],
 				pAPort->Exact[i].a[4],
-				pAPort->Exact[i].a[5]))
+				pAPort->Exact[i].a[5]));
 	}
 #endif /* DEBUG */
 
@@ -1095,13 +1106,13 @@ SK_U32	PortNumber)	/* Port Number */
 	SK_ADDR_PORT	*pAPort;
 
 	SK_DBG_MSG(pAC,SK_DBGMOD_ADDR, SK_DBGCAT_CTRL,
-		("SkAddrGmacMcUpdate on Port %u.\n", PortNumber))
+		("SkAddrGmacMcUpdate on Port %u.\n", PortNumber));
 	
 	pAPort = &pAC->Addr.Port[PortNumber];
 
 #ifdef DEBUG
 	SK_DBG_MSG(pAC,SK_DBGMOD_ADDR, SK_DBGCAT_CTRL,
-		("Next0 on Port %d: %d\n", PortNumber, Next0[PortNumber]))
+		("Next0 on Port %d: %d\n", PortNumber, Next0[PortNumber]));
 #endif /* DEBUG */
 	
 #ifndef SK_SLIM
@@ -1157,7 +1168,7 @@ SK_U32	PortNumber)	/* Port Number */
 			pAPort->Exact[0].a[2],
 			pAPort->Exact[0].a[3],
 			pAPort->Exact[0].a[4],
-			pAPort->Exact[0].a[5]))
+			pAPort->Exact[0].a[5]));
 	
 	SK_DBG_MSG(pAC, SK_DBGMOD_ADDR, SK_DBGCAT_CTRL,
 		("SkAddrGmacMcUpdate: Physical MAC Address: %02X %02X %02X %02X %02X %02X\n",
@@ -1166,7 +1177,7 @@ SK_U32	PortNumber)	/* Port Number */
 			pAPort->CurrentMacAddress.a[2],
 			pAPort->CurrentMacAddress.a[3],
 			pAPort->CurrentMacAddress.a[4],
-			pAPort->CurrentMacAddress.a[5]))
+			pAPort->CurrentMacAddress.a[5]));
 #endif /* DEBUG */
 	
 #ifndef SK_SLIM
@@ -1275,24 +1286,40 @@ int			Flags)				/* logical/physical MAC address */
 		(void) SkAddrMcUpdate(pAC, IoC, PortNumber);
 	}
 	else if (Flags & SK_ADDR_PHYSICAL_ADDRESS) {	/* Physical MAC address. */
-		if (SK_ADDR_EQUAL(pNewAddr->a,
-			pAC->Addr.Net[NetNumber].CurrentMacAddress.a)) {
-			return (SK_ADDR_DUPLICATE_ADDRESS);
-		}
-
 		for (i = 0; i < (SK_U32) pAC->GIni.GIMacsFound; i++) {
 			if (!pAC->Addr.Port[i].CurrentMacAddressSet) {
 				return (SK_ADDR_TOO_EARLY);
 			}
+		}
 
+		/*
+		 * In dual net mode it should be possible to set all MAC
+		 * addresses independently. Therefore the equality checks
+		 * against the locical address of the same port and the
+		 * physical address of the other port are suppressed here.
+		 */
+		if (pAC->Rlmt.NumNets == 1) {
 			if (SK_ADDR_EQUAL(pNewAddr->a,
-				pAC->Addr.Port[i].CurrentMacAddress.a)) {
-				if (i == PortNumber) {
-					return (SK_ADDR_SUCCESS);
+				pAC->Addr.Net[NetNumber].CurrentMacAddress.a)) {
+				return (SK_ADDR_DUPLICATE_ADDRESS);
+			}
+
+			for (i = 0; i < (SK_U32) pAC->GIni.GIMacsFound; i++) {
+				if (SK_ADDR_EQUAL(pNewAddr->a,
+					pAC->Addr.Port[i].CurrentMacAddress.a)) {
+					if (i == PortNumber) {
+						return (SK_ADDR_SUCCESS);
+					}
+					else {
+						return (SK_ADDR_DUPLICATE_ADDRESS);
+					}
 				}
-				else {
-					return (SK_ADDR_DUPLICATE_ADDRESS);
-				}
+			}
+		}
+		else {
+			if (SK_ADDR_EQUAL(pNewAddr->a,
+				pAC->Addr.Port[PortNumber].CurrentMacAddress.a)) {
+				return (SK_ADDR_SUCCESS);
 			}
 		}
 
@@ -1325,18 +1352,28 @@ int			Flags)				/* logical/physical MAC address */
 			pAC->Addr.Net[NetNumber].CurrentMacAddress.a)) {
 			return (SK_ADDR_SUCCESS);
 		}
-		
+
 		for (i = 0; i < (SK_U32) pAC->GIni.GIMacsFound; i++) {
 			if (!pAC->Addr.Port[i].CurrentMacAddressSet) {
 				return (SK_ADDR_TOO_EARLY);
 			}
+		}
 
-			if (SK_ADDR_EQUAL(pNewAddr->a,
-				pAC->Addr.Port[i].CurrentMacAddress.a)) {
-				return (SK_ADDR_DUPLICATE_ADDRESS);
+		/*
+		 * In dual net mode on Yukon-2 adapters the physical address
+		 * of port 0 and the logical address of port 1 are equal - in
+		 * this case the equality check of the physical address leads
+		 * to an error and is suppressed here.
+		 */
+		if (pAC->Rlmt.NumNets == 1) {
+			for (i = 0; i < (SK_U32) pAC->GIni.GIMacsFound; i++) {
+				if (SK_ADDR_EQUAL(pNewAddr->a,
+					pAC->Addr.Port[i].CurrentMacAddress.a)) {
+					return (SK_ADDR_DUPLICATE_ADDRESS);
+				}
 			}
 		}
-		
+
 		/*
 		 * In case that the physical and the logical MAC addresses are equal
 		 * we must also change the physical MAC address here.
@@ -1424,7 +1461,7 @@ SK_IOC	IoC,			/* I/O context */
 SK_U32	PortNumber,		/* port whose promiscuous mode changes */
 int		NewPromMode)	/* new promiscuous mode */
 {
-	int ReturnCode = 0;
+	int ReturnCode = SK_ADDR_ILLEGAL_PORT;
 #if (!defined(SK_SLIM) || defined(DEBUG))
 	if (PortNumber >= (SK_U32) pAC->GIni.GIMacsFound) {
 		return (SK_ADDR_ILLEGAL_PORT);
