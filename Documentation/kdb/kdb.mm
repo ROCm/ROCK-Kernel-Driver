@@ -1,4 +1,4 @@
-.TH KDB 8 "April 4, 2005"
+.TH KDB 8 "August 2, 2005"
 .hy 0
 .SH NAME
 Built-in Kernel Debugger for Linux - v4.4
@@ -61,6 +61,18 @@ characters such as <esc>KDB then all but the last character are passed
 through to the application that is reading from the serial console.
 After exiting from kdb, you should use backspace to delete the rest of
 the control sequence.
+.P
+You can boot with kdb activated but without the ability to enter kdb
+via any keyboard sequence.
+In this mode, kdb will only be entered after a system failure.
+Booting with kdb=on-nokey will activate kdb but ignore keyboard
+sequences that would normally drop you into kdb.
+kdb=on-nokey is mainly useful when you are using a PC keyboard and your
+application needs to use the Pause key.
+You can also activate this mode by
+.nf
+  echo "2" > /proc/sys/kernel/kdb
+.fi
 .P
 If the console is sitting on the login prompt when you enter kdb, then
 the login command may switch into upper case mode.

@@ -1067,7 +1067,7 @@ static void kbd_keycode(unsigned int keycode, int down,
 				printk(KERN_WARNING "keyboard.c: can't emulate rawmode for keycode %d\n", keycode);
 
 #ifdef	CONFIG_KDB
-	if (down && !rep && (keycode == KEY_PAUSE) && kdb_on) {
+	if (down && !rep && keycode == KEY_PAUSE && kdb_on == 1) {
 		kdb(KDB_REASON_KEYBOARD, 0, regs);
 		return;
 	}

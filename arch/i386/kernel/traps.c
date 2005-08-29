@@ -707,6 +707,10 @@ EXPORT_SYMBOL_GPL(unset_nmi_callback);
 #ifdef CONFIG_KPROBES
 fastcall void do_int3(struct pt_regs *regs, long error_code)
 {
+#ifdef	CONFIG_KDB
+	if (kdb(KDB_REASON_BREAK, error_code, regs))
+		return;
+#endif
 	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP)
 			== NOTIFY_STOP)
 		return;
@@ -804,14 +808,14 @@ clear_TF_reenable:
 	return;
 }
 
-#ifdef	CONFIG_KDB
+#if	defined(CONFIG_KDB) && !defined(CONFIG_KPROBES)
 fastcall void do_int3(struct pt_regs * regs, long error_code)
 {
 	if (kdb(KDB_REASON_BREAK, error_code, regs))
 		return;
 	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
 }
-#endif	/* CONFIG_KDB */
+#endif	/* CONFIG_KDB && !CONFIG_KPROBES */
 
 
 /*

@@ -40,7 +40,9 @@
 #endif
 
 #ifdef CONFIG_KDB_USB
-struct kdb_usb_exchange kdb_usb_infos = { NULL, NULL, NULL, NULL, NULL, 0};
+struct kdb_usb_exchange kdb_usb_infos;
+
+EXPORT_SYMBOL(kdb_usb_infos);
 
 static unsigned char kdb_usb_keycode[256] = {
 	  0,  0,  0,  0, 30, 48, 46, 32, 18, 33, 34, 35, 23, 36, 37, 38,
@@ -133,7 +135,7 @@ static int get_usb_char(void)
 	}
 	return -1;
 }
-#endif
+#endif	/* CONFIG_KDB_USB */
 
 /*
  * This module contains code to read characters from the keyboard or a serial

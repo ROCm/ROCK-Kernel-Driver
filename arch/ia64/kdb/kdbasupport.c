@@ -327,6 +327,110 @@ kdba_switch_stack(int argc, const char **argv, const char **envp, struct pt_regs
 }
 
 /*
+ * kdb_minstate
+ *
+ *	Format the PAL minstate area.
+ *
+ * Inputs:
+ *	argc	argument count
+ *	argv	argument vector
+ *	envp	environment vector
+ *	regs	registers at time kdb was entered.
+ * Outputs:
+ *	None.
+ * Returns:
+ *	zero for success, a kdb diagnostic if error
+ * Locking:
+ *	none.
+ * Remarks:
+ *	None.
+ */
+
+static int
+kdba_minstate(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+{
+	int diag;
+	kdb_machreg_t addr;
+	long offset = 0;
+	int nextarg;
+	pal_min_state_area_t *p;
+
+	if (argc == 1) {
+		nextarg = 1;
+		diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+		if (diag)
+			return diag;
+	} else {
+		return KDB_ARGCOUNT;
+	}
+
+	p = (pal_min_state_area_t *) addr;
+	kdb_printf("PAL minstate %p-%p\n", p, (unsigned char *)p + sizeof(*p) - 1);
+	kdb_printf("  pmsa_nat_bits 0x%lx\n", p->pmsa_nat_bits);
+	kdb_print_nameval("r1", p->pmsa_gr[1-1]);
+	kdb_print_nameval("r2", p->pmsa_gr[2-1]);
+	kdb_print_nameval("r3", p->pmsa_gr[3-1]);
+	kdb_print_nameval("r4", p->pmsa_gr[4-1]);
+	kdb_print_nameval("r5", p->pmsa_gr[5-1]);
+	kdb_print_nameval("r6", p->pmsa_gr[6-1]);
+	kdb_print_nameval("r7", p->pmsa_gr[7-1]);
+	kdb_print_nameval("r8", p->pmsa_gr[8-1]);
+	kdb_print_nameval("r9", p->pmsa_gr[9-1]);
+	kdb_print_nameval("r10", p->pmsa_gr[10-1]);
+	kdb_print_nameval("r11", p->pmsa_gr[11-1]);
+	kdb_print_nameval("r12", p->pmsa_gr[12-1]);
+	kdb_print_nameval("r13", p->pmsa_gr[13-1]);
+	kdb_print_nameval("r14", p->pmsa_gr[14-1]);
+	kdb_print_nameval("r15", p->pmsa_gr[15-1]);
+	kdb_printf("  Bank 0\n");
+	kdb_print_nameval("r16", p->pmsa_bank0_gr[16-16]);
+	kdb_print_nameval("r17", p->pmsa_bank0_gr[17-16]);
+	kdb_print_nameval("r18", p->pmsa_bank0_gr[18-16]);
+	kdb_print_nameval("r19", p->pmsa_bank0_gr[19-16]);
+	kdb_print_nameval("r20", p->pmsa_bank0_gr[20-16]);
+	kdb_print_nameval("r21", p->pmsa_bank0_gr[21-16]);
+	kdb_print_nameval("r22", p->pmsa_bank0_gr[22-16]);
+	kdb_print_nameval("r23", p->pmsa_bank0_gr[23-16]);
+	kdb_print_nameval("r24", p->pmsa_bank0_gr[24-16]);
+	kdb_print_nameval("r25", p->pmsa_bank0_gr[25-16]);
+	kdb_print_nameval("r26", p->pmsa_bank0_gr[26-16]);
+	kdb_print_nameval("r27", p->pmsa_bank0_gr[27-16]);
+	kdb_print_nameval("r28", p->pmsa_bank0_gr[28-16]);
+	kdb_print_nameval("r29", p->pmsa_bank0_gr[29-16]);
+	kdb_print_nameval("r30", p->pmsa_bank0_gr[30-16]);
+	kdb_print_nameval("r31", p->pmsa_bank0_gr[31-16]);
+	kdb_printf("  Bank 1\n");
+	kdb_print_nameval("r16", p->pmsa_bank1_gr[16-16]);
+	kdb_print_nameval("r17", p->pmsa_bank1_gr[17-16]);
+	kdb_print_nameval("r18", p->pmsa_bank1_gr[18-16]);
+	kdb_print_nameval("r19", p->pmsa_bank1_gr[19-16]);
+	kdb_print_nameval("r20", p->pmsa_bank1_gr[20-16]);
+	kdb_print_nameval("r21", p->pmsa_bank1_gr[21-16]);
+	kdb_print_nameval("r22", p->pmsa_bank1_gr[22-16]);
+	kdb_print_nameval("r23", p->pmsa_bank1_gr[23-16]);
+	kdb_print_nameval("r24", p->pmsa_bank1_gr[24-16]);
+	kdb_print_nameval("r25", p->pmsa_bank1_gr[25-16]);
+	kdb_print_nameval("r26", p->pmsa_bank1_gr[26-16]);
+	kdb_print_nameval("r27", p->pmsa_bank1_gr[27-16]);
+	kdb_print_nameval("r28", p->pmsa_bank1_gr[28-16]);
+	kdb_print_nameval("r29", p->pmsa_bank1_gr[29-16]);
+	kdb_print_nameval("r30", p->pmsa_bank1_gr[30-16]);
+	kdb_print_nameval("r31", p->pmsa_bank1_gr[31-16]);
+	kdb_printf("  pr          0x%lx\n", p->pmsa_pr);
+	kdb_print_nameval("b0", p->pmsa_br0);
+	kdb_printf("  ar.rsc      0x%lx\n", p->pmsa_rsc);
+	kdb_print_nameval("cr.iip", p->pmsa_iip);
+	kdb_printf("  cr.ipsr     0x%lx\n", p->pmsa_ipsr);
+	kdb_printf("  cr.ifs      0x%lx\n", p->pmsa_ifs);
+	kdb_print_nameval("cr.xip", p->pmsa_xip);
+	kdb_printf("  cr.xpsr     0x%lx\n", p->pmsa_xpsr);
+	kdb_printf("  cr.xfs      0x%lx\n", p->pmsa_xfs);
+	kdb_print_nameval("b1", p->pmsa_br1);
+
+	return 0;
+}
+
+/*
  * kdba_cpuinfo
  *
  *	Format struct cpuinfo_ia64.
@@ -1314,6 +1418,7 @@ kdba_init(void)
 #endif
 	kdb_register("pt_regs", kdba_pt_regs, "address", "Format struct pt_regs", 0);
 	kdb_register("switch_stack", kdba_switch_stack, "address", "Format struct switch_stack", 0);
+	kdb_register("minstate", kdba_minstate, "address", "Format PAL minstate", 0);
 	kdb_register("tpa", kdba_tpa, "<vaddr>", "Translate virtual to physical address", 0);
 #if defined(CONFIG_NUMA)
 	kdb_register("tpav", kdba_tpav, "<begin addr> <end addr>", "Verify that physical addresses corresponding to virtual addresses from <begin addr> to <end addr> are in same node", 0);

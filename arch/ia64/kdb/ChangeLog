@@ -1,3 +1,43 @@
+2005-08-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-ia64-1.
+
+2005-08-24 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc7-ia64-1.
+
+2005-08-08 Keith Owens  <kaos@sgi.com>
+
+	* Add minstate command.
+	* kdb v4.4-2.6.13-rc6-ia64-1.
+
+2005-08-02 Keith Owens  <kaos@sgi.com>
+
+	* Replace hard coded kdb declarations with #include <asm/sections>.
+	* kdb v4.4-2.6.13-rc5-ia64-1.
+
+2005-07-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc4-ia64-1.
+
+2005-07-22 Keith Owens  <kaos@sgi.com>
+
+	* Handle INIT delivered while in physical mode.
+	* kdb v4.4-2.6.13-rc3-ia64-2.
+
+2005-07-19 Keith Owens  <kaos@sgi.com>
+
+	* Add support for USB keyboard (OHCI only).  Aaron Young, SGI.
+	* kdb v4.4-2.6.13-rc3-ia64-1.
+
+2005-07-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc2-ia64-1.
+
+2005-07-01 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc1-ia64-1.
+
 2005-06-18 Keith Owens  <kaos@sgi.com>
 
 	* Standard IA64 code now works around break.b setting cr.iim to 0

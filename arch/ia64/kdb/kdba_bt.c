@@ -17,6 +17,7 @@
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
 #include <asm/system.h>
+#include <asm/sections.h>
 
 /*
  * bt_print_one
@@ -149,7 +150,6 @@ kdba_bt_stack(int argcount, struct task_struct *p)
 	u64 *prev_pfs_loc = NULL;
 	extern char __attribute__ ((weak)) ia64_spinlock_contention_pre3_4[];
 	extern char __attribute__ ((weak)) ia64_spinlock_contention_pre3_4_end[];
-	extern char ia64_ivt[];
 
 	/* FIXME: All the arch specific code should be in activation records, not here */
 	memset(&ar, 0, sizeof(ar));
@@ -225,7 +225,7 @@ kdba_bt_stack(int argcount, struct task_struct *p)
 		 * to unwind through the Interrupt Vector Table which has no unwind
 		 * information.
 		 */
-		if (info.ip >= (u64)ia64_ivt && info.ip < (u64)ia64_ivt+32768)
+		if (info.ip >= (u64)__start_ivt_text && info.ip < (u64)__end_ivt_text)
 			return 0;
 
 		/* WAR for spinlock contention from leaf functions.  ia64_spinlock_contention_pre3_4

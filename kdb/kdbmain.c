@@ -53,7 +53,7 @@ atomic_t kdb_event;
  * kdb_lock protects updates to kdb_initial_cpu.  Used to
  * single thread processors through the kernel debugger.
  */
-static spinlock_t kdb_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(kdb_lock);
 volatile int kdb_initial_cpu = -1;		/* cpu number that owns kdb */
 int kdb_seqno = 2;				/* how many times kdb has been entered */
 
@@ -1669,7 +1669,7 @@ kdb_main_loop(kdb_reason_t reason, kdb_reason_t reason2, int error,
  *	  release all the cpus at once.
  */
 
-int
+asmlinkage int
 kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 {
 	kdb_intstate_t int_state;	/* Interrupt state */
@@ -1677,6 +1677,7 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	int result = 0;	/* Default is kdb did not handle it */
 	int ss_event;
 	kdb_dbtrap_t db_result=KDB_DB_NOBPT;
+	preempt_disable();
 	atomic_inc(&kdb_event);
 
 	switch(reason) {
@@ -1982,6 +1983,7 @@ kdb(kdb_reason_t reason, int error, struct pt_regs *regs)
 	KDB_DEBUG_STATE("kdb 17", reason);
 out:
 	atomic_dec(&kdb_event);
+	preempt_enable();
 	return result != 0;
 }
 

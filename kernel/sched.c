@@ -5349,7 +5349,8 @@ kdb_runqueue(unsigned long cpu, kdb_printf_t xxx_printf)
 		xxx_printf(" is idle");
 	xxx_printf("\n ");
 #ifdef CONFIG_SMP
-	xxx_printf(" cpu_load:%lu", rq->cpu_load);
+	xxx_printf(" cpu_load:%lu %lu %lu",
+			rq->cpu_load[0], rq->cpu_load[1], rq->cpu_load[2]);
 #endif
 	xxx_printf(" nr_running:%lu nr_switches:%llu\n",
 		   rq->nr_running, rq->nr_switches);

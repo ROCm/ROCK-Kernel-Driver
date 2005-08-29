@@ -1,3 +1,46 @@
+2005-08-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-i386-1.
+
+2005-08-24 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc7-i386-1.
+
+2005-08-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc6-i386-1.
+
+2005-08-02 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc5-i386-1.
+
+2005-07-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc4-i386-1.
+
+2005-07-22 Keith Owens  <kaos@sgi.com>
+
+	* Compile fix for kprobes.
+	* kdb v4.4-2.6.13-rc3-i386-2.
+
+2005-07-19 Keith Owens  <kaos@sgi.com>
+
+	* Add support for USB keyboard (OHCI only).  Aaron Young, SGI.
+	* kdb v4.4-2.6.13-rc3-i386-1.
+
+2005-07-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc2-i386-1.
+
+2005-07-01 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc1-i386-1.
+
+2005-06-19 Keith Owens  <kaos@sgi.com>
+
+	* gcc 4 compile fix, remove extern kdb_hardbreaks.  Steve Lord.
+	* kdb v4.4-2.6.12-i386-2.
+
 2005-06-18 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.12-i386-1.

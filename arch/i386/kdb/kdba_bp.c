@@ -25,7 +25,7 @@ static char *kdba_rwtypes[] = { "Instruction(Register)", "Data Write",
  * breakpoint registers.
  */
 
-kdbhard_bp_t kdb_hardbreaks[KDB_MAXHARDBPT];
+static kdbhard_bp_t kdb_hardbreaks[KDB_MAXHARDBPT];
 
 /*
  * kdba_db_trap

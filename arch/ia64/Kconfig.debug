@@ -137,16 +137,13 @@ config KDB_CONTINUE_CATASTROPHIC
 	  If you are not sure, say 0.  Read Documentation/kdb/dump.txt before
 	  setting to 2.
 
-# KDB_USB does not work, the usb code needs to be
-# converted from 2.4.19 to 2.5.40 APIs.  Omit it until somebody
-# fixes CONFIG_KDB_USB.
-#config KDB_USB
-#	bool "Support for USB Keyboard in KDB"
-#	depends on KDB && USB
-#	help
-#	  If you want to use kdb from a USB keyboard then say Y here.  If you
-#	  say N then kdb can only be used from a PC (AT) keyboard or a serial
-#	  console.
+config KDB_USB
+	bool "Support for USB Keyboard in KDB (OHCI only)"
+	depends on KDB && USB_OHCI_HCD
+	help
+	  If you want to use kdb from a OHCI USB keyboard then say Y here.  If you
+	  say N then kdb can only be used from a PC (AT) keyboard or a serial
+	  console.
 
 config SYSVIPC_COMPAT
 	bool

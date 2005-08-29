@@ -1905,6 +1905,27 @@ kdba_mca_init(int sal_info_type, pal_processor_state_info_t *psp, int recover)
 	data.regs = &regs;
 	data.r12 = regs.r12;
 	data.bspstore = s->ar[17];
+	if (sal_info_type == SAL_INFO_TYPE_INIT) {
+		ia64_va va;
+		if (ia64_psr(&regs)->dt == 0) {
+			va.l = data.r12;
+			if (va.f.reg == 0) {
+				kdb_printf("KDBA_MCA_TRACE: converting r12 (0x%lx) from physical to virtual\n",
+					   data.r12);
+				va.f.reg = 7;
+				data.r12 = va.l;
+			}
+		}
+		if (ia64_psr(&regs)->rt == 0) {
+			va.l = data.bspstore;
+			if (va.f.reg == 0) {
+				kdb_printf("KDBA_MCA_TRACE: converting bspstore (0x%lx) from physical to virtual\n",
+					   data.bspstore);
+				va.f.reg = 7;
+				data.bspstore = va.l;
+			}
+		}
+	}
 	if (sal_info_type == SAL_INFO_TYPE_MCA) {
 		if (kdba_mca_bspstore_fixup(s)) {
 			/* No unwind data available, just enter kdb */

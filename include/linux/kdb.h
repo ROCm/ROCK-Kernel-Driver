@@ -45,8 +45,8 @@ extern atomic_t kdb_event;
  * kdb_on
  *
  * 	Defines whether kdb is on or not.  Default value
- *	is set by CONFIG_KDB_OFF.  Boot with kdb=on/off
- *	or echo "[01]" > /proc/sys/kernel/kdb to change it.
+ *	is set by CONFIG_KDB_OFF.  Boot with kdb=on/off/on-nokey
+ *	or echo "[012]" > /proc/sys/kernel/kdb to change it.
  */
 extern int kdb_on;
 
@@ -107,7 +107,7 @@ typedef enum {
 } kdb_reason_t;
 
 #ifdef	CONFIG_KDB
-extern int   kdb(kdb_reason_t, int, struct pt_regs *);
+extern asmlinkage int kdb(kdb_reason_t, int, struct pt_regs *);
 #else
 #define kdb(reason,error_code,frame) (0)
 #endif
@@ -156,8 +156,6 @@ extern struct notifier_block *kdb_notifier_list;
 
 #ifdef CONFIG_KDB_USB
 #include <linux/usb.h>
-#define KDB_USB_ACTIVE 	1 /* Keyboard driver is usbkbd */
-#define HID_ACTIVE 	2 /* Keyboard driver is hid    */
 
 struct kdb_usb_exchange {
 	void *uhci;			/* pointer to the UHCI structure */
@@ -165,7 +163,6 @@ struct kdb_usb_exchange {
 	unsigned char *buffer;		/* pointer to buffer */
 	void (*poll_func)(void *, struct urb *); /* pointer to the polling function */
 	void (*reset_timer)(void);	/* pointer to the reset timer function */
-	int driver;			/* driver mode, see above KDB_USB_KBD */
 };
 extern struct kdb_usb_exchange kdb_usb_infos; /* KDB common structure */
 #endif /* CONFIG_KDB_USB */

@@ -1,3 +1,51 @@
+2005-08-29 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-common-1.
+
+2005-08-24 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc7-common-1.
+
+2005-08-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc6-common-1.
+
+2005-08-02 Keith Owens  <kaos@sgi.com>
+
+	* Print more fields from filp, dentry.
+	* Add kdb=on-nokey to suppress kdb entry from the keyboard.
+	* kdb v4.4-2.6.13-rc5-common-1.
+
+2005-07-30 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc4-common-1.
+
+2005-07-26 Keith Owens  <kaos@sgi.com>
+
+	* Fix compile problem with CONFIG_USB_KBD.
+	* kdb v4.4-2.6.13-rc3-common-3.
+
+2005-07-22 Keith Owens  <kaos@sgi.com>
+
+	* The asmlinkage kdb() patch was lost during packaging.  Reinstate it.
+	* kdb v4.4-2.6.13-rc3-common-2.
+
+2005-07-19 Keith Owens  <kaos@sgi.com>
+
+	* Add support for USB keyboard (OHCI only).  Aaron Young, SGI.
+	* kdb v4.4-2.6.13-rc3-common-1.
+
+2005-07-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.13-rc2-common-1.
+
+2005-07-01 Keith Owens  <kaos@sgi.com>
+
+	* Make kdb() asmlinkage to avoid problems with CONFIG_REGPARM.
+	* Change some uses of smp_processor_id() to be preempt safe.
+	* Use DEFINE_SPINLOCK().
+	* kdb v4.4-2.6.13-rc1-common-1.
+
 2005-06-18 Keith Owens  <kaos@sgi.com>
 
 	* kdb v4.4-2.6.12-common-1.

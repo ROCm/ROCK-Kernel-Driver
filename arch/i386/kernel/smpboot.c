@@ -44,12 +44,12 @@
 #include <linux/smp_lock.h>
 #include <linux/irq.h>
 #include <linux/bootmem.h>
-#include <linux/notifier.h>
-#include <linux/cpu.h>
-#include <linux/percpu.h>
 #ifdef	CONFIG_KDB
 #include <linux/kdb.h>
 #endif	/* CONFIG_KDB */
+#include <linux/notifier.h>
+#include <linux/cpu.h>
+#include <linux/percpu.h>
 
 #include <linux/delay.h>
 #include <linux/mc146818rtc.h>

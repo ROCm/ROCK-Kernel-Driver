@@ -468,7 +468,7 @@ kdb_printf(const char *fmt, ...)
 	int do_longjmp = 0;
 	int got_printf_lock = 0;
 	struct console *c = console_drivers;
-	static spinlock_t kdb_printf_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(kdb_printf_lock);
 
 	/* Serialize kdb_printf if multiple cpus try to write at once.
 	 * But if any cpu goes recursive in kdb, just print the output,
@@ -544,7 +544,8 @@ kdb_printf(const char *fmt, ...)
 
 #if defined(CONFIG_SMP)
 		if (strchr(moreprompt, '%')) {
-			sprintf(buf2, moreprompt, smp_processor_id());
+			sprintf(buf2, moreprompt, get_cpu());
+			put_cpu();
 			moreprompt = buf2;
 		}
 #endif

@@ -1102,7 +1102,7 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 		}
 		ch = serial_inp(up, UART_RX);
 #ifdef	CONFIG_KDB
-		if ((up->port.line == kdb_serial_line) && kdb_on) {
+		if ((up->port.line == kdb_serial_line) && kdb_on == 1) {
 		    if (ch == *kdb_serial_ptr) {
 			if (!(*++kdb_serial_ptr)) {
 			    kdb(KDB_REASON_KEYBOARD, 0, regs);

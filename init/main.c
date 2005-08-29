@@ -168,6 +168,8 @@ static int __init kdb_setup(char *str)
 {
 	if (strcmp(str, "on") == 0) {
 		kdb_on = 1;
+	} else if (strcmp(str, "on-nokey") == 0) {
+		kdb_on = 2;
 	} else if (strcmp(str, "off") == 0) {
 		kdb_on = 0;
 	} else if (strcmp(str, "early") == 0) {

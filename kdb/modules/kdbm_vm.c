@@ -454,54 +454,28 @@ kdbm_rpte(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 }
 
 static int
-kdbm_fp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+kdbm_print_dentry(unsigned long daddr)
 {
-	struct file   f;
-	struct inode *i = NULL;
 	struct dentry d;
-	int nextarg;
-	unsigned long addr;
-	long offset;
 	int diag;
+	char buf[256];
 
-	if (argc != 1)
-		return KDB_ARGCOUNT;
+	kdb_printf("Dentry at 0x%lx\n", daddr);
+	if ((diag = kdb_getarea(d, (unsigned long)daddr)))
+		return diag;
 
-	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
-	    (diag = kdb_getarea(f, addr)) ||
-	    (diag = kdb_getarea(d, (unsigned long)f.f_dentry)))
-		goto out;
-	if (!(i = kmalloc(sizeof(*i), GFP_ATOMIC))) {
-		kdb_printf("kdbm_fp: cannot kmalloc inode\n");
-		goto out;
-	}
-	if ((diag = kdb_getarea(*i, (unsigned long)d.d_inode)))
-		goto out;
-
-	kdb_printf("name.name 0x%p  name.len  %d\n",
-		    d.d_name.name, d.d_name.len);
-
-	kdb_printf("File Pointer at 0x%lx\n", addr);
-
-	kdb_printf(" f_list.nxt = 0x%p f_list.prv = 0x%p\n",
-					f.f_list.next, f.f_list.prev);
-
-	kdb_printf(" f_dentry = 0x%p f_op = 0x%p\n",
-					f.f_dentry, f.f_op);
-
-	kdb_printf(" f_count = %d f_flags = 0x%x f_mode = 0x%x\n",
-					f.f_count.counter, f.f_flags, f.f_mode);
-
-	kdb_printf(" f_pos = %Ld\n",
-					f.f_pos);
-
-	kdb_printf("\nDirectory Entry at 0x%p\n", f.f_dentry);
-	kdb_printf(" d_name.len = %d d_name.name = 0x%p>\n",
+	if ((d.d_name.len > sizeof(buf)) || (diag = kdb_getarea_size(buf, (unsigned long)(d.d_name.name), d.d_name.len)))
+		kdb_printf(" d_name.len = %d d_name.name = 0x%p\n",
 					d.d_name.len, d.d_name.name);
+	else
+		kdb_printf(" d_name.len = %d d_name.name = 0x%p <%.*s>\n",
+					d.d_name.len, d.d_name.name,
+					(int)(d.d_name.len), d.d_name.name);
 
 	kdb_printf(" d_count = %d d_flags = 0x%x d_inode = 0x%p\n",
 					atomic_read(&d.d_count), d.d_flags, d.d_inode);
+
+	kdb_printf(" d_parent = 0x%p\n", d.d_parent);
 
 	kdb_printf(" d_hash.nxt = 0x%p d_hash.prv = 0x%p\n",
 					d.d_hash.next, d.d_hash.pprev);
@@ -518,31 +492,72 @@ kdbm_fp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	kdb_printf(" d_alias.nxt = 0x%p d_alias.prv = 0x%p\n",
 					d.d_alias.next, d.d_alias.prev);
 
-	kdb_printf(" d_op = 0x%p d_sb = 0x%p\n\n",
-					d.d_op, d.d_sb);
+	kdb_printf(" d_op = 0x%p d_sb = 0x%p d_fsdata = 0x%p\n",
+					d.d_op, d.d_sb, d.d_fsdata);
 
+	kdb_printf(" d_iname = %s\n",
+					d.d_iname);
 
-	kdb_printf("\nInode Entry at 0x%p\n", d.d_inode);
+	if (d.d_inode) {
+		struct inode i;
+		kdb_printf("\nInode Entry at 0x%p\n", d.d_inode);
+		if ((diag = kdb_getarea(i, (unsigned long)d.d_inode)))
+			return diag;
+		kdb_printf(" i_mode = 0%o  i_nlink = %d  i_rdev = 0x%x\n",
+						i.i_mode, i.i_nlink, i.i_rdev);
 
-	kdb_printf(" i_mode = 0%o  i_nlink = %d  i_rdev = 0x%x\n",
-					i->i_mode, i->i_nlink, i->i_rdev);
+		kdb_printf(" i_ino = %ld i_count = %d\n",
+						i.i_ino, atomic_read(&i.i_count));
 
-	kdb_printf(" i_ino = %ld i_count = %d\n",
-					i->i_ino, atomic_read(&i->i_count));
+		kdb_printf(" i_hash.nxt = 0x%p i_hash.prv = 0x%p\n",
+						i.i_hash.next, i.i_hash.pprev);
 
-	kdb_printf(" i_hash.nxt = 0x%p i_hash.prv = 0x%p\n",
-					i->i_hash.next, i->i_hash.pprev);
+		kdb_printf(" i_list.nxt = 0x%p i_list.prv = 0x%p\n",
+						i.i_list.next, i.i_list.prev);
 
-	kdb_printf(" i_list.nxt = 0x%p i_list.prv = 0x%p\n",
-					i->i_list.next, i->i_list.prev);
+		kdb_printf(" i_dentry.nxt = 0x%p i_dentry.prv = 0x%p\n",
+						i.i_dentry.next, i.i_dentry.prev);
 
-	kdb_printf(" i_dentry.nxt = 0x%p i_dentry.prv = 0x%p\n",
-					i->i_dentry.next, i->i_dentry.prev);
+	}
+	kdb_printf("\n");
+	return 0;
+}
 
-out:
-	if (i)
-		kfree(i);
-	return diag;
+static int
+kdbm_filp(int argc, const char **argv, const char **envp, struct pt_regs *regs)
+{
+	struct file   f;
+	int nextarg;
+	unsigned long addr;
+	long offset;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	nextarg = 1;
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	    (diag = kdb_getarea(f, addr)))
+		return diag;
+
+	kdb_printf("File Pointer at 0x%lx\n", addr);
+
+	kdb_printf(" f_list.nxt = 0x%p f_list.prv = 0x%p\n",
+					f.f_list.next, f.f_list.prev);
+
+	kdb_printf(" f_dentry = 0x%p f_vfsmnt = 0x%p f_op = 0x%p\n",
+					f.f_dentry, f.f_vfsmnt, f.f_op);
+
+	kdb_printf(" f_count = %d f_flags = 0x%x f_mode = 0x%x\n",
+					f.f_count.counter, f.f_flags, f.f_mode);
+
+	kdb_printf(" f_pos = %Ld security = 0x%p\n",
+					f.f_pos, f.f_security);
+
+	kdb_printf(" private_data = 0x%p f_mapping = 0x%p\n\n",
+					f.private_data, f.f_mapping);
+
+	return kdbm_print_dentry((unsigned long)f.f_dentry);
 }
 
 static int
@@ -595,56 +610,19 @@ kdbm_fl(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 static int
 kdbm_dentry(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 {
-	struct dentry d;
 	int nextarg;
 	unsigned long addr;
 	long offset;
 	int diag;
-	char buf[256];
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
 
 	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
-	    (diag = kdb_getarea(d, addr)))
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)))
 		return diag;
 
-
-	kdb_printf("Dentry at 0x%lx\n", addr);
-
-	if ((d.d_name.len > sizeof(buf)) || (diag = kdb_getarea_size(buf, (unsigned long)(d.d_name.name), d.d_name.len)))
-		kdb_printf(" d_name.len = %d d_name.name = 0x%p\n",
-					d.d_name.len, d.d_name.name);
-	else
-		kdb_printf(" d_name.len = %d d_name.name = 0x%p <%.*s>\n",
-					d.d_name.len, d.d_name.name,
-					(int)(d.d_name.len), d.d_name.name);
-
-	kdb_printf(" d_count = %d d_flags = 0x%x d_inode = 0x%p\n",
-					atomic_read(&d.d_count), d.d_flags, d.d_inode);
-
-	kdb_printf(" d_parent = 0x%p\n", d.d_parent);
-
-	kdb_printf(" d_hash.nxt = 0x%p d_hash.prv = 0x%p\n",
-					d.d_hash.next, d.d_hash.pprev);
-
-	kdb_printf(" d_lru.nxt = 0x%p d_lru.prv = 0x%p\n",
-					d.d_lru.next, d.d_lru.prev);
-
-	kdb_printf(" d_child.nxt = 0x%p d_child.prv = 0x%p\n",
-					d.d_child.next, d.d_child.prev);
-
-	kdb_printf(" d_subdirs.nxt = 0x%p d_subdirs.prv = 0x%p\n",
-					d.d_subdirs.next, d.d_subdirs.prev);
-
-	kdb_printf(" d_alias.nxt = 0x%p d_alias.prv = 0x%p\n",
-					d.d_alias.next, d.d_alias.prev);
-
-	kdb_printf(" d_op = 0x%p d_sb = 0x%p\n\n",
-					d.d_op, d.d_sb);
-
-	return 0;
+	return kdbm_print_dentry(addr);
 }
 
 static int
@@ -785,10 +763,8 @@ kdbm_sc(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		goto out;
 
 	kdb_printf("scsi_cmnd at 0x%lx\n", addr);
-	kdb_printf("device = 0x%p\nb",
-		    sc->device);
-	kdb_printf("next = 0x%p done = 0x%p\n",
-		   sc->list.next, sc->done);
+	kdb_printf("device = 0x%p  next = 0x%p  done = 0x%p\n",
+		   sc->device, sc->list.next, sc->done);
 	kdb_printf("serial_number = %ld  retries = %d timeout = %d\n",
 		   sc->serial_number, sc->retries, sc->timeout);
 	kdb_printf("cmd_len = %d  old_cmd_len = %d\n",
@@ -824,7 +800,7 @@ static int __init kdbm_vm_init(void)
 	kdb_register("rpte", kdbm_rpte, "( -m <mm> | -p <pid> ) <pfn> [<npages>]", "Find pte_t containing pfn for mm_struct or pid", 0);
 	kdb_register("dentry", kdbm_dentry, "<dentry>", "Display interesting dentry stuff", 0);
 	kdb_register("kobject", kdbm_kobject, "<kobject>", "Display interesting kobject stuff", 0);
-	kdb_register("filp", kdbm_fp, "<filp>", "Display interesting filp stuff", 0);
+	kdb_register("filp", kdbm_filp, "<filp>", "Display interesting filp stuff", 0);
 	kdb_register("fl", kdbm_fl, "<fl>", "Display interesting file_lock stuff", 0);
 	kdb_register("sh", kdbm_sh, "<vaddr>", "Show scsi_host", 0);
 	kdb_register("sd", kdbm_sd, "<vaddr>", "Show scsi_device", 0);

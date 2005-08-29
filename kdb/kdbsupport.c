@@ -1143,7 +1143,7 @@ static u32 dah_first;
  * then give up.  If the lock could not be previously obtained on this cpu then
  * only try once.
  */
-static spinlock_t dap_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dap_lock);
 static inline
 int get_dap_lock(void)
 {

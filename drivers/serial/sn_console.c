@@ -507,7 +507,7 @@ sn_receive_chars(struct sn_cons_port *port, struct pt_regs *regs,
 			break;
 		}
 #ifdef CONFIG_KDB
-	if (kdb_on) {
+	if (kdb_on == 1) {
 		if (ch == *kdb_serial_ptr) {
 			if (!(*++kdb_serial_ptr)) {
 				spin_unlock_irqrestore(&port->sc_port.lock, flags);
