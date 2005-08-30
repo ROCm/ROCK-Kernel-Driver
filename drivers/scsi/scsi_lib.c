@@ -1850,8 +1850,9 @@ EXPORT_SYMBOL(scsi_device_quiesce);
 void
 scsi_device_resume(struct scsi_device *sdev)
 {
-	if(scsi_device_set_state(sdev, SDEV_RUNNING))
+	if (scsi_device_set_state(sdev, SDEV_RUNNING))
 		return;
+
 	scsi_run_queue(sdev->request_queue);
 }
 EXPORT_SYMBOL(scsi_device_resume);
