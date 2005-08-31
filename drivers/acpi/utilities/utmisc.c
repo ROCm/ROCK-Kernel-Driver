@@ -45,6 +45,9 @@
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
 
+#ifdef CONFIG_ACPI_DEBUG_LITE
+#define acpi_ut_get_mutex_name(x) NULL
+#endif
 
 #define _COMPONENT          ACPI_UTILITIES
 	 ACPI_MODULE_NAME    ("utmisc")
@@ -745,7 +748,6 @@ acpi_ut_acquire_mutex (
 		}
 	}
 #endif
-
 	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX,
 		"Thread %X attempting to acquire Mutex [%s]\n",
 		this_thread_id, acpi_ut_get_mutex_name (mutex_id)));
@@ -1503,6 +1505,7 @@ acpi_ut_report_warning (
 	acpi_os_printf ("%8s-%04d: *** Warning: ", module_name, line_number);
 }
 
+EXPORT_SYMBOL(acpi_ut_report_warning);
 
 /*******************************************************************************
  *
