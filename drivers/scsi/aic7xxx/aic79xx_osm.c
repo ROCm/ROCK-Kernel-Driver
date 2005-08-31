@@ -2771,7 +2771,6 @@ ahd_linux_init(void)
 				      sizeof(struct ahd_linux_device));
 	if (ahd_linux_detect(&aic79xx_driver_template) > 0)
 		return 0;
-	spi_release_transport(ahd_linux_transport_template);
 	ahd_linux_exit();
 	return -ENODEV;
 }
