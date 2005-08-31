@@ -189,6 +189,8 @@ static Scsi_Host_Template pdc_sata_sht = {
 	.slave_configure	= ata_scsi_slave_config,
 	.bios_param		= ata_std_bios_param,
 	.ordered_flush		= 1,
+	.resume			= ata_scsi_device_resume,
+	.suspend		= ata_scsi_device_suspend,
 };
 
 static struct ata_port_operations pdc_20621_ops = {
@@ -235,6 +237,8 @@ static struct pci_driver pdc_sata_pci_driver = {
 	.id_table		= pdc_sata_pci_tbl,
 	.probe			= pdc_sata_init_one,
 	.remove			= ata_pci_remove_one,
+	.suspend		= ata_pci_device_suspend,
+	.resume			= ata_pci_device_resume,
 };
 
 

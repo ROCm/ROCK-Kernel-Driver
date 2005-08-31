@@ -140,6 +140,8 @@ static Scsi_Host_Template qs_ata_sht = {
 	.dma_boundary		= QS_DMA_BOUNDARY,
 	.slave_configure	= ata_scsi_slave_config,
 	.bios_param		= ata_std_bios_param,
+	.resume			= ata_scsi_device_resume,
+	.suspend		= ata_scsi_device_suspend,
 };
 
 static struct ata_port_operations qs_ata_ops = {
@@ -191,6 +193,8 @@ static struct pci_driver qs_ata_pci_driver = {
 	.id_table		= qs_ata_pci_tbl,
 	.probe			= qs_ata_init_one,
 	.remove			= ata_pci_remove_one,
+	.suspend		= ata_pci_device_suspend,
+	.resume			= ata_pci_device_resume,
 };
 
 static int qs_check_atapi_dma(struct ata_queued_cmd *qc)

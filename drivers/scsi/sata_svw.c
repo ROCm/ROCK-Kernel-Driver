@@ -289,6 +289,8 @@ static Scsi_Host_Template k2_sata_sht = {
 #endif
 	.bios_param		= ata_std_bios_param,
 	.ordered_flush		= 1,
+	.resume			= ata_scsi_device_resume,
+	.suspend		= ata_scsi_device_suspend,
 };
 
 
@@ -466,6 +468,8 @@ static struct pci_driver k2_sata_pci_driver = {
 	.id_table		= k2_sata_pci_tbl,
 	.probe			= k2_sata_init_one,
 	.remove			= ata_pci_remove_one,
+	.suspend		= ata_pci_device_suspend,
+	.resume			= ata_pci_device_resume,
 };
 
 
