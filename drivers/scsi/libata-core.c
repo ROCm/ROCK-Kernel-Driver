@@ -3738,8 +3738,8 @@ static int ata_do_simple_cmd(struct ata_port *ap, struct ata_device *dev,
 	unsigned long flags;
 	int rc;
 
-	qc = ata_qc_new_init(ap, dev);
-	BUG_ON(qc == NULL);
+	while ((qc = ata_qc_new_init(ap, dev)) == NULL)
+		msleep(10);
 
 	qc->tf.command = cmd;
 	qc->tf.flags |= ATA_TFLAG_DEVICE;
