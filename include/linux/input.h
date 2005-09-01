@@ -12,6 +12,7 @@
 #ifdef __KERNEL__
 #include <linux/time.h>
 #include <linux/list.h>
+#include <linux/device.h>
 #else
 #include <sys/time.h>
 #include <sys/ioctl.h>
@@ -864,6 +865,7 @@ struct input_dev {
 	unsigned int users;
 
 	struct device *dev;
+	struct class_device cdev;
 
 	struct list_head	h_list;
 	struct list_head	node;
