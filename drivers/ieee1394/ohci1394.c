@@ -1083,8 +1083,10 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
 
 			initialize_dma_rcv_ctx(&ohci->ir_legacy_context, 1);
 
+#if 0
 			if (printk_ratelimit())
 				PRINT(KERN_ERR, "IR legacy activated");
+#endif
 		}
 
                 spin_lock_irqsave(&ohci->IR_channel_lock, flags);
