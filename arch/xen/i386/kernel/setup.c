@@ -60,6 +60,7 @@
 #include <asm/io.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/physdev.h>
+#include <asm-xen/xen-public/memory.h>
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
@@ -1148,12 +1149,12 @@ static void __init reserve_ebda_region(void)
 void __init setup_bootmem_allocator(void);
 static unsigned long __init setup_memory(void)
 {
-
 	/*
 	 * partially used pages are not usable - thus
 	 * we are rounding upwards:
 	 */
- 	min_low_pfn = PFN_UP(__pa(xen_start_info.pt_base)) + xen_start_info.nr_pt_frames;
+ 	min_low_pfn = PFN_UP(__pa(xen_start_info.pt_base)) +
+		xen_start_info.nr_pt_frames;
 
 	find_max_pfn();
 
@@ -1645,15 +1646,21 @@ void __init setup_arch(char **cmdline_p)
 				(unsigned int *)xen_start_info.mfn_list,
 				xen_start_info.nr_pages * sizeof(unsigned int));
 		} else {
+			struct xen_memory_reservation reservation = {
+				.extent_start = (unsigned long *)xen_start_info.mfn_list + max_pfn,
+				.nr_extents   = xen_start_info.nr_pages - max_pfn,
+				.extent_order = 0,
+				.domid        = DOMID_SELF
+			};
+
 			memcpy(phys_to_machine_mapping,
 				(unsigned int *)xen_start_info.mfn_list,
 				max_pfn * sizeof(unsigned int));
 			/* N.B. below relies on sizeof(int) == sizeof(long). */
-			if (HYPERVISOR_dom_mem_op(
-				MEMOP_decrease_reservation,
-				(unsigned long *)xen_start_info.mfn_list + max_pfn,
-				xen_start_info.nr_pages - max_pfn, 0) !=
-			    (xen_start_info.nr_pages - max_pfn)) BUG();
+			BUG_ON(HYPERVISOR_memory_op(
+				XENMEM_decrease_reservation,
+				&reservation) !=
+			    (xen_start_info.nr_pages - max_pfn));
 		}
 		free_bootmem(
 			__pa(xen_start_info.mfn_list), 
@@ -1686,8 +1693,8 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 
-
-	dmi_scan_machine();
+	if (xen_start_info.flags & SIF_INITDOMAIN)
+		dmi_scan_machine();
 
 #ifdef CONFIG_X86_GENERICARCH
 	generic_apic_probe(*cmdline_p);

@@ -247,12 +247,12 @@ skip:
 	} else if (i == NR_IRQS) {
 		seq_printf(p, "NMI: ");
 		for_each_cpu(j)
-			seq_printf(p, "%10u ", nmi_count(j));
+ 			seq_printf(p, "%10u ", nmi_count(j));
 		seq_putc(p, '\n');
 #ifdef CONFIG_X86_LOCAL_APIC
 		seq_printf(p, "LOC: ");
 		for_each_cpu(j)
-			seq_printf(p, "%10u ", per_cpu(irq_stat, j).apic_timer_irqs);
+			seq_printf(p, "%10u ", per_cpu(irq_stat,j).apic_timer_irqs);
 		seq_putc(p, '\n');
 #endif
 		seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
@@ -269,6 +269,7 @@ skip:
 void fixup_irqs(cpumask_t map)
 {
 	unsigned int irq;
+	static int warned;
 
 	for (irq = 0; irq < NR_IRQS; irq++) {
 		cpumask_t mask;
@@ -282,7 +283,7 @@ void fixup_irqs(cpumask_t map)
 		}
 		if (irq_desc[irq].handler->set_affinity)
 			irq_desc[irq].handler->set_affinity(irq, mask);
-		else if (irq_desc[irq].action)
+		else if (irq_desc[irq].action && !(warned++))
 			printk("Cannot set affinity for irq %i\n", irq);
 	}
 
