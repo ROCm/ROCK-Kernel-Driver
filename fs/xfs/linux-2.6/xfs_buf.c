@@ -54,6 +54,7 @@
 #include <linux/percpu.h>
 #include <linux/blkdev.h>
 #include <linux/hash.h>
+#include <linux/kthread.h>
 
 #include "xfs_linux.h"
 
@@ -1733,9 +1734,7 @@ pagebuf_runall_queues(
 }
 
 /* Defines for pagebuf daemon */
-STATIC DECLARE_COMPLETION(xfsbufd_done);
 STATIC struct task_struct *xfsbufd_task;
-STATIC int xfsbufd_active;
 STATIC int xfsbufd_force_flush;
 STATIC int xfsbufd_force_sleep;
 
@@ -1761,13 +1760,7 @@ xfsbufd(
 	xfs_buftarg_t		*target;
 	xfs_buf_t		*pb, *n;
 
-	/*  Set up the thread  */
-	daemonize("xfsbufd");
 	current->flags |= PF_MEMALLOC;
-
-	xfsbufd_task = current;
-	xfsbufd_active = 1;
-	barrier();
 
 	INIT_LIST_HEAD(&tmp);
 	do {
@@ -1816,9 +1809,9 @@ xfsbufd(
 			purge_addresses();
 
 		xfsbufd_force_flush = 0;
-	} while (xfsbufd_active);
+	} while (!kthread_should_stop());
 
-	complete_and_exit(&xfsbufd_done, 0);
+	return 0;
 }
 
 /*
@@ -1888,101 +1881,63 @@ xfs_flush_buftarg(
 	return pincount;
 }
 
-STATIC int
-xfs_buf_daemons_start(void)
-{
-	int		error = -ENOMEM;
-
-	xfslogd_workqueue = create_workqueue("xfslogd");
-	if (!xfslogd_workqueue)
-		goto out;
-
-	xfsdatad_workqueue = create_workqueue("xfsdatad");
-	if (!xfsdatad_workqueue)
-		goto out_destroy_xfslogd_workqueue;
-
-	error = kernel_thread(xfsbufd, NULL, CLONE_FS|CLONE_FILES);
-	if (error < 0)
-		goto out_destroy_xfsdatad_workqueue;
-	return 0;
-
- out_destroy_xfsdatad_workqueue:
-	destroy_workqueue(xfsdatad_workqueue);
- out_destroy_xfslogd_workqueue:
-	destroy_workqueue(xfslogd_workqueue);
- out:
-	return error;
-}
-
-/*
- * Note: do not mark as __exit, it is called from pagebuf_terminate.
- */
-STATIC void
-xfs_buf_daemons_stop(void)
-{
-	xfsbufd_active = 0;
-	barrier();
-	wait_for_completion(&xfsbufd_done);
-
-	destroy_workqueue(xfslogd_workqueue);
-	destroy_workqueue(xfsdatad_workqueue);
-}
-
-/*
- *	Initialization and Termination
- */
-
 int __init
 pagebuf_init(void)
 {
 	int		error = -ENOMEM;
 
-	pagebuf_zone = kmem_zone_init(sizeof(xfs_buf_t), "xfs_buf");
-	if (!pagebuf_zone)
-		goto out;
-
 #ifdef PAGEBUF_TRACE
 	pagebuf_trace_buf = ktrace_alloc(PAGEBUF_TRACE_SIZE, KM_SLEEP);
 #endif
 
-	error = xfs_buf_daemons_start();
-	if (error)
+	pagebuf_zone = kmem_zone_init(sizeof(xfs_buf_t), "xfs_buf");
+	if (!pagebuf_zone)
+		goto out_free_trace_buf;
+
+	xfslogd_workqueue = create_workqueue("xfslogd");
+	if (!xfslogd_workqueue)
 		goto out_free_buf_zone;
 
-	pagebuf_shake = kmem_shake_register(xfsbufd_wakeup);
-	if (!pagebuf_shake) {
-		error = -ENOMEM;
-		goto out_stop_daemons;
+	xfsdatad_workqueue = create_workqueue("xfsdatad");
+	if (!xfsdatad_workqueue)
+		goto out_destroy_xfslogd_workqueue;
+
+	xfsbufd_task = kthread_run(xfsbufd, NULL, "xfsbufd");
+	if (IS_ERR(xfsbufd_task)) {
+		error = PTR_ERR(xfsbufd_task);
+		goto out_destroy_xfsdatad_workqueue;
 	}
+
+	pagebuf_shake = kmem_shake_register(xfsbufd_wakeup);
+	if (!pagebuf_shake)
+		goto out_stop_xfsbufd;
 
 	return 0;
 
- out_stop_daemons:
-	xfs_buf_daemons_stop();
+ out_stop_xfsbufd:
+	kthread_stop(xfsbufd_task);
+ out_destroy_xfsdatad_workqueue:
+	destroy_workqueue(xfsdatad_workqueue);
+ out_destroy_xfslogd_workqueue:
+	destroy_workqueue(xfslogd_workqueue);
  out_free_buf_zone:
+	kmem_zone_destroy(pagebuf_zone);
+ out_free_trace_buf:
 #ifdef PAGEBUF_TRACE
 	ktrace_free(pagebuf_trace_buf);
 #endif
-	kmem_zone_destroy(pagebuf_zone);
- out:
 	return error;
 }
 
-
-/*
- *	pagebuf_terminate.
- *
- *	Note: do not mark as __exit, this is also called from the __init code.
- */
 void
 pagebuf_terminate(void)
 {
-	xfs_buf_daemons_stop();
-
+	kmem_shake_deregister(pagebuf_shake);
+	kthread_stop(xfsbufd_task);
+	destroy_workqueue(xfsdatad_workqueue);
+	destroy_workqueue(xfslogd_workqueue);
+	kmem_zone_destroy(pagebuf_zone);
 #ifdef PAGEBUF_TRACE
 	ktrace_free(pagebuf_trace_buf);
 #endif
-
-	kmem_zone_destroy(pagebuf_zone);
-	kmem_shake_deregister(pagebuf_shake);
 }
