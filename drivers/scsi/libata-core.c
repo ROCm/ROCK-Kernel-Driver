@@ -3148,9 +3148,14 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 	if (likely(qc->flags & ATA_QCFLAG_DMAMAP))
 		ata_sg_clean(qc);
 
+	/*
+	 * atapi: Inactivate qc to prevent the interrupt handler from
+	 * racing with the error handling and atapi_request_sense() later.
+	 */
+	qc->flags &= ~ATA_QCFLAG_ACTIVE;
+
 	/* call completion callback */
 	rc = qc->complete_fn(qc, drv_stat);
-	qc->flags &= ~ATA_QCFLAG_ACTIVE;
 
 	/* if callback indicates not to complete command (non-zero),
 	 * return immediately
