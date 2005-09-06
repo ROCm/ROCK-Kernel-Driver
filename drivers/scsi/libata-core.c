@@ -2539,9 +2539,12 @@ static unsigned long ata_pio_poll(struct ata_port *ap)
  *
  *	LOCKING:
  *	None.  (executing in kernel thread context)
+ *
+ *	RETURNS:
+ *	Zero if qc completed, non-zero otherwise.
  */
 
-static void ata_pio_complete (struct ata_port *ap)
+static int ata_pio_complete (struct ata_port *ap)
 {
 	struct ata_queued_cmd *qc;
 	u8 drv_stat;
@@ -2561,14 +2564,14 @@ static void ata_pio_complete (struct ata_port *ap)
 		if (drv_stat & (ATA_BUSY | ATA_DRQ)) {
 			ap->pio_task_state = PIO_ST_LAST_POLL;
 			ap->pio_task_timeout = jiffies + ATA_TMOUT_PIO;
-			return;
+			return 1; /* qc not completed */
 		}
 	}
 
 	drv_stat = ata_wait_idle(ap);
 	if (!ata_ok(drv_stat)) {
 		ap->pio_task_state = PIO_ST_ERR;
-		return;
+		return 1; /* qc not completed */
 	}
 
 	qc = ata_qc_from_tag(ap, ap->active_tag);
@@ -2577,6 +2580,7 @@ static void ata_pio_complete (struct ata_port *ap)
 	ap->pio_task_state = PIO_ST_IDLE;
 
 	ata_poll_qc_complete(qc, drv_stat);
+	return 0; /* qc completed */
 }
 
 
@@ -2892,9 +2896,12 @@ err_out:
  *
  *	LOCKING:
  *	None.  (executing in kernel thread context)
+ *
+ *	RETURNS:
+ *	Zero if qc completed, non-zero otherwise.
  */
 
-static void ata_pio_block(struct ata_port *ap)
+static int ata_pio_block(struct ata_port *ap)
 {
 	struct ata_queued_cmd *qc;
 	u8 status;
@@ -2914,7 +2921,7 @@ static void ata_pio_block(struct ata_port *ap)
 		if (status & ATA_BUSY) {
 			ap->pio_task_state = PIO_ST_POLL;
 			ap->pio_task_timeout = jiffies + ATA_TMOUT_PIO;
-			return;
+			return 1; /* qc not completed */
 		}
 	}
 
@@ -2927,7 +2934,7 @@ static void ata_pio_block(struct ata_port *ap)
 			ap->pio_task_state = PIO_ST_IDLE;
 
 			ata_poll_qc_complete(qc, status);
-			return;
+			return 0; /* qc completed */
 		}
 
 		atapi_pio_bytes(qc);
@@ -2935,11 +2942,13 @@ static void ata_pio_block(struct ata_port *ap)
 		/* handle BSY=0, DRQ=0 as error */
 		if ((status & ATA_DRQ) == 0) {
 			ap->pio_task_state = PIO_ST_ERR;
-			return;
+			return 1; /* qc not completed */
 		}
 
 		ata_pio_sector(qc);
 	}
+
+	return 1; /* qc not completed */
 }
 
 static void ata_pio_error(struct ata_port *ap)
@@ -2963,21 +2972,20 @@ static void ata_pio_task(void *_data)
 {
 	struct ata_port *ap = _data;
 	unsigned long timeout = 0;
+	int has_next = 0;
 
 	switch (ap->pio_task_state) {
-	case PIO_ST_IDLE:
-		return;
-
 	case PIO_ST:
-		ata_pio_block(ap);
+		has_next = ata_pio_block(ap);
 		break;
 
 	case PIO_ST_LAST:
-		ata_pio_complete(ap);
+		has_next = ata_pio_complete(ap);
 		break;
 
 	case PIO_ST_POLL:
 	case PIO_ST_LAST_POLL:
+		has_next = 1;
 		timeout = ata_pio_poll(ap);
 		break;
 
@@ -2985,13 +2993,18 @@ static void ata_pio_task(void *_data)
 	case PIO_ST_ERR:
 		ata_pio_error(ap);
 		return;
+	default:
+		printk(KERN_ERR "ata%u unknown PIO task state %u\n", 
+		       ap->id, ap->pio_task_state);
+		return;
 	}
 
-	if (timeout)
-		queue_delayed_work(ata_wq, &ap->pio_task,
-				   timeout);
-	else
-		queue_work(ata_wq, &ap->pio_task);
+	if (has_next) {
+		if (timeout)
+			queue_delayed_work(ata_wq, &ap->pio_task, timeout);
+		else
+			queue_work(ata_wq, &ap->pio_task);
+	}
 }
 
 static void atapi_request_sense(struct ata_port *ap, struct ata_device *dev,
