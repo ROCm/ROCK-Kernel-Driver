@@ -568,7 +568,11 @@ unsigned long __init e820_end_of_ram(void)
         return xen_override_max_pfn;
 }
 
-
+unsigned long __init
+e820_hole_size(unsigned long start_pfn, unsigned long end_pfn)
+{
+	return 0;
+}
 
 void __init e820_reserve_resources(void) 
 {
