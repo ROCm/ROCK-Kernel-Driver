@@ -158,6 +158,14 @@ static struct vfsmount *get_child_mount (struct subfs_mount *sfs_mnt,
 	int result;
 	unsigned long flags = 0;
 
+	/* We're sitting in a detached namespace -
+	 * don't mount the filesystem. */
+	if (mnt->mnt_mountpoint == mnt->mnt_root) {
+		printk (KERN_ERR "subfs: refusing to mount media in "
+		        "deleted directory\n");
+		return ERR_PTR(-ENOENT);
+	}
+	
 	/* Lookup the child mount - if it's not mounted, mount it */
 	child = lookup_mnt (mnt, sfs_mnt->sb->s_root);
 	if (!child) {
