@@ -471,7 +471,7 @@ ifeq ($(KBUILD_EXTMOD),)
 # Carefully list dependencies so we do not try to build scripts twice
 # in parrallel
 .PHONY: scripts
-scripts: scripts_basic $(objtree)/include/config/MARKER
+scripts: scripts_basic include/config/MARKER
 	$(Q)$(MAKE) $(build)=$(@)
 
 scripts_basic: $(objtree)/include/linux/autoconf.h
@@ -779,7 +779,7 @@ endif
 # prepare1 creates a makefile if using a separate output directory
 prepare1: prepare2 outputmakefile
 
-prepare0: prepare1 $(objtree)/include/linux/version.h $(objtree)/include/asm $(objtree)/include/config/MARKER
+prepare0: prepare1 $(objtree)/include/linux/version.h $(objtree)/include/asm include/config/MARKER
 ifneq ($(KBUILD_MODULES),)
 	$(Q)rm -rf $(MODVERDIR)
 	$(Q)mkdir -p $(MODVERDIR)
@@ -826,7 +826,7 @@ $(objtree)/include/asm:
 
 # 	Split autoconf.h into include/linux/config/*
 
-$(objtree)/include/config/MARKER: $(objtree)/include/linux/autoconf.h
+include/config/MARKER: $(objtree)/include/linux/autoconf.h
 	@echo '  SPLIT   include/linux/autoconf.h -> include/config/*'
 	@scripts/basic/split-include include/linux/autoconf.h include/config
 	@touch $@
