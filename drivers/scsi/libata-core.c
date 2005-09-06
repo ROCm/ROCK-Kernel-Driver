@@ -2932,7 +2932,7 @@ static void ata_qc_timeout(struct ata_queued_cmd *qc)
 		/* finish completing original command */
 		__ata_qc_complete(qc);
 
-		if (SCSI_SENSE_VALID(cmd)) {
+		if (!SCSI_SENSE_VALID(cmd)) {
 			atapi_request_sense(ap, dev, cmd);
 		
 			cmd->result = (CHECK_CONDITION << 1) | (DID_OK << 16);
