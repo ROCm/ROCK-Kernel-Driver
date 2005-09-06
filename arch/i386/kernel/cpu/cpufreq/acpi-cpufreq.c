@@ -31,6 +31,7 @@
 #include <linux/cpufreq.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/compiler.h>
 #include <asm/io.h>
 #include <asm/delay.h>
 #include <asm/uaccess.h>
@@ -56,6 +57,8 @@ struct cpufreq_acpi_io {
 static struct cpufreq_acpi_io	*acpi_io_data[NR_CPUS];
 
 static struct cpufreq_driver acpi_cpufreq_driver;
+
+static unsigned int acpi_pstate_strict;
 
 static int
 acpi_processor_write_port(
@@ -163,6 +166,12 @@ acpi_processor_set_performance (
 	}
 
 	/*
+	 * Assume the write went through when acpi_pstate_strict is not used.
+	 * As read status_register is an expensive operation and there
+	 * are no specific error cases where an IO port write will fail.
+	 */
+   if (acpi_pstate_strict) {
+	/*
 	 * Then we read the 'status_register' and compare the value with the
 	 * target state's 'status' to make sure the transition was successful.
 	 * Note that we'll poll for up to 1ms (100 cycles of 10us) before
@@ -186,11 +195,14 @@ acpi_processor_set_performance (
 			break;
 		udelay(10);
 	}
+   } else {
+       value = (u32) data->acpi_data.states[state].status;
+   }
 
 	/* notify cpufreq */
 	cpufreq_notify_transition(&cpufreq_freqs, CPUFREQ_POSTCHANGE);
 
-	if (value != (u32) data->acpi_data.states[state].status) {
+	if (unlikely(value != (u32) data->acpi_data.states[state].status)) {
 		unsigned int tmp = cpufreq_freqs.new;
 		cpufreq_freqs.new = cpufreq_freqs.old;
 		cpufreq_freqs.old = tmp;
@@ -537,6 +549,8 @@ acpi_cpufreq_exit (void)
 	return;
 }
 
+module_param(acpi_pstate_strict, uint, 0644);
+MODULE_PARM_DESC(acpi_pstate_strict, "value 0 or non-zero. non-zero -> strict ACPI checks are performed during frequency changes.");
 
 late_initcall(acpi_cpufreq_init);
 module_exit(acpi_cpufreq_exit);
