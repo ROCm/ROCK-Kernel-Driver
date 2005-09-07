@@ -50,6 +50,13 @@ int get_physical_broadcast(void)
         return 0xff;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+#define DEFAULT_SEND_IPI        (1)
+#else
+#define DEFAULT_SEND_IPI        (0)
+#endif
+int no_broadcast=DEFAULT_SEND_IPI;
+
 /*
  * 'what should we do if we get a hw irq event on an illegal vector'.
  * each architecture has to answer this themselves.

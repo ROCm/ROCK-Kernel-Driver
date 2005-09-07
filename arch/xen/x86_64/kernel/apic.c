@@ -199,3 +199,8 @@ int __init APIC_init_uniprocessor (void)
 
 	return 0;
 }
+
+void __cpuinit disable_APIC_timer(void)
+{
+}
+

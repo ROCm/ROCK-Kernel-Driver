@@ -133,6 +133,7 @@ void xen_tlb_flush(void)
 	op.cmd = MMUEXT_TLB_FLUSH_LOCAL;
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
+EXPORT_SYMBOL(xen_tlb_flush);
 
 void xen_invlpg(unsigned long ptr)
 {

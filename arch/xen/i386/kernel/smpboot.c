@@ -1365,7 +1365,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		if (kicked == 1)
 			prepare_for_smp();
 #endif
-		if (((cpu = alloc_cpu_id()) <= 0) || do_boot_cpu(apicid, cpu))
+		if (((cpu = alloc_cpu_id()) <= 0) || do_boot_cpu(x86_cpu_to_apicid[cpu], cpu))
 			printk("CPU #%d not responding - cannot use it.\n",
 								cpu);
 		else
