@@ -25,18 +25,6 @@
 #include <linux/slab.h>
 #include "pci.h"
 
-/* aty128fb and radeonfb crash when calling pci_map_rom */
-#ifdef __powerpc__
-static int pci_rom_disable = 1;
-#else
-static int pci_rom_disable;
-#endif
-static int __init pci_rom_disable_setup(char *str)
-{
-	pci_rom_disable = simple_strtoul(str, NULL, 0);
-	return 1;
-}
-__setup("pcirom=", pci_rom_disable_setup);
 
 static void
 pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
@@ -65,12 +53,9 @@ pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
 	if (resno < 6) {
 		reg = PCI_BASE_ADDRESS_0 + 4 * resno;
 	} else if (resno == PCI_ROM_RESOURCE) {
-		if (!pci_rom_disable) {
 		if (!(res->flags & IORESOURCE_ROM_ENABLE))
 			return;
 		new |= PCI_ROM_ADDRESS_ENABLE;
-		} else
-			new |= res->flags & IORESOURCE_ROM_ENABLE;
 		reg = dev->rom_base_reg;
 	} else {
 		/* Hmm, non-standard resource. */
