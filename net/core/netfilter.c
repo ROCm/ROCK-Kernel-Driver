@@ -544,8 +544,10 @@ int nf_rcv_postxfrm_local(struct sk_buff *skb)
 	/* Fix header len and checksum if last xfrm was transport mode */
 	if (!skb->sp->x[skb->sp->len - 1].xvec->props.mode) {
 		skb->nh.iph->tot_len = htons(skb->len);
-		ip_send_check(skb->nh.iph);
 	}
+	/* Unconditionally do the checksum; the packet
+	 * may have been fragmented. Icky. */
+	ip_send_check(skb->nh.iph);
 	return nf_rcv_postxfrm_nonlocal(skb);
 }
  
