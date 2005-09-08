@@ -1653,6 +1653,7 @@ static struct of_device_id pmac_ide_macio_match[] =
 	},
 	{},
 };
+MODULE_DEVICE_TABLE (of, pmac_ide_macio_match);
 
 static struct macio_driver pmac_ide_macio_driver = 
 {
