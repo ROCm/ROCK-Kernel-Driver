@@ -602,9 +602,11 @@ read_led(const char *ledname, int ledmask)
 
 		if (read_acpi_int(NULL, ledname, &led_status))
 			return led_status;
+#ifdef DEBUG
 		else
 			printk(KERN_WARNING "Asus ACPI: Error reading LED "
 			       "status\n");
+#endif
 	}
 	return (hotk->status & ledmask) ? 1 : 0;
 }
@@ -756,8 +758,11 @@ static int get_lcd_state(void)
 
 	if (hotk->model != L3H) {
 	/* We don't have to check anything if we are here */
-		if (!read_acpi_int(NULL, hotk->methods->lcd_status, &lcd))
+		if (!read_acpi_int(NULL, hotk->methods->lcd_status, &lcd)) {
+#ifdef DEBUG
 			printk(KERN_WARNING "Asus ACPI: Error reading LCD status\n");
+#endif
+		}
 	
 		if (hotk->model == L2D)
 			lcd = ~lcd;
@@ -843,12 +848,18 @@ static int read_brightness(void)
 	
 	if(hotk->methods->brightness_get) { /* SPLV/GPLV laptop */
 		if (!read_acpi_int(hotk->handle, hotk->methods->brightness_get, 
-				   &value))
+				   &value)) {
+#ifdef DEBUG
 			printk(KERN_WARNING "Asus ACPI: Error reading brightness\n");
+#endif
+		}
 	} else if (hotk->methods->brightness_status) { /* For D1 for example */
 		if (!read_acpi_int(NULL, hotk->methods->brightness_status, 
-				   &value))
+				   &value)) {
+#ifdef DEBUG
 			printk(KERN_WARNING "Asus ACPI: Error reading brightness\n");
+#endif
+		}
 	} else /* No GPLV method */
 		value = hotk->brightness;
 	return value;
@@ -927,8 +938,12 @@ proc_read_disp(char *page, char **start, off_t off, int count, int *eof,
 {
 	int value = 0;
 	
-	if (!read_acpi_int(hotk->handle, hotk->methods->display_get, &value))
+	if (!read_acpi_int(hotk->handle, hotk->methods->display_get, &value)) {
+#ifdef DEBUG
 		printk(KERN_WARNING "Asus ACPI: Error reading display status\n");
+#endif
+	}
+
 	value &= 0x07; /* needed for some models, shouldn't hurt others */
 	return sprintf(page, "%d\n", value);
 }
