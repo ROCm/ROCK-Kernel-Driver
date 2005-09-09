@@ -62,7 +62,7 @@ MODULE_PARM_DESC(enable, "Enable Intel HD audio interface.");
 module_param_array(model, charp, NULL, 0444);
 MODULE_PARM_DESC(model, "Use the given board model.");
 module_param_array(position_fix, int, NULL, 0444);
-MODULE_PARM_DESC(position_fix, "Fix DMA pointer (0 = auto, 1 = none, 2 = POSBUF, 3 = FIFO size).");
+MODULE_PARM_DESC(position_fix, "Fix DMA pointer (0 = FIFO size, 1 = none, 2 = POSBUF).");
 
 MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("{{Intel, ICH6},"
@@ -213,10 +213,9 @@ enum { SDI0, SDI1, SDI2, SDI3, SDO0, SDO1, SDO2, SDO3 };
 
 /* position fix mode */
 enum {
-	POS_FIX_AUTO,
-	POS_FIX_NONE,
-	POS_FIX_POSBUF,
 	POS_FIX_FIFO,
+	POS_FIX_NONE,
+	POS_FIX_POSBUF
 };
 
 /* Defines for ATI HD Audio support in SB450 south bridge */
@@ -246,7 +245,6 @@ struct snd_azx_dev {
 	unsigned int fragsize;		/* size of each period in bytes */
 	unsigned int frags;		/* number for period in the play buffer */
 	unsigned int fifo_size;		/* FIFO size */
-	unsigned int last_pos;		/* last updated period position */
 
 	void __iomem *sd_addr;		/* stream descriptor pointer */
 
@@ -260,7 +258,6 @@ struct snd_azx_dev {
 
 	unsigned int opened: 1;
 	unsigned int running: 1;
-	unsigned int period_updating: 1;
 };
 
 /* CORB/RIRB */
@@ -729,9 +726,11 @@ static void azx_init_chip(azx_t *chip)
 	/* initialize the codec command I/O */
 	azx_init_cmd_io(chip);
 
-	/* program the position buffer */
-	azx_writel(chip, DPLBASE, (u32)chip->posbuf.addr);
-	azx_writel(chip, DPUBASE, upper_32bit(chip->posbuf.addr));
+	if (chip->position_fix == POS_FIX_POSBUF) {
+		/* program the position buffer */
+		azx_writel(chip, DPLBASE, (u32)chip->posbuf.addr);
+		azx_writel(chip, DPUBASE, upper_32bit(chip->posbuf.addr));
+	}
 
 	/* For ATI SB450 azalia HD audio, we need to enable snoop */
 	if (chip->driver_type == AZX_DRIVER_ATI) {
@@ -766,11 +765,9 @@ static irqreturn_t azx_interrupt(int irq, void* dev_id, struct pt_regs *regs)
 		if (status & azx_dev->sd_int_sta_mask) {
 			azx_sd_writeb(azx_dev, SD_STS, SD_INT_MASK);
 			if (azx_dev->substream && azx_dev->running) {
-				azx_dev->period_updating = 1;
 				spin_unlock(&chip->reg_lock);
 				snd_pcm_period_elapsed(azx_dev->substream);
 				spin_lock(&chip->reg_lock);
-				azx_dev->period_updating = 0;
 			}
 		}
 	}
@@ -871,9 +868,11 @@ static int azx_setup_controller(azx_t *chip, azx_dev_t *azx_dev)
 	/* upper BDL address */
 	azx_sd_writel(azx_dev, SD_BDLPU, upper_32bit(azx_dev->bdl_addr));
 
-	/* enable the position buffer */
-	if (! (azx_readl(chip, DPLBASE) & ICH6_DPLBASE_ENABLE))
-		azx_writel(chip, DPLBASE, (u32)chip->posbuf.addr | ICH6_DPLBASE_ENABLE);
+	if (chip->position_fix == POS_FIX_POSBUF) {
+		/* enable the position buffer */
+		if (! (azx_readl(chip, DPLBASE) & ICH6_DPLBASE_ENABLE))
+			azx_writel(chip, DPLBASE, (u32)chip->posbuf.addr | ICH6_DPLBASE_ENABLE);
+	}
 
 	/* set the interrupt enable bits in the descriptor control register */
 	azx_sd_writel(azx_dev, SD_CTL, azx_sd_readl(azx_dev, SD_CTL) | SD_INT_MASK);
@@ -1081,7 +1080,6 @@ static int azx_pcm_prepare(snd_pcm_substream_t *substream)
 		azx_dev->fifo_size = azx_sd_readw(azx_dev, SD_FIFOSIZE) + 1;
 	else
 		azx_dev->fifo_size = 0;
-	azx_dev->last_pos = 0;
 
 	return hinfo->ops.prepare(hinfo, apcm->codec, azx_dev->stream_tag,
 				  azx_dev->format_val, substream);
@@ -1137,26 +1135,6 @@ static snd_pcm_uframes_t azx_pcm_pointer(snd_pcm_substream_t *substream)
 		pos = azx_sd_readl(azx_dev, SD_LPIB);
 		if (chip->position_fix == POS_FIX_FIFO)
 			pos += azx_dev->fifo_size;
-		else if (chip->position_fix == POS_FIX_AUTO && azx_dev->period_updating) {
-			/* check the validity of DMA position */
-			unsigned int diff = 0;
-			azx_dev->last_pos += azx_dev->fragsize;
-			if (azx_dev->last_pos > pos)
-				diff = azx_dev->last_pos - pos;
-			if (azx_dev->last_pos >= azx_dev->bufsize) {
-				if (pos < azx_dev->fragsize)
-					diff = 0;
-				azx_dev->last_pos = 0;
-			}
-			if (diff > 0 && diff <= azx_dev->fifo_size)
-				pos += azx_dev->fifo_size;
-			else {
-				snd_printdd(KERN_INFO "hda_intel: DMA position fix %d, switching to posbuf\n", diff);
-				chip->position_fix = POS_FIX_POSBUF;
-				pos = *azx_dev->posbuf;
-			}
-			azx_dev->period_updating = 0;
-		}
 	}
 	if (pos >= azx_dev->bufsize)
 		pos = 0;
@@ -1289,7 +1267,8 @@ static int __devinit azx_init_stream(azx_t *chip)
 		azx_dev_t *azx_dev = &chip->azx_dev[i];
 		azx_dev->bdl = (u32 *)(chip->bdl.area + off);
 		azx_dev->bdl_addr = chip->bdl.addr + off;
-		azx_dev->posbuf = (volatile u32 *)(chip->posbuf.area + i * 8);
+		if (chip->position_fix == POS_FIX_POSBUF)
+			azx_dev->posbuf = (volatile u32 *)(chip->posbuf.area + i * 8);
 		/* offset: SDI0=0x80, SDI1=0xa0, ... SDO3=0x160 */
 		azx_dev->sd_addr = chip->remap_addr + (0x20 * i + 0x80);
 		/* int mask: SDI0=0x01, SDI1=0x02, ... SDO3=0x80 */
@@ -1481,11 +1460,13 @@ static int __devinit azx_create(snd_card_t *card, struct pci_dev *pci,
 		snd_printk(KERN_ERR SFX "cannot allocate BDL\n");
 		goto errout;
 	}
-	/* allocate memory for the position buffer */
-	if ((err = snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
-				       chip->num_streams * 8, &chip->posbuf)) < 0) {
-		snd_printk(KERN_ERR SFX "cannot allocate posbuf\n");
-		goto errout;
+	if (chip->position_fix == POS_FIX_POSBUF) {
+		/* allocate memory for the position buffer */
+		if ((err = snd_dma_alloc_pages(SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
+					       chip->num_streams * 8, &chip->posbuf)) < 0) {
+			snd_printk(KERN_ERR SFX "cannot allocate posbuf\n");
+			goto errout;
+		}
 	}
 	/* allocate CORB/RIRB */
 	if ((err = azx_alloc_cmd_io(chip)) < 0)
