@@ -313,23 +313,12 @@ static int ahci_port_start(struct ata_port *ap)
 	dma_addr_t mem_dma;
 
 	pp = kmalloc(sizeof(*pp), GFP_KERNEL);
-	if (!pp) {
-		printk(KERN_ERR "ahci: failed allocating pp %d\n", (int)sizeof(*pp));
+	if (!pp)
 		return -ENOMEM;
-	}
 	memset(pp, 0, sizeof(*pp));
-
-	ap->pad = dma_alloc_coherent(dev, ATA_DMA_PAD_BUF_SZ, &ap->pad_dma, GFP_KERNEL);
-	if (!ap->pad) {
-		printk(KERN_ERR "ahci: failed allocating pad %d\n", ATA_DMA_PAD_BUF_SZ);
-		kfree(pp);
-		return -ENOMEM;
-	}
 
 	mem = dma_alloc_coherent(dev, AHCI_PORT_PRIV_DMA_SZ, &mem_dma, GFP_KERNEL);
 	if (!mem) {
-		printk(KERN_ERR "ahci: failed allocating mem %d\n", AHCI_PORT_PRIV_DMA_SZ);
-		dma_free_coherent(dev, ATA_DMA_PAD_BUF_SZ, ap->pad, ap->pad_dma);
 		kfree(pp);
 		return -ENOMEM;
 	}
@@ -405,7 +394,6 @@ static void ahci_port_stop(struct ata_port *ap)
 	ap->private_data = NULL;
 	dma_free_coherent(dev, AHCI_PORT_PRIV_DMA_SZ,
 			  pp->cmd_slot, pp->cmd_slot_dma);
-	dma_free_coherent(dev, ATA_DMA_PAD_BUF_SZ, ap->pad, ap->pad_dma);
 	kfree(pp);
 }
 
@@ -491,23 +479,23 @@ static void ahci_tf_read(struct ata_port *ap, struct ata_taskfile *tf)
 static void ahci_fill_sg(struct ata_queued_cmd *qc)
 {
 	struct ahci_port_priv *pp = qc->ap->private_data;
-	struct scatterlist *sg;
-	struct ahci_sg *ahci_sg;
+	unsigned int i;
 
 	VPRINTK("ENTER\n");
 
 	/*
 	 * Next, the S/G list.
 	 */
-	ahci_sg = pp->cmd_tbl_sg;
-	ata_for_each_sg(sg, qc) {
-		dma_addr_t addr = sg_dma_address(sg);
-		u32 sg_len = sg_dma_len(sg);
+	for (i = 0; i < qc->n_elem; i++) {
+		u32 sg_len;
+		dma_addr_t addr;
 
-		ahci_sg->addr = cpu_to_le32(addr & 0xffffffff);
-		ahci_sg->addr_hi = cpu_to_le32((addr >> 16) >> 16);
-		ahci_sg->flags_size = cpu_to_le32(sg_len - 1);
-		ahci_sg++;
+		addr = sg_dma_address(&qc->sg[i]);
+		sg_len = sg_dma_len(&qc->sg[i]);
+
+		pp->cmd_tbl_sg[i].addr = cpu_to_le32(addr & 0xffffffff);
+		pp->cmd_tbl_sg[i].addr_hi = cpu_to_le32((addr >> 16) >> 16);
+		pp->cmd_tbl_sg[i].flags_size = cpu_to_le32(sg_len - 1);
 	}
 }
 
@@ -1005,7 +993,6 @@ static int ahci_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	probe_ent = kmalloc(sizeof(*probe_ent), GFP_KERNEL);
 	if (probe_ent == NULL) {
-		printk(KERN_ERR "ahci: failed allocating probeent %d\n", (int)sizeof(*probe_ent));
 		rc = -ENOMEM;
 		goto err_out_msi;
 	}
@@ -1017,7 +1004,6 @@ static int ahci_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	mmio_base = ioremap(pci_resource_start(pdev, AHCI_PCI_BAR),
 		            pci_resource_len(pdev, AHCI_PCI_BAR));
 	if (mmio_base == NULL) {
-		printk(KERN_ERR "ahci: failed ioremapping mmio %lx/%lu\n", pci_resource_start(pdev, AHCI_PCI_BAR), pci_resource_len(pdev, AHCI_PCI_BAR));
 		rc = -ENOMEM;
 		goto err_out_free_ent;
 	}
@@ -1025,7 +1011,6 @@ static int ahci_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	hpriv = kmalloc(sizeof(*hpriv), GFP_KERNEL);
 	if (!hpriv) {
-		printk(KERN_ERR "ahci: failed allocating hpriv %d\n", (int)sizeof(*hpriv));
 		rc = -ENOMEM;
 		goto err_out_iounmap;
 	}
