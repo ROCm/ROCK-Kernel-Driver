@@ -80,13 +80,6 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     }
     break;
 
-    case IOCTL_PRIVCMD_INITDOMAIN_EVTCHN:
-    {
-        extern int initdom_ctrlif_domcontroller_port;
-        ret = initdom_ctrlif_domcontroller_port;
-    }
-    break;
-    
 #if defined(CONFIG_XEN_PRIVILEGED_GUEST)
     case IOCTL_PRIVCMD_MMAP:
     {
@@ -123,9 +116,9 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
                 if ( (msg[j].va + (msg[j].npages<<PAGE_SHIFT)) > vma->vm_end )
                     return -EINVAL;
 
-                if ( (rc = direct_remap_area_pages(vma->vm_mm, 
+                if ( (rc = direct_remap_pfn_range(vma->vm_mm, 
                                                    msg[j].va&PAGE_MASK, 
-                                                   msg[j].mfn<<PAGE_SHIFT, 
+                                                   msg[j].mfn, 
                                                    msg[j].npages<<PAGE_SHIFT, 
                                                    vma->vm_page_prot,
                                                    mmapcmd.dom)) < 0 )

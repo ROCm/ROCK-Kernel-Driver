@@ -14,7 +14,6 @@
 #include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/queues.h>
 #include <asm-xen/xenbus.h>
-#include <asm-xen/ctrl_if.h>
 #include <linux/cpu.h>
 #include <linux/kthread.h>
 
@@ -72,7 +71,7 @@ static int shutting_down = SHUTDOWN_INVALID;
 
 static int __do_suspend(void *ignore)
 {
-    int i, j;
+    int i, j, k, fpp;
 
 #ifdef CONFIG_XEN_USB_FRONTEND
     extern void usbif_resume();
@@ -86,7 +85,7 @@ static int __do_suspend(void *ignore)
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
-    extern unsigned long *pfn_to_mfn_frame_list;
+    extern unsigned long *pfn_to_mfn_frame_list_list, *pfn_to_mfn_frame_list[];
 
 #ifdef CONFIG_SMP
     extern void smp_suspend(void);
@@ -173,8 +172,6 @@ static int __do_suspend(void *ignore)
 
     xencons_suspend();
 
-    ctrl_if_suspend();
-
     irq_suspend();
 
     gnttab_suspend();
@@ -196,20 +193,28 @@ static int __do_suspend(void *ignore)
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 
     memset(empty_zero_page, 0, PAGE_SIZE);
-
-    for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
+	     
+    HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
+		virt_to_mfn(pfn_to_mfn_frame_list_list);
+  
+    fpp = PAGE_SIZE/sizeof(unsigned long);
+    for ( i=0, j=0, k=-1; i< max_pfn; i+=fpp, j++ )
     {
-        pfn_to_mfn_frame_list[j] = 
-            virt_to_mfn(&phys_to_machine_mapping[i]);
+	if ( (j % fpp) == 0 )
+	{
+	    k++;
+	    pfn_to_mfn_frame_list_list[k] = 
+		    virt_to_mfn(pfn_to_mfn_frame_list[k]);
+	    j=0;
+	}
+	pfn_to_mfn_frame_list[k][j] = 
+		virt_to_mfn(&phys_to_machine_mapping[i]);
     }
-    HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
-        virt_to_mfn(pfn_to_mfn_frame_list);
+    HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
 
     gnttab_resume();
 
     irq_resume();
-
-    ctrl_if_resume();
 
     xencons_resume();
 
