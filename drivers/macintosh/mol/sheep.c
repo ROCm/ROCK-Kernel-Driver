@@ -74,7 +74,7 @@ struct SheepVars {
 static struct proto sheep_proto = {
 	.name = "SHEEP",
 	.owner = THIS_MODULE,
-	.obj_size = sizeof(struct SheepVars),
+	.obj_size = sizeof(struct sock),
 };
 
 #ifdef LINUX_26
@@ -246,11 +246,18 @@ sheep_net_open( struct inode *inode, struct file *f )
 {
 	static char fake_addr_[6] = { 0xFE, 0xFD, 0xDE, 0xAD, 0xBE, 0xEF };
 	struct SheepVars *v;
+	int rc;
 	D(bug("sheep_net: open\n"));
 
 	// Must be opened with read permissions
 	if( (f->f_flags & O_ACCMODE) == O_WRONLY )
 		return -EPERM;
+
+	rc = proto_register(&sheep_proto, 0);
+	if (rc) {
+		printk(KERN_INFO "Unable to register mol sheep protocol type: %d\n", rc);
+		return rc;
+	}
 
 	// Allocate private variables
 	if( !(v=f->private_data=kmalloc(sizeof(*v), GFP_USER)) )
@@ -283,6 +290,8 @@ sheep_net_release( struct inode *inode, struct file *f )
 	// Empty packet queue
 	while( (skb=skb_dequeue(&v->queue)) )
 		kfree_skb(skb);
+
+	proto_unregister(&sheep_proto);
 
 	// Free private variables
 	kfree(v);
