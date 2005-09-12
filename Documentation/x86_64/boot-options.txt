@@ -32,9 +32,6 @@ APICs
 
    no_timer_check Don't check the IO-APIC timer. This can work around
 		 problems with incorrect timer initialization on some boards.
-   timer_check	 Do check the IO-APIC timer. On ATI boards we force 
-		 no_timer_check now, but if that causes problems it can
-		 be turned off again with this option.
 
 Early Console
 

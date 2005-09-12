@@ -44,7 +44,7 @@ static __init int setup_node(int pxm)
 static __init int conflicting_nodes(unsigned long start, unsigned long end)
 {
 	int i;
-	for_each_online_node(i) {
+	for_each_node_mask(i, nodes_parsed) {
 		struct node *nd = &nodes[i];
 		if (nd->start == nd->end)
 			continue;
@@ -75,8 +75,11 @@ static __init void cutoff_node(int i, unsigned long start, unsigned long end)
 
 static __init void bad_srat(void)
 {
+	int i;
 	printk(KERN_ERR "SRAT: SRAT not used.\n");
 	acpi_numa = -1;
+	for (i = 0; i < NR_CPUS; i++)
+		cpu_to_node[i] = NUMA_NO_NODE;
 }
 
 static __init inline int srat_disabled(void)
@@ -174,6 +177,11 @@ int __init acpi_scan_nodes(unsigned long start, unsigned long end)
 	int i;
 	if (acpi_numa <= 0)
 		return -1;
+	for_each_node_mask(i, nodes_parsed) { 
+		cutoff_node(i, start, end);
+		if (nodes[i].start == nodes[i].end)
+			node_clear(i, nodes_parsed);
+	}
 	memnode_shift = compute_hash_shift(nodes, nodes_weight(nodes_parsed));
 	if (memnode_shift < 0) {
 		printk(KERN_ERR
@@ -184,11 +192,6 @@ int __init acpi_scan_nodes(unsigned long start, unsigned long end)
 	for (i = 0; i < MAX_NUMNODES; i++) {
 		if (!node_isset(i, nodes_parsed))
 			continue;
-		cutoff_node(i, start, end);
-		if (nodes[i].start == nodes[i].end) { 
-			node_clear(i, nodes_parsed);
-			continue;
-		}
 		setup_node_bootmem(i, nodes[i].start, nodes[i].end);
 	}
 	for (i = 0; i < NR_CPUS; i++) { 

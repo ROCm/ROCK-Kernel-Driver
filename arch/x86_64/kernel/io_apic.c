@@ -44,7 +44,8 @@
 int sis_apic_bug; /* not actually supported, dummy for compile */
 
 static int no_timer_check;
-static int force_timer_check;
+
+int disable_timer_pin_1 __initdata;
 
 static DEFINE_SPINLOCK(ioapic_lock);
 
@@ -272,12 +273,14 @@ void __init check_ioapic(void)
 					/* RED-PEN skip them on mptables too? */
 					return;
 				case PCI_VENDOR_ID_ATI:
-					if (force_timer_check) 
-						break;
-					printk(KERN_INFO
- "ATI board detected: Enabling no_timer_check. Overwrite with timer_check\n");				       
-					no_timer_check = 1;
-					break;					
+					/* All timer interrupts on atiixp
+				           are doubled. Disable one. */
+					if (disable_timer_pin_1 == 0) {
+						disable_timer_pin_1 = 1;
+						printk(KERN_INFO
+		"ATI board detected. Disabling timer pin 1.\n");
+					}
+					return;
 				} 
 
 				/* No multi-function device? */
@@ -1650,6 +1653,8 @@ static inline void check_timer(void)
 				setup_nmi();
 				enable_8259A_irq(0);
 			}
+			if (disable_timer_pin_1 > 0)
+				clear_IO_APIC_pin(0, pin1);
 			return;
 		}
 		clear_IO_APIC_pin(0, pin1);
@@ -1719,14 +1724,6 @@ static int __init notimercheck(char *s)
 	return 1;
 }
 __setup("no_timer_check", notimercheck);
-
-
-static int __init enable_timer_check(char *s)
-{
-	force_timer_check = 1;	
-	return 1;
-}
-__setup("timer_check", enable_timer_check);
 
 /*
  *
