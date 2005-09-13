@@ -59,8 +59,8 @@ ACPI_MODULE_NAME		("acpi_ec")
 #define ACPI_EC_DELAY		50	/* Wait 50ms max. during EC ops */
 #define ACPI_EC_UDELAY_GLK	1000	/* Wait 1ms max. to get global lock */
 
-#define ACPI_EC_UDELAY         100     /* Poll @ 100us increments */
-#define ACPI_EC_UDELAY_COUNT   1000    /* Wait 10ms max. during EC ops */
+#define ACPI_EC_MDELAY_MS         1     /* Poll @ 1ms increments */
+#define ACPI_EC_MDELAY_COUNT      (HZ/100)    /* Wait 10ms max. during EC ops */
 
 #define ACPI_EC_COMMAND_READ	0x80
 #define ACPI_EC_COMMAND_WRITE	0x81
@@ -126,7 +126,7 @@ union acpi_ec {
 		struct acpi_generic_address	command_addr;
 		struct acpi_generic_address	data_addr;
 		unsigned long			global_lock;
-       		spinlock_t                      lock;
+		struct semaphore		sem;
 	}polling;
 };
 
@@ -196,7 +196,7 @@ acpi_ec_polling_wait (
 	u8			event)
 {
 	u32			acpi_ec_status = 0;
-	u32			i = ACPI_EC_UDELAY_COUNT;
+	u32			i = ACPI_EC_MDELAY_COUNT;
 
 	if (!ec)
 		return -EINVAL;
@@ -208,7 +208,7 @@ acpi_ec_polling_wait (
 			acpi_hw_low_level_read(8, &acpi_ec_status, &ec->common.status_addr);
 			if (acpi_ec_status & ACPI_EC_FLAG_OBF)
 				return 0;
-			udelay(ACPI_EC_UDELAY);
+			msleep(1);
 		} while (--i>0);
 		break;
 	case ACPI_EC_EVENT_IBE:
@@ -216,7 +216,7 @@ acpi_ec_polling_wait (
 			acpi_hw_low_level_read(8, &acpi_ec_status, &ec->common.status_addr);
 			if (!(acpi_ec_status & ACPI_EC_FLAG_IBF))
 				return 0;
-			udelay(ACPI_EC_UDELAY);
+			msleep(1);
 		} while (--i>0);
 		break;
 	default:
@@ -353,13 +353,14 @@ acpi_ec_polling_read (
 {
 	acpi_status		status = AE_OK;
 	int			result = 0;
-	unsigned long		flags = 0;
 	u32			glk = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_ec_read");
 
 	if (!ec || !data)
 		return_VALUE(-EINVAL);
+	if (in_interrupt())
+		return_VALUE(-ENODEV);
 
 	*data = 0;
 
@@ -369,7 +370,8 @@ acpi_ec_polling_read (
 			return_VALUE(-ENODEV);
 	}
 
-	spin_lock_irqsave(&ec->polling.lock, flags);
+	
+	down(&ec->polling.sem);
 
 	acpi_hw_low_level_write(8, ACPI_EC_COMMAND_READ, &ec->common.command_addr);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBE);
@@ -387,7 +389,7 @@ acpi_ec_polling_read (
 		*data, address));
 	
 end:
-	spin_unlock_irqrestore(&ec->polling.lock, flags);
+	up(&ec->polling.sem);
 
 	if (ec->common.global_lock)
 		acpi_release_global_lock(glk);
@@ -404,7 +406,6 @@ acpi_ec_polling_write (
 {
 	int			result = 0;
 	acpi_status		status = AE_OK;
-	unsigned long		flags = 0;
 	u32			glk = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_ec_write");
@@ -412,13 +413,16 @@ acpi_ec_polling_write (
 	if (!ec)
 		return_VALUE(-EINVAL);
 
+	if (in_interrupt())
+		return_VALUE(-ENODEV);
+
 	if (ec->common.global_lock) {
 		status = acpi_acquire_global_lock(ACPI_EC_UDELAY_GLK, &glk);
 		if (ACPI_FAILURE(status))
 			return_VALUE(-ENODEV);
 	}
 
-	spin_lock_irqsave(&ec->polling.lock, flags);
+	down(&ec->polling.sem);
 
 	acpi_hw_low_level_write(8, ACPI_EC_COMMAND_WRITE, &ec->common.command_addr);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_IBE);
@@ -439,7 +443,7 @@ acpi_ec_polling_write (
 		data, address));
 
 end:
-	spin_unlock_irqrestore(&ec->polling.lock, flags);
+	up(&ec->polling.sem);
 
 	if (ec->common.global_lock)
 		acpi_release_global_lock(glk);
@@ -658,7 +662,6 @@ acpi_ec_polling_query (
 {
 	int			result = 0;
 	acpi_status		status = AE_OK;
-	unsigned long		flags = 0;
 	u32			glk = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_ec_query");
@@ -666,6 +669,8 @@ acpi_ec_polling_query (
 	if (!ec || !data)
 		return_VALUE(-EINVAL);
 
+	if (in_interrupt())
+		return_VALUE(-EINVAL);
 	*data = 0;
 
 	if (ec->common.global_lock) {
@@ -679,7 +684,7 @@ acpi_ec_polling_query (
 	 * Note that successful completion of the query causes the ACPI_EC_SCI
 	 * bit to be cleared (and thus clearing the interrupt source).
 	 */
-	spin_lock_irqsave(&ec->polling.lock, flags);
+	down(&ec->polling.sem);
 
 	acpi_hw_low_level_write(8, ACPI_EC_COMMAND_QUERY, &ec->common.command_addr);
 	result = acpi_ec_wait(ec, ACPI_EC_EVENT_OBF);
@@ -691,7 +696,7 @@ acpi_ec_polling_query (
 		result = -ENODATA;
 
 end:
-	spin_unlock_irqrestore(&ec->polling.lock, flags);
+	up(&ec->polling.sem);
 
 	if (ec->common.global_lock)
 		acpi_release_global_lock(glk);
@@ -779,7 +784,6 @@ acpi_ec_gpe_polling_query (
 {
 	union acpi_ec		*ec = (union acpi_ec *) ec_cxt;
 	u32			value = 0;
-	unsigned long		flags = 0;
 	static char		object_name[5] = {'_','Q','0','0','\0'};
 	const char		hex[] = {'0','1','2','3','4','5','6','7',
 				         '8','9','A','B','C','D','E','F'};
@@ -789,9 +793,12 @@ acpi_ec_gpe_polling_query (
 	if (!ec_cxt)
 		goto end;
 
-	spin_lock_irqsave(&ec->polling.lock, flags);
+	if (in_interrupt())
+		goto end;
+
+	down(&ec->polling.sem);
 	acpi_hw_low_level_read(8, &value, &ec->common.command_addr);
-	spin_unlock_irqrestore(&ec->polling.lock, flags);
+	up(&ec->polling.sem);
 
 	/* TBD: Implement asynch events!
 	 * NOTE: All we care about are EC-SCI's.  Other EC events are
@@ -1137,7 +1144,7 @@ acpi_ec_polling_add (
 
 	ec->common.handle = device->handle;
 	ec->common.uid = -1;
-	spin_lock_init(&ec->polling.lock);
+	init_MUTEX(&ec->polling.sem);
 	strcpy(acpi_device_name(device), ACPI_EC_DEVICE_NAME);
 	strcpy(acpi_device_class(device), ACPI_EC_CLASS);
 	acpi_driver_data(device) = ec;
@@ -1434,7 +1441,7 @@ acpi_fake_ecdt_polling_callback (
 	status = acpi_evaluate_integer(handle, "_GPE", NULL, &ec_ecdt->common.gpe_bit);
 	if (ACPI_FAILURE(status))
 		return status;
-	spin_lock_init(&ec_ecdt->polling.lock);
+	init_MUTEX(&ec_ecdt->polling.sem);
 	ec_ecdt->common.global_lock = TRUE;
 	ec_ecdt->common.handle = handle;
 
@@ -1553,7 +1560,7 @@ acpi_ec_polling_get_real_ecdt(void)
 	ec_ecdt->common.status_addr = ecdt_ptr->ec_control;
 	ec_ecdt->common.data_addr = ecdt_ptr->ec_data;
 	ec_ecdt->common.gpe_bit = ecdt_ptr->gpe_bit;
-	spin_lock_init(&ec_ecdt->polling.lock);
+	init_MUTEX(&ec_ecdt->polling.sem);
 	/* use the GL just to be safe */
 	ec_ecdt->common.global_lock = TRUE;
 	ec_ecdt->common.uid = ecdt_ptr->uid;
