@@ -514,7 +514,7 @@ static int
 acpi_thermal_passive (
 	struct acpi_thermal	*tz)
 {
-	int			result = 0;
+	int			result = 1;
 	struct acpi_thermal_passive *passive = NULL;
 	int			trend = 0;
 	int			i = 0;
@@ -540,7 +540,7 @@ acpi_thermal_passive (
 			trend, passive->tc1, tz->temperature, 
 			tz->last_temperature, passive->tc2, 
 			tz->temperature, passive->temperature));
-		tz->trips.passive.flags.enabled = 1;
+		passive->flags.enabled = 1;
 		/* Heating up? */
 		if (trend > 0)
 			for (i=0; i<passive->devices.count; i++)
@@ -548,11 +548,24 @@ acpi_thermal_passive (
 					passive->devices.handles[i], 
 					ACPI_PROCESSOR_LIMIT_INCREMENT);
 		/* Cooling off? */
-		else if (trend < 0)
+		else if (trend < 0){
 			for (i=0; i<passive->devices.count; i++)
-				acpi_processor_set_thermal_limit(
-					passive->devices.handles[i], 
-					ACPI_PROCESSOR_LIMIT_DECREMENT);
+				// assume that we are on highest freq/lowest thrott
+				// and can leave passive mode, even in error case
+				if (!acpi_processor_set_thermal_limit(
+					    passive->devices.handles[i], 
+					    ACPI_PROCESSOR_LIMIT_DECREMENT))
+					result = 0;
+			// Leave cooling mode, even we the temp might higher than trip point.
+			// This is because some machines might have long thermal polling frequencies
+			// (tsp) defined. We will fall back into passive mode in next cycle (probably quicker)
+			if (result){
+				passive->flags.enabled = 0;
+				ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+						  "Disabling passive cooling, still above threshold,"
+						  " but we are cooling down\n"));
+			}
+		}
 	}
 
 	/*
@@ -562,13 +575,14 @@ acpi_thermal_passive (
 	 * and avoid thrashing around the passive trip point.  Note that we
 	 * assume symmetry.
 	 */
-	else if (tz->trips.passive.flags.enabled) {
+	else if (passive->flags.enabled) {
 		for (i=0; i<passive->devices.count; i++)
-			result = acpi_processor_set_thermal_limit(
-				passive->devices.handles[i], 
-				ACPI_PROCESSOR_LIMIT_DECREMENT);
-		if (result == 1) {
-			tz->trips.passive.flags.enabled = 0;
+			if (!acpi_processor_set_thermal_limit(
+				    passive->devices.handles[i], 
+				    ACPI_PROCESSOR_LIMIT_DECREMENT))
+				result = 0;
+		if (result) {
+			passive->flags.enabled = 0;
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 				"Disabling passive cooling (zone is cool)\n"));
 		}
@@ -720,15 +734,13 @@ acpi_thermal_check (
 	 * Again, separated from the above two to allow independent policy
 	 * decisions.
 	 */
-	if (tz->trips.critical.flags.enabled)
-		tz->state.critical = 1;
-	if (tz->trips.hot.flags.enabled)
-		tz->state.hot = 1;
-	if (tz->trips.passive.flags.enabled)
-		tz->state.passive = 1;
+	tz->state.critical = tz->trips.critical.flags.enabled;
+	tz->state.hot = tz->trips.hot.flags.enabled;
+	tz->state.passive = tz->trips.passive.flags.enabled;
+	tz->state.active = 0;
 	for (i=0; i<ACPI_THERMAL_MAX_ACTIVE; i++)
-		if (tz->trips.active[i].flags.enabled)
-			tz->state.active = 1;
+		tz->state.active |= tz->trips.active[i].flags.enabled;
+			
 
 	/*
 	 * Calculate Sleep Time

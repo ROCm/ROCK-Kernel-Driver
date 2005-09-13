@@ -139,9 +139,11 @@ static int acpi_thermal_cpufreq_decrease(unsigned int cpu)
 	if (cpufreq_thermal_reduction_pctg[cpu] >= 20) {
 		cpufreq_thermal_reduction_pctg[cpu] -= 20;
 		cpufreq_update_policy(cpu);
+		// We reached max freq again and can leave passive mode
+		if (cpufreq_thermal_reduction_pctg[cpu] == 0)
+			return 1;
 		return 0;
 	}
-
 	return -ERANGE;
 }
 
@@ -206,7 +208,7 @@ acpi_processor_set_thermal_limit (
 	int			result = 0;
 	struct acpi_processor	*pr = NULL;
 	struct acpi_device	*device = NULL;
-	int			tx = 0;
+	int			tx = 0, max_tx_px = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_set_thermal_limit");
 
@@ -265,9 +267,11 @@ acpi_processor_set_thermal_limit (
 		/* if going down: T-states first, P-states later */
 
 		if (pr->flags.throttling) {
-			if (tx == 0)
+			if (tx == 0){
+				max_tx_px = 1;
 				ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 					"At minimum throttling state\n"));
+			}
 			else {
 				tx--;
 				goto end;
@@ -275,10 +279,15 @@ acpi_processor_set_thermal_limit (
 		}
 
 		result = acpi_thermal_cpufreq_decrease(pr->id);
-		if (result == -ERANGE)
+		if (result){
+			// We only could get -ERANGE, 1 or 0.
+			// In the first two cases we reached max freq again.
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 					"At minimum performance state\n"));
-
+			max_tx_px = 1;
+		}
+		else
+			max_tx_px = 0;
 		break;
 	}
 
@@ -298,7 +307,10 @@ end:
 	} else
 		result = 0;
 
-	return_VALUE(result);
+	if (max_tx_px)
+		return_VALUE(1);
+	else
+		return_VALUE(result);
 }
 
 
