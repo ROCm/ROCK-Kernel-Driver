@@ -60,7 +60,7 @@ ACPI_MODULE_NAME		("acpi_ec")
 #define ACPI_EC_UDELAY_GLK	1000	/* Wait 1ms max. to get global lock */
 
 #define ACPI_EC_MDELAY_MS         1     /* Poll @ 1ms increments */
-#define ACPI_EC_MDELAY_COUNT      (HZ/100)    /* Wait 10ms max. during EC ops */
+#define ACPI_EC_MDELAY_COUNT      msecs_to_jiffies(10)    /* Wait 10ms max. during EC ops */
 
 #define ACPI_EC_COMMAND_READ	0x80
 #define ACPI_EC_COMMAND_WRITE	0x81
