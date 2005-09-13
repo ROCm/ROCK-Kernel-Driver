@@ -511,11 +511,9 @@ retry:
 	if ((inode = iget_locked(XFS_MTOVFS(mp)->vfs_super, ino))) {
 		bhv_desc_t	*bdp;
 		xfs_inode_t	*ip;
-		int		newnode;
 
 		vp = LINVFS_GET_VP(inode);
 		if (inode->i_state & I_NEW) {
-inode_allocate:
 			vn_initialize(inode);
 			error = xfs_iget_core(vp, mp, tp, ino, flags,
 					lock_flags, ipp, bno);
@@ -535,23 +533,25 @@ inode_allocate:
 				iput(inode);
 				goto retry;
 			}
-
-			if (is_bad_inode(inode)) {
+			/*
+			 * If the inode is not fully constructed due to
+			 * filehandle mismatches wait for the inode to go
+			 * away and try again.
+			 *
+			 * iget_locked will call wait_on_freeing_inode
+			 * to wait for the inode to go away.
+			 */
+			if (is_bad_inode(inode) ||
+			    ((bdp = vn_bhv_lookup(VN_BHV_HEAD(vp),
+						&xfs_vnodeops)) == NULL)) {
 				iput(inode);
-				return EIO;
+				delay(1);
+				goto retry;
 			}
 
-			bdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
-			if (bdp == NULL) {
-				XFS_STATS_INC(xs_ig_dup);
-				goto inode_allocate;
-			}
 			ip = XFS_BHVTOI(bdp);
 			if (lock_flags != 0)
 				xfs_ilock(ip, lock_flags);
-			newnode = (ip->i_d.di_mode == 0);
-			if (newnode)
-				xfs_iocore_inode_reinit(ip);
 			XFS_STATS_INC(xs_ig_found);
 			*ipp = ip;
 			error = 0;
