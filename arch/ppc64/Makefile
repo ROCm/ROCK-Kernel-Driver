@@ -115,8 +115,9 @@ archclean:
 
 prepare: include/asm-ppc64/offsets.h
 
-arch/ppc64/kernel/asm-offsets.s: include/asm include/linux/version.h \
-				   include/config/MARKER
+arch/ppc64/kernel/asm-offsets.s: $(objtree)/include/asm \
+				 $(objtree)/include/linux/version.h \
+				 include/config/MARKER
 
 include/asm-ppc64/offsets.h: arch/ppc64/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)

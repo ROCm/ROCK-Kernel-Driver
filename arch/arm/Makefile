@@ -178,7 +178,7 @@ endif
 prepare: maketools include/asm-arm/.arch
 
 .PHONY: maketools FORCE
-maketools: include/asm-arm/constants.h include/linux/version.h FORCE
+maketools: include/asm-arm/constants.h $(objtree)/include/linux/version.h FORCE
 	$(Q)$(MAKE) $(build)=arch/arm/tools include/asm-arm/mach-types.h
 
 # Convert bzImage to zImage
@@ -201,7 +201,8 @@ archclean:
 bp:;	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/bootpImage
 i zi:;	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
 
-arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+arch/$(ARCH)/kernel/asm-offsets.s: $(objtree)/include/asm \
+				   $(objtree)/include/linux/version.h \
 				   include/asm-arm/.arch
 
 include/asm-$(ARCH)/constants.h: arch/$(ARCH)/kernel/asm-offsets.s

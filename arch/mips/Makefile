@@ -754,8 +754,9 @@ endef
 
 prepare: include/asm-$(ARCH)/offset.h
 
-arch/$(ARCH)/kernel/offset.s: include/asm include/linux/version.h \
-				   include/config/MARKER
+arch/$(ARCH)/kernel/offset.s: $(objtree)/include/asm \
+			      $(objtree)/include/linux/version.h \
+			      include/config/MARKER
 
 include/asm-$(ARCH)/offset.h: arch/$(ARCH)/kernel/offset.s
 	$(call filechk,gen-asm-offset.h)

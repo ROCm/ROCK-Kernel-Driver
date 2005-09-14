@@ -55,8 +55,9 @@ endif
 prepare: include/asm-$(ARCH)/asm-consts.h
 
 # Generate constants from C code for use by asm files
-arch/$(ARCH)/kernel/asm-consts.s: include/asm include/linux/version.h \
-				   include/config/MARKER
+arch/$(ARCH)/kernel/asm-consts.s: $(objtree)/include/asm \
+				  $(objtree)/include/linux/version.h \
+				  include/config/MARKER
 
 include/asm-$(ARCH)/asm-consts.h: arch/$(ARCH)/kernel/asm-consts.s
 	$(call filechk,gen-asm-offsets)

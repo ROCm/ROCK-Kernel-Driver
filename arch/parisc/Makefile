@@ -102,8 +102,9 @@ install: kernel_install modules_install
 
 prepare: include/asm-parisc/offsets.h
 
-arch/parisc/kernel/asm-offsets.s: include/asm include/linux/version.h \
-				   include/config/MARKER
+arch/parisc/kernel/asm-offsets.s: $(objtree)/include/asm \
+				  $(objtree)/include/linux/version.h \
+				  include/config/MARKER
 
 include/asm-parisc/offsets.h: arch/parisc/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)

@@ -206,7 +206,7 @@ define filechk_umlconfig
 	sed 's/ CONFIG/ UML_CONFIG/'
 endef
 
-$(ARCH_DIR)/include/uml-config.h : include/linux/autoconf.h
+$(ARCH_DIR)/include/uml-config.h : $(objtree)/include/linux/autoconf.h
 	$(call filechk,umlconfig)
 
 $(ARCH_DIR)/user-offsets.s: $(ARCH_DIR)/sys-$(SUBARCH)/user-offsets.c
@@ -220,7 +220,8 @@ CLEAN_FILES += $(ARCH_DIR)/user-offsets.s  $(ARCH_DIR)/user-offsets.h
 $(ARCH_DIR)/kernel-offsets.s: $(ARCH_DIR)/sys-$(SUBARCH)/kernel-offsets.c \
 				   $(ARCH_SYMLINKS) \
 				   $(SYS_DIR)/sc.h \
-				   include/asm include/linux/version.h \
+				   $(objtree)/include/asm \
+				   $(objtree)/include/linux/version.h \
 				   include/config/MARKER \
 				   $(ARCH_DIR)/include/user_constants.h
 	$(CC) $(CFLAGS) $(NOSTDINC_FLAGS) $(CPPFLAGS) -S -o $@ $<

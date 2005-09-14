@@ -155,7 +155,7 @@ endif
 prepare: maketools include/asm-sh/.cpu include/asm-sh/.mach
 
 .PHONY: maketools FORCE
-maketools: include/asm-sh/asm-offsets.h include/linux/version.h FORCE
+maketools: include/asm-sh/asm-offsets.h $(objtree)/include/linux/version.h FORCE
 	$(Q)$(MAKE) $(build)=arch/sh/tools include/asm-sh/machtypes.h
 
 all: zImage
@@ -170,7 +170,8 @@ archclean:
 
 CLEAN_FILES += include/asm-sh/machtypes.h include/asm-sh/asm-offsets.h
 
-arch/sh/kernel/asm-offsets.s: include/asm include/linux/version.h \
+arch/sh/kernel/asm-offsets.s: $(objtree)/include/asm \
+			      $(objtree)/include/linux/version.h \
 			      include/asm-sh/.cpu include/asm-sh/.mach
 
 include/asm-sh/asm-offsets.h: arch/sh/kernel/asm-offsets.s

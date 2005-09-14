@@ -129,8 +129,10 @@ $(srctree)/include/asm-$(ARCH)/.arch: $(wildcard include/config/arch/*.h)
 	@ln -sf $(srctree)/include/asm-$(ARCH)/$(SARCH) $(srctree)/include/asm-$(ARCH)/arch
 	@touch $@
 
-arch/$(ARCH)/$(SARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
-					include/config/MARKER
+arch/$(ARCH)/$(SARCH)/kernel/asm-offsets.s: \
+				$(objtree)/include/asm \
+				$(objtree)/include/linux/version.h \
+				include/config/MARKER
 
 include/asm-$(ARCH)/$(SARCH)/offset.h: arch/$(ARCH)/$(SARCH)/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)

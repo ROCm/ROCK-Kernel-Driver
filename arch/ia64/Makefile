@@ -91,7 +91,9 @@ MRPROPER_FILES += include/asm-ia64/offsets.h
 
 prepare: include/asm-ia64/offsets.h
 
-arch/ia64/kernel/asm-offsets.s: include/asm include/linux/version.h include/config/MARKER
+arch/ia64/kernel/asm-offsets.s: $(objtree)/include/asm \
+				$(objtree)/include/linux/version.h \
+				include/config/MARKER
 
 include/asm-ia64/offsets.h: arch/ia64/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)

@@ -112,6 +112,7 @@ archclean:
 	$(call descend arch/$(ARCH)/boot, subdirclean)
 
 include/asm-$(ARCH)/asm-offsets.h: arch/$(ARCH)/kernel/asm-offsets.s \
-				   include/asm include/linux/version.h \
+				   $(objtree)/include/asm \
+				   $(objtree)/include/linux/version.h \
 				   include/config/MARKER
 	$(call filechk,gen-asm-offsets)

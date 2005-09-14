@@ -818,7 +818,6 @@ export CPPFLAGS_vmlinux.lds += -P -C -U$(ARCH)
 #	hard to detect, but I suppose "make mrproper" is a good idea
 #	before switching between archs anyway.
 
-include/asm: $(objtree)/include/asm
 $(objtree)/include/asm:
 	@echo '  SYMLINK $@ -> include/asm-$(ARCH)'
 	$(Q)if [ ! -d include ]; then mkdir -p include; fi;

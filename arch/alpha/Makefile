@@ -111,7 +111,8 @@ bootimage bootpfile bootpzfile: vmlinux
 
 prepare: include/asm-$(ARCH)/asm_offsets.h
 
-arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+arch/$(ARCH)/kernel/asm-offsets.s: $(objtree)/include/asm \
+				   $(objtree)/include/linux/version.h \
 				   include/config/MARKER
 
 include/asm-$(ARCH)/asm_offsets.h: arch/$(ARCH)/kernel/asm-offsets.s

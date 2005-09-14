@@ -76,7 +76,8 @@ archclean:
 prepare: include/asm-$(ARCH)/asm-offsets.h arch/$(ARCH)/lib/syscalltab.h
 
 include/asm-$(ARCH)/asm-offsets.h: arch/$(ARCH)/kernel/asm-offsets.s \
-				   include/asm include/linux/version.h
+				   $(objtree)/include/asm \
+				   $(objtree)/include/linux/version.h
 	$(call filechk,gen-asm-offsets)
 
 define filechk_gen-syscalltab
