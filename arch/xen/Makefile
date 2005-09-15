@@ -32,7 +32,7 @@ ifneq ($(KBUILD_SRC),)
 	$(Q)ln -fsn ../include/asm-$(XENARCH) include2/asm
 endif
 
-include/.asm-ignore: include/asm
+include/.asm-ignore: $(objtree)/include/asm
 	@rm -f include/.asm-ignore
 	@mv include/asm include/.asm-ignore
 	@echo '  SYMLINK include/asm -> include/asm-$(XENARCH)'
@@ -49,8 +49,9 @@ arch/xen/arch:
 	@mkdir -p arch/xen
 	@ln -fsn $(srctree)/arch/xen/$(XENARCH) $@
 
-arch/$(XENARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
-				   include/config/MARKER
+arch/$(XENARCH)/kernel/asm-offsets.s: $(objtree)/include/asm \
+				      $(objtree)/include/linux/version.h \
+				      include/config/MARKER
 
 include/asm-$(ARCH)/asm_offsets.h: arch/$(XENARCH)/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
