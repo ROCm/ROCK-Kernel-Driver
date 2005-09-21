@@ -331,7 +331,7 @@ splitm_fallback:
 	sync					// 74xx needs this
 
 	mtsrr0	r2				// The simplest thing is to do an RFI
-	LOADI	r3,MSR_EE | MSR_PR | MSR_IR | MSR_SE | MSR_BE
+	LOADI	r3,(MSR_EE | MSR_PR | MSR_IR | MSR_SE | MSR_BE)
 	andc	r4,r7,r3			// Clear msr bits (r7=srr1)
 	xGPR_LOAD	R6
 	xGPR_LOAD	R7	

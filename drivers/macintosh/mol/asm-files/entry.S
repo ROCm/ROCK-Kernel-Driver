@@ -55,7 +55,7 @@ mac_entry_initialize:
 	mtcr	r3
 
 	// msr to be used in mac-mode
-	LOADI	r3,MSR_ME | MSR_IR | MSR_DR | MSR_PR | MSR_EE 
+	LOADI	r3,(MSR_ME | MSR_IR | MSR_DR | MSR_PR | MSR_EE )
 	stw	r3,K_MSR(r1)
 
 	PERF_MONITOR_SETUP /**/ r4
