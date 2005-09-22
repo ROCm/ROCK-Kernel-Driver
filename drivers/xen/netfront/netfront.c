@@ -105,7 +105,7 @@ dump_packet(int tag, void *addr, u32 ap)
     } while (0)
 
 /* Allow headroom on each rx pkt for Ethernet header, alignment padding, ... */
-#define RX_HEADROOM 200
+#define RX_HEADROOM 256
 
 /*
  * If the backend driver is pipelining transmit requests then we can be very
