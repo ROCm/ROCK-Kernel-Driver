@@ -143,21 +143,6 @@ shmem_acl_destroy_inode(struct inode *inode)
 	SHMEM_I(inode)->i_default_acl = NULL;
 }
 
-int
-shmem_setattr(struct dentry *dentry, struct iattr *iattr)
-{
-	struct inode *inode = dentry->d_inode;
-	int error;
-
-	error = inode_change_ok(inode, iattr);
-	if (error)
-		return error;
-	error = inode_setattr(inode, iattr);
-	if (!error && (iattr->ia_valid & ATTR_MODE))
-		error = generic_acl_chmod(inode, &shmem_acl_ops);
-	return error;
-}
-
 static int
 shmem_check_acl(struct inode *inode, int mask)
 {

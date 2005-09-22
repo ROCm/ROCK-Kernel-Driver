@@ -28,6 +28,7 @@
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/fs.h>
+#include <linux/generic_acl.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/file.h>
@@ -618,13 +619,15 @@ done2:
 	}
 }
 
+extern struct generic_acl_operations shmem_acl_ops;
+
 static int shmem_notify_change(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
 	struct page *page = NULL;
 	int error;
 
-	if (attr->ia_valid & ATTR_SIZE) {
+	if (S_ISREG(inode->i_mode) && (attr->ia_valid & ATTR_SIZE)) {
 		if (attr->ia_size < inode->i_size) {
 			/*
 			 * If truncating down to a partial page, then
@@ -657,6 +660,10 @@ static int shmem_notify_change(struct dentry *dentry, struct iattr *attr)
 	error = inode_change_ok(inode, attr);
 	if (!error)
 		error = inode_setattr(inode, attr);
+#ifdef CONFIG_TMPFS_POSIX_ACL
+	if (!error && (attr->ia_valid & ATTR_MODE))
+		error = generic_acl_chmod(inode, &shmem_acl_ops);
+#endif
 	if (page)
 		page_cache_release(page);
 	return error;
@@ -2105,7 +2112,6 @@ static struct inode_operations shmem_inode_operations = {
 	.listxattr      = generic_listxattr,
 	.removexattr    = generic_removexattr,
 #endif
-	.setattr	= shmem_setattr,
 	.permission	= shmem_permission,
 };
 
@@ -2126,7 +2132,7 @@ static struct inode_operations shmem_dir_inode_operations = {
 	.listxattr      = generic_listxattr,
 	.removexattr    = generic_removexattr,
 #endif
-	.setattr	= shmem_setattr,
+	.setattr	= shmem_notify_change,
 	.permission	= shmem_permission,
 #endif
 };
@@ -2138,7 +2144,7 @@ static struct inode_operations shmem_special_inode_operations = {
 	.listxattr	= generic_listxattr,
 	.removexattr	= generic_removexattr,
 #endif
-	.setattr	= shmem_setattr,
+	.setattr	= shmem_notify_change,
 	.permission	= shmem_permission,
 };
 
