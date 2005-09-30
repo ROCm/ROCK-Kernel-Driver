@@ -2328,7 +2328,7 @@ static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int dest
 	struct scsi_cmnd *SCpnt = NULL;
 	u32 scsi_status = SBP2_SCSI_STATUS_GOOD;
 	struct sbp2_command_info *command;
-	unsigned int flags;
+	unsigned long flags;
 
 	SBP2_DEBUG("sbp2_handle_status_write");
 
