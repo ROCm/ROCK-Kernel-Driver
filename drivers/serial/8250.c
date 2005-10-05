@@ -2197,7 +2197,7 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 	 *	and restore the IER
 	 */
 	wait_for_xmitr(up);
-	if (serial_in(up, UART_IER) == 0)
+	if (serial_in(up, UART_IER) == ((up->capabilities & UART_CAP_UUE)? UART_IER_UUE: 0))
 		serial_out(up, UART_IER, ier);
 }
 
