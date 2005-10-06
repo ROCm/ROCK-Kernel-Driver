@@ -187,10 +187,10 @@ end:
 	acpi_os_free(buffer.pointer);
 	
 	if (status != AE_OK) {
-		return -1;
+		return 0;
 	}
 
-	return 0;
+	return 1;
 }
 
 static int acpi_pcc_read_sinf_field(struct seq_file *seq, int field)
@@ -208,6 +208,7 @@ static int acpi_pcc_read_sinf_field(struct seq_file *seq, int field)
 		seq_printf(seq, "%u\n",	sinf[field]);
 	}
 	else {
+		seq_printf(seq, "error");
 		printk(PCC_ERR "acpi_pcc_read_sinf_field() could not retrieve \
 				BIOS data\n");
 	}
@@ -877,6 +878,8 @@ static int acpi_pcc_hotkey_remove(struct acpi_device *device, int type)
 		printk(PCC_ERR "acpi_pcc_hotkey_remove() error removing \
 				notify handler\n");
 	}
+
+	input_unregister_device(hotkey->input_dev);
 
 	kfree(hotkey);
 
