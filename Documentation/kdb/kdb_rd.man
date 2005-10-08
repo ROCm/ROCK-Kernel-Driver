@@ -1,0 +1,170 @@
+.TH RD 1 "September 20, 2005"
+.SH NAME
+rd, rm\- Register manipulation commands
+.SH SYNOPSIS
+rd [[c [n]]|d|u]
+.LP
+rm \fIregister-name\fP \fInew-contents\fP
+.LP
+ef <address>
+.SH DESCRIPTION
+The
+.B rd
+command is used to display the contents of processor and coprocessor registers.
+Without any arguments, the rd command displays the contents of the general
+register set at the point at which the kernel debugger was entered.
+If the bt* or pid commands have been used to change the current process then
+.B rd
+and
+.B rm
+may not be able to display any registers.
+'n' argument is only used for XScale platform to identify the desired
+coprocessor number, while 'd' option is not valid for XScale platform.
+.P
+On IA32 and IA64, with the 'c' argument, the processor control registers
+%cr0, %cr1, %cr2 and %cr4 are displayed, while with the 'd' argument
+the processor debug registers are displayed.  If the 'u' argument
+is supplied, the registers for the current task as of the last
+time the current task entered the kernel are displayed.
+.P
+On XScale, 'c' argument is used to display the
+all coprocessor control registers or specified coprocessor registers by
+argumnet 'n'. Argument 'u' is used to display the
+registers for the current task as of the last time the current task
+entered the kernel. Argument 'd' is not supported.
+.P
+On ix86, the
+.B rm
+command allows modification of a register.  The following
+register names are valid:  \fB%eax\fP, \fB%ebx\fP, \fB%ecx\fP,
+\fB%edx\fP, \fB%esi\fP, \fB%edi\fP, \fB%esp\fP, \fB%eip\fP,
+and \fB%ebp\fP.   Note that if two '%' symbols are used
+consecutively, the register set displayed by the 'u' argument
+to the \fBrd\fP command is modified.
+.P
+The debug registers, \fBdr0\fP through \fBdr3\fP and both
+\fBdr6\fP and \fBdr7\fP can also be modified with the \fBrm\fP
+command.
+.P
+On sparc64, the valid registers are named \fB%g0\fP through
+\fB%g7\fP, \fB%l0\fP through \fB%l7\fP, \fB%o0\fP through
+\fB%o7\fP, and \fB%i0\fP through \fB%i7\fP, with the exceptions
+that \fB%o6\fP is called \fB%sp\fP and that \fB%i6\fP is called
+\fB%fp\fP. The registers \fB%tstate\fP, \fB%tpc\fP, \fB%tnpc\fP,
+\fB%y\fP, and \fB%fprs\fP provide state information at the time
+the system entered kdb. Additionally, when viewing registers, two
+convenience names are provided: \fB%&regs\fP shows the
+address on the stack of the current registers, and \fB%csp\fP
+shows the current stack pointer within kdb itself.
+.P
+While on XScale, both the cpu registers and most coprocessor
+registers can be be modified. \fIregister-name\fP can be followings like
+r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14,
+r15, cpsr to address  cpu registers. For the coprocessor registers in XSacle,
+either alias name or \fICpcc[CRndd[CRmbb[Opaa]]]\fP can be used to address
+the register in coprocessor cc with CRn=dd, CRm=bb and opcode2=aa. All aa, bb, cc, dd can be
+1 or 2 decimal digitals, the default value is 0 when any of them is omitted. Name
+acc0_h and acc0_l are used to identify the high byte and
+low word of accumulator in coprocessor 0.
+.P
+On IA64, the parameter to
+.B rd
+can be d (debug registers), u (user registers at most recent entry to kernel),
+i (interrupt registers), %isr (current interrupt status), s (stacked
+registers), k (kernel registers).  You can also specify these individual
+registers -
+psr,
+ifs,
+ip,
+unat,
+pfs,
+rsc,
+rnat,
+bsps,
+pr,
+ldrs,
+ccv,
+fpsr,
+b0,
+b6,
+b7,
+r1,
+r2,
+r3,
+r8,
+r9,
+r10,
+r11,
+r12,
+r13,
+r14,
+r15,
+r16,
+r17,
+r18,
+r19,
+r20,
+r21,
+r22,
+r23,
+r24,
+r25,
+r26,
+r27,
+r28,
+r29,
+r30,
+r31.
+.B rm
+can change any of the individual registers or the stacked registers.
+.P
+The
+.B ef
+command displays an exception frame at the specified address.
+.SH LIMITATIONS
+Currently the \fBrm\fP command will not allow modification of the
+control registers.
+.P
+Currently neither the \fBrd\fP command nor the \fBrm\fP command will
+display or modify the model specific registers on the Pentium
+and Pentium Pro families.
+.SH ENVIRONMENT
+None.
+.SH SMP CONSIDERATIONS
+None.
+.SH EXAMPLES
+.TP 8
+rd
+Display general register set from kdb's current task.
+
+.TP 8
+rd c 0
+Display coprocessor 0 registers.
+
+.TP 8
+rm %eax 0
+Set the contents of \fB%eax\fP to zero.  This will be the
+value of %eax when kdb returns from the condition which
+invoked it.
+
+.TP 8
+rm %%eax 0
+Set the value of the \fB%eax\fP register to zero.  This will
+be the value the user-mode application will see upon returning
+from the kernel.
+
+.TP 8
+rm %acc0_h 0
+Set the contents of high byte of accumulator to zero.
+
+.TP 8
+rm dr0 0xc1287220
+Set the value of the \fBdr0\fB register to \f(CW0xc1287220\fP.
+
+.TP 8
+rm %InVLD_BTB 0
+Write 0 to coprocessor 15 register with CRn=7, CRm=5, opcode2=6.
+
+.TP 8
+rm %CP15CRn7CRm5Op6 0
+Same with above.

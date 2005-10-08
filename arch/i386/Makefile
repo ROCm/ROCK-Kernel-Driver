@@ -57,6 +57,7 @@ cflags-$(CONFIG_MWINCHIP2)	+= $(call cc-option,-march=winchip2,-march=i586)
 cflags-$(CONFIG_MWINCHIP3D)	+= $(call cc-option,-march=winchip2,-march=i586)
 cflags-$(CONFIG_MCYRIXIII)	+= $(call cc-option,-march=c3,-march=i486) $(align)-functions=0 $(align)-jumps=0 $(align)-loops=0
 cflags-$(CONFIG_MVIAC3_2)	+= $(call cc-option,-march=c3-2,-march=i686)
+cflags-$(CONFIG_KDB)		+= $(call cc-option,-fno-optimize-sibling-calls,)
 
 # AMD Elan support
 cflags-$(CONFIG_X86_ELAN)	+= -march=i486
@@ -123,6 +124,7 @@ drivers-$(CONFIG_PCI)			+= arch/i386/pci/
 # must be linked after kernel/
 drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
 drivers-$(CONFIG_PM)			+= arch/i386/power/
+drivers-$(CONFIG_KDB)			+= arch/i386/kdb/
 
 CFLAGS += $(mflags-y)
 AFLAGS += $(mflags-y)

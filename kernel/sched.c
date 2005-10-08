@@ -5603,7 +5603,7 @@ void normalize_rt_tasks(void)
 
 #endif /* CONFIG_MAGIC_SYSRQ */
 
-#ifdef CONFIG_IA64
+#if	defined(CONFIG_IA64) || defined(CONFIG_KDB)
 /*
  * These functions are only useful for the IA64 MCA handling.
  *
@@ -5646,3 +5646,80 @@ void set_curr_task(int cpu, task_t *p)
 }
 
 #endif
+
+#ifdef	CONFIG_KDB
+
+#include <linux/kdb.h>
+
+static void
+kdb_prio(char *name, prio_array_t *array, kdb_printf_t xxx_printf)
+{
+	int pri;
+
+	xxx_printf("  %s nr_active:%d  bitmap: 0x%lx 0x%lx 0x%lx\n",
+		name, array->nr_active,
+		array->bitmap[0], array->bitmap[1], array->bitmap[2]);
+
+	pri = sched_find_first_bit(array->bitmap);
+	if (pri != MAX_PRIO) {
+		xxx_printf("   bitmap priorities:");
+		while (pri != MAX_PRIO) {
+			xxx_printf(" %d", pri);
+			pri++;
+			pri = find_next_bit(array->bitmap, MAX_PRIO, pri);
+		}
+		xxx_printf("\n");
+	}
+
+	for (pri = 0; pri < MAX_PRIO; pri++) {
+		int printed_hdr = 0;
+		struct list_head *head, *curr;
+
+		head = array->queue + pri;
+		curr = head->next;
+		while(curr != head) {
+			task_t *task;
+			if (!printed_hdr) {
+				xxx_printf("   queue at priority=%d\n", pri);
+				printed_hdr = 1;
+			}
+			task = list_entry(curr, task_t, run_list);
+			xxx_printf("    0x%p %d %s  time_slice:%d\n",
+				   task, task->pid, task->comm,
+				   task->time_slice);
+			curr = curr->next;
+		}
+	}
+}
+
+/* This code must be in sched.c because struct runqueue is only defined in this
+ * source.  To allow most of kdb to be modular, this code cannot call any kdb
+ * functions directly, any external functions that it needs must be passed in
+ * as parameters.
+ */
+
+void
+kdb_runqueue(unsigned long cpu, kdb_printf_t xxx_printf)
+{
+	struct runqueue *rq;
+
+	rq = cpu_rq(cpu);
+
+	xxx_printf("CPU%ld lock:%s curr:0x%p(%d)(%s)",
+		   cpu, (spin_is_locked(&rq->lock))?"LOCKED":"free",
+		   rq->curr, rq->curr->pid, rq->curr->comm);
+	if (rq->curr == rq->idle)
+		xxx_printf(" is idle");
+	xxx_printf("\n ");
+#ifdef CONFIG_SMP
+	xxx_printf(" cpu_load:%lu %lu %lu",
+			rq->cpu_load[0], rq->cpu_load[1], rq->cpu_load[2]);
+#endif
+	xxx_printf(" nr_running:%lu nr_switches:%llu\n",
+		   rq->nr_running, rq->nr_switches);
+	kdb_prio("active", rq->active, xxx_printf);
+	kdb_prio("expired", rq->expired, xxx_printf);
+}
+EXPORT_SYMBOL(kdb_runqueue);
+
+#endif	/* CONFIG_KDB */

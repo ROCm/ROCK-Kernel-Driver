@@ -35,6 +35,13 @@
 #include <asm/io.h>
 #include <asm/serial.h>
 
+
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+
+static int  kdb_serial_line = -1;
+#endif	/* CONFIG_KDB */
+
 struct early_uart_device {
 	struct uart_port port;
 	char options[16];		/* e.g., 115200n8 */
@@ -190,6 +197,31 @@ static int __init early_uart_setup(struct console *console, char *options)
 
 	if ((err = parse_options(device, options)) < 0)
 		return err;
+
+
+#ifdef	CONFIG_KDB
+	/*
+	 * Remember the line number of the first serial
+	 * console.  We'll make this the kdb serial console too.
+	 */
+	if (kdb_serial_line == -1) {
+		kdb_serial_line = console->index;
+		kdb_serial.io_type = device->port.iotype;
+		switch (device->port.iotype) {
+		case SERIAL_IO_MEM:
+#ifdef  SERIAL_IO_MEM32
+		case SERIAL_IO_MEM32:
+#endif
+			kdb_serial.iobase = (unsigned long)(device->port.membase);
+			kdb_serial.ioreg_shift = device->port.regshift;
+			break;
+		default:
+			kdb_serial.iobase = device->port.iobase;
+			kdb_serial.ioreg_shift = 0;
+			break;
+		}
+	}
+#endif	/* CONFIG_KDB */
 
 	init_port(device);
 	return 0;

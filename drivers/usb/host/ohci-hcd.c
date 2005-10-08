@@ -17,6 +17,7 @@
  *
  * History:
  * 
+ * 2005/06/23 CONFIG_KDB_USB support. (ayoung@sgi.com)
  * 2004/03/24 LH7A404 support (Durgesh Pattamatta & Marc Singer)
  * 2004/02/04 use generic dma_* functions instead of pci_* (dsaxena@plexity.net)
  * 2003/02/24 show registers in sysfs (Kevin Brosius)
@@ -872,6 +873,53 @@ static int ohci_restart (struct ohci_hcd *ohci)
 	return 0;
 }
 #endif
+
+/*-------------------------------------------------------------------------*/
+
+#ifdef	CONFIG_KDB_USB
+
+static void
+ohci_kdb_poll (void * __ohci, struct urb *urb)
+{
+	struct ohci_hcd *ohci;
+	struct ohci_regs * regs;
+
+	/*
+	 * NOTE - we use the ohci_hcd from the urb rather than the
+	 * __ohci parameter (which is NULL anyway). This ensures
+	 * that we will process the proper controller for the urb.
+	 */
+
+	if (!urb) /* can happen if no keyboard attached */
+		return;
+
+	ohci = (struct ohci_hcd *) hcd_to_ohci(urb->dev->bus->hcpriv);
+	regs = ohci->regs;
+
+	/* if the urb is not currently in progress resubmit it */
+	if (urb->status != -EINPROGRESS) {
+
+		if (usb_submit_urb (urb, SLAB_ATOMIC))
+			return;
+
+		/* make sure the HC registers are set correctly */
+		writel (OHCI_INTR_WDH, &regs->intrenable);
+		writel (OHCI_INTR_WDH, &regs->intrstatus);
+		writel (OHCI_INTR_MIE, &regs->intrenable);
+
+		// flush those pci writes
+		(void) readl (&ohci->regs->control);
+	}
+
+	if (ohci->hcca->done_head) {
+		dl_done_list_kdb (ohci, urb);
+		writel (OHCI_INTR_WDH, &regs->intrstatus);
+		// flush the pci write
+		(void) readl (&ohci->regs->control);
+	}
+}
+
+#endif /* CONFIG_KDB_USB */
 
 /*-------------------------------------------------------------------------*/
 

@@ -67,6 +67,10 @@
 #include <linux/kernel.h>
 #include <linux/smp.h>
 #include <linux/workqueue.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#include <linux/kdbprivate.h>	/* for switch state wrappers */
+#endif	/* CONFIG_KDB */
 
 #include <asm/delay.h>
 #include <asm/machvec.h>
@@ -87,6 +91,37 @@
 #else
 # define IA64_MCA_DEBUG(fmt...)
 #endif
+
+#ifdef	CONFIG_KDB
+/* Warning: usage of kdba_mca_trace assumes that ia64 atomic inc/dec are lock
+ * free.  If atomic operations ever use spinlocks on ia64 then, sooner or later,
+ * this will deadlock on an MCA or INIT event (not irq safe).
+ *
+ * If you want kdb procedure traces at all times, not just during MCA/INIT
+ * handling, then use kdb to set kdba_mca_trace to 1, 'mm4 kdba_mca_trace 1' or
+ * patch this code to set kdba_mca_trace = ATOMIC_INIT(1).
+ * To disable kdb MCA tracing, 'mm4 no_kdba_mca_trace 1' or patch this code
+ * to set no_kdba_mca_trace = 1.
+ */
+static atomic_t kdba_mca_trace;
+static int no_kdba_mca_trace;
+#define INC_KDBA_MCA_TRACE() (void)(atomic_inc(&kdba_mca_trace))
+#define DEC_KDBA_MCA_TRACE() (void)(atomic_dec(&kdba_mca_trace))
+#define KDBA_MCA_TRACE_TEST()						\
+	(!no_kdba_mca_trace && atomic_read(&kdba_mca_trace))
+#define KDBA_MCA_TRACE()						\
+	if (KDBA_MCA_TRACE_TEST())					\
+		kdb_printf("KDBA_MCA_TRACE: %s: cpu %d itc %ld\n",	\
+			__FUNCTION__,					\
+			smp_processor_id(),				\
+			ia64_get_itc())
+extern int kdb_wait_for_cpus_secs;
+#else/* !CONFIG_KDB */
+#define INC_KDBA_MCA_TRACE() do {} while(0)
+#define DEC_KDBA_MCA_TRACE() do {} while(0)
+#define KDBA_MCA_TRACE_TEST() 0
+#define KDBA_MCA_TRACE() do {} while(0)
+#endif/* CONFIG_KDB */
 
 /* Used by mca_asm.S */
 u32				ia64_mca_serialize;
@@ -253,6 +288,7 @@ ia64_mca_log_sal_error_record(int sal_info_type)
 	static const char * const rec_name[] = { "MCA", "INIT", "CMC", "CPE" };
 #endif
 
+	KDBA_MCA_TRACE();
 	size = ia64_log_get(sal_info_type, &buffer, irq_safe);
 	if (!size)
 		return;
@@ -286,6 +322,7 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 	static int		index;
 	static DEFINE_SPINLOCK(cpe_history_lock);
 
+	KDBA_MCA_TRACE();
 	IA64_MCA_DEBUG("%s: received interrupt vector = %#x on CPU %d\n",
 		       __FUNCTION__, cpe_irq, smp_processor_id());
 
@@ -506,6 +543,7 @@ static void
 ia64_mca_wakeup_all(void)
 {
 	int cpu;
+	KDBA_MCA_TRACE();
 
 	/* Clear the Rendez checkin flag for all cpus */
 	for(cpu = 0; cpu < NR_CPUS; cpu++) {
@@ -533,6 +571,8 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 	unsigned long flags;
 	int cpu = smp_processor_id();
 
+	INC_KDBA_MCA_TRACE();
+	KDBA_MCA_TRACE();
 	/* Mask all interrupts */
 	local_irq_save(flags);
 
@@ -542,12 +582,20 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 	 */
 	ia64_sal_mc_rendez();
 
+#ifdef	CONFIG_KDB
+	/* We get here when the MCA monarch has entered and has woken up the
+	 * slaves.  Do a KDB rendezvous to meet the monarch cpu.
+	 */
+	KDB_ENTER_SLAVE();
+#endif
+
 	/* Wait for the monarch cpu to exit. */
 	while (monarch_cpu != -1)
 	       cpu_relax();	/* spin until monarch leaves */
 
 	/* Enable all interrupts */
 	local_irq_restore(flags);
+	DEC_KDBA_MCA_TRACE();
 	return IRQ_HANDLED;
 }
 
@@ -569,6 +617,7 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg, struct pt_regs *ptregs)
 static irqreturn_t
 ia64_mca_wakeup_int_handler(int wakeup_irq, void *arg, struct pt_regs *ptregs)
 {
+	KDBA_MCA_TRACE();
 	return IRQ_HANDLED;
 }
 
@@ -931,6 +980,8 @@ ia64_mca_handler(struct pt_regs *regs, struct switch_stack *sw,
 		&sos->proc_state_param;
 	int recover, cpu = smp_processor_id();
 	task_t *previous_current;
+	INC_KDBA_MCA_TRACE();
+	KDBA_MCA_TRACE();
 
 	oops_in_progress = 1;	/* FIXME: make printk NMI/MCA/INIT safe */
 	previous_current = ia64_mca_modify_original_stack(regs, sw, sos, "MCA");
@@ -963,8 +1014,17 @@ ia64_mca_handler(struct pt_regs *regs, struct switch_stack *sw,
 		sos->os_status = IA64_MCA_CORRECTED;
 	}
 
+#ifdef	CONFIG_KDB
+	if (!recover)
+		KDB_FLAG_SET(CATASTROPHIC);
+	KDB_FLAG_SET(NOIPI);		/* do not send IPI for MCA/INIT events */
+	KDB_ENTER();
+	KDB_FLAG_CLEAR(NOIPI);
+#endif	/* CONFIG_KDB */
+
 	set_curr_task(cpu, previous_current);
 	monarch_cpu = -1;
+	DEC_KDBA_MCA_TRACE();
 }
 
 static DECLARE_WORK(cmc_disable_work, ia64_mca_cmc_vector_disable_keventd, NULL);
@@ -1211,6 +1271,8 @@ ia64_init_handler(struct pt_regs *regs, struct switch_stack *sw,
 	task_t *previous_current;
 	int cpu = smp_processor_id(), c;
 	struct task_struct *g, *t;
+	INC_KDBA_MCA_TRACE();
+	KDBA_MCA_TRACE();
 
 	oops_in_progress = 1;	/* FIXME: make printk NMI/MCA/INIT safe */
 	console_loglevel = 15;	/* make sure printks make it to console */
@@ -1250,6 +1312,9 @@ ia64_init_handler(struct pt_regs *regs, struct switch_stack *sw,
 		ia64_mc_info.imi_rendez_checkin[cpu] = IA64_MCA_RENDEZ_CHECKIN_INIT;
 		while (monarch_cpu == -1)
 		       cpu_relax();	/* spin until monarch enters */
+#ifdef	CONFIG_KDB
+		KDB_ENTER_SLAVE();
+#endif	/* CONFIG_KDB */
 		while (monarch_cpu != -1)
 		       cpu_relax();	/* spin until monarch leaves */
 		printk("Slave on cpu %d returning to normal service.\n", cpu);
@@ -1284,6 +1349,11 @@ ia64_init_handler(struct pt_regs *regs, struct switch_stack *sw,
 		}
 	}
 	printk("\n\n");
+#ifdef	CONFIG_KDB
+	KDB_FLAG_SET(NOIPI);		/* do not send IPI for MCA/INIT events */
+	KDB_ENTER();
+	KDB_FLAG_CLEAR(NOIPI);
+#else	/* !CONFIG_KDB */
 	if (read_trylock(&tasklist_lock)) {
 		do_each_thread (g, t) {
 			printk("\nBacktrace of pid %d (%s)\n", t->pid, t->comm);
@@ -1291,10 +1361,12 @@ ia64_init_handler(struct pt_regs *regs, struct switch_stack *sw,
 		} while_each_thread (g, t);
 		read_unlock(&tasklist_lock);
 	}
+#endif	/* CONFIG_KDB */
 	printk("\nINIT dump complete.  Monarch on cpu %d returning to normal service.\n", cpu);
 	atomic_dec(&monarchs);
 	set_curr_task(cpu, previous_current);
 	monarch_cpu = -1;
+	DEC_KDBA_MCA_TRACE();
 	return;
 }
 
@@ -1484,6 +1556,12 @@ ia64_mca_init(void)
 			printk(KERN_INFO "Increasing MCA rendezvous timeout from "
 				"%ld to %ld milliseconds\n", timeout, isrv.v0);
 			timeout = isrv.v0;
+#ifdef	CONFIG_KDB
+			/* kdb must wait long enough for the MCA timeout to trip
+			 * and process.  The MCA timeout is in milliseconds.
+			 */
+			kdb_wait_for_cpus_secs = max(kdb_wait_for_cpus_secs, (int)(timeout/1000) + 10);
+#endif	/* CONFIG_KDB */
 			continue;
 		}
 		printk(KERN_ERR "Failed to register rendezvous interrupt "

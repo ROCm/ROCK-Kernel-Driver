@@ -4,6 +4,10 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <linux/config.h>
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -301,6 +305,14 @@ void machine_shutdown(void)
 	 * all of the others, and disable their local APICs.
 	 */
 
+#ifdef	CONFIG_KDB
+	/*
+	 * If this restart is occuring while kdb is running (e.g. reboot
+	 * command), the other CPU's are already stopped.  Don't try to
+	 * stop them yet again.
+	 */
+	if (!KDB_IS_RUNNING())
+#endif	/* CONFIG_KDB */
 	smp_send_stop();
 #endif /* CONFIG_SMP */
 

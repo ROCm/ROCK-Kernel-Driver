@@ -2020,6 +2020,13 @@ const char *module_address_lookup(unsigned long addr,
 	return NULL;
 }
 
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+struct list_head *kdb_modules = &modules;	/* kdb needs the list of modules */
+#else	/* !CONFIG_KDB */
+#define	KDB_IS_RUNNING() 0
+#endif	/* CONFIG_KDB */
+
 struct module *module_get_kallsym(unsigned int symnum,
 				  unsigned long *value,
 				  char *type,
@@ -2027,7 +2034,8 @@ struct module *module_get_kallsym(unsigned int symnum,
 {
 	struct module *mod;
 
-	down(&module_mutex);
+	if (!KDB_IS_RUNNING())
+		down(&module_mutex);
 	list_for_each_entry(mod, &modules, list) {
 		if (symnum < mod->num_symtab) {
 			*value = mod->symtab[symnum].st_value;
@@ -2035,12 +2043,14 @@ struct module *module_get_kallsym(unsigned int symnum,
 			strncpy(namebuf,
 				mod->strtab + mod->symtab[symnum].st_name,
 				127);
-			up(&module_mutex);
+			if (!KDB_IS_RUNNING())
+				up(&module_mutex);
 			return mod;
 		}
 		symnum -= mod->num_symtab;
 	}
-	up(&module_mutex);
+	if (!KDB_IS_RUNNING())
+		up(&module_mutex);
 	return NULL;
 }
 
